@@ -1,29 +1,26 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 26 Jul 2017 22:38:41 +0200
-Subject: [PATCH 0/3] memory: atmel-ebi: Fix setting EBI timings through dts
-In-Reply-To: <1500984024-26403-1-git-send-email-ada@thorsis.com>
-References: <1500984024-26403-1-git-send-email-ada@thorsis.com>
-Message-ID: <20170726203841.yj3tvaokhx4buekx@piout.net>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Wed, 26 Jul 2017 23:56:58 +0300
+Subject: [PATCH 3/4] iommu/tegra-gart: Add iommu_group support
+In-Reply-To: <9c3fa9661e8177f0ccea960dd584a05fc19f92c8.1500637633.git.robin.murphy@arm.com>
+References: <cover.1500637633.git.robin.murphy@arm.com>
+ <9c3fa9661e8177f0ccea960dd584a05fc19f92c8.1500637633.git.robin.murphy@arm.com>
+Message-ID: <e1de80c6-33fd-6bd5-bc28-8b3d3043ca4f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/2017 at 14:00:21 +0200, Alexander Dahl wrote:
-> Hello,
+On 21.07.2017 15:12, Robin Murphy wrote:
+> As the last step to making groups mandatory, clean up the remaining
+> drivers by adding basic support. Whilst it may not perfectly reflect the
+> isolation capabilities of the hardware, using generic_device_group()
+> should at least maintain existing behaviour with respect to the API.
 > 
-> this small patch series based on v4.13-rc2 fixes three things I found
-> when trying to run the latest rc on an at91samg20 based platform with
-> a SRAM like memory connected to the EBI interface, for which the
-> timings should be set through dts. 
-> 
-> For all register settings of interest I checked the hardware manuals
-> of the at91sam9g20 and the sama5d3x to not cause regressions, as well
-> as the actual register settings in the running system. (I used the
-> devmem tool from busybox for that.)
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/tegra-gart.c | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
 > 
 
-All applied, thanks.
+Tested-by: Dmitry Osipenko <digetx@gmail.com>
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Dmitry
