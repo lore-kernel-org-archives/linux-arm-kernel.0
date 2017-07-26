@@ -1,73 +1,161 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Wed, 26 Jul 2017 11:05:39 +0100
-Subject: [PATCH] drm: hdlcd: allow HDLCD to be used without interrupt
-Message-ID: <E1daJCF-0003pG-DI@rmk-PC.armlinux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 26 Jul 2017 11:19:06 +0100
+Subject: [PATCH 1/3] ARM: dts: NSP: Add dma-coherent to relevant DT entries
+In-Reply-To: <1501020372-19607-2-git-send-email-jon.mason@broadcom.com>
+References: <1501020372-19607-1-git-send-email-jon.mason@broadcom.com>
+ <1501020372-19607-2-git-send-email-jon.mason@broadcom.com>
+Message-ID: <6b419bfc-56e8-5a6d-e995-78fbeca02282@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some ARM platforms do not wire the HDLCD interrupt.  Allow hdlcd to
-initialise without an interrupt present.
+Hi Jon,
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- Documentation/devicetree/bindings/display/arm,hdlcd.txt |  6 +++---
- drivers/gpu/drm/arm/hdlcd_drv.c                         | 13 ++++++++-----
- 2 files changed, 11 insertions(+), 8 deletions(-)
+On 25/07/17 23:06, Jon Mason wrote:
+> Cache related issues with DMA rings and performance issues related to
+> caching are being caused by not properly setting the "dma-coherent" flag
+> in the device tree entries.  Adding it here to correct the issue.
+> 
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+> Fixes: 5fa1026a3e4d ("ARM: dts: NSP: Add PL330 support")
+> Fixes: 3107fa5bcfb2 ("ARM: dts: NSP: Add SD/MMC support")
+> Fixes: 13d04f20935c ("ARM: dts: NSP: Add AMAC entries")
+> Fixes: 5aeda7bf8a1e ("ARM: dts: NSP: Add and enable amac2")
+> Fixes: 17d517172300 ("ARM: dts: NSP: Add mailbox (PDC) to NSP")
+> Fixes: 1d8ece6639e1 ("ARM: dts: NSP: Add EHCI/OHCI USB nodes to device tree")
+> Fixes: bf2289bedef4 ("ARM: dts: NSP: Add Switch Register Access Block node")
+> Fixes: 0f9f27a36d09 ("ARM: dts: NSP: Add I2C support to the DT")
+> Fixes: 8dbcad020f2e ("ARM: dts: nsp: Add sata device tree entry")
+> Fixes: 522199029fdc ("ARM: dts: NSP: Fix PCIE DT issue")
+> ---
+>  arch/arm/boot/dts/bcm-nsp.dtsi | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
+> index 7204d1def23d..c8d734d9f5fc 100644
+> --- a/arch/arm/boot/dts/bcm-nsp.dtsi
+> +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+> @@ -207,6 +207,7 @@
+>  			clocks = <&iprocslow>;
+>  			clock-names = "apb_pclk";
+>  			#dma-cells = <1>;
+> +			dma-coherent;
 
-diff --git a/Documentation/devicetree/bindings/display/arm,hdlcd.txt b/Documentation/devicetree/bindings/display/arm,hdlcd.txt
-index 78bc24296f3e..7f78b455c4b2 100644
---- a/Documentation/devicetree/bindings/display/arm,hdlcd.txt
-+++ b/Documentation/devicetree/bindings/display/arm,hdlcd.txt
-@@ -8,9 +8,6 @@ digital encoder (DVI or HDMI).
- Required properties:
-   - compatible: "arm,hdlcd"
-   - reg: Physical base address and length of the controller's registers.
--  - interrupts: One interrupt used by the display controller to notify the
--    interrupt controller when any of the interrupt sources programmed in
--    the interrupt mask register have activated.
-   - clocks: A list of phandle + clock-specifier pairs, one for each
-     entry in 'clock-names'.
-   - clock-names: A list of clock names. For HDLCD it should contain:
-@@ -22,6 +19,9 @@ digital encoder (DVI or HDMI).
-     Documentation/devicetree/bindings/graph.txt.
- 
- Optional properties:
-+  - interrupts: One interrupt used by the display controller to notify the
-+    interrupt controller when any of the interrupt sources programmed in
-+    the interrupt mask register have activated.
-   - memory-region: phandle to a node describing memory (see
-     Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt) to be
-     used for the framebuffer; if not present, the framebuffer may be located
-diff --git a/drivers/gpu/drm/arm/hdlcd_drv.c b/drivers/gpu/drm/arm/hdlcd_drv.c
-index d3da87fbd85a..283c435fe90b 100644
---- a/drivers/gpu/drm/arm/hdlcd_drv.c
-+++ b/drivers/gpu/drm/arm/hdlcd_drv.c
-@@ -36,7 +36,7 @@ static int hdlcd_load(struct drm_device *drm, unsigned long flags)
- 	struct platform_device *pdev = to_platform_device(drm->dev);
- 	struct resource *res;
- 	u32 version;
--	int ret;
-+	int ret, irq;
- 
- 	hdlcd->clk = devm_clk_get(drm->dev, "pxlclk");
- 	if (IS_ERR(hdlcd->clk))
-@@ -82,10 +82,13 @@ static int hdlcd_load(struct drm_device *drm, unsigned long flags)
- 		goto setup_fail;
- 	}
- 
--	ret = drm_irq_install(drm, platform_get_irq(pdev, 0));
--	if (ret < 0) {
--		DRM_ERROR("failed to install IRQ handler\n");
--		goto irq_fail;
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq > 0) {
-+		ret = drm_irq_install(drm, irq);
-+		if (ret < 0) {
-+			DRM_ERROR("failed to install IRQ handler\n");
-+			goto irq_fail;
-+		}
- 	}
- 
- 	return 0;
--- 
-2.7.4
+Just to check, does this actually work? I ask because the pl330 driver
+currently never sets src_cache_ctrl/dst_cache_ctrl to anything other
+than noncacheable nonbufferable, so if your interconnect respects those
+attributes this seems liable to make things go wrong under current
+kernels, even if it is an accurate description of the hardware. If on
+the other hand the interconnect does its own magic and will manage to
+snoop caches appropriately regardless of AXI attributes, then I guess
+it's fine, if a little scary ;)
+
+Robin.
+
+>  		};
+>  
+>  		sdio: sdhci at 21000 {
+> @@ -215,6 +216,7 @@
+>  			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
+>  			sdhci,auto-cmd12;
+>  			clocks = <&lcpll0 BCM_NSP_LCPLL0_SDIO_CLK>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -224,6 +226,7 @@
+>  			      <0x110000 0x1000>;
+>  			reg-names = "amac_base", "idm_base";
+>  			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -233,6 +236,7 @@
+>  			      <0x111000 0x1000>;
+>  			reg-names = "amac_base", "idm_base";
+>  			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -242,6 +246,7 @@
+>  			      <0x112000 0x1000>;
+>  			reg-names = "amac_base", "idm_base";
+>  			interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -252,6 +257,7 @@
+>  			#mbox-cells = <1>;
+>  			brcm,rx-status-len = <32>;
+>  			brcm,use-bcm-hdr;
+> +			dma-coherent;
+>  		};
+>  
+>  		nand: nand at 26000 {
+> @@ -325,6 +331,7 @@
+>  			compatible = "generic-ehci";
+>  			reg = <0x2a000 0x100>;
+>  			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -332,6 +339,7 @@
+>  			compatible = "generic-ohci";
+>  			reg = <0x2b000 0x100>;
+>  			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -364,6 +372,7 @@
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  
+> +			dma-coherent;
+>  			status = "disabled";
+>  
+>  			/* ports are defined in board DTS */
+> @@ -376,6 +385,7 @@
+>  			#size-cells = <0>;
+>  			interrupts = <GIC_SPI 89 IRQ_TYPE_NONE>;
+>  			clock-frequency = <100000>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -446,6 +456,7 @@
+>  			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  
+>  			sata0: sata-port at 0 {
+> @@ -483,6 +494,7 @@
+>  		 */
+>  		ranges = <0x82000000 0 0x08000000 0x08000000 0 0x8000000>;
+>  
+> +		dma-coherent;
+>  		status = "disabled";
+>  
+>  		msi-parent = <&msi0>;
+> @@ -519,6 +531,7 @@
+>  		 */
+>  		ranges = <0x82000000 0 0x40000000 0x40000000 0 0x8000000>;
+>  
+> +		dma-coherent;
+>  		status = "disabled";
+>  
+>  		msi-parent = <&msi1>;
+> @@ -555,6 +568,7 @@
+>  		 */
+>  		ranges = <0x82000000 0 0x48000000 0x48000000 0 0x8000000>;
+>  
+> +		dma-coherent;
+>  		status = "disabled";
+>  
+>  		msi-parent = <&msi2>;
+> 
