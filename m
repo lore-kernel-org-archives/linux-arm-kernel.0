@@ -1,74 +1,49 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed, 26 Jul 2017 14:02:42 -0700
-Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <20170726200802.GA17722@kroah.com>
-References: <131179fe-42e7-f286-5bd4-801f4c93d5f9@arm.com>
- <20170726145522.GC28875@nazgul.tnic> <20170726151314.GA10696@hc>
- <20170726153502.GE28875@nazgul.tnic> <20170726154515.GA11453@hc>
- <20170726155548.GF28875@nazgul.tnic> <20170726161949.GB15426@kroah.com>
- <20170726163049.GG28875@nazgul.tnic> <20170726173353.GB21705@kroah.com>
- <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
- <20170726200802.GA17722@kroah.com>
-Message-ID: <b27cda60-8bf8-47a1-15b5-bf8b3a83fc45@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 26 Jul 2017 23:02:46 +0200
+Subject: [BUG] v4.12 breaks pxa25x
+In-Reply-To: <20170726220334.2961ae22@roar.ozlabs.ibm.com> (Nicholas Piggin's
+ message of "Wed, 26 Jul 2017 22:03:34 +1000")
+References: <87inirsgzk.fsf@belgarion.home>
+ <20170717081518.GI31807@n2100.armlinux.org.uk>
+ <87eftfrs0e.fsf@belgarion.home> <87o9s7qw64.fsf@belgarion.home>
+ <20170726114139.GN31807@n2100.armlinux.org.uk>
+ <20170726220334.2961ae22@roar.ozlabs.ibm.com>
+Message-ID: <87k22urjwp.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2017 01:08 PM, Greg KH wrote:
-> On Wed, Jul 26, 2017 at 01:02:38PM -0700, David Daney wrote:
->> On 07/26/2017 10:33 AM, Greg KH wrote:
->>> On Wed, Jul 26, 2017 at 06:30:49PM +0200, Borislav Petkov wrote:
->>>> On Wed, Jul 26, 2017 at 09:19:49AM -0700, Greg KH wrote:
->>>>> On Wed, Jul 26, 2017 at 05:55:48PM +0200, Borislav Petkov wrote:
->>>>>> On Wed, Jul 26, 2017 at 05:45:15PM +0200, Jan Glauber wrote:
->>>>>>> The PMU/EDAC devices are all PCI devices do I need the 'struct pci_dev *'.
->>>>>>> I'm not aware of other ways to access these devices. Please enlighten
->>>>>>> me if I'm missing something.
->>>>>>
->>>>>> Me enlighten you on Cavium hardware?! You're funny.
->>>>>>
->>>>>> So I don't know whether the PCI hotplug code can run more than one
->>>>>> function upon PCI ID detection. Probably Greg will say, write a
->>>>>> multiplexer wrapper. :-)
->>>>>
->>>>> -ENOCONTEXT....
->>>>>
->>>>> Anyway, pci questions are best asked on the linux-pci at vger list.  And
->>>>> yes, all PCI devices end up with a 'struct pci_dev *' automatically.
->>>>
->>>> Simple: so they have a PCI ID of a memory contoller and want to hotplug
->>>> two drivers for it. And those two drivers should remain independent from
->>>> each other.
->>>
->>> Hahahahaha, no.  That's crazy, you were right in guessing what my answer
->>> was going to be :)
->>>
->>
->>
->> Just to be clear about the situation, the device is a memory controller.  It
->> has two main behaviors we are interested in:
->>
->> A) Error Detection And Correction (EDAC).  This should be connected to the
->> kernel's EDAC subsystem.  An existing driver (drivers/edac/thunderx_edac.c)
->> does exactly this.
->>
->> B) Performance Counters for actions taken in the corresponding memory. This
->> should be connected to the kernel's perf framework as an uncore-PMU (the
->> subject of this patch set).
->>
->> It is a single PCI device.  What should the driver architecture look like to
->> connect it to two different kernel subsystems?
-> 
-> Modify the drivers/edac/thunderx_edac.c code to add support for
-> performance counters.
-> 
+Nicholas Piggin <npiggin@gmail.com> writes:
 
-Thanks Greg.  This adds some clarity to the situation.
+> On Wed, 26 Jul 2017 12:41:39 +0100
+> Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+>> Obviously, the mixing of .data.unlikely with the normal .data sections
+>> is undesirable - that looks like it's come from commit b67067f1176d
+>> ("kbuild: allow archs to select link dead code/data elimination") dated
+>> 2016, which according to git describe --contains was merged in v4.9-rc1.
+>> So it's unlikely to be directly caused by this, although this commit is
+>> implicated.
+>> 
+>> I wonder if Nick realised this side effect (that .data.unlikely is no
+>> longer grouped together) - maybe we need to rename .data.unlikely?
+>> (Adding Nick and Michal).
+>
+> I did to some degree -- hence TEXT was not done that way -- but obviously
+> did not look closely enough.
+>
+> The right short term fix I think is to make those wildcards depend only on
+> CONFIG_LD_DEAD_CODE_DATA_ELIMINATION.
+>
+> One way to avoid clashes with compiler generated section names is to use
+> ".." as separators in our section names.
+>
+> Anyway I'll code up a fix for the linker script that we can get into 4.12,
+> thanks for pointing it out.
+Ok, cool. I'd like to be copied to your patch so that I can test it please.
 
-This technique does slightly complicate the mapping of files and 
-directories in the kernel source tree to maintainers.
+For what is worth, your patch, Russell, fixes the issue as well, I just tested
+it.
 
-Also, if a given configuration disables CONFIG_EDAC there is some 
-hackery needed to get the perf portion of the driver included.
+Cheers.
 
-David Daney
+-- 
+Robert
