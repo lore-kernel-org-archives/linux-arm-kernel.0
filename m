@@ -1,84 +1,65 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Wed, 26 Jul 2017 14:17:23 +0800
-Subject: [PATCH v5 2/7] drm/rockchip: vop: move write_relaxed flags to vop
- register
-In-Reply-To: <2048476.V4PpOSpEqb@phil>
-References: <1500518564-30371-1-git-send-email-mark.yao@rock-chips.com>
- <1500518608-30538-1-git-send-email-mark.yao@rock-chips.com>
- <2048476.V4PpOSpEqb@phil>
-Message-ID: <597833F3.4050307@rock-chips.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Wed, 26 Jul 2017 08:18:18 +0200
+Subject: [PATCH 0/8] net: mvpp2: add TX interrupts support
+In-Reply-To: <20170725155509.10574-1-thomas.petazzoni@free-electrons.com>
+References: <20170725155509.10574-1-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAPv3WKeC4Ry+cR5FMh5BGgp=+UdzkxRf6=EqKBmWMNQtb+YLdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?07?26? 05:47, Heiko Stuebner wrote:
-> Hi Mark,
->
-> Am Donnerstag, 20. Juli 2017, 10:43:27 CEST schrieb Mark Yao:
->> Since the drm atomic framework, only a small part of the vop
->> register needs sync write, Currently seems only following registers
->> need sync write:
->>     cfg_done, standby and interrupt related register.
->>
->> All ctrl registers are using the sync write method that is
->> inefficient, hardcode the write_relaxed flags to vop registers,
->> then can only do synchronize write for those actual needed register.
->>
->> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->> ---
->>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 14 +++-------
->>   drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 42 ++++++++++++++++-------------
->>   2 files changed, 28 insertions(+), 28 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> index 81164d6..784a2b7 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> @@ -42,18 +42,12 @@
->>   #include "rockchip_drm_psr.h"
->>   #include "rockchip_drm_vop.h"
->>   
->> -#define __REG_SET_RELAXED(x, off, mask, shift, v, write_mask) \
->> -		vop_mask_write(x, off, mask, shift, v, write_mask, true)
->> -
->> -#define __REG_SET_NORMAL(x, off, mask, shift, v, write_mask) \
->> -		vop_mask_write(x, off, mask, shift, v, write_mask, false)
->> -
->>   #define REG_SET(x, base, reg, v, mode) \
->> -		__REG_SET_##mode(x, base + reg.offset, \
->> -				 reg.mask, reg.shift, v, reg.write_mask)
->> +		vop_mask_write(x, base + reg.offset, reg.mask, reg.shift, \
->> +			       v, reg.write_mask, reg.relaxed)
->>   #define REG_SET_MASK(x, base, reg, mask, v, mode) \
->> -		__REG_SET_##mode(x, base + reg.offset, \
->> -				 mask, reg.shift, v, reg.write_mask)
->> +		vop_mask_write(x, base + reg.offset, \
->> +			       mask, reg.shift, v, reg.write_mask, reg.relaxed)
-> you only introduce the relaxed element of struct vop_reg in patch4.
-> So using it here produces a compile error
->
-> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c: In function ?vop_cfg_done?:
-> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:47:33: error: ?const struct vop_reg? has no member named ?relaxed?
->             v, reg.write_mask, reg.relaxed)
->                                   ^
-> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:59:3: note: in expansion of macro ?REG_SET?
->     REG_SET(x, 0, (x)->data->ctrl->name, v, NORMAL)
->     ^~~~~~~
-> ../drivers/gpu/drm/rockchip/rockchip_drm_vop.c:201:2: note: in expansion of macro ?VOP_CTRL_SET?
->    VOP_CTRL_SET(vop, cfg_done, 1);
->    ^~~~~~~~~~~~
->
-> when only patches 1+2 are applied. So the relaxed field addition should
-> definitly move into this patch to not break bisectability.
->
->
-> Heiko
->
->
->
->
-Hi Heiko
+Hi Thomas,
 
-Thanks for the test, will fix it at next version.
+I tested patchset on A8040-DB, everything seems fine.
 
--- 
-?ark Yao
+Best regards,
+Marcin
+
+2017-07-25 17:55 GMT+02:00 Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com>:
+> Hello,
+>
+> So far, the mvpp2 driver was using an hrtimer to handle TX
+> completion. This patch series adds support for using TX interrupts
+> (for each CPU) on PPv2.2, the variant of the IP used on Marvell Armada
+> 7K/8K.
+>
+> This series has been tested on Marvell Armada 7K (PPv2.2) and Armada
+> 375 (PPv2.1).
+>
+> Dave:
+>
+>  - This series depends on the previous series sent by Antoine T?nart
+>    "net: mvpp2: MAC/GoP configuration and optional PHYs". Functionally
+>    speaking there is no real dependency, but we touch in a few areas
+>    the same piece of code, so I based my patch series on top of
+>    Antoine's.
+>
+>  - Please do not apply the last patch of this series "arm64: dts:
+>    marvell: add TX interrupts for PPv2.2", it will be taken by the ARM
+>    mvebu maintainers.
+>
+> Thanks!
+>
+> Thomas
+>
+> Thomas Petazzoni (8):
+>   net: mvpp2: fix MVPP21_ISR_RXQ_GROUP_REG definition
+>   net: mvpp2: remove RX queue group reset code
+>   net: mvpp2: introduce per-port nrxqs/ntxqs variables
+>   net: mvpp2: move from cpu-centric naming to "software thread" naming
+>   net: mvpp2: introduce queue_vector concept
+>   net: mvpp2: add support for TX interrupts and RX queue distribution
+>     modes
+>   dt-bindings: net: marvell-pp2: update interrupt-names with TX
+>     interrupts
+>   arm64: dts: marvell: add TX interrupts for PPv2.2
+>
+>  .../devicetree/bindings/net/marvell-pp2.txt        |  33 +-
+>  .../boot/dts/marvell/armada-cp110-master.dtsi      |  21 +-
+>  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |  21 +-
+>  drivers/net/ethernet/marvell/mvpp2.c               | 638 +++++++++++++++------
+>  4 files changed, 534 insertions(+), 179 deletions(-)
+>
+> --
+> 2.9.4
+>
