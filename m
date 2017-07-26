@@ -1,154 +1,110 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 26 Jul 2017 13:47:35 +0100
-Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <20170726111946.GA6273@hc>
-References: <20170725150422.4775-1-jglauber@cavium.com>
- <20170725150422.4775-2-jglauber@cavium.com>
- <72145781-e9ec-036f-f752-b4756fef08ee@arm.com> <20170726111946.GA6273@hc>
-Message-ID: <faa339c4-b087-d970-1099-3d6cf8186545@arm.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Wed, 26 Jul 2017 13:49:43 +0100
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170726132801.00001e8c@huawei.com>
+References: <20170725175207.000001cb@huawei.com>
+ <20170725.141029.676882447882600000.davem@davemloft.net>
+ <20170726035545.GG3730@linux.vnet.ibm.com>
+ <20170725.210233.1441906980505926406.davem@davemloft.net>
+ <20170726041217.GH3730@linux.vnet.ibm.com>
+ <20170726091623.000004f7@huawei.com>
+ <20170726103232.0000368e@huawei.com>
+ <20170726132801.00001e8c@huawei.com>
+Message-ID: <20170726134943.00005ff1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/07/17 12:19, Jan Glauber wrote:
-> On Tue, Jul 25, 2017 at 04:39:18PM +0100, Suzuki K Poulose wrote:
->> On 25/07/17 16:04, Jan Glauber wrote:
->>> Add support for the PMU counters on Cavium SOC memory controllers.
->>>
->>> This patch also adds generic functions to allow supporting more
->>> devices with PMU counters.
->>>
->>> Properties of the LMC PMU counters:
->>> - not stoppable
->>> - fixed purpose
->>> - read-only
->>> - one PCI device per memory controller
->>>
->>> Signed-off-by: Jan Glauber <jglauber@cavium.com>
->>> ---
->>> drivers/perf/Kconfig       |   8 +
->>> drivers/perf/Makefile      |   1 +
->>> drivers/perf/cavium_pmu.c  | 424 +++++++++++++++++++++++++++++++++++++++++++++
->>> include/linux/cpuhotplug.h |   1 +
->>> 4 files changed, 434 insertions(+)
->>> create mode 100644 drivers/perf/cavium_pmu.c
->>>
->>> diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
->>> index e5197ff..a46c3f0 100644
->>> --- a/drivers/perf/Kconfig
->>> +++ b/drivers/perf/Kconfig
->>> @@ -43,4 +43,12 @@ config XGENE_PMU
->>>         help
->>>           Say y if you want to use APM X-Gene SoC performance monitors.
->>>
->>> +config CAVIUM_PMU
->>> +	bool "Cavium SOC PMU"
->>
->> Is there any specific reason why this can't be built as a module ?
->
-> Yes. I don't know how to load the module automatically. I can't make it
-> a pci driver as the EDAC driver "owns" the device (and having two
-> drivers for one device wont work as far as I know). I tried to hook
-> into the EDAC driver but the EDAC maintainer was not overly welcoming
-> that approach.
+On Wed, 26 Jul 2017 13:28:01 +0100
+Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
 
->
-> And while it would be possible to have it a s a module I think it is of
-> no use if it requires manualy loading. But maybe there is a simple
-> solution I'm missing here?
+> On Wed, 26 Jul 2017 10:32:32 +0100
+> Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
+> 
+> > On Wed, 26 Jul 2017 09:16:23 +0100
+> > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
+> >   
+> > > On Tue, 25 Jul 2017 21:12:17 -0700
+> > > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+> > >     
+> > > > On Tue, Jul 25, 2017 at 09:02:33PM -0700, David Miller wrote:      
+> > > > > From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+> > > > > Date: Tue, 25 Jul 2017 20:55:45 -0700
+> > > > >         
+> > > > > > On Tue, Jul 25, 2017 at 02:10:29PM -0700, David Miller wrote:        
+> > > > > >> Just to report, turning softlockup back on fixes things for me on
+> > > > > >> sparc64 too.        
+> > > > > > 
+> > > > > > Very good!
+> > > > > >         
+> > > > > >> The thing about softlockup is it runs an hrtimer, which seems to run
+> > > > > >> about every 4 seconds.        
+> > > > > > 
+> > > > > > I could see where that could shake things loose, but I am surprised that
+> > > > > > it would be needed.  I ran a short run with CONFIG_SOFTLOCKUP_DETECTOR=y
+> > > > > > with no trouble, but I will be running a longer test later on.
+> > > > > >         
+> > > > > >> So I wonder if this is a NO_HZ problem.        
+> > > > > > 
+> > > > > > Might be.  My tests run with NO_HZ_FULL=n and NO_HZ_IDLE=y.  What are
+> > > > > > you running?  (Again, my symptoms are slightly different, so I might
+> > > > > > be seeing a different bug.)        
+> > > > > 
+> > > > > I run with NO_HZ_FULL=n and NO_HZ_IDLE=y, just like you.
+> > > > > 
+> > > > > To clarify, the symptoms show up with SOFTLOCKUP_DETECTOR disabled.        
+> > > > 
+> > > > Same here -- but my failure case happens fairly rarely, so it will take
+> > > > some time to gain reasonable confidence that enabling SOFTLOCKUP_DETECTOR
+> > > > had effect.
+> > > > 
+> > > > But you are right, might be interesting to try NO_HZ_PERIODIC=y
+> > > > or NO_HZ_FULL=y.  So many possible tests, and so little time.  ;-)
+> > > > 
+> > > > 							Thanx, Paul
+> > > >       
+> > > I'll be the headless chicken running around and trying as many tests
+> > > as I can fit in.  Typical time to see the failure for us is sub 10
+> > > minutes so we'll see how far we get.
+> > > 
+> > > Make me a list to run if you like ;)
+> > > 
+> > > NO_HZ_PERIODIC=y running now.    
+> > By which I mean CONFIG_HZ_PERIODIC=y
+> > 
+> > Anyhow, run for 40 minutes with out seeing a splat but my sanity check
+> > on the NO_FULL_HZ=n and NO_HZ_IDLE=y this morning took 20 minutes so
+> > I won't have much confidence until we are a few hours in on this.
+> > 
+> > Anyhow, certainly looking like a promising direction for investigation!
+> >   
+> Well it's done over 3 hours without a splat so I think it is fine with
+> CONFIG_HZ_PERIODIC=y
+> 
+As I think we expected, the problem occurs with NO_HZ_FULL.
+Happened pretty quickly but given the somewhat random nature,
+might just be coincidence.
 
-
-If you are talking about a Cavium specific EDAC driver, may be we could
-make that depend on this driver "at runtime" via symbols (may be even,
-trigger the probe of PMU), which will be referenced only when CONFIG_CAVIUM_PMU
-is defined. It is not the perfect solution, but that should do the trick.
-
-
->>> +	/*
->>> +	 * Forbid groups containing mixed PMUs, software events are acceptable.
->>> +	 */
->>> +	if (event->group_leader->pmu != event->pmu &&
->>> +	    !is_software_event(event->group_leader))
->>> +		return -EINVAL;
->>> +
->>> +	list_for_each_entry(sibling, &event->group_leader->sibling_list,
->>> +			    group_entry)
->>> +		if (sibling->pmu != event->pmu &&
->>> +		    !is_software_event(sibling))
->>> +			return -EINVAL;
->>
->> Do we also need to check if the events in the same group can be scheduled
->> at once ? i.e, there is enough resources to schedule the requested events from
->> the group.
->>
->
-> Not sure what you mean, do I need to check for programmable counters
-> that no more counters are programmed than available?
->
-
-Yes. What if there are two events, both trying to use the same counter (either
-due to lack of programmable counters or duplicate events).
-
->>> +
->>> +	hwc->config = event->attr.config;
->>> +	hwc->idx = -1;
->>> +	return 0;
->>> +}
->>> +
->> ...
->>
->>> +static int cvm_pmu_add(struct perf_event *event, int flags, u64 config_base,
->>> +		       u64 event_base)
->>> +{
->>> +	struct cvm_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
->>> +	struct hw_perf_event *hwc = &event->hw;
->>> +
->>> +	if (!cmpxchg(&pmu_dev->events[hwc->config], NULL, event))
->>> +		hwc->idx = hwc->config;
->>> +
->>> +	if (hwc->idx == -1)
->>> +		return -EBUSY;
->>> +
->>> +	hwc->config_base = config_base;
->>> +	hwc->event_base = event_base;
->>> +	hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
->>> +
->>> +	if (flags & PERF_EF_START)
->>> +		pmu_dev->pmu.start(event, PERF_EF_RELOAD);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static void cvm_pmu_del(struct perf_event *event, int flags)
->>> +{
->>> +	struct cvm_pmu_dev *pmu_dev = to_pmu_dev(event->pmu);
->>> +	struct hw_perf_event *hwc = &event->hw;
->>> +	int i;
->>> +
->>> +	event->pmu->stop(event, PERF_EF_UPDATE);
->>> +
->>> +	/*
->>> +	 * For programmable counters we need to check where we installed it.
->>> +	 * To keep this function generic always test the more complicated
->>> +	 * case (free running counters won't need the loop).
->>> +	 */
->>> +	for (i = 0; i < pmu_dev->num_counters; i++)
->>> +		if (cmpxchg(&pmu_dev->events[i], event, NULL) == event)
->>> +			break;
->>
->> I couldn't see why hwc->config wouldn't give us the index where we installed
->> the event in pmu_dev->events. What am I missing ?
->
-> Did you see the comment above? It is not yet needed but will be when I
-> add support for programmable counters.
-
-Is it supported in this series ?
-
-> If it is still confusing I can
-> also remove that for now and add it back later when it is needed.
-
-What is the hwc->idx for programmable counters ? is it going to be different
-than hwc->config ? If so, can we use hwc->idx to keep the idx where we installed
-the event ?
-
-Suzuki
+Jonathan
+> 
+> > Jonathan
+> >   
+> > > 
+> > > Jonathan
+> > > 
+> > > _______________________________________________
+> > > linuxarm mailing list
+> > > linuxarm at huawei.com
+> > > http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm    
+> > 
+> > 
+> > _______________________________________________
+> > linuxarm mailing list
+> > linuxarm at huawei.com
+> > http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm  
+> 
+> 
+> _______________________________________________
+> linuxarm mailing list
+> linuxarm at huawei.com
+> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
