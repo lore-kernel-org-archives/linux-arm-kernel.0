@@ -1,30 +1,29 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 26 Jul 2017 11:26:49 -0700
-Subject: [PATCH] arm: fix sparse flags for build on 64bit machines
-In-Reply-To: <20170726084305.38537-1-luc.vanoostenryck@gmail.com>
-References: <20170726013020.GL2146@codeaurora.org>
- <20170726084305.38537-1-luc.vanoostenryck@gmail.com>
-Message-ID: <e4e7c448-5176-34af-0d88-ee7325d666f0@codeaurora.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 26 Jul 2017 20:28:52 +0200
+Subject: [PATCH 0/3] memory: atmel-ebi: Fix setting EBI timings through dts
+In-Reply-To: <1500984024-26403-1-git-send-email-ada@thorsis.com>
+References: <1500984024-26403-1-git-send-email-ada@thorsis.com>
+Message-ID: <20170726202852.4ffd01c2@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2017 01:43 AM, Luc Van Oostenryck wrote:
-> By default sparse uses the characteristics of the build
-> machine to infer things like the wordsize.
-> This is fine when doing native builds but for ARM it's,
-> I suspect, very rarely the case and if the build are done
-> on a 64bit machine we get a bunch of warnings like:
->   'cast truncates bits from constant value (... becomes ...)'
->
-> Fix this by adding the -m32 flags for sparse.
->
-> Reported-by: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+Le Tue, 25 Jul 2017 14:00:21 +0200,
+Alexander Dahl <ada@thorsis.com> a ?crit :
 
-Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+> Hello,
+> 
+> this small patch series based on v4.13-rc2 fixes three things I found
+> when trying to run the latest rc on an at91samg20 based platform with
+> a SRAM like memory connected to the EBI interface, for which the
+> timings should be set through dts. 
+> 
+> For all register settings of interest I checked the hardware manuals
+> of the at91sam9g20 and the sama5d3x to not cause regressions, as well
+> as the actual register settings in the running system. (I used the
+> devmem tool from busybox for that.)
 
-Thanks.
+To the whole series:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+Alexandre, Nicolas, can you queue that for 4.13-rc3 or -rc4?
