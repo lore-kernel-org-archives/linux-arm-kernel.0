@@ -1,46 +1,39 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 26 Jul 2017 17:55:47 -0500
-Subject: [PATCH v6 1/3] Documentation: devicetree: add Freescale RNGC
- binding
-In-Reply-To: <1500832146-8660-1-git-send-email-martin@kaiser.cx>
-References: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
- <1500832146-8660-1-git-send-email-martin@kaiser.cx>
-Message-ID: <CAL_Jsq+2Z94apqTsvs4HQdS49GdzT50XmPS4RvA7MDp_kK5Wow@mail.gmail.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Wed, 26 Jul 2017 18:56:23 -0400
+Subject: [PATCH v2 2/6] dt-bindings: usb: Add documentation for NS2 CDRU USB3
+In-Reply-To: <1501109787-15489-1-git-send-email-jon.mason@broadcom.com>
+References: <1501109787-15489-1-git-send-email-jon.mason@broadcom.com>
+Message-ID: <1501109787-15489-3-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 23, 2017 at 12:49 PM, Martin Kaiser <martin@kaiser.cx> wrote:
-> From: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->
-> Add binding documentation for the Freescale RNGC found on
-> some i.MX2/3 SoCs.
->
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
-> ---
-> Changes in v6:
->   - be more precise about rngc and rngb
->   - get rid of mxc, rename the file to imx-rngc.txt
->   - reformat the compatible strings
->   - use RNGC instead of RNG
->   - clarify that clock is not optional (remove "should contain")
->
-> Changes in v5:
->   none
->
-> Changes in v4:
->   none
->
-> Changes in v3:
->   - add compatible string for imx35
->   - remove imx5 from the commit message,
->     I couldn't find an i.MX SOC that has RNGC
->
-> Changes in v2:
->   none
->
->  Documentation/devicetree/bindings/rng/imx-rngc.txt | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/rng/imx-rngc.txt
+Add documentation for CDRU USB3 registers available in NS2 SoC
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+---
+ .../devicetree/bindings/usb/brcm,cdru-usb3-ctrl.txt        | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/brcm,cdru-usb3-ctrl.txt
+
+diff --git a/Documentation/devicetree/bindings/usb/brcm,cdru-usb3-ctrl.txt b/Documentation/devicetree/bindings/usb/brcm,cdru-usb3-ctrl.txt
+new file mode 100644
+index 000000000000..30c03bef58fd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/brcm,cdru-usb3-ctrl.txt
+@@ -0,0 +1,14 @@
++Broadcom Chip Device Resource Unit USB3 register
++
++Required properties:
++- compatible: "brcm,cdru-usb3-ctrl"
++- reg: Base address and length of the USB registers
++
++
++Example:
++
++cdru_usb3_ctrl: cdru_usb3_ctrl at 6501d144 {
++        compatible = "brcm,cdru-usb3-ctrl";
++        reg = <0x6501d144 0x4>;
++};
++
+-- 
+2.7.4
