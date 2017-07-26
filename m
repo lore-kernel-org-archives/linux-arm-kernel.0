@@ -1,161 +1,142 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 26 Jul 2017 11:19:06 +0100
-Subject: [PATCH 1/3] ARM: dts: NSP: Add dma-coherent to relevant DT entries
-In-Reply-To: <1501020372-19607-2-git-send-email-jon.mason@broadcom.com>
-References: <1501020372-19607-1-git-send-email-jon.mason@broadcom.com>
- <1501020372-19607-2-git-send-email-jon.mason@broadcom.com>
-Message-ID: <6b419bfc-56e8-5a6d-e995-78fbeca02282@arm.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 26 Jul 2017 18:15:49 +0800
+Subject: [PATCH v3] irqchip/gic-v3-its: Allow GIC ITS number more than
+ MAX_NUMNODES
+Message-ID: <1501064149-37285-1-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
-On 25/07/17 23:06, Jon Mason wrote:
-> Cache related issues with DMA rings and performance issues related to
-> caching are being caused by not properly setting the "dma-coherent" flag
-> in the device tree entries.  Adding it here to correct the issue.
-> 
-> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
-> Fixes: 5fa1026a3e4d ("ARM: dts: NSP: Add PL330 support")
-> Fixes: 3107fa5bcfb2 ("ARM: dts: NSP: Add SD/MMC support")
-> Fixes: 13d04f20935c ("ARM: dts: NSP: Add AMAC entries")
-> Fixes: 5aeda7bf8a1e ("ARM: dts: NSP: Add and enable amac2")
-> Fixes: 17d517172300 ("ARM: dts: NSP: Add mailbox (PDC) to NSP")
-> Fixes: 1d8ece6639e1 ("ARM: dts: NSP: Add EHCI/OHCI USB nodes to device tree")
-> Fixes: bf2289bedef4 ("ARM: dts: NSP: Add Switch Register Access Block node")
-> Fixes: 0f9f27a36d09 ("ARM: dts: NSP: Add I2C support to the DT")
-> Fixes: 8dbcad020f2e ("ARM: dts: nsp: Add sata device tree entry")
-> Fixes: 522199029fdc ("ARM: dts: NSP: Fix PCIE DT issue")
-> ---
->  arch/arm/boot/dts/bcm-nsp.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-> index 7204d1def23d..c8d734d9f5fc 100644
-> --- a/arch/arm/boot/dts/bcm-nsp.dtsi
-> +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-> @@ -207,6 +207,7 @@
->  			clocks = <&iprocslow>;
->  			clock-names = "apb_pclk";
->  			#dma-cells = <1>;
-> +			dma-coherent;
+When enabling ITS NUMA support on D05, I got the boot log:
 
-Just to check, does this actually work? I ask because the pl330 driver
-currently never sets src_cache_ctrl/dst_cache_ctrl to anything other
-than noncacheable nonbufferable, so if your interconnect respects those
-attributes this seems liable to make things go wrong under current
-kernels, even if it is an accurate description of the hardware. If on
-the other hand the interconnect does its own magic and will manage to
-snoop caches appropriately regardless of AXI attributes, then I guess
-it's fine, if a little scary ;)
+[    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+[    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+[    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+[    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+[    0.000000] SRAT: ITS affinity exceeding max count[4]
 
-Robin.
+This is wrong on D05 as we have 8 ITSs with 4 NUMA nodes.
 
->  		};
->  
->  		sdio: sdhci at 21000 {
-> @@ -215,6 +216,7 @@
->  			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
->  			sdhci,auto-cmd12;
->  			clocks = <&lcpll0 BCM_NSP_LCPLL0_SDIO_CLK>;
-> +			dma-coherent;
->  			status = "disabled";
->  		};
->  
-> @@ -224,6 +226,7 @@
->  			      <0x110000 0x1000>;
->  			reg-names = "amac_base", "idm_base";
->  			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-> +			dma-coherent;
->  			status = "disabled";
->  		};
->  
-> @@ -233,6 +236,7 @@
->  			      <0x111000 0x1000>;
->  			reg-names = "amac_base", "idm_base";
->  			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-> +			dma-coherent;
->  			status = "disabled";
->  		};
->  
-> @@ -242,6 +246,7 @@
->  			      <0x112000 0x1000>;
->  			reg-names = "amac_base", "idm_base";
->  			interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
-> +			dma-coherent;
->  			status = "disabled";
->  		};
->  
-> @@ -252,6 +257,7 @@
->  			#mbox-cells = <1>;
->  			brcm,rx-status-len = <32>;
->  			brcm,use-bcm-hdr;
-> +			dma-coherent;
->  		};
->  
->  		nand: nand at 26000 {
-> @@ -325,6 +331,7 @@
->  			compatible = "generic-ehci";
->  			reg = <0x2a000 0x100>;
->  			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-> +			dma-coherent;
->  			status = "disabled";
->  		};
->  
-> @@ -332,6 +339,7 @@
->  			compatible = "generic-ohci";
->  			reg = <0x2b000 0x100>;
->  			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-> +			dma-coherent;
->  			status = "disabled";
->  		};
->  
-> @@ -364,6 +372,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  
-> +			dma-coherent;
->  			status = "disabled";
->  
->  			/* ports are defined in board DTS */
-> @@ -376,6 +385,7 @@
->  			#size-cells = <0>;
->  			interrupts = <GIC_SPI 89 IRQ_TYPE_NONE>;
->  			clock-frequency = <100000>;
-> +			dma-coherent;
->  			status = "disabled";
->  		};
->  
-> @@ -446,6 +456,7 @@
->  			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +			dma-coherent;
->  			status = "disabled";
->  
->  			sata0: sata-port at 0 {
-> @@ -483,6 +494,7 @@
->  		 */
->  		ranges = <0x82000000 0 0x08000000 0x08000000 0 0x8000000>;
->  
-> +		dma-coherent;
->  		status = "disabled";
->  
->  		msi-parent = <&msi0>;
-> @@ -519,6 +531,7 @@
->  		 */
->  		ranges = <0x82000000 0 0x40000000 0x40000000 0 0x8000000>;
->  
-> +		dma-coherent;
->  		status = "disabled";
->  
->  		msi-parent = <&msi1>;
-> @@ -555,6 +568,7 @@
->  		 */
->  		ranges = <0x82000000 0 0x48000000 0x48000000 0 0x8000000>;
->  
-> +		dma-coherent;
->  		status = "disabled";
->  
->  		msi-parent = <&msi2>;
-> 
+So dynamically alloc the memory needed instead of using
+its_srat_maps[MAX_NUMNODES], which count the number of
+ITS entry(ies) in SRAT and alloc its_srat_maps as needed,
+then build the mapping of numa node to ITS ID. Of course,
+its_srat_maps will be freed after ITS probing because
+we don't need that after boot.
+
+After doing this, I got what I wanted:
+
+[    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+[    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+[    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+[    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+[    0.000000] SRAT: PXM 2 -> ITS 4 -> Node 2
+[    0.000000] SRAT: PXM 2 -> ITS 5 -> Node 2
+[    0.000000] SRAT: PXM 2 -> ITS 6 -> Node 2
+[    0.000000] SRAT: PXM 3 -> ITS 7 -> Node 3
+
+Fixes: dbd2b8267233 ("irqchip/gic-v3-its: Add ACPI NUMA node mapping")
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+Cc: John Garry <john.garry@huawei.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+---
+
+v2->v3:
+  - Remove the NULL check for its_srat_maps as its_in_srat will be 0;
+  - Add warning if alloc memory failed for its_srat_maps;
+  - Update commit log as Lorenzo suggested;
+  - Add review tag
+
+ drivers/irqchip/irq-gic-v3-its.c | 38 +++++++++++++++++++++++++++++++-------
+ 1 file changed, 31 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 3ccdf76..bf70115 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1847,7 +1847,7 @@ struct its_srat_map {
+ 	u32	its_id;
+ };
+ 
+-static struct its_srat_map its_srat_maps[MAX_NUMNODES] __initdata;
++static struct its_srat_map *its_srat_maps __initdata;
+ static int its_in_srat __initdata;
+ 
+ static int __init acpi_get_its_numa_node(u32 its_id)
+@@ -1861,6 +1861,12 @@ static int __init acpi_get_its_numa_node(u32 its_id)
+ 	return NUMA_NO_NODE;
+ }
+ 
++static int __init gic_acpi_match_srat_its(struct acpi_subtable_header *header,
++					  const unsigned long end)
++{
++	return 0;
++}
++
+ static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+ 			 const unsigned long end)
+ {
+@@ -1877,12 +1883,6 @@ static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+ 		return -EINVAL;
+ 	}
+ 
+-	if (its_in_srat >= MAX_NUMNODES) {
+-		pr_err("SRAT: ITS affinity exceeding max count[%d]\n",
+-				MAX_NUMNODES);
+-		return -EINVAL;
+-	}
+-
+ 	node = acpi_map_pxm_to_node(its_affinity->proximity_domain);
+ 
+ 	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
+@@ -1901,14 +1901,37 @@ static int __init gic_acpi_parse_srat_its(struct acpi_subtable_header *header,
+ 
+ static void __init acpi_table_parse_srat_its(void)
+ {
++	int count;
++
++	count = acpi_table_parse_entries(ACPI_SIG_SRAT,
++			sizeof(struct acpi_table_srat),
++			ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
++			gic_acpi_match_srat_its, 0);
++	if (count <= 0)
++		return;
++
++	its_srat_maps = kmalloc(count * sizeof(struct its_srat_map),
++				GFP_KERNEL);
++	if (!its_srat_maps) {
++		pr_warn("SRAT: Failed to allocate memory for its_srat_maps!\n");
++		return;
++	}
++
+ 	acpi_table_parse_entries(ACPI_SIG_SRAT,
+ 			sizeof(struct acpi_table_srat),
+ 			ACPI_SRAT_TYPE_GIC_ITS_AFFINITY,
+ 			gic_acpi_parse_srat_its, 0);
+ }
++
++/* free the its_srat_maps after ITS probing */
++static void __init acpi_its_srat_maps_free(void)
++{
++	kfree(its_srat_maps);
++}
+ #else
+ static void __init acpi_table_parse_srat_its(void)	{ }
+ static int __init acpi_get_its_numa_node(u32 its_id) { return NUMA_NO_NODE; }
++static void __init acpi_its_srat_maps_free(void) { }
+ #endif
+ 
+ static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+@@ -1955,6 +1978,7 @@ static void __init its_acpi_probe(void)
+ 	acpi_table_parse_srat_its();
+ 	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
+ 			      gic_acpi_parse_madt_its, 0);
++	acpi_its_srat_maps_free();
+ }
+ #else
+ static void __init its_acpi_probe(void) { }
+-- 
+1.7.12.4
