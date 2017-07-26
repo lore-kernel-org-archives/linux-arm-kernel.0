@@ -1,83 +1,121 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 26 Jul 2017 20:59:39 +0530
-Subject: [PATCH 1/4] iommu/msm: Add iommu_group support
-In-Reply-To: <e148ac58-2fda-454f-c8b1-e01dd1c1347c@arm.com>
-References: <cover.1500637633.git.robin.murphy@arm.com>
- <b87d44e09fa18efbb9daf6258c1f8ecbedaac23c.1500637633.git.robin.murphy@arm.com>
- <f5071164-c965-b6bf-c330-90ff6ea0c956@codeaurora.org>
- <e148ac58-2fda-454f-c8b1-e01dd1c1347c@arm.com>
-Message-ID: <4270d431-2ec7-b3b2-5f13-076da4dba83e@codeaurora.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 26 Jul 2017 16:35:19 +0100
+Subject: [PATCH 0/4] ACPI: DMA ranges management
+In-Reply-To: <c09352cc-e1a2-a494-c457-dc3ea275f504@arm.com>
+References: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
+ <7df11172-5a40-685f-5202-9a0bceb6e19b@codeaurora.org>
+ <c09352cc-e1a2-a494-c457-dc3ea275f504@arm.com>
+Message-ID: <20170726153519.GA4696@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
-On 7/24/2017 3:25 PM, Robin Murphy wrote:
-> On 24/07/17 08:34, Sricharan R wrote:
->> Hi Robin,
->>
->>> As the last step to making groups mandatory, clean up the remaining
->>> drivers by adding basic support. Whilst it may not perfectly reflect the
->>> isolation capabilities of the hardware, using generic_device_group()
->>> should at least maintain existing behaviour with respect to the API.
->>>
->>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>> ---
->>>  drivers/iommu/msm_iommu.c | 15 ++++++++++++++-
->>>  1 file changed, 14 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
->>> index d0448353d501..04f4d51ffacb 100644
->>> --- a/drivers/iommu/msm_iommu.c
->>> +++ b/drivers/iommu/msm_iommu.c
->>> @@ -393,6 +393,7 @@ static struct msm_iommu_dev *find_iommu_for_dev(struct device *dev)
->>>  static int msm_iommu_add_device(struct device *dev)
->>>  {
->>>  	struct msm_iommu_dev *iommu;
->>> +	struct iommu_group *group;
->>>  	unsigned long flags;
->>>  	int ret = 0;
->>>  
->>> @@ -406,7 +407,16 @@ static int msm_iommu_add_device(struct device *dev)
->>>  
->>>  	spin_unlock_irqrestore(&msm_iommu_lock, flags);
->>>  
->>> -	return ret;
->>> +	if (ret)
->>> +		return ret;
->>> +
->>> +	group = iommu_group_get_for_dev(dev);
->>> +	if (IS_ERR(group))
->>> +		return PTR_ERR(group);
->>> +
->>> +	iommu_group_put(group);
->>> +
->>> +	return 0;
->>>  }
->>>  
->>
->>  While this is correct for completing the group support, this adds the default domain and
->>  that might break in the driver while attaching a private domain. The msm_iomm_attach_dev
->>  needs to be fixed by calling msm_iommu_detach_dev while trying to attach a new domain when
->>  already connected to a default one. But let me test and confirm this.
+On Wed, Jul 26, 2017 at 04:05:55PM +0100, Robin Murphy wrote:
+> Hi Nate,
 > 
-> The default domain shouldn't matter, since msm_iommu_domain_alloc() will
-> refuse to create DMA ops or identity domains in the first place. In the
-> absence of a default domain, __iommu_detach_group() will still end up
-> calling ops->detach_dev, so I don't think the ultimate behaviour is any
-> different with this change. Testing is of course welcome, though ;)
+> On 26/07/17 15:46, Nate Watterson wrote:
+> > Hi Lorenzo,
+> > 
+> > On 7/20/2017 10:45 AM, Lorenzo Pieralisi wrote:
+> >> As reported in:
+> >>
+> >> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
+> >>
+> >>
+> >> the bus connecting devices to an IOMMU bus can be smaller in size than
+> >> the IOMMU input address bits which results in devices DMA HW bugs in
+> >> particular related to IOVA allocation (ie chopping of higher address
+> >> bits owing to system bus HW capabilities mismatch with the IOMMU).
+> >>
+> >> Fortunately this problem can be solved through an already present but
+> >> never
+> >> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define
+> >> the DMA
+> >> window for a specific bus in ACPI and therefore all upstream devices
+> >> connected to it.
+> >>
+> >> This small patch series enables _DMA parsing in ACPI core code and
+> >> use it in ACPI IORT code in order to detect DMA ranges for devices and
+> >> update their data structures to make them work with their related DMA
+> >> addressing restrictions.
+> > 
+> > I tested the patches and unfortunately it seems like the DMA addressing
+> > restrictions are not really enforced for devices that attempt to set
+> > their own dma_mask based on controller capabilities. For instance,
+> > consider the following from the ahci_platform driver:
+> > 
+> >     if (hpriv->cap & HOST_CAP_64) {
+> >         rc = dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(64));
+> >         [...]
+> >     }
+> > 
+> > Prior to the check, I can see that the device dma_mask respects the
+> > limits enumerated in the _DMA object, however it is then clobbered by
+> > the call to dma_coerce_mask_and_coherent(). Interestingly, if
+> > HOST_CAP_64 was not set and the _DMA object for the device (or its
+> > parent) indicated support for > 32-bit addrs, the host controller
+> > could end up getting programmed with addresses beyond what it actually
+> > supports. That is more a bug with the ahci_platform driver assuming a
+> > default 32-bit dma_mask, but I would not be surprised to find other
+> > drivers that rely on the same assumption.
+> 
+> Yup, you've hit upon the more general problem, which applies equally to
+> DT "dma-ranges" too. I'm working on arm64 DMA stuff at the moment, and
+> have the patch to actually enforce the firmware-described limit when
+> drivers update their masks, but that depends on everyone passing the
+> correct information to arch_setup_dma_ops() in the first place (I think
+> DT needs more fixing than ACPI does).
+> 
+> > To ensure that dma_set_mask() and friends actually respect _DMA, would
+> > you consider introducing a dma_supported() callback to check the input
+> > dma_mask against the FW defined limits? This would end up aggressively
+> > clipping the dma_mask to 32-bits for devices like the above if the _DMA
+> > limit was less than 64-bits, but that is probably preferable to the
+> > controller accessing unintended addresses.
+> > 
+> > Also, how would you feel about adding support for the IORT named_node
+> > memory_address_limit field?
+> 
+> We will certainly need that for some platform devices, so if you fancy
+> giving it a go before Lorenzo or I get there, feel free!
 
- Ha, you are right. Sorry, overlooked that only DOMAIN_UNMANAGED is supported here.
- Meanwhile, lost access to the board. So would give test feedback once i get it.
+I can do it for v2 but I would like to understand why using _DMA is
+not good enough for named components - having two bindings describing
+the same thing is not ideal and I'd rather avoid it - if there is
+a reason I am happy to add the necessary code.
 
- Otherwise, Reviewed-by: sricharan at codeaurora.org
+Thanks,
+Lorenzo
 
-Regards,
- Sricharan
-
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
-
----
-This email has been checked for viruses by Avast antivirus software.
-https://www.avast.com/antivirus
+> Robin.
+> 
+> > -Nate
+> >>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> >> Cc: Feng Kan <fkan@apm.com>
+> >> Cc: Jon Masters <jcm@redhat.com>
+> >> Cc: Robert Moore <robert.moore@intel.com>
+> >> Cc: Robin Murphy <robin.murphy@arm.com>
+> >> Cc: Zhang Rui <rui.zhang@intel.com>
+> >> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> >>
+> >> Lorenzo Pieralisi (4):
+> >>    ACPI: Allow _DMA method in walk resources
+> >>    ACPI: Make acpi_dev_get_resources() method agnostic
+> >>    ACPI: Introduce DMA ranges parsing
+> >>    ACPI: Make acpi_dma_configure() DMA regions aware
+> >>
+> >>   drivers/acpi/acpica/rsxface.c |  7 ++--
+> >>   drivers/acpi/arm64/iort.c     | 27 +++++++++++-
+> >>   drivers/acpi/resource.c       | 83
+> >> ++++++++++++++++++++++++++++---------
+> >>   drivers/acpi/scan.c           | 95
+> >> +++++++++++++++++++++++++++++++++++++++----
+> >>   include/acpi/acnames.h        |  1 +
+> >>   include/acpi/acpi_bus.h       |  2 +
+> >>   include/linux/acpi.h          |  8 ++++
+> >>   include/linux/acpi_iort.h     |  5 ++-
+> >>   8 files changed, 194 insertions(+), 34 deletions(-)
+> >>
+> > 
+> 
