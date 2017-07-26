@@ -1,44 +1,39 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 26 Jul 2017 10:33:53 -0700
-Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <20170726163049.GG28875@nazgul.tnic>
-References: <faa339c4-b087-d970-1099-3d6cf8186545@arm.com>
- <20170726131058.GA8665@hc>
- <131179fe-42e7-f286-5bd4-801f4c93d5f9@arm.com>
- <20170726145522.GC28875@nazgul.tnic> <20170726151314.GA10696@hc>
- <20170726153502.GE28875@nazgul.tnic> <20170726154515.GA11453@hc>
- <20170726155548.GF28875@nazgul.tnic>
- <20170726161949.GB15426@kroah.com>
- <20170726163049.GG28875@nazgul.tnic>
-Message-ID: <20170726173353.GB21705@kroah.com>
+From: jekarlson@gmail.com (Emil Karlson)
+Date: Wed, 26 Jul 2017 20:44:18 +0300
+Subject: [RESEND PATCH 0/2] crypto/rockchip: fix some issue which causes
+ crypto failed
+In-Reply-To: <1500859394-1799-1-git-send-email-wzz@rock-chips.com>
+References: <1500859394-1799-1-git-send-email-wzz@rock-chips.com>
+Message-ID: <CAELSAVZAs=Tqz_yHb2u8StXFeC550Tm98jqmnRFZLRmFCqs0bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 06:30:49PM +0200, Borislav Petkov wrote:
-> On Wed, Jul 26, 2017 at 09:19:49AM -0700, Greg KH wrote:
-> > On Wed, Jul 26, 2017 at 05:55:48PM +0200, Borislav Petkov wrote:
-> > > On Wed, Jul 26, 2017 at 05:45:15PM +0200, Jan Glauber wrote:
-> > > > The PMU/EDAC devices are all PCI devices do I need the 'struct pci_dev *'.
-> > > > I'm not aware of other ways to access these devices. Please enlighten
-> > > > me if I'm missing something.
-> > > 
-> > > Me enlighten you on Cavium hardware?! You're funny.
-> > > 
-> > > So I don't know whether the PCI hotplug code can run more than one
-> > > function upon PCI ID detection. Probably Greg will say, write a
-> > > multiplexer wrapper. :-)
-> > 
-> > -ENOCONTEXT....
-> > 
-> > Anyway, pci questions are best asked on the linux-pci at vger list.  And
-> > yes, all PCI devices end up with a 'struct pci_dev *' automatically.
-> 
-> Simple: so they have a PCI ID of a memory contoller and want to hotplug
-> two drivers for it. And those two drivers should remain independent from
-> each other.
+Greetings
 
-Hahahahaha, no.  That's crazy, you were right in guessing what my answer
-was going to be :)
+While I am not getting the original error anymore, using dm-crypt
+still fails at cryptsetup luksOpen with [rk_ablk_rx:331] Lack of data
+https://users.aalto.fi/~jkarlson/files/rk3288-fail_2017-07-24.jpg
 
-greg k-h
+Test platform: Asus chromebook C201/rk3288 linux-4.12.3+ this patchset
+
+Best Regards
+-Emil
+
+On Mon, Jul 24, 2017 at 4:23 AM, zain wang <wzz@rock-chips.com> wrote:
+> These patches fix some bugs on rockchip's crypto which would cause crypto failed.
+>
+> zain wang (2):
+>   crypto: rockchip - move the crypto completion from interrupt context
+>   crypto: rockchip - return the err code when unable dequeue the crypto
+>     request
+>
+>  drivers/crypto/rockchip/rk3288_crypto.c            | 58 +++++++++++-----------
+>  drivers/crypto/rockchip/rk3288_crypto.h            |  4 +-
+>  drivers/crypto/rockchip/rk3288_crypto_ablkcipher.c | 17 ++++++-
+>  drivers/crypto/rockchip/rk3288_crypto_ahash.c      | 16 +++++-
+>  4 files changed, 62 insertions(+), 33 deletions(-)
+>
+> --
+> 1.9.1
+>
+>
