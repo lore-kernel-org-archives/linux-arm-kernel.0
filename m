@@ -1,72 +1,84 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 25 Jul 2017 17:48:30 -0700
-Subject: [PATCH 3/3] dt-bindings: clock: amlogic,gxbb-aoclkc: Update
- bindings
-In-Reply-To: <1500897650.2401.1.camel@baylibre.com>
-References: <1499336663-23875-1-git-send-email-narmstrong@baylibre.com>
- <1499336663-23875-4-git-send-email-narmstrong@baylibre.com>
- <20170710035031.rdbi64ookkbq6zeo@rob-hp-laptop>
- <20170721204439.GJ19878@codeaurora.org>
- <1a971e80-1f91-c446-7e28-d193354b2859@baylibre.com>
- <1500897650.2401.1.camel@baylibre.com>
-Message-ID: <20170726004830.GI2146@codeaurora.org>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Wed, 26 Jul 2017 08:59:10 +0800
+Subject: [PATCH v5 1/7] drm/rockchip: vop: initialize registers directly
+In-Reply-To: <3165793.eZGRgZzZRy@phil>
+References: <1500518564-30371-1-git-send-email-mark.yao@rock-chips.com>
+ <1500518603-30486-1-git-send-email-mark.yao@rock-chips.com>
+ <3165793.eZGRgZzZRy@phil>
+Message-ID: <5977E95E.1040700@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24, Jerome Brunet wrote:
-> On Mon, 2017-07-24 at 13:47 +0200, Neil Armstrong wrote:
-> > 
-> > Hi Rob, Stephen,
-> > 
-> > Thanks for your feedback, but on these Amlogic platforms, the AO register bank
-> > is
-> > filled with interleaved registers used for various purposes.
-> > 
-> > For instance, the first 1k of registers are :
-> > 
-> > 0-c RTI_STATUS
-> > c-14 RTI_PWR_CNTL
-> > 14-1c PIN_MUX
-> > 1c RTI_STATUS
-> > 24-30 GPIO
-> > 30 JTAG_CONFIG
-> > 34 WD
-> > 38-40 CPU_CTRL
-> > 40 RTI_GEN_CTRL
-> > 44 CPU_CTRL
-> > 4c-58 TIMER
-> > 58 OSCIN
-> > 60 AHB2DDR
-> > ...
-> > 
-> > 
-> > And so on, and the clock related registers are split among this space.
-> > 
-> > For sure, this could be declared as an system controller node, but this would
-> > imply completely
-> > re-designing the actual clock driver and drop the actual bindings.
-> > (and with re-writting the clock gate code to use regmap registers access)
+On 2017?07?26? 06:36, Heiko Stuebner wrote:
+> Hi Mark,
+>
+> Am Donnerstag, 20. Juli 2017, 10:43:22 CEST schrieb Mark Yao:
+>> At present we are using init_table to initialize some
+>> registers, but the Register init table use un-document define,
+>> it is unreadable, and sometimes we only want to update tiny
+>> bits, init table method is not friendly, it's diffcult to
+>> reuse for difference chips.
+>>
+>> To make it clean, initialize registers directly, and drops
+>> init_table mechanism out.
+>>
+>> Changes in v3:
+>> - Explain more in details
+>>
+>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> [...]
+>
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+>> index bafd698..00e9d79 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+>> @@ -127,13 +127,7 @@
+>>   	.cfg_done = VOP_REG(RK3036_REG_CFG_DONE, 0x1, 0),
+>>   };
+>>   
+>> -static const struct vop_reg_data rk3036_vop_init_reg_table[] = {
+>> -	{RK3036_DSP_CTRL1, 0x00000000},
+>> -};
+>> -
+>>   static const struct vop_data rk3036_vop = {
+>> -	.init_table = rk3036_vop_init_reg_table,
+>> -	.table_size = ARRAY_SIZE(rk3036_vop_init_reg_table),
+>>   	.ctrl = &rk3036_ctrl_data,
+>>   	.intr = &rk3036_intr,
+>>   	.win = rk3036_vop_win_data,
+> This seems to break vop initialization on my rk3036 kylin board.
+>
+> Before, kylin was able to bring output to the hdmi but with this
+> patch applied this stops working. As the init-value is to zero it seems
+> there is still something turned on, that should be turned off instead.
+>
+> rk3288 seems to stay in working condition though.
+>
+>
+> Heiko
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>
+>
+>
+Hi Heiko
 
-I'm not suggesting a sycon node or binding usage here. There's an
-"always on" hw block here that could be implemented as an MFD
-driver that binds and creates a clk subdevice and whatever else
-is sitting in here. Those subdevices could be informed of the
-register base by knowing their parent driver is an MFD with a
-certain driver data structure inside and then get at an __iomem
-pointer through the parent's driver data. Or they could use a
-regmap approach and rewrite a bunch of code. Or there could be
-just a clk driver that binds to this node for now until a later
-time that other features are needed.
+Thanks for your testing on rk3036 board.
 
-> 
-> Maybe it is time to investigate having the regmap clock from qcom available to
-> every other platform ?
+I research the init table on rk3036, the dsp_blank reset value is 1, we need set the register to zero.
 
-I think we have regmap clk duplicated a couple times in the
-drivers/clk/ directory now. Not sure how this is related, except
-for that there looks to be a desire to use a syscon binding here
-and that forces regmap on drivers?
+So I think not working problem can be fixed by following change:
+
+     drivers/gpu/drm/rockchip/rockchip_vop_reg.c:
+     static const struct vop_ctrl rk3036_ctrl_data = {
+             .standby = VOP_REG(RK3036_SYS_CTRL, 0x1, 30),
+     +       .dsp_blank = VOP_REG(RK3036_DSP_CTRL1, 0x1, 24),
+             .out_mode = VOP_REG(RK3036_DSP_CTRL0, 0xf, 0),
+             .pin_pol = VOP_REG(RK3036_DSP_CTRL0, 0xf, 4),
+             .htotal_pw = VOP_REG(RK3036_DSP_HTOTAL_HS_END, 0x1fff1fff, 0),
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+?ark Yao
