@@ -1,50 +1,63 @@
-From: hw.likun@huawei.com (Li Kun)
-Date: Wed, 26 Jul 2017 09:47:35 +0800
-Subject: [RFC PATCH untested] arm64: kernel: implement fast refcount
- checking
-In-Reply-To: <CAKv+Gu8L1M6iO-pELrVvouxgh+t1qjzD4fOu3Fw+LeiWMZWzpA@mail.gmail.com>
-References: <20170725114901.31403-1-ard.biesheuvel@linaro.org>
- <CAGXu5jLNB5dmA0o=n_nn=4NRu3LjuNf5PGRopATuRiq0aJ1ECA@mail.gmail.com>
- <CAKv+Gu8L1M6iO-pELrVvouxgh+t1qjzD4fOu3Fw+LeiWMZWzpA@mail.gmail.com>
-Message-ID: <c89c560c-c8b5-2079-6e19-0b85d9658ca3@huawei.com>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Wed, 26 Jul 2017 11:30:04 +1000
+Subject: [PATCH] scripts/dtc: fix '%zx' warning
+In-Reply-To: <E1da2Z7-0008GG-AV@rmk-PC.armlinux.org.uk>
+References: <E1da2Z7-0008GG-AV@rmk-PC.armlinux.org.uk>
+Message-ID: <20170726013004.GJ8978@umbus.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard and Kees,
+On Tue, Jul 25, 2017 at 05:20:09PM +0100, Russell King wrote:
+> dtc uses an incorrect format specifier for printing a uint64_t value.
+> uint64_t may be either 'unsigned long' or 'unsigned long long' depending
+> on the host architecture.
+> 
+> Fix this by using %llx and casting to unsigned long long, which ensures
+> that we always have a wide enough variable to print 64 bits of hex.
+> 
+>   HOSTCC  scripts/dtc/checks.o
+> scripts/dtc/checks.c: In function 'check_simple_bus_reg':
+> scripts/dtc/checks.c:876:2: warning: format '%zx' expects argument of type 'size_t', but argument 4 has type 'uint64_t' [-Wformat=]
+>   snprintf(unit_addr, sizeof(unit_addr), "%zx", reg);
+>   ^
+> scripts/dtc/checks.c:876:2: warning: format '%zx' expects argument of type 'size_t', but argument 4 has type 'uint64_t' [-Wformat=]
+> 
+> Fixes: 828d4cdd012c ("dtc: check.c fix compile error")
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-Yes, i have been working on this for several days, but i think Ard's 
-patch is better than mine in some ways.
-So i'll help reviewing the patch and try to give some suggestions.
-Never mind:)
+This (embarrassing) error is already fixed in upstream dtc.
 
-on 2017/7/26 1:20, Ard Biesheuvel wrote:
-> On 25 July 2017 at 18:13, Kees Cook <keescook@chromium.org> wrote:
->> On Tue, Jul 25, 2017 at 4:49 AM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>> Hi all,
->>>
->>> I had a stab at porting the fast refcount checks to arm64. It is slightly
->>> less straight-forward than x86 given that we need to support both LSE and
->>> LL/SC, and fallback to the latter if running a kernel built with support
->>> for the former on hardware that does not support it.
->>>
->>> It is build tested with and without LSE support, and boots fine on non-LSE
->>> hardware in both cases.
->> Ah! Very cool. Hopefully you and Li can compare notes; I think they've
->> been working on an implementation too.
->>
-> I wasn't aware of that.
->
->>> Suggestions welcome as to how to test and/or benchmark this,
->> I'll post a patch for LKDTM that I've been using. It's more
->> comprehensive than the existing ATOMIC checks (which predated the
->> refcount-only protection).
->>
-> OK. One thing I couldn't figure out: is refcount_t signed or not? The
-> saturate tests set the initial value to UINT_MAX - 1, but this is
-> interpreted as a negative value and so the refcount manipulations that
-> are expected to succeed also fail in my case.
+> ---
+>  scripts/dtc/checks.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> I've been carrying this patch for some time, but I guess hardly anyone
+> builds DT based kernels on 32-bit x86 boxes anymore as it has remained
+> unfixed.
+> 
+> diff --git a/scripts/dtc/checks.c b/scripts/dtc/checks.c
+> index 4b72b530c84f..62ea8f83d4a0 100644
+> --- a/scripts/dtc/checks.c
+> +++ b/scripts/dtc/checks.c
+> @@ -873,7 +873,7 @@ static void check_simple_bus_reg(struct check *c, struct dt_info *dti, struct no
+>  	while (size--)
+>  		reg = (reg << 32) | fdt32_to_cpu(*(cells++));
+>  
+> -	snprintf(unit_addr, sizeof(unit_addr), "%zx", reg);
+> +	snprintf(unit_addr, sizeof(unit_addr), "%llx", (unsigned long long)reg);
+>  	if (!streq(unitname, unit_addr))
+>  		FAIL(c, dti, "Node %s simple-bus unit address format error, expected \"%s\"",
+>  		     node->fullpath, unit_addr);
 
 -- 
-Best Regards
-Li Kun
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170726/f55751a8/attachment.sig>
