@@ -1,112 +1,91 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Wed, 26 Jul 2017 15:23:15 +0100
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170726141417.GJ3730@linux.vnet.ibm.com>
-References: <20170725175207.000001cb@huawei.com>
- <20170725.141029.676882447882600000.davem@davemloft.net>
- <20170726035545.GG3730@linux.vnet.ibm.com>
- <20170725.210233.1441906980505926406.davem@davemloft.net>
- <20170726041217.GH3730@linux.vnet.ibm.com>
- <20170726091623.000004f7@huawei.com>
- <20170726103232.0000368e@huawei.com>
- <20170726132801.00001e8c@huawei.com>
- <20170726141417.GJ3730@linux.vnet.ibm.com>
-Message-ID: <20170726152315.00003d61@huawei.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 26 Jul 2017 15:35:25 +0100
+Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
+ counters
+In-Reply-To: <20170726131058.GA8665@hc>
+References: <20170725150422.4775-1-jglauber@cavium.com>
+ <20170725150422.4775-2-jglauber@cavium.com>
+ <72145781-e9ec-036f-f752-b4756fef08ee@arm.com> <20170726111946.GA6273@hc>
+ <faa339c4-b087-d970-1099-3d6cf8186545@arm.com> <20170726131058.GA8665@hc>
+Message-ID: <131179fe-42e7-f286-5bd4-801f4c93d5f9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Jul 2017 07:14:17 -0700
-"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
++To: Boris
 
-> On Wed, Jul 26, 2017 at 01:28:01PM +0100, Jonathan Cameron wrote:
-> > On Wed, 26 Jul 2017 10:32:32 +0100
-> > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
-> >   
-> > > On Wed, 26 Jul 2017 09:16:23 +0100
-> > > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
-> > >   
-> > > > On Tue, 25 Jul 2017 21:12:17 -0700
-> > > > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> > > >     
-> > > > > On Tue, Jul 25, 2017 at 09:02:33PM -0700, David Miller wrote:      
-> > > > > > From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-> > > > > > Date: Tue, 25 Jul 2017 20:55:45 -0700
-> > > > > >         
-> > > > > > > On Tue, Jul 25, 2017 at 02:10:29PM -0700, David Miller wrote:        
-> > > > > > >> Just to report, turning softlockup back on fixes things for me on
-> > > > > > >> sparc64 too.        
-> > > > > > > 
-> > > > > > > Very good!
-> > > > > > >         
-> > > > > > >> The thing about softlockup is it runs an hrtimer, which seems to run
-> > > > > > >> about every 4 seconds.        
-> > > > > > > 
-> > > > > > > I could see where that could shake things loose, but I am surprised that
-> > > > > > > it would be needed.  I ran a short run with CONFIG_SOFTLOCKUP_DETECTOR=y
-> > > > > > > with no trouble, but I will be running a longer test later on.
-> > > > > > >         
-> > > > > > >> So I wonder if this is a NO_HZ problem.        
-> > > > > > > 
-> > > > > > > Might be.  My tests run with NO_HZ_FULL=n and NO_HZ_IDLE=y.  What are
-> > > > > > > you running?  (Again, my symptoms are slightly different, so I might
-> > > > > > > be seeing a different bug.)        
-> > > > > > 
-> > > > > > I run with NO_HZ_FULL=n and NO_HZ_IDLE=y, just like you.
-> > > > > > 
-> > > > > > To clarify, the symptoms show up with SOFTLOCKUP_DETECTOR disabled.        
-> > > > > 
-> > > > > Same here -- but my failure case happens fairly rarely, so it will take
-> > > > > some time to gain reasonable confidence that enabling SOFTLOCKUP_DETECTOR
-> > > > > had effect.
-> > > > > 
-> > > > > But you are right, might be interesting to try NO_HZ_PERIODIC=y
-> > > > > or NO_HZ_FULL=y.  So many possible tests, and so little time.  ;-)
-> > > > > 
-> > > > > 							Thanx, Paul
-> > > > >       
-> > > > I'll be the headless chicken running around and trying as many tests
-> > > > as I can fit in.  Typical time to see the failure for us is sub 10
-> > > > minutes so we'll see how far we get.
-> > > > 
-> > > > Make me a list to run if you like ;)
-> > > > 
-> > > > NO_HZ_PERIODIC=y running now.    
-> > > By which I mean CONFIG_HZ_PERIODIC=y  
-> 
-> I did get that messed up, didn't I?  Sorry for my confusion!
-> 
-> > > Anyhow, run for 40 minutes with out seeing a splat but my sanity check
-> > > on the NO_FULL_HZ=n and NO_HZ_IDLE=y this morning took 20 minutes so
-> > > I won't have much confidence until we are a few hours in on this.
-> > > 
-> > > Anyhow, certainly looking like a promising direction for investigation!
-> > >   
-> > Well it's done over 3 hours without a splat so I think it is fine with
-> > CONFIG_HZ_PERIODIC=y  
-> 
-> Thank you!
-> 
-> If you run with SOFTLOCKUP_DETECTOR=n and NO_HZ_IDLE=y, but have a normal
-> user task waking up every few seconds on each CPU, does the problem occur?
-> (The question is whether any disturbance gets things going, or whether there
-> is something special about SOFTLOCKUP_DETECTOR=y and HZ_PERIODIC=y.
-> 
-> Dave, any other ideas on what might be causing this or what might be
-> tested?
-> 
-> 							Thanx, Paul
-> 
+Hi Boris,
 
-Although it's still early days (40 mins in) it looks like the issue first
-occurred between 4.10-rc7 and 4.11-rc1 (don't ask why those particular RCs)
+On 26/07/17 14:10, Jan Glauber wrote:
+> On Wed, Jul 26, 2017 at 01:47:35PM +0100, Suzuki K Poulose wrote:
+>> On 26/07/17 12:19, Jan Glauber wrote:
+>>> On Tue, Jul 25, 2017 at 04:39:18PM +0100, Suzuki K Poulose wrote:
+>>>> On 25/07/17 16:04, Jan Glauber wrote:
+>>>>> Add support for the PMU counters on Cavium SOC memory controllers.
+>>>>>
+>>>>> This patch also adds generic functions to allow supporting more
+>>>>> devices with PMU counters.
+>>>>>
+>>>>> Properties of the LMC PMU counters:
+>>>>> - not stoppable
+>>>>> - fixed purpose
+>>>>> - read-only
+>>>>> - one PCI device per memory controller
+>>>>>
+>>>>> Signed-off-by: Jan Glauber <jglauber@cavium.com>
+>>>>> ---
+>>>>> drivers/perf/Kconfig       |   8 +
+>>>>> drivers/perf/Makefile      |   1 +
+>>>>> drivers/perf/cavium_pmu.c  | 424 +++++++++++++++++++++++++++++++++++++++++++++
+>>>>> include/linux/cpuhotplug.h |   1 +
+>>>>> 4 files changed, 434 insertions(+)
+>>>>> create mode 100644 drivers/perf/cavium_pmu.c
+>>>>>
+>>>>> diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+>>>>> index e5197ff..a46c3f0 100644
+>>>>> --- a/drivers/perf/Kconfig
+>>>>> +++ b/drivers/perf/Kconfig
+>>>>> @@ -43,4 +43,12 @@ config XGENE_PMU
+>>>>>        help
+>>>>>          Say y if you want to use APM X-Gene SoC performance monitors.
+>>>>>
+>>>>> +config CAVIUM_PMU
+>>>>> +	bool "Cavium SOC PMU"
+>>>>
+>>>> Is there any specific reason why this can't be built as a module ?
+>>>
+>>> Yes. I don't know how to load the module automatically. I can't make it
+>>> a pci driver as the EDAC driver "owns" the device (and having two
+>>> drivers for one device wont work as far as I know). I tried to hook
+>>> into the EDAC driver but the EDAC maintainer was not overly welcoming
+>>> that approach.
+>>
+>>>
+>>> And while it would be possible to have it a s a module I think it is of
+>>> no use if it requires manualy loading. But maybe there is a simple
+>>> solution I'm missing here?
+>>
+>>
+>> If you are talking about a Cavium specific EDAC driver, may be we could
+>> make that depend on this driver "at runtime" via symbols (may be even,
+>> trigger the probe of PMU), which will be referenced only when CONFIG_CAVIUM_PMU
+>> is defined. It is not the perfect solution, but that should do the trick.
+>
+> I think that is roughly what I proposed in v6. Can you have a look at:
+>
+> https://lkml.org/lkml/2017/6/23/333
+> https://patchwork.kernel.org/patch/9806427/
 
-Bad as with current kernel on 4.11-rc1 and good on 4.10-rc7.
+So the Cavium EDACs, which appear as PCI devices have a PMU attached to it.
+In order to build this PMU driver as a module, we need a way to load the module
+automatically based on the PCI id. However, since the EDAC driver already
+registers with that PCI id, we cannot use the same for the PMU. Ideally,
+the PMU driver should be loaded when the EDAC driver is loaded. But looking
+at the links above, it looks like you don't like the idea of triggering a
+probe of the PMU component from the EDAC driver. We may be able to get rid
+of the PMU specific information from the EDAC driver by maintaining the PCI
+id of the device in the PMU driver. But we may still need to make sure that
+the PMU driver gets a chance to probe the PMU when the device is available.
 
-Could be something different was hiding it in 4.10 though.  We have a fair
-delta from mainline back then unfortunately so bisecting will be
-'interesting'.
+What do you think is the best option here ?
 
-I'll see if I can get the test you suggest running.
-
-Jonathan
+Suzuki
