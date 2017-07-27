@@ -1,51 +1,23 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 27 Jul 2017 16:24:55 +0530
-Subject: [PATCH RESEND] ARM: davinci: don't mark vpif_input structures as
- 'const'
-In-Reply-To: <20170727101320.609258-1-arnd@arndb.de>
-References: <20170727101320.609258-1-arnd@arndb.de>
-Message-ID: <5dc37564-2efe-d090-78a4-1702291b176d@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Jul 2017 12:57:50 +0200
+Subject: [PATCH resend v2] soc: zte: Restrict SOC_ZTE to ARCH_ZX or
+ COMPILE_TEST
+In-Reply-To: <1500966738-4431-1-git-send-email-geert@linux-m68k.org>
+References: <1500966738-4431-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <CAK8P3a1h7K3ecCcbMQ=egp5_dZ13ACcRgJoeFgmRsQityUn2tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Thursday 27 July 2017 03:42 PM, Arnd Bergmann wrote:
-> A change to the platform data definitions caused a warning in the board code:
-> 
-> arch/arm/mach-davinci/board-dm646x-evm.c:680:13: error: initialization discards 'const' qualifier from pointer target type [-Werror=discarded-qualifiers]
-> arch/arm/mach-davinci/board-dm646x-evm.c:690:13: error: initialization discards 'const' qualifier from pointer target type [-Werror=discarded-qualifiers]
-
-You can replace these by:
-
-arch/arm/mach-davinci/board-da850-evm.c:1221:13: warning: initialization discards ?const? qualifier from pointer target type [-Wdiscarded-qualifiers]
-arch/arm/mach-davinci/board-da850-evm.c:1231:13: warning: initialization discards ?const? qualifier from pointer target type [-Wdiscarded-qualifiers]
-
-to match with this patch.
-
-> 
-> This is a bit unfortunate, since we generally like structure definitions to
-> be const, but as this is legacy code, the easiest way out is still to
-> remove the 'const' annotation here.
-> 
-> Fixes: 4a5f8ae50b66 ("[media] davinci: vpif_capture: get subdevs from DT when available")
-> Fixes: 231ce279e6e3 ("ARM: davinci: fix const warnings")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Acked-by: Sekhar Nori <nsekhar@ti.com>
-
-Looks like this slipped my testing since I had 
-CONFIG_DA850_UI_SD_VIDEO_PORT switched off. Thanks for catching it.
-
+On Tue, Jul 25, 2017 at 9:12 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> The ZTE SoC drivers are only useful when building for a ZTE ZX platform.
+>
+> Fixes: 4c2c2e39713b8cfb ("soc: zte: pm_domains: Prepare for supporting ARMv8 zx2967 family")
+> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> Reviewed-by: Baoyou Xie <baoyou.xie@linaro.org>
 > ---
-> I originally sent my fix on Jun 9, but Kevin had already applied an
-> identical fix for two of the three affected files. This fixes the
-> third one that his patch missed.
-> 
-> I have a couple of other patches that I'm planning to apply directly
-> to the fixes branch now, and would do the same for this one unless
-> there are objections.
+> Sent before on 2017-05-29.
 
-No problem. Thanks!
+Applied to fixes, thanks
 
-~Sekhar
+      Arnd
