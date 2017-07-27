@@ -1,18 +1,27 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 27 Jul 2017 15:07:03 +0000 (UTC)
-Subject: [PATCH] ARM: Convert to using %pOF instead of full_name
-In-Reply-To: <20170718214339.7774-1-robh@kernel.org>
-References: <20170718214339.7774-1-robh@kernel.org>
-Message-ID: <alpine.DEB.2.02.1707271506200.23088@utopia.booyaka.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 27 Jul 2017 17:09:00 +0200
+Subject: [PATCH 0/4] soc: renesas: Add R-Car D3 support
+In-Reply-To: <1500554094-22198-1-git-send-email-geert+renesas@glider.be>
+References: <1500554094-22198-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170727150859.GE16143@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Jul 2017, Rob Herring wrote:
+On Thu, Jul 20, 2017 at 02:34:50PM +0200, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
+> 
+> This patch series adds R-Car D3 support to the Renesas-specific SoC
+> drivers:
+>   - SoC identification,
+>   - System controller,
+>   - Reset controller.
+> 
+> Thanks!
+> 
+> Geert Uytterhoeven (4):
+>   soc: renesas: Identify R-Car D3
+>   soc: renesas: Add r8a77995 SYSC PM Domain Binding Definitions
+>   soc: renesas: rcar-sysc: Add support for R-Car D3 power areas
+>   soc: renesas: rcar-rst: Add support for R-Car D3
 
-> Now that we have a custom printf format specifier, convert users of
-> full_name to use %pOF instead. This is preparation to remove storing
-> of the full path string for each node.
-
-Acked-by: Paul Walmsley <paul@pwsan.com>  # for mach-omap2/omap-hwmod.c
-
-- Paul
+Thanks, applied for v4.14.
