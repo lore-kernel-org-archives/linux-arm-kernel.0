@@ -1,72 +1,64 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Thu, 27 Jul 2017 14:49:03 +0100
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170727124913.GL3730@linux.vnet.ibm.com>
-References: <20170726223658.GA27617@linux.vnet.ibm.com>
- <20170726.154540.150558937277891719.davem@davemloft.net>
- <20170726231505.GG3730@linux.vnet.ibm.com>
- <20170726.162200.1904949371593276937.davem@davemloft.net>
- <20170727014214.GH3730@linux.vnet.ibm.com>
- <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
- <20170727124913.GL3730@linux.vnet.ibm.com>
-Message-ID: <20170727144903.000022a1@huawei.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Thu, 27 Jul 2017 15:49:52 +0200
+Subject: [PATCH v3] ARM: dts: stm32: change pinctrl bindings definition
+Message-ID: <1501163393-28884-1-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Jul 2017 05:49:13 -0700
-"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+Initially each pin was declared in "include/dt-bindings/stm32<SOC>-pinfunc.h"
+and each definition contained SOC names (ex: STM32F429_PA9_FUNC_USART1_TX).
+Since this approach was approved, the number of supported MCU has
+increased (STM32F429/STM32F469/STM32f746/STM32H743). To avoid to add a new
+file in "include/dt-bindings" each time a new STM32 SOC arrives I propose
+a new approach which consist to use a macro to define pin muxing in device
+tree. All STM32 DT will use the common macro to define pinmux. Furthermore, it
+will make maintenance and integration of new SOC easier.
 
-> On Thu, Jul 27, 2017 at 02:34:00PM +1000, Nicholas Piggin wrote:
-> > On Wed, 26 Jul 2017 18:42:14 -0700
-> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> >   
-> > > On Wed, Jul 26, 2017 at 04:22:00PM -0700, David Miller wrote:  
-> >   
-> > > > Indeed, that really wouldn't explain how we end up with a RCU stall
-> > > > dump listing almost all of the cpus as having missed a grace period.    
-> > > 
-> > > I have seen stranger things, but admittedly not often.  
-> > 
-> > So the backtraces show the RCU gp thread in schedule_timeout.
-> > 
-> > Are you sure that it's timeout has expired and it's not being scheduled,
-> > or could it be a bad (large) timeout (looks unlikely) or that it's being
-> > scheduled but not correctly noting gps on other CPUs?
-> > 
-> > It's not in R state, so if it's not being scheduled at all, then it's
-> > because the timer has not fired:  
-> 
-> Good point, Nick!
-> 
-> Jonathan, could you please reproduce collecting timer event tracing?
-I'm a little new to tracing (only started playing with it last week)
-so fingers crossed I've set it up right.  No splats yet.  Was getting
-splats on reading out the trace when running with the RCU stall timer
-set to 4 so have increased that back to the default and am rerunning.
+I made only one patch to avoid dependencies. Let me know if you prefer that I
+split it.
 
-This may take a while.  Correct me if I've gotten this wrong to save time
+To check that patch generate same dtb than befrore I used dtc binary to (re)generate dts files
+(before and after apply the series).
 
-echo "timer:*" > /sys/kernel/debug/tracing/set_event
+Example on stm32f469-disco:
 
-when it dumps, just send you the relevant part of what is in
-/sys/kernel/debug/tracing/trace?
+./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-after.dts
+stm32f469-disco-after.dtb
 
-Thanks,
+./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-before.dts
+stm32f469-disco-before.dtb
 
-Jonathan
-> 
-> 							Thanx, Paul
-> 
-> > [ 1984.628602] rcu_preempt kthread starved for 5663 jiffies! g1566 c1565 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1
-> > [ 1984.638153] rcu_preempt     S    0     9      2 0x00000000
-> > [ 1984.643626] Call trace:
-> > [ 1984.646059] [<ffff000008084fb0>] __switch_to+0x90/0xa8
-> > [ 1984.651189] [<ffff000008962274>] __schedule+0x19c/0x5d8
-> > [ 1984.656400] [<ffff0000089626e8>] schedule+0x38/0xa0
-> > [ 1984.661266] [<ffff000008965844>] schedule_timeout+0x124/0x218
-> > [ 1984.667002] [<ffff000008121424>] rcu_gp_kthread+0x4fc/0x748
-> > [ 1984.672564] [<ffff0000080df0b4>] kthread+0xfc/0x128
-> > [ 1984.677429] [<ffff000008082ec0>] ret_from_fork+0x10/0x50
-> >   
-> 
+Then diff -u stm32f469-disco-before.dts stm32f469-disco-after.dts
+
+Changes since v2:
+ -Drop RFC tag
+ -Add reviewers
+ -Enhance modifications to all STM32 (F4/F7/H7)
+
+Changes since v1:
+ -According to Vikas Manocha review, use generic macro to define port.
+
+
+Regards
+Alex
+
+
+Alexandre Torgue (1):
+  ARM: dts: stm32: change pinctrl bindings definition
+
+ .../bindings/pinctrl/st,stm32-pinctrl.txt          |   37 +-
+ arch/arm/boot/dts/stm32f429.dtsi                   |  176 +--
+ arch/arm/boot/dts/stm32f746.dtsi                   |   10 +-
+ arch/arm/boot/dts/stm32h743-pinctrl.dtsi           |   10 +-
+ include/dt-bindings/pinctrl/stm32-pinfunc.h        |   31 +
+ include/dt-bindings/pinctrl/stm32f429-pinfunc.h    | 1239 ---------------
+ include/dt-bindings/pinctrl/stm32f746-pinfunc.h    | 1324 ----------------
+ include/dt-bindings/pinctrl/stm32h7-pinfunc.h      | 1612 --------------------
+ 8 files changed, 150 insertions(+), 4289 deletions(-)
+ create mode 100644 include/dt-bindings/pinctrl/stm32-pinfunc.h
+ delete mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
+ delete mode 100644 include/dt-bindings/pinctrl/stm32f746-pinfunc.h
+ delete mode 100644 include/dt-bindings/pinctrl/stm32h7-pinfunc.h
+
+-- 
+2.7.4
