@@ -1,54 +1,109 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 27 Jul 2017 22:54:53 +0800
-Subject: [GIT PULL] Allwinner fixes for 4.13
-Message-ID: <20170727145453.il2nepmrrr355fgp@wens.csie.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 27 Jul 2017 17:14:32 +0200
+Subject: [PATCH v2 1/2] platform: Add Amlogic Meson AO CEC Controller
+ driver
+In-Reply-To: <9acecab0-7dda-9aa1-fa07-886d40f6c7df@baylibre.com>
+References: <1499673696-21372-1-git-send-email-narmstrong@baylibre.com>
+ <1499673696-21372-2-git-send-email-narmstrong@baylibre.com>
+ <b5cb7021-4c9e-98b2-5fd1-11effda3fd30@xs4all.nl>
+ <f6e40d38-fe18-49e6-0ee1-a4467666777c@baylibre.com>
+ <6f93edd0-098e-6cbc-9eea-99dd68ab3420@xs4all.nl>
+ <9acecab0-7dda-9aa1-fa07-886d40f6c7df@baylibre.com>
+Message-ID: <b3cc0f02-7bd0-a6c9-c223-6902f448d276@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On 07/27/2017 04:43 PM, Neil Armstrong wrote:
+> On 07/25/2017 03:45 PM, Hans Verkuil wrote:
+>> On 07/25/17 14:34, Neil Armstrong wrote:
+>>> Hi Hans,
+>>
+>>>>> +static int meson_ao_cec_probe(struct platform_device *pdev)
+>>>>> +{
+>>>>> +	struct meson_ao_cec_device *ao_cec;
+>>>>> +	struct platform_device *hdmi_dev;
+>>>>> +	struct device_node *np;
+>>>>> +	struct resource *res;
+>>>>> +	int ret, irq;
+>>>>> +
+>>>>> +	np = of_parse_phandle(pdev->dev.of_node, "hdmi-phandle", 0);
+>>>>> +	if (!np) {
+>>>>> +		dev_err(&pdev->dev, "Failed to find hdmi node\n");
+>>>>> +		return -ENODEV;
+>>>>> +	}
+>>>>> +
+>>>>> +	hdmi_dev = of_find_device_by_node(np);
+>>>>> +	if (hdmi_dev == NULL)
+>>>>> +		return -EPROBE_DEFER;
+>>>>> +
+>>>>> +	ao_cec = devm_kzalloc(&pdev->dev, sizeof(*ao_cec), GFP_KERNEL);
+>>>>> +	if (!ao_cec)
+>>>>> +		return -ENOMEM;
+>>>>> +
+>>>>> +	spin_lock_init(&ao_cec->cec_reg_lock);
+>>>>> +
+>>>>> +	ao_cec->notify = cec_notifier_get(&hdmi_dev->dev);
+>>>>> +	if (!ao_cec->notify)
+>>>>> +		return -ENOMEM;
+>>>>> +
+>>>>> +	ao_cec->adap = cec_allocate_adapter(&meson_ao_cec_ops, ao_cec,
+>>>>> +					    "meson_ao_cec",
+>>>>> +					    CEC_CAP_LOG_ADDRS |
+>>>>> +					    CEC_CAP_TRANSMIT |
+>>>>> +					    CEC_CAP_RC |
+>>>>> +					    CEC_CAP_PASSTHROUGH,
+>>>>> +					    1); /* Use 1 for now */
+>>>>
+>>>> I recommend that you add support for 2 logical addresses. More isn't allowed
+>>>> by the CEC 2.0 spec anyway (no such restriction for CEC 1.4, but more than
+>>>> two really isn't needed).
+>>>
+>>> I know, but in the "communication" register with the suspend/poweroff firmware
+>>> that  handles the wake up, only a single logical address is supported...
+>>>
+>>> What should I do in this case ? Which logical adress should I pass to the firmware when implementing ir ?
+>>
+>> Ah, OK. Interesting.
+>>
+>> From cec-adap.c:
+>>
+>>                 if (log_addrs->num_log_addrs == 2) {
+>>                         if (!(type_mask & ((1 << CEC_LOG_ADDR_TYPE_AUDIOSYSTEM) |
+>>                                            (1 << CEC_LOG_ADDR_TYPE_TV)))) {
+>>                                 dprintk(1, "two LAs is only allowed for audiosystem and TV\n");
+>>                                 return -EINVAL;
+>>                         }
+>>                         if (!(type_mask & ((1 << CEC_LOG_ADDR_TYPE_PLAYBACK) |
+>>                                            (1 << CEC_LOG_ADDR_TYPE_RECORD)))) {
+>>                                 dprintk(1, "an audiosystem/TV can only be combined with record or playback\n");
+>>                                 return -EINVAL;
+>>                         }
+>>                 }
+>>
+>> So you would store the TV or AUDIOSYSTEM logical address in the firmware, since those
+>> describe the system best.
+>>
+>> I.e. it is a TV/Audiosystem with recording/playback capabilities.
+>>
+>> The problem is that for CEC 1.4 no such restriction is imposed (the test above is
+>> specific to CEC 2.0). But I think it makes sense to just check if TV/Audiosystem
+>> is selected and pick that as the LA to store in the firmware, and otherwise just
+>> pick the first LA (log_addr[0]).
+> 
+> 
+> Ok I'll add support for dual LA, and I'll do this LA selection when I'll add firmware support.
 
-I will be handling some of the pull requests this cycle.
-Here are some fixes we would like merged for 4.13.
+Sorry, but having more than 1 LA makes the CEC controller very unstable, I'll need more info from amlogic to activate multiple LAs.
 
-Thanks!
-ChenYu
+Neil
 
-
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
-
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-fixes-for-4.13
-
-for you to fetch changes up to c50f9fb6c535edf4731eecb53d91ebc297e82e5b:
-
-  ARM: dts: sun8i: a83t: Switch to CCU device tree binding macros (2017-07-27 21:18:48 +0800)
-
-----------------------------------------------------------------
-Allwinner fixes for 4.13
-
-Two fixes to correct the EMAC blocks memory region size to match the
-datasheet. One that converts raw A83T clock indices to macros from the
-clk dt-binding header, completing the A83T sunxi-ng clk driver.
-
-----------------------------------------------------------------
-Chen-Yu Tsai (1):
-      ARM: dts: sun8i: a83t: Switch to CCU device tree binding macros
-
-Corentin Labbe (2):
-      ARM: dts: sunxi: h3/h5: Correct emac register size
-      arm64: allwinner: sun50i-a64: Correct emac register size
-
- arch/arm/boot/dts/sun8i-a83t.dtsi             | 16 +++++++++-------
- arch/arm/boot/dts/sunxi-h3-h5.dtsi            |  2 +-
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi |  2 +-
- 3 files changed, 11 insertions(+), 9 deletions(-)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170727/a32e23c9/attachment.sig>
+> 
+> Thanks,
+> Neil
+> 
+> 
+>> Regards,
+>>
+>> 	Hans
+>>
+> 
