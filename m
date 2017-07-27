@@ -1,73 +1,104 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Thu, 27 Jul 2017 12:08:31 +0200
-Subject: [PATCH 06/12] ARM: omap2: mark unused functions as __maybe_unused
-In-Reply-To: <20170720155209.3250880-3-arnd@arndb.de>
-References: <20170720154616.3250481-1-arnd@arndb.de>
- <20170720155209.3250880-3-arnd@arndb.de>
-Message-ID: <20170727100831.dixjoysxje6vkduq@earth>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 27 Jul 2017 12:10:40 +0200
+Subject: [PATCH v6 4/7] drm/rockchip: vop: group vop registers
+In-Reply-To: <44153824.CqyclESHdT@diego>
+References: <1501049930-5794-1-git-send-email-mark.yao@rock-chips.com>
+ <1501049966-6070-1-git-send-email-mark.yao@rock-chips.com>
+ <44153824.CqyclESHdT@diego>
+Message-ID: <10499935.q3BgzX4LKL@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jul 20, 2017 at 05:51:44PM +0200, Arnd Bergmann wrote:
-> The omap_generic_init() and omap_hwmod_init_postsetup() functions are
-> used in the initialization for all OMAP2+ SoC types, but in the
-> extreme case that those are all disabled, we get a warning about
-> unused code:
+Am Donnerstag, 27. Juli 2017, 11:51:06 CEST schrieb Heiko St?bner:
+> Hi Mark,
 > 
-> arch/arm/mach-omap2/io.c:412:123: error: 'omap_hwmod_init_postsetup' defined but not used [-Werror=unused-function]
-> arch/arm/mach-omap2/board-generic.c:30:123: error: 'omap_generic_init' defined but not used [-Werror=unused-function]
+> Am Mittwoch, 26. Juli 2017, 14:19:25 CEST schrieb Mark Yao:
+> > Grouping the vop registers facilitates make register
+> > definition clearer, and also is useful for different vop
+> > reuse the same group register.
+> > 
+> > Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> > ---
+> > 
+> >  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  99
+> >  ++++++++++++------------
+> >  drivers/gpu/drm/rockchip/rockchip_drm_vop.h |  60 ++++++++-------
+> >  drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 112
+> > 
+> > +++++++++++++++------------- 3 files changed, 144 insertions(+), 127
+> > deletions(-)
 > 
-> This annotates both as __maybe_unused to shut up that warning.
+> This breaks display support on both rk3036 and rk3288 and I end up
+> with a null pointer dereference in
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> [   10.640297] Unable to handle kernel NULL pointer dereference at virtual
+> address 00000000 [   10.654430] pgd = c0204000
+> [   10.657452] [00000000] *pgd=00000000
+> [   10.661473] Internal error: Oops: 5 [#1] SMP ARM
+> [   10.666635] Modules linked in: snd_pcm media snd_timer phy_rockchip_dp
+> snd soundcore rockchipdrm dw_hdmi analogix_dp rtc_rk808 pwm_rockchip
+> clk_rk808 spi_rockchip [   10.682897] CPU: 2 PID: 143 Comm: kworker/2:2 Not
+> tainted 4.13.0-rc2-01791-g2b86603d0515 #355 [   10.692430] Hardware name:
+> Rockchip (Device Tree)
+> [   10.697692] Workqueue: events deferred_probe_work_func
+> [   10.702152] Linux video capture interface: v2.00
+> [   10.708590] task: ee38c800 task.stack: ed2e6000
+> [   10.713656] PC is at vop_reg_set.constprop.4+0x4/0xa8 [rockchipdrm]
+> [   10.720668] LR is at vop_bind+0x568/0x8a0 [rockchipdrm]
 
-I guess I am CC'd because of get_maintainer's git feature? Anyways:
+The obvious reason for that is
 
-Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
-
-> ---
-> Originally sent in Feb 2016, but it got lost for some reason.
-> ---
->  arch/arm/mach-omap2/board-generic.c | 2 +-
->  arch/arm/mach-omap2/io.c            | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+> @@ -164,14 +153,20 @@ static inline uint32_t vop_read_reg(struct vop *vop,
+> uint32_t base, return (vop_readl(vop, base + reg->offset) >> reg->shift) &
+> reg->mask; }
 > 
-> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-> index dc9e34e670a2..b1e661bb5521 100644
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -28,7 +28,7 @@ static const struct of_device_id omap_dt_match_table[] __initconst = {
->  	{ }
->  };
->  
-> -static void __init omap_generic_init(void)
-> +static void __init __maybe_unused omap_generic_init(void)
+> -static inline void vop_mask_write(struct vop *vop, uint32_t offset,
+> -				  uint32_t mask, uint32_t shift, uint32_t v,
+> -				  bool write_mask, bool relaxed)
+> +static void vop_reg_set(struct vop *vop, const struct vop_reg *reg,
+> +			uint32_t _offset, uint32_t _mask, uint32_t v,
+> +			const char *reg_name)
 >  {
->  	pdata_quirks_init(omap_dt_match_table);
->  
-> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-> index 1d739d1a0a65..1cd20e4d56b0 100644
-> --- a/arch/arm/mach-omap2/io.c
-> +++ b/arch/arm/mach-omap2/io.c
-> @@ -410,7 +410,7 @@ static int _set_hwmod_postsetup_state(struct omap_hwmod *oh, void *data)
->  	return omap_hwmod_set_postsetup_state(oh, *(u8 *)data);
->  }
->  
-> -static void __init omap_hwmod_init_postsetup(void)
-> +static void __init __maybe_unused omap_hwmod_init_postsetup(void)
->  {
->  	u8 postsetup_state;
->  
-> -- 
-> 2.9.0
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170727/0f52afce/attachment.sig>
+> -	if (!mask)
+> +	int offset = reg->offset + _offset;
+> +	int mask = reg->mask & _mask;
+> +	int shift = reg->shift;
+> +
+> +	if (!reg || !reg->mask) {
+> +		dev_dbg(vop->dev, "Warning: not support %s\n", reg_name);
+>  		return;
+> +	}
+
+where the check for !reg happens after it got already dereferenced.
+But even with that fixed I end up with
+
+on rk3288:
+[    7.254823] rockchip-vop ff930000.vop: Warning: not support global_regdone_en
+[    7.262847] rockchip-vop ff930000.vop: Warning: not support gate
+[    7.269580] rockchip-vop ff930000.vop: Warning: not support gate
+[    7.302765] rockchip-vop ff940000.vop: Warning: not support global_regdone_en
+[    7.310758] rockchip-vop ff940000.vop: Warning: not support gate
+[    7.317475] rockchip-vop ff940000.vop: Warning: not support gate
+[    7.425724] rockchip-vop ff930000.vop: Warning: not support edp_pin_pol
+[    7.526298] rockchip-vop ff940000.vop: Warning: not support hdmi_pin_pol
+
+on rk3036:
+[   12.389138] rockchip-vop 10118000.vop: Warning: not support global_regdone_en
+[   12.397324] rockchip-vop 10118000.vop: Warning: not support gate
+[   12.404165] rockchip-vop 10118000.vop: Warning: not support gate
+[   13.747361] rockchip-vop 10118000.vop: Warning: not support hdmi_pin_pol
+[   13.747371] rockchip-vop 10118000.vop: Warning: not support hdmi_en
+[   13.747379] rockchip-vop 10118000.vop: Warning: not support hpost_st_end
+[   13.747385] rockchip-vop 10118000.vop: Warning: not support vpost_st_end
+[   13.747461] rockchip-vop 10118000.vop: Warning: not support src_alpha_ctl
+[   13.767098] rockchip-vop 10118000.vop: Warning: not support src_alpha_ctl
+[   13.786060] rockchip-vop 10118000.vop: Warning: not support src_alpha_ctl
+
+While reqdone and friends are obviously features of newer vops, at least
+the hdmi pin-pol is available on both these socs.
+
+With this patch applied (and null-ptr fixed) I end up without hdmi output
+on both socs.
+
+
+Heiko
