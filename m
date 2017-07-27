@@ -1,33 +1,30 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 27 Jul 2017 21:37:50 +0200
-Subject: [BUG] v4.12 breaks pxa25x
-In-Reply-To: <20170727120807.15148375@roar.ozlabs.ibm.com> (Nicholas Piggin's
- message of "Thu, 27 Jul 2017 12:08:07 +1000")
-References: <87inirsgzk.fsf@belgarion.home>
- <20170717081518.GI31807@n2100.armlinux.org.uk>
- <87eftfrs0e.fsf@belgarion.home> <87o9s7qw64.fsf@belgarion.home>
- <20170726114139.GN31807@n2100.armlinux.org.uk>
- <20170726220334.2961ae22@roar.ozlabs.ibm.com>
- <87k22urjwp.fsf@belgarion.home>
- <20170727120807.15148375@roar.ozlabs.ibm.com>
-Message-ID: <87fudhr7qp.fsf@belgarion.home>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 27 Jul 2017 21:53:12 +0200
+Subject: [PATCH] ARM: shmobile: rcar-gen2: Fix deadlock in regulator quirk
+In-Reply-To: <1499870720-30390-1-git-send-email-geert+renesas@glider.be>
+References: <1499870720-30390-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170727195307.GA2834@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicholas Piggin <npiggin@gmail.com> writes:
+On Wed, Jul 12, 2017 at 04:45:20PM +0200, Geert Uytterhoeven wrote:
+> Simon Horman reported that Koelsch and Lager hang during boot, and
+> bisected this to commit 1c3c5eab171590f8 ("sched/core: Enable
+> might_sleep() and smp_processor_id() checks early").
+> 
+> The da9063/da9210 regulator quirk for R-Car Gen2 boards uses a bus
+> notifier, and unregisters the notifier when it is no longer needed.
+> However, a notifier must not be unregistered from within the call chain.
+> 
+> This bug went unnoticed, as blocking_notifier_chain_unregister() didn't
+> take the semaphore during early boot.  The aforementioned commit changed
+> that behavior, leading to a deadlock.
+> 
+> Fix this by removing the call to bus_unregister_notifier(), and keeping
+> local completion state instead.
+> 
+> Reported-by: Simon Horman <horms+renesas@verge.net.au>
+> Fixes: 663fbb52159cca6f ("ARM: shmobile: R-Car Gen2: Add da9063/da9210 regulator quirk")
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-> Hmm, I intended to cc you, but somehow failed that too. No wonder my
-> code has bugs :\
->
-> It's gone to linux-kbuild and linux-arm-kernel
->
-> http://marc.info/?l=linux-kbuild&m=150107320226315&q=raw
-I verified your patch, it works. Could you please add :
-Reported-by: Robert Jarzmik <robert.jarzmik@free.fr>
-...
-Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
-
-Cheers.
-
--- 
-Robert
+Sorry for the delay, I have applied this as a fix for v4.13.
