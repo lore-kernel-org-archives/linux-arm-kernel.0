@@ -1,111 +1,58 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Thu, 27 Jul 2017 13:26:14 +0000
-Subject: [PATCH v4 1/2] acpi:iort: Add an IORT helper function to
- reserve HW ITS address regions for IOMMU drivers
-In-Reply-To: <989fec76-45e7-d744-3411-78ec2764cb7d@arm.com>
-References: <20170725111732.41792-1-shameerali.kolothum.thodi@huawei.com>
- <20170725111732.41792-2-shameerali.kolothum.thodi@huawei.com>
- <20170725171100.GA1663@red-moon>
- <b7512f89-4fe7-940e-0fa9-9274d8b1e935@arm.com>
- <20170726095208.GA2468@red-moon>
- <5FC3163CFD30C246ABAA99954A238FA8383C0268@FRAEML521-MBX.china.huawei.com>
- <989fec76-45e7-d744-3411-78ec2764cb7d@arm.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA8383C04A2@FRAEML521-MBX.china.huawei.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 27 Jul 2017 15:31:46 +0200
+Subject: [PATCH v2] ARM: Convert to using %pOF instead of full_name
+In-Reply-To: <20170721192835.25555-1-robh@kernel.org>
+References: <20170721192835.25555-1-robh@kernel.org>
+Message-ID: <20170727133143.GB16143@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Robin Murphy [mailto:robin.murphy at arm.com]
-> Sent: Thursday, July 27, 2017 12:13 PM
-> To: Shameerali Kolothum Thodi; Lorenzo Pieralisi
-> Cc: Guohanjun (Hanjun Guo); Gabriele Paoloni; marc.zyngier at arm.com;
-> John Garry; will.deacon at arm.com; Linuxarm; linux-acpi at vger.kernel.org;
-> iommu at lists.linux-foundation.org; hanjun.guo at linaro.org; Wangzhou (B);
-> sudeep.holla at arm.com; linux-arm-kernel at lists.infradead.org;
-> devel at acpica.org
-> Subject: Re: [PATCH v4 1/2] acpi:iort: Add an IORT helper function to reserve
-> HW ITS address regions for IOMMU drivers
+On Fri, Jul 21, 2017 at 02:28:32PM -0500, Rob Herring wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
 > 
-[...]
-
-> >>>> I can make these changes but I suspect this series will go via IOMMU
-> >>>> tree, let me know how you want to handle it.
-> >>>>
-> >>>> Lorenzo
-> >>>>
-> >>>>> +	node = iort_find_dev_node(dev);
-> >>>>> +	if (!node)
-> >>>>> +		return -ENODEV;
-> >>>>> +
-> >>>
-> >>> I'd suggest we also want a comment here to clarify that we're currently
-> >>> assuming straightforward topologies where all mappings for a given root
-> >>> complex/named component target the same ITS group. Otherwise
-> we're
-> >> going
-> >>> to need somewhat more logic to iterate the its_node processing over
-> >>> every mapping (or every alias in the PCI case), but avoid creating
-> >>> duplicate entries.
-> >>
-> >> You have a point and we have time to update the code. Short of reserving
-> >> all ITS regions for every device that maps to one at least, we could (even
-> >> pre-compute instead of looking it up on the fly) create a list of ITS
-> >> identifiers a given IORT node may map to and use that to reserve the
-> >> regions.
-> >
-> > I am trying to understand the use case scenario discussed here. Apologies
-> > if it is a dumb query.
-> >
-> > My understanding is that, it is possible to have a PCI  RC iort node mapped
-> to
-> > multiple ITS group nodes.  That is perfectly fine and given a dev input RID
-> we
-> > can identify the ITS group the device points to using - iort_node_map_id().
-> >
-> > But the above discussion seems to suggest that there might be situations
-> where
-> > we have to go through all the mapped ITS groups and identify all the ITSs
-> associated
-> > with the RC.  Clearly I am missing something.
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Acked-by: Heiko Stuebner <heiko@sntech.de>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-rockchip at lists.infradead.org
+> Cc: linux-renesas-soc at vger.kernel.org
+> ---
+> v2:
+> - Merge several 2 line prints to single line.
+> - Add acks
 > 
-> I was mostly thinking of a situation like this:
-> 
-> +----Node 0-----+  +----Node 1-----+
-> |  [CPU 0..n]   |  |  [CPU n+1..]  |
-> | [ITS group 0] |  | [ITS group 1] |
-> +---------------+  +---------------+
->         ^                  ^
->          \_______  _______/
->                  \/
->             +--Node 2--+
->             |  [SMMU]  |
->             |     ^    |
->             |     |    |
->             | [Device] |
->             +----------+
-> 
-> where the (named component) device has IDs for both ITS groups (to help
-> optimise affining, or allow physically hotplugging CPU nodes, or
-> whatever - I'm hypothesising here ;)).  A generic IORT function isn't in
-> a position to decide *which* ITS region the device may be targeting at
-> any given time, so can only correctly describe both.
+>  arch/arm/kernel/cpuidle.c            | 4 ++--
+>  arch/arm/kernel/devtree.c            | 5 ++---
+>  arch/arm/kernel/topology.c           | 3 +--
+>  arch/arm/mach-exynos/suspend.c       | 7 +++----
+>  arch/arm/mach-imx/gpc.c              | 4 ++--
+>  arch/arm/mach-mvebu/kirkwood.c       | 3 +--
+>  arch/arm/mach-omap2/omap-wakeupgen.c | 4 ++--
+>  arch/arm/mach-omap2/omap_hwmod.c     | 4 ++--
+>  arch/arm/mach-rockchip/platsmp.c     | 4 ++--
+>  arch/arm/mach-shmobile/pm-rmobile.c  | 7 +++----
+>  10 files changed, 20 insertions(+), 25 deletions(-)
 
-Thanks Robin. That makes it clear.
- 
-> I'm perfectly happy not to even try to support such crazy configurations
-> until they actually exist, if ever; I'd just prefer to document whatever
-> assumptions we do make, so that we don't have to remember or re-derive
-> them when looking at the code in future.
+mach-shmobile portion:
 
-So I think the conclusion here is we will document the assumption that we are
-only taking care of the straightforward topologies for now.
-
-Hi Lorenzo,
-If you are ok with the above, please let me know if it make sense to send out
-a v5 with this and your other comments or you can take care of them. I am fine
-either way.
-
-Many thanks,
-Shameer
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
