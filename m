@@ -1,41 +1,33 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 27 Jul 2017 23:25:46 +0100
-Subject: halting the kernel does not stop the CPU cores?
-In-Reply-To: <26ccb0f7-0f78-27cd-cead-ddd810f4a33e@gmail.com>
-References: <VI1PR04MB1662099750F9EAFA0324C6538CBE0@VI1PR04MB1662.eurprd04.prod.outlook.com>
- <26ccb0f7-0f78-27cd-cead-ddd810f4a33e@gmail.com>
-Message-ID: <20170727222545.GT31807@n2100.armlinux.org.uk>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 27 Jul 2017 15:38:17 -0700
+Subject: [PATCH] irqchip: brcmstb-l2: Define an irq_pm_shutdown function
+Message-ID: <20170727223817.7494-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 27, 2017 at 01:07:00PM -0700, Florian Fainelli wrote:
-> On 07/27/2017 07:38 AM, Heinz Wrobel wrote:
-> > Hi,
-> > 
-> > I noticed that when halting the kernel (intentionally or not), the cores effectively go into a while(1) loop and power consumption on larger devices really jumps up significantly to the point where, e.g., a ?crash? turns into ?crash and burn?.
-> > 
-> > I would assume that if a system is halted, you don?t want to dissipate more power than on a running system but go as silent as low power as reasonable.
-> > 
-> > Is there any specific reason why the cores would not go into a wfi loop like they do on idle?
-> > The patch to fix this seems to be easy at first glance, but is there a good reason *NOT* to do such a patch and to leave the plain while(1)?
-> 
-> In fact, if your platform supports CPU_HOTPLUG, I am not clear why
-> smp_send_stop() + ipi_send_stop() is not calling platform_cpu_kill()
-> which would be smp_ops.cpu_kill() but instead cpu_relax() was chosen?
-> 
-> The CPU is dead anyway so as you say, so it's not like there is a remote
-> chance to resume execution on these secondary cores?
+The Broadcom STB platforms support S5 and we allow specific hardware
+wake-up events to take us out of this state. Because we were not
+defining an irq_pm_shutdown() function pointer, we would not be
+correctly masking non-wakeup events, which would result in spurious
+wake-ups from sources that were not explicitly configured for wake-up.
 
-The cpu kill method also needs another cpu to be interacting with the
-cpu die methods as well - the CPU hotunplug is a combination effort
-between the CPU to be killed and the CPU asking for the killing of
-that CPU.
+Fixes: 7f646e92766e ("irqchip: brcmstb-l2: Add Broadcom Set Top Box Level-2 interrupt controller")
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ drivers/irqchip/irq-brcmstb-l2.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-We don't have that luxury in these paths, which are used amongst
-other things for when the kernel panics, which can happen from any
-context.
-
+diff --git a/drivers/irqchip/irq-brcmstb-l2.c b/drivers/irqchip/irq-brcmstb-l2.c
+index bddf169c4b37..b009b916a292 100644
+--- a/drivers/irqchip/irq-brcmstb-l2.c
++++ b/drivers/irqchip/irq-brcmstb-l2.c
+@@ -189,6 +189,7 @@ static int __init brcmstb_l2_intc_of_init(struct device_node *np,
+ 
+ 	ct->chip.irq_suspend = brcmstb_l2_intc_suspend;
+ 	ct->chip.irq_resume = brcmstb_l2_intc_resume;
++	ct->chip.irq_pm_shutdown = brcmstb_l2_intc_suspend;
+ 
+ 	if (data->can_wake) {
+ 		/* This IRQ chip can wake the system, set all child interrupts
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.9.3
