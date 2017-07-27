@@ -1,59 +1,28 @@
-From: bp@suse.de (Borislav Petkov)
-Date: Thu, 27 Jul 2017 16:49:22 +0200
-Subject: [PATCH v6 1/1] acpi: apei: Enable APEI multiple GHES source to
- share a single external IRQ
-In-Reply-To: <CAJZ5v0jVSrsufoWyexb_MWS=ni0CDn7Oo1-oHOcaTxdYpfpQMg@mail.gmail.com>
-References: <1500661477-6536-1-git-send-email-lho@apm.com>
- <20170722055954.GA2082@nazgul.tnic>
- <1893763.BLgt1zgLk5@aspire.rjw.lan>
- <1632667.Vgem7HtdXu@aspire.rjw.lan>
- <20170727055825.GA4611@nazgul.tnic>
- <CAJZ5v0jVSrsufoWyexb_MWS=ni0CDn7Oo1-oHOcaTxdYpfpQMg@mail.gmail.com>
-Message-ID: <20170727144922.GF28553@nazgul.tnic>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 27 Jul 2017 16:53:56 +0200
+Subject: [PATCH] clk: sunxi-ng: Fix header guard of ccu-sun8i-r.h
+In-Reply-To: <20170726210221.173968-1-mka@chromium.org>
+References: <20170726210221.173968-1-mka@chromium.org>
+Message-ID: <20170727145356.uqt2aaqhcrpejxfv@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 27, 2017 at 04:34:59PM +0200, Rafael J. Wysocki wrote:
-> I can collect it, no problem.
+On Wed, Jul 26, 2017 at 02:02:21PM -0700, Matthias Kaehlcke wrote:
+> Remove trailing extra underscore in definition of _CCU_SUN8I_R_H
 > 
-> So from now on I will pick up APEI things with ACKs from you or Tony.
+> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
 
-If you agree with that, that is. But we kinda do that already, more or
-less. :-)
-
-Then I guess we should add something like this so that get_maintainer
-finds us:
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index f66488dfdbc9..985413fb5d83 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -310,6 +310,14 @@ F:	drivers/pci/*/*acpi*
- F:	drivers/pci/*/*/*acpi*
- F:	tools/power/acpi/
- 
-+ACPI APEI
-+M:	"Rafael J. Wysocki" <rjw@rjwysocki.net>
-+M:	Len Brown <lenb@kernel.org>
-+L:	linux-acpi at vger.kernel.org
-+R:	Tony Luck <tony.luck@intel.com>
-+R:	Borislav Petkov <bp@alien8.de>
-+F:	drivers/acpi/apei/
-+
- ACPI COMPONENT ARCHITECTURE (ACPICA)
- M:	Robert Moore <robert.moore@intel.com>
- M:	Lv Zheng <lv.zheng@intel.com>
-
----
-
-Provided Tony agrees though... I'd venture a guess and say that he
-doesn't have a choice, woahahhahaha...
-
-:-)))
+Applied, thanks!
+Maxime
 
 -- 
-Regards/Gruss,
-    Boris.
-
-SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
--- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170727/da0b3996/attachment.sig>
