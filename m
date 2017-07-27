@@ -1,109 +1,78 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 27 Jul 2017 17:14:32 +0200
-Subject: [PATCH v2 1/2] platform: Add Amlogic Meson AO CEC Controller
- driver
-In-Reply-To: <9acecab0-7dda-9aa1-fa07-886d40f6c7df@baylibre.com>
-References: <1499673696-21372-1-git-send-email-narmstrong@baylibre.com>
- <1499673696-21372-2-git-send-email-narmstrong@baylibre.com>
- <b5cb7021-4c9e-98b2-5fd1-11effda3fd30@xs4all.nl>
- <f6e40d38-fe18-49e6-0ee1-a4467666777c@baylibre.com>
- <6f93edd0-098e-6cbc-9eea-99dd68ab3420@xs4all.nl>
- <9acecab0-7dda-9aa1-fa07-886d40f6c7df@baylibre.com>
-Message-ID: <b3cc0f02-7bd0-a6c9-c223-6902f448d276@baylibre.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 27 Jul 2017 17:16:23 +0200
+Subject: [PATCH 0/4] arm64: dts: renesas: Add Support for R-Car D3 and
+ Draak
+In-Reply-To: <1500555277-22921-1-git-send-email-geert+renesas@glider.be>
+References: <1500555277-22921-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170727151622.GG16143@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/27/2017 04:43 PM, Neil Armstrong wrote:
-> On 07/25/2017 03:45 PM, Hans Verkuil wrote:
->> On 07/25/17 14:34, Neil Armstrong wrote:
->>> Hi Hans,
->>
->>>>> +static int meson_ao_cec_probe(struct platform_device *pdev)
->>>>> +{
->>>>> +	struct meson_ao_cec_device *ao_cec;
->>>>> +	struct platform_device *hdmi_dev;
->>>>> +	struct device_node *np;
->>>>> +	struct resource *res;
->>>>> +	int ret, irq;
->>>>> +
->>>>> +	np = of_parse_phandle(pdev->dev.of_node, "hdmi-phandle", 0);
->>>>> +	if (!np) {
->>>>> +		dev_err(&pdev->dev, "Failed to find hdmi node\n");
->>>>> +		return -ENODEV;
->>>>> +	}
->>>>> +
->>>>> +	hdmi_dev = of_find_device_by_node(np);
->>>>> +	if (hdmi_dev == NULL)
->>>>> +		return -EPROBE_DEFER;
->>>>> +
->>>>> +	ao_cec = devm_kzalloc(&pdev->dev, sizeof(*ao_cec), GFP_KERNEL);
->>>>> +	if (!ao_cec)
->>>>> +		return -ENOMEM;
->>>>> +
->>>>> +	spin_lock_init(&ao_cec->cec_reg_lock);
->>>>> +
->>>>> +	ao_cec->notify = cec_notifier_get(&hdmi_dev->dev);
->>>>> +	if (!ao_cec->notify)
->>>>> +		return -ENOMEM;
->>>>> +
->>>>> +	ao_cec->adap = cec_allocate_adapter(&meson_ao_cec_ops, ao_cec,
->>>>> +					    "meson_ao_cec",
->>>>> +					    CEC_CAP_LOG_ADDRS |
->>>>> +					    CEC_CAP_TRANSMIT |
->>>>> +					    CEC_CAP_RC |
->>>>> +					    CEC_CAP_PASSTHROUGH,
->>>>> +					    1); /* Use 1 for now */
->>>>
->>>> I recommend that you add support for 2 logical addresses. More isn't allowed
->>>> by the CEC 2.0 spec anyway (no such restriction for CEC 1.4, but more than
->>>> two really isn't needed).
->>>
->>> I know, but in the "communication" register with the suspend/poweroff firmware
->>> that  handles the wake up, only a single logical address is supported...
->>>
->>> What should I do in this case ? Which logical adress should I pass to the firmware when implementing ir ?
->>
->> Ah, OK. Interesting.
->>
->> From cec-adap.c:
->>
->>                 if (log_addrs->num_log_addrs == 2) {
->>                         if (!(type_mask & ((1 << CEC_LOG_ADDR_TYPE_AUDIOSYSTEM) |
->>                                            (1 << CEC_LOG_ADDR_TYPE_TV)))) {
->>                                 dprintk(1, "two LAs is only allowed for audiosystem and TV\n");
->>                                 return -EINVAL;
->>                         }
->>                         if (!(type_mask & ((1 << CEC_LOG_ADDR_TYPE_PLAYBACK) |
->>                                            (1 << CEC_LOG_ADDR_TYPE_RECORD)))) {
->>                                 dprintk(1, "an audiosystem/TV can only be combined with record or playback\n");
->>                                 return -EINVAL;
->>                         }
->>                 }
->>
->> So you would store the TV or AUDIOSYSTEM logical address in the firmware, since those
->> describe the system best.
->>
->> I.e. it is a TV/Audiosystem with recording/playback capabilities.
->>
->> The problem is that for CEC 1.4 no such restriction is imposed (the test above is
->> specific to CEC 2.0). But I think it makes sense to just check if TV/Audiosystem
->> is selected and pick that as the LA to store in the firmware, and otherwise just
->> pick the first LA (log_addr[0]).
+On Thu, Jul 20, 2017 at 02:54:33PM +0200, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
 > 
+> This patch series adds minimal support for the R-Car D3 SoC and the
+> Draak development board, allowing to boot from a ramdisk using a serial
+> console.
 > 
-> Ok I'll add support for dual LA, and I'll do this LA selection when I'll add firmware support.
+>   - The first two patches add DT sources for R-Car D3 and Draak.
+>     Due to the use of hardcoded constants, they have no further (build)
+>     dependencies (obviously there is a runtime dependency).
+>   - The last two patches replace the hardcoded constants by symbols from
+>     DT binding headers, and thus depend on those headers.  Hence it
+>     should be postponed to v4.15.
+> 
+> For proper operation, this depends on the 3 series I have just sent:
+>   - [PATCH 0/3] arm64: renesas: Base R-Car D3 support,
 
-Sorry, but having more than 1 LA makes the CEC controller very unstable, I'll need more info from amlogic to activate multiple LAs.
+I have applied the above patchset for v4.14.
 
-Neil
+>   - [PATCH 0/4] soc: renesas: Add R-Car D3 support,
 
+And this one too.
+
+>   - [PATCH 0/4] clk: renesas: Add R-Car D3 support.
+
+And this one seems to have been acked, so I assume you will
+apply it once you are back from holidays.
+
+So I have applied the first two patches for v4.14.
+Please repost the remaining two after v4.13-rc6 at which time I should
+be able to queue them up for v4.15.
+
+> For testing, an integration branch containing all dependencies (and a
+> few DT binding updates I do not want to send before "ARM: shmobile:
+> Document R-Car D3 SoC DT bindings" has been accepted) is available in
+> the topic/r8a77995-integration branch of the git repository at
+> https://git.kernel.org/cgit/linux/kernel/git/geert/renesas-drivers.git.
 > 
-> Thanks,
-> Neil
+> Thanks for your comments!
 > 
+> Geert Uytterhoeven (4):
+>   arm64: dts: renesas: Add Renesas R8A77995 SoC support
+>   arm64: dts: renesas: Add Renesas Draak board support
+>   arm64: dts: renesas: r8a77995: Use r8a7795-sysc binding definitions
+>   arm64: dts: renesas: r8a77995: Use r8a7795-cpg-mssr binding
+>     definitions
 > 
->> Regards,
->>
->> 	Hans
->>
+>  arch/arm64/boot/dts/renesas/Makefile           |   1 +
+>  arch/arm64/boot/dts/renesas/r8a77995-draak.dts |  46 ++++++++
+>  arch/arm64/boot/dts/renesas/r8a77995.dtsi      | 151 +++++++++++++++++++++++++
+>  3 files changed, 198 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+>  create mode 100644 arch/arm64/boot/dts/renesas/r8a77995.dtsi
+> 
+> -- 
+> 2.7.4
+> 
+> Gr{oetje,eeting}s,
+> 
+> 						Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+> 							    -- Linus Torvalds
 > 
