@@ -1,31 +1,39 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 27 Jul 2017 17:34:15 +0200
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Fixes for v4.13
-In-Reply-To: <CAK8P3a3+Q1UyQytegSoBSYv+WvnCgGgcbX6U-y51_EA-SZwcGA@mail.gmail.com>
-References: <cover.1500019167.git.horms+renesas@verge.net.au>
- <CAK8P3a3+Q1UyQytegSoBSYv+WvnCgGgcbX6U-y51_EA-SZwcGA@mail.gmail.com>
-Message-ID: <20170727153415.GN16143@verge.net.au>
+Date: Thu, 27 Jul 2017 17:37:02 +0200
+Subject: [PATCH 1/6] ARM: multi_v7_defconfig: Cleanup from non-existing
+ options
+In-Reply-To: <20170717163716.GB2346@kozik-book>
+References: <1500270596-22384-1-git-send-email-krzk@kernel.org>
+ <CAMuHMdUnFCUKQdEcyFiKzVgkL5__ZLRMudCvkRxp6cBXgV6g=g@mail.gmail.com>
+ <20170717163716.GB2346@kozik-book>
+Message-ID: <20170727153702.GO16143@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 27, 2017 at 12:52:47PM +0200, Arnd Bergmann wrote:
-> On Fri, Jul 14, 2017 at 10:04 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Hi Olof, Hi Kevin, Hi Arnd,
-> >
-> > Please consider these second round of Renesas ARM based SoC fixes for v4.13.
-> >
-> > This pull request is based on the previous round of
-> > such requests, tagged as renesas-fixes-for-v4.13,
-> > which I have already sent a pull-request for.
-> > That pull request provides the same fix as this pull one
-> > but for the Salvator rather than ULCB boards.
+On Mon, Jul 17, 2017 at 06:37:16PM +0200, Krzysztof Kozlowski wrote:
+> On Mon, Jul 17, 2017 at 09:28:09AM +0200, Geert Uytterhoeven wrote:
+> > Hi Krzysztof,
+> > 
+> > On Mon, Jul 17, 2017 at 7:49 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > > Remove options which do not exist anymore:
+> > 
+> > <snip>
+> > 
+> > >  - DRM_RCAR_HDMI was merged to generic DRM bridge and is obsolete since
+> > >    commit 5c602531feb3 ("drm: rcar-du: Replace manual bridge
+> > >    implementation with DRM bridge");
+> > >
+> > >  - SND_SOC_RSRC_CARD was replaced by SND_SIMPLE_SCU_CARD in commit
+> > >    d12c6216c4a5 ("ASoC: rsrc-card: rename rsrc-card to simple-scu-card
+> > >    phase3");
+> > 
+> > These have already be fixed in the defconfig-for-v4.14 branch Simon Horman's
+> > tree (git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git).
+> > They're not yet in -next as v4.13-rc1 wasn't released at that time, and
+> > Simon is noew on holidays.
 > 
-> Pulled into fixes.
-> 
-> > On a personal note, I will be on holidays from the 17th - 26th July.
-> > I apologise in advance for any inconvenience that may cause.
-> 
-> No worries. Sorry for not getting to this before you returned.
+> I'll rebase then on top of his branch.
 
-No problem, thanks for taking this fix.
+FYI, I have rebased that branch on top of v4.13-rc1 now that it has been
+released (and I am back from holidays). I intend to push the updated branch
+soon.
