@@ -1,11 +1,11 @@
 From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Thu, 27 Jul 2017 11:31:21 +0800
+Date: Thu, 27 Jul 2017 11:38:09 +0800
 Subject: [PATCH v2 5/5] dt-bindings: PCI: add support for new generation
  controller
 In-Reply-To: <06c9b3439431221794fc9f723fef52ff59be7ec6.1501122135.git.honghui.zhang@mediatek.com>
 References: <cover.1501122135.git.honghui.zhang@mediatek.com>
  <06c9b3439431221794fc9f723fef52ff59be7ec6.1501122135.git.honghui.zhang@mediatek.com>
-Message-ID: <1501126281.20860.11.camel@mtksdaap41>
+Message-ID: <1501126689.20860.14.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -22,11 +22,12 @@ On Thu, 2017-07-27 at 10:58 +0800, honghui.zhang at mediatek.com wrote:
 >  1 file changed, 161 insertions(+), 7 deletions(-)
 > 
 
-Sorry about the disturb, I send the wrong local version  of this patch.
+Sorry for the disturb, I send the wrong patch from my local version for
+this patch: 
 [PATCH v2 5/5] dt-bindings: PCI: add support for new generation
  controller
 
-The right version for this patch have been re-send.
+And the new right version have been re-send.
 
 thanks.
 
