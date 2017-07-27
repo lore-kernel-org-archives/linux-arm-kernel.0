@@ -1,47 +1,34 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Thu, 27 Jul 2017 10:57:15 +0200
-Subject: [PATCH] irqchip/gic-v3-its: Remove ACPICA version check for ACPI
- NUMA
-In-Reply-To: <20170712132509.11281-1-rrichter@cavium.com>
-References: <20170712132509.11281-1-rrichter@cavium.com>
-Message-ID: <20170727085715.GJ17961@rric.localdomain>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Thu, 27 Jul 2017 16:59:45 +0800
+Subject: [v6,5/7] drm/rockchip: vop: add a series of vop support
+In-Reply-To: <1501049971-6131-1-git-send-email-mark.yao@rock-chips.com>
+References: <1501049971-6131-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <5979AB81.4040503@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
+Hi mark,
 
-I think this can go in as fix for 4.13.
+On 07/26/2017 02:19 PM, Mark yao wrote:
+> Vop Full framework now has following vops:
+> IP version    chipname
+>    3.1           rk3288
+>    3.2           rk3368
+>    3.4           rk3366
+>    3.5           rk3399 big
+>    3.6           rk3399 lit
+>    3.7           rk3228
+>    3.8           rk3328
+>
+> The above IP version is from H/W define, some of vop support get
+> the IP version from VERSION_INFO register, some are not.
+> hardcode the IP version for each vop to identify them.
+>
+> major version: used for IP structure, Vop full framework is 3,
+>                 vop little framework is 2.
+> minor version: on same structure, newer design vop will bigger
+>                 then old one.
+>
+> Signed-off-by: Mark Yao<mark.yao@rock-chips.com>
 
-Please review. Thanks,
-
--Robert
-
-On 12.07.17 15:25:09, Robert Richter wrote:
-> The version check was added due to dependency to
-> 
->  a618c7f89a02 ACPICA: Add support for new SRAT subtable
-> 
-> Now, that this code is in the kernel, remove the check. This is esp.
-> useful to enable backports.
-> 
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index bb33ba1837a9..745c5772e99b 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1858,7 +1858,7 @@ static int __init its_of_probe(struct device_node *node)
->  
->  #define ACPI_GICV3_ITS_MEM_SIZE (SZ_128K)
->  
-> -#if defined(CONFIG_ACPI_NUMA) && (ACPI_CA_VERSION >= 0x20170531)
-> +#ifdef CONFIG_ACPI_NUMA
->  struct its_srat_map {
->  	/* numa node id */
->  	u32	numa_node;
-> -- 
-> 2.11.0
-> 
+Reviewed-by: Jeffy Chen <jeffy.chen@rock-chips.com>
