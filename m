@@ -1,72 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 27 Jul 2017 18:03:55 +0100
-Subject: [PATCH] arm64: mmu: Place guard page after mapping of kernel image
-Message-ID: <1501175035-32460-1-git-send-email-will.deacon@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 27 Jul 2017 18:12:22 +0100
+Subject: [PATCH v8 00/20] ILP32 for ARM64
+In-Reply-To: <20170724112624.7ie6na7uszmsc5te@yury-thinkpad>
+References: <20170619155003.13218-1-ynorov@caviumnetworks.com>
+ <20170629161036.ftedtbp2gdmyzloo@e104818-lin.cambridge.arm.com>
+ <20170706215902.qtmbsidwvqlr7o56@yury-thinkpad>
+ <20170707171135.h54fe4ea7xuxnrqt@armageddon.cambridge.arm.com>
+ <20170724112624.7ie6na7uszmsc5te@yury-thinkpad>
+Message-ID: <20170727171221.ep4xs2hhv4pxnhax@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vast majority of virtual allocations in the vmalloc region are followed
-by a guard page, which can help to avoid overruning on vma into another,
-which may map a read-sensitive device.
+Hi Yury,
 
-This patch adds a guard page to the end of the kernel image mapping (i.e.
-following the data/bss segments).
+On Mon, Jul 24, 2017 at 02:26:24PM +0300, Yury Norov wrote:
+> On Fri, Jul 07, 2017 at 06:11:36PM +0100, Catalin Marinas wrote:
+> > On Fri, Jul 07, 2017 at 12:59:02AM +0300, Yury Norov wrote:
+> > > If so, I would like to ask you to do the first ILP32 community poll
+> > > now, not in 6 months. So we'll collect opinions and requests from
+> > > people interested in ILP32, and in 6 month will be able to check the
+> > > progress. I would like to see this thread public because if we are not
+> > > taking ILP32 to official sources right now, this is the only way to
+> > > inform people that the project exists and is ready to use.
+> > 
+> > That's an ongoing process, I'm not going to ask for people's opinion
+> > every 6 months. It's just that I will revisit periodically the progress
+> > on automated testing, public availability of a cross-toolchain,
+> > Tested/Acked/Reviewed-by tags on these patches from interested parties.
+> > Since I haven't seen any of these now, I don't see any point in asking.
+> > 
+> > To be clear, I'm not really interested in "we need this too" opinions, I
+> > get lots of these via the marketing channels. I'm looking for actual
+> > users with a long-term view of making/keeping ILP32 a first class ABI.
+> 
+> From my side, there are people who ask me for help with ilo32, and who
+> write from big companies mailservers. But they don't want to ask
+> their questions publicly for some reason. From my point of view, there
+> is not so big but stable interest in ILP32.
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/mmu.c | 18 +++++++++++-------
- 1 file changed, 11 insertions(+), 7 deletions(-)
+It would be nice if they were more open about what they need/use.
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 23c2d89a362e..f1eb15e0e864 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -496,7 +496,7 @@ void mark_rodata_ro(void)
- 
- static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
- 				      pgprot_t prot, struct vm_struct *vma,
--				      int flags)
-+				      int flags, unsigned long vm_flags)
- {
- 	phys_addr_t pa_start = __pa_symbol(va_start);
- 	unsigned long size = va_end - va_start;
-@@ -507,10 +507,13 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
- 	__create_pgd_mapping(pgd, pa_start, (unsigned long)va_start, size, prot,
- 			     early_pgtable_alloc, flags);
- 
-+	if (!(vm_flags & VM_NO_GUARD))
-+		size += PAGE_SIZE;
-+
- 	vma->addr	= va_start;
- 	vma->phys_addr	= pa_start;
- 	vma->size	= size;
--	vma->flags	= VM_MAP;
-+	vma->flags	= VM_MAP | vm_flags;
- 	vma->caller	= __builtin_return_address(0);
- 
- 	vm_area_add_early(vma);
-@@ -541,14 +544,15 @@ static void __init map_kernel(pgd_t *pgd)
- 	 * Only rodata will be remapped with different permissions later on,
- 	 * all other segments are allowed to use contiguous mappings.
- 	 */
--	map_kernel_segment(pgd, _text, _etext, text_prot, &vmlinux_text, 0);
-+	map_kernel_segment(pgd, _text, _etext, text_prot, &vmlinux_text, 0,
-+			   VM_NO_GUARD);
- 	map_kernel_segment(pgd, __start_rodata, __inittext_begin, PAGE_KERNEL,
--			   &vmlinux_rodata, NO_CONT_MAPPINGS);
-+			   &vmlinux_rodata, NO_CONT_MAPPINGS, VM_NO_GUARD);
- 	map_kernel_segment(pgd, __inittext_begin, __inittext_end, text_prot,
--			   &vmlinux_inittext, 0);
-+			   &vmlinux_inittext, 0, VM_NO_GUARD);
- 	map_kernel_segment(pgd, __initdata_begin, __initdata_end, PAGE_KERNEL,
--			   &vmlinux_initdata, 0);
--	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data, 0);
-+			   &vmlinux_initdata, 0, VM_NO_GUARD);
-+	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data, 0, 0);
- 
- 	if (!pgd_val(*pgd_offset_raw(pgd, FIXADDR_START))) {
- 		/*
+> This is the 4.12 and linux-next - based kernel patches:
+> https://github.com/norov/linux/tree/ilp32-4.12
+> https://github.com/norov/linux/tree/ilp32-20170724
+
+Thanks. I'll publish the 4.12-based branch sometime next week.
+
+At this stage I don't see much value in a linux-next based ILP32. I
+would rather like to see a 4.13-rc3 based one, in preparation for a 4.13
+branch once released.
+
+> Should I resend kernel patches to LKML, or links above are enough for
+> you?
+
+The 4.12 link is ok. However, could you please post a 4.13-rcX based
+series, maybe split in two so that a few generic patches can be merged
+in 4.14? Given the reworking of the sigcontext code in 4.13, it would be
+good to review the ILP32 changes in this area again.
+
+Thanks.
+
 -- 
-2.1.4
+Catalin
