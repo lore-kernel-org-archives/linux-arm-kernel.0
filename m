@@ -1,125 +1,35 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 27 Jul 2017 22:59:39 +0200
-Subject: [PATCH v4 02/12] ALSA: ac97: add an ac97 bus
-In-Reply-To: <s5h60eg8a8d.wl-tiwai@suse.de> (Takashi Iwai's message of "Tue,
- 25 Jul 2017 23:42:10 +0200")
-References: <20170724204928.29505-1-robert.jarzmik@free.fr>
- <20170724204928.29505-3-robert.jarzmik@free.fr>
- <s5h60eg8a8d.wl-tiwai@suse.de>
-Message-ID: <87a83pr3yc.fsf@belgarion.home>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 27 Jul 2017 16:01:08 -0500
+Subject: [PATCH v5 03/19] arm: qcom-msm8974: dts: Update coresight
+ replicator
+In-Reply-To: <2cafb93f-efb5-a26f-ec93-52076169de03@arm.com>
+References: <1500545849-23724-1-git-send-email-suzuki.poulose@arm.com>
+ <1500545849-23724-4-git-send-email-suzuki.poulose@arm.com>
+ <2cafb93f-efb5-a26f-ec93-52076169de03@arm.com>
+Message-ID: <20170727210108.GB8602@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Takashi Iwai <tiwai@suse.de> writes:
+On Thu, Jul 27, 2017 at 12:17:14PM +0100, Suzuki K Poulose wrote:
+> On 20/07/17 11:17, Suzuki K Poulose wrote:
+> >Replace the obsolete compatible string for Coresight programmable
+> >replicator with the new one.
+> >
+> >Cc: Andy Gross <andy.gross@linaro.org>
+> >Cc: David Brown <david.brown@linaro.org>
+> >Cc: linux-arm-msm at vger.kernel.org
+> >Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> >Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> >Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> 
+> David, Andy
+> 
+> Please could one you pick this up and the next one in this series ?
+> Rest of the patches have been queued via Mathieu's coresight/next tree.
+> 
+> Suzuki
 
-> On Mon, 24 Jul 2017 22:49:18 +0200,
-> Robert Jarzmik wrote:
+Sure thing.  I'll add it to the queue.
 
-...zip...
->> +#ifndef AC97_COMPAT_H
->> +#define AC97_COMPAT_H
->> +
->> +#include <sound/ac97_codec.h>
->> +#include <sound/soc.h>
->
-> Is this inclusion needed?  The code here doesn't look ASoC-specific at
-> all.
-Mmm no, actually it's not, good point.
 
-...zip...
->> +#ifndef AC97_CONTROLLER_H
->> +#define AC97_CONTROLLER_H
->> +
->> +#include <linux/list.h>
->> +
->> +#define AC97_BUS_MAX_CODECS 4
->> +#define AC97_SLOTS_AVAILABLE_ALL 0xf
->> +
->> +struct device;
->
-> You need the definition struct device in below (it's no pointer), thus
-> you have to include <linux/device.h> instead.
-Fair enough, vor v5.
->> +struct ac97_controller {
->> +	const struct ac97_controller_ops *ops;
->
-> The struct isn't declared beforehand?  GCC will warn.
-Actually it doesn't.
-It's interesting as ac97_controller depends on ac97_controller_ops, and
-ac97_controller_ops depends on ac97_controller;
-
-As for why it doesn't warn, every time I used controller.h, I also used
-codec.h. And codec.h holds a :
-struct ac97_controller;
-
-So it's declared beforehand after all ...
-
-But I will add before "struct ac97_controller" a :
-struct ac97_controller_ops;
-
->> +	struct list_head controllers;
->> +	struct device adap;
->> +	int nr;
->> +	struct device *parent;
->> +	unsigned short slots_available;
->
-> I'd move parent field below, so that 64bit pointer can be aligned
-> better.
-Okay, got it.
-
-...zip...
->> +
->> +	device_initialize(&codec->dev);
->> +	dev_set_name(&codec->dev, "%s:%u", dev_name(ac97_ctrl->parent), idx);
->> +
->> +	ret = device_add(&codec->dev);
->> +	if (ret)
->> +		goto err_free_codec;
->> +
->> +	return 0;
->> +err_free_codec:
->> +	kfree(codec);
->
-> This may leave the device name string.  You need to call
-> put_device() even if device_add() returns an error.
-You're right, I'll change that.
-
-...zip...
->> +int snd_ac97_codec_driver_register(struct ac97_codec_driver *drv)
->> +{
->> +	int ret;
->> +
->> +	drv->driver.bus = &ac97_bus_type;
->> +	ret = driver_register(&drv->driver);
->> +
->> +	return ret;
->
-> This can be simplified.
-Indeed.
-
->> +}
->> +EXPORT_SYMBOL(snd_ac97_codec_driver_register);
->
-> No GPL?  (Ditto for other entries, too)
-Euh yeah, GPL forever. I will change all the occurrences.
-
->> +int snd_ac97_reset(struct snd_ac97 *ac97, bool try_warm, unsigned int id,
->> +	unsigned int id_mask)
->> +{
->> +	struct ac97_codec_device *adev = to_ac97_device(ac97->private_data);
->> +	struct ac97_controller *actrl = adev->ac97_ctrl;
->> +
->> +	if (try_warm) {
->> +		compat_ac97_warm_reset(ac97);
->> +		if (snd_ac97_bus_scan_one(actrl, adev->num) == adev->vendor_id)
->
-> Can we ignore id_mask here?  I'm not quite sure whether it's fixed...
-Probably not, but I will take a bit more time to cross-check that one.
-
-Thanks for the review, I'll follow up on that last question when I'll have
-settled on the correct answer.
-
-Cheers.
-
--- 
-Robert
+Andy
