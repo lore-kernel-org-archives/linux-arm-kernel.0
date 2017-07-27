@@ -1,30 +1,27 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 27 Jul 2017 21:53:12 +0200
-Subject: [PATCH] ARM: shmobile: rcar-gen2: Fix deadlock in regulator quirk
-In-Reply-To: <1499870720-30390-1-git-send-email-geert+renesas@glider.be>
-References: <1499870720-30390-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170727195307.GA2834@verge.net.au>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 27 Jul 2017 13:07:00 -0700
+Subject: halting the kernel does not stop the CPU cores?
+In-Reply-To: <VI1PR04MB1662099750F9EAFA0324C6538CBE0@VI1PR04MB1662.eurprd04.prod.outlook.com>
+References: <VI1PR04MB1662099750F9EAFA0324C6538CBE0@VI1PR04MB1662.eurprd04.prod.outlook.com>
+Message-ID: <26ccb0f7-0f78-27cd-cead-ddd810f4a33e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 12, 2017 at 04:45:20PM +0200, Geert Uytterhoeven wrote:
-> Simon Horman reported that Koelsch and Lager hang during boot, and
-> bisected this to commit 1c3c5eab171590f8 ("sched/core: Enable
-> might_sleep() and smp_processor_id() checks early").
+On 07/27/2017 07:38 AM, Heinz Wrobel wrote:
+> Hi,
 > 
-> The da9063/da9210 regulator quirk for R-Car Gen2 boards uses a bus
-> notifier, and unregisters the notifier when it is no longer needed.
-> However, a notifier must not be unregistered from within the call chain.
+> I noticed that when halting the kernel (intentionally or not), the cores effectively go into a while(1) loop and power consumption on larger devices really jumps up significantly to the point where, e.g., a ?crash? turns into ?crash and burn?.
 > 
-> This bug went unnoticed, as blocking_notifier_chain_unregister() didn't
-> take the semaphore during early boot.  The aforementioned commit changed
-> that behavior, leading to a deadlock.
+> I would assume that if a system is halted, you don?t want to dissipate more power than on a running system but go as silent as low power as reasonable.
 > 
-> Fix this by removing the call to bus_unregister_notifier(), and keeping
-> local completion state instead.
-> 
-> Reported-by: Simon Horman <horms+renesas@verge.net.au>
-> Fixes: 663fbb52159cca6f ("ARM: shmobile: R-Car Gen2: Add da9063/da9210 regulator quirk")
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Is there any specific reason why the cores would not go into a wfi loop like they do on idle?
+> The patch to fix this seems to be easy at first glance, but is there a good reason *NOT* to do such a patch and to leave the plain while(1)?
 
-Sorry for the delay, I have applied this as a fix for v4.13.
+In fact, if your platform supports CPU_HOTPLUG, I am not clear why
+smp_send_stop() + ipi_send_stop() is not calling platform_cpu_kill()
+which would be smp_ops.cpu_kill() but instead cpu_relax() was chosen?
+
+The CPU is dead anyway so as you say, so it's not like there is a remote
+chance to resume execution on these secondary cores?
+--
+Florian
