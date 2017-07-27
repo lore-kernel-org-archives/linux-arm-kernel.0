@@ -1,63 +1,114 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 27 Jul 2017 17:42:29 +0200
-Subject: [PATCH 1/3] memory: mtk-smi: add larbid init routine
-In-Reply-To: <1501120872-19652-2-git-send-email-honghui.zhang@mediatek.com>
-References: <1501120872-19652-1-git-send-email-honghui.zhang@mediatek.com>
- <1501120872-19652-2-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <f7dac4d6-4ef8-e10d-e483-088120392ab2@gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 27 Jul 2017 10:48:34 -0500
+Subject: [PATCH v3 2/6] of: Add helper for mapping device node to logical
+ CPU number
+In-Reply-To: <1501168218-26741-3-git-send-email-suzuki.poulose@arm.com>
+References: <1501168218-26741-1-git-send-email-suzuki.poulose@arm.com>
+ <1501168218-26741-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <CAL_JsqKTdysnhHMRKyqODm7VN4k=tkddozmUYXWv9nOmYGtzdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Please use get_maintainers and cc the right people/lists.
 
++Frank, DT list
 
-On 07/27/2017 04:01 AM, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
-> 
-> In the commit 3c8f4ad85c4b ("memory/mediatek: add support for mt2701"),
-> the larb->larbid was added but not initialized.
-> Mediatek's gen1 smi need this hardware larbid information to get the
-> register offset which controls whether enable iommu for this larb.
-> This patch add the initialize routine for larbid.
-> 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+On Thu, Jul 27, 2017 at 10:10 AM, Suzuki K Poulose
+<suzuki.poulose@arm.com> wrote:
+> Add a helper to map a device node to a logical CPU number to avoid
+> duplication. Currently this is open coded in different places (e.g
+> gic-v3, coresight). The helper tries to map device node to a "possible"
+> logical CPU id, which may not be online yet. It is the responsibility
+> of the user to make sure that the CPU is online. The helper uses
+> of_get_cpu_node() which uses arch specific backends to match the phyiscal
+> ids.
+>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
->   drivers/memory/mtk-smi.c | 9 +++++++++
->   1 file changed, 9 insertions(+)
-> 
-> diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
-> index 2b798bb4..fe36b3e 100644
-> --- a/drivers/memory/mtk-smi.c
-> +++ b/drivers/memory/mtk-smi.c
-> @@ -240,6 +240,7 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
->   	struct device *dev = &pdev->dev;
->   	struct device_node *smi_node;
->   	struct platform_device *smi_pdev;
-> +	int err;
->   
->   	if (!dev->pm_domain)
->   		return -EPROBE_DEFER;
-> @@ -263,6 +264,14 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
->   		return PTR_ERR(larb->smi.clk_smi);
->   	larb->smi.dev = dev;
->   
-> +	err = of_property_read_u32(dev->of_node, "mediatek,larbid",
-> +				   &larb->larbid);
-> +	if (err && of_device_is_compatible(dev->of_node,
-> +					   "mediatek,mt2701-smi-larb")) {
+>  drivers/of/base.c         | 26 ++++++++++++++++++++++++++
+>  include/linux/of_device.h |  7 +++++++
+>  2 files changed, 33 insertions(+)
+>
+> diff --git a/drivers/of/base.c b/drivers/of/base.c
+> index 686628d..0b01515 100644
+> --- a/drivers/of/base.c
+> +++ b/drivers/of/base.c
+> @@ -420,6 +420,32 @@ struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
+>  EXPORT_SYMBOL(of_get_cpu_node);
+>
+>  /**
+> + * of_device_node_get_cpu: Get the logical CPU number for a given device_node
+> + *
+> + * @cpu_node: Pointer to the device_node for CPU.
+> + *
+> + * Returns the logical CPU number of the given CPU device_node.
+> + * Returns >= nr_cpu_ids if CPU is not found.
 
-Instead of checking hard-coded bindings you should be able to determine the 
-generation using the smi_pdev.
-Apart I think it would be better to check for mediatek,larbid only on 
-MTK_SIM_GEN1, or do I miss something?
+Wouldn't negative be easier to test for? Then the caller doesn't need
+to know nr_cpu_ids.
 
-Regards,
-Matthias
+> + */
+> +int of_device_node_get_cpu(struct device_node *cpu_node)
 
-> +		dev_err(dev, "missing larbid property\n");
-> +		return err;
-> +	}
+of_device_* is for functions operating on struct device. So find
+another name. of_cpu_node_to_id perhaps.
+
+_get functions generally imply incrementing ref counts which you are
+not doing here.
+
+> +{
+> +       int cpu;
+> +       bool found = false;
+> +       struct device_node *np;
 > +
->   	smi_node = of_parse_phandle(dev->of_node, "mediatek,smi", 0);
->   	if (!smi_node)
->   		return -EINVAL;
-> 
+> +       for_each_possible_cpu(cpu) {
+> +               np = of_get_cpu_node(cpu, NULL);
+> +               found = (cpu_node == np);
+> +               of_node_put(np);
+> +               if (found)
+> +                       break;
+> +       }
+> +
+> +       return cpu;
+> +}
+> +EXPORT_SYMBOL(of_device_node_get_cpu);
+> +
+> +/**
+>   * __of_device_is_compatible() - Check if the node matches given constraints
+>   * @device: pointer to node
+>   * @compat: required compatible string, NULL or "" for any match
+> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+> index b4ad8b4..00a4ba9 100644
+> --- a/include/linux/of_device.h
+> +++ b/include/linux/of_device.h
+> @@ -40,6 +40,8 @@ extern int of_device_request_module(struct device *dev);
+>  extern void of_device_uevent(struct device *dev, struct kobj_uevent_env *env);
+>  extern int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env);
+>
+> +extern int of_device_node_get_cpu(struct device_node *np);
+> +
+
+Wrong place for this.
+
+>  static inline void of_device_node_put(struct device *dev)
+>  {
+>         of_node_put(dev->of_node);
+> @@ -110,6 +112,11 @@ static inline int of_dma_configure(struct device *dev, struct device_node *np)
+>  }
+>  static inline void of_dma_deconfigure(struct device *dev)
+>  {}
+> +
+> +static inline int of_device_node_get_cpu(struct device_node *np)
+> +{
+> +       return nr_cpu_ids;
+> +}
+>  #endif /* CONFIG_OF */
+>
+>  #endif /* _LINUX_OF_DEVICE_H */
+> --
+> 2.7.5
+>
