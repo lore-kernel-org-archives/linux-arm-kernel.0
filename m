@@ -1,31 +1,59 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 27 Jul 2017 14:21:15 +0200
-Subject: [GIT PULL] Immutable branch between MFD, ARM and I2C due for the
- v4.14 merge window
-In-Reply-To: <20170718080441.g3kmastovt32y33y@dell>
-References: <20170615184928.12007-1-javier@dowhile0.org>
- <20170718080441.g3kmastovt32y33y@dell>
-Message-ID: <20170727122115.kvwq6qk7pjp73lkn@ninjato>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 27 Jul 2017 14:25:51 +0200
+Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20170727121644.jtpge4x432gfxhvw@tarshish>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+ <20170727121644.jtpge4x432gfxhvw@tarshish>
+Message-ID: <20170727122551.qca4atjeet6whfrs@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 09:04:41AM +0100, Lee Jones wrote:
-> Enjoy!
+On Thu, Jul 27, 2017 at 03:16:44PM +0300, Baruch Siach wrote:
+> Hi Yong,
 > 
-> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+> I managed to get the Frame Done interrupt with the previous version of this 
+> driver on the A33 OLinuXino. No data yet (all zeros). I'm still working on it.
 > 
->   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+> One comment below.
 > 
-> are available in the git repository at:
+> On Thu, Jul 27, 2017 at 01:01:35PM +0800, Yong Deng wrote:
+> > Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
+> > and CSI1 is used for parallel interface. This is not documented in
+> > datasheet but by testing and guess.
+> > 
+> > This patch implement a v4l2 framework driver for it.
+> > 
+> > Currently, the driver only support the parallel interface. MIPI-CSI2,
+> > ISP's support are not included in this patch.
+> > 
+> > Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> > ---
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git ib-mfd-arm-i2c-v4.14
+> [...]
+> 
+> > +static int update_buf_addr(struct sun6i_csi *csi, dma_addr_t addr)
+> > +{
+> > +	struct sun6i_csi_dev *sdev = sun6i_csi_to_dev(csi);
+> > +	/* transform physical address to bus address */
+> > +	dma_addr_t bus_addr = addr - 0x40000000;
+> 
+> What is the source of this magic number? Is it platform dependent? Are there 
+> other devices doing DMA that need this adjustment?
 
-Pulled, thanks!
+This is the RAM base address in most (but not all) Allwinner
+SoCs. You'll want to use PHYS_OFFSET instead.
 
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 833 bytes
+Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170727/c4d9021d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170727/d46176b0/attachment.sig>
