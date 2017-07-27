@@ -1,51 +1,46 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Fri, 28 Jul 2017 07:27:08 +0800
-Subject: halting the kernel does not stop the CPU cores?
-In-Reply-To: <20170727222545.GT31807@n2100.armlinux.org.uk>
-References: <VI1PR04MB1662099750F9EAFA0324C6538CBE0@VI1PR04MB1662.eurprd04.prod.outlook.com>
- <26ccb0f7-0f78-27cd-cead-ddd810f4a33e@gmail.com>
- <20170727222545.GT31807@n2100.armlinux.org.uk>
-Message-ID: <dec9a2e080cbd15502659e78260b62cd@aosc.io>
+From: borneo.antonio@gmail.com (Antonio Borneo)
+Date: Fri, 28 Jul 2017 01:26:09 +0200
+Subject: [PATCH v2 0/3] ASoC: fix unbalanced of_node_get()/of_node_put()
+In-Reply-To: <20170725214952.6491-1-borneo.antonio@gmail.com>
+References: <20170725214952.6491-1-borneo.antonio@gmail.com>
+Message-ID: <20170727232612.23543-1-antonio.borneo@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-07-28 06:25?Russell King - ARM Linux ???
-> On Thu, Jul 27, 2017 at 01:07:00PM -0700, Florian Fainelli wrote:
->> On 07/27/2017 07:38 AM, Heinz Wrobel wrote:
->> > Hi,
->> >
->> > I noticed that when halting the kernel (intentionally or not), the cores effectively go into a while(1) loop and power consumption on larger devices really jumps up significantly to the point where, e.g., a ?crash? turns into ?crash and burn?.
+From: Antonio Borneo <borneo.antonio@gmail.com>
 
-This is also an issue on Allwinner H3 boards.
+On Hikey target board, enabling CONFIG_OF_DYNAMIC triggers several
+errors at kernel boot, like
+OF: ERROR: Bad of_node_put() on /soc/i2s at f7118000/ports/port at 0
+OF: ERROR: Bad of_node_put() on /soc/i2s at f7118000/ports/port at 0/endpoint
+each followed by stack dump.
 
-Allwinner H3 boards usually doesn't have any PMICs, so it cannot do
-hardware shutdown, so if it halts the CPU will also go into while(1)
-loop. More serious problem is that some boards are not well designed
-and the heat produced by while(1) is possible to hurt the hardware.
+Fixed by:
+- removing of_node_put() in the body of of_for_each_phandle(){},
+  since already provided at each iteration. Add it in case the
+  loop is break out;
+- adding of_node_get() before calling of_graph_get_port_parent().
 
-I remember Chen-Yu Tsai suggested in #linux-sunxi IRC channel to change
-this busy loop to a WFI loop, so it can reduce power consumption and
-heat.
+Tested with kernel v4.13-rc2 with hikey_defconfig taken from
+https://git.linaro.org/people/john.stultz/android-dev.git
+branch dev/hikey-mainline-WIP
 
->> >
->> > I would assume that if a system is halted, you don?t want to dissipate more power than on a running system but go as silent as low power as reasonable.
->> >
->> > Is there any specific reason why the cores would not go into a wfi loop like they do on idle?
->> > The patch to fix this seems to be easy at first glance, but is there a good reason *NOT* to do such a patch and to leave the plain while(1)?
->> 
->> In fact, if your platform supports CPU_HOTPLUG, I am not clear why
->> smp_send_stop() + ipi_send_stop() is not calling platform_cpu_kill()
->> which would be smp_ops.cpu_kill() but instead cpu_relax() was chosen?
->> 
->> The CPU is dead anyway so as you say, so it's not like there is a 
->> remote
->> chance to resume execution on these secondary cores?
-> 
-> The cpu kill method also needs another cpu to be interacting with the
-> cpu die methods as well - the CPU hotunplug is a combination effort
-> between the CPU to be killed and the CPU asking for the killing of
-> that CPU.
-> 
-> We don't have that luxury in these paths, which are used amongst
-> other things for when the kernel panics, which can happen from any
-> context.
+v1 -> v2:
+- modify subject "s/fix balance of/fix unbalanced/";
+- split the patch per each individual issue. It also simplify the
+  backport;
+- add ref to the commit being fixed;
+- drop one fix not needed.
+
+Antonio Borneo (3):
+  ASoC: fix use of of_node_put() in of_for_each_phandle() loops
+  ASoC: soc-core: fix unbalanced of_node_get()/of_node_put()
+  ASoC: simple-card-utils: fix unbalanced of_node_get()/of_node_put()
+
+ sound/soc/generic/audio-graph-card.c  | 9 ++++-----
+ sound/soc/generic/simple-card-utils.c | 5 +++++
+ sound/soc/soc-core.c                  | 5 +++++
+ 3 files changed, 14 insertions(+), 5 deletions(-)
+
+-- 
+1.9.1
