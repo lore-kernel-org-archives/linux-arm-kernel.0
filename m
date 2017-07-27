@@ -1,29 +1,62 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 27 Jul 2017 14:58:12 +0200
-Subject: [PATCH 0/3] Add larbid init routine for mediatek's gen1 smi larb
- driver
-In-Reply-To: <1501120872-19652-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1501120872-19652-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <20170727125812.GD21502@8bytes.org>
+From: david.wu@rock-chips.com (David Wu)
+Date: Thu, 27 Jul 2017 21:08:48 +0800
+Subject: [PATCH v2 10/11] ARM64: dts: rockchip: Add gmac2phy node support for
+ rk3328
+In-Reply-To: <1501160156-30328-1-git-send-email-david.wu@rock-chips.com>
+References: <1501160156-30328-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1501160928-30783-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 27, 2017 at 10:01:09AM +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
-> 
-> Mediatek's gen1 smi need the hardware larbid to identify the offset for
-> the register which controls whether enable iommu for this larb.
-> In the commit 3c8f4ad85c4b ("memory/mediatek: add support for mt2701"),
-> the larbid was used without properly initialized. This patchset fixed
-> that.
-> 
-> Honghui Zhang (3):
->   memory: mtk-smi: add larbid init routine
->   dt-bindings: mediatek: add descriptions for larbid
->   arm: dts: mediatek: add larbid property for larb
+The gmac2phy controller of rk3328 is connected to internal phy
+directly inside, add the node for the internal phy support.
 
-What are these patches based on? They don't apply to v4.13-rc2.
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-
-
-	Joerg
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+index 0be96ce..4349492 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+@@ -63,6 +63,8 @@
+ 		i2c1 = &i2c1;
+ 		i2c2 = &i2c2;
+ 		i2c3 = &i2c3;
++		ethernet0 = &gmac2io;
++		ethernet1 = &gmac2phy;
+ 	};
+ 
+ 	cpus {
+@@ -424,6 +426,28 @@
+ 		status = "disabled";
+ 	};
+ 
++	gmac2phy: eth at ff550000 {
++		compatible = "rockchip,rk3328-gmac";
++		reg = <0x0 0xff550000 0x0 0x10000>;
++		rockchip,grf = <&grf>;
++		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "macirq";
++		clocks = <&cru SCLK_MAC2PHY_SRC>, <&cru SCLK_MAC2PHY_RXTX>,
++			 <&cru SCLK_MAC2PHY_RXTX>, <&cru SCLK_MAC2PHY_REF>,
++			 <&cru ACLK_MAC2PHY>, <&cru PCLK_MAC2PHY>,
++			 <&cru SCLK_MAC2PHY_OUT>;
++		clock-names = "stmmaceth", "mac_clk_rx",
++			      "mac_clk_tx", "clk_mac_ref",
++			      "aclk_mac", "pclk_mac",
++			      "clk_macphy";
++		resets = <&cru SRST_GMAC2PHY_A>, <&cru SRST_MACPHY>;
++		reset-names = "stmmaceth", "mac-phy";
++		phy-mode = "internal";
++		pinctrl-names = "default";
++		pinctrl-0 = <&fephyled_rxm1 &fephyled_linkm1>;
++		status = "disabled";
++	};
++
+ 	gic: interrupt-controller at ff811000 {
+ 		compatible = "arm,gic-400";
+ 		#interrupt-cells = <3>;
+-- 
+1.9.1
