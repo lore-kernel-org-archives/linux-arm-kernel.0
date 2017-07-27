@@ -1,94 +1,86 @@
-From: hw.likun@huawei.com (Li Kun)
-Date: Thu, 27 Jul 2017 10:11:16 +0800
-Subject: [PATCH v2] arm64: kernel: implement fast refcount checking
-In-Reply-To: <48B13266-4D48-40AD-A205-169D907FAD68@linaro.org>
-References: <20170725181536.21092-1-ard.biesheuvel@linaro.org>
- <0816933d-7e58-0773-1441-891823983ff9@huawei.com>
- <CAKv+Gu8djcgmovajhUUpniHwEVDupCWW3L__3JtqZ0GCM3=U2w@mail.gmail.com>
- <34605822-8f95-f963-48c4-65d724eae0c7@huawei.com>
- <48B13266-4D48-40AD-A205-169D907FAD68@linaro.org>
-Message-ID: <db288c30-5111-18e3-caf9-8df25508b523@huawei.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 26 Jul 2017 19:29:07 -0700
+Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
+ counters
+In-Reply-To: <b27cda60-8bf8-47a1-15b5-bf8b3a83fc45@gmail.com>
+References: <20170726151314.GA10696@hc> <20170726153502.GE28875@nazgul.tnic>
+ <20170726154515.GA11453@hc> <20170726155548.GF28875@nazgul.tnic>
+ <20170726161949.GB15426@kroah.com>
+ <20170726163049.GG28875@nazgul.tnic>
+ <20170726173353.GB21705@kroah.com>
+ <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
+ <20170726200802.GA17722@kroah.com>
+ <b27cda60-8bf8-47a1-15b5-bf8b3a83fc45@gmail.com>
+Message-ID: <20170727022907.GC1398@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jul 26, 2017 at 02:02:42PM -0700, David Daney wrote:
+> On 07/26/2017 01:08 PM, Greg KH wrote:
+> > On Wed, Jul 26, 2017 at 01:02:38PM -0700, David Daney wrote:
+> > > On 07/26/2017 10:33 AM, Greg KH wrote:
+> > > > On Wed, Jul 26, 2017 at 06:30:49PM +0200, Borislav Petkov wrote:
+> > > > > On Wed, Jul 26, 2017 at 09:19:49AM -0700, Greg KH wrote:
+> > > > > > On Wed, Jul 26, 2017 at 05:55:48PM +0200, Borislav Petkov wrote:
+> > > > > > > On Wed, Jul 26, 2017 at 05:45:15PM +0200, Jan Glauber wrote:
+> > > > > > > > The PMU/EDAC devices are all PCI devices do I need the 'struct pci_dev *'.
+> > > > > > > > I'm not aware of other ways to access these devices. Please enlighten
+> > > > > > > > me if I'm missing something.
+> > > > > > > 
+> > > > > > > Me enlighten you on Cavium hardware?! You're funny.
+> > > > > > > 
+> > > > > > > So I don't know whether the PCI hotplug code can run more than one
+> > > > > > > function upon PCI ID detection. Probably Greg will say, write a
+> > > > > > > multiplexer wrapper. :-)
+> > > > > > 
+> > > > > > -ENOCONTEXT....
+> > > > > > 
+> > > > > > Anyway, pci questions are best asked on the linux-pci at vger list.  And
+> > > > > > yes, all PCI devices end up with a 'struct pci_dev *' automatically.
+> > > > > 
+> > > > > Simple: so they have a PCI ID of a memory contoller and want to hotplug
+> > > > > two drivers for it. And those two drivers should remain independent from
+> > > > > each other.
+> > > > 
+> > > > Hahahahaha, no.  That's crazy, you were right in guessing what my answer
+> > > > was going to be :)
+> > > > 
+> > > 
+> > > 
+> > > Just to be clear about the situation, the device is a memory controller.  It
+> > > has two main behaviors we are interested in:
+> > > 
+> > > A) Error Detection And Correction (EDAC).  This should be connected to the
+> > > kernel's EDAC subsystem.  An existing driver (drivers/edac/thunderx_edac.c)
+> > > does exactly this.
+> > > 
+> > > B) Performance Counters for actions taken in the corresponding memory. This
+> > > should be connected to the kernel's perf framework as an uncore-PMU (the
+> > > subject of this patch set).
+> > > 
+> > > It is a single PCI device.  What should the driver architecture look like to
+> > > connect it to two different kernel subsystems?
+> > 
+> > Modify the drivers/edac/thunderx_edac.c code to add support for
+> > performance counters.
+> > 
+> 
+> Thanks Greg.  This adds some clarity to the situation.
+> 
+> This technique does slightly complicate the mapping of files and directories
+> in the kernel source tree to maintainers.
+> 
+> Also, if a given configuration disables CONFIG_EDAC there is some hackery
+> needed to get the perf portion of the driver included.
 
+Well, you all deserve it for trying to have a single PCI device do
+multiple things at the same time.  There's no real good reason for
+creating hardware that way, PCI devices are "free", you should go throw
+a printed copy of the PCI spec at the firmware developers who did this
+to you.
 
-? 2017/7/26 21:25, Ard Biesheuvel ??:
->> On 26 Jul 2017, at 10:21, Li Kun <hw.likun@huawei.com> wrote:
->>
->>
->>
->>> ? 2017/7/26 16:40, Ard Biesheuvel ??:
->>>> On 26 July 2017 at 05:11, Li Kun <hw.likun@huawei.com> wrote:
->>>> Hi Ard?
->>>>
->>>>
->>>>> on 2017/7/26 2:15, Ard Biesheuvel wrote:
->>>>> +#define REFCOUNT_OP(op, asm_op, cond, l, clobber...)                   \
->>>>> +__LL_SC_INLINE int                                                     \
->>>>> +__LL_SC_PREFIX(__refcount_##op(int i, atomic_t *r))                    \
->>>>> +{                                                                      \
->>>>> +       unsigned long tmp;                                              \
->>>>> +       int result;                                                     \
->>>>> +                                                                       \
->>>>> +       asm volatile("// refcount_" #op "\n"                            \
->>>>> +"      prfm            pstl1strm, %2\n"                                \
->>>>> +"1:    ldxr            %w0, %2\n"                                      \
->>>>> +"      " #asm_op "     %w0, %w0, %w[i]\n"                              \
->>>>> +"      st" #l "xr      %w1, %w0, %2\n"                                 \
->>>>> +"      cbnz            %w1, 1b\n"                                      \
->>>>> +       REFCOUNT_CHECK(cond)                                            \
->>>>> +       : "=&r" (result), "=&r" (tmp), "+Q" (r->counter)                \
->>>>> +       : REFCOUNT_INPUTS(r) [i] "Ir" (i)                               \
->>>>> +       clobber);                                                       \
->>>>> +                                                                       \
->>>>> +       return result;                                                  \
->>>>> +}                                                                      \
->>>>> +__LL_SC_EXPORT(__refcount_##op);
->>>>> +
->>>>> +REFCOUNT_OP(add_lt, adds, mi,  , REFCOUNT_CLOBBERS);
->>>>> +REFCOUNT_OP(sub_lt_neg, adds, mi, l, REFCOUNT_CLOBBERS);
->>>>> +REFCOUNT_OP(sub_le_neg, adds, ls, l, REFCOUNT_CLOBBERS);
->>>>> +REFCOUNT_OP(sub_lt, subs, mi, l, REFCOUNT_CLOBBERS);
->>>>> +REFCOUNT_OP(sub_le, subs, ls, l, REFCOUNT_CLOBBERS);
->>>>> +
->>>> I'm not quite sure if we use b.lt to judge whether the result of adds is
->>>> less than zero is correct or not.
->>>> The b.lt means N!=V, take an extreme example, if we operate like below, the
->>>> b.lt will also be true.
->>>>
->>>> refcount_set(&ref_c,0x80000000);
->>>> refcount_dec_and_test(&ref_c);
->>>>
->>>> maybe we should use PL/NE/MI/EQ to judge the LT_ZERO or LE_ZERO condition ?
->>>>
->>> The lt/le is confusing here: the actual condition coded used are mi
->>> for negative and ls for negative or zero.
->>>
->>> I started out using lt and le, because it matches the x86 code, but I
->>> moved to mi and ls instead. (I don't think it makes sense to deviate
->>> from that just because the flags and predicates work a bit
->>> differently.)
->>>
->>> However, I see now that there is one instance of REFCOUNT_CHECK(lt)
->>> remaining (in refcount.h). That should mi as well.
->> Sorry for having  misunderstood your implementation.
->> If we want to catch the refcount_sub operate on negetive value(like -1 to -2 ), i think b.ls can't achieve that.
-> You are right. Decrementing a refcount which is already negative will not be caught. Is that a problem?
-I think it will be, when we saturate the refcount to INT_MIN/2 and 
-return from the exception, we should catch every operation next.
->
->> I think (b.eq || b.mi ) may be better than b.ls for this case.
->>
-> At the expense of one more instruction, yes. I tend to agree, though. The atomics are fairly costly to begin with, so one more predicted non-taken branch won't really make a difference.
->
-> In fact, I realised that we could easily implement the add-from-zero case as well: both ll/sc and lse versions have the old count in a register already, so all we need is a cbz in the right place.
-I agree with you. One thing we should care about is we should check the 
-refcount against zero before sc or use 'CAS' to do it, and we should 
-modify the procedure in refcount_exception_handler.
-@Kees, should we implement the add-from-zero case ? What do you think?
->
+Then get them to fix the firmware so you have multiple PCI devices...
 
--- 
-Best Regards
-Li Kun
+good luck!
+
+greg k-h
