@@ -1,65 +1,31 @@
-From: yong.deng@magewell.com (Yong Deng)
-Date: Thu, 27 Jul 2017 12:35:32 +0800
-Subject: [PATCH v2 0/3] Initial Allwinner V3s CSI Support
-Message-ID: <1501130135-41670-1-git-send-email-yong.deng@magewell.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Thu, 27 Jul 2017 10:25:25 +0530
+Subject: [PATCH 2/6] dma: bcm-sba-raid: Peek mbox when we are left with no
+ free requests
+In-Reply-To: <20170726171028.GJ3053@localhost>
+References: <1501047404-14456-1-git-send-email-anup.patel@broadcom.com>
+ <1501047404-14456-3-git-send-email-anup.patel@broadcom.com>
+ <20170726171028.GJ3053@localhost>
+Message-ID: <CAALAos_+ba+fg8wiqtgzWdf3L554G_jW83-J7jFoDNni5_yS9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for resend the patch. Delivering to somebody in cc has failed at
-last time.
+On Wed, Jul 26, 2017 at 10:40 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Wed, Jul 26, 2017 at 11:06:40AM +0530, Anup Patel wrote:
+>> We should peek mbox channels when we are left with no free
+>> sba_requests in sba_alloc_request()
+>
+> and why is the world should we do that, how does that help??
 
-This patchset add initial support for Allwinner V3s CSI.
+When setting up RAID array on several NVMe disk we observed
+that sba_alloc_request() start failing (due to no free requests left)
+and RAID array setup becomes very slow.
 
-Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
-and CSI1 is used for parallel interface. This is not documented in
-datasheet but by testing and guess.
+Doing mbox channel peek when we have no free requests left,
+improves performance of RAID array setup.
 
-This patchset implement a v4l2 framework driver and add a binding 
-documentation for it. 
+This change is inspired from mv_chan_alloc_slot() implemented
+in drivers/dma/mv_xor.c
 
-Currently, the driver only support the parallel interface. And has been
-tested with a BT1120 signal which generating from FPGA. The following
-fetures are not support with this patchset:
-  - ISP 
-  - MIPI-CSI2
-  - Master clock for camera sensor
-  - Power regulator for the front end IC
-
-sun6i_csi_ops is still there. I seriously thought about it. Without 
-sun6i_csi_ops, the dependency between sun6i_video and sun6i_csi_v3s
-will be complicated. Comments and criticisms are welcome.
-
-Changes in v2:
-  * Change sunxi-csi to sun6i-csi
-  * Rebase to media_tree master branch
-
-Yong Deng (3):
-  media: V3s: Add support for Allwinner CSI.
-  dt-bindings: media: Add Allwinner V3s Camera Sensor Interface (CSI)
-  media: MAINTAINERS: add entries for Allwinner V3s CSI
-
- .../devicetree/bindings/media/sun6i-csi.txt        |  49 ++
- MAINTAINERS                                        |   8 +
- drivers/media/platform/Kconfig                     |   1 +
- drivers/media/platform/Makefile                    |   2 +
- drivers/media/platform/sun6i-csi/Kconfig           |   9 +
- drivers/media/platform/sun6i-csi/Makefile          |   3 +
- drivers/media/platform/sun6i-csi/sun6i_csi.c       | 545 ++++++++++++++
- drivers/media/platform/sun6i-csi/sun6i_csi.h       | 203 +++++
- drivers/media/platform/sun6i-csi/sun6i_csi_v3s.c   | 827 +++++++++++++++++++++
- drivers/media/platform/sun6i-csi/sun6i_csi_v3s.h   | 206 +++++
- drivers/media/platform/sun6i-csi/sun6i_video.c     | 663 +++++++++++++++++
- drivers/media/platform/sun6i-csi/sun6i_video.h     |  61 ++
- 12 files changed, 2577 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
- create mode 100644 drivers/media/platform/sun6i-csi/Kconfig
- create mode 100644 drivers/media/platform/sun6i-csi/Makefile
- create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi.c
- create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi.h
- create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi_v3s.c
- create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi_v3s.h
- create mode 100644 drivers/media/platform/sun6i-csi/sun6i_video.c
- create mode 100644 drivers/media/platform/sun6i-csi/sun6i_video.h
-
--- 
-1.8.3.1
+Regards,
+Anup
