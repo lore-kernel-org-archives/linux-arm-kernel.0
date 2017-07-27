@@ -1,24 +1,21 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 27 Jul 2017 15:35:45 +0200
-Subject: [PATCH 0/2] clk: meson: gxbb: fix audio divider flags
-In-Reply-To: <20170727130940.18005-1-jbrunet@baylibre.com>
-References: <20170727130940.18005-1-jbrunet@baylibre.com>
-Message-ID: <0aa1d502-473e-637e-7907-e4f805a16ffb@baylibre.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 27 Jul 2017 15:38:00 +0200
+Subject: [PATCH v2 01/11] net: phy: Add rockchip phy driver support
+In-Reply-To: <1501160156-30328-2-git-send-email-david.wu@rock-chips.com>
+References: <1501160156-30328-1-git-send-email-david.wu@rock-chips.com>
+ <1501160156-30328-2-git-send-email-david.wu@rock-chips.com>
+Message-ID: <20170727133800.GC18666@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/27/2017 03:09 PM, Jerome Brunet wrote:
-> Two audio clocks incorrectly set divider flags in the hw.init flag.
-> Just move these flags where they belong.
-> 
-> Jerome Brunet (2):
->   clk: meson: gxbb: fix meson cts_amclk divider flags
->   clk: meson: gxbb: fix clk_mclk_i958 divider flags
-> 
->  drivers/clk/meson/gxbb.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
+> +	/*
+> +	 * If mode switch happens from 10BT to 100BT, all DSP/AFE
+> +	 * registers are set to default values. So any AFE/DSP
+> +	 * registers have to be re-initialized in this case.
+> +	 */
 
-Applied on clk-meson's fixes/drivers
+Hi David
 
-Thx
+Are they also lost on suspend and resume?
+
+    Andrew
