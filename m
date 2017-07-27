@@ -1,60 +1,18 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 27 Jul 2017 15:54:14 +0100
-Subject: [PATCH 2/2] vfio/type1: Give hardware MSI regions precedence
-In-Reply-To: <d244103e295a81d7f556f297adc79c2ac45345cc.1501163100.git.robin.murphy@arm.com>
-References: <d244103e295a81d7f556f297adc79c2ac45345cc.1501163100.git.robin.murphy@arm.com>
-Message-ID: <d42df6c9d7d854a6b5c4586b02000678e71916fc.1501163100.git.robin.murphy@arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 27 Jul 2017 15:07:03 +0000 (UTC)
+Subject: [PATCH] ARM: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-1-robh@kernel.org>
+References: <20170718214339.7774-1-robh@kernel.org>
+Message-ID: <alpine.DEB.2.02.1707271506200.23088@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the IOMMU driver advertises 'real' reserved regions for MSIs, but
-still includes the software-managed region as well, we are currently
-blind to the former and will configure the IOMMU domain to map MSIs into
-the latter, which is unlikely to work as expected.
+On Tue, 18 Jul 2017, Rob Herring wrote:
 
-Since it would take a ridiculous hardware topology for both regions to
-be valid (which would be rather difficult to support in general), we
-should be safe to assume that the presence of any hardware regions makes
-the software region irrelevant. However, the IOMMU driver might still
-advertise the software region by default, particularly if the hardware
-regions are filled in elsewhere by generic code, so it might not be fair
-for VFIO to be super-strict about not mixing them. To that end, make
-vfio_iommu_has_sw_msi() robust against the presence of both region types
-at once, so that we end up doing what is almost certainly right, rather
-than what is almost certainly wrong.
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/vfio/vfio_iommu_type1.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+Acked-by: Paul Walmsley <paul@pwsan.com>  # for mach-omap2/omap-hwmod.c
 
-diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index 2328be628f21..92155cce926d 100644
---- a/drivers/vfio/vfio_iommu_type1.c
-+++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -1169,13 +1169,21 @@ static bool vfio_iommu_has_sw_msi(struct iommu_group *group, phys_addr_t *base)
- 	INIT_LIST_HEAD(&group_resv_regions);
- 	iommu_get_group_resv_regions(group, &group_resv_regions);
- 	list_for_each_entry(region, &group_resv_regions, list) {
-+		/*
-+		 * The presence of any 'real' MSI regions should take
-+		 * precedence over the software-managed one if the
-+		 * IOMMU driver happens to advertise both types.
-+		 */
-+		if (region->type == IOMMU_RESV_MSI) {
-+			ret = false;
-+			break;
-+		}
-+
- 		if (region->type == IOMMU_RESV_SW_MSI) {
- 			*base = region->start;
- 			ret = true;
--			goto out;
- 		}
- 	}
--out:
- 	list_for_each_entry_safe(region, next, &group_resv_regions, list)
- 		kfree(region);
- 	return ret;
--- 
-2.12.2.dirty
+- Paul
