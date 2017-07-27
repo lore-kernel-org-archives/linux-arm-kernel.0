@@ -1,21 +1,23 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 27 Jul 2017 17:25:06 +0200
+Date: Thu, 27 Jul 2017 17:25:23 +0200
 Subject: [PATCH] ARM: shmobile: rcar-gen2: Correct arch timer frequency
  on RZ/G1E
-In-Reply-To: <KL1PR06MB1702B09E7C1EFE352D759E5BB8A10@KL1PR06MB1702.apcprd06.prod.outlook.com>
+In-Reply-To: <1500384557-22123-1-git-send-email-geert+renesas@glider.be>
 References: <1500384557-22123-1-git-send-email-geert+renesas@glider.be>
- <KL1PR06MB1702B09E7C1EFE352D759E5BB8A10@KL1PR06MB1702.apcprd06.prod.outlook.com>
-Message-ID: <20170727152506.GJ16143@verge.net.au>
+Message-ID: <20170727152523.GK16143@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 01:59:58PM +0000, Biju Das wrote:
-> It looks good to me.
+On Tue, Jul 18, 2017 at 03:29:17PM +0200, Geert Uytterhoeven wrote:
+> According to the datasheet, the frequency of the ARM architecture timer
+> on RZ/G1E depends on the frequency of the ZS clock, just like on R-Car
+> E2 and V2H.
 > 
-> Regards,
-> Biju
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> Untested due to lack of hardware.
+> 
+> v2:
+>   - Rebased to avoid dependencies.
 
-Thanks for your review. A few comments on it to keep in mind for next time:
-
-* Please don't top-post
-* Please consider providing a more formal tag, e.g. Reviewed-by
+Thanks. I have applied this for v4.14.
