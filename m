@@ -1,32 +1,111 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Thu, 27 Jul 2017 15:15:15 +0200
-Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <20170727090856.GB15784@hc>
-References: <20170726154515.GA11453@hc> <20170726155548.GF28875@nazgul.tnic>
- <20170726161949.GB15426@kroah.com>
- <20170726163049.GG28875@nazgul.tnic>
- <20170726173353.GB21705@kroah.com>
- <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
- <20170726200802.GA17722@kroah.com>
- <b27cda60-8bf8-47a1-15b5-bf8b3a83fc45@gmail.com>
- <20170727051157.GA4525@nazgul.tnic> <20170727090856.GB15784@hc>
-Message-ID: <20170727131515.GC28548@nazgul.tnic>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Thu, 27 Jul 2017 13:26:14 +0000
+Subject: [PATCH v4 1/2] acpi:iort: Add an IORT helper function to
+ reserve HW ITS address regions for IOMMU drivers
+In-Reply-To: <989fec76-45e7-d744-3411-78ec2764cb7d@arm.com>
+References: <20170725111732.41792-1-shameerali.kolothum.thodi@huawei.com>
+ <20170725111732.41792-2-shameerali.kolothum.thodi@huawei.com>
+ <20170725171100.GA1663@red-moon>
+ <b7512f89-4fe7-940e-0fa9-9274d8b1e935@arm.com>
+ <20170726095208.GA2468@red-moon>
+ <5FC3163CFD30C246ABAA99954A238FA8383C0268@FRAEML521-MBX.china.huawei.com>
+ <989fec76-45e7-d744-3411-78ec2764cb7d@arm.com>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA8383C04A2@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 27, 2017 at 11:08:56AM +0200, Jan Glauber wrote:
-> OK. As fixing the firmware will take quite some time I'll go for the memory
-> controller driver that starts EDAC / PMU depending on their CONFIG_.
+
+
+> -----Original Message-----
+> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> Sent: Thursday, July 27, 2017 12:13 PM
+> To: Shameerali Kolothum Thodi; Lorenzo Pieralisi
+> Cc: Guohanjun (Hanjun Guo); Gabriele Paoloni; marc.zyngier at arm.com;
+> John Garry; will.deacon at arm.com; Linuxarm; linux-acpi at vger.kernel.org;
+> iommu at lists.linux-foundation.org; hanjun.guo at linaro.org; Wangzhou (B);
+> sudeep.holla at arm.com; linux-arm-kernel at lists.infradead.org;
+> devel at acpica.org
+> Subject: Re: [PATCH v4 1/2] acpi:iort: Add an IORT helper function to reserve
+> HW ITS address regions for IOMMU drivers
 > 
-> What would be the proper location for the multiplexer?
-> drivers/soc/cavium or drivers/misc?
+[...]
 
-Uff, no idea. Greg? You're the special drivers guy. :-)
+> >>>> I can make these changes but I suspect this series will go via IOMMU
+> >>>> tree, let me know how you want to handle it.
+> >>>>
+> >>>> Lorenzo
+> >>>>
+> >>>>> +	node = iort_find_dev_node(dev);
+> >>>>> +	if (!node)
+> >>>>> +		return -ENODEV;
+> >>>>> +
+> >>>
+> >>> I'd suggest we also want a comment here to clarify that we're currently
+> >>> assuming straightforward topologies where all mappings for a given root
+> >>> complex/named component target the same ITS group. Otherwise
+> we're
+> >> going
+> >>> to need somewhat more logic to iterate the its_node processing over
+> >>> every mapping (or every alias in the PCI case), but avoid creating
+> >>> duplicate entries.
+> >>
+> >> You have a point and we have time to update the code. Short of reserving
+> >> all ITS regions for every device that maps to one at least, we could (even
+> >> pre-compute instead of looking it up on the fly) create a list of ITS
+> >> identifiers a given IORT node may map to and use that to reserve the
+> >> regions.
+> >
+> > I am trying to understand the use case scenario discussed here. Apologies
+> > if it is a dumb query.
+> >
+> > My understanding is that, it is possible to have a PCI  RC iort node mapped
+> to
+> > multiple ITS group nodes.  That is perfectly fine and given a dev input RID
+> we
+> > can identify the ITS group the device points to using - iort_node_map_id().
+> >
+> > But the above discussion seems to suggest that there might be situations
+> where
+> > we have to go through all the mapped ITS groups and identify all the ITSs
+> associated
+> > with the RC.  Clearly I am missing something.
+> 
+> I was mostly thinking of a situation like this:
+> 
+> +----Node 0-----+  +----Node 1-----+
+> |  [CPU 0..n]   |  |  [CPU n+1..]  |
+> | [ITS group 0] |  | [ITS group 1] |
+> +---------------+  +---------------+
+>         ^                  ^
+>          \_______  _______/
+>                  \/
+>             +--Node 2--+
+>             |  [SMMU]  |
+>             |     ^    |
+>             |     |    |
+>             | [Device] |
+>             +----------+
+> 
+> where the (named component) device has IDs for both ITS groups (to help
+> optimise affining, or allow physically hotplugging CPU nodes, or
+> whatever - I'm hypothesising here ;)).  A generic IORT function isn't in
+> a position to decide *which* ITS region the device may be targeting at
+> any given time, so can only correctly describe both.
 
--- 
-Regards/Gruss,
-    Boris.
+Thanks Robin. That makes it clear.
+ 
+> I'm perfectly happy not to even try to support such crazy configurations
+> until they actually exist, if ever; I'd just prefer to document whatever
+> assumptions we do make, so that we don't have to remember or re-derive
+> them when looking at the code in future.
 
-ECO tip #101: Trim your mails when you reply.
---
+So I think the conclusion here is we will document the assumption that we are
+only taking care of the straightforward topologies for now.
+
+Hi Lorenzo,
+If you are ok with the above, please let me know if it make sense to send out
+a v5 with this and your other comments or you can take care of them. I am fine
+either way.
+
+Many thanks,
+Shameer
