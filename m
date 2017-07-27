@@ -1,98 +1,60 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 27 Jul 2017 20:08:03 +0800
-Subject: [PATCH] ARM: Use WFI when possible when halting a core
-Message-ID: <20170727120803.27848-1-wens@csie.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 27 Jul 2017 15:16:44 +0300
+Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+Message-ID: <20170727121644.jtpge4x432gfxhvw@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM, the kernel busy loops after cleaning up when a core is to be
-halted. This may have the undesired effect of increasing the core
-temperature, at a time when no power or thermal management is
-available, such as a kernel panic or shutdown to halt.
+Hi Yong,
 
-x86 uses the more efficient HLT (halt) instruction. The equivalent
-instruction on ARM is WFI (wait for interrupt).
+I managed to get the Frame Done interrupt with the previous version of this 
+driver on the A33 OLinuXino. No data yet (all zeros). I'm still working on it.
 
-This patch makes the busy loops in the ARM halt/reboot/panic paths
-use WFI when available (as defined in arch/arm/include/asm/barrier.h).
+One comment below.
 
-A touch test indicates that this lowers the surface temperature of the
-Allwinner H3 SoC, with all 4 cores brought up with SMP, from painfully
-hot to just warm to the touch after shutdown to halt.
+On Thu, Jul 27, 2017 at 01:01:35PM +0800, Yong Deng wrote:
+> Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
+> and CSI1 is used for parallel interface. This is not documented in
+> datasheet but by testing and guess.
+> 
+> This patch implement a v4l2 framework driver for it.
+> 
+> Currently, the driver only support the parallel interface. MIPI-CSI2,
+> ISP's support are not included in this patch.
+> 
+> Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> ---
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
+[...]
 
-I asked about this some time ago, and the answer was no one had done
-it. So here it is. It is somewhat similar to the patch "arm64:
-Improve parking of stopped CPUs", for arm64 obviously.
+> +static int update_buf_addr(struct sun6i_csi *csi, dma_addr_t addr)
+> +{
+> +	struct sun6i_csi_dev *sdev = sun6i_csi_to_dev(csi);
+> +	/* transform physical address to bus address */
+> +	dma_addr_t bus_addr = addr - 0x40000000;
 
----
- arch/arm/kernel/reboot.c | 13 +++++++++++--
- arch/arm/kernel/smp.c    |  7 ++++++-
- 2 files changed, 17 insertions(+), 3 deletions(-)
+What is the source of this magic number? Is it platform dependent? Are there 
+other devices doing DMA that need this adjustment?
 
-diff --git a/arch/arm/kernel/reboot.c b/arch/arm/kernel/reboot.c
-index 3b2aa9a9fe26..068aef796de4 100644
---- a/arch/arm/kernel/reboot.c
-+++ b/arch/arm/kernel/reboot.c
-@@ -10,6 +10,7 @@
- #include <linux/delay.h>
- #include <linux/reboot.h>
- 
-+#include <asm/barrier.h>
- #include <asm/cacheflush.h>
- #include <asm/idmap.h>
- #include <asm/virt.h>
-@@ -107,7 +108,11 @@ void machine_halt(void)
- {
- 	local_irq_disable();
- 	smp_send_stop();
--	while (1);
-+	while (1) {
-+#ifdef wfi
-+		wfi();
-+#endif
-+	}
- }
- 
- /*
-@@ -151,5 +156,9 @@ void machine_restart(char *cmd)
- 
- 	/* Whoops - the platform was unable to reboot. Tell the user! */
- 	printk("Reboot failed -- System halted\n");
--	while (1);
-+	while (1) {
-+#ifdef wfi
-+		wfi();
-+#endif
-+	}
- }
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index c9a0a5299827..7666fb2ed481 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -32,6 +32,7 @@
- 
- #include <linux/atomic.h>
- #include <asm/smp.h>
-+#include <asm/barrier.h>
- #include <asm/cacheflush.h>
- #include <asm/cpu.h>
- #include <asm/cputype.h>
-@@ -567,8 +568,12 @@ static void ipi_cpu_stop(unsigned int cpu)
- 	local_fiq_disable();
- 	local_irq_disable();
- 
--	while (1)
-+	while (1) {
- 		cpu_relax();
-+#ifdef wfi
-+		wfi();
-+#endif
-+	}
- }
- 
- static DEFINE_PER_CPU(struct completion *, cpu_completion);
+baruch
+
+> +
+> +	regmap_write(sdev->regmap, CSI_CH_F0_BUFA_REG,
+> +		     (bus_addr + sdev->planar_offset[0]) >> 2);
+> +	if (sdev->planar_offset[1] != -1)
+> +		regmap_write(sdev->regmap, CSI_CH_F1_BUFA_REG,
+> +			     (bus_addr + sdev->planar_offset[1]) >> 2);
+> +	if (sdev->planar_offset[2] != -1)
+> +		regmap_write(sdev->regmap, CSI_CH_F2_BUFA_REG,
+> +			     (bus_addr + sdev->planar_offset[2]) >> 2);
+> +
+> +	return 0;
+> +}
+
 -- 
-2.13.3
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
