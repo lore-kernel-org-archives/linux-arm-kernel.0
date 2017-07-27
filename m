@@ -1,32 +1,43 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 26 Jul 2017 21:16:10 -0700
-Subject: [PATCH v2] arm64: kernel: implement fast refcount checking
-In-Reply-To: <db288c30-5111-18e3-caf9-8df25508b523@huawei.com>
-References: <20170725181536.21092-1-ard.biesheuvel@linaro.org>
- <0816933d-7e58-0773-1441-891823983ff9@huawei.com>
- <CAKv+Gu8djcgmovajhUUpniHwEVDupCWW3L__3JtqZ0GCM3=U2w@mail.gmail.com>
- <34605822-8f95-f963-48c4-65d724eae0c7@huawei.com>
- <48B13266-4D48-40AD-A205-169D907FAD68@linaro.org>
- <db288c30-5111-18e3-caf9-8df25508b523@huawei.com>
-Message-ID: <CAGXu5jLFAOhs0eak9BfNP=3XLwtHxdSqNF+AB_yjcWyX1=SoNQ@mail.gmail.com>
+From: npiggin@gmail.com (Nicholas Piggin)
+Date: Thu, 27 Jul 2017 14:34:00 +1000
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170727014214.GH3730@linux.vnet.ibm.com>
+References: <20170726223658.GA27617@linux.vnet.ibm.com>
+ <20170726.154540.150558937277891719.davem@davemloft.net>
+ <20170726231505.GG3730@linux.vnet.ibm.com>
+ <20170726.162200.1904949371593276937.davem@davemloft.net>
+ <20170727014214.GH3730@linux.vnet.ibm.com>
+Message-ID: <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 7:11 PM, Li Kun <hw.likun@huawei.com> wrote:
-> @Kees, should we implement the add-from-zero case ? What do you think?
+On Wed, 26 Jul 2017 18:42:14 -0700
+"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
 
-If it can be done efficiently, yes. In the x86 case, it would
-basically change "lock inc" into a huge cmpxchg loop, and it almost
-doubled the cycles for the operation. Since
-refcount_inc()/refcount_dec_and_test() is the primary code pattern,
-it's not a good idea to mess with performance on especially those.
-This LKDTM series should provide a good perf target to compare
-against:
+> On Wed, Jul 26, 2017 at 04:22:00PM -0700, David Miller wrote:
 
-https://git.kernel.org/pub/scm/linux/kernel/git/kees/linux.git/log/?h=lkdtm/refcount
+> > Indeed, that really wouldn't explain how we end up with a RCU stall
+> > dump listing almost all of the cpus as having missed a grace period.  
+> 
+> I have seen stranger things, but admittedly not often.
 
--Kees
+So the backtraces show the RCU gp thread in schedule_timeout.
 
--- 
-Kees Cook
-Pixel Security
+Are you sure that it's timeout has expired and it's not being scheduled,
+or could it be a bad (large) timeout (looks unlikely) or that it's being
+scheduled but not correctly noting gps on other CPUs?
+
+It's not in R state, so if it's not being scheduled at all, then it's
+because the timer has not fired:
+
+[ 1984.628602] rcu_preempt kthread starved for 5663 jiffies! g1566 c1565 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1
+[ 1984.638153] rcu_preempt     S    0     9      2 0x00000000
+[ 1984.643626] Call trace:
+[ 1984.646059] [<ffff000008084fb0>] __switch_to+0x90/0xa8
+[ 1984.651189] [<ffff000008962274>] __schedule+0x19c/0x5d8
+[ 1984.656400] [<ffff0000089626e8>] schedule+0x38/0xa0
+[ 1984.661266] [<ffff000008965844>] schedule_timeout+0x124/0x218
+[ 1984.667002] [<ffff000008121424>] rcu_gp_kthread+0x4fc/0x748
+[ 1984.672564] [<ffff0000080df0b4>] kthread+0xfc/0x128
+[ 1984.677429] [<ffff000008082ec0>] ret_from_fork+0x10/0x50
