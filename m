@@ -1,51 +1,146 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Thu, 27 Jul 2017 09:52:10 +0300
-Subject: [PATCH v2 1/5] arm64: tegra: Add BPMP thermal sensor to Tegra186
-In-Reply-To: <201707271402.PznRxqSc%fengguang.wu@intel.com>
-References: <201707271402.PznRxqSc%fengguang.wu@intel.com>
-Message-ID: <0f9e5f15-c4e2-d897-df3e-5253c3b94007@nvidia.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 27 Jul 2017 00:14:29 -0700
+Subject: [RFC PATCH v2 02/19] arm64: Use the physical counter when
+ available for read_cycles
+In-Reply-To: <20170726171728.GB18154@arm.com>
+References: <20170717142718.13853-1-cdall@linaro.org>
+ <20170717142718.13853-3-cdall@linaro.org>
+ <20170725094308.GC23359@arm.com> <20170725143647.GC1588@lvm>
+ <20170726171728.GB18154@arm.com>
+Message-ID: <20170727071429.GA1432@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Good point, so patches 1/5 and 2/5 should be swapped around.
+On Wed, Jul 26, 2017 at 06:17:29PM +0100, Will Deacon wrote:
+> On Tue, Jul 25, 2017 at 07:36:47AM -0700, Christoffer Dall wrote:
+> > On Tue, Jul 25, 2017 at 10:43:08AM +0100, Will Deacon wrote:
+> > > On Mon, Jul 17, 2017 at 04:27:01PM +0200, Christoffer Dall wrote:
+> > > > Currently get_cycles() is hardwired to arch_counter_get_cntvct() on
+> > > > arm64, but as we move to using the physical timer for the in-kernel
+> > > > time-keeping, we need to make that more flexible.
+> > > > 
+> > > > First, we need to make sure the physical counter can be read on equal
+> > > > terms to the virtual counter, which includes adding physical counter
+> > > > read functions for timers that require errata.
+> > > > 
+> > > > Second, we need to make a choice between reading the physical vs virtual
+> > > > counter, depending on which timer is used for time keeping in the kernel
+> > > > otherwise.  We can do this using a static key to avoid a performance
+> > > > penalty during runtime when reading the counter.
+> > > > 
+> > > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > > Cc: Will Deacon <will.deacon@arm.com>
+> > > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > > > Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> > > > ---
+> > > >  arch/arm64/include/asm/arch_timer.h  | 18 ++++++++++++------
+> > > >  arch/arm64/include/asm/timex.h       |  2 +-
+> > > >  drivers/clocksource/arm_arch_timer.c | 32 ++++++++++++++++++++++++++++++--
+> > > >  3 files changed, 43 insertions(+), 9 deletions(-)
+> > > 
+> > > [...]
+> > > 
+> > > > @@ -886,10 +912,12 @@ static void __init arch_counter_register(unsigned type)
+> > > >  
+> > > >  	/* Register the CP15 based counter if we have one */
+> > > >  	if (type & ARCH_TIMER_TYPE_CP15) {
+> > > > -		if (arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
+> > > > +		if (arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI) {
+> > > >  			arch_timer_read_counter = arch_counter_get_cntvct;
+> > > > -		else
+> > > > +		} else {
+> > > >  			arch_timer_read_counter = arch_counter_get_cntpct;
+> > > > +			static_branch_enable(&arch_timer_phys_counter_available);
+> > > > +		}
+> > > 
+> > > I'm a bit worried about this change, although I can't put my finger on
+> > > exactly the problematic scenario. My concern is that if we have a system
+> > > where the host kernel is entered at NS-EL1 (because, e.g. EL2 is used for
+> > > something else or the bootloader just didn't load us there) then the booting
+> > > protocol doesn't mandate a zero-initialised CNTVOFF value. If we can
+> > > subsequently end up using the physical counter in the kernel and the virtual
+> > > counter in userspace, the vDSO will get confused because the datapage values
+> > > will not correspond to the values it actually ends up reading. 
+> > 
+> > Just so I'm sure I'm understanding correctly, vDSO always reads the
+> > virtual counter?
+> 
+> Yes, that's right.
+> 
+> > > There's also
+> > > the likelihood that existing EL2 init code simply isn't setting up
+> > > CNTHCTL_EL2 and CNTVOFF correctly, so we probably need a way to force
+> > > virtual counter on the cmdline.
+> > 
+> > My understanding was that we only ever use the physical counter when we
+> > boot at EL2 and therefore the kernel is in control of CNTVOFF and can
+> > set that to 0.  Is this not the case, or are you asking for a way to
+> > mandate this relationship or make it abundantly clear?
+> 
+> AFAICT, arch_timer_ppi_nr could return ARCH_TIMER_PHYS_NONSECURE_PPI
+> or ARCH_TIMER_PHYS_SECURE_PPI when we're not running at EL2, which would
+> cause us to use the physical counter with your patch applied.
+> 
 
-Mikko
+With patch 1, yes.
 
-On 27.07.2017 09:47, kbuild test robot wrote:
-> Hi Mikko,
->
-> [auto build test ERROR on tegra/for-next]
-> [also build test ERROR on v4.13-rc2 next-20170726]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Mikko-Perttunen/arm64-tegra-Add-BPMP-thermal-sensor-to-Tegra186/20170726-055759
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git for-next
-> config: arm64-allnoconfig (attached as .config)
-> compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm64
->
-> Note: the linux-review/Mikko-Perttunen/arm64-tegra-Add-BPMP-thermal-sensor-to-Tegra186/20170726-055759 HEAD 2aebe2225f7f5f03abf6098e07387fa011ec16a8 builds fine.
->       It only hurts bisectibility.
->
-> All errors (new ones prefixed by >>):
->
->    In file included from arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi:1:0,
->                     from arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts:5:
->>> arch/arm64/boot/dts/nvidia/tegra186.dtsi:7:55: fatal error: dt-bindings/thermal/tegra186-bpmp-thermal.h: No such file or directory
->     #include <dt-bindings/thermal/tegra186-bpmp-thermal.h>
->                                                           ^
->    compilation terminated.
->
-> vim +7 arch/arm64/boot/dts/nvidia/tegra186.dtsi
->
->    > 7	#include <dt-bindings/thermal/tegra186-bpmp-thermal.h>
->      8	
->
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
->
+How about simply adding something like this then:
+
+
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index f4e7261..b0426ac 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -912,7 +912,8 @@ static void __init arch_counter_register(unsigned type)
+ 
+ 	/* Register the CP15 based counter if we have one */
+ 	if (type & ARCH_TIMER_TYPE_CP15) {
+-		if (arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI) {
++		if (arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI ||
++		    (!is_hyp_mode_available() && IS_ENABLED(CONFIG_ARM64))) {
+ 			arch_timer_read_counter = arch_counter_get_cntvct;
+ 		} else {
+ 			arch_timer_read_counter = arch_counter_get_cntpct;
+
+
+> > Also, are you fine with arch_timer_read_counter changing to using the
+> > physical counter on arm64, but you're merely worried about
+> > read_cycles()?
+> 
+> Assuming you mean get_cycles(), 
+
+Yes, I should change that in the patch subject as well.
+
+> then no, I'm not worried about that because
+> it's just used for things like small delta calculations and entropy.
+
+ok, I was a bit confused becasue this patch only changes get_cycles(),
+where the previous patch changes what arch_timer_read_counter() does.
+
+> I'm
+> worried about the timekeeper (which I think uses arch_timer_read_counter)
+> being based on the physical counter and the vDSO being based on the virtual
+> counter and CNTVOFF != 0.
+> 
+
+ok, so with the above proposed modification we'll maintain that CNTVOFF
+== 0 whenever we're not in VCPU context and the timekeeper will always
+use the physical counter.
+
+[...]
+
+> > 
+> > How does this change affect the 32-bit side?  All this should do is
+> > enable a static branch which is unused on the 32-bit side; what am I
+> > missing?
+> 
+> The PPI selection is more complicated for 32-bit, because of the
+> "arm,cpu-registers-not-fw-configured" quirk.
+> 
+
+ok, but I don't see how my two patches here affect the 32-bit side, as
+I only change the logic on the arm64 side?
+
+Thanks,
+-Christoffer
