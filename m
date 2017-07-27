@@ -1,62 +1,88 @@
-From: sugar.zhang@rock-chips.com (sugar)
-Date: Thu, 27 Jul 2017 15:20:02 +0800
-Subject: [PATCH] ARM: dts: rockchip: add spdif for rk322x SoCs
-In-Reply-To: <1501138227-11796-1-git-send-email-sugar.zhang@rock-chips.com>
-References: <1501138227-11796-1-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <2dd9d195-92fb-4f83-fb13-034850b403ec@rock-chips.com>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Thu, 27 Jul 2017 12:53:04 +0530
+Subject: [PATCH] net: thunderx: Fix BGX transmit stall due to underflow
+Message-ID: <1501140184-25625-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Sunil Goutham <sgoutham@cavium.com>
 
-please ignore this email, I remember another patch about this was been 
-merged.
+For SGMII/RGMII/QSGMII interfaces when physical link goes down
+while traffic is high is resulting in underflow condition being set
+on that specific BGX's LMAC. Which assets a backpresure and VNIC stops
+transmitting packets.
 
-? 7/27/2017 14:50, Sugar Zhang ??:
-> This patch add the spdif dt node for rk322x SoCs.
->
-> Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
-> ---
->
->  arch/arm/boot/dts/rk322x.dtsi | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-> index f3e4ffd..b3b80e1 100644
-> --- a/arch/arm/boot/dts/rk322x.dtsi
-> +++ b/arch/arm/boot/dts/rk322x.dtsi
-> @@ -196,6 +196,20 @@
->  		status = "disabled";
->  	};
->
-> +	spdif: spdif at 100d0000 {
-> +		compatible = "rockchip,rk3228-spdif";
-> +		reg = <0x100d0000 0x1000>;
-> +		interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru SCLK_SPDIF>, <&cru HCLK_SPDIF_8CH>;
-> +		clock-names = "mclk", "hclk";
-> +		dmas = <&pdma 10>;
-> +		#dma-cells = <1>;
-> +		dma-names = "tx";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&spdif_tx>;
-> +		status = "disabled";
-> +	};
-> +
->  	i2s2: i2s2 at 100e0000 {
->  		compatible = "rockchip,rk3228-i2s", "rockchip,rk3066-i2s";
->  		reg = <0x100e0000 0x4000>;
-> @@ -835,6 +849,12 @@
->  			};
->  		};
->
-> +		spdif {
-> +			spdif_tx: spdif-tx {
-> +				rockchip,pins = <3 31 RK_FUNC_2 &pcfg_pull_none>;
-> +			};
-> +		};
-> +
->  		tsadc {
->  			otp_gpio: otp-gpio {
->  				rockchip,pins = <0 24 RK_FUNC_GPIO &pcfg_pull_none>;
->
+This is due to BGX being disabled in link status change callback while
+packet is in transit. This patch fixes this issue by not disabling BGX
+but instead just disables packet Rx and Tx.
+
+Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 27 ++++++++++++++++++-----
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h |  2 ++
+ 2 files changed, 24 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index 7911256..5e5c4d7 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -292,11 +292,30 @@ static void bgx_sgmii_change_link_state(struct lmac *lmac)
+ 	u64 cmr_cfg;
+ 	u64 port_cfg = 0;
+ 	u64 misc_ctl = 0;
++	bool tx_en, rx_en;
+ 
+ 	cmr_cfg = bgx_reg_read(bgx, lmac->lmacid, BGX_CMRX_CFG);
+-	cmr_cfg &= ~CMR_EN;
++	tx_en = cmr_cfg & CMR_PKT_TX_EN;
++	rx_en = cmr_cfg & CMR_PKT_RX_EN;
++	cmr_cfg &= ~(CMR_PKT_RX_EN | CMR_PKT_TX_EN);
+ 	bgx_reg_write(bgx, lmac->lmacid, BGX_CMRX_CFG, cmr_cfg);
+ 
++	/* Wait for BGX RX to be idle */
++	if (bgx_poll_reg(bgx, lmac->lmacid, BGX_GMP_GMI_PRTX_CFG,
++			 GMI_PORT_CFG_RX_IDLE, false)) {
++		dev_err(&bgx->pdev->dev, "BGX%d LMAC%d GMI RX not idle\n",
++			bgx->bgx_id, lmac->lmacid);
++		return;
++	}
++
++	/* Wait for BGX TX to be idle */
++	if (bgx_poll_reg(bgx, lmac->lmacid, BGX_GMP_GMI_PRTX_CFG,
++			 GMI_PORT_CFG_TX_IDLE, false)) {
++		dev_err(&bgx->pdev->dev, "BGX%d LMAC%d GMI TX not idle\n",
++			bgx->bgx_id, lmac->lmacid);
++		return;
++	}
++
+ 	port_cfg = bgx_reg_read(bgx, lmac->lmacid, BGX_GMP_GMI_PRTX_CFG);
+ 	misc_ctl = bgx_reg_read(bgx, lmac->lmacid, BGX_GMP_PCS_MISCX_CTL);
+ 
+@@ -347,10 +366,8 @@ static void bgx_sgmii_change_link_state(struct lmac *lmac)
+ 	bgx_reg_write(bgx, lmac->lmacid, BGX_GMP_PCS_MISCX_CTL, misc_ctl);
+ 	bgx_reg_write(bgx, lmac->lmacid, BGX_GMP_GMI_PRTX_CFG, port_cfg);
+ 
+-	port_cfg = bgx_reg_read(bgx, lmac->lmacid, BGX_GMP_GMI_PRTX_CFG);
+-
+-	/* Re-enable lmac */
+-	cmr_cfg |= CMR_EN;
++	/* Restore CMR config settings */
++	cmr_cfg |= (rx_en ? CMR_PKT_RX_EN : 0) | (tx_en ? CMR_PKT_TX_EN : 0);
+ 	bgx_reg_write(bgx, lmac->lmacid, BGX_CMRX_CFG, cmr_cfg);
+ 
+ 	if (bgx->is_rgx && (cmr_cfg & (CMR_PKT_RX_EN | CMR_PKT_TX_EN)))
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+index 6b7fe6fd..23acdc5 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+@@ -170,6 +170,8 @@
+ #define  GMI_PORT_CFG_DUPLEX			BIT_ULL(2)
+ #define  GMI_PORT_CFG_SLOT_TIME			BIT_ULL(3)
+ #define  GMI_PORT_CFG_SPEED_MSB			BIT_ULL(8)
++#define  GMI_PORT_CFG_RX_IDLE			BIT_ULL(12)
++#define  GMI_PORT_CFG_TX_IDLE			BIT_ULL(13)
+ #define BGX_GMP_GMI_RXX_JABBER		0x38038
+ #define BGX_GMP_GMI_TXX_THRESH		0x38210
+ #define BGX_GMP_GMI_TXX_APPEND		0x38218
+-- 
+2.7.4
