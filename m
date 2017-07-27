@@ -1,132 +1,65 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 27 Jul 2017 10:29:04 +0530
-Subject: [PATCH v2 6/7] mailbox: bcm-flexrm-mailbox: Set msg_queue_len for
- each channel
-In-Reply-To: <CAALAos-aKDw8p2_BFausm+VC4teoAW22239+gnkPfFUaiZxB6w@mail.gmail.com>
-References: <1500620142-910-1-git-send-email-anup.patel@broadcom.com>
- <1500620142-910-7-git-send-email-anup.patel@broadcom.com>
- <CABb+yY1Pxhgvvit=0eZr66DpLJ3MDEvRPx9dwDPJM8PwiKXiew@mail.gmail.com>
- <CAALAos_yh0bCMZFrSmf-c92pNMBGhLT05YFF0duhmpxgYec+_w@mail.gmail.com>
- <CABb+yY3d1FvfB-NBVHLNfoFXGn9-8nFEdKBhXt4sBTr1vodhYw@mail.gmail.com>
- <CAALAos9T0YtCvgjGCMVPn=dw2JKY=jTxz-v431NgpBCKFo1vVQ@mail.gmail.com>
- <CABb+yY2x1Wb=RZhq+eUnM0wkcih4YkFDrKRgqhs1erGQGH3tdw@mail.gmail.com>
- <CAALAos-aKDw8p2_BFausm+VC4teoAW22239+gnkPfFUaiZxB6w@mail.gmail.com>
-Message-ID: <CABb+yY3fwPTSc0PKh44uvgdbvQJhu-X3O_L5EtumB6ovsaOdSw@mail.gmail.com>
+From: yong.deng@magewell.com (Yong Deng)
+Date: Thu, 27 Jul 2017 13:01:34 +0800
+Subject: [PATCH v2 0/3] Initial Allwinner V3s CSI Support
+Message-ID: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 27, 2017 at 9:25 AM, Anup Patel <anup.patel@broadcom.com> wrote:
-> On Tue, Jul 25, 2017 at 9:37 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> On Tue, Jul 25, 2017 at 11:11 AM, Anup Patel <anup.patel@broadcom.com> wrote:
->>> On Mon, Jul 24, 2017 at 10:06 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->>>> On Mon, Jul 24, 2017 at 9:26 AM, Anup Patel <anup.patel@broadcom.com> wrote:
->>>>> Hi Jassi,
->>>>>
->>>>> Sorry for the delayed response...
->>>>>
->>>>> On Fri, Jul 21, 2017 at 9:16 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->>>>>> Hi Anup,
->>>>>>
->>>>>> On Fri, Jul 21, 2017 at 12:25 PM, Anup Patel <anup.patel@broadcom.com> wrote:
->>>>>>> The Broadcom FlexRM ring (i.e. mailbox channel) can handle
->>>>>>> larger number of messages queued in one FlexRM ring hence
->>>>>>> this patch sets msg_queue_len for each mailbox channel to
->>>>>>> be same as RING_MAX_REQ_COUNT.
->>>>>>>
->>>>>>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->>>>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>>>>>> ---
->>>>>>>  drivers/mailbox/bcm-flexrm-mailbox.c | 5 ++++-
->>>>>>>  1 file changed, 4 insertions(+), 1 deletion(-)
->>>>>>>
->>>>>>> diff --git a/drivers/mailbox/bcm-flexrm-mailbox.c b/drivers/mailbox/bcm-flexrm-mailbox.c
->>>>>>> index 9873818..20055a0 100644
->>>>>>> --- a/drivers/mailbox/bcm-flexrm-mailbox.c
->>>>>>> +++ b/drivers/mailbox/bcm-flexrm-mailbox.c
->>>>>>> @@ -1683,8 +1683,11 @@ static int flexrm_mbox_probe(struct platform_device *pdev)
->>>>>>>                 ret = -ENOMEM;
->>>>>>>                 goto fail_free_debugfs_root;
->>>>>>>         }
->>>>>>> -       for (index = 0; index < mbox->num_rings; index++)
->>>>>>> +       for (index = 0; index < mbox->num_rings; index++) {
->>>>>>> +               mbox->controller.chans[index].msg_queue_len =
->>>>>>> +                                               RING_MAX_REQ_COUNT;
->>>>>>>                 mbox->controller.chans[index].con_priv = &mbox->rings[index];
->>>>>>> +       }
->>>>>>>
->>>>>> While writing mailbox.c I wasn't unaware that there is the option to
->>>>>> choose the queue length at runtime.
->>>>>> The idea was to keep the code as simple as possible. I am open to
->>>>>> making it a runtime thing, but first, please help me understand how
->>>>>> that is useful here.
->>>>>>
->>>>>> I understand FlexRm has a ring buffer of RING_MAX_REQ_COUNT(1024)
->>>>>> elements. Any message submitted to mailbox api can be immediately
->>>>>> written onto the ringbuffer if there is some space.
->>>>>> Is there any mechanism to report back to a client driver, if its
->>>>>> message in ringbuffer failed "to be sent"?
->>>>>> If there isn't any, then I think, in flexrm_last_tx_done() you should
->>>>>> simply return true if there is some space left in the rung-buffer,
->>>>>> false otherwise.
->>>>>
->>>>> Yes, we have error code in "struct brcm_message" to report back
->>>>> errors from send_message. In our mailbox clients, we check
->>>>> return value of mbox_send_message() and also the error code
->>>>> in "struct brcm_message".
->>>>>
->>>> I meant after the message has been accepted in the ringbuffer but the
->>>> remote failed to receive it.
->>>
->>> Yes, even this case is handled.
->>>
->>> In case of IO errors after message has been put in ring buffer, we get
->>> completion message with error code and mailbox client drivers will
->>> receive back "struct brcm_message" with error set.
->>>
->>> You can refer flexrm_process_completions() for more details.
->>>
-It doesn't seem to be what I suggest. I see two issues in
-flexrm_process_completions()
-1) It calls mbox_send_message(), which is a big NO for a controller
-driver. Why should you have one more message stored outside of
-ringbuffer?
+Sorry for resend the patch. Delivering to somebody in cc has failed at
+last time.
 
-2) It calls mbox_chan_received_data()  which is for messages received
-from the remote. And not the way to report failed _transmission_, for
-which the api calls back mbox_client.tx_done() .  In your client
-driver please populate mbox_client.tx_done() and see which message is
-reported "sent fine" when.
+This patchset add initial support for Allwinner V3s CSI.
 
+Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
+and CSI1 is used for parallel interface. This is not documented in
+datasheet but by testing and guess.
 
->>>> There seems no such provision. IIANW, then you should be able to
->>>> consider every message as "sent successfully" once it is in the ring
->>>> buffer i.e, immediately after mbox_send_message() returns 0.
->>>> In that case I would think you don't need more than a couple of
->>>> entries out of MBOX_TX_QUEUE_LEN ?
->>>
->>> What I am trying to suggest is that we can take upto 1024 messages
->>> in a FlexRM ring but the MBOX_TX_QUEUE_LEN limits us queuing
->>> more messages. This issue manifest easily when multiple CPUs
->>> queues to same FlexRM ring (i.e. same mailbox channel).
->>>
->> OK then, I guess we have to make the queue length a runtime decision.
->
-> Do you agree with approach taken by PATCH5 and PATCH6 to
-> make queue length runtime?
->
-I agree that we may have to get the queue length from platform, if
-MBOX_TX_QUEUE_LEN is limiting performance. That will be easier on both
-of us. However I suspect the right fix for _this_ situation is in
-flexrm driver. See above.
+This patchset implement a v4l2 framework driver and add a binding 
+documentation for it. 
 
->>
->> BTW, is it a practical use case that needs to queue upto 1024
->> requests? Or are you just testing?
->
-> Yes, we just need bigger queue length for FlexRM but we
-> choose 1024 (max limit) to avoid changing it again in future.
->
-How does the client use the api? Does it work in blocking mode i.e, is
-tx_block set ? Is it available somewhere I can have a look?
+Currently, the driver only support the parallel interface. And has been
+tested with a BT1120 signal which generating from FPGA. The following
+fetures are not support with this patchset:
+  - ISP 
+  - MIPI-CSI2
+  - Master clock for camera sensor
+  - Power regulator for the front end IC
 
-Thanks.
+sun6i_csi_ops is still there. I seriously thought about it. Without 
+sun6i_csi_ops, the dependency between sun6i_video and sun6i_csi_v3s
+will be complicated. Comments and criticisms are welcome.
+
+Changes in v2:
+  * Change sunxi-csi to sun6i-csi
+  * Rebase to media_tree master branch
+
+Yong Deng (3):
+  media: V3s: Add support for Allwinner CSI.
+  dt-bindings: media: Add Allwinner V3s Camera Sensor Interface (CSI)
+  media: MAINTAINERS: add entries for Allwinner V3s CSI
+
+ .../devicetree/bindings/media/sun6i-csi.txt        |  49 ++
+ MAINTAINERS                                        |   8 +
+ drivers/media/platform/Kconfig                     |   1 +
+ drivers/media/platform/Makefile                    |   2 +
+ drivers/media/platform/sun6i-csi/Kconfig           |   9 +
+ drivers/media/platform/sun6i-csi/Makefile          |   3 +
+ drivers/media/platform/sun6i-csi/sun6i_csi.c       | 545 ++++++++++++++
+ drivers/media/platform/sun6i-csi/sun6i_csi.h       | 203 +++++
+ drivers/media/platform/sun6i-csi/sun6i_csi_v3s.c   | 827 +++++++++++++++++++++
+ drivers/media/platform/sun6i-csi/sun6i_csi_v3s.h   | 206 +++++
+ drivers/media/platform/sun6i-csi/sun6i_video.c     | 663 +++++++++++++++++
+ drivers/media/platform/sun6i-csi/sun6i_video.h     |  61 ++
+ 12 files changed, 2577 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+ create mode 100644 drivers/media/platform/sun6i-csi/Kconfig
+ create mode 100644 drivers/media/platform/sun6i-csi/Makefile
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi.c
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi.h
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi_v3s.c
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi_v3s.h
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_video.c
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_video.h
+
+-- 
+1.8.3.1
