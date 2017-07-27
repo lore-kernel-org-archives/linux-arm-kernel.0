@@ -1,42 +1,60 @@
 From: david.wu@rock-chips.com (David Wu)
-Date: Thu, 27 Jul 2017 21:02:19 +0800
-Subject: [PATCH v2 08/11] ARM: dts: rk322x: Add support internal phy for gmac
+Date: Thu, 27 Jul 2017 21:02:20 +0800
+Subject: [PATCH v2 09/11] ARM: dts: rk3228-evb: Enable the internal phy for
+ gmac
 In-Reply-To: <1501160540-30662-1-git-send-email-david.wu@rock-chips.com>
 References: <1501160156-30328-1-git-send-email-david.wu@rock-chips.com>
  <1501160540-30662-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1501160540-30662-4-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1501160540-30662-5-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds internal mac phy clock and internal mac phy reset
-for rk gmac using.
+This patch enables the internal phy for rk3228 evb board
+by default.
+To use the external 1000M phy on evb board, need to make
+some switch of evb board to be on.
 
 Signed-off-by: David Wu <david.wu@rock-chips.com>
 ---
- arch/arm/boot/dts/rk322x.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/rk3228-evb.dts | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-index f3e4ffd..3778f7d 100644
---- a/arch/arm/boot/dts/rk322x.dtsi
-+++ b/arch/arm/boot/dts/rk322x.dtsi
-@@ -611,13 +611,13 @@
- 		clocks = <&cru SCLK_MAC>, <&cru SCLK_MAC_RX>,
- 			<&cru SCLK_MAC_TX>, <&cru SCLK_MAC_REF>,
- 			<&cru SCLK_MAC_REFOUT>, <&cru ACLK_GMAC>,
--			<&cru PCLK_GMAC>;
-+			<&cru PCLK_GMAC>, <&cru SCLK_MAC_PHY>;
- 		clock-names = "stmmaceth", "mac_clk_rx",
- 			"mac_clk_tx", "clk_mac_ref",
- 			"clk_mac_refout", "aclk_mac",
--			"pclk_mac";
--		resets = <&cru SRST_GMAC>;
--		reset-names = "stmmaceth";
-+			"pclk_mac", "clk_macphy";
-+		resets = <&cru SRST_GMAC>, <&cru SRST_MACPHY>;
-+		reset-names = "stmmaceth", "mac-phy";
- 		rockchip,grf = <&grf>;
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/rk3228-evb.dts b/arch/arm/boot/dts/rk3228-evb.dts
+index 5883433..73b88d3 100644
+--- a/arch/arm/boot/dts/rk3228-evb.dts
++++ b/arch/arm/boot/dts/rk3228-evb.dts
+@@ -50,6 +50,16 @@
+ 		device_type = "memory";
+ 		reg = <0x60000000 0x40000000>;
  	};
++
++	vcc_phy: vcc-phy-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		regulator-name = "vcc_phy";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
+ };
+ 
+ &emmc {
+@@ -60,6 +70,15 @@
+ 	status = "okay";
+ };
+ 
++&gmac {
++	assigned-clocks = <&cru SCLK_MAC_SRC>;
++	assigned-clock-rates = <50000000>;
++	clock_in_out = "output";
++	phy-supply = <&vcc_phy>;
++	phy-mode = "internal";
++	status = "okay";
++};
++
+ &tsadc {
+ 	status = "okay";
+ 
 -- 
 1.9.1
