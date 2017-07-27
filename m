@@ -1,47 +1,70 @@
-From: alexander.duyck@gmail.com (Alexander Duyck)
-Date: Thu, 27 Jul 2017 10:49:25 -0700
-Subject: [PATCH v7 2/3] PCI: Enable PCIe Relaxed Ordering if supported
-In-Reply-To: <75213fca-4522-2297-3cb8-338e643d3552@huawei.com>
-References: <1499955692-26556-1-git-send-email-dingtianhong@huawei.com>
- <1499955692-26556-3-git-send-email-dingtianhong@huawei.com>
- <e496ff1d-b836-ebef-fdf7-76273aaaaef6@codeaurora.org>
- <0260e398-bd8e-6615-6d5c-1f7c07b6fc09@huawei.com>
- <67be791f-e0cf-8284-9229-17174dc741ef@codeaurora.org>
- <5f9b8bfb-41a8-a17c-6fea-581aec1d5573@huawei.com>
- <20170724090516.2e0f0d2a@w520.home>
- <MWHPR12MB1600065968964410EDFBDA3BC8B90@MWHPR12MB1600.namprd12.prod.outlook.com>
- <75213fca-4522-2297-3cb8-338e643d3552@huawei.com>
-Message-ID: <CAKgT0UcqdRCwDDxD=22Q_jLuqz8KVHwH1-V45Aq-1WzQw=agcA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 27 Jul 2017 11:17:18 -0700
+Subject: [PATCH v3] irqchip/tango: Don't use incorrect irq_mask_ack
+ callback
+In-Reply-To: <yw1x4ltzm2ok.fsf@mansr.com>
+References: <20170719190734.18566-1-opendmb@gmail.com>
+ <20170719190734.18566-3-opendmb@gmail.com>
+ <7a51555f-8191-9ebd-1f30-7c20f6db9d3f@sigmadesigns.com>
+ <8d29fec9-35b8-c33b-3091-3e9a51c99ed7@gmail.com>
+ <dddc01e3-b4f0-1f94-db6a-e3d4b31e6f4d@sigmadesigns.com>
+ <yw1xfudkodvv.fsf@mansr.com>
+ <6f0092f7-692f-4a15-1d95-40f4e59c8585@sigmadesigns.com>
+ <yw1xbmo8odan.fsf@mansr.com> <3b858e14-0da1-d4aa-eb84-f136ece8c2a6@gmail.com>
+ <yw1x4ltzm2ok.fsf@mansr.com>
+Message-ID: <48734beb-0e6b-3a8f-ebf4-b1cec63322e5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 6:08 PM, Ding Tianhong <dingtianhong@huawei.com> wrote:
->
->
-> On 2017/7/27 2:26, Casey Leedom wrote:
->>   By the way Ding, two issues:
+On 07/26/2017 12:13 PM, M?ns Rullg?rd wrote:
+> Florian Fainelli <f.fainelli@gmail.com> writes:
+> 
+>> On 07/25/2017 06:29 AM, M?ns Rullg?rd wrote:
+>>> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+>>>
+>>>> On 25/07/2017 15:16, M?ns Rullg?rd wrote:
+>>>>
+>>>>> What happened to the patch adding the proper combined function?
+>>>>
+>>>> It appears you're not CCed on v2.
+>>>>
+>>>> https://patchwork.kernel.org/patch/9859799/
+>>>>
+>>>> Doug wrote:
+>>>>> Yes, you understand correctly.  The irq_mask_ack method is entirely
+>>>>> optional and I assume that is why this issue went undetected for so
+>>>>> long; however, it is slightly more efficient to combine the functions
+>>>>> (even if the ack is unnecessary) which is why I chose to do so for my
+>>>>> changes to the irqchip-brcmstb-l2 driver where I first discovered this
+>>>>> issue.  How much value the improved efficiency has is certainly
+>>>>> debatable, but interrupt handling is one area where people might care
+>>>>> about such a small difference.  As the irqchip-tango driver maintainer
+>>>>> you are welcome to decide whether or not the irq_mask_ack method makes
+>>>>> sense to you.
+>>>>
+>>>> My preference goes to leaving the irq_mask_ack callback undefined,
+>>>> and let the irqchip framework use irq_mask and irq_ack instead.
+>>>
+>>> Why would you prefer the less efficient way?
+>>>
 >>
->>  1. Did we ever get any acknowledgement from either Intel or AMD
->>     on this patch?  I know that we can't ensure that, but it sure would
->>     be nice since the PCI Quirks that we're putting in affect their
->>     products.
+>> Same question here, that does not really make sense to me.
 >>
->
-> Still no Intel and AMD guys has ack this, this is what I am worried about, should I
-> ping some man again ?
->
-> Thanks
-> Ding
+>> The whole point of this patch series is to have a set of efficient and
+>> bugfree (or nearly) helper functions that drivers can rely on, are you
+>> saying that somehow using irq_mask_and_ack is exposing a bug in the
+>> tango irqchip driver and using the separate functions does not expose
+>> this bug?
+> 
+> There is currently a bug in that the function used doesn't do what its
+> name implies which can't be good.  Using the separate mask and ack
+> functions obviously works, but combining them saves a lock/unlock
+> sequence.  The correct combined function has already been written, so I
+> see no reason not to use it.
 
-
-I probably wouldn't worry about it too much. If anything all this
-patch is doing is disabling relaxed ordering on the platforms we know
-have issues based on what Casey originally had. If nothing else we can
-follow up once the patches are in the kernel and if somebody has an
-issue then.
-
-You can include my acked-by, but it is mostly related to how this
-interacts with NICs, and not so much about the PCI chipsets
-themselves.
-
-Acked-by: Alexander Duyck <alexander.h.duyck@intel.com>
+Marc/Mason, are you intending to get this patch accepted in order to
+provide a quick bugfix targeting earlier kernels with the tango irqchip
+driver or is this how you think the correct fix for the tango irqchip
+driver is as opposed to using Doug's fix?
+-- 
+Florian
