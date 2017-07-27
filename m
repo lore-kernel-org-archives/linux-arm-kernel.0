@@ -1,179 +1,41 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 27 Jul 2017 16:15:52 -0500
-Subject: [PATCH] [for 4.13] tty: pl011: fix initialization order of QDF2400 E44
-Message-ID: <1501190152-24060-1-git-send-email-timur@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 27 Jul 2017 23:25:46 +0100
+Subject: halting the kernel does not stop the CPU cores?
+In-Reply-To: <26ccb0f7-0f78-27cd-cead-ddd810f4a33e@gmail.com>
+References: <VI1PR04MB1662099750F9EAFA0324C6538CBE0@VI1PR04MB1662.eurprd04.prod.outlook.com>
+ <26ccb0f7-0f78-27cd-cead-ddd810f4a33e@gmail.com>
+Message-ID: <20170727222545.GT31807@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The work-around for Qualcomm Technologies QDF2400 Erratum 44 hinges on a
-global variable defined in the pl011 driver.  The ACPI SPCR parsing code
-determines whether the work-around is needed, and if so, it changes the
-console name from "pl011" to "qdf2400_e44".  The expectation is that
-the pl011 driver will implement the work-around when it sees the console
-name.  The global variable qdf2400_e44_present is set when that happens.
+On Thu, Jul 27, 2017 at 01:07:00PM -0700, Florian Fainelli wrote:
+> On 07/27/2017 07:38 AM, Heinz Wrobel wrote:
+> > Hi,
+> > 
+> > I noticed that when halting the kernel (intentionally or not), the cores effectively go into a while(1) loop and power consumption on larger devices really jumps up significantly to the point where, e.g., a ?crash? turns into ?crash and burn?.
+> > 
+> > I would assume that if a system is halted, you don?t want to dissipate more power than on a running system but go as silent as low power as reasonable.
+> > 
+> > Is there any specific reason why the cores would not go into a wfi loop like they do on idle?
+> > The patch to fix this seems to be easy at first glance, but is there a good reason *NOT* to do such a patch and to leave the plain while(1)?
+> 
+> In fact, if your platform supports CPU_HOTPLUG, I am not clear why
+> smp_send_stop() + ipi_send_stop() is not calling platform_cpu_kill()
+> which would be smp_ops.cpu_kill() but instead cpu_relax() was chosen?
+> 
+> The CPU is dead anyway so as you say, so it's not like there is a remote
+> chance to resume execution on these secondary cores?
 
-The problem is that work-around needs to be enabled when the pl011
-driver probes, not when the console name is queried.  However, sbsa_probe()
-is called before pl011_console_match().  The work-around appeared to work
-previously because the default console on QDF2400 platforms was always
-ttyAMA1.  The first time sbsa_probe() is called (for ttyAMA0),
-qdf2400_e44_present is still false.  Then pl011_console_match() is called,
-and it sets qdf2400_e44_present to true.  All subsequent calls to
-sbsa_probe() enable the work-around.
+The cpu kill method also needs another cpu to be interacting with the
+cpu die methods as well - the CPU hotunplug is a combination effort
+between the CPU to be killed and the CPU asking for the killing of
+that CPU.
 
-The solution is to move the global variable into spcr.c and let the
-pl011 driver query it during probe time.  This works because all QDF2400
-platforms require SPCR, so parse_spcr() will always be called.
-pl011_console_match still checks for the "qdf2400_e44" console name,
-but it doesn't do anything else special.
+We don't have that luxury in these paths, which are used amongst
+other things for when the kernel panics, which can happen from any
+context.
 
-Fixes: 5a0722b898f8 ("tty: pl011: use "qdf2400_e44" as the earlycon name for QDF2400 E44")
-Tested-by: Jeffrey Hugo <jhugo@codeaurora.org>
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- drivers/acpi/spcr.c             | 36 ++++++++++++++++++++++++++++++++++--
- drivers/tty/serial/amba-pl011.c | 37 +++++++++++++++++++------------------
- include/linux/acpi.h            |  1 +
- 3 files changed, 54 insertions(+), 20 deletions(-)
-
-diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
-index 4ac3e06b41d8..98aa8c808a33 100644
---- a/drivers/acpi/spcr.c
-+++ b/drivers/acpi/spcr.c
-@@ -17,6 +17,16 @@
- #include <linux/serial_core.h>
- 
- /*
-+ * Erratum 44 for QDF2432v1 and QDF2400v1 SoCs describes the BUSY bit as
-+ * occasionally getting stuck as 1. To avoid the potential for a hang, check
-+ * TXFE == 0 instead of BUSY == 1. This may not be suitable for all UART
-+ * implementations, so only do so if an affected platform is detected in
-+ * parse_spcr().
-+ */
-+bool qdf2400_e44_present;
-+EXPORT_SYMBOL(qdf2400_e44_present);
-+
-+/*
-  * Some Qualcomm Datacenter Technologies SoCs have a defective UART BUSY bit.
-  * Detect them by examining the OEM fields in the SPCR header, similiar to PCI
-  * quirk detection in pci_mcfg.c.
-@@ -147,8 +157,30 @@ int __init parse_spcr(bool earlycon)
- 		goto done;
- 	}
- 
--	if (qdf2400_erratum_44_present(&table->header))
--		uart = "qdf2400_e44";
-+	/*
-+	 * If the E44 erratum is required, then we need to tell the pl011
-+	 * driver to implement the work-around.
-+	 *
-+	 * The global variable is used by the probe function when it
-+	 * creates the UARTs, whether or not they're used as a console.
-+	 *
-+	 * If the user specifies "traditional" earlycon, the qdf2400_e44
-+	 * console name matches the EARLYCON_DECLARE() statement, and
-+	 * SPCR is not used.  Parameter "earlycon" is false.
-+	 *
-+	 * If the user specifies "SPCR" earlycon, then we need to update
-+	 * the console name so that it also says "qdf2400_e44".  Parameter
-+	 * "earlycon" is true.
-+	 *
-+	 * For consistency, if we change the console name, then we do it
-+	 * for everyone, not just earlycon.
-+	 */
-+	if (qdf2400_erratum_44_present(&table->header)) {
-+		qdf2400_e44_present = true;
-+		if (earlycon)
-+			uart = "qdf2400_e44";
-+	}
-+
- 	if (xgene_8250_erratum_present(table))
- 		iotype = "mmio32";
- 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 8a857bb34fbb..1888d168a41c 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -142,15 +142,7 @@ static unsigned int get_fifosize_arm(struct amba_device *dev)
- 	.fixed_options		= true,
- };
- 
--/*
-- * Erratum 44 for QDF2432v1 and QDF2400v1 SoCs describes the BUSY bit as
-- * occasionally getting stuck as 1. To avoid the potential for a hang, check
-- * TXFE == 0 instead of BUSY == 1. This may not be suitable for all UART
-- * implementations, so only do so if an affected platform is detected in
-- * parse_spcr().
-- */
--static bool qdf2400_e44_present = false;
--
-+#ifdef CONFIG_ACPI_SPCR_TABLE
- static struct vendor_data vendor_qdt_qdf2400_e44 = {
- 	.reg_offset		= pl011_std_offsets,
- 	.fr_busy		= UART011_FR_TXFE,
-@@ -165,6 +157,7 @@ static unsigned int get_fifosize_arm(struct amba_device *dev)
- 	.always_enabled		= true,
- 	.fixed_options		= true,
- };
-+#endif
- 
- static u16 pl011_st_offsets[REG_ARRAY_SIZE] = {
- 	[REG_DR] = UART01x_DR,
-@@ -2375,12 +2368,14 @@ static int __init pl011_console_match(struct console *co, char *name, int idx,
- 	resource_size_t addr;
- 	int i;
- 
--	if (strcmp(name, "qdf2400_e44") == 0) {
--		pr_info_once("UART: Working around QDF2400 SoC erratum 44");
--		qdf2400_e44_present = true;
--	} else if (strcmp(name, "pl011") != 0) {
-+	/*
-+	 * Systems affected by the Qualcomm Technologies QDF2400 E44 erratum
-+	 * have a distinct console name, so make sure we check for that.
-+	 * The actual implementation of the erratum occurs in the probe
-+	 * function.
-+	 */
-+	if ((strcmp(name, "qdf2400_e44") != 0) && (strcmp(name, "pl011") != 0))
- 		return -ENODEV;
--	}
- 
- 	if (uart_parse_earlycon(options, &iotype, &addr, &options))
- 		return -ENODEV;
-@@ -2734,11 +2729,17 @@ static int sbsa_uart_probe(struct platform_device *pdev)
- 	}
- 	uap->port.irq	= ret;
- 
--	uap->reg_offset	= vendor_sbsa.reg_offset;
--	uap->vendor	= qdf2400_e44_present ?
--					&vendor_qdt_qdf2400_e44 : &vendor_sbsa;
-+#ifdef CONFIG_ACPI_SPCR_TABLE
-+	if (qdf2400_e44_present) {
-+		dev_info(&pdev->dev, "working around QDF2400 SoC erratum 44\n");
-+		uap->vendor = &vendor_qdt_qdf2400_e44;
-+	} else
-+#endif
-+		uap->vendor = &vendor_sbsa;
-+
-+	uap->reg_offset	= uap->vendor->reg_offset;
- 	uap->fifosize	= 32;
--	uap->port.iotype = vendor_sbsa.access_32b ? UPIO_MEM32 : UPIO_MEM;
-+	uap->port.iotype = uap->vendor->access_32b ? UPIO_MEM32 : UPIO_MEM;
- 	uap->port.ops	= &sbsa_uart_pops;
- 	uap->fixed_baud = baudrate;
- 
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index c749eef1daa1..27b4b6615263 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -1209,6 +1209,7 @@ static inline void acpi_table_upgrade(void) { }
- #endif
- 
- #ifdef CONFIG_ACPI_SPCR_TABLE
-+extern bool qdf2400_e44_present;
- int parse_spcr(bool earlycon);
- #else
- static inline int parse_spcr(bool earlycon) { return 0; }
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
