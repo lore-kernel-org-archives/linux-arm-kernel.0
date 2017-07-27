@@ -1,74 +1,56 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 27 Jul 2017 11:12:55 +0100
-Subject: [PATCH v4 1/2] acpi:iort: Add an IORT helper function to reserve
- HW ITS address regions for IOMMU drivers
-In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA8383C0268@FRAEML521-MBX.china.huawei.com>
-References: <20170725111732.41792-1-shameerali.kolothum.thodi@huawei.com>
- <20170725111732.41792-2-shameerali.kolothum.thodi@huawei.com>
- <20170725171100.GA1663@red-moon>
- <b7512f89-4fe7-940e-0fa9-9274d8b1e935@arm.com>
- <20170726095208.GA2468@red-moon>
- <5FC3163CFD30C246ABAA99954A238FA8383C0268@FRAEML521-MBX.china.huawei.com>
-Message-ID: <20170727101255.GA15067@red-moon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Jul 2017 12:12:59 +0200
+Subject: [PATCH RESEND] ARM: davinci: don't mark vpif_input structures as
+ 'const'
+Message-ID: <20170727101320.609258-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 27, 2017 at 09:13:42AM +0000, Shameerali Kolothum Thodi wrote:
+A change to the platform data definitions caused a warning in the board code:
 
-[...]
+arch/arm/mach-davinci/board-dm646x-evm.c:680:13: error: initialization discards 'const' qualifier from pointer target type [-Werror=discarded-qualifiers]
+arch/arm/mach-davinci/board-dm646x-evm.c:690:13: error: initialization discards 'const' qualifier from pointer target type [-Werror=discarded-qualifiers]
 
-> > > >> +int iort_iommu_its_get_resv_regions(struct device *dev, struct
-> > list_head *head)
-> > > >> +{
-> > > >> +	int i;
-> > > >> +	struct acpi_iort_its_group *its;
-> > > >> +	struct acpi_iort_node *node, *its_node = NULL;
-> > > >> +	int resv = 0;
-> > > >
-> > > > Nit: int i, resv = 0;
-> > > >
-> > > > I can make these changes but I suspect this series will go via IOMMU
-> > > > tree, let me know how you want to handle it.
-> > > >
-> > > > Lorenzo
-> > > >
-> > > >> +	node = iort_find_dev_node(dev);
-> > > >> +	if (!node)
-> > > >> +		return -ENODEV;
-> > > >> +
-> > >
-> > > I'd suggest we also want a comment here to clarify that we're currently
-> > > assuming straightforward topologies where all mappings for a given root
-> > > complex/named component target the same ITS group. Otherwise we're
-> > going
-> > > to need somewhat more logic to iterate the its_node processing over
-> > > every mapping (or every alias in the PCI case), but avoid creating
-> > > duplicate entries.
-> > 
-> > You have a point and we have time to update the code. Short of reserving
-> > all ITS regions for every device that maps to one at least, we could (even
-> > pre-compute instead of looking it up on the fly) create a list of ITS
-> > identifiers a given IORT node may map to and use that to reserve the
-> > regions.
-> 
-> I am trying to understand the use case scenario discussed here.
-> Apologies if it is a dumb query. 
-> 
-> My understanding is that, it is possible to have a PCI  RC iort node
-> mapped to multiple ITS group nodes.  That is perfectly fine and given
-> a dev input RID we can identify the ITS group the device points to
-> using - iort_node_map_id().
-> 
-> But the above discussion seems to suggest that there might be
-> situations where we have to go through all the mapped ITS groups and
-> identify all the ITSs associated with the RC.  Clearly I am missing
-> something.
+This is a bit unfortunate, since we generally like structure definitions to
+be const, but as this is legacy code, the easiest way out is still to
+remove the 'const' annotation here.
 
-I reckon Robin was referring to this:
+Fixes: 4a5f8ae50b66 ("[media] davinci: vpif_capture: get subdevs from DT when available")
+Fixes: 231ce279e6e3 ("ARM: davinci: fix const warnings")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+I originally sent my fix on Jun 9, but Kevin had already applied an
+identical fix for two of the three affected files. This fixes the
+third one that his patch missed.
 
-https://patchwork.kernel.org/patch/9757911/
+I have a couple of other patches that I'm planning to apply directly
+to the fixes branch now, and would do the same for this one unless
+there are objections.
+---
+ arch/arm/mach-davinci/board-da850-evm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Does this help ?
-
-Thanks,
-Lorenzo
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index b5625d009288..e568c8c6f69c 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -1166,7 +1166,7 @@ static struct tvp514x_platform_data tvp5146_pdata = {
+ 
+ #define TVP514X_STD_ALL (V4L2_STD_NTSC | V4L2_STD_PAL)
+ 
+-static const struct vpif_input da850_ch0_inputs[] = {
++static struct vpif_input da850_ch0_inputs[] = {
+ 	{
+ 		.input = {
+ 			.index = 0,
+@@ -1181,7 +1181,7 @@ static const struct vpif_input da850_ch0_inputs[] = {
+ 	},
+ };
+ 
+-static const struct vpif_input da850_ch1_inputs[] = {
++static struct vpif_input da850_ch1_inputs[] = {
+ 	{
+ 		.input = {
+ 			.index = 0,
+-- 
+2.9.0
