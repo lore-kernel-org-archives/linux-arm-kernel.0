@@ -1,32 +1,31 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 27 Jul 2017 16:53:01 +0530
-Subject: [GIT PULL] DaVinci fixes for v4.13
-Message-ID: <6dc06dd1-0d7b-1988-d5c9-9cfafcf847f3@ti.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 27 Jul 2017 12:23:57 +0100
+Subject: [PATCH v5 02/19] arm64: juno: dts: Use the new coresight
+ replicator string
+In-Reply-To: <20170720125718.GB3532@e110455-lin.cambridge.arm.com>
+References: <1500545849-23724-1-git-send-email-suzuki.poulose@arm.com>
+ <1500545849-23724-3-git-send-email-suzuki.poulose@arm.com>
+ <20170720125718.GB3532@e110455-lin.cambridge.arm.com>
+Message-ID: <2e8dd89e-3b03-54c7-cc34-5a2a4550c296@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 520eccdfe187591a51ea9ab4c1a024ae4d0f68d9:
+Hi Suzuki,
 
-  Linux 4.13-rc2 (2017-07-23 16:15:17 -0700)
+On 20/07/17 13:57, Liviu Dudau wrote:
+> On Thu, Jul 20, 2017 at 11:17:12AM +0100, Suzuki K Poulose wrote:
+>> Use the new compatible for ATB programmable replicator in Juno.
+>>
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>
+>> Cc: Mike Leach <mike.leach@linaro.org>
+>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> 
+> Acked-by: Liviu Dudau <liviu.dudau@arm.com>
+> 
 
-are available in the git repository at:
+Applied now.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.13
-
-for you to fetch changes up to 6ea57ad6b9526f8106d0bf410b41a7223462ff89:
-
-  ARM: dts: da850-lcdk: drop unused VPIF endpoints (2017-07-27 16:29:44 +0530)
-
-----------------------------------------------------------------
-Drop unused VPIF endpoints from device-tree.
-They should be used only when an actual
-remote-endpoint is connected.
-
-----------------------------------------------------------------
-Kevin Hilman (2):
-      ARM: dts: da850-evm: drop unused VPIF endpoints
-      ARM: dts: da850-lcdk: drop unused VPIF endpoints
-
- arch/arm/boot/dts/da850-evm.dts  | 21 ---------------------
- arch/arm/boot/dts/da850-lcdk.dts |  7 -------
- 2 files changed, 28 deletions(-)
+-- 
+Regards,
+Sudeep
