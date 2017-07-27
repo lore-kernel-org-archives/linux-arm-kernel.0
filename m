@@ -1,32 +1,30 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 27 Jul 2017 22:58:08 +0200
-Subject: [PATCH v4 26/28] ARM: dts: s500: Set power domains for CPU2 and
- CPU3
-In-Reply-To: <20170606005426.26446-27-afaerber@suse.de>
-References: <20170606005426.26446-1-afaerber@suse.de>
- <20170606005426.26446-27-afaerber@suse.de>
-Message-ID: <819d3189-e3f7-5b6c-a292-693c241b1727@suse.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 27 Jul 2017 22:59:49 +0200
+Subject: linux-next: Signed-off-by missing in commit in the arm-soc tree
+In-Reply-To: <20170728012134.39de1c48@canb.auug.org.au>
+References: <20170728012134.39de1c48@canb.auug.org.au>
+Message-ID: <CAK8P3a3kY=i-TB__yY_ELAGq_GG=10JzgXGPRbTeAtcz8qHo=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
-> CPU2 has its own power domain PD_CPU2, and CPU3 has PD_CPU3.
-> 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v4: new (split off due to dt-bindings dependency)
->  
->  arch/arm/boot/dts/s500.dtsi | 3 +++
->  1 file changed, 3 insertions(+)
+On Thu, Jul 27, 2017 at 5:21 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi all,
+>
+> I noticed that commit
+>
+>   2cb68e9b44f7 ("ARM: ep93xx: normalize clk API")
+>
+> has no Signed-off-by from its committer.
 
-Applied to v4.14/dt:
+Thanks, my mistake. I initially cherry-picked this one and added my S-o-B,
+but then had to do it again and forgot to add it when I picked it the
+second time.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.14/dt
+I uploaded the new head now. Alexander, when you rebase your other patches
+on top of the fixes branch, please make sure you have the version I
+just uploaded,
+not the one from earlier today.  I usually don't rebase that branch,
+but it seemed
+otherwise harmless enough.
 
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+      Arnd
