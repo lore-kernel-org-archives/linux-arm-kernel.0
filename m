@@ -1,77 +1,59 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 27 Jul 2017 16:39:39 +0200
-Subject: [PATCH v4 9/9] arm: dts: mt7623: add dts file for Bananapi R2
- (BPI-R2) board
-In-Reply-To: <5cc5489b38fc2723c30c8cfe0d4353f967d100f3.1495683769.git.sean.wang@mediatek.com>
-References: <cover.1495683769.git.sean.wang@mediatek.com>
- <5cc5489b38fc2723c30c8cfe0d4353f967d100f3.1495683769.git.sean.wang@mediatek.com>
-Message-ID: <805ad5c4-db47-ef10-565d-b63e33a84bdf@gmail.com>
+From: bp@suse.de (Borislav Petkov)
+Date: Thu, 27 Jul 2017 16:49:22 +0200
+Subject: [PATCH v6 1/1] acpi: apei: Enable APEI multiple GHES source to
+ share a single external IRQ
+In-Reply-To: <CAJZ5v0jVSrsufoWyexb_MWS=ni0CDn7Oo1-oHOcaTxdYpfpQMg@mail.gmail.com>
+References: <1500661477-6536-1-git-send-email-lho@apm.com>
+ <20170722055954.GA2082@nazgul.tnic>
+ <1893763.BLgt1zgLk5@aspire.rjw.lan>
+ <1632667.Vgem7HtdXu@aspire.rjw.lan>
+ <20170727055825.GA4611@nazgul.tnic>
+ <CAJZ5v0jVSrsufoWyexb_MWS=ni0CDn7Oo1-oHOcaTxdYpfpQMg@mail.gmail.com>
+Message-ID: <20170727144922.GF28553@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 05/25/2017 06:02 AM, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+On Thu, Jul 27, 2017 at 04:34:59PM +0200, Rafael J. Wysocki wrote:
+> I can collect it, no problem.
 > 
-> Add support for the Bananapi R2 (BPI-R2) development board from
-> BIPAI KEJI. Detailed hardware information for BPI-R2 which could be
-> found on http://www.banana-pi.org/r2.html
-> 
-> The patch currently only adds Mediatek GMAC, MT7530 Switch, the crypto
-> engine, USB, IR, I2S, I2C, UART, SPI, PWM, GPIO keys, GPIO LEDs and
-> PMIC LEDs. As to the other missing hardware and peripherals, they would
-> be added and integrated continuously.
-> 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
->   Documentation/devicetree/bindings/arm/mediatek.txt |   2 +
->   arch/arm/boot/dts/Makefile                         |   1 +
->   arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts      | 440 +++++++++++++++++++++
->   3 files changed, 443 insertions(+)
->   create mode 100644 arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> 
-[...]
-> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> new file mode 100644
-> index 0000000..72c7984
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-[...]
-> +
-> +&eth {
-> +	status = "okay";
-> +	gmac0: mac at 0 {
-> +		compatible = "mediatek,eth-mac";
-> +		reg = <0>;
-> +		phy-mode = "trgmii";
-> +		fixed-link {
-> +			speed = <1000>;
-> +			full-duplex;
-> +			pause;
-> +		};
-> +	};
-> +
-> +	mdio: mdio-bus {
-> +		switch at 0 {
-> +			compatible = "mediatek,mt7530";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0>;
+> So from now on I will pick up APEI things with ACKs from you or Tony.
 
-What is this reg needed for? I can't find it neither in the code nor in the 
-bindings (mt7530 and general dsa bindings). Actually it throws a warning when 
-compiling:
-arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dtb: Warning (reg_format): "reg" 
-property in /ethernet at 1b100000/mdio-bus/switch at 0 has invalid length (4 bytes) 
-(#address-cells == 2, #size-cells == 1)
-arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dtb: Warning 
-(avoid_default_addr_size): Relying on default #address-cells value for 
-/ethernet at 1b100000/mdio-bus/switch at 0
-arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dtb: Warning 
-(avoid_default_addr_size): Relying on default #size-cells value for 
-/ethernet at 1b100000/mdio-bus/switch at 0
+If you agree with that, that is. But we kinda do that already, more or
+less. :-)
 
-Regards,
-Matthias
+Then I guess we should add something like this so that get_maintainer
+finds us:
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f66488dfdbc9..985413fb5d83 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -310,6 +310,14 @@ F:	drivers/pci/*/*acpi*
+ F:	drivers/pci/*/*/*acpi*
+ F:	tools/power/acpi/
+ 
++ACPI APEI
++M:	"Rafael J. Wysocki" <rjw@rjwysocki.net>
++M:	Len Brown <lenb@kernel.org>
++L:	linux-acpi at vger.kernel.org
++R:	Tony Luck <tony.luck@intel.com>
++R:	Borislav Petkov <bp@alien8.de>
++F:	drivers/acpi/apei/
++
+ ACPI COMPONENT ARCHITECTURE (ACPICA)
+ M:	Robert Moore <robert.moore@intel.com>
+ M:	Lv Zheng <lv.zheng@intel.com>
+
+---
+
+Provided Tony agrees though... I'd venture a guess and say that he
+doesn't have a choice, woahahhahaha...
+
+:-)))
+
+-- 
+Regards/Gruss,
+    Boris.
+
+SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
+-- 
