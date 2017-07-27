@@ -1,51 +1,109 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 27 Jul 2017 13:19:23 -0500
-Subject: [PATCH 1/3] gliolib: request the gpio before querying its direction
+Date: Thu, 27 Jul 2017 13:19:24 -0500
+Subject: [PATCH 2/3] [v3] pinctrl: qcom: disable GPIO groups with no pins
 In-Reply-To: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
 References: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1501179565-26466-2-git-send-email-timur@codeaurora.org>
+Message-ID: <1501179565-26466-3-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before querying a GPIO to determine its direction, the GPIO should be
-formally requested.  This allows the GPIO driver to block access to
-unavailable GPIOs, which makes it easier for some drivers to support
-sparse GPIO maps.
+To support sparse GPIO maps, pinctrl-msm client drivers can specify
+that a given GPIO has a pin count of zero.  These GPIOs will be
+considered "hidden".  Any attempt to claim the GPIO will fail, and they
+will not be listed in debugfs.
+
+During a kexec shutdown, machine_kexec_mask_interrupts() will attempt
+to disable all IRQs, even those that aren't enabled.  This includes
+GPIOs that are unavailable (npins == 0), so add a check to the irq mask
+and unmask functions.
 
 Signed-off-by: Timur Tabi <timur@codeaurora.org>
 ---
- drivers/gpio/gpiolib.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/pinctrl/qcom/pinctrl-msm.c | 30 +++++++++++++++++++++++++-----
+ 1 file changed, 25 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index 9568708..3b4e1e8 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -1202,6 +1202,14 @@ int gpiochip_add_data(struct gpio_chip *chip, void *data)
- 		struct gpio_desc *desc = &gdev->descs[i];
+diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+index 273badd..6b4f353 100644
+--- a/drivers/pinctrl/qcom/pinctrl-msm.c
++++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+@@ -494,6 +494,11 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
+ 	};
  
- 		desc->gdev = gdev;
+ 	g = &pctrl->soc->groups[offset];
 +
-+		if (chip->request) {
-+			status = chip->request(chip, i);
-+			if (status < 0)
-+				/* The GPIO is unavailable, so skip it */
-+				continue;
-+		}
++	/* If the GPIO group has no pins, then don't show it. */
++	if (!g->npins)
++		return;
 +
- 		/*
- 		 * REVISIT: most hardware initializes GPIOs as inputs
- 		 * (often with pullups enabled) so power usage is
-@@ -1227,6 +1235,9 @@ int gpiochip_add_data(struct gpio_chip *chip, void *data)
- 			 */
- 			set_bit(FLAG_IS_OUT, &desc->flags);
- 		}
-+
-+		if (chip->free)
-+			chip->free(chip, i);
- 	}
+ 	ctl_reg = readl(pctrl->regs + g->ctl_reg);
  
- #ifdef CONFIG_PINCTRL
+ 	is_out = !!(ctl_reg & BIT(g->oe_bit));
+@@ -503,7 +508,7 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
+ 
+ 	seq_printf(s, " %-8s: %-3s %d", g->name, is_out ? "out" : "in", func);
+ 	seq_printf(s, " %dmA", msm_regval_to_drive(drive));
+-	seq_printf(s, " %s", pulls[pull]);
++	seq_printf(s, " %s\n", pulls[pull]);
+ }
+ 
+ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+@@ -511,23 +516,30 @@ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+ 	unsigned gpio = chip->base;
+ 	unsigned i;
+ 
+-	for (i = 0; i < chip->ngpio; i++, gpio++) {
++	for (i = 0; i < chip->ngpio; i++, gpio++)
+ 		msm_gpio_dbg_show_one(s, NULL, chip, i, gpio);
+-		seq_puts(s, "\n");
+-	}
+ }
+ 
+ #else
+ #define msm_gpio_dbg_show NULL
+ #endif
+ 
++/* If the GPIO has no pins, then treat it as unavailable. */
++static int msm_gpio_request(struct gpio_chip *chip, unsigned int offset)
++{
++	struct msm_pinctrl *pctrl = gpiochip_get_data(chip);
++	const struct msm_pingroup *g = &pctrl->soc->groups[offset];
++
++	return g->npins ? 0 : -ENODEV;
++}
++
+ static struct gpio_chip msm_gpio_template = {
+ 	.direction_input  = msm_gpio_direction_input,
+ 	.direction_output = msm_gpio_direction_output,
+ 	.get_direction    = msm_gpio_get_direction,
+ 	.get              = msm_gpio_get,
+ 	.set              = msm_gpio_set,
+-	.request          = gpiochip_generic_request,
++	.request          = msm_gpio_request,
+ 	.free             = gpiochip_generic_free,
+ 	.dbg_show         = msm_gpio_dbg_show,
+ };
+@@ -586,6 +598,10 @@ static void msm_gpio_irq_mask(struct irq_data *d)
+ 
+ 	g = &pctrl->soc->groups[d->hwirq];
+ 
++	/* If there no pins, then this GPIO is unavailable */
++	if (!g->npins)
++		return;
++
+ 	raw_spin_lock_irqsave(&pctrl->lock, flags);
+ 
+ 	val = readl(pctrl->regs + g->intr_cfg_reg);
+@@ -607,6 +623,10 @@ static void msm_gpio_irq_unmask(struct irq_data *d)
+ 
+ 	g = &pctrl->soc->groups[d->hwirq];
+ 
++	/* If there no pins, then this GPIO is unavailable */
++	if (!g->npins)
++		return;
++
+ 	raw_spin_lock_irqsave(&pctrl->lock, flags);
+ 
+ 	val = readl(pctrl->regs + g->intr_cfg_reg);
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
