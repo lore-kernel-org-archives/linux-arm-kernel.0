@@ -1,243 +1,62 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Thu, 27 Jul 2017 11:38:09 +0800
-Subject: [PATCH v2 5/5] dt-bindings: PCI: add support for new generation
- controller
-In-Reply-To: <06c9b3439431221794fc9f723fef52ff59be7ec6.1501122135.git.honghui.zhang@mediatek.com>
-References: <cover.1501122135.git.honghui.zhang@mediatek.com>
- <06c9b3439431221794fc9f723fef52ff59be7ec6.1501122135.git.honghui.zhang@mediatek.com>
-Message-ID: <1501126689.20860.14.camel@mtksdaap41>
+From: yong.deng@magewell.com (Yong Deng)
+Date: Thu, 27 Jul 2017 11:51:11 +0800
+Subject: [PATCH v2 0/3] Initial Allwinner V3s CSI Support
+Message-ID: <1501127474-40895-1-git-send-email-yong.deng@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-07-27 at 10:58 +0800, honghui.zhang at mediatek.com wrote:
-> From: Ryder Lee <ryder.lee@mediatek.com>
-> 
-> Add support for MediaTek new generation controller and update related
-> properities.
-> 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> ---
->  .../devicetree/bindings/pci/mediatek-pcie.txt      | 168 ++++++++++++++++++++-
->  1 file changed, 161 insertions(+), 7 deletions(-)
-> 
+This patchset add initial support for Allwinner V3s CSI.
 
-Sorry for the disturb, I send the wrong patch from my local version for
-this patch: 
-[PATCH v2 5/5] dt-bindings: PCI: add support for new generation
- controller
+Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
+and CSI1 is used for parallel interface. This is not documented in
+datasheet but by testing and guess.
 
-And the new right version have been re-send.
+This patchset implement a v4l2 framework driver and add a binding 
+documentation for it. 
 
-thanks.
+Currently, the driver only support the parallel interface. And has been
+tested with a BT1120 signal which generating from FPGA. The following
+fetures are not support with this patchset:
+  - ISP 
+  - MIPI-CSI2
+  - Master clock for camera sensor
+  - Power regulator for the front end IC
 
-> diff --git a/Documentation/devicetree/bindings/pci/mediatek-pcie.txt b/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
-> index a968f25..179329b 100644
-> --- a/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
-> @@ -3,18 +3,31 @@ MediaTek Gen2 PCIe controller
->  Required properties:
->  - compatible: Should contain one of the following string:
->  	"mediatek,mt2701-pcie"
-> +	"mediatek,mt2712-pcie"
-> +	"mediatek,mt7622-pcie"
->  	"mediatek,mt7623-pcie"
->  - device_type: Must be "pci"
-> -- reg: Base addresses and lengths of the PCIe controller.
-> +- reg: Base addresses and lengths of the PICe subsys and root ports.
-> +- reg-names: Names of the above areas to use during resource look-up.
->  - #address-cells: Address representation for root ports (must be 3)
->  - #size-cells: Size representation for root ports (must be 2)
->  - clocks: Must contain an entry for each entry in clock-names.
->    See ../clocks/clock-bindings.txt for details.
-> -- clock-names: Must include the following entries:
-> -  - free_ck :for reference clock of PCIe subsys
-> -  - sys_ck0 :for clock of Port0
-> -  - sys_ck1 :for clock of Port1
-> -  - sys_ck2 :for clock of Port2
-> +- clock-names:
-> +  Mandatory entries:
-> +   - sys_ckN :transaction layer and data link layer clock
-> +  Required entries for MT2701/MT7623:
-> +   - free_ck :for reference clock of PCIe subsys
-> +  Required entries for MT2712/MT7622:
-> +   - ahb_ckN :AHB slave interface operating clock for CSR access and RC
-> +	      initiated MMIO access
-> +  Required entries for MT7622:
-> +   - axi_ckN :application layer MMIO channel operating clock
-> +   - aux_ckN :pe2_mac_bridge and pe2_mac_core operating clock when
-> +	      pcie_mac_ck/pcie_pipe_ck is turned off
-> +   - obff_ckN :OBFF functional block operating clock
-> +   - pipe_ckN :LTSSM and phy/mac layer operating clock
-> +  where N starting from 0 to the maximum number of root ports.
->  - phys: List of PHY specifiers (used by generic PHY framework).
->  - phy-names : Must be "pcie-phy0", "pcie-phy1", "pcie-phyN".. based on the
->    number of PHYs as specified in *phys* property.
-> @@ -33,6 +46,10 @@ Required properties for MT7623/MT2701:
->  - reset-names: Must be "pcie-rst0", "pcie-rst1", "pcie-rstN".. based on the
->    number of root ports.
->  
-> +Required properties for MT2712/MT7622:
-> +-interrupts: A list of interrupt outputs of the controller, must have one
-> +	     entry for each PCIe port
-> +
->  In addition, the device tree node must have sub-nodes describing each
->  PCIe port interface, having the following mandatory properties:
->  
-> @@ -50,7 +67,7 @@ Required properties:
->    property is sufficient.
->  - num-lanes: Number of lanes to use for this port.
->  
-> -Examples:
-> +Examples for MT7623:
->  
->  	hifsys: syscon at 1a000000 {
->  		compatible = "mediatek,mt7623-hifsys",
-> @@ -68,6 +85,7 @@ Examples:
->  		      <0 0x1a142000 0 0x1000>, /* Port0 registers */
->  		      <0 0x1a143000 0 0x1000>, /* Port1 registers */
->  		      <0 0x1a144000 0 0x1000>; /* Port2 registers */
-> +		reg-names = "subsys", "port0", "port1", "port2";
->  		#address-cells = <3>;
->  		#size-cells = <2>;
->  		#interrupt-cells = <1>;
-> @@ -127,3 +145,139 @@ Examples:
->  			num-lanes = <1>;
->  		};
->  	};
-> +
-> +Examples for MT2712:
-> +	pcie: pcie at 11700000 {
-> +		compatible = "mediatek,generic-pcie-v2";
-> +		device_type = "pci";
-> +		reg = <0 0x11700000 0 0x1000>,
-> +		      <0 0x112ff000 0 0x1000>;
-> +		reg-names = "port0", "port1";
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&pericfg CLK_PERI_PCIE0>,
-> +			 <&pericfg CLK_PERI_PCIE1>,
-> +			 <&topckgen CLK_TOP_PE2_MAC_P0_SEL>,
-> +			 <&topckgen CLK_TOP_PE2_MAC_P1_SEL>;
-> +		clock-names = "sys_ck0", "sys_ck1", "ahb_ck0", "ahb_ck1";
-> +		phys = <&pcie0_phy PHY_TYPE_PCIE>, <&pcie1_phy PHY_TYPE_PCIE>;
-> +		phy-names = "pcie-phy0", "pcie-phy1";
-> +		bus-range = <0x00 0xff>;
-> +		ranges = <0x82000000 0 0x20000000  0x0 0x20000000  0 0x10000000>;
-> +
-> +		pcie0: pcie at 0,0 {
-> +			device_type = "pci";
-> +			reg = <0x0000 0 0 0 0>;
-> +			#address-cells = <3>;
-> +			#size-cells = <2>;
-> +			#interrupt-cells = <1>;
-> +			ranges;
-> +			num-lanes = <1>;
-> +			interrupt-map-mask = <0 0 0 7>;
-> +			interrupt-map = <0 0 0 1 &pcie_intc0 0>,
-> +					<0 0 0 2 &pcie_intc0 1>,
-> +					<0 0 0 3 &pcie_intc0 2>,
-> +					<0 0 0 4 &pcie_intc0 3>;
-> +			pcie_intc0: interrupt-controller {
-> +				interrupt-controller;
-> +				#address-cells = <0>;
-> +				#interrupt-cells = <1>;
-> +			};
-> +		};
-> +
-> +		pcie1: pcie at 1,0 {
-> +			device_type = "pci";
-> +			reg = <0x0800 0 0 0 0>;
-> +			#address-cells = <3>;
-> +			#size-cells = <2>;
-> +			#interrupt-cells = <1>;
-> +			ranges;
-> +			num-lanes = <1>;
-> +			interrupt-map-mask = <0 0 0 7>;
-> +			interrupt-map = <0 0 0 1 &pcie_intc1 0>,
-> +					<0 0 0 2 &pcie_intc1 1>,
-> +					<0 0 0 3 &pcie_intc1 2>,
-> +					<0 0 0 4 &pcie_intc1 3>;
-> +			pcie_intc1: interrupt-controller {
-> +				interrupt-controller;
-> +				#address-cells = <0>;
-> +				#interrupt-cells = <1>;
-> +			};
-> +		};
-> +	};
-> +
-> +Examples for MT7622:
-> +	pcie: pcie at 1a140000 {
-> +		compatible = "mediatek,generic-pcie-v2";
-> +		device_type = "pci";
-> +		reg = <0 0x1a140000 0 0x1000>,
-> +		      <0 0x1a143000 0 0x1000>,
-> +		      <0 0x1a145000 0 0x1000>;
-> +		reg-names = "subsys", "port0", "port1";
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		interrupts = <GIC_SPI 228 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_SPI 229 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&pciesys CLK_PCIE_P0_MAC_EN>,
-> +			 <&pciesys CLK_PCIE_P1_MAC_EN>,
-> +			 <&pciesys CLK_PCIE_P0_AHB_EN>,
-> +			 <&pciesys CLK_PCIE_P1_AHB_EN>,
-> +			 <&pciesys CLK_PCIE_P0_AUX_EN>,
-> +			 <&pciesys CLK_PCIE_P1_AUX_EN>,
-> +			 <&pciesys CLK_PCIE_P0_AXI_EN>,
-> +			 <&pciesys CLK_PCIE_P1_AXI_EN>,
-> +			 <&pciesys CLK_PCIE_P0_OBFF_EN>,
-> +			 <&pciesys CLK_PCIE_P1_OBFF_EN>,
-> +			 <&pciesys CLK_PCIE_P0_PIPE_EN>,
-> +			 <&pciesys CLK_PCIE_P1_PIPE_EN>;
-> +		clock-names = "sys_ck0", "sys_ck1", "ahb_ck0", "ahb_ck1",
-> +			      "aux_ck0", "aux_ck1", "axi_ck0", "axi_ck1",
-> +			      "obff_ck0", "obff_ck1", "pipe_ck0", "pipe_ck1";
-> +		phys = <&pcie0_phy PHY_TYPE_PCIE>, <&pcie1_phy PHY_TYPE_PCIE>;
-> +		phy-names = "pcie-phy0", "pcie-phy1";
-> +		power-domains = <&scpsys MT7622_POWER_DOMAIN_HIF0>;
-> +		bus-range = <0x00 0xff>;
-> +		ranges = <0x82000000 0 0x20000000  0x0 0x20000000  0 0x10000000>;
-> +
-> +		pcie0: pcie at 0,0 {
-> +			device_type = "pci";
-> +			reg = <0x0000 0 0 0 0>;
-> +			#address-cells = <3>;
-> +			#size-cells = <2>;
-> +			#interrupt-cells = <1>;
-> +			ranges;
-> +			num-lanes = <1>;
-> +			interrupt-map-mask = <0 0 0 7>;
-> +			interrupt-map = <0 0 0 1 &pcie_intc0 0>,
-> +					<0 0 0 2 &pcie_intc0 1>,
-> +					<0 0 0 3 &pcie_intc0 2>,
-> +					<0 0 0 4 &pcie_intc0 3>;
-> +			pcie_intc0: interrupt-controller {
-> +				interrupt-controller;
-> +				#address-cells = <0>;
-> +				#interrupt-cells = <1>;
-> +			};
-> +		};
-> +
-> +		pcie1: pcie at 1,0 {
-> +			device_type = "pci";
-> +			reg = <0x0800 0 0 0 0>;
-> +			#address-cells = <3>;
-> +			#size-cells = <2>;
-> +			#interrupt-cells = <1>;
-> +			ranges;
-> +			num-lanes = <1>;
-> +			interrupt-map-mask = <0 0 0 7>;
-> +			interrupt-map = <0 0 0 1 &pcie_intc1 0>,
-> +					<0 0 0 2 &pcie_intc1 1>,
-> +					<0 0 0 3 &pcie_intc1 2>,
-> +					<0 0 0 4 &pcie_intc1 3>;
-> +			pcie_intc1: interrupt-controller {
-> +				interrupt-controller;
-> +				#address-cells = <0>;
-> +				#interrupt-cells = <1>;
-> +			};
-> +		};
-> +	};
+sun6i_csi_ops is still there. I seriously thought about it. Without 
+sun6i_csi_ops, the dependency between sun6i_video and sun6i_csi_v3s
+will be complicated. Comments and criticisms are welcome.
+
+Changes in v2:
+  * Change sunxi-csi to sun6i-csi
+  * Rebase to media_tree master branch
+
+Yong Deng (3):
+  media: V3s: Add support for Allwinner CSI.
+  dt-bindings: media: Add Allwinner V3s Camera Sensor Interface (CSI)
+  media: MAINTAINERS: add entries for Allwinner V3s CSI
+
+ .../devicetree/bindings/media/sun6i-csi.txt        |  49 ++
+ MAINTAINERS                                        |   8 +
+ drivers/media/platform/Kconfig                     |   1 +
+ drivers/media/platform/Makefile                    |   2 +
+ drivers/media/platform/sun6i-csi/Kconfig           |   9 +
+ drivers/media/platform/sun6i-csi/Makefile          |   3 +
+ drivers/media/platform/sun6i-csi/sun6i_csi.c       | 545 ++++++++++++++
+ drivers/media/platform/sun6i-csi/sun6i_csi.h       | 203 +++++
+ drivers/media/platform/sun6i-csi/sun6i_csi_v3s.c   | 827 +++++++++++++++++++++
+ drivers/media/platform/sun6i-csi/sun6i_csi_v3s.h   | 206 +++++
+ drivers/media/platform/sun6i-csi/sun6i_video.c     | 663 +++++++++++++++++
+ drivers/media/platform/sun6i-csi/sun6i_video.h     |  61 ++
+ 12 files changed, 2577 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+ create mode 100644 drivers/media/platform/sun6i-csi/Kconfig
+ create mode 100644 drivers/media/platform/sun6i-csi/Makefile
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi.c
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi.h
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi_v3s.c
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi_v3s.h
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_video.c
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_video.h
+
+-- 
+1.8.3.1
