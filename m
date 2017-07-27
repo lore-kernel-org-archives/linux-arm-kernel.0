@@ -1,64 +1,97 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 27 Jul 2017 18:12:22 +0100
-Subject: [PATCH v8 00/20] ILP32 for ARM64
-In-Reply-To: <20170724112624.7ie6na7uszmsc5te@yury-thinkpad>
-References: <20170619155003.13218-1-ynorov@caviumnetworks.com>
- <20170629161036.ftedtbp2gdmyzloo@e104818-lin.cambridge.arm.com>
- <20170706215902.qtmbsidwvqlr7o56@yury-thinkpad>
- <20170707171135.h54fe4ea7xuxnrqt@armageddon.cambridge.arm.com>
- <20170724112624.7ie6na7uszmsc5te@yury-thinkpad>
-Message-ID: <20170727171221.ep4xs2hhv4pxnhax@armageddon.cambridge.arm.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Thu, 27 Jul 2017 10:29:53 -0700
+Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
+ counters
+In-Reply-To: <20170727022907.GC1398@kroah.com>
+References: <20170726151314.GA10696@hc> <20170726153502.GE28875@nazgul.tnic>
+ <20170726154515.GA11453@hc> <20170726155548.GF28875@nazgul.tnic>
+ <20170726161949.GB15426@kroah.com> <20170726163049.GG28875@nazgul.tnic>
+ <20170726173353.GB21705@kroah.com>
+ <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
+ <20170726200802.GA17722@kroah.com>
+ <b27cda60-8bf8-47a1-15b5-bf8b3a83fc45@gmail.com>
+ <20170727022907.GC1398@kroah.com>
+Message-ID: <4f58aeab-7b8d-50dc-5497-6ac42536e0c0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yury,
-
-On Mon, Jul 24, 2017 at 02:26:24PM +0300, Yury Norov wrote:
-> On Fri, Jul 07, 2017 at 06:11:36PM +0100, Catalin Marinas wrote:
-> > On Fri, Jul 07, 2017 at 12:59:02AM +0300, Yury Norov wrote:
-> > > If so, I would like to ask you to do the first ILP32 community poll
-> > > now, not in 6 months. So we'll collect opinions and requests from
-> > > people interested in ILP32, and in 6 month will be able to check the
-> > > progress. I would like to see this thread public because if we are not
-> > > taking ILP32 to official sources right now, this is the only way to
-> > > inform people that the project exists and is ready to use.
-> > 
-> > That's an ongoing process, I'm not going to ask for people's opinion
-> > every 6 months. It's just that I will revisit periodically the progress
-> > on automated testing, public availability of a cross-toolchain,
-> > Tested/Acked/Reviewed-by tags on these patches from interested parties.
-> > Since I haven't seen any of these now, I don't see any point in asking.
-> > 
-> > To be clear, I'm not really interested in "we need this too" opinions, I
-> > get lots of these via the marketing channels. I'm looking for actual
-> > users with a long-term view of making/keeping ILP32 a first class ABI.
+On 07/26/2017 07:29 PM, Greg KH wrote:
+> On Wed, Jul 26, 2017 at 02:02:42PM -0700, David Daney wrote:
+>> On 07/26/2017 01:08 PM, Greg KH wrote:
+>>> On Wed, Jul 26, 2017 at 01:02:38PM -0700, David Daney wrote:
+>>>> On 07/26/2017 10:33 AM, Greg KH wrote:
+>>>>> On Wed, Jul 26, 2017 at 06:30:49PM +0200, Borislav Petkov wrote:
+>>>>>> On Wed, Jul 26, 2017 at 09:19:49AM -0700, Greg KH wrote:
+>>>>>>> On Wed, Jul 26, 2017 at 05:55:48PM +0200, Borislav Petkov wrote:
+>>>>>>>> On Wed, Jul 26, 2017 at 05:45:15PM +0200, Jan Glauber wrote:
+>>>>>>>>> The PMU/EDAC devices are all PCI devices do I need the 'struct pci_dev *'.
+>>>>>>>>> I'm not aware of other ways to access these devices. Please enlighten
+>>>>>>>>> me if I'm missing something.
+>>>>>>>>
+>>>>>>>> Me enlighten you on Cavium hardware?! You're funny.
+>>>>>>>>
+>>>>>>>> So I don't know whether the PCI hotplug code can run more than one
+>>>>>>>> function upon PCI ID detection. Probably Greg will say, write a
+>>>>>>>> multiplexer wrapper. :-)
+>>>>>>>
+>>>>>>> -ENOCONTEXT....
+>>>>>>>
+>>>>>>> Anyway, pci questions are best asked on the linux-pci at vger list.  And
+>>>>>>> yes, all PCI devices end up with a 'struct pci_dev *' automatically.
+>>>>>>
+>>>>>> Simple: so they have a PCI ID of a memory contoller and want to hotplug
+>>>>>> two drivers for it. And those two drivers should remain independent from
+>>>>>> each other.
+>>>>>
+>>>>> Hahahahaha, no.  That's crazy, you were right in guessing what my answer
+>>>>> was going to be :)
+>>>>>
+>>>>
+>>>>
+>>>> Just to be clear about the situation, the device is a memory controller.  It
+>>>> has two main behaviors we are interested in:
+>>>>
+>>>> A) Error Detection And Correction (EDAC).  This should be connected to the
+>>>> kernel's EDAC subsystem.  An existing driver (drivers/edac/thunderx_edac.c)
+>>>> does exactly this.
+>>>>
+>>>> B) Performance Counters for actions taken in the corresponding memory. This
+>>>> should be connected to the kernel's perf framework as an uncore-PMU (the
+>>>> subject of this patch set).
+>>>>
+>>>> It is a single PCI device.  What should the driver architecture look like to
+>>>> connect it to two different kernel subsystems?
+>>>
+>>> Modify the drivers/edac/thunderx_edac.c code to add support for
+>>> performance counters.
+>>>
+>>
+>> Thanks Greg.  This adds some clarity to the situation.
+>>
+>> This technique does slightly complicate the mapping of files and directories
+>> in the kernel source tree to maintainers.
+>>
+>> Also, if a given configuration disables CONFIG_EDAC there is some hackery
+>> needed to get the perf portion of the driver included.
 > 
-> From my side, there are people who ask me for help with ilo32, and who
-> write from big companies mailservers. But they don't want to ask
-> their questions publicly for some reason. From my point of view, there
-> is not so big but stable interest in ILP32.
+> Well, you all deserve it for trying to have a single PCI device do
+> multiple things at the same time.  There's no real good reason for
+> creating hardware that way, PCI devices are "free", you should go throw
+> a printed copy of the PCI spec at the firmware developers who did this
+> to you.
 
-It would be nice if they were more open about what they need/use.
+The problem lies in something even more congealed than the "firmware". 
+The PCI topology is etched in to the very fabric of the silicon of the SoC.
 
-> This is the 4.12 and linux-next - based kernel patches:
-> https://github.com/norov/linux/tree/ilp32-4.12
-> https://github.com/norov/linux/tree/ilp32-20170724
 
-Thanks. I'll publish the 4.12-based branch sometime next week.
+> 
+> Then get them to fix the firmware so you have multiple PCI devices...
+> 
+> good luck!
 
-At this stage I don't see much value in a linux-next based ILP32. I
-would rather like to see a 4.13-rc3 based one, in preparation for a 4.13
-branch once released.
+We'll use all of that we can get!  Thanks.
 
-> Should I resend kernel patches to LKML, or links above are enough for
-> you?
 
-The 4.12 link is ok. However, could you please post a 4.13-rcX based
-series, maybe split in two so that a few generic patches can be merged
-in 4.14? Given the reworking of the sigcontext code in 4.13, it would be
-good to review the ILP32 changes in this area again.
-
-Thanks.
-
--- 
-Catalin
+> 
+> greg k-h
+> 
