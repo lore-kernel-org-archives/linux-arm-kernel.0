@@ -1,47 +1,86 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 27 Jul 2017 12:17:14 +0100
-Subject: [PATCH v5 03/19] arm: qcom-msm8974: dts: Update coresight
- replicator
-In-Reply-To: <1500545849-23724-4-git-send-email-suzuki.poulose@arm.com>
-References: <1500545849-23724-1-git-send-email-suzuki.poulose@arm.com>
- <1500545849-23724-4-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <2cafb93f-efb5-a26f-ec93-52076169de03@arm.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 27 Jul 2017 19:21:39 +0800
+Subject: [arm:phy 15/23] drivers/net/ethernet/marvell/mvneta.c:4558:35:
+ error: 'struct mvneta_port' has no member named 'phy_interface'
+Message-ID: <201707271937.pBdVMjC6%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/07/17 11:17, Suzuki K Poulose wrote:
-> Replace the obsolete compatible string for Coresight programmable
-> replicator with the new one.
->
-> Cc: Andy Gross <andy.gross@linaro.org>
-> Cc: David Brown <david.brown@linaro.org>
-> Cc: linux-arm-msm at vger.kernel.org
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git phy
+head:   93875f86328b49a0a4928c73ad13bfd96fd17c0b
+commit: 0ee3701144e52a6d6d241116bc079dc963706186 [15/23] net: mvneta: convert to phylink
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 0ee3701144e52a6d6d241116bc079dc963706186
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-David, Andy
+Note: the arm/phy HEAD 93875f86328b49a0a4928c73ad13bfd96fd17c0b builds fine.
+      It only hurts bisectibility.
 
-Please could one you pick this up and the next one in this series ?
-Rest of the patches have been queued via Mathieu's coresight/next tree.
+All errors (new ones prefixed by >>):
 
-Suzuki
+   drivers/net/ethernet/marvell/mvneta.c: In function 'mvneta_resume':
+>> drivers/net/ethernet/marvell/mvneta.c:4558:35: error: 'struct mvneta_port' has no member named 'phy_interface'
+     err = mvneta_port_power_up(pp, pp->phy_interface);
+                                      ^~
 
-> ---
->  arch/arm/boot/dts/qcom-msm8974.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> index c5ee68a..a392076 100644
-> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> @@ -779,7 +779,7 @@
->  		};
->
->  		replicator at fc31c000 {
-> -			compatible = "qcom,coresight-replicator1x", "arm,primecell";
-> +			compatible = "arm,coresight-dynamic-replicator", "arm,primecell";
->  			reg = <0xfc31c000 0x1000>;
->
->  			clocks = <&rpmcc RPM_SMD_QDSS_CLK>, <&rpmcc RPM_SMD_QDSS_A_CLK>;
->
+vim +4558 drivers/net/ethernet/marvell/mvneta.c
+
+9768b45c Jane Li       2017-03-16  4537  
+9768b45c Jane Li       2017-03-16  4538  static int mvneta_resume(struct device *device)
+9768b45c Jane Li       2017-03-16  4539  {
+9768b45c Jane Li       2017-03-16  4540  	struct platform_device *pdev = to_platform_device(device);
+9768b45c Jane Li       2017-03-16  4541  	struct net_device *dev = dev_get_drvdata(device);
+9768b45c Jane Li       2017-03-16  4542  	struct mvneta_port *pp = netdev_priv(dev);
+9768b45c Jane Li       2017-03-16  4543  	int err;
+9768b45c Jane Li       2017-03-16  4544  
+9768b45c Jane Li       2017-03-16  4545  	clk_prepare_enable(pp->clk);
+9768b45c Jane Li       2017-03-16  4546  	if (!IS_ERR(pp->clk_bus))
+9768b45c Jane Li       2017-03-16  4547  		clk_prepare_enable(pp->clk_bus);
+9768b45c Jane Li       2017-03-16  4548  	if (pp->dram_target_info || pp->neta_armada3700)
+9768b45c Jane Li       2017-03-16  4549  		mvneta_conf_mbus_windows(pp, pp->dram_target_info);
+9768b45c Jane Li       2017-03-16  4550  	if (pp->bm_priv) {
+9768b45c Jane Li       2017-03-16  4551  		err = mvneta_bm_port_init(pdev, pp);
+9768b45c Jane Li       2017-03-16  4552  		if (err < 0) {
+9768b45c Jane Li       2017-03-16  4553  			dev_info(&pdev->dev, "use SW buffer management\n");
+9768b45c Jane Li       2017-03-16  4554  			pp->bm_priv = NULL;
+9768b45c Jane Li       2017-03-16  4555  		}
+9768b45c Jane Li       2017-03-16  4556  	}
+9768b45c Jane Li       2017-03-16  4557  	mvneta_defaults_set(pp);
+9768b45c Jane Li       2017-03-16 @4558  	err = mvneta_port_power_up(pp, pp->phy_interface);
+9768b45c Jane Li       2017-03-16  4559  	if (err < 0) {
+9768b45c Jane Li       2017-03-16  4560  		dev_err(device, "can't power up port\n");
+9768b45c Jane Li       2017-03-16  4561  		return err;
+9768b45c Jane Li       2017-03-16  4562  	}
+9768b45c Jane Li       2017-03-16  4563  
+9768b45c Jane Li       2017-03-16  4564  	netif_device_attach(dev);
+d6956ac8 Jisheng Zhang 2017-03-29  4565  	if (netif_running(dev)) {
+9768b45c Jane Li       2017-03-16  4566  		mvneta_open(dev);
+d6956ac8 Jisheng Zhang 2017-03-29  4567  		mvneta_set_rx_mode(dev);
+d6956ac8 Jisheng Zhang 2017-03-29  4568  	}
+d6956ac8 Jisheng Zhang 2017-03-29  4569  
+9768b45c Jane Li       2017-03-16  4570  	return 0;
+9768b45c Jane Li       2017-03-16  4571  }
+9768b45c Jane Li       2017-03-16  4572  #endif
+9768b45c Jane Li       2017-03-16  4573  
+
+:::::: The code at line 4558 was first introduced by commit
+:::::: 9768b45ceb0bc7bdee61837afad331dd6bf7977f net: mvneta: support suspend and resume
+
+:::::: TO: Jane Li <jiel@marvell.com>
+:::::: CC: David S. Miller <davem@davemloft.net>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 36276 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170727/26a9c60f/attachment-0001.gz>
