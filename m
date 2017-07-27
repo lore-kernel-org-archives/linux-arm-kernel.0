@@ -1,64 +1,51 @@
-From: borneo.antonio@gmail.com (Antonio Borneo)
-Date: Fri, 28 Jul 2017 01:26:12 +0200
-Subject: [PATCH v2 3/3] ASoC: simple-card-utils: fix unbalanced
- of_node_get()/of_node_put()
-In-Reply-To: <20170727232612.23543-1-antonio.borneo@st.com>
-References: <20170727232612.23543-1-antonio.borneo@st.com>
-Message-ID: <20170727232612.23543-4-antonio.borneo@st.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Fri, 28 Jul 2017 07:27:08 +0800
+Subject: halting the kernel does not stop the CPU cores?
+In-Reply-To: <20170727222545.GT31807@n2100.armlinux.org.uk>
+References: <VI1PR04MB1662099750F9EAFA0324C6538CBE0@VI1PR04MB1662.eurprd04.prod.outlook.com>
+ <26ccb0f7-0f78-27cd-cead-ddd810f4a33e@gmail.com>
+ <20170727222545.GT31807@n2100.armlinux.org.uk>
+Message-ID: <dec9a2e080cbd15502659e78260b62cd@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Antonio Borneo <borneo.antonio@gmail.com>
+? 2017-07-28 06:25?Russell King - ARM Linux ???
+> On Thu, Jul 27, 2017 at 01:07:00PM -0700, Florian Fainelli wrote:
+>> On 07/27/2017 07:38 AM, Heinz Wrobel wrote:
+>> > Hi,
+>> >
+>> > I noticed that when halting the kernel (intentionally or not), the cores effectively go into a while(1) loop and power consumption on larger devices really jumps up significantly to the point where, e.g., a ?crash? turns into ?crash and burn?.
 
-On Hikey target board, enabling CONFIG_OF_DYNAMIC triggers several
-errors at kernel boot, like the following one
-OF: ERROR: Bad of_node_put() on /soc/i2s at f7118000/ports/port at 0/endpoint
-each followed by stack dump.
+This is also an issue on Allwinner H3 boards.
 
-of_graph_get_port_parent() walks through the parents looking for a
-node named "ports". At each step it uses of_get_next_parent() that
-drops the current node with of_node_put().
-Avoid dropping the initial node by calling of_node_get() before
-of_graph_get_port_parent().
+Allwinner H3 boards usually doesn't have any PMICs, so it cannot do
+hardware shutdown, so if it halts the CPU will also go into while(1)
+loop. More serious problem is that some boards are not well designed
+and the heat produced by while(1) is possible to hurt the hardware.
 
-Tested with kernel v4.13-rc2 with hikey_defconfig taken from
-https://git.linaro.org/people/john.stultz/android-dev.git
-branch dev/hikey-mainline-WIP
+I remember Chen-Yu Tsai suggested in #linux-sunxi IRC channel to change
+this busy loop to a WFI loop, so it can reduce power consumption and
+heat.
 
-This fixes commit 1689333f8311 ("ASoC: simple-card-utils: add
-asoc_simple_card_parse_graph_dai()").
-
-Signed-off-by: Antonio Borneo <borneo.antonio@gmail.com>
----
-To: Liam Girdwood <lgirdwood@gmail.com>
-To: Mark Brown <broonie@kernel.org>
-To: Jaroslav Kysela <perex@perex.cz>
-To: Takashi Iwai <tiwai@suse.com>
-To: alsa-devel at alsa-project.org
-Cc: linux-kernel at vger.kernel.org
-Cc: Wei Xu <xuwei5@hisilicon.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
----
- sound/soc/generic/simple-card-utils.c | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/sound/soc/generic/simple-card-utils.c b/sound/soc/generic/simple-card-utils.c
-index 26d64fa..144954b 100644
---- a/sound/soc/generic/simple-card-utils.c
-+++ b/sound/soc/generic/simple-card-utils.c
-@@ -250,6 +250,11 @@ static int asoc_simple_card_get_dai_id(struct device_node *ep)
- 	if (ret != -ENOTSUPP)
- 		return ret;
- 
-+	/*
-+	 * of_graph_get_port_parent() will call
-+	 * of_node_put(). So, call of_node_get() here
-+	 */
-+	of_node_get(ep);
- 	node = of_graph_get_port_parent(ep);
- 
- 	/*
--- 
-1.9.1
+>> >
+>> > I would assume that if a system is halted, you don?t want to dissipate more power than on a running system but go as silent as low power as reasonable.
+>> >
+>> > Is there any specific reason why the cores would not go into a wfi loop like they do on idle?
+>> > The patch to fix this seems to be easy at first glance, but is there a good reason *NOT* to do such a patch and to leave the plain while(1)?
+>> 
+>> In fact, if your platform supports CPU_HOTPLUG, I am not clear why
+>> smp_send_stop() + ipi_send_stop() is not calling platform_cpu_kill()
+>> which would be smp_ops.cpu_kill() but instead cpu_relax() was chosen?
+>> 
+>> The CPU is dead anyway so as you say, so it's not like there is a 
+>> remote
+>> chance to resume execution on these secondary cores?
+> 
+> The cpu kill method also needs another cpu to be interacting with the
+> cpu die methods as well - the CPU hotunplug is a combination effort
+> between the CPU to be killed and the CPU asking for the killing of
+> that CPU.
+> 
+> We don't have that luxury in these paths, which are used amongst
+> other things for when the kernel panics, which can happen from any
+> context.
