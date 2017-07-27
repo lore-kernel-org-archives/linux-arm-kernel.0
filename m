@@ -1,32 +1,29 @@
-From: bp@suse.de (Borislav Petkov)
-Date: Thu, 27 Jul 2017 07:58:25 +0200
-Subject: [PATCH v6 1/1] acpi: apei: Enable APEI multiple GHES source to
- share a single external IRQ
-In-Reply-To: <1632667.Vgem7HtdXu@aspire.rjw.lan>
-References: <1500661477-6536-1-git-send-email-lho@apm.com>
- <20170722055954.GA2082@nazgul.tnic>
- <1893763.BLgt1zgLk5@aspire.rjw.lan>
- <1632667.Vgem7HtdXu@aspire.rjw.lan>
-Message-ID: <20170727055825.GA4611@nazgul.tnic>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 27 Jul 2017 08:22:04 +0200
+Subject: [PATCH v2] arm64: dts: xilinx: fix PCI bus dtc warnings
+In-Reply-To: <20170726210943.6875-6-robh@kernel.org>
+References: <20170726210943.6875-1-robh@kernel.org>
+ <20170726210943.6875-6-robh@kernel.org>
+Message-ID: <8b5c2d43-5365-0923-c122-84b4b35e3fb3@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 08:57:03PM +0200, Rafael J. Wysocki wrote:
-> > Should I apply this or will Tony do that?
+On 26.7.2017 23:09, Rob Herring wrote:
+> dtc recently added PCI bus checks. Fix these warnings.
 > 
-> So am I suppsed to drop this?
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
+> ---
+> v2:
+> - rebase on v4.13-rc2
+> 
+> Michal, you said you applied v1, but it looks like it never was.
 
-Well, as suggested in another mail, I think it'll be best if Tony and I
-put ourselves as reviewers for the APEI crap and you still collect it.
 
-Unless you want to give it to us and we can arrange some pull order to
-send it to you.
+I have this in my branch but it wasn't merged to arm-soc tree yet.
 
-What do you prefer?
+https://github.com/Xilinx/linux-xlnx/commits/zynqmp/dt
 
--- 
-Regards/Gruss,
-    Boris.
-
-SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
--- 
+Thanks,
+Michal
