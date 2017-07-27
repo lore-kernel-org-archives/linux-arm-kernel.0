@@ -1,36 +1,73 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 27 Jul 2017 09:08:20 +0800
-Subject: [PATCH v7 2/3] PCI: Enable PCIe Relaxed Ordering if supported
-In-Reply-To: <MWHPR12MB1600065968964410EDFBDA3BC8B90@MWHPR12MB1600.namprd12.prod.outlook.com>
-References: <1499955692-26556-1-git-send-email-dingtianhong@huawei.com>
- <1499955692-26556-3-git-send-email-dingtianhong@huawei.com>
- <e496ff1d-b836-ebef-fdf7-76273aaaaef6@codeaurora.org>
- <0260e398-bd8e-6615-6d5c-1f7c07b6fc09@huawei.com>
- <67be791f-e0cf-8284-9229-17174dc741ef@codeaurora.org>
- <5f9b8bfb-41a8-a17c-6fea-581aec1d5573@huawei.com>
- <20170724090516.2e0f0d2a@w520.home>
- <MWHPR12MB1600065968964410EDFBDA3BC8B90@MWHPR12MB1600.namprd12.prod.outlook.com>
-Message-ID: <75213fca-4522-2297-3cb8-338e643d3552@huawei.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Wed, 26 Jul 2017 18:42:14 -0700
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170726.162200.1904949371593276937.davem@davemloft.net>
+References: <20170726223658.GA27617@linux.vnet.ibm.com>
+ <20170726.154540.150558937277891719.davem@davemloft.net>
+ <20170726231505.GG3730@linux.vnet.ibm.com>
+ <20170726.162200.1904949371593276937.davem@davemloft.net>
+Message-ID: <20170727014214.GH3730@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2017/7/27 2:26, Casey Leedom wrote:
->   By the way Ding, two issues:
+On Wed, Jul 26, 2017 at 04:22:00PM -0700, David Miller wrote:
+> From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+> Date: Wed, 26 Jul 2017 16:15:05 -0700
 > 
->  1. Did we ever get any acknowledgement from either Intel or AMD
->     on this patch?  I know that we can't ensure that, but it sure would
->     be nice since the PCI Quirks that we're putting in affect their
->     products.
+> > On Wed, Jul 26, 2017 at 03:45:40PM -0700, David Miller wrote:
+> >> Just out of curiousity, what x86 idle method is your machine using?
+> >> The mwait one or the one which simply uses 'halt'?  The mwait variant
+> >> might mask this bug, and halt would be a lot closer to how sparc64 and
+> >> Jonathan's system operates.
+> > 
+> > My kernel builds with CONFIG_INTEL_IDLE=n, which I believe means that
+> > I am not using the mwait one.  Here is a grep for IDLE in my .config:
+> > 
+> > 	CONFIG_NO_HZ_IDLE=y
+> > 	CONFIG_GENERIC_SMP_IDLE_THREAD=y
+> > 	# CONFIG_IDLE_PAGE_TRACKING is not set
+> > 	CONFIG_ACPI_PROCESSOR_IDLE=y
+> > 	CONFIG_CPU_IDLE=y
+> > 	# CONFIG_CPU_IDLE_GOV_LADDER is not set
+> > 	CONFIG_CPU_IDLE_GOV_MENU=y
+> > 	# CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED is not set
+> > 	# CONFIG_INTEL_IDLE is not set
 > 
+> No, that doesn't influence it.  It is determined by cpu features at
+> run time.
+> 
+> If you are using mwait, it'll say so in your kernel log like this:
+> 
+> 	using mwait in idle threads
 
-Still no Intel and AMD guys has ack this, this is what I am worried about, should I
-ping some man again ?
+Thank you for the hint!
 
-Thanks
-Ding
+And vim says:
+
+"E486: Pattern not found: using mwait in idle threads"
+
+> >> On sparc64 the cpu yield we do in the idle loop sleeps the cpu.  It's
+> >> local TICK register keeps advancing, and the local timer therefore
+> >> will still trigger.  Also, any externally generated interrupts
+> >> (including cross calls) will wake up the cpu as well.
+> >> 
+> >> The tick-sched code is really tricky wrt. NO_HZ even in the NO_HZ_IDLE
+> >> case.  One of my running theories is that we miss scheduling a tick
+> >> due to a race.  That would be consistent with the behavior we see
+> >> in the RCU dumps, I think.
+> > 
+> > But wouldn't you have to miss a -lot- of ticks to get an RCU CPU stall
+> > warning?  By default, your grace period needs to extend for more than
+> > 21 seconds (more than one-third of a -minute-) to get one.  Or do
+> > you mean that the ticks get shut off now and forever, as opposed to
+> > just losing one of them?
 > 
-> Casey
-> .
+> Hmmm, good point.  And I was talking about simply missing one tick.
 > 
+> Indeed, that really wouldn't explain how we end up with a RCU stall
+> dump listing almost all of the cpus as having missed a grace period.
+
+I have seen stranger things, but admittedly not often.
+
+							Thanx, Paul
