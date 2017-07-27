@@ -1,31 +1,51 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 27 Jul 2017 13:19:22 -0500
-Subject: [PATCH 0/3][v3] pinctrl: qcom: add support for sparse GPIOs
-Message-ID: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
+Date: Thu, 27 Jul 2017 13:19:23 -0500
+Subject: [PATCH 1/3] gliolib: request the gpio before querying its direction
+In-Reply-To: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
+References: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
+Message-ID: <1501179565-26466-2-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-First patch update gpiolib so that it requests the GPIO before trying to
-initialize it.
+Before querying a GPIO to determine its direction, the GPIO should be
+formally requested.  This allows the GPIO driver to block access to
+unavailable GPIOs, which makes it easier for some drivers to support
+sparse GPIO maps.
 
-Second patch allows for for pinctrl-msm to understand GPIO groups with
-no pins.  Such pins are "hidden" and can't be exported or accessed.
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ drivers/gpio/gpiolib.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Last patch updates the QDF2xxx driver to take advantage of all that.
-
-v3: Add checks in IRQ mask and unmask functions
-
-
-Timur Tabi (3):
-  gliolib: request the gpio before querying its direction
-  [v3] pinctrl: qcom: disable GPIO groups with no pins
-  [v2] pinctrl: qcom: qdf2xxx: add support for new ACPI HID QCOM8002
-
- drivers/gpio/gpiolib.c                 |  11 +++
- drivers/pinctrl/qcom/pinctrl-msm.c     |  30 +++++--
- drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 139 ++++++++++++++++++++++++---------
- 3 files changed, 139 insertions(+), 41 deletions(-)
-
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 9568708..3b4e1e8 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -1202,6 +1202,14 @@ int gpiochip_add_data(struct gpio_chip *chip, void *data)
+ 		struct gpio_desc *desc = &gdev->descs[i];
+ 
+ 		desc->gdev = gdev;
++
++		if (chip->request) {
++			status = chip->request(chip, i);
++			if (status < 0)
++				/* The GPIO is unavailable, so skip it */
++				continue;
++		}
++
+ 		/*
+ 		 * REVISIT: most hardware initializes GPIOs as inputs
+ 		 * (often with pullups enabled) so power usage is
+@@ -1227,6 +1235,9 @@ int gpiochip_add_data(struct gpio_chip *chip, void *data)
+ 			 */
+ 			set_bit(FLAG_IS_OUT, &desc->flags);
+ 		}
++
++		if (chip->free)
++			chip->free(chip, i);
+ 	}
+ 
+ #ifdef CONFIG_PINCTRL
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
