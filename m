@@ -1,46 +1,92 @@
-From: borneo.antonio@gmail.com (Antonio Borneo)
-Date: Fri, 28 Jul 2017 01:26:09 +0200
-Subject: [PATCH v2 0/3] ASoC: fix unbalanced of_node_get()/of_node_put()
-In-Reply-To: <20170725214952.6491-1-borneo.antonio@gmail.com>
-References: <20170725214952.6491-1-borneo.antonio@gmail.com>
-Message-ID: <20170727232612.23543-1-antonio.borneo@st.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 28 Jul 2017 01:54:06 +0200
+Subject: [PATCH v2] cpufreq: s5pv210: add missing of_node_put
+In-Reply-To: <20170724085216.GS352@vireshk-i7>
+References: <1500666810-21841-1-git-send-email-Julia.Lawall@lip6.fr>
+ <20170724085216.GS352@vireshk-i7>
+Message-ID: <3083277.s4JKRQruaM@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Antonio Borneo <borneo.antonio@gmail.com>
+On Monday, July 24, 2017 02:22:16 PM Viresh Kumar wrote:
+> On 21-07-17, 21:53, Julia Lawall wrote:
+> > for_each_compatible_node performs an of_node_get on each iteration, so a
+> > return from the loop requires an of_node_put.
+> > 
+> > The semantic patch that fixes this problem is as follows
+> > (http://coccinelle.lip6.fr):
+> > 
+> > // <smpl>
+> > @@
+> > local idexpression n;
+> > expression e,e1,e2;
+> > statement S;
+> > iterator i1;
+> > iterator name for_each_compatible_node;
+> > @@
+> > 
+> >  for_each_compatible_node(n,e1,e2) {
+> >    ...
+> > (
+> >    of_node_put(n);
+> > |
+> >    e = n
+> > |
+> >    return n;
+> > |
+> >    i1(...,n,...) S
+> > |
+> > +  of_node_put(n);
+> > ?  return ...;
+> > )
+> >    ...
+> >  }
+> > // </smpl>
+> > 
+> > Additionally, call of_node_put on the previous value of np, obtained from
+> > of_find_compatible_node, that is no longer accessible at the point of the
+> > for_each_compatible_node.
+> > 
+> > Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> > 
+> > ---
+> > 
+> > v2: add the of_node_put for the call to of_find_compatible_node as well.
+> > 
+> >  drivers/cpufreq/s5pv210-cpufreq.c |    3 +++
+> >  1 file changed, 3 insertions(+)
+> > 
+> > diff --git a/drivers/cpufreq/s5pv210-cpufreq.c b/drivers/cpufreq/s5pv210-cpufreq.c
+> > index f82074e..5d31c2d 100644
+> > --- a/drivers/cpufreq/s5pv210-cpufreq.c
+> > +++ b/drivers/cpufreq/s5pv210-cpufreq.c
+> > @@ -602,6 +602,7 @@ static int s5pv210_cpufreq_probe(struct platform_device *pdev)
+> >  	}
+> >  
+> >  	clk_base = of_iomap(np, 0);
+> > +	of_node_put(np);
+> >  	if (!clk_base) {
+> >  		pr_err("%s: failed to map clock registers\n", __func__);
+> >  		return -EFAULT;
+> > @@ -612,6 +613,7 @@ static int s5pv210_cpufreq_probe(struct platform_device *pdev)
+> >  		if (id < 0 || id >= ARRAY_SIZE(dmc_base)) {
+> >  			pr_err("%s: failed to get alias of dmc node '%s'\n",
+> >  				__func__, np->name);
+> > +			of_node_put(np);
+> >  			return id;
+> >  		}
+> >  
+> > @@ -619,6 +621,7 @@ static int s5pv210_cpufreq_probe(struct platform_device *pdev)
+> >  		if (!dmc_base[id]) {
+> >  			pr_err("%s: failed to map dmc%d registers\n",
+> >  				__func__, id);
+> > +			of_node_put(np);
+> >  			return -EFAULT;
+> >  		}
+> >  	}
+> 
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> 
+> 
 
-On Hikey target board, enabling CONFIG_OF_DYNAMIC triggers several
-errors at kernel boot, like
-OF: ERROR: Bad of_node_put() on /soc/i2s at f7118000/ports/port at 0
-OF: ERROR: Bad of_node_put() on /soc/i2s at f7118000/ports/port at 0/endpoint
-each followed by stack dump.
-
-Fixed by:
-- removing of_node_put() in the body of of_for_each_phandle(){},
-  since already provided at each iteration. Add it in case the
-  loop is break out;
-- adding of_node_get() before calling of_graph_get_port_parent().
-
-Tested with kernel v4.13-rc2 with hikey_defconfig taken from
-https://git.linaro.org/people/john.stultz/android-dev.git
-branch dev/hikey-mainline-WIP
-
-v1 -> v2:
-- modify subject "s/fix balance of/fix unbalanced/";
-- split the patch per each individual issue. It also simplify the
-  backport;
-- add ref to the commit being fixed;
-- drop one fix not needed.
-
-Antonio Borneo (3):
-  ASoC: fix use of of_node_put() in of_for_each_phandle() loops
-  ASoC: soc-core: fix unbalanced of_node_get()/of_node_put()
-  ASoC: simple-card-utils: fix unbalanced of_node_get()/of_node_put()
-
- sound/soc/generic/audio-graph-card.c  | 9 ++++-----
- sound/soc/generic/simple-card-utils.c | 5 +++++
- sound/soc/soc-core.c                  | 5 +++++
- 3 files changed, 14 insertions(+), 5 deletions(-)
-
--- 
-1.9.1
+Applied, thanks!
