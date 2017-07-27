@@ -1,97 +1,69 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Thu, 27 Jul 2017 10:29:53 -0700
-Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <20170727022907.GC1398@kroah.com>
-References: <20170726151314.GA10696@hc> <20170726153502.GE28875@nazgul.tnic>
- <20170726154515.GA11453@hc> <20170726155548.GF28875@nazgul.tnic>
- <20170726161949.GB15426@kroah.com> <20170726163049.GG28875@nazgul.tnic>
- <20170726173353.GB21705@kroah.com>
- <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
- <20170726200802.GA17722@kroah.com>
- <b27cda60-8bf8-47a1-15b5-bf8b3a83fc45@gmail.com>
- <20170727022907.GC1398@kroah.com>
-Message-ID: <4f58aeab-7b8d-50dc-5497-6ac42536e0c0@gmail.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Thu, 27 Jul 2017 19:31:52 +0200
+Subject: [PATCH v2 05/11] net: stmmac: dwmac-rk: Add internal phy support
+In-Reply-To: <65ae1747-4dff-b1d8-8aa3-684fc8c7809a@gmail.com>
+References: <1501160156-30328-1-git-send-email-david.wu@rock-chips.com>
+ <1501160540-30662-1-git-send-email-david.wu@rock-chips.com>
+ <20170727134834.GD18666@lunn.ch>
+ <65ae1747-4dff-b1d8-8aa3-684fc8c7809a@gmail.com>
+Message-ID: <20170727173152.GA16362@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2017 07:29 PM, Greg KH wrote:
-> On Wed, Jul 26, 2017 at 02:02:42PM -0700, David Daney wrote:
->> On 07/26/2017 01:08 PM, Greg KH wrote:
->>> On Wed, Jul 26, 2017 at 01:02:38PM -0700, David Daney wrote:
->>>> On 07/26/2017 10:33 AM, Greg KH wrote:
->>>>> On Wed, Jul 26, 2017 at 06:30:49PM +0200, Borislav Petkov wrote:
->>>>>> On Wed, Jul 26, 2017 at 09:19:49AM -0700, Greg KH wrote:
->>>>>>> On Wed, Jul 26, 2017 at 05:55:48PM +0200, Borislav Petkov wrote:
->>>>>>>> On Wed, Jul 26, 2017 at 05:45:15PM +0200, Jan Glauber wrote:
->>>>>>>>> The PMU/EDAC devices are all PCI devices do I need the 'struct pci_dev *'.
->>>>>>>>> I'm not aware of other ways to access these devices. Please enlighten
->>>>>>>>> me if I'm missing something.
->>>>>>>>
->>>>>>>> Me enlighten you on Cavium hardware?! You're funny.
->>>>>>>>
->>>>>>>> So I don't know whether the PCI hotplug code can run more than one
->>>>>>>> function upon PCI ID detection. Probably Greg will say, write a
->>>>>>>> multiplexer wrapper. :-)
->>>>>>>
->>>>>>> -ENOCONTEXT....
->>>>>>>
->>>>>>> Anyway, pci questions are best asked on the linux-pci at vger list.  And
->>>>>>> yes, all PCI devices end up with a 'struct pci_dev *' automatically.
->>>>>>
->>>>>> Simple: so they have a PCI ID of a memory contoller and want to hotplug
->>>>>> two drivers for it. And those two drivers should remain independent from
->>>>>> each other.
->>>>>
->>>>> Hahahahaha, no.  That's crazy, you were right in guessing what my answer
->>>>> was going to be :)
->>>>>
->>>>
->>>>
->>>> Just to be clear about the situation, the device is a memory controller.  It
->>>> has two main behaviors we are interested in:
->>>>
->>>> A) Error Detection And Correction (EDAC).  This should be connected to the
->>>> kernel's EDAC subsystem.  An existing driver (drivers/edac/thunderx_edac.c)
->>>> does exactly this.
->>>>
->>>> B) Performance Counters for actions taken in the corresponding memory. This
->>>> should be connected to the kernel's perf framework as an uncore-PMU (the
->>>> subject of this patch set).
->>>>
->>>> It is a single PCI device.  What should the driver architecture look like to
->>>> connect it to two different kernel subsystems?
->>>
->>> Modify the drivers/edac/thunderx_edac.c code to add support for
->>> performance counters.
->>>
->>
->> Thanks Greg.  This adds some clarity to the situation.
->>
->> This technique does slightly complicate the mapping of files and directories
->> in the kernel source tree to maintainers.
->>
->> Also, if a given configuration disables CONFIG_EDAC there is some hackery
->> needed to get the perf portion of the driver included.
+On Thu, Jul 27, 2017 at 09:54:01AM -0700, Florian Fainelli wrote:
+> On 07/27/2017 06:48 AM, Andrew Lunn wrote:
+> > On Thu, Jul 27, 2017 at 09:02:16PM +0800, David Wu wrote:
+> >> To make internal phy work, need to configure the phy_clock,
+> >> phy cru_reset and related registers.
+> >>
+> >> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> >> ---
+> >> changes in v2:
+> >>  - Use the standard "phy-mode" property for internal phy. (Florian)
+> > 
+> > I think we need to discuss this. This PHY appears to be on an MDIO
+> > bus, it uses a standard PHY driver, and it appears to be using an RMII
+> > interface. So it is just an ordinary PHY.
 > 
-> Well, you all deserve it for trying to have a single PCI device do
-> multiple things at the same time.  There's no real good reason for
-> creating hardware that way, PCI devices are "free", you should go throw
-> a printed copy of the PCI spec at the firmware developers who did this
-> to you.
-
-The problem lies in something even more congealed than the "firmware". 
-The PCI topology is etched in to the very fabric of the silicon of the SoC.
-
-
+> First, the fact that the internal PHY also appears through MDIO is
+> orthogonal to the fact that it is internal or external. Plenty of
+> designs have internal PHYs exposed through MDIO because that is
+> convenient. What matters though is how the data/clock lines are wired
+> internally, which is what "phy-mode" describes.
 > 
-> Then get them to fix the firmware so you have multiple PCI devices...
+> > 
+> > Internal is supposed to be something which is not ordinary, does not
+> > use one of the standard phy modes, needs something special to make it
+> > work.
+> > 
+> > Florain, it appears to be your suggestion to use internal. What do you
+> > say?
 > 
-> good luck!
-
-We'll use all of that we can get!  Thanks.
-
-
+> phy-mode = "internal" really means that it is not a standard MII variant
+> to connect the data/clock lines between the Ethernet MAC and the PHY,
+> and this can happen in some designs (although quite unlikely). So from
+> there we could do several things depending on the requirements:
 > 
-> greg k-h
+> - if you can have your Ethernet MAC driver perform the necessary
+> configuration *after* you have been able to bind the PHY device with its
+> PHY driver, then the PHY driver should have PHY_IS_INTERNAL in its
+> flags, and you can use phy_is_internal() from PHYLIB to tell you that
+> and we could imagine using: phy-mode = "rmii" because that would not too
+> much of a stretch
 > 
+> - if you need knowledge about this PHY connection type prior to binding
+> the PHY device and its driver (that is, before of_phy_connect()) we
+> could add a boolean property e.g: "phy-is-internal" that allows us to
+> know that, or we can have a new phy-mode value, e.g: "internal-rmii"
+> which describes that, either way would probably be fine, but the former
+> scales better
+> 
+
+Hello
+
+We have the same problem on Allwinner SoCs for dwmac-sun8i, we need to set a syscon for chossing between internal/external PHY.
+Having this phy-is-internal would be very helpfull. (adding internal-xmii will add too many flags in our case)
+
+Thanks
+Regards
+Corentin Labbe
