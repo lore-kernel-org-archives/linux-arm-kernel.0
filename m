@@ -1,43 +1,65 @@
-From: npiggin@gmail.com (Nicholas Piggin)
-Date: Thu, 27 Jul 2017 14:34:00 +1000
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170727014214.GH3730@linux.vnet.ibm.com>
-References: <20170726223658.GA27617@linux.vnet.ibm.com>
- <20170726.154540.150558937277891719.davem@davemloft.net>
- <20170726231505.GG3730@linux.vnet.ibm.com>
- <20170726.162200.1904949371593276937.davem@davemloft.net>
- <20170727014214.GH3730@linux.vnet.ibm.com>
-Message-ID: <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
+From: yong.deng@magewell.com (Yong Deng)
+Date: Thu, 27 Jul 2017 12:35:32 +0800
+Subject: [PATCH v2 0/3] Initial Allwinner V3s CSI Support
+Message-ID: <1501130135-41670-1-git-send-email-yong.deng@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Jul 2017 18:42:14 -0700
-"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+Sorry for resend the patch. Delivering to somebody in cc has failed at
+last time.
 
-> On Wed, Jul 26, 2017 at 04:22:00PM -0700, David Miller wrote:
+This patchset add initial support for Allwinner V3s CSI.
 
-> > Indeed, that really wouldn't explain how we end up with a RCU stall
-> > dump listing almost all of the cpus as having missed a grace period.  
-> 
-> I have seen stranger things, but admittedly not often.
+Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
+and CSI1 is used for parallel interface. This is not documented in
+datasheet but by testing and guess.
 
-So the backtraces show the RCU gp thread in schedule_timeout.
+This patchset implement a v4l2 framework driver and add a binding 
+documentation for it. 
 
-Are you sure that it's timeout has expired and it's not being scheduled,
-or could it be a bad (large) timeout (looks unlikely) or that it's being
-scheduled but not correctly noting gps on other CPUs?
+Currently, the driver only support the parallel interface. And has been
+tested with a BT1120 signal which generating from FPGA. The following
+fetures are not support with this patchset:
+  - ISP 
+  - MIPI-CSI2
+  - Master clock for camera sensor
+  - Power regulator for the front end IC
 
-It's not in R state, so if it's not being scheduled at all, then it's
-because the timer has not fired:
+sun6i_csi_ops is still there. I seriously thought about it. Without 
+sun6i_csi_ops, the dependency between sun6i_video and sun6i_csi_v3s
+will be complicated. Comments and criticisms are welcome.
 
-[ 1984.628602] rcu_preempt kthread starved for 5663 jiffies! g1566 c1565 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1
-[ 1984.638153] rcu_preempt     S    0     9      2 0x00000000
-[ 1984.643626] Call trace:
-[ 1984.646059] [<ffff000008084fb0>] __switch_to+0x90/0xa8
-[ 1984.651189] [<ffff000008962274>] __schedule+0x19c/0x5d8
-[ 1984.656400] [<ffff0000089626e8>] schedule+0x38/0xa0
-[ 1984.661266] [<ffff000008965844>] schedule_timeout+0x124/0x218
-[ 1984.667002] [<ffff000008121424>] rcu_gp_kthread+0x4fc/0x748
-[ 1984.672564] [<ffff0000080df0b4>] kthread+0xfc/0x128
-[ 1984.677429] [<ffff000008082ec0>] ret_from_fork+0x10/0x50
+Changes in v2:
+  * Change sunxi-csi to sun6i-csi
+  * Rebase to media_tree master branch
+
+Yong Deng (3):
+  media: V3s: Add support for Allwinner CSI.
+  dt-bindings: media: Add Allwinner V3s Camera Sensor Interface (CSI)
+  media: MAINTAINERS: add entries for Allwinner V3s CSI
+
+ .../devicetree/bindings/media/sun6i-csi.txt        |  49 ++
+ MAINTAINERS                                        |   8 +
+ drivers/media/platform/Kconfig                     |   1 +
+ drivers/media/platform/Makefile                    |   2 +
+ drivers/media/platform/sun6i-csi/Kconfig           |   9 +
+ drivers/media/platform/sun6i-csi/Makefile          |   3 +
+ drivers/media/platform/sun6i-csi/sun6i_csi.c       | 545 ++++++++++++++
+ drivers/media/platform/sun6i-csi/sun6i_csi.h       | 203 +++++
+ drivers/media/platform/sun6i-csi/sun6i_csi_v3s.c   | 827 +++++++++++++++++++++
+ drivers/media/platform/sun6i-csi/sun6i_csi_v3s.h   | 206 +++++
+ drivers/media/platform/sun6i-csi/sun6i_video.c     | 663 +++++++++++++++++
+ drivers/media/platform/sun6i-csi/sun6i_video.h     |  61 ++
+ 12 files changed, 2577 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+ create mode 100644 drivers/media/platform/sun6i-csi/Kconfig
+ create mode 100644 drivers/media/platform/sun6i-csi/Makefile
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi.c
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi.h
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi_v3s.c
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_csi_v3s.h
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_video.c
+ create mode 100644 drivers/media/platform/sun6i-csi/sun6i_video.h
+
+-- 
+1.8.3.1
