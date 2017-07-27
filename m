@@ -1,33 +1,33 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 27 Jul 2017 21:27:43 +0300
-Subject: halting the kernel does not stop the CPU cores?
-In-Reply-To: <VI1PR04MB1662099750F9EAFA0324C6538CBE0@VI1PR04MB1662.eurprd04.prod.outlook.com>
-References: <VI1PR04MB1662099750F9EAFA0324C6538CBE0@VI1PR04MB1662.eurprd04.prod.outlook.com>
-Message-ID: <20170727182743.ma4bo54mar4bknap@tarshish>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 27 Jul 2017 20:38:04 +0200
+Subject: [GIT PULL] Allwinner fixes for 4.13
+In-Reply-To: <20170727145453.il2nepmrrr355fgp@wens.csie.org>
+References: <20170727145453.il2nepmrrr355fgp@wens.csie.org>
+Message-ID: <20170727183804.wzof76mcek7frigk@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heinz,
+Hi Arnd, Olof,
 
-On Thu, Jul 27, 2017 at 02:38:48PM +0000, Heinz Wrobel wrote:
-> I noticed that when halting the kernel (intentionally or not), the cores 
-> effectively go into a while(1) loop and power consumption on larger devices 
-> really jumps up significantly to the point where, e.g., a ?crash? turns into 
-> ?crash and burn?.
-> 
-> I would assume that if a system is halted, you don?t want to dissipate more 
-> power than on a running system but go as silent as low power as reasonable.
-> 
-> Is there any specific reason why the cores would not go into a wfi loop like 
-> they do on idle?
-> The patch to fix this seems to be easy at first glance, but is there a good 
-> reason *NOT* to do such a patch and to leave the plain while(1)?
+On Thu, Jul 27, 2017 at 10:54:53PM +0800, Chen-Yu Tsai wrote:
+> I will be handling some of the pull requests this cycle.
+> Here are some fixes we would like merged for 4.13.
 
-See https://patchwork.kernel.org/patch/9866711/ .
+As you might have noticed, Chen-Yu has been a co-maintainer for the
+Allwinner stuff. He will handle most (if not all) the pull requests
+for this cycle, so you should expect to see more PR's from him.
 
-baruch
+Thanks!
+Maxime
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170727/114a6124/attachment-0001.sig>
