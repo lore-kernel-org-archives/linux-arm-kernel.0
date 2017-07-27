@@ -1,31 +1,55 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 27 Jul 2017 16:23:35 +0800
-Subject: [PATCH v2 0/2] Add ZTE ZX PWM device driver support
-Message-ID: <1501143817-15843-1-git-send-email-shawnguo@kernel.org>
+Date: Thu, 27 Jul 2017 16:23:36 +0800
+Subject: [PATCH v2 1/2] dt-bindings: pwm: add bindings doc for ZTE ZX PWM
+ controller
+In-Reply-To: <1501143817-15843-1-git-send-email-shawnguo@kernel.org>
+References: <1501143817-15843-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <1501143817-15843-2-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shawn Guo <shawn.guo@linaro.org>
 
-The series adds the dt-bindings document and device driver for PWM
-controller found on ZTE ZX family SoCs.
+It adds bindings document for ZTE ZX PWM controller.  The device
+has two clocks: PCLK and WCLK.  The PCLK is for register access, and
+WCLK is the reference clock for calculating period and duty cycles.
+Also, the device supports polarity configuration, so #pwm-cells should
+be 3.
 
-Changes for v2:
- - Add Rob's ACK for dt-bindings patch
- - Use inline function rather than macro for to_zx_pwm_chip()
- - Convert zx_pwm_ops to implement atomic callbacks .apply() and .get_state()
-
-Shawn Guo (2):
-  dt-bindings: pwm: add bindings doc for ZTE ZX PWM controller
-  pwm: add ZTE ZX PWM device driver
-
- Documentation/devicetree/bindings/pwm/pwm-zx.txt |  22 ++
- drivers/pwm/Kconfig                              |   9 +
- drivers/pwm/Makefile                             |   1 +
- drivers/pwm/pwm-zx.c                             | 270 +++++++++++++++++++++++
- 4 files changed, 302 insertions(+)
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/pwm/pwm-zx.txt | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-zx.txt
- create mode 100644 drivers/pwm/pwm-zx.c
 
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-zx.txt b/Documentation/devicetree/bindings/pwm/pwm-zx.txt
+new file mode 100644
+index 000000000000..a6bcc75c9164
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/pwm-zx.txt
+@@ -0,0 +1,22 @@
++ZTE ZX PWM controller
++
++Required properties:
++ - compatible: Should be "zte,zx296718-pwm".
++ - reg: Physical base address and length of the controller's registers.
++ - clocks : The phandle and specifier referencing the controller's clocks.
++ - clock-names: "pclk" for PCLK, "wclk" for WCLK to the PWM controller.  The
++   PCLK is for register access, while WCLK is the reference clock for
++   calculating period and duty cycles.
++ - #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
++   the cells format.
++
++Example:
++
++	pwm: pwm at 1439000 {
++		compatible = "zte,zx296718-pwm";
++		reg = <0x1439000 0x1000>;
++		clocks = <&lsp1crm LSP1_PWM_PCLK>,
++			 <&lsp1crm LSP1_PWM_WCLK>;
++		clock-names = "pclk", "wclk";
++		#pwm-cells = <3>;
++	};
 -- 
 1.9.1
