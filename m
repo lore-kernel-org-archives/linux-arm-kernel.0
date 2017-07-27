@@ -1,36 +1,44 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Thu, 27 Jul 2017 18:18:58 +0200
-Subject: [PATCH 2/4] iio: trigger: stm32-timer: fix write_raw return value
-In-Reply-To: <1501172340-8448-1-git-send-email-fabrice.gasnier@st.com>
-References: <1501172340-8448-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1501172340-8448-3-git-send-email-fabrice.gasnier@st.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu, 27 Jul 2017 18:17:55 +0200
+Subject: [PATCH 2/2] clk: meson: gxbb: fix protection against undefined clks
+In-Reply-To: <20170727161755.10393-1-jbrunet@baylibre.com>
+References: <20170727161755.10393-1-jbrunet@baylibre.com>
+Message-ID: <20170727161755.10393-3-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes: 4adec7da0536 ("iio: stm32 trigger: Add quadrature encoder device")
+gxbb clock driver gracefully handles case where the clkid is defined but
+the clock hw pointer is not provided, as long as it is not at the end of
+the hw_onecell_data array.
 
-IIO core expects zero as return value for write_raw() callback
-in case of success.
+This patch ensure that the last entries are defined as well to handle
+this particular case.
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Fixes: a70c6e06ed7c ("clk: meson: gxbb: protect against holes in the onecell_data array")
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/iio/trigger/stm32-timer-trigger.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/clk/meson/gxbb.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/iio/trigger/stm32-timer-trigger.c b/drivers/iio/trigger/stm32-timer-trigger.c
-index 6aa73d6..107918b 100644
---- a/drivers/iio/trigger/stm32-timer-trigger.c
-+++ b/drivers/iio/trigger/stm32-timer-trigger.c
-@@ -406,9 +406,8 @@ static int stm32_counter_write_raw(struct iio_dev *indio_dev,
- 
- 	switch (mask) {
- 	case IIO_CHAN_INFO_RAW:
--		regmap_write(priv->regmap, TIM_CNT, val);
-+		return regmap_write(priv->regmap, TIM_CNT, val);
- 
--		return IIO_VAL_INT;
- 	case IIO_CHAN_INFO_SCALE:
- 		/* fixed scale */
- 		return -EINVAL;
+diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+index a897ea45327c..8409d86cda24 100644
+--- a/drivers/clk/meson/gxbb.c
++++ b/drivers/clk/meson/gxbb.c
+@@ -1183,6 +1183,7 @@ static struct clk_hw_onecell_data gxbb_hw_onecell_data = {
+ 		[CLKID_32K_CLK]		    = &gxbb_32k_clk.hw,
+ 		[CLKID_32K_CLK_SEL]	    = &gxbb_32k_clk_sel.hw,
+ 		[CLKID_32K_CLK_DIV]	    = &gxbb_32k_clk_div.hw,
++		[NR_CLKS]		    = NULL,
+ 	},
+ 	.num = NR_CLKS,
+ };
+@@ -1305,6 +1306,7 @@ static struct clk_hw_onecell_data gxl_hw_onecell_data = {
+ 		[CLKID_32K_CLK]		    = &gxbb_32k_clk.hw,
+ 		[CLKID_32K_CLK_SEL]	    = &gxbb_32k_clk_sel.hw,
+ 		[CLKID_32K_CLK_DIV]	    = &gxbb_32k_clk_div.hw,
++		[NR_CLKS]		    = NULL,
+ 	},
+ 	.num = NR_CLKS,
+ };
 -- 
-1.9.1
+2.9.4
