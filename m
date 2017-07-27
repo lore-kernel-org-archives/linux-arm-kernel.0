@@ -1,33 +1,71 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 27 Jul 2017 15:38:17 -0700
-Subject: [PATCH] irqchip: brcmstb-l2: Define an irq_pm_shutdown function
-Message-ID: <20170727223817.7494-1-f.fainelli@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 27 Jul 2017 15:47:13 -0700
+Subject: [PATCH v2 2/5] clk: Add clk_hw_get_clk() helper API to be used
+ by clk providers
+In-Reply-To: <1500526099-9935-3-git-send-email-rnayak@codeaurora.org>
+References: <1500526099-9935-1-git-send-email-rnayak@codeaurora.org>
+ <1500526099-9935-3-git-send-email-rnayak@codeaurora.org>
+Message-ID: <20170727224713.GP2146@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Broadcom STB platforms support S5 and we allow specific hardware
-wake-up events to take us out of this state. Because we were not
-defining an irq_pm_shutdown() function pointer, we would not be
-correctly masking non-wakeup events, which would result in spurious
-wake-ups from sources that were not explicitly configured for wake-up.
+On 07/20, Rajendra Nayak wrote:
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index fc58c52..c9bbfb3 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -186,6 +186,45 @@ const char *clk_hw_get_name(const struct clk_hw *hw)
+>  }
+>  EXPORT_SYMBOL_GPL(clk_hw_get_name);
+>  
+> +struct clk *clk_hw_get_clk(struct clk_hw *hw, const char *dev_id,
+> +			   const char *con_id)
+> +{
+> +	return __clk_create_clk(hw, dev_id, con_id);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_hw_get_clk);
+> +
+> +void clk_hw_put_clk(struct clk *clk)
+> +{
+> +	__clk_free_clk(clk);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_hw_put_clk);
 
-Fixes: 7f646e92766e ("irqchip: brcmstb-l2: Add Broadcom Set Top Box Level-2 interrupt controller")
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- drivers/irqchip/irq-brcmstb-l2.c | 1 +
- 1 file changed, 1 insertion(+)
+Isn't this just clk_put()? Not sure why we need this API.
 
-diff --git a/drivers/irqchip/irq-brcmstb-l2.c b/drivers/irqchip/irq-brcmstb-l2.c
-index bddf169c4b37..b009b916a292 100644
---- a/drivers/irqchip/irq-brcmstb-l2.c
-+++ b/drivers/irqchip/irq-brcmstb-l2.c
-@@ -189,6 +189,7 @@ static int __init brcmstb_l2_intc_of_init(struct device_node *np,
- 
- 	ct->chip.irq_suspend = brcmstb_l2_intc_suspend;
- 	ct->chip.irq_resume = brcmstb_l2_intc_resume;
-+	ct->chip.irq_pm_shutdown = brcmstb_l2_intc_suspend;
- 
- 	if (data->can_wake) {
- 		/* This IRQ chip can wake the system, set all child interrupts
+> +
+> +static void devm_clk_hw_put(struct device *dev, void *res)
+> +{
+> +	clk_hw_put_clk(*(struct clk **)res);
+> +}
+
+Same comment.
+
+> +
+> +struct clk *devm_clk_hw_get_clk(struct device *dev, struct clk_hw *hw,
+> +				const char *con_id)
+> +{
+> +	struct clk **ptr, *clk;
+> +
+> +	ptr = devres_alloc(devm_clk_hw_put, sizeof(*ptr), GFP_KERNEL);
+> +	if (!ptr)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	clk = clk_hw_get_clk(hw, dev_name(dev), con_id);
+> +	if (!IS_ERR(clk)) {
+> +		*ptr = clk;
+> +		devres_add(dev, ptr);
+> +	} else {
+> +		devres_free(ptr);
+> +	}
+> +
+> +	return clk;
+> +}
+> +EXPORT_SYMBOL_GPL(devm_clk_hw_get_clk);
+
+Hm.. ok. Wasn't expecting us to need this API, but I guess it is
+needed.
+
 -- 
-2.9.3
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
