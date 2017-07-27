@@ -1,34 +1,35 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Thu, 27 Jul 2017 16:59:45 +0800
-Subject: [v6,5/7] drm/rockchip: vop: add a series of vop support
-In-Reply-To: <1501049971-6131-1-git-send-email-mark.yao@rock-chips.com>
-References: <1501049971-6131-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <5979AB81.4040503@rock-chips.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Thu, 27 Jul 2017 11:08:56 +0200
+Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
+ counters
+In-Reply-To: <20170727051157.GA4525@nazgul.tnic>
+References: <20170726153502.GE28875@nazgul.tnic> <20170726154515.GA11453@hc>
+ <20170726155548.GF28875@nazgul.tnic>
+ <20170726161949.GB15426@kroah.com>
+ <20170726163049.GG28875@nazgul.tnic>
+ <20170726173353.GB21705@kroah.com>
+ <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
+ <20170726200802.GA17722@kroah.com>
+ <b27cda60-8bf8-47a1-15b5-bf8b3a83fc45@gmail.com>
+ <20170727051157.GA4525@nazgul.tnic>
+Message-ID: <20170727090856.GB15784@hc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi mark,
+On Thu, Jul 27, 2017 at 07:11:57AM +0200, Borislav Petkov wrote:
+> On Wed, Jul 26, 2017 at 02:02:42PM -0700, David Daney wrote:
+> > Also, if a given configuration disables CONFIG_EDAC there is some hackery
+> > needed to get the perf portion of the driver included.
+> 
+> Yes, and we don't do performance counters in EDAC.
+> 
+> So you could add a small memory controller driver which does the
+> arbitration or fix the firmware.
 
-On 07/26/2017 02:19 PM, Mark yao wrote:
-> Vop Full framework now has following vops:
-> IP version    chipname
->    3.1           rk3288
->    3.2           rk3368
->    3.4           rk3366
->    3.5           rk3399 big
->    3.6           rk3399 lit
->    3.7           rk3228
->    3.8           rk3328
->
-> The above IP version is from H/W define, some of vop support get
-> the IP version from VERSION_INFO register, some are not.
-> hardcode the IP version for each vop to identify them.
->
-> major version: used for IP structure, Vop full framework is 3,
->                 vop little framework is 2.
-> minor version: on same structure, newer design vop will bigger
->                 then old one.
->
-> Signed-off-by: Mark Yao<mark.yao@rock-chips.com>
+OK. As fixing the firmware will take quite some time I'll go for the memory
+controller driver that starts EDAC / PMU depending on their CONFIG_.
 
-Reviewed-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+What would be the proper location for the multiplexer?
+drivers/soc/cavium or drivers/misc?
+
+--Jan
