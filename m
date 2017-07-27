@@ -1,60 +1,73 @@
-From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
-Date: Thu, 27 Jul 2017 17:49:05 +0800
-Subject: [PATCH] config: ls1012aqds: Add USB EHCI support for ls1012aqds
-Message-ID: <1501148945-11775-1-git-send-email-yinbo.zhu@nxp.com>
+From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
+Date: Thu, 27 Jul 2017 12:08:31 +0200
+Subject: [PATCH 06/12] ARM: omap2: mark unused functions as __maybe_unused
+In-Reply-To: <20170720155209.3250880-3-arnd@arndb.de>
+References: <20170720154616.3250481-1-arnd@arndb.de>
+ <20170720155209.3250880-3-arnd@arndb.de>
+Message-ID: <20170727100831.dixjoysxje6vkduq@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajesh Bhagat <rajesh.bhagat@nxp.com>
+Hi,
 
-Add USB EHCI support for ls1012aqds platform
+On Thu, Jul 20, 2017 at 05:51:44PM +0200, Arnd Bergmann wrote:
+> The omap_generic_init() and omap_hwmod_init_postsetup() functions are
+> used in the initialization for all OMAP2+ SoC types, but in the
+> extreme case that those are all disabled, we get a warning about
+> unused code:
+> 
+> arch/arm/mach-omap2/io.c:412:123: error: 'omap_hwmod_init_postsetup' defined but not used [-Werror=unused-function]
+> arch/arm/mach-omap2/board-generic.c:30:123: error: 'omap_generic_init' defined but not used [-Werror=unused-function]
+> 
+> This annotates both as __maybe_unused to shut up that warning.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-Signed-off-by: Rajat Srivastava <rajat.srivastava@nxp.com>
-Signed-off-by: Rajesh Bhagat <rajesh.bhagat@nxp.com>
-Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
----
- arch/arm/include/asm/arch-fsl-layerscape/immap_lsch2.h | 1 +
- include/configs/ls1012aqds.h                           | 2 ++
- include/usb/ehci-ci.h                                  | 2 +-
- 3 files changed, 4 insertions(+), 1 deletion(-)
+I guess I am CC'd because of get_maintainer's git feature? Anyways:
 
-diff --git a/arch/arm/include/asm/arch-fsl-layerscape/immap_lsch2.h b/arch/arm/include/asm/arch-fsl-layerscape/immap_lsch2.h
-index 8ad199f..4afc338 100644
---- a/arch/arm/include/asm/arch-fsl-layerscape/immap_lsch2.h
-+++ b/arch/arm/include/asm/arch-fsl-layerscape/immap_lsch2.h
-@@ -35,6 +35,7 @@
- #define CONFIG_SYS_XHCI_USB1_ADDR		(CONFIG_SYS_IMMR + 0x01f00000)
- #define CONFIG_SYS_XHCI_USB2_ADDR		(CONFIG_SYS_IMMR + 0x02000000)
- #define CONFIG_SYS_XHCI_USB3_ADDR		(CONFIG_SYS_IMMR + 0x02100000)
-+#define CONFIG_SYS_EHCI_USB1_ADDR		(CONFIG_SYS_IMMR + 0x07600000)
- #define CONFIG_SYS_PCIE1_ADDR			(CONFIG_SYS_IMMR + 0x2400000)
- #define CONFIG_SYS_PCIE2_ADDR			(CONFIG_SYS_IMMR + 0x2500000)
- #define CONFIG_SYS_PCIE3_ADDR			(CONFIG_SYS_IMMR + 0x2600000)
-diff --git a/include/configs/ls1012aqds.h b/include/configs/ls1012aqds.h
-index 5b8500b..55f2578 100644
---- a/include/configs/ls1012aqds.h
-+++ b/include/configs/ls1012aqds.h
-@@ -115,6 +115,8 @@
- 
- #ifdef CONFIG_HAS_FSL_DR_USB
- #define CONFIG_USB_EHCI_FSL
-+#define CONFIG_USB_ULPI
-+#define CONFIG_USB_ULPI_VIEWPORT
- #define CONFIG_EHCI_HCD_INIT_AFTER_RESET
- #endif
- 
-diff --git a/include/usb/ehci-ci.h b/include/usb/ehci-ci.h
-index 847b698..cd3eb47 100644
---- a/include/usb/ehci-ci.h
-+++ b/include/usb/ehci-ci.h
-@@ -156,7 +156,7 @@
- #elif defined(CONFIG_MPC85xx)
- #define CONFIG_SYS_FSL_USB1_ADDR CONFIG_SYS_MPC85xx_USB1_ADDR
- #define CONFIG_SYS_FSL_USB2_ADDR CONFIG_SYS_MPC85xx_USB2_ADDR
--#elif defined(CONFIG_ARCH_LS1021A)
-+#elif defined(CONFIG_LS102XA) || defined(CONFIG_ARCH_LS1012A)
- #define CONFIG_SYS_FSL_USB1_ADDR CONFIG_SYS_EHCI_USB1_ADDR
- #define CONFIG_SYS_FSL_USB2_ADDR        0
- #endif
--- 
-2.1.0.27.g96db324
+Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+
+> ---
+> Originally sent in Feb 2016, but it got lost for some reason.
+> ---
+>  arch/arm/mach-omap2/board-generic.c | 2 +-
+>  arch/arm/mach-omap2/io.c            | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index dc9e34e670a2..b1e661bb5521 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -28,7 +28,7 @@ static const struct of_device_id omap_dt_match_table[] __initconst = {
+>  	{ }
+>  };
+>  
+> -static void __init omap_generic_init(void)
+> +static void __init __maybe_unused omap_generic_init(void)
+>  {
+>  	pdata_quirks_init(omap_dt_match_table);
+>  
+> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+> index 1d739d1a0a65..1cd20e4d56b0 100644
+> --- a/arch/arm/mach-omap2/io.c
+> +++ b/arch/arm/mach-omap2/io.c
+> @@ -410,7 +410,7 @@ static int _set_hwmod_postsetup_state(struct omap_hwmod *oh, void *data)
+>  	return omap_hwmod_set_postsetup_state(oh, *(u8 *)data);
+>  }
+>  
+> -static void __init omap_hwmod_init_postsetup(void)
+> +static void __init __maybe_unused omap_hwmod_init_postsetup(void)
+>  {
+>  	u8 postsetup_state;
+>  
+> -- 
+> 2.9.0
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170727/0f52afce/attachment.sig>
