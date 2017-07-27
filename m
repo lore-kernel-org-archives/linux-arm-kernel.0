@@ -1,57 +1,42 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Thu, 27 Jul 2017 12:00:35 +0530
-Subject: [PATCH 1/2] pinctrl: qcom: spmi-gpio: Add pmi8994 gpio support
-Message-ID: <1501137036-20155-1-git-send-email-vivek.gautam@codeaurora.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 27 Jul 2017 08:36:15 +0200
+Subject: [PATCH 1/5] dt-bindings: rockchip-thermal: Support the RK3328 SoC
+ compatible
+In-Reply-To: <1500973788-14627-2-git-send-email-rocky.hao@rock-chips.com>
+References: <1500973788-14627-1-git-send-email-rocky.hao@rock-chips.com>
+ <1500973788-14627-2-git-send-email-rocky.hao@rock-chips.com>
+Message-ID: <4621265.xPXIvBV6Fl@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the bindings doc and driver for pmi8994-gpio devices.
+Hi Rocky,
 
-Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
----
+Am Dienstag, 25. Juli 2017, 17:09:44 CEST schrieb Rocky Hao:
+> attempt to new compatible for thermal founding on RK3328 SoC.
+> 
+> Change-Id: Ie6f6d7b4e545891a0035851a923c0412f584140c
+> Signed-off-by: Rocky Hao <rocky.hao@rock-chips.com>
 
-- Have been using this patch-set on db820c [1] for extcon with
-  usb controller. The usb controller uses one of these gpios
-  for usb-id/vbus detection.
+generally looks good but you should not have gerrit Change-Ids in patches
+for mainline. This is true for all patches in this series.
 
-[1] https://github.com/boddob/linux/tree/for-qcomlt/4.13rc2-merged
 
- Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt | 2 ++
- drivers/pinctrl/qcom/pinctrl-spmi-gpio.c                     | 1 +
- 2 files changed, 3 insertions(+)
+Heiko
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt b/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt
-index 8d893a874634..74932318d41d 100644
---- a/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt
-@@ -15,6 +15,7 @@ PMIC's from Qualcomm.
- 		    "qcom,pm8921-gpio"
- 		    "qcom,pm8941-gpio"
- 		    "qcom,pm8994-gpio"
-+		    "qcom,pmi8994-gpio"
- 		    "qcom,pma8084-gpio"
- 
- 		    And must contain either "qcom,spmi-gpio" or "qcom,ssbi-gpio"
-@@ -84,6 +85,7 @@ to specify in a pin configuration subnode:
- 		    gpio1-gpio44 for pm8921
- 		    gpio1-gpio36 for pm8941
- 		    gpio1-gpio22 for pm8994
-+		    gpio1-gpio10 for pmi8994
- 		    gpio1-gpio22 for pma8084
- 
- - function:
-diff --git a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-index 664b641fd776..bf0a6438424b 100644
---- a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-+++ b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
-@@ -799,6 +799,7 @@ static int pmic_gpio_remove(struct platform_device *pdev)
- 	{ .compatible = "qcom,pm8916-gpio" },	/* 4 GPIO's */
- 	{ .compatible = "qcom,pm8941-gpio" },	/* 36 GPIO's */
- 	{ .compatible = "qcom,pm8994-gpio" },	/* 22 GPIO's */
-+	{ .compatible = "qcom,pmi8994-gpio" },	/* 10 GPIO's */
- 	{ .compatible = "qcom,pma8084-gpio" },	/* 22 GPIO's */
- 	{ .compatible = "qcom,spmi-gpio" }, /* Generic */
- 	{ },
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> ---
+>  Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt index
+> 43003aec94bd..e3a6234fb1ac 100644
+> --- a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> @@ -4,6 +4,7 @@ Required properties:
+>  - compatible : should be "rockchip,<name>-tsadc"
+>     "rockchip,rk3228-tsadc": found on RK3228 SoCs
+>     "rockchip,rk3288-tsadc": found on RK3288 SoCs
+> +   "rockchip,rk3328-tsadc": found on RK3328 SoCs
+>     "rockchip,rk3368-tsadc": found on RK3368 SoCs
+>     "rockchip,rk3399-tsadc": found on RK3399 SoCs
+>  - reg : physical base address of the controller and length of memory mapped
