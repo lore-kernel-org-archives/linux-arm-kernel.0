@@ -1,62 +1,89 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Thu, 27 Jul 2017 09:29:55 +0200
-Subject: [PATCH 4/4] ARM: dts: stm32: Add DAC support on stm32f429
-In-Reply-To: <1499693040-12994-5-git-send-email-fabrice.gasnier@st.com>
-References: <1499693040-12994-1-git-send-email-fabrice.gasnier@st.com>
- <1499693040-12994-5-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <5b66624c-3a4c-a3af-72b2-d867cf880722@st.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 27 Jul 2017 15:36:21 +0800
+Subject: [PATCH v2] irqchip/gic-v3-its: Allow GIC ITS number more than
+ MAX_NUMNODES
+In-Reply-To: <5e8aacb2-9c20-0f4a-2c5e-721fe82bfc60@arm.com>
+References: <1500695652-27025-1-git-send-email-guohanjun@huawei.com>
+ <20170725104758.GC19302@red-moon>
+ <eec017c3-0d41-fb9f-478c-805368f66179@linaro.org>
+ <5e8aacb2-9c20-0f4a-2c5e-721fe82bfc60@arm.com>
+Message-ID: <b14f3a93-6d9d-3be0-ae3e-12b1ac510df2@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Robin,
 
-On 07/10/2017 03:24 PM, Fabrice Gasnier wrote:
-> Add support for DAC (Digital to Analog Converter) to STM32F429.
-> STM32F429 DAC has two output channels.
+On 2017/7/26 19:05, Robin Murphy wrote:
+> On 26/07/17 09:11, Hanjun Guo wrote:
+>> On 2017/7/25 18:47, Lorenzo Pieralisi wrote:
+>>> On Sat, Jul 22, 2017 at 11:54:12AM +0800, Hanjun Guo wrote:
+>>>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>
+>>>> When running 4.13-rc1 on top of D05, I got the boot log:
+>>>
+>>> Nit: You should stick to what the problem is and why you need to solve
+>>> it, "Fixes:" tag gives the commit history you need, the rest (eg "When
+>>> running 4.13-rc1") does not belong in the commit log.
+>>
+>> Updated as "After enabling the ITS NUMA support on D05, I got
+>> the boot log:"
+>>
+>>>
+>>>> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+>>>> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+>>>> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+>>>> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+>>>> [    0.000000] SRAT: ITS affinity exceeding max count[4]
+>>>>
+>>>> This is wrong on D05 as we have 8 ITSes with 4 NUMA nodes.
+>>>>
+>>>> So dynamically alloc the memory needed instead of using
+>>>> its_srat_maps[MAX_NUMNODES], which count the number of
+>>>> ITS entry(ies) in SRAT and alloc its_srat_maps as needed,
+>>>> then build the mapping of numa node to ITS ID. Of course,
+>>>> its_srat_maps will be freed after ITS probing because
+>>>> we don't need that after boot.
+>>>>
+>>>> After doing this, I got what I wanted:
+>>>>
+>>>> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+>>>> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+>>>> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+>>>> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+>>>> [    0.000000] SRAT: PXM 2 -> ITS 4 -> Node 2
+>>>> [    0.000000] SRAT: PXM 2 -> ITS 5 -> Node 2
+>>>> [    0.000000] SRAT: PXM 2 -> ITS 6 -> Node 2
+>>>> [    0.000000] SRAT: PXM 3 -> ITS 7 -> Node 3
+>>>
+>>> Question (unrelated): how are PCI devices (or better PCI host bridges)
+>>> mapped to ITSs ? I ask because in IORT we currently ignore the notion
+>>> of ITS groups - so it is just out of curiosity (I suspect you have
+>>> a static 1:1 mapping PCI-host-bridge->ITS).
+>>
+>> Yes, on D05 we enabled 8 ITSs, and also have 8 PCI hostbridges, here is
+>> the IORT for D05:
+>>
+>> https://github.com/hisilicon/OpenPlatformPkg/blob/bb17676e6c529732af8adf438fc2c8ceeb9b3271/Chips/Hisilicon/Hi1616/D05AcpiTables/D05Iort.asl
 > 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
->   arch/arm/boot/dts/stm32f429.dtsi | 25 +++++++++++++++++++++++++
->   1 file changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-> index b2a2b5c..f15f633 100644
-> --- a/arch/arm/boot/dts/stm32f429.dtsi
-> +++ b/arch/arm/boot/dts/stm32f429.dtsi
-> @@ -354,6 +354,31 @@
->   			status = "disabled";
->   		};
->   
-> +		dac: dac at 40007400 {
-> +			compatible = "st,stm32f4-dac-core";
-> +			reg = <0x40007400 0x400>;
-> +			resets = <&rcc STM32F4_APB1_RESET(DAC)>;
-> +			clocks = <&rcc 0 STM32F4_APB1_CLOCK(DAC)>;
-> +			clock-names = "pclk";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +
-> +			dac1: dac at 1 {
-> +				compatible = "st,stm32-dac";
-> +				#io-channels-cells = <1>;
-> +				reg = <1>;
-> +				status = "disabled";
-> +			};
-> +
-> +			dac2: dac at 2 {
-> +				compatible = "st,stm32-dac";
-> +				#io-channels-cells = <1>;
-> +				reg = <2>;
-> +				status = "disabled";
-> +			};
-> +		};
-> +
->   		usart7: serial at 40007800 {
->   			compatible = "st,stm32-usart", "st,stm32-uart";
->   			reg = <0x40007800 0x400>;
-> 
-Applied on stm32-dt-for-v4.14 branch.
+> On a further side note, do the SMMUs really have no interrupts, or is
+> that just a hack to avoid MBIgen-related problems? Now that we have
+> working probe-deferral for IOMMU masters, it ought to be possible to
+> address any dependency by deferring the SMMU itself until the IRQs are
+> available. At a glance I guess ACPI doesn't make it as easy as
+> of_irq_get() does, but it might be worth looking into.
+
+SMMUs on D05 have interrupts as SMMU spec defined, but as you said they
+are routed to MBIgen.
+
+For now, IORT can support two types of interrupt for SMMU, one is SPI
+which connect to GICD, the other one is using MSI which describing the
+mapping of smmu dev id to ITS.
+
+So interrupts connecting to MBIgen or other interrupt controller are not
+supported, but I investigated that for a while and I think we can update
+the IORT table to support other interrupt controllers by introducing
+"ACPI device object full path name" in the IORT that the SMMU interrupts
+are referring.
 
 Thanks
-Alex
+Hanjun
