@@ -1,27 +1,32 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 27 Jul 2017 13:07:00 -0700
-Subject: halting the kernel does not stop the CPU cores?
-In-Reply-To: <VI1PR04MB1662099750F9EAFA0324C6538CBE0@VI1PR04MB1662.eurprd04.prod.outlook.com>
-References: <VI1PR04MB1662099750F9EAFA0324C6538CBE0@VI1PR04MB1662.eurprd04.prod.outlook.com>
-Message-ID: <26ccb0f7-0f78-27cd-cead-ddd810f4a33e@gmail.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Thu, 27 Jul 2017 22:58:08 +0200
+Subject: [PATCH v4 26/28] ARM: dts: s500: Set power domains for CPU2 and
+ CPU3
+In-Reply-To: <20170606005426.26446-27-afaerber@suse.de>
+References: <20170606005426.26446-1-afaerber@suse.de>
+ <20170606005426.26446-27-afaerber@suse.de>
+Message-ID: <819d3189-e3f7-5b6c-a292-693c241b1727@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/27/2017 07:38 AM, Heinz Wrobel wrote:
-> Hi,
+Am 06.06.2017 um 02:54 schrieb Andreas F?rber:
+> CPU2 has its own power domain PD_CPU2, and CPU3 has PD_CPU3.
 > 
-> I noticed that when halting the kernel (intentionally or not), the cores effectively go into a while(1) loop and power consumption on larger devices really jumps up significantly to the point where, e.g., a ?crash? turns into ?crash and burn?.
-> 
-> I would assume that if a system is halted, you don?t want to dissipate more power than on a running system but go as silent as low power as reasonable.
-> 
-> Is there any specific reason why the cores would not go into a wfi loop like they do on idle?
-> The patch to fix this seems to be easy at first glance, but is there a good reason *NOT* to do such a patch and to leave the plain while(1)?
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v4: new (split off due to dt-bindings dependency)
+>  
+>  arch/arm/boot/dts/s500.dtsi | 3 +++
+>  1 file changed, 3 insertions(+)
 
-In fact, if your platform supports CPU_HOTPLUG, I am not clear why
-smp_send_stop() + ipi_send_stop() is not calling platform_cpu_kill()
-which would be smp_ops.cpu_kill() but instead cpu_relax() was chosen?
+Applied to v4.14/dt:
 
-The CPU is dead anyway so as you say, so it's not like there is a remote
-chance to resume execution on these secondary cores?
---
-Florian
+https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.14/dt
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
