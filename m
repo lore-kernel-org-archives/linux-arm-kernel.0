@@ -1,17 +1,137 @@
-From: david.wu@rock-chips.com (David.Wu)
-Date: Thu, 27 Jul 2017 20:44:42 +0800
-Subject: [PATCH 05/11] net: stmmac: dwmac-rk: Add internal phy support
-In-Reply-To: <20170624022954.GD4875@lunn.ch>
-References: <1498192929-7519-1-git-send-email-david.wu@rock-chips.com>
- <1498193947-8011-1-git-send-email-david.wu@rock-chips.com>
- <20170624022954.GD4875@lunn.ch>
-Message-ID: <24bc9102-d37f-1a63-ad7b-f69e8e38d848@rock-chips.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 27 Jul 2017 13:45:31 +0100
+Subject: [PATCH v2] drivers/perf: arm_pmu: Request PMU SPIs with IRQF_PER_CPU
+Message-ID: <1501159531-27698-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Since the PMU register interface is banked per CPU, CPU PMU interrrupts
+cannot be handled by a CPU other than the one with the PMU asserting the
+interrupt. This means that migrating PMU SPIs, as we do during a CPU
+hotplug operation doesn't make any sense and can lead to the IRQ being
+disabled entirely if we route a spurious IRQ to the new affinity target.
 
-? 2017/6/24 10:29, Andrew Lunn ??:
-> If this is the PHY clock, should it actually be specified in the PHY
-> binding? Can you read the PHY ID registers with this clock off?
-If the phy clock is closed, we can not read the PHYID.
+This has been observed in practice on AMD Seattle, where CPUs on the
+non-boot cluster appear to take a spurious PMU IRQ when coming online,
+which is routed to CPU0 where it cannot be handled.
+
+This patch passes IRQF_PERCPU for PMU SPIs and forcefully sets their
+affinity prior to requesting them, ensuring that they cannot
+be migrated during hotplug events. This interacts badly with the DB8500
+erratum workaround that ping-pongs the interrupt affinity from the handler,
+so we avoid passing IRQF_PERCPU in that case by allowing the IRQ flags
+to be overridden in the platdata.
+
+Fixes: 3cf7ee98b848 ("drivers/perf: arm_pmu: move irq request/free into probe")
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+
+v1->v2: Update DB8500 workaround to specify IRQ flags
+
+ arch/arm/mach-ux500/cpu-db8500.c |  1 +
+ drivers/perf/arm_pmu.c           | 41 ++++++++++++++++++++++++++--------------
+ include/linux/perf/arm_pmu.h     |  4 ++++
+ 3 files changed, 32 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 28083ef72819..71a34e8c345a 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -133,6 +133,7 @@ static irqreturn_t db8500_pmu_handler(int irq, void *dev, irq_handler_t handler)
+ 
+ static struct arm_pmu_platdata db8500_pmu_platdata = {
+ 	.handle_irq		= db8500_pmu_handler,
++	.irq_flags		= IRQF_NOBALANCING | IRQF_NO_THREAD,
+ };
+ 
+ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index dc459eb1246b..1c5e0f333779 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -569,22 +569,41 @@ int armpmu_request_irq(struct arm_pmu *armpmu, int cpu)
+ 		if (irq != other_irq) {
+ 			pr_warn("mismatched PPIs detected.\n");
+ 			err = -EINVAL;
++			goto err_out;
+ 		}
+ 	} else {
+-		err = request_irq(irq, handler,
+-				  IRQF_NOBALANCING | IRQF_NO_THREAD, "arm-pmu",
++		struct arm_pmu_platdata *platdata = armpmu_get_platdata(armpmu);
++		unsigned long irq_flags;
++
++		err = irq_force_affinity(irq, cpumask_of(cpu));
++
++		if (err && num_possible_cpus() > 1) {
++			pr_warn("unable to set irq affinity (irq=%d, cpu=%u)\n",
++				irq, cpu);
++			goto err_out;
++		}
++
++		if (platdata && platdata->irq_flags) {
++			irq_flags = platdata->irq_flags;
++		} else {
++			irq_flags = IRQF_PERCPU |
++				    IRQF_NOBALANCING |
++				    IRQF_NO_THREAD;
++		}
++
++		err = request_irq(irq, handler, irq_flags, "arm-pmu",
+ 				  per_cpu_ptr(&hw_events->percpu_pmu, cpu));
+ 	}
+ 
+-	if (err) {
+-		pr_err("unable to request IRQ%d for ARM PMU counters\n",
+-			irq);
+-		return err;
+-	}
++	if (err)
++		goto err_out;
+ 
+ 	cpumask_set_cpu(cpu, &armpmu->active_irqs);
+-
+ 	return 0;
++
++err_out:
++	pr_err("unable to request IRQ%d for ARM PMU counters\n", irq);
++	return err;
+ }
+ 
+ int armpmu_request_irqs(struct arm_pmu *armpmu)
+@@ -628,12 +647,6 @@ static int arm_perf_starting_cpu(unsigned int cpu, struct hlist_node *node)
+ 			enable_percpu_irq(irq, IRQ_TYPE_NONE);
+ 			return 0;
+ 		}
+-
+-		if (irq_force_affinity(irq, cpumask_of(cpu)) &&
+-		    num_possible_cpus() > 1) {
+-			pr_warn("unable to set irq affinity (irq=%d, cpu=%u)\n",
+-				irq, cpu);
+-		}
+ 	}
+ 
+ 	return 0;
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index 1360dd6d5e61..af0f44effd44 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -24,10 +24,14 @@
+  *	interrupt and passed the address of the low level handler,
+  *	and can be used to implement any platform specific handling
+  *	before or after calling it.
++ *
++ * @irq_flags: if non-zero, these flags will be passed to request_irq
++ *             when requesting interrupts for this PMU device.
+  */
+ struct arm_pmu_platdata {
+ 	irqreturn_t (*handle_irq)(int irq, void *dev,
+ 				  irq_handler_t pmu_handler);
++	unsigned long irq_flags;
+ };
+ 
+ #ifdef CONFIG_ARM_PMU
+-- 
+2.1.4
