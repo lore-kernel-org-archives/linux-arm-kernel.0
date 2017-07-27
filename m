@@ -1,104 +1,74 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 27 Jul 2017 12:10:40 +0200
-Subject: [PATCH v6 4/7] drm/rockchip: vop: group vop registers
-In-Reply-To: <44153824.CqyclESHdT@diego>
-References: <1501049930-5794-1-git-send-email-mark.yao@rock-chips.com>
- <1501049966-6070-1-git-send-email-mark.yao@rock-chips.com>
- <44153824.CqyclESHdT@diego>
-Message-ID: <10499935.q3BgzX4LKL@diego>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 27 Jul 2017 11:12:55 +0100
+Subject: [PATCH v4 1/2] acpi:iort: Add an IORT helper function to reserve
+ HW ITS address regions for IOMMU drivers
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA8383C0268@FRAEML521-MBX.china.huawei.com>
+References: <20170725111732.41792-1-shameerali.kolothum.thodi@huawei.com>
+ <20170725111732.41792-2-shameerali.kolothum.thodi@huawei.com>
+ <20170725171100.GA1663@red-moon>
+ <b7512f89-4fe7-940e-0fa9-9274d8b1e935@arm.com>
+ <20170726095208.GA2468@red-moon>
+ <5FC3163CFD30C246ABAA99954A238FA8383C0268@FRAEML521-MBX.china.huawei.com>
+Message-ID: <20170727101255.GA15067@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 27. Juli 2017, 11:51:06 CEST schrieb Heiko St?bner:
-> Hi Mark,
-> 
-> Am Mittwoch, 26. Juli 2017, 14:19:25 CEST schrieb Mark Yao:
-> > Grouping the vop registers facilitates make register
-> > definition clearer, and also is useful for different vop
-> > reuse the same group register.
+On Thu, Jul 27, 2017 at 09:13:42AM +0000, Shameerali Kolothum Thodi wrote:
+
+[...]
+
+> > > >> +int iort_iommu_its_get_resv_regions(struct device *dev, struct
+> > list_head *head)
+> > > >> +{
+> > > >> +	int i;
+> > > >> +	struct acpi_iort_its_group *its;
+> > > >> +	struct acpi_iort_node *node, *its_node = NULL;
+> > > >> +	int resv = 0;
+> > > >
+> > > > Nit: int i, resv = 0;
+> > > >
+> > > > I can make these changes but I suspect this series will go via IOMMU
+> > > > tree, let me know how you want to handle it.
+> > > >
+> > > > Lorenzo
+> > > >
+> > > >> +	node = iort_find_dev_node(dev);
+> > > >> +	if (!node)
+> > > >> +		return -ENODEV;
+> > > >> +
+> > >
+> > > I'd suggest we also want a comment here to clarify that we're currently
+> > > assuming straightforward topologies where all mappings for a given root
+> > > complex/named component target the same ITS group. Otherwise we're
+> > going
+> > > to need somewhat more logic to iterate the its_node processing over
+> > > every mapping (or every alias in the PCI case), but avoid creating
+> > > duplicate entries.
 > > 
-> > Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> > ---
-> > 
-> >  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  99
-> >  ++++++++++++------------
-> >  drivers/gpu/drm/rockchip/rockchip_drm_vop.h |  60 ++++++++-------
-> >  drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 112
-> > 
-> > +++++++++++++++------------- 3 files changed, 144 insertions(+), 127
-> > deletions(-)
+> > You have a point and we have time to update the code. Short of reserving
+> > all ITS regions for every device that maps to one at least, we could (even
+> > pre-compute instead of looking it up on the fly) create a list of ITS
+> > identifiers a given IORT node may map to and use that to reserve the
+> > regions.
 > 
-> This breaks display support on both rk3036 and rk3288 and I end up
-> with a null pointer dereference in
+> I am trying to understand the use case scenario discussed here.
+> Apologies if it is a dumb query. 
 > 
-> [   10.640297] Unable to handle kernel NULL pointer dereference at virtual
-> address 00000000 [   10.654430] pgd = c0204000
-> [   10.657452] [00000000] *pgd=00000000
-> [   10.661473] Internal error: Oops: 5 [#1] SMP ARM
-> [   10.666635] Modules linked in: snd_pcm media snd_timer phy_rockchip_dp
-> snd soundcore rockchipdrm dw_hdmi analogix_dp rtc_rk808 pwm_rockchip
-> clk_rk808 spi_rockchip [   10.682897] CPU: 2 PID: 143 Comm: kworker/2:2 Not
-> tainted 4.13.0-rc2-01791-g2b86603d0515 #355 [   10.692430] Hardware name:
-> Rockchip (Device Tree)
-> [   10.697692] Workqueue: events deferred_probe_work_func
-> [   10.702152] Linux video capture interface: v2.00
-> [   10.708590] task: ee38c800 task.stack: ed2e6000
-> [   10.713656] PC is at vop_reg_set.constprop.4+0x4/0xa8 [rockchipdrm]
-> [   10.720668] LR is at vop_bind+0x568/0x8a0 [rockchipdrm]
-
-The obvious reason for that is
-
-> @@ -164,14 +153,20 @@ static inline uint32_t vop_read_reg(struct vop *vop,
-> uint32_t base, return (vop_readl(vop, base + reg->offset) >> reg->shift) &
-> reg->mask; }
+> My understanding is that, it is possible to have a PCI  RC iort node
+> mapped to multiple ITS group nodes.  That is perfectly fine and given
+> a dev input RID we can identify the ITS group the device points to
+> using - iort_node_map_id().
 > 
-> -static inline void vop_mask_write(struct vop *vop, uint32_t offset,
-> -				  uint32_t mask, uint32_t shift, uint32_t v,
-> -				  bool write_mask, bool relaxed)
-> +static void vop_reg_set(struct vop *vop, const struct vop_reg *reg,
-> +			uint32_t _offset, uint32_t _mask, uint32_t v,
-> +			const char *reg_name)
->  {
-> -	if (!mask)
-> +	int offset = reg->offset + _offset;
-> +	int mask = reg->mask & _mask;
-> +	int shift = reg->shift;
-> +
-> +	if (!reg || !reg->mask) {
-> +		dev_dbg(vop->dev, "Warning: not support %s\n", reg_name);
->  		return;
-> +	}
+> But the above discussion seems to suggest that there might be
+> situations where we have to go through all the mapped ITS groups and
+> identify all the ITSs associated with the RC.  Clearly I am missing
+> something.
 
-where the check for !reg happens after it got already dereferenced.
-But even with that fixed I end up with
+I reckon Robin was referring to this:
 
-on rk3288:
-[    7.254823] rockchip-vop ff930000.vop: Warning: not support global_regdone_en
-[    7.262847] rockchip-vop ff930000.vop: Warning: not support gate
-[    7.269580] rockchip-vop ff930000.vop: Warning: not support gate
-[    7.302765] rockchip-vop ff940000.vop: Warning: not support global_regdone_en
-[    7.310758] rockchip-vop ff940000.vop: Warning: not support gate
-[    7.317475] rockchip-vop ff940000.vop: Warning: not support gate
-[    7.425724] rockchip-vop ff930000.vop: Warning: not support edp_pin_pol
-[    7.526298] rockchip-vop ff940000.vop: Warning: not support hdmi_pin_pol
+https://patchwork.kernel.org/patch/9757911/
 
-on rk3036:
-[   12.389138] rockchip-vop 10118000.vop: Warning: not support global_regdone_en
-[   12.397324] rockchip-vop 10118000.vop: Warning: not support gate
-[   12.404165] rockchip-vop 10118000.vop: Warning: not support gate
-[   13.747361] rockchip-vop 10118000.vop: Warning: not support hdmi_pin_pol
-[   13.747371] rockchip-vop 10118000.vop: Warning: not support hdmi_en
-[   13.747379] rockchip-vop 10118000.vop: Warning: not support hpost_st_end
-[   13.747385] rockchip-vop 10118000.vop: Warning: not support vpost_st_end
-[   13.747461] rockchip-vop 10118000.vop: Warning: not support src_alpha_ctl
-[   13.767098] rockchip-vop 10118000.vop: Warning: not support src_alpha_ctl
-[   13.786060] rockchip-vop 10118000.vop: Warning: not support src_alpha_ctl
+Does this help ?
 
-While reqdone and friends are obviously features of newer vops, at least
-the hdmi pin-pol is available on both these socs.
-
-With this patch applied (and null-ptr fixed) I end up without hdmi output
-on both socs.
-
-
-Heiko
+Thanks,
+Lorenzo
