@@ -1,19 +1,101 @@
-From: heinz.wrobel@nxp.com (Heinz Wrobel)
-Date: Thu, 27 Jul 2017 14:38:48 +0000
-Subject: halting the kernel does not stop the CPU cores?
-Message-ID: <VI1PR04MB1662099750F9EAFA0324C6538CBE0@VI1PR04MB1662.eurprd04.prod.outlook.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 27 Jul 2017 16:43:46 +0200
+Subject: [PATCH v2 1/2] platform: Add Amlogic Meson AO CEC Controller
+ driver
+In-Reply-To: <6f93edd0-098e-6cbc-9eea-99dd68ab3420@xs4all.nl>
+References: <1499673696-21372-1-git-send-email-narmstrong@baylibre.com>
+ <1499673696-21372-2-git-send-email-narmstrong@baylibre.com>
+ <b5cb7021-4c9e-98b2-5fd1-11effda3fd30@xs4all.nl>
+ <f6e40d38-fe18-49e6-0ee1-a4467666777c@baylibre.com>
+ <6f93edd0-098e-6cbc-9eea-99dd68ab3420@xs4all.nl>
+Message-ID: <9acecab0-7dda-9aa1-fa07-886d40f6c7df@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 07/25/2017 03:45 PM, Hans Verkuil wrote:
+> On 07/25/17 14:34, Neil Armstrong wrote:
+>> Hi Hans,
+> 
+>>>> +static int meson_ao_cec_probe(struct platform_device *pdev)
+>>>> +{
+>>>> +	struct meson_ao_cec_device *ao_cec;
+>>>> +	struct platform_device *hdmi_dev;
+>>>> +	struct device_node *np;
+>>>> +	struct resource *res;
+>>>> +	int ret, irq;
+>>>> +
+>>>> +	np = of_parse_phandle(pdev->dev.of_node, "hdmi-phandle", 0);
+>>>> +	if (!np) {
+>>>> +		dev_err(&pdev->dev, "Failed to find hdmi node\n");
+>>>> +		return -ENODEV;
+>>>> +	}
+>>>> +
+>>>> +	hdmi_dev = of_find_device_by_node(np);
+>>>> +	if (hdmi_dev == NULL)
+>>>> +		return -EPROBE_DEFER;
+>>>> +
+>>>> +	ao_cec = devm_kzalloc(&pdev->dev, sizeof(*ao_cec), GFP_KERNEL);
+>>>> +	if (!ao_cec)
+>>>> +		return -ENOMEM;
+>>>> +
+>>>> +	spin_lock_init(&ao_cec->cec_reg_lock);
+>>>> +
+>>>> +	ao_cec->notify = cec_notifier_get(&hdmi_dev->dev);
+>>>> +	if (!ao_cec->notify)
+>>>> +		return -ENOMEM;
+>>>> +
+>>>> +	ao_cec->adap = cec_allocate_adapter(&meson_ao_cec_ops, ao_cec,
+>>>> +					    "meson_ao_cec",
+>>>> +					    CEC_CAP_LOG_ADDRS |
+>>>> +					    CEC_CAP_TRANSMIT |
+>>>> +					    CEC_CAP_RC |
+>>>> +					    CEC_CAP_PASSTHROUGH,
+>>>> +					    1); /* Use 1 for now */
+>>>
+>>> I recommend that you add support for 2 logical addresses. More isn't allowed
+>>> by the CEC 2.0 spec anyway (no such restriction for CEC 1.4, but more than
+>>> two really isn't needed).
+>>
+>> I know, but in the "communication" register with the suspend/poweroff firmware
+>> that  handles the wake up, only a single logical address is supported...
+>>
+>> What should I do in this case ? Which logical adress should I pass to the firmware when implementing ir ?
+> 
+> Ah, OK. Interesting.
+> 
+> From cec-adap.c:
+> 
+>                 if (log_addrs->num_log_addrs == 2) {
+>                         if (!(type_mask & ((1 << CEC_LOG_ADDR_TYPE_AUDIOSYSTEM) |
+>                                            (1 << CEC_LOG_ADDR_TYPE_TV)))) {
+>                                 dprintk(1, "two LAs is only allowed for audiosystem and TV\n");
+>                                 return -EINVAL;
+>                         }
+>                         if (!(type_mask & ((1 << CEC_LOG_ADDR_TYPE_PLAYBACK) |
+>                                            (1 << CEC_LOG_ADDR_TYPE_RECORD)))) {
+>                                 dprintk(1, "an audiosystem/TV can only be combined with record or playback\n");
+>                                 return -EINVAL;
+>                         }
+>                 }
+> 
+> So you would store the TV or AUDIOSYSTEM logical address in the firmware, since those
+> describe the system best.
+> 
+> I.e. it is a TV/Audiosystem with recording/playback capabilities.
+> 
+> The problem is that for CEC 1.4 no such restriction is imposed (the test above is
+> specific to CEC 2.0). But I think it makes sense to just check if TV/Audiosystem
+> is selected and pick that as the LA to store in the firmware, and otherwise just
+> pick the first LA (log_addr[0]).
 
-I noticed that when halting the kernel (intentionally or not), the cores effectively go into a while(1) loop and power consumption on larger devices really jumps up significantly to the point where, e.g., a ?crash? turns into ?crash and burn?.
 
-I would assume that if a system is halted, you don?t want to dissipate more power than on a running system but go as silent as low power as reasonable.
-
-Is there any specific reason why the cores would not go into a wfi loop like they do on idle?
-The patch to fix this seems to be easy at first glance, but is there a good reason *NOT* to do such a patch and to leave the plain while(1)?
+Ok I'll add support for dual LA, and I'll do this LA selection when I'll add firmware support.
 
 Thanks,
+Neil
 
-Heinz
+
+> Regards,
+> 
+> 	Hans
+> 
