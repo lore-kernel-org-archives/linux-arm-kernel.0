@@ -1,56 +1,55 @@
-From: rocky.hao@rock-chips.com (rocky.hao)
-Date: Thu, 27 Jul 2017 14:49:37 +0800
-Subject: [PATCH 1/5] dt-bindings: rockchip-thermal: Support the RK3328 SoC
- compatible
-In-Reply-To: <4621265.xPXIvBV6Fl@diego>
-References: <1500973788-14627-1-git-send-email-rocky.hao@rock-chips.com>
- <1500973788-14627-2-git-send-email-rocky.hao@rock-chips.com>
- <4621265.xPXIvBV6Fl@diego>
-Message-ID: <4c4a3974-e841-3d98-9850-131711c40c61@rock-chips.com>
+From: sugar.zhang@rock-chips.com (Sugar Zhang)
+Date: Thu, 27 Jul 2017 14:50:27 +0800
+Subject: [PATCH] ARM: dts: rockchip: add spdif for rk322x SoCs
+Message-ID: <1501138227-11796-1-git-send-email-sugar.zhang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-Thank you for the quick reply. I will remove the gerrit Change-Ids in my 
-v2 patches.
+This patch add the spdif dt node for rk322x SoCs.
 
-Thanks again,
-Rocky
+Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
+---
 
-? 2017/7/27 14:36, Heiko St?bner ??:
-> Hi Rocky,
-> 
-> Am Dienstag, 25. Juli 2017, 17:09:44 CEST schrieb Rocky Hao:
->> attempt to new compatible for thermal founding on RK3328 SoC.
->>
->> Change-Id: Ie6f6d7b4e545891a0035851a923c0412f584140c
->> Signed-off-by: Rocky Hao <rocky.hao@rock-chips.com>
-> 
-> generally looks good but you should not have gerrit Change-Ids in patches
-> for mainline. This is true for all patches in this series.
-> 
-> 
-> Heiko
-> 
->> ---
->>   Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
->> b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt index
->> 43003aec94bd..e3a6234fb1ac 100644
->> --- a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
->> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
->> @@ -4,6 +4,7 @@ Required properties:
->>   - compatible : should be "rockchip,<name>-tsadc"
->>      "rockchip,rk3228-tsadc": found on RK3228 SoCs
->>      "rockchip,rk3288-tsadc": found on RK3288 SoCs
->> +   "rockchip,rk3328-tsadc": found on RK3328 SoCs
->>      "rockchip,rk3368-tsadc": found on RK3368 SoCs
->>      "rockchip,rk3399-tsadc": found on RK3399 SoCs
->>   - reg : physical base address of the controller and length of memory mapped
-> 
-> 
-> 
-> 
-> 
+ arch/arm/boot/dts/rk322x.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
+index f3e4ffd..b3b80e1 100644
+--- a/arch/arm/boot/dts/rk322x.dtsi
++++ b/arch/arm/boot/dts/rk322x.dtsi
+@@ -196,6 +196,20 @@
+ 		status = "disabled";
+ 	};
+ 
++	spdif: spdif at 100d0000 {
++		compatible = "rockchip,rk3228-spdif";
++		reg = <0x100d0000 0x1000>;
++		interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru SCLK_SPDIF>, <&cru HCLK_SPDIF_8CH>;
++		clock-names = "mclk", "hclk";
++		dmas = <&pdma 10>;
++		#dma-cells = <1>;
++		dma-names = "tx";
++		pinctrl-names = "default";
++		pinctrl-0 = <&spdif_tx>;
++		status = "disabled";
++	};
++
+ 	i2s2: i2s2 at 100e0000 {
+ 		compatible = "rockchip,rk3228-i2s", "rockchip,rk3066-i2s";
+ 		reg = <0x100e0000 0x4000>;
+@@ -835,6 +849,12 @@
+ 			};
+ 		};
+ 
++		spdif {
++			spdif_tx: spdif-tx {
++				rockchip,pins = <3 31 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
+ 		tsadc {
+ 			otp_gpio: otp-gpio {
+ 				rockchip,pins = <0 24 RK_FUNC_GPIO &pcfg_pull_none>;
+-- 
+2.7.4
