@@ -1,63 +1,72 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 27 Jul 2017 09:54:01 -0700
-Subject: [PATCH v2 05/11] net: stmmac: dwmac-rk: Add internal phy support
-In-Reply-To: <20170727134834.GD18666@lunn.ch>
-References: <1501160156-30328-1-git-send-email-david.wu@rock-chips.com>
- <1501160540-30662-1-git-send-email-david.wu@rock-chips.com>
- <20170727134834.GD18666@lunn.ch>
-Message-ID: <65ae1747-4dff-b1d8-8aa3-684fc8c7809a@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 27 Jul 2017 18:03:55 +0100
+Subject: [PATCH] arm64: mmu: Place guard page after mapping of kernel image
+Message-ID: <1501175035-32460-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/27/2017 06:48 AM, Andrew Lunn wrote:
-> On Thu, Jul 27, 2017 at 09:02:16PM +0800, David Wu wrote:
->> To make internal phy work, need to configure the phy_clock,
->> phy cru_reset and related registers.
->>
->> Signed-off-by: David Wu <david.wu@rock-chips.com>
->> ---
->> changes in v2:
->>  - Use the standard "phy-mode" property for internal phy. (Florian)
-> 
-> I think we need to discuss this. This PHY appears to be on an MDIO
-> bus, it uses a standard PHY driver, and it appears to be using an RMII
-> interface. So it is just an ordinary PHY.
+The vast majority of virtual allocations in the vmalloc region are followed
+by a guard page, which can help to avoid overruning on vma into another,
+which may map a read-sensitive device.
 
-First, the fact that the internal PHY also appears through MDIO is
-orthogonal to the fact that it is internal or external. Plenty of
-designs have internal PHYs exposed through MDIO because that is
-convenient. What matters though is how the data/clock lines are wired
-internally, which is what "phy-mode" describes.
+This patch adds a guard page to the end of the kernel image mapping (i.e.
+following the data/bss segments).
 
-> 
-> Internal is supposed to be something which is not ordinary, does not
-> use one of the standard phy modes, needs something special to make it
-> work.
-> 
-> Florain, it appears to be your suggestion to use internal. What do you
-> say?
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/mm/mmu.c | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
 
-phy-mode = "internal" really means that it is not a standard MII variant
-to connect the data/clock lines between the Ethernet MAC and the PHY,
-and this can happen in some designs (although quite unlikely). So from
-there we could do several things depending on the requirements:
-
-- if you can have your Ethernet MAC driver perform the necessary
-configuration *after* you have been able to bind the PHY device with its
-PHY driver, then the PHY driver should have PHY_IS_INTERNAL in its
-flags, and you can use phy_is_internal() from PHYLIB to tell you that
-and we could imagine using: phy-mode = "rmii" because that would not too
-much of a stretch
-
-- if you need knowledge about this PHY connection type prior to binding
-the PHY device and its driver (that is, before of_phy_connect()) we
-could add a boolean property e.g: "phy-is-internal" that allows us to
-know that, or we can have a new phy-mode value, e.g: "internal-rmii"
-which describes that, either way would probably be fine, but the former
-scales better
-
-Then again, using phy-mode = "internal" even though this is Reduced MII
-is not big of a deal IMHO as long as there is no loss of information and
-that internal de-facto means internal reduced MII for instance.
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 23c2d89a362e..f1eb15e0e864 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -496,7 +496,7 @@ void mark_rodata_ro(void)
+ 
+ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+ 				      pgprot_t prot, struct vm_struct *vma,
+-				      int flags)
++				      int flags, unsigned long vm_flags)
+ {
+ 	phys_addr_t pa_start = __pa_symbol(va_start);
+ 	unsigned long size = va_end - va_start;
+@@ -507,10 +507,13 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+ 	__create_pgd_mapping(pgd, pa_start, (unsigned long)va_start, size, prot,
+ 			     early_pgtable_alloc, flags);
+ 
++	if (!(vm_flags & VM_NO_GUARD))
++		size += PAGE_SIZE;
++
+ 	vma->addr	= va_start;
+ 	vma->phys_addr	= pa_start;
+ 	vma->size	= size;
+-	vma->flags	= VM_MAP;
++	vma->flags	= VM_MAP | vm_flags;
+ 	vma->caller	= __builtin_return_address(0);
+ 
+ 	vm_area_add_early(vma);
+@@ -541,14 +544,15 @@ static void __init map_kernel(pgd_t *pgd)
+ 	 * Only rodata will be remapped with different permissions later on,
+ 	 * all other segments are allowed to use contiguous mappings.
+ 	 */
+-	map_kernel_segment(pgd, _text, _etext, text_prot, &vmlinux_text, 0);
++	map_kernel_segment(pgd, _text, _etext, text_prot, &vmlinux_text, 0,
++			   VM_NO_GUARD);
+ 	map_kernel_segment(pgd, __start_rodata, __inittext_begin, PAGE_KERNEL,
+-			   &vmlinux_rodata, NO_CONT_MAPPINGS);
++			   &vmlinux_rodata, NO_CONT_MAPPINGS, VM_NO_GUARD);
+ 	map_kernel_segment(pgd, __inittext_begin, __inittext_end, text_prot,
+-			   &vmlinux_inittext, 0);
++			   &vmlinux_inittext, 0, VM_NO_GUARD);
+ 	map_kernel_segment(pgd, __initdata_begin, __initdata_end, PAGE_KERNEL,
+-			   &vmlinux_initdata, 0);
+-	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data, 0);
++			   &vmlinux_initdata, 0, VM_NO_GUARD);
++	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data, 0, 0);
+ 
+ 	if (!pgd_val(*pgd_offset_raw(pgd, FIXADDR_START))) {
+ 		/*
 -- 
-Florian
+2.1.4
