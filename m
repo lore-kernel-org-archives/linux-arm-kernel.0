@@ -1,49 +1,32 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 27 Jul 2017 15:09:40 +0200
-Subject: [PATCH 2/2] clk: meson: gxbb: fix clk_mclk_i958 divider flags
-In-Reply-To: <20170727130940.18005-1-jbrunet@baylibre.com>
-References: <20170727130940.18005-1-jbrunet@baylibre.com>
-Message-ID: <20170727130940.18005-3-jbrunet@baylibre.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Thu, 27 Jul 2017 15:15:15 +0200
+Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
+ counters
+In-Reply-To: <20170727090856.GB15784@hc>
+References: <20170726154515.GA11453@hc> <20170726155548.GF28875@nazgul.tnic>
+ <20170726161949.GB15426@kroah.com>
+ <20170726163049.GG28875@nazgul.tnic>
+ <20170726173353.GB21705@kroah.com>
+ <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
+ <20170726200802.GA17722@kroah.com>
+ <b27cda60-8bf8-47a1-15b5-bf8b3a83fc45@gmail.com>
+ <20170727051157.GA4525@nazgul.tnic> <20170727090856.GB15784@hc>
+Message-ID: <20170727131515.GC28548@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CLK_DIVIDER_ROUND_CLOSEST was incorrectly put in the hw.init flags
-while it should have been in the divider flags
+On Thu, Jul 27, 2017 at 11:08:56AM +0200, Jan Glauber wrote:
+> OK. As fixing the firmware will take quite some time I'll go for the memory
+> controller driver that starts EDAC / PMU depending on their CONFIG_.
+> 
+> What would be the proper location for the multiplexer?
+> drivers/soc/cavium or drivers/misc?
 
-Fixes: 3c277c247eab ("clk: meson: gxbb: add cts_mclk_i958")
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- drivers/clk/meson/gxbb.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+Uff, no idea. Greg? You're the special drivers guy. :-)
 
-diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-index b1b72524153b..59a296b119ea 100644
---- a/drivers/clk/meson/gxbb.c
-+++ b/drivers/clk/meson/gxbb.c
-@@ -876,7 +876,7 @@ static struct clk_mux gxbb_cts_mclk_i958_sel = {
- 	/* Default parent unknown (register reset value: 0) */
- 	.table = (u32[]){ 1, 2, 3 },
- 	.lock = &clk_lock,
--		.hw.init = &(struct clk_init_data){
-+	.hw.init = &(struct clk_init_data) {
- 		.name = "cts_mclk_i958_sel",
- 		.ops = &clk_mux_ops,
- 		.parent_names = (const char *[]){ "mpll0", "mpll1", "mpll2" },
-@@ -890,12 +890,13 @@ static struct clk_divider gxbb_cts_mclk_i958_div = {
- 	.shift = 16,
- 	.width = 8,
- 	.lock = &clk_lock,
--	.hw.init = &(struct clk_init_data){
-+	.flags = CLK_DIVIDER_ROUND_CLOSEST,
-+	.hw.init = &(struct clk_init_data) {
- 		.name = "cts_mclk_i958_div",
- 		.ops = &clk_divider_ops,
- 		.parent_names = (const char *[]){ "cts_mclk_i958_sel" },
- 		.num_parents = 1,
--		.flags = CLK_SET_RATE_PARENT | CLK_DIVIDER_ROUND_CLOSEST,
-+		.flags = CLK_SET_RATE_PARENT,
- 	},
- };
- 
 -- 
-2.9.4
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
