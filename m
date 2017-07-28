@@ -1,31 +1,52 @@
-From: david.wu@rock-chips.com (David.Wu)
-Date: Fri, 28 Jul 2017 15:48:10 +0800
-Subject: [PATCH v2 01/11] net: phy: Add rockchip phy driver support
-In-Reply-To: <20170727133800.GC18666@lunn.ch>
-References: <1501160156-30328-1-git-send-email-david.wu@rock-chips.com>
- <1501160156-30328-2-git-send-email-david.wu@rock-chips.com>
- <20170727133800.GC18666@lunn.ch>
-Message-ID: <71a83db0-61e1-5852-30af-526d8a5d2c60@rock-chips.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Fri, 28 Jul 2017 13:26:59 +0530
+Subject: [PATCH v2 2/5] clk: Add clk_hw_get_clk() helper API to be used by
+ clk providers
+In-Reply-To: <20170727224713.GP2146@codeaurora.org>
+References: <1500526099-9935-1-git-send-email-rnayak@codeaurora.org>
+ <1500526099-9935-3-git-send-email-rnayak@codeaurora.org>
+ <20170727224713.GP2146@codeaurora.org>
+Message-ID: <733f03bf-c05b-7fb7-6052-d78f9f6eaf7f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
 
-? 2017/7/27 21:38, Andrew Lunn ??:
->> +	/*
->> +	 * If mode switch happens from 10BT to 100BT, all DSP/AFE
->> +	 * registers are set to default values. So any AFE/DSP
->> +	 * registers have to be re-initialized in this case.
->> +	 */
-> 
-> Hi David
-> 
-> Are they also lost on suspend and resume?
 
-Yes, i will add the re-initialized on suspend and resume?and thank you?
+On 07/28/2017 04:17 AM, Stephen Boyd wrote:
+> On 07/20, Rajendra Nayak wrote:
+>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>> index fc58c52..c9bbfb3 100644
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -186,6 +186,45 @@ const char *clk_hw_get_name(const struct clk_hw *hw)
+>>  }
+>>  EXPORT_SYMBOL_GPL(clk_hw_get_name);
+>>  
+>> +struct clk *clk_hw_get_clk(struct clk_hw *hw, const char *dev_id,
+>> +			   const char *con_id)
+>> +{
+>> +	return __clk_create_clk(hw, dev_id, con_id);
+>> +}
+>> +EXPORT_SYMBOL_GPL(clk_hw_get_clk);
+>> +
+>> +void clk_hw_put_clk(struct clk *clk)
+>> +{
+>> +	__clk_free_clk(clk);
+>> +}
+>> +EXPORT_SYMBOL_GPL(clk_hw_put_clk);
+> 
+> Isn't this just clk_put()? Not sure why we need this API.
+> 
+>> +
+>> +static void devm_clk_hw_put(struct device *dev, void *res)
+>> +{
+>> +	clk_hw_put_clk(*(struct clk **)res);
+>> +}
+> 
+> Same comment.
 
-> 
->      Andrew
-> 
-> 
-> 
+yes, I guess we don;t need these.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
