@@ -1,59 +1,37 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Fri, 28 Jul 2017 13:40:15 +0300
-Subject: [PATCH] i2c: use dev_get_drvdata() to get private data in
- suspend/resume hooks
-In-Reply-To: <1501172184-17102-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1501172184-17102-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1501238415.29303.279.camel@linux.intel.com>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Fri, 28 Jul 2017 18:55:40 +0800
+Subject: [PATCH v2 0/3] Add larbid init routine for mediatek's gen1 smi larb
+ driver
+Message-ID: <1501239343-9190-1-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-07-28 at 01:16 +0900, Masahiro Yamada wrote:
-> Several drivers call to_platform_device() to get platform_device
-> and pass it to platform_get_drvdata().??In platform_get_drvdata(),
-> the platform_device is converted back to struct device again.
-> 
-> Use dev_get_drvdata() to avoid platform_device/device dance.
-> 
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-I think it should be split on per driver basis.
+Mediatek's gen1 smi need the hardware larbid to identify the offset for
+the register which controls whether enable iommu for this larb.
+In the commit 3c8f4ad85c4b ("memory/mediatek: add support for mt2701"),
+the larbid was used without properly initialized. This patchset fixed
+that.
+This patchset was based on the v2 version of the patch:
+memory: mtk-smi: Use of_device_get_match_data helper[1],
+which was base on 4.13-rc1
 
-In any case,
+[1] https://patchwork.kernel.org/patch/9864719
 
-Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Change since v1:
+ - Using mtk_smi_larb_gen to identify whether larbid was needed instead of
+   checking hard code bindings.
 
-(for DesignWare only)
+Honghui Zhang (3):
+  memory: mtk-smi: add larbid handle routine
+  dt-bindings: mediatek: add descriptions for larbid
+  arm: dts: mediatek: add larbid property for larb
 
-> ?drivers/i2c/busses/i2c-designware-platdrv.c | 6 ++----
-
-> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c
-> b/drivers/i2c/busses/i2c-designware-platdrv.c
-> index 2ea6d0d25a01..abe1eca8d689 100644
-> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> @@ -428,8 +428,7 @@ static void dw_i2c_plat_complete(struct device
-> *dev)
-> ?#ifdef CONFIG_PM
-> ?static int dw_i2c_plat_suspend(struct device *dev)
-> ?{
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
-> +	struct dw_i2c_dev *i_dev = dev_get_drvdata(dev);
-> ?
-> ?	i_dev->disable(i_dev);
-> ?	i2c_dw_plat_prepare_clk(i_dev, false);
-> @@ -439,8 +438,7 @@ static int dw_i2c_plat_suspend(struct device *dev)
-> ?
-> ?static int dw_i2c_plat_resume(struct device *dev)
-> ?{
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
-> +	struct dw_i2c_dev *i_dev = dev_get_drvdata(dev);
-> ?
-> ?	i2c_dw_plat_prepare_clk(i_dev, true);
-> ?	i_dev->init(i_dev);
-> 
+ .../bindings/memory-controllers/mediatek,smi-larb.txt     | 15 +++++++++++++++
+ arch/arm/boot/dts/mt2701.dtsi                             |  3 +++
+ drivers/memory/mtk-smi.c                                  | 12 ++++++++++++
+ 3 files changed, 30 insertions(+)
 
 -- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+2.6.4
