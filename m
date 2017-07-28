@@ -1,53 +1,138 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 28 Jul 2017 11:27:38 -0400 (EDT)
-Subject: [PATCH] [RFC] ARM: move __bug_table into .data for XIP_KERNEL
-In-Reply-To: <20170728141108.1283320-1-arnd@arndb.de>
-References: <20170728141108.1283320-1-arnd@arndb.de>
-Message-ID: <alpine.LFD.2.20.1707281119450.5981@knanqh.ubzr>
+From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
+Date: Fri, 28 Jul 2017 15:48:48 +0000
+Subject: [PATCH v4 1/2] acpi:iort: Add an IORT helper function to
+ reserve HW ITS address regions for IOMMU drivers
+In-Reply-To: <20170728095755.GA10987@red-moon>
+References: <20170725111732.41792-1-shameerali.kolothum.thodi@huawei.com>
+ <20170725111732.41792-2-shameerali.kolothum.thodi@huawei.com>
+ <20170725171100.GA1663@red-moon>
+ <b7512f89-4fe7-940e-0fa9-9274d8b1e935@arm.com>
+ <20170726095208.GA2468@red-moon>
+ <5FC3163CFD30C246ABAA99954A238FA8383C0268@FRAEML521-MBX.china.huawei.com>
+ <989fec76-45e7-d744-3411-78ec2764cb7d@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA8383C04A2@FRAEML521-MBX.china.huawei.com>
+ <20170728095755.GA10987@red-moon>
+Message-ID: <5FC3163CFD30C246ABAA99954A238FA8383C0FA5@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Jul 2017, Arnd Bergmann wrote:
 
-> Matt Hart reports that vf610m4_defconfig kernels grew to 2GB
-> xipImage size after the __bug_table change.
+
+> -----Original Message-----
+> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
+> Sent: Friday, July 28, 2017 10:58 AM
+> To: Shameerali Kolothum Thodi
+> Cc: Robin Murphy; Guohanjun (Hanjun Guo); Gabriele Paoloni;
+> marc.zyngier at arm.com; John Garry; will.deacon at arm.com; Linuxarm; linux-
+> acpi at vger.kernel.org; iommu at lists.linux-foundation.org;
+> hanjun.guo at linaro.org; Wangzhou (B); sudeep.holla at arm.com; linux-arm-
+> kernel at lists.infradead.org; devel at acpica.org
+> Subject: Re: [PATCH v4 1/2] acpi:iort: Add an IORT helper function to reserve
+> HW ITS address regions for IOMMU drivers
 > 
-> I tried out a few things and found that moving the bug table
-> into the .data section avoids this problem. However, the
-> linker script magic is beyond my capabilities here, so this
-> is almost certainly not correct.
+> On Thu, Jul 27, 2017 at 01:26:14PM +0000, Shameerali Kolothum Thodi wrote:
+> >
+> >
+> > > -----Original Message-----
+> > > From: Robin Murphy [mailto:robin.murphy at arm.com]
+> > > Sent: Thursday, July 27, 2017 12:13 PM
+> > > To: Shameerali Kolothum Thodi; Lorenzo Pieralisi
+> > > Cc: Guohanjun (Hanjun Guo); Gabriele Paoloni; marc.zyngier at arm.com;
+> > > John Garry; will.deacon at arm.com; Linuxarm;
+> > > linux-acpi at vger.kernel.org; iommu at lists.linux-foundation.org;
+> > > hanjun.guo at linaro.org; Wangzhou (B); sudeep.holla at arm.com;
+> > > linux-arm-kernel at lists.infradead.org;
+> > > devel at acpica.org
+> > > Subject: Re: [PATCH v4 1/2] acpi:iort: Add an IORT helper function
+> > > to reserve HW ITS address regions for IOMMU drivers
+> > >
+> > [...]
+> >
+> > > >>>> I can make these changes but I suspect this series will go via
+> > > >>>> IOMMU tree, let me know how you want to handle it.
+> > > >>>>
+> > > >>>> Lorenzo
+> > > >>>>
+> > > >>>>> +	node = iort_find_dev_node(dev);
+> > > >>>>> +	if (!node)
+> > > >>>>> +		return -ENODEV;
+> > > >>>>> +
+> > > >>>
+> > > >>> I'd suggest we also want a comment here to clarify that we're
+> > > >>> currently assuming straightforward topologies where all mappings
+> > > >>> for a given root complex/named component target the same ITS
+> > > >>> group. Otherwise
+> > > we're
+> > > >> going
+> > > >>> to need somewhat more logic to iterate the its_node processing
+> > > >>> over every mapping (or every alias in the PCI case), but avoid
+> > > >>> creating duplicate entries.
+> > > >>
+> > > >> You have a point and we have time to update the code. Short of
+> > > >> reserving all ITS regions for every device that maps to one at
+> > > >> least, we could (even pre-compute instead of looking it up on the
+> > > >> fly) create a list of ITS identifiers a given IORT node may map
+> > > >> to and use that to reserve the regions.
+> > > >
+> > > > I am trying to understand the use case scenario discussed here.
+> > > > Apologies if it is a dumb query.
+> > > >
+> > > > My understanding is that, it is possible to have a PCI  RC iort
+> > > > node mapped
+> > > to
+> > > > multiple ITS group nodes.  That is perfectly fine and given a dev
+> > > > input RID
+> > > we
+> > > > can identify the ITS group the device points to using -
+> iort_node_map_id().
+> > > >
+> > > > But the above discussion seems to suggest that there might be
+> > > > situations
+> > > where
+> > > > we have to go through all the mapped ITS groups and identify all
+> > > > the ITSs
+> > > associated
+> > > > with the RC.  Clearly I am missing something.
+> > >
+> > > I was mostly thinking of a situation like this:
+> > >
+> > > +----Node 0-----+  +----Node 1-----+
+> > > |  [CPU 0..n]   |  |  [CPU n+1..]  |
+> > > | [ITS group 0] |  | [ITS group 1] |
+> > > +---------------+  +---------------+
+> > >         ^                  ^
+> > >          \_______  _______/
+> > >                  \/
+> > >             +--Node 2--+
+> > >             |  [SMMU]  |
+> > >             |     ^    |
+> > >             |     |    |
+> > >             | [Device] |
+> > >             +----------+
+> > >
+> > > where the (named component) device has IDs for both ITS groups (to
+> > > help optimise affining, or allow physically hotplugging CPU nodes,
+> > > or whatever - I'm hypothesising here ;)).  A generic IORT function
+> > > isn't in a position to decide *which* ITS region the device may be
+> > > targeting at any given time, so can only correctly describe both.
+> >
+> > Thanks Robin. That makes it clear.
+> >
+> > > I'm perfectly happy not to even try to support such crazy
+> > > configurations until they actually exist, if ever; I'd just prefer
+> > > to document whatever assumptions we do make, so that we don't have
+> > > to remember or re-derive them when looking at the code in future.
+> >
+> > So I think the conclusion here is we will document the assumption that
+> > we are only taking care of the straightforward topologies for now.
+> >
+> > Hi Lorenzo,
+> > If you are ok with the above, please let me know if it make sense to
+> > send out a v5 with this and your other comments or you can take care
+> > of them. I am fine either way.
+> 
+> I added below what should be the final patch - please have a look test and
+> post it as part of v5 that should hopefully be final.
 
-Well, before your patch the BUG_TABLE location as well as its runtime 
-functionality were completely wrong and broken.
-
-> I've added a few people to Cc that understand this better
-> than I do, hopefully someone can turn my bogus patch into
-> a proper one.
-
-Your patch isn't as bad as you make it, but maybe the following will 
-avoid open recoding BUG_TABLE locally:
-
-diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
-index 8265b11621..21b4b29c2f 100644
---- a/arch/arm/kernel/vmlinux-xip.lds.S
-+++ b/arch/arm/kernel/vmlinux-xip.lds.S
-@@ -237,13 +237,13 @@ SECTIONS
- 		 */
- 		DATA_DATA
- 		CONSTRUCTORS
--
--		_edata = .;
- 	}
--	_edata_loc = __data_loc + SIZEOF(.data);
- 
- 	BUG_TABLE
- 
-+	_edata = .;
-+	_edata_loc = __data_loc + SIZEOF(.data);
-+
- #ifdef CONFIG_HAVE_TCM
-         /*
- 	 * We align everything to a page boundary so we can
-
-
-Nicolas
+Thanks Lorenzo. Will do that.
+Shameer
