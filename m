@@ -1,82 +1,136 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 28 Jul 2017 17:51:29 +0200
-Subject: [PATCH 0/7] ARM: NOMMU: MPU updates
-In-Reply-To: <1497344707-14446-1-git-send-email-vladimir.murzin@arm.com>
-References: <1497344707-14446-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <4f7f6318-dd3f-978c-5138-e9d16379e1c1@st.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 28 Jul 2017 16:55:36 +0100
+Subject: [PATCH 0/4] ACPI: DMA ranges management
+In-Reply-To: <20170728140956.GA21569@red-moon>
+References: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
+ <7df11172-5a40-685f-5202-9a0bceb6e19b@codeaurora.org>
+ <c09352cc-e1a2-a494-c457-dc3ea275f504@arm.com>
+ <20170726153519.GA4696@red-moon>
+ <eb81a7c6-b62b-8e02-8f22-a7fda7e403ce@arm.com>
+ <20170728140956.GA21569@red-moon>
+Message-ID: <c6edb652-d13c-e21f-1cef-01ced2b08c05@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vlad,
-
-On 06/13/2017 11:05 AM, Vladimir Murzin wrote:
-> Hi,
+On 28/07/17 15:09, Lorenzo Pieralisi wrote:
+> On Fri, Jul 28, 2017 at 02:08:01PM +0100, Robin Murphy wrote:
 > 
-> This is an update of the existent MPU code which consist set of
-> clean-ups and enhancements. The most significant changes are in the way
-> how MPU settings sync-up for secondaries (PATCH 3/7) and more flexible
-> layout for memory (PATCH 7/7). Since there is no in-tree user of MPU,
-> support for M-class has been added (PATCH 6/7).
+> [...]
 > 
-> Thanks!
+>>>>> To ensure that dma_set_mask() and friends actually respect _DMA, would
+>>>>> you consider introducing a dma_supported() callback to check the input
+>>>>> dma_mask against the FW defined limits? This would end up aggressively
+>>>>> clipping the dma_mask to 32-bits for devices like the above if the _DMA
+>>>>> limit was less than 64-bits, but that is probably preferable to the
+>>>>> controller accessing unintended addresses.
+>>>>>
+>>>>> Also, how would you feel about adding support for the IORT named_node
+>>>>> memory_address_limit field?
+>>>>
+>>>> We will certainly need that for some platform devices, so if you fancy
+>>>> giving it a go before Lorenzo or I get there, feel free!
+>>>
+>>> I can do it for v2 but I would like to understand why using _DMA is
+>>> not good enough for named components - having two bindings describing
+>>> the same thing is not ideal and I'd rather avoid it - if there is
+>>> a reason I am happy to add the necessary code.
+>>
+>> My interpretation of "_DMA is only defined under devices that represent
+>> buses." (ACPI 6.0, section 6.2.4) is that "devices that represent buses"
+>> are those that have other device objects as children.
 > 
-> Changelog:
+> Well if that was the case we would not be able to use _DMA for
+> eg PNP0A03 PCI host bridges that have no child ACPI devices, which
+> defeats the whole purpose of what I am doing.
 > 
->          RFC v2 -> v1
->                 - dropped RFC tag
-> 	       - Tested-by from Andr?s
-> 	       - rebased on 4.12-rc5
+> The question here is what the _DMA object binding exactly means when
+> it refers to a "bus" and that's something I will figure out (and possibly
+> change) ASAP.
 > 
->             RFC -> RFC v2
-> 	       - fixed MPU enable for v7m (PATCH 6/7)
+>> In other words (excuse my novice pseudo-ASL), this would be valid:
+>>
+>> Scope(_SB)
+>> {
+>> 	Device (Bus)
+>> 	{
+>> 		...
+>> 		Method (_DMA ... )
+>> 		Device (Dev1)
+>> 		{
+>> 			...
+>> 		}
+>> 	}
+>> }
+>>
+>> but this should be invalid:
+>>
+>> Scope(_SB)
+>> {
+>> 	Device (Dev2)
+>> 	{
+>> 		...
+>> 		Method (_DMA ... )
+>> 	}
+>> }
 > 
-> Vladimir Murzin (7):
->    ARM: NOMMU: Move out MPU setup in separate module
->    ARM: NOMMU: Update MPU accessors to use cp15 helpers
->    ARM: NOMMU: Rework MPU to be mostly done in C
->    ARM: NOMMU: Disallow MPU for XIP
->    ARM: Kconfig: Kill CONFIG_VECTORS_BASE
->    ARM: V7M: Add support for MPU to M-class
->    ARM: NOMMU: Use more MPU regions to cover memory
+> Not sure about that (see above) and I agree that's what needs
+> clarification.
 > 
->   arch/arm/Kconfig               |   9 -
->   arch/arm/Kconfig-nommu         |   4 +-
->   arch/arm/include/asm/cputype.h |  10 +
->   arch/arm/include/asm/mpu.h     |  23 ++-
->   arch/arm/include/asm/smp.h     |   2 +-
->   arch/arm/include/asm/v7m.h     |  10 +
->   arch/arm/kernel/asm-offsets.c  |  11 +
->   arch/arm/kernel/head-nommu.S   | 128 +++++++++---
->   arch/arm/kernel/smp.c          |   2 +-
->   arch/arm/mm/Makefile           |   1 +
->   arch/arm/mm/nommu.c            | 254 +----------------------
->   arch/arm/mm/pmsa-v7.c          | 445 +++++++++++++++++++++++++++++++++++++++++
->   12 files changed, 598 insertions(+), 301 deletions(-)
->   create mode 100644 arch/arm/mm/pmsa-v7.c
+>> Thus in the case where Dev2 is wired directly to an SMMU input, but
+>> fewer address bits are wired up between the two than both the device and
+>> SMMU interfaces are capable of, memory address limit is enough to
+>> describe that without having to insert a fake "bus" object above it just
+>> to hold the _DMA method.
 > 
+> BTW, how would you describe that in DT ? A "dma-ranges" property in the
+> device DT node right ? Arguably "dma-ranges" was not meant to be used
+> like that either ;-)
 
-I tested two cases on stm32h743 (based on cortes-M7):
+I believe that in real Open Firmware, the full PCI hierarchy is
+described in the device tree - I had assumed that ACPI expected the
+equivalent (i.e. the firmware probes PCI and assigns resources, so
+bridges/endpoints/etc. would be represented in the namespace with
+appropriate _CRS), thus the "bus with invisible children" case would
+only need to apply to DT. In terms of DTspec, it does not say that
+"dma-ranges" cannot be present on nodes without children, but that *is*
+implied of #address-cells and #size cells, so there does exist a similar
+ambiguity about what exactly counts as "a memory-mapped bus whose
+devicetree parent can be accessed from DMA operations originating from
+the bus". Certainly in the current Linux code, of_dma_configure()
+*doesn't* parse "dma-ranges" on leaf nodes (which is an open problem for
+some PCI host bridges in extant FDTs).
 
-  - NO XIP: it works fine.
-  - XIP: it is ko Kernel doesn't boot.
+As for the case of straightforward interconnect widths/offsets (rather
+than potentially arbitrary windows), the 'fake bus' notion is already
+alive and well:
 
-I started investigations but no big success.
-I have a question:
-In arch/arm/kernel/head-nommu.S, I see that background region is set 
-after the XIP region. It seems due to save CPU register value. But doing 
-that you remove the XIP region just created. No ?
+$ git grep 'soc {' arch/arm*/boot/dts
 
-Other point, why (in arch/arm/kernel/head-nommu.S) we couldn't create:
+and the current "dma-ranges" users thankfully have consistent-enough
+topologies that they don't need to get much crazier than that.
 
-1-backup region strongly-ordered
-2-create SDRAM region (normal one)
-3-create XIP region
+(side note: up at the other end, I'm not entirely convinced that what I
+did for Juno is actually legal either)
 
-By debugging I saw that issue was due to the backup region. If I remove, 
-backup region settings done by Kernel, and I put the sequence above in 
-my bootloader, it works fine in XIP.
+> Long and short of it is: I do not like having two ways of describing
+> the same thing. I agree that the _DMA object usage requires
+> clarifications from a spec point of view but I want to do that before
+> plugging in code that may use bindings inconsistently.
 
-Sorry to not have more precise analysis.
+I'd still argue that they are describing different things, just that one
+(the number of address bits wired up between a device and an SMMU)
+happens to be possible to describe as a subset of the other (an
+arbitrary mapping between two address spaces). The use-cases don't
+entirely overlap either - the information in _DMA is also likely to be
+wanted by non-ECAM PCI host controller drivers to configure their
+inbound windows, irrespective of anything to do with IOMMUs, whereas
+IORT code in hypervisors or other situations without a full ACPI
+namespace available may need to make decisions that the device memory
+address size limit is necessary for (well, that's the argument I've
+heard anyway).
+> I will flag this up at ACPI spec level as soon as possible and get this
+> sorted.
 
-Regards
-Alex
+Agreed.
+
+Robin.
