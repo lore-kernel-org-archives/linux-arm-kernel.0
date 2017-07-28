@@ -1,154 +1,153 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 28 Jul 2017 15:10:16 +0100
-Subject: [PATCH v2 13/16] arm64: cpufeature: Enable Implicit ESB on
- entry/return-from EL1
+Date: Fri, 28 Jul 2017 15:10:11 +0100
+Subject: [PATCH v2 08/16] arm64: entry.S: move SError handling into a C
+ function for future expansion
 In-Reply-To: <20170728141019.9084-1-james.morse@arm.com>
 References: <20170728141019.9084-1-james.morse@arm.com>
-Message-ID: <20170728141019.9084-14-james.morse@arm.com>
+Message-ID: <20170728141019.9084-9-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM v8.2 adds a feature to add implicit error synchronization barriers
-whenever the CPU enters or returns from EL1. Add code to detect this
-feature and enable the SCTLR_EL1.IESB bit.
+From: Xie XiuQi <xiexiuqi@huawei.com>
 
-The explicit ESBs on entry/return-from EL1 are replaced with nops
-by this feature.
+Today SError is taken using the inv_entry macro that ends up in
+bad_mode.
 
-Platform level RAS support may require additional firmware support.
+SError can be used by the RAS Extensions to notify either the OS or
+firmware of CPU problems, some of which may have been corrected.
 
+To allow this handling to be added, add a do_serror() C function
+that just panic()s. Add the entry.S boiler plate to save/restore the
+CPU registers. Future patches may change do_serror() to return if the
+SError Interrupt was notification of a corrected error.
+
+Use nmi_panic() so that an SError taken during a regular panic()
+continues to process the first panic().
+
+Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
+Signed-off-by: Wang Xiongfeng <wangxiongfengi2@huawei.com>
+[Split out of a bigger patch, added compat path, renamed, enabled debug
+ exceptions]
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/Kconfig                 | 15 +++++++++++++++
- arch/arm64/include/asm/cpucaps.h   |  3 ++-
- arch/arm64/include/asm/processor.h |  1 +
- arch/arm64/include/asm/sysreg.h    |  1 +
- arch/arm64/kernel/cpufeature.c     | 21 +++++++++++++++++++++
- arch/arm64/kernel/entry.S          |  4 ++++
- 6 files changed, 44 insertions(+), 1 deletion(-)
+ arch/arm64/Kconfig        |  2 +-
+ arch/arm64/kernel/entry.S | 34 +++++++++++++++++++++++++++-------
+ arch/arm64/kernel/traps.c | 15 +++++++++++++++
+ 3 files changed, 43 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 6e417e25672f..f6367cc2e180 100644
+index dfd908630631..d3913cffa3ac 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -976,6 +976,21 @@ config ARM64_RAS_EXTN
- 	  and access the new registers if the system supports the extension.
- 	  Platform RAS features may additionally depend on firmware support.
- 
-+config ARM64_IESB
-+	bool "Enable Implicit Error Synchronization Barrier (IESB)"
-+	default y
-+	depends on ARM64_RAS_EXTN
-+	help
-+	  ARM v8.2 adds a feature to add implicit error synchronization
-+	  barriers whenever the CPU enters or exits a particular exception
-+	  level.
-+
-+	  On CPUs with this feature and the 'RAS Extensions' feature, we can
-+	  use this to contain detected (but not yet reported) errors to the
-+	  relevant exception level.
-+
-+	  The feature is detected at runtime, selecting this option will
-+	  enable these implicit barriers if the CPU supports the feature.
- endmenu
- 
- config ARM64_MODULE_CMODEL_LARGE
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index f93bf77f1f74..716545c96714 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -40,7 +40,8 @@
- #define ARM64_WORKAROUND_858921			19
- #define ARM64_WORKAROUND_CAVIUM_30115		20
- #define ARM64_HAS_RAS_EXTN			21
-+#define ARM64_HAS_IESB				22
- 
--#define ARM64_NCAPS				22
-+#define ARM64_NCAPS				23
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 82e8ff01153d..fe353f5a4a7b 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -194,5 +194,6 @@ static inline void spin_lock_prefetch(const void *ptr)
- int cpu_enable_pan(void *__unused);
- int cpu_enable_cache_maint_trap(void *__unused);
- int cpu_clear_disr(void *__unused);
-+int cpu_enable_iesb(void *__unused);
- 
- #endif /* __ASM_PROCESSOR_H */
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 18cabd92af22..e817e802f0b9 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -314,6 +314,7 @@
- /* SCTLR_EL1 specific flags. */
- #define SCTLR_EL1_UCI		(1 << 26)
- #define SCTLR_EL1_SPAN		(1 << 23)
-+#define SCTLR_EL1_IESB		(1 << 21)
- #define SCTLR_EL1_UCT		(1 << 15)
- #define SCTLR_EL1_SED		(1 << 8)
- #define SCTLR_EL1_CP15BEN	(1 << 5)
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 6dbefe401dc4..12cb1b7ef46b 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -901,6 +901,19 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.min_field_value = ID_AA64PFR0_RAS_V1,
- 		.enable = cpu_clear_disr,
- 	},
-+#ifdef CONFIG_ARM64_IESB
-+	{
-+		.desc = "Implicit Error Synchronization Barrier",
-+		.capability = ARM64_HAS_IESB,
-+		.def_scope = SCOPE_SYSTEM,
-+		.matches = has_cpuid_feature,
-+		.sys_reg = SYS_ID_AA64MMFR2_EL1,
-+		.sign = FTR_UNSIGNED,
-+		.field_pos = ID_AA64MMFR2_IESB_SHIFT,
-+		.min_field_value = 1,
-+		.enable = cpu_enable_iesb,
-+	},
-+#endif /* CONFIG_ARM64_IESB */
- #endif /* CONFIG_ARM64_RAS_EXTN */
- 	{},
- };
-@@ -1317,3 +1330,11 @@ int cpu_clear_disr(void *__unused)
- 
- 	return 0;
- }
-+
-+int cpu_enable_iesb(void *__unused)
-+{
-+	if (cpus_have_cap(ARM64_HAS_RAS_EXTN))
-+		config_sctlr_el1(0, SCTLR_EL1_IESB);
-+
-+	return 0;
-+}
+@@ -97,7 +97,7 @@ config ARM64
+ 	select HAVE_IRQ_TIME_ACCOUNTING
+ 	select HAVE_MEMBLOCK
+ 	select HAVE_MEMBLOCK_NODE_MAP if NUMA
+-	select HAVE_NMI if ACPI_APEI_SEA
++	select HAVE_NMI
+ 	select HAVE_PATA_PLATFORM
+ 	select HAVE_PERF_EVENTS
+ 	select HAVE_PERF_REGS
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 173b86fac066..0e9b056385c2 100644
+index 2fde60f96239..9e63f69e1366 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -160,7 +160,9 @@ alternative_else_nop_endif
- 	msr	sp_el0, tsk
- 	.endif
+@@ -329,18 +329,18 @@ ENTRY(vectors)
+ 	ventry	el1_sync			// Synchronous EL1h
+ 	ventry	el1_irq				// IRQ EL1h
+ 	ventry	el1_fiq_invalid			// FIQ EL1h
+-	ventry	el1_error_invalid		// Error EL1h
++	ventry	el1_serror			// Error EL1h
  
-+	alternative_if_not ARM64_HAS_IESB
- 	esb
-+	alternative_else_nop_endif
- 	disr_read reg=x15
+ 	ventry	el0_sync			// Synchronous 64-bit EL0
+ 	ventry	el0_irq				// IRQ 64-bit EL0
+ 	ventry	el0_fiq_invalid			// FIQ 64-bit EL0
+-	ventry	el0_error_invalid		// Error 64-bit EL0
++	ventry	el0_serror			// Error 64-bit EL0
  
- 	/*
-@@ -442,7 +444,9 @@ ENDPROC(el1_error_invalid)
- ENTRY(do_kernel_exit)
- __do_kernel_exit_start:
- 	enable_serror
-+	alternative_if_not ARM64_HAS_IESB
- 	esb
-+	alternative_else_nop_endif
+ #ifdef CONFIG_COMPAT
+ 	ventry	el0_sync_compat			// Synchronous 32-bit EL0
+ 	ventry	el0_irq_compat			// IRQ 32-bit EL0
+ 	ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
+-	ventry	el0_error_invalid_compat	// Error 32-bit EL0
++	ventry	el0_serror_compat		// Error 32-bit EL0
+ #else
+ 	ventry	el0_sync_invalid		// Synchronous 32-bit EL0
+ 	ventry	el0_irq_invalid			// IRQ 32-bit EL0
+@@ -380,10 +380,6 @@ ENDPROC(el0_error_invalid)
+ el0_fiq_invalid_compat:
+ 	inv_entry 0, BAD_FIQ, 32
+ ENDPROC(el0_fiq_invalid_compat)
+-
+-el0_error_invalid_compat:
+-	inv_entry 0, BAD_ERROR, 32
+-ENDPROC(el0_error_invalid_compat)
+ #endif
  
- 	eret
- __do_kernel_exit_end:
+ el1_sync_invalid:
+@@ -593,6 +589,10 @@ el0_svc_compat:
+ el0_irq_compat:
+ 	kernel_entry 0, 32
+ 	b	el0_irq_naked
++
++el0_serror_compat:
++	kernel_entry 0, 32
++	b	el0_serror_naked
+ #endif
+ 
+ el0_da:
+@@ -691,6 +691,26 @@ el0_irq_naked:
+ 	b	ret_to_user
+ ENDPROC(el0_irq)
+ 
++el1_serror:
++	kernel_entry 1
++	mrs	x1, esr_el1
++	mov	x0, sp
++	bl	do_serror
++	kernel_exit 1
++ENDPROC(el1_serror)
++
++el0_serror:
++	kernel_entry 0
++el0_serror_naked:
++	mrs	x1, esr_el1
++	mov	x0, sp
++	bl	do_serror
++	enable_daif
++	ct_user_exit
++	b	ret_to_user
++ENDPROC(el0_serror)
++
++
+ /*
+  * Register switch for AArch64. The callee-saved registers need to be saved
+  * and restored. On entry:
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 59efec10be15..943a0e242dbc 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -685,6 +685,21 @@ asmlinkage void bad_el0_sync(struct pt_regs *regs, int reason, unsigned int esr)
+ 	force_sig_info(info.si_signo, &info, current);
+ }
+ 
++asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
++{
++	nmi_enter();
++
++	console_verbose();
++
++	pr_crit("SError Interrupt on CPU%d, code 0x%08x -- %s\n",
++		smp_processor_id(), esr, esr_get_class_string(esr));
++	__show_regs(regs);
++
++	nmi_panic(regs, "Asynchronous SError Interrupt");
++
++	nmi_exit();
++}
++
+ void __pte_error(const char *file, int line, unsigned long val)
+ {
+ 	pr_err("%s:%d: bad pte %016lx.\n", file, line, val);
 -- 
 2.13.2
