@@ -1,37 +1,81 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 28 Jul 2017 14:48:36 +0200
-Subject: [PATCH v6 5/7] drm/rockchip: vop: add a series of vop support
-In-Reply-To: <1501049971-6131-1-git-send-email-mark.yao@rock-chips.com>
-References: <1501049930-5794-1-git-send-email-mark.yao@rock-chips.com>
- <1501049971-6131-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <3368237.z7l18g54BE@phil>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 28 Jul 2017 14:50:57 +0200
+Subject: [PATCH v3 0/2] media: Add Amlogic Meson AO CEC Controller support
+In-Reply-To: <36cab0eb-0986-58d6-9cec-9bf4ab099495@xs4all.nl>
+References: <1501168830-5308-1-git-send-email-narmstrong@baylibre.com>
+ <d9aecd99-47d7-6a72-8d07-d64e185ea60e@xs4all.nl>
+ <36cab0eb-0986-58d6-9cec-9bf4ab099495@xs4all.nl>
+Message-ID: <c1a9518c-88e7-cc20-e64a-d8056fad448f@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 26. Juli 2017, 14:19:30 CEST schrieb Mark Yao:
-> Vop Full framework now has following vops:
-> IP version    chipname
->   3.1           rk3288
->   3.2           rk3368
->   3.4           rk3366
->   3.5           rk3399 big
->   3.6           rk3399 lit
->   3.7           rk3228
->   3.8           rk3328
+On 07/28/2017 02:37 PM, Hans Verkuil wrote:
+> On 07/28/2017 02:35 PM, Hans Verkuil wrote:
+>> Hi Neil,
+>>
+>> On 07/27/2017 05:20 PM, Neil Armstrong wrote:
+>>> The Amlogic SoC embeds a standalone CEC controller, this patch adds a driver
+>>> for such controller.
+>>> The controller does not need HPD to be active, and could support up to max
+>>> 5 logical addresses, but only 1 is handled since the Suspend firmware can
+>>> make use of this unique logical address to wake up the device.
+>>>
+>>> The Suspend firmware configuration will be added in an other patchset.
+>>
+>> Note that to get the right module dependencies you will also need to add
+>> this line:
+>>
+>> 	select CEC_CORE if CEC_NOTIFIER
+>>
+>> to DRM_MESON_DW_HDMI in drivers/gpu/drm/meson/Kconfig.
+>>
+>> This ensures that if DRM_MESON_DW_HDMI is 'y' but VIDEO_MESON_AO_CEC is 'm'
+>> the CEC_CORE config is set to 'y'.
+>>
+>> Obviously this is a patch for dri-devel.
 > 
-> The above IP version is from H/W define, some of vop support get
-> the IP version from VERSION_INFO register, some are not.
-> hardcode the IP version for each vop to identify them.
+> I was too quick sending this: I expect this line to appear in DRM_DW_HDMI,
+> not DRM_MESON_DW_HDMI. Sorry about the noise.
+
+Indeed, I will respin russell's notifier patch with this.
+
+Thanks,
+Neil
+
 > 
-> major version: used for IP structure, Vop full framework is 3,
->                vop little framework is 2.
-> minor version: on same structure, newer design vop will bigger
->                then old one.
+> 	Hans
 > 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-
-on rk3036 and rk3288
-Tested-by: Heiko Stuebner <heiko@sntech.de>
-
-
-Heiko
+>>
+>> Regards,
+>>
+>> 	Hans
+>>
+>>>
+>>> Changes since v2 at [2] :
+>>>  - change meson_ao_cec_read/write prototype to simplify error handling
+>>>
+>>> Changes since v1 at [1] :
+>>>  - add timeout to wait busy, with error return
+>>>  - handle busy error in all read/write operations
+>>>  - add CEC_CAP_PASSTHROUGH
+>>>  - add bindings ack
+>>>
+>>> [1] https://lkml.kernel.org/r/1499336870-24118-1-git-send-email-narmstrong at baylibre.com
+>>> [2] https://lkml.kernel.org/r/1499673696-21372-1-git-send-email-narmstrong at baylibre.com
+>>>
+>>> Neil Armstrong (2):
+>>>   platform: Add Amlogic Meson AO CEC Controller driver
+>>>   dt-bindings: media: Add Amlogic Meson AO-CEC bindings
+>>>
+>>>  .../devicetree/bindings/media/meson-ao-cec.txt     |  28 +
+>>>  drivers/media/platform/Kconfig                     |  11 +
+>>>  drivers/media/platform/Makefile                    |   2 +
+>>>  drivers/media/platform/meson/Makefile              |   1 +
+>>>  drivers/media/platform/meson/ao-cec.c              | 744 +++++++++++++++++++++
+>>>  5 files changed, 786 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/media/meson-ao-cec.txt
+>>>  create mode 100644 drivers/media/platform/meson/Makefile
+>>>  create mode 100644 drivers/media/platform/meson/ao-cec.c
+>>>
+>>
+> 
