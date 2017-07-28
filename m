@@ -1,150 +1,37 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 28 Jul 2017 17:17:42 +0100
-Subject: [RFC PATCH v1] net: ethernet: nb8800: Reset HW block in ndo_open
-In-Reply-To: <823b1540-b528-bbd7-7f99-5dc39a08868a@sigmadesigns.com> (Marc
- Gonzalez's message of "Fri, 28 Jul 2017 18:13:15 +0200")
-References: <823b1540-b528-bbd7-7f99-5dc39a08868a@sigmadesigns.com>
-Message-ID: <yw1xk22slemx.fsf@mansr.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 28 Jul 2017 11:30:55 -0500
+Subject: [PATCH] soc: ti: ti_sci_pm_domains: Populate name for genpd
+Message-ID: <20170728163055.532-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+Commit b6a1d093f96b ("PM / Domains: Extend generic power domain
+debugfs") now creates a debugfs directory for each genpd based on the
+name of the genpd. Currently no name is given to the genpd created by
+ti_sci_pm_domains driver so because of this we see a NULL pointer
+dereferences when it is accessed on boot when the debugfs entry creation
+is attempted.
 
-> ndo_stop breaks RX in a way that ndo_open is unable to undo.
+Give the genpd a name before registering it to avoid this.
 
-Please elaborate.  Why can't it be fixed in a less heavy-handed way?
+Fixes: 52835d59fc6c ("soc: ti: Add ti_sci_pm_domains driver")
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ drivers/soc/ti/ti_sci_pm_domains.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> Work around the issue by resetting the HW in ndo_open.
-> This will provide the basis for suspend/resume support.
->
-> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-> ---
->  drivers/net/ethernet/aurora/nb8800.c | 40 +++++++++++++++++-------------------
->  drivers/net/ethernet/aurora/nb8800.h |  1 +
->  2 files changed, 20 insertions(+), 21 deletions(-)
-
-I'm pretty sure this doesn't preserve everything it should.
-
-> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
-> index e94159507847..954a28542c3b 100644
-> --- a/drivers/net/ethernet/aurora/nb8800.c
-> +++ b/drivers/net/ethernet/aurora/nb8800.c
-> @@ -39,6 +39,7 @@
->
->  #include "nb8800.h"
->
-> +static void nb8800_init(struct net_device *dev);
->  static void nb8800_tx_done(struct net_device *dev);
->  static int nb8800_dma_stop(struct net_device *dev);
->
-> @@ -957,6 +958,8 @@ static int nb8800_open(struct net_device *dev)
->  	struct phy_device *phydev;
->  	int err;
->
-> +	nb8800_init(dev);
-> +
->  	/* clear any pending interrupts */
->  	nb8800_writel(priv, NB8800_RXC_SR, 0xf);
->  	nb8800_writel(priv, NB8800_TXC_SR, 0xf);
-> @@ -1350,6 +1353,20 @@ static const struct of_device_id nb8800_dt_ids[] = {
->  };
->  MODULE_DEVICE_TABLE(of, nb8800_dt_ids);
->
-> +static void nb8800_init(struct net_device *dev)
-> +{
-> +	struct nb8800_priv *priv = netdev_priv(dev);
-> +	const struct nb8800_ops *ops = priv->ops;
-> +
-> +	if (ops && ops->reset)
-> +		ops->reset(dev);
-> +	nb8800_hw_init(dev);
-> +	if (ops && ops->init)
-> +		ops->init(dev);
-> +	nb8800_update_mac_addr(dev);
-> +	priv->speed = 0;
-> +}
-> +
->  static int nb8800_probe(struct platform_device *pdev)
->  {
->  	const struct of_device_id *match;
-> @@ -1389,6 +1406,7 @@ static int nb8800_probe(struct platform_device *pdev)
->
->  	priv = netdev_priv(dev);
->  	priv->base = base;
-> +	priv->ops = ops;
->
->  	priv->phy_mode = of_get_phy_mode(pdev->dev.of_node);
->  	if (priv->phy_mode < 0)
-> @@ -1407,12 +1425,6 @@ static int nb8800_probe(struct platform_device *pdev)
->
->  	spin_lock_init(&priv->tx_lock);
->
-> -	if (ops && ops->reset) {
-> -		ret = ops->reset(dev);
-> -		if (ret)
-> -			goto err_disable_clk;
-> -	}
-> -
->  	bus = devm_mdiobus_alloc(&pdev->dev);
->  	if (!bus) {
->  		ret = -ENOMEM;
-> @@ -1454,16 +1466,6 @@ static int nb8800_probe(struct platform_device *pdev)
->
->  	priv->mii_bus = bus;
->
-> -	ret = nb8800_hw_init(dev);
-> -	if (ret)
-> -		goto err_deregister_fixed_link;
-> -
-> -	if (ops && ops->init) {
-> -		ret = ops->init(dev);
-> -		if (ret)
-> -			goto err_deregister_fixed_link;
-> -	}
-> -
->  	dev->netdev_ops = &nb8800_netdev_ops;
->  	dev->ethtool_ops = &nb8800_ethtool_ops;
->  	dev->flags |= IFF_MULTICAST;
-> @@ -1476,14 +1478,12 @@ static int nb8800_probe(struct platform_device *pdev)
->  	if (!is_valid_ether_addr(dev->dev_addr))
->  		eth_hw_addr_random(dev);
->
-> -	nb8800_update_mac_addr(dev);
-> -
->  	netif_carrier_off(dev);
->
->  	ret = register_netdev(dev);
->  	if (ret) {
->  		netdev_err(dev, "failed to register netdev\n");
-> -		goto err_free_dma;
-> +		goto err_deregister_fixed_link;
->  	}
->
->  	netif_napi_add(dev, &priv->napi, nb8800_poll, NAPI_POLL_WEIGHT);
-> @@ -1492,8 +1492,6 @@ static int nb8800_probe(struct platform_device *pdev)
->
->  	return 0;
->
-> -err_free_dma:
-> -	nb8800_dma_free(dev);
->  err_deregister_fixed_link:
->  	if (of_phy_is_fixed_link(pdev->dev.of_node))
->  		of_phy_deregister_fixed_link(pdev->dev.of_node);
-> diff --git a/drivers/net/ethernet/aurora/nb8800.h b/drivers/net/ethernet/aurora/nb8800.h
-> index 6ec4a956e1e5..d5f4481a2c7b 100644
-> --- a/drivers/net/ethernet/aurora/nb8800.h
-> +++ b/drivers/net/ethernet/aurora/nb8800.h
-> @@ -305,6 +305,7 @@ struct nb8800_priv {
->  	dma_addr_t			tx_desc_dma;
->
->  	struct clk			*clk;
-> +	const struct nb8800_ops		*ops;
->  };
->
->  struct nb8800_ops {
-> -- 
-> 2.11.0
->
-
+diff --git a/drivers/soc/ti/ti_sci_pm_domains.c b/drivers/soc/ti/ti_sci_pm_domains.c
+index b0b283810e72..de31b9389e2e 100644
+--- a/drivers/soc/ti/ti_sci_pm_domains.c
++++ b/drivers/soc/ti/ti_sci_pm_domains.c
+@@ -176,6 +176,8 @@ static int ti_sci_pm_domain_probe(struct platform_device *pdev)
+ 
+ 	ti_sci_pd->dev = dev;
+ 
++	ti_sci_pd->pd.name = "ti_sci_pd";
++
+ 	ti_sci_pd->pd.attach_dev = ti_sci_pd_attach_dev;
+ 	ti_sci_pd->pd.detach_dev = ti_sci_pd_detach_dev;
+ 
 -- 
-M?ns Rullg?rd
+2.13.0
