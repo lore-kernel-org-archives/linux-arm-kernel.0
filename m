@@ -1,121 +1,229 @@
-From: mgorman@techsingularity.net (Mel Gorman)
-Date: Fri, 28 Jul 2017 09:46:34 +0100
-Subject: [PATCH 2/3] mm: fix MADV_[FREE|DONTNEED] TLB flush miss problem
-In-Reply-To: <1501224112-23656-3-git-send-email-minchan@kernel.org>
-References: <1501224112-23656-1-git-send-email-minchan@kernel.org>
- <1501224112-23656-3-git-send-email-minchan@kernel.org>
-Message-ID: <20170728084634.foo3wjhsyydml6yj@techsingularity.net>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Fri, 28 Jul 2017 14:19:48 +0530
+Subject: [PATCH v2 6/7] mailbox: bcm-flexrm-mailbox: Set msg_queue_len for
+ each channel
+In-Reply-To: <CABb+yY2gj3SBTCzcGim0=c1G9SzAiQ0HxA1F24kjs-jS42Z+dg@mail.gmail.com>
+References: <1500620142-910-1-git-send-email-anup.patel@broadcom.com>
+ <1500620142-910-7-git-send-email-anup.patel@broadcom.com>
+ <CABb+yY1Pxhgvvit=0eZr66DpLJ3MDEvRPx9dwDPJM8PwiKXiew@mail.gmail.com>
+ <CAALAos_yh0bCMZFrSmf-c92pNMBGhLT05YFF0duhmpxgYec+_w@mail.gmail.com>
+ <CABb+yY3d1FvfB-NBVHLNfoFXGn9-8nFEdKBhXt4sBTr1vodhYw@mail.gmail.com>
+ <CAALAos9T0YtCvgjGCMVPn=dw2JKY=jTxz-v431NgpBCKFo1vVQ@mail.gmail.com>
+ <CABb+yY2x1Wb=RZhq+eUnM0wkcih4YkFDrKRgqhs1erGQGH3tdw@mail.gmail.com>
+ <CAALAos-aKDw8p2_BFausm+VC4teoAW22239+gnkPfFUaiZxB6w@mail.gmail.com>
+ <CABb+yY3fwPTSc0PKh44uvgdbvQJhu-X3O_L5EtumB6ovsaOdSw@mail.gmail.com>
+ <CAALAos9RoAbZcsyQV_U_aUeVSO9SMYNqNpqOdCF0ytNXK8SrnA@mail.gmail.com>
+ <CABb+yY2gj3SBTCzcGim0=c1G9SzAiQ0HxA1F24kjs-jS42Z+dg@mail.gmail.com>
+Message-ID: <CAALAos-VXg9XcNOr6OyiefdnL=oajEi3JGjoFSf74HEJgBiWBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 03:41:51PM +0900, Minchan Kim wrote:
-> Nadav reported parallel MADV_DONTNEED on same range has a stale TLB
-> problem and Mel fixed it[1] and found same problem on MADV_FREE[2].
-> 
-> Quote from Mel Gorman
-> 
-> "The race in question is CPU 0 running madv_free and updating some PTEs
-> while CPU 1 is also running madv_free and looking at the same PTEs.
-> CPU 1 may have writable TLB entries for a page but fail the pte_dirty
-> check (because CPU 0 has updated it already) and potentially fail to flush.
-> Hence, when madv_free on CPU 1 returns, there are still potentially writable
-> TLB entries and the underlying PTE is still present so that a subsequent write
-> does not necessarily propagate the dirty bit to the underlying PTE any more.
-> Reclaim at some unknown time at the future may then see that the PTE is still
-> clean and discard the page even though a write has happened in the meantime.
-> I think this is possible but I could have missed some protection in madv_free
-> that prevents it happening."
-> 
-> This patch aims for solving both problems all at once and is ready for
-> other problem with KSM, MADV_FREE and soft-dirty story[3].
-> 
-> TLB batch API(tlb_[gather|finish]_mmu] uses [set|clear]_tlb_flush_pending
-> and mmu_tlb_flush_pending so that when tlb_finish_mmu is called, we can catch
-> there are parallel threads going on. In that case, flush TLB to prevent
-> for user to access memory via stale TLB entry although it fail to gather
-> pte entry.
-> 
-> I confiremd this patch works with [4] test program Nadav gave so this patch
-> supersedes "mm: Always flush VMA ranges affected by zap_page_range v2"
-> in current mmotm.
-> 
-> NOTE:
-> This patch modifies arch-specific TLB gathering interface(x86, ia64,
-> s390, sh, um). It seems most of architecture are straightforward but s390
-> need to be careful because tlb_flush_mmu works only if mm->context.flush_mm
-> is set to non-zero which happens only a pte entry really is cleared by
-> ptep_get_and_clear and friends. However, this problem never changes the
-> pte entries but need to flush to prevent memory access from stale tlb.
-> 
-> Any thoughts?
-> 
+On Thu, Jul 27, 2017 at 5:23 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Thu, Jul 27, 2017 at 11:20 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+>> On Thu, Jul 27, 2017 at 10:29 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>
+>>>>>>>> Sorry for the delayed response...
+>>>>>>>>
+>>>>>>>> On Fri, Jul 21, 2017 at 9:16 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>>>>>>>> Hi Anup,
+>>>>>>>>>
+>>>>>>>>> On Fri, Jul 21, 2017 at 12:25 PM, Anup Patel <anup.patel@broadcom.com> wrote:
+>>>>>>>>>> The Broadcom FlexRM ring (i.e. mailbox channel) can handle
+>>>>>>>>>> larger number of messages queued in one FlexRM ring hence
+>>>>>>>>>> this patch sets msg_queue_len for each mailbox channel to
+>>>>>>>>>> be same as RING_MAX_REQ_COUNT.
+>>>>>>>>>>
+>>>>>>>>>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>>>>>>>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>>>>>>>>> ---
+>>>>>>>>>>  drivers/mailbox/bcm-flexrm-mailbox.c | 5 ++++-
+>>>>>>>>>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>>>>>>>>>
+>>>>>>>>>> diff --git a/drivers/mailbox/bcm-flexrm-mailbox.c b/drivers/mailbox/bcm-flexrm-mailbox.c
+>>>>>>>>>> index 9873818..20055a0 100644
+>>>>>>>>>> --- a/drivers/mailbox/bcm-flexrm-mailbox.c
+>>>>>>>>>> +++ b/drivers/mailbox/bcm-flexrm-mailbox.c
+>>>>>>>>>> @@ -1683,8 +1683,11 @@ static int flexrm_mbox_probe(struct platform_device *pdev)
+>>>>>>>>>>                 ret = -ENOMEM;
+>>>>>>>>>>                 goto fail_free_debugfs_root;
+>>>>>>>>>>         }
+>>>>>>>>>> -       for (index = 0; index < mbox->num_rings; index++)
+>>>>>>>>>> +       for (index = 0; index < mbox->num_rings; index++) {
+>>>>>>>>>> +               mbox->controller.chans[index].msg_queue_len =
+>>>>>>>>>> +                                               RING_MAX_REQ_COUNT;
+>>>>>>>>>>                 mbox->controller.chans[index].con_priv = &mbox->rings[index];
+>>>>>>>>>> +       }
+>>>>>>>>>>
+>>>>>>>>> While writing mailbox.c I wasn't unaware that there is the option to
+>>>>>>>>> choose the queue length at runtime.
+>>>>>>>>> The idea was to keep the code as simple as possible. I am open to
+>>>>>>>>> making it a runtime thing, but first, please help me understand how
+>>>>>>>>> that is useful here.
+>>>>>>>>>
+>>>>>>>>> I understand FlexRm has a ring buffer of RING_MAX_REQ_COUNT(1024)
+>>>>>>>>> elements. Any message submitted to mailbox api can be immediately
+>>>>>>>>> written onto the ringbuffer if there is some space.
+>>>>>>>>> Is there any mechanism to report back to a client driver, if its
+>>>>>>>>> message in ringbuffer failed "to be sent"?
+>>>>>>>>> If there isn't any, then I think, in flexrm_last_tx_done() you should
+>>>>>>>>> simply return true if there is some space left in the rung-buffer,
+>>>>>>>>> false otherwise.
+>>>>>>>>
+>>>>>>>> Yes, we have error code in "struct brcm_message" to report back
+>>>>>>>> errors from send_message. In our mailbox clients, we check
+>>>>>>>> return value of mbox_send_message() and also the error code
+>>>>>>>> in "struct brcm_message".
+>>>>>>>>
+>>>>>>> I meant after the message has been accepted in the ringbuffer but the
+>>>>>>> remote failed to receive it.
+>>>>>>
+>>>>>> Yes, even this case is handled.
+>>>>>>
+>>>>>> In case of IO errors after message has been put in ring buffer, we get
+>>>>>> completion message with error code and mailbox client drivers will
+>>>>>> receive back "struct brcm_message" with error set.
+>>>>>>
+>>>>>> You can refer flexrm_process_completions() for more details.
+>>>>>>
+>>> It doesn't seem to be what I suggest. I see two issues in
+>>> flexrm_process_completions()
+>>> 1) It calls mbox_send_message(), which is a big NO for a controller
+>>> driver. Why should you have one more message stored outside of
+>>> ringbuffer?
+>>
+>> The "last_pending_msg" in each FlexRM ring was added to fit FlexRM
+>> in Mailbox framework.
+>>
+>> We don't have any IRQ for TX done so "txdone_irq" out of the question for
+>> FlexRM. We only have completions for both success or failures (IO errors).
+>>
+>> This means we have to use "txdone_poll" for FlexRM. For "txdone_poll",
+>> we have to provide last_tx_done() callback. The last_tx_done() callback
+>> is supposed to return true if last send_data() call succeeded.
+>>
+>> To implement last_tx_done() in FlexRM driver, we added "last_pending_msg".
+>>
+>> When "last_pending_msg" is NULL it means last call to send_data() succeeded
+>> and when "last_pending_msg" is != NULL it means last call to send_data()
+>> did not go through due to lack of space in FlexRM ring.
+>>
+> It could be simpler.
+> Since flexrm_send_data() is essentially about putting the message in
+> the ring-buffer (and not about _transmission_ failures), the
+> last_tx_done() should simply return true if requests_ida has not all
+> ids allocated. False otherwise.
 
-The cc list is somewhat ..... extensive, given the topic. Trim it if
-there is another version.
+It's not that simple because we have two cases in-which
+send_data() will fail:
+1. It run-out of IDs in requests_ida
+2. There is no room in BD queue of FlexRM ring. This because each
+brcm_message can be translated into variable number of descriptors.
+In fact, using SPU2 crypto client we have one brcm_message translating
+into 100's of descriptors. All-in-all few messages (< 1024) can also
+fill-up the BD queue of FlexRM ring.
 
-> index 3f2eb76243e3..8c26961f0503 100644
-> --- a/arch/arm/include/asm/tlb.h
-> +++ b/arch/arm/include/asm/tlb.h
-> @@ -163,13 +163,26 @@ tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm, unsigned long start
->  #ifdef CONFIG_HAVE_RCU_TABLE_FREE
->  	tlb->batch = NULL;
->  #endif
-> +	set_tlb_flush_pending(tlb->mm);
->  }
->  
->  static inline void
->  tlb_finish_mmu(struct mmu_gather *tlb, unsigned long start, unsigned long end)
->  {
-> -	tlb_flush_mmu(tlb);
-> +	/*
-> +	 * If there are parallel threads are doing PTE changes on same range
-> +	 * under non-exclusive lock(e.g., mmap_sem read-side) but defer TLB
-> +	 * flush by batching, a thread has stable TLB entry can fail to flush
-> +	 * the TLB by observing pte_none|!pte_dirty, for example so flush TLB
-> +	 * if we detect parallel PTE batching threads.
-> +	 */
-> +	if (mm_tlb_flush_pending(tlb->mm, false) > 1) {
-> +		tlb->range_start = start;
-> +		tlb->range_end = end;
-> +	}
->  
-> +	tlb_flush_mmu(tlb);
-> +	clear_tlb_flush_pending(tlb->mm);
->  	/* keep the page table cache within bounds */
->  	check_pgt_cache();
->  
+>
+>>>
+>>> 2) It calls mbox_chan_received_data()  which is for messages received
+>>> from the remote. And not the way to report failed _transmission_, for
+>>> which the api calls back mbox_client.tx_done() .  In your client
+>>> driver please populate mbox_client.tx_done() and see which message is
+>>> reported "sent fine" when.
+>>>
+>>>
+>>>>>>> There seems no such provision. IIANW, then you should be able to
+>>>>>>> consider every message as "sent successfully" once it is in the ring
+>>>>>>> buffer i.e, immediately after mbox_send_message() returns 0.
+>>>>>>> In that case I would think you don't need more than a couple of
+>>>>>>> entries out of MBOX_TX_QUEUE_LEN ?
+>>>>>>
+>>>>>> What I am trying to suggest is that we can take upto 1024 messages
+>>>>>> in a FlexRM ring but the MBOX_TX_QUEUE_LEN limits us queuing
+>>>>>> more messages. This issue manifest easily when multiple CPUs
+>>>>>> queues to same FlexRM ring (i.e. same mailbox channel).
+>>>>>>
+>>>>> OK then, I guess we have to make the queue length a runtime decision.
+>>>>
+>>>> Do you agree with approach taken by PATCH5 and PATCH6 to
+>>>> make queue length runtime?
+>>>>
+>>> I agree that we may have to get the queue length from platform, if
+>>> MBOX_TX_QUEUE_LEN is limiting performance. That will be easier on both
+>>> of us. However I suspect the right fix for _this_ situation is in
+>>> flexrm driver. See above.
+>>
+>> The current implementation is trying to model FlexRM using "txdone_poll"
+>> method and that's why we have dependency on MBOX_TX_QUEUE_LEN
+>>
+>> I think what we really need is new method for "txdone" to model ring
+>> manager HW (such as FlexRM). Let's call it "txdone_none".
+>>
+>> For "txdone_none", it means there is no "txdone" reporting in HW
+>> and mbox_send_data() should simply return value returned by
+>> send_data() callback. The last_tx_done() callback is not required
+>> for "txdone_none" and MBOX_TX_QUEUE_LEN also has no
+>> effect on "txdone_none". Both blocking and non-blocking clients
+>> are treated same for "txdone_none".
+>>
+> That is already supported :)
 
-mm_tlb_flush_pending shouldn't be taking a barrier specific arg. I expect
-this to change in the future and cause a conflict. At least I think in
-this context, it's the conditional barrier stuff.
+If you are referring to "txdone_ack" then this cannot be used here
+because for "txdone_ack" we have to call mbox_chan_txdon() API
+after writing descriptors in send_data() callback which will cause
+dead-lock in tx_tick() called by mbox_chan_txdone().
 
-That aside, it's very unfortunate that the return value of
-mm_tlb_flush_pending really matters. Knowing why 1 is magic there requires
-knowledge of the internals on a per-arch basis which is a bit nuts.
-Consider renaming this to mm_tlb_flush_parallel() to return true if there
-is a nr_pending > 1 with comments explaining why. I don't think any of
-the callers expect a nr_pending of 0 ever. That removes some knowledge of
-the specifics.
+>
+> In drivers/dma/bcm-sba-raid.c
+>
+> sba_send_mbox_request(...)
+> {
+>            ......
+>         req->msg.error = 0;
+>         ret = mbox_send_message(sba->mchans[mchans_idx], &req->msg);
+>         if (ret < 0) {
+>                 dev_err(sba->dev, "send message failed with error %d", ret);
+>                 return ret;
+>         }
+>         ret = req->msg.error;
+>         if (ret < 0) {
+>                 dev_err(sba->dev, "message error %d", ret);
+>                 return ret;
+>         }
+>           .....
+> }
+>
+> Here you _do_ assume that as soon as the mbox_send_message() returns,
+> the last_tx_done() is true. In other words, this is a case of client
+> 'knows_txdone'.
+>
+> So ideally you should specify cl->knows_txdone = true during
+> mbox_request_channel() and have ...
+>
+> sba_send_mbox_request(...)
+> {
+>         ret = mbox_send_message(sba->mchans[mchans_idx], &req->msg);
+>         if (ret < 0) {
+>                 dev_err(sba->dev, "send message failed with error %d", ret);
+>                 return ret;
+>         }
+>
+>         ret = req->msg.error;
+>
+>        /* Message successfully placed in the ringbuffer, i.e, done */
+>        mbox_client_txdone(sba->mchans[mchans_idx], ret);
+>
+>        if (ret < 0) {
+>                 dev_err(sba->dev, "message error %d", ret);
+>                 return ret;
+>         }
+>
+>         .....
+> }
+>
 
-The arch-specific changes to tlb_gather_mmu are almost all identical.
-It's a little tricky to split the arch layer and core mm to have all
-the set/clear of mm_tlb_flush_pending handled by the core mm.  It's not
-required but it would be preferred. The set one is obvious. rename
-tlb_gather_mmu to arch_tlb_gather_mmu (including the generic implementation)
-and create a tlb_gather_mmu alias that calls arch_tlb_gather_mmu and
-set_tlb_flush_pending.
+I think we need to improve mailbox.c so that
+mbox_chan_txdone() can be called from
+send_data() callback.
 
-The clear is not as straight-forward but can be done by creating a new
-arch helper that handles this hunk on a per-arch basis
-
-> +     if (mm_tlb_flush_pending(tlb->mm, false) > 1) {
-> +             tlb->start = start;
-> +             tlb->end = end;
-> +     }
-
-It'll be churn initially but it means any different handling in the TLB
-batching area will be mostly a core concern.
-
--- 
-Mel Gorman
-SUSE Labs
+Regards,
+Anup
