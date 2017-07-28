@@ -1,58 +1,125 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Jul 2017 16:10:49 +0200
-Subject: [PATCH] [RFC] ARM: move __bug_table into .data for XIP_KERNEL
-Message-ID: <20170728141108.1283320-1-arnd@arndb.de>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 28 Jul 2017 15:10:03 +0100
+Subject: [PATCH v2 00/16] SError rework + v8.2 RAS and IESB cpufeature support
+Message-ID: <20170728141019.9084-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matt Hart reports that vf610m4_defconfig kernels grew to 2GB
-xipImage size after the __bug_table change.
+Hello,
 
-I tried out a few things and found that moving the bug table
-into the .data section avoids this problem. However, the
-linker script magic is beyond my capabilities here, so this
-is almost certainly not correct.
+This series reworks the exception masking so that SError is unmasked ~all the
+time, and adds the RAS and IESB cpufeatures.
 
-I've added a few people to Cc that understand this better
-than I do, hopefully someone can turn my bogus patch into
-a proper one.
+The major change from v1 is the priority-order for DAIF exceptions after the
+SError rework is different due to IESB.
 
-Fixes: b5effd3815cc ("debug: Fix __bug_table[] in arch linker scripts")
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Matt Hart <matthew.hart@linaro.org>
-Cc: Stefan Agner <stefan@agner.ch>
-Cc: Chris Brandt <chris.brandt@renesas.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Nicolas Pitre <nico@linaro.org>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/kernel/vmlinux-xip.lds.S | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+The SError rework is needed for the esb in __switch_to() to be delivered as
+an exception, instead of being 'deferred' requiring a sysreg read to check.
+The esb cost should be small compared to the dsb(ish) immediately before.
 
-diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
-index a8ceec3e0580..1ebb40ecf411 100644
---- a/arch/arm/kernel/vmlinux-xip.lds.S
-+++ b/arch/arm/kernel/vmlinux-xip.lds.S
-@@ -241,12 +241,17 @@ SECTIONS
- 		DATA_DATA
- 		CONSTRUCTORS
- 
-+#ifdef CONFIG_GENERIC_BUG
-+		__bug_table = ALIGN(8);
-+		VMLINUX_SYMBOL(__start___bug_table) = .;
-+		KEEP(*(__bug_table))
-+		VMLINUX_SYMBOL(__stop___bug_table) = .;
-+#endif
-+
- 		_edata = .;
- 	}
- 	_edata_loc = __data_loc + SIZEOF(.data);
- 
--	BUG_TABLE
--
- #ifdef CONFIG_HAVE_TCM
-         /*
- 	 * We align everything to a page boundary so we can
+Systems with the RAS Extensions[0] are likely to be servers with APEI's
+firmware-first support. For these any SError will be taken to EL3, and Linux
+will be notified by some other mechanism... we will never get a physical SError
+and don't need to check DISR_EL1 on these systems.
+But, if we don't handle RAS SErrors and check DISR_EL1, systems with the RAS
+Extensions but no APEI firmware-first will lose SErrors. This series adds the
+minimum handling for non-APEI systems.
+
+The ESR AET 'severity' has 'corrected' and not-yet-consumed values, we ignore
+RAS SErrors that have these severity values, and panic() for everything else.
+
+v8.2's IESB adds an implicit ESB 'after' TakeException() and 'before'
+ExceptionReturn() when entering/returning-from EL1. The TakeException()
+esb will always be deferred, so we have to check DISR_EL1. For
+ExceptionReturn() we need to unmask SError over the kernel's ERET, so that
+any deferred SError isn't left in DISR_EL1 while we are running at EL0.
+
+This means being able to restore SPSR and ELR if we take a 'survivable' SError
+during kernel_exit, which is done by stashing the values in a per-cpu variable.
+
+There is no SCTLR_EL2.IESB bit, so KVM only has IESB's behaviour if its using
+VHE and we have RAS & IESB. To avoid losing SErrors KVM needs to check DISR_EL1
+on __guest_exit(). For ExceptionReturn() a pending host-error will be
+blamed on a guest, unmask SError over ERET... if there is an error and the
+system doesn't have APEI firmware-first this will cause a hyp-panic.
+Future work: add the same minimum-handling to KVMs EL2 panic code.
+
+The DISR_EL1 read on every TakeException() may have an impact on performance.
+I'd be interested in seeing any numbers that can be shared, I only have a
+software model to test this. If we know a system has APEI firmware-first,
+(indicated by GHES entries in the HEST), we can assume firmware has set
+SCR_EL3.EA, making DISR_EL1 RAZ/WI for EL{1,2}. More future work is to use
+a static key to disable the DISR_EL1 checking on kernel-entry if we know
+all reads will be zero.
+
+Known-issues:
+ * A synchronous exception taken from the SError handler will overwrite
+   the per-cpu SPSR/ELR values on return. Getting the asm code to save these
+   and do the restore makes it more complicated and shouldn't be necessary for
+   the SError handler as it is today.
+ * Handing v8.2s RAS without v8.1s VHE is weird, (see kvm_explicit_esb). Would
+   anyone object to making 'all v8.1 features' a runtime requirement of any
+   v8.2 feature?
+
+
+This series can be retrieved from:
+git://linux-arm.org/linux-jm.git -b serror_rework/v2
+
+
+Thanks,
+
+James
+
+[0] https://static.docs.arm.com/ddi0587/a/RAS%20Extension-release%20candidate_march_29.pdf
+
+James Morse (14):
+  arm64: explicitly mask all exceptions
+  arm64: introduce an order for exceptions
+  arm64: unmask all exceptions from C code on CPU startup
+  arm64: entry.S: mask all exceptions during kernel_exit
+  arm64: entry.S: move enable_step_tsk into kernel_exit
+  arm64: entry.S: convert elX_sync
+  arm64: entry.S: convert elX_irq
+  arm64: kernel: Survive corrected RAS errors notified by SError
+  arm64: kernel: Handle deferred SError on kernel entry
+  arm64: entry.S: Make eret restartable
+  arm64: cpufeature: Enable Implicit ESB on entry/return-from EL1
+  KVM: arm64: Take pending SErrors on entry to the guest
+  KVM: arm64: Save ESR_EL2 on guest SError
+  KVM: arm64: Handle deferred SErrors consumed on guest exit
+
+Xie XiuQi (2):
+  arm64: entry.S: move SError handling into a C function for future
+    expansion
+  arm64: cpufeature: Detect CPU RAS Extentions
+
+ arch/arm64/Kconfig                   |  33 ++++-
+ arch/arm64/include/asm/assembler.h   |  75 ++++++++---
+ arch/arm64/include/asm/barrier.h     |   1 +
+ arch/arm64/include/asm/cpucaps.h     |   4 +-
+ arch/arm64/include/asm/esr.h         |  17 +++
+ arch/arm64/include/asm/exception.h   |  34 +++++
+ arch/arm64/include/asm/irqflags.h    |  58 +++++++--
+ arch/arm64/include/asm/kvm_emulate.h |   5 +
+ arch/arm64/include/asm/kvm_host.h    |   1 +
+ arch/arm64/include/asm/processor.h   |   2 +
+ arch/arm64/include/asm/sysreg.h      |   4 +
+ arch/arm64/kernel/asm-offsets.c      |   1 +
+ arch/arm64/kernel/cpufeature.c       |  43 +++++++
+ arch/arm64/kernel/entry.S            | 241 +++++++++++++++++++++++++----------
+ arch/arm64/kernel/hibernate.c        |   4 +-
+ arch/arm64/kernel/machine_kexec.c    |   3 +-
+ arch/arm64/kernel/process.c          |   3 +
+ arch/arm64/kernel/setup.c            |   7 +-
+ arch/arm64/kernel/smp.c              |  12 +-
+ arch/arm64/kernel/suspend.c          |   6 +-
+ arch/arm64/kernel/traps.c            |  68 +++++++++-
+ arch/arm64/kvm/handle_exit.c         |  84 +++++++++---
+ arch/arm64/kvm/hyp.S                 |   1 +
+ arch/arm64/kvm/hyp/entry.S           |  27 ++++
+ arch/arm64/kvm/hyp/switch.c          |  15 ++-
+ arch/arm64/mm/proc.S                 |  17 +--
+ 26 files changed, 618 insertions(+), 148 deletions(-)
+
 -- 
-2.9.0
+2.13.2
