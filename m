@@ -1,61 +1,155 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 27 Jul 2017 21:15:17 -0500
-Subject: [PATCH v2] arm64: dts: cavium: fix PCI bus dtc warnings
-In-Reply-To: <20170728014304.GA6857@localhost>
-References: <20170726210943.6875-1-robh@kernel.org>
- <20170726210943.6875-7-robh@kernel.org>
- <20170728014304.GA6857@localhost>
-Message-ID: <CAL_JsqLgPRQqWu=Fh-6EroHs64_M9Q8jWa20Hv=dGro62oR=XA@mail.gmail.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Fri, 28 Jul 2017 10:45:33 +0800
+Subject: [PATCH v6 4/7] drm/rockchip: vop: group vop registers
+In-Reply-To: <597A8D38.3040905@rock-chips.com>
+References: <1501049930-5794-1-git-send-email-mark.yao@rock-chips.com>
+ <1501049966-6070-1-git-send-email-mark.yao@rock-chips.com>
+ <44153824.CqyclESHdT@diego> <10499935.q3BgzX4LKL@diego>
+ <597A8D38.3040905@rock-chips.com>
+Message-ID: <597AA54D.60706@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 27, 2017 at 8:43 PM, Jayachandran C
-<jnair@caviumnetworks.com> wrote:
-> On Wed, Jul 26, 2017 at 04:09:43PM -0500, Rob Herring wrote:
->> dtc recently added PCI bus checks. Fix these warnings:
->>
->> arch/arm64/boot/dts/cavium/thunder2-99xx.dtb: Warning (pci_bridge): Node /pci missing bus-range for PCI bridge
->> arch/arm64/boot/dts/cavium/thunder2-99xx.dtb: Warning (unit_address_vs_reg): Node /pci has a reg or ranges property, but no unit name
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> Cc: Jayachandran C <jnair@caviumnetworks.com>
->> ---
->> v2:
->> - Reapply broadcom vulkan changes to thunder2.
->>
->>  arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi b/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi
->> index 4220fbdcb24a..ea50c1320bf7 100644
->> --- a/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi
->> +++ b/arch/arm64/boot/dts/cavium/thunder2-99xx.dtsi
->> @@ -98,7 +98,7 @@
->>               clock-output-names = "clk125mhz";
->>       };
->>
->> -     pci {
->> +     pci at 30000000 {
->>               compatible = "pci-host-ecam-generic";
->>               device_type = "pci";
->>               #interrupt-cells = <1>;
->> @@ -118,6 +118,7 @@
->>               ranges =
->>                 <0x02000000    0 0x40000000    0 0x40000000    0 0x20000000
->>                  0x43000000 0x40 0x00000000 0x40 0x00000000 0x20 0x00000000>;
->> +             bus-range = <0 0xff>;
->>               interrupt-map-mask = <0 0 0 7>;
->>               interrupt-map =
->>                     /* addr  pin  ic   icaddr  icintr */
->
-> Thanks for fixing this up.
->
-> Acked-by: Jayachandran C <jnair@caviumnetworks.com>
->
-> The unit name issue is there with memory node on thunder2-99xx.dts as well, I can fix
-> this up if you are not planning to.
+Hi Heiko
 
-Please do. There are lots more warnings (tree wide) and I don't plan
-to fix all of them.
+On 2017?07?28? 09:02, Mark yao wrote:
+> Hi Heiko
+>
+> Thanks for the test.
+>
+> On 2017?07?27? 18:10, Heiko St?bner wrote:
+>> Am Donnerstag, 27. Juli 2017, 11:51:06 CEST schrieb Heiko St?bner:
+>>> Hi Mark,
+>>>
+>>> Am Mittwoch, 26. Juli 2017, 14:19:25 CEST schrieb Mark Yao:
+>>>> Grouping the vop registers facilitates make register
+>>>> definition clearer, and also is useful for different vop
+>>>> reuse the same group register.
+>>>>
+>>>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+>>>> ---
+>>>>
+>>>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  99
+>>>>   ++++++++++++------------
+>>>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.h |  60 ++++++++-------
+>>>>   drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 112
+>>>>
+>>>> +++++++++++++++------------- 3 files changed, 144 insertions(+), 127
+>>>> deletions(-)
+>>> This breaks display support on both rk3036 and rk3288 and I end up
+>>> with a null pointer dereference in
+>>>
+>>> [   10.640297] Unable to handle kernel NULL pointer dereference at virtual
+>>> address 00000000 [   10.654430] pgd = c0204000
+>>> [   10.657452] [00000000] *pgd=00000000
+>>> [   10.661473] Internal error: Oops: 5 [#1] SMP ARM
+>>> [   10.666635] Modules linked in: snd_pcm media snd_timer phy_rockchip_dp
+>>> snd soundcore rockchipdrm dw_hdmi analogix_dp rtc_rk808 pwm_rockchip
+>>> clk_rk808 spi_rockchip [   10.682897] CPU: 2 PID: 143 Comm: kworker/2:2 Not
+>>> tainted 4.13.0-rc2-01791-g2b86603d0515 #355 [   10.692430] Hardware name:
+>>> Rockchip (Device Tree)
+>>> [   10.697692] Workqueue: events deferred_probe_work_func
+>>> [   10.702152] Linux video capture interface: v2.00
+>>> [   10.708590] task: ee38c800 task.stack: ed2e6000
+>>> [   10.713656] PC is at vop_reg_set.constprop.4+0x4/0xa8 [rockchipdrm]
+>>> [   10.720668] LR is at vop_bind+0x568/0x8a0 [rockchipdrm]
+>> The obvious reason for that is
+>>
+>>> @@ -164,14 +153,20 @@ static inline uint32_t vop_read_reg(struct vop *vop,
+>>> uint32_t base, return (vop_readl(vop, base + reg->offset) >> reg->shift) &
+>>> reg->mask; }
+>>>
+>>> -static inline void vop_mask_write(struct vop *vop, uint32_t offset,
+>>> -                  uint32_t mask, uint32_t shift, uint32_t v,
+>>> -                  bool write_mask, bool relaxed)
+>>> +static void vop_reg_set(struct vop *vop, const struct vop_reg *reg,
+>>> +            uint32_t _offset, uint32_t _mask, uint32_t v,
+>>> +            const char *reg_name)
+>>>   {
+>>> -    if (!mask)
+>>> +    int offset = reg->offset + _offset;
+>>> +    int mask = reg->mask & _mask;
+>>> +    int shift = reg->shift;
+>
+> Does the crash is that using reg->offset/mask/shift before !reg checking?
 
-Rob
+I reproduce this cause, from objdump, it crash on "int mask = reg->mask & _mask; "
+Seems difference gcc has difference behavior, my aarch64 gcc maybe optimize it,
+only access when the value be used. I think that is the reason why rk3399 works on my test.
+
+I will fix it at next version.
+
+>
+>>> +
+>>> +    if (!reg || !reg->mask) {
+>>> +        dev_dbg(vop->dev, "Warning: not support %s\n", reg_name);
+>>>           return;
+>>> +    }
+>> where the check for !reg happens after it got already dereferenced.
+>> But even with that fixed I end up with
+>>
+>> on rk3288:
+>> [    7.254823] rockchip-vop ff930000.vop: Warning: not support global_regdone_en
+>> [    7.262847] rockchip-vop ff930000.vop: Warning: not support gate
+>> [    7.269580] rockchip-vop ff930000.vop: Warning: not support gate
+>> [    7.302765] rockchip-vop ff940000.vop: Warning: not support global_regdone_en
+>> [    7.310758] rockchip-vop ff940000.vop: Warning: not support gate
+>> [    7.317475] rockchip-vop ff940000.vop: Warning: not support gate
+>> [    7.425724] rockchip-vop ff930000.vop: Warning: not support edp_pin_pol
+>> [    7.526298] rockchip-vop ff940000.vop: Warning: not support hdmi_pin_pol
+>
+> Rk3288 does not support independent pin_pol settings, all output interfaces share the pin_pol register,
+> So not support hdmi_pin_pol here is correct.
+>
+> hdmi pin pol would be set by following register:
+>     .pin_pol = VOP_REG(RK3288_DSP_CTRL0, 0xf, 4),
+>
+>>
+>> on rk3036:
+>> [   12.389138] rockchip-vop 10118000.vop: Warning: not support global_regdone_en
+>> [   12.397324] rockchip-vop 10118000.vop: Warning: not support gate
+>> [   12.404165] rockchip-vop 10118000.vop: Warning: not support gate
+>> [   13.747361] rockchip-vop 10118000.vop: Warning: not support hdmi_pin_pol
+>> [   13.747371] rockchip-vop 10118000.vop: Warning: not support hdmi_en
+>> [   13.747379] rockchip-vop 10118000.vop: Warning: not support hpost_st_end
+>> [   13.747385] rockchip-vop 10118000.vop: Warning: not support vpost_st_end
+>> [   13.747461] rockchip-vop 10118000.vop: Warning: not support src_alpha_ctl
+>> [   13.767098] rockchip-vop 10118000.vop: Warning: not support src_alpha_ctl
+>> [   13.786060] rockchip-vop 10118000.vop: Warning: not support src_alpha_ctl
+>>
+>> While reqdone and friends are obviously features of newer vops, at least
+>> the hdmi pin-pol is available on both these socs.
+>>
+>> With this patch applied (and null-ptr fixed) I end up without hdmi output
+>> on both socs.
+>
+> Hmmm, I am confused, from code review, I didn't see what will cause hdmi not work on rk3036 and rk3288,
+>
+> Give me some time, I try to bringup my popmetal rk3288 board to do the test.
+>
+> Heiko, Thanks very much for your test.
+
+Hi Heiko
+
+After fix null pointer problem, On rk3288 popmetal board, hdmi works good on my test, Can you double check it?
+
+Thanks.
+
+>
+>>
+>>
+>> Heiko
+>>
+>> _______________________________________________
+>> Linux-rockchip mailing list
+>> Linux-rockchip at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>>
+>>
+>>
+>
+>
+
+
+-- 
+?ark Yao
