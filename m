@@ -1,81 +1,125 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 28 Jul 2017 14:50:57 +0200
-Subject: [PATCH v3 0/2] media: Add Amlogic Meson AO CEC Controller support
-In-Reply-To: <36cab0eb-0986-58d6-9cec-9bf4ab099495@xs4all.nl>
-References: <1501168830-5308-1-git-send-email-narmstrong@baylibre.com>
- <d9aecd99-47d7-6a72-8d07-d64e185ea60e@xs4all.nl>
- <36cab0eb-0986-58d6-9cec-9bf4ab099495@xs4all.nl>
-Message-ID: <c1a9518c-88e7-cc20-e64a-d8056fad448f@baylibre.com>
+From: boqun.feng@gmail.com (Boqun Feng)
+Date: Fri, 28 Jul 2017 20:54:16 +0800
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170728084411.00001ddb@huawei.com>
+References: <20170726.154540.150558937277891719.davem@davemloft.net>
+ <20170726231505.GG3730@linux.vnet.ibm.com>
+ <20170726.162200.1904949371593276937.davem@davemloft.net>
+ <20170727014214.GH3730@linux.vnet.ibm.com>
+ <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
+ <20170727124913.GL3730@linux.vnet.ibm.com>
+ <20170727144903.000022a1@huawei.com>
+ <20170727173923.000001b2@huawei.com>
+ <20170727165245.GD3730@linux.vnet.ibm.com>
+ <20170728084411.00001ddb@huawei.com>
+Message-ID: <20170728125416.j7gcgvnxgv2gq73u@tardis>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28/2017 02:37 PM, Hans Verkuil wrote:
-> On 07/28/2017 02:35 PM, Hans Verkuil wrote:
->> Hi Neil,
->>
->> On 07/27/2017 05:20 PM, Neil Armstrong wrote:
->>> The Amlogic SoC embeds a standalone CEC controller, this patch adds a driver
->>> for such controller.
->>> The controller does not need HPD to be active, and could support up to max
->>> 5 logical addresses, but only 1 is handled since the Suspend firmware can
->>> make use of this unique logical address to wake up the device.
->>>
->>> The Suspend firmware configuration will be added in an other patchset.
->>
->> Note that to get the right module dependencies you will also need to add
->> this line:
->>
->> 	select CEC_CORE if CEC_NOTIFIER
->>
->> to DRM_MESON_DW_HDMI in drivers/gpu/drm/meson/Kconfig.
->>
->> This ensures that if DRM_MESON_DW_HDMI is 'y' but VIDEO_MESON_AO_CEC is 'm'
->> the CEC_CORE config is set to 'y'.
->>
->> Obviously this is a patch for dri-devel.
-> 
-> I was too quick sending this: I expect this line to appear in DRM_DW_HDMI,
-> not DRM_MESON_DW_HDMI. Sorry about the noise.
+Hi Jonathan,
 
-Indeed, I will respin russell's notifier patch with this.
+FWIW, there is wakeup-missing issue in swake_up() and swake_up_all():
 
-Thanks,
-Neil
+	https://marc.info/?l=linux-kernel&m=149750022019663
 
-> 
-> 	Hans
-> 
->>
->> Regards,
->>
->> 	Hans
->>
->>>
->>> Changes since v2 at [2] :
->>>  - change meson_ao_cec_read/write prototype to simplify error handling
->>>
->>> Changes since v1 at [1] :
->>>  - add timeout to wait busy, with error return
->>>  - handle busy error in all read/write operations
->>>  - add CEC_CAP_PASSTHROUGH
->>>  - add bindings ack
->>>
->>> [1] https://lkml.kernel.org/r/1499336870-24118-1-git-send-email-narmstrong at baylibre.com
->>> [2] https://lkml.kernel.org/r/1499673696-21372-1-git-send-email-narmstrong at baylibre.com
->>>
->>> Neil Armstrong (2):
->>>   platform: Add Amlogic Meson AO CEC Controller driver
->>>   dt-bindings: media: Add Amlogic Meson AO-CEC bindings
->>>
->>>  .../devicetree/bindings/media/meson-ao-cec.txt     |  28 +
->>>  drivers/media/platform/Kconfig                     |  11 +
->>>  drivers/media/platform/Makefile                    |   2 +
->>>  drivers/media/platform/meson/Makefile              |   1 +
->>>  drivers/media/platform/meson/ao-cec.c              | 744 +++++++++++++++++++++
->>>  5 files changed, 786 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/media/meson-ao-cec.txt
->>>  create mode 100644 drivers/media/platform/meson/Makefile
->>>  create mode 100644 drivers/media/platform/meson/ao-cec.c
->>>
->>
-> 
+and RCU begins to use swait/wake last year, so I thought this could be
+relevant.
+
+Could you try the following patch and see if it works? Thanks.
+
+Regards,
+Boqun
+
+------------------>8
+Subject: [PATCH] swait: Remove the lockless swait_active() check in
+ swake_up*()
+
+Steven Rostedt reported a potential race in RCU core because of
+swake_up():
+
+        CPU0                            CPU1
+        ----                            ----
+                                __call_rcu_core() {
+
+                                 spin_lock(rnp_root)
+                                 need_wake = __rcu_start_gp() {
+                                  rcu_start_gp_advanced() {
+                                   gp_flags = FLAG_INIT
+                                  }
+                                 }
+
+ rcu_gp_kthread() {
+   swait_event_interruptible(wq,
+        gp_flags & FLAG_INIT) {
+   spin_lock(q->lock)
+
+                                *fetch wq->task_list here! *
+
+   list_add(wq->task_list, q->task_list)
+   spin_unlock(q->lock);
+
+   *fetch old value of gp_flags here *
+
+                                 spin_unlock(rnp_root)
+
+                                 rcu_gp_kthread_wake() {
+                                  swake_up(wq) {
+                                   swait_active(wq) {
+                                    list_empty(wq->task_list)
+
+                                   } * return false *
+
+  if (condition) * false *
+    schedule();
+
+In this case, a wakeup is missed, which could cause the rcu_gp_kthread
+waits for a long time.
+
+The reason of this is that we do a lockless swait_active() check in
+swake_up(). To fix this, we can either 1) add a smp_mb() in swake_up()
+before swait_active() to provide the proper order or 2) simply remove
+the swait_active() in swake_up().
+
+The solution 2 not only fixes this problem but also keeps the swait and
+wait API as close as possible, as wake_up() doesn't provide a full
+barrier and doesn't do a lockless check of the wait queue either.
+Moreover, there are users already using swait_active() to do their quick
+checks for the wait queues, so it make less sense that swake_up() and
+swake_up_all() do this on their own.
+
+This patch then removes the lockless swait_active() check in swake_up()
+and swake_up_all().
+
+Reported-by: Steven Rostedt <rostedt@goodmis.org>
+Signed-off-by: Boqun Feng <boqun.feng@gmail.com>
+---
+ kernel/sched/swait.c | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/kernel/sched/swait.c b/kernel/sched/swait.c
+index 3d5610dcce11..2227e183e202 100644
+--- a/kernel/sched/swait.c
++++ b/kernel/sched/swait.c
+@@ -33,9 +33,6 @@ void swake_up(struct swait_queue_head *q)
+ {
+ 	unsigned long flags;
+ 
+-	if (!swait_active(q))
+-		return;
+-
+ 	raw_spin_lock_irqsave(&q->lock, flags);
+ 	swake_up_locked(q);
+ 	raw_spin_unlock_irqrestore(&q->lock, flags);
+@@ -51,9 +48,6 @@ void swake_up_all(struct swait_queue_head *q)
+ 	struct swait_queue *curr;
+ 	LIST_HEAD(tmp);
+ 
+-	if (!swait_active(q))
+-		return;
+-
+ 	raw_spin_lock_irq(&q->lock);
+ 	list_splice_init(&q->task_list, &tmp);
+ 	while (!list_empty(&tmp)) {
+-- 
+2.13.0
