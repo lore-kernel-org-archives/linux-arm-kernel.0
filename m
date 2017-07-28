@@ -1,60 +1,77 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 28 Jul 2017 15:10:18 +0100
-Subject: [PATCH v2 15/16] KVM: arm64: Save ESR_EL2 on guest SError
+Date: Fri, 28 Jul 2017 15:10:10 +0100
+Subject: [PATCH v2 07/16] arm64: entry.S: convert elX_irq
 In-Reply-To: <20170728141019.9084-1-james.morse@arm.com>
 References: <20170728141019.9084-1-james.morse@arm.com>
-Message-ID: <20170728141019.9084-16-james.morse@arm.com>
+Message-ID: <20170728141019.9084-8-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we exit a guest due to an SError the vcpu fault info isn't updated
-with the ESR. Today this is only done for traps.
+Following our 'adi' order, Interrupts should be processed with Debug and
+SError exceptions unmasked.
 
-The v8.2 RAS Extensions define ISS values for SError. Update the vcpu's
-fault_info with the ESR on SError so that handle_exit() can determine
-if this was a RAS SError and decode its severity.
+Add a helper to unmask these two, (and fiq for good measure).
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/kvm/hyp/switch.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/assembler.h | 10 +++++-----
+ arch/arm64/kernel/entry.S          |  4 ++--
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 945e79c641c4..c6f17c7675ad 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -226,13 +226,20 @@ static bool __hyp_text __translate_far_to_hpfar(u64 far, u64 *hpfar)
- 	return true;
- }
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 6a2512da468a..a013ab05210d 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -56,6 +56,10 @@
+ 	msr	daif, \tmp
+ 	.endm
  
-+static void __hyp_text __populate_fault_info_esr(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.fault.esr_el2 = read_sysreg_el2(esr);
-+}
++	.macro enable_da_f
++	msr	daifclr, #(8 | 4 | 1)
++	.endm
 +
- static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
- {
--	u64 esr = read_sysreg_el2(esr);
--	u8 ec = ESR_ELx_EC(esr);
-+	u8 ec;
-+	u64 esr;
- 	u64 hpfar, far;
+ /*
+  * Enable and disable interrupts.
+  */
+@@ -80,16 +84,12 @@
+ 	msr	daifclr, #4
+ 	.endm
  
--	vcpu->arch.fault.esr_el2 = esr;
-+	__populate_fault_info_esr(vcpu);
-+	esr = vcpu->arch.fault.esr_el2;
-+	ec = ESR_ELx_EC(esr);
+-	.macro	enable_dbg
+-	msr	daifclr, #8
+-	.endm
+-
+ 	.macro	disable_step_tsk, flgs, tmp
+ 	tbz	\flgs, #TIF_SINGLESTEP, 9990f
+ 	mrs	\tmp, mdscr_el1
+ 	bic	\tmp, \tmp, #1
+ 	msr	mdscr_el1, \tmp
+-	isb	// Synchronise with enable_dbg
++	isb	// Synchronise with any daif write that enables debug
+ 9990:
+ 	.endm
  
- 	if (ec != ESR_ELx_EC_DABT_LOW && ec != ESR_ELx_EC_IABT_LOW)
- 		return true;
-@@ -321,6 +328,8 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	 */
- 	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
- 		goto again;
-+	else if (ARM_EXCEPTION_CODE(exit_code) == ARM_EXCEPTION_EL1_SERROR)
-+		__populate_fault_info_esr(vcpu);
- 
- 	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
- 	    exit_code == ARM_EXCEPTION_TRAP) {
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 51e704e46c29..2fde60f96239 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -477,7 +477,7 @@ ENDPROC(el1_sync)
+ 	.align	6
+ el1_irq:
+ 	kernel_entry 1
+-	enable_dbg
++	enable_da_f
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	bl	trace_hardirqs_off
+ #endif
+@@ -677,7 +677,7 @@ ENDPROC(el0_sync)
+ el0_irq:
+ 	kernel_entry 0
+ el0_irq_naked:
+-	enable_dbg
++	enable_da_f
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	bl	trace_hardirqs_off
+ #endif
 -- 
 2.13.2
