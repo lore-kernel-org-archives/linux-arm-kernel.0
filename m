@@ -1,77 +1,154 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 28 Jul 2017 15:10:10 +0100
-Subject: [PATCH v2 07/16] arm64: entry.S: convert elX_irq
+Date: Fri, 28 Jul 2017 15:10:16 +0100
+Subject: [PATCH v2 13/16] arm64: cpufeature: Enable Implicit ESB on
+ entry/return-from EL1
 In-Reply-To: <20170728141019.9084-1-james.morse@arm.com>
 References: <20170728141019.9084-1-james.morse@arm.com>
-Message-ID: <20170728141019.9084-8-james.morse@arm.com>
+Message-ID: <20170728141019.9084-14-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Following our 'adi' order, Interrupts should be processed with Debug and
-SError exceptions unmasked.
+ARM v8.2 adds a feature to add implicit error synchronization barriers
+whenever the CPU enters or returns from EL1. Add code to detect this
+feature and enable the SCTLR_EL1.IESB bit.
 
-Add a helper to unmask these two, (and fiq for good measure).
+The explicit ESBs on entry/return-from EL1 are replaced with nops
+by this feature.
+
+Platform level RAS support may require additional firmware support.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/assembler.h | 10 +++++-----
- arch/arm64/kernel/entry.S          |  4 ++--
- 2 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm64/Kconfig                 | 15 +++++++++++++++
+ arch/arm64/include/asm/cpucaps.h   |  3 ++-
+ arch/arm64/include/asm/processor.h |  1 +
+ arch/arm64/include/asm/sysreg.h    |  1 +
+ arch/arm64/kernel/cpufeature.c     | 21 +++++++++++++++++++++
+ arch/arm64/kernel/entry.S          |  4 ++++
+ 6 files changed, 44 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 6a2512da468a..a013ab05210d 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -56,6 +56,10 @@
- 	msr	daif, \tmp
- 	.endm
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 6e417e25672f..f6367cc2e180 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -976,6 +976,21 @@ config ARM64_RAS_EXTN
+ 	  and access the new registers if the system supports the extension.
+ 	  Platform RAS features may additionally depend on firmware support.
  
-+	.macro enable_da_f
-+	msr	daifclr, #(8 | 4 | 1)
-+	.endm
++config ARM64_IESB
++	bool "Enable Implicit Error Synchronization Barrier (IESB)"
++	default y
++	depends on ARM64_RAS_EXTN
++	help
++	  ARM v8.2 adds a feature to add implicit error synchronization
++	  barriers whenever the CPU enters or exits a particular exception
++	  level.
 +
- /*
-  * Enable and disable interrupts.
-  */
-@@ -80,16 +84,12 @@
- 	msr	daifclr, #4
- 	.endm
++	  On CPUs with this feature and the 'RAS Extensions' feature, we can
++	  use this to contain detected (but not yet reported) errors to the
++	  relevant exception level.
++
++	  The feature is detected at runtime, selecting this option will
++	  enable these implicit barriers if the CPU supports the feature.
+ endmenu
  
--	.macro	enable_dbg
--	msr	daifclr, #8
--	.endm
--
- 	.macro	disable_step_tsk, flgs, tmp
- 	tbz	\flgs, #TIF_SINGLESTEP, 9990f
- 	mrs	\tmp, mdscr_el1
- 	bic	\tmp, \tmp, #1
- 	msr	mdscr_el1, \tmp
--	isb	// Synchronise with enable_dbg
-+	isb	// Synchronise with any daif write that enables debug
- 9990:
- 	.endm
+ config ARM64_MODULE_CMODEL_LARGE
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index f93bf77f1f74..716545c96714 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -40,7 +40,8 @@
+ #define ARM64_WORKAROUND_858921			19
+ #define ARM64_WORKAROUND_CAVIUM_30115		20
+ #define ARM64_HAS_RAS_EXTN			21
++#define ARM64_HAS_IESB				22
  
+-#define ARM64_NCAPS				22
++#define ARM64_NCAPS				23
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 82e8ff01153d..fe353f5a4a7b 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -194,5 +194,6 @@ static inline void spin_lock_prefetch(const void *ptr)
+ int cpu_enable_pan(void *__unused);
+ int cpu_enable_cache_maint_trap(void *__unused);
+ int cpu_clear_disr(void *__unused);
++int cpu_enable_iesb(void *__unused);
+ 
+ #endif /* __ASM_PROCESSOR_H */
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 18cabd92af22..e817e802f0b9 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -314,6 +314,7 @@
+ /* SCTLR_EL1 specific flags. */
+ #define SCTLR_EL1_UCI		(1 << 26)
+ #define SCTLR_EL1_SPAN		(1 << 23)
++#define SCTLR_EL1_IESB		(1 << 21)
+ #define SCTLR_EL1_UCT		(1 << 15)
+ #define SCTLR_EL1_SED		(1 << 8)
+ #define SCTLR_EL1_CP15BEN	(1 << 5)
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 6dbefe401dc4..12cb1b7ef46b 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -901,6 +901,19 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.min_field_value = ID_AA64PFR0_RAS_V1,
+ 		.enable = cpu_clear_disr,
+ 	},
++#ifdef CONFIG_ARM64_IESB
++	{
++		.desc = "Implicit Error Synchronization Barrier",
++		.capability = ARM64_HAS_IESB,
++		.def_scope = SCOPE_SYSTEM,
++		.matches = has_cpuid_feature,
++		.sys_reg = SYS_ID_AA64MMFR2_EL1,
++		.sign = FTR_UNSIGNED,
++		.field_pos = ID_AA64MMFR2_IESB_SHIFT,
++		.min_field_value = 1,
++		.enable = cpu_enable_iesb,
++	},
++#endif /* CONFIG_ARM64_IESB */
+ #endif /* CONFIG_ARM64_RAS_EXTN */
+ 	{},
+ };
+@@ -1317,3 +1330,11 @@ int cpu_clear_disr(void *__unused)
+ 
+ 	return 0;
+ }
++
++int cpu_enable_iesb(void *__unused)
++{
++	if (cpus_have_cap(ARM64_HAS_RAS_EXTN))
++		config_sctlr_el1(0, SCTLR_EL1_IESB);
++
++	return 0;
++}
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 51e704e46c29..2fde60f96239 100644
+index 173b86fac066..0e9b056385c2 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -477,7 +477,7 @@ ENDPROC(el1_sync)
- 	.align	6
- el1_irq:
- 	kernel_entry 1
--	enable_dbg
-+	enable_da_f
- #ifdef CONFIG_TRACE_IRQFLAGS
- 	bl	trace_hardirqs_off
- #endif
-@@ -677,7 +677,7 @@ ENDPROC(el0_sync)
- el0_irq:
- 	kernel_entry 0
- el0_irq_naked:
--	enable_dbg
-+	enable_da_f
- #ifdef CONFIG_TRACE_IRQFLAGS
- 	bl	trace_hardirqs_off
- #endif
+@@ -160,7 +160,9 @@ alternative_else_nop_endif
+ 	msr	sp_el0, tsk
+ 	.endif
+ 
++	alternative_if_not ARM64_HAS_IESB
+ 	esb
++	alternative_else_nop_endif
+ 	disr_read reg=x15
+ 
+ 	/*
+@@ -442,7 +444,9 @@ ENDPROC(el1_error_invalid)
+ ENTRY(do_kernel_exit)
+ __do_kernel_exit_start:
+ 	enable_serror
++	alternative_if_not ARM64_HAS_IESB
+ 	esb
++	alternative_else_nop_endif
+ 
+ 	eret
+ __do_kernel_exit_end:
 -- 
 2.13.2
