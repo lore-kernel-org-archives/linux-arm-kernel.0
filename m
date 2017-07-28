@@ -1,89 +1,57 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 28 Jul 2017 10:59:35 +0100
-Subject: [PATCH 1/3] memory: mtk-smi: add larbid init routine
-In-Reply-To: <1501204505.29316.9.camel@mtksdaap41>
-References: <1501120872-19652-1-git-send-email-honghui.zhang@mediatek.com>
- <1501120872-19652-2-git-send-email-honghui.zhang@mediatek.com>
- <f7dac4d6-4ef8-e10d-e483-088120392ab2@gmail.com>
- <1501204505.29316.9.camel@mtksdaap41>
-Message-ID: <a4a00e4b-175c-88d3-d2b4-9f4f1c41a935@arm.com>
+From: hugues.fruchet@st.com (Hugues Fruchet)
+Date: Fri, 28 Jul 2017 12:04:59 +0200
+Subject: [PATCH v1 2/5] [media] stm32-dcmi: revisit control register handling
+In-Reply-To: <1501236302-18097-1-git-send-email-hugues.fruchet@st.com>
+References: <1501236302-18097-1-git-send-email-hugues.fruchet@st.com>
+Message-ID: <1501236302-18097-3-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/07/17 02:15, Honghui Zhang wrote:
-> On Thu, 2017-07-27 at 17:42 +0200, Matthias Brugger wrote:
->>
->> On 07/27/2017 04:01 AM, honghui.zhang at mediatek.com wrote:
->>> From: Honghui Zhang <honghui.zhang@mediatek.com>
->>>
->>> In the commit 3c8f4ad85c4b ("memory/mediatek: add support for mt2701"),
->>> the larb->larbid was added but not initialized.
->>> Mediatek's gen1 smi need this hardware larbid information to get the
->>> register offset which controls whether enable iommu for this larb.
->>> This patch add the initialize routine for larbid.
->>>
->>> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
->>> ---
->>>   drivers/memory/mtk-smi.c | 9 +++++++++
->>>   1 file changed, 9 insertions(+)
->>>
->>> diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
->>> index 2b798bb4..fe36b3e 100644
->>> --- a/drivers/memory/mtk-smi.c
->>> +++ b/drivers/memory/mtk-smi.c
->>> @@ -240,6 +240,7 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
->>>   	struct device *dev = &pdev->dev;
->>>   	struct device_node *smi_node;
->>>   	struct platform_device *smi_pdev;
->>> +	int err;
->>>   
->>>   	if (!dev->pm_domain)
->>>   		return -EPROBE_DEFER;
->>> @@ -263,6 +264,14 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
->>>   		return PTR_ERR(larb->smi.clk_smi);
->>>   	larb->smi.dev = dev;
->>>   
->>> +	err = of_property_read_u32(dev->of_node, "mediatek,larbid",
->>> +				   &larb->larbid);
->>> +	if (err && of_device_is_compatible(dev->of_node,
->>> +					   "mediatek,mt2701-smi-larb")) {
->>
->> Instead of checking hard-coded bindings you should be able to determine the 
->> generation using the smi_pdev.
->> Apart I think it would be better to check for mediatek,larbid only on 
->> MTK_SIM_GEN1, or do I miss something?
->>
-> 
-> Hi, Matthias,
-> 	There's a new SoC of mediatek which use MTK_SMI_GEN2 hardware, but it
-> has 2 iommus and 2 smi_common, and we are intend to send it's driver
-> soon. It need the mediatek,larbid to identify which iommu should be
-> binding to.
-> 
-> This patch use the hard-code bindings will make the future work easier.
+Simplify bits handling of DCMI_CR register.
 
-In that case, might it make sense to add some indicator like "bool
-need_larb_id" to struct mtk_smi_larb_gen?
+Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
+---
+ drivers/media/platform/stm32/stm32-dcmi.c | 14 ++++----------
+ 1 file changed, 4 insertions(+), 10 deletions(-)
 
-Robin.
-
-> 
-> thanks.
->> Regards,
->> Matthias
->>
->>> +		dev_err(dev, "missing larbid property\n");
->>> +		return err;
->>> +	}
->>> +
->>>   	smi_node = of_parse_phandle(dev->of_node, "mediatek,smi", 0);
->>>   	if (!smi_node)
->>>   		return -EINVAL;
->>>
->>
->> _______________________________________________
->> Linux-mediatek mailing list
->> Linux-mediatek at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-mediatek
-> 
-> 
+diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
+index 716b3db..526e354 100644
+--- a/drivers/media/platform/stm32/stm32-dcmi.c
++++ b/drivers/media/platform/stm32/stm32-dcmi.c
+@@ -490,7 +490,7 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
+ {
+ 	struct stm32_dcmi *dcmi = vb2_get_drv_priv(vq);
+ 	struct dcmi_buf *buf, *node;
+-	u32 val;
++	u32 val = 0;
+ 	int ret;
+ 
+ 	ret = clk_enable(dcmi->mclk);
+@@ -510,22 +510,16 @@ static int dcmi_start_streaming(struct vb2_queue *vq, unsigned int count)
+ 
+ 	spin_lock_irq(&dcmi->irqlock);
+ 
+-	val = reg_read(dcmi->regs, DCMI_CR);
+-
+-	val &= ~(CR_PCKPOL | CR_HSPOL | CR_VSPOL |
+-		 CR_EDM_0 | CR_EDM_1 | CR_FCRC_0 |
+-		 CR_FCRC_1 | CR_JPEG | CR_ESS);
+-
+ 	/* Set bus width */
+ 	switch (dcmi->bus.bus_width) {
+ 	case 14:
+-		val &= CR_EDM_0 + CR_EDM_1;
++		val |= CR_EDM_0 | CR_EDM_1;
+ 		break;
+ 	case 12:
+-		val &= CR_EDM_1;
++		val |= CR_EDM_1;
+ 		break;
+ 	case 10:
+-		val &= CR_EDM_0;
++		val |= CR_EDM_0;
+ 		break;
+ 	default:
+ 		/* Set bus width to 8 bits by default */
+-- 
+1.9.1
