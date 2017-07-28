@@ -1,92 +1,150 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 28 Jul 2017 17:16:08 +0100
-Subject: [GIT PULL] arm64 fixes for 4.13-rc3
-Message-ID: <20170728161607.GA6571@arm.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 28 Jul 2017 17:17:42 +0100
+Subject: [RFC PATCH v1] net: ethernet: nb8800: Reset HW block in ndo_open
+In-Reply-To: <823b1540-b528-bbd7-7f99-5dc39a08868a@sigmadesigns.com> (Marc
+ Gonzalez's message of "Fri, 28 Jul 2017 18:13:15 +0200")
+References: <823b1540-b528-bbd7-7f99-5dc39a08868a@sigmadesigns.com>
+Message-ID: <yw1xk22slemx.fsf@mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-Please pull these arm64 fixes for 4.13. I'd been collecting these whilst
-we debugged a CPU hotplug failure, but we ended up diagnosing that one
-to tglx, who has taken a fix via -tip separately.
+> ndo_stop breaks RX in a way that ndo_open is unable to undo.
 
-We're seeing some NFS issues that we haven't gotten to the bottom of yet,
-and we've uncovered some issues with our backtracing too so there might
-be another fixes pull before we're done.
+Please elaborate.  Why can't it be fixed in a less heavy-handed way?
 
-Cheers,
+> Work around the issue by resetting the HW in ndo_open.
+> This will provide the basis for suspend/resume support.
+>
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> ---
+>  drivers/net/ethernet/aurora/nb8800.c | 40 +++++++++++++++++-------------------
+>  drivers/net/ethernet/aurora/nb8800.h |  1 +
+>  2 files changed, 20 insertions(+), 21 deletions(-)
 
-Will
+I'm pretty sure this doesn't preserve everything it should.
 
---->8
+> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
+> index e94159507847..954a28542c3b 100644
+> --- a/drivers/net/ethernet/aurora/nb8800.c
+> +++ b/drivers/net/ethernet/aurora/nb8800.c
+> @@ -39,6 +39,7 @@
+>
+>  #include "nb8800.h"
+>
+> +static void nb8800_init(struct net_device *dev);
+>  static void nb8800_tx_done(struct net_device *dev);
+>  static int nb8800_dma_stop(struct net_device *dev);
+>
+> @@ -957,6 +958,8 @@ static int nb8800_open(struct net_device *dev)
+>  	struct phy_device *phydev;
+>  	int err;
+>
+> +	nb8800_init(dev);
+> +
+>  	/* clear any pending interrupts */
+>  	nb8800_writel(priv, NB8800_RXC_SR, 0xf);
+>  	nb8800_writel(priv, NB8800_TXC_SR, 0xf);
+> @@ -1350,6 +1353,20 @@ static const struct of_device_id nb8800_dt_ids[] = {
+>  };
+>  MODULE_DEVICE_TABLE(of, nb8800_dt_ids);
+>
+> +static void nb8800_init(struct net_device *dev)
+> +{
+> +	struct nb8800_priv *priv = netdev_priv(dev);
+> +	const struct nb8800_ops *ops = priv->ops;
+> +
+> +	if (ops && ops->reset)
+> +		ops->reset(dev);
+> +	nb8800_hw_init(dev);
+> +	if (ops && ops->init)
+> +		ops->init(dev);
+> +	nb8800_update_mac_addr(dev);
+> +	priv->speed = 0;
+> +}
+> +
+>  static int nb8800_probe(struct platform_device *pdev)
+>  {
+>  	const struct of_device_id *match;
+> @@ -1389,6 +1406,7 @@ static int nb8800_probe(struct platform_device *pdev)
+>
+>  	priv = netdev_priv(dev);
+>  	priv->base = base;
+> +	priv->ops = ops;
+>
+>  	priv->phy_mode = of_get_phy_mode(pdev->dev.of_node);
+>  	if (priv->phy_mode < 0)
+> @@ -1407,12 +1425,6 @@ static int nb8800_probe(struct platform_device *pdev)
+>
+>  	spin_lock_init(&priv->tx_lock);
+>
+> -	if (ops && ops->reset) {
+> -		ret = ops->reset(dev);
+> -		if (ret)
+> -			goto err_disable_clk;
+> -	}
+> -
+>  	bus = devm_mdiobus_alloc(&pdev->dev);
+>  	if (!bus) {
+>  		ret = -ENOMEM;
+> @@ -1454,16 +1466,6 @@ static int nb8800_probe(struct platform_device *pdev)
+>
+>  	priv->mii_bus = bus;
+>
+> -	ret = nb8800_hw_init(dev);
+> -	if (ret)
+> -		goto err_deregister_fixed_link;
+> -
+> -	if (ops && ops->init) {
+> -		ret = ops->init(dev);
+> -		if (ret)
+> -			goto err_deregister_fixed_link;
+> -	}
+> -
+>  	dev->netdev_ops = &nb8800_netdev_ops;
+>  	dev->ethtool_ops = &nb8800_ethtool_ops;
+>  	dev->flags |= IFF_MULTICAST;
+> @@ -1476,14 +1478,12 @@ static int nb8800_probe(struct platform_device *pdev)
+>  	if (!is_valid_ether_addr(dev->dev_addr))
+>  		eth_hw_addr_random(dev);
+>
+> -	nb8800_update_mac_addr(dev);
+> -
+>  	netif_carrier_off(dev);
+>
+>  	ret = register_netdev(dev);
+>  	if (ret) {
+>  		netdev_err(dev, "failed to register netdev\n");
+> -		goto err_free_dma;
+> +		goto err_deregister_fixed_link;
+>  	}
+>
+>  	netif_napi_add(dev, &priv->napi, nb8800_poll, NAPI_POLL_WEIGHT);
+> @@ -1492,8 +1492,6 @@ static int nb8800_probe(struct platform_device *pdev)
+>
+>  	return 0;
+>
+> -err_free_dma:
+> -	nb8800_dma_free(dev);
+>  err_deregister_fixed_link:
+>  	if (of_phy_is_fixed_link(pdev->dev.of_node))
+>  		of_phy_deregister_fixed_link(pdev->dev.of_node);
+> diff --git a/drivers/net/ethernet/aurora/nb8800.h b/drivers/net/ethernet/aurora/nb8800.h
+> index 6ec4a956e1e5..d5f4481a2c7b 100644
+> --- a/drivers/net/ethernet/aurora/nb8800.h
+> +++ b/drivers/net/ethernet/aurora/nb8800.h
+> @@ -305,6 +305,7 @@ struct nb8800_priv {
+>  	dma_addr_t			tx_desc_dma;
+>
+>  	struct clk			*clk;
+> +	const struct nb8800_ops		*ops;
+>  };
+>
+>  struct nb8800_ops {
+> -- 
+> 2.11.0
+>
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
-
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 92bbd16e500c85bc210ba48caecbfbdb721bb5b4:
-
-  arm64: mmu: Place guard page after mapping of kernel image (2017-07-28 10:32:14 +0100)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- Ensure we have a guard page after the kernel image in vmalloc
-
-- Fix incorrect prefetch stride in copy_page
-
-- Ensure irqs are disabled in die()
-
-- Fix for event group validation in QCOM L2 PMU driver
-
-- Fix requesting of PMU IRQs on AMD Seattle
-
-- Minor cleanups and fixes
-
-----------------------------------------------------------------
-Ard Biesheuvel (1):
-      arm64/lib: copy_page: use consistent prefetch stride
-
-Dave Martin (1):
-      arm64: sysreg: Fix unprotected macro argmuent in write_sysreg
-
-Neil Leeder (1):
-      perf: qcom_l2: fix column exclusion check
-
-Punit Agrawal (1):
-      arm64/numa: Drop duplicate message
-
-Qiao Zhou (1):
-      arm64: traps: disable irq in die()
-
-Rob Herring (2):
-      arm64: Convert to using %pOF instead of full_name
-      perf: Convert to using %pOF instead of full_name
-
-Will Deacon (4):
-      arm64: uaccess: Remove redundant __force from addr cast in __range_ok
-      arm64: atomics: Remove '&' from '+&' asm constraint in lse atomics
-      drivers/perf: arm_pmu: Request PMU SPIs with IRQF_PER_CPU
-      arm64: mmu: Place guard page after mapping of kernel image
-
- arch/arm/mach-ux500/cpu-db8500.c    |  1 +
- arch/arm64/include/asm/atomic_lse.h |  2 +-
- arch/arm64/include/asm/sysreg.h     |  4 ++--
- arch/arm64/include/asm/uaccess.h    |  2 +-
- arch/arm64/kernel/cpu_ops.c         |  4 ++--
- arch/arm64/kernel/smp.c             | 12 +++++------
- arch/arm64/kernel/topology.c        | 22 ++++++++++----------
- arch/arm64/kernel/traps.c           |  8 ++++++--
- arch/arm64/lib/copy_page.S          |  9 ++++----
- arch/arm64/mm/mmu.c                 | 18 +++++++++-------
- arch/arm64/mm/numa.c                |  7 +------
- drivers/perf/arm_pmu.c              | 41 ++++++++++++++++++++++++-------------
- drivers/perf/arm_pmu_platform.c     |  9 ++++----
- drivers/perf/qcom_l2_pmu.c          |  2 ++
- include/linux/perf/arm_pmu.h        |  4 ++++
- 15 files changed, 84 insertions(+), 61 deletions(-)
+-- 
+M?ns Rullg?rd
