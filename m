@@ -1,27 +1,64 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 28 Jul 2017 11:42:34 -0700 (PDT)
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170728125416.j7gcgvnxgv2gq73u@tardis>
-References: <20170727165245.GD3730@linux.vnet.ibm.com>
- <20170728084411.00001ddb@huawei.com>
- <20170728125416.j7gcgvnxgv2gq73u@tardis>
-Message-ID: <20170728.114234.665847938315546094.davem@davemloft.net>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 28 Jul 2017 19:56:17 +0100
+Subject: [RFC PATCH v1] net: ethernet: nb8800: Reset HW block in ndo_open
+In-Reply-To: <c1bf54ee-8634-23a1-abda-55bc3fafe2a8@sigmadesigns.com> (Marc
+ Gonzalez's message of "Fri, 28 Jul 2017 18:43:42 +0200")
+References: <823b1540-b528-bbd7-7f99-5dc39a08868a@sigmadesigns.com>
+ <yw1xk22slemx.fsf@mansr.com>
+ <c1bf54ee-8634-23a1-abda-55bc3fafe2a8@sigmadesigns.com>
+Message-ID: <yw1xfudgl7am.fsf@mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boqun Feng <boqun.feng@gmail.com>
-Date: Fri, 28 Jul 2017 20:54:16 +0800
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-> Hi Jonathan,
-> 
-> FWIW, there is wakeup-missing issue in swake_up() and swake_up_all():
-> 
-> 	https://marc.info/?l=linux-kernel&m=149750022019663
-> 
-> and RCU begins to use swait/wake last year, so I thought this could be
-> relevant.
-> 
-> Could you try the following patch and see if it works? Thanks.
+> On 28/07/2017 18:17, M?ns Rullg?rd wrote:
+>
+>> Marc Gonzalez wrote:
+>> 
+>>> ndo_stop breaks RX in a way that ndo_open is unable to undo.
+>> 
+>> Please elaborate.  Why can't it be fixed in a less heavy-handed way?
+>
+> I'm not sure what "elaborate" means. After we've been through
+> ndo_stop once, the board can send packets, but it doesn't see
+> any replies from remote systems. RX is wedged.
 
-Just FYI I'm testing this patch now on sparc64...
+So you say, but you have not explained why this happens.  Until we know
+why, we can't decide on the proper fix.
+
+> I think ndo_stop is rare enough an event that doing a full
+> reset is not an issue, in terms of performance.
+
+Performance isn't the issue.  Doing the right thing is.
+
+> Also I will need this infrastructure anyway for suspend/resume
+> support.
+
+> It might also make sense to put the HW in reset at close
+> (to save power). I will try measuring the power savings,
+> if any.
+>
+>>> Work around the issue by resetting the HW in ndo_open.
+>>> This will provide the basis for suspend/resume support.
+>>>
+>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>> ---
+>>>  drivers/net/ethernet/aurora/nb8800.c | 40 +++++++++++++++++-------------------
+>>>  drivers/net/ethernet/aurora/nb8800.h |  1 +
+>>>  2 files changed, 20 insertions(+), 21 deletions(-)
+>> 
+>> I'm pretty sure this doesn't preserve everything it should.
+>
+> Hmmm, we're supposed to start fresh ("full reset").
+> What could there be to preserve?
+> You mentioned flow control and multicast elsewhere.
+> I will take a closer look. Thanks for the heads up.
+
+Yes, those settings are definitely lost with your patch.  Now I'm not
+sure whether the networking core expects these to survive a stop/start
+cycle, so please check that.  There might also be other less obvious
+things that need to be preserved.
+
+-- 
+M?ns Rullg?rd
