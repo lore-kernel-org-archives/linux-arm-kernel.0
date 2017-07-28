@@ -1,65 +1,34 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 29 Jul 2017 00:04:31 +0100
-Subject: [PATCH] [RFC] ARM: move __bug_table into .data for XIP_KERNEL
-In-Reply-To: <alpine.LFD.2.20.1707281119450.5981@knanqh.ubzr>
-References: <20170728141108.1283320-1-arnd@arndb.de>
- <alpine.LFD.2.20.1707281119450.5981@knanqh.ubzr>
-Message-ID: <27F512E2-F027-4BD1-9D40-ECCC55952DC3@linaro.org>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 28 Jul 2017 16:12:33 -0700
+Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
+ counters
+In-Reply-To: <20170727131515.GC28548@nazgul.tnic>
+References: <20170726155548.GF28875@nazgul.tnic>
+ <20170726161949.GB15426@kroah.com>
+ <20170726163049.GG28875@nazgul.tnic>
+ <20170726173353.GB21705@kroah.com>
+ <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
+ <20170726200802.GA17722@kroah.com>
+ <b27cda60-8bf8-47a1-15b5-bf8b3a83fc45@gmail.com>
+ <20170727051157.GA4525@nazgul.tnic> <20170727090856.GB15784@hc>
+ <20170727131515.GC28548@nazgul.tnic>
+Message-ID: <20170728231233.GA29240@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jul 27, 2017 at 03:15:15PM +0200, Borislav Petkov wrote:
+> On Thu, Jul 27, 2017 at 11:08:56AM +0200, Jan Glauber wrote:
+> > OK. As fixing the firmware will take quite some time I'll go for the memory
+> > controller driver that starts EDAC / PMU depending on their CONFIG_.
+> > 
+> > What would be the proper location for the multiplexer?
+> > drivers/soc/cavium or drivers/misc?
+> 
+> Uff, no idea. Greg? You're the special drivers guy. :-)
 
+Start out in misc/ and let's see the code to determine if it should be
+moved elsewhere.
 
-> On 28 Jul 2017, at 16:27, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> 
->> On Fri, 28 Jul 2017, Arnd Bergmann wrote:
->> 
->> Matt Hart reports that vf610m4_defconfig kernels grew to 2GB
->> xipImage size after the __bug_table change.
->> 
->> I tried out a few things and found that moving the bug table
->> into the .data section avoids this problem. However, the
->> linker script magic is beyond my capabilities here, so this
->> is almost certainly not correct.
-> 
-> Well, before your patch the BUG_TABLE location as well as its runtime 
-> functionality were completely wrong and broken.
-> 
->> I've added a few people to Cc that understand this better
->> than I do, hopefully someone can turn my bogus patch into
->> a proper one.
-> 
-> Your patch isn't as bad as you make it, but maybe the following will 
-> avoid open recoding BUG_TABLE locally:
-> 
-> diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
-> index 8265b11621..21b4b29c2f 100644
-> --- a/arch/arm/kernel/vmlinux-xip.lds.S
-> +++ b/arch/arm/kernel/vmlinux-xip.lds.S
-> @@ -237,13 +237,13 @@ SECTIONS
->         */
->        DATA_DATA
->        CONSTRUCTORS
-> -
-> -        _edata = .;
->    }
-> -    _edata_loc = __data_loc + SIZEOF(.data);
-> 
->    BUG_TABLE
-> 
+thanks,
 
-The .data section is deliberately emitted with LMA != VMA so that the code refers to the correct offset in RAM while the initial contents are in ROM and are copied into RAM by the startup code.
-
-This applies to the bug table as well (now that it needs to be writable) so the only correct way to do this is to move it into .data like Arnd's patch does.
-
-I guess we could split the macro so we can emit bug table into an existing section, but in itself, the code is correct, and i don't see a better way of doing it.
-
-> +    _edata = .;
-> +    _edata_loc = __data_loc + SIZEOF(.data);
-> +
-> #ifdef CONFIG_HAVE_TCM
->         /*
->     * We align everything to a page boundary so we can
-> 
-> 
-> Nicolas
+greg k-h
