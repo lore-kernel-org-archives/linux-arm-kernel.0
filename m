@@ -1,32 +1,50 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 28 Jul 2017 09:23:16 +0200
-Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <20170728011130.GC19160@kroah.com>
-References: <20170726155548.GF28875@nazgul.tnic>
- <20170726161949.GB15426@kroah.com>
- <20170726163049.GG28875@nazgul.tnic>
- <20170726173353.GB21705@kroah.com>
- <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
- <20170726200802.GA17722@kroah.com>
- <b27cda60-8bf8-47a1-15b5-bf8b3a83fc45@gmail.com>
- <20170727022907.GC1398@kroah.com>
- <4f58aeab-7b8d-50dc-5497-6ac42536e0c0@gmail.com>
- <20170728011130.GC19160@kroah.com>
-Message-ID: <20170728072316.GE1884@nazgul.tnic>
+From: bp@suse.de (Borislav Petkov)
+Date: Fri, 28 Jul 2017 09:35:51 +0200
+Subject: [PATCH] MAINTAINERS: Add Tony and Boris as ACPI/APEI reviewers
+In-Reply-To: <3908561D78D1C84285E8C5FCA982C28F61317AEB@ORSMSX114.amr.corp.intel.com>
+References: <1500661477-6536-1-git-send-email-lho@apm.com>
+ <20170722055954.GA2082@nazgul.tnic>
+ <1893763.BLgt1zgLk5@aspire.rjw.lan>
+ <1632667.Vgem7HtdXu@aspire.rjw.lan>
+ <20170727055825.GA4611@nazgul.tnic>
+ <CAJZ5v0jVSrsufoWyexb_MWS=ni0CDn7Oo1-oHOcaTxdYpfpQMg@mail.gmail.com>
+ <20170727144922.GF28553@nazgul.tnic>
+ <CAJZ5v0gQ5aYZw8NOpvmw-1zqfFg_k+nkTZxEocnT=hDk37VsGA@mail.gmail.com>
+ <3908561D78D1C84285E8C5FCA982C28F61317AEB@ORSMSX114.amr.corp.intel.com>
+Message-ID: <20170728073551.GB1889@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 27, 2017 at 06:11:30PM -0700, Greg KH wrote:
-> Oh well, fix it in the kernel, that's what it's there for :)
+Since this piece of the ACPI pile is doing RAS, it is perhaps prudent if
+we at least paid attention to it and the direction it takes. So add Tony
+and me as reviewers.
 
-Duude, don't put crazy ideas in people's heads!
+Signed-off-by: Borislav Petkov <bp@suse.de>
+---
+ MAINTAINERS | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-:-)))
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f66488dfdbc9..985413fb5d83 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -310,6 +310,14 @@ F:	drivers/pci/*/*acpi*
+ F:	drivers/pci/*/*/*acpi*
+ F:	tools/power/acpi/
+ 
++ACPI APEI
++M:	"Rafael J. Wysocki" <rjw@rjwysocki.net>
++M:	Len Brown <lenb@kernel.org>
++L:	linux-acpi at vger.kernel.org
++R:	Tony Luck <tony.luck@intel.com>
++R:	Borislav Petkov <bp@alien8.de>
++F:	drivers/acpi/apei/
++
+ ACPI COMPONENT ARCHITECTURE (ACPICA)
+ M:	Robert Moore <robert.moore@intel.com>
+ M:	Lv Zheng <lv.zheng@intel.com>
 -- 
-Regards/Gruss,
-    Boris.
+2.14.0.rc0
 
-ECO tip #101: Trim your mails when you reply.
---
+SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
+-- 
