@@ -1,50 +1,48 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Fri, 28 Jul 2017 18:55:42 +0800
-Subject: [PATCH v2 2/3] dt-bindings: mediatek: add descriptions for larbid
-In-Reply-To: <1501239343-9190-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1501239343-9190-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1501239343-9190-3-git-send-email-honghui.zhang@mediatek.com>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Fri, 28 Jul 2017 19:37:13 +0800
+Subject: [PATCH v5 0/2] Add basic support for Mediatek MT2712 SoC
+Message-ID: <1501241835-47849-1-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+MT2712 is a SoC based on 64bit ARMv8 architecture.
+MT2712 share many HW IP with MT8173.  This patchset was tested on MT2712 evaluation board, and boot to shell ok.
 
-This patch add larbid descritptions for mediatek's gen1 smi larb hardware.
+This series contains document bindings, device tree including interrupt and uart.
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
----
- .../bindings/memory-controllers/mediatek,smi-larb.txt     | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+Changes compared to v4:
+- rebase to 4.13-rc1
+- use two clocks (baud_clk & sys_clk) instead of one uart_clk to the correct bindings
 
-diff --git a/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt b/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
-index 21277a5..d1b115c 100644
---- a/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
-+++ b/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
-@@ -15,6 +15,9 @@ Required properties:
- 	    the register.
-   - "smi" : It's the clock for transfer data and command.
- 
-+Required property for mt2701:
-+- mediatek,larbid :the hardware id of this larb.
-+
- Example:
- 	larb1: larb at 16010000 {
- 		compatible = "mediatek,mt8173-smi-larb";
-@@ -25,3 +28,15 @@ Example:
- 			 <&vdecsys CLK_VDEC_LARB_CKEN>;
- 		clock-names = "apb", "smi";
- 	};
-+
-+Example for mt2701:
-+	larb0: larb at 14010000 {
-+		compatible = "mediatek,mt2701-smi-larb";
-+		reg = <0 0x14010000 0 0x1000>;
-+		mediatek,smi = <&smi_common>;
-+		mediatek,larbid = <0>;
-+		clocks = <&mmsys CLK_MM_SMI_LARB0>,
-+			 <&mmsys CLK_MM_SMI_LARB0>;
-+		clock-names = "apb", "smi";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
-+	};
+Changes compared to v3:
+- use two uart clocks refer to the bindings
+
+Changes compared to v2:
+- remove alias from serial1 to serial5
+- remove initrd-start and initrd-end
+- change GIC_CPU_MASK_SIMPLE(6) to GIC_CPU_MASK_RAW(0x13)
+- change gic-400 reg range
+
+Changes compared to v1:
+- change subject prefix for bindings
+- change device tree license to SPDX tag.
+- change bootargs parameter to DT usage.
+- change intpol-controller to interrupt-controller
+
+YT Shen (2):
+  dt-bindings: arm: Add bindings for Mediatek MT2712 SoC Platform
+  arm64: dts: Add Mediatek SoC MT2712 and evaluation board dts and
+    Makefile
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
+ .../interrupt-controller/mediatek,sysirq.txt       |   1 +
+ .../devicetree/bindings/serial/mtk-uart.txt        |   1 +
+ arch/arm64/boot/dts/mediatek/Makefile              |   1 +
+ arch/arm64/boot/dts/mediatek/mt2712-evb.dts        |  32 ++++
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi          | 178 +++++++++++++++++++++
+ 6 files changed, 217 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+ create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+
 -- 
-2.6.4
+1.9.1
