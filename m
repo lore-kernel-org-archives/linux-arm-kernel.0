@@ -1,35 +1,75 @@
-From: cychiang@chromium.org (Cheng-Yi Chiang)
-Date: Fri, 28 Jul 2017 16:42:06 +0800
-Subject: [PATCH] ASoC: Intel: Reset hw_ptr on resume trigger
-Message-ID: <20170728084206.4431-1-cychiang@chromium.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 28 Jul 2017 09:46:45 +0100
+Subject: [PATCH] arm64: mmu: Place guard page after mapping of kernel image
+In-Reply-To: <1501175035-32460-1-git-send-email-will.deacon@arm.com>
+References: <1501175035-32460-1-git-send-email-will.deacon@arm.com>
+Message-ID: <CAKv+Gu_gKqP=a+LsKdbR0sW2R9xuFZ0Fe0afGPVVJqaiJ4WaQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "U. Artie Eoff" <ullysses.a.eoff@intel.com>
+On 27 July 2017 at 18:03, Will Deacon <will.deacon@arm.com> wrote:
+> The vast majority of virtual allocations in the vmalloc region are followed
+> by a guard page, which can help to avoid overruning on vma into another,
+> which may map a read-sensitive device.
+>
+> This patch adds a guard page to the end of the kernel image mapping (i.e.
+> following the data/bss segments).
+>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/mm/mmu.c | 18 +++++++++++-------
+>  1 file changed, 11 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 23c2d89a362e..f1eb15e0e864 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -496,7 +496,7 @@ void mark_rodata_ro(void)
+>
+>  static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+>                                       pgprot_t prot, struct vm_struct *vma,
+> -                                     int flags)
+> +                                     int flags, unsigned long vm_flags)
+>  {
+>         phys_addr_t pa_start = __pa_symbol(va_start);
+>         unsigned long size = va_end - va_start;
+> @@ -507,10 +507,13 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+>         __create_pgd_mapping(pgd, pa_start, (unsigned long)va_start, size, prot,
+>                              early_pgtable_alloc, flags);
+>
+> +       if (!(vm_flags & VM_NO_GUARD))
+> +               size += PAGE_SIZE;
+> +
+>         vma->addr       = va_start;
+>         vma->phys_addr  = pa_start;
+>         vma->size       = size;
+> -       vma->flags      = VM_MAP;
+> +       vma->flags      = VM_MAP | vm_flags;
+>         vma->caller     = __builtin_return_address(0);
+>
+>         vm_area_add_early(vma);
+> @@ -541,14 +544,15 @@ static void __init map_kernel(pgd_t *pgd)
+>          * Only rodata will be remapped with different permissions later on,
+>          * all other segments are allowed to use contiguous mappings.
+>          */
+> -       map_kernel_segment(pgd, _text, _etext, text_prot, &vmlinux_text, 0);
+> +       map_kernel_segment(pgd, _text, _etext, text_prot, &vmlinux_text, 0,
+> +                          VM_NO_GUARD);
+>         map_kernel_segment(pgd, __start_rodata, __inittext_begin, PAGE_KERNEL,
+> -                          &vmlinux_rodata, NO_CONT_MAPPINGS);
+> +                          &vmlinux_rodata, NO_CONT_MAPPINGS, VM_NO_GUARD);
+>         map_kernel_segment(pgd, __inittext_begin, __inittext_end, text_prot,
+> -                          &vmlinux_inittext, 0);
+> +                          &vmlinux_inittext, 0, VM_NO_GUARD);
+>         map_kernel_segment(pgd, __initdata_begin, __initdata_end, PAGE_KERNEL,
+> -                          &vmlinux_initdata, 0);
+> -       map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data, 0);
+> +                          &vmlinux_initdata, 0, VM_NO_GUARD);
+> +       map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data, 0, 0);
+>
+>         if (!pgd_val(*pgd_offset_raw(pgd, FIXADDR_START))) {
+>                 /*
 
-Reset the hw_ptr before queuing the restore_stream_context
-work to eradicate a nasty white audio noise on resume.
-
-Signed-off-by: U. Artie Eoff <ullysses.a.eoff@intel.com>
----
- sound/soc/intel/baytrail/sst-baytrail-pcm.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/sound/soc/intel/baytrail/sst-baytrail-pcm.c b/sound/soc/intel/baytrail/sst-baytrail-pcm.c
-index 4765ad474544..e0db7070cd42 100644
---- a/sound/soc/intel/baytrail/sst-baytrail-pcm.c
-+++ b/sound/soc/intel/baytrail/sst-baytrail-pcm.c
-@@ -187,8 +187,10 @@ static int sst_byt_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
- 		sst_byt_stream_start(byt, pcm_data->stream, 0);
- 		break;
- 	case SNDRV_PCM_TRIGGER_RESUME:
--		if (pdata->restore_stream == true)
-+		if (pdata->restore_stream == true) {
-+			pcm_data->hw_ptr = 0;
- 			schedule_work(&pcm_data->work);
-+		}
- 		else
- 			sst_byt_stream_resume(byt, pcm_data->stream);
- 		break;
--- 
-2.12.2
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
