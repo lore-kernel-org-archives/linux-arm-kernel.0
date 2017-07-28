@@ -1,29 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 28 Jul 2017 11:07:35 +0100
-Subject: [PATCH v2 0/3] ASoC: fix unbalanced of_node_get()/of_node_put()
-In-Reply-To: <20170727232612.23543-1-antonio.borneo@st.com>
-References: <20170725214952.6491-1-borneo.antonio@gmail.com>
- <20170727232612.23543-1-antonio.borneo@st.com>
-Message-ID: <20170728100735.enwrl7whjkmnicd7@sirena.org.uk>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 28 Jul 2017 12:07:00 +0200
+Subject: [PATCH 0/2] clk: meson: fix protection against undefined clks
+In-Reply-To: <20170727161755.10393-1-jbrunet@baylibre.com>
+References: <20170727161755.10393-1-jbrunet@baylibre.com>
+Message-ID: <709b4877-f3e5-3654-c0c7-970ea43161e6@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 01:26:09AM +0200, Antonio Borneo wrote:
-> From: Antonio Borneo <borneo.antonio@gmail.com>
+On 07/27/2017 06:17 PM, Jerome Brunet wrote:
+> If the last clkids defined have no hw pointer associated with them in
+> the hw_onecell_data array, the initialization is going to crash badly
+> because the array is not big enough.
 > 
-> On Hikey target board, enabling CONFIG_OF_DYNAMIC triggers several
-> errors at kernel boot, like
-> OF: ERROR: Bad of_node_put() on /soc/i2s at f7118000/ports/port at 0
-> OF: ERROR: Bad of_node_put() on /soc/i2s at f7118000/ports/port at 0/endpoint
-> each followed by stack dump.
+> The patchset makes sure the array is big enough, and that each clkid is
+> associated with a valid hw pointer, or NULL.
+> 
+> Doing it in two patches to ease backport, since we are not fixing the
+> same commit on meson8b and gxbb
+> 
+> Jerome Brunet (2):
+>   clk: meson: meson8b: fix protection against undefined clks
+>   clk: meson: gxbb: fix protection against undefined clks
+> 
+>  drivers/clk/meson/gxbb.c    | 2 ++
+>  drivers/clk/meson/meson8b.c | 1 +
+>  2 files changed, 3 insertions(+)
+> 
 
-Please take a look at the patches that Tony Lindgren has posted in the
-past day for this issue which go into the of_graph API to make it less
-error prone.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170728/2f9d19fa/attachment-0001.sig>
+Applied to clk-meson's fixes/drivers !
+
+Thanks,
+Neil
