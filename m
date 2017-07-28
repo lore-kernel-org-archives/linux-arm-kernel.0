@@ -1,138 +1,82 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Fri, 28 Jul 2017 15:48:48 +0000
-Subject: [PATCH v4 1/2] acpi:iort: Add an IORT helper function to
- reserve HW ITS address regions for IOMMU drivers
-In-Reply-To: <20170728095755.GA10987@red-moon>
-References: <20170725111732.41792-1-shameerali.kolothum.thodi@huawei.com>
- <20170725111732.41792-2-shameerali.kolothum.thodi@huawei.com>
- <20170725171100.GA1663@red-moon>
- <b7512f89-4fe7-940e-0fa9-9274d8b1e935@arm.com>
- <20170726095208.GA2468@red-moon>
- <5FC3163CFD30C246ABAA99954A238FA8383C0268@FRAEML521-MBX.china.huawei.com>
- <989fec76-45e7-d744-3411-78ec2764cb7d@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA8383C04A2@FRAEML521-MBX.china.huawei.com>
- <20170728095755.GA10987@red-moon>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA8383C0FA5@FRAEML521-MBX.china.huawei.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 28 Jul 2017 17:51:29 +0200
+Subject: [PATCH 0/7] ARM: NOMMU: MPU updates
+In-Reply-To: <1497344707-14446-1-git-send-email-vladimir.murzin@arm.com>
+References: <1497344707-14446-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <4f7f6318-dd3f-978c-5138-e9d16379e1c1@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Vlad,
 
-
-> -----Original Message-----
-> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> Sent: Friday, July 28, 2017 10:58 AM
-> To: Shameerali Kolothum Thodi
-> Cc: Robin Murphy; Guohanjun (Hanjun Guo); Gabriele Paoloni;
-> marc.zyngier at arm.com; John Garry; will.deacon at arm.com; Linuxarm; linux-
-> acpi at vger.kernel.org; iommu at lists.linux-foundation.org;
-> hanjun.guo at linaro.org; Wangzhou (B); sudeep.holla at arm.com; linux-arm-
-> kernel at lists.infradead.org; devel at acpica.org
-> Subject: Re: [PATCH v4 1/2] acpi:iort: Add an IORT helper function to reserve
-> HW ITS address regions for IOMMU drivers
+On 06/13/2017 11:05 AM, Vladimir Murzin wrote:
+> Hi,
 > 
-> On Thu, Jul 27, 2017 at 01:26:14PM +0000, Shameerali Kolothum Thodi wrote:
-> >
-> >
-> > > -----Original Message-----
-> > > From: Robin Murphy [mailto:robin.murphy at arm.com]
-> > > Sent: Thursday, July 27, 2017 12:13 PM
-> > > To: Shameerali Kolothum Thodi; Lorenzo Pieralisi
-> > > Cc: Guohanjun (Hanjun Guo); Gabriele Paoloni; marc.zyngier at arm.com;
-> > > John Garry; will.deacon at arm.com; Linuxarm;
-> > > linux-acpi at vger.kernel.org; iommu at lists.linux-foundation.org;
-> > > hanjun.guo at linaro.org; Wangzhou (B); sudeep.holla at arm.com;
-> > > linux-arm-kernel at lists.infradead.org;
-> > > devel at acpica.org
-> > > Subject: Re: [PATCH v4 1/2] acpi:iort: Add an IORT helper function
-> > > to reserve HW ITS address regions for IOMMU drivers
-> > >
-> > [...]
-> >
-> > > >>>> I can make these changes but I suspect this series will go via
-> > > >>>> IOMMU tree, let me know how you want to handle it.
-> > > >>>>
-> > > >>>> Lorenzo
-> > > >>>>
-> > > >>>>> +	node = iort_find_dev_node(dev);
-> > > >>>>> +	if (!node)
-> > > >>>>> +		return -ENODEV;
-> > > >>>>> +
-> > > >>>
-> > > >>> I'd suggest we also want a comment here to clarify that we're
-> > > >>> currently assuming straightforward topologies where all mappings
-> > > >>> for a given root complex/named component target the same ITS
-> > > >>> group. Otherwise
-> > > we're
-> > > >> going
-> > > >>> to need somewhat more logic to iterate the its_node processing
-> > > >>> over every mapping (or every alias in the PCI case), but avoid
-> > > >>> creating duplicate entries.
-> > > >>
-> > > >> You have a point and we have time to update the code. Short of
-> > > >> reserving all ITS regions for every device that maps to one at
-> > > >> least, we could (even pre-compute instead of looking it up on the
-> > > >> fly) create a list of ITS identifiers a given IORT node may map
-> > > >> to and use that to reserve the regions.
-> > > >
-> > > > I am trying to understand the use case scenario discussed here.
-> > > > Apologies if it is a dumb query.
-> > > >
-> > > > My understanding is that, it is possible to have a PCI  RC iort
-> > > > node mapped
-> > > to
-> > > > multiple ITS group nodes.  That is perfectly fine and given a dev
-> > > > input RID
-> > > we
-> > > > can identify the ITS group the device points to using -
-> iort_node_map_id().
-> > > >
-> > > > But the above discussion seems to suggest that there might be
-> > > > situations
-> > > where
-> > > > we have to go through all the mapped ITS groups and identify all
-> > > > the ITSs
-> > > associated
-> > > > with the RC.  Clearly I am missing something.
-> > >
-> > > I was mostly thinking of a situation like this:
-> > >
-> > > +----Node 0-----+  +----Node 1-----+
-> > > |  [CPU 0..n]   |  |  [CPU n+1..]  |
-> > > | [ITS group 0] |  | [ITS group 1] |
-> > > +---------------+  +---------------+
-> > >         ^                  ^
-> > >          \_______  _______/
-> > >                  \/
-> > >             +--Node 2--+
-> > >             |  [SMMU]  |
-> > >             |     ^    |
-> > >             |     |    |
-> > >             | [Device] |
-> > >             +----------+
-> > >
-> > > where the (named component) device has IDs for both ITS groups (to
-> > > help optimise affining, or allow physically hotplugging CPU nodes,
-> > > or whatever - I'm hypothesising here ;)).  A generic IORT function
-> > > isn't in a position to decide *which* ITS region the device may be
-> > > targeting at any given time, so can only correctly describe both.
-> >
-> > Thanks Robin. That makes it clear.
-> >
-> > > I'm perfectly happy not to even try to support such crazy
-> > > configurations until they actually exist, if ever; I'd just prefer
-> > > to document whatever assumptions we do make, so that we don't have
-> > > to remember or re-derive them when looking at the code in future.
-> >
-> > So I think the conclusion here is we will document the assumption that
-> > we are only taking care of the straightforward topologies for now.
-> >
-> > Hi Lorenzo,
-> > If you are ok with the above, please let me know if it make sense to
-> > send out a v5 with this and your other comments or you can take care
-> > of them. I am fine either way.
+> This is an update of the existent MPU code which consist set of
+> clean-ups and enhancements. The most significant changes are in the way
+> how MPU settings sync-up for secondaries (PATCH 3/7) and more flexible
+> layout for memory (PATCH 7/7). Since there is no in-tree user of MPU,
+> support for M-class has been added (PATCH 6/7).
 > 
-> I added below what should be the final patch - please have a look test and
-> post it as part of v5 that should hopefully be final.
+> Thanks!
+> 
+> Changelog:
+> 
+>          RFC v2 -> v1
+>                 - dropped RFC tag
+> 	       - Tested-by from Andr?s
+> 	       - rebased on 4.12-rc5
+> 
+>             RFC -> RFC v2
+> 	       - fixed MPU enable for v7m (PATCH 6/7)
+> 
+> Vladimir Murzin (7):
+>    ARM: NOMMU: Move out MPU setup in separate module
+>    ARM: NOMMU: Update MPU accessors to use cp15 helpers
+>    ARM: NOMMU: Rework MPU to be mostly done in C
+>    ARM: NOMMU: Disallow MPU for XIP
+>    ARM: Kconfig: Kill CONFIG_VECTORS_BASE
+>    ARM: V7M: Add support for MPU to M-class
+>    ARM: NOMMU: Use more MPU regions to cover memory
+> 
+>   arch/arm/Kconfig               |   9 -
+>   arch/arm/Kconfig-nommu         |   4 +-
+>   arch/arm/include/asm/cputype.h |  10 +
+>   arch/arm/include/asm/mpu.h     |  23 ++-
+>   arch/arm/include/asm/smp.h     |   2 +-
+>   arch/arm/include/asm/v7m.h     |  10 +
+>   arch/arm/kernel/asm-offsets.c  |  11 +
+>   arch/arm/kernel/head-nommu.S   | 128 +++++++++---
+>   arch/arm/kernel/smp.c          |   2 +-
+>   arch/arm/mm/Makefile           |   1 +
+>   arch/arm/mm/nommu.c            | 254 +----------------------
+>   arch/arm/mm/pmsa-v7.c          | 445 +++++++++++++++++++++++++++++++++++++++++
+>   12 files changed, 598 insertions(+), 301 deletions(-)
+>   create mode 100644 arch/arm/mm/pmsa-v7.c
+> 
 
-Thanks Lorenzo. Will do that.
-Shameer
+I tested two cases on stm32h743 (based on cortes-M7):
+
+  - NO XIP: it works fine.
+  - XIP: it is ko Kernel doesn't boot.
+
+I started investigations but no big success.
+I have a question:
+In arch/arm/kernel/head-nommu.S, I see that background region is set 
+after the XIP region. It seems due to save CPU register value. But doing 
+that you remove the XIP region just created. No ?
+
+Other point, why (in arch/arm/kernel/head-nommu.S) we couldn't create:
+
+1-backup region strongly-ordered
+2-create SDRAM region (normal one)
+3-create XIP region
+
+By debugging I saw that issue was due to the backup region. If I remove, 
+backup region settings done by Kernel, and I put the sequence above in 
+my bootloader, it works fine in XIP.
+
+Sorry to not have more precise analysis.
+
+Regards
+Alex
