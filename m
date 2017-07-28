@@ -1,255 +1,154 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 28 Jul 2017 15:10:15 +0100
-Subject: [PATCH v2 12/16] arm64: entry.S: Make eret restartable
+Date: Fri, 28 Jul 2017 15:10:12 +0100
+Subject: [PATCH v2 09/16] arm64: cpufeature: Detect CPU RAS Extentions
 In-Reply-To: <20170728141019.9084-1-james.morse@arm.com>
 References: <20170728141019.9084-1-james.morse@arm.com>
-Message-ID: <20170728141019.9084-13-james.morse@arm.com>
+Message-ID: <20170728141019.9084-10-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To gain any benefit from IESB on exception return we must unmask SError
-over ERET instructions so that the SError is taken to EL1, instead of
-deferred. SErrors deferred like this would only be processed once we take
-another exception, at which point they may be overwritten by a new (less
-severe) deferred SError.
+From: Xie XiuQi <xiexiuqi@huawei.com>
 
-The 'IESB' bit in the ESR isn't enough for us to fixup this error, as
-we may take a pending SError the moment we unmask it, instead of being
-synchronized by IESB when we ERET.
+ARM's v8.2 Extentions add support for Reliability, Availability and
+Serviceability (RAS). On CPUs with these extensions system software
+can use additional barriers to isolate errors and determine if faults
+are pending.
 
-Instead we move exception return out of the kernel_exit macro so that its
-PC range is well-known, and stash the SPSR and ELR which would be lost if
-we take an SError from this code.
+Add cpufeature detection and a barrier in the context-switch code.
+There is no need to use alternatives for this as CPUs that don't
+support this feature will treat the instruction as a nop.
 
-_do_serror() is extended to match the interrupted PC against the well known
-do_kernel_exit range and restore the stashed values.
+Platform level RAS support may require additional firmware support.
 
-Now if we take a survivable SError from EL1 to EL1, we must check if
-kernel_exit had restored the EL0 state, if so we must call 'kernel_enter 0'
-from el1_serror. _do_serror() restores the clobbered SPSR value, and we
-then return to EL0 from el1_serror. This keeps the enter/exit calls
-balanced.
-
-None of this code is specific to IESB, enable it for all platforms. On
-systems without the IESB feature we may take a pending SError earlier.
-
+Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
+[Rebased, added esb and config option, reworded commit message]
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
-Known issue: If _do_serror() takes a synchronous exception the per-cpu SPSR
-and ELR will be overwritten. A WARN_ON() firing is the most likely way of
-doing this. Fixing it requires the asm to do the restore, which makes it
-three times as complicated. This shouldn't be a problem for _do_serror()
-as it is today.
+ arch/arm64/Kconfig               | 16 ++++++++++++++++
+ arch/arm64/include/asm/barrier.h |  1 +
+ arch/arm64/include/asm/cpucaps.h |  3 ++-
+ arch/arm64/include/asm/sysreg.h  |  2 ++
+ arch/arm64/kernel/cpufeature.c   | 13 +++++++++++++
+ arch/arm64/kernel/process.c      |  3 +++
+ 6 files changed, 37 insertions(+), 1 deletion(-)
 
- arch/arm64/include/asm/exception.h | 20 +++++++++++++++
- arch/arm64/kernel/entry.S          | 51 +++++++++++++++++++++++++++++++++++++-
- arch/arm64/kernel/traps.c          | 23 ++++++++++++++---
- 3 files changed, 90 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/include/asm/exception.h b/arch/arm64/include/asm/exception.h
-index bc30429d8e91..a0ef187127ea 100644
---- a/arch/arm64/include/asm/exception.h
-+++ b/arch/arm64/include/asm/exception.h
-@@ -18,7 +18,10 @@
- #ifndef __ASM_EXCEPTION_H
- #define __ASM_EXCEPTION_H
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index d3913cffa3ac..6e417e25672f 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -960,6 +960,22 @@ config ARM64_UAO
+ 	  regular load/store instructions if the cpu does not implement the
+ 	  feature.
  
-+#ifndef __ASSEMBLY__
++config ARM64_RAS_EXTN
++	bool "Enable support for RAS CPU Extensions"
++	default y
++	help
++	  CPUs that support the Reliability, Availability and Serviceability
++	  (RAS) Extensions, part of ARMv8.2 are able to track faults and
++	  errors, classify them and report them to software.
 +
- #include <asm/esr.h>
-+#include <asm/ptrace.h>
- 
- #include <linux/interrupt.h>
- 
-@@ -41,4 +44,21 @@ static inline u32 disr_to_esr(u64 disr)
- 	return esr;
- }
- 
-+extern char __do_kernel_exit_start;
-+extern char __do_kernel_exit_end;
++	  On CPUs with these extensions system software can use additional
++	  barriers to determine if faults are pending and read the
++	  classification from a new set of registers.
 +
-+static inline bool __is_kernel_exit(unsigned long pc)
-+{
-+	return ((unsigned long)&__do_kernel_exit_start <= pc &&
-+		pc < (unsigned long)&__do_kernel_exit_end);
-+}
-+#else
-+/* result returned in flags, 'lo' true, 'hs' false */
-+.macro	is_kernel_exit, reg, tmp
-+	adr	\tmp, __do_kernel_exit_start
-+	cmp	\reg, \tmp
-+	adr	\tmp, __do_kernel_exit_end
-+	ccmp	\reg, \tmp, #2, hs
-+.endm
-+#endif /* __ASSEMBLY__*/
- #endif	/* __ASM_EXCEPTION_H */
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 8cdfca4060e3..173b86fac066 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -26,6 +26,7 @@
- #include <asm/asm-offsets.h>
- #include <asm/cpufeature.h>
- #include <asm/errno.h>
-+#include <asm/exception.h>
- #include <asm/esr.h>
- #include <asm/irq.h>
- #include <asm/memory.h>
-@@ -239,6 +240,10 @@ alternative_else_nop_endif
- #endif
- 	.endif
- 
-+	/* Stash elr and spsr so we can restart this eret */
-+	adr_this_cpu x15, __exit_exception_regs, tmp=x16
-+	stp	x21, x22, [x15]
++	  Selecting this feature will allow the kernel to use these barriers
++	  and access the new registers if the system supports the extension.
++	  Platform RAS features may additionally depend on firmware support.
 +
- 	msr	elr_el1, x21			// set up the return data
- 	msr	spsr_el1, x22
- 	ldp	x0, x1, [sp, #16 * 0]
-@@ -258,7 +263,7 @@ alternative_else_nop_endif
- 	ldp	x28, x29, [sp, #16 * 14]
- 	ldr	lr, [sp, #S_LR]
- 	add	sp, sp, #S_FRAME_SIZE		// restore sp
--	eret					// return to kernel
-+	b	do_kernel_exit
- 	.endm
+ endmenu
  
- 	.macro	irq_stack_entry
-@@ -432,6 +437,17 @@ el1_error_invalid:
- 	inv_entry 1, BAD_ERROR
- ENDPROC(el1_error_invalid)
+ config ARM64_MODULE_CMODEL_LARGE
+diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
+index 0fe7e43b7fbc..8b0a0eb67625 100644
+--- a/arch/arm64/include/asm/barrier.h
++++ b/arch/arm64/include/asm/barrier.h
+@@ -30,6 +30,7 @@
+ #define isb()		asm volatile("isb" : : : "memory")
+ #define dmb(opt)	asm volatile("dmb " #opt : : : "memory")
+ #define dsb(opt)	asm volatile("dsb " #opt : : : "memory")
++#define esb()		asm volatile("hint #16"  : : : "memory")
  
-+.global __do_kernel_exit_start
-+.global __do_kernel_exit_end
-+ENTRY(do_kernel_exit)
-+__do_kernel_exit_start:
-+	enable_serror
-+	esb
+ #define mb()		dsb(sy)
+ #define rmb()		dsb(ld)
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index 8d2272c6822c..f93bf77f1f74 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -39,7 +39,8 @@
+ #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	18
+ #define ARM64_WORKAROUND_858921			19
+ #define ARM64_WORKAROUND_CAVIUM_30115		20
++#define ARM64_HAS_RAS_EXTN			21
+ 
+-#define ARM64_NCAPS				21
++#define ARM64_NCAPS				22
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 16e44fa9b3b6..58358acf7c9b 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -331,6 +331,7 @@
+ #define ID_AA64ISAR1_JSCVT_SHIFT	12
+ 
+ /* id_aa64pfr0 */
++#define ID_AA64PFR0_RAS_SHIFT		28
+ #define ID_AA64PFR0_GIC_SHIFT		24
+ #define ID_AA64PFR0_ASIMD_SHIFT		20
+ #define ID_AA64PFR0_FP_SHIFT		16
+@@ -339,6 +340,7 @@
+ #define ID_AA64PFR0_EL1_SHIFT		4
+ #define ID_AA64PFR0_EL0_SHIFT		0
+ 
++#define ID_AA64PFR0_RAS_V1		0x1
+ #define ID_AA64PFR0_FP_NI		0xf
+ #define ID_AA64PFR0_FP_SUPPORTED	0x0
+ #define ID_AA64PFR0_ASIMD_NI		0xf
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 9f9e0064c8c1..a807ab55ee10 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -124,6 +124,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
+ };
+ 
+ static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
++	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_RAS_SHIFT, 4, 0),
+ 	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+ 	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+ 	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
+@@ -888,6 +889,18 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.min_field_value = 0,
+ 		.matches = has_no_fpsimd,
+ 	},
++#ifdef CONFIG_ARM64_RAS_EXTN
++	{
++		.desc = "RAS Extension Support",
++		.capability = ARM64_HAS_RAS_EXTN,
++		.def_scope = SCOPE_SYSTEM,
++		.matches = has_cpuid_feature,
++		.sys_reg = SYS_ID_AA64PFR0_EL1,
++		.sign = FTR_UNSIGNED,
++		.field_pos = ID_AA64PFR0_RAS_SHIFT,
++		.min_field_value = ID_AA64PFR0_RAS_V1,
++	},
++#endif /* CONFIG_ARM64_RAS_EXTN */
+ 	{},
+ };
+ 
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 659ae8094ed5..2def5ce75867 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -363,6 +363,9 @@ __notrace_funcgraph struct task_struct *__switch_to(struct task_struct *prev,
+ 	 */
+ 	dsb(ish);
+ 
++	/* Deliver any pending SError from prev */
++	esb();
 +
-+	eret
-+__do_kernel_exit_end:
-+ENDPROC(do_kernel_exit)
-+
- /*
-  * EL1 mode handlers.
-  */
-@@ -737,13 +753,46 @@ el0_irq_naked:
- ENDPROC(el0_irq)
+ 	/* the actual thread switch */
+ 	last = cpu_switch_to(prev, next);
  
- el1_serror:
-+	/*
-+	 * If this SError was taken due to an SError while returning from EL1
-+	 * to EL0, then sp_el0 is a user space address, even though we took the
-+	 * exception from EL1.
-+	 * Did we interrupt __do_kernel_exit()?
-+	 */
-+	stp	x0, x1, [sp, #-16]!
-+	mrs	x0, elr_el1
-+	is_kernel_exit x0, x1
-+	b.hs	1f
-+
-+	/*
-+	 * Retrieve the per-cpu stashed SPSR to check if the interrupted
-+	 * kernel_exit was heading for EL0.
-+	 */
-+	adr_this_cpu x0, __exit_exception_regs, tmp=x1
-+	ldr	x1, [x0, #8]
-+	and	x1, x1, #PSR_MODE_MASK
-+	cmp	x1, #PSR_MODE_EL0t
-+	b.ne	1f
-+
-+	ldp	x0, x1, [sp], #16
-+	kernel_entry 0
-+	mov	x24, #0		// do EL0 exit
-+	b	2f
-+
-+1:	ldp	x0, x1, [sp], #16
- 	kernel_entry 1
-+	mov	x24, #1		// do EL1 exit
-+2:
- 	mov	x20, x15
- 	mrs	x1, esr_el1
- 	mov	x0, sp
- 	bl	do_serror
- 
- 	disr_check	reg=x20
-+
-+	cbnz	x24, 9f
-+	kernel_exit 0		// do_serror() restored the clobbered ELR, SPSR
-+9:
- 	kernel_exit 1
- ENDPROC(el1_serror)
- 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 27ebcaa2f0b6..18f53e3afd06 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -29,6 +29,7 @@
- #include <linux/kexec.h>
- #include <linux/delay.h>
- #include <linux/init.h>
-+#include <linux/percpu.h>
- #include <linux/sched/signal.h>
- #include <linux/sched/debug.h>
- #include <linux/sched/task_stack.h>
-@@ -40,6 +41,7 @@
- #include <asm/debug-monitors.h>
- #include <asm/esr.h>
- #include <asm/insn.h>
-+#include <asm/kprobes.h>
- #include <asm/traps.h>
- #include <asm/stack_pointer.h>
- #include <asm/stacktrace.h>
-@@ -56,6 +58,9 @@ static const char *handler[]= {
- 
- int show_unhandled_signals = 1;
- 
-+/* Stashed ELR/SPSR pair for restoring after taking an SError during eret */
-+DEFINE_PER_CPU(u64 [2], __exit_exception_regs);
-+
- /*
-  * Dump out the contents of some kernel memory nicely...
-  */
-@@ -696,7 +701,7 @@ static void do_serror_panic(struct pt_regs *regs, unsigned int esr)
- 	nmi_panic(regs, "Asynchronous SError Interrupt");
- }
- 
--static void _do_serror(struct pt_regs *regs, unsigned int esr)
-+static void __kprobes _do_serror(struct pt_regs *regs, unsigned int esr)
- {
- 	bool impdef_syndrome = esr & ESR_ELx_ISV;	/* aka IDS */
- 	unsigned int aet = esr & ESR_ELx_AET;
-@@ -718,9 +723,21 @@ static void _do_serror(struct pt_regs *regs, unsigned int esr)
- 	default:
- 		return do_serror_panic(regs, esr);
- 	}
-+
-+	/*
-+	 * If we took this SError during kernel_exit restore the ELR and SPSR.
-+	 * We can only do this if the interrupted PC points into do_kernel_exit.
-+	 * We can't return into do_kernel_exit code and restore the ELR and
-+	 * SPSR, so instead we skip the rest of do_kernel_exit and unmask SError
-+	 * and eret with the stashed values on our own return path.
-+	 */
-+	if (__is_kernel_exit(regs->pc)) {
-+		regs->pc = this_cpu_read(__exit_exception_regs[0]);
-+		regs->pstate = this_cpu_read(__exit_exception_regs[1]);
-+	}
- }
- 
--asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
-+asmlinkage void __kprobes do_serror(struct pt_regs *regs, unsigned int esr)
- {
- 	nmi_enter();
- 
-@@ -729,7 +746,7 @@ asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
- 	nmi_exit();
- }
- 
--asmlinkage void do_deferred_serror(struct pt_regs *regs, u64 disr)
-+asmlinkage void __kprobes do_deferred_serror(struct pt_regs *regs, u64 disr)
- {
- 	return do_serror(regs, disr_to_esr(disr));
- }
 -- 
 2.13.2
