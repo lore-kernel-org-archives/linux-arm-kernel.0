@@ -1,104 +1,43 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Fri, 28 Jul 2017 17:32:48 +0100
-Subject: [PATCH] drm: hdlcd: allow HDLCD to be used without interrupt
-In-Reply-To: <20170728155827.GV31807@n2100.armlinux.org.uk>
-References: <E1daJCF-0003pG-DI@rmk-PC.armlinux.org.uk>
- <20170726102748.GM31807@n2100.armlinux.org.uk>
- <20170728152311.GA970@e110455-lin.cambridge.arm.com>
- <20170728155827.GV31807@n2100.armlinux.org.uk>
-Message-ID: <20170728163248.GG970@e110455-lin.cambridge.arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 28 Jul 2017 18:33:08 +0200
+Subject: "external abort on linefetch (0x814)" on Kirkwood 6282 SoC
+In-Reply-To: <1501085885.3330.24.camel@hellion.org.uk>
+References: <1500801941.22097.24.camel@hellion.org.uk>
+ <20170726152251.GE12049@lunn.ch>
+ <1501085885.3330.24.camel@hellion.org.uk>
+Message-ID: <20170728163308.GJ2132@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 04:58:27PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jul 28, 2017 at 04:23:11PM +0100, Liviu Dudau wrote:
-> > On Wed, Jul 26, 2017 at 11:27:48AM +0100, Russell King - ARM Linux wrote:
-> > > On Wed, Jul 26, 2017 at 11:05:39AM +0100, Russell King wrote:
-> > > > Some ARM platforms do not wire the HDLCD interrupt.  Allow hdlcd to
-> > > > initialise without an interrupt present.
-> > > > 
-> > > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > > 
-> > 
-> > Hi Russell,
-> > 
-> > Sorry for my silence, I was on holiday this week and just came back
-> > today.
-> > 
-> > > This isn't fully functional on ARM MPS platforms yet, but at least
-> > > gets us further.  Without any display connected:
-> > > 
-> > > [   14.315986] [drm] found ARM HDLCD version r0p0
-> > > [   14.557038] tda998x 2-0070: found TDA19988
-> > > [   14.622232] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
-> > > [   14.630406] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-> > > [   14.639335] [drm] No driver support for vblank timestamp query.
-> > > [   14.653210] [drm] Cannot find any crtc or sizes - going 1024x768
-> > > [   15.232556] hdlcd 40205000.hdlcd: fb0:  frame buffer device
-> > > [   15.284076] [drm] Initialized hdlcd 1.0.0 20151021 for 40205000.hdlcd on minor 0
-> > > 
-> > > With a TV connected, the driver doesn't initialise:
-> > > 
-> > > [   14.422810] [drm] found ARM HDLCD version r0p0
-> > > [   14.657227] tda998x 2-0070: found TDA19988
-> > > [   14.722439] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
-> > > [   14.730613] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-> > > [   14.739538] [drm] No driver support for vblank timestamp query.
-> > > [   15.311977] hdlcd 40205000.hdlcd: Failed to set initial hw configuration.
-> > > [   15.357402] hdlcd 40205000.hdlcd: master bind failed: -12
-> > > [   15.365082] tda998x: probe of 2-0070 failed with error -12
-> > > 
-> > > I don't think this is correct behaviour - if we fail to set an initial
-> > > configuration (which will be based on the resolution of the connected
-> > > display) why should the driver fail to probe - it's not that there is
-> > > no device, it's (in this case) that there aren't the resources for the
-> > > chosen mode.  Userspace could always try setting a different mode.
-> > > 
-> > > I suspect the above failure is down to either (a) not having enough
-> > > memory available to allocate a 1920x1080 frame buffer, or (b) not
-> > > (yet) being able to program the hdlcd pixel clock for this platform,
-> > > which is currently hard-coded in DT at 23.75MHz.
-> > 
-> > I don't think it is the clock, if that fails then you would not see the
-> > r0p0 version number being printed. Due to the fact that until now HDLCD
-> > has run mostly on platforms that have SCP, which takes care of actual
-> > setup of the clocks, it is pretty lax on errors on pixel clock setup.
+> Hello kirkwood folks,
 > 
-> Note, however, that in this case, the clock is a fixed frequency clock.
-> I wasn't meaning a failure to obtain the clock, I was meaning a failure
-> to set the appropriate rate.
-
-Yeah, we both meant the same thing. :) HDLCD is not checking that
-strictly that the appropriate rate was set, although looking into
-hdlcd_crtc_atomic_check() we do return -EINVAL if the set rate differs
-from what the mode wants. Maybe add a printk there to see if you hit
-that case?
-
+> We have been seeing reports on the Debian arm list about
+> instability/errors running Debian Stretch (4.9 based) on
+> various?Kirkwood 6282 based QNAP systems. Errors are things like [0,
+> actually one of the earlier pre-4.9 reports, same symptoms as with 4.9
+> though]:
 > 
-> > Also, may I ask what MPS platform you are trying to use? I might be able
-> > to source one internally and try to reproduce your problems.
+> [???37.167103] BUG: Bad rss-counter state mm:c0caa1e0 idx:1 val:1
+> [??783.570365] BUG: Bad rss-counter state mm:c09e6220 idx:1 val:1
+> [??800.172223] BUG: Bad rss-counter state mm:ecbc05e0 idx:1 val:1
+> [??829.005336] BUG: Bad rss-counter state mm:c0d4b880 idx:1 val:1
+> [??871.773956] BUG: Bad rss-counter state mm:c09e63c0 idx:1 val:1
+> [ 1299.565344] BUG: Bad rss-counter state mm:ecaf8c40 idx:1 val:1
 > 
-> I'll point you in the direction of Ian Rickards in ARM for that
-> information.  (I'm not sure if I can mention the board publically
-> yet as its early days...)
-
-Thanks, I'll get in touch with Ian.
-
-Best regards,
-Liviu
-
+> and
 > 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+> [???71.033784] Unhandled fault: external abort on linefetch (0x014) at
+> 0xb6c73db0
+> [???71.041037] pgd = ead9c000
+> [???71.043747] [b6c73db0] *pgd=3fd72831
+> [???84.144056] Unhandled fault: external abort on linefetch (0x014) at
+> 0xb6d44db0
+> [...]
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+So far, i've not been able to reproduce this. I have 6282 based QNAP
+NAS box, with a single disk. Since this is a kernel hacking box, i
+tftpboot and don't use an initrd. I've been using the
+mvebu_v5_defconfig kernel configuration and i have tried v4.13-rc2,
+v4.12, v4.10.0 and v3.9.30. And i have sid for user space.
+
+       Andrew
