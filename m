@@ -1,93 +1,96 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Fri, 28 Jul 2017 16:06:29 +0200
-Subject: [PATCH v3] irqchip/tango: Don't use incorrect irq_mask_ack
- callback
-In-Reply-To: <48734beb-0e6b-3a8f-ebf4-b1cec63322e5@gmail.com>
-References: <20170719190734.18566-1-opendmb@gmail.com>
- <20170719190734.18566-3-opendmb@gmail.com>
- <7a51555f-8191-9ebd-1f30-7c20f6db9d3f@sigmadesigns.com>
- <8d29fec9-35b8-c33b-3091-3e9a51c99ed7@gmail.com>
- <dddc01e3-b4f0-1f94-db6a-e3d4b31e6f4d@sigmadesigns.com>
- <yw1xfudkodvv.fsf@mansr.com>
- <6f0092f7-692f-4a15-1d95-40f4e59c8585@sigmadesigns.com>
- <yw1xbmo8odan.fsf@mansr.com> <3b858e14-0da1-d4aa-eb84-f136ece8c2a6@gmail.com>
- <yw1x4ltzm2ok.fsf@mansr.com> <48734beb-0e6b-3a8f-ebf4-b1cec63322e5@gmail.com>
-Message-ID: <fb868111-bcff-9a12-70db-a820d3bbffd0@sigmadesigns.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 28 Jul 2017 15:09:56 +0100
+Subject: [PATCH 0/4] ACPI: DMA ranges management
+In-Reply-To: <eb81a7c6-b62b-8e02-8f22-a7fda7e403ce@arm.com>
+References: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
+ <7df11172-5a40-685f-5202-9a0bceb6e19b@codeaurora.org>
+ <c09352cc-e1a2-a494-c457-dc3ea275f504@arm.com>
+ <20170726153519.GA4696@red-moon>
+ <eb81a7c6-b62b-8e02-8f22-a7fda7e403ce@arm.com>
+Message-ID: <20170728140956.GA21569@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/07/2017 20:17, Florian Fainelli wrote:
+On Fri, Jul 28, 2017 at 02:08:01PM +0100, Robin Murphy wrote:
 
-> On 07/26/2017 12:13 PM, M?ns Rullg?rd wrote:
->
->> Florian Fainelli writes:
->>
->>> On 07/25/2017 06:29 AM, M?ns Rullg?rd wrote:
->>>
->>>> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
->>>>
->>>>> On 25/07/2017 15:16, M?ns Rullg?rd wrote:
->>>>>
->>>>>> What happened to the patch adding the proper combined function?
->>>>>
->>>>> It appears you're not CCed on v2.
->>>>>
->>>>> https://patchwork.kernel.org/patch/9859799/
->>>>>
->>>>> Doug wrote:
->>>>>> Yes, you understand correctly.  The irq_mask_ack method is entirely
->>>>>> optional and I assume that is why this issue went undetected for so
->>>>>> long; however, it is slightly more efficient to combine the functions
->>>>>> (even if the ack is unnecessary) which is why I chose to do so for my
->>>>>> changes to the irqchip-brcmstb-l2 driver where I first discovered this
->>>>>> issue.  How much value the improved efficiency has is certainly
->>>>>> debatable, but interrupt handling is one area where people might care
->>>>>> about such a small difference.  As the irqchip-tango driver maintainer
->>>>>> you are welcome to decide whether or not the irq_mask_ack method makes
->>>>>> sense to you.
->>>>>
->>>>> My preference goes to leaving the irq_mask_ack callback undefined,
->>>>> and let the irqchip framework use irq_mask and irq_ack instead.
->>>>
->>>> Why would you prefer the less efficient way?
->>>>
->>>
->>> Same question here, that does not really make sense to me.
->>>
->>> The whole point of this patch series is to have a set of efficient and
->>> bugfree (or nearly) helper functions that drivers can rely on, are you
->>> saying that somehow using irq_mask_and_ack is exposing a bug in the
->>> tango irqchip driver and using the separate functions does not expose
->>> this bug?
->>
->> There is currently a bug in that the function used doesn't do what its
->> name implies which can't be good.  Using the separate mask and ack
->> functions obviously works, but combining them saves a lock/unlock
->> sequence.  The correct combined function has already been written, so I
->> see no reason not to use it.
+[...]
+
+> >>> To ensure that dma_set_mask() and friends actually respect _DMA, would
+> >>> you consider introducing a dma_supported() callback to check the input
+> >>> dma_mask against the FW defined limits? This would end up aggressively
+> >>> clipping the dma_mask to 32-bits for devices like the above if the _DMA
+> >>> limit was less than 64-bits, but that is probably preferable to the
+> >>> controller accessing unintended addresses.
+> >>>
+> >>> Also, how would you feel about adding support for the IORT named_node
+> >>> memory_address_limit field?
+> >>
+> >> We will certainly need that for some platform devices, so if you fancy
+> >> giving it a go before Lorenzo or I get there, feel free!
+> > 
+> > I can do it for v2 but I would like to understand why using _DMA is
+> > not good enough for named components - having two bindings describing
+> > the same thing is not ideal and I'd rather avoid it - if there is
+> > a reason I am happy to add the necessary code.
 > 
-> Marc/Mason, are you intending to get this patch accepted in order to
-> provide a quick bugfix targeting earlier kernels with the tango irqchip
-> driver or is this how you think the correct fix for the tango irqchip
-> driver is as opposed to using Doug's fix?
+> My interpretation of "_DMA is only defined under devices that represent
+> buses." (ACPI 6.0, section 6.2.4) is that "devices that represent buses"
+> are those that have other device objects as children.
 
-Hello Florian,
+Well if that was the case we would not be able to use _DMA for
+eg PNP0A03 PCI host bridges that have no child ACPI devices, which
+defeats the whole purpose of what I am doing.
 
-I am extremely grateful for you and Doug bringing the defect to
-my attention, as it was indeed causing an issue which I had not
-found the time to investigate.
+The question here is what the _DMA object binding exactly means when
+it refers to a "bus" and that's something I will figure out (and possibly
+change) ASAP.
 
-The reason I proposed an alternate patch is that
-1) Doug didn't seem to mind, 2) simpler code leads to fewer bugs
-and less maintenance IME, and 3) I didn't see many drivers using
-the irq_mask_ack() callback (9 out of 86) with a few misusing it,
-by defining irq_mask = irq_mask_ack.
+> In other words (excuse my novice pseudo-ASL), this would be valid:
+> 
+> Scope(_SB)
+> {
+> 	Device (Bus)
+> 	{
+> 		...
+> 		Method (_DMA ... )
+> 		Device (Dev1)
+> 		{
+> 			...
+> 		}
+> 	}
+> }
+> 
+> but this should be invalid:
+> 
+> Scope(_SB)
+> {
+> 	Device (Dev2)
+> 	{
+> 		...
+> 		Method (_DMA ... )
+> 	}
+> }
 
-As you point out, my patch might be slightly easier to backport
-than Doug's (TBH, I hadn't considered that aspect until you
-mentioned it).
+Not sure about that (see above) and I agree that's what needs
+clarification.
 
-Has anyone ever quantified the performance improvement of
-mask_ack over mask + ack?
+> Thus in the case where Dev2 is wired directly to an SMMU input, but
+> fewer address bits are wired up between the two than both the device and
+> SMMU interfaces are capable of, memory address limit is enough to
+> describe that without having to insert a fake "bus" object above it just
+> to hold the _DMA method.
 
-Regards.
+BTW, how would you describe that in DT ? A "dma-ranges" property in the
+device DT node right ? Arguably "dma-ranges" was not meant to be used
+like that either ;-)
+
+Long and short of it is: I do not like having two ways of describing
+the same thing. I agree that the _DMA object usage requires
+clarifications from a spec point of view but I want to do that before
+plugging in code that may use bindings inconsistently.
+
+I will flag this up at ACPI spec level as soon as possible and get this
+sorted.
+
+Thanks,
+Lorenzo
