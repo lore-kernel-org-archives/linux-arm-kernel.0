@@ -1,90 +1,38 @@
-From: 0x7f454c46@gmail.com (Dmitry Safonov)
-Date: Fri, 28 Jul 2017 22:06:20 +0300
-Subject: [PATCH] arm64/vdso: Support mremap() for vDSO
-In-Reply-To: <20170728164800.GD14170@arm.com>
-References: <20170726170737.21696-1-dsafonov@virtuozzo.com>
- <20170728164800.GD14170@arm.com>
-Message-ID: <CAJwJo6bCxRvKvwmwwH7UZW2fRZkqTTqfnp0j85Si454pDQUjVw@mail.gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 28 Jul 2017 12:09:56 -0700
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170728184129.GA24364@linux.vnet.ibm.com>
+References: <20170727014214.GH3730@linux.vnet.ibm.com>
+ <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
+ <20170727124913.GL3730@linux.vnet.ibm.com>
+ <20170727144903.000022a1@huawei.com>
+ <20170727173923.000001b2@huawei.com>
+ <20170727165245.GD3730@linux.vnet.ibm.com>
+ <20170728084411.00001ddb@huawei.com>
+ <20170728125416.j7gcgvnxgv2gq73u@tardis>
+ <20170728145530.GE3730@linux.vnet.ibm.com>
+ <20170728184129.GA24364@linux.vnet.ibm.com>
+Message-ID: <20170728190956.GA26640@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-07-28 19:48 GMT+03:00 Will Deacon <will.deacon@arm.com>:
-> On Wed, Jul 26, 2017 at 08:07:37PM +0300, Dmitry Safonov wrote:
->> vDSO VMA address is saved in mm_context for the purpose of using
->> restorer from vDSO page to return to userspace after signal handling.
->>
->> In Checkpoint Restore in Userspace (CRIU) project we place vDSO VMA
->> on restore back to the place where it was on the dump.
->> With the exception for x86 (where there is API to map vDSO with
->> arch_prctl()), we move vDSO inherited from CRIU task to restoree
->> position by mremap().
->>
->> CRIU does support arm64 architecture, but kernel doesn't update
->> context.vdso pointer after mremap(). Which results in translation
->> fault after signal handling on restored application:
->> https://github.com/xemul/criu/issues/288
->>
->> Make vDSO code track the VMA address by supplying .mremap() fops
->> the same way it's done for x86 and arm32 by:
->> commit b059a453b1cf ("x86/vdso: Add mremap hook to vm_special_mapping")
->> commit 280e87e98c09 ("ARM: 8683/1: ARM32: Support mremap() for sigpage/vDSO").
->>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Russell King <rmk+kernel@armlinux.org.uk>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: Cyrill Gorcunov <gorcunov@openvz.org>
->> Cc: Pavel Emelyanov <xemul@virtuozzo.com>
->> Cc: Christopher Covington <cov@codeaurora.org>
->> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
->> ---
->>  arch/arm64/kernel/vdso.c | 15 +++++++++++++++
->>  1 file changed, 15 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
->> index e8f759f764f2..2d419006ad43 100644
->> --- a/arch/arm64/kernel/vdso.c
->> +++ b/arch/arm64/kernel/vdso.c
->> @@ -110,12 +110,27 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
->>  }
->>  #endif /* CONFIG_COMPAT */
->>
->> +static int vdso_mremap(const struct vm_special_mapping *sm,
->> +             struct vm_area_struct *new_vma)
->> +{
->> +     unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
->> +     unsigned long vdso_size = vdso_end - vdso_start;
->
-> You might be able to use vdso_pages here, but it depends on my question
-> below.
+On Fri, Jul 28, 2017 at 11:41:29AM -0700, Paul E. McKenney wrote:
+> On Fri, Jul 28, 2017 at 07:55:30AM -0700, Paul E. McKenney wrote:
+> > On Fri, Jul 28, 2017 at 08:54:16PM +0800, Boqun Feng wrote:
 
-Yes, shifting with PAGE_SHIFT.
-Is it just a preference?
+[ . . . ]
 
->
->> +
->> +     if (vdso_size != new_size)
->> +             return -EINVAL;
->> +
->> +     current->mm->context.vdso = (void *)new_vma->vm_start;
->> +
->> +     return 0;
->> +}
->> +
->>  static struct vm_special_mapping vdso_spec[2] __ro_after_init = {
->>       {
->>               .name   = "[vvar]",
->>       },
->>       {
->>               .name   = "[vdso]",
->> +             .mremap = vdso_mremap,
->
-> Does this mean we move the vdso text, but not the data page? How does that
-> work?
+> > Even though Jonathan's testing indicates that it didn't fix this
+> > particular problem:
+> > 
+> > Acked-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> 
+> And while we are at it:
+> 
+> Tested-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
 
-Well, the kernel tracks only vdso pages - to find restorer addr after a signal.
-In userspace one needs to move vvar and vdso vma pair accordingly,
-with the same order and offset of course.
+Not because it it fixed the TREE01 issue -- it did not.  But as near
+as I can see, it didn't cause any additional issues.
 
--- 
-             Dmitry
+							Thanx, Paul
