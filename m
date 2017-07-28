@@ -1,88 +1,55 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Fri, 28 Jul 2017 18:27:05 +0100
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170728165529.GF3730@linux.vnet.ibm.com>
-References: <20170726231505.GG3730@linux.vnet.ibm.com>
- <20170726.162200.1904949371593276937.davem@davemloft.net>
- <20170727014214.GH3730@linux.vnet.ibm.com>
- <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
- <20170727124913.GL3730@linux.vnet.ibm.com>
- <20170727144903.000022a1@huawei.com>
- <20170727173923.000001b2@huawei.com>
- <20170727165245.GD3730@linux.vnet.ibm.com>
- <20170728084411.00001ddb@huawei.com>
- <20170728142403.0000122b@huawei.com>
- <20170728165529.GF3730@linux.vnet.ibm.com>
-Message-ID: <20170728182053.000072aa@huawei.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 28 Jul 2017 10:54:30 -0700
+Subject: [PATCH 0/3] net-next: stmmac: support future possible different
+ internal phy mode
+In-Reply-To: <20170728144424.GB7221@Red>
+References: <20170728092818.23419-1-clabbe.montjoie@gmail.com>
+ <20170728135544.GD32230@lunn.ch> <20170728142508.GA7221@Red>
+ <20170728143600.GB2132@lunn.ch> <20170728144424.GB7221@Red>
+Message-ID: <f8fe754c-8b46-a9f6-4020-f7db6c985773@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Jul 2017 09:55:29 -0700
-"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+On 07/28/2017 07:44 AM, Corentin Labbe wrote:
+> On Fri, Jul 28, 2017 at 04:36:00PM +0200, Andrew Lunn wrote:
+>>>> I've probably asked this before: Does the internal PHY use a different
+>>>> PHY ID in registers 2 and 3?
+>>>>
+>>>
+>>> yes
+>>>
+>>> reg2: 0x0044
+>>> reg3: 0X1500
+> 
+> Copy/paste error, its 1400
+> 
+>>
+>> So this is not about loading the correct PHY driver. You can already
+>> do this based on the PHY IDs...
+>>
+>> This is about selecting which PHY to use. Internal or External?	
+>>
+>>      Andrew
+> 
+> It is too late when we know the PHY ID.
 
-> On Fri, Jul 28, 2017 at 02:24:03PM +0100, Jonathan Cameron wrote:
-> > On Fri, 28 Jul 2017 08:44:11 +0100
-> > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:  
-> 
-> [ . . . ]
-> 
-> > Ok.  Some info.  I disabled a few driver (usb and SAS) in the interest of having
-> > fewer timer events.  Issue became much easier to trigger (on some runs before
-> > I could get tracing up and running)
-> >e
-> > So logs are large enough that pastebin doesn't like them - please shoet if  
-> >>e another timer period is of interest.  
-> > 
-> > https://pastebin.com/iUZDfQGM for the timer trace.
-> > https://pastebin.com/3w1F7amH for dmesg.  
-> > 
-> > The relevant timeout on the RCU stall detector was 8 seconds.  Event is
-> > detected around 835.
-> > 
-> > It's a lot of logs, so I haven't identified a smoking gun yet but there
-> > may well be one in there.  
-> 
-> The dmesg says:
-> 
-> rcu_preempt kthread starved for 2508 jiffies! g112 c111 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1
-> 
-> So I look for "rcu_preempt" timer events and find these:
-> 
-> rcu_preempt-9     [019] ....   827.579114: timer_init: timer=ffff8017d5fc7da0
-> rcu_preempt-9     [019] d..1   827.579115: timer_start: timer=ffff8017d5fc7da0 function=process_timeout 
-> 
-> Next look for "ffff8017d5fc7da0" and I don't find anything else.
-It does show up off the bottom of what would fit in pastebin...
+> We need to set a syscon for choosing external/internal PHY.
+> So we can rely only on DT.
 
-     rcu_preempt-9     [001] d..1   837.681077: timer_cancel: timer=ffff8017d5fc7da0
-     rcu_preempt-9     [001] ....   837.681086: timer_init: timer=ffff8017d5fc7da0
-     rcu_preempt-9     [001] d..1   837.681087: timer_start: timer=ffff8017d5fc7da0 function=process_timeout expires=4295101298 [timeout=1] cpu=1 idx=0 flags=
+Since the Device Tree needs to be correct to identify which PHY to use
+(internal or external), if you use the standard compatible string for
+the PHY that contains its OUI, e.g:
 
-> The timeout was one jiffy, and more than a second later, no expiration.
-> Is it possible that this event was lost?  I am not seeing any sign of
-> this is the trace.
-> 
-> I don't see any sign of CPU hotplug (and I test with lots of that in
-> any case).
-> 
-> The last time we saw something like this it was a timer HW/driver problem,
-> but it is a bit hard to imagine such a problem affecting both ARM64
-> and SPARC.  ;-)
-Could be different issues, both of which were hidden by that lockup detector.
+compatible = "ethernet-phy-id0044.1400", "ethernet-phy-ieee802.3-c22"
 
-There is an errata work around for the timers on this particular board.
-I'm only vaguely aware of it, so may be unconnected.
+then you can have your Ethernet MAC identify whether this is an internal
+PHY by having a list of compatible strings to match against.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clocksource/arm_arch_timer.c?h=v4.13-rc2&id=bb42ca47401010fc02901b5e8f79e40a26f208cb
+Corentin, can you make sure you copy netdev, Andrew and myself on the
+next submissions so we don't have to keep track of seemingly identical
+threads (this one + the rockchip dwmac changes) and we can work towards
+one solution?
 
-Seems unlikely though! + we've not yet seen it on the other chips that
-errata effects (not that that means much).
-
-Jonathan
-
-> 
-> Thomas, any debugging suggestions?
-> 
-> 							Thanx, Paul
-> 
+Thanks
+-- 
+Florian
