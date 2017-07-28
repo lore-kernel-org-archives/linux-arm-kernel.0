@@ -1,105 +1,174 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 28 Jul 2017 23:21:37 +0200
-Subject: [PATCH v5 5/6] ARM: dts: meson8: add support for booting the
- secondary CPU cores
-In-Reply-To: <20170728212138.12217-1-martin.blumenstingl@googlemail.com>
-References: <20170728212138.12217-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170728212138.12217-6-martin.blumenstingl@googlemail.com>
+From: jintack.lim@linaro.org (Jintack Lim)
+Date: Fri, 28 Jul 2017 17:45:01 -0400
+Subject: [RFC PATCH v2 00/38] Nested Virtualization on KVM/ARM
+In-Reply-To: <jpgshhg7227.fsf@linux.bootlegged.copy>
+References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
+ <CAHyh4xjkT+JNJL0kxmEjz4qU8kD2-ZwYgVB8VgwsSYjpjTc3LA@mail.gmail.com>
+ <jpgshhg7227.fsf@linux.bootlegged.copy>
+Message-ID: <CAHyh4xjhJ+uXSek3cayf9E-xjCYY2vt1L+KH2yWAoj469sXaXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Booting the secondary CPU cores involves the following nodes/devices:
-- SCU (Snoop-Control-Unit, for which we already have a DT node)
-- a reset line for each CPU core, provided by the reset-controller
-  which is built into the clock-controller
-- the PMU (power management unit) which controls the power of the CPU
-  cores
-- a range in the SRAM specifically reserved for booting secondary CPU
-  cores
-- the "enable-method" which activates booting the secondary CPU cores
+On Fri, Jul 28, 2017 at 4:13 PM, Bandan Das <bsd@redhat.com> wrote:
+> Jintack Lim <jintack.lim@linaro.org> writes:
+> ...
+>>>
+>>> I'll share my experiment setup shortly.
+>>
+>> I summarized my experiment setup here.
+>>
+>> https://github.com/columbia/nesting-pub/wiki/Nested-virtualization-on-ARM-setup
+>
+> Thanks Jintack! I was able to test L2 boot up with these instructions.
 
-This adds all required nodes and properties to boot the secondary CPU
-cores.
+Thanks for the confirmation!
 
-Suggested-by: Carlo Caione <carlo@caione.org>
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- arch/arm/boot/dts/meson8.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+>
+> Next, I will try to run some simple tests. Any suggestions on reducing the L2 bootup
+> time in my test setup ? I think I will try to make the L2 kernel print
+> less messages; and maybe just get rid of some of the userspace services.
+> I also applied the patch to reduce the timer frequency btw.
 
-diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
-index b98d44fde6b6..bf572fb45fe0 100644
---- a/arch/arm/boot/dts/meson8.dtsi
-+++ b/arch/arm/boot/dts/meson8.dtsi
-@@ -45,6 +45,7 @@
- 
- #include <dt-bindings/clock/meson8b-clkc.h>
- #include <dt-bindings/gpio/meson8-gpio.h>
-+#include <dt-bindings/reset/amlogic,meson8b-clkc-reset.h>
- #include "meson.dtsi"
- 
- / {
-@@ -60,6 +61,8 @@
- 			compatible = "arm,cortex-a9";
- 			next-level-cache = <&L2>;
- 			reg = <0x200>;
-+			enable-method = "amlogic,meson8-smp";
-+			resets = <&clkc CLKC_RESET_CPU0_SOFT_RESET>;
- 		};
- 
- 		cpu at 201 {
-@@ -67,6 +70,8 @@
- 			compatible = "arm,cortex-a9";
- 			next-level-cache = <&L2>;
- 			reg = <0x201>;
-+			enable-method = "amlogic,meson8-smp";
-+			resets = <&clkc CLKC_RESET_CPU1_SOFT_RESET>;
- 		};
- 
- 		cpu at 202 {
-@@ -74,6 +79,8 @@
- 			compatible = "arm,cortex-a9";
- 			next-level-cache = <&L2>;
- 			reg = <0x202>;
-+			enable-method = "amlogic,meson8-smp";
-+			resets = <&clkc CLKC_RESET_CPU2_SOFT_RESET>;
- 		};
- 
- 		cpu at 203 {
-@@ -81,6 +88,8 @@
- 			compatible = "arm,cortex-a9";
- 			next-level-cache = <&L2>;
- 			reg = <0x203>;
-+			enable-method = "amlogic,meson8-smp";
-+			resets = <&clkc CLKC_RESET_CPU3_SOFT_RESET>;
- 		};
- 	};
- 
-@@ -118,6 +127,11 @@
- }; /* end of / */
- 
- &aobus {
-+	pmu: pmu at e0 {
-+		compatible = "amlogic,meson8-pmu", "syscon";
-+		reg = <0xe0 0x8>;
-+	};
-+
- 	pinctrl_aobus: pinctrl at 84 {
- 		compatible = "amlogic,meson8-aobus-pinctrl";
- 		reg = <0x84 0xc>;
-@@ -249,6 +263,13 @@
- 	};
- };
- 
-+&ahb_sram {
-+	smp-sram at 1ff80 {
-+		compatible = "amlogic,meson8-smp-sram";
-+		reg = <0x1ff80 0x8>;
-+	};
-+};
-+
- &ethmac {
- 	clocks = <&clkc CLKID_ETH>;
- 	clock-names = "stmmaceth";
--- 
-2.13.3
+I think you can try to use those kernel parameters: "loglevel=1", with
+which the kernel print (almost) nothing during the boot process but
+the init process will print something,  or "console=none", with which
+you don't see anything but the login message.  I didn't used them
+because I wanted to see the L2 boot message as soon as possible :)
+
+Thanks,
+Jintack
+
+>
+> Bandan
+>
+>>>
+>>> Even though this work has some limitations and TODOs, I'd appreciate early
+>>> feedback on this RFC. Specifically, I'm interested in:
+>>>
+>>> - Overall design to manage vcpu context for the virtual EL2
+>>> - Verifying correct EL2 register configurations such as HCR_EL2, CPTR_EL2
+>>>   (Patch 30 and 32)
+>>> - Patch organization and coding style
+>>
+>> I also wonder if the hardware and/or KVM do not support nested
+>> virtualization but the userspace uses nested virtualization option,
+>> which one is better: giving an error or launching a regular VM
+>> silently.
+>>
+>>>
+>>> This patch series is based on kvm/next d38338e.
+>>> The whole patch series including memory, VGIC, and timer patches is available
+>>> here:
+>>>
+>>> git at github.com:columbia/nesting-pub.git rfc-v2
+>>>
+>>> Limitations:
+>>> - There are some cases that the target exception level of a VM is ambiguous when
+>>>   emulating eret instruction. I'm discussing this issue with Christoffer and
+>>>   Marc. Meanwhile, I added a temporary patch (not included in this
+>>>   series. f1beaba in the repo) and used 4.10.0 kernel when testing the guest
+>>>   hypervisor with VHE.
+>>> - Recursive nested virtualization is not tested yet.
+>>> - Other hypervisors (such as Xen) on KVM are not tested.
+>>>
+>>> TODO:
+>>> - Submit memory, VGIC, and timer patches
+>>> - Evaluate regular VM performance to see if there's a negative impact.
+>>> - Test other hypervisors such as Xen on KVM
+>>> - Test recursive nested virtualization
+>>>
+>>> v1-->v2:
+>>> - Added support for the virtual EL2 with VHE
+>>> - Rewrote commit messages and comments from the perspective of supporting
+>>>   execution environments to VMs, rather than from the perspective of the guest
+>>>   hypervisor running in them.
+>>> - Fixed a few bugs to make it run on the FastModel.
+>>> - Tested on ARMv8.3 with four configurations. (host/guest. with/without VHE.)
+>>> - Rebased to kvm/next
+>>>
+>>> [1] https://www.community.arm.com/processors/b/blog/posts/armv8-a-architecture-2016-additions
+>>>
+>>> Christoffer Dall (7):
+>>>   KVM: arm64: Add KVM nesting feature
+>>>   KVM: arm64: Allow userspace to set PSR_MODE_EL2x
+>>>   KVM: arm64: Add vcpu_mode_el2 primitive to support nesting
+>>>   KVM: arm/arm64: Add a framework to prepare virtual EL2 execution
+>>>   arm64: Add missing TCR hw defines
+>>>   KVM: arm64: Create shadow EL1 registers
+>>>   KVM: arm64: Trap EL1 VM register accesses in virtual EL2
+>>>
+>>> Jintack Lim (31):
+>>>   arm64: Add ARM64_HAS_NESTED_VIRT feature
+>>>   KVM: arm/arm64: Enable nested virtualization via command-line
+>>>   KVM: arm/arm64: Check if nested virtualization is in use
+>>>   KVM: arm64: Add EL2 system registers to vcpu context
+>>>   KVM: arm64: Add EL2 special registers to vcpu context
+>>>   KVM: arm64: Add the shadow context for virtual EL2 execution
+>>>   KVM: arm64: Set vcpu context depending on the guest exception level
+>>>   KVM: arm64: Synchronize EL1 system registers on virtual EL2 entry and
+>>>     exit
+>>>   KVM: arm64: Move exception macros and enums to a common file
+>>>   KVM: arm64: Support to inject exceptions to the virtual EL2
+>>>   KVM: arm64: Trap SPSR_EL1, ELR_EL1 and VBAR_EL1 from virtual EL2
+>>>   KVM: arm64: Trap CPACR_EL1 access in virtual EL2
+>>>   KVM: arm64: Handle eret instruction traps
+>>>   KVM: arm64: Set a handler for the system instruction traps
+>>>   KVM: arm64: Handle PSCI call via smc from the guest
+>>>   KVM: arm64: Inject HVC exceptions to the virtual EL2
+>>>   KVM: arm64: Respect virtual HCR_EL2.TWX setting
+>>>   KVM: arm64: Respect virtual CPTR_EL2.TFP setting
+>>>   KVM: arm64: Add macros to support the virtual EL2 with VHE
+>>>   KVM: arm64: Add EL2 registers defined in ARMv8.1 to vcpu context
+>>>   KVM: arm64: Emulate EL12 register accesses from the virtual EL2
+>>>   KVM: arm64: Support a VM with VHE considering EL0 of the VHE host
+>>>   KVM: arm64: Allow the virtual EL2 to access EL2 states without trap
+>>>   KVM: arm64: Manage the shadow states when virtual E2H bit enabled
+>>>   KVM: arm64: Trap and emulate CPTR_EL2 accesses via CPACR_EL1 from the
+>>>     virtual EL2 with VHE
+>>>   KVM: arm64: Emulate appropriate VM control system registers
+>>>   KVM: arm64: Respect the virtual HCR_EL2.NV bit setting
+>>>   KVM: arm64: Respect the virtual HCR_EL2.NV bit setting for EL12
+>>>     register traps
+>>>   KVM: arm64: Respect virtual HCR_EL2.TVM and TRVM settings
+>>>   KVM: arm64: Respect the virtual HCR_EL2.NV1 bit setting
+>>>   KVM: arm64: Respect the virtual CPTR_EL2.TCPAC setting
+>>>
+>>>  Documentation/admin-guide/kernel-parameters.txt |   4 +
+>>>  arch/arm/include/asm/kvm_emulate.h              |  17 ++
+>>>  arch/arm/include/asm/kvm_host.h                 |  15 +
+>>>  arch/arm64/include/asm/cpucaps.h                |   3 +-
+>>>  arch/arm64/include/asm/esr.h                    |   1 +
+>>>  arch/arm64/include/asm/kvm_arm.h                |   2 +
+>>>  arch/arm64/include/asm/kvm_coproc.h             |   3 +-
+>>>  arch/arm64/include/asm/kvm_emulate.h            |  56 ++++
+>>>  arch/arm64/include/asm/kvm_host.h               |  64 ++++-
+>>>  arch/arm64/include/asm/kvm_hyp.h                |  24 --
+>>>  arch/arm64/include/asm/pgtable-hwdef.h          |   6 +
+>>>  arch/arm64/include/asm/sysreg.h                 |  70 +++++
+>>>  arch/arm64/include/uapi/asm/kvm.h               |   1 +
+>>>  arch/arm64/kernel/asm-offsets.c                 |   1 +
+>>>  arch/arm64/kernel/cpufeature.c                  |  11 +
+>>>  arch/arm64/kvm/Makefile                         |   5 +-
+>>>  arch/arm64/kvm/context.c                        | 346 +++++++++++++++++++++++
+>>>  arch/arm64/kvm/emulate-nested.c                 |  83 ++++++
+>>>  arch/arm64/kvm/guest.c                          |   2 +
+>>>  arch/arm64/kvm/handle_exit.c                    |  89 +++++-
+>>>  arch/arm64/kvm/hyp/entry.S                      |  13 +
+>>>  arch/arm64/kvm/hyp/hyp-entry.S                  |   2 +-
+>>>  arch/arm64/kvm/hyp/switch.c                     |  33 ++-
+>>>  arch/arm64/kvm/hyp/sysreg-sr.c                  | 117 ++++----
+>>>  arch/arm64/kvm/inject_fault.c                   |  12 -
+>>>  arch/arm64/kvm/nested.c                         |  63 +++++
+>>>  arch/arm64/kvm/reset.c                          |   8 +
+>>>  arch/arm64/kvm/sys_regs.c                       | 359 +++++++++++++++++++++++-
+>>>  arch/arm64/kvm/sys_regs.h                       |   8 +
+>>>  arch/arm64/kvm/trace.h                          |  43 ++-
+>>>  virt/kvm/arm/arm.c                              |  20 ++
+>>>  31 files changed, 1363 insertions(+), 118 deletions(-)
+>>>  create mode 100644 arch/arm64/kvm/context.c
+>>>  create mode 100644 arch/arm64/kvm/emulate-nested.c
+>>>  create mode 100644 arch/arm64/kvm/nested.c
+>>>
+>>> --
+>>> 1.9.1
+>>>
