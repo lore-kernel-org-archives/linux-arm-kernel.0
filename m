@@ -1,123 +1,132 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 28 Jul 2017 14:08:01 +0100
-Subject: [PATCH 0/4] ACPI: DMA ranges management
-In-Reply-To: <20170726153519.GA4696@red-moon>
-References: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
- <7df11172-5a40-685f-5202-9a0bceb6e19b@codeaurora.org>
- <c09352cc-e1a2-a494-c457-dc3ea275f504@arm.com>
- <20170726153519.GA4696@red-moon>
-Message-ID: <eb81a7c6-b62b-8e02-8f22-a7fda7e403ce@arm.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Fri, 28 Jul 2017 14:13:31 +0100
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170728125416.j7gcgvnxgv2gq73u@tardis>
+References: <20170726.154540.150558937277891719.davem@davemloft.net>
+ <20170726231505.GG3730@linux.vnet.ibm.com>
+ <20170726.162200.1904949371593276937.davem@davemloft.net>
+ <20170727014214.GH3730@linux.vnet.ibm.com>
+ <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
+ <20170727124913.GL3730@linux.vnet.ibm.com>
+ <20170727144903.000022a1@huawei.com>
+ <20170727173923.000001b2@huawei.com>
+ <20170727165245.GD3730@linux.vnet.ibm.com>
+ <20170728084411.00001ddb@huawei.com>
+ <20170728125416.j7gcgvnxgv2gq73u@tardis>
+Message-ID: <20170728141331.00006a10@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/07/17 16:35, Lorenzo Pieralisi wrote:
-> On Wed, Jul 26, 2017 at 04:05:55PM +0100, Robin Murphy wrote:
->> Hi Nate,
->>
->> On 26/07/17 15:46, Nate Watterson wrote:
->>> Hi Lorenzo,
->>>
->>> On 7/20/2017 10:45 AM, Lorenzo Pieralisi wrote:
->>>> As reported in:
->>>>
->>>> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
->>>>
->>>>
->>>> the bus connecting devices to an IOMMU bus can be smaller in size than
->>>> the IOMMU input address bits which results in devices DMA HW bugs in
->>>> particular related to IOVA allocation (ie chopping of higher address
->>>> bits owing to system bus HW capabilities mismatch with the IOMMU).
->>>>
->>>> Fortunately this problem can be solved through an already present but
->>>> never
->>>> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define
->>>> the DMA
->>>> window for a specific bus in ACPI and therefore all upstream devices
->>>> connected to it.
->>>>
->>>> This small patch series enables _DMA parsing in ACPI core code and
->>>> use it in ACPI IORT code in order to detect DMA ranges for devices and
->>>> update their data structures to make them work with their related DMA
->>>> addressing restrictions.
->>>
->>> I tested the patches and unfortunately it seems like the DMA addressing
->>> restrictions are not really enforced for devices that attempt to set
->>> their own dma_mask based on controller capabilities. For instance,
->>> consider the following from the ahci_platform driver:
->>>
->>>     if (hpriv->cap & HOST_CAP_64) {
->>>         rc = dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(64));
->>>         [...]
->>>     }
->>>
->>> Prior to the check, I can see that the device dma_mask respects the
->>> limits enumerated in the _DMA object, however it is then clobbered by
->>> the call to dma_coerce_mask_and_coherent(). Interestingly, if
->>> HOST_CAP_64 was not set and the _DMA object for the device (or its
->>> parent) indicated support for > 32-bit addrs, the host controller
->>> could end up getting programmed with addresses beyond what it actually
->>> supports. That is more a bug with the ahci_platform driver assuming a
->>> default 32-bit dma_mask, but I would not be surprised to find other
->>> drivers that rely on the same assumption.
->>
->> Yup, you've hit upon the more general problem, which applies equally to
->> DT "dma-ranges" too. I'm working on arm64 DMA stuff at the moment, and
->> have the patch to actually enforce the firmware-described limit when
->> drivers update their masks, but that depends on everyone passing the
->> correct information to arch_setup_dma_ops() in the first place (I think
->> DT needs more fixing than ACPI does).
->>
->>> To ensure that dma_set_mask() and friends actually respect _DMA, would
->>> you consider introducing a dma_supported() callback to check the input
->>> dma_mask against the FW defined limits? This would end up aggressively
->>> clipping the dma_mask to 32-bits for devices like the above if the _DMA
->>> limit was less than 64-bits, but that is probably preferable to the
->>> controller accessing unintended addresses.
->>>
->>> Also, how would you feel about adding support for the IORT named_node
->>> memory_address_limit field?
->>
->> We will certainly need that for some platform devices, so if you fancy
->> giving it a go before Lorenzo or I get there, feel free!
+On Fri, 28 Jul 2017 20:54:16 +0800
+Boqun Feng <boqun.feng@gmail.com> wrote:
+
+> Hi Jonathan,
 > 
-> I can do it for v2 but I would like to understand why using _DMA is
-> not good enough for named components - having two bindings describing
-> the same thing is not ideal and I'd rather avoid it - if there is
-> a reason I am happy to add the necessary code.
+> FWIW, there is wakeup-missing issue in swake_up() and swake_up_all():
+> 
+> 	https://marc.info/?l=linux-kernel&m=149750022019663
+> 
+> and RCU begins to use swait/wake last year, so I thought this could be
+> relevant.
+> 
+> Could you try the following patch and see if it works? Thanks.
+Sadly seems to be a no...  Just splatted before I could even get
+the tracing set up. Back to staring at logs and hoping something
+will stand out!
 
-My interpretation of "_DMA is only defined under devices that represent
-buses." (ACPI 6.0, section 6.2.4) is that "devices that represent buses"
-are those that have other device objects as children. In other words
-(excuse my novice pseudo-ASL), this would be valid:
-
-Scope(_SB)
-{
-	Device (Bus)
-	{
-		...
-		Method (_DMA ... )
-		Device (Dev1)
-		{
-			...
-		}
-	}
-}
-
-but this should be invalid:
-
-Scope(_SB)
-{
-	Device (Dev2)
-	{
-		...
-		Method (_DMA ... )
-	}
-}
-
-Thus in the case where Dev2 is wired directly to an SMMU input, but
-fewer address bits are wired up between the two than both the device and
-SMMU interfaces are capable of, memory address limit is enough to
-describe that without having to insert a fake "bus" object above it just
-to hold the _DMA method.
-
-Robin.
+Jonathan
+> 
+> Regards,
+> Boqun
+> 
+> ------------------>8  
+> Subject: [PATCH] swait: Remove the lockless swait_active() check in
+>  swake_up*()
+> 
+> Steven Rostedt reported a potential race in RCU core because of
+> swake_up():
+> 
+>         CPU0                            CPU1
+>         ----                            ----
+>                                 __call_rcu_core() {
+> 
+>                                  spin_lock(rnp_root)
+>                                  need_wake = __rcu_start_gp() {
+>                                   rcu_start_gp_advanced() {
+>                                    gp_flags = FLAG_INIT
+>                                   }
+>                                  }
+> 
+>  rcu_gp_kthread() {
+>    swait_event_interruptible(wq,
+>         gp_flags & FLAG_INIT) {
+>    spin_lock(q->lock)
+> 
+>                                 *fetch wq->task_list here! *
+> 
+>    list_add(wq->task_list, q->task_list)
+>    spin_unlock(q->lock);
+> 
+>    *fetch old value of gp_flags here *
+> 
+>                                  spin_unlock(rnp_root)
+> 
+>                                  rcu_gp_kthread_wake() {
+>                                   swake_up(wq) {
+>                                    swait_active(wq) {
+>                                     list_empty(wq->task_list)
+> 
+>                                    } * return false *
+> 
+>   if (condition) * false *
+>     schedule();
+> 
+> In this case, a wakeup is missed, which could cause the rcu_gp_kthread
+> waits for a long time.
+> 
+> The reason of this is that we do a lockless swait_active() check in
+> swake_up(). To fix this, we can either 1) add a smp_mb() in swake_up()
+> before swait_active() to provide the proper order or 2) simply remove
+> the swait_active() in swake_up().
+> 
+> The solution 2 not only fixes this problem but also keeps the swait and
+> wait API as close as possible, as wake_up() doesn't provide a full
+> barrier and doesn't do a lockless check of the wait queue either.
+> Moreover, there are users already using swait_active() to do their quick
+> checks for the wait queues, so it make less sense that swake_up() and
+> swake_up_all() do this on their own.
+> 
+> This patch then removes the lockless swait_active() check in swake_up()
+> and swake_up_all().
+> 
+> Reported-by: Steven Rostedt <rostedt@goodmis.org>
+> Signed-off-by: Boqun Feng <boqun.feng@gmail.com>
+> ---
+>  kernel/sched/swait.c | 6 ------
+>  1 file changed, 6 deletions(-)
+> 
+> diff --git a/kernel/sched/swait.c b/kernel/sched/swait.c
+> index 3d5610dcce11..2227e183e202 100644
+> --- a/kernel/sched/swait.c
+> +++ b/kernel/sched/swait.c
+> @@ -33,9 +33,6 @@ void swake_up(struct swait_queue_head *q)
+>  {
+>  	unsigned long flags;
+>  
+> -	if (!swait_active(q))
+> -		return;
+> -
+>  	raw_spin_lock_irqsave(&q->lock, flags);
+>  	swake_up_locked(q);
+>  	raw_spin_unlock_irqrestore(&q->lock, flags);
+> @@ -51,9 +48,6 @@ void swake_up_all(struct swait_queue_head *q)
+>  	struct swait_queue *curr;
+>  	LIST_HEAD(tmp);
+>  
+> -	if (!swait_active(q))
+> -		return;
+> -
+>  	raw_spin_lock_irq(&q->lock);
+>  	list_splice_init(&q->task_list, &tmp);
+>  	while (!list_empty(&tmp)) {
