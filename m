@@ -1,66 +1,22 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 28 Jul 2017 09:55:29 -0700
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170728142403.0000122b@huawei.com>
-References: <20170726231505.GG3730@linux.vnet.ibm.com>
- <20170726.162200.1904949371593276937.davem@davemloft.net>
- <20170727014214.GH3730@linux.vnet.ibm.com>
- <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
- <20170727124913.GL3730@linux.vnet.ibm.com>
- <20170727144903.000022a1@huawei.com>
- <20170727173923.000001b2@huawei.com>
- <20170727165245.GD3730@linux.vnet.ibm.com>
- <20170728084411.00001ddb@huawei.com>
- <20170728142403.0000122b@huawei.com>
-Message-ID: <20170728165529.GF3730@linux.vnet.ibm.com>
+From: tony.luck@intel.com (Luck, Tony)
+Date: Fri, 28 Jul 2017 17:02:11 +0000
+Subject: [PATCH] MAINTAINERS: Add Tony and Boris as ACPI/APEI reviewers
+In-Reply-To: <20170728073551.GB1889@nazgul.tnic>
+References: <1500661477-6536-1-git-send-email-lho@apm.com>
+ <20170722055954.GA2082@nazgul.tnic> <1893763.BLgt1zgLk5@aspire.rjw.lan>
+ <1632667.Vgem7HtdXu@aspire.rjw.lan> <20170727055825.GA4611@nazgul.tnic>
+ <CAJZ5v0jVSrsufoWyexb_MWS=ni0CDn7Oo1-oHOcaTxdYpfpQMg@mail.gmail.com>
+ <20170727144922.GF28553@nazgul.tnic>
+ <CAJZ5v0gQ5aYZw8NOpvmw-1zqfFg_k+nkTZxEocnT=hDk37VsGA@mail.gmail.com>
+ <3908561D78D1C84285E8C5FCA982C28F61317AEB@ORSMSX114.amr.corp.intel.com>
+ <20170728073551.GB1889@nazgul.tnic>
+Message-ID: <3908561D78D1C84285E8C5FCA982C28F61318E5F@ORSMSX114.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 02:24:03PM +0100, Jonathan Cameron wrote:
-> On Fri, 28 Jul 2017 08:44:11 +0100
-> Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
+> Since this piece of the ACPI pile is doing RAS, it is perhaps prudent if
+> we at least paid attention to it and the direction it takes. So add Tony
+> and me as reviewers.
 
-[ . . . ]
-
-> Ok.  Some info.  I disabled a few driver (usb and SAS) in the interest of having
-> fewer timer events.  Issue became much easier to trigger (on some runs before
-> I could get tracing up and running)
->e
-> So logs are large enough that pastebin doesn't like them - please shoet if
->>e another timer period is of interest.
-> 
-> https://pastebin.com/iUZDfQGM for the timer trace.
-> https://pastebin.com/3w1F7amH for dmesg.  
-> 
-> The relevant timeout on the RCU stall detector was 8 seconds.  Event is
-> detected around 835.
-> 
-> It's a lot of logs, so I haven't identified a smoking gun yet but there
-> may well be one in there.
-
-The dmesg says:
-
-rcu_preempt kthread starved for 2508 jiffies! g112 c111 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1
-
-So I look for "rcu_preempt" timer events and find these:
-
-rcu_preempt-9     [019] ....   827.579114: timer_init: timer=ffff8017d5fc7da0
-rcu_preempt-9     [019] d..1   827.579115: timer_start: timer=ffff8017d5fc7da0 function=process_timeout 
-
-Next look for "ffff8017d5fc7da0" and I don't find anything else.
-
-The timeout was one jiffy, and more than a second later, no expiration.
-Is it possible that this event was lost?  I am not seeing any sign of
-this is the trace.
-
-I don't see any sign of CPU hotplug (and I test with lots of that in
-any case).
-
-The last time we saw something like this it was a timer HW/driver problem,
-but it is a bit hard to imagine such a problem affecting both ARM64
-and SPARC.  ;-)
-
-Thomas, any debugging suggestions?
-
-							Thanx, Paul
+Acked-by: Tony Luck <tony.luck@intel.com>
+ 
