@@ -1,30 +1,58 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 28 Jul 2017 07:53:37 +0200
-Subject: [PATCH v2] ARM: dts: exynos: fix PCI bus dtc warnings
-In-Reply-To: <20170726210943.6875-2-robh@kernel.org>
-References: <20170726210943.6875-1-robh@kernel.org>
- <20170726210943.6875-2-robh@kernel.org>
-Message-ID: <20170728055337.GA2805@kozik-book>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Fri, 28 Jul 2017 11:31:21 +0530
+Subject: [PATCH 2/2] arm64: dts: Add device node for pmi8994 gpios
+In-Reply-To: <f0ad95d2-f79e-c3d4-1ac6-48d5d6e21956@codeaurora.org>
+References: <1501137036-20155-1-git-send-email-vivek.gautam@codeaurora.org>
+ <1501137036-20155-2-git-send-email-vivek.gautam@codeaurora.org>
+ <f0ad95d2-f79e-c3d4-1ac6-48d5d6e21956@codeaurora.org>
+Message-ID: <CAFp+6iHecyKSGLRrsA=4-9TZmtkMrDzxtKijQ8+gab0EGsBkjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 04:09:38PM -0500, Rob Herring wrote:
-> dtc recently added PCI bus checks. Fix these warnings.
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-> Cc: linux-samsung-soc at vger.kernel.org
-> ---
-> v2:
-> - rebase on v4.13-rc2
-> 
->  arch/arm/boot/dts/exynos5440.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
+On Fri, Jul 28, 2017 at 2:30 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 07/26/2017 11:30 PM, Vivek Gautam wrote:
+>> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+>> ---
+>>  arch/arm64/boot/dts/qcom/pmi8994.dtsi | 17 +++++++++++++++++
+>>  1 file changed, 17 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/qcom/pmi8994.dtsi b/arch/arm64/boot/dts/qcom/pmi8994.dtsi
+>> index d3879a4e8076..3b04ca63c31e 100644
+>> --- a/arch/arm64/boot/dts/qcom/pmi8994.dtsi
+>> +++ b/arch/arm64/boot/dts/qcom/pmi8994.dtsi
+>> @@ -8,6 +8,23 @@
+>>               reg = <0x2 SPMI_USID>;
+>>               #address-cells = <1>;
+>>               #size-cells = <0>;
+>> +
+>> +             pmi8994_gpios: gpios at c000 {
+>> +                     compatible = "qcom,pmi8994-gpio";
+>
+>
+> Please also include the generic "qcom,spmi-gpio" compatible. We really
+> don't need to add the "qcom,pmi8994-gpio" one to the driver right now so
+> I would leave that out of the driver but leave it here in the dtsi file
+> of course.
 
-Thanks, applied.
+Sure, will add the "qcom,spmi-gpio" compatible as well, and will drop the
+"qcom,pmi8994-gpio" from the driver.
+Thanks.
 
-Best regards,
-Krzysztof
+regards
+Vivek
+
+>
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
