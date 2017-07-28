@@ -1,59 +1,139 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 28 Jul 2017 17:03:20 +0200
-Subject: [PATCH 0/8] net: mvpp2: add TX interrupts support
-In-Reply-To: <20170726.133533.262039701450895012.davem@davemloft.net>
-References: <20170725155509.10574-1-thomas.petazzoni@free-electrons.com>
- <20170726.133533.262039701450895012.davem@davemloft.net>
-Message-ID: <20170728170320.4e4bd683@windsurf.lan>
+From: minchan@kernel.org (Minchan Kim)
+Date: Sat, 29 Jul 2017 00:12:24 +0900
+Subject: [PATCH 2/3] mm: fix MADV_[FREE|DONTNEED] TLB flush miss problem
+In-Reply-To: <20170728084634.foo3wjhsyydml6yj@techsingularity.net>
+References: <1501224112-23656-1-git-send-email-minchan@kernel.org>
+ <1501224112-23656-3-git-send-email-minchan@kernel.org>
+ <20170728084634.foo3wjhsyydml6yj@techsingularity.net>
+Message-ID: <20170728151224.GA24201@bbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Wed, 26 Jul 2017 13:35:33 -0700 (PDT), David Miller wrote:
-
-> >  - This series depends on the previous series sent by Antoine T?nart
-> >    "net: mvpp2: MAC/GoP configuration and optional PHYs". Functionally
-> >    speaking there is no real dependency, but we touch in a few areas
-> >    the same piece of code, so I based my patch series on top of
-> >    Antoine's.
+On Fri, Jul 28, 2017 at 09:46:34AM +0100, Mel Gorman wrote:
+> On Fri, Jul 28, 2017 at 03:41:51PM +0900, Minchan Kim wrote:
+> > Nadav reported parallel MADV_DONTNEED on same range has a stale TLB
+> > problem and Mel fixed it[1] and found same problem on MADV_FREE[2].
 > > 
-> >  - Please do not apply the last patch of this series "arm64: dts:
-> >    marvell: add TX interrupts for PPv2.2", it will be taken by the ARM
-> >    mvebu maintainers.  
+> > Quote from Mel Gorman
+> > 
+> > "The race in question is CPU 0 running madv_free and updating some PTEs
+> > while CPU 1 is also running madv_free and looking at the same PTEs.
+> > CPU 1 may have writable TLB entries for a page but fail the pte_dirty
+> > check (because CPU 0 has updated it already) and potentially fail to flush.
+> > Hence, when madv_free on CPU 1 returns, there are still potentially writable
+> > TLB entries and the underlying PTE is still present so that a subsequent write
+> > does not necessarily propagate the dirty bit to the underlying PTE any more.
+> > Reclaim at some unknown time at the future may then see that the PTE is still
+> > clean and discard the page even though a write has happened in the meantime.
+> > I think this is possible but I could have missed some protection in madv_free
+> > that prevents it happening."
+> > 
+> > This patch aims for solving both problems all at once and is ready for
+> > other problem with KSM, MADV_FREE and soft-dirty story[3].
+> > 
+> > TLB batch API(tlb_[gather|finish]_mmu] uses [set|clear]_tlb_flush_pending
+> > and mmu_tlb_flush_pending so that when tlb_finish_mmu is called, we can catch
+> > there are parallel threads going on. In that case, flush TLB to prevent
+> > for user to access memory via stale TLB entry although it fail to gather
+> > pte entry.
+> > 
+> > I confiremd this patch works with [4] test program Nadav gave so this patch
+> > supersedes "mm: Always flush VMA ranges affected by zap_page_range v2"
+> > in current mmotm.
+> > 
+> > NOTE:
+> > This patch modifies arch-specific TLB gathering interface(x86, ia64,
+> > s390, sh, um). It seems most of architecture are straightforward but s390
+> > need to be careful because tlb_flush_mmu works only if mm->context.flush_mm
+> > is set to non-zero which happens only a pte entry really is cleared by
+> > ptep_get_and_clear and friends. However, this problem never changes the
+> > pte entries but need to flush to prevent memory access from stale tlb.
+> > 
+> > Any thoughts?
+> > 
 > 
-> Please don't do things this way.
+> The cc list is somewhat ..... extensive, given the topic. Trim it if
+> there is another version.
+
+Most of them are maintainers and mailling list for each architecures
+I am changing. I'm not sure what I can trim. As you said it's rather
+extensive, I will trim mailing list for each arch but keep maintainers
+and linux-arch.
+
 > 
-> Patiently wait for Antione's series to make it into my tree, then
-> submit your's.
+> > index 3f2eb76243e3..8c26961f0503 100644
+> > --- a/arch/arm/include/asm/tlb.h
+> > +++ b/arch/arm/include/asm/tlb.h
+> > @@ -163,13 +163,26 @@ tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm, unsigned long start
+> >  #ifdef CONFIG_HAVE_RCU_TABLE_FREE
+> >  	tlb->batch = NULL;
+> >  #endif
+> > +	set_tlb_flush_pending(tlb->mm);
+> >  }
+> >  
+> >  static inline void
+> >  tlb_finish_mmu(struct mmu_gather *tlb, unsigned long start, unsigned long end)
+> >  {
+> > -	tlb_flush_mmu(tlb);
+> > +	/*
+> > +	 * If there are parallel threads are doing PTE changes on same range
+> > +	 * under non-exclusive lock(e.g., mmap_sem read-side) but defer TLB
+> > +	 * flush by batching, a thread has stable TLB entry can fail to flush
+> > +	 * the TLB by observing pte_none|!pte_dirty, for example so flush TLB
+> > +	 * if we detect parallel PTE batching threads.
+> > +	 */
+> > +	if (mm_tlb_flush_pending(tlb->mm, false) > 1) {
+> > +		tlb->range_start = start;
+> > +		tlb->range_end = end;
+> > +	}
+> >  
+> > +	tlb_flush_mmu(tlb);
+> > +	clear_tlb_flush_pending(tlb->mm);
+> >  	/* keep the page table cache within bounds */
+> >  	check_pgt_cache();
+> >  
+> 
+> mm_tlb_flush_pending shouldn't be taking a barrier specific arg. I expect
+> this to change in the future and cause a conflict. At least I think in
+> this context, it's the conditional barrier stuff.
+> 
 
-I'll resubmit when Antoine's series is merged. The idea of submitting
-my patches was to allow others to review/test them, not necessarily to
-have them merged right away. Perhaps I should have marked them RFC to
-make it clear that I don't expect you to merge them right away.
+Yub. I saw your comment to Nadav so I expect you want mm_tlb_flush_pending
+be called under pte lock. However, I will use it out of pte lock where
+tlb_finish_mmu, however, in that case, atomic op and barrier
+to prevent compiler reordering between tlb flush and atomic_read
+in mm_tlb_flush_pending are enough to work.
 
-> Also, if we're continually going to elide the DTS file patches, just
+> That aside, it's very unfortunate that the return value of
+> mm_tlb_flush_pending really matters. Knowing why 1 is magic there requires
+> knowledge of the internals on a per-arch basis which is a bit nuts.
+> Consider renaming this to mm_tlb_flush_parallel() to return true if there
+> is a nr_pending > 1 with comments explaining why. I don't think any of
+> the callers expect a nr_pending of 0 ever. That removes some knowledge of
+> the specifics.
 
-It's the dutty of the sub-architecture maintainers to merge the DTS
-changes. Merging them through your tree doesn't work really well, as
-the changes might very likely conflict with other DTS changes merged by
-the sub-architecture maintainer.
+Okay. If you are not strong against, I prefer mm_tlb_flush_nested
+which returns true if nr_pending > 1.
 
-But it makes sense to have such DTS changes in the same patch series,
-since they are really related. It's very common to have patch series
-that contain patches that will be merged by different maintainers.
+> 
+> The arch-specific changes to tlb_gather_mmu are almost all identical.
+> It's a little tricky to split the arch layer and core mm to have all
+> the set/clear of mm_tlb_flush_pending handled by the core mm.  It's not
+> required but it would be preferred. The set one is obvious. rename
+> tlb_gather_mmu to arch_tlb_gather_mmu (including the generic implementation)
+> and create a tlb_gather_mmu alias that calls arch_tlb_gather_mmu and
+> set_tlb_flush_pending.
+> 
+> The clear is not as straight-forward but can be done by creating a new
+> arch helper that handles this hunk on a per-arch basis
+> 
+> > +     if (mm_tlb_flush_pending(tlb->mm, false) > 1) {
+> > +             tlb->start = start;
+> > +             tlb->end = end;
+> > +     }
+> 
+> It'll be churn initially but it means any different handling in the TLB
+> batching area will be mostly a core concern.
 
-> don't bother adding them to the series.  That way you don't have to
-> give me special instructions, and I don't have the possibility of
-> making a mistake and applying it accidently.
-
-... but OK, I won't resend them, so you don't get potentially confused
-by such patches.
-
-Thanks!
-
-Thomas Petazzoni
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Fair enough. I will respin next week.
+Thanks for the review, Mel.
