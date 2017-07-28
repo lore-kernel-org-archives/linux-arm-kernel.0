@@ -1,31 +1,42 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 28 Jul 2017 21:50:18 +0800
-Subject: [PATCH 0/2] STM32 HASH crypto driver
-In-Reply-To: <1499952747-16423-1-git-send-email-lionel.debieve@st.com>
-References: <1499952747-16423-1-git-send-email-lionel.debieve@st.com>
-Message-ID: <20170728135018.GD21401@gondor.apana.org.au>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 28 Jul 2017 14:50:21 +0100
+Subject: [RFC PATCH v4 2/5] arm64: neon: Add missing header guard in
+ <asm/neon.h>
+In-Reply-To: <1501249824-18913-1-git-send-email-Dave.Martin@arm.com>
+References: <1501249824-18913-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1501249824-18913-3-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 03:32:25PM +0200, Lionel Debieve wrote:
-> This set of patches adds a new crypto driver for STMicroelectronics stm32 HW.
-> This drivers uses the crypto API and provides with HW-enabled md5, sha1,
-> sha224, sha256 hash based algorithms.
-> It makes use of the crypto engine to support ahash requests.
-> 
-> This driver was successfully tested with tcrypt / testmgr.
-> 
-> Note:
-> Since two other set of patches (update of STM32 CRC32 and addition of STM32
-> CRYP) are being proposed, it may happen that there are some minor conflicts in
-> 'Kconfig' and 'Makefile'. In that case, I will fix the issue in due course.
-> 
-> Lionel Debieve (2):
->   dt-bindings: Document STM32 HASH bindings
->   crypto: stm32 - Support for STM32 HASH module
+asm/neon.h doesn't have a header inclusion guard, but it should
+have one for consistency with other headers.
 
-All patches applied.  Thanks.
+This patch adds a suitable guard.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm64/include/asm/neon.h | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
+index ad4cdc9..5368bd0 100644
+--- a/arch/arm64/include/asm/neon.h
++++ b/arch/arm64/include/asm/neon.h
+@@ -8,6 +8,9 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#ifndef __ASM_NEON_H
++#define __ASM_NEON_H
++
+ #include <linux/types.h>
+ #include <asm/fpsimd.h>
+ 
+@@ -17,3 +20,5 @@
+ 
+ void kernel_neon_begin_partial(u32 num_regs);
+ void kernel_neon_end(void);
++
++#endif /* ! __ASM_NEON_H */
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.1.4
