@@ -1,110 +1,107 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 28 Jul 2017 23:21:33 +0200
-Subject: [PATCH v5 1/6] dt-bindings: Amlogic: Add Meson8 and Meson8b SMP
- related documentation
+Date: Fri, 28 Jul 2017 23:21:38 +0200
+Subject: [PATCH v5 6/6] ARM: dts: meson8b: add support for booting the
+ secondary CPU cores
 In-Reply-To: <20170728212138.12217-1-martin.blumenstingl@googlemail.com>
 References: <20170728212138.12217-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170728212138.12217-2-martin.blumenstingl@googlemail.com>
+Message-ID: <20170728212138.12217-7-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+From: Carlo Caione <carlo@caione.org>
 
-With this patch we add documentation for:
+Booting the secondary CPU cores involves the following nodes/devices:
+- SCU (Snoop-Control-Unit, for which we already have a DT node)
+- a reset line for each CPU core, provided by the reset-controller
+  which is built into the clock-controller
+- the PMU (power management unit) which controls the power of the CPU
+  cores
+- a range in the SRAM specifically reserved for booting secondary CPU
+  cores
+- the "enable-method" which activates booting the secondary CPU cores
 
-* power-management-unit: the PMU is used to bring up the cores during
-  SMP operations
-* sram: among other things the sram is used to store the first code
-  executed by the core when it is powered up
-* cpu-enable-method: the CPU enable method used by Amlogic Meson8 and
-  Meson8b SoCs
+This adds all required nodes and properties to boot the secondary CPU
+cores.
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
-[also add Meson8 to the documentation]
+Signed-off-by: Carlo Caione <carlo@caione.org>
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/arm/amlogic/pmu.txt        | 18 ++++++++++++
- .../devicetree/bindings/arm/amlogic/smp-sram.txt   | 32 ++++++++++++++++++++++
- Documentation/devicetree/bindings/arm/cpus.txt     |  2 ++
- 3 files changed, 52 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic/pmu.txt
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
+ arch/arm/boot/dts/meson8b.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic/pmu.txt b/Documentation/devicetree/bindings/arm/amlogic/pmu.txt
-new file mode 100644
-index 000000000000..72f8d08198b6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/amlogic/pmu.txt
-@@ -0,0 +1,18 @@
-+Amlogic Meson8 and Meson8b power-management-unit:
-+-------------------------------------------------
-+
-+The pmu is used to turn off and on different power domains of the SoCs
-+This includes the power to the CPU cores.
-+
-+Required node properties:
-+- compatible value : depending on the SoC this should be one of:
-+			"amlogic,meson8-pmu"
-+			"amlogic,meson8b-pmu"
-+- reg : physical base address and the size of the registers window
-+
-+Example:
-+
-+	pmu at c81000e4 {
+diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
+index bc278da7df0d..aaebfcce9073 100644
+--- a/arch/arm/boot/dts/meson8b.dtsi
++++ b/arch/arm/boot/dts/meson8b.dtsi
+@@ -47,6 +47,7 @@
+ #include <dt-bindings/clock/meson8b-clkc.h>
+ #include <dt-bindings/gpio/meson8b-gpio.h>
+ #include <dt-bindings/reset/amlogic,meson8b-reset.h>
++#include <dt-bindings/reset/amlogic,meson8b-clkc-reset.h>
+ #include "meson.dtsi"
+ 
+ / {
+@@ -59,6 +60,8 @@
+ 			compatible = "arm,cortex-a5";
+ 			next-level-cache = <&L2>;
+ 			reg = <0x200>;
++			enable-method = "amlogic,meson8b-smp";
++			resets = <&clkc CLKC_RESET_CPU0_SOFT_RESET>;
+ 		};
+ 
+ 		cpu at 201 {
+@@ -66,6 +69,8 @@
+ 			compatible = "arm,cortex-a5";
+ 			next-level-cache = <&L2>;
+ 			reg = <0x201>;
++			enable-method = "amlogic,meson8b-smp";
++			resets = <&clkc CLKC_RESET_CPU1_SOFT_RESET>;
+ 		};
+ 
+ 		cpu at 202 {
+@@ -73,6 +78,8 @@
+ 			compatible = "arm,cortex-a5";
+ 			next-level-cache = <&L2>;
+ 			reg = <0x202>;
++			enable-method = "amlogic,meson8b-smp";
++			resets = <&clkc CLKC_RESET_CPU2_SOFT_RESET>;
+ 		};
+ 
+ 		cpu at 203 {
+@@ -80,6 +87,8 @@
+ 			compatible = "arm,cortex-a5";
+ 			next-level-cache = <&L2>;
+ 			reg = <0x203>;
++			enable-method = "amlogic,meson8b-smp";
++			resets = <&clkc CLKC_RESET_CPU3_SOFT_RESET>;
+ 		};
+ 	};
+ 
+@@ -90,6 +99,11 @@
+ }; /* end of / */
+ 
+ &aobus {
++	pmu: pmu at e0 {
 +		compatible = "amlogic,meson8b-pmu", "syscon";
-+		reg = <0xc81000e0 0x18>;
++		reg = <0xe0 0x18>;
 +	};
-diff --git a/Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt b/Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
-new file mode 100644
-index 000000000000..3473ddaadfac
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
-@@ -0,0 +1,32 @@
-+Amlogic Meson8 and Meson8b SRAM for smp bringup:
-+------------------------------------------------
 +
-+Amlogic's SMP-capable SoCs use part of the sram for the bringup of the cores.
-+Once the core gets powered up it executes the code that is residing at a
-+specific location.
-+
-+Therefore a reserved section sub-node has to be added to the mmio-sram
-+declaration.
-+
-+Required sub-node properties:
-+- compatible : depending on the SoC this should be one of:
-+		"amlogic,meson8-smp-sram"
-+		"amlogic,meson8b-smp-sram"
-+
-+The rest of the properties should follow the generic mmio-sram discription
-+found in ../../misc/sram.txt
-+
-+Example:
-+
-+	sram: sram at d9000000 {
-+		compatible = "mmio-sram";
-+		reg = <0xd9000000 0x20000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0xd9000000 0x20000>;
-+
-+		smp-sram at 1ff80 {
-+			compatible = "amlogic,meson8b-smp-sram";
-+			reg = <0x1ff80 0x8>;
-+		};
+ 	pinctrl_aobus: pinctrl at 84 {
+ 		compatible = "amlogic,meson8b-aobus-pinctrl";
+ 		reg = <0x84 0xc>;
+@@ -157,6 +171,13 @@
+ 	};
+ };
+ 
++&ahb_sram {
++	smp-sram at 1ff80 {
++		compatible = "amlogic,meson8b-smp-sram";
++		reg = <0x1ff80 0x8>;
 +	};
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index a44253cad269..1ef3e53b9be7 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -197,6 +197,8 @@ described below.
- 			    "actions,s500-smp"
- 			    "allwinner,sun6i-a31"
- 			    "allwinner,sun8i-a23"
-+			    "amlogic,meson8-smp"
-+			    "amlogic,meson8b-smp"
- 			    "arm,realview-smp"
- 			    "brcm,bcm11351-cpu-method"
- 			    "brcm,bcm23550"
++};
++
+ &ethmac {
+ 	clocks = <&clkc CLKID_ETH>;
+ 	clock-names = "stmmaceth";
 -- 
 2.13.3
