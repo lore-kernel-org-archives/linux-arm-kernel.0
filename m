@@ -1,51 +1,39 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 27 Jul 2017 18:49:05 -0700
-Subject: [PATCH net-next 03/18] net: mvpp2: set the SMI PHY address when
- connecting to the PHY
-In-Reply-To: <20170726160806.GF12049@lunn.ch>
+Date: Thu, 27 Jul 2017 18:50:33 -0700
+Subject: [PATCH net-next 08/18] net: mvpp2: make the phy optional
+In-Reply-To: <20170726162000.GJ12049@lunn.ch>
 References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
- <20170724134848.19330-4-antoine.tenart@free-electrons.com>
- <20170726160806.GF12049@lunn.ch>
-Message-ID: <20170728014905.GC24728@kwain>
+ <20170724134848.19330-9-antoine.tenart@free-electrons.com>
+ <20170726162000.GJ12049@lunn.ch>
+Message-ID: <20170728015033.GD24728@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Andrew,
 
-On Wed, Jul 26, 2017 at 06:08:06PM +0200, Andrew Lunn wrote:
-> On Mon, Jul 24, 2017 at 03:48:33PM +0200, Antoine Tenart wrote:
-> >  
-> > +	if (priv->hw_version != MVPP22)
-> > +		return 0;
-> > +
-> > +	/* Set the SMI PHY address */
-> > +	if (of_property_read_u32(port->phy_node, "reg", &phy_addr)) {
-> > +		netdev_err(port->dev, "cannot find the PHY address\n");
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	writel(phy_addr, priv->iface_base + MVPP22_SMI_PHY_ADDR(port->gop_id));
-> >  	return 0;
-> >  }
+On Wed, Jul 26, 2017 at 06:20:00PM +0200, Andrew Lunn wrote:
+> On Mon, Jul 24, 2017 at 03:48:38PM +0200, Antoine Tenart wrote:
+> > SFP ports do not necessarily need to have an Ethernet PHY between the
+> > SoC and the actual physical port. However, the driver currently makes
+> > the "phy" property mandatory, contrary to what is stated in the Device
+> > Tree binding.
+> > 
+> > To allow handling the PPv2 controller on those boards, this patch makes
+> > the PHY optional, and aligns the PPv2 driver on its device tree
+> > documentation.
 > 
-> You could use phy_dev->mdiodev->addr, rather than parse the DT.
+> It is an architectural question...
+> 
+> but with the boards i have with an SFF port, i actually use a
+> fixed-phy to represent the SFF. Then nothing special is needed.
 
-OK.
+I was not aware of the fixed-phy, that might work for us here.
+Thanks for the hint!
 
-> Why does the MAC need to know this address? The phylib and PHY driver
-> should be the only thing accessing the PHY, otherwise you are asking
-> for trouble.
+> Also, Russell King posted his phylink patches. Once accepted, you are
+> going to want to re-write some of this to make use of that code.
 
-This is part of the SMI/xSMI interface. I added into the mvpp2 driver
-and not in the mvmdio one because the GoP port number must be known to
-set this register (so that would be even less clean to do it).
-
-> What if the PHY is hanging off some other mdio bus? I've got a
-> freescale board with dual ethernets and a Marvell switch on the
-> hardware MDIO bus and a PHY on a bit-banging MDIO bus.
-
-Then it wouldn't be controlled by the PPv2 SMI/xSMI interface, so we
-wouldn't need to set the this register.
+And there's that as well.
 
 Thanks!
 Antoine
@@ -60,4 +48,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170727/b50413ff/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170727/349f36fb/attachment.sig>
