@@ -1,87 +1,30 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 28 Jul 2017 15:54:43 +0200
-Subject: [PATCH 1/2] ARM64: dts: meson-gxl-khadas-vim: Add GPIO lines names
-In-Reply-To: <1501250084-19967-1-git-send-email-narmstrong@baylibre.com>
-References: <1501250084-19967-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1501250084-19967-2-git-send-email-narmstrong@baylibre.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 28 Jul 2017 15:55:44 +0200
+Subject: [PATCH 0/3] net-next: stmmac: support future possible different
+ internal phy mode
+In-Reply-To: <20170728092818.23419-1-clabbe.montjoie@gmail.com>
+References: <20170728092818.23419-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170728135544.GD32230@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch describes the GPIO lines usage on the Khadas VIM board.
+On Fri, Jul 28, 2017 at 11:28:15AM +0200, Corentin Labbe wrote:
+> Hello
+> 
+> The current way to find if the phy is internal is to compare DT phy-mode
+> and emac_variant/internal_phy.
+> But it will negate a possible future SoC where an external PHY use the
+> same phy mode than the internal one.
+> 
+> This patchs series adds a new way to find if the PHY is internal, via its
+> compatible.
 
-This is useful in the debugfs gpio file and using the cdev gpio API.
+http://elixir.free-electrons.com/linux/latest/source/drivers/of/of_mdio.c#L144
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- .../dts/amlogic/meson-gxl-s905x-khadas-vim.dts     | 56 ++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+Since you also have "ethernet-phy-ieee802.3-c22", you won't get the
+warning. But still, your device tree gives the wrong idea.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
-index 72c5a9f..67bc40f 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
-@@ -105,6 +105,62 @@
- 	linux,rc-map-name = "rc-geekbox";
- };
- 
-+&pinctrl_aobus {
-+	gpio-line-names = "UART TX",
-+			  "UART RX",
-+			  "Power Key In",
-+			  "J9 Header Pin35",
-+			  "J9 Header Pin16",
-+			  "J9 Header Pin15",
-+			  "J9 Header Pin33",
-+			  "IR In",
-+			  "HDMI CEC",
-+			  "SYS LED";
-+};
-+
-+&pinctrl_periphs {
-+	gpio-line-names = /* Bank GPIOZ */
-+			  "", "", "", "", "", "", "",
-+			  "", "", "", "", "", "", "",
-+			  "Power OFF",
-+			  "VCCK Enable",
-+			  /* Bank GPIOH */
-+			  "HDMI HPD", "HDMI SDA", "HDMI SCL",
-+			  "HDMI_5V_EN", "SPDIF",
-+			  "J9 Header Pin37",
-+			  "J9 Header Pin30",
-+			  "J9 Header Pin29",
-+			  "J9 Header Pin32",
-+			  "J9 Header Pin31",
-+			  /* Bank BOOT */
-+			  "eMMC D0", "eMMC D1", "eMMC D2", "eMMC D3",
-+			  "eMMC D4", "eMMC D5", "eMMC D6", "eMMC D7",
-+			  "eMMC Clk", "eMMC Reset", "eMMC CMD",
-+			  "", "BOOT_MODE", "", "", "eMMC Data Strobe", 
-+			  /* Bank CARD */
-+			  "SDCard D1", "SDCard D0", "SDCard CLK", "SDCard CMD",
-+			  "SDCard D3", "SDCard D2", "SDCard Det",
-+			  /* Bank GPIODV */
-+			  "", "", "", "", "", "", "", "", "", "", "", "",
-+			  "", "", "", "", "", "", "", "", "", "", "", "",
-+			  "I2C A SDA", "I2C A SCK", "I2C B SDA", "I2C B SCK",
-+			  "VCCK Regulator", "VDDEE Regulator",
-+			  /* Bank GPIOX */
-+			  "WIFI SDIO D0", "WIFI SDIO D1", "WIFI SDIO D2",
-+			  "WIFI SDIO D3", "WIFI SDIO CLK", "WIFI SDIO CMD",
-+			  "WIFI Power Enable", "WIFI WAKE HOST",
-+			  "Bluetooth PCM DOUT", "Bluetooth PCM DIN",
-+			  "Bluetooth PCM SYNC", "Bluetooth PCM CLK",
-+			  "Bluetooth UART TX", "Bluetooth UART RX",
-+			  "Bluetooth UART CTS", "Bluetooth UART RTS",
-+			  "WIFI 32K", "Bluetooth Enable",
-+			  "Bluetooth WAKE HOST",
-+			  /* Bank GPIOCLK */
-+			  "", "J9 Header Pin39",
-+			  /* GPIO_TEST_N */
-+			  "";
-+};
-+
- &pwm_AO_ab {
- 	status = "okay";
- 	pinctrl-0 = <&pwm_ao_a_3_pins>, <&pwm_ao_b_pins>;
--- 
-1.9.1
+I've probably asked this before: Does the internal PHY use a different
+PHY ID in registers 2 and 3?
+
+    Andrew
