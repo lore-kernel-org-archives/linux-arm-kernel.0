@@ -1,94 +1,88 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 28 Jul 2017 11:28:18 +0200
-Subject: [PATCH 3/3] net-next: stmmac: dwmac-sun8i: choose internal PHY via
- compatible
-In-Reply-To: <20170728092818.23419-1-clabbe.montjoie@gmail.com>
-References: <20170728092818.23419-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170728092818.23419-4-clabbe.montjoie@gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 28 Jul 2017 12:35:53 +0300
+Subject: [PATCH] ARM: OMAP2+: Fix omap3 prm shared irq
+In-Reply-To: <20170627084838.30275-1-tony@atomide.com>
+References: <20170627084838.30275-1-tony@atomide.com>
+Message-ID: <cdac8d51-580b-c6d8-60be-39e31337c3af@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current way to find if the phy is internal is to compare DT phy-mode
-and emac_variant/internal_phy.
-But it will negate a possible future SoC where an external PHY use the
-same phy mode than the internal one.
+On 27/06/17 11:48, Tony Lindgren wrote:
+> Shared interrupts with IRQ_NOAUTOEN got a warning added with commit
+> 04c848d39879 ("genirq: Warn when IRQ_NOAUTOEN is used with shared
+> interrupts").
+> 
+> Let's just drop the IRQ_NOAUTOEN use for omap3 PRM shared interrupt as
+> it does not seem to cause any other issues based on my testing. We have
+> moved a lot of the code to initialize later, and whatever problems the
+> legacy booting had seem to be gone now with pinctrl driver and device
+> tree based booting.
+> 
+> Otherwise we will get:
+> 
+> WARNING: CPU: 0 PID: 1 at kernel/irq/manage.c:1348 __setup_irq+0x5d0/0x64c
+> [<c01b0260>] (__setup_irq) from [<c01b0480>]
+> (request_threaded_irq+0xdc/0x188)
+> [<c01b0480>] (request_threaded_irq) from [<c051c780>]
+> (pcs_probe+0x6ec/0x8a4)
+> [<c051c780>] (pcs_probe) from [<c05a84b8>] (platform_drv_probe+0x50/0xb0)
+> [<c05a84b8>] (platform_drv_probe) from [<c05a6288>]
+> (driver_probe_device+0x33c/0x478)
+> 
+> Note that we also need to remove the related enable_irq() to avoid
+> getting the following:
+> 
+> WARNING: CPU: 0 PID: 1 at kernel/irq/manage.c:529 enable_irq+0x34/0x70
+> [<c01afa04>] (enable_irq) from [<c0c0f1fc>] (omap3_pm_init+0x118/0x3f8)
+> [<c0c0f1fc>] (omap3_pm_init) from [<c0c0ae7c>] (am35xx_init_late+0x10/0x18)
+> 
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-This patch adds a new way to find if the PHY is internal, via its
-compatible.
+Looks fine to me.
 
-Since the phy_mode of the internal PHY does need to be know, the
-variant internal_phy member is converted to a boolean.
+-Tero
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-index fffd6d5fc907..04f7ddd802b0 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-@@ -48,7 +48,7 @@
-  */
- struct emac_variant {
- 	u32 default_syscon_value;
--	int internal_phy;
-+	bool internal_phy;
- 	bool support_mii;
- 	bool support_rmii;
- 	bool support_rgmii;
-@@ -75,7 +75,7 @@ struct sunxi_priv_data {
- 
- static const struct emac_variant emac_variant_h3 = {
- 	.default_syscon_value = 0x58000,
--	.internal_phy = PHY_INTERFACE_MODE_MII,
-+	.internal_phy = true,
- 	.support_mii = true,
- 	.support_rmii = true,
- 	.support_rgmii = true
-@@ -83,20 +83,20 @@ static const struct emac_variant emac_variant_h3 = {
- 
- static const struct emac_variant emac_variant_v3s = {
- 	.default_syscon_value = 0x38000,
--	.internal_phy = PHY_INTERFACE_MODE_MII,
-+	.internal_phy = true,
- 	.support_mii = true
- };
- 
- static const struct emac_variant emac_variant_a83t = {
- 	.default_syscon_value = 0,
--	.internal_phy = 0,
-+	.internal_phy = false,
- 	.support_mii = true,
- 	.support_rgmii = true
- };
- 
- static const struct emac_variant emac_variant_a64 = {
- 	.default_syscon_value = 0,
--	.internal_phy = 0,
-+	.internal_phy = false,
- 	.support_mii = true,
- 	.support_rmii = true,
- 	.support_rgmii = true
-@@ -889,6 +889,10 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
- 	struct sunxi_priv_data *gmac;
- 	struct device *dev = &pdev->dev;
- 	int ret;
-+	static const struct of_device_id internal_phys[] = {
-+		{ .compatible = "allwinner,sun8i-h3-ephy" },
-+		{ .compatible = "allwinner,sun8i-v3s-ephy" },
-+	};
- 
- 	ret = stmmac_get_platform_resources(pdev, &stmmac_res);
- 	if (ret)
-@@ -932,7 +936,7 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
- 	}
- 
- 	plat_dat->interface = of_get_phy_mode(dev->of_node);
--	if (plat_dat->interface == gmac->variant->internal_phy) {
-+	if (of_match_node(internal_phys, plat_dat->phy_node)) {
- 		dev_info(&pdev->dev, "Will use internal PHY\n");
- 		gmac->use_internal_phy = true;
- 		gmac->ephy_clk = of_clk_get(plat_dat->phy_node, 0);
--- 
-2.13.0
+> ---
+>   arch/arm/mach-omap2/pm34xx.c  | 1 -
+>   arch/arm/mach-omap2/prm3xxx.c | 7 +------
+>   2 files changed, 1 insertion(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -483,7 +483,6 @@ int __init omap3_pm_init(void)
+>   	ret = request_irq(omap_prcm_event_to_irq("io"),
+>   		_prcm_int_handle_io, IRQF_SHARED | IRQF_NO_SUSPEND, "pm_io",
+>   		omap3_pm_init);
+> -	enable_irq(omap_prcm_event_to_irq("io"));
+>   
+>   	if (ret) {
+>   		pr_err("pm: Failed to request pm_io irq\n");
+> diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
+> --- a/arch/arm/mach-omap2/prm3xxx.c
+> +++ b/arch/arm/mach-omap2/prm3xxx.c
+> @@ -692,7 +692,6 @@ static int omap3xxx_prm_late_init(void)
+>   {
+>   	struct device_node *np;
+>   	int irq_num;
+> -	int ret;
+>   
+>   	if (!(prm_features & PRM_HAS_IO_WAKEUP))
+>   		return 0;
+> @@ -712,12 +711,8 @@ static int omap3xxx_prm_late_init(void)
+>   	}
+>   
+>   	omap3xxx_prm_enable_io_wakeup();
+> -	ret = omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
+> -	if (!ret)
+> -		irq_set_status_flags(omap_prcm_event_to_irq("io"),
+> -				     IRQ_NOAUTOEN);
+>   
+> -	return ret;
+> +	return omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
+>   }
+>   
+>   static void __exit omap3xxx_prm_exit(void)
+> 
