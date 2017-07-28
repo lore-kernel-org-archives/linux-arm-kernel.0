@@ -1,53 +1,30 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 28 Jul 2017 11:25:36 +0200
-Subject: [PATCH v6 6/7] dt-bindings: display: rockchip: fill Documents for
- vop series
-In-Reply-To: <1501049975-6185-1-git-send-email-mark.yao@rock-chips.com>
-References: <1501049930-5794-1-git-send-email-mark.yao@rock-chips.com>
- <1501049975-6185-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <2981514.6HN6ClsfAP@phil>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 28 Jul 2017 11:28:15 +0200
+Subject: [PATCH 0/3] net-next: stmmac: support future possible different
+ internal phy mode
+Message-ID: <20170728092818.23419-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hello
 
-Am Mittwoch, 26. Juli 2017, 14:19:35 CEST schrieb Mark Yao:
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
-> Changes in v5:
-> - clean document commit title
-> - move changes description out of docummit commit msg
-> 
-> Changes in v2:
-> - rename rk322x to rk3228
-> - correct some vop registers define
-> 
->  Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-> index 9eb3f0a..5d835d9 100644
-> --- a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-> +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-> @@ -8,8 +8,12 @@ Required properties:
->  - compatible: value should be one of the following
->  		"rockchip,rk3036-vop";
->  		"rockchip,rk3288-vop";
-> +		"rockchip,rk3368-vop";
-> +		"rockchip,rk3366-vop";
->  		"rockchip,rk3399-vop-big";
->  		"rockchip,rk3399-vop-lit";
-> +		"rockchip,rk3228-vop";
-> +		"rockchip,rk3328-vop";
+The current way to find if the phy is internal is to compare DT phy-mode
+and emac_variant/internal_phy.
+But it will negate a possible future SoC where an external PHY use the
+same phy mode than the internal one.
 
-what is your ordering scheme here?
-As the number of rkXXXX socs will very likely increase in the future
-ordering alphanumerical might make everything more manageable when
-the list grows.
+This patchs series adds a new way to find if the PHY is internal, via its
+compatible.
 
-So maybe swap rk3368 and rk3366 and move rk3228+rk3328 to sorted
-positions?
+Corentin Labbe (3):
+  dt-bindings: net: add compatible for internal sun8i-h3/sun8i-v3s PHYs
+  ARM: sunxi: h3/h5: Add sun8i-h3-ephy compatible
+  net-next: stmmac: dwmac-sun8i: choose internal PHY via compatible
 
+ Documentation/devicetree/bindings/net/dwmac-sun8i.txt |  4 ++--
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                    |  3 ++-
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c     | 16 ++++++++++------
+ 3 files changed, 14 insertions(+), 9 deletions(-)
 
-Heiko
+-- 
+2.13.0
