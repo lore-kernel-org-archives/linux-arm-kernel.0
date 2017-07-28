@@ -1,49 +1,51 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Fri, 28 Jul 2017 18:48:13 +0530
-Subject: [PATCH v2 2/2] arm64: dts: pmi8994: Add device node for pmi8994 gpios
-In-Reply-To: <1501247893-30226-1-git-send-email-vivek.gautam@codeaurora.org>
-References: <1501247893-30226-1-git-send-email-vivek.gautam@codeaurora.org>
-Message-ID: <1501247893-30226-2-git-send-email-vivek.gautam@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 28 Jul 2017 15:19:19 +0200
+Subject: [PATCH] iommu/exynos: prevent building on big-endian kernels
+Message-ID: <20170728131954.213595-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+Since we print the correct warning, an allmodconfig build is no longer
+clean but always prints it, which defeats compile-testing:
+
+drivers/iommu/exynos-iommu.c:58:2: error: #warning "revisit driver if we can enable big-endian ptes" [-Werror=cpp]
+
+This replaces the #warning with a dependency, moving warning text into
+a comment.
+
+Fixes: 1f59adb1766d ("iommu/exynos: Replace non-existing big-endian Kconfig option")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
+ drivers/iommu/Kconfig        | 1 +
+ drivers/iommu/exynos-iommu.c | 4 ----
+ 2 files changed, 1 insertion(+), 4 deletions(-)
 
-Changes since v1:
- - Added "qcom,spmi-gpio" to the compatible.
-
- arch/arm64/boot/dts/qcom/pmi8994.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/qcom/pmi8994.dtsi b/arch/arm64/boot/dts/qcom/pmi8994.dtsi
-index d3879a4e8076..57673f92805d 100644
---- a/arch/arm64/boot/dts/qcom/pmi8994.dtsi
-+++ b/arch/arm64/boot/dts/qcom/pmi8994.dtsi
-@@ -8,6 +8,23 @@
- 		reg = <0x2 SPMI_USID>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+
-+		pmi8994_gpios: gpios at c000 {
-+			compatible = "qcom,pmi8994-gpio", "qcom,spmi-gpio";
-+			reg = <0xc000>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupts = <2 0xc0 0 IRQ_TYPE_NONE>,
-+				     <2 0xc1 0 IRQ_TYPE_NONE>,
-+				     <2 0xc2 0 IRQ_TYPE_NONE>,
-+				     <2 0xc3 0 IRQ_TYPE_NONE>,
-+				     <2 0xc4 0 IRQ_TYPE_NONE>,
-+				     <2 0xc5 0 IRQ_TYPE_NONE>,
-+				     <2 0xc6 0 IRQ_TYPE_NONE>,
-+				     <2 0xc7 0 IRQ_TYPE_NONE>,
-+				     <2 0xc8 0 IRQ_TYPE_NONE>,
-+				     <2 0xc9 0 IRQ_TYPE_NONE>;
-+		};
- 	};
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index f73ff28f77e2..c5d80fe3dab9 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -253,6 +253,7 @@ config TEGRA_IOMMU_SMMU
+ config EXYNOS_IOMMU
+ 	bool "Exynos IOMMU Support"
+ 	depends on ARCH_EXYNOS && MMU
++	depends on !CPU_BIG_ENDIAN # revisit driver if we can enable big-endian ptes
+ 	select IOMMU_API
+ 	select ARM_DMA_USE_IOMMU
+ 	help
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index b7aebaf28b82..c6b69e91132b 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -54,10 +54,6 @@ typedef u32 sysmmu_pte_t;
+ #define lv2ent_small(pent) ((*(pent) & 2) == 2)
+ #define lv2ent_large(pent) ((*(pent) & 3) == 1)
  
- 	pmic at 3 {
+-#ifdef CONFIG_CPU_BIG_ENDIAN
+-#warning "revisit driver if we can enable big-endian ptes"
+-#endif
+-
+ /*
+  * v1.x - v3.x SYSMMU supports 32bit physical and 32bit virtual address spaces
+  * v5.0 introduced support for 36bit physical address space by shifting
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.9.0
