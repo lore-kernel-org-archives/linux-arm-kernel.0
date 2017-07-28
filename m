@@ -1,43 +1,38 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 28 Jul 2017 18:33:08 +0200
-Subject: "external abort on linefetch (0x814)" on Kirkwood 6282 SoC
-In-Reply-To: <1501085885.3330.24.camel@hellion.org.uk>
-References: <1500801941.22097.24.camel@hellion.org.uk>
- <20170726152251.GE12049@lunn.ch>
- <1501085885.3330.24.camel@hellion.org.uk>
-Message-ID: <20170728163308.GJ2132@lunn.ch>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 28 Jul 2017 11:33:33 -0500
+Subject: [RESEND PATCH] soc: ti: ti_sci_pm_domains: Populate name for genpd
+Message-ID: <20170728163333.704-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hello kirkwood folks,
-> 
-> We have been seeing reports on the Debian arm list about
-> instability/errors running Debian Stretch (4.9 based) on
-> various?Kirkwood 6282 based QNAP systems. Errors are things like [0,
-> actually one of the earlier pre-4.9 reports, same symptoms as with 4.9
-> though]:
-> 
-> [???37.167103] BUG: Bad rss-counter state mm:c0caa1e0 idx:1 val:1
-> [??783.570365] BUG: Bad rss-counter state mm:c09e6220 idx:1 val:1
-> [??800.172223] BUG: Bad rss-counter state mm:ecbc05e0 idx:1 val:1
-> [??829.005336] BUG: Bad rss-counter state mm:c0d4b880 idx:1 val:1
-> [??871.773956] BUG: Bad rss-counter state mm:c09e63c0 idx:1 val:1
-> [ 1299.565344] BUG: Bad rss-counter state mm:ecaf8c40 idx:1 val:1
-> 
-> and
-> 
-> [???71.033784] Unhandled fault: external abort on linefetch (0x014) at
-> 0xb6c73db0
-> [???71.041037] pgd = ead9c000
-> [???71.043747] [b6c73db0] *pgd=3fd72831
-> [???84.144056] Unhandled fault: external abort on linefetch (0x014) at
-> 0xb6d44db0
-> [...]
+Commit b6a1d093f96b ("PM / Domains: Extend generic power domain
+debugfs") now creates a debugfs directory for each genpd based on the
+name of the genpd. Currently no name is given to the genpd created by
+ti_sci_pm_domains driver so because of this we see a NULL pointer
+dereferences when it is accessed on boot when the debugfs entry creation
+is attempted.
 
-So far, i've not been able to reproduce this. I have 6282 based QNAP
-NAS box, with a single disk. Since this is a kernel hacking box, i
-tftpboot and don't use an initrd. I've been using the
-mvebu_v5_defconfig kernel configuration and i have tried v4.13-rc2,
-v4.12, v4.10.0 and v3.9.30. And i have sid for user space.
+Give the genpd a name before registering it to avoid this.
 
-       Andrew
+Fixes: 52835d59fc6c ("soc: ti: Add ti_sci_pm_domains driver")
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+
+ drivers/soc/ti/ti_sci_pm_domains.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/soc/ti/ti_sci_pm_domains.c b/drivers/soc/ti/ti_sci_pm_domains.c
+index b0b283810e72..de31b9389e2e 100644
+--- a/drivers/soc/ti/ti_sci_pm_domains.c
++++ b/drivers/soc/ti/ti_sci_pm_domains.c
+@@ -176,6 +176,8 @@ static int ti_sci_pm_domain_probe(struct platform_device *pdev)
+ 
+ 	ti_sci_pd->dev = dev;
+ 
++	ti_sci_pd->pd.name = "ti_sci_pd";
++
+ 	ti_sci_pd->pd.attach_dev = ti_sci_pd_attach_dev;
+ 	ti_sci_pd->pd.detach_dev = ti_sci_pd_detach_dev;
+ 
+-- 
+2.13.0
