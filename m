@@ -1,41 +1,48 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 28 Jul 2017 09:42:59 -0700
-Subject: [PATCH v2 1/5] arm64: qcom: Select PM_GENERIC_DOMAINS
-In-Reply-To: <1500526099-9935-2-git-send-email-rnayak@codeaurora.org>
-References: <1500526099-9935-1-git-send-email-rnayak@codeaurora.org>
- <1500526099-9935-2-git-send-email-rnayak@codeaurora.org>
-Message-ID: <20170728164259.GD2146@codeaurora.org>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Fri, 28 Jul 2017 18:43:42 +0200
+Subject: [RFC PATCH v1] net: ethernet: nb8800: Reset HW block in ndo_open
+In-Reply-To: <yw1xk22slemx.fsf@mansr.com>
+References: <823b1540-b528-bbd7-7f99-5dc39a08868a@sigmadesigns.com>
+ <yw1xk22slemx.fsf@mansr.com>
+Message-ID: <c1bf54ee-8634-23a1-abda-55bc3fafe2a8@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20, Rajendra Nayak wrote:
-> Enable PM_GENERIC_DOMAINS for 64-bit qualcomm platforms. This is required
-> to ensure devices which are dependent on some gdscs (powerdomains) to be
-> powered on before they can be probed, work as expected.
+On 28/07/2017 18:17, M?ns Rullg?rd wrote:
+
+> Marc Gonzalez wrote:
 > 
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
-> ---
-
-Maybe Andy can ack this? It's ARCH_QCOM specific anyway.
-
->  arch/arm64/Kconfig.platforms | 2 ++
->  1 file changed, 2 insertions(+)
+>> ndo_stop breaks RX in a way that ndo_open is unable to undo.
 > 
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index f5f0c81..e3de82d 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -133,6 +133,8 @@ config ARCH_QCOM
->  	bool "Qualcomm Platforms"
->  	select GPIOLIB
->  	select PINCTRL
-> +	select PM
-> +	select PM_GENERIC_DOMAINS
->  	help
->  	  This enables support for the ARMv8 based Qualcomm chipsets.
->  
+> Please elaborate.  Why can't it be fixed in a less heavy-handed way?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I'm not sure what "elaborate" means. After we've been through
+ndo_stop once, the board can send packets, but it doesn't see
+any replies from remote systems. RX is wedged.
+
+I think ndo_stop is rare enough an event that doing a full
+reset is not an issue, in terms of performance. Also I will
+need this infrastructure anyway for suspend/resume support.
+
+It might also make sense to put the HW in reset at close
+(to save power). I will try measuring the power savings,
+if any.
+
+
+>> Work around the issue by resetting the HW in ndo_open.
+>> This will provide the basis for suspend/resume support.
+>>
+>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> ---
+>>  drivers/net/ethernet/aurora/nb8800.c | 40 +++++++++++++++++-------------------
+>>  drivers/net/ethernet/aurora/nb8800.h |  1 +
+>>  2 files changed, 20 insertions(+), 21 deletions(-)
+> 
+> I'm pretty sure this doesn't preserve everything it should.
+
+Hmmm, we're supposed to start fresh ("full reset").
+What could there be to preserve?
+You mentioned flow control and multicast elsewhere.
+I will take a closer look. Thanks for the heads up.
+
+Regards.
