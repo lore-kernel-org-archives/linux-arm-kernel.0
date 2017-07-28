@@ -1,88 +1,54 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 28 Jul 2017 12:35:53 +0300
-Subject: [PATCH] ARM: OMAP2+: Fix omap3 prm shared irq
-In-Reply-To: <20170627084838.30275-1-tony@atomide.com>
-References: <20170627084838.30275-1-tony@atomide.com>
-Message-ID: <cdac8d51-580b-c6d8-60be-39e31337c3af@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 28 Jul 2017 17:44:51 +0800
+Subject: [PATCH 2/3] ARM: sunxi: h3/h5: Add sun8i-h3-ephy compatible
+In-Reply-To: <20170728092818.23419-3-clabbe.montjoie@gmail.com>
+References: <20170728092818.23419-1-clabbe.montjoie@gmail.com>
+ <20170728092818.23419-3-clabbe.montjoie@gmail.com>
+Message-ID: <CAGb2v67Lt5whR4=6+SDc=Ooi6zyiHuprW+7zbPh0njnKOCiFFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/06/17 11:48, Tony Lindgren wrote:
-> Shared interrupts with IRQ_NOAUTOEN got a warning added with commit
-> 04c848d39879 ("genirq: Warn when IRQ_NOAUTOEN is used with shared
-> interrupts").
-> 
-> Let's just drop the IRQ_NOAUTOEN use for omap3 PRM shared interrupt as
-> it does not seem to cause any other issues based on my testing. We have
-> moved a lot of the code to initialize later, and whatever problems the
-> legacy booting had seem to be gone now with pinctrl driver and device
-> tree based booting.
-> 
-> Otherwise we will get:
-> 
-> WARNING: CPU: 0 PID: 1 at kernel/irq/manage.c:1348 __setup_irq+0x5d0/0x64c
-> [<c01b0260>] (__setup_irq) from [<c01b0480>]
-> (request_threaded_irq+0xdc/0x188)
-> [<c01b0480>] (request_threaded_irq) from [<c051c780>]
-> (pcs_probe+0x6ec/0x8a4)
-> [<c051c780>] (pcs_probe) from [<c05a84b8>] (platform_drv_probe+0x50/0xb0)
-> [<c05a84b8>] (platform_drv_probe) from [<c05a6288>]
-> (driver_probe_device+0x33c/0x478)
-> 
-> Note that we also need to remove the related enable_irq() to avoid
-> getting the following:
-> 
-> WARNING: CPU: 0 PID: 1 at kernel/irq/manage.c:529 enable_irq+0x34/0x70
-> [<c01afa04>] (enable_irq) from [<c0c0f1fc>] (omap3_pm_init+0x118/0x3f8)
-> [<c0c0f1fc>] (omap3_pm_init) from [<c0c0ae7c>] (am35xx_init_late+0x10/0x18)
-> 
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-Looks fine to me.
-
--Tero
-
+On Fri, Jul 28, 2017 at 5:28 PM, Corentin Labbe
+<clabbe.montjoie@gmail.com> wrote:
+> This patch adds the sun8i-h3-ephy compatible to the internal PHY.
+>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 > ---
->   arch/arm/mach-omap2/pm34xx.c  | 1 -
->   arch/arm/mach-omap2/prm3xxx.c | 7 +------
->   2 files changed, 1 insertion(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -483,7 +483,6 @@ int __init omap3_pm_init(void)
->   	ret = request_irq(omap_prcm_event_to_irq("io"),
->   		_prcm_int_handle_io, IRQF_SHARED | IRQF_NO_SUSPEND, "pm_io",
->   		omap3_pm_init);
-> -	enable_irq(omap_prcm_event_to_irq("io"));
->   
->   	if (ret) {
->   		pr_err("pm: Failed to request pm_io irq\n");
-> diff --git a/arch/arm/mach-omap2/prm3xxx.c b/arch/arm/mach-omap2/prm3xxx.c
-> --- a/arch/arm/mach-omap2/prm3xxx.c
-> +++ b/arch/arm/mach-omap2/prm3xxx.c
-> @@ -692,7 +692,6 @@ static int omap3xxx_prm_late_init(void)
->   {
->   	struct device_node *np;
->   	int irq_num;
-> -	int ret;
->   
->   	if (!(prm_features & PRM_HAS_IO_WAKEUP))
->   		return 0;
-> @@ -712,12 +711,8 @@ static int omap3xxx_prm_late_init(void)
->   	}
->   
->   	omap3xxx_prm_enable_io_wakeup();
-> -	ret = omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
-> -	if (!ret)
-> -		irq_set_status_flags(omap_prcm_event_to_irq("io"),
-> -				     IRQ_NOAUTOEN);
->   
-> -	return ret;
-> +	return omap_prcm_register_chain_handler(&omap3_prcm_irq_setup);
->   }
->   
->   static void __exit omap3xxx_prm_exit(void)
-> 
+>  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 3 ++-
+
+To avoid repeating the past, this patch, if approved, will be merged
+through the sunxi tree, not netdev nor net-next.
+
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> index 4b599b5d26f6..7aaa837c2388 100644
+> --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> @@ -421,7 +421,8 @@
+>                                 #address-cells = <1>;
+>                                 #size-cells = <0>;
+>                                 int_mii_phy: ethernet-phy at 1 {
+> -                                       compatible = "ethernet-phy-ieee802.3-c22";
+> +                                       compatible = "allwinner,sun8i-h3-ephy",
+> +                                                       "ethernet-phy-ieee802.3-c22";
+
+Are you expecting people to override this properly?
+
+As it currently is, any external phy at address 1 will simply
+reuse the same device node. And if they don't override the
+property correctly, the driver will end up trying to use
+the internal phy, while the user is expecting the external
+one to be used.
+
+Maybe you could move this to some other address, maybe the last
+valid one, or second last valid one?
+
+ChenYu
+
+>                                         reg = <1>;
+>                                         clocks = <&ccu CLK_BUS_EPHY>;
+>                                         resets = <&ccu RST_BUS_EPHY>;
+> --
+> 2.13.0
+>
