@@ -1,95 +1,79 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 27 Jul 2017 18:11:30 -0700
-Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <4f58aeab-7b8d-50dc-5497-6ac42536e0c0@gmail.com>
-References: <20170726154515.GA11453@hc> <20170726155548.GF28875@nazgul.tnic>
- <20170726161949.GB15426@kroah.com>
- <20170726163049.GG28875@nazgul.tnic>
- <20170726173353.GB21705@kroah.com>
- <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
- <20170726200802.GA17722@kroah.com>
- <b27cda60-8bf8-47a1-15b5-bf8b3a83fc45@gmail.com>
- <20170727022907.GC1398@kroah.com>
- <4f58aeab-7b8d-50dc-5497-6ac42536e0c0@gmail.com>
-Message-ID: <20170728011130.GC19160@kroah.com>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Fri, 28 Jul 2017 09:15:05 +0800
+Subject: [PATCH 1/3] memory: mtk-smi: add larbid init routine
+In-Reply-To: <f7dac4d6-4ef8-e10d-e483-088120392ab2@gmail.com>
+References: <1501120872-19652-1-git-send-email-honghui.zhang@mediatek.com>
+ <1501120872-19652-2-git-send-email-honghui.zhang@mediatek.com>
+ <f7dac4d6-4ef8-e10d-e483-088120392ab2@gmail.com>
+Message-ID: <1501204505.29316.9.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 27, 2017 at 10:29:53AM -0700, David Daney wrote:
-> On 07/26/2017 07:29 PM, Greg KH wrote:
-> > On Wed, Jul 26, 2017 at 02:02:42PM -0700, David Daney wrote:
-> > > On 07/26/2017 01:08 PM, Greg KH wrote:
-> > > > On Wed, Jul 26, 2017 at 01:02:38PM -0700, David Daney wrote:
-> > > > > On 07/26/2017 10:33 AM, Greg KH wrote:
-> > > > > > On Wed, Jul 26, 2017 at 06:30:49PM +0200, Borislav Petkov wrote:
-> > > > > > > On Wed, Jul 26, 2017 at 09:19:49AM -0700, Greg KH wrote:
-> > > > > > > > On Wed, Jul 26, 2017 at 05:55:48PM +0200, Borislav Petkov wrote:
-> > > > > > > > > On Wed, Jul 26, 2017 at 05:45:15PM +0200, Jan Glauber wrote:
-> > > > > > > > > > The PMU/EDAC devices are all PCI devices do I need the 'struct pci_dev *'.
-> > > > > > > > > > I'm not aware of other ways to access these devices. Please enlighten
-> > > > > > > > > > me if I'm missing something.
-> > > > > > > > > 
-> > > > > > > > > Me enlighten you on Cavium hardware?! You're funny.
-> > > > > > > > > 
-> > > > > > > > > So I don't know whether the PCI hotplug code can run more than one
-> > > > > > > > > function upon PCI ID detection. Probably Greg will say, write a
-> > > > > > > > > multiplexer wrapper. :-)
-> > > > > > > > 
-> > > > > > > > -ENOCONTEXT....
-> > > > > > > > 
-> > > > > > > > Anyway, pci questions are best asked on the linux-pci at vger list.  And
-> > > > > > > > yes, all PCI devices end up with a 'struct pci_dev *' automatically.
-> > > > > > > 
-> > > > > > > Simple: so they have a PCI ID of a memory contoller and want to hotplug
-> > > > > > > two drivers for it. And those two drivers should remain independent from
-> > > > > > > each other.
-> > > > > > 
-> > > > > > Hahahahaha, no.  That's crazy, you were right in guessing what my answer
-> > > > > > was going to be :)
-> > > > > > 
-> > > > > 
-> > > > > 
-> > > > > Just to be clear about the situation, the device is a memory controller.  It
-> > > > > has two main behaviors we are interested in:
-> > > > > 
-> > > > > A) Error Detection And Correction (EDAC).  This should be connected to the
-> > > > > kernel's EDAC subsystem.  An existing driver (drivers/edac/thunderx_edac.c)
-> > > > > does exactly this.
-> > > > > 
-> > > > > B) Performance Counters for actions taken in the corresponding memory. This
-> > > > > should be connected to the kernel's perf framework as an uncore-PMU (the
-> > > > > subject of this patch set).
-> > > > > 
-> > > > > It is a single PCI device.  What should the driver architecture look like to
-> > > > > connect it to two different kernel subsystems?
-> > > > 
-> > > > Modify the drivers/edac/thunderx_edac.c code to add support for
-> > > > performance counters.
-> > > > 
-> > > 
-> > > Thanks Greg.  This adds some clarity to the situation.
-> > > 
-> > > This technique does slightly complicate the mapping of files and directories
-> > > in the kernel source tree to maintainers.
-> > > 
-> > > Also, if a given configuration disables CONFIG_EDAC there is some hackery
-> > > needed to get the perf portion of the driver included.
-> > 
-> > Well, you all deserve it for trying to have a single PCI device do
-> > multiple things at the same time.  There's no real good reason for
-> > creating hardware that way, PCI devices are "free", you should go throw
-> > a printed copy of the PCI spec at the firmware developers who did this
-> > to you.
+On Thu, 2017-07-27 at 17:42 +0200, Matthias Brugger wrote:
 > 
-> The problem lies in something even more congealed than the "firmware". The
-> PCI topology is etched in to the very fabric of the silicon of the SoC.
+> On 07/27/2017 04:01 AM, honghui.zhang at mediatek.com wrote:
+> > From: Honghui Zhang <honghui.zhang@mediatek.com>
+> > 
+> > In the commit 3c8f4ad85c4b ("memory/mediatek: add support for mt2701"),
+> > the larb->larbid was added but not initialized.
+> > Mediatek's gen1 smi need this hardware larbid information to get the
+> > register offset which controls whether enable iommu for this larb.
+> > This patch add the initialize routine for larbid.
+> > 
+> > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> > ---
+> >   drivers/memory/mtk-smi.c | 9 +++++++++
+> >   1 file changed, 9 insertions(+)
+> > 
+> > diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+> > index 2b798bb4..fe36b3e 100644
+> > --- a/drivers/memory/mtk-smi.c
+> > +++ b/drivers/memory/mtk-smi.c
+> > @@ -240,6 +240,7 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
+> >   	struct device *dev = &pdev->dev;
+> >   	struct device_node *smi_node;
+> >   	struct platform_device *smi_pdev;
+> > +	int err;
+> >   
+> >   	if (!dev->pm_domain)
+> >   		return -EPROBE_DEFER;
+> > @@ -263,6 +264,14 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
+> >   		return PTR_ERR(larb->smi.clk_smi);
+> >   	larb->smi.dev = dev;
+> >   
+> > +	err = of_property_read_u32(dev->of_node, "mediatek,larbid",
+> > +				   &larb->larbid);
+> > +	if (err && of_device_is_compatible(dev->of_node,
+> > +					   "mediatek,mt2701-smi-larb")) {
+> 
+> Instead of checking hard-coded bindings you should be able to determine the 
+> generation using the smi_pdev.
+> Apart I think it would be better to check for mediatek,larbid only on 
+> MTK_SIM_GEN1, or do I miss something?
+> 
 
-That's not very wise, as you can see here, most "modern" chips allow
-stuff like this to be changeable at the firmware level.  I strongly
-suggest telling the hardware developers to fix this for your next
-revision.
+Hi, Matthias,
+	There's a new SoC of mediatek which use MTK_SMI_GEN2 hardware, but it
+has 2 iommus and 2 smi_common, and we are intend to send it's driver
+soon. It need the mediatek,larbid to identify which iommu should be
+binding to.
 
-Oh well, fix it in the kernel, that's what it's there for :)
+This patch use the hard-code bindings will make the future work easier.
 
-greg k-h
+thanks.
+> Regards,
+> Matthias
+> 
+> > +		dev_err(dev, "missing larbid property\n");
+> > +		return err;
+> > +	}
+> > +
+> >   	smi_node = of_parse_phandle(dev->of_node, "mediatek,smi", 0);
+> >   	if (!smi_node)
+> >   		return -EINVAL;
+> > 
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
