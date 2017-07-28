@@ -1,254 +1,94 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Fri, 28 Jul 2017 19:37:15 +0800
-Subject: [PATCH v5 2/2] arm64: dts: Add Mediatek SoC MT2712 and evaluation
- board dts and Makefile
-In-Reply-To: <1501241835-47849-1-git-send-email-yt.shen@mediatek.com>
-References: <1501241835-47849-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1501241835-47849-3-git-send-email-yt.shen@mediatek.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 28 Jul 2017 14:29:06 +0200
+Subject: [RESEND PATCH] ARM: dts: stm32: Add DMA support for STM32F746 SoC
+In-Reply-To: <1499756067-445-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1499756067-445-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <03a5b6bc-4e33-741c-e065-6f32e2710eee@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds basic chip support for Mediatek 2712
+Hi Pierre-Yves,
 
-Signed-off-by: YT Shen <yt.shen@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/Makefile       |   1 +
- arch/arm64/boot/dts/mediatek/mt2712-evb.dts |  32 +++++
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 178 ++++++++++++++++++++++++++++
- 3 files changed, 211 insertions(+)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
- create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+On 07/11/2017 08:54 AM, Pierre-Yves MORDRET wrote:
+> This patch adds DMA support for STM32F746 SoC.
+> 
+> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+> ---
+>   arch/arm/boot/dts/stm32f746.dtsi | 31 +++++++++++++++++++++++++++++++
+>   1 file changed, 31 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
+> index c2765ce..bfffea4 100644
+> --- a/arch/arm/boot/dts/stm32f746.dtsi
+> +++ b/arch/arm/boot/dts/stm32f746.dtsi
+> @@ -344,6 +344,37 @@
+>   			assigned-clocks = <&rcc 1 CLK_HSE_RTC>;
+>   			assigned-clock-rates = <1000000>;
+>   		};
+> +
+> +		dma1: dma at 40026000 {
+> +			compatible = "st,stm32-dma";
+> +			reg = <0x40026000 0x400>;
+> +			interrupts = <11>,
+> +				     <12>,
+> +				     <13>,
+> +				     <14>,
+> +				     <15>,
+> +				     <16>,
+> +				     <17>,
+> +				     <47>;
+> +			clocks = <&rcc 0 21>;
+> +			#dma-cells = <4>;
+> +		};
+> +
+> +		dma2: dma at 40026400 {
+> +			compatible = "st,stm32-dma";
+> +			reg = <0x40026400 0x400>;
+> +			interrupts = <56>,
+> +				     <57>,
+> +				     <58>,
+> +				     <59>,
+> +				     <60>,
+> +				     <68>,
+> +				     <69>,
+> +				     <70>;
+> +			clocks = <&rcc 0 22>;
+> +			#dma-cells = <4>;
+> +			st,mem2mem;
+> +		};
+>   	};
+>   };
+>   
+> 
+Applied on stm32-dt-for-v4.14 branch.
 
-diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-index 015eb07..f323936 100644
---- a/arch/arm64/boot/dts/mediatek/Makefile
-+++ b/arch/arm64/boot/dts/mediatek/Makefile
-@@ -1,3 +1,4 @@
-+dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
-diff --git a/arch/arm64/boot/dts/mediatek/mt2712-evb.dts b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-new file mode 100644
-index 0000000..8c804df
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-@@ -0,0 +1,32 @@
-+/*
-+ * Copyright (c) 2017 MediaTek Inc.
-+ * Author: YT Shen <yt.shen@mediatek.com>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+ */
-+
-+/dts-v1/;
-+#include "mt2712e.dtsi"
-+
-+/ {
-+	model = "MediaTek MT2712 evaluation board";
-+	compatible = "mediatek,mt2712-evb", "mediatek,mt2712";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x80000000>;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:921600n8";
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-new file mode 100644
-index 0000000..1e135af
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-@@ -0,0 +1,178 @@
-+/*
-+ * Copyright (c) 2017 MediaTek Inc.
-+ * Author: YT Shen <yt.shen@mediatek.com>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+ */
-+
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "mediatek,mt2712";
-+	interrupt-parent = <&sysirq>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	cpus {
+However, I prefer to keep DMA nodes disabled.
+Indeed on cortex-M7, dma allocations have to be done in a 
+"strongly-ordered" area. So If you want to use DMA you need to create in 
+your device tree a "reserved memory" area like that:
+
++	reserved-memory {
 +		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu-map {
-+			cluster0 {
-+				core0 {
-+					cpu = <&cpu0>;
-+				};
-+				core1 {
-+					cpu = <&cpu1>;
-+				};
-+			};
-+
-+			cluster1 {
-+				core0 {
-+					cpu = <&cpu2>;
-+				};
-+			};
-+		};
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a35";
-+			reg = <0x000>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a35";
-+			reg = <0x001>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu2: cpu at 200 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a72";
-+			reg = <0x200>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	baud_clk: dummy26m {
-+		compatible = "fixed-clock";
-+		clock-frequency = <26000000>;
-+		#clock-cells = <0>;
-+	};
-+
-+	sys_clk: dummyclk {
-+		compatible = "fixed-clock";
-+		clock-frequency = <26000000>;
-+		#clock-cells = <0>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_PPI 13
-+			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14
-+			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11
-+			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10
-+			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	soc {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		compatible = "simple-bus";
++		#size-cells = <1>;
 +		ranges;
 +
-+		uart5: serial at 1000f000 {
-+			compatible = "mediatek,mt2712-uart",
-+				     "mediatek,mt6577-uart";
-+			reg = <0 0x1000f000 0 0x400>;
-+			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&baud_clk>, <&sys_clk>;
-+			clock-names = "baud", "bus";
-+			status = "disabled";
-+		};
-+
-+		sysirq: interrupt-controller at 10220a80 {
-+			compatible = "mediatek,mt2712-sysirq",
-+				     "mediatek,mt6577-sysirq";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			interrupt-parent = <&gic>;
-+			reg = <0 0x10220a80 0 0x40>;
-+		};
-+
-+		gic: interrupt-controller at 10510000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			interrupt-parent = <&gic>;
-+			interrupt-controller;
-+			reg = <0 0x10510000 0 0x10000>,
-+			      <0 0x10520000 0 0x20000>,
-+			      <0 0x10540000 0 0x20000>,
-+			      <0 0x10560000 0 0x20000>;
-+			interrupts = <GIC_PPI 9
-+				(GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_HIGH)>;
-+		};
-+
-+		uart0: serial at 11002000 {
-+			compatible = "mediatek,mt2712-uart",
-+				     "mediatek,mt6577-uart";
-+			reg = <0 0x11002000 0 0x400>;
-+			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&baud_clk>, <&sys_clk>;
-+			clock-names = "baud", "bus";
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 11003000 {
-+			compatible = "mediatek,mt2712-uart",
-+				     "mediatek,mt6577-uart";
-+			reg = <0 0x11003000 0 0x400>;
-+			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&baud_clk>, <&sys_clk>;
-+			clock-names = "baud", "bus";
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 11004000 {
-+			compatible = "mediatek,mt2712-uart",
-+				     "mediatek,mt6577-uart";
-+			reg = <0 0x11004000 0 0x400>;
-+			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&baud_clk>, <&sys_clk>;
-+			clock-names = "baud", "bus";
-+			status = "disabled";
-+		};
-+
-+		uart3: serial at 11005000 {
-+			compatible = "mediatek,mt2712-uart",
-+				     "mediatek,mt6577-uart";
-+			reg = <0 0x11005000 0 0x400>;
-+			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&baud_clk>, <&sys_clk>;
-+			clock-names = "baud", "bus";
-+			status = "disabled";
-+		};
-+
-+		uart4: serial at 11019000 {
-+			compatible = "mediatek,mt2712-uart",
-+				     "mediatek,mt6577-uart";
-+			reg = <0 0x11019000 0 0x400>;
-+			interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&baud_clk>, <&sys_clk>;
-+			clock-names = "baud", "bus";
-+			status = "disabled";
++		linux,dma {
++			compatible = "shared-dma-pool";
++			linux,dma-default;
++			no-map;
++			reg = <0xd1c00000 0x400000>;
 +		};
 +	};
-+};
-+
--- 
-1.9.1
+
+In the same time, you have to configure in the same way the cortex-m7 
+MPU in your bootloader.
+
+FYI, patches are under review to configure MPU directly in the kernel 
+(bootloader will not longer have to configure it). It seems also that 
+discussions are ongoing about the way to declare "linux,dma" area in 
+devicetree.
+As soon all discussions will close and MPU patches applied, we will be 
+able to enable DMA.
+
+Regards
+Alex
