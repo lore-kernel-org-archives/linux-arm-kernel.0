@@ -1,51 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 28 Jul 2017 15:19:19 +0200
-Subject: [PATCH] iommu/exynos: prevent building on big-endian kernels
-Message-ID: <20170728131954.213595-1-arnd@arndb.de>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Fri, 28 Jul 2017 15:27:49 +0200
+Subject: [PATCH v3] ARM: dts: tango4: Request RGMII RX and TX clock delays
+Message-ID: <d669e207-ae47-4c9e-67c5-75424fde501f@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we print the correct warning, an allmodconfig build is no longer
-clean but always prints it, which defeats compile-testing:
+RX and TX clock delays are required. Request them explicitly.
 
-drivers/iommu/exynos-iommu.c:58:2: error: #warning "revisit driver if we can enable big-endian ptes" [-Werror=cpp]
-
-This replaces the #warning with a dependency, moving warning text into
-a comment.
-
-Fixes: 1f59adb1766d ("iommu/exynos: Replace non-existing big-endian Kconfig option")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: cad008b8a77e6 ("ARM: dts: tango4: Initial device trees")
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
 ---
- drivers/iommu/Kconfig        | 1 +
- drivers/iommu/exynos-iommu.c | 4 ----
- 2 files changed, 1 insertion(+), 4 deletions(-)
+Arnd, Kevin, Olof, can one of you take this patch through arm-soc?
+Greg will apply it to all stable branches, right?
+---
+ arch/arm/boot/dts/tango4-vantage-1172.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index f73ff28f77e2..c5d80fe3dab9 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -253,6 +253,7 @@ config TEGRA_IOMMU_SMMU
- config EXYNOS_IOMMU
- 	bool "Exynos IOMMU Support"
- 	depends on ARCH_EXYNOS && MMU
-+	depends on !CPU_BIG_ENDIAN # revisit driver if we can enable big-endian ptes
- 	select IOMMU_API
- 	select ARM_DMA_USE_IOMMU
- 	help
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index b7aebaf28b82..c6b69e91132b 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -54,10 +54,6 @@ typedef u32 sysmmu_pte_t;
- #define lv2ent_small(pent) ((*(pent) & 2) == 2)
- #define lv2ent_large(pent) ((*(pent) & 3) == 1)
+diff --git a/arch/arm/boot/dts/tango4-vantage-1172.dts b/arch/arm/boot/dts/tango4-vantage-1172.dts
+index 86d8df98802f..13bcc460bcb2 100644
+--- a/arch/arm/boot/dts/tango4-vantage-1172.dts
++++ b/arch/arm/boot/dts/tango4-vantage-1172.dts
+@@ -22,7 +22,7 @@
+ };
  
--#ifdef CONFIG_CPU_BIG_ENDIAN
--#warning "revisit driver if we can enable big-endian ptes"
--#endif
--
- /*
-  * v1.x - v3.x SYSMMU supports 32bit physical and 32bit virtual address spaces
-  * v5.0 introduced support for 36bit physical address space by shifting
+ &eth0 {
+-	phy-connection-type = "rgmii";
++	phy-connection-type = "rgmii-id";
+ 	phy-handle = <&eth0_phy>;
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
 -- 
-2.9.0
+2.11.0
