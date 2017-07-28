@@ -1,88 +1,53 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Fri, 28 Jul 2017 16:23:11 +0100
-Subject: [PATCH] drm: hdlcd: allow HDLCD to be used without interrupt
-In-Reply-To: <20170726102748.GM31807@n2100.armlinux.org.uk>
-References: <E1daJCF-0003pG-DI@rmk-PC.armlinux.org.uk>
- <20170726102748.GM31807@n2100.armlinux.org.uk>
-Message-ID: <20170728152311.GA970@e110455-lin.cambridge.arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 28 Jul 2017 11:27:38 -0400 (EDT)
+Subject: [PATCH] [RFC] ARM: move __bug_table into .data for XIP_KERNEL
+In-Reply-To: <20170728141108.1283320-1-arnd@arndb.de>
+References: <20170728141108.1283320-1-arnd@arndb.de>
+Message-ID: <alpine.LFD.2.20.1707281119450.5981@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 11:27:48AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 26, 2017 at 11:05:39AM +0100, Russell King wrote:
-> > Some ARM platforms do not wire the HDLCD interrupt.  Allow hdlcd to
-> > initialise without an interrupt present.
-> > 
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+On Fri, 28 Jul 2017, Arnd Bergmann wrote:
+
+> Matt Hart reports that vf610m4_defconfig kernels grew to 2GB
+> xipImage size after the __bug_table change.
 > 
+> I tried out a few things and found that moving the bug table
+> into the .data section avoids this problem. However, the
+> linker script magic is beyond my capabilities here, so this
+> is almost certainly not correct.
 
-Hi Russell,
+Well, before your patch the BUG_TABLE location as well as its runtime 
+functionality were completely wrong and broken.
 
-Sorry for my silence, I was on holiday this week and just came back
-today.
+> I've added a few people to Cc that understand this better
+> than I do, hopefully someone can turn my bogus patch into
+> a proper one.
 
-> This isn't fully functional on ARM MPS platforms yet, but at least
-> gets us further.  Without any display connected:
-> 
-> [   14.315986] [drm] found ARM HDLCD version r0p0
-> [   14.557038] tda998x 2-0070: found TDA19988
-> [   14.622232] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
-> [   14.630406] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-> [   14.639335] [drm] No driver support for vblank timestamp query.
-> [   14.653210] [drm] Cannot find any crtc or sizes - going 1024x768
-> [   15.232556] hdlcd 40205000.hdlcd: fb0:  frame buffer device
-> [   15.284076] [drm] Initialized hdlcd 1.0.0 20151021 for 40205000.hdlcd on minor 0
-> 
-> With a TV connected, the driver doesn't initialise:
-> 
-> [   14.422810] [drm] found ARM HDLCD version r0p0
-> [   14.657227] tda998x 2-0070: found TDA19988
-> [   14.722439] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
-> [   14.730613] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-> [   14.739538] [drm] No driver support for vblank timestamp query.
-> [   15.311977] hdlcd 40205000.hdlcd: Failed to set initial hw configuration.
-> [   15.357402] hdlcd 40205000.hdlcd: master bind failed: -12
-> [   15.365082] tda998x: probe of 2-0070 failed with error -12
-> 
-> I don't think this is correct behaviour - if we fail to set an initial
-> configuration (which will be based on the resolution of the connected
-> display) why should the driver fail to probe - it's not that there is
-> no device, it's (in this case) that there aren't the resources for the
-> chosen mode.  Userspace could always try setting a different mode.
-> 
-> I suspect the above failure is down to either (a) not having enough
-> memory available to allocate a 1920x1080 frame buffer, or (b) not
-> (yet) being able to program the hdlcd pixel clock for this platform,
-> which is currently hard-coded in DT at 23.75MHz.
+Your patch isn't as bad as you make it, but maybe the following will 
+avoid open recoding BUG_TABLE locally:
 
-I don't think it is the clock, if that fails then you would not see the
-r0p0 version number being printed. Due to the fact that until now HDLCD
-has run mostly on platforms that have SCP, which takes care of actual
-setup of the clocks, it is pretty lax on errors on pixel clock setup.
-That is the reason why I have added the 'clocks' entry in debugfs, to be
-able to find out the actual clock setup vs what HDLCD would like to have
-for the current mode.
+diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
+index 8265b11621..21b4b29c2f 100644
+--- a/arch/arm/kernel/vmlinux-xip.lds.S
++++ b/arch/arm/kernel/vmlinux-xip.lds.S
+@@ -237,13 +237,13 @@ SECTIONS
+ 		 */
+ 		DATA_DATA
+ 		CONSTRUCTORS
+-
+-		_edata = .;
+ 	}
+-	_edata_loc = __data_loc + SIZEOF(.data);
+ 
+ 	BUG_TABLE
+ 
++	_edata = .;
++	_edata_loc = __data_loc + SIZEOF(.data);
++
+ #ifdef CONFIG_HAVE_TCM
+         /*
+ 	 * We align everything to a page boundary so we can
 
-If is quite likely to be a memory issue (-12 points that way too).
 
-Also, may I ask what MPS platform you are trying to use? I might be able
-to source one internally and try to reproduce your problems.
-
-Best regards,
-Liviu
-
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Nicolas
