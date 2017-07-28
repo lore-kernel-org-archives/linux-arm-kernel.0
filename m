@@ -1,134 +1,262 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 28 Jul 2017 15:10:06 +0100
-Subject: [PATCH v2 03/16] arm64: unmask all exceptions from C code on CPU
- startup
+Date: Fri, 28 Jul 2017 15:10:04 +0100
+Subject: [PATCH v2 01/16] arm64: explicitly mask all exceptions
 In-Reply-To: <20170728141019.9084-1-james.morse@arm.com>
 References: <20170728141019.9084-1-james.morse@arm.com>
-Message-ID: <20170728141019.9084-4-james.morse@arm.com>
+Message-ID: <20170728141019.9084-2-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On startup (and before any C code) __cpu_setup() resets the debug
-configuration register MDSCR_EL1 to disable MDE and KDE, it then umasks
-Debug exceptions.
+There are a few places where we want to mask all exceptions. Today we
+do this in a piecemeal fashion, typically we expect the caller to
+have masked irqs and the arch code masks debug exceptions, ignoring
+serror which is probably masked.
 
-On first boot, once we get into the setup.c on CPU0, we unmask SError.
-IRQs are unmasked some time later by core code. FIQ is only unmasked
-when we enter user-spce.
-On secondary CPUs the __cpu_setup() code unmasks Debug exceptions early,
-(cpuidle then has to mask them when it restores MDSCR_EL1), smp.c then
-unmasks SError and Interrupts.
+Make it clear that 'mask all exceptions' is the intention by adding
+helpers to do exactly that.
 
-Move the Debug unmask into {setup,smp}.c to preserve our expected
-priority order: SError should be unmasked before Debug and we can't
-unmask SError until we have the earlycon available.
-
-The same goes for secondary CPUs only here we are ready to receive
-interrupts. Just unmask everything.
-
-Remove the local_fiq_{en,dis}able macros as they don't respect our newly
-defined order, and don't have any users.
-
-This patch removes the isb that synchronized the MDSCR_el1 write in
-__cpu_setup() with the PSTATE.D write. Now the PSTATE.D write happens
-after __enable_mmu().
+The caller should update trace_hardirqs where appropriate, adding this
+logic to the mask/unmask helpers causes asm/irqflags.h and
+linux/irqflag.h to include each other.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/irqflags.h |  6 ------
- arch/arm64/kernel/setup.c         |  7 ++++---
- arch/arm64/kernel/smp.c           |  4 ++--
- arch/arm64/mm/proc.S              | 12 +-----------
- 4 files changed, 7 insertions(+), 22 deletions(-)
+Remove the 'disable IRQs' comment above cpu_die(), nothing returns via
+this path, cpu's are resurrected via kernel/smp.c's
+secondary_start_kernel().
 
+ arch/arm64/include/asm/assembler.h | 19 +++++++++++++++++++
+ arch/arm64/include/asm/irqflags.h  | 34 ++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/hibernate.c      |  4 ++--
+ arch/arm64/kernel/machine_kexec.c  |  3 +--
+ arch/arm64/kernel/smp.c            |  8 ++------
+ arch/arm64/kernel/suspend.c        |  6 +++---
+ arch/arm64/kernel/traps.c          |  2 +-
+ arch/arm64/mm/proc.S               |  9 ++++-----
+ 8 files changed, 66 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 1b67c3782d00..896ddd9b21a6 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -31,6 +31,25 @@
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
+ 
++	.macro save_and_disable_daif, flags
++	.ifnb	\flags
++	mrs	\flags, daif
++	.endif
++	msr	daifset, #0xf
++	.endm
++
++	.macro disable_daif
++	msr	daifset, #0xf
++	.endm
++
++	.macro enable_daif
++	msr	daifclr, #0xf
++	.endm
++
++	.macro	restore_daif, flags:req
++	msr	daif, \flags
++	.endm
++
+ /*
+  * Enable and disable interrupts.
+  */
 diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
-index 6904f2247394..df61dcbce22e 100644
+index 8c581281fa12..578d14f376ce 100644
 --- a/arch/arm64/include/asm/irqflags.h
 +++ b/arch/arm64/include/asm/irqflags.h
-@@ -67,12 +67,6 @@ static inline void arch_local_irq_disable(void)
- 		: "memory");
+@@ -110,5 +110,39 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
+ 		: : "r" (flags) : "memory");				\
+ 	} while (0)
+ 
++/*
++ * Mask/unmask/restore all exceptions, including interrupts. If the I bit
++ * is modified the caller should call trace_hardirqs_{on,off}().
++ */
++static inline unsigned long local_mask_daif(void)
++{
++	unsigned long flags;
++
++	asm volatile(
++		"mrs	%0, daif		// local_mask_daif\n"
++		"msr	daifset, #0xf"
++		: "=r" (flags)
++		:
++		: "memory");
++	return flags;
++}
++
++static inline void local_unmask_daif(void)
++{
++	asm volatile(
++		"msr	daifclr, #0xf		// local_unmask_daif"
++		:
++		:
++		: "memory");
++}
++
++static inline void local_restore_daif(unsigned long flags)
++{
++	asm volatile(
++		"msr	daif, %0		// local_restore_daif"
++		:
++		: "r" (flags)
++		: "memory");
++}
+ #endif
+ #endif
+diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+index a44e13942d30..e29f85938ef5 100644
+--- a/arch/arm64/kernel/hibernate.c
++++ b/arch/arm64/kernel/hibernate.c
+@@ -285,7 +285,7 @@ int swsusp_arch_suspend(void)
+ 		return -EBUSY;
+ 	}
+ 
+-	local_dbg_save(flags);
++	flags = local_mask_daif();
+ 
+ 	if (__cpu_suspend_enter(&state)) {
+ 		/* make the crash dump kernel image visible/saveable */
+@@ -315,7 +315,7 @@ int swsusp_arch_suspend(void)
+ 		__cpu_suspend_exit();
+ 	}
+ 
+-	local_dbg_restore(flags);
++	local_restore_daif(flags);
+ 
+ 	return ret;
  }
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index 481f54a866c5..24e0df967400 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -195,8 +195,7 @@ void machine_kexec(struct kimage *kimage)
  
--#define local_fiq_enable()	asm("msr	daifclr, #1" : : : "memory")
--#define local_fiq_disable()	asm("msr	daifset, #1" : : : "memory")
--
--#define local_async_enable()	asm("msr	daifclr, #4" : : : "memory")
--#define local_async_disable()	asm("msr	daifset, #4" : : : "memory")
--
- /*
-  * Save the current interrupt enable state.
-  */
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index d4b740538ad5..133735cede73 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -262,10 +262,11 @@ void __init setup_arch(char **cmdline_p)
- 	parse_early_param();
+ 	pr_info("Bye!\n");
+ 
+-	/* Disable all DAIF exceptions. */
+-	asm volatile ("msr daifset, #0xf" : : : "memory");
++	local_mask_daif();
  
  	/*
--	 *  Unmask asynchronous aborts after bringing up possible earlycon.
--	 * (Report possible System Errors once we can report this occurred)
-+	 * Unmask asynchronous aborts, debug and fiq exceptions after bringing
-+	 * up possible earlycon. (Report possible System Errors once we can
-+	 * report this occurred).
- 	 */
--	local_async_enable();
-+	local_restore_daif(PSR_I_BIT);
- 
- 	/*
- 	 * TTBR0 is only used for the identity mapping at this stage. Make it
+ 	 * cpu_soft_restart will shutdown the MMU, disable data caches, then
 diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index cb2e5dd0f429..ccd63681c327 100644
+index 321119881abf..cb2e5dd0f429 100644
 --- a/arch/arm64/kernel/smp.c
 +++ b/arch/arm64/kernel/smp.c
-@@ -271,8 +271,8 @@ asmlinkage void secondary_start_kernel(void)
- 	set_cpu_online(cpu, true);
- 	complete(&cpu_running);
+@@ -368,10 +368,6 @@ void __cpu_die(unsigned int cpu)
+ /*
+  * Called from the idle thread for the CPU which has been shutdown.
+  *
+- * Note that we disable IRQs here, but do not re-enable them
+- * before returning to the caller. This is also the behaviour
+- * of the other hotplug-cpu capable cores, so presumably coming
+- * out of idle fixes this.
+  */
+ void cpu_die(void)
+ {
+@@ -379,7 +375,7 @@ void cpu_die(void)
  
--	local_irq_enable();
--	local_async_enable();
-+	trace_hardirqs_on();
-+	local_unmask_daif();
+ 	idle_task_exit();
+ 
+-	local_irq_disable();
++	local_mask_daif();
+ 
+ 	/* Tell __cpu_die() that this CPU is now safe to dispose of */
+ 	(void)cpu_report_death();
+@@ -837,7 +833,7 @@ static void ipi_cpu_stop(unsigned int cpu)
+ {
+ 	set_cpu_online(cpu, false);
+ 
+-	local_irq_disable();
++	local_mask_daif();
+ 
+ 	while (1)
+ 		cpu_relax();
+diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+index 1e3be9064cfa..d135c70dec97 100644
+--- a/arch/arm64/kernel/suspend.c
++++ b/arch/arm64/kernel/suspend.c
+@@ -57,7 +57,7 @@ void notrace __cpu_suspend_exit(void)
+ 	/*
+ 	 * Restore HW breakpoint registers to sane values
+ 	 * before debug exceptions are possibly reenabled
+-	 * through local_dbg_restore.
++	 * by cpu_suspend()s local_daif_restore() call.
+ 	 */
+ 	if (hw_breakpoint_restore)
+ 		hw_breakpoint_restore(cpu);
+@@ -81,7 +81,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 	 * updates to mdscr register (saved and restored along with
+ 	 * general purpose registers) from kernel debuggers.
+ 	 */
+-	local_dbg_save(flags);
++	flags = local_mask_daif();
  
  	/*
- 	 * OK, it's off to the idle thread for us
+ 	 * Function graph tracer state gets incosistent when the kernel
+@@ -114,7 +114,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 	 * restored, so from this point onwards, debugging is fully
+ 	 * renabled if it was enabled when core started shutdown.
+ 	 */
+-	local_dbg_restore(flags);
++	local_restore_daif(flags);
+ 
+ 	return ret;
+ }
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index c7c7088097be..59efec10be15 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -656,7 +656,7 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+ 		esr_get_class_string(esr));
+ 
+ 	die("Oops - bad mode", regs, 0);
+-	local_irq_disable();
++	local_mask_daif();
+ 	panic("bad mode");
+ }
+ 
 diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 95233dfc4c39..9b18ef0c8ae0 100644
+index 877d42fb0df6..95233dfc4c39 100644
 --- a/arch/arm64/mm/proc.S
 +++ b/arch/arm64/mm/proc.S
-@@ -83,6 +83,7 @@ ENDPROC(cpu_do_suspend)
- 
- /**
-  * cpu_do_resume - restore CPU register context
-+ * Call with debug exceptions masked
-  *
-  * x0: Address of context pointer
-  */
-@@ -105,16 +106,7 @@ ENTRY(cpu_do_resume)
- 
- 	msr	tcr_el1, x8
- 	msr	vbar_el1, x9
--
--	/*
--	 * __cpu_setup() cleared MDSCR_EL1.MDE and friends, before unmasking
--	 * debug exceptions. By restoring MDSCR_EL1 here, we may take a debug
--	 * exception. Mask them until local_daif_restore() in cpu_suspend()
--	 * resets them.
--	 */
--	disable_daif
- 	msr	mdscr_el1, x10
--
- 	msr	sctlr_el1, x12
- 	msr	tpidr_el1, x13
- 	msr	sp_el0, x14
-@@ -189,8 +181,6 @@ ENTRY(__cpu_setup)
- 	msr	cpacr_el1, x0			// Enable FP/ASIMD
- 	mov	x0, #1 << 12			// Reset mdscr_el1 and disable
- 	msr	mdscr_el1, x0			// access to the DCC from EL0
--	isb					// Unmask debug exceptions now,
--	enable_dbg				// since this is per-cpu
- 	reset_pmuserenr_el0 x0			// Disable PMU access from EL0
+@@ -109,10 +109,10 @@ ENTRY(cpu_do_resume)
  	/*
- 	 * Memory region attributes for LPAE:
+ 	 * __cpu_setup() cleared MDSCR_EL1.MDE and friends, before unmasking
+ 	 * debug exceptions. By restoring MDSCR_EL1 here, we may take a debug
+-	 * exception. Mask them until local_dbg_restore() in cpu_suspend()
++	 * exception. Mask them until local_daif_restore() in cpu_suspend()
+ 	 * resets them.
+ 	 */
+-	disable_dbg
++	disable_daif
+ 	msr	mdscr_el1, x10
+ 
+ 	msr	sctlr_el1, x12
+@@ -155,8 +155,7 @@ ENDPROC(cpu_do_switch_mm)
+  * called by anything else. It can only be executed from a TTBR0 mapping.
+  */
+ ENTRY(idmap_cpu_replace_ttbr1)
+-	mrs	x2, daif
+-	msr	daifset, #0xf
++	save_and_disable_daif flags=x2
+ 
+ 	adrp	x1, empty_zero_page
+ 	msr	ttbr1_el1, x1
+@@ -169,7 +168,7 @@ ENTRY(idmap_cpu_replace_ttbr1)
+ 	msr	ttbr1_el1, x0
+ 	isb
+ 
+-	msr	daif, x2
++	restore_daif x2
+ 
+ 	ret
+ ENDPROC(idmap_cpu_replace_ttbr1)
 -- 
 2.13.2
