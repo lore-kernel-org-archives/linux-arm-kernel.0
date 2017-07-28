@@ -1,22 +1,44 @@
-From: tony.luck@intel.com (Luck, Tony)
-Date: Fri, 28 Jul 2017 17:02:11 +0000
-Subject: [PATCH] MAINTAINERS: Add Tony and Boris as ACPI/APEI reviewers
-In-Reply-To: <20170728073551.GB1889@nazgul.tnic>
-References: <1500661477-6536-1-git-send-email-lho@apm.com>
- <20170722055954.GA2082@nazgul.tnic> <1893763.BLgt1zgLk5@aspire.rjw.lan>
- <1632667.Vgem7HtdXu@aspire.rjw.lan> <20170727055825.GA4611@nazgul.tnic>
- <CAJZ5v0jVSrsufoWyexb_MWS=ni0CDn7Oo1-oHOcaTxdYpfpQMg@mail.gmail.com>
- <20170727144922.GF28553@nazgul.tnic>
- <CAJZ5v0gQ5aYZw8NOpvmw-1zqfFg_k+nkTZxEocnT=hDk37VsGA@mail.gmail.com>
- <3908561D78D1C84285E8C5FCA982C28F61317AEB@ORSMSX114.amr.corp.intel.com>
- <20170728073551.GB1889@nazgul.tnic>
-Message-ID: <3908561D78D1C84285E8C5FCA982C28F61318E5F@ORSMSX114.amr.corp.intel.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 28 Jul 2017 10:02:36 -0700
+Subject: [PATCH v2 4/5] clk: qcom: gcc-msm8996: Mark
+ gcc_mmss_noc_cfg_ahb_clk as a critical clock
+In-Reply-To: <20170728164058.GC2146@codeaurora.org>
+References: <1500526099-9935-1-git-send-email-rnayak@codeaurora.org>
+ <1500526099-9935-5-git-send-email-rnayak@codeaurora.org>
+ <20170727225130.GQ2146@codeaurora.org>
+ <319a0d15-354b-946b-da27-41d56fa0bb21@codeaurora.org>
+ <20170728164058.GC2146@codeaurora.org>
+Message-ID: <20170728170236.GE2146@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Since this piece of the ACPI pile is doing RAS, it is perhaps prudent if
-> we at least paid attention to it and the direction it takes. So add Tony
-> and me as reviewers.
+On 07/28, Stephen Boyd wrote:
+> On 07/28, Rajendra Nayak wrote:
+> > 
+> > On 07/28/2017 04:21 AM, Stephen Boyd wrote:
+> > > On 07/20, Rajendra Nayak wrote:
+> > >> we have gcc_mmss_noc_cfg_ahb_clk marked with a CLK_IGNORE_UNUSED. While
+> > >> this can prevent it from being disabled while its unused, it does not
+> > >> prevent it from being disabled when a child derived from the clock calls
+> > >> an explicit enable/disable.
+> > > 
+> > > Do you mean the config_noc_clk_src is being disabled? Who is
+> > 
+> > I think the issue I saw was after I switched the parent from
+> > config_noc_clk_src to the RPM controlled cnoc_clk. That had to
+> > be kept voted, else some other ahb clock derived from it being
+> > disabled was causing the vote on cnoc_clk to be dropped.
+> 
+> Hmm ok. Maybe we have some sort of bus driver vote from the
+> multimedia clk driver in downstream code? Let me check.
+> 
 
-Acked-by: Tony Luck <tony.luck@intel.com>
- 
+Ah I was looking at the mmss file when I should have been looking
+at the gcc file. I see it downstream too, where we call
+clk_prepare_enable() during gcc boot. This patch looks fine.
+Eventually, it would make more sense to have this handled by the
+bus driver, but until we get there this is fine.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
