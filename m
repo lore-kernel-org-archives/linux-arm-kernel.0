@@ -1,77 +1,19 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 28 Jul 2017 18:19:17 -0500
-Subject: [PATCH 5/6] ARM: dts: keystone-k2l-evm: Add and enable common DSP CMA
- memory pool
-In-Reply-To: <20170728231918.16778-1-s-anna@ti.com>
-References: <20170728231918.16778-1-s-anna@ti.com>
-Message-ID: <20170728231918.16778-6-s-anna@ti.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 28 Jul 2017 16:31:36 -0700
+Subject: [PATCH 1/2] arm64: dts: move ns2 into northstar2 directory
+In-Reply-To: <1500483950-9217-2-git-send-email-scott.branden@broadcom.com>
+References: <1500483950-9217-1-git-send-email-scott.branden@broadcom.com>
+ <1500483950-9217-2-git-send-email-scott.branden@broadcom.com>
+Message-ID: <92ccb588-744f-ee91-bfba-ced7e6675335@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sam Nelson <sam.nelson@ti.com>
+On 07/19/2017 10:05 AM, Scott Branden wrote:
+> Place northstar2 into its own subdirectory.  This helps as the number
+> of Broadcom boards grow and we can separate them per SoC.
+> 
+> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
 
-A common CMA memory pool reserved memory node is added, and is attached
-to all the DSP nodes through the 'memory-region' property on the 66AK2L
-EVM board. This area will be used for allocating virtio rings and buffers.
-The common node allows the DSP Memory Protection and Address Extension
-(MPAX) module to be configured uniformly across all the DSP processors.
-
-The reserved memory node and all the user DSP nodes are also marked okay
-to enable the DSPs on the 66AK2L EVM board.
-
-Signed-off-by: Sam Nelson <sam.nelson@ti.com>
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/boot/dts/keystone-k2l-evm.dts | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
-
-diff --git a/arch/arm/boot/dts/keystone-k2l-evm.dts b/arch/arm/boot/dts/keystone-k2l-evm.dts
-index 056b42f99d7a..528667618db4 100644
---- a/arch/arm/boot/dts/keystone-k2l-evm.dts
-+++ b/arch/arm/boot/dts/keystone-k2l-evm.dts
-@@ -16,6 +16,19 @@
- 	compatible = "ti,k2l-evm", "ti,k2l", "ti,keystone";
- 	model = "Texas Instruments Keystone 2 Lamarr EVM";
- 
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		dsp_common_memory: dsp-common-memory at 81f800000 {
-+			compatible = "shared-dma-pool";
-+			reg = <0x00000008 0x1f800000 0x00000000 0x800000>;
-+			reusable;
-+			status = "okay";
-+		};
-+	};
-+
- 	soc {
- 		clocks {
- 			refclksys: refclksys {
-@@ -133,3 +146,23 @@
- 		reg = <1>;
- 	};
- };
-+
-+&dsp0 {
-+	memory-region = <&dsp_common_memory>;
-+	status = "okay";
-+};
-+
-+&dsp1 {
-+	memory-region = <&dsp_common_memory>;
-+	status = "okay";
-+};
-+
-+&dsp2 {
-+	memory-region = <&dsp_common_memory>;
-+	status = "okay";
-+};
-+
-+&dsp3 {
-+	memory-region = <&dsp_common_memory>;
-+	status = "okay";
-+};
+Applied, thanks Scott.
 -- 
-2.13.1
+Florian
