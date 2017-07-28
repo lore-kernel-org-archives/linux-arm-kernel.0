@@ -1,33 +1,28 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 28 Jul 2017 15:47:36 +0200
-Subject: [PATCH 0/3] net-next: stmmac: support future possible different
- internal phy mode
-In-Reply-To: <CAGb2v66=h_5df=B0Us-kvvFg9r_qSUroDzn-xvQLSpD1d8DhBQ@mail.gmail.com>
-References: <20170728092818.23419-1-clabbe.montjoie@gmail.com>
- <CAGb2v66=h_5df=B0Us-kvvFg9r_qSUroDzn-xvQLSpD1d8DhBQ@mail.gmail.com>
-Message-ID: <20170728134736.GC32230@lunn.ch>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 28 Jul 2017 21:50:06 +0800
+Subject: [PATCH 0/3] STM32 CRC update
+In-Reply-To: <1499951193-14842-1-git-send-email-lionel.debieve@st.com>
+References: <1499951193-14842-1-git-send-email-lionel.debieve@st.com>
+Message-ID: <20170728135006.GC21401@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 05:53:40PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Jul 28, 2017 at 5:28 PM, Corentin Labbe
-> <clabbe.montjoie@gmail.com> wrote:
-> > Hello
-> >
-> > The current way to find if the phy is internal is to compare DT phy-mode
-> > and emac_variant/internal_phy.
-> > But it will negate a possible future SoC where an external PHY use the
-> > same phy mode than the internal one.
-> >
-> > This patchs series adds a new way to find if the PHY is internal, via its
-> > compatible.
+On Thu, Jul 13, 2017 at 03:06:30PM +0200, Lionel Debieve wrote:
+> This set of patches update the STM32 CRC driver.
+> It contains two corrections and one global Kconfig rework.
+> First correction is about the relaxed usage in scope of arm
+> platform usage, second about a unbind driver issue.
+> Last patch is about a Kconfig rework that make configuration
+> generic for STM32 crypto algos, HASH and CRYP are pushed
+> accordingly.
 > 
-> You've already joined in on the discussion for the patch "net: stmmac:
-> dwmac-rk: Add internal phy support". It is pretty much the same issue.
-> Please wait for it to come to a proper conclusion. At least then we can
-> agree on something so different platforms with the same problem don't
-> have diverging solutions.
+> Lionel Debieve (3):
+>   crypto: stm32 - CRC use relaxed function
+>   crypto: stm32 - solve crc issue during unbind
+>   crypto: stm32 - Rename module to use generic crypto
 
-Yes, this is important.
-
-     Andrew
+All patches applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
