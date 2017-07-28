@@ -1,44 +1,88 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 28 Jul 2017 10:02:36 -0700
-Subject: [PATCH v2 4/5] clk: qcom: gcc-msm8996: Mark
- gcc_mmss_noc_cfg_ahb_clk as a critical clock
-In-Reply-To: <20170728164058.GC2146@codeaurora.org>
-References: <1500526099-9935-1-git-send-email-rnayak@codeaurora.org>
- <1500526099-9935-5-git-send-email-rnayak@codeaurora.org>
- <20170727225130.GQ2146@codeaurora.org>
- <319a0d15-354b-946b-da27-41d56fa0bb21@codeaurora.org>
- <20170728164058.GC2146@codeaurora.org>
-Message-ID: <20170728170236.GE2146@codeaurora.org>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Fri, 28 Jul 2017 18:27:05 +0100
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170728165529.GF3730@linux.vnet.ibm.com>
+References: <20170726231505.GG3730@linux.vnet.ibm.com>
+ <20170726.162200.1904949371593276937.davem@davemloft.net>
+ <20170727014214.GH3730@linux.vnet.ibm.com>
+ <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
+ <20170727124913.GL3730@linux.vnet.ibm.com>
+ <20170727144903.000022a1@huawei.com>
+ <20170727173923.000001b2@huawei.com>
+ <20170727165245.GD3730@linux.vnet.ibm.com>
+ <20170728084411.00001ddb@huawei.com>
+ <20170728142403.0000122b@huawei.com>
+ <20170728165529.GF3730@linux.vnet.ibm.com>
+Message-ID: <20170728182053.000072aa@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28, Stephen Boyd wrote:
-> On 07/28, Rajendra Nayak wrote:
-> > 
-> > On 07/28/2017 04:21 AM, Stephen Boyd wrote:
-> > > On 07/20, Rajendra Nayak wrote:
-> > >> we have gcc_mmss_noc_cfg_ahb_clk marked with a CLK_IGNORE_UNUSED. While
-> > >> this can prevent it from being disabled while its unused, it does not
-> > >> prevent it from being disabled when a child derived from the clock calls
-> > >> an explicit enable/disable.
-> > > 
-> > > Do you mean the config_noc_clk_src is being disabled? Who is
-> > 
-> > I think the issue I saw was after I switched the parent from
-> > config_noc_clk_src to the RPM controlled cnoc_clk. That had to
-> > be kept voted, else some other ahb clock derived from it being
-> > disabled was causing the vote on cnoc_clk to be dropped.
-> 
-> Hmm ok. Maybe we have some sort of bus driver vote from the
-> multimedia clk driver in downstream code? Let me check.
-> 
+On Fri, 28 Jul 2017 09:55:29 -0700
+"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
 
-Ah I was looking at the mmss file when I should have been looking
-at the gcc file. I see it downstream too, where we call
-clk_prepare_enable() during gcc boot. This patch looks fine.
-Eventually, it would make more sense to have this handled by the
-bus driver, but until we get there this is fine.
+> On Fri, Jul 28, 2017 at 02:24:03PM +0100, Jonathan Cameron wrote:
+> > On Fri, 28 Jul 2017 08:44:11 +0100
+> > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:  
+> 
+> [ . . . ]
+> 
+> > Ok.  Some info.  I disabled a few driver (usb and SAS) in the interest of having
+> > fewer timer events.  Issue became much easier to trigger (on some runs before
+> > I could get tracing up and running)
+> >e
+> > So logs are large enough that pastebin doesn't like them - please shoet if  
+> >>e another timer period is of interest.  
+> > 
+> > https://pastebin.com/iUZDfQGM for the timer trace.
+> > https://pastebin.com/3w1F7amH for dmesg.  
+> > 
+> > The relevant timeout on the RCU stall detector was 8 seconds.  Event is
+> > detected around 835.
+> > 
+> > It's a lot of logs, so I haven't identified a smoking gun yet but there
+> > may well be one in there.  
+> 
+> The dmesg says:
+> 
+> rcu_preempt kthread starved for 2508 jiffies! g112 c111 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1
+> 
+> So I look for "rcu_preempt" timer events and find these:
+> 
+> rcu_preempt-9     [019] ....   827.579114: timer_init: timer=ffff8017d5fc7da0
+> rcu_preempt-9     [019] d..1   827.579115: timer_start: timer=ffff8017d5fc7da0 function=process_timeout 
+> 
+> Next look for "ffff8017d5fc7da0" and I don't find anything else.
+It does show up off the bottom of what would fit in pastebin...
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+     rcu_preempt-9     [001] d..1   837.681077: timer_cancel: timer=ffff8017d5fc7da0
+     rcu_preempt-9     [001] ....   837.681086: timer_init: timer=ffff8017d5fc7da0
+     rcu_preempt-9     [001] d..1   837.681087: timer_start: timer=ffff8017d5fc7da0 function=process_timeout expires=4295101298 [timeout=1] cpu=1 idx=0 flags=
+
+> The timeout was one jiffy, and more than a second later, no expiration.
+> Is it possible that this event was lost?  I am not seeing any sign of
+> this is the trace.
+> 
+> I don't see any sign of CPU hotplug (and I test with lots of that in
+> any case).
+> 
+> The last time we saw something like this it was a timer HW/driver problem,
+> but it is a bit hard to imagine such a problem affecting both ARM64
+> and SPARC.  ;-)
+Could be different issues, both of which were hidden by that lockup detector.
+
+There is an errata work around for the timers on this particular board.
+I'm only vaguely aware of it, so may be unconnected.
+
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clocksource/arm_arch_timer.c?h=v4.13-rc2&id=bb42ca47401010fc02901b5e8f79e40a26f208cb
+
+Seems unlikely though! + we've not yet seen it on the other chips that
+errata effects (not that that means much).
+
+Jonathan
+
+> 
+> Thomas, any debugging suggestions?
+> 
+> 							Thanx, Paul
+> 
