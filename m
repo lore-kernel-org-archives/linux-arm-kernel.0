@@ -1,97 +1,47 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Fri, 28 Jul 2017 14:24:03 +0100
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170728084411.00001ddb@huawei.com>
-References: <20170726223658.GA27617@linux.vnet.ibm.com>
- <20170726.154540.150558937277891719.davem@davemloft.net>
- <20170726231505.GG3730@linux.vnet.ibm.com>
- <20170726.162200.1904949371593276937.davem@davemloft.net>
- <20170727014214.GH3730@linux.vnet.ibm.com>
- <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
- <20170727124913.GL3730@linux.vnet.ibm.com>
- <20170727144903.000022a1@huawei.com>
- <20170727173923.000001b2@huawei.com>
- <20170727165245.GD3730@linux.vnet.ibm.com>
- <20170728084411.00001ddb@huawei.com>
-Message-ID: <20170728142403.0000122b@huawei.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Fri, 28 Jul 2017 18:48:12 +0530
+Subject: [PATCH v2 1/2] Documentation: dt: pinctrl: Add pmi8994 gpio support
+Message-ID: <1501247893-30226-1-git-send-email-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Jul 2017 08:44:11 +0100
-Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
+Update the binding doc for qcom pmi8994-gpio devices.
 
-> On Thu, 27 Jul 2017 09:52:45 -0700
-> "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> 
-> > On Thu, Jul 27, 2017 at 05:39:23PM +0100, Jonathan Cameron wrote:  
-> > > On Thu, 27 Jul 2017 14:49:03 +0100
-> > > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
-> > >     
-> > > > On Thu, 27 Jul 2017 05:49:13 -0700
-> > > > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> > > >     
-> > > > > On Thu, Jul 27, 2017 at 02:34:00PM +1000, Nicholas Piggin wrote:      
-> > > > > > On Wed, 26 Jul 2017 18:42:14 -0700
-> > > > > > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> > > > > >         
-> > > > > > > On Wed, Jul 26, 2017 at 04:22:00PM -0700, David Miller wrote:        
-> > > > > >         
-> > > > > > > > Indeed, that really wouldn't explain how we end up with a RCU stall
-> > > > > > > > dump listing almost all of the cpus as having missed a grace period.          
-> > > > > > > 
-> > > > > > > I have seen stranger things, but admittedly not often.        
-> > > > > > 
-> > > > > > So the backtraces show the RCU gp thread in schedule_timeout.
-> > > > > > 
-> > > > > > Are you sure that it's timeout has expired and it's not being scheduled,
-> > > > > > or could it be a bad (large) timeout (looks unlikely) or that it's being
-> > > > > > scheduled but not correctly noting gps on other CPUs?
-> > > > > > 
-> > > > > > It's not in R state, so if it's not being scheduled at all, then it's
-> > > > > > because the timer has not fired:        
-> > > > > 
-> > > > > Good point, Nick!
-> > > > > 
-> > > > > Jonathan, could you please reproduce collecting timer event tracing?      
-> > > > I'm a little new to tracing (only started playing with it last week)
-> > > > so fingers crossed I've set it up right.  No splats yet.  Was getting
-> > > > splats on reading out the trace when running with the RCU stall timer
-> > > > set to 4 so have increased that back to the default and am rerunning.
-> > > > 
-> > > > This may take a while.  Correct me if I've gotten this wrong to save time
-> > > > 
-> > > > echo "timer:*" > /sys/kernel/debug/tracing/set_event
-> > > > 
-> > > > when it dumps, just send you the relevant part of what is in
-> > > > /sys/kernel/debug/tracing/trace?    
-> > > 
-> > > Interestingly the only thing that can make trip for me with tracing on
-> > > is peaking in the tracing buffers.  Not sure this is a valid case or
-> > > not.
-> > > 
-> > > Anyhow all timer activity seems to stop around the area of interest.
-> > > 
-> > > 
+Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+---
 
-Firstly sorry to those who got the rather silly length email a minute ago.
-It bounced on the list (fair enough - I was just being lazy on getting
-data past our firewalls).
+- Have been testing this patch-set on db820c for extcon with
+  usb controller. The usb controller uses one of these gpios
+  for usb-id/vbus detection.
 
-Ok.  Some info.  I disabled a few driver (usb and SAS) in the interest of having
-fewer timer events.  Issue became much easier to trigger (on some runs before
-I could get tracing up and running)
+Changes since v1:
+ - Dropped "qcom,pmi8994-gpio" compatible addition to the driver
+   since we can use the generic "qcom,spmi-gpio" compatible.
+ - Sorted to add pmi8994-gpio in alphabatical order.
 
-So logs are large enough that pastebin doesn't like them - please shout if
-another timer period is of interest.
+ Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-https://pastebin.com/iUZDfQGM for the timer trace.
-https://pastebin.com/3w1F7amH for dmesg.  
-
-The relevant timeout on the RCU stall detector was 8 seconds.  Event is
-detected around 835.
-
-It's a lot of logs, so I haven't identified a smoking gun yet but there
-may well be one in there.
-
-Jonathan
+diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt b/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt
+index 8d893a874634..d6f8adbf25c6 100644
+--- a/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt
++++ b/Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt
+@@ -16,6 +16,7 @@ PMIC's from Qualcomm.
+ 		    "qcom,pm8941-gpio"
+ 		    "qcom,pm8994-gpio"
+ 		    "qcom,pma8084-gpio"
++		    "qcom,pmi8994-gpio"
+ 
+ 		    And must contain either "qcom,spmi-gpio" or "qcom,ssbi-gpio"
+ 		    if the device is on an spmi bus or an ssbi bus respectively
+@@ -85,6 +86,7 @@ to specify in a pin configuration subnode:
+ 		    gpio1-gpio36 for pm8941
+ 		    gpio1-gpio22 for pm8994
+ 		    gpio1-gpio22 for pma8084
++		    gpio1-gpio10 for pmi8994
+ 
+ - function:
+ 	Usage: required
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
