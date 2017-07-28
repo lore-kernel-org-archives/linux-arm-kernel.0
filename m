@@ -1,50 +1,84 @@
-From: bp@suse.de (Borislav Petkov)
-Date: Fri, 28 Jul 2017 09:35:51 +0200
-Subject: [PATCH] MAINTAINERS: Add Tony and Boris as ACPI/APEI reviewers
-In-Reply-To: <3908561D78D1C84285E8C5FCA982C28F61317AEB@ORSMSX114.amr.corp.intel.com>
-References: <1500661477-6536-1-git-send-email-lho@apm.com>
- <20170722055954.GA2082@nazgul.tnic>
- <1893763.BLgt1zgLk5@aspire.rjw.lan>
- <1632667.Vgem7HtdXu@aspire.rjw.lan>
- <20170727055825.GA4611@nazgul.tnic>
- <CAJZ5v0jVSrsufoWyexb_MWS=ni0CDn7Oo1-oHOcaTxdYpfpQMg@mail.gmail.com>
- <20170727144922.GF28553@nazgul.tnic>
- <CAJZ5v0gQ5aYZw8NOpvmw-1zqfFg_k+nkTZxEocnT=hDk37VsGA@mail.gmail.com>
- <3908561D78D1C84285E8C5FCA982C28F61317AEB@ORSMSX114.amr.corp.intel.com>
-Message-ID: <20170728073551.GB1889@nazgul.tnic>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 28 Jul 2017 09:39:36 +0200
+Subject: [PATCH v2 05/11] net: stmmac: dwmac-rk: Add internal phy support
+In-Reply-To: <20170727173152.GA16362@Red>
+References: <1501160156-30328-1-git-send-email-david.wu@rock-chips.com>
+ <1501160540-30662-1-git-send-email-david.wu@rock-chips.com>
+ <20170727134834.GD18666@lunn.ch>
+ <65ae1747-4dff-b1d8-8aa3-684fc8c7809a@gmail.com>
+ <20170727173152.GA16362@Red>
+Message-ID: <20170728073936.jwgrq2z2nd3dqrti@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since this piece of the ACPI pile is doing RAS, it is perhaps prudent if
-we at least paid attention to it and the direction it takes. So add Tony
-and me as reviewers.
+On Thu, Jul 27, 2017 at 07:31:52PM +0200, Corentin Labbe wrote:
+> On Thu, Jul 27, 2017 at 09:54:01AM -0700, Florian Fainelli wrote:
+> > On 07/27/2017 06:48 AM, Andrew Lunn wrote:
+> > > On Thu, Jul 27, 2017 at 09:02:16PM +0800, David Wu wrote:
+> > >> To make internal phy work, need to configure the phy_clock,
+> > >> phy cru_reset and related registers.
+> > >>
+> > >> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> > >> ---
+> > >> changes in v2:
+> > >>  - Use the standard "phy-mode" property for internal phy. (Florian)
+> > > 
+> > > I think we need to discuss this. This PHY appears to be on an MDIO
+> > > bus, it uses a standard PHY driver, and it appears to be using an RMII
+> > > interface. So it is just an ordinary PHY.
+> > 
+> > First, the fact that the internal PHY also appears through MDIO is
+> > orthogonal to the fact that it is internal or external. Plenty of
+> > designs have internal PHYs exposed through MDIO because that is
+> > convenient. What matters though is how the data/clock lines are wired
+> > internally, which is what "phy-mode" describes.
+> > 
+> > > 
+> > > Internal is supposed to be something which is not ordinary, does not
+> > > use one of the standard phy modes, needs something special to make it
+> > > work.
+> > > 
+> > > Florain, it appears to be your suggestion to use internal. What do you
+> > > say?
+> > 
+> > phy-mode = "internal" really means that it is not a standard MII variant
+> > to connect the data/clock lines between the Ethernet MAC and the PHY,
+> > and this can happen in some designs (although quite unlikely). So from
+> > there we could do several things depending on the requirements:
+> > 
+> > - if you can have your Ethernet MAC driver perform the necessary
+> > configuration *after* you have been able to bind the PHY device with its
+> > PHY driver, then the PHY driver should have PHY_IS_INTERNAL in its
+> > flags, and you can use phy_is_internal() from PHYLIB to tell you that
+> > and we could imagine using: phy-mode = "rmii" because that would not too
+> > much of a stretch
+> > 
+> > - if you need knowledge about this PHY connection type prior to binding
+> > the PHY device and its driver (that is, before of_phy_connect()) we
+> > could add a boolean property e.g: "phy-is-internal" that allows us to
+> > know that, or we can have a new phy-mode value, e.g: "internal-rmii"
+> > which describes that, either way would probably be fine, but the former
+> > scales better
+> 
+> We have the same problem on Allwinner SoCs for dwmac-sun8i, we need
+> to set a syscon for chossing between internal/external PHY.
+>
+> Having this phy-is-internal would be very helpfull. (adding
+> internal-xmii will add too many flags in our case)
 
-Signed-off-by: Borislav Petkov <bp@suse.de>
----
- MAINTAINERS | 8 ++++++++
- 1 file changed, 8 insertions(+)
+In our case, we'll always have a phy node, so we can have a compatible
+that will give you the same information.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index f66488dfdbc9..985413fb5d83 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -310,6 +310,14 @@ F:	drivers/pci/*/*acpi*
- F:	drivers/pci/*/*/*acpi*
- F:	tools/power/acpi/
- 
-+ACPI APEI
-+M:	"Rafael J. Wysocki" <rjw@rjwysocki.net>
-+M:	Len Brown <lenb@kernel.org>
-+L:	linux-acpi at vger.kernel.org
-+R:	Tony Luck <tony.luck@intel.com>
-+R:	Borislav Petkov <bp@alien8.de>
-+F:	drivers/acpi/apei/
-+
- ACPI COMPONENT ARCHITECTURE (ACPICA)
- M:	Robert Moore <robert.moore@intel.com>
- M:	Lv Zheng <lv.zheng@intel.com>
+Maxime
+
 -- 
-2.14.0.rc0
-
-SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
--- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170728/c65c919d/attachment-0001.sig>
