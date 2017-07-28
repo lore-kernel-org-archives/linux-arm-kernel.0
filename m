@@ -1,277 +1,332 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 28 Jul 2017 15:50:01 +0530
-Subject: [PATCH v2 6/7] mailbox: bcm-flexrm-mailbox: Set msg_queue_len for
- each channel
-In-Reply-To: <CAALAos-vY+Cf226eQrRYQ+o0xfbSQOcWpSVzDeu_aZgxE+VQtg@mail.gmail.com>
-References: <1500620142-910-1-git-send-email-anup.patel@broadcom.com>
- <1500620142-910-7-git-send-email-anup.patel@broadcom.com>
- <CABb+yY1Pxhgvvit=0eZr66DpLJ3MDEvRPx9dwDPJM8PwiKXiew@mail.gmail.com>
- <CAALAos_yh0bCMZFrSmf-c92pNMBGhLT05YFF0duhmpxgYec+_w@mail.gmail.com>
- <CABb+yY3d1FvfB-NBVHLNfoFXGn9-8nFEdKBhXt4sBTr1vodhYw@mail.gmail.com>
- <CAALAos9T0YtCvgjGCMVPn=dw2JKY=jTxz-v431NgpBCKFo1vVQ@mail.gmail.com>
- <CABb+yY2x1Wb=RZhq+eUnM0wkcih4YkFDrKRgqhs1erGQGH3tdw@mail.gmail.com>
- <CAALAos-aKDw8p2_BFausm+VC4teoAW22239+gnkPfFUaiZxB6w@mail.gmail.com>
- <CABb+yY3fwPTSc0PKh44uvgdbvQJhu-X3O_L5EtumB6ovsaOdSw@mail.gmail.com>
- <CAALAos9RoAbZcsyQV_U_aUeVSO9SMYNqNpqOdCF0ytNXK8SrnA@mail.gmail.com>
- <CABb+yY2gj3SBTCzcGim0=c1G9SzAiQ0HxA1F24kjs-jS42Z+dg@mail.gmail.com>
- <CAALAos-VXg9XcNOr6OyiefdnL=oajEi3JGjoFSf74HEJgBiWBA@mail.gmail.com>
- <CABb+yY3=yOKfRP=JEuBNG+ssx6rqjuVSYFCLOJJxvTEkAh7H2w@mail.gmail.com>
- <CAALAos-vY+Cf226eQrRYQ+o0xfbSQOcWpSVzDeu_aZgxE+VQtg@mail.gmail.com>
-Message-ID: <CABb+yY0rYaMdDgDkBZ+J62YnFRRRRRCw9FqyQ3kCHhno9CJTSQ@mail.gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Fri, 28 Jul 2017 12:29:48 +0200
+Subject: [PATCH v2 4/4] clk: meson: gxbb-aoclk: Add CEC 32k clock
+In-Reply-To: <1501235589-318-5-git-send-email-narmstrong@baylibre.com>
+References: <1501235589-318-1-git-send-email-narmstrong@baylibre.com>
+ <1501235589-318-5-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CAFBinCDNU5p59CvKLoJAh0ve7JGLnTi79kBa5+SVEJ9nzeMv=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 3:18 PM, Anup Patel <anup.patel@broadcom.com> wrote:
-> On Fri, Jul 28, 2017 at 2:34 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> On Fri, Jul 28, 2017 at 2:19 PM, Anup Patel <anup.patel@broadcom.com> wrote:
->>> On Thu, Jul 27, 2017 at 5:23 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->>>> On Thu, Jul 27, 2017 at 11:20 AM, Anup Patel <anup.patel@broadcom.com> wrote:
->>>>> On Thu, Jul 27, 2017 at 10:29 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->>>>
->>>>>>>>>>> Sorry for the delayed response...
->>>>>>>>>>>
->>>>>>>>>>> On Fri, Jul 21, 2017 at 9:16 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->>>>>>>>>>>> Hi Anup,
->>>>>>>>>>>>
->>>>>>>>>>>> On Fri, Jul 21, 2017 at 12:25 PM, Anup Patel <anup.patel@broadcom.com> wrote:
->>>>>>>>>>>>> The Broadcom FlexRM ring (i.e. mailbox channel) can handle
->>>>>>>>>>>>> larger number of messages queued in one FlexRM ring hence
->>>>>>>>>>>>> this patch sets msg_queue_len for each mailbox channel to
->>>>>>>>>>>>> be same as RING_MAX_REQ_COUNT.
->>>>>>>>>>>>>
->>>>>>>>>>>>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->>>>>>>>>>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>>>>>>>>>>>> ---
->>>>>>>>>>>>>  drivers/mailbox/bcm-flexrm-mailbox.c | 5 ++++-
->>>>>>>>>>>>>  1 file changed, 4 insertions(+), 1 deletion(-)
->>>>>>>>>>>>>
->>>>>>>>>>>>> diff --git a/drivers/mailbox/bcm-flexrm-mailbox.c b/drivers/mailbox/bcm-flexrm-mailbox.c
->>>>>>>>>>>>> index 9873818..20055a0 100644
->>>>>>>>>>>>> --- a/drivers/mailbox/bcm-flexrm-mailbox.c
->>>>>>>>>>>>> +++ b/drivers/mailbox/bcm-flexrm-mailbox.c
->>>>>>>>>>>>> @@ -1683,8 +1683,11 @@ static int flexrm_mbox_probe(struct platform_device *pdev)
->>>>>>>>>>>>>                 ret = -ENOMEM;
->>>>>>>>>>>>>                 goto fail_free_debugfs_root;
->>>>>>>>>>>>>         }
->>>>>>>>>>>>> -       for (index = 0; index < mbox->num_rings; index++)
->>>>>>>>>>>>> +       for (index = 0; index < mbox->num_rings; index++) {
->>>>>>>>>>>>> +               mbox->controller.chans[index].msg_queue_len =
->>>>>>>>>>>>> +                                               RING_MAX_REQ_COUNT;
->>>>>>>>>>>>>                 mbox->controller.chans[index].con_priv = &mbox->rings[index];
->>>>>>>>>>>>> +       }
->>>>>>>>>>>>>
->>>>>>>>>>>> While writing mailbox.c I wasn't unaware that there is the option to
->>>>>>>>>>>> choose the queue length at runtime.
->>>>>>>>>>>> The idea was to keep the code as simple as possible. I am open to
->>>>>>>>>>>> making it a runtime thing, but first, please help me understand how
->>>>>>>>>>>> that is useful here.
->>>>>>>>>>>>
->>>>>>>>>>>> I understand FlexRm has a ring buffer of RING_MAX_REQ_COUNT(1024)
->>>>>>>>>>>> elements. Any message submitted to mailbox api can be immediately
->>>>>>>>>>>> written onto the ringbuffer if there is some space.
->>>>>>>>>>>> Is there any mechanism to report back to a client driver, if its
->>>>>>>>>>>> message in ringbuffer failed "to be sent"?
->>>>>>>>>>>> If there isn't any, then I think, in flexrm_last_tx_done() you should
->>>>>>>>>>>> simply return true if there is some space left in the rung-buffer,
->>>>>>>>>>>> false otherwise.
->>>>>>>>>>>
->>>>>>>>>>> Yes, we have error code in "struct brcm_message" to report back
->>>>>>>>>>> errors from send_message. In our mailbox clients, we check
->>>>>>>>>>> return value of mbox_send_message() and also the error code
->>>>>>>>>>> in "struct brcm_message".
->>>>>>>>>>>
->>>>>>>>>> I meant after the message has been accepted in the ringbuffer but the
->>>>>>>>>> remote failed to receive it.
->>>>>>>>>
->>>>>>>>> Yes, even this case is handled.
->>>>>>>>>
->>>>>>>>> In case of IO errors after message has been put in ring buffer, we get
->>>>>>>>> completion message with error code and mailbox client drivers will
->>>>>>>>> receive back "struct brcm_message" with error set.
->>>>>>>>>
->>>>>>>>> You can refer flexrm_process_completions() for more details.
->>>>>>>>>
->>>>>> It doesn't seem to be what I suggest. I see two issues in
->>>>>> flexrm_process_completions()
->>>>>> 1) It calls mbox_send_message(), which is a big NO for a controller
->>>>>> driver. Why should you have one more message stored outside of
->>>>>> ringbuffer?
->>>>>
->>>>> The "last_pending_msg" in each FlexRM ring was added to fit FlexRM
->>>>> in Mailbox framework.
->>>>>
->>>>> We don't have any IRQ for TX done so "txdone_irq" out of the question for
->>>>> FlexRM. We only have completions for both success or failures (IO errors).
->>>>>
->>>>> This means we have to use "txdone_poll" for FlexRM. For "txdone_poll",
->>>>> we have to provide last_tx_done() callback. The last_tx_done() callback
->>>>> is supposed to return true if last send_data() call succeeded.
->>>>>
->>>>> To implement last_tx_done() in FlexRM driver, we added "last_pending_msg".
->>>>>
->>>>> When "last_pending_msg" is NULL it means last call to send_data() succeeded
->>>>> and when "last_pending_msg" is != NULL it means last call to send_data()
->>>>> did not go through due to lack of space in FlexRM ring.
->>>>>
->>>> It could be simpler.
->>>> Since flexrm_send_data() is essentially about putting the message in
->>>> the ring-buffer (and not about _transmission_ failures), the
->>>> last_tx_done() should simply return true if requests_ida has not all
->>>> ids allocated. False otherwise.
->>>
->>> It's not that simple because we have two cases in-which
->>> send_data() will fail:
->>> 1. It run-out of IDs in requests_ida
->>> 2. There is no room in BD queue of FlexRM ring. This because each
->>> brcm_message can be translated into variable number of descriptors.
->>> In fact, using SPU2 crypto client we have one brcm_message translating
->>> into 100's of descriptors. All-in-all few messages (< 1024) can also
->>> fill-up the BD queue of FlexRM ring.
->>>
->> OK let me put it abstractly... return false if "there is no space for
->> another message in the ringbuffer", true otherwise.
->
-> Let say at time T, there was no space in BD queue. Now at
-> time T+X when last_tx_done() it is possible that BD queue
-> has space because FlexRM has processed some more
-> descriptor.
->
-> I think last_tx_done() for "txdone_poll" method will require
-> some information passing from send_data() callback to
-> last_tx_done() which is last_pending_msg for FlexRM driver.
->
-The problem is flexrm_send_data() accepts single as well as batched
-messages, so each send_data() can require different spaces. If you
-make flexrm_send_data() accept fixed size messages then you can simply
-set a flag (say, last_tx_busy) when max possible messages are queued
-and unset that flag in flexrm_process_completions().
+Hi Neil,
 
+thanks for these patches, CEC support is another good step!
 
-> Anyways, I plan to try "txdone_ack" method so I will
-> remove last_tx_done() and last_pending_msg both.
-> What do you think?
+On Fri, Jul 28, 2017 at 11:53 AM, Neil Armstrong
+<narmstrong@baylibre.com> wrote:
+> The CEC 32K AO Clock is a dual divider with dual counter to provide a more
+> precise 32768Hz clock for the CEC subsystem from the external xtal.
 >
-Sounds good.
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  drivers/clk/meson/Makefile         |   2 +-
+>  drivers/clk/meson/gxbb-aoclk-32k.c | 180 +++++++++++++++++++++++++++++++++++++
+>  drivers/clk/meson/gxbb-aoclk.c     |  21 ++++-
+>  drivers/clk/meson/gxbb-aoclk.h     |  16 ++++
+>  4 files changed, 217 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/clk/meson/gxbb-aoclk-32k.c
+>
+> diff --git a/drivers/clk/meson/Makefile b/drivers/clk/meson/Makefile
+> index de65427..b139d41 100644
+> --- a/drivers/clk/meson/Makefile
+> +++ b/drivers/clk/meson/Makefile
+> @@ -4,4 +4,4 @@
+>
+>  obj-$(CONFIG_COMMON_CLK_AMLOGIC) += clk-pll.o clk-cpu.o clk-mpll.o clk-audio-divider.o
+>  obj-$(CONFIG_COMMON_CLK_MESON8B) += meson8b.o
+> -obj-$(CONFIG_COMMON_CLK_GXBB)   += gxbb.o gxbb-aoclk.o gxbb-aoclk-regmap.o
+> +obj-$(CONFIG_COMMON_CLK_GXBB)   += gxbb.o gxbb-aoclk.o gxbb-aoclk-regmap.o gxbb-aoclk-32k.o
+> diff --git a/drivers/clk/meson/gxbb-aoclk-32k.c b/drivers/clk/meson/gxbb-aoclk-32k.c
+> new file mode 100644
+> index 0000000..497cd09
+> --- /dev/null
+> +++ b/drivers/clk/meson/gxbb-aoclk-32k.c
+> @@ -0,0 +1,180 @@
+> +/*
+> + * Copyright (c) 2017 BayLibre, SAS.
+> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+> + *
+> + * SPDX-License-Identifier: GPL-2.0+
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/bitfield.h>
+> +#include <linux/regmap.h>
+> +#include "gxbb-aoclk.h"
+> +
+> +/*
+> + * The AO Domain embeds a dual/divider to generate a more precise
+> + * 32,768KHz clock for low-power suspend mode and CEC.
+> + */
+> +
+> +#define CLK_CNTL0_N1_MASK      GENMASK(11, 0)
+> +#define CLK_CNTL0_N2_MASK      GENMASK(23, 12)
+> +#define CLK_CNTL0_DUALDIV_EN   BIT(28)
+> +#define CLK_CNTL0_OUT_GATE_EN  BIT(30)
+> +#define CLK_CNTL0_IN_GATE_EN   BIT(31)
+> +
+> +#define CLK_CNTL1_M1_MASK      GENMASK(11, 0)
+> +#define CLK_CNTL1_M2_MASK      GENMASK(23, 12)
+> +#define CLK_CNTL1_BYPASS_EN    BIT(24)
+> +#define CLK_CNTL1_SELECT_OSC   BIT(27)
+> +
+> +#define PWR_CNTL_ALT_32K_SEL   GENMASK(13, 10)
+> +
+> +struct cec_32k_freq_table {
+> +       unsigned long parent_rate;
+> +       unsigned long target_rate;
+> +       bool dualdiv;
+> +       unsigned int n1;
+> +       unsigned int n2;
+> +       unsigned int m1;
+> +       unsigned int m2;
+> +};
+> +
+> +static const struct cec_32k_freq_table aoclk_cec_32k_table[] = {
+> +       [0] = {
+> +               .parent_rate = 24000000,
+shouldn't you add a parent (XTAL) to this new clock so you could get
+rid of this?
 
+> +               .target_rate = 32768,
+> +               .dualdiv = true,
+> +               .n1 = 733,
+> +               .n2 = 732,
+> +               .m1 = 8,
+> +               .m2 = 11,
+> +       },
+> +};
+> +
+> +/*
+> + * If CLK_CNTL0_DUALDIV_EN == 0
+> + *  - will use N1 divider only
+> + * If CLK_CNTL0_DUALDIV_EN == 1
+> + *  - hold M1 cycles of N1 divider then changes to N2
+> + *  - hold M2 cycles of N2 divider then changes to N1
+> + * Then we can get more accurate division.
+> + */
+> +static unsigned long aoclk_cec_32k_recalc_rate(struct clk_hw *hw,
+> +                                              unsigned long parent_rate)
+> +{
+> +       struct aoclk_cec_32k *cec_32k = to_aoclk_cec_32k(hw);
+> +       unsigned long n1;
+> +       u32 reg0, reg1;
+> +
+> +       regmap_read(cec_32k->regmap, AO_RTC_ALT_CLK_CNTL0, &reg0);
+> +       regmap_read(cec_32k->regmap, AO_RTC_ALT_CLK_CNTL1, &reg1);
+> +
+> +       if (reg1 & CLK_CNTL1_BYPASS_EN)
+> +               return parent_rate;
+> +
+> +       if (reg0 & CLK_CNTL0_DUALDIV_EN) {
+> +               unsigned long n2, m1, m2, f1, f2, p1, p2;
+> +
+> +               n1 = FIELD_GET(CLK_CNTL0_N1_MASK, reg0) + 1;
+> +               n2 = FIELD_GET(CLK_CNTL0_N2_MASK, reg0) + 1;
+> +
+> +               m1 = FIELD_GET(CLK_CNTL1_M1_MASK, reg1) + 1;
+> +               m2 = FIELD_GET(CLK_CNTL1_M2_MASK, reg1) + 1;
+> +
+> +               f1 = DIV_ROUND_CLOSEST(parent_rate, n1);
+> +               f2 = DIV_ROUND_CLOSEST(parent_rate, n2);
+> +
+> +               p1 = DIV_ROUND_CLOSEST(100000000 * m1, f1 * (m1 + m2));
+> +               p2 = DIV_ROUND_CLOSEST(100000000 * m2, f2 * (m1 + m2));
+> +
+> +               return DIV_ROUND_UP(100000000, p1 + p2);
+> +       }
+> +
+> +       n1 = FIELD_GET(CLK_CNTL0_N1_MASK, reg0) + 1;
+> +
+> +       return DIV_ROUND_CLOSEST(parent_rate, n1);
+> +}
+> +
+> +static const struct cec_32k_freq_table *find_cec_32k_freq(unsigned long rate,
+> +                                                         unsigned long prate)
+> +{
+> +       int i;
+> +
+> +       for (i = 0 ; i < ARRAY_SIZE(aoclk_cec_32k_table) ; ++i)
+> +               if (aoclk_cec_32k_table[i].parent_rate == prate &&
+> +                   aoclk_cec_32k_table[i].target_rate == rate)
+> +                       return &aoclk_cec_32k_table[i];
+> +
+> +       return NULL;
+> +}
+> +
+> +static long aoclk_cec_32k_round_rate(struct clk_hw *hw, unsigned long rate,
+> +                                    unsigned long *prate)
+> +{
+> +       const struct cec_32k_freq_table *freq = find_cec_32k_freq(rate,
+> +                                                                 *prate);
+> +
+> +       /* If invalid return first one */
+> +       if (!freq)
+> +               return freq[0].target_rate;
+> +
+> +       return freq->target_rate;
+> +}
+> +
+> +static int aoclk_cec_32k_set_rate(struct clk_hw *hw, unsigned long rate,
+> +                                 unsigned long parent_rate)
+> +{
+> +       const struct cec_32k_freq_table *freq = find_cec_32k_freq(rate,
+> +                                                                 parent_rate);
+> +       struct aoclk_cec_32k *cec_32k = to_aoclk_cec_32k(hw);
+> +       u32 reg = 0;
+> +
+> +       if (!freq)
+> +               return -EINVAL;
+> +
+> +       /* Disable clock */
+> +       regmap_update_bits(cec_32k->regmap, AO_RTC_ALT_CLK_CNTL0,
+> +                          CLK_CNTL0_IN_GATE_EN | CLK_CNTL0_OUT_GATE_EN, 0);
+> +
+> +       if (freq->dualdiv)
+> +               reg = CLK_CNTL0_DUALDIV_EN |
+> +                     FIELD_PREP(CLK_CNTL0_N1_MASK, freq->n1 - 1) |
+> +                     FIELD_PREP(CLK_CNTL0_N2_MASK, freq->n2 - 1);
+> +       else
+> +               reg = FIELD_PREP(CLK_CNTL0_N1_MASK, freq->n1 - 1);
+> +
+> +       regmap_write(cec_32k->regmap, AO_RTC_ALT_CLK_CNTL0, reg);
+> +
+> +       if (freq->dualdiv)
+> +               reg = FIELD_PREP(CLK_CNTL1_M1_MASK, freq->m1 - 1) |
+> +                     FIELD_PREP(CLK_CNTL1_M2_MASK, freq->m2 - 1);
+> +       else
+> +               reg = FIELD_PREP(CLK_CNTL1_M1_MASK, freq->m1 - 1);
+> +
+> +       regmap_write(cec_32k->regmap, AO_RTC_ALT_CLK_CNTL1, reg);
+> +
+> +       /* Enable clock */
+> +       regmap_update_bits(cec_32k->regmap, AO_RTC_ALT_CLK_CNTL0,
+> +                          CLK_CNTL0_IN_GATE_EN, CLK_CNTL0_IN_GATE_EN);
+based on how I understand your code the *input* clock needs to be
+gated during rate change, so (in my opinion) it's fine to toggle it
+here.
 
->>
->>>>>>
->>>>>> 2) It calls mbox_chan_received_data()  which is for messages received
->>>>>> from the remote. And not the way to report failed _transmission_, for
->>>>>> which the api calls back mbox_client.tx_done() .  In your client
->>>>>> driver please populate mbox_client.tx_done() and see which message is
->>>>>> reported "sent fine" when.
->>>>>>
->>>>>>
->>>>>>>>>> There seems no such provision. IIANW, then you should be able to
->>>>>>>>>> consider every message as "sent successfully" once it is in the ring
->>>>>>>>>> buffer i.e, immediately after mbox_send_message() returns 0.
->>>>>>>>>> In that case I would think you don't need more than a couple of
->>>>>>>>>> entries out of MBOX_TX_QUEUE_LEN ?
->>>>>>>>>
->>>>>>>>> What I am trying to suggest is that we can take upto 1024 messages
->>>>>>>>> in a FlexRM ring but the MBOX_TX_QUEUE_LEN limits us queuing
->>>>>>>>> more messages. This issue manifest easily when multiple CPUs
->>>>>>>>> queues to same FlexRM ring (i.e. same mailbox channel).
->>>>>>>>>
->>>>>>>> OK then, I guess we have to make the queue length a runtime decision.
->>>>>>>
->>>>>>> Do you agree with approach taken by PATCH5 and PATCH6 to
->>>>>>> make queue length runtime?
->>>>>>>
->>>>>> I agree that we may have to get the queue length from platform, if
->>>>>> MBOX_TX_QUEUE_LEN is limiting performance. That will be easier on both
->>>>>> of us. However I suspect the right fix for _this_ situation is in
->>>>>> flexrm driver. See above.
->>>>>
->>>>> The current implementation is trying to model FlexRM using "txdone_poll"
->>>>> method and that's why we have dependency on MBOX_TX_QUEUE_LEN
->>>>>
->>>>> I think what we really need is new method for "txdone" to model ring
->>>>> manager HW (such as FlexRM). Let's call it "txdone_none".
->>>>>
->>>>> For "txdone_none", it means there is no "txdone" reporting in HW
->>>>> and mbox_send_data() should simply return value returned by
->>>>> send_data() callback. The last_tx_done() callback is not required
->>>>> for "txdone_none" and MBOX_TX_QUEUE_LEN also has no
->>>>> effect on "txdone_none". Both blocking and non-blocking clients
->>>>> are treated same for "txdone_none".
->>>>>
->>>> That is already supported :)
->>>
->>> If you are referring to "txdone_ack" then this cannot be used here
->>> because for "txdone_ack" we have to call mbox_chan_txdon() API
->>> after writing descriptors in send_data() callback which will cause
->>> dead-lock in tx_tick() called by mbox_chan_txdone().
->>>
->> Did you read my code snippet below?
->>
->> It's not mbox_chan_txdone(), but mbox_client_txdone() which is called
->> by the client.
->>
->>>>
->>>> In drivers/dma/bcm-sba-raid.c
->>>>
->>>> sba_send_mbox_request(...)
->>>> {
->>>>            ......
->>>>         req->msg.error = 0;
->>>>         ret = mbox_send_message(sba->mchans[mchans_idx], &req->msg);
->>>>         if (ret < 0) {
->>>>                 dev_err(sba->dev, "send message failed with error %d", ret);
->>>>                 return ret;
->>>>         }
->>>>         ret = req->msg.error;
->>>>         if (ret < 0) {
->>>>                 dev_err(sba->dev, "message error %d", ret);
->>>>                 return ret;
->>>>         }
->>>>           .....
->>>> }
->>>>
->>>> Here you _do_ assume that as soon as the mbox_send_message() returns,
->>>> the last_tx_done() is true. In other words, this is a case of client
->>>> 'knows_txdone'.
->>>>
->>>> So ideally you should specify cl->knows_txdone = true during
->>>> mbox_request_channel() and have ...
->>>>
->>>> sba_send_mbox_request(...)
->>>> {
->>>>         ret = mbox_send_message(sba->mchans[mchans_idx], &req->msg);
->>>>         if (ret < 0) {
->>>>                 dev_err(sba->dev, "send message failed with error %d", ret);
->>>>                 return ret;
->>>>         }
->>>>
->>>>         ret = req->msg.error;
->>>>
->>>>        /* Message successfully placed in the ringbuffer, i.e, done */
->>>>        mbox_client_txdone(sba->mchans[mchans_idx], ret);
->>>>
->>>>        if (ret < 0) {
->>>>                 dev_err(sba->dev, "message error %d", ret);
->>>>                 return ret;
->>>>         }
->>>>
->>>>         .....
->>>> }
->>>>
->>>
->>> I think we need to improve mailbox.c so that
->>> mbox_chan_txdone() can be called from
->>> send_data() callback.
->>>
->> No please. Other clients call mbox_send_message() followed by
->> mbox_client_txdone(), and they are right. For example,
->> drivers/firmware/tegra/bpmp.c
->
-> OK so I got confused between mbox_chan_txdone() and
-> mbox_client_txdone().
->
-> We should do mbox_client_txdone() from mailbox client
-> when mbox_chan txmethod is ACK.
->
-Yes.
+> +
+> +       udelay(200);
+> +
+> +       regmap_update_bits(cec_32k->regmap, AO_RTC_ALT_CLK_CNTL0,
+> +                          CLK_CNTL0_OUT_GATE_EN, CLK_CNTL0_OUT_GATE_EN);
+however, should we make the output clock configurable by implementing
+clk_ops.enable and clk_ops.disable?
 
-Thanks.
+> +
+> +       regmap_update_bits(cec_32k->regmap, AO_CRT_CLK_CNTL1,
+> +                          CLK_CNTL1_SELECT_OSC, CLK_CNTL1_SELECT_OSC);
+> +
+> +       /* Select 32k from XTAL */
+> +       regmap_update_bits(cec_32k->regmap,
+> +                         AO_RTI_PWR_CNTL_REG0,
+> +                         PWR_CNTL_ALT_32K_SEL,
+> +                         FIELD_PREP(PWR_CNTL_ALT_32K_SEL, 4));
+is it correct to configure the muxes after enabling the clock output?
+also do you know about the other parents of PWR_CNTL_ALT_32K_SEL?
+
+> +
+> +       return 0;
+> +}
+> +
+> +const struct clk_ops meson_aoclk_cec_32k_ops = {
+> +       .recalc_rate = aoclk_cec_32k_recalc_rate,
+> +       .round_rate = aoclk_cec_32k_round_rate,
+> +       .set_rate = aoclk_cec_32k_set_rate,
+> +};
+> diff --git a/drivers/clk/meson/gxbb-aoclk.c b/drivers/clk/meson/gxbb-aoclk.c
+> index f61506c..6c161e0 100644
+> --- a/drivers/clk/meson/gxbb-aoclk.c
+> +++ b/drivers/clk/meson/gxbb-aoclk.c
+> @@ -59,6 +59,7 @@
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/regmap.h>
+>  #include <linux/init.h>
+> +#include <linux/delay.h>
+>  #include <dt-bindings/clock/gxbb-aoclkc.h>
+>  #include <dt-bindings/reset/gxbb-aoclkc.h>
+>  #include "gxbb-aoclk.h"
+> @@ -105,6 +106,17 @@ static int gxbb_aoclk_do_reset(struct reset_controller_dev *rcdev,
+>  GXBB_AO_GATE(uart2, 5);
+>  GXBB_AO_GATE(ir_blaster, 6);
+>
+> +static struct aoclk_cec_32k cec_32k_ao = {
+> +       .lock = &gxbb_aoclk_lock,
+> +       .hw.init = &(struct clk_init_data) {
+> +               .name = "cec_32k_ao",
+> +               .ops = &meson_aoclk_cec_32k_ops,
+> +               .parent_names = (const char *[]){ "xtal" },
+> +               .num_parents = 1,
+> +               .flags = CLK_IGNORE_UNUSED,
+> +       },
+> +};
+> +
+>  static unsigned int gxbb_aoclk_reset[] = {
+>         [RESET_AO_REMOTE] = 16,
+>         [RESET_AO_I2C_MASTER] = 18,
+> @@ -131,8 +143,9 @@ static int gxbb_aoclk_do_reset(struct reset_controller_dev *rcdev,
+>                 [CLKID_AO_UART1] = &uart1_ao.hw,
+>                 [CLKID_AO_UART2] = &uart2_ao.hw,
+>                 [CLKID_AO_IR_BLASTER] = &ir_blaster_ao.hw,
+> +               [CLKID_AO_CEC_32K] = &cec_32k_ao.hw,
+>         },
+> -       .num = ARRAY_SIZE(gxbb_aoclk_gate),
+> +       .num = 7,
+>  };
+>
+>  static int gxbb_aoclkc_probe(struct platform_device *pdev)
+> @@ -172,6 +185,12 @@ static int gxbb_aoclkc_probe(struct platform_device *pdev)
+>                         return ret;
+>         }
+>
+> +       /* Specific clocks */
+> +       cec_32k_ao.regmap = regmap;
+> +       ret = devm_clk_hw_register(dev, &cec_32k_ao.hw);
+> +       if (ret)
+> +               return ret;
+> +
+>         return of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
+>                         &gxbb_aoclk_onecell_data);
+>  }
+> diff --git a/drivers/clk/meson/gxbb-aoclk.h b/drivers/clk/meson/gxbb-aoclk.h
+> index 2e26108..e8604c8 100644
+> --- a/drivers/clk/meson/gxbb-aoclk.h
+> +++ b/drivers/clk/meson/gxbb-aoclk.h
+> @@ -9,7 +9,13 @@
+>  #define __GXBB_AOCLKC_H
+>
+>  /* AO Configuration Clock registers offsets */
+> +#define AO_RTI_PWR_CNTL_REG1   0x0c
+> +#define AO_RTI_PWR_CNTL_REG0   0x10
+>  #define AO_RTI_GEN_CNTL_REG0   0x40
+> +#define AO_OSCIN_CNTL          0x58
+> +#define AO_CRT_CLK_CNTL1       0x68
+> +#define AO_RTC_ALT_CLK_CNTL0   0x94
+> +#define AO_RTC_ALT_CLK_CNTL1   0x98
+>
+>  struct aoclk_gate_regmap {
+>         struct clk_hw hw;
+> @@ -23,4 +29,14 @@ struct aoclk_gate_regmap {
+>
+>  extern const struct clk_ops meson_aoclk_gate_regmap_ops;
+>
+> +struct aoclk_cec_32k {
+> +       struct clk_hw hw;
+> +       struct regmap *regmap;
+> +       spinlock_t *lock;
+> +};
+> +
+> +#define to_aoclk_cec_32k(_hw) container_of(_hw, struct aoclk_cec_32k, hw)
+> +
+> +extern const struct clk_ops meson_aoclk_cec_32k_ops;
+> +
+>  #endif /* __GXBB_AOCLKC_H */
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-amlogic mailing list
+> linux-amlogic at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-amlogic
