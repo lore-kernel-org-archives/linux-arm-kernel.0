@@ -1,94 +1,172 @@
 From: hugues.fruchet@st.com (Hugues Fruchet)
-Date: Fri, 28 Jul 2017 12:05:01 +0200
-Subject: [PATCH v1 4/5] [media] stm32-dcmi: set default format at open()
-In-Reply-To: <1501236302-18097-1-git-send-email-hugues.fruchet@st.com>
-References: <1501236302-18097-1-git-send-email-hugues.fruchet@st.com>
-Message-ID: <1501236302-18097-5-git-send-email-hugues.fruchet@st.com>
+Date: Fri, 28 Jul 2017 12:04:57 +0200
+Subject: [PATCH v1 0/5] STM32 DCMI camera interface crop support
+Message-ID: <1501236302-18097-1-git-send-email-hugues.fruchet@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ensure that we start with default pixel format and resolution
-when opening a new instance.
+This patchset implements crop feature of Digital Camera Memory Interface
+(DCMI) of STMicroelectronics STM32 SoC series, allowing user to crop
+at pixel level inside sensor captured frame.
 
-Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
----
- drivers/media/platform/stm32/stm32-dcmi.c | 49 ++++++++++++++++++-------------
- 1 file changed, 28 insertions(+), 21 deletions(-)
+This patchset follows discussions initiated from a first submission of DCMI
+crop support, see [1].
 
-diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-index 4733d1f..2be56b6 100644
---- a/drivers/media/platform/stm32/stm32-dcmi.c
-+++ b/drivers/media/platform/stm32/stm32-dcmi.c
-@@ -890,6 +890,28 @@ static int dcmi_enum_frameintervals(struct file *file, void *fh,
- 	return 0;
- }
- 
-+static int dcmi_set_default_fmt(struct stm32_dcmi *dcmi)
-+{
-+	struct v4l2_format f = {
-+		.type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
-+		.fmt.pix = {
-+			.width		= CIF_WIDTH,
-+			.height		= CIF_HEIGHT,
-+			.field		= V4L2_FIELD_NONE,
-+			.pixelformat	= dcmi->sd_formats[0]->fourcc,
-+		},
-+	};
-+	int ret;
-+
-+	ret = dcmi_try_fmt(dcmi, &f, NULL);
-+	if (ret)
-+		return ret;
-+	dcmi->sd_format = dcmi->sd_formats[0];
-+	dcmi->fmt = f;
-+
-+	return 0;
-+}
-+
- static const struct of_device_id stm32_dcmi_of_match[] = {
- 	{ .compatible = "st,stm32-dcmi"},
- 	{ /* end node */ },
-@@ -916,7 +938,13 @@ static int dcmi_open(struct file *file)
- 	if (ret < 0 && ret != -ENOIOCTLCMD)
- 		goto fh_rel;
- 
-+	ret = dcmi_set_default_fmt(dcmi);
-+	if (ret)
-+		goto power_off;
-+
- 	ret = dcmi_set_fmt(dcmi, &dcmi->fmt);
-+
-+power_off:
- 	if (ret)
- 		v4l2_subdev_call(sd, core, s_power, 0);
- fh_rel:
-@@ -991,27 +1019,6 @@ static int dcmi_release(struct file *file)
- 	.read		= vb2_fop_read,
- };
- 
--static int dcmi_set_default_fmt(struct stm32_dcmi *dcmi)
--{
--	struct v4l2_format f = {
--		.type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
--		.fmt.pix = {
--			.width		= CIF_WIDTH,
--			.height		= CIF_HEIGHT,
--			.field		= V4L2_FIELD_NONE,
--			.pixelformat	= dcmi->sd_formats[0]->fourcc,
--		},
--	};
--	int ret;
--
--	ret = dcmi_try_fmt(dcmi, &f, NULL);
--	if (ret)
--		return ret;
--	dcmi->sd_format = dcmi->sd_formats[0];
--	dcmi->fmt = f;
--	return 0;
--}
--
- static const struct dcmi_format dcmi_formats[] = {
- 	{
- 		.fourcc = V4L2_PIX_FMT_RGB565,
+First part of patches brings few fixes and cleanup in DCMI driver
+to prepare support of crop through g_/s_selection interface in latest
+commit.
+
+This has been tested on STM32F746G-DISCO + STM32F4DIS-CAM extension
+running OV9655 sensor, using a modified version of yavta [2] utility
+to support crop through S_SELECTION(V4L2_SEL_TGT_CROP) ioctl:
+ yavta -s 480x272 -n 1 --capture=2 /dev/video0 --crop=0,0,480,272
+
+v4l2-compliance cropping test is failed due to OV9655 sensor supporting
+several discrete frame sizes and crop support added by DCMI interface [3]:
+  fail: v4l2-test-formats.cpp(1266): node->frmsizes_count[pixfmt] > 1
+    test Cropping: FAIL
+If sensor is restricted to only a single supported resolution, test is OK.
+Compliance test should be adapted to support this case.
+
+
+[1] http://www.mail-archive.com/linux-media at vger.kernel.org/msg114652.html
+[2] http://git.ideasonboard.org/?p=yavta.git;a=summary
+[3] see v4l2-compliance test report below
+
+===========
+= history =
+===========
+version 1:
+  - Initial version
+
+===================
+= v4l2-compliance =
+===================
+Below is the v4l2-compliance report for this current version of the DCMI camera interface.
+v4l2-compliance has been built from v4l-utils-1.12.5.
+
+~ # v4l2-compliance -s -f -d /dev/video0
+v4l2-compliance SHA   : f5f45e17ee98a0ebad7836ade2b34ceec909d751
+
+Driver Info:
+        Driver name   : stm32-dcmi
+        Card type     : STM32 Camera Memory Interface
+        Bus info      : platform:dcmi
+        Driver version: 4.12.0
+        Capabilities  : 0x85200001
+                Video Capture
+                Read/Write
+                Streaming
+                Extended Pix Format
+                Device Capabilities
+        Device Caps   : 0x05200001
+                Video Capture
+                Read/Write
+                Streaming
+                Extended Pix Format
+
+Compliance test for device /dev/video0 (not using libv4l2):
+
+Required ioctls:
+        test VIDIOC_QUERYCAP: OK
+
+Allow for multiple opens:
+        test second video open: OK
+        test VIDIOC_QUERYCAP: OK
+        test VIDIOC_G/S_PRIORITY: OK
+        test for unlimited opens: OK
+
+Debug ioctls:
+        test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
+        test VIDIOC_LOG_STATUS: OK
+
+Input ioctls:
+        test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+        test VIDIOC_ENUMAUDIO: OK (Not Supported)
+        test VIDIOC_G/S/ENUMINPUT: OK
+        test VIDIOC_G/S_AUDIO: OK (Not Supported)
+        Inputs: 1 Audio Inputs: 0 Tuners: 0
+
+Output ioctls:
+        test VIDIOC_G/S_MODULATOR: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_ENUMAUDOUT: OK (Not Supported)
+        test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
+        test VIDIOC_G/S_AUDOUT: OK (Not Supported)
+        Outputs: 0 Audio Outputs: 0 Modulators: 0
+
+Input/Output configuration ioctls:
+        test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+        test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+        test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+        test VIDIOC_G/S_EDID: OK (Not Supported)
+
+Test input 0:
+
+        Control ioctls:
+                test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK
+                test VIDIOC_QUERYCTRL: OK
+                test VIDIOC_G/S_CTRL: OK
+                test VIDIOC_G/S/TRY_EXT_CTRLS: OK
+                test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK
+                test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+                Standard Controls: 2 Private Controls: 0
+
+        Format ioctls:
+                test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+                test VIDIOC_G/S_PARM: OK (Not Supported)
+                test VIDIOC_G_FBUF: OK (Not Supported)
+                test VIDIOC_G_FMT: OK
+                test VIDIOC_TRY_FMT: OK
+                test VIDIOC_S_FMT: OK
+                test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+                fail: v4l2-test-formats.cpp(1266): node->frmsizes_count[pixfmt] > 1
+                test Cropping: FAIL
+                test Composing: OK (Not Supported)
+                fail: v4l2-test-formats.cpp(1633): node->can_scale && node->frmsizes_count[v4l_format_g_pixelformat(&cur)]
+                test Scaling: OK
+
+        Codec ioctls:
+                test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+                test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+                test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+
+        Buffer ioctls:
+                test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+                test VIDIOC_EXPBUF: OK
+
+Test input 0:
+
+Streaming ioctls:
+        test read/write: OK
+        test MMAP: OK
+        test USERPTR: OK (Not Supported)
+        test DMABUF: Cannot test, specify --expbuf-device
+
+Stream using all formats:
+        test MMAP for Format RGBP, Frame Size 160x120:
+                Crop 160x120 at 0x0, Stride 320, Field None: OK
+                Crop 0x0 at 0x0, Stride 320, Field None, SelTest: OK
+                Crop 160x120 at 0x0, Stride 320, Field None, SelTest: OK
+        test MMAP for Format RGBP, Frame Size 160x120:
+                Crop 160x120 at 0x0, Stride 320, Field None: OK
+        test MMAP for Format RGBP, Frame Size 160x120:
+                Crop 160x120 at 0x0, Stride 320, Field None: OK
+
+Total: 51, Succeeded: 50, Failed: 1, Warnings: 0
+
+
+Hugues Fruchet (5):
+  [media] stm32-dcmi: catch dma submission error
+  [media] stm32-dcmi: revisit control register handling
+  [media] stm32-dcmi: cleanup variable/fields namings
+  [media] stm32-dcmi: set default format at open()
+  [media] stm32-dcmi: g_/s_selection crop support
+
+ drivers/media/platform/stm32/stm32-dcmi.c | 527 +++++++++++++++++++++++++-----
+ 1 file changed, 448 insertions(+), 79 deletions(-)
+
 -- 
 1.9.1
