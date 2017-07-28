@@ -1,83 +1,35 @@
-From: sebastien.szymanski@armadeus.com (=?UTF-8?q?S=C3=A9bastien=20Szymanski?=)
-Date: Fri, 28 Jul 2017 10:36:33 +0200
-Subject: [PATCH 1/1] cpufreq: imx6q: imx6ull: use PLL1 for frequency higher
- than 528MHz
-Message-ID: <1501230993-15812-1-git-send-email-sebastien.szymanski@armadeus.com>
+From: cychiang@chromium.org (Cheng-Yi Chiang)
+Date: Fri, 28 Jul 2017 16:42:06 +0800
+Subject: [PATCH] ASoC: Intel: Reset hw_ptr on resume trigger
+Message-ID: <20170728084206.4431-1-cychiang@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setting the frequency higher than 528Mhz actually sets the ARM
-clock to 528MHz. That's because PLL2 is used as the root clock when the
-frequency is higher than 396MHz.
+From: "U. Artie Eoff" <ullysses.a.eoff@intel.com>
 
-cpupower frequency-set -f 792000
+Reset the hw_ptr before queuing the restore_stream_context
+work to eradicate a nasty white audio noise on resume.
 
-arm_clk_root on the CCM_CLKO2 signal is 528MHz instead of 792MHz.
-
-[   61.606383] cpu cpu0: 396 MHz, 1025 mV --> 792 MHz, 1225 mV
-
-pll2                         1  1  528000000 0 0
-   pll2_bypass               1  1  528000000 0 0
-      pll2_bus               3  3  528000000 0 0
-	 ca7_secondary_sel   1  1  528000000 0 0
-	    step             1  1  528000000 0 0
-	       pll1_sw       1  1  528000000 0 0
-		  arm        1  1  528000000 0 0
-
-Fixes this by using the PLL1 as the root clock when the frequency is
-higher than 528MHz.
-
-cpupower frequency-set -f 792000
-
-arm_clk_root on the CCM_CLKO2 signal is now 792MHz as expected.
-
-[   69.717987] cpu cpu0: 198 MHz, 950 mV --> 792 MHz, 1225 mV
-
-pll1               1 1 792000000 0 0
-   pll1_bypass     1 1 792000000 0 0
-      pll1_sys     1 1 792000000 0 0
-	 pll1_sw   1 1 792000000 0 0
-	    arm    1 1 792000000 0 0
-
-Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+Signed-off-by: U. Artie Eoff <ullysses.a.eoff@intel.com>
 ---
- drivers/cpufreq/imx6q-cpufreq.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ sound/soc/intel/baytrail/sst-baytrail-pcm.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index b6edd3c..e5fba50 100644
---- a/drivers/cpufreq/imx6q-cpufreq.c
-+++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -18,6 +18,7 @@
- 
- #define PU_SOC_VOLTAGE_NORMAL	1250000
- #define PU_SOC_VOLTAGE_HIGH	1275000
-+#define FREQ_528_MHZ		528000000
- #define FREQ_1P2_GHZ		1200000000
- 
- static struct regulator *arm_reg;
-@@ -110,14 +111,20 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
- 		 * voltage of 528MHz, so lower the CPU frequency to one
- 		 * half before changing CPU frequency.
- 		 */
--		clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
--		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-+		if ((old_freq * 1000) <= FREQ_528_MHZ) {
-+			clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
-+			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
+diff --git a/sound/soc/intel/baytrail/sst-baytrail-pcm.c b/sound/soc/intel/baytrail/sst-baytrail-pcm.c
+index 4765ad474544..e0db7070cd42 100644
+--- a/sound/soc/intel/baytrail/sst-baytrail-pcm.c
++++ b/sound/soc/intel/baytrail/sst-baytrail-pcm.c
+@@ -187,8 +187,10 @@ static int sst_byt_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
+ 		sst_byt_stream_start(byt, pcm_data->stream, 0);
+ 		break;
+ 	case SNDRV_PCM_TRIGGER_RESUME:
+-		if (pdata->restore_stream == true)
++		if (pdata->restore_stream == true) {
++			pcm_data->hw_ptr = 0;
+ 			schedule_work(&pcm_data->work);
 +		}
- 		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
- 			clk_set_parent(secondary_sel_clk, pll2_bus_clk);
  		else
- 			clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
- 		clk_set_parent(step_clk, secondary_sel_clk);
- 		clk_set_parent(pll1_sw_clk, step_clk);
-+		if (freq_hz > FREQ_528_MHZ) {
-+			clk_set_rate(pll1_sys_clk, freq_hz);
-+			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-+		}
- 	} else {
- 		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
- 		clk_set_parent(pll1_sw_clk, step_clk);
+ 			sst_byt_stream_resume(byt, pcm_data->stream);
+ 		break;
 -- 
-2.7.3
+2.12.2
