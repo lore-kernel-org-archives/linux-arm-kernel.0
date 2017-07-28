@@ -1,31 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 28 Jul 2017 13:46:34 +0100
-Subject: [PATCH] ASoC: Intel: Reset hw_ptr on resume trigger
-In-Reply-To: <20170728084206.4431-1-cychiang@chromium.org>
-References: <20170728084206.4431-1-cychiang@chromium.org>
-Message-ID: <20170728124634.ajonhi3cdbb35qeb@sirena.org.uk>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 28 Jul 2017 14:48:36 +0200
+Subject: [PATCH v6 5/7] drm/rockchip: vop: add a series of vop support
+In-Reply-To: <1501049971-6131-1-git-send-email-mark.yao@rock-chips.com>
+References: <1501049930-5794-1-git-send-email-mark.yao@rock-chips.com>
+ <1501049971-6131-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <3368237.z7l18g54BE@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 04:42:06PM +0800, Cheng-Yi Chiang wrote:
-> From: "U. Artie Eoff" <ullysses.a.eoff@intel.com>
+Am Mittwoch, 26. Juli 2017, 14:19:30 CEST schrieb Mark Yao:
+> Vop Full framework now has following vops:
+> IP version    chipname
+>   3.1           rk3288
+>   3.2           rk3368
+>   3.4           rk3366
+>   3.5           rk3399 big
+>   3.6           rk3399 lit
+>   3.7           rk3228
+>   3.8           rk3328
 > 
-> Reset the hw_ptr before queuing the restore_stream_context
-> work to eradicate a nasty white audio noise on resume.
+> The above IP version is from H/W define, some of vop support get
+> the IP version from VERSION_INFO register, some are not.
+> hardcode the IP version for each vop to identify them.
 > 
-> Signed-off-by: U. Artie Eoff <ullysses.a.eoff@intel.com>
+> major version: used for IP structure, Vop full framework is 3,
+>                vop little framework is 2.
+> minor version: on same structure, newer design vop will bigger
+>                then old one.
+> 
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 
-I can't do anything with this, you've not provided a signoff for it.
-Please see SubmittingPatches for what a signoff means and why it's
-important.
+on rk3036 and rk3288
+Tested-by: Heiko Stuebner <heiko@sntech.de>
 
-Please also try to send your patches to relevant people - you've sent
-this to the ARM kernel list but not to Vinod Koul who's the main
-maintainer for the Intel drivers.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170728/d6f67b24/attachment.sig>
+
+Heiko
