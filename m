@@ -1,132 +1,37 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Fri, 28 Jul 2017 14:13:31 +0100
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170728125416.j7gcgvnxgv2gq73u@tardis>
-References: <20170726.154540.150558937277891719.davem@davemloft.net>
- <20170726231505.GG3730@linux.vnet.ibm.com>
- <20170726.162200.1904949371593276937.davem@davemloft.net>
- <20170727014214.GH3730@linux.vnet.ibm.com>
- <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
- <20170727124913.GL3730@linux.vnet.ibm.com>
- <20170727144903.000022a1@huawei.com>
- <20170727173923.000001b2@huawei.com>
- <20170727165245.GD3730@linux.vnet.ibm.com>
- <20170728084411.00001ddb@huawei.com>
- <20170728125416.j7gcgvnxgv2gq73u@tardis>
-Message-ID: <20170728141331.00006a10@huawei.com>
+From: pure.logic@nexus-software.ie (Bryan O'Donoghue)
+Date: Fri, 28 Jul 2017 14:22:57 +0100
+Subject: [PATCH] mtd: nand: sunxi: fix potential divide-by-zero error
+Message-ID: <1501248177-575-1-git-send-email-pure.logic@nexus-software.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Jul 2017 20:54:16 +0800
-Boqun Feng <boqun.feng@gmail.com> wrote:
+clk_round_rate() can return <= 0. Currently the value returned by
+clk_round_rate() is used directly for a division. This patch introduces a
+guard to ensure a divide-by-zero or a divide by a negative number for that
+matter can't happen by bugging out returning -EINVAL if clk_round_rate()
+returns <= 0.
 
-> Hi Jonathan,
-> 
-> FWIW, there is wakeup-missing issue in swake_up() and swake_up_all():
-> 
-> 	https://marc.info/?l=linux-kernel&m=149750022019663
-> 
-> and RCU begins to use swait/wake last year, so I thought this could be
-> relevant.
-> 
-> Could you try the following patch and see if it works? Thanks.
-Sadly seems to be a no...  Just splatted before I could even get
-the tracing set up. Back to staring at logs and hoping something
-will stand out!
+Fixes: 2d43457f79e4 ("mtd: nand: sunxi: fix EDO mode selection")
 
-Jonathan
-> 
-> Regards,
-> Boqun
-> 
-> ------------------>8  
-> Subject: [PATCH] swait: Remove the lockless swait_active() check in
->  swake_up*()
-> 
-> Steven Rostedt reported a potential race in RCU core because of
-> swake_up():
-> 
->         CPU0                            CPU1
->         ----                            ----
->                                 __call_rcu_core() {
-> 
->                                  spin_lock(rnp_root)
->                                  need_wake = __rcu_start_gp() {
->                                   rcu_start_gp_advanced() {
->                                    gp_flags = FLAG_INIT
->                                   }
->                                  }
-> 
->  rcu_gp_kthread() {
->    swait_event_interruptible(wq,
->         gp_flags & FLAG_INIT) {
->    spin_lock(q->lock)
-> 
->                                 *fetch wq->task_list here! *
-> 
->    list_add(wq->task_list, q->task_list)
->    spin_unlock(q->lock);
-> 
->    *fetch old value of gp_flags here *
-> 
->                                  spin_unlock(rnp_root)
-> 
->                                  rcu_gp_kthread_wake() {
->                                   swake_up(wq) {
->                                    swait_active(wq) {
->                                     list_empty(wq->task_list)
-> 
->                                    } * return false *
-> 
->   if (condition) * false *
->     schedule();
-> 
-> In this case, a wakeup is missed, which could cause the rcu_gp_kthread
-> waits for a long time.
-> 
-> The reason of this is that we do a lockless swait_active() check in
-> swake_up(). To fix this, we can either 1) add a smp_mb() in swake_up()
-> before swait_active() to provide the proper order or 2) simply remove
-> the swait_active() in swake_up().
-> 
-> The solution 2 not only fixes this problem but also keeps the swait and
-> wait API as close as possible, as wake_up() doesn't provide a full
-> barrier and doesn't do a lockless check of the wait queue either.
-> Moreover, there are users already using swait_active() to do their quick
-> checks for the wait queues, so it make less sense that swake_up() and
-> swake_up_all() do this on their own.
-> 
-> This patch then removes the lockless swait_active() check in swake_up()
-> and swake_up_all().
-> 
-> Reported-by: Steven Rostedt <rostedt@goodmis.org>
-> Signed-off-by: Boqun Feng <boqun.feng@gmail.com>
-> ---
->  kernel/sched/swait.c | 6 ------
->  1 file changed, 6 deletions(-)
-> 
-> diff --git a/kernel/sched/swait.c b/kernel/sched/swait.c
-> index 3d5610dcce11..2227e183e202 100644
-> --- a/kernel/sched/swait.c
-> +++ b/kernel/sched/swait.c
-> @@ -33,9 +33,6 @@ void swake_up(struct swait_queue_head *q)
->  {
->  	unsigned long flags;
->  
-> -	if (!swait_active(q))
-> -		return;
-> -
->  	raw_spin_lock_irqsave(&q->lock, flags);
->  	swake_up_locked(q);
->  	raw_spin_unlock_irqrestore(&q->lock, flags);
-> @@ -51,9 +48,6 @@ void swake_up_all(struct swait_queue_head *q)
->  	struct swait_queue *curr;
->  	LIST_HEAD(tmp);
->  
-> -	if (!swait_active(q))
-> -		return;
-> -
->  	raw_spin_lock_irq(&q->lock);
->  	list_splice_init(&q->task_list, &tmp);
->  	while (!list_empty(&tmp)) {
+Signed-off-by: Bryan O'Donoghue <pure.logic@nexus-software.ie>
+---
+ drivers/mtd/nand/sunxi_nand.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index d0b6f8f..6abd142 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -1728,6 +1728,10 @@ static int sunxi_nfc_setup_data_interface(struct mtd_info *mtd, int csline,
+ 	 */
+ 	chip->clk_rate = NSEC_PER_SEC / min_clk_period;
+ 	real_clk_rate = clk_round_rate(nfc->mod_clk, chip->clk_rate);
++	if (real_clk_rate <= 0) {
++		dev_err(nfc->dev, "Unable to round clk %lu\n", chip->clk_rate);
++		return -EINVAL;
++	}
+ 
+ 	/*
+ 	 * ONFI specification 3.1, paragraph 4.15.2 dictates that EDO data
+-- 
+2.7.4
