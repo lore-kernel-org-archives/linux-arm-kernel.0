@@ -1,136 +1,79 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 28 Jul 2017 16:55:36 +0100
-Subject: [PATCH 0/4] ACPI: DMA ranges management
-In-Reply-To: <20170728140956.GA21569@red-moon>
-References: <20170720144517.32529-1-lorenzo.pieralisi@arm.com>
- <7df11172-5a40-685f-5202-9a0bceb6e19b@codeaurora.org>
- <c09352cc-e1a2-a494-c457-dc3ea275f504@arm.com>
- <20170726153519.GA4696@red-moon>
- <eb81a7c6-b62b-8e02-8f22-a7fda7e403ce@arm.com>
- <20170728140956.GA21569@red-moon>
-Message-ID: <c6edb652-d13c-e21f-1cef-01ced2b08c05@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 28 Jul 2017 16:58:27 +0100
+Subject: [PATCH] drm: hdlcd: allow HDLCD to be used without interrupt
+In-Reply-To: <20170728152311.GA970@e110455-lin.cambridge.arm.com>
+References: <E1daJCF-0003pG-DI@rmk-PC.armlinux.org.uk>
+ <20170726102748.GM31807@n2100.armlinux.org.uk>
+ <20170728152311.GA970@e110455-lin.cambridge.arm.com>
+Message-ID: <20170728155827.GV31807@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/07/17 15:09, Lorenzo Pieralisi wrote:
-> On Fri, Jul 28, 2017 at 02:08:01PM +0100, Robin Murphy wrote:
+On Fri, Jul 28, 2017 at 04:23:11PM +0100, Liviu Dudau wrote:
+> On Wed, Jul 26, 2017 at 11:27:48AM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Jul 26, 2017 at 11:05:39AM +0100, Russell King wrote:
+> > > Some ARM platforms do not wire the HDLCD interrupt.  Allow hdlcd to
+> > > initialise without an interrupt present.
+> > > 
+> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > 
 > 
-> [...]
+> Hi Russell,
 > 
->>>>> To ensure that dma_set_mask() and friends actually respect _DMA, would
->>>>> you consider introducing a dma_supported() callback to check the input
->>>>> dma_mask against the FW defined limits? This would end up aggressively
->>>>> clipping the dma_mask to 32-bits for devices like the above if the _DMA
->>>>> limit was less than 64-bits, but that is probably preferable to the
->>>>> controller accessing unintended addresses.
->>>>>
->>>>> Also, how would you feel about adding support for the IORT named_node
->>>>> memory_address_limit field?
->>>>
->>>> We will certainly need that for some platform devices, so if you fancy
->>>> giving it a go before Lorenzo or I get there, feel free!
->>>
->>> I can do it for v2 but I would like to understand why using _DMA is
->>> not good enough for named components - having two bindings describing
->>> the same thing is not ideal and I'd rather avoid it - if there is
->>> a reason I am happy to add the necessary code.
->>
->> My interpretation of "_DMA is only defined under devices that represent
->> buses." (ACPI 6.0, section 6.2.4) is that "devices that represent buses"
->> are those that have other device objects as children.
+> Sorry for my silence, I was on holiday this week and just came back
+> today.
 > 
-> Well if that was the case we would not be able to use _DMA for
-> eg PNP0A03 PCI host bridges that have no child ACPI devices, which
-> defeats the whole purpose of what I am doing.
+> > This isn't fully functional on ARM MPS platforms yet, but at least
+> > gets us further.  Without any display connected:
+> > 
+> > [   14.315986] [drm] found ARM HDLCD version r0p0
+> > [   14.557038] tda998x 2-0070: found TDA19988
+> > [   14.622232] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
+> > [   14.630406] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+> > [   14.639335] [drm] No driver support for vblank timestamp query.
+> > [   14.653210] [drm] Cannot find any crtc or sizes - going 1024x768
+> > [   15.232556] hdlcd 40205000.hdlcd: fb0:  frame buffer device
+> > [   15.284076] [drm] Initialized hdlcd 1.0.0 20151021 for 40205000.hdlcd on minor 0
+> > 
+> > With a TV connected, the driver doesn't initialise:
+> > 
+> > [   14.422810] [drm] found ARM HDLCD version r0p0
+> > [   14.657227] tda998x 2-0070: found TDA19988
+> > [   14.722439] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
+> > [   14.730613] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+> > [   14.739538] [drm] No driver support for vblank timestamp query.
+> > [   15.311977] hdlcd 40205000.hdlcd: Failed to set initial hw configuration.
+> > [   15.357402] hdlcd 40205000.hdlcd: master bind failed: -12
+> > [   15.365082] tda998x: probe of 2-0070 failed with error -12
+> > 
+> > I don't think this is correct behaviour - if we fail to set an initial
+> > configuration (which will be based on the resolution of the connected
+> > display) why should the driver fail to probe - it's not that there is
+> > no device, it's (in this case) that there aren't the resources for the
+> > chosen mode.  Userspace could always try setting a different mode.
+> > 
+> > I suspect the above failure is down to either (a) not having enough
+> > memory available to allocate a 1920x1080 frame buffer, or (b) not
+> > (yet) being able to program the hdlcd pixel clock for this platform,
+> > which is currently hard-coded in DT at 23.75MHz.
 > 
-> The question here is what the _DMA object binding exactly means when
-> it refers to a "bus" and that's something I will figure out (and possibly
-> change) ASAP.
-> 
->> In other words (excuse my novice pseudo-ASL), this would be valid:
->>
->> Scope(_SB)
->> {
->> 	Device (Bus)
->> 	{
->> 		...
->> 		Method (_DMA ... )
->> 		Device (Dev1)
->> 		{
->> 			...
->> 		}
->> 	}
->> }
->>
->> but this should be invalid:
->>
->> Scope(_SB)
->> {
->> 	Device (Dev2)
->> 	{
->> 		...
->> 		Method (_DMA ... )
->> 	}
->> }
-> 
-> Not sure about that (see above) and I agree that's what needs
-> clarification.
-> 
->> Thus in the case where Dev2 is wired directly to an SMMU input, but
->> fewer address bits are wired up between the two than both the device and
->> SMMU interfaces are capable of, memory address limit is enough to
->> describe that without having to insert a fake "bus" object above it just
->> to hold the _DMA method.
-> 
-> BTW, how would you describe that in DT ? A "dma-ranges" property in the
-> device DT node right ? Arguably "dma-ranges" was not meant to be used
-> like that either ;-)
+> I don't think it is the clock, if that fails then you would not see the
+> r0p0 version number being printed. Due to the fact that until now HDLCD
+> has run mostly on platforms that have SCP, which takes care of actual
+> setup of the clocks, it is pretty lax on errors on pixel clock setup.
 
-I believe that in real Open Firmware, the full PCI hierarchy is
-described in the device tree - I had assumed that ACPI expected the
-equivalent (i.e. the firmware probes PCI and assigns resources, so
-bridges/endpoints/etc. would be represented in the namespace with
-appropriate _CRS), thus the "bus with invisible children" case would
-only need to apply to DT. In terms of DTspec, it does not say that
-"dma-ranges" cannot be present on nodes without children, but that *is*
-implied of #address-cells and #size cells, so there does exist a similar
-ambiguity about what exactly counts as "a memory-mapped bus whose
-devicetree parent can be accessed from DMA operations originating from
-the bus". Certainly in the current Linux code, of_dma_configure()
-*doesn't* parse "dma-ranges" on leaf nodes (which is an open problem for
-some PCI host bridges in extant FDTs).
+Note, however, that in this case, the clock is a fixed frequency clock.
+I wasn't meaning a failure to obtain the clock, I was meaning a failure
+to set the appropriate rate.
 
-As for the case of straightforward interconnect widths/offsets (rather
-than potentially arbitrary windows), the 'fake bus' notion is already
-alive and well:
+> Also, may I ask what MPS platform you are trying to use? I might be able
+> to source one internally and try to reproduce your problems.
 
-$ git grep 'soc {' arch/arm*/boot/dts
+I'll point you in the direction of Ian Rickards in ARM for that
+information.  (I'm not sure if I can mention the board publically
+yet as its early days...)
 
-and the current "dma-ranges" users thankfully have consistent-enough
-topologies that they don't need to get much crazier than that.
-
-(side note: up at the other end, I'm not entirely convinced that what I
-did for Juno is actually legal either)
-
-> Long and short of it is: I do not like having two ways of describing
-> the same thing. I agree that the _DMA object usage requires
-> clarifications from a spec point of view but I want to do that before
-> plugging in code that may use bindings inconsistently.
-
-I'd still argue that they are describing different things, just that one
-(the number of address bits wired up between a device and an SMMU)
-happens to be possible to describe as a subset of the other (an
-arbitrary mapping between two address spaces). The use-cases don't
-entirely overlap either - the information in _DMA is also likely to be
-wanted by non-ECAM PCI host controller drivers to configure their
-inbound windows, irrespective of anything to do with IOMMUs, whereas
-IORT code in hypervisors or other situations without a full ACPI
-namespace available may need to make decisions that the device memory
-address size limit is necessary for (well, that's the argument I've
-heard anyway).
-> I will flag this up at ACPI spec level as soon as possible and get this
-> sorted.
-
-Agreed.
-
-Robin.
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
