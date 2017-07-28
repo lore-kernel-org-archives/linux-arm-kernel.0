@@ -1,52 +1,57 @@
 From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Fri, 28 Jul 2017 10:57:55 +0800
+Date: Fri, 28 Jul 2017 11:00:49 +0800
 Subject: [PATCH v7 2/3] PCI: Enable PCIe Relaxed Ordering if supported
-In-Reply-To: <20170727184251.GA205508@otc-nc-03>
-References: <67be791f-e0cf-8284-9229-17174dc741ef@codeaurora.org>
+In-Reply-To: <CAKgT0UcqdRCwDDxD=22Q_jLuqz8KVHwH1-V45Aq-1WzQw=agcA@mail.gmail.com>
+References: <1499955692-26556-1-git-send-email-dingtianhong@huawei.com>
+ <1499955692-26556-3-git-send-email-dingtianhong@huawei.com>
+ <e496ff1d-b836-ebef-fdf7-76273aaaaef6@codeaurora.org>
+ <0260e398-bd8e-6615-6d5c-1f7c07b6fc09@huawei.com>
+ <67be791f-e0cf-8284-9229-17174dc741ef@codeaurora.org>
  <5f9b8bfb-41a8-a17c-6fea-581aec1d5573@huawei.com>
  <20170724090516.2e0f0d2a@w520.home>
  <MWHPR12MB1600065968964410EDFBDA3BC8B90@MWHPR12MB1600.namprd12.prod.outlook.com>
- <CAKgT0UeAad6WArvrE71MFJywDs1wOnCF-iJRnbNLrL+knqhXeA@mail.gmail.com>
- <CAKgT0Uf5hdXUXja_jUB6_kBg6pyX8zXuOMOGzCVNgeBFMUsWqQ@mail.gmail.com>
- <CAKgT0Udn2vh6NaqZyiF69nXVnz2sT=e0ZgiDjWznhGZz-Gk+qQ@mail.gmail.com>
- <MWHPR12MB16007782C422082A92F4765DC8B90@MWHPR12MB1600.namprd12.prod.outlook.com>
- <2feff1a5-25b7-eb6c-7628-7c2257c56e95@huawei.com>
- <MWHPR12MB1600556FFDCE3EC810D97591C8BE0@MWHPR12MB1600.namprd12.prod.outlook.com>
- <20170727184251.GA205508@otc-nc-03>
-Message-ID: <3e8a1756-86ca-0fa0-7119-b0bdfe806e8e@huawei.com>
+ <75213fca-4522-2297-3cb8-338e643d3552@huawei.com>
+ <CAKgT0UcqdRCwDDxD=22Q_jLuqz8KVHwH1-V45Aq-1WzQw=agcA@mail.gmail.com>
+Message-ID: <14218972-553d-eb60-0207-460ac7f4b064@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2017/7/28 2:42, Raj, Ashok wrote:
-> Hi Casey
+On 2017/7/28 1:49, Alexander Duyck wrote:
+> On Wed, Jul 26, 2017 at 6:08 PM, Ding Tianhong <dingtianhong@huawei.com> wrote:
+>>
+>>
+>> On 2017/7/27 2:26, Casey Leedom wrote:
+>>>   By the way Ding, two issues:
+>>>
+>>>  1. Did we ever get any acknowledgement from either Intel or AMD
+>>>     on this patch?  I know that we can't ensure that, but it sure would
+>>>     be nice since the PCI Quirks that we're putting in affect their
+>>>     products.
+>>>
+>>
+>> Still no Intel and AMD guys has ack this, this is what I am worried about, should I
+>> ping some man again ?
+>>
+>> Thanks
+>> Ding
 > 
->> | Still no Intel and AMD guys has ack this, this is what I am worried about,
->> | should I ping some man again ?
 > 
+> I probably wouldn't worry about it too much. If anything all this
+> patch is doing is disabling relaxed ordering on the platforms we know
+> have issues based on what Casey originally had. If nothing else we can
+> follow up once the patches are in the kernel and if somebody has an
+> issue then.
 > 
-> I can ack the patch set for Intel specific changes. Now that the doc is made
-> public :-).
+> You can include my acked-by, but it is mostly related to how this
+> interacts with NICs, and not so much about the PCI chipsets
+> themselves.
+> 
+> Acked-by: Alexander Duyck <alexander.h.duyck@intel.com>
 > 
 
-Good, Thanks. :)
+Thanks, Alex. :)
 
-> Can you/Ding resend the patch series, i do have the most recent v7, some
-> of the commit message wasn't easy to ready. Seems like this patch has
-> gotten bigger than originally intended, but seems to be for the overall
-> good :-).
-> 
-
-OK, I will send v8 patch set and which will update the patch title and add
-Casey's new modification for his vf driver, thanks.
-
-Ding
-
-> Sorry for staying silent up until now.
-> 
-> Cheers,
-> Ashok
-> 
 > .
 > 
