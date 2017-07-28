@@ -1,67 +1,49 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 28 Jul 2017 23:53:49 +0200
-Subject: [RFC PATCH v1] net: ethernet: nb8800: Reset HW block in ndo_open
-In-Reply-To: <yw1xfudgl7am.fsf@mansr.com>
-References: <823b1540-b528-bbd7-7f99-5dc39a08868a@sigmadesigns.com>
- <yw1xk22slemx.fsf@mansr.com>
- <c1bf54ee-8634-23a1-abda-55bc3fafe2a8@sigmadesigns.com>
- <yw1xfudgl7am.fsf@mansr.com>
-Message-ID: <446e3a95-80c3-0742-9cb1-69a8dfc9b1ae@free.fr>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 29 Jul 2017 00:14:09 +0200
+Subject: [PATCH v4 09/12] ASoC: wm9712: add ac97 new bus support
+In-Reply-To: <20170725102057.hblyopxycgz55mr7@localhost.localdomain> (Charles
+ Keepax's message of "Tue, 25 Jul 2017 11:20:57 +0100")
+References: <20170724204928.29505-1-robert.jarzmik@free.fr>
+ <20170724204928.29505-10-robert.jarzmik@free.fr>
+ <20170725102057.hblyopxycgz55mr7@localhost.localdomain>
+Message-ID: <8760ecqkem.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/07/2017 20:56, M?ns Rullg?rd wrote:
+Charles Keepax <ckeepax@opensource.cirrus.com> writes:
 
-> Marc Gonzalez writes:
-> 
->> On 28/07/2017 18:17, M?ns Rullg?rd wrote:
->>
->>> Marc Gonzalez wrote:
->>>
->>>> ndo_stop breaks RX in a way that ndo_open is unable to undo.
->>>
->>> Please elaborate.  Why can't it be fixed in a less heavy-handed way?
->>
->> I'm not sure what "elaborate" means. After we've been through
->> ndo_stop once, the board can send packets, but it doesn't see
->> any replies from remote systems. RX is wedged.
-> 
-> So you say, but you have not explained why this happens.  Until we know
-> why, we can't decide on the proper fix.
+> On Mon, Jul 24, 2017 at 10:49:25PM +0200, Robert Jarzmik wrote:
+>> Add support for the new ac97 bus model, where devices are automatically
+>> discovered on AC-Links.
+>> 
+>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>> ---
+>> +	} else {
+>> +		wm9712->ac97 = snd_soc_new_ac97_codec(codec, WM9712_VENDOR_ID,
+>> +						      WM9712_VENDOR_ID_MASK);
+>> +		if (IS_ERR(wm9712->ac97)) {
+>> +			ret = PTR_ERR(wm9712->ac97);
+>> +			dev_err(codec->dev,
+>> +				"Failed to register AC97 codec: %d\n", ret);
+>> +			return ret;
+>> +		}
+>> +
+>> +		regmap = regmap_init_ac97(wm9712->ac97, &wm9712_regmap_config);
+>> +		if (IS_ERR(regmap)) {
+>> +			ret = PTR_ERR(regmap);
+>> +			goto err_free_ac97_codec;
+>
+> For the 9713 you had this wrapped in an ifdef? Why did it need an
+> ifdef there but doesn't for this driver?
+I have forgotten the ifdef, it's a very good catch, thanks.
+The trick is that in :
+  - include/sound/soc.h
+  - snd_soc_new_ac97_codec() is only defined under this ifdef
 
-I'll try adding delays in strategic places, and see if
-I can trigger the same bug on tango4. If I can't, then
-this work around is all we've got.
+And with the new ac97 bus support, these drivers can be compiled now with
+CONFIG_SND_SOC_AC97_BUS not defined, so I need to add the ifdef.
 
-And I need nb8800_init for resume anyway, so I might
-as well use it in ndo_open.
+Cheers.
 
-TODO: test power savings from holding HW in reset.
-
->> I think ndo_stop is rare enough an event that doing a full
->> reset is not an issue, in terms of performance.
-> 
-> Performance isn't the issue.  Doing the right thing is.
-
-I don't have always have time to figure out exactly how
-broken HW is broken. It's already bad enough that disabling
-DMA requires sending a fake packet through the loop back...
-
-
->>> I'm pretty sure this doesn't preserve everything it should.
->>
->> Hmmm, we're supposed to start fresh ("full reset").
->> What could there be to preserve?
->> You mentioned flow control and multicast elsewhere.
->> I will take a closer look. Thanks for the heads up.
-> 
-> Yes, those settings are definitely lost with your patch.  Now I'm not
-> sure whether the networking core expects these to survive a stop/start
-> cycle, so please check that.  There might also be other less obvious
-> things that need to be preserved.
-
-The original code calls nb8800_pause_config() every
-time the link comes up. The proposed patch doesn't
-change that.
-
-Regards.
+-- 
+Robert
