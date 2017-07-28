@@ -1,83 +1,104 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 28 Jul 2017 18:32:28 +0200
-Subject: [PATCH] clk: meson: mpll: fix mpll0 fractional part ignored
-Message-ID: <20170728163228.10879-1-jbrunet@baylibre.com>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Fri, 28 Jul 2017 17:32:48 +0100
+Subject: [PATCH] drm: hdlcd: allow HDLCD to be used without interrupt
+In-Reply-To: <20170728155827.GV31807@n2100.armlinux.org.uk>
+References: <E1daJCF-0003pG-DI@rmk-PC.armlinux.org.uk>
+ <20170726102748.GM31807@n2100.armlinux.org.uk>
+ <20170728152311.GA970@e110455-lin.cambridge.arm.com>
+ <20170728155827.GV31807@n2100.armlinux.org.uk>
+Message-ID: <20170728163248.GG970@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mpll0 clock is special compared to the other mplls. It needs another
-bit (ssen) to be set to activate the fractional part the mpll divider
+On Fri, Jul 28, 2017 at 04:58:27PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jul 28, 2017 at 04:23:11PM +0100, Liviu Dudau wrote:
+> > On Wed, Jul 26, 2017 at 11:27:48AM +0100, Russell King - ARM Linux wrote:
+> > > On Wed, Jul 26, 2017 at 11:05:39AM +0100, Russell King wrote:
+> > > > Some ARM platforms do not wire the HDLCD interrupt.  Allow hdlcd to
+> > > > initialise without an interrupt present.
+> > > > 
+> > > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > > 
+> > 
+> > Hi Russell,
+> > 
+> > Sorry for my silence, I was on holiday this week and just came back
+> > today.
+> > 
+> > > This isn't fully functional on ARM MPS platforms yet, but at least
+> > > gets us further.  Without any display connected:
+> > > 
+> > > [   14.315986] [drm] found ARM HDLCD version r0p0
+> > > [   14.557038] tda998x 2-0070: found TDA19988
+> > > [   14.622232] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
+> > > [   14.630406] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+> > > [   14.639335] [drm] No driver support for vblank timestamp query.
+> > > [   14.653210] [drm] Cannot find any crtc or sizes - going 1024x768
+> > > [   15.232556] hdlcd 40205000.hdlcd: fb0:  frame buffer device
+> > > [   15.284076] [drm] Initialized hdlcd 1.0.0 20151021 for 40205000.hdlcd on minor 0
+> > > 
+> > > With a TV connected, the driver doesn't initialise:
+> > > 
+> > > [   14.422810] [drm] found ARM HDLCD version r0p0
+> > > [   14.657227] tda998x 2-0070: found TDA19988
+> > > [   14.722439] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
+> > > [   14.730613] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+> > > [   14.739538] [drm] No driver support for vblank timestamp query.
+> > > [   15.311977] hdlcd 40205000.hdlcd: Failed to set initial hw configuration.
+> > > [   15.357402] hdlcd 40205000.hdlcd: master bind failed: -12
+> > > [   15.365082] tda998x: probe of 2-0070 failed with error -12
+> > > 
+> > > I don't think this is correct behaviour - if we fail to set an initial
+> > > configuration (which will be based on the resolution of the connected
+> > > display) why should the driver fail to probe - it's not that there is
+> > > no device, it's (in this case) that there aren't the resources for the
+> > > chosen mode.  Userspace could always try setting a different mode.
+> > > 
+> > > I suspect the above failure is down to either (a) not having enough
+> > > memory available to allocate a 1920x1080 frame buffer, or (b) not
+> > > (yet) being able to program the hdlcd pixel clock for this platform,
+> > > which is currently hard-coded in DT at 23.75MHz.
+> > 
+> > I don't think it is the clock, if that fails then you would not see the
+> > r0p0 version number being printed. Due to the fact that until now HDLCD
+> > has run mostly on platforms that have SCP, which takes care of actual
+> > setup of the clocks, it is pretty lax on errors on pixel clock setup.
+> 
+> Note, however, that in this case, the clock is a fixed frequency clock.
+> I wasn't meaning a failure to obtain the clock, I was meaning a failure
+> to set the appropriate rate.
 
-Fixes: 007e6e5c5f01 ("clk: meson: mpll: add rw operation")
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- drivers/clk/meson/clk-mpll.c | 7 +++++++
- drivers/clk/meson/clkc.h     | 1 +
- drivers/clk/meson/gxbb.c     | 5 +++++
- drivers/clk/meson/meson8b.c  | 5 +++++
- 4 files changed, 18 insertions(+)
+Yeah, we both meant the same thing. :) HDLCD is not checking that
+strictly that the appropriate rate was set, although looking into
+hdlcd_crtc_atomic_check() we do return -EINVAL if the set rate differs
+from what the mode wants. Maybe add a printk there to see if you hit
+that case?
 
-diff --git a/drivers/clk/meson/clk-mpll.c b/drivers/clk/meson/clk-mpll.c
-index 39eab69fe51a..44a5a535ca63 100644
---- a/drivers/clk/meson/clk-mpll.c
-+++ b/drivers/clk/meson/clk-mpll.c
-@@ -161,6 +161,13 @@ static int mpll_set_rate(struct clk_hw *hw,
- 	reg = PARM_SET(p->width, p->shift, reg, 1);
- 	writel(reg, mpll->base + p->reg_off);
- 
-+	p = &mpll->ssen;
-+	if (p->width != 0) {
-+		reg = readl(mpll->base + p->reg_off);
-+		reg = PARM_SET(p->width, p->shift, reg, 1);
-+		writel(reg, mpll->base + p->reg_off);
-+	}
-+
- 	p = &mpll->n2;
- 	reg = readl(mpll->base + p->reg_off);
- 	reg = PARM_SET(p->width, p->shift, reg, n2);
-diff --git a/drivers/clk/meson/clkc.h b/drivers/clk/meson/clkc.h
-index d6feafe8bd6c..1629da9b4141 100644
---- a/drivers/clk/meson/clkc.h
-+++ b/drivers/clk/meson/clkc.h
-@@ -118,6 +118,7 @@ struct meson_clk_mpll {
- 	struct parm sdm_en;
- 	struct parm n2;
- 	struct parm en;
-+	struct parm ssen;
- 	spinlock_t *lock;
- };
- 
-diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-index 59a296b119ea..79b195b4df03 100644
---- a/drivers/clk/meson/gxbb.c
-+++ b/drivers/clk/meson/gxbb.c
-@@ -528,6 +528,11 @@ static struct meson_clk_mpll gxbb_mpll0 = {
- 		.shift   = 14,
- 		.width	 = 1,
- 	},
-+	.ssen = {
-+		.reg_off = HHI_MPLL_CNTL,
-+		.shift   = 25,
-+		.width	 = 1,
-+	},
- 	.lock = &clk_lock,
- 	.hw.init = &(struct clk_init_data){
- 		.name = "mpll0",
-diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
-index bb3f1de876b1..6ec512ad2598 100644
---- a/drivers/clk/meson/meson8b.c
-+++ b/drivers/clk/meson/meson8b.c
-@@ -267,6 +267,11 @@ static struct meson_clk_mpll meson8b_mpll0 = {
- 		.shift   = 14,
- 		.width   = 1,
- 	},
-+	.ssen = {
-+		.reg_off = HHI_MPLL_CNTL,
-+		.shift   = 25,
-+		.width   = 1,
-+	},
- 	.lock = &clk_lock,
- 	.hw.init = &(struct clk_init_data){
- 		.name = "mpll0",
+> 
+> > Also, may I ask what MPS platform you are trying to use? I might be able
+> > to source one internally and try to reproduce your problems.
+> 
+> I'll point you in the direction of Ian Rickards in ARM for that
+> information.  (I'm not sure if I can mention the board publically
+> yet as its early days...)
+
+Thanks, I'll get in touch with Ian.
+
+Best regards,
+Liviu
+
+> 
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
+
 -- 
-2.9.4
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
