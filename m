@@ -1,34 +1,40 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 28 Jul 2017 09:40:58 -0700
-Subject: [PATCH v2 4/5] clk: qcom: gcc-msm8996: Mark
- gcc_mmss_noc_cfg_ahb_clk as a critical clock
-In-Reply-To: <319a0d15-354b-946b-da27-41d56fa0bb21@codeaurora.org>
+Date: Fri, 28 Jul 2017 09:42:59 -0700
+Subject: [PATCH v2 1/5] arm64: qcom: Select PM_GENERIC_DOMAINS
+In-Reply-To: <1500526099-9935-2-git-send-email-rnayak@codeaurora.org>
 References: <1500526099-9935-1-git-send-email-rnayak@codeaurora.org>
- <1500526099-9935-5-git-send-email-rnayak@codeaurora.org>
- <20170727225130.GQ2146@codeaurora.org>
- <319a0d15-354b-946b-da27-41d56fa0bb21@codeaurora.org>
-Message-ID: <20170728164058.GC2146@codeaurora.org>
+ <1500526099-9935-2-git-send-email-rnayak@codeaurora.org>
+Message-ID: <20170728164259.GD2146@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28, Rajendra Nayak wrote:
+On 07/20, Rajendra Nayak wrote:
+> Enable PM_GENERIC_DOMAINS for 64-bit qualcomm platforms. This is required
+> to ensure devices which are dependent on some gdscs (powerdomains) to be
+> powered on before they can be probed, work as expected.
 > 
-> On 07/28/2017 04:21 AM, Stephen Boyd wrote:
-> > On 07/20, Rajendra Nayak wrote:
-> >> we have gcc_mmss_noc_cfg_ahb_clk marked with a CLK_IGNORE_UNUSED. While
-> >> this can prevent it from being disabled while its unused, it does not
-> >> prevent it from being disabled when a child derived from the clock calls
-> >> an explicit enable/disable.
-> > 
-> > Do you mean the config_noc_clk_src is being disabled? Who is
-> 
-> I think the issue I saw was after I switched the parent from
-> config_noc_clk_src to the RPM controlled cnoc_clk. That had to
-> be kept voted, else some other ahb clock derived from it being
-> disabled was causing the vote on cnoc_clk to be dropped.
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> ---
 
-Hmm ok. Maybe we have some sort of bus driver vote from the
-multimedia clk driver in downstream code? Let me check.
+Maybe Andy can ack this? It's ARCH_QCOM specific anyway.
+
+>  arch/arm64/Kconfig.platforms | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> index f5f0c81..e3de82d 100644
+> --- a/arch/arm64/Kconfig.platforms
+> +++ b/arch/arm64/Kconfig.platforms
+> @@ -133,6 +133,8 @@ config ARCH_QCOM
+>  	bool "Qualcomm Platforms"
+>  	select GPIOLIB
+>  	select PINCTRL
+> +	select PM
+> +	select PM_GENERIC_DOMAINS
+>  	help
+>  	  This enables support for the ARMv8 based Qualcomm chipsets.
+>  
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
