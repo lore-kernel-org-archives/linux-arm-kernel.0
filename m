@@ -1,65 +1,97 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 28 Jul 2017 18:19:15 -0500
-Subject: [PATCH 3/6] ARM: dts: keystone-k2e: Add DSP node
+Date: Fri, 28 Jul 2017 18:19:16 -0500
+Subject: [PATCH 4/6] ARM: dts: keystone-k2hk-evm: Add and enable common DSP
+ CMA memory pool
 In-Reply-To: <20170728231918.16778-1-s-anna@ti.com>
 References: <20170728231918.16778-1-s-anna@ti.com>
-Message-ID: <20170728231918.16778-4-s-anna@ti.com>
+Message-ID: <20170728231918.16778-5-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Keystone 2 66AK2E SoC has one TMS320C66x DSP Core Subsystem
-(C66x CorePac), with a 1.4 GHz C66x Fixed or Floating-Point DSP
-Core, and 32 KB of L1P & L1D SRAMs and a 1 MB L2 SRAM. Add the
-DT node for this DSP processor sub-system. The processor does
-not have a MMU, and uses various IPC Generation registers and
-shared memory for inter-processor communication. The alias with
-a stem 'rproc' has also been added for the DSP, it provides a
-fixed remoteproc id for the DSP processor.
+From: Sam Nelson <sam.nelson@ti.com>
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
+A common CMA memory pool reserved memory node is added, and is attached
+to all the DSP nodes through the 'memory-region' property on the 66AK2H
+EVM board. This area will be used for allocating virtio rings and buffers.
+The common node allows the DSP Memory Protection and Address Extension
+(MPAX) module to be configured uniformly across all the DSP processors.
+
+The reserved memory node and all the user DSP nodes are also marked okay
+to enable the DSPs on the 66AK2K EVM board.
+
 Signed-off-by: Sam Nelson <sam.nelson@ti.com>
-Signed-off-by: Andrew F. Davis <afd@ti.com>
+Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/boot/dts/keystone-k2e.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/keystone-k2hk-evm.dts | 53 +++++++++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
 
-diff --git a/arch/arm/boot/dts/keystone-k2e.dtsi b/arch/arm/boot/dts/keystone-k2e.dtsi
-index 0dd4cdd6d40c..819ab8345916 100644
---- a/arch/arm/boot/dts/keystone-k2e.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2e.dtsi
-@@ -45,6 +45,10 @@
- 		};
- 	};
+diff --git a/arch/arm/boot/dts/keystone-k2hk-evm.dts b/arch/arm/boot/dts/keystone-k2hk-evm.dts
+index 2156ff92d08f..6dd13b98aaba 100644
+--- a/arch/arm/boot/dts/keystone-k2hk-evm.dts
++++ b/arch/arm/boot/dts/keystone-k2hk-evm.dts
+@@ -16,6 +16,19 @@
+ 	compatible =  "ti,k2hk-evm", "ti,k2hk", "ti,keystone";
+ 	model = "Texas Instruments Keystone 2 Kepler/Hawking EVM";
  
-+	aliases {
-+		rproc0 = &dsp0;
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		dsp_common_memory: dsp-common-memory at 81f800000 {
++			compatible = "shared-dma-pool";
++			reg = <0x00000008 0x1f800000 0x00000000 0x800000>;
++			reusable;
++			status = "okay";
++		};
 +	};
 +
  	soc {
- 		/include/ "keystone-k2e-clocks.dtsi"
- 
-@@ -114,6 +118,22 @@
- 			gpio,syscon-dev = <&devctrl 0x240>;
- 		};
- 
-+		dsp0: dsp at 10800000 {
-+			compatible = "ti,k2e-dsp";
-+			reg = <0x10800000 0x00080000>,
-+			      <0x10e00000 0x00008000>,
-+			      <0x10f00000 0x00008000>;
-+			reg-names = "l2sram", "l1pram", "l1dram";
-+			clocks = <&clkgem0>;
-+			ti,syscon-dev = <&devctrl 0x844>;
-+			resets = <&pscrst 0>;
-+			interrupt-parent = <&kirq0>;
-+			interrupts = <0 8>;
-+			interrupt-names = "vring", "exception";
-+			kick-gpios = <&dspgpio0 27 0>;
-+			status = "disabled";
-+		};
+ 		clocks {
+ 			refclksys: refclksys {
+@@ -184,3 +197,43 @@
+ 		reg = <1>;
+ 	};
+ };
 +
- 		pcie1: pcie at 21020000 {
- 			compatible = "ti,keystone-pcie","snps,dw-pcie";
- 			clocks = <&clkpcie1>;
++&dsp0 {
++	memory-region = <&dsp_common_memory>;
++	status = "okay";
++};
++
++&dsp1 {
++	memory-region = <&dsp_common_memory>;
++	status = "okay";
++};
++
++&dsp2 {
++	memory-region = <&dsp_common_memory>;
++	status = "okay";
++};
++
++&dsp3 {
++	memory-region = <&dsp_common_memory>;
++	status = "okay";
++};
++
++&dsp4 {
++	memory-region = <&dsp_common_memory>;
++	status = "okay";
++};
++
++&dsp5 {
++	memory-region = <&dsp_common_memory>;
++	status = "okay";
++};
++
++&dsp6 {
++	memory-region = <&dsp_common_memory>;
++	status = "okay";
++};
++
++&dsp7 {
++	memory-region = <&dsp_common_memory>;
++	status = "okay";
++};
 -- 
 2.13.1
