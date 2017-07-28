@@ -1,67 +1,265 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 28 Jul 2017 17:46:48 +0800
-Subject: [PATCH 2/3] ARM: sunxi: h3/h5: Add sun8i-h3-ephy compatible
-In-Reply-To: <CAGb2v67Lt5whR4=6+SDc=Ooi6zyiHuprW+7zbPh0njnKOCiFFA@mail.gmail.com>
-References: <20170728092818.23419-1-clabbe.montjoie@gmail.com>
- <20170728092818.23419-3-clabbe.montjoie@gmail.com>
- <CAGb2v67Lt5whR4=6+SDc=Ooi6zyiHuprW+7zbPh0njnKOCiFFA@mail.gmail.com>
-Message-ID: <700AE117-FE97-4240-830B-256E922D654D@aosc.io>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Fri, 28 Jul 2017 15:18:27 +0530
+Subject: [PATCH v2 6/7] mailbox: bcm-flexrm-mailbox: Set msg_queue_len for
+ each channel
+In-Reply-To: <CABb+yY3=yOKfRP=JEuBNG+ssx6rqjuVSYFCLOJJxvTEkAh7H2w@mail.gmail.com>
+References: <1500620142-910-1-git-send-email-anup.patel@broadcom.com>
+ <1500620142-910-7-git-send-email-anup.patel@broadcom.com>
+ <CABb+yY1Pxhgvvit=0eZr66DpLJ3MDEvRPx9dwDPJM8PwiKXiew@mail.gmail.com>
+ <CAALAos_yh0bCMZFrSmf-c92pNMBGhLT05YFF0duhmpxgYec+_w@mail.gmail.com>
+ <CABb+yY3d1FvfB-NBVHLNfoFXGn9-8nFEdKBhXt4sBTr1vodhYw@mail.gmail.com>
+ <CAALAos9T0YtCvgjGCMVPn=dw2JKY=jTxz-v431NgpBCKFo1vVQ@mail.gmail.com>
+ <CABb+yY2x1Wb=RZhq+eUnM0wkcih4YkFDrKRgqhs1erGQGH3tdw@mail.gmail.com>
+ <CAALAos-aKDw8p2_BFausm+VC4teoAW22239+gnkPfFUaiZxB6w@mail.gmail.com>
+ <CABb+yY3fwPTSc0PKh44uvgdbvQJhu-X3O_L5EtumB6ovsaOdSw@mail.gmail.com>
+ <CAALAos9RoAbZcsyQV_U_aUeVSO9SMYNqNpqOdCF0ytNXK8SrnA@mail.gmail.com>
+ <CABb+yY2gj3SBTCzcGim0=c1G9SzAiQ0HxA1F24kjs-jS42Z+dg@mail.gmail.com>
+ <CAALAos-VXg9XcNOr6OyiefdnL=oajEi3JGjoFSf74HEJgBiWBA@mail.gmail.com>
+ <CABb+yY3=yOKfRP=JEuBNG+ssx6rqjuVSYFCLOJJxvTEkAh7H2w@mail.gmail.com>
+Message-ID: <CAALAos-vY+Cf226eQrRYQ+o0xfbSQOcWpSVzDeu_aZgxE+VQtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 2017?7?28? GMT+08:00 ??5:44:51, Chen-Yu Tsai <wens@csie.org> ??:
->On Fri, Jul 28, 2017 at 5:28 PM, Corentin Labbe
-><clabbe.montjoie@gmail.com> wrote:
->> This patch adds the sun8i-h3-ephy compatible to the internal PHY.
+On Fri, Jul 28, 2017 at 2:34 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Fri, Jul 28, 2017 at 2:19 PM, Anup Patel <anup.patel@broadcom.com> wrote:
+>> On Thu, Jul 27, 2017 at 5:23 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>> On Thu, Jul 27, 2017 at 11:20 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+>>>> On Thu, Jul 27, 2017 at 10:29 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>>
+>>>>>>>>>> Sorry for the delayed response...
+>>>>>>>>>>
+>>>>>>>>>> On Fri, Jul 21, 2017 at 9:16 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>>>>>>>>>>> Hi Anup,
+>>>>>>>>>>>
+>>>>>>>>>>> On Fri, Jul 21, 2017 at 12:25 PM, Anup Patel <anup.patel@broadcom.com> wrote:
+>>>>>>>>>>>> The Broadcom FlexRM ring (i.e. mailbox channel) can handle
+>>>>>>>>>>>> larger number of messages queued in one FlexRM ring hence
+>>>>>>>>>>>> this patch sets msg_queue_len for each mailbox channel to
+>>>>>>>>>>>> be same as RING_MAX_REQ_COUNT.
+>>>>>>>>>>>>
+>>>>>>>>>>>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>>>>>>>>>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>>>>>>>>>>> ---
+>>>>>>>>>>>>  drivers/mailbox/bcm-flexrm-mailbox.c | 5 ++++-
+>>>>>>>>>>>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>>>>>>>>>>>
+>>>>>>>>>>>> diff --git a/drivers/mailbox/bcm-flexrm-mailbox.c b/drivers/mailbox/bcm-flexrm-mailbox.c
+>>>>>>>>>>>> index 9873818..20055a0 100644
+>>>>>>>>>>>> --- a/drivers/mailbox/bcm-flexrm-mailbox.c
+>>>>>>>>>>>> +++ b/drivers/mailbox/bcm-flexrm-mailbox.c
+>>>>>>>>>>>> @@ -1683,8 +1683,11 @@ static int flexrm_mbox_probe(struct platform_device *pdev)
+>>>>>>>>>>>>                 ret = -ENOMEM;
+>>>>>>>>>>>>                 goto fail_free_debugfs_root;
+>>>>>>>>>>>>         }
+>>>>>>>>>>>> -       for (index = 0; index < mbox->num_rings; index++)
+>>>>>>>>>>>> +       for (index = 0; index < mbox->num_rings; index++) {
+>>>>>>>>>>>> +               mbox->controller.chans[index].msg_queue_len =
+>>>>>>>>>>>> +                                               RING_MAX_REQ_COUNT;
+>>>>>>>>>>>>                 mbox->controller.chans[index].con_priv = &mbox->rings[index];
+>>>>>>>>>>>> +       }
+>>>>>>>>>>>>
+>>>>>>>>>>> While writing mailbox.c I wasn't unaware that there is the option to
+>>>>>>>>>>> choose the queue length at runtime.
+>>>>>>>>>>> The idea was to keep the code as simple as possible. I am open to
+>>>>>>>>>>> making it a runtime thing, but first, please help me understand how
+>>>>>>>>>>> that is useful here.
+>>>>>>>>>>>
+>>>>>>>>>>> I understand FlexRm has a ring buffer of RING_MAX_REQ_COUNT(1024)
+>>>>>>>>>>> elements. Any message submitted to mailbox api can be immediately
+>>>>>>>>>>> written onto the ringbuffer if there is some space.
+>>>>>>>>>>> Is there any mechanism to report back to a client driver, if its
+>>>>>>>>>>> message in ringbuffer failed "to be sent"?
+>>>>>>>>>>> If there isn't any, then I think, in flexrm_last_tx_done() you should
+>>>>>>>>>>> simply return true if there is some space left in the rung-buffer,
+>>>>>>>>>>> false otherwise.
+>>>>>>>>>>
+>>>>>>>>>> Yes, we have error code in "struct brcm_message" to report back
+>>>>>>>>>> errors from send_message. In our mailbox clients, we check
+>>>>>>>>>> return value of mbox_send_message() and also the error code
+>>>>>>>>>> in "struct brcm_message".
+>>>>>>>>>>
+>>>>>>>>> I meant after the message has been accepted in the ringbuffer but the
+>>>>>>>>> remote failed to receive it.
+>>>>>>>>
+>>>>>>>> Yes, even this case is handled.
+>>>>>>>>
+>>>>>>>> In case of IO errors after message has been put in ring buffer, we get
+>>>>>>>> completion message with error code and mailbox client drivers will
+>>>>>>>> receive back "struct brcm_message" with error set.
+>>>>>>>>
+>>>>>>>> You can refer flexrm_process_completions() for more details.
+>>>>>>>>
+>>>>> It doesn't seem to be what I suggest. I see two issues in
+>>>>> flexrm_process_completions()
+>>>>> 1) It calls mbox_send_message(), which is a big NO for a controller
+>>>>> driver. Why should you have one more message stored outside of
+>>>>> ringbuffer?
+>>>>
+>>>> The "last_pending_msg" in each FlexRM ring was added to fit FlexRM
+>>>> in Mailbox framework.
+>>>>
+>>>> We don't have any IRQ for TX done so "txdone_irq" out of the question for
+>>>> FlexRM. We only have completions for both success or failures (IO errors).
+>>>>
+>>>> This means we have to use "txdone_poll" for FlexRM. For "txdone_poll",
+>>>> we have to provide last_tx_done() callback. The last_tx_done() callback
+>>>> is supposed to return true if last send_data() call succeeded.
+>>>>
+>>>> To implement last_tx_done() in FlexRM driver, we added "last_pending_msg".
+>>>>
+>>>> When "last_pending_msg" is NULL it means last call to send_data() succeeded
+>>>> and when "last_pending_msg" is != NULL it means last call to send_data()
+>>>> did not go through due to lack of space in FlexRM ring.
+>>>>
+>>> It could be simpler.
+>>> Since flexrm_send_data() is essentially about putting the message in
+>>> the ring-buffer (and not about _transmission_ failures), the
+>>> last_tx_done() should simply return true if requests_ida has not all
+>>> ids allocated. False otherwise.
 >>
->> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
->> ---
->>  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 3 ++-
->
->To avoid repeating the past, this patch, if approved, will be merged
->through the sunxi tree, not netdev nor net-next.
->
->>  1 file changed, 2 insertions(+), 1 deletion(-)
+>> It's not that simple because we have two cases in-which
+>> send_data() will fail:
+>> 1. It run-out of IDs in requests_ida
+>> 2. There is no room in BD queue of FlexRM ring. This because each
+>> brcm_message can be translated into variable number of descriptors.
+>> In fact, using SPU2 crypto client we have one brcm_message translating
+>> into 100's of descriptors. All-in-all few messages (< 1024) can also
+>> fill-up the BD queue of FlexRM ring.
 >>
->> diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
->b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
->> index 4b599b5d26f6..7aaa837c2388 100644
->> --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
->> +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
->> @@ -421,7 +421,8 @@
->>                                 #address-cells = <1>;
->>                                 #size-cells = <0>;
->>                                 int_mii_phy: ethernet-phy at 1 {
->> -                                       compatible =
->"ethernet-phy-ieee802.3-c22";
->> +                                       compatible =
->"allwinner,sun8i-h3-ephy",
->> +                                                      
->"ethernet-phy-ieee802.3-c22";
->
->Are you expecting people to override this properly?
->
->As it currently is, any external phy at address 1 will simply
->reuse the same device node. And if they don't override the
->property correctly, the driver will end up trying to use
->the internal phy, while the user is expecting the external
->one to be used.
->
->Maybe you could move this to some other address, maybe the last
->valid one, or second last valid one?
+> OK let me put it abstractly... return false if "there is no space for
+> another message in the ringbuffer", true otherwise.
 
-Some board designers may use other address.
+Let say at time T, there was no space in BD queue. Now at
+time T+X when last_tx_done() it is possible that BD queue
+has space because FlexRM has processed some more
+descriptor.
 
-For example, on Nano Pi NEO2 the PHY is attached at address 0x7.
+I think last_tx_done() for "txdone_poll" method will require
+some information passing from send_data() callback to
+last_tx_done() which is last_pending_msg for FlexRM driver.
+
+Anyways, I plan to try "txdone_ack" method so I will
+remove last_tx_done() and last_pending_msg both.
+What do you think?
 
 >
->ChenYu
 >
->>                                         reg = <1>;
->>                                         clocks = <&ccu CLK_BUS_EPHY>;
->>                                         resets = <&ccu RST_BUS_EPHY>;
->> --
->> 2.13.0
+>>>>>
+>>>>> 2) It calls mbox_chan_received_data()  which is for messages received
+>>>>> from the remote. And not the way to report failed _transmission_, for
+>>>>> which the api calls back mbox_client.tx_done() .  In your client
+>>>>> driver please populate mbox_client.tx_done() and see which message is
+>>>>> reported "sent fine" when.
+>>>>>
+>>>>>
+>>>>>>>>> There seems no such provision. IIANW, then you should be able to
+>>>>>>>>> consider every message as "sent successfully" once it is in the ring
+>>>>>>>>> buffer i.e, immediately after mbox_send_message() returns 0.
+>>>>>>>>> In that case I would think you don't need more than a couple of
+>>>>>>>>> entries out of MBOX_TX_QUEUE_LEN ?
+>>>>>>>>
+>>>>>>>> What I am trying to suggest is that we can take upto 1024 messages
+>>>>>>>> in a FlexRM ring but the MBOX_TX_QUEUE_LEN limits us queuing
+>>>>>>>> more messages. This issue manifest easily when multiple CPUs
+>>>>>>>> queues to same FlexRM ring (i.e. same mailbox channel).
+>>>>>>>>
+>>>>>>> OK then, I guess we have to make the queue length a runtime decision.
+>>>>>>
+>>>>>> Do you agree with approach taken by PATCH5 and PATCH6 to
+>>>>>> make queue length runtime?
+>>>>>>
+>>>>> I agree that we may have to get the queue length from platform, if
+>>>>> MBOX_TX_QUEUE_LEN is limiting performance. That will be easier on both
+>>>>> of us. However I suspect the right fix for _this_ situation is in
+>>>>> flexrm driver. See above.
+>>>>
+>>>> The current implementation is trying to model FlexRM using "txdone_poll"
+>>>> method and that's why we have dependency on MBOX_TX_QUEUE_LEN
+>>>>
+>>>> I think what we really need is new method for "txdone" to model ring
+>>>> manager HW (such as FlexRM). Let's call it "txdone_none".
+>>>>
+>>>> For "txdone_none", it means there is no "txdone" reporting in HW
+>>>> and mbox_send_data() should simply return value returned by
+>>>> send_data() callback. The last_tx_done() callback is not required
+>>>> for "txdone_none" and MBOX_TX_QUEUE_LEN also has no
+>>>> effect on "txdone_none". Both blocking and non-blocking clients
+>>>> are treated same for "txdone_none".
+>>>>
+>>> That is already supported :)
 >>
+>> If you are referring to "txdone_ack" then this cannot be used here
+>> because for "txdone_ack" we have to call mbox_chan_txdon() API
+>> after writing descriptors in send_data() callback which will cause
+>> dead-lock in tx_tick() called by mbox_chan_txdone().
+>>
+> Did you read my code snippet below?
+>
+> It's not mbox_chan_txdone(), but mbox_client_txdone() which is called
+> by the client.
+>
+>>>
+>>> In drivers/dma/bcm-sba-raid.c
+>>>
+>>> sba_send_mbox_request(...)
+>>> {
+>>>            ......
+>>>         req->msg.error = 0;
+>>>         ret = mbox_send_message(sba->mchans[mchans_idx], &req->msg);
+>>>         if (ret < 0) {
+>>>                 dev_err(sba->dev, "send message failed with error %d", ret);
+>>>                 return ret;
+>>>         }
+>>>         ret = req->msg.error;
+>>>         if (ret < 0) {
+>>>                 dev_err(sba->dev, "message error %d", ret);
+>>>                 return ret;
+>>>         }
+>>>           .....
+>>> }
+>>>
+>>> Here you _do_ assume that as soon as the mbox_send_message() returns,
+>>> the last_tx_done() is true. In other words, this is a case of client
+>>> 'knows_txdone'.
+>>>
+>>> So ideally you should specify cl->knows_txdone = true during
+>>> mbox_request_channel() and have ...
+>>>
+>>> sba_send_mbox_request(...)
+>>> {
+>>>         ret = mbox_send_message(sba->mchans[mchans_idx], &req->msg);
+>>>         if (ret < 0) {
+>>>                 dev_err(sba->dev, "send message failed with error %d", ret);
+>>>                 return ret;
+>>>         }
+>>>
+>>>         ret = req->msg.error;
+>>>
+>>>        /* Message successfully placed in the ringbuffer, i.e, done */
+>>>        mbox_client_txdone(sba->mchans[mchans_idx], ret);
+>>>
+>>>        if (ret < 0) {
+>>>                 dev_err(sba->dev, "message error %d", ret);
+>>>                 return ret;
+>>>         }
+>>>
+>>>         .....
+>>> }
+>>>
+>>
+>> I think we need to improve mailbox.c so that
+>> mbox_chan_txdone() can be called from
+>> send_data() callback.
+>>
+> No please. Other clients call mbox_send_message() followed by
+> mbox_client_txdone(), and they are right. For example,
+> drivers/firmware/tegra/bpmp.c
+
+OK so I got confused between mbox_chan_txdone() and
+mbox_client_txdone().
+
+We should do mbox_client_txdone() from mailbox client
+when mbox_chan txmethod is ACK.
+
+Regards,
+Anup
