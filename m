@@ -1,92 +1,34 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 28 Jul 2017 01:54:06 +0200
-Subject: [PATCH v2] cpufreq: s5pv210: add missing of_node_put
-In-Reply-To: <20170724085216.GS352@vireshk-i7>
-References: <1500666810-21841-1-git-send-email-Julia.Lawall@lip6.fr>
- <20170724085216.GS352@vireshk-i7>
-Message-ID: <3083277.s4JKRQruaM@aspire.rjw.lan>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 27 Jul 2017 17:29:07 -0700
+Subject: [PATCH v3.1 0/3] soc: amlogic: Add Amlogic SoC Information driver
+In-Reply-To: <e9558b4f-b155-9f25-fe39-b876973299b5@baylibre.com> (Neil
+ Armstrong's message of "Thu, 13 Jul 2017 12:25:20 +0200")
+References: <1498206498-19139-1-git-send-email-narmstrong@baylibre.com>
+ <CAFBinCAK0iXJ5zLg64oABXs7rno48Dni6Zc2dQ3_aadJS7wiSQ@mail.gmail.com>
+ <e9558b4f-b155-9f25-fe39-b876973299b5@baylibre.com>
+Message-ID: <7h4ltxs8to.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 24, 2017 02:22:16 PM Viresh Kumar wrote:
-> On 21-07-17, 21:53, Julia Lawall wrote:
-> > for_each_compatible_node performs an of_node_get on each iteration, so a
-> > return from the loop requires an of_node_put.
-> > 
-> > The semantic patch that fixes this problem is as follows
-> > (http://coccinelle.lip6.fr):
-> > 
-> > // <smpl>
-> > @@
-> > local idexpression n;
-> > expression e,e1,e2;
-> > statement S;
-> > iterator i1;
-> > iterator name for_each_compatible_node;
-> > @@
-> > 
-> >  for_each_compatible_node(n,e1,e2) {
-> >    ...
-> > (
-> >    of_node_put(n);
-> > |
-> >    e = n
-> > |
-> >    return n;
-> > |
-> >    i1(...,n,...) S
-> > |
-> > +  of_node_put(n);
-> > ?  return ...;
-> > )
-> >    ...
-> >  }
-> > // </smpl>
-> > 
-> > Additionally, call of_node_put on the previous value of np, obtained from
-> > of_find_compatible_node, that is no longer accessible at the point of the
-> > for_each_compatible_node.
-> > 
-> > Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-> > 
-> > ---
-> > 
-> > v2: add the of_node_put for the call to of_find_compatible_node as well.
-> > 
-> >  drivers/cpufreq/s5pv210-cpufreq.c |    3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/drivers/cpufreq/s5pv210-cpufreq.c b/drivers/cpufreq/s5pv210-cpufreq.c
-> > index f82074e..5d31c2d 100644
-> > --- a/drivers/cpufreq/s5pv210-cpufreq.c
-> > +++ b/drivers/cpufreq/s5pv210-cpufreq.c
-> > @@ -602,6 +602,7 @@ static int s5pv210_cpufreq_probe(struct platform_device *pdev)
-> >  	}
-> >  
-> >  	clk_base = of_iomap(np, 0);
-> > +	of_node_put(np);
-> >  	if (!clk_base) {
-> >  		pr_err("%s: failed to map clock registers\n", __func__);
-> >  		return -EFAULT;
-> > @@ -612,6 +613,7 @@ static int s5pv210_cpufreq_probe(struct platform_device *pdev)
-> >  		if (id < 0 || id >= ARRAY_SIZE(dmc_base)) {
-> >  			pr_err("%s: failed to get alias of dmc node '%s'\n",
-> >  				__func__, np->name);
-> > +			of_node_put(np);
-> >  			return id;
-> >  		}
-> >  
-> > @@ -619,6 +621,7 @@ static int s5pv210_cpufreq_probe(struct platform_device *pdev)
-> >  		if (!dmc_base[id]) {
-> >  			pr_err("%s: failed to map dmc%d registers\n",
-> >  				__func__, id);
-> > +			of_node_put(np);
-> >  			return -EFAULT;
-> >  		}
-> >  	}
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> 
-> 
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-Applied, thanks!
+> On 07/12/2017 09:03 PM, Martin Blumenstingl wrote:
+>> Hi Kevin,
+>> 
+>> On Fri, Jun 23, 2017 at 10:28 AM, Neil Armstrong
+>> <narmstrong@baylibre.com> wrote:
+>>> Amlogic SoCs have a SoC information register for SoC type, package type and
+>>> revision information.
+>>> This patchset adds support for this register decoding and exposing with the
+>>> SoC bus infrastructure, with dt-bindings and DT node.
+>> I'm curious: are you going to take this through your tree or are we
+>> waiting for someone's ACK here?
+>
+> I'm curious also, it should go through armsoc-drivers, no ?
+
+I was being lazy and assuming that Arnd would have another look as he
+reviewed an earlier version, but since there appear to be no further
+reviews/comments, I'll take it through the amlogic tree in the
+v4.14/drivers branch.
+
+Kevin
