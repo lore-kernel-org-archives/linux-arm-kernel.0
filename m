@@ -1,49 +1,65 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 29 Jul 2017 00:14:09 +0200
-Subject: [PATCH v4 09/12] ASoC: wm9712: add ac97 new bus support
-In-Reply-To: <20170725102057.hblyopxycgz55mr7@localhost.localdomain> (Charles
- Keepax's message of "Tue, 25 Jul 2017 11:20:57 +0100")
-References: <20170724204928.29505-1-robert.jarzmik@free.fr>
- <20170724204928.29505-10-robert.jarzmik@free.fr>
- <20170725102057.hblyopxycgz55mr7@localhost.localdomain>
-Message-ID: <8760ecqkem.fsf@belgarion.home>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 29 Jul 2017 00:04:31 +0100
+Subject: [PATCH] [RFC] ARM: move __bug_table into .data for XIP_KERNEL
+In-Reply-To: <alpine.LFD.2.20.1707281119450.5981@knanqh.ubzr>
+References: <20170728141108.1283320-1-arnd@arndb.de>
+ <alpine.LFD.2.20.1707281119450.5981@knanqh.ubzr>
+Message-ID: <27F512E2-F027-4BD1-9D40-ECCC55952DC3@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Charles Keepax <ckeepax@opensource.cirrus.com> writes:
 
-> On Mon, Jul 24, 2017 at 10:49:25PM +0200, Robert Jarzmik wrote:
->> Add support for the new ac97 bus model, where devices are automatically
->> discovered on AC-Links.
+
+> On 28 Jul 2017, at 16:27, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> 
+>> On Fri, 28 Jul 2017, Arnd Bergmann wrote:
 >> 
->> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
->> ---
->> +	} else {
->> +		wm9712->ac97 = snd_soc_new_ac97_codec(codec, WM9712_VENDOR_ID,
->> +						      WM9712_VENDOR_ID_MASK);
->> +		if (IS_ERR(wm9712->ac97)) {
->> +			ret = PTR_ERR(wm9712->ac97);
->> +			dev_err(codec->dev,
->> +				"Failed to register AC97 codec: %d\n", ret);
->> +			return ret;
->> +		}
->> +
->> +		regmap = regmap_init_ac97(wm9712->ac97, &wm9712_regmap_config);
->> +		if (IS_ERR(regmap)) {
->> +			ret = PTR_ERR(regmap);
->> +			goto err_free_ac97_codec;
->
-> For the 9713 you had this wrapped in an ifdef? Why did it need an
-> ifdef there but doesn't for this driver?
-I have forgotten the ifdef, it's a very good catch, thanks.
-The trick is that in :
-  - include/sound/soc.h
-  - snd_soc_new_ac97_codec() is only defined under this ifdef
+>> Matt Hart reports that vf610m4_defconfig kernels grew to 2GB
+>> xipImage size after the __bug_table change.
+>> 
+>> I tried out a few things and found that moving the bug table
+>> into the .data section avoids this problem. However, the
+>> linker script magic is beyond my capabilities here, so this
+>> is almost certainly not correct.
+> 
+> Well, before your patch the BUG_TABLE location as well as its runtime 
+> functionality were completely wrong and broken.
+> 
+>> I've added a few people to Cc that understand this better
+>> than I do, hopefully someone can turn my bogus patch into
+>> a proper one.
+> 
+> Your patch isn't as bad as you make it, but maybe the following will 
+> avoid open recoding BUG_TABLE locally:
+> 
+> diff --git a/arch/arm/kernel/vmlinux-xip.lds.S b/arch/arm/kernel/vmlinux-xip.lds.S
+> index 8265b11621..21b4b29c2f 100644
+> --- a/arch/arm/kernel/vmlinux-xip.lds.S
+> +++ b/arch/arm/kernel/vmlinux-xip.lds.S
+> @@ -237,13 +237,13 @@ SECTIONS
+>         */
+>        DATA_DATA
+>        CONSTRUCTORS
+> -
+> -        _edata = .;
+>    }
+> -    _edata_loc = __data_loc + SIZEOF(.data);
+> 
+>    BUG_TABLE
+> 
 
-And with the new ac97 bus support, these drivers can be compiled now with
-CONFIG_SND_SOC_AC97_BUS not defined, so I need to add the ifdef.
+The .data section is deliberately emitted with LMA != VMA so that the code refers to the correct offset in RAM while the initial contents are in ROM and are copied into RAM by the startup code.
 
-Cheers.
+This applies to the bug table as well (now that it needs to be writable) so the only correct way to do this is to move it into .data like Arnd's patch does.
 
--- 
-Robert
+I guess we could split the macro so we can emit bug table into an existing section, but in itself, the code is correct, and i don't see a better way of doing it.
+
+> +    _edata = .;
+> +    _edata_loc = __data_loc + SIZEOF(.data);
+> +
+> #ifdef CONFIG_HAVE_TCM
+>         /*
+>     * We align everything to a page boundary so we can
+> 
+> 
+> Nicolas
