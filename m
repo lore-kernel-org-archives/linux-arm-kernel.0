@@ -1,42 +1,32 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Fri, 28 Jul 2017 10:14:06 +0200
-Subject: [PATCH 0/4] iio: trigger: stm32-timer fixes
-In-Reply-To: <1501172340-8448-1-git-send-email-fabrice.gasnier@st.com>
-References: <1501172340-8448-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <CA+M3ks5c98rc2RavW5Eon+MXqnMEpSxcFDaQeL=t4rGbjhR3Xg@mail.gmail.com>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Fri, 28 Jul 2017 16:19:52 +0800
+Subject: [PATCH v2 01/11] net: phy: Add rockchip phy driver support
+In-Reply-To: <807c43ee-8421-c0b3-8aea-6091bef07a4c@gmail.com>
+References: <1501160156-30328-1-git-send-email-david.wu@rock-chips.com>
+ <1501160156-30328-2-git-send-email-david.wu@rock-chips.com>
+ <807c43ee-8421-c0b3-8aea-6091bef07a4c@gmail.com>
+Message-ID: <c92ffbe9-dfb0-0fd7-680d-699c31902534@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-07-27 18:18 GMT+02:00 Fabrice Gasnier <fabrice.gasnier@st.com>:
-> Miscellaneous fixes for stm32-timer-trigger driver.
-> Last patch adds enable attribute, which unlocks use of
-> encoder mode.
->
-> Fabrice Gasnier (4):
->   iio: trigger: stm32-timer: fix quadrature mode get routine
->   iio: trigger: stm32-timer: fix write_raw return value
->   iio: trigger: stm32-timer: fix get/set down count direction
->   iio: trigger: stm32-timer: add enable attribute
->
+Hi Florian,
 
-For the series:
+? 2017/7/28 0:51, Florian Fainelli ??:
+>> +}
+>> +
+>> +static int rockchip_internal_phy_config_init(struct phy_device *phydev)
+>> +{
+>> +	int val;
+>> +
+>> +	/*
+>> +	 * The auto MIDX has linked problem on some board,
+>> +	 * workround to disable auto MDIX.
+>> +	 */
+> If this a board-specific problem you may consider register a PHY fixup
+> for the affected boards, or introduce a specific property to illustrate
+> that MDI-X is broken.
 
-Acked-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+You mean is that if I need disable Auto-mdix, then I'm going to add a 
+property to DTS, from here to decide whether or not to close Auto-mdix?
 
->  drivers/iio/trigger/stm32-timer-trigger.c | 80 ++++++++++++++++++++++---------
->  1 file changed, 58 insertions(+), 22 deletions(-)
->
-> --
-> 1.9.1
->
-
-
-
--- 
-Benjamin Gaignard
-
-Graphic Study Group
-
-Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro: Facebook | Twitter | Blog
+> 
