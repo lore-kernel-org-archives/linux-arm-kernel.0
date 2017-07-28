@@ -1,38 +1,35 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 28 Jul 2017 12:09:56 -0700
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170728184129.GA24364@linux.vnet.ibm.com>
-References: <20170727014214.GH3730@linux.vnet.ibm.com>
- <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
- <20170727124913.GL3730@linux.vnet.ibm.com>
- <20170727144903.000022a1@huawei.com>
- <20170727173923.000001b2@huawei.com>
- <20170727165245.GD3730@linux.vnet.ibm.com>
- <20170728084411.00001ddb@huawei.com>
- <20170728125416.j7gcgvnxgv2gq73u@tardis>
- <20170728145530.GE3730@linux.vnet.ibm.com>
- <20170728184129.GA24364@linux.vnet.ibm.com>
-Message-ID: <20170728190956.GA26640@linux.vnet.ibm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 28 Jul 2017 21:17:26 +0200
+Subject: [PATCH] iommu/exynos: prevent building on big-endian kernels
+In-Reply-To: <20170728131954.213595-1-arnd@arndb.de>
+References: <20170728131954.213595-1-arnd@arndb.de>
+Message-ID: <20170728191726.rjx5pczkfwe6q2eo@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 11:41:29AM -0700, Paul E. McKenney wrote:
-> On Fri, Jul 28, 2017 at 07:55:30AM -0700, Paul E. McKenney wrote:
-> > On Fri, Jul 28, 2017 at 08:54:16PM +0800, Boqun Feng wrote:
-
-[ . . . ]
-
-> > Even though Jonathan's testing indicates that it didn't fix this
-> > particular problem:
-> > 
-> > Acked-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+On Fri, Jul 28, 2017 at 03:19:19PM +0200, Arnd Bergmann wrote:
+> Since we print the correct warning, an allmodconfig build is no longer
+> clean but always prints it, which defeats compile-testing:
 > 
-> And while we are at it:
+> drivers/iommu/exynos-iommu.c:58:2: error: #warning "revisit driver if we can enable big-endian ptes" [-Werror=cpp]
 > 
-> Tested-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> This replaces the #warning with a dependency, moving warning text into
+> a comment.
+> 
+> Fixes: 1f59adb1766d ("iommu/exynos: Replace non-existing big-endian Kconfig option")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/iommu/Kconfig        | 1 +
+>  drivers/iommu/exynos-iommu.c | 4 ----
+>  2 files changed, 1 insertion(+), 4 deletions(-)
+>
 
-Not because it it fixed the TREE01 issue -- it did not.  But as near
-as I can see, it didn't cause any additional issues.
+Makes sense, although there is no error to fix (for fixes tag). If there
+was an error, then probably the one bringing warning and wrong kconfig
+option (6ae5343c26f9cba5e9ef8 "iommu/exynos: update to use iommu
+big-endian")?
 
-							Thanx, Paul
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+
+Best regards,
+Krzysztof
