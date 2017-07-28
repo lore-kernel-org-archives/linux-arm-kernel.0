@@ -1,139 +1,88 @@
-From: minchan@kernel.org (Minchan Kim)
-Date: Sat, 29 Jul 2017 00:12:24 +0900
-Subject: [PATCH 2/3] mm: fix MADV_[FREE|DONTNEED] TLB flush miss problem
-In-Reply-To: <20170728084634.foo3wjhsyydml6yj@techsingularity.net>
-References: <1501224112-23656-1-git-send-email-minchan@kernel.org>
- <1501224112-23656-3-git-send-email-minchan@kernel.org>
- <20170728084634.foo3wjhsyydml6yj@techsingularity.net>
-Message-ID: <20170728151224.GA24201@bbox>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Fri, 28 Jul 2017 16:23:11 +0100
+Subject: [PATCH] drm: hdlcd: allow HDLCD to be used without interrupt
+In-Reply-To: <20170726102748.GM31807@n2100.armlinux.org.uk>
+References: <E1daJCF-0003pG-DI@rmk-PC.armlinux.org.uk>
+ <20170726102748.GM31807@n2100.armlinux.org.uk>
+Message-ID: <20170728152311.GA970@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 09:46:34AM +0100, Mel Gorman wrote:
-> On Fri, Jul 28, 2017 at 03:41:51PM +0900, Minchan Kim wrote:
-> > Nadav reported parallel MADV_DONTNEED on same range has a stale TLB
-> > problem and Mel fixed it[1] and found same problem on MADV_FREE[2].
+On Wed, Jul 26, 2017 at 11:27:48AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 26, 2017 at 11:05:39AM +0100, Russell King wrote:
+> > Some ARM platforms do not wire the HDLCD interrupt.  Allow hdlcd to
+> > initialise without an interrupt present.
 > > 
-> > Quote from Mel Gorman
-> > 
-> > "The race in question is CPU 0 running madv_free and updating some PTEs
-> > while CPU 1 is also running madv_free and looking at the same PTEs.
-> > CPU 1 may have writable TLB entries for a page but fail the pte_dirty
-> > check (because CPU 0 has updated it already) and potentially fail to flush.
-> > Hence, when madv_free on CPU 1 returns, there are still potentially writable
-> > TLB entries and the underlying PTE is still present so that a subsequent write
-> > does not necessarily propagate the dirty bit to the underlying PTE any more.
-> > Reclaim at some unknown time at the future may then see that the PTE is still
-> > clean and discard the page even though a write has happened in the meantime.
-> > I think this is possible but I could have missed some protection in madv_free
-> > that prevents it happening."
-> > 
-> > This patch aims for solving both problems all at once and is ready for
-> > other problem with KSM, MADV_FREE and soft-dirty story[3].
-> > 
-> > TLB batch API(tlb_[gather|finish]_mmu] uses [set|clear]_tlb_flush_pending
-> > and mmu_tlb_flush_pending so that when tlb_finish_mmu is called, we can catch
-> > there are parallel threads going on. In that case, flush TLB to prevent
-> > for user to access memory via stale TLB entry although it fail to gather
-> > pte entry.
-> > 
-> > I confiremd this patch works with [4] test program Nadav gave so this patch
-> > supersedes "mm: Always flush VMA ranges affected by zap_page_range v2"
-> > in current mmotm.
-> > 
-> > NOTE:
-> > This patch modifies arch-specific TLB gathering interface(x86, ia64,
-> > s390, sh, um). It seems most of architecture are straightforward but s390
-> > need to be careful because tlb_flush_mmu works only if mm->context.flush_mm
-> > is set to non-zero which happens only a pte entry really is cleared by
-> > ptep_get_and_clear and friends. However, this problem never changes the
-> > pte entries but need to flush to prevent memory access from stale tlb.
-> > 
-> > Any thoughts?
-> > 
-> 
-> The cc list is somewhat ..... extensive, given the topic. Trim it if
-> there is another version.
-
-Most of them are maintainers and mailling list for each architecures
-I am changing. I'm not sure what I can trim. As you said it's rather
-extensive, I will trim mailing list for each arch but keep maintainers
-and linux-arch.
-
-> 
-> > index 3f2eb76243e3..8c26961f0503 100644
-> > --- a/arch/arm/include/asm/tlb.h
-> > +++ b/arch/arm/include/asm/tlb.h
-> > @@ -163,13 +163,26 @@ tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm, unsigned long start
-> >  #ifdef CONFIG_HAVE_RCU_TABLE_FREE
-> >  	tlb->batch = NULL;
-> >  #endif
-> > +	set_tlb_flush_pending(tlb->mm);
-> >  }
-> >  
-> >  static inline void
-> >  tlb_finish_mmu(struct mmu_gather *tlb, unsigned long start, unsigned long end)
-> >  {
-> > -	tlb_flush_mmu(tlb);
-> > +	/*
-> > +	 * If there are parallel threads are doing PTE changes on same range
-> > +	 * under non-exclusive lock(e.g., mmap_sem read-side) but defer TLB
-> > +	 * flush by batching, a thread has stable TLB entry can fail to flush
-> > +	 * the TLB by observing pte_none|!pte_dirty, for example so flush TLB
-> > +	 * if we detect parallel PTE batching threads.
-> > +	 */
-> > +	if (mm_tlb_flush_pending(tlb->mm, false) > 1) {
-> > +		tlb->range_start = start;
-> > +		tlb->range_end = end;
-> > +	}
-> >  
-> > +	tlb_flush_mmu(tlb);
-> > +	clear_tlb_flush_pending(tlb->mm);
-> >  	/* keep the page table cache within bounds */
-> >  	check_pgt_cache();
-> >  
-> 
-> mm_tlb_flush_pending shouldn't be taking a barrier specific arg. I expect
-> this to change in the future and cause a conflict. At least I think in
-> this context, it's the conditional barrier stuff.
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 > 
 
-Yub. I saw your comment to Nadav so I expect you want mm_tlb_flush_pending
-be called under pte lock. However, I will use it out of pte lock where
-tlb_finish_mmu, however, in that case, atomic op and barrier
-to prevent compiler reordering between tlb flush and atomic_read
-in mm_tlb_flush_pending are enough to work.
+Hi Russell,
 
-> That aside, it's very unfortunate that the return value of
-> mm_tlb_flush_pending really matters. Knowing why 1 is magic there requires
-> knowledge of the internals on a per-arch basis which is a bit nuts.
-> Consider renaming this to mm_tlb_flush_parallel() to return true if there
-> is a nr_pending > 1 with comments explaining why. I don't think any of
-> the callers expect a nr_pending of 0 ever. That removes some knowledge of
-> the specifics.
+Sorry for my silence, I was on holiday this week and just came back
+today.
 
-Okay. If you are not strong against, I prefer mm_tlb_flush_nested
-which returns true if nr_pending > 1.
+> This isn't fully functional on ARM MPS platforms yet, but at least
+> gets us further.  Without any display connected:
+> 
+> [   14.315986] [drm] found ARM HDLCD version r0p0
+> [   14.557038] tda998x 2-0070: found TDA19988
+> [   14.622232] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
+> [   14.630406] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+> [   14.639335] [drm] No driver support for vblank timestamp query.
+> [   14.653210] [drm] Cannot find any crtc or sizes - going 1024x768
+> [   15.232556] hdlcd 40205000.hdlcd: fb0:  frame buffer device
+> [   15.284076] [drm] Initialized hdlcd 1.0.0 20151021 for 40205000.hdlcd on minor 0
+> 
+> With a TV connected, the driver doesn't initialise:
+> 
+> [   14.422810] [drm] found ARM HDLCD version r0p0
+> [   14.657227] tda998x 2-0070: found TDA19988
+> [   14.722439] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x213534)
+> [   14.730613] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+> [   14.739538] [drm] No driver support for vblank timestamp query.
+> [   15.311977] hdlcd 40205000.hdlcd: Failed to set initial hw configuration.
+> [   15.357402] hdlcd 40205000.hdlcd: master bind failed: -12
+> [   15.365082] tda998x: probe of 2-0070 failed with error -12
+> 
+> I don't think this is correct behaviour - if we fail to set an initial
+> configuration (which will be based on the resolution of the connected
+> display) why should the driver fail to probe - it's not that there is
+> no device, it's (in this case) that there aren't the resources for the
+> chosen mode.  Userspace could always try setting a different mode.
+> 
+> I suspect the above failure is down to either (a) not having enough
+> memory available to allocate a 1920x1080 frame buffer, or (b) not
+> (yet) being able to program the hdlcd pixel clock for this platform,
+> which is currently hard-coded in DT at 23.75MHz.
+
+I don't think it is the clock, if that fails then you would not see the
+r0p0 version number being printed. Due to the fact that until now HDLCD
+has run mostly on platforms that have SCP, which takes care of actual
+setup of the clocks, it is pretty lax on errors on pixel clock setup.
+That is the reason why I have added the 'clocks' entry in debugfs, to be
+able to find out the actual clock setup vs what HDLCD would like to have
+for the current mode.
+
+If is quite likely to be a memory issue (-12 points that way too).
+
+Also, may I ask what MPS platform you are trying to use? I might be able
+to source one internally and try to reproduce your problems.
+
+Best regards,
+Liviu
 
 > 
-> The arch-specific changes to tlb_gather_mmu are almost all identical.
-> It's a little tricky to split the arch layer and core mm to have all
-> the set/clear of mm_tlb_flush_pending handled by the core mm.  It's not
-> required but it would be preferred. The set one is obvious. rename
-> tlb_gather_mmu to arch_tlb_gather_mmu (including the generic implementation)
-> and create a tlb_gather_mmu alias that calls arch_tlb_gather_mmu and
-> set_tlb_flush_pending.
-> 
-> The clear is not as straight-forward but can be done by creating a new
-> arch helper that handles this hunk on a per-arch basis
-> 
-> > +     if (mm_tlb_flush_pending(tlb->mm, false) > 1) {
-> > +             tlb->start = start;
-> > +             tlb->end = end;
-> > +     }
-> 
-> It'll be churn initially but it means any different handling in the TLB
-> batching area will be mostly a core concern.
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
 
-Fair enough. I will respin next week.
-Thanks for the review, Mel.
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
