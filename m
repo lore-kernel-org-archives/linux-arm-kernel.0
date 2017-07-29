@@ -1,52 +1,46 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 28 Jul 2017 23:51:47 -0400
-Subject: [PATCH 1/4] arm_elf_read_implies_exec(): remove unused argument
+Date: Fri, 28 Jul 2017 23:51:49 -0400
+Subject: [PATCH 3/4] ARM: implement get_tls syscall
 In-Reply-To: <20170729035150.5214-1-nicolas.pitre@linaro.org>
 References: <20170729035150.5214-1-nicolas.pitre@linaro.org>
-Message-ID: <20170729035150.5214-2-nicolas.pitre@linaro.org>
+Message-ID: <20170729035150.5214-4-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first argument to elf_read_implies_exec() is either the actual
-header structure or a pointer to that structure whether one looks
-at fs/binfmt_elf.c or fs/binfmt_elf_fdpic.c. This ought to be fixed
-of course, but in the mean time let's sidestep the issue by removing
-that first argument from arm_elf_read_implies_exec() as it is unused
-anyway.
+When there is no dedicated register to hold the tp value and no MMU
+to provide a fixed address kuser helper entry point, all that is
+left as fallback is a syscall.
 
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/include/asm/elf.h | 4 ++--
- arch/arm/kernel/elf.c      | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/include/uapi/asm/unistd.h | 1 +
+ arch/arm/kernel/traps.c            | 3 +++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-index f13ae153fb..e2786acf82 100644
---- a/arch/arm/include/asm/elf.h
-+++ b/arch/arm/include/asm/elf.h
-@@ -102,8 +102,8 @@ extern int elf_check_arch(const struct elf32_hdr *);
+diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
+index 28bd456494..575b25fc29 100644
+--- a/arch/arm/include/uapi/asm/unistd.h
++++ b/arch/arm/include/uapi/asm/unistd.h
+@@ -35,5 +35,6 @@
+ #define __ARM_NR_usr26			(__ARM_NR_BASE+3)
+ #define __ARM_NR_usr32			(__ARM_NR_BASE+4)
+ #define __ARM_NR_set_tls		(__ARM_NR_BASE+5)
++#define __ARM_NR_get_tls		(__ARM_NR_BASE+6)
  
- #define vmcore_elf64_check_arch(x) (0)
+ #endif /* _UAPI__ASM_ARM_UNISTD_H */
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 948c648fea..43c0560f7b 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -647,6 +647,9 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
+ 		set_tls(regs->ARM_r0);
+ 		return 0;
  
--extern int arm_elf_read_implies_exec(const struct elf32_hdr *, int);
--#define elf_read_implies_exec(ex,stk) arm_elf_read_implies_exec(&(ex), stk)
-+extern int arm_elf_read_implies_exec(int);
-+#define elf_read_implies_exec(ex,stk) arm_elf_read_implies_exec(stk)
- 
- struct task_struct;
- int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs);
-diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
-index d0d1e83150..52fb98358d 100644
---- a/arch/arm/kernel/elf.c
-+++ b/arch/arm/kernel/elf.c
-@@ -80,7 +80,7 @@ EXPORT_SYMBOL(elf_set_personality);
-  *  - the binary requires an executable stack
-  *  - we're running on a CPU which doesn't support NX.
-  */
--int arm_elf_read_implies_exec(const struct elf32_hdr *x, int executable_stack)
-+int arm_elf_read_implies_exec(int executable_stack)
- {
- 	if (executable_stack != EXSTACK_DISABLE_X)
- 		return 1;
++	case NR(get_tls):
++		return current_thread_info()->tp_value[0];
++
+ 	default:
+ 		/* Calls 9f00xx..9f07ff are defined to return -ENOSYS
+ 		   if not implemented, rather than raising SIGILL.  This
 -- 
 2.9.4
