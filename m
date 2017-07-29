@@ -1,61 +1,82 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Sat, 29 Jul 2017 08:48:15 +0200
-Subject: [PATCH 0/3] net-next: stmmac: support future possible different
- internal phy mode
-In-Reply-To: <f8fe754c-8b46-a9f6-4020-f7db6c985773@gmail.com>
-References: <20170728092818.23419-1-clabbe.montjoie@gmail.com>
- <20170728135544.GD32230@lunn.ch> <20170728142508.GA7221@Red>
- <20170728143600.GB2132@lunn.ch> <20170728144424.GB7221@Red>
- <f8fe754c-8b46-a9f6-4020-f7db6c985773@gmail.com>
-Message-ID: <20170729064815.GA2024@Red>
+From: moore@free.fr (Chris Moore)
+Date: Sat, 29 Jul 2017 09:55:52 +0200
+Subject: [PATCH v2 4/4] clk: meson: gxbb-aoclk: Add CEC 32k clock
+In-Reply-To: <1501235589-318-5-git-send-email-narmstrong@baylibre.com>
+References: <1501235589-318-1-git-send-email-narmstrong@baylibre.com>
+ <1501235589-318-5-git-send-email-narmstrong@baylibre.com>
+Message-ID: <184320f7-e131-d7b7-f917-34cf12279740@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 10:54:30AM -0700, Florian Fainelli wrote:
-> On 07/28/2017 07:44 AM, Corentin Labbe wrote:
-> > On Fri, Jul 28, 2017 at 04:36:00PM +0200, Andrew Lunn wrote:
-> >>>> I've probably asked this before: Does the internal PHY use a different
-> >>>> PHY ID in registers 2 and 3?
-> >>>>
-> >>>
-> >>> yes
-> >>>
-> >>> reg2: 0x0044
-> >>> reg3: 0X1500
-> > 
-> > Copy/paste error, its 1400
-> > 
-> >>
-> >> So this is not about loading the correct PHY driver. You can already
-> >> do this based on the PHY IDs...
-> >>
-> >> This is about selecting which PHY to use. Internal or External?	
-> >>
-> >>      Andrew
-> > 
-> > It is too late when we know the PHY ID.
-> 
-> > We need to set a syscon for choosing external/internal PHY.
-> > So we can rely only on DT.
-> 
-> Since the Device Tree needs to be correct to identify which PHY to use
-> (internal or external), if you use the standard compatible string for
-> the PHY that contains its OUI, e.g:
-> 
-> compatible = "ethernet-phy-id0044.1400", "ethernet-phy-ieee802.3-c22"
-> 
-> then you can have your Ethernet MAC identify whether this is an internal
-> PHY by having a list of compatible strings to match against.
+Hi,
 
-So basicly, I replace sun8i-h3-ephy by ethernet-phy-id0044.1400 and it is good ?
+Le 28/07/2017 ? 11:53, Neil Armstrong a ?crit :
 
-> 
-> Corentin, can you make sure you copy netdev, Andrew and myself on the
-> next submissions so we don't have to keep track of seemingly identical
-> threads (this one + the rockchip dwmac changes) and we can work towards
-> one solution?
+[snip]
 
-Ok
+> +static long aoclk_cec_32k_round_rate(struct clk_hw *hw, unsigned long rate,
+> +				     unsigned long *prate)
+> +{
+> +	const struct cec_32k_freq_table *freq = find_cec_32k_freq(rate,
+> +								  *prate);
+> +
+> +	/* If invalid return first one */
+> +	if (!freq)
+> +		return freq[0].target_rate;
 
-Thanks
-Corentin Labbe
+Wouldn't this dereference a null pointer (or am I being stupid this 
+morning)?
+
+> +
+> +	return freq->target_rate;
+> +}
+> +
+> +static int aoclk_cec_32k_set_rate(struct clk_hw *hw, unsigned long rate,
+> +				  unsigned long parent_rate)
+> +{
+> +	const struct cec_32k_freq_table *freq = find_cec_32k_freq(rate,
+> +								  parent_rate);
+> +	struct aoclk_cec_32k *cec_32k = to_aoclk_cec_32k(hw);
+> +	u32 reg = 0;
+> +
+> +	if (!freq)
+> +		return -EINVAL;
+> +
+> +	/* Disable clock */
+> +	regmap_update_bits(cec_32k->regmap, AO_RTC_ALT_CLK_CNTL0,
+> +			   CLK_CNTL0_IN_GATE_EN | CLK_CNTL0_OUT_GATE_EN, 0);
+> +
+> +	if (freq->dualdiv)
+> +		reg = CLK_CNTL0_DUALDIV_EN |
+> +		      FIELD_PREP(CLK_CNTL0_N1_MASK, freq->n1 - 1) |
+> +		      FIELD_PREP(CLK_CNTL0_N2_MASK, freq->n2 - 1);
+> +	else
+> +		reg = FIELD_PREP(CLK_CNTL0_N1_MASK, freq->n1 - 1);
+> +
+
+Suggestion:
+
++	reg = FIELD_PREP(CLK_CNTL0_N1_MASK, freq->n1 - 1);
++	if (freq->dualdiv)
++		reg |= CLK_CNTL0_DUALDIV_EN |
++		       FIELD_PREP(CLK_CNTL0_N2_MASK, freq->n2 - 1);
+
+is shorter but maybe generates the same code.
+
+> +	regmap_write(cec_32k->regmap, AO_RTC_ALT_CLK_CNTL0, reg);
+> +
+> +	if (freq->dualdiv)
+> +		reg = FIELD_PREP(CLK_CNTL1_M1_MASK, freq->m1 - 1) |
+> +		      FIELD_PREP(CLK_CNTL1_M2_MASK, freq->m2 - 1);
+> +	else
+> +		reg = FIELD_PREP(CLK_CNTL1_M1_MASK, freq->m1 - 1);
+> +
+
+Idem:
+
++	reg = FIELD_PREP(CLK_CNTL1_M1_MASK, freq->m1 - 1);
++	if (freq->dualdiv)
++		reg |= FIELD_PREP(CLK_CNTL1_M2_MASK, freq->m2 - 1);
+
+Cheers,
+Chris
