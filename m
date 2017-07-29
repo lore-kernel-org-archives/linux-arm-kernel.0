@@ -1,159 +1,178 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 28 Jul 2017 17:03:39 -0700
-Subject: [PATCH 1/3] ARM: dts: NSP: Add dma-coherent to relevant DT entries
-In-Reply-To: <1501020372-19607-2-git-send-email-jon.mason@broadcom.com>
-References: <1501020372-19607-1-git-send-email-jon.mason@broadcom.com>
- <1501020372-19607-2-git-send-email-jon.mason@broadcom.com>
-Message-ID: <3df223b6-8ac5-b52f-f276-96c4a0dc7f23@gmail.com>
+From: boqun.feng@gmail.com (Boqun Feng)
+Date: Sat, 29 Jul 2017 09:20:49 +0800
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170728184129.GA24364@linux.vnet.ibm.com>
+References: <20170727014214.GH3730@linux.vnet.ibm.com>
+ <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
+ <20170727124913.GL3730@linux.vnet.ibm.com>
+ <20170727144903.000022a1@huawei.com>
+ <20170727173923.000001b2@huawei.com>
+ <20170727165245.GD3730@linux.vnet.ibm.com>
+ <20170728084411.00001ddb@huawei.com>
+ <20170728125416.j7gcgvnxgv2gq73u@tardis>
+ <20170728145530.GE3730@linux.vnet.ibm.com>
+ <20170728184129.GA24364@linux.vnet.ibm.com>
+Message-ID: <20170729012049.xyaeiqukhzcvj7mf@tardis>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2017 03:06 PM, Jon Mason wrote:
-> Cache related issues with DMA rings and performance issues related to
-> caching are being caused by not properly setting the "dma-coherent" flag
-> in the device tree entries.  Adding it here to correct the issue.
+On Fri, Jul 28, 2017 at 11:41:29AM -0700, Paul E. McKenney wrote:
+> On Fri, Jul 28, 2017 at 07:55:30AM -0700, Paul E. McKenney wrote:
+> > On Fri, Jul 28, 2017 at 08:54:16PM +0800, Boqun Feng wrote:
+> > > Hi Jonathan,
+> > > 
+> > > FWIW, there is wakeup-missing issue in swake_up() and swake_up_all():
+> > > 
+> > > 	https://marc.info/?l=linux-kernel&m=149750022019663
+> > > 
+> > > and RCU begins to use swait/wake last year, so I thought this could be
+> > > relevant.
+> > > 
+> > > Could you try the following patch and see if it works? Thanks.
+> > > 
+> > > Regards,
+> > > Boqun
+> > > 
+> > > ------------------>8
+> > > Subject: [PATCH] swait: Remove the lockless swait_active() check in
+> > >  swake_up*()
+> > > 
+> > > Steven Rostedt reported a potential race in RCU core because of
+> > > swake_up():
+> > > 
+> > >         CPU0                            CPU1
+> > >         ----                            ----
+> > >                                 __call_rcu_core() {
+> > > 
+> > >                                  spin_lock(rnp_root)
+> > >                                  need_wake = __rcu_start_gp() {
+> > >                                   rcu_start_gp_advanced() {
+> > >                                    gp_flags = FLAG_INIT
+> > >                                   }
+> > >                                  }
+> > > 
+> > >  rcu_gp_kthread() {
+> > >    swait_event_interruptible(wq,
+> > >         gp_flags & FLAG_INIT) {
+> > 
+> > So the idea is that we get the old value of ->gp_flags here, correct?
+> > 
+
+Yes.
+
+> > >    spin_lock(q->lock)
+> > > 
+> > >                                 *fetch wq->task_list here! *
+> > 
+> > And the above fetch is really part of the swait_active() called out
+> > below, right?
+> > 
+
+Right.
+
+> > >    list_add(wq->task_list, q->task_list)
+> > >    spin_unlock(q->lock);
+> > > 
+> > >    *fetch old value of gp_flags here *
+> > 
+> > And here we fetch the old value of ->gp_flags again, this time under
+> > the lock, right?
+> > 
+
+Hmm.. a bit different, this time is still lockless but *after* the wait
+enqueued itself. We could rely on the spin_lock(q->lock) above to pair
+with a spin_unlock() from another lock critical section of accessing
+the wait queue(typically from some waker). But in the case Steven came
+up, there is an lockless accessing to the wait queue from the waker, so
+such a pair doesn't exist, which end up that the waker sees a empty wait
+queue and do nothing, while the waiter still observes the old value
+after its enqueue and goes to sleep.
+
+> > >                                  spin_unlock(rnp_root)
+> > > 
+> > >                                  rcu_gp_kthread_wake() {
+> > >                                   swake_up(wq) {
+> > >                                    swait_active(wq) {
+> > >                                     list_empty(wq->task_list)
+> > > 
+> > >                                    } * return false *
+> > > 
+> > >   if (condition) * false *
+> > >     schedule();
+> > > 
+> > > In this case, a wakeup is missed, which could cause the rcu_gp_kthread
+> > > waits for a long time.
+> > > 
+> > > The reason of this is that we do a lockless swait_active() check in
+> > > swake_up(). To fix this, we can either 1) add a smp_mb() in swake_up()
+> > > before swait_active() to provide the proper order or 2) simply remove
+> > > the swait_active() in swake_up().
+> > > 
+> > > The solution 2 not only fixes this problem but also keeps the swait and
+> > > wait API as close as possible, as wake_up() doesn't provide a full
+> > > barrier and doesn't do a lockless check of the wait queue either.
+> > > Moreover, there are users already using swait_active() to do their quick
+> > > checks for the wait queues, so it make less sense that swake_up() and
+> > > swake_up_all() do this on their own.
+> > > 
+> > > This patch then removes the lockless swait_active() check in swake_up()
+> > > and swake_up_all().
+> > > 
+> > > Reported-by: Steven Rostedt <rostedt@goodmis.org>
+> > > Signed-off-by: Boqun Feng <boqun.feng@gmail.com>
+> > 
+> > Even though Jonathan's testing indicates that it didn't fix this
+> > particular problem:
+> > 
+> > Acked-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
 > 
-> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
-> Fixes: 5fa1026a3e4d ("ARM: dts: NSP: Add PL330 support")
-> Fixes: 3107fa5bcfb2 ("ARM: dts: NSP: Add SD/MMC support")
-> Fixes: 13d04f20935c ("ARM: dts: NSP: Add AMAC entries")
-> Fixes: 5aeda7bf8a1e ("ARM: dts: NSP: Add and enable amac2")
-> Fixes: 17d517172300 ("ARM: dts: NSP: Add mailbox (PDC) to NSP")
-> Fixes: 1d8ece6639e1 ("ARM: dts: NSP: Add EHCI/OHCI USB nodes to device tree")
-> Fixes: bf2289bedef4 ("ARM: dts: NSP: Add Switch Register Access Block node")
-
-The SRAB block is not DMA capable, so this seems a bit superfluous here.
-
-Do you want to submit a patch that omits PL330 for now and adds it
-eventually later so I can proceed with applying patches 2 & 3 for this
-cycle?
-
-
-> Fixes: 0f9f27a36d09 ("ARM: dts: NSP: Add I2C support to the DT")
-> Fixes: 8dbcad020f2e ("ARM: dts: nsp: Add sata device tree entry")
-> Fixes: 522199029fdc ("ARM: dts: NSP: Fix PCIE DT issue")
-> ---
->  arch/arm/boot/dts/bcm-nsp.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
+> And while we are at it:
 > 
-> diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-> index 7204d1def23d..c8d734d9f5fc 100644
-> --- a/arch/arm/boot/dts/bcm-nsp.dtsi
-> +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-> @@ -207,6 +207,7 @@
->  			clocks = <&iprocslow>;
->  			clock-names = "apb_pclk";
->  			#dma-cells = <1>;
-> +			dma-coherent;
->  		};
->  
->  		sdio: sdhci at 21000 {
-> @@ -215,6 +216,7 @@
->  			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
->  			sdhci,auto-cmd12;
->  			clocks = <&lcpll0 BCM_NSP_LCPLL0_SDIO_CLK>;
-> +			dma-coherent;
->  			status = "disabled";
->  		};
->  
-> @@ -224,6 +226,7 @@
->  			      <0x110000 0x1000>;
->  			reg-names = "amac_base", "idm_base";
->  			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-> +			dma-coherent;
->  			status = "disabled";
->  		};
->  
-> @@ -233,6 +236,7 @@
->  			      <0x111000 0x1000>;
->  			reg-names = "amac_base", "idm_base";
->  			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-> +			dma-coherent;
->  			status = "disabled";
->  		};
->  
-> @@ -242,6 +246,7 @@
->  			      <0x112000 0x1000>;
->  			reg-names = "amac_base", "idm_base";
->  			interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
-> +			dma-coherent;
->  			status = "disabled";
->  		};
->  
-> @@ -252,6 +257,7 @@
->  			#mbox-cells = <1>;
->  			brcm,rx-status-len = <32>;
->  			brcm,use-bcm-hdr;
-> +			dma-coherent;
->  		};
->  
->  		nand: nand at 26000 {
-> @@ -325,6 +331,7 @@
->  			compatible = "generic-ehci";
->  			reg = <0x2a000 0x100>;
->  			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-> +			dma-coherent;
->  			status = "disabled";
->  		};
->  
-> @@ -332,6 +339,7 @@
->  			compatible = "generic-ohci";
->  			reg = <0x2b000 0x100>;
->  			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-> +			dma-coherent;
->  			status = "disabled";
->  		};
->  
-> @@ -364,6 +372,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <0>;
->  
-> +			dma-coherent;
->  			status = "disabled";
->  
->  			/* ports are defined in board DTS */
-> @@ -376,6 +385,7 @@
->  			#size-cells = <0>;
->  			interrupts = <GIC_SPI 89 IRQ_TYPE_NONE>;
->  			clock-frequency = <100000>;
-> +			dma-coherent;
->  			status = "disabled";
->  		};
->  
-> @@ -446,6 +456,7 @@
->  			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
->  			#address-cells = <1>;
->  			#size-cells = <0>;
-> +			dma-coherent;
->  			status = "disabled";
->  
->  			sata0: sata-port at 0 {
-> @@ -483,6 +494,7 @@
->  		 */
->  		ranges = <0x82000000 0 0x08000000 0x08000000 0 0x8000000>;
->  
-> +		dma-coherent;
->  		status = "disabled";
->  
->  		msi-parent = <&msi0>;
-> @@ -519,6 +531,7 @@
->  		 */
->  		ranges = <0x82000000 0 0x40000000 0x40000000 0 0x8000000>;
->  
-> +		dma-coherent;
->  		status = "disabled";
->  
->  		msi-parent = <&msi1>;
-> @@ -555,6 +568,7 @@
->  		 */
->  		ranges = <0x82000000 0 0x48000000 0x48000000 0 0x8000000>;
->  
-> +		dma-coherent;
->  		status = "disabled";
->  
->  		msi-parent = <&msi2>;
+> Tested-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
 > 
 
+Thanks!
 
--- 
-Florian
+Regards,
+Boqun
+
+> > > ---
+> > >  kernel/sched/swait.c | 6 ------
+> > >  1 file changed, 6 deletions(-)
+> > > 
+> > > diff --git a/kernel/sched/swait.c b/kernel/sched/swait.c
+> > > index 3d5610dcce11..2227e183e202 100644
+> > > --- a/kernel/sched/swait.c
+> > > +++ b/kernel/sched/swait.c
+> > > @@ -33,9 +33,6 @@ void swake_up(struct swait_queue_head *q)
+> > >  {
+> > >  	unsigned long flags;
+> > > 
+> > > -	if (!swait_active(q))
+> > > -		return;
+> > > -
+> > >  	raw_spin_lock_irqsave(&q->lock, flags);
+> > >  	swake_up_locked(q);
+> > >  	raw_spin_unlock_irqrestore(&q->lock, flags);
+> > > @@ -51,9 +48,6 @@ void swake_up_all(struct swait_queue_head *q)
+> > >  	struct swait_queue *curr;
+> > >  	LIST_HEAD(tmp);
+> > > 
+> > > -	if (!swait_active(q))
+> > > -		return;
+> > > -
+> > >  	raw_spin_lock_irq(&q->lock);
+> > >  	list_splice_init(&q->task_list, &tmp);
+> > >  	while (!list_empty(&tmp)) {
+> > > -- 
+> > > 2.13.0
+> > > 
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170729/20cbb0f2/attachment.sig>
