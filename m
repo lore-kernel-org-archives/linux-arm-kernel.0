@@ -1,65 +1,121 @@
 From: abhishek.shah@broadcom.com (Abhishek Shah)
-Date: Sat, 29 Jul 2017 10:12:24 +0530
-Subject: [PATCH 2/7] arm64: dts: Add MDIO multiplexer DT node for Stingray
+Date: Sat, 29 Jul 2017 10:12:25 +0530
+Subject: [PATCH 3/7] arm64: dts: Add sp804 DT nodes for Stingray SoC
 In-Reply-To: <1501303349-30007-1-git-send-email-abhishek.shah@broadcom.com>
 References: <1501303349-30007-1-git-send-email-abhishek.shah@broadcom.com>
-Message-ID: <1501303349-30007-3-git-send-email-abhishek.shah@broadcom.com>
+Message-ID: <1501303349-30007-4-git-send-email-abhishek.shah@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinath Mannam <srinath.mannam@broadcom.com>
+From: Anup Patel <anup.patel@broadcom.com>
 
-Added MDIO multiplexer iproc DT node for Stingray, which contains
-the child nodes of PCIe serdes, RGMII, SATA and USB phy MDIO slaves.
+We have 8 instances of sp804 in Stingray SoC. Let's enable
+it in Stingray DT.
 
-Signed-off-by: Srinath Mannam <srinath.mannam@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 31 ++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 87 ++++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-index a63c465..697401d 100644
+index 697401d..19ad887 100644
 --- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
 +++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-@@ -275,6 +275,37 @@
+@@ -314,6 +314,93 @@
+ 			status = "disabled";
+ 		};
  
- 		#include "stingray-pinctrl.dtsi"
- 
-+		mdio_mux_iproc: mdio-mux at 0002023c {
-+			compatible = "brcm,mdio-mux-iproc";
-+			reg = <0x0002023c 0x14>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			mdio at 0 { /* PCIe serdes */
-+				reg = <0x0>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+
-+			mdio at 2 { /* SATA */
-+				reg = <0x2>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+
-+			mdio at 3 { /* USB */
-+				reg = <0x3>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+
-+			mdio at 10 { /* RGMII */
-+				reg = <0x10>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
++		timer0: timer at 00030000 {
++			compatible = "arm,sp804", "arm,primecell";
++			reg = <0x00030000 0x1000>;
++			interrupts = <GIC_SPI 179 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&hsls_25m_div2_clk>,
++				 <&hsls_25m_div2_clk>,
++				 <&hsls_div4_clk>;
++			clock-names = "timer1", "timer2", "apb_pclk";
++			status = "disabled";
 +		};
 +
- 		pwm: pwm at 00010000 {
- 			compatible = "brcm,iproc-pwm";
- 			reg = <0x00010000 0x1000>;
++		timer1: timer at 00040000 {
++			compatible = "arm,sp804", "arm,primecell";
++			reg = <0x00040000 0x1000>;
++			interrupts = <GIC_SPI 180 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&hsls_25m_div2_clk>,
++				 <&hsls_25m_div2_clk>,
++				 <&hsls_div4_clk>;
++			clock-names = "timer1", "timer2", "apb_pclk";
++		};
++
++		timer2: timer at 00050000 {
++			compatible = "arm,sp804", "arm,primecell";
++			reg = <0x00050000 0x1000>;
++			interrupts = <GIC_SPI 181 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&hsls_25m_div2_clk>,
++				 <&hsls_25m_div2_clk>,
++				 <&hsls_div4_clk>;
++			clock-names = "timer1", "timer2", "apb_pclk";
++			status = "disabled";
++		};
++
++		timer3: timer at 00060000 {
++			compatible = "arm,sp804", "arm,primecell";
++			reg = <0x00060000 0x1000>;
++			interrupts = <GIC_SPI 182 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&hsls_25m_div2_clk>,
++				 <&hsls_25m_div2_clk>,
++				 <&hsls_div4_clk>;
++			clock-names = "timer1", "timer2", "apb_pclk";
++			status = "disabled";
++		};
++
++		timer4: timer at 00070000 {
++			compatible = "arm,sp804", "arm,primecell";
++			reg = <0x00070000 0x1000>;
++			interrupts = <GIC_SPI 207 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&hsls_25m_div2_clk>,
++				 <&hsls_25m_div2_clk>,
++				 <&hsls_div4_clk>;
++			clock-names = "timer1", "timer2", "apb_pclk";
++			status = "disabled";
++		};
++
++		timer5: timer at 00080000 {
++			compatible = "arm,sp804", "arm,primecell";
++			reg = <0x00080000 0x1000>;
++			interrupts = <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&hsls_25m_div2_clk>,
++				 <&hsls_25m_div2_clk>,
++				 <&hsls_div4_clk>;
++			clock-names = "timer1", "timer2", "apb_pclk";
++			status = "disabled";
++		};
++
++		timer6: timer at 00090000 {
++			compatible = "arm,sp804", "arm,primecell";
++			reg = <0x00090000 0x1000>;
++			interrupts = <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&hsls_25m_div2_clk>,
++				 <&hsls_25m_div2_clk>,
++				 <&hsls_div4_clk>;
++			clock-names = "timer1", "timer2", "apb_pclk";
++			status = "disabled";
++		};
++
++		timer7: timer at 000a0000 {
++			compatible = "arm,sp804", "arm,primecell";
++			reg = <0x000a0000 0x1000>;
++			interrupts = <GIC_SPI 210 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&hsls_25m_div2_clk>,
++				 <&hsls_25m_div2_clk>,
++				 <&hsls_div4_clk>;
++			clock-names = "timer1", "timer2", "apb_pclk";
++			status = "disabled";
++		};
++
+ 		i2c0: i2c at 000b0000 {
+ 			compatible = "brcm,iproc-i2c";
+ 			reg = <0x000b0000 0x100>;
 -- 
 2.7.4
