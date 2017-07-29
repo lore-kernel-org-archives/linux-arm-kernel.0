@@ -1,170 +1,392 @@
 From: david@lechnology.com (David Lechner)
-Date: Sat, 29 Jul 2017 14:17:45 -0500
-Subject: [PATCH 1/6] drm/tinydrm: Add parameter for MIPI DCS pixel format
+Date: Sat, 29 Jul 2017 14:17:46 -0500
+Subject: [PATCH 2/6] drm/tinydrm: add helpers for ST7586 controllers
 In-Reply-To: <1501355870-13960-1-git-send-email-david@lechnology.com>
 References: <1501355870-13960-1-git-send-email-david@lechnology.com>
-Message-ID: <1501355870-13960-2-git-send-email-david@lechnology.com>
+Message-ID: <1501355870-13960-3-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a parameter for MIPI DCS pixel format to mipi_dbi_init().
-This is in preparation for supporting displays that don't use a 16bpp
-memory layout.
+This adds helper functions and support for ST7586 controllers. These
+controllers have an unusual memory layout where 3 pixels are packed into
+1 byte.
+
++-------+-----------------+
+| bit   | 7 6 5 4 3 2 1 0 |
++-------+-----------------+
+| pixel | 0 0 0 1 1 1 2 2 |
++-------+-----------------+
+
+So, there are a nuber of places in the tinydrm pipline where this format
+needs to be taken into consideration.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
- drivers/gpu/drm/tinydrm/mi0283qt.c |  3 ++-
- drivers/gpu/drm/tinydrm/mipi-dbi.c | 21 ++++++++++++++++++---
- include/drm/tinydrm/mipi-dbi.h     |  7 ++++++-
- include/video/mipi_display.h       | 14 ++++++++------
- 4 files changed, 34 insertions(+), 11 deletions(-)
+ drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c | 148 +++++++++++++++++++++++++
+ drivers/gpu/drm/tinydrm/mipi-dbi.c             |  96 ++++++++++++----
+ include/drm/tinydrm/tinydrm-helpers.h          |   6 +
+ include/video/mipi_display.h                   |   2 +
+ 4 files changed, 232 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/gpu/drm/tinydrm/mi0283qt.c b/drivers/gpu/drm/tinydrm/mi0283qt.c
-index 482ff1c3..2680dab 100644
---- a/drivers/gpu/drm/tinydrm/mi0283qt.c
-+++ b/drivers/gpu/drm/tinydrm/mi0283qt.c
-@@ -196,7 +196,8 @@ static int mi0283qt_probe(struct spi_device *spi)
- 	device_property_read_u32(dev, "rotation", &rotation);
+diff --git a/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c b/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c
+index d4cda33..4a36441 100644
+--- a/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c
++++ b/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c
+@@ -181,6 +181,154 @@ void tinydrm_xrgb8888_to_rgb565(u16 *dst, void *vaddr,
+ EXPORT_SYMBOL(tinydrm_xrgb8888_to_rgb565);
  
- 	ret = mipi_dbi_spi_init(spi, mipi, dc, &mi0283qt_pipe_funcs,
--				&mi0283qt_driver, &mi0283qt_mode, rotation);
-+				&mi0283qt_driver, &mi0283qt_mode,
-+				MIPI_DCS_PIXEL_FMT_16BIT, rotation);
- 	if (ret)
- 		return ret;
- 
+ /**
++ * tinydrm_rgb565_to_st7586 - Convert RGB565 to ST7586 clip buffer
++ * @dst: ST7586 destination buffer
++ * @vaddr: RGB565 source buffer
++ * @fb: DRM framebuffer
++ * @clip: Clip rectangle area to copy
++ * @swap: Swap bytes
++ *
++ * The ST7586 controller has a non-standard pixel layout. It is 2-bit grayscale
++ * (or 1-bit monochrome) packed into 3 pixels per byte.
++ *
++ * Note: the @clip x values are modified! They are aligned to the 3 pixel
++ * boundtry and divied by 3 to get the starting and ending byte (+ 1) in the
++ * @dst buffer.
++ */
++void tinydrm_rgb565_to_st7586(u8 *dst, void *vaddr,
++				struct drm_framebuffer *fb,
++				struct drm_clip_rect *clip)
++{
++	size_t len;
++	unsigned int x, y;
++	u16 *src, *buf;
++	u8 val;
++
++	/* 3 pixels per byte, so align to dst byte */
++	clip->x1 -= clip->x1 % 3;
++	clip->x2 = (clip->x2 + 2) / 3 * 3;
++	len = (clip->x2 - clip->x1) * sizeof(u16);
++
++	buf = kmalloc(len, GFP_KERNEL);
++	if (!buf)
++		return;
++
++	for (y = clip->y1; y < clip->y2; y++) {
++		src = vaddr + (y * fb->pitches[0]);
++		src += clip->x1;
++		memcpy(buf, src, len);
++		src = buf;
++		for (x = clip->x1; x < clip->x2; x += 3) {
++			/*
++			 * TODO: There is probably a better algorithm to get
++			 * a better downsampling.
++			 * If red or green is > 50%, set the high bit, which is
++			 * bright gray. If blue is greater than 50%, set the
++			 * low bit, which is dark gray.
++			 */
++			val =   ((*src & 0x8000) >>  8) |
++				((*src & 0x0400) >>  3) |
++				((*src & 0x0010) <<  2);
++			if (val & 0xC0)
++				val |= 0x20;
++			src++;
++			val |=  ((*src & 0x8000) >> 11) |
++				((*src & 0x0400) >>  6) |
++				((*src & 0x0010) >>  1);
++			if (val & 0x18)
++				val |= 0x04;
++			src++;
++			val |=  ((*src & 0x8000) >> 14) |
++				((*src & 0x0400) >>  9) |
++				((*src & 0x0010) >>  4);
++			src++;
++			*dst++ = ~val;
++		}
++	}
++
++	/* now adjust the clip so it applies to dst */
++	clip->x1 /= 3;
++	clip->x2 /= 3;
++
++	kfree(buf);
++}
++EXPORT_SYMBOL(tinydrm_rgb565_to_st7586);
++
++/**
++ * tinydrm_xrgb8888_to_st7586 - Convert XRGB8888 to ST7586 clip buffer
++ * @dst: ST7586 destination buffer
++ * @vaddr: XRGB8888 source buffer
++ * @fb: DRM framebuffer
++ * @clip: Clip rectangle area to copy
++ * @swap: Swap bytes
++ *
++ * The ST7586 controller has a non-standard pixel layout. It is 2-bit grayscale
++ * (or 1-bit monochrome) packed into 3 pixels per byte.
++ *
++ * Note: the @clip x values are modified! They are aligned to the 3 pixel
++ * boundtry and divied by 3 to get the starting and ending byte (+ 1) in the
++ * @dst buffer.
++ */
++void tinydrm_xrgb8888_to_st7586(u8 *dst, void *vaddr,
++				struct drm_framebuffer *fb,
++				struct drm_clip_rect *clip)
++{
++	size_t len;
++	unsigned int x, y;
++	u32 *src, *buf;
++	u8 val;
++
++	/* 3 pixels per byte, so align to dst byte */
++	clip->x1 -= clip->x1 % 3;
++	clip->x2 = (clip->x2 + 2) / 3 * 3;
++	len = (clip->x2 - clip->x1) * sizeof(u32);
++
++	buf = kmalloc(len, GFP_KERNEL);
++	if (!buf)
++		return;
++
++	for (y = clip->y1; y < clip->y2; y++) {
++		src = vaddr + (y * fb->pitches[0]);
++		src += clip->x1;
++		memcpy(buf, src, len);
++		src = buf;
++		for (x = clip->x1; x < clip->x2; x += 3) {
++			/*
++			 * TODO: There is probably a better algorithm to get
++			 * a better downsampling.
++			 * If red or green is > 50%, set the high bit, which is
++			 * bright gray. If blue is greater than 50%, set the
++			 * low bit, which is dark gray.
++			 */
++			val =   ((*src & 0x00800000) >> 16) |
++				((*src & 0x00008000) >>  8) |
++				((*src & 0x00000080) >>  1);
++			if (val & 0xC0)
++				val |= 0x20;
++			src++;
++			val |=  ((*src & 0x00800000) >> 19) |
++				((*src & 0x00008000) >> 11) |
++				((*src & 0x00000080) >>  4);
++			if (val & 0x18)
++				val |= 0x04;
++			src++;
++			val |=  ((*src & 0x00800000) >> 22) |
++				((*src & 0x00008000) >> 14) |
++				((*src & 0x00000080) >>  7);
++			src++;
++			*dst++ = ~val;
++		}
++	}
++
++	/* now adjust the clip so it applies to dst */
++	clip->x1 /= 3;
++	clip->x2 /= 3;
++
++	kfree(buf);
++}
++EXPORT_SYMBOL(tinydrm_xrgb8888_to_st7586);
++
++/**
+  * tinydrm_of_find_backlight - Find backlight device in device-tree
+  * @dev: Device
+  *
 diff --git a/drivers/gpu/drm/tinydrm/mipi-dbi.c b/drivers/gpu/drm/tinydrm/mipi-dbi.c
-index c83eeb7..7d49366 100644
+index 7d49366..c8fb622 100644
 --- a/drivers/gpu/drm/tinydrm/mipi-dbi.c
 +++ b/drivers/gpu/drm/tinydrm/mipi-dbi.c
-@@ -336,6 +336,7 @@ static const uint32_t mipi_dbi_formats[] = {
-  * @pipe_funcs: Display pipe functions
-  * @driver: DRM driver
-  * @mode: Display mode
-+ * @pixel_fmt: The display memory's pixel format
-  * @rotation: Initial rotation in degrees Counter Clock Wise
-  *
-  * This function initializes a &mipi_dbi structure and it's underlying
-@@ -352,15 +353,26 @@ static const uint32_t mipi_dbi_formats[] = {
- int mipi_dbi_init(struct device *dev, struct mipi_dbi *mipi,
- 		  const struct drm_simple_display_pipe_funcs *pipe_funcs,
- 		  struct drm_driver *driver,
--		  const struct drm_display_mode *mode, unsigned int rotation)
-+		  const struct drm_display_mode *mode,
-+		  enum mipi_dcs_pixel_format pixel_fmt, unsigned int rotation)
+@@ -154,7 +154,8 @@ int mipi_dbi_command_buf(struct mipi_dbi *mipi, u8 cmd, u8 *data, size_t len)
+ EXPORT_SYMBOL(mipi_dbi_command_buf);
+ 
+ static int mipi_dbi_buf_copy(void *dst, struct drm_framebuffer *fb,
+-				struct drm_clip_rect *clip, bool swap)
++				struct drm_clip_rect *clip,
++				enum mipi_dcs_pixel_format pixel_fmt, bool swap)
  {
--	size_t bufsize = mode->vdisplay * mode->hdisplay * sizeof(u16);
- 	struct tinydrm_device *tdev = &mipi->tinydrm;
-+	size_t bufsize;
- 	int ret;
- 
- 	if (!mipi->command)
- 		return -EINVAL;
- 
-+	switch (pixel_fmt) {
-+	case MIPI_DCS_PIXEL_FMT_16BIT:
-+		bufsize = mode->vdisplay * mode->hdisplay * sizeof(u16);
-+		break;
-+	default:
-+		DRM_ERROR("Pixel format is not supported\n");
-+		return -EINVAL;
-+	}
-+	mipi->pixel_fmt = pixel_fmt;
-+
- 	mutex_init(&mipi->cmdlock);
- 
- 	mipi->tx_buf = devm_kmalloc(dev, bufsize, GFP_KERNEL);
-@@ -781,6 +793,7 @@ static int mipi_dbi_typec3_command(struct mipi_dbi *mipi, u8 cmd,
-  * @pipe_funcs: Display pipe functions
-  * @driver: DRM driver
-  * @mode: Display mode
-+ * @pixel_fmt: The display memory's pixel format
-  * @rotation: Initial rotation in degrees Counter Clock Wise
-  *
-  * This function sets &mipi_dbi->command, enables &mipi->read_commands for the
-@@ -803,6 +816,7 @@ int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
- 		      const struct drm_simple_display_pipe_funcs *pipe_funcs,
- 		      struct drm_driver *driver,
- 		      const struct drm_display_mode *mode,
-+		      enum mipi_dcs_pixel_format pixel_fmt,
- 		      unsigned int rotation)
- {
- 	size_t tx_size = tinydrm_spi_max_transfer_size(spi, 0);
-@@ -849,7 +863,8 @@ int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
- 			return -ENOMEM;
+ 	struct drm_gem_cma_object *cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
+ 	struct dma_buf_attachment *import_attach = cma_obj->base.import_attach;
+@@ -169,21 +170,45 @@ static int mipi_dbi_buf_copy(void *dst, struct drm_framebuffer *fb,
+ 			return ret;
  	}
  
--	return mipi_dbi_init(dev, mipi, pipe_funcs, driver, mode, rotation);
-+	return mipi_dbi_init(dev, mipi, pipe_funcs, driver, mode, pixel_fmt,
-+			     rotation);
- }
- EXPORT_SYMBOL(mipi_dbi_spi_init);
+-	switch (fb->format->format) {
+-	case DRM_FORMAT_RGB565:
+-		if (swap)
+-			tinydrm_swab16(dst, src, fb, clip);
+-		else
+-			tinydrm_memcpy(dst, src, fb, clip);
++	switch (pixel_fmt) {
++	case MIPI_DCS_PIXEL_FMT_16BIT:
++		switch (fb->format->format) {
++		case DRM_FORMAT_RGB565:
++			if (swap)
++				tinydrm_swab16(dst, src, fb, clip);
++			else
++				tinydrm_memcpy(dst, src, fb, clip);
++			break;
++		case DRM_FORMAT_XRGB8888:
++			tinydrm_xrgb8888_to_rgb565(dst, src, fb, clip, swap);
++			break;
++		default:
++			ret = -EINVAL;
++			break;
++		}
+ 		break;
+-	case DRM_FORMAT_XRGB8888:
+-		tinydrm_xrgb8888_to_rgb565(dst, src, fb, clip, swap);
++	case MIPI_DCS_PIXEL_FMT_ST7586_332:
++		switch (fb->format->format) {
++		case DRM_FORMAT_RGB565:
++			tinydrm_rgb565_to_st7586(dst, src, fb, clip);
++			break;
++		case DRM_FORMAT_XRGB8888:
++			tinydrm_xrgb8888_to_st7586(dst, src, fb, clip);
++			break;
++		default:
++			ret = -EINVAL;
++			break;
++		}
+ 		break;
+ 	default:
++		ret = -EINVAL;
++		break;
++	}
++	if (ret) {
+ 		dev_err_once(fb->dev->dev, "Format is not supported: %s\n",
+-			     drm_get_format_name(fb->format->format,
+-						 &format_name));
+-		return -EINVAL;
++			drm_get_format_name(fb->format->format,
++						&format_name));
++		return ret;
+ 	}
  
-diff --git a/include/drm/tinydrm/mipi-dbi.h b/include/drm/tinydrm/mipi-dbi.h
-index d137b16..dda100c 100644
---- a/include/drm/tinydrm/mipi-dbi.h
-+++ b/include/drm/tinydrm/mipi-dbi.h
-@@ -13,6 +13,7 @@
- #define __LINUX_MIPI_DBI_H
+ 	if (import_attach)
+@@ -204,8 +229,9 @@ static int mipi_dbi_fb_dirty(struct drm_framebuffer *fb,
+ 	bool swap = mipi->swap_bytes;
+ 	struct drm_clip_rect clip;
+ 	int ret = 0;
+-	bool full;
++	bool full, pixel_fmt_match;
+ 	void *tr;
++	size_t len;
  
- #include <drm/tinydrm/tinydrm.h>
-+#include <video/mipi_display.h>
+ 	mutex_lock(&tdev->dirty_lock);
  
- struct spi_device;
- struct gpio_desc;
-@@ -33,6 +34,7 @@ struct regulator;
-  * @tx_buf9_len: Size of tx_buf9.
-  * @swap_bytes: Swap bytes in buffer before transfer
-  * @reset: Optional reset gpio
-+ * @pixel_fmt: The display memory's pixel format
-  * @rotation: initial rotation in degrees Counter Clock Wise
-  * @backlight: backlight device (optional)
-  * @regulator: power regulator (optional)
-@@ -50,6 +52,7 @@ struct mipi_dbi {
- 	size_t tx_buf9_len;
- 	bool swap_bytes;
- 	struct gpio_desc *reset;
-+	enum mipi_dcs_pixel_format pixel_fmt;
- 	unsigned int rotation;
- 	struct backlight_device *backlight;
- 	struct regulator *regulator;
-@@ -66,11 +69,13 @@ int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
- 		      const struct drm_simple_display_pipe_funcs *pipe_funcs,
- 		      struct drm_driver *driver,
- 		      const struct drm_display_mode *mode,
-+		      enum mipi_dcs_pixel_format pixel_fmt,
- 		      unsigned int rotation);
- int mipi_dbi_init(struct device *dev, struct mipi_dbi *mipi,
- 		  const struct drm_simple_display_pipe_funcs *pipe_funcs,
- 		  struct drm_driver *driver,
--		  const struct drm_display_mode *mode, unsigned int rotation);
-+		  const struct drm_display_mode *mode,
-+		  enum mipi_dcs_pixel_format pixel_fmt, unsigned int rotation);
- void mipi_dbi_pipe_enable(struct drm_simple_display_pipe *pipe,
- 			  struct drm_crtc_state *crtc_state);
- void mipi_dbi_pipe_disable(struct drm_simple_display_pipe *pipe);
+@@ -218,20 +244,24 @@ static int mipi_dbi_fb_dirty(struct drm_framebuffer *fb,
+ 
+ 	full = tinydrm_merge_clips(&clip, clips, num_clips, flags,
+ 				   fb->width, fb->height);
++	pixel_fmt_match = !swap && fb->format->format == DRM_FORMAT_RGB565 &&
++				mipi->pixel_fmt == MIPI_DCS_PIXEL_FMT_16BIT;
+ 
+ 	DRM_DEBUG("Flushing [FB:%d] x1=%u, x2=%u, y1=%u, y2=%u\n", fb->base.id,
+ 		  clip.x1, clip.x2, clip.y1, clip.y2);
+ 
+-	if (!mipi->dc || !full || swap ||
+-	    fb->format->format == DRM_FORMAT_XRGB8888) {
++	if (!mipi->dc || !full || !pixel_fmt_match) {
+ 		tr = mipi->tx_buf;
+-		ret = mipi_dbi_buf_copy(mipi->tx_buf, fb, &clip, swap);
++		ret = mipi_dbi_buf_copy(mipi->tx_buf, fb, &clip,
++					mipi->pixel_fmt, swap);
+ 		if (ret)
+ 			goto out_unlock;
+ 	} else {
+ 		tr = cma_obj->vaddr;
+ 	}
+ 
++	/* NB: mipi_dbi_buf_copy() may modify clip! */
++
+ 	mipi_dbi_command(mipi, MIPI_DCS_SET_COLUMN_ADDRESS,
+ 			 (clip.x1 >> 8) & 0xFF, clip.x1 & 0xFF,
+ 			 (clip.x2 >> 8) & 0xFF, (clip.x2 - 1) & 0xFF);
+@@ -239,8 +269,16 @@ static int mipi_dbi_fb_dirty(struct drm_framebuffer *fb,
+ 			 (clip.y1 >> 8) & 0xFF, clip.y1 & 0xFF,
+ 			 (clip.y2 >> 8) & 0xFF, (clip.y2 - 1) & 0xFF);
+ 
+-	ret = mipi_dbi_command_buf(mipi, MIPI_DCS_WRITE_MEMORY_START, tr,
+-				(clip.x2 - clip.x1) * (clip.y2 - clip.y1) * 2);
++	len = (clip.x2 - clip.x1) * (clip.y2 - clip.y1);
++	switch (mipi->pixel_fmt) {
++	case MIPI_DCS_PIXEL_FMT_16BIT:
++		len *= sizeof(u16);
++		break;
++	default:
++		break;
++	}
++
++	ret = mipi_dbi_command_buf(mipi, MIPI_DCS_WRITE_MEMORY_START, tr, len);
+ 
+ out_unlock:
+ 	mutex_unlock(&tdev->dirty_lock);
+@@ -288,7 +326,20 @@ static void mipi_dbi_blank(struct mipi_dbi *mipi)
+ 	struct drm_device *drm = mipi->tinydrm.drm;
+ 	u16 height = drm->mode_config.min_height;
+ 	u16 width = drm->mode_config.min_width;
+-	size_t len = width * height * 2;
++	size_t len;
++
++	switch (mipi->pixel_fmt) {
++	case MIPI_DCS_PIXEL_FMT_16BIT:
++		len = width * height * sizeof(u16);
++		break;
++	case MIPI_DCS_PIXEL_FMT_ST7586_332:
++		width = (width + 2) / 3;
++		len = width * height;
++		break;
++	default:
++		/* unsupported pixel format */
++		return;
++	}
+ 
+ 	memset(mipi->tx_buf, 0, len);
+ 
+@@ -367,6 +418,10 @@ int mipi_dbi_init(struct device *dev, struct mipi_dbi *mipi,
+ 	case MIPI_DCS_PIXEL_FMT_16BIT:
+ 		bufsize = mode->vdisplay * mode->hdisplay * sizeof(u16);
+ 		break;
++	case MIPI_DCS_PIXEL_FMT_ST7586_332:
++		/* 3 pixels per byte */
++		bufsize = (mode->vdisplay + 2) / 3 * mode->hdisplay;
++		break;
+ 	default:
+ 		DRM_ERROR("Pixel format is not supported\n");
+ 		return -EINVAL;
+@@ -776,7 +831,8 @@ static int mipi_dbi_typec3_command(struct mipi_dbi *mipi, u8 cmd,
+ 	if (ret || !num)
+ 		return ret;
+ 
+-	if (cmd == MIPI_DCS_WRITE_MEMORY_START && !mipi->swap_bytes)
++	if (cmd == MIPI_DCS_WRITE_MEMORY_START && !mipi->swap_bytes &&
++	    mipi->pixel_fmt != MIPI_DCS_PIXEL_FMT_ST7586_332)
+ 		bpw = 16;
+ 
+ 	gpiod_set_value_cansleep(mipi->dc, 1);
+diff --git a/include/drm/tinydrm/tinydrm-helpers.h b/include/drm/tinydrm/tinydrm-helpers.h
+index 9b9b6cf..94792fb 100644
+--- a/include/drm/tinydrm/tinydrm-helpers.h
++++ b/include/drm/tinydrm/tinydrm-helpers.h
+@@ -43,6 +43,12 @@ void tinydrm_swab16(u16 *dst, void *vaddr, struct drm_framebuffer *fb,
+ void tinydrm_xrgb8888_to_rgb565(u16 *dst, void *vaddr,
+ 				struct drm_framebuffer *fb,
+ 				struct drm_clip_rect *clip, bool swap);
++void tinydrm_rgb565_to_st7586(u8 *dst, void *vaddr,
++				struct drm_framebuffer *fb,
++				struct drm_clip_rect *clip);
++void tinydrm_xrgb8888_to_st7586(u8 *dst, void *vaddr,
++				struct drm_framebuffer *fb,
++				struct drm_clip_rect *clip);
+ 
+ struct backlight_device *tinydrm_of_find_backlight(struct device *dev);
+ int tinydrm_enable_backlight(struct backlight_device *backlight);
 diff --git a/include/video/mipi_display.h b/include/video/mipi_display.h
-index 19aa65a..84b70cd 100644
+index 84b70cd..1c134c4 100644
 --- a/include/video/mipi_display.h
 +++ b/include/video/mipi_display.h
-@@ -128,11 +128,13 @@ enum {
+@@ -135,6 +135,8 @@ enum mipi_dcs_pixel_format {
+ 	MIPI_DCS_PIXEL_FMT_12BIT	= 3,
+ 	MIPI_DCS_PIXEL_FMT_8BIT		= 2,
+ 	MIPI_DCS_PIXEL_FMT_3BIT		= 1,
++	/* non-standard format packing 1 or 2bpp in 3:3:2 bits */
++	MIPI_DCS_PIXEL_FMT_ST7586_332	= -1,
  };
- 
- /* MIPI DCS pixel formats */
--#define MIPI_DCS_PIXEL_FMT_24BIT	7
--#define MIPI_DCS_PIXEL_FMT_18BIT	6
--#define MIPI_DCS_PIXEL_FMT_16BIT	5
--#define MIPI_DCS_PIXEL_FMT_12BIT	3
--#define MIPI_DCS_PIXEL_FMT_8BIT		2
--#define MIPI_DCS_PIXEL_FMT_3BIT		1
-+enum mipi_dcs_pixel_format {
-+	MIPI_DCS_PIXEL_FMT_24BIT	= 7,
-+	MIPI_DCS_PIXEL_FMT_18BIT	= 6,
-+	MIPI_DCS_PIXEL_FMT_16BIT	= 5,
-+	MIPI_DCS_PIXEL_FMT_12BIT	= 3,
-+	MIPI_DCS_PIXEL_FMT_8BIT		= 2,
-+	MIPI_DCS_PIXEL_FMT_3BIT		= 1,
-+};
  
  #endif
 -- 
