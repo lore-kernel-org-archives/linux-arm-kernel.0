@@ -1,9 +1,9 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat, 29 Jul 2017 07:59:31 +0200
-Subject: [PATCH 02/12] mmc: s3cmci: constify mmc_host_ops structures
+Date: Sat, 29 Jul 2017 07:59:41 +0200
+Subject: [PATCH 12/12] mmc: bcm2835: constify mmc_host_ops structures
 In-Reply-To: <1501307981-29745-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1501307981-29745-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1501307981-29745-3-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1501307981-29745-13-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -45,19 +45,19 @@ static
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- drivers/mmc/host/s3cmci.c |    2 +-
+ drivers/mmc/host/bcm2835.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index 8896bf5..f7f157a 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -1313,7 +1313,7 @@ static void s3cmci_enable_sdio_irq(struct mmc_host *mmc, int enable)
- 	s3cmci_check_sdio_irq(host);
+diff --git a/drivers/mmc/host/bcm2835.c b/drivers/mmc/host/bcm2835.c
+index abba9a2..229dc18 100644
+--- a/drivers/mmc/host/bcm2835.c
++++ b/drivers/mmc/host/bcm2835.c
+@@ -1252,7 +1252,7 @@ static void bcm2835_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	mutex_unlock(&host->mutex);
  }
  
--static struct mmc_host_ops s3cmci_ops = {
-+static const struct mmc_host_ops s3cmci_ops = {
- 	.request	= s3cmci_request,
- 	.set_ios	= s3cmci_set_ios,
- 	.get_ro		= mmc_gpio_get_ro,
+-static struct mmc_host_ops bcm2835_ops = {
++static const struct mmc_host_ops bcm2835_ops = {
+ 	.request = bcm2835_request,
+ 	.set_ios = bcm2835_set_ios,
+ 	.hw_reset = bcm2835_reset,
