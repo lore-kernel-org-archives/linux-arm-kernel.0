@@ -1,56 +1,76 @@
-From: sean@nyekjaer.dk (Sean Nyekjaer)
-Date: Sat, 29 Jul 2017 12:44:11 +0200
-Subject: [PATCH] arm64: dts: marvell: armada-3720-espressobin: Add vqmmc
- regulator for SD slot
-Message-ID: <20170729104411.3602-1-sean@nyekjaer.dk>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Sat, 29 Jul 2017 12:24:39 +0100
+Subject: [RFC PATCH v1] net: ethernet: nb8800: Reset HW block in ndo_open
+In-Reply-To: <446e3a95-80c3-0742-9cb1-69a8dfc9b1ae@free.fr> (Mason's message
+ of "Fri, 28 Jul 2017 23:53:49 +0200")
+References: <823b1540-b528-bbd7-7f99-5dc39a08868a@sigmadesigns.com>
+ <yw1xk22slemx.fsf@mansr.com>
+ <c1bf54ee-8634-23a1-abda-55bc3fafe2a8@sigmadesigns.com>
+ <yw1xfudgl7am.fsf@mansr.com>
+ <446e3a95-80c3-0742-9cb1-69a8dfc9b1ae@free.fr>
+Message-ID: <yw1x7eyrlc3s.fsf@mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By adding this regulator, the SD cards are usable at higher speed
-protocols such as SDR104.
+Mason <slash.tmp@free.fr> writes:
 
-This patch was tested with an SDHC card compatible with UHS-I.
+> On 28/07/2017 20:56, M?ns Rullg?rd wrote:
+>
+>> Marc Gonzalez writes:
+>> 
+>>> On 28/07/2017 18:17, M?ns Rullg?rd wrote:
+>>>
+>>>> Marc Gonzalez wrote:
+>>>>
+>>>>> ndo_stop breaks RX in a way that ndo_open is unable to undo.
+>>>>
+>>>> Please elaborate.  Why can't it be fixed in a less heavy-handed way?
+>>>
+>>> I'm not sure what "elaborate" means. After we've been through
+>>> ndo_stop once, the board can send packets, but it doesn't see
+>>> any replies from remote systems. RX is wedged.
+>> 
+>> So you say, but you have not explained why this happens.  Until we know
+>> why, we can't decide on the proper fix.
+>
+> I'll try adding delays in strategic places, and see if
+> I can trigger the same bug on tango4. If I can't, then
+> this work around is all we've got.
+>
+> And I need nb8800_init for resume anyway, so I might
+> as well use it in ndo_open.
+>
+> TODO: test power savings from holding HW in reset.
+>
+>>> I think ndo_stop is rare enough an event that doing a full
+>>> reset is not an issue, in terms of performance.
+>> 
+>> Performance isn't the issue.  Doing the right thing is.
+>
+> I don't have always have time to figure out exactly how
+> broken HW is broken. It's already bad enough that disabling
+> DMA requires sending a fake packet through the loop back...
 
-Signed-off-by: Sean Nyekjaer <sean@nyekjaer.dk>
----
+Until you figure out why it's getting stuck, we can't be sure it isn't
+caused by something that could trigger at any time.
 
-This patch depends on "[PATCH] arm64: dts: marvell: Add microsd card definition for the ESPRESSObin"
+>>>> I'm pretty sure this doesn't preserve everything it should.
+>>>
+>>> Hmmm, we're supposed to start fresh ("full reset").
+>>> What could there be to preserve?
+>>> You mentioned flow control and multicast elsewhere.
+>>> I will take a closer look. Thanks for the heads up.
+>> 
+>> Yes, those settings are definitely lost with your patch.  Now I'm not
+>> sure whether the networking core expects these to survive a stop/start
+>> cycle, so please check that.  There might also be other less obvious
+>> things that need to be preserved.
+>
+> The original code calls nb8800_pause_config() every
+> time the link comes up. The proposed patch doesn't
+> change that.
 
- arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
+Yes, but by then you've reset those parameters to the defaults.
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-index 2dadd77e08eb..d5ab5b47f8d4 100644
---- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-@@ -60,6 +60,19 @@
- 		device_type = "memory";
- 		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
- 	};
-+
-+	vcc_sd_reg1: regulator {
-+		compatible = "regulator-gpio";
-+		regulator-name= "vcc_sd1";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpios = <&gpionb 4 GPIO_ACTIVE_HIGH>;
-+		gpios-states = <0>;
-+		states = <1800000 0x1
-+			  3300000 0x0>;
-+		enable-active-high;
-+	};
- };
- 
- /* J9 */
-@@ -82,7 +95,7 @@
- 	wp-inverted;
- 	bus-width = <4>;
- 	cd-gpios = <&gpionb 3 GPIO_ACTIVE_LOW>;
--	no-1-8-v;
-+	vqmmc-supply = <&vcc_sd_reg1>;
- 	marvell,pad-type = "sd";
- 	status = "okay";
- };
 -- 
-2.13.3
+M?ns Rullg?rd
