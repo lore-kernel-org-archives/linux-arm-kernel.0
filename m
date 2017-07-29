@@ -1,98 +1,63 @@
-From: abhishek.shah@broadcom.com (Abhishek Shah)
-Date: Sat, 29 Jul 2017 10:12:28 +0530
-Subject: [PATCH 6/7] arm64: dts: Add FlexRM DT nodes for Stingray
-In-Reply-To: <1501303349-30007-1-git-send-email-abhishek.shah@broadcom.com>
-References: <1501303349-30007-1-git-send-email-abhishek.shah@broadcom.com>
-Message-ID: <1501303349-30007-7-git-send-email-abhishek.shah@broadcom.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sat, 29 Jul 2017 07:59:30 +0200
+Subject: [PATCH 01/12] mmc: wmt-sdmmc: constify mmc_host_ops structures
+In-Reply-To: <1501307981-29745-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1501307981-29745-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1501307981-29745-2-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anup Patel <anup.patel@broadcom.com>
+The mmc_host_ops structure is only stored in the ops field of an
+mmc_host structure, which is declared as const.  Thus the mmc_host_ops
+structure itself can be const.
 
-We have two instances of FlexRM on Stingray. One for SBA RAID
-offload engine and another for SPU2 Crypto offload engine.
+Done with the help of Coccinelle.
 
-This patch adds FlexRM mailbox controller DT nodes for Stingray.
+// <smpl>
+@r disable optional_qualifier@
+identifier i;
+position p;
+@@
+static struct mmc_host_ops i at p = { ... };
 
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
+@ok1@
+struct mmc_host *mmc;
+identifier r.i;
+position p;
+@@
+mmc->ops = &i at p
+
+@bad@
+position p != {r.p,ok1.p};
+identifier r.i;
+struct mmc_host_ops e;
+@@
+e at i@p
+
+@depends on !bad disable optional_qualifier@
+identifier r.i;
+@@
+static
++const
+ struct mmc_host_ops i = { ... };
+// </smpl>
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
 ---
- .../boot/dts/broadcom/stingray/stingray-fs4.dtsi   | 54 ++++++++++++++++++++++
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi |  1 +
- 2 files changed, 55 insertions(+)
- create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
+ drivers/mmc/host/wmt-sdmmc.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
-new file mode 100644
-index 0000000..1f927c4
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
-@@ -0,0 +1,54 @@
-+/*
-+ *  BSD LICENSE
-+ *
-+ *  Copyright(c) 2016-2017 Broadcom.  All rights reserved.
-+ *
-+ *  Redistribution and use in source and binary forms, with or without
-+ *  modification, are permitted provided that the following conditions
-+ *  are met:
-+ *
-+ *    * Redistributions of source code must retain the above copyright
-+ *      notice, this list of conditions and the following disclaimer.
-+ *    * Redistributions in binary form must reproduce the above copyright
-+ *      notice, this list of conditions and the following disclaimer in
-+ *      the documentation and/or other materials provided with the
-+ *      distribution.
-+ *    * Neither the name of Broadcom nor the names of its
-+ *      contributors may be used to endorse or promote products derived
-+ *      from this software without specific prior written permission.
-+ *
-+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+	fs4: fs4 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0x0 0x0 0x67000000 0x00800000>;
-+
-+		crypto_mbox: crypto_mbox at 00000000 {
-+			compatible = "brcm,iproc-flexrm-mbox";
-+			reg = <0x00000000 0x200000>;
-+			msi-parent = <&gic_its 0x4100>;
-+			#mbox-cells = <3>;
-+			dma-coherent;
-+		};
-+
-+		raid_mbox: raid_mbox at 00400000 {
-+			compatible = "brcm,iproc-flexrm-mbox";
-+			reg = <0x00400000 0x200000>;
-+			dma-coherent;
-+			msi-parent = <&gic_its 0x4300>;
-+			#mbox-cells = <3>;
-+		};
-+	};
-diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-index 1700033..e6f75c6 100644
---- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
-@@ -267,6 +267,7 @@
- 		};
- 	};
+diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
+index 21ebba8..50fe69d 100644
+--- a/drivers/mmc/host/wmt-sdmmc.c
++++ b/drivers/mmc/host/wmt-sdmmc.c
+@@ -726,7 +726,7 @@ static int wmt_mci_get_cd(struct mmc_host *mmc)
+ 	return !(cd ^ priv->cd_inverted);
+ }
  
-+	#include "stingray-fs4.dtsi"
- 	#include "stingray-sata.dtsi"
- 
- 	hsls {
--- 
-2.7.4
+-static struct mmc_host_ops wmt_mci_ops = {
++static const struct mmc_host_ops wmt_mci_ops = {
+ 	.request = wmt_mci_request,
+ 	.set_ios = wmt_mci_set_ios,
+ 	.get_ro = wmt_mci_get_ro,
