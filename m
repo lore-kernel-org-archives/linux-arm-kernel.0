@@ -1,183 +1,71 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Sat, 29 Jul 2017 15:01:16 +0200
-Subject: [PATCH v3] vfio: platform: reset: Add Broadcom FlexRM reset module
-In-Reply-To: <1500549437-2870-2-git-send-email-anup.patel@broadcom.com>
-References: <1500549437-2870-1-git-send-email-anup.patel@broadcom.com>
- <1500549437-2870-2-git-send-email-anup.patel@broadcom.com>
-Message-ID: <c44c93c1-0bd9-bdaf-1603-ebbc4838c343@redhat.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Sat, 29 Jul 2017 16:17:41 +0200
+Subject: [PATCH v3 00/12] ASoC: Add I2S support for Allwinner H3 SoCs
+Message-ID: <20170729141753.20174-1-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anup,
-On 20/07/2017 13:17, Anup Patel wrote:
-> This patch adds Broadcom FlexRM low-level reset for
-> VFIO platform.
-> 
-> It will do the following:
-> 1. Disable/Deactivate each FlexRM ring
-> 2. Flush each FlexRM ring
-> 
-> The cleanup sequence for FlexRM rings is adapted from
-> Broadcom FlexRM mailbox driver.
-> 
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> Reviewed-by: Oza Oza <oza.oza@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> ---
->  drivers/vfio/platform/reset/Kconfig                |  9 +++
->  drivers/vfio/platform/reset/Makefile               |  1 +
->  .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 93 ++++++++++++++++++++++
->  3 files changed, 103 insertions(+)
->  create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
-> 
-> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
-> index 70cccc5..8d8d226 100644
-> --- a/drivers/vfio/platform/reset/Kconfig
-> +++ b/drivers/vfio/platform/reset/Kconfig
-> @@ -13,3 +13,12 @@ config VFIO_PLATFORM_AMDXGBE_RESET
->  	  Enables the VFIO platform driver to handle reset for AMD XGBE
->  
->  	  If you don't know what to do here, say N.
-> +
-> +config VFIO_PLATFORM_BCMFLEXRM_RESET
-> +	tristate "VFIO support for Broadcom FlexRM reset"
-> +	depends on VFIO_PLATFORM
-> +	depends on ARCH_BCM_IPROC || COMPILE_TEST
-depends on VFIO_PLATFORM && (ARCH_BCM_IPROC || COMPILE_TEST)?
-> +	help
-> +	  Enables the VFIO platform driver to handle reset for Broadcom FlexRM
-> +
-> +	  If you don't know what to do here, say N.
-> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
-> index 93f4e23..8d9874b 100644
-> --- a/drivers/vfio/platform/reset/Makefile
-> +++ b/drivers/vfio/platform/reset/Makefile
-> @@ -5,3 +5,4 @@ ccflags-y += -Idrivers/vfio/platform
->  
->  obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
->  obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
-> +obj-$(CONFIG_VFIO_PLATFORM_BCMFLEXRM_RESET) += vfio_platform_bcmflexrm.o
-> diff --git a/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
-> new file mode 100644
-> index 0000000..a198196
-> --- /dev/null
-> +++ b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
-> @@ -0,0 +1,93 @@
-> +/*
-> + * Copyright (C) 2017 Broadcom
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +/*
-> + * This driver provides reset support for Broadcom FlexRM ring manager
-> + * to VFIO platform.
-> + */
-> +
-> +#include <linux/delay.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +
-> +#include "vfio_platform_private.h"
-> +
-> +/* FlexRM configuration */
-> +#define RING_REGS_SIZE					0x10000
-> +#define RING_VER_MAGIC					0x76303031
-> +
-> +/* Per-Ring register offsets */
-> +#define RING_VER					0x000
-> +#define RING_CONTROL					0x034
-> +#define RING_FLUSH_DONE					0x038
-> +
-> +/* Register RING_CONTROL fields */
-> +#define CONTROL_FLUSH_SHIFT				5
-> +#define CONTROL_ACTIVE_SHIFT				4
-not used
-> +
-> +/* Register RING_FLUSH_DONE fields */
-> +#define FLUSH_DONE_MASK					0x1
-> +
-> +static void vfio_platform_bcmflexrm_shutdown(void __iomem *ring)
-> +{
-> +	unsigned int timeout;
-> +
-> +	/* Disable/inactivate ring */
-> +	writel_relaxed(0x0, ring + RING_CONTROL);
-> +
-> +	/* Flush ring with timeout of 1s */
-> +	timeout = 1000;
-> +	writel_relaxed(BIT(CONTROL_FLUSH_SHIFT), ring + RING_CONTROL);
-> +	do {
-> +		if (readl_relaxed(ring + RING_FLUSH_DONE) & FLUSH_DONE_MASK)
-> +			break;
-> +		mdelay(1);
-> +	} while (timeout--);
-> +
-> +	if (!timeout)
-> +		pr_warn("VFIO FlexRM shutdown timedout\n");
-s/timedout/timeout
+From: Marcus Cooper <codekipper@gmail.com>
 
-vfio_platform_bcmflexrm_shutdown may also return an error that would be
-propagated to the called:
-vfio_platform_release() would then emit a dev_warn + WARN_ON. your
-choice - I know this is not done in amdxge reset function ;-) -.
+Hi All,
+please find attached a series of patches to bring i2s support to the
+Allwinner H3 SoC. This has been tested with the following setups:
+
+A20 Olimex EVB connected to a pcm5102
+Orange Pi 2 connected to a uda1380
+Orange Pi 2 hdmi audio playback
+Pine 64 connected to the audio DAC board
+
+To get i2s working some additional patches are required which will be
+delivered later. For now they have been pushed here
+
+https://github.com/codekipper/linux-sunxi/commits/sunxi-audio-h3
+
+I don't own a A33 device which uses the i2s block for the audio codec
+so if someone could test against that it would be much appreciated.
+
+I'm also wondering if there is a preferred way of setting the lrclk
+size in the dts?..currently it is set to the sample width but for example
+the pcm5102a wants it to be 32 bits whatever the sample rate.
+
+Thanks in advance,
+CK
+
+---
+
+v3 changes compared to v2 are:
+- initial changes to prepare driver for newer SoCs has been broken down
+  into smaller patches
+- reduce use of regmap fields to where just needed.
+- clkdiv expansion will be delivered later.
+- defines for H3 variant segregated.
+- fixed regmap config issue with SUN8I_I2S_FIFO_TX_REG.
 
 
-Comparing to the drivers/mailbox/bcm-flexrm-mailbox.c flexrm_shutdown()
-there is one section missing commented as "Abort all in-flight
-requests". I understand there is no HW adherence of this section but I
-just want to double check that after disabling and flush the ring as
-above you guarantee there is no more DMA accesses likely to happen and
-also no platform MSI can be triggered by the HW.
+v2 changes compared to v1 are:
+ - massive refactoring to remove duplicate code making use of regmap_fields.
+ - extending the clock divisors.
+ - removed code that should be delivered when we support 20/24bits
 
-Otherwise looks good to me
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+---
 
-For my curiosity do you intend to do a QEMU integration of this device?
+Marcus Cooper (12):
+  ASoC: sun4i-i2s: Extend quirks scope
+  ASoC: sun4i-i2s: Add clkdiv offsets to quirks
+  ASoC: sun4i-i2s: Add regmap config to quirks
+  ASoC: sun4i-i2s: Add TX FIFO offset to quirks
+  ASoC: sun4i-i2s: Add regmap fields for channels
+  ASoC: sun4i-i2s: Add changes for wss and sr
+  ASoC: sun4i-i2s: bclk and lrclk polarity tidyup
+  ASoC: sun4i-i2s: Add mclk enable regmap field
+  ASoC: sun4i-i2s: Add regmap field to set format
+  ASoC: sun4i-i2s: Check for slave select bit
+  ASoC: sun4i-i2s: Update global enable with bitmask
+  ASoC: sun4i-i2s: Add support for H3
 
-Thanks
+ .../devicetree/bindings/sound/sun4i-i2s.txt        |   2 +
+ sound/soc/sunxi/sun4i-i2s.c                        | 460 ++++++++++++++++++---
+ 2 files changed, 398 insertions(+), 64 deletions(-)
 
-Eric
-> +}
-> +
-> +static int vfio_platform_bcmflexrm_reset(struct vfio_platform_device *vdev)
-> +{
-> +	void __iomem *ring;
-> +	struct vfio_platform_region *reg = &vdev->regions[0];
-> +
-> +	/* Map FlexRM ring registers if not mapped */
-> +	if (!reg->ioaddr) {
-> +		reg->ioaddr = ioremap_nocache(reg->addr, reg->size);
-> +		if (!reg->ioaddr)
-> +			return -ENOMEM;
-> +	}
-> +
-> +	/* Discover and shutdown each FlexRM ring */
-> +	for (ring = reg->ioaddr;
-> +	     ring < (reg->ioaddr + reg->size); ring += RING_REGS_SIZE) {
-> +		if (readl_relaxed(ring + RING_VER) == RING_VER_MAGIC)
-> +			vfio_platform_bcmflexrm_shutdown(ring);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +module_vfio_reset_handler("brcm,iproc-flexrm-mbox",
-> +			  vfio_platform_bcmflexrm_reset);
-> +
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_AUTHOR("Anup Patel <anup.patel@broadcom.com>");
-> +MODULE_DESCRIPTION("Reset support for Broadcom FlexRM VFIO platform device");
-> 
+-- 
+2.13.3
