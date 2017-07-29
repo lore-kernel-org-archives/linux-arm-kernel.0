@@ -1,29 +1,159 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 28 Jul 2017 16:59:52 -0700
-Subject: [PATCH v3 0/4] Broadcom STB S2/S3/S5 support for ARM and MIPS
-In-Reply-To: <72d54e9c-6a50-2eac-52db-b1e8c234c552@broadcom.com>
-References: <20170706222225.9758-1-f.fainelli@gmail.com>
- <72d54e9c-6a50-2eac-52db-b1e8c234c552@broadcom.com>
-Message-ID: <4bebae92-5ae3-8b89-a85a-c06f9d70d658@gmail.com>
+Date: Fri, 28 Jul 2017 17:03:39 -0700
+Subject: [PATCH 1/3] ARM: dts: NSP: Add dma-coherent to relevant DT entries
+In-Reply-To: <1501020372-19607-2-git-send-email-jon.mason@broadcom.com>
+References: <1501020372-19607-1-git-send-email-jon.mason@broadcom.com>
+ <1501020372-19607-2-git-send-email-jon.mason@broadcom.com>
+Message-ID: <3df223b6-8ac5-b52f-f276-96c4a0dc7f23@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2017 12:52 PM, Florian Fainelli wrote:
-> On 07/06/2017 03:22 PM, Florian Fainelli wrote:
->> Hi,
->>
->> This patch series adds support for S2/S3/S5 suspend/resume states on
->> ARM and MIPS based Broadcom STB SoCs.
->>
->> This was submitted a long time ago by Brian, and I am now picking this
->> up and trying to get this included with support for our latest chips.
->>
->> Provided that I can collect the necessary Acks from Rob (DT) and other
->> people (Rafael?) I would probably take this via the Broadcom ARM SoC
->> pull requests.
+On 07/25/2017 03:06 PM, Jon Mason wrote:
+> Cache related issues with DMA rings and performance issues related to
+> caching are being caused by not properly setting the "dma-coherent" flag
+> in the device tree entries.  Adding it here to correct the issue.
 > 
-> Rafael, any feedback on this?
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+> Fixes: 5fa1026a3e4d ("ARM: dts: NSP: Add PL330 support")
+> Fixes: 3107fa5bcfb2 ("ARM: dts: NSP: Add SD/MMC support")
+> Fixes: 13d04f20935c ("ARM: dts: NSP: Add AMAC entries")
+> Fixes: 5aeda7bf8a1e ("ARM: dts: NSP: Add and enable amac2")
+> Fixes: 17d517172300 ("ARM: dts: NSP: Add mailbox (PDC) to NSP")
+> Fixes: 1d8ece6639e1 ("ARM: dts: NSP: Add EHCI/OHCI USB nodes to device tree")
+> Fixes: bf2289bedef4 ("ARM: dts: NSP: Add Switch Register Access Block node")
 
-Applied these 4 patches to drivers/next now.
+The SRAB block is not DMA capable, so this seems a bit superfluous here.
+
+Do you want to submit a patch that omits PL330 for now and adds it
+eventually later so I can proceed with applying patches 2 & 3 for this
+cycle?
+
+
+> Fixes: 0f9f27a36d09 ("ARM: dts: NSP: Add I2C support to the DT")
+> Fixes: 8dbcad020f2e ("ARM: dts: nsp: Add sata device tree entry")
+> Fixes: 522199029fdc ("ARM: dts: NSP: Fix PCIE DT issue")
+> ---
+>  arch/arm/boot/dts/bcm-nsp.dtsi | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
+> index 7204d1def23d..c8d734d9f5fc 100644
+> --- a/arch/arm/boot/dts/bcm-nsp.dtsi
+> +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+> @@ -207,6 +207,7 @@
+>  			clocks = <&iprocslow>;
+>  			clock-names = "apb_pclk";
+>  			#dma-cells = <1>;
+> +			dma-coherent;
+>  		};
+>  
+>  		sdio: sdhci at 21000 {
+> @@ -215,6 +216,7 @@
+>  			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
+>  			sdhci,auto-cmd12;
+>  			clocks = <&lcpll0 BCM_NSP_LCPLL0_SDIO_CLK>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -224,6 +226,7 @@
+>  			      <0x110000 0x1000>;
+>  			reg-names = "amac_base", "idm_base";
+>  			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -233,6 +236,7 @@
+>  			      <0x111000 0x1000>;
+>  			reg-names = "amac_base", "idm_base";
+>  			interrupts = <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -242,6 +246,7 @@
+>  			      <0x112000 0x1000>;
+>  			reg-names = "amac_base", "idm_base";
+>  			interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -252,6 +257,7 @@
+>  			#mbox-cells = <1>;
+>  			brcm,rx-status-len = <32>;
+>  			brcm,use-bcm-hdr;
+> +			dma-coherent;
+>  		};
+>  
+>  		nand: nand at 26000 {
+> @@ -325,6 +331,7 @@
+>  			compatible = "generic-ehci";
+>  			reg = <0x2a000 0x100>;
+>  			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -332,6 +339,7 @@
+>  			compatible = "generic-ohci";
+>  			reg = <0x2b000 0x100>;
+>  			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -364,6 +372,7 @@
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  
+> +			dma-coherent;
+>  			status = "disabled";
+>  
+>  			/* ports are defined in board DTS */
+> @@ -376,6 +385,7 @@
+>  			#size-cells = <0>;
+>  			interrupts = <GIC_SPI 89 IRQ_TYPE_NONE>;
+>  			clock-frequency = <100000>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  		};
+>  
+> @@ -446,6 +456,7 @@
+>  			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> +			dma-coherent;
+>  			status = "disabled";
+>  
+>  			sata0: sata-port at 0 {
+> @@ -483,6 +494,7 @@
+>  		 */
+>  		ranges = <0x82000000 0 0x08000000 0x08000000 0 0x8000000>;
+>  
+> +		dma-coherent;
+>  		status = "disabled";
+>  
+>  		msi-parent = <&msi0>;
+> @@ -519,6 +531,7 @@
+>  		 */
+>  		ranges = <0x82000000 0 0x40000000 0x40000000 0 0x8000000>;
+>  
+> +		dma-coherent;
+>  		status = "disabled";
+>  
+>  		msi-parent = <&msi1>;
+> @@ -555,6 +568,7 @@
+>  		 */
+>  		ranges = <0x82000000 0 0x48000000 0x48000000 0 0x8000000>;
+>  
+> +		dma-coherent;
+>  		status = "disabled";
+>  
+>  		msi-parent = <&msi2>;
+> 
+
+
 -- 
 Florian
