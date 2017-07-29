@@ -1,38 +1,40 @@
 From: abhishek.shah@broadcom.com (Abhishek Shah)
-Date: Sat, 29 Jul 2017 10:12:22 +0530
-Subject: [PATCH 0/7] Add more DT nodes for Stingray SoC
-Message-ID: <1501303349-30007-1-git-send-email-abhishek.shah@broadcom.com>
+Date: Sat, 29 Jul 2017 10:12:23 +0530
+Subject: [PATCH 1/7] arm64: dts: Enable stats for CCN-502 interconnect on
+ Stingray
+In-Reply-To: <1501303349-30007-1-git-send-email-abhishek.shah@broadcom.com>
+References: <1501303349-30007-1-git-send-email-abhishek.shah@broadcom.com>
+Message-ID: <1501303349-30007-2-git-send-email-abhishek.shah@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is round two of adding DT nodes for Stingray SoC.
-Corresponding drivers and dt binding documents are already
-checked in the kernel and will be present in v4.14.
+From: Velibor Markovski <velibor.markovski@broadcom.com>
 
-Abhishek Shah (1):
-  arm64: dts: Add DT node to enable BGMAC driver on Stingray
+This patch enables stats for CCN-502 interconnect on Stingray.
 
-Anup Patel (3):
-  arm64: dts: Add sp804 DT nodes for Stingray SoC
-  arm64: dts: Add FlexRM DT nodes for Stingray
-  arm64: dts: Add SBA-RAID DT nodes for Stingray SoC
+Signed-off-by: Velibor Markovski <velibor.markovski@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+---
+ arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Srinath Mannam (2):
-  arm64: dts: Add MDIO multiplexer DT node for Stingray
-  arm64: dts: Add SATA DT nodes for Stingray SoC
-
-Velibor Markovski (1):
-  arm64: dts: Enable stats for CCN-502 interconnect on Stingray
-
- .../boot/dts/broadcom/stingray/bcm958742-base.dtsi |  78 ++++++
- .../boot/dts/broadcom/stingray/bcm958742k.dts      |   4 +
- .../boot/dts/broadcom/stingray/bcm958742t.dts      |   4 +
- .../boot/dts/broadcom/stingray/stingray-fs4.dtsi   | 118 +++++++++
- .../boot/dts/broadcom/stingray/stingray-sata.dtsi  | 278 +++++++++++++++++++++
- .../arm64/boot/dts/broadcom/stingray/stingray.dtsi | 136 ++++++++++
- 6 files changed, 618 insertions(+)
- create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-fs4.dtsi
- create mode 100644 arch/arm64/boot/dts/broadcom/stingray/stingray-sata.dtsi
-
+diff --git a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+index 49933cf..a63c465 100644
+--- a/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
++++ b/arch/arm64/boot/dts/broadcom/stingray/stingray.dtsi
+@@ -152,6 +152,12 @@
+ 		#size-cells = <1>;
+ 		ranges = <0x0 0x0 0x61000000 0x05000000>;
+ 
++		ccn: ccn at 00000000 {
++			compatible = "arm,ccn-502";
++			reg = <0x00000000 0x900000>;
++			interrupts = <GIC_SPI 799 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
+ 		gic: interrupt-controller at 02c00000 {
+ 			compatible = "arm,gic-v3";
+ 			#interrupt-cells = <3>;
 -- 
 2.7.4
