@@ -1,9 +1,9 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat, 29 Jul 2017 07:59:38 +0200
-Subject: [PATCH 09/12] mmc: sunxi: constify mmc_host_ops structures
+Date: Sat, 29 Jul 2017 07:59:31 +0200
+Subject: [PATCH 02/12] mmc: s3cmci: constify mmc_host_ops structures
 In-Reply-To: <1501307981-29745-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1501307981-29745-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1501307981-29745-10-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1501307981-29745-3-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -45,19 +45,19 @@ static
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- drivers/mmc/host/sunxi-mmc.c |    2 +-
+ drivers/mmc/host/s3cmci.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 6adc524..fa0601c 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -1048,7 +1048,7 @@ static int sunxi_mmc_card_busy(struct mmc_host *mmc)
- 	return !!(mmc_readl(host, REG_STAS) & SDXC_CARD_DATA_BUSY);
+diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+index 8896bf5..f7f157a 100644
+--- a/drivers/mmc/host/s3cmci.c
++++ b/drivers/mmc/host/s3cmci.c
+@@ -1313,7 +1313,7 @@ static void s3cmci_enable_sdio_irq(struct mmc_host *mmc, int enable)
+ 	s3cmci_check_sdio_irq(host);
  }
  
--static struct mmc_host_ops sunxi_mmc_ops = {
-+static const struct mmc_host_ops sunxi_mmc_ops = {
- 	.request	 = sunxi_mmc_request,
- 	.set_ios	 = sunxi_mmc_set_ios,
- 	.get_ro		 = mmc_gpio_get_ro,
+-static struct mmc_host_ops s3cmci_ops = {
++static const struct mmc_host_ops s3cmci_ops = {
+ 	.request	= s3cmci_request,
+ 	.set_ios	= s3cmci_set_ios,
+ 	.get_ro		= mmc_gpio_get_ro,
