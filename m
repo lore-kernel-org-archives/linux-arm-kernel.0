@@ -1,49 +1,183 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Sat, 29 Jul 2017 13:51:42 +0100
-Subject: [RFC PATCH v1] net: ethernet: nb8800: Reset HW block in ndo_open
-In-Reply-To: <bfc5678a-0536-7964-0d45-8f6b104e2f1a@free.fr> (Mason's message
- of "Sat, 29 Jul 2017 14:44:57 +0200")
-References: <823b1540-b528-bbd7-7f99-5dc39a08868a@sigmadesigns.com>
- <yw1xk22slemx.fsf@mansr.com>
- <c1bf54ee-8634-23a1-abda-55bc3fafe2a8@sigmadesigns.com>
- <yw1xfudgl7am.fsf@mansr.com>
- <446e3a95-80c3-0742-9cb1-69a8dfc9b1ae@free.fr>
- <yw1x7eyrlc3s.fsf@mansr.com>
- <f04a0cba-6c09-e9e4-f2d1-d8b2a7e276c9@free.fr>
- <yw1x379fla7r.fsf@mansr.com>
- <bfc5678a-0536-7964-0d45-8f6b104e2f1a@free.fr>
-Message-ID: <yw1xy3r7jti9.fsf@mansr.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Sat, 29 Jul 2017 15:01:16 +0200
+Subject: [PATCH v3] vfio: platform: reset: Add Broadcom FlexRM reset module
+In-Reply-To: <1500549437-2870-2-git-send-email-anup.patel@broadcom.com>
+References: <1500549437-2870-1-git-send-email-anup.patel@broadcom.com>
+ <1500549437-2870-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <c44c93c1-0bd9-bdaf-1603-ebbc4838c343@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+Hi Anup,
+On 20/07/2017 13:17, Anup Patel wrote:
+> This patch adds Broadcom FlexRM low-level reset for
+> VFIO platform.
+> 
+> It will do the following:
+> 1. Disable/Deactivate each FlexRM ring
+> 2. Flush each FlexRM ring
+> 
+> The cleanup sequence for FlexRM rings is adapted from
+> Broadcom FlexRM mailbox driver.
+> 
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Oza Oza <oza.oza@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> ---
+>  drivers/vfio/platform/reset/Kconfig                |  9 +++
+>  drivers/vfio/platform/reset/Makefile               |  1 +
+>  .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 93 ++++++++++++++++++++++
+>  3 files changed, 103 insertions(+)
+>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+> 
+> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
+> index 70cccc5..8d8d226 100644
+> --- a/drivers/vfio/platform/reset/Kconfig
+> +++ b/drivers/vfio/platform/reset/Kconfig
+> @@ -13,3 +13,12 @@ config VFIO_PLATFORM_AMDXGBE_RESET
+>  	  Enables the VFIO platform driver to handle reset for AMD XGBE
+>  
+>  	  If you don't know what to do here, say N.
+> +
+> +config VFIO_PLATFORM_BCMFLEXRM_RESET
+> +	tristate "VFIO support for Broadcom FlexRM reset"
+> +	depends on VFIO_PLATFORM
+> +	depends on ARCH_BCM_IPROC || COMPILE_TEST
+depends on VFIO_PLATFORM && (ARCH_BCM_IPROC || COMPILE_TEST)?
+> +	help
+> +	  Enables the VFIO platform driver to handle reset for Broadcom FlexRM
+> +
+> +	  If you don't know what to do here, say N.
+> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
+> index 93f4e23..8d9874b 100644
+> --- a/drivers/vfio/platform/reset/Makefile
+> +++ b/drivers/vfio/platform/reset/Makefile
+> @@ -5,3 +5,4 @@ ccflags-y += -Idrivers/vfio/platform
+>  
+>  obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
+>  obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
+> +obj-$(CONFIG_VFIO_PLATFORM_BCMFLEXRM_RESET) += vfio_platform_bcmflexrm.o
+> diff --git a/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+> new file mode 100644
+> index 0000000..a198196
+> --- /dev/null
+> +++ b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+> @@ -0,0 +1,93 @@
+> +/*
+> + * Copyright (C) 2017 Broadcom
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +/*
+> + * This driver provides reset support for Broadcom FlexRM ring manager
+> + * to VFIO platform.
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +
+> +#include "vfio_platform_private.h"
+> +
+> +/* FlexRM configuration */
+> +#define RING_REGS_SIZE					0x10000
+> +#define RING_VER_MAGIC					0x76303031
+> +
+> +/* Per-Ring register offsets */
+> +#define RING_VER					0x000
+> +#define RING_CONTROL					0x034
+> +#define RING_FLUSH_DONE					0x038
+> +
+> +/* Register RING_CONTROL fields */
+> +#define CONTROL_FLUSH_SHIFT				5
+> +#define CONTROL_ACTIVE_SHIFT				4
+not used
+> +
+> +/* Register RING_FLUSH_DONE fields */
+> +#define FLUSH_DONE_MASK					0x1
+> +
+> +static void vfio_platform_bcmflexrm_shutdown(void __iomem *ring)
+> +{
+> +	unsigned int timeout;
+> +
+> +	/* Disable/inactivate ring */
+> +	writel_relaxed(0x0, ring + RING_CONTROL);
+> +
+> +	/* Flush ring with timeout of 1s */
+> +	timeout = 1000;
+> +	writel_relaxed(BIT(CONTROL_FLUSH_SHIFT), ring + RING_CONTROL);
+> +	do {
+> +		if (readl_relaxed(ring + RING_FLUSH_DONE) & FLUSH_DONE_MASK)
+> +			break;
+> +		mdelay(1);
+> +	} while (timeout--);
+> +
+> +	if (!timeout)
+> +		pr_warn("VFIO FlexRM shutdown timedout\n");
+s/timedout/timeout
 
-> On 29/07/2017 14:05, M?ns Rullg?rd wrote:
->
->> Mason writes:
->> 
->>> I'll take this opportunity to change flow control to
->>> off by default (it breaks several 100 Mbps switches).
->> 
->> I was told to have it on by default.  This is what most other drivers
->> do too.  If you have faulty switches, that's your problem.
->
-> Or maybe the fault is in the HW implementation, and
-> it is the board's fault that the connection is hosed.
->
-> How many switches did you test the driver on?
->
-> We tested 4 switches, and DHCP failed on 3 of them.
-> Disabling pause frames "fixed" that.
+vfio_platform_bcmflexrm_shutdown may also return an error that would be
+propagated to the called:
+vfio_platform_release() would then emit a dev_warn + WARN_ON. your
+choice - I know this is not done in amdxge reset function ;-) -.
 
-Do those switches work with other NICs?
 
-> I could spend weeks testing dozens of switches, but
-> I have to prioritize. Ethernet flow control is simply
-> not an important feature in the market the SoC is
-> intended for.
+Comparing to the drivers/mailbox/bcm-flexrm-mailbox.c flexrm_shutdown()
+there is one section missing commented as "Abort all in-flight
+requests". I understand there is no HW adherence of this section but I
+just want to double check that after disabling and flush the ring as
+above you guarantee there is no more DMA accesses likely to happen and
+also no platform MSI can be triggered by the HW.
 
-Sure, flow control is rarely needed with well behaved systems.
+Otherwise looks good to me
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
--- 
-M?ns Rullg?rd
+For my curiosity do you intend to do a QEMU integration of this device?
+
+Thanks
+
+Eric
+> +}
+> +
+> +static int vfio_platform_bcmflexrm_reset(struct vfio_platform_device *vdev)
+> +{
+> +	void __iomem *ring;
+> +	struct vfio_platform_region *reg = &vdev->regions[0];
+> +
+> +	/* Map FlexRM ring registers if not mapped */
+> +	if (!reg->ioaddr) {
+> +		reg->ioaddr = ioremap_nocache(reg->addr, reg->size);
+> +		if (!reg->ioaddr)
+> +			return -ENOMEM;
+> +	}
+> +
+> +	/* Discover and shutdown each FlexRM ring */
+> +	for (ring = reg->ioaddr;
+> +	     ring < (reg->ioaddr + reg->size); ring += RING_REGS_SIZE) {
+> +		if (readl_relaxed(ring + RING_VER) == RING_VER_MAGIC)
+> +			vfio_platform_bcmflexrm_shutdown(ring);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +module_vfio_reset_handler("brcm,iproc-flexrm-mbox",
+> +			  vfio_platform_bcmflexrm_reset);
+> +
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR("Anup Patel <anup.patel@broadcom.com>");
+> +MODULE_DESCRIPTION("Reset support for Broadcom FlexRM VFIO platform device");
+> 
