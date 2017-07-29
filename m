@@ -1,76 +1,38 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Sat, 29 Jul 2017 12:24:39 +0100
+From: slash.tmp@free.fr (Mason)
+Date: Sat, 29 Jul 2017 14:02:00 +0200
 Subject: [RFC PATCH v1] net: ethernet: nb8800: Reset HW block in ndo_open
-In-Reply-To: <446e3a95-80c3-0742-9cb1-69a8dfc9b1ae@free.fr> (Mason's message
- of "Fri, 28 Jul 2017 23:53:49 +0200")
+In-Reply-To: <yw1x7eyrlc3s.fsf@mansr.com>
 References: <823b1540-b528-bbd7-7f99-5dc39a08868a@sigmadesigns.com>
  <yw1xk22slemx.fsf@mansr.com>
  <c1bf54ee-8634-23a1-abda-55bc3fafe2a8@sigmadesigns.com>
- <yw1xfudgl7am.fsf@mansr.com>
- <446e3a95-80c3-0742-9cb1-69a8dfc9b1ae@free.fr>
-Message-ID: <yw1x7eyrlc3s.fsf@mansr.com>
+ <yw1xfudgl7am.fsf@mansr.com> <446e3a95-80c3-0742-9cb1-69a8dfc9b1ae@free.fr>
+ <yw1x7eyrlc3s.fsf@mansr.com>
+Message-ID: <f04a0cba-6c09-e9e4-f2d1-d8b2a7e276c9@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+On 29/07/2017 13:24, M?ns Rullg?rd wrote:
 
-> On 28/07/2017 20:56, M?ns Rullg?rd wrote:
->
->> Marc Gonzalez writes:
->> 
->>> On 28/07/2017 18:17, M?ns Rullg?rd wrote:
->>>
->>>> Marc Gonzalez wrote:
->>>>
->>>>> ndo_stop breaks RX in a way that ndo_open is unable to undo.
->>>>
->>>> Please elaborate.  Why can't it be fixed in a less heavy-handed way?
->>>
->>> I'm not sure what "elaborate" means. After we've been through
->>> ndo_stop once, the board can send packets, but it doesn't see
->>> any replies from remote systems. RX is wedged.
->> 
->> So you say, but you have not explained why this happens.  Until we know
->> why, we can't decide on the proper fix.
->
-> I'll try adding delays in strategic places, and see if
-> I can trigger the same bug on tango4. If I can't, then
-> this work around is all we've got.
->
-> And I need nb8800_init for resume anyway, so I might
-> as well use it in ndo_open.
->
-> TODO: test power savings from holding HW in reset.
->
->>> I think ndo_stop is rare enough an event that doing a full
->>> reset is not an issue, in terms of performance.
->> 
->> Performance isn't the issue.  Doing the right thing is.
->
-> I don't have always have time to figure out exactly how
-> broken HW is broken. It's already bad enough that disabling
-> DMA requires sending a fake packet through the loop back...
+> Until you figure out why it's getting stuck, we can't be sure
+> it isn't caused by something that could trigger at any time.
+Would you take a look at it, if I can reproduce on tango4?
 
-Until you figure out why it's getting stuck, we can't be sure it isn't
-caused by something that could trigger at any time.
+I have identified a 100% reproducible flaw.
+I have proposed a work-around that brings this down to 0
+(tested 1000 cycles of link up / ping / link down).
 
->>>> I'm pretty sure this doesn't preserve everything it should.
->>>
->>> Hmmm, we're supposed to start fresh ("full reset").
->>> What could there be to preserve?
->>> You mentioned flow control and multicast elsewhere.
->>> I will take a closer look. Thanks for the heads up.
->> 
->> Yes, those settings are definitely lost with your patch.  Now I'm not
->> sure whether the networking core expects these to survive a stop/start
->> cycle, so please check that.  There might also be other less obvious
->> things that need to be preserved.
->
-> The original code calls nb8800_pause_config() every
-> time the link comes up. The proposed patch doesn't
-> change that.
+In my opinion, upstream should consider this work-around
+for inclusion. I'd like to hear David's and Florian's
+opinion on the topic. It's always a pain to maintain
+out-of-tree patches.
 
-Yes, but by then you've reset those parameters to the defaults.
+> Yes, but by then you've reset those parameters to the defaults.
 
--- 
-M?ns Rullg?rd
+Good catch. There is some non HW-related init in
+nb8800_hw_init().
+
+I'll take this opportunity to change flow control to
+off by default (it breaks several 100 Mbps switches).
+I'll take a closer look at priv assignments on Monday.
+
+Regards.
