@@ -1,10 +1,11 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat, 29 Jul 2017 07:59:29 +0200
-Subject: [PATCH 00/12] constify mmc_host_ops structures
-Message-ID: <1501307981-29745-1-git-send-email-Julia.Lawall@lip6.fr>
+Date: Sat, 29 Jul 2017 07:59:38 +0200
+Subject: [PATCH 09/12] mmc: sunxi: constify mmc_host_ops structures
+In-Reply-To: <1501307981-29745-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1501307981-29745-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1501307981-29745-10-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
 
 The mmc_host_ops structure is only stored in the ops field of an
 mmc_host structure, which is declared as const.  Thus the mmc_host_ops
@@ -12,18 +13,51 @@ structure itself can be const.
 
 Done with the help of Coccinelle.
 
----
+// <smpl>
+@r disable optional_qualifier@
+identifier i;
+position p;
+@@
+static struct mmc_host_ops i at p = { ... };
 
- drivers/mmc/host/bcm2835.c     |    2 +-
- drivers/mmc/host/davinci_mmc.c |    2 +-
- drivers/mmc/host/moxart-mmc.c  |    2 +-
- drivers/mmc/host/mtk-sd.c      |    2 +-
- drivers/mmc/host/s3cmci.c      |    2 +-
- drivers/mmc/host/sdricoh_cs.c  |    2 +-
- drivers/mmc/host/sh_mmcif.c    |    2 +-
- drivers/mmc/host/sunxi-mmc.c   |    2 +-
- drivers/mmc/host/toshsd.c      |    2 +-
- drivers/mmc/host/usdhi6rol0.c  |    2 +-
- drivers/mmc/host/vub300.c      |    2 +-
- drivers/mmc/host/wmt-sdmmc.c   |    2 +-
- 12 files changed, 12 insertions(+), 12 deletions(-)
+@ok1@
+struct mmc_host *mmc;
+identifier r.i;
+position p;
+@@
+mmc->ops = &i at p
+
+@bad@
+position p != {r.p,ok1.p};
+identifier r.i;
+struct mmc_host_ops e;
+@@
+e at i@p
+
+@depends on !bad disable optional_qualifier@
+identifier r.i;
+@@
+static
++const
+ struct mmc_host_ops i = { ... };
+// </smpl>
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
+---
+ drivers/mmc/host/sunxi-mmc.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 6adc524..fa0601c 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -1048,7 +1048,7 @@ static int sunxi_mmc_card_busy(struct mmc_host *mmc)
+ 	return !!(mmc_readl(host, REG_STAS) & SDXC_CARD_DATA_BUSY);
+ }
+ 
+-static struct mmc_host_ops sunxi_mmc_ops = {
++static const struct mmc_host_ops sunxi_mmc_ops = {
+ 	.request	 = sunxi_mmc_request,
+ 	.set_ios	 = sunxi_mmc_set_ios,
+ 	.get_ro		 = mmc_gpio_get_ro,
