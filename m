@@ -1,63 +1,30 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat, 29 Jul 2017 07:59:40 +0200
-Subject: [PATCH 11/12] mmc: mediatek: constify mmc_host_ops structures
-In-Reply-To: <1501307981-29745-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1501307981-29745-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1501307981-29745-12-git-send-email-Julia.Lawall@lip6.fr>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat, 29 Jul 2017 14:31:40 +0800
+Subject: [PATCH 0/2] Add ZTE zx-irdec remote control driver
+Message-ID: <1501309902-7559-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mmc_host_ops structure is only stored in the ops field of an
-mmc_host structure, which is declared as const.  Thus the mmc_host_ops
-structure itself can be const.
+From: Shawn Guo <shawn.guo@linaro.org>
 
-Done with the help of Coccinelle.
+The series adds dt-bindings and remote control driver for IRDEC block
+found on ZTE ZX family SoCs.
 
-// <smpl>
-@r disable optional_qualifier@
-identifier i;
-position p;
-@@
-static struct mmc_host_ops i at p = { ... };
+Shawn Guo (2):
+  dt-bindings: add bindings document for zx-irdec
+  rc: add zx-irdec remote control driver
 
-@ok1@
-struct mmc_host *mmc;
-identifier r.i;
-position p;
-@@
-mmc->ops = &i at p
+ .../devicetree/bindings/media/zx-irdec.txt         |  14 ++
+ drivers/media/rc/Kconfig                           |  11 ++
+ drivers/media/rc/Makefile                          |   1 +
+ drivers/media/rc/keymaps/Makefile                  |   3 +-
+ drivers/media/rc/keymaps/rc-zx-irdec.c             |  79 ++++++++
+ drivers/media/rc/zx-irdec.c                        | 198 +++++++++++++++++++++
+ include/media/rc-map.h                             |   1 +
+ 7 files changed, 306 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/media/zx-irdec.txt
+ create mode 100644 drivers/media/rc/keymaps/rc-zx-irdec.c
+ create mode 100644 drivers/media/rc/zx-irdec.c
 
-@bad@
-position p != {r.p,ok1.p};
-identifier r.i;
-struct mmc_host_ops e;
-@@
-e at i@p
-
-@depends on !bad disable optional_qualifier@
-identifier r.i;
-@@
-static
-+const
- struct mmc_host_ops i = { ... };
-// </smpl>
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
- drivers/mmc/host/mtk-sd.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index 68f4453..267f7ab 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -1579,7 +1579,7 @@ static void msdc_hw_reset(struct mmc_host *mmc)
- 	sdr_clr_bits(host->base + EMMC_IOCON, 1);
- }
- 
--static struct mmc_host_ops mt_msdc_ops = {
-+static const struct mmc_host_ops mt_msdc_ops = {
- 	.post_req = msdc_post_req,
- 	.pre_req = msdc_pre_req,
- 	.request = msdc_ops_request,
+-- 
+1.9.1
