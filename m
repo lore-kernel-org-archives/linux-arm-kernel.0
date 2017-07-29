@@ -1,147 +1,58 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Sat, 29 Jul 2017 16:17:48 +0200
-Subject: [PATCH v3 07/12] ASoC: sun4i-i2s: bclk and lrclk polarity tidyup
+Date: Sat, 29 Jul 2017 16:17:43 +0200
+Subject: [PATCH v3 02/12] ASoC: sun4i-i2s: Add clkdiv offsets to quirks
 In-Reply-To: <20170729141753.20174-1-codekipper@gmail.com>
 References: <20170729141753.20174-1-codekipper@gmail.com>
-Message-ID: <20170729141753.20174-8-codekipper@gmail.com>
+Message-ID: <20170729141753.20174-3-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-On newer SoCs the bit fields for the blck and lrclk polarity are in
-a different locations. Use regmap fields to set the polarity bits
-as intended.
+The BCLKDIV and MCLKDIV found on newer SoCs start from an offset of 1.
+Add the functionality to adjust the division values according to the
+needs to the device being used.
 
 Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- sound/soc/sunxi/sun4i-i2s.c | 45 ++++++++++++++++++++++++++++++++-------------
- 1 file changed, 32 insertions(+), 13 deletions(-)
+ sound/soc/sunxi/sun4i-i2s.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
-index 171df99a267e..90daa974bd27 100644
+index d7ee7a443e4e..1d538de4e4d0 100644
 --- a/sound/soc/sunxi/sun4i-i2s.c
 +++ b/sound/soc/sunxi/sun4i-i2s.c
-@@ -50,6 +50,8 @@
- #define SUN4I_I2S_FMT0_FMT_RIGHT_J			(2 << 0)
- #define SUN4I_I2S_FMT0_FMT_LEFT_J			(1 << 0)
- #define SUN4I_I2S_FMT0_FMT_I2S				(0 << 0)
-+#define SUN4I_I2S_FMT0_POLARITY_INVERTED		(1)
-+#define SUN4I_I2S_FMT0_POLARITY_NORMAL			(0)
+@@ -94,9 +94,13 @@
+  * struct sun4i_i2s_quirks - Differences between SoC variants.
+  *
+  * @has_reset: SoC needs reset deasserted.
++ * @mclk_offset: Value by which mclkdiv needs to be adjusted.
++ * @bclk_offset: Value by which bclkdiv needs to be adjusted.
+  */
+ struct sun4i_i2s_quirks {
+ 	bool				has_reset;
++	unsigned int			mclk_offset;
++	unsigned int			bclk_offset;
+ };
  
- #define SUN4I_I2S_FMT1_REG		0x08
- #define SUN4I_I2S_FIFO_TX_REG		0x0c
-@@ -101,6 +103,8 @@
-  * @fmt_offset: Value by which wss and sr needs to be adjusted.
-  * @field_fmt_set_wss: regmap field to set word select size.
-  * @field_fmt_set_sr: regmap field to set sample resolution.
-+ * @field_fmt_set_bclk_polarity: regmap field to set clk polarity.
-+ * @field_fmt_set_lrclk_polarity: regmap field to set frame polarity.
-  * @field_txchanmap: location of the tx channel mapping register.
-  * @field_rxchanmap: location of the rx channel mapping register.
-  * @field_txchansel: location of the tx channel select bit fields.
-@@ -117,6 +121,8 @@ struct sun4i_i2s_quirks {
- 	/* Register fields for i2s */
- 	struct reg_field		field_fmt_set_wss;
- 	struct reg_field		field_fmt_set_sr;
-+	struct reg_field		field_fmt_set_bclk_polarity;
-+	struct reg_field		field_fmt_set_lrclk_polarity;
- 	struct reg_field		field_txchanmap;
- 	struct reg_field		field_rxchanmap;
- 	struct reg_field		field_txchansel;
-@@ -137,6 +143,8 @@ struct sun4i_i2s {
- 	/* Register fields for i2s */
- 	struct regmap_field	*field_fmt_set_wss;
- 	struct regmap_field	*field_fmt_set_sr;
-+	struct regmap_field	*field_fmt_set_bclk_polarity;
-+	struct regmap_field	*field_fmt_set_lrclk_polarity;
- 	struct regmap_field	*field_txchanmap;
- 	struct regmap_field	*field_rxchanmap;
- 	struct regmap_field	*field_txchansel;
-@@ -332,6 +340,8 @@ static int sun4i_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
- {
- 	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
- 	u32 val;
-+	u32 bclk_polarity = SUN4I_I2S_FMT0_POLARITY_NORMAL;
-+	u32 lrclk_polarity = SUN4I_I2S_FMT0_POLARITY_NORMAL;
+ struct sun4i_i2s {
+@@ -149,7 +153,7 @@ static int sun4i_i2s_get_bclk_div(struct sun4i_i2s *i2s,
+ 		const struct sun4i_i2s_clk_div *bdiv = &sun4i_i2s_bclk_div[i];
  
- 	/* DAI Mode */
- 	switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
-@@ -356,32 +366,25 @@ static int sun4i_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
- 	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
- 	case SND_SOC_DAIFMT_IB_IF:
- 		/* Invert both clocks */
--		val = SUN4I_I2S_FMT0_BCLK_POLARITY_INVERTED |
--			SUN4I_I2S_FMT0_LRCLK_POLARITY_INVERTED;
-+		bclk_polarity = SUN4I_I2S_FMT0_POLARITY_INVERTED;
-+		lrclk_polarity = SUN4I_I2S_FMT0_POLARITY_INVERTED;
- 		break;
- 	case SND_SOC_DAIFMT_IB_NF:
- 		/* Invert bit clock */
--		val = SUN4I_I2S_FMT0_BCLK_POLARITY_INVERTED |
--			SUN4I_I2S_FMT0_LRCLK_POLARITY_NORMAL;
-+		bclk_polarity = SUN4I_I2S_FMT0_POLARITY_INVERTED;
- 		break;
- 	case SND_SOC_DAIFMT_NB_IF:
- 		/* Invert frame clock */
--		val = SUN4I_I2S_FMT0_LRCLK_POLARITY_INVERTED |
--			SUN4I_I2S_FMT0_BCLK_POLARITY_NORMAL;
-+		lrclk_polarity = SUN4I_I2S_FMT0_POLARITY_INVERTED;
- 		break;
- 	case SND_SOC_DAIFMT_NB_NF:
--		/* Nothing to do for both normal cases */
--		val = SUN4I_I2S_FMT0_BCLK_POLARITY_NORMAL |
--			SUN4I_I2S_FMT0_LRCLK_POLARITY_NORMAL;
- 		break;
- 	default:
- 		return -EINVAL;
+ 		if (bdiv->div == div)
+-			return bdiv->val;
++			return bdiv->val + i2s->variant->bclk_offset;
  	}
  
--	regmap_update_bits(i2s->regmap, SUN4I_I2S_FMT0_REG,
--			   SUN4I_I2S_FMT0_BCLK_POLARITY_MASK |
--			   SUN4I_I2S_FMT0_LRCLK_POLARITY_MASK,
--			   val);
-+	regmap_field_write(i2s->field_fmt_set_bclk_polarity, bclk_polarity);
-+	regmap_field_write(i2s->field_fmt_set_lrclk_polarity, lrclk_polarity);
+ 	return -EINVAL;
+@@ -167,7 +171,7 @@ static int sun4i_i2s_get_mclk_div(struct sun4i_i2s *i2s,
+ 		const struct sun4i_i2s_clk_div *mdiv = &sun4i_i2s_mclk_div[i];
  
- 	/* DAI clock master masks */
- 	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
-@@ -709,6 +712,8 @@ static const struct sun4i_i2s_quirks sun4i_a10_i2s_quirks = {
- 	.sun4i_i2s_regmap	= &sun4i_i2s_regmap_config,
- 	.field_fmt_set_wss	= REG_FIELD(SUN4I_I2S_FMT0_REG, 2, 3),
- 	.field_fmt_set_sr	= REG_FIELD(SUN4I_I2S_FMT0_REG, 4, 5),
-+	.field_fmt_set_bclk_polarity = REG_FIELD(SUN4I_I2S_FMT0_REG, 6, 6),
-+	.field_fmt_set_lrclk_polarity = REG_FIELD(SUN4I_I2S_FMT0_REG, 7, 7),
- 	.field_txchanmap	= REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
- 	.field_rxchanmap	= REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
- 	.field_txchansel	= REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
-@@ -721,6 +726,8 @@ static const struct sun4i_i2s_quirks sun6i_a31_i2s_quirks = {
- 	.sun4i_i2s_regmap	= &sun4i_i2s_regmap_config,
- 	.field_fmt_set_wss	= REG_FIELD(SUN4I_I2S_FMT0_REG, 2, 3),
- 	.field_fmt_set_sr	= REG_FIELD(SUN4I_I2S_FMT0_REG, 4, 5),
-+	.field_fmt_set_bclk_polarity = REG_FIELD(SUN4I_I2S_FMT0_REG, 6, 6),
-+	.field_fmt_set_lrclk_polarity = REG_FIELD(SUN4I_I2S_FMT0_REG, 7, 7),
- 	.field_txchanmap	= REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
- 	.field_rxchanmap	= REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
- 	.field_txchansel	= REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
-@@ -741,6 +748,18 @@ static int sun4i_i2s_init_regmap_fields(struct device *dev, struct sun4i_i2s *i2
- 	if (IS_ERR(i2s->field_fmt_set_sr))
- 		return PTR_ERR(i2s->field_fmt_set_sr);
+ 		if (mdiv->div == div)
+-			return mdiv->val;
++			return mdiv->val + i2s->variant->mclk_offset;
+ 	}
  
-+	i2s->field_fmt_set_bclk_polarity =
-+		devm_regmap_field_alloc(dev, i2s->regmap,
-+					i2s->variant->field_fmt_set_bclk_polarity);
-+	if (IS_ERR(i2s->field_fmt_set_bclk_polarity))
-+		return PTR_ERR(i2s->field_fmt_set_bclk_polarity);
-+
-+	i2s->field_fmt_set_lrclk_polarity =
-+		devm_regmap_field_alloc(dev, i2s->regmap,
-+					i2s->variant->field_fmt_set_lrclk_polarity);
-+	if (IS_ERR(i2s->field_fmt_set_lrclk_polarity))
-+		return PTR_ERR(i2s->field_fmt_set_lrclk_polarity);
-+
- 	i2s->field_txchanmap =
- 		devm_regmap_field_alloc(dev, i2s->regmap,
- 					i2s->variant->field_txchanmap);
+ 	return -EINVAL;
 -- 
 2.13.3
