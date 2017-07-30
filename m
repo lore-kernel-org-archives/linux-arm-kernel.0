@@ -1,24 +1,23 @@
 From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sun, 30 Jul 2017 21:24:03 +0300
-Subject: [PATCH 4/6] drm/tinydrm: mipi-panel: refactor to use driver id
-In-Reply-To: <1501355870-13960-5-git-send-email-david@lechnology.com>
+Date: Sun, 30 Jul 2017 21:26:15 +0300
+Subject: [PATCH 5/6] drm/tinydrm: add support for LEGO MINDSTORMS EV3 LCD
+In-Reply-To: <1501355870-13960-6-git-send-email-david@lechnology.com>
 References: <1501355870-13960-1-git-send-email-david@lechnology.com>
- <1501355870-13960-5-git-send-email-david@lechnology.com>
-Message-ID: <CAHp75VcdGi=TkB_7fPHROYoKJFUPZPGi=HvUAHuAvgZy-1_Epw@mail.gmail.com>
+ <1501355870-13960-6-git-send-email-david@lechnology.com>
+Message-ID: <CAHp75VdEcsdnhzi9PX6ziDTbp3KWNtyCZdBseYZ8_yNzus0-ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sat, Jul 29, 2017 at 10:17 PM, David Lechner <david@lechnology.com> wrote:
-> This refactors the mipi-panel module to use the driver id for panel-specific
-> data. This is in preparation for adding additional panels.
->
+> LEGO MINDSTORMS EV3 has an LCD with a ST7586 controller. This adds a new
+> module for the ST7586 controller with parameters for the EV3 LCD dispay.
 
-Wouldn't be better to split glue driver from what looks like more
-generic in the first place? Then you will not need to spread some
-stuff
-over generic files.
+>  .../devicetree/bindings/display/mipi-panel.txt     |  2 +-
+>  drivers/gpu/drm/tinydrm/mipi-panel.c               | 87 ++++++++++++++++++++++\]
 
-Are we going to disrupt genericy of the framework already with second driver?!
+C'mon, changes here have nothing to do with the framework itself!
+
+Header, OTOH, has been looking fine.
 
 -- 
 With Best Regards,
