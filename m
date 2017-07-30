@@ -1,105 +1,35 @@
-From: greg@kroah.com (Greg KH)
-Date: Sun, 30 Jul 2017 07:49:47 -0700
-Subject: [PATCH v4 3/9] serial: Add common rs485 device tree parsing
- function
-In-Reply-To: <20170718105948.21986-4-u.kleine-koenig@pengutronix.de>
-References: <20170718105948.21986-1-u.kleine-koenig@pengutronix.de>
- <20170718105948.21986-4-u.kleine-koenig@pengutronix.de>
-Message-ID: <20170730144947.GA18707@kroah.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun, 30 Jul 2017 19:10:33 +0200
+Subject: [PATCH V2 2/3] dt-bindings: bcm: Add Raspberry Pi Zero W
+In-Reply-To: <1501434634-2325-1-git-send-email-stefan.wahren@i2se.com>
+References: <1501434634-2325-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1501434634-2325-3-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 12:59:42PM +0200, Uwe Kleine-K?nig wrote:
-> From: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Several drivers have the same device tree parsing code. Create
-> a common helper function for it.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> [ukl: implement default <0 0> for rts-delay, unset unspecified flags]
-> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  drivers/tty/serial/Kconfig  |  4 ++++
->  drivers/tty/serial/Makefile |  2 ++
->  drivers/tty/serial/of.c     | 47 +++++++++++++++++++++++++++++++++++++++++++++
+This adds the root properties for the Raspberry Pi Zero W.
 
-Why is this a separate file, with a Kconfig option that is always
-enabled?  Why not just add the single function to the serial core?
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Reviewed-by: Eric Anholt <eric@anholt.net>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> +/**
-> + * of_get_rs485_mode() - Implement parsing rs485 properties
-> + * @np: uart node
-> + * @rs485conf: output parameter
-> + *
-> + * This function implements the device tree binding described in
-> + * Documentation/devicetree/bindings/serial/rs485.txt.
-> + *
-> + * Return: 0 on success, 1 if the node doesn't contain rs485 stuff.
-
-1 is not an error code :(
-
-Return a proper error please.
-
-
-> + */
-> +int of_get_rs485_mode(struct device_node *np, struct serial_rs485 *rs485conf)
-> +{
-> +	u32 rs485_delay[2];
-> +	int ret;
-> +
-> +	if (!IS_ENABLED(CONFIG_OF) || !np)
-> +		return 1;
-> +
-> +	ret = of_property_read_u32_array(np, "rs485-rts-delay", rs485_delay, 2);
-> +	if (!ret) {
-> +		rs485conf->delay_rts_before_send = rs485_delay[0];
-> +		rs485conf->delay_rts_after_send = rs485_delay[1];
-> +	} else {
-> +		rs485conf->delay_rts_before_send = 0;
-> +		rs485conf->delay_rts_after_send = 0;
-> +	}
-> +
-> +	/*
-> +	 * clear full-duplex and enabled flags to get to a defined state with
-> +	 * the two following properties.
-> +	 */
-> +	rs485conf->flags &= ~(SER_RS485_RX_DURING_TX | SER_RS485_ENABLED);
-> +
-> +	if (of_property_read_bool(np, "rs485-rx-during-tx"))
-> +		rs485conf->flags |= SER_RS485_RX_DURING_TX;
-> +
-> +	if (of_property_read_bool(np, "linux,rs485-enabled-at-boot-time"))
-> +		rs485conf->flags |= SER_RS485_ENABLED;
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(of_get_rs485_mode);
-> diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
-> index 1775500294bb..3a89e8925722 100644
-> --- a/include/linux/serial_core.h
-> +++ b/include/linux/serial_core.h
-> @@ -501,4 +501,17 @@ static inline int uart_handle_break(struct uart_port *port)
->  					 (cflag) & CRTSCTS || \
->  					 !((cflag) & CLOCAL))
->  
-> +/*
-> + * Common device tree parsing helpers
-> + */
-> +#ifdef CONFIG_OF_SERIAL
-> +int of_get_rs485_mode(struct device_node *np, struct serial_rs485 *rs485conf);
-> +#else
-> +static inline int of_get_rs485_mode(struct device_node *np,
-> +				    struct serial_rs485 *rs485conf)
-> +{
-> +	return 1;
-
-Again, a real error.
-
-And why not have a "generic" firmware function for this that defaults to
-the of_ for that platform type if present?  What's the odds that acpi
-will need/want this soon anyway?
-
-thanks,
-
-greg k-h
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+index 9c97de2..3e3efa0 100644
+--- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+@@ -42,6 +42,10 @@ Raspberry Pi Zero
+ Required root node properties:
+ compatible = "raspberrypi,model-zero", "brcm,bcm2835";
+ 
++Raspberry Pi Zero W
++Required root node properties:
++compatible = "raspberrypi,model-zero-w", "brcm,bcm2835";
++
+ Generic BCM2835 board
+ Required root node properties:
+ compatible = "brcm,bcm2835";
+-- 
+2.7.4
