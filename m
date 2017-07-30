@@ -1,33 +1,82 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Sun, 30 Jul 2017 13:26:46 +0800
-Subject: [PATCH v3 0/2] Last step to working Allwinner R40 pinctrl
-In-Reply-To: <20170722025054.32645-1-icenowy@aosc.io>
-References: <20170722025054.32645-1-icenowy@aosc.io>
-Message-ID: <57922ac75d55aef45ae8d09df76418ea@aosc.io>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sun, 30 Jul 2017 13:36:18 +0800
+Subject: [PATCH] pinctrl: sunxi: rename R_PIO i2c pin function name
+Message-ID: <20170730053618.44781-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-07-22 10:50?Icenowy Zheng ???
-> This patchset contains only two patches.
-> 
-> The first one is a minor fix for the A10 pinctrl driver, add a function
-> of a pin, which used to be missing in A10/A20 pinctrl driver. Thanks 
-> for
-> Chen-Yu for discovering it when reviewing my R40 pinctrl patchset.
-> 
-> The second one is the real R40 pinctrl part, with fixes suggested by
-> Chen-Yu and Maxime.
-> 
-> Icenowy Zheng (2):
->   pinctrl: sunxi: add a missing function of A10/A20 pinctrl driver
->   pinctrl: sunxi: add support of R40 to A10 pinctrl driver
+The I2C pin functions in R_PIO used to be named "s_twi".
 
-Ping...
+As we usually use the name "i2c" instead of "twi" in the mainline
+kernel, change these names to "s_i2c" for consistency.
 
-Can anyone process this patchset?
+The "s_twi" functions are not yet referenced by any device trees in
+mainline kernel so I think it's safe to change the name.
 
-> 
->  drivers/pinctrl/sunxi/Kconfig             |   2 +-
->  drivers/pinctrl/sunxi/pinctrl-sun4i-a10.c | 274 
-> +++++++++++++++++++++---------
->  2 files changed, 197 insertions(+), 79 deletions(-)
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c | 4 ++--
+ drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c | 4 ++--
+ drivers/pinctrl/sunxi/pinctrl-sun8i-h3-r.c  | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c
+index a22bd88a1f03..c96a3610a178 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun6i-a31-r.c
+@@ -25,12 +25,12 @@ static const struct sunxi_desc_pin sun6i_a31_r_pins[] = {
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 0),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "s_twi"),		/* SCK */
++		  SUNXI_FUNCTION(0x2, "s_i2c"),		/* SCK */
+ 		  SUNXI_FUNCTION(0x3, "s_p2wi")),	/* SCK */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 1),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "s_twi"),		/* SDA */
++		  SUNXI_FUNCTION(0x2, "s_i2c"),		/* SDA */
+ 		  SUNXI_FUNCTION(0x3, "s_p2wi")),	/* SDA */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 2),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c
+index 2292e05a397b..5789e9ecbae1 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-a23-r.c
+@@ -29,13 +29,13 @@ static const struct sunxi_desc_pin sun8i_a23_r_pins[] = {
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "s_rsb"),		/* SCK */
+-		  SUNXI_FUNCTION(0x3, "s_twi"),		/* SCK */
++		  SUNXI_FUNCTION(0x3, "s_i2c"),		/* SCK */
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x4, 0, 0)),	/* PL_EINT0 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 1),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+ 		  SUNXI_FUNCTION(0x2, "s_rsb"),		/* SDA */
+-		  SUNXI_FUNCTION(0x3, "s_twi"),		/* SDA */
++		  SUNXI_FUNCTION(0x3, "s_i2c"),		/* SDA */
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x4, 0, 1)),	/* PL_EINT1 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 2),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sun8i-h3-r.c b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3-r.c
+index 686ec212120b..ebfd9a26628c 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sun8i-h3-r.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sun8i-h3-r.c
+@@ -20,12 +20,12 @@ static const struct sunxi_desc_pin sun8i_h3_r_pins[] = {
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 0),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "s_twi"),         /* SCK */
++		  SUNXI_FUNCTION(0x2, "s_i2c"),         /* SCK */
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 0)),	/* PL_EINT0 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 1),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+ 		  SUNXI_FUNCTION(0x1, "gpio_out"),
+-		  SUNXI_FUNCTION(0x2, "s_twi"),         /* SDA */
++		  SUNXI_FUNCTION(0x2, "s_i2c"),         /* SDA */
+ 		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 1)),	/* PL_EINT1 */
+ 	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 2),
+ 		  SUNXI_FUNCTION(0x0, "gpio_in"),
+-- 
+2.13.0
