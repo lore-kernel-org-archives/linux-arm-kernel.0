@@ -1,29 +1,56 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 31 Jul 2017 00:43:29 +0800
-Subject: [alsa-devel] [PATCH v3 05/12] ASoC: sun4i-i2s: Add regmap fields
- for channels
-In-Reply-To: <20170729141753.20174-6-codekipper@gmail.com>
-Message-ID: <201707310016.RARC8ov7%fengguang.wu@intel.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Sun, 30 Jul 2017 09:59:01 -0700
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170730133747.anusyacw2l5hhjgx@tardis>
+References: <20170727124913.GL3730@linux.vnet.ibm.com>
+ <20170727144903.000022a1@huawei.com>
+ <20170727173923.000001b2@huawei.com>
+ <20170727165245.GD3730@linux.vnet.ibm.com>
+ <20170728084411.00001ddb@huawei.com>
+ <20170728125416.j7gcgvnxgv2gq73u@tardis>
+ <20170728145530.GE3730@linux.vnet.ibm.com>
+ <20170728184129.GA24364@linux.vnet.ibm.com>
+ <20170728190956.GA26640@linux.vnet.ibm.com>
+ <20170730133747.anusyacw2l5hhjgx@tardis>
+Message-ID: <20170730165901.GX3730@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcus,
+On Sun, Jul 30, 2017 at 09:37:47PM +0800, Boqun Feng wrote:
+> On Fri, Jul 28, 2017 at 12:09:56PM -0700, Paul E. McKenney wrote:
+> > On Fri, Jul 28, 2017 at 11:41:29AM -0700, Paul E. McKenney wrote:
+> > > On Fri, Jul 28, 2017 at 07:55:30AM -0700, Paul E. McKenney wrote:
+> > > > On Fri, Jul 28, 2017 at 08:54:16PM +0800, Boqun Feng wrote:
+> > 
+> > [ . . . ]
+> > 
+> > > > Even though Jonathan's testing indicates that it didn't fix this
+> > > > particular problem:
+> > > > 
+> > > > Acked-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> > > 
+> > > And while we are at it:
+> > > 
+> > > Tested-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> > 
+> > Not because it it fixed the TREE01 issue -- it did not.  But as near
+> > as I can see, it didn't cause any additional issues.
+> > 
+> 
+> Understood.
+> 
+> Still work on waketorture for a test case which could trigger this
+> problem in a real world. My old plan is to send this out when I could
+> use waketorture to show this patch actually resolves some potential
+> bugs, but just put it ahead here in case it may help.
+> 
+> Will send it out with your Tested-by and Acked-by and continue to work
+> on waketorture.
 
-[auto build test WARNING on asoc/for-next]
-[also build test WARNING on next-20170728]
-[cannot apply to v4.13-rc2]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Sounds good!
 
-url:    https://github.com/0day-ci/linux/commits/codekipper-gmail-com/ASoC-Add-I2S-support-for-Allwinner-H3-SoCs/20170730-220649
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-next
+Given that Jonathan's traces didn't show a timer expiration, the problems
+might be in timers.
 
-
-coccinelle warnings: (new ones prefixed by >>)
-
->> sound/soc/sunxi/sun4i-i2s.c:740:1-3: WARNING: PTR_ERR_OR_ZERO can be used
-
-Please review and possibly fold the followup patch.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+							Thanx, Paul
