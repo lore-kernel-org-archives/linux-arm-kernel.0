@@ -1,144 +1,31 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 30 Jul 2017 14:49:19 +0100
-Subject: [PATCH 4/4] iio: trigger: stm32-timer: add enable attribute
-In-Reply-To: <1501172340-8448-5-git-send-email-fabrice.gasnier@st.com>
-References: <1501172340-8448-1-git-send-email-fabrice.gasnier@st.com>
- <1501172340-8448-5-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170730144919.19c7ee25@kernel.org>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Sun, 30 Jul 2017 17:31:03 +0300
+Subject: [PATCH 0/5] earlycon hang under some conditions
+In-Reply-To: <1500357778-23169-1-git-send-email-jeffy.chen@rock-chips.com>
+References: <1500357778-23169-1-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <CAHp75VdHqD67jcoaQ5EwdTVdoyLNF0DCTQDvTxWikiaOnPs75g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Jul 2017 18:19:00 +0200
-Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+On Tue, Jul 18, 2017 at 9:02 AM, Jeffy Chen <jeffy.chen@rock-chips.com> wrote:
+> I was testing earlycon with 8250 dw serial console. And it hangs in
+> these cases:
+> 1/ kernel hang when calling early write function after free_initmem:
+> a) the earlycon not disabled after the init code(due to keep_bootcon or
+>    not specify a real console to switch to)
+> b) the early write func is marked as __init, for example 8250_early.
 
-> In order to use encoder mode, timers needs to be enabled (e.g. CEN bit)
-> along with peripheral clock.
-> Add IIO_CHAN_INFO_ENABLE attribute to handle this.
-> Also, in triggered mode, CEN bit is set automatically in hardware.
-> Then clock must be enabled before starting triggered mode.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-This one could perhaps have been a little more compact given
-it is a fix, but it's still not huge so we'll let it go.
+> This serial fix 1/ case only.
 
-Applied to the fixes-togreg branch of iio.git.
+Here is another opinion.
+I can tell that conditions to get into the trouble are quite unusual or rare.
 
-Thanks,
+Any rationale behind why one needs such a combination of parameters?
 
-Jonathan
-> ---
->  drivers/iio/trigger/stm32-timer-trigger.c | 55 +++++++++++++++++++++++--------
->  1 file changed, 41 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/iio/trigger/stm32-timer-trigger.c b/drivers/iio/trigger/stm32-timer-trigger.c
-> index d28aa02..14e6eb0 100644
-> --- a/drivers/iio/trigger/stm32-timer-trigger.c
-> +++ b/drivers/iio/trigger/stm32-timer-trigger.c
-> @@ -366,34 +366,32 @@ static int stm32_counter_read_raw(struct iio_dev *indio_dev,
->  				  int *val, int *val2, long mask)
->  {
->  	struct stm32_timer_trigger *priv = iio_priv(indio_dev);
-> +	u32 dat;
->  
->  	switch (mask) {
->  	case IIO_CHAN_INFO_RAW:
-> -	{
-> -		u32 cnt;
-> -
-> -		regmap_read(priv->regmap, TIM_CNT, &cnt);
-> -		*val = cnt;
-> +		regmap_read(priv->regmap, TIM_CNT, &dat);
-> +		*val = dat;
-> +		return IIO_VAL_INT;
->  
-> +	case IIO_CHAN_INFO_ENABLE:
-> +		regmap_read(priv->regmap, TIM_CR1, &dat);
-> +		*val = (dat & TIM_CR1_CEN) ? 1 : 0;
->  		return IIO_VAL_INT;
-> -	}
-> -	case IIO_CHAN_INFO_SCALE:
-> -	{
-> -		u32 smcr;
->  
-> -		regmap_read(priv->regmap, TIM_SMCR, &smcr);
-> -		smcr &= TIM_SMCR_SMS;
-> +	case IIO_CHAN_INFO_SCALE:
-> +		regmap_read(priv->regmap, TIM_SMCR, &dat);
-> +		dat &= TIM_SMCR_SMS;
->  
->  		*val = 1;
->  		*val2 = 0;
->  
->  		/* in quadrature case scale = 0.25 */
-> -		if (smcr == 3)
-> +		if (dat == 3)
->  			*val2 = 2;
->  
->  		return IIO_VAL_FRACTIONAL_LOG2;
->  	}
-> -	}
->  
->  	return -EINVAL;
->  }
-> @@ -403,6 +401,7 @@ static int stm32_counter_write_raw(struct iio_dev *indio_dev,
->  				   int val, int val2, long mask)
->  {
->  	struct stm32_timer_trigger *priv = iio_priv(indio_dev);
-> +	u32 dat;
->  
->  	switch (mask) {
->  	case IIO_CHAN_INFO_RAW:
-> @@ -411,6 +410,22 @@ static int stm32_counter_write_raw(struct iio_dev *indio_dev,
->  	case IIO_CHAN_INFO_SCALE:
->  		/* fixed scale */
->  		return -EINVAL;
-> +
-> +	case IIO_CHAN_INFO_ENABLE:
-> +		if (val) {
-> +			regmap_read(priv->regmap, TIM_CR1, &dat);
-> +			if (!(dat & TIM_CR1_CEN))
-> +				clk_enable(priv->clk);
-> +			regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN,
-> +					   TIM_CR1_CEN);
-> +		} else {
-> +			regmap_read(priv->regmap, TIM_CR1, &dat);
-> +			regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN,
-> +					   0);
-> +			if (dat & TIM_CR1_CEN)
-> +				clk_disable(priv->clk);
-> +		}
-> +		return 0;
->  	}
->  
->  	return -EINVAL;
-> @@ -506,9 +521,19 @@ static int stm32_set_enable_mode(struct iio_dev *indio_dev,
->  {
->  	struct stm32_timer_trigger *priv = iio_priv(indio_dev);
->  	int sms = stm32_enable_mode2sms(mode);
-> +	u32 val;
->  
->  	if (sms < 0)
->  		return sms;
-> +	/*
-> +	 * Triggered mode sets CEN bit automatically by hardware. So, first
-> +	 * enable counter clock, so it can use it. Keeps it in sync with CEN.
-> +	 */
-> +	if (sms == 6) {
-> +		regmap_read(priv->regmap, TIM_CR1, &val);
-> +		if (!(val & TIM_CR1_CEN))
-> +			clk_enable(priv->clk);
-> +	}
->  
->  	regmap_update_bits(priv->regmap, TIM_SMCR, TIM_SMCR_SMS, sms);
->  
-> @@ -681,7 +706,9 @@ static ssize_t stm32_count_set_preset(struct iio_dev *indio_dev,
->  static const struct iio_chan_spec stm32_trigger_channel = {
->  	.type = IIO_COUNT,
->  	.channel = 0,
-> -	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) | BIT(IIO_CHAN_INFO_SCALE),
-> +	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
-> +			      BIT(IIO_CHAN_INFO_ENABLE) |
-> +			      BIT(IIO_CHAN_INFO_SCALE),
->  	.ext_info = stm32_trigger_count_info,
->  	.indexed = 1
->  };
+P.S. For doulble output ask Sergey and Petr (they are quite concerned
+about it). Actually strange I didn't see their names in Cc list for
+console related stuff,
+
+-- 
+With Best Regards,
+Andy Shevchenko
