@@ -1,165 +1,150 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 30 Jul 2017 19:10:32 +0200
-Subject: [PATCH V2 1/3] ARM: bcm283x: Define UART pinmuxing on board level
-In-Reply-To: <1501434634-2325-1-git-send-email-stefan.wahren@i2se.com>
-References: <1501434634-2325-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1501434634-2325-2-git-send-email-stefan.wahren@i2se.com>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Sun, 30 Jul 2017 19:12:59 +0200
+Subject: [PATCH 0/6] Support for LEGO MINDSTORMS EV3 LCD display
+In-Reply-To: <1501355870-13960-1-git-send-email-david@lechnology.com>
+References: <1501355870-13960-1-git-send-email-david@lechnology.com>
+Message-ID: <513cfff8-e181-6533-66dc-28a831dfa18a@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until RPI 3 and Zero W the pl011 (uart0) was always on pin 14/15. So in
-order to take care of them and other boards in the future,
-we need to define UART pinmuxing on board level.
+Hi David,
 
-This work based on Eric Anholt's patch "ARM: bcm2385: Don't force pl011
-onto pins 14/15." and Fabian Vogt's patch "ARM64: dts: bcm2837: assign
-uart0 to BT and uart1 to pin headers".
+I'm glad to see a new tinydrm driver!
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/boot/dts/bcm2835-rpi-a-plus.dts |  6 ++++++
- arch/arm/boot/dts/bcm2835-rpi-a.dts      |  6 ++++++
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts |  6 ++++++
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts |  6 ++++++
- arch/arm/boot/dts/bcm2835-rpi-b.dts      |  6 ++++++
- arch/arm/boot/dts/bcm2835-rpi-zero.dts   |  6 ++++++
- arch/arm/boot/dts/bcm2835-rpi.dtsi       |  2 +-
- arch/arm/boot/dts/bcm2836-rpi-2-b.dts    |  6 ++++++
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts    | 10 ++++++++++
- 9 files changed, 53 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-index d070454..9f86649 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-@@ -99,3 +99,9 @@
- &hdmi {
- 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
- };
+Den 29.07.2017 21.17, skrev David Lechner:
+> The goal of this series is to get the built-in LCD of the LEGO MINDSTORMS EV3
+> working. But, most of the content here is building up the infrastructure to do
+> that.
+>
+> The controller used in the EV3 uses MIPI commands, but it uses a different
+> memory layout. The current tinydrm stuff is hard-coded for RGB565, so most
+> of the patches are adding support for other memory layouts.
+>
+> I've also made the one existing tinydrm driver generic so that it can work for
+> any MIPI display rather than copying a bunch of boiler-plate code for each
+> panel and/or controller.
+>
+> Once all of this is done, it is really easy to add a new panel. :-)
+
+I've been down that path, and decided against it. Otherwise mi0283qt
+and mipi_dbi would have been one driver. I'm not keen on having one
+driver that supports 50 displays, each with their own initialization
+sequence. However if the sequences are very similar, then sharing a
+driver makes sense. Time will tell, it's early days for tinydrm.
+
+With fbtft it's possible to override the init sequence, but the Device
+Tree guys NAK anything that looks like setting random registers
+directly from properties and certainly not delays. If we could have
+copied fbtft in this respect, one mipi_dbi driver would have been enough
+and the DT would contain the init sequence.
+Trying to add DT properties for specific controller properties will
+most likely turn into a nightmare with the complexity of the
+controllers. With very simple controllers it's possible:
+Documentation/devicetree/bindings/display/ssd1307fb.txt
+
+Maybe over time a pattern emerges that gives us a simple way to describe
+these panels, but until then I don't want everything in one giant file.
+If someone from the industry had taken interest in this, then maybe we
+could have had a useful abstraction from the get go, but alas we're
+dealing with old technology here.
+
+Now to the ST7586S:
+
+MIPI among other things have standards for interfacing and driving
+display controllers. For our purpose there are 2 important ones:
+- MIPI DCS - Defines a command set for operating the controller.
+- MIPI DBI - Defines controller interface modes and pixel formats (RGB)
+
+So is the ST7586S MIPI DCS/DBI compatible?
+
+It's missing some of the commands, but it supports the ones necessary
+for mipi_dbi. Interface wise it looks to be DBI compatible, but the
+pixel format isn't.
+
+I don't want to add a lot of complexity to mipi_dbi to support a non
+standard format, so for maintainability and readability it's better to
+write new code for this controller. DBI supports more formats than
+RGB565, but I don't expect any true DBI compatible displays to actually
+use those since RGB666 has no userspace support and RGB888 kills
+throughput by 30%.
+
+I suggest you write a new standalone driver for this display including
+controller code, and if at a later point another ST7586 based display
+shows up, we can pull out the controller specific code into a library
+like mipi_dbi does.
+
+You can use the newly merged repaper driver (monochrome) as a template:
+https://cgit.freedesktop.org/drm/drm-misc/tree/drivers/gpu/drm/tinydrm/repaper.c
+
+Since the ST7586 adheres to the DBI physical interface standard, you
+can unwrap this from mipi_dbi so you can use that part of the library.
+
+You can make a patch that changes mipi_dbi_spi_init() so you can use it:
+
+- * usual read commands and initializes @mipi using mipi_dbi_init().
++ * usual read commands.
+
+  int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
+-              struct gpio_desc *dc,
+-              const struct drm_simple_display_pipe_funcs *pipe_funcs,
+-              struct drm_driver *driver,
+-              const struct drm_display_mode *mode,
+-              unsigned int rotation)
++              struct gpio_desc *dc)
+  {
+[...]
+-    return mipi_dbi_init(dev, mipi, pipe_funcs, driver, mode, rotation);
++    return 0;
+  }
+
+  static int mi0283qt_probe(struct spi_device *spi)
+  {
+[...]
+-    ret = mipi_dbi_spi_init(spi, mipi, dc, &mi0283qt_pipe_funcs,
+-                &mi0283qt_driver, &mi0283qt_mode, rotation);
++    ret = mipi_dbi_spi_init(spi, mipi, dc);
+     if (ret)
+         return ret;
+
++    ret = mipi_dbi_init(dev, mipi, &mi0283qt_pipe_funcs, &mi0283qt_driver,
++                &mi0283qt_mode, rotation);
++    if (ret)
++        return ret;
 +
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_gpio14>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-a.dts b/arch/arm/boot/dts/bcm2835-rpi-a.dts
-index 46d078e..4b1af06 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-a.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-a.dts
-@@ -94,3 +94,9 @@
- &hdmi {
- 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_HIGH>;
- };
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_gpio14>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-index 432088e..a846f1e 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-@@ -101,3 +101,9 @@
- &hdmi {
- 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
- };
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_gpio14>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-index 4133bc2..e860964 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-@@ -94,3 +94,9 @@
- &hdmi {
- 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
- };
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_gpio14>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index 4d56fe3..5d77f3f 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -89,3 +89,9 @@
- &hdmi {
- 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_HIGH>;
- };
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_gpio14>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-zero.dts b/arch/arm/boot/dts/bcm2835-rpi-zero.dts
-index 79a20d5..7036240 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-zero.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-zero.dts
-@@ -103,3 +103,9 @@
- &hdmi {
- 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
- };
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_gpio14>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index e55b362..e36c392 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -39,7 +39,7 @@
- 	};
- 
- 	alt0: alt0 {
--		brcm,pins = <4 5 7 8 9 10 11 14 15>;
-+		brcm,pins = <4 5 7 8 9 10 11>;
- 		brcm,function = <BCM2835_FSEL_ALT0>;
- 	};
- };
-diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-index bf19e8c..e8de414 100644
---- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-+++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-@@ -39,3 +39,9 @@
- &hdmi {
- 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
- };
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_gpio14>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-index 972f14d..20725ca 100644
---- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-+++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-@@ -19,7 +19,17 @@
- 	};
- };
- 
-+/* uart0 communicates with the BT module */
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_gpio32 &gpclk2_gpio43>;
-+	status = "okay";
-+};
-+
-+/* uart1 is mapped to the pin header */
- &uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_gpio14>;
- 	status = "okay";
- };
- 
--- 
-2.7.4
+
+Now you can use mipi_dbi_spi_init() to get the interface abstraction,
+but instead of calling mipi_dbi_init() you implement your own code.
+
+
+Noralf.
+
+> David Lechner (6):
+>    drm/tinydrm: Add parameter for MIPI DCS pixel format
+>    drm/tinydrm: add helpers for ST7586 controllers
+>    drm/tinydrm: rename mi028qt module to mipi-panel
+>    drm/tinydrm: mipi-panel: refactor to use driver id
+>    drm/tinydrm: add support for LEGO MINDSTORMS EV3 LCD
+>    ARM: dts: da850-lego-ev3: Add node for LCD display
+>
+>   .../devicetree/bindings/display/mipi-panel.txt     |  27 ++
+>   .../bindings/display/multi-inno,mi0283qt.txt       |  27 --
+>   MAINTAINERS                                        |   6 +-
+>   arch/arm/boot/dts/da850-lego-ev3.dts               |  24 ++
+>   drivers/gpu/drm/tinydrm/Kconfig                    |  13 +-
+>   drivers/gpu/drm/tinydrm/Makefile                   |   2 +-
+>   drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c     | 148 ++++++++
+>   drivers/gpu/drm/tinydrm/mi0283qt.c                 | 282 ---------------
+>   drivers/gpu/drm/tinydrm/mipi-dbi.c                 | 117 ++++--
+>   drivers/gpu/drm/tinydrm/mipi-panel.c               | 395 +++++++++++++++++++++
+>   include/drm/tinydrm/mipi-dbi.h                     |   9 +-
+>   include/drm/tinydrm/st7586.h                       |  34 ++
+>   include/drm/tinydrm/tinydrm-helpers.h              |   6 +
+>   include/video/mipi_display.h                       |  16 +-
+>   14 files changed, 759 insertions(+), 347 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/display/mipi-panel.txt
+>   delete mode 100644 Documentation/devicetree/bindings/display/multi-inno,mi0283qt.txt
+>   delete mode 100644 drivers/gpu/drm/tinydrm/mi0283qt.c
+>   create mode 100644 drivers/gpu/drm/tinydrm/mipi-panel.c
+>   create mode 100644 include/drm/tinydrm/st7586.h
+>
