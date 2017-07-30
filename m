@@ -1,61 +1,52 @@
-From: boqun.feng@gmail.com (Boqun Feng)
-Date: Sun, 30 Jul 2017 21:37:47 +0800
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170728190956.GA26640@linux.vnet.ibm.com>
-References: <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
- <20170727124913.GL3730@linux.vnet.ibm.com>
- <20170727144903.000022a1@huawei.com>
- <20170727173923.000001b2@huawei.com>
- <20170727165245.GD3730@linux.vnet.ibm.com>
- <20170728084411.00001ddb@huawei.com>
- <20170728125416.j7gcgvnxgv2gq73u@tardis>
- <20170728145530.GE3730@linux.vnet.ibm.com>
- <20170728184129.GA24364@linux.vnet.ibm.com>
- <20170728190956.GA26640@linux.vnet.ibm.com>
-Message-ID: <20170730133747.anusyacw2l5hhjgx@tardis>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 30 Jul 2017 14:43:50 +0100
+Subject: [PATCH 1/4] iio: trigger: stm32-timer: fix quadrature mode get
+ routine
+In-Reply-To: <1501172340-8448-2-git-send-email-fabrice.gasnier@st.com>
+References: <1501172340-8448-1-git-send-email-fabrice.gasnier@st.com>
+ <1501172340-8448-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170730144350.17095cf1@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 12:09:56PM -0700, Paul E. McKenney wrote:
-> On Fri, Jul 28, 2017 at 11:41:29AM -0700, Paul E. McKenney wrote:
-> > On Fri, Jul 28, 2017 at 07:55:30AM -0700, Paul E. McKenney wrote:
-> > > On Fri, Jul 28, 2017 at 08:54:16PM +0800, Boqun Feng wrote:
-> 
-> [ . . . ]
-> 
-> > > Even though Jonathan's testing indicates that it didn't fix this
-> > > particular problem:
-> > > 
-> > > Acked-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> > 
-> > And while we are at it:
-> > 
-> > Tested-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> 
-> Not because it it fixed the TREE01 issue -- it did not.  But as near
-> as I can see, it didn't cause any additional issues.
-> 
+On Thu, 27 Jul 2017 18:18:57 +0200
+Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-Understood.
-
-Still work on waketorture for a test case which could trigger this
-problem in a real world. My old plan is to send this out when I could
-use waketorture to show this patch actually resolves some potential
-bugs, but just put it ahead here in case it may help.
-
-Will send it out with your Tested-by and Acked-by and continue to work
-on waketorture.
-
-Regards,
-Boqun
-
-> 							Thanx, Paul
+> Fixes: 4adec7da0536 ("iio: stm32 trigger: Add quadrature encoder device")
 > 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170730/7da029b1/attachment.sig>
+> SMS bitfiled is mode + 1. After reset, upon boot, SMS = 0. When reading
+> from sysfs, stm32_get_quadrature_mode() returns -1 (e.g. -EPERM) which is
+> wrong error code here. So, check SMS bitfiled matches valid encoder mode,
+> or return -EINVAL.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Applied to the fixes-togreg branch of iio.git.
+
+Thanks,
+
+Jonathan
+> ---
+>  drivers/iio/trigger/stm32-timer-trigger.c | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iio/trigger/stm32-timer-trigger.c b/drivers/iio/trigger/stm32-timer-trigger.c
+> index d22bc56..6aa73d6 100644
+> --- a/drivers/iio/trigger/stm32-timer-trigger.c
+> +++ b/drivers/iio/trigger/stm32-timer-trigger.c
+> @@ -571,11 +571,14 @@ static int stm32_get_quadrature_mode(struct iio_dev *indio_dev,
+>  {
+>  	struct stm32_timer_trigger *priv = iio_priv(indio_dev);
+>  	u32 smcr;
+> +	int mode;
+>  
+>  	regmap_read(priv->regmap, TIM_SMCR, &smcr);
+> -	smcr &= TIM_SMCR_SMS;
+> +	mode = (smcr & TIM_SMCR_SMS) - 1;
+> +	if ((mode < 0) || (mode > ARRAY_SIZE(stm32_quadrature_modes)))
+> +		return -EINVAL;
+>  
+> -	return smcr - 1;
+> +	return mode;
+>  }
+>  
+>  static const struct iio_enum stm32_quadrature_mode_enum = {
