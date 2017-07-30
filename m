@@ -1,49 +1,29 @@
-From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Sun, 30 Jul 2017 18:41:49 +0200
-Subject: [PATCH 3/4] clk: sunxi-ng: Make fractional helper less chatty
-In-Reply-To: <20170730164150.26302-1-jernej.skrabec@siol.net>
-References: <20170730164150.26302-1-jernej.skrabec@siol.net>
-Message-ID: <20170730164150.26302-4-jernej.skrabec@siol.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 31 Jul 2017 00:43:29 +0800
+Subject: [alsa-devel] [PATCH v3 05/12] ASoC: sun4i-i2s: Add regmap fields
+ for channels
+In-Reply-To: <20170729141753.20174-6-codekipper@gmail.com>
+Message-ID: <201707310016.RARC8ov7%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ccu_frac_helper_read_rate() prints some info which is not really
-helpful except during debugging.
+Hi Marcus,
 
-Replace printk() with pr_debug().
+[auto build test WARNING on asoc/for-next]
+[also build test WARNING on next-20170728]
+[cannot apply to v4.13-rc2]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+url:    https://github.com/0day-ci/linux/commits/codekipper-gmail-com/ASoC-Add-I2S-support-for-Allwinner-H3-SoCs/20170730-220649
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-next
+
+
+coccinelle warnings: (new ones prefixed by >>)
+
+>> sound/soc/sunxi/sun4i-i2s.c:740:1-3: WARNING: PTR_ERR_OR_ZERO can be used
+
+Please review and possibly fold the followup patch.
+
 ---
- drivers/clk/sunxi-ng/ccu_frac.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/clk/sunxi-ng/ccu_frac.c b/drivers/clk/sunxi-ng/ccu_frac.c
-index 8b5eb7756bf7..ff9e72dc5337 100644
---- a/drivers/clk/sunxi-ng/ccu_frac.c
-+++ b/drivers/clk/sunxi-ng/ccu_frac.c
-@@ -67,18 +67,18 @@ unsigned long ccu_frac_helper_read_rate(struct ccu_common *common,
- {
- 	u32 reg;
- 
--	printk("%s: Read fractional\n", clk_hw_get_name(&common->hw));
-+	pr_debug("%s: Read fractional\n", clk_hw_get_name(&common->hw));
- 
- 	if (!(common->features & CCU_FEATURE_FRACTIONAL))
- 		return 0;
- 
--	printk("%s: clock is fractional (rates %lu and %lu)\n",
--	       clk_hw_get_name(&common->hw), cf->rates[0], cf->rates[1]);
-+	pr_debug("%s: clock is fractional (rates %lu and %lu)\n",
-+		 clk_hw_get_name(&common->hw), cf->rates[0], cf->rates[1]);
- 
- 	reg = readl(common->base + common->reg);
- 
--	printk("%s: clock reg is 0x%x (select is 0x%x)\n",
--	       clk_hw_get_name(&common->hw), reg, cf->select);
-+	pr_debug("%s: clock reg is 0x%x (select is 0x%x)\n",
-+		 clk_hw_get_name(&common->hw), reg, cf->select);
- 
- 	return (reg & cf->select) ? cf->rates[1] : cf->rates[0];
- }
--- 
-2.13.3
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
