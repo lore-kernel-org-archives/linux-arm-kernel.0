@@ -1,83 +1,81 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Sun, 30 Jul 2017 08:45:45 +0800
-Subject: [PATCH] memory: mtk-smi: Use of_device_get_match_data helper
-In-Reply-To: <1501062725-8571-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <201707300800.UX7FZ2fo%fengguang.wu@intel.com>
+Date: Sun, 30 Jul 2017 12:26:55 +0800
+Subject: [PATCH v1 5/5] [media] stm32-dcmi: g_/s_selection crop support
+In-Reply-To: <1501236302-18097-6-git-send-email-hugues.fruchet@st.com>
+Message-ID: <201707301258.09yjhNRw%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Honghui,
+Hi Hugues,
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.13-rc2 next-20170728]
+[auto build test WARNING on linuxtv-media/master]
+[also build test WARNING on v4.13-rc2 next-20170728]
 [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/honghui-zhang-mediatek-com/memory-mtk-smi-Use-of_device_get_match_data-helper/20170728-161812
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+url:    https://github.com/0day-ci/linux/commits/Hugues-Fruchet/STM32-DCMI-camera-interface-crop-support/20170730-114803
+base:   git://linuxtv.org/media_tree.git master
+config: powerpc-allmodconfig (attached as .config)
+compiler: powerpc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
 reproduce:
         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+        make.cross ARCH=powerpc 
 
-All errors (new ones prefixed by >>):
+Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
+http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
 
-   drivers//memory/mtk-smi.c: In function 'mtk_smi_common_probe':
->> drivers//memory/mtk-smi.c:341:10: error: incompatible types when assigning to type 'enum mtk_smi_gen' from type 'const void *'
-     smi_gen = of_device_get_match_data(dev);
-             ^
+All warnings (new ones prefixed by >>):
 
-vim +341 drivers//memory/mtk-smi.c
+   drivers/media//platform/stm32/stm32-dcmi.c: In function 'dcmi_graph_notify_complete':
+>> drivers/media//platform/stm32/stm32-dcmi.c:1445:5: warning: 'ret' may be used uninitialized in this function [-Wmaybe-uninitialized]
+     if (ret) {
+        ^
 
-   311	
-   312	static int mtk_smi_common_probe(struct platform_device *pdev)
-   313	{
-   314		struct device *dev = &pdev->dev;
-   315		struct mtk_smi *common;
-   316		struct resource *res;
-   317		enum mtk_smi_gen smi_gen;
-   318	
-   319		if (!dev->pm_domain)
-   320			return -EPROBE_DEFER;
-   321	
-   322		common = devm_kzalloc(dev, sizeof(*common), GFP_KERNEL);
-   323		if (!common)
-   324			return -ENOMEM;
-   325		common->dev = dev;
-   326	
-   327		common->clk_apb = devm_clk_get(dev, "apb");
-   328		if (IS_ERR(common->clk_apb))
-   329			return PTR_ERR(common->clk_apb);
-   330	
-   331		common->clk_smi = devm_clk_get(dev, "smi");
-   332		if (IS_ERR(common->clk_smi))
-   333			return PTR_ERR(common->clk_smi);
-   334	
-   335		/*
-   336		 * for mtk smi gen 1, we need to get the ao(always on) base to config
-   337		 * m4u port, and we need to enable the aync clock for transform the smi
-   338		 * clock into emi clock domain, but for mtk smi gen2, there's no smi ao
-   339		 * base.
-   340		 */
- > 341		smi_gen = of_device_get_match_data(dev);
-   342		if (smi_gen == MTK_SMI_GEN1) {
-   343			res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-   344			common->smi_ao_base = devm_ioremap_resource(dev, res);
-   345			if (IS_ERR(common->smi_ao_base))
-   346				return PTR_ERR(common->smi_ao_base);
-   347	
-   348			common->clk_async = devm_clk_get(dev, "async");
-   349			if (IS_ERR(common->clk_async))
-   350				return PTR_ERR(common->clk_async);
-   351	
-   352			clk_prepare_enable(common->clk_async);
-   353		}
-   354		pm_runtime_enable(dev);
-   355		platform_set_drvdata(pdev, common);
-   356		return 0;
-   357	}
-   358	
+vim +/ret +1445 drivers/media//platform/stm32/stm32-dcmi.c
+
+  1431	
+  1432	static int dcmi_graph_notify_complete(struct v4l2_async_notifier *notifier)
+  1433	{
+  1434		struct stm32_dcmi *dcmi = notifier_to_dcmi(notifier);
+  1435		int ret;
+  1436	
+  1437		dcmi->vdev->ctrl_handler = dcmi->entity.subdev->ctrl_handler;
+  1438		ret = dcmi_formats_init(dcmi);
+  1439		if (ret) {
+  1440			dev_err(dcmi->dev, "No supported mediabus format found\n");
+  1441			return ret;
+  1442		}
+  1443	
+  1444		ret = dcmi_framesizes_init(dcmi);
+> 1445		if (ret) {
+  1446			dev_err(dcmi->dev, "Could not initialize framesizes\n");
+  1447			return ret;
+  1448		}
+  1449	
+  1450		ret = dcmi_get_sensor_bounds(dcmi, &dcmi->sd_bounds);
+  1451		if (ret) {
+  1452			dev_err(dcmi->dev, "Could not get sensor bounds\n");
+  1453			return ret;
+  1454		}
+  1455	
+  1456		ret = dcmi_set_default_fmt(dcmi);
+  1457		if (ret) {
+  1458			dev_err(dcmi->dev, "Could not set default format\n");
+  1459			return ret;
+  1460		}
+  1461	
+  1462		ret = video_register_device(dcmi->vdev, VFL_TYPE_GRABBER, -1);
+  1463		if (ret) {
+  1464			dev_err(dcmi->dev, "Failed to register video device\n");
+  1465			return ret;
+  1466		}
+  1467	
+  1468		dev_dbg(dcmi->dev, "Device registered as %s\n",
+  1469			video_device_node_name(dcmi->vdev));
+  1470		return 0;
+  1471	}
+  1472	
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -86,6 +84,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 56840 bytes
+Size: 54615 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170730/8992a771/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170730/939a55ad/attachment-0001.gz>
