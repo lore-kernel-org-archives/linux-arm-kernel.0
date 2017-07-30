@@ -1,36 +1,90 @@
 From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sun, 30 Jul 2017 21:10:59 +0300
-Subject: [PATCH 1/6] drm/tinydrm: Add parameter for MIPI DCS pixel format
-In-Reply-To: <1501355870-13960-2-git-send-email-david@lechnology.com>
+Date: Sun, 30 Jul 2017 21:19:06 +0300
+Subject: [PATCH 2/6] drm/tinydrm: add helpers for ST7586 controllers
+In-Reply-To: <1501355870-13960-3-git-send-email-david@lechnology.com>
 References: <1501355870-13960-1-git-send-email-david@lechnology.com>
- <1501355870-13960-2-git-send-email-david@lechnology.com>
-Message-ID: <CAHp75Vd9=gK3tsXbw5=7j75BJkOJVkqf7rf7WRQ9gF5+XP19cg@mail.gmail.com>
+ <1501355870-13960-3-git-send-email-david@lechnology.com>
+Message-ID: <CAHp75VdwMbe4g_xAtm3EgK4TiF3mubCWKykFA6Pn=iVk53XMRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sat, Jul 29, 2017 at 10:17 PM, David Lechner <david@lechnology.com> wrote:
-> This adds a parameter for MIPI DCS pixel format to mipi_dbi_init().
-> This is in preparation for supporting displays that don't use a 16bpp
-> memory layout.
+> This adds helper functions and support for ST7586 controllers. These
+> controllers have an unusual memory layout where 3 pixels are packed into
+> 1 byte.
+>
+> +-------+-----------------+
+> | bit   | 7 6 5 4 3 2 1 0 |
+> +-------+-----------------+
+> | pixel | 0 0 0 1 1 1 2 2 |
+> +-------+-----------------+
+>
+> So, there are a nuber of places in the tinydrm pipline where this format
 
->  /* MIPI DCS pixel formats */
-> -#define MIPI_DCS_PIXEL_FMT_24BIT       7
-> -#define MIPI_DCS_PIXEL_FMT_18BIT       6
-> -#define MIPI_DCS_PIXEL_FMT_16BIT       5
-> -#define MIPI_DCS_PIXEL_FMT_12BIT       3
-> -#define MIPI_DCS_PIXEL_FMT_8BIT                2
-> -#define MIPI_DCS_PIXEL_FMT_3BIT                1
-> +enum mipi_dcs_pixel_format {
-> +       MIPI_DCS_PIXEL_FMT_24BIT        = 7,
-> +       MIPI_DCS_PIXEL_FMT_18BIT        = 6,
-> +       MIPI_DCS_PIXEL_FMT_16BIT        = 5,
-> +       MIPI_DCS_PIXEL_FMT_12BIT        = 3,
-> +       MIPI_DCS_PIXEL_FMT_8BIT         = 2,
-> +       MIPI_DCS_PIXEL_FMT_3BIT         = 1,
-> +};
+number
 
-May I ask what prevents us to arrange enums in natural
- ordering (you may keep = X parts, of course)?
+> needs to be taken into consideration.
+
+> + * tinydrm_rgb565_to_st7586 - Convert RGB565 to ST7586 clip buffer
+
+How this can be generic tinydrm helper?
+Why driver can't handle it by its own and avoid spreading stuff into
+generic header?
+
+> +void tinydrm_rgb565_to_st7586(u8 *dst, void *vaddr,
+
+> + * tinydrm_xrgb8888_to_st7586 - Convert XRGB8888 to ST7586 clip buffer
+
+> +void tinydrm_xrgb8888_to_st7586(u8 *dst, void *vaddr,
+
+Ditto.
+
+> -       switch (fb->format->format) {
+> -       case DRM_FORMAT_RGB565:
+> -               if (swap)
+> -                       tinydrm_swab16(dst, src, fb, clip);
+> -               else
+> -                       tinydrm_memcpy(dst, src, fb, clip);
+> +       switch (pixel_fmt) {
+> +       case MIPI_DCS_PIXEL_FMT_16BIT:
+> +               switch (fb->format->format) {
+> +               case DRM_FORMAT_RGB565:
+> +                       if (swap)
+> +                               tinydrm_swab16(dst, src, fb, clip);
+> +                       else
+> +                               tinydrm_memcpy(dst, src, fb, clip);
+> +                       break;
+
+Can't you use some other approach? Callbacks? Plugins?
+
+> +       switch (mipi->pixel_fmt) {
+> +       case MIPI_DCS_PIXEL_FMT_16BIT:
+> +               len = width * height * sizeof(u16);
+> +               break;
+> +       case MIPI_DCS_PIXEL_FMT_ST7586_332:
+> +               width = (width + 2) / 3;
+> +               len = width * height;
+> +               break;
+
+Ditto.
+
+> +       case MIPI_DCS_PIXEL_FMT_ST7586_332:
+> +               /* 3 pixels per byte */
+> +               bufsize = (mode->vdisplay + 2) / 3 * mode->hdisplay;
+> +               break;
+
+Ditto.
+
+> -       if (cmd == MIPI_DCS_WRITE_MEMORY_START && !mipi->swap_bytes)
+> +       if (cmd == MIPI_DCS_WRITE_MEMORY_START && !mipi->swap_bytes &&
+> +           mipi->pixel_fmt != MIPI_DCS_PIXEL_FMT_ST7586_332)
+
+Ditto.
+
+If we allow this we end up to have 100500 LOCs in tinydrm-helpers.c
+which will have nothing to do with the framework itself.
+
+
 
 -- 
 With Best Regards,
