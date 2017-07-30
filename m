@@ -1,89 +1,48 @@
-From: philippe.cornu@st.com (Philippe CORNU)
-Date: Sun, 30 Jul 2017 09:10:29 +0000
-Subject: [PATCH v6 1/7] drm/stm: ltdc: Fix leak of px clk enable in some
- error paths
-In-Reply-To: <bd6aeb5d-8f39-3e5e-0f72-a1d50e4438ef@codeaurora.org>
-References: <1500277223-29553-1-git-send-email-philippe.cornu@st.com>
- <1500277223-29553-2-git-send-email-philippe.cornu@st.com>
- <bd6aeb5d-8f39-3e5e-0f72-a1d50e4438ef@codeaurora.org>
-Message-ID: <99a961b3-8549-1612-15e8-08f150cc8989@st.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Sun, 30 Jul 2017 12:39:27 +0200
+Subject: [PATCH 1/2] vfio/type1: Cope with hardware MSI reserved regions
+In-Reply-To: <d244103e295a81d7f556f297adc79c2ac45345cc.1501163100.git.robin.murphy@arm.com>
+References: <d244103e295a81d7f556f297adc79c2ac45345cc.1501163100.git.robin.murphy@arm.com>
+Message-ID: <263da1c2-1a76-020a-62d8-e65b2256030f@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 07/29/2017 04:32 PM, Archit Taneja wrote:
-> Hi Philippe,
+Hi Robin,
+On 27/07/2017 16:54, Robin Murphy wrote:
+> For ARM-based systems with a GICv3 ITS to provide interrupt isolation,
+> but hardware limitations which are worked around by having MSIs bypass
+> SMMU translation (e.g. HiSilicon Hip06/Hip07), VFIO neglects to check
+> for the IRQ_DOMAIN_FLAG_MSI_REMAP capability, (and thus erroneously
+> demands unsafe_interrupts) if a software-managed MSI region is absent.
 > 
-> On 07/17/2017 01:10 PM, Philippe CORNU wrote:
->> The pixel clock gets enabled early during init, since it's required
->> in order to read registers. This pixel clock must be disabled if
->> errors during this init phase.
->>
+> Fix this by always checking for isolation capability at both the IRQ
+> domain and IOMMU domain levels, rather than predicating that on whether
+> MSIs require an IOMMU mapping (which was always slightly tenuous logic).
 > 
-> This patch was pulled in to drm-misc-next, but it lacks your Sign-off.
-> It looks like the Ack and the Sign-off got accidentally mixed up
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+
+Thanks
+
+Eric
+
+> ---
+>  drivers/vfio/vfio_iommu_type1.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-
-Hi Archit,
-This patch is from Eric that is why I put his "signed-off-by" and I 
-"acked" it to confirm that the patch is fine to me :-)
-
-Nevertheless, as I am the patch "author" in the git tree, I confirm with 
-my my below signed-off-by:
-
-Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
-
-Many thanks
-Philippe :-)
-
-> Can you please reply to this mail with your "Signed-off-by" so that
-> we have proof of it on dri-devel?
-> 
-> Thanks,
-> Archit
-> 
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> Acked-by: Philippe Cornu <philippe.cornu@st.com>
->> ---
->>   drivers/gpu/drm/stm/ltdc.c | 10 ++++++----
->>   1 file changed, 6 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/stm/ltdc.c b/drivers/gpu/drm/stm/ltdc.c
->> index 5331760..7f64d5a 100644
->> --- a/drivers/gpu/drm/stm/ltdc.c
->> +++ b/drivers/gpu/drm/stm/ltdc.c
->> @@ -1045,13 +1045,15 @@ int ltdc_load(struct drm_device *ddev)
->>       if (of_address_to_resource(np, 0, &res)) {
->>           DRM_ERROR("Unable to get resource\n");
->> -        return -ENODEV;
->> +        ret = -ENODEV;
->> +        goto err;
->>       }
->>       ldev->regs = devm_ioremap_resource(dev, &res);
->>       if (IS_ERR(ldev->regs)) {
->>           DRM_ERROR("Unable to get ltdc registers\n");
->> -        return PTR_ERR(ldev->regs);
->> +        ret = PTR_ERR(ldev->regs);
->> +        goto err;
->>       }
->>       for (i = 0; i < MAX_IRQ; i++) {
->> @@ -1064,7 +1066,7 @@ int ltdc_load(struct drm_device *ddev)
->>                           dev_name(dev), ddev);
->>           if (ret) {
->>               DRM_ERROR("Failed to register LTDC interrupt\n");
->> -            return ret;
->> +            goto err;
->>           }
->>       }
->> @@ -1079,7 +1081,7 @@ int ltdc_load(struct drm_device *ddev)
->>       if (ret) {
->>           DRM_ERROR("hardware identifier (0x%08x) not supported!\n",
->>                 ldev->caps.hw_version);
->> -        return ret;
->> +        goto err;
->>       }
->>       DRM_INFO("ltdc hw version 0x%08x - ready\n", 
->> ldev->caps.hw_version);
->>
+> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+> index 8549cb111627..2328be628f21 100644
+> --- a/drivers/vfio/vfio_iommu_type1.c
+> +++ b/drivers/vfio/vfio_iommu_type1.c
+> @@ -1265,8 +1265,8 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+>  	INIT_LIST_HEAD(&domain->group_list);
+>  	list_add(&group->next, &domain->group_list);
+>  
+> -	msi_remap = resv_msi ? irq_domain_check_msi_remap() :
+> -				iommu_capable(bus, IOMMU_CAP_INTR_REMAP);
+> +	msi_remap = irq_domain_check_msi_remap() ||
+> +		    iommu_capable(bus, IOMMU_CAP_INTR_REMAP);
+>  
+>  	if (!allow_unsafe_interrupts && !msi_remap) {
+>  		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
 > 
