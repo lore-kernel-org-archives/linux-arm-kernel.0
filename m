@@ -1,56 +1,53 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Sun, 30 Jul 2017 19:14:15 +0200
-Subject: [PATCH 0/6] Support for LEGO MINDSTORMS EV3 LCD display
-In-Reply-To: <5d8f6518-8d7e-c029-2da4-e3417afb3e40@lechnology.com>
-References: <1501355870-13960-1-git-send-email-david@lechnology.com>
- <5d8f6518-8d7e-c029-2da4-e3417afb3e40@lechnology.com>
-Message-ID: <28188f5c-1daf-121b-6daf-1899668c3875@tronnes.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 30 Jul 2017 20:46:23 +0300
+Subject: [PATCH] phy: rockchip-inno-usb2: fix of_irq_get_byname() error checks
+Message-ID: <20170730174630.481994041@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+of_irq_get_byname() may  return 0 as well as negative error number on
+failure,  while the driver only checks for the negative values. The driver
+would then call devm_request_threaded_irq() for IRQ0 and thus never get
+the valid interrupts.
 
-Den 29.07.2017 21.40, skrev David Lechner:
-> On 07/29/2017 02:17 PM, David Lechner wrote:
->> The goal of this series is to get the built-in LCD of the LEGO 
->> MINDSTORMS EV3
->> working. But, most of the content here is building up the 
->> infrastructure to do
->> that.
->>
->
-> Some general comments/questions:
->
-> I have noticed that DRM doesn't really have support for monochrome 
-> displays. I'm guessing that is because no one really uses them anymore?
->
+Check for IRQ <= 0 instead and return -ENXIO iff  it's 0 from
+rockchip_usb2phy_{host|otg}_port_init(), and thus fail the driver's probe.
 
-The repaper driver was the first monochrome drm driver and I chose to
-present it to userspace as XRGB8888 and convert it to monochrome.
-The reason for this is that everything, libraries, apps, plymouth (boot
-splash, no rgb565) supports it. I didn't see any point in adding a new
-monochrome drm format that didn't have, or probably wouldn't get
-userspace support (by libraries at least). The application of course
-needs to know this to get a good result.
+Fixes: 0e08d2a727e6 ("phy: rockchip-inno-usb2: add a new driver for Rockchip usb2phy")
+Fixes: 98898f3bc83c ("phy: rockchip-inno-usb2: support otg-port for rk3399")
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-tinydrm_xrgb8888_to_gray8() does the conversion:
-https://cgit.freedesktop.org/drm/drm-misc/commit/drivers/gpu/drm/tinydrm?id=379ea9a1a59a5a32c8db6f164e80a3fd00cb3781
+---
+The patch is against the 'fixes' branch of Kishon's 'linux-phy.git' repo.
 
-> The LEGO EV3 display is just an LCD (not the backlit kind). It has two 
-> modes of operation. It can to 2bbp grayscale or it can do 1bpp 
-> monochrome. The grayscale isn't the best (looks splotchy in places), 
-> so it would be nice to be able to choose between these two modes. How 
-> would I implement something like that?
->
+ drivers/phy/rockchip/phy-rockchip-inno-usb2.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Do you expect anyone to use grayscale if it doesn't look good?
-Maybe better to add it later if there's a demand for it.
-
-> Also, how can I indicate to userspace that this display really is 
-> monochrome/grayscale since the reported color depth 16bpp?
->
-
-There isn't unless we add formats for it.
-Since this display is in a Lego piece, doesn't it have custom userspace
-that already know it's monochrome?
-
-Noralf.
+Index: linux-phy/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
+===================================================================
+--- linux-phy.orig/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
++++ linux-phy/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
+@@ -925,9 +925,9 @@ static int rockchip_usb2phy_host_port_in
+ 	INIT_DELAYED_WORK(&rport->sm_work, rockchip_usb2phy_sm_work);
+ 
+ 	rport->ls_irq = of_irq_get_byname(child_np, "linestate");
+-	if (rport->ls_irq < 0) {
++	if (rport->ls_irq <= 0) {
+ 		dev_err(rphy->dev, "no linestate irq provided\n");
+-		return rport->ls_irq;
++		return rport->ls_irq ?: -ENXIO;
+ 	}
+ 
+ 	ret = devm_request_threaded_irq(rphy->dev, rport->ls_irq, NULL,
+@@ -988,9 +988,9 @@ static int rockchip_usb2phy_otg_port_ini
+ 		of_property_read_bool(child_np, "rockchip,utmi-avalid");
+ 
+ 	rport->bvalid_irq = of_irq_get_byname(child_np, "otg-bvalid");
+-	if (rport->bvalid_irq < 0) {
++	if (rport->bvalid_irq <= 0) {
+ 		dev_err(rphy->dev, "no vbus valid irq provided\n");
+-		ret = rport->bvalid_irq;
++		ret = rport->bvalid_irq ?: -ENXIO;
+ 		goto out;
+ 	}
+ 
