@@ -1,42 +1,66 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:19:27 +0200
-Subject: [PATCH 15/38] ARM: dts: r8a7793: Add Inter Connect RAM
-In-Reply-To: <cover.1501514100.git.horms+renesas@verge.net.au>
-References: <cover.1501514100.git.horms+renesas@verge.net.au>
-Message-ID: <89d534d96a41c123bf67e419f0d7f7fc02dbcd25.1501514100.git.horms+renesas@verge.net.au>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 31 Jul 2017 16:23:18 +0100
+Subject: [PATCH v2 0/5] ACPI: DMA ranges management
+Message-ID: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+This patch series is v2 of a previous posting:
 
-R-Car M2-N has 2 regions of Inter Connect RAM (72 + 4 KiB).
+v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7793.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+v1->v2:
+	- Reworked acpi_dma_get_range() flow and logs
+	- Added IORT named component address limits
+	- Renamed acpi_dev_get_resources() helper function
+	- Rebased against v4.13-rc3
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index 13b980f27bbc..bc6a44272f55 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -848,6 +848,16 @@
- 		status = "disabled";
- 	};
- 
-+	icram0:	sram at e63a0000 {
-+		compatible = "mmio-sram";
-+		reg = <0 0xe63a0000 0 0x12000>;
-+	};
-+
-+	icram1:	sram at e63c0000 {
-+		compatible = "mmio-sram";
-+		reg = <0 0xe63c0000 0 0x1000>;
-+	};
-+
- 	ether: ethernet at ee700000 {
- 		compatible = "renesas,ether-r8a7793";
- 		reg = <0 0xee700000 0 0x400>;
+-- Original cover letter --
+
+As reported in:
+
+http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
+
+the bus connecting devices to an IOMMU bus can be smaller in size than
+the IOMMU input address bits which results in devices DMA HW bugs in
+particular related to IOVA allocation (ie chopping of higher address
+bits owing to system bus HW capabilities mismatch with the IOMMU).
+
+Fortunately this problem can be solved through an already present but never
+used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
+window for a specific bus in ACPI and therefore all upstream devices
+connected to it.
+
+This small patch series enables _DMA parsing in ACPI core code and
+use it in ACPI IORT code in order to detect DMA ranges for devices and
+update their data structures to make them work with their related DMA
+addressing restrictions.
+
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Feng Kan <fkan@apm.com>
+Cc: Jon Masters <jcm@redhat.com>
+Cc: Robert Moore <robert.moore@intel.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+
+Lorenzo Pieralisi (5):
+  ACPICA: resource_mgr: Allow _DMA method in walk resources
+  ACPI: Make acpi_dev_get_resources() method agnostic
+  ACPI: Introduce DMA ranges parsing
+  ACPI: Make acpi_dma_configure() DMA regions aware
+  ACPI/IORT: Add IORT named component memory address limits
+
+ drivers/acpi/acpica/rsxface.c |  7 ++--
+ drivers/acpi/arm64/iort.c     | 50 +++++++++++++++++++++++-
+ drivers/acpi/resource.c       | 82 ++++++++++++++++++++++++++++++---------
+ drivers/acpi/scan.c           | 90 +++++++++++++++++++++++++++++++++++++++----
+ include/acpi/acnames.h        |  1 +
+ include/acpi/acpi_bus.h       |  2 +
+ include/linux/acpi.h          |  8 ++++
+ include/linux/acpi_iort.h     |  5 ++-
+ 8 files changed, 211 insertions(+), 34 deletions(-)
+
 -- 
-2.1.4
+2.10.0
