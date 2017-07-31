@@ -1,62 +1,98 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 31 Jul 2017 15:37:18 +0300
-Subject: [PATCH v8 00/20] ILP32 for ARM64
-In-Reply-To: <20170727171221.ep4xs2hhv4pxnhax@armageddon.cambridge.arm.com>
-References: <20170619155003.13218-1-ynorov@caviumnetworks.com>
- <20170629161036.ftedtbp2gdmyzloo@e104818-lin.cambridge.arm.com>
- <20170706215902.qtmbsidwvqlr7o56@yury-thinkpad>
- <20170707171135.h54fe4ea7xuxnrqt@armageddon.cambridge.arm.com>
- <20170724112624.7ie6na7uszmsc5te@yury-thinkpad>
- <20170727171221.ep4xs2hhv4pxnhax@armageddon.cambridge.arm.com>
-Message-ID: <20170731123718.7ajkxpjgcuvr7jep@yury-thinkpad>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 31 Jul 2017 14:39:01 +0200
+Subject: [RFC PATCH v2 35/38] KVM: arm64: Respect the virtual HCR_EL2.NV
+ bit setting for EL12 register traps
+In-Reply-To: <1500397144-16232-36-git-send-email-jintack.lim@linaro.org>
+References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
+ <1500397144-16232-36-git-send-email-jintack.lim@linaro.org>
+Message-ID: <20170731123901.GU5176@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On Thu, Jul 27, 2017 at 06:12:22PM +0100, Catalin Marinas wrote:
-> Hi Yury,
+On Tue, Jul 18, 2017 at 11:59:01AM -0500, Jintack Lim wrote:
+> In addition to EL2 register accesses, setting NV bit will also make EL12
+> register accesses trap to EL2. To emulate this for the virtual EL2,
+> forword traps due to EL12 register accessses to the virtual EL2 if the
+> virtual HCR_EL2.NV bit is set.
 > 
-> On Mon, Jul 24, 2017 at 02:26:24PM +0300, Yury Norov wrote:
+> This is for recursive nested virtualization.
 
-[...]
-
-> > This is the 4.12 and linux-next - based kernel patches:
-> > https://github.com/norov/linux/tree/ilp32-4.12
-> > https://github.com/norov/linux/tree/ilp32-20170724
 > 
-> Thanks. I'll publish the 4.12-based branch sometime next week.
+> Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
 > 
-> At this stage I don't see much value in a linux-next based ILP32. I
-> would rather like to see a 4.13-rc3 based one, in preparation for a 4.13
-> branch once released.
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 4fd7090..3559cf7 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -149,6 +149,9 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
+>  	int i;
+>  	const struct el1_el2_map *map;
+>  
+> +	if (el12_reg(p) && forward_nv_traps(vcpu))
+> +		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+> +
+>  	/*
+>  	 * Redirect EL1 register accesses to the corresponding EL2 registers if
+>  	 * they are meant to access EL2 registers.
+> @@ -959,6 +962,9 @@ static bool access_cntkctl_el12(struct kvm_vcpu *vcpu,
+>  			 struct sys_reg_params *p,
+>  			 const struct sys_reg_desc *r)
+>  {
+> +	if (forward_nv_traps(vcpu))
+> +		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+> +
+>  	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
+>  	return true;
+>  }
+> @@ -1005,6 +1011,9 @@ static bool access_elr(struct kvm_vcpu *vcpu,
+>  		struct sys_reg_params *p,
+>  		const struct sys_reg_desc *r)
+>  {
+> +	if (el12_reg(p) && forward_nv_traps(vcpu))
+> +		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+> +
+>  	access_rw(p, &vcpu->arch.ctxt.gp_regs.elr_el1);
+>  	return true;
+>  }
+> @@ -1013,6 +1022,9 @@ static bool access_spsr(struct kvm_vcpu *vcpu,
+>  		struct sys_reg_params *p,
+>  		const struct sys_reg_desc *r)
+>  {
+> +	if (el12_reg(p) && forward_nv_traps(vcpu))
+> +		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+> +
+>  	access_rw(p, &vcpu->arch.ctxt.gp_regs.spsr[KVM_SPSR_EL1]);
+>  	return true;
+>  }
+> @@ -1021,6 +1033,9 @@ static bool access_vbar(struct kvm_vcpu *vcpu,
+>  		struct sys_reg_params *p,
+>  		const struct sys_reg_desc *r)
+>  {
+> +	if (el12_reg(p) && forward_nv_traps(vcpu))
+> +		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+> +
+>  	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
+>  	return true;
+>  }
+> @@ -1031,6 +1046,9 @@ static bool access_cpacr(struct kvm_vcpu *vcpu,
+>  {
+>  	u64 reg = sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
+>  
+> +	if (el12_reg(p) && forward_nv_traps(vcpu))
+> +		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+> +
+>  	/*
+>  	 * When the virtual HCR_EL2.E2H == 1, an access to CPACR_EL1
+>  	 * in the virtual EL2 is to access CPTR_EL2.
+> -- 
+> 1.9.1
 > 
-> > Should I resend kernel patches to LKML, or links above are enough for
-> > you?
-> 
-> The 4.12 link is ok. However, could you please post a 4.13-rcX based
-> series, maybe split in two so that a few generic patches can be merged
-> in 4.14?
 
-This is the 4.13-rc3 - based branch:
-https://github.com/norov/linux/tree/ilp32-4.13-rc3
+I'm wondering instead of having all these handlers, could we add this at
+a higher level, like kvm_handle_sys() instead?
 
-Patches prior to 52315bc30f4967 ("arm64: ilp32: add documentation on
-the ILP32 ABI for ARM64") are looking like generic. 
-
-Note that this series includes the patch "ptrace: Add compat
-PTRACE_{G,S}ETSIGMASK handlers":
-https://patchwork.kernel.org/patch/9817343/
-
-It is still under discussion in maillist. If it will be rejected, we'd
-rework arm64 ptrace accordingly. 
-
-> Given the reworking of the sigcontext code in 4.13, it would be
-> good to review the ILP32 changes in this area again.
-
-Thanks, I forgot to mention it in previous email. Changes are mostly located in
-patches d87e8ed73d59 ("arm64: signal: share lp64 signal structures and routines
-to ilp32") and 99c30e5df3f4 ("arm64: ilp32: introduce ilp32-specific handlers
-for sigframe and ucontext"). All reviews are appreciated.
-
-Yury
+Thanks,
+-Christoffer
