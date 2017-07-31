@@ -1,37 +1,123 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Mon, 31 Jul 2017 19:18:28 +0200
-Subject: [PATCH 4/4] clk: sunxi-ng: Wait for lock when using fractional
- mode
-In-Reply-To: <CAGb2v66FAYtsp39+5Aj2oZfyo=O=R1GJ11w3-vmJOysezsvcYg@mail.gmail.com>
-References: <20170730164150.26302-1-jernej.skrabec@siol.net>
- <20170730164150.26302-5-jernej.skrabec@siol.net>
- <CAGb2v66FAYtsp39+5Aj2oZfyo=O=R1GJ11w3-vmJOysezsvcYg@mail.gmail.com>
-Message-ID: <2215267.q3CNAWEAR3@jernej-laptop>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 31 Jul 2017 18:25:40 +0100
+Subject: [PATCH v3 02/59] irqchip/gic-v3: Add redistributor iterator
+In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
+References: <20170731172637.29355-1-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+In order to discover the VLPI properties, we need to iterate over
+the redistributor regions. As we already have code that does this,
+let's factor it out and make it slightly more generic.
 
-Dne ponedeljek, 31. julij 2017 ob 07:02:18 CEST je Chen-Yu Tsai napisal(a):
-> On Mon, Jul 31, 2017 at 12:41 AM, Jernej Skrabec
-> 
-> <jernej.skrabec@siol.net> wrote:
-> > Currently ccu_frac_helper_set_rate() doesn't wait for a lock bit to be
-> > set before returning. Because of that, unstable clock may be used.
-> > 
-> > Add a wait for lock in the helper function.
-> > 
-> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> 
-> Can you provide a Fixes: tag?
+Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-v3.c | 69 ++++++++++++++++++++++++++++++--------------
+ 1 file changed, 47 insertions(+), 22 deletions(-)
 
-fixes: 89a3dfb78707 ("clk: sunxi-ng: Add fractional lib")
-
-As we discussed on IRC, it is safe to call ccu_helper_wait_for_lock() even on 
-platforms where lock bit is not present, since it just returns without effect.
-
-Regards,
-Jernej
-
-> 
-> Otherwise this looks good.
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index dbffb7ab6203..640f621c7f75 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -421,24 +421,14 @@ static void __init gic_dist_init(void)
+ 		gic_write_irouter(affinity, base + GICD_IROUTER + i * 8);
+ }
+ 
+-static int gic_populate_rdist(void)
++static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
+ {
+-	unsigned long mpidr = cpu_logical_map(smp_processor_id());
+-	u64 typer;
+-	u32 aff;
++	int ret = -ENODEV;
+ 	int i;
+ 
+-	/*
+-	 * Convert affinity to a 32bit value that can be matched to
+-	 * GICR_TYPER bits [63:32].
+-	 */
+-	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
+-	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
+-	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
+-	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
+-
+ 	for (i = 0; i < gic_data.nr_redist_regions; i++) {
+ 		void __iomem *ptr = gic_data.redist_regions[i].redist_base;
++		u64 typer;
+ 		u32 reg;
+ 
+ 		reg = readl_relaxed(ptr + GICR_PIDR2) & GIC_PIDR2_ARCH_MASK;
+@@ -450,15 +440,9 @@ static int gic_populate_rdist(void)
+ 
+ 		do {
+ 			typer = gic_read_typer(ptr + GICR_TYPER);
+-			if ((typer >> 32) == aff) {
+-				u64 offset = ptr - gic_data.redist_regions[i].redist_base;
+-				gic_data_rdist_rd_base() = ptr;
+-				gic_data_rdist()->phys_base = gic_data.redist_regions[i].phys_base + offset;
+-				pr_info("CPU%d: found redistributor %lx region %d:%pa\n",
+-					smp_processor_id(), mpidr, i,
+-					&gic_data_rdist()->phys_base);
++			ret = fn(gic_data.redist_regions + i, ptr);
++			if (!ret)
+ 				return 0;
+-			}
+ 
+ 			if (gic_data.redist_regions[i].single_redist)
+ 				break;
+@@ -473,9 +457,50 @@ static int gic_populate_rdist(void)
+ 		} while (!(typer & GICR_TYPER_LAST));
+ 	}
+ 
++	return ret ? -ENODEV : 0;
++}
++
++static int __gic_populate_rdist(struct redist_region *region, void __iomem *ptr)
++{
++	unsigned long mpidr = cpu_logical_map(smp_processor_id());
++	u64 typer;
++	u32 aff;
++
++	/*
++	 * Convert affinity to a 32bit value that can be matched to
++	 * GICR_TYPER bits [63:32].
++	 */
++	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
++	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
++	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
++	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
++
++	typer = gic_read_typer(ptr + GICR_TYPER);
++	if ((typer >> 32) == aff) {
++		u64 offset = ptr - region->redist_base;
++		gic_data_rdist_rd_base() = ptr;
++		gic_data_rdist()->phys_base = region->phys_base + offset;
++
++		pr_info("CPU%d: found redistributor %lx region %d:%pa\n",
++			smp_processor_id(), mpidr,
++			(int)(region - gic_data.redist_regions),
++			&gic_data_rdist()->phys_base);
++		return 0;
++	}
++
++	/* Try next one */
++	return 1;
++}
++
++static int gic_populate_rdist(void)
++{
++	if (gic_iterate_rdists(__gic_populate_rdist) == 0)
++		return 0;
++
+ 	/* We couldn't even deal with ourselves... */
+ 	WARN(true, "CPU%d: mpidr %lx has no re-distributor!\n",
+-	     smp_processor_id(), mpidr);
++	     smp_processor_id(),
++	     (unsigned long)cpu_logical_map(smp_processor_id()));
+ 	return -ENODEV;
+ }
+ 
+-- 
+2.11.0
