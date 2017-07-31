@@ -1,37 +1,45 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Mon, 31 Jul 2017 11:37:28 -0700
-Subject: [PATCH] clocksource: arm_arch_timer: Fix mem frame loop initialization
-Message-ID: <20170731183728.61087-1-mka@chromium.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 31 Jul 2017 18:26:22 +0100
+Subject: [PATCH v3 44/59] KVM: arm/arm64: GICv4: Handle MOVI applied to a VLPI
+In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
+References: <20170731172637.29355-1-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-45-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The loop to find the best memory frame in arch_timer_mem_acpi_init()
-initializes the loop counter with itself ('i = i'), which is suspicious
-in the first place and pointed out by clang. The loop condition is
-'i < timer_count' and a prior for loop exits when 'i' reaches
-'timer_count', therefore the second loop is never executed.
+When the guest issues a MOVI, we need to tell the physical ITS
+that we're now targetting a new vcpu. This is done by extracting
+the current mapping, updating the target, and reapplying the
+mapping. The core ITS code should do the right thing.
 
-Initialize the loop counter with 0 to iterate over all timers, which
-supposedly was the intention before the typo monster attacked.
-
-Fixes: c2743a36765d3 ("clocksource: arm_arch_timer: add GTDT support for memory-mapped timer")
-Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-its.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index aae87c4c546e..72bbfccef113 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -1440,7 +1440,7 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
- 	 * While unlikely, it's theoretically possible that none of the frames
- 	 * in a timer expose the combination of feature we want.
- 	 */
--	for (i = i; i < timer_count; i++) {
-+	for (i = 0; i < timer_count; i++) {
- 		timer = &timers[i];
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 79bac93d3e7d..aaad577ce328 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -706,6 +706,19 @@ static int vgic_its_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
+ 	ite->irq->target_vcpu = vcpu;
+ 	spin_unlock(&ite->irq->irq_lock);
  
- 		frame = arch_timer_mem_find_best_frame(timer);
++	if (ite->irq->hw) {
++		struct its_vlpi_map map;
++		int ret;
++
++		ret = its_get_vlpi(ite->irq->host_irq, &map);
++		if (ret)
++			return ret;
++
++		map.vpe_idx = vcpu->vcpu_id;
++
++		return its_map_vlpi(ite->irq->host_irq, &map);
++	}
++
+ 	return 0;
+ }
+ 
 -- 
-2.14.0.rc0.400.g1c36432dff-goog
+2.11.0
