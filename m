@@ -1,69 +1,63 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:25:54 +0100
-Subject: [PATCH v3 16/59] irqchip/gic-v3-its: Add VLPI configuration hook
-In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
-References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-17-marc.zyngier@arm.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 31 Jul 2017 20:57:19 +0200
+Subject: [PATCH v2 0/5] ACPI: DMA ranges management
+In-Reply-To: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
+References: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
+Message-ID: <CAJZ5v0g_NHo5Jnp5HcseS2RQL1PwaewGE6eG6Xn9OafAXwHgkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the skeleton irq_set_vcpu_affinity method that will be used
-to configure VLPIs.
+On Mon, Jul 31, 2017 at 5:23 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> This patch series is v2 of a previous posting:
+>
+> v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
+>
+> v1->v2:
+>         - Reworked acpi_dma_get_range() flow and logs
+>         - Added IORT named component address limits
+>         - Renamed acpi_dev_get_resources() helper function
+>         - Rebased against v4.13-rc3
+>
+> -- Original cover letter --
+>
+> As reported in:
+>
+> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
+>
+> the bus connecting devices to an IOMMU bus can be smaller in size than
+> the IOMMU input address bits which results in devices DMA HW bugs in
+> particular related to IOVA allocation (ie chopping of higher address
+> bits owing to system bus HW capabilities mismatch with the IOMMU).
+>
+> Fortunately this problem can be solved through an already present but never
+> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
+> window for a specific bus in ACPI and therefore all upstream devices
+> connected to it.
+>
+> This small patch series enables _DMA parsing in ACPI core code and
+> use it in ACPI IORT code in order to detect DMA ranges for devices and
+> update their data structures to make them work with their related DMA
+> addressing restrictions.
+>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Feng Kan <fkan@apm.com>
+> Cc: Jon Masters <jcm@redhat.com>
+> Cc: Robert Moore <robert.moore@intel.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>
+> Lorenzo Pieralisi (5):
+>   ACPICA: resource_mgr: Allow _DMA method in walk resources
+>   ACPI: Make acpi_dev_get_resources() method agnostic
+>   ACPI: Introduce DMA ranges parsing
+>   ACPI: Make acpi_dma_configure() DMA regions aware
+>   ACPI/IORT: Add IORT named component memory address limits
 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+Patches [1-3/5] are fine by me, but I need ACKs from the ARM side on
+the last two ones.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index bc396ab24037..9ef4f161690a 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -36,6 +36,7 @@
- 
- #include <linux/irqchip.h>
- #include <linux/irqchip/arm-gic-v3.h>
-+#include <linux/irqchip/arm-gic-v4.h>
- 
- #include <asm/cputype.h>
- #include <asm/exception.h>
-@@ -780,6 +781,28 @@ static int its_irq_set_irqchip_state(struct irq_data *d,
- 	return 0;
- }
- 
-+static int its_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
-+{
-+	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-+	struct its_cmd_info *info = vcpu_info;
-+
-+	/* Need a v4 ITS */
-+	if (!its_dev->its->is_v4 || !info)
-+		return -EINVAL;
-+
-+	switch (info->cmd_type) {
-+	case MAP_VLPI:
-+
-+	case GET_VLPI:
-+
-+	case PROP_UPDATE_VLPI:
-+	case PROP_UPDATE_AND_INV_VLPI:
-+
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
- static struct irq_chip its_irq_chip = {
- 	.name			= "ITS",
- 	.irq_mask		= its_mask_irq,
-@@ -788,6 +811,7 @@ static struct irq_chip its_irq_chip = {
- 	.irq_set_affinity	= its_set_affinity,
- 	.irq_compose_msi_msg	= its_irq_compose_msi_msg,
- 	.irq_set_irqchip_state	= its_irq_set_irqchip_state,
-+	.irq_set_vcpu_affinity	= its_irq_set_vcpu_affinity,
- };
- 
- /*
--- 
-2.11.0
+Thanks,
+Rafael
