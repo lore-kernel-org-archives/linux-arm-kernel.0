@@ -1,41 +1,77 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:03:16 +0200
-Subject: [PATCH 24/31] arm64: renesas: Add Renesas R8A77995 Kconfig support
+Date: Mon, 31 Jul 2017 17:03:22 +0200
+Subject: [PATCH 30/31] arm64: dts: renesas: r8a7795: add usb-dmac ch2 and ch3
+ device nodes
 In-Reply-To: <cover.1501509525.git.horms+renesas@verge.net.au>
 References: <cover.1501509525.git.horms+renesas@verge.net.au>
-Message-ID: <a4b68d283bf0922c1d0cbcaf0d3e25a99618d911.1501509526.git.horms+renesas@verge.net.au>
+Message-ID: <62f40bcfa9a8a360637577fb528872ebcb0937c1.1501509526.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Add a configuration option for the R-Car D3 SoC.
+This patch adds support for usb-dmac ch2 and ch3 device nodes for
+R-Car H3 ES2.0.
 
-Note that r8a77995 is the first Renesas "r8a<n>" SoC using a 5 digit
-number in its Kconfig symbol, as r8a77990 will be a different SoC.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/Kconfig.platforms | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi |  3 +++
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi     | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index f5f0c813dfec..a1c9f4ed7a88 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -184,6 +184,12 @@ config ARCH_R8A7796
- 	help
- 	  This enables support for the Renesas R-Car M3-W SoC.
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+index 1eccc7c795df..9743acad9b9c 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+@@ -25,6 +25,9 @@
+ 	/delete-node/ usb at ee0e0100;
+ 	/delete-node/ usb at ee0e0000;
  
-+config ARCH_R8A77995
-+	bool "Renesas R-Car D3 SoC Platform"
-+	depends on ARCH_RENESAS
-+	help
-+	  This enables support for the Renesas R-Car D3 SoC.
++	/delete-node/ dma-controller at e6460000;
++	/delete-node/ dma-controller at e6470000;
 +
- config ARCH_STRATIX10
- 	bool "Altera's Stratix 10 SoCFPGA Family"
- 	help
+ 	fcpf2: fcp at fe952000 {
+ 		compatible = "renesas,fcpf";
+ 		reg = <0 0xfe952000 0 0x200>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index cf9ed0d0a1fb..f9735a3a736e 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1498,6 +1498,34 @@
+ 			dma-channels = <2>;
+ 		};
+ 
++		usb_dmac2: dma-controller at e6460000 {
++			compatible = "renesas,r8a7795-usb-dmac",
++				     "renesas,usb-dmac";
++			reg = <0 0xe6460000 0 0x100>;
++			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "ch0", "ch1";
++			clocks = <&cpg CPG_MOD 326>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 326>;
++			#dma-cells = <1>;
++			dma-channels = <2>;
++		};
++
++		usb_dmac3: dma-controller at e6470000 {
++			compatible = "renesas,r8a7795-usb-dmac",
++				     "renesas,usb-dmac";
++			reg = <0 0xe6470000 0 0x100>;
++			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "ch0", "ch1";
++			clocks = <&cpg CPG_MOD 329>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			resets = <&cpg 329>;
++			#dma-cells = <1>;
++			dma-channels = <2>;
++		};
++
+ 		sdhi0: sd at ee100000 {
+ 			compatible = "renesas,sdhi-r8a7795";
+ 			reg = <0 0xee100000 0 0x2000>;
 -- 
 2.1.4
