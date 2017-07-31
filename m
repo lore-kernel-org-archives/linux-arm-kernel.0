@@ -1,81 +1,57 @@
 From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 31 Jul 2017 16:10:29 +0530
-Subject: [PATCH v3 1/5] hw_breakpoint: Add step_needed event attribute
+Date: Mon, 31 Jul 2017 16:10:30 +0530
+Subject: [PATCH v3 2/5] arm64: use hw_breakpoint_needs_single_step() to decide
+ if step is needed
 In-Reply-To: <cover.1501496603.git.panand@redhat.com>
 References: <cover.1501496603.git.panand@redhat.com>
-Message-ID: <1d7ca935857f93bd09c82a2ff57a53e373211b7e.1501496603.git.panand@redhat.com>
+Message-ID: <2d95da25d614b49196c4d7606334fdd062d88d37.1501496603.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Architecture like ARM64 currently allows to use default hw breakpoint
-single step handler only to perf. However, some other users like few
-systemtap tests or kernel test in
-samples/hw_breakpoint/data_breakpoint.c can also work with default step
-handler implementation.
+Currently we use is_default_overflow_handler() to decide whether a
+"step" will be needed or not. However, is_default_overflow_handler() is
+true only for perf implementation. There can be some custom kernel
+module tests like samples/hw_breakpoint/data_breakpoint.c which can
+rely on default step handler.
 
-Therefore, this patch introduces a flag 'step_needed' in struct
-hw_perf_event, so that arch specific code(specially on arm64) can make a
-decision to enable single stepping.
-
-Any architecture which is not using this field will not have any
-side effect.
+hw_breakpoint_needs_single_step() will be true if any hw_breakpoint user
+wants to use default step handler and sets step_needed in hw_perf_event.
 
 Signed-off-by: Pratyush Anand <panand@redhat.com>
 ---
- include/linux/hw_breakpoint.h | 6 ++++++
- include/linux/perf_event.h    | 6 ++++++
- kernel/events/core.c          | 2 ++
- 3 files changed, 14 insertions(+)
+ arch/arm64/kernel/hw_breakpoint.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/include/linux/hw_breakpoint.h b/include/linux/hw_breakpoint.h
-index 0464c85e63fd..b9ac9629bf74 100644
---- a/include/linux/hw_breakpoint.h
-+++ b/include/linux/hw_breakpoint.h
-@@ -38,6 +38,12 @@ static inline int hw_breakpoint_type(struct perf_event *bp)
- 	return bp->attr.bp_type;
- }
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index 749f81779420..9a73f85ab9ad 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -661,7 +661,7 @@ static int breakpoint_handler(unsigned long unused, unsigned int esr,
+ 		perf_bp_event(bp, regs);
  
-+static inline bool
-+hw_breakpoint_needs_single_step(struct perf_event *bp)
-+{
-+	return bp->hw.step_needed;
-+}
-+
- static inline unsigned long hw_breakpoint_len(struct perf_event *bp)
- {
- 	return bp->attr.bp_len;
-diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index 24a635887f28..7da951f94b47 100644
---- a/include/linux/perf_event.h
-+++ b/include/linux/perf_event.h
-@@ -233,6 +233,12 @@ struct hw_perf_event {
- 	 */
- 	u64				freq_time_stamp;
- 	u64				freq_count_stamp;
-+	/*
-+	 * A HW breakpoint user can either have it's own step handling
-+	 * mechanism or it can use default step handling meachanism defined
-+	 * by arch code. Set step_needed to use default mechanism.
-+	 */
-+	int				step_needed;
- #endif
- };
+ 		/* Do we need to handle the stepping? */
+-		if (is_default_overflow_handler(bp))
++		if (hw_breakpoint_needs_single_step(bp))
+ 			step = 1;
+ unlock:
+ 		rcu_read_unlock();
+@@ -789,7 +789,7 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+ 		perf_bp_event(wp, regs);
  
-diff --git a/kernel/events/core.c b/kernel/events/core.c
-index 6c4e523dc1e2..66ce5574e778 100644
---- a/kernel/events/core.c
-+++ b/kernel/events/core.c
-@@ -9444,9 +9444,11 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
- 	} else if (is_write_backward(event)){
- 		event->overflow_handler = perf_event_output_backward;
- 		event->overflow_handler_context = NULL;
-+		event->hw.step_needed = 1;
- 	} else {
- 		event->overflow_handler = perf_event_output_forward;
- 		event->overflow_handler_context = NULL;
-+		event->hw.step_needed = 1;
+ 		/* Do we need to handle the stepping? */
+-		if (is_default_overflow_handler(wp))
++		if (hw_breakpoint_needs_single_step(wp))
+ 			step = 1;
  	}
+ 	if (min_dist > 0 && min_dist != -1) {
+@@ -800,7 +800,7 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
+ 		perf_bp_event(wp, regs);
  
- 	perf_event__state_init(event);
+ 		/* Do we need to handle the stepping? */
+-		if (is_default_overflow_handler(wp))
++		if (hw_breakpoint_needs_single_step(wp))
+ 			step = 1;
+ 	}
+ 	rcu_read_unlock();
 -- 
 2.9.4
