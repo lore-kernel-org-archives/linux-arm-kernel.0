@@ -1,19 +1,21 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:03:39 +0200
-Subject: [PATCH 08/10] ARM: multi_v7_defconfig: Replace SND_SOC_RSRC_CARD by
- SND_SIMPLE_SCU_CARD
+Date: Mon, 31 Jul 2017 17:03:40 +0200
+Subject: [PATCH 09/10] ARM: multi_v7_defconfig: Replace DRM_RCAR_HDMI by
+ generic bridge options
 In-Reply-To: <cover.1501511664.git.horms+renesas@verge.net.au>
 References: <cover.1501511664.git.horms+renesas@verge.net.au>
-Message-ID: <883338aa8d3009d67868af53c6a7b8f5f1ff7e2d.1501511664.git.horms+renesas@verge.net.au>
+Message-ID: <cdbacdaf89226db73aeed157d287a4702a4a09d3.1501511664.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-SND_SOC_RSRC_CARD was renamed SND_SIMPLE_SCU_CARD, hence update
-multi_v7_defconfig.
+The manual bridge implementation was removed in favor of the generic
+one, so now we need to enable standard bridge drivers like
+DRM_DUMB_VGA_DAC and DRM_I2C_ADV7511.
+Both were already enabled, but the (newer) ADV7511 audio part wasn't.
 
-Fixes: d12c6216c4a58f9f ("ASoC: rsrc-card: rename rsrc-card to simple-scu-card phase3")
+Fixes: 5c602531feb3db39 ("drm: rcar-du: Replace manual bridge implementation with DRM bridge")
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
@@ -21,17 +23,24 @@ Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 4d19c1b4b8e7..7fa1746970ec 100644
+index 7fa1746970ec..ea2075d8e185 100644
 --- a/arch/arm/configs/multi_v7_defconfig
 +++ b/arch/arm/configs/multi_v7_defconfig
-@@ -650,7 +650,7 @@ CONFIG_SND_SOC_SMDK_WM8994_PCM=m
- CONFIG_SND_SOC_SNOW=m
- CONFIG_SND_SOC_SH4_FSI=m
- CONFIG_SND_SOC_RCAR=m
--CONFIG_SND_SOC_RSRC_CARD=m
-+CONFIG_SND_SIMPLE_SCU_CARD=m
- CONFIG_SND_SUN4I_CODEC=m
- CONFIG_SND_SOC_TEGRA=m
- CONFIG_SND_SOC_TEGRA_RT5640=m
+@@ -584,6 +584,7 @@ CONFIG_VIDEO_ADV7180=m
+ CONFIG_VIDEO_ML86V7667=m
+ CONFIG_DRM=y
+ CONFIG_DRM_I2C_ADV7511=m
++CONFIG_DRM_I2C_ADV7511_AUDIO=y
+ # CONFIG_DRM_I2C_CH7006 is not set
+ # CONFIG_DRM_I2C_SIL164 is not set
+ CONFIG_DRM_DUMB_VGA_DAC=m
+@@ -603,7 +604,6 @@ CONFIG_ROCKCHIP_DW_MIPI_DSI=y
+ CONFIG_ROCKCHIP_INNO_HDMI=y
+ CONFIG_DRM_ATMEL_HLCDC=m
+ CONFIG_DRM_RCAR_DU=m
+-CONFIG_DRM_RCAR_HDMI=y
+ CONFIG_DRM_RCAR_LVDS=y
+ CONFIG_DRM_SUN4I=m
+ CONFIG_DRM_TEGRA=y
 -- 
 2.1.4
