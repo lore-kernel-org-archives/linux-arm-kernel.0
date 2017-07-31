@@ -1,176 +1,52 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 31 Jul 2017 21:56:47 +0900
-Subject: [PATCH 1/3] mmc: sdhci: enable/disable the clock in
- sdhci_pltfm_suspend/resume
-In-Reply-To: <1501505809-393-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1501505809-393-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1501505809-393-2-git-send-email-yamada.masahiro@socionext.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 31 Jul 2017 14:59:20 +0200
+Subject: [RFC PATCH v2 38/38] KVM: arm64: Respect the virtual
+ CPTR_EL2.TCPAC setting
+In-Reply-To: <1500397144-16232-39-git-send-email-jintack.lim@linaro.org>
+References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
+ <1500397144-16232-39-git-send-email-jintack.lim@linaro.org>
+Message-ID: <20170731125920.GX5176@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit provides similar cleanups as commit 83eacdfa2529 ("mmc:
-sdhci: disable the clock in sdhci_pltfm_unregister()") did for
-unregister hooks.
+On Tue, Jul 18, 2017 at 11:59:04AM -0500, Jintack Lim wrote:
+> Forward CPACR_EL1 traps to the virtual EL2 if virtual CPTR_EL2 is
+> configured to trap CPACR_EL1 accesses from EL1.
+> 
+> This is for recursive nested virtualization.
+> 
+> Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 6f67666..ba2966d 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -1091,6 +1091,11 @@ static bool access_cpacr(struct kvm_vcpu *vcpu,
+>  	if (el12_reg(p) && forward_nv_traps(vcpu))
+>  		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+>  
+> +	/* Forward this trap to the virtual EL2 if CPTR_EL2.TCPAC is set*/
+> +	if (!el12_reg(p) && !vcpu_mode_el2(vcpu) &&
+> +	    (vcpu_sys_reg(vcpu, CPTR_EL2) & CPTR_EL2_TCPAC))
+> +		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+> +
 
-Some drivers duplicate code to handle pltfm_host->clk in their own
-hooks.  The clock can be handled in sdhci_pltfm.c so that drivers
-can reuse sdhci_pltfm_pmops.
+I'm trying to understand what should happen if the VM is in EL1 and
+accesses CPACR_EL12, but the guest hypervisor did not set
+CPTR_EL2.TCPAC, why would we get here, and if there's a good reason why
+we god here, is the EL12 access not supposed to undef at EL1 as opposed
+to actually work, like it seems your code does when it doesn't take the
+branch?
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+>  	/*
+>  	 * When the virtual HCR_EL2.E2H == 1, an access to CPACR_EL1
+>  	 * in the virtual EL2 is to access CPTR_EL2.
+> -- 
+> 1.9.1
+> 
 
- drivers/mmc/host/sdhci-brcmstb.c | 37 +------------------------------------
- drivers/mmc/host/sdhci-pltfm.c   | 16 +++++++++++++++-
- drivers/mmc/host/sdhci-sirf.c    | 39 +--------------------------------------
- 3 files changed, 17 insertions(+), 75 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci-brcmstb.c b/drivers/mmc/host/sdhci-brcmstb.c
-index e2f638338e8f..6d461fcdd663 100644
---- a/drivers/mmc/host/sdhci-brcmstb.c
-+++ b/drivers/mmc/host/sdhci-brcmstb.c
-@@ -21,41 +21,6 @@
- 
- #include "sdhci-pltfm.h"
- 
--#ifdef CONFIG_PM_SLEEP
--
--static int sdhci_brcmstb_suspend(struct device *dev)
--{
--	struct sdhci_host *host = dev_get_drvdata(dev);
--	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	int res;
--
--	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
--		mmc_retune_needed(host->mmc);
--
--	res = sdhci_suspend_host(host);
--	if (res)
--		return res;
--	clk_disable_unprepare(pltfm_host->clk);
--	return res;
--}
--
--static int sdhci_brcmstb_resume(struct device *dev)
--{
--	struct sdhci_host *host = dev_get_drvdata(dev);
--	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	int err;
--
--	err = clk_prepare_enable(pltfm_host->clk);
--	if (err)
--		return err;
--	return sdhci_resume_host(host);
--}
--
--#endif /* CONFIG_PM_SLEEP */
--
--static SIMPLE_DEV_PM_OPS(sdhci_brcmstb_pmops, sdhci_brcmstb_suspend,
--			sdhci_brcmstb_resume);
--
- static const struct sdhci_ops sdhci_brcmstb_ops = {
- 	.set_clock = sdhci_set_clock,
- 	.set_bus_width = sdhci_set_bus_width,
-@@ -131,7 +96,7 @@ MODULE_DEVICE_TABLE(of, sdhci_brcm_of_match);
- static struct platform_driver sdhci_brcmstb_driver = {
- 	.driver		= {
- 		.name	= "sdhci-brcmstb",
--		.pm	= &sdhci_brcmstb_pmops,
-+		.pm	= &sdhci_pltfm_pmops,
- 		.of_match_table = of_match_ptr(sdhci_brcm_of_match),
- 	},
- 	.probe		= sdhci_brcmstb_probe,
-diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-index e090d8c42ddb..be9a79d62e22 100644
---- a/drivers/mmc/host/sdhci-pltfm.c
-+++ b/drivers/mmc/host/sdhci-pltfm.c
-@@ -212,16 +212,30 @@ EXPORT_SYMBOL_GPL(sdhci_pltfm_unregister);
- static int sdhci_pltfm_suspend(struct device *dev)
- {
- 	struct sdhci_host *host = dev_get_drvdata(dev);
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	int ret;
- 
- 	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
- 		mmc_retune_needed(host->mmc);
- 
--	return sdhci_suspend_host(host);
-+	ret = sdhci_suspend_host(host);
-+	if (ret)
-+		return ret;
-+
-+	clk_disable_unprepare(pltfm_host->clk);
-+
-+	return 0;
- }
- 
- static int sdhci_pltfm_resume(struct device *dev)
- {
- 	struct sdhci_host *host = dev_get_drvdata(dev);
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	int ret;
-+
-+	ret = clk_prepare_enable(pltfm_host->clk);
-+	if (ret)
-+		return ret;
- 
- 	return sdhci_resume_host(host);
- }
-diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
-index c251c6c0a112..dd4680a0ada4 100644
---- a/drivers/mmc/host/sdhci-sirf.c
-+++ b/drivers/mmc/host/sdhci-sirf.c
-@@ -230,43 +230,6 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
- 	return ret;
- }
- 
--#ifdef CONFIG_PM_SLEEP
--static int sdhci_sirf_suspend(struct device *dev)
--{
--	struct sdhci_host *host = dev_get_drvdata(dev);
--	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	int ret;
--
--	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
--		mmc_retune_needed(host->mmc);
--
--	ret = sdhci_suspend_host(host);
--	if (ret)
--		return ret;
--
--	clk_disable(pltfm_host->clk);
--
--	return 0;
--}
--
--static int sdhci_sirf_resume(struct device *dev)
--{
--	struct sdhci_host *host = dev_get_drvdata(dev);
--	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	int ret;
--
--	ret = clk_enable(pltfm_host->clk);
--	if (ret) {
--		dev_dbg(dev, "Resume: Error enabling clock\n");
--		return ret;
--	}
--
--	return sdhci_resume_host(host);
--}
--#endif
--
--static SIMPLE_DEV_PM_OPS(sdhci_sirf_pm_ops, sdhci_sirf_suspend, sdhci_sirf_resume);
--
- static const struct of_device_id sdhci_sirf_of_match[] = {
- 	{ .compatible = "sirf,prima2-sdhc" },
- 	{ }
-@@ -276,7 +239,7 @@ MODULE_DEVICE_TABLE(of, sdhci_sirf_of_match);
- static struct platform_driver sdhci_sirf_driver = {
- 	.driver		= {
- 		.name	= "sdhci-sirf",
--		.of_match_table = sdhci_sirf_of_match,
-+		.of_match_table = sdhci_pltfm_pmops,
- 		.pm	= &sdhci_sirf_pm_ops,
- 	},
- 	.probe		= sdhci_sirf_probe,
--- 
-2.7.4
+Thanks,
+-Christoffer
