@@ -1,40 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:19:34 +0200
-Subject: [PATCH 22/38] ARM: dts: r8a7793: Reserve SRAM for the SMP jump stub
+Date: Mon, 31 Jul 2017 17:19:46 +0200
+Subject: [PATCH 34/38] ARM: dts: rskrza1: Add SCIF2 pin group
 In-Reply-To: <cover.1501514100.git.horms+renesas@verge.net.au>
 References: <cover.1501514100.git.horms+renesas@verge.net.au>
-Message-ID: <cbbf5d6cd14fe1875031fd2f52980efb197ff36c.1501514100.git.horms+renesas@verge.net.au>
+Message-ID: <cde2380548e26afe03e4c9310073e0878af9efd9.1501514100.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Chris Brandt <chris.brandt@renesas.com>
 
-Reserve SRAM for the jump stub for CPU core bringup.
+Add pin configuration for SCIF2 serial console interface.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/r7s72100-rskrza1.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index bc6a44272f55..497716b6fbe2 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -856,6 +856,14 @@
- 	icram1:	sram at e63c0000 {
- 		compatible = "mmio-sram";
- 		reg = <0 0xe63c0000 0 0x1000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0xe63c0000 0x1000>;
-+
-+		smp-sram at 0 {
-+			compatible = "renesas,smp-sram";
-+			reg = <0 0x10>;
-+		};
- 	};
+diff --git a/arch/arm/boot/dts/r7s72100-rskrza1.dts b/arch/arm/boot/dts/r7s72100-rskrza1.dts
+index 72df20a04320..5fac0f82d742 100644
+--- a/arch/arm/boot/dts/r7s72100-rskrza1.dts
++++ b/arch/arm/boot/dts/r7s72100-rskrza1.dts
+@@ -10,6 +10,7 @@
  
- 	ether: ethernet at ee700000 {
+ /dts-v1/;
+ #include "r7s72100.dtsi"
++#include <dt-bindings/pinctrl/r7s72100-pinctrl.h>
+ 
+ / {
+ 	model = "RSKRZA1";
+@@ -47,6 +48,15 @@
+ 	clock-frequency = <32768>;
+ };
+ 
++&pinctrl {
++
++	/* Serial Console */
++	scif2_pins: serial2 {
++		pinmux = <RZA1_PINMUX(3, 0, 6)>,	/* TxD2 */
++			 <RZA1_PINMUX(3, 2, 4)>;	/* RxD2 */
++	};
++};
++
+ &mtu2 {
+ 	status = "okay";
+ };
+@@ -78,5 +88,7 @@
+ };
+ 
+ &scif2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&scif2_pins>;
+ 	status = "okay";
+ };
 -- 
 2.1.4
