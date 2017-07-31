@@ -1,64 +1,112 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:19:47 +0200
-Subject: [PATCH 35/38] ARM: dts: rskrza1: Add Ethernet pin group
+Date: Mon, 31 Jul 2017 17:19:41 +0200
+Subject: [PATCH 29/38] ARM: dts: r7s72100: Add pin controller node
 In-Reply-To: <cover.1501514100.git.horms+renesas@verge.net.au>
 References: <cover.1501514100.git.horms+renesas@verge.net.au>
-Message-ID: <4cb674cd204dc95eeb6d1ea11735510ee6b02180.1501514100.git.horms+renesas@verge.net.au>
+Message-ID: <0d69caa69854b5e59f8079b835e55f725b9e3313.1501514100.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+From: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
-Add pin configuration for Ethernet.
+Add pin controller node with 12 gpio controller sub-nodes to
+r7s72100 dtsi.
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r7s72100-rskrza1.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/r7s72100.dtsi | 78 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r7s72100-rskrza1.dts b/arch/arm/boot/dts/r7s72100-rskrza1.dts
-index 5fac0f82d742..cedf887e809a 100644
---- a/arch/arm/boot/dts/r7s72100-rskrza1.dts
-+++ b/arch/arm/boot/dts/r7s72100-rskrza1.dts
-@@ -55,6 +55,29 @@
- 		pinmux = <RZA1_PINMUX(3, 0, 6)>,	/* TxD2 */
- 			 <RZA1_PINMUX(3, 2, 4)>;	/* RxD2 */
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index 5cf53e9943af..4ed12a4d9d51 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -207,6 +207,84 @@
+ 		};
  	};
+ 
++	pinctrl: pin-controller at fcfe3000 {
++		compatible = "renesas,r7s72100-ports";
 +
-+	/* Ethernet */
-+	ether_pins: ether {
-+		/* Ethernet on Ports 1,2,3,5 */
-+		pinmux = <RZA1_PINMUX(1, 14, 4)>,	/* ET_COL   */
-+			 <RZA1_PINMUX(5, 9, 2)>,	/* ET_MDC   */
-+			 <RZA1_PINMUX(3, 3, 2)>,	/* ET_MDIO  */
-+			 <RZA1_PINMUX(3, 4, 2)>,	/* ET_RXCLK */
-+			 <RZA1_PINMUX(3, 5, 2)>,	/* ET_RXER  */
-+			 <RZA1_PINMUX(3, 6, 2)>,	/* ET_RXDV  */
-+			 <RZA1_PINMUX(2, 0, 2)>,	/* ET_TXCLK */
-+			 <RZA1_PINMUX(2, 1, 2)>,	/* ET_TXER  */
-+			 <RZA1_PINMUX(2, 2, 2)>,	/* ET_TXEN  */
-+			 <RZA1_PINMUX(2, 3, 2)>,	/* ET_CRS   */
-+			 <RZA1_PINMUX(2, 4, 2)>,	/* ET_TXD0  */
-+			 <RZA1_PINMUX(2, 5, 2)>,	/* ET_TXD1  */
-+			 <RZA1_PINMUX(2, 6, 2)>,	/* ET_TXD2  */
-+			 <RZA1_PINMUX(2, 7, 2)>,	/* ET_TXD3  */
-+			 <RZA1_PINMUX(2, 8, 2)>,	/* ET_RXD0  */
-+			 <RZA1_PINMUX(2, 9, 2)>,	/* ET_RXD1  */
-+			 <RZA1_PINMUX(2, 10, 2)>,	/* ET_RXD2  */
-+			 <RZA1_PINMUX(2, 11, 2)>;	/* ET_RXD3  */
++		reg = <0xfcfe3000 0x4230>;
++
++		port0: gpio-0 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 0 6>;
++		};
++
++		port1: gpio-1 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 16 16>;
++		};
++
++		port2: gpio-2 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 32 16>;
++		};
++
++		port3: gpio-3 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 48 16>;
++		};
++
++		port4: gpio-4 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 64 16>;
++		};
++
++		port5: gpio-5 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 80 11>;
++		};
++
++		port6: gpio-6 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 96 16>;
++		};
++
++		port7: gpio-7 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 112 16>;
++		};
++
++		port8: gpio-8 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 128 16>;
++		};
++
++		port9: gpio-9 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 144 8>;
++		};
++
++		port10: gpio-10 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 160 16>;
++		};
++
++		port11: gpio-11 {
++			gpio-controller;
++			#gpio-cells = <2>;
++			gpio-ranges = <&pinctrl 0 176 16>;
++		};
 +	};
- };
- 
- &mtu2 {
-@@ -62,6 +85,8 @@
- };
- 
- &ether {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ether_pins>;
- 	status = "okay";
- 	renesas,no-ether-link;
- 	phy-handle = <&phy0>;
++
+ 	scif0: serial at e8007000 {
+ 		compatible = "renesas,scif-r7s72100", "renesas,scif";
+ 		reg = <0xe8007000 64>;
 -- 
 2.1.4
