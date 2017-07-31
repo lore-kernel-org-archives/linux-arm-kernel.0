@@ -1,40 +1,71 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 31 Jul 2017 15:21:05 +0900
-Subject: [PATCH 0/6] pinctrl: uniphier: UniPhier pinctrl updates for v4.14
-Message-ID: <1501482071-9819-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon, 31 Jul 2017 15:21:07 +0900
+Subject: [PATCH 2/6] pinctrl: uniphier: fix pin_config_get() for input-enable
+In-Reply-To: <1501482071-9819-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1501482071-9819-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1501482071-9819-3-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series includes:
-  - Clean up redundant pin data
-  - Add simple suspend / resume support
-  - Add a driver for a new SoC
+For LD11/LD20 SoCs (capable of per-pin input enable), iectrl bits are
+located across multiple registers.  So, the register offset must be
+taken into account.  Otherwise, wrong input-enable status is displayed.
 
+While we here, rename the macro because it is a base address.
 
+Fixes: aa543888ca8c ("pinctrl: uniphier: support per-pin input enable for new SoCs")
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Masahiro Yamada (6):
-  pinctrl: uniphier: remove unneeded EXPORT_SYMBOL_GPL()
-  pinctrl: uniphier: fix pin_config_get() for input-enable
-  pinctrl: uniphier: clean up GPIO port muxing
-  pinctrl: uniphier: omit redundant input enable bit information
-  pinctrl: uniphier: add suspend / resume support
-  pinctrl: uniphier: add UniPhier PXs3 pinctrl driver
+ drivers/pinctrl/uniphier/pinctrl-uniphier-core.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
- drivers/pinctrl/uniphier/Kconfig                 |   4 +
- drivers/pinctrl/uniphier/Makefile                |   1 +
- drivers/pinctrl/uniphier/pinctrl-uniphier-core.c | 277 +++++--
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c | 660 ++++-----------
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c | 709 +++++-----------
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c  | 273 +------
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c | 386 +--------
- drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c | 451 +----------
- drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c | 458 +----------
- drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c | 386 +--------
- drivers/pinctrl/uniphier/pinctrl-uniphier-pxs3.c | 989 +++++++++++++++++++++++
- drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c | 273 +------
- drivers/pinctrl/uniphier/pinctrl-uniphier.h      |  40 +-
- 13 files changed, 1809 insertions(+), 3098 deletions(-)
- create mode 100644 drivers/pinctrl/uniphier/pinctrl-uniphier-pxs3.c
-
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
+index c649e835bd54..f2f0f9dcfec3 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
+@@ -32,7 +32,7 @@
+ #define UNIPHIER_PINCTRL_DRV2CTRL_BASE	0x1900
+ #define UNIPHIER_PINCTRL_DRV3CTRL_BASE	0x1980
+ #define UNIPHIER_PINCTRL_PUPDCTRL_BASE	0x1a00
+-#define UNIPHIER_PINCTRL_IECTRL		0x1d00
++#define UNIPHIER_PINCTRL_IECTRL_BASE	0x1d00
+ 
+ struct uniphier_pinctrl_priv {
+ 	struct pinctrl_desc pctldesc;
+@@ -252,18 +252,21 @@ static int uniphier_conf_pin_input_enable_get(struct pinctrl_dev *pctldev,
+ {
+ 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
+ 	unsigned int iectrl = uniphier_pin_get_iectrl(desc->drv_data);
+-	unsigned int val;
++	unsigned int reg, mask, val;
+ 	int ret;
+ 
+ 	if (iectrl == UNIPHIER_PIN_IECTRL_NONE)
+ 		/* This pin is always input-enabled. */
+ 		return 0;
+ 
+-	ret = regmap_read(priv->regmap, UNIPHIER_PINCTRL_IECTRL, &val);
++	reg = UNIPHIER_PINCTRL_IECTRL_BASE + iectrl / 32 * 4;
++	mask = BIT(iectrl % 32);
++
++	ret = regmap_read(priv->regmap, reg, &val);
+ 	if (ret)
+ 		return ret;
+ 
+-	return val & BIT(iectrl) ? 0 : -EINVAL;
++	return val & mask ? 0 : -EINVAL;
+ }
+ 
+ static int uniphier_conf_pin_config_get(struct pinctrl_dev *pctldev,
+@@ -456,7 +459,7 @@ static int uniphier_conf_pin_input_enable(struct pinctrl_dev *pctldev,
+ 	if (iectrl == UNIPHIER_PIN_IECTRL_NONE)
+ 		return enable ? 0 : -EINVAL;
+ 
+-	reg = UNIPHIER_PINCTRL_IECTRL + iectrl / 32 * 4;
++	reg = UNIPHIER_PINCTRL_IECTRL_BASE + iectrl / 32 * 4;
+ 	mask = BIT(iectrl % 32);
+ 
+ 	return regmap_update_bits(priv->regmap, reg, mask, enable ? mask : 0);
 -- 
 2.7.4
