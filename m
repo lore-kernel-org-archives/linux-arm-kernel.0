@@ -1,49 +1,52 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Mon, 31 Jul 2017 19:22:00 +0800
-Subject: [xlnx:master 823/864] drivers/usb//dwc3/host.c:24:6: error:
- redefinition of 'dwc3_host_wakeup_capable'
-Message-ID: <201707311958.SzOxxEo4%fengguang.wu@intel.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 31 Jul 2017 13:24:27 +0200
+Subject: [PATCH v3 2/2] dt-bindings: add documentation for rk3126 clock
+In-Reply-To: <1501497728-7805-3-git-send-email-zhangqing@rock-chips.com>
+References: <1501497728-7805-1-git-send-email-zhangqing@rock-chips.com>
+ <1501497728-7805-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1528313.SDTh7a5k6t@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   00346d2eba7634f4fb2c2117ac371e0c104a2870
-commit: 80ac0da9010ebabef6ed1d66b6607b345fd14cb4 [823/864] dwc3: Add support for clock disabling during suspend
-config: blackfin-allyesconfig (attached as .config)
-compiler: bfin-uclinux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 80ac0da9010ebabef6ed1d66b6607b345fd14cb4
-        # save the attached .config to linux build tree
-        make.cross ARCH=blackfin 
+Hi Elaine,
 
-All errors (new ones prefixed by >>):
+Am Montag, 31. Juli 2017, 18:42:08 CEST schrieb Elaine Zhang:
+> This add bindings documentation for rk3126 SoCs.
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 
->> drivers/usb//dwc3/host.c:24:6: error: redefinition of 'dwc3_host_wakeup_capable'
-    void dwc3_host_wakeup_capable(struct device *dev, bool wakeup)
-         ^~~~~~~~~~~~~~~~~~~~~~~~
-   In file included from drivers/usb//dwc3/host.c:20:0:
-   include/linux/usb/xhci_pdriver.h:25:6: note: previous definition of 'dwc3_host_wakeup_capable' was here
-    void dwc3_host_wakeup_capable(struct device *dev, bool wakeup)
-         ^~~~~~~~~~~~~~~~~~~~~~~~
+thanks for noticing that the binding doc was missing, I meant to
+write a response about that but didn't find the time yet.
 
-vim +/dwc3_host_wakeup_capable +24 drivers/usb//dwc3/host.c
+> ---
+>  Documentation/devicetree/bindings/clock/rockchip,rk3128-cru.txt | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3128-cru.txt
+> b/Documentation/devicetree/bindings/clock/rockchip,rk3128-cru.txt index
+> 455a9a00a623..25098fa8595f 100644
+> --- a/Documentation/devicetree/bindings/clock/rockchip,rk3128-cru.txt
+> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3128-cru.txt
+> @@ -1,12 +1,12 @@
+> -* Rockchip RK3128 Clock and Reset Unit
+> +* Rockchip RK3128/RK3126 Clock and Reset Unit
+> 
+> -The RK3128 clock controller generates and supplies clock to various
+> +The RK3128/RK3126 clock controller generates and supplies clock to various
+>  controllers within the SoC and also implements a reset controller for SoC
+>  peripherals.
+> 
+>  Required Properties:
+> 
+> -- compatible: should be "rockchip,rk3128-cru"
+> +- compatible: should be "rockchip,rk3128-cru", "rockchip,rk3126-cru"
 
-    23	
-  > 24	void dwc3_host_wakeup_capable(struct device *dev, bool wakeup)
-    25	{
-    26		dwc3_simple_wakeup_capable(dev, wakeup);
-    27	}
-    28	
+- compatible: should be one of "rockchip,rk3128-cru" or "rockchip,rk3126-cru".
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 42470 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170731/483a4124/attachment-0001.gz>
+
+Heiko
+
+
+>  - reg: physical base address of the controller and length of memory mapped
+>    region.
+>  - #clock-cells: should be 1.
