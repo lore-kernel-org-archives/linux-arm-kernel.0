@@ -1,28 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 31 Jul 2017 15:36:55 +0200
-Subject: [PATCH 2/3] [v3] pinctrl: qcom: disable GPIO groups with no pins
-In-Reply-To: <1501179565-26466-3-git-send-email-timur@codeaurora.org>
-References: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
- <1501179565-26466-3-git-send-email-timur@codeaurora.org>
-Message-ID: <CACRpkdZj+tnMcEpic6PrQS-qMJDodmc_uFJVudxc=USCTXpyKg@mail.gmail.com>
+Date: Mon, 31 Jul 2017 15:39:06 +0200
+Subject: [PATCH] ARM: tegra: Select appropriate DMA options for LPAE
+In-Reply-To: <1499178545.12420.4.camel@paulk.fr>
+References: <20170424225946.19425-1-contact@paulk.fr>
+ <1499178545.12420.4.camel@paulk.fr>
+Message-ID: <CACRpkdYqWesH6nRJboUuF1w512f9nSjce8X4G1dRP9rKNVXY0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 27, 2017 at 8:19 PM, Timur Tabi <timur@codeaurora.org> wrote:
-
-> To support sparse GPIO maps, pinctrl-msm client drivers can specify
-> that a given GPIO has a pin count of zero.  These GPIOs will be
-> considered "hidden".  Any attempt to claim the GPIO will fail, and they
-> will not be listed in debugfs.
+On Tue, Jul 4, 2017 at 4:29 PM, Paul Kocialkowski <contact@paulk.fr> wrote:
+> On Tue, 2017-04-25 at 00:59 +0200, Paul Kocialkowski wrote:
+>> This automatically selects options for zone DMA and 64 bit DMA addresses
+>> when LPAE is enabled on ARM Tegra platforms. These options are required
+>> for proper operation with LPAE enabled.
 >
-> During a kexec shutdown, machine_kexec_mask_interrupts() will attempt
-> to disable all IRQs, even those that aren't enabled.  This includes
-> GPIOs that are unavailable (npins == 0), so add a check to the irq mask
-> and unmask functions.
+> Bumping this one since it did not get any review yet.
 >
-> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+> It should be a good candidate for inclusion now that the merge window is open.
 
-I'm waiting for Bj?rn's review of the two remaining patches.
+If you don't get any reply still, send it to the ARM SoC maintainers
+directly at arm at kernel.org and request it to be applied.
 
 Yours,
 Linus Walleij
