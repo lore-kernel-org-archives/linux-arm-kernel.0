@@ -1,36 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 31 Jul 2017 15:53:31 +0200
-Subject: [PATCH v3 1/2] pinctrl: sunxi: add a missing function of A10/A20
- pinctrl driver
-In-Reply-To: <20170722025054.32645-2-icenowy@aosc.io>
+Date: Mon, 31 Jul 2017 15:55:18 +0200
+Subject: [PATCH v3 2/2] pinctrl: sunxi: add support of R40 to A10 pinctrl
+ driver
+In-Reply-To: <20170722025054.32645-3-icenowy@aosc.io>
 References: <20170722025054.32645-1-icenowy@aosc.io>
- <20170722025054.32645-2-icenowy@aosc.io>
-Message-ID: <CACRpkdbeu=NbWWiJvFHrHYe=4U5M16PNspTZ7S1-9_3v7+tV=A@mail.gmail.com>
+ <20170722025054.32645-3-icenowy@aosc.io>
+Message-ID: <CACRpkdYpnwOWp8ZckV+2aeKDfdKhy86SDDA-ZAicbbDX-aOWYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 22, 2017 at 4:50 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+2017-07-22 4:50 GMT+02:00 Icenowy Zheng <icenowy@aosc.io>:
 
-> The PH16 pin has a function with mux id 0x5, which is the DET pin of the
-> "sim" (smart card reader) IP block.
+> R40 is said to be an upgrade of A20, and its pin configuration is also
+> similar to A20 (and thus similar to A10).
 >
-> This function is missing in old versions of A10/A20 SoCs' datasheets and
-> user manuals, so it's also missing in the old drivers. The newest A10
-> Datasheet V1.70 and A20 Datasheet V1.41 contain this pin function, and
-> it's discovered during implementing R40 pinctrl driver.
->
-> Add it to the driver. As we now merged A20 pinctrl driver to the A10
-> one, we need to only fix the A10 driver now.
->
-> Fixes: f2821b1ca3a2 ("pinctrl: sunxi: Move Allwinner A10 pinctrl
-> driver to a driver of its own")
+> Add support for R40 to the A10 pinctrl driver.
 >
 > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 > ---
 > Changes in v3:
 
-Patch applied for fixes.
+Patch applied for next.
 
 Yours,
 Linus Walleij
