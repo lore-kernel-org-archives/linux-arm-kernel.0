@@ -1,31 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 31 Jul 2017 16:05:02 +0200
-Subject: [PATCH 0/2] clk: meson: expose clk ids
-In-Reply-To: <20170731113832.26490-1-jbrunet@baylibre.com>
-References: <20170731113832.26490-1-jbrunet@baylibre.com>
-Message-ID: <CAK8P3a28nb8QsJC8V4+SJM0gz70BDOv8jAczRWoCF+HfvkwJfA@mail.gmail.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 31 Jul 2017 17:04:27 +0300
+Subject: [PATCH] gpio: drop unnecessary includes from
+ include/linux/gpio/driver.h
+In-Reply-To: <CACRpkdaxgxaXV8XjLTzu68JqjyeZ8Jr2YMR3L46wm3zmnMrPsg@mail.gmail.com>
+References: <1499140415-31677-1-git-send-email-yamada.masahiro@socionext.com>
+ <1499162760.22624.246.camel@linux.intel.com>
+ <CACRpkdaxgxaXV8XjLTzu68JqjyeZ8Jr2YMR3L46wm3zmnMrPsg@mail.gmail.com>
+Message-ID: <1501509867.29303.303.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 1:38 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
-> In previous cycles, concerns have been raised about the way clocks are
-> exposed for the meson clock controller, only when validated and required
-> in DT.
->
-> Instead, this patchset expose all the known clocks which may be needed in
-> DT later on. The clocks left out are internal clocks which should never be
-> used directly in DT. These are mostly internal muxes and dividers of
-> composite clocks.
->
-> While this should reduce the patch flow on the related header files, It
-> won't stop it completely. There are still many clocks we don't know about
-> yet. We tend discover a few in every cycle.
->
-> This patchset depends on these fixes [0] to avoid issues when adding new
-> clk ids.
->
-> [0]: https://lkml.kernel.org/r/20170727161755.10393-1-jbrunet at baylibre.com
+On Mon, 2017-07-31 at 15:48 +0200, Linus Walleij wrote:
+> On Tue, Jul 4, 2017 at 12:06 PM, Andy Shevchenko
+> <andriy.shevchenko@linux.intel.com> wrote:
+> > On Tue, 2017-07-04 at 12:53 +0900, Masahiro Yamada wrote:
+> > > Some of include directives in include/linux/gpio/driver.h are
+> > > unneeded because the header does not need to know the content of
+> > > struct device, irq_chip, etc.??Just declare they are structures.
+> > > 
+> > > On the other hand, <linux/irqhandler.h> and
+> > > <linux/spinlock_types.h>
+> > > turned out to be necessary for irq_flow_handler_t and spinlock_t,
+> > > respectively.
+> > > 
+> > > Each driver should include what it needs without relying on what
+> > > is
+> > > implicitly included from <linux/gpio/driver.h>.??This will cut
+> > > down
+> > > unnecessary header parsing.
+> > 
+> > If Linus is okay with the following proposal I would rather go with
+> > it,
+> > i.e. logical split the series to
+> > 
+> > 1. Fix IRQ related headers inclusion
+> > 2. Fix pinconf-generic.h inclusion
+> > 3. Fix OF headers inclusion (btw, of_gpio.h is not enough there?)
+> 
+> That works fine with me, but also one big patch actually, I do not
+> want to make it too much work to refactor obviously incorrect things.
+> 
+> As soon as we have rough consensus on this and the build robot
+> are happy I will apply it to GPIO and also pull it into the pinctrl
+> subsystem.
 
-Thanks a lot!
+For me priorities like this:
+1) it works after the patch being applied (no regressions);
+2) it makes code cleaner at the end;
+3) it is presented in logically split parts.
 
- Acked-by: Arnd Bergmann <arnd@arndb.de>
+So, as long as 1) and 2) are satisfied I can neglect on 3).
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
