@@ -1,49 +1,35 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:26:32 +0100
-Subject: [PATCH v3 54/59] KVM: arm/arm64: GICv4: Enable virtual cpuif if VLPIs
- can be delivered
+Date: Mon, 31 Jul 2017 18:26:23 +0100
+Subject: [PATCH v3 45/59] KVM: arm/arm64: GICv4: Handle CLEAR applied to a VLPI
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-55-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-46-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for VLPIs to be delivered to the guest, we must make
-sure that the cpuif is always enabled, irrespective of the
-presence of virtual interrupt in the LRs.
+Handling CLEAR is pretty easy. Just ask the ITS driver to clear
+the corresponding pending bit (which will turn into a CLEAR
+command on the physical side).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/hyp/vgic-v3-sr.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-index 91728faa13fd..f5c3d6d7019e 100644
---- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-@@ -258,7 +258,8 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
- 		}
- 	} else {
--		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
-+		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
-+		    cpu_if->its_vpe.its_vm)
- 			write_gicreg(0, ICH_HCR_EL2);
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index aaad577ce328..2c065c970ba0 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -1069,6 +1069,10 @@ static int vgic_its_cmd_handle_clear(struct kvm *kvm, struct vgic_its *its,
  
- 		cpu_if->vgic_elrsr = 0xffff;
-@@ -337,9 +338,11 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 		/*
- 		 * If we need to trap system registers, we must write
- 		 * ICH_HCR_EL2 anyway, even if no interrupts are being
--		 * injected,
-+		 * injected. Same thing if GICv4 is used, as VLPI
-+		 * delivery is gated by ICH_HCR_EL2.En.
- 		 */
--		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
-+		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
-+		    cpu_if->its_vpe.its_vm)
- 			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
- 	}
+ 	ite->irq->pending_latch = false;
+ 
++	if (ite->irq->hw)
++		return irq_set_irqchip_state(ite->irq->host_irq,
++					     IRQCHIP_STATE_PENDING, false);
++
+ 	return 0;
+ }
  
 -- 
 2.11.0
