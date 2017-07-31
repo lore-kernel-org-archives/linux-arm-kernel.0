@@ -1,232 +1,100 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:26:18 +0100
-Subject: [PATCH v3 40/59] KVM: arm/arm64: GICv4: Add init/teardown of the
- per-VM vPE irq domain
+Date: Mon, 31 Jul 2017 18:26:37 +0100
+Subject: [PATCH v3 59/59] irqchip/gic-v3-its: Workaround Huawei D05
+ redistributor addressing
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-41-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-60-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to control the GICv4 view of virtual CPUs, we rely
-on an irqdomain allocated for that purpose. Let's add a couple
-of helpers to that effect.
+The ITSes on the Huawei D05 are broken when it comes to addressing
+the redistributors, and need to be explicitely told to address
+the VLPI page instead of the redistributor base address.
 
-At the same time, the vgic data structures gain new fields to
-track all this... erm... wonderful stuff.
-
-They way we hook into the vgic init is slightly convoluted. We
-need the vgic to be initialized (in order to guarantee that
-the number of vcpus is now fixed), and we must have a vITS
-(otherwise this is all very pointless). So we end-up calling
-the init from both sites...
+So let's add yet another quirk, fixing up the target address
+in the command stream.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/Makefile         |  1 +
- arch/arm64/kvm/Makefile       |  1 +
- include/kvm/arm_vgic.h        |  8 +++++
- virt/kvm/arm/vgic/vgic-init.c |  9 ++++++
- virt/kvm/arm/vgic/vgic-its.c  |  8 +++++
- virt/kvm/arm/vgic/vgic-v4.c   | 74 +++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h      |  2 ++
- 7 files changed, 103 insertions(+)
- create mode 100644 virt/kvm/arm/vgic/vgic-v4.c
+ drivers/irqchip/irq-gic-v3-its.c | 27 +++++++++++++++++++++++++--
+ 1 file changed, 25 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index d9beee652d36..0a1dd2cdb928 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -31,6 +31,7 @@ obj-y += $(KVM)/arm/vgic/vgic-init.o
- obj-y += $(KVM)/arm/vgic/vgic-irqfd.o
- obj-y += $(KVM)/arm/vgic/vgic-v2.o
- obj-y += $(KVM)/arm/vgic/vgic-v3.o
-+obj-y += $(KVM)/arm/vgic/vgic-v4.o
- obj-y += $(KVM)/arm/vgic/vgic-mmio.o
- obj-y += $(KVM)/arm/vgic/vgic-mmio-v2.o
- obj-y += $(KVM)/arm/vgic/vgic-mmio-v3.o
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 5d9810086c25..c30fd388ef80 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -26,6 +26,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-init.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-irqfd.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v2.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v3.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v4.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v2.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 84694b42373a..359eeffe9857 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -26,6 +26,8 @@
- #include <linux/list.h>
- #include <linux/jump_label.h>
- 
-+#include <linux/irqchip/arm-gic-v4.h>
-+
- #define VGIC_V3_MAX_CPUS	255
- #define VGIC_V2_MAX_CPUS	8
- #define VGIC_NR_IRQS_LEGACY     256
-@@ -236,6 +238,9 @@ struct vgic_dist {
- 
- 	/* used by vgic-debug */
- 	struct vgic_state_iter *iter;
-+
-+	/* GICv4 ITS per-VM stuff */
-+	struct its_vm		its_vm;
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index e22c8746ce89..32d8697bcb15 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -103,6 +103,7 @@ struct its_node {
+ 	u32			device_ids;
+ 	int			numa_node;
+ 	bool			is_v4;
++	int			vlpi_redist_offset;
  };
  
- struct vgic_v2_cpu_if {
-@@ -254,6 +259,9 @@ struct vgic_v3_cpu_if {
- 	u32		vgic_ap0r[4];
- 	u32		vgic_ap1r[4];
- 	u64		vgic_lr[VGIC_V3_MAX_LRS];
+ #define ITS_ITT_ALIGN		SZ_256
+@@ -548,13 +549,15 @@ static struct its_vpe *its_build_vmapp_cmd(struct its_node *its,
+ 					   struct its_cmd_desc *desc)
+ {
+ 	unsigned long vpt_addr;
++	u64 target;
+ 
+ 	vpt_addr = virt_to_phys(page_address(desc->its_vmapp_cmd.vpe->vpt_page));
++	target = desc->its_vmapp_cmd.col->target_address + its->vlpi_redist_offset;
+ 
+ 	its_encode_cmd(cmd, GITS_CMD_VMAPP);
+ 	its_encode_vpeid(cmd, desc->its_vmapp_cmd.vpe->vpe_id);
+ 	its_encode_valid(cmd, desc->its_vmapp_cmd.valid);
+-	its_encode_target(cmd, desc->its_vmapp_cmd.col->target_address);
++	its_encode_target(cmd, target);
+ 	its_encode_vpt_addr(cmd, vpt_addr);
+ 	its_encode_vpt_size(cmd, LPI_NRBITS - 1);
+ 
+@@ -613,11 +616,14 @@ static struct its_vpe *its_build_vmovp_cmd(struct its_node *its,
+ 					   struct its_cmd_block *cmd,
+ 					   struct its_cmd_desc *desc)
+ {
++	u64 target;
 +
-+	/* GICv4 vPE info */
-+	struct its_vpe	its_vpe;
- };
++	target = desc->its_vmapp_cmd.col->target_address + its->vlpi_redist_offset;
+ 	its_encode_cmd(cmd, GITS_CMD_VMOVP);
+ 	its_encode_seq_num(cmd, desc->its_vmovp_cmd.seq_num);
+ 	its_encode_its_list(cmd, desc->its_vmovp_cmd.its_list);
+ 	its_encode_vpeid(cmd, desc->its_vmovp_cmd.vpe->vpe_id);
+-	its_encode_target(cmd, desc->its_vmovp_cmd.col->target_address);
++	its_encode_target(cmd, target);
  
- struct vgic_cpu {
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 5801261f3add..d1c6c775203d 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -285,6 +285,12 @@ int vgic_init(struct kvm *kvm)
- 	if (ret)
- 		goto out;
+ 	its_fixup_cmd(cmd);
  
-+	if (vgic_has_its(kvm) && vgic_is_v4_capable(kvm)) {
-+		ret = vgic_v4_init(kvm);
-+		if (ret)
-+			goto out;
-+	}
-+
- 	kvm_for_each_vcpu(i, vcpu, kvm)
- 		kvm_vgic_vcpu_enable(vcpu);
- 
-@@ -320,6 +326,9 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
- 
- 	kfree(dist->spis);
- 	dist->nr_spis = 0;
-+
-+	if (vgic_is_v4_capable(kvm))
-+		vgic_v4_teardown(kvm);
+@@ -2668,6 +2674,17 @@ static void __maybe_unused its_enable_quirk_qdf2400_e0065(void *data)
+ 	its->ite_size = 16;
  }
  
- void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index fb7be8673bff..a2217f53bbe5 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1603,6 +1603,14 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
- 	if (!its)
- 		return -ENOMEM;
- 
-+	if (vgic_initialized(dev->kvm)) {
-+		int ret = vgic_v4_init(dev->kvm);
-+		if (ret) {
-+			kfree(its);
-+			return ret;
-+		}
-+	}
-+	
- 	mutex_init(&its->its_lock);
- 	mutex_init(&its->cmd_lock);
- 
-diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-new file mode 100644
-index 000000000000..207e1fda0dcd
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic-v4.c
-@@ -0,0 +1,74 @@
-+/*
-+ * Copyright (C) 2017 ARM Ltd.
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/interrupt.h>
-+#include <linux/irqdomain.h>
-+#include <linux/kvm_host.h>
-+
-+#include "vgic.h"
-+
-+int vgic_v4_init(struct kvm *kvm)
++static void __maybe_unused its_enable_quirk_d05_vlpi_offset(void *data)
 +{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	struct kvm_vcpu *vcpu;
-+	int i, nr_vcpus, ret;
++	struct its_node *its = data;
 +
 +	/*
-+	 * We may be called each time a vITS is created, or when the
-+	 * vgic is initialized. This relies on kvm->lock to be
-+	 * held. In both cases, the number of vcpus should now be
-+	 * fixed.
++	 * D05 insists on using the wrong address for the VLPI
++	 * page. Trick it into doing the right thing...
 +	 */
-+	if (dist->its_vm.vpes)
-+		return 0;
-+
-+	nr_vcpus = atomic_read(&kvm->online_vcpus);
-+
-+	dist->its_vm.vpes = kzalloc(sizeof(*dist->its_vm.vpes) * nr_vcpus,
-+				    GFP_KERNEL);
-+	if (!dist->its_vm.vpes)
-+		return -ENOMEM;
-+
-+	dist->its_vm.nr_vpes = nr_vcpus;
-+
-+	kvm_for_each_vcpu(i, vcpu, kvm)
-+		dist->its_vm.vpes[i] = &vcpu->arch.vgic_cpu.vgic_v3.its_vpe;
-+
-+	ret = its_alloc_vcpu_irqs(&dist->its_vm);
-+	if (ret < 0) {
-+		kvm_err("VPE IRQ allocation failure\n");
-+		kfree(dist->its_vm.vpes);
-+		dist->its_vm.nr_vpes = 0;
-+		dist->its_vm.vpes = NULL;
-+		return ret;
-+	}
-+
-+	return ret;
++	its->vlpi_redist_offset = SZ_128K;
 +}
 +
-+void vgic_v4_teardown(struct kvm *kvm)
-+{
-+	struct its_vm *its_vm = &kvm->arch.vgic.its_vm;
-+
-+	if (!its_vm->vpes)
-+		return;
-+
-+	its_free_vcpu_irqs(its_vm);
-+	kfree(its_vm->vpes);
-+	its_vm->nr_vpes = 0;
-+	its_vm->vpes = NULL;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 90f6436a11aa..1356f485d7cf 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -230,5 +230,7 @@ int vgic_its_resolve_lpi(struct kvm *kvm, struct vgic_its *its,
- struct vgic_its *vgic_msi_to_its(struct kvm *kvm, struct kvm_msi *msi);
- 
- bool vgic_is_v4_capable(struct kvm *kvm);
-+int vgic_v4_init(struct kvm *kvm);
-+void vgic_v4_teardown(struct kvm *kvm);
- 
+ static const struct gic_quirk its_quirks[] = {
+ #ifdef CONFIG_CAVIUM_ERRATUM_22375
+ 	{
+@@ -2694,6 +2711,12 @@ static const struct gic_quirk its_quirks[] = {
+ 	},
  #endif
+ 	{
++		.desc	= "ITS: D05 128kB VLPI offset",
++		.iidr	= 0x00000004,
++		.mask	= 0xffffffff,
++		.init	= its_enable_quirk_d05_vlpi_offset,
++	},
++	{
+ 	}
+ };
+ 
 -- 
 2.11.0
