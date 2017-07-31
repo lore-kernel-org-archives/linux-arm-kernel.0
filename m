@@ -1,80 +1,83 @@
-From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Mon, 31 Jul 2017 23:58:45 +0800
-Subject: [PATCH v2] arm64: dts: rockchip: add rk3399 hdmi nodes
-Message-ID: <1501516725-6838-1-git-send-email-jacob-chen@iotwrt.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 31 Jul 2017 17:26:57 +0200
+Subject: [PATCH v2 4/4] drm/bridge: dw-hdmi: remove CEC engine register
+ definitions
+In-Reply-To: <E1dcBhk-000890-TQ@rmk-PC.armlinux.org.uk>
+References: <20170731142906.GX31807@n2100.armlinux.org.uk>
+ <E1dcBhk-000890-TQ@rmk-PC.armlinux.org.uk>
+Message-ID: <34fc0d75-3b98-861b-7b6a-54730f9de7a9@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an hdmi node, and also add hdmi endpoints to vopb and vopl
-output port nodes.
+On 07/31/2017 04:29 PM, Russell King wrote:
+> We don't need the CEC engine register definitions, so let's remove them.
+> 
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-changes in v2:
- - remove spare lines
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
 
-Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
----
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 35 ++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+Regards,
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 5c5c9d9..3906471 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1485,6 +1485,10 @@
- 				remote-endpoint = <&edp_in_vopl>;
- 			};
- 
-+			vopl_out_hdmi: endpoint at 2 {
-+				reg = <2>;
-+				remote-endpoint = <&hdmi_in_vopl>;
-+			};
- 		};
- 	};
- 
-@@ -1526,6 +1530,10 @@
- 				remote-endpoint = <&mipi_in_vopb>;
- 			};
- 
-+			vopb_out_hdmi: endpoint at 2 {
-+				reg = <2>;
-+				remote-endpoint = <&hdmi_in_vopb>;
-+			};
- 		};
- 	};
- 
-@@ -1541,6 +1549,33 @@
- 		status = "disabled";
- 	};
- 
-+	hdmi: hdmi at ff940000 {
-+		compatible = "rockchip,rk3399-dw-hdmi";
-+		reg = <0x0 0xff940000 0x0 0x20000>;
-+		reg-io-width = <4>;
-+		rockchip,grf = <&grf>;
-+		power-domains = <&power RK3399_PD_HDCP>;
-+		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH 0>;
-+		clocks = <&cru PCLK_HDMI_CTRL>, <&cru SCLK_HDMI_SFR>, <&cru PLL_VPLL>, <&cru PCLK_VIO_GRF>;
-+		clock-names = "iahb", "isfr", "vpll", "grf";
-+		status = "disabled";
-+
-+		ports {
-+			hdmi_in: port {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				hdmi_in_vopb: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vopb_out_hdmi>;
-+				};
-+				hdmi_in_vopl: endpoint at 1 {
-+					reg = <1>;
-+					remote-endpoint = <&vopl_out_hdmi>;
-+				};
-+			};
-+		};
-+	};
-+
- 	mipi_dsi: mipi at ff960000 {
- 		compatible = "rockchip,rk3399-mipi-dsi", "snps,dw-mipi-dsi";
- 		reg = <0x0 0xff960000 0x0 0x8000>;
--- 
-2.7.4
+	Hans
+
+> ---
+>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.h | 45 -------------------------------
+>  1 file changed, 45 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.h b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.h
+> index 69644c83a0f8..9d90eb9c46e5 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.h
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.h
+> @@ -478,51 +478,6 @@
+>  #define HDMI_A_PRESETUP                         0x501A
+>  #define HDMI_A_SRM_BASE                         0x5020
+>  
+> -/* CEC Engine Registers */
+> -#define HDMI_CEC_CTRL                           0x7D00
+> -#define HDMI_CEC_STAT                           0x7D01
+> -#define HDMI_CEC_MASK                           0x7D02
+> -#define HDMI_CEC_POLARITY                       0x7D03
+> -#define HDMI_CEC_INT                            0x7D04
+> -#define HDMI_CEC_ADDR_L                         0x7D05
+> -#define HDMI_CEC_ADDR_H                         0x7D06
+> -#define HDMI_CEC_TX_CNT                         0x7D07
+> -#define HDMI_CEC_RX_CNT                         0x7D08
+> -#define HDMI_CEC_TX_DATA0                       0x7D10
+> -#define HDMI_CEC_TX_DATA1                       0x7D11
+> -#define HDMI_CEC_TX_DATA2                       0x7D12
+> -#define HDMI_CEC_TX_DATA3                       0x7D13
+> -#define HDMI_CEC_TX_DATA4                       0x7D14
+> -#define HDMI_CEC_TX_DATA5                       0x7D15
+> -#define HDMI_CEC_TX_DATA6                       0x7D16
+> -#define HDMI_CEC_TX_DATA7                       0x7D17
+> -#define HDMI_CEC_TX_DATA8                       0x7D18
+> -#define HDMI_CEC_TX_DATA9                       0x7D19
+> -#define HDMI_CEC_TX_DATA10                      0x7D1a
+> -#define HDMI_CEC_TX_DATA11                      0x7D1b
+> -#define HDMI_CEC_TX_DATA12                      0x7D1c
+> -#define HDMI_CEC_TX_DATA13                      0x7D1d
+> -#define HDMI_CEC_TX_DATA14                      0x7D1e
+> -#define HDMI_CEC_TX_DATA15                      0x7D1f
+> -#define HDMI_CEC_RX_DATA0                       0x7D20
+> -#define HDMI_CEC_RX_DATA1                       0x7D21
+> -#define HDMI_CEC_RX_DATA2                       0x7D22
+> -#define HDMI_CEC_RX_DATA3                       0x7D23
+> -#define HDMI_CEC_RX_DATA4                       0x7D24
+> -#define HDMI_CEC_RX_DATA5                       0x7D25
+> -#define HDMI_CEC_RX_DATA6                       0x7D26
+> -#define HDMI_CEC_RX_DATA7                       0x7D27
+> -#define HDMI_CEC_RX_DATA8                       0x7D28
+> -#define HDMI_CEC_RX_DATA9                       0x7D29
+> -#define HDMI_CEC_RX_DATA10                      0x7D2a
+> -#define HDMI_CEC_RX_DATA11                      0x7D2b
+> -#define HDMI_CEC_RX_DATA12                      0x7D2c
+> -#define HDMI_CEC_RX_DATA13                      0x7D2d
+> -#define HDMI_CEC_RX_DATA14                      0x7D2e
+> -#define HDMI_CEC_RX_DATA15                      0x7D2f
+> -#define HDMI_CEC_LOCK                           0x7D30
+> -#define HDMI_CEC_WKUPCTRL                       0x7D31
+> -
+>  /* I2C Master Registers (E-DDC) */
+>  #define HDMI_I2CM_SLAVE                         0x7E00
+>  #define HDMI_I2CM_ADDRESS                       0x7E01
+> 
