@@ -1,72 +1,74 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:25:42 +0100
-Subject: [PATCH v3 04/59] irqchip/gic-v3-its: Move LPI definitions around
+Date: Mon, 31 Jul 2017 18:25:47 +0100
+Subject: [PATCH v3 09/59] irqchip/gic-v3-its: Allow use of indirect VCPU tables
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-5-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-10-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The various LPI definitions are in the middle of the code, and
-would be better placed at the beginning, given that we're going
-to use some of them much earlier.
+The VCPU tables can be quite sparse as well, and it makes sense
+to use indirect tables as well if possible.
 
 Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 25 +++++++++++++------------
- 1 file changed, 13 insertions(+), 12 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 25 +++++++++++++++++--------
+ 1 file changed, 17 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 68932873eebc..ae6b2cee09fa 100644
+index 039626d21a73..9a317934455c 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -48,6 +48,19 @@
- 
- #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
- 
-+static u32 lpi_id_bits;
-+
-+/*
-+ * We allocate memory for PROPBASE to cover 2 ^ lpi_id_bits LPIs to
-+ * deal with (one configuration byte per interrupt). PENDBASE has to
-+ * be 64kB aligned (one bit per LPI, plus 8192 bits for SPI/PPI/SGI).
-+ */
-+#define LPI_NRBITS		lpi_id_bits
-+#define LPI_PROPBASE_SZ		ALIGN(BIT(LPI_NRBITS), SZ_64K)
-+#define LPI_PENDBASE_SZ		ALIGN(BIT(LPI_NRBITS) / 8, SZ_64K)
-+
-+#define LPI_PROP_DEFAULT_PRIO	0xa0
-+
- /*
-  * Collection structure - just an ID, and a redistributor address to
-  * ping. We use one per CPU as a bag of interrupts assigned to this
-@@ -695,7 +708,6 @@ static struct irq_chip its_irq_chip = {
- 
- static unsigned long *lpi_bitmap;
- static u32 lpi_chunks;
--static u32 lpi_id_bits;
- static DEFINE_SPINLOCK(lpi_lock);
- 
- static int its_lpi_to_chunk(int lpi)
-@@ -790,17 +802,6 @@ static void its_lpi_free(struct event_lpi_map *map)
- 	kfree(map->col_map);
+@@ -1071,10 +1071,13 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 	return 0;
  }
  
--/*
-- * We allocate memory for PROPBASE to cover 2 ^ lpi_id_bits LPIs to
-- * deal with (one configuration byte per interrupt). PENDBASE has to
-- * be 64kB aligned (one bit per LPI, plus 8192 bits for SPI/PPI/SGI).
-- */
--#define LPI_NRBITS		lpi_id_bits
--#define LPI_PROPBASE_SZ		ALIGN(BIT(LPI_NRBITS), SZ_64K)
--#define LPI_PENDBASE_SZ		ALIGN(BIT(LPI_NRBITS) / 8, SZ_64K)
--
--#define LPI_PROP_DEFAULT_PRIO	0xa0
--
- static int __init its_alloc_lpi_tables(void)
+-static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser,
+-				   u32 psz, u32 *order)
++static bool its_parse_indirect_baser(struct its_node *its,
++				     struct its_baser *baser,
++				     u32 psz, u32 *order)
  {
- 	phys_addr_t paddr;
+-	u64 esz = GITS_BASER_ENTRY_SIZE(its_read_baser(its, baser));
++	u64 tmp = its_read_baser(its, baser);
++	u64 type = GITS_BASER_TYPE(tmp);
++	u64 esz = GITS_BASER_ENTRY_SIZE(tmp);
+ 	u64 val = GITS_BASER_InnerShareable | GITS_BASER_RaWaWb;
+ 	u32 ids = its->device_ids;
+ 	u32 new_order = *order;
+@@ -1113,8 +1116,9 @@ static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser
+ 	if (new_order >= MAX_ORDER) {
+ 		new_order = MAX_ORDER - 1;
+ 		ids = ilog2(PAGE_ORDER_TO_SIZE(new_order) / (int)esz);
+-		pr_warn("ITS@%pa: Device Table too large, reduce ids %u->%u\n",
+-			&its->phys_base, its->device_ids, ids);
++		pr_warn("ITS@%pa: %s Table too large, reduce ids %u->%u\n",
++			&its->phys_base, its_base_type_string[type],
++			its->device_ids, ids);
+ 	}
+ 
+ 	*order = new_order;
+@@ -1162,11 +1166,16 @@ static int its_alloc_tables(struct its_node *its)
+ 		u32 order = get_order(psz);
+ 		bool indirect = false;
+ 
+-		if (type == GITS_BASER_TYPE_NONE)
++		switch (type) {
++		case GITS_BASER_TYPE_NONE:
+ 			continue;
+ 
+-		if (type == GITS_BASER_TYPE_DEVICE)
+-			indirect = its_parse_baser_device(its, baser, psz, &order);
++		case GITS_BASER_TYPE_DEVICE:
++		case GITS_BASER_TYPE_VCPU:
++			indirect = its_parse_indirect_baser(its, baser,
++							    psz, &order);
++			break;
++		}
+ 
+ 		err = its_setup_baser(its, baser, cache, shr, psz, order, indirect);
+ 		if (err < 0) {
 -- 
 2.11.0
