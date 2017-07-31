@@ -1,49 +1,40 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 31 Jul 2017 18:07:17 +0200
-Subject: [PATCH v4 2/6] [media] extended-controls.rst: add PorterDuff mode
- control
-In-Reply-To: <1501515182-26705-3-git-send-email-jacob-chen@iotwrt.com>
-References: <1501515182-26705-1-git-send-email-jacob-chen@iotwrt.com>
- <1501515182-26705-3-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <d5bc50d0-f468-f1b4-b52a-4f1c10d7d9af@xs4all.nl>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 31 Jul 2017 18:17:38 +0200
+Subject: [RESEND PATCH v5 00/16] eeprom: at24: Add OF device ID table
+In-Reply-To: <20170731153009.xkjknygpmckv2pfp@ninjato>
+References: <20170615185418.13980-1-javier@dowhile0.org>
+ <20170731153009.xkjknygpmckv2pfp@ninjato>
+Message-ID: <CABxcv=mdbE0QGjoi3aLzxRqM3-MbkQ_Ai6fShcGVUGSNNqqrqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2017 05:32 PM, Jacob Chen wrote:
-> PorterDuff mode control are used to determine
-> how two images are combined.
-> 
-> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
-> ---
->  Documentation/media/uapi/v4l/extended-controls.rst | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
-> index abb1057..f9c93bb 100644
-> --- a/Documentation/media/uapi/v4l/extended-controls.rst
-> +++ b/Documentation/media/uapi/v4l/extended-controls.rst
-> @@ -3021,6 +3021,10 @@ Image Process Control IDs
->      The video deinterlacing mode (such as Bob, Weave, ...). The menu items are
->      driver specific and are documented in :ref:`v4l-drivers`.
->  
-> +``V4L2_CID_PORTER_DUFF_MODE (menu)``
-> +    The PorterDuff blend modes. PorterDuff is way to overlay, combine and
-> +    trim images as if they were pieces of cardboard, device could use to
-> +    determine how two images are combined.
+Hello Wolfram,
 
-A little rewrite:
+On Mon, Jul 31, 2017 at 5:30 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+>
+>> Patches can be applied independently since the DTS changes without driver
+>> changes are no-op and the OF table won't be used without the DTS changes.
+>
+> But there is a dependency, no? If I apply the driver patch,
+> non-converted device trees will not find their eeproms anymore. So, I
 
-    The PorterDuff blend modes. PorterDuff is a method to overlay, combine and
-    trim images as if they were pieces of cardboard. The device uses this to
-    determine how two images are combined.
+I don't think that's correct. If you apply this patch before the DTS
+changes, the driver will still match using the I2C device ID table
+like it has been doing it until today.
 
-Also add a link to the same android article that you pointed to in the header.
+IOW, this is what will happen:
 
-Regards,
+1- an OF device is registered with the wrong compatible (not found in
+the OF table)
+2- the I2C core strips the vendor part and fills the struct i2c_client
+.name with the device part.
+3- i2c_device_match() will be called since a new device has been registered
+4- i2c_of_match_device() will fail because there's no OF entry that
+matches the device compatible
+5- the I2C core fallbacks to i2c_match_id() and matches using the I2C
+device ID table.
 
-	Hans
+So no noticeable difference AFAICT in that case.
 
->  
->  .. _dv-controls:
->  
-> 
+Best regards,
+Javier
