@@ -1,75 +1,74 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:26:33 +0100
-Subject: [PATCH v3 55/59] KVM: arm/arm64: GICv4: Enable VLPI support
+Date: Mon, 31 Jul 2017 18:26:27 +0100
+Subject: [PATCH v3 49/59] KVM: arm/arm64: GICv4: Propagate VLPI properties at
+ map time
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-56-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-50-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All it takes is the has_v4 flag to be set in gic_kvm_info
-as well as "kvm-arm.vgic_v4_enable=1" being passed on the
-command line for GICv4 to be enabled in KVM.
+When the VLPI gets mapped, it must inherit the configuration of
+LPI configured at the vITS level. FOr that purpose, let's make
+update_lpi_config globally available and call it just after
+having performed the VLPI map operation.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/admin-guide/kernel-parameters.txt |  4 ++++
- virt/kvm/arm/vgic/vgic-v3.c                     | 14 ++++++++++++++
- 2 files changed, 18 insertions(+)
+ virt/kvm/arm/vgic/vgic-its.c | 6 ++----
+ virt/kvm/arm/vgic/vgic-v4.c  | 2 ++
+ virt/kvm/arm/vgic/vgic.h     | 2 ++
+ 3 files changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index d9c171ce4190..d2927d01d8b2 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -1874,6 +1874,10 @@
- 			[KVM,ARM] Trap guest accesses to GICv3 common
- 			system registers
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index b395df1bf47c..d790d0c74b8b 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -37,8 +37,6 @@
+ static int vgic_its_save_tables_v0(struct vgic_its *its);
+ static int vgic_its_restore_tables_v0(struct vgic_its *its);
+ static int vgic_its_commit_v0(struct vgic_its *its);
+-static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+-			     struct kvm_vcpu *filter_vcpu, bool needs_inv);
  
-+	kvm-arm.vgic_v4_enable=
-+			[KVM,ARM] Allow use of GICv4 for direct injection of
-+			LPIs.
-+
- 	kvm-intel.ept=	[KVM,Intel] Disable extended page tables
- 			(virtualized MMU) support on capable Intel chips.
- 			Default is 1 (enabled)
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 96ea597db0e7..405733678c2f 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -24,6 +24,7 @@
- static bool group0_trap;
- static bool group1_trap;
- static bool common_trap;
-+static bool gicv4_enable;
- 
- void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+ /*
+  * Creates a new (reference to a) struct vgic_irq for a given LPI.
+@@ -273,8 +271,8 @@ static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
+  * If filter_vcpu is not NULL, applies only if the IRQ is targeting this
+  * VCPU. Unconditionally applies if filter_vcpu is NULL.
+  */
+-static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+-			     struct kvm_vcpu *filter_vcpu, bool needs_inv)
++int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
++		      struct kvm_vcpu *filter_vcpu, bool needs_inv)
  {
-@@ -459,6 +460,12 @@ static int __init early_common_trap_cfg(char *buf)
- }
- early_param("kvm-arm.vgic_v3_common_trap", early_common_trap_cfg);
+ 	u64 propbase = GICR_PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
+ 	u8 prop;
+diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+index 338c86c5159f..534d3051a078 100644
+--- a/virt/kvm/arm/vgic/vgic-v4.c
++++ b/virt/kvm/arm/vgic/vgic-v4.c
+@@ -137,6 +137,8 @@ int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int virq,
+ 	irq->hw		= true;
+ 	irq->host_irq	= virq;
  
-+static int __init early_gicv4_enable(char *buf)
-+{
-+	return strtobool(buf, &gicv4_enable);
-+}
-+early_param("kvm-arm.vgic_v4_enable", early_gicv4_enable);
-+
- /**
-  * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
-  * @node:	pointer to the DT node
-@@ -478,6 +485,13 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
- 	kvm_vgic_global_state.can_emulate_gicv2 = false;
- 	kvm_vgic_global_state.ich_vtr_el2 = ich_vtr_el2;
++	/* Force the property update and invalidate */
++	update_lpi_config(kvm, irq, NULL, true);
+ out:
+ 	mutex_unlock(&its->its_lock);
+ 	return 0;
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 1356f485d7cf..1210bf4681dc 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -228,6 +228,8 @@ void unlock_all_vcpus(struct kvm *kvm);
+ int vgic_its_resolve_lpi(struct kvm *kvm, struct vgic_its *its,
+ 			 u32 devid, u32 eventid, struct vgic_irq **irq);
+ struct vgic_its *vgic_msi_to_its(struct kvm *kvm, struct kvm_msi *msi);
++int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
++		      struct kvm_vcpu *filter_vcpu, bool needs_inv);
  
-+	/* GICv4 support? */
-+	if (info->has_v4) {
-+		kvm_vgic_global_state.has_gicv4 = gicv4_enable;
-+		kvm_info("GICv4 support %sabled\n",
-+			 gicv4_enable ? "en" : "dis");
-+	}
-+
- 	if (!info->vcpu.start) {
- 		kvm_info("GICv3: no GICV resource entry\n");
- 		kvm_vgic_global_state.vcpu_base = 0;
+ bool vgic_is_v4_capable(struct kvm *kvm);
+ int vgic_v4_init(struct kvm *kvm);
 -- 
 2.11.0
