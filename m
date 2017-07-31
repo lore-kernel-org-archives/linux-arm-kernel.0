@@ -1,113 +1,39 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 31 Jul 2017 08:04:11 -0700
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170731120847.00003d5c@huawei.com>
-References: <20170727124913.GL3730@linux.vnet.ibm.com>
- <20170727144903.000022a1@huawei.com>
- <20170727173923.000001b2@huawei.com>
- <20170727165245.GD3730@linux.vnet.ibm.com>
- <20170728084411.00001ddb@huawei.com>
- <20170728142403.0000122b@huawei.com>
- <20170728165529.GF3730@linux.vnet.ibm.com>
- <20170728182053.000072aa@huawei.com>
- <20170728190349.GM3730@linux.vnet.ibm.com>
- <20170731120847.00003d5c@huawei.com>
-Message-ID: <20170731150411.GA3730@linux.vnet.ibm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 31 Jul 2017 17:02:59 +0200
+Subject: [PATCH 07/31] arm64: dts: ulcb: Enable I2C4
+In-Reply-To: <cover.1501509525.git.horms+renesas@verge.net.au>
+References: <cover.1501509525.git.horms+renesas@verge.net.au>
+Message-ID: <476b2e4f71542e9ea61f6eb856a040495c665a07.1501509525.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 12:08:47PM +0100, Jonathan Cameron wrote:
-> On Fri, 28 Jul 2017 12:03:50 -0700
-> "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> 
-> > On Fri, Jul 28, 2017 at 06:27:05PM +0100, Jonathan Cameron wrote:
-> > > On Fri, 28 Jul 2017 09:55:29 -0700
-> > > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> > >   
-> > > > On Fri, Jul 28, 2017 at 02:24:03PM +0100, Jonathan Cameron wrote:  
-> > > > > On Fri, 28 Jul 2017 08:44:11 +0100
-> > > > > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:    
-> > > > 
-> > > > [ . . . ]
-> > > >   
-> > > > > Ok.  Some info.  I disabled a few driver (usb and SAS) in the interest of having
-> > > > > fewer timer events.  Issue became much easier to trigger (on some runs before
-> > > > > I could get tracing up and running)
-> > > > >e
-> > > > > So logs are large enough that pastebin doesn't like them - please shoet if    
-> > > > >>e another timer period is of interest.    
-> > > > > 
-> > > > > https://pastebin.com/iUZDfQGM for the timer trace.
-> > > > > https://pastebin.com/3w1F7amH for dmesg.  
-> > > > > 
-> > > > > The relevant timeout on the RCU stall detector was 8 seconds.  Event is
-> > > > > detected around 835.
-> > > > > 
-> > > > > It's a lot of logs, so I haven't identified a smoking gun yet but there
-> > > > > may well be one in there.    
-> > > > 
-> > > > The dmesg says:
-> > > > 
-> > > > rcu_preempt kthread starved for 2508 jiffies! g112 c111 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1
-> > > > 
-> > > > So I look for "rcu_preempt" timer events and find these:
-> > > > 
-> > > > rcu_preempt-9     [019] ....   827.579114: timer_init: timer=ffff8017d5fc7da0
-> > > > rcu_preempt-9     [019] d..1   827.579115: timer_start: timer=ffff8017d5fc7da0 function=process_timeout 
-> > > > 
-> > > > Next look for "ffff8017d5fc7da0" and I don't find anything else.  
-> > > It does show up off the bottom of what would fit in pastebin...
-> > > 
-> > >      rcu_preempt-9     [001] d..1   837.681077: timer_cancel: timer=ffff8017d5fc7da0
-> > >      rcu_preempt-9     [001] ....   837.681086: timer_init: timer=ffff8017d5fc7da0
-> > >      rcu_preempt-9     [001] d..1   837.681087: timer_start: timer=ffff8017d5fc7da0 function=process_timeout expires=4295101298 [timeout=1] cpu=1 idx=0 flags=  
-> > 
-> > Odd.  I would expect an expiration...  And ten seconds is way longer
-> > than the requested one jiffy!
-> > 
-> > > > The timeout was one jiffy, and more than a second later, no expiration.
-> > > > Is it possible that this event was lost?  I am not seeing any sign of
-> > > > this is the trace.
-> > > > 
-> > > > I don't see any sign of CPU hotplug (and I test with lots of that in
-> > > > any case).
-> > > > 
-> > > > The last time we saw something like this it was a timer HW/driver problem,
-> > > > but it is a bit hard to imagine such a problem affecting both ARM64
-> > > > and SPARC.  ;-)  
-> > > Could be different issues, both of which were hidden by that lockup detector.
-> > > 
-> > > There is an errata work around for the timers on this particular board.
-> > > I'm only vaguely aware of it, so may be unconnected.
-> > > 
-> > > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clocksource/arm_arch_timer.c?h=v4.13-rc2&id=bb42ca47401010fc02901b5e8f79e40a26f208cb
-> > > 
-> > > Seems unlikely though! + we've not yet seen it on the other chips that
-> > > errata effects (not that that means much).  
-> > 
-> > If you can reproduce quickly, might be worth trying anyway...
-> > 
-> > 							Thanx, Paul
-> Errata fix is running already and was for all those tests.
+From: Vladimir Barinov <vladimir.barinov+renesas@cogentembedded.com>
 
-I was afraid of that...  ;-)
+This enables I2C4 for ULCB board
 
-> I'll have a dig into the timers today and see where I get to.
+Signed-off-by: Vladimir Barinov <vladimir.barinov+renesas@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/ulcb.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Look forward to seeing what you find!
-
-							Thanx, Paul
-
-> Jonathan
-> > 
-> > > Jonathan
-> > >   
-> > > > 
-> > > > Thomas, any debugging suggestions?
-> > > > 
-> > > > 							Thanx, Paul
-> > > >   
-> > >   
-> > 
-> 
+diff --git a/arch/arm64/boot/dts/renesas/ulcb.dtsi b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+index 84b4daddced0..0467cd051710 100644
+--- a/arch/arm64/boot/dts/renesas/ulcb.dtsi
++++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+@@ -189,6 +189,12 @@
+ 	};
+ };
+ 
++&i2c4 {
++	status = "okay";
++
++	clock-frequency = <400000>;
++};
++
+ &i2c_dvfs {
+ 	status = "okay";
+ };
+-- 
+2.1.4
