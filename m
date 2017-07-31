@@ -1,88 +1,69 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 31 Jul 2017 14:42:07 +0200
-Subject: [RFC PATCH v2 36/38] KVM: arm64: Respect virtual HCR_EL2.TVM and
- TRVM settings
-In-Reply-To: <1500397144-16232-37-git-send-email-jintack.lim@linaro.org>
-References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
- <1500397144-16232-37-git-send-email-jintack.lim@linaro.org>
-Message-ID: <20170731124207.GV5176@cbox>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 31 Jul 2017 14:42:34 +0200
+Subject: [PATCH v3 1/4] dt-bindings: clock: amlogic,
+ gxbb-aoclkc: Update bindings
+In-Reply-To: <1501504957-19476-1-git-send-email-narmstrong@baylibre.com>
+References: <1501504957-19476-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1501504957-19476-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 11:59:02AM -0500, Jintack Lim wrote:
-> Forward the EL1 virtual memory register traps to the virtual EL2 if they
-> are not coming from the virtual EL2 and the virtual HCR_EL2.TVM or TRVM
-> bit is set.
+On the first revision of the bindings, only the gates + resets were known
+in the AO Clock HW, but more registers used to configures AO clock are known
+to be spread among the AO register space.
+This patch adds a parent node for the entire system control zone for the AO
+domain then moves the clock controller as a subnode of the system control
+node.
 
-I noticed that all these recursive patches don't change how we program
-the physical HCR_EL2.  Is that because we always respect the guest
-hypervisor's configuration of the virtual HCR_EL2 into the physical one
-when running the VM?
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ .../bindings/clock/amlogic,gxbb-aoclkc.txt         | 22 ++++++++++++++++------
+ 1 file changed, 16 insertions(+), 6 deletions(-)
 
-If so, perhaps we should add a single sentence in the commit messages
-about that.
-
-> 
-> This is for recursive nested virtualization.
-> 
-> Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 3559cf7..3e4ec5e 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -135,6 +135,27 @@ static inline bool el12_reg(struct sys_reg_params *p)
->  	return (p->Op1 == 5);
->  }
->  
-> +/* This function is to support the recursive nested virtualization */
-
-it's just 'recursive nested virtualization', not 'the recursive nested
-virtualization', and I also think 'recursive virtualization' is
-sufficient.
-
-> +static bool forward_vm_traps(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
-> +{
-> +	u64 hcr_el2 = vcpu_sys_reg(vcpu, HCR_EL2);
-> +
-> +	/* If a trap comes from the virtual EL2, the host hypervisor handles. */
-> +	if (vcpu_mode_el2(vcpu))
-> +		return false;
-> +
-> +	/*
-> +	 * If the virtual HCR_EL2.TVM or TRVM bit is set, we need to foward
-> +	 * this trap to the virtual EL2.
-> +	 */
-> +	if ((hcr_el2 & HCR_TVM) && p->is_write)
-> +		return true;
-> +	else if ((hcr_el2 & HCR_TRVM) && !p->is_write)
-> +		return true;
-> +
-> +	return false;
-> +}
-> +
->  /*
->   * Generic accessor for VM registers. Only called as long as HCR_TVM
->   * is set. If the guest enables the MMU, we stop trapping the VM
-> @@ -152,6 +173,9 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
->  	if (el12_reg(p) && forward_nv_traps(vcpu))
->  		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
->  
-> +	if (!el12_reg(p) && forward_vm_traps(vcpu, p))
-> +		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
-
-why do you need the !el12_reg(p) check here?
-
-> +
->  	/*
->  	 * Redirect EL1 register accesses to the corresponding EL2 registers if
->  	 * they are meant to access EL2 registers.
-> -- 
-> 1.9.1
-> 
-
-Thanks,
--Christoffer
+diff --git a/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt b/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
+index a55d31b..64884ed 100644
+--- a/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
++++ b/Documentation/devicetree/bindings/clock/amlogic,gxbb-aoclkc.txt
+@@ -5,9 +5,11 @@ controllers within the Always-On part of the SoC.
+ 
+ Required Properties:
+ 
+-- compatible: should be "amlogic,gxbb-aoclkc"
+-- reg: physical base address of the clock controller and length of memory
+-       mapped region.
++- compatible: value should be different for each SoC family as :
++	- GXBB (S905) : "amlogic,meson-gxbb-aoclkc"
++	- GXL (S905X, S905D) : "amlogic,meson-gxl-aoclkc"
++	- GXM (S912) : "amlogic,meson-gxm-aoclkc"
++	followed by the common "amlogic,meson-gx-aoclkc"
+ 
+ - #clock-cells: should be 1.
+ 
+@@ -23,14 +25,22 @@ to specify the reset which they consume. All available resets are defined as
+ preprocessor macros in the dt-bindings/reset/gxbb-aoclkc.h header and can be
+ used in device tree sources.
+ 
++Parent node should have the following properties :
++- compatible: "amlogic,meson-gx-ao-sysctrl", "syscon", "simple-mfd"
++- reg: base address and size of the AO system control register space.
++
+ Example: AO Clock controller node:
+ 
+-	clkc_AO: clock-controller at 040 {
+-		compatible = "amlogic,gxbb-aoclkc";
+-		reg = <0x0 0x040 0x0 0x4>;
++ao_sysctrl: sys-ctrl at 0 {
++	compatible = "amlogic,meson-gx-ao-sysctrl", "syscon", "simple-mfd";
++	reg =  <0x0 0x0 0x0 0x100>;
++
++	clkc_AO: clock-controller {
++		compatible = "amlogic,meson-gxbb-aoclkc", "amlogic,meson-gx-aoclkc";
+ 		#clock-cells = <1>;
+ 		#reset-cells = <1>;
+ 	};
++};
+ 
+ Example: UART controller node that consumes the clock and reset generated
+   by the clock controller:
+-- 
+1.9.1
