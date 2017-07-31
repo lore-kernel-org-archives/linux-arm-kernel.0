@@ -1,44 +1,41 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:19:50 +0200
-Subject: [PATCH 38/38] ARM: dts: iwg20m: Correct indentation of mmcif0
- properties
-In-Reply-To: <cover.1501514100.git.horms+renesas@verge.net.au>
-References: <cover.1501514100.git.horms+renesas@verge.net.au>
-Message-ID: <bf38b9ac16c5c8a82d63c79391dd64c5924fc00b.1501514100.git.horms+renesas@verge.net.au>
+From: jacob-chen@iotwrt.com (Jacob Chen)
+Date: Mon, 31 Jul 2017 23:33:00 +0800
+Subject: [PATCH v4 4/6] ARM: dts: rockchip: add RGA device node for RK3288
+In-Reply-To: <1501515182-26705-1-git-send-email-jacob-chen@iotwrt.com>
+References: <1501515182-26705-1-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <1501515182-26705-5-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+This patch add the RGA dt config of rk3288 SoC.
 
-Fixes: 4658c4b789d8e2ae ("ARM: dts: iwg20m: Add MMCIF0 support")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
 ---
- arch/arm/boot/dts/r8a7743-iwg20m.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/rk3288.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-index f78dbc542a82..ff7993818637 100644
---- a/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-+++ b/arch/arm/boot/dts/r8a7743-iwg20m.dtsi
-@@ -45,11 +45,11 @@
- };
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 1efc2f2..cea41b7 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -945,6 +945,17 @@
+ 		status = "okay";
+ 	};
  
- &mmcif0 {
--		pinctrl-0 = <&mmcif0_pins>;
--		pinctrl-names = "default";
-+	pinctrl-0 = <&mmcif0_pins>;
-+	pinctrl-names = "default";
- 
--		vmmc-supply = <&reg_3p3v>;
--		bus-width = <8>;
--		non-removable;
--		status = "okay";
-+	vmmc-supply = <&reg_3p3v>;
-+	bus-width = <8>;
-+	non-removable;
-+	status = "okay";
- };
++	rga: rga at ff920000 {
++		compatible = "rockchip,rk3288-rga";
++		reg = <0xff920000 0x180>;
++		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru SCLK_RGA>;
++		clock-names = "aclk", "hclk", "sclk";
++		power-domains = <&power RK3288_PD_VIO>;
++		resets = <&cru SRST_RGA_CORE>, <&cru SRST_RGA_AXI>, <&cru SRST_RGA_AHB>;
++		reset-names = "core", "axi", "ahb";
++	};
++
+ 	vopb: vop at ff930000 {
+ 		compatible = "rockchip,rk3288-vop";
+ 		reg = <0xff930000 0x19c>;
 -- 
-2.1.4
+2.7.4
