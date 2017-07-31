@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:19:32 +0200
-Subject: [PATCH 20/38] ARM: dts: r8a7791: Reserve SRAM for the SMP jump stub
+Date: Mon, 31 Jul 2017 17:19:29 +0200
+Subject: [PATCH 17/38] ARM: dts: r8a7743: Reserve SRAM for the SMP jump stub
 In-Reply-To: <cover.1501514100.git.horms+renesas@verge.net.au>
 References: <cover.1501514100.git.horms+renesas@verge.net.au>
-Message-ID: <d7ff938254e5665c06006893cf5335d2367a4b6a.1501514100.git.horms+renesas@verge.net.au>
+Message-ID: <857892bfc55e0a3fd0916bdac30fd7c0d81195bd.1501514100.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,27 +14,27 @@ Reserve SRAM for the jump stub for CPU core bringup.
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 8 ++++++++
+ arch/arm/boot/dts/r8a7743.dtsi | 8 ++++++++
  1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index f4748a9cb037..e135da440eed 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -898,6 +898,14 @@
- 	icram1:	sram at e63c0000 {
- 		compatible = "mmio-sram";
- 		reg = <0 0xe63c0000 0 0x1000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0xe63c0000 0x1000>;
+diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+index 2cdb9a7115af..0d021919755c 100644
+--- a/arch/arm/boot/dts/r8a7743.dtsi
++++ b/arch/arm/boot/dts/r8a7743.dtsi
+@@ -606,6 +606,14 @@
+ 		icram1:	sram at e63c0000 {
+ 			compatible = "mmio-sram";
+ 			reg = <0 0xe63c0000 0 0x1000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 0 0xe63c0000 0x1000>;
 +
-+		smp-sram at 0 {
-+			compatible = "renesas,smp-sram";
-+			reg = <0 0x10>;
-+		};
- 	};
++			smp-sram at 0 {
++				compatible = "renesas,smp-sram";
++				reg = <0 0x10>;
++			};
+ 		};
  
- 	ether: ethernet at ee700000 {
+ 		ether: ethernet at ee700000 {
 -- 
 2.1.4
