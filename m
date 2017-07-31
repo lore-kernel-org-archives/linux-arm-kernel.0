@@ -1,165 +1,173 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:25:59 +0100
-Subject: [PATCH v3 21/59] irqchip/gic-v3-its: Add VPE irq domain [de]activation
+Date: Mon, 31 Jul 2017 18:26:03 +0100
+Subject: [PATCH v3 25/59] irqchip/gic-v3-its: Add VPE affinity changes
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-22-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-26-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On activation, a VPE is mapped using the VMAPP command, followed
-by a VINVALL for a good measure. On deactivation, the VPE is
-simply unmapped.
+When we're about to run a vcpu, it is crucial that the redistributor
+associated with the physical CPU is being told about the new residency.
+
+This is abstracted by hijacking the irq_set_affinity method for the
+doorbell interrupt associated with the VPE. It is expected that the
+hypervisor will call this method before scheduling the VPE.
 
 Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 102 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 102 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c | 96 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 96 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 0f9a487448b9..5ca1e571c1b4 100644
+index 16cdd1f60ebf..0a9aedaf6da2 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -215,6 +215,16 @@ struct its_cmd_desc {
+@@ -148,6 +148,9 @@ static struct irq_domain *its_parent;
+ #define ITS_LIST_MAX		16
  
- 		struct {
- 			struct its_vpe *vpe;
-+		} its_vinvall_cmd;
+ static unsigned long its_list_map;
++static u16 vmovp_seq_num;
++static DEFINE_RAW_SPINLOCK(vmovp_lock);
++
+ static DEFINE_IDA(its_vpeid_ida);
+ 
+ #define gic_data_rdist()		(raw_cpu_ptr(gic_rdists->rdist))
+@@ -238,6 +241,13 @@ struct its_cmd_desc {
+ 			u32 event_id;
+ 			bool db_enabled;
+ 		} its_vmovi_cmd;
 +
 +		struct {
 +			struct its_vpe *vpe;
 +			struct its_collection *col;
-+			bool valid;
-+		} its_vmapp_cmd;
-+
-+		struct {
-+			struct its_vpe *vpe;
- 			struct its_device *dev;
- 			u32 virt_id;
- 			u32 event_id;
-@@ -318,6 +328,16 @@ static void its_encode_db_valid(struct its_cmd_block *cmd, bool db_valid)
++			u16 seq_num;
++			u16 its_list;
++		} its_vmovp_cmd;
+ 	};
+ };
+ 
+@@ -329,6 +339,16 @@ static void its_encode_db_valid(struct its_cmd_block *cmd, bool db_valid)
  	its_mask_encode(&cmd->raw_cmd[2], db_valid, 0, 0);
  }
  
-+static void its_encode_vpt_addr(struct its_cmd_block *cmd, u64 vpt_pa)
++static void its_encode_seq_num(struct its_cmd_block *cmd, u16 seq_num)
 +{
-+	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 50, 16);
++	its_mask_encode(&cmd->raw_cmd[0], seq_num, 47, 32);
 +}
 +
-+static void its_encode_vpt_size(struct its_cmd_block *cmd, u8 vpt_size)
++static void its_encode_its_list(struct its_cmd_block *cmd, u16 its_list)
 +{
-+	its_mask_encode(&cmd->raw_cmd[3], vpt_size, 4, 0);
++	its_mask_encode(&cmd->raw_cmd[1], its_list, 15, 0);
 +}
 +
- static inline void its_fixup_cmd(struct its_cmd_block *cmd)
+ static void its_encode_vpt_addr(struct its_cmd_block *cmd, u64 vpt_pa)
  {
- 	/* Let's fixup BE commands */
-@@ -476,6 +496,36 @@ static struct its_collection *its_build_invall_cmd(struct its_cmd_block *cmd,
- 	return NULL;
+ 	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 50, 16);
+@@ -571,6 +591,20 @@ static struct its_vpe *its_build_vmovi_cmd(struct its_cmd_block *cmd,
+ 	return desc->its_vmovi_cmd.vpe;
  }
  
-+static struct its_vpe *its_build_vinvall_cmd(struct its_cmd_block *cmd,
-+					     struct its_cmd_desc *desc)
-+{
-+	its_encode_cmd(cmd, GITS_CMD_VINVALL);
-+	its_encode_vpeid(cmd, desc->its_vinvall_cmd.vpe->vpe_id);
-+
-+	its_fixup_cmd(cmd);
-+
-+	return desc->its_vinvall_cmd.vpe;
-+}
-+
-+static struct its_vpe *its_build_vmapp_cmd(struct its_cmd_block *cmd,
++static struct its_vpe *its_build_vmovp_cmd(struct its_cmd_block *cmd,
 +					   struct its_cmd_desc *desc)
 +{
-+	unsigned long vpt_addr;
-+
-+	vpt_addr = virt_to_phys(page_address(desc->its_vmapp_cmd.vpe->vpt_page));
-+
-+	its_encode_cmd(cmd, GITS_CMD_VMAPP);
-+	its_encode_vpeid(cmd, desc->its_vmapp_cmd.vpe->vpe_id);
-+	its_encode_valid(cmd, desc->its_vmapp_cmd.valid);
-+	its_encode_target(cmd, desc->its_vmapp_cmd.col->target_address);
-+	its_encode_vpt_addr(cmd, vpt_addr);
-+	its_encode_vpt_size(cmd, LPI_NRBITS - 1);
++	its_encode_cmd(cmd, GITS_CMD_VMOVP);
++	its_encode_seq_num(cmd, desc->its_vmovp_cmd.seq_num);
++	its_encode_its_list(cmd, desc->its_vmovp_cmd.its_list);
++	its_encode_vpeid(cmd, desc->its_vmovp_cmd.vpe->vpe_id);
++	its_encode_target(cmd, desc->its_vmovp_cmd.col->target_address);
 +
 +	its_fixup_cmd(cmd);
 +
-+	return desc->its_vmapp_cmd.vpe;
++	return desc->its_vmovp_cmd.vpe;
 +}
 +
- static struct its_vpe *its_build_vmapti_cmd(struct its_cmd_block *cmd,
- 					    struct its_cmd_desc *desc)
+ static u64 its_cmd_ptr_to_offset(struct its_node *its,
+ 				 struct its_cmd_block *ptr)
  {
-@@ -797,6 +847,37 @@ static void its_send_vmovi(struct its_device *dev, u32 id)
- 	its_send_single_vcommand(dev->its, its_build_vmovi_cmd, &desc);
+@@ -865,6 +899,48 @@ static void its_send_vmapp(struct its_vpe *vpe, bool valid)
+ 	}
  }
  
-+static void its_send_vmapp(struct its_vpe *vpe, bool valid)
++static void its_send_vmovp(struct its_vpe *vpe)
 +{
 +	struct its_cmd_desc desc;
 +	struct its_node *its;
++	unsigned long flags;
++	int col_id = vpe->col_idx;
 +
-+	desc.its_vmapp_cmd.vpe = vpe;
-+	desc.its_vmapp_cmd.valid = valid;
++	desc.its_vmovp_cmd.vpe = vpe;
++	desc.its_vmovp_cmd.its_list = (u16)its_list_map;
 +
++	if (!its_list_map) {
++		its = list_first_entry(&its_nodes, struct its_node, entry);
++		desc.its_vmovp_cmd.seq_num = 0;
++		desc.its_vmovp_cmd.col = &its->collections[col_id];
++		its_send_single_vcommand(its, its_build_vmovp_cmd, &desc);
++		return;
++	}
++
++	/*
++	 * Yet another marvel of the architecture. If using the
++	 * its_list "feature", we need to make sure that all ITSs
++	 * receive all VMOVP commands in the same order. The only way
++	 * to guarantee this is to make vmovp a serialization point.
++	 *
++	 * Wall <-- Head.
++	 */
++	raw_spin_lock_irqsave(&vmovp_lock, flags);
++
++	desc.its_vmovp_cmd.seq_num = vmovp_seq_num++;
++
++	/* Emit VMOVPs */
 +	list_for_each_entry(its, &its_nodes, entry) {
 +		if (!its->is_v4)
 +			continue;
 +
-+		desc.its_vmapp_cmd.col = &its->collections[vpe->col_idx];
-+		its_send_single_vcommand(its, its_build_vmapp_cmd, &desc);
++		desc.its_vmovp_cmd.col = &its->collections[col_id];
++		its_send_single_vcommand(its, its_build_vmovp_cmd, &desc);
 +	}
++
++	raw_spin_unlock_irqrestore(&vmovp_lock, flags);
 +}
 +
-+static void its_send_vinvall(struct its_vpe *vpe)
-+{
-+	struct its_cmd_desc desc;
-+	struct its_node *its;
-+
-+	desc.its_vinvall_cmd.vpe = vpe;
-+
-+	list_for_each_entry(its, &its_nodes, entry) {
-+		if (!its->is_v4)
-+			continue;
-+		its_send_single_vcommand(its, its_build_vinvall_cmd, &desc);
-+	}
-+}
-+
- /*
-  * irqchip functions - assumes MSI, mostly.
-  */
-@@ -2197,9 +2278,30 @@ static int its_vpe_irq_domain_alloc(struct irq_domain *domain, unsigned int virq
- 	return err;
- }
- 
-+static void its_vpe_irq_domain_activate(struct irq_domain *domain,
-+					struct irq_data *d)
-+{
-+	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
-+
-+	/* Map the VPE to the first possible CPU */
-+	vpe->col_idx = cpumask_first(cpu_online_mask);
-+	its_send_vmapp(vpe, true);
-+	its_send_vinvall(vpe);
-+}
-+
-+static void its_vpe_irq_domain_deactivate(struct irq_domain *domain,
-+					  struct irq_data *d)
-+{
-+	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
-+
-+	its_send_vmapp(vpe, false);
-+}
-+
- static const struct irq_domain_ops its_vpe_domain_ops = {
- 	.alloc			= its_vpe_irq_domain_alloc,
- 	.free			= its_vpe_irq_domain_free,
-+	.activate		= its_vpe_irq_domain_activate,
-+	.deactivate		= its_vpe_irq_domain_deactivate,
+ static void its_send_vinvall(struct its_vpe *vpe)
+ {
+ 	struct its_cmd_desc desc;
+@@ -2148,6 +2224,25 @@ static const struct irq_domain_ops its_domain_ops = {
+ 	.deactivate		= its_irq_domain_deactivate,
  };
  
- static int its_force_quiescent(void __iomem *base)
++static int its_vpe_set_affinity(struct irq_data *d,
++				const struct cpumask *mask_val,
++				bool force)
++{
++	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
++	int cpu = cpumask_first(mask_val);
++
++	/*
++	 * Changing affinity is mega expensive, so let's be as lazy as
++	 * we can and only do it if we really have to.
++	 */
++	if (vpe->col_idx != cpu) {
++		vpe->col_idx = cpu;
++		its_send_vmovp(vpe);
++	}
++
++	return IRQ_SET_MASK_OK_DONE;
++}
++
+ static void its_vpe_schedule(struct its_vpe *vpe)
+ {
+ 	void * __iomem vlpi_base = gic_data_rdist_vlpi_base();
+@@ -2237,6 +2332,7 @@ static int its_vpe_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
+ 
+ static struct irq_chip its_vpe_irq_chip = {
+ 	.name			= "GICv4-vpe",
++	.irq_set_affinity	= its_vpe_set_affinity,
+ 	.irq_set_vcpu_affinity	= its_vpe_set_vcpu_affinity,
+ };
+ 
 -- 
 2.11.0
