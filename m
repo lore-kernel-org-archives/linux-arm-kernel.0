@@ -1,116 +1,72 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 31 Jul 2017 14:09:26 +0200
-Subject: [RFC PATCH v2 33/38] KVM: arm64: Emulate appropriate VM control
- system registers
-In-Reply-To: <1500397144-16232-34-git-send-email-jintack.lim@linaro.org>
-References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
- <1500397144-16232-34-git-send-email-jintack.lim@linaro.org>
-Message-ID: <20170731120926.GT5176@cbox>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 31 Jul 2017 20:19:40 +0800
+Subject: [PATCH 0/3] net-next: stmmac: support future possible different
+ internal phy mode
+In-Reply-To: <20170729064815.GA2024@Red>
+References: <20170728092818.23419-1-clabbe.montjoie@gmail.com>
+ <20170728135544.GD32230@lunn.ch> <20170728142508.GA7221@Red>
+ <20170728143600.GB2132@lunn.ch> <20170728144424.GB7221@Red>
+ <f8fe754c-8b46-a9f6-4020-f7db6c985773@gmail.com> <20170729064815.GA2024@Red>
+Message-ID: <CAGb2v6626KDmww5u_-ogMJHgfdxTHQLCnUF4bmcUt35f2JJgLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 11:58:59AM -0500, Jintack Lim wrote:
-> Now that the virtual EL2 can access EL2 register states via EL1
-> registers, we need to consider it when selecting the register to
-> emulate.
+On Sat, Jul 29, 2017 at 2:48 PM, Corentin Labbe
+<clabbe.montjoie@gmail.com> wrote:
+> On Fri, Jul 28, 2017 at 10:54:30AM -0700, Florian Fainelli wrote:
+>> On 07/28/2017 07:44 AM, Corentin Labbe wrote:
+>> > On Fri, Jul 28, 2017 at 04:36:00PM +0200, Andrew Lunn wrote:
+>> >>>> I've probably asked this before: Does the internal PHY use a different
+>> >>>> PHY ID in registers 2 and 3?
+>> >>>>
+>> >>>
+>> >>> yes
+>> >>>
+>> >>> reg2: 0x0044
+>> >>> reg3: 0X1500
+>> >
+>> > Copy/paste error, its 1400
+>> >
+>> >>
+>> >> So this is not about loading the correct PHY driver. You can already
+>> >> do this based on the PHY IDs...
+>> >>
+>> >> This is about selecting which PHY to use. Internal or External?
+>> >>
+>> >>      Andrew
+>> >
+>> > It is too late when we know the PHY ID.
+>>
+>> > We need to set a syscon for choosing external/internal PHY.
+>> > So we can rely only on DT.
+>>
+>> Since the Device Tree needs to be correct to identify which PHY to use
+>> (internal or external), if you use the standard compatible string for
+>> the PHY that contains its OUI, e.g:
+>>
+>> compatible = "ethernet-phy-id0044.1400", "ethernet-phy-ieee802.3-c22"
+>>
+>> then you can have your Ethernet MAC identify whether this is an internal
+>> PHY by having a list of compatible strings to match against.
+>
+> So basicly, I replace sun8i-h3-ephy by ethernet-phy-id0044.1400 and it is good ?
 
-I don't really understand what this patch does from the commit message.
+IIRC you mentioned some time ago the PHY in the AC200 also has this ID?
+Do you remember if this is true?
 
->From looking at the code, is trying to cater for the case where the
-guest hypervisor configures the virtual hardware to trap on memory
-control register accesses (for example during VM boot to solve the cache
-issues) and we correspondingly set the VM control register trap bits,
-and when actually handling the trap we need to take special care in the
-VHE guest hypervisor case, because we'll have to redirect the register
-access to the vitual EL2 registers instead of the virtual EL1 registers?
+If someone were crazy enough to hook that up to the H3, then we still
+wouldn't be able to tell if it's the internal or external one.
 
-> 
-> Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 46 ++++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 44 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 79980be..910b50d 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -110,6 +110,31 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
->  	return true;
->  }
->  
-> +struct el1_el2_map {
-> +	int	el1;
-> +	int	el2;
-> +};
-> +
-> +static const struct el1_el2_map vm_map[] = {
-> +	{SCTLR_EL1, SCTLR_EL2},
-> +	{TTBR0_EL1, TTBR0_EL2},
-> +	{TTBR1_EL1, TTBR1_EL2},
-> +	{TCR_EL1, TCR_EL2},
-> +	{ESR_EL1, ESR_EL2},
-> +	{FAR_EL1, FAR_EL2},
-> +	{AFSR0_EL1, AFSR0_EL2},
-> +	{AFSR1_EL1, AFSR1_EL2},
-> +	{MAIR_EL1, MAIR_EL2},
-> +	{AMAIR_EL1, AMAIR_EL2},
-> +	{CONTEXTIDR_EL1, CONTEXTIDR_EL2},
-> +};
-> +
-> +static inline bool el12_reg(struct sys_reg_params *p)
+ChenYu
 
-let's call this is_el12_instr
-
-> +{
-> +	/* All *_EL12 registers have Op1=5. */
-
-s/registers/access instructions/
-
-> +	return (p->Op1 == 5);
-> +}
-> +
->  /*
->   * Generic accessor for VM registers. Only called as long as HCR_TVM
->   * is set. If the guest enables the MMU, we stop trapping the VM
-> @@ -120,16 +145,33 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
->  			  const struct sys_reg_desc *r)
->  {
->  	bool was_enabled = vcpu_has_cache_enabled(vcpu);
-> +	u64 *sysreg = &vcpu_sys_reg(vcpu, r->reg);
-> +	int i;
-> +	const struct el1_el2_map *map;
-> +
-> +	/*
-> +	 * Redirect EL1 register accesses to the corresponding EL2 registers if
-> +	 * they are meant to access EL2 registers.
-> +	 */
-> +	if (vcpu_el2_e2h_is_set(vcpu) && !el12_reg(p)) {
-> +		for (i = 0; i < ARRAY_SIZE(vm_map); i++) {
-> +			map = &vm_map[i];
-> +			if (map->el1 == r->reg) {
-> +				sysreg = &vcpu_sys_reg(vcpu, map->el2);
-> +				break;
-> +			}
-> +		}
-> +	}
->  
->  	BUG_ON(!vcpu_mode_el2(vcpu) && !p->is_write);
->  
->  	if (!p->is_write) {
-> -		p->regval = vcpu_sys_reg(vcpu, r->reg);
-> +		p->regval = *sysreg;
->  		return true;
->  	}
->  
->  	if (!p->is_aarch32) {
-> -		vcpu_sys_reg(vcpu, r->reg) = p->regval;
-> +		*sysreg = p->regval;
->  	} else {
->  		if (!p->is_32bit)
->  			vcpu_cp15_64_high(vcpu, r->reg) = upper_32_bits(p->regval);
-> -- 
-> 1.9.1
-> 
-
-Thanks,
--Christoffer
+>
+>>
+>> Corentin, can you make sure you copy netdev, Andrew and myself on the
+>> next submissions so we don't have to keep track of seemingly identical
+>> threads (this one + the rockchip dwmac changes) and we can work towards
+>> one solution?
+>
+> Ok
+>
+> Thanks
+> Corentin Labbe
