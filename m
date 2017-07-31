@@ -1,76 +1,22 @@
-From: jacobchen110@gmail.com (Jacob Chen)
-Date: Mon, 31 Jul 2017 15:21:27 +0800
-Subject: [PATCH v3 0/5] Add Rockchip RGA V4l2 support
-In-Reply-To: <1501470460-12014-1-git-send-email-jacob-chen@iotwrt.com>
-References: <1501470460-12014-1-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <CAFLEztRRq5Eep+c20h_=a+uf30egAYfPmX75=K+F6XnQ2N1+zg@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 31 Jul 2017 15:33:15 +0800
+Subject: [linux-sunxi] [PATCH] pinctrl: sunxi: rename R_PIO i2c pin
+ function name
+In-Reply-To: <20170730053618.44781-1-icenowy@aosc.io>
+References: <20170730053618.44781-1-icenowy@aosc.io>
+Message-ID: <CAGb2v64M+FqOeXMOyGQmUiZGw2K9+oRW8ADy=aeUAXVUn0BfQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Jul 30, 2017 at 1:36 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> The I2C pin functions in R_PIO used to be named "s_twi".
+>
+> As we usually use the name "i2c" instead of "twi" in the mainline
+> kernel, change these names to "s_i2c" for consistency.
+>
+> The "s_twi" functions are not yet referenced by any device trees in
+> mainline kernel so I think it's safe to change the name.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-
-2017-07-31 11:07 GMT+08:00 Jacob Chen <jacob-chen@iotwrt.com>:
-> This patch series add a v4l2 m2m drvier for rockchip RGA direct rendering based 2d graphics acceleration module.
->
-> Before, my colleague yakir have write a drm RGA drvier and send it to the lists.
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/416769.html
-> I have been asked to find a userspace user("compositor") for it, but after some studys, my conclusion is that unlike exynos g2d,
-> rockchip rga are not suitable for compositor. Rockchip RGA have a limited MMU, which means it can only hold several buffers in the same time.
-> When it was used in compositor, it will waste a lot of time to import/export/flush buffer, resulting in a bad performance.
->
-> A few months ago, i saw a discussion in dri-devel at lists.freedesktop.org.
-> It remind that we could write a v4l2 m2m RGA driver, since we usually use RGA for streaming purpose.
-> https://patches.linaro.org/cover/97727/
->
-> I have test this driver with gstreamer v4l2transform plugin and it seems work well.
->
-> change in V3:
-> - rename the controls.
-> - add pm_runtime support.
-> - enable node by default.
-> - correct spelling in documents.
->
-> change in V2:
-> - generalize the controls.
-> - map buffers (10-50 us) in every cmd-run rather than in buffer-import to avoid get_free_pages failed on
-> actively used systems.
-> - remove status in dt-bindings examples.
->
-> Jacob Chen (5):
->   [media] v4l: add blend modes controls
->   [media]: rockchip/rga: v4l2 m2m support
->   ARM: dts: rockchip: add RGA device node for RK3288
->   ARM: dts: rockchip: add RGA device node for RK3399
->   dt-bindings: Document the Rockchip RGA bindings
->
->  .../devicetree/bindings/media/rockchip-rga.txt     |  33 +
->  arch/arm/boot/dts/rk3288.dtsi                      |  11 +
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi           |  11 +
->  drivers/media/platform/Kconfig                     |  11 +
->  drivers/media/platform/Makefile                    |   2 +
->  drivers/media/platform/rockchip-rga/Makefile       |   3 +
->  drivers/media/platform/rockchip-rga/rga-buf.c      | 141 +++
->  drivers/media/platform/rockchip-rga/rga-hw.c       | 650 ++++++++++++++
->  drivers/media/platform/rockchip-rga/rga-hw.h       | 437 +++++++++
->  drivers/media/platform/rockchip-rga/rga.c          | 987 +++++++++++++++++++++
->  drivers/media/platform/rockchip-rga/rga.h          | 110 +++
->  drivers/media/v4l2-core/v4l2-ctrls.c               |  20 +-
->  include/uapi/linux/v4l2-controls.h                 |  16 +-
->  13 files changed, 2430 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
->  create mode 100644 drivers/media/platform/rockchip-rga/Makefile
->  create mode 100644 drivers/media/platform/rockchip-rga/rga-buf.c
->  create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.c
->  create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.h
->  create mode 100644 drivers/media/platform/rockchip-rga/rga.c
->  create mode 100644 drivers/media/platform/rockchip-rga/rga.h
->
-> --
-> 2.7.4
->
-
-We are going to use this driver in our BSP, and write userspace for it.
-Though there are some work needed be done for better use, i'm
-satisfied with it at present.
-It could be improved through usage.
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
