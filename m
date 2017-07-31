@@ -1,76 +1,91 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:05:38 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.14
-Message-ID: <cover.1501512320.git.horms+renesas@verge.net.au>
+Date: Mon, 31 Jul 2017 17:05:37 +0200
+Subject: [PATCH 2/5] ARM: shmobile: rcar-gen2: Obtain jump stub region from DT
+In-Reply-To: <cover.1501512320.git.horms+renesas@verge.net.au>
+References: <cover.1501512320.git.horms+renesas@verge.net.au>
+Message-ID: <816756962b15f469d467b09beeb702af015c55cc.1501512320.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC updates for v4.14.
+Add support for obtaining from DT the SRAM region to store the jump stub
+for CPU core bringup, according to the renesas,smp-sram DT bindings.
 
+If no region is specified in DT, the code falls back to hardcoded ICRAM1
+as before, to maintain backwards compatibility.
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/pm-rcar-gen2.c | 33 ++++++++++++++++++++++++++++++---
+ 1 file changed, 30 insertions(+), 3 deletions(-)
 
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.14
-
-for you to fetch changes up to 84a1e84b95bb7b2596821578c3acc38d4e6e7a59:
-
-  ARM: shmobile: Remove ARCH_SHMOBILE_MULTI (2017-07-27 17:31:12 +0200)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Updates for v4.14
-
-* Add debug-ll support to RZ/G1M (r8a7743) SoC
-
-  Chris Paterson says, "RZ/G1M uses SCIF0 for the debug console, like most
-  of the R-Car Gen2 SoCs."
-
-* Remove ARCH_SHMOBILE_MULTI
-
-  Geert Uytterhoeven says, "The migration from ARCH_SHMOBILE_MULTI to
-  ARCH_RENESAS has been completed in v4.12..."
-
-* Correct arch timer frequency on RZ/G1M (r8a7743) SoC
-
-  Geert Uytterhoeven says, "According to the datasheet, the frequency of
-  the ARM architecture timer on RZ/G1E depends on the frequency of the ZS
-  clock..."
-
-* Add support for CPG/MSSR bindings
-
-  Geert Uytterhoeven says, "When using the new CPG/MSSR bindings, there is
-  no longer a "renesas,rcar-gen2-cpg-clocks" node, and the code to obtain
-  the external clock crystal frequency falls back to a default of 20 MHz.
-  While this is correct for all upstream R-Car Gen2 and RZ/G1 boards, this
-  is not necessarily the case for out-of-tree third party boards.
-
-  Add support for finding the external clock crystal oscillator on RZ/G1M,
-  and on R-Car H2, M2-W, and M2-N using the new CPG/MSSR bindings, through
-  the corresponding "renesas,r8a77xx-cpg-mssr" nodes."
-
-* Obtain jump stub region from DT
-
-  Geert Uytterhoeven says, "Add support for obtaining from DT the SRAM
-  region to store the jump stub for CPU core bringup, according to the
-  renesas,smp-sram DT bindings."
-
-----------------------------------------------------------------
-Chris Paterson (1):
-      ARM: debug-ll: Add support for r8a7743
-
-Geert Uytterhoeven (4):
-      ARM: shmobile: rcar-gen2: Obtain jump stub region from DT
-      ARM: shmobile: rcar-gen2: Add support for CPG/MSSR bindings
-      ARM: shmobile: rcar-gen2: Correct arch timer frequency on RZ/G1E
-      ARM: shmobile: Remove ARCH_SHMOBILE_MULTI
-
- arch/arm/Kconfig.debug                   |  9 +++++----
- arch/arm/mach-shmobile/Kconfig           |  4 ----
- arch/arm/mach-shmobile/pm-rcar-gen2.c    | 33 +++++++++++++++++++++++++++++---
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 21 ++++++++++++++++----
- 4 files changed, 52 insertions(+), 15 deletions(-)
+diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+index 0178da7ace82..e5f215c8b218 100644
+--- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+@@ -11,7 +11,9 @@
+  */
+ 
+ #include <linux/kernel.h>
++#include <linux/ioport.h>
+ #include <linux/of.h>
++#include <linux/of_address.h>
+ #include <linux/smp.h>
+ #include <linux/soc/renesas/rcar-sysc.h>
+ #include <asm/io.h>
+@@ -69,8 +71,9 @@ void __init rcar_gen2_pm_init(void)
+ 	struct device_node *np, *cpus;
+ 	bool has_a7 = false;
+ 	bool has_a15 = false;
+-	phys_addr_t boot_vector_addr = ICRAM1;
++	struct resource res;
+ 	u32 syscier = 0;
++	int error;
+ 
+ 	if (once++)
+ 		return;
+@@ -91,14 +94,38 @@ void __init rcar_gen2_pm_init(void)
+ 	else if (of_machine_is_compatible("renesas,r8a7791"))
+ 		syscier = 0x00111003;
+ 
++	np = of_find_compatible_node(NULL, NULL, "renesas,smp-sram");
++	if (!np) {
++		/* No smp-sram in DT, fall back to hardcoded address */
++		res = (struct resource)DEFINE_RES_MEM(ICRAM1,
++						      shmobile_boot_size);
++		goto map;
++	}
++
++	error = of_address_to_resource(np, 0, &res);
++	if (error) {
++		pr_err("Failed to get smp-sram address: %d\n", error);
++		return;
++	}
++
++map:
+ 	/* RAM for jump stub, because BAR requires 256KB aligned address */
+-	p = ioremap_nocache(boot_vector_addr, shmobile_boot_size);
++	if (res.start & (256 * 1024 - 1) ||
++	    resource_size(&res) < shmobile_boot_size) {
++		pr_err("Invalid smp-sram region\n");
++		return;
++	}
++
++	p = ioremap(res.start, resource_size(&res));
++	if (!p)
++		return;
++
+ 	memcpy_toio(p, shmobile_boot_vector, shmobile_boot_size);
+ 	iounmap(p);
+ 
+ 	/* setup reset vectors */
+ 	p = ioremap_nocache(RST, 0x63);
+-	bar = phys_to_sbar(boot_vector_addr);
++	bar = phys_to_sbar(res.start);
+ 	if (has_a15) {
+ 		writel_relaxed(bar, p + CA15BAR);
+ 		writel_relaxed(bar | SBAR_BAREN, p + CA15BAR);
+-- 
+2.1.4
