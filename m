@@ -1,36 +1,38 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Mon, 31 Jul 2017 11:45:19 +0300
-Subject: [PATCH] Staging: vc04_services: Fix WARN_ON instead of BUG_ON
-In-Reply-To: <1501485243-11977-1-git-send-email-jananis37@gmail.com>
-References: <1501485243-11977-1-git-send-email-jananis37@gmail.com>
-Message-ID: <20170731084519.s7zy3cvejtvcqbf2@mwanda>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 31 Jul 2017 10:52:50 +0200
+Subject: [PATCH 00/12] constify mmc_host_ops structures
+In-Reply-To: <1501307981-29745-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1501307981-29745-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <CAPDyKFpPRNAb1s4PUnkg0iFUg-Y5J+T_5TAzxLL-4SVSSVY4MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 12:44:03PM +0530, janani-sankarababu wrote:
-> This patch is to replace the use of BUG_ON macro with WARN_ON
-> inorder to prevent the crashing of the kernel.
-> 
-> Signed-off-by: Janani Sankara Babu <jananis37@gmail.com>
+On 29 July 2017 at 07:59, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
+>
+> The mmc_host_ops structure is only stored in the ops field of an
+> mmc_host structure, which is declared as const.  Thus the mmc_host_ops
+> structure itself can be const.
+>
+> Done with the help of Coccinelle.
+>
 > ---
->  drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-> index f484bb0..30bc246 100644
-> --- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-> +++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-> @@ -91,7 +91,7 @@ static int snd_bcm2835_ctl_get(struct snd_kcontrol *kcontrol,
->  	if (mutex_lock_interruptible(&chip->audio_mutex))
-                                      ^^^^^^
-We dereference chip here.
+>
+>  drivers/mmc/host/bcm2835.c     |    2 +-
+>  drivers/mmc/host/davinci_mmc.c |    2 +-
+>  drivers/mmc/host/moxart-mmc.c  |    2 +-
+>  drivers/mmc/host/mtk-sd.c      |    2 +-
+>  drivers/mmc/host/s3cmci.c      |    2 +-
+>  drivers/mmc/host/sdricoh_cs.c  |    2 +-
+>  drivers/mmc/host/sh_mmcif.c    |    2 +-
+>  drivers/mmc/host/sunxi-mmc.c   |    2 +-
+>  drivers/mmc/host/toshsd.c      |    2 +-
+>  drivers/mmc/host/usdhi6rol0.c  |    2 +-
+>  drivers/mmc/host/vub300.c      |    2 +-
+>  drivers/mmc/host/wmt-sdmmc.c   |    2 +-
+>  12 files changed, 12 insertions(+), 12 deletions(-)
 
->  		return -EINTR;
->  
-> -	BUG_ON(!chip && !(chip->avail_substreams & AVAIL_SUBSTREAMS_MASK));
-> +	WARN_ON(!chip && !(chip->avail_substreams & AVAIL_SUBSTREAMS_MASK));
-                ^^^^^
-Too late.
 
-regards,
-dan carpenter
+Thanks, applied for next!
+
+Kind regards
+Uffe
