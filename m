@@ -1,59 +1,79 @@
-From: yong.deng@magewell.com (Yong)
-Date: Mon, 31 Jul 2017 08:50:00 +0800
-Subject: [PATCH v2 2/3] dt-bindings: media: Add Allwinner V3s Camera
- Sensor Interface (CSI)
-In-Reply-To: <20170728160353.gqb2f47v6ujozvxz@flea.lan>
-References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
- <1501131697-1359-3-git-send-email-yong.deng@magewell.com>
- <20170728160353.gqb2f47v6ujozvxz@flea.lan>
-Message-ID: <20170731085000.f4cd7287a28647cbc0be2f3c@magewell.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Mon, 31 Jul 2017 09:02:49 +0800
+Subject: [PATCH v6 0/7] drm/rockchip: add all full framework vop support
+In-Reply-To: <1501049930-5794-1-git-send-email-mark.yao@rock-chips.com>
+References: <1501049930-5794-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <597E81B9.20408@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Jul 2017 18:03:53 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+Hi
 
-> Hi,
-> 
-> On Thu, Jul 27, 2017 at 01:01:36PM +0800, Yong Deng wrote:
-> > Add binding documentation for Allwinner V3s CSI.
-> > 
-> > Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> > ---
-> >  .../devicetree/bindings/media/sun6i-csi.txt        | 49 ++++++++++++++++++++++
-> >  1 file changed, 49 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > new file mode 100644
-> > index 0000000..f8d83f6
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > @@ -0,0 +1,49 @@
-> > +Allwinner V3s Camera Sensor Interface
-> > +------------------------------
-> > +
-> > +Required properties:
-> > +  - compatible: value must be "allwinner,sun8i-v3s-csi"
-> > +  - reg: base address and size of the memory-mapped region.
-> > +  - interrupts: interrupt associated to this IP
-> > +  - clocks: phandles to the clocks feeding the CSI
-> > +    * ahb: the CSI interface clock
-> 
-> We've been bad at this, but we're trying to have the same clock name
-> here across all devices, and to use "bus" instead of "ahb".
+Pushed to drm-misc-next.
 
-OK. "ahb" was just follow other sunxi drivers.
+Thanks Sean Paul, Jeffy Chen's review, Heiko's test and Rob's ack.
 
-> 
-> Thanks!
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Best regards.
+
+On 2017?07?26? 14:18, Mark Yao wrote:
+> These patches try to make all current rockchip full framework vop works
+> on drm, fill missing vop on full framework.
+> Vop Full framework now has following vops:
+> IP version    chipname
+>        3.1           rk3288
+>        3.2           rk3368
+>        3.4           rk3366
+>        3.5           rk3399 big
+>        3.6           rk3399 lit
+>        3.7           rk3228
+>        3.8           rk3328
+>
+> Group the vop register, it would make register  definition clearer and
+> more easily to reuse same group register define for difference vops.
+>
+> Tested on rk3399 excavator board with kernel 4.13-rc1.
+>
+> And other chips tested on rockchip kernel 4.4:
+>     https://github.com/rockchip-linux/kernel/tree/release-4.4/drivers/gpu/drm/rockchip
+>
+> Changes in v6:
+> - fix some patches complie error
+> - fix rk3036 display blank
+>
+> Changes in v5:
+> - clean document commit title
+> - move changes description out of docummit commit msg
+>
+> Changes in v4:
+> - rebase to newest torvalds kernel, fix merge conflict
+>
+> Changes in v3:
+> - group vop register instead using VOP_REG_VER mechanism
+> - Explain more on patch commit message
+> - move write_relaxed flags to vop registers
+> - fix rk3328 overlay abnormal
+>
+> Changes in v2:
+> - rename rk322x to rk3228
+> - correct some vop registers define
+>
+> Mark Yao (7):
+>    drm/rockchip: vop: initialize registers directly
+>    drm/rockchip: vop: move write_relaxed flags to vop register
+>    drm/rockchip: vop: move line_flag_num to interrupt registers
+>    drm/rockchip: vop: group vop registers
+>    drm/rockchip: vop: add a series of vop support
+>    dt-bindings: display: rockchip: fill Documents for vop series
+>    drm/rockchip: vop: rk3328: fix overlay abnormal
+>
+>   .../bindings/display/rockchip/rockchip-vop.txt     |   4 +
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c        | 109 ++-
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |  81 +-
+>   drivers/gpu/drm/rockchip/rockchip_vop_reg.c        | 375 ++++++---
+>   drivers/gpu/drm/rockchip/rockchip_vop_reg.h        | 905 ++++++++++++++++-----
+>   5 files changed, 1075 insertions(+), 399 deletions(-)
+>
 
 
-Thanks,
-Yong
+-- 
+?ark Yao
