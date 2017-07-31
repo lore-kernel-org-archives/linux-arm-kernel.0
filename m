@@ -1,81 +1,39 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:26:12 +0100
-Subject: [PATCH v3 34/59] irqchip/gic-v4: Enable low-level GICv4 operations
+Date: Mon, 31 Jul 2017 18:26:28 +0100
+Subject: [PATCH v3 50/59] KVM: arm/arm64: GICv4: Use pending_last as a
+ scheduling hint
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-35-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-51-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get the show on the road...
+When a vPE exits, the pending_last flag is set when there are
+pending VLPIs stored in the pending table. Similarily, we set
+this flag when a doorbell interrupt fires, as it indicates the
+same condition.
 
-Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+Let's update kvm_vgic_vcpu_pending_irq() to account for that
+flag as well, making a vcpu runnable when set.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/Makefile           |  2 +-
- drivers/irqchip/irq-gic-v3-its.c   |  3 ++-
- drivers/irqchip/irq-gic-v4.c       | 13 +++++++++++++
- include/linux/irqchip/arm-gic-v4.h |  2 ++
- 4 files changed, 18 insertions(+), 2 deletions(-)
+ virt/kvm/arm/vgic/vgic.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index e88d856cc09c..7dd05ad6bcfb 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -28,7 +28,7 @@ obj-$(CONFIG_ARM_GIC_PM)		+= irq-gic-pm.o
- obj-$(CONFIG_ARCH_REALVIEW)		+= irq-gic-realview.o
- obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
- obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
--obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
-+obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o irq-gic-v4.o
- obj-$(CONFIG_PARTITION_PERCPU)		+= irq-partition-percpu.o
- obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
- obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index a5b1317d89eb..9f32cd42238f 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -3109,7 +3109,8 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
- 		has_v4 |= its->is_v4;
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index a96e566905d2..dfac894f6f03 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -781,6 +781,9 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
+ 	if (!vcpu->kvm->arch.vgic.enabled)
+ 		return false;
  
- 	if (has_v4 & rdists->has_vlpis) {
--		if (its_init_vpe_domain()) {
-+		if (its_init_vpe_domain() ||
-+		    its_init_v4(parent_domain, &its_vpe_domain_ops)) {
- 			rdists->has_vlpis = false;
- 			pr_err("ITS: Disabling GICv4 support\n");
- 		}
-diff --git a/drivers/irqchip/irq-gic-v4.c b/drivers/irqchip/irq-gic-v4.c
-index d10d73477d01..400d9bbb0e56 100644
---- a/drivers/irqchip/irq-gic-v4.c
-+++ b/drivers/irqchip/irq-gic-v4.c
-@@ -209,3 +209,16 @@ int its_prop_update_vlpi(int irq, u8 config, bool inv)
++	if (vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last)
++		return true;
++
+ 	spin_lock(&vgic_cpu->ap_list_lock);
  
- 	return irq_set_vcpu_affinity(irq, &info);
- }
-+
-+int its_init_v4(struct irq_domain *domain, const struct irq_domain_ops *ops)
-+{
-+	if (domain) {
-+		pr_info("ITS: Enabling GICv4 support\n");
-+		gic_domain = domain;
-+		vpe_domain_ops = ops;
-+		return 0;
-+	}
-+
-+	pr_err("ITS: No GICv4 VPE domain allocated\n");
-+	return -ENODEV;
-+}
-diff --git a/include/linux/irqchip/arm-gic-v4.h b/include/linux/irqchip/arm-gic-v4.h
-index f495d4d1f7d7..3cf72af2c796 100644
---- a/include/linux/irqchip/arm-gic-v4.h
-+++ b/include/linux/irqchip/arm-gic-v4.h
-@@ -98,4 +98,6 @@ int its_get_vlpi(int irq, struct its_vlpi_map *map);
- int its_unmap_vlpi(int irq);
- int its_prop_update_vlpi(int irq, u8 config, bool inv);
- 
-+int its_init_v4(struct irq_domain *domain, const struct irq_domain_ops *ops);
-+
- #endif
+ 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
 -- 
 2.11.0
