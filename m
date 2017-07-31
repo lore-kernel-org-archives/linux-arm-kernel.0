@@ -1,85 +1,37 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Mon, 31 Jul 2017 12:09:08 +0100
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170726231505.GG3730@linux.vnet.ibm.com>
-References: <20170726.095432.169004918437663011.davem@davemloft.net>
- <20170726175013.GT3730@linux.vnet.ibm.com>
- <20170726223658.GA27617@linux.vnet.ibm.com>
- <20170726.154540.150558937277891719.davem@davemloft.net>
- <20170726231505.GG3730@linux.vnet.ibm.com>
-Message-ID: <20170731120908.00002e28@huawei.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 31 Jul 2017 13:38:30 +0200
+Subject: [PATCH 0/2] clk: meson: expose clk ids
+Message-ID: <20170731113832.26490-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Jul 2017 16:15:05 -0700
-"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+In previous cycles, concerns have been raised about the way clocks are
+exposed for the meson clock controller, only when validated and required
+in DT.
 
-> On Wed, Jul 26, 2017 at 03:45:40PM -0700, David Miller wrote:
-> > From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-> > Date: Wed, 26 Jul 2017 15:36:58 -0700
-> >   
-> > > And without CONFIG_SOFTLOCKUP_DETECTOR, I see five runs of 24 with RCU
-> > > CPU stall warnings.  So it seems likely that CONFIG_SOFTLOCKUP_DETECTOR
-> > > really is having an effect.  
-> > 
-> > Thanks for all of the info Paul, I'll digest this and scan over the
-> > code myself.
-> > 
-> > Just out of curiousity, what x86 idle method is your machine using?
-> > The mwait one or the one which simply uses 'halt'?  The mwait variant
-> > might mask this bug, and halt would be a lot closer to how sparc64 and
-> > Jonathan's system operates.  
-> 
-> My kernel builds with CONFIG_INTEL_IDLE=n, which I believe means that
-> I am not using the mwait one.  Here is a grep for IDLE in my .config:
-> 
-> 	CONFIG_NO_HZ_IDLE=y
-> 	CONFIG_GENERIC_SMP_IDLE_THREAD=y
-> 	# CONFIG_IDLE_PAGE_TRACKING is not set
-> 	CONFIG_ACPI_PROCESSOR_IDLE=y
-> 	CONFIG_CPU_IDLE=y
-> 	# CONFIG_CPU_IDLE_GOV_LADDER is not set
-> 	CONFIG_CPU_IDLE_GOV_MENU=y
-> 	# CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED is not set
-> 	# CONFIG_INTEL_IDLE is not set
-> 
-> > On sparc64 the cpu yield we do in the idle loop sleeps the cpu.  It's
-> > local TICK register keeps advancing, and the local timer therefore
-> > will still trigger.  Also, any externally generated interrupts
-> > (including cross calls) will wake up the cpu as well.
-> > 
-> > The tick-sched code is really tricky wrt. NO_HZ even in the NO_HZ_IDLE
-> > case.  One of my running theories is that we miss scheduling a tick
-> > due to a race.  That would be consistent with the behavior we see
-> > in the RCU dumps, I think.  
-> 
-> But wouldn't you have to miss a -lot- of ticks to get an RCU CPU stall
-> warning?  By default, your grace period needs to extend for more than
-> 21 seconds (more than one-third of a -minute-) to get one.  Or do
-> you mean that the ticks get shut off now and forever, as opposed to
-> just losing one of them?
-> 
-> > Anyways, just a theory, and that's why I keep mentioning that commit
-> > about the revert of the revert (specifically
-> > 411fe24e6b7c283c3a1911450cdba6dd3aaea56e).
-> > 
-> > :-)  
-> 
-> I am running an overnight test in preparation for attempting to push
-> some fixes for regressions into 4.12, but will try reverting this
-> and enabling CONFIG_HZ_PERIODIC tomorrow.
-> 
-> Jonathan, might the commit that Dave points out above be what reduces
-> the probability of occurrence as you test older releases?
-I just got around to trying this out of curiosity.  Superficially it did
-appear to possibly make the issue harder to hit took over 30 minutes
-but the issue otherwise looks much the same with or without that patch.
+Instead, this patchset expose all the known clocks which may be needed in
+DT later on. The clocks left out are internal clocks which should never be
+used directly in DT. These are mostly internal muxes and dividers of
+composite clocks.
 
-Just out of curiosity, next thing on my list is to disable hrtimers entirely
-and see what happens.
+While this should reduce the patch flow on the related header files, It
+won't stop it completely. There are still many clocks we don't know about
+yet. We tend discover a few in every cycle.
 
-Jonathan
-> 
-> 							Thanx, Paul
-> 
+This patchset depends on these fixes [0] to avoid issues when adding new
+clk ids.
+
+[0]: https://lkml.kernel.org/r/20170727161755.10393-1-jbrunet at baylibre.com
+
+Jerome Brunet (2):
+  clk: meson8b: expose every clock in the bindings
+  clk: meson-gxbb: expose almost every clock in the bindings
+
+ drivers/clk/meson/gxbb.h                 | 117 ++-----------------------------
+ drivers/clk/meson/meson8b.h              | 103 ++-------------------------
+ include/dt-bindings/clock/gxbb-clkc.h    |  60 ++++++++++++++++
+ include/dt-bindings/clock/meson8b-clkc.h |  70 ++++++++++++++++++
+ 4 files changed, 141 insertions(+), 209 deletions(-)
+
+-- 
+2.9.4
