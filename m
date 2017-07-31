@@ -1,108 +1,41 @@
 From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Mon, 31 Jul 2017 11:07:36 +0800
-Subject: [PATCH v3 1/5] [media] v4l: add porter duff blend controls
+Date: Mon, 31 Jul 2017 11:07:38 +0800
+Subject: [PATCH v3 3/5] ARM: dts: rockchip: add RGA device node for RK3288
 In-Reply-To: <1501470460-12014-1-git-send-email-jacob-chen@iotwrt.com>
 References: <1501470460-12014-1-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <1501470460-12014-2-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <1501470460-12014-4-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At peresent, we don't have a control for Compositing and Blend.
-All drivers are just doing copies while actually many hardwares
-supports more functions.
-
-So Adding V4L2 controls for Compositing and Blend, used for for
-composting streams.
-
-The values are based on porter duff operations.
-Defined in below links.
-https://developer.xamarin.com/api/type/Android.Graphics.PorterDuff+Mode/
+This patch add the RGA dt config of rk3288 SoC.
 
 Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
-Suggested-by: Nicolas Dufresne <nicolas@ndufresne.ca>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
- drivers/media/v4l2-core/v4l2-ctrls.c | 20 +++++++++++++++++++-
- include/uapi/linux/v4l2-controls.h   | 16 +++++++++++++++-
- 2 files changed, 34 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/rk3288.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
-index b9e08e3..561d7d5 100644
---- a/drivers/media/v4l2-core/v4l2-ctrls.c
-+++ b/drivers/media/v4l2-core/v4l2-ctrls.c
-@@ -478,7 +478,21 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
- 		"Region Grid",
- 		NULL,
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 1efc2f2..cea41b7 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -945,6 +945,17 @@
+ 		status = "okay";
  	};
--
-+	static const char * const porter_duff_modes[] = {
-+		"Source",
-+		"Source Top",
-+		"Source In",
-+		"Source Out",
-+		"Source Over",
-+		"Destination",
-+		"Destination Top",
-+		"Destination In",
-+		"Destination Out",
-+		"Destination Over",
-+		"Add",
-+		"Clear",
-+		NULL
+ 
++	rga: rga at ff920000 {
++		compatible = "rockchip,rk3288-rga";
++		reg = <0xff920000 0x180>;
++		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru SCLK_RGA>;
++		clock-names = "aclk", "hclk", "sclk";
++		power-domains = <&power RK3288_PD_VIO>;
++		resets = <&cru SRST_RGA_CORE>, <&cru SRST_RGA_AXI>, <&cru SRST_RGA_AHB>;
++		reset-names = "core", "axi", "ahb";
 +	};
- 
- 	switch (id) {
- 	case V4L2_CID_MPEG_AUDIO_SAMPLING_FREQ:
-@@ -564,6 +578,8 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
- 		return vpx_golden_frame_sel;
- 	case V4L2_CID_JPEG_CHROMA_SUBSAMPLING:
- 		return jpeg_chroma_subsampling;
-+	case V4L2_CID_PORTER_DUFF_MODE:
-+		return porter_duff_modes;
- 	case V4L2_CID_DV_TX_MODE:
- 		return dv_tx_mode;
- 	case V4L2_CID_DV_TX_RGB_RANGE:
-@@ -886,6 +902,7 @@ const char *v4l2_ctrl_get_name(u32 id)
- 	case V4L2_CID_PIXEL_RATE:		return "Pixel Rate";
- 	case V4L2_CID_TEST_PATTERN:		return "Test Pattern";
- 	case V4L2_CID_DEINTERLACING_MODE:	return "Deinterlacing Mode";
-+	case V4L2_CID_PORTER_DUFF_MODE:		return "PorterDuff Blend Modes";
- 
- 	/* DV controls */
- 	/* Keep the order of the 'case's the same as in v4l2-controls.h! */
-@@ -1060,6 +1077,7 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
- 	case V4L2_CID_DV_RX_IT_CONTENT_TYPE:
- 	case V4L2_CID_TEST_PATTERN:
- 	case V4L2_CID_DEINTERLACING_MODE:
-+	case V4L2_CID_PORTER_DUFF_MODE:
- 	case V4L2_CID_TUNE_DEEMPHASIS:
- 	case V4L2_CID_MPEG_VIDEO_VPX_GOLDEN_FRAME_SEL:
- 	case V4L2_CID_DETECT_MD_MODE:
-diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
-index 0d2e1e0..9543b4b 100644
---- a/include/uapi/linux/v4l2-controls.h
-+++ b/include/uapi/linux/v4l2-controls.h
-@@ -893,7 +893,21 @@ enum v4l2_jpeg_chroma_subsampling {
- #define V4L2_CID_PIXEL_RATE			(V4L2_CID_IMAGE_PROC_CLASS_BASE + 2)
- #define V4L2_CID_TEST_PATTERN			(V4L2_CID_IMAGE_PROC_CLASS_BASE + 3)
- #define V4L2_CID_DEINTERLACING_MODE		(V4L2_CID_IMAGE_PROC_CLASS_BASE + 4)
--
-+#define V4L2_CID_PORTER_DUFF_MODE		(V4L2_CID_IMAGE_PROC_CLASS_BASE + 5)
-+enum v4l2_porter_duff_mode {
-+	V4L2_PORTER_DUFF_SRC			= 0,
-+	V4L2_PORTER_DUFF_SRCATOP		= 1,
-+	V4L2_PORTER_DUFF_SRCIN			= 2,
-+	V4L2_PORTER_DUFF_SRCOUT			= 3,
-+	V4L2_PORTER_DUFF_SRCOVER		= 4,
-+	V4L2_PORTER_DUFF_DST			= 5,
-+	V4L2_PORTER_DUFF_DSTATOP		= 6,
-+	V4L2_PORTER_DUFF_DSTIN			= 7,
-+	V4L2_PORTER_DUFF_DSTOUT			= 8,
-+	V4L2_PORTER_DUFF_DSTOVER		= 9,
-+	V4L2_PORTER_DUFF_ADD			= 10,
-+	V4L2_PORTER_DUFF_CLEAR			= 11,
-+};
- 
- /*  DV-class control IDs defined by V4L2 */
- #define V4L2_CID_DV_CLASS_BASE			(V4L2_CTRL_CLASS_DV | 0x900)
++
+ 	vopb: vop at ff930000 {
+ 		compatible = "rockchip,rk3288-vop";
+ 		reg = <0xff930000 0x19c>;
 -- 
 2.7.4
