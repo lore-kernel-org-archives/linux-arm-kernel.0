@@ -1,40 +1,77 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:02:28 +0200
-Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.14
-Message-ID: <cover.1501509815.git.horms+renesas@verge.net.au>
+Date: Mon, 31 Jul 2017 17:02:53 +0200
+Subject: [PATCH 01/31] arm64: dts: r8a7795: add IMR-LX4 support
+In-Reply-To: <cover.1501509525.git.horms+renesas@verge.net.au>
+References: <cover.1501509525.git.horms+renesas@verge.net.au>
+Message-ID: <24604cd36c52edf02831d8754efe2d76010885cf.1501509525.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Please consider these Renesas ARM64 based SoC defconfig updates for v4.14.
+Describe the IMR-LX4 devices in the R8A7795 device tree.
 
+Based on the original (and large) patch by Konstantin Kozhevnikov
+<Konstantin.Kozhevnikov@cogentembedded.com>.
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+Signed-off-by: Konstantin Kozhevnikov <Konstantin.Kozhevnikov@cogentembedded.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 40 ++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-defconfig-for-v4.14
-
-for you to fetch changes up to 140cb4111a51381f51f6cdcc97113f2d04e5939b:
-
-  arm64: defconfig: compile ak4613 and renesas sound as modules (2017-07-27 15:51:58 +0200)
-
-----------------------------------------------------------------
-Renesas ARM64 Based SoC Defconfig Updates for v4.14
-
-* compile ak4613 and renesas sound as modules
-
-  This is intended to reduce the size of a kernel image compiled
-  using the defconfig. This is timely as it brings the kernel image
-  back below the size that can be booted in my environment, a limit
-  it crept over in v4.13-rc1.
-
-----------------------------------------------------------------
-Kuninori Morimoto (1):
-      arm64: defconfig: compile ak4613 and renesas sound as modules
-
- arch/arm64/configs/defconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index e31c1b660b3f..31d1ba586ec2 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1535,6 +1535,46 @@
+ 			status = "disabled";
+ 		};
+ 
++		imr-lx4 at fe860000 {
++			compatible = "renesas,r8a7795-imr-lx4",
++				     "renesas,imr-lx4";
++			reg = <0 0xfe860000 0 0x2000>;
++			interrupts = <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 823>;
++			power-domains = <&sysc R8A7795_PD_A3VC>;
++			resets = <&cpg 823>;
++		};
++
++		imr-lx4 at fe870000 {
++			compatible = "renesas,r8a7795-imr-lx4",
++				     "renesas,imr-lx4";
++			reg = <0 0xfe870000 0 0x2000>;
++			interrupts = <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 822>;
++			power-domains = <&sysc R8A7795_PD_A3VC>;
++			resets = <&cpg 822>;
++		};
++
++		imr-lx4 at fe880000 {
++			compatible = "renesas,r8a7795-imr-lx4",
++				     "renesas,imr-lx4";
++			reg = <0 0xfe880000 0 0x2000>;
++			interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 821>;
++			power-domains = <&sysc R8A7795_PD_A3VC>;
++			resets = <&cpg 821>;
++		};
++
++		imr-lx4 at fe890000 {
++			compatible = "renesas,r8a7795-imr-lx4",
++				     "renesas,imr-lx4";
++			reg = <0 0xfe890000 0 0x2000>;
++			interrupts = <GIC_SPI 195 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 820>;
++			power-domains = <&sysc R8A7795_PD_A3VC>;
++			resets = <&cpg 820>;
++		};
++
+ 		vspbc: vsp at fe920000 {
+ 			compatible = "renesas,vsp2";
+ 			reg = <0 0xfe920000 0 0x8000>;
+-- 
+2.1.4
