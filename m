@@ -1,62 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:04:29 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v4.14
-Message-ID: <cover.1501512759.git.horms+renesas@verge.net.au>
+Date: Mon, 31 Jul 2017 17:04:28 +0200
+Subject: [PATCH 2/5] dt-bindings: sram: Document renesas,smp-sram
+In-Reply-To: <cover.1501512759.git.horms+renesas@verge.net.au>
+References: <cover.1501512759.git.horms+renesas@verge.net.au>
+Message-ID: <d5f2ac6ae9931227d8ccd71c12182e547ec28c21.1501512759.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC DT bindings updates for v4.14.
+Document reserved SRAM for the SMP jump stub on Renesas R-Car Gen2 and
+RZ/G1 SoCs.
 
-
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
-
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings-for-v4.14
-
-for you to fetch changes up to 100acb0bd90be67b3fc625cff91c7617b791743d:
-
-  ARM: shmobile: Document Renesas Draak board DT bindings (2017-07-27 17:10:48 +0200)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC DT Bindings Updates for v4.14
-
-* Document R-Car D3 (r8a77995) SoC and Draak board
-
-* Document reserved SRAM for the SMP jump stub on R-Car Gen2 and RZ/G1 SoCs
-
-  Geert Uytterhoeven says, "+Renesas R-Car Gen2 and RZ/G1 SoCs need a small
-  piece of SRAM for the jump stub +for secondary CPU bringup and CPU
-  hotplug.  +This memory is reserved by adding a child node to a
-  "mmio-sram" node..."
-
-* Add a VSP channel index to DU vsps
-
-  Laurent Pinchart says, "multiple LIF instances in the VSP. The current DT
-  bindings don't support specifying that kind of SoC integration scheme.
-  Extend them with a VSP channel index."
-
-* Add R-Car M3-W (r8a7796) HDMI TX DT bindings
-
-  This is compatible with existing R-Car H3 (r8a7795) support
-
-----------------------------------------------------------------
-Geert Uytterhoeven (3):
-      dt-bindings: sram: Document renesas,smp-sram
-      ARM: shmobile: Document R-Car D3 SoC DT bindings
-      ARM: shmobile: Document Renesas Draak board DT bindings
-
-Laurent Pinchart (2):
-      dt-bindings: display: renesas: Add R-Car M3-W HDMI TX DT bindings
-      dt-bindings: display: rcar-du: Add a VSP channel index to the vsps DT property
-
- Documentation/devicetree/bindings/arm/shmobile.txt |  4 ++
- .../bindings/display/bridge/renesas,dw-hdmi.txt    |  1 +
- .../devicetree/bindings/display/renesas,du.txt     | 51 +++++++++++++---------
- .../devicetree/bindings/sram/renesas,smp-sram.txt  | 27 ++++++++++++
- 4 files changed, 62 insertions(+), 21 deletions(-)
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ .../devicetree/bindings/sram/renesas,smp-sram.txt  | 27 ++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/sram/renesas,smp-sram.txt
+
+diff --git a/Documentation/devicetree/bindings/sram/renesas,smp-sram.txt b/Documentation/devicetree/bindings/sram/renesas,smp-sram.txt
+new file mode 100644
+index 000000000000..712d05e3e15e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sram/renesas,smp-sram.txt
+@@ -0,0 +1,27 @@
++* Renesas SMP SRAM
++
++Renesas R-Car Gen2 and RZ/G1 SoCs need a small piece of SRAM for the jump stub
++for secondary CPU bringup and CPU hotplug.
++This memory is reserved by adding a child node to a "mmio-sram" node, cfr.
++Documentation/devicetree/bindings/sram/sram.txt.
++
++Required child node properties:
++  - compatible: Must be "renesas,smp-sram",
++  - reg: Address and length of the reserved SRAM.
++    The full physical (bus) address must be aligned to a 256 KiB boundary.
++
++
++Example:
++
++	icram1:	sram at e63c0000 {
++		compatible = "mmio-sram";
++		reg = <0 0xe63c0000 0 0x1000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0 0xe63c0000 0x1000>;
++
++		smp-sram at 0 {
++			compatible = "renesas,smp-sram";
++			reg = <0 0x10>;
++		};
++	};
+-- 
+2.1.4
