@@ -1,73 +1,127 @@
-From: fkan@apm.com (Feng Kan)
-Date: Mon, 31 Jul 2017 15:16:10 -0700
-Subject: [PATCH v2 0/5] ACPI: DMA ranges management
-In-Reply-To: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
-References: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
-Message-ID: <CAL85gmD1LCivX2VOpcy1y0=Ywp8SkQCORPovQLhRv+Bb2n4MxA@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 31 Jul 2017 17:19:25 -0500
+Subject: [PATCH V4] PCI: handle CRS returned by device after FLR
+In-Reply-To: <7271b29d-5394-997c-a2af-0621d9f3283c@codeaurora.org>
+References: <1499375234-23928-1-git-send-email-okaya@codeaurora.org>
+ <20170713234910.GB5944@bhelgaas-glaptop.roam.corp.google.com>
+ <7271b29d-5394-997c-a2af-0621d9f3283c@codeaurora.org>
+Message-ID: <20170731221925.GC5944@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 8:23 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> This patch series is v2 of a previous posting:
->
-> v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
->
-> v1->v2:
->         - Reworked acpi_dma_get_range() flow and logs
->         - Added IORT named component address limits
->         - Renamed acpi_dev_get_resources() helper function
->         - Rebased against v4.13-rc3
->
-> -- Original cover letter --
->
-> As reported in:
->
-> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
->
-> the bus connecting devices to an IOMMU bus can be smaller in size than
-> the IOMMU input address bits which results in devices DMA HW bugs in
-> particular related to IOVA allocation (ie chopping of higher address
-> bits owing to system bus HW capabilities mismatch with the IOMMU).
->
-> Fortunately this problem can be solved through an already present but never
-> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
-> window for a specific bus in ACPI and therefore all upstream devices
-> connected to it.
->
-> This small patch series enables _DMA parsing in ACPI core code and
-> use it in ACPI IORT code in order to detect DMA ranges for devices and
-> update their data structures to make them work with their related DMA
-> addressing restrictions.
->
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Feng Kan <fkan@apm.com>
-> Cc: Jon Masters <jcm@redhat.com>
-> Cc: Robert Moore <robert.moore@intel.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->
-> Lorenzo Pieralisi (5):
->   ACPICA: resource_mgr: Allow _DMA method in walk resources
->   ACPI: Make acpi_dev_get_resources() method agnostic
->   ACPI: Introduce DMA ranges parsing
->   ACPI: Make acpi_dma_configure() DMA regions aware
->   ACPI/IORT: Add IORT named component memory address limits
->
->  drivers/acpi/acpica/rsxface.c |  7 ++--
->  drivers/acpi/arm64/iort.c     | 50 +++++++++++++++++++++++-
->  drivers/acpi/resource.c       | 82 ++++++++++++++++++++++++++++++---------
->  drivers/acpi/scan.c           | 90 +++++++++++++++++++++++++++++++++++++++----
->  include/acpi/acnames.h        |  1 +
->  include/acpi/acpi_bus.h       |  2 +
->  include/linux/acpi.h          |  8 ++++
->  include/linux/acpi_iort.h     |  5 ++-
->  8 files changed, 211 insertions(+), 34 deletions(-)
->
-> --
-> 2.10.0
->
-Thanks, this was tested and works on the XGene system.
-Tested-by: Feng Kan <fkan@apm.com>
+On Mon, Jul 31, 2017 at 05:45:46PM -0400, Sinan Kaya wrote:
+> Hi Bjorn,
+> 
+> On 7/13/2017 7:49 PM, Bjorn Helgaas wrote:
+> > On Thu, Jul 06, 2017 at 05:07:14PM -0400, Sinan Kaya wrote:
+> >> An endpoint is allowed to issue Configuration Request Retry Status (CRS)
+> >> following a Function Level Reset (FLR) request to indicate that it is not
+> >> ready to accept new requests.
+> >>
+> >> Seen a timeout message with Intel 750 NVMe drive and FLR reset.
+> >>
+> >> Kernel enables CRS visibility in pci_enable_crs() function for each bridge
+> >> it discovers. The OS observes a special vendor ID read value of 0xFFFF0001
+> >> in this case. We need to keep polling until this special read value
+> >> disappears. pci_bus_read_dev_vendor_id() takes care of CRS handling for a
+> >> given vendor id read request under the covers.
+> > 
+> > This patch isn't about how CRS works; we already have support for
+> > that.  So this paragraph is mostly extraneous and can be replaced by a
+> > simple reference to CRS in the spec.  
+> > 
+> >> Adding a vendor ID read if this is a physical function before attempting
+> >> to read any other registers on the endpoint. A CRS indication will only
+> >> be given if the address to be read is vendor ID register.
+> >>
+> >> Note that virtual functions report their vendor ID through another
+> >> mechanism.
+> > 
+> > How VFs report vendor ID is irrelevant.
+> > 
+> > What *is* relevant is how FLR affects VFs.  The SR-IOV spec, r1.1,
+> > sec 2.2.2, says FLR doesn't affect a VF's existence in config space.
+> > 
+> > That suggests to me that reading a VF's PCI_COMMAND register after an
+> > FLR should always return valid data (never ~0).  I suppose an FLR VF
+> > reset isn't instantaneous, though, so I suppose we do need the 100ms
+> > delay.  But maybe we should just return immediately after that,
+> > without reading any VF config space?
+> > 
+> > pci_flr_wait() was added by 5adecf817dd6 ("PCI: Wait for up to 1000ms
+> > after FLR reset"); maybe Alex has more insight into this.
+> > 
+> >> The spec is calling to wait up to 1 seconds if the device is sending CRS.
+> >> The NVMe device seems to be requiring more. Relax this up to 60 seconds.
+> >>
+> >> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> >> ---
+> >>  drivers/pci/pci.c | 14 ++++++++++----
+> >>  1 file changed, 10 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> >> index aab9d51..83a9784 100644
+> >> --- a/drivers/pci/pci.c
+> >> +++ b/drivers/pci/pci.c
+> >> @@ -3723,10 +3723,16 @@ static void pci_flr_wait(struct pci_dev *dev)
+> >>  	int i = 0;
+> >>  	u32 id;
+> >>  
+> >> -	do {
+> >> -		msleep(100);
+> >> -		pci_read_config_dword(dev, PCI_COMMAND, &id);
+> >> -	} while (i++ < 10 && id == ~0);
+> >> +	if (dev->is_virtfn) {
+> >> +		do {
+> >> +			msleep(100);
+> >> +			pci_read_config_dword(dev, PCI_COMMAND, &id);
+> >> +		} while (i++ < 10 && id == ~0);
+> >> +	} else {
+> >> +		if (!pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
+> >> +						60*1000))
+> >> +			id = ~0;
+> >> +	}
+> >>  
+> >>  	if (id == ~0)
+> >>  		dev_warn(&dev->dev, "Failed to return from FLR\n");
+> >> -- 
+> >> 1.9.1
+> >>
+> >>
+> 
+> Welcome back from vacation. Let's pick up from where we left. 
+> 
+> Based on our email conversation, here are things I noted:
+> 
+> 1. You want to go back to 100ms for virtual functions.
+
+This should be a separate patch with a changelog and a comment that
+references the spec, e.g., SR-IOV r1.1, sec 2.2.2 or whatever seems
+most relevant.
+
+> 2. You want to print some user visible information when CRS is
+> taking longer.  I can call the vendor ID function 60 times and print
+> a message on each loop if it helps.
+
+I don't remember the context of this.  60 copies of a message sounds
+like too much.
+
+> 3. You are looking for maximum CRS time reference from the spec. The
+> reference depends on how you interpret it. I interpreted it as 1
+> second maximum CRS time.  Keith interpreted it as 1 second being a
+> reference to conventional reset maximum time rather than CRS time.
+> The fact that no time limit specified in the CRS chapter also makes
+> me lean towards Keith's interpretation. 
+
+I'm looking for the *minimum* time we're required to wait per the
+spec, with pointers to the spec sections you used to derive it.
+
+In most cases the spec does not specify maximum times for software
+events because that would be like saying "your software must be at
+least this fast" and that sort of thing is impossible to enforce.
+
+If you find a maximum, great -- use it and include the spec pointer.
+But I suspect the max time we wait for a device to become ready will
+be a policy question of how long Linux wants to wait.
+
+Bjorn
