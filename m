@@ -1,50 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:03:38 +0200
-Subject: [PATCH 07/10] ARM: shmobile: defconfig: Refresh
+Date: Mon, 31 Jul 2017 17:03:39 +0200
+Subject: [PATCH 08/10] ARM: multi_v7_defconfig: Replace SND_SOC_RSRC_CARD by
+ SND_SIMPLE_SCU_CARD
 In-Reply-To: <cover.1501511664.git.horms+renesas@verge.net.au>
 References: <cover.1501511664.git.horms+renesas@verge.net.au>
-Message-ID: <e4c4bdbacdfe8e6d6b7b3fcc58fdd2141915b915.1501511664.git.horms+renesas@verge.net.au>
+Message-ID: <883338aa8d3009d67868af53c6a7b8f5f1ff7e2d.1501511664.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-- Several options were moved,
-  - INPUT_MOUSEDEV_PSAUX is no longer enabled by default since commit
-    73d8ef76006b649f ("Input: mousedev - stop offering PS/2 to userspace
-    by default").
+SND_SOC_RSRC_CARD was renamed SND_SIMPLE_SCU_CARD, hence update
+multi_v7_defconfig.
 
+Fixes: d12c6216c4a58f9f ("ASoC: rsrc-card: rename rsrc-card to simple-scu-card phase3")
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/shmobile_defconfig | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/configs/multi_v7_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index e9cc8a557e80..18886c53424a 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -90,9 +90,8 @@ CONFIG_SMSC911X=y
- # CONFIG_NET_VENDOR_STMICRO is not set
- # CONFIG_NET_VENDOR_VIA is not set
- # CONFIG_NET_VENDOR_WIZNET is not set
--CONFIG_SMSC_PHY=y
- CONFIG_MICREL_PHY=y
--# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
-+CONFIG_SMSC_PHY=y
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_INPUT_MOUSE is not set
-@@ -124,9 +123,9 @@ CONFIG_SPI_SH_HSPI=y
- CONFIG_GPIO_EM=y
- CONFIG_GPIO_RCAR=y
- CONFIG_GPIO_PCF857X=y
--CONFIG_POWER_SUPPLY=y
- CONFIG_POWER_RESET=y
- CONFIG_POWER_RESET_RMOBILE=y
-+CONFIG_POWER_SUPPLY=y
- # CONFIG_HWMON is not set
- CONFIG_THERMAL=y
- CONFIG_CPU_THERMAL=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 4d19c1b4b8e7..7fa1746970ec 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -650,7 +650,7 @@ CONFIG_SND_SOC_SMDK_WM8994_PCM=m
+ CONFIG_SND_SOC_SNOW=m
+ CONFIG_SND_SOC_SH4_FSI=m
+ CONFIG_SND_SOC_RCAR=m
+-CONFIG_SND_SOC_RSRC_CARD=m
++CONFIG_SND_SIMPLE_SCU_CARD=m
+ CONFIG_SND_SUN4I_CODEC=m
+ CONFIG_SND_SOC_TEGRA=m
+ CONFIG_SND_SOC_TEGRA_RT5640=m
 -- 
 2.1.4
