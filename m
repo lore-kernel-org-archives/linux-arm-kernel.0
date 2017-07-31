@@ -1,47 +1,35 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 31 Jul 2017 11:25:46 +0200
-Subject: [GIT PULL] Meson clock fixes for 4.13-rc4
-Message-ID: <ce41382f-fd93-1dc9-0dba-1484ac555945@baylibre.com>
+From: bich.hemon@st.com (Bich HEMON)
+Date: Mon, 31 Jul 2017 09:30:54 +0000
+Subject: [PATCH 4/9] serial: stm32: fix pio transmit timeout
+In-Reply-To: <20170730143256.GA30584@kroah.com>
+References: <1499958494-19354-1-git-send-email-bich.hemon@st.com>
+ <1499958494-19354-5-git-send-email-bich.hemon@st.com>
+ <20170730143256.GA30584@kroah.com>
+Message-ID: <b1eb499b-4099-6109-7516-3b872175b8f9@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+Hi Greg,
 
-Here is some fixes for Meson GXBB and Meson8 drivers, that could go for 4.13-rc4.
+On 07/30/2017 04:32 PM, Greg Kroah-Hartman wrote:
+> On Thu, Jul 13, 2017 at 03:08:28PM +0000, Bich HEMON wrote:
+>> From: Gerald Baeza <gerald.baeza@st.com>
+>>
+>> 100?s was too short for low speed transmission
+>> (9600bps)
+>>
+>> Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
+>> Signed-off-by: Bich Hemon <bich.hemon@st.com>
+>> ---
+>>   drivers/tty/serial/stm32-usart.c | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> This patch did not apply :(
+> 
 
-Thanks,
-Neil
+I have rebased the patch on top of your tty-next branch . Please drop 
+this patch as I will send you a new version.
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+Thx,
 
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  git://github.com/baylibre/clk-meson.git tags/meson-clk-fixes-for-4.13-rc4
-
-for you to fetch changes up to c1922eed58f38f3d7876f53e1000e3c3e3024e54:
-
-  clk: meson: mpll: fix mpll0 fractional part ignored (2017-07-31 10:08:01 +0200)
-
-----------------------------------------------------------------
-Meson Clock fixes:
-- gxbb: fix meson cts_amclk divider flags
-- gxbb: fix clk_mclk_i958 divider flags
-- meson8b: fix protection against undefined clks
-- gxbb: fix protection against undefined clks
-- mpll: fix mpll0 fractional part ignored
-
-----------------------------------------------------------------
-Jerome Brunet (5):
-      clk: meson: gxbb: fix meson cts_amclk divider flags
-      clk: meson: gxbb: fix clk_mclk_i958 divider flags
-      clk: meson: meson8b: fix protection against undefined clks
-      clk: meson: gxbb: fix protection against undefined clks
-      clk: meson: mpll: fix mpll0 fractional part ignored
-
- drivers/clk/meson/clk-mpll.c |  7 +++++++
- drivers/clk/meson/clkc.h     |  1 +
- drivers/clk/meson/gxbb.c     | 17 +++++++++++++----
- drivers/clk/meson/meson8b.c  |  6 ++++++
- 4 files changed, 27 insertions(+), 4 deletions(-)
+Bich
