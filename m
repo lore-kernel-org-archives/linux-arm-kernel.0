@@ -1,41 +1,40 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Mon, 31 Jul 2017 12:59:03 +0100
-Subject: [RFC PATCH v1] net: ethernet: nb8800: Reset HW block in ndo_open
-In-Reply-To: <a5ef2294-2adf-743b-f877-144a8f3958b4@free.fr> (Mason's message
- of "Mon, 31 Jul 2017 13:49:45 +0200")
-References: <823b1540-b528-bbd7-7f99-5dc39a08868a@sigmadesigns.com>
- <yw1xk22slemx.fsf@mansr.com>
- <c1bf54ee-8634-23a1-abda-55bc3fafe2a8@sigmadesigns.com>
- <yw1xfudgl7am.fsf@mansr.com>
- <446e3a95-80c3-0742-9cb1-69a8dfc9b1ae@free.fr>
- <yw1x7eyrlc3s.fsf@mansr.com>
- <f04a0cba-6c09-e9e4-f2d1-d8b2a7e276c9@free.fr>
- <4ff343de-41c7-c309-04dc-983b5fe3e066@gmail.com>
- <a5ef2294-2adf-743b-f877-144a8f3958b4@free.fr>
-Message-ID: <yw1x60e8kebc.fsf@mansr.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 31 Jul 2017 14:00:12 +0200
+Subject: [PATCH 0/2] clk: meson: expose clk ids
+In-Reply-To: <20170731113832.26490-1-jbrunet@baylibre.com>
+References: <20170731113832.26490-1-jbrunet@baylibre.com>
+Message-ID: <203231e0-1d9b-ecca-bc04-d5133fb2ec87@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+On 07/31/2017 01:38 PM, Jerome Brunet wrote:
+> In previous cycles, concerns have been raised about the way clocks are
+> exposed for the meson clock controller, only when validated and required
+> in DT.
+> 
+> Instead, this patchset expose all the known clocks which may be needed in
+> DT later on. The clocks left out are internal clocks which should never be
+> used directly in DT. These are mostly internal muxes and dividers of
+> composite clocks.
+> 
+> While this should reduce the patch flow on the related header files, It
+> won't stop it completely. There are still many clocks we don't know about
+> yet. We tend discover a few in every cycle.
+> 
+> This patchset depends on these fixes [0] to avoid issues when adding new
+> clk ids.
+> 
+> [0]: https://lkml.kernel.org/r/20170727161755.10393-1-jbrunet at baylibre.com
+> 
+> Jerome Brunet (2):
+>   clk: meson8b: expose every clock in the bindings
+>   clk: meson-gxbb: expose almost every clock in the bindings
+> 
+>  drivers/clk/meson/gxbb.h                 | 117 ++-----------------------------
+>  drivers/clk/meson/meson8b.h              | 103 ++-------------------------
+>  include/dt-bindings/clock/gxbb-clkc.h    |  60 ++++++++++++++++
+>  include/dt-bindings/clock/meson8b-clkc.h |  70 ++++++++++++++++++
+>  4 files changed, 141 insertions(+), 209 deletions(-)
+> 
 
-> On 29/07/2017 17:18, Florian Fainelli wrote:
->
->> On 07/29/2017 05:02 AM, Mason wrote:
->>
->>> I have identified a 100% reproducible flaw.
->>> I have proposed a work-around that brings this down to 0
->>> (tested 1000 cycles of link up / ping / link down).
->> 
->> Can you also try to get help from your HW resources to eventually help
->> you find out what is going on here?
->
-> The patch I proposed /is/ based on the feedback from the HW team :-(
-> "Just reset the HW block, and everything will work as expected."
-
-Nobody is saying a reset won't recover the lockup.  The problem is that
-we don't know what caused it to lock up in the first place.  How do we
-know it can't happen during normal operation?  If we knew the cause, it
-might also be possible to avoid the situation entirely.
-
--- 
-M?ns Rullg?rd
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
