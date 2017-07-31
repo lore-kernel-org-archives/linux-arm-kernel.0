@@ -1,87 +1,42 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 31 Jul 2017 16:23:23 +0100
-Subject: [PATCH v2 5/5] ACPI/IORT: Add IORT named component memory address
- limits
-In-Reply-To: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
-References: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170731152323.32488-6-lorenzo.pieralisi@arm.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 31 Jul 2017 17:19:24 +0200
+Subject: [PATCH 12/38] ARM: dts: r8a7790: Add Inter Connect RAM
+In-Reply-To: <cover.1501514100.git.horms+renesas@verge.net.au>
+References: <cover.1501514100.git.horms+renesas@verge.net.au>
+Message-ID: <c90715a3ba3b01ff9a10bbffeca791062f2e3173.1501514100.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IORT named components provide firmware configuration describing
-how many address bits a given device is capable of generating
-to address memory.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add code to the kernel to retrieve memory address limits
-configuration for IORT named components and configure DMA masks
-accordingly.
+R-Car H2 has 2 regions of Inter Connect RAM (72 + 4 KiB).
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Nate Watterson <nwatters@codeaurora.org>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/acpi/arm64/iort.c | 40 ++++++++++++++++++++++++++++++----------
- 1 file changed, 30 insertions(+), 10 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 67b85ae..b85d19f 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -680,6 +680,24 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
- 	return ret ? NULL : ops;
- }
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 2805a8608d4b..4ee34995573c 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -830,6 +830,16 @@
+ 		status = "disabled";
+ 	};
  
-+static int nc_dma_get_range(struct device *dev, u64 *size)
-+{
-+	struct acpi_iort_node *node;
-+	struct acpi_iort_named_component *ncomp;
++	icram0:	sram at e63a0000 {
++		compatible = "mmio-sram";
++		reg = <0 0xe63a0000 0 0x12000>;
++	};
 +
-+	node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
-+			      iort_match_node_callback, dev);
-+	if (!node)
-+		return -ENODEV;
++	icram1:	sram at e63c0000 {
++		compatible = "mmio-sram";
++		reg = <0 0xe63c0000 0 0x1000>;
++	};
 +
-+	ncomp = (struct acpi_iort_named_component *)node->node_data;
-+
-+	*size = ncomp->memory_address_limit >= 64 ? ~0ULL :
-+			1ULL<<ncomp->memory_address_limit;
-+
-+	return 0;
-+}
-+
- /**
-  * iort_dma_setup() - Set-up device DMA parameters.
-  *
-@@ -708,17 +726,19 @@ void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
- 
- 	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
- 
--	if (dev_is_pci(dev)) {
-+	if (dev_is_pci(dev))
- 		ret = acpi_dma_get_range(dev, &dmaaddr, &offset, &size);
--		if (!ret) {
--			mask = __roundup_pow_of_two(dmaaddr + size) - 1;
--			/*
--			 * Limit coherent and dma mask based on size
--			 * retrieved from firmware.
--			 */
--			dev->coherent_dma_mask = mask;
--			*dev->dma_mask = mask;
--		}
-+	else
-+		ret = nc_dma_get_range(dev, &size);
-+
-+	if (!ret) {
-+		mask = __roundup_pow_of_two(dmaaddr + size) - 1;
-+		/*
-+		 * Limit coherent and dma mask based on size
-+		 * retrieved from firmware.
-+		 */
-+		dev->coherent_dma_mask = mask;
-+		*dev->dma_mask = mask;
- 	}
- 
- 	*dma_addr = dmaaddr;
+ 	ether: ethernet at ee700000 {
+ 		compatible = "renesas,ether-r8a7790";
+ 		reg = <0 0xee700000 0 0x400>;
 -- 
-2.10.0
+2.1.4
