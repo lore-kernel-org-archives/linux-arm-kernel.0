@@ -1,164 +1,165 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:25:43 +0100
-Subject: [PATCH v3 05/59] irqchip/gic-v3-its: Add probing for VLPI properties
+Date: Mon, 31 Jul 2017 18:25:59 +0100
+Subject: [PATCH v3 21/59] irqchip/gic-v3-its: Add VPE irq domain [de]activation
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-6-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-22-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the probing code for the ITS VLPI support. This includes
-configuring the ITS number if not supporting the single VMOVP
-command feature.
+On activation, a VPE is mapped using the VMAPP command, followed
+by a VINVALL for a good measure. On deactivation, the VPE is
+simply unmapped.
 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c   | 71 +++++++++++++++++++++++++++++++++++---
- include/linux/irqchip/arm-gic-v3.h |  5 +++
- 2 files changed, 72 insertions(+), 4 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 102 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 102 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index ae6b2cee09fa..e7a7dc9ad585 100644
+index 0f9a487448b9..5ca1e571c1b4 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -101,6 +101,7 @@ struct its_node {
- 	u32			ite_size;
- 	u32			device_ids;
- 	int			numa_node;
-+	bool			is_v4;
- };
+@@ -215,6 +215,16 @@ struct its_cmd_desc {
  
- #define ITS_ITT_ALIGN		SZ_256
-@@ -133,6 +134,14 @@ static DEFINE_SPINLOCK(its_lock);
- static struct rdists *gic_rdists;
- static struct irq_domain *its_parent;
- 
-+/*
-+ * We have a maximum number of 16 ITSs in the whole system if we're
-+ * using the ITSList mechanism
-+ */
-+#define ITS_LIST_MAX		16
+ 		struct {
+ 			struct its_vpe *vpe;
++		} its_vinvall_cmd;
 +
-+static unsigned long its_list_map;
++		struct {
++			struct its_vpe *vpe;
++			struct its_collection *col;
++			bool valid;
++		} its_vmapp_cmd;
 +
- #define gic_data_rdist()		(raw_cpu_ptr(gic_rdists->rdist))
- #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
- 
-@@ -1673,13 +1682,51 @@ static int its_init_domain(struct fwnode_handle *handle, struct its_node *its)
- 	return 0;
++		struct {
++			struct its_vpe *vpe;
+ 			struct its_device *dev;
+ 			u32 virt_id;
+ 			u32 event_id;
+@@ -318,6 +328,16 @@ static void its_encode_db_valid(struct its_cmd_block *cmd, bool db_valid)
+ 	its_mask_encode(&cmd->raw_cmd[2], db_valid, 0, 0);
  }
  
-+static int __init its_compute_its_list_map(struct resource *res,
-+					   void __iomem *its_base)
++static void its_encode_vpt_addr(struct its_cmd_block *cmd, u64 vpt_pa)
 +{
-+	int its_number;
-+	u32 ctlr;
-+
-+	/*
-+	 * This is assumed to be done early enough that we're
-+	 * guaranteed to be single-threaded, hence no
-+	 * locking. Should this change, we should address
-+	 * this.
-+	 */
-+	its_number = find_first_zero_bit(&its_list_map, ITS_LIST_MAX);
-+	if (its_number >= ITS_LIST_MAX) {
-+		pr_err("ITS@%pa: No ITSList entry available!\n",
-+		       &res->start);
-+		return -EINVAL;
-+	}
-+
-+	ctlr = readl_relaxed(its_base + GITS_CTLR);
-+	ctlr &= ~GITS_CTLR_ITS_NUMBER;
-+	ctlr |= its_number << GITS_CTLR_ITS_NUMBER_SHIFT;
-+	writel_relaxed(ctlr, its_base + GITS_CTLR);
-+	ctlr = readl_relaxed(its_base + GITS_CTLR);
-+	if ((ctlr & GITS_CTLR_ITS_NUMBER) != (its_number << GITS_CTLR_ITS_NUMBER_SHIFT)) {
-+		its_number = ctlr & GITS_CTLR_ITS_NUMBER;
-+		its_number >>= GITS_CTLR_ITS_NUMBER_SHIFT;
-+	}
-+
-+	if (test_and_set_bit(its_number, &its_list_map)) {
-+		pr_err("ITS@%pa: Duplicate ITSList entry %d\n",
-+		       &res->start, its_number);
-+		return -EINVAL;
-+	}
-+
-+	return its_number;
++	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 50, 16);
 +}
 +
- static int __init its_probe_one(struct resource *res,
- 				struct fwnode_handle *handle, int numa_node)
++static void its_encode_vpt_size(struct its_cmd_block *cmd, u8 vpt_size)
++{
++	its_mask_encode(&cmd->raw_cmd[3], vpt_size, 4, 0);
++}
++
+ static inline void its_fixup_cmd(struct its_cmd_block *cmd)
  {
- 	struct its_node *its;
- 	void __iomem *its_base;
--	u32 val;
--	u64 baser, tmp;
-+	u32 val, ctlr;
-+	u64 baser, tmp, typer;
- 	int err;
+ 	/* Let's fixup BE commands */
+@@ -476,6 +496,36 @@ static struct its_collection *its_build_invall_cmd(struct its_cmd_block *cmd,
+ 	return NULL;
+ }
  
- 	its_base = ioremap(res->start, resource_size(res));
-@@ -1712,9 +1759,24 @@ static int __init its_probe_one(struct resource *res,
- 	raw_spin_lock_init(&its->lock);
- 	INIT_LIST_HEAD(&its->entry);
- 	INIT_LIST_HEAD(&its->its_device_list);
-+	typer = gic_read_typer(its_base + GITS_TYPER);
- 	its->base = its_base;
- 	its->phys_base = res->start;
--	its->ite_size = ((gic_read_typer(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
-+	its->ite_size = GITS_TYPER_ITT_ENTRY_SIZE(typer);
-+	its->is_v4 = !!(typer & GITS_TYPER_VLPIS);
-+	if (its->is_v4) {
-+		if (!(typer & GITS_TYPER_VMOVP)) {
-+			err = its_compute_its_list_map(res, its_base);
-+			if (err < 0)
-+				goto out_free_its;
++static struct its_vpe *its_build_vinvall_cmd(struct its_cmd_block *cmd,
++					     struct its_cmd_desc *desc)
++{
++	its_encode_cmd(cmd, GITS_CMD_VINVALL);
++	its_encode_vpeid(cmd, desc->its_vinvall_cmd.vpe->vpe_id);
 +
-+			pr_info("ITS@%pa: Using ITS number %d\n",
-+				&res->start, err);
-+		} else {
-+			pr_info("ITS@%pa: Single VMOVP capable\n", &res->start);
-+		}
++	its_fixup_cmd(cmd);
++
++	return desc->its_vinvall_cmd.vpe;
++}
++
++static struct its_vpe *its_build_vmapp_cmd(struct its_cmd_block *cmd,
++					   struct its_cmd_desc *desc)
++{
++	unsigned long vpt_addr;
++
++	vpt_addr = virt_to_phys(page_address(desc->its_vmapp_cmd.vpe->vpt_page));
++
++	its_encode_cmd(cmd, GITS_CMD_VMAPP);
++	its_encode_vpeid(cmd, desc->its_vmapp_cmd.vpe->vpe_id);
++	its_encode_valid(cmd, desc->its_vmapp_cmd.valid);
++	its_encode_target(cmd, desc->its_vmapp_cmd.col->target_address);
++	its_encode_vpt_addr(cmd, vpt_addr);
++	its_encode_vpt_size(cmd, LPI_NRBITS - 1);
++
++	its_fixup_cmd(cmd);
++
++	return desc->its_vmapp_cmd.vpe;
++}
++
+ static struct its_vpe *its_build_vmapti_cmd(struct its_cmd_block *cmd,
+ 					    struct its_cmd_desc *desc)
+ {
+@@ -797,6 +847,37 @@ static void its_send_vmovi(struct its_device *dev, u32 id)
+ 	its_send_single_vcommand(dev->its, its_build_vmovi_cmd, &desc);
+ }
+ 
++static void its_send_vmapp(struct its_vpe *vpe, bool valid)
++{
++	struct its_cmd_desc desc;
++	struct its_node *its;
++
++	desc.its_vmapp_cmd.vpe = vpe;
++	desc.its_vmapp_cmd.valid = valid;
++
++	list_for_each_entry(its, &its_nodes, entry) {
++		if (!its->is_v4)
++			continue;
++
++		desc.its_vmapp_cmd.col = &its->collections[vpe->col_idx];
++		its_send_single_vcommand(its, its_build_vmapp_cmd, &desc);
 +	}
++}
 +
- 	its->numa_node = numa_node;
++static void its_send_vinvall(struct its_vpe *vpe)
++{
++	struct its_cmd_desc desc;
++	struct its_node *its;
++
++	desc.its_vinvall_cmd.vpe = vpe;
++
++	list_for_each_entry(its, &its_nodes, entry) {
++		if (!its->is_v4)
++			continue;
++		its_send_single_vcommand(its, its_build_vinvall_cmd, &desc);
++	}
++}
++
+ /*
+  * irqchip functions - assumes MSI, mostly.
+  */
+@@ -2197,9 +2278,30 @@ static int its_vpe_irq_domain_alloc(struct irq_domain *domain, unsigned int virq
+ 	return err;
+ }
  
- 	its->cmd_base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
-@@ -1761,7 +1823,8 @@ static int __init its_probe_one(struct resource *res,
- 	}
++static void its_vpe_irq_domain_activate(struct irq_domain *domain,
++					struct irq_data *d)
++{
++	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
++
++	/* Map the VPE to the first possible CPU */
++	vpe->col_idx = cpumask_first(cpu_online_mask);
++	its_send_vmapp(vpe, true);
++	its_send_vinvall(vpe);
++}
++
++static void its_vpe_irq_domain_deactivate(struct irq_domain *domain,
++					  struct irq_data *d)
++{
++	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
++
++	its_send_vmapp(vpe, false);
++}
++
+ static const struct irq_domain_ops its_vpe_domain_ops = {
+ 	.alloc			= its_vpe_irq_domain_alloc,
+ 	.free			= its_vpe_irq_domain_free,
++	.activate		= its_vpe_irq_domain_activate,
++	.deactivate		= its_vpe_irq_domain_deactivate,
+ };
  
- 	gits_write_cwriter(0, its->base + GITS_CWRITER);
--	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
-+	ctlr = readl_relaxed(its->base + GITS_CTLR);
-+	writel_relaxed(ctlr | GITS_CTLR_ENABLE, its->base + GITS_CTLR);
- 
- 	err = its_init_domain(handle, its);
- 	if (err)
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 20a553423ac7..af8c55105fc2 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -235,15 +235,20 @@
- #define GITS_TRANSLATER			0x10040
- 
- #define GITS_CTLR_ENABLE		(1U << 0)
-+#define	GITS_CTLR_ITS_NUMBER_SHIFT	4
-+#define	GITS_CTLR_ITS_NUMBER		(0xFU << GITS_CTLR_ITS_NUMBER_SHIFT)
- #define GITS_CTLR_QUIESCENT		(1U << 31)
- 
- #define GITS_TYPER_PLPIS		(1UL << 0)
-+#define GITS_TYPER_VLPIS		(1UL << 1)
- #define GITS_TYPER_ITT_ENTRY_SIZE_SHIFT	4
-+#define GITS_TYPER_ITT_ENTRY_SIZE(r)	((((r) >> GITS_TYPER_ITT_ENTRY_SIZE_SHIFT) & 0x1f) + 1)
- #define GITS_TYPER_IDBITS_SHIFT		8
- #define GITS_TYPER_DEVBITS_SHIFT	13
- #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
- #define GITS_TYPER_PTA			(1UL << 19)
- #define GITS_TYPER_HWCOLLCNT_SHIFT	24
-+#define GITS_TYPER_VMOVP		(1ULL << 37)
- 
- #define GITS_IIDR_REV_SHIFT		12
- #define GITS_IIDR_REV_MASK		(0xf << GITS_IIDR_REV_SHIFT)
+ static int its_force_quiescent(void __iomem *base)
 -- 
 2.11.0
