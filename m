@@ -1,31 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 31 Jul 2017 11:21:22 +0100
-Subject: [PATCHv2 3/7] arm64: move non-entry code out of .entry.text
-In-Reply-To: <c35db9f2-6a4c-c85b-f01a-a4123d755a6e@codeaurora.org>
-References: <1501093110-3844-1-git-send-email-mark.rutland@arm.com>
- <1501093110-3844-4-git-send-email-mark.rutland@arm.com>
- <c35db9f2-6a4c-c85b-f01a-a4123d755a6e@codeaurora.org>
-Message-ID: <20170731102109.GA21287@remoulade>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 31 Jul 2017 12:22:39 +0200
+Subject: [PATCH 2/3] ARM: configs: Add Tegra I2S interfaces to
+ tegra_defconfig
+In-Reply-To: <20170730112220.15525-2-contact@paulk.fr>
+References: <20170730112220.15525-1-contact@paulk.fr>
+ <20170730112220.15525-2-contact@paulk.fr>
+Message-ID: <20170731102239.GC26667@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 02:38:17PM -0700, Stephen Boyd wrote:
-> On 07/26/2017 11:18 AM, Mark Rutland wrote:
-> > Currently, cpu_switch_to and ret_from_fork both live in .entry.text,
-> > though neither form the critical path for an exception entry.
-> >
-> > In subsequent patches, we will require that code in .entry.text is part
-> > of the critical path for exception entry, for which we can assume
-> > certain properties (e.g. the presence of exception regs on the stack).
-> >
-> > Neither cpu_switch_to nor ret_from_fork will meet these requirements, so
-> > we must most them out of .entry.text. To ensure that neither are kprobed
+On Sun, Jul 30, 2017 at 01:22:19PM +0200, Paul Kocialkowski wrote:
+> This selects both the Tegra20 and Tegra30 I2S interfaces (that were
+> previously auto-selected by Kconfig but are not anymore) to
+> tegra_defconfig, as built-ins.
 > 
-> s/most/move/ ?
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> ---
+>  arch/arm/configs/tegra_defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
 
-Yes; whoops.
+Applied, thanks.
 
-I've corrected that now, and pushed the corrected branch.
-
-Thanks,
-Mark.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170731/7514ca9e/attachment.sig>
