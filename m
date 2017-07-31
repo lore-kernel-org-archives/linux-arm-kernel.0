@@ -1,49 +1,64 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:19:49 +0200
-Subject: [PATCH 37/38] ARM: dts: rskrza1: Add LED0 pin support
+Date: Mon, 31 Jul 2017 17:19:37 +0200
+Subject: [PATCH 25/38] ARM: dts: r8a7790: Use R-Car Gen 2 fallback binding for
+ vin nodes
 In-Reply-To: <cover.1501514100.git.horms+renesas@verge.net.au>
 References: <cover.1501514100.git.horms+renesas@verge.net.au>
-Message-ID: <a4604f4d245fe58aac3bc792296ef2e9ec774e12.1501514100.git.horms+renesas@verge.net.au>
+Message-ID: <a94b9e569c8e087c063fb0e66507681453a798b3.1501514100.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+Use R-Car Gen 2 fallback binding for vind nodes in DT for r8a7790 SoC.
 
-Add pin configuration for LED0 which is connected to a GPIO.
+This has no run-time effect for the current driver as the initialisation
+sequence is the same for the SoC-specific binding for r8a7790 and the
+fallback binding for R-Car Gen 2
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r7s72100-rskrza1.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/r8a7790.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r7s72100-rskrza1.dts b/arch/arm/boot/dts/r7s72100-rskrza1.dts
-index f8285b951140..5dcaaf131d27 100644
---- a/arch/arm/boot/dts/r7s72100-rskrza1.dts
-+++ b/arch/arm/boot/dts/r7s72100-rskrza1.dts
-@@ -10,6 +10,7 @@
- 
- /dts-v1/;
- #include "r7s72100.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/pinctrl/r7s72100-pinctrl.h>
- 
- / {
-@@ -34,6 +35,15 @@
- 		#address-cells = <1>;
- 		#size-cells = <1>;
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index ff986df23b62..167fd57aea68 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -927,7 +927,7 @@
  	};
-+
-+	leds {
-+		status = "okay";
-+		compatible = "gpio-leds";
-+
-+		led0 {
-+			gpios = <&port7 1 GPIO_ACTIVE_LOW>;
-+		};
-+	};
- };
  
- &extal_clk {
+ 	vin0: video at e6ef0000 {
+-		compatible = "renesas,vin-r8a7790";
++		compatible = "renesas,vin-r8a7790", "renesas,rcar-gen2-vin";
+ 		reg = <0 0xe6ef0000 0 0x1000>;
+ 		interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp8_clks R8A7790_CLK_VIN0>;
+@@ -936,7 +936,7 @@
+ 	};
+ 
+ 	vin1: video at e6ef1000 {
+-		compatible = "renesas,vin-r8a7790";
++		compatible = "renesas,vin-r8a7790", "renesas,rcar-gen2-vin";
+ 		reg = <0 0xe6ef1000 0 0x1000>;
+ 		interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp8_clks R8A7790_CLK_VIN1>;
+@@ -945,7 +945,7 @@
+ 	};
+ 
+ 	vin2: video at e6ef2000 {
+-		compatible = "renesas,vin-r8a7790";
++		compatible = "renesas,vin-r8a7790", "renesas,rcar-gen2-vin";
+ 		reg = <0 0xe6ef2000 0 0x1000>;
+ 		interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp8_clks R8A7790_CLK_VIN2>;
+@@ -954,7 +954,7 @@
+ 	};
+ 
+ 	vin3: video at e6ef3000 {
+-		compatible = "renesas,vin-r8a7790";
++		compatible = "renesas,vin-r8a7790", "renesas,rcar-gen2-vin";
+ 		reg = <0 0xe6ef3000 0 0x1000>;
+ 		interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp8_clks R8A7790_CLK_VIN3>;
 -- 
 2.1.4
