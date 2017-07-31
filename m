@@ -1,64 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:19:37 +0200
-Subject: [PATCH 25/38] ARM: dts: r8a7790: Use R-Car Gen 2 fallback binding for
- vin nodes
+Date: Mon, 31 Jul 2017 17:19:35 +0200
+Subject: [PATCH 23/38] ARM: dts: r8a7794: Reserve SRAM for the SMP jump stub
 In-Reply-To: <cover.1501514100.git.horms+renesas@verge.net.au>
 References: <cover.1501514100.git.horms+renesas@verge.net.au>
-Message-ID: <a94b9e569c8e087c063fb0e66507681453a798b3.1501514100.git.horms+renesas@verge.net.au>
+Message-ID: <18951ad1dccf76fc4f8956f7d3db0e242a4fa316.1501514100.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use R-Car Gen 2 fallback binding for vind nodes in DT for r8a7790 SoC.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-This has no run-time effect for the current driver as the initialisation
-sequence is the same for the SoC-specific binding for r8a7790 and the
-fallback binding for R-Car Gen 2
+Reserve SRAM for the jump stub for CPU core bringup.
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/r8a7794.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index ff986df23b62..167fd57aea68 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -927,7 +927,7 @@
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 78973cee7185..f32b458e9328 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -596,6 +596,14 @@
+ 	icram1:	sram at e63c0000 {
+ 		compatible = "mmio-sram";
+ 		reg = <0 0xe63c0000 0 0x1000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0 0xe63c0000 0x1000>;
++
++		smp-sram at 0 {
++			compatible = "renesas,smp-sram";
++			reg = <0 0x10>;
++		};
  	};
  
- 	vin0: video at e6ef0000 {
--		compatible = "renesas,vin-r8a7790";
-+		compatible = "renesas,vin-r8a7790", "renesas,rcar-gen2-vin";
- 		reg = <0 0xe6ef0000 0 0x1000>;
- 		interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7790_CLK_VIN0>;
-@@ -936,7 +936,7 @@
- 	};
- 
- 	vin1: video at e6ef1000 {
--		compatible = "renesas,vin-r8a7790";
-+		compatible = "renesas,vin-r8a7790", "renesas,rcar-gen2-vin";
- 		reg = <0 0xe6ef1000 0 0x1000>;
- 		interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7790_CLK_VIN1>;
-@@ -945,7 +945,7 @@
- 	};
- 
- 	vin2: video at e6ef2000 {
--		compatible = "renesas,vin-r8a7790";
-+		compatible = "renesas,vin-r8a7790", "renesas,rcar-gen2-vin";
- 		reg = <0 0xe6ef2000 0 0x1000>;
- 		interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7790_CLK_VIN2>;
-@@ -954,7 +954,7 @@
- 	};
- 
- 	vin3: video at e6ef3000 {
--		compatible = "renesas,vin-r8a7790";
-+		compatible = "renesas,vin-r8a7790", "renesas,rcar-gen2-vin";
- 		reg = <0 0xe6ef3000 0 0x1000>;
- 		interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7790_CLK_VIN3>;
+ 	ether: ethernet at ee700000 {
 -- 
 2.1.4
