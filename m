@@ -1,399 +1,204 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 31 Jul 2017 13:01:44 +0100
-Subject: [PATCH v3] arm64: kernel: implement fast refcount checking
-Message-ID: <20170731120144.14214-1-ard.biesheuvel@linaro.org>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 31 Jul 2017 14:04:01 +0200
+Subject: [RFC PATCH v2 32/38] KVM: arm64: Trap and emulate CPTR_EL2
+ accesses via CPACR_EL1 from the virtual EL2 with VHE
+In-Reply-To: <1500397144-16232-33-git-send-email-jintack.lim@linaro.org>
+References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
+ <1500397144-16232-33-git-send-email-jintack.lim@linaro.org>
+Message-ID: <20170731120401.GS5176@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support to arm64 for fast refcount checking, as proposed by
-Kees for x86 based on the implementation by grsecurity/PaX.
+On Tue, Jul 18, 2017 at 11:58:58AM -0500, Jintack Lim wrote:
+> While the EL1 virtual memory control registers can be accessed in the
+> virtual EL2 with VHE without trap to manuplate the virtual EL2 states,
+> we can't do that for CPTR_EL2 for an unfortunate reason.
+> 
+> This is because the top bit of CPTR_EL2, which is TCPAC, will be ignored
+> if it is accessed via CPACR_EL1 in the virtual EL2 without trap since
+> the top bot of cpacr_el1 is RES0. Therefore we need to trap CPACR_EL1
 
-The general approach is identical: the existing atomic_t helpers are
-cloned for refcount_t, with the arithmetic instruction modified to set
-the PSTATE flags, and one or two branch instructions added that jump to
-an out of line handler if overflow and/or decrement to zero are detected.
+top bit ?
 
-One complication that we have to deal with on arm64 is the fact that
-is has two atomics implementations: the original LL/SC implementation
-using load/store exclusive loops, and the newer LSE one that do mostly
-the same in a single instruction. So we need to clone some parts of
-both for the refcount handlers, but we also need to deal with the way
-LSE builds fall back to LL/SC at runtime if the hardware does not
-support it. (The only exception is refcount_add_not_zero(), which
-updates the refcount conditionally, so it is only implemented using
-a load/store exclusive loop)
+> accesses from the virtual EL2 to emulate this bit correctly.
+> 
+> Set CPTR_EL2.TCPAC bit to trap CPACR_EL1 accesses and handle them in the
+> existing handler considering that they could be meant to access CPTR_EL2
+> instead in the virtual EL2 with VHE.
+> 
+> Note that CPTR_EL2 format depends on HCR_EL2.E2H bit. We always keep it
+> in v8.0 format for the convenience. Otherwise, we need to check E2H bit
+> and use different bit masks in the entry.S, and we also check E2H bit in
+> all places we access virtual CPTR_EL2. The downside of using v8.0 format
+> is to convert the format when copying states between CPTR_EL2 and
+> CPACR_EL1 to support the virtual EL2 with VHE. The decision is subject
+> to change depending on the future discussion.
 
-As is the case with the x86 version, the performance delta is in the
-noise (Cortex-A57 @ 2 GHz, using LL/SC not LSE):
+I would remove the last sentence here for the actual commit message,
+that is already implied by sending these patches for review.
 
-perf stat -B -- cat <(echo ATOMIC_TIMING) >/sys/kernel/debug/provoke-crash/DIRECT
+> 
+> Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
+> ---
+>  arch/arm64/include/asm/kvm_emulate.h |  2 ++
+>  arch/arm64/kvm/context.c             | 29 ++++++++++++++++++++++++++---
+>  arch/arm64/kvm/hyp/switch.c          |  2 ++
+>  arch/arm64/kvm/sys_regs.c            | 18 +++++++++++++++++-
+>  4 files changed, 47 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index 68aafbd..4776bfc 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -59,6 +59,8 @@ enum exception_type {
+>  void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu);
+>  void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu);
+>  void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt);
+> +u64 cptr_to_cpacr(u64 cptr_el2);
+> +u64 cpacr_to_cptr(u64 cpacr_el1);
+>  
+>  static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+>  {
+> diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
+> index 9947bc8..a7811e1 100644
+> --- a/arch/arm64/kvm/context.c
+> +++ b/arch/arm64/kvm/context.c
+> @@ -66,7 +66,7 @@ static inline u64 tcr_el2_ips_to_tcr_el1_ps(u64 tcr_el2)
+>  		<< TCR_IPS_SHIFT;
+>  }
+>  
+> -static inline u64 cptr_to_cpacr(u64 cptr_el2)
+> +u64 cptr_to_cpacr(u64 cptr_el2)
+>  {
+>  	u64 cpacr_el1 = 0;
+>  
+> @@ -78,6 +78,21 @@ static inline u64 cptr_to_cpacr(u64 cptr_el2)
+>  	return cpacr_el1;
+>  }
+>  
+> +u64 cpacr_to_cptr(u64 cpacr_el1)
+> +{
+> +	u64 cptr_el2;
+> +
+> +	cptr_el2 = CPTR_EL2_DEFAULT;
+> +	if (!(cpacr_el1 & CPACR_EL1_FPEN))
+> +		cptr_el2 |= CPTR_EL2_TFP;
+> +	if (cpacr_el1 & CPACR_EL1_TTA)
+> +		cptr_el2 |= CPTR_EL2_TTA;
+> +	if (cpacr_el1 & CPTR_EL2_TCPAC)
+> +		cptr_el2 |= CPTR_EL2_TCPAC;
+> +
+> +	return cptr_el2;
+> +}
+> +
+>  static void sync_shadow_el1_sysregs(struct kvm_vcpu *vcpu)
+>  {
+>  	u64 *s_sys_regs = vcpu->arch.ctxt.shadow_sys_regs;
+> @@ -93,8 +108,12 @@ static void sync_shadow_el1_sysregs(struct kvm_vcpu *vcpu)
+>  
+>  	for (i = 0; i < ARRAY_SIZE(vhe_map); i++) {
+>  		const struct el1_el2_map *map = &vhe_map[i];
+> +		u64 *el2_reg = &vcpu_sys_reg(vcpu, map->el2);
+>  
+> -		vcpu_sys_reg(vcpu, map->el2) = s_sys_regs[map->el1];
+> +		/* We do trap-and-emulate CPACR_EL1 accesses. So, don't sync */
+> +		if (map->el2 == CPTR_EL2)
+> +			continue;
+> +		*el2_reg = s_sys_regs[map->el1];
+>  	}
+>  }
+>  
+> @@ -138,8 +157,12 @@ static void flush_shadow_el1_sysregs_vhe(struct kvm_vcpu *vcpu)
+>  	 */
+>  	for (i = 0; i < ARRAY_SIZE(vhe_map); i++) {
+>  		const struct el1_el2_map *map = &vhe_map[i];
+> +		u64 *el1_reg = &s_sys_regs[map->el1];
+>  
+> -		s_sys_regs[map->el1] = vcpu_sys_reg(vcpu, map->el2);
+> +		if (map->el2 == CPTR_EL2)
+> +			*el1_reg = cptr_to_cpacr(vcpu_sys_reg(vcpu, map->el2));
+> +		else
+> +			*el1_reg = vcpu_sys_reg(vcpu, map->el2);
 
- Performance counter stats for 'cat /dev/fd/63':
+nit: you could add a translation function to the map array and call that
+if it's set, otherwise default to copying values as they are, something
+like:
+	if (map->translate)
+		*el1_reg = map->translate(vcpu_sys_reg(vcpu, map->el2));
+	else
+		*el1_reg = vcpu_sys_reg(vcpu, map->el2);
 
-      65736.585960      task-clock (msec)         #    1.000 CPUs utilized
-                 1      context-switches          #    0.000 K/sec
-                 0      cpu-migrations            #    0.000 K/sec
-                45      page-faults               #    0.001 K/sec
-      131379085033      cycles                    #    1.999 GHz
-       36739083993      instructions              #    0.28  insn per cycle
-   <not supported>      branches
-            909235      branch-misses
 
-      65.737640608 seconds time elapsed
+>  	}
+>  }
+>  
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index fffd0c7..50c90f2 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -50,6 +50,8 @@ static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
+>  	val = read_sysreg(cpacr_el1);
+>  	val |= CPACR_EL1_TTA;
+>  	val &= ~CPACR_EL1_FPEN;
+> +	if (is_hyp_ctxt(vcpu))
+> +		val |= CPTR_EL2_TCPAC;
 
-perf stat -B -- cat <(echo REFCOUNT_TIMING) >/sys/kernel/debug/provoke-crash/DIRECT
+also, I think we'll forget why this gets set for hyp context here, so a
+short comment would be nice.
 
- Performance counter stats for 'cat /dev/fd/63':
+what if the guest hypervisor has set CPTR_EL2.TCPAC and runs a VM don't
+we also need to set the CPTR_EL2.TCPAC in the hardware and forward the
+exception to the VM in that case?
 
-      65555.402680      task-clock (msec)         #    1.000 CPUs utilized
-                 6      context-switches          #    0.000 K/sec
-                 0      cpu-migrations            #    0.000 K/sec
-                46      page-faults               #    0.001 K/sec
-      131023560293      cycles                    #    1.999 GHz
-       38885768741      instructions              #    0.30  insn per cycle
-   <not supported>      branches
-            869174      branch-misses
+>  	write_sysreg(val, cpacr_el1);
+>  
+>  	write_sysreg(__kvm_hyp_vector, vbar_el1);
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 2aa922c..79980be 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -972,7 +972,23 @@ static bool access_cpacr(struct kvm_vcpu *vcpu,
+>  		struct sys_reg_params *p,
+>  		const struct sys_reg_desc *r)
+>  {
+> -	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
+> +	u64 reg = sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
+> +
+> +	/*
+> +	 * When the virtual HCR_EL2.E2H == 1, an access to CPACR_EL1
+> +	 * in the virtual EL2 is to access CPTR_EL2.
+> +	 */
+> +	if (vcpu_el2_e2h_is_set(vcpu) && (reg == SYS_CPACR_EL1)) {
 
-      65.580366472 seconds time elapsed
+you don't check here if we're in virtual el2 mode, because you rely on
+only ever getting here if we had is_hyp_ctxt() when entering the VM,
+right?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v3: - switch to refcount_add_not_zero() that has opencoded ll/sc atomics
+> +		u64 *sysreg = &vcpu_sys_reg(vcpu, CPTR_EL2);
+> +
+> +		/* We keep the value in ARMv8.0 CPTR_EL2 format. */
+> +		if (!p->is_write)
+> +			p->regval = cptr_to_cpacr(*sysreg);
+> +		else
+> +			*sysreg	= cpacr_to_cptr(p->regval);
+> +	} else /* CPACR_EL1 access with E2H == 0 or CPACR_EL12 access */
+> +		access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
+> +
 
-I played around with adding a pre-check to the refcount_add paths to check
-for cases where the refcount is already zero, but that results in a 10%
-performance hit:
+again, I think you can improve your commenting style to make it clear
+which comment belongs to which block and only put a comment above the
+entire if-statement if it applies to the logic as a whole.
 
-perf stat -B -- cat <(echo REFCOUNT_TIMING) >/sys/kernel/debug/provoke-crash/DIRECT
+the coding style also prefers that you use braces in both branches if
+only one of the branches is a single statement.
 
- Performance counter stats for 'cat /dev/fd/63':
 
-      72470.950728      task-clock (msec)         #    1.000 CPUs utilized
-                 0      context-switches          #    0.000 K/sec
-                 0      cpu-migrations            #    0.000 K/sec
-                46      page-faults               #    0.001 K/sec
-      144846868175      cycles                    #    1.999 GHz
-       41058738640      instructions              #    0.28  insn per cycle
-   <not supported>      branches
-            899090      branch-misses
+>  	return true;
+>  }
+>  
+> -- 
+> 1.9.1
+> 
 
-      72.471588816 seconds time elapsed
-
- arch/arm64/Kconfig                    |  1 +
- arch/arm64/include/asm/atomic.h       | 23 +++++++
- arch/arm64/include/asm/atomic_ll_sc.h | 28 ++++++++
- arch/arm64/include/asm/atomic_lse.h   | 55 +++++++++++++++
- arch/arm64/include/asm/brk-imm.h      |  1 +
- arch/arm64/include/asm/refcount.h     | 71 ++++++++++++++++++++
- arch/arm64/kernel/traps.c             | 29 ++++++++
- arch/arm64/lib/atomic_ll_sc.c         | 16 +++++
- 8 files changed, 224 insertions(+)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index dfd908630631..53b9a8f5277b 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -16,6 +16,7 @@ config ARM64
- 	select ARCH_HAS_GCOV_PROFILE_ALL
- 	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
- 	select ARCH_HAS_KCOV
-+	select ARCH_HAS_REFCOUNT
- 	select ARCH_HAS_SET_MEMORY
- 	select ARCH_HAS_SG_CHAIN
- 	select ARCH_HAS_STRICT_KERNEL_RWX
-diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
-index c0235e0ff849..63457741d141 100644
---- a/arch/arm64/include/asm/atomic.h
-+++ b/arch/arm64/include/asm/atomic.h
-@@ -24,10 +24,33 @@
- #include <linux/types.h>
- 
- #include <asm/barrier.h>
-+#include <asm/brk-imm.h>
- #include <asm/lse.h>
- 
- #ifdef __KERNEL__
- 
-+#define REFCOUNT_CHECK_TAIL						\
-+"	.subsection	1\n"						\
-+"33:	mov		x16, %[counter]\n"				\
-+"	adr		x17, 44f\n"					\
-+"	brk		%[brk_imm]\n"					\
-+"44:	.long		22b - .\n"					\
-+"	.previous\n"
-+
-+#define REFCOUNT_POST_CHECK_NEG						\
-+"22:	b.mi		33f\n"						\
-+	REFCOUNT_CHECK_TAIL
-+
-+#define REFCOUNT_POST_CHECK_NEG_OR_ZERO					\
-+"	b.mi		33f\n"						\
-+"22:	b.eq		33f\n"						\
-+	REFCOUNT_CHECK_TAIL
-+
-+#define REFCOUNT_INPUTS(r)						\
-+	[counter] "r" (&(r)->counter), [brk_imm] "i" (REFCOUNT_BRK_IMM),
-+
-+#define REFCOUNT_CLOBBERS	"cc", "x16", "x17"
-+
- #define __ARM64_IN_ATOMIC_IMPL
- 
- #if defined(CONFIG_ARM64_LSE_ATOMICS) && defined(CONFIG_AS_LSE)
-diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-index f5a2d09afb38..ef7a42931533 100644
---- a/arch/arm64/include/asm/atomic_ll_sc.h
-+++ b/arch/arm64/include/asm/atomic_ll_sc.h
-@@ -327,4 +327,32 @@ __CMPXCHG_DBL(_mb, dmb ish, l, "memory")
- 
- #undef __CMPXCHG_DBL
- 
-+#define REFCOUNT_OP(op, asm_op, post, l)				\
-+__LL_SC_INLINE int							\
-+__LL_SC_PREFIX(__refcount_##op(int i, atomic_t *r))			\
-+{									\
-+	unsigned long tmp;						\
-+	int result;							\
-+									\
-+	asm volatile("// refcount_" #op "\n"				\
-+"	prfm		pstl1strm, %2\n"				\
-+"1:	ldxr		%w[val], %2\n"					\
-+"	" #asm_op "	%w[val], %w[val], %w[i]\n"			\
-+"	st" #l "xr	%w1, %w[val], %2\n"				\
-+"	cbnz		%w1, 1b\n"					\
-+	REFCOUNT_POST_CHECK_ ## post					\
-+	: [val] "=&r" (result), "=&r" (tmp), "+Q" (r->counter)		\
-+	: REFCOUNT_INPUTS(r) [i] "Ir" (i)				\
-+	: REFCOUNT_CLOBBERS);						\
-+									\
-+	return result;							\
-+}									\
-+__LL_SC_EXPORT(__refcount_##op);
-+
-+REFCOUNT_OP(add_lt,     adds, NEG,          );
-+REFCOUNT_OP(sub_lt_neg, adds, NEG,         l);
-+REFCOUNT_OP(sub_le_neg, adds, NEG_OR_ZERO, l);
-+REFCOUNT_OP(sub_lt,     subs, NEG,         l);
-+REFCOUNT_OP(sub_le,     subs, NEG_OR_ZERO, l);
-+
- #endif	/* __ASM_ATOMIC_LL_SC_H */
-diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
-index 99fa69c9c3cf..004891b61df1 100644
---- a/arch/arm64/include/asm/atomic_lse.h
-+++ b/arch/arm64/include/asm/atomic_lse.h
-@@ -531,4 +531,59 @@ __CMPXCHG_DBL(_mb, al, "memory")
- #undef __LL_SC_CMPXCHG_DBL
- #undef __CMPXCHG_DBL
- 
-+#define REFCOUNT_ADD_OP(op, rel, post)					\
-+static inline int __refcount_##op(int i, atomic_t *r)			\
-+{									\
-+	register int w0 asm ("w0") = i;					\
-+	register atomic_t *x1 asm ("x1") = r;				\
-+	register int w30 asm ("w30");					\
-+									\
-+	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
-+	/* LL/SC */							\
-+	__LL_SC_CALL(__refcount_##op)					\
-+	__nops(1),							\
-+	/* LSE atomics */						\
-+	"	ldadd" #rel "	%w[i], %w[val], %[v]\n"			\
-+	"	adds		%w[i], %w[i], %w[val]")			\
-+	REFCOUNT_POST_CHECK_ ## post					\
-+	: [i] "+r" (w0), [v] "+Q" (r->counter), [val] "=&r" (w30)	\
-+	: REFCOUNT_INPUTS(r) "r" (x1)					\
-+	: REFCOUNT_CLOBBERS);						\
-+									\
-+	return w0;							\
-+}
-+
-+REFCOUNT_ADD_OP(add_lt,      , NEG        );
-+REFCOUNT_ADD_OP(sub_lt_neg, l, NEG        );
-+REFCOUNT_ADD_OP(sub_le_neg, l, NEG_OR_ZERO);
-+
-+#define REFCOUNT_SUB_OP(op, post, fbop)					\
-+static inline int __refcount_##op(int i, atomic_t *r)			\
-+{									\
-+	register int w0 asm ("w0") = i;					\
-+	register atomic_t *x1 asm ("x1") = r;				\
-+	register int w30 asm ("w30");					\
-+									\
-+	if (__builtin_constant_p(i))					\
-+		return __refcount_##fbop(-i, r);			\
-+									\
-+	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
-+	/* LL/SC */							\
-+	__LL_SC_CALL(__refcount_##op)					\
-+	__nops(2),							\
-+	/* LSE atomics */						\
-+	"	neg	%w[i], %w[i]\n"					\
-+	"	ldaddl	%w[i], %w[val], %[v]\n"				\
-+	"	adds	%w[i], %w[i], %w[val]")				\
-+	REFCOUNT_POST_CHECK_ ## post					\
-+	: [i] "+r" (w0), [v] "+Q" (r->counter), [val] "=&r" (w30)	\
-+	: REFCOUNT_INPUTS(r) "r" (x1)					\
-+	: REFCOUNT_CLOBBERS);						\
-+									\
-+	return w0;							\
-+}
-+
-+REFCOUNT_SUB_OP(sub_lt, NEG,         sub_lt_neg);
-+REFCOUNT_SUB_OP(sub_le, NEG_OR_ZERO, sub_le_neg);
-+
- #endif	/* __ASM_ATOMIC_LSE_H */
-diff --git a/arch/arm64/include/asm/brk-imm.h b/arch/arm64/include/asm/brk-imm.h
-index ed693c5bcec0..0bce57737ff1 100644
---- a/arch/arm64/include/asm/brk-imm.h
-+++ b/arch/arm64/include/asm/brk-imm.h
-@@ -18,6 +18,7 @@
-  * 0x800: kernel-mode BUG() and WARN() traps
-  */
- #define FAULT_BRK_IMM			0x100
-+#define REFCOUNT_BRK_IMM		0x101
- #define KGDB_DYN_DBG_BRK_IMM		0x400
- #define KGDB_COMPILED_DBG_BRK_IMM	0x401
- #define BUG_BRK_IMM			0x800
-diff --git a/arch/arm64/include/asm/refcount.h b/arch/arm64/include/asm/refcount.h
-new file mode 100644
-index 000000000000..ceb2fe713b80
---- /dev/null
-+++ b/arch/arm64/include/asm/refcount.h
-@@ -0,0 +1,71 @@
-+/*
-+ * arm64-specific implementation of refcount_t. Based on x86 version and
-+ * PAX_REFCOUNT from PaX/grsecurity.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_REFCOUNT_H
-+#define __ASM_REFCOUNT_H
-+
-+#include <linux/refcount.h>
-+
-+#include <asm/atomic.h>
-+#include <asm/uaccess.h>
-+
-+static __always_inline void refcount_add(int i, refcount_t *r)
-+{
-+	__refcount_add_lt(i, &r->refs);
-+}
-+
-+static __always_inline void refcount_inc(refcount_t *r)
-+{
-+	__refcount_add_lt(1, &r->refs);
-+}
-+
-+static __always_inline void refcount_dec(refcount_t *r)
-+{
-+	__refcount_sub_le(1, &r->refs);
-+}
-+
-+static __always_inline __must_check bool refcount_sub_and_test(unsigned int i,
-+							       refcount_t *r)
-+{
-+	return __refcount_sub_lt(i, &r->refs) == 0;
-+}
-+
-+static __always_inline __must_check bool refcount_dec_and_test(refcount_t *r)
-+{
-+	return __refcount_sub_lt(1, &r->refs) == 0;
-+}
-+
-+static __always_inline __must_check bool refcount_add_not_zero(unsigned int i,
-+							       refcount_t *r)
-+{
-+	unsigned long tmp;
-+	int result;
-+
-+	asm volatile("// refcount_add_not_zero \n"
-+"	prfm		pstl1strm, %2\n"
-+"1:	ldxr		%w[val], %2\n"
-+"	cbz		%w[val], 2f\n"
-+"	adds		%w[val], %w[val], %w[i]\n"
-+"	stxr		%w1, %w[val], %2\n"
-+"	cbnz		%w1, 1b\n"
-+	REFCOUNT_POST_CHECK_NEG
-+"2:"
-+	: [val] "=&r" (result), "=&r" (tmp), "+Q" (r->refs.counter)
-+	: REFCOUNT_INPUTS(&r->refs) [i] "Ir" (i)
-+	: REFCOUNT_CLOBBERS);
-+
-+	return result != 0;
-+}
-+
-+static __always_inline __must_check bool refcount_inc_not_zero(refcount_t *r)
-+{
-+	return refcount_add_not_zero(1, r);
-+}
-+
-+#endif
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index c7c7088097be..07bd026ec71d 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -758,8 +758,37 @@ int __init early_brk64(unsigned long addr, unsigned int esr,
- 	return bug_handler(regs, esr) != DBG_HOOK_HANDLED;
- }
- 
-+static int refcount_overflow_handler(struct pt_regs *regs, unsigned int esr)
-+{
-+	bool zero = regs->pstate & PSR_Z_BIT;
-+
-+	/* First unconditionally saturate the refcount. */
-+	*(int *)regs->regs[16] = INT_MIN / 2;
-+
-+	/*
-+	 * This function has been called because either a negative refcount
-+	 * value was seen by any of the refcount functions, or a zero
-+	 * refcount value was seen by refcount_{add,dec}().
-+	 */
-+
-+	/* point pc to the branch instruction that brought us here */
-+	regs->pc = regs->regs[17] + *(s32 *)regs->regs[17];
-+	refcount_error_report(regs, zero ? "hit zero" : "overflow");
-+
-+	/* advance pc and proceed */
-+	regs->pc += 4;
-+	return DBG_HOOK_HANDLED;
-+}
-+
-+static struct break_hook refcount_break_hook = {
-+	.esr_val	= 0xf2000000 | REFCOUNT_BRK_IMM,
-+	.esr_mask	= 0xffffffff,
-+	.fn		= refcount_overflow_handler,
-+};
-+
- /* This registration must happen early, before debug_traps_init(). */
- void __init trap_init(void)
- {
- 	register_break_hook(&bug_break_hook);
-+	register_break_hook(&refcount_break_hook);
- }
-diff --git a/arch/arm64/lib/atomic_ll_sc.c b/arch/arm64/lib/atomic_ll_sc.c
-index b0c538b0da28..013a10c5461a 100644
---- a/arch/arm64/lib/atomic_ll_sc.c
-+++ b/arch/arm64/lib/atomic_ll_sc.c
-@@ -1,3 +1,19 @@
- #include <asm/atomic.h>
- #define __ARM64_IN_ATOMIC_IMPL
-+
-+/*
-+ * If we are invoking the LL/SC versions out of line as the fallback
-+ * alternatives for LSE atomics, disarm the overflow check because it
-+ * would be redundant (and would identify the out of line routine as
-+ * the location of the error which not be helpful either).
-+ */
-+#undef REFCOUNT_POST_CHECK_NEG
-+#undef REFCOUNT_POST_CHECK_NEG_OR_ZERO
-+#undef REFCOUNT_INPUTS
-+#undef REFCOUNT_CLOBBERS
-+#define REFCOUNT_POST_CHECK_NEG
-+#define REFCOUNT_POST_CHECK_NEG_OR_ZERO
-+#define REFCOUNT_INPUTS(r)
-+#define REFCOUNT_CLOBBERS			"cc"
-+
- #include <asm/atomic_ll_sc.h>
--- 
-2.11.0
+Thanks,
+-Christoffer
