@@ -1,156 +1,114 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:25:56 +0100
-Subject: [PATCH v3 18/59] irqchip/gic-v3-its: Add VLPI configuration handling
+Date: Mon, 31 Jul 2017 18:26:08 +0100
+Subject: [PATCH v3 30/59] irqchip/gic-v4: Add per-VM VPE domain creation
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-19-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-31-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a VLPI is reconfigured (enabled, disabled, change in priority),
-the full configuration byte must be written, and the caches invalidated.
-
-Also, when using the irq_mask/irq_unmask methods, it is necessary
-to disable the doorbell for that particular interrupt (by mapping it
-to 1023) on top of clearing the Enable bit.
+When creating a VM, it is very convenient to have an irq domain
+containing all the doorbell interrupts associated with that VM
+(each interrupt representing a VPE).
 
 Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 75 +++++++++++++++++++++++++++++++++++++---
- 1 file changed, 70 insertions(+), 5 deletions(-)
+ drivers/irqchip/irq-gic-v4.c       | 73 ++++++++++++++++++++++++++++++++++++++
+ include/linux/irqchip/arm-gic-v4.h |  3 ++
+ 2 files changed, 76 insertions(+)
+ create mode 100644 drivers/irqchip/irq-gic-v4.c
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index ef31c3e58c01..b618c259be8b 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -806,18 +806,26 @@ static inline u32 its_get_event_id(struct irq_data *d)
- 	return d->hwirq - its_dev->event_map.lpi_base;
- }
- 
--static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
-+static void lpi_write_config(struct irq_data *d, u8 clr, u8 set)
- {
--	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
--	irq_hw_number_t hwirq = d->hwirq;
-+	irq_hw_number_t hwirq;
- 	struct page *prop_page;
- 	u8 *cfg;
- 
--	prop_page = gic_rdists->prop_page;
-+	if (irqd_is_forwarded_to_vcpu(d)) {
-+		struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-+		u32 event = its_get_event_id(d);
+diff --git a/drivers/irqchip/irq-gic-v4.c b/drivers/irqchip/irq-gic-v4.c
+new file mode 100644
+index 000000000000..f7fe6181ec8d
+--- /dev/null
++++ b/drivers/irqchip/irq-gic-v4.c
+@@ -0,0 +1,73 @@
++/*
++ * Copyright (C) 2016,2017 ARM Limited, All Rights Reserved.
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+		prop_page = its_dev->event_map.vm->vprop_page;
-+		hwirq = its_dev->event_map.vlpi_maps[event].vintid;
-+	} else {
-+		prop_page = gic_rdists->prop_page;
-+		hwirq = d->hwirq;
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/msi.h>
++
++#include <linux/irqchip/arm-gic-v4.h>
++
++static struct irq_domain *gic_domain;
++static const struct irq_domain_ops *vpe_domain_ops;
++
++int its_alloc_vcpu_irqs(struct its_vm *vm)
++{
++	int vpe_base_irq, i;
++
++	vm->fwnode = irq_domain_alloc_named_id_fwnode("GICv4-vpe",
++						      task_pid_nr(current));
++	if (!vm->fwnode)
++		goto err;
++
++	vm->domain = irq_domain_create_hierarchy(gic_domain, 0, vm->nr_vpes,
++						 vm->fwnode, vpe_domain_ops,
++						 vm);
++	if (!vm->domain)
++		goto err;
++
++	for (i = 0; i < vm->nr_vpes; i++) {
++		vm->vpes[i]->its_vm = vm;
++		vm->vpes[i]->idai = true;
 +	}
- 
- 	cfg = page_address(prop_page) + hwirq - 8192;
- 	*cfg &= ~clr;
--	*cfg |= set;
-+	*cfg |= set | LPI_PROP_GROUP1;
- 
- 	/*
- 	 * Make the above write visible to the redistributors.
-@@ -828,16 +836,52 @@ static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
- 		gic_flush_dcache_to_poc(cfg, sizeof(*cfg));
- 	else
- 		dsb(ishst);
-+}
 +
-+static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
-+{
-+	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
++	vpe_base_irq = __irq_domain_alloc_irqs(vm->domain, -1, vm->nr_vpes,
++					       NUMA_NO_NODE, vm,
++					       false, NULL);
++	if (vpe_base_irq <= 0)
++		goto err;
 +
-+	lpi_write_config(d, clr, set);
- 	its_send_inv(its_dev, its_get_event_id(d));
- }
- 
-+static void its_vlpi_set_doorbell(struct irq_data *d, bool enable)
-+{
-+	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-+	u32 event = its_get_event_id(d);
-+
-+	if (its_dev->event_map.vlpi_maps[event].db_enabled == enable)
-+		return;
-+
-+	its_dev->event_map.vlpi_maps[event].db_enabled = enable;
-+
-+	/*
-+	 * More fun with the architecture:
-+	 *
-+	 * Ideally, we'd issue a VMAPTI to set the doorbell to its LPI
-+	 * value or to 1023, depending on the enable bit. But that
-+	 * would be issueing a mapping for an /existing/ DevID+EventID
-+	 * pair, which is UNPREDICTABLE. Instead, let's issue a VMOVI
-+	 * to the /same/ vPE, using this opportunity to adjust the
-+	 * doorbell. Mouahahahaha. We loves it, Precious.
-+	 */
-+	its_send_vmovi(its_dev, event);
-+}
-+
- static void its_mask_irq(struct irq_data *d)
- {
-+	if (irqd_is_forwarded_to_vcpu(d))
-+		its_vlpi_set_doorbell(d, false);
-+
- 	lpi_update_config(d, LPI_PROP_ENABLED, 0);
- }
- 
- static void its_unmask_irq(struct irq_data *d)
- {
-+	if (irqd_is_forwarded_to_vcpu(d))
-+		its_vlpi_set_doorbell(d, true);
-+
- 	lpi_update_config(d, 0, LPI_PROP_ENABLED);
- }
- 
-@@ -850,6 +894,10 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 	struct its_collection *target_col;
- 	u32 id = its_get_event_id(d);
- 
-+	/* A forwarded interrupt should use irq_set_vcpu_affinity */
-+	if (irqd_is_forwarded_to_vcpu(d))
-+		return -EINVAL;
-+
-        /* lpi cannot be routed to a redistributor that is on a foreign node */
- 	if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
- 		if (its_dev->its->numa_node >= 0) {
-@@ -1018,6 +1066,22 @@ static int its_vlpi_unmap(struct irq_data *d)
- 	return ret;
- }
- 
-+static int its_vlpi_prop_update(struct irq_data *d, struct its_cmd_info *info)
-+{
-+	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-+
-+	if (!its_dev->event_map.vm || !irqd_is_forwarded_to_vcpu(d))
-+		return -EINVAL;
-+
-+	if (info->cmd_type == PROP_UPDATE_AND_INV_VLPI)
-+		lpi_update_config(d, 0xff, info->config);
-+	else
-+		lpi_write_config(d, 0xff, info->config);
-+	its_vlpi_set_doorbell(d, !!(info->config & LPI_PROP_ENABLED));
++	for (i = 0; i < vm->nr_vpes; i++)
++		vm->vpes[i]->irq = vpe_base_irq + i;
 +
 +	return 0;
++
++err:
++	if (vm->domain)
++		irq_domain_remove(vm->domain);
++	if (vm->fwnode)
++		irq_domain_free_fwnode(vm->fwnode);
++
++	return -ENOMEM;
 +}
 +
- static int its_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
- {
- 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-@@ -1040,6 +1104,7 @@ static int its_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
++void its_free_vcpu_irqs(struct its_vm *vm)
++{
++	irq_domain_free_irqs(vm->vpes[0]->irq, vm->nr_vpes);
++	irq_domain_remove(vm->domain);
++	irq_domain_free_fwnode(vm->fwnode);
++}
+diff --git a/include/linux/irqchip/arm-gic-v4.h b/include/linux/irqchip/arm-gic-v4.h
+index 5ba0fb6b094d..b31fb8aeba03 100644
+--- a/include/linux/irqchip/arm-gic-v4.h
++++ b/include/linux/irqchip/arm-gic-v4.h
+@@ -89,4 +89,7 @@ struct its_cmd_info {
+ 	};
+ };
  
- 	case PROP_UPDATE_VLPI:
- 	case PROP_UPDATE_AND_INV_VLPI:
-+		return its_vlpi_prop_update(d, info);
- 
- 	default:
- 		return -EINVAL;
++int its_alloc_vcpu_irqs(struct its_vm *vm);
++void its_free_vcpu_irqs(struct its_vm *vm);
++
+ #endif
 -- 
 2.11.0
