@@ -1,43 +1,36 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:19:19 +0200
-Subject: [PATCH 07/38] ARM: dts: iwg20d-q7: Add pinctl support for scif0
-In-Reply-To: <cover.1501514100.git.horms+renesas@verge.net.au>
-References: <cover.1501514100.git.horms+renesas@verge.net.au>
-Message-ID: <7095f279c03a05cf9007001852b939236edc2897.1501514100.git.horms+renesas@verge.net.au>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 31 Jul 2017 17:19:57 +0200
+Subject: [PATCH] i2c: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-26-robh@kernel.org>
+References: <20170718214339.7774-26-robh@kernel.org>
+Message-ID: <20170731151957.jjq43coqlsql3v2x@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+On Tue, Jul 18, 2017 at 04:43:06PM -0500, Rob Herring wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Haavard Skinnemoen <hskinnemoen@gmail.com>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Michael Ellerman <mpe@ellerman.id.au>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: Peter Rosin <peda@axentia.se>
+> Cc: linux-i2c at vger.kernel.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-arm-kernel at lists.infradead.org
 
-Adding pinctrl support for scif0 interface.
+Applied to for-next, thanks!
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-index 9b54783cc2a5..497aec00cfac 100644
---- a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-+++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-@@ -20,6 +20,16 @@
- 	};
- };
- 
-+&pfc {
-+	scif0_pins: scif0 {
-+		groups = "scif0_data_d";
-+		function = "scif0";
-+	};
-+};
-+
- &scif0 {
-+	pinctrl-0 = <&scif0_pins>;
-+	pinctrl-names = "default";
-+
- 	status = "okay";
- };
--- 
-2.1.4
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170731/401ff1ca/attachment-0001.sig>
