@@ -1,41 +1,59 @@
 From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Mon, 31 Jul 2017 11:07:39 +0800
-Subject: [PATCH v3 4/5] ARM: dts: rockchip: add RGA device node for RK3399
+Date: Mon, 31 Jul 2017 11:07:40 +0800
+Subject: [PATCH v3 5/5] dt-bindings: Document the Rockchip RGA bindings
 In-Reply-To: <1501470460-12014-1-git-send-email-jacob-chen@iotwrt.com>
 References: <1501470460-12014-1-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <1501470460-12014-5-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <1501470460-12014-6-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the RGA dt config of RK3399 SoC.
+Add DT bindings documentation for Rockchip RGA
 
 Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ .../devicetree/bindings/media/rockchip-rga.txt     | 33 ++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 8e6d1bd..0133a5f 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1056,6 +1056,17 @@
- 		status = "disabled";
- 	};
- 
+diff --git a/Documentation/devicetree/bindings/media/rockchip-rga.txt b/Documentation/devicetree/bindings/media/rockchip-rga.txt
+new file mode 100644
+index 0000000..fd5276a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/rockchip-rga.txt
+@@ -0,0 +1,33 @@
++device-tree bindings for rockchip 2D raster graphic acceleration controller (RGA)
++
++RGA is a standalone 2D raster graphic acceleration unit. It accelerates 2D
++graphics operations, such as point/line drawing, image scaling, rotation,
++BitBLT, alpha blending and image blur/sharpness.
++
++Required properties:
++- compatible: value should be one of the following
++		"rockchip,rk3288-rga";
++		"rockchip,rk3399-rga";
++
++- interrupts: RGA interrupt specifier.
++
++- clocks: phandle to RGA sclk/hclk/aclk clocks
++
++- clock-names: should be "aclk", "hclk" and "sclk"
++
++- resets: Must contain an entry for each entry in reset-names.
++  See ../reset/reset.txt for details.
++- reset-names: should be "core", "axi" and "ahb"
++
++Example:
++SoC-specific DT entry:
 +	rga: rga at ff680000 {
 +		compatible = "rockchip,rk3399-rga";
-+		reg = <0x0 0xff680000 0x0 0x10000>;
-+		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH 0>;
++		reg = <0xff680000 0x10000>;
++		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
 +		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru SCLK_RGA_CORE>;
 +		clock-names = "aclk", "hclk", "sclk";
-+		resets = <&cru SRST_RGA_CORE>, <&cru SRST_A_RGA>, <&cru SRST_H_RGA>;
-+		reset-names = "core", "axi", "ahb";
-+		power-domains = <&power RK3399_PD_RGA>;
-+	};
 +
- 	efuse0: efuse at ff690000 {
- 		compatible = "rockchip,rk3399-efuse";
- 		reg = <0x0 0xff690000 0x0 0x80>;
++		resets = <&cru SRST_RGA_CORE>, <&cru SRST_A_RGA>, <&cru SRST_H_RGA>;
++		reset-names = "core, "axi", "ahb";
++	};
 -- 
 2.7.4
