@@ -1,82 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:03:00 +0200
-Subject: [PATCH 08/31] arm64: dts: r8a7796: Add FCPF and FCPV instances
+Date: Mon, 31 Jul 2017 17:03:13 +0200
+Subject: [PATCH 21/31] arm64: dts: r8a7796: Add missing second pair of DMA
+ names to MSIOF nodes
 In-Reply-To: <cover.1501509525.git.horms+renesas@verge.net.au>
 References: <cover.1501509525.git.horms+renesas@verge.net.au>
-Message-ID: <41dbbf0c5b4eeb912909ceb36e25086c7baefdf1.1501509525.git.horms+renesas@verge.net.au>
+Message-ID: <71adc330aa7d88e7c64c66d28ff7b71ddab25465.1501509526.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The FCPs handle the interface between various IP cores and memory. Add
-the instances related to the FDPs and VSP2s.
+MSIOF0 and MSIOF1 are tied to two DMA controllers through two pairs of
+DMA specifiers.  However, the second pair of corresponding DMA names was
+missing.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Fixes: 80fab06e258da762 ("arm64: dts: r8a7796: Add all MSIOF nodes")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 48 ++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 367da78ad4fc..b301554ff424 100644
+index 016cdd0bf289..ef1120f4e561 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -1562,6 +1562,54 @@
- 			/* placeholder */
- 		};
- 
-+		fcpf0: fcp at fe950000 {
-+			compatible = "renesas,fcpf";
-+			reg = <0 0xfe950000 0 0x200>;
-+			clocks = <&cpg CPG_MOD 615>;
-+			power-domains = <&sysc R8A7796_PD_A3VC>;
-+			resets = <&cpg 615>;
-+		};
-+
-+		fcpvb0: fcp at fe96f000 {
-+			compatible = "renesas,fcpv";
-+			reg = <0 0xfe96f000 0 0x200>;
-+			clocks = <&cpg CPG_MOD 607>;
-+			power-domains = <&sysc R8A7796_PD_A3VC>;
-+			resets = <&cpg 607>;
-+		};
-+
-+		fcpvi0: fcp at fe9af000 {
-+			compatible = "renesas,fcpv";
-+			reg = <0 0xfe9af000 0 0x200>;
-+			clocks = <&cpg CPG_MOD 611>;
-+			power-domains = <&sysc R8A7796_PD_A3VC>;
-+			resets = <&cpg 611>;
-+		};
-+
-+		fcpvd0: fcp at fea27000 {
-+			compatible = "renesas,fcpv";
-+			reg = <0 0xfea27000 0 0x200>;
-+			clocks = <&cpg CPG_MOD 603>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			resets = <&cpg 603>;
-+		};
-+
-+		fcpvd1: fcp at fea2f000 {
-+			compatible = "renesas,fcpv";
-+			reg = <0 0xfea2f000 0 0x200>;
-+			clocks = <&cpg CPG_MOD 602>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			resets = <&cpg 602>;
-+		};
-+
-+		fcpvd2: fcp at fea37000 {
-+			compatible = "renesas,fcpv";
-+			reg = <0 0xfea37000 0 0x200>;
-+			clocks = <&cpg CPG_MOD 601>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			resets = <&cpg 601>;
-+		};
-+
- 		du: display at feb00000 {
- 			/* placeholder */
- 
+@@ -999,7 +999,7 @@
+ 			clocks = <&cpg CPG_MOD 211>;
+ 			dmas = <&dmac1 0x41>, <&dmac1 0x40>,
+ 			       <&dmac2 0x41>, <&dmac2 0x40>;
+-			dma-names = "tx", "rx";
++			dma-names = "tx", "rx", "tx", "rx";
+ 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
+ 			resets = <&cpg 211>;
+ 			#address-cells = <1>;
+@@ -1015,7 +1015,7 @@
+ 			clocks = <&cpg CPG_MOD 210>;
+ 			dmas = <&dmac1 0x43>, <&dmac1 0x42>,
+ 			       <&dmac2 0x43>, <&dmac2 0x42>;
+-			dma-names = "tx", "rx";
++			dma-names = "tx", "rx", "tx", "rx";
+ 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
+ 			resets = <&cpg 210>;
+ 			#address-cells = <1>;
 -- 
 2.1.4
