@@ -1,91 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:03:18 +0200
-Subject: [PATCH 26/31] arm64: dts: renesas: Add Renesas Draak board support
-In-Reply-To: <cover.1501509525.git.horms+renesas@verge.net.au>
-References: <cover.1501509525.git.horms+renesas@verge.net.au>
-Message-ID: <c550443f08752b74aacc459fea85c12104a74077.1501509526.git.horms+renesas@verge.net.au>
+Date: Mon, 31 Jul 2017 17:03:33 +0200
+Subject: [PATCH 02/10] ARM: shmobile: defconfig: Enable missing PCIE_RCAR
+ dependency
+In-Reply-To: <cover.1501511664.git.horms+renesas@verge.net.au>
+References: <cover.1501511664.git.horms+renesas@verge.net.au>
+Message-ID: <b217113362f9e24e68ce849fc2fef7a1d2e40b82.1501511664.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Basic support for the Renesas Draak board based on R-Car D3:
-  - Memory,
-  - Main crystal,
-  - Serial console,
-  - Watchdog.
+PCIE_RCAR is no longer enabled, as it now has a dependency on
+PCI_MSI_IRQ_DOMAIN instead of selecting PCI_MSI and PCI_MSI_IRQ_DOMAIN.
+Fix this by explicitly enabling PCIE_RCAR in shmobile_defconfig.
 
+Fixes: 3ee803641e76bea7 ("PCI/MSI: irqchip: Fix PCI_MSI dependencies")
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/Makefile           |  1 +
- arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 46 ++++++++++++++++++++++++++
- 2 files changed, 47 insertions(+)
- create mode 100644 arch/arm64/boot/dts/renesas/r8a77995-draak.dts
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
-index acc4bb30d485..381928bc1358 100644
---- a/arch/arm64/boot/dts/renesas/Makefile
-+++ b/arch/arm64/boot/dts/renesas/Makefile
-@@ -2,6 +2,7 @@ dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-salvator-x.dtb r8a7795-h3ulcb.dtb
- dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-salvator-xs.dtb
- dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-es1-salvator-x.dtb r8a7795-es1-h3ulcb.dtb
- dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-x.dtb r8a7796-m3ulcb.dtb
-+dtb-$(CONFIG_ARCH_R8A77995) += r8a77995-draak.dtb
- 
- always		:= $(dtb-y)
- clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-new file mode 100644
-index 000000000000..d144370051d5
---- /dev/null
-+++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-@@ -0,0 +1,46 @@
-+/*
-+ * Device Tree Source for the Draak board
-+ *
-+ * Copyright (C) 2016 Renesas Electronics Corp.
-+ * Copyright (C) 2017 Glider bvba
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "r8a77995.dtsi"
-+
-+/ {
-+	model = "Renesas Draak board based on r8a77995";
-+	compatible = "renesas,draak", "renesas,r8a77995";
-+
-+	aliases {
-+		serial0 = &scif2;
-+	};
-+
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 48000000 {
-+		device_type = "memory";
-+		/* first 128MB is reserved for secure area. */
-+		reg = <0x0 0x48000000 0x0 0x18000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <48000000>;
-+};
-+
-+&scif2 {
-+	status = "okay";
-+};
-+
-+&rwdt {
-+	timeout-sec = <60>;
-+	status = "okay";
-+};
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index d9929114d47b..297ef8e584f3 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -27,6 +27,7 @@ CONFIG_ARCH_SH73A0=y
+ CONFIG_PL310_ERRATA_588369=y
+ CONFIG_ARM_ERRATA_754322=y
+ CONFIG_PCI=y
++CONFIG_PCI_MSI=y
+ CONFIG_PCI_RCAR_GEN2=y
+ CONFIG_PCIE_RCAR=y
+ CONFIG_SMP=y
 -- 
 2.1.4
