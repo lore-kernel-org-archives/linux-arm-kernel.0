@@ -1,36 +1,83 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 31 Jul 2017 12:23:09 +0200
-Subject: [PATCH 1/3] sound: ASoC: tegra: Remove SoC-specific Kconfig
- depends and selects
-In-Reply-To: <20170730112220.15525-1-contact@paulk.fr>
-References: <20170730112220.15525-1-contact@paulk.fr>
-Message-ID: <20170731102309.GE26667@ulmo>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 31 Jul 2017 11:24:14 +0100
+Subject: [PATCH] arm64: mmu: Place guard page after mapping of kernel image
+In-Reply-To: <1501175035-32460-1-git-send-email-will.deacon@arm.com>
+References: <1501175035-32460-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20170731102414.GB21287@remoulade>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 30, 2017 at 01:22:18PM +0200, Paul Kocialkowski wrote:
-> This removes the SoC-specific dependencies on the platform drivers,
-> as well as SoC-specific selections of platform drivers for the
-> machine drivers. The rationale behind this change is that the
-> dependencies are not actual build dependencies but run-time ones.
+On Thu, Jul 27, 2017 at 06:03:55PM +0100, Will Deacon wrote:
+> The vast majority of virtual allocations in the vmalloc region are followed
+> by a guard page, which can help to avoid overruning on vma into another,
+> which may map a read-sensitive device.
 > 
-> The previously listed SoCs were also incomplete: for instance, tegra124
-> uses the tegra30 platform drivers, which could not be built without
-> ARCH_TEGRA_3x_SOC set.
+> This patch adds a guard page to the end of the kernel image mapping (i.e.
+> following the data/bss segments).
 > 
-> Descriptions of the tristates are also added to allow these options
-> to be set via defconfig/menuconfig.
-> 
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> ---
->  sound/soc/tegra/Kconfig | 42 ++++++++++++++----------------------------
->  1 file changed, 14 insertions(+), 28 deletions(-)
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Acked-by: Thierry Reding <treding@nvidia.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170731/d5764aeb/attachment.sig>
+Looks sane to me.
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> ---
+>  arch/arm64/mm/mmu.c | 18 +++++++++++-------
+>  1 file changed, 11 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 23c2d89a362e..f1eb15e0e864 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -496,7 +496,7 @@ void mark_rodata_ro(void)
+>  
+>  static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+>  				      pgprot_t prot, struct vm_struct *vma,
+> -				      int flags)
+> +				      int flags, unsigned long vm_flags)
+>  {
+>  	phys_addr_t pa_start = __pa_symbol(va_start);
+>  	unsigned long size = va_end - va_start;
+> @@ -507,10 +507,13 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+>  	__create_pgd_mapping(pgd, pa_start, (unsigned long)va_start, size, prot,
+>  			     early_pgtable_alloc, flags);
+>  
+> +	if (!(vm_flags & VM_NO_GUARD))
+> +		size += PAGE_SIZE;
+> +
+>  	vma->addr	= va_start;
+>  	vma->phys_addr	= pa_start;
+>  	vma->size	= size;
+> -	vma->flags	= VM_MAP;
+> +	vma->flags	= VM_MAP | vm_flags;
+>  	vma->caller	= __builtin_return_address(0);
+>  
+>  	vm_area_add_early(vma);
+> @@ -541,14 +544,15 @@ static void __init map_kernel(pgd_t *pgd)
+>  	 * Only rodata will be remapped with different permissions later on,
+>  	 * all other segments are allowed to use contiguous mappings.
+>  	 */
+> -	map_kernel_segment(pgd, _text, _etext, text_prot, &vmlinux_text, 0);
+> +	map_kernel_segment(pgd, _text, _etext, text_prot, &vmlinux_text, 0,
+> +			   VM_NO_GUARD);
+>  	map_kernel_segment(pgd, __start_rodata, __inittext_begin, PAGE_KERNEL,
+> -			   &vmlinux_rodata, NO_CONT_MAPPINGS);
+> +			   &vmlinux_rodata, NO_CONT_MAPPINGS, VM_NO_GUARD);
+>  	map_kernel_segment(pgd, __inittext_begin, __inittext_end, text_prot,
+> -			   &vmlinux_inittext, 0);
+> +			   &vmlinux_inittext, 0, VM_NO_GUARD);
+>  	map_kernel_segment(pgd, __initdata_begin, __initdata_end, PAGE_KERNEL,
+> -			   &vmlinux_initdata, 0);
+> -	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data, 0);
+> +			   &vmlinux_initdata, 0, VM_NO_GUARD);
+> +	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data, 0, 0);
+>  
+>  	if (!pgd_val(*pgd_offset_raw(pgd, FIXADDR_START))) {
+>  		/*
+> -- 
+> 2.1.4
+> 
