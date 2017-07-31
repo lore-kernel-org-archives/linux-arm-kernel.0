@@ -1,26 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 31 Jul 2017 15:13:40 +0200
-Subject: [PATCH] pinctrl: zte: fix dereference of 'data' in zx_set_mux()
-In-Reply-To: <1498880736-18143-1-git-send-email-shawnguo@kernel.org>
-References: <1498880736-18143-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <CACRpkda31aW5YpFefGe3R8mWmMJ-iPF7UMB8t-tqPxhnihkWEw@mail.gmail.com>
+From: hw.likun@huawei.com (Li Kun)
+Date: Mon, 31 Jul 2017 21:17:40 +0800
+Subject: [PATCH v3] arm64: kernel: implement fast refcount checking
+In-Reply-To: <20170731120144.14214-1-ard.biesheuvel@linaro.org>
+References: <20170731120144.14214-1-ard.biesheuvel@linaro.org>
+Message-ID: <a0b6690d-039e-04ed-9847-b4521935375f@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 1, 2017 at 5:45 AM, Shawn Guo <shawnguo@kernel.org> wrote:
 
-> From: Shawn Guo <shawn.guo@linaro.org>
->
-> It fixes the following Smatch complaint:
->
-> drivers/pinctrl/zte/pinctrl-zx.c:76 zx_set_mux()
-> warn: variable dereferenced before check 'data' (see line 67)
->
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Fixes: cbff0c4d27f4 ("pinctrl: add ZTE ZX pinctrl driver support")
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Patch applied for fixes.
+? 2017/7/31 20:01, Ard Biesheuvel ??:
+> +static __always_inline __must_check bool refcount_add_not_zero(unsigned int i,
+> +							       refcount_t *r)
+> +{
+> +	unsigned long tmp;
+> +	int result;
+> +
+> +	asm volatile("// refcount_add_not_zero \n"
+> +"	prfm		pstl1strm, %2\n"
+> +"1:	ldxr		%w[val], %2\n"
+> +"	cbz		%w[val], 2f\n"
+> +"	adds		%w[val], %w[val], %w[i]\n"
+> +"	stxr		%w1, %w[val], %2\n"
+> +"	cbnz		%w1, 1b\n"
+> +	REFCOUNT_POST_CHECK_NEG
+> +"2:"
+> +	: [val] "=&r" (result), "=&r" (tmp), "+Q" (r->refs.counter)
+> +	: REFCOUNT_INPUTS(&r->refs) [i] "Ir" (i)
+> +	: REFCOUNT_CLOBBERS);
+> +
+> +	return result != 0;
+> +}
+> +
+Could we use "cas" here instead of ll/sc ?
 
-Yours,
-Linus Walleij
+-- 
+Best Regards
+Li Kun
