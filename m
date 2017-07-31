@@ -1,59 +1,47 @@
-From: k.konieczny@partner.samsung.com (Kamil Konieczny)
-Date: Mon, 31 Jul 2017 11:16:25 +0200
-Subject: [PATCH 2/2] crypto: stm32 - Support for STM32 HASH module
-In-Reply-To: <1499952747-16423-3-git-send-email-lionel.debieve@st.com>
-References: <1499952747-16423-1-git-send-email-lionel.debieve@st.com>
- <CGME20170713133412epcas5p29f30bb8be65b6f7673dbd70182674fc9@epcas5p2.samsung.com>
- <1499952747-16423-3-git-send-email-lionel.debieve@st.com>
-Message-ID: <8a6bd548-a23a-7aa3-4b3c-b02e1f167c05@partner.samsung.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 31 Jul 2017 11:25:46 +0200
+Subject: [GIT PULL] Meson clock fixes for 4.13-rc4
+Message-ID: <ce41382f-fd93-1dc9-0dba-1484ac555945@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mike, Stephen,
 
+Here is some fixes for Meson GXBB and Meson8 drivers, that could go for 4.13-rc4.
 
-On 13.07.2017 15:32, Lionel Debieve wrote:
-> This module register a HASH module that support multiples
-> algorithms: MD5, SHA1, SHA224, SHA256. [...]
+Thanks,
+Neil
 
-> +static irqreturn_t stm32_hash_irq_thread(int irq, void *dev_id)
-> +{
-> +	struct stm32_hash_dev *hdev = dev_id;
-> +	int err;
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
-The 'err' var is used without initialize.
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 
-> +
-> +	if (HASH_FLAGS_CPU & hdev->flags) {
-> +		if (HASH_FLAGS_OUTPUT_READY & hdev->flags) {
-> +			hdev->flags &= ~HASH_FLAGS_OUTPUT_READY;
-> +			goto finish;
-> +		}
-> +	} else if (HASH_FLAGS_DMA_READY & hdev->flags) {
-> +		if (HASH_FLAGS_DMA_ACTIVE & hdev->flags) {
-> +			hdev->flags &= ~HASH_FLAGS_DMA_ACTIVE;
-> +				goto finish;
-> +		}
-> +	}
-> +
-> +	return IRQ_HANDLED;
-> +
-> +finish:
-> +	/*Finish current request */
-> +	stm32_hash_finish_req(hdev->req, err);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-and here is beginnig for finish_req:
+are available in the git repository at:
 
-+static void stm32_hash_finish_req(struct ahash_request *req, int err)
-+{
-+	struct stm32_hash_request_ctx *rctx = ahash_request_ctx(req);
-+	struct stm32_hash_dev *hdev = rctx->hdev;
-+
-+	if (!err && (HASH_FLAGS_FINAL & hdev->flags)) {
+  git://github.com/baylibre/clk-meson.git tags/meson-clk-fixes-for-4.13-rc4
 
--- 
-Best regards,
-Kamil Konieczny
-Samsung R&D Institute Poland
+for you to fetch changes up to c1922eed58f38f3d7876f53e1000e3c3e3024e54:
+
+  clk: meson: mpll: fix mpll0 fractional part ignored (2017-07-31 10:08:01 +0200)
+
+----------------------------------------------------------------
+Meson Clock fixes:
+- gxbb: fix meson cts_amclk divider flags
+- gxbb: fix clk_mclk_i958 divider flags
+- meson8b: fix protection against undefined clks
+- gxbb: fix protection against undefined clks
+- mpll: fix mpll0 fractional part ignored
+
+----------------------------------------------------------------
+Jerome Brunet (5):
+      clk: meson: gxbb: fix meson cts_amclk divider flags
+      clk: meson: gxbb: fix clk_mclk_i958 divider flags
+      clk: meson: meson8b: fix protection against undefined clks
+      clk: meson: gxbb: fix protection against undefined clks
+      clk: meson: mpll: fix mpll0 fractional part ignored
+
+ drivers/clk/meson/clk-mpll.c |  7 +++++++
+ drivers/clk/meson/clkc.h     |  1 +
+ drivers/clk/meson/gxbb.c     | 17 +++++++++++++----
+ drivers/clk/meson/meson8b.c  |  6 ++++++
+ 4 files changed, 27 insertions(+), 4 deletions(-)
