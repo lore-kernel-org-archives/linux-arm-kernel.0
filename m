@@ -1,53 +1,26 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 31 Jul 2017 13:53:42 +0900
-Subject: [PATCH] bus: uniphier-system-bus: set up registers when resuming
-Message-ID: <1501476822-18679-1-git-send-email-yamada.masahiro@socionext.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 31 Jul 2017 12:54:53 +0800
+Subject: [PATCH 1/4] clk: sunxi-ng: Fix fractional mode for N-M clocks
+In-Reply-To: <20170730164150.26302-2-jernej.skrabec@siol.net>
+References: <20170730164150.26302-1-jernej.skrabec@siol.net>
+ <20170730164150.26302-2-jernej.skrabec@siol.net>
+Message-ID: <CAGb2v65mVyS+4k+o70mBEOqDq2+4xrrEZex8BSLy83xZDsQKAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When resuming, set up registers that have been lost in the sleep state.
+On Mon, Jul 31, 2017 at 12:41 AM, Jernej Skrabec
+<jernej.skrabec@siol.net> wrote:
+> N-M factor clock driver is missing a call to ccu_frac_helper_enable()
+> when fractional mode is used. Additionally, most SoCs require that M
+> factor must be set to 0 when fractional mode is used.
+>
+> Without this patch, clock keeps the old value and clk_set_rate() returns
+> without error.
+>
+> Fixes: 6174a1e24b0d ("clk: sunxi-ng: Add N-M-factor clock support")
+> CC: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Queued as a fix for 4.13.
 
- drivers/bus/uniphier-system-bus.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
-
-diff --git a/drivers/bus/uniphier-system-bus.c b/drivers/bus/uniphier-system-bus.c
-index 1e6e0269edcc..f9c334159e83 100644
---- a/drivers/bus/uniphier-system-bus.c
-+++ b/drivers/bus/uniphier-system-bus.c
-@@ -256,10 +256,23 @@ static int uniphier_system_bus_probe(struct platform_device *pdev)
- 
- 	uniphier_system_bus_set_reg(priv);
- 
-+	platform_set_drvdata(pdev, priv);
-+
- 	/* Now, the bus is configured.  Populate platform_devices below it */
- 	return of_platform_default_populate(dev->of_node, NULL, dev);
- }
- 
-+static int uniphier_system_bus_resume(struct device *dev)
-+{
-+	uniphier_system_bus_set_reg(dev_get_drvdata(dev));
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops uniphier_system_bus_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(NULL, uniphier_system_bus_resume)
-+};
-+
- static const struct of_device_id uniphier_system_bus_match[] = {
- 	{ .compatible = "socionext,uniphier-system-bus" },
- 	{ /* sentinel */ }
-@@ -271,6 +284,7 @@ static struct platform_driver uniphier_system_bus_driver = {
- 	.driver = {
- 		.name	= "uniphier-system-bus",
- 		.of_match_table = uniphier_system_bus_match,
-+		.pm = &uniphier_system_bus_pm_ops,
- 	},
- };
- module_platform_driver(uniphier_system_bus_driver);
--- 
-2.7.4
+ChenYu
