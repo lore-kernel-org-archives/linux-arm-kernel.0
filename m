@@ -1,62 +1,52 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 13:12:40 +0200
-Subject: [PATCH] ARM: shmobile: rcar-gen2: Fix deadlock in regulator quirk
-In-Reply-To: <cover.1501499175.git.horms+renesas@verge.net.au>
-References: <cover.1501499175.git.horms+renesas@verge.net.au>
-Message-ID: <fce8dc5e50e44d8f644e0f7854e6d7d518fedb68.1501499175.git.horms+renesas@verge.net.au>
+Date: Mon, 31 Jul 2017 13:12:34 +0200
+Subject: [GIT PULL] Third Round of Renesas ARM Based SoC Fixes for v4.13
+Message-ID: <cover.1501499175.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Simon Horman reported that Koelsch and Lager hang during boot, and
-bisected this to commit 1c3c5eab171590f8 ("sched/core: Enable
-might_sleep() and smp_processor_id() checks early").
+Please consider these third round of Renesas ARM based SoC fixes for v4.13.
+
+This pull request is based on v4.12-rc1 rather than earlier fixes for v4.13
+as it is unrelated to those fixes and their dependencies - arm64 DT updates
+for R-Car Gen 3 SoCs.
+
+This fix resolves a deadlock during boot on R-Car Gen 2 SoCs.
+The bug has been present since v4.1-rc1 but does not manifest in
+a deadlock until v4.13-rc1.
+
+
+The following changes since commit 2ea659a9ef488125eb46da6eb571de5eae5c43f6:
+
+  Linux 4.12-rc1 (2017-05-13 13:19:49 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes3-for-v4.13
+
+for you to fetch changes up to fce8dc5e50e44d8f644e0f7854e6d7d518fedb68:
+
+  ARM: shmobile: rcar-gen2: Fix deadlock in regulator quirk (2017-07-29 10:32:52 +0200)
+
+----------------------------------------------------------------
+Third Round of Renesas ARM Based SoC Fixes for v4.13
+
+Fix deadlock in regulator quirk for R-Car Gen 2 SoCs
 
 The da9063/da9210 regulator quirk for R-Car Gen2 boards uses a bus
 notifier, and unregisters the notifier when it is no longer needed.
 However, a notifier must not be unregistered from within the call chain.
 
 This bug went unnoticed, as blocking_notifier_chain_unregister() didn't
-take the semaphore during early boot.  The aforementioned commit changed
-that behavior, leading to a deadlock.
+take the semaphore during early boot. This is no longer the case as of
+upstream commit 1c3c5eab171590f8 ("sched/core: Enable might_sleep() and
+smp_processor_id() checks early") and a deadlock occurs.
 
-Fix this by removing the call to bus_unregister_notifier(), and keeping
-local completion state instead.
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: rcar-gen2: Fix deadlock in regulator quirk
 
-Reported-by: Simon Horman <horms+renesas@verge.net.au>
-Fixes: 663fbb52159cca6f ("ARM: shmobile: R-Car Gen2: Add da9063/da9210 regulator quirk")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
  arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c | 6 +++++-
  1 file changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-index 73e3adbc1330..44438f344dc8 100644
---- a/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/regulator-quirk-rcar-gen2.c
-@@ -67,8 +67,12 @@ static int regulator_quirk_notify(struct notifier_block *nb,
- {
- 	struct device *dev = data;
- 	struct i2c_client *client;
-+	static bool done;
- 	u32 mon;
- 
-+	if (done)
-+		return 0;
-+
- 	mon = ioread32(irqc + IRQC_MONITOR);
- 	dev_dbg(dev, "%s: %ld, IRQC_MONITOR = 0x%x\n", __func__, action, mon);
- 	if (mon & REGULATOR_IRQ_MASK)
-@@ -99,7 +103,7 @@ static int regulator_quirk_notify(struct notifier_block *nb,
- remove:
- 	dev_info(dev, "IRQ2 is not asserted, removing quirk\n");
- 
--	bus_unregister_notifier(&i2c_bus_type, nb);
-+	done = true;
- 	iounmap(irqc);
- 	return 0;
- }
--- 
-2.1.4
