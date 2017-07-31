@@ -1,131 +1,104 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Mon, 31 Jul 2017 16:27:57 +0100
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170731150411.GA3730@linux.vnet.ibm.com>
-References: <20170727124913.GL3730@linux.vnet.ibm.com>
- <20170727144903.000022a1@huawei.com>
- <20170727173923.000001b2@huawei.com>
- <20170727165245.GD3730@linux.vnet.ibm.com>
- <20170728084411.00001ddb@huawei.com>
- <20170728142403.0000122b@huawei.com>
- <20170728165529.GF3730@linux.vnet.ibm.com>
- <20170728182053.000072aa@huawei.com>
- <20170728190349.GM3730@linux.vnet.ibm.com>
- <20170731120847.00003d5c@huawei.com>
- <20170731150411.GA3730@linux.vnet.ibm.com>
-Message-ID: <20170731162757.000058ba@huawei.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 31 Jul 2017 17:26:31 +0200
+Subject: [PATCH v2 2/4] drm/bridge: dw-hdmi: add better clock disable
+ control
+In-Reply-To: <E1dcBha-00088l-DE@rmk-PC.armlinux.org.uk>
+References: <20170731142906.GX31807@n2100.armlinux.org.uk>
+ <E1dcBha-00088l-DE@rmk-PC.armlinux.org.uk>
+Message-ID: <8bc9989d-d385-a8f9-d433-b8abe6e53fe9@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 31 Jul 2017 08:04:11 -0700
-"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+On 07/31/2017 04:29 PM, Russell King wrote:
+> The video setup path aways sets the clock disable register to a specific
+> value, which has the effect of disabling the CEC engine.  When we add the
+> CEC driver, this becomes a problem.
+> 
+> Fix this by only setting/clearing the bits that the video path needs to.
+> 
+> Reviewed-by: Jose Abreu <joabreu@synopsys.com>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-> On Mon, Jul 31, 2017 at 12:08:47PM +0100, Jonathan Cameron wrote:
-> > On Fri, 28 Jul 2017 12:03:50 -0700
-> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> >   
-> > > On Fri, Jul 28, 2017 at 06:27:05PM +0100, Jonathan Cameron wrote:  
-> > > > On Fri, 28 Jul 2017 09:55:29 -0700
-> > > > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> > > >     
-> > > > > On Fri, Jul 28, 2017 at 02:24:03PM +0100, Jonathan Cameron wrote:    
-> > > > > > On Fri, 28 Jul 2017 08:44:11 +0100
-> > > > > > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:      
-> > > > > 
-> > > > > [ . . . ]
-> > > > >     
-> > > > > > Ok.  Some info.  I disabled a few driver (usb and SAS) in the interest of having
-> > > > > > fewer timer events.  Issue became much easier to trigger (on some runs before
-> > > > > > I could get tracing up and running)
-> > > > > >e
-> > > > > > So logs are large enough that pastebin doesn't like them - please shoet if      
-> > > > > >>e another timer period is of interest.      
-> > > > > > 
-> > > > > > https://pastebin.com/iUZDfQGM for the timer trace.
-> > > > > > https://pastebin.com/3w1F7amH for dmesg.  
-> > > > > > 
-> > > > > > The relevant timeout on the RCU stall detector was 8 seconds.  Event is
-> > > > > > detected around 835.
-> > > > > > 
-> > > > > > It's a lot of logs, so I haven't identified a smoking gun yet but there
-> > > > > > may well be one in there.      
-> > > > > 
-> > > > > The dmesg says:
-> > > > > 
-> > > > > rcu_preempt kthread starved for 2508 jiffies! g112 c111 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1
-> > > > > 
-> > > > > So I look for "rcu_preempt" timer events and find these:
-> > > > > 
-> > > > > rcu_preempt-9     [019] ....   827.579114: timer_init: timer=ffff8017d5fc7da0
-> > > > > rcu_preempt-9     [019] d..1   827.579115: timer_start: timer=ffff8017d5fc7da0 function=process_timeout 
-> > > > > 
-> > > > > Next look for "ffff8017d5fc7da0" and I don't find anything else.    
-> > > > It does show up off the bottom of what would fit in pastebin...
-> > > > 
-> > > >      rcu_preempt-9     [001] d..1   837.681077: timer_cancel: timer=ffff8017d5fc7da0
-> > > >      rcu_preempt-9     [001] ....   837.681086: timer_init: timer=ffff8017d5fc7da0
-> > > >      rcu_preempt-9     [001] d..1   837.681087: timer_start: timer=ffff8017d5fc7da0 function=process_timeout expires=4295101298 [timeout=1] cpu=1 idx=0 flags=    
-> > > 
-> > > Odd.  I would expect an expiration...  And ten seconds is way longer
-> > > than the requested one jiffy!
-> > >   
-> > > > > The timeout was one jiffy, and more than a second later, no expiration.
-> > > > > Is it possible that this event was lost?  I am not seeing any sign of
-> > > > > this is the trace.
-> > > > > 
-> > > > > I don't see any sign of CPU hotplug (and I test with lots of that in
-> > > > > any case).
-> > > > > 
-> > > > > The last time we saw something like this it was a timer HW/driver problem,
-> > > > > but it is a bit hard to imagine such a problem affecting both ARM64
-> > > > > and SPARC.  ;-)    
-> > > > Could be different issues, both of which were hidden by that lockup detector.
-> > > > 
-> > > > There is an errata work around for the timers on this particular board.
-> > > > I'm only vaguely aware of it, so may be unconnected.
-> > > > 
-> > > > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clocksource/arm_arch_timer.c?h=v4.13-rc2&id=bb42ca47401010fc02901b5e8f79e40a26f208cb
-> > > > 
-> > > > Seems unlikely though! + we've not yet seen it on the other chips that
-> > > > errata effects (not that that means much).    
-> > > 
-> > > If you can reproduce quickly, might be worth trying anyway...
-> > > 
-> > > 							Thanx, Paul  
-> > Errata fix is running already and was for all those tests.  
-> 
-> I was afraid of that...  ;-)
-It's a pretty rare errata it seems.  Not actually managed to catch
-one yet. 
-> 
-> > I'll have a dig into the timers today and see where I get to.  
-> 
-> Look forward to seeing what you find!
-Nothing obvious turning up other than we don't seem to have issue
-when we aren't running hrtimers.
+Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
 
-On a plus side I just got a report that it is effecting our d03
-boards which is good on the basis I couldn't tell what the difference
-could be wrt to this issue!
+Regards,
 
-It indeed looks like we are consistently missing a timer before
-the rcu splat occurs.
+	Hans
 
-J
+> ---
+>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 29 ++++++++++++++++++-----------
+>  1 file changed, 18 insertions(+), 11 deletions(-)
 > 
-> 							Thanx, Paul
-> 
-> > Jonathan  
-> > >   
-> > > > Jonathan
-> > > >     
-> > > > > 
-> > > > > Thomas, any debugging suggestions?
-> > > > > 
-> > > > > 							Thanx, Paul
-> > > > >     
-> > > >     
-> > >   
-> >   
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> index 82e55ee8e4fa..b08cc0c95590 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> @@ -166,6 +166,7 @@ struct dw_hdmi {
+>  	bool bridge_is_on;		/* indicates the bridge is on */
+>  	bool rxsense;			/* rxsense state */
+>  	u8 phy_mask;			/* desired phy int mask settings */
+> +	u8 mc_clkdis;			/* clock disable register */
+>  
+>  	spinlock_t audio_lock;
+>  	struct mutex audio_mutex;
+> @@ -551,8 +552,11 @@ EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
+>  
+>  static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi, bool enable)
+>  {
+> -	hdmi_modb(hdmi, enable ? 0 : HDMI_MC_CLKDIS_AUDCLK_DISABLE,
+> -		  HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
+> +	if (enable)
+> +		hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_AUDCLK_DISABLE;
+> +	else
+> +		hdmi->mc_clkdis |= HDMI_MC_CLKDIS_AUDCLK_DISABLE;
+> +	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
+>  }
+>  
+>  static void dw_hdmi_ahb_audio_enable(struct dw_hdmi *hdmi)
+> @@ -1574,8 +1578,6 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
+>  /* HDMI Initialization Step B.4 */
+>  static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
+>  {
+> -	u8 clkdis;
+> -
+>  	/* control period minimum duration */
+>  	hdmi_writeb(hdmi, 12, HDMI_FC_CTRLDUR);
+>  	hdmi_writeb(hdmi, 32, HDMI_FC_EXCTRLDUR);
+> @@ -1587,17 +1589,21 @@ static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
+>  	hdmi_writeb(hdmi, 0x21, HDMI_FC_CH2PREAM);
+>  
+>  	/* Enable pixel clock and tmds data path */
+> -	clkdis = 0x7F;
+> -	clkdis &= ~HDMI_MC_CLKDIS_PIXELCLK_DISABLE;
+> -	hdmi_writeb(hdmi, clkdis, HDMI_MC_CLKDIS);
+> +	hdmi->mc_clkdis |= HDMI_MC_CLKDIS_HDCPCLK_DISABLE |
+> +			   HDMI_MC_CLKDIS_CSCCLK_DISABLE |
+> +			   HDMI_MC_CLKDIS_AUDCLK_DISABLE |
+> +			   HDMI_MC_CLKDIS_PREPCLK_DISABLE |
+> +			   HDMI_MC_CLKDIS_TMDSCLK_DISABLE;
+> +	hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_PIXELCLK_DISABLE;
+> +	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
+>  
+> -	clkdis &= ~HDMI_MC_CLKDIS_TMDSCLK_DISABLE;
+> -	hdmi_writeb(hdmi, clkdis, HDMI_MC_CLKDIS);
+> +	hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_TMDSCLK_DISABLE;
+> +	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
+>  
+>  	/* Enable csc path */
+>  	if (is_color_space_conversion(hdmi)) {
+> -		clkdis &= ~HDMI_MC_CLKDIS_CSCCLK_DISABLE;
+> -		hdmi_writeb(hdmi, clkdis, HDMI_MC_CLKDIS);
+> +		hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_CSCCLK_DISABLE;
+> +		hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
+>  	}
+>  
+>  	/* Enable color space conversion if needed */
+> @@ -2272,6 +2278,7 @@ __dw_hdmi_probe(struct platform_device *pdev,
+>  	hdmi->disabled = true;
+>  	hdmi->rxsense = true;
+>  	hdmi->phy_mask = (u8)~(HDMI_PHY_HPD | HDMI_PHY_RX_SENSE);
+> +	hdmi->mc_clkdis = 0x7f;
+>  
+>  	mutex_init(&hdmi->mutex);
+>  	mutex_init(&hdmi->audio_mutex);
 > 
