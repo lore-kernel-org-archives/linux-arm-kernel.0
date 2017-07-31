@@ -1,27 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 31 Jul 2017 15:55:18 +0200
-Subject: [PATCH v3 2/2] pinctrl: sunxi: add support of R40 to A10 pinctrl
- driver
-In-Reply-To: <20170722025054.32645-3-icenowy@aosc.io>
-References: <20170722025054.32645-1-icenowy@aosc.io>
- <20170722025054.32645-3-icenowy@aosc.io>
-Message-ID: <CACRpkdYpnwOWp8ZckV+2aeKDfdKhy86SDDA-ZAicbbDX-aOWYQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 31 Jul 2017 14:59:32 +0100
+Subject: [PATCH v3] arm64: kernel: implement fast refcount checking
+In-Reply-To: <a0b6690d-039e-04ed-9847-b4521935375f@huawei.com>
+References: <20170731120144.14214-1-ard.biesheuvel@linaro.org>
+ <a0b6690d-039e-04ed-9847-b4521935375f@huawei.com>
+Message-ID: <CAKv+Gu9nQf=+HcN0c3Uy3YjDqnh0Xci3N-LqyAVw-gjRPRWmXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-07-22 4:50 GMT+02:00 Icenowy Zheng <icenowy@aosc.io>:
-
-> R40 is said to be an upgrade of A20, and its pin configuration is also
-> similar to A20 (and thus similar to A10).
+On 31 July 2017 at 14:17, Li Kun <hw.likun@huawei.com> wrote:
 >
-> Add support for R40 to the A10 pinctrl driver.
 >
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes in v3:
+> ? 2017/7/31 20:01, Ard Biesheuvel ??:
+>>
+>> +static __always_inline __must_check bool refcount_add_not_zero(unsigned
+>> int i,
+>> +                                                              refcount_t
+>> *r)
+>> +{
+>> +       unsigned long tmp;
+>> +       int result;
+>> +
+>> +       asm volatile("// refcount_add_not_zero \n"
+>> +"      prfm            pstl1strm, %2\n"
+>> +"1:    ldxr            %w[val], %2\n"
+>> +"      cbz             %w[val], 2f\n"
+>> +"      adds            %w[val], %w[val], %w[i]\n"
+>> +"      stxr            %w1, %w[val], %2\n"
+>> +"      cbnz            %w1, 1b\n"
+>> +       REFCOUNT_POST_CHECK_NEG
+>> +"2:"
+>> +       : [val] "=&r" (result), "=&r" (tmp), "+Q" (r->refs.counter)
+>> +       : REFCOUNT_INPUTS(&r->refs) [i] "Ir" (i)
+>> +       : REFCOUNT_CLOBBERS);
+>> +
+>> +       return result != 0;
+>> +}
+>> +
+>
+> Could we use "cas" here instead of ll/sc ?
+>
 
-Patch applied for next.
+I don't see how, to be honest.
 
-Yours,
-Linus Walleij
+Compare and swap only performs the store if the expected value is in
+the memory location. In this case, we don't know the old value, we
+only know we need to do something special if it is 0.
