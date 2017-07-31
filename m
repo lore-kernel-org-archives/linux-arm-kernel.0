@@ -1,99 +1,35 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Mon, 31 Jul 2017 17:49:42 +0800
-Subject: [PATCH 2/6] drm/rockchip: vop: fix iommu page fault when resume
+Date: Mon, 31 Jul 2017 17:49:55 +0800
+Subject: [PATCH 5/6] drm/rockchip: vop: report error when check resource error
 In-Reply-To: <1501494569-6825-1-git-send-email-mark.yao@rock-chips.com>
 References: <1501494569-6825-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1501494582-6934-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1501494596-7090-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Iommu would get page fault with following path:
-   vop_disable:
-      1, disable all windows and set vop config done
-      2, vop enter to standy, all windows not works, but their registers
-         are not clean, when you read window's enable bit, may found the
-         window is enable.
-
-   vop_enable:
-      1, memcpy(vop->regsbak, vop->regs, len)
-         save current vop registers to vop->regsbak, then you can found
-         window is enable on regsbak.
-      2, VOP_WIN_SET(vop, win, gate, 1);
-         force enable window gate, but gate and enable are on same
-         hardware register, then window enable bit rewrite to vop hardware.
-      3, vop power on, and vop might try to scan destroyed buffer,
-         then iommu get page fault.
-
-Move windows disable after vop regsbak restore, then vop regsbak mechanism
-would keep tracing the modify, everything would be safe.
+The user would be confused while facing a error commit without
+any error report.
 
 Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 ---
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 33 +++++++++++++----------------
- 1 file changed, 15 insertions(+), 18 deletions(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 0bfd563..0b5fd75 100644
+index fa0d9f7..999c2e0 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -495,7 +495,7 @@ static void vop_line_flag_irq_disable(struct vop *vop)
- static int vop_enable(struct drm_crtc *crtc)
- {
- 	struct vop *vop = to_vop(crtc);
--	int ret;
-+	int ret, i;
- 
- 	ret = pm_runtime_get_sync(vop->dev);
- 	if (ret < 0) {
-@@ -528,6 +528,20 @@ static int vop_enable(struct drm_crtc *crtc)
- 	}
- 
- 	memcpy(vop->regs, vop->regsbak, vop->len);
-+	/*
-+	 * We need to make sure that all windows are disabled before we
-+	 * enable the crtc. Otherwise we might try to scan from a destroyed
-+	 * buffer later.
-+	 */
-+	for (i = 0; i < vop->data->win_size; i++) {
-+		struct vop_win *vop_win = &vop->win[i];
-+		const struct vop_win_data *win = vop_win->data;
-+
-+		spin_lock(&vop->reg_lock);
-+		VOP_WIN_SET(vop, win, enable, 0);
-+		spin_unlock(&vop->reg_lock);
+@@ -674,8 +674,10 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
+ 	 * Src.x1 can be odd when do clip, but yuv plane start point
+ 	 * need align with 2 pixel.
+ 	 */
+-	if (is_yuv_support(fb->format->format) && ((state->src.x1 >> 16) % 2))
++	if (is_yuv_support(fb->format->format) && ((state->src.x1 >> 16) % 2)) {
++		DRM_ERROR("Invalid Source: Yuv format not support odd xpos\n");
+ 		return -EINVAL;
 +	}
-+
- 	vop_cfg_done(vop);
  
- 	/*
-@@ -561,28 +575,11 @@ static int vop_enable(struct drm_crtc *crtc)
- static void vop_crtc_disable(struct drm_crtc *crtc)
- {
- 	struct vop *vop = to_vop(crtc);
--	int i;
- 
- 	WARN_ON(vop->event);
- 
- 	rockchip_drm_psr_deactivate(&vop->crtc);
- 
--	/*
--	 * We need to make sure that all windows are disabled before we
--	 * disable that crtc. Otherwise we might try to scan from a destroyed
--	 * buffer later.
--	 */
--	for (i = 0; i < vop->data->win_size; i++) {
--		struct vop_win *vop_win = &vop->win[i];
--		const struct vop_win_data *win = vop_win->data;
--
--		spin_lock(&vop->reg_lock);
--		VOP_WIN_SET(vop, win, enable, 0);
--		spin_unlock(&vop->reg_lock);
--	}
--
--	vop_cfg_done(vop);
--
- 	drm_crtc_vblank_off(crtc);
- 
- 	/*
+ 	return 0;
+ }
 -- 
 1.9.1
