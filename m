@@ -1,41 +1,53 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 31 Jul 2017 13:56:01 +0200
-Subject: [PATCH v3 0/2] clk: meson: add mmc input 0 clocks
-Message-ID: <20170731115603.29720-1-jbrunet@baylibre.com>
+Date: Mon, 31 Jul 2017 13:56:02 +0200
+Subject: [PATCH v3 1/2] clk: meson: gxbb: Add sd_emmc clk0 clkids
+In-Reply-To: <20170731115603.29720-1-jbrunet@baylibre.com>
+References: <20170731115603.29720-1-jbrunet@baylibre.com>
+Message-ID: <20170731115603.29720-2-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds the clocks feeding the clock input 0 of the mmc
-controllers
+Add the clkids for the clocks feeding the input0 of the mmc controllers
 
-This patchset depends on the following patchset being merged first:
-* https://lkml.kernel.org/r/20170727161755.10393-1-jbrunet at baylibre.com
-* https://lkml.kernel.org/r/20170731113832.26490-1-jbrunet at baylibre.com
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ drivers/clk/meson/gxbb.h              | 10 ++++++++--
+ include/dt-bindings/clock/gxbb-clkc.h |  3 +++
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
-FIXME:
-We need CLK_IGNORE_UNUSED in clock flags because mmc DT node point to
-xtal instead of these clocks. W/O the flag, CCF would gate the mmc clocks
-on boot, killing the mmc controllers. CLK_IGNORE_UNUSED could be removed
-once the DT is fixed
-
-Changes between v2 and v3 [1]:
-* Split driver and header changes
-* Add CLK_INGORE_UNUSED flag
-
-Changes between v1 and v2 [0]:
-* Correct commit description and comments.
-
-[1]: https://lkml.kernel.org/r/20170727103902.3262-1-jbrunet at baylibre.com
-[0]: https://lkml.kernel.org/r/20170726203138.11367-1-jbrunet at baylibre.com
-
-Jerome Brunet (2):
-  clk: meson: gxbb: Add sd_emmc clk0 clkids
-  clk: meson: gxbb: Add sd_emmc clk0 clocks
-
- drivers/clk/meson/gxbb.c              | 177 ++++++++++++++++++++++++++++++++++
- drivers/clk/meson/gxbb.h              |  10 +-
- include/dt-bindings/clock/gxbb-clkc.h |   3 +
- 3 files changed, 188 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+index 2c8986d3232c..5b1d4b374d1c 100644
+--- a/drivers/clk/meson/gxbb.h
++++ b/drivers/clk/meson/gxbb.h
+@@ -184,8 +184,14 @@
+ #define CLKID_CTS_MCLK_I958_DIV	  112
+ #define CLKID_32K_CLK_SEL	  115
+ #define CLKID_32K_CLK_DIV	  116
+-
+-#define NR_CLKS			  117
++#define CLKID_SD_EMMC_A_CLK0_SEL  117
++#define CLKID_SD_EMMC_A_CLK0_DIV  118
++#define CLKID_SD_EMMC_B_CLK0_SEL  120
++#define CLKID_SD_EMMC_B_CLK0_DIV  121
++#define CLKID_SD_EMMC_C_CLK0_SEL  123
++#define CLKID_SD_EMMC_C_CLK0_DIV  124
++
++#define NR_CLKS			  126
+ 
+ /* include the CLKIDs that have been made part of the DT binding */
+ #include <dt-bindings/clock/gxbb-clkc.h>
+diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+index e07fea011ebd..c04a76d8facf 100644
+--- a/include/dt-bindings/clock/gxbb-clkc.h
++++ b/include/dt-bindings/clock/gxbb-clkc.h
+@@ -110,5 +110,8 @@
+ #define CLKID_CTS_MCLK_I958	110
+ #define CLKID_CTS_I958		113
+ #define CLKID_32K_CLK		114
++#define CLKID_SD_EMMC_A_CLK0	119
++#define CLKID_SD_EMMC_B_CLK0	122
++#define CLKID_SD_EMMC_C_CLK0	125
+ 
+ #endif /* __GXBB_CLKC_H */
 -- 
 2.9.4
