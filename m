@@ -1,66 +1,84 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 31 Jul 2017 16:23:19 +0100
-Subject: [PATCH v2 1/5] ACPICA: resource_mgr: Allow _DMA method in walk
- resources
-In-Reply-To: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
-References: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170731152323.32488-2-lorenzo.pieralisi@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 31 Jul 2017 17:33:00 +0200
+Subject: [PATCH RESEND] arm64: arch_timer: fix the infinite recursion when
+ enable ftrace and erratum workaround
+In-Reply-To: <5f7566b3-a2ca-b882-89e1-dcaaaec79fcd@huawei.com>
+References: <321e4c16-aa14-beee-b6dc-36e19e5ec35a@huawei.com>
+ <20170710112229.GA18040@leverpostej>
+ <5f7566b3-a2ca-b882-89e1-dcaaaec79fcd@huawei.com>
+Message-ID: <c044ea37-a8f2-d2fd-a0d9-a9a3a5e5b136@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPICA commit 7636d2fb683d5699a5c14e949fba9ac52e91d4c1
+On 26/07/2017 04:42, Ding Tianhong wrote:
+> 
+> 
+> On 2017/7/10 19:22, Mark Rutland wrote:
+>> On Sun, Jul 09, 2017 at 04:30:54PM +0800, Ding Tianhong wrote:
+>>> When enable preempt and debug ftrace, and perform the following steps, the
+>>> system will hang:
+>>> mount -t debugfs nodev /sys/kernel/debug/
+>>> cd /sys/kernel/debug/tracing/
+>>> echo function_graph > current_tracer
+>>>
+>>> This is because tracing the preempt_disable/enable calls would cause
+>>> trace_clock() which would get local timer to go into infinite recursion
+>>> when enable the arch timer erratum workaround for some chips, so Prevent
+>>> tracing of preempt_disable/enable() in arch_timer_reg_read_stable().
+>>>
+>>> This problem is similar to the fixed by upstream commit 96b3d28bf4
+>>> ("sched/clock: Prevent tracing recursion in sched_clock_cpu()").
+>>
+>> As I mentioned before, the patch itself looks fine to me, but the commit
+>> message is somewhat difficult to read.
+>>
+>> Can we please change this to:
+>>
+>>   arm64: arch_timer: avoid infinite recursion when ftrace is enabled
+>>
+>>   On platforms with an arch timer erratum workaround, it's possible for
+>>   arch_timer_reg_read_stable() to recurse into itself when certain
+>>   tracing options are enabled, leading to stack overflows and related
+>>   problems.
+>>  
+>>   For example, when PREEMPT_TRACER and FUNCTION_GRAPH_TRACER are
+>>   selected, it's possible to trigger this with:
+>>   
+>>   $ mount -t debugfs nodev /sys/kernel/debug/
+>>   $ echo function_graph > /sys/kernel/debug/tracing/current_tracer
+>>
+>>   The problem is that in such cases, preempt_disable() instrumentation
+>>   attempts to acquire a timestamp via trace_clock(), resulting in a call
+>>   back to arch_timer_reg_read_stable(), and hence recursion.
+>>
+>>   This patch changes arch_timer_reg_read_stable() to use
+>>   preempt_{disable,enable}_notrace(), which avoids this.
+>>
+>> With that commit message:
+>>
+>> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>>
+>> Daniel, Thomas, would you be happy to fold that in when picking this? Or
+>> would you prefer that I fix this up and resend?
+>>
+> 
+> Hi Danial, Thomas:
+> 
+> It looks didn't merge to the mainline tree yet, should I update the commit and
+> resend this patch again?
+> 
 
-The _DMA object contains a resource template, this change adds support
-for the walk resources function so that ACPI devices containing a _DMA
-object can actually parse it to detect DMA ranges for the respective
-bus.
 
-Link: https://github.com/acpica/acpica/commit/7636d2fb
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- drivers/acpi/acpica/rsxface.c | 7 ++++---
- include/acpi/acnames.h        | 1 +
- 2 files changed, 5 insertions(+), 3 deletions(-)
+Yes, please. I'm coming back from two weeks OoO, that will help.
 
-diff --git a/drivers/acpi/acpica/rsxface.c b/drivers/acpi/acpica/rsxface.c
-index 59a4f9e..be65e65 100644
---- a/drivers/acpi/acpica/rsxface.c
-+++ b/drivers/acpi/acpica/rsxface.c
-@@ -615,7 +615,7 @@ ACPI_EXPORT_SYMBOL(acpi_walk_resource_buffer)
-  *                                device we are querying
-  *              name            - Method name of the resources we want.
-  *                                (METHOD_NAME__CRS, METHOD_NAME__PRS, or
-- *                                METHOD_NAME__AEI)
-+ *                                METHOD_NAME__AEI or METHOD_NAME__DMA)
-  *              user_function   - Called for each resource
-  *              context         - Passed to user_function
-  *
-@@ -641,11 +641,12 @@ acpi_walk_resources(acpi_handle device_handle,
- 	if (!device_handle || !user_function || !name ||
- 	    (!ACPI_COMPARE_NAME(name, METHOD_NAME__CRS) &&
- 	     !ACPI_COMPARE_NAME(name, METHOD_NAME__PRS) &&
--	     !ACPI_COMPARE_NAME(name, METHOD_NAME__AEI))) {
-+	     !ACPI_COMPARE_NAME(name, METHOD_NAME__AEI) &&
-+	     !ACPI_COMPARE_NAME(name, METHOD_NAME__DMA))) {
- 		return_ACPI_STATUS(AE_BAD_PARAMETER);
- 	}
- 
--	/* Get the _CRS/_PRS/_AEI resource list */
-+	/* Get the _CRS/_PRS/_AEI/_DMA resource list */
- 
- 	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
- 	status = acpi_rs_get_method_data(device_handle, name, &buffer);
-diff --git a/include/acpi/acnames.h b/include/acpi/acnames.h
-index b421584..d8dd3bf 100644
---- a/include/acpi/acnames.h
-+++ b/include/acpi/acnames.h
-@@ -54,6 +54,7 @@
- #define METHOD_NAME__CLS        "_CLS"
- #define METHOD_NAME__CRS        "_CRS"
- #define METHOD_NAME__DDN        "_DDN"
-+#define METHOD_NAME__DMA        "_DMA"
- #define METHOD_NAME__HID        "_HID"
- #define METHOD_NAME__INI        "_INI"
- #define METHOD_NAME__PLD        "_PLD"
+Thanks.
+
+  -- Daniel
+
+
 -- 
-2.10.0
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
