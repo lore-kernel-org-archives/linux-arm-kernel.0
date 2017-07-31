@@ -1,55 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:03:19 +0200
-Subject: [PATCH 27/31] arm64: dts: renesas: r8a7795: Add usb companion
- property in EHCI
-In-Reply-To: <cover.1501509525.git.horms+renesas@verge.net.au>
-References: <cover.1501509525.git.horms+renesas@verge.net.au>
-Message-ID: <1c422b4c501ec329802a5d00f664821d3b58e11d.1501509526.git.horms+renesas@verge.net.au>
+Date: Mon, 31 Jul 2017 17:03:38 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.14
+Message-ID: <cover.1501511664.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-This patch adds the "companion" property in the EHCI ch0, ch1 and
-ch2 nodes to wait for the usb companion controller startup at resume.
+Please consider these Renesas ARM based SoC defconfig updates for v4.14.
 
-Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-[remove ch3 node and revise the commit log]
-Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index d73d986039c8..7246e689b619 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -1583,6 +1583,7 @@
- 			clocks = <&cpg CPG_MOD 703>;
- 			phys = <&usb2_phy0>;
- 			phy-names = "usb";
-+			companion= <&ohci0>;
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
- 			resets = <&cpg 703>;
- 			status = "disabled";
-@@ -1595,6 +1596,7 @@
- 			clocks = <&cpg CPG_MOD 702>;
- 			phys = <&usb2_phy1>;
- 			phy-names = "usb";
-+			companion= <&ohci1>;
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
- 			resets = <&cpg 702>;
- 			status = "disabled";
-@@ -1607,6 +1609,7 @@
- 			clocks = <&cpg CPG_MOD 701>;
- 			phys = <&usb2_phy2>;
- 			phy-names = "usb";
-+			companion= <&ohci2>;
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
- 			resets = <&cpg 701>;
- 			status = "disabled";
--- 
-2.1.4
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.14
+
+for you to fetch changes up to 52078ca712cd933844721aaa700b3bd85234841f:
+
+  ARM: multi_v7_defconfig: Enable DMA for Renesas serial ports (2017-07-27 16:06:23 +0200)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Defconfig Updates for v4.14
+
+* Enable DMA for Renesas serial ports
+
+  Geert Uytterhoeven says, "DMA for (H)SCIF(A|B) serial ports on Renesas
+  R-Car Gen2 and RZ/G1 SoCs is considered stable, hence enable it by
+  default.".
+
+* Enable Ethernet AVB
+
+  For the iWave RZ/G1M Q7 SOM
+
+* Replace DRM_RCAR_HDMI by generic bridge options
+* Replace SND_SOC_RSRC_CARD by SND_SIMPLE_SCU_CARD
+* Replace USB_XHCI_RCAR by USB_XHCI_PLATFORM
+* Enable missing PCIE_RCAR dependency
+
+  Defconfig updates for various Kconfig updates covering
+  renamed Kconfig symbols, now missing dependancies and so on.
+
+----------------------------------------------------------------
+Biju Das (1):
+      ARM: shmobile: defconfig: Enable Ethernet AVB
+
+Geert Uytterhoeven (9):
+      ARM: shmobile: defconfig: Enable missing PCIE_RCAR dependency
+      ARM: shmobile: defconfig: Replace USB_XHCI_RCAR by USB_XHCI_PLATFORM
+      ARM: shmobile: defconfig: Replace SND_SOC_RSRC_CARD by SND_SIMPLE_SCU_CARD
+      ARM: shmobile: defconfig: Replace DRM_RCAR_HDMI by generic bridge options
+      ARM: shmobile: defconfig: Enable DMA for serial ports
+      ARM: shmobile: defconfig: Refresh
+      ARM: multi_v7_defconfig: Replace SND_SOC_RSRC_CARD by SND_SIMPLE_SCU_CARD
+      ARM: multi_v7_defconfig: Replace DRM_RCAR_HDMI by generic bridge options
+      ARM: multi_v7_defconfig: Enable DMA for Renesas serial ports
+
+ arch/arm/configs/multi_v7_defconfig |  5 +++--
+ arch/arm/configs/shmobile_defconfig | 17 ++++++++++-------
+ 2 files changed, 13 insertions(+), 9 deletions(-)
