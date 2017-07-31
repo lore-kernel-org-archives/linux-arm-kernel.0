@@ -1,357 +1,1515 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 31 Jul 2017 15:21:10 +0900
-Subject: [PATCH 5/6] pinctrl: uniphier: add suspend / resume support
+Date: Mon, 31 Jul 2017 15:21:09 +0900
+Subject: [PATCH 4/6] pinctrl: uniphier: omit redundant input enable bit
+ information
 In-Reply-To: <1501482071-9819-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1501482071-9819-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1501482071-9819-6-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1501482071-9819-5-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save registers lost in the sleep when suspending, and restore them
-when resuming.
+For LD11/20 SoCs (capable of per-pin input enable), the iectrl bit
+number matches its pin number.  So, this is redundant information.
+Instead, we just need a flag to know if the iectrl gating exists or not.
+
+With this refactoring, 5 bits in pin data will be saved.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- drivers/pinctrl/uniphier/pinctrl-uniphier-core.c | 178 +++++++++++++++++++++++
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c |   1 +
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c |   1 +
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c  |   1 +
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c |   1 +
- drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c |   1 +
- drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c |   1 +
- drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c |   1 +
- drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c |   1 +
- drivers/pinctrl/uniphier/pinctrl-uniphier.h      |   2 +
- 10 files changed, 188 insertions(+)
+ drivers/pinctrl/uniphier/pinctrl-uniphier-core.c |  45 +--
+ drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c | 284 +++++++++---------
+ drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c | 352 +++++++++++------------
+ drivers/pinctrl/uniphier/pinctrl-uniphier.h      |   3 +-
+ 4 files changed, 345 insertions(+), 339 deletions(-)
 
 diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-index b976e9109b1d..5d8c9efd8135 100644
+index 6de6fdca4e9c..b976e9109b1d 100644
 --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
 +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-@@ -13,6 +13,7 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <linux/list.h>
- #include <linux/mfd/syscon.h>
- #include <linux/of.h>
- #include <linux/pinctrl/pinconf.h>
-@@ -34,11 +35,19 @@
- #define UNIPHIER_PINCTRL_PUPDCTRL_BASE	0x1a00
- #define UNIPHIER_PINCTRL_IECTRL_BASE	0x1d00
- 
-+struct uniphier_pinctrl_reg_region {
-+	struct list_head node;
-+	unsigned int base;
-+	unsigned int nregs;
-+	u32 vals[0];
-+};
-+
- struct uniphier_pinctrl_priv {
- 	struct pinctrl_desc pctldesc;
- 	struct pinctrl_dev *pctldev;
- 	struct regmap *regmap;
- 	struct uniphier_pinctrl_socdata *socdata;
-+	struct list_head reg_regions;
+@@ -138,10 +138,11 @@ static const struct pinctrl_ops uniphier_pctlops = {
  };
  
- static int uniphier_pctl_get_groups_count(struct pinctrl_dev *pctldev)
-@@ -688,12 +697,177 @@ static const struct pinmux_ops uniphier_pmxops = {
- 	.strict = true,
- };
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int uniphier_pinctrl_suspend(struct device *dev)
-+{
-+	struct uniphier_pinctrl_priv *priv = dev_get_drvdata(dev);
-+	struct uniphier_pinctrl_reg_region *r;
-+	int ret;
-+
-+	list_for_each_entry(r, &priv->reg_regions, node) {
-+		ret = regmap_bulk_read(priv->regmap, r->base, r->vals,
-+				       r->nregs);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int uniphier_pinctrl_resume(struct device *dev)
-+{
-+	struct uniphier_pinctrl_priv *priv = dev_get_drvdata(dev);
-+	struct uniphier_pinctrl_reg_region *r;
-+	int ret;
-+
-+	list_for_each_entry(r, &priv->reg_regions, node) {
-+		ret = regmap_bulk_write(priv->regmap, r->base, r->vals,
-+					r->nregs);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	if (priv->socdata->caps & UNIPHIER_PINCTRL_CAPS_DBGMUX_SEPARATE) {
-+		ret = regmap_write(priv->regmap,
-+				   UNIPHIER_PINCTRL_LOAD_PINMUX, 1);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int uniphier_pinctrl_add_reg_region(struct device *dev,
-+					   struct uniphier_pinctrl_priv *priv,
-+					   unsigned int base,
-+					   unsigned int count,
-+					   unsigned int width)
-+{
-+	struct uniphier_pinctrl_reg_region *region;
-+	unsigned int nregs;
-+
-+	if (!count)
-+		return 0;
-+
-+	nregs = DIV_ROUND_UP(count * width, 32);
-+
-+	region = devm_kzalloc(dev,
-+			      sizeof(*region) + sizeof(region->vals[0]) * nregs,
-+			      GFP_KERNEL);
-+	if (!region)
-+		return -ENOMEM;
-+
-+	region->base = base;
-+	region->nregs = nregs;
-+
-+	list_add_tail(&region->node, &priv->reg_regions);
-+
-+	return 0;
-+}
-+#endif
-+
-+static int uniphier_pinctrl_pm_init(struct device *dev,
-+				    struct uniphier_pinctrl_priv *priv)
-+{
-+#ifdef CONFIG_PM_SLEEP
-+	const struct uniphier_pinctrl_socdata *socdata = priv->socdata;
-+	unsigned int num_drvctrl = 0;
-+	unsigned int num_drv2ctrl = 0;
-+	unsigned int num_drv3ctrl = 0;
-+	unsigned int num_pupdctrl = 0;
-+	unsigned int num_iectrl = 0;
-+	unsigned int iectrl, drvctrl, pupdctrl;
-+	enum uniphier_pin_drv_type drv_type;
-+	enum uniphier_pin_pull_dir pull_dir;
-+	int i, ret;
-+
-+	for (i = 0; i < socdata->npins; i++) {
-+		void *drv_data = socdata->pins[i].drv_data;
-+
-+		drvctrl = uniphier_pin_get_drvctrl(drv_data);
-+		drv_type = uniphier_pin_get_drv_type(drv_data);
-+		pupdctrl = uniphier_pin_get_pupdctrl(drv_data);
-+		pull_dir = uniphier_pin_get_pull_dir(drv_data);
-+		iectrl = uniphier_pin_get_iectrl(drv_data);
-+
-+		switch (drv_type) {
-+		case UNIPHIER_PIN_DRV_1BIT:
-+			num_drvctrl = max(num_drvctrl, drvctrl + 1);
-+			break;
-+		case UNIPHIER_PIN_DRV_2BIT:
-+			num_drv2ctrl = max(num_drv2ctrl, drvctrl + 1);
-+			break;
-+		case UNIPHIER_PIN_DRV_3BIT:
-+			num_drv3ctrl = max(num_drv3ctrl, drvctrl + 1);
-+			break;
-+		default:
-+			break;
-+		}
-+
-+		if (pull_dir == UNIPHIER_PIN_PULL_UP ||
-+		    pull_dir == UNIPHIER_PIN_PULL_DOWN)
-+			num_pupdctrl = max(num_pupdctrl, pupdctrl + 1);
-+
-+		if (iectrl != UNIPHIER_PIN_IECTRL_NONE) {
-+			if (socdata->caps & UNIPHIER_PINCTRL_CAPS_PERPIN_IECTRL)
-+				iectrl = i;
-+			num_iectrl = max(num_iectrl, iectrl + 1);
-+		}
-+	}
-+
-+	INIT_LIST_HEAD(&priv->reg_regions);
-+
-+	ret = uniphier_pinctrl_add_reg_region(dev, priv,
-+					      UNIPHIER_PINCTRL_PINMUX_BASE,
-+					      socdata->npins, 8);
-+	if (ret)
-+		return ret;
-+
-+	ret = uniphier_pinctrl_add_reg_region(dev, priv,
-+					      UNIPHIER_PINCTRL_DRVCTRL_BASE,
-+					      num_drvctrl, 1);
-+	if (ret)
-+		return ret;
-+
-+	ret = uniphier_pinctrl_add_reg_region(dev, priv,
-+					      UNIPHIER_PINCTRL_DRV2CTRL_BASE,
-+					      num_drv2ctrl, 2);
-+	if (ret)
-+		return ret;
-+
-+	ret = uniphier_pinctrl_add_reg_region(dev, priv,
-+					      UNIPHIER_PINCTRL_DRV3CTRL_BASE,
-+					      num_drv3ctrl, 3);
-+	if (ret)
-+		return ret;
-+
-+	ret = uniphier_pinctrl_add_reg_region(dev, priv,
-+					      UNIPHIER_PINCTRL_PUPDCTRL_BASE,
-+					      num_pupdctrl, 1);
-+	if (ret)
-+		return ret;
-+
-+	ret = uniphier_pinctrl_add_reg_region(dev, priv,
-+					      UNIPHIER_PINCTRL_IECTRL_BASE,
-+					      num_iectrl, 1);
-+	if (ret)
-+		return ret;
-+#endif
-+	return 0;
-+}
-+
-+const struct dev_pm_ops uniphier_pinctrl_pm_ops = {
-+	SET_LATE_SYSTEM_SLEEP_PM_OPS(uniphier_pinctrl_suspend,
-+				     uniphier_pinctrl_resume)
-+};
-+
- int uniphier_pinctrl_probe(struct platform_device *pdev,
- 			   struct uniphier_pinctrl_socdata *socdata)
+ static int uniphier_conf_pin_bias_get(struct pinctrl_dev *pctldev,
+-				      const struct pin_desc *desc,
++				      unsigned int pin,
+ 				      enum pin_config_param param)
  {
- 	struct device *dev = &pdev->dev;
- 	struct uniphier_pinctrl_priv *priv;
- 	struct device_node *parent;
-+	int ret;
+ 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
++	const struct pin_desc *desc = pin_desc_get(pctldev, pin);
+ 	enum uniphier_pin_pull_dir pull_dir =
+ 				uniphier_pin_get_pull_dir(desc->drv_data);
+ 	unsigned int pupdctrl, reg, shift, val;
+@@ -188,10 +189,10 @@ static int uniphier_conf_pin_bias_get(struct pinctrl_dev *pctldev,
+ }
  
- 	if (!socdata ||
- 	    !socdata->pins || !socdata->npins ||
-@@ -725,6 +899,10 @@ int uniphier_pinctrl_probe(struct platform_device *pdev,
- 	priv->pctldesc.confops = &uniphier_confops;
- 	priv->pctldesc.owner = dev->driver->owner;
+ static int uniphier_conf_pin_drive_get(struct pinctrl_dev *pctldev,
+-				       const struct pin_desc *desc,
+-				       u16 *strength)
++				       unsigned int pin, u16 *strength)
+ {
+ 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
++	const struct pin_desc *desc = pin_desc_get(pctldev, pin);
+ 	enum uniphier_pin_drv_type type =
+ 				uniphier_pin_get_drv_type(desc->drv_data);
+ 	const unsigned int strength_1bit[] = {4, 8};
+@@ -248,9 +249,10 @@ static int uniphier_conf_pin_drive_get(struct pinctrl_dev *pctldev,
+ }
  
-+	ret = uniphier_pinctrl_pm_init(dev, priv);
-+	if (ret)
-+		return ret;
+ static int uniphier_conf_pin_input_enable_get(struct pinctrl_dev *pctldev,
+-					      const struct pin_desc *desc)
++					      unsigned int pin)
+ {
+ 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
++	const struct pin_desc *desc = pin_desc_get(pctldev, pin);
+ 	unsigned int iectrl = uniphier_pin_get_iectrl(desc->drv_data);
+ 	unsigned int reg, mask, val;
+ 	int ret;
+@@ -259,6 +261,9 @@ static int uniphier_conf_pin_input_enable_get(struct pinctrl_dev *pctldev,
+ 		/* This pin is always input-enabled. */
+ 		return 0;
+ 
++	if (priv->socdata->caps & UNIPHIER_PINCTRL_CAPS_PERPIN_IECTRL)
++		iectrl = pin;
 +
- 	priv->pctldev = devm_pinctrl_register(dev, &priv->pctldesc, priv);
- 	if (IS_ERR(priv->pctldev)) {
- 		dev_err(dev, "failed to register UniPhier pinctrl driver\n");
+ 	reg = UNIPHIER_PINCTRL_IECTRL_BASE + iectrl / 32 * 4;
+ 	mask = BIT(iectrl % 32);
+ 
+@@ -273,7 +278,6 @@ static int uniphier_conf_pin_config_get(struct pinctrl_dev *pctldev,
+ 					unsigned pin,
+ 					unsigned long *configs)
+ {
+-	const struct pin_desc *desc = pin_desc_get(pctldev, pin);
+ 	enum pin_config_param param = pinconf_to_config_param(*configs);
+ 	bool has_arg = false;
+ 	u16 arg;
+@@ -283,14 +287,14 @@ static int uniphier_conf_pin_config_get(struct pinctrl_dev *pctldev,
+ 	case PIN_CONFIG_BIAS_DISABLE:
+ 	case PIN_CONFIG_BIAS_PULL_UP:
+ 	case PIN_CONFIG_BIAS_PULL_DOWN:
+-		ret = uniphier_conf_pin_bias_get(pctldev, desc, param);
++		ret = uniphier_conf_pin_bias_get(pctldev, pin, param);
+ 		break;
+ 	case PIN_CONFIG_DRIVE_STRENGTH:
+-		ret = uniphier_conf_pin_drive_get(pctldev, desc, &arg);
++		ret = uniphier_conf_pin_drive_get(pctldev, pin, &arg);
+ 		has_arg = true;
+ 		break;
+ 	case PIN_CONFIG_INPUT_ENABLE:
+-		ret = uniphier_conf_pin_input_enable_get(pctldev, desc);
++		ret = uniphier_conf_pin_input_enable_get(pctldev, pin);
+ 		break;
+ 	default:
+ 		/* unsupported parameter */
+@@ -305,10 +309,11 @@ static int uniphier_conf_pin_config_get(struct pinctrl_dev *pctldev,
+ }
+ 
+ static int uniphier_conf_pin_bias_set(struct pinctrl_dev *pctldev,
+-				      const struct pin_desc *desc,
++				      unsigned int pin,
+ 				      enum pin_config_param param, u32 arg)
+ {
+ 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
++	const struct pin_desc *desc = pin_desc_get(pctldev, pin);
+ 	enum uniphier_pin_pull_dir pull_dir =
+ 				uniphier_pin_get_pull_dir(desc->drv_data);
+ 	unsigned int pupdctrl, reg, shift;
+@@ -379,10 +384,10 @@ static int uniphier_conf_pin_bias_set(struct pinctrl_dev *pctldev,
+ }
+ 
+ static int uniphier_conf_pin_drive_set(struct pinctrl_dev *pctldev,
+-				       const struct pin_desc *desc,
+-				       u16 strength)
++				       unsigned int pin, u16 strength)
+ {
+ 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
++	const struct pin_desc *desc = pin_desc_get(pctldev, pin);
+ 	enum uniphier_pin_drv_type type =
+ 				uniphier_pin_get_drv_type(desc->drv_data);
+ 	const unsigned int strength_1bit[] = {4, 8, -1};
+@@ -440,10 +445,10 @@ static int uniphier_conf_pin_drive_set(struct pinctrl_dev *pctldev,
+ }
+ 
+ static int uniphier_conf_pin_input_enable(struct pinctrl_dev *pctldev,
+-					  const struct pin_desc *desc,
+-					  u16 enable)
++					  unsigned int pin, u16 enable)
+ {
+ 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
++	const struct pin_desc *desc = pin_desc_get(pctldev, pin);
+ 	unsigned int iectrl = uniphier_pin_get_iectrl(desc->drv_data);
+ 	unsigned int reg, mask;
+ 
+@@ -459,6 +464,9 @@ static int uniphier_conf_pin_input_enable(struct pinctrl_dev *pctldev,
+ 	if (iectrl == UNIPHIER_PIN_IECTRL_NONE)
+ 		return enable ? 0 : -EINVAL;
+ 
++	if (priv->socdata->caps & UNIPHIER_PINCTRL_CAPS_PERPIN_IECTRL)
++		iectrl = pin;
++
+ 	reg = UNIPHIER_PINCTRL_IECTRL_BASE + iectrl / 32 * 4;
+ 	mask = BIT(iectrl % 32);
+ 
+@@ -470,7 +478,6 @@ static int uniphier_conf_pin_config_set(struct pinctrl_dev *pctldev,
+ 					unsigned long *configs,
+ 					unsigned num_configs)
+ {
+-	const struct pin_desc *desc = pin_desc_get(pctldev, pin);
+ 	int i, ret;
+ 
+ 	for (i = 0; i < num_configs; i++) {
+@@ -483,15 +490,14 @@ static int uniphier_conf_pin_config_set(struct pinctrl_dev *pctldev,
+ 		case PIN_CONFIG_BIAS_PULL_UP:
+ 		case PIN_CONFIG_BIAS_PULL_DOWN:
+ 		case PIN_CONFIG_BIAS_PULL_PIN_DEFAULT:
+-			ret = uniphier_conf_pin_bias_set(pctldev, desc,
++			ret = uniphier_conf_pin_bias_set(pctldev, pin,
+ 							 param, arg);
+ 			break;
+ 		case PIN_CONFIG_DRIVE_STRENGTH:
+-			ret = uniphier_conf_pin_drive_set(pctldev, desc, arg);
++			ret = uniphier_conf_pin_drive_set(pctldev, pin, arg);
+ 			break;
+ 		case PIN_CONFIG_INPUT_ENABLE:
+-			ret = uniphier_conf_pin_input_enable(pctldev, desc,
+-							     arg);
++			ret = uniphier_conf_pin_input_enable(pctldev, pin, arg);
+ 			break;
+ 		default:
+ 			dev_err(pctldev->dev,
+@@ -571,8 +577,7 @@ static int uniphier_pmx_set_one_mux(struct pinctrl_dev *pctldev, unsigned pin,
+ 	int ret;
+ 
+ 	/* some pins need input-enabling */
+-	ret = uniphier_conf_pin_input_enable(pctldev,
+-					     pin_desc_get(pctldev, pin), 1);
++	ret = uniphier_conf_pin_input_enable(pctldev, pin, 1);
+ 	if (ret)
+ 		return ret;
+ 
 diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-index be08de07146e..745706920642 100644
+index 01bff06f1277..be08de07146e 100644
 --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
 +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-@@ -643,6 +643,7 @@ static struct platform_driver uniphier_ld11_pinctrl_driver = {
- 	.driver = {
- 		.name = "uniphier-ld11-pinctrl",
- 		.of_match_table = uniphier_ld11_pinctrl_match,
-+		.pm = &uniphier_pinctrl_pm_ops,
- 	},
+@@ -21,7 +21,7 @@
+ #include "pinctrl-uniphier.h"
+ 
+ static const struct pinctrl_pin_desc uniphier_ld11_pins[] = {
+-	UNIPHIER_PINCTRL_PIN(0, "XECS1", 0,
++	UNIPHIER_PINCTRL_PIN(0, "XECS1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     0, UNIPHIER_PIN_DRV_1BIT,
+ 			     0, UNIPHIER_PIN_PULL_UP),
+ 	UNIPHIER_PINCTRL_PIN(1, "ERXW", UNIPHIER_PIN_IECTRL_NONE,
+@@ -30,13 +30,13 @@ static const struct pinctrl_pin_desc uniphier_ld11_pins[] = {
+ 	UNIPHIER_PINCTRL_PIN(2, "XERWE1", UNIPHIER_PIN_IECTRL_NONE,
+ 			     2, UNIPHIER_PIN_DRV_1BIT,
+ 			     2, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(3, "XNFWP", 3,
++	UNIPHIER_PINCTRL_PIN(3, "XNFWP", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     3, UNIPHIER_PIN_DRV_1BIT,
+ 			     3, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(4, "XNFCE0", 4,
++	UNIPHIER_PINCTRL_PIN(4, "XNFCE0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     4, UNIPHIER_PIN_DRV_1BIT,
+ 			     4, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(5, "NFRYBY0", 5,
++	UNIPHIER_PINCTRL_PIN(5, "NFRYBY0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     5, UNIPHIER_PIN_DRV_1BIT,
+ 			     5, UNIPHIER_PIN_PULL_UP),
+ 	UNIPHIER_PINCTRL_PIN(6, "XNFRE", UNIPHIER_PIN_IECTRL_NONE,
+@@ -51,421 +51,421 @@ static const struct pinctrl_pin_desc uniphier_ld11_pins[] = {
+ 	UNIPHIER_PINCTRL_PIN(9, "NFCLE", UNIPHIER_PIN_IECTRL_NONE,
+ 			     9, UNIPHIER_PIN_DRV_1BIT,
+ 			     9, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(10, "NFD0", 10,
++	UNIPHIER_PINCTRL_PIN(10, "NFD0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     10, UNIPHIER_PIN_DRV_1BIT,
+ 			     10, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(11, "NFD1", 11,
++	UNIPHIER_PINCTRL_PIN(11, "NFD1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     11, UNIPHIER_PIN_DRV_1BIT,
+ 			     11, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(12, "NFD2", 12,
++	UNIPHIER_PINCTRL_PIN(12, "NFD2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     12, UNIPHIER_PIN_DRV_1BIT,
+ 			     12, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(13, "NFD3", 13,
++	UNIPHIER_PINCTRL_PIN(13, "NFD3", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     13, UNIPHIER_PIN_DRV_1BIT,
+ 			     13, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(14, "NFD4", 14,
++	UNIPHIER_PINCTRL_PIN(14, "NFD4", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     14, UNIPHIER_PIN_DRV_1BIT,
+ 			     14, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(15, "NFD5", 15,
++	UNIPHIER_PINCTRL_PIN(15, "NFD5", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     15, UNIPHIER_PIN_DRV_1BIT,
+ 			     15, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(16, "NFD6", 16,
++	UNIPHIER_PINCTRL_PIN(16, "NFD6", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     16, UNIPHIER_PIN_DRV_1BIT,
+ 			     16, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(17, "NFD7", 17,
++	UNIPHIER_PINCTRL_PIN(17, "NFD7", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     17, UNIPHIER_PIN_DRV_1BIT,
+ 			     17, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(18, "XERST", 18,
++	UNIPHIER_PINCTRL_PIN(18, "XERST", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     0, UNIPHIER_PIN_DRV_2BIT,
+ 			     18, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(19, "MMCCLK", 19,
++	UNIPHIER_PINCTRL_PIN(19, "MMCCLK", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     1, UNIPHIER_PIN_DRV_2BIT,
+ 			     19, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(20, "MMCCMD", 20,
++	UNIPHIER_PINCTRL_PIN(20, "MMCCMD", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     2, UNIPHIER_PIN_DRV_2BIT,
+ 			     20, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(21, "MMCDS", 21,
++	UNIPHIER_PINCTRL_PIN(21, "MMCDS", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     3, UNIPHIER_PIN_DRV_2BIT,
+ 			     21, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(22, "MMCDAT0", 22,
++	UNIPHIER_PINCTRL_PIN(22, "MMCDAT0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     4, UNIPHIER_PIN_DRV_2BIT,
+ 			     22, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(23, "MMCDAT1", 23,
++	UNIPHIER_PINCTRL_PIN(23, "MMCDAT1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     5, UNIPHIER_PIN_DRV_2BIT,
+ 			     23, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(24, "MMCDAT2", 24,
++	UNIPHIER_PINCTRL_PIN(24, "MMCDAT2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     6, UNIPHIER_PIN_DRV_2BIT,
+ 			     24, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(25, "MMCDAT3", 25,
++	UNIPHIER_PINCTRL_PIN(25, "MMCDAT3", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     7, UNIPHIER_PIN_DRV_2BIT,
+ 			     25, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(26, "MMCDAT4", 26,
++	UNIPHIER_PINCTRL_PIN(26, "MMCDAT4", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     8, UNIPHIER_PIN_DRV_2BIT,
+ 			     26, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(27, "MMCDAT5", 27,
++	UNIPHIER_PINCTRL_PIN(27, "MMCDAT5", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     9, UNIPHIER_PIN_DRV_2BIT,
+ 			     27, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(28, "MMCDAT6", 28,
++	UNIPHIER_PINCTRL_PIN(28, "MMCDAT6", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     10, UNIPHIER_PIN_DRV_2BIT,
+ 			     28, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(29, "MMCDAT7", 29,
++	UNIPHIER_PINCTRL_PIN(29, "MMCDAT7", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     11, UNIPHIER_PIN_DRV_2BIT,
+ 			     29, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(46, "USB0VBUS", 46,
++	UNIPHIER_PINCTRL_PIN(46, "USB0VBUS", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     46, UNIPHIER_PIN_DRV_1BIT,
+ 			     46, UNIPHIER_PIN_PULL_DOWN),
+ 	UNIPHIER_PINCTRL_PIN(47, "USB0OD", UNIPHIER_PIN_IECTRL_NONE,
+ 			     47, UNIPHIER_PIN_DRV_1BIT,
+ 			     47, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(48, "USB1VBUS", 48,
++	UNIPHIER_PINCTRL_PIN(48, "USB1VBUS", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     48, UNIPHIER_PIN_DRV_1BIT,
+ 			     48, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(49, "USB1OD", 49,
++	UNIPHIER_PINCTRL_PIN(49, "USB1OD", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     49, UNIPHIER_PIN_DRV_1BIT,
+ 			     49, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(50, "USB2VBUS", 50,
++	UNIPHIER_PINCTRL_PIN(50, "USB2VBUS", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     50, UNIPHIER_PIN_DRV_1BIT,
+ 			     50, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(51, "USB2OD", 51,
++	UNIPHIER_PINCTRL_PIN(51, "USB2OD", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     51, UNIPHIER_PIN_DRV_1BIT,
+ 			     51, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(54, "TXD0", 54,
++	UNIPHIER_PINCTRL_PIN(54, "TXD0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     54, UNIPHIER_PIN_DRV_1BIT,
+ 			     54, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(55, "RXD0", 55,
++	UNIPHIER_PINCTRL_PIN(55, "RXD0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     55, UNIPHIER_PIN_DRV_1BIT,
+ 			     55, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(56, "SPISYNC0", 56,
++	UNIPHIER_PINCTRL_PIN(56, "SPISYNC0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     56, UNIPHIER_PIN_DRV_1BIT,
+ 			     56, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(57, "SPISCLK0", 57,
++	UNIPHIER_PINCTRL_PIN(57, "SPISCLK0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     57, UNIPHIER_PIN_DRV_1BIT,
+ 			     57, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(58, "SPITXD0", 58,
++	UNIPHIER_PINCTRL_PIN(58, "SPITXD0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     58, UNIPHIER_PIN_DRV_1BIT,
+ 			     58, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(59, "SPIRXD0", 59,
++	UNIPHIER_PINCTRL_PIN(59, "SPIRXD0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     59, UNIPHIER_PIN_DRV_1BIT,
+ 			     59, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(60, "AGCI", 60,
++	UNIPHIER_PINCTRL_PIN(60, "AGCI", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     60, UNIPHIER_PIN_DRV_1BIT,
+ 			     60, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(61, "DMDSDA0", 61,
++	UNIPHIER_PINCTRL_PIN(61, "DMDSDA0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED4,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(62, "DMDSCL0", 62,
++	UNIPHIER_PINCTRL_PIN(62, "DMDSCL0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED4,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(63, "SDA0", 63,
++	UNIPHIER_PINCTRL_PIN(63, "SDA0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED4,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(64, "SCL0", 64,
++	UNIPHIER_PINCTRL_PIN(64, "SCL0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED4,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(65, "SDA1", 65,
++	UNIPHIER_PINCTRL_PIN(65, "SDA1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED4,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(66, "SCL1", 66,
++	UNIPHIER_PINCTRL_PIN(66, "SCL1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED4,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(67, "HIN", 67,
++	UNIPHIER_PINCTRL_PIN(67, "HIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED5,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(68, "VIN", 68,
++	UNIPHIER_PINCTRL_PIN(68, "VIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED5,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(69, "PCA00", 69,
++	UNIPHIER_PINCTRL_PIN(69, "PCA00", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     69, UNIPHIER_PIN_DRV_1BIT,
+ 			     69, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(70, "PCA01", 70,
++	UNIPHIER_PINCTRL_PIN(70, "PCA01", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     70, UNIPHIER_PIN_DRV_1BIT,
+ 			     70, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(71, "PCA02", 71,
++	UNIPHIER_PINCTRL_PIN(71, "PCA02", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     71, UNIPHIER_PIN_DRV_1BIT,
+ 			     71, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(72, "PCA03", 72,
++	UNIPHIER_PINCTRL_PIN(72, "PCA03", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     72, UNIPHIER_PIN_DRV_1BIT,
+ 			     72, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(73, "PCA04", 73,
++	UNIPHIER_PINCTRL_PIN(73, "PCA04", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     73, UNIPHIER_PIN_DRV_1BIT,
+ 			     73, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(74, "PCA05", 74,
++	UNIPHIER_PINCTRL_PIN(74, "PCA05", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     74, UNIPHIER_PIN_DRV_1BIT,
+ 			     74, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(75, "PCA06", 75,
++	UNIPHIER_PINCTRL_PIN(75, "PCA06", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     75, UNIPHIER_PIN_DRV_1BIT,
+ 			     75, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(76, "PCA07", 76,
++	UNIPHIER_PINCTRL_PIN(76, "PCA07", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     76, UNIPHIER_PIN_DRV_1BIT,
+ 			     76, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(77, "PCA08", 77,
++	UNIPHIER_PINCTRL_PIN(77, "PCA08", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     77, UNIPHIER_PIN_DRV_1BIT,
+ 			     77, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(78, "PCA09", 78,
++	UNIPHIER_PINCTRL_PIN(78, "PCA09", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     78, UNIPHIER_PIN_DRV_1BIT,
+ 			     78, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(79, "PCA10", 79,
++	UNIPHIER_PINCTRL_PIN(79, "PCA10", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     79, UNIPHIER_PIN_DRV_1BIT,
+ 			     79, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(80, "PCA11", 80,
++	UNIPHIER_PINCTRL_PIN(80, "PCA11", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     80, UNIPHIER_PIN_DRV_1BIT,
+ 			     80, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(81, "PCA12", 81,
++	UNIPHIER_PINCTRL_PIN(81, "PCA12", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     81, UNIPHIER_PIN_DRV_1BIT,
+ 			     81, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(82, "PCA13", 82,
++	UNIPHIER_PINCTRL_PIN(82, "PCA13", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     82, UNIPHIER_PIN_DRV_1BIT,
+ 			     82, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(83, "PCA14", 83,
++	UNIPHIER_PINCTRL_PIN(83, "PCA14", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     83, UNIPHIER_PIN_DRV_1BIT,
+ 			     83, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(84, "PC0READY", 84,
++	UNIPHIER_PINCTRL_PIN(84, "PC0READY", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     84, UNIPHIER_PIN_DRV_1BIT,
+ 			     84, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(85, "PC0CD1", 85,
++	UNIPHIER_PINCTRL_PIN(85, "PC0CD1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     85, UNIPHIER_PIN_DRV_1BIT,
+ 			     85, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(86, "PC0CD2", 86,
++	UNIPHIER_PINCTRL_PIN(86, "PC0CD2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     86, UNIPHIER_PIN_DRV_1BIT,
+ 			     86, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(87, "PC0WAIT", 87,
++	UNIPHIER_PINCTRL_PIN(87, "PC0WAIT", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     87, UNIPHIER_PIN_DRV_1BIT,
+ 			     87, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(88, "PC0RESET", 88,
++	UNIPHIER_PINCTRL_PIN(88, "PC0RESET", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     88, UNIPHIER_PIN_DRV_1BIT,
+ 			     88, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(89, "PC0CE1", 89,
++	UNIPHIER_PINCTRL_PIN(89, "PC0CE1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     89, UNIPHIER_PIN_DRV_1BIT,
+ 			     89, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(90, "PC0WE", 90,
++	UNIPHIER_PINCTRL_PIN(90, "PC0WE", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     90, UNIPHIER_PIN_DRV_1BIT,
+ 			     90, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(91, "PC0OE", 91,
++	UNIPHIER_PINCTRL_PIN(91, "PC0OE", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     91, UNIPHIER_PIN_DRV_1BIT,
+ 			     91, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(92, "PC0IOWR", 92,
++	UNIPHIER_PINCTRL_PIN(92, "PC0IOWR", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     92, UNIPHIER_PIN_DRV_1BIT,
+ 			     92, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(93, "PC0IORD", 93,
++	UNIPHIER_PINCTRL_PIN(93, "PC0IORD", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     93, UNIPHIER_PIN_DRV_1BIT,
+ 			     93, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(94, "PCD00", 94,
++	UNIPHIER_PINCTRL_PIN(94, "PCD00", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     94, UNIPHIER_PIN_DRV_1BIT,
+ 			     94, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(95, "PCD01", 95,
++	UNIPHIER_PINCTRL_PIN(95, "PCD01", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     95, UNIPHIER_PIN_DRV_1BIT,
+ 			     95, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(96, "PCD02", 96,
++	UNIPHIER_PINCTRL_PIN(96, "PCD02", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     96, UNIPHIER_PIN_DRV_1BIT,
+ 			     96, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(97, "PCD03", 97,
++	UNIPHIER_PINCTRL_PIN(97, "PCD03", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     97, UNIPHIER_PIN_DRV_1BIT,
+ 			     97, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(98, "PCD04", 98,
++	UNIPHIER_PINCTRL_PIN(98, "PCD04", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     98, UNIPHIER_PIN_DRV_1BIT,
+ 			     98, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(99, "PCD05", 99,
++	UNIPHIER_PINCTRL_PIN(99, "PCD05", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     99, UNIPHIER_PIN_DRV_1BIT,
+ 			     99, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(100, "PCD06", 100,
++	UNIPHIER_PINCTRL_PIN(100, "PCD06", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     100, UNIPHIER_PIN_DRV_1BIT,
+ 			     100, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(101, "PCD07", 101,
++	UNIPHIER_PINCTRL_PIN(101, "PCD07", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     101, UNIPHIER_PIN_DRV_1BIT,
+ 			     101, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(102, "HS0BCLKIN", 102,
++	UNIPHIER_PINCTRL_PIN(102, "HS0BCLKIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     102, UNIPHIER_PIN_DRV_1BIT,
+ 			     102, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(103, "HS0SYNCIN", 103,
++	UNIPHIER_PINCTRL_PIN(103, "HS0SYNCIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     103, UNIPHIER_PIN_DRV_1BIT,
+ 			     103, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(104, "HS0VALIN", 104,
++	UNIPHIER_PINCTRL_PIN(104, "HS0VALIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     104, UNIPHIER_PIN_DRV_1BIT,
+ 			     104, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(105, "HS0DIN0", 105,
++	UNIPHIER_PINCTRL_PIN(105, "HS0DIN0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     105, UNIPHIER_PIN_DRV_1BIT,
+ 			     105, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(106, "HS0DIN1", 106,
++	UNIPHIER_PINCTRL_PIN(106, "HS0DIN1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     106, UNIPHIER_PIN_DRV_1BIT,
+ 			     106, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(107, "HS0DIN2", 107,
++	UNIPHIER_PINCTRL_PIN(107, "HS0DIN2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     107, UNIPHIER_PIN_DRV_1BIT,
+ 			     107, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(108, "HS0DIN3", 108,
++	UNIPHIER_PINCTRL_PIN(108, "HS0DIN3", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     108, UNIPHIER_PIN_DRV_1BIT,
+ 			     108, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(109, "HS0DIN4", 109,
++	UNIPHIER_PINCTRL_PIN(109, "HS0DIN4", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     109, UNIPHIER_PIN_DRV_1BIT,
+ 			     109, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(110, "HS0DIN5", 110,
++	UNIPHIER_PINCTRL_PIN(110, "HS0DIN5", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     110, UNIPHIER_PIN_DRV_1BIT,
+ 			     110, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(111, "HS0DIN6", 111,
++	UNIPHIER_PINCTRL_PIN(111, "HS0DIN6", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     111, UNIPHIER_PIN_DRV_1BIT,
+ 			     111, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(112, "HS0DIN7", 112,
++	UNIPHIER_PINCTRL_PIN(112, "HS0DIN7", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     112, UNIPHIER_PIN_DRV_1BIT,
+ 			     112, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(113, "HS0BCLKOUT", 113,
++	UNIPHIER_PINCTRL_PIN(113, "HS0BCLKOUT", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     113, UNIPHIER_PIN_DRV_1BIT,
+ 			     113, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(114, "HS0SYNCOUT", 114,
++	UNIPHIER_PINCTRL_PIN(114, "HS0SYNCOUT", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     114, UNIPHIER_PIN_DRV_1BIT,
+ 			     114, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(115, "HS0VALOUT", 115,
++	UNIPHIER_PINCTRL_PIN(115, "HS0VALOUT", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     115, UNIPHIER_PIN_DRV_1BIT,
+ 			     115, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(116, "HS0DOUT0", 116,
++	UNIPHIER_PINCTRL_PIN(116, "HS0DOUT0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     116, UNIPHIER_PIN_DRV_1BIT,
+ 			     116, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(117, "HS0DOUT1", 117,
++	UNIPHIER_PINCTRL_PIN(117, "HS0DOUT1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     117, UNIPHIER_PIN_DRV_1BIT,
+ 			     117, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(118, "HS0DOUT2", 118,
++	UNIPHIER_PINCTRL_PIN(118, "HS0DOUT2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     118, UNIPHIER_PIN_DRV_1BIT,
+ 			     118, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(119, "HS0DOUT3", 119,
++	UNIPHIER_PINCTRL_PIN(119, "HS0DOUT3", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     119, UNIPHIER_PIN_DRV_1BIT,
+ 			     119, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(120, "HS0DOUT4", 120,
++	UNIPHIER_PINCTRL_PIN(120, "HS0DOUT4", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     120, UNIPHIER_PIN_DRV_1BIT,
+ 			     120, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(121, "HS0DOUT5", 121,
++	UNIPHIER_PINCTRL_PIN(121, "HS0DOUT5", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     121, UNIPHIER_PIN_DRV_1BIT,
+ 			     121, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(122, "HS0DOUT6", 122,
++	UNIPHIER_PINCTRL_PIN(122, "HS0DOUT6", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     122, UNIPHIER_PIN_DRV_1BIT,
+ 			     122, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(123, "HS0DOUT7", 123,
++	UNIPHIER_PINCTRL_PIN(123, "HS0DOUT7", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     123, UNIPHIER_PIN_DRV_1BIT,
+ 			     123, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(124, "HS1BCLKIN", 124,
++	UNIPHIER_PINCTRL_PIN(124, "HS1BCLKIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     124, UNIPHIER_PIN_DRV_1BIT,
+ 			     124, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(125, "HS1SYNCIN", 125,
++	UNIPHIER_PINCTRL_PIN(125, "HS1SYNCIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     125, UNIPHIER_PIN_DRV_1BIT,
+ 			     125, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(126, "HS1VALIN", 126,
++	UNIPHIER_PINCTRL_PIN(126, "HS1VALIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     126, UNIPHIER_PIN_DRV_1BIT,
+ 			     126, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(127, "HS1DIN0", 127,
++	UNIPHIER_PINCTRL_PIN(127, "HS1DIN0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     127, UNIPHIER_PIN_DRV_1BIT,
+ 			     127, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(128, "HS1DIN1", 128,
++	UNIPHIER_PINCTRL_PIN(128, "HS1DIN1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     128, UNIPHIER_PIN_DRV_1BIT,
+ 			     128, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(129, "HS1DIN2", 129,
++	UNIPHIER_PINCTRL_PIN(129, "HS1DIN2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     129, UNIPHIER_PIN_DRV_1BIT,
+ 			     129, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(130, "HS1DIN3", 130,
++	UNIPHIER_PINCTRL_PIN(130, "HS1DIN3", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     130, UNIPHIER_PIN_DRV_1BIT,
+ 			     130, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(131, "HS1DIN4", 131,
++	UNIPHIER_PINCTRL_PIN(131, "HS1DIN4", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     131, UNIPHIER_PIN_DRV_1BIT,
+ 			     131, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(132, "HS1DIN5", 132,
++	UNIPHIER_PINCTRL_PIN(132, "HS1DIN5", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     132, UNIPHIER_PIN_DRV_1BIT,
+ 			     132, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(133, "HS1DIN6", 133,
++	UNIPHIER_PINCTRL_PIN(133, "HS1DIN6", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     133, UNIPHIER_PIN_DRV_1BIT,
+ 			     133, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(134, "HS1DIN7", 134,
++	UNIPHIER_PINCTRL_PIN(134, "HS1DIN7", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     134, UNIPHIER_PIN_DRV_1BIT,
+ 			     134, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(135, "AO1IEC", 135,
++	UNIPHIER_PINCTRL_PIN(135, "AO1IEC", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     135, UNIPHIER_PIN_DRV_1BIT,
+ 			     135, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(136, "AO1ARC", 136,
++	UNIPHIER_PINCTRL_PIN(136, "AO1ARC", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     136, UNIPHIER_PIN_DRV_1BIT,
+ 			     136, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(137, "AO1DACCK", 137,
++	UNIPHIER_PINCTRL_PIN(137, "AO1DACCK", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     137, UNIPHIER_PIN_DRV_1BIT,
+ 			     137, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(138, "AO1BCK", 138,
++	UNIPHIER_PINCTRL_PIN(138, "AO1BCK", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     138, UNIPHIER_PIN_DRV_1BIT,
+ 			     138, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(139, "AO1LRCK", 139,
++	UNIPHIER_PINCTRL_PIN(139, "AO1LRCK", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     139, UNIPHIER_PIN_DRV_1BIT,
+ 			     139, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(140, "AO1D0", 140,
++	UNIPHIER_PINCTRL_PIN(140, "AO1D0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     140, UNIPHIER_PIN_DRV_1BIT,
+ 			     140, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(141, "AO1D1", 141,
++	UNIPHIER_PINCTRL_PIN(141, "AO1D1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     141, UNIPHIER_PIN_DRV_1BIT,
+ 			     141, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(142, "AO1D2", 142,
++	UNIPHIER_PINCTRL_PIN(142, "AO1D2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     142, UNIPHIER_PIN_DRV_1BIT,
+ 			     142, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(143, "XIRQ9", 143,
++	UNIPHIER_PINCTRL_PIN(143, "XIRQ9", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     143, UNIPHIER_PIN_DRV_1BIT,
+ 			     143, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(144, "XIRQ10", 144,
++	UNIPHIER_PINCTRL_PIN(144, "XIRQ10", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     144, UNIPHIER_PIN_DRV_1BIT,
+ 			     144, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(145, "XIRQ11", 145,
++	UNIPHIER_PINCTRL_PIN(145, "XIRQ11", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     145, UNIPHIER_PIN_DRV_1BIT,
+ 			     145, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(146, "XIRQ13", 146,
++	UNIPHIER_PINCTRL_PIN(146, "XIRQ13", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     146, UNIPHIER_PIN_DRV_1BIT,
+ 			     146, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(147, "PWMA", 147,
++	UNIPHIER_PINCTRL_PIN(147, "PWMA", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     147, UNIPHIER_PIN_DRV_1BIT,
+ 			     147, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(148, "LR_GOUT", 148,
++	UNIPHIER_PINCTRL_PIN(148, "LR_GOUT", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     148, UNIPHIER_PIN_DRV_1BIT,
+ 			     148, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(149, "XIRQ0", 149,
++	UNIPHIER_PINCTRL_PIN(149, "XIRQ0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     149, UNIPHIER_PIN_DRV_1BIT,
+ 			     149, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(150, "XIRQ1", 150,
++	UNIPHIER_PINCTRL_PIN(150, "XIRQ1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     150, UNIPHIER_PIN_DRV_1BIT,
+ 			     150, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(151, "XIRQ2", 151,
++	UNIPHIER_PINCTRL_PIN(151, "XIRQ2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     151, UNIPHIER_PIN_DRV_1BIT,
+ 			     151, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(152, "XIRQ3", 152,
++	UNIPHIER_PINCTRL_PIN(152, "XIRQ3", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     152, UNIPHIER_PIN_DRV_1BIT,
+ 			     152, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(153, "XIRQ4", 153,
++	UNIPHIER_PINCTRL_PIN(153, "XIRQ4", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     153, UNIPHIER_PIN_DRV_1BIT,
+ 			     153, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(154, "XIRQ5", 154,
++	UNIPHIER_PINCTRL_PIN(154, "XIRQ5", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     154, UNIPHIER_PIN_DRV_1BIT,
+ 			     154, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(155, "XIRQ6", 155,
++	UNIPHIER_PINCTRL_PIN(155, "XIRQ6", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     155, UNIPHIER_PIN_DRV_1BIT,
+ 			     155, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(156, "XIRQ7", 156,
++	UNIPHIER_PINCTRL_PIN(156, "XIRQ7", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     156, UNIPHIER_PIN_DRV_1BIT,
+ 			     156, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(157, "XIRQ8", 157,
++	UNIPHIER_PINCTRL_PIN(157, "XIRQ8", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     157, UNIPHIER_PIN_DRV_1BIT,
+ 			     157, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(158, "AGCBS", 158,
++	UNIPHIER_PINCTRL_PIN(158, "AGCBS", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     158, UNIPHIER_PIN_DRV_1BIT,
+ 			     158, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(159, "XIRQ21", 159,
++	UNIPHIER_PINCTRL_PIN(159, "XIRQ21", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     159, UNIPHIER_PIN_DRV_1BIT,
+ 			     159, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(160, "XIRQ22", 160,
++	UNIPHIER_PINCTRL_PIN(160, "XIRQ22", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     160, UNIPHIER_PIN_DRV_1BIT,
+ 			     160, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(161, "XIRQ23", 161,
++	UNIPHIER_PINCTRL_PIN(161, "XIRQ23", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     161, UNIPHIER_PIN_DRV_1BIT,
+ 			     161, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(162, "CH2CLK", 162,
++	UNIPHIER_PINCTRL_PIN(162, "CH2CLK", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     162, UNIPHIER_PIN_DRV_1BIT,
+ 			     162, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(163, "CH2PSYNC", 163,
++	UNIPHIER_PINCTRL_PIN(163, "CH2PSYNC", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     163, UNIPHIER_PIN_DRV_1BIT,
+ 			     163, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(164, "CH2VAL", 164,
++	UNIPHIER_PINCTRL_PIN(164, "CH2VAL", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     164, UNIPHIER_PIN_DRV_1BIT,
+ 			     164, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(165, "CH2DATA", 165,
++	UNIPHIER_PINCTRL_PIN(165, "CH2DATA", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     165, UNIPHIER_PIN_DRV_1BIT,
+ 			     165, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(166, "CK25O", 166,
++	UNIPHIER_PINCTRL_PIN(166, "CK25O", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     166, UNIPHIER_PIN_DRV_1BIT,
+ 			     166, UNIPHIER_PIN_PULL_DOWN),
  };
- builtin_platform_driver(uniphier_ld11_pinctrl_driver);
 diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-index e5bc7c36c1e4..82f754cd85d9 100644
+index d5ebe2482bda..e5bc7c36c1e4 100644
 --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
 +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-@@ -733,6 +733,7 @@ static struct platform_driver uniphier_ld20_pinctrl_driver = {
- 	.driver = {
- 		.name = "uniphier-ld20-pinctrl",
- 		.of_match_table = uniphier_ld20_pinctrl_match,
-+		.pm = &uniphier_pinctrl_pm_ops,
- 	},
+@@ -21,532 +21,532 @@
+ #include "pinctrl-uniphier.h"
+ 
+ static const struct pinctrl_pin_desc uniphier_ld20_pins[] = {
+-	UNIPHIER_PINCTRL_PIN(0, "XECS1", 0,
++	UNIPHIER_PINCTRL_PIN(0, "XECS1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     0, UNIPHIER_PIN_DRV_3BIT,
+ 			     0, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(1, "ERXW", 1,
++	UNIPHIER_PINCTRL_PIN(1, "ERXW", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     1, UNIPHIER_PIN_DRV_3BIT,
+ 			     1, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(2, "XERWE1", 2,
++	UNIPHIER_PINCTRL_PIN(2, "XERWE1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     2, UNIPHIER_PIN_DRV_3BIT,
+ 			     2, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(3, "XNFWP", 3,
++	UNIPHIER_PINCTRL_PIN(3, "XNFWP", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     3, UNIPHIER_PIN_DRV_3BIT,
+ 			     3, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(4, "XNFCE0", 4,
++	UNIPHIER_PINCTRL_PIN(4, "XNFCE0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     4, UNIPHIER_PIN_DRV_3BIT,
+ 			     4, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(5, "NFRYBY0", 5,
++	UNIPHIER_PINCTRL_PIN(5, "NFRYBY0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     5, UNIPHIER_PIN_DRV_3BIT,
+ 			     5, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(6, "XNFRE", 6,
++	UNIPHIER_PINCTRL_PIN(6, "XNFRE", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     6, UNIPHIER_PIN_DRV_3BIT,
+ 			     6, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(7, "XNFWE", 7,
++	UNIPHIER_PINCTRL_PIN(7, "XNFWE", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     7, UNIPHIER_PIN_DRV_3BIT,
+ 			     7, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(8, "NFALE", 8,
++	UNIPHIER_PINCTRL_PIN(8, "NFALE", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     8, UNIPHIER_PIN_DRV_3BIT,
+ 			     8, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(9, "NFCLE", 9,
++	UNIPHIER_PINCTRL_PIN(9, "NFCLE", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     9, UNIPHIER_PIN_DRV_3BIT,
+ 			     9, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(10, "NFD0", 10,
++	UNIPHIER_PINCTRL_PIN(10, "NFD0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     10, UNIPHIER_PIN_DRV_3BIT,
+ 			     10, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(11, "NFD1", 11,
++	UNIPHIER_PINCTRL_PIN(11, "NFD1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     11, UNIPHIER_PIN_DRV_3BIT,
+ 			     11, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(12, "NFD2", 12,
++	UNIPHIER_PINCTRL_PIN(12, "NFD2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     12, UNIPHIER_PIN_DRV_3BIT,
+ 			     12, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(13, "NFD3", 13,
++	UNIPHIER_PINCTRL_PIN(13, "NFD3", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     13, UNIPHIER_PIN_DRV_3BIT,
+ 			     13, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(14, "NFD4", 14,
++	UNIPHIER_PINCTRL_PIN(14, "NFD4", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     14, UNIPHIER_PIN_DRV_3BIT,
+ 			     14, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(15, "NFD5", 15,
++	UNIPHIER_PINCTRL_PIN(15, "NFD5", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     15, UNIPHIER_PIN_DRV_3BIT,
+ 			     15, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(16, "NFD6", 16,
++	UNIPHIER_PINCTRL_PIN(16, "NFD6", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     16, UNIPHIER_PIN_DRV_3BIT,
+ 			     16, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(17, "NFD7", 17,
++	UNIPHIER_PINCTRL_PIN(17, "NFD7", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     17, UNIPHIER_PIN_DRV_3BIT,
+ 			     17, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(18, "XERST", 18,
++	UNIPHIER_PINCTRL_PIN(18, "XERST", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     0, UNIPHIER_PIN_DRV_2BIT,
+ 			     18, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(19, "MMCCLK", 19,
++	UNIPHIER_PINCTRL_PIN(19, "MMCCLK", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     1, UNIPHIER_PIN_DRV_2BIT,
+ 			     19, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(20, "MMCCMD", 20,
++	UNIPHIER_PINCTRL_PIN(20, "MMCCMD", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     2, UNIPHIER_PIN_DRV_2BIT,
+ 			     20, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(21, "MMCDS", 21,
++	UNIPHIER_PINCTRL_PIN(21, "MMCDS", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     3, UNIPHIER_PIN_DRV_2BIT,
+ 			     21, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(22, "MMCDAT0", 22,
++	UNIPHIER_PINCTRL_PIN(22, "MMCDAT0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     4, UNIPHIER_PIN_DRV_2BIT,
+ 			     22, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(23, "MMCDAT1", 23,
++	UNIPHIER_PINCTRL_PIN(23, "MMCDAT1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     5, UNIPHIER_PIN_DRV_2BIT,
+ 			     23, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(24, "MMCDAT2", 24,
++	UNIPHIER_PINCTRL_PIN(24, "MMCDAT2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     6, UNIPHIER_PIN_DRV_2BIT,
+ 			     24, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(25, "MMCDAT3", 25,
++	UNIPHIER_PINCTRL_PIN(25, "MMCDAT3", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     7, UNIPHIER_PIN_DRV_2BIT,
+ 			     25, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(26, "MMCDAT4", 26,
++	UNIPHIER_PINCTRL_PIN(26, "MMCDAT4", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     8, UNIPHIER_PIN_DRV_2BIT,
+ 			     26, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(27, "MMCDAT5", 27,
++	UNIPHIER_PINCTRL_PIN(27, "MMCDAT5", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     9, UNIPHIER_PIN_DRV_2BIT,
+ 			     27, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(28, "MMCDAT6", 28,
++	UNIPHIER_PINCTRL_PIN(28, "MMCDAT6", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     10, UNIPHIER_PIN_DRV_2BIT,
+ 			     28, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(29, "MMCDAT7", 29,
++	UNIPHIER_PINCTRL_PIN(29, "MMCDAT7", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     11, UNIPHIER_PIN_DRV_2BIT,
+ 			     29, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(30, "MDC", 30,
++	UNIPHIER_PINCTRL_PIN(30, "MDC", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     18, UNIPHIER_PIN_DRV_3BIT,
+ 			     30, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(31, "MDIO", 31,
++	UNIPHIER_PINCTRL_PIN(31, "MDIO", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     19, UNIPHIER_PIN_DRV_3BIT,
+ 			     31, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(32, "MDIO_INTL", 32,
++	UNIPHIER_PINCTRL_PIN(32, "MDIO_INTL", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     20, UNIPHIER_PIN_DRV_3BIT,
+ 			     32, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(33, "PHYRSTL", 33,
++	UNIPHIER_PINCTRL_PIN(33, "PHYRSTL", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     21, UNIPHIER_PIN_DRV_3BIT,
+ 			     33, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(34, "RGMII_RXCLK", 34,
++	UNIPHIER_PINCTRL_PIN(34, "RGMII_RXCLK", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     22, UNIPHIER_PIN_DRV_3BIT,
+ 			     34, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(35, "RGMII_RXD0", 35,
++	UNIPHIER_PINCTRL_PIN(35, "RGMII_RXD0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     23, UNIPHIER_PIN_DRV_3BIT,
+ 			     35, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(36, "RGMII_RXD1", 36,
++	UNIPHIER_PINCTRL_PIN(36, "RGMII_RXD1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     24, UNIPHIER_PIN_DRV_3BIT,
+ 			     36, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(37, "RGMII_RXD2", 37,
++	UNIPHIER_PINCTRL_PIN(37, "RGMII_RXD2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     25, UNIPHIER_PIN_DRV_3BIT,
+ 			     37, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(38, "RGMII_RXD3", 38,
++	UNIPHIER_PINCTRL_PIN(38, "RGMII_RXD3", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     26, UNIPHIER_PIN_DRV_3BIT,
+ 			     38, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(39, "RGMII_RXCTL", 39,
++	UNIPHIER_PINCTRL_PIN(39, "RGMII_RXCTL", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     27, UNIPHIER_PIN_DRV_3BIT,
+ 			     39, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(40, "RGMII_TXCLK", 40,
++	UNIPHIER_PINCTRL_PIN(40, "RGMII_TXCLK", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     28, UNIPHIER_PIN_DRV_3BIT,
+ 			     40, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(41, "RGMII_TXD0", 41,
++	UNIPHIER_PINCTRL_PIN(41, "RGMII_TXD0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     29, UNIPHIER_PIN_DRV_3BIT,
+ 			     41, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(42, "RGMII_TXD1", 42,
++	UNIPHIER_PINCTRL_PIN(42, "RGMII_TXD1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     30, UNIPHIER_PIN_DRV_3BIT,
+ 			     42, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(43, "RGMII_TXD2", 43,
++	UNIPHIER_PINCTRL_PIN(43, "RGMII_TXD2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     31, UNIPHIER_PIN_DRV_3BIT,
+ 			     43, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(44, "RGMII_TXD3", 44,
++	UNIPHIER_PINCTRL_PIN(44, "RGMII_TXD3", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     32, UNIPHIER_PIN_DRV_3BIT,
+ 			     44, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(45, "RGMII_TXCTL", 45,
++	UNIPHIER_PINCTRL_PIN(45, "RGMII_TXCTL", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     33, UNIPHIER_PIN_DRV_3BIT,
+ 			     45, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(46, "USB0VBUS", 46,
++	UNIPHIER_PINCTRL_PIN(46, "USB0VBUS", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     34, UNIPHIER_PIN_DRV_3BIT,
+ 			     46, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(47, "USB0OD", 47,
++	UNIPHIER_PINCTRL_PIN(47, "USB0OD", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     35, UNIPHIER_PIN_DRV_3BIT,
+ 			     47, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(48, "USB1VBUS", 48,
++	UNIPHIER_PINCTRL_PIN(48, "USB1VBUS", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     36, UNIPHIER_PIN_DRV_3BIT,
+ 			     48, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(49, "USB1OD", 49,
++	UNIPHIER_PINCTRL_PIN(49, "USB1OD", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     37, UNIPHIER_PIN_DRV_3BIT,
+ 			     49, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(50, "USB2VBUS", 50,
++	UNIPHIER_PINCTRL_PIN(50, "USB2VBUS", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     38, UNIPHIER_PIN_DRV_3BIT,
+ 			     50, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(51, "USB2OD", 51,
++	UNIPHIER_PINCTRL_PIN(51, "USB2OD", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     39, UNIPHIER_PIN_DRV_3BIT,
+ 			     51, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(52, "USB3VBUS", 52,
++	UNIPHIER_PINCTRL_PIN(52, "USB3VBUS", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     40, UNIPHIER_PIN_DRV_3BIT,
+ 			     52, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(53, "USB3OD", 53,
++	UNIPHIER_PINCTRL_PIN(53, "USB3OD", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     41, UNIPHIER_PIN_DRV_3BIT,
+ 			     53, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(54, "TXD0", 54,
++	UNIPHIER_PINCTRL_PIN(54, "TXD0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     42, UNIPHIER_PIN_DRV_3BIT,
+ 			     54, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(55, "RXD0", 55,
++	UNIPHIER_PINCTRL_PIN(55, "RXD0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     43, UNIPHIER_PIN_DRV_3BIT,
+ 			     55, UNIPHIER_PIN_PULL_UP),
+-	UNIPHIER_PINCTRL_PIN(56, "SPISYNC0", 56,
++	UNIPHIER_PINCTRL_PIN(56, "SPISYNC0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     44, UNIPHIER_PIN_DRV_3BIT,
+ 			     56, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(57, "SPISCLK0", 57,
++	UNIPHIER_PINCTRL_PIN(57, "SPISCLK0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     45, UNIPHIER_PIN_DRV_3BIT,
+ 			     57, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(58, "SPITXD0", 58,
++	UNIPHIER_PINCTRL_PIN(58, "SPITXD0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     46, UNIPHIER_PIN_DRV_3BIT,
+ 			     58, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(59, "SPIRXD0", 59,
++	UNIPHIER_PINCTRL_PIN(59, "SPIRXD0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     47, UNIPHIER_PIN_DRV_3BIT,
+ 			     59, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(60, "AGCI", 60,
++	UNIPHIER_PINCTRL_PIN(60, "AGCI", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     48, UNIPHIER_PIN_DRV_3BIT,
+ 			     60, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(61, "DMDSDA0", 61,
++	UNIPHIER_PINCTRL_PIN(61, "DMDSDA0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED4,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(62, "DMDSCL0", 62,
++	UNIPHIER_PINCTRL_PIN(62, "DMDSCL0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED4,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(63, "SDA0", 63,
++	UNIPHIER_PINCTRL_PIN(63, "SDA0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED4,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(64, "SCL0", 64,
++	UNIPHIER_PINCTRL_PIN(64, "SCL0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED4,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(65, "SDA1", 65,
++	UNIPHIER_PINCTRL_PIN(65, "SDA1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED4,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(66, "SCL1", 66,
++	UNIPHIER_PINCTRL_PIN(66, "SCL1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED4,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(67, "HIN", 67,
++	UNIPHIER_PINCTRL_PIN(67, "HIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED4,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(68, "VIN", 68,
++	UNIPHIER_PINCTRL_PIN(68, "VIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     -1, UNIPHIER_PIN_DRV_FIXED4,
+ 			     -1, UNIPHIER_PIN_PULL_NONE),
+-	UNIPHIER_PINCTRL_PIN(69, "PCA00", 69,
++	UNIPHIER_PINCTRL_PIN(69, "PCA00", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     49, UNIPHIER_PIN_DRV_3BIT,
+ 			     69, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(70, "PCA01", 70,
++	UNIPHIER_PINCTRL_PIN(70, "PCA01", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     50, UNIPHIER_PIN_DRV_3BIT,
+ 			     70, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(71, "PCA02", 71,
++	UNIPHIER_PINCTRL_PIN(71, "PCA02", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     51, UNIPHIER_PIN_DRV_3BIT,
+ 			     71, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(72, "PCA03", 72,
++	UNIPHIER_PINCTRL_PIN(72, "PCA03", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     52, UNIPHIER_PIN_DRV_3BIT,
+ 			     72, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(73, "PCA04", 73,
++	UNIPHIER_PINCTRL_PIN(73, "PCA04", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     53, UNIPHIER_PIN_DRV_3BIT,
+ 			     73, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(74, "PCA05", 74,
++	UNIPHIER_PINCTRL_PIN(74, "PCA05", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     54, UNIPHIER_PIN_DRV_3BIT,
+ 			     74, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(75, "PCA06", 75,
++	UNIPHIER_PINCTRL_PIN(75, "PCA06", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     55, UNIPHIER_PIN_DRV_3BIT,
+ 			     75, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(76, "PCA07", 76,
++	UNIPHIER_PINCTRL_PIN(76, "PCA07", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     56, UNIPHIER_PIN_DRV_3BIT,
+ 			     76, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(77, "PCA08", 77,
++	UNIPHIER_PINCTRL_PIN(77, "PCA08", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     57, UNIPHIER_PIN_DRV_3BIT,
+ 			     77, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(78, "PCA09", 78,
++	UNIPHIER_PINCTRL_PIN(78, "PCA09", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     58, UNIPHIER_PIN_DRV_3BIT,
+ 			     78, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(79, "PCA10", 79,
++	UNIPHIER_PINCTRL_PIN(79, "PCA10", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     59, UNIPHIER_PIN_DRV_3BIT,
+ 			     79, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(80, "PCA11", 80,
++	UNIPHIER_PINCTRL_PIN(80, "PCA11", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     60, UNIPHIER_PIN_DRV_3BIT,
+ 			     80, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(81, "PCA12", 81,
++	UNIPHIER_PINCTRL_PIN(81, "PCA12", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     61, UNIPHIER_PIN_DRV_3BIT,
+ 			     81, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(82, "PCA13", 82,
++	UNIPHIER_PINCTRL_PIN(82, "PCA13", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     62, UNIPHIER_PIN_DRV_3BIT,
+ 			     82, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(83, "PCA14", 83,
++	UNIPHIER_PINCTRL_PIN(83, "PCA14", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     63, UNIPHIER_PIN_DRV_3BIT,
+ 			     83, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(84, "PC0READY", 84,
++	UNIPHIER_PINCTRL_PIN(84, "PC0READY", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     0, UNIPHIER_PIN_DRV_1BIT,
+ 			     84, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(85, "PC0CD1", 85,
++	UNIPHIER_PINCTRL_PIN(85, "PC0CD1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     1, UNIPHIER_PIN_DRV_1BIT,
+ 			     85, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(86, "PC0CD2", 86,
++	UNIPHIER_PINCTRL_PIN(86, "PC0CD2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     2, UNIPHIER_PIN_DRV_1BIT,
+ 			     86, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(87, "PC0WAIT", 87,
++	UNIPHIER_PINCTRL_PIN(87, "PC0WAIT", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     3, UNIPHIER_PIN_DRV_1BIT,
+ 			     87, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(88, "PC0RESET", 88,
++	UNIPHIER_PINCTRL_PIN(88, "PC0RESET", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     4, UNIPHIER_PIN_DRV_1BIT,
+ 			     88, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(89, "PC0CE1", 89,
++	UNIPHIER_PINCTRL_PIN(89, "PC0CE1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     5, UNIPHIER_PIN_DRV_1BIT,
+ 			     89, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(90, "PC0WE", 90,
++	UNIPHIER_PINCTRL_PIN(90, "PC0WE", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     6, UNIPHIER_PIN_DRV_1BIT,
+ 			     90, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(91, "PC0OE", 91,
++	UNIPHIER_PINCTRL_PIN(91, "PC0OE", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     7, UNIPHIER_PIN_DRV_1BIT,
+ 			     91, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(92, "PC0IOWR", 92,
++	UNIPHIER_PINCTRL_PIN(92, "PC0IOWR", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     8, UNIPHIER_PIN_DRV_1BIT,
+ 			     92, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(93, "PC0IORD", 93,
++	UNIPHIER_PINCTRL_PIN(93, "PC0IORD", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     9, UNIPHIER_PIN_DRV_1BIT,
+ 			     93, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(94, "PCD00", 94,
++	UNIPHIER_PINCTRL_PIN(94, "PCD00", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     10, UNIPHIER_PIN_DRV_1BIT,
+ 			     94, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(95, "PCD01", 95,
++	UNIPHIER_PINCTRL_PIN(95, "PCD01", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     11, UNIPHIER_PIN_DRV_1BIT,
+ 			     95, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(96, "PCD02", 96,
++	UNIPHIER_PINCTRL_PIN(96, "PCD02", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     12, UNIPHIER_PIN_DRV_1BIT,
+ 			     96, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(97, "PCD03", 97,
++	UNIPHIER_PINCTRL_PIN(97, "PCD03", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     13, UNIPHIER_PIN_DRV_1BIT,
+ 			     97, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(98, "PCD04", 98,
++	UNIPHIER_PINCTRL_PIN(98, "PCD04", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     14, UNIPHIER_PIN_DRV_1BIT,
+ 			     98, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(99, "PCD05", 99,
++	UNIPHIER_PINCTRL_PIN(99, "PCD05", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     15, UNIPHIER_PIN_DRV_1BIT,
+ 			     99, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(100, "PCD06", 100,
++	UNIPHIER_PINCTRL_PIN(100, "PCD06", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     16, UNIPHIER_PIN_DRV_1BIT,
+ 			     100, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(101, "PCD07", 101,
++	UNIPHIER_PINCTRL_PIN(101, "PCD07", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     17, UNIPHIER_PIN_DRV_1BIT,
+ 			     101, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(102, "HS0BCLKIN", 102,
++	UNIPHIER_PINCTRL_PIN(102, "HS0BCLKIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     18, UNIPHIER_PIN_DRV_1BIT,
+ 			     102, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(103, "HS0SYNCIN", 103,
++	UNIPHIER_PINCTRL_PIN(103, "HS0SYNCIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     19, UNIPHIER_PIN_DRV_1BIT,
+ 			     103, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(104, "HS0VALIN", 104,
++	UNIPHIER_PINCTRL_PIN(104, "HS0VALIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     20, UNIPHIER_PIN_DRV_1BIT,
+ 			     104, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(105, "HS0DIN0", 105,
++	UNIPHIER_PINCTRL_PIN(105, "HS0DIN0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     21, UNIPHIER_PIN_DRV_1BIT,
+ 			     105, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(106, "HS0DIN1", 106,
++	UNIPHIER_PINCTRL_PIN(106, "HS0DIN1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     22, UNIPHIER_PIN_DRV_1BIT,
+ 			     106, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(107, "HS0DIN2", 107,
++	UNIPHIER_PINCTRL_PIN(107, "HS0DIN2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     23, UNIPHIER_PIN_DRV_1BIT,
+ 			     107, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(108, "HS0DIN3", 108,
++	UNIPHIER_PINCTRL_PIN(108, "HS0DIN3", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     24, UNIPHIER_PIN_DRV_1BIT,
+ 			     108, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(109, "HS0DIN4", 109,
++	UNIPHIER_PINCTRL_PIN(109, "HS0DIN4", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     25, UNIPHIER_PIN_DRV_1BIT,
+ 			     109, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(110, "HS0DIN5", 110,
++	UNIPHIER_PINCTRL_PIN(110, "HS0DIN5", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     26, UNIPHIER_PIN_DRV_1BIT,
+ 			     110, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(111, "HS0DIN6", 111,
++	UNIPHIER_PINCTRL_PIN(111, "HS0DIN6", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     27, UNIPHIER_PIN_DRV_1BIT,
+ 			     111, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(112, "HS0DIN7", 112,
++	UNIPHIER_PINCTRL_PIN(112, "HS0DIN7", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     28, UNIPHIER_PIN_DRV_1BIT,
+ 			     112, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(113, "HS0BCLKOUT", 113,
++	UNIPHIER_PINCTRL_PIN(113, "HS0BCLKOUT", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     64, UNIPHIER_PIN_DRV_3BIT,
+ 			     113, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(114, "HS0SYNCOUT", 114,
++	UNIPHIER_PINCTRL_PIN(114, "HS0SYNCOUT", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     65, UNIPHIER_PIN_DRV_3BIT,
+ 			     114, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(115, "HS0VALOUT", 115,
++	UNIPHIER_PINCTRL_PIN(115, "HS0VALOUT", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     66, UNIPHIER_PIN_DRV_3BIT,
+ 			     115, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(116, "HS0DOUT0", 116,
++	UNIPHIER_PINCTRL_PIN(116, "HS0DOUT0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     67, UNIPHIER_PIN_DRV_3BIT,
+ 			     116, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(117, "HS0DOUT1", 117,
++	UNIPHIER_PINCTRL_PIN(117, "HS0DOUT1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     68, UNIPHIER_PIN_DRV_3BIT,
+ 			     117, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(118, "HS0DOUT2", 118,
++	UNIPHIER_PINCTRL_PIN(118, "HS0DOUT2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     69, UNIPHIER_PIN_DRV_3BIT,
+ 			     118, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(119, "HS0DOUT3", 119,
++	UNIPHIER_PINCTRL_PIN(119, "HS0DOUT3", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     70, UNIPHIER_PIN_DRV_3BIT,
+ 			     119, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(120, "HS0DOUT4", 120,
++	UNIPHIER_PINCTRL_PIN(120, "HS0DOUT4", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     71, UNIPHIER_PIN_DRV_3BIT,
+ 			     120, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(121, "HS0DOUT5", 121,
++	UNIPHIER_PINCTRL_PIN(121, "HS0DOUT5", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     72, UNIPHIER_PIN_DRV_3BIT,
+ 			     121, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(122, "HS0DOUT6", 122,
++	UNIPHIER_PINCTRL_PIN(122, "HS0DOUT6", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     73, UNIPHIER_PIN_DRV_3BIT,
+ 			     122, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(123, "HS0DOUT7", 123,
++	UNIPHIER_PINCTRL_PIN(123, "HS0DOUT7", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     74, UNIPHIER_PIN_DRV_3BIT,
+ 			     123, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(124, "HS1BCLKIN", 124,
++	UNIPHIER_PINCTRL_PIN(124, "HS1BCLKIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     75, UNIPHIER_PIN_DRV_3BIT,
+ 			     124, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(125, "HS1SYNCIN", 125,
++	UNIPHIER_PINCTRL_PIN(125, "HS1SYNCIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     76, UNIPHIER_PIN_DRV_3BIT,
+ 			     125, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(126, "HS1VALIN", 126,
++	UNIPHIER_PINCTRL_PIN(126, "HS1VALIN", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     77, UNIPHIER_PIN_DRV_3BIT,
+ 			     126, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(127, "HS1DIN0", 127,
++	UNIPHIER_PINCTRL_PIN(127, "HS1DIN0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     78, UNIPHIER_PIN_DRV_3BIT,
+ 			     127, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(128, "HS1DIN1", 128,
++	UNIPHIER_PINCTRL_PIN(128, "HS1DIN1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     79, UNIPHIER_PIN_DRV_3BIT,
+ 			     128, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(129, "HS1DIN2", 129,
++	UNIPHIER_PINCTRL_PIN(129, "HS1DIN2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     80, UNIPHIER_PIN_DRV_3BIT,
+ 			     129, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(130, "HS1DIN3", 130,
++	UNIPHIER_PINCTRL_PIN(130, "HS1DIN3", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     81, UNIPHIER_PIN_DRV_3BIT,
+ 			     130, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(131, "HS1DIN4", 131,
++	UNIPHIER_PINCTRL_PIN(131, "HS1DIN4", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     82, UNIPHIER_PIN_DRV_3BIT,
+ 			     131, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(132, "HS1DIN5", 132,
++	UNIPHIER_PINCTRL_PIN(132, "HS1DIN5", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     83, UNIPHIER_PIN_DRV_3BIT,
+ 			     132, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(133, "HS1DIN6", 133,
++	UNIPHIER_PINCTRL_PIN(133, "HS1DIN6", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     84, UNIPHIER_PIN_DRV_3BIT,
+ 			     133, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(134, "HS1DIN7", 134,
++	UNIPHIER_PINCTRL_PIN(134, "HS1DIN7", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     85, UNIPHIER_PIN_DRV_3BIT,
+ 			     134, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(135, "AO1IEC", 135,
++	UNIPHIER_PINCTRL_PIN(135, "AO1IEC", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     86, UNIPHIER_PIN_DRV_3BIT,
+ 			     135, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(136, "AO1ARC", 136,
++	UNIPHIER_PINCTRL_PIN(136, "AO1ARC", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     87, UNIPHIER_PIN_DRV_3BIT,
+ 			     136, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(137, "AO1DACCK", 137,
++	UNIPHIER_PINCTRL_PIN(137, "AO1DACCK", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     88, UNIPHIER_PIN_DRV_3BIT,
+ 			     137, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(138, "AO1BCK", 138,
++	UNIPHIER_PINCTRL_PIN(138, "AO1BCK", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     89, UNIPHIER_PIN_DRV_3BIT,
+ 			     138, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(139, "AO1LRCK", 139,
++	UNIPHIER_PINCTRL_PIN(139, "AO1LRCK", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     90, UNIPHIER_PIN_DRV_3BIT,
+ 			     139, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(140, "AO1D0", 140,
++	UNIPHIER_PINCTRL_PIN(140, "AO1D0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     91, UNIPHIER_PIN_DRV_3BIT,
+ 			     140, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(141, "AO1D1", 141,
++	UNIPHIER_PINCTRL_PIN(141, "AO1D1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     92, UNIPHIER_PIN_DRV_3BIT,
+ 			     141, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(142, "AO1D2", 142,
++	UNIPHIER_PINCTRL_PIN(142, "AO1D2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     93, UNIPHIER_PIN_DRV_3BIT,
+ 			     142, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(143, "HTPDN0", 143,
++	UNIPHIER_PINCTRL_PIN(143, "HTPDN0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     94, UNIPHIER_PIN_DRV_3BIT,
+ 			     143, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(144, "LOCKN0", 144,
++	UNIPHIER_PINCTRL_PIN(144, "LOCKN0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     95, UNIPHIER_PIN_DRV_3BIT,
+ 			     144, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(145, "HTPDN1", 145,
++	UNIPHIER_PINCTRL_PIN(145, "HTPDN1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     96, UNIPHIER_PIN_DRV_3BIT,
+ 			     145, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(146, "LOCKN1", 146,
++	UNIPHIER_PINCTRL_PIN(146, "LOCKN1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     97, UNIPHIER_PIN_DRV_3BIT,
+ 			     146, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(147, "PWMA", 147,
++	UNIPHIER_PINCTRL_PIN(147, "PWMA", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     98, UNIPHIER_PIN_DRV_3BIT,
+ 			     147, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(148, "LR_GOUT", 148,
++	UNIPHIER_PINCTRL_PIN(148, "LR_GOUT", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     99, UNIPHIER_PIN_DRV_3BIT,
+ 			     148, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(149, "XIRQ0", 149,
++	UNIPHIER_PINCTRL_PIN(149, "XIRQ0", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     100, UNIPHIER_PIN_DRV_3BIT,
+ 			     149, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(150, "XIRQ1", 150,
++	UNIPHIER_PINCTRL_PIN(150, "XIRQ1", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     101, UNIPHIER_PIN_DRV_3BIT,
+ 			     150, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(151, "XIRQ2", 151,
++	UNIPHIER_PINCTRL_PIN(151, "XIRQ2", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     102, UNIPHIER_PIN_DRV_3BIT,
+ 			     151, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(152, "XIRQ3", 152,
++	UNIPHIER_PINCTRL_PIN(152, "XIRQ3", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     103, UNIPHIER_PIN_DRV_3BIT,
+ 			     152, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(153, "XIRQ4", 153,
++	UNIPHIER_PINCTRL_PIN(153, "XIRQ4", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     104, UNIPHIER_PIN_DRV_3BIT,
+ 			     153, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(154, "XIRQ5", 154,
++	UNIPHIER_PINCTRL_PIN(154, "XIRQ5", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     105, UNIPHIER_PIN_DRV_3BIT,
+ 			     154, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(155, "XIRQ6", 155,
++	UNIPHIER_PINCTRL_PIN(155, "XIRQ6", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     106, UNIPHIER_PIN_DRV_3BIT,
+ 			     155, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(156, "XIRQ7", 156,
++	UNIPHIER_PINCTRL_PIN(156, "XIRQ7", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     107, UNIPHIER_PIN_DRV_3BIT,
+ 			     156, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(157, "XIRQ8", 157,
++	UNIPHIER_PINCTRL_PIN(157, "XIRQ8", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     108, UNIPHIER_PIN_DRV_3BIT,
+ 			     157, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(158, "XIRQ9", 158,
++	UNIPHIER_PINCTRL_PIN(158, "XIRQ9", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     109, UNIPHIER_PIN_DRV_3BIT,
+ 			     158, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(159, "XIRQ10", 159,
++	UNIPHIER_PINCTRL_PIN(159, "XIRQ10", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     110, UNIPHIER_PIN_DRV_3BIT,
+ 			     159, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(160, "XIRQ11", 160,
++	UNIPHIER_PINCTRL_PIN(160, "XIRQ11", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     111, UNIPHIER_PIN_DRV_3BIT,
+ 			     160, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(161, "XIRQ13", 161,
++	UNIPHIER_PINCTRL_PIN(161, "XIRQ13", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     112, UNIPHIER_PIN_DRV_3BIT,
+ 			     161, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(162, "XIRQ14", 162,
++	UNIPHIER_PINCTRL_PIN(162, "XIRQ14", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     113, UNIPHIER_PIN_DRV_3BIT,
+ 			     162, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(163, "XIRQ16", 163,
++	UNIPHIER_PINCTRL_PIN(163, "XIRQ16", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     114, UNIPHIER_PIN_DRV_3BIT,
+ 			     163, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(164, "XIRQ17", 164,
++	UNIPHIER_PINCTRL_PIN(164, "XIRQ17", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     115, UNIPHIER_PIN_DRV_3BIT,
+ 			     164, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(165, "XIRQ18", 165,
++	UNIPHIER_PINCTRL_PIN(165, "XIRQ18", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     116, UNIPHIER_PIN_DRV_3BIT,
+ 			     165, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(166, "XIRQ19", 166,
++	UNIPHIER_PINCTRL_PIN(166, "XIRQ19", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     117, UNIPHIER_PIN_DRV_3BIT,
+ 			     166, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(167, "XIRQ20", 167,
++	UNIPHIER_PINCTRL_PIN(167, "XIRQ20", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     118, UNIPHIER_PIN_DRV_3BIT,
+ 			     167, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(168, "PORT00", 168,
++	UNIPHIER_PINCTRL_PIN(168, "PORT00", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     119, UNIPHIER_PIN_DRV_3BIT,
+ 			     168, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(169, "PORT01", 169,
++	UNIPHIER_PINCTRL_PIN(169, "PORT01", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     120, UNIPHIER_PIN_DRV_3BIT,
+ 			     169, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(170, "PORT02", 170,
++	UNIPHIER_PINCTRL_PIN(170, "PORT02", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     121, UNIPHIER_PIN_DRV_3BIT,
+ 			     170, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(171, "PORT03", 171,
++	UNIPHIER_PINCTRL_PIN(171, "PORT03", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     122, UNIPHIER_PIN_DRV_3BIT,
+ 			     171, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(172, "PORT04", 172,
++	UNIPHIER_PINCTRL_PIN(172, "PORT04", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     123, UNIPHIER_PIN_DRV_3BIT,
+ 			     172, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(173, "CK27FO", 173,
++	UNIPHIER_PINCTRL_PIN(173, "CK27FO", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     124, UNIPHIER_PIN_DRV_3BIT,
+ 			     173, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(174, "PHSYNCO", 174,
++	UNIPHIER_PINCTRL_PIN(174, "PHSYNCO", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     125, UNIPHIER_PIN_DRV_3BIT,
+ 			     174, UNIPHIER_PIN_PULL_DOWN),
+-	UNIPHIER_PINCTRL_PIN(175, "PVSYNCO", 175,
++	UNIPHIER_PINCTRL_PIN(175, "PVSYNCO", UNIPHIER_PIN_IECTRL_EXIST,
+ 			     126, UNIPHIER_PIN_DRV_3BIT,
+ 			     175, UNIPHIER_PIN_PULL_DOWN),
  };
- builtin_platform_driver(uniphier_ld20_pinctrl_driver);
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
-index 7db3fd0f72e5..840382847212 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
-@@ -740,6 +740,7 @@ static struct platform_driver uniphier_ld4_pinctrl_driver = {
- 	.driver = {
- 		.name = "uniphier-ld4-pinctrl",
- 		.of_match_table = uniphier_ld4_pinctrl_match,
-+		.pm = &uniphier_pinctrl_pm_ops,
- 	},
- };
- builtin_platform_driver(uniphier_ld4_pinctrl_driver);
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
-index 2d8dc0f0b907..493a90c6d733 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
-@@ -950,6 +950,7 @@ static struct platform_driver uniphier_ld6b_pinctrl_driver = {
- 	.driver = {
- 		.name = "uniphier-ld6b-pinctrl",
- 		.of_match_table = uniphier_ld6b_pinctrl_match,
-+		.pm = &uniphier_pinctrl_pm_ops,
- 	},
- };
- builtin_platform_driver(uniphier_ld6b_pinctrl_driver);
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-index 1c95a4689eda..24d358290a0c 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
-@@ -1245,6 +1245,7 @@ static struct platform_driver uniphier_pro4_pinctrl_driver = {
- 	.driver = {
- 		.name = "uniphier-pro4-pinctrl",
- 		.of_match_table = uniphier_pro4_pinctrl_match,
-+		.pm = &uniphier_pinctrl_pm_ops,
- 	},
- };
- builtin_platform_driver(uniphier_pro4_pinctrl_driver);
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
-index d0d730b2e71e..9381a4ff4389 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
-@@ -1003,6 +1003,7 @@ static struct platform_driver uniphier_pro5_pinctrl_driver = {
- 	.driver = {
- 		.name = "uniphier-pro5-pinctrl",
- 		.of_match_table = uniphier_pro5_pinctrl_match,
-+		.pm = &uniphier_pinctrl_pm_ops,
- 	},
- };
- builtin_platform_driver(uniphier_pro5_pinctrl_driver);
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
-index e323c3e19a41..c0ef40ae99a7 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
-@@ -937,6 +937,7 @@ static struct platform_driver uniphier_pxs2_pinctrl_driver = {
- 	.driver = {
- 		.name = "uniphier-pxs2-pinctrl",
- 		.of_match_table = uniphier_pxs2_pinctrl_match,
-+		.pm = &uniphier_pinctrl_pm_ops,
- 	},
- };
- builtin_platform_driver(uniphier_pxs2_pinctrl_driver);
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
-index f0221e93aa25..1af430d701be 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
-@@ -669,6 +669,7 @@ static struct platform_driver uniphier_sld8_pinctrl_driver = {
- 	.driver = {
- 		.name = "uniphier-sld8-pinctrl",
- 		.of_match_table = uniphier_sld8_pinctrl_match,
-+		.pm = &uniphier_pinctrl_pm_ops,
- 	},
- };
- builtin_platform_driver(uniphier_sld8_pinctrl_driver);
 diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier.h b/drivers/pinctrl/uniphier/pinctrl-uniphier.h
-index 24e48e3ed048..c075ecb8e5db 100644
+index b040a3b56c52..24e48e3ed048 100644
 --- a/drivers/pinctrl/uniphier/pinctrl-uniphier.h
 +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier.h
-@@ -192,4 +192,6 @@ struct uniphier_pinctrl_socdata {
- int uniphier_pinctrl_probe(struct platform_device *pdev,
- 			   struct uniphier_pinctrl_socdata *socdata);
+@@ -25,7 +25,7 @@ struct platform_device;
  
-+extern const struct dev_pm_ops uniphier_pinctrl_pm_ops;
-+
- #endif /* __PINCTRL_UNIPHIER_H__ */
+ /* input enable control register bit */
+ #define UNIPHIER_PIN_IECTRL_SHIFT	0
+-#define UNIPHIER_PIN_IECTRL_BITS	8
++#define UNIPHIER_PIN_IECTRL_BITS	3
+ #define UNIPHIER_PIN_IECTRL_MASK	((1UL << (UNIPHIER_PIN_IECTRL_BITS)) \
+ 					 - 1)
+ 
+@@ -62,6 +62,7 @@ struct platform_device;
+ #endif
+ 
+ #define UNIPHIER_PIN_IECTRL_NONE	(UNIPHIER_PIN_IECTRL_MASK)
++#define UNIPHIER_PIN_IECTRL_EXIST	0
+ 
+ /* drive control type */
+ enum uniphier_pin_drv_type {
 -- 
 2.7.4
