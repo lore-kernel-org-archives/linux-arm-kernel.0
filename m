@@ -1,100 +1,85 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:26:37 +0100
-Subject: [PATCH v3 59/59] irqchip/gic-v3-its: Workaround Huawei D05
- redistributor addressing
+Date: Mon, 31 Jul 2017 18:26:10 +0100
+Subject: [PATCH v3 32/59] irqchip/gic-v4: Add VLPI configuration interface
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-60-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-33-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ITSes on the Huawei D05 are broken when it comes to addressing
-the redistributors, and need to be explicitely told to address
-the VLPI page instead of the redistributor base address.
+Add the required interfaces to map, unmap and update a VLPI.
 
-So let's add yet another quirk, fixing up the target address
-in the command stream.
-
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 27 +++++++++++++++++++++++++--
- 1 file changed, 25 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-gic-v4.c       | 42 ++++++++++++++++++++++++++++++++++++++
+ include/linux/irqchip/arm-gic-v4.h |  4 ++++
+ 2 files changed, 46 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index e22c8746ce89..32d8697bcb15 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -103,6 +103,7 @@ struct its_node {
- 	u32			device_ids;
- 	int			numa_node;
- 	bool			is_v4;
-+	int			vlpi_redist_offset;
- };
+diff --git a/drivers/irqchip/irq-gic-v4.c b/drivers/irqchip/irq-gic-v4.c
+index 86b46fb532ab..6fe2e09172ed 100644
+--- a/drivers/irqchip/irq-gic-v4.c
++++ b/drivers/irqchip/irq-gic-v4.c
+@@ -96,3 +96,45 @@ int its_invall_vpe(struct its_vpe *vpe)
  
- #define ITS_ITT_ALIGN		SZ_256
-@@ -548,13 +549,15 @@ static struct its_vpe *its_build_vmapp_cmd(struct its_node *its,
- 					   struct its_cmd_desc *desc)
- {
- 	unsigned long vpt_addr;
-+	u64 target;
- 
- 	vpt_addr = virt_to_phys(page_address(desc->its_vmapp_cmd.vpe->vpt_page));
-+	target = desc->its_vmapp_cmd.col->target_address + its->vlpi_redist_offset;
- 
- 	its_encode_cmd(cmd, GITS_CMD_VMAPP);
- 	its_encode_vpeid(cmd, desc->its_vmapp_cmd.vpe->vpe_id);
- 	its_encode_valid(cmd, desc->its_vmapp_cmd.valid);
--	its_encode_target(cmd, desc->its_vmapp_cmd.col->target_address);
-+	its_encode_target(cmd, target);
- 	its_encode_vpt_addr(cmd, vpt_addr);
- 	its_encode_vpt_size(cmd, LPI_NRBITS - 1);
- 
-@@ -613,11 +616,14 @@ static struct its_vpe *its_build_vmovp_cmd(struct its_node *its,
- 					   struct its_cmd_block *cmd,
- 					   struct its_cmd_desc *desc)
- {
-+	u64 target;
-+
-+	target = desc->its_vmapp_cmd.col->target_address + its->vlpi_redist_offset;
- 	its_encode_cmd(cmd, GITS_CMD_VMOVP);
- 	its_encode_seq_num(cmd, desc->its_vmovp_cmd.seq_num);
- 	its_encode_its_list(cmd, desc->its_vmovp_cmd.its_list);
- 	its_encode_vpeid(cmd, desc->its_vmovp_cmd.vpe->vpe_id);
--	its_encode_target(cmd, desc->its_vmovp_cmd.col->target_address);
-+	its_encode_target(cmd, target);
- 
- 	its_fixup_cmd(cmd);
- 
-@@ -2668,6 +2674,17 @@ static void __maybe_unused its_enable_quirk_qdf2400_e0065(void *data)
- 	its->ite_size = 16;
+ 	return its_send_vpe_cmd(vpe, &info);
  }
- 
-+static void __maybe_unused its_enable_quirk_d05_vlpi_offset(void *data)
++
++int its_map_vlpi(int irq, struct its_vlpi_map *map)
 +{
-+	struct its_node *its = data;
++	struct its_cmd_info info = {
++		.cmd_type = MAP_VLPI,
++		.map      = map,
++	};
 +
 +	/*
-+	 * D05 insists on using the wrong address for the VLPI
-+	 * page. Trick it into doing the right thing...
++	 * The host will never see that interrupt firing again, so it
++	 * is vital that we don't do any lazy masking.
 +	 */
-+	its->vlpi_redist_offset = SZ_128K;
++	irq_set_status_flags(irq, IRQ_DISABLE_UNLAZY);
++
++	return irq_set_vcpu_affinity(irq, &info);
 +}
 +
- static const struct gic_quirk its_quirks[] = {
- #ifdef CONFIG_CAVIUM_ERRATUM_22375
- 	{
-@@ -2694,6 +2711,12 @@ static const struct gic_quirk its_quirks[] = {
- 	},
- #endif
- 	{
-+		.desc	= "ITS: D05 128kB VLPI offset",
-+		.iidr	= 0x00000004,
-+		.mask	= 0xffffffff,
-+		.init	= its_enable_quirk_d05_vlpi_offset,
-+	},
-+	{
- 	}
- };
++int its_get_vlpi(int irq, struct its_vlpi_map *map)
++{
++	struct its_cmd_info info = {
++		.cmd_type = GET_VLPI,
++		.map      = map,
++	};
++
++	return irq_set_vcpu_affinity(irq, &info);
++}
++
++int its_unmap_vlpi(int irq)
++{
++	irq_clear_status_flags(irq, IRQ_DISABLE_UNLAZY);
++	return irq_set_vcpu_affinity(irq, NULL);
++}
++
++int its_prop_update_vlpi(int irq, u8 config, bool inv)
++{
++	struct its_cmd_info info = {
++		.cmd_type = inv ? PROP_UPDATE_AND_INV_VLPI : PROP_UPDATE_VLPI,
++		.config   = config,
++	};
++
++	return irq_set_vcpu_affinity(irq, &info);
++}
+diff --git a/include/linux/irqchip/arm-gic-v4.h b/include/linux/irqchip/arm-gic-v4.h
+index faaafd12d8c7..f495d4d1f7d7 100644
+--- a/include/linux/irqchip/arm-gic-v4.h
++++ b/include/linux/irqchip/arm-gic-v4.h
+@@ -93,5 +93,9 @@ int its_alloc_vcpu_irqs(struct its_vm *vm);
+ void its_free_vcpu_irqs(struct its_vm *vm);
+ int its_schedule_vpe(struct its_vpe *vpe, bool on);
+ int its_invall_vpe(struct its_vpe *vpe);
++int its_map_vlpi(int irq, struct its_vlpi_map *map);
++int its_get_vlpi(int irq, struct its_vlpi_map *map);
++int its_unmap_vlpi(int irq);
++int its_prop_update_vlpi(int irq, u8 config, bool inv);
  
+ #endif
 -- 
 2.11.0
