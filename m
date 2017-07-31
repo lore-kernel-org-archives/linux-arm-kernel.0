@@ -1,106 +1,142 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Mon, 31 Jul 2017 12:08:47 +0100
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170728190349.GM3730@linux.vnet.ibm.com>
-References: <20170727014214.GH3730@linux.vnet.ibm.com>
- <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
- <20170727124913.GL3730@linux.vnet.ibm.com>
- <20170727144903.000022a1@huawei.com>
- <20170727173923.000001b2@huawei.com>
- <20170727165245.GD3730@linux.vnet.ibm.com>
- <20170728084411.00001ddb@huawei.com>
- <20170728142403.0000122b@huawei.com>
- <20170728165529.GF3730@linux.vnet.ibm.com>
- <20170728182053.000072aa@huawei.com>
- <20170728190349.GM3730@linux.vnet.ibm.com>
-Message-ID: <20170731120847.00003d5c@huawei.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Mon, 31 Jul 2017 19:10:28 +0800
+Subject: [xlnx:master 688/864] include/linux/kernel.h:836:48: error:
+ initialization from incompatible pointer type
+Message-ID: <201707311918.dqq2z8nM%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 28 Jul 2017 12:03:50 -0700
-"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+Hi Daniel,
 
-> On Fri, Jul 28, 2017 at 06:27:05PM +0100, Jonathan Cameron wrote:
-> > On Fri, 28 Jul 2017 09:55:29 -0700
-> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> >   
-> > > On Fri, Jul 28, 2017 at 02:24:03PM +0100, Jonathan Cameron wrote:  
-> > > > On Fri, 28 Jul 2017 08:44:11 +0100
-> > > > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:    
-> > > 
-> > > [ . . . ]
-> > >   
-> > > > Ok.  Some info.  I disabled a few driver (usb and SAS) in the interest of having
-> > > > fewer timer events.  Issue became much easier to trigger (on some runs before
-> > > > I could get tracing up and running)
-> > > >e
-> > > > So logs are large enough that pastebin doesn't like them - please shoet if    
-> > > >>e another timer period is of interest.    
-> > > > 
-> > > > https://pastebin.com/iUZDfQGM for the timer trace.
-> > > > https://pastebin.com/3w1F7amH for dmesg.  
-> > > > 
-> > > > The relevant timeout on the RCU stall detector was 8 seconds.  Event is
-> > > > detected around 835.
-> > > > 
-> > > > It's a lot of logs, so I haven't identified a smoking gun yet but there
-> > > > may well be one in there.    
-> > > 
-> > > The dmesg says:
-> > > 
-> > > rcu_preempt kthread starved for 2508 jiffies! g112 c111 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1
-> > > 
-> > > So I look for "rcu_preempt" timer events and find these:
-> > > 
-> > > rcu_preempt-9     [019] ....   827.579114: timer_init: timer=ffff8017d5fc7da0
-> > > rcu_preempt-9     [019] d..1   827.579115: timer_start: timer=ffff8017d5fc7da0 function=process_timeout 
-> > > 
-> > > Next look for "ffff8017d5fc7da0" and I don't find anything else.  
-> > It does show up off the bottom of what would fit in pastebin...
-> > 
-> >      rcu_preempt-9     [001] d..1   837.681077: timer_cancel: timer=ffff8017d5fc7da0
-> >      rcu_preempt-9     [001] ....   837.681086: timer_init: timer=ffff8017d5fc7da0
-> >      rcu_preempt-9     [001] d..1   837.681087: timer_start: timer=ffff8017d5fc7da0 function=process_timeout expires=4295101298 [timeout=1] cpu=1 idx=0 flags=  
-> 
-> Odd.  I would expect an expiration...  And ten seconds is way longer
-> than the requested one jiffy!
-> 
-> > > The timeout was one jiffy, and more than a second later, no expiration.
-> > > Is it possible that this event was lost?  I am not seeing any sign of
-> > > this is the trace.
-> > > 
-> > > I don't see any sign of CPU hotplug (and I test with lots of that in
-> > > any case).
-> > > 
-> > > The last time we saw something like this it was a timer HW/driver problem,
-> > > but it is a bit hard to imagine such a problem affecting both ARM64
-> > > and SPARC.  ;-)  
-> > Could be different issues, both of which were hidden by that lockup detector.
-> > 
-> > There is an errata work around for the timers on this particular board.
-> > I'm only vaguely aware of it, so may be unconnected.
-> > 
-> > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clocksource/arm_arch_timer.c?h=v4.13-rc2&id=bb42ca47401010fc02901b5e8f79e40a26f208cb
-> > 
-> > Seems unlikely though! + we've not yet seen it on the other chips that
-> > errata effects (not that that means much).  
-> 
-> If you can reproduce quickly, might be worth trying anyway...
-> 
-> 							Thanx, Paul
-Errata fix is running already and was for all those tests.
+FYI, the error/warning still remains.
 
-I'll have a dig into the timers today and see where I get to.
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   00346d2eba7634f4fb2c2117ac371e0c104a2870
+commit: 472236088ad190937efa1be2d96965f9bb7c9bcb [688/864] kbuild: Add option to turn incompatible pointer check into error
+config: blackfin-allyesconfig (attached as .config)
+compiler: bfin-uclinux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 472236088ad190937efa1be2d96965f9bb7c9bcb
+        # save the attached .config to linux build tree
+        make.cross ARCH=blackfin 
 
-Jonathan
-> 
-> > Jonathan
-> >   
-> > > 
-> > > Thomas, any debugging suggestions?
-> > > 
-> > > 							Thanx, Paul
-> > >   
-> >   
-> 
+All errors (new ones prefixed by >>):
+
+   drivers/misc/jesd204b/xilinx_jesd204b.c:28:17: error: field 'hw' has incomplete type
+     struct clk_hw  hw;
+                    ^~
+   In file included from include/linux/clk.h:16:0,
+                    from drivers/misc/jesd204b/xilinx_jesd204b.c:11:
+   drivers/misc/jesd204b/xilinx_jesd204b.c: In function 'jesd204b_clk_enable':
+>> include/linux/kernel.h:836:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                   ^
+   drivers/misc/jesd204b/xilinx_jesd204b.c:34:26: note: in expansion of macro 'container_of'
+    #define to_clk_priv(_hw) container_of(_hw, struct child_clk, hw)
+                             ^~~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:214:2: note: in expansion of macro 'to_clk_priv'
+     to_clk_priv(hw)->enabled = true;
+     ^~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c: In function 'jesd204b_clk_disable':
+>> include/linux/kernel.h:836:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                   ^
+   drivers/misc/jesd204b/xilinx_jesd204b.c:34:26: note: in expansion of macro 'container_of'
+    #define to_clk_priv(_hw) container_of(_hw, struct child_clk, hw)
+                             ^~~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:221:2: note: in expansion of macro 'to_clk_priv'
+     to_clk_priv(hw)->enabled = false;
+     ^~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c: In function 'jesd204b_clk_is_enabled':
+>> include/linux/kernel.h:836:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
+     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                   ^
+   drivers/misc/jesd204b/xilinx_jesd204b.c:34:26: note: in expansion of macro 'container_of'
+    #define to_clk_priv(_hw) container_of(_hw, struct child_clk, hw)
+                             ^~~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:226:9: note: in expansion of macro 'to_clk_priv'
+     return to_clk_priv(hw)->enabled;
+            ^~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c: At top level:
+   drivers/misc/jesd204b/xilinx_jesd204b.c:229:21: error: variable 'clkout_ops' has initializer but incomplete type
+    static const struct clk_ops clkout_ops = {
+                        ^~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:230:2: error: unknown field 'recalc_rate' specified in initializer
+     .recalc_rate = jesd204b_clk_recalc_rate,
+     ^
+   drivers/misc/jesd204b/xilinx_jesd204b.c:230:17: warning: excess elements in struct initializer
+     .recalc_rate = jesd204b_clk_recalc_rate,
+                    ^~~~~~~~~~~~~~~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:230:17: note: (near initialization for 'clkout_ops')
+   drivers/misc/jesd204b/xilinx_jesd204b.c:231:2: error: unknown field 'enable' specified in initializer
+     .enable = jesd204b_clk_enable,
+     ^
+   drivers/misc/jesd204b/xilinx_jesd204b.c:231:12: warning: excess elements in struct initializer
+     .enable = jesd204b_clk_enable,
+               ^~~~~~~~~~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:231:12: note: (near initialization for 'clkout_ops')
+   drivers/misc/jesd204b/xilinx_jesd204b.c:232:2: error: unknown field 'disable' specified in initializer
+     .disable = jesd204b_clk_disable,
+     ^
+   drivers/misc/jesd204b/xilinx_jesd204b.c:232:13: warning: excess elements in struct initializer
+     .disable = jesd204b_clk_disable,
+                ^~~~~~~~~~~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:232:13: note: (near initialization for 'clkout_ops')
+   drivers/misc/jesd204b/xilinx_jesd204b.c:233:2: error: unknown field 'is_enabled' specified in initializer
+     .is_enabled = jesd204b_clk_is_enabled,
+     ^
+   drivers/misc/jesd204b/xilinx_jesd204b.c:233:16: warning: excess elements in struct initializer
+     .is_enabled = jesd204b_clk_is_enabled,
+                   ^~~~~~~~~~~~~~~~~~~~~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:233:16: note: (near initialization for 'clkout_ops')
+   drivers/misc/jesd204b/xilinx_jesd204b.c: In function 'jesd204b_probe':
+   drivers/misc/jesd204b/xilinx_jesd204b.c:251:23: error: storage size of 'init' isn't known
+     struct clk_init_data init;
+                          ^~~~
+   drivers/misc/jesd204b/xilinx_jesd204b.c:251:23: warning: unused variable 'init' [-Wunused-variable]
+   drivers/misc/jesd204b/xilinx_jesd204b.c: At top level:
+   drivers/misc/jesd204b/xilinx_jesd204b.c:229:29: error: storage size of 'clkout_ops' isn't known
+    static const struct clk_ops clkout_ops = {
+                                ^~~~~~~~~~
+   cc1: some warnings being treated as errors
+
+vim +836 include/linux/kernel.h
+
+^1da177e Linus Torvalds 2005-04-16  820  
+91f68b73 Wu Fengguang   2009-01-07  821  
+91f68b73 Wu Fengguang   2009-01-07  822  /*
+91f68b73 Wu Fengguang   2009-01-07  823   * swap - swap value of @a and @b
+91f68b73 Wu Fengguang   2009-01-07  824   */
+ac7b9004 Peter Zijlstra 2009-02-04  825  #define swap(a, b) \
+ac7b9004 Peter Zijlstra 2009-02-04  826  	do { typeof(a) __tmp = (a); (a) = (b); (b) = __tmp; } while (0)
+91f68b73 Wu Fengguang   2009-01-07  827  
+^1da177e Linus Torvalds 2005-04-16  828  /**
+^1da177e Linus Torvalds 2005-04-16  829   * container_of - cast a member of a structure out to the containing structure
+^1da177e Linus Torvalds 2005-04-16  830   * @ptr:	the pointer to the member.
+^1da177e Linus Torvalds 2005-04-16  831   * @type:	the type of the container struct this is embedded in.
+^1da177e Linus Torvalds 2005-04-16  832   * @member:	the name of the member within the struct.
+^1da177e Linus Torvalds 2005-04-16  833   *
+^1da177e Linus Torvalds 2005-04-16  834   */
+^1da177e Linus Torvalds 2005-04-16  835  #define container_of(ptr, type, member) ({			\
+^1da177e Linus Torvalds 2005-04-16 @836  	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
+^1da177e Linus Torvalds 2005-04-16  837  	(type *)( (char *)__mptr - offsetof(type,member) );})
+^1da177e Linus Torvalds 2005-04-16  838  
+
+:::::: The code at line 836 was first introduced by commit
+:::::: 1da177e4c3f41524e886b7f1b8a0c1fc7321cac2 Linux-2.6.12-rc2
+
+:::::: TO: Linus Torvalds <torvalds@ppc970.osdl.org>
+:::::: CC: Linus Torvalds <torvalds@ppc970.osdl.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 42448 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170731/7cdf480e/attachment-0001.gz>
