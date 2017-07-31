@@ -1,95 +1,75 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 31 Jul 2017 15:29:46 +0100
-Subject: [PATCH v2 2/4] drm/bridge: dw-hdmi: add better clock disable control
+Date: Mon, 31 Jul 2017 15:29:56 +0100
+Subject: [PATCH v2 4/4] drm/bridge: dw-hdmi: remove CEC engine register
+ definitions
 In-Reply-To: <20170731142906.GX31807@n2100.armlinux.org.uk>
 References: <20170731142906.GX31807@n2100.armlinux.org.uk>
-Message-ID: <E1dcBha-00088l-DE@rmk-PC.armlinux.org.uk>
+Message-ID: <E1dcBhk-000890-TQ@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The video setup path aways sets the clock disable register to a specific
-value, which has the effect of disabling the CEC engine.  When we add the
-CEC driver, this becomes a problem.
+We don't need the CEC engine register definitions, so let's remove them.
 
-Fix this by only setting/clearing the bits that the video path needs to.
-
-Reviewed-by: Jose Abreu <joabreu@synopsys.com>
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 29 ++++++++++++++++++-----------
- 1 file changed, 18 insertions(+), 11 deletions(-)
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.h | 45 -------------------------------
+ 1 file changed, 45 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-index 82e55ee8e4fa..b08cc0c95590 100644
---- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-@@ -166,6 +166,7 @@ struct dw_hdmi {
- 	bool bridge_is_on;		/* indicates the bridge is on */
- 	bool rxsense;			/* rxsense state */
- 	u8 phy_mask;			/* desired phy int mask settings */
-+	u8 mc_clkdis;			/* clock disable register */
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.h b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.h
+index 69644c83a0f8..9d90eb9c46e5 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.h
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.h
+@@ -478,51 +478,6 @@
+ #define HDMI_A_PRESETUP                         0x501A
+ #define HDMI_A_SRM_BASE                         0x5020
  
- 	spinlock_t audio_lock;
- 	struct mutex audio_mutex;
-@@ -551,8 +552,11 @@ EXPORT_SYMBOL_GPL(dw_hdmi_set_sample_rate);
- 
- static void hdmi_enable_audio_clk(struct dw_hdmi *hdmi, bool enable)
- {
--	hdmi_modb(hdmi, enable ? 0 : HDMI_MC_CLKDIS_AUDCLK_DISABLE,
--		  HDMI_MC_CLKDIS_AUDCLK_DISABLE, HDMI_MC_CLKDIS);
-+	if (enable)
-+		hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_AUDCLK_DISABLE;
-+	else
-+		hdmi->mc_clkdis |= HDMI_MC_CLKDIS_AUDCLK_DISABLE;
-+	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
- }
- 
- static void dw_hdmi_ahb_audio_enable(struct dw_hdmi *hdmi)
-@@ -1574,8 +1578,6 @@ static void hdmi_av_composer(struct dw_hdmi *hdmi,
- /* HDMI Initialization Step B.4 */
- static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
- {
--	u8 clkdis;
+-/* CEC Engine Registers */
+-#define HDMI_CEC_CTRL                           0x7D00
+-#define HDMI_CEC_STAT                           0x7D01
+-#define HDMI_CEC_MASK                           0x7D02
+-#define HDMI_CEC_POLARITY                       0x7D03
+-#define HDMI_CEC_INT                            0x7D04
+-#define HDMI_CEC_ADDR_L                         0x7D05
+-#define HDMI_CEC_ADDR_H                         0x7D06
+-#define HDMI_CEC_TX_CNT                         0x7D07
+-#define HDMI_CEC_RX_CNT                         0x7D08
+-#define HDMI_CEC_TX_DATA0                       0x7D10
+-#define HDMI_CEC_TX_DATA1                       0x7D11
+-#define HDMI_CEC_TX_DATA2                       0x7D12
+-#define HDMI_CEC_TX_DATA3                       0x7D13
+-#define HDMI_CEC_TX_DATA4                       0x7D14
+-#define HDMI_CEC_TX_DATA5                       0x7D15
+-#define HDMI_CEC_TX_DATA6                       0x7D16
+-#define HDMI_CEC_TX_DATA7                       0x7D17
+-#define HDMI_CEC_TX_DATA8                       0x7D18
+-#define HDMI_CEC_TX_DATA9                       0x7D19
+-#define HDMI_CEC_TX_DATA10                      0x7D1a
+-#define HDMI_CEC_TX_DATA11                      0x7D1b
+-#define HDMI_CEC_TX_DATA12                      0x7D1c
+-#define HDMI_CEC_TX_DATA13                      0x7D1d
+-#define HDMI_CEC_TX_DATA14                      0x7D1e
+-#define HDMI_CEC_TX_DATA15                      0x7D1f
+-#define HDMI_CEC_RX_DATA0                       0x7D20
+-#define HDMI_CEC_RX_DATA1                       0x7D21
+-#define HDMI_CEC_RX_DATA2                       0x7D22
+-#define HDMI_CEC_RX_DATA3                       0x7D23
+-#define HDMI_CEC_RX_DATA4                       0x7D24
+-#define HDMI_CEC_RX_DATA5                       0x7D25
+-#define HDMI_CEC_RX_DATA6                       0x7D26
+-#define HDMI_CEC_RX_DATA7                       0x7D27
+-#define HDMI_CEC_RX_DATA8                       0x7D28
+-#define HDMI_CEC_RX_DATA9                       0x7D29
+-#define HDMI_CEC_RX_DATA10                      0x7D2a
+-#define HDMI_CEC_RX_DATA11                      0x7D2b
+-#define HDMI_CEC_RX_DATA12                      0x7D2c
+-#define HDMI_CEC_RX_DATA13                      0x7D2d
+-#define HDMI_CEC_RX_DATA14                      0x7D2e
+-#define HDMI_CEC_RX_DATA15                      0x7D2f
+-#define HDMI_CEC_LOCK                           0x7D30
+-#define HDMI_CEC_WKUPCTRL                       0x7D31
 -
- 	/* control period minimum duration */
- 	hdmi_writeb(hdmi, 12, HDMI_FC_CTRLDUR);
- 	hdmi_writeb(hdmi, 32, HDMI_FC_EXCTRLDUR);
-@@ -1587,17 +1589,21 @@ static void dw_hdmi_enable_video_path(struct dw_hdmi *hdmi)
- 	hdmi_writeb(hdmi, 0x21, HDMI_FC_CH2PREAM);
- 
- 	/* Enable pixel clock and tmds data path */
--	clkdis = 0x7F;
--	clkdis &= ~HDMI_MC_CLKDIS_PIXELCLK_DISABLE;
--	hdmi_writeb(hdmi, clkdis, HDMI_MC_CLKDIS);
-+	hdmi->mc_clkdis |= HDMI_MC_CLKDIS_HDCPCLK_DISABLE |
-+			   HDMI_MC_CLKDIS_CSCCLK_DISABLE |
-+			   HDMI_MC_CLKDIS_AUDCLK_DISABLE |
-+			   HDMI_MC_CLKDIS_PREPCLK_DISABLE |
-+			   HDMI_MC_CLKDIS_TMDSCLK_DISABLE;
-+	hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_PIXELCLK_DISABLE;
-+	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
- 
--	clkdis &= ~HDMI_MC_CLKDIS_TMDSCLK_DISABLE;
--	hdmi_writeb(hdmi, clkdis, HDMI_MC_CLKDIS);
-+	hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_TMDSCLK_DISABLE;
-+	hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
- 
- 	/* Enable csc path */
- 	if (is_color_space_conversion(hdmi)) {
--		clkdis &= ~HDMI_MC_CLKDIS_CSCCLK_DISABLE;
--		hdmi_writeb(hdmi, clkdis, HDMI_MC_CLKDIS);
-+		hdmi->mc_clkdis &= ~HDMI_MC_CLKDIS_CSCCLK_DISABLE;
-+		hdmi_writeb(hdmi, hdmi->mc_clkdis, HDMI_MC_CLKDIS);
- 	}
- 
- 	/* Enable color space conversion if needed */
-@@ -2272,6 +2278,7 @@ __dw_hdmi_probe(struct platform_device *pdev,
- 	hdmi->disabled = true;
- 	hdmi->rxsense = true;
- 	hdmi->phy_mask = (u8)~(HDMI_PHY_HPD | HDMI_PHY_RX_SENSE);
-+	hdmi->mc_clkdis = 0x7f;
- 
- 	mutex_init(&hdmi->mutex);
- 	mutex_init(&hdmi->audio_mutex);
+ /* I2C Master Registers (E-DDC) */
+ #define HDMI_I2CM_SLAVE                         0x7E00
+ #define HDMI_I2CM_ADDRESS                       0x7E01
 -- 
 2.7.4
