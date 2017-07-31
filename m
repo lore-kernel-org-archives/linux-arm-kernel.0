@@ -1,25 +1,112 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 31 Jul 2017 17:30:09 +0200
-Subject: [RESEND PATCH v5 00/16] eeprom: at24: Add OF device ID table
-In-Reply-To: <20170615185418.13980-1-javier@dowhile0.org>
-References: <20170615185418.13980-1-javier@dowhile0.org>
-Message-ID: <20170731153009.xkjknygpmckv2pfp@ninjato>
+From: jacob-chen@iotwrt.com (Jacob Chen)
+Date: Mon, 31 Jul 2017 23:32:57 +0800
+Subject: [PATCH v4 1/6] [media] v4l: add portduff blend modes
+In-Reply-To: <1501515182-26705-1-git-send-email-jacob-chen@iotwrt.com>
+References: <1501515182-26705-1-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <1501515182-26705-2-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+At peresent, we don't have a control for Compositing and Blend.
+All drivers are just doing copies while actually many hardwares
+supports more functions.
 
-> Patches can be applied independently since the DTS changes without driver
-> changes are no-op and the OF table won't be used without the DTS changes.
+So Adding V4L2 controls for Compositing and Blend, used for for
+composting streams.
 
-But there is a dependency, no? If I apply the driver patch,
-non-converted device trees will not find their eeproms anymore. So, I
-need to wait until all DTS patches are upstream, right? I can pick patch
-1, though. We can already document it.
+The values are based on porter duff operations.
+Defined in below links.
+https://developer.xamarin.com/api/type/Android.Graphics.PorterDuff+Mode/
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170731/696b547b/attachment-0001.sig>
+Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+Suggested-by: Nicolas Dufresne <nicolas@ndufresne.ca>
+---
+ drivers/media/v4l2-core/v4l2-ctrls.c | 20 +++++++++++++++++++-
+ include/uapi/linux/v4l2-controls.h   | 20 +++++++++++++++++++-
+ 2 files changed, 38 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+index b9e08e3..561d7d5 100644
+--- a/drivers/media/v4l2-core/v4l2-ctrls.c
++++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+@@ -478,7 +478,21 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
+ 		"Region Grid",
+ 		NULL,
+ 	};
+-
++	static const char * const porter_duff_modes[] = {
++		"Source",
++		"Source Top",
++		"Source In",
++		"Source Out",
++		"Source Over",
++		"Destination",
++		"Destination Top",
++		"Destination In",
++		"Destination Out",
++		"Destination Over",
++		"Add",
++		"Clear",
++		NULL
++	};
+ 
+ 	switch (id) {
+ 	case V4L2_CID_MPEG_AUDIO_SAMPLING_FREQ:
+@@ -564,6 +578,8 @@ const char * const *v4l2_ctrl_get_menu(u32 id)
+ 		return vpx_golden_frame_sel;
+ 	case V4L2_CID_JPEG_CHROMA_SUBSAMPLING:
+ 		return jpeg_chroma_subsampling;
++	case V4L2_CID_PORTER_DUFF_MODE:
++		return porter_duff_modes;
+ 	case V4L2_CID_DV_TX_MODE:
+ 		return dv_tx_mode;
+ 	case V4L2_CID_DV_TX_RGB_RANGE:
+@@ -886,6 +902,7 @@ const char *v4l2_ctrl_get_name(u32 id)
+ 	case V4L2_CID_PIXEL_RATE:		return "Pixel Rate";
+ 	case V4L2_CID_TEST_PATTERN:		return "Test Pattern";
+ 	case V4L2_CID_DEINTERLACING_MODE:	return "Deinterlacing Mode";
++	case V4L2_CID_PORTER_DUFF_MODE:		return "PorterDuff Blend Modes";
+ 
+ 	/* DV controls */
+ 	/* Keep the order of the 'case's the same as in v4l2-controls.h! */
+@@ -1060,6 +1077,7 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
+ 	case V4L2_CID_DV_RX_IT_CONTENT_TYPE:
+ 	case V4L2_CID_TEST_PATTERN:
+ 	case V4L2_CID_DEINTERLACING_MODE:
++	case V4L2_CID_PORTER_DUFF_MODE:
+ 	case V4L2_CID_TUNE_DEEMPHASIS:
+ 	case V4L2_CID_MPEG_VIDEO_VPX_GOLDEN_FRAME_SEL:
+ 	case V4L2_CID_DETECT_MD_MODE:
+diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+index 0d2e1e0..986a02b6 100644
+--- a/include/uapi/linux/v4l2-controls.h
++++ b/include/uapi/linux/v4l2-controls.h
+@@ -893,7 +893,25 @@ enum v4l2_jpeg_chroma_subsampling {
+ #define V4L2_CID_PIXEL_RATE			(V4L2_CID_IMAGE_PROC_CLASS_BASE + 2)
+ #define V4L2_CID_TEST_PATTERN			(V4L2_CID_IMAGE_PROC_CLASS_BASE + 3)
+ #define V4L2_CID_DEINTERLACING_MODE		(V4L2_CID_IMAGE_PROC_CLASS_BASE + 4)
+-
++#define V4L2_CID_PORTER_DUFF_MODE		(V4L2_CID_IMAGE_PROC_CLASS_BASE + 5)
++/*
++ * For details: see
++ * https://developer.android.com/reference/android/graphics/PorterDuff.Mode.html
++ */
++enum v4l2_porter_duff_mode {
++	V4L2_PORTER_DUFF_SRC			= 0,
++	V4L2_PORTER_DUFF_SRCATOP		= 1,
++	V4L2_PORTER_DUFF_SRCIN			= 2,
++	V4L2_PORTER_DUFF_SRCOUT			= 3,
++	V4L2_PORTER_DUFF_SRCOVER		= 4,
++	V4L2_PORTER_DUFF_DST			= 5,
++	V4L2_PORTER_DUFF_DSTATOP		= 6,
++	V4L2_PORTER_DUFF_DSTIN			= 7,
++	V4L2_PORTER_DUFF_DSTOUT			= 8,
++	V4L2_PORTER_DUFF_DSTOVER		= 9,
++	V4L2_PORTER_DUFF_ADD			= 10,
++	V4L2_PORTER_DUFF_CLEAR			= 11,
++};
+ 
+ /*  DV-class control IDs defined by V4L2 */
+ #define V4L2_CID_DV_CLASS_BASE			(V4L2_CTRL_CLASS_DV | 0x900)
+-- 
+2.7.4
