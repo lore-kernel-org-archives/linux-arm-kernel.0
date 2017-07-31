@@ -1,216 +1,107 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Mon, 31 Jul 2017 10:20:03 +0530
-Subject: [PATCH v3] vfio: platform: reset: Add Broadcom FlexRM reset module
-In-Reply-To: <c44c93c1-0bd9-bdaf-1603-ebbc4838c343@redhat.com>
-References: <1500549437-2870-1-git-send-email-anup.patel@broadcom.com>
- <1500549437-2870-2-git-send-email-anup.patel@broadcom.com>
- <c44c93c1-0bd9-bdaf-1603-ebbc4838c343@redhat.com>
-Message-ID: <CAALAos-w--9h14rV9nfGtd2OV5yR2x0m-MN1Y-zDYL501zRsJg@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 31 Jul 2017 13:51:07 +0900
+Subject: [PATCH 1/2] i2c: uniphier: add PM suspend / resume support
+Message-ID: <1501476668-18432-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+When resuming, set up registers that have been lost in the sleep state.
+Also, add clock handling in the resume / suspend hooks.
 
-Thanks for the review comments...
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-On Sat, Jul 29, 2017 at 6:31 PM, Auger Eric <eric.auger@redhat.com> wrote:
-> Hi Anup,
-> On 20/07/2017 13:17, Anup Patel wrote:
->> This patch adds Broadcom FlexRM low-level reset for
->> VFIO platform.
->>
->> It will do the following:
->> 1. Disable/Deactivate each FlexRM ring
->> 2. Flush each FlexRM ring
->>
->> The cleanup sequence for FlexRM rings is adapted from
->> Broadcom FlexRM mailbox driver.
->>
->> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->> Reviewed-by: Oza Oza <oza.oza@broadcom.com>
->> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->> ---
->>  drivers/vfio/platform/reset/Kconfig                |  9 +++
->>  drivers/vfio/platform/reset/Makefile               |  1 +
->>  .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 93 ++++++++++++++++++++++
->>  3 files changed, 103 insertions(+)
->>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
->>
->> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
->> index 70cccc5..8d8d226 100644
->> --- a/drivers/vfio/platform/reset/Kconfig
->> +++ b/drivers/vfio/platform/reset/Kconfig
->> @@ -13,3 +13,12 @@ config VFIO_PLATFORM_AMDXGBE_RESET
->>         Enables the VFIO platform driver to handle reset for AMD XGBE
->>
->>         If you don't know what to do here, say N.
->> +
->> +config VFIO_PLATFORM_BCMFLEXRM_RESET
->> +     tristate "VFIO support for Broadcom FlexRM reset"
->> +     depends on VFIO_PLATFORM
->> +     depends on ARCH_BCM_IPROC || COMPILE_TEST
-> depends on VFIO_PLATFORM && (ARCH_BCM_IPROC || COMPILE_TEST)?
+ drivers/i2c/busses/i2c-uniphier.c | 40 ++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 35 insertions(+), 5 deletions(-)
 
-OK, I will update this.
-
->> +     help
->> +       Enables the VFIO platform driver to handle reset for Broadcom FlexRM
->> +
->> +       If you don't know what to do here, say N.
->> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
->> index 93f4e23..8d9874b 100644
->> --- a/drivers/vfio/platform/reset/Makefile
->> +++ b/drivers/vfio/platform/reset/Makefile
->> @@ -5,3 +5,4 @@ ccflags-y += -Idrivers/vfio/platform
->>
->>  obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
->>  obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
->> +obj-$(CONFIG_VFIO_PLATFORM_BCMFLEXRM_RESET) += vfio_platform_bcmflexrm.o
->> diff --git a/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
->> new file mode 100644
->> index 0000000..a198196
->> --- /dev/null
->> +++ b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
->> @@ -0,0 +1,93 @@
->> +/*
->> + * Copyright (C) 2017 Broadcom
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +/*
->> + * This driver provides reset support for Broadcom FlexRM ring manager
->> + * to VFIO platform.
->> + */
->> +
->> +#include <linux/delay.h>
->> +#include <linux/init.h>
->> +#include <linux/io.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +
->> +#include "vfio_platform_private.h"
->> +
->> +/* FlexRM configuration */
->> +#define RING_REGS_SIZE                                       0x10000
->> +#define RING_VER_MAGIC                                       0x76303031
->> +
->> +/* Per-Ring register offsets */
->> +#define RING_VER                                     0x000
->> +#define RING_CONTROL                                 0x034
->> +#define RING_FLUSH_DONE                                      0x038
->> +
->> +/* Register RING_CONTROL fields */
->> +#define CONTROL_FLUSH_SHIFT                          5
->> +#define CONTROL_ACTIVE_SHIFT                         4
-> not used
-
-OK, I will remove this.
-
->> +
->> +/* Register RING_FLUSH_DONE fields */
->> +#define FLUSH_DONE_MASK                                      0x1
->> +
->> +static void vfio_platform_bcmflexrm_shutdown(void __iomem *ring)
->> +{
->> +     unsigned int timeout;
->> +
->> +     /* Disable/inactivate ring */
->> +     writel_relaxed(0x0, ring + RING_CONTROL);
->> +
->> +     /* Flush ring with timeout of 1s */
->> +     timeout = 1000;
->> +     writel_relaxed(BIT(CONTROL_FLUSH_SHIFT), ring + RING_CONTROL);
->> +     do {
->> +             if (readl_relaxed(ring + RING_FLUSH_DONE) & FLUSH_DONE_MASK)
->> +                     break;
->> +             mdelay(1);
->> +     } while (timeout--);
->> +
->> +     if (!timeout)
->> +             pr_warn("VFIO FlexRM shutdown timedout\n");
-> s/timedout/timeout
-
-OK, will fix this.
-
->
-> vfio_platform_bcmflexrm_shutdown may also return an error that would be
-> propagated to the called:
-> vfio_platform_release() would then emit a dev_warn + WARN_ON. your
-> choice - I know this is not done in amdxge reset function ;-) -.
-
-Yes, its good to return error. I will try to implement this.
-
->
->
-> Comparing to the drivers/mailbox/bcm-flexrm-mailbox.c flexrm_shutdown()
-> there is one section missing commented as "Abort all in-flight
-> requests". I understand there is no HW adherence of this section but I
-> just want to double check that after disabling and flush the ring as
-> above you guarantee there is no more DMA accesses likely to happen and
-> also no platform MSI can be triggered by the HW.
-
-We can only abort in-flight requests if we are managing device in-kernel.
-
-For VFIO, the device is managed from user-space (DPDK) or Guest/VM
-so we just need to bring HW in sane state.
-
->
-> Otherwise looks good to me
-> Reviewed-by: Eric Auger <eric.auger@redhat.com>
->
-> For my curiosity do you intend to do a QEMU integration of this device?
-
-Our primary objective is to use FlexRM from user-space poll mode drivers
-(DPDK).
-
-For now, we don't plan to add support FlexRM pass-through for Guest/VM.
-
->
-> Thanks
->
-> Eric
->> +}
->> +
->> +static int vfio_platform_bcmflexrm_reset(struct vfio_platform_device *vdev)
->> +{
->> +     void __iomem *ring;
->> +     struct vfio_platform_region *reg = &vdev->regions[0];
->> +
->> +     /* Map FlexRM ring registers if not mapped */
->> +     if (!reg->ioaddr) {
->> +             reg->ioaddr = ioremap_nocache(reg->addr, reg->size);
->> +             if (!reg->ioaddr)
->> +                     return -ENOMEM;
->> +     }
->> +
->> +     /* Discover and shutdown each FlexRM ring */
->> +     for (ring = reg->ioaddr;
->> +          ring < (reg->ioaddr + reg->size); ring += RING_REGS_SIZE) {
->> +             if (readl_relaxed(ring + RING_VER) == RING_VER_MAGIC)
->> +                     vfio_platform_bcmflexrm_shutdown(ring);
->> +     }
->> +
->> +     return 0;
->> +}
->> +
->> +module_vfio_reset_handler("brcm,iproc-flexrm-mbox",
->> +                       vfio_platform_bcmflexrm_reset);
->> +
->> +MODULE_LICENSE("GPL v2");
->> +MODULE_AUTHOR("Anup Patel <anup.patel@broadcom.com>");
->> +MODULE_DESCRIPTION("Reset support for Broadcom FlexRM VFIO platform device");
->>
-
-Regards,
-Anup
+diff --git a/drivers/i2c/busses/i2c-uniphier.c b/drivers/i2c/busses/i2c-uniphier.c
+index 777c0fe93653..f41a09d9927a 100644
+--- a/drivers/i2c/busses/i2c-uniphier.c
++++ b/drivers/i2c/busses/i2c-uniphier.c
+@@ -53,6 +53,7 @@ struct uniphier_i2c_priv {
+ 	void __iomem *membase;
+ 	struct clk *clk;
+ 	unsigned int busy_cnt;
++	unsigned int clk_cycle;
+ };
+ 
+ static irqreturn_t uniphier_i2c_interrupt(int irq, void *dev_id)
+@@ -316,13 +317,13 @@ static struct i2c_bus_recovery_info uniphier_i2c_bus_recovery_info = {
+ 	.unprepare_recovery = uniphier_i2c_unprepare_recovery,
+ };
+ 
+-static void uniphier_i2c_hw_init(struct uniphier_i2c_priv *priv,
+-				 u32 bus_speed, unsigned long clk_rate)
++static void uniphier_i2c_hw_init(struct uniphier_i2c_priv *priv)
+ {
++	unsigned int cyc = priv->clk_cycle;
++
+ 	uniphier_i2c_reset(priv, true);
+ 
+-	writel((clk_rate / bus_speed / 2 << 16) | (clk_rate / bus_speed),
+-	       priv->membase + UNIPHIER_I2C_CLK);
++	writel((cyc / 2 << 16) | cyc, priv->membase + UNIPHIER_I2C_CLK);
+ 
+ 	uniphier_i2c_reset(priv, false);
+ }
+@@ -376,6 +377,7 @@ static int uniphier_i2c_probe(struct platform_device *pdev)
+ 		goto disable_clk;
+ 	}
+ 
++	priv->clk_cycle = clk_rate / bus_speed;
+ 	init_completion(&priv->comp);
+ 	priv->adap.owner = THIS_MODULE;
+ 	priv->adap.algo = &uniphier_i2c_algo;
+@@ -386,7 +388,7 @@ static int uniphier_i2c_probe(struct platform_device *pdev)
+ 	i2c_set_adapdata(&priv->adap, priv);
+ 	platform_set_drvdata(pdev, priv);
+ 
+-	uniphier_i2c_hw_init(priv, bus_speed, clk_rate);
++	uniphier_i2c_hw_init(priv);
+ 
+ 	ret = devm_request_irq(dev, irq, uniphier_i2c_interrupt, 0, pdev->name,
+ 			       priv);
+@@ -413,6 +415,33 @@ static int uniphier_i2c_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int uniphier_i2c_suspend(struct device *dev)
++{
++	struct uniphier_i2c_priv *priv = dev_get_drvdata(dev);
++
++	clk_disable_unprepare(priv->clk);
++
++	return 0;
++}
++
++static int uniphier_i2c_resume(struct device *dev)
++{
++	struct uniphier_i2c_priv *priv = dev_get_drvdata(dev);
++	int ret;
++
++	ret = clk_prepare_enable(priv->clk);
++	if (ret)
++		return ret;
++
++	uniphier_i2c_hw_init(priv);
++
++	return 0;
++}
++
++static const struct dev_pm_ops uniphier_i2c_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(uniphier_i2c_suspend, uniphier_i2c_resume)
++};
++
+ static const struct of_device_id uniphier_i2c_match[] = {
+ 	{ .compatible = "socionext,uniphier-i2c" },
+ 	{ /* sentinel */ }
+@@ -425,6 +454,7 @@ static struct platform_driver uniphier_i2c_drv = {
+ 	.driver = {
+ 		.name  = "uniphier-i2c",
+ 		.of_match_table = uniphier_i2c_match,
++		.pm = &uniphier_i2c_pm_ops,
+ 	},
+ };
+ module_platform_driver(uniphier_i2c_drv);
+-- 
+2.7.4
