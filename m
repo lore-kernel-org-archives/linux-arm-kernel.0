@@ -1,61 +1,32 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 31 Jul 2017 22:22:11 +0200
-Subject: [PATCH] arm64: defconfig: enable fine-grained task level IRQ time
- accounting
-Message-ID: <1501532531-4499-1-git-send-email-mw@semihalf.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 31 Jul 2017 14:16:21 -0700
+Subject: [PATCH v4] arm64: kernel: implement fast refcount checking
+In-Reply-To: <20170731192251.12491-1-ard.biesheuvel@linaro.org>
+References: <20170731192251.12491-1-ard.biesheuvel@linaro.org>
+Message-ID: <CAGXu5jLZw1aK_wqSiAi3ddxPavOC1i47q4ahnwVnja=gsrLs2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tests showed, that under certain conditions, the summary number of jiffies
-spent on softirq/idle, which are counted by system statistics can be even
-below 10% of expected value, resulting in false load presentation.
+On Mon, Jul 31, 2017 at 12:22 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> v4: Implement add-from-zero checking using a conditional compare rather than
+>     a conditional branch, which I omitted from v3 due to the 10% performance
+>     hit: this will result in the new refcount to be written back to memory
+>     before invoking the handler, which is more in line with the other checks,
+>     and is apparently much easier on the branch predictor, given that there
+>     is no performance hit whatsoever.
 
-The issue was observed on the quad-core Marvell Armada 8k SoC, whose two
-10G ports were bound into L2 bridge. Load was controlled by bidirectional
-UDP traffic, produced by a packet generator. Under such condition,
-the dominant load is softirq. With 100% single CPU occupation or without
-any activity (all CPUs 100% idle), total number of jiffies is 10000 (2500
-per each core) in 10s interval. Also with other kind of load this was
-true.
+So refcount_inc() and refcount_add(n, ...) will write 1 and n
+respectively, then hit the handler to saturate? That seems entirely
+fine to me: checking inc-from-zero is just a protection against a
+possible double-free condition. It's still technically a race, but a
+narrow race on a rare condition is better than being able to always
+win it.
 
-However below a saturation threshold it was observed, that with CPU which
-was occupied almost by softirqs only, the statistic were awkward. See
-the mpstat output:
+Nice!
 
-CPU %usr %nice %sys %iowait %irq %soft %steal %guest %gnice %idle
-all 0.00  0.00 0.13    0.00 0.00  0.55   0.00   0.00   0.00 99.32
-  0 0.00  0.00 0.00    0.00 0.00 23.08   0.00   0.00   0.00 76.92
-  1 0.00  0.00 0.40    0.00 0.00  0.00   0.00   0.00   0.00 99.60
-  2 0.00  0.00 0.00    0.00 0.00  0.00   0.00   0.00   0.00 100.00
-  3 0.00  0.00 0.00    0.00 0.00  0.00   0.00   0.00   0.00 100.00
+-Kees
 
-Above would mean basically no total load, debug CPU0 occupied in 25%.
-Raw statistics, printed every 10s from /proc/stat unveiled a root
-cause - summary idle/softirq jiffies on loaded CPU were below 200,
-i.e. over 90% samples lost. All problems were gone after enabling
-fine granulity IRQ time accounting.
-
-This patch fixes possible wrong statistics processing by enabling
-CONFIG_IRQ_TIME_ACCOUNTING for arm64 platfroms, which is by
-default done on other architectures, e.g. x86 and arm. Tests
-showed no noticeable performance penalty, nor stability impact.
-
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 44423e6..ed51ac6 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -3,6 +3,7 @@ CONFIG_POSIX_MQUEUE=y
- CONFIG_AUDIT=y
- CONFIG_NO_HZ_IDLE=y
- CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_IRQ_TIME_ACCOUNTING=y
- CONFIG_BSD_PROCESS_ACCT=y
- CONFIG_BSD_PROCESS_ACCT_V3=y
- CONFIG_TASKSTATS=y
 -- 
-1.8.3.1
+Kees Cook
+Pixel Security
