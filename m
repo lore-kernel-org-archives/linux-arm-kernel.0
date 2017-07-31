@@ -1,56 +1,82 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 31 Jul 2017 17:04:27 +0300
-Subject: [PATCH] gpio: drop unnecessary includes from
- include/linux/gpio/driver.h
-In-Reply-To: <CACRpkdaxgxaXV8XjLTzu68JqjyeZ8Jr2YMR3L46wm3zmnMrPsg@mail.gmail.com>
-References: <1499140415-31677-1-git-send-email-yamada.masahiro@socionext.com>
- <1499162760.22624.246.camel@linux.intel.com>
- <CACRpkdaxgxaXV8XjLTzu68JqjyeZ8Jr2YMR3L46wm3zmnMrPsg@mail.gmail.com>
-Message-ID: <1501509867.29303.303.camel@linux.intel.com>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 31 Jul 2017 16:08:31 +0200
+Subject: [RFC PATCH v1] net: ethernet: nb8800: Reset HW block in ndo_open
+In-Reply-To: <yw1x60e8kebc.fsf@mansr.com>
+References: <823b1540-b528-bbd7-7f99-5dc39a08868a@sigmadesigns.com>
+ <yw1xk22slemx.fsf@mansr.com>
+ <c1bf54ee-8634-23a1-abda-55bc3fafe2a8@sigmadesigns.com>
+ <yw1xfudgl7am.fsf@mansr.com> <446e3a95-80c3-0742-9cb1-69a8dfc9b1ae@free.fr>
+ <yw1x7eyrlc3s.fsf@mansr.com> <f04a0cba-6c09-e9e4-f2d1-d8b2a7e276c9@free.fr>
+ <4ff343de-41c7-c309-04dc-983b5fe3e066@gmail.com>
+ <a5ef2294-2adf-743b-f877-144a8f3958b4@free.fr> <yw1x60e8kebc.fsf@mansr.com>
+Message-ID: <31792688-7720-1d1e-4fd4-a0f96ac8af59@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-07-31 at 15:48 +0200, Linus Walleij wrote:
-> On Tue, Jul 4, 2017 at 12:06 PM, Andy Shevchenko
-> <andriy.shevchenko@linux.intel.com> wrote:
-> > On Tue, 2017-07-04 at 12:53 +0900, Masahiro Yamada wrote:
-> > > Some of include directives in include/linux/gpio/driver.h are
-> > > unneeded because the header does not need to know the content of
-> > > struct device, irq_chip, etc.??Just declare they are structures.
-> > > 
-> > > On the other hand, <linux/irqhandler.h> and
-> > > <linux/spinlock_types.h>
-> > > turned out to be necessary for irq_flow_handler_t and spinlock_t,
-> > > respectively.
-> > > 
-> > > Each driver should include what it needs without relying on what
-> > > is
-> > > implicitly included from <linux/gpio/driver.h>.??This will cut
-> > > down
-> > > unnecessary header parsing.
-> > 
-> > If Linus is okay with the following proposal I would rather go with
-> > it,
-> > i.e. logical split the series to
-> > 
-> > 1. Fix IRQ related headers inclusion
-> > 2. Fix pinconf-generic.h inclusion
-> > 3. Fix OF headers inclusion (btw, of_gpio.h is not enough there?)
+On 31/07/2017 13:59, M?ns Rullg?rd wrote:
+
+> Mason writes:
 > 
-> That works fine with me, but also one big patch actually, I do not
-> want to make it too much work to refactor obviously incorrect things.
+>> On 29/07/2017 17:18, Florian Fainelli wrote:
+>>
+>>> On 07/29/2017 05:02 AM, Mason wrote:
+>>>
+>>>> I have identified a 100% reproducible flaw.
+>>>> I have proposed a work-around that brings this down to 0
+>>>> (tested 1000 cycles of link up / ping / link down).
+>>>
+>>> Can you also try to get help from your HW resources to eventually help
+>>> you find out what is going on here?
+>>
+>> The patch I proposed /is/ based on the feedback from the HW team :-(
+>> "Just reset the HW block, and everything will work as expected."
 > 
-> As soon as we have rough consensus on this and the build robot
-> are happy I will apply it to GPIO and also pull it into the pinctrl
-> subsystem.
+> Nobody is saying a reset won't recover the lockup.  The problem is that
+> we don't know what caused it to lock up in the first place.  How do we
+> know it can't happen during normal operation?  If we knew the cause, it
+> might also be possible to avoid the situation entirely.
 
-For me priorities like this:
-1) it works after the patch being applied (no regressions);
-2) it makes code cleaner at the end;
-3) it is presented in logically split parts.
+How does one prove that something "can't happen during normal operation"?
 
-So, as long as 1) and 2) are satisfied I can neglect on 3).
+The "put adapter in loop-back mode so we can send ourselves fake packets"
+shenanigans seems completely insane, if you ask me.
 
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Other things make no sense to me, for example in nb8800_dma_stop()
+there is a polling loop:
+
+	do {
+		mdelay(100);
+		nb8800_writel(priv, NB8800_TX_DESC_ADDR, txb->dma_desc);
+		wmb();
+		mdelay(100);
+		nb8800_writel(priv, NB8800_TXC_CR, txcr | TCR_EN);
+
+		mdelay(5500);
+
+		err = readl_poll_timeout_atomic(priv->base + NB8800_RXC_CR,
+						rxcr, !(rxcr & RCR_EN),
+						1000, 100000);
+		printk("err=%d retry=%d\n", err, retry);
+	} while (err && --retry);
+
+
+(It was me who added the delays.)
+
+*Whatever* delays I insert, it always goes 3 times through the loop.
+
+[   29.654492] ++ETH++ gw32 reg=f002610c val=9ecc8000
+[   29.759320] ++ETH++ gw32 reg=f0026100 val=005c0aff
+[   35.364705] err=-110 retry=5
+[   35.467609] ++ETH++ gw32 reg=f002610c val=9ecc8000
+[   35.572436] ++ETH++ gw32 reg=f0026100 val=005c0aff
+[   41.177822] err=-110 retry=4
+[   41.280726] ++ETH++ gw32 reg=f002610c val=9ecc8000
+[   41.385553] ++ETH++ gw32 reg=f0026100 val=005c0aff
+[   46.890907] err=0 retry=3
+
+How is that possible?
+
+I've tried using spinlocks and delays to get parallel execution
+down to a minimum, and have the same logs on both boards.
+
+Regards.
