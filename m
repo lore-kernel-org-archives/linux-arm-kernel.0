@@ -1,55 +1,42 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:19:38 +0200
-Subject: [PATCH 26/38] ARM: dts: r8a7791: Use R-Car Gen 2 fallback binding for
- vin nodes
+Date: Mon, 31 Jul 2017 17:19:25 +0200
+Subject: [PATCH 13/38] ARM: dts: r8a7791: Add Inter Connect RAM
 In-Reply-To: <cover.1501514100.git.horms+renesas@verge.net.au>
 References: <cover.1501514100.git.horms+renesas@verge.net.au>
-Message-ID: <b5595f2ffec64cce76fd1c6e4bfeb7a0109517a7.1501514100.git.horms+renesas@verge.net.au>
+Message-ID: <5ccce438b9a58b9b99c3f847f7a40f3f8e48907b.1501514100.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use R-Car Gen 2 fallback binding for vind nodes in DT for r8a7791 SoC.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-This has no run-time effect for the current driver as the initialisation
-sequence is the same for the SoC-specific binding for r8a7791 and the
-fallback binding for R-Car Gen 2
+R-Car M2-W has 2 regions of Inter Connect RAM (72 + 4 KiB).
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index e135da440eed..ea4a8147d995 100644
+index bd93f699ad84..f4748a9cb037 100644
 --- a/arch/arm/boot/dts/r8a7791.dtsi
 +++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -987,7 +987,7 @@
+@@ -890,6 +890,16 @@
+ 		status = "disabled";
  	};
  
- 	vin0: video at e6ef0000 {
--		compatible = "renesas,vin-r8a7791";
-+		compatible = "renesas,vin-r8a7791", "renesas,rcar-gen2-vin";
- 		reg = <0 0xe6ef0000 0 0x1000>;
- 		interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7791_CLK_VIN0>;
-@@ -996,7 +996,7 @@
- 	};
- 
- 	vin1: video at e6ef1000 {
--		compatible = "renesas,vin-r8a7791";
-+		compatible = "renesas,vin-r8a7791", "renesas,rcar-gen2-vin";
- 		reg = <0 0xe6ef1000 0 0x1000>;
- 		interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7791_CLK_VIN1>;
-@@ -1005,7 +1005,7 @@
- 	};
- 
- 	vin2: video at e6ef2000 {
--		compatible = "renesas,vin-r8a7791";
-+		compatible = "renesas,vin-r8a7791", "renesas,rcar-gen2-vin";
- 		reg = <0 0xe6ef2000 0 0x1000>;
- 		interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7791_CLK_VIN2>;
++	icram0:	sram at e63a0000 {
++		compatible = "mmio-sram";
++		reg = <0 0xe63a0000 0 0x12000>;
++	};
++
++	icram1:	sram at e63c0000 {
++		compatible = "mmio-sram";
++		reg = <0 0xe63c0000 0 0x1000>;
++	};
++
+ 	ether: ethernet at ee700000 {
+ 		compatible = "renesas,ether-r8a7791";
+ 		reg = <0 0xee700000 0 0x400>;
 -- 
 2.1.4
