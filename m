@@ -1,141 +1,54 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 31 Jul 2017 16:23:22 +0100
-Subject: [PATCH v2 4/5] ACPI: Make acpi_dma_configure() DMA regions aware
-In-Reply-To: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
-References: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170731152323.32488-5-lorenzo.pieralisi@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 31 Jul 2017 18:15:41 +0100
+Subject: [PATCH v3 0/5] ARM64: disable irq between breakpoint and step
+ exception
+In-Reply-To: <cover.1501496603.git.panand@redhat.com>
+References: <cover.1501496603.git.panand@redhat.com>
+Message-ID: <597F65BD.3070200@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current ACPI DMA configuration set-up device DMA capabilities through
-kernel defaults that do not take into account platform specific DMA
-configurations reported by firmware.
+Hi Pratyush,
 
-By leveraging the ACPI acpi_dev_get_dma_resources() API, add code
-in acpi_dma_configure() to retrieve the DMA regions to correctly
-set-up PCI devices DMA parameters.
+On 31/07/17 11:40, Pratyush Anand wrote:
+> samples/hw_breakpoint/data_breakpoint.c passes with x86_64 but fails with
+> ARM64. Even though it has been NAKed previously on upstream [1, 2], I have
+> tried to come up with patches which can resolve it for ARM64 as well.
+> 
+> I noticed that even perf step exception can go into an infinite loop if CPU
+> receives an interrupt while executing breakpoint/watchpoint handler. So,
+> event though we are not concerned about above test, we will have to find a
+> solution for the perf issue.
 
-Rework the ACPI IORT kernel API to make sure they can accommodate
-the DMA set-up required by firmware. By making PCI devices DMA set-up
-ACPI IORT specific, the kernel is shielded from unwanted regressions
-that could be triggered by parsing DMA resources on arches that were
-previously ignoring them (ie x86/ia64), leaving kernel behaviour
-unchanged on those arches.
+This caught my eye as I've been reworking the order the DAIF flags get
+set/cleared[0].
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
----
- drivers/acpi/arm64/iort.c | 30 ++++++++++++++++++++++++++++--
- drivers/acpi/scan.c       | 12 ++++--------
- include/linux/acpi_iort.h |  5 +++--
- 3 files changed, 35 insertions(+), 12 deletions(-)
+What causes your infinite loop? Is it single-stepping kernel_exit? If so patch 4
+"arm64: entry.S mask all exceptions during kernel_exit" [1] may help.
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index a3215ee..67b85ae 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -681,12 +681,17 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
- }
- 
- /**
-- * iort_set_dma_mask - Set-up dma mask for a device.
-+ * iort_dma_setup() - Set-up device DMA parameters.
-  *
-  * @dev: device to configure
-+ * @dma_addr: device DMA address result pointer
-+ * @size: DMA range size result pointer
-  */
--void iort_set_dma_mask(struct device *dev)
-+void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
- {
-+	u64 mask, dmaaddr = 0, size = 0, offset = 0;
-+	int ret;
-+
- 	/*
- 	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
- 	 * setup the correct supported mask.
-@@ -700,6 +705,27 @@ void iort_set_dma_mask(struct device *dev)
- 	 */
- 	if (!dev->dma_mask)
- 		dev->dma_mask = &dev->coherent_dma_mask;
-+
-+	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
-+
-+	if (dev_is_pci(dev)) {
-+		ret = acpi_dma_get_range(dev, &dmaaddr, &offset, &size);
-+		if (!ret) {
-+			mask = __roundup_pow_of_two(dmaaddr + size) - 1;
-+			/*
-+			 * Limit coherent and dma mask based on size
-+			 * retrieved from firmware.
-+			 */
-+			dev->coherent_dma_mask = mask;
-+			*dev->dma_mask = mask;
-+		}
-+	}
-+
-+	*dma_addr = dmaaddr;
-+	*dma_size = size;
-+
-+	dev->dma_pfn_offset = PFN_DOWN(offset);
-+	dev_dbg(dev, "dma_pfn_offset(%#08llx)\n", offset);
- }
- 
- /**
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index dcf5f22..ae3d580 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -1445,20 +1445,16 @@ int acpi_dma_get_range(struct device *dev, u64 *dma_addr, u64 *offset,
- int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
- {
- 	const struct iommu_ops *iommu;
--	u64 size;
-+	u64 dma_addr = 0, size = 0;
- 
--	iort_set_dma_mask(dev);
-+	iort_dma_setup(dev, &dma_addr, &size);
- 
- 	iommu = iort_iommu_configure(dev);
- 	if (IS_ERR(iommu) && PTR_ERR(iommu) == -EPROBE_DEFER)
- 		return -EPROBE_DEFER;
- 
--	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
--	/*
--	 * Assume dma valid range starts at 0 and covers the whole
--	 * coherent_dma_mask.
--	 */
--	arch_setup_dma_ops(dev, 0, size, iommu, attr == DEV_DMA_COHERENT);
-+	arch_setup_dma_ops(dev, dma_addr, size,
-+				iommu, attr == DEV_DMA_COHERENT);
- 
- 	return 0;
- }
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index 8379d40..8d3f0bf 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -36,7 +36,7 @@ struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
- void acpi_configure_pmsi_domain(struct device *dev);
- int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id);
- /* IOMMU interface */
--void iort_set_dma_mask(struct device *dev);
-+void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *size);
- const struct iommu_ops *iort_iommu_configure(struct device *dev);
- #else
- static inline void acpi_iort_init(void) { }
-@@ -47,7 +47,8 @@ static inline struct irq_domain *iort_get_device_domain(struct device *dev,
- { return NULL; }
- static inline void acpi_configure_pmsi_domain(struct device *dev) { }
- /* IOMMU interface */
--static inline void iort_set_dma_mask(struct device *dev) { }
-+static inline void iort_dma_setup(struct device *dev, u64 *dma_addr,
-+				  u64 *size) { }
- static inline
- const struct iommu_ops *iort_iommu_configure(struct device *dev)
- { return NULL; }
--- 
-2.10.0
+If its more like "single stepping something we didn't expect" you will get the
+same problem if we take an SError. (which with that series is unmasked ~all the
+time).
+Either way this looks like a new and exciting way of hitting the 'known issue'
+described in patch 12 [3].
+
+
+Would disabling MDSCR_EL1.SS if we took an exception solve your problem?
+
+If so, I think we should add a new flag, 'TIF_KSINGLESTEP', causing us to
+save/restore MDSCR_EL1.SS into pt_regs on el1 exceptions. This would let us
+single-step without modifying the DAIF flags for the location we are stepping,
+and allow taking any kind of exception from that location.
+
+We should disable nested users of single-step, we can do that by testing the
+flag, print a warning then pretend we missed the breakpoint. (hence it needs to
+be separate from the user single-step flag).
+
+
+Thanks,
+
+James
+
+[0] https://www.spinics.net/lists/arm-kernel/msg596684.html
+[1] https://www.spinics.net/lists/arm-kernel/msg596686.html
+[2] https://www.spinics.net/lists/arm-kernel/msg596689.html
