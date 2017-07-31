@@ -1,116 +1,31 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:03:01 +0200
-Subject: [PATCH 09/31] arm64: dts: r8a7796: Add VSP instances
-In-Reply-To: <cover.1501509525.git.horms+renesas@verge.net.au>
-References: <cover.1501509525.git.horms+renesas@verge.net.au>
-Message-ID: <f06ffdfbdd90e566569bda56763097ce277e42d4.1501509525.git.horms+renesas@verge.net.au>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 31 Jul 2017 17:04:33 +0200
+Subject: [PATCH] i2c: use dev_get_drvdata() to get private data in
+ suspend/resume hooks
+In-Reply-To: <1501172184-17102-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1501172184-17102-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20170731150433.hokceynz2j6eiu6j@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+On Fri, Jul 28, 2017 at 01:16:24AM +0900, Masahiro Yamada wrote:
+> Several drivers call to_platform_device() to get platform_device
+> and pass it to platform_get_drvdata().  In platform_get_drvdata(),
+> the platform_device is converted back to struct device again.
+> 
+> Use dev_get_drvdata() to avoid platform_device/device dance.
 
-The r8a7796 has 5 VSP instances.
+'dance' :D
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 55 ++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index b301554ff424..9ef1729a800c 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -1570,6 +1570,17 @@
- 			resets = <&cpg 615>;
- 		};
- 
-+		vspb: vsp at fe960000 {
-+			compatible = "renesas,vsp2";
-+			reg = <0 0xfe960000 0 0x8000>;
-+			interrupts = <GIC_SPI 266 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 626>;
-+			power-domains = <&sysc R8A7796_PD_A3VC>;
-+			resets = <&cpg 626>;
-+
-+			renesas,fcp = <&fcpvb0>;
-+		};
-+
- 		fcpvb0: fcp at fe96f000 {
- 			compatible = "renesas,fcpv";
- 			reg = <0 0xfe96f000 0 0x200>;
-@@ -1578,6 +1589,17 @@
- 			resets = <&cpg 607>;
- 		};
- 
-+		vspi0: vsp at fe9a0000 {
-+			compatible = "renesas,vsp2";
-+			reg = <0 0xfe9a0000 0 0x8000>;
-+			interrupts = <GIC_SPI 444 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 631>;
-+			power-domains = <&sysc R8A7796_PD_A3VC>;
-+			resets = <&cpg 631>;
-+
-+			renesas,fcp = <&fcpvi0>;
-+		};
-+
- 		fcpvi0: fcp at fe9af000 {
- 			compatible = "renesas,fcpv";
- 			reg = <0 0xfe9af000 0 0x200>;
-@@ -1586,6 +1608,17 @@
- 			resets = <&cpg 611>;
- 		};
- 
-+		vspd0: vsp at fea20000 {
-+			compatible = "renesas,vsp2";
-+			reg = <0 0xfea20000 0 0x4000>;
-+			interrupts = <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 623>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			resets = <&cpg 623>;
-+
-+			renesas,fcp = <&fcpvd0>;
-+		};
-+
- 		fcpvd0: fcp at fea27000 {
- 			compatible = "renesas,fcpv";
- 			reg = <0 0xfea27000 0 0x200>;
-@@ -1594,6 +1627,17 @@
- 			resets = <&cpg 603>;
- 		};
- 
-+		vspd1: vsp at fea28000 {
-+			compatible = "renesas,vsp2";
-+			reg = <0 0xfea28000 0 0x4000>;
-+			interrupts = <GIC_SPI 467 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 622>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			resets = <&cpg 622>;
-+
-+			renesas,fcp = <&fcpvd1>;
-+		};
-+
- 		fcpvd1: fcp at fea2f000 {
- 			compatible = "renesas,fcpv";
- 			reg = <0 0xfea2f000 0 0x200>;
-@@ -1602,6 +1646,17 @@
- 			resets = <&cpg 602>;
- 		};
- 
-+		vspd2: vsp at fea30000 {
-+			compatible = "renesas,vsp2";
-+			reg = <0 0xfea30000 0 0x4000>;
-+			interrupts = <GIC_SPI 468 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 621>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			resets = <&cpg 621>;
-+
-+			renesas,fcp = <&fcpvd2>;
-+		};
-+
- 		fcpvd2: fcp at fea37000 {
- 			compatible = "renesas,fcpv";
- 			reg = <0 0xfea37000 0 0x200>;
--- 
-2.1.4
+Applied to for-next, and thanks for doing it subsystem wide!
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170731/f69b109c/attachment-0001.sig>
