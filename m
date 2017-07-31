@@ -1,37 +1,46 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:26:14 +0100
-Subject: [PATCH v3 36/59] KVM: arm: Select ARM_GIC_V3 and ARM_GIC_V3_ITS
+Date: Mon, 31 Jul 2017 18:26:15 +0100
+Subject: [PATCH v3 37/59] KVM: arm/arm64: vgic: Move kvm_vgic_destroy call
+ around
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-37-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-38-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GICv4 support introduces a hard dependency between the KVM
-core and the ITS infrastructure. arm64 already selects it at
-the architecture level, but 32bit doesn't. In order to avoid
-littering the kernel with #ifdefs, let's just select the whole
-of the GICv3 suport code.
+The way we call kvm_vgic_destroy is a bit bizarre. We call it
+*after* having freed the vcpus, which sort of defeats the point
+of cleaning up things before that point.
 
-You know you want it.
+Let's move kvm_vgic_destroy towards the beginning of kvm_arch_destroy_vm,
+which seems more sensible.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ virt/kvm/arm/arm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 4e2b192a030a..52b50af04e3b 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -23,6 +23,8 @@ config KVM
- 	select PREEMPT_NOTIFIERS
- 	select ANON_INODES
- 	select ARM_GIC
-+	select ARM_GIC_V3
-+	select ARM_GIC_V3_ITS
- 	select HAVE_KVM_CPU_RELAX_INTERCEPT
- 	select HAVE_KVM_ARCH_TLB_FLUSH_ALL
- 	select KVM_MMIO
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 7846a578db1a..ebab6c29e3be 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -177,6 +177,8 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
+ {
+ 	int i;
+ 
++	kvm_vgic_destroy(kvm);
++
+ 	free_percpu(kvm->arch.last_vcpu_ran);
+ 	kvm->arch.last_vcpu_ran = NULL;
+ 
+@@ -186,8 +188,6 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
+ 			kvm->vcpus[i] = NULL;
+ 		}
+ 	}
+-
+-	kvm_vgic_destroy(kvm);
+ }
+ 
+ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 -- 
 2.11.0
