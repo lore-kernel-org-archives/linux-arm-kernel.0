@@ -1,43 +1,95 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 31 Jul 2017 10:48:27 +0900
-Subject: [PATCH 0/5] phy: Replace the deprecated extcon API
-In-Reply-To: <1500254456-6525-1-git-send-email-cw00.choi@samsung.com>
-References: <CGME20170717012057epcas1p11fe3d445ed16c7f94b57922b0a8f243a@epcas1p1.samsung.com>
- <1500254456-6525-1-git-send-email-cw00.choi@samsung.com>
-Message-ID: <597E8C6B.1060004@samsung.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Mon, 31 Jul 2017 10:46:22 +0800
+Subject: [PATCH v4 9/9] arm: dts: mt7623: add dts file for Bananapi R2
+ (BPI-R2) board
+In-Reply-To: <805ad5c4-db47-ef10-565d-b63e33a84bdf@gmail.com>
+References: <cover.1495683769.git.sean.wang@mediatek.com>
+ <5cc5489b38fc2723c30c8cfe0d4353f967d100f3.1495683769.git.sean.wang@mediatek.com>
+ <805ad5c4-db47-ef10-565d-b63e33a84bdf@gmail.com>
+Message-ID: <1501469182.10930.3.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kishon and Felipe,
-
-Please review the patch3/patch4.
-
-
-On 2017? 07? 17? 10:20, Chanwoo Choi wrote:
-> These patches replace the deprecated extcon API
-> and remove them from extcon framework.
+On Thu, 2017-07-27 at 16:39 +0200, Matthias Brugger wrote:
 > 
-> The patch1 and patch2 were already acked by Kishon Vijay Abraham I.
-> If patch3/patch4 are reviewed, I'll create the immutable branch
-> and send the pull request to both usb and phy maintainer.
+> On 05/25/2017 06:02 AM, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > Add support for the Bananapi R2 (BPI-R2) development board from
+> > BIPAI KEJI. Detailed hardware information for BPI-R2 which could be
+> > found on http://www.banana-pi.org/r2.html
+> > 
+> > The patch currently only adds Mediatek GMAC, MT7530 Switch, the crypto
+> > engine, USB, IR, I2S, I2C, UART, SPI, PWM, GPIO keys, GPIO LEDs and
+> > PMIC LEDs. As to the other missing hardware and peripherals, they would
+> > be added and integrated continuously.
+> > 
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > ---
+> >   Documentation/devicetree/bindings/arm/mediatek.txt |   2 +
+> >   arch/arm/boot/dts/Makefile                         |   1 +
+> >   arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts      | 440 +++++++++++++++++++++
+> >   3 files changed, 443 insertions(+)
+> >   create mode 100644 arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> > 
+> [...]
+> > diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> > new file mode 100644
+> > index 0000000..72c7984
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+> [...]
+> > +
+> > +&eth {
+> > +	status = "okay";
+> > +	gmac0: mac at 0 {
+> > +		compatible = "mediatek,eth-mac";
+> > +		reg = <0>;
+> > +		phy-mode = "trgmii";
+> > +		fixed-link {
+> > +			speed = <1000>;
+> > +			full-duplex;
+> > +			pause;
+> > +		};
+> > +	};
+> > +
+> > +	mdio: mdio-bus {
+> > +		switch at 0 {
+> > +			compatible = "mediatek,mt7530";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +			reg = <0>;
 > 
-> Chanwoo Choi (5):
->   phy: qcom-usb-hs: Replace the extcon API
->   phy: rockchip-inno-usb2: Replace the extcon API
->   phy: phy-bcm-ns2-usbdrd: Replace the deprecated extcon API
->   usb: gadget: udc: Replace the deprecated extcon API
->   extcon: Remove deprecated extcon_set/get_cable_state_()
+> What is this reg needed for? I can't find it neither in the code nor in the 
+> bindings (mt7530 and general dsa bindings). Actually it throws a warning when 
+> compiling:
+> arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dtb: Warning (reg_format): "reg" 
+> property in /ethernet at 1b100000/mdio-bus/switch at 0 has invalid length (4 bytes) 
+> (#address-cells == 2, #size-cells == 1)
+> arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dtb: Warning 
+> (avoid_default_addr_size): Relying on default #address-cells value for 
+> /ethernet at 1b100000/mdio-bus/switch at 0
+> arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dtb: Warning 
+> (avoid_default_addr_size): Relying on default #size-cells value for 
+> /ethernet at 1b100000/mdio-bus/switch at 0
 > 
->  drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c     |  8 ++++----
->  drivers/phy/qualcomm/phy-qcom-usb-hs.c        | 14 +++-----------
->  drivers/phy/rockchip/phy-rockchip-inno-usb2.c | 10 +++++-----
->  drivers/usb/gadget/udc/snps_udc_plat.c        |  6 +++---
->  include/linux/extcon.h                        | 11 -----------
->  5 files changed, 15 insertions(+), 34 deletions(-)
+> Regards,
+> Matthias
 > 
 
 
--- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+Hi, Matthias
+
+many thanks
+
+It should be just my written mistakes. Recently I prepared the next
+version including a few fixups and enhancements which also would include
+the warning correction you reported here.
+
+	Sean 
+
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
