@@ -1,52 +1,46 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 31 Jul 2017 13:24:27 +0200
-Subject: [PATCH v3 2/2] dt-bindings: add documentation for rk3126 clock
-In-Reply-To: <1501497728-7805-3-git-send-email-zhangqing@rock-chips.com>
-References: <1501497728-7805-1-git-send-email-zhangqing@rock-chips.com>
- <1501497728-7805-3-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1528313.SDTh7a5k6t@diego>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 31 Jul 2017 13:27:19 +0200
+Subject: [PATCH] pinctrl-st: fix of_irq_to_resource() result check
+In-Reply-To: <20170729180744.873303067@cogentembedded.com>
+References: <20170729180744.873303067@cogentembedded.com>
+Message-ID: <20170731112719.GM26667@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Elaine,
-
-Am Montag, 31. Juli 2017, 18:42:08 CEST schrieb Elaine Zhang:
-> This add bindings documentation for rk3126 SoCs.
+On Sat, Jul 29, 2017 at 09:07:07PM +0300, Sergei Shtylyov wrote:
+> of_irq_to_resource() has recently been fixed to return negative error #'s
+> along with 0 in case of failure, however the ST driver still only regards
+> 0 as failure indication -- fix it up.
 > 
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-
-thanks for noticing that the binding doc was missing, I meant to
-write a response about that but didn't find the time yet.
-
+> Fixes: 7a4228bbff76 ("of: irq: use of_irq_get() in of_irq_to_resource()")
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
 > ---
->  Documentation/devicetree/bindings/clock/rockchip,rk3128-cru.txt | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  drivers/pinctrl/pinctrl-st.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3128-cru.txt
-> b/Documentation/devicetree/bindings/clock/rockchip,rk3128-cru.txt index
-> 455a9a00a623..25098fa8595f 100644
-> --- a/Documentation/devicetree/bindings/clock/rockchip,rk3128-cru.txt
-> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3128-cru.txt
-> @@ -1,12 +1,12 @@
-> -* Rockchip RK3128 Clock and Reset Unit
-> +* Rockchip RK3128/RK3126 Clock and Reset Unit
-> 
-> -The RK3128 clock controller generates and supplies clock to various
-> +The RK3128/RK3126 clock controller generates and supplies clock to various
->  controllers within the SoC and also implements a reset controller for SoC
->  peripherals.
-> 
->  Required Properties:
-> 
-> -- compatible: should be "rockchip,rk3128-cru"
-> +- compatible: should be "rockchip,rk3128-cru", "rockchip,rk3126-cru"
+> Index: linux-pinctrl/drivers/pinctrl/pinctrl-st.c
+> ===================================================================
+> --- linux-pinctrl.orig/drivers/pinctrl/pinctrl-st.c
+> +++ linux-pinctrl/drivers/pinctrl/pinctrl-st.c
+> @@ -1521,7 +1521,7 @@ static int st_gpiolib_register_bank(stru
+>  	 *	[irqN]----> [gpio-bank (n)]
+>  	 */
+>  
+> -	if (of_irq_to_resource(np, 0, &irq_res)) {
+> +	if (of_irq_to_resource(np, 0, &irq_res) > 0) {
+>  		gpio_irq = irq_res.start;
+>  		gpiochip_set_chained_irqchip(&bank->gpio_chip, &st_gpio_irqchip,
+>  					     gpio_irq, st_gpio_irq_handler);
 
-- compatible: should be one of "rockchip,rk3128-cru" or "rockchip,rk3126-cru".
+While at it, maybe turn this into of_irq_get() since you only need the
+interrupt number in the first place?
 
-
-Heiko
-
-
->  - reg: physical base address of the controller and length of memory mapped
->    region.
->  - #clock-cells: should be 1.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170731/5617fad3/attachment.sig>
