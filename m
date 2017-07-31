@@ -1,74 +1,77 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:25:47 +0100
-Subject: [PATCH v3 09/59] irqchip/gic-v3-its: Allow use of indirect VCPU tables
+Date: Mon, 31 Jul 2017 18:25:46 +0100
+Subject: [PATCH v3 08/59] irqchip/gic-v3-its: Split out property table
+ allocation
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-10-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-9-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VCPU tables can be quite sparse as well, and it makes sense
-to use indirect tables as well if possible.
+Move the LPI property table allocation into its own function, as
+this is going to be required for those associated with VMs in
+the future.
 
-Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 25 +++++++++++++++++--------
- 1 file changed, 17 insertions(+), 8 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 31 +++++++++++++++++++++----------
+ 1 file changed, 21 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 039626d21a73..9a317934455c 100644
+index 3e4ac8c13e21..039626d21a73 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1071,10 +1071,13 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
- 	return 0;
+@@ -899,13 +899,32 @@ static void its_lpi_free(struct event_lpi_map *map)
+ 	kfree(map->col_map);
  }
  
--static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser,
--				   u32 psz, u32 *order)
-+static bool its_parse_indirect_baser(struct its_node *its,
-+				     struct its_baser *baser,
-+				     u32 psz, u32 *order)
++static struct page *its_allocate_prop_table(gfp_t gfp_flags)
++{
++	struct page *prop_page;
++
++	prop_page = alloc_pages(gfp_flags, get_order(LPI_PROPBASE_SZ));
++	if (!prop_page)
++		return NULL;
++
++	/* Priority 0xa0, Group-1, disabled */
++	memset(page_address(prop_page),
++	       LPI_PROP_DEFAULT_PRIO | LPI_PROP_GROUP1,
++	       LPI_PROPBASE_SZ);
++
++	/* Make sure the GIC will observe the written configuration */
++	gic_flush_dcache_to_poc(page_address(prop_page), LPI_PROPBASE_SZ);
++
++	return prop_page;
++}
++
++
+ static int __init its_alloc_lpi_tables(void)
  {
--	u64 esz = GITS_BASER_ENTRY_SIZE(its_read_baser(its, baser));
-+	u64 tmp = its_read_baser(its, baser);
-+	u64 type = GITS_BASER_TYPE(tmp);
-+	u64 esz = GITS_BASER_ENTRY_SIZE(tmp);
- 	u64 val = GITS_BASER_InnerShareable | GITS_BASER_RaWaWb;
- 	u32 ids = its->device_ids;
- 	u32 new_order = *order;
-@@ -1113,8 +1116,9 @@ static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser
- 	if (new_order >= MAX_ORDER) {
- 		new_order = MAX_ORDER - 1;
- 		ids = ilog2(PAGE_ORDER_TO_SIZE(new_order) / (int)esz);
--		pr_warn("ITS@%pa: Device Table too large, reduce ids %u->%u\n",
--			&its->phys_base, its->device_ids, ids);
-+		pr_warn("ITS@%pa: %s Table too large, reduce ids %u->%u\n",
-+			&its->phys_base, its_base_type_string[type],
-+			its->device_ids, ids);
- 	}
+ 	phys_addr_t paddr;
  
- 	*order = new_order;
-@@ -1162,11 +1166,16 @@ static int its_alloc_tables(struct its_node *its)
- 		u32 order = get_order(psz);
- 		bool indirect = false;
+ 	lpi_id_bits = min_t(u32, gic_rdists->id_bits, ITS_MAX_LPI_NRBITS);
+-	gic_rdists->prop_page = alloc_pages(GFP_NOWAIT,
+-					   get_order(LPI_PROPBASE_SZ));
++	gic_rdists->prop_page = its_allocate_prop_table(GFP_NOWAIT);
+ 	if (!gic_rdists->prop_page) {
+ 		pr_err("Failed to allocate PROPBASE\n");
+ 		return -ENOMEM;
+@@ -914,14 +933,6 @@ static int __init its_alloc_lpi_tables(void)
+ 	paddr = page_to_phys(gic_rdists->prop_page);
+ 	pr_info("GIC: using LPI property table @%pa\n", &paddr);
  
--		if (type == GITS_BASER_TYPE_NONE)
-+		switch (type) {
-+		case GITS_BASER_TYPE_NONE:
- 			continue;
+-	/* Priority 0xa0, Group-1, disabled */
+-	memset(page_address(gic_rdists->prop_page),
+-	       LPI_PROP_DEFAULT_PRIO | LPI_PROP_GROUP1,
+-	       LPI_PROPBASE_SZ);
+-
+-	/* Make sure the GIC will observe the written configuration */
+-	gic_flush_dcache_to_poc(page_address(gic_rdists->prop_page), LPI_PROPBASE_SZ);
+-
+ 	return its_lpi_init(lpi_id_bits);
+ }
  
--		if (type == GITS_BASER_TYPE_DEVICE)
--			indirect = its_parse_baser_device(its, baser, psz, &order);
-+		case GITS_BASER_TYPE_DEVICE:
-+		case GITS_BASER_TYPE_VCPU:
-+			indirect = its_parse_indirect_baser(its, baser,
-+							    psz, &order);
-+			break;
-+		}
- 
- 		err = its_setup_baser(its, baser, cache, shr, psz, order, indirect);
- 		if (err < 0) {
 -- 
 2.11.0
