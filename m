@@ -1,274 +1,265 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 31 Jul 2017 12:42:30 +0100
-Subject: [PATCH v2 3/4] iommu/iova: Extend rbtree node caching
-In-Reply-To: <23972edc-e59e-3a43-59a9-d776e64af4d7@codeaurora.org>
-References: <cover.1500636791.git.robin.murphy@arm.com>
- <b5b7e5541e47cba1112ef5bfb036d8ad44df8893.1500636791.git.robin.murphy@arm.com>
- <23972edc-e59e-3a43-59a9-d776e64af4d7@codeaurora.org>
-Message-ID: <e5d4524e-bfe9-acf1-66c1-ea1d9d319855@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 31 Jul 2017 13:49:45 +0200
+Subject: [RFC PATCH v1] net: ethernet: nb8800: Reset HW block in ndo_open
+In-Reply-To: <4ff343de-41c7-c309-04dc-983b5fe3e066@gmail.com>
+References: <823b1540-b528-bbd7-7f99-5dc39a08868a@sigmadesigns.com>
+ <yw1xk22slemx.fsf@mansr.com>
+ <c1bf54ee-8634-23a1-abda-55bc3fafe2a8@sigmadesigns.com>
+ <yw1xfudgl7am.fsf@mansr.com> <446e3a95-80c3-0742-9cb1-69a8dfc9b1ae@free.fr>
+ <yw1x7eyrlc3s.fsf@mansr.com> <f04a0cba-6c09-e9e4-f2d1-d8b2a7e276c9@free.fr>
+ <4ff343de-41c7-c309-04dc-983b5fe3e066@gmail.com>
+Message-ID: <a5ef2294-2adf-743b-f877-144a8f3958b4@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nate,
+On 29/07/2017 17:18, Florian Fainelli wrote:
 
-On 29/07/17 04:57, Nate Watterson wrote:
-> Hi Robin,
-> I am seeing a crash when performing very basic testing on this series
-> with a Mellanox CX4 NIC. I dug into the crash a bit, and think this
-> patch is the culprit, but this rcache business is still mostly
-> witchcraft to me.
-> 
-> # ifconfig eth5 up
-> # ifconfig eth5 down
->     Unable to handle kernel NULL pointer dereference at virtual address
-> 00000020
->     user pgtable: 64k pages, 48-bit VAs, pgd = ffff8007dbf47c00
->     [0000000000000020] *pgd=00000006efab0003, *pud=00000006efab0003,
-> *pmd=00000007d8720003, *pte=0000000000000000
->     Internal error: Oops: 96000007 [#1] SMP
->     Modules linked in:
->     CPU: 47 PID: 5082 Comm: ifconfig Not tainted 4.13.0-rtp-enablement+ #3
->     task: ffff8007da1e5780 task.stack: ffff8007ddcb8000
->     PC is at __cached_rbnode_delete_update+0x2c/0x58
->     LR is at private_free_iova+0x2c/0x60
->     pc : [<ffff00000852c6e4>] lr : [<ffff00000852cdac>] pstate: 204001c5
->     sp : ffff8007ddcbba00
->     x29: ffff8007ddcbba00 x28: ffff8007c8350210
->     x27: ffff8007d1a80000 x26: ffff8007dcc20800
->     x25: 0000000000000140 x24: ffff8007c98f0008
->     x23: 00000000fffffe4e x22: 0000000000000140
->     x21: ffff8007c98f0008 x20: ffff8007c9adb240
->     x19: ffff8007c98f0018 x18: 0000000000000010
->     x17: 0000000000000000 x16: 0000000000000000
->     x15: 4000000000000000 x14: 0000000000000000
->     x13: 00000000ffffffff x12: 0000000000000001
->     x11: dead000000000200 x10: 00000000ffffffff
->     x9 : 0000000000000000 x8 : ffff8007c9adb1c0
->     x7 : 0000000040002000 x6 : 0000000000210d00
->     x5 : 0000000000000000 x4 : 000000000000c57e
->     x3 : 00000000ffffffcf x2 : 00000000ffffffcf
->     x1 : ffff8007c9adb240 x0 : 0000000000000000
->     [...]
->     [<ffff00000852c6e4>] __cached_rbnode_delete_update+0x2c/0x58
->     [<ffff00000852cdac>] private_free_iova+0x2c/0x60
->     [<ffff00000852cea4>] iova_magazine_free_pfns+0x4c/0xa0
->     [<ffff00000852d0a8>] free_iova_fast+0x1b0/0x230
->     [<ffff000008529d34>] iommu_dma_free_iova+0x5c/0x80
->     [<ffff000008529db4>] __iommu_dma_unmap+0x5c/0x98
->     [<ffff00000852aebc>] iommu_dma_unmap_resource+0x24/0x30
->     [<ffff00000852aed4>] iommu_dma_unmap_page+0xc/0x18
->     [<ffff000008093030>] __iommu_unmap_page+0x40/0x60
->     [<ffff0000087401bc>] mlx5e_page_release+0xbc/0x128
->     [<ffff000008740498>] mlx5e_dealloc_rx_wqe+0x30/0x40
->     [<ffff000008735ef0>] mlx5e_close_channel+0x70/0x1f8
->     [<ffff0000087370f4>] mlx5e_close_channels+0x2c/0x50
->     [<ffff0000087385dc>] mlx5e_close_locked+0x54/0x68
->     [<ffff000008738620>] mlx5e_close+0x30/0x58
->     [...]
-> 
-> ** Disassembly for __cached_rbnode_delete_update() near the fault **
->               92|if (free->pfn_hi < iovad->dma_32bit_pfn)
-> FFFF00000852C6C4|            ldr     x3,[x1,#0x18]    ; x3,[free,#24]
-> FFFF00000852C6C8|            ldr     x2,[x0,#0x30]    ; x2,[iovad,#48]
-> FFFF00000852C6CC|            cmp     x3,x2
-> FFFF00000852C6D0|            b.cs    0xFFFF00000852C708
->                 |        curr = &iovad->cached32_node;
->               94|if (!curr)
-> FFFF00000852C6D4|            adds    x19,x0,#0x18     ; x19,iovad,#24
-> FFFF00000852C6D8|            b.eq    0xFFFF00000852C708
->                 |
->                 |cached_iova = rb_entry(*curr, struct iova, node);
->                 |
->               99|if (free->pfn_lo >= cached_iova->pfn_lo)
-> FFFF00000852C6DC|            ldr     x0,[x19]         ; xiovad,[curr]
-> FFFF00000852C6E0|            ldr     x2,[x1,#0x20]    ; x2,[free,#32]
-> FFFF00000852C6E4|            ldr     x0,[x0,#0x20]    ; x0,[x0,#32]
-> Apparently cached_iova was NULL so the pfn_lo access faulted.
-> 
-> FFFF00000852C6E8|            cmp     x2,x0
-> FFFF00000852C6EC|            b.cc    0xFFFF00000852C6FC
-> FFFF00000852C6F0|            mov     x0,x1            ; x0,free
->              100|        *curr = rb_next(&free->node);
-> After instrumenting the code a bit, this seems to be the culprit. In the
-> previous call, free->pfn_lo was 0xFFFF_FFFF which is actually the
-> dma_limit for the domain so rb_next() returns NULL.
-> 
-> Let me know if you have any questions or would like additional tests
-> run. I also applied your "DMA domain debug info" patches and dumped the
-> contents of the domain at each of the steps above in case that would be
-> useful. If nothing else, they reinforce how thirsty the CX4 NIC is
-> especially when using 64k pages and many CPUs.
-
-Thanks for the report - I somehow managed to reason myself out of
-keeping the "no cached node" check in __cached_rbnode_delete_update() on
-the assumption that it must always be set by a previous allocation.
-However, there is indeed just one case case for which that fails: when
-you free any IOVA immediately after freeing the very topmost one. Which
-is something that freeing an entire magazine's worth of IOVAs back to
-the tree all at once has a very real chance of doing...
-
-The obvious straightforward fix is inline below, but I'm now starting to
-understand the appeal of reserving a sentinel node to ensure the tree
-can never be empty, so I might have a quick go at that to see if it
-results in nicer code overall.
-
-Robin.
-
+> On 07/29/2017 05:02 AM, Mason wrote:
 >
-> -Nate
+>> I have identified a 100% reproducible flaw.
+>> I have proposed a work-around that brings this down to 0
+>> (tested 1000 cycles of link up / ping / link down).
 > 
-> On 7/21/2017 7:42 AM, Robin Murphy wrote:
->> The cached node mechanism provides a significant performance benefit for
->> allocations using a 32-bit DMA mask, but in the case of non-PCI devices
->> or where the 32-bit space is full, the loss of this benefit can be
->> significant - on large systems there can be many thousands of entries in
->> the tree, such that traversing to the end then walking all the way down
->> to find free space every time becomes increasingly awful.
->>
->> Maintain a similar cached node for the whole IOVA space as a superset of
->> the 32-bit space so that performance can remain much more consistent.
->>
->> Inspired by work by Zhen Lei <thunder.leizhen@huawei.com>.
->>
->> Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> Tested-by: Zhen Lei <thunder.leizhen@huawei.com>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>
->> v2: No change
->>
->>   drivers/iommu/iova.c | 59
->> +++++++++++++++++++++++++---------------------------
->>   include/linux/iova.h |  3 ++-
->>   2 files changed, 30 insertions(+), 32 deletions(-)
->>
->> diff --git a/drivers/iommu/iova.c b/drivers/iommu/iova.c
->> index d094d1ca8f23..f5809a2ee6c2 100644
->> --- a/drivers/iommu/iova.c
->> +++ b/drivers/iommu/iova.c
->> @@ -46,6 +46,7 @@ init_iova_domain(struct iova_domain *iovad, unsigned
->> long granule,
->>         spin_lock_init(&iovad->iova_rbtree_lock);
->>       iovad->rbroot = RB_ROOT;
->> +    iovad->cached_node = NULL;
->>       iovad->cached32_node = NULL;
->>       iovad->granule = granule;
->>       iovad->start_pfn = start_pfn;
->> @@ -57,48 +58,46 @@ EXPORT_SYMBOL_GPL(init_iova_domain);
->>   static struct rb_node *
->>   __get_cached_rbnode(struct iova_domain *iovad, unsigned long
->> *limit_pfn)
->>   {
->> -    if ((*limit_pfn > iovad->dma_32bit_pfn) ||
->> -        (iovad->cached32_node == NULL))
->> +    struct rb_node *cached_node = NULL;
->> +    struct iova *curr_iova;
->> +
->> +    if (*limit_pfn <= iovad->dma_32bit_pfn)
->> +        cached_node = iovad->cached32_node;
->> +    if (!cached_node)
->> +        cached_node = iovad->cached_node;
->> +    if (!cached_node)
->>           return rb_last(&iovad->rbroot);
->> -    else {
->> -        struct rb_node *prev_node = rb_prev(iovad->cached32_node);
->> -        struct iova *curr_iova =
->> -            rb_entry(iovad->cached32_node, struct iova, node);
->> -        *limit_pfn = curr_iova->pfn_lo;
->> -        return prev_node;
->> -    }
->> +
->> +    curr_iova = rb_entry(cached_node, struct iova, node);
->> +    *limit_pfn = curr_iova->pfn_lo;
->> +
->> +    return rb_prev(cached_node);
->>   }
->>     static void
->> -__cached_rbnode_insert_update(struct iova_domain *iovad,
->> -    unsigned long limit_pfn, struct iova *new)
->> +__cached_rbnode_insert_update(struct iova_domain *iovad, struct iova
->> *new)
->>   {
->> -    if (limit_pfn != iovad->dma_32bit_pfn)
->> -        return;
->> -    iovad->cached32_node = &new->node;
->> +    if (new->pfn_lo > iovad->dma_32bit_pfn)
->> +        iovad->cached_node = &new->node;
->> +    else
->> +        iovad->cached32_node = &new->node;
->>   }
->>     static void
->>   __cached_rbnode_delete_update(struct iova_domain *iovad, struct iova
->> *free)
->>   {
->>       struct iova *cached_iova;
->> -    struct rb_node *curr;
->> +    struct rb_node **curr = NULL;
->>   -    if (!iovad->cached32_node)
->> -        return;
->> -    curr = iovad->cached32_node;
->> -    cached_iova = rb_entry(curr, struct iova, node);
->> +    if (free->pfn_hi < iovad->dma_32bit_pfn)
->> +        curr = &iovad->cached32_node;
->> +    if (!curr)
->> +        curr = &iovad->cached_node;
+> Can you also try to get help from your HW resources to eventually help
+> you find out what is going on here?
 
-+	if (!*curr)
-+		return;
+The patch I proposed /is/ based on the feedback from the HW team :-(
+"Just reset the HW block, and everything will work as expected."
 
->>   -    if (free->pfn_lo >= cached_iova->pfn_lo) {
->> -        struct rb_node *node = rb_next(&free->node);
->> -        struct iova *iova = rb_entry(node, struct iova, node);
->> +    cached_iova = rb_entry(*curr, struct iova, node);
->>   -        /* only cache if it's below 32bit pfn */
->> -        if (node && iova->pfn_lo < iovad->dma_32bit_pfn)
->> -            iovad->cached32_node = node;
->> -        else
->> -            iovad->cached32_node = NULL;
->> -    }
->> +    if (free->pfn_lo >= cached_iova->pfn_lo)
->> +        *curr = rb_next(&free->node);
->>   }
->>     /* Insert the iova into domain rbtree by holding writer lock */
->> @@ -135,7 +134,6 @@ static int __alloc_and_insert_iova_range(struct
->> iova_domain *iovad,
->>   {
->>       struct rb_node *prev, *curr = NULL;
->>       unsigned long flags;
->> -    unsigned long saved_pfn;
->>       unsigned long align_mask = ~0UL;
->>         if (size_aligned)
->> @@ -143,7 +141,6 @@ static int __alloc_and_insert_iova_range(struct
->> iova_domain *iovad,
->>         /* Walk the tree backwards */
->>       spin_lock_irqsave(&iovad->iova_rbtree_lock, flags);
->> -    saved_pfn = limit_pfn;
->>       curr = __get_cached_rbnode(iovad, &limit_pfn);
->>       prev = curr;
->>       while (curr) {
->> @@ -173,7 +170,7 @@ static int __alloc_and_insert_iova_range(struct
->> iova_domain *iovad,
->>         /* If we have 'prev', it's a valid place to start the
->> insertion. */
->>       iova_insert_rbtree(&iovad->rbroot, new, prev);
->> -    __cached_rbnode_insert_update(iovad, saved_pfn, new);
->> +    __cached_rbnode_insert_update(iovad, new);
->>         spin_unlock_irqrestore(&iovad->iova_rbtree_lock, flags);
->>   diff --git a/include/linux/iova.h b/include/linux/iova.h
->> index e0a892ae45c0..0bb8df43b393 100644
->> --- a/include/linux/iova.h
->> +++ b/include/linux/iova.h
->> @@ -40,7 +40,8 @@ struct iova_rcache {
->>   struct iova_domain {
->>       spinlock_t    iova_rbtree_lock; /* Lock to protect update of
->> rbtree */
->>       struct rb_root    rbroot;        /* iova domain rbtree root */
->> -    struct rb_node    *cached32_node; /* Save last alloced node */
->> +    struct rb_node    *cached_node;    /* Save last alloced node */
->> +    struct rb_node    *cached32_node; /* Save last 32-bit alloced
->> node */
->>       unsigned long    granule;    /* pfn granularity for this domain */
->>       unsigned long    start_pfn;    /* Lower limit for this domain */
->>       unsigned long    dma_32bit_pfn;
->>
+>> In my opinion, upstream should consider this work-around
+>> for inclusion. I'd like to hear David's and Florian's
+>> opinion on the topic. It's always a pain to maintain
+>> out-of-tree patches.
 > 
+> I have to agree with Mans here that the commit message explanation is
+> not good enough to understand how the RX path is hosed after a call to
+> ndo_stop() it would be good, both for you and for the people maintaining
+> this driver to understand what happens exactly so the fix is correct,
+> understood and maintainable. The patch itself looks reasonable with the
+> limited description given, but it's the description itself that needs
+> changing.
+
+I have logged all register reads/writes occurring while
+nb8800_stop() is executing.
+
+
+
+1) BOARD A -- EVERYTHING WORKS AS EXPECTED
+
+# test_eth.sh 
+[   13.293669] nb8800 26000.ethernet eth0: Link is Up - 1Gbps/Full - flow control rx/tx
+172.27.64.1 : xmt/rcv/%loss = 1/1/0%, min/avg/max = 0.41/0.41/0.41
+[   15.874627] nb8800_stop from __dev_close_many
+[   15.879044] ++ETH++ gw32 reg=f0026020 val=00920000
+[   15.883900] ++ETH++ gw32 reg=f0026020 val=80920000
+[   15.888969] ++ETH++ gr32 reg=f0026024 val=0000ec00
+[   15.893809] ++ETH++ gw32 reg=f0026020 val=04920000
+[   15.898697] ++ETH++ gw32 reg=f0026020 val=84920000
+[   15.903582] ++ETH++ gw32 reg=f0026020 val=00930000
+[   15.908423] ++ETH++ gw32 reg=f0026020 val=80930000
+[   15.913272] ++ETH++ gr32 reg=f0026024 val=00000000
+[   15.918160] ++ETH++ gr8  reg=f0026004 val=2b
+[   15.922459] ++ETH++ gw8  reg=f0026004 val=0b
+[   15.926782] ++ETH++ gr8  reg=f0026044 val=81
+[   15.931123] ++ETH++ gw8  reg=f0026044 val=85
+[   15.935457] ++ETH++ gw32 reg=f002610c val=9de74000
+[   15.940317] ++ETH++ gw32 reg=f0026100 val=005c0aff
+[   15.945187] ENTER nb8800_irq
+[   15.948077] ++ETH++ gr32 reg=f0026104 val=00000004
+[   15.952887] ++ETH++ gw32 reg=f0026104 val=00000004
+[   15.957697] ++ETH++ gr32 reg=f0026204 val=00000004
+[   15.962507] ++ETH++ gw32 reg=f0026204 val=00000004
+[   15.967316] ++ETH++ gw32 reg=f0026218 val=003cc4a4
+[   15.972149] ENTER nb8800_irq
+[   15.975039] ++ETH++ gr32 reg=f0026104 val=00000001
+[   15.979848] ++ETH++ gw32 reg=f0026104 val=00000001
+[   15.984658] ++ETH++ gr32 reg=f0026204 val=00000000
+[   16.045509] ++ETH++ gw32 reg=f002610c val=9de74000
+[   16.050329] ++ETH++ gw32 reg=f0026100 val=005c0aff
+[   16.055150] ENTER nb8800_irq
+[   16.058042] ++ETH++ gr32 reg=f0026104 val=00000004
+[   16.062852] ++ETH++ gw32 reg=f0026104 val=00000004
+[   16.067662] ++ETH++ gr32 reg=f0026204 val=00000004
+[   16.072470] ++ETH++ gw32 reg=f0026204 val=00000004
+[   16.077279] ++ETH++ gw32 reg=f0026218 val=003cc4a4
+[   16.082100] ENTER nb8800_irq
+[   16.084993] ++ETH++ gr32 reg=f0026104 val=00000001
+[   16.089802] ++ETH++ gw32 reg=f0026104 val=00000001
+[   16.094611] ++ETH++ gr32 reg=f0026204 val=00000000
+[   16.099454] ++ETH++ gr8  reg=f0026004 val=0b
+[   16.103752] ++ETH++ gw8  reg=f0026004 val=2b
+[   16.108057] ++ETH++ gr8  reg=f0026044 val=85
+[   16.112353] ++ETH++ gw8  reg=f0026044 val=81
+[   16.116699] ++ETH++ gw32 reg=f002620c val=9f7b2000
+[   16.121528] ++ETH++ gr8  reg=f0026004 val=2b
+[   16.125827] ++ETH++ gw8  reg=f0026004 val=2a
+[   16.130126] ++ETH++ gr32 reg=f0026100 val=00080afe
+[   16.134945] ++ETH++ gr8  reg=f0026000 val=1d
+[   16.139238] ++ETH++ gw8  reg=f0026000 val=1c
+[   16.143534] ++ETH++ gw32 reg=f0026020 val=00920000
+[   16.148363] ++ETH++ gw32 reg=f0026020 val=80920000
+[   16.153209] ++ETH++ gr32 reg=f0026024 val=00000000
+[   16.158027] ++ETH++ gw32 reg=f0026020 val=04920000
+[   16.162856] ++ETH++ gw32 reg=f0026020 val=84920000
+[   16.167702] ++ETH++ gw32 reg=f0026020 val=00930000
+[   16.172531] ++ETH++ gw32 reg=f0026020 val=80930000
+[   16.177377] ++ETH++ gr32 reg=f0026024 val=00000000
+[   16.182338] nb8800 26000.ethernet eth0: Link is Down
+[   16.187361] ++ETH++ gw32 reg=f0026020 val=00920000
+[   16.192194] ++ETH++ gw32 reg=f0026020 val=80920000
+[   16.197052] ++ETH++ gr32 reg=f0026024 val=00000000
+[   16.201887] ++ETH++ gw32 reg=f0026020 val=00920000
+[   16.206717] ++ETH++ gw32 reg=f0026020 val=80920000
+[   16.211575] ++ETH++ gr32 reg=f0026024 val=00000000
+[   16.216394] ++ETH++ gw32 reg=f0026020 val=00800000
+[   16.221235] ++ETH++ gw32 reg=f0026020 val=80800000
+[   16.226084] ++ETH++ gr32 reg=f0026024 val=00001000
+[   16.230913] ++ETH++ gw32 reg=f0026020 val=04801800
+[   16.235742] ++ETH++ gw32 reg=f0026020 val=84801800
+[   16.240620] ++ETH++ gw32 reg=f0026020 val=00920000
+[   16.245451] ++ETH++ gw32 reg=f0026020 val=80920000
+[   16.250310] ++ETH++ gr32 reg=f0026024 val=00000000
+[   16.255134] ++ETH++ gw32 reg=f0026020 val=00920000
+[   16.259964] ++ETH++ gw32 reg=f0026020 val=80920000
+[   16.264821] ++ETH++ gr32 reg=f0026024 val=00000000
+[   16.269642] ++ETH++ gw32 reg=f0026020 val=00800000
+[   16.274470] ++ETH++ gw32 reg=f0026020 val=80800000
+[   16.279316] ++ETH++ gr32 reg=f0026024 val=00001800
+[   16.284134] ++ETH++ gw32 reg=f0026020 val=04801800
+[   16.288963] ++ETH++ gw32 reg=f0026020 val=84801800
+[   16.293872] EXIT nb8800_stop
+[   20.087916] nb8800 26000.ethernet eth0: Link is Up - 1Gbps/Full - flow control rx/tx
+172.27.64.1 : xmt/rcv/%loss = 1/1/0%, min/avg/max = 0.27/0.27/0.27
+
+
+
+1) BOARD B -- RX WEDGED AFTER nb8800_stop
+
+# test_eth.sh 
+[   26.369255] nb8800 26000.ethernet eth0: Link is Up - 1Gbps/Full - flow control rx/tx
+172.27.64.1 : xmt/rcv/%loss = 1/1/0%, min/avg/max = 0.34/0.34/0.34
+[   28.907583] nb8800_stop from __dev_close_many
+[   28.911997] ++ETH++ gw32 reg=f0026020 val=00920000
+[   28.916856] ++ETH++ gw32 reg=f0026020 val=80920000
+[   28.921732] ++ETH++ gr32 reg=f0026024 val=0000ec00
+[   28.926565] ++ETH++ gw32 reg=f0026020 val=04920000
+[   28.931422] ++ETH++ gw32 reg=f0026020 val=84920000
+[   28.936285] ++ETH++ gw32 reg=f0026020 val=00930000
+[   28.941134] ++ETH++ gw32 reg=f0026020 val=80930000
+[   28.945993] ++ETH++ gr32 reg=f0026024 val=00000000
+[   28.950857] ++ETH++ gr8  reg=f0026004 val=2b
+[   28.955161] ++ETH++ gw8  reg=f0026004 val=0b
+[   28.959463] ++ETH++ gr8  reg=f0026044 val=81
+[   28.963767] ++ETH++ gw8  reg=f0026044 val=85
+[   28.968067] ++ETH++ gw32 reg=f002610c val=9eed8000
+[   28.972896] ++ETH++ gw32 reg=f0026100 val=005c0aff
+[   28.977731] ENTER nb8800_irq
+[   28.980632] ++ETH++ gr32 reg=f0026104 val=00000004
+[   28.985450] ++ETH++ gw32 reg=f0026104 val=00000004
+[   28.990268] ++ETH++ gr32 reg=f0026204 val=00000004
+[   28.995085] ++ETH++ gw32 reg=f0026204 val=00000004
+[   28.999903] ++ETH++ gw32 reg=f0026218 val=003cc4a4
+[   29.004730] ENTER nb8800_irq
+[   29.007625] ++ETH++ gr32 reg=f0026104 val=00000001
+[   29.012442] ++ETH++ gw32 reg=f0026104 val=00000001
+[   29.017259] ++ETH++ gr32 reg=f0026204 val=00000000
+[   29.077759] ++ETH++ gw32 reg=f002610c val=9eed8000
+[   29.082590] ++ETH++ gw32 reg=f0026100 val=005c0aff
+[   29.087422] ENTER nb8800_irq
+[   29.090322] ++ETH++ gr32 reg=f0026104 val=00000004
+[   29.095140] ++ETH++ gw32 reg=f0026104 val=00000004
+[   29.099958] ++ETH++ gr32 reg=f0026204 val=00000004
+[   29.104774] ++ETH++ gw32 reg=f0026204 val=00000004
+[   29.109591] ++ETH++ gw32 reg=f0026218 val=003cc4a4
+[   29.114415] ENTER nb8800_irq
+[   29.117311] ++ETH++ gr32 reg=f0026104 val=00000001
+[   29.122127] ++ETH++ gw32 reg=f0026104 val=00000001
+[   29.126944] ++ETH++ gr32 reg=f0026204 val=00000000
+[   29.187460] ++ETH++ gw32 reg=f002610c val=9eed8000
+[   29.192291] ++ETH++ gw32 reg=f0026100 val=005c0aff
+[   29.197123] ENTER nb8800_irq
+[   29.198119] ++ETH++ gr8  reg=f0026004 val=0b
+[   29.198121] ++ETH++ gw8  reg=f0026004 val=2b
+[   29.198123] ++ETH++ gr8  reg=f0026044 val=85
+[   29.198125] ++ETH++ gw8  reg=f0026044 val=81
+[   29.198139] ++ETH++ gw32 reg=f002620c val=9d818000
+[   29.198141] ++ETH++ gr8  reg=f0026004 val=2b
+[   29.198143] ++ETH++ gw8  reg=f0026004 val=2a
+[   29.198145] ++ETH++ gr32 reg=f0026100 val=00080afe
+[   29.198147] ++ETH++ gr8  reg=f0026000 val=1d
+[   29.198148] ++ETH++ gw8  reg=f0026000 val=1c
+[   29.198151] ++ETH++ gw32 reg=f0026020 val=00920000
+[   29.198163] ++ETH++ gw32 reg=f0026020 val=80920000
+[   29.198193] ++ETH++ gr32 reg=f0026024 val=00000000
+[   29.198195] ++ETH++ gw32 reg=f0026020 val=04920000
+[   29.198207] ++ETH++ gw32 reg=f0026020 val=84920000
+[   29.198237] ++ETH++ gw32 reg=f0026020 val=00930000
+[   29.198249] ++ETH++ gw32 reg=f0026020 val=80930000
+[   29.198279] ++ETH++ gr32 reg=f0026024 val=00000000
+[   29.282484] ++ETH++ gr32 reg=f0026104 val=00000005
+[   29.287301] ++ETH++ gw32 reg=f0026104 val=00000005
+[   29.292118] ++ETH++ gr32 reg=f0026204 val=00000004
+[   29.296935] ++ETH++ gw32 reg=f0026204 val=00000004
+[   29.301752] ++ETH++ gw32 reg=f0026218 val=003cc4a4
+[   29.306640] nb8800 26000.ethernet eth0: Link is Down
+[   29.311664] ++ETH++ gw32 reg=f0026020 val=00920000
+[   29.316508] ++ETH++ gw32 reg=f0026020 val=80920000
+[   29.321363] ++ETH++ gr32 reg=f0026024 val=00000000
+[   29.326193] ++ETH++ gw32 reg=f0026020 val=00920000
+[   29.331031] ++ETH++ gw32 reg=f0026020 val=80920000
+[   29.335885] ++ETH++ gr32 reg=f0026024 val=00000000
+[   29.340712] ++ETH++ gw32 reg=f0026020 val=00800000
+[   29.345550] ++ETH++ gw32 reg=f0026020 val=80800000
+[   29.350405] ++ETH++ gr32 reg=f0026024 val=00001000
+[   29.355234] ++ETH++ gw32 reg=f0026020 val=04801800
+[   29.360069] ++ETH++ gw32 reg=f0026020 val=84801800
+[   29.364940] ++ETH++ gw32 reg=f0026020 val=00920000
+[   29.369777] ++ETH++ gw32 reg=f0026020 val=80920000
+[   29.374635] ++ETH++ gr32 reg=f0026024 val=00000000
+[   29.379462] ++ETH++ gw32 reg=f0026020 val=00920000
+[   29.384300] ++ETH++ gw32 reg=f0026020 val=80920000
+[   29.389153] ++ETH++ gr32 reg=f0026024 val=00000000
+[   29.393982] ++ETH++ gw32 reg=f0026020 val=00800000
+[   29.398817] ++ETH++ gw32 reg=f0026020 val=80800000
+[   29.403674] ++ETH++ gr32 reg=f0026024 val=00001800
+[   29.408499] ++ETH++ gw32 reg=f0026020 val=04801800
+[   29.413337] ++ETH++ gw32 reg=f0026020 val=84801800
+[   29.418245] EXIT nb8800_stop
+[   33.644357] nb8800 26000.ethernet eth0: Link is Up - 1Gbps/Full - flow control rx/tx
+172.27.64.1 : xmt/rcv/%loss = 1/0/100%
+
+
+There are only small differences between these two logs.
+
+1) Different TRANSMIT_DESCRIPTOR_ADDRESS (0x2610c)
+=> Not unexpected
+
+2) On BOARD B, an additional
+[   29.187460] ++ETH++ gw32 reg=f002610c val=9eed8000
+[   29.192291] ++ETH++ gw32 reg=f0026100 val=005c0aff
+[   29.197123] ENTER nb8800_irq
+=> Is it possible for the ISR to be running simultaneously on two cores?
+0x26100 = TRANSMIT_CHANNEL_CONTROL
+
+3) Different RECEIVE_DESCRIPTOR_ADDRESS (0x2620c)
+=> Not unexpected
+
+4) ON BOARD B, an additional
+[   29.282484] ++ETH++ gr32 reg=f0026104 val=00000005
+[   29.287301] ++ETH++ gw32 reg=f0026104 val=00000005
+[   29.292118] ++ETH++ gr32 reg=f0026204 val=00000004
+[   29.296935] ++ETH++ gw32 reg=f0026204 val=00000004
+[   29.301752] ++ETH++ gw32 reg=f0026218 val=003cc4a4
+0x26104 = TRANSMIT_CHANNEL_STATUS
+0x26204 = RECEIVE_CHANNEL_STATUS
+0x26218 = RECEIVE_INTERRUPT_TIME
+=> BOARD A didn't have to deal with two TX interrupts at the same time,
+though it did deal with 1 and 4 separately.
+
+
+
+
+I need to look if some of these register accesses are
+racing on different cores.
+
+Regards.
