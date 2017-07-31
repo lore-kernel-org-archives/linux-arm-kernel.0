@@ -1,42 +1,37 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 31 Jul 2017 15:48:34 +0200
-Subject: [PATCH] gpio: drop unnecessary includes from
- include/linux/gpio/driver.h
-In-Reply-To: <1499162760.22624.246.camel@linux.intel.com>
-References: <1499140415-31677-1-git-send-email-yamada.masahiro@socionext.com>
- <1499162760.22624.246.camel@linux.intel.com>
-Message-ID: <CACRpkdaxgxaXV8XjLTzu68JqjyeZ8Jr2YMR3L46wm3zmnMrPsg@mail.gmail.com>
+Date: Mon, 31 Jul 2017 15:52:02 +0200
+Subject: [PATCH v3 0/2] Last step to working Allwinner R40 pinctrl
+In-Reply-To: <57922ac75d55aef45ae8d09df76418ea@aosc.io>
+References: <20170722025054.32645-1-icenowy@aosc.io>
+ <57922ac75d55aef45ae8d09df76418ea@aosc.io>
+Message-ID: <CACRpkdamz2C=_NhKqCzmr-4QfEhrd7XcMPBHBOzup8edSKe7_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 4, 2017 at 12:06 PM, Andy Shevchenko
-<andriy.shevchenko@linux.intel.com> wrote:
-> On Tue, 2017-07-04 at 12:53 +0900, Masahiro Yamada wrote:
->> Some of include directives in include/linux/gpio/driver.h are
->> unneeded because the header does not need to know the content of
->> struct device, irq_chip, etc.  Just declare they are structures.
+On Sun, Jul 30, 2017 at 7:26 AM,  <icenowy@aosc.io> wrote:
+> ? 2017-07-22 10:50?Icenowy Zheng ???
 >>
->> On the other hand, <linux/irqhandler.h> and <linux/spinlock_types.h>
->> turned out to be necessary for irq_flow_handler_t and spinlock_t,
->> respectively.
+>> This patchset contains only two patches.
 >>
->> Each driver should include what it needs without relying on what is
->> implicitly included from <linux/gpio/driver.h>.  This will cut down
->> unnecessary header parsing.
+>> The first one is a minor fix for the A10 pinctrl driver, add a function
+>> of a pin, which used to be missing in A10/A20 pinctrl driver. Thanks for
+>> Chen-Yu for discovering it when reviewing my R40 pinctrl patchset.
+>>
+>> The second one is the real R40 pinctrl part, with fixes suggested by
+>> Chen-Yu and Maxime.
+>>
+>> Icenowy Zheng (2):
+>>   pinctrl: sunxi: add a missing function of A10/A20 pinctrl driver
+>>   pinctrl: sunxi: add support of R40 to A10 pinctrl driver
 >
-> If Linus is okay with the following proposal I would rather go with it,
-> i.e. logical split the series to
 >
-> 1. Fix IRQ related headers inclusion
-> 2. Fix pinconf-generic.h inclusion
-> 3. Fix OF headers inclusion (btw, of_gpio.h is not enough there?)
+> Ping...
+>
+> Can anyone process this patchset?
 
-That works fine with me, but also one big patch actually, I do not
-want to make it too much work to refactor obviously incorrect things.
+Sorry, I was on vacation.
 
-As soon as we have rough consensus on this and the build robot
-are happy I will apply it to GPIO and also pull it into the pinctrl
-subsystem.
+Looking at the backlog now.
 
 Yours,
 Linus Walleij
