@@ -1,60 +1,80 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 31 Jul 2017 19:40:23 +0300
-Subject: [PATCH 27/31] arm64: dts: renesas: r8a7795: Add usb companion
- property in EHCI
-In-Reply-To: <1c422b4c501ec329802a5d00f664821d3b58e11d.1501509526.git.horms+renesas@verge.net.au>
-References: <cover.1501509525.git.horms+renesas@verge.net.au>
- <1c422b4c501ec329802a5d00f664821d3b58e11d.1501509526.git.horms+renesas@verge.net.au>
-Message-ID: <b18c9692-bcbf-a24b-10a9-4a79a74bcead@cogentembedded.com>
+From: jacob-chen@iotwrt.com (Jacob Chen)
+Date: Mon, 31 Jul 2017 23:58:45 +0800
+Subject: [PATCH v2] arm64: dts: rockchip: add rk3399 hdmi nodes
+Message-ID: <1501516725-6838-1-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2017 06:03 PM, Simon Horman wrote:
+Add an hdmi node, and also add hdmi endpoints to vopb and vopl
+output port nodes.
 
-> From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-> 
-> This patch adds the "companion" property in the EHCI ch0, ch1 and
-> ch2 nodes to wait for the usb companion controller startup at resume.
-> 
-> Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> [remove ch3 node and revise the commit log]
-> Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->   arch/arm64/boot/dts/renesas/r8a7795.dtsi | 3 +++
->   1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> index d73d986039c8..7246e689b619 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> @@ -1583,6 +1583,7 @@
->   			clocks = <&cpg CPG_MOD 703>;
->   			phys = <&usb2_phy0>;
->   			phy-names = "usb";
-> +			companion= <&ohci0>;
->   			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
->   			resets = <&cpg 703>;
->   			status = "disabled";
-> @@ -1595,6 +1596,7 @@
->   			clocks = <&cpg CPG_MOD 702>;
->   			phys = <&usb2_phy1>;
->   			phy-names = "usb";
-> +			companion= <&ohci1>;
->   			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
->   			resets = <&cpg 702>;
->   			status = "disabled";
-> @@ -1607,6 +1609,7 @@
->   			clocks = <&cpg CPG_MOD 701>;
->   			phys = <&usb2_phy2>;
->   			phy-names = "usb";
-> +			companion= <&ohci2>;
->   			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
->   			resets = <&cpg 701>;
->   			status = "disabled";
+changes in v2:
+ - remove spare lines
 
-    Looks like a space before = is missing in all 3 cases.
+Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 35 ++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-MBR, Sergei
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 5c5c9d9..3906471 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -1485,6 +1485,10 @@
+ 				remote-endpoint = <&edp_in_vopl>;
+ 			};
+ 
++			vopl_out_hdmi: endpoint at 2 {
++				reg = <2>;
++				remote-endpoint = <&hdmi_in_vopl>;
++			};
+ 		};
+ 	};
+ 
+@@ -1526,6 +1530,10 @@
+ 				remote-endpoint = <&mipi_in_vopb>;
+ 			};
+ 
++			vopb_out_hdmi: endpoint at 2 {
++				reg = <2>;
++				remote-endpoint = <&hdmi_in_vopb>;
++			};
+ 		};
+ 	};
+ 
+@@ -1541,6 +1549,33 @@
+ 		status = "disabled";
+ 	};
+ 
++	hdmi: hdmi at ff940000 {
++		compatible = "rockchip,rk3399-dw-hdmi";
++		reg = <0x0 0xff940000 0x0 0x20000>;
++		reg-io-width = <4>;
++		rockchip,grf = <&grf>;
++		power-domains = <&power RK3399_PD_HDCP>;
++		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH 0>;
++		clocks = <&cru PCLK_HDMI_CTRL>, <&cru SCLK_HDMI_SFR>, <&cru PLL_VPLL>, <&cru PCLK_VIO_GRF>;
++		clock-names = "iahb", "isfr", "vpll", "grf";
++		status = "disabled";
++
++		ports {
++			hdmi_in: port {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				hdmi_in_vopb: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&vopb_out_hdmi>;
++				};
++				hdmi_in_vopl: endpoint at 1 {
++					reg = <1>;
++					remote-endpoint = <&vopl_out_hdmi>;
++				};
++			};
++		};
++	};
++
+ 	mipi_dsi: mipi at ff960000 {
+ 		compatible = "rockchip,rk3399-mipi-dsi", "snps,dw-mipi-dsi";
+ 		reg = <0x0 0xff960000 0x0 0x8000>;
+-- 
+2.7.4
