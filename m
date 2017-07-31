@@ -1,218 +1,83 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:26:36 +0100
-Subject: [PATCH v3 58/59] irqchip/gic-v3-its: Pass its_node pointer to each
- command bulder
+Date: Mon, 31 Jul 2017 18:26:24 +0100
+Subject: [PATCH v3 46/59] KVM: arm/arm64: GICv4: Handle MOVALL applied to a vPE
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-59-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-47-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to issue command variants depending on
-how broken an ITS is, let's pass the its pointer to all
-command building primitives.
+The current implementation of MOVALL doesn't allow us to call
+into the core ITS code as we hold a number of spinlocks.
+
+Let's try a method used in other parts of the code, were we copy
+the intids of the candicate interrupts, and then do whatever
+we need to do with them outside of the critical section.
+
+This allows us to move the interrupts one by one, at the expense
+of a bit of CPU time. Who cares? MOVALL is such a stupid command
+anyway...
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 58 ++++++++++++++++++++++++++--------------
- 1 file changed, 38 insertions(+), 20 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 27 ++++++++++++++++++++-------
+ 1 file changed, 20 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 9f32cd42238f..e22c8746ce89 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -264,10 +264,12 @@ struct its_cmd_block {
- #define ITS_CMD_QUEUE_SZ		SZ_64K
- #define ITS_CMD_QUEUE_NR_ENTRIES	(ITS_CMD_QUEUE_SZ / sizeof(struct its_cmd_block))
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 2c065c970ba0..65cc77fde609 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -1147,11 +1147,12 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
+ static int vgic_its_cmd_handle_movall(struct kvm *kvm, struct vgic_its *its,
+ 				      u64 *its_cmd)
+ {
+-	struct vgic_dist *dist = &kvm->arch.vgic;
+ 	u32 target1_addr = its_cmd_get_target_addr(its_cmd);
+ 	u32 target2_addr = its_cmd_mask_field(its_cmd, 3, 16, 32);
+ 	struct kvm_vcpu *vcpu1, *vcpu2;
+ 	struct vgic_irq *irq;
++	u32 *intids;
++	int irq_count, i;
  
--typedef struct its_collection *(*its_cmd_builder_t)(struct its_cmd_block *,
-+typedef struct its_collection *(*its_cmd_builder_t)(struct its_node *,
-+						    struct its_cmd_block *,
- 						    struct its_cmd_desc *);
+ 	if (target1_addr >= atomic_read(&kvm->online_vcpus) ||
+ 	    target2_addr >= atomic_read(&kvm->online_vcpus))
+@@ -1163,19 +1164,31 @@ static int vgic_its_cmd_handle_movall(struct kvm *kvm, struct vgic_its *its,
+ 	vcpu1 = kvm_get_vcpu(kvm, target1_addr);
+ 	vcpu2 = kvm_get_vcpu(kvm, target2_addr);
  
--typedef struct its_vpe *(*its_cmd_vbuilder_t)(struct its_cmd_block *,
-+typedef struct its_vpe *(*its_cmd_vbuilder_t)(struct its_node *,
-+					      struct its_cmd_block *,
- 					      struct its_cmd_desc *);
+-	spin_lock(&dist->lpi_list_lock);
++	irq_count = vgic_copy_lpi_list(vcpu1, &intids);
++	if (irq_count < 0)
++		return irq_count;
  
- static void its_mask_encode(u64 *raw_cmd, u64 val, int h, int l)
-@@ -371,7 +373,8 @@ static inline void its_fixup_cmd(struct its_cmd_block *cmd)
- 	cmd->raw_cmd[3] = cpu_to_le64(cmd->raw_cmd[3]);
+-	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
+-		spin_lock(&irq->irq_lock);
++	for (i = 0; i < irq_count; i++) {
++		irq = vgic_get_irq(kvm, NULL, intids[i]);
++		if (!irq)
++			continue;
+ 
+ 		if (irq->target_vcpu == vcpu1)
+ 			irq->target_vcpu = vcpu2;
+ 
+-		spin_unlock(&irq->irq_lock);
+-	}
++		if (irq->hw) {
++			struct its_vlpi_map map;
+ 
+-	spin_unlock(&dist->lpi_list_lock);
++			if (!its_get_vlpi(irq->host_irq, &map)) {
++				map.vpe_idx = vcpu2->vcpu_id;
++				its_map_vlpi(irq->host_irq, &map);
++			}
++		}
+ 
++		vgic_put_irq(kvm, irq);
++	}
++
++	kfree(intids);
+ 	return 0;
  }
  
--static struct its_collection *its_build_mapd_cmd(struct its_cmd_block *cmd,
-+static struct its_collection *its_build_mapd_cmd(struct its_node *its,
-+						 struct its_cmd_block *cmd,
- 						 struct its_cmd_desc *desc)
- {
- 	unsigned long itt_addr;
-@@ -391,7 +394,8 @@ static struct its_collection *its_build_mapd_cmd(struct its_cmd_block *cmd,
- 	return NULL;
- }
- 
--static struct its_collection *its_build_mapc_cmd(struct its_cmd_block *cmd,
-+static struct its_collection *its_build_mapc_cmd(struct its_node *its,
-+						 struct its_cmd_block *cmd,
- 						 struct its_cmd_desc *desc)
- {
- 	its_encode_cmd(cmd, GITS_CMD_MAPC);
-@@ -404,7 +408,8 @@ static struct its_collection *its_build_mapc_cmd(struct its_cmd_block *cmd,
- 	return desc->its_mapc_cmd.col;
- }
- 
--static struct its_collection *its_build_mapti_cmd(struct its_cmd_block *cmd,
-+static struct its_collection *its_build_mapti_cmd(struct its_node *its,
-+						  struct its_cmd_block *cmd,
- 						  struct its_cmd_desc *desc)
- {
- 	struct its_collection *col;
-@@ -423,7 +428,8 @@ static struct its_collection *its_build_mapti_cmd(struct its_cmd_block *cmd,
- 	return col;
- }
- 
--static struct its_collection *its_build_movi_cmd(struct its_cmd_block *cmd,
-+static struct its_collection *its_build_movi_cmd(struct its_node *its,
-+						 struct its_cmd_block *cmd,
- 						 struct its_cmd_desc *desc)
- {
- 	struct its_collection *col;
-@@ -441,7 +447,8 @@ static struct its_collection *its_build_movi_cmd(struct its_cmd_block *cmd,
- 	return col;
- }
- 
--static struct its_collection *its_build_discard_cmd(struct its_cmd_block *cmd,
-+static struct its_collection *its_build_discard_cmd(struct its_node *its,
-+						    struct its_cmd_block *cmd,
- 						    struct its_cmd_desc *desc)
- {
- 	struct its_collection *col;
-@@ -458,7 +465,8 @@ static struct its_collection *its_build_discard_cmd(struct its_cmd_block *cmd,
- 	return col;
- }
- 
--static struct its_collection *its_build_inv_cmd(struct its_cmd_block *cmd,
-+static struct its_collection *its_build_inv_cmd(struct its_node *its,
-+						struct its_cmd_block *cmd,
- 						struct its_cmd_desc *desc)
- {
- 	struct its_collection *col;
-@@ -475,7 +483,8 @@ static struct its_collection *its_build_inv_cmd(struct its_cmd_block *cmd,
- 	return col;
- }
- 
--static struct its_collection *its_build_int_cmd(struct its_cmd_block *cmd,
-+static struct its_collection *its_build_int_cmd(struct its_node *its,
-+						struct its_cmd_block *cmd,
- 						struct its_cmd_desc *desc)
- {
- 	struct its_collection *col;
-@@ -492,7 +501,8 @@ static struct its_collection *its_build_int_cmd(struct its_cmd_block *cmd,
- 	return col;
- }
- 
--static struct its_collection *its_build_clear_cmd(struct its_cmd_block *cmd,
-+static struct its_collection *its_build_clear_cmd(struct its_node *its,
-+						  struct its_cmd_block *cmd,
- 						  struct its_cmd_desc *desc)
- {
- 	struct its_collection *col;
-@@ -509,7 +519,8 @@ static struct its_collection *its_build_clear_cmd(struct its_cmd_block *cmd,
- 	return col;
- }
- 
--static struct its_collection *its_build_invall_cmd(struct its_cmd_block *cmd,
-+static struct its_collection *its_build_invall_cmd(struct its_node *its,
-+						   struct its_cmd_block *cmd,
- 						   struct its_cmd_desc *desc)
- {
- 	its_encode_cmd(cmd, GITS_CMD_INVALL);
-@@ -520,7 +531,8 @@ static struct its_collection *its_build_invall_cmd(struct its_cmd_block *cmd,
- 	return NULL;
- }
- 
--static struct its_vpe *its_build_vinvall_cmd(struct its_cmd_block *cmd,
-+static struct its_vpe *its_build_vinvall_cmd(struct its_node *its,
-+					     struct its_cmd_block *cmd,
- 					     struct its_cmd_desc *desc)
- {
- 	its_encode_cmd(cmd, GITS_CMD_VINVALL);
-@@ -531,7 +543,8 @@ static struct its_vpe *its_build_vinvall_cmd(struct its_cmd_block *cmd,
- 	return desc->its_vinvall_cmd.vpe;
- }
- 
--static struct its_vpe *its_build_vmapp_cmd(struct its_cmd_block *cmd,
-+static struct its_vpe *its_build_vmapp_cmd(struct its_node *its,
-+					   struct its_cmd_block *cmd,
- 					   struct its_cmd_desc *desc)
- {
- 	unsigned long vpt_addr;
-@@ -550,7 +563,8 @@ static struct its_vpe *its_build_vmapp_cmd(struct its_cmd_block *cmd,
- 	return desc->its_vmapp_cmd.vpe;
- }
- 
--static struct its_vpe *its_build_vmapti_cmd(struct its_cmd_block *cmd,
-+static struct its_vpe *its_build_vmapti_cmd(struct its_node *its,
-+					    struct its_cmd_block *cmd,
- 					    struct its_cmd_desc *desc)
- {
- 	u32 db;
-@@ -572,7 +586,8 @@ static struct its_vpe *its_build_vmapti_cmd(struct its_cmd_block *cmd,
- 	return desc->its_vmapti_cmd.vpe;
- }
- 
--static struct its_vpe *its_build_vmovi_cmd(struct its_cmd_block *cmd,
-+static struct its_vpe *its_build_vmovi_cmd(struct its_node *its,
-+					   struct its_cmd_block *cmd,
- 					   struct its_cmd_desc *desc)
- {
- 	u32 db;
-@@ -594,7 +609,8 @@ static struct its_vpe *its_build_vmovi_cmd(struct its_cmd_block *cmd,
- 	return desc->its_vmovi_cmd.vpe;
- }
- 
--static struct its_vpe *its_build_vmovp_cmd(struct its_cmd_block *cmd,
-+static struct its_vpe *its_build_vmovp_cmd(struct its_node *its,
-+					   struct its_cmd_block *cmd,
- 					   struct its_cmd_desc *desc)
- {
- 	its_encode_cmd(cmd, GITS_CMD_VMOVP);
-@@ -722,7 +738,7 @@ void name(struct its_node *its,						\
- 		raw_spin_unlock_irqrestore(&its->lock, flags);		\
- 		return;							\
- 	}								\
--	sync_obj = builder(cmd, desc);					\
-+	sync_obj = builder(its, cmd, desc);				\
- 	its_flush_cmd(its, cmd);					\
- 									\
- 	if (sync_obj) {							\
-@@ -730,7 +746,7 @@ void name(struct its_node *its,						\
- 		if (!sync_cmd)						\
- 			goto post;					\
- 									\
--		buildfn(sync_cmd, sync_obj);				\
-+		buildfn(its, sync_cmd, sync_obj);			\
- 		its_flush_cmd(its, sync_cmd);				\
- 	}								\
- 									\
-@@ -741,7 +757,8 @@ post:									\
- 	its_wait_for_range_completion(its, cmd, next_cmd);		\
- }
- 
--static void its_build_sync_cmd(struct its_cmd_block *sync_cmd,
-+static void its_build_sync_cmd(struct its_node *its,
-+			       struct its_cmd_block *sync_cmd,
- 			       struct its_collection *sync_col)
- {
- 	its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
-@@ -753,7 +770,8 @@ static void its_build_sync_cmd(struct its_cmd_block *sync_cmd,
- static BUILD_SINGLE_CMD_FUNC(its_send_single_command, its_cmd_builder_t,
- 			     struct its_collection, its_build_sync_cmd)
- 
--static void its_build_vsync_cmd(struct its_cmd_block *sync_cmd,
-+static void its_build_vsync_cmd(struct its_node *its,
-+				struct its_cmd_block *sync_cmd,
- 				struct its_vpe *sync_vpe)
- {
- 	its_encode_cmd(sync_cmd, GITS_CMD_VSYNC);
 -- 
 2.11.0
