@@ -1,46 +1,52 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:03:40 +0200
-Subject: [PATCH 09/10] ARM: multi_v7_defconfig: Replace DRM_RCAR_HDMI by
- generic bridge options
-In-Reply-To: <cover.1501511664.git.horms+renesas@verge.net.au>
-References: <cover.1501511664.git.horms+renesas@verge.net.au>
-Message-ID: <cdbacdaf89226db73aeed157d287a4702a4a09d3.1501511664.git.horms+renesas@verge.net.au>
+Date: Mon, 31 Jul 2017 17:04:03 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.14
+Message-ID: <cover.1501511923.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-The manual bridge implementation was removed in favor of the generic
-one, so now we need to enable standard bridge drivers like
-DRM_DUMB_VGA_DAC and DRM_I2C_ADV7511.
-Both were already enabled, but the (newer) ADV7511 audio part wasn't.
+Please consider these Renesas ARM based SoC drivers updates for v4.14.
 
-Fixes: 5c602531feb3db39 ("drm: rcar-du: Replace manual bridge implementation with DRM bridge")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/multi_v7_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 7fa1746970ec..ea2075d8e185 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -584,6 +584,7 @@ CONFIG_VIDEO_ADV7180=m
- CONFIG_VIDEO_ML86V7667=m
- CONFIG_DRM=y
- CONFIG_DRM_I2C_ADV7511=m
-+CONFIG_DRM_I2C_ADV7511_AUDIO=y
- # CONFIG_DRM_I2C_CH7006 is not set
- # CONFIG_DRM_I2C_SIL164 is not set
- CONFIG_DRM_DUMB_VGA_DAC=m
-@@ -603,7 +604,6 @@ CONFIG_ROCKCHIP_DW_MIPI_DSI=y
- CONFIG_ROCKCHIP_INNO_HDMI=y
- CONFIG_DRM_ATMEL_HLCDC=m
- CONFIG_DRM_RCAR_DU=m
--CONFIG_DRM_RCAR_HDMI=y
- CONFIG_DRM_RCAR_LVDS=y
- CONFIG_DRM_SUN4I=m
- CONFIG_DRM_TEGRA=y
--- 
-2.1.4
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-drivers-for-v4.14
+
+for you to fetch changes up to 105ae504a3eb6c2e188e8d67db59b71186f11967:
+
+  soc: renesas: rcar-rst: Add support for R-Car D3 (2017-07-27 17:08:28 +0200)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Drivers Updates for v4.14
+
+Add R-Car D3 (r8a77995) support to the Renesas-specific SoC drivers
+- SoC identification
+- System controller
+- Reset controller
+
+----------------------------------------------------------------
+Geert Uytterhoeven (4):
+      soc: renesas: Identify R-Car D3
+      soc: renesas: Add r8a77995 SYSC PM Domain Binding Definitions
+      soc: renesas: rcar-sysc: Add support for R-Car D3 power areas
+      soc: renesas: rcar-rst: Add support for R-Car D3
+
+ .../bindings/power/renesas,rcar-sysc.txt           |  1 +
+ .../devicetree/bindings/reset/renesas,rst.txt      |  1 +
+ drivers/soc/renesas/Kconfig                        |  7 ++++-
+ drivers/soc/renesas/Makefile                       |  1 +
+ drivers/soc/renesas/r8a77995-sysc.c                | 31 ++++++++++++++++++++++
+ drivers/soc/renesas/rcar-rst.c                     |  1 +
+ drivers/soc/renesas/rcar-sysc.c                    |  3 +++
+ drivers/soc/renesas/rcar-sysc.h                    |  1 +
+ drivers/soc/renesas/renesas-soc.c                  |  8 ++++++
+ include/dt-bindings/power/r8a77995-sysc.h          | 23 ++++++++++++++++
+ 10 files changed, 76 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/soc/renesas/r8a77995-sysc.c
+ create mode 100644 include/dt-bindings/power/r8a77995-sysc.h
