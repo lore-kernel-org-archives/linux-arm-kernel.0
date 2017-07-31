@@ -1,67 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:19:21 +0200
-Subject: [PATCH 09/38] ARM: dts: iwg20d-q7: Add Ethernet AVB support
+Date: Mon, 31 Jul 2017 17:19:14 +0200
+Subject: [PATCH 02/38] ARM: dts: koelsch: Add generic compatible string for
+ I2C EEPROM
 In-Reply-To: <cover.1501514100.git.horms+renesas@verge.net.au>
 References: <cover.1501514100.git.horms+renesas@verge.net.au>
-Message-ID: <9e70afe39eeb33488f0d18131b023b92c1493db8.1501514100.git.horms+renesas@verge.net.au>
+Message-ID: <3e82be14a1dcdfef75b5a87a25862bd7d878b7f8.1501514100.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+From: Javier Martinez Canillas <javier@dowhile0.org>
 
-Define the iWave RainboW-G20D-Qseven board dependent part of the Ethernet
-AVB device node.
+The at24 driver allows to register I2C EEPROM chips using different vendor
+and devices, but the I2C subsystem does not take the vendor into account
+when matching using the I2C table since it only has device entries.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+But when matching using an OF table, both the vendor and device has to be
+taken into account so the driver defines only a set of compatible strings
+using the "atmel" vendor as a generic fallback for compatible I2C devices.
+
+So add this generic fallback to the device node compatible string to make
+the device to match the driver using the OF device ID table.
+
+Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-index 497aec00cfac..081af0192851 100644
---- a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-+++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-@@ -17,6 +17,7 @@
- 
- 	aliases {
- 		serial0 = &scif0;
-+		ethernet0 = &avb;
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 001e6116c47c..dc8ed02de707 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -702,7 +702,7 @@
  	};
- };
  
-@@ -25,6 +26,11 @@
- 		groups = "scif0_data_d";
- 		function = "scif0";
+ 	eeprom at 50 {
+-		compatible = "renesas,24c02";
++		compatible = "renesas,24c02", "atmel,24c02";
+ 		reg = <0x50>;
+ 		pagesize = <16>;
  	};
-+
-+	avb_pins: avb {
-+		groups = "avb_mdio", "avb_gmii";
-+		function = "avb";
-+	};
- };
- 
- &scif0 {
-@@ -33,3 +39,18 @@
- 
- 	status = "okay";
- };
-+
-+&avb {
-+	pinctrl-0 = <&avb_pins>;
-+	pinctrl-names = "default";
-+
-+	phy-handle = <&phy3>;
-+	phy-mode = "gmii";
-+	renesas,no-ether-link;
-+	status = "okay";
-+
-+	phy3: ethernet-phy at 3 {
-+		reg = <3>;
-+		micrel,led-mode = <1>;
-+	};
-+};
 -- 
 2.1.4
