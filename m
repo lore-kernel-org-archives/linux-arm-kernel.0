@@ -1,62 +1,81 @@
 From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 31 Jul 2017 16:10:28 +0530
-Subject: [PATCH v3 0/5] ARM64: disable irq between breakpoint and step
- exception
-Message-ID: <cover.1501496603.git.panand@redhat.com>
+Date: Mon, 31 Jul 2017 16:10:29 +0530
+Subject: [PATCH v3 1/5] hw_breakpoint: Add step_needed event attribute
+In-Reply-To: <cover.1501496603.git.panand@redhat.com>
+References: <cover.1501496603.git.panand@redhat.com>
+Message-ID: <1d7ca935857f93bd09c82a2ff57a53e373211b7e.1501496603.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2 -> v3
-- Moved step_needed from uapi structure to kernel only structure
-- Re-enable interrupt if stepped instruction faults
-- Modified register_wide_hw_breakpoint() to accept step_needed arg
-v2 was here: http://marc.info/?l=linux-arm-kernel&m=149942910730496&w=2
+Architecture like ARM64 currently allows to use default hw breakpoint
+single step handler only to perf. However, some other users like few
+systemtap tests or kernel test in
+samples/hw_breakpoint/data_breakpoint.c can also work with default step
+handler implementation.
 
-v1 -> v2:
-- patch 1 of v1 has been modified to patch 1-3 of v2.
-- Introduced a new event attribute step_needed and implemented
-  hw_breakpoint_needs_single_step() (patch 1)
-- Replaced usage of is_default_overflow_handler() with
-  hw_breakpoint_needs_single_step(). (patch 2)
-- Modified sample test to set set step_needed bit field (patch 3)
-v1 was here: http://marc.info/?l=linux-arm-kernel&m=149910958418708&w=2
+Therefore, this patch introduces a flag 'step_needed' in struct
+hw_perf_event, so that arch specific code(specially on arm64) can make a
+decision to enable single stepping.
 
-samples/hw_breakpoint/data_breakpoint.c passes with x86_64 but fails with
-ARM64. Even though it has been NAKed previously on upstream [1, 2], I have
-tried to come up with patches which can resolve it for ARM64 as well.
+Any architecture which is not using this field will not have any
+side effect.
 
-I noticed that even perf step exception can go into an infinite loop if CPU
-receives an interrupt while executing breakpoint/watchpoint handler. So,
-event though we are not concerned about above test, we will have to find a
-solution for the perf issue.
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+---
+ include/linux/hw_breakpoint.h | 6 ++++++
+ include/linux/perf_event.h    | 6 ++++++
+ kernel/events/core.c          | 2 ++
+ 3 files changed, 14 insertions(+)
 
-This patchset attempts to resolve both the issue. Please review.
-Since, it also takes care of SW breakpoint, so I hope kgdb should also be
-fine. However, I have not tested that.
-@Takahiro: Will it be possible to test these patches for kgdb.
-
-[1] http://marc.info/?l=linux-arm-kernel&m=149580777524910&w=2
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/425266.html
-
-
-Pratyush Anand (5):
-  hw_breakpoint: Add step_needed event attribute
-  arm64: use hw_breakpoint_needs_single_step() to decide if step is
-    needed
-  register_wide_hw_breakpoint(): modify to accept step_needed arg
-  arm64: disable irq between breakpoint and step exception
-  arm64: fault: re-enable irq if it was disabled for single stepping
-
- arch/arm64/kernel/debug-monitors.c      |  3 +++
- arch/arm64/kernel/hw_breakpoint.c       | 10 +++++-----
- arch/arm64/mm/fault.c                   | 28 ++++++++++++++++++++++++----
- arch/x86/kernel/kgdb.c                  |  2 +-
- include/linux/hw_breakpoint.h           | 10 ++++++++--
- include/linux/perf_event.h              |  6 ++++++
- kernel/events/core.c                    |  2 ++
- kernel/events/hw_breakpoint.c           |  4 +++-
- samples/hw_breakpoint/data_breakpoint.c |  3 ++-
- 9 files changed, 54 insertions(+), 14 deletions(-)
-
+diff --git a/include/linux/hw_breakpoint.h b/include/linux/hw_breakpoint.h
+index 0464c85e63fd..b9ac9629bf74 100644
+--- a/include/linux/hw_breakpoint.h
++++ b/include/linux/hw_breakpoint.h
+@@ -38,6 +38,12 @@ static inline int hw_breakpoint_type(struct perf_event *bp)
+ 	return bp->attr.bp_type;
+ }
+ 
++static inline bool
++hw_breakpoint_needs_single_step(struct perf_event *bp)
++{
++	return bp->hw.step_needed;
++}
++
+ static inline unsigned long hw_breakpoint_len(struct perf_event *bp)
+ {
+ 	return bp->attr.bp_len;
+diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+index 24a635887f28..7da951f94b47 100644
+--- a/include/linux/perf_event.h
++++ b/include/linux/perf_event.h
+@@ -233,6 +233,12 @@ struct hw_perf_event {
+ 	 */
+ 	u64				freq_time_stamp;
+ 	u64				freq_count_stamp;
++	/*
++	 * A HW breakpoint user can either have it's own step handling
++	 * mechanism or it can use default step handling meachanism defined
++	 * by arch code. Set step_needed to use default mechanism.
++	 */
++	int				step_needed;
+ #endif
+ };
+ 
+diff --git a/kernel/events/core.c b/kernel/events/core.c
+index 6c4e523dc1e2..66ce5574e778 100644
+--- a/kernel/events/core.c
++++ b/kernel/events/core.c
+@@ -9444,9 +9444,11 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
+ 	} else if (is_write_backward(event)){
+ 		event->overflow_handler = perf_event_output_backward;
+ 		event->overflow_handler_context = NULL;
++		event->hw.step_needed = 1;
+ 	} else {
+ 		event->overflow_handler = perf_event_output_forward;
+ 		event->overflow_handler_context = NULL;
++		event->hw.step_needed = 1;
+ 	}
+ 
+ 	perf_event__state_init(event);
 -- 
 2.9.4
