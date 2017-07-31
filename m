@@ -1,7 +1,7 @@
 From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Mon, 31 Jul 2017 14:51:16 +0800
+Date: Mon, 31 Jul 2017 14:59:27 +0800
 Subject: [PATCH v3 2/5] [RESEND] [media]: rockchip/rga: v4l2 m2m support
-Message-ID: <1501483876-18335-1-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <1501484367-18689-1-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -154,7 +154,7 @@ index 0000000..b4d28e3
 +	v4l2_m2m_buf_queue(ctx->fh.m2m_ctx, vbuf);
 +}
 +
-+static int  rga_buf_start_streaming(struct vb2_queue *q, unsigned int count)
++static int rga_buf_start_streaming(struct vb2_queue *q, unsigned int count)
 +{
 +	struct rga_ctx *ctx = vb2_get_drv_priv(q);
 +	struct rockchip_rga *rga = ctx->rga;
