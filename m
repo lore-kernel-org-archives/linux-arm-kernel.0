@@ -1,127 +1,96 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:25:44 +0100
-Subject: [PATCH v3 06/59] irqchip/gic-v3-its: Macro-ize its_send_single_command
+Date: Mon, 31 Jul 2017 18:26:04 +0100
+Subject: [PATCH v3 26/59] irqchip/gic-v3-its: Add VPE interrupt masking
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-7-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-27-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most ITS commands do operate on a collection object, and require
-a SYNC command to be performed on that collection in order to
-guarantee the execution of the first command.
+When masking/unmasking a doorbell interrupt, it is necessary
+to issue an invalidation to the corresponding redistributor.
+We use the DirectLPI feature by writting directly to the corresponding
+redistributor.
 
-With GICv4 ITS, another set of commands perform similar operations
-on a VPE object, and a VSYNC operations must be executed to guarantee
-their execution.
-
-Given the similarities (post a command, perform a synchronization
-operation on a sync object), it makes sense to reuse the same
-mechanism for both class of commands.
-
-Let's start with turning its_send_single_command into a huge macro
-that performs the bulk of the work, and a set of helpers that
-make this macro usable for the GICv3 ITS commands.
-
+Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 84 ++++++++++++++++++++++------------------
- 1 file changed, 47 insertions(+), 37 deletions(-)
+ arch/arm/include/asm/arch_gicv3.h   |  5 +++++
+ arch/arm64/include/asm/arch_gicv3.h |  1 +
+ drivers/irqchip/irq-gic-v3-its.c    | 31 +++++++++++++++++++++++++++++++
+ 3 files changed, 37 insertions(+)
 
+diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
+index 8d45e88feac9..550fb0bcccf8 100644
+--- a/arch/arm/include/asm/arch_gicv3.h
++++ b/arch/arm/include/asm/arch_gicv3.h
+@@ -276,6 +276,11 @@ static inline u64 __gic_readq_nonatomic(const volatile void __iomem *addr)
+ #define gicr_write_pendbaser(v, c)	__gic_writeq_nonatomic(v, c)
+ 
+ /*
++ * GICR_xLPIR - only the lower bits are significant
++ */
++#define gic_write_lpir(v, c)		writel_relaxed(lower_32_bits(v), c)
++
++/*
+  * GITS_TYPER is an ID register and doesn't need atomicity.
+  */
+ #define gits_read_typer(c)		__gic_readq_nonatomic(c)
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index 0d2a53457c30..c2de3ff374a0 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -116,6 +116,7 @@ static inline void gic_write_bpr1(u32 val)
+ 
+ #define gic_read_typer(c)		readq_relaxed(c)
+ #define gic_write_irouter(v, c)		writeq_relaxed(v, c)
++#define gic_write_lpir(v, c)		writeq_relaxed(v, c)
+ 
+ #define gic_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
+ 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index e7a7dc9ad585..0f345c0fa700 100644
+index 0a9aedaf6da2..d871d105be9d 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -488,43 +488,53 @@ static void its_wait_for_range_completion(struct its_node *its,
+@@ -2330,8 +2330,39 @@ static int its_vpe_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
  	}
  }
  
--static void its_send_single_command(struct its_node *its,
--				    its_cmd_builder_t builder,
--				    struct its_cmd_desc *desc)
--{
--	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;
--	struct its_collection *sync_col;
--	unsigned long flags;
--
--	raw_spin_lock_irqsave(&its->lock, flags);
--
--	cmd = its_allocate_entry(its);
--	if (!cmd) {		/* We're soooooo screewed... */
--		pr_err_ratelimited("ITS can't allocate, dropping command\n");
--		raw_spin_unlock_irqrestore(&its->lock, flags);
--		return;
--	}
--	sync_col = builder(cmd, desc);
--	its_flush_cmd(its, cmd);
--
--	if (sync_col) {
--		sync_cmd = its_allocate_entry(its);
--		if (!sync_cmd) {
--			pr_err_ratelimited("ITS can't SYNC, skipping\n");
--			goto post;
--		}
--		its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
--		its_encode_target(sync_cmd, sync_col->target_address);
--		its_fixup_cmd(sync_cmd);
--		its_flush_cmd(its, sync_cmd);
--	}
--
--post:
--	next_cmd = its_post_commands(its);
--	raw_spin_unlock_irqrestore(&its->lock, flags);
--
--	its_wait_for_range_completion(its, cmd, next_cmd);
--}
-+/* Warning, macro hell follows */
-+#define BUILD_SINGLE_CMD_FUNC(name, buildtype, synctype, buildfn)	\
-+void name(struct its_node *its,						\
-+	  buildtype builder,						\
-+	  struct its_cmd_desc *desc)					\
-+{									\
-+	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;		\
-+	synctype *sync_obj;						\
-+	unsigned long flags;						\
-+									\
-+	raw_spin_lock_irqsave(&its->lock, flags);			\
-+									\
-+	cmd = its_allocate_entry(its);					\
-+	if (!cmd) {		/* We're soooooo screewed... */		\
-+		raw_spin_unlock_irqrestore(&its->lock, flags);		\
-+		return;							\
-+	}								\
-+	sync_obj = builder(cmd, desc);					\
-+	its_flush_cmd(its, cmd);					\
-+									\
-+	if (sync_obj) {							\
-+		sync_cmd = its_allocate_entry(its);			\
-+		if (!sync_cmd)						\
-+			goto post;					\
-+									\
-+		buildfn(sync_cmd, sync_obj);				\
-+		its_flush_cmd(its, sync_cmd);				\
-+	}								\
-+									\
-+post:									\
-+	next_cmd = its_post_commands(its);				\
-+	raw_spin_unlock_irqrestore(&its->lock, flags);			\
-+									\
-+	its_wait_for_range_completion(its, cmd, next_cmd);		\
-+}
-+
-+static void its_build_sync_cmd(struct its_cmd_block *sync_cmd,
-+			       struct its_collection *sync_col)
++static void its_vpe_send_inv(struct irq_data *d)
 +{
-+	its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
-+	its_encode_target(sync_cmd, sync_col->target_address);
++	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
++	void __iomem *rdbase;
 +
-+	its_fixup_cmd(sync_cmd);
++	rdbase = per_cpu_ptr(gic_rdists->rdist, vpe->col_idx)->rd_base;
++	gic_write_lpir(vpe->vpe_db_lpi, rdbase + GICR_INVLPIR);
 +}
 +
-+static BUILD_SINGLE_CMD_FUNC(its_send_single_command, its_cmd_builder_t,
-+			     struct its_collection, its_build_sync_cmd)
- 
- static void its_send_inv(struct its_device *dev, u32 event_id)
- {
++static void its_vpe_mask_irq(struct irq_data *d)
++{
++	/*
++	 * We need to unmask the LPI, which is described by the parent
++	 * irq_data. Instead of calling into the parent (which won't
++	 * exactly do the right thing, let's simply use the
++	 * parent_data pointer. Yes, I'm naughty.
++	 */
++	lpi_write_config(d->parent_data, LPI_PROP_ENABLED, 0);
++	its_vpe_send_inv(d);
++}
++
++static void its_vpe_unmask_irq(struct irq_data *d)
++{
++	/* Same hack as above... */
++	lpi_write_config(d->parent_data, 0, LPI_PROP_ENABLED);
++	its_vpe_send_inv(d);
++}
++
+ static struct irq_chip its_vpe_irq_chip = {
+ 	.name			= "GICv4-vpe",
++	.irq_mask		= its_vpe_mask_irq,
++	.irq_unmask		= its_vpe_unmask_irq,
++	.irq_eoi		= irq_chip_eoi_parent,
+ 	.irq_set_affinity	= its_vpe_set_affinity,
+ 	.irq_set_vcpu_affinity	= its_vpe_set_vcpu_affinity,
+ };
 -- 
 2.11.0
