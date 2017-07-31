@@ -1,95 +1,64 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Mon, 31 Jul 2017 10:46:22 +0800
-Subject: [PATCH v4 9/9] arm: dts: mt7623: add dts file for Bananapi R2
- (BPI-R2) board
-In-Reply-To: <805ad5c4-db47-ef10-565d-b63e33a84bdf@gmail.com>
-References: <cover.1495683769.git.sean.wang@mediatek.com>
- <5cc5489b38fc2723c30c8cfe0d4353f967d100f3.1495683769.git.sean.wang@mediatek.com>
- <805ad5c4-db47-ef10-565d-b63e33a84bdf@gmail.com>
-Message-ID: <1501469182.10930.3.camel@mtkswgap22>
+From: jacob-chen@iotwrt.com (Jacob Chen)
+Date: Mon, 31 Jul 2017 11:07:35 +0800
+Subject: [PATCH v3 0/5] Add Rockchip RGA V4l2 support
+Message-ID: <1501470460-12014-1-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-07-27 at 16:39 +0200, Matthias Brugger wrote:
-> 
-> On 05/25/2017 06:02 AM, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > Add support for the Bananapi R2 (BPI-R2) development board from
-> > BIPAI KEJI. Detailed hardware information for BPI-R2 which could be
-> > found on http://www.banana-pi.org/r2.html
-> > 
-> > The patch currently only adds Mediatek GMAC, MT7530 Switch, the crypto
-> > engine, USB, IR, I2S, I2C, UART, SPI, PWM, GPIO keys, GPIO LEDs and
-> > PMIC LEDs. As to the other missing hardware and peripherals, they would
-> > be added and integrated continuously.
-> > 
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > Acked-by: Rob Herring <robh@kernel.org>
-> > ---
-> >   Documentation/devicetree/bindings/arm/mediatek.txt |   2 +
-> >   arch/arm/boot/dts/Makefile                         |   1 +
-> >   arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts      | 440 +++++++++++++++++++++
-> >   3 files changed, 443 insertions(+)
-> >   create mode 100644 arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> > 
-> [...]
-> > diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> > new file mode 100644
-> > index 0000000..72c7984
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> [...]
-> > +
-> > +&eth {
-> > +	status = "okay";
-> > +	gmac0: mac at 0 {
-> > +		compatible = "mediatek,eth-mac";
-> > +		reg = <0>;
-> > +		phy-mode = "trgmii";
-> > +		fixed-link {
-> > +			speed = <1000>;
-> > +			full-duplex;
-> > +			pause;
-> > +		};
-> > +	};
-> > +
-> > +	mdio: mdio-bus {
-> > +		switch at 0 {
-> > +			compatible = "mediatek,mt7530";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			reg = <0>;
-> 
-> What is this reg needed for? I can't find it neither in the code nor in the 
-> bindings (mt7530 and general dsa bindings). Actually it throws a warning when 
-> compiling:
-> arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dtb: Warning (reg_format): "reg" 
-> property in /ethernet at 1b100000/mdio-bus/switch at 0 has invalid length (4 bytes) 
-> (#address-cells == 2, #size-cells == 1)
-> arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dtb: Warning 
-> (avoid_default_addr_size): Relying on default #address-cells value for 
-> /ethernet at 1b100000/mdio-bus/switch at 0
-> arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dtb: Warning 
-> (avoid_default_addr_size): Relying on default #size-cells value for 
-> /ethernet at 1b100000/mdio-bus/switch at 0
-> 
-> Regards,
-> Matthias
-> 
+This patch series add a v4l2 m2m drvier for rockchip RGA direct rendering based 2d graphics acceleration module.
 
+Before, my colleague yakir have write a drm RGA drvier and send it to the lists.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/416769.html
+I have been asked to find a userspace user("compositor") for it, but after some studys, my conclusion is that unlike exynos g2d,
+rockchip rga are not suitable for compositor. Rockchip RGA have a limited MMU, which means it can only hold several buffers in the same time.
+When it was used in compositor, it will waste a lot of time to import/export/flush buffer, resulting in a bad performance.
 
-Hi, Matthias
+A few months ago, i saw a discussion in dri-devel at lists.freedesktop.org.
+It remind that we could write a v4l2 m2m RGA driver, since we usually use RGA for streaming purpose.
+https://patches.linaro.org/cover/97727/
 
-many thanks
+I have test this driver with gstreamer v4l2transform plugin and it seems work well.
 
-It should be just my written mistakes. Recently I prepared the next
-version including a few fixups and enhancements which also would include
-the warning correction you reported here.
+change in V3:
+- rename the controls.
+- add pm_runtime support.
+- enable node by default.
+- correct spelling in documents.
 
-	Sean 
+change in V2:
+- generalize the controls.
+- map buffers (10-50 us) in every cmd-run rather than in buffer-import to avoid get_free_pages failed on
+actively used systems.
+- remove status in dt-bindings examples.
 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+Jacob Chen (5):
+  [media] v4l: add blend modes controls
+  [media]: rockchip/rga: v4l2 m2m support
+  ARM: dts: rockchip: add RGA device node for RK3288
+  ARM: dts: rockchip: add RGA device node for RK3399
+  dt-bindings: Document the Rockchip RGA bindings
+
+ .../devicetree/bindings/media/rockchip-rga.txt     |  33 +
+ arch/arm/boot/dts/rk3288.dtsi                      |  11 +
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |  11 +
+ drivers/media/platform/Kconfig                     |  11 +
+ drivers/media/platform/Makefile                    |   2 +
+ drivers/media/platform/rockchip-rga/Makefile       |   3 +
+ drivers/media/platform/rockchip-rga/rga-buf.c      | 141 +++
+ drivers/media/platform/rockchip-rga/rga-hw.c       | 650 ++++++++++++++
+ drivers/media/platform/rockchip-rga/rga-hw.h       | 437 +++++++++
+ drivers/media/platform/rockchip-rga/rga.c          | 987 +++++++++++++++++++++
+ drivers/media/platform/rockchip-rga/rga.h          | 110 +++
+ drivers/media/v4l2-core/v4l2-ctrls.c               |  20 +-
+ include/uapi/linux/v4l2-controls.h                 |  16 +-
+ 13 files changed, 2430 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
+ create mode 100644 drivers/media/platform/rockchip-rga/Makefile
+ create mode 100644 drivers/media/platform/rockchip-rga/rga-buf.c
+ create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.c
+ create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.h
+ create mode 100644 drivers/media/platform/rockchip-rga/rga.c
+ create mode 100644 drivers/media/platform/rockchip-rga/rga.h
+
+-- 
+2.7.4
