@@ -1,175 +1,73 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Mon, 31 Jul 2017 17:54:23 -0400
-Subject: [PATCH v2 3/3] ARM: dts: NSP: Add USB3 and USB3 PHY to NSP
-In-Reply-To: <1501538063-32662-1-git-send-email-jon.mason@broadcom.com>
-References: <1501538063-32662-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1501538063-32662-4-git-send-email-jon.mason@broadcom.com>
+From: fkan@apm.com (Feng Kan)
+Date: Mon, 31 Jul 2017 15:16:10 -0700
+Subject: [PATCH v2 0/5] ACPI: DMA ranges management
+In-Reply-To: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
+References: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
+Message-ID: <CAL85gmD1LCivX2VOpcy1y0=Ywp8SkQCORPovQLhRv+Bb2n4MxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This uses the existing Northstar USB3 PHY driver to enable the USB3
-ports on NSP.
-
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
----
- arch/arm/boot/dts/bcm-nsp.dtsi     | 19 +++++++++++++++++++
- arch/arm/boot/dts/bcm958522er.dts  |  8 ++++++++
- arch/arm/boot/dts/bcm958525er.dts  |  8 ++++++++
- arch/arm/boot/dts/bcm958525xmc.dts |  8 ++++++++
- arch/arm/boot/dts/bcm958622hr.dts  |  8 ++++++++
- arch/arm/boot/dts/bcm958623hr.dts  |  8 ++++++++
- arch/arm/boot/dts/bcm958625hr.dts  |  8 ++++++++
- arch/arm/boot/dts/bcm958625k.dts   |  8 ++++++++
- 8 files changed, 75 insertions(+)
-
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index 9feb3689d191..dff66974feed 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -302,6 +302,16 @@
- 			#size-cells = <0>;
- 		};
- 
-+		xhci: usb at 29000 {
-+			compatible = "generic-xhci";
-+			reg = <0x29000 0x1000>;
-+			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
-+			phys = <&usb3_phy>;
-+			phy-names = "usb3-phy";
-+			dma-coherent;
-+			status = "disabled";
-+		};
-+
- 		ehci0: usb at 2a000 {
- 			compatible = "generic-ehci";
- 			reg = <0x2a000 0x100>;
-@@ -469,6 +479,15 @@
- 				phy-names = "sata-phy";
- 			};
- 		};
-+
-+		usb3_phy: usb3-phy at 104000 {
-+			compatible = "brcm,ns-bx-usb3-phy";
-+			reg = <0x104000 0x1000>,
-+			      <0x032000 0x1000>;
-+			reg-names = "dmp", "ccb-mii";
-+			#phy-cells = <0>;
-+			status = "disabled";
-+		};
- 	};
- 
- 	pcie0: pcie at 18012000 {
-diff --git a/arch/arm/boot/dts/bcm958522er.dts b/arch/arm/boot/dts/bcm958522er.dts
-index f5c42962c201..f9dd342cc2ae 100644
---- a/arch/arm/boot/dts/bcm958522er.dts
-+++ b/arch/arm/boot/dts/bcm958522er.dts
-@@ -170,3 +170,11 @@
- &uart0 {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+	status = "okay";
-+};
-+
-+&xhci {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm958525er.dts b/arch/arm/boot/dts/bcm958525er.dts
-index efcb1f67bdad..374508a9cfbf 100644
---- a/arch/arm/boot/dts/bcm958525er.dts
-+++ b/arch/arm/boot/dts/bcm958525er.dts
-@@ -182,3 +182,11 @@
- &uart0 {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+	status = "okay";
-+};
-+
-+&xhci {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm958525xmc.dts b/arch/arm/boot/dts/bcm958525xmc.dts
-index b335ce02e32f..403250c5ad8e 100644
---- a/arch/arm/boot/dts/bcm958525xmc.dts
-+++ b/arch/arm/boot/dts/bcm958525xmc.dts
-@@ -202,3 +202,11 @@
- &uart0 {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+	status = "okay";
-+};
-+
-+&xhci {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm958622hr.dts b/arch/arm/boot/dts/bcm958622hr.dts
-index 16ab2d82a14b..fd8b8c689ffe 100644
---- a/arch/arm/boot/dts/bcm958622hr.dts
-+++ b/arch/arm/boot/dts/bcm958622hr.dts
-@@ -219,3 +219,11 @@
- &uart0 {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+	status = "okay";
-+};
-+
-+&xhci {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm958623hr.dts b/arch/arm/boot/dts/bcm958623hr.dts
-index 9b921c6aa8f8..3bc50849d013 100644
---- a/arch/arm/boot/dts/bcm958623hr.dts
-+++ b/arch/arm/boot/dts/bcm958623hr.dts
-@@ -227,3 +227,11 @@
- &uart0 {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+	status = "okay";
-+};
-+
-+&xhci {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm958625hr.dts b/arch/arm/boot/dts/bcm958625hr.dts
-index 006b08e41a3b..d94d14b3c745 100644
---- a/arch/arm/boot/dts/bcm958625hr.dts
-+++ b/arch/arm/boot/dts/bcm958625hr.dts
-@@ -229,3 +229,11 @@
- &uart0 {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+	status = "okay";
-+};
-+
-+&xhci {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
-index 64740f85cf4c..2cf2392483b2 100644
---- a/arch/arm/boot/dts/bcm958625k.dts
-+++ b/arch/arm/boot/dts/bcm958625k.dts
-@@ -264,3 +264,11 @@
- &uart1 {
- 	status = "okay";
- };
-+
-+&usb3_phy {
-+	status = "okay";
-+};
-+
-+&xhci {
-+	status = "okay";
-+};
--- 
-2.7.4
+On Mon, Jul 31, 2017 at 8:23 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> This patch series is v2 of a previous posting:
+>
+> v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
+>
+> v1->v2:
+>         - Reworked acpi_dma_get_range() flow and logs
+>         - Added IORT named component address limits
+>         - Renamed acpi_dev_get_resources() helper function
+>         - Rebased against v4.13-rc3
+>
+> -- Original cover letter --
+>
+> As reported in:
+>
+> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
+>
+> the bus connecting devices to an IOMMU bus can be smaller in size than
+> the IOMMU input address bits which results in devices DMA HW bugs in
+> particular related to IOVA allocation (ie chopping of higher address
+> bits owing to system bus HW capabilities mismatch with the IOMMU).
+>
+> Fortunately this problem can be solved through an already present but never
+> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
+> window for a specific bus in ACPI and therefore all upstream devices
+> connected to it.
+>
+> This small patch series enables _DMA parsing in ACPI core code and
+> use it in ACPI IORT code in order to detect DMA ranges for devices and
+> update their data structures to make them work with their related DMA
+> addressing restrictions.
+>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Feng Kan <fkan@apm.com>
+> Cc: Jon Masters <jcm@redhat.com>
+> Cc: Robert Moore <robert.moore@intel.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>
+> Lorenzo Pieralisi (5):
+>   ACPICA: resource_mgr: Allow _DMA method in walk resources
+>   ACPI: Make acpi_dev_get_resources() method agnostic
+>   ACPI: Introduce DMA ranges parsing
+>   ACPI: Make acpi_dma_configure() DMA regions aware
+>   ACPI/IORT: Add IORT named component memory address limits
+>
+>  drivers/acpi/acpica/rsxface.c |  7 ++--
+>  drivers/acpi/arm64/iort.c     | 50 +++++++++++++++++++++++-
+>  drivers/acpi/resource.c       | 82 ++++++++++++++++++++++++++++++---------
+>  drivers/acpi/scan.c           | 90 +++++++++++++++++++++++++++++++++++++++----
+>  include/acpi/acnames.h        |  1 +
+>  include/acpi/acpi_bus.h       |  2 +
+>  include/linux/acpi.h          |  8 ++++
+>  include/linux/acpi_iort.h     |  5 ++-
+>  8 files changed, 211 insertions(+), 34 deletions(-)
+>
+> --
+> 2.10.0
+>
+Thanks, this was tested and works on the XGene system.
+Tested-by: Feng Kan <fkan@apm.com>
