@@ -1,85 +1,54 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:26:10 +0100
-Subject: [PATCH v3 32/59] irqchip/gic-v4: Add VLPI configuration interface
+Date: Mon, 31 Jul 2017 18:26:13 +0100
+Subject: [PATCH v3 35/59] irqchip/gic-v3: Advertise GICv4 support to KVM
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-33-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-36-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the required interfaces to map, unmap and update a VLPI.
+As KVM needs to know about the availability of GICv4 to enable
+direct injection of interrupts, let's advertise the feature in
+the gic_kvm_info structure.
 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v4.c       | 42 ++++++++++++++++++++++++++++++++++++++
- include/linux/irqchip/arm-gic-v4.h |  4 ++++
- 2 files changed, 46 insertions(+)
+ drivers/irqchip/irq-gic-v3.c           | 2 ++
+ include/linux/irqchip/arm-gic-common.h | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v4.c b/drivers/irqchip/irq-gic-v4.c
-index 86b46fb532ab..6fe2e09172ed 100644
---- a/drivers/irqchip/irq-gic-v4.c
-+++ b/drivers/irqchip/irq-gic-v4.c
-@@ -96,3 +96,45 @@ int its_invall_vpe(struct its_vpe *vpe)
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 17f0ad41864f..e2b8409dd76e 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -1159,6 +1159,7 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
+ 	if (!ret)
+ 		gic_v3_kvm_info.vcpu = r;
  
- 	return its_send_vpe_cmd(vpe, &info);
++	gic_v3_kvm_info.has_v4 = gic_data.rdists.has_vlpis;
+ 	gic_set_kvm_info(&gic_v3_kvm_info);
  }
-+
-+int its_map_vlpi(int irq, struct its_vlpi_map *map)
-+{
-+	struct its_cmd_info info = {
-+		.cmd_type = MAP_VLPI,
-+		.map      = map,
-+	};
-+
-+	/*
-+	 * The host will never see that interrupt firing again, so it
-+	 * is vital that we don't do any lazy masking.
-+	 */
-+	irq_set_status_flags(irq, IRQ_DISABLE_UNLAZY);
-+
-+	return irq_set_vcpu_affinity(irq, &info);
-+}
-+
-+int its_get_vlpi(int irq, struct its_vlpi_map *map)
-+{
-+	struct its_cmd_info info = {
-+		.cmd_type = GET_VLPI,
-+		.map      = map,
-+	};
-+
-+	return irq_set_vcpu_affinity(irq, &info);
-+}
-+
-+int its_unmap_vlpi(int irq)
-+{
-+	irq_clear_status_flags(irq, IRQ_DISABLE_UNLAZY);
-+	return irq_set_vcpu_affinity(irq, NULL);
-+}
-+
-+int its_prop_update_vlpi(int irq, u8 config, bool inv)
-+{
-+	struct its_cmd_info info = {
-+		.cmd_type = inv ? PROP_UPDATE_AND_INV_VLPI : PROP_UPDATE_VLPI,
-+		.config   = config,
-+	};
-+
-+	return irq_set_vcpu_affinity(irq, &info);
-+}
-diff --git a/include/linux/irqchip/arm-gic-v4.h b/include/linux/irqchip/arm-gic-v4.h
-index faaafd12d8c7..f495d4d1f7d7 100644
---- a/include/linux/irqchip/arm-gic-v4.h
-+++ b/include/linux/irqchip/arm-gic-v4.h
-@@ -93,5 +93,9 @@ int its_alloc_vcpu_irqs(struct its_vm *vm);
- void its_free_vcpu_irqs(struct its_vm *vm);
- int its_schedule_vpe(struct its_vpe *vpe, bool on);
- int its_invall_vpe(struct its_vpe *vpe);
-+int its_map_vlpi(int irq, struct its_vlpi_map *map);
-+int its_get_vlpi(int irq, struct its_vlpi_map *map);
-+int its_unmap_vlpi(int irq);
-+int its_prop_update_vlpi(int irq, u8 config, bool inv);
  
- #endif
+@@ -1455,6 +1456,7 @@ static void __init gic_acpi_setup_kvm_info(void)
+ 		vcpu->end = vcpu->start + ACPI_GICV2_VCPU_MEM_SIZE - 1;
+ 	}
+ 
++	gic_v3_kvm_info.has_v4 = gic_data.rdists.has_vlpis;
+ 	gic_set_kvm_info(&gic_v3_kvm_info);
+ }
+ 
+diff --git a/include/linux/irqchip/arm-gic-common.h b/include/linux/irqchip/arm-gic-common.h
+index c647b0547bcd..0a83b4379f34 100644
+--- a/include/linux/irqchip/arm-gic-common.h
++++ b/include/linux/irqchip/arm-gic-common.h
+@@ -27,6 +27,8 @@ struct gic_kvm_info {
+ 	unsigned int	maint_irq;
+ 	/* Virtual control interface */
+ 	struct resource vctrl;
++	/* vlpi support */
++	bool		has_v4;
+ };
+ 
+ const struct gic_kvm_info *gic_get_kvm_info(void);
 -- 
 2.11.0
