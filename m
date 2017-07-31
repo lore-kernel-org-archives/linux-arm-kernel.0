@@ -1,141 +1,51 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 31 Jul 2017 16:10:32 +0530
-Subject: [PATCH v3 4/5] arm64: disable irq between breakpoint and step
- exception
-In-Reply-To: <cover.1501496603.git.panand@redhat.com>
-References: <cover.1501496603.git.panand@redhat.com>
-Message-ID: <b0b65bb42fc005b71fe70bf2007b80a48dcfd4ab.1501496603.git.panand@redhat.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 31 Jul 2017 12:58:10 +0200
+Subject: [PATCH] pinctrl: sirf: atlas7: Initialize GPIO offset
+In-Reply-To: <20170720170107.14612-1-thierry.reding@gmail.com>
+References: <20170720170107.14612-1-thierry.reding@gmail.com>
+Message-ID: <20170731105810.GI26667@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If an interrupt is generated between breakpoint and step handler then
-step handler can not get correct step address. This situation can easily
-be invoked by samples/hw_breakpoint/data_breakpoint.c. It can also be
-reproduced if we insert any printk() statement or dump_stack() in perf
-overflow_handler. So, it seems that perf is working fine just luckily.
-If the CPU which is handling perf breakpoint handler receives any
-interrupt then, perf step handler will not execute sanely.
+On Thu, Jul 20, 2017 at 07:01:07PM +0200, Thierry Reding wrote:
+> From: Thierry Reding <treding@nvidia.com>
+> 
+> The GPIO offset is never initialized, which means that it will end up
+> being zero as per the devm_kzalloc() of the parent structure.
+> 
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+> I have no idea how the driver could've ever worked for anything other
+> than instances with a single bank, but maybe it did and I missed some
+> detail.
+> 
+>  drivers/pinctrl/sirf/pinctrl-atlas7.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-This patch improves do_debug_exception() handling, which enforces now,
-that exception handler function:
-- should return 0 for any software breakpoint and hw
-breakpoint/watchpoint handler if it does not expect a single step stage
-- should return 1 if it expects single step.
-- A single step handler should always return 0.
-- All handler should return a -ve error in any other case.
+Any comments on this one?
 
-Now, we can know in do_debug_exception() that whether a step exception
-will be followed or not. If there will a step exception then disable
-irq. Re-enable it after single step handling.
+Thierry
 
-Since we also fix brk_handler() for the above rule, so all SW kernel
-breakpoint handler like kgdb and kprobe should behave similar to perf HW
-breakpoint. Interrupt will be disabled if kgdb or kprobe breakpoint
-handler requires a single stepping.
-
-Signed-off-by: Pratyush Anand <panand@redhat.com>
----
- arch/arm64/kernel/debug-monitors.c |  3 +++
- arch/arm64/kernel/hw_breakpoint.c  |  4 ++--
- arch/arm64/mm/fault.c              | 22 ++++++++++++++++++----
- 3 files changed, 23 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-index d618e25c3de1..16f29f853b54 100644
---- a/arch/arm64/kernel/debug-monitors.c
-+++ b/arch/arm64/kernel/debug-monitors.c
-@@ -325,6 +325,9 @@ static int brk_handler(unsigned long addr, unsigned int esr,
- 		return -EFAULT;
- 	}
- 
-+	if (kernel_active_single_step() || test_thread_flag(TIF_SINGLESTEP))
-+		return 1;
-+
- 	return 0;
- }
- NOKPROBE_SYMBOL(brk_handler);
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index 9a73f85ab9ad..d39b8039c70e 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -697,7 +697,7 @@ static int breakpoint_handler(unsigned long unused, unsigned int esr,
- 		}
- 	}
- 
--	return 0;
-+	return 1;
- }
- NOKPROBE_SYMBOL(breakpoint_handler);
- 
-@@ -840,7 +840,7 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
- 		}
- 	}
- 
--	return 0;
-+	return 1;
- }
- NOKPROBE_SYMBOL(watchpoint_handler);
- 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 37b95dff0b07..ce5290dacba3 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -653,6 +653,13 @@ static struct fault_info __refdata debug_fault_info[] = {
- 	{ do_bad,	SIGBUS,		0,		"unknown 7"		},
- };
- 
-+/*
-+ * fn should return 0 from any software breakpoint and hw
-+ * breakpoint/watchpoint handler if it does not expect a single step stage
-+ * and 1 if it expects single step followed by its execution. A single step
-+ * handler should always return 0. All handler should return a -ve error in
-+ * any other case.
-+ */
- void __init hook_debug_fault_code(int nr,
- 				  int (*fn)(unsigned long, unsigned int, struct pt_regs *),
- 				  int sig, int code, const char *name)
-@@ -665,6 +672,8 @@ void __init hook_debug_fault_code(int nr,
- 	debug_fault_info[nr].name	= name;
- }
- 
-+static DEFINE_PER_CPU(bool, irq_enable_needed);
-+
- asmlinkage int __exception do_debug_exception(unsigned long addr,
- 					      unsigned int esr,
- 					      struct pt_regs *regs)
-@@ -672,6 +681,7 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
- 	const struct fault_info *inf = debug_fault_info + DBG_ESR_EVT(esr);
- 	struct siginfo info;
- 	int rv;
-+	bool *irq_en_needed = this_cpu_ptr(&irq_enable_needed);
- 
- 	/*
- 	 * Tell lockdep we disabled irqs in entry.S. Do nothing if they were
-@@ -680,9 +690,8 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
- 	if (interrupts_enabled(regs))
- 		trace_hardirqs_off();
- 
--	if (!inf->fn(addr, esr, regs)) {
--		rv = 1;
--	} else {
-+	rv = inf->fn(addr, esr, regs);
-+	if (rv < 0) {
- 		pr_alert("Unhandled debug exception: %s (0x%08x)@0x%016lx\n",
- 			 inf->name, esr, addr);
- 
-@@ -691,7 +700,12 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
- 		info.si_code  = inf->code;
- 		info.si_addr  = (void __user *)addr;
- 		arm64_notify_die("", regs, &info, 0);
--		rv = 0;
-+	} else if (rv == 1 && interrupts_enabled(regs)) {
-+		regs->pstate |= PSR_I_BIT;
-+		*irq_en_needed = true;
-+	} else if (rv == 0 && *irq_en_needed) {
-+		regs->pstate &= ~PSR_I_BIT;
-+		*irq_en_needed = false;
- 	}
- 
- 	if (interrupts_enabled(regs))
--- 
-2.9.4
+> 
+> diff --git a/drivers/pinctrl/sirf/pinctrl-atlas7.c b/drivers/pinctrl/sirf/pinctrl-atlas7.c
+> index 36b5c8d5471e..a2ca4a9472c7 100644
+> --- a/drivers/pinctrl/sirf/pinctrl-atlas7.c
+> +++ b/drivers/pinctrl/sirf/pinctrl-atlas7.c
+> @@ -6078,6 +6078,7 @@ static int atlas7_gpio_probe(struct platform_device *pdev)
+>  		bank = &a7gc->banks[idx];
+>  		/* Set ctrl registers' base of this bank */
+>  		bank->base = ATLAS7_GPIO_BASE(a7gc, idx);
+> +		bank->gpio_offset = idx * NGPIO_OF_BANK;
+>  
+>  		/* Get interrupt number from DTS */
+>  		ret = of_irq_get(np, idx);
+> -- 
+> 2.13.3
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170731/e3b94dbb/attachment.sig>
