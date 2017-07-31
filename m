@@ -1,46 +1,65 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:26:15 +0100
-Subject: [PATCH v3 37/59] KVM: arm/arm64: vgic: Move kvm_vgic_destroy call
- around
+Date: Mon, 31 Jul 2017 18:26:17 +0100
+Subject: [PATCH v3 39/59] KVM: arm/arm64: GICv4: Add property field and per-VM
+ predicate
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-38-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-40-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The way we call kvm_vgic_destroy is a bit bizarre. We call it
-*after* having freed the vcpus, which sort of defeats the point
-of cleaning up things before that point.
-
-Let's move kvm_vgic_destroy towards the beginning of kvm_arch_destroy_vm,
-which seems more sensible.
+Add a new has_gicv4 field in the global VGIC state that indicates
+whether the HW is GICv4 capable, as a per-VM predicate indicating
+if there is a possibility for a VM to support direct injection
+(the above being true and the VM having an ITS).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/arm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ include/kvm/arm_vgic.h           | 3 +++
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 5 +++++
+ virt/kvm/arm/vgic/vgic.h         | 2 ++
+ 3 files changed, 10 insertions(+)
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 7846a578db1a..ebab6c29e3be 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -177,6 +177,8 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
- {
- 	int i;
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index ee8587c8c715..84694b42373a 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -73,6 +73,9 @@ struct vgic_global {
+ 	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
+ 	bool			can_emulate_gicv2;
  
-+	kvm_vgic_destroy(kvm);
++	/* Does have GICv4? */
++	bool			has_gicv4;
 +
- 	free_percpu(kvm->arch.last_vcpu_ran);
- 	kvm->arch.last_vcpu_ran = NULL;
+ 	/* GIC system register CPU interface */
+ 	struct static_key_false gicv3_cpuif;
  
-@@ -186,8 +188,6 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
- 			kvm->vcpus[i] = NULL;
- 		}
- 	}
--
--	kvm_vgic_destroy(kvm);
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 714fa3933546..74109ca75cc0 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -54,6 +54,11 @@ bool vgic_has_its(struct kvm *kvm)
+ 	return dist->has_its;
  }
  
- int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
++bool vgic_is_v4_capable(struct kvm *kvm)
++{
++	return kvm_vgic_global_state.has_gicv4 && vgic_has_its(kvm);
++}
++
+ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+ 					    gpa_t addr, unsigned int len)
+ {
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 3002b72d938b..90f6436a11aa 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -229,4 +229,6 @@ int vgic_its_resolve_lpi(struct kvm *kvm, struct vgic_its *its,
+ 			 u32 devid, u32 eventid, struct vgic_irq **irq);
+ struct vgic_its *vgic_msi_to_its(struct kvm *kvm, struct kvm_msi *msi);
+ 
++bool vgic_is_v4_capable(struct kvm *kvm);
++
+ #endif
 -- 
 2.11.0
