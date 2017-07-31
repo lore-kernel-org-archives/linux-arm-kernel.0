@@ -1,62 +1,156 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:26:07 +0100
-Subject: [PATCH v3 29/59] irqchip/gic-v3-its: Set implementation defined bit
- to enable VLPIs
+Date: Mon, 31 Jul 2017 18:25:56 +0100
+Subject: [PATCH v3 18/59] irqchip/gic-v3-its: Add VLPI configuration handling
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-30-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-19-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A long time ago, GITS_CTLR[1] used to be called GITC_CTLR.EnableVLPI.
-It has been subsequently deprecated and is now an "Implementation
-Defined" bit that may ot may not be set for GICv4. Brilliant.
+When a VLPI is reconfigured (enabled, disabled, change in priority),
+the full configuration byte must be written, and the caches invalidated.
 
-And the current crop of the FastModel requires that bit for VLPIs
-to be enabled. Oh well... Let's set it and find out what breaks.
+Also, when using the irq_mask/irq_unmask methods, it is necessary
+to disable the doorbell for that particular interrupt (by mapping it
+to 1023) on top of clearing the Enable bit.
 
+Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c   | 7 +++++--
- include/linux/irqchip/arm-gic-v3.h | 1 +
- 2 files changed, 6 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 75 +++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 70 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index a177af0b1657..a5b1317d89eb 100644
+index ef31c3e58c01..b618c259be8b 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -2610,7 +2610,7 @@ static int its_force_quiescent(void __iomem *base)
- 		return 0;
+@@ -806,18 +806,26 @@ static inline u32 its_get_event_id(struct irq_data *d)
+ 	return d->hwirq - its_dev->event_map.lpi_base;
+ }
  
- 	/* Disable the generation of all interrupts to this ITS */
--	val &= ~GITS_CTLR_ENABLE;
-+	val &= ~(GITS_CTLR_ENABLE | GITS_CTLR_ImDe);
- 	writel_relaxed(val, base + GITS_CTLR);
+-static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
++static void lpi_write_config(struct irq_data *d, u8 clr, u8 set)
+ {
+-	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
+-	irq_hw_number_t hwirq = d->hwirq;
++	irq_hw_number_t hwirq;
+ 	struct page *prop_page;
+ 	u8 *cfg;
  
- 	/* Poll GITS_CTLR and wait until ITS becomes quiescent */
-@@ -2879,7 +2879,10 @@ static int __init its_probe_one(struct resource *res,
+-	prop_page = gic_rdists->prop_page;
++	if (irqd_is_forwarded_to_vcpu(d)) {
++		struct its_device *its_dev = irq_data_get_irq_chip_data(d);
++		u32 event = its_get_event_id(d);
++
++		prop_page = its_dev->event_map.vm->vprop_page;
++		hwirq = its_dev->event_map.vlpi_maps[event].vintid;
++	} else {
++		prop_page = gic_rdists->prop_page;
++		hwirq = d->hwirq;
++	}
  
- 	gits_write_cwriter(0, its->base + GITS_CWRITER);
- 	ctlr = readl_relaxed(its->base + GITS_CTLR);
--	writel_relaxed(ctlr | GITS_CTLR_ENABLE, its->base + GITS_CTLR);
-+	ctlr |= GITS_CTLR_ENABLE;
-+	if (its->is_v4)
-+		ctlr |= GITS_CTLR_ImDe;
-+	writel_relaxed(ctlr, its->base + GITS_CTLR);
+ 	cfg = page_address(prop_page) + hwirq - 8192;
+ 	*cfg &= ~clr;
+-	*cfg |= set;
++	*cfg |= set | LPI_PROP_GROUP1;
  
- 	err = its_init_domain(handle, its);
- 	if (err)
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 6bc142cfa616..1ea576c8126f 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -298,6 +298,7 @@
- #define GITS_TRANSLATER			0x10040
+ 	/*
+ 	 * Make the above write visible to the redistributors.
+@@ -828,16 +836,52 @@ static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
+ 		gic_flush_dcache_to_poc(cfg, sizeof(*cfg));
+ 	else
+ 		dsb(ishst);
++}
++
++static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
++{
++	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
++
++	lpi_write_config(d, clr, set);
+ 	its_send_inv(its_dev, its_get_event_id(d));
+ }
  
- #define GITS_CTLR_ENABLE		(1U << 0)
-+#define GITS_CTLR_ImDe			(1U << 1)
- #define	GITS_CTLR_ITS_NUMBER_SHIFT	4
- #define	GITS_CTLR_ITS_NUMBER		(0xFU << GITS_CTLR_ITS_NUMBER_SHIFT)
- #define GITS_CTLR_QUIESCENT		(1U << 31)
++static void its_vlpi_set_doorbell(struct irq_data *d, bool enable)
++{
++	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
++	u32 event = its_get_event_id(d);
++
++	if (its_dev->event_map.vlpi_maps[event].db_enabled == enable)
++		return;
++
++	its_dev->event_map.vlpi_maps[event].db_enabled = enable;
++
++	/*
++	 * More fun with the architecture:
++	 *
++	 * Ideally, we'd issue a VMAPTI to set the doorbell to its LPI
++	 * value or to 1023, depending on the enable bit. But that
++	 * would be issueing a mapping for an /existing/ DevID+EventID
++	 * pair, which is UNPREDICTABLE. Instead, let's issue a VMOVI
++	 * to the /same/ vPE, using this opportunity to adjust the
++	 * doorbell. Mouahahahaha. We loves it, Precious.
++	 */
++	its_send_vmovi(its_dev, event);
++}
++
+ static void its_mask_irq(struct irq_data *d)
+ {
++	if (irqd_is_forwarded_to_vcpu(d))
++		its_vlpi_set_doorbell(d, false);
++
+ 	lpi_update_config(d, LPI_PROP_ENABLED, 0);
+ }
+ 
+ static void its_unmask_irq(struct irq_data *d)
+ {
++	if (irqd_is_forwarded_to_vcpu(d))
++		its_vlpi_set_doorbell(d, true);
++
+ 	lpi_update_config(d, 0, LPI_PROP_ENABLED);
+ }
+ 
+@@ -850,6 +894,10 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 	struct its_collection *target_col;
+ 	u32 id = its_get_event_id(d);
+ 
++	/* A forwarded interrupt should use irq_set_vcpu_affinity */
++	if (irqd_is_forwarded_to_vcpu(d))
++		return -EINVAL;
++
+        /* lpi cannot be routed to a redistributor that is on a foreign node */
+ 	if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
+ 		if (its_dev->its->numa_node >= 0) {
+@@ -1018,6 +1066,22 @@ static int its_vlpi_unmap(struct irq_data *d)
+ 	return ret;
+ }
+ 
++static int its_vlpi_prop_update(struct irq_data *d, struct its_cmd_info *info)
++{
++	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
++
++	if (!its_dev->event_map.vm || !irqd_is_forwarded_to_vcpu(d))
++		return -EINVAL;
++
++	if (info->cmd_type == PROP_UPDATE_AND_INV_VLPI)
++		lpi_update_config(d, 0xff, info->config);
++	else
++		lpi_write_config(d, 0xff, info->config);
++	its_vlpi_set_doorbell(d, !!(info->config & LPI_PROP_ENABLED));
++
++	return 0;
++}
++
+ static int its_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
+ {
+ 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
+@@ -1040,6 +1104,7 @@ static int its_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
+ 
+ 	case PROP_UPDATE_VLPI:
+ 	case PROP_UPDATE_AND_INV_VLPI:
++		return its_vlpi_prop_update(d, info);
+ 
+ 	default:
+ 		return -EINVAL;
 -- 
 2.11.0
