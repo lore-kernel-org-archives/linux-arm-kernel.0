@@ -1,38 +1,77 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:26:02 +0100
-Subject: [PATCH v3 24/59] irqchip/gic-v3-its: Add VPE invalidation hook
+Date: Mon, 31 Jul 2017 18:25:50 +0100
+Subject: [PATCH v3 12/59] irqchip/gic-v3-its: Generalize device table
+ allocation
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-25-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-13-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a guest issues a INVALL command targetting a collection, it must
-be translated into a VINVALL for the VPE that has this collection.
-
-This patch implements a hook that offers this functionallity to the
-hypervisor.
+As we want to use 2-level tables for VCPUs, let's hack the device
+table allocator in order to make it slightly more generic. It
+will get reused in subsequent patches.
 
 Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c | 26 ++++++++++++++++----------
+ 1 file changed, 16 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index d94a51489f6c..16cdd1f60ebf 100644
+index 1298a9bca56a..1c2d6bdf85cb 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -2226,6 +2226,10 @@ static int its_vpe_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
- 		its_vpe_deschedule(vpe);
- 		return 0;
+@@ -1386,26 +1386,19 @@ static struct its_baser *its_get_baser(struct its_node *its, u32 type)
+ 	return NULL;
+ }
  
-+	case INVALL_VPE:
-+		its_send_vinvall(vpe);
-+		return 0;
+-static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
++static bool its_alloc_table_entry(struct its_baser *baser, u32 id)
+ {
+-	struct its_baser *baser;
+ 	struct page *page;
+ 	u32 esz, idx;
+ 	__le64 *table;
+ 
+-	baser = its_get_baser(its, GITS_BASER_TYPE_DEVICE);
+-
+-	/* Don't allow device id that exceeds ITS hardware limit */
+-	if (!baser)
+-		return (ilog2(dev_id) < its->device_ids);
+-
+ 	/* Don't allow device id that exceeds single, flat table limit */
+ 	esz = GITS_BASER_ENTRY_SIZE(baser->val);
+ 	if (!(baser->val & GITS_BASER_INDIRECT))
+-		return (dev_id < (PAGE_ORDER_TO_SIZE(baser->order) / esz));
++		return (id < (PAGE_ORDER_TO_SIZE(baser->order) / esz));
+ 
+ 	/* Compute 1st level table index & check if that exceeds table limit */
+-	idx = dev_id >> ilog2(baser->psz / esz);
++	idx = id >> ilog2(baser->psz / esz);
+ 	if (idx >= (PAGE_ORDER_TO_SIZE(baser->order) / GITS_LVL1_ENTRY_SIZE))
+ 		return false;
+ 
+@@ -1434,6 +1427,19 @@ static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
+ 	return true;
+ }
+ 
++static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
++{
++	struct its_baser *baser;
 +
- 	default:
- 		return -EINVAL;
- 	}
++	baser = its_get_baser(its, GITS_BASER_TYPE_DEVICE);
++
++	/* Don't allow device id that exceeds ITS hardware limit */
++	if (!baser)
++		return (ilog2(dev_id) < its->device_ids);
++
++	return its_alloc_table_entry(baser, dev_id);
++}
++
+ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 					    int nvecs)
+ {
 -- 
 2.11.0
