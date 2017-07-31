@@ -1,34 +1,43 @@
-From: sugar.zhang@rock-chips.com (Sugar Zhang)
-Date: Mon, 31 Jul 2017 09:47:51 +0800
-Subject: [PATCH] ASoC: rockchip: add bindings for i2s
-Message-ID: <1501465671-22863-1-git-send-email-sugar.zhang@rock-chips.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 31 Jul 2017 10:48:27 +0900
+Subject: [PATCH 0/5] phy: Replace the deprecated extcon API
+In-Reply-To: <1500254456-6525-1-git-send-email-cw00.choi@samsung.com>
+References: <CGME20170717012057epcas1p11fe3d445ed16c7f94b57922b0a8f243a@epcas1p1.samsung.com>
+ <1500254456-6525-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <597E8C6B.1060004@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add bindings for rk3036/rk3228/rk3328/rk3366 i2s.
+Dear Kishon and Felipe,
 
-Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
----
+Please review the patch3/patch4.
 
- Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 4 ++++
- 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
-index 206aba1..b208a75 100644
---- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
-@@ -7,8 +7,12 @@ Required properties:
- 
- - compatible: should be one of the following:
-    - "rockchip,rk3066-i2s": for rk3066
-+   - "rockchip,rk3036-i2s", "rockchip,rk3066-i2s": for rk3036
-    - "rockchip,rk3188-i2s", "rockchip,rk3066-i2s": for rk3188
-+   - "rockchip,rk3228-i2s", "rockchip,rk3066-i2s": for rk3228
-    - "rockchip,rk3288-i2s", "rockchip,rk3066-i2s": for rk3288
-+   - "rockchip,rk3328-i2s", "rockchip,rk3066-i2s": for rk3328
-+   - "rockchip,rk3366-i2s", "rockchip,rk3066-i2s": for rk3366
-    - "rockchip,rk3368-i2s", "rockchip,rk3066-i2s": for rk3368
-    - "rockchip,rk3399-i2s", "rockchip,rk3066-i2s": for rk3399
- - reg: physical base address of the controller and length of memory mapped
+On 2017? 07? 17? 10:20, Chanwoo Choi wrote:
+> These patches replace the deprecated extcon API
+> and remove them from extcon framework.
+> 
+> The patch1 and patch2 were already acked by Kishon Vijay Abraham I.
+> If patch3/patch4 are reviewed, I'll create the immutable branch
+> and send the pull request to both usb and phy maintainer.
+> 
+> Chanwoo Choi (5):
+>   phy: qcom-usb-hs: Replace the extcon API
+>   phy: rockchip-inno-usb2: Replace the extcon API
+>   phy: phy-bcm-ns2-usbdrd: Replace the deprecated extcon API
+>   usb: gadget: udc: Replace the deprecated extcon API
+>   extcon: Remove deprecated extcon_set/get_cable_state_()
+> 
+>  drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c     |  8 ++++----
+>  drivers/phy/qualcomm/phy-qcom-usb-hs.c        | 14 +++-----------
+>  drivers/phy/rockchip/phy-rockchip-inno-usb2.c | 10 +++++-----
+>  drivers/usb/gadget/udc/snps_udc_plat.c        |  6 +++---
+>  include/linux/extcon.h                        | 11 -----------
+>  5 files changed, 15 insertions(+), 34 deletions(-)
+> 
+
+
 -- 
-2.7.4
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
