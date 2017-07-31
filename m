@@ -1,30 +1,76 @@
-From: jananis37@gmail.com (janani-sankarababu)
-Date: Mon, 31 Jul 2017 12:44:03 +0530
-Subject: [PATCH] Staging: vc04_services: Fix WARN_ON instead of BUG_ON
-Message-ID: <1501485243-11977-1-git-send-email-jananis37@gmail.com>
+From: jacobchen110@gmail.com (Jacob Chen)
+Date: Mon, 31 Jul 2017 15:21:27 +0800
+Subject: [PATCH v3 0/5] Add Rockchip RGA V4l2 support
+In-Reply-To: <1501470460-12014-1-git-send-email-jacob-chen@iotwrt.com>
+References: <1501470460-12014-1-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <CAFLEztRRq5Eep+c20h_=a+uf30egAYfPmX75=K+F6XnQ2N1+zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is to replace the use of BUG_ON macro with WARN_ON
-inorder to prevent the crashing of the kernel.
+Hi,
 
-Signed-off-by: Janani Sankara Babu <jananis37@gmail.com>
----
- drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-index f484bb0..30bc246 100644
---- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-+++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
-@@ -91,7 +91,7 @@ static int snd_bcm2835_ctl_get(struct snd_kcontrol *kcontrol,
- 	if (mutex_lock_interruptible(&chip->audio_mutex))
- 		return -EINTR;
- 
--	BUG_ON(!chip && !(chip->avail_substreams & AVAIL_SUBSTREAMS_MASK));
-+	WARN_ON(!chip && !(chip->avail_substreams & AVAIL_SUBSTREAMS_MASK));
- 
- 	if (kcontrol->private_value == PCM_PLAYBACK_VOLUME)
- 		ucontrol->value.integer.value[0] = chip2alsa(chip->volume);
--- 
-1.9.1
+2017-07-31 11:07 GMT+08:00 Jacob Chen <jacob-chen@iotwrt.com>:
+> This patch series add a v4l2 m2m drvier for rockchip RGA direct rendering based 2d graphics acceleration module.
+>
+> Before, my colleague yakir have write a drm RGA drvier and send it to the lists.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/416769.html
+> I have been asked to find a userspace user("compositor") for it, but after some studys, my conclusion is that unlike exynos g2d,
+> rockchip rga are not suitable for compositor. Rockchip RGA have a limited MMU, which means it can only hold several buffers in the same time.
+> When it was used in compositor, it will waste a lot of time to import/export/flush buffer, resulting in a bad performance.
+>
+> A few months ago, i saw a discussion in dri-devel at lists.freedesktop.org.
+> It remind that we could write a v4l2 m2m RGA driver, since we usually use RGA for streaming purpose.
+> https://patches.linaro.org/cover/97727/
+>
+> I have test this driver with gstreamer v4l2transform plugin and it seems work well.
+>
+> change in V3:
+> - rename the controls.
+> - add pm_runtime support.
+> - enable node by default.
+> - correct spelling in documents.
+>
+> change in V2:
+> - generalize the controls.
+> - map buffers (10-50 us) in every cmd-run rather than in buffer-import to avoid get_free_pages failed on
+> actively used systems.
+> - remove status in dt-bindings examples.
+>
+> Jacob Chen (5):
+>   [media] v4l: add blend modes controls
+>   [media]: rockchip/rga: v4l2 m2m support
+>   ARM: dts: rockchip: add RGA device node for RK3288
+>   ARM: dts: rockchip: add RGA device node for RK3399
+>   dt-bindings: Document the Rockchip RGA bindings
+>
+>  .../devicetree/bindings/media/rockchip-rga.txt     |  33 +
+>  arch/arm/boot/dts/rk3288.dtsi                      |  11 +
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi           |  11 +
+>  drivers/media/platform/Kconfig                     |  11 +
+>  drivers/media/platform/Makefile                    |   2 +
+>  drivers/media/platform/rockchip-rga/Makefile       |   3 +
+>  drivers/media/platform/rockchip-rga/rga-buf.c      | 141 +++
+>  drivers/media/platform/rockchip-rga/rga-hw.c       | 650 ++++++++++++++
+>  drivers/media/platform/rockchip-rga/rga-hw.h       | 437 +++++++++
+>  drivers/media/platform/rockchip-rga/rga.c          | 987 +++++++++++++++++++++
+>  drivers/media/platform/rockchip-rga/rga.h          | 110 +++
+>  drivers/media/v4l2-core/v4l2-ctrls.c               |  20 +-
+>  include/uapi/linux/v4l2-controls.h                 |  16 +-
+>  13 files changed, 2430 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
+>  create mode 100644 drivers/media/platform/rockchip-rga/Makefile
+>  create mode 100644 drivers/media/platform/rockchip-rga/rga-buf.c
+>  create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.c
+>  create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.h
+>  create mode 100644 drivers/media/platform/rockchip-rga/rga.c
+>  create mode 100644 drivers/media/platform/rockchip-rga/rga.h
+>
+> --
+> 2.7.4
+>
+
+We are going to use this driver in our BSP, and write userspace for it.
+Though there are some work needed be done for better use, i'm
+satisfied with it at present.
+It could be improved through usage.
