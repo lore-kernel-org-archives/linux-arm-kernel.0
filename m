@@ -1,45 +1,56 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 31 Jul 2017 08:13:10 +0300
-Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20170731094806.88c3188576d7e2c14b5e3e33@magewell.com>
-References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
- <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
- <20170728160233.xooevio4hoqkgfaq@flea.lan>
- <20170730060801.bkc2kvm72ktixy74@tarshish>
- <20170731094806.88c3188576d7e2c14b5e3e33@magewell.com>
-Message-ID: <20170731051310.jp45cj7lugcueztc@tarshish>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 31 Jul 2017 13:13:34 +0800
+Subject: [PATCH 0/4] clk: sunxi-ng: Fix issues with fractional mode
+In-Reply-To: <20170730164150.26302-1-jernej.skrabec@siol.net>
+References: <20170730164150.26302-1-jernej.skrabec@siol.net>
+Message-ID: <CAGb2v65pH-Me6JjMYzp41NwS478azMTLBPrkJwZcho9Ay2JX1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+Hi Jernej,
 
-On Mon, Jul 31, 2017 at 09:48:06AM +0800, Yong wrote:
-> On Sun, 30 Jul 2017 09:08:01 +0300
-> Baruch Siach <baruch@tkos.co.il> wrote:
-> > On Fri, Jul 28, 2017 at 06:02:33PM +0200, Maxime Ripard wrote:
-> > > On Thu, Jul 27, 2017 at 01:01:35PM +0800, Yong Deng wrote:
-> > > > +	regmap_write(sdev->regmap, CSI_CH_F0_BUFA_REG,
-> > > > +		     (bus_addr + sdev->planar_offset[0]) >> 2);
-> > 
-> > Why do you need the bit shift? Does that work for you?
-> > 
-> > The User Manuals of both the V3s and the and the A33 (AKA R16) state that the 
-> > BUFA field size in this register is 31:00, that is 32bit. I have found no 
-> > indication of this bit shift in the Olimex provided sunxi-vfe[1] driver. On 
-> > the A33 I have found that only after removing the bit-shift, (some sort of) 
-> > data started to appear in the buffer.
-> > 
-> > [1] https://github.com/hehopmajieh/a33_linux/tree/master/drivers/media/video/sunxi-vfe
-> 
-> The Users Manuals do not document this bit shift. You should see line 10 to
-> 32 in https://github.com/hehopmajieh/a33_linux/blob/master/drivers/media/video/sunxi-vfe/csi/csi_reg.c
+On Mon, Jul 31, 2017 at 12:41 AM, Jernej Skrabec
+<jernej.skrabec@siol.net> wrote:
+> During development of H3 HDMI driver, I found some issues with
+> setting video clock rate. It turned out that clock driver decided
+> to use fractional mode and selected right frequency, but it didn't
+> enable it. Additionally, fractional helpers don't wait on lock.
 
-Thanks. So for my reference, the SoCs that don't need bit shift are A31, A23, 
-and A33. SoCs that need bit shift are A80, A83, H3, and V3s (AKA V30).
+What kind of resolution were you testing to actually hit this?
 
-baruch
+AFAIK the fractional mode is either 297 or 270 MHz. Even Full HD
+1080p60 dot clocks aren't that high. And the clk drivers should
+try to request a matching parent clk rate. So the PLL wouldn't
+go that high. Are you testing 4k @ 30fps?
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+As it stands, I don't think any of the existing display support
+can go that high, so I think we're safe as far as old kernels
+go, i.e. we don't need to Cc stable for these.
+
+Regards
+ChenYu
+
+> Patch 1 adds a call to N-M clock driver which enables fractional mode.
+> It also clears M factor before that as required by most SoCs.
+>
+> Patch 2 adds a call to N clock driver which enables fractional mode.
+>
+> Patch 3 makes fractional helpers less chatty.
+>
+> Patch 4 adds a wait for lock to fractional helpers.
+>
+> Jernej Skrabec (4):
+>   clk: sunxi-ng: Fix fractional mode for N-M clocks
+>   clk: sunxi-ng: multiplier: Fix fractional mode
+>   clk: sunxi-ng: Make fractional helper less chatty
+>   clk: sunxi-ng: Wait for lock when using fractional mode
+>
+>  drivers/clk/sunxi-ng/ccu_frac.c | 14 ++++++++------
+>  drivers/clk/sunxi-ng/ccu_frac.h |  2 +-
+>  drivers/clk/sunxi-ng/ccu_mult.c | 10 +++++++---
+>  drivers/clk/sunxi-ng/ccu_nm.c   | 19 ++++++++++++++++---
+>  4 files changed, 32 insertions(+), 13 deletions(-)
+>
+> --
+> 2.13.3
+>
