@@ -1,51 +1,106 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 31 Jul 2017 12:58:10 +0200
-Subject: [PATCH] pinctrl: sirf: atlas7: Initialize GPIO offset
-In-Reply-To: <20170720170107.14612-1-thierry.reding@gmail.com>
-References: <20170720170107.14612-1-thierry.reding@gmail.com>
-Message-ID: <20170731105810.GI26667@ulmo>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Mon, 31 Jul 2017 12:08:47 +0100
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170728190349.GM3730@linux.vnet.ibm.com>
+References: <20170727014214.GH3730@linux.vnet.ibm.com>
+ <20170727143400.23e4d2b2@roar.ozlabs.ibm.com>
+ <20170727124913.GL3730@linux.vnet.ibm.com>
+ <20170727144903.000022a1@huawei.com>
+ <20170727173923.000001b2@huawei.com>
+ <20170727165245.GD3730@linux.vnet.ibm.com>
+ <20170728084411.00001ddb@huawei.com>
+ <20170728142403.0000122b@huawei.com>
+ <20170728165529.GF3730@linux.vnet.ibm.com>
+ <20170728182053.000072aa@huawei.com>
+ <20170728190349.GM3730@linux.vnet.ibm.com>
+Message-ID: <20170731120847.00003d5c@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 07:01:07PM +0200, Thierry Reding wrote:
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> The GPIO offset is never initialized, which means that it will end up
-> being zero as per the devm_kzalloc() of the parent structure.
-> 
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> I have no idea how the driver could've ever worked for anything other
-> than instances with a single bank, but maybe it did and I missed some
-> detail.
-> 
->  drivers/pinctrl/sirf/pinctrl-atlas7.c | 1 +
->  1 file changed, 1 insertion(+)
+On Fri, 28 Jul 2017 12:03:50 -0700
+"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
 
-Any comments on this one?
-
-Thierry
-
+> On Fri, Jul 28, 2017 at 06:27:05PM +0100, Jonathan Cameron wrote:
+> > On Fri, 28 Jul 2017 09:55:29 -0700
+> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+> >   
+> > > On Fri, Jul 28, 2017 at 02:24:03PM +0100, Jonathan Cameron wrote:  
+> > > > On Fri, 28 Jul 2017 08:44:11 +0100
+> > > > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:    
+> > > 
+> > > [ . . . ]
+> > >   
+> > > > Ok.  Some info.  I disabled a few driver (usb and SAS) in the interest of having
+> > > > fewer timer events.  Issue became much easier to trigger (on some runs before
+> > > > I could get tracing up and running)
+> > > >e
+> > > > So logs are large enough that pastebin doesn't like them - please shoet if    
+> > > >>e another timer period is of interest.    
+> > > > 
+> > > > https://pastebin.com/iUZDfQGM for the timer trace.
+> > > > https://pastebin.com/3w1F7amH for dmesg.  
+> > > > 
+> > > > The relevant timeout on the RCU stall detector was 8 seconds.  Event is
+> > > > detected around 835.
+> > > > 
+> > > > It's a lot of logs, so I haven't identified a smoking gun yet but there
+> > > > may well be one in there.    
+> > > 
+> > > The dmesg says:
+> > > 
+> > > rcu_preempt kthread starved for 2508 jiffies! g112 c111 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1
+> > > 
+> > > So I look for "rcu_preempt" timer events and find these:
+> > > 
+> > > rcu_preempt-9     [019] ....   827.579114: timer_init: timer=ffff8017d5fc7da0
+> > > rcu_preempt-9     [019] d..1   827.579115: timer_start: timer=ffff8017d5fc7da0 function=process_timeout 
+> > > 
+> > > Next look for "ffff8017d5fc7da0" and I don't find anything else.  
+> > It does show up off the bottom of what would fit in pastebin...
+> > 
+> >      rcu_preempt-9     [001] d..1   837.681077: timer_cancel: timer=ffff8017d5fc7da0
+> >      rcu_preempt-9     [001] ....   837.681086: timer_init: timer=ffff8017d5fc7da0
+> >      rcu_preempt-9     [001] d..1   837.681087: timer_start: timer=ffff8017d5fc7da0 function=process_timeout expires=4295101298 [timeout=1] cpu=1 idx=0 flags=  
 > 
-> diff --git a/drivers/pinctrl/sirf/pinctrl-atlas7.c b/drivers/pinctrl/sirf/pinctrl-atlas7.c
-> index 36b5c8d5471e..a2ca4a9472c7 100644
-> --- a/drivers/pinctrl/sirf/pinctrl-atlas7.c
-> +++ b/drivers/pinctrl/sirf/pinctrl-atlas7.c
-> @@ -6078,6 +6078,7 @@ static int atlas7_gpio_probe(struct platform_device *pdev)
->  		bank = &a7gc->banks[idx];
->  		/* Set ctrl registers' base of this bank */
->  		bank->base = ATLAS7_GPIO_BASE(a7gc, idx);
-> +		bank->gpio_offset = idx * NGPIO_OF_BANK;
->  
->  		/* Get interrupt number from DTS */
->  		ret = of_irq_get(np, idx);
-> -- 
-> 2.13.3
+> Odd.  I would expect an expiration...  And ten seconds is way longer
+> than the requested one jiffy!
 > 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170731/e3b94dbb/attachment.sig>
+> > > The timeout was one jiffy, and more than a second later, no expiration.
+> > > Is it possible that this event was lost?  I am not seeing any sign of
+> > > this is the trace.
+> > > 
+> > > I don't see any sign of CPU hotplug (and I test with lots of that in
+> > > any case).
+> > > 
+> > > The last time we saw something like this it was a timer HW/driver problem,
+> > > but it is a bit hard to imagine such a problem affecting both ARM64
+> > > and SPARC.  ;-)  
+> > Could be different issues, both of which were hidden by that lockup detector.
+> > 
+> > There is an errata work around for the timers on this particular board.
+> > I'm only vaguely aware of it, so may be unconnected.
+> > 
+> > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/clocksource/arm_arch_timer.c?h=v4.13-rc2&id=bb42ca47401010fc02901b5e8f79e40a26f208cb
+> > 
+> > Seems unlikely though! + we've not yet seen it on the other chips that
+> > errata effects (not that that means much).  
+> 
+> If you can reproduce quickly, might be worth trying anyway...
+> 
+> 							Thanx, Paul
+Errata fix is running already and was for all those tests.
+
+I'll have a dig into the timers today and see where I get to.
+
+Jonathan
+> 
+> > Jonathan
+> >   
+> > > 
+> > > Thomas, any debugging suggestions?
+> > > 
+> > > 							Thanx, Paul
+> > >   
+> >   
+> 
