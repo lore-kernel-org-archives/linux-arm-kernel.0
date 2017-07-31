@@ -1,75 +1,139 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:25:48 +0100
-Subject: [PATCH v3 10/59] irqchip/gic-v3-its: Split out pending table
- allocation
+Date: Mon, 31 Jul 2017 18:25:45 +0100
+Subject: [PATCH v3 07/59] irqchip/gic-v3-its: Implement irq_set_irqchip_state
+ for pending state
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-11-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-8-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just as for the property table, let's move the pending table
-allocation to a separate function.
+Allow the pending state of an LPI to be set or cleared via
+irq_set_irqchip_state.
 
 Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 29 ++++++++++++++++++++---------
- 1 file changed, 20 insertions(+), 9 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 78 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 9a317934455c..ebdb1603b95d 100644
+index 0f345c0fa700..3e4ac8c13e21 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1202,6 +1202,24 @@ static int its_alloc_collections(struct its_node *its)
- 	return 0;
+@@ -167,6 +167,11 @@ struct its_cmd_desc {
+ 		struct {
+ 			struct its_device *dev;
+ 			u32 event_id;
++		} its_clear_cmd;
++
++		struct {
++			struct its_device *dev;
++			u32 event_id;
+ 		} its_int_cmd;
+ 
+ 		struct {
+@@ -380,6 +385,40 @@ static struct its_collection *its_build_inv_cmd(struct its_cmd_block *cmd,
+ 	return col;
  }
  
-+static struct page *its_allocate_pending_table(gfp_t gfp_flags)
++static struct its_collection *its_build_int_cmd(struct its_cmd_block *cmd,
++						struct its_cmd_desc *desc)
 +{
-+	struct page *pend_page;
-+	/*
-+	 * The pending pages have to be at least 64kB aligned,
-+	 * hence the 'max(LPI_PENDBASE_SZ, SZ_64K)' below.
-+	 */
-+	pend_page = alloc_pages(gfp_flags | __GFP_ZERO,
-+				get_order(max_t(u32, LPI_PENDBASE_SZ, SZ_64K)));
-+	if (!pend_page)
-+		return NULL;
++	struct its_collection *col;
 +
-+	/* Make sure the GIC will observe the zero-ed page */
-+	gic_flush_dcache_to_poc(page_address(pend_page), LPI_PENDBASE_SZ);
++	col = dev_event_to_col(desc->its_int_cmd.dev,
++			       desc->its_int_cmd.event_id);
 +
-+	return pend_page;
++	its_encode_cmd(cmd, GITS_CMD_INT);
++	its_encode_devid(cmd, desc->its_int_cmd.dev->device_id);
++	its_encode_event_id(cmd, desc->its_int_cmd.event_id);
++
++	its_fixup_cmd(cmd);
++
++	return col;
 +}
 +
- static void its_cpu_init_lpis(void)
- {
- 	void __iomem *rbase = gic_data_rdist_rd_base();
-@@ -1212,21 +1230,14 @@ static void its_cpu_init_lpis(void)
- 	pend_page = gic_data_rdist()->pend_page;
- 	if (!pend_page) {
- 		phys_addr_t paddr;
--		/*
--		 * The pending pages have to be at least 64kB aligned,
--		 * hence the 'max(LPI_PENDBASE_SZ, SZ_64K)' below.
--		 */
--		pend_page = alloc_pages(GFP_NOWAIT | __GFP_ZERO,
--					get_order(max_t(u32, LPI_PENDBASE_SZ, SZ_64K)));
++static struct its_collection *its_build_clear_cmd(struct its_cmd_block *cmd,
++						  struct its_cmd_desc *desc)
++{
++	struct its_collection *col;
 +
-+		pend_page = its_allocate_pending_table(GFP_NOWAIT);
- 		if (!pend_page) {
- 			pr_err("Failed to allocate PENDBASE for CPU%d\n",
- 			       smp_processor_id());
- 			return;
- 		}
++	col = dev_event_to_col(desc->its_clear_cmd.dev,
++			       desc->its_clear_cmd.event_id);
++
++	its_encode_cmd(cmd, GITS_CMD_CLEAR);
++	its_encode_devid(cmd, desc->its_clear_cmd.dev->device_id);
++	its_encode_event_id(cmd, desc->its_clear_cmd.event_id);
++
++	its_fixup_cmd(cmd);
++
++	return col;
++}
++
+ static struct its_collection *its_build_invall_cmd(struct its_cmd_block *cmd,
+ 						   struct its_cmd_desc *desc)
+ {
+@@ -536,6 +575,26 @@ static void its_build_sync_cmd(struct its_cmd_block *sync_cmd,
+ static BUILD_SINGLE_CMD_FUNC(its_send_single_command, its_cmd_builder_t,
+ 			     struct its_collection, its_build_sync_cmd)
  
--		/* Make sure the GIC will observe the zero-ed page */
--		gic_flush_dcache_to_poc(page_address(pend_page), LPI_PENDBASE_SZ);
--
- 		paddr = page_to_phys(pend_page);
- 		pr_info("CPU%d: using LPI pending table @%pa\n",
- 			smp_processor_id(), &paddr);
++static void its_send_int(struct its_device *dev, u32 event_id)
++{
++	struct its_cmd_desc desc;
++
++	desc.its_int_cmd.dev = dev;
++	desc.its_int_cmd.event_id = event_id;
++
++	its_send_single_command(dev->its, its_build_int_cmd, &desc);
++}
++
++static void its_send_clear(struct its_device *dev, u32 event_id)
++{
++	struct its_cmd_desc desc;
++
++	desc.its_clear_cmd.dev = dev;
++	desc.its_clear_cmd.event_id = event_id;
++
++	its_send_single_command(dev->its, its_build_clear_cmd, &desc);
++}
++
+ static void its_send_inv(struct its_device *dev, u32 event_id)
+ {
+ 	struct its_cmd_desc desc;
+@@ -702,6 +761,24 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
+ 	iommu_dma_map_msi_msg(d->irq, msg);
+ }
+ 
++static int its_irq_set_irqchip_state(struct irq_data *d,
++				     enum irqchip_irq_state which,
++				     bool state)
++{
++	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
++	u32 event = its_get_event_id(d);
++
++	if (which != IRQCHIP_STATE_PENDING)
++		return -EINVAL;
++
++	if (state)
++		its_send_int(its_dev, event);
++	else
++		its_send_clear(its_dev, event);
++
++	return 0;
++}
++
+ static struct irq_chip its_irq_chip = {
+ 	.name			= "ITS",
+ 	.irq_mask		= its_mask_irq,
+@@ -709,6 +786,7 @@ static struct irq_chip its_irq_chip = {
+ 	.irq_eoi		= irq_chip_eoi_parent,
+ 	.irq_set_affinity	= its_set_affinity,
+ 	.irq_compose_msi_msg	= its_irq_compose_msi_msg,
++	.irq_set_irqchip_state	= its_irq_set_irqchip_state,
+ };
+ 
+ /*
 -- 
 2.11.0
