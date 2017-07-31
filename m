@@ -1,57 +1,58 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Mon, 31 Jul 2017 15:36:39 +0800
-Subject: [PATCH v5 06/10] arm: dts: mt7623: cleanup the mt7623n rfb uart nodes
+Date: Mon, 31 Jul 2017 15:36:43 +0800
+Subject: [PATCH v5 10/10] arm: dts: mt7623: add clock-frequency to CPU nodes
 In-Reply-To: <cover.1501486190.git.sean.wang@mediatek.com>
 References: <cover.1501486190.git.sean.wang@mediatek.com>
-Message-ID: <49854fd2da4b8742a33e3ea6fe6cd2f61fc65103.1501486190.git.sean.wang@mediatek.com>
+Message-ID: <878bfa648e0a8c4ec4e2a400e2b45a803e808abc.1501486190.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: John Crispin <john@phrozen.org>
+From: Sean Wang <sean.wang@mediatek.com>
 
-This patch does a cleanup of the uart nodes in the dts file of the RFB. It
-adds aliases, enables 2 more uarts and explicitly sets the uart mode of the
-console.
+Add clock-frequency property to CPU nodes. Avoids warnings like
+[    0.001568] /cpus/cpu at 0 missing clock-frequency property
+[    0.001588] /cpus/cpu at 1 missing clock-frequency property
+[    0.001601] /cpus/cpu at 2 missing clock-frequency property
+[    0.001614] /cpus/cpu at 3 missing clock-frequency property
+at boot time
 
-Signed-off-by: John Crispin <john@phrozen.org>
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- arch/arm/boot/dts/mt7623n-rfb.dtsi | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/mt7623.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt7623n-rfb.dtsi b/arch/arm/boot/dts/mt7623n-rfb.dtsi
-index 805ba69..5e0dd79 100644
---- a/arch/arm/boot/dts/mt7623n-rfb.dtsi
-+++ b/arch/arm/boot/dts/mt7623n-rfb.dtsi
-@@ -19,7 +19,7 @@
- 
- / {
- 	chosen {
--		stdout-path = &uart2;
-+		stdout-path = "serial2:115200n8";
+diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+index 86cab5c..4ae0ab0 100644
+--- a/arch/arm/boot/dts/mt7623.dtsi
++++ b/arch/arm/boot/dts/mt7623.dtsi
+@@ -89,24 +89,28 @@
+ 			#cooling-cells = <2>;
+ 			cooling-min-level = <0>;
+ 			cooling-max-level = <7>;
++			clock-frequency = <1300000000>;
+ 		};
+ 		cpu1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x1>;
+ 			operating-points-v2 = <&cpu_opp_table>;
++			clock-frequency = <1300000000>;
+ 		};
+ 		cpu2: cpu at 2 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x2>;
+ 			operating-points-v2 = <&cpu_opp_table>;
++			clock-frequency = <1300000000>;
+ 		};
+ 		cpu3: cpu at 3 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a7";
+ 			reg = <0x3>;
+ 			operating-points-v2 = <&cpu_opp_table>;
++			clock-frequency = <1300000000>;
+ 		};
  	};
  
- 	cpus {
-@@ -43,6 +43,20 @@
- 	memory at 80000000 {
- 		reg = <0 0x80000000 0 0x40000000>;
- 	};
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
- };
- 
- &uart2 {
 -- 
 2.7.4
