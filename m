@@ -1,28 +1,30 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 31 Jul 2017 15:15:48 +0800
-Subject: [PATCH 3/4] clk: sunxi-ng: Make fractional helper less chatty
-In-Reply-To: <20170730164150.26302-4-jernej.skrabec@siol.net>
-References: <20170730164150.26302-1-jernej.skrabec@siol.net>
- <20170730164150.26302-4-jernej.skrabec@siol.net>
-Message-ID: <CAGb2v655pccxuv7HYZQ8U58t27pH8cm2U=RqVER-xZ+0_CEF_Q@mail.gmail.com>
+From: jananis37@gmail.com (janani-sankarababu)
+Date: Mon, 31 Jul 2017 12:44:03 +0530
+Subject: [PATCH] Staging: vc04_services: Fix WARN_ON instead of BUG_ON
+Message-ID: <1501485243-11977-1-git-send-email-jananis37@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-()On Mon, Jul 31, 2017 at 12:41 AM, Jernej Skrabec
-<jernej.skrabec@siol.net> wrote:
-> ccu_frac_helper_read_rate() prints some info which is not really
-> helpful except during debugging.
->
-> Replace printk() with pr_debug().
->
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+This patch is to replace the use of BUG_ON macro with WARN_ON
+inorder to prevent the crashing of the kernel.
 
-Queued as a fix for 4.13 with the following tag:
+Signed-off-by: Janani Sankara Babu <jananis37@gmail.com>
+---
+ drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Fixes: 89a3dfb78707 ("clk: sunxi-ng: Add fractional lib")
-
-The rationale being the previous two patches actually enable
-the ccu_frac_helper_read_rate() code path, and we don't want
-the users to be annoyed by all the noise.
-
-ChenYu
+diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+index f484bb0..30bc246 100644
+--- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
++++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-ctl.c
+@@ -91,7 +91,7 @@ static int snd_bcm2835_ctl_get(struct snd_kcontrol *kcontrol,
+ 	if (mutex_lock_interruptible(&chip->audio_mutex))
+ 		return -EINTR;
+ 
+-	BUG_ON(!chip && !(chip->avail_substreams & AVAIL_SUBSTREAMS_MASK));
++	WARN_ON(!chip && !(chip->avail_substreams & AVAIL_SUBSTREAMS_MASK));
+ 
+ 	if (kcontrol->private_value == PCM_PLAYBACK_VOLUME)
+ 		ucontrol->value.integer.value[0] = chip2alsa(chip->volume);
+-- 
+1.9.1
