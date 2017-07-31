@@ -1,68 +1,94 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 31 Jul 2017 18:26:06 +0100
-Subject: [PATCH v3 28/59] irqchip/gic-v3-its: Allow doorbell interrupts to be
- injected/cleared
+Date: Mon, 31 Jul 2017 18:26:00 +0100
+Subject: [PATCH v3 22/59] irqchip/gic-v3-its: Add VPENDBASER/VPROPBASER
+ accessors
 In-Reply-To: <20170731172637.29355-1-marc.zyngier@arm.com>
 References: <20170731172637.29355-1-marc.zyngier@arm.com>
-Message-ID: <20170731172637.29355-29-marc.zyngier@arm.com>
+Message-ID: <20170731172637.29355-23-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While the doorbell interrupts are usually driven by the HW itself,
-having a way to trigger them independently has proved to be a
-really useful debug feature. As it is actually very little code,
-let's add it to the VPE irqchip operations.
+V{PEND,PROP}BASER being 64bit registers, they need some ad-hoc
+accessors on 32bit, specially given that VPENDBASER contains
+a Valid bit, making the access a bit convoluted.
 
+Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm/include/asm/arch_gicv3.h   | 28 ++++++++++++++++++++++++++++
+ arch/arm64/include/asm/arch_gicv3.h |  5 +++++
+ include/linux/irqchip/arm-gic-v3.h  |  5 +++++
+ 3 files changed, 38 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 210840e0ec92..a177af0b1657 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -2404,12 +2404,41 @@ static void its_vpe_unmask_irq(struct irq_data *d)
- 	its_vpe_send_inv(d);
- }
+diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
+index 27475904e096..8d45e88feac9 100644
+--- a/arch/arm/include/asm/arch_gicv3.h
++++ b/arch/arm/include/asm/arch_gicv3.h
+@@ -291,5 +291,33 @@ static inline u64 __gic_readq_nonatomic(const volatile void __iomem *addr)
+  */
+ #define gits_write_cwriter(v, c)	__gic_writeq_nonatomic(v, c)
  
-+/* This is really a debug feature */
-+static int its_vpe_set_irqchip_state(struct irq_data *d,
-+				     enum irqchip_irq_state which,
-+				     bool state)
++/*
++ * GITS_VPROPBASER - hi and lo bits may be accessed independently.
++ */
++#define gits_write_vpropbaser(v, c)	__gic_writeq_nonatomic(v, c)
++
++/*
++ * GITS_VPENDBASER - the Valid bit must be cleared before changing
++ * anything else.
++ */
++static inline void gits_write_vpendbaser(u64 val, void * __iomem addr)
 +{
-+	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
++	u32 tmp;
 +
-+	if (which != IRQCHIP_STATE_PENDING)
-+		return -EINVAL;
-+
-+	if (gic_rdists->has_direct_lpi) {
-+		void __iomem *rdbase;
-+
-+		rdbase = per_cpu_ptr(gic_rdists->rdist, vpe->col_idx)->rd_base;
-+		if (state)
-+			gic_write_lpir(vpe->vpe_db_lpi, rdbase + GICR_SETLPIR);
-+		else
-+			gic_write_lpir(vpe->vpe_db_lpi, rdbase + GICR_CLRLPIR);
-+	} else {
-+		if (state)
-+			its_vpe_send_cmd(vpe, its_send_int);
-+		else
-+			its_vpe_send_cmd(vpe, its_send_clear);
++	tmp = readl_relaxed(addr + 4);
++	if (tmp & (GICR_VPENDBASER_Valid >> 32)) {
++		tmp &= ~(GICR_VPENDBASER_Valid >> 32);
++		writel_relaxed(tmp, addr + 4);
 +	}
 +
-+	return 0;
++	/*
++	 * Use the fact that __gic_writeq_nonatomic writes the second
++	 * half of the 64bit quantity after the first.
++	 */
++	__gic_writeq_nonatomic(val, addr);
 +}
 +
- static struct irq_chip its_vpe_irq_chip = {
- 	.name			= "GICv4-vpe",
- 	.irq_mask		= its_vpe_mask_irq,
- 	.irq_unmask		= its_vpe_unmask_irq,
- 	.irq_eoi		= irq_chip_eoi_parent,
- 	.irq_set_affinity	= its_vpe_set_affinity,
-+	.irq_set_irqchip_state	= its_vpe_set_irqchip_state,
- 	.irq_set_vcpu_affinity	= its_vpe_set_vcpu_affinity,
- };
++#define gits_read_vpendbaser(c)		__gic_readq_nonatomic(c)
++
+ #endif /* !__ASSEMBLY__ */
+ #endif /* !__ASM_ARCH_GICV3_H */
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index 8cef47fa2218..0d2a53457c30 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -133,5 +133,10 @@ static inline void gic_write_bpr1(u32 val)
+ #define gicr_write_pendbaser(v, c)	writeq_relaxed(v, c)
+ #define gicr_read_pendbaser(c)		readq_relaxed(c)
  
++#define gits_write_vpropbaser(v, c)	writeq_relaxed(v, c)
++
++#define gits_write_vpendbaser(v, c)	writeq_relaxed(v, c)
++#define gits_read_vpendbaser(c)		readq_relaxed(c)
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ASM_ARCH_GICV3_H */
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 7c6fd8f3e36c..17ba0d732f12 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -212,6 +212,11 @@
+ #define LPI_PROP_GROUP1			(1 << 1)
+ #define LPI_PROP_ENABLED		(1 << 0)
+ 
++#define GICR_VPENDBASER_Dirty		(1ULL << 60)
++#define GICR_VPENDBASER_PendingLast	(1ULL << 61)
++#define GICR_VPENDBASER_IDAI		(1ULL << 62)
++#define GICR_VPENDBASER_Valid		(1ULL << 63)
++
+ /*
+  * ITS registers, offsets from ITS_base
+  */
 -- 
 2.11.0
