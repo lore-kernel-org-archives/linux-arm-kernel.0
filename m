@@ -1,84 +1,70 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 31 Jul 2017 17:33:00 +0200
-Subject: [PATCH RESEND] arm64: arch_timer: fix the infinite recursion when
- enable ftrace and erratum workaround
-In-Reply-To: <5f7566b3-a2ca-b882-89e1-dcaaaec79fcd@huawei.com>
-References: <321e4c16-aa14-beee-b6dc-36e19e5ec35a@huawei.com>
- <20170710112229.GA18040@leverpostej>
- <5f7566b3-a2ca-b882-89e1-dcaaaec79fcd@huawei.com>
-Message-ID: <c044ea37-a8f2-d2fd-a0d9-a9a3a5e5b136@linaro.org>
+From: jacob-chen@iotwrt.com (Jacob Chen)
+Date: Mon, 31 Jul 2017 23:32:56 +0800
+Subject: [PATCH v4 0/5] Add Rockchip RGA V4l2 support
+Message-ID: <1501515182-26705-1-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/07/2017 04:42, Ding Tianhong wrote:
-> 
-> 
-> On 2017/7/10 19:22, Mark Rutland wrote:
->> On Sun, Jul 09, 2017 at 04:30:54PM +0800, Ding Tianhong wrote:
->>> When enable preempt and debug ftrace, and perform the following steps, the
->>> system will hang:
->>> mount -t debugfs nodev /sys/kernel/debug/
->>> cd /sys/kernel/debug/tracing/
->>> echo function_graph > current_tracer
->>>
->>> This is because tracing the preempt_disable/enable calls would cause
->>> trace_clock() which would get local timer to go into infinite recursion
->>> when enable the arch timer erratum workaround for some chips, so Prevent
->>> tracing of preempt_disable/enable() in arch_timer_reg_read_stable().
->>>
->>> This problem is similar to the fixed by upstream commit 96b3d28bf4
->>> ("sched/clock: Prevent tracing recursion in sched_clock_cpu()").
->>
->> As I mentioned before, the patch itself looks fine to me, but the commit
->> message is somewhat difficult to read.
->>
->> Can we please change this to:
->>
->>   arm64: arch_timer: avoid infinite recursion when ftrace is enabled
->>
->>   On platforms with an arch timer erratum workaround, it's possible for
->>   arch_timer_reg_read_stable() to recurse into itself when certain
->>   tracing options are enabled, leading to stack overflows and related
->>   problems.
->>  
->>   For example, when PREEMPT_TRACER and FUNCTION_GRAPH_TRACER are
->>   selected, it's possible to trigger this with:
->>   
->>   $ mount -t debugfs nodev /sys/kernel/debug/
->>   $ echo function_graph > /sys/kernel/debug/tracing/current_tracer
->>
->>   The problem is that in such cases, preempt_disable() instrumentation
->>   attempts to acquire a timestamp via trace_clock(), resulting in a call
->>   back to arch_timer_reg_read_stable(), and hence recursion.
->>
->>   This patch changes arch_timer_reg_read_stable() to use
->>   preempt_{disable,enable}_notrace(), which avoids this.
->>
->> With that commit message:
->>
->> Acked-by: Mark Rutland <mark.rutland@arm.com>
->>
->> Daniel, Thomas, would you be happy to fold that in when picking this? Or
->> would you prefer that I fix this up and resend?
->>
-> 
-> Hi Danial, Thomas:
-> 
-> It looks didn't merge to the mainline tree yet, should I update the commit and
-> resend this patch again?
-> 
+This patch series add a v4l2 m2m drvier for rockchip RGA direct rendering based 2d graphics acceleration module.
 
+Before, my colleague yakir have write a drm RGA drvier and send it to the lists.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/416769.html
+I have been asked to find a userspace user("compositor") for it, but after some studys, my conclusion is that unlike exynos g2d,
+rockchip rga are not suitable for compositor. Rockchip RGA have a limited MMU, which means it can only hold several buffers in the same time.
+When it was used in compositor, it will waste a lot of time to import/export/flush buffer, resulting in a bad performance.
 
-Yes, please. I'm coming back from two weeks OoO, that will help.
+A few months ago, i saw a discussion in dri-devel at lists.freedesktop.org.
+It remind that we could write a v4l2 m2m RGA driver, since we usually use RGA for streaming purpose.
+https://patches.linaro.org/cover/97727/
 
-Thanks.
+I have test this driver with gstreamer v4l2transform plugin and it seems work well.
 
-  -- Daniel
+change in V4:
+- document the controls.
+- change according to Hans's comments
 
+change in V3:
+- rename the controls.
+- add pm_runtime support.
+- enable node by default.
+- correct spelling in documents.
+
+change in V2:
+- generalize the controls.
+- map buffers (10-50 us) in every cmd-run rather than in buffer-import to avoid get_free_pages failed on
+actively used systems.
+- remove status in dt-bindings examples.
+
+Jacob Chen (6):
+  [media] v4l: add portduff blend modes
+  [media] extended-controls.rst: add PorterDuff mode control
+  [media]: rockchip/rga: v4l2 m2m support
+  ARM: dts: rockchip: add RGA device node for RK3288
+  ARM: dts: rockchip: add RGA device node for RK3399
+  dt-bindings: Document the Rockchip RGA bindings
+
+ .../devicetree/bindings/media/rockchip-rga.txt     |  33 +
+ Documentation/media/uapi/v4l/extended-controls.rst |   4 +
+ arch/arm/boot/dts/rk3288.dtsi                      |  11 +
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |  11 +
+ drivers/media/platform/Kconfig                     |  11 +
+ drivers/media/platform/Makefile                    |   2 +
+ drivers/media/platform/rockchip-rga/Makefile       |   3 +
+ drivers/media/platform/rockchip-rga/rga-buf.c      | 153 ++++
+ drivers/media/platform/rockchip-rga/rga-hw.c       | 650 ++++++++++++++
+ drivers/media/platform/rockchip-rga/rga-hw.h       | 437 +++++++++
+ drivers/media/platform/rockchip-rga/rga.c          | 975 +++++++++++++++++++++
+ drivers/media/platform/rockchip-rga/rga.h          | 109 +++
+ drivers/media/v4l2-core/v4l2-ctrls.c               |  20 +-
+ include/uapi/linux/v4l2-controls.h                 |  20 +-
+ 14 files changed, 2437 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
+ create mode 100644 drivers/media/platform/rockchip-rga/Makefile
+ create mode 100644 drivers/media/platform/rockchip-rga/rga-buf.c
+ create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.c
+ create mode 100644 drivers/media/platform/rockchip-rga/rga-hw.h
+ create mode 100644 drivers/media/platform/rockchip-rga/rga.c
+ create mode 100644 drivers/media/platform/rockchip-rga/rga.h
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.7.4
