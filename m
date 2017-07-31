@@ -1,63 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:03:38 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC Defconfig Updates for v4.14
-Message-ID: <cover.1501511664.git.horms+renesas@verge.net.au>
+Date: Mon, 31 Jul 2017 17:03:10 +0200
+Subject: [PATCH 18/31] arm64: dts: ulcb: Enable HDMI output
+In-Reply-To: <cover.1501509525.git.horms+renesas@verge.net.au>
+References: <cover.1501509525.git.horms+renesas@verge.net.au>
+Message-ID: <2a50b40fa4edc6aa14e1afeec04aa41c0127c0c6.1501509526.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Vladimir Barinov <vladimir.barinov+renesas@cogentembedded.com>
 
-Please consider these Renesas ARM based SoC defconfig updates for v4.14.
+Enable the HDMI encoder for ULCB board and hook it up to the HDMI connector.
 
+The HDMI encoder and connector are available on both the H3 and M3-W ULCB boards.
+Add them to the ulcb.dtsi file.
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+Signed-off-by: Vladimir Barinov <vladimir.barinov+renesas@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/ulcb.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig-for-v4.14
-
-for you to fetch changes up to 52078ca712cd933844721aaa700b3bd85234841f:
-
-  ARM: multi_v7_defconfig: Enable DMA for Renesas serial ports (2017-07-27 16:06:23 +0200)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Defconfig Updates for v4.14
-
-* Enable DMA for Renesas serial ports
-
-  Geert Uytterhoeven says, "DMA for (H)SCIF(A|B) serial ports on Renesas
-  R-Car Gen2 and RZ/G1 SoCs is considered stable, hence enable it by
-  default.".
-
-* Enable Ethernet AVB
-
-  For the iWave RZ/G1M Q7 SOM
-
-* Replace DRM_RCAR_HDMI by generic bridge options
-* Replace SND_SOC_RSRC_CARD by SND_SIMPLE_SCU_CARD
-* Replace USB_XHCI_RCAR by USB_XHCI_PLATFORM
-* Enable missing PCIE_RCAR dependency
-
-  Defconfig updates for various Kconfig updates covering
-  renamed Kconfig symbols, now missing dependancies and so on.
-
-----------------------------------------------------------------
-Biju Das (1):
-      ARM: shmobile: defconfig: Enable Ethernet AVB
-
-Geert Uytterhoeven (9):
-      ARM: shmobile: defconfig: Enable missing PCIE_RCAR dependency
-      ARM: shmobile: defconfig: Replace USB_XHCI_RCAR by USB_XHCI_PLATFORM
-      ARM: shmobile: defconfig: Replace SND_SOC_RSRC_CARD by SND_SIMPLE_SCU_CARD
-      ARM: shmobile: defconfig: Replace DRM_RCAR_HDMI by generic bridge options
-      ARM: shmobile: defconfig: Enable DMA for serial ports
-      ARM: shmobile: defconfig: Refresh
-      ARM: multi_v7_defconfig: Replace SND_SOC_RSRC_CARD by SND_SIMPLE_SCU_CARD
-      ARM: multi_v7_defconfig: Replace DRM_RCAR_HDMI by generic bridge options
-      ARM: multi_v7_defconfig: Enable DMA for Renesas serial ports
-
- arch/arm/configs/multi_v7_defconfig |  5 +++--
- arch/arm/configs/shmobile_defconfig | 17 ++++++++++-------
- 2 files changed, 13 insertions(+), 9 deletions(-)
+diff --git a/arch/arm64/boot/dts/renesas/ulcb.dtsi b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+index 9f93d6087df2..6b93b42de679 100644
+--- a/arch/arm64/boot/dts/renesas/ulcb.dtsi
++++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+@@ -169,6 +169,23 @@
+ 	clock-frequency = <32768>;
+ };
+ 
++&hdmi0 {
++	status = "okay";
++
++	ports {
++		port at 1 {
++			reg = <1>;
++			rcar_dw_hdmi0_out: endpoint {
++				remote-endpoint = <&hdmi0_con>;
++			};
++		};
++	};
++};
++
++&hdmi0_con {
++	remote-endpoint = <&rcar_dw_hdmi0_out>;
++};
++
+ &i2c2 {
+ 	pinctrl-0 = <&i2c2_pins>;
+ 	pinctrl-names = "default";
+-- 
+2.1.4
