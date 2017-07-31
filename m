@@ -1,45 +1,62 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:04:02 +0200
-Subject: [PATCH 1/4] soc: renesas: Identify R-Car D3
-In-Reply-To: <cover.1501511923.git.horms+renesas@verge.net.au>
-References: <cover.1501511923.git.horms+renesas@verge.net.au>
-Message-ID: <1b954784e0d47db184ccf0bc3b684520c508664f.1501511923.git.horms+renesas@verge.net.au>
+Date: Mon, 31 Jul 2017 17:04:29 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v4.14
+Message-ID: <cover.1501512759.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/soc/renesas/renesas-soc.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Please consider these Renesas ARM based SoC DT bindings updates for v4.14.
 
-diff --git a/drivers/soc/renesas/renesas-soc.c b/drivers/soc/renesas/renesas-soc.c
-index ca26f13d399c..90d6b7a4340a 100644
---- a/drivers/soc/renesas/renesas-soc.c
-+++ b/drivers/soc/renesas/renesas-soc.c
-@@ -144,6 +144,11 @@ static const struct renesas_soc soc_rcar_m3_w __initconst __maybe_unused = {
- 	.id	= 0x52,
- };
- 
-+static const struct renesas_soc soc_rcar_d3 __initconst __maybe_unused = {
-+	.family	= &fam_rcar_gen3,
-+	.id	= 0x58,
-+};
-+
- static const struct renesas_soc soc_shmobile_ag5 __initconst __maybe_unused = {
- 	.family	= &fam_shmobile,
- 	.id	= 0x37,
-@@ -199,6 +204,9 @@ static const struct of_device_id renesas_socs[] __initconst = {
- #ifdef CONFIG_ARCH_R8A7796
- 	{ .compatible = "renesas,r8a7796",	.data = &soc_rcar_m3_w },
- #endif
-+#ifdef CONFIG_ARCH_R8A77995
-+	{ .compatible = "renesas,r8a77995",	.data = &soc_rcar_d3 },
-+#endif
- #ifdef CONFIG_ARCH_SH73A0
- 	{ .compatible = "renesas,sh73a0",	.data = &soc_shmobile_ag5 },
- #endif
--- 
-2.1.4
+
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings-for-v4.14
+
+for you to fetch changes up to 100acb0bd90be67b3fc625cff91c7617b791743d:
+
+  ARM: shmobile: Document Renesas Draak board DT bindings (2017-07-27 17:10:48 +0200)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC DT Bindings Updates for v4.14
+
+* Document R-Car D3 (r8a77995) SoC and Draak board
+
+* Document reserved SRAM for the SMP jump stub on R-Car Gen2 and RZ/G1 SoCs
+
+  Geert Uytterhoeven says, "+Renesas R-Car Gen2 and RZ/G1 SoCs need a small
+  piece of SRAM for the jump stub +for secondary CPU bringup and CPU
+  hotplug.  +This memory is reserved by adding a child node to a
+  "mmio-sram" node..."
+
+* Add a VSP channel index to DU vsps
+
+  Laurent Pinchart says, "multiple LIF instances in the VSP. The current DT
+  bindings don't support specifying that kind of SoC integration scheme.
+  Extend them with a VSP channel index."
+
+* Add R-Car M3-W (r8a7796) HDMI TX DT bindings
+
+  This is compatible with existing R-Car H3 (r8a7795) support
+
+----------------------------------------------------------------
+Geert Uytterhoeven (3):
+      dt-bindings: sram: Document renesas,smp-sram
+      ARM: shmobile: Document R-Car D3 SoC DT bindings
+      ARM: shmobile: Document Renesas Draak board DT bindings
+
+Laurent Pinchart (2):
+      dt-bindings: display: renesas: Add R-Car M3-W HDMI TX DT bindings
+      dt-bindings: display: rcar-du: Add a VSP channel index to the vsps DT property
+
+ Documentation/devicetree/bindings/arm/shmobile.txt |  4 ++
+ .../bindings/display/bridge/renesas,dw-hdmi.txt    |  1 +
+ .../devicetree/bindings/display/renesas,du.txt     | 51 +++++++++++++---------
+ .../devicetree/bindings/sram/renesas,smp-sram.txt  | 27 ++++++++++++
+ 4 files changed, 62 insertions(+), 21 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sram/renesas,smp-sram.txt
