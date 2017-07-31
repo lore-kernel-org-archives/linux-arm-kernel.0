@@ -1,52 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 31 Jul 2017 17:04:03 +0200
-Subject: [PATCH 2/4] soc: renesas: Add r8a77995 SYSC PM Domain Binding
- Definitions
+Date: Mon, 31 Jul 2017 17:04:02 +0200
+Subject: [PATCH 1/4] soc: renesas: Identify R-Car D3
 In-Reply-To: <cover.1501511923.git.horms+renesas@verge.net.au>
 References: <cover.1501511923.git.horms+renesas@verge.net.au>
-Message-ID: <ee011c5b4c43b215a985c7d4368f77a572c5c216.1501511923.git.horms+renesas@verge.net.au>
+Message-ID: <1b954784e0d47db184ccf0bc3b684520c508664f.1501511923.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add power domain indices for R-Car D3.
-
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- include/dt-bindings/power/r8a77995-sysc.h | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 include/dt-bindings/power/r8a77995-sysc.h
+ drivers/soc/renesas/renesas-soc.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/include/dt-bindings/power/r8a77995-sysc.h b/include/dt-bindings/power/r8a77995-sysc.h
-new file mode 100644
-index 000000000000..09d0ed575b73
---- /dev/null
-+++ b/include/dt-bindings/power/r8a77995-sysc.h
-@@ -0,0 +1,23 @@
-+/*
-+ * Copyright (C) 2017 Glider bvba
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ */
-+#ifndef __DT_BINDINGS_POWER_R8A77995_SYSC_H__
-+#define __DT_BINDINGS_POWER_R8A77995_SYSC_H__
+diff --git a/drivers/soc/renesas/renesas-soc.c b/drivers/soc/renesas/renesas-soc.c
+index ca26f13d399c..90d6b7a4340a 100644
+--- a/drivers/soc/renesas/renesas-soc.c
++++ b/drivers/soc/renesas/renesas-soc.c
+@@ -144,6 +144,11 @@ static const struct renesas_soc soc_rcar_m3_w __initconst __maybe_unused = {
+ 	.id	= 0x52,
+ };
+ 
++static const struct renesas_soc soc_rcar_d3 __initconst __maybe_unused = {
++	.family	= &fam_rcar_gen3,
++	.id	= 0x58,
++};
 +
-+/*
-+ * These power domain indices match the numbers of the interrupt bits
-+ * representing the power areas in the various Interrupt Registers
-+ * (e.g. SYSCISR, Interrupt Status Register)
-+ */
-+
-+#define R8A77995_PD_CA53_CPU0		 5
-+#define R8A77995_PD_CA53_SCU		21
-+
-+/* Always-on power area */
-+#define R8A77995_PD_ALWAYS_ON		32
-+
-+#endif /* __DT_BINDINGS_POWER_R8A77995_SYSC_H__ */
+ static const struct renesas_soc soc_shmobile_ag5 __initconst __maybe_unused = {
+ 	.family	= &fam_shmobile,
+ 	.id	= 0x37,
+@@ -199,6 +204,9 @@ static const struct of_device_id renesas_socs[] __initconst = {
+ #ifdef CONFIG_ARCH_R8A7796
+ 	{ .compatible = "renesas,r8a7796",	.data = &soc_rcar_m3_w },
+ #endif
++#ifdef CONFIG_ARCH_R8A77995
++	{ .compatible = "renesas,r8a77995",	.data = &soc_rcar_d3 },
++#endif
+ #ifdef CONFIG_ARCH_SH73A0
+ 	{ .compatible = "renesas,sh73a0",	.data = &soc_shmobile_ag5 },
+ #endif
 -- 
 2.1.4
