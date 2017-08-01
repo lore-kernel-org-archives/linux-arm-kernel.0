@@ -1,32 +1,37 @@
 From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue,  1 Aug 2017 18:36:21 +0200
-Subject: [PATCH 0/2] Add generic Cortex-A9 timer for Armada 38x
-Message-ID: <1501605383-24748-1-git-send-email-mw@semihalf.com>
+Date: Tue,  1 Aug 2017 18:36:23 +0200
+Subject: [PATCH 2/2] ARM: dts: armada-38x: Add arm_global_timer node
+In-Reply-To: <1501605383-24748-1-git-send-email-mw@semihalf.com>
+References: <1501605383-24748-1-git-send-email-mw@semihalf.com>
+Message-ID: <1501605383-24748-3-git-send-email-mw@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Since generic Cortex-A9 global timer is available after adding
+it to compilation, enable its node in armada-38x.dtsi.
 
-This small patchset adds usage of generic Cortex-A9 timer driver
-by Armada 38x SoCs. The system clocksource subsystem
-will pick one of above two available ones (ARM generic or legacy
-axp/a370 timer). Test on v4.13-rc3 showed, that the generic one
-is chosen - no regression whatsoever observed on A388-GP and
-A388-Clearfog. Backward compatibility with older kernels/DT
-is preserved.
-
-I'm looking forward to any comments or remarks.
-
-Best regards,
-Marcin
-
-Marcin Wojtas (2):
-  ARM: mvebu: enable ARM_GLOBAL_TIMER compilation Armada 38x platforms
-  ARM: dts: armada-38x: Add arm_global_timer node
-
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+---
  arch/arm/boot/dts/armada-38x.dtsi | 7 +++++++
- arch/arm/mach-mvebu/Kconfig       | 2 ++
- 2 files changed, 9 insertions(+)
+ 1 file changed, 7 insertions(+)
 
+diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+index af31f5d..7ff0811e 100644
+--- a/arch/arm/boot/dts/armada-38x.dtsi
++++ b/arch/arm/boot/dts/armada-38x.dtsi
+@@ -154,6 +154,13 @@
+ 				reg = <0xc000 0x58>;
+ 			};
+ 
++			timer at c200 {
++				compatible = "arm,cortex-a9-global-timer";
++				reg = <0xc200 0x20>;
++				interrupts = <GIC_PPI 11 (IRQ_TYPE_EDGE_RISING | GIC_CPU_MASK_SIMPLE(2))>;
++				clocks = <&coreclk 2>;
++			};
++
+ 			timer at c600 {
+ 				compatible = "arm,cortex-a9-twd-timer";
+ 				reg = <0xc600 0x20>;
 -- 
 1.8.3.1
