@@ -1,171 +1,170 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue,  1 Aug 2017 16:05:53 +0530
-Subject: [PATCH v3 4/5] mailbox: bcm-flexrm-mailbox: Use bitmap instead of IDA
+Date: Tue,  1 Aug 2017 16:05:54 +0530
+Subject: [PATCH v3 5/5] mailbox: bcm-flexrm-mailbox: Use txdone_ack instead of
+ txdone_poll
 In-Reply-To: <1501583754-31969-1-git-send-email-anup.patel@broadcom.com>
 References: <1501583754-31969-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1501583754-31969-5-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1501583754-31969-6-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we are using IDA library for managing IDs
-on a FlexRM ring. The IDA library dynamically allocates
-memory for underlying data structures which can cause
-potential locking issue when allocating/free IDs from
-flexrm_new_request() and flexrm_process_completions().
+Currently, FlexRM driver uses txdone_poll method of Linux Mailbox
+to model the send_data() callback. To achieve this, we have introduced
+"last_pending_msg" pointer for each FlexRM ring which keeps track of
+the message that did not fit in the FlexRM ring.
 
-To tackle this, we replace use of IDA with bitmap for
-each FlexRM ring and also protect the bitmap with FlexRM
-ring lock.
+This patch updates FlexRM driver to use txdone_ack method instead of
+txdone_poll method because txdone_poll is not efficient for FlexRM
+and requires additional tracking in FlexRM driver.
+
+Also, moving to txdone_ack method helps us remove "last_pending_msg"
+pointer and last_tx_done() callback.
 
 Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
 ---
- drivers/mailbox/bcm-flexrm-mailbox.c | 36 +++++++++++++++++++-----------------
- 1 file changed, 19 insertions(+), 17 deletions(-)
+ drivers/mailbox/bcm-flexrm-mailbox.c | 61 +++---------------------------------
+ 1 file changed, 4 insertions(+), 57 deletions(-)
 
 diff --git a/drivers/mailbox/bcm-flexrm-mailbox.c b/drivers/mailbox/bcm-flexrm-mailbox.c
-index 46ad305..9873818 100644
+index 9873818..ae61463 100644
 --- a/drivers/mailbox/bcm-flexrm-mailbox.c
 +++ b/drivers/mailbox/bcm-flexrm-mailbox.c
-@@ -18,13 +18,13 @@
- #include <asm/barrier.h>
- #include <asm/byteorder.h>
- #include <linux/atomic.h>
-+#include <linux/bitmap.h>
- #include <linux/debugfs.h>
- #include <linux/delay.h>
- #include <linux/device.h>
- #include <linux/dma-mapping.h>
- #include <linux/dmapool.h>
- #include <linux/err.h>
--#include <linux/idr.h>
- #include <linux/interrupt.h>
- #include <linux/kernel.h>
- #include <linux/mailbox_controller.h>
-@@ -265,7 +265,6 @@ struct flexrm_ring {
- 	cpumask_t irq_aff_hint;
- 	unsigned int msi_timer_val;
- 	unsigned int msi_count_threshold;
--	struct ida requests_ida;
- 	struct brcm_message *requests[RING_MAX_REQ_COUNT];
- 	void *bd_base;
- 	dma_addr_t bd_dma_base;
-@@ -277,6 +276,7 @@ struct flexrm_ring {
- 	atomic_t msg_cmpl_count;
+@@ -277,7 +277,6 @@ struct flexrm_ring {
  	/* Protected members */
  	spinlock_t lock;
-+	DECLARE_BITMAP(requests_bmap, RING_MAX_REQ_COUNT);
- 	struct brcm_message *last_pending_msg;
+ 	DECLARE_BITMAP(requests_bmap, RING_MAX_REQ_COUNT);
+-	struct brcm_message *last_pending_msg;
  	u32 cmpl_read_offset;
  };
-@@ -994,10 +994,10 @@ static int flexrm_new_request(struct flexrm_ring *ring,
- 	msg->error = 0;
  
- 	/* If no requests possible then save data pointer and goto done. */
--	reqid = ida_simple_get(&ring->requests_ida, 0,
--				RING_MAX_REQ_COUNT, GFP_KERNEL);
-+	spin_lock_irqsave(&ring->lock, flags);
-+	reqid = bitmap_find_free_region(ring->requests_bmap,
-+					RING_MAX_REQ_COUNT, 0);
- 	if (reqid < 0) {
--		spin_lock_irqsave(&ring->lock, flags);
- 		if (batch_msg)
- 			ring->last_pending_msg = batch_msg;
- 		else
-@@ -1005,13 +1005,16 @@ static int flexrm_new_request(struct flexrm_ring *ring,
- 		spin_unlock_irqrestore(&ring->lock, flags);
- 		return 0;
- 	}
-+	spin_unlock_irqrestore(&ring->lock, flags);
+@@ -997,15 +996,9 @@ static int flexrm_new_request(struct flexrm_ring *ring,
+ 	spin_lock_irqsave(&ring->lock, flags);
+ 	reqid = bitmap_find_free_region(ring->requests_bmap,
+ 					RING_MAX_REQ_COUNT, 0);
+-	if (reqid < 0) {
+-		if (batch_msg)
+-			ring->last_pending_msg = batch_msg;
+-		else
+-			ring->last_pending_msg = msg;
+-		spin_unlock_irqrestore(&ring->lock, flags);
+-		return 0;
+-	}
+ 	spin_unlock_irqrestore(&ring->lock, flags);
++	if (reqid < 0)
++		return -ENOSPC;
  	ring->requests[reqid] = msg;
  
  	/* Do DMA mappings for the message */
- 	ret = flexrm_dma_map(ring->mbox->dev, msg);
- 	if (ret < 0) {
- 		ring->requests[reqid] = NULL;
--		ida_simple_remove(&ring->requests_ida, reqid);
-+		spin_lock_irqsave(&ring->lock, flags);
-+		bitmap_release_region(ring->requests_bmap, reqid, 0);
-+		spin_unlock_irqrestore(&ring->lock, flags);
+@@ -1018,17 +1011,6 @@ static int flexrm_new_request(struct flexrm_ring *ring,
  		return ret;
  	}
  
-@@ -1088,7 +1091,9 @@ static int flexrm_new_request(struct flexrm_ring *ring,
- 	if (exit_cleanup) {
- 		flexrm_dma_unmap(ring->mbox->dev, msg);
- 		ring->requests[reqid] = NULL;
--		ida_simple_remove(&ring->requests_ida, reqid);
-+		spin_lock_irqsave(&ring->lock, flags);
-+		bitmap_release_region(ring->requests_bmap, reqid, 0);
-+		spin_unlock_irqrestore(&ring->lock, flags);
- 	}
- 
- 	return ret;
-@@ -1163,7 +1168,9 @@ static int flexrm_process_completions(struct flexrm_ring *ring)
- 
- 		/* Release reqid for recycling */
- 		ring->requests[reqid] = NULL;
--		ida_simple_remove(&ring->requests_ida, reqid);
-+		spin_lock_irqsave(&ring->lock, flags);
-+		bitmap_release_region(ring->requests_bmap, reqid, 0);
-+		spin_unlock_irqrestore(&ring->lock, flags);
- 
- 		/* Unmap DMA mappings */
- 		flexrm_dma_unmap(ring->mbox->dev, msg);
-@@ -1414,7 +1421,6 @@ static void flexrm_shutdown(struct mbox_chan *chan)
- 
- 		/* Release reqid for recycling */
- 		ring->requests[reqid] = NULL;
--		ida_simple_remove(&ring->requests_ida, reqid);
- 
- 		/* Unmap DMA mappings */
- 		flexrm_dma_unmap(ring->mbox->dev, msg);
-@@ -1424,6 +1430,9 @@ static void flexrm_shutdown(struct mbox_chan *chan)
- 		mbox_chan_received_data(chan, msg);
- 	}
- 
-+	/* Clear requests bitmap */
-+	bitmap_zero(ring->requests_bmap, RING_MAX_REQ_COUNT);
-+
- 	/* Release IRQ */
- 	if (ring->irq_requested) {
- 		irq_set_affinity_hint(ring->irq, NULL);
-@@ -1581,7 +1590,6 @@ static int flexrm_mbox_probe(struct platform_device *pdev)
- 		ring->irq_requested = false;
- 		ring->msi_timer_val = MSI_TIMER_VAL_MASK;
- 		ring->msi_count_threshold = 0x1;
--		ida_init(&ring->requests_ida);
- 		memset(ring->requests, 0, sizeof(ring->requests));
- 		ring->bd_base = NULL;
- 		ring->bd_dma_base = 0;
-@@ -1590,6 +1598,7 @@ static int flexrm_mbox_probe(struct platform_device *pdev)
- 		atomic_set(&ring->msg_send_count, 0);
- 		atomic_set(&ring->msg_cmpl_count, 0);
- 		spin_lock_init(&ring->lock);
-+		bitmap_zero(ring->requests_bmap, RING_MAX_REQ_COUNT);
- 		ring->last_pending_msg = NULL;
- 		ring->cmpl_read_offset = 0;
- 	}
-@@ -1701,9 +1710,7 @@ static int flexrm_mbox_probe(struct platform_device *pdev)
- 
- static int flexrm_mbox_remove(struct platform_device *pdev)
- {
--	int index;
- 	struct device *dev = &pdev->dev;
--	struct flexrm_ring *ring;
- 	struct flexrm_mbox *mbox = platform_get_drvdata(pdev);
- 
- 	mbox_controller_unregister(&mbox->controller);
-@@ -1715,11 +1722,6 @@ static int flexrm_mbox_remove(struct platform_device *pdev)
- 	dma_pool_destroy(mbox->cmpl_pool);
- 	dma_pool_destroy(mbox->bd_pool);
- 
--	for (index = 0; index < mbox->num_rings; index++) {
--		ring = &mbox->rings[index];
--		ida_destroy(&ring->requests_ida);
+-	/* If last_pending_msg is already set then goto done with error */
+-	spin_lock_irqsave(&ring->lock, flags);
+-	if (ring->last_pending_msg)
+-		ret = -ENOSPC;
+-	spin_unlock_irqrestore(&ring->lock, flags);
+-	if (ret < 0) {
+-		dev_warn(ring->mbox->dev, "no space in ring %d\n", ring->num);
+-		exit_cleanup = true;
+-		goto exit;
 -	}
 -
- 	return 0;
+ 	/* Determine current HW BD read offset */
+ 	read_offset = readl_relaxed(ring->regs + RING_BD_READ_PTR);
+ 	val = readl_relaxed(ring->regs + RING_BD_START_ADDR);
+@@ -1055,13 +1037,7 @@ static int flexrm_new_request(struct flexrm_ring *ring,
+ 			break;
+ 	}
+ 	if (count) {
+-		spin_lock_irqsave(&ring->lock, flags);
+-		if (batch_msg)
+-			ring->last_pending_msg = batch_msg;
+-		else
+-			ring->last_pending_msg = msg;
+-		spin_unlock_irqrestore(&ring->lock, flags);
+-		ret = 0;
++		ret = -ENOSPC;
+ 		exit_cleanup = true;
+ 		goto exit;
+ 	}
+@@ -1110,12 +1086,6 @@ static int flexrm_process_completions(struct flexrm_ring *ring)
+ 
+ 	spin_lock_irqsave(&ring->lock, flags);
+ 
+-	/* Check last_pending_msg */
+-	if (ring->last_pending_msg) {
+-		msg = ring->last_pending_msg;
+-		ring->last_pending_msg = NULL;
+-	}
+-
+ 	/*
+ 	 * Get current completion read and write offset
+ 	 *
+@@ -1131,10 +1101,6 @@ static int flexrm_process_completions(struct flexrm_ring *ring)
+ 
+ 	spin_unlock_irqrestore(&ring->lock, flags);
+ 
+-	/* If last_pending_msg was set then queue it back */
+-	if (msg)
+-		mbox_send_message(chan, msg);
+-
+ 	/* For each completed request notify mailbox clients */
+ 	reqid = 0;
+ 	while (cmpl_read_offset != cmpl_write_offset) {
+@@ -1345,9 +1311,6 @@ static int flexrm_startup(struct mbox_chan *chan)
+ 	val = CMPL_START_ADDR_VALUE(ring->cmpl_dma_base);
+ 	writel_relaxed(val, ring->regs + RING_CMPL_START_ADDR);
+ 
+-	/* Ensure last pending message is cleared */
+-	ring->last_pending_msg = NULL;
+-
+ 	/* Completion read pointer will be same as HW write pointer */
+ 	ring->cmpl_read_offset =
+ 			readl_relaxed(ring->regs + RING_CMPL_WRITE_PTR);
+@@ -1455,24 +1418,10 @@ static void flexrm_shutdown(struct mbox_chan *chan)
+ 	}
  }
  
+-static bool flexrm_last_tx_done(struct mbox_chan *chan)
+-{
+-	bool ret;
+-	unsigned long flags;
+-	struct flexrm_ring *ring = chan->con_priv;
+-
+-	spin_lock_irqsave(&ring->lock, flags);
+-	ret = (ring->last_pending_msg) ? false : true;
+-	spin_unlock_irqrestore(&ring->lock, flags);
+-
+-	return ret;
+-}
+-
+ static const struct mbox_chan_ops flexrm_mbox_chan_ops = {
+ 	.send_data	= flexrm_send_data,
+ 	.startup	= flexrm_startup,
+ 	.shutdown	= flexrm_shutdown,
+-	.last_tx_done	= flexrm_last_tx_done,
+ 	.peek_data	= flexrm_peek_data,
+ };
+ 
+@@ -1599,7 +1548,6 @@ static int flexrm_mbox_probe(struct platform_device *pdev)
+ 		atomic_set(&ring->msg_cmpl_count, 0);
+ 		spin_lock_init(&ring->lock);
+ 		bitmap_zero(ring->requests_bmap, RING_MAX_REQ_COUNT);
+-		ring->last_pending_msg = NULL;
+ 		ring->cmpl_read_offset = 0;
+ 	}
+ 
+@@ -1671,8 +1619,7 @@ static int flexrm_mbox_probe(struct platform_device *pdev)
+ 
+ 	/* Initialize mailbox controller */
+ 	mbox->controller.txdone_irq = false;
+-	mbox->controller.txdone_poll = true;
+-	mbox->controller.txpoll_period = 1;
++	mbox->controller.txdone_poll = false;
+ 	mbox->controller.ops = &flexrm_mbox_chan_ops;
+ 	mbox->controller.dev = dev;
+ 	mbox->controller.num_chans = mbox->num_rings;
 -- 
 2.7.4
