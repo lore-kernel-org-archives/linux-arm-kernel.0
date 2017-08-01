@@ -1,58 +1,85 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 1 Aug 2017 12:12:23 +0100
-Subject: [PATCH] clocksource: arm_arch_timer: Fix mem frame loop
- initialization
-In-Reply-To: <20170731183728.61087-1-mka@chromium.org>
-References: <20170731183728.61087-1-mka@chromium.org>
-Message-ID: <20170801111222.GC9347@leverpostej>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 1 Aug 2017 13:16:18 +0200
+Subject: [PATCH 3/6] kvm: arm64: Convert kvm_set_s2pte_readonly() from
+ inline asm to cmpxchg()
+In-Reply-To: <20170725135308.18173-4-catalin.marinas@arm.com>
+References: <20170725135308.18173-1-catalin.marinas@arm.com>
+ <20170725135308.18173-4-catalin.marinas@arm.com>
+Message-ID: <20170801111618.GC5176@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 11:37:28AM -0700, Matthias Kaehlcke wrote:
-> The loop to find the best memory frame in arch_timer_mem_acpi_init()
-> initializes the loop counter with itself ('i = i'), which is suspicious
-> in the first place and pointed out by clang. The loop condition is
-> 'i < timer_count' and a prior for loop exits when 'i' reaches
-> 'timer_count', therefore the second loop is never executed.
+Hi Catalin,
+
+On Tue, Jul 25, 2017 at 02:53:05PM +0100, Catalin Marinas wrote:
+> To take advantage of the LSE atomic instructions and also make the code
+> cleaner, convert the kvm_set_s2pte_readonly() function to use the more
+> generic cmpxchg().
 > 
-> Initialize the loop counter with 0 to iterate over all timers, which
-> supposedly was the intention before the typo monster attacked.
-> 
-> Fixes: c2743a36765d3 ("clocksource: arm_arch_timer: add GTDT support for memory-mapped timer")
-> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
-
-Ard also spotted this issue [1], along with another issue we still need
-to solve. In the mean time it would be nice to have this fixed, so:
-
-Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org> 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Daniel, Thomas,
-
-Could one of you please pick this up as a fix, with the above tags?
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-July/520779.html
-
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 > ---
->  drivers/clocksource/arm_arch_timer.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm64/include/asm/kvm_mmu.h | 20 ++++++++------------
+>  1 file changed, 8 insertions(+), 12 deletions(-)
 > 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index aae87c4c546e..72bbfccef113 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -1440,7 +1440,7 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
->  	 * While unlikely, it's theoretically possible that none of the frames
->  	 * in a timer expose the combination of feature we want.
->  	 */
-> -	for (i = i; i < timer_count; i++) {
-> +	for (i = 0; i < timer_count; i++) {
->  		timer = &timers[i];
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index a89cc22abadc..40b3ea690826 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -175,18 +175,14 @@ static inline pmd_t kvm_s2pmd_mkwrite(pmd_t pmd)
 >  
->  		frame = arch_timer_mem_find_best_frame(timer);
-> -- 
-> 2.14.0.rc0.400.g1c36432dff-goog
-> 
+>  static inline void kvm_set_s2pte_readonly(pte_t *pte)
+>  {
+> -	pteval_t pteval;
+> -	unsigned long tmp;
+> -
+> -	asm volatile("//	kvm_set_s2pte_readonly\n"
+> -	"	prfm	pstl1strm, %2\n"
+> -	"1:	ldxr	%0, %2\n"
+> -	"	and	%0, %0, %3		// clear PTE_S2_RDWR\n"
+> -	"	orr	%0, %0, %4		// set PTE_S2_RDONLY\n"
+> -	"	stxr	%w1, %0, %2\n"
+> -	"	cbnz	%w1, 1b\n"
+> -	: "=&r" (pteval), "=&r" (tmp), "+Q" (pte_val(*pte))
+> -	: "L" (~PTE_S2_RDWR), "L" (PTE_S2_RDONLY));
+> +	pteval_t old_pteval, pteval;
+> +
+> +	do {
+> +		pteval = old_pteval = READ_ONCE(pte_val(*pte));
+> +		pteval &= ~PTE_S2_RDWR;
+> +		pteval |= PTE_S2_RDONLY;
+> +	} while (cmpxchg_relaxed(&pte_val(*pte), old_pteval, pteval) !=
+> +		 old_pteval);
+
+I'm wondering if the READ_ONCE for old_pteval is strictly necessary, or
+if that's really for the pteval.  Actually, I'm a little unsure whether
+this is equivalent to
+
+	old_pteval = READ_ONCE(pte_val(*pte));
+	pteval = old_pteval;
+
+or
+
+	old_pteval = READ_ONCE(pte_val(*pte));
+	pteval = READ_ONCE(pte_val(*pte));
+
+I think it's the former, which I also think is correct, but the reason
+I'm going down this road is that we have a use of cmpxchg() in the VGIC
+code, which doesn't use READ_ONCE for the old value (~
+vgic-mmio-v3.c:404), and I also found other occurences of this in the
+kernel, so I'm wondering if the VGIC code is broken or we're being
+overly careful here, or if this is necessary because hardware can update
+the value behind our backs in this case?
+
+In any case, for this patch:
+
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
+
+
+
+>  }
+>  
+>  static inline bool kvm_s2pte_readonly(pte_t *pte)
