@@ -1,47 +1,81 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Tue, 1 Aug 2017 09:32:50 +0000
-Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
-In-Reply-To: <20170731123157.GJ3053@localhost>
-References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
- <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
- <20170722065133.GT3053@localhost>
- <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
- <20170726052930.GF3053@localhost>
- <f2908e38-dc4d-3886-4058-52a7ad845415@st.com>
- <20170731123157.GJ3053@localhost>
-Message-ID: <e3a76a50-4160-d111-cce9-132b46b66c33@st.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Tue, 1 Aug 2017 11:30:11 +0200
+Subject: [PATCHv2 1/2] arm64:vdso: Rewrite gettimeofday into C.
+In-Reply-To: <20170531124430.GG9723@arm.com>
+References: <1496190860-5116-1-git-send-email-apinski@cavium.com>
+ <20170531124430.GG9723@arm.com>
+Message-ID: <20170801093011.GC18024@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Will,
 
-
-On 07/31/2017 02:31 PM, Vinod Koul wrote:
-> On Wed, Jul 26, 2017 at 07:38:02AM +0000, Pierre Yves MORDRET wrote:
->>>>>> +
->>>>>> +#ifndef __DMA_STM32_DMAMUX_H
->>>>>> +#define __DMA_STM32_DMAMUX_H
->>>>>> +
->>>>>> +#if defined(CONFIG_STM32_DMAMUX)
->>>>>> +int stm32_dmamux_set_config(struct device *dev, void *route_data, u32 chan_id);
->>>>>
->>>>> Why do we need a custom API in this case?
->>>>>
->>>>
->>>> This API is called by DMA when a slave is requested by client. DMA can work
->>>> without DMAMUX this API has been put in place to configure DMAMUX whether client
->>>> is requesting a DMAMUX Channel instead of a DMA one.
->>>
->>> You mean the dmaengine driver right?
->>>
->>
->> Yes. The API is mainly called by "device_config" through out STM32 DMA Driver
->> when a router is in place for client.
->> Please refer to Patch 4/5 on this set.
+On 31.05.17 13:44:30, Will Deacon wrote:
+> Thanks for posting this, but please try to cc the maintainers in future -- I
+> almost missed it!
 > 
-> Okay am thinking on why this can't be generic..? An optional router config
-> callback?
+> On Tue, May 30, 2017 at 05:34:19PM -0700, Andrew Pinski wrote:
+> > This allows the compiler to optimize the divide by 1000.
+> > And remove the other divide.
+> > 
+> > On ThunderX, gettimeofday improves by 32%.  On ThunderX 2,
+> > gettimeofday improves by 18%.
+> > 
+> > Note I noticed a bug in the old implementation of __kernel_clock_getres;
+> > it was checking only the lower 32bits of the pointer; this would work
+> > for most cases but could fail in a few.
+> > 
+> > Changes from v1:
+> > * Fixed bug in __kernel_clock_getres for checking the pointer argument.
+> > * Fix comments to refer to functions in arm64.
 > 
+> I tested this patch on a few platforms I have access to and didn't see the
+> perf regressions I saw when I looked at this in the past with an older
+> toolchain (it was mostly about the same, with a couple of improvements).
+> 
+> So, in principle, I'm not opposed to moving this into C. However, we're
+> currently close to a "vDSO-explosion" on arm64 with people wanting a compat
+> variant and also an ILP32 variant. When Kevin posted his compat variant
+> (also in C):
+> 
+>   http://lkml.kernel.org/r/20161206160353.14581-1-kevin.brodsky at arm.com
 
-I would have liked to answer there is a callback within engine but unfortunately
-I didn't figure out one when I did my router's development. I've looked once
-more but again I can't find how to map chanID and request line without custom API.
+from a technical pov there are no issues in a convertion to C. Since
+this fixes bad syscall performance and an alternative solution as
+pointed out here is not in sight very soon, would you be willing to
+get this series upstream. Should we update to latest kernel and resend
+the patches for v4.14?
+
+Thanks,
+
+-Robert
+
+> 
+> Nathan (who apparently needs to set his mail host address ;) was concerned
+> about duplication between arm and arm64:
+> 
+>   http://lkml.kernel.org/r/87r35jmv3e.fsf at wedge.i-did-not-set--mail-host-address--so-tickle-me
+> 
+> I'm firmly of the opinion that we should try to write an arch-agnostic vDSO
+> implementation in core code (lib/vdso or something) where the arch header
+> provides things like:
+> 
+>   * The mechanism to read the counter
+>   * The mechanism to issue a syscall
+>   * A function to determine whether or not the current clocksource is
+>     suitable
+> 
+> I think the datapage format could be defined in core code and it would be
+> worth looking to see how much the virtual mapping code can be consolidated
+> too.
+> 
+> If we can get something that works for arm native, arm64 native, arm64
+> compat and arm64 ilp32 then it's probably going to be useful for other
+> architectures too, even if we need to add more customisation points in
+> future.
+> 
+> I've spoken to Kevin about this, but I'm not sure whether he's had a chance
+> to look at knocking up a prototype. A first stab could just unconditionally
+> fallback to the system call.
+> 
+> Will
