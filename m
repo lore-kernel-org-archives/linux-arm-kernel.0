@@ -1,22 +1,75 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 1 Aug 2017 15:26:04 +0200
-Subject: [PATCH 1/2] pinctrl: zynq: Fix kernel doc warnings
-In-Reply-To: <4c6e1f9b0635682518d2ffa50cf611efef4aff68.1499937148.git.michal.simek@xilinx.com>
-References: <4c6e1f9b0635682518d2ffa50cf611efef4aff68.1499937148.git.michal.simek@xilinx.com>
-Message-ID: <CACRpkdbw6cVkqOLwcHoQWrYFjy5HFhgrgT2tHkddjUU4+uKQ3Q@mail.gmail.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue,  1 Aug 2017 21:13:03 +0800
+Subject: [PATCH 12/13] [NOT FOR REVIEW NOW] ARM: sun8i: h3: enable DesignWare
+ HDMI controller
+In-Reply-To: <20170801131304.7741-1-icenowy@aosc.io>
+References: <20170801131304.7741-1-icenowy@aosc.io>
+Message-ID: <20170801131304.7741-13-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 13, 2017 at 11:12 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+The H3 SoC has a DesignWare HDMI controller with some Allwinner-specific
+glues.
 
-> From: Nava kishore Manne <nava.manne@xilinx.com>
->
-> This patch fixes the kernel doc warnings in the driver.
->
-> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Add the related device nodes.
 
-Patch applied.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm/boot/dts/sun8i-h3.dtsi | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 75ad7b65a7fc..cd38d7e04606 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -197,6 +197,11 @@
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+ 					reg = <1>;
++
++					tcon0_out_hdmi: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&hdmi_in_tcon0>;
++					};
+ 				};
+ 			};
+ 		};
+@@ -240,6 +245,36 @@
+ 				};
+ 			};
+ 		};
++
++		hdmi: hdmi at 1ee0000 {
++			compatible = "allwinner,h3-dw-hdmi";
++			reg = <0x01ee0000 0x10000>,
++			      <0x01ef0000 0x10000>;
++			reg-io-width = <1>;
++			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI>,
++				 <&ccu CLK_HDMI_DDC>;
++			clock-names = "iahb", "isfr", "iddc";
++			resets = <&ccu RST_BUS_HDMI0>, <&ccu RST_BUS_HDMI1>;
++			reset-names = "hdmi", "ddc";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				hdmi_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					hdmi_in_tcon0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&tcon0_out_hdmi>;
++					};
++				};
++			};
++		};
+ 	};
+ 
+ 	timer {
+-- 
+2.13.0
