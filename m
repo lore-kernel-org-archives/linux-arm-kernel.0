@@ -1,36 +1,29 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 1 Aug 2017 14:00:22 +0200
-Subject: [PATCH 0/2] clk: meson: expose clk ids
-In-Reply-To: <CAK8P3a28nb8QsJC8V4+SJM0gz70BDOv8jAczRWoCF+HfvkwJfA@mail.gmail.com>
-References: <20170731113832.26490-1-jbrunet@baylibre.com>
- <CAK8P3a28nb8QsJC8V4+SJM0gz70BDOv8jAczRWoCF+HfvkwJfA@mail.gmail.com>
-Message-ID: <6494a76f-7282-cc39-c02a-0f1b2a8d83ff@baylibre.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 1 Aug 2017 14:01:05 +0200
+Subject: [PATCH RESEND 1/2] dt-bindings: gpio-vf610: add imx7ulp support
+In-Reply-To: <1500990438-3894-2-git-send-email-aisheng.dong@nxp.com>
+References: <1500990438-3894-1-git-send-email-aisheng.dong@nxp.com>
+ <1500990438-3894-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CACRpkdbc6X7HNdJ3FJN7n6P1Uf3_006EjCDSaJ9Ekua-m_2eow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2017 04:05 PM, Arnd Bergmann wrote:
-> On Mon, Jul 31, 2017 at 1:38 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
->> In previous cycles, concerns have been raised about the way clocks are
->> exposed for the meson clock controller, only when validated and required
->> in DT.
->>
->> Instead, this patchset expose all the known clocks which may be needed in
->> DT later on. The clocks left out are internal clocks which should never be
->> used directly in DT. These are mostly internal muxes and dividers of
->> composite clocks.
->>
->> While this should reduce the patch flow on the related header files, It
->> won't stop it completely. There are still many clocks we don't know about
->> yet. We tend discover a few in every cycle.
->>
->> This patchset depends on these fixes [0] to avoid issues when adding new
->> clk ids.
->>
->> [0]: https://lkml.kernel.org/r/20170727161755.10393-1-jbrunet at baylibre.com
-> 
-> Thanks a lot!
-> 
->  Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
+On Tue, Jul 25, 2017 at 3:47 PM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
 
-Applied to clk-meson's next/headers with arnd's ack.
+> The Rapid General-Purpose Input and Output with 2 Ports (RGPIO2P)
+> on MX7ULP is similar to GPIO on Vibrid, except it has an extra
+> Port Data Direction Register (PDDR) used to configure the individual
+> port pins for input or output.
+>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+
+Uncontroversial compatible update so patch applied.
+
+Yours,
+Linus Walleij
