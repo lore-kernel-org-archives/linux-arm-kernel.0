@@ -1,250 +1,149 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue,  1 Aug 2017 14:53:47 +0530
-Subject: [PATCH V3 6/8] drivers: boot_constraint: Add debugfs support
+Date: Tue,  1 Aug 2017 14:53:49 +0530
+Subject: [PATCH V3 8/8] drivers: boot_constraint: Add Qualcomm display
+ controller constraints
 In-Reply-To: <cover.1501578037.git.viresh.kumar@linaro.org>
 References: <cover.1501578037.git.viresh.kumar@linaro.org>
-Message-ID: <7a42cfb49a580a07c2045207fe7f1a3cb2096ce3.1501578037.git.viresh.kumar@linaro.org>
+Message-ID: <f1d035bb3202dd6135e6cde9e4a142ea32a6a79c.1501578037.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds debugfs support for boot constraints. This is how it
-looks for a "vmmc-supply" constraint for the MMC device.
+From: Rajendra Nayak <rnayak@codeaurora.org>
 
-$ ls -R /sys/kernel/debug/boot_constraints/
-/sys/kernel/debug/boot_constraints/:
-f723d000.dwmmc0
+NOT TO BE MERGED
 
-/sys/kernel/debug/boot_constraints/f723d000.dwmmc0:
-clk-ciu  pm-domain  supply-vmmc  supply-vmmcaux
+This sets boot constraints for the display controller used on Qualcomm
+dragonboard 410c.
 
-/sys/kernel/debug/boot_constraints/f723d000.dwmmc0/clk-ciu:
-
-/sys/kernel/debug/boot_constraints/f723d000.dwmmc0/pm-domain:
-
-/sys/kernel/debug/boot_constraints/f723d000.dwmmc0/supply-vmmc:
-u_volt_max  u_volt_min
-
-/sys/kernel/debug/boot_constraints/f723d000.dwmmc0/supply-vmmcaux:
-u_volt_max  u_volt_min
-
-Tested-by: Rajendra Nayak <rnayak@codeaurora.org>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Not-signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+Not-signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/base/boot_constraints/clk.c    |  4 ++
- drivers/base/boot_constraints/core.c   | 72 ++++++++++++++++++++++++++++++++++
- drivers/base/boot_constraints/core.h   |  6 +++
- drivers/base/boot_constraints/pm.c     | 12 +++++-
- drivers/base/boot_constraints/supply.c | 10 +++++
- 5 files changed, 102 insertions(+), 2 deletions(-)
+ drivers/base/boot_constraints/Makefile       |   2 +-
+ drivers/base/boot_constraints/qcom-display.c | 107 +++++++++++++++++++++++++++
+ 2 files changed, 108 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/base/boot_constraints/qcom-display.c
 
-diff --git a/drivers/base/boot_constraints/clk.c b/drivers/base/boot_constraints/clk.c
-index b5b1d63c3e76..bdbfcbc2944d 100644
---- a/drivers/base/boot_constraints/clk.c
-+++ b/drivers/base/boot_constraints/clk.c
-@@ -49,6 +49,9 @@ int constraint_clk_add(struct constraint *constraint, void *data)
- 	cclk->clk_info.name = kstrdup_const(clk_info->name, GFP_KERNEL);
- 	constraint->private = cclk;
+diff --git a/drivers/base/boot_constraints/Makefile b/drivers/base/boot_constraints/Makefile
+index a765094623a3..b0bdf67ebbbf 100644
+--- a/drivers/base/boot_constraints/Makefile
++++ b/drivers/base/boot_constraints/Makefile
+@@ -1,3 +1,3 @@
+ # Makefile for device boot constraints
  
-+	/* Debugfs */
-+	constraint_add_debugfs(constraint, clk_info->name);
+-obj-y := clk.o deferrable_dev.o core.o pm.o supply.o
++obj-y := clk.o deferrable_dev.o core.o pm.o supply.o qcom-display.o
+diff --git a/drivers/base/boot_constraints/qcom-display.c b/drivers/base/boot_constraints/qcom-display.c
+new file mode 100644
+index 000000000000..29f930ac692b
+--- /dev/null
++++ b/drivers/base/boot_constraints/qcom-display.c
+@@ -0,0 +1,107 @@
++/*
++ * Sets up constraints on behalf of the bootloader, which uses display
++ * controller to display a flash screen during system boot.
++ */
 +
- 	return 0;
- 
- put_clk:
-@@ -63,6 +66,7 @@ void constraint_clk_remove(struct constraint *constraint)
- {
- 	struct constraint_clk *cclk = constraint->private;
- 
-+	constraint_remove_debugfs(constraint);
- 	kfree_const(cclk->clk_info.name);
- 	clk_disable_unprepare(cclk->clk);
- 	clk_put(cclk->clk);
-diff --git a/drivers/base/boot_constraints/core.c b/drivers/base/boot_constraints/core.c
-index 06267f0c88d4..c0e3a85ff85a 100644
---- a/drivers/base/boot_constraints/core.c
-+++ b/drivers/base/boot_constraints/core.c
-@@ -35,6 +35,76 @@ static int __init constraints_disable(char *str)
- }
- early_param("boot_constraints_disable", constraints_disable);
- 
-+/* Debugfs */
++#include <linux/boot_constraint.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
 +
-+static struct dentry *rootdir;
++struct dev_boot_constraint_clk_info iface_clk_info = {
++	.name = "iface_clk",
++};
 +
-+static void constraint_device_add_debugfs(struct constraint_dev *cdev)
++struct dev_boot_constraint_clk_info bus_clk_info = {
++	.name = "bus_clk",
++};
++
++struct dev_boot_constraint_clk_info core_clk_info = {
++	.name = "core_clk",
++};
++
++struct dev_boot_constraint_clk_info vsync_clk_info = {
++	.name = "vsync_clk",
++};
++
++struct dev_boot_constraint_clk_info esc0_clk_info = {
++	.name = "core_clk",
++};
++
++struct dev_boot_constraint_clk_info byte_clk_info = {
++	.name = "byte_clk",
++};
++
++struct dev_boot_constraint_clk_info pixel_clk_info = {
++	.name = "pixel_clk",
++};
++
++struct dev_boot_constraint_supply_info vdda_info = {
++	.name = "vdda"
++};
++
++struct dev_boot_constraint_supply_info vddio_info = {
++	.name = "vddio"
++};
++
++struct dev_boot_constraint constraints_mdss[] = {
++	{
++		.type = DEV_BOOT_CONSTRAINT_PM,
++		.data = NULL,
++	},
++};
++
++struct dev_boot_constraint constraints_mdp[] = {
++	{
++		.type = DEV_BOOT_CONSTRAINT_CLK,
++		.data = &iface_clk_info,
++	}, {
++		.type = DEV_BOOT_CONSTRAINT_CLK,
++		.data = &bus_clk_info,
++	}, {
++		.type = DEV_BOOT_CONSTRAINT_CLK,
++		.data = &core_clk_info,
++	}, {
++		.type = DEV_BOOT_CONSTRAINT_CLK,
++		.data = &vsync_clk_info,
++	},
++};
++
++struct dev_boot_constraint constraints_dsi[] = {
++	{
++		.type = DEV_BOOT_CONSTRAINT_CLK,
++		.data = &esc0_clk_info,
++	}, {
++		.type = DEV_BOOT_CONSTRAINT_CLK,
++		.data = &byte_clk_info,
++	}, {
++		.type = DEV_BOOT_CONSTRAINT_CLK,
++		.data = &pixel_clk_info,
++	}, {
++		.type = DEV_BOOT_CONSTRAINT_SUPPLY,
++		.data = &vdda_info,
++
++	}, {
++		.type = DEV_BOOT_CONSTRAINT_SUPPLY,
++		.data = &vddio_info,
++	},
++};
++
++static int __init qcom_constraints_init(void)
 +{
-+	struct device *dev = cdev->dev;
-+
-+	cdev->dentry = debugfs_create_dir(dev_name(dev), rootdir);
-+	if (!cdev->dentry)
-+		dev_err(dev, "Failed to create constraint dev debugfs dir\n");
-+}
-+
-+static void constraint_device_remove_debugfs(struct constraint_dev *cdev)
-+{
-+	debugfs_remove_recursive(cdev->dentry);
-+}
-+
-+void constraint_add_debugfs(struct constraint *constraint, const char *suffix)
-+{
-+	struct device *dev = constraint->cdev->dev;
-+	const char *prefix;
-+	char name[NAME_MAX];
-+
-+	switch (constraint->type) {
-+	case DEV_BOOT_CONSTRAINT_CLK:
-+		prefix = "clk";
-+		break;
-+	case DEV_BOOT_CONSTRAINT_PM:
-+		prefix = "pm";
-+		break;
-+	case DEV_BOOT_CONSTRAINT_SUPPLY:
-+		prefix = "supply";
-+		break;
-+	default:
-+		dev_err(dev, "%s: Constraint type (%d) not supported\n",
-+			__func__, constraint->type);
-+		return;
-+	}
-+
-+	snprintf(name, NAME_MAX, "%s-%s", prefix, suffix);
-+
-+	constraint->dentry = debugfs_create_dir(name, constraint->cdev->dentry);
-+	if (!constraint->dentry)
-+		dev_err(dev, "Failed to create constraint (%s) debugfs dir\n",
-+			name);
-+}
-+
-+void constraint_remove_debugfs(struct constraint *constraint)
-+{
-+	debugfs_remove_recursive(constraint->dentry);
-+}
-+
-+static int __init constraint_debugfs_init(void)
-+{
-+	if (boot_constraints_disabled)
-+		return -ENODEV;
-+
-+	/* Create /sys/kernel/debug/opp directory */
-+	rootdir = debugfs_create_dir("boot_constraints", NULL);
-+	if (!rootdir) {
-+		pr_err("Failed to create root directory\n");
-+		return -ENOMEM;
-+	}
-+
-+	return 0;
-+}
-+core_initcall(constraint_debugfs_init);
-+
-+
- /* Boot constraints core */
- 
- static struct constraint_dev *constraint_device_find(struct device *dev)
-@@ -62,12 +132,14 @@ static struct constraint_dev *constraint_device_allocate(struct device *dev)
- 	INIT_LIST_HEAD(&cdev->constraints);
- 
- 	list_add(&cdev->node, &constraint_devices);
-+	constraint_device_add_debugfs(cdev);
- 
- 	return cdev;
- }
- 
- static void constraint_device_free(struct constraint_dev *cdev)
- {
-+	constraint_device_remove_debugfs(cdev);
- 	list_del(&cdev->node);
- 	kfree(cdev);
- }
-diff --git a/drivers/base/boot_constraints/core.h b/drivers/base/boot_constraints/core.h
-index a051c3d7c8ab..ee84e237c66a 100644
---- a/drivers/base/boot_constraints/core.h
-+++ b/drivers/base/boot_constraints/core.h
-@@ -8,6 +8,7 @@
- #define _CORE_H
- 
- #include <linux/boot_constraint.h>
-+#include <linux/debugfs.h>
- #include <linux/device.h>
- #include <linux/list.h>
- 
-@@ -15,6 +16,7 @@ struct constraint_dev {
- 	struct device *dev;
- 	struct list_head node;
- 	struct list_head constraints;
-+	struct dentry *dentry;
- };
- 
- struct constraint {
-@@ -23,12 +25,16 @@ struct constraint {
- 	enum dev_boot_constraint_type type;
- 	void (*free_resources)(void *data);
- 	void *free_resources_data;
-+	struct dentry *dentry;
- 
- 	int (*add)(struct constraint *constraint, void *data);
- 	void (*remove)(struct constraint *constraint);
- 	void *private;
- };
- 
-+void constraint_add_debugfs(struct constraint *constraint, const char *suffix);
-+void constraint_remove_debugfs(struct constraint *constraint);
-+
- /* Forward declarations of constraint specific callbacks */
- int constraint_clk_add(struct constraint *constraint, void *data);
- void constraint_clk_remove(struct constraint *constraint);
-diff --git a/drivers/base/boot_constraints/pm.c b/drivers/base/boot_constraints/pm.c
-index edba5eca5093..95910d0dc457 100644
---- a/drivers/base/boot_constraints/pm.c
-+++ b/drivers/base/boot_constraints/pm.c
-@@ -14,11 +14,19 @@
- int constraint_pm_add(struct constraint *constraint, void *data)
- {
- 	struct device *dev = constraint->cdev->dev;
 +	int ret;
- 
--	return dev_pm_domain_attach(dev, true);
-+	ret = dev_pm_domain_attach(dev, true);
++
++	ret = dev_boot_constraint_add_of_deferrable("qcom,mdss",
++				constraints_mdss, ARRAY_SIZE(constraints_mdss));
 +	if (ret)
 +		return ret;
 +
-+	/* Debugfs */
-+	constraint_add_debugfs(constraint, "domain");
++	ret = dev_boot_constraint_add_of_deferrable("qcom,mdp5",
++				constraints_mdp, ARRAY_SIZE(constraints_mdp));
++	if (ret)
++		return ret;
 +
-+	return 0;
- }
- 
- void constraint_pm_remove(struct constraint *constraint)
- {
--	/* Nothing to do for now */
-+	constraint_remove_debugfs(constraint);
- }
-diff --git a/drivers/base/boot_constraints/supply.c b/drivers/base/boot_constraints/supply.c
-index 30f816dbf12c..b206f500b2bc 100644
---- a/drivers/base/boot_constraints/supply.c
-+++ b/drivers/base/boot_constraints/supply.c
-@@ -60,6 +60,15 @@ int constraint_supply_add(struct constraint *constraint, void *data)
- 	csupply->supply.name = kstrdup_const(supply->name, GFP_KERNEL);
- 	constraint->private = csupply;
- 
-+	/* Debugfs */
-+	constraint_add_debugfs(constraint, supply->name);
-+
-+	debugfs_create_u32("u_volt_min", 0444, constraint->dentry,
-+			   &csupply->supply.u_volt_min);
-+
-+	debugfs_create_u32("u_volt_max", 0444, constraint->dentry,
-+			   &csupply->supply.u_volt_max);
-+
- 	return 0;
- 
- remove_voltage:
-@@ -80,6 +89,7 @@ void constraint_supply_remove(struct constraint *constraint)
- 	struct device *dev = constraint->cdev->dev;
- 	int ret;
- 
-+	constraint_remove_debugfs(constraint);
- 	kfree_const(supply->name);
- 
- 	ret = regulator_disable(csupply->reg);
++	ret = dev_boot_constraint_add_of_deferrable("qcom,mdss-dsi-ctrl",
++				constraints_dsi, ARRAY_SIZE(constraints_dsi));
++	return ret;
++}
++subsys_initcall(qcom_constraints_init);
 -- 
 2.13.0.71.gd7076ec9c9cb
