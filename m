@@ -1,28 +1,27 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 1 Aug 2017 16:44:29 +0800
-Subject: [PATCH 0/3] PINCTRL: Mediatek pinctrl driver for mt2712
-In-Reply-To: <1501489333-23145-1-git-send-email-zhiyong.tao@mediatek.com>
-References: <1501489333-23145-1-git-send-email-zhiyong.tao@mediatek.com>
-Message-ID: <1501577069.32089.0.camel@mtksdaap41>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 1 Aug 2017 10:11:24 +0200
+Subject: [PATCH 2/6] pinctrl: uniphier: fix pin_config_get() for
+ input-enable
+In-Reply-To: <1501482071-9819-3-git-send-email-yamada.masahiro@socionext.com>
+References: <1501482071-9819-1-git-send-email-yamada.masahiro@socionext.com>
+ <1501482071-9819-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkda459U9AbS3bXV=H2X8A8EodbEFS5GkgwZKMsBtv8uRPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-07-31 at 16:22 +0800, Zhiyong Tao wrote:
-> This series includes three patches:
-> 1.Add mt2712 compatible node in binding document.
-> 2.Add mt2712 pinctrl device node.
-> 3.Add mt2712 pinctrl driver.
-> 
-> Zhiyong Tao (3):
->   dt-bindings: pinctrl: mt2712: add binding document
->   arm64: dts: mt2712: add pintcrl device node.
->   pinctrl: add mt2712 pinctrl driver
-> 
->  .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |    1 +
->  arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h      | 1014 +++++++++++
->  arch/arm64/boot/dts/mediatek/mt2712e.dtsi          |   18 +
+On Mon, Jul 31, 2017 at 8:21 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-mt2712e.dtsi doesn't exists in v4.13-rc1.
-What's the base for this series?
+> For LD11/LD20 SoCs (capable of per-pin input enable), iectrl bits are
+> located across multiple registers.  So, the register offset must be
+> taken into account.  Otherwise, wrong input-enable status is displayed.
+>
+> While we here, rename the macro because it is a base address.
+>
+> Fixes: aa543888ca8c ("pinctrl: uniphier: support per-pin input enable for new SoCs")
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Joe.C
+Patch applied.
+
+Yours,
+Linus Walleij
