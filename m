@@ -1,84 +1,108 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  1 Aug 2017 17:57:20 +0200
-Subject: [PATCH 2/2] pinctrl: armada-37xx: Fix number of pin in south bridge
+Date: Tue,  1 Aug 2017 17:57:19 +0200
+Subject: [PATCH 1/2] pinctrl: armada-37xx: Fix the pin 23 on south bridge
 In-Reply-To: <20170801155720.10229-1-gregory.clement@free-electrons.com>
 References: <20170801155720.10229-1-gregory.clement@free-electrons.com>
-Message-ID: <20170801155720.10229-3-gregory.clement@free-electrons.com>
+Message-ID: <20170801155720.10229-2-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the south bridge we have pin from to 29, so it gives 30 pins (and not
-29).
+Pin 23 on South bridge does not belong to the rgmii group. It belongs to
+a separate group which can have 3 functions.
 
-Without this patch the kernel complain with the following traces:
-cat /sys/kernel/debug/pinctrl/d0018800.pinctrl/pingroups
-[  154.530205] armada-37xx-pinctrl d0018800.pinctrl: failed to get pin(29) name
-[  154.537567] ------------[ cut here ]------------
-[  154.542348] WARNING: CPU: 1 PID: 1347 at /home/gclement/open/kernel/marvell-mainline-linux/drivers/pinctrl/core.c:1610 pinctrl_groups_show+0x15c/0x1a0
-[  154.555918] Modules linked in:
-[  154.558890] CPU: 1 PID: 1347 Comm: cat Tainted: G        W       4.13.0-rc1-00001-g19e1b9fa219d #525
-[  154.568316] Hardware name: Marvell Armada 3720 Development Board DB-88F3720-DDR3 (DT)
-[  154.576311] task: ffff80001d32d100 task.stack: ffff80001bdc0000
-[  154.583048] PC is at pinctrl_groups_show+0x15c/0x1a0
-[  154.587816] LR is at pinctrl_groups_show+0x148/0x1a0
-[  154.592847] pc : [<ffff0000083e3adc>] lr : [<ffff0000083e3ac8>] pstate: 00000145
-[  154.600840] sp : ffff80001bdc3c80
-[  154.604255] x29: ffff80001bdc3c80 x28: 00000000f7750000
-[  154.609825] x27: ffff80001d05d198 x26: 0000000000000009
-[  154.615224] x25: ffff0000089ead20 x24: 0000000000000002
-[  154.620705] x23: ffff000008c8e1d0 x22: ffff80001be55700
-[  154.626187] x21: ffff80001d05d100 x20: 0000000000000005
-[  154.631667] x19: 0000000000000006 x18: 0000000000000010
-[  154.637238] x17: 0000000000000000 x16: ffff0000081fc4b8
-[  154.642726] x15: 0000000000000006 x14: ffff0000899e537f
-[  154.648214] x13: ffff0000099e538d x12: 206f742064656c69
-[  154.653613] x11: 6166203a6c727463 x10: 0000000005f5e0ff
-[  154.659094] x9 : ffff80001bdc38c0 x8 : 286e697020746567
-[  154.664576] x7 : ffff000008551870 x6 : 000000000000011b
-[  154.670146] x5 : 0000000000000000 x4 : 0000000000000000
-[  154.675544] x3 : 0000000000000000 x2 : 0000000000000000
-[  154.681025] x1 : ffff000008c8e1d0 x0 : ffff80001be55700
-[  154.686507] Call trace:
-[  154.688668] Exception stack(0xffff80001bdc3ab0 to 0xffff80001bdc3be0)
-[  154.695224] 3aa0:                                   0000000000000006 0001000000000000
-[  154.703310] 3ac0: ffff80001bdc3c80 ffff0000083e3adc ffff80001bdc3bb0 00000000ffffffd8
-[  154.711304] 3ae0: 4554535953425553 6f6674616c703d4d 4349564544006d72 6674616c702b3d45
-[  154.719478] 3b00: 313030643a6d726f 6e69702e30303838 ffff80006c727463 ffff0000089635d8
-[  154.727562] 3b20: ffff80001d1ca0cb ffff000008af0fa4 ffff80001bdc3b40 ffff000008c8e1dc
-[  154.735648] 3b40: ffff80001bdc3bc0 ffff000008223174 ffff80001be55700 ffff000008c8e1d0
-[  154.743731] 3b60: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-[  154.752354] 3b80: 000000000000011b ffff000008551870 286e697020746567 ffff80001bdc38c0
-[  154.760446] 3ba0: 0000000005f5e0ff 6166203a6c727463 206f742064656c69 ffff0000099e538d
-[  154.767910] 3bc0: ffff0000899e537f 0000000000000006 ffff0000081fc4b8 0000000000000000
-[  154.776085] [<ffff0000083e3adc>] pinctrl_groups_show+0x15c/0x1a0
-[  154.782823] [<ffff000008222abc>] seq_read+0x184/0x460
-[  154.787505] [<ffff000008344120>] full_proxy_read+0x60/0xa8
-[  154.793431] [<ffff0000081f9bec>] __vfs_read+0x1c/0x110
-[  154.799001] [<ffff0000081faff4>] vfs_read+0x84/0x140
-[  154.803860] [<ffff0000081fc4fc>] SyS_read+0x44/0xa0
-[  154.808983] [<ffff000008082f30>] el0_svc_naked+0x24/0x28
-[  154.814459] ---[ end trace 4cbb00a92d616b95 ]---
+Due to this the fix also have to update the way the functions are
+managed. Until now each groups used NB_FUNCS(which was 2) functions. For
+the mpp23, 3 functions are available but it is the only group which needs
+it, so on the loop involving NB_FUNCS an extra test was added to handle
+only the functions added.
+
+The bug was visible with the merge of the commit 07d065abf93d "arm64:
+dts: marvell: armada-3720-db: Add vqmmc regulator for SD slot", the gpio
+regulator used the gpio 23, due to this the whole rgmii group was setup
+to gpio which broke the Ethernet support on the Armada 3720 DB
+board. Thanks to this patch, the UHS SD cards (which need the vqmmc)
+_and_ the Ethernet work again.
 
 Cc: stable at vger.kernel.org
 Fixes: 87466ccd9401 ("pinctrl: armada-37xx: Add pin controller support
 for Armada 37xx")
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 23 +++++++++++++++++------
+ 1 file changed, 17 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-index c95c76ecc3f7..0c6d7812d6fd 100644
+index f024e25787fc..c95c76ecc3f7 100644
 --- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
 +++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-@@ -198,7 +198,7 @@ const struct armada_37xx_pin_data armada_37xx_pin_nb = {
+@@ -37,7 +37,7 @@
+ #define IRQ_STATUS	0x10
+ #define IRQ_WKUP	0x18
+ 
+-#define NB_FUNCS 2
++#define NB_FUNCS 3
+ #define GPIO_PER_REG	32
+ 
+ /**
+@@ -126,6 +126,16 @@ struct armada_37xx_pinctrl {
+ 		.funcs = {_func1, "gpio"}	\
+ 	}
+ 
++#define PIN_GRP_GPIO_3(_name, _start, _nr, _mask, _v1, _v2, _v3, _f1, _f2) \
++	{					\
++		.name = _name,			\
++		.start_pin = _start,		\
++		.npins = _nr,			\
++		.reg_mask = _mask,		\
++		.val = {_v1, _v2, _v3},	\
++		.funcs = {_f1, _f2, "gpio"}	\
++	}
++
+ #define PIN_GRP_EXTRA(_name, _start, _nr, _mask, _v1, _v2, _start2, _nr2, \
+ 		      _f1, _f2)				\
+ 	{						\
+@@ -171,12 +181,13 @@ static struct armada_37xx_pin_group armada_37xx_sb_groups[] = {
+ 	PIN_GRP_GPIO("usb32_drvvbus0", 0, 1, BIT(0), "drvbus"),
+ 	PIN_GRP_GPIO("usb2_drvvbus1", 1, 1, BIT(1), "drvbus"),
+ 	PIN_GRP_GPIO("sdio_sb", 24, 6, BIT(2), "sdio"),
+-	PIN_GRP_EXTRA("rgmii", 6, 12, BIT(3), 0, BIT(3), 23, 1, "mii", "gpio"),
++	PIN_GRP_GPIO("rgmii", 6, 12, BIT(3), "mii"),
+ 	PIN_GRP_GPIO("pcie1", 3, 2, BIT(4), "pcie"),
+ 	PIN_GRP_GPIO("ptp", 20, 3, BIT(5), "ptp"),
+ 	PIN_GRP("ptp_clk", 21, 1, BIT(6), "ptp", "mii"),
+ 	PIN_GRP("ptp_trig", 22, 1, BIT(7), "ptp", "mii"),
+-	PIN_GRP("mii_col", 23, 1, BIT(8), "mii", "mii_err"),
++	PIN_GRP_GPIO_3("mii_col", 23, 1, BIT(8) | BIT(14), 0, BIT(8), BIT(14),
++		       "mii", "mii_err"),
  };
  
- const struct armada_37xx_pin_data armada_37xx_pin_sb = {
--	.nr_pins = 29,
-+	.nr_pins = 30,
- 	.name = "GPIO2",
- 	.groups = armada_37xx_sb_groups,
- 	.ngroups = ARRAY_SIZE(armada_37xx_sb_groups),
+ const struct armada_37xx_pin_data armada_37xx_pin_nb = {
+@@ -208,7 +219,7 @@ static int armada_37xx_get_func_reg(struct armada_37xx_pin_group *grp,
+ {
+ 	int f;
+ 
+-	for (f = 0; f < NB_FUNCS; f++)
++	for (f = 0; (f < NB_FUNCS) && grp->funcs[f]; f++)
+ 		if (!strcmp(grp->funcs[f], func))
+ 			return f;
+ 
+@@ -795,7 +806,7 @@ static int armada_37xx_fill_group(struct armada_37xx_pinctrl *info)
+ 		for (j = 0; j < grp->extra_npins; j++)
+ 			grp->pins[i+j] = grp->extra_pin + j;
+ 
+-		for (f = 0; f < NB_FUNCS; f++) {
++		for (f = 0; (f < NB_FUNCS) && grp->funcs[f]; f++) {
+ 			int ret;
+ 			/* check for unique functions and count groups */
+ 			ret = armada_37xx_add_function(info->funcs, &funcsize,
+@@ -847,7 +858,7 @@ static int armada_37xx_fill_func(struct armada_37xx_pinctrl *info)
+ 			struct armada_37xx_pin_group *gp = &info->groups[g];
+ 			int f;
+ 
+-			for (f = 0; f < NB_FUNCS; f++) {
++			for (f = 0; (f < NB_FUNCS) && gp->funcs[f]; f++) {
+ 				if (strcmp(gp->funcs[f], name) == 0) {
+ 					*groups = gp->name;
+ 					groups++;
 -- 
 2.13.2
