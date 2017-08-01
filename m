@@ -1,123 +1,68 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 1 Aug 2017 09:40:45 -0600
-Subject: [PATCH] coresight: STM: Clean up __iomem type usage
-In-Reply-To: <20170728203111.20078-1-sboyd@codeaurora.org>
-References: <20170728203111.20078-1-sboyd@codeaurora.org>
-Message-ID: <CANLsYkx3CyO3mU6JrR=Cvr7V=aCcWJW2ELj1wYrYo2ggbtnxhg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 1 Aug 2017 16:41:11 +0100
+Subject: [RFC PATCH v2 06/19] KVM: arm/arm64: Make timer_arm and
+ timer_disarm helpers more generic
+In-Reply-To: <20170801145746.GJ5176@cbox>
+References: <20170717142718.13853-1-cdall@linaro.org>
+ <20170717142718.13853-7-cdall@linaro.org>
+ <f7871c0f-50db-45cc-c161-32c4b54497ac@arm.com> <20170801145746.GJ5176@cbox>
+Message-ID: <7f4730e5-bd75-513b-c79c-bb074fabcbfe@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 July 2017 at 14:31, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> The casting and other things here is odd, and causes sparse to
-> complain:
->
-> drivers/hwtracing/coresight/coresight-stm.c:279:35: warning: incorrect type in argument 1 (different address spaces)
-> drivers/hwtracing/coresight/coresight-stm.c:279:35:    expected void [noderef] <asn:2>*addr
-> drivers/hwtracing/coresight/coresight-stm.c:279:35:    got struct stm_drvdata *drvdata
-> drivers/hwtracing/coresight/coresight-stm.c:327:17: warning: incorrect type in argument 2 (different address spaces)
-> drivers/hwtracing/coresight/coresight-stm.c:327:17:    expected void volatile [noderef] <asn:2>*addr
-> drivers/hwtracing/coresight/coresight-stm.c:327:17:    got void *addr
-> drivers/hwtracing/coresight/coresight-stm.c:330:17: warning: incorrect type in argument 2 (different address spaces)
-> drivers/hwtracing/coresight/coresight-stm.c:330:17:    expected void volatile [noderef] <asn:2>*addr
-> drivers/hwtracing/coresight/coresight-stm.c:330:17:    got void *addr
-> drivers/hwtracing/coresight/coresight-stm.c:333:17: warning: incorrect type in argument 2 (different address spaces)
-> drivers/hwtracing/coresight/coresight-stm.c:333:17:    expected void volatile [noderef] <asn:2>*addr
-> drivers/hwtracing/coresight/coresight-stm.c:333:17:    got void *addr
->
-> From what I can tell, we don't really need to treat ch_addr as
-> anything besides a pointer, and we can just do pointer math
-> instead of ORing in the bits of the offset and achieve the same
-> thing.
->
-> Also, we were passing a drvdata pointer to the
-> coresight_timeout() function, but we really wanted to pass the
-> address of the register base. Luckily the base is the first
-> member of the structure, so everything works out, but this is
-> quite unsafe if we ever change the structure layout. Clean this
-> all up so sparse stops complaining on this code.
->
-> Reported-by: Satyajit Desai <sadesai@codeaurora.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->  drivers/hwtracing/coresight/coresight-stm.c | 16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-> index 93fc26f01bab..a4273972099d 100644
-> --- a/drivers/hwtracing/coresight/coresight-stm.c
-> +++ b/drivers/hwtracing/coresight/coresight-stm.c
-> @@ -276,7 +276,7 @@ static void stm_disable(struct coresight_device *csdev,
->                 spin_unlock(&drvdata->spinlock);
->
->                 /* Wait until the engine has completely stopped */
-> -               coresight_timeout(drvdata, STMTCSR, STMTCSR_BUSY_BIT, 0);
-> +               coresight_timeout(drvdata->base, STMTCSR, STMTCSR_BUSY_BIT, 0);
+On 01/08/17 15:57, Christoffer Dall wrote:
+> On Tue, Aug 01, 2017 at 03:10:59PM +0100, Marc Zyngier wrote:
+>> On 17/07/17 15:27, Christoffer Dall wrote:
+>>> We are about to add an additional soft timer to the arch timer state for
+>>> a VCPU and would like to be able to reuse the functions to program and
+>>> cancel a timer, so we make them slightly more generic and rename to make
+>>> it more clear that these functions work on soft timers and not the
+>>> hardware resource that this code is managing.
+>>>
+>>> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+>>> ---
+>>>  virt/kvm/arm/arch_timer.c | 33 ++++++++++++++++-----------------
+>>>  1 file changed, 16 insertions(+), 17 deletions(-)
+>>>
+>>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+>>> index 8e89d63..871d8ae 100644
+>>> --- a/virt/kvm/arm/arch_timer.c
+>>> +++ b/virt/kvm/arm/arch_timer.c
+>>> @@ -56,26 +56,22 @@ u64 kvm_phys_timer_read(void)
+>>>  	return timecounter->cc->read(timecounter->cc);
+>>>  }
+>>>  
+>>> -static bool timer_is_armed(struct arch_timer_cpu *timer)
+>>> +static bool soft_timer_is_armed(struct arch_timer_cpu *timer)
+>>>  {
+>>>  	return timer->armed;
+>>>  }
+>>>  
+>>> -/* timer_arm: as in "arm the timer", not as in ARM the company */
+>>> -static void timer_arm(struct arch_timer_cpu *timer, u64 ns)
+>>> +static void soft_timer_start(struct hrtimer *hrt, u64 ns)
+>>
+>> I find it a bit confusing that the soft_timer_* functions operate on
+>> different object types: arch_timer_cpu for soft_timer_is_armed(), and
+>> hrtimer for soft_timer_start. Is there anything that prevents us from
+>> keeping arch_timer_cpu for all of them?
+>>
+> 
+> The problem is now we have two timers for a VCPU, one which is shared
+> between the two timer contexts (physical and virtual) used when the
+> process goes to sleep with a programmed timer, and one used to exit the
+> guest for the physical timer emulation.  So I either need to provide
+> some sideband information or use the hrtimer pointer.
 
-Oh boy...
+Yes, I came to the same conclusion at while reading patch 8.
 
->
->                 pm_runtime_put(drvdata->dev);
->
-> @@ -307,7 +307,7 @@ static inline bool stm_addr_unaligned(const void *addr, u8 write_bytes)
->         return ((unsigned long)addr & (write_bytes - 1));
->  }
->
-> -static void stm_send(void *addr, const void *data, u32 size, u8 write_bytes)
-> +static void stm_send(void __iomem *addr, const void *data, u32 size, u8 write_bytes)
+> I tried to address this in later patches by renaming timer_is_armed() to
+> bg_timer_is_armed(), but I'm open to better suggestions.
 
-This ends up being over 80 characters long - I have corrected and
-applied your patch.
+Bah, never mind.
 
 Thanks,
-Mathieu
 
->  {
->         u8 paload[8];
->
-> @@ -414,7 +414,7 @@ static ssize_t notrace stm_generic_packet(struct stm_data *stm_data,
->                                   unsigned int size,
->                                   const unsigned char *payload)
->  {
-> -       unsigned long ch_addr;
-> +       void __iomem *ch_addr;
->         struct stm_drvdata *drvdata = container_of(stm_data,
->                                                    struct stm_drvdata, stm);
->
-> @@ -424,7 +424,7 @@ static ssize_t notrace stm_generic_packet(struct stm_data *stm_data,
->         if (channel >= drvdata->numsp)
->                 return -EINVAL;
->
-> -       ch_addr = (unsigned long)stm_channel_addr(drvdata, channel);
-> +       ch_addr = stm_channel_addr(drvdata, channel);
->
->         flags = (flags == STP_PACKET_TIMESTAMPED) ? STM_FLAG_TIMESTAMPED : 0;
->         flags |= test_bit(channel, drvdata->chs.guaranteed) ?
-> @@ -437,20 +437,20 @@ static ssize_t notrace stm_generic_packet(struct stm_data *stm_data,
->
->         switch (packet) {
->         case STP_PACKET_FLAG:
-> -               ch_addr |= stm_channel_off(STM_PKT_TYPE_FLAG, flags);
-> +               ch_addr += stm_channel_off(STM_PKT_TYPE_FLAG, flags);
->
->                 /*
->                  * The generic STM core sets a size of '0' on flag packets.
->                  * As such send a flag packet of size '1' and tell the
->                  * core we did so.
->                  */
-> -               stm_send((void *)ch_addr, payload, 1, drvdata->write_bytes);
-> +               stm_send(ch_addr, payload, 1, drvdata->write_bytes);
->                 size = 1;
->                 break;
->
->         case STP_PACKET_DATA:
-> -               ch_addr |= stm_channel_off(STM_PKT_TYPE_DATA, flags);
-> -               stm_send((void *)ch_addr, payload, size,
-> +               ch_addr += stm_channel_off(STM_PKT_TYPE_DATA, flags);
-> +               stm_send(ch_addr, payload, size,
->                                 drvdata->write_bytes);
->                 break;
->
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
->
+	M.
+-- 
+Jazz is not dead. It just smells funny...
