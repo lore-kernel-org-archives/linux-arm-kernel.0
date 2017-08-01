@@ -1,79 +1,59 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 1 Aug 2017 20:56:39 +0800
-Subject: [PATCH v2 5/5] ACPI/IORT: Add IORT named component memory address
- limits
-In-Reply-To: <20170801112111.GA23348@red-moon>
-References: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
- <20170731152323.32488-6-lorenzo.pieralisi@arm.com>
- <35b7d17a-7ab2-9b36-9482-33a7449691d2@linaro.org>
- <20170801112111.GA23348@red-moon>
-Message-ID: <833cf8e7-8dc5-49c6-2beb-4683af354b6d@linaro.org>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue,  1 Aug 2017 21:12:51 +0800
+Subject: [PATCH 00/13] Allwinner H3 DE2 basical support
+Message-ID: <20170801131304.7741-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/8/1 19:21, Lorenzo Pieralisi wrote:
-> On Tue, Aug 01, 2017 at 06:20:43PM +0800, Hanjun Guo wrote:
->> Hi Lorenzo,
->>
->> On 2017/7/31 23:23, Lorenzo Pieralisi wrote:
->>> IORT named components provide firmware configuration describing
->>> how many address bits a given device is capable of generating
->>> to address memory.
->>>
->>> Add code to the kernel to retrieve memory address limits
->>> configuration for IORT named components and configure DMA masks
->>> accordingly.
->>>
->>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Cc: Robin Murphy <robin.murphy@arm.com>
->>> Cc: Nate Watterson <nwatters@codeaurora.org>
->>> ---
->>>   drivers/acpi/arm64/iort.c | 40 ++++++++++++++++++++++++++++++----------
->>>   1 file changed, 30 insertions(+), 10 deletions(-)
->>>
->>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
->>> index 67b85ae..b85d19f 100644
->>> --- a/drivers/acpi/arm64/iort.c
->>> +++ b/drivers/acpi/arm64/iort.c
->>> @@ -680,6 +680,24 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
->>>   	return ret ? NULL : ops;
->>>   }
->>> +static int nc_dma_get_range(struct device *dev, u64 *size)
->>> +{
->>> +	struct acpi_iort_node *node;
->>> +	struct acpi_iort_named_component *ncomp;
->>> +
->>> +	node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
->>> +			      iort_match_node_callback, dev);
->>> +	if (!node)
->>> +		return -ENODEV;
->>> +
->>> +	ncomp = (struct acpi_iort_named_component *)node->node_data;
->>> +
->>> +	*size = ncomp->memory_address_limit >= 64 ? ~0ULL :
->>> +			1ULL<<ncomp->memory_address_limit;
->>
->> Just a question here, if the IORT table didn't configure this
->> value properly, will the device working properly? I'm asking this
->> because in the table of IORT of D05, this value is set to 0 so far
->> (SAS and network), but I can boot D05 OK with your patch set, not
->> sure if any further issues.
-> 
-> Then you wonder why I wrote it as a separate patch. Why is that
-> value set to 0 (is that because that's the insane default ?) ?
-> It is a firmware bug and if things work ok with this patch applied
-> either this patch contains a bug or drivers override the DMA masks
-> to cancel out this patch effects.
+Allwinner H3 features a "Display Engine 2.0", which needs some support
+to be present in the DRM driver.
 
-Thanks for the reply, not a bug for this patch, I confirmed that
-the driver override the DMA masks (both SAS and network set 64 bit
-DMA mask).
+This patchset is now a basical version, which dropped some features I
+used to submitted:
+- TVE support (not so high priority now)
+- Multi-pipeline support (also not so high priority now due to no TVE)
 
-> 
-> Please fix the firmware.
+The last 6 patches are only used for testing this patchset, and they're
+going to be sent by Jernej Skrabec after this patchset is applied.
 
-Sure.
+Icenowy Zheng (9):
+  dt-bindings: update the binding for Allwinner H3 DE2 support
+  drm: sun4i: add support for H3 mixers
+  drm: sun4i: add support for H3's TCON
+  drm: sun4i: add compatible for H3 display engine
+  clk: sunxi-ng: allow CLK_DE to set CLK_PLL_DE for H3
+  clk: sunxi-ng: export CLK_PLL_DE for H3
+  ARM: sun8i: h3: add display engine pipeline barebone
+  [NOT FOR REVIEW NOW] ARM: sun8i: h3: enable DesignWare HDMI controller
+  [NOT FOR REVIEW NOW] ARM: sun8i: h3: enable HDMI output on Orange Pi
+    PC
 
-Thanks
-Hanjun
+Jernej Skrabec (4):
+  [NOT FOR REVIEW NOW] drm: bridge: Enable polling hpd event in dw_hdmi
+  [NOT FOR REVIEW NOW] drm: bridge: Add a pre_init function for the
+    dw_hdmi driver
+  [NOT FOR REVIEW NOW] clk: sunxi: Add CLK_SET_RATE_PARENT flag for H3
+    HDMI clock
+  [NOT FOR REVIEW NOW] drm: sun4i: Add a glue for the DesignWare HDMI
+    controller in H3
+
+ .../bindings/display/sunxi/sun4i-drm.txt           |  25 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  16 +
+ arch/arm/boot/dts/sun8i-h3.dtsi                    | 205 +++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |   4 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.h                |   3 +-
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c          |   9 +-
+ drivers/gpu/drm/sun4i/Kconfig                      |   9 +
+ drivers/gpu/drm/sun4i/Makefile                     |   1 +
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  |   2 +
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 |  43 +-
+ drivers/gpu/drm/sun4i/sun4i_tcon.h                 |   1 +
+ drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c              | 462 +++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun8i_mixer.c                |  18 +
+ include/drm/bridge/dw_hdmi.h                       |   2 +
+ include/dt-bindings/clock/sun8i-h3-ccu.h           |   2 +
+ 15 files changed, 781 insertions(+), 21 deletions(-)
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+
+-- 
+2.13.0
