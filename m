@@ -1,84 +1,67 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 1 Aug 2017 10:24:28 +0530
-Subject: [PATCH 1/7] mtd: spi-nor: cadence-quadspi: add a delay in write
- sequence
-In-Reply-To: <20170801045434.8733-1-vigneshr@ti.com>
-References: <20170801045434.8733-1-vigneshr@ti.com>
-Message-ID: <20170801045434.8733-2-vigneshr@ti.com>
+From: luaraneda@gmail.com (Luis Araneda)
+Date: Tue,  1 Aug 2017 01:01:15 -0400
+Subject: [PATCH] ARM: dts: sun8i: h3: Enable EMAC with external PHY on NanoPi
+ M1 Plus
+Message-ID: <20170801050115.21497-1-luaraneda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per 66AK2G02 TRM[1] SPRUHY8F section 11.15.5.3 Indirect Access
-Controller programming sequence, a delay equal to couple QSPI master
-clock(~5ns) is required after setting CQSPI_REG_INDIRECTWR_START bit and
-writing data to the flash. Add a new compatible to handle the couple of
-cycles of delay required in the indirect write sequence, since this
-delay is specific to TI 66AK2G SoC.
+The Nanopi M1 Plus uses an external Realtek RTL8211E PHY in RGMII mode,
+enabled by a GPIO-based regulator.
 
-[1]http://www.ti.com/lit/ug/spruhy8f/spruhy8f.pdf
-
-Signed-off-by: Vignesh R <vigneshr@ti.com>
+Signed-off-by: Luis Araneda <luaraneda@gmail.com>
 ---
- Documentation/devicetree/bindings/mtd/cadence-quadspi.txt |  1 +
- drivers/mtd/spi-nor/cadence-quadspi.c                     | 13 +++++++++++++
- 2 files changed, 14 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 31 +++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
-index f248056da24c..fdd511a83511 100644
---- a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
-+++ b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
-@@ -2,6 +2,7 @@
- 
- Required properties:
- - compatible : Should be "cdns,qspi-nor".
-+	       Should be "ti,k2g-qspi" for TI 66AK2G platform.
- - reg : Contains two entries, each of which is a tuple consisting of a
- 	physical address and length. The first entry is the address and
- 	length of the controller register set. The second entry is the
-diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
-index 53c7d8e0327a..94571590371d 100644
---- a/drivers/mtd/spi-nor/cadence-quadspi.c
-+++ b/drivers/mtd/spi-nor/cadence-quadspi.c
-@@ -76,6 +76,7 @@ struct cqspi_st {
- 	u32			fifo_depth;
- 	u32			fifo_width;
- 	u32			trigger_address;
-+	u32			wr_delay;
- 	struct cqspi_flash_pdata f_pdata[CQSPI_MAX_CHIPSELECT];
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+index 8ddd1b2cc..54727990c 100644
+--- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+@@ -45,6 +45,20 @@
+ / {
+ 	model = "FriendlyArm NanoPi M1 Plus";
+ 	compatible = "friendlyarm,nanopi-m1-plus", "allwinner,sun8i-h3";
++
++	aliases {
++		ethernet0 = &emac;
++	};
++
++	reg_gmac_3v3: gmac-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "gmac-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <100000>;
++		enable-active-high;
++		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
++	};
  };
  
-@@ -608,6 +609,14 @@ static int cqspi_indirect_write_execute(struct spi_nor *nor,
- 	reinit_completion(&cqspi->transfer_complete);
- 	writel(CQSPI_REG_INDIRECTWR_START_MASK,
- 	       reg_base + CQSPI_REG_INDIRECTWR);
-+	/*
-+	 * As per 66AK2G02 TRM SPRUHY8F section 11.15.5.3 Indirect Access
-+	 * Controller programming sequence, couple of cycles of
-+	 * QSPI_REF_CLK delay is required for the above bit to
-+	 * be internally synchronized by the QSPI module. Provide 5
-+	 * cycles of delay.
-+	 */
-+	ndelay(cqspi->wr_delay);
- 
- 	while (remaining > 0) {
- 		write_bytes = remaining > page_size ? page_size : remaining;
-@@ -1213,6 +1222,9 @@ static int cqspi_probe(struct platform_device *pdev)
- 	}
- 
- 	cqspi->master_ref_clk_hz = clk_get_rate(cqspi->clk);
-+	if (of_device_is_compatible(dev->of_node, "ti,k2g-qspi"))
-+		cqspi->wr_delay = 5 * DIV_ROUND_UP(NSEC_PER_SEC,
-+						   cqspi->master_ref_clk_hz);
- 
- 	ret = devm_request_irq(dev, irq, cqspi_irq_handler, 0,
- 			       pdev->name, cqspi);
-@@ -1285,6 +1297,7 @@ static const struct dev_pm_ops cqspi__dev_pm_ops = {
- 
- static const struct of_device_id cqspi_dt_ids[] = {
- 	{.compatible = "cdns,qspi-nor",},
-+	{.compatible = "ti,k2g-qspi",},
- 	{ /* end of table */ }
+ &ehci1 {
+@@ -55,6 +69,23 @@
+ 	status = "okay";
  };
  
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_rgmii_pins>;
++	phy-supply = <&reg_gmac_3v3>;
++	phy-handle = <&ext_rgmii_phy>;
++	phy-mode = "rgmii";
++	allwinner,leds-active-low;
++	status = "okay";
++};
++
++&mdio {
++	ext_rgmii_phy: ethernet-phy at 1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <0>;
++	};
++};
++
+ &ohci1 {
+ 	status = "okay";
+ };
 -- 
 2.13.3
