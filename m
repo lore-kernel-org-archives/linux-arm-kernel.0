@@ -1,62 +1,23 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Tue, 01 Aug 2017 09:26:05 +0900
-Subject: [PATCH v4 0/3] Add support for the s6e63j0x03 panel on Rinato
- board
-In-Reply-To: <1499912443-3671-1-git-send-email-hoegeun.kwon@samsung.com>
-References: <CGME20170713022056epcas5p21ece2860cb2cce0b4381cf98988496f9@epcas5p2.samsung.com>
- <1499912443-3671-1-git-send-email-hoegeun.kwon@samsung.com>
-Message-ID: <90041545-2bce-52cc-d926-606f76d81f0f@samsung.com>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Tue,  1 Aug 2017 09:17:02 +0800
+Subject: [PATCH v4 0/2] clk: rockchip: support clk drivers for RK3126 SoC.
+Message-ID: <1501550224-6875-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Thierry,
+changed in V4:
+modify the document description for rk3126 clock.
 
-Could you please check these patches.
+changed in V3:
+add documentation for rk3126 clock
 
-Best regards,
-Hoegeun
+Elaine Zhang (2):
+  clk: rockchip: rk3128: modify rk3128 clk driver to support rk3126
+  dt-bindings: add documentation for rk3126 clock
 
+ .../bindings/clock/rockchip,rk3128-cru.txt         |  8 ++-
+ drivers/clk/rockchip/clk-rk3128.c                  | 69 +++++++++++++++++-----
+ 2 files changed, 60 insertions(+), 17 deletions(-)
 
-On 07/13/2017 11:20 AM, Hoegeun Kwon wrote:
-> Hi Andrzej,
->
-> Thank you for your review.
->
-> The purpose of this patch is add support for s6e63j0x03 AMOLED panel
-> on the rinato board(Samsung Galaxy Gear 2).
->
-> Changes for V4:
-> - Added Reviewed-by: Andrzej Hajda <a.hajda@samsung.com> (2/3 patch).
-> - Fixed the style of macro function.
->
-> Changes for V3:
-> - Applied patch 'ARM: dts: exynos: Fix the active of reset gpios from rinato dts' (v2 3/4)
-> - Remove the unnecessary define ('MIN_BRIGHTNESS')
-> - Removed explicit casting.
-> - Removed violation of kernel coding style.
->
-> Changes for V2:
-> - Added the interface info in binding document.
-> - Added Reviewed-by: Andrzej Hajda <a.hajda@samsung.com> (1/3 patch).
-> - Added Acked-by: Rob Herring <robh@kernel.org> (1/3 patch).
-> - Fixed the tristate of config from video mode to command mode.
-> - Fixed the reset gpios from active high to low from rinato dts.
-> - Fixed a lot of things in panel driver, reflect Andrzej's review.
->
-> Best regards,
-> Hoegeun
->
-> Hoegeun Kwon (3):
->    dt-bindings: Add support for samsung s6e63j0x03 panel binding
->    drm/panel: Add support for s6e63j0x03 panel driver
->    ARM: dts: exynos: Remove the display-timing and delay from rinato dts
->
->   .../bindings/display/panel/samsung,s6e63j0x03.txt  |  24 +
->   arch/arm/boot/dts/exynos3250-rinato.dts            |  22 -
->   drivers/gpu/drm/panel/Kconfig                      |   7 +
->   drivers/gpu/drm/panel/Makefile                     |   1 +
->   drivers/gpu/drm/panel/panel-samsung-s6e63j0x03.c   | 532 +++++++++++++++++++++
->   5 files changed, 564 insertions(+), 22 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/display/panel/samsung,s6e63j0x03.txt
->   create mode 100644 drivers/gpu/drm/panel/panel-samsung-s6e63j0x03.c
->
+-- 
+1.9.1
