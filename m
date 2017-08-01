@@ -1,53 +1,107 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 1 Aug 2017 14:11:38 +0200
-Subject: [GIT PULL] Meson clock fixes for 4.13-rc4
-In-Reply-To: <20170801013800.GL2146@codeaurora.org>
-References: <ce41382f-fd93-1dc9-0dba-1484ac555945@baylibre.com>
- <20170731202031.GK2146@codeaurora.org> <1501537388.2759.7.camel@baylibre.com>
- <20170801013800.GL2146@codeaurora.org>
-Message-ID: <3492f1fe-c4d6-034c-1914-ec7e702f5bcc@baylibre.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 1 Aug 2017 14:26:11 +0200
+Subject: [RFC PATCH v2 05/19] KVM: arm/arm64: Check that system supports
+ split eoi/deactivate
+In-Reply-To: <3ca8bc15-b5e7-abf7-78cc-9bbc5332c267@arm.com>
+References: <20170717142718.13853-1-cdall@linaro.org>
+ <20170717142718.13853-6-cdall@linaro.org>
+ <3ca8bc15-b5e7-abf7-78cc-9bbc5332c267@arm.com>
+Message-ID: <20170801122611.GE5176@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2017 03:38 AM, Stephen Boyd wrote:
-> On 07/31, Jerome Brunet wrote:
->> On Mon, 2017-07-31 at 13:20 -0700, Stephen Boyd wrote:
->>> On 07/31, Neil Armstrong wrote:
->>>> Hi Mike, Stephen,
->>>>
->>>> Here is some fixes for Meson GXBB and Meson8 drivers, that could go for
->>>> 4.13-rc4.
->>>>
->>>
->>> Are any of these critical fixes for regressions in the v4.13-rc
->>> series? All the Fixes tags look like they go back to before
->>> v4.13-rc1, so they don't look critical at first glance. If
->>> anything, they're mostly nice to have non-critical fixes? If so,
->>> can we defer these until the next merge window?
->>
->> I agree that these fixes hardly qualify as critical, except maybe for the mpll
->> fix. The clock rate actually applied can be really off compared to what CCF will
->>  except to have set.
+On Tue, Aug 01, 2017 at 12:35:23PM +0100, Marc Zyngier wrote:
+> On 17/07/17 15:27, Christoffer Dall wrote:
+> > Some systems without proper firmware and/or hardware description data
+> > don't support the split EOI and deactivate operation.
+> > 
+> > On such systems, we cannot leave the physical interrupt active after the
+> > timer handler on the host has run, so we cannot support KVM with an
+> > in-kernel GIC with the timer changes we about to introduce.
+> > 
+> > This patch makes sure that trying to initialize the KVM GIC code will
+> > fail on such systems.
+> > 
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> > ---
+> >  drivers/irqchip/irq-gic.c | 12 +++++++++---
+> >  1 file changed, 9 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> > index 090991f..b7e4fed 100644
+> > --- a/drivers/irqchip/irq-gic.c
+> > +++ b/drivers/irqchip/irq-gic.c
+> > @@ -1391,7 +1391,8 @@ int gic_of_init_child(struct device *dev, struct gic_chip_data **gic, int irq)
+> >  	return 0;
+> >  }
+> >  
+> > -static void __init gic_of_setup_kvm_info(struct device_node *node)
+> > +static void __init gic_of_setup_kvm_info(struct device_node *node,
+> > +					 bool supports_deactivate)
 > 
-> Ok. So perhaps just the mpll fix would be appropriate then?
-> 
->>
->> These fixes are quite simple and safe, it would be nice if we could avoid having
->>  the next version tagged with known issues.
->>
-> 
-> I agree they're simple and safe, but they're also not necessary
-> to the release we're working on unless they're causing some
-> problem with code that was introduced this merge window. We try
-> to avoid merging non-critical fixes unless they're really causing
-> someone some sort of problems. If they aren't, we can stick them
-> into linux-next and wait until next release. Of course, they'll
-> be backported to stable trees as well with the Fixes tag, so
-> everything works out in the end.
+> Ouch, nasty. This shadows the static key which is also called
+> supports_deactivate...
 > 
 
-OK, I'll resend a v2 PR with only the mpll fix.
+oh, yeah, that's a trap waiting to happen.
 
-The other will be pushed on our next/drivers branch.
+> >  {
+> >  	int ret;
+> >  	struct resource *vctrl_res = &gic_v2_kvm_info.vctrl;
+> > @@ -1411,6 +1412,9 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
+> >  	if (ret)
+> >  		return;
+> >  
+> > +	if (!supports_deactivate)
+> > +		return;
+> > +
+> >  	gic_set_kvm_info(&gic_v2_kvm_info);
+> 
+> Speaking of which, the static key should already be initialized, so this
+> could actually read:
+> 
+> 	if (static_key_true(&supports_deactivate))
+> 		gic_set_kvm_info(&gic_v2_kvm_info);
+> 
+> >  }
+> >  
+> > @@ -1419,6 +1423,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+> >  {
+> >  	struct gic_chip_data *gic;
+> >  	int irq, ret;
+> > +	bool has_eoimode;
+> >  
+> >  	if (WARN_ON(!node))
+> >  		return -ENODEV;
+> > @@ -1436,7 +1441,8 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+> >  	 * Disable split EOI/Deactivate if either HYP is not available
+> >  	 * or the CPU interface is too small.
+> >  	 */
+> > -	if (gic_cnt == 0 && !gic_check_eoimode(node, &gic->raw_cpu_base))
+> > +	has_eoimode = gic_check_eoimode(node, &gic->raw_cpu_base);
+> > +	if (gic_cnt == 0 && !has_eoimode)
+> >  		static_key_slow_dec(&supports_deactivate);
+> >  
+> >  	ret = __gic_init_bases(gic, -1, &node->fwnode);
+> > @@ -1447,7 +1453,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+> >  
+> >  	if (!gic_cnt) {
+> >  		gic_init_physaddr(node);
+> > -		gic_of_setup_kvm_info(node);
+> > +		gic_of_setup_kvm_info(node, has_eoimode);
+> >  	}
+> >  
+> >  	if (parent) {
+> > 
+> 
+> and we shouldn't need any of this. What do you think?
+> 
 
-Neil
+I wasn't exactly sure if gic_cnt > 0 && !gic_check_eiomode() could then
+end up registering the KVM info when we shouldn't.
+
+If that's not a concern, I'm happy to rework this.
+
+Thanks,
+-Christoffer
