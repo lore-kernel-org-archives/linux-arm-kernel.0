@@ -1,34 +1,84 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 1 Aug 2017 10:24:27 +0530
-Subject: [PATCH 0/7] K2G: Add QSPI support
-Message-ID: <20170801045434.8733-1-vigneshr@ti.com>
+Date: Tue, 1 Aug 2017 10:24:28 +0530
+Subject: [PATCH 1/7] mtd: spi-nor: cadence-quadspi: add a delay in write
+ sequence
+In-Reply-To: <20170801045434.8733-1-vigneshr@ti.com>
+References: <20170801045434.8733-1-vigneshr@ti.com>
+Message-ID: <20170801045434.8733-2-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for Cadence QSPI for 66AK2G SoC. The first
-three patches enhance the cadence-quadspi driver to support loopback
-clock and pm_runtime and tweaks for 66AK2G SoC. Remaining patches add
-DT nodes and enable the driver in defconfig.
+As per 66AK2G02 TRM[1] SPRUHY8F section 11.15.5.3 Indirect Access
+Controller programming sequence, a delay equal to couple QSPI master
+clock(~5ns) is required after setting CQSPI_REG_INDIRECTWR_START bit and
+writing data to the flash. Add a new compatible to handle the couple of
+cycles of delay required in the indirect write sequence, since this
+delay is specific to TI 66AK2G SoC.
 
-Tested on 66AK2G GP and ICE boards.
+[1]http://www.ti.com/lit/ug/spruhy8f/spruhy8f.pdf
 
-Vignesh R (7):
-  mtd: spi-nor: cadence-quadspi: add a delay in write sequence
-  mtd: spi-nor: cadence-quadspi: Add support to enable loopback clock
-    circuit
-  mtd: spi-nor: cadence-quadspi: Add runtime PM support
-  ARM: dts: keystone-k2g: Add QSPI DT entry
-  ARM: dts: keystone-k2g-evm: Add QSPI node
-  ARM: dts: keystone-k2g-ice: Add QSPI node
-  ARM: configs: keystone: Enable Cadence QSPI driver
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
+ Documentation/devicetree/bindings/mtd/cadence-quadspi.txt |  1 +
+ drivers/mtd/spi-nor/cadence-quadspi.c                     | 13 +++++++++++++
+ 2 files changed, 14 insertions(+)
 
- .../devicetree/bindings/mtd/cadence-quadspi.txt    |  4 ++
- arch/arm/boot/dts/keystone-k2g-evm.dts             | 69 ++++++++++++++++++++++
- arch/arm/boot/dts/keystone-k2g-ice.dts             | 69 ++++++++++++++++++++++
- arch/arm/boot/dts/keystone-k2g.dtsi                | 15 +++++
- arch/arm/configs/keystone_defconfig                |  1 +
- drivers/mtd/spi-nor/cadence-quadspi.c              | 32 +++++++++-
- 6 files changed, 188 insertions(+), 2 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
+index f248056da24c..fdd511a83511 100644
+--- a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
++++ b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
+@@ -2,6 +2,7 @@
+ 
+ Required properties:
+ - compatible : Should be "cdns,qspi-nor".
++	       Should be "ti,k2g-qspi" for TI 66AK2G platform.
+ - reg : Contains two entries, each of which is a tuple consisting of a
+ 	physical address and length. The first entry is the address and
+ 	length of the controller register set. The second entry is the
+diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
+index 53c7d8e0327a..94571590371d 100644
+--- a/drivers/mtd/spi-nor/cadence-quadspi.c
++++ b/drivers/mtd/spi-nor/cadence-quadspi.c
+@@ -76,6 +76,7 @@ struct cqspi_st {
+ 	u32			fifo_depth;
+ 	u32			fifo_width;
+ 	u32			trigger_address;
++	u32			wr_delay;
+ 	struct cqspi_flash_pdata f_pdata[CQSPI_MAX_CHIPSELECT];
+ };
+ 
+@@ -608,6 +609,14 @@ static int cqspi_indirect_write_execute(struct spi_nor *nor,
+ 	reinit_completion(&cqspi->transfer_complete);
+ 	writel(CQSPI_REG_INDIRECTWR_START_MASK,
+ 	       reg_base + CQSPI_REG_INDIRECTWR);
++	/*
++	 * As per 66AK2G02 TRM SPRUHY8F section 11.15.5.3 Indirect Access
++	 * Controller programming sequence, couple of cycles of
++	 * QSPI_REF_CLK delay is required for the above bit to
++	 * be internally synchronized by the QSPI module. Provide 5
++	 * cycles of delay.
++	 */
++	ndelay(cqspi->wr_delay);
+ 
+ 	while (remaining > 0) {
+ 		write_bytes = remaining > page_size ? page_size : remaining;
+@@ -1213,6 +1222,9 @@ static int cqspi_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	cqspi->master_ref_clk_hz = clk_get_rate(cqspi->clk);
++	if (of_device_is_compatible(dev->of_node, "ti,k2g-qspi"))
++		cqspi->wr_delay = 5 * DIV_ROUND_UP(NSEC_PER_SEC,
++						   cqspi->master_ref_clk_hz);
+ 
+ 	ret = devm_request_irq(dev, irq, cqspi_irq_handler, 0,
+ 			       pdev->name, cqspi);
+@@ -1285,6 +1297,7 @@ static const struct dev_pm_ops cqspi__dev_pm_ops = {
+ 
+ static const struct of_device_id cqspi_dt_ids[] = {
+ 	{.compatible = "cdns,qspi-nor",},
++	{.compatible = "ti,k2g-qspi",},
+ 	{ /* end of table */ }
+ };
+ 
 -- 
 2.13.3
