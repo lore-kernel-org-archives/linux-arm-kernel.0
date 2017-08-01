@@ -1,93 +1,109 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue, 1 Aug 2017 10:49:36 -0500
-Subject: [PATCH v3 1/2] gpio: davinci: Add keystone-k2g compatible
-In-Reply-To: <20799238-a72b-c6e7-5898-3de23f91a9ed@ti.com>
-References: <1501051524-5990-1-git-send-email-j-keerthy@ti.com>
- <5aa0d273-8e05-a5ff-7931-b9a94acade36@ti.com>
- <8021c424-460c-def4-3a67-ed760997193d@ti.com>
- <2eeaeea5-9476-8631-8680-7db3322151bf@ti.com>
- <da92fe60-d70b-6a37-6b88-2ac95dd67b6a@ti.com>
- <90337754-8670-6df7-5421-7100e31755b1@ti.com>
- <65ab0098-ef1b-3bec-1d2a-768e478fa413@ti.com>
- <20799238-a72b-c6e7-5898-3de23f91a9ed@ti.com>
-Message-ID: <779826e7-0c48-d24f-c3ad-76039f7fdf7e@ti.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 1 Aug 2017 10:48:44 -0500
+Subject: [PATCH v2 4/4] remoteproc/davinci: Add device tree support for
+ OMAP-L138 DSP
+In-Reply-To: <20170801154844.24662-1-s-anna@ti.com>
+References: <20170801154844.24662-1-s-anna@ti.com>
+Message-ID: <20170801154844.24662-5-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Davinci remoteproc driver currently supports the DSP remoteproc
+device created in legacy-style on OMAP-L13x SoCs. The driver has been
+enhanced to support the DSP remoteproc device created through Device
+Tree now. The current DT support handles the C674x DSP processor
+subsystem on OMAP-L138 SoCs.
 
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+v2:
+ - Add __maybe_unused and of_match_ptr to deal with non-OF builds
+ - Rebased patch after dropping the interrupt management patch from
+   the cleanup series, https://patchwork.kernel.org/patch/9735321/
+v1: https://patchwork.kernel.org/patch/9751277/
 
-On 08/01/2017 09:30 AM, Suman Anna wrote:
-> On 08/01/2017 01:12 AM, Vignesh R wrote:
->>
->>
->> On Monday 31 July 2017 07:14 PM, Keerthy wrote:
->>>
->>>
->>> On Wednesday 26 July 2017 07:50 PM, Suman Anna wrote:
->>>> On 07/26/2017 08:36 AM, Keerthy wrote:
->>>>>
->>>>> On Wednesday 26 July 2017 06:57 PM, Franklin S Cooper Jr wrote:
->>>>>>
->>>>>>
->>>>>> On 07/26/2017 08:00 AM, Suman Anna wrote:
->>>>>>> Hi Keerthy,
->>>>>>>
->>>>>>> On 07/26/2017 01:45 AM, Keerthy wrote:
->>>>>>>> The patch adds keystone-k2g compatible, specific properties and
->>>>>>>> an example.
->>>>>>
->> [...]
->>>>>>>
->>>>>>
->>>>>> What about power-domain property?
->>>>
->>>> The correct name is "power-domains".
->>>>
->>>>> Driver has no pm_runtime implemented yet.
->>>>
->>>> True, not yet, but this is in general a required property on K2G SoCs to
->>>> automatically enable clocks through runtime_pm. Clock properties on K2G
->>>> nodes should only be truly required if a driver is using clk API
->>>> (ideally to control optional clocks or for adjusting clock frequencies).
->>>> When the gpio-davinci driver gets updated to use pm_runtime, the clock
->>>> properties will be rendered obsolete for K2G.
->>>>
->>>> Rob,
->>>> Any suggestions on how we need to handle this? Should we be adding the
->>>> property now or later when we adapt the driver for runtime_pm? This
->>>> would be a common theme for K2G nodes that are reusing Davinci drivers.
->>>>
->>>> My take on this would be to add the property now, and mark the clock
->>>> properties obsolete when the driver gets converted.
->>>
->>
->> I don't think SoC wide properties are put into device specific binding
->> documentation, for example pinctrl bindings are not put into device
->> documentation.
-> 
-> I wouldn't compare this to pinctrl bindings exactly but more similar to
-> clocks or the ti,hwmods on OMAP/AM platforms. I see lot of other
-> bindings documenting the power-domains property just as well.
+ drivers/remoteproc/da8xx_remoteproc.c | 30 +++++++++++++++++++++++++++---
+ 1 file changed, 27 insertions(+), 3 deletions(-)
 
-The issue is that 66AK2G utilizes drivers from both Keystone/Davinci and
-OMAP SoC architectures that handles clock and pm in different ways. So
-for various reasons some drivers just need the power-domain property
-which is new and unique to 66AK2G and other drivers just need the clocks
-property while others may also need the clock-names property. This lack
-of consistency makes properly documenting things important. Also 66AK2G
-will never used hwmod property so avoiding that confusion will also be
-helpful if the current bindings document does include references to hwmod.
-
-> 
-> regards
-> Suman
-> 
->>
->>> Rob,
->>>
->>> Any comments on this?
->>>
->>
->> [...]
->>
-> 
+diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
+index c1cff78de67b..bf3b9034c319 100644
+--- a/drivers/remoteproc/da8xx_remoteproc.c
++++ b/drivers/remoteproc/da8xx_remoteproc.c
+@@ -16,6 +16,7 @@
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of_reserved_mem.h>
+ #include <linux/platform_device.h>
+ #include <linux/remoteproc.h>
+ 
+@@ -261,10 +262,21 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+ 		return PTR_ERR(dsp_clk);
+ 	}
+ 
++	if (dev->of_node) {
++		ret = of_reserved_mem_device_init(dev);
++		if (ret) {
++			dev_err(dev, "device does not have specific CMA pool: %d\n",
++				ret);
++			return ret;
++		}
++	}
++
+ 	rproc = rproc_alloc(dev, "dsp", &da8xx_rproc_ops, da8xx_fw_name,
+ 		sizeof(*drproc));
+-	if (!rproc)
+-		return -ENOMEM;
++	if (!rproc) {
++		ret = -ENOMEM;
++		goto free_mem;
++	}
+ 
+ 	drproc = rproc->priv;
+ 	drproc->rproc = rproc;
+@@ -311,7 +323,9 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+ 
+ free_rproc:
+ 	rproc_free(rproc);
+-
++free_mem:
++	if (dev->of_node)
++		of_reserved_mem_device_release(dev);
+ 	return ret;
+ }
+ 
+@@ -319,6 +333,7 @@ static int da8xx_rproc_remove(struct platform_device *pdev)
+ {
+ 	struct rproc *rproc = platform_get_drvdata(pdev);
+ 	struct da8xx_rproc *drproc = (struct da8xx_rproc *)rproc->priv;
++	struct device *dev = &pdev->dev;
+ 
+ 	/*
+ 	 * The devm subsystem might end up releasing things before
+@@ -329,15 +344,24 @@ static int da8xx_rproc_remove(struct platform_device *pdev)
+ 
+ 	rproc_del(rproc);
+ 	rproc_free(rproc);
++	if (dev->of_node)
++		of_reserved_mem_device_release(dev);
+ 
+ 	return 0;
+ }
+ 
++static const struct of_device_id davinci_rproc_of_match[] __maybe_unused = {
++	{ .compatible = "ti,da850-dsp", },
++	{ /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, davinci_rproc_of_match);
++
+ static struct platform_driver da8xx_rproc_driver = {
+ 	.probe = da8xx_rproc_probe,
+ 	.remove = da8xx_rproc_remove,
+ 	.driver = {
+ 		.name = "davinci-rproc",
++		.of_match_table = of_match_ptr(davinci_rproc_of_match),
+ 	},
+ };
+ 
+-- 
+2.13.1
