@@ -1,75 +1,68 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue,  1 Aug 2017 21:13:03 +0800
-Subject: [PATCH 12/13] [NOT FOR REVIEW NOW] ARM: sun8i: h3: enable DesignWare
- HDMI controller
-In-Reply-To: <20170801131304.7741-1-icenowy@aosc.io>
-References: <20170801131304.7741-1-icenowy@aosc.io>
-Message-ID: <20170801131304.7741-13-icenowy@aosc.io>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue,  1 Aug 2017 14:54:12 +0100
+Subject: [PATCH v2 0/2] arm64: Abstract syscallno manipulation
+Message-ID: <1501595654-4014-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The H3 SoC has a DesignWare HDMI controller with some Allwinner-specific
-glues.
+Changes since v1:
 
-Add the related device nodes.
+ * Change the argument of in_syscall() from int sycallno to a struct
+   pt_regs *, since that's more natural for the current callsites.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm/boot/dts/sun8i-h3.dtsi | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+ * Add missing #include of <asm/ptrace.h>.
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 75ad7b65a7fc..cd38d7e04606 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -197,6 +197,11 @@
- 					#address-cells = <1>;
- 					#size-cells = <0>;
- 					reg = <1>;
-+
-+					tcon0_out_hdmi: endpoint at 1 {
-+						reg = <1>;
-+						remote-endpoint = <&hdmi_in_tcon0>;
-+					};
- 				};
- 			};
- 		};
-@@ -240,6 +245,36 @@
- 				};
- 			};
- 		};
-+
-+		hdmi: hdmi at 1ee0000 {
-+			compatible = "allwinner,h3-dw-hdmi";
-+			reg = <0x01ee0000 0x10000>,
-+			      <0x01ef0000 0x10000>;
-+			reg-io-width = <1>;
-+			interrupts = <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_HDMI>, <&ccu CLK_HDMI>,
-+				 <&ccu CLK_HDMI_DDC>;
-+			clock-names = "iahb", "isfr", "iddc";
-+			resets = <&ccu RST_BUS_HDMI0>, <&ccu RST_BUS_HDMI1>;
-+			reset-names = "hdmi", "ddc";
-+			status = "disabled";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				hdmi_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					hdmi_in_tcon0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon0_out_hdmi>;
-+					};
-+				};
-+			};
-+		};
- 	};
- 
- 	timer {
+ * Minor commit message clarifications.
+
+
+Original blurb:
+
+The upper 32 bits of the syscallno field in struct pt_regs are handled
+inconsistently, being sometimes zero extended and sometimes
+sign-extended.  The reason for this appears to be that they are not
+intentionally significant at all.
+
+This series attempts to clarify this situation by getting rid of the
+spurious extra bits and adding a symbolic #define and helpers.
+
+My current motivation for this series is SVE, which will makes use of
+the in_syscall() condition to decide when the user SVE register state
+for a thread can be discarded.
+
+
+The refactoring done by this series also fixes a strange behaviour
+observable in ftrace when a tracer cancels a syscall in a compat
+binary.  Currently, ftrace traces the syscall number erroneously in
+this case:
+
+    cancel-sys32-2142  [001] ....  1740.510558: sys_enter: NR 4294967295 (1, 6a364, e, 0, 0, 85e)
+
+instead of the expected:
+
+    cancel-sys32-2142  [001] ....  1740.510558: sys_enter: NR -1 (1, 6a364, e, 0, 0, 85e)
+
+(Native always says -1, as one might expect.)
+
+
+The gdb testsuite reports no regressions resulting from this series.
+
+For big-endian, I have only boot-tested, and checked by inspection that
+the offset of syscallno in pt_regs is transformed in the correct way
+(+4) compared with little-endian.
+
+
+Dave Martin (2):
+  arm64: syscallno is secretly an int, make it official
+  arm64: Abstract syscallno manipulation
+
+ arch/arm64/include/asm/processor.h |  2 +-
+ arch/arm64/include/asm/ptrace.h    | 30 +++++++++++++++++++++++++++-
+ arch/arm64/kernel/entry.S          | 40 ++++++++++++++++++--------------------
+ arch/arm64/kernel/ptrace.c         |  2 +-
+ arch/arm64/kernel/signal.c         | 10 +++++-----
+ arch/arm64/kernel/signal32.c       |  2 +-
+ arch/arm64/kernel/traps.c          |  2 +-
+ 7 files changed, 57 insertions(+), 31 deletions(-)
+
 -- 
-2.13.0
+2.1.4
