@@ -1,30 +1,69 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue,  1 Aug 2017 21:12:55 +0800
-Subject: [PATCH 04/13] drm: sun4i: add compatible for H3 display engine
+Date: Tue,  1 Aug 2017 21:13:04 +0800
+Subject: [PATCH 13/13] [NOT FOR REVIEW NOW] ARM: sun8i: h3: enable HDMI output
+ on Orange Pi PC
 In-Reply-To: <20170801131304.7741-1-icenowy@aosc.io>
 References: <20170801131304.7741-1-icenowy@aosc.io>
-Message-ID: <20170801131304.7741-5-icenowy@aosc.io>
+Message-ID: <20170801131304.7741-14-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a compatible string for H3 display engine in sun4i_drv code.
+Orange Pi PC board has a HDMI-A port connected to the HDMI controller of
+Allwinner H3 SoC.
+
+Enable the HDMI output in Orange Pi PC device tree.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index fd99fe8a4df7..02c80bb7b385 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -314,6 +314,7 @@ static const struct of_device_id sun4i_drv_of_table[] = {
- 	{ .compatible = "allwinner,sun6i-a31-display-engine" },
- 	{ .compatible = "allwinner,sun6i-a31s-display-engine" },
- 	{ .compatible = "allwinner,sun8i-a33-display-engine" },
-+	{ .compatible = "allwinner,sun8i-h3-display-engine" },
- 	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
- 	{ }
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+index 998b60f8d295..0e3326399590 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -98,6 +98,10 @@
+ 	status = "okay";
  };
+ 
++&de {
++	status = "okay";
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -121,12 +125,20 @@
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	status = "okay";
++};
++
+ &ir {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&ir_pins_a>;
+ 	status = "okay";
+ };
+ 
++&mixer0 {
++	status = "okay";
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+@@ -177,6 +189,10 @@
+ 	status = "okay";
+ };
+ 
++&tcon0 {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 2.13.0
