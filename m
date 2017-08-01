@@ -1,39 +1,28 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue,  1 Aug 2017 21:12:59 +0800
-Subject: [PATCH 08/13] [NOT FOR REVIEW NOW] drm: bridge: Enable polling hpd
- event in dw_hdmi
-In-Reply-To: <20170801131304.7741-1-icenowy@aosc.io>
-References: <20170801131304.7741-1-icenowy@aosc.io>
-Message-ID: <20170801131304.7741-9-icenowy@aosc.io>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 1 Aug 2017 15:44:06 +0200
+Subject: [PATCH 1/4] ARM: mediatek: dts: Cleanup bindings documentation
+In-Reply-To: <20170724195644.oztdexqhicir5xn3@rob-hp-laptop>
+References: <20170720102247.12342-1-matthias.bgg@gmail.com>
+ <20170724195644.oztdexqhicir5xn3@rob-hp-laptop>
+Message-ID: <5451bdfa-e2c1-30cb-a5a9-252662b2d190@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jernej Skrabec <jernej.skrabec@siol.net>
 
-Some custom phys don't support hpd interrupts. Add support for polling
-such events.
 
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
----
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+On 07/24/2017 09:56 PM, Rob Herring wrote:
+> On Thu, Jul 20, 2017 at 12:22:44PM +0200, Matthias Brugger wrote:
+>> From: Matthias Brugger <mbrugger@suse.com>
+>>
+>> This patch cleans up the binding documentation stating explicitly
+>> the binding and it's fallback for every SoC.
+>>
+>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>> ---
+>>   Documentation/devicetree/bindings/watchdog/mtk-wdt.txt | 5 ++---
+>>   1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+> 
 
-diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-index 60faf2d2bc6b..6c6466c6297c 100644
---- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-@@ -1942,7 +1942,11 @@ static int dw_hdmi_bridge_attach(struct drm_bridge *bridge)
- 	struct drm_connector *connector = &hdmi->connector;
- 
- 	connector->interlace_allowed = 1;
--	connector->polled = DRM_CONNECTOR_POLL_HPD;
-+	if (hdmi->phy.ops->setup_hpd)
-+		connector->polled = DRM_CONNECTOR_POLL_HPD;
-+	else
-+		connector->polled = DRM_CONNECTOR_POLL_CONNECT |
-+				    DRM_CONNECTOR_POLL_DISCONNECT;
- 
- 	drm_connector_helper_add(connector, &dw_hdmi_connector_helper_funcs);
- 
--- 
-2.13.0
+Thanks. Whole series pushed now to v4.13-next/dts64
