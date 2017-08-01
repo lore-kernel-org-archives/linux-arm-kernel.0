@@ -1,21 +1,20 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 1 Aug 2017 10:18:01 +0200
-Subject: [PATCH 6/6] pinctrl: uniphier: add UniPhier PXs3 pinctrl driver
-In-Reply-To: <1501482071-9819-7-git-send-email-yamada.masahiro@socionext.com>
-References: <1501482071-9819-1-git-send-email-yamada.masahiro@socionext.com>
- <1501482071-9819-7-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdYtSBG-hy+YefTMw0wijM2KmAV8DmvT7_bhsEfhSOJKRg@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 1 Aug 2017 16:18:11 +0800
+Subject: [linux-sunxi] [PATCH v3 04/12] ASoC: sun4i-i2s: Add TX FIFO
+ offset to quirks
+In-Reply-To: <20170729141753.20174-5-codekipper@gmail.com>
+References: <20170729141753.20174-1-codekipper@gmail.com>
+ <20170729141753.20174-5-codekipper@gmail.com>
+Message-ID: <CAGb2v64P3Kc9MOe2SsVv4QjiwFfrvtjdd8z0OzjpqPQP+q3bkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 8:21 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-
-> Add pin configuration and pinmux support for UniPhier PXs3 SoC.
+On Sat, Jul 29, 2017 at 10:17 PM,  <codekipper@gmail.com> wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 >
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> It has been seen that the newer SoCs have a different TX FIFO
+> address. Add this to the quirks structure.
+>
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 
-Patch applied.
-
-Yours,
-Linus Walleij
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
