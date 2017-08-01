@@ -1,97 +1,23 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 1 Aug 2017 12:35:23 +0100
-Subject: [RFC PATCH v2 05/19] KVM: arm/arm64: Check that system supports
- split eoi/deactivate
-In-Reply-To: <20170717142718.13853-6-cdall@linaro.org>
-References: <20170717142718.13853-1-cdall@linaro.org>
- <20170717142718.13853-6-cdall@linaro.org>
-Message-ID: <3ca8bc15-b5e7-abf7-78cc-9bbc5332c267@arm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 1 Aug 2017 14:37:03 +0300
+Subject: [PATCH RFC] arm64: introduce mm_context_t flags
+In-Reply-To: <5e0f1ae7-3a69-0d1c-3f33-ddb44ed8b6c5@redhat.com>
+References: <20170731144825.31322-1-ynorov@caviumnetworks.com>
+ <5e0f1ae7-3a69-0d1c-3f33-ddb44ed8b6c5@redhat.com>
+Message-ID: <20170801113703.ufn7tg2lvn4mr3so@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/17 15:27, Christoffer Dall wrote:
-> Some systems without proper firmware and/or hardware description data
-> don't support the split EOI and deactivate operation.
+On Tue, Aug 01, 2017 at 09:10:05AM +0530, Pratyush Anand wrote:
 > 
-> On such systems, we cannot leave the physical interrupt active after the
-> timer handler on the host has run, so we cannot support KVM with an
-> in-kernel GIC with the timer changes we about to introduce.
 > 
-> This patch makes sure that trying to initialize the KVM GIC code will
-> fail on such systems.
+> On Monday 31 July 2017 08:18 PM, Yury Norov wrote:
+> >   - If we start using TIF flags here, we cannot easily add new mm_context
+> >     specific bits because they may mess with TIF ones.
 > 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> ---
->  drivers/irqchip/irq-gic.c | 12 +++++++++---
->  1 file changed, 9 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index 090991f..b7e4fed 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -1391,7 +1391,8 @@ int gic_of_init_child(struct device *dev, struct gic_chip_data **gic, int irq)
->  	return 0;
->  }
->  
-> -static void __init gic_of_setup_kvm_info(struct device_node *node)
-> +static void __init gic_of_setup_kvm_info(struct device_node *node,
-> +					 bool supports_deactivate)
+> This one seems convincing argument. ATM do you have any mm_context flag
+> which would you like to incorporate?
 
-Ouch, nasty. This shadows the static key which is also called
-supports_deactivate...
+I think no
 
->  {
->  	int ret;
->  	struct resource *vctrl_res = &gic_v2_kvm_info.vctrl;
-> @@ -1411,6 +1412,9 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
->  	if (ret)
->  		return;
->  
-> +	if (!supports_deactivate)
-> +		return;
-> +
->  	gic_set_kvm_info(&gic_v2_kvm_info);
-
-Speaking of which, the static key should already be initialized, so this
-could actually read:
-
-	if (static_key_true(&supports_deactivate))
-		gic_set_kvm_info(&gic_v2_kvm_info);
-
->  }
->  
-> @@ -1419,6 +1423,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->  {
->  	struct gic_chip_data *gic;
->  	int irq, ret;
-> +	bool has_eoimode;
->  
->  	if (WARN_ON(!node))
->  		return -ENODEV;
-> @@ -1436,7 +1441,8 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->  	 * Disable split EOI/Deactivate if either HYP is not available
->  	 * or the CPU interface is too small.
->  	 */
-> -	if (gic_cnt == 0 && !gic_check_eoimode(node, &gic->raw_cpu_base))
-> +	has_eoimode = gic_check_eoimode(node, &gic->raw_cpu_base);
-> +	if (gic_cnt == 0 && !has_eoimode)
->  		static_key_slow_dec(&supports_deactivate);
->  
->  	ret = __gic_init_bases(gic, -1, &node->fwnode);
-> @@ -1447,7 +1453,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
->  
->  	if (!gic_cnt) {
->  		gic_init_physaddr(node);
-> -		gic_of_setup_kvm_info(node);
-> +		gic_of_setup_kvm_info(node, has_eoimode);
->  	}
->  
->  	if (parent) {
-> 
-
-and we shouldn't need any of this. What do you think?
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Yury
