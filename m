@@ -1,108 +1,136 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Tue, 1 Aug 2017 11:53:09 +0100
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170731125548.00007b68@huawei.com>
-References: <20170726.095432.169004918437663011.davem@davemloft.net>
- <20170726175013.GT3730@linux.vnet.ibm.com>
- <20170726223658.GA27617@linux.vnet.ibm.com>
- <20170726.154540.150558937277891719.davem@davemloft.net>
- <20170726231505.GG3730@linux.vnet.ibm.com>
- <20170731120908.00002e28@huawei.com>
- <20170731125548.00007b68@huawei.com>
-Message-ID: <20170801115309.000070fd@huawei.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 1 Aug 2017 11:53:45 +0100
+Subject: [PATCH] arm64: acpi/gtdt: validate CNTFRQ after having enabled
+ the frame
+In-Reply-To: <20170724151053.17769-1-ard.biesheuvel@linaro.org>
+References: <20170724151053.17769-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170801105345.GB9347@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ard,
 
-Sorry - accidental send.  No content!
+Thanks for this. Sorry it's taken a while to reply.
 
-Jonathan
-
-On Mon, 31 Jul 2017 12:55:48 +0100
-Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
-
-> On Mon, 31 Jul 2017 12:09:08 +0100
-> Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
+On Mon, Jul 24, 2017 at 04:10:53PM +0100, Ard Biesheuvel wrote:
+> The ACPI GTDT code validates the CNTFRQ field of each MMIO timer
+> frame against the CNTFRQ system register of the current CPU, to
+> ensure that they are equal, which is mandated by the architecture.
 > 
-> > On Wed, 26 Jul 2017 16:15:05 -0700
-> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> >   
-> > > On Wed, Jul 26, 2017 at 03:45:40PM -0700, David Miller wrote:    
-> > > > From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
-> > > > Date: Wed, 26 Jul 2017 15:36:58 -0700
-> > > >       
-> > > > > And without CONFIG_SOFTLOCKUP_DETECTOR, I see five runs of 24 with RCU
-> > > > > CPU stall warnings.  So it seems likely that CONFIG_SOFTLOCKUP_DETECTOR
-> > > > > really is having an effect.      
-> > > > 
-> > > > Thanks for all of the info Paul, I'll digest this and scan over the
-> > > > code myself.
-> > > > 
-> > > > Just out of curiousity, what x86 idle method is your machine using?
-> > > > The mwait one or the one which simply uses 'halt'?  The mwait variant
-> > > > might mask this bug, and halt would be a lot closer to how sparc64 and
-> > > > Jonathan's system operates.      
-> > > 
-> > > My kernel builds with CONFIG_INTEL_IDLE=n, which I believe means that
-> > > I am not using the mwait one.  Here is a grep for IDLE in my .config:
-> > > 
-> > > 	CONFIG_NO_HZ_IDLE=y
-> > > 	CONFIG_GENERIC_SMP_IDLE_THREAD=y
-> > > 	# CONFIG_IDLE_PAGE_TRACKING is not set
-> > > 	CONFIG_ACPI_PROCESSOR_IDLE=y
-> > > 	CONFIG_CPU_IDLE=y
-> > > 	# CONFIG_CPU_IDLE_GOV_LADDER is not set
-> > > 	CONFIG_CPU_IDLE_GOV_MENU=y
-> > > 	# CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED is not set
-> > > 	# CONFIG_INTEL_IDLE is not set
-> > >     
-> > > > On sparc64 the cpu yield we do in the idle loop sleeps the cpu.  It's
-> > > > local TICK register keeps advancing, and the local timer therefore
-> > > > will still trigger.  Also, any externally generated interrupts
-> > > > (including cross calls) will wake up the cpu as well.
-> > > > 
-> > > > The tick-sched code is really tricky wrt. NO_HZ even in the NO_HZ_IDLE
-> > > > case.  One of my running theories is that we miss scheduling a tick
-> > > > due to a race.  That would be consistent with the behavior we see
-> > > > in the RCU dumps, I think.      
-> > > 
-> > > But wouldn't you have to miss a -lot- of ticks to get an RCU CPU stall
-> > > warning?  By default, your grace period needs to extend for more than
-> > > 21 seconds (more than one-third of a -minute-) to get one.  Or do
-> > > you mean that the ticks get shut off now and forever, as opposed to
-> > > just losing one of them?
-> > >     
-> > > > Anyways, just a theory, and that's why I keep mentioning that commit
-> > > > about the revert of the revert (specifically
-> > > > 411fe24e6b7c283c3a1911450cdba6dd3aaea56e).
-> > > > 
-> > > > :-)      
-> > > 
-> > > I am running an overnight test in preparation for attempting to push
-> > > some fixes for regressions into 4.12, but will try reverting this
-> > > and enabling CONFIG_HZ_PERIODIC tomorrow.
-> > > 
-> > > Jonathan, might the commit that Dave points out above be what reduces
-> > > the probability of occurrence as you test older releases?    
-> > I just got around to trying this out of curiosity.  Superficially it did
-> > appear to possibly make the issue harder to hit took over 30 minutes
-> > but the issue otherwise looks much the same with or without that patch.
-> > 
-> > Just out of curiosity, next thing on my list is to disable hrtimers entirely
-> > and see what happens.
-> > 
-> > Jonathan  
-> > > 
-> > > 							Thanx, Paul
-> > >     
-> > 
-> > _______________________________________________
-> > linuxarm mailing list
-> > linuxarm at huawei.com
-> > http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm  
+> However, reading the CNTFRQ field of a frame is not possible until
+> the RFRQ bit in the frame's CNTACRn register is set, and doing so
+> before that willl produce the following error:
 > 
-> _______________________________________________
-> linuxarm mailing list
-> linuxarm at huawei.com
-> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+>   arch_timer: [Firmware Bug]: CNTFRQ mismatch: frame @ 0x00000000e0be0000: (0x00000000), CPU: (0x0ee6b280)
+>   arch_timer: Disabling MMIO timers due to CNTFRQ mismatch
+>   arch_timer: Failed to initialize memory-mapped timer.
+> 
+> The reason is that the CNTFRQ field is RES0 if access is not enabled.
+> 
+> So move the validation of CNTFRQ into the loop that iterates over the
+> timers to find the best frame, and only validate the frame that has
+> been selected as the best frame (and has thus been enabled).
+
+The intention here was to verify all frames, such that if/when we choose
+to use other frames in future, CNTFRQ will be valid. This is stricter
+than the DT case, which I'd also make stricter were it not for legacy.
+
+So while that check needs to be corrected, I'd like to retain the check
+for all frames.
+
+> (Note that there is no point in trying other frames of the same timer
+> if the validation fails, since they are all architecturally guaranteed
+> to have the same value for CNTFRQ)
+> 
+> Oh, and while we're at it, fix the bogus 'i = i' initializer in the
+> for() loop that iterates over the timers.
+
+Matthias Kaehlcke just sent a patch for this alone. I'd like to take
+that as an ortohogonal fix while we sort out the dodgy CNTFRQ check.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-July/522472.html
+
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/clocksource/arm_arch_timer.c | 44 ++++++++++++++++--------------------
+>  1 file changed, 20 insertions(+), 24 deletions(-)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 8b5c30062d99..8fb632633331 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -1387,22 +1387,12 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
+>  
+>  #ifdef CONFIG_ACPI_GTDT
+>  static int __init
+> -arch_timer_mem_verify_cntfrq(struct arch_timer_mem *timer_mem)
+> +arch_timer_mem_verify_cntfrq(struct arch_timer_mem_frame *frame)
+>  {
+> -	struct arch_timer_mem_frame *frame;
+>  	u32 rate;
+> -	int i;
+> -
+> -	for (i = 0; i < ARCH_TIMER_MEM_MAX_FRAMES; i++) {
+> -		frame = &timer_mem->frame[i];
+> -
+> -		if (!frame->valid)
+> -			continue;
+> -
+> -		rate = arch_timer_mem_frame_get_cntfrq(frame);
+> -		if (rate == arch_timer_rate)
+> -			continue;
+>  
+> +	rate = arch_timer_mem_frame_get_cntfrq(frame);
+> +	if (rate != arch_timer_rate) {
+>  		pr_err(FW_BUG "CNTFRQ mismatch: frame @ %pa: (0x%08lx), CPU: (0x%08lx)\n",
+>  			&frame->cntbase,
+>  			(unsigned long)rate, (unsigned long)arch_timer_rate);
+> @@ -1428,24 +1418,30 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
+>  	if (ret || !timer_count)
+>  		goto out;
+>  
+> -	for (i = 0; i < timer_count; i++) {
+> -		ret = arch_timer_mem_verify_cntfrq(&timers[i]);
+> -		if (ret) {
+> -			pr_err("Disabling MMIO timers due to CNTFRQ mismatch\n");
+> -			goto out;
+> -		}
+> -	}
+> -
+>  	/*
+>  	 * While unlikely, it's theoretically possible that none of the frames
+> -	 * in a timer expose the combination of feature we want.
+> +	 * in a timer expose the combination of features we want.
+>  	 */
+> -	for (i = i; i < timer_count; i++) {
+> +	for (i = 0; i < timer_count; i++) {
+>  		timer = &timers[i];
+>  
+>  		frame = arch_timer_mem_find_best_frame(timer);
+> -		if (frame)
+> +		if (!frame)
+> +			continue;
+> +
+> +		/* validate CNTFRQ after having enabled the frame */
+> +		ret = arch_timer_mem_verify_cntfrq(frame);
+> +		if (!ret)
+>  			break;
+> +
+> +		/*
+> +		 * If this timer provides a suitable frame but with the wrong
+> +		 * value for the CNTFRQ field, there is no point in trying other
+> +		 * frames of the same timer, given that they are architecturally
+> +		 * guaranteed to carry the same CNTFRQ value. So just carry on
+> +		 * with the next timer instead.
+> +		 */
+> +		frame = NULL;
+>  	}
+>  
+>  	if (frame)
+> -- 
+> 2.9.3
+> 
