@@ -1,173 +1,98 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue,  1 Aug 2017 21:12:54 +0800
-Subject: [PATCH 03/13] drm: sun4i: add support for H3's TCON
+Date: Tue,  1 Aug 2017 21:12:52 +0800
+Subject: [PATCH 01/13] dt-bindings: update the binding for Allwinner H3 DE2
+ support
 In-Reply-To: <20170801131304.7741-1-icenowy@aosc.io>
 References: <20170801131304.7741-1-icenowy@aosc.io>
-Message-ID: <20170801131304.7741-4-icenowy@aosc.io>
+Message-ID: <20170801131304.7741-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.xyz>
+Allwinner H3 features a "Display Engine 2.0".
 
-Allwinner H3 has two special TCONs without channel 0.
-
-Add support for this kind of TCON.
+Add device tree bindings for the following parts:
+- H3 TCONs
+- H3 Mixers
+- H3 Display engine
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c  |  1 +
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 43 +++++++++++++++++++++++++++-----------
- drivers/gpu/drm/sun4i/sun4i_tcon.h |  1 +
- 3 files changed, 33 insertions(+), 12 deletions(-)
+ .../bindings/display/sunxi/sun4i-drm.txt           | 25 ++++++++++++++++++----
+ 1 file changed, 21 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index ace59651892f..fd99fe8a4df7 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -188,6 +188,7 @@ static bool sun4i_drv_node_is_tcon(struct device_node *node)
- 		of_device_is_compatible(node, "allwinner,sun6i-a31-tcon") ||
- 		of_device_is_compatible(node, "allwinner,sun6i-a31s-tcon") ||
- 		of_device_is_compatible(node, "allwinner,sun8i-a33-tcon") ||
-+		of_device_is_compatible(node, "allwinner,sun8i-h3-tcon") ||
- 		of_device_is_compatible(node, "allwinner,sun8i-v3s-tcon");
- }
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 2ee6ff0ef98e..92512953943e 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -87,18 +87,17 @@ Required properties:
+    * allwinner,sun6i-a31-tcon
+    * allwinner,sun6i-a31s-tcon
+    * allwinner,sun8i-a33-tcon
++   * allwinner,sun8i-h3-tcon
+    * allwinner,sun8i-v3s-tcon
+  - reg: base address and size of memory-mapped region
+  - interrupts: interrupt associated to this IP
+  - clocks: phandles to the clocks feeding the TCON. Three are needed:
+    - 'ahb': the interface clocks
+-   - 'tcon-ch0': The clock driving the TCON channel 0
+  - resets: phandles to the reset controllers driving the encoder
+    - "lcd": the reset line for the TCON channel 0
  
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index d9791292553e..270f09e381a5 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -59,6 +59,7 @@ void sun4i_tcon_channel_disable(struct sun4i_tcon *tcon, int channel)
+  - clock-names: the clock names mentioned above
+  - reset-names: the reset names mentioned above
+- - clock-output-names: Name of the pixel clock created
  
- 	/* Disable the TCON's channel */
- 	if (channel == 0) {
-+		WARN_ON(!tcon->quirks->has_channel_0);
- 		regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
- 				   SUN4I_TCON0_CTL_TCON_ENABLE, 0);
- 		clk_disable_unprepare(tcon->dclk);
-@@ -78,6 +79,7 @@ void sun4i_tcon_channel_enable(struct sun4i_tcon *tcon, int channel)
+ - ports: A ports node with endpoint definitions as defined in
+   Documentation/devicetree/bindings/media/video-interfaces.txt. The
+@@ -112,7 +111,23 @@ Required properties:
+   channel the endpoint is associated to. If that property is not
+   present, the endpoint number will be used as the channel number.
  
- 	/* Enable the TCON's channel */
- 	if (channel == 0) {
-+		WARN_ON(!tcon->quirks->has_channel_0);
- 		regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
- 				   SUN4I_TCON0_CTL_TCON_ENABLE,
- 				   SUN4I_TCON0_CTL_TCON_ENABLE);
-@@ -157,6 +159,8 @@ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
- 	u8 clk_delay;
- 	u32 val = 0;
- 
-+	WARN_ON(!tcon->quirks->has_channel_0);
+-On SoCs other than the A33 and V3s, there is one more clock required:
++For the following compatibles:
++   * allwinner,sun5i-a13-tcon
++   * allwinner,sun6i-a31-tcon
++   * allwinner,sun6i-a31s-tcon
++   * allwinner,sun8i-a33-tcon
++   * allwinner,sun8i-v3s-tcon
++there is one more clock and one more property required:
++ - clocks:
++   - 'tcon-ch0': The clock driving the TCON channel 0
++ - clock-output-names: Name of the pixel clock created
 +
- 	/* Configure the dot clock */
- 	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
++For the following compatibles:
++   * allwinner,sun5i-a13-tcon
++   * allwinner,sun6i-a31-tcon
++   * allwinner,sun6i-a31s-tcon
++   * allwinner,sun8i-h3-tcon
++there is one more clock required:
+    - 'tcon-ch1': The clock driving the TCON channel 1
  
-@@ -366,10 +370,12 @@ static int sun4i_tcon_init_clocks(struct device *dev,
- 	}
- 	clk_prepare_enable(tcon->clk);
+ DRC
+@@ -207,6 +222,8 @@ supported.
+ Required properties:
+   - compatible: value must be one of:
+     * allwinner,sun8i-v3s-de2-mixer
++    * allwinner,sun8i-h3-de2-mixer0
++    * allwinner,sun8i-h3-de2-mixer1
+   - reg: base address and size of the memory-mapped region.
+   - clocks: phandles to the clocks feeding the mixer
+     * bus: the mixer interface clock
+@@ -218,7 +235,6 @@ Required properties:
+   Documentation/devicetree/bindings/media/video-interfaces.txt. The
+   first port should be the input endpoints, the second one the output
  
--	tcon->sclk0 = devm_clk_get(dev, "tcon-ch0");
--	if (IS_ERR(tcon->sclk0)) {
--		dev_err(dev, "Couldn't get the TCON channel 0 clock\n");
--		return PTR_ERR(tcon->sclk0);
-+	if (tcon->quirks->has_channel_0) {
-+		tcon->sclk0 = devm_clk_get(dev, "tcon-ch0");
-+		if (IS_ERR(tcon->sclk0)) {
-+			dev_err(dev, "Couldn't get the TCON channel 0 clock\n");
-+			return PTR_ERR(tcon->sclk0);
-+		}
- 	}
+-
+ Display Engine Pipeline
+ -----------------------
  
- 	if (tcon->quirks->has_channel_1) {
-@@ -551,10 +557,12 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 		goto err_free_clocks;
- 	}
+@@ -233,6 +249,7 @@ Required properties:
+     * allwinner,sun6i-a31-display-engine
+     * allwinner,sun6i-a31s-display-engine
+     * allwinner,sun8i-a33-display-engine
++    * allwinner,sun8i-h3-display-engine
+     * allwinner,sun8i-v3s-display-engine
  
--	ret = sun4i_dclk_create(dev, tcon);
--	if (ret) {
--		dev_err(dev, "Couldn't create our TCON dot clock\n");
--		goto err_free_clocks;
-+	if (tcon->quirks->has_channel_0) {
-+		ret = sun4i_dclk_create(dev, tcon);
-+		if (ret) {
-+			dev_err(dev, "Couldn't create our TCON dot clock\n");
-+			goto err_free_clocks;
-+		}
- 	}
- 
- 	ret = sun4i_tcon_init_irq(dev, tcon);
-@@ -579,7 +587,8 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 	return 0;
- 
- err_free_dotclock:
--	sun4i_dclk_free(tcon);
-+	if (tcon->quirks->has_channel_0)
-+		sun4i_dclk_free(tcon);
- err_free_clocks:
- 	sun4i_tcon_free_clocks(tcon);
- err_assert_reset:
-@@ -593,7 +602,9 @@ static void sun4i_tcon_unbind(struct device *dev, struct device *master,
- 	struct sun4i_tcon *tcon = dev_get_drvdata(dev);
- 
- 	list_del(&tcon->list);
--	sun4i_dclk_free(tcon);
-+
-+	if (tcon->quirks->has_channel_0)
-+		sun4i_dclk_free(tcon);
- 	sun4i_tcon_free_clocks(tcon);
- }
- 
-@@ -625,23 +636,30 @@ static int sun4i_tcon_remove(struct platform_device *pdev)
- 
- static const struct sun4i_tcon_quirks sun5i_a13_quirks = {
- 	.has_unknown_mux = true,
-+	.has_channel_0	= true,
- 	.has_channel_1	= true,
- };
- 
- static const struct sun4i_tcon_quirks sun6i_a31_quirks = {
-+	.has_channel_0	= true,
- 	.has_channel_1	= true,
- };
- 
- static const struct sun4i_tcon_quirks sun6i_a31s_quirks = {
-+	.has_channel_0	= true,
- 	.has_channel_1	= true,
- };
- 
- static const struct sun4i_tcon_quirks sun8i_a33_quirks = {
--	/* nothing is supported */
-+	.has_channel_0	= true,
- };
- 
- static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
--	/* nothing is supported */
-+	.has_channel_0	= true,
-+};
-+
-+static const struct sun4i_tcon_quirks sun8i_h3_quirks = {
-+	.has_channel_1	= true,
- };
- 
- static const struct of_device_id sun4i_tcon_of_table[] = {
-@@ -649,6 +667,7 @@ static const struct of_device_id sun4i_tcon_of_table[] = {
- 	{ .compatible = "allwinner,sun6i-a31-tcon", .data = &sun6i_a31_quirks },
- 	{ .compatible = "allwinner,sun6i-a31s-tcon", .data = &sun6i_a31s_quirks },
- 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
-+	{ .compatible = "allwinner,sun8i-h3-tcon", .data = &sun8i_h3_quirks },
- 	{ .compatible = "allwinner,sun8i-v3s-tcon", .data = &sun8i_v3s_quirks },
- 	{ }
- };
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index 552c88ec16be..de035e598129 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -145,6 +145,7 @@
- 
- struct sun4i_tcon_quirks {
- 	bool	has_unknown_mux; /* sun5i has undocumented mux */
-+	bool	has_channel_0;	/* some A83T+ TCONs don't have channel 0*/
- 	bool	has_channel_1;	/* a33 does not have channel 1 */
- };
- 
+   - allwinner,pipelines: list of phandle to the display engine
 -- 
 2.13.0
