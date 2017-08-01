@@ -1,141 +1,39 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 1 Aug 2017 16:57:46 +0200
-Subject: [RFC PATCH v2 06/19] KVM: arm/arm64: Make timer_arm and
- timer_disarm helpers more generic
-In-Reply-To: <f7871c0f-50db-45cc-c161-32c4b54497ac@arm.com>
-References: <20170717142718.13853-1-cdall@linaro.org>
- <20170717142718.13853-7-cdall@linaro.org>
- <f7871c0f-50db-45cc-c161-32c4b54497ac@arm.com>
-Message-ID: <20170801145746.GJ5176@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 1 Aug 2017 15:57:04 +0100
+Subject: [PATCH] arm64: acpi/gtdt: validate CNTFRQ after having enabled
+ the frame
+In-Reply-To: <20170801113120.GD9347@leverpostej>
+References: <20170724151053.17769-1-ard.biesheuvel@linaro.org>
+ <20170801105345.GB9347@leverpostej>
+ <CAKv+Gu8jD_oJV138qWGQm2dOnqJTSxSNNQ7xFCPtb4efyR9n1Q@mail.gmail.com>
+ <20170801113120.GD9347@leverpostej>
+Message-ID: <20170801145704.GA27566@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 01, 2017 at 03:10:59PM +0100, Marc Zyngier wrote:
-> On 17/07/17 15:27, Christoffer Dall wrote:
-> > We are about to add an additional soft timer to the arch timer state for
-> > a VCPU and would like to be able to reuse the functions to program and
-> > cancel a timer, so we make them slightly more generic and rename to make
-> > it more clear that these functions work on soft timers and not the
-> > hardware resource that this code is managing.
-> > 
-> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > ---
-> >  virt/kvm/arm/arch_timer.c | 33 ++++++++++++++++-----------------
-> >  1 file changed, 16 insertions(+), 17 deletions(-)
-> > 
-> > diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> > index 8e89d63..871d8ae 100644
-> > --- a/virt/kvm/arm/arch_timer.c
-> > +++ b/virt/kvm/arm/arch_timer.c
-> > @@ -56,26 +56,22 @@ u64 kvm_phys_timer_read(void)
-> >  	return timecounter->cc->read(timecounter->cc);
-> >  }
-> >  
-> > -static bool timer_is_armed(struct arch_timer_cpu *timer)
-> > +static bool soft_timer_is_armed(struct arch_timer_cpu *timer)
-> >  {
-> >  	return timer->armed;
-> >  }
-> >  
-> > -/* timer_arm: as in "arm the timer", not as in ARM the company */
-> > -static void timer_arm(struct arch_timer_cpu *timer, u64 ns)
-> > +static void soft_timer_start(struct hrtimer *hrt, u64 ns)
-> 
-> I find it a bit confusing that the soft_timer_* functions operate on
-> different object types: arch_timer_cpu for soft_timer_is_armed(), and
-> hrtimer for soft_timer_start. Is there anything that prevents us from
-> keeping arch_timer_cpu for all of them?
-> 
+On Tue, Aug 01, 2017 at 12:31:21PM +0100, Mark Rutland wrote:
+> On Tue, Aug 01, 2017 at 12:09:32PM +0100, Ard Biesheuvel wrote:
 
-The problem is now we have two timers for a VCPU, one which is shared
-between the two timer contexts (physical and virtual) used when the
-process goes to sleep with a programmed timer, and one used to exit the
-guest for the physical timer emulation.  So I either need to provide
-some sideband information or use the hrtimer pointer.
-
-I tried to address this in later patches by renaming timer_is_armed() to
-bg_timer_is_armed(), but I'm open to better suggestions.
-
-
-> >  {
-> > -	timer->armed = true;
-> > -	hrtimer_start(&timer->timer, ktime_add_ns(ktime_get(), ns),
-> > +	hrtimer_start(hrt, ktime_add_ns(ktime_get(), ns),
-> >  		      HRTIMER_MODE_ABS);
-> >  }
-> >  
-> > -static void timer_disarm(struct arch_timer_cpu *timer)
-> > +static void soft_timer_cancel(struct hrtimer *hrt, struct work_struct *work)
-> >  {
-> > -	if (timer_is_armed(timer)) {
-> > -		hrtimer_cancel(&timer->timer);
-> > -		cancel_work_sync(&timer->expired);
-> > -		timer->armed = false;
-> > -	}
-> > +	hrtimer_cancel(hrt);
-> > +	if (work)
-> > +		cancel_work_sync(work);
-> >  }
-> >  
-> >  static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
-> > @@ -271,7 +267,7 @@ static void kvm_timer_emulate(struct kvm_vcpu *vcpu,
-> >  		return;
-> >  
-> >  	/*  The timer has not yet expired, schedule a background timer */
-> > -	timer_arm(timer, kvm_timer_compute_delta(timer_ctx));
-> > +	soft_timer_start(&timer->timer, kvm_timer_compute_delta(timer_ctx));
-> >  }
-> >  
-> >  /*
-> > @@ -285,7 +281,7 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
-> >  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-> >  	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-> >  
-> > -	BUG_ON(timer_is_armed(timer));
-> > +	BUG_ON(soft_timer_is_armed(timer));
-> >  
-> >  	/*
-> >  	 * No need to schedule a background timer if any guest timer has
-> > @@ -306,13 +302,16 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
-> >  	 * The guest timers have not yet expired, schedule a background timer.
-> >  	 * Set the earliest expiration time among the guest timers.
-> >  	 */
-> > -	timer_arm(timer, kvm_timer_earliest_exp(vcpu));
-> > +	timer->armed = true;
-> > +	soft_timer_start(&timer->timer, kvm_timer_earliest_exp(vcpu));
-> >  }
-> >  
-> >  void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
-> >  {
-> >  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> > -	timer_disarm(timer);
-> > +
-> > +	soft_timer_cancel(&timer->timer, &timer->expired);
-> > +	timer->armed = false;
-> >  }
-> >  
-> >  static void kvm_timer_flush_hwstate_vgic(struct kvm_vcpu *vcpu)
-> > @@ -448,7 +447,7 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
-> >  	 * This is to cancel the background timer for the physical timer
-> >  	 * emulation if it is set.
-> >  	 */
-> > -	timer_disarm(timer);
-> > +	soft_timer_cancel(&timer->timer, &timer->expired);
-> >  
-> >  	/*
-> >  	 * The guest could have modified the timer registers or the timer
-> > @@ -615,7 +614,7 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
-> >  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> >  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-> >  
-> > -	timer_disarm(timer);
-> > +	soft_timer_cancel(&timer->timer, &timer->expired);
-> >  	kvm_vgic_unmap_phys_irq(vcpu, vtimer->irq.irq);
-> >  }
-> >  
-> > 
+> > The point here is that CNTFRQ cannot differ between frames. It either
+> > returns the value of the base frame or RES0.
 > 
-> Otherwise looks good to me.
+> Sorry; you had mentioned this before, and I had forgotten.
 > 
-Thanks!
--Christoffer
+> I'm under the impression that the ARM ARM may be misleading (and
+> potentially erroneous) in that regard. In the past I had been told that
+> each instance of a CNTFRQ register was independent, and each must be
+> writeable for system initialization.
+
+FWIW, I took a look at a Juno R1 with a DSTREAM.
+
+I can independently configure CNTCTLBase.CNTFRQ and CNTBase1.CNTFRQ,
+with the latter being RW from the Non-secure side. It seems that
+firmware I'm using doesn't bother to initialise either. :/
+
+So regardless of what the architectural intent is, there exist platforms
+where these can differ.
+
+I'll try to fix up the patch accordingly, to check all instances.
+
+Thanks,
+Mark.
