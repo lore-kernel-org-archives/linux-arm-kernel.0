@@ -1,54 +1,78 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 1 Aug 2017 14:46:28 +0200
-Subject: [PATCH v5 2/2] arm64: dts: Add Mediatek SoC MT2712 and evaluation
- board dts and Makefile
-In-Reply-To: <1501577481.32089.3.camel@mtksdaap41>
-References: <1501241835-47849-1-git-send-email-yt.shen@mediatek.com>
- <1501241835-47849-3-git-send-email-yt.shen@mediatek.com>
- <1501577481.32089.3.camel@mtksdaap41>
-Message-ID: <85f5d713-a599-e4cc-f1b4-2e0dedf2797f@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 1 Aug 2017 13:47:02 +0100
+Subject: [PATCH 1/2] arm64: syscallno is secretly an int, make it official
+In-Reply-To: <20170801113647.GF8702@arm.com>
+References: <1500381724-19003-1-git-send-email-Dave.Martin@arm.com>
+ <1500381724-19003-2-git-send-email-Dave.Martin@arm.com>
+ <20170801113647.GF8702@arm.com>
+Message-ID: <20170801124700.GF6321@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Aug 01, 2017 at 12:36:47PM +0100, Will Deacon wrote:
+> On Tue, Jul 18, 2017 at 01:41:43PM +0100, Dave Martin wrote:
+> > The upper 32 bits of the syscallno field in struct pt_regs are handled
+> > inconsistently, being sometimes zero extended and sometimes
+> > sign-extended.  The reason for this appears to be that they are not
+> > intentionally significant at all.
+> > 
+> > Currently, the only place I can find where those bits are
+> > significant is in calling trace_sys_enter(), which may be
+> > unintentional: for example, if a compat tracer attempts to cancel a
+> > syscall by passing -1 to (COMPAT_)PTRACE_SET_SYSCALL at the
+> > syscall-enter-stop, it will be traced as syscall 4294967295
+> > rather than -1 as might be expected (and as occurs for a native
+> > tracer doing the same thing).  Elsewhere, reads of syscallno cast
+> > it to an int or truncate it.
+> > 
+> > There's also a conspicuous amount of code and casting to bodge
+> > around the fact that although semantically an int, syscallno is
+> > stored as a u64.
+> > 
+> > Let's not pretend any more.
+> > 
+> > In order to preserve the stp x instruction that stores the syscall
+> > number in entry.S, this patch special-cases the layout of struct
+> > pt_regs for big endian so that the newly 32-bit syscallno field
+> > maps onto the low bits of the stored value.  This is not beautiful,
+> > but benchmarking of the getpid syscall on Juno suggests indicates a
+> > minor slowdown if the stp is split into an stp x and stp w.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
+[...]
 
-On 08/01/2017 10:51 AM, Yingjoe Chen wrote:
-> On Fri, 2017-07-28 at 19:37 +0800, YT Shen wrote:
->> diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
->> new file mode 100644
->> index 0000000..1e135af
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+> > diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+> > index 11403fd..21c87dc 100644
+> > --- a/arch/arm64/include/asm/ptrace.h
+> > +++ b/arch/arm64/include/asm/ptrace.h
+> > @@ -116,7 +116,14 @@ struct pt_regs {
+> >  		};
+> >  	};
+> >  	u64 orig_x0;
+> > -	u64 syscallno;
+> > +#ifdef __AARCH64EB__
+> > +	u32 unused2;
+> > +	s32 syscallno;
+> > +#else
+> > +	s32 syscallno;
+> > +	u32 unused2;
+> > +#endif
+> > +
+> >  	u64 orig_addr_limit;
+> >  	u64 unused;	// maintain 16 byte alignment
 > 
-> <...>
-> 
->> +	timer {
->> +		compatible = "arm,armv8-timer";
->> +		interrupt-parent = <&gic>;
->> +		interrupts = <GIC_PPI 13
->> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
->> +			     <GIC_PPI 14
->> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
->> +			     <GIC_PPI 11
->> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
->> +			     <GIC_PPI 10
->> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>;
->> +	};
->> +
->> +	soc {
->> +		#address-cells = <2>;
->> +		#size-cells = <2>;
->> +		compatible = "simple-bus";
->> +		ranges;
-> 
-> Matthias,
-> 
-> I notice this have soc node.
-> Do we need to get rid of it?
-> 
+> This isn't a UAPI struct, so we could juggle these about a bit to put all
+> the unused padding at the end.
 
-Good catch. Yes please get rid of it. We should avoid artificial bus nodes. As 
-soc is no real bus, we should get rid of it.
+In the __AARCH64EB__ case syscallno still needs to be padded up to an
+odd 32-bit boundary, so we need padding before it in that case; also
+we'd still need the #ifdef either way, and the struct is already
+intentionally a multiple of 16 bytes to align it on the stack.  So I'm
+not sure what we'd save here (?)
 
-Thanks,
-Matthias
+I could put orig_addr_limit before (padded) syscallno, but I'm not
+sure that's better.
+
+Cheers
+---Dave
