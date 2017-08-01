@@ -1,98 +1,41 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  1 Aug 2017 09:02:55 +0100
-Subject: [PATCH v2 2/4] jump_label: Split out code under the hotplug lock
-In-Reply-To: <20170801080257.5056-1-marc.zyngier@arm.com>
-References: <20170801080257.5056-1-marc.zyngier@arm.com>
-Message-ID: <20170801080257.5056-3-marc.zyngier@arm.com>
+Date: Tue,  1 Aug 2017 09:02:53 +0100
+Subject: [PATCH v2 0/4] Working around CPU hotplug and static keys locking
+Message-ID: <20170801080257.5056-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to later introduce an "already locked" version of some
-of the static key funcions, let's split the code into the core stuff
-(the *_cpuslocked functions) and the usual helpers, which now
-take/release the hotplug lock and call into the _cpuslocked
-versions.
+Since f2545b2d4ce1 ("jump_label: Reorder hotplug lock and
+jump_label_lock"), it has become impossible to switch a static key
+from a CPU hotplug notifier:
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- kernel/jump_label.c | 28 +++++++++++++++++++---------
- 1 file changed, 19 insertions(+), 9 deletions(-)
+- On the primary CPU, cpu_hotplug_lock is taken by
+  __cpuhp_setup_state(), and then again by static_key_slow_inc(). The
+  lock being taken as a reader, so it is OK so far.
 
-diff --git a/kernel/jump_label.c b/kernel/jump_label.c
-index f11b10091100..0ab8b35daa54 100644
---- a/kernel/jump_label.c
-+++ b/kernel/jump_label.c
-@@ -101,11 +101,10 @@ void static_key_disable(struct static_key *key)
- }
- EXPORT_SYMBOL_GPL(static_key_disable);
- 
--void static_key_slow_inc(struct static_key *key)
-+static void static_key_slow_inc_cpuslocked(struct static_key *key)
- {
- 	int v, v1;
- 
--	cpus_read_lock();
- 	STATIC_KEY_CHECK_USE();
- 
- 	/*
-@@ -122,10 +121,8 @@ void static_key_slow_inc(struct static_key *key)
- 	 */
- 	for (v = atomic_read(&key->enabled); v > 0; v = v1) {
- 		v1 = atomic_cmpxchg(&key->enabled, v, v + 1);
--		if (likely(v1 == v)) {
--			cpus_read_unlock();
-+		if (likely(v1 == v))
- 			return;
--		}
- 	}
- 
- 	jump_label_lock();
-@@ -137,14 +134,20 @@ void static_key_slow_inc(struct static_key *key)
- 		atomic_inc(&key->enabled);
- 	}
- 	jump_label_unlock();
-+}
-+
-+void static_key_slow_inc(struct static_key *key)
-+{
-+	cpus_read_lock();
-+	static_key_slow_inc_cpuslocked(key);
- 	cpus_read_unlock();
- }
- EXPORT_SYMBOL_GPL(static_key_slow_inc);
- 
--static void __static_key_slow_dec(struct static_key *key,
--		unsigned long rate_limit, struct delayed_work *work)
-+static void static_key_slow_dec_cpuslocked(struct static_key *key,
-+					   unsigned long rate_limit,
-+					   struct delayed_work *work)
- {
--	cpus_read_lock();
- 	/*
- 	 * The negative count check is valid even when a negative
- 	 * key->enabled is in use by static_key_slow_inc(); a
-@@ -155,7 +158,6 @@ static void __static_key_slow_dec(struct static_key *key,
- 	if (!atomic_dec_and_mutex_lock(&key->enabled, &jump_label_mutex)) {
- 		WARN(atomic_read(&key->enabled) < 0,
- 		     "jump label: negative count!\n");
--		cpus_read_unlock();
- 		return;
- 	}
- 
-@@ -166,6 +168,14 @@ static void __static_key_slow_dec(struct static_key *key,
- 		jump_label_update(key);
- 	}
- 	jump_label_unlock();
-+}
-+
-+static void __static_key_slow_dec(struct static_key *key,
-+				  unsigned long rate_limit,
-+				  struct delayed_work *work)
-+{
-+	cpus_read_lock();
-+	static_key_slow_dec_cpuslocked(key, rate_limit, work);
- 	cpus_read_unlock();
- }
- 
+- On a secondary CPU, _cpu_up takes the lock *as a writer* on the boot
+  CPU, and the secondary tries to switch the static key, taking the
+  lock as well (as a reader). In that case, we're toasted.
+
+I couldn't find an elegant solution to this, so this series works
+around the issue in the most disgusting way, adding a _nolock version
+of the static key API to be used in CPU hotplug situations.
+
+The last patch uses this API to work around the issue that Leo
+reported, where the static key flipped on a secondary CPU brings the
+box down in flames.
+
+Marc Zyngier (4):
+  jump_label: Move cpu hotplug locking
+  jump_label: Split out code under the hotplug lock
+  jump_label: Provide hotplug context variants
+  clocksource/arm_arch_timer: Use static_branch_enable_cpuslocked()
+
+ Documentation/static-keys.txt        | 15 ++++++++++++
+ drivers/clocksource/arm_arch_timer.c |  6 ++++-
+ include/linux/jump_label.h           | 11 +++++++--
+ kernel/jump_label.c                  | 44 +++++++++++++++++++++++++++++++-----
+ 4 files changed, 67 insertions(+), 9 deletions(-)
+
 -- 
 2.11.0
