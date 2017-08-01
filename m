@@ -1,29 +1,37 @@
-From: huangtao@rock-chips.com (Tao Huang)
-Date: Tue,  1 Aug 2017 17:55:55 +0800
-Subject: [PATCH] ARM: rockchip: select ARCH_DMA_ADDR_T_64BIT for LPAE
-Message-ID: <1501581355-3538-1-git-send-email-huangtao@rock-chips.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Tue, 1 Aug 2017 18:06:10 +0800
+Subject: [PATCH v2 0/3] add support of SCPSYS power domain for MediaTek MT7622
+Message-ID: <cover.1501581552.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rockchip RK3288 has some 64-bit capable DMA and therefore needs
-dma_addr_t to be a 64-bit size. One user is the Mali GPU.
+From: Sean Wang <sean.wang@mediatek.com>
 
-Signed-off-by: Tao Huang <huangtao@rock-chips.com>
----
- arch/arm/mach-rockchip/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Changes since v1:
+- rebase to Linux v4.13-rc1
 
-diff --git a/arch/arm/mach-rockchip/Kconfig b/arch/arm/mach-rockchip/Kconfig
-index 9ad84cd01ba0..240354963158 100644
---- a/arch/arm/mach-rockchip/Kconfig
-+++ b/arch/arm/mach-rockchip/Kconfig
-@@ -3,6 +3,7 @@ config ARCH_ROCKCHIP
- 	depends on ARCH_MULTI_V7
- 	select PINCTRL
- 	select PINCTRL_ROCKCHIP
-+	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
- 	select ARCH_HAS_RESET_CONTROLLER
- 	select ARM_AMBA
- 	select ARM_GIC
+There are four power domains on MediaTek MT7622 SoC which are respectively
+ETHSYS for Ethernet including extra embedded switch, HIF0SYS for PCI-E and
+SATA, HIF1SYS for USB and WBSYS for WIFI and Bluetooth.
+
+Those functions could be selectively powered gated when the corresponding
+function is no longer to use in order to reach more minimal power
+dissipation through the patch series introduced here.
+
+Chen Zhong (2):
+  soc: mediatek: add header files required for MT7622 SCPSYS dt-binding
+  soc: mediatek: add SCPSYS power domain driver for MediaTek MT7622 SoC
+
+Sean Wang (1):
+  dt-bindings: soc: update the binding document for SCPSYS on MediaTek
+    MT7622 SoC
+
+ .../devicetree/bindings/soc/mediatek/scpsys.txt    |  3 +
+ drivers/soc/mediatek/mtk-scpsys.c                  | 81 ++++++++++++++++++++++
+ include/dt-bindings/power/mt7622-power.h           | 22 ++++++
+ include/linux/soc/mediatek/infracfg.h              |  8 ++-
+ 4 files changed, 113 insertions(+), 1 deletion(-)
+ create mode 100644 include/dt-bindings/power/mt7622-power.h
+
 -- 
 2.7.4
