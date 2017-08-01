@@ -1,76 +1,199 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Tue, 1 Aug 2017 14:02:02 +0530
-Subject: [PATCH v3 0/5] ARM64: disable irq between breakpoint and step
- exception
-In-Reply-To: <20170801081420.GB7745@linaro.org>
-References: <cover.1501496603.git.panand@redhat.com>
- <20170801081420.GB7745@linaro.org>
-Message-ID: <0309fb7e-4906-0f92-5b7a-87b0f487d0dc@redhat.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 1 Aug 2017 16:31:49 +0800
+Subject: [linux-sunxi] [PATCH v3 05/12] ASoC: sun4i-i2s: Add regmap fields
+ for channels
+In-Reply-To: <20170729141753.20174-6-codekipper@gmail.com>
+References: <20170729141753.20174-1-codekipper@gmail.com>
+ <20170729141753.20174-6-codekipper@gmail.com>
+Message-ID: <CAGb2v640QLn4oDWoFeT51xJqSN7FSBP9KRNdpRB4MuATSE2rVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Takahiro,
+On Sat, Jul 29, 2017 at 10:17 PM,  <codekipper@gmail.com> wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+>
+> On the original i2s block the channel mapping and selection were
+> configured for stereo audio by default: This is not the case with
+> the newer SoCs and they are also located at different offsets.
+>
+> To support the newer SoC then regmap fields have been added to the
+> quirks and these are initialised to their correct settings during
+> probing.
+>
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> ---
+>  sound/soc/sunxi/sun4i-i2s.c | 80 ++++++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 72 insertions(+), 8 deletions(-)
+>
+> diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+> index 2a25df22c2f8..120f797a38e8 100644
+> --- a/sound/soc/sunxi/sun4i-i2s.c
+> +++ b/sound/soc/sunxi/sun4i-i2s.c
+> @@ -82,7 +82,7 @@
+>  #define SUN4I_I2S_TX_CNT_REG           0x2c
+>
+>  #define SUN4I_I2S_TX_CHAN_SEL_REG      0x30
+> -#define SUN4I_I2S_TX_CHAN_SEL(num_chan)                (((num_chan) - 1) << 0)
+> +#define SUN4I_I2S_CHAN_SEL(num_chan)           (((num_chan) - 1) << 0)
+>
+>  #define SUN4I_I2S_TX_CHAN_MAP_REG      0x34
+>  #define SUN4I_I2S_TX_CHAN_MAP(chan, sample)    ((sample) << (chan << 2))
+> @@ -98,6 +98,10 @@
+>   * @sun4i_i2s_regmap: regmap config to use.
+>   * @mclk_offset: Value by which mclkdiv needs to be adjusted.
+>   * @bclk_offset: Value by which bclkdiv needs to be adjusted.
+> + * @field_txchanmap: location of the tx channel mapping register.
+> + * @field_rxchanmap: location of the rx channel mapping register.
+> + * @field_txchansel: location of the tx channel select bit fields.
+> + * @field_rxchansel: location of the rx channel select bit fields.
+>   */
+>  struct sun4i_i2s_quirks {
+>         bool                            has_reset;
+> @@ -105,6 +109,12 @@ struct sun4i_i2s_quirks {
+>         const struct regmap_config      *sun4i_i2s_regmap;
+>         unsigned int                    mclk_offset;
+>         unsigned int                    bclk_offset;
+> +
+> +       /* Register fields for i2s */
+> +       struct reg_field                field_txchanmap;
+> +       struct reg_field                field_rxchanmap;
+> +       struct reg_field                field_txchansel;
+> +       struct reg_field                field_rxchansel;
+>  };
+>
+>  struct sun4i_i2s {
+> @@ -118,6 +128,12 @@ struct sun4i_i2s {
+>         struct snd_dmaengine_dai_dma_data       capture_dma_data;
+>         struct snd_dmaengine_dai_dma_data       playback_dma_data;
+>
+> +       /* Register fields for i2s */
+> +       struct regmap_field     *field_txchanmap;
+> +       struct regmap_field     *field_rxchanmap;
+> +       struct regmap_field     *field_txchansel;
+> +       struct regmap_field     *field_rxchansel;
+> +
+>         const struct sun4i_i2s_quirks   *variant;
+>  };
+>
+> @@ -264,6 +280,18 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
+>         if (params_channels(params) != 2)
+>                 return -EINVAL;
+>
+> +       /* Map the channels for playback and capture */
+> +       regmap_field_write(i2s->field_txchanmap, 0x76543210);
+> +       regmap_field_write(i2s->field_rxchanmap, 0x00003210);
+> +
+> +       /* Configure the channels */
+> +       regmap_field_write(i2s->field_txchansel,
+> +                          SUN4I_I2S_CHAN_SEL(params_channels(params)));
+> +
+> +       regmap_field_write(i2s->field_rxchansel,
+> +                          SUN4I_I2S_CHAN_SEL(params_channels(params)));
+> +
+> +
 
-On Tuesday 01 August 2017 01:44 PM, AKASHI Takahiro wrote:
-> Hi Pratyush,
-> 
-> On Mon, Jul 31, 2017 at 04:10:28PM +0530, Pratyush Anand wrote:
->> v2 -> v3
->> - Moved step_needed from uapi structure to kernel only structure
->> - Re-enable interrupt if stepped instruction faults
->> - Modified register_wide_hw_breakpoint() to accept step_needed arg
->> v2 was here: http://marc.info/?l=linux-arm-kernel&m=149942910730496&w=2
->>
->> v1 -> v2:
->> - patch 1 of v1 has been modified to patch 1-3 of v2.
->> - Introduced a new event attribute step_needed and implemented
->>    hw_breakpoint_needs_single_step() (patch 1)
->> - Replaced usage of is_default_overflow_handler() with
->>    hw_breakpoint_needs_single_step(). (patch 2)
->> - Modified sample test to set set step_needed bit field (patch 3)
->> v1 was here: http://marc.info/?l=linux-arm-kernel&m=149910958418708&w=2
->>
->> samples/hw_breakpoint/data_breakpoint.c passes with x86_64 but fails with
->> ARM64. Even though it has been NAKed previously on upstream [1, 2], I have
->> tried to come up with patches which can resolve it for ARM64 as well.
->>
->> I noticed that even perf step exception can go into an infinite loop if CPU
->> receives an interrupt while executing breakpoint/watchpoint handler. So,
->> event though we are not concerned about above test, we will have to find a
->> solution for the perf issue.
->>
->> This patchset attempts to resolve both the issue. Please review.
->> Since, it also takes care of SW breakpoint, so I hope kgdb should also be
->> fine. However, I have not tested that.
->> @Takahiro: Will it be possible to test these patches for kgdb.
-> 
-> I have not yet understood the details of your patch, but
-> I gave it a try and didn't see any difference around the behavior
-> of kgdb's single stepping.
-> 
-> I also gave a try to James' patch, but again nothing different
-> as long as kgdb is concerned.
-> (I'm tackling some issue in single stepping at irq's kernel_exit,
-> in particular, 'eret'.)
+Checkpatch says don't use multiple blank lines.
 
-You mean that you were expecting an step exception after eret (and this eret 
-was being called from kgdb breakpoint exception handler), but you got irq 
-exception? This is what I understood from your previous patch [0].
+>         switch (params_physical_width(params)) {
+>         case 16:
+>                 width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+> @@ -486,13 +514,6 @@ static int sun4i_i2s_startup(struct snd_pcm_substream *substream,
+>                            SUN4I_I2S_CTRL_SDO_EN_MASK,
+>                            SUN4I_I2S_CTRL_SDO_EN(0));
+>
+> -       /* Enable the first two channels */
+> -       regmap_write(i2s->regmap, SUN4I_I2S_TX_CHAN_SEL_REG,
+> -                    SUN4I_I2S_TX_CHAN_SEL(2));
+> -
+> -       /* Map them to the two first samples coming in */
+> -       regmap_write(i2s->regmap, SUN4I_I2S_TX_CHAN_MAP_REG,
+> -                    SUN4I_I2S_TX_CHAN_MAP(0, 0) | SUN4I_I2S_TX_CHAN_MAP(1, 1));
+>
+>         return clk_prepare_enable(i2s->mod_clk);
+>  }
+> @@ -677,14 +698,51 @@ static const struct sun4i_i2s_quirks sun4i_a10_i2s_quirks = {
+>         .has_reset              = false,
+>         .reg_offset_txdata      = SUN4I_I2S_FIFO_TX_REG,
+>         .sun4i_i2s_regmap       = &sun4i_i2s_regmap_config,
+> +       .field_txchanmap        = REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
+> +       .field_rxchanmap        = REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
+> +       .field_txchansel        = REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
+> +       .field_rxchansel        = REG_FIELD(SUN4I_I2S_RX_CHAN_SEL_REG, 0, 2),
+>  };
+>
+>  static const struct sun4i_i2s_quirks sun6i_a31_i2s_quirks = {
+>         .has_reset              = true,
+>         .reg_offset_txdata      = SUN4I_I2S_FIFO_TX_REG,
+>         .sun4i_i2s_regmap       = &sun4i_i2s_regmap_config,
+> +       .field_txchanmap        = REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
+> +       .field_rxchanmap        = REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
+> +       .field_txchansel        = REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
+> +       .field_rxchansel        = REG_FIELD(SUN4I_I2S_RX_CHAN_SEL_REG, 0, 2),
+>  };
+>
+> +static int sun4i_i2s_init_regmap_fields(struct device *dev, struct sun4i_i2s *i2s)
 
-If that was the case, then I was expecting that this patch series should help.
-See, patch 4/5:
-- kgdb breakpoint handler kgdb_brk_fn() will be called from 
-arch/arm64/kernel/debug-monitors.c: brk_handler().
-- If we are expecting a step exception after servicing this breakpoint 
-handler, then kgdb code would have called kernel_enable_single_step(). So, we 
-should see kernel_active_single_step() true in brk_handler().
-- If above happens then do_debug_exception() will make sure that PSR I bit is 
-set before eret is called and we should not see an IRQ exception after eret.
+This line is over 80 characters. Please wrap the line.
 
-Can you please help me with your reproducer test case?
+> +{
+> +       i2s->field_txchanmap =
+> +               devm_regmap_field_alloc(dev, i2s->regmap,
+> +                                       i2s->variant->field_txchanmap);
+> +       if (IS_ERR(i2s->field_txchanmap))
+> +               return PTR_ERR(i2s->field_txchanmap);
+> +
+> +       i2s->field_rxchanmap =
+> +               devm_regmap_field_alloc(dev, i2s->regmap,
+> +                                       i2s->variant->field_rxchanmap);
+> +       if (IS_ERR(i2s->field_rxchanmap))
+> +               return PTR_ERR(i2s->field_rxchanmap);
+> +
+> +       i2s->field_txchansel =
+> +               devm_regmap_field_alloc(dev, i2s->regmap,
+> +                                       i2s->variant->field_txchansel);
+> +       if (IS_ERR(i2s->field_txchansel))
+> +               return PTR_ERR(i2s->field_txchansel);
+> +
+> +       i2s->field_rxchansel =
+> +               devm_regmap_field_alloc(dev, i2s->regmap,
+> +                                       i2s->variant->field_rxchansel);
+> +       if (IS_ERR(i2s->field_rxchansel))
+> +               return PTR_ERR(i2s->field_rxchansel);
+> +
+> +       return 0;
 
-[0]  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-May/508066.html
+This seems to be the last "if (IS_ERR()) return PTR_ERR()" sequence.
+So it looks like you could apply the PTR_ERR_OR_ZERO hunk from the
+kbuild test robot. I wasn't aware of this preference before, and to
+be honest I'm fine either way.
 
--- 
-Regards
-Pratyush
+Otherwise,
+
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+
+
+> +}
+> +
+>  static int sun4i_i2s_probe(struct platform_device *pdev)
+>  {
+>         struct sun4i_i2s *i2s;
+> @@ -778,6 +836,12 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
+>                 goto err_suspend;
+>         }
+>
+> +       ret = sun4i_i2s_init_regmap_fields(&pdev->dev, i2s);
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "Could not initialise regmap fields\n");
+> +               goto err_suspend;
+> +       }
+> +
+>         return 0;
+>
+>  err_suspend:
+> --
+> 2.13.3
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
