@@ -1,80 +1,124 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Tue, 1 Aug 2017 11:08:19 -0700
-Subject: [PATCH v3 2/2] memory: ti-emif-sram: introduce relocatable
- suspend/resume handlers
-In-Reply-To: <9b856bf5-f404-5cfc-6f1e-5ae527c6e0b1@oracle.com>
-References: <20170724212454.27574-1-d-gerlach@ti.com>
- <20170724212454.27574-3-d-gerlach@ti.com>
- <9b856bf5-f404-5cfc-6f1e-5ae527c6e0b1@oracle.com>
-Message-ID: <cfb8007b-7f3a-1787-bb9d-9486f547f23f@oracle.com>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Tue, 1 Aug 2017 20:08:49 +0200
+Subject: [PATCH 0/6] Support for LEGO MINDSTORMS EV3 LCD display
+In-Reply-To: <1ce36d43-b9dd-807e-23aa-bac4fda70fdc@lechnology.com>
+References: <1501355870-13960-1-git-send-email-david@lechnology.com>
+ <5d8f6518-8d7e-c029-2da4-e3417afb3e40@lechnology.com>
+ <28188f5c-1daf-121b-6daf-1899668c3875@tronnes.org>
+ <1ce36d43-b9dd-807e-23aa-bac4fda70fdc@lechnology.com>
+Message-ID: <bfb3d541-856b-0233-dd85-72512788939f@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/26/2017 9:54 AM, Santosh Shilimkar wrote:
-> 
-> On 7/24/2017 2:24 PM, Dave Gerlach wrote:
->> Certain SoCs like Texas Instruments AM335x and AM437x require parts
->> of the EMIF PM code to run late in the suspend sequence from SRAM,
->> such as saving and restoring the EMIF context and placing the memory
->> into self-refresh.
+(cc: Daniel Vetter)
+
+
+Den 01.08.2017 18.51, skrev David Lechner:
+> On 07/30/2017 12:14 PM, Noralf Tr?nnes wrote:
 >>
->> One requirement for these SoCs to suspend and enter its lowest power
->> mode, called DeepSleep0, is that the PER power domain must be shut off.
->> Because the EMIF (DDR Controller) resides within this power domain, it
->> will lose context during a suspend operation, so we must save it so we
->> can restore once we resume. However, we cannot execute this code from
->> external memory, as it is not available at this point, so the code must
->> be executed late in the suspend path from SRAM.
+>> Den 29.07.2017 21.40, skrev David Lechner:
+>>> On 07/29/2017 02:17 PM, David Lechner wrote:
+>>>> The goal of this series is to get the built-in LCD of the LEGO 
+>>>> MINDSTORMS EV3
+>>>> working. But, most of the content here is building up the 
+>>>> infrastructure to do
+>>>> that.
+>>>>
+>>>
+>>> Some general comments/questions:
+>>>
+>>> I have noticed that DRM doesn't really have support for monochrome 
+>>> displays. I'm guessing that is because no one really uses them anymore?
+>>>
 >>
->> This patch introduces a ti-emif-sram driver that includes several
->> functions written in ARM ASM that are relocatable so the PM SRAM
->> code can use them. It also allocates a region of writable SRAM to
->> be used by the code running in the executable region of SRAM to save
->> and restore the EMIF context. It can export a table containing the
->> absolute addresses of the available PM functions so that other SRAM
->> code can branch to them. This code is required for suspend/resume on
->> AM335x and AM437x to work.
+>> The repaper driver was the first monochrome drm driver and I chose to
+>> present it to userspace as XRGB8888 and convert it to monochrome.
+>> The reason for this is that everything, libraries, apps, plymouth (boot
+>> splash, no rgb565) supports it. I didn't see any point in adding a new
+>> monochrome drm format that didn't have, or probably wouldn't get
+>> userspace support (by libraries at least). The application of course
+>> needs to know this to get a good result.
 >>
->> In addition to this, to be able to share data structures between C and
->> the ti-emif-sram-pm assembly code, we can automatically generate all of
->> the C struct member offsets and sizes as macros by making use of the ARM
->> asm-offsets file. In the same header that we define our data structures
->> in we also define all the macros in an inline function and by adding a
->> call to this in the asm_offsets file all macros are properly generated
->> and available to the assembly code without cluttering up the asm-offsets
->> file.
+>> tinydrm_xrgb8888_to_gray8() does the conversion:
+>> https://cgit.freedesktop.org/drm/drm-misc/commit/drivers/gpu/drm/tinydrm?id=379ea9a1a59a5a32c8db6f164e80a3fd00cb3781 
 >>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->> ---
-[...]
+>>
+>>> The LEGO EV3 display is just an LCD (not the backlit kind). It has 
+>>> two modes of operation. It can to 2bbp grayscale or it can do 1bpp 
+>>> monochrome. The grayscale isn't the best (looks splotchy in places), 
+>>> so it would be nice to be able to choose between these two modes. 
+>>> How would I implement something like that?
+>>>
+>>
+>> Do you expect anyone to use grayscale if it doesn't look good?
+>> Maybe better to add it later if there's a demand for it.
+>
+> I don't expect many people to use it at all. The people that do will 
+> be hackers like me that want to see what it is capable of, so I think 
+> I will keep it grayscale by default.
+>
+
+It looks like the best way to satisfy your needs is to add specific formats.
+
+Video for Linux have these:
+
+include/uapi/linux/videodev2.h
+
+/* Grey formats */
+#define V4L2_PIX_FMT_GREY    v4l2_fourcc('G', 'R', 'E', 'Y') /*  8 
+Greyscale     */
+#define V4L2_PIX_FMT_Y4      v4l2_fourcc('Y', '0', '4', ' ') /*  4 
+Greyscale     */
+#define V4L2_PIX_FMT_Y6      v4l2_fourcc('Y', '0', '6', ' ') /*  6 
+Greyscale     */
+#define V4L2_PIX_FMT_Y10     v4l2_fourcc('Y', '1', '0', ' ') /* 10 
+Greyscale     */
+#define V4L2_PIX_FMT_Y12     v4l2_fourcc('Y', '1', '2', ' ') /* 12 
+Greyscale     */
+#define V4L2_PIX_FMT_Y16     v4l2_fourcc('Y', '1', '6', ' ') /* 16 
+Greyscale     */
+#define V4L2_PIX_FMT_Y16_BE  v4l2_fourcc_be('Y', '1', '6', ' ') /* 16  
+Greyscale BE  */
+
+
+Maybe we can add formats like these:
+
+include/uapi/drm/drm_fourcc.h
+
+#define DRM_FORMAT_MONO        fourcc_code('Y', '0', '1', ' ') /* [0] 
+Monochrome */
+or
+#define DRM_FORMAT_Y1        fourcc_code('Y', '0', '1', ' ') /* [0] 
+Monochrome */
+
+#define DRM_FORMAT_Y2        fourcc_code('Y', '0', '2', ' ') /* [1:0] 
+Greyscale */
+
+Daniel, what do you think?
 
 >>
->>   arch/arm/kernel/asm-offsets.c    |   4 +
->>   drivers/memory/Kconfig           |  10 ++
->>   drivers/memory/Makefile          |   4 +
->>   drivers/memory/emif.h            |  17 ++
->>   drivers/memory/ti-emif-pm.c      | 339 
->> +++++++++++++++++++++++++++++++++++++++
->>   drivers/memory/ti-emif-sram-pm.S | 334 
->> ++++++++++++++++++++++++++++++++++++++
->>   include/linux/ti-emif-sram.h     | 147 +++++++++++++++++
->>   7 files changed, 855 insertions(+)
->>   create mode 100644 drivers/memory/ti-emif-pm.c
->>   create mode 100644 drivers/memory/ti-emif-sram-pm.S
->>   create mode 100644 include/linux/ti-emif-sram.h
+>>> Also, how can I indicate to userspace that this display really is 
+>>> monochrome/grayscale since the reported color depth 16bpp?
+>>>
 >>
-> I will need RMKs blessing since he reviewed the ASM code.
-> 
-> Also need work out how to line this up. Typically I use to get
-> driver/memory patches via Greg's driver-core but this is more
-> PM code than memory driver and very SOC specific.
-> 
-> Hi Arnd/Olof,
-> Will you be ok to pull this via arm-soc ? There is also follow
-> up platform PM code and DTS series which will make use of this.
-> 
-Looks like I missed to copy Olof. Let me know guys if you are
-ok to pull this into your driver-soc given the dependencies.
+>> There isn't unless we add formats for it.
+>> Since this display is in a Lego piece, doesn't it have custom userspace
+>> that already know it's monochrome?
+>
+> The official LEGO software is like this, yes. But I am working on a 
+> project that supports other LEGO compatible devices that have color 
+> screens, so the same software needs to be able to detect at runtime 
+> which type of screen it is using. Currently I have a plain fbdev 
+> driver that provides FB_VISUAL_MONO10 for the EV3 display and so the 
+> software knows when it has a monochrome screen and when it doesn't. 
+> But since plain fbdev drivers can't be accepted into mainline, I need 
+> to find a different way to detect what type of screen this is so that 
+> my graphics library can treat it differently.
+>
+>
 
-Regards
-Santosh
+You can tell userspace about the preferred bitdepth:
+drm->mode_config.preferred_depth
+
+
+Noralf.
