@@ -1,25 +1,28 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 01 Aug 2017 12:48:48 -0700
-Subject: [PATCH] ARM64: dts: meson-gx: Use correct mmc clock source 0
-In-Reply-To: <20170731120552.31606-1-jbrunet@baylibre.com> (Jerome Brunet's
- message of "Mon, 31 Jul 2017 14:05:52 +0200")
-References: <20170731120552.31606-1-jbrunet@baylibre.com>
-Message-ID: <7h60e7yspr.fsf@baylibre.com>
+Date: Tue, 01 Aug 2017 12:49:09 -0700
+Subject: [PATCH] ARM64: dts: meson-gxbb: p20x: add card regulator settle
+ times
+In-Reply-To: <20170801152224.15754-1-jbrunet@baylibre.com> (Jerome Brunet's
+ message of "Tue, 1 Aug 2017 17:22:24 +0200")
+References: <20170801152224.15754-1-jbrunet@baylibre.com>
+Message-ID: <7h1sovysp6.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Jerome Brunet <jbrunet@baylibre.com> writes:
 
-> Now that the clock source 0 is properly described in the CCF, use it
-> instead of assuming the default value (xtal)
+> Changing the card voltage on the p200 is not instantaneous, especially
+> when switching from 3.3v to 1.8v.
 >
+> I take at least 70ms for the regulator to go from 3.3v to 1.8v. Add
+> margin to that to make sure we don't upset the sdcard during the voltage
+> switch
+>
+> Fixes: ef8d2ffedf18 ("ARM64: dts: meson-gxbb: add MMC support")
 > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> ---
->
-> This patchset depends on clock patchset adding the related clocks:
-> * https://lkml.kernel.org/r/20170731115603.29720-1-jbrunet at baylibre.com
 
-I'll need a stable tag/commit in clk-meson/next/drivers to use in order
-to apply this one.
+Applied to v4.14/dt64,
+
+Thanks,
 
 Kevin
