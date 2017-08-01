@@ -1,62 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 1 Aug 2017 09:59:11 +0200
-Subject: [PATCH] pinctrl: nomadik: abx500: constify gpio_chip structure
-In-Reply-To: <20170711212929.GA1037@embeddedgus>
-References: <20170711212929.GA1037@embeddedgus>
-Message-ID: <CACRpkdZmUMRWZLak+3u3uGNyPDBmxqe6GH-aV2V1medoKmebBg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue,  1 Aug 2017 09:02:54 +0100
+Subject: [PATCH v2 1/4] jump_label: Move cpu hotplug locking
+In-Reply-To: <20170801080257.5056-1-marc.zyngier@arm.com>
+References: <20170801080257.5056-1-marc.zyngier@arm.com>
+Message-ID: <20170801080257.5056-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 11, 2017 at 11:29 PM, Gustavo A. R. Silva
-<garsilva@embeddedor.com> wrote:
+As we're about to rework the locking, let's move the taking and
+release of the CPU hotplug lock to locations that will make its
+reworking completely obvious.
 
-> This structure is only used to copy into another structure, so declare
-> it as const.
->
-> This issue was detected using Coccinelle and the following semantic patch:
->
-> @r disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
-> static struct gpio_chip i at p = { ... };
->
-> @ok@
-> identifier r.i;
-> expression e;
-> position p;
-> @@
-> e = i at p;
->
-> @bad@
-> position p != {r.p,ok.p};
-> identifier r.i;
-> struct gpio_chip e;
-> @@
-> e at i@p
->
-> @depends on !bad disable optional_qualifier@
-> identifier r.i;
-> @@
-> static
-> +const
->  struct gpio_chip i = { ... };
->
-> In the following log you can see a significant difference in the code size
-> and data segment, hence in the dec segment. This log is the output
-> of the size command, before and after the code change:
->
-> before:
->    text    data     bss     dec     hex filename
->   17545    5376       0   22921    5989 drivers/pinctrl/nomadik/pinctrl-abx500.o
->
-> after:
->             bss     dec     hex filename
->   17273    5320       0   22593    5841 drivers/pinctrl/nomadik/pinctrl-abx500.o
->
-> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ kernel/jump_label.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Patch applied.
-
-Yours,
-Linus Walleij
+diff --git a/kernel/jump_label.c b/kernel/jump_label.c
+index d11c506a6ac3..f11b10091100 100644
+--- a/kernel/jump_label.c
++++ b/kernel/jump_label.c
+@@ -105,6 +105,7 @@ void static_key_slow_inc(struct static_key *key)
+ {
+ 	int v, v1;
+ 
++	cpus_read_lock();
+ 	STATIC_KEY_CHECK_USE();
+ 
+ 	/*
+@@ -121,11 +122,12 @@ void static_key_slow_inc(struct static_key *key)
+ 	 */
+ 	for (v = atomic_read(&key->enabled); v > 0; v = v1) {
+ 		v1 = atomic_cmpxchg(&key->enabled, v, v + 1);
+-		if (likely(v1 == v))
++		if (likely(v1 == v)) {
++			cpus_read_unlock();
+ 			return;
++		}
+ 	}
+ 
+-	cpus_read_lock();
+ 	jump_label_lock();
+ 	if (atomic_read(&key->enabled) == 0) {
+ 		atomic_set(&key->enabled, -1);
+-- 
+2.11.0
