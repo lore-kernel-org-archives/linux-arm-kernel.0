@@ -1,86 +1,59 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 1 Aug 2017 14:05:53 +0200
-Subject: [PATCH v5 00/10] arm: dts: extend mt7623 support
-In-Reply-To: <cover.1501486190.git.sean.wang@mediatek.com>
-References: <cover.1501486190.git.sean.wang@mediatek.com>
-Message-ID: <e65768f8-a177-6214-7fe7-cf71b71f02dc@gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 1 Aug 2017 14:09:28 +0200
+Subject: [PATCH v3 1/2] clk: meson: gxbb: Add sd_emmc clk0 clkids
+In-Reply-To: <20170731115603.29720-2-jbrunet@baylibre.com>
+References: <20170731115603.29720-1-jbrunet@baylibre.com>
+ <20170731115603.29720-2-jbrunet@baylibre.com>
+Message-ID: <ddf63956-781d-670b-366e-712445307e60@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 07/31/2017 09:36 AM, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+On 07/31/2017 01:56 PM, Jerome Brunet wrote:
+> Add the clkids for the clocks feeding the input0 of the mmc controllers
 > 
-> Change since v4:
-> - split mt6323 nodes as the independent item which tends to integration with
->    other MediaTek SoCs
-> - enhanced commit log
-> - fixed up building warning shown in make dtsb
-> - added clock-frequency to CPU nodes to avoid warning in boot time
-> - added more nodes into the SoC-level file mt7623.dtsi such as CPU OPP table
->    and thermal zone treating CPU as one of cooling devices
-> - cleaned up the file mt7623n-bananapi-bpi-r2.dts such as listing nodes in
->    alphabetical order
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>  drivers/clk/meson/gxbb.h              | 10 ++++++++--
+>  include/dt-bindings/clock/gxbb-clkc.h |  3 +++
+>  2 files changed, 11 insertions(+), 2 deletions(-)
 > 
-> Changes since v3:
-> - explain in the commit message why this binding is changed
-> - patches for dt-binding is reordered at the beginning of patch list
-> - be concise wigh using SPDX-License-Identifier in new dts file
-> 
-> Changes since v2:
-> - exclude those patch are already queued into v4.11-next/dts32
-> - exclude those patches already sent in separation
-> - add mt7623a SoC basic support
-> - update binding SoC for mt7623n and relevant boards
-> 
-> Changes since v1:
-> Continue the upstream journey based on the previous John Crispin's good work.
-> - add fixes for the v1 suggestion
-> - fix typo in the commit log
-> - add missing pinctrl bindings for mt7623
-> - reuse pinctrl driver for mt7623
-> - enhance existing nodes since the way for binding is changed e.g USB
-> - add more nodes which already gets support from the latest tree e.g MT7530 DSA
-> - add the dts file for Bananapi R2 (BPI-R2) board
-> 
-> John Crispin (4):
->    arm: dts: mt7623: add mt6323.dtsi file
->    arm: dts: mt7623: cleanup the mt7623n rfb uart nodes
->    arm: dts: mt7623: enable the usb device on the mt7623n rfb
->    arm: dts: mt7623: enable the nand device on the mt7623n nand rfb
-> 
-> Sean Wang (6):
->    dt-bindings: arm: mediatek: update for MT7623n SoC and relevant boards
->    dt-bindings: arm: mediatek: add bindings for mediatek MT7623a SoC
->      Platform
->    arm: dts: mt7623: rename mt7623-evb.dts to
->      arch/arm/boot/dts/mt7623n-rfb.dtsi
->    ARM: mediatek: add MT7623a smp bringup code
->    arm: dts: mt7623: add support for Bananapi R2 (BPI-R2) board
->    arm: dts: mt7623: add clock-frequency to CPU nodes
+> diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
+> index 2c8986d3232c..5b1d4b374d1c 100644
+> --- a/drivers/clk/meson/gxbb.h
+> +++ b/drivers/clk/meson/gxbb.h
+> @@ -184,8 +184,14 @@
+>  #define CLKID_CTS_MCLK_I958_DIV	  112
+>  #define CLKID_32K_CLK_SEL	  115
+>  #define CLKID_32K_CLK_DIV	  116
+> -
+> -#define NR_CLKS			  117
+> +#define CLKID_SD_EMMC_A_CLK0_SEL  117
+> +#define CLKID_SD_EMMC_A_CLK0_DIV  118
+> +#define CLKID_SD_EMMC_B_CLK0_SEL  120
+> +#define CLKID_SD_EMMC_B_CLK0_DIV  121
+> +#define CLKID_SD_EMMC_C_CLK0_SEL  123
+> +#define CLKID_SD_EMMC_C_CLK0_DIV  124
+> +
+> +#define NR_CLKS			  126
+>  
+>  /* include the CLKIDs that have been made part of the DT binding */
+>  #include <dt-bindings/clock/gxbb-clkc.h>
+> diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
+> index e07fea011ebd..c04a76d8facf 100644
+> --- a/include/dt-bindings/clock/gxbb-clkc.h
+> +++ b/include/dt-bindings/clock/gxbb-clkc.h
+> @@ -110,5 +110,8 @@
+>  #define CLKID_CTS_MCLK_I958	110
+>  #define CLKID_CTS_I958		113
+>  #define CLKID_32K_CLK		114
+> +#define CLKID_SD_EMMC_A_CLK0	119
+> +#define CLKID_SD_EMMC_B_CLK0	122
+> +#define CLKID_SD_EMMC_C_CLK0	125
+>  
+>  #endif /* __GXBB_CLKC_H */
 > 
 
-All but patch 5 pushed to v4.13-next/dts32
-Patch 5 went to v4.13-next/soc
+Applied to clk-meson's next/headers.
 
 Thanks,
-Matthias
-
->   Documentation/devicetree/bindings/arm/mediatek.txt |  14 +-
->   arch/arm/boot/dts/Makefile                         |   3 +-
->   arch/arm/boot/dts/mt6323.dtsi                      | 241 +++++++++++
->   arch/arm/boot/dts/mt7623-evb.dts                   |  33 --
->   arch/arm/boot/dts/mt7623.dtsi                      | 132 +++++-
->   arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts      | 443 +++++++++++++++++++++
->   arch/arm/boot/dts/mt7623n-rfb-nand.dts             | 109 +++++
->   arch/arm/boot/dts/mt7623n-rfb.dtsi                 |  92 +++++
->   arch/arm/mach-mediatek/mediatek.c                  |   2 +
->   arch/arm/mach-mediatek/platsmp.c                   |   1 +
->   10 files changed, 1021 insertions(+), 49 deletions(-)
->   create mode 100644 arch/arm/boot/dts/mt6323.dtsi
->   delete mode 100644 arch/arm/boot/dts/mt7623-evb.dts
->   create mode 100644 arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
->   create mode 100644 arch/arm/boot/dts/mt7623n-rfb-nand.dts
->   create mode 100644 arch/arm/boot/dts/mt7623n-rfb.dtsi
-> 
+Neil
