@@ -1,98 +1,200 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 1 Aug 2017 16:58:44 +0200
-Subject: [RFC PATCH v2 04/38] KVM: arm/arm64: Check if nested
- virtualization is in use
-In-Reply-To: <CAHyh4xi0hQE2kxOY78_25GwRsCCjMwOt0Lj=Jv1Vs1LdTUO+pQ@mail.gmail.com>
-References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
- <1500397144-16232-5-git-send-email-jintack.lim@linaro.org>
- <20170730195949.GF5176@cbox>
- <CAHyh4xi0hQE2kxOY78_25GwRsCCjMwOt0Lj=Jv1Vs1LdTUO+pQ@mail.gmail.com>
-Message-ID: <20170801145844.GK5176@cbox>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 1 Aug 2017 16:58:42 +0200
+Subject: [PATCH v2 3/3] soc: mediatek: add SCPSYS power domain driver for
+ MediaTek MT7622 SoC
+In-Reply-To: <892e8fb55428c0761620c4472852f86cd56f0f0d.1501581552.git.sean.wang@mediatek.com>
+References: <cover.1501581552.git.sean.wang@mediatek.com>
+ <892e8fb55428c0761620c4472852f86cd56f0f0d.1501581552.git.sean.wang@mediatek.com>
+Message-ID: <79cdec68-19ce-d647-5f35-ff29808aac18@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 01, 2017 at 10:07:40AM -0400, Jintack Lim wrote:
-> On Sun, Jul 30, 2017 at 3:59 PM, Christoffer Dall <cdall@linaro.org> wrote:
-> > On Tue, Jul 18, 2017 at 11:58:30AM -0500, Jintack Lim wrote:
-> >> Nested virtualizaion is in use only if all three conditions are met:
-> >> - The architecture supports nested virtualization.
-> >> - The kernel parameter is set.
-> >> - The userspace uses nested virtualiztion feature.
-> >>
-> >> Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
-> >> ---
-> >>  arch/arm/include/asm/kvm_host.h   | 11 +++++++++++
-> >>  arch/arm64/include/asm/kvm_host.h |  2 ++
-> >>  arch/arm64/kvm/nested.c           | 17 +++++++++++++++++
-> >>  virt/kvm/arm/arm.c                |  4 ++++
-> >>  4 files changed, 34 insertions(+)
-> >>
-> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> >> index 00b0f97..7e9e6c8 100644
-> >> --- a/arch/arm/include/asm/kvm_host.h
-> >> +++ b/arch/arm/include/asm/kvm_host.h
-> >> @@ -303,4 +303,15 @@ static inline int __init kvmarm_nested_cfg(char *buf)
-> >>  {
-> >>       return 0;
-> >>  }
-> >> +
-> >> +static inline int init_nested_virt(void)
-> >> +{
-> >> +     return 0;
-> >> +}
-> >> +
-> >> +static inline bool nested_virt_in_use(struct kvm_vcpu *vcpu)
-> >> +{
-> >> +     return false;
-> >> +}
-> >> +
-> >>  #endif /* __ARM_KVM_HOST_H__ */
-> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >> index 6df0c7c..86d4b6c 100644
-> >> --- a/arch/arm64/include/asm/kvm_host.h
-> >> +++ b/arch/arm64/include/asm/kvm_host.h
-> >> @@ -387,5 +387,7 @@ static inline void __cpu_init_stage2(void)
-> >>  }
-> >>
-> >>  int __init kvmarm_nested_cfg(char *buf);
-> >> +int init_nested_virt(void);
-> >> +bool nested_virt_in_use(struct kvm_vcpu *vcpu);
-> >>
-> >>  #endif /* __ARM64_KVM_HOST_H__ */
-> >> diff --git a/arch/arm64/kvm/nested.c b/arch/arm64/kvm/nested.c
-> >> index 79f38da..9a05c76 100644
-> >> --- a/arch/arm64/kvm/nested.c
-> >> +++ b/arch/arm64/kvm/nested.c
-> >> @@ -24,3 +24,20 @@ int __init kvmarm_nested_cfg(char *buf)
-> >>  {
-> >>       return strtobool(buf, &nested_param);
-> >>  }
-> >> +
-> >> +int init_nested_virt(void)
-> >> +{
-> >> +     if (nested_param && cpus_have_const_cap(ARM64_HAS_NESTED_VIRT))
-> >> +             kvm_info("Nested virtualization is supported\n");
-> >> +
-> >> +     return 0;
-> >> +}
-> >> +
-> >> +bool nested_virt_in_use(struct kvm_vcpu *vcpu)
-> >> +{
-> >> +     if (nested_param && cpus_have_const_cap(ARM64_HAS_NESTED_VIRT)
-> >> +         && test_bit(KVM_ARM_VCPU_NESTED_VIRT, vcpu->arch.features))
-> >> +             return true;
-> >
-> > you could initialize a bool in init_nested_virt which you then check
-> > here to avoid duplicating the logic.
-> 
-> I can make a bool to check the kernel param and the capability. The
-> third one is per VM given by the userspace, so we don't know it when
-> we initialize the host hypervisor. We can potentially have a bool in
-> kvm_vcpu_arch or kvm_arch to cache the whole three conditions, if that
-> sounds ok.
-> 
 
-Yes, that sounds good to me.
 
-Thanks,
--Christoffer
+On 08/01/2017 12:06 PM, sean.wang at mediatek.com wrote:
+> From: Chen Zhong <chen.zhong@mediatek.com>
+> 
+> Add SCPSYS power domain driver for MT7622 SoC having four power domains
+> which are respectively ETHSYS for Ethernet including embedded switch,
+> WBSYS for WIFI and Bluetooth, HIF0SYS for PCI-E and SATA, and HIF1SYS for
+> USB. Those functions could be selectively powered gated when the
+> corresponding function is no longer to use in order to reach more minimal
+> power dissipation.
+> 
+> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>   drivers/soc/mediatek/mtk-scpsys.c     | 81 +++++++++++++++++++++++++++++++++++
+>   include/linux/soc/mediatek/infracfg.h |  8 +++-
+>   2 files changed, 88 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> index ceb2cc4..513aa73 100644
+> --- a/drivers/soc/mediatek/mtk-scpsys.c
+> +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> @@ -22,6 +22,7 @@
+>   
+>   #include <dt-bindings/power/mt2701-power.h>
+>   #include <dt-bindings/power/mt6797-power.h>
+> +#include <dt-bindings/power/mt7622-power.h>
+>   #include <dt-bindings/power/mt8173-power.h>
+>   
+>   #define SPM_VDE_PWR_CON			0x0210
+> @@ -39,6 +40,11 @@
+>   #define SPM_MFG_2D_PWR_CON		0x02c0
+>   #define SPM_MFG_ASYNC_PWR_CON		0x02c4
+>   #define SPM_USB_PWR_CON			0x02cc
+> +#define SPM_ETHSYS_PWR_CON		0x02e0	/* MT7622 */
+> +#define SPM_HIF0_PWR_CON		0x02e4	/* MT7622 */
+> +#define SPM_HIF1_PWR_CON		0x02e8	/* MT7622 */
+> +#define SPM_WB_PWR_CON			0x02ec	/* MT7622 */
+> +
+>   
+>   #define SPM_PWR_STATUS			0x060c
+>   #define SPM_PWR_STATUS_2ND		0x0610
+> @@ -64,6 +70,10 @@
+>   #define PWR_STATUS_MFG_ASYNC		BIT(23)
+>   #define PWR_STATUS_AUDIO		BIT(24)
+>   #define PWR_STATUS_USB			BIT(25)
+> +#define PWR_STATUS_ETHSYS		BIT(24)	/* MT7622 */
+> +#define PWR_STATUS_HIF0			BIT(25)	/* MT7622 */
+> +#define PWR_STATUS_HIF1			BIT(26)	/* MT7622 */
+> +#define PWR_STATUS_WB			BIT(27)	/* MT7622 */
+>   
+>   enum clk_id {
+>   	CLK_NONE,
+> @@ -73,6 +83,7 @@ enum clk_id {
+>   	CLK_VENC_LT,
+>   	CLK_ETHIF,
+>   	CLK_VDEC,
+> +	CLK_HIFSEL,
+>   	CLK_MAX,
+>   };
+>   
+> @@ -84,6 +95,7 @@ static const char * const clk_names[] = {
+>   	"venc_lt",
+>   	"ethif",
+>   	"vdec",
+> +	"hif_sel",
+>   	NULL,
+>   };
+>   
+> @@ -696,6 +708,72 @@ static int __init scpsys_probe_mt6797(struct platform_device *pdev)
+>   }
+>   
+>   /*
+> + * MT7622 power domain support
+> + */
+> +static const struct scp_domain_data scp_domain_data_mt7622[] = {
+> +	[MT7622_POWER_DOMAIN_ETHSYS] = {
+> +		.name = "ethsys",
+> +		.sta_mask = PWR_STATUS_ETHSYS,
+> +		.ctl_offs = SPM_ETHSYS_PWR_CON,
+> +		.sram_pdn_bits = GENMASK(11, 8),
+> +		.sram_pdn_ack_bits = GENMASK(15, 12),
+> +		.clk_id = {CLK_NONE},
+> +		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_ETHSYS,
+> +		.active_wakeup = true,
+> +	},
+> +	[MT7622_POWER_DOMAIN_HIF0] = {
+> +		.name = "hif0",
+> +		.sta_mask = PWR_STATUS_HIF0,
+> +		.ctl_offs = SPM_HIF0_PWR_CON,
+> +		.sram_pdn_bits = GENMASK(11, 8),
+> +		.sram_pdn_ack_bits = GENMASK(15, 12),
+> +		.clk_id = {CLK_HIFSEL},
+> +		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_HIF0,
+> +		.active_wakeup = true,
+> +	},
+> +	[MT7622_POWER_DOMAIN_HIF1] = {
+> +		.name = "hif1",
+> +		.sta_mask = PWR_STATUS_HIF1,
+> +		.ctl_offs = SPM_HIF1_PWR_CON,
+> +		.sram_pdn_bits = GENMASK(11, 8),
+> +		.sram_pdn_ack_bits = GENMASK(15, 12),
+> +		.clk_id = {CLK_HIFSEL},
+> +		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_HIF1,
+> +		.active_wakeup = true,
+> +	},
+> +	[MT7622_POWER_DOMAIN_WB] = {
+> +		.name = "wb",
+> +		.sta_mask = PWR_STATUS_WB,
+> +		.ctl_offs = SPM_WB_PWR_CON,
+> +		.sram_pdn_bits = 0,
+> +		.sram_pdn_ack_bits = 0,
+> +		.clk_id = {CLK_NONE},
+> +		.bus_prot_mask = MT7622_TOP_AXI_PROT_EN_WB,
+> +		.active_wakeup = true,
+> +	},
+> +};
+> +
+> +#define NUM_DOMAINS_MT7622	ARRAY_SIZE(scp_domain_data_mt7622)
+> +
+> +static int __init scpsys_probe_mt7622(struct platform_device *pdev)
+> +{
+> +	struct scp *scp;
+> +	struct scp_ctrl_reg scp_reg;
+> +
+> +	scp_reg.pwr_sta_offs = SPM_PWR_STATUS;
+> +	scp_reg.pwr_sta2nd_offs = SPM_PWR_STATUS_2ND;
+> +
+> +	scp = init_scp(pdev, scp_domain_data_mt7622, NUM_DOMAINS_MT7622,
+> +		       &scp_reg);
+> +	if (IS_ERR(scp))
+> +		return PTR_ERR(scp);
+> +
+> +	mtk_register_power_domains(pdev, scp, NUM_DOMAINS_MT7622);
+> +
+> +	return 0;
+> +}
+
+All the scpsys_probe_mtXXXX are following the same pattern, which get's really 
+obvious when comparing this function to scpsys_probe_mt2701.
+Instead of adding the scpsys_probe_mtXXXX callback to the of_device_id data 
+pointer, couldn't we pass a struct with a pointer to the scp_domain_data_mtXXXX 
+array and a possible callback to register the subdomains?
+
+This would reduce code duplication for every new SoC, which starts to bloat the 
+driver.
+
+Can you implement this as a separate patch of this series? Or do you prefer me 
+to do so and you just rebase your series on top of that?
+
+Regards,
+Matthias
+
+> +
+> +/*
+>    * MT8173 power domain support
+>    */
+>   
+> @@ -835,6 +913,9 @@ static const struct of_device_id of_scpsys_match_tbl[] = {
+>   		.compatible = "mediatek,mt6797-scpsys",
+>   		.data = scpsys_probe_mt6797,
+>   	}, {
+> +		.compatible = "mediatek,mt7622-scpsys",
+> +		.data = scpsys_probe_mt7622,
+> +	}, {
+>   		.compatible = "mediatek,mt8173-scpsys",
+>   		.data = scpsys_probe_mt8173,
+>   	}, {
+> diff --git a/include/linux/soc/mediatek/infracfg.h b/include/linux/soc/mediatek/infracfg.h
+> index a5714e9..c1e5062 100644
+> --- a/include/linux/soc/mediatek/infracfg.h
+> +++ b/include/linux/soc/mediatek/infracfg.h
+> @@ -20,7 +20,13 @@
+>   #define MT8173_TOP_AXI_PROT_EN_MFG_M1		BIT(22)
+>   #define MT8173_TOP_AXI_PROT_EN_MFG_SNOOP_OUT	BIT(23)
+>   
+> +#define MT7622_TOP_AXI_PROT_EN_ETHSYS		(BIT(3) | BIT(17))
+> +#define MT7622_TOP_AXI_PROT_EN_HIF0		(BIT(24) | BIT(25))
+> +#define MT7622_TOP_AXI_PROT_EN_HIF1		(BIT(26) | BIT(27) | \
+> +						 BIT(28))
+> +#define MT7622_TOP_AXI_PROT_EN_WB		(BIT(2) | BIT(6) | \
+> +						 BIT(7) | BIT(8))
+> +
+>   int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask);
+>   int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask);
+> -
+>   #endif /* __SOC_MEDIATEK_INFRACFG_H */
+> 
