@@ -1,66 +1,69 @@
 From: jiaheng.fan@nxp.com (jiaheng.fan)
-Date: Tue, 1 Aug 2017 10:14:06 +0800
-Subject: [PATCH v1 1/6] dma: fsl-dma: add devicetree documentation for qdma
- driver.
+Date: Tue, 1 Aug 2017 10:14:11 +0800
+Subject: [PATCH v1 6/6] arm64: dts: ls1043/ls1046: add qdma note to dtsi
 In-Reply-To: <1501553651-7203-1-git-send-email-jiaheng.fan@nxp.com>
 References: <1501553651-7203-1-git-send-email-jiaheng.fan@nxp.com>
-Message-ID: <1501553651-7203-2-git-send-email-jiaheng.fan@nxp.com>
+Message-ID: <1501553651-7203-7-git-send-email-jiaheng.fan@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: jiaheng.fan <jiaheng.fan@nxp.com>
 ---
- Documentation/devicetree/bindings/dma/fsl-qdma.txt | 42 ++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/dma/fsl-qdma.txt
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 15 +++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 15 +++++++++++++++
+ 2 files changed, 30 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/dma/fsl-qdma.txt b/Documentation/devicetree/bindings/dma/fsl-qdma.txt
-new file mode 100644
-index 0000000..b076177
---- /dev/null
-+++ b/Documentation/devicetree/bindings/dma/fsl-qdma.txt
-@@ -0,0 +1,42 @@
-+* Freescale queue Direct Memory Access Controller(qDMA) Controller
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+index 31fd77f..78c534c 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+@@ -652,6 +652,21 @@
+ 			dma-coherent;
+ 		};
+ 
++		qdma: qdma at 8380000 {
++			compatible = "fsl,ls1043a-qdma";
++			reg = <0x0 0x8380000 0x0 0x1000>, /* Controller regs */
++			      <0x0 0x8390000 0x0 0x10000>, /* Status regs */
++			      <0x0 0x83a0000 0x0 0x40000>; /* Block regs */
++			interrupts = <0 152 0x4>,
++				     <0 39 0x4>;
++			interrupt-names = "qdma-error", "qdma-queue";
++			channels = <8>;
++			queues = <2>;
++			status-sizes = <64>;
++			queue-sizes = <64 64>;
++			big-endian;
++		};
 +
-+  The qDMA controller transfers blocks of data between one source and one or more
-+destinations. The blocks of data transferred can be represented in memory as contiguous
-+or non-contiguous using scatter/gather table(s). Channel virtualization is supported
-+through enqueuing of DMA jobs to, or dequeuing DMA jobs from, different work
-+queues.
+ 		msi1: msi-controller1 at 1571000 {
+ 			compatible = "fsl,1s1043a-msi";
+ 			reg = <0x0 0x1571000 0x0 0x8>;
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+index dc1640b..4419df8 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+@@ -595,6 +595,21 @@
+ 				 <&clockgen 4 1>;
+ 		};
+ 
++		qdma: qdma at 8380000 {
++			compatible = "fsl,ls1046a-qdma";
++			reg = <0x0 0x8380000 0x0 0x1000>, /* Controller regs */
++			      <0x0 0x8390000 0x0 0x10000>, /* Status regs */
++			      <0x0 0x83a0000 0x0 0x40000>; /* Block regs */
++			interrupts = <0 153 0x4>,
++				     <0 39 0x4>;
++			interrupt-names = "qdma-error", "qdma-queue";
++			channels = <8>;
++			queues = <2>;
++			status-sizes = <64>;
++			queue-sizes = <64 64>;
++			big-endian;
++		};
 +
-+* qDMA Controller
-+Required properties:
-+- compatible :
-+	- "fsl,ls1021a-qdma",
-+	Or "fsl,ls1043a-qdma" followed by "fsl,ls1021a-qdma",
-+- reg : Specifies base physical address(s) and size of the qDMA registers.
-+	The region is qDMA control register's address and size.
-+- interrupts : A list of interrupt-specifiers, one for each entry in
-+	interrupt-names.
-+- interrupt-names : Should contain:
-+	"qdma-error" - the error interrupt
-+	"qdma-queue" - the queue interrupt
-+- channels : Number of channels supported by the controller
-+- queues : Number of queues supported by driver
-+
-+Optional properties:
-+- big-endian: If present registers and hardware scatter/gather descriptors
-+	of the qDMA are implemented in big endian mode, otherwise in little
-+	mode.
-+
-+
-+Examples:
-+
-+	qdma: qdma at 8390000 {
-+		compatible = "fsl,ls1021a-qdma";
-+		reg = <0x0 0x8398000 0x0 0x2000 /* Controller registers */
-+		       0x0 0x839a000 0x0 0x2000>; /* Block registers */
-+		interrupts = <GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>,
-+				<GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "qdma-error", "qdma-queue";
-+		channels = <8>;
-+		queues = <2>;
-+		big-endian;
-+	};
+ 		usb0: usb at 2f00000 {
+ 			compatible = "snps,dwc3";
+ 			reg = <0x0 0x2f00000 0x0 0x10000>;
 -- 
 2.7.4
