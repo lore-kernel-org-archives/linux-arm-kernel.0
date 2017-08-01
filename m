@@ -1,113 +1,87 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue,  1 Aug 2017 16:07:52 +0530
-Subject: [PATCH v2 08/16] dmaengine: bcm-sba-raid: Increase number of free
- sba_request
+Date: Tue,  1 Aug 2017 16:07:55 +0530
+Subject: [PATCH v2 11/16] dmaengine: bcm-sba-raid: Peek mbox when we have no
+ free requests
 In-Reply-To: <1501583880-32072-1-git-send-email-anup.patel@broadcom.com>
 References: <1501583880-32072-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1501583880-32072-9-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1501583880-32072-12-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we have only 1024 free sba_request created
-by sba_prealloc_channel_resources(). This is too low
-and the prep_xxx() callbacks start failing more often
-at time of RAID array setup over NVMe disks.
+When setting up RAID array on several NVMe disks we observed that
+sba_alloc_request() start failing (due to no free requests left)
+and RAID array setup becomes very slow.
 
-This patch sets number of free sba_request created by
-sba_prealloc_channel_resources() to be:
-<number_of_mailbox_channels> x 8192
-
-Due to above, we will have sufficient number of free
-sba_request and prep_xxx() callbacks failing is very
-unlikely.
+To improve performance, we do mbox channel peek when we have
+no free requests. This improves performance of RAID array setup
+because mbox requests that were completed but not processed by
+mbox completion worker will be processed immediately by mbox
+channel peek.
 
 Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 ---
- drivers/dma/bcm-sba-raid.c | 25 +++++++++++++------------
- 1 file changed, 13 insertions(+), 12 deletions(-)
+ drivers/dma/bcm-sba-raid.c | 25 ++++++++++++++++++++-----
+ 1 file changed, 20 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
-index cd6e3cd..af6cc8e 100644
+index f14ed0a..399250e 100644
 --- a/drivers/dma/bcm-sba-raid.c
 +++ b/drivers/dma/bcm-sba-raid.c
-@@ -83,6 +83,8 @@
- #define SBA_CMD_WRITE_BUFFER				0xc
- #define SBA_CMD_GALOIS					0xe
+@@ -200,6 +200,14 @@ static inline u32 __pure sba_cmd_pq_c_mdata(u32 d, u32 b1, u32 b0)
  
-+#define SBA_MAX_REQ_PER_MBOX_CHANNEL			8192
+ /* ====== General helper routines ===== */
+ 
++static void sba_peek_mchans(struct sba_device *sba)
++{
++	int mchan_idx;
 +
- /* Driver helper macros */
- #define to_sba_request(tx)		\
- 	container_of(tx, struct sba_request, tx)
-@@ -1622,6 +1624,13 @@ static int sba_probe(struct platform_device *pdev)
- 	sba->dev = &pdev->dev;
- 	platform_set_drvdata(pdev, sba);
- 
-+	/* Number of channels equals number of mailbox channels */
-+	ret = of_count_phandle_with_args(pdev->dev.of_node,
-+					 "mboxes", "#mbox-cells");
-+	if (ret <= 0)
-+		return -ENODEV;
-+	mchans_count = ret;
++	for (mchan_idx = 0; mchan_idx < sba->mchans_count; mchan_idx++)
++		mbox_client_peek_data(sba->mchans[mchan_idx]);
++}
 +
- 	/* Determine SBA version from DT compatible string */
- 	if (of_device_is_compatible(sba->dev->of_node, "brcm,iproc-sba"))
- 		sba->ver = SBA_VER_1;
-@@ -1634,14 +1643,12 @@ static int sba_probe(struct platform_device *pdev)
- 	/* Derived Configuration parameters */
- 	switch (sba->ver) {
- 	case SBA_VER_1:
--		sba->max_req = 1024;
- 		sba->hw_buf_size = 4096;
- 		sba->hw_resp_size = 8;
- 		sba->max_pq_coefs = 6;
- 		sba->max_pq_srcs = 6;
- 		break;
- 	case SBA_VER_2:
--		sba->max_req = 1024;
- 		sba->hw_buf_size = 4096;
- 		sba->hw_resp_size = 8;
- 		sba->max_pq_coefs = 30;
-@@ -1655,6 +1662,7 @@ static int sba_probe(struct platform_device *pdev)
- 	default:
- 		return -EINVAL;
- 	}
-+	sba->max_req = SBA_MAX_REQ_PER_MBOX_CHANNEL * mchans_count;
- 	sba->max_cmd_per_req = sba->max_pq_srcs + 3;
- 	sba->max_xor_srcs = sba->max_cmd_per_req - 1;
- 	sba->max_resp_pool_size = sba->max_req * sba->hw_resp_size;
-@@ -1668,22 +1676,14 @@ static int sba_probe(struct platform_device *pdev)
- 	sba->client.knows_txdone	= false;
- 	sba->client.tx_tout		= 0;
+ static struct sba_request *sba_alloc_request(struct sba_device *sba)
+ {
+ 	unsigned long flags;
+@@ -211,8 +219,17 @@ static struct sba_request *sba_alloc_request(struct sba_device *sba)
+ 	if (req)
+ 		list_move_tail(&req->node, &sba->reqs_alloc_list);
+ 	spin_unlock_irqrestore(&sba->reqs_lock, flags);
+-	if (!req)
++
++	if (!req) {
++		/*
++		 * We have no more free requests so, we peek
++		 * mailbox channels hoping few active requests
++		 * would have completed which will create more
++		 * room for new requests.
++		 */
++		sba_peek_mchans(sba);
+ 		return NULL;
++	}
  
--	/* Number of channels equals number of mailbox channels */
--	ret = of_count_phandle_with_args(pdev->dev.of_node,
--					 "mboxes", "#mbox-cells");
--	if (ret <= 0)
--		return -ENODEV;
--	mchans_count = ret;
--	sba->mchans_count = 0;
--	atomic_set(&sba->mchans_current, 0);
+ 	req->flags = SBA_REQUEST_STATE_ALLOCED;
+ 	req->first = req;
+@@ -560,17 +577,15 @@ static enum dma_status sba_tx_status(struct dma_chan *dchan,
+ 				     dma_cookie_t cookie,
+ 				     struct dma_tx_state *txstate)
+ {
+-	int mchan_idx;
+ 	enum dma_status ret;
+ 	struct sba_device *sba = to_sba_device(dchan);
+ 
+-	for (mchan_idx = 0; mchan_idx < sba->mchans_count; mchan_idx++)
+-		mbox_client_peek_data(sba->mchans[mchan_idx]);
 -
- 	/* Allocate mailbox channel array */
--	sba->mchans = devm_kcalloc(&pdev->dev, sba->mchans_count,
-+	sba->mchans = devm_kcalloc(&pdev->dev, mchans_count,
- 				   sizeof(*sba->mchans), GFP_KERNEL);
- 	if (!sba->mchans)
- 		return -ENOMEM;
+ 	ret = dma_cookie_status(dchan, cookie, txstate);
+ 	if (ret == DMA_COMPLETE)
+ 		return ret;
  
- 	/* Request mailbox channels */
-+	sba->mchans_count = 0;
- 	for (i = 0; i < mchans_count; i++) {
- 		sba->mchans[i] = mbox_request_channel(&sba->client, i);
- 		if (IS_ERR(sba->mchans[i])) {
-@@ -1692,6 +1692,7 @@ static int sba_probe(struct platform_device *pdev)
- 		}
- 		sba->mchans_count++;
- 	}
-+	atomic_set(&sba->mchans_current, 0);
++	sba_peek_mchans(sba);
++
+ 	return dma_cookie_status(dchan, cookie, txstate);
+ }
  
- 	/* Find-out underlying mailbox device */
- 	ret = of_parse_phandle_with_args(pdev->dev.of_node,
 -- 
 2.7.4
