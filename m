@@ -1,44 +1,82 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue,  1 Aug 2017 16:07:44 +0530
-Subject: [PATCH v2 00/16] Broadcom SBA-RAID driver improvements
-Message-ID: <1501583880-32072-1-git-send-email-anup.patel@broadcom.com>
+From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
+Date: Tue, 1 Aug 2017 11:49:11 +0100
+Subject: [PATCH v5 0/2] iommu/smmu-v3: Workaround for hisilicon 161010801
+ erratum(reserve HW MSI)
+Message-ID: <20170801104913.71912-1-shameerali.kolothum.thodi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset does various improvments to Broadcom SBA-RAID
-driver.
+On certain HiSilicon platforms (Hip06/Hip07) the GIC ITS and
+PCIe RC deviates from the standard implementation and this breaks
+PCIe MSI functionality when SMMU is enabled.
 
-The patches are based on Linux-4.13-rc3 and can also be found
-at sba-raid-imp-v2 branch of
-https://github.com/Broadcom/arm64-linux.git
+The HiSilicon erratum 161010801 describes this limitation of certain
+HiSilicon platforms to support the SMMU mappings for MSI transactions.
+On these platforms GICv3 ITS translator is presented with the deviceID
+by extending the MSI payload data to 64 bits to include the deviceID.
+Hence, the PCIe controller on this platforms has to differentiate the
+MSI payload against other DMA payload and has to modify the MSI payload.
+This basically makes it difficult for this platforms to have a SMMU
+translation for MSI.
 
-Changes since v1:
- - Split PATCH1 into 10 smaller patches for easier review
- - Added more info to commit description of PATCH2
- - Split PATCH4 into 2 patches for easier review
- - Dropped PATCH6 because it is now part of
-http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1456425.html
+To implement this quirk, the following changes are incorporated:
 
-Anup Patel (16):
-  dmaengine: bcm-sba-raid: Minor improvments in comments
-  dmaengine: bcm-sba-raid: Reduce locking context in sba_alloc_request()
-  dmaengine: bcm-sba-raid: Common flags for sba_request state and fence
-  dmaengine: bcm-sba-raid: Remove redundant next_count from sba_request
-  dmaengine: bcm-sba-raid: Remove redundant resp_dma from sba_request
-  dmaengine: bcm-sba-raid: Remove reqs_free_count from sba_device
-  dmaengine: bcm-sba-raid: Allow arbitrary number free sba_request
-  dmaengine: bcm-sba-raid: Increase number of free sba_request
-  dmaengine: bcm-sba-raid: Improve sba_issue_pending() run duration
-  dmaengine: bcm-sba-raid: Alloc resources before registering DMA device
-  dmaengine: bcm-sba-raid: Peek mbox when we have no free requests
-  dmaengine: bcm-sba-raid: Pre-ack async tx descriptor
-  dmaengine: bcm-sba-raid: Re-factor sba_process_deferred_requests()
-  dmaengine: bcm-sba-raid: Remove redundant SBA_REQUEST_STATE_RECEIVED
-  dmaengine: bcm-sba-raid: Add debugfs support
-  dmaengine: bcm-sba-raid: Explicitly ACK mailbox message after sending
+1. Added a generic helper function to IORT code to retrieve and
+   reserve the HW ITS address regions.
+2. Modified iommu_dma_get_resv_regions() to reserve the hw msi
+   regions which means these address regions will not be translated and
+   will be excluded from iova allocations.
 
- drivers/dma/bcm-sba-raid.c | 539 ++++++++++++++++++++++++++-------------------
- 1 file changed, 308 insertions(+), 231 deletions(-)
+Note: This requires patches [1] and [2] for vfio pass-through support
+on these platforms.
+
+Thanks,
+Shameer
+
+[1]: https://lkml.org/lkml/2017/7/27/388
+[2]: https://lkml.org/lkml/2017/7/27/386
+
+Changelog:
+
+v4 --> v5
+Addressed comments from Robin and Lorenzo:
+-Added a comment to make it clear that, for now, only straightforward 
+ HW topologies are handled while reserving ITS regions(patch #1).
+
+v3 --> v4
+Rebased on 4.13-rc1.
+Addressed comments from Robin, Will and Lorenzo:
+-As suggested by Robin, moved the ITS msi reservation into
+ iommu_dma_get_resv_regions().
+-Added its_count != resv region failure case(patch #1).
+
+v2 --> v3
+Addressed comments from Lorenzo and Robin:
+-Removed dev_is_pci() check in smmuV3 driver.
+-Don't treat device not having an ITS mapping as an error in
+ iort helper function.
+
+v1 --> v2
+-patch 2/2: Invoke iort helper fn based on fwnode type(acpi).
+
+RFCv2 -->PATCH
+-Incorporated Lorenzo's review comments.
+
+RFC v1 --> RFC v2
+Based on Robin's review comments,
+-Removed  the generic erratum framework.
+-Using IORT/MADT tables to retrieve the ITS base addr instead
+ of vendor specific CSRT table.
+
+Shameer Kolothum (2):
+  ACPI/IORT: Add ITS address regions reservation helper
+  iommu/dma: Add HW MSI address regions reservation
+
+ drivers/acpi/arm64/iort.c        | 95 ++++++++++++++++++++++++++++++++++++++--
+ drivers/iommu/dma-iommu.c        |  8 +++-
+ drivers/irqchip/irq-gic-v3-its.c |  3 +-
+ include/linux/acpi_iort.h        |  7 ++-
+ 4 files changed, 107 insertions(+), 6 deletions(-)
 
 -- 
-2.7.4
+1.9.1
