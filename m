@@ -1,56 +1,80 @@
 From: erin.lo@mediatek.com (Erin Lo)
-Date: Tue, 1 Aug 2017 15:03:29 +0800
-Subject: [PATCH 1/5] arm: dts: mt2701: Add ethernet device node
+Date: Tue, 1 Aug 2017 15:03:31 +0800
+Subject: [PATCH 3/5] arm: dts: mt2701: Add display bls related nodes for MT2701
 In-Reply-To: <1501571013-22327-1-git-send-email-erin.lo@mediatek.com>
 References: <1501571013-22327-1-git-send-email-erin.lo@mediatek.com>
-Message-ID: <1501571013-22327-2-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1501571013-22327-4-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+From: Weiqing Kong <weiqing.kong@mediatek.com>
 
-Add ethernet device node for MT2701
+This patch adds board related config for backlight
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
 Signed-off-by: Erin Lo <erin.lo@mediatek.com>
 ---
- arch/arm/boot/dts/mt2701.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm/boot/dts/mt2701-evb.dts | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index f1efdc6..0619b86 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -597,6 +597,30 @@
- 		#clock-cells = <1>;
+diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
+index f484973..b96e34d 100644
+--- a/arch/arm/boot/dts/mt2701-evb.dts
++++ b/arch/arm/boot/dts/mt2701-evb.dts
+@@ -23,6 +23,19 @@
+ 		reg = <0 0x80000000 0 0x40000000>;
  	};
  
-+	eth: ethernet at 1b100000 {
-+		compatible = "mediatek,mt2701-eth", "syscon";
-+		reg = <0 0x1b100000 0 0x20000>;
-+		interrupts = <GIC_SPI 200 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 199 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
-+			 <&ethsys CLK_ETHSYS_ESW>,
-+			 <&ethsys CLK_ETHSYS_GP1>,
-+			 <&ethsys CLK_ETHSYS_GP2>,
-+			 <&apmixedsys CLK_APMIXED_TRGPLL>;
-+		clock-names = "ethif", "esw", "gp1", "gp2", "trgpll";
-+		resets = <&ethsys MT2701_ETHSYS_FE_RST>,
-+			 <&ethsys MT2701_ETHSYS_GMAC_RST>,
-+			 <&ethsys MT2701_ETHSYS_PPE_RST>;
-+		reset-names = "fe", "gmac", "ppe";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
-+		mediatek,ethsys = <&ethsys>;
-+		mediatek,pctl = <&syscfg_pctl_a>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
++	backlight_lcd: backlight_lcd {
++		compatible = "pwm-backlight";
++		pwms = <&bls 0 100000>;
++		brightness-levels = <
++			  0  16  32  48  64  80  96 112
++			128 144 160 176 192 208 224 240
++			255
++		>;
++		default-brightness-level = <9>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm_bls_gpio>;
 +	};
 +
- 	bdpsys: syscon at 1c000000 {
- 		compatible = "mediatek,mt2701-bdpsys", "syscon";
- 		reg = <0 0x1c000000 0 0x1000>;
+ 	sound:sound {
+ 		compatible = "mediatek,mt2701-cs42448-machine";
+ 		mediatek,platform = <&afe>;
+@@ -62,6 +75,10 @@
+ 	status = "okay";
+ };
+ 
++&bls {
++	status = "okay";
++};
++
+ &i2c0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c0_pins_a>;
+@@ -86,6 +103,10 @@
+ 	};
+ };
+ 
++&mmsys {
++	status = "okay";
++};
++
+ &pio {
+ 	i2c0_pins_a: i2c0 at 0 {
+ 		pins1 {
+@@ -111,6 +132,12 @@
+ 		};
+ 	};
+ 
++	pwm_bls_gpio: pwm_bls_gpio {
++		pins_cmd_dat {
++			pinmux = <MT2701_PIN_208_AUD_EXT_CK1__FUNC_DISP_PWM>;
++		};
++	};
++
+ 	spi_pins_a: spi0 at 0 {
+ 		pins_spi {
+ 			pinmux = <MT2701_PIN_53_SPI0_CSN__FUNC_SPI0_CS>,
 -- 
 1.9.1
