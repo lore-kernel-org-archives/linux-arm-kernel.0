@@ -1,164 +1,79 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 1 Aug 2017 15:50:03 +0300
-Subject: [PATCH 1/6] dt-bindings: ti, edma: Add 66AK2G specific information
-In-Reply-To: <20170801044119.16201-2-lokeshvutla@ti.com>
-References: <20170801044119.16201-1-lokeshvutla@ti.com>
- <20170801044119.16201-2-lokeshvutla@ti.com>
-Message-ID: <31fe2206-675b-5425-412f-0033017f6511@ti.com>
+From: ladis@linux-mips.org (Ladislav Michl)
+Date: Tue, 1 Aug 2017 14:52:44 +0200
+Subject: [PATCH] serial: amba-pl011: Add basic rs485 support
+Message-ID: <20170801125244.cmeycp5ujp2lmmwr@lenoch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently RS485 mode can be selected only via DT bindings.
 
+Signed-off-by: Ladislav Michl <ladis@linux-mips.org>
+---
+ Notes: this change was sitting in my tree for a year and now with
+ "serial: Add common rs485 device tree parsing function" et al.
+ patches being submitted is time to move forward a bit.
+ Although rpi with this patched driver is working for months I do not
+ like mdelay in interrupt while waiting for last bit to leave tx wire.
+ If anyone has better idea, I'll happily implement it. Thank you.
 
-On 2017-08-01 07:41, Lokesh Vutla wrote:
-> Update ti,edma binding documentation to reflect 66AK2G specific
-> properties.
->
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> ---
->  Documentation/devicetree/bindings/dma/ti-edma.txt | 95 +++++++++++++++++++++--
->  1 file changed, 90 insertions(+), 5 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> index 18090e7226b4..05fe2931d025 100644
-> --- a/Documentation/devicetree/bindings/dma/ti-edma.txt
-> +++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> @@ -9,7 +9,12 @@ execute the actual DMA tansfer.
->  eDMA3 Channel Controller
->
->  Required properties:
-> -- compatible:	"ti,edma3-tpcc" for the channel controller(s)
-> +--------------------
-> +- compatible:	Should be:
-> +		- "ti,edma3-tpcc" for the channel controller(s) on OMAP,
-> +		  AM33xx and AM43xx SoCs.
-> +		- "ti,k2g-edma3-tpcc", "ti,edma3-tpcc" for the
-> +		  channel controller(s) on 66AK2G.
->  - #dma-cells:	Should be set to <2>. The first number is the DMA request
->  		number and the second is the TC the channel is serviced on.
->  - reg:		Memory map of eDMA CC
-> @@ -19,8 +24,19 @@ Required properties:
->  - ti,tptcs:	List of TPTCs associated with the eDMA in the following form:
->  		<&tptc_phandle TC_priority_number>. The highest priority is 0.
->
-> +SoC-specific Required properties:
-> +--------------------------------
-> +The following are mandatory properties for OMAP, AM33xx and AM43xx SoCs only:
-> +- ti,hwmods:	Name of the hwmods associated to the eDMA CC.
-> +
-> +The following are mandatory properties for 66AK2G SoCs only:
-> +- power-domains:Should contain a phandle to a PM domain provider node
-> +		and an args specifier containing the device id
-> +		value. This property is as per the binding,
-> +		Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
-> +
->  Optional properties:
-> -- ti,hwmods:	Name of the hwmods associated to the eDMA CC
-> +-------------------
->  - ti,edma-memcpy-channels: List of channels allocated to be used for memcpy, iow
->  		these channels will be SW triggered channels. See example.
->  - ti,edma-reserved-slot-ranges: PaRAM slot ranges which should not be used by
-> @@ -31,17 +47,34 @@ Optional properties:
->  eDMA3 Transfer Controller
->
->  Required properties:
-> -- compatible:	"ti,edma3-tptc" for the transfer controller(s)
-> +--------------------
-> +- compatible:	Should be:
-> +		- "ti,edma3-tptc" for the transfer controller(s) on OMAP,
-> +		  AM33xx and AM43xx SoCs.
-> +		- "ti,k2g-edma3-tptc", "ti,edma3-tptc" for the
-> +		  transfer controller(s) on 66AK2G.
->  - reg:		Memory map of eDMA TC
->  - interrupts:	Interrupt number for TCerrint.
->
-> +SoC-specific Required properties:
-> +--------------------------------
-> +The following are mandatory properties for OMAP, AM33xx and AM43xx SoCs only:
-> +- ti,hwmods:	Name of the hwmods associated to the eDMA TC.
-> +
-> +The following are mandatory properties for 66AK2G SoCs only:
-> +- power-domains:Should contain a phandle to a PM domain provider node
-> +		and an args specifier containing the device id
-> +		value. This property is as per the binding,
-> +		Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
-> +
->  Optional properties:
-> -- ti,hwmods:	Name of the hwmods associated to the given eDMA TC
-> +-------------------
->  - interrupt-names: "edma3_tcerrint"
->
->  ------------------------------------------------------------------------------
-> -Example:
-> +Examples:
+ drivers/tty/serial/amba-pl011.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-Do we really need to expand the examples to have identical set, but with 
-power-domains?
-
->
-> +1.
->  edma: edma at 49000000 {
->  	compatible = "ti,edma3-tpcc";
->  	ti,hwmods = "tpcc";
-> @@ -109,6 +142,58 @@ mcasp0: mcasp at 48038000 {
->  	dma-names = "tx", "rx";
->  };
->
-> +2.
-> +edma1: edma at 02728000 {
-> +	compatible = "ti,k2g-edma3-tpcc", "ti,edma3-tpcc";
-> +	reg =	<0x02728000 0x8000>;
-> +	reg-names = "edma3_cc";
-> +	interrupts = <GIC_SPI 208 IRQ_TYPE_EDGE_RISING>,
-> +			<GIC_SPI 219 IRQ_TYPE_EDGE_RISING>,
-> +			<GIC_SPI 220 IRQ_TYPE_EDGE_RISING>;
-> +	interrupt-names = "edma3_ccint", "emda3_mperr",
-> +			  "edma3_ccerrint";
-> +	dma-requests = <64>;
-> +	#dma-cells = <2>;
-> +
-> +	ti,tptcs = <&edma1_tptc0 7>, <&edma1_tptc1 0>;
-> +
-> +	/*
-> +	 * memcpy is disabled, can be enabled with:
-> +	 * ti,edma-memcpy-channels = <12 13 14 15>;
-> +	 * for example.
-> +	 */
-> +
-> +	power-domains = <&k2g_pds 0x4f>;
-> +};
-> +
-> +edma1_tptc0: tptc at 027b0000 {
-> +	compatible = "ti,k2g-edma3-tptc", "ti,edma3-tptc";
-> +	reg =	<0x027b0000 0x400>;
-> +	power-domains = <&k2g_pds 0x4f>;
-> +};
-> +
-> +edma1_tptc1: tptc at 027b8000 {
-> +	compatible = "ti, k2g-edma3-tptc", "ti,edma3-tptc";
-> +	reg =	<0x027b8000 0x400>;
-> +	power-domains = <&k2g_pds 0x4f>;
-> +};
-> +
-> +mmc0: mmc at 23000000 {
-> +	compatible = "ti,k2g-hsmmc", "ti,omap4-hsmmc";
-> +	reg = <0x23000000 0x400>;
-> +	interrupts = <GIC_SPI 96 IRQ_TYPE_EDGE_RISING>;
-> +	dmas = <&edma1 24 0>, <&edma1 25 0>;
-> +	dma-names = "tx", "rx";
-> +	bus-width = <4>;
-> +	ti,needs-special-reset;
-> +	no-1-8-v;
-> +	max-frequency = <96000000>;
-> +	power-domains = <&k2g_pds 0xb>;
-> +	clocks = <&k2g_clks 0xb 1>, <&k2g_clks 0xb 2>;
-> +	clock-names = "fck", "mmchsdb_fck";
-> +	status = "disabled";
-> +};
-> +
->  ------------------------------------------------------------------------------
->  DEPRECATED binding, new DTS files must use the ti,edma3-tpcc/ti,edma3-tptc
->  binding.
->
-
-- P?ter
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 8a857bb34fbb..44016840f5df 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1319,9 +1319,22 @@ static inline bool pl011_dma_rx_running(struct uart_amba_port *uap)
+ 
+ static void pl011_stop_tx(struct uart_port *port)
+ {
++	unsigned int cr;
+ 	struct uart_amba_port *uap =
+ 	    container_of(port, struct uart_amba_port, port);
+ 
++	/* Handle RS-485 */
++	if (port->rs485.flags & SER_RS485_ENABLED) {
++		while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
++			mdelay(1);
++		cr = readw(uap->port.membase + UART011_CR);
++		if (port->rs485.flags & SER_RS485_RTS_ON_SEND)
++			cr &= ~UART011_CR_RTS;
++		else
++			cr |= UART011_CR_RTS;
++		writew(cr, uap->port.membase + UART011_CR);
++	}
++
+ 	uap->im &= ~UART011_TXIM;
+ 	pl011_write(uap->im, uap, REG_IMSC);
+ 	pl011_dma_tx_stop(uap);
+@@ -1340,9 +1353,20 @@ static void pl011_start_tx_pio(struct uart_amba_port *uap)
+ 
+ static void pl011_start_tx(struct uart_port *port)
+ {
++	unsigned int cr;
+ 	struct uart_amba_port *uap =
+ 	    container_of(port, struct uart_amba_port, port);
+ 
++	/* Handle RS-485 */
++	if (port->rs485.flags & SER_RS485_ENABLED) {
++		cr = readw(uap->port.membase + UART011_CR);
++		if (port->rs485.flags & SER_RS485_RTS_ON_SEND)
++			cr |= UART011_CR_RTS;
++		else
++			cr &= ~UART011_CR_RTS;
++		writew(cr, uap->port.membase + UART011_CR);
++	}
++
+ 	if (!pl011_dma_tx_start(uap))
+ 		pl011_start_tx_pio(uap);
+ }
+@@ -2588,6 +2612,7 @@ static int pl011_setup_port(struct device *dev, struct uart_amba_port *uap,
+ 		return PTR_ERR(base);
+ 
+ 	index = pl011_probe_dt_alias(index, dev);
++	of_get_rs485_mode(dev->of_node, &uap->port.rs485);
+ 
+ 	uap->old_cr = 0;
+ 	uap->port.dev = dev;
+-- 
+2.11.0
