@@ -1,81 +1,105 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Tue, 1 Aug 2017 11:30:11 +0200
-Subject: [PATCHv2 1/2] arm64:vdso: Rewrite gettimeofday into C.
-In-Reply-To: <20170531124430.GG9723@arm.com>
-References: <1496190860-5116-1-git-send-email-apinski@cavium.com>
- <20170531124430.GG9723@arm.com>
-Message-ID: <20170801093011.GC18024@rric.localdomain>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Tue, 01 Aug 2017 12:56:17 +0300
+Subject: [PATCH] ARM: tegra: Register host1x node with iommu binding on
+ tegra124
+In-Reply-To: <20170731152306.GB27815@ulmo>
+References: <20170709163614.6746-1-contact@paulk.fr>
+ <1499763009.1340.11.camel@paulk.fr> <1499784841.1520.20.camel@toradex.com>
+ <1499785555.1340.15.camel@paulk.fr> <1499786264.1520.22.camel@toradex.com>
+ <20170731152306.GB27815@ulmo>
+Message-ID: <1501581377.1304.4.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
-
-On 31.05.17 13:44:30, Will Deacon wrote:
-> Thanks for posting this, but please try to cc the maintainers in future -- I
-> almost missed it!
-> 
-> On Tue, May 30, 2017 at 05:34:19PM -0700, Andrew Pinski wrote:
-> > This allows the compiler to optimize the divide by 1000.
-> > And remove the other divide.
+On Mon, 2017-07-31 at 17:23 +0200, Thierry Reding wrote:
+> On Tue, Jul 11, 2017 at 03:17:46PM +0000, Marcel Ziswiler wrote:
+> > On Tue, 2017-07-11 at 18:05 +0300, Paul Kocialkowski wrote:
+> > > On Tue, 2017-07-11 at 14:54 +0000, Marcel Ziswiler wrote:
+> > > > On Tue, 2017-07-11 at 11:50 +0300, Paul Kocialkowski wrote:
+> > > > > On Sun, 2017-07-09 at 19:36 +0300, Paul Kocialkowski wrote:
+> > > > > > This registers the host1x node with the SMMU (as HC swgroup)
+> > > > > > to
+> > > > > > allow
+> > > > > > the host1x code to attach to it. It avoid failing the probe
+> > > > > > sequence,
+> > > > > > which resulted in the tegra drm driver not probing and thus
+> > > > > > nothing
+> > > > > > being displayed on-screen.
+> > > > > 
+> > > > > Fixes: 404bfb78daf3 ("gpu: host1x: Add IOMMU support")
+> > > > > 
+> > > > > > Signed-off-by: Paul Kocialkowski <contact-
+> > > > > > W9ppeneeCTY at public.gmane.org>
+> > > > 
+> > > > Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> > > > Tested-on: Apalis TK1, Jetson-TK1
+> > > > 
+> > > > > > ---
+> > > > > >  arch/arm/boot/dts/tegra124.dtsi | 1 +
+> > > > > >  1 file changed, 1 insertion(+)
+> > > > > > 
+> > > > > > diff --git a/arch/arm/boot/dts/tegra124.dtsi
+> > > > > > b/arch/arm/boot/dts/tegra124.dtsi
+> > > > > > index 187a36c6d0fc..b3b89befffeb 100644
+> > > > > > --- a/arch/arm/boot/dts/tegra124.dtsi
+> > > > > > +++ b/arch/arm/boot/dts/tegra124.dtsi
+> > > > > > @@ -85,6 +85,7 @@
+> > > > > >  		clocks = <&tegra_car TEGRA124_CLK_HOST1X>;
+> > > > > >  		resets = <&tegra_car 28>;
+> > > > > >  		reset-names = "host1x";
+> > > > > > +		iommus = <&mc TEGRA_SWGROUP_HC>;
+> > > > > >  
+> > > > > >  		#address-cells = <2>;
+> > > > > >  		#size-cells = <2>;
+> > > > 
+> > > > So I take it we still will need this one moving forward,
+> > > > correct?
+> > > 
+> > > Yes, this one actually enables the IOMMU while the other one
+> > > handles
+> > > the
+> > > failure to attach the IOMMU without brinding the whole drm driver
+> > > down.
+> > > 
+> > > So it's best to actually make use of the feature!
+> > > 
+> > > > How about tegra30, I guess the same applies there, isn't it?
+> > > > Should
+> > > > I
+> > > > send a patch or are you guys doing that?
+> > > 
+> > > I don't have any tegra hardware aside of tegra124, so that's all I
+> > > can
+> > > contribute to. I don't know if others have looked into the same
+> > > type
+> > > of
+> > > issue happening on either newer or older platforms.
 > > 
-> > On ThunderX, gettimeofday improves by 32%.  On ThunderX 2,
-> > gettimeofday improves by 18%.
-> > 
-> > Note I noticed a bug in the old implementation of __kernel_clock_getres;
-> > it was checking only the lower 32bits of the pointer; this would work
-> > for most cases but could fail in a few.
-> > 
-> > Changes from v1:
-> > * Fixed bug in __kernel_clock_getres for checking the pointer argument.
-> > * Fix comments to refer to functions in arm64.
+> > OK, as we happen to still selling Apalis/Colibri T30 and me having
+> > Beaver as well as Cardhu available for testing I can cook something
+> > up,
+> > test and send it along. First tries indicate it working on 4.12 but
+> > somehow crashing during memory allocation on -next. We'll see.
 > 
-> I tested this patch on a few platforms I have access to and didn't see the
-> perf regressions I saw when I looked at this in the past with an older
-> toolchain (it was mostly about the same, with a couple of improvements).
-> 
-> So, in principle, I'm not opposed to moving this into C. However, we're
-> currently close to a "vDSO-explosion" on arm64 with people wanting a compat
-> variant and also an ILP32 variant. When Kevin posted his compat variant
-> (also in C):
-> 
->   http://lkml.kernel.org/r/20161206160353.14581-1-kevin.brodsky at arm.com
+> I think we're going to need the same change on Tegra30 and Tegra114.
+> And
+> Tegra132 and Tegra210 for that matter. With the gpu/host1x fix applied
+> things should keep working on all generations, but we need DT changes
+> if
+> we want to make use of the SMMU.
 
-from a technical pov there are no issues in a convertion to C. Since
-this fixes bad syscall performance and an alternative solution as
-pointed out here is not in sight very soon, would you be willing to
-get this series upstream. Should we update to latest kernel and resend
-the patches for v4.14?
+I don't have any other hardware than tegra124, so I don't really feel
+confident sending out those patches knowing that I won't be able to test
+them.
 
-Thanks,
+I could still craft them, but we'd have to make sure that someone can
+test them before they are applied.
 
--Robert
+-- 
+Paul Kocialkowski,
 
-> 
-> Nathan (who apparently needs to set his mail host address ;) was concerned
-> about duplication between arm and arm64:
-> 
->   http://lkml.kernel.org/r/87r35jmv3e.fsf at wedge.i-did-not-set--mail-host-address--so-tickle-me
-> 
-> I'm firmly of the opinion that we should try to write an arch-agnostic vDSO
-> implementation in core code (lib/vdso or something) where the arch header
-> provides things like:
-> 
->   * The mechanism to read the counter
->   * The mechanism to issue a syscall
->   * A function to determine whether or not the current clocksource is
->     suitable
-> 
-> I think the datapage format could be defined in core code and it would be
-> worth looking to see how much the virtual mapping code can be consolidated
-> too.
-> 
-> If we can get something that works for arm native, arm64 native, arm64
-> compat and arm64 ilp32 then it's probably going to be useful for other
-> architectures too, even if we need to add more customisation points in
-> future.
-> 
-> I've spoken to Kevin about this, but I'm not sure whether he's had a chance
-> to look at knocking up a prototype. A first stab could just unconditionally
-> fallback to the system call.
-> 
-> Will
+developer of free digital technology and hardware support
+
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
