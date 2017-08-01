@@ -1,64 +1,47 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 1 Aug 2017 11:32:04 +0200
-Subject: [PATCH V5 0/2] timer: add imx tpm timer support
-In-Reply-To: <1501576817-18681-1-git-send-email-aisheng.dong@nxp.com>
-References: <1501576817-18681-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20170801093204.GA1919@mai>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Tue, 1 Aug 2017 09:32:50 +0000
+Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
+In-Reply-To: <20170731123157.GJ3053@localhost>
+References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
+ <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
+ <20170722065133.GT3053@localhost>
+ <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
+ <20170726052930.GF3053@localhost>
+ <f2908e38-dc4d-3886-4058-52a7ad845415@st.com>
+ <20170731123157.GJ3053@localhost>
+Message-ID: <e3a76a50-4160-d111-cce9-132b46b66c33@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 01, 2017 at 04:40:15PM +0800, Dong Aisheng wrote:
-> The Timer/PWM Module (TPM) supports input capture, output compare,
-> and the generation of PWM signals to control electric motor and power
-> management applications. The counter, compare and capture registers
-> are clocked by an asynchronous clock that can remain enabled in low
-> power modes. TPM can support global counter bus where one TPM drives
-> the counter bus for the others, provided bit width is the same.
+
+
+On 07/31/2017 02:31 PM, Vinod Koul wrote:
+> On Wed, Jul 26, 2017 at 07:38:02AM +0000, Pierre Yves MORDRET wrote:
+>>>>>> +
+>>>>>> +#ifndef __DMA_STM32_DMAMUX_H
+>>>>>> +#define __DMA_STM32_DMAMUX_H
+>>>>>> +
+>>>>>> +#if defined(CONFIG_STM32_DMAMUX)
+>>>>>> +int stm32_dmamux_set_config(struct device *dev, void *route_data, u32 chan_id);
+>>>>>
+>>>>> Why do we need a custom API in this case?
+>>>>>
+>>>>
+>>>> This API is called by DMA when a slave is requested by client. DMA can work
+>>>> without DMAMUX this API has been put in place to configure DMAMUX whether client
+>>>> is requesting a DMAMUX Channel instead of a DMA one.
+>>>
+>>> You mean the dmaengine driver right?
+>>>
+>>
+>> Yes. The API is mainly called by "device_config" through out STM32 DMA Driver
+>> when a router is in place for client.
+>> Please refer to Patch 4/5 on this set.
 > 
-> This patch only adds the timer support. PWM would be added later.
-> 
-> ChangeLog:
-> v4->v5:
->  * use request_irq instead of setup_irq
->  * switch to TIMER_OF_DECLARE from CLOCKSOURCE_OF_DECLARE
->  * add more error check
->  * patch title change to clocksource/drivers/imx-tpm: add imx tpm timer support
-> v3->v4:
->  * also add ETIME explanation in function
-> v2->v3:
->  * address a few minor comments from Daniel Lezcano
->  * add more explaination on ETIME check in commit message
-> v1->v2:
->  * change to readl/writel from __raw_readl/writel according to Arnd's
->    suggestion to avoid endian issue
->  * add help information in Kconfig
->  * add more error checking
-> 
-> Dong Aisheng (2):
->   dt-bindings: timer: add nxp tpm timer binding doc
->   clocksource/drivers/imx-tpm: add imx tpm timer support
-> 
->  .../devicetree/bindings/timer/nxp,tpm-timer.txt    |  28 +++
->  drivers/clocksource/Kconfig                        |   8 +
->  drivers/clocksource/Makefile                       |   1 +
->  drivers/clocksource/timer-imx-tpm.c                | 239 +++++++++++++++++++++
->  4 files changed, 276 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/timer/nxp,tpm-timer.txt
->  create mode 100644 drivers/clocksource/timer-imx-tpm.c
+> Okay am thinking on why this can't be generic..? An optional router config
+> callback?
 > 
 
-Hi Dong,
-
-applied for 4.14.
-
-Thanks.
-
-  -- Daniel
-
--- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+I would have liked to answer there is a callback within engine but unfortunately
+I didn't figure out one when I did my router's development. I've looked once
+more but again I can't find how to map chanID and request line without custom API.
