@@ -1,114 +1,113 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue,  1 Aug 2017 16:07:54 +0530
-Subject: [PATCH v2 10/16] dmaengine: bcm-sba-raid: Alloc resources before
- registering DMA device
+Date: Tue,  1 Aug 2017 16:07:52 +0530
+Subject: [PATCH v2 08/16] dmaengine: bcm-sba-raid: Increase number of free
+ sba_request
 In-Reply-To: <1501583880-32072-1-git-send-email-anup.patel@broadcom.com>
 References: <1501583880-32072-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1501583880-32072-11-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1501583880-32072-9-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should allocate DMA channel resources before registering the
-DMA device in sba_probe() because we can get DMA request soon
-after registering the DMA device. If DMA channel resources are
-not allocated before first DMA request then SBA-RAID driver will
-crash.
+Currently, we have only 1024 free sba_request created
+by sba_prealloc_channel_resources(). This is too low
+and the prep_xxx() callbacks start failing more often
+at time of RAID array setup over NVMe disks.
+
+This patch sets number of free sba_request created by
+sba_prealloc_channel_resources() to be:
+<number_of_mailbox_channels> x 8192
+
+Due to above, we will have sufficient number of free
+sba_request and prep_xxx() callbacks failing is very
+unlikely.
 
 Signed-off-by: Anup Patel <anup.patel@broadcom.com>
 ---
- drivers/dma/bcm-sba-raid.c | 30 +++++++++++++++---------------
- 1 file changed, 15 insertions(+), 15 deletions(-)
+ drivers/dma/bcm-sba-raid.c | 25 +++++++++++++------------
+ 1 file changed, 13 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
-index f6616da..f14ed0a 100644
+index cd6e3cd..af6cc8e 100644
 --- a/drivers/dma/bcm-sba-raid.c
 +++ b/drivers/dma/bcm-sba-raid.c
-@@ -1478,13 +1478,13 @@ static int sba_prealloc_channel_resources(struct sba_device *sba)
- 	int i, j, ret = 0;
- 	struct sba_request *req = NULL;
+@@ -83,6 +83,8 @@
+ #define SBA_CMD_WRITE_BUFFER				0xc
+ #define SBA_CMD_GALOIS					0xe
  
--	sba->resp_base = dma_alloc_coherent(sba->dma_dev.dev,
-+	sba->resp_base = dma_alloc_coherent(sba->mbox_dev,
- 					    sba->max_resp_pool_size,
- 					    &sba->resp_dma_base, GFP_KERNEL);
- 	if (!sba->resp_base)
++#define SBA_MAX_REQ_PER_MBOX_CHANNEL			8192
++
+ /* Driver helper macros */
+ #define to_sba_request(tx)		\
+ 	container_of(tx, struct sba_request, tx)
+@@ -1622,6 +1624,13 @@ static int sba_probe(struct platform_device *pdev)
+ 	sba->dev = &pdev->dev;
+ 	platform_set_drvdata(pdev, sba);
+ 
++	/* Number of channels equals number of mailbox channels */
++	ret = of_count_phandle_with_args(pdev->dev.of_node,
++					 "mboxes", "#mbox-cells");
++	if (ret <= 0)
++		return -ENODEV;
++	mchans_count = ret;
++
+ 	/* Determine SBA version from DT compatible string */
+ 	if (of_device_is_compatible(sba->dev->of_node, "brcm,iproc-sba"))
+ 		sba->ver = SBA_VER_1;
+@@ -1634,14 +1643,12 @@ static int sba_probe(struct platform_device *pdev)
+ 	/* Derived Configuration parameters */
+ 	switch (sba->ver) {
+ 	case SBA_VER_1:
+-		sba->max_req = 1024;
+ 		sba->hw_buf_size = 4096;
+ 		sba->hw_resp_size = 8;
+ 		sba->max_pq_coefs = 6;
+ 		sba->max_pq_srcs = 6;
+ 		break;
+ 	case SBA_VER_2:
+-		sba->max_req = 1024;
+ 		sba->hw_buf_size = 4096;
+ 		sba->hw_resp_size = 8;
+ 		sba->max_pq_coefs = 30;
+@@ -1655,6 +1662,7 @@ static int sba_probe(struct platform_device *pdev)
+ 	default:
+ 		return -EINVAL;
+ 	}
++	sba->max_req = SBA_MAX_REQ_PER_MBOX_CHANNEL * mchans_count;
+ 	sba->max_cmd_per_req = sba->max_pq_srcs + 3;
+ 	sba->max_xor_srcs = sba->max_cmd_per_req - 1;
+ 	sba->max_resp_pool_size = sba->max_req * sba->hw_resp_size;
+@@ -1668,22 +1676,14 @@ static int sba_probe(struct platform_device *pdev)
+ 	sba->client.knows_txdone	= false;
+ 	sba->client.tx_tout		= 0;
+ 
+-	/* Number of channels equals number of mailbox channels */
+-	ret = of_count_phandle_with_args(pdev->dev.of_node,
+-					 "mboxes", "#mbox-cells");
+-	if (ret <= 0)
+-		return -ENODEV;
+-	mchans_count = ret;
+-	sba->mchans_count = 0;
+-	atomic_set(&sba->mchans_current, 0);
+-
+ 	/* Allocate mailbox channel array */
+-	sba->mchans = devm_kcalloc(&pdev->dev, sba->mchans_count,
++	sba->mchans = devm_kcalloc(&pdev->dev, mchans_count,
+ 				   sizeof(*sba->mchans), GFP_KERNEL);
+ 	if (!sba->mchans)
  		return -ENOMEM;
  
--	sba->cmds_base = dma_alloc_coherent(sba->dma_dev.dev,
-+	sba->cmds_base = dma_alloc_coherent(sba->mbox_dev,
- 					    sba->max_cmds_pool_size,
- 					    &sba->cmds_dma_base, GFP_KERNEL);
- 	if (!sba->cmds_base) {
-@@ -1534,11 +1534,11 @@ static int sba_prealloc_channel_resources(struct sba_device *sba)
- 	return 0;
- 
- fail_free_cmds_pool:
--	dma_free_coherent(sba->dma_dev.dev,
-+	dma_free_coherent(sba->mbox_dev,
- 			  sba->max_cmds_pool_size,
- 			  sba->cmds_base, sba->cmds_dma_base);
- fail_free_resp_pool:
--	dma_free_coherent(sba->dma_dev.dev,
-+	dma_free_coherent(sba->mbox_dev,
- 			  sba->max_resp_pool_size,
- 			  sba->resp_base, sba->resp_dma_base);
- 	return ret;
-@@ -1547,9 +1547,9 @@ static int sba_prealloc_channel_resources(struct sba_device *sba)
- static void sba_freeup_channel_resources(struct sba_device *sba)
- {
- 	dmaengine_terminate_all(&sba->dma_chan);
--	dma_free_coherent(sba->dma_dev.dev, sba->max_cmds_pool_size,
-+	dma_free_coherent(sba->mbox_dev, sba->max_cmds_pool_size,
- 			  sba->cmds_base, sba->cmds_dma_base);
--	dma_free_coherent(sba->dma_dev.dev, sba->max_resp_pool_size,
-+	dma_free_coherent(sba->mbox_dev, sba->max_resp_pool_size,
- 			  sba->resp_base, sba->resp_dma_base);
- 	sba->resp_base = NULL;
- 	sba->resp_dma_base = 0;
-@@ -1737,15 +1737,15 @@ static int sba_probe(struct platform_device *pdev)
+ 	/* Request mailbox channels */
++	sba->mchans_count = 0;
+ 	for (i = 0; i < mchans_count; i++) {
+ 		sba->mchans[i] = mbox_request_channel(&sba->client, i);
+ 		if (IS_ERR(sba->mchans[i])) {
+@@ -1692,6 +1692,7 @@ static int sba_probe(struct platform_device *pdev)
  		}
+ 		sba->mchans_count++;
  	}
++	atomic_set(&sba->mchans_current, 0);
  
--	/* Register DMA device with linux async framework */
--	ret = sba_async_register(sba);
-+	/* Prealloc channel resource */
-+	ret = sba_prealloc_channel_resources(sba);
- 	if (ret)
- 		goto fail_free_mchans;
- 
--	/* Prealloc channel resource */
--	ret = sba_prealloc_channel_resources(sba);
-+	/* Register DMA device with Linux async framework */
-+	ret = sba_async_register(sba);
- 	if (ret)
--		goto fail_async_dev_unreg;
-+		goto fail_free_resources;
- 
- 	/* Print device info */
- 	dev_info(sba->dev, "%s using SBAv%d and %d mailbox channels",
-@@ -1754,8 +1754,8 @@ static int sba_probe(struct platform_device *pdev)
- 
- 	return 0;
- 
--fail_async_dev_unreg:
--	dma_async_device_unregister(&sba->dma_dev);
-+fail_free_resources:
-+	sba_freeup_channel_resources(sba);
- fail_free_mchans:
- 	for (i = 0; i < sba->mchans_count; i++)
- 		mbox_free_channel(sba->mchans[i]);
-@@ -1767,10 +1767,10 @@ static int sba_remove(struct platform_device *pdev)
- 	int i;
- 	struct sba_device *sba = platform_get_drvdata(pdev);
- 
--	sba_freeup_channel_resources(sba);
--
- 	dma_async_device_unregister(&sba->dma_dev);
- 
-+	sba_freeup_channel_resources(sba);
-+
- 	for (i = 0; i < sba->mchans_count; i++)
- 		mbox_free_channel(sba->mchans[i]);
- 
+ 	/* Find-out underlying mailbox device */
+ 	ret = of_parse_phandle_with_args(pdev->dev.of_node,
 -- 
 2.7.4
