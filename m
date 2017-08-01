@@ -1,30 +1,34 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 1 Aug 2017 12:38:10 -0500
-Subject: [PATCH 2/2] iommu/omap: Use DMA-API for performing cache flushes
-In-Reply-To: <1501274954-20973-3-git-send-email-j-albarran@ti.com>
-References: <1501274954-20973-1-git-send-email-j-albarran@ti.com>
- <1501274954-20973-3-git-send-email-j-albarran@ti.com>
-Message-ID: <9e59b00e-a6d9-b0a8-8da6-6724d93c3e58@ti.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Tue, 1 Aug 2017 11:01:43 -0700
+Subject: [PATCH 0/7] K2G: Add QSPI support
+In-Reply-To: <20170801045434.8733-1-vigneshr@ti.com>
+References: <20170801045434.8733-1-vigneshr@ti.com>
+Message-ID: <29c0e8ec-1f9f-cfc9-2d0e-e4d31890b699@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28/2017 03:49 PM, Josue Albarran wrote:
-> The OMAP IOMMU driver was using ARM assembly code directly for
-> flushing the MMU page table entries from the caches. This caused
-> MMU faults on OMAP4 (Cortex-A9 based SoCs) as L2 caches were not
-> handled due to the presence of a PL310 L2 Cache Controller. These
-> faults were however not seen on OMAP5/DRA7 SoCs (Cortex-A15 based
-> SoCs).
+On 7/31/2017 9:54 PM, Vignesh R wrote:
+> This series adds support for Cadence QSPI for 66AK2G SoC. The first
+> three patches enhance the cadence-quadspi driver to support loopback
+> clock and pm_runtime and tweaks for 66AK2G SoC. Remaining patches add
+> DT nodes and enable the driver in defconfig.
 > 
-> The OMAP IOMMU driver is adapted to use the DMA Streaming API
-> instead now to flush the page table/directory table entries from
-> the CPU caches. This ensures that the devices always see the
-> updated page table entries. The outer caches are now addressed
-> automatically with the usage of the DMA API.
+> Tested on 66AK2G GP and ICE boards.
 > 
-> Signed-off-by: Josue Albarran <j-albarran@ti.com>
+> Vignesh R (7):
+>    mtd: spi-nor: cadence-quadspi: add a delay in write sequence
+>    mtd: spi-nor: cadence-quadspi: Add support to enable loopback clock
+>      circuit
+>    mtd: spi-nor: cadence-quadspi: Add runtime PM support
+>    ARM: dts: keystone-k2g: Add QSPI DT entry
+>    ARM: dts: keystone-k2g-evm: Add QSPI node
+>    ARM: dts: keystone-k2g-ice: Add QSPI node
+>    ARM: configs: keystone: Enable Cadence QSPI driver
+> 
+Please separate dts and driver patches in its own series
+while posting next time since they go throgh different
+subsystem trees. Get your driver patch queed
+first before adding DTS and enabling config option.
 
-Thanks for fixing this,
-Acked-by: Suman Anna <s-anna@ti.com>
-
-[snip]
+Regards,
+Santosh
