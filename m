@@ -1,88 +1,76 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Tue, 1 Aug 2017 10:00:36 +0800
-Subject: [PATCH 6/6] drm/rockchip: fix race with kms hotplug and fbdev
-In-Reply-To: <CAKMK7uFXGPRQOxAXi+0_TO4HUN8p1RweGOGGsvnQrAcHbtuXWg@mail.gmail.com>
-References: <1501494569-6825-1-git-send-email-mark.yao@rock-chips.com>
- <1501494601-7140-1-git-send-email-mark.yao@rock-chips.com>
- <CACvgo511Cb0_vT1vR+q-3d3zU2PmHmi-r-aH8uZHQXDj8V4byg@mail.gmail.com>
- <CAKMK7uFXGPRQOxAXi+0_TO4HUN8p1RweGOGGsvnQrAcHbtuXWg@mail.gmail.com>
-Message-ID: <597FE0C4.4000808@rock-chips.com>
+From: jiaheng.fan@nxp.com (Jiaheng Fan)
+Date: Tue, 1 Aug 2017 02:04:20 +0000
+Subject: [PATCH v1 1/6] dma: fsl-dma: add devicetree documentation for
+ qdma driver.
+In-Reply-To: <1501552044-6081-2-git-send-email-jiaheng.fan@nxp.com>
+References: <1501552044-6081-2-git-send-email-jiaheng.fan@nxp.com>
+Message-ID: <HE1PR04MB119677571300C8CDAD3A7F88F2B30@HE1PR04MB1196.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?07?31? 20:28, Daniel Vetter wrote:
-> On Mon, Jul 31, 2017 at 1:57 PM, Emil Velikov <emil.l.velikov@gmail.com> wrote:
->> On 31 July 2017 at 10:50, Mark Yao <mark.yao@rock-chips.com> wrote:
->>> Since fb_helper is not a pointer on rockchip_drm_private, it's no
->>> need to check pointer.
->>>
->>> Kms hotplug event may race into fbdev helper initial, and fb_helper->dev
->>> may be NULL pointer, that would cause the bug:
->>>
->>> [    0.735411] [00000200] *pgd=00000000f6ffe003, *pud=00000000f6ffe003, *pmd=0000000000000000
->>> [    0.736156] Internal error: Oops: 96000005 [#1] PREEMPT SMP
->>> [    0.736648] Modules linked in:
->>> [    0.736930] CPU: 2 PID: 20 Comm: kworker/2:0 Not tainted 4.4.41 #20
->>> [    0.737480] Hardware name: Rockchip RK3399 Board rev2 (BOX) (DT)
->>> [    0.738020] Workqueue: events cdn_dp_pd_event_work
->>> [    0.738447] task: ffffffc0f21f3100 ti: ffffffc0f2218000 task.ti: ffffffc0f2218000
->>> [    0.739109] PC is at mutex_lock+0x14/0x44
->>> [    0.739469] LR is at drm_fb_helper_hotplug_event+0x30/0x114
->>> [    0.756253] [<ffffff8008a344f4>] mutex_lock+0x14/0x44
->>> [    0.756260] [<ffffff8008445708>] drm_fb_helper_hotplug_event+0x30/0x114
->>> [    0.756271] [<ffffff8008473c84>] rockchip_drm_output_poll_changed+0x18/0x20
->>> [    0.756280] [<ffffff8008439fcc>] drm_kms_helper_hotplug_event+0x28/0x34
->>> [    0.756286] [<ffffff800846c444>] cdn_dp_pd_event_work+0x394/0x3c4
->>> [    0.756295] [<ffffff80080b2b38>] process_one_work+0x218/0x3e0
->>> [    0.756302] [<ffffff80080b3538>] worker_thread+0x2e8/0x404
->>> [    0.756308] [<ffffff80080b7e70>] kthread+0xe8/0xf0
->>> [    0.756316] [<ffffff8008082690>] ret_from_fork+0x10/0x40
->>>
->>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->>> ---
->>>   drivers/gpu/drm/rockchip/rockchip_drm_fb.c | 2 +-
->>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
->>> index 81f9548..e6bd0f4 100644
->>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
->>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
->>> @@ -170,7 +170,7 @@ static void rockchip_drm_output_poll_changed(struct drm_device *dev)
->>>          struct rockchip_drm_private *private = dev->dev_private;
->>>          struct drm_fb_helper *fb_helper = &private->fbdev_helper;
->>>
->>> -       if (fb_helper)
->>> +       if (fb_helper->dev)
->>>                  drm_fb_helper_hotplug_event(fb_helper);
->> Food for thought:
->>
->> Quick grep shows that no other drivers have such a ->dev check. Does
->> this mean that either the issue is rockchip specific?
->> If not, one could look into resolving the problem directly in drm core.
->>
->> Or at least update the other users, so they don't stumble upon the problem?
-> The fbdev helpers support already handling hotplug events before you
-> have finalized the fbdev setup. Please read the kerneldoc for the
-> various fbdev functions, they explain what you should be doing. This
-> hack here should indeed not be needed.
-> -Daniel
+Redraw this patch, thanks.
+Jiaheng
 
-Hi Daniel
+-----Original Message-----
+From: jiaheng.fan [mailto:jiaheng.fan at nxp.com] 
+Sent: Tuesday, August 01, 2017 9:47 AM
+To: vinod.koul at intel.com; robh+dt at kernel.org; dan.j.williams at intel.com; mark.rutland at arm.com; linux at armlinux.org.uk; shawnguo at kernel.org
+Cc: Leo Li <leoyang.li@nxp.com>; dmaengine at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Jiafei Pan <jiafei.pan@nxp.com>; Jiaheng Fan <jiaheng.fan@nxp.com>
+Subject: [PATCH v1 1/6] dma: fsl-dma: add devicetree documentation for qdma driver.
 
-Right, the doc[0] already detail this:
-     It is possible, though perhaps somewhat tricky, to implement race-free hotplug detection using
-     the fbdev helpers. The drm_fb_helper_prepare() helper must be called first to initialize the
-     minimum required to make hotplug detection work.Drivers also need to make sure to properly
-     set up the drm_mode_config.funcs member. After calling drm_kms_helper_poll_init() it is safe to
-     enable interrupts and start processing hotplug events.
+signed-off-by: jiaheng.fan <jiaheng.fan@nxp.com>
+---
+ Documentation/devicetree/bindings/dma/fsl-qdma.txt | 42 ++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/fsl-qdma.txt
 
-The problem is drm/rockchip do the wrong initial, call drm_kms_helper_poll_init before fbdev setup.
-
-will fix it at next version.
-
-[0]: https://01.org/linuxgraphics/gfx-docs/drm/gpu/drm-kms-helpers.html#fbdev-helper-functions-reference
-
-Best regards.
-
--- 
-?ark Yao
+diff --git a/Documentation/devicetree/bindings/dma/fsl-qdma.txt b/Documentation/devicetree/bindings/dma/fsl-qdma.txt
+new file mode 100644
+index 0000000..b076177
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/fsl-qdma.txt
+@@ -0,0 +1,42 @@
++* Freescale queue Direct Memory Access Controller(qDMA) Controller
++
++  The qDMA controller transfers blocks of data between one source and 
++one or more destinations. The blocks of data transferred can be 
++represented in memory as contiguous or non-contiguous using 
++scatter/gather table(s). Channel virtualization is supported through 
++enqueuing of DMA jobs to, or dequeuing DMA jobs from, different work queues.
++
++* qDMA Controller
++Required properties:
++- compatible :
++	- "fsl,ls1021a-qdma",
++	Or "fsl,ls1043a-qdma" followed by "fsl,ls1021a-qdma",
++- reg : Specifies base physical address(s) and size of the qDMA registers.
++	The region is qDMA control register's address and size.
++- interrupts : A list of interrupt-specifiers, one for each entry in
++	interrupt-names.
++- interrupt-names : Should contain:
++	"qdma-error" - the error interrupt
++	"qdma-queue" - the queue interrupt
++- channels : Number of channels supported by the controller
++- queues : Number of queues supported by driver
++
++Optional properties:
++- big-endian: If present registers and hardware scatter/gather descriptors
++	of the qDMA are implemented in big endian mode, otherwise in little
++	mode.
++
++
++Examples:
++
++	qdma: qdma at 8390000 {
++		compatible = "fsl,ls1021a-qdma";
++		reg = <0x0 0x8398000 0x0 0x2000 /* Controller registers */
++		       0x0 0x839a000 0x0 0x2000>; /* Block registers */
++		interrupts = <GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>,
++				<GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "qdma-error", "qdma-queue";
++		channels = <8>;
++		queues = <2>;
++		big-endian;
++	};
+--
+2.7.4
