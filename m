@@ -1,200 +1,125 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 1 Aug 2017 17:14:05 +0800
-Subject: [PATCH 3/3] pinctrl: add mt2712 pinctrl driver
-In-Reply-To: <1501489333-23145-4-git-send-email-zhiyong.tao@mediatek.com>
-References: <1501489333-23145-1-git-send-email-zhiyong.tao@mediatek.com>
- <1501489333-23145-4-git-send-email-zhiyong.tao@mediatek.com>
-Message-ID: <1501578845.32089.18.camel@mtksdaap41>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue,  1 Aug 2017 14:53:41 +0530
+Subject: [PATCH V3 0/8] drivers: Boot Constraints core
+Message-ID: <cover.1501578037.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Greg,
 
+Here is V3 of the boot constraints core based on the feedbacks I have
+received during V2. This tested on real hardware (Qcom dragonboard 410c)
+with a display controller configured from bootloader to display a flash
+screen. Obviously it doesn't work seamlessly without this series and
+works just fine with it. Rajendra Nayak helped getting this tested on
+Qcom hardware.
 
-Hi Zhiyong,
+Problem statement:
 
+Some devices are powered ON by the bootloader before the bootloader
+handovers control to Linux. It maybe important for those devices to keep
+working until the time a Linux device driver probes the device and
+reconfigure its resources.
 
+A typical example of that can be the LCD controller, which is used by
+the bootloaders to show image(s) while the platform is booting into
+Linux.  The LCD controller can be using some resources, like clk,
+regulators, etc, that are shared between several devices. These shared
+resources should be configured to satisfy need of all the users.  If
+another device's (X) driver gets probed before the LCD controller driver
+in this case, then it may end up reconfiguring these resources to ranges
+satisfying the current users (only device X) and that can make the LCD
+screen unstable.
 
-On Mon, 2017-07-31 at 16:22 +0800, Zhiyong Tao wrote:
-<...>
-> 3)Add "spec_dir_set" and "spec_dir_get" in "mtk_pinctrl_devdata".
-> 4)Change "spec_dir_set" and add "spec_dir_get" in "pinctrl-mt2701.c"
->   and "pinctrl-mtk-common.c".
+Of course we can have more complex cases where the same resource is
+getting used by two devices while the kernel boots and the order in
+which devices get probed wouldn't matter as the other device will surely
+break then.
 
-I think these deserve another patch.
-Please also explain why we need this.
+There are also cases where the resources may not be shared, but the
+kernel will disable them forcefully as no users may have appeared until
+a certain point in kernel boot. This makes sure that the resources stay
+enabled. A wide variety of constraints can be satisfied using the new
+framework.
 
+Proposed solution:
 
-> 5)Change "port_mask" from "7" to "6" for EINT.
+This patchset introduces the concept of boot-constraints, which are set
+by platform specific drivers (for now at least) at early init (like
+subsys_initcall) and the kernel will satisfy them until the time driver
+for such a device is probed (successfully or unsuccessfully). Once the
+driver is probed, the driver core removes the constraints set for the
+device. This series implements clk, regulator and PM domain constraints
+for now.
 
-I'm assuming this is a bug fix for mt2701?
-If yes, this should be a separate patch.
+The last patch isn't up for merge yet, and is used to test the boot
+constraint framework on Qcom 410c along with some of the display
+controller patches from Rob's series [1] to make sure the controller's
+registers are configured properly.
 
-> 6)Remove generic pull config condition in "mtk_pconf_set_pull_select".
-> 7)Change "arg" to "MTK_PUPD_SET_R1R0_00" of "mtk_pconf_set_pull_select".
+Rebased over: drivers/driver-core-next (some debugfs dependencies)
+Pushed here: git://git.kernel.org/pub/scm/linux/kernel/git/vireshk/linux.git device/boot-constraints
 
-Why we need to change arg?
+V2->V3:
+- Removed DT support as we aren't sure about how to define the bindings
+  yet.
+- Added CLK and PM domain constraint types.
+- A new directory is added for boot constraints, which will also contain
+  platform specific drivers in future.
+- Deferred devices are still supported, just that it wouldn't be called
+  from generic code anymore but platform specific code.
+- Tested on Qcom 410c dragonboard with display flash screen (Rajendra).
+- Usual renaming/commit-log-updates/etc changes done.
 
+V1->V2:
+- Add support for setting constraints for devices created from DT.
+- Allow handling deferred devices earlier then late_init.
+- Remove 'default y' line from kconfig.
+- Drop '=" after boot_constraints_disable kernel param.
+- Dropped the dummy testing patch now.
 
-> 
-> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
-> ---
->  drivers/pinctrl/mediatek/Kconfig              |    8 +
->  drivers/pinctrl/mediatek/Makefile             |    1 +
->  drivers/pinctrl/mediatek/pinctrl-mt2701.c     |   21 +-
->  drivers/pinctrl/mediatek/pinctrl-mt2712.c     |  670 +++++++++
->  drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   16 +-
->  drivers/pinctrl/mediatek/pinctrl-mtk-common.h |   44 +-
->  drivers/pinctrl/mediatek/pinctrl-mtk-mt2712.h | 1858 +++++++++++++++++++++++++
->  7 files changed, 2586 insertions(+), 32 deletions(-)
->  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mt2712.c
->  create mode 100644 drivers/pinctrl/mediatek/pinctrl-mtk-mt2712.h
-> 
+--
+viresh
 
-<...>
+[1] https://marc.info/?l=dri-devel&m=149979722606563&w=2
 
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt2701.c b/drivers/pinctrl/mediatek/pinctrl-mt2701.c
-> index f86f3b3..4a43f5c 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mt2701.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mt2701.c
-> @@ -503,10 +503,26 @@ static void mt2701_spec_pinmux_set(struct regmap *reg, unsigned int pin,
->  	regmap_update_bits(reg, mt2701_spec_pinmux[i].offset, mask, value);
->  }
->  
-> -static void mt2701_spec_dir_set(unsigned int *reg_addr, unsigned int pin)
-> +static int mt2701_spec_dir_set(struct mtk_pinctrl *pctl,
-> +				unsigned int *reg_addr,
-> +				unsigned int pin,
-> +				bool input)
->  {
->  	if (pin > 175)
->  		*reg_addr += 0x10;
-> +
-> +	return 0;
-> +}
-> +
-> +static int mt2701_spec_dir_get(struct mtk_pinctrl *pctl,
-> +				unsigned int *reg_addr,
-> +				unsigned int pin,
-> +				bool input)
+Rajendra Nayak (1):
+  drivers: boot_constraint: Add Qualcomm display controller constraints
 
-incorrect prototype?
+Viresh Kumar (7):
+  drivers: Add boot constraints core
+  drivers: boot_constraint: Add boot_constraints_disable kernel
+    parameter
+  drivers: boot_constraint: Add support for supply constraints
+  drivers: boot_constraint: Add support for clk constraints
+  drivers: boot_constraint: Add support for PM constraints
+  drivers: boot_constraint: Add debugfs support
+  drivers: boot_constraint: Manage deferrable constraints
 
-> +{
-> +	if (pin > 175)
-> +		*reg_addr += 0x10;
-> +
-> +	return 0;
->  }
->  
->  static const struct mtk_pinctrl_devdata mt2701_pinctrl_data = {
-> @@ -520,6 +536,7 @@ static void mt2701_spec_dir_set(unsigned int *reg_addr, unsigned int pin)
->  	.spec_ies_smt_set = mt2701_ies_smt_set,
->  	.spec_pinmux_set = mt2701_spec_pinmux_set,
->  	.spec_dir_set = mt2701_spec_dir_set,
-> +	.spec_dir_get = mt2701_spec_dir_get,
->  	.dir_offset = 0x0000,
->  	.pullen_offset = 0x0150,
->  	.pullsel_offset = 0x0280,
-> @@ -551,7 +568,7 @@ static void mt2701_spec_dir_set(unsigned int *reg_addr, unsigned int pin)
->  		.dbnc_ctrl = 0x500,
->  		.dbnc_set  = 0x600,
->  		.dbnc_clr  = 0x700,
-> -		.port_mask = 6,
-> +		.port_mask = 7,
->  		.ports     = 6,
->  	},
->  	.ap_num = 169,
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mt2712.c b/drivers/pinctrl/mediatek/pinctrl-mt2712.c
-> new file mode 100644
-> index 0000000..c933b75
-> --- /dev/null
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mt2712.c
+ Documentation/admin-guide/kernel-parameters.txt |   3 +
+ drivers/base/Kconfig                            |  10 +
+ drivers/base/Makefile                           |   1 +
+ drivers/base/base.h                             |   1 +
+ drivers/base/boot_constraints/Makefile          |   3 +
+ drivers/base/boot_constraints/clk.c             |  74 ++++++
+ drivers/base/boot_constraints/core.c            | 300 ++++++++++++++++++++++++
+ drivers/base/boot_constraints/core.h            |  50 ++++
+ drivers/base/boot_constraints/deferrable_dev.c  | 192 +++++++++++++++
+ drivers/base/boot_constraints/pm.c              |  32 +++
+ drivers/base/boot_constraints/qcom-display.c    | 107 +++++++++
+ drivers/base/boot_constraints/supply.c          | 108 +++++++++
+ drivers/base/dd.c                               |  32 ++-
+ include/linux/boot_constraint.h                 |  68 ++++++
+ 14 files changed, 974 insertions(+), 7 deletions(-)
+ create mode 100644 drivers/base/boot_constraints/Makefile
+ create mode 100644 drivers/base/boot_constraints/clk.c
+ create mode 100644 drivers/base/boot_constraints/core.c
+ create mode 100644 drivers/base/boot_constraints/core.h
+ create mode 100644 drivers/base/boot_constraints/deferrable_dev.c
+ create mode 100644 drivers/base/boot_constraints/pm.c
+ create mode 100644 drivers/base/boot_constraints/qcom-display.c
+ create mode 100644 drivers/base/boot_constraints/supply.c
+ create mode 100644 include/linux/boot_constraint.h
 
-<...>
-
-> +
-> +static int mt2712_spec_dir_set(struct mtk_pinctrl *pctl,
-> +				unsigned int *reg_addr,
-> +				unsigned int pin,
-> +				bool input)
-> +{
-> +	u32 reg_val;
-> +
-> +	if (pin == 16) {
-> +		regmap_read(pctl->regmap2, 0x940, &reg_val);
-> +		reg_val |= BIT(15);
-> +		if (input == true)
-> +			reg_val &= ~BIT(14);
-> +		else
-> +			reg_val |= BIT(14);
-> +		regmap_write(pctl->regmap2, 0x940, reg_val);
-> +	}
-> +
-> +	if (pin == 17) {
-> +		regmap_read(pctl->regmap2, 0x940, &reg_val);
-> +		reg_val |= BIT(7);
-> +		if (input == true)
-> +			reg_val &= ~BIT(6);
-> +		else
-> +			reg_val |= BIT(6);
-> +		regmap_write(pctl->regmap2, 0x940, reg_val);
-> +	}
-> +
-> +	return 0;
-> +}
-
-Does this means pin 16, 17 is in different/special reg/bit location?
-I didn't see spec_dir_get in your patch, does this means they are in
-standard location or you just forgot it?
-
-The original idea of spec_dir_set is to get the register offset for the
-pin, so both set_direction and get_direction are using the same
-extension function. Instead of adding a new spec_dir_get, can we just
-extend the function to also include bit location?
-
-
-
-<...>
-
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> index 3cf384f..aeec87e 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> @@ -84,7 +84,7 @@ static int mtk_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
->  	bit = BIT(offset & 0xf);
->  
->  	if (pctl->devdata->spec_dir_set)
-> -		pctl->devdata->spec_dir_set(&reg_addr, offset);
-> +		pctl->devdata->spec_dir_set(pctl, &reg_addr, offset, input);
->  
->  	if (input)
->  		/* Different SoC has different alignment offset. */
-> @@ -307,13 +307,6 @@ static int mtk_pconf_set_pull_select(struct mtk_pinctrl *pctl,
->  			return 0;
->  	}
->  
-> -	/* For generic pull config, default arg value should be 0 or 1. */
-> -	if (arg != 0 && arg != 1) {
-> -		dev_err(pctl->dev, "invalid pull-up argument %d on pin %d .\n",
-> -			arg, pin);
-> -		return -EINVAL;
-> -	}
-> -
-
-
-Why we need to remove this?
-
->  	bit = BIT(pin & 0xf);
->  	if (enable)
->  		reg_pullen = SET_ADDR(mtk_get_port(pctl, pin) +
-> @@ -343,7 +336,8 @@ static int mtk_pconf_parse_conf(struct pinctrl_dev *pctldev,
->  
->  	switch (param) {
->  	case PIN_CONFIG_BIAS_DISABLE:
-> -		ret = mtk_pconf_set_pull_select(pctl, pin, false, false, arg);
-> +		ret = mtk_pconf_set_pull_select(pctl, pin, false, false,
-> +						MTK_PUPD_SET_R1R0_00);
-
-Why we need to change this?
-
-Joe.C
+-- 
+2.13.0.71.gd7076ec9c9cb
