@@ -1,67 +1,71 @@
-From: luaraneda@gmail.com (Luis Araneda)
-Date: Tue,  1 Aug 2017 01:01:15 -0400
-Subject: [PATCH] ARM: dts: sun8i: h3: Enable EMAC with external PHY on NanoPi
- M1 Plus
-Message-ID: <20170801050115.21497-1-luaraneda@gmail.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 1 Aug 2017 11:42:49 +0530
+Subject: [PATCH v3 1/2] gpio: davinci: Add keystone-k2g compatible
+In-Reply-To: <90337754-8670-6df7-5421-7100e31755b1@ti.com>
+References: <1501051524-5990-1-git-send-email-j-keerthy@ti.com>
+ <5aa0d273-8e05-a5ff-7931-b9a94acade36@ti.com>
+ <8021c424-460c-def4-3a67-ed760997193d@ti.com>
+ <2eeaeea5-9476-8631-8680-7db3322151bf@ti.com>
+ <da92fe60-d70b-6a37-6b88-2ac95dd67b6a@ti.com>
+ <90337754-8670-6df7-5421-7100e31755b1@ti.com>
+Message-ID: <65ab0098-ef1b-3bec-1d2a-768e478fa413@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Nanopi M1 Plus uses an external Realtek RTL8211E PHY in RGMII mode,
-enabled by a GPIO-based regulator.
 
-Signed-off-by: Luis Araneda <luaraneda@gmail.com>
----
- arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 31 +++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-index 8ddd1b2cc..54727990c 100644
---- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-@@ -45,6 +45,20 @@
- / {
- 	model = "FriendlyArm NanoPi M1 Plus";
- 	compatible = "friendlyarm,nanopi-m1-plus", "allwinner,sun8i-h3";
-+
-+	aliases {
-+		ethernet0 = &emac;
-+	};
-+
-+	reg_gmac_3v3: gmac-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "gmac-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		enable-active-high;
-+		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
-+	};
- };
- 
- &ehci1 {
-@@ -55,6 +69,23 @@
- 	status = "okay";
- };
- 
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_rgmii_pins>;
-+	phy-supply = <&reg_gmac_3v3>;
-+	phy-handle = <&ext_rgmii_phy>;
-+	phy-mode = "rgmii";
-+	allwinner,leds-active-low;
-+	status = "okay";
-+};
-+
-+&mdio {
-+	ext_rgmii_phy: ethernet-phy at 1 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <0>;
-+	};
-+};
-+
- &ohci1 {
- 	status = "okay";
- };
+On Monday 31 July 2017 07:14 PM, Keerthy wrote:
+> 
+> 
+> On Wednesday 26 July 2017 07:50 PM, Suman Anna wrote:
+>> On 07/26/2017 08:36 AM, Keerthy wrote:
+>>>
+>>> On Wednesday 26 July 2017 06:57 PM, Franklin S Cooper Jr wrote:
+>>>>
+>>>>
+>>>> On 07/26/2017 08:00 AM, Suman Anna wrote:
+>>>>> Hi Keerthy,
+>>>>>
+>>>>> On 07/26/2017 01:45 AM, Keerthy wrote:
+>>>>>> The patch adds keystone-k2g compatible, specific properties and
+>>>>>> an example.
+>>>>
+[...]
+>>>>>
+>>>>
+>>>> What about power-domain property?
+>>
+>> The correct name is "power-domains".
+>>
+>>> Driver has no pm_runtime implemented yet.
+>>
+>> True, not yet, but this is in general a required property on K2G SoCs to
+>> automatically enable clocks through runtime_pm. Clock properties on K2G
+>> nodes should only be truly required if a driver is using clk API
+>> (ideally to control optional clocks or for adjusting clock frequencies).
+>> When the gpio-davinci driver gets updated to use pm_runtime, the clock
+>> properties will be rendered obsolete for K2G.
+>>
+>> Rob,
+>> Any suggestions on how we need to handle this? Should we be adding the
+>> property now or later when we adapt the driver for runtime_pm? This
+>> would be a common theme for K2G nodes that are reusing Davinci drivers.
+>>
+>> My take on this would be to add the property now, and mark the clock
+>> properties obsolete when the driver gets converted.
+> 
+
+I don't think SoC wide properties are put into device specific binding
+documentation, for example pinctrl bindings are not put into device
+documentation.
+
+> Rob,
+> 
+> Any comments on this?
+> 
+
+[...]
+
 -- 
-2.13.3
+Regards
+Vignesh
