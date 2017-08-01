@@ -1,50 +1,209 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue,  1 Aug 2017 21:12:57 +0800
-Subject: [PATCH 06/13] clk: sunxi-ng: export CLK_PLL_DE for H3
+Date: Tue,  1 Aug 2017 21:12:58 +0800
+Subject: [PATCH 07/13] ARM: sun8i: h3: add display engine pipeline barebone
 In-Reply-To: <20170801131304.7741-1-icenowy@aosc.io>
 References: <20170801131304.7741-1-icenowy@aosc.io>
-Message-ID: <20170801131304.7741-7-icenowy@aosc.io>
+Message-ID: <20170801131304.7741-8-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CLK_PLL_DE is needed to be referenced in device tree for H3, for
-both forcing the parent of PLL_DE.
+As we have already the support for the DE2 on Allwinner H3, add the
+display engine pipeline device tree nodes to its DTSI file.
 
-So export it to the device tree binding header.
+The H5 pipeline has some differences and will be enabled later.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/clk/sunxi-ng/ccu-sun8i-h3.h      | 3 +--
- include/dt-bindings/clock/sun8i-h3-ccu.h | 2 ++
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sun8i-h3.dtsi | 170 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 170 insertions(+)
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h b/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
-index 1b4baea37d81..add3a7c18212 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
-@@ -35,9 +35,8 @@
- #define CLK_PLL_PERIPH0_2X	10
- #define CLK_PLL_GPU		11
- #define CLK_PLL_PERIPH1		12
--#define CLK_PLL_DE		13
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index b36f9f423c39..75ad7b65a7fc 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -41,6 +41,8 @@
+  */
  
--/* The CPUX clock is exported */
-+/* The PLL_DE and CPUX clocks is exported */
+ #include "sunxi-h3-h5.dtsi"
++#include <dt-bindings/clock/sun8i-de2.h>
++#include <dt-bindings/reset/sun8i-de2.h>
  
- #define CLK_AXI			15
- #define CLK_AHB1		16
-diff --git a/include/dt-bindings/clock/sun8i-h3-ccu.h b/include/dt-bindings/clock/sun8i-h3-ccu.h
-index e139fe5c62ec..5345957a8c2e 100644
---- a/include/dt-bindings/clock/sun8i-h3-ccu.h
-+++ b/include/dt-bindings/clock/sun8i-h3-ccu.h
-@@ -45,6 +45,8 @@
+ / {
+ 	cpus {
+@@ -72,6 +74,174 @@
+ 		};
+ 	};
  
- #define CLK_PLL_PERIPH0		9
- 
-+#define CLK_PLL_DE		13
++	de: display-engine {
++		compatible = "allwinner,sun8i-h3-display-engine";
++		allwinner,pipelines = <&mixer0>,
++				      <&mixer1>;
++		status = "disabled";
++	};
 +
- #define CLK_CPUX		14
- 
- #define CLK_BUS_CE		20
++	soc {
++		display_clocks: clock at 1000000 {
++			compatible = "allwinner,sun8i-a83t-de2-clk";
++			reg = <0x01000000 0x100000>;
++			clocks = <&ccu CLK_BUS_DE>,
++				 <&ccu CLK_DE>;
++			clock-names = "bus",
++				      "mod";
++			resets = <&ccu RST_BUS_DE>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++			assigned-clocks = <&ccu CLK_DE>;
++			assigned-clock-parents = <&ccu CLK_PLL_DE>;
++			assigned-clock-rates = <432000000>;
++		};
++
++		mixer0: mixer at 1100000 {
++			compatible = "allwinner,sun8i-h3-de2-mixer0";
++			reg = <0x01100000 0x100000>;
++			clocks = <&display_clocks CLK_BUS_MIXER0>,
++				 <&display_clocks CLK_MIXER0>;
++			clock-names = "bus",
++				      "mod";
++			resets = <&display_clocks RST_MIXER0>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				mixer0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					mixer0_out_tcon0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&tcon0_in_mixer0>;
++					};
++
++					mixer0_out_tcon1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&tcon1_in_mixer0>;
++					};
++				};
++			};
++		};
++
++		mixer1: mixer at 1200000 {
++			compatible = "allwinner,sun8i-h3-de2-mixer1";
++			reg = <0x01200000 0x100000>;
++			clocks = <&display_clocks CLK_BUS_MIXER1>,
++				 <&display_clocks CLK_MIXER1>;
++			clock-names = "bus",
++				      "mod";
++			resets = <&display_clocks RST_WB>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				mixer1_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					mixer1_out_tcon0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&tcon0_in_mixer1>;
++					};
++
++					mixer1_out_tcon1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&tcon1_in_mixer1>;
++					};
++				};
++			};
++		};
++
++		tcon0: lcd-controller at 1c0c000 {
++			compatible = "allwinner,sun8i-h3-tcon";
++			reg = <0x01c0c000 0x1000>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_TCON0>,
++				 <&ccu CLK_TCON0>;
++			clock-names = "ahb",
++				      "tcon-ch1";
++			resets = <&ccu RST_BUS_TCON0>;
++			reset-names = "lcd";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon0_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					tcon0_in_mixer0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&mixer0_out_tcon0>;
++					};
++
++					tcon0_in_mixer1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&mixer1_out_tcon0>;
++					};
++				};
++
++				tcon0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++
++		tcon1: lcd-controller at 1c0d000 {
++			compatible = "allwinner,sun8i-h3-tcon";
++			reg = <0x01c0d000 0x1000>;
++			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_TCON1>,
++				 <&ccu CLK_TVE>;
++			clock-names = "ahb",
++				      "tcon-ch1";
++			resets = <&ccu RST_BUS_TCON1>;
++			reset-names = "lcd";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon1_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					tcon1_in_mixer0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&mixer0_out_tcon1>;
++					};
++
++					tcon1_in_mixer1: endpoint at 1 {
++						reg = <1>;
++						remote-endpoint = <&mixer1_out_tcon1>;
++					};
++				};
++
++				tcon1_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++	};
++
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
 -- 
 2.13.0
