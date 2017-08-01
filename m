@@ -1,51 +1,138 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 1 Aug 2017 14:04:26 +0300
-Subject: [PATCH] gpio: drop unnecessary includes from
- include/linux/gpio/driver.h
-In-Reply-To: <CACRpkdZ9q5vub3sQkA2xsQaZ+CGHeAp4RRueposnTPiHoFbSsA@mail.gmail.com>
-References: <1499140415-31677-1-git-send-email-yamada.masahiro@socionext.com>
- <1499162760.22624.246.camel@linux.intel.com>
- <CACRpkdaxgxaXV8XjLTzu68JqjyeZ8Jr2YMR3L46wm3zmnMrPsg@mail.gmail.com>
- <1501509867.29303.303.camel@linux.intel.com>
- <CACRpkdZ9q5vub3sQkA2xsQaZ+CGHeAp4RRueposnTPiHoFbSsA@mail.gmail.com>
-Message-ID: <CAHp75VeLwM8Q5vVLeeGz9hL8AWa2J47NTaeX0ogJk6v7y18diw@mail.gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 1 Aug 2017 13:00:21 +0200
+Subject: [PATCH 09/11] arm64/kvm: preserve host HCR_EL2 value
+In-Reply-To: <1500480092-28480-10-git-send-email-mark.rutland@arm.com>
+References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
+ <1500480092-28480-10-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170801110021.GB5176@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 1, 2017 at 10:53 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Jul 31, 2017 at 4:04 PM, Andy Shevchenko
-> <andriy.shevchenko@linux.intel.com> wrote:
->> On Mon, 2017-07-31 at 15:48 +0200, Linus Walleij wrote:
->>> On Tue, Jul 4, 2017 at 12:06 PM, Andy Shevchenko
->>> <andriy.shevchenko@linux.intel.com> wrote:
+On Wed, Jul 19, 2017 at 05:01:30PM +0100, Mark Rutland wrote:
+> When restoring HCR_EL2 for the host, KVM uses HCR_HOST_VHE_FLAGS, which
+> is a constant value. This works today, as the host HCR_EL2 value is
+> always the same, but this will get in the way of supporting extensions
+> that require HCR_EL2 bits to be set conditionally for the host.
+> 
+> To allow such features to work without KVM having to explicitly handle
+> every possible host feature combination, this patch has KVM save/restore
+> the host HCR when switching to/from a guest HCR.
+> 
+> For __{activate,deactivate}_traps(), the HCR save/restore is made common
+> across the !VHE and VHE paths. As the host and guest HCR values must
+> have E2H set when VHE is in use, register redirection should always be
+> in effect at EL2, and this change should not adversely affect the VHE
+> code.
+> 
+> For the hyp TLB maintenance code, __tlb_switch_to_host_vhe() is updated
+> to toggle the TGE bit with a RMW sequence, as we already do in
+> __tlb_switch_to_guest_vhe().
+> 
+> The now unused HCR_HOST_VHE_FLAGS definition is removed.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: kvmarm at lists.cs.columbia.edu
+> ---
+>  arch/arm64/include/asm/kvm_arm.h  | 1 -
+>  arch/arm64/include/asm/kvm_host.h | 5 ++++-
+>  arch/arm64/kvm/hyp/switch.c       | 5 +++--
+>  arch/arm64/kvm/hyp/tlb.c          | 6 +++++-
+>  4 files changed, 12 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index c1267e8..7b9c898 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -84,7 +84,6 @@
+>  			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW)
+>  #define HCR_VIRT_EXCP_MASK (HCR_VSE | HCR_VI | HCR_VF)
+>  #define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
+> -#define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
+>  
+>  /* TCR_EL2 Registers bits */
+>  #define TCR_EL2_RES1		((1 << 31) | (1 << 23))
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index d686300..0d7c3dd 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -198,10 +198,13 @@ struct kvm_cpu_context {
+>  struct kvm_vcpu_arch {
+>  	struct kvm_cpu_context ctxt;
+>  
+> -	/* HYP configuration */
+> +	/* Guest HYP configuration */
+>  	u64 hcr_el2;
+>  	u32 mdcr_el2;
+>  
+> +	/* Host HYP configuration */
+> +	u64 host_hcr_el2;
+> +
+>  	/* Exception Information */
+>  	struct kvm_vcpu_fault_info fault;
+>  
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 945e79c..6108813 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -71,6 +71,8 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+>  {
+>  	u64 val;
+>  
+> +	vcpu->arch.host_hcr_el2 = read_sysreg(hcr_el2);
+> +
+>  	/*
+>  	 * We are about to set CPTR_EL2.TFP to trap all floating point
+>  	 * register accesses to EL2, however, the ARM ARM clearly states that
+> @@ -110,7 +112,6 @@ static void __hyp_text __deactivate_traps_vhe(void)
+>  		    MDCR_EL2_TPMS;
+>  
+>  	write_sysreg(mdcr_el2, mdcr_el2);
+> -	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+>  	write_sysreg(CPACR_EL1_FPEN, cpacr_el1);
+>  	write_sysreg(vectors, vbar_el1);
+>  }
+> @@ -123,7 +124,6 @@ static void __hyp_text __deactivate_traps_nvhe(void)
+>  	mdcr_el2 |= MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT;
+>  
+>  	write_sysreg(mdcr_el2, mdcr_el2);
+> -	write_sysreg(HCR_RW, hcr_el2);
+>  	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
+>  }
+>  
+> @@ -145,6 +145,7 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+>  	__deactivate_traps_arch()();
+>  	write_sysreg(0, hstr_el2);
+>  	write_sysreg(0, pmuserenr_el0);
+> +	write_sysreg(vcpu->arch.host_hcr_el2, hcr_el2);
+>  }
+>  
+>  static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
+> diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+> index 73464a9..c2b0680 100644
+> --- a/arch/arm64/kvm/hyp/tlb.c
+> +++ b/arch/arm64/kvm/hyp/tlb.c
+> @@ -49,12 +49,16 @@ static hyp_alternate_select(__tlb_switch_to_guest,
+>  
+>  static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm)
+>  {
+> +	u64 val;
+> +
+>  	/*
+>  	 * We're done with the TLB operation, let's restore the host's
+>  	 * view of HCR_EL2.
+>  	 */
+>  	write_sysreg(0, vttbr_el2);
+> -	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+> +	val = read_sysreg(hcr_el2);
+> +	val |= HCR_TGE;
+> +	write_sysreg(val, hcr_el2);
+>  }
+>  
+>  static void __hyp_text __tlb_switch_to_host_nvhe(struct kvm *kvm)
+> -- 
+> 1.9.1
+> 
 
->>> > If Linus is okay with the following proposal I would rather go with
->>> > it,
->>> > i.e. logical split the series to
->>> >
->>> > 1. Fix IRQ related headers inclusion
->>> > 2. Fix pinconf-generic.h inclusion
->>> > 3. Fix OF headers inclusion (btw, of_gpio.h is not enough there?)
->>>
->>> That works fine with me, but also one big patch actually, I do not
->>> want to make it too much work to refactor obviously incorrect things.
->>>
->>> As soon as we have rough consensus on this and the build robot
->>> are happy I will apply it to GPIO and also pull it into the pinctrl
->>> subsystem.
->>
->> For me priorities like this:
->> 1) it works after the patch being applied (no regressions);
->> 2) it makes code cleaner at the end;
->> 3) it is presented in logically split parts.
->>
->> So, as long as 1) and 2) are satisfied I can neglect on 3).
->
-> We are in violent agreement :D
-
-What I would like to say is that is up to you after all :-)
-For me looks better to split.
-
--- 
-With Best Regards,
-Andy Shevchenko
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
