@@ -1,43 +1,97 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 1 Aug 2017 13:34:44 +0200
-Subject: [PATCH] clocksource: arm_arch_timer: Fix mem frame loop
- initialization
-In-Reply-To: <20170801111222.GC9347@leverpostej>
-References: <20170731183728.61087-1-mka@chromium.org>
- <20170801111222.GC9347@leverpostej>
-Message-ID: <20170801113444.GB1919@mai>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 1 Aug 2017 12:35:23 +0100
+Subject: [RFC PATCH v2 05/19] KVM: arm/arm64: Check that system supports
+ split eoi/deactivate
+In-Reply-To: <20170717142718.13853-6-cdall@linaro.org>
+References: <20170717142718.13853-1-cdall@linaro.org>
+ <20170717142718.13853-6-cdall@linaro.org>
+Message-ID: <3ca8bc15-b5e7-abf7-78cc-9bbc5332c267@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 01, 2017 at 12:12:23PM +0100, Mark Rutland wrote:
-> On Mon, Jul 31, 2017 at 11:37:28AM -0700, Matthias Kaehlcke wrote:
-> > The loop to find the best memory frame in arch_timer_mem_acpi_init()
-> > initializes the loop counter with itself ('i = i'), which is suspicious
-> > in the first place and pointed out by clang. The loop condition is
-> > 'i < timer_count' and a prior for loop exits when 'i' reaches
-> > 'timer_count', therefore the second loop is never executed.
-> > 
-> > Initialize the loop counter with 0 to iterate over all timers, which
-> > supposedly was the intention before the typo monster attacked.
-> > 
-> > Fixes: c2743a36765d3 ("clocksource: arm_arch_timer: add GTDT support for memory-mapped timer")
-> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+On 17/07/17 15:27, Christoffer Dall wrote:
+> Some systems without proper firmware and/or hardware description data
+> don't support the split EOI and deactivate operation.
 > 
-> Ard also spotted this issue [1], along with another issue we still need
-> to solve. In the mean time it would be nice to have this fixed, so:
+> On such systems, we cannot leave the physical interrupt active after the
+> timer handler on the host has run, so we cannot support KVM with an
+> in-kernel GIC with the timer changes we about to introduce.
 > 
-> Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> This patch makes sure that trying to initialize the KVM GIC code will
+> fail on such systems.
 > 
-> Daniel, Thomas,
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> ---
+>  drivers/irqchip/irq-gic.c | 12 +++++++++---
+>  1 file changed, 9 insertions(+), 3 deletions(-)
 > 
-> Could one of you please pick this up as a fix, with the above tags?
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index 090991f..b7e4fed 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -1391,7 +1391,8 @@ int gic_of_init_child(struct device *dev, struct gic_chip_data **gic, int irq)
+>  	return 0;
+>  }
+>  
+> -static void __init gic_of_setup_kvm_info(struct device_node *node)
+> +static void __init gic_of_setup_kvm_info(struct device_node *node,
+> +					 bool supports_deactivate)
 
+Ouch, nasty. This shadows the static key which is also called
+supports_deactivate...
 
-Hi Mark,
+>  {
+>  	int ret;
+>  	struct resource *vctrl_res = &gic_v2_kvm_info.vctrl;
+> @@ -1411,6 +1412,9 @@ static void __init gic_of_setup_kvm_info(struct device_node *node)
+>  	if (ret)
+>  		return;
+>  
+> +	if (!supports_deactivate)
+> +		return;
+> +
+>  	gic_set_kvm_info(&gic_v2_kvm_info);
 
-picked as a fix with the above tags.
+Speaking of which, the static key should already be initialized, so this
+could actually read:
 
-Thanks.
+	if (static_key_true(&supports_deactivate))
+		gic_set_kvm_info(&gic_v2_kvm_info);
 
-  -- Daniel
+>  }
+>  
+> @@ -1419,6 +1423,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+>  {
+>  	struct gic_chip_data *gic;
+>  	int irq, ret;
+> +	bool has_eoimode;
+>  
+>  	if (WARN_ON(!node))
+>  		return -ENODEV;
+> @@ -1436,7 +1441,8 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+>  	 * Disable split EOI/Deactivate if either HYP is not available
+>  	 * or the CPU interface is too small.
+>  	 */
+> -	if (gic_cnt == 0 && !gic_check_eoimode(node, &gic->raw_cpu_base))
+> +	has_eoimode = gic_check_eoimode(node, &gic->raw_cpu_base);
+> +	if (gic_cnt == 0 && !has_eoimode)
+>  		static_key_slow_dec(&supports_deactivate);
+>  
+>  	ret = __gic_init_bases(gic, -1, &node->fwnode);
+> @@ -1447,7 +1453,7 @@ gic_of_init(struct device_node *node, struct device_node *parent)
+>  
+>  	if (!gic_cnt) {
+>  		gic_init_physaddr(node);
+> -		gic_of_setup_kvm_info(node);
+> +		gic_of_setup_kvm_info(node, has_eoimode);
+>  	}
+>  
+>  	if (parent) {
+> 
+
+and we shouldn't need any of this. What do you think?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
