@@ -1,55 +1,54 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 01 Aug 2017 14:46:09 +0200
-Subject: [PATCH] video: xilinxfb: constify fb_fix_screeninfo and
- fb_var_screeninfo structures
-In-Reply-To: <20170708012416.GA1843@embeddedgus>
-References: <CGME20170708012420epcas4p3f5cc06fb74847c659e28a80d405f77a0@epcas4p3.samsung.com>
- <20170708012416.GA1843@embeddedgus>
-Message-ID: <3588026.hdL4GfIT2C@amdc3058>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 1 Aug 2017 14:46:28 +0200
+Subject: [PATCH v5 2/2] arm64: dts: Add Mediatek SoC MT2712 and evaluation
+ board dts and Makefile
+In-Reply-To: <1501577481.32089.3.camel@mtksdaap41>
+References: <1501241835-47849-1-git-send-email-yt.shen@mediatek.com>
+ <1501241835-47849-3-git-send-email-yt.shen@mediatek.com>
+ <1501577481.32089.3.camel@mtksdaap41>
+Message-ID: <85f5d713-a599-e4cc-f1b4-2e0dedf2797f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 07, 2017 08:24:16 PM Gustavo A. R. Silva wrote:
-> These structures are only used to copy into other structures,
-> so declare them as const.
-> 
-> This issue was detected using Coccinelle and the following semantic patch:
-> 
-> @r disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
-> static struct fb_fix_screeninfo i at p = { ... };
-> 
-> @ok@
-> identifier r.i;
-> expression e;
-> position p;
-> @@
-> e = i at p
-> 
-> @bad@
-> position p != {r.p,ok.p};
-> identifier r.i;
-> struct fb_fix_screeninfo e;
-> @@
-> e at i@p
-> 
-> @depends on !bad disable optional_qualifier@
-> identifier r.i;
-> @@
-> static
-> +const
->  struct fb_fix_screeninfo i = { ... };
-> 
-> The semantic patch for fb_var_screeninfo is analogous.
-> 
-> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
 
-Patch queued for 4.14, thanks.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+On 08/01/2017 10:51 AM, Yingjoe Chen wrote:
+> On Fri, 2017-07-28 at 19:37 +0800, YT Shen wrote:
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+>> new file mode 100644
+>> index 0000000..1e135af
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+> 
+> <...>
+> 
+>> +	timer {
+>> +		compatible = "arm,armv8-timer";
+>> +		interrupt-parent = <&gic>;
+>> +		interrupts = <GIC_PPI 13
+>> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
+>> +			     <GIC_PPI 14
+>> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
+>> +			     <GIC_PPI 11
+>> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
+>> +			     <GIC_PPI 10
+>> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>;
+>> +	};
+>> +
+>> +	soc {
+>> +		#address-cells = <2>;
+>> +		#size-cells = <2>;
+>> +		compatible = "simple-bus";
+>> +		ranges;
+> 
+> Matthias,
+> 
+> I notice this have soc node.
+> Do we need to get rid of it?
+> 
+
+Good catch. Yes please get rid of it. We should avoid artificial bus nodes. As 
+soc is no real bus, we should get rid of it.
+
+Thanks,
+Matthias
