@@ -1,28 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 1 Aug 2017 10:14:07 +0200
-Subject: [PATCH 3/6] pinctrl: uniphier: clean up GPIO port muxing
-In-Reply-To: <1501482071-9819-4-git-send-email-yamada.masahiro@socionext.com>
-References: <1501482071-9819-1-git-send-email-yamada.masahiro@socionext.com>
- <1501482071-9819-4-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdbeuhNRE_-WmGeed0Sj4Zg3r+JnVKX-CET1s3SkD=k4=w@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 1 Aug 2017 16:49:00 +0800
+Subject: [linux-sunxi] [PATCH v3 06/12] ASoC: sun4i-i2s: Add changes for
+ wss and sr
+In-Reply-To: <20170729141753.20174-7-codekipper@gmail.com>
+References: <20170729141753.20174-1-codekipper@gmail.com>
+ <20170729141753.20174-7-codekipper@gmail.com>
+Message-ID: <CAGb2v65cn6=BKS=jdOuX3j7xPcdjt5FKDGdN=MZrTNiWTsCNMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 8:21 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-
-> There are a bunch of GPIO muxing data, but most of them are actually
-> unneeded because GPIO-to-pin mapping can be specified by "gpio-ranges"
-> DT properties.
+On Sat, Jul 29, 2017 at 10:17 PM,  <codekipper@gmail.com> wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
 >
-> Tables that contain a set of GPIO pins are still needed for the named
-> mapping by "gpio-ranges-group-names".  This is a much cleaner way for
-> UniPhier SoC family where GPIO numbers are not straight mapped to pin
-> numbers.
+> On newer SoCs the location of the slot width select and sample
+> resolution are different and also there is a bigger range of
+> support.
+
+There is enough space to not use acronyms in the commit subject line.
+
+    ASoC: sun4i-i2s: Add regfields for word size select and sample resolution
+
+would be much clearer.
+
 >
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> For the current supported rates then an offset is required.
+>
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 
-Patch applied.
+Otherwise,
 
-Yours,
-Linus Walleij
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
