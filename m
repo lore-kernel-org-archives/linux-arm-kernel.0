@@ -1,32 +1,45 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 1 Aug 2017 16:49:00 +0800
-Subject: [linux-sunxi] [PATCH v3 06/12] ASoC: sun4i-i2s: Add changes for
- wss and sr
-In-Reply-To: <20170729141753.20174-7-codekipper@gmail.com>
-References: <20170729141753.20174-1-codekipper@gmail.com>
- <20170729141753.20174-7-codekipper@gmail.com>
-Message-ID: <CAGb2v65cn6=BKS=jdOuX3j7xPcdjt5FKDGdN=MZrTNiWTsCNMA@mail.gmail.com>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Tue, 1 Aug 2017 16:51:21 +0800
+Subject: [PATCH v5 2/2] arm64: dts: Add Mediatek SoC MT2712 and
+ evaluation board dts and Makefile
+In-Reply-To: <1501241835-47849-3-git-send-email-yt.shen@mediatek.com>
+References: <1501241835-47849-1-git-send-email-yt.shen@mediatek.com>
+ <1501241835-47849-3-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1501577481.32089.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 29, 2017 at 10:17 PM,  <codekipper@gmail.com> wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
->
-> On newer SoCs the location of the slot width select and sample
-> resolution are different and also there is a bigger range of
-> support.
+On Fri, 2017-07-28 at 19:37 +0800, YT Shen wrote:
+> diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+> new file mode 100644
+> index 0000000..1e135af
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
 
-There is enough space to not use acronyms in the commit subject line.
+<...>
 
-    ASoC: sun4i-i2s: Add regfields for word size select and sample resolution
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_PPI 13
+> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 14
+> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 11
+> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 10
+> +			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>;
+> +	};
+> +
+> +	soc {
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		compatible = "simple-bus";
+> +		ranges;
 
-would be much clearer.
+Matthias,
 
->
-> For the current supported rates then an offset is required.
->
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+I notice this have soc node.
+Do we need to get rid of it?
 
-Otherwise,
-
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Joe.C
