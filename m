@@ -1,125 +1,39 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 1 Aug 2017 10:48:42 -0500
-Subject: [PATCH v2 2/4] remoteproc/davinci: Add support to parse internal
- memories
-In-Reply-To: <20170801154844.24662-1-s-anna@ti.com>
-References: <20170801154844.24662-1-s-anna@ti.com>
-Message-ID: <20170801154844.24662-3-s-anna@ti.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 1 Aug 2017 21:20:08 +0530
+Subject: [PATCH v2 0/3] mailbox: arm: introduce smc triggered mailbox
+In-Reply-To: <ffabbe33-5edd-4642-6038-5b48c87ad372@suse.de>
+References: <1500852206-28771-1-git-send-email-andre.przywara@arm.com>
+ <ffabbe33-5edd-4642-6038-5b48c87ad372@suse.de>
+Message-ID: <CABb+yY04O+XQ5Dy=dEBYTcHEUwES_sFi1_3409qnUgV0r1y_bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DSP subsystem on OMAP-L13x SoCs has various internal RAM
-memories that can accessed from the ARM side. These memories
-can be configured to be used as either RAM or Cache.
+On Tue, Aug 1, 2017 at 4:20 PM, Alexander Graf <agraf@suse.de> wrote:
+> Hi Andre,
+>
+> On 24.07.17 01:23, Andre Przywara wrote:
+>>
+>> This is a reworked version of my previous post. It addresses Jassi's
+>> comments on the driver and also tries to cover Rob's and Mark's comments
+>> on the binding documentation.
+>> I dropped the more example-like DT changes from v1, as they are actually
+>> not meant to be merged into the Linux tree, but instead are provided as
+>> part of some firmware actually implementing this functionality.
+>>
+>> Please let me know what you think.
+>
+>
+> Could you please quickly explain what it would take to provide SCMI on top
+> of this instead of SCPI?
+>
+> https://lkml.org/lkml/2017/6/7/624
+>
+The SCMI (and SCPI) code is broken, that is, unless the firmware/SM is
+trained to ignore the random value (pointer to a structure) passed via
+R1. Which may be possible to do, but is surely a sign of poor
+implementation. And may not be possible if some protocol other than
+SCMI runs in parallel.
 
-The Davinci remoteproc driver has been enhanced to parse and
-store the kernel mappings for these internal RAM memories.
-These mappings can then be used to support direct loading of
-text/data into these memories from the remoteproc driver.
+Andre, your take please?
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
-v2: No code changes
-
- drivers/remoteproc/da8xx_remoteproc.c | 62 +++++++++++++++++++++++++++++++++++
- 1 file changed, 62 insertions(+)
-
-diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
-index 280b66d4f622..c1cff78de67b 100644
---- a/drivers/remoteproc/da8xx_remoteproc.c
-+++ b/drivers/remoteproc/da8xx_remoteproc.c
-@@ -38,9 +38,27 @@ MODULE_PARM_DESC(da8xx_fw_name,
- #define SYSCFG_CHIPSIG3 BIT(3)
- #define SYSCFG_CHIPSIG4 BIT(4)
- 
-+#define DA8XX_RPROC_LOCAL_ADDRESS_MASK	(SZ_16M - 1)
-+
-+/**
-+ * struct da8xx_rproc_mem - internal memory structure
-+ * @cpu_addr: MPU virtual address of the memory region
-+ * @bus_addr: Bus address used to access the memory region
-+ * @dev_addr: Device address of the memory region from DSP view
-+ * @size: Size of the memory region
-+ */
-+struct da8xx_rproc_mem {
-+	void __iomem *cpu_addr;
-+	phys_addr_t bus_addr;
-+	u32 dev_addr;
-+	size_t size;
-+};
-+
- /**
-  * struct da8xx_rproc - da8xx remote processor instance state
-  * @rproc: rproc handle
-+ * @mem: internal memory regions data
-+ * @num_mems: number of internal memory regions
-  * @dsp_clk: placeholder for platform's DSP clk
-  * @ack_fxn: chip-specific ack function for ack'ing irq
-  * @irq_data: ack_fxn function parameter
-@@ -50,6 +68,8 @@ MODULE_PARM_DESC(da8xx_fw_name,
-  */
- struct da8xx_rproc {
- 	struct rproc *rproc;
-+	struct da8xx_rproc_mem *mem;
-+	int num_mems;
- 	struct clk *dsp_clk;
- 	void (*ack_fxn)(struct irq_data *data);
- 	struct irq_data *irq_data;
-@@ -158,6 +178,44 @@ static const struct rproc_ops da8xx_rproc_ops = {
- 	.kick = da8xx_rproc_kick,
- };
- 
-+static int da8xx_rproc_get_internal_memories(struct platform_device *pdev,
-+					     struct da8xx_rproc *drproc)
-+{
-+	static const char * const mem_names[] = {"l2sram", "l1pram", "l1dram"};
-+	int num_mems = ARRAY_SIZE(mem_names);
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	int i;
-+
-+	drproc->mem = devm_kcalloc(dev, num_mems, sizeof(*drproc->mem),
-+				   GFP_KERNEL);
-+	if (!drproc->mem)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < num_mems; i++) {
-+		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-+						   mem_names[i]);
-+		drproc->mem[i].cpu_addr = devm_ioremap_resource(dev, res);
-+		if (IS_ERR(drproc->mem[i].cpu_addr)) {
-+			dev_err(dev, "failed to parse and map %s memory\n",
-+				mem_names[i]);
-+			return PTR_ERR(drproc->mem[i].cpu_addr);
-+		}
-+		drproc->mem[i].bus_addr = res->start;
-+		drproc->mem[i].dev_addr =
-+				res->start & DA8XX_RPROC_LOCAL_ADDRESS_MASK;
-+		drproc->mem[i].size = resource_size(res);
-+
-+		dev_dbg(dev, "memory %8s: bus addr %pa size 0x%x va %p da 0x%x\n",
-+			mem_names[i], &drproc->mem[i].bus_addr,
-+			drproc->mem[i].size, drproc->mem[i].cpu_addr,
-+			drproc->mem[i].dev_addr);
-+	}
-+	drproc->num_mems = num_mems;
-+
-+	return 0;
-+}
-+
- static int da8xx_rproc_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -213,6 +271,10 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
- 	drproc->dsp_clk = dsp_clk;
- 	rproc->has_iommu = false;
- 
-+	ret = da8xx_rproc_get_internal_memories(pdev, drproc);
-+	if (ret)
-+		goto free_rproc;
-+
- 	platform_set_drvdata(pdev, rproc);
- 
- 	/* everything the ISR needs is now setup, so hook it up */
--- 
-2.13.1
+Thanks.
