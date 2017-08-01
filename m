@@ -1,189 +1,117 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 1 Aug 2017 10:02:19 -0700
-Subject: [PATCH 10/11] arm64/kvm: context-switch ptrauth registers
-In-Reply-To: <20170801142603.GE9347@leverpostej>
-References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
- <1500480092-28480-11-git-send-email-mark.rutland@arm.com>
- <20170801110014.GA5176@cbox> <20170801142603.GE9347@leverpostej>
-Message-ID: <20170801170219.GB4033@lvm>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Aug 2017 18:03:54 +0100
+Subject: [PATCH 1/6] arm64: Fix potential race with hardware DBM in
+ ptep_set_access_flags()
+In-Reply-To: <20170725135308.18173-2-catalin.marinas@arm.com>
+References: <20170725135308.18173-1-catalin.marinas@arm.com>
+ <20170725135308.18173-2-catalin.marinas@arm.com>
+Message-ID: <20170801170354.GE12027@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 01, 2017 at 03:26:07PM +0100, Mark Rutland wrote:
-> On Tue, Aug 01, 2017 at 01:00:14PM +0200, Christoffer Dall wrote:
-> > On Wed, Jul 19, 2017 at 05:01:31PM +0100, Mark Rutland wrote:
-> > > When pointer authentication is supported, a guest may wish to use it.
-> > > This patch adds the necessary KVM infrastructure for this to work, with
-> > > a semi-lazy context switch of the pointer auth state.
-> > > 
-> > > When we schedule a vcpu, we disable guest usage of pointer
-> > > authentication instructions and accesses to the keys. While these are
-> > > disabled, we avoid context-switching the keys. When we trap the guest
-> > > trying to use pointer authentication functionality, we change to eagerly
-> > > context-switching the keys, and enable the feature. The next time the
-> > > vcpu is scheduled out/in, we start again.
-> > > 
-> > > This is sufficient for systems with uniform pointer authentication
-> > > support. For systems with mismatched support, it will be necessary to
-> > 
-> > What is mismatched support?  You mean systems where one CPU has ptrauth
-> > and another one doesn't (or if they both have it but in different ways)?
+On Tue, Jul 25, 2017 at 02:53:03PM +0100, Catalin Marinas wrote:
+> In a system with DBM (dirty bit management) capable agents there is a
+> possible race between a CPU executing ptep_set_access_flags() (maybe
+> non-DBM capable) and a hardware update of the dirty state (clearing of
+> PTE_RDONLY). The scenario:
 > 
-> Both! Any case where the support is not uniform across all CPUs.
+> a) the pte is writable (PTE_WRITE set), clean (PTE_RDONLY set) and old
+>    (PTE_AF clear)
+> b) ptep_set_access_flags() is called as a result of a read access and it
+>    needs to set the pte to writable, clean and young (PTE_AF set)
+> c) a DBM-capable agent, as a result of a different write access, is
+>    marking the entry as young (setting PTE_AF) and dirty (clearing
+>    PTE_RDONLY)
 > 
-> A CPU can implement address auth and/or generic auth, and either may use
-> an architected algorithm or an IMP DEF algorithm.
+> The current ptep_set_access_flags() implementation would set the
+> PTE_RDONLY bit in the resulting value overriding the DBM update and
+> losing the dirty state.
 > 
-> Even if all CPUs report an IMP DEF algorithm, the particular algorithm
-> may differ across CPUs.
+> This patch fixes such race by setting PTE_RDONLY to the most permissive
+> (lowest value) of the current entry and the new one.
 > 
-> > > hide the feature from the guest's view of the ID registers.
-> > 
-> > I think the work Drew is pondering to allow userspace more control of
-> > what we emulate to the guest can semi-automatically take care of this as
-> > well.
+> Fixes: 66dbd6e61a52 ("arm64: Implement ptep_set_access_flags() for hardware AF/DBM")
+> Cc: Will Deacon <will.deacon@arm.com>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Steve Capper <steve.capper@arm.com>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm64/mm/fault.c | 15 ++++++++-------
+>  1 file changed, 8 insertions(+), 7 deletions(-)
 > 
-> I'll take a look.
-> 
-> [...]
-> 
-> > > +static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu)
-> > > +{
-> > > +	kvm_arm_vcpu_ptrauth_disable(vcpu);
-> > > +}
-> > > +
-> > 
-> > why sched_in and not vcpu_load?  (vcpu_load happens whenever you're
-> > returning from userspace for example, and not only when you've been
-> > scheduled away and are coming back).
-> 
-> I think this is the result of going searching for similar lazy context
-> switching, and stumbling on some (fairly different) code on x86.
-> 
-> It looks like I can use vcpu_load() instead, so I'll give that a shot
-> for v2.
-> 
-> > And why do we want to 'reset' the behavior of KVM when the host
-> > schedules a VCPU thread?
-> > 
-> > If I understand the logic correctly, what you're establishing with the
-> > appraoch of initially trapping use of ptrauth is to avoid
-> > saving/restoring the state if the guest dosn't use ptrauth, but then if
-> > the guest starts using it, it's likely to keep using it, and therefore
-> > we start saving/restoring the registers.
-> 
-> Yes.
-> 
-> > Why is the host's decision to schedule something else on this physical
-> > CPU a good indication that we should no longer save/restore these
-> > registers for the VCPU?
-> 
-> I guess it's not.
-> 
-> Initially, I was followed the same approach we take for fpsimd, leaving
-> the feature trapped until we take a shallow trap to hyp. Handing all the
-> sysreg traps in hyp was unwieldy, so I moved that down to the kernel
-> proper. That meant I couldn't enable the trap when switching from host
-> to guest, and doing so in the regular context switch seemed like the
-> next best option.
-> 
-> > Wouldn't it make more sense to have a flag on the VCPU, and
-> > potentially a counter, so that if you switch X times without ever
-> > touching the registers again, you can stop saving/restoring the state,
-> > if that's even something we care about?
-> 
-> Something like that could make more sense. It should be fairly simple to
-> implement a decaying counter to determine when to trap.
-> 
-> I'd steered clear of optimising the lazy heuristic as I'm testing with
-> models, and I don't have numbers that would be representative of real
-> HW.
-> 
-> > Another thing that comes to mind; does the kernel running a KVM's VCPU
-> > thread (and handling softirqs, ISRs, etc.) ever use the ptrauth system,
-> > or does that only happen when we go to userspace? 
-> 
-> Today, only userspace uses pointer auth, and the kernel does not.
-> However, in-kernel usage is on the cards.
-> 
-> > If the latter, we could handle the save/restore entirely in
-> > vcpu_put/vcpu_load instead. I don't mind picking up that bit as part
-> > of my ongoing optimization work later though, if you're eager to get
-> > these patches merged.
-> 
-> I'd avoided that so far, since it would be undone when in-kernel usage
-> is implemented. If you prefer, I can implement that for now.
-> 
-> [...]
-> 
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index c7861c9864e6..2509e4fe6992 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -163,26 +163,27 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
+>  	/* only preserve the access flags and write permission */
+>  	pte_val(entry) &= PTE_AF | PTE_WRITE | PTE_DIRTY;
+>  
+> -	/*
+> -	 * PTE_RDONLY is cleared by default in the asm below, so set it in
+> -	 * back if necessary (read-only or clean PTE).
+> -	 */
+> +	/* set PTE_RDONLY if actual read-only or clean PTE */
+>  	if (!pte_write(entry) || !pte_sw_dirty(entry))
+>  		pte_val(entry) |= PTE_RDONLY;
+>  
+>  	/*
+>  	 * Setting the flags must be done atomically to avoid racing with the
+> -	 * hardware update of the access/dirty state.
+> +	 * hardware update of the access/dirty state. The PTE_RDONLY bit must
+> +	 * be set to the most permissive (lowest value) of *ptep and entry
+> +	 * (calculated as: a & b == ~(~a | ~b)).
+>  	 */
+> +	pte_val(entry) ^= PTE_RDONLY;
+>  	asm volatile("//	ptep_set_access_flags\n"
+>  	"	prfm	pstl1strm, %2\n"
+>  	"1:	ldxr	%0, %2\n"
+> -	"	and	%0, %0, %3		// clear PTE_RDONLY\n"
+> +	"	eor	%0, %0, %3		// negate PTE_RDONLY in *ptep\n"
+>  	"	orr	%0, %0, %4		// set flags\n"
+> +	"	eor	%0, %0, %3		// negate final PTE_RDONLY\n"
+>  	"	stxr	%w1, %0, %2\n"
+>  	"	cbnz	%w1, 1b\n"
+>  	: "=&r" (old_pteval), "=&r" (tmp), "+Q" (pte_val(*ptep))
+> -	: "L" (~PTE_RDONLY), "r" (pte_val(entry)));
+> +	: "L" (PTE_RDONLY), "r" (pte_val(entry)));
 
-I think we should just do a simple flag for now, and once we have
-hardware and can measure things, we can add more advanced support like a
-decaying counter or a doing this at vcpu_put/vcpu_load instead.
+Can this be simplified using BIC instead? Ultimately, it would be better
+to use cmpxchg, but as a fix for stable I'd prefer something that doesn't
+invert the current logic.
 
-I can then deal with the headache of making sure this performs well on
-systems that don't have the hardware support once things are merged,
-because I'm looking at that already.
+Will
 
-> > > +/*
-> > > + * Handle the guest trying to use a ptrauth instruction, or trying to access a
-> > > + * ptrauth register.
-> > > + */
-> > > +void kvm_arm_vcpu_ptrauth_trap(struct kvm_vcpu *vcpu)
-> > > +{
-> > > +	if (cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH) &&
-> > > +	    cpus_have_const_cap(ARM64_HAS_GENERIC_AUTH)) {
-> > > +		kvm_arm_vcpu_ptrauth_enable(vcpu);
-> > > +	} else {
-> > > +		kvm_inject_undefined(vcpu);
-> > 
-> > How can we trap here without having ARM64_HAS_[ADDRESS,GENERIC]_AUTH ?
-> 
-> We'll trap if the current CPU supports one of the two (with an
-> architected algorithm), but some other CPU does not (or uses an IMP DEF
-> algorithm). Note that we're checking that all CPUs have the feature.
-> 
-> > If this to cover the case if we only have one of the two or is there a
-> > case where we trap ptrauth registers/instructions even though the CPU
-> > doesn't have the support?
-> 
-> It's there to cater for the case that some CPUs lack a feature that
-> others have, so that we expose a uniform view to guests.
-> 
-> There's a single control to trap both address/generic authentication, so
-> it has to check that support is uniform for both. 
-> 
-> I'd meant to fix this up to not be so pessimistic -- we could support
-> one without that other, so long as it is uniformly absent. e.g. if all
-> CPUs support address auth and all CPUs have no support for generic auth.
-> 
-> I'll need to add negative cpucaps to detect that. I'll try to sort that
-> out for v2.
-> 
-> [...]
-> 
-> > > +static void __hyp_text __ptrauth_save_state(struct kvm_cpu_context *ctxt)
-> > > +{
-> > > +	if (cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH)) {
-> > > +		__ptrauth_save_key(ctxt->sys_regs, APIA);
-> > > +		__ptrauth_save_key(ctxt->sys_regs, APIB);
-> > > +		__ptrauth_save_key(ctxt->sys_regs, APDA);
-> > > +		__ptrauth_save_key(ctxt->sys_regs, APDB);
-> > > +	}
-> > > +
-> > > +	if (cpus_have_const_cap(ARM64_HAS_GENERIC_AUTH)) {
-> > > +		__ptrauth_save_key(ctxt->sys_regs, APGA);
-> > > +	}
-> > 
-> > Aren't we ever only enabling the save/restore if we have both caps, so
-> > why are we checking it here again?
-> 
-> Sorry; I'd meant to fix things up so that we could support one without
-> the other. Likewise for __ptrauth_restore_state().
-> 
-> I'll try to fix this up for v2.
-> 
+--->8
 
-Sounds good.  Thanks for otherwise producing a well-readable patch.
-
--Christoffer
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index c7861c9864e6..082366ad04d1 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -155,7 +155,7 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
+ 			  pte_t entry, int dirty)
+ {
+ 	pteval_t old_pteval;
+-	unsigned int tmp;
++	unsigned long tmp;
+ 
+ 	if (pte_same(*ptep, entry))
+ 		return 0;
+@@ -177,12 +177,14 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
+ 	asm volatile("//	ptep_set_access_flags\n"
+ 	"	prfm	pstl1strm, %2\n"
+ 	"1:	ldxr	%0, %2\n"
+-	"	and	%0, %0, %3		// clear PTE_RDONLY\n"
+-	"	orr	%0, %0, %4		// set flags\n"
++	"	bic	%1, %3, %0		// clear PTE_RDONLY if\n"
++	"	bic	%1, %4, %1		// not already set in pte,\n"
++	"	bic	%0, %0, %3		// then set the other\n"
++	"	orr	%0, %0, %1		// access flags\n"
+ 	"	stxr	%w1, %0, %2\n"
+ 	"	cbnz	%w1, 1b\n"
+ 	: "=&r" (old_pteval), "=&r" (tmp), "+Q" (pte_val(*ptep))
+-	: "L" (~PTE_RDONLY), "r" (pte_val(entry)));
++	: "L" (PTE_RDONLY), "r" (pte_val(entry)));
+ 
+ 	flush_tlb_fix_spurious_fault(vma, address);
+ 	return 1;
