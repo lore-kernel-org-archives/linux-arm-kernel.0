@@ -1,111 +1,84 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 1 Aug 2017 10:17:56 -0600
-Subject: [PATCH v1] perf: cs-etm: Fix ETMv4 CONFIGR entry in perf.data file
-In-Reply-To: <CANLsYkx0AW0R21m04rE987bDtYmsd=r_w2ipWyPLs=StENhEiw@mail.gmail.com>
-References: <1499878883-3066-1-git-send-email-mike.leach@linaro.org>
- <CANLsYkxDLVONpuQpF6Zo-gUPf+WVt2v+DLNduq0mDMk0XAZ5hw@mail.gmail.com>
- <20170721161916.GH4134@kernel.org> <20170721183533.GP4134@kernel.org>
- <20170721183740.GQ4134@kernel.org> <20170721191103.GR4134@kernel.org>
- <CANLsYkx0AW0R21m04rE987bDtYmsd=r_w2ipWyPLs=StENhEiw@mail.gmail.com>
-Message-ID: <CANLsYkzTyjmVYA+mYCp-6P9WjCMjEH4gcm_Ua2gKN04bWTz2CQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 01 Aug 2017 18:19:46 +0200
+Subject: [PATCH v3] clk: fractional-divider: fix up the fractional clk's
+ jitter
+In-Reply-To: <1500624187-12165-1-git-send-email-zhangqing@rock-chips.com>
+References: <1500624187-12165-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <5990882.df1suBpf8V@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 July 2017 at 13:37, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
-> On 21 July 2017 at 13:11, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
->> Em Fri, Jul 21, 2017 at 03:37:40PM -0300, Arnaldo Carvalho de Melo escreveu:
->>> Em Fri, Jul 21, 2017 at 03:35:33PM -0300, Arnaldo Carvalho de Melo escreveu:
->>> > Em Fri, Jul 21, 2017 at 01:19:16PM -0300, Arnaldo Carvalho de Melo escreveu:
->>> > > Em Fri, Jul 21, 2017 at 08:50:09AM -0600, Mathieu Poirier escreveu:
->>> > > > On 12 July 2017 at 11:01, Mike Leach <mike.leach@linaro.org> wrote:
->>> > > > > The value passed into the perf.data file for the CONFIGR register in ETMv4
->>> > > > > was incorrectly being set to the command line options/ETMv3 value.
->>> > > > >
->>> > > > >                 info->priv[*offset + CS_ETMV4_TRCTRACEIDR] =
->>> > > > >                                                 coresight_get_trace_id(cpu);
->>> > > >
->>> > > > I have tested this patch on my side and things work as advertised now.
->>> > > >
->>> > > > Arnaldo, if you want to pick this up through your tree then:
->>> > > >
->>> > > > Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->>> > > >
->>> > > > Otherwise I'll get this, whatever you prefer.
->>> > >
->>> > > I'll get it, thanks for the ping,
->>> >
->>> > It is breaking the build in one of my containers, one with fedora 24 and
->>> > a android toolchain from http://dl.google.com/android/repository/android-ndk-r12b-linux-x86_64.zip
->>> >
->>> > arch/arm/util/cs-etm.c: In function 'cs_etmv4_get_config':^M
->>> > arch/arm/util/cs-etm.c:289:24: error: 'ETM_OPT_RETSTK' undeclared (first use in this function)^M
->>> >   if (config_opts & BIT(ETM_OPT_RETSTK))
->>> >
->>> > It builds as
->>> >
->>> > NDK=/opt/android-ndk-r12b/
->>> > NDK_TOOLCHAIN=${NDK}/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/arm-linux-androideabi-
->>> > NDK_SYSROOT=${NDK}/platforms/android-24/arch-arm
->>> > make -C /git/linux/tools/perf O=/tmp/build/perf WERROR=0 CFLAGS=${CFLAGS} ARCH=arm CROSS_COMPILE=${NDK_TOOLCHAIN} EXTRA_CFLAGS="-pie --sysroot=${NDK_SYSROOT}"
->>> > Ideas?
->>>
->>> Ok, it also fails on:
->>>
->>>   14 debian:experimental-x-arm64: FAIL
->>
->> Ok, we need a definition for ETM_OPT_RETSTK, just like we have for the
->> other two...
->>
->> Nuked it from my perf/core branch, please resubmit.
->
-> Symbol ETM_OPT_RETSTK was added as part of another patch [1] that is
-> already in my CoreSight tree.  Do you mind if we make this one go
-> through my tree then?
+Hi Elaine,
 
-I haven't heard back from this so I'll assume you want me to take the patch.
+sorry this took a bit longer, but I didn't manage to find the time to
+respond properly until now.
 
->
-> Thanks,
-> Mathieu
->
-> [1]. https://www.spinics.net/lists/arm-kernel/msg593008.html
->
->> - Arnaldo
->>
->>>
->>> Same problem:
->>>
->>>   CC       /tmp/build/perf/arch/arm64/util/../../arm/util/cs-etm.o
->>>   CC       /tmp/build/perf/util/config.o
->>> arch/arm64/util/../../arm/util/cs-etm.c: In function 'cs_etmv4_get_config':
->>> arch/arm64/util/../../arm/util/cs-etm.c:289:24: error: 'ETM_OPT_RETSTK' undeclared (first use in this function)
->>>   if (config_opts & BIT(ETM_OPT_RETSTK))
->>>                         ^
->>> arch/arm64/util/../../arm/util/cs-etm.c:270:25: note: in definition of macro 'BIT'
->>>  #define BIT(N) (1UL << (N))
->>>                          ^
->>> arch/arm64/util/../../arm/util/cs-etm.c:289:24: note: each undeclared identifier is reported only once for each function it appears in
->>>   if (config_opts & BIT(ETM_OPT_RETSTK))
->>>                         ^
->>> arch/arm64/util/../../arm/util/cs-etm.c:270:25: note: in definition of macro 'BIT'
->>>  #define BIT(N) (1UL << (N))
->>>                          ^
->>> mv: cannot stat '/tmp/build/perf/arch/arm64/util/../../arm/util/.cs-etm.o.tmp': No such file or directory
->>> /git/linux/tools/build/Makefile.build:101: recipe for target '/tmp/build/perf/arch/arm64/util/../../arm/util/cs-etm.o' failed
->>> make[6]: *** [/tmp/build/perf/arch/arm64/util/../../arm/util/cs-etm.o] Error 1
->>> /git/linux/tools/build/Makefile.build:144: recipe for target 'util' failed
->>> make[5]: *** [util] Error 2
->>> /git/linux/tools/build/Makefile.build:144: recipe for target 'arm64' failed
->>> make[4]: *** [arm64] Error 2
->>> /git/linux/tools/build/Makefile.build:144: recipe for target 'arch' failed
->>> make[3]: *** [arch] Error 2
->>> make[3]: *** Waiting for unfinished jobs....
->>>   CC       /tmp/build/perf/util/ctype.o
->>>
->>> Builds with:
->>>
->>> ARCH=arm64
->>> TARGET=aarch64-linux-gnu
->>> make ARCH=${ARCH} CROSS_COMPILE=${TARGET}- -C /git/linux/tools/perf O=/tmp/build/perf
->>>
->>> - Arnaldo
+Am Freitag, 21. Juli 2017, 16:03:07 CEST schrieb Elaine Zhang:
+> Fractional dividers may have special requirements concerning numerator
+> and denominator selection that differ from just getting the best
+> approximation.
+> 
+> For example on Rockchip socs the denominator must be at least 20 times
+> larger than the numerator to generate precise clock frequencies.
+> 
+> Therefore add the ability to provide custom approximation functions,
+> approx = rockchip_fractional_special_approx;
+> but approx = NULL in the default case.
+> 
+> RK document description:
+> 3.1.9  Fractional divider usage
+> To get specific frequency, clocks of I2S, SPDIF, UARTcan be generated by
+> fractional divider. Generally you must set that denominator is 20 times
+> larger than numerator to generate precise clock frequency. So the
+> fractional divider applies only to generate low frequency clock like
+> I2S, UART.
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> ---
+>  drivers/clk/clk-fractional-divider.c |  4 ++++
+>  drivers/clk/rockchip/clk.c           | 20 ++++++++++++++++++++
+>  include/linux/clk-provider.h         |  3 +++
+>  3 files changed, 27 insertions(+)
+
+The code below does go into the right direction, but I'd really like to
+have the full approximation  overrideable. The reason is that while on
+Rockchip SoCs it's enough to increase the parent rate, other socs might
+have completely different requirements when determining numerator
+and denominator.
+
+So I've taken the time and modified your patch into 2 that look like I
+would envision it - compile-tested only, so please test :-)
+But essentially it only moves some things around but should be
+functionally equivalent to your patch.
+
+I'll add the patches as replies to this mail.
+
+
+Two more things to keep in mind for the future below:
+
+> @@ -145,6 +148,7 @@ struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
+>  	fd->nmask = GENMASK(nwidth - 1, 0) << nshift;
+>  	fd->flags = clk_divider_flags;
+>  	fd->lock = lock;
+> +	fd->approx = NULL;
+
+not needed, as fd is allocated via kzalloc, so this is already NULL.
+Also it is nicer to spell approximation full (which I've done in my rework)
+
+[...]
+
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index a428aec36ace..807262375292 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -564,6 +564,9 @@ struct clk_fractional_divider {
+>  	u8		nwidth;
+>  	u32		nmask;
+>  	u8		flags;
+> +	void            (*approx)(struct clk_hw *hw,
+
+Please keep the spacing in line with other elements. Somehow
+here spaces instead of a tab slipped in between void and (*appro...
+
+
+Heiko
