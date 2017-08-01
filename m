@@ -1,82 +1,108 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
-Date: Tue, 1 Aug 2017 11:49:11 +0100
-Subject: [PATCH v5 0/2] iommu/smmu-v3: Workaround for hisilicon 161010801
- erratum(reserve HW MSI)
-Message-ID: <20170801104913.71912-1-shameerali.kolothum.thodi@huawei.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Tue, 1 Aug 2017 11:53:09 +0100
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170731125548.00007b68@huawei.com>
+References: <20170726.095432.169004918437663011.davem@davemloft.net>
+ <20170726175013.GT3730@linux.vnet.ibm.com>
+ <20170726223658.GA27617@linux.vnet.ibm.com>
+ <20170726.154540.150558937277891719.davem@davemloft.net>
+ <20170726231505.GG3730@linux.vnet.ibm.com>
+ <20170731120908.00002e28@huawei.com>
+ <20170731125548.00007b68@huawei.com>
+Message-ID: <20170801115309.000070fd@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On certain HiSilicon platforms (Hip06/Hip07) the GIC ITS and
-PCIe RC deviates from the standard implementation and this breaks
-PCIe MSI functionality when SMMU is enabled.
 
-The HiSilicon erratum 161010801 describes this limitation of certain
-HiSilicon platforms to support the SMMU mappings for MSI transactions.
-On these platforms GICv3 ITS translator is presented with the deviceID
-by extending the MSI payload data to 64 bits to include the deviceID.
-Hence, the PCIe controller on this platforms has to differentiate the
-MSI payload against other DMA payload and has to modify the MSI payload.
-This basically makes it difficult for this platforms to have a SMMU
-translation for MSI.
+Sorry - accidental send.  No content!
 
-To implement this quirk, the following changes are incorporated:
+Jonathan
 
-1. Added a generic helper function to IORT code to retrieve and
-   reserve the HW ITS address regions.
-2. Modified iommu_dma_get_resv_regions() to reserve the hw msi
-   regions which means these address regions will not be translated and
-   will be excluded from iova allocations.
+On Mon, 31 Jul 2017 12:55:48 +0100
+Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
 
-Note: This requires patches [1] and [2] for vfio pass-through support
-on these platforms.
-
-Thanks,
-Shameer
-
-[1]: https://lkml.org/lkml/2017/7/27/388
-[2]: https://lkml.org/lkml/2017/7/27/386
-
-Changelog:
-
-v4 --> v5
-Addressed comments from Robin and Lorenzo:
--Added a comment to make it clear that, for now, only straightforward 
- HW topologies are handled while reserving ITS regions(patch #1).
-
-v3 --> v4
-Rebased on 4.13-rc1.
-Addressed comments from Robin, Will and Lorenzo:
--As suggested by Robin, moved the ITS msi reservation into
- iommu_dma_get_resv_regions().
--Added its_count != resv region failure case(patch #1).
-
-v2 --> v3
-Addressed comments from Lorenzo and Robin:
--Removed dev_is_pci() check in smmuV3 driver.
--Don't treat device not having an ITS mapping as an error in
- iort helper function.
-
-v1 --> v2
--patch 2/2: Invoke iort helper fn based on fwnode type(acpi).
-
-RFCv2 -->PATCH
--Incorporated Lorenzo's review comments.
-
-RFC v1 --> RFC v2
-Based on Robin's review comments,
--Removed  the generic erratum framework.
--Using IORT/MADT tables to retrieve the ITS base addr instead
- of vendor specific CSRT table.
-
-Shameer Kolothum (2):
-  ACPI/IORT: Add ITS address regions reservation helper
-  iommu/dma: Add HW MSI address regions reservation
-
- drivers/acpi/arm64/iort.c        | 95 ++++++++++++++++++++++++++++++++++++++--
- drivers/iommu/dma-iommu.c        |  8 +++-
- drivers/irqchip/irq-gic-v3-its.c |  3 +-
- include/linux/acpi_iort.h        |  7 ++-
- 4 files changed, 107 insertions(+), 6 deletions(-)
-
--- 
-1.9.1
+> On Mon, 31 Jul 2017 12:09:08 +0100
+> Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
+> 
+> > On Wed, 26 Jul 2017 16:15:05 -0700
+> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+> >   
+> > > On Wed, Jul 26, 2017 at 03:45:40PM -0700, David Miller wrote:    
+> > > > From: "Paul E. McKenney" <paulmck@linux.vnet.ibm.com>
+> > > > Date: Wed, 26 Jul 2017 15:36:58 -0700
+> > > >       
+> > > > > And without CONFIG_SOFTLOCKUP_DETECTOR, I see five runs of 24 with RCU
+> > > > > CPU stall warnings.  So it seems likely that CONFIG_SOFTLOCKUP_DETECTOR
+> > > > > really is having an effect.      
+> > > > 
+> > > > Thanks for all of the info Paul, I'll digest this and scan over the
+> > > > code myself.
+> > > > 
+> > > > Just out of curiousity, what x86 idle method is your machine using?
+> > > > The mwait one or the one which simply uses 'halt'?  The mwait variant
+> > > > might mask this bug, and halt would be a lot closer to how sparc64 and
+> > > > Jonathan's system operates.      
+> > > 
+> > > My kernel builds with CONFIG_INTEL_IDLE=n, which I believe means that
+> > > I am not using the mwait one.  Here is a grep for IDLE in my .config:
+> > > 
+> > > 	CONFIG_NO_HZ_IDLE=y
+> > > 	CONFIG_GENERIC_SMP_IDLE_THREAD=y
+> > > 	# CONFIG_IDLE_PAGE_TRACKING is not set
+> > > 	CONFIG_ACPI_PROCESSOR_IDLE=y
+> > > 	CONFIG_CPU_IDLE=y
+> > > 	# CONFIG_CPU_IDLE_GOV_LADDER is not set
+> > > 	CONFIG_CPU_IDLE_GOV_MENU=y
+> > > 	# CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED is not set
+> > > 	# CONFIG_INTEL_IDLE is not set
+> > >     
+> > > > On sparc64 the cpu yield we do in the idle loop sleeps the cpu.  It's
+> > > > local TICK register keeps advancing, and the local timer therefore
+> > > > will still trigger.  Also, any externally generated interrupts
+> > > > (including cross calls) will wake up the cpu as well.
+> > > > 
+> > > > The tick-sched code is really tricky wrt. NO_HZ even in the NO_HZ_IDLE
+> > > > case.  One of my running theories is that we miss scheduling a tick
+> > > > due to a race.  That would be consistent with the behavior we see
+> > > > in the RCU dumps, I think.      
+> > > 
+> > > But wouldn't you have to miss a -lot- of ticks to get an RCU CPU stall
+> > > warning?  By default, your grace period needs to extend for more than
+> > > 21 seconds (more than one-third of a -minute-) to get one.  Or do
+> > > you mean that the ticks get shut off now and forever, as opposed to
+> > > just losing one of them?
+> > >     
+> > > > Anyways, just a theory, and that's why I keep mentioning that commit
+> > > > about the revert of the revert (specifically
+> > > > 411fe24e6b7c283c3a1911450cdba6dd3aaea56e).
+> > > > 
+> > > > :-)      
+> > > 
+> > > I am running an overnight test in preparation for attempting to push
+> > > some fixes for regressions into 4.12, but will try reverting this
+> > > and enabling CONFIG_HZ_PERIODIC tomorrow.
+> > > 
+> > > Jonathan, might the commit that Dave points out above be what reduces
+> > > the probability of occurrence as you test older releases?    
+> > I just got around to trying this out of curiosity.  Superficially it did
+> > appear to possibly make the issue harder to hit took over 30 minutes
+> > but the issue otherwise looks much the same with or without that patch.
+> > 
+> > Just out of curiosity, next thing on my list is to disable hrtimers entirely
+> > and see what happens.
+> > 
+> > Jonathan  
+> > > 
+> > > 							Thanx, Paul
+> > >     
+> > 
+> > _______________________________________________
+> > linuxarm mailing list
+> > linuxarm at huawei.com
+> > http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm  
+> 
+> _______________________________________________
+> linuxarm mailing list
+> linuxarm at huawei.com
+> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
