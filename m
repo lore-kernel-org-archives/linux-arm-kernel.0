@@ -1,39 +1,98 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 1 Aug 2017 15:57:04 +0100
-Subject: [PATCH] arm64: acpi/gtdt: validate CNTFRQ after having enabled
- the frame
-In-Reply-To: <20170801113120.GD9347@leverpostej>
-References: <20170724151053.17769-1-ard.biesheuvel@linaro.org>
- <20170801105345.GB9347@leverpostej>
- <CAKv+Gu8jD_oJV138qWGQm2dOnqJTSxSNNQ7xFCPtb4efyR9n1Q@mail.gmail.com>
- <20170801113120.GD9347@leverpostej>
-Message-ID: <20170801145704.GA27566@leverpostej>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 1 Aug 2017 16:58:44 +0200
+Subject: [RFC PATCH v2 04/38] KVM: arm/arm64: Check if nested
+ virtualization is in use
+In-Reply-To: <CAHyh4xi0hQE2kxOY78_25GwRsCCjMwOt0Lj=Jv1Vs1LdTUO+pQ@mail.gmail.com>
+References: <1500397144-16232-1-git-send-email-jintack.lim@linaro.org>
+ <1500397144-16232-5-git-send-email-jintack.lim@linaro.org>
+ <20170730195949.GF5176@cbox>
+ <CAHyh4xi0hQE2kxOY78_25GwRsCCjMwOt0Lj=Jv1Vs1LdTUO+pQ@mail.gmail.com>
+Message-ID: <20170801145844.GK5176@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 01, 2017 at 12:31:21PM +0100, Mark Rutland wrote:
-> On Tue, Aug 01, 2017 at 12:09:32PM +0100, Ard Biesheuvel wrote:
-
-> > The point here is that CNTFRQ cannot differ between frames. It either
-> > returns the value of the base frame or RES0.
+On Tue, Aug 01, 2017 at 10:07:40AM -0400, Jintack Lim wrote:
+> On Sun, Jul 30, 2017 at 3:59 PM, Christoffer Dall <cdall@linaro.org> wrote:
+> > On Tue, Jul 18, 2017 at 11:58:30AM -0500, Jintack Lim wrote:
+> >> Nested virtualizaion is in use only if all three conditions are met:
+> >> - The architecture supports nested virtualization.
+> >> - The kernel parameter is set.
+> >> - The userspace uses nested virtualiztion feature.
+> >>
+> >> Signed-off-by: Jintack Lim <jintack.lim@linaro.org>
+> >> ---
+> >>  arch/arm/include/asm/kvm_host.h   | 11 +++++++++++
+> >>  arch/arm64/include/asm/kvm_host.h |  2 ++
+> >>  arch/arm64/kvm/nested.c           | 17 +++++++++++++++++
+> >>  virt/kvm/arm/arm.c                |  4 ++++
+> >>  4 files changed, 34 insertions(+)
+> >>
+> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> >> index 00b0f97..7e9e6c8 100644
+> >> --- a/arch/arm/include/asm/kvm_host.h
+> >> +++ b/arch/arm/include/asm/kvm_host.h
+> >> @@ -303,4 +303,15 @@ static inline int __init kvmarm_nested_cfg(char *buf)
+> >>  {
+> >>       return 0;
+> >>  }
+> >> +
+> >> +static inline int init_nested_virt(void)
+> >> +{
+> >> +     return 0;
+> >> +}
+> >> +
+> >> +static inline bool nested_virt_in_use(struct kvm_vcpu *vcpu)
+> >> +{
+> >> +     return false;
+> >> +}
+> >> +
+> >>  #endif /* __ARM_KVM_HOST_H__ */
+> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> >> index 6df0c7c..86d4b6c 100644
+> >> --- a/arch/arm64/include/asm/kvm_host.h
+> >> +++ b/arch/arm64/include/asm/kvm_host.h
+> >> @@ -387,5 +387,7 @@ static inline void __cpu_init_stage2(void)
+> >>  }
+> >>
+> >>  int __init kvmarm_nested_cfg(char *buf);
+> >> +int init_nested_virt(void);
+> >> +bool nested_virt_in_use(struct kvm_vcpu *vcpu);
+> >>
+> >>  #endif /* __ARM64_KVM_HOST_H__ */
+> >> diff --git a/arch/arm64/kvm/nested.c b/arch/arm64/kvm/nested.c
+> >> index 79f38da..9a05c76 100644
+> >> --- a/arch/arm64/kvm/nested.c
+> >> +++ b/arch/arm64/kvm/nested.c
+> >> @@ -24,3 +24,20 @@ int __init kvmarm_nested_cfg(char *buf)
+> >>  {
+> >>       return strtobool(buf, &nested_param);
+> >>  }
+> >> +
+> >> +int init_nested_virt(void)
+> >> +{
+> >> +     if (nested_param && cpus_have_const_cap(ARM64_HAS_NESTED_VIRT))
+> >> +             kvm_info("Nested virtualization is supported\n");
+> >> +
+> >> +     return 0;
+> >> +}
+> >> +
+> >> +bool nested_virt_in_use(struct kvm_vcpu *vcpu)
+> >> +{
+> >> +     if (nested_param && cpus_have_const_cap(ARM64_HAS_NESTED_VIRT)
+> >> +         && test_bit(KVM_ARM_VCPU_NESTED_VIRT, vcpu->arch.features))
+> >> +             return true;
+> >
+> > you could initialize a bool in init_nested_virt which you then check
+> > here to avoid duplicating the logic.
 > 
-> Sorry; you had mentioned this before, and I had forgotten.
+> I can make a bool to check the kernel param and the capability. The
+> third one is per VM given by the userspace, so we don't know it when
+> we initialize the host hypervisor. We can potentially have a bool in
+> kvm_vcpu_arch or kvm_arch to cache the whole three conditions, if that
+> sounds ok.
 > 
-> I'm under the impression that the ARM ARM may be misleading (and
-> potentially erroneous) in that regard. In the past I had been told that
-> each instance of a CNTFRQ register was independent, and each must be
-> writeable for system initialization.
 
-FWIW, I took a look at a Juno R1 with a DSTREAM.
-
-I can independently configure CNTCTLBase.CNTFRQ and CNTBase1.CNTFRQ,
-with the latter being RW from the Non-secure side. It seems that
-firmware I'm using doesn't bother to initialise either. :/
-
-So regardless of what the architectural intent is, there exist platforms
-where these can differ.
-
-I'll try to fix up the patch accordingly, to check all instances.
+Yes, that sounds good to me.
 
 Thanks,
-Mark.
+-Christoffer
