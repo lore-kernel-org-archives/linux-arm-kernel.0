@@ -1,98 +1,55 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 1 Aug 2017 10:11:18 +0530
-Subject: [PATCH 5/6] ARM: dts: keystone-k2g-evm: Enable MMC0 and MMC1
-In-Reply-To: <20170801044119.16201-1-lokeshvutla@ti.com>
-References: <20170801044119.16201-1-lokeshvutla@ti.com>
-Message-ID: <20170801044119.16201-6-lokeshvutla@ti.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 1 Aug 2017 10:24:30 +0530
+Subject: [PATCH 3/7] mtd: spi-nor: cadence-quadspi: Add runtime PM support
+In-Reply-To: <20170801045434.8733-1-vigneshr@ti.com>
+References: <20170801045434.8733-1-vigneshr@ti.com>
+Message-ID: <20170801045434.8733-4-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable MMC0 which is used for micro SD and MMC1 which is used for the on
-board EMMC.
+Add pm_runtime* calls to cadence-quadspi driver. This is required to
+switch on QSPI power domain on TI 66AK2G SoC during probe.
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-[fcooper at ti.com: add mmc1, bufferclass and pullup/pulldown settings]
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-[nsekhar at ti.com: add card detect GPIO support]
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
- arch/arm/boot/dts/keystone-k2g-evm.dts | 53 ++++++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ drivers/mtd/spi-nor/cadence-quadspi.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/keystone-k2g-evm.dts b/arch/arm/boot/dts/keystone-k2g-evm.dts
-index 61883cb969d2..f47f95d8bf1c 100644
---- a/arch/arm/boot/dts/keystone-k2g-evm.dts
-+++ b/arch/arm/boot/dts/keystone-k2g-evm.dts
-@@ -25,6 +25,13 @@
- 		reg = <0x00000008 0x00000000 0x00000000 0x80000000>;
- 	};
+diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
+index 297c86a2d4a7..1e432916e00b 100644
+--- a/drivers/mtd/spi-nor/cadence-quadspi.c
++++ b/drivers/mtd/spi-nor/cadence-quadspi.c
+@@ -31,6 +31,7 @@
+ #include <linux/of_device.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
+ #include <linux/sched.h>
+ #include <linux/spi/spi.h>
+ #include <linux/timer.h>
+@@ -1219,6 +1220,13 @@ static int cqspi_probe(struct platform_device *pdev)
+ 		return -ENXIO;
+ 	}
  
-+	vcc3v3_dcin_reg: fixedregulator-vcc3v3-dcin {
-+		compatible = "regulator-fixed";
-+		regulator-name = "mmc0_fixed";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
- };
++	pm_runtime_enable(&pdev->dev);
++	ret = pm_runtime_get_sync(&pdev->dev);
++	if (ret < 0) {
++		pm_runtime_put_noidle(&pdev->dev);
++		return ret;
++	}
++
+ 	ret = clk_prepare_enable(cqspi->clk);
+ 	if (ret) {
+ 		dev_err(dev, "Cannot enable QSPI clock.\n");
+@@ -1269,6 +1277,9 @@ static int cqspi_remove(struct platform_device *pdev)
  
- &k2g_pinctrl {
-@@ -34,6 +41,33 @@
- 			K2G_CORE_IOPAD(0x11d0) (BUFFER_CLASS_B | PIN_PULLDOWN | MUX_MODE0)	/* uart0_txd.uart0_txd */
- 		>;
- 	};
-+
-+	mmc0_pins: pinmux_mmc0_pins {
-+		pinctrl-single,pins = <
-+			K2G_CORE_IOPAD(0x1300) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE2)	/* mmc0_dat3.mmc0_dat3 */
-+			K2G_CORE_IOPAD(0x1304) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE2)	/* mmc0_dat2.mmc0_dat2 */
-+			K2G_CORE_IOPAD(0x1308) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE2)	/* mmc0_dat1.mmc0_dat1 */
-+			K2G_CORE_IOPAD(0x130c) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE2)	/* mmc0_dat0.mmc0_dat0 */
-+			K2G_CORE_IOPAD(0x1310) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE2)	/* mmc0_clk.mmc0_clk */
-+			K2G_CORE_IOPAD(0x1314) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE2)	/* mmc0_cmd.mmc0_cmd */
-+			K2G_CORE_IOPAD(0x12ec) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE3)	/* mmc0_sdcd.gpio1_12 */
-+		>;
-+	};
-+
-+	mmc1_pins: pinmux_mmc1_pins {
-+		pinctrl-single,pins = <
-+			K2G_CORE_IOPAD(0x10ec) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE0)	/* mmc1_dat7.mmc1_dat7 */
-+			K2G_CORE_IOPAD(0x10f0) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE0)	/* mmc1_dat6.mmc1_dat6 */
-+			K2G_CORE_IOPAD(0x10f4) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE0)	/* mmc1_dat5.mmc1_dat5 */
-+			K2G_CORE_IOPAD(0x10f8) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE0)	/* mmc1_dat4.mmc1_dat4 */
-+			K2G_CORE_IOPAD(0x10fc) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE0)	/* mmc1_dat3.mmc1_dat3 */
-+			K2G_CORE_IOPAD(0x1100) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE0)	/* mmc1_dat2.mmc1_dat2 */
-+			K2G_CORE_IOPAD(0x1104) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE0)	/* mmc1_dat1.mmc1_dat1 */
-+			K2G_CORE_IOPAD(0x1108) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE0)	/* mmc1_dat0.mmc1_dat0 */
-+			K2G_CORE_IOPAD(0x110c) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE0)	/* mmc1_clk.mmc1_clk */
-+			K2G_CORE_IOPAD(0x1110) (BUFFER_CLASS_B | PIN_PULLUP | MUX_MODE0)	/* mmc1_cmd.mmc1_cmd */
-+		>;
-+	};
- };
+ 	clk_disable_unprepare(cqspi->clk);
  
- &uart0 {
-@@ -41,3 +75,22 @@
- 	pinctrl-0 = <&uart0_pins>;
- 	status = "okay";
- };
++	pm_runtime_put_sync(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
 +
-+&gpio1 {
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins>;
-+	vmmc-supply = <&vcc3v3_dcin_reg>;
-+	cd-gpios = <&gpio1 12 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins>;
-+	vmmc-supply = <&vcc3v3_dcin_reg>; /* VCC3V3_EMMC is connected to VCC3V3_DCIN */
-+	status = "okay";
-+};
+ 	return 0;
+ }
+ 
 -- 
-2.13.0
+2.13.3
