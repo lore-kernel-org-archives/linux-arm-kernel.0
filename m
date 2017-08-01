@@ -1,80 +1,62 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 1 Aug 2017 15:55:08 +0800
-Subject: [PATCH] ARM: dts: sun8i: h3: Enable EMAC with external PHY on
- NanoPi M1 Plus
-In-Reply-To: <20170801050115.21497-1-luaraneda@gmail.com>
-References: <20170801050115.21497-1-luaraneda@gmail.com>
-Message-ID: <CAGb2v66r1kpbzKN8uE5pb9mqzWMwTjn-N2ufZGdUU2LJ7FvbeA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 1 Aug 2017 09:59:11 +0200
+Subject: [PATCH] pinctrl: nomadik: abx500: constify gpio_chip structure
+In-Reply-To: <20170711212929.GA1037@embeddedgus>
+References: <20170711212929.GA1037@embeddedgus>
+Message-ID: <CACRpkdZmUMRWZLak+3u3uGNyPDBmxqe6GH-aV2V1medoKmebBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 1, 2017 at 1:01 PM, Luis Araneda <luaraneda@gmail.com> wrote:
-> The Nanopi M1 Plus uses an external Realtek RTL8211E PHY in RGMII mode,
-> enabled by a GPIO-based regulator.
->
-> Signed-off-by: Luis Araneda <luaraneda@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 31 +++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-> index 8ddd1b2cc..54727990c 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-> @@ -45,6 +45,20 @@
->  / {
->         model = "FriendlyArm NanoPi M1 Plus";
->         compatible = "friendlyarm,nanopi-m1-plus", "allwinner,sun8i-h3";
-> +
-> +       aliases {
-> +               ethernet0 = &emac;
-> +       };
-> +
-> +       reg_gmac_3v3: gmac-3v3 {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "gmac-3v3";
-> +               regulator-min-microvolt = <3300000>;
-> +               regulator-max-microvolt = <3300000>;
-> +               startup-delay-us = <100000>;
-> +               enable-active-high;
-> +               gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
-> +       };
->  };
->
->  &ehci1 {
-> @@ -55,6 +69,23 @@
->         status = "okay";
->  };
->
-> +&emac {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&emac_rgmii_pins>;
-> +       phy-supply = <&reg_gmac_3v3>;
-> +       phy-handle = <&ext_rgmii_phy>;
-> +       phy-mode = "rgmii";
-> +       allwinner,leds-active-low;
+On Tue, Jul 11, 2017 at 11:29 PM, Gustavo A. R. Silva
+<garsilva@embeddedor.com> wrote:
 
-This property is for the internal PHY. You should not be using it
-with an external PHY.
-
-> +       status = "okay";
-> +};
-> +
-> +&mdio {
-> +       ext_rgmii_phy: ethernet-phy at 1 {
-> +               compatible = "ethernet-phy-ieee802.3-c22";
-> +               reg = <0>;
-
-Value in reg should match the address part of the node name.
-
-ChenYu
-
-> +       };
-> +};
-> +
->  &ohci1 {
->         status = "okay";
->  };
-> --
-> 2.13.3
+> This structure is only used to copy into another structure, so declare
+> it as const.
 >
+> This issue was detected using Coccinelle and the following semantic patch:
+>
+> @r disable optional_qualifier@
+> identifier i;
+> position p;
+> @@
+> static struct gpio_chip i at p = { ... };
+>
+> @ok@
+> identifier r.i;
+> expression e;
+> position p;
+> @@
+> e = i at p;
+>
+> @bad@
+> position p != {r.p,ok.p};
+> identifier r.i;
+> struct gpio_chip e;
+> @@
+> e at i@p
+>
+> @depends on !bad disable optional_qualifier@
+> identifier r.i;
+> @@
+> static
+> +const
+>  struct gpio_chip i = { ... };
+>
+> In the following log you can see a significant difference in the code size
+> and data segment, hence in the dec segment. This log is the output
+> of the size command, before and after the code change:
+>
+> before:
+>    text    data     bss     dec     hex filename
+>   17545    5376       0   22921    5989 drivers/pinctrl/nomadik/pinctrl-abx500.o
+>
+> after:
+>             bss     dec     hex filename
+>   17273    5320       0   22593    5841 drivers/pinctrl/nomadik/pinctrl-abx500.o
+>
+> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+
+Patch applied.
+
+Yours,
+Linus Walleij
