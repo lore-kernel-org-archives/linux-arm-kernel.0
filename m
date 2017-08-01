@@ -1,28 +1,31 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 01 Aug 2017 12:49:09 -0700
-Subject: [PATCH] ARM64: dts: meson-gxbb: p20x: add card regulator settle
- times
-In-Reply-To: <20170801152224.15754-1-jbrunet@baylibre.com> (Jerome Brunet's
- message of "Tue, 1 Aug 2017 17:22:24 +0200")
-References: <20170801152224.15754-1-jbrunet@baylibre.com>
-Message-ID: <7h1sovysp6.fsf@baylibre.com>
+Date: Tue, 01 Aug 2017 12:56:07 -0700
+Subject: [PATCH 1/2] ARM64: dts: meson-gxl-khadas-vim: Add GPIO lines names
+In-Reply-To: <1501250084-19967-2-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Fri, 28 Jul 2017 15:54:43 +0200")
+References: <1501250084-19967-1-git-send-email-narmstrong@baylibre.com>
+ <1501250084-19967-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <7htw1rxdt4.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-> Changing the card voltage on the p200 is not instantaneous, especially
-> when switching from 3.3v to 1.8v.
+> This patch describes the GPIO lines usage on the Khadas VIM board.
 >
-> I take at least 70ms for the regulator to go from 3.3v to 1.8v. Add
-> margin to that to make sure we don't upset the sdcard during the voltage
-> switch
+> This is useful in the debugfs gpio file and using the cdev gpio API.
 >
-> Fixes: ef8d2ffedf18 ("ARM64: dts: meson-gxbb: add MMC support")
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Applied to v4.14/dt64,
+[...]
 
-Thanks,
+> +			  /* Bank BOOT */
+> +			  "eMMC D0", "eMMC D1", "eMMC D2", "eMMC D3",
+> +			  "eMMC D4", "eMMC D5", "eMMC D6", "eMMC D7",
+> +			  "eMMC Clk", "eMMC Reset", "eMMC CMD",
+> +			  "", "BOOT_MODE", "", "", "eMMC Data Strobe", 
+
+nit/FYI: checkpatch whined about some trailing whitespace here.  I fixed up
+locally before applying to v4.14/dt64.
 
 Kevin
