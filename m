@@ -1,64 +1,72 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 1 Aug 2017 18:43:56 +0200
-Subject: [RFC PATCH v2 2/2] net: ethernet: nb8800: Add suspend/resume support
-In-Reply-To: <33d1ab47-6098-5e3f-8a3c-f72626d07113@free.fr>
-References: <33d1ab47-6098-5e3f-8a3c-f72626d07113@free.fr>
-Message-ID: <9e7bbeac-748d-c837-f621-89ab728d5c2f@free.fr>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 1 Aug 2017 11:51:23 -0500
+Subject: [PATCH 0/6] Support for LEGO MINDSTORMS EV3 LCD display
+In-Reply-To: <28188f5c-1daf-121b-6daf-1899668c3875@tronnes.org>
+References: <1501355870-13960-1-git-send-email-david@lechnology.com>
+ <5d8f6518-8d7e-c029-2da4-e3417afb3e40@lechnology.com>
+ <28188f5c-1daf-121b-6daf-1899668c3875@tronnes.org>
+Message-ID: <1ce36d43-b9dd-807e-23aa-bac4fda70fdc@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wrappers around nb8800_stop and nb8800_open.
----
- drivers/net/ethernet/aurora/nb8800.c | 23 ++++++++++++++++++++++-
- 1 file changed, 22 insertions(+), 1 deletion(-)
+On 07/30/2017 12:14 PM, Noralf Tr?nnes wrote:
+> 
+> Den 29.07.2017 21.40, skrev David Lechner:
+>> On 07/29/2017 02:17 PM, David Lechner wrote:
+>>> The goal of this series is to get the built-in LCD of the LEGO 
+>>> MINDSTORMS EV3
+>>> working. But, most of the content here is building up the 
+>>> infrastructure to do
+>>> that.
+>>>
+>>
+>> Some general comments/questions:
+>>
+>> I have noticed that DRM doesn't really have support for monochrome 
+>> displays. I'm guessing that is because no one really uses them anymore?
+>>
+> 
+> The repaper driver was the first monochrome drm driver and I chose to
+> present it to userspace as XRGB8888 and convert it to monochrome.
+> The reason for this is that everything, libraries, apps, plymouth (boot
+> splash, no rgb565) supports it. I didn't see any point in adding a new
+> monochrome drm format that didn't have, or probably wouldn't get
+> userspace support (by libraries at least). The application of course
+> needs to know this to get a good result.
+> 
+> tinydrm_xrgb8888_to_gray8() does the conversion:
+> https://cgit.freedesktop.org/drm/drm-misc/commit/drivers/gpu/drm/tinydrm?id=379ea9a1a59a5a32c8db6f164e80a3fd00cb3781 
+> 
+> 
+>> The LEGO EV3 display is just an LCD (not the backlit kind). It has two 
+>> modes of operation. It can to 2bbp grayscale or it can do 1bpp 
+>> monochrome. The grayscale isn't the best (looks splotchy in places), 
+>> so it would be nice to be able to choose between these two modes. How 
+>> would I implement something like that?
+>>
+> 
+> Do you expect anyone to use grayscale if it doesn't look good?
+> Maybe better to add it later if there's a demand for it.
 
-diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
-index aa18ea25d91f..607064a6d7a1 100644
---- a/drivers/net/ethernet/aurora/nb8800.c
-+++ b/drivers/net/ethernet/aurora/nb8800.c
-@@ -1012,7 +1012,6 @@ static int nb8800_stop(struct net_device *dev)
- 	netif_stop_queue(dev);
- 	napi_disable(&priv->napi);
- 
--	nb8800_dma_stop(dev);
- 	nb8800_mac_rx(dev, false);
- 	nb8800_mac_tx(dev, false);
- 
-@@ -1526,6 +1525,26 @@ static int nb8800_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int nb8800_suspend(struct platform_device *pdev, pm_message_t state)
-+{
-+	struct net_device *dev = platform_get_drvdata(pdev);
-+
-+	if (netif_running(dev))
-+		nb8800_stop(dev);
-+
-+	return 0;
-+}
-+
-+static int nb8800_resume(struct platform_device *pdev)
-+{
-+	struct net_device *dev = platform_get_drvdata(pdev);
-+
-+	if (netif_running(dev))
-+		nb8800_open(dev);
-+
-+	return 0;
-+}
-+
- static struct platform_driver nb8800_driver = {
- 	.driver = {
- 		.name		= "nb8800",
-@@ -1533,6 +1552,8 @@ static struct platform_driver nb8800_driver = {
- 	},
- 	.probe	= nb8800_probe,
- 	.remove	= nb8800_remove,
-+	.suspend = nb8800_suspend,
-+	.resume = nb8800_resume,
- };
- 
- module_platform_driver(nb8800_driver);
--- 
-2.11.0
+I don't expect many people to use it at all. The people that do will be 
+hackers like me that want to see what it is capable of, so I think I 
+will keep it grayscale by default.
+
+> 
+>> Also, how can I indicate to userspace that this display really is 
+>> monochrome/grayscale since the reported color depth 16bpp?
+>>
+> 
+> There isn't unless we add formats for it.
+> Since this display is in a Lego piece, doesn't it have custom userspace
+> that already know it's monochrome?
+
+The official LEGO software is like this, yes. But I am working on a 
+project that supports other LEGO compatible devices that have color 
+screens, so the same software needs to be able to detect at runtime 
+which type of screen it is using. Currently I have a plain fbdev driver 
+that provides FB_VISUAL_MONO10 for the EV3 display and so the software 
+knows when it has a monochrome screen and when it doesn't. But since 
+plain fbdev drivers can't be accepted into mainline, I need to find a 
+different way to detect what type of screen this is so that my graphics 
+library can treat it differently.
