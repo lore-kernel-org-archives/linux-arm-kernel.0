@@ -1,248 +1,207 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue,  1 Aug 2017 15:35:53 +0100
-Subject: [PATCH v2 REPOST 1/2] arm64: syscallno is secretly an int,
- make it official
+Date: Tue,  1 Aug 2017 15:35:54 +0100
+Subject: [PATCH v2 REPOST 2/2] arm64: Abstract syscallno manipulation
 In-Reply-To: <1501598154-1663-1-git-send-email-Dave.Martin@arm.com>
 References: <1501598154-1663-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1501598154-1663-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1501598154-1663-3-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The upper 32 bits of the syscallno field in thread_struct are
-handled inconsistently, being sometimes zero extended and sometimes
-sign-extended.  In fact, only the lower 32 bits seem to have any
-real significance for the behaviour of the code: it's been OK to
-handle the upper bits inconsistently because they don't matter.
+The -1 "no syscall" value is written in various ways, shared with
+the user ABI in some places, and generally obscure.
 
-Currently, the only place I can find where those bits are
-significant is in calling trace_sys_enter(), which may be
-unintentional: for example, if a compat tracer attempts to cancel a
-syscall by passing -1 to (COMPAT_)PTRACE_SET_SYSCALL at the
-syscall-enter-stop, it will be traced as syscall 4294967295
-rather than -1 as might be expected (and as occurs for a native
-tracer doing the same thing).  Elsewhere, reads of syscallno cast
-it to an int or truncate it.
+This patch attempts to make things a little more consistent and
+readable by replacing all these uses with a single #define.  A
+couple of symbolic helpers are provided to clarify the intent
+further.
 
-There's also a conspicuous amount of code and casting to bodge
-around the fact that although semantically an int, syscallno is
-stored as a u64.
+Because the in-syscall check in do_signal() is changed from >= 0 to
+!= NO_SYSCALL by this patch, different behaviour may be observable
+if syscallno is set to values less than -1 by a tracer.  However,
+this is not different from the behaviour that is already observable
+if a tracer sets syscallno to a value >= __NR_(compat_)syscalls.
 
-Let's not pretend any more.
-
-In order to preserve the stp x instruction that stores the syscall
-number in entry.S, this patch special-cases the layout of struct
-pt_regs for big endian so that the newly 32-bit syscallno field
-maps onto the low bits of the stored value.  This is not beautiful,
-but benchmarking of the getpid syscall on Juno suggests indicates a
-minor slowdown if the stp is split into an stp x and stp w.
+It appears that this can cause spurious syscall restarting, but
+that is not a new behaviour either, and does not appear harmful.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 Acked-by: Will Deacon <will.deacon@arm.com>
 ---
  arch/arm64/include/asm/processor.h |  2 +-
- arch/arm64/include/asm/ptrace.h    |  9 ++++++++-
- arch/arm64/kernel/entry.S          | 34 +++++++++++++++++-----------------
+ arch/arm64/include/asm/ptrace.h    | 21 +++++++++++++++++++++
+ arch/arm64/kernel/entry.S          | 10 ++++------
  arch/arm64/kernel/ptrace.c         |  2 +-
- arch/arm64/kernel/signal.c         |  6 +++---
+ arch/arm64/kernel/signal.c         | 10 +++++-----
  arch/arm64/kernel/signal32.c       |  2 +-
- arch/arm64/kernel/traps.c          |  2 +-
- 7 files changed, 32 insertions(+), 25 deletions(-)
+ 6 files changed, 33 insertions(+), 14 deletions(-)
 
 diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 64c9e78..379def1 100644
+index 379def1..b7334f1 100644
 --- a/arch/arm64/include/asm/processor.h
 +++ b/arch/arm64/include/asm/processor.h
 @@ -112,7 +112,7 @@ void tls_preserve_current_state(void);
  static inline void start_thread_common(struct pt_regs *regs, unsigned long pc)
  {
  	memset(regs, 0, sizeof(*regs));
--	regs->syscallno = ~0UL;
-+	regs->syscallno = ~0;
+-	regs->syscallno = ~0;
++	forget_syscall(regs);
  	regs->pc = pc;
  }
  
 diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index 11403fd..21c87dc 100644
+index 21c87dc..4f64373 100644
 --- a/arch/arm64/include/asm/ptrace.h
 +++ b/arch/arm64/include/asm/ptrace.h
-@@ -116,7 +116,14 @@ struct pt_regs {
- 		};
- 	};
- 	u64 orig_x0;
--	u64 syscallno;
-+#ifdef __AARCH64EB__
-+	u32 unused2;
-+	s32 syscallno;
-+#else
-+	s32 syscallno;
-+	u32 unused2;
-+#endif
+@@ -72,8 +72,19 @@
+ #define COMPAT_PT_TEXT_ADDR		0x10000
+ #define COMPAT_PT_DATA_ADDR		0x10004
+ #define COMPAT_PT_TEXT_END_ADDR		0x10008
 +
- 	u64 orig_addr_limit;
++/*
++ * If pt_regs.syscallno == NO_SYSCALL, then the thread is not executing
++ * a syscall -- i.e., its most recent entry into the kernel from
++ * userspace was not via SVC, or otherwise a tracer cancelled the syscall.
++ *
++ * This must have the value -1, for ABI compatibility with ptrace etc.
++ */
++#define NO_SYSCALL (-1)
++
+ #ifndef __ASSEMBLY__
+ #include <linux/bug.h>
++#include <linux/types.h>
+ 
+ /* sizeof(struct user) for AArch32 */
+ #define COMPAT_USER_SZ	296
+@@ -128,6 +139,16 @@ struct pt_regs {
  	u64 unused;	// maintain 16 byte alignment
  };
+ 
++static inline bool in_syscall(struct pt_regs const *regs)
++{
++	return regs->syscallno != NO_SYSCALL;
++}
++
++static inline void forget_syscall(struct pt_regs *regs)
++{
++	regs->syscallno = NO_SYSCALL;
++}
++
+ #define MAX_REG_OFFSET offsetof(struct pt_regs, pstate)
+ 
+ #define arch_has_single_step()	(1)
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index b738880..3bf0bd7 100644
+index 3bf0bd7..cace76d 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -142,8 +142,8 @@ alternative_else_nop_endif
- 	 * Set syscallno to -1 by default (overridden later if real syscall).
- 	 */
+@@ -138,11 +138,9 @@ alternative_else_nop_endif
+ 
+ 	stp	x22, x23, [sp, #S_PC]
+ 
+-	/*
+-	 * Set syscallno to -1 by default (overridden later if real syscall).
+-	 */
++	/* Not in a syscall by default (el0_svc overwrites for real syscall) */
  	.if	\el == 0
--	mvn	x21, xzr
--	str	x21, [sp, #S_SYSCALLNO]
-+	mvn	w21, wzr
-+	str	w21, [sp, #S_SYSCALLNO]
+-	mvn	w21, wzr
++	mov	w21, #NO_SYSCALL
+ 	str	w21, [sp, #S_SYSCALLNO]
  	.endif
  
- 	/*
-@@ -290,8 +290,9 @@ alternative_else_nop_endif
-  *
-  * x7 is reserved for the system call number in 32-bit mode.
-  */
--sc_nr	.req	x25		// number of system calls
--scno	.req	x26		// syscall number
-+wsc_nr	.req	w25		// number of system calls
-+wscno	.req	w26		// syscall number
-+xscno	.req	x26		// syscall number (zero-extended)
- stbl	.req	x27		// syscall table pointer
- tsk	.req	x28		// current thread_info
- 
-@@ -577,8 +578,8 @@ el0_svc_compat:
- 	 * AArch32 syscall handling
- 	 */
- 	adrp	stbl, compat_sys_call_table	// load compat syscall table pointer
--	uxtw	scno, w7			// syscall number in w7 (r7)
--	mov     sc_nr, #__NR_compat_syscalls
-+	mov	wscno, w7			// syscall number in w7 (r7)
-+	mov     wsc_nr, #__NR_compat_syscalls
- 	b	el0_svc_naked
- 
- 	.align	6
-@@ -798,19 +799,19 @@ ENDPROC(ret_from_fork)
- 	.align	6
- el0_svc:
- 	adrp	stbl, sys_call_table		// load syscall table pointer
--	uxtw	scno, w8			// syscall number in w8
--	mov	sc_nr, #__NR_syscalls
-+	mov	wscno, w8			// syscall number in w8
-+	mov	wsc_nr, #__NR_syscalls
- el0_svc_naked:					// compat entry point
--	stp	x0, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
-+	stp	x0, xscno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
- 	enable_dbg_and_irq
- 	ct_user_exit 1
- 
- 	ldr	x16, [tsk, #TSK_TI_FLAGS]	// check for syscall hooks
- 	tst	x16, #_TIF_SYSCALL_WORK
- 	b.ne	__sys_trace
--	cmp     scno, sc_nr                     // check upper syscall limit
-+	cmp     wscno, wsc_nr			// check upper syscall limit
- 	b.hs	ni_sys
--	ldr	x16, [stbl, scno, lsl #3]	// address in the syscall table
-+	ldr	x16, [stbl, xscno, lsl #3]	// address in the syscall table
- 	blr	x16				// call sys_* routine
- 	b	ret_fast_syscall
- ni_sys:
-@@ -824,24 +825,23 @@ ENDPROC(el0_svc)
+@@ -825,13 +823,13 @@ ENDPROC(el0_svc)
  	 * switches, and waiting for our parent to respond.
  	 */
  __sys_trace:
--	mov	w0, #-1				// set default errno for
--	cmp     scno, x0			// user-issued syscall(-1)
-+	cmp     wscno, #-1			// user-issued syscall(-1)?
+-	cmp     wscno, #-1			// user-issued syscall(-1)?
++	cmp     wscno, #NO_SYSCALL		// user-issued syscall(-1)?
  	b.ne	1f
--	mov	x0, #-ENOSYS
-+	mov	x0, #-ENOSYS			// set default errno if so
+ 	mov	x0, #-ENOSYS			// set default errno if so
  	str	x0, [sp, #S_X0]
  1:	mov	x0, sp
  	bl	syscall_trace_enter
- 	cmp	w0, #-1				// skip the syscall?
+-	cmp	w0, #-1				// skip the syscall?
++	cmp	w0, #NO_SYSCALL			// skip the syscall?
  	b.eq	__sys_trace_return_skipped
--	uxtw	scno, w0			// syscall number (possibly new)
-+	mov	wscno, w0			// syscall number (possibly new)
+ 	mov	wscno, w0			// syscall number (possibly new)
  	mov	x1, sp				// pointer to regs
--	cmp	scno, sc_nr			// check upper syscall limit
-+	cmp	wscno, wsc_nr			// check upper syscall limit
- 	b.hs	__ni_sys_trace
- 	ldp	x0, x1, [sp]			// restore the syscall args
- 	ldp	x2, x3, [sp, #S_X2]
- 	ldp	x4, x5, [sp, #S_X4]
- 	ldp	x6, x7, [sp, #S_X6]
--	ldr	x16, [stbl, scno, lsl #3]	// address in the syscall table
-+	ldr	x16, [stbl, xscno, lsl #3]	// address in the syscall table
- 	blr	x16				// call sys_* routine
- 
- __sys_trace_return:
 diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 1b38c01..de77480 100644
+index de77480..28619b5 100644
 --- a/arch/arm64/kernel/ptrace.c
 +++ b/arch/arm64/kernel/ptrace.c
 @@ -1363,7 +1363,7 @@ static void tracehook_report_syscall(struct pt_regs *regs,
  	if (dir == PTRACE_SYSCALL_EXIT)
  		tracehook_report_syscall_exit(regs, 0);
  	else if (tracehook_report_syscall_entry(regs))
--		regs->syscallno = ~0UL;
-+		regs->syscallno = ~0;
+-		regs->syscallno = ~0;
++		forget_syscall(regs);
  
  	regs->regs[regno] = saved_reg;
  }
 diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 089c3747..4d04b89 100644
+index 4d04b89..4991e87 100644
 --- a/arch/arm64/kernel/signal.c
 +++ b/arch/arm64/kernel/signal.c
-@@ -387,7 +387,7 @@ static int restore_sigframe(struct pt_regs *regs,
+@@ -36,6 +36,7 @@
+ #include <asm/ucontext.h>
+ #include <asm/unistd.h>
+ #include <asm/fpsimd.h>
++#include <asm/ptrace.h>
+ #include <asm/signal32.h>
+ #include <asm/vdso.h>
+ 
+@@ -387,7 +388,7 @@ static int restore_sigframe(struct pt_regs *regs,
  	/*
  	 * Avoid sys_rt_sigreturn() restarting.
  	 */
--	regs->syscallno = ~0UL;
-+	regs->syscallno = ~0;
+-	regs->syscallno = ~0;
++	forget_syscall(regs);
  
  	err |= !valid_user_regs(&regs->user_regs, current);
  	if (err == 0)
-@@ -673,7 +673,7 @@ static void do_signal(struct pt_regs *regs)
+@@ -673,13 +674,12 @@ static void do_signal(struct pt_regs *regs)
  {
  	unsigned long continue_addr = 0, restart_addr = 0;
  	int retval = 0;
--	int syscall = (int)regs->syscallno;
-+	int syscall = regs->syscallno;
+-	int syscall = regs->syscallno;
  	struct ksignal ksig;
  
  	/*
+ 	 * If we were from a system call, check for system call restarting...
+ 	 */
+-	if (syscall >= 0) {
++	if (in_syscall(regs)) {
+ 		continue_addr = regs->pc;
+ 		restart_addr = continue_addr - (compat_thumb_mode(regs) ? 2 : 4);
+ 		retval = regs->regs[0];
 @@ -687,7 +687,7 @@ static void do_signal(struct pt_regs *regs)
  		/*
  		 * Avoid additional syscall restarting via ret_to_user.
  		 */
--		regs->syscallno = ~0UL;
-+		regs->syscallno = ~0;
+-		regs->syscallno = ~0;
++		forget_syscall(regs);
  
  		/*
  		 * Prepare for system call restart. We do this here so that a
+@@ -731,7 +731,7 @@ static void do_signal(struct pt_regs *regs)
+ 	 * Handle restarting a different system call. As above, if a debugger
+ 	 * has chosen to restart at a different PC, ignore the restart.
+ 	 */
+-	if (syscall >= 0 && regs->pc == restart_addr) {
++	if (in_syscall(regs) && regs->pc == restart_addr) {
+ 		if (retval == -ERESTART_RESTARTBLOCK)
+ 			setup_restart_syscall(regs);
+ 		user_rewind_single_step(current);
 diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index c747a0f..d98ca76 100644
+index d98ca76..4e5a664 100644
 --- a/arch/arm64/kernel/signal32.c
 +++ b/arch/arm64/kernel/signal32.c
 @@ -354,7 +354,7 @@ static int compat_restore_sigframe(struct pt_regs *regs,
  	/*
  	 * Avoid compat_sys_sigreturn() restarting.
  	 */
--	regs->syscallno = ~0UL;
-+	regs->syscallno = ~0;
+-	regs->syscallno = ~0;
++	forget_syscall(regs);
  
  	err |= !valid_user_regs(&regs->user_regs, current);
  
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index d48f470..c8ef6da 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -593,7 +593,7 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
- 
- 	if (show_unhandled_signals_ratelimited()) {
- 		pr_info("%s[%d]: syscall %d\n", current->comm,
--			task_pid_nr(current), (int)regs->syscallno);
-+			task_pid_nr(current), regs->syscallno);
- 		dump_instr("", regs);
- 		if (user_mode(regs))
- 			__show_regs(regs);
 -- 
 2.1.4
