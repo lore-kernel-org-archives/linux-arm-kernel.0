@@ -1,112 +1,250 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue,  1 Aug 2017 14:53:46 +0530
-Subject: [PATCH V3 5/8] drivers: boot_constraint: Add support for PM
- constraints
+Date: Tue,  1 Aug 2017 14:53:47 +0530
+Subject: [PATCH V3 6/8] drivers: boot_constraint: Add debugfs support
 In-Reply-To: <cover.1501578037.git.viresh.kumar@linaro.org>
 References: <cover.1501578037.git.viresh.kumar@linaro.org>
-Message-ID: <ce820ae6cce162c69cd3583a4a88cae0ad6e03ec.1501578037.git.viresh.kumar@linaro.org>
+Message-ID: <7a42cfb49a580a07c2045207fe7f1a3cb2096ce3.1501578037.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the PM constraint type.
+This patch adds debugfs support for boot constraints. This is how it
+looks for a "vmmc-supply" constraint for the MMC device.
 
-The constraint is set by attaching the power domain for the device,
-which will also enable the power domain. This guarantees that the power
-domain doesn't get shut down while being used.
+$ ls -R /sys/kernel/debug/boot_constraints/
+/sys/kernel/debug/boot_constraints/:
+f723d000.dwmmc0
 
-We don't need to detach the power domain to remove the constraint as the
-domain is attached only once, from here or before driver probe.
+/sys/kernel/debug/boot_constraints/f723d000.dwmmc0:
+clk-ciu  pm-domain  supply-vmmc  supply-vmmcaux
+
+/sys/kernel/debug/boot_constraints/f723d000.dwmmc0/clk-ciu:
+
+/sys/kernel/debug/boot_constraints/f723d000.dwmmc0/pm-domain:
+
+/sys/kernel/debug/boot_constraints/f723d000.dwmmc0/supply-vmmc:
+u_volt_max  u_volt_min
+
+/sys/kernel/debug/boot_constraints/f723d000.dwmmc0/supply-vmmcaux:
+u_volt_max  u_volt_min
 
 Tested-by: Rajendra Nayak <rnayak@codeaurora.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/base/boot_constraints/Makefile |  2 +-
- drivers/base/boot_constraints/core.c   |  4 ++++
- drivers/base/boot_constraints/core.h   |  3 +++
- drivers/base/boot_constraints/pm.c     | 24 ++++++++++++++++++++++++
- include/linux/boot_constraint.h        |  1 +
- 5 files changed, 33 insertions(+), 1 deletion(-)
- create mode 100644 drivers/base/boot_constraints/pm.c
+ drivers/base/boot_constraints/clk.c    |  4 ++
+ drivers/base/boot_constraints/core.c   | 72 ++++++++++++++++++++++++++++++++++
+ drivers/base/boot_constraints/core.h   |  6 +++
+ drivers/base/boot_constraints/pm.c     | 12 +++++-
+ drivers/base/boot_constraints/supply.c | 10 +++++
+ 5 files changed, 102 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/base/boot_constraints/Makefile b/drivers/base/boot_constraints/Makefile
-index 3424379fd1e4..b7ade1a7afb5 100644
---- a/drivers/base/boot_constraints/Makefile
-+++ b/drivers/base/boot_constraints/Makefile
-@@ -1,3 +1,3 @@
- # Makefile for device boot constraints
+diff --git a/drivers/base/boot_constraints/clk.c b/drivers/base/boot_constraints/clk.c
+index b5b1d63c3e76..bdbfcbc2944d 100644
+--- a/drivers/base/boot_constraints/clk.c
++++ b/drivers/base/boot_constraints/clk.c
+@@ -49,6 +49,9 @@ int constraint_clk_add(struct constraint *constraint, void *data)
+ 	cclk->clk_info.name = kstrdup_const(clk_info->name, GFP_KERNEL);
+ 	constraint->private = cclk;
  
--obj-y := clk.o core.o supply.o
-+obj-y := clk.o core.o pm.o supply.o
++	/* Debugfs */
++	constraint_add_debugfs(constraint, clk_info->name);
++
+ 	return 0;
+ 
+ put_clk:
+@@ -63,6 +66,7 @@ void constraint_clk_remove(struct constraint *constraint)
+ {
+ 	struct constraint_clk *cclk = constraint->private;
+ 
++	constraint_remove_debugfs(constraint);
+ 	kfree_const(cclk->clk_info.name);
+ 	clk_disable_unprepare(cclk->clk);
+ 	clk_put(cclk->clk);
 diff --git a/drivers/base/boot_constraints/core.c b/drivers/base/boot_constraints/core.c
-index 88568ed1bfad..06267f0c88d4 100644
+index 06267f0c88d4..c0e3a85ff85a 100644
 --- a/drivers/base/boot_constraints/core.c
 +++ b/drivers/base/boot_constraints/core.c
-@@ -109,6 +109,10 @@ static struct constraint *constraint_allocate(struct constraint_dev *cdev,
- 		add = constraint_clk_add;
- 		remove = constraint_clk_remove;
- 		break;
-+	case DEV_BOOT_CONSTRAINT_PM:
-+		add = constraint_pm_add;
-+		remove = constraint_pm_remove;
-+		break;
- 	case DEV_BOOT_CONSTRAINT_SUPPLY:
- 		add = constraint_supply_add;
- 		remove = constraint_supply_remove;
-diff --git a/drivers/base/boot_constraints/core.h b/drivers/base/boot_constraints/core.h
-index 4f28ac2ef691..a051c3d7c8ab 100644
---- a/drivers/base/boot_constraints/core.h
-+++ b/drivers/base/boot_constraints/core.h
-@@ -33,6 +33,9 @@ struct constraint {
- int constraint_clk_add(struct constraint *constraint, void *data);
- void constraint_clk_remove(struct constraint *constraint);
+@@ -35,6 +35,76 @@ static int __init constraints_disable(char *str)
+ }
+ early_param("boot_constraints_disable", constraints_disable);
  
-+int constraint_pm_add(struct constraint *constraint, void *data);
-+void constraint_pm_remove(struct constraint *constraint);
++/* Debugfs */
 +
- int constraint_supply_add(struct constraint *constraint, void *data);
- void constraint_supply_remove(struct constraint *constraint);
- 
-diff --git a/drivers/base/boot_constraints/pm.c b/drivers/base/boot_constraints/pm.c
-new file mode 100644
-index 000000000000..edba5eca5093
---- /dev/null
-+++ b/drivers/base/boot_constraints/pm.c
-@@ -0,0 +1,24 @@
-+/*
-+ * Copyright (C) 2017 Linaro.
-+ * Viresh Kumar <viresh.kumar@linaro.org>
-+ *
-+ * This file is released under the GPLv2.
-+ */
++static struct dentry *rootdir;
 +
-+#define pr_fmt(fmt) "PM Boot Constraints: " fmt
++static void constraint_device_add_debugfs(struct constraint_dev *cdev)
++{
++	struct device *dev = cdev->dev;
 +
-+#include <linux/pm_domain.h>
++	cdev->dentry = debugfs_create_dir(dev_name(dev), rootdir);
++	if (!cdev->dentry)
++		dev_err(dev, "Failed to create constraint dev debugfs dir\n");
++}
 +
-+#include "core.h"
++static void constraint_device_remove_debugfs(struct constraint_dev *cdev)
++{
++	debugfs_remove_recursive(cdev->dentry);
++}
 +
-+int constraint_pm_add(struct constraint *constraint, void *data)
++void constraint_add_debugfs(struct constraint *constraint, const char *suffix)
 +{
 +	struct device *dev = constraint->cdev->dev;
++	const char *prefix;
++	char name[NAME_MAX];
 +
-+	return dev_pm_domain_attach(dev, true);
++	switch (constraint->type) {
++	case DEV_BOOT_CONSTRAINT_CLK:
++		prefix = "clk";
++		break;
++	case DEV_BOOT_CONSTRAINT_PM:
++		prefix = "pm";
++		break;
++	case DEV_BOOT_CONSTRAINT_SUPPLY:
++		prefix = "supply";
++		break;
++	default:
++		dev_err(dev, "%s: Constraint type (%d) not supported\n",
++			__func__, constraint->type);
++		return;
++	}
++
++	snprintf(name, NAME_MAX, "%s-%s", prefix, suffix);
++
++	constraint->dentry = debugfs_create_dir(name, constraint->cdev->dentry);
++	if (!constraint->dentry)
++		dev_err(dev, "Failed to create constraint (%s) debugfs dir\n",
++			name);
 +}
 +
-+void constraint_pm_remove(struct constraint *constraint)
++void constraint_remove_debugfs(struct constraint *constraint)
 +{
-+	/* Nothing to do for now */
++	debugfs_remove_recursive(constraint->dentry);
 +}
-diff --git a/include/linux/boot_constraint.h b/include/linux/boot_constraint.h
-index a2696002e6e1..edc9abe7913a 100644
---- a/include/linux/boot_constraint.h
-+++ b/include/linux/boot_constraint.h
-@@ -16,6 +16,7 @@ struct device;
++
++static int __init constraint_debugfs_init(void)
++{
++	if (boot_constraints_disabled)
++		return -ENODEV;
++
++	/* Create /sys/kernel/debug/opp directory */
++	rootdir = debugfs_create_dir("boot_constraints", NULL);
++	if (!rootdir) {
++		pr_err("Failed to create root directory\n");
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++core_initcall(constraint_debugfs_init);
++
++
+ /* Boot constraints core */
  
- enum dev_boot_constraint_type {
- 	DEV_BOOT_CONSTRAINT_CLK,
-+	DEV_BOOT_CONSTRAINT_PM,
- 	DEV_BOOT_CONSTRAINT_SUPPLY,
+ static struct constraint_dev *constraint_device_find(struct device *dev)
+@@ -62,12 +132,14 @@ static struct constraint_dev *constraint_device_allocate(struct device *dev)
+ 	INIT_LIST_HEAD(&cdev->constraints);
+ 
+ 	list_add(&cdev->node, &constraint_devices);
++	constraint_device_add_debugfs(cdev);
+ 
+ 	return cdev;
+ }
+ 
+ static void constraint_device_free(struct constraint_dev *cdev)
+ {
++	constraint_device_remove_debugfs(cdev);
+ 	list_del(&cdev->node);
+ 	kfree(cdev);
+ }
+diff --git a/drivers/base/boot_constraints/core.h b/drivers/base/boot_constraints/core.h
+index a051c3d7c8ab..ee84e237c66a 100644
+--- a/drivers/base/boot_constraints/core.h
++++ b/drivers/base/boot_constraints/core.h
+@@ -8,6 +8,7 @@
+ #define _CORE_H
+ 
+ #include <linux/boot_constraint.h>
++#include <linux/debugfs.h>
+ #include <linux/device.h>
+ #include <linux/list.h>
+ 
+@@ -15,6 +16,7 @@ struct constraint_dev {
+ 	struct device *dev;
+ 	struct list_head node;
+ 	struct list_head constraints;
++	struct dentry *dentry;
  };
  
+ struct constraint {
+@@ -23,12 +25,16 @@ struct constraint {
+ 	enum dev_boot_constraint_type type;
+ 	void (*free_resources)(void *data);
+ 	void *free_resources_data;
++	struct dentry *dentry;
+ 
+ 	int (*add)(struct constraint *constraint, void *data);
+ 	void (*remove)(struct constraint *constraint);
+ 	void *private;
+ };
+ 
++void constraint_add_debugfs(struct constraint *constraint, const char *suffix);
++void constraint_remove_debugfs(struct constraint *constraint);
++
+ /* Forward declarations of constraint specific callbacks */
+ int constraint_clk_add(struct constraint *constraint, void *data);
+ void constraint_clk_remove(struct constraint *constraint);
+diff --git a/drivers/base/boot_constraints/pm.c b/drivers/base/boot_constraints/pm.c
+index edba5eca5093..95910d0dc457 100644
+--- a/drivers/base/boot_constraints/pm.c
++++ b/drivers/base/boot_constraints/pm.c
+@@ -14,11 +14,19 @@
+ int constraint_pm_add(struct constraint *constraint, void *data)
+ {
+ 	struct device *dev = constraint->cdev->dev;
++	int ret;
+ 
+-	return dev_pm_domain_attach(dev, true);
++	ret = dev_pm_domain_attach(dev, true);
++	if (ret)
++		return ret;
++
++	/* Debugfs */
++	constraint_add_debugfs(constraint, "domain");
++
++	return 0;
+ }
+ 
+ void constraint_pm_remove(struct constraint *constraint)
+ {
+-	/* Nothing to do for now */
++	constraint_remove_debugfs(constraint);
+ }
+diff --git a/drivers/base/boot_constraints/supply.c b/drivers/base/boot_constraints/supply.c
+index 30f816dbf12c..b206f500b2bc 100644
+--- a/drivers/base/boot_constraints/supply.c
++++ b/drivers/base/boot_constraints/supply.c
+@@ -60,6 +60,15 @@ int constraint_supply_add(struct constraint *constraint, void *data)
+ 	csupply->supply.name = kstrdup_const(supply->name, GFP_KERNEL);
+ 	constraint->private = csupply;
+ 
++	/* Debugfs */
++	constraint_add_debugfs(constraint, supply->name);
++
++	debugfs_create_u32("u_volt_min", 0444, constraint->dentry,
++			   &csupply->supply.u_volt_min);
++
++	debugfs_create_u32("u_volt_max", 0444, constraint->dentry,
++			   &csupply->supply.u_volt_max);
++
+ 	return 0;
+ 
+ remove_voltage:
+@@ -80,6 +89,7 @@ void constraint_supply_remove(struct constraint *constraint)
+ 	struct device *dev = constraint->cdev->dev;
+ 	int ret;
+ 
++	constraint_remove_debugfs(constraint);
+ 	kfree_const(supply->name);
+ 
+ 	ret = regulator_disable(csupply->reg);
 -- 
 2.13.0.71.gd7076ec9c9cb
