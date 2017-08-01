@@ -1,72 +1,111 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 1 Aug 2017 17:15:39 +0100
-Subject: [RFC PATCH v2 11/19] genirq: Document vcpu_info usage for per-CPU
- interrupts
-In-Reply-To: <20170717142718.13853-12-cdall@linaro.org>
-References: <20170717142718.13853-1-cdall@linaro.org>
- <20170717142718.13853-12-cdall@linaro.org>
-Message-ID: <7a872305-40fb-bc76-4ac0-8ebe8b5ce7c1@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 1 Aug 2017 10:17:56 -0600
+Subject: [PATCH v1] perf: cs-etm: Fix ETMv4 CONFIGR entry in perf.data file
+In-Reply-To: <CANLsYkx0AW0R21m04rE987bDtYmsd=r_w2ipWyPLs=StENhEiw@mail.gmail.com>
+References: <1499878883-3066-1-git-send-email-mike.leach@linaro.org>
+ <CANLsYkxDLVONpuQpF6Zo-gUPf+WVt2v+DLNduq0mDMk0XAZ5hw@mail.gmail.com>
+ <20170721161916.GH4134@kernel.org> <20170721183533.GP4134@kernel.org>
+ <20170721183740.GQ4134@kernel.org> <20170721191103.GR4134@kernel.org>
+ <CANLsYkx0AW0R21m04rE987bDtYmsd=r_w2ipWyPLs=StENhEiw@mail.gmail.com>
+Message-ID: <CANLsYkzTyjmVYA+mYCp-6P9WjCMjEH4gcm_Ua2gKN04bWTz2CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/17 15:27, Christoffer Dall wrote:
-> It is currently unclear how to set the VCPU affinity for an interrupt
-> which is of the per-CPU kind, since the Linux irq_data structure
+On 24 July 2017 at 13:37, Mathieu Poirier <mathieu.poirier@linaro.org> wrote:
+> On 21 July 2017 at 13:11, Arnaldo Carvalho de Melo <acme@kernel.org> wrote:
+>> Em Fri, Jul 21, 2017 at 03:37:40PM -0300, Arnaldo Carvalho de Melo escreveu:
+>>> Em Fri, Jul 21, 2017 at 03:35:33PM -0300, Arnaldo Carvalho de Melo escreveu:
+>>> > Em Fri, Jul 21, 2017 at 01:19:16PM -0300, Arnaldo Carvalho de Melo escreveu:
+>>> > > Em Fri, Jul 21, 2017 at 08:50:09AM -0600, Mathieu Poirier escreveu:
+>>> > > > On 12 July 2017 at 11:01, Mike Leach <mike.leach@linaro.org> wrote:
+>>> > > > > The value passed into the perf.data file for the CONFIGR register in ETMv4
+>>> > > > > was incorrectly being set to the command line options/ETMv3 value.
+>>> > > > >
+>>> > > > >                 info->priv[*offset + CS_ETMV4_TRCTRACEIDR] =
+>>> > > > >                                                 coresight_get_trace_id(cpu);
+>>> > > >
+>>> > > > I have tested this patch on my side and things work as advertised now.
+>>> > > >
+>>> > > > Arnaldo, if you want to pick this up through your tree then:
+>>> > > >
+>>> > > > Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> > > >
+>>> > > > Otherwise I'll get this, whatever you prefer.
+>>> > >
+>>> > > I'll get it, thanks for the ping,
+>>> >
+>>> > It is breaking the build in one of my containers, one with fedora 24 and
+>>> > a android toolchain from http://dl.google.com/android/repository/android-ndk-r12b-linux-x86_64.zip
+>>> >
+>>> > arch/arm/util/cs-etm.c: In function 'cs_etmv4_get_config':^M
+>>> > arch/arm/util/cs-etm.c:289:24: error: 'ETM_OPT_RETSTK' undeclared (first use in this function)^M
+>>> >   if (config_opts & BIT(ETM_OPT_RETSTK))
+>>> >
+>>> > It builds as
+>>> >
+>>> > NDK=/opt/android-ndk-r12b/
+>>> > NDK_TOOLCHAIN=${NDK}/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/arm-linux-androideabi-
+>>> > NDK_SYSROOT=${NDK}/platforms/android-24/arch-arm
+>>> > make -C /git/linux/tools/perf O=/tmp/build/perf WERROR=0 CFLAGS=${CFLAGS} ARCH=arm CROSS_COMPILE=${NDK_TOOLCHAIN} EXTRA_CFLAGS="-pie --sysroot=${NDK_SYSROOT}"
+>>> > Ideas?
+>>>
+>>> Ok, it also fails on:
+>>>
+>>>   14 debian:experimental-x-arm64: FAIL
+>>
+>> Ok, we need a definition for ETM_OPT_RETSTK, just like we have for the
+>> other two...
+>>
+>> Nuked it from my perf/core branch, please resubmit.
+>
+> Symbol ETM_OPT_RETSTK was added as part of another patch [1] that is
+> already in my CoreSight tree.  Do you mind if we make this one go
+> through my tree then?
 
-very minor nit (which I should have noticed before, my bad): we have two
-kinds of per-CPU interrupts in the kernel. percpu, and percpu_devid. For
-the percpu variety, the IRQ number represents a single interrupt line,
-delivered to a given CPU (and non migrate-able). The percpu_devid
-variant represents multiple interrupts, each assigned to one CPU.
+I haven't heard back from this so I'll assume you want me to take the patch.
 
-It'd be nice if the commit message (and the comment below) reflected
-this distinction.
-
-> describes the state for multiple interrupts when the interrupt is a
-> per-CPU interrupt, one for each physical CPU on the system.  Since each
-> such interrupt can be associated with different VCPUs or none at all,
-> associating a single VCPU state with such an interrupt does not capture
-> the necessary semantics.
-> 
-> The implementers of irq_set_affinity are the Intel and AMD IOMMUs, and
-> the ARM GIC irqchip.  The Intel and AMD callers do not appear to use
-> per-CPU interrupts, and the ARM GIC implementation only checks the
-> pointer against NULL vs. non-NULL.
-> 
-> Therefore, simply update the function documentation to explain the
-> expected use in the context of per-CPU interrupts, allowing future
-> changes or additions to irqchip implementers to do the right thing.
-> 
-> This allows us to set the VCPU affinity for the virtual timer interrupt
-> in KVM/ARM, which is a per-CPU (PPI) interrupt.
-> 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> ---
->  kernel/irq/manage.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-> index 5624b2d..050b9f6 100644
-> --- a/kernel/irq/manage.c
-> +++ b/kernel/irq/manage.c
-> @@ -381,7 +381,8 @@ int irq_select_affinity_usr(unsigned int irq)
->  /**
->   *	irq_set_vcpu_affinity - Set vcpu affinity for the interrupt
->   *	@irq: interrupt number to set affinity
-> - *	@vcpu_info: vCPU specific data
-> + *	@vcpu_info: vCPU specific data or pointer to a percpu array of vCPU
-> + *	            specific data for per-CPU interrupts
->   *
->   *	This function uses the vCPU specific data to set the vCPU
->   *	affinity for an irq. The vCPU specific data is passed from
-> 
-
-Otherwise a worthy clarification of the feature.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> Thanks,
+> Mathieu
+>
+> [1]. https://www.spinics.net/lists/arm-kernel/msg593008.html
+>
+>> - Arnaldo
+>>
+>>>
+>>> Same problem:
+>>>
+>>>   CC       /tmp/build/perf/arch/arm64/util/../../arm/util/cs-etm.o
+>>>   CC       /tmp/build/perf/util/config.o
+>>> arch/arm64/util/../../arm/util/cs-etm.c: In function 'cs_etmv4_get_config':
+>>> arch/arm64/util/../../arm/util/cs-etm.c:289:24: error: 'ETM_OPT_RETSTK' undeclared (first use in this function)
+>>>   if (config_opts & BIT(ETM_OPT_RETSTK))
+>>>                         ^
+>>> arch/arm64/util/../../arm/util/cs-etm.c:270:25: note: in definition of macro 'BIT'
+>>>  #define BIT(N) (1UL << (N))
+>>>                          ^
+>>> arch/arm64/util/../../arm/util/cs-etm.c:289:24: note: each undeclared identifier is reported only once for each function it appears in
+>>>   if (config_opts & BIT(ETM_OPT_RETSTK))
+>>>                         ^
+>>> arch/arm64/util/../../arm/util/cs-etm.c:270:25: note: in definition of macro 'BIT'
+>>>  #define BIT(N) (1UL << (N))
+>>>                          ^
+>>> mv: cannot stat '/tmp/build/perf/arch/arm64/util/../../arm/util/.cs-etm.o.tmp': No such file or directory
+>>> /git/linux/tools/build/Makefile.build:101: recipe for target '/tmp/build/perf/arch/arm64/util/../../arm/util/cs-etm.o' failed
+>>> make[6]: *** [/tmp/build/perf/arch/arm64/util/../../arm/util/cs-etm.o] Error 1
+>>> /git/linux/tools/build/Makefile.build:144: recipe for target 'util' failed
+>>> make[5]: *** [util] Error 2
+>>> /git/linux/tools/build/Makefile.build:144: recipe for target 'arm64' failed
+>>> make[4]: *** [arm64] Error 2
+>>> /git/linux/tools/build/Makefile.build:144: recipe for target 'arch' failed
+>>> make[3]: *** [arch] Error 2
+>>> make[3]: *** Waiting for unfinished jobs....
+>>>   CC       /tmp/build/perf/util/ctype.o
+>>>
+>>> Builds with:
+>>>
+>>> ARCH=arm64
+>>> TARGET=aarch64-linux-gnu
+>>> make ARCH=${ARCH} CROSS_COMPILE=${TARGET}- -C /git/linux/tools/perf O=/tmp/build/perf
+>>>
+>>> - Arnaldo
