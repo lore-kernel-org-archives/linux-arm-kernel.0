@@ -1,56 +1,26 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 1 Aug 2017 17:14:22 +0900
-Subject: [PATCH v3 0/5] ARM64: disable irq between breakpoint and step
- exception
-In-Reply-To: <cover.1501496603.git.panand@redhat.com>
-References: <cover.1501496603.git.panand@redhat.com>
-Message-ID: <20170801081420.GB7745@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 1 Aug 2017 10:15:42 +0200
+Subject: [PATCH 4/6] pinctrl: uniphier: omit redundant input enable bit
+ information
+In-Reply-To: <1501482071-9819-5-git-send-email-yamada.masahiro@socionext.com>
+References: <1501482071-9819-1-git-send-email-yamada.masahiro@socionext.com>
+ <1501482071-9819-5-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdYpLYcKCbvpMQ34iLsdjroGKy=UvFqG3nqQk5VyA8CB0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pratyush,
+On Mon, Jul 31, 2017 at 8:21 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-On Mon, Jul 31, 2017 at 04:10:28PM +0530, Pratyush Anand wrote:
-> v2 -> v3
-> - Moved step_needed from uapi structure to kernel only structure
-> - Re-enable interrupt if stepped instruction faults
-> - Modified register_wide_hw_breakpoint() to accept step_needed arg
-> v2 was here: http://marc.info/?l=linux-arm-kernel&m=149942910730496&w=2
-> 
-> v1 -> v2:
-> - patch 1 of v1 has been modified to patch 1-3 of v2.
-> - Introduced a new event attribute step_needed and implemented
->   hw_breakpoint_needs_single_step() (patch 1)
-> - Replaced usage of is_default_overflow_handler() with
->   hw_breakpoint_needs_single_step(). (patch 2)
-> - Modified sample test to set set step_needed bit field (patch 3)
-> v1 was here: http://marc.info/?l=linux-arm-kernel&m=149910958418708&w=2
-> 
-> samples/hw_breakpoint/data_breakpoint.c passes with x86_64 but fails with
-> ARM64. Even though it has been NAKed previously on upstream [1, 2], I have
-> tried to come up with patches which can resolve it for ARM64 as well.
-> 
-> I noticed that even perf step exception can go into an infinite loop if CPU
-> receives an interrupt while executing breakpoint/watchpoint handler. So,
-> event though we are not concerned about above test, we will have to find a
-> solution for the perf issue.
-> 
-> This patchset attempts to resolve both the issue. Please review.
-> Since, it also takes care of SW breakpoint, so I hope kgdb should also be
-> fine. However, I have not tested that.
-> @Takahiro: Will it be possible to test these patches for kgdb.
+> For LD11/20 SoCs (capable of per-pin input enable), the iectrl bit
+> number matches its pin number.  So, this is redundant information.
+> Instead, we just need a flag to know if the iectrl gating exists or not.
+>
+> With this refactoring, 5 bits in pin data will be saved.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-I have not yet understood the details of your patch, but
-I gave it a try and didn't see any difference around the behavior
-of kgdb's single stepping.
+Patch applied.
 
-I also gave a try to James' patch, but again nothing different
-as long as kgdb is concerned.
-(I'm tackling some issue in single stepping at irq's kernel_exit,
-in particular, 'eret'.)
-
--Takahiro AKASHI
-
-
-> [1] http://marc.info/?l=linux-arm-kernel&m=149580777524910&w=2
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/425266.html
+Yours,
+Linus Walleij
