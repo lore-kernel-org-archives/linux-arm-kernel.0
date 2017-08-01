@@ -1,37 +1,98 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  1 Aug 2017 09:02:57 +0100
-Subject: [PATCH v2 4/4] clocksource/arm_arch_timer: Use
- static_branch_enable_cpuslocked()
+Date: Tue,  1 Aug 2017 09:02:55 +0100
+Subject: [PATCH v2 2/4] jump_label: Split out code under the hotplug lock
 In-Reply-To: <20170801080257.5056-1-marc.zyngier@arm.com>
 References: <20170801080257.5056-1-marc.zyngier@arm.com>
-Message-ID: <20170801080257.5056-5-marc.zyngier@arm.com>
+Message-ID: <20170801080257.5056-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new static_branch_enable_cpuslocked function to switch
-the workaround static key on the CPU hotplug path.
+In order to later introduce an "already locked" version of some
+of the static key funcions, let's split the code into the core stuff
+(the *_cpuslocked functions) and the usual helpers, which now
+take/release the hotplug lock and call into the _cpuslocked
+versions.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ kernel/jump_label.c | 28 +++++++++++++++++++---------
+ 1 file changed, 19 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index aae87c4c546e..c62e71614c75 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -455,7 +455,11 @@ void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa
- 			per_cpu(timer_unstable_counter_workaround, i) = wa;
- 	}
+diff --git a/kernel/jump_label.c b/kernel/jump_label.c
+index f11b10091100..0ab8b35daa54 100644
+--- a/kernel/jump_label.c
++++ b/kernel/jump_label.c
+@@ -101,11 +101,10 @@ void static_key_disable(struct static_key *key)
+ }
+ EXPORT_SYMBOL_GPL(static_key_disable);
  
--	static_branch_enable(&arch_timer_read_ool_enabled);
-+	/*
-+	 * Use the locked version, as we're called from the CPU
-+	 * hotplug framework. Otherwise, we end-up in deadlock-land.
-+	 */
-+	static_branch_enable_cpuslocked(&arch_timer_read_ool_enabled);
+-void static_key_slow_inc(struct static_key *key)
++static void static_key_slow_inc_cpuslocked(struct static_key *key)
+ {
+ 	int v, v1;
+ 
+-	cpus_read_lock();
+ 	STATIC_KEY_CHECK_USE();
  
  	/*
- 	 * Don't use the vdso fastpath if errata require using the
+@@ -122,10 +121,8 @@ void static_key_slow_inc(struct static_key *key)
+ 	 */
+ 	for (v = atomic_read(&key->enabled); v > 0; v = v1) {
+ 		v1 = atomic_cmpxchg(&key->enabled, v, v + 1);
+-		if (likely(v1 == v)) {
+-			cpus_read_unlock();
++		if (likely(v1 == v))
+ 			return;
+-		}
+ 	}
+ 
+ 	jump_label_lock();
+@@ -137,14 +134,20 @@ void static_key_slow_inc(struct static_key *key)
+ 		atomic_inc(&key->enabled);
+ 	}
+ 	jump_label_unlock();
++}
++
++void static_key_slow_inc(struct static_key *key)
++{
++	cpus_read_lock();
++	static_key_slow_inc_cpuslocked(key);
+ 	cpus_read_unlock();
+ }
+ EXPORT_SYMBOL_GPL(static_key_slow_inc);
+ 
+-static void __static_key_slow_dec(struct static_key *key,
+-		unsigned long rate_limit, struct delayed_work *work)
++static void static_key_slow_dec_cpuslocked(struct static_key *key,
++					   unsigned long rate_limit,
++					   struct delayed_work *work)
+ {
+-	cpus_read_lock();
+ 	/*
+ 	 * The negative count check is valid even when a negative
+ 	 * key->enabled is in use by static_key_slow_inc(); a
+@@ -155,7 +158,6 @@ static void __static_key_slow_dec(struct static_key *key,
+ 	if (!atomic_dec_and_mutex_lock(&key->enabled, &jump_label_mutex)) {
+ 		WARN(atomic_read(&key->enabled) < 0,
+ 		     "jump label: negative count!\n");
+-		cpus_read_unlock();
+ 		return;
+ 	}
+ 
+@@ -166,6 +168,14 @@ static void __static_key_slow_dec(struct static_key *key,
+ 		jump_label_update(key);
+ 	}
+ 	jump_label_unlock();
++}
++
++static void __static_key_slow_dec(struct static_key *key,
++				  unsigned long rate_limit,
++				  struct delayed_work *work)
++{
++	cpus_read_lock();
++	static_key_slow_dec_cpuslocked(key, rate_limit, work);
+ 	cpus_read_unlock();
+ }
+ 
 -- 
 2.11.0
