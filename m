@@ -1,72 +1,49 @@
-From: david@lechnology.com (David Lechner)
-Date: Tue, 1 Aug 2017 11:51:23 -0500
-Subject: [PATCH 0/6] Support for LEGO MINDSTORMS EV3 LCD display
-In-Reply-To: <28188f5c-1daf-121b-6daf-1899668c3875@tronnes.org>
-References: <1501355870-13960-1-git-send-email-david@lechnology.com>
- <5d8f6518-8d7e-c029-2da4-e3417afb3e40@lechnology.com>
- <28188f5c-1daf-121b-6daf-1899668c3875@tronnes.org>
-Message-ID: <1ce36d43-b9dd-807e-23aa-bac4fda70fdc@lechnology.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 1 Aug 2017 11:55:41 -0500
+Subject: [PATCH v2 0/4] Add DT support for davinci remoteproc driver
+In-Reply-To: <20170801154844.24662-1-s-anna@ti.com>
+References: <20170801154844.24662-1-s-anna@ti.com>
+Message-ID: <d03c1786-fd13-7fc0-aad1-dfa91ba50914@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/30/2017 12:14 PM, Noralf Tr?nnes wrote:
+On 08/01/2017 10:48 AM, Suman Anna wrote:
+> Hi,
 > 
-> Den 29.07.2017 21.40, skrev David Lechner:
->> On 07/29/2017 02:17 PM, David Lechner wrote:
->>> The goal of this series is to get the built-in LCD of the LEGO 
->>> MINDSTORMS EV3
->>> working. But, most of the content here is building up the 
->>> infrastructure to do
->>> that.
->>>
->>
->> Some general comments/questions:
->>
->> I have noticed that DRM doesn't really have support for monochrome 
->> displays. I'm guessing that is because no one really uses them anymore?
->>
+> The following is v2 of the series [1] that adds the device tree support to
+> the Davinci remoteproc driver. Patches are baselined on 4.13-rc1, the
+> main dependent patches from the series "Davinci remoteproc cleanup/fixes"
+> [2] and the resource name additions [3] were merged and available in
+> mainline 4.13-rc1.
 > 
-> The repaper driver was the first monochrome drm driver and I chose to
-> present it to userspace as XRGB8888 and convert it to monochrome.
-> The reason for this is that everything, libraries, apps, plymouth (boot
-> splash, no rgb565) supports it. I didn't see any point in adding a new
-> monochrome drm format that didn't have, or probably wouldn't get
-> userspace support (by libraries at least). The application of course
-> needs to know this to get a good result.
+> DTS nodes for the OMAP-L138 LCDK board will be added for a subsequent merge
+> window once these patches are picked up.
 > 
-> tinydrm_xrgb8888_to_gray8() does the conversion:
-> https://cgit.freedesktop.org/drm/drm-misc/commit/drivers/gpu/drm/tinydrm?id=379ea9a1a59a5a32c8db6f164e80a3fd00cb3781 
+> Change summary for v2:
+>  - Patches 1 and 2 are unchanged
+>  - Binding in Patch 3 revised slightly to address Rob Herring's comments
+>  - Patch 4 updated to deal with non-OF builds since Davinci platforms still
+>    support non-DT boots.
 > 
+> regards
+> Suman
 > 
->> The LEGO EV3 display is just an LCD (not the backlit kind). It has two 
->> modes of operation. It can to 2bbp grayscale or it can do 1bpp 
->> monochrome. The grayscale isn't the best (looks splotchy in places), 
->> so it would be nice to be able to choose between these two modes. How 
->> would I implement something like that?
->>
-> 
-> Do you expect anyone to use grayscale if it doesn't look good?
-> Maybe better to add it later if there's a demand for it.
+> [1] http://marc.info/?l=linux-arm-kernel&m=149514538506046&w=2
 
-I don't expect many people to use it at all. The people that do will be 
-hackers like me that want to see what it is capable of, so I think I 
-will keep it grayscale by default.
+Oops, pasted the wrong link, correct link is
+http://marc.info/?l=linux-arm-kernel&m=149583015432586&w=2
 
+> [2] http://marc.info/?l=linux-arm-kernel&m=149514538506046&w=2
+> [3] http://marc.info/?l=linux-kernel&m=149497287512869&w=2
 > 
->> Also, how can I indicate to userspace that this display really is 
->> monochrome/grayscale since the reported color depth 16bpp?
->>
+> Suman Anna (4):
+>   remoteproc/davinci: Switch to platform_get_resource_byname()
+>   remoteproc/davinci: Add support to parse internal memories
+>   dt-bindings: remoteproc: Add bindings for Davinci DSP processors
+>   remoteproc/davinci: Add device tree support for OMAP-L138 DSP
 > 
-> There isn't unless we add formats for it.
-> Since this display is in a Lego piece, doesn't it have custom userspace
-> that already know it's monochrome?
-
-The official LEGO software is like this, yes. But I am working on a 
-project that supports other LEGO compatible devices that have color 
-screens, so the same software needs to be able to detect at runtime 
-which type of screen it is using. Currently I have a plain fbdev driver 
-that provides FB_VISUAL_MONO10 for the EV3 display and so the software 
-knows when it has a monochrome screen and when it doesn't. But since 
-plain fbdev drivers can't be accepted into mainline, I need to find a 
-different way to detect what type of screen this is so that my graphics 
-library can treat it differently.
+>  .../bindings/remoteproc/ti,davinci-rproc.txt       | 86 +++++++++++++++++++
+>  drivers/remoteproc/da8xx_remoteproc.c              | 98 ++++++++++++++++++++--
+>  2 files changed, 179 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/remoteproc/ti,davinci-rproc.txt
+> 
