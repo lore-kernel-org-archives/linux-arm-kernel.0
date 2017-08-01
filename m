@@ -1,41 +1,92 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  1 Aug 2017 09:02:53 +0100
-Subject: [PATCH v2 0/4] Working around CPU hotplug and static keys locking
-Message-ID: <20170801080257.5056-1-marc.zyngier@arm.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Tue,  1 Aug 2017 17:04:50 +0900
+Subject: [PATCH v6 1/2] dt-bindings: thermal: add binding documentation for
+ UniPhier thermal monitor
+In-Reply-To: <1501574691-8961-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1501574691-8961-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1501574691-8961-2-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since f2545b2d4ce1 ("jump_label: Reorder hotplug lock and
-jump_label_lock"), it has become impossible to switch a static key
-from a CPU hotplug notifier:
+Add devicetree binding documentation for thermal monitor implemented on
+Socionext UniPhier SoCs.
 
-- On the primary CPU, cpu_hotplug_lock is taken by
-  __cpuhp_setup_state(), and then again by static_key_slow_inc(). The
-  lock being taken as a reader, so it is OK so far.
+Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../bindings/thermal/uniphier-thermal.txt          | 64 ++++++++++++++++++++++
+ 1 file changed, 64 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/uniphier-thermal.txt
 
-- On a secondary CPU, _cpu_up takes the lock *as a writer* on the boot
-  CPU, and the secondary tries to switch the static key, taking the
-  lock as well (as a reader). In that case, we're toasted.
-
-I couldn't find an elegant solution to this, so this series works
-around the issue in the most disgusting way, adding a _nolock version
-of the static key API to be used in CPU hotplug situations.
-
-The last patch uses this API to work around the issue that Leo
-reported, where the static key flipped on a secondary CPU brings the
-box down in flames.
-
-Marc Zyngier (4):
-  jump_label: Move cpu hotplug locking
-  jump_label: Split out code under the hotplug lock
-  jump_label: Provide hotplug context variants
-  clocksource/arm_arch_timer: Use static_branch_enable_cpuslocked()
-
- Documentation/static-keys.txt        | 15 ++++++++++++
- drivers/clocksource/arm_arch_timer.c |  6 ++++-
- include/linux/jump_label.h           | 11 +++++++--
- kernel/jump_label.c                  | 44 +++++++++++++++++++++++++++++++-----
- 4 files changed, 67 insertions(+), 9 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/thermal/uniphier-thermal.txt b/Documentation/devicetree/bindings/thermal/uniphier-thermal.txt
+new file mode 100644
+index 0000000..686c0b4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/uniphier-thermal.txt
+@@ -0,0 +1,64 @@
++* UniPhier Thermal bindings
++
++This describes the devicetree bindings for thermal monitor supported by
++PVT(Process, Voltage and Temperature) monitoring unit implemented on Socionext
++UniPhier SoCs.
++
++Required properties:
++- compatible :
++  - "socionext,uniphier-pxs2-thermal" : For UniPhier PXs2 SoC
++  - "socionext,uniphier-ld20-thermal" : For UniPhier LD20 SoC
++- interrupts : IRQ for the temperature alarm
++- #thermal-sensor-cells : Should be 0. See ./thermal.txt for details.
++
++Optional properties:
++- socionext,tmod-calibration: A pair of calibrated values referred from PVT,
++                              in case that the values aren't set on SoC,
++                              like a reference board.
++
++Example:
++
++	sysctrl at 61840000 {
++		compatible = "socionext,uniphier-ld20-sysctrl",
++			     "simple-mfd", "syscon";
++		reg = <0x61840000 0x10000>;
++		...
++		pvtctl: pvtctl {
++			compatible = "socionext,uniphier-ld20-thermal";
++			interrupts = <0 3 1>;
++			#thermal-sensor-cells = <0>;
++		};
++		...
++	};
++
++	thermal-zones {
++		cpu_thermal {
++			polling-delay-passive = <250>;	/* 250ms */
++			polling-delay = <1000>;		/* 1000ms */
++			thermal-sensors = <&pvtctl>;
++
++			trips {
++				cpu_crit: cpu_crit {
++					temperature = <110000>;	/* 110C */
++					hysteresis = <2000>;
++					type = "critical";
++				};
++				cpu_alert: cpu_alert {
++					temperature = <100000>;	/* 100C */
++					hysteresis = <2000>;
++					type = "passive";
++				};
++			};
++
++			cooling-maps {
++				map0 {
++					trip = <&cpu_alert>;
++					cooling-device = <&cpu0 (-1) (-1)>;
++				};
++				map1 {
++					trip = <&cpu_alert>;
++					cooling-device = <&cpu2 (-1) (-1)>;
++				};
++			};
++		};
++	};
 -- 
-2.11.0
+2.7.4
