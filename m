@@ -1,37 +1,48 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Tue, 1 Aug 2017 18:06:10 +0800
-Subject: [PATCH v2 0/3] add support of SCPSYS power domain for MediaTek MT7622
-Message-ID: <cover.1501581552.git.sean.wang@mediatek.com>
+Date: Tue, 1 Aug 2017 18:06:11 +0800
+Subject: [PATCH v2 1/3] dt-bindings: soc: update the binding document for
+ SCPSYS on MediaTek MT7622 SoC
+In-Reply-To: <cover.1501581552.git.sean.wang@mediatek.com>
+References: <cover.1501581552.git.sean.wang@mediatek.com>
+Message-ID: <978aad669c09316ee6d18f84e2b5ac8b161aa12c.1501581552.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Changes since v1:
-- rebase to Linux v4.13-rc1
+Update the binding document for enabling SCPSYS on MediaTek MT7622 SoC.
 
-There are four power domains on MediaTek MT7622 SoC which are respectively
-ETHSYS for Ethernet including extra embedded switch, HIF0SYS for PCI-E and
-SATA, HIF1SYS for USB and WBSYS for WIFI and Bluetooth.
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+---
+ Documentation/devicetree/bindings/soc/mediatek/scpsys.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Those functions could be selectively powered gated when the corresponding
-function is no longer to use in order to reach more minimal power
-dissipation through the patch series introduced here.
-
-Chen Zhong (2):
-  soc: mediatek: add header files required for MT7622 SCPSYS dt-binding
-  soc: mediatek: add SCPSYS power domain driver for MediaTek MT7622 SoC
-
-Sean Wang (1):
-  dt-bindings: soc: update the binding document for SCPSYS on MediaTek
-    MT7622 SoC
-
- .../devicetree/bindings/soc/mediatek/scpsys.txt    |  3 +
- drivers/soc/mediatek/mtk-scpsys.c                  | 81 ++++++++++++++++++++++
- include/dt-bindings/power/mt7622-power.h           | 22 ++++++
- include/linux/soc/mediatek/infracfg.h              |  8 ++-
- 4 files changed, 113 insertions(+), 1 deletion(-)
- create mode 100644 include/dt-bindings/power/mt7622-power.h
-
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+index b1d165b..40056f7 100644
+--- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
++++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+@@ -12,11 +12,13 @@ power/power_domain.txt. It provides the power domains defined in
+ - include/dt-bindings/power/mt8173-power.h
+ - include/dt-bindings/power/mt6797-power.h
+ - include/dt-bindings/power/mt2701-power.h
++- include/dt-bindings/power/mt7622-power.h
+ 
+ Required properties:
+ - compatible: Should be one of:
+ 	- "mediatek,mt2701-scpsys"
+ 	- "mediatek,mt6797-scpsys"
++	- "mediatek,mt7622-scpsys"
+ 	- "mediatek,mt8173-scpsys"
+ - #power-domain-cells: Must be 1
+ - reg: Address range of the SCPSYS unit
+@@ -26,6 +28,7 @@ Required properties:
+                       enabled before enabling certain power domains.
+ 	Required clocks for MT2701: "mm", "mfg", "ethif"
+ 	Required clocks for MT6797: "mm", "mfg", "vdec"
++	Required clocks for MT7622: "hif_sel"
+ 	Required clocks for MT8173: "mm", "mfg", "venc", "venc_lt"
+ 
+ Optional properties:
 -- 
 2.7.4
