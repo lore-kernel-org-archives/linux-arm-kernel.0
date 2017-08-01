@@ -1,22 +1,56 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Tue,  1 Aug 2017 16:12:10 +0800
-Subject: [PATCH 0/3] add some quirks for Rockchip usb2-phy and add rv1108
- SoCs' support
-Message-ID: <1501575133-20953-1-git-send-email-frank.wang@rock-chips.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 1 Aug 2017 17:14:22 +0900
+Subject: [PATCH v3 0/5] ARM64: disable irq between breakpoint and step
+ exception
+In-Reply-To: <cover.1501496603.git.panand@redhat.com>
+References: <cover.1501496603.git.panand@redhat.com>
+Message-ID: <20170801081420.GB7745@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These series of patches add companion_grf_quirk and otg_mux_irq_quirk for
-rockchip usb2-phy. In addition, this change also add rv1108 usb2-phy support.
+Hi Pratyush,
 
-Frank Wang (3):
-  phy: rockchip-inno-usb2: add companion grf quirk
-  phy: rockchip-inno-usb2: add otg mux irq quirk
-  phy: rockchip-inno-usb2: add support of usb2-phy for rv1108 SoCs
+On Mon, Jul 31, 2017 at 04:10:28PM +0530, Pratyush Anand wrote:
+> v2 -> v3
+> - Moved step_needed from uapi structure to kernel only structure
+> - Re-enable interrupt if stepped instruction faults
+> - Modified register_wide_hw_breakpoint() to accept step_needed arg
+> v2 was here: http://marc.info/?l=linux-arm-kernel&m=149942910730496&w=2
+> 
+> v1 -> v2:
+> - patch 1 of v1 has been modified to patch 1-3 of v2.
+> - Introduced a new event attribute step_needed and implemented
+>   hw_breakpoint_needs_single_step() (patch 1)
+> - Replaced usage of is_default_overflow_handler() with
+>   hw_breakpoint_needs_single_step(). (patch 2)
+> - Modified sample test to set set step_needed bit field (patch 3)
+> v1 was here: http://marc.info/?l=linux-arm-kernel&m=149910958418708&w=2
+> 
+> samples/hw_breakpoint/data_breakpoint.c passes with x86_64 but fails with
+> ARM64. Even though it has been NAKed previously on upstream [1, 2], I have
+> tried to come up with patches which can resolve it for ARM64 as well.
+> 
+> I noticed that even perf step exception can go into an infinite loop if CPU
+> receives an interrupt while executing breakpoint/watchpoint handler. So,
+> event though we are not concerned about above test, we will have to find a
+> solution for the perf issue.
+> 
+> This patchset attempts to resolve both the issue. Please review.
+> Since, it also takes care of SW breakpoint, so I hope kgdb should also be
+> fine. However, I have not tested that.
+> @Takahiro: Will it be possible to test these patches for kgdb.
 
- .../bindings/phy/phy-rockchip-inno-usb2.txt        |  10 +
- drivers/phy/rockchip/phy-rockchip-inno-usb2.c      | 223 ++++++++++++++++-----
- 2 files changed, 182 insertions(+), 51 deletions(-)
+I have not yet understood the details of your patch, but
+I gave it a try and didn't see any difference around the behavior
+of kgdb's single stepping.
 
--- 
-2.0.0
+I also gave a try to James' patch, but again nothing different
+as long as kgdb is concerned.
+(I'm tackling some issue in single stepping at irq's kernel_exit,
+in particular, 'eret'.)
+
+-Takahiro AKASHI
+
+
+> [1] http://marc.info/?l=linux-arm-kernel&m=149580777524910&w=2
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/425266.html
