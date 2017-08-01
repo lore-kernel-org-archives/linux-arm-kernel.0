@@ -1,69 +1,64 @@
 From: jiaheng.fan@nxp.com (jiaheng.fan)
-Date: Tue, 1 Aug 2017 10:14:11 +0800
-Subject: [PATCH v1 6/6] arm64: dts: ls1043/ls1046: add qdma note to dtsi
+Date: Tue, 1 Aug 2017 10:14:08 +0800
+Subject: [PATCH v1 3/6] dma: fsl-qdma: workaround for ERR010812
 In-Reply-To: <1501553651-7203-1-git-send-email-jiaheng.fan@nxp.com>
 References: <1501553651-7203-1-git-send-email-jiaheng.fan@nxp.com>
-Message-ID: <1501553651-7203-7-git-send-email-jiaheng.fan@nxp.com>
+Message-ID: <1501553651-7203-4-git-send-email-jiaheng.fan@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ERR010812:
+Enqueue rejection occurs as a results of the lack of processing by the
+consumer of the command descriptors in the status queue. This may be due
+to the size of the status queue, i.e. too small, to account for the
+delay in reacting to an exceeded queue threshold or other means of
+determining a non-empty status queue. While increasing the status queue
+size may alleviate the occurrence of enqueue rejections, it is  not a
+complete solution. qDMA supports flow control (XOFF) flowing from the
+status queue to the command queue(s) producing traffic. This flow
+control is initiated when and enter XOFF watermark is triggered as
+defined by register SQCCMR. Setting this to the recommended value in the
+register description will guarantee that no enqueue rejections will ever
+occur.
+
 Signed-off-by: jiaheng.fan <jiaheng.fan@nxp.com>
 ---
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 15 +++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 15 +++++++++++++++
- 2 files changed, 30 insertions(+)
+ drivers/dma/fsl-qdma.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index 31fd77f..78c534c 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -652,6 +652,21 @@
- 			dma-coherent;
- 		};
+diff --git a/drivers/dma/fsl-qdma.c b/drivers/dma/fsl-qdma.c
+index 41bec13..7b9e09a 100644
+--- a/drivers/dma/fsl-qdma.c
++++ b/drivers/dma/fsl-qdma.c
+@@ -63,6 +63,7 @@
+ #define FSL_QDMA_CQDSCR2                0xa0c
+ #define FSL_QDMA_CQIER			0xa10
+ #define FSL_QDMA_CQEDR			0xa14
++#define FSL_QDMA_SQCCMR			0xa20
  
-+		qdma: qdma at 8380000 {
-+			compatible = "fsl,ls1043a-qdma";
-+			reg = <0x0 0x8380000 0x0 0x1000>, /* Controller regs */
-+			      <0x0 0x8390000 0x0 0x10000>, /* Status regs */
-+			      <0x0 0x83a0000 0x0 0x40000>; /* Block regs */
-+			interrupts = <0 152 0x4>,
-+				     <0 39 0x4>;
-+			interrupt-names = "qdma-error", "qdma-queue";
-+			channels = <8>;
-+			queues = <2>;
-+			status-sizes = <64>;
-+			queue-sizes = <64 64>;
-+			big-endian;
-+		};
-+
- 		msi1: msi-controller1 at 1571000 {
- 			compatible = "fsl,1s1043a-msi";
- 			reg = <0x0 0x1571000 0x0 0x8>;
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-index dc1640b..4419df8 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-@@ -595,6 +595,21 @@
- 				 <&clockgen 4 1>;
- 		};
+ #define FSL_QDMA_SQICR_ICEN
  
-+		qdma: qdma at 8380000 {
-+			compatible = "fsl,ls1046a-qdma";
-+			reg = <0x0 0x8380000 0x0 0x1000>, /* Controller regs */
-+			      <0x0 0x8390000 0x0 0x10000>, /* Status regs */
-+			      <0x0 0x83a0000 0x0 0x40000>; /* Block regs */
-+			interrupts = <0 153 0x4>,
-+				     <0 39 0x4>;
-+			interrupt-names = "qdma-error", "qdma-queue";
-+			channels = <8>;
-+			queues = <2>;
-+			status-sizes = <64>;
-+			queue-sizes = <64 64>;
-+			big-endian;
-+		};
-+
- 		usb0: usb at 2f00000 {
- 			compatible = "snps,dwc3";
- 			reg = <0x0 0x2f00000 0x0 0x10000>;
+@@ -76,6 +77,7 @@
+ #define FSL_QDMA_BSQICR_ICST(x)		((x) << 16)
+ #define FSL_QDMA_CQIER_MEIE		0x80000000
+ #define FSL_QDMA_CQIER_TEIE		0x1
++#define FSL_QDMA_SQCCMR_ENTER_WM	0x200000
+ 
+ #define FSL_QDMA_QUEUE_MAX		8
+ 
+@@ -842,6 +844,13 @@ static int fsl_qdma_reg_init(struct fsl_qdma_engine *fsl_qdma)
+ 	}
+ 
+ 	/*
++	 * Workaround for erratum: ERR010812.
++	 * We must enable XOFF to avoid the enqueue rejection occurs.
++	 * Setting SQCCMR ENTER_WM to 0x20.
++	 */
++	qdma_writel(fsl_qdma, FSL_QDMA_SQCCMR_ENTER_WM,
++			      block + FSL_QDMA_SQCCMR);
++	/*
+ 	 * Initialize status queue registers to point to the first
+ 	 * command descriptor in memory.
+ 	 * Dequeue Pointer Address Registers
 -- 
 2.7.4
