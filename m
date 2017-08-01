@@ -1,74 +1,57 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 1 Aug 2017 09:57:44 -0700
-Subject: [RFC PATCH v2 11/19] genirq: Document vcpu_info usage for
- per-CPU interrupts
-In-Reply-To: <7a872305-40fb-bc76-4ac0-8ebe8b5ce7c1@arm.com>
-References: <20170717142718.13853-1-cdall@linaro.org>
- <20170717142718.13853-12-cdall@linaro.org>
- <7a872305-40fb-bc76-4ac0-8ebe8b5ce7c1@arm.com>
-Message-ID: <20170801165744.GA4033@lvm>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 1 Aug 2017 18:00:15 +0100
+Subject: [PATCHv2 1/2] arm64:vdso: Rewrite gettimeofday into C.
+In-Reply-To: <20170801093011.GC18024@rric.localdomain>
+References: <1496190860-5116-1-git-send-email-apinski@cavium.com>
+ <20170531124430.GG9723@arm.com>
+ <20170801093011.GC18024@rric.localdomain>
+Message-ID: <20170801170015.GD12027@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 01, 2017 at 05:15:39PM +0100, Marc Zyngier wrote:
-> On 17/07/17 15:27, Christoffer Dall wrote:
-> > It is currently unclear how to set the VCPU affinity for an interrupt
-> > which is of the per-CPU kind, since the Linux irq_data structure
+On Tue, Aug 01, 2017 at 11:30:11AM +0200, Robert Richter wrote:
+> Will,
 > 
-> very minor nit (which I should have noticed before, my bad): we have two
-> kinds of per-CPU interrupts in the kernel. percpu, and percpu_devid. For
-> the percpu variety, the IRQ number represents a single interrupt line,
-> delivered to a given CPU (and non migrate-able). The percpu_devid
-> variant represents multiple interrupts, each assigned to one CPU.
+> On 31.05.17 13:44:30, Will Deacon wrote:
+> > Thanks for posting this, but please try to cc the maintainers in future -- I
+> > almost missed it!
+> > 
+> > On Tue, May 30, 2017 at 05:34:19PM -0700, Andrew Pinski wrote:
+> > > This allows the compiler to optimize the divide by 1000.
+> > > And remove the other divide.
+> > > 
+> > > On ThunderX, gettimeofday improves by 32%.  On ThunderX 2,
+> > > gettimeofday improves by 18%.
+> > > 
+> > > Note I noticed a bug in the old implementation of __kernel_clock_getres;
+> > > it was checking only the lower 32bits of the pointer; this would work
+> > > for most cases but could fail in a few.
+> > > 
+> > > Changes from v1:
+> > > * Fixed bug in __kernel_clock_getres for checking the pointer argument.
+> > > * Fix comments to refer to functions in arm64.
+> > 
+> > I tested this patch on a few platforms I have access to and didn't see the
+> > perf regressions I saw when I looked at this in the past with an older
+> > toolchain (it was mostly about the same, with a couple of improvements).
+> > 
+> > So, in principle, I'm not opposed to moving this into C. However, we're
+> > currently close to a "vDSO-explosion" on arm64 with people wanting a compat
+> > variant and also an ILP32 variant. When Kevin posted his compat variant
+> > (also in C):
+> > 
+> >   http://lkml.kernel.org/r/20161206160353.14581-1-kevin.brodsky at arm.com
 > 
-> It'd be nice if the commit message (and the comment below) reflected
-> this distinction.
-> 
-> > describes the state for multiple interrupts when the interrupt is a
-> > per-CPU interrupt, one for each physical CPU on the system.  Since each
-> > such interrupt can be associated with different VCPUs or none at all,
-> > associating a single VCPU state with such an interrupt does not capture
-> > the necessary semantics.
-> > 
-> > The implementers of irq_set_affinity are the Intel and AMD IOMMUs, and
-> > the ARM GIC irqchip.  The Intel and AMD callers do not appear to use
-> > per-CPU interrupts, and the ARM GIC implementation only checks the
-> > pointer against NULL vs. non-NULL.
-> > 
-> > Therefore, simply update the function documentation to explain the
-> > expected use in the context of per-CPU interrupts, allowing future
-> > changes or additions to irqchip implementers to do the right thing.
-> > 
-> > This allows us to set the VCPU affinity for the virtual timer interrupt
-> > in KVM/ARM, which is a per-CPU (PPI) interrupt.
-> > 
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > ---
-> >  kernel/irq/manage.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-> > index 5624b2d..050b9f6 100644
-> > --- a/kernel/irq/manage.c
-> > +++ b/kernel/irq/manage.c
-> > @@ -381,7 +381,8 @@ int irq_select_affinity_usr(unsigned int irq)
-> >  /**
-> >   *	irq_set_vcpu_affinity - Set vcpu affinity for the interrupt
-> >   *	@irq: interrupt number to set affinity
-> > - *	@vcpu_info: vCPU specific data
-> > + *	@vcpu_info: vCPU specific data or pointer to a percpu array of vCPU
-> > + *	            specific data for per-CPU interrupts
-> >   *
-> >   *	This function uses the vCPU specific data to set the vCPU
-> >   *	affinity for an irq. The vCPU specific data is passed from
-> > 
-> 
-> Otherwise a worthy clarification of the feature.
-> 
-Thanks, I'll try to clarify based on the info below.
+> from a technical pov there are no issues in a convertion to C. Since
+> this fixes bad syscall performance and an alternative solution as
+> pointed out here is not in sight very soon, would you be willing to
+> get this series upstream. Should we update to latest kernel and resend
+> the patches for v4.14?
 
-Linux IRQ abstractions; I know nothing.
+No, I'd much rather get this right straight off the bat whilst there's an
+incentive to do it properly. Otherwise we just end up maintaining something
+which nobody will realistically rework, despite their best intentions.
+"bad syscall performance" seems like a bit of an over-reaction if you look
+at the cost of the vDSO relative to an actual trap.
 
--Christoffer
+Will
