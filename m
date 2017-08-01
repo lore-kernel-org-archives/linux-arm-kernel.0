@@ -1,21 +1,77 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 1 Aug 2017 16:10:45 +0800
-Subject: [linux-sunxi] [PATCH v3 03/12] ASoC: sun4i-i2s: Add regmap config
- to quirks
-In-Reply-To: <20170729141753.20174-4-codekipper@gmail.com>
-References: <20170729141753.20174-1-codekipper@gmail.com>
- <20170729141753.20174-4-codekipper@gmail.com>
-Message-ID: <CAGb2v649V0fscBbmYLjQOhh2Uw3FHSo+Q694vz0jSg5_RBe=cw@mail.gmail.com>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Tue,  1 Aug 2017 16:11:43 +0800
+Subject: [PATCH v1.1] drm/rockchip: fix race with kms hotplug and fbdev
+In-Reply-To: <1501494601-7140-1-git-send-email-mark.yao@rock-chips.com>
+References: <1501494601-7140-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1501575103-20136-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 29, 2017 at 10:17 PM,  <codekipper@gmail.com> wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
->
-> The newer SoCs have a larger range than the original SoC that this
-> driver was developed for. By adding the regmap config to the quirks
-> then the driver can initialise the managed register map correctly.
->
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+According to the kerneldoc[0], should do fbdev setup before calling
+drm_kms_helper_poll_init(), otherwise, Kms hotplug event may race
+into fbdev helper initial, and fb_helper->dev may be NULL pointer,
+that would cause the bug:
+[    0.735411] [00000200] *pgd=00000000f6ffe003, *pud=00000000f6ffe003, *pmd=0000000000000000
+[    0.736156] Internal error: Oops: 96000005 [#1] PREEMPT SMP
+[    0.736648] Modules linked in:
+[    0.736930] CPU: 2 PID: 20 Comm: kworker/2:0 Not tainted 4.4.41 #20
+[    0.737480] Hardware name: Rockchip RK3399 Board rev2 (BOX) (DT)
+[    0.738020] Workqueue: events cdn_dp_pd_event_work
+[    0.738447] task: ffffffc0f21f3100 ti: ffffffc0f2218000 task.ti: ffffffc0f2218000
+[    0.739109] PC is at mutex_lock+0x14/0x44
+[    0.739469] LR is at drm_fb_helper_hotplug_event+0x30/0x114
+[    0.756253] [<ffffff8008a344f4>] mutex_lock+0x14/0x44
+[    0.756260] [<ffffff8008445708>] drm_fb_helper_hotplug_event+0x30/0x114
+[    0.756271] [<ffffff8008473c84>] rockchip_drm_output_poll_changed+0x18/0x20
+[    0.756280] [<ffffff8008439fcc>] drm_kms_helper_hotplug_event+0x28/0x34
+[    0.756286] [<ffffff800846c444>] cdn_dp_pd_event_work+0x394/0x3c4
+[    0.756295] [<ffffff80080b2b38>] process_one_work+0x218/0x3e0
+[    0.756302] [<ffffff80080b3538>] worker_thread+0x2e8/0x404
+[    0.756308] [<ffffff80080b7e70>] kthread+0xe8/0xf0
+[    0.756316] [<ffffff8008082690>] ret_from_fork+0x10/0x40
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+[0]: https://01.org/linuxgraphics/gfx-docs/drm/gpu/drm-kms-helpers.html
+
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+Changes in v1.1:
+- According to the kerneldoc, fix the race bug in generic way.
+
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index 848edcf..c41f48a 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -161,22 +161,21 @@ static int rockchip_drm_bind(struct device *dev)
+ 	 */
+ 	drm_dev->irq_enabled = true;
+ 
+-	/* init kms poll for handling hpd */
+-	drm_kms_helper_poll_init(drm_dev);
+-
+ 	ret = rockchip_drm_fbdev_init(drm_dev);
+ 	if (ret)
+-		goto err_kms_helper_poll_fini;
++		goto err_unbind_all;
++
++	/* init kms poll for handling hpd */
++	drm_kms_helper_poll_init(drm_dev);
+ 
+ 	ret = drm_dev_register(drm_dev, 0);
+ 	if (ret)
+-		goto err_fbdev_fini;
++		goto err_kms_helper_poll_fini;
+ 
+ 	return 0;
+-err_fbdev_fini:
+-	rockchip_drm_fbdev_fini(drm_dev);
+ err_kms_helper_poll_fini:
+ 	drm_kms_helper_poll_fini(drm_dev);
++	rockchip_drm_fbdev_fini(drm_dev);
+ err_unbind_all:
+ 	component_unbind_all(dev, drm_dev);
+ err_mode_config_cleanup:
+-- 
+1.9.1
