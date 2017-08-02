@@ -1,64 +1,229 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Thu, 3 Aug 2017 01:37:50 +0800
-Subject: [PATCH 0/2] serial: 8250: add support for MediaTek BTIF controller
-In-Reply-To: <1501694063.29303.361.camel@linux.intel.com>
-References: <cover.1501692369.git.sean.wang@mediatek.com>
- <1501694063.29303.361.camel@linux.intel.com>
-Message-ID: <1501695470.25246.7.camel@mtkswgap22>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 2 Aug 2017 10:38:04 -0700
+Subject: [PATCH v3 05/11] net: stmmac: dwmac-rk: Add internal phy support
+In-Reply-To: <1501654888-19514-1-git-send-email-david.wu@rock-chips.com>
+References: <1501654546-17292-1-git-send-email-david.wu@rock-chips.com>
+ <1501654888-19514-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <6b1ebf64-6903-6d35-b1fc-92ec47334425@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-08-02 at 20:14 +0300, Andy Shevchenko wrote:
-> On Thu, 2017-08-03 at 01:05 +0800, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > This patchset introduces the support for MediaTek BTIF controller.
-> > 
-> > MediaTek BTIF controller is the serial interface similar to UART but
-> > it
-> > works only as the digital device which is mainly used to communicate
-> > with
-> > the connectivity module also called CONNSYS inside the SoC which could
-> > be
-> > mostly found on those MediaTek SoCs with Bluetooth feature.
-> > 
-> > And the controller is made as being compatible with the 8250 register
-> > layout so it tends to be integrated with existing 8250 core driver and
-> > have no requirement for the modem configuration additionally such as
-> > the
-> > baud rate calculation and assignment.
+On 08/01/2017 11:21 PM, David Wu wrote:
+> To make internal phy work, need to configure the phy_clock,
+> phy cru_reset and related registers.
 > 
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> ---
+>  .../devicetree/bindings/net/rockchip-dwmac.txt     |  6 +-
+>  drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 81 ++++++++++++++++++++++
+>  2 files changed, 86 insertions(+), 1 deletion(-)
 > 
-> Why it requires a separate driver?
-> 
-> 8250_of is for DT enabled drivers.
+> diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+> index 8f42755..ec39b31 100644
+> --- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+> +++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+> @@ -25,7 +25,8 @@ Required properties:
+>   - clock-names: One name for each entry in the clocks property.
+>   - phy-mode: See ethernet.txt file in the same directory.
+>   - pinctrl-names: Names corresponding to the numbered pinctrl states.
+> - - pinctrl-0: pin-control mode. can be <&rgmii_pins> or <&rmii_pins>.
+> + - pinctrl-0: pin-control mode. can be <&rgmii_pins>, <&rmii_pins> or led pins
+> +   for internal phy mode.
+>   - clock_in_out: For RGMII, it must be "input", means main clock(125MHz)
+>     is not sourced from SoC's PLL, but input from PHY; For RMII, "input" means
+>     PHY provides the reference clock(50MHz), "output" means GMAC provides the
+> @@ -40,6 +41,9 @@ Optional properties:
+>   - tx_delay: Delay value for TXD timing. Range value is 0~0x7F, 0x30 as default.
+>   - rx_delay: Delay value for RXD timing. Range value is 0~0x7F, 0x10 as default.
+>   - phy-supply: phandle to a regulator if the PHY needs one
+> + - clocks: <&cru MAC_PHY>: Clock selector for internal macphy
+> + - phy-is-internal: A boolean property allows us to know that MAC will connect to
+> +   internal phy.
+
+This is incorrect in two ways:
+
+- this is a property of the PHY, so it should be documented as such in
+Documentation/devicetree/bindings/net/phy.txt so other bindings can
+re-use it
+
+- if it was specific to your MAC you would expect a vendor prefix to
+this property, which is not there
+
+An alternative way to implement the external/internal logic selection
+would be mandate that your Ethernet PHY node have a compatible string
+like this:
+
+phy at 0 {
+	compatible = "ethernet-phy-id1234.d400", "ethernet-phy-802.3-c22";
+};
+
+Then you don't need this phy-is-internal property, because you can
+locate the PHY node by the phy-handle (see more about that in a reply to
+patch 10) and you can determine ahead of time whether this PHY is
+internal or not based on its compatible string.
+
+Thank you
+
+>  
+>  Example:
+>  
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+> index a8e8fd5..7b80ab9 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+> @@ -41,6 +41,7 @@ struct rk_gmac_ops {
+>  	void (*set_to_rmii)(struct rk_priv_data *bsp_priv);
+>  	void (*set_rgmii_speed)(struct rk_priv_data *bsp_priv, int speed);
+>  	void (*set_rmii_speed)(struct rk_priv_data *bsp_priv, int speed);
+> +	void (*internal_phy_powerup)(struct rk_priv_data *bsp_priv);
+>  };
+>  
+>  struct rk_priv_data {
+> @@ -52,6 +53,7 @@ struct rk_priv_data {
+>  
+>  	bool clk_enabled;
+>  	bool clock_input;
+> +	bool internal_phy;
+>  
+>  	struct clk *clk_mac;
+>  	struct clk *gmac_clkin;
+> @@ -61,6 +63,9 @@ struct rk_priv_data {
+>  	struct clk *clk_mac_refout;
+>  	struct clk *aclk_mac;
+>  	struct clk *pclk_mac;
+> +	struct clk *clk_macphy;
+> +
+> +	struct reset_control *macphy_reset;
+>  
+>  	int tx_delay;
+>  	int rx_delay;
+> @@ -750,6 +755,50 @@ static void rk3399_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
+>  	.set_rmii_speed = rk3399_set_rmii_speed,
+>  };
+>  
+> +#define RK_GRF_MACPHY_CON0		0xb00
+> +#define RK_GRF_MACPHY_CON1		0xb04
+> +#define RK_GRF_MACPHY_CON2		0xb08
+> +#define RK_GRF_MACPHY_CON3		0xb0c
+> +
+> +#define RK_MACPHY_ENABLE		GRF_BIT(0)
+> +#define RK_MACPHY_DISABLE		GRF_CLR_BIT(0)
+> +#define RK_MACPHY_CFG_CLK_50M		GRF_BIT(14)
+> +#define RK_GMAC2PHY_RMII_MODE		(GRF_BIT(6) | GRF_CLR_BIT(7))
+> +#define RK_GRF_CON2_MACPHY_ID		HIWORD_UPDATE(0x1234, 0xffff, 0)
+> +#define RK_GRF_CON3_MACPHY_ID		HIWORD_UPDATE(0x35, 0x3f, 0)
+> +
+> +static void rk_gmac_internal_phy_powerup(struct rk_priv_data *priv)
+> +{
+> +	if (priv->ops->internal_phy_powerup)
+> +		priv->ops->internal_phy_powerup(priv);
+> +
+> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_MACPHY_CFG_CLK_50M);
+> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_GMAC2PHY_RMII_MODE);
+> +
+> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON2, RK_GRF_CON2_MACPHY_ID);
+> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON3, RK_GRF_CON3_MACPHY_ID);
+> +
+> +	if (priv->macphy_reset) {
+> +		/* macphy needs to be disabled before trying to reset it */
+> +		regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_MACPHY_DISABLE);
+> +		if (priv->macphy_reset)
+> +			reset_control_assert(priv->macphy_reset);
+> +		usleep_range(10, 20);
+> +		if (priv->macphy_reset)
+> +			reset_control_deassert(priv->macphy_reset);
+> +		usleep_range(10, 20);
+> +		regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_MACPHY_ENABLE);
+> +		msleep(30);
+> +	}
+> +}
+> +
+> +static void rk_gmac_internal_phy_powerdown(struct rk_priv_data *priv)
+> +{
+> +	regmap_write(priv->grf, RK_GRF_MACPHY_CON0, RK_MACPHY_DISABLE);
+> +	if (priv->macphy_reset)
+> +		reset_control_assert(priv->macphy_reset);
+> +}
+> +
+>  static int gmac_clk_init(struct rk_priv_data *bsp_priv)
+>  {
+>  	struct device *dev = &bsp_priv->pdev->dev;
+> @@ -803,6 +852,14 @@ static int gmac_clk_init(struct rk_priv_data *bsp_priv)
+>  			clk_set_rate(bsp_priv->clk_mac, 50000000);
+>  	}
+>  
+> +	if (bsp_priv->internal_phy) {
+> +		bsp_priv->clk_macphy = devm_clk_get(dev, "clk_macphy");
+> +		if (IS_ERR(bsp_priv->clk_macphy))
+> +			dev_err(dev, "cannot get %s clock\n", "clk_macphy");
+> +		else
+> +			clk_set_rate(bsp_priv->clk_macphy, 50000000);
+> +	}
+> +
+>  	return 0;
+>  }
+>  
+> @@ -826,6 +883,9 @@ static int gmac_clk_enable(struct rk_priv_data *bsp_priv, bool enable)
+>  						bsp_priv->clk_mac_refout);
+>  			}
+>  
+> +			if (!IS_ERR(bsp_priv->clk_macphy))
+> +				clk_prepare_enable(bsp_priv->clk_macphy);
+> +
+>  			if (!IS_ERR(bsp_priv->aclk_mac))
+>  				clk_prepare_enable(bsp_priv->aclk_mac);
+>  
+> @@ -858,6 +918,9 @@ static int gmac_clk_enable(struct rk_priv_data *bsp_priv, bool enable)
+>  						bsp_priv->clk_mac_refout);
+>  			}
+>  
+> +			if (!IS_ERR(bsp_priv->clk_macphy))
+> +				clk_disable_unprepare(bsp_priv->clk_macphy);
+> +
+>  			if (!IS_ERR(bsp_priv->aclk_mac))
+>  				clk_disable_unprepare(bsp_priv->aclk_mac);
+>  
+> @@ -940,6 +1003,18 @@ static struct rk_priv_data *rk_gmac_setup(struct platform_device *pdev,
+>  			bsp_priv->clock_input = false;
+>  	}
+>  
+> +	bsp_priv->internal_phy = device_property_read_bool(dev,
+> +							   "phy-is-internal");
+> +	if (bsp_priv->internal_phy) {
+> +		bsp_priv->macphy_reset = devm_reset_control_get(dev, "mac-phy");
+> +		if (IS_ERR(bsp_priv->macphy_reset)) {
+> +			dev_info(dev, "no macphy_reset control found\n");
+> +			bsp_priv->macphy_reset = NULL;
+> +		}
+> +	}
+> +	dev_info(dev, "internal PHY? (%s).\n",
+> +		 bsp_priv->internal_phy ? "yes" : "no");
+> +
+>  	ret = of_property_read_u32(dev->of_node, "tx_delay", &value);
+>  	if (ret) {
+>  		bsp_priv->tx_delay = 0x30;
+> @@ -1014,6 +1089,9 @@ static int rk_gmac_powerup(struct rk_priv_data *bsp_priv)
+>  	pm_runtime_enable(dev);
+>  	pm_runtime_get_sync(dev);
+>  
+> +	if (bsp_priv->internal_phy)
+> +		rk_gmac_internal_phy_powerup(bsp_priv);
+> +
+>  	return 0;
+>  }
+>  
+> @@ -1021,6 +1099,9 @@ static void rk_gmac_powerdown(struct rk_priv_data *gmac)
+>  {
+>  	struct device *dev = &gmac->pdev->dev;
+>  
+> +	if (gmac->internal_phy)
+> +		rk_gmac_internal_phy_powerdown(gmac);
+> +
+>  	pm_runtime_put_sync(dev);
+>  	pm_runtime_disable(dev);
+>  
 > 
 
-Hi, Andy
 
-thanks for your information
-
-the hardware is not completely identical to 8250 device, 
-it has extra registers belonged to platform control such as internal
-loopback, dma disable/enable, sleep/wakeup setup and so on, so I create
-it as a separate driver.
-
-	Sean
-
-> > 
-> > Sean Wang (2):
-> >   dt-bindings: serial: Add MediaTek BTIF controller bindings
-> >   tty: serial: 8250: Add MediaTek BTIF controller on MT7622 and MT7623
-> >     SoC
-> > 
-> >  .../devicetree/bindings/serial/mtk-btif.txt        |  26 +++
-> >  drivers/tty/serial/8250/8250_btif.c                | 224
-> > +++++++++++++++++++++
-> >  drivers/tty/serial/8250/Kconfig                    |   9 +
-> >  drivers/tty/serial/8250/Makefile                   |   1 +
-> >  4 files changed, 260 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/serial/mtk-
-> > btif.txt
-> >  create mode 100644 drivers/tty/serial/8250/8250_btif.c
-> > 
-> 
+-- 
+Florian
