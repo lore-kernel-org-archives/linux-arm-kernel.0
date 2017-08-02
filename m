@@ -1,27 +1,25 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 2 Aug 2017 11:02:25 +0100
-Subject: [RFC PATCH v4 4/5] arm64: neon: Remove support for nested or
- hardirq kernel-mode NEON
-In-Reply-To: <1501249824-18913-5-git-send-email-Dave.Martin@arm.com>
-References: <1501249824-18913-1-git-send-email-Dave.Martin@arm.com>
- <1501249824-18913-5-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170802100224.tllivhe6u54xp3rd@armageddon.cambridge.arm.com>
+From: sean@mess.org (Sean Young)
+Date: Wed, 2 Aug 2017 11:02:58 +0100
+Subject: [PATCH v1 0/4] media: rc: add support for IR receiver on MT7622
+ SoC
+In-Reply-To: <1501640647.17690.25.camel@mtkswgap22>
+References: <CGME20170630060312epcas4p351a77795e8469640d5177039f6b1955d@epcas4p3.samsung.com>
+ <cover.1498794408.git.sean.wang@mediatek.com>
+ <20170704101008.pgnjacbsk3twadzo@gangnam.samsung>
+ <1501640647.17690.25.camel@mtkswgap22>
+Message-ID: <20170802100257.cn5nfotpccdwsruo@gofer.mess.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 02:50:23PM +0100, Dave P Martin wrote:
-> Support for kernel-mode NEON to be nested and/or used in hardirq
-> context adds significant complexity, and the benefits may be
-> marginal.  In practice, kernel-mode NEON is not used in hardirq
-> context, and is rarely used in softirq context (by certain mac80211
-> drivers).
+Hi Sean,
 
-Just for clarification, the issue we had with hardirq contexts was that
-we could be interrupted while saving the current FPSIMD state as we
-don't want to disable IRQs during this. If this was the only aspect,
-your patch looks fine. Note that softirqs may be executed as result of
-an IRQ (via the irq_exit() function) but local_bh_disable() should
-protect against such race.
+On Wed, Aug 02, 2017 at 10:24:07AM +0800, Sean Wang wrote:
+> Hi, Mauro and Sean
+> 
+> Just a gentle ping on the whole patchset porting MediaTek CIR to another
+> platform.
 
--- 
-Catalin
+I'm creating the rc-core pull request, should be done by the end of the week. 
+
+
+Sean
