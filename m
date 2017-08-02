@@ -1,76 +1,90 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 2 Aug 2017 13:54:29 +0200
-Subject: [RFC PATCH v2 1/2] net: ethernet: nb8800: Reset HW block in
- ndo_open
-In-Reply-To: <yw1xbmnyi660.fsf@mansr.com>
-References: <33d1ab47-6098-5e3f-8a3c-f72626d07113@free.fr>
- <d817da35-f977-5985-4aae-73617004fac3@free.fr> <yw1xbmnyi660.fsf@mansr.com>
-Message-ID: <ef36cd4a-b1b5-7505-34d1-250c736d6731@free.fr>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 02 Aug 2017 14:09:45 +0200
+Subject: [PATCH] gpio: mvebu: Fix cause computation in irq handler
+In-Reply-To: <874lu14yyb.fsf@free-electrons.com> (Gregory CLEMENT's message of
+ "Mon, 24 Jul 2017 17:49:32 +0200")
+References: <20170712112229.858-1-gregory.clement@free-electrons.com>
+ <874lu14yyb.fsf@free-electrons.com>
+Message-ID: <87379ab27q.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/2017 13:02, M?ns Rullg?rd wrote:
+Hi Linus,
+ 
+ On lun., juil. 24 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-> Mason wrote:
-> 
->> Move all HW initializations to nb8800_init.
->> This provides the basis for suspend/resume support.
+> Hi Linus,
+>  
+>  On mer., juil. 12 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+>
+>> When switching to regmap, the way to compute the irq cause was
+>> reorganized. However while doing it, a typo was introduced: a 'xor'
+>> replaced a 'and'.
+>>
+>> This lead to wrong behavior in the interrupt handler ans one of the
+>> symptom was wrong irq handler called on the Armada 388 GP:
+>> "->handle_irq():  c016303c,
+>> handle_bad_irq+0x0/0x278
+>> ->irq_data.chip(): c0b0ec0c,
+>> 0xc0b0ec0c
+>> ->action():   (null)
+>>    IRQ_NOPROBE set
+>>  IRQ_NOREQUEST set
+>> unexpected IRQ trap at vector 00
+>> irq 0, desc: ee804800, depth: 1, count: 0, unhandled: 0"
+>>
+>> Fixes: 2233bf7a92e7 ("gpio: mvebu: switch to regmap for register access")
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>
+> Would it be possible to push this fix on the current kernel (v4.13-rc) ?
+>
+> Indeed currently due to this bug, the Armada 388 GP board does not boot
+> anymore because this board uses a gpio interrupt. So it prevents to have
+> continuous integration on this one with kci for instance.
+
+I saw that yesterday you appplied patches on gpio/fixes but it seems
+that you missed this one, because most of the patch you're applied were
+actually posted after this one.
+
+Thanks,
+
+Gregory
+>
+>
 >> ---
->>  drivers/net/ethernet/aurora/nb8800.c | 50 +++++++++++++++++-------------------
->>  drivers/net/ethernet/aurora/nb8800.h |  1 +
->>  2 files changed, 25 insertions(+), 26 deletions(-)
-> 
-> You're still not doing anything to preserve flow control and multicast
-> configuration, and those are probably not the only ones.
+>>  drivers/gpio/gpio-mvebu.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/gpio/gpio-mvebu.c b/drivers/gpio/gpio-mvebu.c
+>> index e338c3743562..45c65f805fd6 100644
+>> --- a/drivers/gpio/gpio-mvebu.c
+>> +++ b/drivers/gpio/gpio-mvebu.c
+>> @@ -557,7 +557,7 @@ static void mvebu_gpio_irq_handler(struct irq_desc *desc)
+>>  	edge_cause = mvebu_gpio_read_edge_cause(mvchip);
+>>  	edge_mask  = mvebu_gpio_read_edge_mask(mvchip);
+>>  
+>> -	cause = (data_in ^ level_mask) | (edge_cause & edge_mask);
+>> +	cause = (data_in & level_mask) | (edge_cause & edge_mask);
+>>  
+>>  	for (i = 0; i < mvchip->chip.ngpio; i++) {
+>>  		int irq;
+>> -- 
+>> 2.13.2
+>>
+>
+> -- 
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-I did handle flow control (as far as I can tell).
-The current settings are stored in:
-priv->pause_aneg, priv->pause_rx, priv->pause_tx
-and nb8800_pause_config() is called from nb8800_link_reconfigure()
-
-I'll take a closer look at multicast settings.
-
-> Worse, you're now never tearing down dma properly, which means the
-> hardware can be left with active pointers to memory no longer allocated
-> to it.
-
-You're making it sound like there is a risk those pointers
-might be used somehow. There is no such risk AFAICT.
-The PHY is disconnected, NAPI is stopped, RX and TX have
-been disabled, and the ISR has been removed.
-
-I have considered putting the HW block in reset (clock gated)
-at the end of nb8800_stop() to save power, which would make
-the issue you point out moot.
-
-The reason I removed nb8800_dma_stop() in nb8800_stop()
-is because it hangs when called from nb8800_suspend().
-(It requires interrupts to make progress, and interrupts
-seem to be disabled when nb8800_suspend() is called.)
-
-
-Broader question for netdev:
-
-I've been wondering about costly close operations.
-If closing a device is complex (in terms of code), at which
-point does it become simpler to just reset the block, and
-avoid writing/maintaining/debugging the code performing
-said close operation?
-
-> Finally, you still haven't explained why the hw needs to be reset in
-> ndo_open().  Whatever is causing your lockup can almost certainly be
-> triggered in some other way too.  I will not accept this side-stepping
-> of the issue.
-
-(I was not aware that you were the final authority on which
-patches are accepted upstream.)
-
-FWIW, I have placed a formal request for the HW dev to
-investigate, as I could not reproduce on tango4, despite
-several days wasted on this issue.
-
-In the mean time, the driver in its current form does not
-support suspend/resume. How would *you* implement it?
-(IMO, my way is great in its simplicity and code reuse.)
-
-Regards.
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
