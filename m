@@ -1,89 +1,113 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 02 Aug 2017 15:11:43 +0200
-Subject: [PATCH] arm64: defconfig: enable fine-grained task level IRQ time
- accounting
-In-Reply-To: <1501532531-4499-1-git-send-email-mw@semihalf.com> (Marcin
- Wojtas's message of "Mon, 31 Jul 2017 22:22:11 +0200")
-References: <1501532531-4499-1-git-send-email-mw@semihalf.com>
-Message-ID: <87y3r29ks0.fsf@free-electrons.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Wed, 2 Aug 2017 13:11:41 +0000
+Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
+In-Reply-To: <7d2091fe-a2e5-78bb-b63d-9cb66bdb7e84@ti.com>
+References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
+ <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
+ <20170722065133.GT3053@localhost>
+ <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
+ <20170726052930.GF3053@localhost>
+ <f2908e38-dc4d-3886-4058-52a7ad845415@st.com>
+ <20170731123157.GJ3053@localhost>
+ <e3a76a50-4160-d111-cce9-132b46b66c33@st.com>
+ <20170802045522.GU3053@localhost>
+ <7d2091fe-a2e5-78bb-b63d-9cb66bdb7e84@ti.com>
+Message-ID: <7bcad698-fa1a-3dc2-e918-4400639ca6d7@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-(Adding Arnd and Olof)
- 
- On lun., juil. 31 2017, Marcin Wojtas <mw@semihalf.com> wrote:
 
-> Tests showed, that under certain conditions, the summary number of jiffies
-> spent on softirq/idle, which are counted by system statistics can be even
-> below 10% of expected value, resulting in false load presentation.
->
-> The issue was observed on the quad-core Marvell Armada 8k SoC, whose two
-> 10G ports were bound into L2 bridge. Load was controlled by bidirectional
-> UDP traffic, produced by a packet generator. Under such condition,
-> the dominant load is softirq. With 100% single CPU occupation or without
-> any activity (all CPUs 100% idle), total number of jiffies is 10000 (2500
-> per each core) in 10s interval. Also with other kind of load this was
-> true.
->
-> However below a saturation threshold it was observed, that with CPU which
-> was occupied almost by softirqs only, the statistic were awkward. See
-> the mpstat output:
->
-> CPU %usr %nice %sys %iowait %irq %soft %steal %guest %gnice %idle
-> all 0.00  0.00 0.13    0.00 0.00  0.55   0.00   0.00   0.00 99.32
->   0 0.00  0.00 0.00    0.00 0.00 23.08   0.00   0.00   0.00 76.92
->   1 0.00  0.00 0.40    0.00 0.00  0.00   0.00   0.00   0.00 99.60
->   2 0.00  0.00 0.00    0.00 0.00  0.00   0.00   0.00   0.00 100.00
->   3 0.00  0.00 0.00    0.00 0.00  0.00   0.00   0.00   0.00 100.00
->
-> Above would mean basically no total load, debug CPU0 occupied in 25%.
-> Raw statistics, printed every 10s from /proc/stat unveiled a root
-> cause - summary idle/softirq jiffies on loaded CPU were below 200,
-> i.e. over 90% samples lost. All problems were gone after enabling
-> fine granulity IRQ time accounting.
->
-> This patch fixes possible wrong statistics processing by enabling
-> CONFIG_IRQ_TIME_ACCOUNTING for arm64 platfroms, which is by
-> default done on other architectures, e.g. x86 and arm. Tests
-> showed no noticeable performance penalty, nor stability impact.
+On 08/02/2017 11:19 AM, Peter Ujfalusi wrote:
+> 
+> 
+> On 2017-08-02 07:55, Vinod Koul wrote:
+>> On Tue, Aug 01, 2017 at 09:32:50AM +0000, Pierre Yves MORDRET wrote:
+>>>
+>>>
+>>> On 07/31/2017 02:31 PM, Vinod Koul wrote:
+>>>> On Wed, Jul 26, 2017 at 07:38:02AM +0000, Pierre Yves MORDRET wrote:
+>>>>>>>>> +
+>>>>>>>>> +#ifndef __DMA_STM32_DMAMUX_H
+>>>>>>>>> +#define __DMA_STM32_DMAMUX_H
+>>>>>>>>> +
+>>>>>>>>> +#if defined(CONFIG_STM32_DMAMUX)
+>>>>>>>>> +int stm32_dmamux_set_config(struct device *dev, void *route_data, u32 chan_id);
+>>>>>>>>
+>>>>>>>> Why do we need a custom API in this case?
+>>>>>>>>
+>>>>>>>
+>>>>>>> This API is called by DMA when a slave is requested by client. DMA can work
+>>>>>>> without DMAMUX this API has been put in place to configure DMAMUX whether client
+>>>>>>> is requesting a DMAMUX Channel instead of a DMA one.
+>>>>>>
+>>>>>> You mean the dmaengine driver right?
+>>>>>>
+>>>>>
+>>>>> Yes. The API is mainly called by "device_config" through out STM32 DMA Driver
+>>>>> when a router is in place for client.
+>>>>> Please refer to Patch 4/5 on this set.
+>>>>
+>>>> Okay am thinking on why this can't be generic..? An optional router config
+>>>> callback?
+>>>>
+>>>
+>>> I would have liked to answer there is a callback within engine but unfortunately
+>>> I didn't figure out one when I did my router's development. I've looked once
+>>> more but again I can't find how to map chanID and request line without custom API.
+>>
+>> Yes there is no callback for routers but we can add a generic callback
+>> here to be used. I added Peter for his comments, isn't that something they
+>> need too?
+> 
+> The event router via of_dma_router_register() should be capable of 
+> handling different type of muxers, like the ti-dma-crossbar.c is doing 
+> for two different type of event crossbars.
+> 
+> Basically with the of_dma_route_allocate you craft a dma_spec which can 
+> be understood by the dma-master pointed form the router's node.
+> You do the configuration of the mux in this function, craft the dma_spec 
+> and that's it. In DT the peripherals are using the router's node for DMA 
+> binding and everything is transparent for them.
+> 
+> Note: The use of am335x xbar in the ti-dma-crossbar is optional and only 
+> needed when we need to have different event than the default for a 
+> specific dma request line.
+> 
+> If you normally use the DMA like this:
+> dmas = <&edma 129 1>, <&ddma_xbar 128 1>;
+> dma-names = "tx", "rx";
+> 
+> If you have DMA event router/mux, then depending on how it works you 
+> might have different number of parameters. In my case the DRA7 crossbar 
+> does not need extra parameter, so to get it in use:
+> dmas = <&edma_xbar 129 1>, <&edma_xbar 128 1>;
+> dma-names = "tx", "rx";
+> 
+> The router driver will rewrite the dma_spec and replace the 129/128 and 
+> pass something different to the dma-master (dynamic event mapping).
+> 
+> On am335x we have different xbar type so there:
+> 
+> dmas = <&edma_xbar 12 0 1>, <&edma_xbar 13 0 2>;
+> 
+> Out from this the router driver will create a spec equivalent to
+> dmas = <&edma_xbar 12 0>, <&edma_xbar 13 0>;
+> 
+> But it will change the xbar that DMA request 12/13 will not have the 
+> default event routed to.
+> 
+> I believe that the dma_router infra we have in dmaengine can cover most 
+> if not all use cases...
+> 
+> - P?ter
+> 
 
-Who should take this patch?
-
-I think that all the defconfig under arm64 are merged through the
-arm-soc subsystem, but this one is not really specific to a
-SoC. However, as it was experimented on an mvebu SoC, if you agree I can
-take it.
-
-Thanks,
-
-Gregory
-
->
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 44423e6..ed51ac6 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -3,6 +3,7 @@ CONFIG_POSIX_MQUEUE=y
->  CONFIG_AUDIT=y
->  CONFIG_NO_HZ_IDLE=y
->  CONFIG_HIGH_RES_TIMERS=y
-> +CONFIG_IRQ_TIME_ACCOUNTING=y
->  CONFIG_BSD_PROCESS_ACCT=y
->  CONFIG_BSD_PROCESS_ACCT_V3=y
->  CONFIG_TASKSTATS=y
-> -- 
-> 1.8.3.1
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Our SoC works with or without DMAMUX. Both binding is allowed. Using only DMA a
+ChannelId and request line is part of the binding. Using DMAMUx now the request
+line is coming from dma_spec forwards to dma-master as well explained by Peter.
+However ChannelID is now given by dma_get_any_slave_channel instead of bindings.
+DMAMUX driver has to be aware of this ID to route request line to out DMA
+channel. This channel id information is carried on until DMAMUX through
+dmaengine_slave_config with a custom API.
+Hope it clarifies the need.
