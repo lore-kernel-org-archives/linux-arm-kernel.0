@@ -1,52 +1,59 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 2 Aug 2017 10:24:03 +0200
-Subject: [PATCH] watchdog: coh901327_wdt: constify watchdog_ops structure
-In-Reply-To: <20170708003330.GA15374@embeddedgus>
-References: <20170708003330.GA15374@embeddedgus>
-Message-ID: <CACRpkda3N-taTuBXJu626r8UCU34vOkvXFqQXvGnwkha_ywTbg@mail.gmail.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Wed,  2 Aug 2017 16:25:03 +0800
+Subject: [PATCH v2 00/23] Support more devices on rockchip rv1108
+Message-ID: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 8, 2017 at 2:33 AM, Gustavo A. R. Silva
-<garsilva@embeddedor.com> wrote:
 
-> Check for watchdog_ops structures that are only stored in the ops field of
-> a watchdog_device structure. This field is declared const, so watchdog_ops
-> structures that have this property can be declared as const also.
->
-> This issue was detected using Coccinelle and the following semantic patch:
->
-> @r
-> disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
-> static struct watchdog_ops i at p = { ... };
->
-> @ok@
-> identifier r.i;
-> struct watchdog_device e;
-> position p;
-> @@
-> e.ops = &i at p;
->
-> @bad@
-> position p != {r.p,ok.p};
-> identifier r.i;
-> struct watchdog_ops e;
-> @@
-> e at i@p
->
-> @depends on !bad disable optional_qualifier@
-> identifier r.i;
-> @@
-> static
-> +const
->  struct watchdog_ops i = { ... };
->
-> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+This series try to support i2c/spi/pwm/saradc/pmic/watchdog and
+the full clk tree on rockchip rv1108 soc.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Changes in v2:
+- split the rename and intentation fix part from id patch
+- split the new added clks and rename.
+- add compatible string "rockchip,rv1108-pwm"
+- add compatible string "rockchip,rv1108-saradc"
 
-Yours,
-Linus Walleij
+Andy Yan (14):
+  pinctrl: rockchip: add schmitt input mode support for rv1108
+  dt-bindings: i2c: rk3x: add support for rv1108
+  i2c: rk3x: add support for rv1108
+  ARM: dts: rockchip: add i2c dt node for rv1108
+  spi: rockchip: add compatible string for rv1108 spi
+  ARM: dts: rockchip: add spi dt node for rv1108
+  dt-bindings: pwm: add description for rv1108 pwm
+  ARM: dts: rockchip: add pwm dt node for rv1108
+  ARM: dts: rockchip: add watchdog dt node for rv1108
+  dt-bindings: adc: add description for rv1108 saradc
+  ARM: dts: rockchip: add saradc support for rv1108
+  ARM: dts: rockchip: add pwm backlight for rv1108 evb
+  ARM: dts: rockchip: add pmic rk805 dt node for rv1108 evb
+  ARM: dts: rockchip: add accelerometer bma250e dt node for rv1108 evb
+
+Elaine Zhang (9):
+  clk: rockchip: add more clk ids for rv1108
+  clk: rockchip: rename the clk id for HCLK_I2S1_2CH
+  clk: rockchip: fix up the indentation stuff for RV1108 SoC
+  clk: rockchip: support more rates for cpuclk
+  clk: rockchip: fix up the pll clks error for rv1108 SoC
+  clk: rockchip: support more clks for rv1108
+  clk: rockchip: fix up some clks describe error for rv1108 SoC
+  clk: rockchip: rename some of clks for rv1108 SoC
+  clk: rockchip: add some critical clocks for rv1108 SoC
+
+ Documentation/devicetree/bindings/i2c/i2c-rk3x.txt |   1 +
+ .../bindings/iio/adc/rockchip-saradc.txt           |   1 +
+ .../devicetree/bindings/pwm/pwm-rockchip.txt       |   2 +-
+ .../devicetree/bindings/spi/spi-rockchip.txt       |   1 +
+ arch/arm/boot/dts/rv1108-evb.dts                   | 158 +++++++
+ arch/arm/boot/dts/rv1108.dtsi                      | 249 ++++++++++
+ drivers/clk/rockchip/clk-rv1108.c                  | 514 ++++++++++++++++-----
+ drivers/i2c/busses/i2c-rk3x.c                      |   9 +
+ drivers/pinctrl/pinctrl-rockchip.c                 |  31 ++
+ drivers/spi/spi-rockchip.c                         |   1 +
+ include/dt-bindings/clock/rv1108-cru.h             | 123 ++++-
+ 11 files changed, 964 insertions(+), 126 deletions(-)
+
+-- 
+2.7.4
