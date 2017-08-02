@@ -1,73 +1,104 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  2 Aug 2017 10:22:18 -0600
-Subject: [PATCH 24/26] coresight: Add support for Coresight SoC 600 components
+Date: Wed,  2 Aug 2017 10:22:19 -0600
+Subject: [PATCH 25/26] perf: cs-etm: Fix ETMv4 CONFIGR entry in perf.data file
 In-Reply-To: <1501690940-4137-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1501690940-4137-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1501690940-4137-25-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1501690940-4137-26-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
+From: Mike Leach <mike.leach@linaro.org>
 
-Add the peripheral ids for the Coresight SoC 600 TPIU, replicator
-and funnel.
+The value passed into the perf.data file for the CONFIGR register in ETMv4
+was incorrectly being set to the command line options/ETMv3 value.
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Adds bit definitions and function to remap this value to the correct ETMv4
+CONFIGR bit values for all selected options.
+
+Signed-off-by: Mike Leach <mike.leach@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-dynamic-replicator.c | 5 +++++
- drivers/hwtracing/coresight/coresight-funnel.c             | 5 +++++
- drivers/hwtracing/coresight/coresight-tpiu.c               | 5 +++++
- 3 files changed, 15 insertions(+)
+ include/linux/coresight-pmu.h       |  5 +++++
+ tools/include/linux/coresight-pmu.h |  5 +++++
+ tools/perf/arch/arm/util/cs-etm.c   | 28 +++++++++++++++++++++++++++-
+ 3 files changed, 37 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-index b00ea2d7d13f..87bcf2123e66 100644
---- a/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-+++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
-@@ -202,6 +202,11 @@ static struct amba_id replicator_ids[] = {
- 		.id     = 0x0003b909,
- 		.mask   = 0x0003ffff,
- 	},
-+	{
-+		/* Coresight SoC-600 */
-+		.id     = 0x000bb9ec,
-+		.mask   = 0x000fffff,
-+	},
- 	{ 0, 0 },
- };
+diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
+index 45852c2cd096..edfeaba95429 100644
+--- a/include/linux/coresight-pmu.h
++++ b/include/linux/coresight-pmu.h
+@@ -26,6 +26,11 @@
+ #define ETM_OPT_TS      28
+ #define ETM_OPT_RETSTK	29
  
-diff --git a/drivers/hwtracing/coresight/coresight-funnel.c b/drivers/hwtracing/coresight/coresight-funnel.c
-index 860fe6ef5632..e55851564273 100644
---- a/drivers/hwtracing/coresight/coresight-funnel.c
-+++ b/drivers/hwtracing/coresight/coresight-funnel.c
-@@ -251,6 +251,11 @@ static struct amba_id funnel_ids[] = {
- 		.id     = 0x0003b908,
- 		.mask   = 0x0003ffff,
- 	},
-+	{
-+		/* Coresight SoC-600 */
-+		.id     = 0x000bb9eb,
-+		.mask   = 0x000fffff,
-+	},
- 	{ 0, 0},
- };
++/* ETMv4 CONFIGR programming bits for the ETM OPTs */
++#define ETM4_CFG_BIT_CYCACC	4
++#define ETM4_CFG_BIT_TS		11
++#define ETM4_CFG_BIT_RETSTK	12
++
+ static inline int coresight_get_trace_id(int cpu)
+ {
+ 	/*
+diff --git a/tools/include/linux/coresight-pmu.h b/tools/include/linux/coresight-pmu.h
+index 45852c2cd096..edfeaba95429 100644
+--- a/tools/include/linux/coresight-pmu.h
++++ b/tools/include/linux/coresight-pmu.h
+@@ -26,6 +26,11 @@
+ #define ETM_OPT_TS      28
+ #define ETM_OPT_RETSTK	29
  
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index 0673baf0f2f5..0e9d57e372bd 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -201,6 +201,11 @@ static struct amba_id tpiu_ids[] = {
- 		.id	= 0x0004b912,
- 		.mask	= 0x0007ffff,
- 	},
-+	{
-+		/* Coresight SoC-600 */
-+		.id	= 0x000bb9e7,
-+		.mask	= 0x000fffff,
-+	},
- 	{ 0, 0},
- };
++/* ETMv4 CONFIGR programming bits for the ETM OPTs */
++#define ETM4_CFG_BIT_CYCACC	4
++#define ETM4_CFG_BIT_TS		11
++#define ETM4_CFG_BIT_RETSTK	12
++
+ static inline int coresight_get_trace_id(int cpu)
+ {
+ 	/*
+diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
+index 7ce3d1a25133..fbfc055d3f4d 100644
+--- a/tools/perf/arch/arm/util/cs-etm.c
++++ b/tools/perf/arch/arm/util/cs-etm.c
+@@ -266,6 +266,32 @@ static u64 cs_etm_get_config(struct auxtrace_record *itr)
+ 	return config;
+ }
  
++#ifndef BIT
++#define BIT(N) (1UL << (N))
++#endif
++
++static u64 cs_etmv4_get_config(struct auxtrace_record *itr)
++{
++	u64 config = 0;
++	u64 config_opts = 0;
++
++	/*
++	 * The perf event variable config bits represent both
++	 * the command line options and register programming
++	 * bits in ETMv3/PTM. For ETMv4 we must remap options
++	 * to real bits
++	 */
++	config_opts = cs_etm_get_config(itr);
++	if (config_opts & BIT(ETM_OPT_CYCACC))
++		config |= BIT(ETM4_CFG_BIT_CYCACC);
++	if (config_opts & BIT(ETM_OPT_TS))
++		config |= BIT(ETM4_CFG_BIT_TS);
++	if (config_opts & BIT(ETM_OPT_RETSTK))
++		config |= BIT(ETM4_CFG_BIT_RETSTK);
++
++	return config;
++}
++
+ static size_t
+ cs_etm_info_priv_size(struct auxtrace_record *itr __maybe_unused,
+ 		      struct perf_evlist *evlist __maybe_unused)
+@@ -363,7 +389,7 @@ static void cs_etm_get_metadata(int cpu, u32 *offset,
+ 		magic = __perf_cs_etmv4_magic;
+ 		/* Get trace configuration register */
+ 		info->priv[*offset + CS_ETMV4_TRCCONFIGR] =
+-						cs_etm_get_config(itr);
++						cs_etmv4_get_config(itr);
+ 		/* Get traceID from the framework */
+ 		info->priv[*offset + CS_ETMV4_TRCTRACEIDR] =
+ 						coresight_get_trace_id(cpu);
 -- 
 2.7.4
