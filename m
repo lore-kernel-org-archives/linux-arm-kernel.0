@@ -1,64 +1,49 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed,  2 Aug 2017 10:48:57 +0100
-Subject: [PATCH v5 2/9] arm64: hugetlb: Introduce pte_pgprot helper
-In-Reply-To: <20170802094904.27749-1-punit.agrawal@arm.com>
-References: <20170802094904.27749-1-punit.agrawal@arm.com>
-Message-ID: <20170802094904.27749-3-punit.agrawal@arm.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 2 Aug 2017 16:29:16 +0530
+Subject: [PATCH v2 2/3] gpio: davinci: Handle the return value of
+ davinci_gpio_irq_setup function
+In-Reply-To: <1500543738-9696-3-git-send-email-j-keerthy@ti.com>
+References: <1500543738-9696-1-git-send-email-j-keerthy@ti.com>
+ <1500543738-9696-3-git-send-email-j-keerthy@ti.com>
+Message-ID: <32ca2ace-bca3-4819-d3fb-10331cd0213c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Capper <steve.capper@arm.com>
 
-Rather than xor pte bits in various places, use this helper function.
 
-Cc: David Woods <dwoods@mellanox.com>
-Signed-off-by: Steve Capper <steve.capper@arm.com>
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm64/mm/hugetlbpage.c | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+On Thursday 20 July 2017 03:12 PM, Keerthy wrote:
+> Currently davinci_gpio_irq_setup return value is ignored. Handle the
+> return value appropriately.
 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 7b61e4833432..cb84ca33bc6b 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -41,6 +41,16 @@ int pud_huge(pud_t pud)
- #endif
- }
- 
-+/*
-+ * Select all bits except the pfn
-+ */
-+static inline pgprot_t pte_pgprot(pte_t pte)
-+{
-+	unsigned long pfn = pte_pfn(pte);
-+
-+	return __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
-+}
-+
- static int find_num_contig(struct mm_struct *mm, unsigned long addr,
- 			   pte_t *ptep, size_t *pgsize)
- {
-@@ -80,7 +90,7 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 
- 	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
- 	pfn = pte_pfn(pte);
--	hugeprot = __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
-+	hugeprot = pte_pgprot(pte);
- 	for (i = 0; i < ncontig; i++) {
- 		pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
- 			 pte_val(pfn_pte(pfn, hugeprot)));
-@@ -223,9 +233,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 		size_t pgsize = 0;
- 		unsigned long pfn = pte_pfn(pte);
- 		/* Select all bits except the pfn */
--		pgprot_t hugeprot =
--			__pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^
--				 pte_val(pte));
-+		pgprot_t hugeprot = pte_pgprot(pte);
- 
- 		pfn = pte_pfn(pte);
- 		ncontig = find_num_contig(vma->vm_mm, addr, ptep,
--- 
-2.11.0
+Linus,
+
+Any comments on this? Sorry if i pinged too soon. The rest 2 of this
+series were pulled by you. So just wanted to check on this one if you
+had specific comments.
+
+Regards,
+Keerthy
+
+> 
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
+>  drivers/gpio/gpio-davinci.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+> index 27499ec..d6fb1ce 100644
+> --- a/drivers/gpio/gpio-davinci.c
+> +++ b/drivers/gpio/gpio-davinci.c
+> @@ -237,7 +237,10 @@ static int davinci_gpio_probe(struct platform_device *pdev)
+>  		goto err;
+>  
+>  	platform_set_drvdata(pdev, chips);
+> -	davinci_gpio_irq_setup(pdev);
+> +	ret = davinci_gpio_irq_setup(pdev);
+> +	if (ret)
+> +		goto err;
+> +
+>  	return 0;
+>  
+>  err:
+> 
