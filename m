@@ -1,68 +1,148 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed,  2 Aug 2017 10:49:04 +0100
-Subject: [PATCH v5 9/9] arm64: hugetlb: Cleanup setup_hugepagesz
-In-Reply-To: <20170802094904.27749-1-punit.agrawal@arm.com>
-References: <20170802094904.27749-1-punit.agrawal@arm.com>
-Message-ID: <20170802094904.27749-10-punit.agrawal@arm.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Wed,  2 Aug 2017 15:23:18 +0530
+Subject: [PATCH] iommu/arm-smmu: Defer TLB flush in case of unmap op
+In-Reply-To: <CAFp+6iFfu2-qrDDim7fzKKLqMcSVMmOr7esqBZ-xEeLTOOTNLA@mail.gmail.com>
+References: <CAFp+6iFfu2-qrDDim7fzKKLqMcSVMmOr7esqBZ-xEeLTOOTNLA@mail.gmail.com>
+Message-ID: <1501667598-16404-1-git-send-email-vivek.gautam@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Capper <steve.capper@arm.com>
+We don't want to touch the TLB when smmu is suspended.
+Defer it until resume.
 
-Replace a lot of if statements with switch and case labels to make it
-much clearer which huge page sizes are supported.
-
-Also, we prevent PUD_SIZE from being used on systems not running with
-4KB PAGE_SIZE. Before if one supplied PUD_SIZE in these circumstances,
-then unusuable huge page sizes would be in use.
-
-Fixes: 084bd29810a5 ("ARM64: mm: HugeTLB support.")
-Cc: David Woods <dwoods@mellanox.com>
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Steve Capper <steve.capper@arm.com>
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
 ---
- arch/arm64/mm/hugetlbpage.c | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index a10dfbd0ffd5..b5dc7cca3f45 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -381,20 +381,20 @@ static __init int setup_hugepagesz(char *opt)
- {
- 	unsigned long ps = memparse(opt, &opt);
+Hi all,
+
+Here's the small patch in response of suggestion to defer tlb operations
+when smmu is in suspend state.
+The patch stores the TLB requests in 'unmap' when the smmu device is
+suspended. On resume, it checks all the pending TLB requests, and
+performs the unmap over those.
+
+Right now, I have applied the patch on top of the pm runtime series.
+Let me know what you think of the change. It will also be helpful if
+somebody can please test a valid use case with this.
+
+regards
+Vivek
+
+ drivers/iommu/arm-smmu.c | 59 +++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 53 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index fe8e7fd61282..1f9c2b16aabb 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -51,6 +51,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
++#include <linux/list.h>
  
--	if (ps == PMD_SIZE) {
--		hugetlb_add_hstate(PMD_SHIFT - PAGE_SHIFT);
--	} else if (ps == PUD_SIZE) {
--		hugetlb_add_hstate(PUD_SHIFT - PAGE_SHIFT);
--	} else if (ps == (PAGE_SIZE * CONT_PTES)) {
--		hugetlb_add_hstate(CONT_PTE_SHIFT);
--	} else if (ps == (PMD_SIZE * CONT_PMDS)) {
--		hugetlb_add_hstate((PMD_SHIFT + CONT_PMD_SHIFT) - PAGE_SHIFT);
--	} else {
--		hugetlb_bad_size();
--		pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
--		return 0;
-+	switch (ps) {
-+#ifdef CONFIG_ARM64_4K_PAGES
-+	case PUD_SIZE:
-+#endif
-+	case PMD_SIZE * CONT_PMDS:
-+	case PMD_SIZE:
-+	case PAGE_SIZE * CONT_PTES:
-+		hugetlb_add_hstate(ilog2(ps) - PAGE_SHIFT);
-+		return 1;
- 	}
--	return 1;
+ #include <linux/amba/bus.h>
+ 
+@@ -151,6 +152,14 @@ struct arm_smmu_master_cfg {
+ #define for_each_cfg_sme(fw, i, idx) \
+ 	for (i = 0; idx = fwspec_smendx(fw, i), i < fw->num_ids; ++i)
+ 
++struct arm_smmu_tlb_req_info {
++	struct iommu_domain *domain;
++	unsigned long iova;
++	size_t size;
++	bool tlb_flush_pending;
++	struct list_head list;
++};
 +
-+	hugetlb_bad_size();
-+	pr_err("hugepagesz: Unsupported page size %lu K\n", ps >> 10);
+ struct arm_smmu_device {
+ 	struct device			*dev;
+ 
+@@ -182,6 +191,7 @@ struct arm_smmu_device {
+ 	u32				num_s2_context_banks;
+ 	DECLARE_BITMAP(context_map, ARM_SMMU_MAX_CBS);
+ 	atomic_t			irptndx;
++	struct list_head		domain_list;
+ 
+ 	u32				num_mapping_groups;
+ 	u16				streamid_mask;
+@@ -1239,17 +1249,32 @@ static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
+ 			     size_t size)
+ {
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
++	struct arm_smmu_device *smmu = smmu_domain->smmu;
+ 	struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
+-	size_t ret;
++	struct arm_smmu_tlb_req_info *tlb_info;
+ 
+ 	if (!ops)
+ 		return 0;
+ 
+-	pm_runtime_get_sync(smmu_domain->smmu->dev);
+-	ret = ops->unmap(ops, iova, size);
+-	pm_runtime_put_sync(smmu_domain->smmu->dev);
++	/* if the device is suspended; we can't unmap, defer any tlb operations */
++	if (pm_runtime_suspended(smmu->dev)) {
++		tlb_info = devm_kzalloc(smmu->dev, sizeof(*tlb_info), GFP_ATOMIC);
++		if (!tlb_info)
++			return -ENOMEM;
+ 
+-	return ret;
++		tlb_info->domain = domain;
++		tlb_info->iova = iova;
++		tlb_info->size = size;
++		tlb_info->tlb_flush_pending = true;
++		INIT_LIST_HEAD(&tlb_info->list);
++
++		/* XXX: We need locks here, but that again introduce the slowpath ? */
++		list_add_tail(&tlb_info->list, &smmu->domain_list);
++
++		return size;
++	}
++
++	return ops->unmap(ops, iova, size);
+ }
+ 
+ static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
+@@ -2166,6 +2191,8 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+ 		smmu->irqs[i] = irq;
+ 	}
+ 
++	INIT_LIST_HEAD(&smmu->domain_list);
++
+ 	err = arm_smmu_init_clocks(smmu);
+ 	if (err)
+ 		return err;
+@@ -2268,8 +2295,28 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+ static int arm_smmu_resume(struct device *dev)
+ {
+ 	struct arm_smmu_device *smmu = dev_get_drvdata(dev);
++	struct arm_smmu_tlb_req_info  *tlb_info, *temp;
++	int ret;
++
++	ret = arm_smmu_enable_clocks(smmu);
++	if (ret)
++		return ret;
++
++	list_for_each_entry_safe(tlb_info, temp, &smmu->domain_list, list) {
++		printk("\n\n %s %d :: iterating over pending tlb request\n\n", __func__, __LINE__);
++		if (tlb_info->tlb_flush_pending) {
++			ret = arm_smmu_unmap(tlb_info->domain, tlb_info->iova, tlb_info->size);
++			if (!ret)
++				return -EINVAL;
+ 
+-	return arm_smmu_enable_clocks(smmu);
++			tlb_info->tlb_flush_pending = false;
++
++			/* we are done with this request; delete it */
++			list_del(&tlb_info->list);
++		}
++	}
++
 +	return 0;
  }
- __setup("hugepagesz=", setup_hugepagesz);
  
+ static int arm_smmu_suspend(struct device *dev)
 -- 
-2.11.0
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
