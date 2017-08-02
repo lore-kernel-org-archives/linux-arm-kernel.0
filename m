@@ -1,57 +1,57 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 2 Aug 2017 11:46:57 +0800
-Subject: [PATCH v2 05/11] net: stmmac: dwmac-rk: Add internal phy support
-In-Reply-To: <69ad9443-ff65-8e49-df68-7e5e6c812d45@rock-chips.com>
-References: <1501160156-30328-1-git-send-email-david.wu@rock-chips.com>
- <1501160540-30662-1-git-send-email-david.wu@rock-chips.com>
- <20170727134834.GD18666@lunn.ch>
- <65ae1747-4dff-b1d8-8aa3-684fc8c7809a@gmail.com>
- <69ad9443-ff65-8e49-df68-7e5e6c812d45@rock-chips.com>
-Message-ID: <CAGb2v6766-8Cn0ZESo9Z0zU4yWR7Tt3+u0gdcd0LccYqLWW+3Q@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 2 Aug 2017 09:19:51 +0530
+Subject: [PATCH 1/1] cpufreq: imx6q: imx6ull: use PLL1 for frequency
+ higher than 528MHz
+In-Reply-To: <1501230993-15812-1-git-send-email-sebastien.szymanski@armadeus.com>
+References: <1501230993-15812-1-git-send-email-sebastien.szymanski@armadeus.com>
+Message-ID: <20170802034951.GA31169@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David, Florian, Andrew
+On 28-07-17, 10:36, S?bastien Szymanski wrote:
+> Setting the frequency higher than 528Mhz actually sets the ARM
+> clock to 528MHz. That's because PLL2 is used as the root clock when the
+> frequency is higher than 396MHz.
+> 
+> cpupower frequency-set -f 792000
+> 
+> arm_clk_root on the CCM_CLKO2 signal is 528MHz instead of 792MHz.
+> 
+> [   61.606383] cpu cpu0: 396 MHz, 1025 mV --> 792 MHz, 1225 mV
+> 
+> pll2                         1  1  528000000 0 0
+>    pll2_bypass               1  1  528000000 0 0
+>       pll2_bus               3  3  528000000 0 0
+> 	 ca7_secondary_sel   1  1  528000000 0 0
+> 	    step             1  1  528000000 0 0
+> 	       pll1_sw       1  1  528000000 0 0
+> 		  arm        1  1  528000000 0 0
+> 
+> Fixes this by using the PLL1 as the root clock when the frequency is
+> higher than 528MHz.
+> 
+> cpupower frequency-set -f 792000
+> 
+> arm_clk_root on the CCM_CLKO2 signal is now 792MHz as expected.
+> 
+> [   69.717987] cpu cpu0: 198 MHz, 950 mV --> 792 MHz, 1225 mV
+> 
+> pll1               1 1 792000000 0 0
+>    pll1_bypass     1 1 792000000 0 0
+>       pll1_sys     1 1 792000000 0 0
+> 	 pll1_sw   1 1 792000000 0 0
+> 	    arm    1 1 792000000 0 0
+> 
+> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+> ---
+>  drivers/cpufreq/imx6q-cpufreq.c | 11 +++++++++--
+>  1 file changed, 9 insertions(+), 2 deletions(-)
 
-(resent in plain text)
+Looks fine to me:
 
-On Fri, Jul 28, 2017 at 2:56 PM, David.Wu <david.wu@rock-chips.com> wrote:
->
-> Hi Florian,
->
-> ? 2017/7/28 0:54, Florian Fainelli ??:
->>
->> - if you need knowledge about this PHY connection type prior to binding
->> the PHY device and its driver (that is, before of_phy_connect()) we
->> could add a boolean property e.g: "phy-is-internal" that allows us to
->> know that, or we can have a new phy-mode value, e.g: "internal-rmii"
->> which describes that, either way would probably be fine, but the former
->> scales better
->>
->
-> Using "phy-is-internal" is very helpful, but it is easy to confuse with
-> the real internal PHY, may we use the other words like phy is inlined.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-If "internal" is confusing, would "phy-is-integrated" in the MAC node work?
+@Shawn: Can you also confirm if this looks fine to you ?
 
-Either way we would like to have a definitive solution to this. Our
-dwmac-sun8i driver is already in v4.13-rc1, with a somewhat flaky
-method of knowing whether the internal PHY is used (phy-mode = "mii").
-
-We really want a fix for this release, otherwise we would be force
-to revert either the internal PHY part or the whole driver.
-
-ChenYu
-
->
->> Then again, using phy-mode = "internal" even though this is Reduced MII
->> is not big of a deal IMHO as long as there is no loss of information and
->> that internal de-facto means internal reduced MII for instance.
->> --
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+viresh
