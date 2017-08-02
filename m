@@ -1,56 +1,146 @@
 From: jlu@pengutronix.de (Jan Luebbe)
-Date: Wed,  2 Aug 2017 14:39:18 +0200
-Subject: [PATCH v2 5/9] ARM: l2x0: add marvell,ecc-enable property for aurora
+Date: Wed,  2 Aug 2017 14:39:21 +0200
+Subject: [PATCH v2 8/9] EDAC: Add devres helpers for
+ edac_device_alloc_ctl_info/edac_device_add_device
 In-Reply-To: <20170802123922.11498-1-jlu@pengutronix.de>
 References: <20170802123922.11498-1-jlu@pengutronix.de>
-Message-ID: <20170802123922.11498-6-jlu@pengutronix.de>
+Message-ID: <20170802123922.11498-9-jlu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Packham <chris.packham@alliedtelesis.co.nz>
+These helpers simplify error handling in the _probe functions and
+automate deallocation in the _remove functions.
 
-The aurora cache on the Marvell Armada-XP SoC supports ECC protection
-for the L2 data arrays. Add a "marvell,ecc-enable" device tree property
-which can be used to enable this.
-
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-[jlu at pengutronix.de: use aurora specific define AURORA_ACR_ECC_EN]
 Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 ---
- Documentation/devicetree/bindings/arm/l2c2x0.txt | 2 ++
- arch/arm/mm/cache-l2x0.c                         | 7 +++++++
- 2 files changed, 9 insertions(+)
+ drivers/edac/edac_device.c | 60 ++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/edac/edac_device.h | 29 ++++++++++++++++++++++
+ 2 files changed, 89 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-index fbe6cb21f4cf..15a84f0ba9f1 100644
---- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
-+++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-@@ -76,6 +76,8 @@ Optional properties:
-   specified to indicate that such transforms are precluded.
- - arm,parity-enable : enable parity checking on the L2 cache (L220 or PL310).
- - arm,parity-disable : disable parity checking on the L2 cache (L220 or PL310).
-+- marvell,ecc-enable : enable ECC protection on the L2 cache
-+- marvell,ecc-disable : disable ECC protection on the L2 cache
- - arm,outer-sync-disable : disable the outer sync operation on the L2 cache.
-   Some core tiles, especially ARM PB11MPCore have a faulty L220 cache that
-   will randomly hang unless outer sync operations are disabled.
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index b70bee74750d..644f786e4fa9 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1505,6 +1505,13 @@ static void __init aurora_of_parse(const struct device_node *np,
- 		mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
- 	}
+diff --git a/drivers/edac/edac_device.c b/drivers/edac/edac_device.c
+index 65cf2b9355c4..d011f42c3507 100644
+--- a/drivers/edac/edac_device.c
++++ b/drivers/edac/edac_device.c
+@@ -232,6 +232,42 @@ void edac_device_free_ctl_info(struct edac_device_ctl_info *ctl_info)
+ }
+ EXPORT_SYMBOL_GPL(edac_device_free_ctl_info);
  
-+	if (of_property_read_bool(np, "marvell,ecc-enable")) {
-+		mask |= AURORA_ACR_ECC_EN;
-+		val |= AURORA_ACR_ECC_EN;
-+	} else if (of_property_read_bool(np, "marvell,ecc-disable")) {
-+		mask |= AURORA_ACR_ECC_EN;
-+	}
++/**
++ * devm_edac_device_free_ctl_info() - Internal helper to call
++ *	edac_device_free_ctl_info from a devres action
++ */
++static void devm_edac_device_free_ctl_info(void *ctl_info)
++{
++	edac_device_free_ctl_info((struct edac_device_ctl_info *)ctl_info);
++}
 +
- 	if (of_property_read_bool(np, "arm,parity-enable")) {
- 		mask |= AURORA_ACR_PARITY_EN;
- 		val |= AURORA_ACR_PARITY_EN;
++struct edac_device_ctl_info *devm_edac_device_alloc_ctl_info(
++	struct device *dev,
++	unsigned int sz_private,
++	char *edac_device_name, unsigned int nr_instances,
++	char *edac_block_name, unsigned int nr_blocks,
++	unsigned int offset_value,
++	struct edac_dev_sysfs_block_attribute *attrib_spec, unsigned int nr_attrib,
++	int device_index)
++{
++	struct edac_device_ctl_info *ctl_info;
++
++	ctl_info = edac_device_alloc_ctl_info(sz_private,
++			edac_device_name, nr_instances,
++			edac_block_name, nr_blocks,
++			offset_value,
++			attrib_spec, nr_attrib,
++			device_index);
++	if (!ctl_info)
++		return ctl_info;
++
++	if (devm_add_action_or_reset(dev, devm_edac_device_free_ctl_info, ctl_info))
++		return NULL;
++
++	return ctl_info;
++}
++EXPORT_SYMBOL_GPL(devm_edac_device_alloc_ctl_info);
++
+ /*
+  * find_edac_device_by_dev
+  *	scans the edac_device list for a specific 'struct device *'
+@@ -539,6 +575,30 @@ struct edac_device_ctl_info *edac_device_del_device(struct device *dev)
+ }
+ EXPORT_SYMBOL_GPL(edac_device_del_device);
+ 
++/**
++ * devm_edac_device_del_device() - Internal helper to call
++ *	edac_device_del_device from a devres action
++ */
++static void devm_edac_device_del_device(void *dev)
++{
++	edac_device_del_device((struct device *)dev);
++}
++
++int devm_edac_device_add_device(struct device *dev,
++		struct edac_device_ctl_info *edac_dev)
++{
++	int ret;
++
++	ret = edac_device_add_device(edac_dev);
++	if (ret)
++		return ret;
++
++	if (devm_add_action_or_reset(dev, devm_edac_device_del_device, dev))
++		return 1;
++
++	return 0;
++}
++
+ static inline int edac_device_get_log_ce(struct edac_device_ctl_info *edac_dev)
+ {
+ 	return edac_dev->log_ce;
+diff --git a/drivers/edac/edac_device.h b/drivers/edac/edac_device.h
+index 1aaba74ae411..711a50b133cd 100644
+--- a/drivers/edac/edac_device.h
++++ b/drivers/edac/edac_device.h
+@@ -258,6 +258,24 @@ extern struct edac_device_ctl_info *edac_device_alloc_ctl_info(
+ extern void edac_device_free_ctl_info(struct edac_device_ctl_info *ctl_info);
+ 
+ /**
++ * devm_edac_device_alloc_ctl_info: Allocate a new managed edac device
++ *	control info structure
++ *
++ *	This function takes the same arguments as edac_device_alloc_ctl_info in
++ *	addition to the owning device. The structure is freed by devres using
++ *	edac_device_free_ctl_info.
++ */
++extern struct edac_device_ctl_info *devm_edac_device_alloc_ctl_info(
++		struct device *dev,
++		unsigned int sizeof_private,
++		char *edac_device_name, unsigned int nr_instances,
++		char *edac_block_name, unsigned int nr_blocks,
++		unsigned int offset_value,
++		struct edac_dev_sysfs_block_attribute *block_attributes,
++		unsigned int nr_attribs,
++		int device_index);
++
++/**
+  * edac_device_add_device: Insert the 'edac_dev' structure into the
+  *	 edac_device global list and create sysfs entries associated with
+  *	 edac_device structure.
+@@ -286,6 +304,17 @@ extern int edac_device_add_device(struct edac_device_ctl_info *edac_dev);
+ extern struct edac_device_ctl_info *edac_device_del_device(struct device *dev);
+ 
+ /**
++ * devm_edac_device_add_device:
++ *	Helper to call edac_device_add_device and register it for cleanup with
++ *	devres.
++ *
++ * Returns:
++ *	0 on Success, or an error code on failure
++ */
++extern int devm_edac_device_add_device(struct device *dev,
++				       struct edac_device_ctl_info *edac_dev);
++
++/**
+  * edac_device_handle_ue():
+  *	perform a common output and handling of an 'edac_dev' UE event
+  *
 -- 
 2.11.0
