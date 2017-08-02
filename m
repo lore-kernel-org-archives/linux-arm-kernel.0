@@ -1,57 +1,93 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 2 Aug 2017 09:19:51 +0530
-Subject: [PATCH 1/1] cpufreq: imx6q: imx6ull: use PLL1 for frequency
- higher than 528MHz
-In-Reply-To: <1501230993-15812-1-git-send-email-sebastien.szymanski@armadeus.com>
-References: <1501230993-15812-1-git-send-email-sebastien.szymanski@armadeus.com>
-Message-ID: <20170802034951.GA31169@vireshk-i7>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 2 Aug 2017 11:50:38 +0800
+Subject: [linux-sunxi] [PATCH v3 10/12] ASoC: sun4i-i2s: Check for slave
+ select bit
+In-Reply-To: <20170729141753.20174-11-codekipper@gmail.com>
+References: <20170729141753.20174-1-codekipper@gmail.com>
+ <20170729141753.20174-11-codekipper@gmail.com>
+Message-ID: <CAGb2v665f=OCZJfZY9VqoD8sgof7qLGUkkqMoTv9xtb=MXxa2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28-07-17, 10:36, S?bastien Szymanski wrote:
-> Setting the frequency higher than 528Mhz actually sets the ARM
-> clock to 528MHz. That's because PLL2 is used as the root clock when the
-> frequency is higher than 396MHz.
-> 
-> cpupower frequency-set -f 792000
-> 
-> arm_clk_root on the CCM_CLKO2 signal is 528MHz instead of 792MHz.
-> 
-> [   61.606383] cpu cpu0: 396 MHz, 1025 mV --> 792 MHz, 1225 mV
-> 
-> pll2                         1  1  528000000 0 0
->    pll2_bypass               1  1  528000000 0 0
->       pll2_bus               3  3  528000000 0 0
-> 	 ca7_secondary_sel   1  1  528000000 0 0
-> 	    step             1  1  528000000 0 0
-> 	       pll1_sw       1  1  528000000 0 0
-> 		  arm        1  1  528000000 0 0
-> 
-> Fixes this by using the PLL1 as the root clock when the frequency is
-> higher than 528MHz.
-> 
-> cpupower frequency-set -f 792000
-> 
-> arm_clk_root on the CCM_CLKO2 signal is now 792MHz as expected.
-> 
-> [   69.717987] cpu cpu0: 198 MHz, 950 mV --> 792 MHz, 1225 mV
-> 
-> pll1               1 1 792000000 0 0
->    pll1_bypass     1 1 792000000 0 0
->       pll1_sys     1 1 792000000 0 0
-> 	 pll1_sw   1 1 792000000 0 0
-> 	    arm    1 1 792000000 0 0
-> 
-> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+On Sat, Jul 29, 2017 at 10:17 PM,  <codekipper@gmail.com> wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+>
+> The newer SoCs do not have this setting. Instead they set the pin
+> direction. Add a check to see if the bit is valid and if so set
+> it accordingly.
+>
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 > ---
->  drivers/cpufreq/imx6q-cpufreq.c | 11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
+>  sound/soc/sunxi/sun4i-i2s.c | 38 ++++++++++++++++++++++----------------
+>  1 file changed, 22 insertions(+), 16 deletions(-)
+>
+> diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+> index 9e060d1b73d5..1c4d763e3a8e 100644
+> --- a/sound/soc/sunxi/sun4i-i2s.c
+> +++ b/sound/soc/sunxi/sun4i-i2s.c
+> @@ -96,6 +96,7 @@
+>   * struct sun4i_i2s_quirks - Differences between SoC variants.
+>   *
+>   * @has_reset: SoC needs reset deasserted.
+> + * @has_slave_select_bit: SoC has a bit to enable slave mode.
+>   * @reg_offset_txdata: offset of the tx fifo.
+>   * @sun4i_i2s_regmap: regmap config to use.
+>   * @mclk_offset: Value by which mclkdiv needs to be adjusted.
+> @@ -114,6 +115,7 @@
+>   */
+>  struct sun4i_i2s_quirks {
+>         bool                            has_reset;
+> +       bool                            has_slave_select_bit;
+>         unsigned int                    reg_offset_txdata;      /* TX FIFO */
+>         const struct regmap_config      *sun4i_i2s_regmap;
+>         unsigned int                    mclk_offset;
+> @@ -391,30 +393,32 @@ static int sun4i_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+>         regmap_field_write(i2s->field_fmt_set_bclk_polarity, bclk_polarity);
+>         regmap_field_write(i2s->field_fmt_set_lrclk_polarity, lrclk_polarity);
+>
+> -       /* DAI clock master masks */
+> -       switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
+> -       case SND_SOC_DAIFMT_CBS_CFS:
+> -               /* BCLK and LRCLK master */
+> -               val = SUN4I_I2S_CTRL_MODE_MASTER;
+> -               break;
+> -       case SND_SOC_DAIFMT_CBM_CFM:
+> -               /* BCLK and LRCLK slave */
+> -               val = SUN4I_I2S_CTRL_MODE_SLAVE;
+> -               break;
+> -       default:
+> -               return -EINVAL;
+> +       if (i2s->variant->has_slave_select_bit) {
+> +               /* DAI clock master masks */
+> +               switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
+> +               case SND_SOC_DAIFMT_CBS_CFS:
+> +                       /* BCLK and LRCLK master */
+> +                       val = SUN4I_I2S_CTRL_MODE_MASTER;
+> +                       break;
+> +               case SND_SOC_DAIFMT_CBM_CFM:
+> +                       /* BCLK and LRCLK slave */
+> +                       val = SUN4I_I2S_CTRL_MODE_SLAVE;
+> +                       break;
+> +               default:
+> +                       return -EINVAL;
+> +               }
+> +               regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> +                                  SUN4I_I2S_CTRL_MODE_MASK,
+> +                                  val);
+>         }
+>
+> -       regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> -                          SUN4I_I2S_CTRL_MODE_MASK,
+> -                          val);
+> -
+>         /* Set significant bits in our FIFOs */
+>         regmap_update_bits(i2s->regmap, SUN4I_I2S_FIFO_CTRL_REG,
+>                            SUN4I_I2S_FIFO_CTRL_TX_MODE_MASK |
+>                            SUN4I_I2S_FIFO_CTRL_RX_MODE_MASK,
+>                            SUN4I_I2S_FIFO_CTRL_TX_MODE(1) |
+>                            SUN4I_I2S_FIFO_CTRL_RX_MODE(1));
+> +
 
-Looks fine to me:
+Stray newline. Otherwise,
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-
-@Shawn: Can you also confirm if this looks fine to you ?
-
--- 
-viresh
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
