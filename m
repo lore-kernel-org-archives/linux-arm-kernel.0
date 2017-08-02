@@ -1,24 +1,33 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 2 Aug 2017 22:07:03 +0200
-Subject: i.mx7: Changing linux,usable-memory causes BUG: Bad Page
-In-Reply-To: <CAN1Oqpw835L3Rc-J59_qSJ3toUWH8TD00r=ZcN6quvcnE8mnHQ@mail.gmail.com>
-References: <CAN1Oqpw835L3Rc-J59_qSJ3toUWH8TD00r=ZcN6quvcnE8mnHQ@mail.gmail.com>
-Message-ID: <20170802200703.rnr4ucjy5c7dnhuf@pengutronix.de>
+From: martin@kaiser.cx (Martin Kaiser)
+Date: Wed,  2 Aug 2017 22:06:11 +0200
+Subject: [PATCH] ARM: dts: i.MX25: add ranges to tscadc
+Message-ID: <1501704371-28151-1-git-send-email-martin@kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ryan,
+Add a ranges; line to the tscadc node. This creates a 1:1 mapping between
+the addresses used by tscadc and those in its child nodes (adc, tsc).
 
-On Wed, Aug 02, 2017 at 09:11:14AM -0700, Ryan Schaefer wrote:
-> I am using an i.mx7d based board, and attempting to reserve the lower
-> 2MB of memory for the M4 co-processor.
+Without such a mapping, the reg = ... lines in the tsc and adc nodes do
+not create a resource. Probing the fsl-imx25-tcq and fsl-imx25-tsadc
+drivers will then fail since there's no IORESOURCE_MEM.
 
-Linux expects TAM starting at a 128 MiB boundary in some places. So,
-does it work if you reserve 128 MiB for the M4?
+Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+---
+ arch/arm/boot/dts/imx25.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-Best regards
-Uwe
-
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index 0d2f3a1..1e37bd3 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -297,6 +297,7 @@
+ 				#address-cells = <1>;
+ 				#size-cells = <1>;
+ 				status = "disabled";
++				ranges;
+ 
+ 				adc: adc at 50030800 {
+ 					compatible = "fsl,imx25-gcq";
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.1.4
