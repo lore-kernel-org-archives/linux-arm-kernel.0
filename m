@@ -1,39 +1,51 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Wed, 2 Aug 2017 16:05:05 +0200
-Subject: [PATCH v2 0/9] EDAC drivers for Armada XP L2 and DDR
-In-Reply-To: <20170802123922.11498-1-jlu@pengutronix.de>
-References: <20170802123922.11498-1-jlu@pengutronix.de>
-Message-ID: <20170802140505.GA2290@nazgul.tnic>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 2 Aug 2017 17:09:37 +0300
+Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
+In-Reply-To: <7bcad698-fa1a-3dc2-e918-4400639ca6d7@st.com>
+References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
+ <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
+ <20170722065133.GT3053@localhost>
+ <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
+ <20170726052930.GF3053@localhost>
+ <f2908e38-dc4d-3886-4058-52a7ad845415@st.com>
+ <20170731123157.GJ3053@localhost>
+ <e3a76a50-4160-d111-cce9-132b46b66c33@st.com>
+ <20170802045522.GU3053@localhost>
+ <7d2091fe-a2e5-78bb-b63d-9cb66bdb7e84@ti.com>
+ <7bcad698-fa1a-3dc2-e918-4400639ca6d7@st.com>
+Message-ID: <47ceba83-1097-072e-bed6-d1964bce7a25@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 02, 2017 at 02:39:13PM +0200, Jan Luebbe wrote:
-> Chris Packham (2):
->   ARM: l2x0: support parity-enable/disable on aurora
->   ARM: l2x0: add marvell,ecc-enable property for aurora
-> 
-> Jan Luebbe (7):
->   ARM: l2c: move cache-aurora-l2.h to asm/hardware
->   ARM: aurora-l2: add prefix to MAX_RANGE_SIZE
->   ARM: aurora-l2: add defines for parity and ECC registers
+?
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
 
-I'd need an ACK from an ARM maintainer for those if the whole series is
-going to go through the EDAC tree.
+On 2017-08-02 16:11, Pierre Yves MORDRET wrote:
+> Our SoC works with or without DMAMUX. Both binding is allowed. Using only DMA a
+> ChannelId and request line is part of the binding.
 
->   EDAC: Add missing debugfs_create_x32 wrapper
->   EDAC: Add devres helpers for
->     edac_mc_alloc/edac_mc_add_mc(_with_groups)
->   EDAC: Add devres helpers for
->     edac_device_alloc_ctl_info/edac_device_add_device
->   EDAC: Add driver for the Marvell Armada XP SDRAM and L2 cache ECC
+In our case the am335x's eDMA can work with or without the router, we 
+only use the router node if we need none default event for a given DMA 
+request line.
 
-Alternatively, I can review those and they can go through an ARM tree.
+> Using DMAMUx now the request
+> line is coming from dma_spec forwards to dma-master as well explained by Peter.
+> However ChannelID is now given by dma_get_any_slave_channel instead of bindings.
+> DMAMUX driver has to be aware of this ID to route request line to out DMA
+> channel. This channel id information is carried on until DMAMUX through
+> dmaengine_slave_config with a custom API.
+> Hope it clarifies the need.
 
-I'm fine with whatever ARM maintainers prefer.
+I see, this is not much different then what we face with our dra7 
+devices. In theory we could use direct DMA binding to the DMA controller 
+itself, but some requests would not be reachable, so we always use the 
+router's node for DMA on dra7 family.
 
--- 
-Regards/Gruss,
-    Boris.
+Basically the router would manage the ChannelID and create 
+'st,stm32-dma' compatible dma_spec (the four parameters).
+Afaik you could have 3 parameters for the router and create a four 
+parameter dma_spec, where the ChannelID is dynamically allocated.
+But you need to convert all peripherals to use the router's node for the 
+DMA.
 
-ECO tip #101: Trim your mails when you reply.
---
+- P?ter
