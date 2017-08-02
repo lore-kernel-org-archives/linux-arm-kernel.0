@@ -1,28 +1,64 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 2 Aug 2017 12:47:37 +0200
-Subject: [PATCH v2 3/5] ARM: vexpress_defconfig: Cleanup from non-existing
- options
-In-Reply-To: <eb3d0725-8fc3-23cf-5fae-ce8cdf875c83@arm.com>
-References: <1500353947-26122-1-git-send-email-krzk@kernel.org>
- <1500353947-26122-4-git-send-email-krzk@kernel.org>
- <eb3d0725-8fc3-23cf-5fae-ce8cdf875c83@arm.com>
-Message-ID: <CAJKOXPfKEktmdvaGZKO_wUpAnfui3CPaJamxs+NVr=hGwqDwKw@mail.gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed,  2 Aug 2017 10:48:57 +0100
+Subject: [PATCH v5 2/9] arm64: hugetlb: Introduce pte_pgprot helper
+In-Reply-To: <20170802094904.27749-1-punit.agrawal@arm.com>
+References: <20170802094904.27749-1-punit.agrawal@arm.com>
+Message-ID: <20170802094904.27749-3-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 2, 2017 at 12:45 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> On 18/07/17 05:59, Krzysztof Kozlowski wrote:
->> ARCH_VEXPRESS_CA9X4 is gone since commit 81cc3f868d30 ("ARM: vexpress:
->> Remove non-DT code").
->>
->> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->> Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
->
-> I assume you are planning to send this pull request to this series to
-> ARM-SoC team based on Arnd's reply. Please shout if that's not the case.
+From: Steve Capper <steve.capper@arm.com>
 
-Yes, correct. In progress, waiting for arm-soc folks:
-http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1452037.html
+Rather than xor pte bits in various places, use this helper function.
 
-Best regards,
-Krzysztof
+Cc: David Woods <dwoods@mellanox.com>
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/mm/hugetlbpage.c | 16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index 7b61e4833432..cb84ca33bc6b 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -41,6 +41,16 @@ int pud_huge(pud_t pud)
+ #endif
+ }
+ 
++/*
++ * Select all bits except the pfn
++ */
++static inline pgprot_t pte_pgprot(pte_t pte)
++{
++	unsigned long pfn = pte_pfn(pte);
++
++	return __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
++}
++
+ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
+ 			   pte_t *ptep, size_t *pgsize)
+ {
+@@ -80,7 +90,7 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+ 
+ 	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
+ 	pfn = pte_pfn(pte);
+-	hugeprot = __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
++	hugeprot = pte_pgprot(pte);
+ 	for (i = 0; i < ncontig; i++) {
+ 		pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
+ 			 pte_val(pfn_pte(pfn, hugeprot)));
+@@ -223,9 +233,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+ 		size_t pgsize = 0;
+ 		unsigned long pfn = pte_pfn(pte);
+ 		/* Select all bits except the pfn */
+-		pgprot_t hugeprot =
+-			__pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^
+-				 pte_val(pte));
++		pgprot_t hugeprot = pte_pgprot(pte);
+ 
+ 		pfn = pte_pfn(pte);
+ 		ncontig = find_num_contig(vma->vm_mm, addr, ptep,
+-- 
+2.11.0
