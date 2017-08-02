@@ -1,41 +1,59 @@
 From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Wed,  2 Aug 2017 11:19:45 +0800
-Subject: [PATCH v5 4/6] ARM: dts: rockchip: add RGA device node for RK3288
+Date: Wed,  2 Aug 2017 11:19:47 +0800
+Subject: [PATCH v5 6/6] dt-bindings: Document the Rockchip RGA bindings
 In-Reply-To: <1501643987-27847-1-git-send-email-jacob-chen@iotwrt.com>
 References: <1501643987-27847-1-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <1501643987-27847-5-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <1501643987-27847-7-git-send-email-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the RGA dt config of rk3288 SoC.
+Add DT bindings documentation for Rockchip RGA
 
 Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
- arch/arm/boot/dts/rk3288.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ .../devicetree/bindings/media/rockchip-rga.txt     | 33 ++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/rockchip-rga.txt
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 1efc2f2..cea41b7 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -945,6 +945,17 @@
- 		status = "okay";
- 	};
- 
-+	rga: rga at ff920000 {
-+		compatible = "rockchip,rk3288-rga";
-+		reg = <0xff920000 0x180>;
-+		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru SCLK_RGA>;
-+		clock-names = "aclk", "hclk", "sclk";
-+		power-domains = <&power RK3288_PD_VIO>;
-+		resets = <&cru SRST_RGA_CORE>, <&cru SRST_RGA_AXI>, <&cru SRST_RGA_AHB>;
-+		reset-names = "core", "axi", "ahb";
-+	};
+diff --git a/Documentation/devicetree/bindings/media/rockchip-rga.txt b/Documentation/devicetree/bindings/media/rockchip-rga.txt
+new file mode 100644
+index 0000000..fd5276a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/rockchip-rga.txt
+@@ -0,0 +1,33 @@
++device-tree bindings for rockchip 2D raster graphic acceleration controller (RGA)
 +
- 	vopb: vop at ff930000 {
- 		compatible = "rockchip,rk3288-vop";
- 		reg = <0xff930000 0x19c>;
++RGA is a standalone 2D raster graphic acceleration unit. It accelerates 2D
++graphics operations, such as point/line drawing, image scaling, rotation,
++BitBLT, alpha blending and image blur/sharpness.
++
++Required properties:
++- compatible: value should be one of the following
++		"rockchip,rk3288-rga";
++		"rockchip,rk3399-rga";
++
++- interrupts: RGA interrupt specifier.
++
++- clocks: phandle to RGA sclk/hclk/aclk clocks
++
++- clock-names: should be "aclk", "hclk" and "sclk"
++
++- resets: Must contain an entry for each entry in reset-names.
++  See ../reset/reset.txt for details.
++- reset-names: should be "core", "axi" and "ahb"
++
++Example:
++SoC-specific DT entry:
++	rga: rga at ff680000 {
++		compatible = "rockchip,rk3399-rga";
++		reg = <0xff680000 0x10000>;
++		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru ACLK_RGA>, <&cru HCLK_RGA>, <&cru SCLK_RGA_CORE>;
++		clock-names = "aclk", "hclk", "sclk";
++
++		resets = <&cru SRST_RGA_CORE>, <&cru SRST_A_RGA>, <&cru SRST_H_RGA>;
++		reset-names = "core, "axi", "ahb";
++	};
 -- 
 2.7.4
