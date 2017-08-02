@@ -1,26 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 2 Aug 2017 11:29:02 +0200
-Subject: [PATCH v3 1/2] gpio: davinci: Add keystone-k2g compatible
-In-Reply-To: <1501051524-5990-1-git-send-email-j-keerthy@ti.com>
-References: <1501051524-5990-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <CACRpkdakZ_ZTemASG68hPiFik+OVN+pUPDdpOeorsha4chtLRw@mail.gmail.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Wed,  2 Aug 2017 11:04:39 +0200
+Subject: [PATCH] video: fbdev: constify copied structures
+Message-ID: <1501664679-10356-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 8:45 AM, Keerthy <j-keerthy@ti.com> wrote:
+Make const some structures that are only copied into other structures.
 
-> The patch adds keystone-k2g compatible, specific properties and
-> an example.
->
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
->
-> Changes in v3:
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-I guess I'm waiting for a v4 on this.
+---
+ drivers/video/fbdev/xilinxfb.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-The changes seem reasonable, also fairly standard and
-uncontroversial.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/video/fbdev/xilinxfb.c b/drivers/video/fbdev/xilinxfb.c
+index 17dc119..9531474 100644
+--- a/drivers/video/fbdev/xilinxfb.c
++++ b/drivers/video/fbdev/xilinxfb.c
+@@ -100,7 +100,7 @@ struct xilinxfb_platform_data {
+ /*
+  * Default xilinxfb configuration
+  */
+-static struct xilinxfb_platform_data xilinx_fb_default_pdata = {
++static const struct xilinxfb_platform_data xilinx_fb_default_pdata = {
+ 	.xres = 640,
+ 	.yres = 480,
+ 	.xvirt = 1024,
+@@ -110,14 +110,14 @@ struct xilinxfb_platform_data {
+ /*
+  * Here are the default fb_fix_screeninfo and fb_var_screeninfo structures
+  */
+-static struct fb_fix_screeninfo xilinx_fb_fix = {
++static const struct fb_fix_screeninfo xilinx_fb_fix = {
+ 	.id =		"Xilinx",
+ 	.type =		FB_TYPE_PACKED_PIXELS,
+ 	.visual =	FB_VISUAL_TRUECOLOR,
+ 	.accel =	FB_ACCEL_NONE
+ };
+ 
+-static struct fb_var_screeninfo xilinx_fb_var = {
++static const struct fb_var_screeninfo xilinx_fb_var = {
+ 	.bits_per_pixel =	BITS_PER_PIXEL,
+ 
+ 	.red =		{ RED_SHIFT, 8, 0 },
