@@ -1,99 +1,171 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Wed, 02 Aug 2017 15:33:22 +0100
-Subject: [RFC PATCH v2 1/2] net: ethernet: nb8800: Reset HW block in
- ndo_open
-References: <33d1ab47-6098-5e3f-8a3c-f72626d07113@free.fr>
- <d817da35-f977-5985-4aae-73617004fac3@free.fr>
- <yw1xbmnyi660.fsf@mansr.com>
- <ef36cd4a-b1b5-7505-34d1-250c736d6731@free.fr>
-Message-ID: <yw1xwp6mghu5.fsf@mansr.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 2 Aug 2017 16:37:48 +0200
+Subject: [PATCH v2 3/4] jump_label: Provide hotplug context variants
+In-Reply-To: <20170801080257.5056-4-marc.zyngier@arm.com>
+References: <20170801080257.5056-1-marc.zyngier@arm.com>
+ <20170801080257.5056-4-marc.zyngier@arm.com>
+Message-ID: <20170802143748.dmthd3hvbq5pbelt@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+On Tue, Aug 01, 2017 at 09:02:56AM +0100, Marc Zyngier wrote:
+> As using the normal static key API under the hotplug lock is
+> pretty much impossible, let's provide a variant of some of them
+> that require the hotplug lock to have already been taken.
+> 
+> These function are only meant to be used in CPU hotplug callbacks.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  Documentation/static-keys.txt | 15 +++++++++++++++
+>  include/linux/jump_label.h    | 11 +++++++++--
+>  kernel/jump_label.c           | 20 ++++++++++++++++++++
+>  3 files changed, 44 insertions(+), 2 deletions(-)
 
-> On 02/08/2017 13:02, M?ns Rullg?rd wrote:
->
->> Mason wrote:
->> 
->>> Move all HW initializations to nb8800_init.
->>> This provides the basis for suspend/resume support.
->>> ---
->>>  drivers/net/ethernet/aurora/nb8800.c | 50 +++++++++++++++++-------------------
->>>  drivers/net/ethernet/aurora/nb8800.h |  1 +
->>>  2 files changed, 25 insertions(+), 26 deletions(-)
->> 
->> You're still not doing anything to preserve flow control and multicast
->> configuration, and those are probably not the only ones.
->
-> I did handle flow control (as far as I can tell).
-> The current settings are stored in:
-> priv->pause_aneg, priv->pause_rx, priv->pause_tx
-> and nb8800_pause_config() is called from nb8800_link_reconfigure()
+I stuffed them in my locking/core branch on top of Paolo's patches:
 
-I think the whole pause setup needs to be revisited.  It's a mess.
-Maybe I'll find the time one day.
+  https://lkml.kernel.org/r/1501601046-35683-1-git-send-email-pbonzini at redhat.com
 
-> I'll take a closer look at multicast settings.
+This patch now looks like so.
 
-You're currently losing all multicast setup as well as promiscuous mode
-if that has been enabled.
+---
+Subject: jump_label: Provide hotplug context variants
+From:   Marc Zyngier <marc.zyngier@arm.com>
+Date: Tue, 1 Aug 2017 09:02:56 +0100
 
->> Worse, you're now never tearing down dma properly, which means the
->> hardware can be left with active pointers to memory no longer allocated
->> to it.
->
-> You're making it sound like there is a risk those pointers
-> might be used somehow. There is no such risk AFAICT.
-> The PHY is disconnected, NAPI is stopped, RX and TX have
-> been disabled, and the ISR has been removed.
+As using the normal static key API under the hotplug lock is
+pretty much impossible, let's provide a variant of some of them
+that require the hotplug lock to have already been taken.
 
-The interrupt handler and NAPI have nothing to do with it since they
-only get involved *after* the hw has filled the buffers.  If you've
-given the hardware control of a memory buffer, you should damn well take
-it back before reusing that memory for something else.  Otherwise you'll
-eventually have a very difficult to debug problem and a security risk.
+These function are only meant to be used in CPU hotplug callbacks.
 
-> I have considered putting the HW block in reset (clock gated)
-> at the end of nb8800_stop() to save power, which would make
-> the issue you point out moot.
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Leo Yan <leo.yan@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+Link: http://lkml.kernel.org/r/20170801080257.5056-4-marc.zyngier at arm.com
+---
+ Documentation/static-keys.txt |   15 +++++++++++++++
+ include/linux/jump_label.h    |   11 +++++++++--
+ kernel/jump_label.c           |   22 ++++++++++++++++++----
+ 3 files changed, 42 insertions(+), 6 deletions(-)
 
-That's not necessarily possible.  It is on Sigma SoCs, but it doesn't
-have to be.
-
-> The reason I removed nb8800_dma_stop() in nb8800_stop()
-> is because it hangs when called from nb8800_suspend().
-> (It requires interrupts to make progress, and interrupts
-> seem to be disabled when nb8800_suspend() is called.)
-
-It shouldn't require interrupts.  If it does for some reason, that
-should be fixed.
-
-> Broader question for netdev:
->
-> I've been wondering about costly close operations.
-> If closing a device is complex (in terms of code), at which
-> point does it become simpler to just reset the block, and
-> avoid writing/maintaining/debugging the code performing
-> said close operation?
->
->> Finally, you still haven't explained why the hw needs to be reset in
->> ndo_open().  Whatever is causing your lockup can almost certainly be
->> triggered in some other way too.  I will not accept this side-stepping
->> of the issue.
->
-> (I was not aware that you were the final authority on which
-> patches are accepted upstream.)
->
-> FWIW, I have placed a formal request for the HW dev to
-> investigate, as I could not reproduce on tango4, despite
-> several days wasted on this issue.
->
-> In the mean time, the driver in its current form does not
-> support suspend/resume. How would *you* implement it?
-
-I'm not saying it's a bad idea for suspend.  It might even be the only
-way.
-
--- 
-M?ns Rullg?rd
+--- a/Documentation/static-keys.txt
++++ b/Documentation/static-keys.txt
+@@ -154,6 +154,21 @@ and 'static_key_count()'.  In general, i
+ should be protected with the same mutex used around the enable/disable
+ or increment/decrement function.
+ 
++Note that switching branches results in some locks being taken,
++particularly the CPU hotplug lock (in order to avoid races against
++CPUs being brought in the kernel whilst the kernel is getting
++patched). Calling the static key API from within a hotplug notifier is
++thus a sure deadlock recipe. In order to still allow use of the
++functionnality, the following functions are provided:
++
++	static_key_enable_cpuslocked()
++	static_key_disable_cpuslocked()
++	static_branch_enable_cpuslocked()
++	static_branch_disable_cpuslocked()
++
++These functions are *not* general purpose, and must only be used when
++you really know that you're in the above context, and no other.
++
+ Where an array of keys is required, it can be defined as::
+ 
+ 	DEFINE_STATIC_KEY_ARRAY_TRUE(keys, count);
+--- a/include/linux/jump_label.h
++++ b/include/linux/jump_label.h
+@@ -163,6 +163,8 @@ extern void jump_label_apply_nops(struct
+ extern int static_key_count(struct static_key *key);
+ extern void static_key_enable(struct static_key *key);
+ extern void static_key_disable(struct static_key *key);
++extern void static_key_enable_cpuslocked(struct static_key *key);
++extern void static_key_disable_cpuslocked(struct static_key *key);
+ 
+ /*
+  * We should be using ATOMIC_INIT() for initializing .enabled, but
+@@ -254,6 +256,9 @@ static inline void static_key_disable(st
+ 	atomic_set(&key->enabled, 0);
+ }
+ 
++#define static_key_enable_cpuslocked(k)		static_key_enable((k))
++#define static_key_disable_cpuslocked(k)	static_key_disable((k))
++
+ #define STATIC_KEY_INIT_TRUE	{ .enabled = ATOMIC_INIT(1) }
+ #define STATIC_KEY_INIT_FALSE	{ .enabled = ATOMIC_INIT(0) }
+ 
+@@ -415,8 +420,10 @@ extern bool ____wrong_branch_error(void)
+  * Normal usage; boolean enable/disable.
+  */
+ 
+-#define static_branch_enable(x)		static_key_enable(&(x)->key)
+-#define static_branch_disable(x)	static_key_disable(&(x)->key)
++#define static_branch_enable(x)			static_key_enable(&(x)->key)
++#define static_branch_disable(x)		static_key_disable(&(x)->key)
++#define static_branch_enable_cpuslocked(x)	static_key_enable_cpuslocked(&(x)->key)
++#define static_branch_disable_cpuslocked(x)	static_key_disable_cpuslocked(&(x)->key)
+ 
+ #endif /* __ASSEMBLY__ */
+ 
+--- a/kernel/jump_label.c
++++ b/kernel/jump_label.c
+@@ -126,15 +126,15 @@ void static_key_slow_inc(struct static_k
+ }
+ EXPORT_SYMBOL_GPL(static_key_slow_inc);
+ 
+-void static_key_enable(struct static_key *key)
++void static_key_enable_cpuslocked(struct static_key *key)
+ {
+ 	STATIC_KEY_CHECK_USE();
++
+ 	if (atomic_read(&key->enabled) > 0) {
+ 		WARN_ON_ONCE(atomic_read(&key->enabled) != 1);
+ 		return;
+ 	}
+ 
+-	cpus_read_lock();
+ 	jump_label_lock();
+ 	if (atomic_read(&key->enabled) == 0) {
+ 		atomic_set(&key->enabled, -1);
+@@ -145,23 +145,37 @@ void static_key_enable(struct static_key
+ 		atomic_set_release(&key->enabled, 1);
+ 	}
+ 	jump_label_unlock();
++}
++EXPORT_SYMBOL_GPL(static_key_enable_cpuslocked);
++
++void static_key_enable(struct static_key *key)
++{
++	cpus_read_lock();
++	static_key_enable_cpuslocked(key);
+ 	cpus_read_unlock();
+ }
+ EXPORT_SYMBOL_GPL(static_key_enable);
+ 
+-void static_key_disable(struct static_key *key)
++void static_key_disable_cpuslocked(struct static_key *key)
+ {
+ 	STATIC_KEY_CHECK_USE();
++
+ 	if (atomic_read(&key->enabled) != 1) {
+ 		WARN_ON_ONCE(atomic_read(&key->enabled) != 0);
+ 		return;
+ 	}
+ 
+-	cpus_read_lock();
+ 	jump_label_lock();
+ 	if (atomic_cmpxchg(&key->enabled, 1, 0))
+ 		jump_label_update(key);
+ 	jump_label_unlock();
++}
++EXPORT_SYMBOL_GPL(static_key_disable_cpuslocked);
++
++void static_key_disable(struct static_key *key)
++{
++	cpus_read_lock();
++	static_key_disable_cpuslocked(key);
+ 	cpus_read_unlock();
+ }
+ EXPORT_SYMBOL_GPL(static_key_disable);
