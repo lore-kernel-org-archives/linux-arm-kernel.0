@@ -1,34 +1,37 @@
-From: david.wu@rock-chips.com (David.Wu)
-Date: Wed, 2 Aug 2017 16:46:58 +0800
-Subject: [PATCH v2 0/7] Add rk3328 pwm support
-In-Reply-To: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
-References: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <b4c44f20-9246-a47b-2b8d-d124220474f3@rock-chips.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 2 Aug 2017 09:44:14 +0100
+Subject: rcu_sched stall while waiting in csd_lock_wait()
+In-Reply-To: <20170802080827.GA15219@arm.com>
+References: <da7c56d6-066a-d123-f0cf-d9a3b97b001e@redhat.com>
+ <20170802080827.GA15219@arm.com>
+Message-ID: <f0fa028b-b690-2b85-ca01-3642ff883e30@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi thierry & boris,
+On 02/08/17 09:08, Will Deacon wrote:
+> Hi Pratyush,
+> 
+> On Wed, Aug 02, 2017 at 09:01:19AM +0530, Pratyush Anand wrote:
+>> I am observing following rcu_sched stall while executing `perf record -a  --
+>> sleep 1` with one of the arm64 platform. It looks like that stalled cpu was
+>> waiting in csd_lock_wait() from where it never came out,and so the stall.
+>> Any help/pointer for further debugging would be very helpful. Problem also
+>> reproduced with 4.13.0-rc3.
+> 
+> When you say "also", which other kernel(s) show the problem? Is this a
+> recent regression? Which platform are you running on?
+> 
+> It would be interesting to know what the other CPUs are doing, in particular
+> the target of the cross-call. Either it crashed spectacularly and didn't
+> unlock the csd lock, or the IPI somehow wasn't delivered.
+> 
+> Do you see any other splats if you enable lock debugging?
 
-Do you have any other suggestion for the patches?
-We hope to make them arrive in Linux-v4.14.
+Also, is that in a guest, or bare metal? If that's a guest, what's the
+host's kernel version?
 
-? 2017/7/8 12:03, David Wu ??:
-> There are two features of rk3328 pwm module.
->   - PWM APB and function clocks are different.
->   - Add pwm atomic hardware update
-> 
-> David Wu (7):
->    pwm: rockchip: Add APB and function both clocks support
->    pwm: rockchip: Remove the judge from return value of pwm_config
->    pwm: rockchip: Remove the dumplicate rockchip_pwm_ops ops
->    pwm: rockchip: Use pwm_apply instead of the pwm_enable
->    pwm: rockchip: Move the configuration of polarity from
->      rockchip_pwm_set_enable() to rockchip_pwm_config()
->    pwm: rockchip: Add rk3328 pwm support
->    arm64: dts: rockchip: Add pwm nodes for rk3328
-> 
->   .../devicetree/bindings/pwm/pwm-rockchip.txt       |   9 +-
->   arch/arm64/boot/dts/rockchip/rk3328.dtsi           |  45 ++++
->   drivers/pwm/pwm-rockchip.c                         | 275 ++++++++++++++-------
->   3 files changed, 236 insertions(+), 93 deletions(-)
-> 
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
