@@ -1,65 +1,33 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 02 Aug 2017 17:11:41 +0300
-Subject: [PATCH v2 1/4] drm/bridge: dw-hdmi: add cec notifier support
-In-Reply-To: <E1dcBhV-00088e-8x@rmk-PC.armlinux.org.uk>
-References: <20170731142906.GX31807@n2100.armlinux.org.uk>
- <E1dcBhV-00088e-8x@rmk-PC.armlinux.org.uk>
-Message-ID: <2091520.p8lH1xBY9c@avalon>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 2 Aug 2017 16:12:09 +0200
+Subject: [patch v1 0/2] JTAG driver introduction
+In-Reply-To: <1501679918-20486-1-git-send-email-oleksandrs@mellanox.com>
+References: <1501679918-20486-1-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <20170802141209.GB25781@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Wed, Aug 02, 2017 at 04:18:36PM +0300, Oleksandr Shamray wrote:
+> When a need raise up to use JTAG interface for system's devices
+> programming or CPU debugging, it could be done from the external
+> JTAG master controller.
+>  
+> For such purpose, usually the user layer
+> application implements jtag protocol or using a proprietary
+> connection to vendor hardware.
+> This method is slow and not generic.
+>  
+> We propose to implement general JTAG interface and infrastructure
+> to communicate with user layer application. In such way, we can
+> have the standard JTAG interface core part and separation from
+> specific HW implementation.
+> This allow new capability to debug the CPU or program system's 
+> device via BMC without additional devices nor cost. 
 
-Thank you for the patch.
+Hi Oleksandr
 
-On Monday 31 Jul 2017 15:29:41 Russell King wrote:
-> Add CEC notifier support to the HDMI bridge driver, so that the CEC
-> part of the IP can receive its physical address.
-> 
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  drivers/gpu/drm/bridge/synopsys/Kconfig   |  1 +
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 22 +++++++++++++++++++++-
->  2 files changed, 22 insertions(+), 1 deletion(-)
+Do you have patches for OpenOCD? Or maybe i should ask it another way,
+what user space tools are you using?
 
-[snip]
-
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c index
-> ead11242c4b9..82e55ee8e4fa 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-
-[snip]
-
-> @@ -2376,6 +2387,12 @@ __dw_hdmi_probe(struct platform_device *pdev,
->  	if (ret)
->  		goto err_iahb;
-> 
-> +	hdmi->cec_notifier = cec_notifier_get(dev);
-> +	if (!hdmi->cec_notifier) {
-> +		ret = -ENOMEM;
-> +		goto err_iahb;
-> +	}
-> +
->  	/*
->  	 * To prevent overflows in HDMI_IH_FC_STAT2, set the clk regenerator
->  	 * N and cts values before enabling phy
-> @@ -2452,6 +2469,9 @@ __dw_hdmi_probe(struct platform_device *pdev,
->  		hdmi->ddc = NULL;
->  	}
-> 
-> +	if (hdmi->cec_notifier)
-> +		cec_notifier_put(hdmi->cec_notifier);
-> +
->  	clk_disable_unprepare(hdmi->iahb_clk);
->  err_isfr:
->  	clk_disable_unprepare(hdmi->isfr_clk);
-
-I'm not very familiar yet with the CEC API so I made have missed something, 
-but shouldn't you call cec_notifier_put() in the remove() handler ?
-
--- 
-Regards,
-
-Laurent Pinchart
+Thanks
+	Andrew
