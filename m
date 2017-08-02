@@ -1,156 +1,77 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Wed,  2 Aug 2017 06:40:41 +0200
-Subject: [PATCH] ARM: dts: BCM5301X: Specify USB ports for USB LEDs of few
- devices
-Message-ID: <20170802044041.3626-1-zajec5@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 2 Aug 2017 12:46:12 +0800
+Subject: [linux-sunxi] [PATCH 00/13] Allwinner H3 DE2 basical support
+In-Reply-To: <20170801131304.7741-1-icenowy@aosc.io>
+References: <20170801131304.7741-1-icenowy@aosc.io>
+Message-ID: <CAGb2v64giQbwJK+Yp=EN0jVDN3eHA_Yf_X3gR-hfC6j_u3z9PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+On Tue, Aug 1, 2017 at 9:12 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> Allwinner H3 features a "Display Engine 2.0", which needs some support
+> to be present in the DRM driver.
+>
+> This patchset is now a basical version, which dropped some features I
+> used to submitted:
+> - TVE support (not so high priority now)
+> - Multi-pipeline support (also not so high priority now due to no TVE)
 
-This uses trigger-sources documented in commit 80dc6e1cd85fc ("dt-bindings:
-leds: document new trigger-sources property") to specify USB ports. Such an
-information can be used by operating system to setup LEDs behavior.
+Even though you dropped some patches, this is still v3.
 
-I updated dts files for 7 devices I own and I was able to test.
+What has changed since v2?
 
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
- arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  | 4 ++++
- arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 3 +++
- arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      | 6 ++++++
- arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts | 4 ++++
- arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts  | 5 +++++
- arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts      | 3 +++
- arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts      | 3 +++
- 7 files changed, 28 insertions(+)
+>
+> The last 6 patches are only used for testing this patchset, and they're
+> going to be sent by Jernej Skrabec after this patchset is applied.
+>
+> Icenowy Zheng (9):
+>   dt-bindings: update the binding for Allwinner H3 DE2 support
+>   drm: sun4i: add support for H3 mixers
+>   drm: sun4i: add support for H3's TCON
+>   drm: sun4i: add compatible for H3 display engine
+>   clk: sunxi-ng: allow CLK_DE to set CLK_PLL_DE for H3
+>   clk: sunxi-ng: export CLK_PLL_DE for H3
+>   ARM: sun8i: h3: add display engine pipeline barebone
+>   [NOT FOR REVIEW NOW] ARM: sun8i: h3: enable DesignWare HDMI controller
+>   [NOT FOR REVIEW NOW] ARM: sun8i: h3: enable HDMI output on Orange Pi
+>     PC
+>
+> Jernej Skrabec (4):
+>   [NOT FOR REVIEW NOW] drm: bridge: Enable polling hpd event in dw_hdmi
+>   [NOT FOR REVIEW NOW] drm: bridge: Add a pre_init function for the
+>     dw_hdmi driver
+>   [NOT FOR REVIEW NOW] clk: sunxi: Add CLK_SET_RATE_PARENT flag for H3
+>     HDMI clock
 
-diff --git a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-index 62e1427b3f10..8b64caabaad8 100644
---- a/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-+++ b/arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts
-@@ -52,6 +52,10 @@
- 		usb {
- 			label = "bcm53xx:blue:usb";
- 			gpios = <&hc595 0 GPIO_ACTIVE_HIGH>;
-+			trigger-sources = <&ohci_port1>, <&ehci_port1>,
-+					  <&xhci_port1>, <&ohci_port2>,
-+					  <&ehci_port2>;
-+			linux,default-trigger = "usbport";
- 		};
- 
- 		power0 {
-diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-index a5647efe4118..d7c34fa72b4b 100644
---- a/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-+++ b/arch/arm/boot/dts/bcm4708-netgear-r6250.dts
-@@ -48,6 +48,9 @@
- 		usb {
- 			label = "bcm53xx:blue:usb";
- 			gpios = <&chipcommon 8 GPIO_ACTIVE_LOW>;
-+			trigger-sources = <&ohci_port1>, <&ehci_port1>,
-+					  <&xhci_port1>;
-+			linux,default-trigger = "usbport";
- 		};
- 
- 		wireless {
-diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-index 19ee924d7d53..83a4c60bb431 100644
---- a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-+++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-@@ -42,16 +42,22 @@
- 		usb2 {
- 			label = "bcm53xx:white:usb2";
- 			gpios = <&chipcommon 3 GPIO_ACTIVE_HIGH>;
-+			trigger-sources = <&ohci_port2>, <&ehci_port2>;
-+			linux,default-trigger = "usbport";
- 		};
- 
- 		usb3-white {
- 			label = "bcm53xx:white:usb3";
- 			gpios = <&chipcommon 4 GPIO_ACTIVE_HIGH>;
-+			trigger-sources = <&xhci_port1>;
-+			linux,default-trigger = "usbport";
- 		};
- 
- 		usb3-green {
- 			label = "bcm53xx:green:usb3";
- 			gpios = <&chipcommon 5 GPIO_ACTIVE_HIGH>;
-+			trigger-sources = <&ohci_port1>, <&ehci_port1>;
-+			linux,default-trigger = "usbport";
- 		};
- 
- 		wps {
-diff --git a/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts b/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
-index a854a5174b7f..3ed8de42cb48 100644
---- a/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
-+++ b/arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts
-@@ -36,6 +36,8 @@
- 		usb2-port1 {
- 			label = "bcm53xx:green:usb2-port1";
- 			gpios = <&chipcommon 2 GPIO_ACTIVE_HIGH>;
-+			trigger-sources = <&ohci_port1>, <&ehci_port1>;
-+			linux,default-trigger = "usbport";
- 		};
- 
- 		power {
-@@ -67,6 +69,8 @@
- 		usb2-port2 {
- 			label = "bcm53xx:green:usb2-port2";
- 			gpios = <&chipcommon 13 GPIO_ACTIVE_HIGH>;
-+			trigger-sources = <&ohci_port2>, <&ehci_port2>;
-+			linux,default-trigger = "usbport";
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
-index 97aa5d59a1d8..ec4a50e440f6 100644
---- a/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
-+++ b/arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts
-@@ -46,11 +46,16 @@
- 		usb3 {
- 			label = "bcm53xx:blue:usb3";
- 			gpios = <&chipcommon 6 GPIO_ACTIVE_HIGH>;
-+			trigger-sources = <&ohci_port1>, <&ehci_port1>,
-+					  <&xhci_port1>;
-+			linux,default-trigger = "usbport";
- 		};
- 
- 		usb2 {
- 			label = "bcm53xx:blue:usb2";
- 			gpios = <&chipcommon 7 GPIO_ACTIVE_HIGH>;
-+			trigger-sources = <&ohci_port2>, <&ehci_port2>;
-+			linux,default-trigger = "usbport";
- 		};
- 
- 		wan-blue {
-diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-index 51b0641b5f79..7cc7d344fe5b 100644
---- a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-+++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-@@ -71,6 +71,9 @@
- 		usb3-white {
- 			label = "bcm53xx:white:usb3";
- 			gpios = <&chipcommon 8 GPIO_ACTIVE_LOW>;
-+			trigger-sources = <&ohci_port1>, <&ehci_port1>,
-+					  <&xhci_port1>;
-+			linux,default-trigger = "usbport";
- 		};
- 
- 		2ghz {
-diff --git a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
-index 5f8621d00c50..bc1d1e10d4ac 100644
---- a/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
-+++ b/arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts
-@@ -59,6 +59,9 @@
- 		usb3	{
- 			label = "bcm53xx:green:usb3";
- 			gpios = <&chipcommon 8 GPIO_ACTIVE_LOW>;
-+			trigger-sources = <&ohci_port1>, <&ehci_port1>,
-+					  <&xhci_port1>;
-+			linux,default-trigger = "usbport";
- 		};
- 
- 		status	{
--- 
-2.11.0
+This one looks trivial enough that I can pick it up regardless of the tag.
+
+ChenYu
+
+>   [NOT FOR REVIEW NOW] drm: sun4i: Add a glue for the DesignWare HDMI
+>     controller in H3
+>
+>  .../bindings/display/sunxi/sun4i-drm.txt           |  25 +-
+>  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  16 +
+>  arch/arm/boot/dts/sun8i-h3.dtsi                    | 205 +++++++++
+>  drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |   4 +-
+>  drivers/clk/sunxi-ng/ccu-sun8i-h3.h                |   3 +-
+>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c          |   9 +-
+>  drivers/gpu/drm/sun4i/Kconfig                      |   9 +
+>  drivers/gpu/drm/sun4i/Makefile                     |   1 +
+>  drivers/gpu/drm/sun4i/sun4i_drv.c                  |   2 +
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c                 |  43 +-
+>  drivers/gpu/drm/sun4i/sun4i_tcon.h                 |   1 +
+>  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c              | 462 +++++++++++++++++++++
+>  drivers/gpu/drm/sun4i/sun8i_mixer.c                |  18 +
+>  include/drm/bridge/dw_hdmi.h                       |   2 +
+>  include/dt-bindings/clock/sun8i-h3-ccu.h           |   2 +
+>  15 files changed, 781 insertions(+), 21 deletions(-)
+>  create mode 100644 drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
+>
+> --
+> 2.13.0
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
