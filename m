@@ -1,20 +1,59 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 2 Aug 2017 06:44:56 -0700
-Subject: [patch v1 1/2] drivers: jtag: Add JTAG core driver
-In-Reply-To: <1501679918-20486-2-git-send-email-oleksandrs@mellanox.com>
-References: <1501679918-20486-1-git-send-email-oleksandrs@mellanox.com>
- <1501679918-20486-2-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <20170802134456.GD27481@kroah.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 02 Aug 2017 15:45:52 +0200
+Subject: [PATCH] ARM64: dts: marvell: armada37xx: Fix number of GPIO on
+ south bridge
+In-Reply-To: <20170801160135.10434-1-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Tue, 1 Aug 2017 18:01:35 +0200")
+References: <20170801160135.10434-1-gregory.clement@free-electrons.com>
+Message-ID: <87h8xq9j73.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 02, 2017 at 04:18:37PM +0300, Oleksandr Shamray wrote:
-> +menuconfig JTAG
-> +	tristate "JTAG support"
-> +	default n
+Hi,
+ 
+ On mar., ao?t 01 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-'n' is always the default, no need for this line at all.
+> The number of pins in South Bridge is 30 and not 29. There is a fix for
+> the driver for the pinctrl, but a fix is also need at device tree level
+> for the GPIO.
+>
+> Fixes: afda007feda5 ("ARM64: dts: marvell: Add pinctrl nodes for Armada
+> 3700")
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-thanks,
+Applied on mvebu/fixes
 
-greg k-h
+Gregory
+
+> ---
+>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> index dbcc3d4e2ed5..51763d674050 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+> @@ -219,7 +219,7 @@
+>  				reg = <0x18800 0x100>, <0x18C00 0x20>;
+>  				gpiosb: gpio {
+>  					#gpio-cells = <2>;
+> -					gpio-ranges = <&pinctrl_sb 0 0 29>;
+> +					gpio-ranges = <&pinctrl_sb 0 0 30>;
+>  					gpio-controller;
+>  					interrupts =
+>  					<GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
+> -- 
+> 2.13.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
