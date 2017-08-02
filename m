@@ -1,51 +1,102 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 2 Aug 2017 17:09:37 +0300
-Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
-In-Reply-To: <7bcad698-fa1a-3dc2-e918-4400639ca6d7@st.com>
-References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
- <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
- <20170722065133.GT3053@localhost>
- <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
- <20170726052930.GF3053@localhost>
- <f2908e38-dc4d-3886-4058-52a7ad845415@st.com>
- <20170731123157.GJ3053@localhost>
- <e3a76a50-4160-d111-cce9-132b46b66c33@st.com>
- <20170802045522.GU3053@localhost>
- <7d2091fe-a2e5-78bb-b63d-9cb66bdb7e84@ti.com>
- <7bcad698-fa1a-3dc2-e918-4400639ca6d7@st.com>
-Message-ID: <47ceba83-1097-072e-bed6-d1964bce7a25@ti.com>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Wed, 2 Aug 2017 07:10:52 -0700
+Subject: [PATCH v2 2/3] arm/syscalls: Optimize address limit check
+In-Reply-To: <20170726170051.28328-2-thgarnie@google.com>
+References: <20170726170051.28328-1-thgarnie@google.com>
+ <20170726170051.28328-2-thgarnie@google.com>
+Message-ID: <CAJcbSZHq3FLvfm+7jODmqOCYOGh2ZDF8A4ZnihvkdwbMA7GGRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+On Wed, Jul 26, 2017 at 10:00 AM, Thomas Garnier <thgarnie@google.com> wrote:
+> Disable the generic address limit check in favor of an architecture
+> specific optimized implementation. The generic implementation using
+> pending work flags did not work well with ARM and alignment faults.
+>
+> The address limit is checked on each syscall return path to user-mode
+> path as well as the irq user-mode return function. If the address limit
+> was changed, a function is called to stop the kernel with an explicit
+> message.
+>
+> The address limit check has to be done before any pending work because
+> they can reset the address limit. For example the lkdtm address limit
+> check does not work because the signal to kill the process will reset
+> the user-mode address limit.
+>
+> Signed-off-by: Thomas Garnier <thgarnie@google.com>
+> ---
 
-On 2017-08-02 16:11, Pierre Yves MORDRET wrote:
-> Our SoC works with or without DMAMUX. Both binding is allowed. Using only DMA a
-> ChannelId and request line is part of the binding.
+Russel: What do you think about this patch set?
 
-In our case the am335x's eDMA can work with or without the router, we 
-only use the router node if we need none default event for a given DMA 
-request line.
+>  arch/arm/kernel/entry-common.S | 11 +++++++++++
+>  arch/arm/kernel/signal.c       |  5 +++++
+>  2 files changed, 16 insertions(+)
+>
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index 0b60adf4a5d9..99c908226065 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -12,6 +12,7 @@
+>  #include <asm/unistd.h>
+>  #include <asm/ftrace.h>
+>  #include <asm/unwind.h>
+> +#include <asm/memory.h>
+>  #ifdef CONFIG_AEABI
+>  #include <asm/unistd-oabi.h>
+>  #endif
+> @@ -48,10 +49,14 @@ ret_fast_syscall:
+>   UNWIND(.fnstart       )
+>   UNWIND(.cantunwind    )
+>         disable_irq_notrace                     @ disable interrupts
+> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
+> +       cmp     r2, #TASK_SIZE
+> +       blne    addr_limit_check_failed
+>         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
+>         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+>         bne     fast_work_pending
+>
+> +
+>         /* perform architecture specific actions before user return */
+>         arch_ret_to_user r1, lr
+>
+> @@ -74,6 +79,9 @@ ret_fast_syscall:
+>   UNWIND(.cantunwind    )
+>         str     r0, [sp, #S_R0 + S_OFF]!        @ save returned r0
+>         disable_irq_notrace                     @ disable interrupts
+> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
+> +       cmp     r2, #TASK_SIZE
+> +       blne    addr_limit_check_failed
+>         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
+>         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+>         beq     no_work_pending
+> @@ -106,6 +114,9 @@ ENTRY(ret_to_user)
+>  ret_slow_syscall:
+>         disable_irq_notrace                     @ disable interrupts
+>  ENTRY(ret_to_user_from_irq)
+> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
+> +       cmp     r2, #TASK_SIZE
+> +       blne    addr_limit_check_failed
+>         ldr     r1, [tsk, #TI_FLAGS]
+>         tst     r1, #_TIF_WORK_MASK
+>         bne     slow_work_pending
+> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> index 5814298ef0b7..5769c15cff89 100644
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -673,3 +673,8 @@ struct page *get_signal_page(void)
+>
+>         return page;
+>  }
+> +
+> +asmlinkage void addr_limit_check_failed(void)
+> +{
+> +       panic("Incorrect address limit while returning to user-mode.");
+> +}
+> --
+> 2.14.0.rc0.400.g1c36432dff-goog
+>
 
-> Using DMAMUx now the request
-> line is coming from dma_spec forwards to dma-master as well explained by Peter.
-> However ChannelID is now given by dma_get_any_slave_channel instead of bindings.
-> DMAMUX driver has to be aware of this ID to route request line to out DMA
-> channel. This channel id information is carried on until DMAMUX through
-> dmaengine_slave_config with a custom API.
-> Hope it clarifies the need.
 
-I see, this is not much different then what we face with our dra7 
-devices. In theory we could use direct DMA binding to the DMA controller 
-itself, but some requests would not be reachable, so we always use the 
-router's node for DMA on dra7 family.
 
-Basically the router would manage the ChannelID and create 
-'st,stm32-dma' compatible dma_spec (the four parameters).
-Afaik you could have 3 parameters for the router and create a four 
-parameter dma_spec, where the ChannelID is dynamically allocated.
-But you need to convert all peripherals to use the router's node for the 
-DMA.
-
-- P?ter
+-- 
+Thomas
