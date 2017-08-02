@@ -1,70 +1,69 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 2 Aug 2017 17:52:18 +0100
-Subject: [PATCH v2 0/5] ACPI: DMA ranges management
-In-Reply-To: <CAJZ5v0g_NHo5Jnp5HcseS2RQL1PwaewGE6eG6Xn9OafAXwHgkw@mail.gmail.com>
-References: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
- <CAJZ5v0g_NHo5Jnp5HcseS2RQL1PwaewGE6eG6Xn9OafAXwHgkw@mail.gmail.com>
-Message-ID: <20170802165218.GA32215@red-moon>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 2 Aug 2017 17:54:51 +0100
+Subject: [PATCH v2 0/3] mailbox: arm: introduce smc triggered mailbox
+In-Reply-To: <CABb+yY04O+XQ5Dy=dEBYTcHEUwES_sFi1_3409qnUgV0r1y_bQ@mail.gmail.com>
+References: <1500852206-28771-1-git-send-email-andre.przywara@arm.com>
+ <ffabbe33-5edd-4642-6038-5b48c87ad372@suse.de>
+ <CABb+yY04O+XQ5Dy=dEBYTcHEUwES_sFi1_3409qnUgV0r1y_bQ@mail.gmail.com>
+Message-ID: <e17ef686-b222-98d9-3cd1-c4632caccc59@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 08:57:19PM +0200, Rafael J. Wysocki wrote:
-> On Mon, Jul 31, 2017 at 5:23 PM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > This patch series is v2 of a previous posting:
-> >
-> > v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
-> >
-> > v1->v2:
-> >         - Reworked acpi_dma_get_range() flow and logs
-> >         - Added IORT named component address limits
-> >         - Renamed acpi_dev_get_resources() helper function
-> >         - Rebased against v4.13-rc3
-> >
-> > -- Original cover letter --
-> >
-> > As reported in:
-> >
-> > http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
-> >
-> > the bus connecting devices to an IOMMU bus can be smaller in size than
-> > the IOMMU input address bits which results in devices DMA HW bugs in
-> > particular related to IOVA allocation (ie chopping of higher address
-> > bits owing to system bus HW capabilities mismatch with the IOMMU).
-> >
-> > Fortunately this problem can be solved through an already present but never
-> > used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
-> > window for a specific bus in ACPI and therefore all upstream devices
-> > connected to it.
-> >
-> > This small patch series enables _DMA parsing in ACPI core code and
-> > use it in ACPI IORT code in order to detect DMA ranges for devices and
-> > update their data structures to make them work with their related DMA
-> > addressing restrictions.
-> >
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> > Cc: Feng Kan <fkan@apm.com>
-> > Cc: Jon Masters <jcm@redhat.com>
-> > Cc: Robert Moore <robert.moore@intel.com>
-> > Cc: Robin Murphy <robin.murphy@arm.com>
-> > Cc: Zhang Rui <rui.zhang@intel.com>
-> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> >
-> > Lorenzo Pieralisi (5):
-> >   ACPICA: resource_mgr: Allow _DMA method in walk resources
-> >   ACPI: Make acpi_dev_get_resources() method agnostic
-> >   ACPI: Introduce DMA ranges parsing
-> >   ACPI: Make acpi_dma_configure() DMA regions aware
-> >   ACPI/IORT: Add IORT named component memory address limits
+(sorry for SCPI/SCMI discussion in this thread)
+
+On 01/08/17 16:50, Jassi Brar wrote:
+> On Tue, Aug 1, 2017 at 4:20 PM, Alexander Graf <agraf@suse.de> wrote:
+>> Hi Andre,
+>>
+>> On 24.07.17 01:23, Andre Przywara wrote:
+>>>
+>>> This is a reworked version of my previous post. It addresses Jassi's
+>>> comments on the driver and also tries to cover Rob's and Mark's comments
+>>> on the binding documentation.
+>>> I dropped the more example-like DT changes from v1, as they are actually
+>>> not meant to be merged into the Linux tree, but instead are provided as
+>>> part of some firmware actually implementing this functionality.
+>>>
+>>> Please let me know what you think.
+>>
+>>
+>> Could you please quickly explain what it would take to provide SCMI on top
+>> of this instead of SCPI?
+>>
+>> https://lkml.org/lkml/2017/6/7/624
+>>
+> The SCMI (and SCPI) code is broken, that is, unless the firmware/SM is
+> trained to ignore the random value (pointer to a structure) passed via
+> R1. Which may be possible to do, but is surely a sign of poor
+> implementation. And may not be possible if some protocol other than
+> SCMI runs in parallel.
 > 
-> Patches [1-3/5] are fine by me, but I need ACKs from the ARM side on
-> the last two ones.
 
-Will, Robin, are you ok with this series ?
+Since SCPI and SCMI are based on doorbell designs like ACPI PCC, they
+can't send any data as all the data are part of shared memory.
 
-@Nate: I'd need your tested-by on v2 please (ie IORT named component
-address limits handling) before we go ahead.
+What data needs to be sent from SCPI/SCMI as part of mbox_send_message
+in your opinion ? I can't think of any generic way to form this data.
 
-Thanks,
-Lorenzo
+It's not possible to generalize that and SCPI/SCMI's transport is
+specifically designed in that way to avoid any kind of dependency
+on the mailbox hardware so that the protocol can be generic exactly like
+ACPI PCC.
+
+I understand your concern on how existing mailbox controllers work with
+it. They can't as they stand today as they expect some specific data
+based on the hardware or the protocol they support on it.
+
+One option to deal with this is to have a generic DT based doorbell kind
+of controller driver but I am not sure if we can define register level
+bindings like ACPI PCC.
+
+Or we teach them to ignore the data if it's not present. I don't like
+the idea of adding shim layer for each of the controller as each one
+expect different format and more over SCPI/SCMI doesn't even require it
+to support SCMI on those mailbox controllers. That may end up with 2x
+drivers(one actual driver and and another shim layer for it)
+
+-- 
+Regards,
+Sudeep
