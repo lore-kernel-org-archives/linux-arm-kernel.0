@@ -1,172 +1,65 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 2 Aug 2017 13:17:18 +0100
-Subject: [PATCH] iommu/arm-smmu: Defer TLB flush in case of unmap op
-In-Reply-To: <1501667598-16404-1-git-send-email-vivek.gautam@codeaurora.org>
-References: <CAFp+6iFfu2-qrDDim7fzKKLqMcSVMmOr7esqBZ-xEeLTOOTNLA@mail.gmail.com>
- <1501667598-16404-1-git-send-email-vivek.gautam@codeaurora.org>
-Message-ID: <35aeb7dd-4fe6-3175-2252-41c3c54873a9@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 2 Aug 2017 14:20:59 +0200
+Subject: [PATCH 27/31] arm64: dts: renesas: r8a7795: Add usb companion
+ property in EHCI
+In-Reply-To: <b18c9692-bcbf-a24b-10a9-4a79a74bcead@cogentembedded.com>
+References: <cover.1501509525.git.horms+renesas@verge.net.au>
+ <1c422b4c501ec329802a5d00f664821d3b58e11d.1501509526.git.horms+renesas@verge.net.au>
+ <b18c9692-bcbf-a24b-10a9-4a79a74bcead@cogentembedded.com>
+Message-ID: <20170802122059.GA20012@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/17 10:53, Vivek Gautam wrote:
-> We don't want to touch the TLB when smmu is suspended.
-> Defer it until resume.
+On Mon, Jul 31, 2017 at 07:40:23PM +0300, Sergei Shtylyov wrote:
+> On 07/31/2017 06:03 PM, Simon Horman wrote:
 > 
-> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
-> ---
+> >From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+> >
+> >This patch adds the "companion" property in the EHCI ch0, ch1 and
+> >ch2 nodes to wait for the usb companion controller startup at resume.
+> >
+> >Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+> >Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> >[remove ch3 node and revise the commit log]
+> >Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+> >
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >---
+> >  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 3 +++
+> >  1 file changed, 3 insertions(+)
+> >
+> >diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> >index d73d986039c8..7246e689b619 100644
+> >--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> >+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> >@@ -1583,6 +1583,7 @@
+> >  			clocks = <&cpg CPG_MOD 703>;
+> >  			phys = <&usb2_phy0>;
+> >  			phy-names = "usb";
+> >+			companion= <&ohci0>;
+> >  			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+> >  			resets = <&cpg 703>;
+> >  			status = "disabled";
+> >@@ -1595,6 +1596,7 @@
+> >  			clocks = <&cpg CPG_MOD 702>;
+> >  			phys = <&usb2_phy1>;
+> >  			phy-names = "usb";
+> >+			companion= <&ohci1>;
+> >  			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+> >  			resets = <&cpg 702>;
+> >  			status = "disabled";
+> >@@ -1607,6 +1609,7 @@
+> >  			clocks = <&cpg CPG_MOD 701>;
+> >  			phys = <&usb2_phy2>;
+> >  			phy-names = "usb";
+> >+			companion= <&ohci2>;
+> >  			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+> >  			resets = <&cpg 701>;
+> >  			status = "disabled";
 > 
-> Hi all,
-> 
-> Here's the small patch in response of suggestion to defer tlb operations
-> when smmu is in suspend state.
-> The patch stores the TLB requests in 'unmap' when the smmu device is
-> suspended. On resume, it checks all the pending TLB requests, and
-> performs the unmap over those.
-> 
-> Right now, I have applied the patch on top of the pm runtime series.
-> Let me know what you think of the change. It will also be helpful if
-> somebody can please test a valid use case with this.
+>    Looks like a space before = is missing in all 3 cases.
 
-The patch itself doesn't make much sense to me, but more crucially it's
-definitely broken in concept. We can't return from arm_smmu_unmap()
-without having actually unmapped anything, because that leaves the page
-tables out of sync with what the caller expects - they may immmediately
-reuse that IOVA to map something else for a different device and hit an
-unexpected failure from io-pgtable when the PTE turns out to be non-empty.
+Thanks.
 
-However, if in general suspend *might* power-gate any part of the SMMU,
-then I don't think we have any guarantee of what state any TLBs could be
-in upon resume. Therefore any individual invalidations we skip while
-suspended are probably moot, since resume would almost certainly have to
-invalidate everything to get back to a safe state anyway.
-
-Conversely though, the situation that still concerns me is whether this
-can work at all for a distributed SMMU if things *don't* lose state. Say
-the GPU and its local TBU are in the same clock domain - if the GPU has
-just gone idle and we've clock-gated it, but "the SMMU" (i.e. the TCU)
-is still active servicing other devices, we will assume we can happily
-unmap GPU buffers and issue TLBIs, but what happens with entries held in
-the unclocked TBU's micro-TLB?
-
-Robin.
-
-> 
-> regards
-> Vivek
-> 
->  drivers/iommu/arm-smmu.c | 59 +++++++++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 53 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index fe8e7fd61282..1f9c2b16aabb 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -51,6 +51,7 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/slab.h>
->  #include <linux/spinlock.h>
-> +#include <linux/list.h>
->  
->  #include <linux/amba/bus.h>
->  
-> @@ -151,6 +152,14 @@ struct arm_smmu_master_cfg {
->  #define for_each_cfg_sme(fw, i, idx) \
->  	for (i = 0; idx = fwspec_smendx(fw, i), i < fw->num_ids; ++i)
->  
-> +struct arm_smmu_tlb_req_info {
-> +	struct iommu_domain *domain;
-> +	unsigned long iova;
-> +	size_t size;
-> +	bool tlb_flush_pending;
-> +	struct list_head list;
-> +};
-> +
->  struct arm_smmu_device {
->  	struct device			*dev;
->  
-> @@ -182,6 +191,7 @@ struct arm_smmu_device {
->  	u32				num_s2_context_banks;
->  	DECLARE_BITMAP(context_map, ARM_SMMU_MAX_CBS);
->  	atomic_t			irptndx;
-> +	struct list_head		domain_list;
->  
->  	u32				num_mapping_groups;
->  	u16				streamid_mask;
-> @@ -1239,17 +1249,32 @@ static size_t arm_smmu_unmap(struct iommu_domain *domain, unsigned long iova,
->  			     size_t size)
->  {
->  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
-> +	struct arm_smmu_device *smmu = smmu_domain->smmu;
->  	struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
-> -	size_t ret;
-> +	struct arm_smmu_tlb_req_info *tlb_info;
->  
->  	if (!ops)
->  		return 0;
->  
-> -	pm_runtime_get_sync(smmu_domain->smmu->dev);
-> -	ret = ops->unmap(ops, iova, size);
-> -	pm_runtime_put_sync(smmu_domain->smmu->dev);
-> +	/* if the device is suspended; we can't unmap, defer any tlb operations */
-> +	if (pm_runtime_suspended(smmu->dev)) {
-> +		tlb_info = devm_kzalloc(smmu->dev, sizeof(*tlb_info), GFP_ATOMIC);
-> +		if (!tlb_info)
-> +			return -ENOMEM;
->  
-> -	return ret;
-> +		tlb_info->domain = domain;
-> +		tlb_info->iova = iova;
-> +		tlb_info->size = size;
-> +		tlb_info->tlb_flush_pending = true;
-> +		INIT_LIST_HEAD(&tlb_info->list);
-> +
-> +		/* XXX: We need locks here, but that again introduce the slowpath ? */
-> +		list_add_tail(&tlb_info->list, &smmu->domain_list);
-> +
-> +		return size;
-> +	}
-> +
-> +	return ops->unmap(ops, iova, size);
->  }
->  
->  static phys_addr_t arm_smmu_iova_to_phys_hard(struct iommu_domain *domain,
-> @@ -2166,6 +2191,8 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
->  		smmu->irqs[i] = irq;
->  	}
->  
-> +	INIT_LIST_HEAD(&smmu->domain_list);
-> +
->  	err = arm_smmu_init_clocks(smmu);
->  	if (err)
->  		return err;
-> @@ -2268,8 +2295,28 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
->  static int arm_smmu_resume(struct device *dev)
->  {
->  	struct arm_smmu_device *smmu = dev_get_drvdata(dev);
-> +	struct arm_smmu_tlb_req_info  *tlb_info, *temp;
-> +	int ret;
-> +
-> +	ret = arm_smmu_enable_clocks(smmu);
-> +	if (ret)
-> +		return ret;
-> +
-> +	list_for_each_entry_safe(tlb_info, temp, &smmu->domain_list, list) {
-> +		printk("\n\n %s %d :: iterating over pending tlb request\n\n", __func__, __LINE__);
-> +		if (tlb_info->tlb_flush_pending) {
-> +			ret = arm_smmu_unmap(tlb_info->domain, tlb_info->iova, tlb_info->size);
-> +			if (!ret)
-> +				return -EINVAL;
->  
-> -	return arm_smmu_enable_clocks(smmu);
-> +			tlb_info->tlb_flush_pending = false;
-> +
-> +			/* we are done with this request; delete it */
-> +			list_del(&tlb_info->list);
-> +		}
-> +	}
-> +
-> +	return 0;
->  }
->  
->  static int arm_smmu_suspend(struct device *dev)
-> 
+I'll post a follow-up patch for that. I don't think it warrants respinning
+this pull request at this point.
