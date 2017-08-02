@@ -1,91 +1,31 @@
 From: jonas.gorski@gmail.com (Jonas Gorski)
-Date: Wed,  2 Aug 2017 11:34:23 +0200
-Subject: [PATCH 2/8] MIPS: BCM63XX: provide periph clock as refclk for uart
+Date: Wed,  2 Aug 2017 11:34:24 +0200
+Subject: [PATCH 3/8] tty/bcm63xx_uart: use refclk for the expected clock name
 In-Reply-To: <20170802093429.12572-1-jonas.gorski@gmail.com>
 References: <20170802093429.12572-1-jonas.gorski@gmail.com>
-Message-ID: <20170802093429.12572-3-jonas.gorski@gmail.com>
+Message-ID: <20170802093429.12572-4-jonas.gorski@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a lookup as "refclk" to describe its function for the uarts.
+We now have the clock available under refclk, so use that.
 
 Signed-off-by: Jonas Gorski <jonas.gorski@gmail.com>
 ---
- arch/mips/bcm63xx/clk.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/tty/serial/bcm63xx_uart.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/mips/bcm63xx/clk.c b/arch/mips/bcm63xx/clk.c
-index eb1cb0bf930b..0b898e5e4c5b 100644
---- a/arch/mips/bcm63xx/clk.c
-+++ b/arch/mips/bcm63xx/clk.c
-@@ -360,6 +360,8 @@ EXPORT_SYMBOL_GPL(clk_round_rate);
- static struct clk_lookup bcm3368_clks[] = {
- 	/* fixed rate clocks */
- 	CLKDEV_INIT(NULL, "periph", &clk_periph),
-+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
-+	CLKDEV_INIT("bcm63xx_uart.1", "refclk", &clk_periph),
- 	/* gated clocks */
- 	CLKDEV_INIT(NULL, "enet0", &clk_enet0),
- 	CLKDEV_INIT(NULL, "enet1", &clk_enet1),
-@@ -373,6 +375,8 @@ static struct clk_lookup bcm3368_clks[] = {
- static struct clk_lookup bcm6328_clks[] = {
- 	/* fixed rate clocks */
- 	CLKDEV_INIT(NULL, "periph", &clk_periph),
-+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
-+	CLKDEV_INIT("bcm63xx_uart.1", "refclk", &clk_periph),
- 	/* gated clocks */
- 	CLKDEV_INIT(NULL, "enetsw", &clk_enetsw),
- 	CLKDEV_INIT(NULL, "usbh", &clk_usbh),
-@@ -384,6 +388,7 @@ static struct clk_lookup bcm6328_clks[] = {
- static struct clk_lookup bcm6338_clks[] = {
- 	/* fixed rate clocks */
- 	CLKDEV_INIT(NULL, "periph", &clk_periph),
-+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
- 	/* gated clocks */
- 	CLKDEV_INIT(NULL, "enet0", &clk_enet0),
- 	CLKDEV_INIT(NULL, "enet1", &clk_enet1),
-@@ -396,6 +401,7 @@ static struct clk_lookup bcm6338_clks[] = {
- static struct clk_lookup bcm6345_clks[] = {
- 	/* fixed rate clocks */
- 	CLKDEV_INIT(NULL, "periph", &clk_periph),
-+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
- 	/* gated clocks */
- 	CLKDEV_INIT(NULL, "enet0", &clk_enet0),
- 	CLKDEV_INIT(NULL, "enet1", &clk_enet1),
-@@ -408,6 +414,7 @@ static struct clk_lookup bcm6345_clks[] = {
- static struct clk_lookup bcm6348_clks[] = {
- 	/* fixed rate clocks */
- 	CLKDEV_INIT(NULL, "periph", &clk_periph),
-+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
- 	/* gated clocks */
- 	CLKDEV_INIT(NULL, "enet0", &clk_enet0),
- 	CLKDEV_INIT(NULL, "enet1", &clk_enet1),
-@@ -420,6 +427,8 @@ static struct clk_lookup bcm6348_clks[] = {
- static struct clk_lookup bcm6358_clks[] = {
- 	/* fixed rate clocks */
- 	CLKDEV_INIT(NULL, "periph", &clk_periph),
-+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
-+	CLKDEV_INIT("bcm63xx_uart.1", "refclk", &clk_periph),
- 	/* gated clocks */
- 	CLKDEV_INIT(NULL, "enet0", &clk_enet0),
- 	CLKDEV_INIT(NULL, "enet1", &clk_enet1),
-@@ -433,6 +442,8 @@ static struct clk_lookup bcm6358_clks[] = {
- static struct clk_lookup bcm6362_clks[] = {
- 	/* fixed rate clocks */
- 	CLKDEV_INIT(NULL, "periph", &clk_periph),
-+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
-+	CLKDEV_INIT("bcm63xx_uart.1", "refclk", &clk_periph),
- 	/* gated clocks */
- 	CLKDEV_INIT(NULL, "enetsw", &clk_enetsw),
- 	CLKDEV_INIT(NULL, "usbh", &clk_usbh),
-@@ -446,6 +457,8 @@ static struct clk_lookup bcm6362_clks[] = {
- static struct clk_lookup bcm6368_clks[] = {
- 	/* fixed rate clocks */
- 	CLKDEV_INIT(NULL, "periph", &clk_periph),
-+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
-+	CLKDEV_INIT("bcm63xx_uart.1", "refclk", &clk_periph),
- 	/* gated clocks */
- 	CLKDEV_INIT(NULL, "enetsw", &clk_enetsw),
- 	CLKDEV_INIT(NULL, "usbh", &clk_usbh),
+diff --git a/drivers/tty/serial/bcm63xx_uart.c b/drivers/tty/serial/bcm63xx_uart.c
+index 583c9a0c7ecc..a2b9376ec861 100644
+--- a/drivers/tty/serial/bcm63xx_uart.c
++++ b/drivers/tty/serial/bcm63xx_uart.c
+@@ -842,7 +842,7 @@ static int bcm_uart_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 
+ 	clk = pdev->dev.of_node ? of_clk_get(pdev->dev.of_node, 0) :
+-				  clk_get(&pdev->dev, "periph");
++				  clk_get(&pdev->dev, "refclk");
+ 	if (IS_ERR(clk))
+ 		return -ENODEV;
+ 
 -- 
 2.13.2
