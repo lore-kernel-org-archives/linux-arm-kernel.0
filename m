@@ -1,58 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 2 Aug 2017 15:33:33 +0100
-Subject: [PATCH] arm64: defconfig: enable fine-grained task level IRQ
- time accounting
-In-Reply-To: <87y3r29ks0.fsf@free-electrons.com>
-References: <1501532531-4499-1-git-send-email-mw@semihalf.com>
- <87y3r29ks0.fsf@free-electrons.com>
-Message-ID: <20170802143332.7mbfg3lwqocmca7x@armageddon.cambridge.arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 2 Aug 2017 16:41:07 +0200
+Subject: [RFC PATCH v2 0/2] nb8800 suspend/resume support
+In-Reply-To: <33d1ab47-6098-5e3f-8a3c-f72626d07113@free.fr>
+References: <33d1ab47-6098-5e3f-8a3c-f72626d07113@free.fr>
+Message-ID: <aa8885b8-e6bb-3624-2bf9-0bb40505ac54@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 02, 2017 at 03:11:43PM +0200, Gregory CLEMENT wrote:
->  On lun., juil. 31 2017, Marcin Wojtas <mw@semihalf.com> wrote:
-> > Tests showed, that under certain conditions, the summary number of jiffies
-> > spent on softirq/idle, which are counted by system statistics can be even
-> > below 10% of expected value, resulting in false load presentation.
-> >
-> > The issue was observed on the quad-core Marvell Armada 8k SoC, whose two
-> > 10G ports were bound into L2 bridge. Load was controlled by bidirectional
-> > UDP traffic, produced by a packet generator. Under such condition,
-> > the dominant load is softirq. With 100% single CPU occupation or without
-> > any activity (all CPUs 100% idle), total number of jiffies is 10000 (2500
-> > per each core) in 10s interval. Also with other kind of load this was
-> > true.
-> >
-> > However below a saturation threshold it was observed, that with CPU which
-> > was occupied almost by softirqs only, the statistic were awkward. See
-> > the mpstat output:
-> >
-> > CPU %usr %nice %sys %iowait %irq %soft %steal %guest %gnice %idle
-> > all 0.00  0.00 0.13    0.00 0.00  0.55   0.00   0.00   0.00 99.32
-> >   0 0.00  0.00 0.00    0.00 0.00 23.08   0.00   0.00   0.00 76.92
-> >   1 0.00  0.00 0.40    0.00 0.00  0.00   0.00   0.00   0.00 99.60
-> >   2 0.00  0.00 0.00    0.00 0.00  0.00   0.00   0.00   0.00 100.00
-> >   3 0.00  0.00 0.00    0.00 0.00  0.00   0.00   0.00   0.00 100.00
-> >
-> > Above would mean basically no total load, debug CPU0 occupied in 25%.
-> > Raw statistics, printed every 10s from /proc/stat unveiled a root
-> > cause - summary idle/softirq jiffies on loaded CPU were below 200,
-> > i.e. over 90% samples lost. All problems were gone after enabling
-> > fine granulity IRQ time accounting.
-> >
-> > This patch fixes possible wrong statistics processing by enabling
-> > CONFIG_IRQ_TIME_ACCOUNTING for arm64 platfroms, which is by
-> > default done on other architectures, e.g. x86 and arm. Tests
-> > showed no noticeable performance penalty, nor stability impact.
-> 
-> Who should take this patch?
-> 
-> I think that all the defconfig under arm64 are merged through the
-> arm-soc subsystem, but this one is not really specific to a
-> SoC. However, as it was experimented on an mvebu SoC, if you agree I
-> can take it.
+On 01/08/2017 18:32, Mason wrote:
 
-It's fine by me to go via arm-soc.
+> I need suspend/resume support in the nb8800 driver.
+> On tango platforms, suspend loses all context (MMIO registers).
+> To make the task easy, we just close the device on suspend,
+> and open it again on resume. This requires properly resetting
+> the HW on resume.
+> 
+> Patch 1 moves all the HW init to nb8800_init()
+> Patch 2 adds suspend/resume support
 
--- 
-Catalin
+I have now confirmed that the "flow control" issue I reported
+in another thread has nothing to do with flow control per se.
+
+The problem is that nb8800_pause_config() calls nb8800_dma_stop()
+and when it does, RX is borked.
+
+On a GigE switch:
+[   21.444268] ENTER nb8800_pause_config
+[   21.448604] rxcr=06100a8f pause_rx=1 pause_tx=0 pause=1 asym_pause=1
+[   21.455020] nb8800 26000.ethernet eth0: Link is Up - 1Gbps/Full - flow control rx/tx
+
+In this case, pause_tx and RCR_FL match, so we skip the
+silly dance.
+
+On a FastE switch:
+[   11.611613] ENTER nb8800_pause_config
+[   11.615942] rxcr=06100a8f pause_rx=1 pause_tx=1 pause=1 asym_pause=0
+[   11.825535] nb8800 26000.ethernet eth0: Link is Up - 100Mbps/Full - flow control rx/tx
+
+In this case pause_tx and RCR_FL don't match, so we hit
+nb8800_dma_stop() and the HW block becomes deaf.
+
+In conclusion, two issues I've been discussing:
+A) RX wedged after ndo_close
+B) flow control breaks on FastE switches
+are in fact two symptoms of the same root issue.
+
+Regards.
