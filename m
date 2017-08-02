@@ -1,34 +1,66 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  2 Aug 2017 10:21:58 -0600
-Subject: [PATCH 04/26] coresight: etb10: Move etb_disable_hw() outside of lock
+Date: Wed,  2 Aug 2017 10:22:01 -0600
+Subject: [PATCH 07/26] coresight: pmu: Adds return stack option to perf
+ coresight pmu
 In-Reply-To: <1501690940-4137-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1501690940-4137-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1501690940-4137-5-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1501690940-4137-8-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function etb_disable_hw() is already taking care of unlocking and locking
-the coresight access register and as such doesn't need to be placed
-within the unlock/lock of function etb_update_buffer().
+From: Mike Leach <mike.leach@linaro.org>
 
+Return stack is a programmable option on some ETM and PTM hardware.
+Adds the option flags to enable this from the perf event command line.
+
+Signed-off-by: Mike Leach <mike.leach@linaro.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etb10.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 2 ++
+ include/linux/coresight-pmu.h                    | 1 +
+ tools/include/linux/coresight-pmu.h              | 1 +
+ 3 files changed, 4 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 42360306f049..d0d186575c5d 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -376,8 +376,8 @@ static void etb_update_buffer(struct coresight_device *csdev,
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index ad01dfeb2d68..8a0ad77574e7 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -53,10 +53,12 @@ static DEFINE_PER_CPU(struct coresight_device *, csdev_src);
+ /* ETMv3.5/PTM's ETMCR is 'config' */
+ PMU_FORMAT_ATTR(cycacc,		"config:" __stringify(ETM_OPT_CYCACC));
+ PMU_FORMAT_ATTR(timestamp,	"config:" __stringify(ETM_OPT_TS));
++PMU_FORMAT_ATTR(retstack,	"config:" __stringify(ETM_OPT_RETSTK));
  
- 	capacity = drvdata->buffer_depth * ETB_FRAME_SIZE_WORDS;
+ static struct attribute *etm_config_formats_attr[] = {
+ 	&format_attr_cycacc.attr,
+ 	&format_attr_timestamp.attr,
++	&format_attr_retstack.attr,
+ 	NULL,
+ };
  
--	CS_UNLOCK(drvdata->base);
- 	etb_disable_hw(drvdata);
-+	CS_UNLOCK(drvdata->base);
+diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
+index 7d410260661b..45852c2cd096 100644
+--- a/include/linux/coresight-pmu.h
++++ b/include/linux/coresight-pmu.h
+@@ -24,6 +24,7 @@
+ /* ETMv3.5/PTM's ETMCR config bit */
+ #define ETM_OPT_CYCACC  12
+ #define ETM_OPT_TS      28
++#define ETM_OPT_RETSTK	29
  
- 	/* unit is in words, not bytes */
- 	read_ptr = readl_relaxed(drvdata->base + ETB_RAM_READ_POINTER);
+ static inline int coresight_get_trace_id(int cpu)
+ {
+diff --git a/tools/include/linux/coresight-pmu.h b/tools/include/linux/coresight-pmu.h
+index 7d410260661b..45852c2cd096 100644
+--- a/tools/include/linux/coresight-pmu.h
++++ b/tools/include/linux/coresight-pmu.h
+@@ -24,6 +24,7 @@
+ /* ETMv3.5/PTM's ETMCR config bit */
+ #define ETM_OPT_CYCACC  12
+ #define ETM_OPT_TS      28
++#define ETM_OPT_RETSTK	29
+ 
+ static inline int coresight_get_trace_id(int cpu)
+ {
 -- 
 2.7.4
