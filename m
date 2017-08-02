@@ -1,28 +1,57 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Wed, 2 Aug 2017 16:19:16 +0000
-Subject: [RFC PATCH v2 0/2] nb8800 suspend/resume support
-In-Reply-To: <yw1xk22mgdcx.fsf@mansr.com>
-References: <33d1ab47-6098-5e3f-8a3c-f72626d07113@free.fr>
- <aa8885b8-e6bb-3624-2bf9-0bb40505ac54@free.fr>
- <dd883398-1511-0bfd-972b-a11ef8709f0d@free.fr>
- <yw1xshhagexd.fsf@mansr.com>
- <9e8e12b1-74e2-8323-ec16-eebda46b2a3d@free.fr>
- <yw1xo9rygdyu.fsf@mansr.com>
- <6906dccf-bec9-0fc8-a34a-c39c05ada917@free.fr>
- <yw1xk22mgdcx.fsf@mansr.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DD004937D@AcuExch.aculab.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 2 Aug 2017 17:19:34 +0100
+Subject: [RFC PATCH v4 5/5] arm64: neon: Allow EFI runtime services to
+ use FPSIMD in irq context
+In-Reply-To: <20170802160236.ynrw7cri6ljhyrdr@armageddon.cambridge.arm.com>
+References: <1501249824-18913-1-git-send-email-Dave.Martin@arm.com>
+ <1501249824-18913-6-git-send-email-Dave.Martin@arm.com>
+ <20170802145801.nlmm6zfxe4xidkpg@armageddon.cambridge.arm.com>
+ <20170802151521.GI6321@e103592.cambridge.arm.com>
+ <20170802160236.ynrw7cri6ljhyrdr@armageddon.cambridge.arm.com>
+Message-ID: <20170802161934.GJ6321@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: M?ns Rullg?rd
-> Sent: 02 August 2017 17:10
-...
-> ping -f is limited to 100 packets per second.  Use something like iperf
-> in UDP mode instead.
+On Wed, Aug 02, 2017 at 05:02:36PM +0100, Catalin Marinas wrote:
+> On Wed, Aug 02, 2017 at 04:15:21PM +0100, Dave P Martin wrote:
+> > On Wed, Aug 02, 2017 at 03:58:01PM +0100, Catalin Marinas wrote:
+> > > On Fri, Jul 28, 2017 at 02:50:24PM +0100, Dave P Martin wrote:
+> > > > Now that kernel-mode NEON use is non-nestable and not allowed in
+> > > > hardirq/nmi context, we have a problem if the kernel decides to
+> > > > call into EFI during an interrupt that interrupted a
+> > > > kernel_neon_begin()..._end() block.  This will occur if the kernel
+> > > > tries to write diagnostic data to EFI persistent storage during
+> > > > a panic triggered by an NMI for example.
+> > > > 
+> > > > EFI runtime services specify an ABI that clobbers the FPSIMD state,
+> > > > rather than being able to use it optionally as an accelerator.
+> > > > This means that EFI is really a special case and can be handled
+> > > > separately.
+> > > > 
+> > > > To enable EFI calls from interrupts, this patch creates dedicated
+> > > > __efi_fpsimd_{begin,end}() helpers solely for this purpose, which
+> > > > save/restore to a separate percpu buffer if called in a context
+> > > > where kernel_neon_begin() is not usable.
+> > > > 
+> > > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > > 
+> > > Should this patch be reordered with patch 4? It looks like patch 4 no
+> > > longer allows EFI runtime services in IRQ context.
+> > 
+> > Hmmm, yes, patches 4/5 are not bisectable at present.
+> > 
+> > I can't immediately see why patch 5 won't work if they're swapped:
+> > rather, the !may_use_simd() fallback and efi_fpsimd_state won't get
+> > used, and save/restore around EFI should work much the same as it does
+> > today.
+> > 
+> > I'm happy to swap the patches, but I don't want to put too much effort
+> > into confirming the above.  How concerned are you about the risk?
+> 
+> I'm not concerned but we could at least test that it boots with patches
+> 1-4.
 
-Or break a MAC driver so it just saturates the network.
+Agreed, I'll be checking that, but I won't otherwise kick it too hard.
 
-You might actually need bursts of traffic - otherwise the receiver
-will be continuously out of rx buffers and no dma will be active.
-
-	David
+Cheers
+---Dave
