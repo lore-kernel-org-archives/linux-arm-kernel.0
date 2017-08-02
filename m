@@ -1,45 +1,26 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Wed,  2 Aug 2017 16:33:04 +0800
-Subject: [PATCH v2 05/23] clk: rockchip: fix up the pll clks error for rv1108
- SoC
-In-Reply-To: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
-References: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1501662784-11973-1-git-send-email-andy.yan@rock-chips.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 2 Aug 2017 10:33:55 +0200
+Subject: [PATCH v5 3/8] dt-bindings: bus: Add documentation for the
+ Technologic Systems NBUS
+In-Reply-To: <20170714203218.14409-4-sebastien.bourdelin@savoirfairelinux.com>
+References: <20170714203218.14409-1-sebastien.bourdelin@savoirfairelinux.com>
+ <20170714203218.14409-4-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <CACRpkdbhQoDY6aKxLjEfU0ydUocCd_qXBSvJqz96MKU9cSQXVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Elaine Zhang <zhangqing@rock-chips.com>
+On Fri, Jul 14, 2017 at 10:32 PM, Sebastien Bourdelin
+<sebastien.bourdelin@savoirfairelinux.com> wrote:
 
-fix up the lock_shift describe error.
-remove the ROCKCHIP_PLL_SYNC_RATE flag for gpll.
+> Add binding documentation for the Technologic Systems NBUS that is used
+> to interface with peripherals in the FPGA of the TS-4600 SoM.
+>
+> Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+> ---
+> Changes v4 -> v5:
+>   - fix missing signed off
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
----
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Changes in v2: None
-
- drivers/clk/rockchip/clk-rv1108.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/clk/rockchip/clk-rv1108.c b/drivers/clk/rockchip/clk-rv1108.c
-index 3c670db..9c6bad0 100644
---- a/drivers/clk/rockchip/clk-rv1108.c
-+++ b/drivers/clk/rockchip/clk-rv1108.c
-@@ -148,11 +148,11 @@ PNAME(mux_i2s2_p)		= { "i2s2_src", "i2s2_frac", "xin12m" };
- 
- static struct rockchip_pll_clock rv1108_pll_clks[] __initdata = {
- 	[apll] = PLL(pll_rk3399, PLL_APLL, "apll", mux_pll_p, 0, RV1108_PLL_CON(0),
--		     RV1108_PLL_CON(3), 8, 31, 0, rv1108_pll_rates),
-+		     RV1108_PLL_CON(3), 8, 0, 0, rv1108_pll_rates),
- 	[dpll] = PLL(pll_rk3399, PLL_DPLL, "dpll", mux_pll_p, 0, RV1108_PLL_CON(8),
--		     RV1108_PLL_CON(11), 8, 31, 0, NULL),
-+		     RV1108_PLL_CON(11), 8, 1, 0, NULL),
- 	[gpll] = PLL(pll_rk3399, PLL_GPLL, "gpll", mux_pll_p, 0, RV1108_PLL_CON(16),
--		     RV1108_PLL_CON(19), 8, 31, ROCKCHIP_PLL_SYNC_RATE, rv1108_pll_rates),
-+		     RV1108_PLL_CON(19), 8, 2, 0, rv1108_pll_rates),
- };
- 
- #define MFLAGS CLK_MUX_HIWORD_MASK
--- 
-2.7.4
+Yours,
+Linus Walleij
