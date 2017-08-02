@@ -1,33 +1,31 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Wed,  2 Aug 2017 14:15:39 +0800
-Subject: [PATCH v3 04/11] net: stmmac: dwmac-rk: Remove unwanted code for
- rk3328_set_to_rmii()
-In-Reply-To: <1501654546-17292-1-git-send-email-david.wu@rock-chips.com>
-References: <1501654546-17292-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1501654546-17292-5-git-send-email-david.wu@rock-chips.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Wed, 2 Aug 2017 11:43:44 +0530
+Subject: [PATCH] pwm: Kconfig: Enable pwm-tiecap to be built for Keystone
+Message-ID: <20170802061344.1713-1-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is wrong setting for rk3328_set_to_rmii(), so remove it.
+66AK2G SoC has ECAP subsystem that is used as pwm-backlight provider for
+display. Hence, enable pwm-tiecap driver to be built for Keystone
+architecture.
 
-Signed-off-by: David Wu <david.wu@rock-chips.com>
+Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/pwm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-index f0df519..a8e8fd5 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-@@ -365,9 +365,6 @@ static void rk3328_set_to_rmii(struct rk_priv_data *bsp_priv)
- 	regmap_write(bsp_priv->grf, RK3328_GRF_MAC_CON1,
- 		     RK3328_GMAC_PHY_INTF_SEL_RMII |
- 		     RK3328_GMAC_RMII_MODE);
--
--	/* set MAC to RMII mode */
--	regmap_write(bsp_priv->grf, RK3328_GRF_MAC_CON1, GRF_BIT(11));
- }
+diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+index 313c10789ca2..c7f3a6037c93 100644
+--- a/drivers/pwm/Kconfig
++++ b/drivers/pwm/Kconfig
+@@ -446,7 +446,7 @@ config PWM_TEGRA
  
- static void rk3328_set_rgmii_speed(struct rk_priv_data *bsp_priv, int speed)
+ config  PWM_TIECAP
+ 	tristate "ECAP PWM support"
+-	depends on ARCH_OMAP2PLUS || ARCH_DAVINCI_DA8XX
++	depends on ARCH_OMAP2PLUS || ARCH_DAVINCI_DA8XX || ARCH_KEYSTONE
+ 	help
+ 	  PWM driver support for the ECAP APWM controller found on AM33XX
+ 	  TI SOC
 -- 
-1.9.1
+2.13.3
