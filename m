@@ -1,45 +1,59 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Wed,  2 Aug 2017 11:04:39 +0200
-Subject: [PATCH] video: fbdev: constify copied structures
-Message-ID: <1501664679-10356-1-git-send-email-Julia.Lawall@lip6.fr>
+From: faiz_abbas@ti.com (Faiz Abbas)
+Date: Wed, 2 Aug 2017 15:00:49 +0530
+Subject: [PATCH] ARM: dts: am437x-gp-evm: Add support for buzzer
+In-Reply-To: <1497935361-11019-1-git-send-email-faiz_abbas@ti.com>
+References: <1497935361-11019-1-git-send-email-faiz_abbas@ti.com>
+Message-ID: <c135a805-868a-87fc-ce78-b4e49139211d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make const some structures that are only copied into other structures.
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
----
- drivers/video/fbdev/xilinxfb.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+On Tuesday 20 June 2017 10:39 AM, Faiz Abbas wrote:
+> Add support for onboard gpio buzzer. It works using
+> the gpio-beeper driver. Pinmux entries for GPIO
+> controlling the buzzer are also added.
 
-diff --git a/drivers/video/fbdev/xilinxfb.c b/drivers/video/fbdev/xilinxfb.c
-index 17dc119..9531474 100644
---- a/drivers/video/fbdev/xilinxfb.c
-+++ b/drivers/video/fbdev/xilinxfb.c
-@@ -100,7 +100,7 @@ struct xilinxfb_platform_data {
- /*
-  * Default xilinxfb configuration
-  */
--static struct xilinxfb_platform_data xilinx_fb_default_pdata = {
-+static const struct xilinxfb_platform_data xilinx_fb_default_pdata = {
- 	.xres = 640,
- 	.yres = 480,
- 	.xvirt = 1024,
-@@ -110,14 +110,14 @@ struct xilinxfb_platform_data {
- /*
-  * Here are the default fb_fix_screeninfo and fb_var_screeninfo structures
-  */
--static struct fb_fix_screeninfo xilinx_fb_fix = {
-+static const struct fb_fix_screeninfo xilinx_fb_fix = {
- 	.id =		"Xilinx",
- 	.type =		FB_TYPE_PACKED_PIXELS,
- 	.visual =	FB_VISUAL_TRUECOLOR,
- 	.accel =	FB_ACCEL_NONE
- };
- 
--static struct fb_var_screeninfo xilinx_fb_var = {
-+static const struct fb_var_screeninfo xilinx_fb_var = {
- 	.bits_per_pixel =	BITS_PER_PIXEL,
- 
- 	.red =		{ RED_SHIFT, 8, 0 },
+Gentle ping
+
+Regards,
+Faiz
+> 
+> Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
+> ---
+>  arch/arm/boot/dts/am437x-gp-evm.dts | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+> index 397e98b..24cdf6d 100644
+> --- a/arch/arm/boot/dts/am437x-gp-evm.dts
+> +++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+> @@ -149,6 +149,13 @@
+>  			system-clock-frequency = <12000000>;
+>  		};
+>  	};
+> +
+> +	beeper: beeper {
+> +		compatible = "gpio-beeper";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&beeper_pins>;
+> +		gpios = <&gpio4 12 GPIO_ACTIVE_HIGH>;
+> +	};
+>  };
+>  
+>  &am43xx_pinmux {
+> @@ -510,6 +517,13 @@
+>  			AM4372_IOPAD(0x974, PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* uart0_txd.uart0_txd */
+>  		>;
+>  	};
+> +
+> +	beeper_pins: beeper_pins {
+> +		pinctrl-single,pins = <
+> +			AM4372_IOPAD(0x9e0, PIN_OUTPUT_PULLUP | MUX_MODE7)	/* cam1_field.gpio4_12 */
+> +		>;
+> +	};
+> +
+>  };
+>  
+>  &uart0 {
+> 
