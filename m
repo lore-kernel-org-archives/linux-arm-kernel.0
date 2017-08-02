@@ -1,31 +1,71 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 01 Aug 2017 19:41:41 -0700
-Subject: [PATCH v6 0/3] ARM: dts: imx7: add NAND support
-In-Reply-To: <20170614151146.GC30112@dragon>
-References: <cover.9fab78eaa869dbad4c9ad7e8578c9cef3e49daa8.1496961128.git-series.stefan@agner.ch>
- <20170614151146.GC30112@dragon>
-Message-ID: <c05aff108433c9ced4c85efcf3ba65e8@agner.ch>
+From: luaraneda@gmail.com (Luis Araneda)
+Date: Tue,  1 Aug 2017 22:50:26 -0400
+Subject: [PATCH v2] ARM: dts: sun8i: h3: Enable EMAC with external PHY on
+ NanoPi M1 Plus
+Message-ID: <20170802025026.24232-1-luaraneda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+The Nanopi M1 Plus uses an external Realtek RTL8211E PHY in RGMII mode,
+enabled by a GPIO-based regulator.
 
-On 2017-06-14 08:11, Shawn Guo wrote:
-> On Thu, Jun 08, 2017 at 03:34:46PM -0700, Stefan Agner wrote:
->> Stefan Agner (3):
->>   clk: imx7d: create clocks behind rawnand clock gate
->>   ARM: dts: imx7: add GPMI NAND and APBH DMA
->>   ARM: dts: imx7-colibri: add NAND support
-> 
-> Both dts patches look good to me.  Please ping me after the clk patch
-> lands on mainline.
+Signed-off-by: Luis Araneda <luaraneda@gmail.com>
 
-The clk patch landed in mainline. These two patches seem to apply fine
-still. Can you queue them for -next?
+---
+Changes v1 -> v2:
+- Removed unnecessary property
+- Corrected part address to match reg value
 
-FWIW, tested it on a Colibri iMX7 using v3.13-rc3, works fine after
-reverting the GPC changes (see my other email with subject "i.MX 7 boot
-freeze with 4.13-rc3").
+ arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 30 +++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
---
-Stefan
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+index 8ddd1b2cc..1273a5e45 100644
+--- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+@@ -45,6 +45,20 @@
+ / {
+ 	model = "FriendlyArm NanoPi M1 Plus";
+ 	compatible = "friendlyarm,nanopi-m1-plus", "allwinner,sun8i-h3";
++
++	aliases {
++		ethernet0 = &emac;
++	};
++
++	reg_gmac_3v3: gmac-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "gmac-3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <100000>;
++		enable-active-high;
++		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
++	};
+ };
+ 
+ &ehci1 {
+@@ -55,6 +69,22 @@
+ 	status = "okay";
+ };
+ 
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_rgmii_pins>;
++	phy-supply = <&reg_gmac_3v3>;
++	phy-handle = <&ext_rgmii_phy>;
++	phy-mode = "rgmii";
++	status = "okay";
++};
++
++&mdio {
++	ext_rgmii_phy: ethernet-phy at 0 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <0>;
++	};
++};
++
+ &ohci1 {
+ 	status = "okay";
+ };
+-- 
+2.13.3
