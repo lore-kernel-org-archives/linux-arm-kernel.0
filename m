@@ -1,49 +1,49 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 2 Aug 2017 10:36:37 +0200
-Subject: [PATCH] dt-bindings: mtd: add new compatible strings for mtk
- nor controller
-In-Reply-To: <03016ea3-51ad-0b2d-e824-0a20913bd7c1@gmail.com>
-References: <1500948617-19627-1-git-send-email-guochun.mao@mediatek.com>
- <1500948617-19627-2-git-send-email-guochun.mao@mediatek.com>
- <03016ea3-51ad-0b2d-e824-0a20913bd7c1@gmail.com>
-Message-ID: <20170802103637.16cd6548@bbrezillon>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Wed,  2 Aug 2017 16:36:54 +0800
+Subject: [PATCH v2 09/23] clk: rockchip: add some critical clocks for rv1108
+ SoC
+In-Reply-To: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
+References: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1501663014-12192-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthias,
+From: Elaine Zhang <zhangqing@rock-chips.com>
 
-On Tue, 1 Aug 2017 14:33:22 +0200
-Matthias Brugger <matthias.bgg@gmail.com> wrote:
+the bus/periph/nclk_ddrupctl/pclk_ddrmon/pclk_acodecphy/pclk_pmu
+no driver to handle them,
+chip design requirements for these clock to always on.
 
-> On 07/25/2017 04:10 AM, Guochun Mao wrote:
-> > Add "mediatek,mt2712-nor" and "mediatek,mt7622-nor"
-> > for nor flash node's compatible strings.
-> > 
-> > Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
-> > Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
-> > ---
-> >   .../devicetree/bindings/mtd/mtk-quadspi.txt        |    2 ++
-> >   1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > index 5ded66a..9845ff4 100644
-> > --- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > @@ -3,6 +3,8 @@
-> >   Required properties:
-> >   - compatible: 	  The possible values are:
-> >   		  "mediatek,mt2701-nor"
-> > +		  "mediatek,mt2712-nor"
-> > +		  "mediatek,mt7622-nor"
-> >   		  "mediatek,mt7623-nor"
-> >   		  "mediatek,mt8173-nor"
-> >   		  For mt8173, compatible should be "mediatek,mt8173-nor".
-> >   
-> 
-> Boris, will you take this through your tree, or do you prefer that I take it?
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+---
 
-I'm not the spi-nor maintainer, you should ask Cyrille or Marek.
+Changes in v2: None
 
-Regards,
+ drivers/clk/rockchip/clk-rv1108.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-Boris
+diff --git a/drivers/clk/rockchip/clk-rv1108.c b/drivers/clk/rockchip/clk-rv1108.c
+index dca9c37..e60d83a 100644
+--- a/drivers/clk/rockchip/clk-rv1108.c
++++ b/drivers/clk/rockchip/clk-rv1108.c
+@@ -774,10 +774,16 @@ static struct rockchip_clk_branch rv1108_clk_branches[] __initdata = {
+ 
+ static const char *const rv1108_critical_clocks[] __initconst = {
+ 	"aclk_core",
+-	"aclk_bus_src_gpll",
++	"aclk_bus",
++	"hclk_bus",
++	"pclk_bus",
+ 	"aclk_periph",
+ 	"hclk_periph",
+ 	"pclk_periph",
++	"nclk_ddrupctl",
++	"pclk_ddrmon",
++	"pclk_acodecphy",
++	"pclk_pmu",
+ };
+ 
+ static void __init rv1108_clk_init(struct device_node *np)
+-- 
+2.7.4
