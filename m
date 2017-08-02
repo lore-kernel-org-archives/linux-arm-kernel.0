@@ -1,73 +1,46 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed,  2 Aug 2017 12:51:29 -0700
-Subject: [PATCH] soc: imx: gpcv2: fix regulator deferred probe
-Message-ID: <20170802195129.20442-1-stefan@agner.ch>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 2 Aug 2017 22:02:24 +0200
+Subject: [RFC PATCH v2 0/2] nb8800 suspend/resume support
+In-Reply-To: <f1554ee7-2151-1304-c5c1-35264b9be5be@free.fr>
+References: <33d1ab47-6098-5e3f-8a3c-f72626d07113@free.fr>
+ <aa8885b8-e6bb-3624-2bf9-0bb40505ac54@free.fr>
+ <dd883398-1511-0bfd-972b-a11ef8709f0d@free.fr> <yw1xshhagexd.fsf@mansr.com>
+ <9e8e12b1-74e2-8323-ec16-eebda46b2a3d@free.fr> <yw1xo9rygdyu.fsf@mansr.com>
+ <6906dccf-bec9-0fc8-a34a-c39c05ada917@free.fr> <yw1xk22mgdcx.fsf@mansr.com>
+ <f1554ee7-2151-1304-c5c1-35264b9be5be@free.fr>
+Message-ID: <71dd7987-8c43-2548-5058-51a95658da71@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a regulator requests a deferred probe, the power domain gets
-initialized twice. This leads to a list double add (without
-list debugging the kernel hangs due to the double add later):
+On 02/08/2017 19:31, Mason wrote:
 
-  WARNING: CPU: 0 PID: 19 at lib/list_debug.c:31 __list_add_valid+0xbc/0xc4
-  list_add double add: new=c1229754, prev=c12383b4, next=c1229754.
+> # iperf3 -c 172.27.64.45 -u -b 950M
+> Connecting to host 172.27.64.45, port 5201
+> [  4] local 172.27.64.1 port 55533 connected to 172.27.64.45 port 5201
+> [ ID] Interval           Transfer     Bandwidth       Total Datagrams
+> [  4]   0.00-1.00   sec   102 MBytes   858 Mbits/sec  13091  
+> [  4]   1.00-2.00   sec   114 MBytes   953 Mbits/sec  14541  
 
-Initialize the power domain after we get the regulator. Also do
-not print an error in case the regulator defers probing.
+114 MB in 14541 packets => 7840 bytes per packet
+Is iperf3 sending jumbo frames??
+In the nb8800 driver, RX_BUF_SIZE is only 1552,
+how would it deal with jumbo frames... truncate?
 
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Andrey Smirnov <andrew.smirnov@gmail.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Fixes: 03aa12629fc4 ("soc: imx: Add GPCv2 power gating driver")
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-Hi Shawn,
+> # iperf3 -c 172.27.64.45 -u -b 950M -l 800
+> Connecting to host 172.27.64.45, port 5201
+> [  4] local 172.27.64.1 port 35197 connected to 172.27.64.45 port 5201
+> [ ID] Interval           Transfer     Bandwidth       Total Datagrams
+> [  4]   0.00-1.00   sec  90.6 MBytes   760 Mbits/sec  118724  
+> [  4]   1.00-2.00   sec   107 MBytes   894 Mbits/sec  139718  
 
-Since this leads to a Kernel hang in v4.13-rc3, can you get this
-into v4.13 still?
+107 MB in 139718 packets => 766 bytes per packet
+800 - 8 (UDP) - 20 (IPv4) = 772 bytes per packet
+I suppose that's close enough...
+772 * 139718 = 107.86 MB
 
---
-Stefan
+I need to run the test slightly slower, to prevent
+packet loss at the sender.
 
- drivers/soc/imx/gpcv2.c | 15 ++++++++-------
- 1 file changed, 8 insertions(+), 7 deletions(-)
+Perhaps -b 0 or -b 800M
 
-diff --git a/drivers/soc/imx/gpcv2.c b/drivers/soc/imx/gpcv2.c
-index 3039072911a5..afc7ecc3c187 100644
---- a/drivers/soc/imx/gpcv2.c
-+++ b/drivers/soc/imx/gpcv2.c
-@@ -200,16 +200,11 @@ static int imx7_pgc_domain_probe(struct platform_device *pdev)
- 
- 	domain->dev = &pdev->dev;
- 
--	ret = pm_genpd_init(&domain->genpd, NULL, true);
--	if (ret) {
--		dev_err(domain->dev, "Failed to init power domain\n");
--		return ret;
--	}
--
- 	domain->regulator = devm_regulator_get_optional(domain->dev, "power");
- 	if (IS_ERR(domain->regulator)) {
- 		if (PTR_ERR(domain->regulator) != -ENODEV) {
--			dev_err(domain->dev, "Failed to get domain's regulator\n");
-+			if (PTR_ERR(domain->regulator) != -EPROBE_DEFER)
-+				dev_err(domain->dev, "Failed to get domain's regulator\n");
- 			return PTR_ERR(domain->regulator);
- 		}
- 	} else {
-@@ -217,6 +212,12 @@ static int imx7_pgc_domain_probe(struct platform_device *pdev)
- 				      domain->voltage, domain->voltage);
- 	}
- 
-+	ret = pm_genpd_init(&domain->genpd, NULL, true);
-+	if (ret) {
-+		dev_err(domain->dev, "Failed to init power domain\n");
-+		return ret;
-+	}
-+
- 	ret = of_genpd_add_provider_simple(domain->dev->of_node,
- 					   &domain->genpd);
- 	if (ret) {
--- 
-2.13.3
+Regards.
