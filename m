@@ -1,53 +1,100 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 2 Aug 2017 17:02:36 +0100
-Subject: [RFC PATCH v4 5/5] arm64: neon: Allow EFI runtime services to
- use FPSIMD in irq context
-In-Reply-To: <20170802151521.GI6321@e103592.cambridge.arm.com>
-References: <1501249824-18913-1-git-send-email-Dave.Martin@arm.com>
- <1501249824-18913-6-git-send-email-Dave.Martin@arm.com>
- <20170802145801.nlmm6zfxe4xidkpg@armageddon.cambridge.arm.com>
- <20170802151521.GI6321@e103592.cambridge.arm.com>
-Message-ID: <20170802160236.ynrw7cri6ljhyrdr@armageddon.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 2 Aug 2017 17:04:02 +0100
+Subject: [PATCH] arm64/vdso: Support mremap() for vDSO
+In-Reply-To: <CAJwJo6bCxRvKvwmwwH7UZW2fRZkqTTqfnp0j85Si454pDQUjVw@mail.gmail.com>
+References: <20170726170737.21696-1-dsafonov@virtuozzo.com>
+ <20170728164800.GD14170@arm.com>
+ <CAJwJo6bCxRvKvwmwwH7UZW2fRZkqTTqfnp0j85Si454pDQUjVw@mail.gmail.com>
+Message-ID: <20170802160401.GA16932@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 02, 2017 at 04:15:21PM +0100, Dave P Martin wrote:
-> On Wed, Aug 02, 2017 at 03:58:01PM +0100, Catalin Marinas wrote:
-> > On Fri, Jul 28, 2017 at 02:50:24PM +0100, Dave P Martin wrote:
-> > > Now that kernel-mode NEON use is non-nestable and not allowed in
-> > > hardirq/nmi context, we have a problem if the kernel decides to
-> > > call into EFI during an interrupt that interrupted a
-> > > kernel_neon_begin()..._end() block.  This will occur if the kernel
-> > > tries to write diagnostic data to EFI persistent storage during
-> > > a panic triggered by an NMI for example.
-> > > 
-> > > EFI runtime services specify an ABI that clobbers the FPSIMD state,
-> > > rather than being able to use it optionally as an accelerator.
-> > > This means that EFI is really a special case and can be handled
-> > > separately.
-> > > 
-> > > To enable EFI calls from interrupts, this patch creates dedicated
-> > > __efi_fpsimd_{begin,end}() helpers solely for this purpose, which
-> > > save/restore to a separate percpu buffer if called in a context
-> > > where kernel_neon_begin() is not usable.
-> > > 
-> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > 
-> > Should this patch be reordered with patch 4? It looks like patch 4 no
-> > longer allows EFI runtime services in IRQ context.
+On Fri, Jul 28, 2017 at 10:06:20PM +0300, Dmitry Safonov wrote:
+> 2017-07-28 19:48 GMT+03:00 Will Deacon <will.deacon@arm.com>:
+> > On Wed, Jul 26, 2017 at 08:07:37PM +0300, Dmitry Safonov wrote:
+> >> vDSO VMA address is saved in mm_context for the purpose of using
+> >> restorer from vDSO page to return to userspace after signal handling.
+> >>
+> >> In Checkpoint Restore in Userspace (CRIU) project we place vDSO VMA
+> >> on restore back to the place where it was on the dump.
+> >> With the exception for x86 (where there is API to map vDSO with
+> >> arch_prctl()), we move vDSO inherited from CRIU task to restoree
+> >> position by mremap().
+> >>
+> >> CRIU does support arm64 architecture, but kernel doesn't update
+> >> context.vdso pointer after mremap(). Which results in translation
+> >> fault after signal handling on restored application:
+> >> https://github.com/xemul/criu/issues/288
+> >>
+> >> Make vDSO code track the VMA address by supplying .mremap() fops
+> >> the same way it's done for x86 and arm32 by:
+> >> commit b059a453b1cf ("x86/vdso: Add mremap hook to vm_special_mapping")
+> >> commit 280e87e98c09 ("ARM: 8683/1: ARM32: Support mremap() for sigpage/vDSO").
+> >>
+> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Cc: Russell King <rmk+kernel@armlinux.org.uk>
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> Cc: Cyrill Gorcunov <gorcunov@openvz.org>
+> >> Cc: Pavel Emelyanov <xemul@virtuozzo.com>
+> >> Cc: Christopher Covington <cov@codeaurora.org>
+> >> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
+> >> ---
+> >>  arch/arm64/kernel/vdso.c | 15 +++++++++++++++
+> >>  1 file changed, 15 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+> >> index e8f759f764f2..2d419006ad43 100644
+> >> --- a/arch/arm64/kernel/vdso.c
+> >> +++ b/arch/arm64/kernel/vdso.c
+> >> @@ -110,12 +110,27 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
+> >>  }
+> >>  #endif /* CONFIG_COMPAT */
+> >>
+> >> +static int vdso_mremap(const struct vm_special_mapping *sm,
+> >> +             struct vm_area_struct *new_vma)
+> >> +{
+> >> +     unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
+> >> +     unsigned long vdso_size = vdso_end - vdso_start;
+> >
+> > You might be able to use vdso_pages here, but it depends on my question
+> > below.
 > 
-> Hmmm, yes, patches 4/5 are not bisectable at present.
-> 
-> I can't immediately see why patch 5 won't work if they're swapped:
-> rather, the !may_use_simd() fallback and efi_fpsimd_state won't get
-> used, and save/restore around EFI should work much the same as it does
-> today.
-> 
-> I'm happy to swap the patches, but I don't want to put too much effort
-> into confirming the above.  How concerned are you about the risk?
+> Yes, shifting with PAGE_SHIFT.
+> Is it just a preference?
 
-I'm not concerned but we could at least test that it boots with patches
-1-4.
+Yeah, just a minor thing, although thinking about it again, I don't know
+what you're trying to achieve with the size check anyway. Userspace is only
+going to hurt itself if it screws up the layout, so why police this?
 
--- 
-Catalin
+> >
+> >> +
+> >> +     if (vdso_size != new_size)
+> >> +             return -EINVAL;
+> >> +
+> >> +     current->mm->context.vdso = (void *)new_vma->vm_start;
+> >> +
+> >> +     return 0;
+> >> +}
+> >> +
+> >>  static struct vm_special_mapping vdso_spec[2] __ro_after_init = {
+> >>       {
+> >>               .name   = "[vvar]",
+> >>       },
+> >>       {
+> >>               .name   = "[vdso]",
+> >> +             .mremap = vdso_mremap,
+> >
+> > Does this mean we move the vdso text, but not the data page? How does that
+> > work?
+> 
+> Well, the kernel tracks only vdso pages - to find restorer addr after a signal.
+> In userspace one needs to move vvar and vdso vma pair accordingly,
+> with the same order and offset of course.
+
+Ah, I see. I misunderstood what the .mremap callback was actually doing.
+I guess there's also no issue with not being able to do this atomically,
+either, as long as you can avoid making syscalls via the vDSO until you've
+relocated both mappings.
+
+Will
