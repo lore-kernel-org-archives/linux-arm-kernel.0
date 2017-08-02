@@ -1,53 +1,43 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Wed, 02 Aug 2017 20:14:23 +0300
-Subject: [PATCH 0/2] serial: 8250: add support for MediaTek BTIF controller
-In-Reply-To: <cover.1501692369.git.sean.wang@mediatek.com>
-References: <cover.1501692369.git.sean.wang@mediatek.com>
-Message-ID: <1501694063.29303.361.camel@linux.intel.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Wed, 2 Aug 2017 10:19:49 -0700
+Subject: [PATCH 0/7] K2G: Add QSPI support
+In-Reply-To: <00b2b8b8-3f3d-d563-bebc-f37f67362aa0@ti.com>
+References: <20170801045434.8733-1-vigneshr@ti.com>
+ <29c0e8ec-1f9f-cfc9-2d0e-e4d31890b699@oracle.com>
+ <00b2b8b8-3f3d-d563-bebc-f37f67362aa0@ti.com>
+Message-ID: <ff8e0f4f-eb26-85dc-b5b2-8f6ddd39145b@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-08-03 at 01:05 +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+8/1/2017 10:52 PM, Vignesh R wrote:
+> Hi,
 > 
-> This patchset introduces the support for MediaTek BTIF controller.
+> On Tuesday 01 August 2017 11:31 PM, Santosh Shilimkar wrote:
+>> On 7/31/2017 9:54 PM, Vignesh R wrote:
+>>> This series adds support for Cadence QSPI for 66AK2G SoC. The first
+>>> three patches enhance the cadence-quadspi driver to support loopback
+>>> clock and pm_runtime and tweaks for 66AK2G SoC. Remaining patches add
+>>> DT nodes and enable the driver in defconfig.
+>>>
+>>> Tested on 66AK2G GP and ICE boards.
+>>>
+>>> Vignesh R (7):
+>>>     mtd: spi-nor: cadence-quadspi: add a delay in write sequence
+>>>     mtd: spi-nor: cadence-quadspi: Add support to enable loopback clock
+>>>       circuit
+>>>     mtd: spi-nor: cadence-quadspi: Add runtime PM support
+>>>     ARM: dts: keystone-k2g: Add QSPI DT entry
+>>>     ARM: dts: keystone-k2g-evm: Add QSPI node
+>>>     ARM: dts: keystone-k2g-ice: Add QSPI node
+>>>     ARM: configs: keystone: Enable Cadence QSPI driver
+>>>
+>> Please separate dts and driver patches in its own series
+>> while posting next time since they go throgh different
+>> subsystem trees. Get your driver patch queed
+>> first before adding DTS and enabling config option.
 > 
-> MediaTek BTIF controller is the serial interface similar to UART but
-> it
-> works only as the digital device which is mainly used to communicate
-> with
-> the connectivity module also called CONNSYS inside the SoC which could
-> be
-> mostly found on those MediaTek SoCs with Bluetooth feature.
+> Okay. I thought it would be easy for you to know when driver patches are
+> queued, if DTS changes are part of the same series. Will post DT nodes
+> separately from next time or if I need to do a v2 of this series.
 > 
-> And the controller is made as being compatible with the 8250 register
-> layout so it tends to be integrated with existing 8250 core driver and
-> have no requirement for the modem configuration additionally such as
-> the
-> baud rate calculation and assignment.
-
-
-Why it requires a separate driver?
-
-8250_of is for DT enabled drivers.
-
-> 
-> Sean Wang (2):
-> ? dt-bindings: serial: Add MediaTek BTIF controller bindings
-> ? tty: serial: 8250: Add MediaTek BTIF controller on MT7622 and MT7623
-> ????SoC
-> 
-> ?.../devicetree/bindings/serial/mtk-btif.txt????????|??26 +++
-> ?drivers/tty/serial/8250/8250_btif.c????????????????| 224
-> +++++++++++++++++++++
-> ?drivers/tty/serial/8250/Kconfig????????????????????|???9 +
-> ?drivers/tty/serial/8250/Makefile???????????????????|???1 +
-> ?4 files changed, 260 insertions(+)
-> ?create mode 100644 Documentation/devicetree/bindings/serial/mtk-
-> btif.txt
-> ?create mode 100644 drivers/tty/serial/8250/8250_btif.c
-> 
-
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Thanks !!
