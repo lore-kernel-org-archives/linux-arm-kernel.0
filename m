@@ -1,37 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 2 Aug 2017 09:44:14 +0100
-Subject: rcu_sched stall while waiting in csd_lock_wait()
-In-Reply-To: <20170802080827.GA15219@arm.com>
-References: <da7c56d6-066a-d123-f0cf-d9a3b97b001e@redhat.com>
- <20170802080827.GA15219@arm.com>
-Message-ID: <f0fa028b-b690-2b85-ca01-3642ff883e30@arm.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Wed,  2 Aug 2017 16:46:56 +0800
+Subject: [PATCH v2 15/23] ARM: dts: rockchip: add spi dt node for rv1108
+In-Reply-To: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
+References: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1501663616-12538-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/17 09:08, Will Deacon wrote:
-> Hi Pratyush,
-> 
-> On Wed, Aug 02, 2017 at 09:01:19AM +0530, Pratyush Anand wrote:
->> I am observing following rcu_sched stall while executing `perf record -a  --
->> sleep 1` with one of the arm64 platform. It looks like that stalled cpu was
->> waiting in csd_lock_wait() from where it never came out,and so the stall.
->> Any help/pointer for further debugging would be very helpful. Problem also
->> reproduced with 4.13.0-rc3.
-> 
-> When you say "also", which other kernel(s) show the problem? Is this a
-> recent regression? Which platform are you running on?
-> 
-> It would be interesting to know what the other CPUs are doing, in particular
-> the target of the cross-call. Either it crashed spectacularly and didn't
-> unlock the csd lock, or the IPI somehow wasn't delivered.
-> 
-> Do you see any other splats if you enable lock debugging?
+Add SPI device tree node for rv1108.
 
-Also, is that in a guest, or bare metal? If that's a guest, what's the
-host's kernel version?
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+---
 
-Thanks,
+Changes in v2: None
 
-	M.
+ arch/arm/boot/dts/rv1108.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
+index 124ed97..f6fb47f 100644
+--- a/arch/arm/boot/dts/rv1108.dtsi
++++ b/arch/arm/boot/dts/rv1108.dtsi
+@@ -200,6 +200,19 @@
+ 		status = "disabled";
+ 	};
+ 
++	spi: spi at 10270000 {
++		compatible = "rockchip,rv1108-spi";
++		reg = <0x10270000 0x1000>;
++		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clocks = <&cru SCLK_SPI>, <&cru PCLK_SPI>;
++		clock-names = "spiclk", "apb_pclk";
++		dmas = <&pdma 8>, <&pdma 9>;
++		#dma-cells = <2>;
++		status = "disabled";
++	};
++
+ 	grf: syscon at 10300000 {
+ 		compatible = "rockchip,rv1108-grf", "syscon";
+ 		reg = <0x10300000 0x1000>;
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
