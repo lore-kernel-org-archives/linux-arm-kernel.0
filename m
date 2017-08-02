@@ -1,68 +1,172 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 2 Aug 2017 16:17:15 +0200
-Subject: [PATCH v2 1/4] drm/bridge: dw-hdmi: add cec notifier support
-In-Reply-To: <2091520.p8lH1xBY9c@avalon>
-References: <20170731142906.GX31807@n2100.armlinux.org.uk>
- <E1dcBhV-00088e-8x@rmk-PC.armlinux.org.uk> <2091520.p8lH1xBY9c@avalon>
-Message-ID: <734aa419-2f1c-131e-bad3-298ba295bdd3@xs4all.nl>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 02 Aug 2017 17:20:13 +0300
+Subject: [PATCH v2 1/4] drm/atomic: implement
+ drm_atomic_helper_commit_tail for runtime_pm users
+In-Reply-To: <20170802135730.GR970@e110455-lin.cambridge.arm.com>
+References: <cover.204b8c1b76558ee33ecf147e51c2b6a04d302d55.1500555652.git-series.maxime.ripard@free-electrons.com>
+ <1828962.5J4WLQuEBS@avalon>
+ <20170802135730.GR970@e110455-lin.cambridge.arm.com>
+Message-ID: <2304894.3Tqul3vgAT@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/02/17 16:11, Laurent Pinchart wrote:
-> Hi Russell,
-> 
-> Thank you for the patch.
-> 
-> On Monday 31 Jul 2017 15:29:41 Russell King wrote:
->> Add CEC notifier support to the HDMI bridge driver, so that the CEC
->> part of the IP can receive its physical address.
->>
->> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->> ---
->>  drivers/gpu/drm/bridge/synopsys/Kconfig   |  1 +
->>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 22 +++++++++++++++++++++-
->>  2 files changed, 22 insertions(+), 1 deletion(-)
-> 
-> [snip]
-> 
->> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
->> b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c index
->> ead11242c4b9..82e55ee8e4fa 100644
->> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
->> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> 
-> [snip]
-> 
->> @@ -2376,6 +2387,12 @@ __dw_hdmi_probe(struct platform_device *pdev,
->>  	if (ret)
->>  		goto err_iahb;
->>
->> +	hdmi->cec_notifier = cec_notifier_get(dev);
->> +	if (!hdmi->cec_notifier) {
->> +		ret = -ENOMEM;
->> +		goto err_iahb;
->> +	}
->> +
->>  	/*
->>  	 * To prevent overflows in HDMI_IH_FC_STAT2, set the clk regenerator
->>  	 * N and cts values before enabling phy
->> @@ -2452,6 +2469,9 @@ __dw_hdmi_probe(struct platform_device *pdev,
->>  		hdmi->ddc = NULL;
->>  	}
->>
->> +	if (hdmi->cec_notifier)
->> +		cec_notifier_put(hdmi->cec_notifier);
->> +
->>  	clk_disable_unprepare(hdmi->iahb_clk);
->>  err_isfr:
->>  	clk_disable_unprepare(hdmi->isfr_clk);
-> 
-> I'm not very familiar yet with the CEC API so I made have missed something, 
-> but shouldn't you call cec_notifier_put() in the remove() handler ?
-> 
+Hi Liviu,
 
-Yes, you should. Well spotted, I missed that one.
+On Wednesday 02 Aug 2017 14:57:30 Liviu Dudau wrote:
+> On Wed, Aug 02, 2017 at 04:49:16PM +0300, Laurent Pinchart wrote:
+> > On Wednesday 02 Aug 2017 14:32:06 Liviu Dudau wrote:
+> >> On Wed, Aug 02, 2017 at 04:27:27PM +0300, Laurent Pinchart wrote:
+> >>> On Wednesday 02 Aug 2017 13:46:48 Liviu Dudau wrote:
+> >>>> On Wed, Aug 02, 2017 at 01:27:23PM +0200, Daniel Vetter wrote:
+> >>>>> On Wed, Aug 2, 2017 at 1:20 PM, Liviu Dudau wrote:
+> >>>>>> On Thu, Jul 20, 2017 at 03:01:16PM +0200, Maxime Ripard wrote:
+> >>>>>>> +/**
+> >>>>>>> + * drm_atomic_helper_commit_tail_rpm - commit atomic update to
+> >>>>>>> hardware
+> >>>>>>> + * @old_state: new modeset state to be committed
+> >>>>>>> + *
+> >>>>>>> + * This is an alternative implementation for the
+> >>>>>>> + * &drm_mode_config_helper_funcs.atomic_commit_tail hook, for
+> >>>>>>> drivers
+> >>>>>>> + * that support runtime_pm or need the CRTC to be enabled to
+> >>>>>>> perform a
+> >>>>>>> + * commit. Otherwise, one should use the default implementation
+> >>>>>>> + * drm_atomic_helper_commit_tail().
+> >>>>>>> + */
+> >>>>>>> +void drm_atomic_helper_commit_tail_rpm(struct drm_atomic_state
+> >>>>>>> *old_state)
+> >>>>>>> +{
+> >>>>>>> +     struct drm_device *dev = old_state->dev;
+> >>>>>>> +
+> >>>>>>> +     drm_atomic_helper_commit_modeset_disables(dev, old_state);
+> >>>>>>> +
+> >>>>>>> +     drm_atomic_helper_commit_modeset_enables(dev, old_state);
+> >>>>>>> +
+> >>>>>>> +     drm_atomic_helper_commit_planes(dev, old_state,
+> >>>>>>> +                                    
+> >>>>>>> DRM_PLANE_COMMIT_ACTIVE_ONLY);
+> >>>>>>> +
+> >>>>>>> +     drm_atomic_helper_commit_hw_done(old_state);
+> >>>>>>> +
+> >>>>>>> +     drm_atomic_helper_wait_for_vblanks(dev, old_state);
+> >>>>>>> +
+> >>>>>>> +     drm_atomic_helper_cleanup_planes(dev, old_state);
+> >>>>>>> +}
+> >>>>>>> +EXPORT_SYMBOL(drm_atomic_helper_commit_tail_rpm);
+> >>>>>>> +
+> >>>>>> 
+> >>>>>> Given that this function is supposed to be used by runtime PM aware
+> >>>>>> drivers and that the hook is called from the DRM core, should there
+> >>>>>> not be some pm_runtime_{get,put} calls wrapping the body of this
+> >>>>>> function?
+> >>>> 
+> >>>> Hi Daniel,
+> >>>> 
+> >>>>> No, because the drm atomic helpers have no idea which device is
+> >>>>> backing which part of the drm device. Some drivers might on have one
+> >>>>> device for the entire driver, some one device for just the display
+> >>>>> part (which might or might not match drm_device->dev). And many arm
+> >>>>> drivers have a device for each block separately (and you need to
+> >>>>> call rpm_get/put on each). And some something in-between (e.g. core
+> >>>>> device + external encoders).
+> >>>> 
+> >>>> Hmm, I understand your point about this function not having to care
+> >>>> about pm_runtime_{get,put}, but I do not agree with your view that if
+> >>>> it wanted to care about it, it wouldn't be able to do the right thing
+> >>>> because it doesn't have the right device. After all, this function is
+> >>>> about handling the updates that this atomic commit is concerned
+> >>>> about, so having the old_state->dev drm_device pointer and its
+> >>>> associated device should be enough. Am I missing something?
+> >>> 
+> >>> In embedded system it's quite common for display hardware to be made
+> >>> of multiple IP cores. Depending on the SoC you could have to manage
+> >>> runtime PM at the CRTC level for instance. The DRM core doesn't know
+> >>> about that, and sees a single device only.
+> >>> 
+> >>> I've expressed my doubts previously about the need for a RPM version
+> >>> of drm_atomic_helper_commit_tail(), as the resulting order of CRTC
+> >>> enable/disable and plane update operations can lead to corrupt frames
+> >>> when enabling the CRTC. I had a commit tail implementation in the
+> >>> rcar-du driver that was very similar to
+> >>> drm_atomic_helper_commit_tail_rpm(), and had to move back to the
+> >>> standard order to fix the corrupt frame issue. The result isn't as clean
+> >>> as I would like, as power handling is split between the CRTC
+> >>> enable/disable and the atomic begin/flush in a way that is not
+> >>> straightforward.
+> >>> 
+> >>> It now occurred to me that a simpler implementation could be possible.
+> >>> I'll have to experiment with it first, but the idea is as follows.
+> >>> 
+> >>> 1 Call pm_runtime_get_sync() at the beginning of .commit_tail() and
+> >>> pm_runtime_put() at the end.
+> >>> 
+> >>> 2. Use the standard CRTC disable, plane update, CRTC enable order in
+> >>> .commit_tail().
+> >>> 
+> >>> 3. Call pm_runtime_get() in the CRTC .enable() handler and
+> >>> pm_runtime_put() in the CRTC .disable() handler;
+> >> 
+> >> Well, that is what mali-dp driver currently does, but according to
+> >> Daniel (and I can see his POV) that is wrong.
+> > 
+> > Is it ? I might not have understood his arguments the same way (or
+> > possibly failed to even see them). Are you referring to this comments in
+> > this mail thread, or to something else ?
+> 
+> I'm talking about his reply above. My understanding: you can't do
+> pm_runtime_{get,set} in the atomic_commit_tail hook because:
+> 
+>  1. you don't know if you have the correct drm_device->dev (or all the
+>  relevant devices) to call pm_runtime_get() on.
 
+You can't call pm_runtime_get() in the DRM core for that exact reason, but you 
+can call it in a driver's implementation of .atomic_commit_tail(), which was 
+my proposal. The .atomic_commit_tail() handler would then become something 
+like
+
+{
+	for_each_ip_affected(ip, ...)
+		pm_runtime_get_sync(ip);
+
+	drm_atomic_helper_commit_tail(...);
+
+	for_each_ip_affected(ip, ...)
+		pm_runtime_put(ip);
+}
+
+>  2. If pm_runtime_get() affects in any way the atomic commit behaviour by
+>  being at the top of the commit_tail_rpm() function then you are:
+>     a) papering over bugs in one's driver
+>     b) going to turn off things at the end of commit_tail_rpm() function
+>     when you call pm_runtime_put() so your changes are going to be lost.
+
+You won't, because you also call pm_runtime_get() in the CRTC .enable() 
+handler.
+
+> >> I'm playing with removing all of that to see if there are any side
+> >> effects in Mali DP like the ones you mentioned for RCAR.
+> > 
+> > Note that the first frame will usually not be noticed as it often takes a
+> > few frames for the display to turn on.
+> 
+> Yes, and I have a TV connected to the output that takes ages to sync. But I
+> can usually run some quick rmmmod+insmod tests and the TV would be too slow
+> to turn off the output, so I can see if there are any artifacts.
+
+One good way to test this is to implement support for CRC calculation if your 
+hardware supports it.
+
+> >>> This should guarantee that the device won't be suspended between CRTC
+> >>> disable and CRTC enable during a mode set, without requiring any
+> >>> special collaboration between CRTC enable/disable and atomic
+> >>> begin/flush to handle runtime PM. If drivers implement this, there
+> >>> should be no need for drm_atomic_helper_commit_tail_rpm().
+> >>> 
+> >>> Maxime, Daniel, what do you think about this ?
+
+[snip]
+
+-- 
 Regards,
 
-	Hans
+Laurent Pinchart
