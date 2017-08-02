@@ -1,100 +1,66 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 2 Aug 2017 19:07:35 +0100
-Subject: [PATCH v2 5/5] ACPI/IORT: Add IORT named component memory
- address limits
-In-Reply-To: <cf158a20-e6ec-6826-e727-71ad74f9f7c5@codeaurora.org>
-References: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
- <20170731152323.32488-6-lorenzo.pieralisi@arm.com>
- <cf158a20-e6ec-6826-e727-71ad74f9f7c5@codeaurora.org>
-Message-ID: <20170802180735.GA26765@red-moon>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Wed, 02 Aug 2017 21:02:15 +0300
+Subject: [PATCH 0/2] serial: 8250: add support for MediaTek BTIF controller
+In-Reply-To: <1501695470.25246.7.camel@mtkswgap22>
+References: <cover.1501692369.git.sean.wang@mediatek.com>
+ <1501694063.29303.361.camel@linux.intel.com>
+ <1501695470.25246.7.camel@mtkswgap22>
+Message-ID: <1501696935.29303.367.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 02, 2017 at 01:31:03PM -0400, Nate Watterson wrote:
-> Hi Lorenzo,
-> I ran a quick test and this seems to work for memory_address_limit < 64,
-> however memory_address_limit == 64 yields a mask of 0x0.
+On Thu, 2017-08-03 at 01:37 +0800, Sean Wang wrote:
+> On Wed, 2017-08-02 at 20:14 +0300, Andy Shevchenko wrote:
+> > On Thu, 2017-08-03 at 01:05 +0800, sean.wang at mediatek.com wrote:
+> > > From: Sean Wang <sean.wang@mediatek.com>
+> > > 
+> > > This patchset introduces the support for MediaTek BTIF controller.
+> > > 
+> > > MediaTek BTIF controller is the serial interface similar to UART
+> > > but
+> > > it
+> > > works only as the digital device which is mainly used to
+> > > communicate
+> > > with
+> > > the connectivity module also called CONNSYS inside the SoC which
+> > > could
+> > > be
+> > > mostly found on those MediaTek SoCs with Bluetooth feature.
+> > > 
+> > > And the controller is made as being compatible with the 8250
+> > > register
+> > > layout so it tends to be integrated with existing 8250 core driver
+> > > and
+> > > have no requirement for the modem configuration additionally such
+> > > as
+> > > the
+> > > baud rate calculation and assignment.
 
-I will fix it - apologies. Thanks.
++Cc: Arnd.
 
-Lorenzo
-
-> -Nate
+> > Why it requires a separate driver?
+> > 
+> > 8250_of is for DT enabled drivers.
+> > 
 > 
-> On 7/31/2017 11:23 AM, Lorenzo Pieralisi wrote:
-> >IORT named components provide firmware configuration describing
-> >how many address bits a given device is capable of generating
-> >to address memory.
-> >
-> >Add code to the kernel to retrieve memory address limits
-> >configuration for IORT named components and configure DMA masks
-> >accordingly.
-> >
-> >Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >Cc: Will Deacon <will.deacon@arm.com>
-> >Cc: Robin Murphy <robin.murphy@arm.com>
-> >Cc: Nate Watterson <nwatters@codeaurora.org>
-> >---
-> >  drivers/acpi/arm64/iort.c | 40 ++++++++++++++++++++++++++++++----------
-> >  1 file changed, 30 insertions(+), 10 deletions(-)
-> >
-> >diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> >index 67b85ae..b85d19f 100644
-> >--- a/drivers/acpi/arm64/iort.c
-> >+++ b/drivers/acpi/arm64/iort.c
-> >@@ -680,6 +680,24 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
-> >  	return ret ? NULL : ops;
-> >  }
-> >+static int nc_dma_get_range(struct device *dev, u64 *size)
-> >+{
-> >+	struct acpi_iort_node *node;
-> >+	struct acpi_iort_named_component *ncomp;
-> >+
-> >+	node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
-> >+			      iort_match_node_callback, dev);
-> >+	if (!node)
-> >+		return -ENODEV;
-> >+
-> >+	ncomp = (struct acpi_iort_named_component *)node->node_data;
-> >+
-> >+	*size = ncomp->memory_address_limit >= 64 ? ~0ULL :
-> >+			1ULL<<ncomp->memory_address_limit;
-> >+
-> >+	return 0;
-> >+}
-> >+
-> >  /**
-> >   * iort_dma_setup() - Set-up device DMA parameters.
-> >   *
-> >@@ -708,17 +726,19 @@ void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
-> >  	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
-> >-	if (dev_is_pci(dev)) {
-> >+	if (dev_is_pci(dev))
-> >  		ret = acpi_dma_get_range(dev, &dmaaddr, &offset, &size);
-> >-		if (!ret) {
-> >-			mask = __roundup_pow_of_two(dmaaddr + size) - 1;
-> >-			/*
-> >-			 * Limit coherent and dma mask based on size
-> >-			 * retrieved from firmware.
-> >-			 */
-> >-			dev->coherent_dma_mask = mask;
-> >-			*dev->dma_mask = mask;
-> >-		}
-> >+	else
-> >+		ret = nc_dma_get_range(dev, &size);
-> >+
-> >+	if (!ret) {
-> >+		mask = __roundup_pow_of_two(dmaaddr + size) - 1;
-> >+		/*
-> >+		 * Limit coherent and dma mask based on size
-> >+		 * retrieved from firmware.
-> >+		 */
-> >+		dev->coherent_dma_mask = mask;
-> >+		*dev->dma_mask = mask;
-> >  	}
-> >  	*dma_addr = dmaaddr;
-> >
+> Hi, Andy
 > 
-> -- 
-> Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> thanks for your information
+> 
+> the hardware is not completely identical to 8250 device,?
+> it has extra registers belonged to platform control such as internal
+> loopback, dma disable/enable, sleep/wakeup setup and so on, so I
+> create
+> it as a separate driver.
+
+Over all 200+ LOCs I didn't see any of the above except loopback, which
+is one property that can be easily added to 8250_of.c.
+
+Moreover, if you have more code coming I would suggest you to split
+8250_of to library and driver parts and re-use stuff from there.
+
+Arnd, what is your opinion about new 8250 OF based drivers?
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
