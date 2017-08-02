@@ -1,48 +1,32 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 2 Aug 2017 16:15:40 +0800
-Subject: [GIT PULL] Allwinner clock fixes for 4.13
-Message-ID: <20170802081540.kzy2q7qo4lb3muxt@wens.csie.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 2 Aug 2017 10:31:59 +0200
+Subject: [PATCH] pinctrl: zte: fix 'functions' allocation in
+ zx_pinctrl_build_state()
+In-Reply-To: <1500212008-29321-1-git-send-email-shawnguo@kernel.org>
+References: <1500212008-29321-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <CACRpkdbXYOv8FdbWoiwL-4mhBN5JSP3D8iMMjFM1H2u-vgUC-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+On Sun, Jul 16, 2017 at 3:33 PM, Shawn Guo <shawnguo@kernel.org> wrote:
 
-I will be handling most of the Allwinner pull requests for this cycle.
-Here is a critical fix for the sunxi-ng clk drivers.
+> From: Shawn Guo <shawn.guo@linaro.org>
+>
+> It fixes the following Smatch static check warning:
+>
+>  drivers/pinctrl/zte/pinctrl-zx.c:338 zx_pinctrl_build_state()
+>  warn: passing devm_ allocated variable to kfree.
+>
+> As we will be calling krealloc() on pointer 'functions', which means
+> kfree() will be called in there, devm_kzalloc() shouldn't be used with
+> the allocation in the first place.  Fix the warning by calling kcalloc()
+> and managing the free procedure in error path on our own.
+>
+> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Fixes: cbff0c4d27f4 ("pinctrl: add ZTE ZX pinctrl driver support")
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Thanks
-ChenYu
+Patch applied.
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
-
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-fixes-for-4.13
-
-for you to fetch changes up to 9735ee9e3cc3ba113ac96b0368ef3f1a73092a23:
-
-  clk: sunxi-ng: sun5i: Add clk_set_rate_parent to the CPU clock (2017-07-24 11:37:04 +0200)
-
-----------------------------------------------------------------
-Allwinner clock fixes for 4.13
-
-One critical clock fix for sun5i (A10s/A13/R8) which enables propogation
-of clock rate changes from the "cpu" clock to it's parent PLL clock.
-This fixes cpufreq related crashes that have been observed on KernelCI
-with the C.H.I.P. and multi_v7_defconfig.
-
-----------------------------------------------------------------
-Maxime Ripard (1):
-      clk: sunxi-ng: sun5i: Add clk_set_rate_parent to the CPU clock
-
- drivers/clk/sunxi-ng/ccu-sun5i.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170802/704bd691/attachment.sig>
+Yours,
+Linus Walleij
