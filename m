@@ -1,75 +1,142 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 2 Aug 2017 10:59:02 +0200
-Subject: [PATCH v2 3/7] pwm: rockchip: Remove the dumplicate
- rockchip_pwm_ops ops
-In-Reply-To: <1499486629-9659-4-git-send-email-david.wu@rock-chips.com>
-References: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
- <1499486629-9659-4-git-send-email-david.wu@rock-chips.com>
-Message-ID: <20170802105902.2d137072@bbrezillon>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Wed,  2 Aug 2017 16:59:54 +0800
+Subject: [PATCH v2 22/23] ARM: dts: rockchip: add pmic rk805 dt node for
+ rv1108 evb
+In-Reply-To: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
+References: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1501664394-12993-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat,  8 Jul 2017 12:03:45 +0800
-David Wu <david.wu@rock-chips.com> wrote:
+RK805 is used as the voltage regulator on rv1108 evaluation
+board. Add device tree node for it.
 
-> The rockchip_pwm_ops_v1 and rockchip_pwm_ops_v2 ops are the same
-> struct members, remove one of them.
-> 
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
-> ---
->  drivers/pwm/pwm-rockchip.c | 14 ++++----------
->  1 file changed, 4 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
-> index cd45f17..85f9515 100644
-> --- a/drivers/pwm/pwm-rockchip.c
-> +++ b/drivers/pwm/pwm-rockchip.c
-> @@ -255,13 +255,7 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
->  	return ret;
->  }
->  
-> -static const struct pwm_ops rockchip_pwm_ops_v1 = {
-> -	.get_state = rockchip_pwm_get_state,
-> -	.apply = rockchip_pwm_apply,
-> -	.owner = THIS_MODULE,
-> -};
-> -
-> -static const struct pwm_ops rockchip_pwm_ops_v2 = {
-> +static const struct pwm_ops rockchip_pwm_ops = {
->  	.get_state = rockchip_pwm_get_state,
->  	.apply = rockchip_pwm_apply,
->  	.owner = THIS_MODULE,
-> @@ -275,7 +269,7 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
->  		.ctrl = 0x0c,
->  	},
->  	.prescaler = 2,
-> -	.ops = &rockchip_pwm_ops_v1,
-> +	.ops = &rockchip_pwm_ops,
->  	.set_enable = rockchip_pwm_set_enable_v1,
->  	.get_state = rockchip_pwm_get_state_v1,
->  };
-> @@ -289,7 +283,7 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
->  	},
->  	.prescaler = 1,
->  	.supports_polarity = true,
-> -	.ops = &rockchip_pwm_ops_v2,
-> +	.ops = &rockchip_pwm_ops,
->  	.set_enable = rockchip_pwm_set_enable_v2,
->  	.get_state = rockchip_pwm_get_state_v2,
->  };
-> @@ -303,7 +297,7 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
->  	},
->  	.prescaler = 1,
->  	.supports_polarity = true,
-> -	.ops = &rockchip_pwm_ops_v2,
-> +	.ops = &rockchip_pwm_ops,
->  	.set_enable = rockchip_pwm_set_enable_v2,
->  	.get_state = rockchip_pwm_get_state_v2,
->  };
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+---
 
-Actually, when I suggested to just implement ->apply_state() and be
-done with all other fields I was thinking that you could get rid of
-this rockchip_pwm_data struct entirely and just have 3 different
-pwm_ops. You seem to take the other direction here: you're removing
-rockchip_pwm_ops_v1 and renaming rockchip_pwm_ops_v2 into
-rockchip_pwm_ops.
+Changes in v2: None
+
+ arch/arm/boot/dts/rv1108-evb.dts | 108 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 108 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rv1108-evb.dts b/arch/arm/boot/dts/rv1108-evb.dts
+index 77ce707..a1bd95e 100644
+--- a/arch/arm/boot/dts/rv1108-evb.dts
++++ b/arch/arm/boot/dts/rv1108-evb.dts
+@@ -94,6 +94,114 @@
+ 			248 249 250 251 252 253 254 255>;
+ 		default-brightness-level = <200>;
+ 	};
++
++	vcc_sys: vsys-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "vsys";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-boot-on;
++	};
++};
++
++&i2c0 {
++	status = "okay";
++	i2c-scl-rising-time-ns = <275>;
++	i2c-scl-falling-time-ns = <16>;
++	clock-frequency = <400000>;
++
++	rk805: pmic at 18 {
++		compatible = "rockchip,rk805";
++		reg = <0x18>;
++		interrupt-parent = <&gpio0>;
++		interrupts = <RK_PB4 IRQ_TYPE_LEVEL_LOW>;
++		rockchip,system-power-controller;
++
++		vcc1-supply = <&vcc_sys>;
++		vcc2-supply = <&vcc_sys>;
++		vcc3-supply = <&vcc_sys>;
++		vcc4-supply = <&vcc_sys>;
++		vcc5-supply = <&vcc_sys>;
++		vcc6-supply = <&vcc_sys>;
++
++		regulators {
++			vdd_core: DCDC_REG1 {
++				regulator-name= "vdd_core";
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-state-enabled;
++					regulator-state-uv = <900000>;
++				};
++			};
++
++			vdd_cam: DCDC_REG2 {
++				regulator-name= "vdd_cam";
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <2000000>;
++				regulator-state-mem {
++					regulator-state-disabled;
++				};
++			};
++
++			vcc_ddr: DCDC_REG3 {
++				regulator-name= "vcc_ddr";
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-state-enabled;
++				};
++			};
++
++			vcc_io: DCDC_REG4 {
++				regulator-name= "vcc_io";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-state-enabled;
++					regulator-state-uv = <3300000>;
++				};
++			};
++
++			vdd_10: LDO_REG1 {
++				regulator-name= "vdd_10";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-state-disabled;
++				};
++			};
++
++			vcc_18: LDO_REG2 {
++				regulator-name= "vcc_18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-state-disabled;
++				};
++			};
++
++			vdd10_pmu: LDO_REG3 {
++				regulator-name= "vdd10_pmu";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-state-enabled;
++					regulator-state-uv = <1000000>;
++				};
++			};
++		};
++	};
+ };
+ 
+ &pwm0 {
+-- 
+2.7.4
