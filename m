@@ -1,68 +1,53 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Wed, 02 Aug 2017 16:56:57 +0100
-Subject: [RFC PATCH v2 0/2] nb8800 suspend/resume support
-In-Reply-To: <9e8e12b1-74e2-8323-ec16-eebda46b2a3d@free.fr> (Mason's message
- of "Wed, 2 Aug 2017 17:52:59 +0200")
-References: <33d1ab47-6098-5e3f-8a3c-f72626d07113@free.fr>
- <aa8885b8-e6bb-3624-2bf9-0bb40505ac54@free.fr>
- <dd883398-1511-0bfd-972b-a11ef8709f0d@free.fr>
- <yw1xshhagexd.fsf@mansr.com>
- <9e8e12b1-74e2-8323-ec16-eebda46b2a3d@free.fr>
-Message-ID: <yw1xo9rygdyu.fsf@mansr.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 2 Aug 2017 17:02:36 +0100
+Subject: [RFC PATCH v4 5/5] arm64: neon: Allow EFI runtime services to
+ use FPSIMD in irq context
+In-Reply-To: <20170802151521.GI6321@e103592.cambridge.arm.com>
+References: <1501249824-18913-1-git-send-email-Dave.Martin@arm.com>
+ <1501249824-18913-6-git-send-email-Dave.Martin@arm.com>
+ <20170802145801.nlmm6zfxe4xidkpg@armageddon.cambridge.arm.com>
+ <20170802151521.GI6321@e103592.cambridge.arm.com>
+Message-ID: <20170802160236.ynrw7cri6ljhyrdr@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+On Wed, Aug 02, 2017 at 04:15:21PM +0100, Dave P Martin wrote:
+> On Wed, Aug 02, 2017 at 03:58:01PM +0100, Catalin Marinas wrote:
+> > On Fri, Jul 28, 2017 at 02:50:24PM +0100, Dave P Martin wrote:
+> > > Now that kernel-mode NEON use is non-nestable and not allowed in
+> > > hardirq/nmi context, we have a problem if the kernel decides to
+> > > call into EFI during an interrupt that interrupted a
+> > > kernel_neon_begin()..._end() block.  This will occur if the kernel
+> > > tries to write diagnostic data to EFI persistent storage during
+> > > a panic triggered by an NMI for example.
+> > > 
+> > > EFI runtime services specify an ABI that clobbers the FPSIMD state,
+> > > rather than being able to use it optionally as an accelerator.
+> > > This means that EFI is really a special case and can be handled
+> > > separately.
+> > > 
+> > > To enable EFI calls from interrupts, this patch creates dedicated
+> > > __efi_fpsimd_{begin,end}() helpers solely for this purpose, which
+> > > save/restore to a separate percpu buffer if called in a context
+> > > where kernel_neon_begin() is not usable.
+> > > 
+> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > 
+> > Should this patch be reordered with patch 4? It looks like patch 4 no
+> > longer allows EFI runtime services in IRQ context.
+> 
+> Hmmm, yes, patches 4/5 are not bisectable at present.
+> 
+> I can't immediately see why patch 5 won't work if they're swapped:
+> rather, the !may_use_simd() fallback and efi_fpsimd_state won't get
+> used, and save/restore around EFI should work much the same as it does
+> today.
+> 
+> I'm happy to swap the patches, but I don't want to put too much effort
+> into confirming the above.  How concerned are you about the risk?
 
-> On 02/08/2017 17:36, M?ns Rullg?rd wrote:
->
->> Mason wrote:
->> 
->>> Looking at the tango-specific integration, I note this nugget:
->>>
->>> 1.5.4 Stopping & Starting the DMA
->>>
->>> This feature has been added to allow the software to stop and start
->>> the DMA without any issues.
->>>
->>> Procedure:
->>> 1- STOP:
->>> 2- Stop RX core;
->>> 3- Set OWN bit of all descriptor of the chain to 1;
->>> 4- Stop DMA by writing dma_stop bit to 1 in  RX_DMA_Stop register
->>> 5- Wait around 100 clock cycles.
->>>
->>> The pending packets are held until the system will re-start.
->>>
->>> RE-START:
->>> 1- Clear dma_stop bit (note that if at the time of stopping the DMA,
->>> the next packet in the FIFO was an UDP packet, when clearing dma_stop,
->>> this packet will directly start being written in the DRAM since UDP
->>> packets are not controlled by the descriptor mechanism);
->>> 2- Program a new chain of descriptor;
->>> 3- Re-enable DMA (rx_ctrl register)
->>>
->>> rx_dma_stop:
->>> Software control to stop the Rx DMA.
->>> A write to this bit with "1" will gracefully stop the Rx DMA by after
->>> transferring the current packet. If more packets are pending they will
->>> be held until the software clears this bit.
->>>
->>> Hmmm, what do you think? This looks promising...
->> 
->> This is only available in the more recent Sigma versions.  Although it
->> is nicer, I didn't think it was worth the trouble to support both
->> methods since the older method should work on all chips.
->
-> Well, from my perspective, the older method does not work on newer
-> chips :-)
-
-It does work on tango4.
-
-What does the tango5 do if you flood it with packets faster than the
-kernel can keep up with?  That would make it hit the end of the rx
-chain, which is apparently what makes it miserable with the current dma
-stop code.
+I'm not concerned but we could at least test that it boots with patches
+1-4.
 
 -- 
-M?ns Rullg?rd
+Catalin
