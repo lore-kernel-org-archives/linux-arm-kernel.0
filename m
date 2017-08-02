@@ -1,49 +1,39 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 02 Aug 2017 16:03:57 +0200
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.13 (#2)
-Message-ID: <87fuda9icy.fsf@free-electrons.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 2 Aug 2017 16:05:05 +0200
+Subject: [PATCH v2 0/9] EDAC drivers for Armada XP L2 and DDR
+In-Reply-To: <20170802123922.11498-1-jlu@pengutronix.de>
+References: <20170802123922.11498-1-jlu@pengutronix.de>
+Message-ID: <20170802140505.GA2290@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Aug 02, 2017 at 02:39:13PM +0200, Jan Luebbe wrote:
+> Chris Packham (2):
+>   ARM: l2x0: support parity-enable/disable on aurora
+>   ARM: l2x0: add marvell,ecc-enable property for aurora
+> 
+> Jan Luebbe (7):
+>   ARM: l2c: move cache-aurora-l2.h to asm/hardware
+>   ARM: aurora-l2: add prefix to MAX_RANGE_SIZE
+>   ARM: aurora-l2: add defines for parity and ECC registers
 
-Here is the second pull request for fixes for mvebu for v4.13.
+I'd need an ACK from an ARM maintainer for those if the whole series is
+going to go through the EDAC tree.
 
-Gregory
+>   EDAC: Add missing debugfs_create_x32 wrapper
+>   EDAC: Add devres helpers for
+>     edac_mc_alloc/edac_mc_add_mc(_with_groups)
+>   EDAC: Add devres helpers for
+>     edac_device_alloc_ctl_info/edac_device_add_device
+>   EDAC: Add driver for the Marvell Armada XP SDRAM and L2 cache ECC
 
-The following changes since commit 8d4514173211586c6238629b1ef1e071927735f5:
+Alternatively, I can review those and they can go through an ARM tree.
 
-  ARM: dts: armada-38x: Fix irq type for pca955 (2017-07-18 11:26:30 +0200)
+I'm fine with whatever ARM maintainers prefer.
 
-are available in the git repository at:
+-- 
+Regards/Gruss,
+    Boris.
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-4.13-2
-
-for you to fetch changes up to d7a65c4905bc9c304ecf3d8aa566802f6119480f:
-
-  ARM64: dts: marvell: armada-37xx: Fix the number of GPIO on south bridge (2017-08-02 16:00:00 +0200)
-
-----------------------------------------------------------------
-mvebu fixes for 4.13 (part 2)
-
-All the fixes are for ARM64 mvebu:
-
- - Fix the RTC interrupt on A7K/A8K which was missed when switching
-   from GIC to ICU
- - Mark the A7K/A8K crypto engine as dma coherent
- - Fix the number of GPIO on south bridge on Armada 3700
-
-----------------------------------------------------------------
-Antoine Tenart (1):
-      arm64: dts: marvell: mark the cp110 crypto engine as dma coherent
-
-Gregory CLEMENT (1):
-      ARM64: dts: marvell: armada-37xx: Fix the number of GPIO on south bridge
-
-Thomas Petazzoni (1):
-      arm64: dts: marvell: use ICU for the CP110 slave RTC
-
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi         | 2 +-
- arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 1 +
- arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 3 ++-
- 3 files changed, 4 insertions(+), 2 deletions(-)
+ECO tip #101: Trim your mails when you reply.
+--
