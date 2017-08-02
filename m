@@ -1,37 +1,36 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Wed, 2 Aug 2017 17:17:50 -0500
-Subject: [PATCH 1/4] i2c: davinci: Preserve return value of devm_clk_get
-In-Reply-To: <20170802221753.13786-1-fcooper@ti.com>
-References: <20170802221753.13786-1-fcooper@ti.com>
-Message-ID: <20170802221753.13786-2-fcooper@ti.com>
+Date: Wed, 2 Aug 2017 17:17:49 -0500
+Subject: [PATCH 0/4] ARM: dts: keystone-k2g: Add I2C support for 66AK2G
+Message-ID: <20170802221753.13786-1-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i2c driver can run into driver dependency issues if its loaded
-before a clock driver it depends on. Therefore, EPROBE_DEFER may be
-returned by devm_clk_get and should be returned in probe to allow the
-kernel to reprobe the driver at a later time. This patch allows the error
-value returned by devm_clk_get to be passed through and not overwritten.
+Add I2C support to 66AK2G. Primary requirement is to add PM
+Runtime support to the driver.
 
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- drivers/i2c/busses/i2c-davinci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This has been tested on following platforms by performing simple i2c test
+such as i2c detect and reading on board i2c devices:
+K2G GP evm
+OMAPL138
+K2L GP EVM
 
-diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
-index 9e7ef5c..5749aac 100644
---- a/drivers/i2c/busses/i2c-davinci.c
-+++ b/drivers/i2c/busses/i2c-davinci.c
-@@ -801,7 +801,7 @@ static int davinci_i2c_probe(struct platform_device *pdev)
- 
- 	dev->clk = devm_clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(dev->clk))
--		return -ENODEV;
-+		return PTR_ERR(dev->clk);
- 	clk_prepare_enable(dev->clk);
- 
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+and boot tested on:
+K2E GP EVM
+K2HK GP EVM
+
+Franklin S Cooper Jr (3):
+  i2c: davinci: Preserve return value of devm_clk_get
+  i2c: davinci: Add PM Runtime Support
+  dt-bindings: i2c: i2c-davinci: Update binding for 66AK2Gx pwr dm
+    property
+
+Vitaly Andrianov (1):
+  ARM: dts: keystone-k2g: Add I2C nodes
+
+ .../devicetree/bindings/i2c/i2c-davinci.txt        | 12 +++++
+ arch/arm/boot/dts/keystone-k2g.dtsi                | 36 +++++++++++++
+ drivers/i2c/busses/i2c-davinci.c                   | 63 ++++++++++++++++++----
+ 3 files changed, 102 insertions(+), 9 deletions(-)
+
 -- 
 2.9.4.dirty
