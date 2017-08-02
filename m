@@ -1,32 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 2 Aug 2017 10:31:59 +0200
-Subject: [PATCH] pinctrl: zte: fix 'functions' allocation in
- zx_pinctrl_build_state()
-In-Reply-To: <1500212008-29321-1-git-send-email-shawnguo@kernel.org>
-References: <1500212008-29321-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <CACRpkdbXYOv8FdbWoiwL-4mhBN5JSP3D8iMMjFM1H2u-vgUC-A@mail.gmail.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Wed,  2 Aug 2017 16:32:23 +0800
+Subject: [PATCH v2 04/23] clk: rockchip: support more rates for cpuclk
+In-Reply-To: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
+References: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1501662743-11920-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 16, 2017 at 3:33 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+From: Elaine Zhang <zhangqing@rock-chips.com>
 
-> From: Shawn Guo <shawn.guo@linaro.org>
->
-> It fixes the following Smatch static check warning:
->
->  drivers/pinctrl/zte/pinctrl-zx.c:338 zx_pinctrl_build_state()
->  warn: passing devm_ allocated variable to kfree.
->
-> As we will be calling krealloc() on pointer 'functions', which means
-> kfree() will be called in there, devm_kzalloc() shouldn't be used with
-> the allocation in the first place.  Fix the warning by calling kcalloc()
-> and managing the free procedure in error path on our own.
->
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Fixes: cbff0c4d27f4 ("pinctrl: add ZTE ZX pinctrl driver support")
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+fix up the cpuclk rates table for support more freqs.
+fix up the mux_core_mask describe error.
 
-Patch applied.
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
-Yours,
-Linus Walleij
+---
+
+Changes in v2:
+- split the new added clks and rename.
+
+ drivers/clk/rockchip/clk-rv1108.c | 23 +++++++++++++++++++----
+ 1 file changed, 19 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clk/rockchip/clk-rv1108.c b/drivers/clk/rockchip/clk-rv1108.c
+index 7c05ab3..3c670db 100644
+--- a/drivers/clk/rockchip/clk-rv1108.c
++++ b/drivers/clk/rockchip/clk-rv1108.c
+@@ -93,9 +93,24 @@ static struct rockchip_pll_rate_table rv1108_pll_rates[] = {
+ 	}
+ 
+ static struct rockchip_cpuclk_rate_table rv1108_cpuclk_rates[] __initdata = {
+-	RV1108_CPUCLK_RATE(816000000, 4),
+-	RV1108_CPUCLK_RATE(600000000, 4),
+-	RV1108_CPUCLK_RATE(312000000, 4),
++	RV1108_CPUCLK_RATE(1608000000, 7),
++	RV1108_CPUCLK_RATE(1512000000, 7),
++	RV1108_CPUCLK_RATE(1488000000, 5),
++	RV1108_CPUCLK_RATE(1416000000, 5),
++	RV1108_CPUCLK_RATE(1392000000, 5),
++	RV1108_CPUCLK_RATE(1296000000, 5),
++	RV1108_CPUCLK_RATE(1200000000, 5),
++	RV1108_CPUCLK_RATE(1104000000, 5),
++	RV1108_CPUCLK_RATE(1008000000, 5),
++	RV1108_CPUCLK_RATE(912000000, 5),
++	RV1108_CPUCLK_RATE(816000000, 3),
++	RV1108_CPUCLK_RATE(696000000, 3),
++	RV1108_CPUCLK_RATE(600000000, 3),
++	RV1108_CPUCLK_RATE(500000000, 3),
++	RV1108_CPUCLK_RATE(408000000, 1),
++	RV1108_CPUCLK_RATE(312000000, 1),
++	RV1108_CPUCLK_RATE(216000000, 1),
++	RV1108_CPUCLK_RATE(96000000, 1),
+ };
+ 
+ static const struct rockchip_cpuclk_reg_data rv1108_cpuclk_data = {
+@@ -105,7 +120,7 @@ static const struct rockchip_cpuclk_reg_data rv1108_cpuclk_data = {
+ 	.mux_core_alt = 1,
+ 	.mux_core_main = 0,
+ 	.mux_core_shift = 8,
+-	.mux_core_mask = 0x1,
++	.mux_core_mask = 0x3,
+ };
+ 
+ PNAME(mux_pll_p)		= { "xin24m", "xin24m"};
+-- 
+2.7.4
