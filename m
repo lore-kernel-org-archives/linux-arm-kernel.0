@@ -1,34 +1,68 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 2 Aug 2017 15:21:21 +0200
-Subject: [PATCH v3 01/11] net: phy: Add rockchip phy driver support
-In-Reply-To: <1501654546-17292-2-git-send-email-david.wu@rock-chips.com>
-References: <1501654546-17292-1-git-send-email-david.wu@rock-chips.com>
- <1501654546-17292-2-git-send-email-david.wu@rock-chips.com>
-Message-ID: <20170802132121.GA24708@lunn.ch>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 02 Aug 2017 16:14:34 +0300
+Subject: [PATCH v2 3/4] drm/bridge: dw-hdmi: add cec driver
+In-Reply-To: <56537209-32df-8b4e-13cd-19548ad8d1da@xs4all.nl>
+References: <20170731142906.GX31807@n2100.armlinux.org.uk>
+ <1884159.hmXKyeR78T@avalon> <56537209-32df-8b4e-13cd-19548ad8d1da@xs4all.nl>
+Message-ID: <4399618.oOUScL5uAk@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +static struct phy_driver rockchip_phy_driver[] = {
-> +{
-> +	.phy_id			= 0x1234d400,
-> +	.phy_id_mask		= 0xfffffff0,
-> +	.name			= "Rockchip internal EPHY",
-> +	.features		= (PHY_BASIC_FEATURES | SUPPORTED_Pause
-> +				   | SUPPORTED_Asym_Pause),
+Hi Hans,
 
-Please take a look at Documentation/networking/phy.txt and
-Fixes: 529ed1275263 ("net: phy: phy drivers should not set SUPPORTED_[Asym_]Pause")
+On Wednesday 02 Aug 2017 08:47:23 Hans Verkuil wrote:
+> On 08/02/2017 12:32 AM, Laurent Pinchart wrote:
+> >> +
+> >> +	cec_register_cec_notifier(cec->adap, cec->notify);
+> >> +
+> >> +	return 0;
+> >> +}
+> >> +
+> >> +static int dw_hdmi_cec_remove(struct platform_device *pdev)
+> >> +{
+> >> +	struct dw_hdmi_cec *cec = platform_get_drvdata(pdev);
+> >> +
+> >> +	cec_unregister_adapter(cec->adap);
+> >> +	cec_notifier_put(cec->notify);
+> >> +
+> >> +	return 0;
+> >> +}
+> >> +
+> >> +static struct platform_driver dw_hdmi_cec_driver = {
+> >> +	.probe	= dw_hdmi_cec_probe,
+> >> +	.remove	= dw_hdmi_cec_remove,
+> >> +	.driver = {
+> >> +		.name = "dw-hdmi-cec",
+> >> +	},
+> >> +};
+> >> +module_platform_driver(dw_hdmi_cec_driver);
+> > 
+> > Is there a particular reason why this has to be a separate module instead
+> > of simply calling the CEC init/cleanup functions directly from the main
+> > dw-hdmi driver ?
+> 
+> Not all SoCs that use dw-hdmi also use the dw-hdmi CEC implementation. Some
+> use their own implementation (amlogic).
 
-Pause frames / flow control
+Lovely. Of course we need to reinvent the wheel every time, where would the 
+fun be otherwise ?
 
- The PHY does not participate directly in flow control/pause frames except by
- making sure that the SUPPORTED_Pause and SUPPORTED_AsymPause bits are set in
- MII_ADVERTISE to indicate towards the link partner that the Ethernet MAC
- controller supports such a thing. Since flow control/pause frames generation
- involves the Ethernet MAC driver, it is recommended that this driver takes care
- of properly indicating advertisement and support for such features by setting
- the SUPPORTED_Pause and SUPPORTED_AsymPause bits accordingly. This can be done
- either before or after phy_connect() and/or as a result of implementing the
- ethtool::set_pauseparam feature.
+> So by implementing the cec-notifier in the dw-hdmi driver and keeping dw-
+> hdmi CEC separate you can easily choose whether or not you want to use this
+> CEC driver or another SoC CEC driver.
 
-	Andrew
+I'm certainly fine with such a split, but I don't think it requires a separate 
+platform_driver. We could use a similar approach as with the HDMI PHY that can 
+also differ between SoCs. The PHY is identified at runtime when possible, and 
+the SoC-specific glue code can override that with a few data fields and 
+function pointers.
+
+> >> +MODULE_AUTHOR("Russell King <rmk+kernel@armlinux.org.uk>");
+> >> +MODULE_DESCRIPTION("Synopsys Designware HDMI CEC driver for i.MX");
+> >> +MODULE_LICENSE("GPL");
+> >> +MODULE_ALIAS(PLATFORM_MODULE_PREFIX "dw-hdmi-cec");
+
+-- 
+Regards,
+
+Laurent Pinchart
