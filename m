@@ -1,48 +1,130 @@
 From: jlu@pengutronix.de (Jan Luebbe)
-Date: Wed,  2 Aug 2017 14:39:15 +0200
-Subject: [PATCH v2 2/9] ARM: aurora-l2: add prefix to MAX_RANGE_SIZE
+Date: Wed,  2 Aug 2017 14:39:20 +0200
+Subject: [PATCH v2 7/9] EDAC: Add devres helpers for
+ edac_mc_alloc/edac_mc_add_mc(_with_groups)
 In-Reply-To: <20170802123922.11498-1-jlu@pengutronix.de>
 References: <20170802123922.11498-1-jlu@pengutronix.de>
-Message-ID: <20170802123922.11498-3-jlu@pengutronix.de>
+Message-ID: <20170802123922.11498-8-jlu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The macro name is too generic, so add a AURORA_ prefix.
+These helpers simplify error handling in the _probe functions and automate
+deallocation in the _remove functions.
 
 Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/include/asm/hardware/cache-aurora-l2.h | 2 +-
- arch/arm/mm/cache-l2x0.c                        | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/edac/edac_mc.c | 54 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/edac/edac_mc.h | 26 ++++++++++++++++++++++++
+ 2 files changed, 80 insertions(+)
 
-diff --git a/arch/arm/include/asm/hardware/cache-aurora-l2.h b/arch/arm/include/asm/hardware/cache-aurora-l2.h
-index c86124769831..dc5c479ec4c3 100644
---- a/arch/arm/include/asm/hardware/cache-aurora-l2.h
-+++ b/arch/arm/include/asm/hardware/cache-aurora-l2.h
-@@ -41,7 +41,7 @@
- #define AURORA_ACR_FORCE_WRITE_THRO_POLICY	\
- 	(2 << AURORA_ACR_FORCE_WRITE_POLICY_OFFSET)
+diff --git a/drivers/edac/edac_mc.c b/drivers/edac/edac_mc.c
+index 480072139b7a..d3ee2b851329 100644
+--- a/drivers/edac/edac_mc.c
++++ b/drivers/edac/edac_mc.c
+@@ -517,6 +517,34 @@ void edac_mc_free(struct mem_ctl_info *mci)
+ }
+ EXPORT_SYMBOL_GPL(edac_mc_free);
  
--#define MAX_RANGE_SIZE		1024
-+#define AURORA_MAX_RANGE_SIZE	1024
++/**
++ * devm_edac_mc_free() - Internal helper to call edac_mc_free from a devres
++ *	action.
++ */
++static void devm_edac_mc_free(void *mci)
++{
++	edac_mc_free((struct mem_ctl_info *)mci);
++}
++
++struct mem_ctl_info *devm_edac_mc_alloc(struct device *dev,
++					unsigned int mc_num,
++					unsigned int n_layers,
++					struct edac_mc_layer *layers,
++					unsigned int sz_pvt)
++{
++	struct mem_ctl_info *mci;
++
++	mci = edac_mc_alloc(mc_num, n_layers, layers, sz_pvt);
++	if (!mci)
++		return mci;
++
++	if (devm_add_action_or_reset(dev, devm_edac_mc_free, mci))
++		return NULL;
++
++	return mci;
++}
++EXPORT_SYMBOL_GPL(devm_edac_mc_alloc);
++
+ bool edac_has_mcs(void)
+ {
+ 	bool ret;
+@@ -828,6 +856,32 @@ struct mem_ctl_info *edac_mc_del_mc(struct device *dev)
+ }
+ EXPORT_SYMBOL_GPL(edac_mc_del_mc);
  
- #define AURORA_WAY_SIZE_SHIFT	2
++/**
++ * devm_edac_mc_del_mc() - Internal helper to call edac_mc_del_mc from a devres
++ *	action.
++ */
++static void devm_edac_mc_del_mc(void *dev)
++{
++	edac_mc_del_mc((struct device *)dev);
++}
++
++int devm_edac_mc_add_mc_with_groups(struct device *dev,
++				    struct mem_ctl_info *mci,
++				    const struct attribute_group **groups)
++{
++	int ret;
++
++	ret = edac_mc_add_mc_with_groups(mci, groups);
++	if (ret)
++		return ret;
++
++	if (devm_add_action_or_reset(dev, devm_edac_mc_del_mc, dev))
++		return 1;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(devm_edac_mc_add_mc_with_groups);
++
+ static void edac_mc_scrub_block(unsigned long page, unsigned long offset,
+ 				u32 size)
+ {
+diff --git a/drivers/edac/edac_mc.h b/drivers/edac/edac_mc.h
+index 5357800e418d..32f88cc4a65b 100644
+--- a/drivers/edac/edac_mc.h
++++ b/drivers/edac/edac_mc.h
+@@ -149,6 +149,32 @@ extern int edac_mc_add_mc_with_groups(struct mem_ctl_info *mci,
+ extern void edac_mc_free(struct mem_ctl_info *mci);
  
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index a00d6f7fd34c..7d2d2a3c67d0 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1364,8 +1364,8 @@ static unsigned long aurora_range_end(unsigned long start, unsigned long end)
- 	 * since cache range operations stall the CPU pipeline
- 	 * until completion.
- 	 */
--	if (end > start + MAX_RANGE_SIZE)
--		end = start + MAX_RANGE_SIZE;
-+	if (end > start + AURORA_MAX_RANGE_SIZE)
-+		end = start + AURORA_MAX_RANGE_SIZE;
- 
- 	/*
- 	 * Cache range operations can't straddle a page boundary.
+ /**
++ * devm_edac_mc_alloc() - Helper to call edac_mc_alloc() and register it for
++ *	cleanup with devres.
++ *
++ * Returns:
++ *	On success, return a pointer to struct mem_ctl_info pointer;
++ *	%NULL otherwise
++ */
++struct mem_ctl_info *devm_edac_mc_alloc(struct device *dev,
++					unsigned int mc_num,
++					unsigned int n_layers,
++					struct edac_mc_layer *layers,
++					unsigned int sz_pvt);
++
++/**
++ * devm_edac_mc_add_mc_with_groups() - Helper to call
++ *	edac_mc_add_mc_with_groups() and register it for cleanup with devres.
++ *
++ * Returns:
++ *	0 on Success, or an error code on failure
++ */
++int devm_edac_mc_add_mc_with_groups(struct device *dev,
++				    struct mem_ctl_info *mci,
++				    const struct attribute_group **groups);
++#define devm_edac_mc_add_mc(dev, mci)	devm_edac_mc_add_mc_with_groups(dev, mci, NULL)
++
++/**
+  * edac_has_mcs() - Check if any MCs have been allocated.
+  *
+  * Returns:
 -- 
 2.11.0
