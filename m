@@ -1,41 +1,48 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Wed, 2 Aug 2017 10:24:07 +0800
-Subject: [PATCH v1 0/4] media: rc: add support for IR receiver on MT7622
- SoC
-In-Reply-To: <20170704101008.pgnjacbsk3twadzo@gangnam.samsung>
-References: <CGME20170630060312epcas4p351a77795e8469640d5177039f6b1955d@epcas4p3.samsung.com>
- <cover.1498794408.git.sean.wang@mediatek.com>
- <20170704101008.pgnjacbsk3twadzo@gangnam.samsung>
-Message-ID: <1501640647.17690.25.camel@mtkswgap22>
+From: luaraneda@gmail.com (Luis Araneda)
+Date: Tue, 1 Aug 2017 22:39:41 -0400
+Subject: [PATCH] ARM: dts: sun8i: h3: Enable EMAC with external PHY on
+ NanoPi M1 Plus
+In-Reply-To: <CAGb2v66r1kpbzKN8uE5pb9mqzWMwTjn-N2ufZGdUU2LJ7FvbeA@mail.gmail.com>
+References: <20170801050115.21497-1-luaraneda@gmail.com>
+ <CAGb2v66r1kpbzKN8uE5pb9mqzWMwTjn-N2ufZGdUU2LJ7FvbeA@mail.gmail.com>
+Message-ID: <CAHbBuxon0L-TPOYpzYEVtFf4pEGsLLFxNPSGgh6t3mooWFXgDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-Hi, Mauro and Sean
+On Tue, Aug 1, 2017 at 3:55 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Tue, Aug 1, 2017 at 1:01 PM, Luis Araneda <luaraneda@gmail.com> wrote:
+>> +&emac {
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&emac_rgmii_pins>;
+>> +       phy-supply = <&reg_gmac_3v3>;
+>> +       phy-handle = <&ext_rgmii_phy>;
+>> +       phy-mode = "rgmii";
+>> +       allwinner,leds-active-low;
+>
+> This property is for the internal PHY. You should not be using it
+> with an external PHY.
 
-Just a gentle ping on the whole patchset porting MediaTek CIR to another
-platform.
+You're right. When reading the file "dwmac-sun8i.txt" I thought EPHY meant
+External PHY, but it means Ethernet PHY (integrated).
+I've tested the board without the property and the LEDs are working fine.
 
-	Sean
+>
+>> +       status = "okay";
+>> +};
+>> +
+>> +&mdio {
+>> +       ext_rgmii_phy: ethernet-phy at 1 {
+>> +               compatible = "ethernet-phy-ieee802.3-c22";
+>> +               reg = <0>;
+>
+> Value in reg should match the address part of the node name.
 
+Ok.
 
-On Tue, 2017-07-04 at 19:10 +0900, Andi Shyti wrote:
-> Hi Sean,
-> 
-> > This patchset introduces Consumer IR (CIR) support for MT7622 SoC
-> > implements raw mode for more compatibility with different protocols
-> > as previously SoC did. Before adding support to MT7622 SoC, extra
-> > code refactor is done since there're major differences in register and
-> > field definition from the previous SoC.
-> > 
-> > Sean Wang (4):
-> >   dt-bindings: media: mtk-cir: Add support for MT7622 SoC
-> >   media: rc: mtk-cir: add platform data to adapt into various hardware
-> >   media: rc: mtk-cir: add support for MediaTek MT7622 SoC
-> >   MAINTAINERS: add entry for MediaTek CIR driver
-> 
-> for the whole patchset:
-> 
-> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
-> 
-> Andi
+I'll be sending a v2 with the suggested changes.
+
+Cheers,
+
+Luis Araneda.
