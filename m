@@ -1,40 +1,66 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Wed,  2 Aug 2017 17:00:38 +0800
-Subject: [PATCH v2 23/23] ARM: dts: rockchip: add accelerometer bma250e dt
- node for rv1108 evb
-In-Reply-To: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
-References: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1501664438-13046-1-git-send-email-andy.yan@rock-chips.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 2 Aug 2017 10:15:36 +0100
+Subject: [PATCH 3/6] kvm: arm64: Convert kvm_set_s2pte_readonly() from
+ inline asm to cmpxchg()
+In-Reply-To: <20170801111618.GC5176@cbox>
+References: <20170725135308.18173-1-catalin.marinas@arm.com>
+ <20170725135308.18173-4-catalin.marinas@arm.com>
+ <20170801111618.GC5176@cbox>
+Message-ID: <20170802091536.xqhy7vcsamoa46ah@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dt node of bosch accelerometer bma250e on rv1108 evb.
+Hi Christoffer,
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
----
+On Tue, Aug 01, 2017 at 01:16:18PM +0200, Christoffer Dall wrote:
+> On Tue, Jul 25, 2017 at 02:53:05PM +0100, Catalin Marinas wrote:
+> > +	pteval_t old_pteval, pteval;
+> > +
+> > +	do {
+> > +		pteval = old_pteval = READ_ONCE(pte_val(*pte));
+> > +		pteval &= ~PTE_S2_RDWR;
+> > +		pteval |= PTE_S2_RDONLY;
+> > +	} while (cmpxchg_relaxed(&pte_val(*pte), old_pteval, pteval) !=
+> > +		 old_pteval);
+> 
+> I'm wondering if the READ_ONCE for old_pteval is strictly necessary, or
+> if that's really for the pteval.  Actually, I'm a little unsure whether
+> this is equivalent to
+> 
+> 	old_pteval = READ_ONCE(pte_val(*pte));
+> 	pteval = old_pteval;
+> 
+> or
+> 
+> 	old_pteval = READ_ONCE(pte_val(*pte));
+> 	pteval = READ_ONCE(pte_val(*pte));
+> 
+> I think it's the former, which I also think is correct,
 
-Changes in v2: None
+I think so too.
 
- arch/arm/boot/dts/rv1108-evb.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+> but the reason
+> I'm going down this road is that we have a use of cmpxchg() in the VGIC
+> code, which doesn't use READ_ONCE for the old value (~
+> vgic-mmio-v3.c:404), and I also found other occurences of this in the
+> kernel, so I'm wondering if the VGIC code is broken or we're being
+> overly careful here, or if this is necessary because hardware can update
+> the value behind our backs in this case?
 
-diff --git a/arch/arm/boot/dts/rv1108-evb.dts b/arch/arm/boot/dts/rv1108-evb.dts
-index a1bd95e..6690083 100644
---- a/arch/arm/boot/dts/rv1108-evb.dts
-+++ b/arch/arm/boot/dts/rv1108-evb.dts
-@@ -110,6 +110,13 @@
- 	i2c-scl-falling-time-ns = <16>;
- 	clock-frequency = <400000>;
- 
-+	bma250: accelerometer at 19 {
-+		compatible = "bosch,bma250e";
-+		reg = <0x19>;
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <RK_PB3 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+
- 	rk805: pmic at 18 {
- 		compatible = "rockchip,rk805";
- 		reg = <0x18>;
+We use it because the compiler may decide it's short on registers and
+instead of saving old_pteval on the stack it reads it again from memory
+just before cmpxchg, so we would miss any update to *pte done by the
+hardware. In practice, I've never seen (on arm64) gcc generating two
+loads to *pte without READ_ONCE but maybe I haven't tried hard enough.
+
+We should probably fix the VGIC code as well as a precaution, just in
+case the compiler tries to get smarter in the future.
+
+> In any case, for this patch:
+> 
+> Reviewed-by: Christoffer Dall <cdall@linaro.org>
+
+Thanks.
+
 -- 
-2.7.4
+Catalin
