@@ -1,29 +1,25 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 2 Aug 2017 09:22:02 +0530
-Subject: [PATCH 0/6] ARM: dts: keystone-k2g: Add support for eDMA and MMC
-In-Reply-To: <adb66c80-3a33-3fcf-b50e-555df2c62eb7@oracle.com>
-References: <20170801044119.16201-1-lokeshvutla@ti.com>
- <adb66c80-3a33-3fcf-b50e-555df2c62eb7@oracle.com>
-Message-ID: <b9ba9c92-b827-7cb3-9d7e-1584c3559608@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 2 Aug 2017 11:55:11 +0800
+Subject: [linux-sunxi] [PATCH v3 11/12] ASoC: sun4i-i2s: Update global
+ enable with bitmask
+In-Reply-To: <20170729141753.20174-12-codekipper@gmail.com>
+References: <20170729141753.20174-1-codekipper@gmail.com>
+ <20170729141753.20174-12-codekipper@gmail.com>
+Message-ID: <CAGb2v640SbFeMhmfcNdYng=o3QVKZgM=upVmSCZJbsCnm2frUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Jul 29, 2017 at 10:17 PM,  <codekipper@gmail.com> wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+>
+> The default value of the config register is different on newer
+> SoCs and therefore enabling/disabling with a register write
+> will clear bits used to set the direction of the clock and frame
+> pins.
+>
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-On Tuesday 01 August 2017 11:40 PM, Santosh Shilimkar wrote:
-> 
-> On 7/31/2017 9:41 PM, Lokesh Vutla wrote:
->> This series adds DT nodes and documentation for eDMA and MMC IPs on
->> Keystone 66AK2G SoC. Also enable the required configs in
->> keystone_defconfig.
->>
->> This series depends on Keerthy's gpio node patches on 66AK2G:
-> Am waiting for Keerthy to send refresh series. Thanks for
-> note about the deps.
-
-Thanks Santosh. I am waiting for a response from Rob H on Suman's
-question on whether to include power-domains property.
-
-> 
-> Regards,
-> Santosh
+This patch looks like it could be applied directly without any
+of the other preceding patches?
