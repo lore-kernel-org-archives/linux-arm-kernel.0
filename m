@@ -1,133 +1,115 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Wed, 02 Aug 2017 16:36:14 +0100
-Subject: [RFC PATCH v2 0/2] nb8800 suspend/resume support
-In-Reply-To: <dd883398-1511-0bfd-972b-a11ef8709f0d@free.fr> (Mason's message
- of "Wed, 2 Aug 2017 17:26:21 +0200")
-References: <33d1ab47-6098-5e3f-8a3c-f72626d07113@free.fr>
- <aa8885b8-e6bb-3624-2bf9-0bb40505ac54@free.fr>
- <dd883398-1511-0bfd-972b-a11ef8709f0d@free.fr>
-Message-ID: <yw1xshhagexd.fsf@mansr.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 2 Aug 2017 11:42:27 -0400
+Subject: [PATCH V5 2/2] PCI: handle CRS returned by device after FLR
+In-Reply-To: <20170801224440.3f677a8d@w520.home>
+References: <1501645453-22842-1-git-send-email-okaya@codeaurora.org>
+ <1501645453-22842-2-git-send-email-okaya@codeaurora.org>
+ <20170801224440.3f677a8d@w520.home>
+Message-ID: <fc84cb54-1771-45cd-d01f-b88dc833baf2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+Hi Alex,
 
-> On 02/08/2017 16:41, Mason wrote:
->
->> On 01/08/2017 18:32, Mason wrote:
->> 
->>> I need suspend/resume support in the nb8800 driver.
->>> On tango platforms, suspend loses all context (MMIO registers).
->>> To make the task easy, we just close the device on suspend,
->>> and open it again on resume. This requires properly resetting
->>> the HW on resume.
->>>
->>> Patch 1 moves all the HW init to nb8800_init()
->>> Patch 2 adds suspend/resume support
->> 
->> I have now confirmed that the "flow control" issue I reported
->> in another thread has nothing to do with flow control per se.
->> 
->> The problem is that nb8800_pause_config() calls nb8800_dma_stop()
->> and when it does, RX is borked.
->> 
->> On a GigE switch:
->> [   21.444268] ENTER nb8800_pause_config
->> [   21.448604] rxcr=06100a8f pause_rx=1 pause_tx=0 pause=1 asym_pause=1
->> [   21.455020] nb8800 26000.ethernet eth0: Link is Up - 1Gbps/Full - flow control rx/tx
->> 
->> In this case, pause_tx and RCR_FL match, so we skip the
->> silly dance.
->
-> The documentation states:
->
-> Receive Channel Control Register
-> Description:
-> The Receive Channel Control Register holds channel enable, mode, endian,
-> DMA control, and interrupt control information.  This register can only
-> be written when the Receive DMA Channel is idle - the Enable bit in it is "0".
-> Register Number:  0x200
-> Access:  read/write
-> Reset Value: le = AMBA_LE; all other bits = 0x0
-> Fields:
->
-> fl:  Flow control enable.  "1" indicates flow control is enabled. 
-> When flow control is enabled and a Receive FIFO overrun occurs,
-> the Ethernet 10/100/1000 Subsystem will send PAUSE frames if in
-> full duplex mode.  This continues until the Receive FIFO is emptied.
->
-> en:  Receive DMA Channel enable.  "1" indicates that the Receive
-> DMA Channel is being configured from a descriptor, or that the DMA
-> operation is in progress.  The Receive DMA Channel is idle when
-> this enable bit is "0".  Software sets this bit to "1" to start the
-> configuration from a descriptor and DMA operation.  When the DMA
-> operation is finished, this bit is automatically reset to "0".
+On 8/2/2017 12:44 AM, Alex Williamson wrote:
+> On Tue,  1 Aug 2017 23:44:13 -0400
+> Sinan Kaya <okaya@codeaurora.org> wrote:
+> 
+>> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+>> index 2ed604a..25c7a83 100644
+>> --- a/drivers/pci/pci.c
+>> +++ b/drivers/pci/pci.c
+>> @@ -3813,14 +3813,16 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
+>>  
+>>  /*
+>>   * We should only need to wait 100ms after FLR for virtual functions.
+>> - * Wait for up to 1000ms for config space to return something other than -1.
+>> - * Intel IGD requires this when an LCD panel is attached.  We read the 2nd
+>> - * dword because VFs don't implement the 1st dword.
+>> + * Wait for up to 60s for config space to return something other than -1.
+>> + * Intel IGD requires 1s when an LCD panel is attached.  We use
+>> + * pci_bus_read_dev_vendor_id() for reading the vendor ID as it handles
+>> + * CRS gracefully.
+> 
+> nit, stating that IGD requires 1s with an LCD panel is a
+> misinterpretation of the previous comment.  In fact the original commit
+> only mentions 300ms.  I think perhaps 1s was simply a nice round
+> interval.
 
-Here's the problem.  Once started, there is no way to forcibly stop rx
-dma.  It keeps going until it hits a descriptor with the end of chain
-flag set.
+I can fix the comment as 300ms to be correct. 
 
->> Receive DMA Channel Disabling
->>
->> When the entire receive frame has been read from the Receive FIFO and
->> sent over the AMBA bus, the DMA operation ends, and the Receive DMA
->> Channel is automatically disabled.  To do this, hardware resets the
->> Enable bit in the Receive Channel Control Register to "0" after the
->> last data has been read from the Receive FIFO and sent over the AMBA
->> bus.
->> 
->> When operating in descriptor mode, upon completion of a receive frame
->> DMA operation, if the descriptor chain has not ended when a receive
->> frame DMA operation completes, the next receive frame DMA operation
->> begins.  The last descriptor in a descriptor chain is indicated by
->> having its End Of Chain- EOC, flag set to "1".  If this EOC flag is
->> "0", to begin the next receive frame DMA operation, the next
->> descriptor is automatically retrieved and used to configure the
->> Receive DMA Channel.  The Receive DMA Channel is then automatically
->> re-enabled and the next receive frame DMA operation begins.
->> 
->> In descriptor mode, an AMBA bus error can occur when reading receive
->> descriptor data.  If this happens, receive descriptor processing ends
->> and the Receive DMA Channel is turned off.  The Descriptor Error bit
->> in the Receive Status Register is set to "1".
->
-> Hmmm, I guess this is what Maxime/Mans did...
->
-> Looking at the tango-specific integration, I note this nugget:
->
-> 1.5.4 Stopping & Starting the DMA
->
-> This feature has been added to allow the software to stop and start
-> the DMA without any issues.
->
-> Procedure:
-> 1- STOP:
-> 2- Stop RX core;
-> 3- Set OWN bit of all descriptor of the chain to 1;
-> 4- Stop DMA by writing dma_stop bit to 1 in  RX_DMA_Stop register
-> 5- Wait around 100 clock cycles.
->
-> The pending packets are held until the system will re-start.
->
-> RE-START:
-> 1- Clear dma_stop bit (note that if at the time of stopping the DMA,
-> the next packet in the FIFO was an UDP packet, when clearing dma_stop,
-> this packet will directly start being written in the DRAM since UDP
-> packets are not controlled by the descriptor mechanism);
-> 2- Program a new chain of descriptor;
-> 3- Re-enable DMA (rx_ctrl register)
->
-> rx_dma_stop:
-> Software control to stop the Rx DMA.
-> A write to this bit with ?1? will gracefully stop the Rx DMA by after
-> transferring the current packet. If more packets are pending they will
-> be held until the software clears this bit.
->
-> Hmmm, what do you think? This looks promising...
+> 
+>>   */
+>>  static void pci_flr_wait(struct pci_dev *dev)
+>>  {
+>>  	int i = 0;
+>>  	u32 id;
+>> +	bool ret;
+>>  
+>>  	if (dev->is_virtfn) {
+>>  		msleep(100);
+>> @@ -3828,15 +3830,15 @@ static void pci_flr_wait(struct pci_dev *dev)
+>>  	}
+>>  
+>>  	do {
+>> -		msleep(100);
+>> -		pci_read_config_dword(dev, PCI_COMMAND, &id);
+>> -	} while (i++ < 10 && id == ~0);
+>> +		ret = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
+>> +						 1000);
+> 
+> Is it a problem that there's now zero delay between the FLR and first
+> attempt to read config space?  
 
-This is only available in the more recent Sigma versions.  Although it
-is nicer, I didn't think it was worth the trouble to support both
-methods since the older method should work on all chips.
+I agree, we should wait 100ms before attempting to do anything.
+
+> Seems like there should be a 100ms
+> delay before we start trying.  This is also going to print a kernel
+> warning 60 times in the course of getting to a 60s timeout, why not let
+> pci_bus_read_dev_vendor_id() manage the entire timeout?  
+
+Bjorn was concerned that if a device is taking too long to come out of reset, 
+there won't be any visible output on the screen and somebody might be under the
+impression that system is frozen even though we are just busy waiting. 
+
+That's why, I tried to introduce some verbosity.
+
+What I can do is instead of polling 60 times, I can follow a similar pattern
+in vendor_id() function and sleep 1 second first, followed by 2 seconds, followed
+by 4 seconds etc. to be less verbose. 
+
+User will still see a warning on each read loop that failed. At least, we won't 
+fill the screen with warning messages.
+
+> Are we only
+> trying to preserve the dev_info() below?  Thanks,
+
+Yes and no, we want to see the progress of polling and a final result. 60 seconds
+is a very long time.
+
+> 
+> Alex
+> 
+>> +	} while (i++ < 60 && !ret);
+>>  
+>> -	if (id == ~0)
+>> +	if (!ret)
+>>  		dev_warn(&dev->dev, "Failed to return from FLR\n");
+>>  	else if (i > 1)
+>> -		dev_info(&dev->dev, "Required additional %dms to
+>> return from FLR\n",
+>> -			 (i - 1) * 100);
+>> +		dev_info(&dev->dev, "Required additional %ds to
+>> return from FLR\n",
+>> +			 (i - 1));
+>>  }
+>>  
+>>  /**
+> 
+> 
+
 
 -- 
-M?ns Rullg?rd
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
