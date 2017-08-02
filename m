@@ -1,23 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 2 Aug 2017 10:45:07 +0200
-Subject: [PATCH] pinctrl: samsung: Remove unneeded local variable
- initialization
-In-Reply-To: <1500399808-6580-1-git-send-email-krzk@kernel.org>
-References: <1500399808-6580-1-git-send-email-krzk@kernel.org>
-Message-ID: <CACRpkdbMBgOad3Vidccu46GhF9ccYwGqPjE19N_AvnRn0S_qMg@mail.gmail.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Wed,  2 Aug 2017 16:46:03 +0800
+Subject: [PATCH v2 14/23] spi: rockchip: add compatible string for rv1108 spi
+In-Reply-To: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
+References: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1501663563-12482-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 7:43 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+The spi on rv1108 is the same as other rockchip based
+socs, add compatible string for it.
 
-> Two local variables (shift and reg_con) were initialized to unused
-> values - they were overwritten just few lines after.  Getting rid of
-> this unused initialization allows dropping other variables and
-> compacting slightly the code.
->
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+---
 
-Looks good to me, I expect to get this from you in a pull request.
+Changes in v2: None
 
-Yours,
-Linus Walleij
+ Documentation/devicetree/bindings/spi/spi-rockchip.txt | 1 +
+ drivers/spi/spi-rockchip.c                             | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+index 83da493..6e3ffac 100644
+--- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
++++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+@@ -6,6 +6,7 @@ and display controllers using the SPI communication interface.
+ Required Properties:
+ 
+ - compatible: should be one of the following.
++    "rockchip,rv1108-spi" for rv1108 SoCs.
+     "rockchip,rk3036-spi" for rk3036 SoCS.
+     "rockchip,rk3066-spi" for rk3066 SoCs.
+     "rockchip,rk3188-spi" for rk3188 SoCs.
+diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+index 0b4a52b..27b4db2 100644
+--- a/drivers/spi/spi-rockchip.c
++++ b/drivers/spi/spi-rockchip.c
+@@ -919,6 +919,7 @@ static const struct dev_pm_ops rockchip_spi_pm = {
+ };
+ 
+ static const struct of_device_id rockchip_spi_dt_match[] = {
++	{ .compatible = "rockchip,rv1108-spi", },
+ 	{ .compatible = "rockchip,rk3036-spi", },
+ 	{ .compatible = "rockchip,rk3066-spi", },
+ 	{ .compatible = "rockchip,rk3188-spi", },
+-- 
+2.7.4
