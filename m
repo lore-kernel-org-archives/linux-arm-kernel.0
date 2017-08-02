@@ -1,26 +1,63 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 2 Aug 2017 16:32:26 -0400
-Subject: [PATCH V7 1/3] PCI: limit FLR wait time to 100ms maximum
-In-Reply-To: <20170802202735.GE20308@bhelgaas-glaptop.roam.corp.google.com>
-References: <1501701317-32249-1-git-send-email-okaya@codeaurora.org>
- <20170802202735.GE20308@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <51e4468b-1c58-b95a-f5a0-07dec5825483@codeaurora.org>
+From: pasha.tatashin@oracle.com (Pavel Tatashin)
+Date: Wed,  2 Aug 2017 16:38:15 -0400
+Subject: [v4 06/15] sparc64: simplify vmemmap_populate
+In-Reply-To: <1501706304-869240-1-git-send-email-pasha.tatashin@oracle.com>
+References: <1501706304-869240-1-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <1501706304-869240-7-git-send-email-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/2/2017 4:27 PM, Bjorn Helgaas wrote:
-> I haven't worked through all the details of what 6.6.2 says, but I
-> think it uses 100ms in the context of the *minimum* time software must
-> wait between initiating an FLR and initializing the function
+Remove duplicating code by using common functions
+vmemmap_pud_populate and vmemmap_pgd_populate.
 
-Here is what spec says in 6.6.2
+Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+Reviewed-by: Bob Picco <bob.picco@oracle.com>
+---
+ arch/sparc/mm/init_64.c | 23 ++++++-----------------
+ 1 file changed, 6 insertions(+), 17 deletions(-)
 
-"After an FLR has been initiated by writing a 1b to the Initiate Function Level Reset bit,
-the Function must complete the FLR within 100 ms."
-
-I interpret this as maximum.
-
+diff --git a/arch/sparc/mm/init_64.c b/arch/sparc/mm/init_64.c
+index ba957b763c07..e18947e9ab6c 100644
+--- a/arch/sparc/mm/init_64.c
++++ b/arch/sparc/mm/init_64.c
+@@ -2567,30 +2567,19 @@ int __meminit vmemmap_populate(unsigned long vstart, unsigned long vend,
+ 	vstart = vstart & PMD_MASK;
+ 	vend = ALIGN(vend, PMD_SIZE);
+ 	for (; vstart < vend; vstart += PMD_SIZE) {
+-		pgd_t *pgd = pgd_offset_k(vstart);
++		pgd_t *pgd = vmemmap_pgd_populate(vstart, node);
+ 		unsigned long pte;
+ 		pud_t *pud;
+ 		pmd_t *pmd;
+ 
+-		if (pgd_none(*pgd)) {
+-			pud_t *new = vmemmap_alloc_block(PAGE_SIZE, node);
++		if (!pgd)
++			return -ENOMEM;
+ 
+-			if (!new)
+-				return -ENOMEM;
+-			pgd_populate(&init_mm, pgd, new);
+-		}
+-
+-		pud = pud_offset(pgd, vstart);
+-		if (pud_none(*pud)) {
+-			pmd_t *new = vmemmap_alloc_block(PAGE_SIZE, node);
+-
+-			if (!new)
+-				return -ENOMEM;
+-			pud_populate(&init_mm, pud, new);
+-		}
++		pud = vmemmap_pud_populate(pgd, vstart, node);
++		if (!pud)
++			return -ENOMEM;
+ 
+ 		pmd = pmd_offset(pud, vstart);
+-
+ 		pte = pmd_val(*pmd);
+ 		if (!(pte & _PAGE_VALID)) {
+ 			void *block = vmemmap_alloc_block(PMD_SIZE, node);
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.13.3
