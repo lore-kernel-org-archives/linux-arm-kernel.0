@@ -1,104 +1,109 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed,  2 Aug 2017 10:49:01 +0100
-Subject: [PATCH v5 6/9] arm64: hugetlb: Override huge_pte_clear() to support
- contiguous hugepages
-In-Reply-To: <20170802094904.27749-1-punit.agrawal@arm.com>
-References: <20170802094904.27749-1-punit.agrawal@arm.com>
-Message-ID: <20170802094904.27749-7-punit.agrawal@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Wed, 2 Aug 2017 12:33:08 +0200
+Subject: [PATCH 3/4] input: Add MediaTek PMIC keys support
+In-Reply-To: <1501643840-21485-4-git-send-email-chen.zhong@mediatek.com>
+References: <1501643840-21485-1-git-send-email-chen.zhong@mediatek.com>
+ <1501643840-21485-4-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <a6b77a6e-00bb-8aa1-86fe-f158bd96abbc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default huge_pte_clear() implementation does not clear contiguous
-page table entries when it encounters contiguous hugepages that are
-supported on arm64.
 
-Fix this by overriding the default implementation to clear all the
-entries associated with contiguous hugepages.
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: David Woods <dwoods@mellanox.com>
----
- arch/arm64/include/asm/hugetlb.h |  6 +++++-
- arch/arm64/mm/hugetlbpage.c      | 36 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 41 insertions(+), 1 deletion(-)
+On 08/02/2017 05:17 AM, Chen Zhong wrote:
+> This patch add support to handle MediaTek PMIC MT6397/MT6323 key
+> interrupts including pwrkey and homekey, also add setting for
+> long press key shutdown behavior.
+> 
+> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+> ---
+>   drivers/input/keyboard/mtk-pmic-keys.c |  320 ++++++++++++++++++++++++++++++++
+>   1 file changed, 320 insertions(+)
+>   create mode 100644 drivers/input/keyboard/mtk-pmic-keys.c
+> 
+> diff --git a/drivers/input/keyboard/mtk-pmic-keys.c b/drivers/input/keyboard/mtk-pmic-keys.c
+> new file mode 100644
+> index 0000000..0ea7d17
+> --- /dev/null
+> +++ b/drivers/input/keyboard/mtk-pmic-keys.c
+> @@ -0,0 +1,320 @@
+> +/*
+> + * Copyright (C) 2017 MediaTek, Inc.
+> + *
+> + * Author: Chen Zhong <chen.zhong@mediatek.com>
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +
+> +#include <linux/ioctl.h>
+> +#include <linux/module.h>
+> +#include <linux/kernel.h>
+> +#include <linux/input.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/kernel.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/mt6323/registers.h>
+> +#include <linux/mfd/mt6397/registers.h>
+> +#include <linux/mfd/mt6397/core.h>
+> +#include <linux/slab.h>
+> +#include <linux/irqdomain.h>
+> +
+> +#define PWRKEY_RST_EN_MASK  0x1
+> +#define PWRKEY_RST_EN_SHIFT  6
+> +#define HOMEKEY_RST_EN_MASK  0x1
+> +#define HOMEKEY_RST_EN_SHIFT  5
+> +#define RST_DU_MASK  0x3
+> +#define RST_DU_SHIFT  8
+> +
+> +struct pmic_keys_regs {
+> +	u32 deb_reg;
+> +	u32 deb_mask;
+> +	u32 intsel_reg;
+> +	u32 intsel_mask;
+> +};
+> +
+> +#define PMIC_KEYS_REGS(_deb_reg, _deb_mask, _intsel_reg, _intsel_mask)	\
+> +{									\
+> +	.deb_reg		= _deb_reg,				\
+> +	.deb_mask		= _deb_mask,				\
+> +	.intsel_reg		= _intsel_reg,				\
+> +	.intsel_mask		= _intsel_mask,				\
+> +}
+> +
+> +struct pmic_regs {
+> +	const struct pmic_keys_regs pwrkey_regs;
+> +	const struct pmic_keys_regs homekey_regs;
+> +	u32 pmic_rst_reg;
+> +};
+> +
+> +static const struct pmic_regs mt6397_regs = {
+> +	.pwrkey_regs = PMIC_KEYS_REGS(MT6397_CHRSTATUS,
+> +		0x8, MT6397_INT_RSV, 0x10),
+> +	.homekey_regs = PMIC_KEYS_REGS(MT6397_OCSTATUS2,
+> +		0x10, MT6397_INT_RSV, 0x8),
+> +	.pmic_rst_reg = MT6397_TOP_RST_MISC,
+> +};
+> +
+> +static const struct pmic_regs mt6323_regs = {
+> +	.pwrkey_regs = PMIC_KEYS_REGS(MT6323_CHRSTATUS,
+> +		0x2, MT6323_INT_MISC_CON, 0x10),
+> +	.homekey_regs = PMIC_KEYS_REGS(MT6323_CHRSTATUS,
+> +		0x4, MT6323_INT_MISC_CON, 0x8),
+> +	.pmic_rst_reg = MT6323_TOP_RST_MISC,
+> +};
 
-diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
-index 793bd73b0d07..df8c0aea0917 100644
---- a/arch/arm64/include/asm/hugetlb.h
-+++ b/arch/arm64/include/asm/hugetlb.h
-@@ -18,7 +18,6 @@
- #ifndef __ASM_HUGETLB_H
- #define __ASM_HUGETLB_H
- 
--#include <asm-generic/hugetlb.h>
- #include <asm/page.h>
- 
- static inline pte_t huge_ptep_get(pte_t *ptep)
-@@ -82,6 +81,11 @@ extern void huge_ptep_set_wrprotect(struct mm_struct *mm,
- 				    unsigned long addr, pte_t *ptep);
- extern void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 				  unsigned long addr, pte_t *ptep);
-+extern void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
-+			   pte_t *ptep, unsigned long sz);
-+#define huge_pte_clear huge_pte_clear
-+
-+#include <asm-generic/hugetlb.h>
- 
- #ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE
- static inline bool gigantic_page_supported(void) { return true; }
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index e9061704aec3..240b2fd53266 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -68,6 +68,30 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
- 	return CONT_PTES;
- }
- 
-+static inline int num_contig_ptes(unsigned long size, size_t *pgsize)
-+{
-+	int contig_ptes = 0;
-+
-+	*pgsize = size;
-+
-+	switch (size) {
-+	case PUD_SIZE:
-+	case PMD_SIZE:
-+		contig_ptes = 1;
-+		break;
-+	case CONT_PMD_SIZE:
-+		*pgsize = PMD_SIZE;
-+		contig_ptes = CONT_PMDS;
-+		break;
-+	case CONT_PTE_SIZE:
-+		*pgsize = PAGE_SIZE;
-+		contig_ptes = CONT_PTES;
-+		break;
-+	}
-+
-+	return contig_ptes;
-+}
-+
- /*
-  * Changing some bits of contiguous entries requires us to follow a
-  * Break-Before-Make approach, breaking the whole contiguous set
-@@ -245,6 +269,18 @@ pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
- 	return entry;
- }
- 
-+void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
-+		    pte_t *ptep, unsigned long sz)
-+{
-+	int i, ncontig;
-+	size_t pgsize;
-+
-+	ncontig = num_contig_ptes(sz, &pgsize);
-+
-+	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++)
-+		pte_clear(mm, addr, ptep);
-+}
-+
- pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 			      unsigned long addr, pte_t *ptep)
- {
--- 
-2.11.0
+Where are this MTxxxx_CHRSTATUS defined?
+
+Regards,
+Matthias
