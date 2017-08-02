@@ -1,25 +1,21 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 2 Aug 2017 14:29:52 +0200
-Subject: [PATCH 02/12] ARM: ep93xx: use ARM_PATCH_PHYS_VIRT
-In-Reply-To: <20170720154939.3250697-1-arnd@arndb.de>
-References: <20170720154616.3250481-1-arnd@arndb.de>
- <20170720154939.3250697-1-arnd@arndb.de>
-Message-ID: <CACRpkdYRYysAum99m55HKm-9SEH6Up=a7PnvQxkYAKfACPQ=Hg@mail.gmail.com>
+Date: Wed, 2 Aug 2017 14:30:57 +0200
+Subject: [PATCH 1/4] rtc: pl031: constify amba_ids
+In-Reply-To: <E1dYKi9-0001kK-RQ@rmk-PC.armlinux.org.uk>
+References: <20170720231745.GE31807@n2100.armlinux.org.uk>
+ <E1dYKi9-0001kK-RQ@rmk-PC.armlinux.org.uk>
+Message-ID: <CACRpkda1kSAFJZHqGAPWiFckGJ5AoJG4htB0+r56gDFKmxubrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 20, 2017 at 5:49 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Fri, Jul 21, 2017 at 1:18 AM, Russell King
+<rmk+kernel@armlinux.org.uk> wrote:
 
-> Just like ARCH_MULTIPLATFORM, we want to use ARM_PATCH_PHYS_VIRT
-> when possible, but that fails for NOMMU or XIP_KERNEL configurations.
-> Using 'imply' instead of 'select' gets this right and only uses
-> the symbol when we don't have to hardcode the address anyway.
+> The AMBA device IDs should be marked const.  Make that so.
 >
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-I assume you will apply this directly to ARM SoC.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
