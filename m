@@ -1,79 +1,98 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  2 Aug 2017 10:22:16 -0600
-Subject: [PATCH 22/26] coresight tmc: Support for save-restore in ETR
+Date: Wed,  2 Aug 2017 10:22:13 -0600
+Subject: [PATCH 19/26] coresight tmc etr: Detect address width at runtime
 In-Reply-To: <1501690940-4137-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1501690940-4137-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1501690940-4137-23-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1501690940-4137-20-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-The Coresight SoC 600 TMC ETR supports save-restore feature,
-where the values of the RRP/RWP and STS.Full are retained
-when it leaves the Disabled state. Hence, we must program the
-RRP/RWP and STS.Full to a proper value. For now, set the RRP/RWP
-to the base address of the buffer and clear the STS.Full register.
-This can be later exploited for proper save-restore of ETR
-trace contexts (e.g, perf).
+TMC in Coresight SoC-600 advertises the AXI address width
+in the device configuration register.
+
+Bit 16 - AXIAW_VALID
+ 0 - AXI Address Width not valid
+ 1 - Valid AXI Address width in Bits[23-17]
+
+Bits [23-17] - AXIAW. If AXIAW_VALID = b01 then
+ 0x20 - 32bit AXI address bus
+ 0x28 - 40bit AXI address bus
+ 0x2c - 44bit AXI address bus
+ 0x30 - 48bit AXI address bus
+ 0x34 - 52bit AXI address bus
+
+Use the address bits from the device configuration register, if
+available. Otherwise, default to 40bit.
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etr.c | 13 ++++++++++++-
- drivers/hwtracing/coresight/coresight-tmc.h     |  9 +++++++++
- 2 files changed, 21 insertions(+), 1 deletion(-)
+ drivers/hwtracing/coresight/coresight-tmc.c | 26 +++++++++++++++++++++++---
+ drivers/hwtracing/coresight/coresight-tmc.h |  4 ++++
+ 2 files changed, 27 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-index 40ddcf11ae4c..68fbc8f7450e 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-@@ -22,7 +22,7 @@
- 
- static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index bb409c485d05..5bfc1b3ab80c 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -303,16 +303,36 @@ const struct attribute_group *coresight_tmc_groups[] = {
+ static int tmc_etr_setup_caps(struct tmc_drvdata *drvdata,
+ 			     u32 devid, void *dev_caps)
  {
--	u32 axictl;
-+	u32 axictl, sts;
++	u32 dma_mask = 0;
++
+ 	/* Set the unadvertised capabilities */
+ 	tmc_etr_init_caps(drvdata, (u32)(unsigned long)dev_caps);
  
- 	/* Zero out the memory to help with debug */
- 	memset(drvdata->vaddr, 0, drvdata->size);
-@@ -47,6 +47,17 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata)
- 
- 	writel_relaxed(axictl, drvdata->base + TMC_AXICTL);
- 	tmc_write_dba(drvdata, drvdata->paddr);
-+	/*
-+	 * If the TMC pointers must be programmed before the session,
-+	 * we have to set it properly (i.e, RRP/RWP to base address and
-+	 * STS to "not full").
-+	 */
-+	if (tmc_etr_has_cap(drvdata, TMC_ETR_SAVE_RESTORE)) {
-+		tmc_write_rrp(drvdata, drvdata->paddr);
-+		tmc_write_rwp(drvdata, drvdata->paddr);
-+		sts = readl_relaxed(drvdata->base + TMC_STS) & ~TMC_STS_FULL;
-+		writel_relaxed(sts, drvdata->base + TMC_STS);
+ 	if (!(devid & TMC_DEVID_NOSCAT))
+ 		tmc_etr_set_cap(drvdata, TMC_ETR_SG);
++
++	/* Check if the AXI address width is available */
++	if (devid & TMC_DEVID_AXIAW_VALID)
++		dma_mask = ((devid >> TMC_DEVID_AXIAW_SHIFT) &
++				TMC_DEVID_AXIAW_MASK);
++
+ 	/*
+-	 * ETR configuration uses a 40-bit AXI master in place of
+-	 * the embedded SRAM of ETB/ETF.
++	 * Unless specified in the device configuration, ETR uses a 40-bit
++	 * AXI master in place of the embedded SRAM of ETB/ETF.
+ 	 */
+-	return dma_set_mask_and_coherent(drvdata->dev, DMA_BIT_MASK(40));
++	switch (dma_mask) {
++	case 32:
++	case 40:
++	case 44:
++	case 48:
++	case 52:
++		dev_info(drvdata->dev, "Detected dma mask %dbits\n", dma_mask);
++		break;
++	default:
++		dma_mask = 40;
 +	}
++
++	return dma_set_mask_and_coherent(drvdata->dev, DMA_BIT_MASK(dma_mask));
+ }
  
- 	writel_relaxed(TMC_FFCR_EN_FMT | TMC_FFCR_EN_TI |
- 		       TMC_FFCR_FON_FLIN | TMC_FFCR_FON_TRIG_EVT |
+ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
 diff --git a/drivers/hwtracing/coresight/coresight-tmc.h b/drivers/hwtracing/coresight/coresight-tmc.h
-index f39caa6a45c3..d0da43a14246 100644
+index bb6a3e3314b8..f55203d48673 100644
 --- a/drivers/hwtracing/coresight/coresight-tmc.h
 +++ b/drivers/hwtracing/coresight/coresight-tmc.h
-@@ -119,6 +119,15 @@ enum tmc_mem_intf_width {
- #define TMC_ETR_SG			(0x1U << 0)
- /* ETR has separate read/write cache encodings */
- #define TMC_ETR_AXI_ARCACHE		(0x1U << 1)
-+/*
-+ * TMC_ETR_SAVE_RESTORE - Values of RRP/RWP/STS.Full are
-+ * retained when TMC leaves Disabled state, allowing us to continue
-+ * the tracing from a point where we stopped. This also implies that
-+ * the RRP/RWP/STS.Full should always be programmed to the correct
-+ * value. Unfortunately this is not advertised by the hardware,
-+ * so we have to rely on PID of the IP to detect the functionality.
-+ */
-+#define TMC_ETR_SAVE_RESTORE		(0x1U << 2)
+@@ -71,6 +71,10 @@
  
- /**
-  * struct tmc_drvdata - specifics associated to an TMC component
+ #define TMC_DEVID_NOSCAT	BIT(24)
+ 
++#define TMC_DEVID_AXIAW_VALID	BIT(16)
++#define TMC_DEVID_AXIAW_SHIFT	17
++#define TMC_DEVID_AXIAW_MASK	0x7f
++
+ enum tmc_config_type {
+ 	TMC_CONFIG_TYPE_ETB,
+ 	TMC_CONFIG_TYPE_ETR,
 -- 
 2.7.4
