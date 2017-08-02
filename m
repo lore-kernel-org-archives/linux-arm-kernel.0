@@ -1,97 +1,47 @@
-From: luaraneda@gmail.com (Luis Araneda)
-Date: Wed, 2 Aug 2017 10:31:15 -0400
-Subject: [PATCH v2] ARM: dts: sun8i: h3: Enable EMAC with external PHY on
- NanoPi M1 Plus
-In-Reply-To: <CAGb2v653hG2h5fZSBGeXaVE2Gn03vsncHi1d87cmyYA=w2TnKw@mail.gmail.com>
-References: <20170802025026.24232-1-luaraneda@gmail.com>
- <CAGb2v653hG2h5fZSBGeXaVE2Gn03vsncHi1d87cmyYA=w2TnKw@mail.gmail.com>
-Message-ID: <CAHbBuxrjBg0Zudg0o_j5kedA4po=+wHLLo6nHU97=xDLfhVdJA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 2 Aug 2017 15:31:23 +0100
+Subject: [RFC PATCH v4 4/5] arm64: neon: Remove support for nested or
+ hardirq kernel-mode NEON
+In-Reply-To: <20170802130051.GG6321@e103592.cambridge.arm.com>
+References: <1501249824-18913-1-git-send-email-Dave.Martin@arm.com>
+ <1501249824-18913-5-git-send-email-Dave.Martin@arm.com>
+ <20170802100224.tllivhe6u54xp3rd@armageddon.cambridge.arm.com>
+ <20170802130051.GG6321@e103592.cambridge.arm.com>
+Message-ID: <20170802143123.rqoc54xekpqb5hxz@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Aug 02, 2017 at 02:00:52PM +0100, Dave P Martin wrote:
+> On Wed, Aug 02, 2017 at 11:02:25AM +0100, Catalin Marinas wrote:
+> > On Fri, Jul 28, 2017 at 02:50:23PM +0100, Dave P Martin wrote:
+> > > Support for kernel-mode NEON to be nested and/or used in hardirq
+> > > context adds significant complexity, and the benefits may be
+> > > marginal.  In practice, kernel-mode NEON is not used in hardirq
+> > > context, and is rarely used in softirq context (by certain mac80211
+> > > drivers).
+> > 
+> > Just for clarification, the issue we had with hardirq contexts was that
+> > we could be interrupted while saving the current FPSIMD state as we
+> > don't want to disable IRQs during this. If this was the only aspect,
+> 
+> Certainly this is an aspect: for SVE we definitely don't want IRQs
+> disabled for the whole save/restore -- and I will be building SVE
+> support on top of this.
+> 
+> > your patch looks fine. Note that softirqs may be executed as result of
+> > an IRQ (via the irq_exit() function) but local_bh_disable() should
+> > protect against such race.
+> 
+> This is my understanding: any such softirq would get deferred until
+> local_bh_enable(), or would run in ksoftirqd.
+> 
+> There's an assumption here that EFI runtime services calls won't be made
+> from softirq context, but I think that's reasonable: softirqs are far
+> from general-purpose these days.
+> 
+> Was there any other concen here that you're aware of?
 
+No. Just wanted to double-check my assumptions were right.
 
-You're right again.
-I tested the board with the address set to 7 and it worked.
-Also, I tested other addresses to be sure (that they don't work).
-
-I'll send a v3 in a couple of hours if no more comments are received.
-
-
-Cheers,
-
-Luis Araneda.
-
-On Tue, Aug 1, 2017 at 10:55 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Wed, Aug 2, 2017 at 10:50 AM, Luis Araneda <luaraneda@gmail.com> wrote:
->> The Nanopi M1 Plus uses an external Realtek RTL8211E PHY in RGMII mode,
->> enabled by a GPIO-based regulator.
->>
->> Signed-off-by: Luis Araneda <luaraneda@gmail.com>
->>
->> ---
->> Changes v1 -> v2:
->> - Removed unnecessary property
->> - Corrected part address to match reg value
->>
->>  arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 30 +++++++++++++++++++++++++++
->>  1 file changed, 30 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
->> index 8ddd1b2cc..1273a5e45 100644
->> --- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
->> +++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
->> @@ -45,6 +45,20 @@
->>  / {
->>         model = "FriendlyArm NanoPi M1 Plus";
->>         compatible = "friendlyarm,nanopi-m1-plus", "allwinner,sun8i-h3";
->> +
->> +       aliases {
->> +               ethernet0 = &emac;
->> +       };
->> +
->> +       reg_gmac_3v3: gmac-3v3 {
->> +               compatible = "regulator-fixed";
->> +               regulator-name = "gmac-3v3";
->> +               regulator-min-microvolt = <3300000>;
->> +               regulator-max-microvolt = <3300000>;
->> +               startup-delay-us = <100000>;
->> +               enable-active-high;
->> +               gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
->> +       };
->>  };
->>
->>  &ehci1 {
->> @@ -55,6 +69,22 @@
->>         status = "okay";
->>  };
->>
->> +&emac {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&emac_rgmii_pins>;
->> +       phy-supply = <&reg_gmac_3v3>;
->> +       phy-handle = <&ext_rgmii_phy>;
->> +       phy-mode = "rgmii";
->> +       status = "okay";
->> +};
->> +
->> +&mdio {
->> +       ext_rgmii_phy: ethernet-phy at 0 {
->> +               compatible = "ethernet-phy-ieee802.3-c22";
->> +               reg = <0>;
->
-> Please use the actual address as designed on the board.
-> It seems to be 7. 0 for the RTL8211E is a broadcast address.
->
-> ChenYu
->
->> +       };
->> +};
->> +
->>  &ohci1 {
->>         status = "okay";
->>  };
->> --
->> 2.13.3
->>
+-- 
+Catalin
