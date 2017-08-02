@@ -1,61 +1,77 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 2 Aug 2017 17:22:08 -0400
-Subject: [PATCH V7 1/3] PCI: limit FLR wait time to 100ms maximum
-In-Reply-To: <20170802202735.GE20308@bhelgaas-glaptop.roam.corp.google.com>
-References: <1501701317-32249-1-git-send-email-okaya@codeaurora.org>
- <20170802202735.GE20308@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <db1860be-9b0b-85b1-814c-40e497ac792f@codeaurora.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 2 Aug 2017 16:29:42 -0500
+Subject: [PATCH] PCI: layerscape: Add support for ls2088a and ls1088a
+In-Reply-To: <1499333984-17668-1-git-send-email-Zhiqiang.Hou@nxp.com>
+References: <1499333984-17668-1-git-send-email-Zhiqiang.Hou@nxp.com>
+Message-ID: <20170802212942.GA7667@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/2/2017 4:27 PM, Bjorn Helgaas wrote:
-> On Wed, Aug 02, 2017 at 03:15:15PM -0400, Sinan Kaya wrote:
-> My hypothesis was that CRS isn't useful on VFs because of sec 2.2.2
-> says "FLR ... does not affect its existence in PCI Configuration
-> Space".  But I think that hypothesis is wrong because sec 3.3.3.1
-> does talk about a VF returning CRS.
+[+cc Minghuan, Mingkai, Roy]
+
+On Thu, Jul 06, 2017 at 05:39:44PM +0800, Zhiqiang Hou wrote:
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > 
-
-hmm, good catch. I'll drop the first patch.
-
-> The SR-IOV spec (sec 3.4.1.1) says a VF's Vendor ID is read-only
-> 0xffff.  But I expect CRS visibility (PCIe r3.1, sec 2.3.2) would work
-> normally and return a Vendor ID of 0x0001 to indicate CRS for a VF.
+> The ls1088a and ls2088a has the same PCIe controller, so the ls1088a
+> will reuse the ls2088a's pcie compatible.
 > 
-> Of course, not all Root Ports support CRS software visibility, so
-> whatever we do has to work when it's absent.
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/pci/layerscape-pci.txt | 1 +
+>  drivers/pci/dwc/pci-layerscape.c                         | 9 +++++++++
+>  2 files changed, 10 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> index ee1c72d5..cb735e1 100644
+> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> @@ -15,6 +15,7 @@ Required properties:
+>  - compatible: should contain the platform identifier such as:
+>          "fsl,ls1021a-pcie", "snps,dw-pcie"
+>          "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
+> +        "fsl,ls2088a-pcie", "fsl,ls1088a-pcie"
 
-How about a mixture of old code and new code as follows?
+You add "fsl,ls1088a-pcie" here, but not in the ls_pcie_of_match[]
+table in the driver, so I don't think this will actually make the
+driver claim ls1088a devices, will it?
 
-static void pci_flr_wait(struct pci_dev *dev)
-{
-	u32 id;
-	bool ret = false;
-	int i = 0;
+I'm also waiting for an ack from the layerscape maintainers (added to
+cc list).
 
-	if (CRS supported) {
-		/* don't touch the HW before waiting 100ms */
-		msleep(100);
-
-		ret = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id, 60000);
-		if (ret)
-			return;
-	}
-
-	do {
-		msleep(100);
-		pci_read_config_dword(dev, PCI_COMMAND, &id);
-	} while (i++ < 10 && id == ~0);
- 
-	if (id == ~0)
- 		dev_warn(&dev->dev, "Failed to return from FLR\n");
-	else if (i > 1)
-		dev_info(&dev->dev, "Required additional %dms to return from FLR\n",
-			 (i - 1) * 100);
-}
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>          "fsl,ls1046a-pcie"
+>  - reg: base addresses and lengths of the PCIe controller
+>  - interrupts: A list of interrupt outputs of the controller. Must contain an
+> diff --git a/drivers/pci/dwc/pci-layerscape.c b/drivers/pci/dwc/pci-layerscape.c
+> index 9bed3cd..0df8189 100644
+> --- a/drivers/pci/dwc/pci-layerscape.c
+> +++ b/drivers/pci/dwc/pci-layerscape.c
+> @@ -239,12 +239,21 @@ static struct ls_pcie_drvdata ls2080_drvdata = {
+>  	.dw_pcie_ops = &dw_ls_pcie_ops,
+>  };
+>  
+> +static struct ls_pcie_drvdata ls2088_drvdata = {
+> +	.lut_offset = 0x80000,
+> +	.ltssm_shift = 0,
+> +	.lut_dbg = 0x407fc,
+> +	.ops = &ls_pcie_host_ops,
+> +	.dw_pcie_ops = &dw_ls_pcie_ops,
+> +};
+> +
+>  static const struct of_device_id ls_pcie_of_match[] = {
+>  	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata },
+>  	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata },
+>  	{ .compatible = "fsl,ls1046a-pcie", .data = &ls1046_drvdata },
+>  	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata },
+>  	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata },
+> +	{ .compatible = "fsl,ls2088a-pcie", .data = &ls2088_drvdata },
+>  	{ },
+>  };
+>  
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
