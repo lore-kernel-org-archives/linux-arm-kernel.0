@@ -1,109 +1,63 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 2 Aug 2017 12:33:08 +0200
-Subject: [PATCH 3/4] input: Add MediaTek PMIC keys support
-In-Reply-To: <1501643840-21485-4-git-send-email-chen.zhong@mediatek.com>
-References: <1501643840-21485-1-git-send-email-chen.zhong@mediatek.com>
- <1501643840-21485-4-git-send-email-chen.zhong@mediatek.com>
-Message-ID: <a6b77a6e-00bb-8aa1-86fe-f158bd96abbc@gmail.com>
+Date: Wed, 2 Aug 2017 12:39:39 +0200
+Subject: [PATCH] soc: mtk-pmic-wrap: make of_device_ids const.
+In-Reply-To: <1498651806.6668.2.camel@mhfsdcap03>
+References: <ec7445881f9cbd7d7e6a29126dce6e62f9e6b3f1.1498625812.git.arvind.yadav.cs@gmail.com>
+ <1498651806.6668.2.camel@mhfsdcap03>
+Message-ID: <50025832-8a59-0f05-7be1-91a2d2c309e1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 08/02/2017 05:17 AM, Chen Zhong wrote:
-> This patch add support to handle MediaTek PMIC MT6397/MT6323 key
-> interrupts including pwrkey and homekey, also add setting for
-> long press key shutdown behavior.
+On 06/28/2017 02:10 PM, chen.zhong wrote:
+> Hi,
+> On Wed, 2017-06-28 at 10:28 +0530, Arvind Yadav wrote:
+>> of_device_ids are not supposed to change at runtime. All functions
+>> working with of_device_ids provided by <linux/of.h> work with const
+>> of_device_ids. So mark the non-const structs as const.
+>>
+>> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+>> ---
+>>   drivers/soc/mediatek/mtk-pmic-wrap.c | 6 +++---
+>>   1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+>> index a5f1093..1205a671 100644
+>> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
+>> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+>> @@ -1067,7 +1067,7 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
+>>   	.init_soc_specific = pwrap_mt2701_init_soc_specific,
+>>   };
+>>   
+>> -static struct pmic_wrapper_type pwrap_mt8135 = {
+>> +static const struct pmic_wrapper_type pwrap_mt8135 = {
+>>   	.regs = mt8135_regs,
+>>   	.type = PWRAP_MT8135,
+>>   	.arb_en_all = 0x1ff,
+>> @@ -1079,7 +1079,7 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
+>>   	.init_soc_specific = pwrap_mt8135_init_soc_specific,
+>>   };
+>>   
+>> -static struct pmic_wrapper_type pwrap_mt8173 = {
+>> +static const struct pmic_wrapper_type pwrap_mt8173 = {
+>>   	.regs = mt8173_regs,
+>>   	.type = PWRAP_MT8173,
+>>   	.arb_en_all = 0x3f,
+>> @@ -1091,7 +1091,7 @@ static irqreturn_t pwrap_interrupt(int irqno, void *dev_id)
+>>   	.init_soc_specific = pwrap_mt8173_init_soc_specific,
+>>   };
+>>   
+>> -static struct of_device_id of_pwrap_match_tbl[] = {
+>> +static const struct of_device_id of_pwrap_match_tbl[] = {
+>>   	{
+>>   		.compatible = "mediatek,mt2701-pwrap",
+>>   		.data = &pwrap_mt2701,
 > 
-> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-> ---
->   drivers/input/keyboard/mtk-pmic-keys.c |  320 ++++++++++++++++++++++++++++++++
->   1 file changed, 320 insertions(+)
->   create mode 100644 drivers/input/keyboard/mtk-pmic-keys.c
+> Acked-by: Chen Zhong <chen.zhong@mediatek.com>
 > 
-> diff --git a/drivers/input/keyboard/mtk-pmic-keys.c b/drivers/input/keyboard/mtk-pmic-keys.c
-> new file mode 100644
-> index 0000000..0ea7d17
-> --- /dev/null
-> +++ b/drivers/input/keyboard/mtk-pmic-keys.c
-> @@ -0,0 +1,320 @@
-> +/*
-> + * Copyright (C) 2017 MediaTek, Inc.
-> + *
-> + * Author: Chen Zhong <chen.zhong@mediatek.com>
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#include <linux/ioctl.h>
-> +#include <linux/module.h>
-> +#include <linux/kernel.h>
-> +#include <linux/input.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/kernel.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/mfd/mt6323/registers.h>
-> +#include <linux/mfd/mt6397/registers.h>
-> +#include <linux/mfd/mt6397/core.h>
-> +#include <linux/slab.h>
-> +#include <linux/irqdomain.h>
-> +
-> +#define PWRKEY_RST_EN_MASK  0x1
-> +#define PWRKEY_RST_EN_SHIFT  6
-> +#define HOMEKEY_RST_EN_MASK  0x1
-> +#define HOMEKEY_RST_EN_SHIFT  5
-> +#define RST_DU_MASK  0x3
-> +#define RST_DU_SHIFT  8
-> +
-> +struct pmic_keys_regs {
-> +	u32 deb_reg;
-> +	u32 deb_mask;
-> +	u32 intsel_reg;
-> +	u32 intsel_mask;
-> +};
-> +
-> +#define PMIC_KEYS_REGS(_deb_reg, _deb_mask, _intsel_reg, _intsel_mask)	\
-> +{									\
-> +	.deb_reg		= _deb_reg,				\
-> +	.deb_mask		= _deb_mask,				\
-> +	.intsel_reg		= _intsel_reg,				\
-> +	.intsel_mask		= _intsel_mask,				\
-> +}
-> +
-> +struct pmic_regs {
-> +	const struct pmic_keys_regs pwrkey_regs;
-> +	const struct pmic_keys_regs homekey_regs;
-> +	u32 pmic_rst_reg;
-> +};
-> +
-> +static const struct pmic_regs mt6397_regs = {
-> +	.pwrkey_regs = PMIC_KEYS_REGS(MT6397_CHRSTATUS,
-> +		0x8, MT6397_INT_RSV, 0x10),
-> +	.homekey_regs = PMIC_KEYS_REGS(MT6397_OCSTATUS2,
-> +		0x10, MT6397_INT_RSV, 0x8),
-> +	.pmic_rst_reg = MT6397_TOP_RST_MISC,
-> +};
-> +
-> +static const struct pmic_regs mt6323_regs = {
-> +	.pwrkey_regs = PMIC_KEYS_REGS(MT6323_CHRSTATUS,
-> +		0x2, MT6323_INT_MISC_CON, 0x10),
-> +	.homekey_regs = PMIC_KEYS_REGS(MT6323_CHRSTATUS,
-> +		0x4, MT6323_INT_MISC_CON, 0x8),
-> +	.pmic_rst_reg = MT6323_TOP_RST_MISC,
-> +};
 
-Where are this MTxxxx_CHRSTATUS defined?
+Applied to v4.13-next/soc
 
-Regards,
+Thanks a lot,
 Matthias
