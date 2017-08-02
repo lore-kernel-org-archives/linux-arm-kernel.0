@@ -1,69 +1,35 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 2 Aug 2017 17:54:51 +0100
-Subject: [PATCH v2 0/3] mailbox: arm: introduce smc triggered mailbox
-In-Reply-To: <CABb+yY04O+XQ5Dy=dEBYTcHEUwES_sFi1_3409qnUgV0r1y_bQ@mail.gmail.com>
-References: <1500852206-28771-1-git-send-email-andre.przywara@arm.com>
- <ffabbe33-5edd-4642-6038-5b48c87ad372@suse.de>
- <CABb+yY04O+XQ5Dy=dEBYTcHEUwES_sFi1_3409qnUgV0r1y_bQ@mail.gmail.com>
-Message-ID: <e17ef686-b222-98d9-3cd1-c4632caccc59@arm.com>
+From: vasilyev@ispras.ru (Anton Vasilyev)
+Date: Wed, 2 Aug 2017 19:59:30 +0300
+Subject: net: thunderx: Buffer overwrite on bgx_probe
+Message-ID: <86a1b4d9-db67-4380-13c9-f759d2e05ed9@ispras.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(sorry for SCPI/SCMI discussion in this thread)
+Hello.
 
-On 01/08/17 16:50, Jassi Brar wrote:
-> On Tue, Aug 1, 2017 at 4:20 PM, Alexander Graf <agraf@suse.de> wrote:
->> Hi Andre,
->>
->> On 24.07.17 01:23, Andre Przywara wrote:
->>>
->>> This is a reworked version of my previous post. It addresses Jassi's
->>> comments on the driver and also tries to cover Rob's and Mark's comments
->>> on the binding documentation.
->>> I dropped the more example-like DT changes from v1, as they are actually
->>> not meant to be merged into the Linux tree, but instead are provided as
->>> part of some firmware actually implementing this functionality.
->>>
->>> Please let me know what you think.
->>
->>
->> Could you please quickly explain what it would take to provide SCMI on top
->> of this instead of SCPI?
->>
->> https://lkml.org/lkml/2017/6/7/624
->>
-> The SCMI (and SCPI) code is broken, that is, unless the firmware/SM is
-> trained to ignore the random value (pointer to a structure) passed via
-> R1. Which may be possible to do, but is surely a sign of poor
-> implementation. And may not be possible if some protocol other than
-> SCMI runs in parallel.
-> 
+While searching for memory errors in Linux kernel I've come across
+drivers/net/ethernet/cavium/thunder/thunder_bgx.ko module.
 
-Since SCPI and SCMI are based on doorbell designs like ACPI PCC, they
-can't send any data as all the data are part of shared memory.
+I've found buffer overwrite at bgx_probe():
+Consider device PCI_SUBSYS_DEVID_83XX_BGX.
+max_bgx_per_node is set to 4 by set_max_bgx_per_node().
+Then on branch:
+     pci_read_config_word(pdev, PCI_DEVICE_ID, &sdevid);
+     if (sdevid != PCI_DEVICE_ID_THUNDER_RGX) {
+         bgx->bgx_id = (pci_resource_start(pdev,
+             PCI_CFG_REG_BAR_NUM) >> 24) & BGX_ID_MASK;
+         bgx->bgx_id += nic_get_node_id(pdev) * max_bgx_per_node;
 
-What data needs to be sent from SCPI/SCMI as part of mbox_send_message
-in your opinion ? I can't think of any generic way to form this data.
+bgx->bgx_id could achieve value 3 + 3 * 4 = 15,
+which lead to buffer overwrite on
+         bgx_vnic[bgx->bgx_id] = bgx;
 
-It's not possible to generalize that and SCPI/SCMI's transport is
-specifically designed in that way to avoid any kind of dependency
-on the mailbox hardware so that the protocol can be generic exactly like
-ACPI PCC.
+Question: is it enough for fix to change bgx_vnic's size?
 
-I understand your concern on how existing mailbox controllers work with
-it. They can't as they stand today as they expect some specific data
-based on the hardware or the protocol they support on it.
-
-One option to deal with this is to have a generic DT based doorbell kind
-of controller driver but I am not sure if we can define register level
-bindings like ACPI PCC.
-
-Or we teach them to ignore the data if it's not present. I don't like
-the idea of adding shim layer for each of the controller as each one
-expect different format and more over SCPI/SCMI doesn't even require it
-to support SCMI on those mailbox controllers. That may end up with 2x
-drivers(one actual driver and and another shim layer for it)
+Found by Linux Driver Verification project (linuxtesting.org).
 
 -- 
-Regards,
-Sudeep
+Anton Vasilyev
+Linux Verification Center, ISPRAS
+web: http://linuxtesting.org
+e-mail: vasilyev at ispras.ru
