@@ -1,77 +1,228 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 2 Aug 2017 12:46:12 +0800
-Subject: [linux-sunxi] [PATCH 00/13] Allwinner H3 DE2 basical support
-In-Reply-To: <20170801131304.7741-1-icenowy@aosc.io>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Wed, 02 Aug 2017 06:47:31 +0200
+Subject: [linux-sunxi] [PATCH 07/13] ARM: sun8i: h3: add display engine
+ pipeline barebone
+In-Reply-To: <20170801131304.7741-8-icenowy@aosc.io>
 References: <20170801131304.7741-1-icenowy@aosc.io>
-Message-ID: <CAGb2v64giQbwJK+Yp=EN0jVDN3eHA_Yf_X3gR-hfC6j_u3z9PA@mail.gmail.com>
+ <20170801131304.7741-8-icenowy@aosc.io>
+Message-ID: <1773537.vAqre0jhCE@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 1, 2017 at 9:12 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> Allwinner H3 features a "Display Engine 2.0", which needs some support
-> to be present in the DRM driver.
->
-> This patchset is now a basical version, which dropped some features I
-> used to submitted:
-> - TVE support (not so high priority now)
-> - Multi-pipeline support (also not so high priority now due to no TVE)
+Hi Icenowy,
 
-Even though you dropped some patches, this is still v3.
+Dne torek, 01. avgust 2017 ob 15:12:58 CEST je Icenowy Zheng napisal(a):
+> As we have already the support for the DE2 on Allwinner H3, add the
+> display engine pipeline device tree nodes to its DTSI file.
+> 
+> The H5 pipeline has some differences and will be enabled later.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  arch/arm/boot/dts/sun8i-h3.dtsi | 170
+> ++++++++++++++++++++++++++++++++++++++++ 1 file changed, 170 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi
+> b/arch/arm/boot/dts/sun8i-h3.dtsi index b36f9f423c39..75ad7b65a7fc 100644
+> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> @@ -41,6 +41,8 @@
+>   */
+> 
+>  #include "sunxi-h3-h5.dtsi"
+> +#include <dt-bindings/clock/sun8i-de2.h>
+> +#include <dt-bindings/reset/sun8i-de2.h>
+> 
+>  / {
+>  	cpus {
+> @@ -72,6 +74,174 @@
+>  		};
+>  	};
+> 
+> +	de: display-engine {
+> +		compatible = "allwinner,sun8i-h3-display-engine";
+> +		allwinner,pipelines = <&mixer0>,
+> +				      <&mixer1>;
+> +		status = "disabled";
+> +	};
+> +
+> +	soc {
+> +		display_clocks: clock at 1000000 {
+> +			compatible = "allwinner,sun8i-a83t-de2-clk";
+> +			reg = <0x01000000 0x100000>;
+> +			clocks = <&ccu CLK_BUS_DE>,
+> +				 <&ccu CLK_DE>;
+> +			clock-names = "bus",
+> +				      "mod";
+> +			resets = <&ccu RST_BUS_DE>;
+> +			#clock-cells = <1>;
+> +			#reset-cells = <1>;
+> +			assigned-clocks = <&ccu CLK_DE>;
+> +			assigned-clock-parents = <&ccu CLK_PLL_DE>;
+> +			assigned-clock-rates = <432000000>;
+> +		};
 
-What has changed since v2?
+I believe Maxime ask you to use clk_set_rate() in the past:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/512909.html
 
->
-> The last 6 patches are only used for testing this patchset, and they're
-> going to be sent by Jernej Skrabec after this patchset is applied.
->
-> Icenowy Zheng (9):
->   dt-bindings: update the binding for Allwinner H3 DE2 support
->   drm: sun4i: add support for H3 mixers
->   drm: sun4i: add support for H3's TCON
->   drm: sun4i: add compatible for H3 display engine
->   clk: sunxi-ng: allow CLK_DE to set CLK_PLL_DE for H3
->   clk: sunxi-ng: export CLK_PLL_DE for H3
->   ARM: sun8i: h3: add display engine pipeline barebone
->   [NOT FOR REVIEW NOW] ARM: sun8i: h3: enable DesignWare HDMI controller
->   [NOT FOR REVIEW NOW] ARM: sun8i: h3: enable HDMI output on Orange Pi
->     PC
->
-> Jernej Skrabec (4):
->   [NOT FOR REVIEW NOW] drm: bridge: Enable polling hpd event in dw_hdmi
->   [NOT FOR REVIEW NOW] drm: bridge: Add a pre_init function for the
->     dw_hdmi driver
->   [NOT FOR REVIEW NOW] clk: sunxi: Add CLK_SET_RATE_PARENT flag for H3
->     HDMI clock
+Regards,
+Jernej
 
-This one looks trivial enough that I can pick it up regardless of the tag.
-
-ChenYu
-
->   [NOT FOR REVIEW NOW] drm: sun4i: Add a glue for the DesignWare HDMI
->     controller in H3
->
->  .../bindings/display/sunxi/sun4i-drm.txt           |  25 +-
->  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |  16 +
->  arch/arm/boot/dts/sun8i-h3.dtsi                    | 205 +++++++++
->  drivers/clk/sunxi-ng/ccu-sun8i-h3.c                |   4 +-
->  drivers/clk/sunxi-ng/ccu-sun8i-h3.h                |   3 +-
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c          |   9 +-
->  drivers/gpu/drm/sun4i/Kconfig                      |   9 +
->  drivers/gpu/drm/sun4i/Makefile                     |   1 +
->  drivers/gpu/drm/sun4i/sun4i_drv.c                  |   2 +
->  drivers/gpu/drm/sun4i/sun4i_tcon.c                 |  43 +-
->  drivers/gpu/drm/sun4i/sun4i_tcon.h                 |   1 +
->  drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c              | 462 +++++++++++++++++++++
->  drivers/gpu/drm/sun4i/sun8i_mixer.c                |  18 +
->  include/drm/bridge/dw_hdmi.h                       |   2 +
->  include/dt-bindings/clock/sun8i-h3-ccu.h           |   2 +
->  15 files changed, 781 insertions(+), 21 deletions(-)
->  create mode 100644 drivers/gpu/drm/sun4i/sun8i_dw_hdmi.c
->
+> +
+> +		mixer0: mixer at 1100000 {
+> +			compatible = "allwinner,sun8i-h3-de2-mixer0";
+> +			reg = <0x01100000 0x100000>;
+> +			clocks = <&display_clocks CLK_BUS_MIXER0>,
+> +				 <&display_clocks CLK_MIXER0>;
+> +			clock-names = "bus",
+> +				      "mod";
+> +			resets = <&display_clocks RST_MIXER0>;
+> +			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				mixer0_out: port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +					reg = <1>;
+> +
+> +					mixer0_out_tcon0: endpoint at 0 {
+> +						reg = <0>;
+> +						remote-endpoint = <&tcon0_in_mixer0>;
+> +					};
+> +
+> +					mixer0_out_tcon1: endpoint at 1 {
+> +						reg = <1>;
+> +						remote-endpoint = <&tcon1_in_mixer0>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		mixer1: mixer at 1200000 {
+> +			compatible = "allwinner,sun8i-h3-de2-mixer1";
+> +			reg = <0x01200000 0x100000>;
+> +			clocks = <&display_clocks CLK_BUS_MIXER1>,
+> +				 <&display_clocks CLK_MIXER1>;
+> +			clock-names = "bus",
+> +				      "mod";
+> +			resets = <&display_clocks RST_WB>;
+> +			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				mixer1_out: port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +					reg = <1>;
+> +
+> +					mixer1_out_tcon0: endpoint at 0 {
+> +						reg = <0>;
+> +						remote-endpoint = <&tcon0_in_mixer1>;
+> +					};
+> +
+> +					mixer1_out_tcon1: endpoint at 1 {
+> +						reg = <1>;
+> +						remote-endpoint = <&tcon1_in_mixer1>;
+> +					};
+> +				};
+> +			};
+> +		};
+> +
+> +		tcon0: lcd-controller at 1c0c000 {
+> +			compatible = "allwinner,sun8i-h3-tcon";
+> +			reg = <0x01c0c000 0x1000>;
+> +			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&ccu CLK_BUS_TCON0>,
+> +				 <&ccu CLK_TCON0>;
+> +			clock-names = "ahb",
+> +				      "tcon-ch1";
+> +			resets = <&ccu RST_BUS_TCON0>;
+> +			reset-names = "lcd";
+> +			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				tcon0_in: port at 0 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +					reg = <0>;
+> +
+> +					tcon0_in_mixer0: endpoint at 0 {
+> +						reg = <0>;
+> +						remote-endpoint = <&mixer0_out_tcon0>;
+> +					};
+> +
+> +					tcon0_in_mixer1: endpoint at 1 {
+> +						reg = <1>;
+> +						remote-endpoint = <&mixer1_out_tcon0>;
+> +					};
+> +				};
+> +
+> +				tcon0_out: port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +					reg = <1>;
+> +				};
+> +			};
+> +		};
+> +
+> +		tcon1: lcd-controller at 1c0d000 {
+> +			compatible = "allwinner,sun8i-h3-tcon";
+> +			reg = <0x01c0d000 0x1000>;
+> +			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&ccu CLK_BUS_TCON1>,
+> +				 <&ccu CLK_TVE>;
+> +			clock-names = "ahb",
+> +				      "tcon-ch1";
+> +			resets = <&ccu RST_BUS_TCON1>;
+> +			reset-names = "lcd";
+> +			status = "disabled";
+> +
+> +			ports {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				tcon1_in: port at 0 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +					reg = <0>;
+> +
+> +					tcon1_in_mixer0: endpoint at 0 {
+> +						reg = <0>;
+> +						remote-endpoint = <&mixer0_out_tcon1>;
+> +					};
+> +
+> +					tcon1_in_mixer1: endpoint at 1 {
+> +						reg = <1>;
+> +						remote-endpoint = <&mixer1_out_tcon1>;
+> +					};
+> +				};
+> +
+> +				tcon1_out: port at 1 {
+> +					#address-cells = <1>;
+> +					#size-cells = <0>;
+> +					reg = <1>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+>  	timer {
+>  		compatible = "arm,armv7-timer";
+>  		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | 
+IRQ_TYPE_LEVEL_LOW)>,
 > --
 > 2.13.0
->
+> 
 > --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> You received this message because you are subscribed to the Google Groups
+> "linux-sunxi" group. To unsubscribe from this group and stop receiving
+> emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
 > For more options, visit https://groups.google.com/d/optout.
