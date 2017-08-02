@@ -1,53 +1,53 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Wed, 2 Aug 2017 15:18:20 -0500
-Subject: [PATCH 1/3] dt-bindings: net: c_can: Update binding for clock and
- power-domains property
+Date: Wed, 2 Aug 2017 15:18:21 -0500
+Subject: [PATCH 2/3] ARM: dts: k2g: Add DCAN nodes
 In-Reply-To: <20170802201822.11532-1-fcooper@ti.com>
 References: <20170802201822.11532-1-fcooper@ti.com>
-Message-ID: <20170802201822.11532-2-fcooper@ti.com>
+Message-ID: <20170802201822.11532-3-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CAN driver uses the clk_get_rate call to determine the frequency of the
-functional clock. OMAP based SoCs do not require the clock property since
-hwmod already handles creating a "fck" clock thats accessible to drivers.
-However, this isn't the case for 66AK2G which makes the clocks property
-require for that SoC.
+From: Lokesh Vutla <lokeshvutla@ti.com>
 
-66AK2G requires a new property. Therefore, update the binding to also make
-this property requirement clear. Also clarify that for OMAP based SoCs
-ti,hwmod is a required property.
+Add nodes for the two DCAN instances included in 66AK2G
 
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+[d-gerlach at ti.com: add power-domains and clock information]
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+[fcooper at ti.com: update subject and commit message. Misc minor updates]
 Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 ---
- Documentation/devicetree/bindings/net/can/c_can.txt | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/keystone-k2g.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/can/c_can.txt b/Documentation/devicetree/bindings/net/can/c_can.txt
-index 5a1d8b0..2d50425 100644
---- a/Documentation/devicetree/bindings/net/can/c_can.txt
-+++ b/Documentation/devicetree/bindings/net/can/c_can.txt
-@@ -11,9 +11,20 @@ Required properties:
- - interrupts		: property with a value describing the interrupt
- 			  number
+diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+index bf4d1fa..bebc857 100644
+--- a/arch/arm/boot/dts/keystone-k2g.dtsi
++++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+@@ -113,6 +113,24 @@
+ 			status = "disabled";
+ 		};
  
--Optional properties:
-+The following are mandatory properties for DRA7x, AM33xx and AM43xx SoCs only:
- - ti,hwmods		: Must be "d_can<n>" or "c_can<n>", n being the
- 			  instance number
++		dcan0: can at 0260B200 {
++			compatible = "ti,am4372-d_can", "ti,am3352-d_can";
++			reg = <0x0260B200 0x200>;
++			interrupts = <GIC_SPI 190 IRQ_TYPE_EDGE_RISING>;
++			status = "disabled";
++			power-domains = <&k2g_pds 0x0008>;
++			clocks = <&k2g_clks 0x0008 1>;
++		};
 +
-+The following are mandatory properties for Keystone 2 66AK2G SoCs only:
-+- power-domains		: Should contain a phandle to a PM domain provider node
-+			  and an args specifier containing the DCAN device id
-+			  value. This property is as per the binding,
-+			  Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
-+- clocks		: CAN functional clock phandle. This property is as per the
-+			  binding,
-+			  Documentation/devicetree/bindings/clock/ti,sci-clk.txt
++		dcan1: can at 0260B400 {
++			compatible = "ti,am4372-d_can", "ti,am3352-d_can";
++			reg = <0x0260B400 0x200>;
++			interrupts = <GIC_SPI 193 IRQ_TYPE_EDGE_RISING>;
++			status = "disabled";
++			power-domains = <&k2g_pds 0x0009>;
++			clocks = <&k2g_clks 0x0009 1>;
++		};
 +
-+Optional properties:
- - syscon-raminit	: Handle to system control region that contains the
- 			  RAMINIT register, register offset to the RAMINIT
- 			  register and the CAN instance number (0 offset).
+ 		kirq0: keystone_irq at 026202a0 {
+ 			compatible = "ti,keystone-irq";
+ 			interrupts = <GIC_SPI 1 IRQ_TYPE_EDGE_RISING>;
 -- 
 2.9.4.dirty
