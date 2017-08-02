@@ -1,81 +1,101 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  2 Aug 2017 10:21:54 -0600
-Subject: [PATCH 00/26] coresight: next v4.13-rc3 
-Message-ID: <1501690940-4137-1-git-send-email-mathieu.poirier@linaro.org>
+Date: Wed,  2 Aug 2017 10:21:55 -0600
+Subject: [PATCH 01/26] coresight: Correct buffer lost increment
+In-Reply-To: <1501690940-4137-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1501690940-4137-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1501690940-4137-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Good morning Grep,
+Many conditions may cause synchronisation to be lost when updating
+the perf ring buffer but the end result is still the same: synchronisation
+is lost.  As such there is no need to increment the lost count for each
+condition, just once will suffice.
 
-These are the patches I'd like you to consider for inclusion in the v4.14
-cycle.  Please have a look when you get the chance.  As usual I made sure
-things apply on your char-misc-next branch (24a81a2c2581).
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-etb10.c   | 10 +++++++---
+ drivers/hwtracing/coresight/coresight-tmc-etf.c |  8 ++++++--
+ 2 files changed, 13 insertions(+), 5 deletions(-)
 
-Thanks,
-Mathieu
-
-Arvind Yadav (1):
-  hwtracing: coresight: constify attribute_group structures.
-
-Mathieu Poirier (5):
-  coresight: Correct buffer lost increment
-  coresight: etb10: Remove useless conversion to LE
-  coresight: Add barrier packet for synchronisation
-  coresight: etb10: Move etb_disable_hw() outside of lock
-  coresight: etm3x: Set synchronisation frequencty to TRM default
-
-Mike Leach (4):
-  coresight: pmu: Adds return stack option to perf coresight pmu
-  coresight: ptm: Adds trace return stack option programming for PTM.
-  coresight: etm4x: Adds trace return stack option programming for
-    ETMv4.
-  perf: cs-etm: Fix ETMv4 CONFIGR entry in perf.data file
-
-Stephen Boyd (1):
-  coresight: STM: Clean up __iomem type usage
-
-Suzuki K Poulose (15):
-  coresight replicator: Cleanup programmable replicator naming
-  coresight: Add support for reading 64bit registers
-  coresight: Use the new helper for defining registers
-  coresight tmc: Add helpers for accessing 64bit registers
-  coresight tmc: Expose DBA and AXICTL
-  coresight replicator: Expose replicator management registers
-  coresight tmc: Handle configuration types properly
-  coresight tmc etr: Add capabilitiy information
-  coresight tmc: Detect support for scatter gather
-  coresight tmc etr: Detect address width at runtime
-  coresight tmc etr: Cleanup AXICTL register handling
-  coresight tmc etr: Setup AXI cache encoding for read transfers
-  coresight tmc: Support for save-restore in ETR
-  coresight tmc: Add support for Coresight SoC 600 TMC
-  coresight: Add support for Coresight SoC 600 components
-
- .../devicetree/bindings/arm/coresight.txt          |   4 +-
- drivers/hwtracing/coresight/Kconfig                |  10 +-
- drivers/hwtracing/coresight/Makefile               |   2 +-
- ...cator-qcom.c => coresight-dynamic-replicator.c} |  32 ++++++-
- drivers/hwtracing/coresight/coresight-etb10.c      |  68 ++++++++-----
- drivers/hwtracing/coresight/coresight-etm-perf.c   |   4 +-
- drivers/hwtracing/coresight/coresight-etm.h        |   1 +
- .../hwtracing/coresight/coresight-etm3x-sysfs.c    |  26 ++---
- drivers/hwtracing/coresight/coresight-etm3x.c      |  20 +++-
- .../hwtracing/coresight/coresight-etm4x-sysfs.c    |  24 ++---
- drivers/hwtracing/coresight/coresight-etm4x.c      |   4 +
- drivers/hwtracing/coresight/coresight-funnel.c     |   5 +
- drivers/hwtracing/coresight/coresight-priv.h       |  39 +++++++-
- drivers/hwtracing/coresight/coresight-stm.c        |  47 ++++-----
- drivers/hwtracing/coresight/coresight-tmc-etf.c    |  42 ++++++--
- drivers/hwtracing/coresight/coresight-tmc-etr.c    |  49 +++++++---
- drivers/hwtracing/coresight/coresight-tmc.c        | 106 ++++++++++++++++-----
- drivers/hwtracing/coresight/coresight-tmc.h        |  85 ++++++++++++++++-
- drivers/hwtracing/coresight/coresight-tpiu.c       |   5 +
- drivers/hwtracing/coresight/coresight.c            |   8 ++
- include/linux/coresight-pmu.h                      |   6 ++
- tools/include/linux/coresight-pmu.h                |   6 ++
- tools/perf/arch/arm/util/cs-etm.c                  |  28 +++++-
- 23 files changed, 485 insertions(+), 136 deletions(-)
- rename drivers/hwtracing/coresight/{coresight-replicator-qcom.c => coresight-dynamic-replicator.c} (87%)
-
+diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+index d5b96423e1a5..d9c233135d6d 100644
+--- a/drivers/hwtracing/coresight/coresight-etb10.c
++++ b/drivers/hwtracing/coresight/coresight-etb10.c
+@@ -353,6 +353,7 @@ static void etb_update_buffer(struct coresight_device *csdev,
+ 			      struct perf_output_handle *handle,
+ 			      void *sink_config)
+ {
++	bool lost = false;
+ 	int i, cur;
+ 	u8 *buf_ptr;
+ 	u32 read_ptr, write_ptr, capacity;
+@@ -384,7 +385,7 @@ static void etb_update_buffer(struct coresight_device *csdev,
+ 			(unsigned long)write_ptr);
+ 
+ 		write_ptr &= ~(ETB_FRAME_SIZE_WORDS - 1);
+-		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
++		lost = true;
+ 	}
+ 
+ 	/*
+@@ -395,7 +396,7 @@ static void etb_update_buffer(struct coresight_device *csdev,
+ 	 */
+ 	status = readl_relaxed(drvdata->base + ETB_STATUS_REG);
+ 	if (status & ETB_STATUS_RAM_FULL) {
+-		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
++		lost = true;
+ 		to_read = capacity;
+ 		read_ptr = write_ptr;
+ 	} else {
+@@ -428,9 +429,12 @@ static void etb_update_buffer(struct coresight_device *csdev,
+ 		if (read_ptr > (drvdata->buffer_depth - 1))
+ 			read_ptr -= drvdata->buffer_depth;
+ 		/* let the decoder know we've skipped ahead */
+-		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
++		lost = true;
+ 	}
+ 
++	if (lost)
++		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
++
+ 	/* finally tell HW where we want to start reading from */
+ 	writel_relaxed(read_ptr, drvdata->base + ETB_RAM_READ_POINTER);
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+index e3b9fb82eb8d..2e0fb5b9372c 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
++++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+@@ -369,6 +369,7 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
+ 				  struct perf_output_handle *handle,
+ 				  void *sink_config)
+ {
++	bool lost = false;
+ 	int i, cur;
+ 	u32 *buf_ptr;
+ 	u32 read_ptr, write_ptr;
+@@ -397,7 +398,7 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
+ 	 */
+ 	status = readl_relaxed(drvdata->base + TMC_STS);
+ 	if (status & TMC_STS_FULL) {
+-		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
++		lost = true;
+ 		to_read = drvdata->size;
+ 	} else {
+ 		to_read = CIRC_CNT(write_ptr, read_ptr, drvdata->size);
+@@ -442,9 +443,12 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
+ 			read_ptr -= drvdata->size;
+ 		/* Tell the HW */
+ 		writel_relaxed(read_ptr, drvdata->base + TMC_RRP);
+-		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
++		lost = true;
+ 	}
+ 
++	if (lost)
++		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
++
+ 	cur = buf->cur;
+ 	offset = buf->offset;
+ 
 -- 
 2.7.4
