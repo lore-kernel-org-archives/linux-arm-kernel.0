@@ -1,115 +1,58 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 2 Aug 2017 11:42:27 -0400
-Subject: [PATCH V5 2/2] PCI: handle CRS returned by device after FLR
-In-Reply-To: <20170801224440.3f677a8d@w520.home>
-References: <1501645453-22842-1-git-send-email-okaya@codeaurora.org>
- <1501645453-22842-2-git-send-email-okaya@codeaurora.org>
- <20170801224440.3f677a8d@w520.home>
-Message-ID: <fc84cb54-1771-45cd-d01f-b88dc833baf2@codeaurora.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 2 Aug 2017 23:50:39 +0800
+Subject: [PATCH 1/3] mmc: sdhci: enable/disable the clock in
+ sdhci_pltfm_suspend/resume
+In-Reply-To: <1501505809-393-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <201708022332.VqGgwitn%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+Hi Masahiro,
 
-On 8/2/2017 12:44 AM, Alex Williamson wrote:
-> On Tue,  1 Aug 2017 23:44:13 -0400
-> Sinan Kaya <okaya@codeaurora.org> wrote:
-> 
->> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
->> index 2ed604a..25c7a83 100644
->> --- a/drivers/pci/pci.c
->> +++ b/drivers/pci/pci.c
->> @@ -3813,14 +3813,16 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
->>  
->>  /*
->>   * We should only need to wait 100ms after FLR for virtual functions.
->> - * Wait for up to 1000ms for config space to return something other than -1.
->> - * Intel IGD requires this when an LCD panel is attached.  We read the 2nd
->> - * dword because VFs don't implement the 1st dword.
->> + * Wait for up to 60s for config space to return something other than -1.
->> + * Intel IGD requires 1s when an LCD panel is attached.  We use
->> + * pci_bus_read_dev_vendor_id() for reading the vendor ID as it handles
->> + * CRS gracefully.
-> 
-> nit, stating that IGD requires 1s with an LCD panel is a
-> misinterpretation of the previous comment.  In fact the original commit
-> only mentions 300ms.  I think perhaps 1s was simply a nice round
-> interval.
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.13-rc3 next-20170802]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-I can fix the comment as 300ms to be correct. 
+url:    https://github.com/0day-ci/linux/commits/Masahiro-Yamada/mmc-sdhci-enable-disable-the-clock-in-sdhci_pltfm_suspend-resume/20170801-021149
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-> 
->>   */
->>  static void pci_flr_wait(struct pci_dev *dev)
->>  {
->>  	int i = 0;
->>  	u32 id;
->> +	bool ret;
->>  
->>  	if (dev->is_virtfn) {
->>  		msleep(100);
->> @@ -3828,15 +3830,15 @@ static void pci_flr_wait(struct pci_dev *dev)
->>  	}
->>  
->>  	do {
->> -		msleep(100);
->> -		pci_read_config_dword(dev, PCI_COMMAND, &id);
->> -	} while (i++ < 10 && id == ~0);
->> +		ret = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
->> +						 1000);
-> 
-> Is it a problem that there's now zero delay between the FLR and first
-> attempt to read config space?  
+All errors (new ones prefixed by >>):
 
-I agree, we should wait 100ms before attempting to do anything.
+>> drivers/mmc/host/sdhci-sirf.c:242:21: error: initializer element is not constant
+      .of_match_table = sdhci_pltfm_pmops,
+                        ^~~~~~~~~~~~~~~~~
+   drivers/mmc/host/sdhci-sirf.c:242:21: note: (near initialization for 'sdhci_sirf_driver.driver.of_match_table')
+>> drivers/mmc/host/sdhci-sirf.c:243:10: error: 'sdhci_sirf_pm_ops' undeclared here (not in a function)
+      .pm = &sdhci_sirf_pm_ops,
+             ^~~~~~~~~~~~~~~~~
 
-> Seems like there should be a 100ms
-> delay before we start trying.  This is also going to print a kernel
-> warning 60 times in the course of getting to a 60s timeout, why not let
-> pci_bus_read_dev_vendor_id() manage the entire timeout?  
+vim +242 drivers/mmc/host/sdhci-sirf.c
 
-Bjorn was concerned that if a device is taking too long to come out of reset, 
-there won't be any visible output on the screen and somebody might be under the
-impression that system is frozen even though we are just busy waiting. 
+   238	
+   239	static struct platform_driver sdhci_sirf_driver = {
+   240		.driver		= {
+   241			.name	= "sdhci-sirf",
+ > 242			.of_match_table = sdhci_pltfm_pmops,
+ > 243			.pm	= &sdhci_sirf_pm_ops,
+   244		},
+   245		.probe		= sdhci_sirf_probe,
+   246		.remove		= sdhci_pltfm_unregister,
+   247	};
+   248	
 
-That's why, I tried to introduce some verbosity.
-
-What I can do is instead of polling 60 times, I can follow a similar pattern
-in vendor_id() function and sleep 1 second first, followed by 2 seconds, followed
-by 4 seconds etc. to be less verbose. 
-
-User will still see a warning on each read loop that failed. At least, we won't 
-fill the screen with warning messages.
-
-> Are we only
-> trying to preserve the dev_info() below?  Thanks,
-
-Yes and no, we want to see the progress of polling and a final result. 60 seconds
-is a very long time.
-
-> 
-> Alex
-> 
->> +	} while (i++ < 60 && !ret);
->>  
->> -	if (id == ~0)
->> +	if (!ret)
->>  		dev_warn(&dev->dev, "Failed to return from FLR\n");
->>  	else if (i > 1)
->> -		dev_info(&dev->dev, "Required additional %dms to
->> return from FLR\n",
->> -			 (i - 1) * 100);
->> +		dev_info(&dev->dev, "Required additional %ds to
->> return from FLR\n",
->> +			 (i - 1));
->>  }
->>  
->>  /**
-> 
-> 
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 63458 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170802/4a684794/attachment-0001.gz>
