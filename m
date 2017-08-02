@@ -1,234 +1,115 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  2 Aug 2017 14:46:32 +0100
-Subject: [RFC PATCH] module: use relative references for __ksymtab entries
-Message-ID: <20170802134632.19040-1-ard.biesheuvel@linaro.org>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Wed, 2 Aug 2017 21:46:42 +0800
+Subject: [PATCH 3/4] input: Add MediaTek PMIC keys support
+In-Reply-To: <a6b77a6e-00bb-8aa1-86fe-f158bd96abbc@gmail.com>
+References: <1501643840-21485-1-git-send-email-chen.zhong@mediatek.com>
+ <1501643840-21485-4-git-send-email-chen.zhong@mediatek.com>
+ <a6b77a6e-00bb-8aa1-86fe-f158bd96abbc@gmail.com>
+Message-ID: <1501681602.28466.2.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An ordinary arm64 defconfig build has ~64 KB worth of __ksymtab
-entries, each consisting of two 64-bit fields containing absolute
-references, to the symbol itself and to a char array containing
-its name, respectively.
+On Wed, 2017-08-02 at 12:33 +0200, Matthias Brugger wrote:
+> 
+> On 08/02/2017 05:17 AM, Chen Zhong wrote:
+> > This patch add support to handle MediaTek PMIC MT6397/MT6323 key
+> > interrupts including pwrkey and homekey, also add setting for
+> > long press key shutdown behavior.
+> > 
+> > Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+> > ---
+> >   drivers/input/keyboard/mtk-pmic-keys.c |  320 ++++++++++++++++++++++++++++++++
+> >   1 file changed, 320 insertions(+)
+> >   create mode 100644 drivers/input/keyboard/mtk-pmic-keys.c
+> > 
+> > diff --git a/drivers/input/keyboard/mtk-pmic-keys.c b/drivers/input/keyboard/mtk-pmic-keys.c
+> > new file mode 100644
+> > index 0000000..0ea7d17
+> > --- /dev/null
+> > +++ b/drivers/input/keyboard/mtk-pmic-keys.c
+> > @@ -0,0 +1,320 @@
+> > +/*
+> > + * Copyright (C) 2017 MediaTek, Inc.
+> > + *
+> > + * Author: Chen Zhong <chen.zhong@mediatek.com>
+> > + *
+> > + * This software is licensed under the terms of the GNU General Public
+> > + * License version 2, as published by the Free Software Foundation, and
+> > + * may be copied, distributed, and modified under those terms.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + */
+> > +
+> > +#include <linux/ioctl.h>
+> > +#include <linux/module.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/input.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_device.h>
+> > +#include <linux/regmap.h>
+> > +#include <linux/mfd/mt6323/registers.h>
+> > +#include <linux/mfd/mt6397/registers.h>
+> > +#include <linux/mfd/mt6397/core.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/irqdomain.h>
+> > +
+> > +#define PWRKEY_RST_EN_MASK  0x1
+> > +#define PWRKEY_RST_EN_SHIFT  6
+> > +#define HOMEKEY_RST_EN_MASK  0x1
+> > +#define HOMEKEY_RST_EN_SHIFT  5
+> > +#define RST_DU_MASK  0x3
+> > +#define RST_DU_SHIFT  8
+> > +
+> > +struct pmic_keys_regs {
+> > +	u32 deb_reg;
+> > +	u32 deb_mask;
+> > +	u32 intsel_reg;
+> > +	u32 intsel_mask;
+> > +};
+> > +
+> > +#define PMIC_KEYS_REGS(_deb_reg, _deb_mask, _intsel_reg, _intsel_mask)	\
+> > +{									\
+> > +	.deb_reg		= _deb_reg,				\
+> > +	.deb_mask		= _deb_mask,				\
+> > +	.intsel_reg		= _intsel_reg,				\
+> > +	.intsel_mask		= _intsel_mask,				\
+> > +}
+> > +
+> > +struct pmic_regs {
+> > +	const struct pmic_keys_regs pwrkey_regs;
+> > +	const struct pmic_keys_regs homekey_regs;
+> > +	u32 pmic_rst_reg;
+> > +};
+> > +
+> > +static const struct pmic_regs mt6397_regs = {
+> > +	.pwrkey_regs = PMIC_KEYS_REGS(MT6397_CHRSTATUS,
+> > +		0x8, MT6397_INT_RSV, 0x10),
+> > +	.homekey_regs = PMIC_KEYS_REGS(MT6397_OCSTATUS2,
+> > +		0x10, MT6397_INT_RSV, 0x8),
+> > +	.pmic_rst_reg = MT6397_TOP_RST_MISC,
+> > +};
+> > +
+> > +static const struct pmic_regs mt6323_regs = {
+> > +	.pwrkey_regs = PMIC_KEYS_REGS(MT6323_CHRSTATUS,
+> > +		0x2, MT6323_INT_MISC_CON, 0x10),
+> > +	.homekey_regs = PMIC_KEYS_REGS(MT6323_CHRSTATUS,
+> > +		0x4, MT6323_INT_MISC_CON, 0x8),
+> > +	.pmic_rst_reg = MT6323_TOP_RST_MISC,
+> > +};
+> 
+> Where are this MTxxxx_CHRSTATUS defined?
 
-When we build the same configuration with KASLR enabled, we end
-up with an additional ~192 KB of relocations in the .init section,
-i.e., one 24 byte entry for each absolute reference, which all need
-to be processed at boot time.
+Hi Matthias,
 
-Given how the struct kernel_symbol that describes each entry is
-completely local to module.c (except for the references emitted
-by EXPORT_SYMBOL() itself), we can easily modify it to contain
-two 32-bit relative references instead. This reduces the size of
-the __ksymtab section by 50% for all 64-bit architectures, and
-gets rid of the runtime relocations entirely for architectures
-implementing KASLR, either via standard PIE linking (arm64) or
-using custom host tools (x86).
+They are defined in "linux/mfd/mt63xx/registers.h".
 
-Since EXPORT_SYMBOL() no longer refers to struct kernel_symbol,
-move the definition into module.c, which is its only user.
-
-Note that the binary search involving __ksymtab contents relies
-on each section being sorted by symbol name. This is implemented
-based on the input section names, not the names in the ksymtab
-entries, so this patch does not interfere with that.
-
-Cc: Jessica Yu <jeyu@kernel.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Ingo Molnar <mingo@kernel.org>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Thomas Garnier <thgarnie@google.com>
-Cc: Nicolas Pitre <nico@linaro.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-
-Note that ARM requires a little tweak to ensure that the unwind
-info related to the discarded code is discarded as well. I'm sure
-there will be an arch or two where something similar may be required.
-
- arch/arm/kernel/vmlinux.lds.S |  1 +
- include/asm-generic/export.h  | 10 +------
- include/linux/export.h        | 27 +++++++++--------
- kernel/module.c               | 31 ++++++++++++++++----
- 4 files changed, 42 insertions(+), 27 deletions(-)
-
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index c83a7ba737d6..4bdba75e510c 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -89,6 +89,7 @@ SECTIONS
- #endif
- 		*(.discard)
- 		*(.discard.*)
-+		*(.ARM.exidx.discard)
- 	}
- 
- 	. = PAGE_OFFSET + TEXT_OFFSET;
-diff --git a/include/asm-generic/export.h b/include/asm-generic/export.h
-index 719db1968d81..fac5b2e6df37 100644
---- a/include/asm-generic/export.h
-+++ b/include/asm-generic/export.h
-@@ -4,17 +4,9 @@
- #ifndef KSYM_FUNC
- #define KSYM_FUNC(x) x
- #endif
--#ifdef CONFIG_64BIT
--#define __put .quad
- #ifndef KSYM_ALIGN
- #define KSYM_ALIGN 8
- #endif
--#else
--#define __put .long
--#ifndef KSYM_ALIGN
--#define KSYM_ALIGN 4
--#endif
--#endif
- #ifndef KCRC_ALIGN
- #define KCRC_ALIGN 4
- #endif
-@@ -35,7 +27,7 @@
- 	.section ___ksymtab\sec+\name,"a"
- 	.balign KSYM_ALIGN
- KSYM(__ksymtab_\name):
--	__put \val, KSYM(__kstrtab_\name)
-+	.long \val - ., KSYM(__kstrtab_\name) - .
- 	.previous
- 	.section __ksymtab_strings,"a"
- KSYM(__kstrtab_\name):
-diff --git a/include/linux/export.h b/include/linux/export.h
-index 1a1dfdb2a5c6..06d673799ac8 100644
---- a/include/linux/export.h
-+++ b/include/linux/export.h
-@@ -24,12 +24,6 @@
- #define VMLINUX_SYMBOL_STR(x) __VMLINUX_SYMBOL_STR(x)
- 
- #ifndef __ASSEMBLY__
--struct kernel_symbol
--{
--	unsigned long value;
--	const char *name;
--};
--
- #ifdef MODULE
- extern struct module __this_module;
- #define THIS_MODULE (&__this_module)
-@@ -60,17 +54,26 @@ extern struct module __this_module;
- #define __CRC_SYMBOL(sym, sec)
- #endif
- 
--/* For every exported symbol, place a struct in the __ksymtab section */
-+/*
-+ * For every exported symbol, place a struct in the __ksymtab section.
-+ * Note that we have to visibly take the address of sym, so the compiler
-+ * is forced to emit it, rather than inlining it or removing it
-+ * altogether. Do so in a way that avoids taking the address statically,
-+ * and emit that code into a section that is discarded by the linker.
-+ */
- #define ___EXPORT_SYMBOL(sym, sec)					\
- 	extern typeof(sym) sym;						\
- 	__CRC_SYMBOL(sym, sec)						\
- 	static const char __kstrtab_##sym[]				\
--	__attribute__((section("__ksymtab_strings"), aligned(1)))	\
-+	__attribute__((section("__ksymtab_strings"), used, aligned(1)))	\
- 	= VMLINUX_SYMBOL_STR(sym);					\
--	static const struct kernel_symbol __ksymtab_##sym		\
--	__used								\
--	__attribute__((section("___ksymtab" sec "+" #sym), used))	\
--	= { (unsigned long)&sym, __kstrtab_##sym }
-+	static void * __attribute__((section(".discard"), used))	\
-+			__discard_##sym(void) { return (void *)&sym; }	\
-+	asm("	.section \"___ksymtab" sec "+" #sym "\", \"a\"	\n"	\
-+	    "	.balign	8					\n"	\
-+	    "	.long "	VMLINUX_SYMBOL_STR(sym) "- .		\n"	\
-+	    "	.long "	VMLINUX_SYMBOL_STR(__kstrtab_##sym) "- .\n"	\
-+	    "	.previous					\n")
- 
- #if defined(__KSYM_DEPS__)
- 
-diff --git a/kernel/module.c b/kernel/module.c
-index 40f983cbea81..f09529f695f9 100644
---- a/kernel/module.c
-+++ b/kernel/module.c
-@@ -88,6 +88,12 @@
- /* If this is set, the section belongs in the init part of the module */
- #define INIT_OFFSET_MASK (1UL << (BITS_PER_LONG-1))
- 
-+struct kernel_symbol
-+{
-+	signed int value_offset;
-+	signed int name_offset;
-+};
-+
- /*
-  * Mutex protects:
-  * 1) List of modules (also safely readable with preempt_disable),
-@@ -539,12 +545,23 @@ static bool check_symbol(const struct symsearch *syms,
- 	return true;
- }
- 
-+static unsigned long kernel_symbol_value(const struct kernel_symbol *sym)
-+{
-+	return (unsigned long)&sym->value_offset + sym->value_offset;
-+}
-+
-+static const char *kernel_symbol_name(const struct kernel_symbol *sym)
-+{
-+	return (const char *)((unsigned long)&sym->name_offset +
-+			      sym->name_offset);
-+}
-+
- static int cmp_name(const void *va, const void *vb)
- {
- 	const char *a;
- 	const struct kernel_symbol *b;
- 	a = va; b = vb;
--	return strcmp(a, b->name);
-+	return strcmp(a, kernel_symbol_name(b));
- }
- 
- static bool find_symbol_in_section(const struct symsearch *syms,
-@@ -2190,7 +2207,7 @@ void *__symbol_get(const char *symbol)
- 		sym = NULL;
- 	preempt_enable();
- 
--	return sym ? (void *)sym->value : NULL;
-+	return sym ? (void *)kernel_symbol_value(sym) : NULL;
- }
- EXPORT_SYMBOL_GPL(__symbol_get);
- 
-@@ -2220,10 +2237,12 @@ static int verify_export_symbols(struct module *mod)
- 
- 	for (i = 0; i < ARRAY_SIZE(arr); i++) {
- 		for (s = arr[i].sym; s < arr[i].sym + arr[i].num; s++) {
--			if (find_symbol(s->name, &owner, NULL, true, false)) {
-+			if (find_symbol(kernel_symbol_name(s), &owner, NULL,
-+					true, false)) {
- 				pr_err("%s: exports duplicate symbol %s"
- 				       " (owned by %s)\n",
--				       mod->name, s->name, module_name(owner));
-+				       mod->name, kernel_symbol_name(s),
-+				       module_name(owner));
- 				return -ENOEXEC;
- 			}
- 		}
-@@ -2272,7 +2291,7 @@ static int simplify_symbols(struct module *mod, const struct load_info *info)
- 			ksym = resolve_symbol_wait(mod, info, name);
- 			/* Ok if resolved.  */
- 			if (ksym && !IS_ERR(ksym)) {
--				sym[i].st_value = ksym->value;
-+				sym[i].st_value = kernel_symbol_value(ksym);
- 				break;
- 			}
- 
-@@ -2532,7 +2551,7 @@ static int is_exported(const char *name, unsigned long value,
- 		ks = lookup_symbol(name, __start___ksymtab, __stop___ksymtab);
- 	else
- 		ks = lookup_symbol(name, mod->syms, mod->syms + mod->num_syms);
--	return ks != NULL && ks->value == value;
-+	return ks != NULL && kernel_symbol_value(ks) == value;
- }
- 
- /* As per nm */
--- 
-2.11.0
+> 
+> Regards,
+> Matthias
