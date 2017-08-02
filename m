@@ -1,114 +1,117 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  2 Aug 2017 10:22:20 -0600
-Subject: [PATCH 26/26] coresight: STM: Clean up __iomem type usage
-In-Reply-To: <1501690940-4137-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1501690940-4137-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1501690940-4137-27-git-send-email-mathieu.poirier@linaro.org>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Wed, 2 Aug 2017 11:32:18 -0500
+Subject: [PATCH] serial: 8250_of: Add basic PM runtime support
+Message-ID: <20170802163218.14377-1-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Boyd <sboyd@codeaurora.org>
+Add basic PM Runtime support.
 
-The casting and other things here is odd, and causes sparse to
-complain:
-
-drivers/hwtracing/coresight/coresight-stm.c:279:35: warning: incorrect type in argument 1 (different address spaces)
-drivers/hwtracing/coresight/coresight-stm.c:279:35:    expected void [noderef] <asn:2>*addr
-drivers/hwtracing/coresight/coresight-stm.c:279:35:    got struct stm_drvdata *drvdata
-drivers/hwtracing/coresight/coresight-stm.c:327:17: warning: incorrect type in argument 2 (different address spaces)
-drivers/hwtracing/coresight/coresight-stm.c:327:17:    expected void volatile [noderef] <asn:2>*addr
-drivers/hwtracing/coresight/coresight-stm.c:327:17:    got void *addr
-drivers/hwtracing/coresight/coresight-stm.c:330:17: warning: incorrect type in argument 2 (different address spaces)
-drivers/hwtracing/coresight/coresight-stm.c:330:17:    expected void volatile [noderef] <asn:2>*addr
-drivers/hwtracing/coresight/coresight-stm.c:330:17:    got void *addr
-drivers/hwtracing/coresight/coresight-stm.c:333:17: warning: incorrect type in argument 2 (different address spaces)
-drivers/hwtracing/coresight/coresight-stm.c:333:17:    expected void volatile [noderef] <asn:2>*addr
-drivers/hwtracing/coresight/coresight-stm.c:333:17:    got void *addr
-
->From what I can tell, we don't really need to treat ch_addr as
-anything besides a pointer, and we can just do pointer math
-instead of ORing in the bits of the offset and achieve the same
-thing.
-
-Also, we were passing a drvdata pointer to the
-coresight_timeout() function, but we really wanted to pass the
-address of the register base. Luckily the base is the first
-member of the structure, so everything works out, but this is
-quite unsafe if we ever change the structure layout. Clean this
-all up so sparse stops complaining on this code.
-
-Reported-by: Satyajit Desai <sadesai@codeaurora.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 ---
- drivers/hwtracing/coresight/coresight-stm.c | 17 +++++++++--------
- 1 file changed, 9 insertions(+), 8 deletions(-)
+ drivers/tty/serial/8250/8250_of.c | 35 ++++++++++++++++++++++++-----------
+ 1 file changed, 24 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index 202ed7a909e1..8ec4c4f8a2f2 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -276,7 +276,7 @@ static void stm_disable(struct coresight_device *csdev,
- 		spin_unlock(&drvdata->spinlock);
+diff --git a/drivers/tty/serial/8250/8250_of.c b/drivers/tty/serial/8250/8250_of.c
+index 6c5a8ca..94e7c93 100644
+--- a/drivers/tty/serial/8250/8250_of.c
++++ b/drivers/tty/serial/8250/8250_of.c
+@@ -18,6 +18,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
++#include <linux/pm_runtime.h>
+ #include <linux/clk.h>
+ #include <linux/reset.h>
  
- 		/* Wait until the engine has completely stopped */
--		coresight_timeout(drvdata, STMTCSR, STMTCSR_BUSY_BIT, 0);
-+		coresight_timeout(drvdata->base, STMTCSR, STMTCSR_BUSY_BIT, 0);
+@@ -65,6 +66,10 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
+ 	int ret;
  
- 		pm_runtime_put(drvdata->dev);
+ 	memset(port, 0, sizeof *port);
++
++	pm_runtime_enable(&ofdev->dev);
++	pm_runtime_get_sync(&ofdev->dev);
++
+ 	if (of_property_read_u32(np, "clock-frequency", &clk)) {
  
-@@ -307,7 +307,8 @@ static inline bool stm_addr_unaligned(const void *addr, u8 write_bytes)
- 	return ((unsigned long)addr & (write_bytes - 1));
+ 		/* Get clk rate through clk driver if present */
+@@ -72,12 +77,13 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
+ 		if (IS_ERR(info->clk)) {
+ 			dev_warn(&ofdev->dev,
+ 				"clk or clock-frequency not defined\n");
+-			return PTR_ERR(info->clk);
++			ret = PTR_ERR(info->clk);
++			goto err_pmruntime;
+ 		}
+ 
+ 		ret = clk_prepare_enable(info->clk);
+ 		if (ret < 0)
+-			return ret;
++			goto err_pmruntime;
+ 
+ 		clk = clk_get_rate(info->clk);
+ 	}
+@@ -170,8 +176,10 @@ static int of_platform_serial_setup(struct platform_device *ofdev,
+ err_dispose:
+ 	irq_dispose_mapping(port->irq);
+ err_unprepare:
+-	if (info->clk)
+-		clk_disable_unprepare(info->clk);
++	clk_disable_unprepare(info->clk);
++err_pmruntime:
++	pm_runtime_put_sync(&ofdev->dev);
++	pm_runtime_disable(&ofdev->dev);
+ 	return ret;
  }
  
--static void stm_send(void *addr, const void *data, u32 size, u8 write_bytes)
-+static void stm_send(void __iomem *addr, const void *data,
-+		     u32 size, u8 write_bytes)
- {
- 	u8 paload[8];
+@@ -227,8 +235,9 @@ static int of_platform_serial_probe(struct platform_device *ofdev)
+ 	return 0;
+ err_dispose:
+ 	irq_dispose_mapping(port8250.port.irq);
+-	if (info->clk)
+-		clk_disable_unprepare(info->clk);
++	pm_runtime_put_sync(&ofdev->dev);
++	pm_runtime_disable(&ofdev->dev);
++	clk_disable_unprepare(info->clk);
+ err_free:
+ 	kfree(info);
+ 	return ret;
+@@ -244,8 +253,9 @@ static int of_platform_serial_remove(struct platform_device *ofdev)
+ 	serial8250_unregister_port(info->line);
  
-@@ -414,7 +415,7 @@ static ssize_t notrace stm_generic_packet(struct stm_data *stm_data,
- 				  unsigned int size,
- 				  const unsigned char *payload)
- {
--	unsigned long ch_addr;
-+	void __iomem *ch_addr;
- 	struct stm_drvdata *drvdata = container_of(stm_data,
- 						   struct stm_drvdata, stm);
+ 	reset_control_assert(info->rst);
+-	if (info->clk)
+-		clk_disable_unprepare(info->clk);
++	pm_runtime_put_sync(&ofdev->dev);
++	pm_runtime_disable(&ofdev->dev);
++	clk_disable_unprepare(info->clk);
+ 	kfree(info);
+ 	return 0;
+ }
+@@ -259,9 +269,10 @@ static int of_serial_suspend(struct device *dev)
  
-@@ -424,7 +425,7 @@ static ssize_t notrace stm_generic_packet(struct stm_data *stm_data,
- 	if (channel >= drvdata->numsp)
- 		return -EINVAL;
+ 	serial8250_suspend_port(info->line);
  
--	ch_addr = (unsigned long)stm_channel_addr(drvdata, channel);
-+	ch_addr = stm_channel_addr(drvdata, channel);
+-	if (info->clk && (!uart_console(port) || console_suspend_enabled))
++	if ((!uart_console(port) || console_suspend_enabled)) {
++		pm_runtime_put_sync(&ofdev->dev);
+ 		clk_disable_unprepare(info->clk);
+-
++	}
+ 	return 0;
+ }
  
- 	flags = (flags == STP_PACKET_TIMESTAMPED) ? STM_FLAG_TIMESTAMPED : 0;
- 	flags |= test_bit(channel, drvdata->chs.guaranteed) ?
-@@ -437,20 +438,20 @@ static ssize_t notrace stm_generic_packet(struct stm_data *stm_data,
+@@ -271,8 +282,10 @@ static int of_serial_resume(struct device *dev)
+ 	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
+ 	struct uart_port *port = &port8250->port;
  
- 	switch (packet) {
- 	case STP_PACKET_FLAG:
--		ch_addr |= stm_channel_off(STM_PKT_TYPE_FLAG, flags);
-+		ch_addr += stm_channel_off(STM_PKT_TYPE_FLAG, flags);
+-	if (info->clk && (!uart_console(port) || console_suspend_enabled))
++	if ((!uart_console(port) || console_suspend_enabled)) {
++		pm_runtime_get_sync(&ofdev->dev);
+ 		clk_prepare_enable(info->clk);
++	}
  
- 		/*
- 		 * The generic STM core sets a size of '0' on flag packets.
- 		 * As such send a flag packet of size '1' and tell the
- 		 * core we did so.
- 		 */
--		stm_send((void *)ch_addr, payload, 1, drvdata->write_bytes);
-+		stm_send(ch_addr, payload, 1, drvdata->write_bytes);
- 		size = 1;
- 		break;
- 
- 	case STP_PACKET_DATA:
--		ch_addr |= stm_channel_off(STM_PKT_TYPE_DATA, flags);
--		stm_send((void *)ch_addr, payload, size,
-+		ch_addr += stm_channel_off(STM_PKT_TYPE_DATA, flags);
-+		stm_send(ch_addr, payload, size,
- 				drvdata->write_bytes);
- 		break;
+ 	serial8250_resume_port(info->line);
  
 -- 
-2.7.4
+2.9.4.dirty
