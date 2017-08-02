@@ -1,78 +1,80 @@
 From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Wed,  2 Aug 2017 16:38:11 -0400
-Subject: [v4 02/15] x86/mm: setting fields in deferred pages
-In-Reply-To: <1501706304-869240-1-git-send-email-pasha.tatashin@oracle.com>
-References: <1501706304-869240-1-git-send-email-pasha.tatashin@oracle.com>
-Message-ID: <1501706304-869240-3-git-send-email-pasha.tatashin@oracle.com>
+Date: Wed,  2 Aug 2017 16:38:09 -0400
+Subject: [v4 00/15] complete deferred page initialization
+Message-ID: <1501706304-869240-1-git-send-email-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without deferred struct page feature (CONFIG_DEFERRED_STRUCT_PAGE_INIT),
-flags and other fields in "struct page"es are never changed prior to first
-initializing struct pages by going through __init_single_page().
+Changelog:
+v3 - v2
+- Rewrote code to zero sturct pages in __init_single_page() as
+  suggested by Michal Hocko
+- Added code to handle issues related to accessing struct page
+  memory before they are initialized.
 
-With deferred struct page feature enabled there is a case where we set some
-fields prior to initializing:
+v2 - v3
+- Addressed David Miller comments about one change per patch:
+    * Splited changes to platforms into 4 patches
+    * Made "do not zero vmemmap_buf" as a separate patch
 
-        mem_init() {
-                register_page_bootmem_info();
-                free_all_bootmem();
-                ...
-        }
+v1 - v2
+- Per request, added s390 to deferred "struct page" zeroing
+- Collected performance data on x86 which proofs the importance to
+  keep memset() as prefetch (see below).
 
-When register_page_bootmem_info() is called only non-deferred struct pages
-are initialized. But, this function goes through some reserved pages which
-might be part of the deferred, and thus are not yet initialized.
+SMP machines can benefit from the DEFERRED_STRUCT_PAGE_INIT config option,
+which defers initializing struct pages until all cpus have been started so
+it can be done in parallel.
 
-  mem_init
-   register_page_bootmem_info
-    register_page_bootmem_info_node
-     get_page_bootmem
-      .. setting fields here ..
-      such as: page->freelist = (void *)type;
+However, this feature is sub-optimal, because the deferred page
+initialization code expects that the struct pages have already been zeroed,
+and the zeroing is done early in boot with a single thread only.  Also, we
+access that memory and set flags before struct pages are initialized. All
+of this is fixed in this patchset.
 
-We end-up with similar issue as in the previous patch, where currently we
-do not observe problem as memory is zeroed. But, if flag asserts are
-changed we can start hitting issues.
+In this work we do the following:
+- Never read access struct page until it was initialized
+- Never set any fields in struct pages before they are initialized
+- Zero struct page at the beginning of struct page initialization
 
-Also, because in this patch series we will stop zeroing struct page memory
-during allocation, we must make sure that struct pages are properly
-initialized prior to using them.
+Performance improvements on x86 machine with 8 nodes:
+Intel(R) Xeon(R) CPU E7-8895 v3 @ 2.60GHz
 
-The deferred-reserved pages are initialized in free_all_bootmem().
-Therefore, the fix is to switch the above calls.
+Single threaded struct page init: 7.6s/T improvement
+Deferred struct page init: 10.2s/T improvement
 
-Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-Reviewed-by: Bob Picco <bob.picco@oracle.com>
----
- arch/x86/mm/init_64.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+Pavel Tatashin (15):
+  x86/mm: reserve only exiting low pages
+  x86/mm: setting fields in deferred pages
+  sparc64/mm: setting fields in deferred pages
+  mm: discard memblock data later
+  mm: don't accessed uninitialized struct pages
+  sparc64: simplify vmemmap_populate
+  mm: defining memblock_virt_alloc_try_nid_raw
+  mm: zero struct pages during initialization
+  sparc64: optimized struct page zeroing
+  x86/kasan: explicitly zero kasan shadow memory
+  arm64/kasan: explicitly zero kasan shadow memory
+  mm: explicitly zero pagetable memory
+  mm: stop zeroing memory during allocation in vmemmap
+  mm: optimize early system hash allocations
+  mm: debug for raw alloctor
 
-diff --git a/arch/x86/mm/init_64.c b/arch/x86/mm/init_64.c
-index 136422d7d539..1e863baec847 100644
---- a/arch/x86/mm/init_64.c
-+++ b/arch/x86/mm/init_64.c
-@@ -1165,12 +1165,17 @@ void __init mem_init(void)
- 
- 	/* clear_bss() already clear the empty_zero_page */
- 
--	register_page_bootmem_info();
--
- 	/* this will put all memory onto the freelists */
- 	free_all_bootmem();
- 	after_bootmem = 1;
- 
-+	/* Must be done after boot memory is put on freelist, because here we
-+	 * might set fields in deferred struct pages that have not yet been
-+	 * initialized, and free_all_bootmem() initializes all the reserved
-+	 * deferred pages for us.
-+	 */
-+	register_page_bootmem_info();
-+
- 	/* Register memory areas for /proc/kcore */
- 	kclist_add(&kcore_vsyscall, (void *)VSYSCALL_ADDR,
- 			 PAGE_SIZE, KCORE_OTHER);
--- 
+ arch/arm64/mm/kasan_init.c          |  32 ++++++++
+ arch/sparc/include/asm/pgtable_64.h |  18 +++++
+ arch/sparc/mm/init_64.c             |  31 +++-----
+ arch/x86/kernel/setup.c             |   5 +-
+ arch/x86/mm/init_64.c               |   9 ++-
+ arch/x86/mm/kasan_init_64.c         |  29 +++++++
+ include/linux/bootmem.h             |  11 +++
+ include/linux/memblock.h            |  10 ++-
+ include/linux/mm.h                  |   9 +++
+ mm/memblock.c                       | 152 ++++++++++++++++++++++++++++--------
+ mm/nobootmem.c                      |  16 ----
+ mm/page_alloc.c                     |  29 ++++---
+ mm/sparse-vmemmap.c                 |  10 ++-
+ mm/sparse.c                         |   6 +-
+ 14 files changed, 279 insertions(+), 88 deletions(-)
+
+--
 2.13.3
