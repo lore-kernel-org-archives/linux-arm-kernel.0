@@ -1,228 +1,98 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Wed, 02 Aug 2017 06:47:31 +0200
-Subject: [linux-sunxi] [PATCH 07/13] ARM: sun8i: h3: add display engine
- pipeline barebone
-In-Reply-To: <20170801131304.7741-8-icenowy@aosc.io>
-References: <20170801131304.7741-1-icenowy@aosc.io>
- <20170801131304.7741-8-icenowy@aosc.io>
-Message-ID: <1773537.vAqre0jhCE@jernej-laptop>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Tue, 1 Aug 2017 22:44:40 -0600
+Subject: [PATCH V5 2/2] PCI: handle CRS returned by device after FLR
+In-Reply-To: <1501645453-22842-2-git-send-email-okaya@codeaurora.org>
+References: <1501645453-22842-1-git-send-email-okaya@codeaurora.org>
+ <1501645453-22842-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <20170801224440.3f677a8d@w520.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Icenowy,
+On Tue,  1 Aug 2017 23:44:13 -0400
+Sinan Kaya <okaya@codeaurora.org> wrote:
 
-Dne torek, 01. avgust 2017 ob 15:12:58 CEST je Icenowy Zheng napisal(a):
-> As we have already the support for the DE2 on Allwinner H3, add the
-> display engine pipeline device tree nodes to its DTSI file.
+> An endpoint is allowed to issue Configuration Request Retry Status (CRS)
+> following a Function Level Reset (FLR) request to indicate that it is
+> not ready to accept new requests. CRS is defined in PCIe r3.1, sec 2.3.1.
+> Request Handling Rules and CRS usage in FLR context is mentioned in
+> PCIe r3.1, sec 6.6.2. Function-Level Reset.
 > 
-> The H5 pipeline has some differences and will be enabled later.
+> Adding a vendor ID read if this is a physical function before attempting
+> to read any other registers on the endpoint. A CRS indication will only
+> be given if the address to be read is vendor ID register.
+> pci_bus_read_dev_vendor_id() knows how to deal with CRS returned values.
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> If pci_bus_read_dev_vendor_id() fails, it prints a user visible warning
+> after provided 1 second timeout is reached. pci_flr_wait() will keep
+> calling this function 60 times to allow up to 60 seconds to be consistent
+> with the rest of the kernel CRS timeout handling.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  arch/arm/boot/dts/sun8i-h3.dtsi | 170
-> ++++++++++++++++++++++++++++++++++++++++ 1 file changed, 170 insertions(+)
+>  drivers/pci/pci.c | 20 +++++++++++---------
+>  1 file changed, 11 insertions(+), 9 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi
-> b/arch/arm/boot/dts/sun8i-h3.dtsi index b36f9f423c39..75ad7b65a7fc 100644
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -41,6 +41,8 @@
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index 2ed604a..25c7a83 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -3813,14 +3813,16 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
+>  
+>  /*
+>   * We should only need to wait 100ms after FLR for virtual functions.
+> - * Wait for up to 1000ms for config space to return something other than -1.
+> - * Intel IGD requires this when an LCD panel is attached.  We read the 2nd
+> - * dword because VFs don't implement the 1st dword.
+> + * Wait for up to 60s for config space to return something other than -1.
+> + * Intel IGD requires 1s when an LCD panel is attached.  We use
+> + * pci_bus_read_dev_vendor_id() for reading the vendor ID as it handles
+> + * CRS gracefully.
+
+nit, stating that IGD requires 1s with an LCD panel is a
+misinterpretation of the previous comment.  In fact the original commit
+only mentions 300ms.  I think perhaps 1s was simply a nice round
+interval.
+
 >   */
-> 
->  #include "sunxi-h3-h5.dtsi"
-> +#include <dt-bindings/clock/sun8i-de2.h>
-> +#include <dt-bindings/reset/sun8i-de2.h>
-> 
->  / {
->  	cpus {
-> @@ -72,6 +74,174 @@
->  		};
->  	};
-> 
-> +	de: display-engine {
-> +		compatible = "allwinner,sun8i-h3-display-engine";
-> +		allwinner,pipelines = <&mixer0>,
-> +				      <&mixer1>;
-> +		status = "disabled";
-> +	};
-> +
-> +	soc {
-> +		display_clocks: clock at 1000000 {
-> +			compatible = "allwinner,sun8i-a83t-de2-clk";
-> +			reg = <0x01000000 0x100000>;
-> +			clocks = <&ccu CLK_BUS_DE>,
-> +				 <&ccu CLK_DE>;
-> +			clock-names = "bus",
-> +				      "mod";
-> +			resets = <&ccu RST_BUS_DE>;
-> +			#clock-cells = <1>;
-> +			#reset-cells = <1>;
-> +			assigned-clocks = <&ccu CLK_DE>;
-> +			assigned-clock-parents = <&ccu CLK_PLL_DE>;
-> +			assigned-clock-rates = <432000000>;
-> +		};
+>  static void pci_flr_wait(struct pci_dev *dev)
+>  {
+>  	int i = 0;
+>  	u32 id;
+> +	bool ret;
+>  
+>  	if (dev->is_virtfn) {
+>  		msleep(100);
+> @@ -3828,15 +3830,15 @@ static void pci_flr_wait(struct pci_dev *dev)
+>  	}
+>  
+>  	do {
+> -		msleep(100);
+> -		pci_read_config_dword(dev, PCI_COMMAND, &id);
+> -	} while (i++ < 10 && id == ~0);
+> +		ret = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
+> +						 1000);
 
-I believe Maxime ask you to use clk_set_rate() in the past:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/512909.html
+Is it a problem that there's now zero delay between the FLR and first
+attempt to read config space?  Seems like there should be a 100ms
+delay before we start trying.  This is also going to print a kernel
+warning 60 times in the course of getting to a 60s timeout, why not let
+pci_bus_read_dev_vendor_id() manage the entire timeout?  Are we only
+trying to preserve the dev_info() below?  Thanks,
 
-Regards,
-Jernej
+Alex
 
-> +
-> +		mixer0: mixer at 1100000 {
-> +			compatible = "allwinner,sun8i-h3-de2-mixer0";
-> +			reg = <0x01100000 0x100000>;
-> +			clocks = <&display_clocks CLK_BUS_MIXER0>,
-> +				 <&display_clocks CLK_MIXER0>;
-> +			clock-names = "bus",
-> +				      "mod";
-> +			resets = <&display_clocks RST_MIXER0>;
-> +			status = "disabled";
-> +
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				mixer0_out: port at 1 {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					reg = <1>;
-> +
-> +					mixer0_out_tcon0: endpoint at 0 {
-> +						reg = <0>;
-> +						remote-endpoint = <&tcon0_in_mixer0>;
-> +					};
-> +
-> +					mixer0_out_tcon1: endpoint at 1 {
-> +						reg = <1>;
-> +						remote-endpoint = <&tcon1_in_mixer0>;
-> +					};
-> +				};
-> +			};
-> +		};
-> +
-> +		mixer1: mixer at 1200000 {
-> +			compatible = "allwinner,sun8i-h3-de2-mixer1";
-> +			reg = <0x01200000 0x100000>;
-> +			clocks = <&display_clocks CLK_BUS_MIXER1>,
-> +				 <&display_clocks CLK_MIXER1>;
-> +			clock-names = "bus",
-> +				      "mod";
-> +			resets = <&display_clocks RST_WB>;
-> +			status = "disabled";
-> +
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				mixer1_out: port at 1 {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					reg = <1>;
-> +
-> +					mixer1_out_tcon0: endpoint at 0 {
-> +						reg = <0>;
-> +						remote-endpoint = <&tcon0_in_mixer1>;
-> +					};
-> +
-> +					mixer1_out_tcon1: endpoint at 1 {
-> +						reg = <1>;
-> +						remote-endpoint = <&tcon1_in_mixer1>;
-> +					};
-> +				};
-> +			};
-> +		};
-> +
-> +		tcon0: lcd-controller at 1c0c000 {
-> +			compatible = "allwinner,sun8i-h3-tcon";
-> +			reg = <0x01c0c000 0x1000>;
-> +			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&ccu CLK_BUS_TCON0>,
-> +				 <&ccu CLK_TCON0>;
-> +			clock-names = "ahb",
-> +				      "tcon-ch1";
-> +			resets = <&ccu RST_BUS_TCON0>;
-> +			reset-names = "lcd";
-> +			status = "disabled";
-> +
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				tcon0_in: port at 0 {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					reg = <0>;
-> +
-> +					tcon0_in_mixer0: endpoint at 0 {
-> +						reg = <0>;
-> +						remote-endpoint = <&mixer0_out_tcon0>;
-> +					};
-> +
-> +					tcon0_in_mixer1: endpoint at 1 {
-> +						reg = <1>;
-> +						remote-endpoint = <&mixer1_out_tcon0>;
-> +					};
-> +				};
-> +
-> +				tcon0_out: port at 1 {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					reg = <1>;
-> +				};
-> +			};
-> +		};
-> +
-> +		tcon1: lcd-controller at 1c0d000 {
-> +			compatible = "allwinner,sun8i-h3-tcon";
-> +			reg = <0x01c0d000 0x1000>;
-> +			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&ccu CLK_BUS_TCON1>,
-> +				 <&ccu CLK_TVE>;
-> +			clock-names = "ahb",
-> +				      "tcon-ch1";
-> +			resets = <&ccu RST_BUS_TCON1>;
-> +			reset-names = "lcd";
-> +			status = "disabled";
-> +
-> +			ports {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				tcon1_in: port at 0 {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					reg = <0>;
-> +
-> +					tcon1_in_mixer0: endpoint at 0 {
-> +						reg = <0>;
-> +						remote-endpoint = <&mixer0_out_tcon1>;
-> +					};
-> +
-> +					tcon1_in_mixer1: endpoint at 1 {
-> +						reg = <1>;
-> +						remote-endpoint = <&mixer1_out_tcon1>;
-> +					};
-> +				};
-> +
-> +				tcon1_out: port at 1 {
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					reg = <1>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
->  	timer {
->  		compatible = "arm,armv7-timer";
->  		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | 
-IRQ_TYPE_LEVEL_LOW)>,
-> --
-> 2.13.0
-> 
-> --
-> You received this message because you are subscribed to the Google Groups
-> "linux-sunxi" group. To unsubscribe from this group and stop receiving
-> emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> +	} while (i++ < 60 && !ret);
+>  
+> -	if (id == ~0)
+> +	if (!ret)
+>  		dev_warn(&dev->dev, "Failed to return from FLR\n");
+>  	else if (i > 1)
+> -		dev_info(&dev->dev, "Required additional %dms to
+> return from FLR\n",
+> -			 (i - 1) * 100);
+> +		dev_info(&dev->dev, "Required additional %ds to
+> return from FLR\n",
+> +			 (i - 1));
+>  }
+>  
+>  /**
