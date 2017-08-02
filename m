@@ -1,35 +1,191 @@
 From: andy.yan@rock-chips.com (Andy Yan)
-Date: Wed,  2 Aug 2017 16:47:55 +0800
-Subject: [PATCH v2 16/23] dt-bindings: pwm: add description for rv1108 pwm
+Date: Wed,  2 Aug 2017 16:48:46 +0800
+Subject: [PATCH v2 17/23] ARM: dts: rockchip: add pwm dt node for rv1108
 In-Reply-To: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
 References: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1501663675-12591-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1501663726-12644-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device tree bindings document for pwm on
-rockchip rv1108 soc.
+Add pwm device tree node for rv1108 soc
 
 Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+
 ---
 
-Changes in v2: None
+Changes in v2:
+- add compatible string "rockchip,rv1108-pwm"
 
- Documentation/devicetree/bindings/pwm/pwm-rockchip.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/rv1108.dtsi | 143 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 143 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt b/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
-index 2350ef9..b49f121 100644
---- a/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
-@@ -3,7 +3,7 @@ Rockchip PWM controller
- Required properties:
-  - compatible: should be "rockchip,<name>-pwm"
-    "rockchip,rk2928-pwm": found on RK29XX,RK3066 and RK3188 SoCs
--   "rockchip,rk3288-pwm": found on RK3288 SoC
-+   "rockchip,rk3288-pwm": found on RK3288 and RV1108 SoCs
-    "rockchip,vop-pwm": found integrated in VOP on RK3288 SoC
-  - reg: physical base address and length of the controller's registers
-  - clocks: See ../clock/clock-bindings.txt
+diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
+index f6fb47f..d397c22 100644
+--- a/arch/arm/boot/dts/rv1108.dtsi
++++ b/arch/arm/boot/dts/rv1108.dtsi
+@@ -213,6 +213,54 @@
+ 		status = "disabled";
+ 	};
+ 
++	pwm4: pwm at 10280000 {
++		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
++		reg = <0x10280000 0x10>;
++		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm4_pin>;
++		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
++		clock-names = "pwm", "pclk";
++		status = "disabled";
++	};
++
++	pwm5: pwm at 10280010 {
++		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
++		reg = <0x10280010 0x10>;
++		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm5_pin>;
++		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
++		clock-names = "pwm", "pclk";
++		status = "disabled";
++	};
++
++	pwm6: pwm at 10280020 {
++		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
++		reg = <0x10280020 0x10>;
++		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm6_pin>;
++		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
++		clock-names = "pwm", "pclk";
++		status = "disabled";
++	};
++
++	pwm7: pwm at 10280030 {
++		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
++		reg = <0x10280030 0x10>;
++		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm7_pin>;
++		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
++		clock-names = "pwm", "pclk";
++		status = "disabled";
++	};
++
+ 	grf: syscon at 10300000 {
+ 		compatible = "rockchip,rv1108-grf", "syscon";
+ 		reg = <0x10300000 0x1000>;
+@@ -232,6 +280,53 @@
+ 		status = "disabled";
+ 	};
+ 
++	pwm0: pwm at 20040000 {
++		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
++		reg = <0x20040000 0x10>;
++		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm0_pin>;
++		clocks = <&cru SCLK_PWM0_PMU>, <&cru PCLK_PWM0_PMU>;
++		clock-names = "pwm", "pclk";
++		status = "disabled";
++	};
++
++	pwm1: pwm at 20040010 {
++		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
++		reg = <0x20040010 0x10>;
++		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm1_pin>;
++		clocks = <&cru SCLK_PWM0_PMU>, <&cru PCLK_PWM0_PMU>;
++		clock-names = "pwm", "pclk";
++		status = "disabled";
++	};
++
++	pwm2: pwm at 20040020 {
++		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
++		reg = <0x20040020 0x10>;
++		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm2_pin>;
++		clocks = <&cru SCLK_PWM0_PMU>, <&cru PCLK_PWM0_PMU>;
++		clock-names = "pwm", "pclk";
++		status = "disabled";
++	};
++
++	pwm3: pwm at 20040030 {
++		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
++		reg = <0x20040030 0x10>;
++		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm3_pin>;
++		clocks = <&cru SCLK_PWM0_PMU>, <&cru PCLK_PWM0_PMU>;
++		clock-names = "pwm", "pclk";
++		status = "disabled";
++	};
+ 	pmugrf: syscon at 20060000 {
+ 		compatible = "rockchip,rv1108-pmugrf", "syscon";
+ 		reg = <0x20060000 0x1000>;
+@@ -466,6 +561,54 @@
+ 			};
+ 		};
+ 
++		pwm0 {
++			pwm0_pin: pwm0-pin {
++				rockchip,pins = <0 RK_PC5 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		pwm1 {
++			pwm1_pin: pwm1-pin {
++				rockchip,pins = <0 RK_PC4 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		pwm2 {
++			pwm2_pin: pwm2-pin {
++				rockchip,pins = <0 RK_PC6 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		pwm3 {
++			pwm3_pin: pwm3-pin {
++				rockchip,pins = <0 RK_PC0 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		pwm4 {
++			pwm4_pin: pwm4-pin {
++				rockchip,pins = <1 RK_PC1 RK_FUNC_3 &pcfg_pull_none>;
++			};
++		};
++
++		pwm5 {
++			pwm5_pin: pwm5-pin {
++				rockchip,pins = <1 RK_PA7 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm6 {
++			pwm6_pin: pwm6-pin {
++				rockchip,pins = <1 RK_PB0 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm7 {
++			pwm7_pin: pwm7-pin {
++				rockchip,pins = <1 RK_PB1 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
+ 		sdmmc {
+ 			sdmmc_clk: sdmmc-clk {
+ 				rockchip,pins = <3 RK_PC4 RK_FUNC_1 &pcfg_pull_none_drv_4ma>;
 -- 
 2.7.4
