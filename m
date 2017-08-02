@@ -1,47 +1,34 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Wed,  2 Aug 2017 16:46:03 +0800
-Subject: [PATCH v2 14/23] spi: rockchip: add compatible string for rv1108 spi
-In-Reply-To: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
-References: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1501663563-12482-1-git-send-email-andy.yan@rock-chips.com>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Wed, 2 Aug 2017 16:46:58 +0800
+Subject: [PATCH v2 0/7] Add rk3328 pwm support
+In-Reply-To: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
+References: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <b4c44f20-9246-a47b-2b8d-d124220474f3@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The spi on rv1108 is the same as other rockchip based
-socs, add compatible string for it.
+Hi thierry & boris,
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
----
+Do you have any other suggestion for the patches?
+We hope to make them arrive in Linux-v4.14.
 
-Changes in v2: None
-
- Documentation/devicetree/bindings/spi/spi-rockchip.txt | 1 +
- drivers/spi/spi-rockchip.c                             | 1 +
- 2 files changed, 2 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-index 83da493..6e3ffac 100644
---- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-@@ -6,6 +6,7 @@ and display controllers using the SPI communication interface.
- Required Properties:
- 
- - compatible: should be one of the following.
-+    "rockchip,rv1108-spi" for rv1108 SoCs.
-     "rockchip,rk3036-spi" for rk3036 SoCS.
-     "rockchip,rk3066-spi" for rk3066 SoCs.
-     "rockchip,rk3188-spi" for rk3188 SoCs.
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 0b4a52b..27b4db2 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -919,6 +919,7 @@ static const struct dev_pm_ops rockchip_spi_pm = {
- };
- 
- static const struct of_device_id rockchip_spi_dt_match[] = {
-+	{ .compatible = "rockchip,rv1108-spi", },
- 	{ .compatible = "rockchip,rk3036-spi", },
- 	{ .compatible = "rockchip,rk3066-spi", },
- 	{ .compatible = "rockchip,rk3188-spi", },
--- 
-2.7.4
+? 2017/7/8 12:03, David Wu ??:
+> There are two features of rk3328 pwm module.
+>   - PWM APB and function clocks are different.
+>   - Add pwm atomic hardware update
+> 
+> David Wu (7):
+>    pwm: rockchip: Add APB and function both clocks support
+>    pwm: rockchip: Remove the judge from return value of pwm_config
+>    pwm: rockchip: Remove the dumplicate rockchip_pwm_ops ops
+>    pwm: rockchip: Use pwm_apply instead of the pwm_enable
+>    pwm: rockchip: Move the configuration of polarity from
+>      rockchip_pwm_set_enable() to rockchip_pwm_config()
+>    pwm: rockchip: Add rk3328 pwm support
+>    arm64: dts: rockchip: Add pwm nodes for rk3328
+> 
+>   .../devicetree/bindings/pwm/pwm-rockchip.txt       |   9 +-
+>   arch/arm64/boot/dts/rockchip/rk3328.dtsi           |  45 ++++
+>   drivers/pwm/pwm-rockchip.c                         | 275 ++++++++++++++-------
+>   3 files changed, 236 insertions(+), 93 deletions(-)
+> 
