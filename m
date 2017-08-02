@@ -1,135 +1,184 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Wed,  2 Aug 2017 15:53:08 +0800
-Subject: [PATCH v2 3/5] phy: rockchip-inno-usb2: add otg mux irq quirk
-In-Reply-To: <1501660390-5956-1-git-send-email-frank.wang@rock-chips.com>
-References: <1501660390-5956-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1501660390-5956-4-git-send-email-frank.wang@rock-chips.com>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Wed, 2 Aug 2017 10:05:06 +0200
+Subject: [PATCH 0/6] Support for LEGO MINDSTORMS EV3 LCD display
+In-Reply-To: <bbec0574-311a-e1b4-d7fd-f6fb15b078d2@lechnology.com>
+References: <1501355870-13960-1-git-send-email-david@lechnology.com>
+ <5d8f6518-8d7e-c029-2da4-e3417afb3e40@lechnology.com>
+ <28188f5c-1daf-121b-6daf-1899668c3875@tronnes.org>
+ <1ce36d43-b9dd-807e-23aa-bac4fda70fdc@lechnology.com>
+ <bfb3d541-856b-0233-dd85-72512788939f@tronnes.org>
+ <bbec0574-311a-e1b4-d7fd-f6fb15b078d2@lechnology.com>
+Message-ID: <937aa71c-1415-4645-7e04-6be43dd33174@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The otg-id/otg-bvalid/linestate irqs are multiplexed to one irq in
-otg-port on some Rockchip SoCs (e.g RV1108), this patch add a quirk
-to support this mux irq feature.
 
-Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
----
- drivers/phy/rockchip/phy-rockchip-inno-usb2.c | 68 ++++++++++++++++++++++-----
- 1 file changed, 55 insertions(+), 13 deletions(-)
+Den 02.08.2017 00.26, skrev David Lechner:
+> On 08/01/2017 01:08 PM, Noralf Tr?nnes wrote:
+>> (cc: Daniel Vetter)
+>>
+>>
+>> Den 01.08.2017 18.51, skrev David Lechner:
+>>> On 07/30/2017 12:14 PM, Noralf Tr?nnes wrote:
+>>>>
+>>>> Den 29.07.2017 21.40, skrev David Lechner:
+>>>>> On 07/29/2017 02:17 PM, David Lechner wrote:
+>>>>>> The goal of this series is to get the built-in LCD of the LEGO 
+>>>>>> MINDSTORMS EV3
+>>>>>> working. But, most of the content here is building up the 
+>>>>>> infrastructure to do
+>>>>>> that.
+>>>>>>
+>>>>>
+>>>>> Some general comments/questions:
+>>>>>
+>>>>> I have noticed that DRM doesn't really have support for monochrome 
+>>>>> displays. I'm guessing that is because no one really uses them 
+>>>>> anymore?
+>>>>>
+>>>>
+>>>> The repaper driver was the first monochrome drm driver and I chose to
+>>>> present it to userspace as XRGB8888 and convert it to monochrome.
+>>>> The reason for this is that everything, libraries, apps, plymouth 
+>>>> (boot
+>>>> splash, no rgb565) supports it. I didn't see any point in adding a new
+>>>> monochrome drm format that didn't have, or probably wouldn't get
+>>>> userspace support (by libraries at least). The application of course
+>>>> needs to know this to get a good result.
+>>>>
+>>>> tinydrm_xrgb8888_to_gray8() does the conversion:
+>>>> https://cgit.freedesktop.org/drm/drm-misc/commit/drivers/gpu/drm/tinydrm?id=379ea9a1a59a5a32c8db6f164e80a3fd00cb3781 
+>>>>
+>>>>
+>>>>> The LEGO EV3 display is just an LCD (not the backlit kind). It has 
+>>>>> two modes of operation. It can to 2bbp grayscale or it can do 1bpp 
+>>>>> monochrome. The grayscale isn't the best (looks splotchy in 
+>>>>> places), so it would be nice to be able to choose between these 
+>>>>> two modes. How would I implement something like that?
+>>>>>
+>>>>
+>>>> Do you expect anyone to use grayscale if it doesn't look good?
+>>>> Maybe better to add it later if there's a demand for it.
+>>>
+>>> I don't expect many people to use it at all. The people that do will 
+>>> be hackers like me that want to see what it is capable of, so I 
+>>> think I will keep it grayscale by default.
+>>>
+>>
+>> It looks like the best way to satisfy your needs is to add specific 
+>> formats.
+>>
+>> Video for Linux have these:
+>>
+>> include/uapi/linux/videodev2.h
+>>
+>> /* Grey formats */
+>> #define V4L2_PIX_FMT_GREY    v4l2_fourcc('G', 'R', 'E', 'Y') /* 8 
+>> Greyscale     */
+>> #define V4L2_PIX_FMT_Y4      v4l2_fourcc('Y', '0', '4', ' ') /* 4 
+>> Greyscale     */
+>> #define V4L2_PIX_FMT_Y6      v4l2_fourcc('Y', '0', '6', ' ') /* 6 
+>> Greyscale     */
+>> #define V4L2_PIX_FMT_Y10     v4l2_fourcc('Y', '1', '0', ' ') /* 10 
+>> Greyscale     */
+>> #define V4L2_PIX_FMT_Y12     v4l2_fourcc('Y', '1', '2', ' ') /* 12 
+>> Greyscale     */
+>> #define V4L2_PIX_FMT_Y16     v4l2_fourcc('Y', '1', '6', ' ') /* 16 
+>> Greyscale     */
+>> #define V4L2_PIX_FMT_Y16_BE  v4l2_fourcc_be('Y', '1', '6', ' ') /* 16 
+>> Greyscale BE  */
+>>
+>>
+>> Maybe we can add formats like these:
+>>
+>> include/uapi/drm/drm_fourcc.h
+>>
+>> #define DRM_FORMAT_MONO        fourcc_code('Y', '0', '1', ' ') /* [0] 
+>> Monochrome */
+>> or
+>> #define DRM_FORMAT_Y1        fourcc_code('Y', '0', '1', ' ') /* [0] 
+>> Monochrome */
+>>
+>> #define DRM_FORMAT_Y2        fourcc_code('Y', '0', '2', ' ') /* [1:0] 
+>> Greyscale */
+>>
+>> Daniel, what do you think?
+>
+> 2 of the first 3 tinydrm drivers are monochrome (and I would like to 
+> write a driver for the Seeed/Grove I2C OLED displays which are also 
+> monochrome), so I think the 1bpp modes would definitely be useful. I 
+> think there is enough userspace code still around that knows about 
+> FB_VISUAL_MONO01 and FB_VISUAL_MONO10 that could use these.
+>
 
-diff --git a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-index 23a0652..bebf23f 100644
---- a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-+++ b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-@@ -172,6 +172,8 @@ struct rockchip_usb2phy_cfg {
-  * @vbus_attached: otg device vbus status.
-  * @bvalid_irq: IRQ number assigned for vbus valid rise detection.
-  * @ls_irq: IRQ number assigned for linestate detection.
-+ * @otg_mux_irq: IRQ number which multiplex otg-id/otg-bvalid/linestate
-+ *		 irqs to one irq in otg-port.
-  * @mutex: for register updating in sm_work.
-  * @chg_work: charge detect work.
-  * @otg_sm_work: OTG state machine work.
-@@ -189,6 +191,7 @@ struct rockchip_usb2phy_port {
- 	bool		vbus_attached;
- 	int		bvalid_irq;
- 	int		ls_irq;
-+	int		otg_mux_irq;
- 	struct mutex	mutex;
- 	struct		delayed_work chg_work;
- 	struct		delayed_work otg_sm_work;
-@@ -228,6 +231,7 @@ struct rockchip_usb2phy {
- 	const struct rockchip_usb2phy_cfg	*phy_cfg;
- 	struct rockchip_usb2phy_port	ports[USB2PHY_NUM_PORTS];
- 	unsigned int	companion_grf_quirk:1;
-+	unsigned int	otg_mux_irq_quirk:1;
- };
- 
- static inline struct regmap *get_reg_base(struct rockchip_usb2phy *rphy)
-@@ -935,6 +939,17 @@ static irqreturn_t rockchip_usb2phy_bvalid_irq(int irq, void *data)
- 	return IRQ_HANDLED;
- }
- 
-+static irqreturn_t rockchip_usb2phy_otg_mux_irq(int irq, void *data)
-+{
-+	struct rockchip_usb2phy_port *rport = data;
-+	struct rockchip_usb2phy *rphy = dev_get_drvdata(rport->phy->dev.parent);
-+
-+	if (property_enabled(rphy->grf, &rport->port_cfg->bvalid_det_st))
-+		return rockchip_usb2phy_bvalid_irq(irq, data);
-+	else
-+		return IRQ_NONE;
-+}
-+
- static int rockchip_usb2phy_host_port_init(struct rockchip_usb2phy *rphy,
- 					   struct rockchip_usb2phy_port *rport,
- 					   struct device_node *child_np)
-@@ -1011,20 +1026,44 @@ static int rockchip_usb2phy_otg_port_init(struct rockchip_usb2phy *rphy,
- 	rport->utmi_avalid =
- 		of_property_read_bool(child_np, "rockchip,utmi-avalid");
- 
--	rport->bvalid_irq = of_irq_get_byname(child_np, "otg-bvalid");
--	if (rport->bvalid_irq < 0) {
--		dev_err(rphy->dev, "no vbus valid irq provided\n");
--		ret = rport->bvalid_irq;
--		goto out;
--	}
-+	if (rphy->otg_mux_irq_quirk) {
-+		rport->otg_mux_irq = of_irq_get_byname(child_np, "otg-mux");
-+		if (rport->otg_mux_irq < 0) {
-+			dev_err(rphy->dev, "no otg-mux irq provided\n");
-+			ret = rport->otg_mux_irq;
-+			goto out;
-+		}
- 
--	ret = devm_request_threaded_irq(rphy->dev, rport->bvalid_irq, NULL,
--					rockchip_usb2phy_bvalid_irq,
--					IRQF_ONESHOT,
--					"rockchip_usb2phy_bvalid", rport);
--	if (ret) {
--		dev_err(rphy->dev, "failed to request otg-bvalid irq handle\n");
--		goto out;
-+		ret = devm_request_threaded_irq(rphy->dev, rport->otg_mux_irq,
-+						NULL,
-+						rockchip_usb2phy_otg_mux_irq,
-+						IRQF_ONESHOT,
-+						"rockchip_usb2phy_otg",
-+						rport);
-+		if (ret) {
-+			dev_err(rphy->dev,
-+				"failed to request otg-mux irq handle\n");
-+			goto out;
-+		}
-+	} else {
-+		rport->bvalid_irq = of_irq_get_byname(child_np, "otg-bvalid");
-+		if (rport->bvalid_irq < 0) {
-+			dev_err(rphy->dev, "no vbus valid irq provided\n");
-+			ret = rport->bvalid_irq;
-+			goto out;
-+		}
-+
-+		ret = devm_request_threaded_irq(rphy->dev, rport->bvalid_irq,
-+						NULL,
-+						rockchip_usb2phy_bvalid_irq,
-+						IRQF_ONESHOT,
-+						"rockchip_usb2phy_bvalid",
-+						rport);
-+		if (ret) {
-+			dev_err(rphy->dev,
-+				"failed to request otg-bvalid irq handle\n");
-+			goto out;
-+		}
- 	}
- 
- 	if (!IS_ERR(rphy->edev)) {
-@@ -1081,6 +1120,9 @@ static int rockchip_usb2phy_probe(struct platform_device *pdev)
- 		rphy->usbgrf = NULL;
- 	}
- 
-+	rphy->otg_mux_irq_quirk =
-+		device_property_read_bool(dev, "rockchip,otg_mux_irq_quirk");
-+
- 	if (of_property_read_u32(np, "reg", &reg)) {
- 		dev_err(dev, "the reg property is not assigned in %s node\n",
- 			np->name);
--- 
-2.0.0
+Can you elaborate, would you use the display trough monochrome fbdev
+or through drm?
+
+> I don't think a Y02 mode would be useful though. There is pretty much 
+> nothing out there (that I could find) that uses such a mode.
+>
+> A Y08 mode for 8bpp grayscale would be useful though. This is another 
+> more commonly used format.
+>
+
+Another source of fourcc's is FFmpeg which has these:
+
+     { AV_PIX_FMT_GRAY8,    MKTAG('Y', '8', '0', '0') },
+     { AV_PIX_FMT_GRAY8,    MKTAG('Y', '8', ' ', ' ') },
+     { AV_PIX_FMT_GRAY8,   MKTAG('G', 'R', 'E', 'Y') },
+
+     { AV_PIX_FMT_MONOWHITE,MKTAG('B', '1', 'W', '0') },
+     { AV_PIX_FMT_MONOBLACK,MKTAG('B', '0', 'W', '1') },
+
+AV_PIX_FMT_GRAY8
+Y , 8bpp.
+AV_PIX_FMT_MONOWHITE
+Y , 1bpp, 0 is white, 1 is black,
+     in each byte pixels are ordered from the msb to the lsb.
+AV_PIX_FMT_MONOBLACK
+Y , 1bpp, 0 is black, 1 is white,
+     in each byte pixels are ordered from the msb to the lsb.
+
+
+__drm_format_info() provides details about formats:
+     { .format = DRM_FORMAT_MONO,    .depth = 1,  .num_planes = 1, .cpp 
+= { 0, 0, 0 }, .hsub = 1, .vsub = 1 },
+     { .format = DRM_FORMAT_GREY,    .depth = 8,  .num_planes = 1, .cpp 
+= { 1, 0, 0 }, .hsub = 1, .vsub = 1 },
+
+framebuffer_check() and drm_fb_cma_create_with_funcs() use cpp for
+validation and they don't expect it to be zero.
+
+
+Noralf.
+
+>>
+>>>>
+>>>>> Also, how can I indicate to userspace that this display really is 
+>>>>> monochrome/grayscale since the reported color depth 16bpp?
+>>>>>
+>>>>
+>>>> There isn't unless we add formats for it.
+>>>> Since this display is in a Lego piece, doesn't it have custom 
+>>>> userspace
+>>>> that already know it's monochrome?
+>>>
+>>> The official LEGO software is like this, yes. But I am working on a 
+>>> project that supports other LEGO compatible devices that have color 
+>>> screens, so the same software needs to be able to detect at runtime 
+>>> which type of screen it is using. Currently I have a plain fbdev 
+>>> driver that provides FB_VISUAL_MONO10 for the EV3 display and so the 
+>>> software knows when it has a monochrome screen and when it doesn't. 
+>>> But since plain fbdev drivers can't be accepted into mainline, I 
+>>> need to find a different way to detect what type of screen this is 
+>>> so that my graphics library can treat it differently.
+>>>
+>>>
+>>
+>> You can tell userspace about the preferred bitdepth:
+>> drm->mode_config.preferred_depth
+>>
+>>
+>> Noralf.
+>>
+>
