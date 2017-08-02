@@ -1,146 +1,87 @@
 From: jlu@pengutronix.de (Jan Luebbe)
-Date: Wed,  2 Aug 2017 14:39:21 +0200
-Subject: [PATCH v2 8/9] EDAC: Add devres helpers for
- edac_device_alloc_ctl_info/edac_device_add_device
+Date: Wed,  2 Aug 2017 14:39:16 +0200
+Subject: [PATCH v2 3/9] ARM: aurora-l2: add defines for parity and ECC
+ registers
 In-Reply-To: <20170802123922.11498-1-jlu@pengutronix.de>
 References: <20170802123922.11498-1-jlu@pengutronix.de>
-Message-ID: <20170802123922.11498-9-jlu@pengutronix.de>
+Message-ID: <20170802123922.11498-4-jlu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These helpers simplify error handling in the _probe functions and
-automate deallocation in the _remove functions.
+These defines will be used by subsequent patches to add support for the
+parity check and error correction functionality in the Aurora L2 cache
+controller.
 
 Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 ---
- drivers/edac/edac_device.c | 60 ++++++++++++++++++++++++++++++++++++++++++++++
- drivers/edac/edac_device.h | 29 ++++++++++++++++++++++
- 2 files changed, 89 insertions(+)
+ arch/arm/include/asm/hardware/cache-aurora-l2.h | 48 +++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-diff --git a/drivers/edac/edac_device.c b/drivers/edac/edac_device.c
-index 65cf2b9355c4..d011f42c3507 100644
---- a/drivers/edac/edac_device.c
-+++ b/drivers/edac/edac_device.c
-@@ -232,6 +232,42 @@ void edac_device_free_ctl_info(struct edac_device_ctl_info *ctl_info)
- }
- EXPORT_SYMBOL_GPL(edac_device_free_ctl_info);
+diff --git a/arch/arm/include/asm/hardware/cache-aurora-l2.h b/arch/arm/include/asm/hardware/cache-aurora-l2.h
+index dc5c479ec4c3..c32be689d1f6 100644
+--- a/arch/arm/include/asm/hardware/cache-aurora-l2.h
++++ b/arch/arm/include/asm/hardware/cache-aurora-l2.h
+@@ -31,6 +31,9 @@
+ #define AURORA_ACR_REPLACEMENT_TYPE_SEMIPLRU \
+ 	(3 << AURORA_ACR_REPLACEMENT_OFFSET)
  
-+/**
-+ * devm_edac_device_free_ctl_info() - Internal helper to call
-+ *	edac_device_free_ctl_info from a devres action
-+ */
-+static void devm_edac_device_free_ctl_info(void *ctl_info)
-+{
-+	edac_device_free_ctl_info((struct edac_device_ctl_info *)ctl_info);
-+}
++#define AURORA_ACR_PARITY_EN	(1 << 21)
++#define AURORA_ACR_ECC_EN	(1 << 20)
 +
-+struct edac_device_ctl_info *devm_edac_device_alloc_ctl_info(
-+	struct device *dev,
-+	unsigned int sz_private,
-+	char *edac_device_name, unsigned int nr_instances,
-+	char *edac_block_name, unsigned int nr_blocks,
-+	unsigned int offset_value,
-+	struct edac_dev_sysfs_block_attribute *attrib_spec, unsigned int nr_attrib,
-+	int device_index)
-+{
-+	struct edac_device_ctl_info *ctl_info;
-+
-+	ctl_info = edac_device_alloc_ctl_info(sz_private,
-+			edac_device_name, nr_instances,
-+			edac_block_name, nr_blocks,
-+			offset_value,
-+			attrib_spec, nr_attrib,
-+			device_index);
-+	if (!ctl_info)
-+		return ctl_info;
-+
-+	if (devm_add_action_or_reset(dev, devm_edac_device_free_ctl_info, ctl_info))
-+		return NULL;
-+
-+	return ctl_info;
-+}
-+EXPORT_SYMBOL_GPL(devm_edac_device_alloc_ctl_info);
-+
- /*
-  * find_edac_device_by_dev
-  *	scans the edac_device list for a specific 'struct device *'
-@@ -539,6 +575,30 @@ struct edac_device_ctl_info *edac_device_del_device(struct device *dev)
- }
- EXPORT_SYMBOL_GPL(edac_device_del_device);
+ #define AURORA_ACR_FORCE_WRITE_POLICY_OFFSET	0
+ #define AURORA_ACR_FORCE_WRITE_POLICY_MASK	\
+ 	(0x3 << AURORA_ACR_FORCE_WRITE_POLICY_OFFSET)
+@@ -41,6 +44,51 @@
+ #define AURORA_ACR_FORCE_WRITE_THRO_POLICY	\
+ 	(2 << AURORA_ACR_FORCE_WRITE_POLICY_OFFSET)
  
-+/**
-+ * devm_edac_device_del_device() - Internal helper to call
-+ *	edac_device_del_device from a devres action
-+ */
-+static void devm_edac_device_del_device(void *dev)
-+{
-+	edac_device_del_device((struct device *)dev);
-+}
++#define AURORA_ERR_CNT_REG          0x600
++#define AURORA_ERR_ATTR_CAP_REG     0x608
++#define AURORA_ERR_ADDR_CAP_REG     0x60c
++#define AURORA_ERR_WAY_CAP_REG      0x610
++#define AURORA_ERR_INJECT_CTL_REG   0x614
++#define AURORA_ERR_INJECT_MASK_REG  0x618
 +
-+int devm_edac_device_add_device(struct device *dev,
-+		struct edac_device_ctl_info *edac_dev)
-+{
-+	int ret;
++#define AURORA_ERR_CNT_CLR_OFFSET         31
++#define AURORA_ERR_CNT_CLR		   \
++	(0x1 << AURORA_ERR_CNT_CLR_OFFSET)
++#define AURORA_ERR_CNT_UE_OFFSET          16
++#define AURORA_ERR_CNT_UE_MASK             \
++	(0x7fff << AURORA_ERR_CNT_UE_OFFSET)
++#define AURORA_ERR_CNT_CE_OFFSET            0
++#define AURORA_ERR_CNT_CE_MASK              \
++	(0xffff << AURORA_ERR_CNT_CE_OFFSET)
 +
-+	ret = edac_device_add_device(edac_dev);
-+	if (ret)
-+		return ret;
++#define AURORA_ERR_ATTR_CAP_ERR_SOURCE_OFFSET       16
++#define AURORA_ERR_ATTR_CAP_ERR_SOURCE_MASK          \
++	(0x7 << AURORA_ERR_ATTR_CAP_ERR_SOURCE_OFFSET)
++#define AURORA_ERR_ATTR_CAP_TRANS_TYPE_OFFSET       12
++#define AURORA_ERR_ATTR_CAP_TRANS_TYPE_MASK          \
++	(0xf << AURORA_ERR_ATTR_CAP_TRANS_TYPE_OFFSET)
++#define AURORA_ERR_ATTR_CAP_ERR_TYPE_OFFSET          8
++#define AURORA_ERR_ATTR_CAP_ERR_TYPE_MASK            \
++	(0x3 << AURORA_ERR_ATTR_CAP_ERR_TYPE_OFFSET)
++#define AURORA_ERR_ATTR_CAP_VALID_OFFSET             0
++#define AURORA_ERR_ATTR_CAP_VALID                    \
++	(0x1 << AURORA_ERR_ATTR_CAP_VALID_OFFSET)
 +
-+	if (devm_add_action_or_reset(dev, devm_edac_device_del_device, dev))
-+		return 1;
++#define AURORA_ERR_ADDR_CAP_ADDR_MASK 0xffffffe0
 +
-+	return 0;
-+}
++#define AURORA_ERR_WAY_CAP_INDEX_OFFSET          8
++#define AURORA_ERR_WAY_CAP_INDEX_MASK            \
++	(0xfff << AURORA_ERR_WAY_CAP_INDEX_OFFSET)
++#define AURORA_ERR_WAY_CAP_WAY_OFFSET          1
++#define AURORA_ERR_WAY_CAP_WAY_MASK            \
++	(0xf << AURORA_ERR_WAY_CAP_WAY_OFFSET)
 +
- static inline int edac_device_get_log_ce(struct edac_device_ctl_info *edac_dev)
- {
- 	return edac_dev->log_ce;
-diff --git a/drivers/edac/edac_device.h b/drivers/edac/edac_device.h
-index 1aaba74ae411..711a50b133cd 100644
---- a/drivers/edac/edac_device.h
-+++ b/drivers/edac/edac_device.h
-@@ -258,6 +258,24 @@ extern struct edac_device_ctl_info *edac_device_alloc_ctl_info(
- extern void edac_device_free_ctl_info(struct edac_device_ctl_info *ctl_info);
++#define AURORA_ERR_INJECT_CTL_ADDR_MASK 0xfffffff0
++#define AURORA_ERR_ATTR_CAP_TRANS_TYPE_OFFSET   12
++#define AURORA_ERR_INJECT_CTL_EN_MASK          0x3
++#define AURORA_ERR_INJECT_CTL_EN_PARITY        0x2
++#define AURORA_ERR_INJECT_CTL_EN_ECC           0x1
++
+ #define AURORA_MAX_RANGE_SIZE	1024
  
- /**
-+ * devm_edac_device_alloc_ctl_info: Allocate a new managed edac device
-+ *	control info structure
-+ *
-+ *	This function takes the same arguments as edac_device_alloc_ctl_info in
-+ *	addition to the owning device. The structure is freed by devres using
-+ *	edac_device_free_ctl_info.
-+ */
-+extern struct edac_device_ctl_info *devm_edac_device_alloc_ctl_info(
-+		struct device *dev,
-+		unsigned int sizeof_private,
-+		char *edac_device_name, unsigned int nr_instances,
-+		char *edac_block_name, unsigned int nr_blocks,
-+		unsigned int offset_value,
-+		struct edac_dev_sysfs_block_attribute *block_attributes,
-+		unsigned int nr_attribs,
-+		int device_index);
-+
-+/**
-  * edac_device_add_device: Insert the 'edac_dev' structure into the
-  *	 edac_device global list and create sysfs entries associated with
-  *	 edac_device structure.
-@@ -286,6 +304,17 @@ extern int edac_device_add_device(struct edac_device_ctl_info *edac_dev);
- extern struct edac_device_ctl_info *edac_device_del_device(struct device *dev);
- 
- /**
-+ * devm_edac_device_add_device:
-+ *	Helper to call edac_device_add_device and register it for cleanup with
-+ *	devres.
-+ *
-+ * Returns:
-+ *	0 on Success, or an error code on failure
-+ */
-+extern int devm_edac_device_add_device(struct device *dev,
-+				       struct edac_device_ctl_info *edac_dev);
-+
-+/**
-  * edac_device_handle_ue():
-  *	perform a common output and handling of an 'edac_dev' UE event
-  *
+ #define AURORA_WAY_SIZE_SHIFT	2
 -- 
 2.11.0
