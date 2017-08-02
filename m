@@ -1,33 +1,26 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Wed,  2 Aug 2017 16:41:52 +0800
-Subject: [PATCH v2 11/23] dt-bindings: i2c: rk3x: add support for rv1108
-In-Reply-To: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
-References: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1501663312-12310-1-git-send-email-andy.yan@rock-chips.com>
+From: john@phrozen.org (John Crispin)
+Date: Wed, 2 Aug 2017 10:42:24 +0200
+Subject: [PATCH v3 0/6] mediatek: pwm driver add MT2712/MT7622 support
+In-Reply-To: <1501658394.22478.36.camel@mhfsdcap03>
+References: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
+ <1500261364.22478.32.camel@mhfsdcap03> <1501658394.22478.36.camel@mhfsdcap03>
+Message-ID: <a9dc58dc-d54c-6e8b-9006-8e8da1535daf@phrozen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dt Document for i2c controller on rv1108
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
----
 
-Changes in v2: None
+On 02/08/17 09:19, Zhi Mao wrote:
+> Hi John, Matthais & Thierry,
+>> Just a gentle ping on this issue again.
+>> Do you have any update?
+>>
+>> Regards,
+>> Zhi
+Hi Zhi,
 
- Documentation/devicetree/bindings/i2c/i2c-rk3x.txt | 1 +
- 1 file changed, 1 insertion(+)
+looks good to me
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
-index e18445d..22f2eeb 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-rk3x.txt
-@@ -7,6 +7,7 @@ Required properties :
- 
-  - reg : Offset and length of the register set for the device
-  - compatible: should be one of the following:
-+   - "rockchip,rv1108-i2c": for rv1108
-    - "rockchip,rk3066-i2c": for rk3066
-    - "rockchip,rk3188-i2c": for rk3188
-    - "rockchip,rk3228-i2c": for rk3228
--- 
-2.7.4
+Acked-by: John Crispin <john@phrozen.org>
+
+     John
