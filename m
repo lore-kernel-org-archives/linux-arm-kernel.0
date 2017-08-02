@@ -1,47 +1,67 @@
 From: jonas.gorski@gmail.com (Jonas Gorski)
-Date: Wed,  2 Aug 2017 11:34:27 +0200
-Subject: [PATCH 6/8] bcm63xx_enet: just use "enet" as the clock name
+Date: Wed,  2 Aug 2017 11:34:26 +0200
+Subject: [PATCH 5/8] MIPS: BCM63XX: provide enet clocks as "enet" to the
+ ethernet devices
 In-Reply-To: <20170802093429.12572-1-jonas.gorski@gmail.com>
 References: <20170802093429.12572-1-jonas.gorski@gmail.com>
-Message-ID: <20170802093429.12572-7-jonas.gorski@gmail.com>
+Message-ID: <20170802093429.12572-6-jonas.gorski@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have the individual clocks available as "enet" we
-don't need to rely on the device id for them anymore.
+Add lookups to provide the appropriate enetX clocks as just "enet" to
+the ethernet devices.
 
 Signed-off-by: Jonas Gorski <jonas.gorski@gmail.com>
 ---
- drivers/net/ethernet/broadcom/bcm63xx_enet.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ arch/mips/bcm63xx/clk.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-index 61a88b64bd39..d6844923a1c0 100644
---- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-+++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
-@@ -1718,7 +1718,6 @@ static int bcm_enet_probe(struct platform_device *pdev)
- 	struct bcm63xx_enet_platform_data *pd;
- 	struct resource *res_mem, *res_irq, *res_irq_rx, *res_irq_tx;
- 	struct mii_bus *bus;
--	const char *clk_name;
- 	int i, ret;
+diff --git a/arch/mips/bcm63xx/clk.c b/arch/mips/bcm63xx/clk.c
+index 0b898e5e4c5b..8a089a92e029 100644
+--- a/arch/mips/bcm63xx/clk.c
++++ b/arch/mips/bcm63xx/clk.c
+@@ -370,6 +370,8 @@ static struct clk_lookup bcm3368_clks[] = {
+ 	CLKDEV_INIT(NULL, "usbd", &clk_usbd),
+ 	CLKDEV_INIT(NULL, "spi", &clk_spi),
+ 	CLKDEV_INIT(NULL, "pcm", &clk_pcm),
++	CLKDEV_INIT("bcm63xx_enet.0", "enet", &clk_enet0),
++	CLKDEV_INIT("bcm63xx_enet.1", "enet", &clk_enet1),
+ };
  
- 	/* stop if shared driver failed, assume driver->probe will be
-@@ -1761,14 +1760,12 @@ static int bcm_enet_probe(struct platform_device *pdev)
- 	if (priv->mac_id == 0) {
- 		priv->rx_chan = 0;
- 		priv->tx_chan = 1;
--		clk_name = "enet0";
- 	} else {
- 		priv->rx_chan = 2;
- 		priv->tx_chan = 3;
--		clk_name = "enet1";
- 	}
+ static struct clk_lookup bcm6328_clks[] = {
+@@ -396,6 +398,7 @@ static struct clk_lookup bcm6338_clks[] = {
+ 	CLKDEV_INIT(NULL, "usbh", &clk_usbh),
+ 	CLKDEV_INIT(NULL, "usbd", &clk_usbd),
+ 	CLKDEV_INIT(NULL, "spi", &clk_spi),
++	CLKDEV_INIT("bcm63xx_enet.0", "enet", &clk_enet_misc),
+ };
  
--	priv->mac_clk = clk_get(&pdev->dev, clk_name);
-+	priv->mac_clk = clk_get(&pdev->dev, "enet");
- 	if (IS_ERR(priv->mac_clk)) {
- 		ret = PTR_ERR(priv->mac_clk);
- 		goto out;
+ static struct clk_lookup bcm6345_clks[] = {
+@@ -409,6 +412,7 @@ static struct clk_lookup bcm6345_clks[] = {
+ 	CLKDEV_INIT(NULL, "usbh", &clk_usbh),
+ 	CLKDEV_INIT(NULL, "usbd", &clk_usbd),
+ 	CLKDEV_INIT(NULL, "spi", &clk_spi),
++	CLKDEV_INIT("bcm63xx_enet.0", "enet", &clk_enet_misc),
+ };
+ 
+ static struct clk_lookup bcm6348_clks[] = {
+@@ -422,6 +426,8 @@ static struct clk_lookup bcm6348_clks[] = {
+ 	CLKDEV_INIT(NULL, "usbh", &clk_usbh),
+ 	CLKDEV_INIT(NULL, "usbd", &clk_usbd),
+ 	CLKDEV_INIT(NULL, "spi", &clk_spi),
++	CLKDEV_INIT("bcm63xx_enet.0", "enet", &clk_enet_misc),
++	CLKDEV_INIT("bcm63xx_enet.1", "enet", &clk_enet_misc),
+ };
+ 
+ static struct clk_lookup bcm6358_clks[] = {
+@@ -437,6 +443,8 @@ static struct clk_lookup bcm6358_clks[] = {
+ 	CLKDEV_INIT(NULL, "usbd", &clk_usbd),
+ 	CLKDEV_INIT(NULL, "spi", &clk_spi),
+ 	CLKDEV_INIT(NULL, "pcm", &clk_pcm),
++	CLKDEV_INIT("bcm63xx_enet.0", "enet", &clk_enet0),
++	CLKDEV_INIT("bcm63xx_enet.1", "enet", &clk_enet1),
+ };
+ 
+ static struct clk_lookup bcm6362_clks[] = {
 -- 
 2.13.2
