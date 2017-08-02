@@ -1,66 +1,99 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 2 Aug 2017 10:15:36 +0100
-Subject: [PATCH 3/6] kvm: arm64: Convert kvm_set_s2pte_readonly() from
- inline asm to cmpxchg()
-In-Reply-To: <20170801111618.GC5176@cbox>
-References: <20170725135308.18173-1-catalin.marinas@arm.com>
- <20170725135308.18173-4-catalin.marinas@arm.com>
- <20170801111618.GC5176@cbox>
-Message-ID: <20170802091536.xqhy7vcsamoa46ah@armageddon.cambridge.arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 2 Aug 2017 12:19:06 +0300
+Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
+In-Reply-To: <20170802045522.GU3053@localhost>
+References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
+ <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
+ <20170722065133.GT3053@localhost>
+ <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
+ <20170726052930.GF3053@localhost>
+ <f2908e38-dc4d-3886-4058-52a7ad845415@st.com>
+ <20170731123157.GJ3053@localhost>
+ <e3a76a50-4160-d111-cce9-132b46b66c33@st.com>
+ <20170802045522.GU3053@localhost>
+Message-ID: <7d2091fe-a2e5-78bb-b63d-9cb66bdb7e84@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
 
-On Tue, Aug 01, 2017 at 01:16:18PM +0200, Christoffer Dall wrote:
-> On Tue, Jul 25, 2017 at 02:53:05PM +0100, Catalin Marinas wrote:
-> > +	pteval_t old_pteval, pteval;
-> > +
-> > +	do {
-> > +		pteval = old_pteval = READ_ONCE(pte_val(*pte));
-> > +		pteval &= ~PTE_S2_RDWR;
-> > +		pteval |= PTE_S2_RDONLY;
-> > +	} while (cmpxchg_relaxed(&pte_val(*pte), old_pteval, pteval) !=
-> > +		 old_pteval);
-> 
-> I'm wondering if the READ_ONCE for old_pteval is strictly necessary, or
-> if that's really for the pteval.  Actually, I'm a little unsure whether
-> this is equivalent to
-> 
-> 	old_pteval = READ_ONCE(pte_val(*pte));
-> 	pteval = old_pteval;
-> 
-> or
-> 
-> 	old_pteval = READ_ONCE(pte_val(*pte));
-> 	pteval = READ_ONCE(pte_val(*pte));
-> 
-> I think it's the former, which I also think is correct,
 
-I think so too.
+On 2017-08-02 07:55, Vinod Koul wrote:
+> On Tue, Aug 01, 2017 at 09:32:50AM +0000, Pierre Yves MORDRET wrote:
+>>
+>>
+>> On 07/31/2017 02:31 PM, Vinod Koul wrote:
+>>> On Wed, Jul 26, 2017 at 07:38:02AM +0000, Pierre Yves MORDRET wrote:
+>>>>>>>> +
+>>>>>>>> +#ifndef __DMA_STM32_DMAMUX_H
+>>>>>>>> +#define __DMA_STM32_DMAMUX_H
+>>>>>>>> +
+>>>>>>>> +#if defined(CONFIG_STM32_DMAMUX)
+>>>>>>>> +int stm32_dmamux_set_config(struct device *dev, void *route_data, u32 chan_id);
+>>>>>>>
+>>>>>>> Why do we need a custom API in this case?
+>>>>>>>
+>>>>>>
+>>>>>> This API is called by DMA when a slave is requested by client. DMA can work
+>>>>>> without DMAMUX this API has been put in place to configure DMAMUX whether client
+>>>>>> is requesting a DMAMUX Channel instead of a DMA one.
+>>>>>
+>>>>> You mean the dmaengine driver right?
+>>>>>
+>>>>
+>>>> Yes. The API is mainly called by "device_config" through out STM32 DMA Driver
+>>>> when a router is in place for client.
+>>>> Please refer to Patch 4/5 on this set.
+>>>
+>>> Okay am thinking on why this can't be generic..? An optional router config
+>>> callback?
+>>>
+>>
+>> I would have liked to answer there is a callback within engine but unfortunately
+>> I didn't figure out one when I did my router's development. I've looked once
+>> more but again I can't find how to map chanID and request line without custom API.
+>
+> Yes there is no callback for routers but we can add a generic callback
+> here to be used. I added Peter for his comments, isn't that something they
+> need too?
 
-> but the reason
-> I'm going down this road is that we have a use of cmpxchg() in the VGIC
-> code, which doesn't use READ_ONCE for the old value (~
-> vgic-mmio-v3.c:404), and I also found other occurences of this in the
-> kernel, so I'm wondering if the VGIC code is broken or we're being
-> overly careful here, or if this is necessary because hardware can update
-> the value behind our backs in this case?
+The event router via of_dma_router_register() should be capable of 
+handling different type of muxers, like the ti-dma-crossbar.c is doing 
+for two different type of event crossbars.
 
-We use it because the compiler may decide it's short on registers and
-instead of saving old_pteval on the stack it reads it again from memory
-just before cmpxchg, so we would miss any update to *pte done by the
-hardware. In practice, I've never seen (on arm64) gcc generating two
-loads to *pte without READ_ONCE but maybe I haven't tried hard enough.
+Basically with the of_dma_route_allocate you craft a dma_spec which can 
+be understood by the dma-master pointed form the router's node.
+You do the configuration of the mux in this function, craft the dma_spec 
+and that's it. In DT the peripherals are using the router's node for DMA 
+binding and everything is transparent for them.
 
-We should probably fix the VGIC code as well as a precaution, just in
-case the compiler tries to get smarter in the future.
+Note: The use of am335x xbar in the ti-dma-crossbar is optional and only 
+needed when we need to have different event than the default for a 
+specific dma request line.
 
-> In any case, for this patch:
-> 
-> Reviewed-by: Christoffer Dall <cdall@linaro.org>
+If you normally use the DMA like this:
+dmas = <&edma 129 1>, <&ddma_xbar 128 1>;
+dma-names = "tx", "rx";
 
-Thanks.
+If you have DMA event router/mux, then depending on how it works you 
+might have different number of parameters. In my case the DRA7 crossbar 
+does not need extra parameter, so to get it in use:
+dmas = <&edma_xbar 129 1>, <&edma_xbar 128 1>;
+dma-names = "tx", "rx";
 
--- 
-Catalin
+The router driver will rewrite the dma_spec and replace the 129/128 and 
+pass something different to the dma-master (dynamic event mapping).
+
+On am335x we have different xbar type so there:
+
+dmas = <&edma_xbar 12 0 1>, <&edma_xbar 13 0 2>;
+
+Out from this the router driver will create a spec equivalent to
+dmas = <&edma_xbar 12 0>, <&edma_xbar 13 0>;
+
+But it will change the xbar that DMA request 12/13 will not have the 
+default event routed to.
+
+I believe that the dma_router infra we have in dmaengine can cover most 
+if not all use cases...
+
+- P?ter
