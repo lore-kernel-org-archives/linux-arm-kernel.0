@@ -1,59 +1,40 @@
-From: faiz_abbas@ti.com (Faiz Abbas)
-Date: Wed, 2 Aug 2017 15:00:49 +0530
-Subject: [PATCH] ARM: dts: am437x-gp-evm: Add support for buzzer
-In-Reply-To: <1497935361-11019-1-git-send-email-faiz_abbas@ti.com>
-References: <1497935361-11019-1-git-send-email-faiz_abbas@ti.com>
-Message-ID: <c135a805-868a-87fc-ce78-b4e49139211d@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 2 Aug 2017 11:32:33 +0200
+Subject: [RFC PATCH] ARM: dts: stm32: change pinctrl bindings definition
+In-Reply-To: <1500289258-3700-1-git-send-email-alexandre.torgue@st.com>
+References: <1500289258-3700-1-git-send-email-alexandre.torgue@st.com>
+Message-ID: <CACRpkdY+_W7uTK+CRqHRrS2gHYjQkhQeNHjWvOSNazq_YpE-uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jul 17, 2017 at 1:00 PM, Alexandre TORGUE
+<alexandre.torgue@st.com> wrote:
 
+> Initially each pin was declared in "include/dt-bindings/stm32f429-pinfunc.h"
+> and each definition contained SOC names (ex: STM32F429_PA9_FUNC_USART1_TX).
+> Since this approach was approved, the number of supported MCU has
+> increased (STM32F429/STM32F469/STM32f746/STM32H743). To avoid to add a new
+> file in "include/dt-bindings" each time a new STM32 SOC arrives I propose
+> a new approach which consist to use a macro to define pin muxing in device
+> tree. All STM32 DT will use the common macro to define pinmux. Furthermore, it
+> will make easy maintenance and integration of new SOC.
+>
+> To check that patch generate same dtb than befrore I used dtc binary to (re)generate dts files
+> (before and after apply the series).
+> Example on stm32f469-disco:
+>
+> ./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-after.dts
+> stm32f469-disco-after.dtb
+>
+> ./scripts/dtc/dtc -I dtb -O dts -o stm32f469-disco-before.dts
+> stm32f469-disco-before.dtb
+>
+> Then diff -u stm32f469-disco-before.dts stm32f469-disco-after.dts
 
-On Tuesday 20 June 2017 10:39 AM, Faiz Abbas wrote:
-> Add support for onboard gpio buzzer. It works using
-> the gpio-beeper driver. Pinmux entries for GPIO
-> controlling the buzzer are also added.
+Looks OK to me. I guess it should all be merged into ARM SoC.
 
-Gentle ping
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+for the final version.
 
-Regards,
-Faiz
-> 
-> Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
-> ---
->  arch/arm/boot/dts/am437x-gp-evm.dts | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-> index 397e98b..24cdf6d 100644
-> --- a/arch/arm/boot/dts/am437x-gp-evm.dts
-> +++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-> @@ -149,6 +149,13 @@
->  			system-clock-frequency = <12000000>;
->  		};
->  	};
-> +
-> +	beeper: beeper {
-> +		compatible = "gpio-beeper";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&beeper_pins>;
-> +		gpios = <&gpio4 12 GPIO_ACTIVE_HIGH>;
-> +	};
->  };
->  
->  &am43xx_pinmux {
-> @@ -510,6 +517,13 @@
->  			AM4372_IOPAD(0x974, PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* uart0_txd.uart0_txd */
->  		>;
->  	};
-> +
-> +	beeper_pins: beeper_pins {
-> +		pinctrl-single,pins = <
-> +			AM4372_IOPAD(0x9e0, PIN_OUTPUT_PULLUP | MUX_MODE7)	/* cam1_field.gpio4_12 */
-> +		>;
-> +	};
-> +
->  };
->  
->  &uart0 {
-> 
+Yours,
+Linus Walleij
