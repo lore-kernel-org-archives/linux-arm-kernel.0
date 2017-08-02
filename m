@@ -1,74 +1,53 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 2 Aug 2017 10:42:06 +0530
-Subject: [PATCH 2/5] phy: rockchip-inno-usb2: Replace the extcon API
-In-Reply-To: <1500254456-6525-3-git-send-email-cw00.choi@samsung.com>
+Date: Wed, 2 Aug 2017 10:42:31 +0530
+Subject: [PATCH 3/5] phy: phy-bcm-ns2-usbdrd: Replace the deprecated
+ extcon API
+In-Reply-To: <1500254456-6525-4-git-send-email-cw00.choi@samsung.com>
 References: <1500254456-6525-1-git-send-email-cw00.choi@samsung.com>
- <CGME20170717012058epcas1p157e9a296eb5e415ae24bb51a1e6026db@epcas1p1.samsung.com>
- <1500254456-6525-3-git-send-email-cw00.choi@samsung.com>
-Message-ID: <06154871-a821-edab-23d8-340c5b0f5081@ti.com>
+ <CGME20170717012058epcas1p10b22154ffb2184cae7453a8b557dbcca@epcas1p1.samsung.com>
+ <1500254456-6525-4-git-send-email-cw00.choi@samsung.com>
+Message-ID: <2c5b20ab-a1cd-f7c0-12e7-2cc338a84bfc@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On Monday 17 July 2017 06:50 AM, Chanwoo Choi wrote:
-> This patch uses the resource-managed extcon API for extcon_register_notifier()
-> and replaces the deprecated extcon API as following:
-> - extcon_get_cable_state_() -> extcon_get_state()
-> - extcon_set_cable_state_() -> extcon_set_state_sync()
+> This patch replaces the deprecated extcon API as following:
+> - extcon_set_cable_state_() -> extcon_get_state()
 > 
-> Cc: linux-rockchip at lists.infradead.org
-> acked-by: Kishon Vijay Abraham I <kishon@ti.com>
-  ^
-should be 'A' here.
-
--Kishon
-
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: Raviteja Garimella <raviteja.garimella@broadcom.com>
 > Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+Acked-by: Kishon Vijay Abraham I <kishon@ti.com>
 > ---
->  drivers/phy/rockchip/phy-rockchip-inno-usb2.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
+>  drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-> index 626883d9d176..ef033089b7a0 100644
-> --- a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-> +++ b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-> @@ -545,7 +545,7 @@ static void rockchip_usb2phy_otg_sm_work(struct work_struct *work)
->  			rockchip_usb2phy_power_off(rport->phy);
->  		/* fall through */
->  	case OTG_STATE_B_IDLE:
-> -		if (extcon_get_cable_state_(rphy->edev, EXTCON_USB_HOST) > 0) {
-> +		if (extcon_get_state(rphy->edev, EXTCON_USB_HOST) > 0) {
->  			dev_dbg(&rport->phy->dev, "usb otg host connect\n");
->  			rport->state = OTG_STATE_A_HOST;
->  			rockchip_usb2phy_power_on(rport->phy);
-> @@ -598,7 +598,7 @@ static void rockchip_usb2phy_otg_sm_work(struct work_struct *work)
->  			rport->vbus_attached = vbus_attach;
+> diff --git a/drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c b/drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c
+> index 9ae59e223131..d099a0c8cee5 100644
+> --- a/drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c
+> +++ b/drivers/phy/broadcom/phy-bcm-ns2-usbdrd.c
+> @@ -253,16 +253,16 @@ static void extcon_work(struct work_struct *work)
+>  	vbus = gpiod_get_value_cansleep(driver->vbus_gpiod);
 >  
->  			if (notify_charger && rphy->edev) {
-> -				extcon_set_cable_state_(rphy->edev,
-> +				extcon_set_state_sync(rphy->edev,
->  							cable, vbus_attach);
->  				if (cable == EXTCON_CHG_USB_SDP)
->  					extcon_set_state_sync(rphy->edev,
-> @@ -619,7 +619,7 @@ static void rockchip_usb2phy_otg_sm_work(struct work_struct *work)
->  		sch_work = true;
->  		break;
->  	case OTG_STATE_A_HOST:
-> -		if (extcon_get_cable_state_(rphy->edev, EXTCON_USB_HOST) == 0) {
-> +		if (extcon_get_state(rphy->edev, EXTCON_USB_HOST) == 0) {
->  			dev_dbg(&rport->phy->dev, "usb otg host disconnect\n");
->  			rport->state = OTG_STATE_B_IDLE;
->  			rockchip_usb2phy_power_off(rport->phy);
-> @@ -1006,8 +1006,8 @@ static int rockchip_usb2phy_otg_port_init(struct rockchip_usb2phy *rphy,
->  	if (!IS_ERR(rphy->edev)) {
->  		rport->event_nb.notifier_call = rockchip_otg_event;
->  
-> -		ret = extcon_register_notifier(rphy->edev, EXTCON_USB_HOST,
-> -					       &rport->event_nb);
-> +		ret = devm_extcon_register_notifier(rphy->dev, rphy->edev,
-> +					EXTCON_USB_HOST, &rport->event_nb);
->  		if (ret)
->  			dev_err(rphy->dev, "register USB HOST notifier failed\n");
->  	}
+>  	if (!id && vbus) { /* Host connected */
+> -		extcon_set_cable_state_(driver->edev, EXTCON_USB_HOST, true);
+> +		extcon_set_state_sync(driver->edev, EXTCON_USB_HOST, true);
+>  		pr_debug("Host cable connected\n");
+>  		driver->data->new_state = EVT_HOST;
+>  		connect_change(driver);
+>  	} else if (id && !vbus) { /* Disconnected */
+> -		extcon_set_cable_state_(driver->edev, EXTCON_USB_HOST, false);
+> -		extcon_set_cable_state_(driver->edev, EXTCON_USB, false);
+> +		extcon_set_state_sync(driver->edev, EXTCON_USB_HOST, false);
+> +		extcon_set_state_sync(driver->edev, EXTCON_USB, false);
+>  		pr_debug("Cable disconnected\n");
+>  	} else if (id && vbus) { /* Device connected */
+> -		extcon_set_cable_state_(driver->edev, EXTCON_USB, true);
+> +		extcon_set_state_sync(driver->edev, EXTCON_USB, true);
+>  		pr_debug("Device cable connected\n");
+>  		driver->data->new_state = EVT_DEVICE;
+>  		connect_change(driver);
 > 
