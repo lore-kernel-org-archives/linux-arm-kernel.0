@@ -1,58 +1,45 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Wed, 02 Aug 2017 17:43:05 +0100
-Subject: [RFC PATCH v2 0/2] nb8800 suspend/resume support
-In-Reply-To: <a7b76388-7a7c-01e0-3966-ff7ebb4df799@free.fr> (Mason's message
- of "Wed, 2 Aug 2017 18:39:08 +0200")
-References: <33d1ab47-6098-5e3f-8a3c-f72626d07113@free.fr>
- <aa8885b8-e6bb-3624-2bf9-0bb40505ac54@free.fr>
- <dd883398-1511-0bfd-972b-a11ef8709f0d@free.fr>
- <yw1xshhagexd.fsf@mansr.com>
- <9e8e12b1-74e2-8323-ec16-eebda46b2a3d@free.fr>
- <yw1xo9rygdyu.fsf@mansr.com>
- <6906dccf-bec9-0fc8-a34a-c39c05ada917@free.fr>
- <yw1xk22mgdcx.fsf@mansr.com>
- <a7b76388-7a7c-01e0-3966-ff7ebb4df799@free.fr>
-Message-ID: <yw1xfud9hqee.fsf@mansr.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 2 Aug 2017 17:39:01 +0100
+Subject: [PATCH RFC] arm64: introduce mm_context_t flags
+In-Reply-To: <20170731144825.31322-1-ynorov@caviumnetworks.com>
+References: <20170731144825.31322-1-ynorov@caviumnetworks.com>
+Message-ID: <20170802163900.66gnhogililb3uak@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+Hi Yury,
 
-> On 02/08/2017 18:10, M?ns Rullg?rd wrote:
->
->> Mason writes:
->> 
->>> On 02/08/2017 17:56, M?ns Rullg?rd wrote:
->>>
->>>> What does the tango5 do if you flood it with packets faster than the
->>>> kernel can keep up with?  That would make it hit the end of the rx
->>>> chain, which is apparently what makes it miserable with the current dma
->>>> stop code.
->>>
->>> The simplest way to test this would be sending tiny packets
->>> as fast as possible, right? So ping -f on a GigE link should
->>> fit the bill?
->> 
->> ping -f is limited to 100 packets per second.  Use something like iperf
->> in UDP mode instead.
->
-> ping -f can go 100 times faster than 100 pps:
->
-> # ping -f -q -c 150000 -s 300 172.27.64.45
-> PING 172.27.64.45 (172.27.64.45) 300(328) bytes of data.
->
-> --- 172.27.64.45 ping statistics ---
-> 150000 packets transmitted, 150000 received, 0% packet loss, time 15035ms
-> rtt min/avg/max/mdev = 0.065/0.084/0.537/0.014 ms, ipg/ewma 0.100/0.087 ms
->
-> 150,000 packets in 15 seconds = 10,000 pps
->
-> (172.27.64.45 is the tango5 board)
->
-> Ergo, dealing with 10,000 packets per second does not hose RX.
+On Mon, Jul 31, 2017 at 05:48:25PM +0300, Yury Norov wrote:
+> In patch 06beb72fbe23e ("arm64: introduce mm context flag to keep 32 bit task
+> information") you introduce the field flags but use it only for a single flag -
+> TIF_32BIT. It looks hacky to me for three reasons:
+>  - The flag is introduced for the case where it's impossible to get the thread
+>    info structure for the thread associated with mm. So thread_info flags (TIF)
+>    may also be unavailable at place. This is not the case for the only existing
+>    user of if - uprobes, but in general this approach requires to include thread
+>    headers in mm code, which may become unwanted dependency.
+>  - New flag, if it uses TIF bits, for consistency should for example set/clear
+>    TIF_32BIT_AARCH64 for ILP32 tasks. And to be completely consistent, with
+>    current approach we'd mirror thread_info flags to mm_context flags. And keep
+>    it syncronized.
+>  - If we start using TIF flags here, we cannot easily add new mm_context
+>    specific bits because they may mess with TIF ones.
+> 
+> I think that this is not what was intended when you added new field in
+> mm_context_t.
 
-ping -f goes as fast as the other end replies or 100 per second,
-whichever is higher, so says the man page.
+TIF_32BIT was handy at the time but it indeed denotes AArch32 user
+task. For ILP32 we wouldn't need to set this bit since the instruction
+set is A64 and uprobe should support it (though not sure anyone tried).
+I noticed in your patch introducing binfmt_ilp32.c that SET_PERSONALITY
+actually sets this flag in the mm context.
+
+As with the TIF bits, the PERSONALITY macros become more complicated
+with more bits to set/clear. Since we don't have any plans for other mm
+context flags (independent of TIF), should we simply rename it to
+thread_flags and just copy the thread_info flags:
+
+	current->mm->context.thread_flags = current_thread_info()->flags;
 
 -- 
-M?ns Rullg?rd
+Catalin
