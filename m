@@ -1,53 +1,61 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Wed, 2 Aug 2017 15:18:21 -0500
-Subject: [PATCH 2/3] ARM: dts: k2g: Add DCAN nodes
-In-Reply-To: <20170802201822.11532-1-fcooper@ti.com>
-References: <20170802201822.11532-1-fcooper@ti.com>
-Message-ID: <20170802201822.11532-3-fcooper@ti.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 2 Aug 2017 17:22:08 -0400
+Subject: [PATCH V7 1/3] PCI: limit FLR wait time to 100ms maximum
+In-Reply-To: <20170802202735.GE20308@bhelgaas-glaptop.roam.corp.google.com>
+References: <1501701317-32249-1-git-send-email-okaya@codeaurora.org>
+ <20170802202735.GE20308@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <db1860be-9b0b-85b1-814c-40e497ac792f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lokesh Vutla <lokeshvutla@ti.com>
+On 8/2/2017 4:27 PM, Bjorn Helgaas wrote:
+> On Wed, Aug 02, 2017 at 03:15:15PM -0400, Sinan Kaya wrote:
+> My hypothesis was that CRS isn't useful on VFs because of sec 2.2.2
+> says "FLR ... does not affect its existence in PCI Configuration
+> Space".  But I think that hypothesis is wrong because sec 3.3.3.1
+> does talk about a VF returning CRS.
+> 
 
-Add nodes for the two DCAN instances included in 66AK2G
+hmm, good catch. I'll drop the first patch.
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-[d-gerlach at ti.com: add power-domains and clock information]
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-[fcooper at ti.com: update subject and commit message. Misc minor updates]
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
----
- arch/arm/boot/dts/keystone-k2g.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+> The SR-IOV spec (sec 3.4.1.1) says a VF's Vendor ID is read-only
+> 0xffff.  But I expect CRS visibility (PCIe r3.1, sec 2.3.2) would work
+> normally and return a Vendor ID of 0x0001 to indicate CRS for a VF.
+> 
+> Of course, not all Root Ports support CRS software visibility, so
+> whatever we do has to work when it's absent.
 
-diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
-index bf4d1fa..bebc857 100644
---- a/arch/arm/boot/dts/keystone-k2g.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2g.dtsi
-@@ -113,6 +113,24 @@
- 			status = "disabled";
- 		};
+How about a mixture of old code and new code as follows?
+
+static void pci_flr_wait(struct pci_dev *dev)
+{
+	u32 id;
+	bool ret = false;
+	int i = 0;
+
+	if (CRS supported) {
+		/* don't touch the HW before waiting 100ms */
+		msleep(100);
+
+		ret = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id, 60000);
+		if (ret)
+			return;
+	}
+
+	do {
+		msleep(100);
+		pci_read_config_dword(dev, PCI_COMMAND, &id);
+	} while (i++ < 10 && id == ~0);
  
-+		dcan0: can at 0260B200 {
-+			compatible = "ti,am4372-d_can", "ti,am3352-d_can";
-+			reg = <0x0260B200 0x200>;
-+			interrupts = <GIC_SPI 190 IRQ_TYPE_EDGE_RISING>;
-+			status = "disabled";
-+			power-domains = <&k2g_pds 0x0008>;
-+			clocks = <&k2g_clks 0x0008 1>;
-+		};
-+
-+		dcan1: can at 0260B400 {
-+			compatible = "ti,am4372-d_can", "ti,am3352-d_can";
-+			reg = <0x0260B400 0x200>;
-+			interrupts = <GIC_SPI 193 IRQ_TYPE_EDGE_RISING>;
-+			status = "disabled";
-+			power-domains = <&k2g_pds 0x0009>;
-+			clocks = <&k2g_clks 0x0009 1>;
-+		};
-+
- 		kirq0: keystone_irq at 026202a0 {
- 			compatible = "ti,keystone-irq";
- 			interrupts = <GIC_SPI 1 IRQ_TYPE_EDGE_RISING>;
+	if (id == ~0)
+ 		dev_warn(&dev->dev, "Failed to return from FLR\n");
+	else if (i > 1)
+		dev_info(&dev->dev, "Required additional %dms to return from FLR\n",
+			 (i - 1) * 100);
+}
+
+
 -- 
-2.9.4.dirty
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
