@@ -1,65 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 2 Aug 2017 14:20:59 +0200
-Subject: [PATCH 27/31] arm64: dts: renesas: r8a7795: Add usb companion
- property in EHCI
-In-Reply-To: <b18c9692-bcbf-a24b-10a9-4a79a74bcead@cogentembedded.com>
-References: <cover.1501509525.git.horms+renesas@verge.net.au>
- <1c422b4c501ec329802a5d00f664821d3b58e11d.1501509526.git.horms+renesas@verge.net.au>
- <b18c9692-bcbf-a24b-10a9-4a79a74bcead@cogentembedded.com>
-Message-ID: <20170802122059.GA20012@verge.net.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 2 Aug 2017 14:25:50 +0200
+Subject: [PATCH] pinctrl: sirf: atlas7: Initialize GPIO offset
+In-Reply-To: <20170720170107.14612-1-thierry.reding@gmail.com>
+References: <20170720170107.14612-1-thierry.reding@gmail.com>
+Message-ID: <CACRpkdZjncCq_D-QVG7gEx8cVusEzyjeYhcgc=wLtGREA40x=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 07:40:23PM +0300, Sergei Shtylyov wrote:
-> On 07/31/2017 06:03 PM, Simon Horman wrote:
-> 
-> >From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-> >
-> >This patch adds the "companion" property in the EHCI ch0, ch1 and
-> >ch2 nodes to wait for the usb companion controller startup at resume.
-> >
-> >Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-> >Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> >[remove ch3 node and revise the commit log]
-> >Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-> >
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >---
-> >  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 3 +++
-> >  1 file changed, 3 insertions(+)
-> >
-> >diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> >index d73d986039c8..7246e689b619 100644
-> >--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> >+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> >@@ -1583,6 +1583,7 @@
-> >  			clocks = <&cpg CPG_MOD 703>;
-> >  			phys = <&usb2_phy0>;
-> >  			phy-names = "usb";
-> >+			companion= <&ohci0>;
-> >  			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-> >  			resets = <&cpg 703>;
-> >  			status = "disabled";
-> >@@ -1595,6 +1596,7 @@
-> >  			clocks = <&cpg CPG_MOD 702>;
-> >  			phys = <&usb2_phy1>;
-> >  			phy-names = "usb";
-> >+			companion= <&ohci1>;
-> >  			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-> >  			resets = <&cpg 702>;
-> >  			status = "disabled";
-> >@@ -1607,6 +1609,7 @@
-> >  			clocks = <&cpg CPG_MOD 701>;
-> >  			phys = <&usb2_phy2>;
-> >  			phy-names = "usb";
-> >+			companion= <&ohci2>;
-> >  			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-> >  			resets = <&cpg 701>;
-> >  			status = "disabled";
-> 
->    Looks like a space before = is missing in all 3 cases.
+On Thu, Jul 20, 2017 at 7:01 PM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
 
-Thanks.
+> From: Thierry Reding <treding@nvidia.com>
+>
+> The GPIO offset is never initialized, which means that it will end up
+> being zero as per the devm_kzalloc() of the parent structure.
+>
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
+> ---
+> I have no idea how the driver could've ever worked for anything other
+> than instances with a single bank, but maybe it did and I missed some
+> detail.
 
-I'll post a follow-up patch for that. I don't think it warrants respinning
-this pull request at this point.
+Patch applied.
+
+I went in and attack-patched this driver, see:
+commit 4e6fd26dcf5d70a7700a4c15d8f239103bdce91d
+"pinctrl: sirf/atlas7: stop poking around in GPIO internals"
+
+I don't know if I may have upset the SirF developers or something,
+or if I was an especially big asshole for not noticing the problem I
+fixed already in the first iteration of the patch, or if I have done something
+else evil, but I just haven't heard from the developers since.
+
+If the problem is me, I'm sorry :(
+
+I would like to have this driver up-to-date and verified working.
+
+Yours,
+Linus Walleij
