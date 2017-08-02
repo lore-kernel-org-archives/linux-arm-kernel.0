@@ -1,27 +1,36 @@
 From: frank.wang@rock-chips.com (Frank Wang)
-Date: Wed,  2 Aug 2017 15:53:05 +0800
-Subject: [PATCH v2 0/5] add some quirks for Rockchip usb2-phy and add rv1108
- SoCs' support
-Message-ID: <1501660390-5956-1-git-send-email-frank.wang@rock-chips.com>
+Date: Wed,  2 Aug 2017 15:53:07 +0800
+Subject: [PATCH v2 2/5] dt-bindings: phy-rockchip-inno-usb2: add companion grf
+ quirk
+In-Reply-To: <1501660390-5956-1-git-send-email-frank.wang@rock-chips.com>
+References: <1501660390-5956-1-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <1501660390-5956-3-git-send-email-frank.wang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These series of patches add companion_grf_quirk and otg_mux_irq_quirk for
-rockchip usb2-phy. In addition, this change also add rv1108 usb2-phy support.
+Add rockchip,usbgrf and rockchip,companion_grf_quirk to support
+the registers of usb-phy that are distributed in grf and usbgrf
+on some special Rockchip SoCs (e.g RV1108).
 
-Changes from v1:
- - Send the dt-bindings as a separate patch and cc devicetree list.
+Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+---
+ Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Frank Wang (5):
-  phy: rockchip-inno-usb2: add companion grf quirk
-  dt-bindings: phy-rockchip-inno-usb2: add companion grf quirk
-  phy: rockchip-inno-usb2: add otg mux irq quirk
-  dt-bindings: phy-rockchip-inno-usb2: add otg mux irq quirk
-  phy: rockchip-inno-usb2: add support of usb2-phy for rv1108 SoCs
-
- .../bindings/phy/phy-rockchip-inno-usb2.txt        |  10 +
- drivers/phy/rockchip/phy-rockchip-inno-usb2.c      | 223 ++++++++++++++++-----
- 2 files changed, 182 insertions(+), 51 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+index 84d59b0..ddf868a 100644
+--- a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
++++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+@@ -18,6 +18,10 @@ Optional properties:
+ 		 usb-phy output 480m and xin24m.
+ 		 Refer to clk/clock-bindings.txt for generic clock
+ 		 consumer properties.
++ - rockchip,usbgrf : phandle to the syscon managing the "usb general
++		 register files".
++ - rockchip,companion_grf_quirk : when set driver will request
++		 "rockchip,usbgrf" phandle as one companion-grf.
+ 
+ Required nodes : a sub-node is required for each port the phy provides.
+ 		 The sub-node name is used to identify host or otg port,
 -- 
 2.0.0
