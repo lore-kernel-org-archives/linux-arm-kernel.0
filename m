@@ -1,16 +1,17 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 2 Aug 2017 09:11:23 -0700
-Subject: [GIT PULL v2] Meson clock fixes for 4.13-rc4
-In-Reply-To: <5af2832c-c23c-c42b-c19f-ba7cb10c27c8@baylibre.com>
-References: <5af2832c-c23c-c42b-c19f-ba7cb10c27c8@baylibre.com>
-Message-ID: <20170802161123.GO2146@codeaurora.org>
+Date: Wed, 2 Aug 2017 09:13:18 -0700
+Subject: [GIT PULL] Allwinner clock fixes for 4.13
+In-Reply-To: <20170802081540.kzy2q7qo4lb3muxt@wens.csie.org>
+References: <20170802081540.kzy2q7qo4lb3muxt@wens.csie.org>
+Message-ID: <20170802161318.GP2146@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01, Neil Armstrong wrote:
+On 08/02, Chen-Yu Tsai wrote:
 > Hi Mike, Stephen,
 > 
-> Here is a fix for Meson GXBB driver, that could go for 4.13-rc4.
+> I will be handling most of the Allwinner pull requests for this cycle.
+> Here is a critical fix for the sunxi-ng clk drivers.
 > 
 
 Thanks. Pulled.
