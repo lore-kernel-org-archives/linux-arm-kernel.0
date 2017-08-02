@@ -1,74 +1,46 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 2 Aug 2017 16:29:42 -0500
-Subject: [PATCH] PCI: layerscape: Add support for ls2088a and ls1088a
-In-Reply-To: <1499333984-17668-1-git-send-email-Zhiqiang.Hou@nxp.com>
-References: <1499333984-17668-1-git-send-email-Zhiqiang.Hou@nxp.com>
-Message-ID: <20170802212942.GA7667@bhelgaas-glaptop.roam.corp.google.com>
+Date: Wed, 2 Aug 2017 16:52:42 -0500
+Subject: [PATCH v2] PCI: dwc: designware: test PCIE_ATU_ENABLE bit to
+ check enabled or not
+In-Reply-To: <20170718064821.3668-1-jszhang@marvell.com>
+References: <20170718064821.3668-1-jszhang@marvell.com>
+Message-ID: <20170802215241.GO20308@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Minghuan, Mingkai, Roy]
+On Tue, Jul 18, 2017 at 02:48:21PM +0800, Jisheng Zhang wrote:
+> The ATU CTRL2 register is 32 bit, besides the enable bit, other bits
+> may also be set. To check whether the ATU is enabled or not, we should
+> test the enable bit.
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Acked-by: Joao Pinto <jpinto@synopsys.com>
 
-On Thu, Jul 06, 2017 at 05:39:44PM +0800, Zhiqiang Hou wrote:
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> 
-> The ls1088a and ls2088a has the same PCIe controller, so the ls1088a
-> will reuse the ls2088a's pcie compatible.
-> 
-> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+Applied with Jingoo's ack to pci/host-designware for v4.14, thanks!
+
 > ---
->  Documentation/devicetree/bindings/pci/layerscape-pci.txt | 1 +
->  drivers/pci/dwc/pci-layerscape.c                         | 9 +++++++++
->  2 files changed, 10 insertions(+)
+> Since v1:
+>  - Add Joao's Ack
+>  - Fix typo in commit msg, thank Jingoo
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> index ee1c72d5..cb735e1 100644
-> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> @@ -15,6 +15,7 @@ Required properties:
->  - compatible: should contain the platform identifier such as:
->          "fsl,ls1021a-pcie", "snps,dw-pcie"
->          "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
-> +        "fsl,ls2088a-pcie", "fsl,ls1088a-pcie"
-
-You add "fsl,ls1088a-pcie" here, but not in the ls_pcie_of_match[]
-table in the driver, so I don't think this will actually make the
-driver claim ls1088a devices, will it?
-
-I'm also waiting for an ack from the layerscape maintainers (added to
-cc list).
-
->          "fsl,ls1046a-pcie"
->  - reg: base addresses and lengths of the PCIe controller
->  - interrupts: A list of interrupt outputs of the controller. Must contain an
-> diff --git a/drivers/pci/dwc/pci-layerscape.c b/drivers/pci/dwc/pci-layerscape.c
-> index 9bed3cd..0df8189 100644
-> --- a/drivers/pci/dwc/pci-layerscape.c
-> +++ b/drivers/pci/dwc/pci-layerscape.c
-> @@ -239,12 +239,21 @@ static struct ls_pcie_drvdata ls2080_drvdata = {
->  	.dw_pcie_ops = &dw_ls_pcie_ops,
->  };
+>  drivers/pci/dwc/pcie-designware.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
+> index 0e03af279259..6bf0b409050a 100644
+> --- a/drivers/pci/dwc/pcie-designware.c
+> +++ b/drivers/pci/dwc/pcie-designware.c
+> @@ -177,7 +177,7 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
+>  	 */
+>  	for (retries = 0; retries < LINK_WAIT_MAX_IATU_RETRIES; retries++) {
+>  		val = dw_pcie_readl_dbi(pci, PCIE_ATU_CR2);
+> -		if (val == PCIE_ATU_ENABLE)
+> +		if (val & PCIE_ATU_ENABLE)
+>  			return;
 >  
-> +static struct ls_pcie_drvdata ls2088_drvdata = {
-> +	.lut_offset = 0x80000,
-> +	.ltssm_shift = 0,
-> +	.lut_dbg = 0x407fc,
-> +	.ops = &ls_pcie_host_ops,
-> +	.dw_pcie_ops = &dw_ls_pcie_ops,
-> +};
-> +
->  static const struct of_device_id ls_pcie_of_match[] = {
->  	{ .compatible = "fsl,ls1021a-pcie", .data = &ls1021_drvdata },
->  	{ .compatible = "fsl,ls1043a-pcie", .data = &ls1043_drvdata },
->  	{ .compatible = "fsl,ls1046a-pcie", .data = &ls1046_drvdata },
->  	{ .compatible = "fsl,ls2080a-pcie", .data = &ls2080_drvdata },
->  	{ .compatible = "fsl,ls2085a-pcie", .data = &ls2080_drvdata },
-> +	{ .compatible = "fsl,ls2088a-pcie", .data = &ls2088_drvdata },
->  	{ },
->  };
->  
+>  		usleep_range(LINK_WAIT_IATU_MIN, LINK_WAIT_IATU_MAX);
 > -- 
-> 2.1.0.27.g96db324
+> 2.13.2
 > 
 > 
 > _______________________________________________
