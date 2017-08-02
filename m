@@ -1,77 +1,64 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Wed, 2 Aug 2017 19:34:40 +0200
-Subject: [PATCH] arm64: dts: marvell: armada-3720-espressobin: Add vqmmc
- regulator for SD slot
-In-Reply-To: <20170729104411.3602-1-sean@nyekjaer.dk>
-References: <20170729104411.3602-1-sean@nyekjaer.dk>
-Message-ID: <20170802193440.21226c2a@xps13>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Thu, 3 Aug 2017 01:37:50 +0800
+Subject: [PATCH 0/2] serial: 8250: add support for MediaTek BTIF controller
+In-Reply-To: <1501694063.29303.361.camel@linux.intel.com>
+References: <cover.1501692369.git.sean.wang@mediatek.com>
+ <1501694063.29303.361.camel@linux.intel.com>
+Message-ID: <1501695470.25246.7.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sat, 29 Jul 2017 12:44:11 +0200
-Sean Nyekjaer <sean@nyekjaer.dk> wrote:
-
-> By adding this regulator, the SD cards are usable at higher speed
-> protocols such as SDR104.
+On Wed, 2017-08-02 at 20:14 +0300, Andy Shevchenko wrote:
+> On Thu, 2017-08-03 at 01:05 +0800, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > This patchset introduces the support for MediaTek BTIF controller.
+> > 
+> > MediaTek BTIF controller is the serial interface similar to UART but
+> > it
+> > works only as the digital device which is mainly used to communicate
+> > with
+> > the connectivity module also called CONNSYS inside the SoC which could
+> > be
+> > mostly found on those MediaTek SoCs with Bluetooth feature.
+> > 
+> > And the controller is made as being compatible with the 8250 register
+> > layout so it tends to be integrated with existing 8250 core driver and
+> > have no requirement for the modem configuration additionally such as
+> > the
+> > baud rate calculation and assignment.
 > 
-> This patch was tested with an SDHC card compatible with UHS-I.
 > 
-> Signed-off-by: Sean Nyekjaer <sean@nyekjaer.dk>
-
-The patch does the job, but does not apply as is.
-
-Tested-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-
-Regards,
-Miqu?l
-
-> ---
+> Why it requires a separate driver?
 > 
-> This patch depends on "[PATCH] arm64: dts: marvell: Add microsd card
-> definition for the ESPRESSObin"
+> 8250_of is for DT enabled drivers.
 > 
->  arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 15
-> ++++++++++++++- 1 file changed, 14 insertions(+), 1 deletion(-)
+
+Hi, Andy
+
+thanks for your information
+
+the hardware is not completely identical to 8250 device, 
+it has extra registers belonged to platform control such as internal
+loopback, dma disable/enable, sleep/wakeup setup and so on, so I create
+it as a separate driver.
+
+	Sean
+
+> > 
+> > Sean Wang (2):
+> >   dt-bindings: serial: Add MediaTek BTIF controller bindings
+> >   tty: serial: 8250: Add MediaTek BTIF controller on MT7622 and MT7623
+> >     SoC
+> > 
+> >  .../devicetree/bindings/serial/mtk-btif.txt        |  26 +++
+> >  drivers/tty/serial/8250/8250_btif.c                | 224
+> > +++++++++++++++++++++
+> >  drivers/tty/serial/8250/Kconfig                    |   9 +
+> >  drivers/tty/serial/8250/Makefile                   |   1 +
+> >  4 files changed, 260 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/serial/mtk-
+> > btif.txt
+> >  create mode 100644 drivers/tty/serial/8250/8250_btif.c
+> > 
 > 
-> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-> b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts index
-> 2dadd77e08eb..d5ab5b47f8d4 100644 ---
-> a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts +++
-> b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts @@ -60,6
-> +60,19 @@ device_type = "memory";
->  		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
->  	};
-> +
-> +	vcc_sd_reg1: regulator {
-> +		compatible = "regulator-gpio";
-> +		regulator-name= "vcc_sd1";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <3300000>;
-> +
-> +		gpios = <&gpionb 4 GPIO_ACTIVE_HIGH>;
-> +		gpios-states = <0>;
-> +		states = <1800000 0x1
-> +			  3300000 0x0>;
-> +		enable-active-high;
-> +	};
->  };
->  
->  /* J9 */
-> @@ -82,7 +95,7 @@
->  	wp-inverted;
->  	bus-width = <4>;
->  	cd-gpios = <&gpionb 3 GPIO_ACTIVE_LOW>;
-> -	no-1-8-v;
-> +	vqmmc-supply = <&vcc_sd_reg1>;
->  	marvell,pad-type = "sd";
->  	status = "okay";
->  };
-
-
-
--- 
-Miquel Raynal, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
