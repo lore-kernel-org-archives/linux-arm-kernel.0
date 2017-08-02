@@ -1,98 +1,124 @@
-From: nwatters@codeaurora.org (Nate Watterson)
-Date: Wed, 2 Aug 2017 13:31:03 -0400
-Subject: [PATCH v2 5/5] ACPI/IORT: Add IORT named component memory address
- limits
-In-Reply-To: <20170731152323.32488-6-lorenzo.pieralisi@arm.com>
-References: <20170731152323.32488-1-lorenzo.pieralisi@arm.com>
- <20170731152323.32488-6-lorenzo.pieralisi@arm.com>
-Message-ID: <cf158a20-e6ec-6826-e727-71ad74f9f7c5@codeaurora.org>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 2 Aug 2017 19:31:19 +0200
+Subject: [RFC PATCH v2 0/2] nb8800 suspend/resume support
+In-Reply-To: <yw1xk22mgdcx.fsf@mansr.com>
+References: <33d1ab47-6098-5e3f-8a3c-f72626d07113@free.fr>
+ <aa8885b8-e6bb-3624-2bf9-0bb40505ac54@free.fr>
+ <dd883398-1511-0bfd-972b-a11ef8709f0d@free.fr> <yw1xshhagexd.fsf@mansr.com>
+ <9e8e12b1-74e2-8323-ec16-eebda46b2a3d@free.fr> <yw1xo9rygdyu.fsf@mansr.com>
+ <6906dccf-bec9-0fc8-a34a-c39c05ada917@free.fr> <yw1xk22mgdcx.fsf@mansr.com>
+Message-ID: <f1554ee7-2151-1304-c5c1-35264b9be5be@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-I ran a quick test and this seems to work for memory_address_limit < 64,
-however memory_address_limit == 64 yields a mask of 0x0.
+On 02/08/2017 18:10, M?ns Rullg?rd wrote:
 
--Nate
+> ping -f is limited to 100 packets per second.
+> Use something like iperf in UDP mode instead.
 
-On 7/31/2017 11:23 AM, Lorenzo Pieralisi wrote:
-> IORT named components provide firmware configuration describing
-> how many address bits a given device is capable of generating
-> to address memory.
-> 
-> Add code to the kernel to retrieve memory address limits
-> configuration for IORT named components and configure DMA masks
-> accordingly.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Nate Watterson <nwatters@codeaurora.org>
-> ---
->   drivers/acpi/arm64/iort.c | 40 ++++++++++++++++++++++++++++++----------
->   1 file changed, 30 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index 67b85ae..b85d19f 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -680,6 +680,24 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
->   	return ret ? NULL : ops;
->   }
->   
-> +static int nc_dma_get_range(struct device *dev, u64 *size)
-> +{
-> +	struct acpi_iort_node *node;
-> +	struct acpi_iort_named_component *ncomp;
-> +
-> +	node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
-> +			      iort_match_node_callback, dev);
-> +	if (!node)
-> +		return -ENODEV;
-> +
-> +	ncomp = (struct acpi_iort_named_component *)node->node_data;
-> +
-> +	*size = ncomp->memory_address_limit >= 64 ? ~0ULL :
-> +			1ULL<<ncomp->memory_address_limit;
-> +
-> +	return 0;
-> +}
-> +
->   /**
->    * iort_dma_setup() - Set-up device DMA parameters.
->    *
-> @@ -708,17 +726,19 @@ void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
->   
->   	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
->   
-> -	if (dev_is_pci(dev)) {
-> +	if (dev_is_pci(dev))
->   		ret = acpi_dma_get_range(dev, &dmaaddr, &offset, &size);
-> -		if (!ret) {
-> -			mask = __roundup_pow_of_two(dmaaddr + size) - 1;
-> -			/*
-> -			 * Limit coherent and dma mask based on size
-> -			 * retrieved from firmware.
-> -			 */
-> -			dev->coherent_dma_mask = mask;
-> -			*dev->dma_mask = mask;
-> -		}
-> +	else
-> +		ret = nc_dma_get_range(dev, &size);
-> +
-> +	if (!ret) {
-> +		mask = __roundup_pow_of_two(dmaaddr + size) - 1;
-> +		/*
-> +		 * Limit coherent and dma mask based on size
-> +		 * retrieved from firmware.
-> +		 */
-> +		dev->coherent_dma_mask = mask;
-> +		*dev->dma_mask = mask;
->   	}
->   
->   	*dma_addr = dmaaddr;
-> 
+CLIENT: DESKTOP
+# iperf3 -c 172.27.64.45 -u -b 950M
+Connecting to host 172.27.64.45, port 5201
+[  4] local 172.27.64.1 port 55533 connected to 172.27.64.45 port 5201
+[ ID] Interval           Transfer     Bandwidth       Total Datagrams
+[  4]   0.00-1.00   sec   102 MBytes   858 Mbits/sec  13091  
+[  4]   1.00-2.00   sec   114 MBytes   953 Mbits/sec  14541  
+[  4]   2.00-3.00   sec   114 MBytes   953 Mbits/sec  14542  
+[  4]   3.00-4.00   sec   114 MBytes   953 Mbits/sec  14541  
+[  4]   4.00-5.00   sec   114 MBytes   953 Mbits/sec  14542  
+[  4]   5.00-6.00   sec   114 MBytes   953 Mbits/sec  14541  
+[  4]   6.00-7.00   sec   114 MBytes   953 Mbits/sec  14535  
+[  4]   7.00-8.00   sec   114 MBytes   953 Mbits/sec  14536  
+[  4]   8.00-9.00   sec   114 MBytes   953 Mbits/sec  14543  
+[  4]   9.00-10.00  sec   114 MBytes   953 Mbits/sec  14541  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total Datagrams
+[  4]   0.00-10.00  sec  1.10 GBytes   943 Mbits/sec  0.247 ms  132176/143788 (92%)  
+[  4] Sent 143788 datagrams
 
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+iperf Done.
+
+
+SERVER: TANGO BOARD
+# iperf3 -s
+Accepted connection from 172.27.64.1, port 44995
+[  5] local 172.27.64.45 port 5201 connected to 172.27.64.1 port 55533
+[ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total Datagrams
+[  5]   0.00-1.00   sec  7.90 MBytes  66.2 Mbits/sec  0.218 ms  11365/12376 (92%)  
+[  5]   1.00-2.00   sec  9.13 MBytes  76.6 Mbits/sec  0.230 ms  13381/14550 (92%)  
+[  5]   2.00-3.00   sec  9.12 MBytes  76.5 Mbits/sec  0.290 ms  13372/14540 (92%)  
+[  5]   3.00-4.00   sec  9.11 MBytes  76.4 Mbits/sec  0.292 ms  13369/14535 (92%)  
+[  5]   4.00-5.00   sec  9.18 MBytes  77.0 Mbits/sec  0.178 ms  13374/14549 (92%)  
+[  5]   5.00-6.00   sec  9.10 MBytes  76.3 Mbits/sec  0.228 ms  13367/14532 (92%)  
+[  5]   6.00-7.00   sec  9.26 MBytes  77.7 Mbits/sec  0.607 ms  13356/14541 (92%)  
+[  5]   7.00-8.00   sec  9.23 MBytes  77.4 Mbits/sec  0.507 ms  13364/14545 (92%)  
+[  5]   8.00-9.00   sec  9.20 MBytes  77.1 Mbits/sec  0.215 ms  13351/14528 (92%)  
+[  5]   9.00-10.00  sec  9.16 MBytes  76.9 Mbits/sec  0.188 ms  13356/14529 (92%)  
+[  5]  10.00-10.04  sec   336 KBytes  72.2 Mbits/sec  0.247 ms  521/563 (93%)  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total Datagrams
+[  5]   0.00-10.04  sec  0.00 Bytes  0.00 bits/sec  0.247 ms  132176/143788 (92%)  
+
+
+There is some packet loss, but the board doesn't lose connectivity.
+
+With smaller packets...
+
+# iperf3 -c 172.27.64.45 -u -b 950M -l 800
+Connecting to host 172.27.64.45, port 5201
+[  4] local 172.27.64.1 port 35197 connected to 172.27.64.45 port 5201
+[ ID] Interval           Transfer     Bandwidth       Total Datagrams
+[  4]   0.00-1.00   sec  90.6 MBytes   760 Mbits/sec  118724  
+[  4]   1.00-2.00   sec   107 MBytes   894 Mbits/sec  139718  
+[  4]   2.00-3.00   sec   106 MBytes   889 Mbits/sec  138918  
+[  4]   3.00-4.00   sec   107 MBytes   895 Mbits/sec  139768  
+[  4]   4.00-5.00   sec   106 MBytes   891 Mbits/sec  139275  
+[  4]   5.00-6.00   sec   107 MBytes   895 Mbits/sec  139862  
+[  4]   6.00-7.00   sec   107 MBytes   895 Mbits/sec  139825  
+[  4]   7.00-8.00   sec   107 MBytes   895 Mbits/sec  139775  
+[  4]   8.00-9.00   sec   107 MBytes   895 Mbits/sec  139849  
+[  4]   9.00-10.00  sec   107 MBytes   895 Mbits/sec  139835  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total Datagrams
+[  4]   0.00-10.00  sec  1.02 GBytes   880 Mbits/sec  0.009 ms  564117/1375520 (41%)  
+[  4] Sent 1375520 datagrams
+
+iperf Done.
+
+
+Accepted connection from 172.27.64.1, port 46151
+[  5] local 172.27.64.45 port 5201 connected to 172.27.64.1 port 35197
+[ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total Datagrams
+[  5]   0.00-1.00   sec  60.8 MBytes   510 Mbits/sec  0.004 ms  33508/113252 (30%)  
+iperf3: OUT OF ORDER - incoming packet = 147146 and received packet = 0 AND SP = 147497
+iperf3: OUT OF ORDER - incoming packet = 146128 and received packet = 0 AND SP = 147690
+iperf3: OUT OF ORDER - incoming packet = 146067 and received packet = 0 AND SP = 147863
+iperf3: OUT OF ORDER - incoming packet = 147242 and received packet = 0 AND SP = 148039
+iperf3: OUT OF ORDER - incoming packet = 163837 and received packet = 0 AND SP = 164363
+[  5]   1.00-2.00   sec  61.0 MBytes   511 Mbits/sec  0.198 ms  59635/139649 (43%)  
+iperf3: OUT OF ORDER - incoming packet = 286437 and received packet = 0 AND SP = 287226
+iperf3: OUT OF ORDER - incoming packet = 302990 and received packet = 0 AND SP = 305710
+[  5]   2.00-3.00   sec  61.5 MBytes   517 Mbits/sec  0.005 ms  58369/138944 (42%)  
+iperf3: OUT OF ORDER - incoming packet = 427697 and received packet = 0 AND SP = 428089
+iperf3: OUT OF ORDER - incoming packet = 441087 and received packet = 0 AND SP = 442963
+iperf3: OUT OF ORDER - incoming packet = 453844 and received packet = 0 AND SP = 454238
+[  5]   3.00-4.00   sec  61.7 MBytes   517 Mbits/sec  0.008 ms  58975/139795 (42%)  
+[  5]   4.00-5.00   sec  61.3 MBytes   514 Mbits/sec  0.010 ms  58453/138795 (42%)  
+[  5]   5.00-6.00   sec  61.2 MBytes   513 Mbits/sec  0.014 ms  60141/140338 (43%)  
+[  5]   6.00-7.00   sec  61.3 MBytes   514 Mbits/sec  0.009 ms  59055/139384 (42%)  
+iperf3: OUT OF ORDER - incoming packet = 993646 and received packet = 0 AND SP = 994370
+[  5]   7.00-8.00   sec  61.0 MBytes   512 Mbits/sec  0.007 ms  60265/140210 (43%)  
+iperf3: OUT OF ORDER - incoming packet = 1134516 and received packet = 0 AND SP = 1135942
+[  5]   8.00-9.00   sec  62.6 MBytes   523 Mbits/sec  0.198 ms  57805/139795 (41%)  
+iperf3: OUT OF ORDER - incoming packet = 1275612 and received packet = 0 AND SP = 1277716
+[  5]   9.00-10.00  sec  64.0 MBytes   538 Mbits/sec  0.007 ms  56029/139888 (40%)  
+[  5]  10.00-10.04  sec  2.74 MBytes   589 Mbits/sec  0.009 ms  1882/5470 (34%)  
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bandwidth       Jitter    Lost/Total Datagrams
+[  5]   0.00-10.04  sec  0.00 Bytes  0.00 bits/sec  0.009 ms  564117/1375520 (41%)  
+[SUM]  0.0-10.0 sec  13 datagrams received out-of-order
+
+
+A lot more packet loss, but RX holds on.
+
+Regards.
