@@ -1,83 +1,124 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed,  2 Aug 2017 10:22:05 -0600
-Subject: [PATCH 11/26] coresight: Add support for reading 64bit registers
+Date: Wed,  2 Aug 2017 10:22:04 -0600
+Subject: [PATCH 10/26] coresight replicator: Cleanup programmable replicator
+ naming
 In-Reply-To: <1501690940-4137-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1501690940-4137-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1501690940-4137-12-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1501690940-4137-11-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Add support for reading a lower and upper 32bits of a register
-as a single 64bit register. Also add simplified macros for
-direct register accesses.
+The Linux coresight drivers define the programmable ATB replicator as
+Qualcomm replicator, while this is designed by ARM. This can cause
+confusion to a user selecting the driver. Cleanup all references to
+make it explicitly clear. This patch :
 
+ 1) Replace the compatible string for the replicator :
+      qcom,coresight-replicator1x => arm,coresight-dynamic-replicator
+ 2) Changes the Kconfig symbol (since this is not part of any defconfigs)
+     CORESIGHT_QCOM_REPLICATOR => CORESIGHT_DYNAMIC_REPLICATOR
+ 3) Improves the help message in the Kconfig.
+ 4) Changes the name of the driver and the file :
+      coresight-replicator-qcom => coresight-dynamic-replicator
+
+Cc: Pratik Patel <pratikp@codeaurora.org>
+Cc: Ivan T. Ivanov <ivan.ivanov@linaro.org>
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: devicetree at vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Rob Herring <robh+dt@kernel.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-priv.h | 29 +++++++++++++++++++++++-----
- 1 file changed, 24 insertions(+), 5 deletions(-)
+ Documentation/devicetree/bindings/arm/coresight.txt            |  4 ++--
+ drivers/hwtracing/coresight/Kconfig                            | 10 +++++-----
+ drivers/hwtracing/coresight/Makefile                           |  2 +-
+ ...esight-replicator-qcom.c => coresight-dynamic-replicator.c} |  4 +---
+ 4 files changed, 9 insertions(+), 11 deletions(-)
+ rename drivers/hwtracing/coresight/{coresight-replicator-qcom.c => coresight-dynamic-replicator.c} (97%)
 
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index 3e25b1dd1a1a..9fdebb773e71 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -39,23 +39,31 @@
- #define ETM_MODE_EXCL_USER	BIT(31)
+diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+index fcbae6a5e6c1..15ac8e8dcfdf 100644
+--- a/Documentation/devicetree/bindings/arm/coresight.txt
++++ b/Documentation/devicetree/bindings/arm/coresight.txt
+@@ -34,8 +34,8 @@ its hardware characteristcs.
+ 		- Embedded Trace Macrocell (version 4.x):
+ 			"arm,coresight-etm4x", "arm,primecell";
  
- typedef u32 (*coresight_read_fn)(const struct device *, u32 offset);
--#define coresight_simple_func(type, func, name, offset)			\
-+#define __coresight_simple_func(type, func, name, lo_off, hi_off)	\
- static ssize_t name##_show(struct device *_dev,				\
- 			   struct device_attribute *attr, char *buf)	\
- {									\
- 	type *drvdata = dev_get_drvdata(_dev->parent);			\
- 	coresight_read_fn fn = func;					\
--	u32 val;							\
-+	u64 val;							\
- 	pm_runtime_get_sync(_dev->parent);				\
- 	if (fn)								\
--		val = fn(_dev->parent, offset);				\
-+		val = (u64)fn(_dev->parent, lo_off);			\
- 	else								\
--		val = readl_relaxed(drvdata->base + offset);		\
-+		val = coresight_read_reg_pair(drvdata->base,		\
-+						 lo_off, hi_off);	\
- 	pm_runtime_put_sync(_dev->parent);				\
--	return scnprintf(buf, PAGE_SIZE, "0x%x\n", val);		\
-+	return scnprintf(buf, PAGE_SIZE, "0x%llx\n", val);		\
- }									\
- static DEVICE_ATTR_RO(name)
+-		- Qualcomm Configurable Replicator (version 1.x):
+-			"qcom,coresight-replicator1x", "arm,primecell";
++		- Coresight programmable Replicator :
++			"arm,coresight-dynamic-replicator", "arm,primecell";
  
-+#define coresight_simple_func(type, func, name, offset)			\
-+	__coresight_simple_func(type, func, name, offset, -1)
-+#define coresight_simple_reg32(type, name, offset)			\
-+	__coresight_simple_func(type, NULL, name, offset, -1)
-+#define coresight_simple_reg64(type, name, lo_off, hi_off)		\
-+	__coresight_simple_func(type, NULL, name, lo_off, hi_off)
-+
- extern const u32 barrier_pkt[5];
+ 		- System Trace Macrocell:
+ 			"arm,coresight-stm", "arm,primecell"; [1]
+diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+index 8d55d6d79015..ef9cb3c164e1 100644
+--- a/drivers/hwtracing/coresight/Kconfig
++++ b/drivers/hwtracing/coresight/Kconfig
+@@ -70,13 +70,13 @@ config CORESIGHT_SOURCE_ETM4X
+ 	  for instruction level tracing. Depending on the implemented version
+ 	  data tracing may also be available.
  
- enum etm_addr_type {
-@@ -108,6 +116,17 @@ static inline void CS_UNLOCK(void __iomem *addr)
- 	} while (0);
+-config CORESIGHT_QCOM_REPLICATOR
+-	bool "Qualcomm CoreSight Replicator driver"
++config CORESIGHT_DYNAMIC_REPLICATOR
++	bool "CoreSight Programmable Replicator driver"
+ 	depends on CORESIGHT_LINKS_AND_SINKS
+ 	help
+-	  This enables support for Qualcomm CoreSight link driver. The
+-	  programmable ATB replicator sends the ATB trace stream from the
+-	  ETB/ETF to the TPIUi and ETR.
++	  This enables support for dynamic CoreSight replicator link driver.
++	  The programmable ATB replicator allows independent filtering of the
++	  trace data based on the traceid.
+ 
+ config CORESIGHT_STM
+ 	bool "CoreSight System Trace Macrocell driver"
+diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
+index 433d59025eb6..5bae90ce794d 100644
+--- a/drivers/hwtracing/coresight/Makefile
++++ b/drivers/hwtracing/coresight/Makefile
+@@ -14,6 +14,6 @@ obj-$(CONFIG_CORESIGHT_SOURCE_ETM3X) += coresight-etm3x.o coresight-etm-cp14.o \
+ 					coresight-etm3x-sysfs.o
+ obj-$(CONFIG_CORESIGHT_SOURCE_ETM4X) += coresight-etm4x.o \
+ 					coresight-etm4x-sysfs.o
+-obj-$(CONFIG_CORESIGHT_QCOM_REPLICATOR) += coresight-replicator-qcom.o
++obj-$(CONFIG_CORESIGHT_DYNAMIC_REPLICATOR) += coresight-dynamic-replicator.o
+ obj-$(CONFIG_CORESIGHT_STM) += coresight-stm.o
+ obj-$(CONFIG_CORESIGHT_CPU_DEBUG) += coresight-cpu-debug.o
+diff --git a/drivers/hwtracing/coresight/coresight-replicator-qcom.c b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+similarity index 97%
+rename from drivers/hwtracing/coresight/coresight-replicator-qcom.c
+rename to drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+index 0a3d15f0b009..c6900f2301de 100644
+--- a/drivers/hwtracing/coresight/coresight-replicator-qcom.c
++++ b/drivers/hwtracing/coresight/coresight-dynamic-replicator.c
+@@ -143,7 +143,6 @@ static int replicator_probe(struct amba_device *adev, const struct amba_id *id)
+ 	if (IS_ERR(drvdata->csdev))
+ 		return PTR_ERR(drvdata->csdev);
+ 
+-	dev_info(dev, "%s initialized\n", (char *)id->data);
+ 	return 0;
  }
  
-+static inline u64
-+coresight_read_reg_pair(void __iomem *addr, s32 lo_offset, s32 hi_offset)
-+{
-+	u64 val;
-+
-+	val = readl_relaxed(addr + lo_offset);
-+	val |= (hi_offset < 0) ? 0 :
-+	       (u64)readl_relaxed(addr + hi_offset) << 32;
-+	return val;
-+}
-+
- void coresight_disable_path(struct list_head *path);
- int coresight_enable_path(struct list_head *path, u32 mode);
- struct coresight_device *coresight_get_sink(struct list_head *path);
+@@ -179,14 +178,13 @@ static struct amba_id replicator_ids[] = {
+ 	{
+ 		.id     = 0x0003b909,
+ 		.mask   = 0x0003ffff,
+-		.data	= "REPLICATOR 1.0",
+ 	},
+ 	{ 0, 0 },
+ };
+ 
+ static struct amba_driver replicator_driver = {
+ 	.drv = {
+-		.name	= "coresight-replicator-qcom",
++		.name	= "coresight-dynamic-replicator",
+ 		.pm	= &replicator_dev_pm_ops,
+ 		.suppress_bind_attrs = true,
+ 	},
 -- 
 2.7.4
