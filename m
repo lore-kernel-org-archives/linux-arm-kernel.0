@@ -1,39 +1,43 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 2 Aug 2017 14:49:01 +0300
-Subject: [PATCH v3 10/11] ARM64: dts: rockchip: Add gmac2phy node support
- for rk3328
-In-Reply-To: <1501655097-21054-1-git-send-email-david.wu@rock-chips.com>
-References: <1501654546-17292-1-git-send-email-david.wu@rock-chips.com>
- <1501655097-21054-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <6b97127d-8ac9-99a8-2d03-2dfc0dc9e86f@cogentembedded.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 2 Aug 2017 13:51:47 +0200
+Subject: [PATCH] pinctrl: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-43-robh@kernel.org>
+References: <20170718214339.7774-43-robh@kernel.org>
+Message-ID: <CACRpkdauP1T9bpp8C68wt6oK7gosAHt3pR7i=2+zRvPwXHo3ZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On Tue, Jul 18, 2017 at 11:43 PM, Rob Herring <robh@kernel.org> wrote:
 
-On 08/02/2017 09:24 AM, David Wu wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
+>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Lee Jones <lee@kernel.org>
+> Cc: Eric Anholt <eric@anholt.net>
+> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Ray Jui <rjui@broadcom.com>
+> Cc: Scott Branden <sbranden@broadcom.com>
+> Cc: bcm-kernel-feedback-list at broadcom.com
+> Cc: Ludovic Desroches <ludovic.desroches@microchip.com>
+> Cc: Patrice Chotard <patrice.chotard@st.com>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Barry Song <baohua@kernel.org>
+> Cc: linux-gpio at vger.kernel.org
+> Cc: linux-rpi-kernel at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: kernel at stlinux.com
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-renesas-soc at vger.kernel.org
 
-> The gmac2phy controller of rk3328 is connected to internal phy
-> directly inside, add the node for the internal phy support.
-> 
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
-> ---
->   arch/arm64/boot/dts/rockchip/rk3328.dtsi | 25 +++++++++++++++++++++++++
->   1 file changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-> index 0be96ce..51c8c66 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-[...]
-> @@ -424,6 +426,29 @@
->   		status = "disabled";
->   	};
->   
-> +	gmac2phy: eth at ff550000 {
+Patch applied with the recieved ACKs.
 
-    The standardized name is ethernet at ...
-
-[...]
-
-MBR, Sergei
+Yours,
+Linus Walleij
