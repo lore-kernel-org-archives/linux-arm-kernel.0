@@ -1,177 +1,33 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Wed, 02 Aug 2017 12:02:31 +0100
-Subject: [RFC PATCH v2 1/2] net: ethernet: nb8800: Reset HW block in
- ndo_open
-In-Reply-To: <d817da35-f977-5985-4aae-73617004fac3@free.fr> (Mason's message
- of "Tue, 1 Aug 2017 18:37:15 +0200")
-References: <33d1ab47-6098-5e3f-8a3c-f72626d07113@free.fr>
- <d817da35-f977-5985-4aae-73617004fac3@free.fr>
-Message-ID: <yw1xbmnyi660.fsf@mansr.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Wed, 2 Aug 2017 16:39:50 +0530
+Subject: rk3288: mmcblk0: error -110 sending status command, retrying
+Message-ID: <CAD6G_RRgPB_FVTr0OUdtUXeViben6pSakEcskzwQXkqUeaT2kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+Hi,
 
-> Move all HW initializations to nb8800_init.
-> This provides the basis for suspend/resume support.
-> ---
->  drivers/net/ethernet/aurora/nb8800.c | 50 +++++++++++++++++-------------------
->  drivers/net/ethernet/aurora/nb8800.h |  1 +
->  2 files changed, 25 insertions(+), 26 deletions(-)
+Did anyone observing error -110 and -84 during boot on rk3288 target?
+full log here[1] and used dts node is[2].
 
-You're still not doing anything to preserve flow control and multicast
-configuration, and those are probably not the only ones.
+Proper card detection is done, once we insert after console came-up
+# [   39.635614] mmc0: card 59b4 removed
+[   40.645537] mmc_host mmc0: Bus speed (slot 0) = 400000Hz (slot req
+400000Hz, actual 400000HZ div = 0)
+[   41.004559] mmc_host mmc0: Bus speed (slot 0) = 50000000Hz (slot
+req 50000000Hz, actual 50000000HZ div = 0)
+[   41.015553] mmc0: new high speed SDXC card at address 59b4
+[   41.022015] mmcblk0: mmc0:59b4 MS    59.1 GiB
+[   41.028458]  mmcblk0: p1 p2
 
-Worse, you're now never tearing down dma properly, which means the
-hardware can be left with active pointers to memory no longer allocated
-to it.
+Any help?
 
-Finally, you still haven't explained why the hw needs to be reset in
-ndo_open().  Whatever is causing your lockup can almost certainly be
-triggered in some other way too.  I will not accept this side-stepping
-of the issue.
+[1] https://paste.ubuntu.com/25225486/
+[2] https://paste.ubuntu.com/25225915/
 
-> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
-> index e94159507847..aa18ea25d91f 100644
-> --- a/drivers/net/ethernet/aurora/nb8800.c
-> +++ b/drivers/net/ethernet/aurora/nb8800.c
-> @@ -39,6 +39,7 @@
->
->  #include "nb8800.h"
->
-> +static void nb8800_init(struct net_device *dev);
->  static void nb8800_tx_done(struct net_device *dev);
->  static int nb8800_dma_stop(struct net_device *dev);
->
-> @@ -957,6 +958,8 @@ static int nb8800_open(struct net_device *dev)
->  	struct phy_device *phydev;
->  	int err;
->
-> +	nb8800_init(dev);
-> +
->  	/* clear any pending interrupts */
->  	nb8800_writel(priv, NB8800_RXC_SR, 0xf);
->  	nb8800_writel(priv, NB8800_TXC_SR, 0xf);
-> @@ -1246,11 +1249,6 @@ static int nb8800_hw_init(struct net_device *dev)
->  	nb8800_writeb(priv, NB8800_PQ1, val >> 8);
->  	nb8800_writeb(priv, NB8800_PQ2, val & 0xff);
->
-> -	/* Auto-negotiate by default */
-> -	priv->pause_aneg = true;
-> -	priv->pause_rx = true;
-> -	priv->pause_tx = true;
-> -
->  	nb8800_mc_init(dev, 0);
->
->  	return 0;
-> @@ -1350,6 +1348,20 @@ static const struct of_device_id nb8800_dt_ids[] = {
->  };
->  MODULE_DEVICE_TABLE(of, nb8800_dt_ids);
->
-> +static void nb8800_init(struct net_device *dev)
-> +{
-> +	struct nb8800_priv *priv = netdev_priv(dev);
-> +	const struct nb8800_ops *ops = priv->ops;
-> +
-> +	if (ops && ops->reset)
-> +		ops->reset(dev);
-> +	nb8800_hw_init(dev);
-> +	if (ops && ops->init)
-> +		ops->init(dev);
-> +	nb8800_update_mac_addr(dev);
-> +	priv->speed = 0;
-> +}
-> +
->  static int nb8800_probe(struct platform_device *pdev)
->  {
->  	const struct of_device_id *match;
-> @@ -1389,6 +1401,7 @@ static int nb8800_probe(struct platform_device *pdev)
->
->  	priv = netdev_priv(dev);
->  	priv->base = base;
-> +	priv->ops = ops;
->
->  	priv->phy_mode = of_get_phy_mode(pdev->dev.of_node);
->  	if (priv->phy_mode < 0)
-> @@ -1407,12 +1420,6 @@ static int nb8800_probe(struct platform_device *pdev)
->
->  	spin_lock_init(&priv->tx_lock);
->
-> -	if (ops && ops->reset) {
-> -		ret = ops->reset(dev);
-> -		if (ret)
-> -			goto err_disable_clk;
-> -	}
-> -
->  	bus = devm_mdiobus_alloc(&pdev->dev);
->  	if (!bus) {
->  		ret = -ENOMEM;
-> @@ -1454,21 +1461,16 @@ static int nb8800_probe(struct platform_device *pdev)
->
->  	priv->mii_bus = bus;
->
-> -	ret = nb8800_hw_init(dev);
-> -	if (ret)
-> -		goto err_deregister_fixed_link;
-> -
-> -	if (ops && ops->init) {
-> -		ret = ops->init(dev);
-> -		if (ret)
-> -			goto err_deregister_fixed_link;
-> -	}
-> -
->  	dev->netdev_ops = &nb8800_netdev_ops;
->  	dev->ethtool_ops = &nb8800_ethtool_ops;
->  	dev->flags |= IFF_MULTICAST;
->  	dev->irq = irq;
->
-> +	/* Auto-negotiate by default */
-> +	priv->pause_aneg = true;
-> +	priv->pause_rx = true;
-> +	priv->pause_tx = true;
-> +
->  	mac = of_get_mac_address(pdev->dev.of_node);
->  	if (mac)
->  		ether_addr_copy(dev->dev_addr, mac);
-> @@ -1476,14 +1478,12 @@ static int nb8800_probe(struct platform_device *pdev)
->  	if (!is_valid_ether_addr(dev->dev_addr))
->  		eth_hw_addr_random(dev);
->
-> -	nb8800_update_mac_addr(dev);
-> -
->  	netif_carrier_off(dev);
->
->  	ret = register_netdev(dev);
->  	if (ret) {
->  		netdev_err(dev, "failed to register netdev\n");
-> -		goto err_free_dma;
-> +		goto err_deregister_fixed_link;
->  	}
->
->  	netif_napi_add(dev, &priv->napi, nb8800_poll, NAPI_POLL_WEIGHT);
-> @@ -1492,8 +1492,6 @@ static int nb8800_probe(struct platform_device *pdev)
->
->  	return 0;
->
-> -err_free_dma:
-> -	nb8800_dma_free(dev);
->  err_deregister_fixed_link:
->  	if (of_phy_is_fixed_link(pdev->dev.of_node))
->  		of_phy_deregister_fixed_link(pdev->dev.of_node);
-> diff --git a/drivers/net/ethernet/aurora/nb8800.h b/drivers/net/ethernet/aurora/nb8800.h
-> index 6ec4a956e1e5..d5f4481a2c7b 100644
-> --- a/drivers/net/ethernet/aurora/nb8800.h
-> +++ b/drivers/net/ethernet/aurora/nb8800.h
-> @@ -305,6 +305,7 @@ struct nb8800_priv {
->  	dma_addr_t			tx_desc_dma;
->
->  	struct clk			*clk;
-> +	const struct nb8800_ops		*ops;
->  };
->
->  struct nb8800_ops {
-> -- 
-> 2.11.0
-
+thanks!
 -- 
-M?ns Rullg?rd
+Jagan Teki
+Free Software Engineer | www.openedev.com
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
