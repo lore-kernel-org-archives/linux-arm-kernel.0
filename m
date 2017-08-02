@@ -1,90 +1,53 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed,  2 Aug 2017 13:18:24 -0400
-Subject: [PATCH V6 2/2] PCI: handle CRS returned by device after FLR
-In-Reply-To: <1501694304-16554-1-git-send-email-okaya@codeaurora.org>
-References: <1501694304-16554-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1501694304-16554-2-git-send-email-okaya@codeaurora.org>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Wed, 02 Aug 2017 20:14:23 +0300
+Subject: [PATCH 0/2] serial: 8250: add support for MediaTek BTIF controller
+In-Reply-To: <cover.1501692369.git.sean.wang@mediatek.com>
+References: <cover.1501692369.git.sean.wang@mediatek.com>
+Message-ID: <1501694063.29303.361.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An endpoint is allowed to issue Configuration Request Retry Status (CRS)
-following a Function Level Reset (FLR) request to indicate that it is
-not ready to accept new requests. CRS is defined in PCIe r3.1, sec 2.3.1.
-Request Handling Rules and CRS usage in FLR context is mentioned in
-PCIe r3.1, sec 6.6.2. Function-Level Reset.
+On Thu, 2017-08-03 at 01:05 +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> This patchset introduces the support for MediaTek BTIF controller.
+> 
+> MediaTek BTIF controller is the serial interface similar to UART but
+> it
+> works only as the digital device which is mainly used to communicate
+> with
+> the connectivity module also called CONNSYS inside the SoC which could
+> be
+> mostly found on those MediaTek SoCs with Bluetooth feature.
+> 
+> And the controller is made as being compatible with the 8250 register
+> layout so it tends to be integrated with existing 8250 core driver and
+> have no requirement for the modem configuration additionally such as
+> the
+> baud rate calculation and assignment.
 
-Adding a vendor ID read if this is a physical function before attempting
-to read any other registers on the endpoint. A CRS indication will only
-be given if the address to be read is vendor ID register.
-pci_bus_read_dev_vendor_id() knows how to deal with CRS returned values.
 
-If pci_bus_read_dev_vendor_id() fails, it prints a user visible warning
-after provided 1 second timeout is reached. pci_flr_wait() will keep
-calling this function 60 times to allow up to 60 seconds to be consistent
-with the rest of the kernel CRS timeout handling.
+Why it requires a separate driver?
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/pci.c | 36 +++++++++++++++++++++++-------------
- 1 file changed, 23 insertions(+), 13 deletions(-)
+8250_of is for DT enabled drivers.
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 2ed604a..01b28ac 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -3813,30 +3813,40 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
- 
- /*
-  * We should only need to wait 100ms after FLR for virtual functions.
-- * Wait for up to 1000ms for config space to return something other than -1.
-- * Intel IGD requires this when an LCD panel is attached.  We read the 2nd
-- * dword because VFs don't implement the 1st dword.
-+ * Wait for up to 60s for config space to return something other than -1.
-+ * Intel IGD requires 300ms when an LCD panel is attached.  We use
-+ * pci_bus_read_dev_vendor_id() for reading the vendor ID as it handles
-+ * CRS gracefully.
-  */
- static void pci_flr_wait(struct pci_dev *dev)
- {
--	int i = 0;
-+	u32 sleep = 1000, total = 0;
- 	u32 id;
-+	bool ret;
- 
- 	if (dev->is_virtfn) {
- 		msleep(100);
- 		return;
- 	}
- 
-+	/* don't touch the HW before waiting 100ms */
-+	msleep(100);
-+
- 	do {
--		msleep(100);
--		pci_read_config_dword(dev, PCI_COMMAND, &id);
--	} while (i++ < 10 && id == ~0);
--
--	if (id == ~0)
--		dev_warn(&dev->dev, "Failed to return from FLR\n");
--	else if (i > 1)
--		dev_info(&dev->dev, "Required additional %dms to return from FLR\n",
--			 (i - 1) * 100);
-+		ret = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
-+						 sleep);
-+		if (ret)
-+			break;
-+		total += sleep;
-+		sleep *= 2;
-+	} while (total < 60000 && !ret);
-+
-+	if (!ret)
-+		dev_warn(&dev->dev, "Failed to return from FLR after %ds\n",
-+			 total);
-+	else if (total)
-+		dev_info(&dev->dev, "Required additional %ds to return from FLR\n",
-+			 total);
- }
- 
- /**
+> 
+> Sean Wang (2):
+> ? dt-bindings: serial: Add MediaTek BTIF controller bindings
+> ? tty: serial: 8250: Add MediaTek BTIF controller on MT7622 and MT7623
+> ????SoC
+> 
+> ?.../devicetree/bindings/serial/mtk-btif.txt????????|??26 +++
+> ?drivers/tty/serial/8250/8250_btif.c????????????????| 224
+> +++++++++++++++++++++
+> ?drivers/tty/serial/8250/Kconfig????????????????????|???9 +
+> ?drivers/tty/serial/8250/Makefile???????????????????|???1 +
+> ?4 files changed, 260 insertions(+)
+> ?create mode 100644 Documentation/devicetree/bindings/serial/mtk-
+> btif.txt
+> ?create mode 100644 drivers/tty/serial/8250/8250_btif.c
+> 
+
 -- 
-1.9.1
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
