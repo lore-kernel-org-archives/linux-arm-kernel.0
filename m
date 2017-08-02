@@ -1,81 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 2 Aug 2017 10:55:55 +0800
-Subject: [PATCH v2] ARM: dts: sun8i: h3: Enable EMAC with external PHY on
- NanoPi M1 Plus
-In-Reply-To: <20170802025026.24232-1-luaraneda@gmail.com>
-References: <20170802025026.24232-1-luaraneda@gmail.com>
-Message-ID: <CAGb2v653hG2h5fZSBGeXaVE2Gn03vsncHi1d87cmyYA=w2TnKw@mail.gmail.com>
+From: zhiyong.tao@mediatek.com (Zhiyong Tao)
+Date: Wed, 2 Aug 2017 10:58:52 +0800
+Subject: [PATCH 0/3] PINCTRL: Mediatek pinctrl driver for mt2712
+In-Reply-To: <1501577069.32089.0.camel@mtksdaap41>
+References: <1501489333-23145-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1501577069.32089.0.camel@mtksdaap41>
+Message-ID: <1501642732.844.14.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 2, 2017 at 10:50 AM, Luis Araneda <luaraneda@gmail.com> wrote:
-> The Nanopi M1 Plus uses an external Realtek RTL8211E PHY in RGMII mode,
-> enabled by a GPIO-based regulator.
+On Tue, 2017-08-01 at 16:44 +0800, Yingjoe Chen wrote:
+> On Mon, 2017-07-31 at 16:22 +0800, Zhiyong Tao wrote:
+> > This series includes three patches:
+> > 1.Add mt2712 compatible node in binding document.
+> > 2.Add mt2712 pinctrl device node.
+> > 3.Add mt2712 pinctrl driver.
+> > 
+> > Zhiyong Tao (3):
+> >   dt-bindings: pinctrl: mt2712: add binding document
+> >   arm64: dts: mt2712: add pintcrl device node.
+> >   pinctrl: add mt2712 pinctrl driver
+> > 
+> >  .../devicetree/bindings/pinctrl/pinctrl-mt65xx.txt |    1 +
+> >  arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h      | 1014 +++++++++++
+> >  arch/arm64/boot/dts/mediatek/mt2712e.dtsi          |   18 +
+> 
+> mt2712e.dtsi doesn't exists in v4.13-rc1.
+> What's the base for this series? 
+> 
 >
-> Signed-off-by: Luis Araneda <luaraneda@gmail.com>
->
-> ---
-> Changes v1 -> v2:
-> - Removed unnecessary property
-> - Corrected part address to match reg value
->
->  arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 30 +++++++++++++++++++++++++++
->  1 file changed, 30 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-> index 8ddd1b2cc..1273a5e45 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-> @@ -45,6 +45,20 @@
->  / {
->         model = "FriendlyArm NanoPi M1 Plus";
->         compatible = "friendlyarm,nanopi-m1-plus", "allwinner,sun8i-h3";
-> +
-> +       aliases {
-> +               ethernet0 = &emac;
-> +       };
-> +
-> +       reg_gmac_3v3: gmac-3v3 {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "gmac-3v3";
-> +               regulator-min-microvolt = <3300000>;
-> +               regulator-max-microvolt = <3300000>;
-> +               startup-delay-us = <100000>;
-> +               enable-active-high;
-> +               gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
-> +       };
->  };
->
->  &ehci1 {
-> @@ -55,6 +69,22 @@
->         status = "okay";
->  };
->
-> +&emac {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&emac_rgmii_pins>;
-> +       phy-supply = <&reg_gmac_3v3>;
-> +       phy-handle = <&ext_rgmii_phy>;
-> +       phy-mode = "rgmii";
-> +       status = "okay";
-> +};
-> +
-> +&mdio {
-> +       ext_rgmii_phy: ethernet-phy at 0 {
-> +               compatible = "ethernet-phy-ieee802.3-c22";
-> +               reg = <0>;
-
-Please use the actual address as designed on the board.
-It seems to be 7. 0 for the RTL8211E is a broadcast address.
-
-ChenYu
-
-> +       };
-> +};
-> +
->  &ohci1 {
->         status = "okay";
->  };
-> --
-> 2.13.3
->
+> 
+> 
+==> This patch is based on 
+http://lists.infradead.org/pipermail/linux-mediatek/2017-July/009618.html
+I forgot to add the comment, I will add it in the next version.
+Thanks.
