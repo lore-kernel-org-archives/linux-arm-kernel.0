@@ -1,73 +1,53 @@
-From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Wed,  2 Aug 2017 16:38:19 -0400
-Subject: [v4 10/15] x86/kasan: explicitly zero kasan shadow memory
-In-Reply-To: <1501706304-869240-1-git-send-email-pasha.tatashin@oracle.com>
-References: <1501706304-869240-1-git-send-email-pasha.tatashin@oracle.com>
-Message-ID: <1501706304-869240-11-git-send-email-pasha.tatashin@oracle.com>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Wed, 2 Aug 2017 15:18:20 -0500
+Subject: [PATCH 1/3] dt-bindings: net: c_can: Update binding for clock and
+ power-domains property
+In-Reply-To: <20170802201822.11532-1-fcooper@ti.com>
+References: <20170802201822.11532-1-fcooper@ti.com>
+Message-ID: <20170802201822.11532-2-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To optimize the performance of struct page initialization,
-vmemmap_populate() will no longer zero memory.
+CAN driver uses the clk_get_rate call to determine the frequency of the
+functional clock. OMAP based SoCs do not require the clock property since
+hwmod already handles creating a "fck" clock thats accessible to drivers.
+However, this isn't the case for 66AK2G which makes the clocks property
+require for that SoC.
 
-We must explicitly zero the memory that is allocated by vmemmap_populate()
-for kasan, as this memory does not go through struct page initialization
-path.
+66AK2G requires a new property. Therefore, update the binding to also make
+this property requirement clear. Also clarify that for OMAP based SoCs
+ti,hwmod is a required property.
 
-Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-Reviewed-by: Bob Picco <bob.picco@oracle.com>
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 ---
- arch/x86/mm/kasan_init_64.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ Documentation/devicetree/bindings/net/can/c_can.txt | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/arch/x86/mm/kasan_init_64.c b/arch/x86/mm/kasan_init_64.c
-index 02c9d7553409..7d06cf0b0b6e 100644
---- a/arch/x86/mm/kasan_init_64.c
-+++ b/arch/x86/mm/kasan_init_64.c
-@@ -84,6 +84,28 @@ static struct notifier_block kasan_die_notifier = {
- };
- #endif
+diff --git a/Documentation/devicetree/bindings/net/can/c_can.txt b/Documentation/devicetree/bindings/net/can/c_can.txt
+index 5a1d8b0..2d50425 100644
+--- a/Documentation/devicetree/bindings/net/can/c_can.txt
++++ b/Documentation/devicetree/bindings/net/can/c_can.txt
+@@ -11,9 +11,20 @@ Required properties:
+ - interrupts		: property with a value describing the interrupt
+ 			  number
  
-+/*
-+ * Memory that was allocated by vmemmap_populate is not zeroed, so we must
-+ * zero it here explicitly.
-+ */
-+static void
-+zero_vemmap_populated_memory(void)
-+{
-+	u64 i, start, end;
+-Optional properties:
++The following are mandatory properties for DRA7x, AM33xx and AM43xx SoCs only:
+ - ti,hwmods		: Must be "d_can<n>" or "c_can<n>", n being the
+ 			  instance number
 +
-+	for (i = 0; i < E820_MAX_ENTRIES && pfn_mapped[i].end; i++) {
-+		void *kaddr_start = pfn_to_kaddr(pfn_mapped[i].start);
-+		void *kaddr_end = pfn_to_kaddr(pfn_mapped[i].end);
++The following are mandatory properties for Keystone 2 66AK2G SoCs only:
++- power-domains		: Should contain a phandle to a PM domain provider node
++			  and an args specifier containing the DCAN device id
++			  value. This property is as per the binding,
++			  Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
++- clocks		: CAN functional clock phandle. This property is as per the
++			  binding,
++			  Documentation/devicetree/bindings/clock/ti,sci-clk.txt
 +
-+		start = (u64)kasan_mem_to_shadow(kaddr_start);
-+		end = (u64)kasan_mem_to_shadow(kaddr_end);
-+		memset((void *)start, 0, end - start);
-+	}
-+	start = (u64)kasan_mem_to_shadow(_stext);
-+	end = (u64)kasan_mem_to_shadow(_end);
-+	memset((void *)start, 0, end - start);
-+}
-+
- void __init kasan_early_init(void)
- {
- 	int i;
-@@ -156,6 +178,13 @@ void __init kasan_init(void)
- 		pte_t pte = __pte(__pa(kasan_zero_page) | __PAGE_KERNEL_RO);
- 		set_pte(&kasan_zero_pte[i], pte);
- 	}
-+
-+	/*
-+	 * vmemmap_populate does not zero the memory, so we need to zero it
-+	 * explicitly
-+	 */
-+	zero_vemmap_populated_memory();
-+
- 	/* Flush TLBs again to be sure that write protection applied. */
- 	__flush_tlb_all();
- 
++Optional properties:
+ - syscon-raminit	: Handle to system control region that contains the
+ 			  RAMINIT register, register offset to the RAMINIT
+ 			  register and the CAN instance number (0 offset).
 -- 
-2.13.3
+2.9.4.dirty
