@@ -1,98 +1,56 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Tue, 1 Aug 2017 22:44:40 -0600
-Subject: [PATCH V5 2/2] PCI: handle CRS returned by device after FLR
-In-Reply-To: <1501645453-22842-2-git-send-email-okaya@codeaurora.org>
-References: <1501645453-22842-1-git-send-email-okaya@codeaurora.org>
- <1501645453-22842-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <20170801224440.3f677a8d@w520.home>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 2 Aug 2017 10:25:22 +0530
+Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
+In-Reply-To: <e3a76a50-4160-d111-cce9-132b46b66c33@st.com>
+References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
+ <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
+ <20170722065133.GT3053@localhost>
+ <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
+ <20170726052930.GF3053@localhost>
+ <f2908e38-dc4d-3886-4058-52a7ad845415@st.com>
+ <20170731123157.GJ3053@localhost>
+ <e3a76a50-4160-d111-cce9-132b46b66c33@st.com>
+Message-ID: <20170802045522.GU3053@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  1 Aug 2017 23:44:13 -0400
-Sinan Kaya <okaya@codeaurora.org> wrote:
-
-> An endpoint is allowed to issue Configuration Request Retry Status (CRS)
-> following a Function Level Reset (FLR) request to indicate that it is
-> not ready to accept new requests. CRS is defined in PCIe r3.1, sec 2.3.1.
-> Request Handling Rules and CRS usage in FLR context is mentioned in
-> PCIe r3.1, sec 6.6.2. Function-Level Reset.
+On Tue, Aug 01, 2017 at 09:32:50AM +0000, Pierre Yves MORDRET wrote:
 > 
-> Adding a vendor ID read if this is a physical function before attempting
-> to read any other registers on the endpoint. A CRS indication will only
-> be given if the address to be read is vendor ID register.
-> pci_bus_read_dev_vendor_id() knows how to deal with CRS returned values.
 > 
-> If pci_bus_read_dev_vendor_id() fails, it prints a user visible warning
-> after provided 1 second timeout is reached. pci_flr_wait() will keep
-> calling this function 60 times to allow up to 60 seconds to be consistent
-> with the rest of the kernel CRS timeout handling.
+> On 07/31/2017 02:31 PM, Vinod Koul wrote:
+> > On Wed, Jul 26, 2017 at 07:38:02AM +0000, Pierre Yves MORDRET wrote:
+> >>>>>> +
+> >>>>>> +#ifndef __DMA_STM32_DMAMUX_H
+> >>>>>> +#define __DMA_STM32_DMAMUX_H
+> >>>>>> +
+> >>>>>> +#if defined(CONFIG_STM32_DMAMUX)
+> >>>>>> +int stm32_dmamux_set_config(struct device *dev, void *route_data, u32 chan_id);
+> >>>>>
+> >>>>> Why do we need a custom API in this case?
+> >>>>>
+> >>>>
+> >>>> This API is called by DMA when a slave is requested by client. DMA can work
+> >>>> without DMAMUX this API has been put in place to configure DMAMUX whether client
+> >>>> is requesting a DMAMUX Channel instead of a DMA one.
+> >>>
+> >>> You mean the dmaengine driver right?
+> >>>
+> >>
+> >> Yes. The API is mainly called by "device_config" through out STM32 DMA Driver
+> >> when a router is in place for client.
+> >> Please refer to Patch 4/5 on this set.
+> > 
+> > Okay am thinking on why this can't be generic..? An optional router config
+> > callback?
+> > 
 > 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/pci/pci.c | 20 +++++++++++---------
->  1 file changed, 11 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 2ed604a..25c7a83 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -3813,14 +3813,16 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
->  
->  /*
->   * We should only need to wait 100ms after FLR for virtual functions.
-> - * Wait for up to 1000ms for config space to return something other than -1.
-> - * Intel IGD requires this when an LCD panel is attached.  We read the 2nd
-> - * dword because VFs don't implement the 1st dword.
-> + * Wait for up to 60s for config space to return something other than -1.
-> + * Intel IGD requires 1s when an LCD panel is attached.  We use
-> + * pci_bus_read_dev_vendor_id() for reading the vendor ID as it handles
-> + * CRS gracefully.
+> I would have liked to answer there is a callback within engine but unfortunately
+> I didn't figure out one when I did my router's development. I've looked once
+> more but again I can't find how to map chanID and request line without custom API.
 
-nit, stating that IGD requires 1s with an LCD panel is a
-misinterpretation of the previous comment.  In fact the original commit
-only mentions 300ms.  I think perhaps 1s was simply a nice round
-interval.
+Yes there is no callback for routers but we can add a generic callback
+here to be used. I added Peter for his comments, isn't that something they
+need too?
 
->   */
->  static void pci_flr_wait(struct pci_dev *dev)
->  {
->  	int i = 0;
->  	u32 id;
-> +	bool ret;
->  
->  	if (dev->is_virtfn) {
->  		msleep(100);
-> @@ -3828,15 +3830,15 @@ static void pci_flr_wait(struct pci_dev *dev)
->  	}
->  
->  	do {
-> -		msleep(100);
-> -		pci_read_config_dword(dev, PCI_COMMAND, &id);
-> -	} while (i++ < 10 && id == ~0);
-> +		ret = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
-> +						 1000);
-
-Is it a problem that there's now zero delay between the FLR and first
-attempt to read config space?  Seems like there should be a 100ms
-delay before we start trying.  This is also going to print a kernel
-warning 60 times in the course of getting to a 60s timeout, why not let
-pci_bus_read_dev_vendor_id() manage the entire timeout?  Are we only
-trying to preserve the dev_info() below?  Thanks,
-
-Alex
-
-> +	} while (i++ < 60 && !ret);
->  
-> -	if (id == ~0)
-> +	if (!ret)
->  		dev_warn(&dev->dev, "Failed to return from FLR\n");
->  	else if (i > 1)
-> -		dev_info(&dev->dev, "Required additional %dms to
-> return from FLR\n",
-> -			 (i - 1) * 100);
-> +		dev_info(&dev->dev, "Required additional %ds to
-> return from FLR\n",
-> +			 (i - 1));
->  }
->  
->  /**
+-- 
+~Vinod
