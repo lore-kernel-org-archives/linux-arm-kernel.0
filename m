@@ -1,85 +1,48 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Wed, 2 Aug 2017 19:16:08 +0200
-Subject: [PATCH] ARM64: dts: marvell: armada-37xx: Enable uSD on
- ESPRESSObin
-In-Reply-To: <1500594636-19911-1-git-send-email-mw@semihalf.com>
-References: <1500594636-19911-1-git-send-email-mw@semihalf.com>
-Message-ID: <20170802191608.58aa312e@xps13>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed,  2 Aug 2017 13:18:23 -0400
+Subject: [PATCH V6 1/2] PCI: limit FLR wait time to 100ms maximum
+Message-ID: <1501694304-16554-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Code is currently allowing PCIe devices to extend polling time up to 1
+second. Reducing the wait time for virtual functions to 100ms maximum to
+satisfy spec requirement mentioned in PCIe r3.1, sec 6.6.2. Function-Level
+Reset (FLR).
 
-On Fri, 21 Jul 2017 01:50:36 +0200
-Marcin Wojtas <mw@semihalf.com> wrote:
+SR-IOV r1.1, sec 2.2.2 also mentions that the virtual function's presence
+from configuration space is not affected from FLR. There is no point in
+polling the command register since it should always return success.
 
-> The ESPRESSObin board exposes one of the SDHCI interfaces
-> via J1 uSD slot. This patch enables it.
-> 
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-> Signed-off-by: Zbigniew Bodek <zbodek@gmail.com>
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/pci.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-Tested-by: Miquel Raynal <miquel.raynal@free-electrons.com>
-
-> ---
->  .../boot/dts/marvell/armada-3720-espressobin.dts   | 26
-> ++++++++++++++++++++++ 1 file changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
-> b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts index
-> b1af3f98..6d0caf1 100644 ---
-> a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts +++
-> b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts @@ -45,6
-> +45,7 @@ 
->  /dts-v1/;
->  
-> +#include <dt-bindings/gpio/gpio.h>
->  #include "armada-372x.dtsi"
->  
->  / {
-> @@ -59,6 +60,20 @@
->  		device_type = "memory";
->  		reg = <0x00000000 0x00000000 0x00000000 0x20000000>;
->  	};
-> +
-> +	vcc_sd_reg1: regulator {
-> +		compatible = "regulator-gpio";
-> +		regulator-name = "vcc_sd1";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-boot-on;
-> +
-> +		gpios = <&gpionb 4 GPIO_ACTIVE_HIGH>;
-> +		gpios-states = <0>;
-> +		states = <1800000 0x1
-> +			  3300000 0x0>;
-> +		enable-active-high;
-> +	};
->  };
->  
->  /* J9 */
-> @@ -71,6 +86,17 @@
->  	status = "okay";
->  };
->  
-> +/* J1 */
-> +&sdhci1 {
-> +	wp-inverted;
-> +	bus-width = <4>;
-> +	cd-gpios = <&gpionb 3 GPIO_ACTIVE_LOW>;
-> +	no-1-8-v;
-> +	marvell,pad-type = "sd";
-> +	vqmmc-supply = <&vcc_sd_reg1>;
-> +	status = "okay";
-> +};
-> +
->  /* Exported on the micro USB connector J5 through an FTDI */
->  &uart0 {
->  	status = "okay";
-
-
-
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index af0cc34..2ed604a 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -3812,7 +3812,7 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
+ EXPORT_SYMBOL(pci_wait_for_pending_transaction);
+ 
+ /*
+- * We should only need to wait 100ms after FLR, but some devices take longer.
++ * We should only need to wait 100ms after FLR for virtual functions.
+  * Wait for up to 1000ms for config space to return something other than -1.
+  * Intel IGD requires this when an LCD panel is attached.  We read the 2nd
+  * dword because VFs don't implement the 1st dword.
+@@ -3822,6 +3822,11 @@ static void pci_flr_wait(struct pci_dev *dev)
+ 	int i = 0;
+ 	u32 id;
+ 
++	if (dev->is_virtfn) {
++		msleep(100);
++		return;
++	}
++
+ 	do {
+ 		msleep(100);
+ 		pci_read_config_dword(dev, PCI_COMMAND, &id);
 -- 
-Miquel Raynal, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
