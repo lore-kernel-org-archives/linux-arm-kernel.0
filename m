@@ -1,40 +1,37 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu,  3 Aug 2017 13:36:48 +0200
-Subject: [PATCH 2/5] arm64: zynqmp: Use C pre-processor for includes
-In-Reply-To: <cover.1501760202.git.michal.simek@xilinx.com>
-References: <cover.1501760202.git.michal.simek@xilinx.com>
-Message-ID: <0226364dd21172af666230f66390c23254df5b48.1501760202.git.michal.simek@xilinx.com>
+Date: Thu,  3 Aug 2017 13:36:46 +0200
+Subject: [PATCH 0/5] arm64: zynqmp: dtsi changes next
+Message-ID: <cover.1501760202.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alistair Francis <alistair.francis@xilinx.com>
+Hi,
 
-Change the dtsi include code to use the C pre-processor #include instead
-of the device tree /include/. This enables option to use dt binding
-headers.
+I have cherry-picked others patches from xilinx soc vendor tree which are
+ready for submission.
+This patchset targets zynqmp.dtsi and ep108 platform.
 
-Signed-off-by: Alistair Francis <alistair.francis@xilinx.com>
-Reviewed-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Thanks,
+Michal
 
- arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-index ee7fa27e1e23..fba8f049769b 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-@@ -13,8 +13,8 @@
- 
- /dts-v1/;
- 
--/include/ "zynqmp.dtsi"
--/include/ "zynqmp-ep108-clk.dtsi"
-+#include "zynqmp.dtsi"
-+#include "zynqmp-ep108-clk.dtsi"
- 
- / {
- 	model = "ZynqMP EP108";
+Alistair Francis (1):
+  arm64: zynqmp: Use C pre-processor for includes
+
+Michal Simek (2):
+  arm64: zynqmp: Add fpd/lpd dmas
+  arm64: zynqmp: Add missing mmc aliases in ep108
+
+Naga Sureshkumar Relli (1):
+  arm64: zynqmp: Enable can1 for ep108
+
+VNSL Durga (1):
+  arm64: zynqmp: Added clocks to DT for ep108
+
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi |  48 +++++++
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts      |  10 +-
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi           | 165 +++++++++++++++++++++++
+ 3 files changed, 221 insertions(+), 2 deletions(-)
+
 -- 
 1.9.1
