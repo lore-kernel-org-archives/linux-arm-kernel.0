@@ -1,129 +1,228 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 3 Aug 2017 14:52:13 +0100
-Subject: [PATCH v4] acpi/iort: numa: Add numa node mapping for smmuv3
- devices
-In-Reply-To: <598326B1.7040508@huawei.com>
-References: <20170725050237.11033-1-ganapatrao.kulkarni@cavium.com>
- <20170725151305.GU17961@rric.localdomain>
- <20170802162119.GA3984@red-moon> <598326B1.7040508@huawei.com>
-Message-ID: <20170803135213.GA11451@red-moon>
+From: cosardindar@gmail.com (Cosar Dindar)
+Date: Thu,  3 Aug 2017 16:46:03 +0300
+Subject: [PATCH v5] crypto : stm32 - Add STM32F4 CRC32 support
+Message-ID: <408e795dea80840a909bab590ea498848e5e3800.1501766734.git.cosardindar@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 03, 2017 at 09:35:45PM +0800, Hanjun Guo wrote:
-> On 2017/8/3 0:21, Lorenzo Pieralisi wrote:
-> > Patch that I will send upstream below, please check, thanks.
-> >
-> > -- >8 --
-> > Subject: [PATCH] ACPI/IORT: numa: Add numa node mapping for smmuv3 devices
-> >
-> > ARM IORT specification(rev. C) has added  provision to define proximity
-> > domain in SMMUv3 IORT table. Adding required code to parse Proximity
-> > domain and set numa_node of smmv3 platform devices.
-> >
-> > Add code to parse proximity domain in SMMUv3 IORT table to
-> > set numa node mapping for smmuv3 devices.
-> >
-> > Link: http://lkml.kernel.org/r/20170706112017.GA16981 at rric.localdomain
-> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> > [lorenzo.pieralisi at arm.com: updated review comments]
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  drivers/acpi/arm64/iort.c | 29 ++++++++++++++++++++++++++++-
-> >  1 file changed, 28 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> > index a3215ee..35dd803 100644
-> > --- a/drivers/acpi/arm64/iort.c
-> > +++ b/drivers/acpi/arm64/iort.c
-> > @@ -908,6 +908,27 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
-> >  	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
-> >  }
-> >  
-> > +#if defined(CONFIG_ACPI_NUMA) && defined(ACPI_IORT_SMMU_v3_PXM_VALID)
-> 
-> Typo here, s/v3/V3, wit this typo, smmu proximity callback will be set to NULL.
-> 
-> > +/*
-> > + * set numa proximity domain for smmuv3 device
-> > + */
-> > +static void  __init arm_smmu_v3_set_proximity(struct device *dev,
-> > +					      struct acpi_iort_node *node)
-> > +{
-> > +	struct acpi_iort_smmu_v3 *smmu;
-> > +
-> > +	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-> > +	if (smmu->flags & ACPI_IORT_SMMU_V3_PXM_VALID) {
-> > +		set_dev_node(dev, acpi_map_pxm_to_node(smmu->pxm));
-> > +		dev_info(dev, "SMMUV3[%llx] Mapped to Proximity domain %d\n",
-> > +			smmu->base_address,
-> > +			smmu->pxm);
-> 
-> Here I got:
-> 
-> [    5.074246]  (null): SMMUV3[a0040000] Mapped to Proximity domain 0
-> [    5.074296]  (null): SMMUV3[700a0040000] Mapped to Proximity domain 2
-> [    5.074319]  (null): SMMUV3[c0040000] Mapped to Proximity domain 0
-> [    5.074344]  (null): SMMUV3[8a0040000] Mapped to Proximity domain 1
-> [    5.074368]  (null): SMMUV3[600a0040000] Mapped to Proximity domain 2
-> 
-> SMMU is probed via static table (IORT) , so no proper name before it
-> fully probed.
-> 
-> Can we just use pr_info here to remove the meaningless (null), or
-> we give the SMMU a proper name?
+This patch adds CRC (CRC32 Crypto) support for STM32F4 series.
 
-Yes on both counts, Ganapatrao sent me offline a fixed-up patch that I
-will send upstream with the two changes you requested.
+As an hardware limitation polynomial and key setting are not supported.
+They are fixed as 0x4C11DB7 (poly) and 0xFFFFFFFF (key).
+CRC32C Castagnoli algorithm is not used.
 
-Thanks for checking anyway.
+Signed-off-by: Cosar Dindar <cosardindar@gmail.com>
+---
+Changes in v5:
+  - shash_alg struct definitons are defined seperately according to 
+    the platform type.
+Changes in v4:
+  - Edited patch summary.
+Changes in v3:
+  - Rearranged patch order to fix build test error.
+Changes in v2:
+  - Patchset created instead of one patch.
 
-Lorenzo
+ drivers/crypto/stm32/stm32_crc32.c | 101 ++++++++++++++++++++++++++++++++-----
+ 1 file changed, 89 insertions(+), 12 deletions(-)
 
-> 
-> Thanks
-> Hanjun
-> 
-> > +	}
-> > +}
-> > +#else
-> > +#define arm_smmu_v3_set_proximity NULL
-> > +#endif
-> > +
-> >  static int __init arm_smmu_count_resources(struct acpi_iort_node *node)
-> >  {
-> >  	struct acpi_iort_smmu *smmu;
-> > @@ -977,13 +998,16 @@ struct iort_iommu_config {
-> >  	int (*iommu_count_resources)(struct acpi_iort_node *node);
-> >  	void (*iommu_init_resources)(struct resource *res,
-> >  				     struct acpi_iort_node *node);
-> > +	void (*iommu_set_proximity)(struct device *dev,
-> > +				    struct acpi_iort_node *node);
-> >  };
-> >  
-> >  static const struct iort_iommu_config iort_arm_smmu_v3_cfg __initconst = {
-> >  	.name = "arm-smmu-v3",
-> >  	.iommu_is_coherent = arm_smmu_v3_is_coherent,
-> >  	.iommu_count_resources = arm_smmu_v3_count_resources,
-> > -	.iommu_init_resources = arm_smmu_v3_init_resources
-> > +	.iommu_init_resources = arm_smmu_v3_init_resources,
-> > +	.iommu_set_proximity = arm_smmu_v3_set_proximity,
-> >  };
-> >  
-> >  static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
-> > @@ -1028,6 +1052,9 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
-> >  	if (!pdev)
-> >  		return -ENOMEM;
-> >  
-> > +	if (ops->iommu_set_proximity)
-> > +		ops->iommu_set_proximity(&pdev->dev, node);
-> > +
-> >  	count = ops->iommu_count_resources(node);
-> >  
-> >  	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/crypto/stm32/stm32_crc32.c b/drivers/crypto/stm32/stm32_crc32.c
+index ec83b1e..39b28b8 100644
+--- a/drivers/crypto/stm32/stm32_crc32.c
++++ b/drivers/crypto/stm32/stm32_crc32.c
+@@ -1,12 +1,14 @@
+ /*
+  * Copyright (C) STMicroelectronics SA 2017
+  * Author: Fabien Dessenne <fabien.dessenne@st.com>
++ * Author: Cosar Dindar <cosardindar@gmail.com>
+  * License terms:  GNU General Public License (GPL), version 2
+  */
+ 
+ #include <linux/bitrev.h>
+ #include <linux/clk.h>
+ #include <linux/module.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ 
+ #include <crypto/internal/hash.h>
+@@ -37,8 +39,12 @@ struct stm32_crc {
+ 	struct device    *dev;
+ 	void __iomem     *regs;
+ 	struct clk       *clk;
++	struct shash_alg *algs;
+ 	u8               pending_data[sizeof(u32)];
+ 	size_t           nb_pending_bytes;
++	bool             key_support;
++	bool             poly_support;
++	bool             reverse_support;
+ };
+ 
+ struct stm32_crc_list {
+@@ -106,13 +112,31 @@ static int stm32_crc_init(struct shash_desc *desc)
+ 	}
+ 	spin_unlock_bh(&crc_list.lock);
+ 
+-	/* Reset, set key, poly and configure in bit reverse mode */
+-	writel(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
+-	writel(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
+-	writel(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
++	/* set key */
++	if (ctx->crc->key_support) {
++		writel(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
++	} else if (mctx->key != CRC_INIT_DEFAULT) {
++		dev_err(ctx->crc->dev, "Unsupported key value! Should be: 0x%x\n",
++			CRC_INIT_DEFAULT);
++		return -EINVAL;
++	}
++
++	/* set poly */
++	if (ctx->crc->poly_support)
++		writel(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
++
++	/* reset and configure in bit reverse mode if supported */
++	if (ctx->crc->reverse_support)
++		writel(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
++	else
++		writel(CRC_CR_RESET, ctx->crc->regs + CRC_CR);
++
++	/* store partial result */
++	if (!ctx->crc->reverse_support)
++		ctx->partial = bitrev32(readl(crc->regs + CRC_DR));
++	else
++		ctx->partial = readl(ctx->crc->regs + CRC_DR);
+ 
+-	/* Store partial result */
+-	ctx->partial = readl(ctx->crc->regs + CRC_DR);
+ 	ctx->crc->nb_pending_bytes = 0;
+ 
+ 	return 0;
+@@ -135,7 +159,12 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
+ 
+ 		if (crc->nb_pending_bytes == sizeof(u32)) {
+ 			/* Process completed pending data */
+-			writel(*(u32 *)crc->pending_data, crc->regs + CRC_DR);
++			if (!ctx->crc->reverse_support)
++				writel(bitrev32(*(u32 *)crc->pending_data),
++				       crc->regs + CRC_DR);
++			else
++				writel(*(u32 *)crc->pending_data,
++				       crc->regs + CRC_DR);
+ 			crc->nb_pending_bytes = 0;
+ 		}
+ 	}
+@@ -143,10 +172,16 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
+ 	d32 = (u32 *)d8;
+ 	for (i = 0; i < length >> 2; i++)
+ 		/* Process 32 bits data */
+-		writel(*(d32++), crc->regs + CRC_DR);
++		if (!ctx->crc->reverse_support)
++			writel(bitrev32(*(d32++)), crc->regs + CRC_DR);
++		else
++			writel(*(d32++), crc->regs + CRC_DR);
+ 
+ 	/* Store partial result */
+-	ctx->partial = readl(crc->regs + CRC_DR);
++	if (!ctx->crc->reverse_support)
++		ctx->partial = bitrev32(readl(crc->regs + CRC_DR));
++	else
++		ctx->partial = readl(crc->regs + CRC_DR);
+ 
+ 	/* Check for pending data (non 32 bits) */
+ 	length &= 3;
+@@ -192,7 +227,7 @@ static int stm32_crc_digest(struct shash_desc *desc, const u8 *data,
+ 	return stm32_crc_init(desc) ?: stm32_crc_finup(desc, data, length, out);
+ }
+ 
+-static struct shash_alg algs[] = {
++static struct shash_alg algs_for_f7[] = {
+ 	/* CRC-32 */
+ 	{
+ 		.setkey         = stm32_crc_setkey,
+@@ -237,12 +272,37 @@ static struct shash_alg algs[] = {
+ 	}
+ };
+ 
++static struct shash_alg algs_for_f4[] = {
++	/* CRC-32 */
++	{
++		.setkey         = stm32_crc_setkey,
++		.init           = stm32_crc_init,
++		.update         = stm32_crc_update,
++		.final          = stm32_crc_final,
++		.finup          = stm32_crc_finup,
++		.digest         = stm32_crc_digest,
++		.descsize       = sizeof(struct stm32_crc_desc_ctx),
++		.digestsize     = CHKSUM_DIGEST_SIZE,
++		.base           = {
++			.cra_name               = "crc32",
++			.cra_driver_name        = DRIVER_NAME,
++			.cra_priority           = 200,
++			.cra_blocksize          = CHKSUM_BLOCK_SIZE,
++			.cra_alignmask          = 3,
++			.cra_ctxsize            = sizeof(struct stm32_crc_ctx),
++			.cra_module             = THIS_MODULE,
++			.cra_init               = stm32_crc32_cra_init,
++		}
++	}
++};
++
+ static int stm32_crc_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct stm32_crc *crc;
+ 	struct resource *res;
+ 	int ret;
++	int algs_size;
+ 
+ 	crc = devm_kzalloc(dev, sizeof(*crc), GFP_KERNEL);
+ 	if (!crc)
+@@ -269,13 +329,29 @@ static int stm32_crc_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
++	/* set key, poly and reverse support if device is of F7 series */
++	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f7-crc")) {
++		crc->key_support = true;
++		crc->poly_support = true;
++		crc->reverse_support = true;
++	}
++
+ 	platform_set_drvdata(pdev, crc);
+ 
+ 	spin_lock(&crc_list.lock);
+ 	list_add(&crc->list, &crc_list.dev_list);
+ 	spin_unlock(&crc_list.lock);
+ 
+-	ret = crypto_register_shashes(algs, ARRAY_SIZE(algs));
++	/* For F4 series only CRC32 algorithm will be used */
++	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f4-crc")) {
++		crc->algs = algs_for_f4;
++		algs_size = ARRAY_SIZE(algs_for_f4);
++	} else {
++		crc->algs = algs_for_f7;
++		algs_size = ARRAY_SIZE(algs_for_f7);
++	}
++
++	ret = crypto_register_shashes(crc->algs, algs_size);
+ 	if (ret) {
+ 		dev_err(dev, "Failed to register\n");
+ 		clk_disable_unprepare(crc->clk);
+@@ -295,7 +371,7 @@ static int stm32_crc_remove(struct platform_device *pdev)
+ 	list_del(&crc->list);
+ 	spin_unlock(&crc_list.lock);
+ 
+-	crypto_unregister_shash(algs);
++	crypto_unregister_shash(crc->algs);
+ 
+ 	clk_disable_unprepare(crc->clk);
+ 
+@@ -304,6 +380,7 @@ static int stm32_crc_remove(struct platform_device *pdev)
+ 
+ static const struct of_device_id stm32_dt_ids[] = {
+ 	{ .compatible = "st,stm32f7-crc", },
++	{ .compatible = "st,stm32f4-crc", },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, stm32_dt_ids);
+-- 
+2.7.4
