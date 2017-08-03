@@ -1,66 +1,99 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  3 Aug 2017 13:32:35 +0100
-Subject: [PATCH v3 1/5] ACPICA: resource_mgr: Allow _DMA method in walk
- resources
+Date: Thu,  3 Aug 2017 13:32:36 +0100
+Subject: [PATCH v3 2/5] ACPI: Make acpi_dev_get_resources() method agnostic
 In-Reply-To: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
 References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170803123239.11359-2-lorenzo.pieralisi@arm.com>
+Message-ID: <20170803123239.11359-3-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPICA commit 7636d2fb683d5699a5c14e949fba9ac52e91d4c1
+The function acpi_dev_get_resources() is completely generic and
+can be used to parse resource objects that are not necessarily
+coming from the _CRS method but also from other objects eg _DMA
+that have the same _CRS resource format.
 
-The _DMA object contains a resource template, this change adds support
-for the walk resources function so that ACPI devices containing a _DMA
-object can actually parse it to detect DMA ranges for the respective
-bus.
+Create an acpi_dev_get_resources() helper, internal to the ACPI
+resources parsing compilation unit, __acpi_dev_get_resources(),
+that takes a const char* parameter to detect which ACPI method should be
+called to retrieve the resources list and make acpi_dev_get_resources()
+call it with a method name _CRS leaving the API behaviour unchanged.
 
-Link: https://github.com/acpica/acpica/commit/7636d2fb
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 ---
- drivers/acpi/acpica/rsxface.c | 7 ++++---
- include/acpi/acnames.h        | 1 +
- 2 files changed, 5 insertions(+), 3 deletions(-)
+ drivers/acpi/resource.c | 53 +++++++++++++++++++++++++++++--------------------
+ 1 file changed, 31 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/acpi/acpica/rsxface.c b/drivers/acpi/acpica/rsxface.c
-index 59a4f9e..be65e65 100644
---- a/drivers/acpi/acpica/rsxface.c
-+++ b/drivers/acpi/acpica/rsxface.c
-@@ -615,7 +615,7 @@ ACPI_EXPORT_SYMBOL(acpi_walk_resource_buffer)
-  *                                device we are querying
-  *              name            - Method name of the resources we want.
-  *                                (METHOD_NAME__CRS, METHOD_NAME__PRS, or
-- *                                METHOD_NAME__AEI)
-+ *                                METHOD_NAME__AEI or METHOD_NAME__DMA)
-  *              user_function   - Called for each resource
-  *              context         - Passed to user_function
-  *
-@@ -641,11 +641,12 @@ acpi_walk_resources(acpi_handle device_handle,
- 	if (!device_handle || !user_function || !name ||
- 	    (!ACPI_COMPARE_NAME(name, METHOD_NAME__CRS) &&
- 	     !ACPI_COMPARE_NAME(name, METHOD_NAME__PRS) &&
--	     !ACPI_COMPARE_NAME(name, METHOD_NAME__AEI))) {
-+	     !ACPI_COMPARE_NAME(name, METHOD_NAME__AEI) &&
-+	     !ACPI_COMPARE_NAME(name, METHOD_NAME__DMA))) {
- 		return_ACPI_STATUS(AE_BAD_PARAMETER);
- 	}
+diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
+index cd4c427..93f1b5c 100644
+--- a/drivers/acpi/resource.c
++++ b/drivers/acpi/resource.c
+@@ -573,6 +573,35 @@ static acpi_status acpi_dev_process_resource(struct acpi_resource *ares,
+ 	return AE_OK;
+ }
  
--	/* Get the _CRS/_PRS/_AEI resource list */
-+	/* Get the _CRS/_PRS/_AEI/_DMA resource list */
++static int __acpi_dev_get_resources(struct acpi_device *adev,
++				    struct list_head *list,
++				    int (*preproc)(struct acpi_resource *, void *),
++				    void *preproc_data, char *method)
++{
++	struct res_proc_context c;
++	acpi_status status;
++
++	if (!adev || !adev->handle || !list_empty(list))
++		return -EINVAL;
++
++	if (!acpi_has_method(adev->handle, method))
++		return 0;
++
++	c.list = list;
++	c.preproc = preproc;
++	c.preproc_data = preproc_data;
++	c.count = 0;
++	c.error = 0;
++	status = acpi_walk_resources(adev->handle, method,
++				     acpi_dev_process_resource, &c);
++	if (ACPI_FAILURE(status)) {
++		acpi_dev_free_resource_list(list);
++		return c.error ? c.error : -EIO;
++	}
++
++	return c.count;
++}
++
+ /**
+  * acpi_dev_get_resources - Get current resources of a device.
+  * @adev: ACPI device node to get the resources for.
+@@ -601,28 +630,8 @@ int acpi_dev_get_resources(struct acpi_device *adev, struct list_head *list,
+ 			   int (*preproc)(struct acpi_resource *, void *),
+ 			   void *preproc_data)
+ {
+-	struct res_proc_context c;
+-	acpi_status status;
+-
+-	if (!adev || !adev->handle || !list_empty(list))
+-		return -EINVAL;
+-
+-	if (!acpi_has_method(adev->handle, METHOD_NAME__CRS))
+-		return 0;
+-
+-	c.list = list;
+-	c.preproc = preproc;
+-	c.preproc_data = preproc_data;
+-	c.count = 0;
+-	c.error = 0;
+-	status = acpi_walk_resources(adev->handle, METHOD_NAME__CRS,
+-				     acpi_dev_process_resource, &c);
+-	if (ACPI_FAILURE(status)) {
+-		acpi_dev_free_resource_list(list);
+-		return c.error ? c.error : -EIO;
+-	}
+-
+-	return c.count;
++	return __acpi_dev_get_resources(adev, list, preproc, preproc_data,
++					METHOD_NAME__CRS);
+ }
+ EXPORT_SYMBOL_GPL(acpi_dev_get_resources);
  
- 	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
- 	status = acpi_rs_get_method_data(device_handle, name, &buffer);
-diff --git a/include/acpi/acnames.h b/include/acpi/acnames.h
-index b421584..d8dd3bf 100644
---- a/include/acpi/acnames.h
-+++ b/include/acpi/acnames.h
-@@ -54,6 +54,7 @@
- #define METHOD_NAME__CLS        "_CLS"
- #define METHOD_NAME__CRS        "_CRS"
- #define METHOD_NAME__DDN        "_DDN"
-+#define METHOD_NAME__DMA        "_DMA"
- #define METHOD_NAME__HID        "_HID"
- #define METHOD_NAME__INI        "_INI"
- #define METHOD_NAME__PLD        "_PLD"
 -- 
 2.10.0
