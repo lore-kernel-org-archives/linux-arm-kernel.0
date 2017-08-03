@@ -1,78 +1,30 @@
-From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Thu,  3 Aug 2017 17:23:40 -0400
-Subject: [v5 02/15] x86/mm: setting fields in deferred pages
-In-Reply-To: <1501795433-982645-1-git-send-email-pasha.tatashin@oracle.com>
-References: <1501795433-982645-1-git-send-email-pasha.tatashin@oracle.com>
-Message-ID: <1501795433-982645-3-git-send-email-pasha.tatashin@oracle.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 3 Aug 2017 23:31:46 +0200
+Subject: [PATCH] pinctrl: sirf: atlas7: fix of_irq_get() error check
+In-Reply-To: <20170730193855.099325987@cogentembedded.com>
+References: <20170730193855.099325987@cogentembedded.com>
+Message-ID: <CACRpkdbW2efOy+qH+JPHYnbaUHkf2eqcWGm66C9a1K+uj_QNdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without deferred struct page feature (CONFIG_DEFERRED_STRUCT_PAGE_INIT),
-flags and other fields in "struct page"es are never changed prior to first
-initializing struct pages by going through __init_single_page().
+On Sun, Jul 30, 2017 at 9:38 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
 
-With deferred struct page feature enabled there is a case where we set some
-fields prior to initializing:
+> of_irq_get() may return  any negative error number as well as 0 on failure,
+> while the driver only checks for -EPROBE_DEFER, blithely continuing with
+> the call to gpiochip_set_chained_irqchip() -- that function expects the
+> parent IRQ as *unsigned int*, so would probably do nothing  when a large
+> IRQ number resulting from a conversion of a negative error number is passed
+> to it, however passing 0 would probably work but the driver won't receive
+> valid GPIO bank interrupts.
+>
+> Check for 'ret <= 0' instead and return -ENXIO from the driver's probe iff
+> of_irq_get() returned 0.
+>
+> Fixes: f9367793293d ("pinctrl: sirf: add sirf atlas7 pinctrl and gpio support")
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-        mem_init() {
-                register_page_bootmem_info();
-                free_all_bootmem();
-                ...
-        }
+Patch applied!
 
-When register_page_bootmem_info() is called only non-deferred struct pages
-are initialized. But, this function goes through some reserved pages which
-might be part of the deferred, and thus are not yet initialized.
-
-  mem_init
-   register_page_bootmem_info
-    register_page_bootmem_info_node
-     get_page_bootmem
-      .. setting fields here ..
-      such as: page->freelist = (void *)type;
-
-We end-up with similar issue as in the previous patch, where currently we
-do not observe problem as memory is zeroed. But, if flag asserts are
-changed we can start hitting issues.
-
-Also, because in this patch series we will stop zeroing struct page memory
-during allocation, we must make sure that struct pages are properly
-initialized prior to using them.
-
-The deferred-reserved pages are initialized in free_all_bootmem().
-Therefore, the fix is to switch the above calls.
-
-Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-Reviewed-by: Bob Picco <bob.picco@oracle.com>
----
- arch/x86/mm/init_64.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/arch/x86/mm/init_64.c b/arch/x86/mm/init_64.c
-index 136422d7d539..1e863baec847 100644
---- a/arch/x86/mm/init_64.c
-+++ b/arch/x86/mm/init_64.c
-@@ -1165,12 +1165,17 @@ void __init mem_init(void)
- 
- 	/* clear_bss() already clear the empty_zero_page */
- 
--	register_page_bootmem_info();
--
- 	/* this will put all memory onto the freelists */
- 	free_all_bootmem();
- 	after_bootmem = 1;
- 
-+	/* Must be done after boot memory is put on freelist, because here we
-+	 * might set fields in deferred struct pages that have not yet been
-+	 * initialized, and free_all_bootmem() initializes all the reserved
-+	 * deferred pages for us.
-+	 */
-+	register_page_bootmem_info();
-+
- 	/* Register memory areas for /proc/kcore */
- 	kclist_add(&kcore_vsyscall, (void *)VSYSCALL_ADDR,
- 			 PAGE_SIZE, KCORE_OTHER);
--- 
-2.13.4
+Yours,
+Linus Walleij
