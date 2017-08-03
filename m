@@ -1,118 +1,101 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  3 Aug 2017 13:32:38 +0100
-Subject: [PATCH v3 4/5] ACPI: Make acpi_dma_configure() DMA regions aware
+Date: Thu,  3 Aug 2017 13:32:39 +0100
+Subject: [PATCH v3 5/5] ACPI/IORT: Add IORT named component memory address
+ limits
 In-Reply-To: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
 References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170803123239.11359-5-lorenzo.pieralisi@arm.com>
+Message-ID: <20170803123239.11359-6-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current ACPI DMA configuration set-up device DMA capabilities through
-kernel defaults that do not take into account platform specific DMA
-configurations reported by firmware.
+IORT named components provide firmware configuration describing
+how many address bits a given device is capable of generating
+to address memory.
 
-By leveraging the ACPI acpi_dev_get_dma_resources() API, add code
-in acpi_dma_configure() to retrieve the DMA regions to correctly
-set-up PCI devices DMA parameters.
-
-Rework the ACPI IORT kernel API to make sure they can accommodate
-the DMA set-up required by firmware. By making PCI devices DMA set-up
-ACPI IORT specific, the kernel is shielded from unwanted regressions
-that could be triggered by parsing DMA resources on arches that were
-previously ignoring them (ie x86/ia64), leaving kernel behaviour
-unchanged on those arches.
+Add code to the kernel to retrieve memory address limits
+configuration for IORT named components and configure DMA masks
+accordingly.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
 Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Nate Watterson <nwatters@codeaurora.org>
 ---
- drivers/acpi/arm64/iort.c | 37 +++++++++++++++++++++++++++++++++++--
- include/linux/acpi_iort.h |  5 +++--
- 2 files changed, 38 insertions(+), 4 deletions(-)
+ drivers/acpi/arm64/iort.c | 54 ++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 37 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index a3215ee..606af87 100644
+index 606af87..5b9e8dc2 100644
 --- a/drivers/acpi/arm64/iort.c
 +++ b/drivers/acpi/arm64/iort.c
-@@ -681,12 +681,17 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+@@ -680,6 +680,24 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+ 	return ret ? NULL : ops;
  }
  
++static int nc_dma_get_range(struct device *dev, u64 *size)
++{
++	struct acpi_iort_node *node;
++	struct acpi_iort_named_component *ncomp;
++
++	node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
++			      iort_match_node_callback, dev);
++	if (!node)
++		return -ENODEV;
++
++	ncomp = (struct acpi_iort_named_component *)node->node_data;
++
++	*size = ncomp->memory_address_limit >= 64 ? U64_MAX :
++			1ULL<<ncomp->memory_address_limit;
++
++	return 0;
++}
++
  /**
-- * iort_set_dma_mask - Set-up dma mask for a device.
-+ * iort_dma_setup() - Set-up device DMA parameters.
+  * iort_dma_setup() - Set-up device DMA parameters.
   *
-  * @dev: device to configure
-+ * @dma_addr: device DMA address result pointer
-+ * @size: DMA range size result pointer
-  */
--void iort_set_dma_mask(struct device *dev)
-+void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
- {
-+	u64 mask, dmaaddr = 0, size = 0, offset = 0;
-+	int ret, msb;
-+
- 	/*
- 	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
- 	 * setup the correct supported mask.
-@@ -700,6 +705,34 @@ void iort_set_dma_mask(struct device *dev)
- 	 */
- 	if (!dev->dma_mask)
- 		dev->dma_mask = &dev->coherent_dma_mask;
-+
-+	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
-+
-+	if (dev_is_pci(dev)) {
-+		ret = acpi_dma_get_range(dev, &dmaaddr, &offset, &size);
-+		if (!ret) {
-+			msb = fls64(dmaaddr + size - 1);
-+			/*
-+			 * Round-up to the power-of-two mask or set
-+			 * the mask to the whole 64-bit address space
-+			 * in case the DMA region covers the full
-+			 * memory window.
-+			 */
-+			mask = msb == 64 ? U64_MAX : (1ULL << msb) - 1;
-+			/*
-+			 * Limit coherent and dma mask based on size
-+			 * retrieved from firmware.
-+			 */
-+			dev->coherent_dma_mask = mask;
-+			*dev->dma_mask = mask;
-+		}
-+	}
-+
-+	*dma_addr = dmaaddr;
-+	*dma_size = size;
-+
-+	dev->dma_pfn_offset = PFN_DOWN(offset);
-+	dev_dbg(dev, "dma_pfn_offset(%#08llx)\n", offset);
- }
+@@ -708,24 +726,26 @@ void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
  
- /**
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index 8379d40..8d3f0bf 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -36,7 +36,7 @@ struct irq_domain *iort_get_device_domain(struct device *dev, u32 req_id);
- void acpi_configure_pmsi_domain(struct device *dev);
- int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id);
- /* IOMMU interface */
--void iort_set_dma_mask(struct device *dev);
-+void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *size);
- const struct iommu_ops *iort_iommu_configure(struct device *dev);
- #else
- static inline void acpi_iort_init(void) { }
-@@ -47,7 +47,8 @@ static inline struct irq_domain *iort_get_device_domain(struct device *dev,
- { return NULL; }
- static inline void acpi_configure_pmsi_domain(struct device *dev) { }
- /* IOMMU interface */
--static inline void iort_set_dma_mask(struct device *dev) { }
-+static inline void iort_dma_setup(struct device *dev, u64 *dma_addr,
-+				  u64 *size) { }
- static inline
- const struct iommu_ops *iort_iommu_configure(struct device *dev)
- { return NULL; }
+ 	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+ 
+-	if (dev_is_pci(dev)) {
++	if (dev_is_pci(dev))
+ 		ret = acpi_dma_get_range(dev, &dmaaddr, &offset, &size);
+-		if (!ret) {
+-			msb = fls64(dmaaddr + size - 1);
+-			/*
+-			 * Round-up to the power-of-two mask or set
+-			 * the mask to the whole 64-bit address space
+-			 * in case the DMA region covers the full
+-			 * memory window.
+-			 */
+-			mask = msb == 64 ? U64_MAX : (1ULL << msb) - 1;
+-			/*
+-			 * Limit coherent and dma mask based on size
+-			 * retrieved from firmware.
+-			 */
+-			dev->coherent_dma_mask = mask;
+-			*dev->dma_mask = mask;
+-		}
++	else
++		ret = nc_dma_get_range(dev, &size);
++
++	if (!ret) {
++		msb = fls64(dmaaddr + size - 1);
++		/*
++		 * Round-up to the power-of-two mask or set
++		 * the mask to the whole 64-bit address space
++		 * in case the DMA region covers the full
++		 * memory window.
++		 */
++		mask = msb == 64 ? U64_MAX : (1ULL << msb) - 1;
++		/*
++		 * Limit coherent and dma mask based on size
++		 * retrieved from firmware.
++		 */
++		dev->coherent_dma_mask = mask;
++		*dev->dma_mask = mask;
+ 	}
+ 
+ 	*dma_addr = dmaaddr;
 -- 
 2.10.0
