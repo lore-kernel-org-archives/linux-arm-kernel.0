@@ -1,64 +1,68 @@
 From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Thu,  3 Aug 2017 17:23:39 -0400
-Subject: [v5 01/15] x86/mm: reserve only exiting low pages
+Date: Thu,  3 Aug 2017 17:23:51 -0400
+Subject: [v5 13/15] mm: stop zeroing memory during allocation in vmemmap
 In-Reply-To: <1501795433-982645-1-git-send-email-pasha.tatashin@oracle.com>
 References: <1501795433-982645-1-git-send-email-pasha.tatashin@oracle.com>
-Message-ID: <1501795433-982645-2-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <1501795433-982645-14-git-send-email-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Struct pages are initialized by going through __init_single_page(). Since
-the existing physical memory in memblock is represented in memblock.memory
-list, struct page for every page from this list goes through
-__init_single_page().
-
-The second memblock list: memblock.reserved, manages the allocated memory.
-The memory that won't be available to kernel allocator. So, every page from
-this list goes through reserve_bootmem_region(), where certain struct page
-fields are set, the assumption being that the struct pages have been
-initialized beforehand.
-
-In trim_low_memory_range() we unconditionally reserve memoryfrom PFN 0, but
-memblock.memory might start at a later PFN. For example, in QEMU,
-e820__memblock_setup() can use PFN 1 as the first PFN in memblock.memory,
-so PFN 0 is not on memblock.memory (and hence isn't initialized via
-__init_single_page) but is on memblock.reserved (and hence we set fields in
-the uninitialized struct page).
-
-Currently, the struct page memory is always zeroed during allocation,
-which prevents this problem from being detected. But, if some asserts
-provided by CONFIG_DEBUG_VM_PGFLAGS are tighten, this problem may become
-visible in existing kernels.
-
-In this patchset we will stop zeroing struct page memory during allocation.
-Therefore, this bug must be fixed in order to avoid random assert failures
-caused by CONFIG_DEBUG_VM_PGFLAGS triggers.
-
-The fix is to reserve memory from the first existing PFN.
+Replace allocators in sprase-vmemmap to use the non-zeroing version. So,
+we will get the performance improvement by zeroing the memory in parallel
+when struct pages are zeroed.
 
 Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
 Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
 Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
 Reviewed-by: Bob Picco <bob.picco@oracle.com>
 ---
- arch/x86/kernel/setup.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ mm/sparse-vmemmap.c | 6 +++---
+ mm/sparse.c         | 6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
-index 3486d0498800..489cdc141bcb 100644
---- a/arch/x86/kernel/setup.c
-+++ b/arch/x86/kernel/setup.c
-@@ -790,7 +790,10 @@ early_param("reservelow", parse_reservelow);
- 
- static void __init trim_low_memory_range(void)
+diff --git a/mm/sparse-vmemmap.c b/mm/sparse-vmemmap.c
+index d40c721ab19f..3b646b5ce1b6 100644
+--- a/mm/sparse-vmemmap.c
++++ b/mm/sparse-vmemmap.c
+@@ -41,7 +41,7 @@ static void * __ref __earlyonly_bootmem_alloc(int node,
+ 				unsigned long align,
+ 				unsigned long goal)
  {
--	memblock_reserve(0, ALIGN(reserve_low, PAGE_SIZE));
-+	unsigned long min_pfn = find_min_pfn_with_active_regions();
-+	phys_addr_t base = min_pfn << PAGE_SHIFT;
-+
-+	memblock_reserve(base, ALIGN(reserve_low, PAGE_SIZE));
+-	return memblock_virt_alloc_try_nid(size, align, goal,
++	return memblock_virt_alloc_try_nid_raw(size, align, goal,
+ 					    BOOTMEM_ALLOC_ACCESSIBLE, node);
  }
- 	
- /*
+ 
+@@ -56,11 +56,11 @@ void * __meminit vmemmap_alloc_block(unsigned long size, int node)
+ 
+ 		if (node_state(node, N_HIGH_MEMORY))
+ 			page = alloc_pages_node(
+-				node, GFP_KERNEL | __GFP_ZERO | __GFP_RETRY_MAYFAIL,
++				node, GFP_KERNEL | __GFP_RETRY_MAYFAIL,
+ 				get_order(size));
+ 		else
+ 			page = alloc_pages(
+-				GFP_KERNEL | __GFP_ZERO | __GFP_RETRY_MAYFAIL,
++				GFP_KERNEL | __GFP_RETRY_MAYFAIL,
+ 				get_order(size));
+ 		if (page)
+ 			return page_address(page);
+diff --git a/mm/sparse.c b/mm/sparse.c
+index 7b4be3fd5cac..0e315766ad11 100644
+--- a/mm/sparse.c
++++ b/mm/sparse.c
+@@ -441,9 +441,9 @@ void __init sparse_mem_maps_populate_node(struct page **map_map,
+ 	}
+ 
+ 	size = PAGE_ALIGN(size);
+-	map = memblock_virt_alloc_try_nid(size * map_count,
+-					  PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
+-					  BOOTMEM_ALLOC_ACCESSIBLE, nodeid);
++	map = memblock_virt_alloc_try_nid_raw(size * map_count,
++					      PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
++					      BOOTMEM_ALLOC_ACCESSIBLE, nodeid);
+ 	if (map) {
+ 		for (pnum = pnum_begin; pnum < pnum_end; pnum++) {
+ 			if (!present_section_nr(pnum))
 -- 
 2.13.4
