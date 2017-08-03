@@ -1,54 +1,36 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Thu, 3 Aug 2017 13:04:01 +0530
-Subject: net: thunderx: Buffer overwrite on bgx_probe
-In-Reply-To: <86a1b4d9-db67-4380-13c9-f759d2e05ed9@ispras.ru>
-References: <86a1b4d9-db67-4380-13c9-f759d2e05ed9@ispras.ru>
-Message-ID: <CA+sq2CeQB0OSNadQNd5oofmmsNsHtinShe2OZhGBGk6sU5xYkQ@mail.gmail.com>
+From: m.niestroj@grinn-global.com (Marcin Niestroj)
+Date: Thu,  3 Aug 2017 09:37:13 +0200
+Subject: [PATCH v2] ARM: dts: imx6ul-liteboard: Support poweroff
+Message-ID: <20170803073713.14889-1-m.niestroj@grinn-global.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 2, 2017 at 10:29 PM, Anton Vasilyev <vasilyev@ispras.ru> wrote:
-> Hello.
->
-> While searching for memory errors in Linux kernel I've come across
-> drivers/net/ethernet/cavium/thunder/thunder_bgx.ko module.
->
-> I've found buffer overwrite at bgx_probe():
-> Consider device PCI_SUBSYS_DEVID_83XX_BGX.
-> max_bgx_per_node is set to 4 by set_max_bgx_per_node().
-> Then on branch:
->     pci_read_config_word(pdev, PCI_DEVICE_ID, &sdevid);
->     if (sdevid != PCI_DEVICE_ID_THUNDER_RGX) {
->         bgx->bgx_id = (pci_resource_start(pdev,
->             PCI_CFG_REG_BAR_NUM) >> 24) & BGX_ID_MASK;
->         bgx->bgx_id += nic_get_node_id(pdev) * max_bgx_per_node;
->
-> bgx->bgx_id could achieve value 3 + 3 * 4 = 15,
+Support proper system power-off, which disables main regulator. This
+results in much lower power consumption and support of power-on issued
+by button press.
 
-No, this will never be the case, the maximum no of NUMA nodes supported
-on these platforms is 2, so the bgx_id will never go beyond 7.
-And the platform 83XX taken as an example deosn't support NUMA, it's only
-88XX which supports NUMA  and maximum no of BGX supported on that is only 2.
+Signed-off-by: Marcin Niestroj <m.niestroj@grinn-global.com>
+---
+Changes v1 -> v2:
+ * Add new node in alphabetical order (suggested by Shawn)
 
+ arch/arm/boot/dts/imx6ul-liteboard.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> which lead to buffer overwrite on
->         bgx_vnic[bgx->bgx_id] = bgx;
->
-> Question: is it enough for fix to change bgx_vnic's size?
->
-> Found by Linux Driver Verification project (linuxtesting.org).
->
-> --
-> Anton Vasilyev
-> Linux Verification Center, ISPRAS
-> web: http://linuxtesting.org
-> e-mail: vasilyev at ispras.ru
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-Thanks,
-Sunil.
+diff --git a/arch/arm/boot/dts/imx6ul-liteboard.dts b/arch/arm/boot/dts/imx6ul-liteboard.dts
+index ed1d891d6a89..1d863a16bcf0 100644
+--- a/arch/arm/boot/dts/imx6ul-liteboard.dts
++++ b/arch/arm/boot/dts/imx6ul-liteboard.dts
+@@ -124,6 +124,10 @@
+ 	};
+ };
+ 
++&snvs_poweroff {
++	status = "okay";
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
+-- 
+2.13.3
