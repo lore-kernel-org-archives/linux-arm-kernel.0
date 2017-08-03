@@ -1,36 +1,51 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 3 Aug 2017 20:11:32 +0300
-Subject: [PATCH 0/6] Support for LEGO MINDSTORMS EV3 LCD display
-In-Reply-To: <CAHp75Vdaq0ersEa2_XneUQtsJMj2GCRZL4Wi=1HQorLkb4SaVg@mail.gmail.com>
-References: <1501355870-13960-1-git-send-email-david@lechnology.com>
- <5d8f6518-8d7e-c029-2da4-e3417afb3e40@lechnology.com>
- <28188f5c-1daf-121b-6daf-1899668c3875@tronnes.org>
- <1ce36d43-b9dd-807e-23aa-bac4fda70fdc@lechnology.com>
- <bfb3d541-856b-0233-dd85-72512788939f@tronnes.org>
- <bbec0574-311a-e1b4-d7fd-f6fb15b078d2@lechnology.com>
- <b8ec0511-afd1-2a1b-6ffe-dfe951d79bf7@tronnes.org>
- <cf740449-c952-08d4-d63c-d92e71fa3092@lechnology.com>
- <CAHp75Vdaq0ersEa2_XneUQtsJMj2GCRZL4Wi=1HQorLkb4SaVg@mail.gmail.com>
-Message-ID: <CAHp75Vf2GVASatG_aJrBPNHR-jQLoYtOPan5ezcoWRDuEsXbNw@mail.gmail.com>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Thu,  3 Aug 2017 10:11:16 -0700
+Subject: [PATCH] arm64: avoid overflow in VA_START and PAGE_OFFSET
+In-Reply-To: <20170803132035.gixd7m7oxtehpquu@yury-thinkpad>
+References: <20170803132035.gixd7m7oxtehpquu@yury-thinkpad>
+Message-ID: <20170803171117.107992-1-ndesaulniers@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 3, 2017 at 8:09 PM, Andy Shevchenko
-<andy.shevchenko@gmail.com> wrote:
-> On Thu, Aug 3, 2017 at 6:18 PM, David Lechner <david@lechnology.com> wrote:
->
->> The particular display I have is this one:
->> http://wiki.seeed.cc/Grove-OLED_Display_1.12inch/
->>
->> It looks like it uses a command/data scheme like the MIPI displays, but
->> doesn't use any of the standard values for the commands. The controller can
->> do parallel, SPI and I2C, but the display I have is wired for I2C.
->
-> It looks very similar to ssd1306. Some description refers to ssd1308.
+The bitmask used to define these values produces overflow, as seen by
+this compiler warning:
 
-http://www.mouser.com/catalog/specsheets/Seeed_104030008.pdf
+arch/arm64/kernel/head.S:47:8: warning:
+      integer overflow in preprocessor expression
+  #elif (PAGE_OFFSET & 0x1fffff) != 0
+         ^~~~~~~~~~~
+arch/arm64/include/asm/memory.h:52:46: note:
+      expanded from macro 'PAGE_OFFSET'
+  #define PAGE_OFFSET             (UL(0xffffffffffffffff) << (VA_BITS -
+1))
+                                      ~~~~~~~~~~~~~~~~~~  ^
 
+It would be preferrable to use GENMASK_ULL() instead, but it's not set
+up to be used from assembly (the UL() macro token pastes UL suffixes
+when not included in assembly sources).
 
+Suggested-by: Yury Norov <ynorov@caviumnetworks.com>
+Suggested-by: Matthias Kaehlcke <mka@chromium.org>
+Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
+---
+ arch/arm64/include/asm/memory.h | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 32f82723338a..dde717a31dee 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -64,8 +64,9 @@
+  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
+  */
+ #define VA_BITS			(CONFIG_ARM64_VA_BITS)
+-#define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
+-#define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
++#define VA_START		((UL(0xffffffffffffffff) >> VA_BITS) << VA_BITS)
++#define PAGE_OFFSET		((UL(0xffffffffffffffff) >> (VA_BITS - 1)) \
++	<< (VA_BITS - 1))
+ #define KIMAGE_VADDR		(MODULES_END)
+ #define MODULES_END		(MODULES_VADDR + MODULES_VSIZE)
+ #define MODULES_VADDR		(VA_START + KASAN_SHADOW_SIZE)
 -- 
-With Best Regards,
-Andy Shevchenko
+2.14.0.rc1.383.gd1ce394fe2-goog
