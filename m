@@ -1,133 +1,95 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 3 Aug 2017 12:05:24 +0200
-Subject: [PATCH 0/6] Support for LEGO MINDSTORMS EV3 LCD display
-In-Reply-To: <abbd75ac-67f6-e189-5093-ee4a8f44ba6e@lechnology.com>
-References: <1501355870-13960-1-git-send-email-david@lechnology.com>
- <5d8f6518-8d7e-c029-2da4-e3417afb3e40@lechnology.com>
- <28188f5c-1daf-121b-6daf-1899668c3875@tronnes.org>
- <1ce36d43-b9dd-807e-23aa-bac4fda70fdc@lechnology.com>
- <bfb3d541-856b-0233-dd85-72512788939f@tronnes.org>
- <bbec0574-311a-e1b4-d7fd-f6fb15b078d2@lechnology.com>
- <937aa71c-1415-4645-7e04-6be43dd33174@tronnes.org>
- <abbd75ac-67f6-e189-5093-ee4a8f44ba6e@lechnology.com>
-Message-ID: <20170803100524.pisejaxz7wr2sutd@phenom.ffwll.local>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 3 Aug 2017 12:09:44 +0200
+Subject: [PATCH] dt-bindings: mtd: add new compatible strings for mtk nor
+ controller
+In-Reply-To: <1501726602.4381.23.camel@mhfsdcap03>
+References: <1500948617-19627-1-git-send-email-guochun.mao@mediatek.com>
+ <1500948617-19627-2-git-send-email-guochun.mao@mediatek.com>
+ <03016ea3-51ad-0b2d-e824-0a20913bd7c1@gmail.com>
+ <20170802103637.16cd6548@bbrezillon>
+ <535cc2d5-7bc9-2cb7-42cf-9d7058e64226@wedev4u.fr>
+ <1501726602.4381.23.camel@mhfsdcap03>
+Message-ID: <0796f86e-044b-5891-e56e-c96242611608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 02, 2017 at 11:05:58AM -0500, David Lechner wrote:
-> On 08/02/2017 03:05 AM, Noralf Tr?nnes wrote:
-> > 
-> > Den 02.08.2017 00.26, skrev David Lechner:
-> > > On 08/01/2017 01:08 PM, Noralf Tr?nnes wrote:
-> > > > (cc: Daniel Vetter)
-> > > > 
-> > > > 
-> > > > Den 01.08.2017 18.51, skrev David Lechner:
-> > > > > On 07/30/2017 12:14 PM, Noralf Tr?nnes wrote:
-> > > > > > 
-> > > > > > Den 29.07.2017 21.40, skrev David Lechner:
-> > > > > > > On 07/29/2017 02:17 PM, David Lechner wrote:
-> > > > > > > > The goal of this series is to get the built-in
-> > > > > > > > LCD of the LEGO MINDSTORMS EV3
-> > > > > > > > working. But, most of the content here is
-> > > > > > > > building up the infrastructure to do
-> > > > > > > > that.
-> > > > > > > > 
-> > > > > > > 
-> > > > > > > Some general comments/questions:
-> > > > > > > 
-> > > > > > > I have noticed that DRM doesn't really have support
-> > > > > > > for monochrome displays. I'm guessing that is
-> > > > > > > because no one really uses them anymore?
-> > > > > > > 
-> > > > > > 
-> > > > > > The repaper driver was the first monochrome drm driver and I chose to
-> > > > > > present it to userspace as XRGB8888 and convert it to monochrome.
-> > > > > > The reason for this is that everything, libraries, apps,
-> > > > > > plymouth (boot
-> > > > > > splash, no rgb565) supports it. I didn't see any point in adding a new
-> > > > > > monochrome drm format that didn't have, or probably wouldn't get
-> > > > > > userspace support (by libraries at least). The application of course
-> > > > > > needs to know this to get a good result.
-> > > > > > 
-> > > > > > tinydrm_xrgb8888_to_gray8() does the conversion:
-> > > > > > https://cgit.freedesktop.org/drm/drm-misc/commit/drivers/gpu/drm/tinydrm?id=379ea9a1a59a5a32c8db6f164e80a3fd00cb3781
-> > > > > > 
-> > > > > > 
-> > > > > > > The LEGO EV3 display is just an LCD (not the backlit
-> > > > > > > kind). It has two modes of operation. It can to 2bbp
-> > > > > > > grayscale or it can do 1bpp monochrome. The
-> > > > > > > grayscale isn't the best (looks splotchy in places),
-> > > > > > > so it would be nice to be able to choose between
-> > > > > > > these two modes. How would I implement something
-> > > > > > > like that?
-> > > > > > > 
-> > > > > > 
-> > > > > > Do you expect anyone to use grayscale if it doesn't look good?
-> > > > > > Maybe better to add it later if there's a demand for it.
-> > > > > 
-> > > > > I don't expect many people to use it at all. The people that
-> > > > > do will be hackers like me that want to see what it is
-> > > > > capable of, so I think I will keep it grayscale by default.
-> > > > > 
-> > > > 
-> > > > It looks like the best way to satisfy your needs is to add
-> > > > specific formats.
-> > > > 
-> > > > Video for Linux have these:
-> > > > 
-> > > > include/uapi/linux/videodev2.h
-> > > > 
-> > > > /* Grey formats */
-> > > > #define V4L2_PIX_FMT_GREY    v4l2_fourcc('G', 'R', 'E', 'Y') /*
-> > > > 8 Greyscale     */
-> > > > #define V4L2_PIX_FMT_Y4      v4l2_fourcc('Y', '0', '4', ' ') /*
-> > > > 4 Greyscale     */
-> > > > #define V4L2_PIX_FMT_Y6      v4l2_fourcc('Y', '0', '6', ' ') /*
-> > > > 6 Greyscale     */
-> > > > #define V4L2_PIX_FMT_Y10     v4l2_fourcc('Y', '1', '0', ' ') /*
-> > > > 10 Greyscale     */
-> > > > #define V4L2_PIX_FMT_Y12     v4l2_fourcc('Y', '1', '2', ' ') /*
-> > > > 12 Greyscale     */
-> > > > #define V4L2_PIX_FMT_Y16     v4l2_fourcc('Y', '1', '6', ' ') /*
-> > > > 16 Greyscale     */
-> > > > #define V4L2_PIX_FMT_Y16_BE  v4l2_fourcc_be('Y', '1', '6', ' ')
-> > > > /* 16 Greyscale BE  */
-> > > > 
-> > > > 
-> > > > Maybe we can add formats like these:
-> > > > 
-> > > > include/uapi/drm/drm_fourcc.h
-> > > > 
-> > > > #define DRM_FORMAT_MONO        fourcc_code('Y', '0', '1', ' ')
-> > > > /* [0] Monochrome */
-> > > > or
-> > > > #define DRM_FORMAT_Y1        fourcc_code('Y', '0', '1', ' ') /*
-> > > > [0] Monochrome */
-> > > > 
-> > > > #define DRM_FORMAT_Y2        fourcc_code('Y', '0', '2', ' ') /*
-> > > > [1:0] Greyscale */
-> > > > 
-> > > > Daniel, what do you think?
-> > > 
-> > > 2 of the first 3 tinydrm drivers are monochrome (and I would like to
-> > > write a driver for the Seeed/Grove I2C OLED displays which are also
-> > > monochrome), so I think the 1bpp modes would definitely be useful. I
-> > > think there is enough userspace code still around that knows about
-> > > FB_VISUAL_MONO01 and FB_VISUAL_MONO10 that could use these.
-> > > 
-> > 
-> > Can you elaborate, would you use the display trough monochrome fbdev
-> > or through drm?
-> 
-> I have a small collection of programs and libraries that work using
-> monochrome fbdev. I would like to just keep using them without having to
-> convert everything to drm.
 
-That probably means we'd need to extend fbdev emulation helpers in drm to
-support Monochrome modes better. Shouldn't be that much work really.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+
+On 08/03/2017 04:16 AM, Guochun Mao wrote:
+> Hi Cyrille,
+> 
+> On Wed, 2017-08-02 at 17:31 +0200, Cyrille Pitchen wrote:
+>> Hi Guochun,
+>>
+>> Le 02/08/2017 ? 10:36, Boris Brezillon a ?crit :
+>>> Hi Matthias,
+>>>
+>>> On Tue, 1 Aug 2017 14:33:22 +0200
+>>> Matthias Brugger <matthias.bgg@gmail.com> wrote:
+>>>
+>>>> On 07/25/2017 04:10 AM, Guochun Mao wrote:
+>>>>> Add "mediatek,mt2712-nor" and "mediatek,mt7622-nor"
+>>>>> for nor flash node's compatible strings.
+>>>>>
+>>>>> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+>>>>> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+>>>>> ---
+>>>>>    .../devicetree/bindings/mtd/mtk-quadspi.txt        |    2 ++
+>>>>>    1 file changed, 2 insertions(+)
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+>>>>> index 5ded66a..9845ff4 100644
+>>>>> --- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+>>>>> +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+>>>>> @@ -3,6 +3,8 @@
+>>>>>    Required properties:
+>>>>>    - compatible: 	  The possible values are:
+>>>>>    		  "mediatek,mt2701-nor"
+>>>>> +		  "mediatek,mt2712-nor"
+>>>>> +		  "mediatek,mt7622-nor"
+>>>>>    		  "mediatek,mt7623-nor"
+>>>>>    		  "mediatek,mt8173-nor"
+>>>>>    		  For mt8173, compatible should be "mediatek,mt8173-nor".
+>>>>>
+>>
+>> There should be another patch to update the mtk_nor_of_ids[] array in
+>> the mtk-quadspi.c driver, shouldn't it?
+>>
+>> Currently, I only see the "mediatek,mt8173-nor" compatible string at the
+>> driver side. The driver and its documentation should be aligned and both
+>> patches should be applied at the same time.
+> 
+>> Best regards,
+>>
+>> Cyrille
+> 
+> 
+>  From my designer's info, these IPs' nor controller could use same
+> driver, and I had verified it. I think there's no need to update
+> mtk_nor_of_ids[], unless we find difference between these IPs(exactly
+> compared with mt8173).
+> How do you think?
+>
+
+
+Right, mt8173-nor is the fallback binding which will be used by the driver. As 
+the documentation states, the compatible string should be something like:
+"mediatek,mt7622-nor", "mediatek,mt8173-nor"
+
+So the mt7622-nor binding is not matched in the driver, as the driver is the 
+same on all SoCs. Nonetheless if we realize in the future that mt7622 IP has 
+some special feature/bug, we can use the binding to implement that in the driver.
+
+AFAIK this is the standard way for bindings. Cyrille, is this ok for you, or do 
+want all bindings to be reflected in the driver even though they don't change 
+any functionality?
+
+Regards,
+Matthias
+
+> And, we will add dts patches for new SOCs, are these patches should
+> applied with this documentation?
+> 
+> Best regards,
+> Guochun
+> 
