@@ -1,23 +1,19 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 3 Aug 2017 18:36:28 -0500
-Subject: [PATCH v2 2/3] dt-bindings: add bindings document for zx-irdec
-In-Reply-To: <1501420993-21977-3-git-send-email-shawnguo@kernel.org>
-References: <1501420993-21977-1-git-send-email-shawnguo@kernel.org>
- <1501420993-21977-3-git-send-email-shawnguo@kernel.org>
-Message-ID: <20170803233628.nxkkrohc6idkmags@rob-hp-laptop>
+Date: Thu, 3 Aug 2017 18:37:09 -0500
+Subject: [PATCH] ASoC: rockchip: add bindings for i2s
+In-Reply-To: <1501465671-22863-1-git-send-email-sugar.zhang@rock-chips.com>
+References: <1501465671-22863-1-git-send-email-sugar.zhang@rock-chips.com>
+Message-ID: <20170803233709.2g5csaxnngb7d3at@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 30, 2017 at 09:23:12PM +0800, Shawn Guo wrote:
-> From: Shawn Guo <shawn.guo@linaro.org>
+On Mon, Jul 31, 2017 at 09:47:51AM +0800, Sugar Zhang wrote:
+> This patch add bindings for rk3036/rk3228/rk3328/rk3366 i2s.
 > 
-> It adds the dt-bindings document for ZTE ZX IRDEC remote control
-> block.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
 > ---
->  Documentation/devicetree/bindings/media/zx-irdec.txt | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/zx-irdec.txt
+> 
+>  Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
