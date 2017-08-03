@@ -1,121 +1,44 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 3 Aug 2017 18:21:33 +0100
-Subject: [PATCH v3 0/5] ACPI: DMA ranges management
-In-Reply-To: <3ccac0b0-dd5a-6a70-f253-99f038f69b8c@codeaurora.org>
-References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
- <3ccac0b0-dd5a-6a70-f253-99f038f69b8c@codeaurora.org>
-Message-ID: <14c1f547-31de-6c7c-2b37-2c902f9d3d78@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 3 Aug 2017 18:46:10 +0100
+Subject: [PATCH v2] arm64: Decode information from ESR upon mem faults
+In-Reply-To: <1500888078-50231-1-git-send-email-julien.thierry@arm.com>
+References: <1500888078-50231-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <20170803174609.m43amupy4vxkjsen@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/17 16:45, Nate Watterson wrote:
-> Hi Lorenzo,
-> 
-> On 8/3/2017 8:32 AM, Lorenzo Pieralisi wrote:
->> This patch series is v3 of a previous posting:
->>
->> v2->v3:
->>     - Fixed DMA masks computation
->>          - Fixed size computation overflow in acpi_dma_get_range()
->>
->> v1->v2:
->>     - Reworked acpi_dma_get_range() flow and logs
->>     - Added IORT named component address limits
->>     - Renamed acpi_dev_get_resources() helper function
->>     - Rebased against v4.13-rc3
->>
->> v2:
->> http://lkml.kernel.org/r/20170731152323.32488-1-lorenzo.pieralisi at arm.com
->> v1:
->> http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
->>
->> -- Original cover letter --
->>
->> As reported in:
->>
->> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
->>
->>
->> the bus connecting devices to an IOMMU bus can be smaller in size than
->> the IOMMU input address bits which results in devices DMA HW bugs in
->> particular related to IOVA allocation (ie chopping of higher address
->> bits owing to system bus HW capabilities mismatch with the IOMMU).
->>
->> Fortunately this problem can be solved through an already present but
->> never
->> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define
->> the DMA
->> window for a specific bus in ACPI and therefore all upstream devices
->> connected to it.
->>
->> This small patch series enables _DMA parsing in ACPI core code and
->> use it in ACPI IORT code in order to detect DMA ranges for devices and
->> update their data structures to make them work with their related DMA
->> addressing restrictions.
->>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Hanjun Guo <hanjun.guo@linaro.org>
->> Cc: Feng Kan <fkan@apm.com>
->> Cc: Jon Masters <jcm@redhat.com>
->> Cc: Robert Moore <robert.moore@intel.com>
->> Cc: Robin Murphy <robin.murphy@arm.com>
->> Cc: Zhang Rui <rui.zhang@intel.com>
->> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->>
->> Lorenzo Pieralisi (5):
->>    ACPICA: resource_mgr: Allow _DMA method in walk resources
->>    ACPI: Make acpi_dev_get_resources() method agnostic
->>    ACPI: Introduce DMA ranges parsing
->>    ACPI: Make acpi_dma_configure() DMA regions aware
->>    ACPI/IORT: Add IORT named component memory address limits
->>
->>   drivers/acpi/acpica/rsxface.c |  7 ++--
->>   drivers/acpi/arm64/iort.c     | 57 ++++++++++++++++++++++++++-
->>   drivers/acpi/resource.c       | 82
->> +++++++++++++++++++++++++++++---------
->>   drivers/acpi/scan.c           | 91
->> +++++++++++++++++++++++++++++++++++++++----
->>   include/acpi/acnames.h        |  1 +
->>   include/acpi/acpi_bus.h       |  2 +
->>   include/linux/acpi.h          |  8 ++++
->>   include/linux/acpi_iort.h     |  5 ++-
->>   8 files changed, 219 insertions(+), 34 deletions(-)
->>
-> 
-> I tested with named components and with _DMA objects at a variety of
-> sizes and verified the configured masks matched the expected values.
-> 
-> Tested-by: Nate Watterson <nwatters@codeaurora.org>
-> 
-> One general question I had while testing the patch is whether it is
-> possible to define a complete 64-bit range using the _DMA method. For
-> instance, to get a 64-bit dma_mask I had to use a non-zero MIN value
-> so that LEN would not overflow.
+Hi Julien,
 
-As far as I understand ACPI, all addresses are at most 64-bit. Thus the
-only valid DMA range of size 2^64 would be one with a minimum of 0 and
-no offset, and that can already be described by the simple absence of a
-_DMA object.
+On Mon, Jul 24, 2017 at 10:21:18AM +0100, Julien Thierry wrote:
+> When receiving unhandled faults from the CPU, description is very sparse.
+> Adding information about faults decoded from ESR.
+> 
+> Added defines to esr.h corresponding ESR fields. Values are based on ARM
+> Archtecture Reference Manual (DDI 0487B.a), section D7.2.28 ESR_ELx, Exception
+> Syndrome Register (ELx) (pages D7-2275 to D7-2280).
+> 
+> New output is of the form:
+> [   77.818059] Mem abort info:
+> [   77.820826]   Exception class = DABT (current EL), IL = 32 bits
+> [   77.826706]   SET = 0, FnV = 0
+> [   77.829742]   EA = 0, S1PTW = 0
+> [   77.832849] Data abort info:
+> [   77.835713]   ISV = 0, ISS = 0x00000070
+> [   77.839522]   CM = 0, WnR = 1
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  arch/arm64/include/asm/esr.h | 38 ++++++++++++++++++++++++++---------
+>  arch/arm64/mm/fault.c        | 47 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 76 insertions(+), 9 deletions(-)
 
-Robin.
+This patch doesn't apply against latest mainline. Would you mind
+reposting against a newer tag like v4.13-rc3?
 
-> 
-> QWORDMemory(
->     ResourceConsumer,
->     PosDecode,       // _DEC
->     MinFixed,        // _MIF
->     MaxFixed,        // _MAF
->     Prefetchable,    // _MEM
->     ReadWrite,       // _RW
->     0,               // _GRA
->     0x1000,               // _MIN
->     0xffffffffffffffff,   // _MAX
->     0x0,                  // _TRA
->     0xfffffffffffff000,   // _LEN
->     ,
->     ,
->     ,
-> )
-> 
-> -Nate
-> 
+Thanks.
+
+-- 
+Catalin
