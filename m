@@ -1,49 +1,50 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 3 Aug 2017 14:06:08 -0500
-Subject: [PATCH v2 3/6] dt-bindings: usb: Add documentation for NS2 ICFG
+Date: Thu, 3 Aug 2017 14:08:38 -0500
+Subject: [PATCH v2 4/6] dt-bindings: usb: Add documentation for NS2 IDM
  USB3
-In-Reply-To: <1501109787-15489-4-git-send-email-jon.mason@broadcom.com>
+In-Reply-To: <1501109787-15489-5-git-send-email-jon.mason@broadcom.com>
 References: <1501109787-15489-1-git-send-email-jon.mason@broadcom.com>
- <1501109787-15489-4-git-send-email-jon.mason@broadcom.com>
-Message-ID: <20170803190608.52l4d2vr3twkjyxt@rob-hp-laptop>
+ <1501109787-15489-5-git-send-email-jon.mason@broadcom.com>
+Message-ID: <20170803190838.q4o7ijukgoliik5n@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 06:56:24PM -0400, Jon Mason wrote:
-> Add documentation for ICFG USB3 registers available in NS2 SoC
+On Wed, Jul 26, 2017 at 06:56:25PM -0400, Jon Mason wrote:
+> Add documentation for IDM USB3 registers available in NS2 SoC
 > 
 > Signed-off-by: Jon Mason <jon.mason@broadcom.com>
 > ---
->  Documentation/devicetree/bindings/usb/brcm,icfg-usb.txt | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/brcm,icfg-usb.txt
+>  Documentation/devicetree/bindings/usb/brcm,usb3-idm.txt | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/brcm,usb3-idm.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/brcm,icfg-usb.txt b/Documentation/devicetree/bindings/usb/brcm,icfg-usb.txt
+> diff --git a/Documentation/devicetree/bindings/usb/brcm,usb3-idm.txt b/Documentation/devicetree/bindings/usb/brcm,usb3-idm.txt
 > new file mode 100644
-> index 000000000000..72176e25a692
+> index 000000000000..3618dbcbe890
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/brcm,icfg-usb.txt
-> @@ -0,0 +1,13 @@
-> +Broadcom ICFG USB3 registers
+> +++ b/Documentation/devicetree/bindings/usb/brcm,usb3-idm.txt
+> @@ -0,0 +1,14 @@
+> +Broadcom IDM USB3 registers
 > +
 > +Required properties:
-> +- compatible: "brcm,icfg-usb"
+> +- compatible: "brcm,usb3-idm"
 > +- reg: Base address and length of the USB registers
 > +
 > +
 > +Example:
 > +
-> +icfg_usb3: icfg_usb3 at 66000900 {
-> +        compatible = "brcm,icfg-usb";
+> +usb3_idm: idm at 67000000 {
 
-s/_/-/
-
-With that,
+I'm assuming these are all some misc registers in addition to the USB 
+controller? If this is the USB controller itself, then use generic node 
+names for the DT spec.
 
 Acked-by: Rob Herring <robh@kernel.org>
 
-> +        reg = <0x66000900 0x60>;
+> +        compatible = "brcm,usb3-idm";
+> +        reg = <0x67000000 0x2000>;
 > +};
+> +
 > -- 
 > 2.7.4
 > 
