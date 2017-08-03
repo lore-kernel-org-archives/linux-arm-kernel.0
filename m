@@ -1,23 +1,29 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 3 Aug 2017 14:26:13 +0800
-Subject: [RESEND PATCH 0/2] crypto/rockchip: fix some issue which causes
- crypto failed
-In-Reply-To: <1500859394-1799-1-git-send-email-wzz@rock-chips.com>
-References: <1500859394-1799-1-git-send-email-wzz@rock-chips.com>
-Message-ID: <20170803062613.GN12039@gondor.apana.org.au>
+From: jay.xu@rock-chips.com (Jianqun Xu)
+Date: Thu,  3 Aug 2017 15:02:00 +0800
+Subject: [PATCH] arm64: dts: rockchip: include opp dtsi for rk3399 firefly
+Message-ID: <1501743720-6778-1-git-send-email-jay.xu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 09:23:12AM +0800, zain wang wrote:
-> These patches fix some bugs on rockchip's crypto which would cause crypto failed.
-> 
-> zain wang (2):
->   crypto: rockchip - move the crypto completion from interrupt context
->   crypto: rockchip - return the err code when unable dequeue the crypto
->     request
+Add opp tables for cpu cluster0 and cluster1 by including
+rk3399-opp.dtsi.
 
-All applied.  Thanks.
+Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3399-firefly.dts | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
+index eed7e99..7fd4bfc 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
+@@ -43,6 +43,7 @@
+ /dts-v1/;
+ #include <dt-bindings/pwm/pwm.h>
+ #include "rk3399.dtsi"
++#include "rk3399-opp.dtsi"
+ 
+ / {
+ 	model = "Firefly-RK3399 Board";
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.9.1
