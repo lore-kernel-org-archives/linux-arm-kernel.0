@@ -1,300 +1,324 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 3 Aug 2017 12:03:02 +0200
-Subject: [PATCH v3] arm: dts: mt7623: Add SD-card and EMMC to bananapi-r2
-In-Reply-To: <1501749538.4398.6.camel@mtkswgap22>
-References: <687af2dc98feffc678945f130c03ca020d9ca7b5.1501748754.git.sean.wang@mediatek.com>
- <1501749538.4398.6.camel@mtkswgap22>
-Message-ID: <18397c89-e569-c3f7-ce3f-24e91c2770c9@gmail.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Thu, 3 Aug 2017 18:20:07 +0800
+Subject: [PATCH 4/4] dt-bindings: phy-mt65xx-usb: supports PCIe, SATA
+ and rename file
+In-Reply-To: <1501754483-10392-4-git-send-email-chunfeng.yun@mediatek.com>
+References: <72854b92d5d86698e5cbb427b1009e346eb15978.1501753328.git.chunfeng.yun@mediatek.com>
+ <1501754483-10392-4-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1501755607.25536.109.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+hi,
 
-On 08/03/2017 10:38 AM, Sean Wang wrote:
-> Hi, Matthias,
-> 
-> Ryder and me tried to make the patch better, so the delivery is made in
-> v3,  including add missing pin  state for mmc1 and remove wp-gpio
-> because the board only has micro-sd slot that can't be adjusted for the
-> lock manually. And also some cleanups are made for nodes sorted in
-> alphabetical order. Thanks for Ryder to catch.
-> 
+I made a mistake, please ignore the patches with Change-Id, very sorry
 
-Thanks for that. Would you mind to split the clean-up into another patch?
-We should avoid patches which do cleanup and adding drivers in one go.
-
-Thanks,
-Matthias
-
-> 	Sean
+On Thu, 2017-08-03 at 18:01 +0800, Chunfeng Yun wrote:
+> add support for PCIe and SATA, also add some new compatibles.
 > 
-> On Thu, 2017-08-03 at 16:29 +0800, sean.wang at mediatek.com wrote:
->> From: Sean Wang <sean.wang@mediatek.com>
->>
->> The bananapi-r2 board has an SD-card controller and built-in
->> EMMC storage so enables those devices in the devicetree. Also
->> cleanup nodes in alphabetical order in the patch.
->>
->> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
->> ---
->>   arch/arm/boot/dts/mt7623.dtsi                 | 73 ++++++++++++++-------------
->>   arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 73 ++++++++++++++++++++-------
->>   2 files changed, 94 insertions(+), 52 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
->> index 2a877ed..ec8a074 100644
->> --- a/arch/arm/boot/dts/mt7623.dtsi
->> +++ b/arch/arm/boot/dts/mt7623.dtsi
->> @@ -91,6 +91,7 @@
->>   			cooling-max-level = <7>;
->>   			clock-frequency = <1300000000>;
->>   		};
->> +
->>   		cpu1: cpu at 1 {
->>   			device_type = "cpu";
->>   			compatible = "arm,cortex-a7";
->> @@ -98,6 +99,7 @@
->>   			operating-points-v2 = <&cpu_opp_table>;
->>   			clock-frequency = <1300000000>;
->>   		};
->> +
->>   		cpu2: cpu at 2 {
->>   			device_type = "cpu";
->>   			compatible = "arm,cortex-a7";
->> @@ -105,6 +107,7 @@
->>   			operating-points-v2 = <&cpu_opp_table>;
->>   			clock-frequency = <1300000000>;
->>   		};
->> +
->>   		cpu3: cpu at 3 {
->>   			device_type = "cpu";
->>   			compatible = "arm,cortex-a7";
->> @@ -172,10 +175,12 @@
->>   					trip = <&cpu_passive>;
->>   					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
->>   				};
->> +
->>   				map1 {
->>   					trip = <&cpu_active>;
->>   					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
->>   				};
->> +
->>   				map2 {
->>   					trip = <&cpu_hot>;
->>   					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
->> @@ -481,6 +486,31 @@
->>   		nvmem-cell-names = "calibration-data";
->>   	};
->>   
->> +	nandc: nfi at 1100d000 {
->> +		compatible = "mediatek,mt7623-nfc",
->> +			     "mediatek,mt2701-nfc";
->> +		reg = <0 0x1100d000 0 0x1000>;
->> +		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_LOW>;
->> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
->> +		clocks = <&pericfg CLK_PERI_NFI>,
->> +			 <&pericfg CLK_PERI_NFI_PAD>;
->> +		clock-names = "nfi_clk", "pad_clk";
->> +		status = "disabled";
->> +		ecc-engine = <&bch>;
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +	};
->> +
->> +	bch: ecc at 1100e000 {
->> +		compatible = "mediatek,mt7623-ecc",
->> +			     "mediatek,mt2701-ecc";
->> +		reg = <0 0x1100e000 0 0x1000>;
->> +		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_LOW>;
->> +		clocks = <&pericfg CLK_PERI_NFI_ECC>;
->> +		clock-names = "nfiecc_clk";
->> +		status = "disabled";
->> +	};
->> +
->>   	spi1: spi at 11016000 {
->>   		compatible = "mediatek,mt7623-spi",
->>   			     "mediatek,mt2701-spi";
->> @@ -509,31 +539,6 @@
->>   		status = "disabled";
->>   	};
->>   
->> -	nandc: nfi at 1100d000 {
->> -		compatible = "mediatek,mt7623-nfc",
->> -			     "mediatek,mt2701-nfc";
->> -		reg = <0 0x1100d000 0 0x1000>;
->> -		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_LOW>;
->> -		power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
->> -		clocks = <&pericfg CLK_PERI_NFI>,
->> -			 <&pericfg CLK_PERI_NFI_PAD>;
->> -		clock-names = "nfi_clk", "pad_clk";
->> -		status = "disabled";
->> -		ecc-engine = <&bch>;
->> -		#address-cells = <1>;
->> -		#size-cells = <0>;
->> -	};
->> -
->> -	bch: ecc at 1100e000 {
->> -		compatible = "mediatek,mt7623-ecc",
->> -			     "mediatek,mt2701-ecc";
->> -		reg = <0 0x1100e000 0 0x1000>;
->> -		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_LOW>;
->> -		clocks = <&pericfg CLK_PERI_NFI_ECC>;
->> -		clock-names = "nfiecc_clk";
->> -		status = "disabled";
->> -	};
->> -
->>   	afe: audio-controller at 11220000 {
->>   		compatible = "mediatek,mt7623-audio",
->>   			     "mediatek,mt2701-audio";
->> @@ -655,6 +660,15 @@
->>   		status = "disabled";
->>   	};
->>   
->> +	hifsys: syscon at 1a000000 {
->> +		compatible = "mediatek,mt7623-hifsys",
->> +			     "mediatek,mt2701-hifsys",
->> +			     "syscon";
->> +		reg = <0 0x1a000000 0 0x1000>;
->> +		#clock-cells = <1>;
->> +		#reset-cells = <1>;
->> +	};
->> +
->>   	usb1: usb at 1a1c0000 {
->>   		compatible = "mediatek,mt7623-xhci",
->>   			     "mediatek,mt8173-xhci";
->> @@ -733,15 +747,6 @@
->>   		};
->>   	};
->>   
->> -	hifsys: syscon at 1a000000 {
->> -		compatible = "mediatek,mt7623-hifsys",
->> -			     "mediatek,mt2701-hifsys",
->> -			     "syscon";
->> -		reg = <0 0x1a000000 0 0x1000>;
->> -		#clock-cells = <1>;
->> -		#reset-cells = <1>;
->> -	};
->> -
->>   	ethsys: syscon at 1b000000 {
->>   		compatible = "mediatek,mt7623-ethsys",
->>   			     "mediatek,mt2701-ethsys",
->> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
->> index 9f3e6dd..0aa1c69 100644
->> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
->> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
->> @@ -179,6 +179,32 @@
->>   	status = "okay";
->>   };
->>   
->> +&mmc0 {
->> +	pinctrl-names = "default", "state_uhs";
->> +	pinctrl-0 = <&mmc0_pins_default>;
->> +	pinctrl-1 = <&mmc0_pins_uhs>;
->> +	status = "okay";
->> +	bus-width = <8>;
->> +	max-frequency = <50000000>;
->> +	cap-mmc-highspeed;
->> +	vmmc-supply = <&mt6323_vemc3v3_reg>;
->> +	vqmmc-supply = <&mt6323_vio18_reg>;
->> +	non-removable;
->> +};
->> +
->> +&mmc1 {
->> +	pinctrl-names = "default", "state_uhs";
->> +	pinctrl-0 = <&mmc1_pins_default>;
->> +	pinctrl-1 = <&mmc1_pins_uhs>;
->> +	status = "okay";
->> +	bus-width = <4>;
->> +	max-frequency = <50000000>;
->> +	cap-sd-highspeed;
->> +	cd-gpios = <&pio 261 0>;
->> +	vmmc-supply = <&mt6323_vmch_reg>;
->> +	vqmmc-supply = <&mt6323_vio18_reg>;
->> +};
->> +
->>   &pio {
->>   	cir_pins_a:cir at 0 {
->>   		pins_cir {
->> @@ -314,6 +340,17 @@
->>   			bias-pull-down;
->>   			drive-strength = <MTK_DRIVE_4mA>;
->>   		};
->> +
->> +		pins_wp {
->> +			pinmux = <MT7623_PIN_29_EINT7_FUNC_MSDC1_WP>;
->> +			input-enable;
->> +			bias-pull-up;
->> +		};
->> +
->> +		pins_insert {
->> +			pinmux = <MT7623_PIN_261_MSDC1_INS_FUNC_GPIO261>;
->> +			bias-pull-up;
->> +		};
->>   	};
->>   
->>   	mmc1_pins_uhs: mmc1 {
->> @@ -335,16 +372,6 @@
->>   		};
->>   	};
->>   
->> -	spi0_pins_a: spi at 0 {
->> -		pins_spi {
->> -			pinmux = <MT7623_PIN_53_SPI0_CSN_FUNC_SPI0_CS>,
->> -				<MT7623_PIN_54_SPI0_CK_FUNC_SPI0_CK>,
->> -				<MT7623_PIN_55_SPI0_MI_FUNC_SPI0_MI>,
->> -				<MT7623_PIN_56_SPI0_MO_FUNC_SPI0_MO>;
->> -			bias-disable;
->> -		};
->> -	};
->> -
->>   	pwm_pins_a: pwm at 0 {
->>   		pins_pwm {
->>   			pinmux = <MT7623_PIN_203_PWM0_FUNC_PWM0>,
->> @@ -355,6 +382,16 @@
->>   		};
->>   	};
->>   
->> +	spi0_pins_a: spi at 0 {
->> +		pins_spi {
->> +			pinmux = <MT7623_PIN_53_SPI0_CSN_FUNC_SPI0_CS>,
->> +				<MT7623_PIN_54_SPI0_CK_FUNC_SPI0_CK>,
->> +				<MT7623_PIN_55_SPI0_MI_FUNC_SPI0_MI>,
->> +				<MT7623_PIN_56_SPI0_MO_FUNC_SPI0_MO>;
->> +			bias-disable;
->> +		};
->> +	};
->> +
->>   	uart0_pins_a: uart at 0 {
->>   		pins_dat {
->>   			pinmux = <MT7623_PIN_79_URXD0_FUNC_URXD0>,
->> @@ -414,14 +451,6 @@
->>   	status = "disabled";
->>   };
->>   
->> -&u3phy1 {
->> -	status = "okay";
->> -};
->> -
->> -&u3phy2 {
->> -	status = "okay";
->> -};
->> -
->>   &uart1 {
->>   	pinctrl-names = "default";
->>   	pinctrl-0 = <&uart1_pins_a>;
->> @@ -441,3 +470,11 @@
->>   	vusb33-supply = <&mt6323_vusb_reg>;
->>   	status = "okay";
->>   };
->> +
->> +&u3phy1 {
->> +	status = "okay";
->> +};
->> +
->> +&u3phy2 {
->> +	status = "okay";
->> +};
+> due to phy-mt65xx-usb.txt holds the bindings for all mediatek SoCs
+> with T-PHY controller, change the name to phy-mtk-tphy.txt to
+> reflect that.
 > 
+> Change-Id: I2d9200d4c8768dc301a4c116fe0e9b8179d5911c
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  .../devicetree/bindings/phy/phy-mt65xx-usb.txt     |  137 -------------------
+>  .../devicetree/bindings/phy/phy-mtk-tphy.txt       |  144 ++++++++++++++++++++
+>  2 files changed, 144 insertions(+), 137 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+>  create mode 100644 Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
 > 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> deleted file mode 100644
+> index 0acc5a9..0000000
+> --- a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> +++ /dev/null
+> @@ -1,137 +0,0 @@
+> -mt65xx USB3.0 PHY binding
+> ---------------------------
+> -
+> -This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
+> -
+> -Required properties (controller (parent) node):
+> - - compatible	: should be one of
+> -		  "mediatek,mt2701-u3phy"
+> -		  "mediatek,mt2712-u3phy"
+> -		  "mediatek,mt8173-u3phy"
+> - - clocks	: (deprecated, use port's clocks instead) a list of phandle +
+> -		  clock-specifier pairs, one for each entry in clock-names
+> - - clock-names	: (deprecated, use port's one instead) must contain
+> -		  "u3phya_ref": for reference clock of usb3.0 analog phy.
+> -
+> -Required nodes	: a sub-node is required for each port the controller
+> -		  provides. Address range information including the usual
+> -		  'reg' property is used inside these nodes to describe
+> -		  the controller's topology.
+> -
+> -Optional properties (controller (parent) node):
+> - - reg		: offset and length of register shared by multiple ports,
+> -		  exclude port's private register. It is needed on mt2701
+> -		  and mt8173, but not on mt2712.
+> -
+> -Required properties (port (child) node):
+> -- reg		: address and length of the register set for the port.
+> -- clocks	: a list of phandle + clock-specifier pairs, one for each
+> -		  entry in clock-names
+> -- clock-names	: must contain
+> -		  "ref": 48M reference clock for HighSpeed analog phy; and 26M
+> -			reference clock for SuperSpeed analog phy, sometimes is
+> -			24M, 25M or 27M, depended on platform.
+> -- #phy-cells	: should be 1 (See second example)
+> -		  cell after port phandle is phy type from:
+> -			- PHY_TYPE_USB2
+> -			- PHY_TYPE_USB3
+> -
+> -Example:
+> -
+> -u3phy: usb-phy at 11290000 {
+> -	compatible = "mediatek,mt8173-u3phy";
+> -	reg = <0 0x11290000 0 0x800>;
+> -	#address-cells = <2>;
+> -	#size-cells = <2>;
+> -	ranges;
+> -	status = "okay";
+> -
+> -	u2port0: usb-phy at 11290800 {
+> -		reg = <0 0x11290800 0 0x100>;
+> -		clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
+> -		clock-names = "ref";
+> -		#phy-cells = <1>;
+> -		status = "okay";
+> -	};
+> -
+> -	u3port0: usb-phy at 11290900 {
+> -		reg = <0 0x11290800 0 0x700>;
+> -		clocks = <&clk26m>;
+> -		clock-names = "ref";
+> -		#phy-cells = <1>;
+> -		status = "okay";
+> -	};
+> -
+> -	u2port1: usb-phy at 11291000 {
+> -		reg = <0 0x11291000 0 0x100>;
+> -		clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
+> -		clock-names = "ref";
+> -		#phy-cells = <1>;
+> -		status = "okay";
+> -	};
+> -};
+> -
+> -Specifying phy control of devices
+> ----------------------------------
+> -
+> -Device nodes should specify the configuration required in their "phys"
+> -property, containing a phandle to the phy port node and a device type;
+> -phy-names for each port are optional.
+> -
+> -Example:
+> -
+> -#include <dt-bindings/phy/phy.h>
+> -
+> -usb30: usb at 11270000 {
+> -	...
+> -	phys = <&u2port0 PHY_TYPE_USB2>, <&u3port0 PHY_TYPE_USB3>;
+> -	phy-names = "usb2-0", "usb3-0";
+> -	...
+> -};
+> -
+> -
+> -Layout differences of banks between mt8173/mt2701 and mt2712
+> --------------------------------------------------------------
+> -mt8173 and mt2701:
+> -port        offset    bank
+> -shared      0x0000    SPLLC
+> -            0x0100    FMREG
+> -u2 port0    0x0800    U2PHY_COM
+> -u3 port0    0x0900    U3PHYD
+> -            0x0a00    U3PHYD_BANK2
+> -            0x0b00    U3PHYA
+> -            0x0c00    U3PHYA_DA
+> -u2 port1    0x1000    U2PHY_COM
+> -u3 port1    0x1100    U3PHYD
+> -            0x1200    U3PHYD_BANK2
+> -            0x1300    U3PHYA
+> -            0x1400    U3PHYA_DA
+> -u2 port2    0x1800    U2PHY_COM
+> -            ...
+> -
+> -mt2712:
+> -port        offset    bank
+> -u2 port0    0x0000    MISC
+> -            0x0100    FMREG
+> -            0x0300    U2PHY_COM
+> -u3 port0    0x0700    SPLLC
+> -            0x0800    CHIP
+> -            0x0900    U3PHYD
+> -            0x0a00    U3PHYD_BANK2
+> -            0x0b00    U3PHYA
+> -            0x0c00    U3PHYA_DA
+> -u2 port1    0x1000    MISC
+> -            0x1100    FMREG
+> -            0x1300    U2PHY_COM
+> -u3 port1    0x1700    SPLLC
+> -            0x1800    CHIP
+> -            0x1900    U3PHYD
+> -            0x1a00    U3PHYD_BANK2
+> -            0x1b00    U3PHYA
+> -            0x1c00    U3PHYA_DA
+> -u2 port2    0x2000    MISC
+> -            ...
+> -
+> -    SPLLC shared by u3 ports and FMREG shared by u2 ports on
+> -mt8173/mt2701 are put back into each port; a new bank MISC for
+> -u2 ports and CHIP for u3 ports are added on mt2712.
+> diff --git a/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
+> new file mode 100644
+> index 0000000..faf1808
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
+> @@ -0,0 +1,144 @@
+> +MediaTek T-PHY binding
+> +--------------------------
+> +
+> +T-phy controller supports physical layer functionality for a number of
+> +controllers on MediaTek SoCs, such as, USB2.0, USB3.0, PCIe, and SATA.
+> +
+> +Required properties (controller (parent) node):
+> + - compatible	: should be one of
+> +		  "mediatek,generic-tphy-v1"
+> +		  "mediatek,generic-tphy-v2"
+> +		  "mediatek,mt2701-u3phy" (deprecated)
+> +		  "mediatek,mt2712-u3phy" (deprecated)
+> +		  "mediatek,mt8173-u3phy";
+> +		  make use of "mediatek,generic-tphy-v1" on mt2701 instead and
+> +		  "mediatek,generic-tphy-v2" on mt2712 instead.
+> + - clocks	: (deprecated, use port's clocks instead) a list of phandle +
+> +		  clock-specifier pairs, one for each entry in clock-names
+> + - clock-names	: (deprecated, use port's one instead) must contain
+> +		  "u3phya_ref": for reference clock of usb3.0 analog phy.
+> +
+> +Required nodes	: a sub-node is required for each port the controller
+> +		  provides. Address range information including the usual
+> +		  'reg' property is used inside these nodes to describe
+> +		  the controller's topology.
+> +
+> +Optional properties (controller (parent) node):
+> + - reg		: offset and length of register shared by multiple ports,
+> +		  exclude port's private register. It is needed on mt2701
+> +		  and mt8173, but not on mt2712.
+> +
+> +Required properties (port (child) node):
+> +- reg		: address and length of the register set for the port.
+> +- clocks	: a list of phandle + clock-specifier pairs, one for each
+> +		  entry in clock-names
+> +- clock-names	: must contain
+> +		  "ref": 48M reference clock for HighSpeed analog phy; and 26M
+> +			reference clock for SuperSpeed analog phy, sometimes is
+> +			24M, 25M or 27M, depended on platform.
+> +- #phy-cells	: should be 1 (See second example)
+> +		  cell after port phandle is phy type from:
+> +			- PHY_TYPE_USB2
+> +			- PHY_TYPE_USB3
+> +			- PHY_TYPE_PCIE
+> +			- PHY_TYPE_SATA
+> +
+> +Example:
+> +
+> +u3phy: usb-phy at 11290000 {
+> +	compatible = "mediatek,mt8173-u3phy";
+> +	reg = <0 0x11290000 0 0x800>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +	ranges;
+> +	status = "okay";
+> +
+> +	u2port0: usb-phy at 11290800 {
+> +		reg = <0 0x11290800 0 0x100>;
+> +		clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
+> +		clock-names = "ref";
+> +		#phy-cells = <1>;
+> +		status = "okay";
+> +	};
+> +
+> +	u3port0: usb-phy at 11290900 {
+> +		reg = <0 0x11290800 0 0x700>;
+> +		clocks = <&clk26m>;
+> +		clock-names = "ref";
+> +		#phy-cells = <1>;
+> +		status = "okay";
+> +	};
+> +
+> +	u2port1: usb-phy at 11291000 {
+> +		reg = <0 0x11291000 0 0x100>;
+> +		clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
+> +		clock-names = "ref";
+> +		#phy-cells = <1>;
+> +		status = "okay";
+> +	};
+> +};
+> +
+> +Specifying phy control of devices
+> +---------------------------------
+> +
+> +Device nodes should specify the configuration required in their "phys"
+> +property, containing a phandle to the phy port node and a device type;
+> +phy-names for each port are optional.
+> +
+> +Example:
+> +
+> +#include <dt-bindings/phy/phy.h>
+> +
+> +usb30: usb at 11270000 {
+> +	...
+> +	phys = <&u2port0 PHY_TYPE_USB2>, <&u3port0 PHY_TYPE_USB3>;
+> +	phy-names = "usb2-0", "usb3-0";
+> +	...
+> +};
+> +
+> +
+> +Layout differences of banks between mt8173/mt2701 and mt2712
+> +-------------------------------------------------------------
+> +mt8173 and mt2701:
+> +port        offset    bank
+> +shared      0x0000    SPLLC
+> +            0x0100    FMREG
+> +u2 port0    0x0800    U2PHY_COM
+> +u3 port0    0x0900    U3PHYD
+> +            0x0a00    U3PHYD_BANK2
+> +            0x0b00    U3PHYA
+> +            0x0c00    U3PHYA_DA
+> +u2 port1    0x1000    U2PHY_COM
+> +u3 port1    0x1100    U3PHYD
+> +            0x1200    U3PHYD_BANK2
+> +            0x1300    U3PHYA
+> +            0x1400    U3PHYA_DA
+> +u2 port2    0x1800    U2PHY_COM
+> +            ...
+> +
+> +mt2712:
+> +port        offset    bank
+> +u2 port0    0x0000    MISC
+> +            0x0100    FMREG
+> +            0x0300    U2PHY_COM
+> +u3 port0    0x0700    SPLLC
+> +            0x0800    CHIP
+> +            0x0900    U3PHYD
+> +            0x0a00    U3PHYD_BANK2
+> +            0x0b00    U3PHYA
+> +            0x0c00    U3PHYA_DA
+> +u2 port1    0x1000    MISC
+> +            0x1100    FMREG
+> +            0x1300    U2PHY_COM
+> +u3 port1    0x1700    SPLLC
+> +            0x1800    CHIP
+> +            0x1900    U3PHYD
+> +            0x1a00    U3PHYD_BANK2
+> +            0x1b00    U3PHYA
+> +            0x1c00    U3PHYA_DA
+> +u2 port2    0x2000    MISC
+> +            ...
+> +
+> +    SPLLC shared by u3 ports and FMREG shared by u2 ports on
+> +mt8173/mt2701 are put back into each port; a new bank MISC for
+> +u2 ports and CHIP for u3 ports are added on mt2712.
