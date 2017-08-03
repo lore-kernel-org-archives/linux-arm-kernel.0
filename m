@@ -1,45 +1,147 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 4 Aug 2017 05:28:40 +0800
-Subject: [PATCH 2/2] arm64: dts: rockchip: Add support for rk3399
- excavator main board
-In-Reply-To: <1501756357-10511-2-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <201708040551.mSxlH21s%fengguang.wu@intel.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Thu,  3 Aug 2017 23:21:31 +0200
+Subject: [PATCH] watchdog: constify watchdog_ops and watchdog_info structures
+Message-ID: <1501795291-21372-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacob,
+These watchdog_ops and watchdog_info structures are only stored
+in the ops and info fields of a watchdog_device structure,
+respectively, which are const.  Thus make the watchdog_ops and
+watchdog_info structures const as well.
 
-[auto build test ERROR on rockchip/for-next]
-[also build test ERROR on v4.13-rc3 next-20170803]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Done with the help of Coccinelle.  The rules for the watchdog_ops case are
+as follows:
 
-url:    https://github.com/0day-ci/linux/commits/Jacob-Chen/arm64-dts-rockchip-Add-support-for-rk3399-sapphire-SOM/20170804-002840
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+// <smpl>
+@r disable optional_qualifier@
+identifier i;
+position p;
+@@
+static struct watchdog_ops i at p = { ... };
 
-All errors (new ones prefixed by >>):
+@ok@
+identifier r.i;
+struct watchdog_device e;
+position p;
+@@
+e.ops = &i at p;
 
->> Error: arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi:197.1-6 Label or path hdmi not found
->> Error: arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi:632.1-6 Label or path vopb not found
->> Error: arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi:636.1-10 Label or path vopb_mmu not found
->> Error: arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi:640.1-6 Label or path vopl not found
->> Error: arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi:644.1-10 Label or path vopl_mmu not found
->> Error: arch/arm64/boot/dts/rockchip/rk3399-sapphire-excavator.dts:157.1-5 Label or path edp not found
-   FATAL ERROR: Syntax error parsing input tree
+@bad@
+position p != {r.p,ok.p};
+identifier r.i;
+struct watchdog_ops e;
+@@
+e at i@p
+
+@depends on !bad disable optional_qualifier@
+identifier r.i;
+@@
+static
++const
+ struct watchdog_ops i = { ... };
+// </smpl>
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 36243 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170804/8023003d/attachment-0001.gz>
+ drivers/watchdog/coh901327_wdt.c |    2 +-
+ drivers/watchdog/diag288_wdt.c   |    2 +-
+ drivers/watchdog/it87_wdt.c      |    2 +-
+ drivers/watchdog/mt7621_wdt.c    |    2 +-
+ drivers/watchdog/rt2880_wdt.c    |    2 +-
+ drivers/watchdog/stm32_iwdg.c    |    2 +-
+ drivers/watchdog/ts72xx_wdt.c    |    2 +-
+ 7 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/watchdog/diag288_wdt.c b/drivers/watchdog/diag288_wdt.c
+index 6f59108..806a04a 100644
+--- a/drivers/watchdog/diag288_wdt.c
++++ b/drivers/watchdog/diag288_wdt.c
+@@ -213,7 +213,7 @@ static int wdt_set_timeout(struct watchdog_device * dev, unsigned int new_to)
+ 	.set_timeout = wdt_set_timeout,
+ };
+ 
+-static struct watchdog_info wdt_info = {
++static const struct watchdog_info wdt_info = {
+ 	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
+ 	.firmware_version = 0,
+ 	.identity = "z Watchdog",
+diff --git a/drivers/watchdog/it87_wdt.c b/drivers/watchdog/it87_wdt.c
+index dd1e7ea..e96faea 100644
+--- a/drivers/watchdog/it87_wdt.c
++++ b/drivers/watchdog/it87_wdt.c
+@@ -253,7 +253,7 @@ static int wdt_set_timeout(struct watchdog_device *wdd, unsigned int t)
+ 	.identity = WATCHDOG_NAME,
+ };
+ 
+-static struct watchdog_ops wdt_ops = {
++static const struct watchdog_ops wdt_ops = {
+ 	.owner = THIS_MODULE,
+ 	.start = wdt_start,
+ 	.stop = wdt_stop,
+diff --git a/drivers/watchdog/mt7621_wdt.c b/drivers/watchdog/mt7621_wdt.c
+index 48a0606..878835c 100644
+--- a/drivers/watchdog/mt7621_wdt.c
++++ b/drivers/watchdog/mt7621_wdt.c
+@@ -105,7 +105,7 @@ static int mt7621_wdt_bootcause(void)
+ 	return 0;
+ }
+ 
+-static struct watchdog_info mt7621_wdt_info = {
++static const struct watchdog_info mt7621_wdt_info = {
+ 	.identity = "Mediatek Watchdog",
+ 	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
+ };
+diff --git a/drivers/watchdog/rt2880_wdt.c b/drivers/watchdog/rt2880_wdt.c
+index 05524ba..1727aa3 100644
+--- a/drivers/watchdog/rt2880_wdt.c
++++ b/drivers/watchdog/rt2880_wdt.c
+@@ -119,7 +119,7 @@ static int rt288x_wdt_bootcause(void)
+ 	return 0;
+ }
+ 
+-static struct watchdog_info rt288x_wdt_info = {
++static const struct watchdog_info rt288x_wdt_info = {
+ 	.identity = "Ralink Watchdog",
+ 	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
+ };
+diff --git a/drivers/watchdog/ts72xx_wdt.c b/drivers/watchdog/ts72xx_wdt.c
+index 17c25da..811e43c 100644
+--- a/drivers/watchdog/ts72xx_wdt.c
++++ b/drivers/watchdog/ts72xx_wdt.c
+@@ -112,7 +112,7 @@ static int ts72xx_wdt_settimeout(struct watchdog_device *wdd, unsigned int to)
+ 	.identity		= "TS-72XX WDT",
+ };
+ 
+-static struct watchdog_ops ts72xx_wdt_ops = {
++static const struct watchdog_ops ts72xx_wdt_ops = {
+ 	.owner		= THIS_MODULE,
+ 	.start		= ts72xx_wdt_start,
+ 	.stop		= ts72xx_wdt_stop,
+diff --git a/drivers/watchdog/stm32_iwdg.c b/drivers/watchdog/stm32_iwdg.c
+index 6c501b7..be64a86 100644
+--- a/drivers/watchdog/stm32_iwdg.c
++++ b/drivers/watchdog/stm32_iwdg.c
+@@ -140,7 +140,7 @@ static int stm32_iwdg_set_timeout(struct watchdog_device *wdd,
+ 	.identity	= "STM32 Independent Watchdog",
+ };
+ 
+-static struct watchdog_ops stm32_iwdg_ops = {
++static const struct watchdog_ops stm32_iwdg_ops = {
+ 	.owner		= THIS_MODULE,
+ 	.start		= stm32_iwdg_start,
+ 	.ping		= stm32_iwdg_ping,
+diff --git a/drivers/watchdog/coh901327_wdt.c b/drivers/watchdog/coh901327_wdt.c
+index 38dd60f0..4410337 100644
+--- a/drivers/watchdog/coh901327_wdt.c
++++ b/drivers/watchdog/coh901327_wdt.c
+@@ -218,7 +218,7 @@ static irqreturn_t coh901327_interrupt(int irq, void *data)
+ 	.identity = DRV_NAME,
+ };
+ 
+-static struct watchdog_ops coh901327_ops = {
++static const struct watchdog_ops coh901327_ops = {
+ 	.owner = THIS_MODULE,
+ 	.start = coh901327_start,
+ 	.stop = coh901327_stop,
