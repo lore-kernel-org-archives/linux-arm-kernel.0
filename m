@@ -1,112 +1,59 @@
-From: cakturk@gmail.com (Cihangir Akturk)
-Date: Thu,  3 Aug 2017 14:58:36 +0300
-Subject: [PATCH 21/29] drm/rockchip: switch to drm_*{get,put} helpers
-In-Reply-To: <1501761585-11757-1-git-send-email-cakturk@gmail.com>
-References: <1501761585-11757-1-git-send-email-cakturk@gmail.com>
-Message-ID: <1501761585-11757-22-git-send-email-cakturk@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 3 Aug 2017 14:02:42 +0200
+Subject: [PATCH v3 00/10] ARM: sun8i: a83t: Add support for MMC controllers
+In-Reply-To: <CAGb2v648K1Nguf8nVjfunow7+xwS0MHazzMXJd1xZ3uNM2WesA@mail.gmail.com>
+References: <20170724135905.28855-1-wens@csie.org>
+ <CAGb2v66DQ3H2Mta7h+t1P+UzSRLnMABRebeYcopaPkN0gOiwxA@mail.gmail.com>
+ <20170726194522.7d64f7c2danrknfi@flea>
+ <CAPDyKFrssySjKW0E7sB3D-UjVea8_Yxvrkkr7sKf47x6jwgVSQ@mail.gmail.com>
+ <CAGb2v648K1Nguf8nVjfunow7+xwS0MHazzMXJd1xZ3uNM2WesA@mail.gmail.com>
+Message-ID: <CAPDyKFrBfQ-mNTNitcpgo1FCa1068ZzC_J4efsxmU2X6tOJgzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drm_*_reference() and drm_*_unreference() functions are just
-compatibility alias for drm_*_get() and drm_*_put() adn should not be
-used by new code. So convert all users of compatibility functions to use
-the new APIs.
+On 3 August 2017 at 13:25, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Thu, Aug 3, 2017 at 7:19 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>> On 26 July 2017 at 21:45, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>>> On Wed, Jul 26, 2017 at 10:09:41PM +0800, Chen-Yu Tsai wrote:
+>>>> On Mon, Jul 24, 2017 at 9:58 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+>>>> > Hi everyone,
+>>>> >
+>>>> > This is v3 of my MMC controller support series.
+>>>> >
+>>>>
+>>>> [...]
+>>>>
+>>>> > Chen-Yu Tsai (10):
+>>>> >   clk: sunxi-ng: Add interface to query or configure MMC timing modes.
+>>>> >   clk: sunxi-ng: Add MP_MMC clocks that support MMC timing modes
+>>>> >     switching
+>>>> >   clk: sunxi-ng: a83t: Support new timing mode for mmc2 clock
+>>>> >   mmc: sunxi: Support controllers that can use both old and new timings
+>>>> >   mmc: sunxi: Support MMC DDR52 transfer mode with new timing mode
+>>>> >   mmc: sunxi: Add support for A83T eMMC (MMC2)
+>>>>
+>>>> So this series seems to be ready for inclusion, unless Ulf has further
+>>>> concerns about the clk usage.
+>>>>
+>>>> The first mmc patch have build time dependencies on the first clk patch.
+>>>> Shall we put the clk patch on a separate immutable branch for both trees
+>>>> to pull? Or we could just merge everything through the mmc tree? I don't
+>>>> think we'll touch this part of the sunxi-ng clk driver for the remainder
+>>>> of this cycle.
+>>>
+>>> I guess the easiest would be for it to go through Ulf tree, unless he
+>>> says otherwise of course :)
+>>
+>> Okay, I have picked up the series and applied it for my next branch.
+>
+> I guess I wasn't very clear. When I meant "everything" I meant the mmc
+> and clk patches. We will take the dts patches through the sunxi tree.
+>
+> Can you drop the four dts patches from your tree? That would be the
+> last four patches on mmc/next at the moment.
 
-Signed-off-by: Cihangir Akturk <cakturk@gmail.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_fb.c    | 6 +++---
- drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c | 2 +-
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c   | 4 ++--
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c   | 4 ++--
- 4 files changed, 8 insertions(+), 8 deletions(-)
+Done!
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-index 81f9548..a933b58 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
-@@ -48,7 +48,7 @@ static void rockchip_drm_fb_destroy(struct drm_framebuffer *fb)
- 	int i;
- 
- 	for (i = 0; i < ROCKCHIP_MAX_FB_BUFFER; i++)
--		drm_gem_object_unreference_unlocked(rockchip_fb->obj[i]);
-+		drm_gem_object_put_unlocked(rockchip_fb->obj[i]);
- 
- 	drm_framebuffer_cleanup(fb);
- 	kfree(rockchip_fb);
-@@ -144,7 +144,7 @@ rockchip_user_fb_create(struct drm_device *dev, struct drm_file *file_priv,
- 			width * drm_format_plane_cpp(mode_cmd->pixel_format, i);
- 
- 		if (obj->size < min_size) {
--			drm_gem_object_unreference_unlocked(obj);
-+			drm_gem_object_put_unlocked(obj);
- 			ret = -EINVAL;
- 			goto err_gem_object_unreference;
- 		}
-@@ -161,7 +161,7 @@ rockchip_user_fb_create(struct drm_device *dev, struct drm_file *file_priv,
- 
- err_gem_object_unreference:
- 	for (i--; i >= 0; i--)
--		drm_gem_object_unreference_unlocked(objs[i]);
-+		drm_gem_object_put_unlocked(objs[i]);
- 	return ERR_PTR(ret);
- }
- 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
-index ce946b9..724579e 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
-@@ -173,7 +173,7 @@ void rockchip_drm_fbdev_fini(struct drm_device *dev)
- 	drm_fb_helper_unregister_fbi(helper);
- 
- 	if (helper->fb)
--		drm_framebuffer_unreference(helper->fb);
-+		drm_framebuffer_put(helper->fb);
- 
- 	drm_fb_helper_fini(helper);
- }
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-index b74ac71..9f880d0 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-@@ -383,7 +383,7 @@ rockchip_gem_create_with_handle(struct drm_file *file_priv,
- 		goto err_handle_create;
- 
- 	/* drop reference from allocate - handle holds it now. */
--	drm_gem_object_unreference_unlocked(obj);
-+	drm_gem_object_put_unlocked(obj);
- 
- 	return rk_obj;
- 
-@@ -414,7 +414,7 @@ int rockchip_gem_dumb_map_offset(struct drm_file *file_priv,
- 	DRM_DEBUG_KMS("offset = 0x%llx\n", *offset);
- 
- out:
--	drm_gem_object_unreference_unlocked(obj);
-+	drm_gem_object_put_unlocked(obj);
- 
- 	return 0;
- }
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 5d45033..12e17e6 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -1065,7 +1065,7 @@ static void vop_crtc_atomic_flush(struct drm_crtc *crtc,
- 		if (old_plane_state->fb == plane->state->fb)
- 			continue;
- 
--		drm_framebuffer_reference(old_plane_state->fb);
-+		drm_framebuffer_get(old_plane_state->fb);
- 		drm_flip_work_queue(&vop->fb_unref_work, old_plane_state->fb);
- 		set_bit(VOP_PENDING_FB_UNREF, &vop->pending);
- 		WARN_ON(drm_crtc_vblank_get(crtc) != 0);
-@@ -1189,7 +1189,7 @@ static void vop_fb_unref_worker(struct drm_flip_work *work, void *val)
- 	struct drm_framebuffer *fb = val;
- 
- 	drm_crtc_vblank_put(&vop->crtc);
--	drm_framebuffer_unreference(fb);
-+	drm_framebuffer_put(fb);
- }
- 
- static void vop_handle_vblank(struct vop *vop)
--- 
-2.7.4
+Kind regards
+Uffe
