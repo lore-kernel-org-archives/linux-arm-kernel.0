@@ -1,150 +1,111 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  3 Aug 2017 16:14:07 +0800
-Subject: [PATCH 4/8] phy: sun4i-usb: Support A83T USB PHYs
+Date: Thu,  3 Aug 2017 16:14:10 +0800
+Subject: [PATCH 7/8] ARM: sun8i: a83t: cubietruck-plus: Enable onboard USB
+ peripherals
 In-Reply-To: <20170803081411.22389-1-wens@csie.org>
 References: <20170803081411.22389-1-wens@csie.org>
-Message-ID: <20170803081411.22389-5-wens@csie.org>
+Message-ID: <20170803081411.22389-8-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A83T has 3 USB PHYs, 1 for OTG, 1 for standard USB, 1 for USB HSIC.
-The phy initialization procedure is very different from other SoCs, but
-the PMU bits are the same, with additional bits for HSIC.
+The Cubietruck-plus has a GL830 USB-to-SATA bridge connected to EHCI0,
+and a USB3503 HSIC USB 2.0 hub connected to EHCI1. The USB3503's I2C
+control interface is not connected.
+
+This patch enables both EHCI controllers, adds a device node for the
+USB hub, and includes sunxi-common-regulators.dtsi for the VBUS
+regulators. The existing reg_vcc3v3 is dropped as it is also available
+in the set of common regulators. Other unused regulators are disabled.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/phy/allwinner/phy-sun4i-usb.c | 66 ++++++++++++++++++++++++++++-------
- 1 file changed, 54 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts | 49 +++++++++++++++++++++---
+ 1 file changed, 44 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c b/drivers/phy/allwinner/phy-sun4i-usb.c
-index 79157eced75a..af16f4fb9707 100644
---- a/drivers/phy/allwinner/phy-sun4i-usb.c
-+++ b/drivers/phy/allwinner/phy-sun4i-usb.c
-@@ -87,6 +87,16 @@
- #define PHY_DISCON_TH_SEL		0x2a
- #define PHY_SQUELCH_DETECT		0x3c
+diff --git a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+index f583e5b9a1c8..716a205c6dbb 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
+@@ -44,6 +44,7 @@
  
-+/* A83T specific control bits for PHY0 */
-+#define PHY_CTL_VBUSVLDEXT		BIT(5)
-+#define PHY_CTL_SIDDQ			BIT(3)
-+
-+/* A83T specific control bits for PHY2 HSIC */
-+#define SUNXI_EHCI_HS_FORCE		BIT(20)
-+#define SUNXI_HSIC_CONNECT_DET		BIT(17)
-+#define SUNXI_HSIC_CONNECT_INT		BIT(16)
-+#define SUNXI_HSIC			BIT(1)
-+
- #define MAX_PHYS			4
+ /dts-v1/;
+ #include "sun8i-a83t.dtsi"
++#include "sunxi-common-regulators.dtsi"
  
- /*
-@@ -100,6 +110,7 @@ enum sun4i_usb_phy_type {
- 	sun4i_a10_phy,
- 	sun6i_a31_phy,
- 	sun8i_a33_phy,
-+	sun8i_a83t_phy,
- 	sun8i_h3_phy,
- 	sun8i_v3s_phy,
- 	sun50i_a64_phy,
-@@ -234,6 +245,7 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
+ #include <dt-bindings/gpio/gpio.h>
  
- static void sun4i_usb_phy_passby(struct sun4i_usb_phy *phy, int enable)
- {
-+	struct sun4i_usb_phy_data *phy_data = to_sun4i_usb_phy_data(phy);
- 	u32 bits, reg_value;
+@@ -83,11 +84,15 @@
+ 		};
+ 	};
  
- 	if (!phy->pmu)
-@@ -242,6 +254,11 @@ static void sun4i_usb_phy_passby(struct sun4i_usb_phy *phy, int enable)
- 	bits = SUNXI_AHB_ICHR8_EN | SUNXI_AHB_INCR4_BURST_EN |
- 		SUNXI_AHB_INCRX_ALIGN_EN | SUNXI_ULPI_BYPASS_EN;
+-	reg_vcc3v3: vcc3v3 {
+-		compatible = "regulator-fixed";
+-		regulator-name = "vcc3v3";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
++	usb-hub {
++		/* I2C is not connected */
++		compatible = "smsc,usb3503";
++		initial-mode = <1>; /* initialize in HUB mode */
++		disabled-ports = <1>;
++		intn-gpios = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
++		reset-gpios = <&pio 4 16 GPIO_ACTIVE_HIGH>; /* PE16 */
++		connect-gpios = <&pio 4 17 GPIO_ACTIVE_HIGH>; /* PE17 */
++		refclk-frequency = <19200000>;
+ 	};
  
-+	/* A83T USB2 is HSIC */
-+	if (phy_data->cfg->type == sun8i_a83t_phy && phy->index == 2)
-+		bits |= SUNXI_EHCI_HS_FORCE | SUNXI_HSIC_CONNECT_INT |
-+			SUNXI_HSIC;
-+
- 	reg_value = readl(phy->pmu);
- 
- 	if (enable)
-@@ -276,21 +293,30 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- 		return ret;
- 	}
- 
--	if (phy->pmu && data->cfg->enable_pmu_unk1) {
--		val = readl(phy->pmu + REG_PMU_UNK1);
--		writel(val & ~2, phy->pmu + REG_PMU_UNK1);
--	}
-+	if (data->cfg->type == sun8i_a83t_phy) {
-+		if (phy->index == 0) {
-+			val = readl(data->base + data->cfg->phyctl_offset);
-+			val |= PHY_CTL_VBUSVLDEXT;
-+			val &= ~PHY_CTL_SIDDQ;
-+			writel(val, data->base + data->cfg->phyctl_offset);
-+		}
-+	} else {
-+		if (phy->pmu && data->cfg->enable_pmu_unk1) {
-+			val = readl(phy->pmu + REG_PMU_UNK1);
-+			writel(val & ~2, phy->pmu + REG_PMU_UNK1);
-+		}
- 
--	/* Enable USB 45 Ohm resistor calibration */
--	if (phy->index == 0)
--		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
-+		/* Enable USB 45 Ohm resistor calibration */
-+		if (phy->index == 0)
-+			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
- 
--	/* Adjust PHY's magnitude and rate */
--	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
-+		/* Adjust PHY's magnitude and rate */
-+		sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
- 
--	/* Disconnect threshold adjustment */
--	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
--			    data->cfg->disc_thresh, 2);
-+		/* Disconnect threshold adjustment */
-+		sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
-+				    data->cfg->disc_thresh, 2);
-+	}
- 
- 	sun4i_usb_phy_passby(phy, 1);
- 
-@@ -316,6 +342,13 @@ static int sun4i_usb_phy_exit(struct phy *_phy)
- 	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
- 
- 	if (phy->index == 0) {
-+		if (data->cfg->type == sun8i_a83t_phy) {
-+			void __iomem *phyctl = data->base +
-+				data->cfg->phyctl_offset;
-+
-+			writel(readl(phyctl) | PHY_CTL_SIDDQ, phyctl);
-+		}
-+
- 		/* Disable pull-ups */
- 		sun4i_usb_phy0_update_iscr(_phy, ISCR_DPDM_PULLUP_EN, 0);
- 		sun4i_usb_phy0_update_iscr(_phy, ISCR_ID_PULLUP_EN, 0);
-@@ -853,6 +886,14 @@ static const struct sun4i_usb_phy_cfg sun8i_a33_cfg = {
- 	.enable_pmu_unk1 = false,
+ 	sound {
+@@ -109,6 +114,16 @@
+ 	};
  };
  
-+static const struct sun4i_usb_phy_cfg sun8i_a83t_cfg = {
-+	.num_phys = 3,
-+	.hsic_index = 2,
-+	.type = sun8i_a83t_phy,
-+	.phyctl_offset = REG_PHYCTL_A33,
-+	.dedicated_clocks = true,
++&ehci0 {
++	/* GL830 USB-to-SATA bridge here */
++	status = "okay";
 +};
 +
- static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
- 	.num_phys = 4,
- 	.type = sun8i_h3_phy,
-@@ -889,6 +930,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
- 	{ .compatible = "allwinner,sun7i-a20-usb-phy", .data = &sun7i_a20_cfg },
- 	{ .compatible = "allwinner,sun8i-a23-usb-phy", .data = &sun8i_a23_cfg },
- 	{ .compatible = "allwinner,sun8i-a33-usb-phy", .data = &sun8i_a33_cfg },
-+	{ .compatible = "allwinner,sun8i-a83t-usb-phy", .data = &sun8i_a83t_cfg },
- 	{ .compatible = "allwinner,sun8i-h3-usb-phy", .data = &sun8i_h3_cfg },
- 	{ .compatible = "allwinner,sun8i-v3s-usb-phy", .data = &sun8i_v3s_cfg },
- 	{ .compatible = "allwinner,sun50i-a64-usb-phy",
++&ehci1 {
++	/* USB3503 HSIC USB 2.0 hub here */
++	status = "okay";
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+@@ -164,6 +179,24 @@
+ 	};
+ };
+ 
++&reg_usb1_vbus {
++	gpio = <&pio 3 29 GPIO_ACTIVE_HIGH>; /* PD29 */
++	status = "okay";
++};
++
++&reg_usb2_vbus {
++	gpio = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
++	status = "okay";
++};
++
++&reg_vcc3v0 {
++	status = "disabled";
++};
++
++&reg_vcc5v0 {
++	status = "disabled";
++};
++
+ &spdif {
+ 	status = "okay";
+ };
+@@ -173,3 +206,9 @@
+ 	pinctrl-0 = <&uart0_pb_pins>;
+ 	status = "okay";
+ };
++
++&usbphy {
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
 -- 
 2.13.3
