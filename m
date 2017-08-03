@@ -1,133 +1,145 @@
 From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Thu,  3 Aug 2017 13:40:32 +0200
-Subject: [PATCH RFC 1/2] spi: pxa2xx: Convert to GPIO descriptor API where
- possible
+Date: Thu,  3 Aug 2017 13:40:33 +0200
+Subject: [PATCH RFC 2/2] spi: pxa2xx: Only claim CS GPIOs when the slave
+ device is created
 In-Reply-To: <cover.1501760433.git.jan.kiszka@siemens.com>
 References: <cover.1501760433.git.jan.kiszka@siemens.com>
-Message-ID: <6bfd2b29b888c14f1a6feb9dee5bb54b74e761b0.1501760433.git.jan.kiszka@siemens.com>
+Message-ID: <5a691263ccf9d61134d6184861b37eaf37b13b77.1501760433.git.jan.kiszka@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jan Kiszka <jan.kiszka@siemens.com>
 
-We still need to request/free GPIOs passed via the legacy path of
-pxa2xx_spi_chip::gpio_cs, but we can use the gpiod API otherwise.
+Avoid hogging chip select GPIOs just because they are listed for the
+master. They might be mulitplexed and, if no slave device is attached,
+used for different purposes. Moreover, this strategy avoids having to
+allocate a cs_gpiods structure.
 
-Consistently use the descriptor API instead of the legacy one.
+Tested on the IOT2000 where the second SPI bus is connected to an
+Arduino-compatible connector and multiplexed between SPI, GPIO and PWM
+usage.
 
 Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
 ---
- drivers/spi/spi-pxa2xx.c | 32 ++++++++++++++++----------------
- drivers/spi/spi-pxa2xx.h |  2 +-
- 2 files changed, 17 insertions(+), 17 deletions(-)
+ drivers/spi/spi-pxa2xx.c | 68 +++++++++++++++++++++---------------------------
+ drivers/spi/spi-pxa2xx.h |  3 +--
+ 2 files changed, 31 insertions(+), 40 deletions(-)
 
 diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-index 38d053682892..7faba738110c 100644
+index 7faba738110c..577a2f4ba3bf 100644
 --- a/drivers/spi/spi-pxa2xx.c
 +++ b/drivers/spi/spi-pxa2xx.c
-@@ -402,8 +402,8 @@ static void cs_assert(struct driver_data *drv_data)
- 		return;
- 	}
- 
--	if (gpio_is_valid(chip->gpio_cs)) {
--		gpio_set_value(chip->gpio_cs, chip->gpio_cs_inverted);
-+	if (chip->gpiod_cs) {
-+		gpiod_set_value(chip->gpiod_cs, chip->gpio_cs_inverted);
- 		return;
- 	}
- 
-@@ -424,8 +424,8 @@ static void cs_deassert(struct driver_data *drv_data)
- 		return;
- 	}
- 
--	if (gpio_is_valid(chip->gpio_cs)) {
--		gpio_set_value(chip->gpio_cs, !chip->gpio_cs_inverted);
-+	if (chip->gpiod_cs) {
-+		gpiod_set_value(chip->gpiod_cs, !chip->gpio_cs_inverted);
- 		return;
- 	}
- 
-@@ -1213,17 +1213,16 @@ static int setup_cs(struct spi_device *spi, struct chip_data *chip,
+@@ -1213,19 +1213,34 @@ static int setup_cs(struct spi_device *spi, struct chip_data *chip,
  		    struct pxa2xx_spi_chip *chip_info)
  {
  	struct driver_data *drv_data = spi_master_get_devdata(spi->master);
-+	struct gpio_desc *gpiod;
++	struct device *pdev = &drv_data->pdev->dev;
+ 	struct gpio_desc *gpiod;
  	int err = 0;
  
  	if (chip == NULL)
  		return 0;
  
- 	if (drv_data->cs_gpiods) {
--		struct gpio_desc *gpiod;
--
- 		gpiod = drv_data->cs_gpiods[spi->chip_select];
- 		if (gpiod) {
--			chip->gpio_cs = desc_to_gpio(gpiod);
-+			chip->gpiod_cs = gpiod;
- 			chip->gpio_cs_inverted = spi->mode & SPI_CS_HIGH;
- 			gpiod_set_value(gpiod, chip->gpio_cs_inverted);
+-	if (drv_data->cs_gpiods) {
+-		gpiod = drv_data->cs_gpiods[spi->chip_select];
+-		if (gpiod) {
+-			chip->gpiod_cs = gpiod;
+-			chip->gpio_cs_inverted = spi->mode & SPI_CS_HIGH;
+-			gpiod_set_value(gpiod, chip->gpio_cs_inverted);
++	if (drv_data->cs_count > 0) {
++		/* setup() might be called multiple times. */
++		if (chip->gpiod_cs)
++			return 0;
++
++		if (spi->chip_select >= drv_data->cs_count)
++			return -EINVAL;
++
++		chip->gpio_cs_inverted = spi->mode & SPI_CS_HIGH;
++
++		gpiod = gpiod_get_index(pdev, "cs", spi->chip_select,
++					chip->gpio_cs_inverted ?
++				        GPIOD_OUT_HIGH : GPIOD_OUT_LOW);
++		if (IS_ERR(gpiod)) {
++			/* Means use native chip select */
++			if (PTR_ERR(gpiod) == -ENOENT)
++				return 0;
++
++			return (int)PTR_ERR(gpiod);
  		}
-@@ -1237,8 +1236,10 @@ static int setup_cs(struct spi_device *spi, struct chip_data *chip,
- 	/* NOTE: setup() can be called multiple times, possibly with
- 	 * different chip_info, release previously requested GPIO
- 	 */
--	if (gpio_is_valid(chip->gpio_cs))
--		gpio_free(chip->gpio_cs);
-+	if (chip->gpiod_cs) {
-+		gpio_free(desc_to_gpio(chip->gpiod_cs));
++		chip->gpiod_cs = gpiod;
+ 
+ 		return 0;
+ 	}
+@@ -1415,9 +1430,13 @@ static void cleanup(struct spi_device *spi)
+ 	if (!chip)
+ 		return;
+ 
+-	if (drv_data->ssp_type != CE4100_SSP && !drv_data->cs_gpiods &&
+-	    chip->gpiod_cs)
+-		gpio_free(desc_to_gpio(chip->gpiod_cs));
++	if (drv_data->ssp_type != CE4100_SSP && chip->gpiod_cs) {
++		if (drv_data->cs_count > 0)
++			gpiod_put(chip->gpiod_cs);
++		else
++			gpio_free(desc_to_gpio(chip->gpiod_cs));
 +		chip->gpiod_cs = NULL;
 +	}
  
- 	/* If (*cs_control) is provided, ignore GPIO chip select */
- 	if (chip_info->cs_control) {
-@@ -1254,11 +1255,11 @@ static int setup_cs(struct spi_device *spi, struct chip_data *chip,
- 			return err;
- 		}
- 
--		chip->gpio_cs = chip_info->gpio_cs;
-+		gpiod = gpio_to_desc(chip_info->gpio_cs);
-+		chip->gpiod_cs = gpiod;
- 		chip->gpio_cs_inverted = spi->mode & SPI_CS_HIGH;
- 
--		err = gpio_direction_output(chip->gpio_cs,
--					!chip->gpio_cs_inverted);
-+		err = gpiod_direction_output(gpiod, !chip->gpio_cs_inverted);
- 	}
- 
- 	return err;
-@@ -1317,8 +1318,7 @@ static int setup(struct spi_device *spi)
- 			}
- 
- 			chip->frm = spi->chip_select;
--		} else
--			chip->gpio_cs = -1;
-+		}
- 		chip->enable_dma = drv_data->master_info->enable_dma;
- 		chip->timeout = TIMOUT_DFLT;
- 	}
-@@ -1416,8 +1416,8 @@ static void cleanup(struct spi_device *spi)
- 		return;
- 
- 	if (drv_data->ssp_type != CE4100_SSP && !drv_data->cs_gpiods &&
--	    gpio_is_valid(chip->gpio_cs))
--		gpio_free(chip->gpio_cs);
-+	    chip->gpiod_cs)
-+		gpio_free(desc_to_gpio(chip->gpiod_cs));
- 
  	kfree(chip);
  }
+@@ -1752,37 +1771,10 @@ static int pxa2xx_spi_probe(struct platform_device *pdev)
+ 	master->num_chipselect = platform_info->num_chipselect;
+ 
+ 	count = gpiod_count(&pdev->dev, "cs");
+-	if (count > 0) {
+-		int i;
+-
++	if (count > 0)
+ 		master->num_chipselect = max_t(int, count,
+ 			master->num_chipselect);
+-
+-		drv_data->cs_gpiods = devm_kcalloc(&pdev->dev,
+-			master->num_chipselect, sizeof(struct gpio_desc *),
+-			GFP_KERNEL);
+-		if (!drv_data->cs_gpiods) {
+-			status = -ENOMEM;
+-			goto out_error_clock_enabled;
+-		}
+-
+-		for (i = 0; i < master->num_chipselect; i++) {
+-			struct gpio_desc *gpiod;
+-
+-			gpiod = devm_gpiod_get_index(dev, "cs", i,
+-						     GPIOD_OUT_HIGH);
+-			if (IS_ERR(gpiod)) {
+-				/* Means use native chip select */
+-				if (PTR_ERR(gpiod) == -ENOENT)
+-					continue;
+-
+-				status = (int)PTR_ERR(gpiod);
+-				goto out_error_clock_enabled;
+-			} else {
+-				drv_data->cs_gpiods[i] = gpiod;
+-			}
+-		}
+-	}
++	drv_data->cs_count = count;
+ 
+ 	tasklet_init(&drv_data->pump_transfers, pump_transfers,
+ 		     (unsigned long)drv_data);
 diff --git a/drivers/spi/spi-pxa2xx.h b/drivers/spi/spi-pxa2xx.h
-index 2823a00a9405..94f7b0713281 100644
+index 94f7b0713281..8551c881f636 100644
 --- a/drivers/spi/spi-pxa2xx.h
 +++ b/drivers/spi/spi-pxa2xx.h
-@@ -83,7 +83,7 @@ struct chip_data {
- 	u16 lpss_tx_threshold;
- 	u8 enable_dma;
- 	union {
--		int gpio_cs;
-+		struct gpio_desc *gpiod_cs;
- 		unsigned int frm;
- 	};
- 	int gpio_cs_inverted;
+@@ -67,8 +67,7 @@ struct driver_data {
+ 
+ 	void __iomem *lpss_base;
+ 
+-	/* GPIOs for chip selects */
+-	struct gpio_desc **cs_gpiods;
++	int cs_count;
+ };
+ 
+ struct chip_data {
 -- 
 2.12.3
