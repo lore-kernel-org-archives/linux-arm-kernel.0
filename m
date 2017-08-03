@@ -1,9 +1,9 @@
 From: cakturk@gmail.com (Cihangir Akturk)
-Date: Thu,  3 Aug 2017 14:58:24 +0300
-Subject: [PATCH 09/29] drm/exynos: switch to drm_*{get,put} helpers
+Date: Thu,  3 Aug 2017 14:58:29 +0300
+Subject: [PATCH 14/29] drm/mediatek: switch to drm_*{get,put} helpers
 In-Reply-To: <1501761585-11757-1-git-send-email-cakturk@gmail.com>
 References: <1501761585-11757-1-git-send-email-cakturk@gmail.com>
-Message-ID: <1501761585-11757-10-git-send-email-cakturk@gmail.com>
+Message-ID: <1501761585-11757-15-git-send-email-cakturk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,101 +14,52 @@ the new APIs.
 
 Signed-off-by: Cihangir Akturk <cakturk@gmail.com>
 ---
- drivers/gpu/drm/exynos/exynos_drm_fb.c    |  4 ++--
- drivers/gpu/drm/exynos/exynos_drm_gem.c   | 12 ++++++------
- drivers/gpu/drm/exynos/exynos_drm_plane.c |  2 +-
- 3 files changed, 9 insertions(+), 9 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_drm_fb.c  | 4 ++--
+ drivers/gpu/drm/mediatek/mtk_drm_gem.c | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_fb.c b/drivers/gpu/drm/exynos/exynos_drm_fb.c
-index d48fd7c..3dccdee 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_fb.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_fb.c
-@@ -80,7 +80,7 @@ static void exynos_drm_fb_destroy(struct drm_framebuffer *fb)
- 			continue;
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fb.c b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
+index d4246c9..0d8d506 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_fb.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
+@@ -58,7 +58,7 @@ static void mtk_drm_fb_destroy(struct drm_framebuffer *fb)
  
- 		obj = &exynos_fb->exynos_gem[i]->base;
--		drm_gem_object_unreference_unlocked(obj);
-+		drm_gem_object_put_unlocked(obj);
- 	}
+ 	drm_framebuffer_cleanup(fb);
  
- 	kfree(exynos_fb);
-@@ -172,7 +172,7 @@ exynos_user_fb_create(struct drm_device *dev, struct drm_file *file_priv,
+-	drm_gem_object_unreference_unlocked(mtk_fb->gem_obj);
++	drm_gem_object_put_unlocked(mtk_fb->gem_obj);
  
- err:
- 	while (i--)
--		drm_gem_object_unreference_unlocked(&exynos_gem[i]->base);
-+		drm_gem_object_put_unlocked(&exynos_gem[i]->base);
+ 	kfree(mtk_fb);
+ }
+@@ -160,6 +160,6 @@ struct drm_framebuffer *mtk_drm_mode_fb_create(struct drm_device *dev,
+ 	return &mtk_fb->base;
  
+ unreference:
+-	drm_gem_object_unreference_unlocked(gem);
++	drm_gem_object_put_unlocked(gem);
  	return ERR_PTR(ret);
  }
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.c b/drivers/gpu/drm/exynos/exynos_drm_gem.c
-index c23479b..1c8d2f9 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_gem.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_gem.c
-@@ -143,7 +143,7 @@ static int exynos_drm_gem_handle_create(struct drm_gem_object *obj,
- 	DRM_DEBUG_KMS("gem handle = 0x%x\n", *handle);
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_gem.c b/drivers/gpu/drm/mediatek/mtk_drm_gem.c
+index 7abc550..961cbf5 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_gem.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_gem.c
+@@ -122,7 +122,7 @@ int mtk_drm_gem_dumb_create(struct drm_file *file_priv, struct drm_device *dev,
+ 		goto err_handle_create;
  
  	/* drop reference from allocate - handle holds it now. */
--	drm_gem_object_unreference_unlocked(obj);
-+	drm_gem_object_put_unlocked(obj);
+-	drm_gem_object_unreference_unlocked(&mtk_gem->base);
++	drm_gem_object_put_unlocked(&mtk_gem->base);
  
  	return 0;
- }
-@@ -186,7 +186,7 @@ unsigned long exynos_drm_gem_get_size(struct drm_device *dev,
  
- 	exynos_gem = to_exynos_gem(obj);
+@@ -152,7 +152,7 @@ int mtk_drm_gem_dumb_map_offset(struct drm_file *file_priv,
+ 	DRM_DEBUG_KMS("offset = 0x%llx\n", *offset);
  
--	drm_gem_object_unreference_unlocked(obj);
-+	drm_gem_object_put_unlocked(obj);
- 
- 	return exynos_gem->size;
- }
-@@ -320,13 +320,13 @@ void exynos_drm_gem_put_dma_addr(struct drm_device *dev,
- 		return;
- 	}
- 
--	drm_gem_object_unreference_unlocked(obj);
-+	drm_gem_object_put_unlocked(obj);
- 
- 	/*
- 	 * decrease obj->refcount one more time because we has already
- 	 * increased it at exynos_drm_gem_get_dma_addr().
- 	 */
--	drm_gem_object_unreference_unlocked(obj);
-+	drm_gem_object_put_unlocked(obj);
- }
- 
- static int exynos_drm_gem_mmap_buffer(struct exynos_drm_gem *exynos_gem,
-@@ -374,7 +374,7 @@ int exynos_drm_gem_get_ioctl(struct drm_device *dev, void *data,
- 	args->flags = exynos_gem->flags;
- 	args->size = exynos_gem->size;
- 
--	drm_gem_object_unreference_unlocked(obj);
-+	drm_gem_object_put_unlocked(obj);
- 
- 	return 0;
- }
-@@ -444,7 +444,7 @@ int exynos_drm_gem_dumb_map_offset(struct drm_file *file_priv,
- 	*offset = drm_vma_node_offset_addr(&obj->vma_node);
- 	DRM_DEBUG_KMS("offset = 0x%lx\n", (unsigned long)*offset);
- 
+ out:
 -	drm_gem_object_unreference_unlocked(obj);
 +	drm_gem_object_put_unlocked(obj);
  	return ret;
  }
  
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_plane.c b/drivers/gpu/drm/exynos/exynos_drm_plane.c
-index 611b6fd..c19de47 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_plane.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_plane.c
-@@ -132,7 +132,7 @@ static void exynos_drm_plane_reset(struct drm_plane *plane)
- 	if (plane->state) {
- 		exynos_state = to_exynos_plane_state(plane->state);
- 		if (exynos_state->base.fb)
--			drm_framebuffer_unreference(exynos_state->base.fb);
-+			drm_framebuffer_put(exynos_state->base.fb);
- 		kfree(exynos_state);
- 		plane->state = NULL;
- 	}
 -- 
 2.7.4
