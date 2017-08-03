@@ -1,91 +1,276 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Thu,  3 Aug 2017 16:10:31 +0800
-Subject: [PATCH v3 5/5] phy: rockchip-inno-usb2: add support of usb2-phy for
- rv1108 SoCs
-In-Reply-To: <1501747753-6983-1-git-send-email-frank.wang@rock-chips.com>
-References: <1501747753-6983-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1501747831-13520-1-git-send-email-frank.wang@rock-chips.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Thu, 3 Aug 2017 16:29:41 +0800
+Subject: [PATCH v3] arm: dts: mt7623: Add SD-card and EMMC to bananapi-r2
+Message-ID: <687af2dc98feffc678945f130c03ca020d9ca7b5.1501748754.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support usb2-phy for rv1108 SoCs and amend phy Documentation.
+From: Sean Wang <sean.wang@mediatek.com>
 
-Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+The bananapi-r2 board has an SD-card controller and built-in
+EMMC storage so enables those devices in the devicetree. Also
+cleanup nodes in alphabetical order in the patch.
+
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 ---
- .../bindings/phy/phy-rockchip-inno-usb2.txt        |  1 +
- drivers/phy/rockchip/phy-rockchip-inno-usb2.c      | 43 ++++++++++++++++++++++
- 2 files changed, 44 insertions(+)
+ arch/arm/boot/dts/mt7623.dtsi                 | 73 ++++++++++++++-------------
+ arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 73 ++++++++++++++++++++-------
+ 2 files changed, 94 insertions(+), 52 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-index ed6aee4..a59798c 100644
---- a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-+++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-@@ -6,6 +6,7 @@ Required properties (phy (parent) node):
- 	* "rockchip,rk3328-usb2phy"
- 	* "rockchip,rk3366-usb2phy"
- 	* "rockchip,rk3399-usb2phy"
-+	* "rockchip,rv1108-usb2phy"
-  - reg : the address offset of grf for usb-phy configuration.
-  - #clock-cells : should be 0.
-  - clock-output-names : specify the 480m output clock name.
-diff --git a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-index 3748d8d..9f2510d 100644
---- a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-+++ b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-@@ -1400,11 +1400,54 @@ static const struct rockchip_usb2phy_cfg rk3399_phy_cfgs[] = {
- 	{ /* sentinel */ }
+diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+index 2a877ed..ec8a074 100644
+--- a/arch/arm/boot/dts/mt7623.dtsi
++++ b/arch/arm/boot/dts/mt7623.dtsi
+@@ -91,6 +91,7 @@
+ 			cooling-max-level = <7>;
+ 			clock-frequency = <1300000000>;
+ 		};
++
+ 		cpu1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a7";
+@@ -98,6 +99,7 @@
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			clock-frequency = <1300000000>;
+ 		};
++
+ 		cpu2: cpu at 2 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a7";
+@@ -105,6 +107,7 @@
+ 			operating-points-v2 = <&cpu_opp_table>;
+ 			clock-frequency = <1300000000>;
+ 		};
++
+ 		cpu3: cpu at 3 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a7";
+@@ -172,10 +175,12 @@
+ 					trip = <&cpu_passive>;
+ 					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+ 				};
++
+ 				map1 {
+ 					trip = <&cpu_active>;
+ 					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+ 				};
++
+ 				map2 {
+ 					trip = <&cpu_hot>;
+ 					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+@@ -481,6 +486,31 @@
+ 		nvmem-cell-names = "calibration-data";
+ 	};
+ 
++	nandc: nfi at 1100d000 {
++		compatible = "mediatek,mt7623-nfc",
++			     "mediatek,mt2701-nfc";
++		reg = <0 0x1100d000 0 0x1000>;
++		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_LOW>;
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
++		clocks = <&pericfg CLK_PERI_NFI>,
++			 <&pericfg CLK_PERI_NFI_PAD>;
++		clock-names = "nfi_clk", "pad_clk";
++		status = "disabled";
++		ecc-engine = <&bch>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++	bch: ecc at 1100e000 {
++		compatible = "mediatek,mt7623-ecc",
++			     "mediatek,mt2701-ecc";
++		reg = <0 0x1100e000 0 0x1000>;
++		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_NFI_ECC>;
++		clock-names = "nfiecc_clk";
++		status = "disabled";
++	};
++
+ 	spi1: spi at 11016000 {
+ 		compatible = "mediatek,mt7623-spi",
+ 			     "mediatek,mt2701-spi";
+@@ -509,31 +539,6 @@
+ 		status = "disabled";
+ 	};
+ 
+-	nandc: nfi at 1100d000 {
+-		compatible = "mediatek,mt7623-nfc",
+-			     "mediatek,mt2701-nfc";
+-		reg = <0 0x1100d000 0 0x1000>;
+-		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_LOW>;
+-		power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
+-		clocks = <&pericfg CLK_PERI_NFI>,
+-			 <&pericfg CLK_PERI_NFI_PAD>;
+-		clock-names = "nfi_clk", "pad_clk";
+-		status = "disabled";
+-		ecc-engine = <&bch>;
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-	};
+-
+-	bch: ecc at 1100e000 {
+-		compatible = "mediatek,mt7623-ecc",
+-			     "mediatek,mt2701-ecc";
+-		reg = <0 0x1100e000 0 0x1000>;
+-		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_LOW>;
+-		clocks = <&pericfg CLK_PERI_NFI_ECC>;
+-		clock-names = "nfiecc_clk";
+-		status = "disabled";
+-	};
+-
+ 	afe: audio-controller at 11220000 {
+ 		compatible = "mediatek,mt7623-audio",
+ 			     "mediatek,mt2701-audio";
+@@ -655,6 +660,15 @@
+ 		status = "disabled";
+ 	};
+ 
++	hifsys: syscon at 1a000000 {
++		compatible = "mediatek,mt7623-hifsys",
++			     "mediatek,mt2701-hifsys",
++			     "syscon";
++		reg = <0 0x1a000000 0 0x1000>;
++		#clock-cells = <1>;
++		#reset-cells = <1>;
++	};
++
+ 	usb1: usb at 1a1c0000 {
+ 		compatible = "mediatek,mt7623-xhci",
+ 			     "mediatek,mt8173-xhci";
+@@ -733,15 +747,6 @@
+ 		};
+ 	};
+ 
+-	hifsys: syscon at 1a000000 {
+-		compatible = "mediatek,mt7623-hifsys",
+-			     "mediatek,mt2701-hifsys",
+-			     "syscon";
+-		reg = <0 0x1a000000 0 0x1000>;
+-		#clock-cells = <1>;
+-		#reset-cells = <1>;
+-	};
+-
+ 	ethsys: syscon at 1b000000 {
+ 		compatible = "mediatek,mt7623-ethsys",
+ 			     "mediatek,mt2701-ethsys",
+diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+index 9f3e6dd..0aa1c69 100644
+--- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
++++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+@@ -179,6 +179,32 @@
+ 	status = "okay";
  };
  
-+static const struct rockchip_usb2phy_cfg rv1108_phy_cfgs[] = {
-+	{
-+		.reg = 0x100,
-+		.num_ports	= 2,
-+		.clkout_ctl	= { 0x108, 4, 4, 1, 0 },
-+		.port_cfgs	= {
-+			[USB2PHY_PORT_OTG] = {
-+				.phy_sus	= { 0x0100, 15, 0, 0, 0x1d1 },
-+				.bvalid_det_en	= { 0x0680, 3, 3, 0, 1 },
-+				.bvalid_det_st	= { 0x0690, 3, 3, 0, 1 },
-+				.bvalid_det_clr = { 0x06a0, 3, 3, 0, 1 },
-+				.ls_det_en	= { 0x0680, 2, 2, 0, 1 },
-+				.ls_det_st	= { 0x0690, 2, 2, 0, 1 },
-+				.ls_det_clr	= { 0x06a0, 2, 2, 0, 1 },
-+				.utmi_bvalid	= { 0x0804, 10, 10, 0, 1 },
-+				.utmi_ls	= { 0x0804, 13, 12, 0, 1 },
-+			},
-+			[USB2PHY_PORT_HOST] = {
-+				.phy_sus	= { 0x0104, 15, 0, 0, 0x1d1 },
-+				.ls_det_en	= { 0x0680, 4, 4, 0, 1 },
-+				.ls_det_st	= { 0x0690, 4, 4, 0, 1 },
-+				.ls_det_clr	= { 0x06a0, 4, 4, 0, 1 },
-+				.utmi_ls	= { 0x0804, 9, 8, 0, 1 },
-+				.utmi_hstdet	= { 0x0804, 7, 7, 0, 1 }
-+			}
-+		},
-+		.chg_det = {
-+			.opmode		= { 0x0100, 3, 0, 5, 1 },
-+			.cp_det		= { 0x0804, 1, 1, 0, 1 },
-+			.dcp_det	= { 0x0804, 0, 0, 0, 1 },
-+			.dp_det		= { 0x0804, 2, 2, 0, 1 },
-+			.idm_sink_en	= { 0x0108, 8, 8, 0, 1 },
-+			.idp_sink_en	= { 0x0108, 7, 7, 0, 1 },
-+			.idp_src_en	= { 0x0108, 9, 9, 0, 1 },
-+			.rdm_pdwn_en	= { 0x0108, 10, 10, 0, 1 },
-+			.vdm_src_en	= { 0x0108, 12, 12, 0, 1 },
-+			.vdp_src_en	= { 0x0108, 11, 11, 0, 1 },
-+		},
-+	},
-+	{ /* sentinel */ }
++&mmc0 {
++	pinctrl-names = "default", "state_uhs";
++	pinctrl-0 = <&mmc0_pins_default>;
++	pinctrl-1 = <&mmc0_pins_uhs>;
++	status = "okay";
++	bus-width = <8>;
++	max-frequency = <50000000>;
++	cap-mmc-highspeed;
++	vmmc-supply = <&mt6323_vemc3v3_reg>;
++	vqmmc-supply = <&mt6323_vio18_reg>;
++	non-removable;
 +};
 +
- static const struct of_device_id rockchip_usb2phy_dt_match[] = {
- 	{ .compatible = "rockchip,rk3228-usb2phy", .data = &rk3228_phy_cfgs },
- 	{ .compatible = "rockchip,rk3328-usb2phy", .data = &rk3328_phy_cfgs },
- 	{ .compatible = "rockchip,rk3366-usb2phy", .data = &rk3366_phy_cfgs },
- 	{ .compatible = "rockchip,rk3399-usb2phy", .data = &rk3399_phy_cfgs },
-+	{ .compatible = "rockchip,rv1108-usb2phy", .data = &rv1108_phy_cfgs },
- 	{}
++&mmc1 {
++	pinctrl-names = "default", "state_uhs";
++	pinctrl-0 = <&mmc1_pins_default>;
++	pinctrl-1 = <&mmc1_pins_uhs>;
++	status = "okay";
++	bus-width = <4>;
++	max-frequency = <50000000>;
++	cap-sd-highspeed;
++	cd-gpios = <&pio 261 0>;
++	vmmc-supply = <&mt6323_vmch_reg>;
++	vqmmc-supply = <&mt6323_vio18_reg>;
++};
++
+ &pio {
+ 	cir_pins_a:cir at 0 {
+ 		pins_cir {
+@@ -314,6 +340,17 @@
+ 			bias-pull-down;
+ 			drive-strength = <MTK_DRIVE_4mA>;
+ 		};
++
++		pins_wp {
++			pinmux = <MT7623_PIN_29_EINT7_FUNC_MSDC1_WP>;
++			input-enable;
++			bias-pull-up;
++		};
++
++		pins_insert {
++			pinmux = <MT7623_PIN_261_MSDC1_INS_FUNC_GPIO261>;
++			bias-pull-up;
++		};
+ 	};
+ 
+ 	mmc1_pins_uhs: mmc1 {
+@@ -335,16 +372,6 @@
+ 		};
+ 	};
+ 
+-	spi0_pins_a: spi at 0 {
+-		pins_spi {
+-			pinmux = <MT7623_PIN_53_SPI0_CSN_FUNC_SPI0_CS>,
+-				<MT7623_PIN_54_SPI0_CK_FUNC_SPI0_CK>,
+-				<MT7623_PIN_55_SPI0_MI_FUNC_SPI0_MI>,
+-				<MT7623_PIN_56_SPI0_MO_FUNC_SPI0_MO>;
+-			bias-disable;
+-		};
+-	};
+-
+ 	pwm_pins_a: pwm at 0 {
+ 		pins_pwm {
+ 			pinmux = <MT7623_PIN_203_PWM0_FUNC_PWM0>,
+@@ -355,6 +382,16 @@
+ 		};
+ 	};
+ 
++	spi0_pins_a: spi at 0 {
++		pins_spi {
++			pinmux = <MT7623_PIN_53_SPI0_CSN_FUNC_SPI0_CS>,
++				<MT7623_PIN_54_SPI0_CK_FUNC_SPI0_CK>,
++				<MT7623_PIN_55_SPI0_MI_FUNC_SPI0_MI>,
++				<MT7623_PIN_56_SPI0_MO_FUNC_SPI0_MO>;
++			bias-disable;
++		};
++	};
++
+ 	uart0_pins_a: uart at 0 {
+ 		pins_dat {
+ 			pinmux = <MT7623_PIN_79_URXD0_FUNC_URXD0>,
+@@ -414,14 +451,6 @@
+ 	status = "disabled";
  };
- MODULE_DEVICE_TABLE(of, rockchip_usb2phy_dt_match);
+ 
+-&u3phy1 {
+-	status = "okay";
+-};
+-
+-&u3phy2 {
+-	status = "okay";
+-};
+-
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart1_pins_a>;
+@@ -441,3 +470,11 @@
+ 	vusb33-supply = <&mt6323_vusb_reg>;
+ 	status = "okay";
+ };
++
++&u3phy1 {
++	status = "okay";
++};
++
++&u3phy2 {
++	status = "okay";
++};
 -- 
-2.0.0
+2.7.4
