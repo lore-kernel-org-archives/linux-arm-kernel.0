@@ -1,29 +1,39 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 3 Aug 2017 12:01:54 -0500
-Subject: [PATCH v2 2/3] dt-bindings: iio: adc: stm32: add optional
- st,min-sample-time-nsecs
-In-Reply-To: <1500912640-23927-3-git-send-email-fabrice.gasnier@st.com>
-References: <1500912640-23927-1-git-send-email-fabrice.gasnier@st.com>
- <1500912640-23927-3-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170803170154.bizlx2dvdbwtgmoy@rob-hp-laptop>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Thu, 3 Aug 2017 10:03:55 -0700
+Subject: [PATCH 1/2] bitops: Avoid integer overflow warning in GENMASK_ULL
+In-Reply-To: <20170803132456.mwrt6yspkbqxcffw@yury-thinkpad>
+References: <20170802225159.159536-1-mka@chromium.org>
+ <20170803132456.mwrt6yspkbqxcffw@yury-thinkpad>
+Message-ID: <20170803170355.GJ84665@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 06:10:39PM +0200, Fabrice Gasnier wrote:
-> STM32 ADC allows each channel to be sampled with a different sampling
-> time. There's an application note that deals with this: 'How to get
-> the best ADC accuracy in STM32...' It basically depends on analog input
-> signal electrical properties (depends on board).
-> 
-> Add optional 'st,min-sample-time-nsecs' property so this can be tuned
-> in dt.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
-> Changes in v2:
-> - Use 'st,min-sample-time-nsecs' instead of 'min-sample-time'.
-> ---
->  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 5 +++++
->  1 file changed, 5 insertions(+)
+El Thu, Aug 03, 2017 at 04:24:56PM +0300 Yury Norov ha dit:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> On Wed, Aug 02, 2017 at 03:51:58PM -0700, Matthias Kaehlcke wrote:
+> > GENMASK_ULL performs a left-shift of (~0ULL), which technically
+> > results in an integer overflow. clang raises a warning about
+> > this if the overflow occurs in a preprocessor expression. To
+> > avoid the overflow first perform a right-shift to clear the
+> > bits that are shifted out.
+> > 
+> > Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+> > ---
+> >  include/linux/bitops.h | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/include/linux/bitops.h b/include/linux/bitops.h
+> > index a83c822c35c2..21dfe63001e3 100644
+> > --- a/include/linux/bitops.h
+> > +++ b/include/linux/bitops.h
+> > @@ -22,7 +22,7 @@
+> >  	(((~0UL) << (l)) & (~0UL >> (BITS_PER_LONG - 1 - (h))))
+> 
+> Once you touche GENMASK_ULL, why not to fix also GENMASK.
+
+Will do, thanks.
+
+Even though GENMASK_ULL can't be used (as is) to define the arm64
+PAGE_OFFSET as initially intended it seems the change is still
+worthwhile since there are a few other preprocessor expressions using
+GENMASK_ULL.
