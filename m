@@ -1,64 +1,57 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 3 Aug 2017 21:25:39 +0800
-Subject: [PATCH v3 0/5] ACPI: DMA ranges management
-In-Reply-To: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
-References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
-Message-ID: <59832453.2030407@huawei.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 03 Aug 2017 15:14:46 +0200
+Subject: [PATCH 2/2] ARM: dts: armada-38x: Add arm_global_timer node
+In-Reply-To: <1501605383-24748-3-git-send-email-mw@semihalf.com> (Marcin
+ Wojtas's message of "Tue, 1 Aug 2017 18:36:23 +0200")
+References: <1501605383-24748-1-git-send-email-mw@semihalf.com>
+ <1501605383-24748-3-git-send-email-mw@semihalf.com>
+Message-ID: <87lgn094jd.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/8/3 20:32, Lorenzo Pieralisi wrote:
-> This patch series is v3 of a previous posting:
->
-> v2->v3:
-> 	- Fixed DMA masks computation
->         - Fixed size computation overflow in acpi_dma_get_range()
->
-> v1->v2:
-> 	- Reworked acpi_dma_get_range() flow and logs
-> 	- Added IORT named component address limits
-> 	- Renamed acpi_dev_get_resources() helper function
-> 	- Rebased against v4.13-rc3
->
-> v2: http://lkml.kernel.org/r/20170731152323.32488-1-lorenzo.pieralisi at arm.com
-> v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
->
-> -- Original cover letter --
->
-> As reported in:
->
-> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
->
-> the bus connecting devices to an IOMMU bus can be smaller in size than
-> the IOMMU input address bits which results in devices DMA HW bugs in
-> particular related to IOVA allocation (ie chopping of higher address
-> bits owing to system bus HW capabilities mismatch with the IOMMU).
->
-> Fortunately this problem can be solved through an already present but never
-> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
-> window for a specific bus in ACPI and therefore all upstream devices
-> connected to it.
->
-> This small patch series enables _DMA parsing in ACPI core code and
-> use it in ACPI IORT code in order to detect DMA ranges for devices and
-> update their data structures to make them work with their related DMA
-> addressing restrictions.
->
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Feng Kan <fkan@apm.com>
-> Cc: Jon Masters <jcm@redhat.com>
-> Cc: Robert Moore <robert.moore@intel.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Hi Marcin,
+ 
+ On mar., ao?t 01 2017, Marcin Wojtas <mw@semihalf.com> wrote:
 
-with the whole patch set:
+> Since generic Cortex-A9 global timer is available after adding
+> it to compilation, enable its node in armada-38x.dtsi.
+>
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Applied on mvebu/dt
 
-I tested this patch set with no _DMA in DSDT but with named
-component in IORT table, seeing no regressions on D05.
+Thanks,
 
-Thanks
-Hanjun
+Gregory
+
+> ---
+>  arch/arm/boot/dts/armada-38x.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
+> index af31f5d..7ff0811e 100644
+> --- a/arch/arm/boot/dts/armada-38x.dtsi
+> +++ b/arch/arm/boot/dts/armada-38x.dtsi
+> @@ -154,6 +154,13 @@
+>  				reg = <0xc000 0x58>;
+>  			};
+>  
+> +			timer at c200 {
+> +				compatible = "arm,cortex-a9-global-timer";
+> +				reg = <0xc200 0x20>;
+> +				interrupts = <GIC_PPI 11 (IRQ_TYPE_EDGE_RISING | GIC_CPU_MASK_SIMPLE(2))>;
+> +				clocks = <&coreclk 2>;
+> +			};
+> +
+>  			timer at c600 {
+>  				compatible = "arm,cortex-a9-twd-timer";
+>  				reg = <0xc600 0x20>;
+> -- 
+> 1.8.3.1
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
