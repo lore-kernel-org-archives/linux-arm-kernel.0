@@ -1,65 +1,86 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 3 Aug 2017 14:26:53 +0800
-Subject: [PATCH resend 00/18] crypto: ARM/arm64 roundup for v4.14
-In-Reply-To: <20170724102820.16534-1-ard.biesheuvel@linaro.org>
-References: <20170724102820.16534-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170803062653.GR12039@gondor.apana.org.au>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 3 Aug 2017 09:42:04 +0300
+Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
+In-Reply-To: <0e16a519-3d60-f683-5517-12a520e0e521@st.com>
+References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
+ <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
+ <20170722065133.GT3053@localhost>
+ <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
+ <20170726052930.GF3053@localhost>
+ <f2908e38-dc4d-3886-4058-52a7ad845415@st.com>
+ <20170731123157.GJ3053@localhost>
+ <e3a76a50-4160-d111-cce9-132b46b66c33@st.com>
+ <20170802045522.GU3053@localhost>
+ <7d2091fe-a2e5-78bb-b63d-9cb66bdb7e84@ti.com>
+ <7bcad698-fa1a-3dc2-e918-4400639ca6d7@st.com>
+ <47ceba83-1097-072e-bed6-d1964bce7a25@ti.com>
+ <0e16a519-3d60-f683-5517-12a520e0e521@st.com>
+Message-ID: <f0db566e-5613-8914-e070-915c8c4d9b9f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 11:28:02AM +0100, Ard Biesheuvel wrote:
-> This is a resend of all the patches I sent out recently that I would
-> like to be considered for v4.14. Their main purpose is to prepare the
-> arm64 crypto code to deal with situations where the SIMD register file
-> is unavailable, which never occurs at present, but this will change in
-> the future when support for SVE is added.
-> 
-> Patches #1 and #2 have been sent out last week as 'crypto/algapi - refactor
-> crypto_xor() to avoid memcpy()s' (v2). This version of #2 fixes an error
-> caught by kbuild. The non-SIMD fallback code added in the remaining patches
-> relies on crypto_xor() extensively, which is why these patches have been
-> included here.
-> 
-> Patches #3 - #13 implement the non-SIMD fallbacks for the various NEON
-> based drivers.
-> 
-> Patch #14 implements AES-GCM natively instead of relying on the generic
-> GCM module to wire accelerated AES-CTR and GHASH together, resulting in
-> a ~37% speedup.
-> 
-> Patches #15 and #16 implement an accelerated GHASH algorithm for ARM cores
-> that lack the 64x64 PMULL instruction.
-> 
-> Patches #17 and #18 update the scalar AES implementations to stop using
-> the expanded lookup tables for the final round. This reduces the Dcache
-> footprint, and thus the key correlated jitter.
-> 
-> This supersedes all other crypto patches I have outstanding, including the
-> AES refactor ones which I will rework later.
-> 
-> Ard Biesheuvel (18):
->   crypto/algapi - use separate dst and src operands for __crypto_xor()
->   crypto/algapi - make crypto_xor() take separate dst and src arguments
->   crypto: arm64/ghash-ce - add non-SIMD scalar fallback
->   crypto: arm64/crct10dif - add non-SIMD generic fallback
->   crypto: arm64/crc32 - add non-SIMD scalar fallback
->   crypto: arm64/sha1-ce - add non-SIMD generic fallback
->   crypto: arm64/sha2-ce - add non-SIMD scalar fallback
->   crypto: arm64/aes-ce-cipher - match round key endianness with generic
->     code
->   crypto: arm64/aes-ce-cipher: add non-SIMD generic fallback
->   crypto: arm64/aes-ce-ccm: add non-SIMD generic fallback
->   crypto: arm64/aes-blk - add a non-SIMD fallback for synchronous CTR
->   crypto: arm64/chacha20 - take may_use_simd() into account
->   crypto: arm64/aes-bs - implement non-SIMD fallback for AES-CTR
->   crypto: arm64/gcm - implement native driver using v8 Crypto Extensions
->   crypto: arm/ghash - add NEON accelerated fallback for vmull.p64
->   crypto: arm64/ghash - add NEON accelerated fallback for 64-bit PMULL
->   crypto: arm/aes - avoid expanded lookup tables in the final round
->   crypto: arm64/aes - avoid expanded lookup tables in the final round
+?our mail server started to mangle outgoing mails, sorry for that, we are 
+trying to resolve that...
 
-All applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+
+On 2017-08-02 17:28, Pierre Yves MORDRET wrote:
+> Correct router needs 3 parameters and among those 2 are forwarded though out
+> dma_spec. But when you say "ChannelID is dynamically allocated" you mean
+> dma_get_any_slave_channel ? If yes I can use the already existing bindings to
+> carry the channelID to DMA. No changes need to peripheral...
+
+What I actually mean is that you should not need to modify the DMA 
+driver at all.
+According to stm32-dma.txt:
+#dma-cells = <4>;
+1. channelID
+2. request line number
+3. - 4. some parameters
+
+I believe if you don't have the event router (directly using the DMA 
+node) you always need to provide these, right?
+If I'm not mistaken, when you use the event router you want to omit the 
+ChannelID and get a random channel via dma_get_any_slave_channel in the 
+DMA driver and feed back the channelID to the event router driver?
+I believe the reason for this is that you want to keep mixed binding 
+use, to have direct DMA bindings and bindings via event router.
+
+Now what happens if you have direct binding:
+device1 {
+	dmas = <&dma2 1 4 0x10400 0x3>;
+};
+
+and via event router:
+device2 {
+	dmas =	<&dma_router 10 0x10400 0x3>,
+		<&dma_router 11 0x10400 0x3>;
+};
+
+device2 probes first, will get channelID 0 and 1 via 
+dma_get_any_slave_channel.
+
+When device1 tries to probe, the channelID 1 is already taken..
+
+You need to convert all peripherals to use the event router to avoid 
+such a races. I have done the same for the dra7.
+Add the event router driver,
+add the event router node and convert existing users to use that
+when adding new devices, use the event router node.
+
+The event router's binding would have 3 parameters, it manages the 
+available channelIDs, like the ti-dma-crossbar does for dra7. At 
+allocate time it would pick an unused channelID and craft the dma-spec 
+with the four parameters as documented.
+The main DMA driver will not need any modification as everything will be 
+taken care of by the event router.
+
+The only gotcha is with memcpy type of transfers as they might also need 
+unique channelID, but not requested via the slave binding. For that I 
+have added properties to the event router to mask out certain channels 
+(and I needed to do the same for the eDMA, but it is unrelated to the 
+router itself).
+
+
+- P?ter
