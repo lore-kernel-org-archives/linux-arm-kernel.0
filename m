@@ -1,45 +1,54 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 03 Aug 2017 17:20:48 +0900
-Subject: [PATCH v2 5/5] extcon: Remove deprecated extcon_set/get_cable_state_()
+Date: Thu, 03 Aug 2017 17:20:47 +0900
+Subject: [PATCH v2 4/5] usb: gadget: udc: Replace the deprecated extcon API
 In-Reply-To: <1501748448-26821-1-git-send-email-cw00.choi@samsung.com>
 References: <1501748448-26821-1-git-send-email-cw00.choi@samsung.com>
- <CGME20170803082050epcas1p38d70b5df911a855708c891b659a56fce@epcas1p3.samsung.com>
-Message-ID: <1501748448-26821-6-git-send-email-cw00.choi@samsung.com>
+ <CGME20170803082050epcas1p2491eedf2f26510f55cd15ce777356fce@epcas1p2.samsung.com>
+Message-ID: <1501748448-26821-5-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 575c2b867ee0 ("extcon: Rename the extcon_set/get_state()
-to maintain the function naming pattern") renames the extcon function as
-following: But, the extcon just keeps the old API to prevent the build error.
-This patch removes the deprecatd extcon API.
-
+This patch replaces the deprecated extcon API as following:
 - extcon_get_cable_state_() -> extcon_get_state()
-- extcon_set_cable_state_() -> extcon_set_state_sync()
 
+Cc: Felipe Balbi <balbi@kernel.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Raviteja Garimella <raviteja.garimella@broadcom.com>
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 ---
- include/linux/extcon.h | 11 -----------
- 1 file changed, 11 deletions(-)
+ drivers/usb/gadget/udc/snps_udc_plat.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/include/linux/extcon.h b/include/linux/extcon.h
-index 7e206a9f88db..3ba02eecba2e 100644
---- a/include/linux/extcon.h
-+++ b/include/linux/extcon.h
-@@ -422,15 +422,4 @@ static inline int extcon_unregister_interest(struct extcon_specific_cable_nb
- {
- 	return -EINVAL;
- }
--
--static inline int extcon_get_cable_state_(struct extcon_dev *edev, unsigned int id)
--{
--	return extcon_get_state(edev, id);
--}
--
--static inline int extcon_set_cable_state_(struct extcon_dev *edev, unsigned int id,
--				   bool cable_state)
--{
--	return extcon_set_state_sync(edev, id, cable_state);
--}
- #endif /* __LINUX_EXTCON_H__ */
+diff --git a/drivers/usb/gadget/udc/snps_udc_plat.c b/drivers/usb/gadget/udc/snps_udc_plat.c
+index 2e11f19e07ae..0ce7b3ba60ff 100644
+--- a/drivers/usb/gadget/udc/snps_udc_plat.c
++++ b/drivers/usb/gadget/udc/snps_udc_plat.c
+@@ -184,7 +184,7 @@ static int udc_plat_probe(struct platform_device *pdev)
+ 			goto exit_phy;
+ 		}
+ 
+-		ret = extcon_get_cable_state_(udc->edev, EXTCON_USB);
++		ret = extcon_get_state(udc->edev, EXTCON_USB);
+ 		if (ret < 0) {
+ 			dev_err(dev, "Can't get cable state\n");
+ 			goto exit_extcon;
+@@ -273,7 +273,7 @@ static int udc_plat_suspend(struct device *dev)
+ 	udc = dev_get_drvdata(dev);
+ 	stop_udc(udc);
+ 
+-	if (extcon_get_cable_state_(udc->edev, EXTCON_USB) > 0) {
++	if (extcon_get_state(udc->edev, EXTCON_USB) > 0) {
+ 		dev_dbg(udc->dev, "device -> idle\n");
+ 		stop_udc(udc);
+ 	}
+@@ -303,7 +303,7 @@ static int udc_plat_resume(struct device *dev)
+ 		return ret;
+ 	}
+ 
+-	if (extcon_get_cable_state_(udc->edev, EXTCON_USB) > 0) {
++	if (extcon_get_state(udc->edev, EXTCON_USB) > 0) {
+ 		dev_dbg(udc->dev, "idle -> device\n");
+ 		start_udc(udc);
+ 	}
 -- 
 1.9.1
