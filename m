@@ -1,71 +1,66 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  3 Aug 2017 13:32:34 +0100
-Subject: [PATCH v3 0/5] ACPI: DMA ranges management
-Message-ID: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
+Date: Thu,  3 Aug 2017 13:32:35 +0100
+Subject: [PATCH v3 1/5] ACPICA: resource_mgr: Allow _DMA method in walk
+ resources
+In-Reply-To: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
+References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20170803123239.11359-2-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series is v3 of a previous posting:
+ACPICA commit 7636d2fb683d5699a5c14e949fba9ac52e91d4c1
 
-v2->v3:
-	- Fixed DMA masks computation
-        - Fixed size computation overflow in acpi_dma_get_range()
+The _DMA object contains a resource template, this change adds support
+for the walk resources function so that ACPI devices containing a _DMA
+object can actually parse it to detect DMA ranges for the respective
+bus.
 
-v1->v2:
-	- Reworked acpi_dma_get_range() flow and logs
-	- Added IORT named component address limits
-	- Renamed acpi_dev_get_resources() helper function
-	- Rebased against v4.13-rc3
+Link: https://github.com/acpica/acpica/commit/7636d2fb
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ drivers/acpi/acpica/rsxface.c | 7 ++++---
+ include/acpi/acnames.h        | 1 +
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-v2: http://lkml.kernel.org/r/20170731152323.32488-1-lorenzo.pieralisi at arm.com
-v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
-
--- Original cover letter --
-
-As reported in:
-
-http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
-
-the bus connecting devices to an IOMMU bus can be smaller in size than
-the IOMMU input address bits which results in devices DMA HW bugs in
-particular related to IOVA allocation (ie chopping of higher address
-bits owing to system bus HW capabilities mismatch with the IOMMU).
-
-Fortunately this problem can be solved through an already present but never
-used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
-window for a specific bus in ACPI and therefore all upstream devices
-connected to it.
-
-This small patch series enables _DMA parsing in ACPI core code and
-use it in ACPI IORT code in order to detect DMA ranges for devices and
-update their data structures to make them work with their related DMA
-addressing restrictions.
-
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Feng Kan <fkan@apm.com>
-Cc: Jon Masters <jcm@redhat.com>
-Cc: Robert Moore <robert.moore@intel.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-
-Lorenzo Pieralisi (5):
-  ACPICA: resource_mgr: Allow _DMA method in walk resources
-  ACPI: Make acpi_dev_get_resources() method agnostic
-  ACPI: Introduce DMA ranges parsing
-  ACPI: Make acpi_dma_configure() DMA regions aware
-  ACPI/IORT: Add IORT named component memory address limits
-
- drivers/acpi/acpica/rsxface.c |  7 ++--
- drivers/acpi/arm64/iort.c     | 57 ++++++++++++++++++++++++++-
- drivers/acpi/resource.c       | 82 +++++++++++++++++++++++++++++---------
- drivers/acpi/scan.c           | 91 +++++++++++++++++++++++++++++++++++++++----
- include/acpi/acnames.h        |  1 +
- include/acpi/acpi_bus.h       |  2 +
- include/linux/acpi.h          |  8 ++++
- include/linux/acpi_iort.h     |  5 ++-
- 8 files changed, 219 insertions(+), 34 deletions(-)
-
+diff --git a/drivers/acpi/acpica/rsxface.c b/drivers/acpi/acpica/rsxface.c
+index 59a4f9e..be65e65 100644
+--- a/drivers/acpi/acpica/rsxface.c
++++ b/drivers/acpi/acpica/rsxface.c
+@@ -615,7 +615,7 @@ ACPI_EXPORT_SYMBOL(acpi_walk_resource_buffer)
+  *                                device we are querying
+  *              name            - Method name of the resources we want.
+  *                                (METHOD_NAME__CRS, METHOD_NAME__PRS, or
+- *                                METHOD_NAME__AEI)
++ *                                METHOD_NAME__AEI or METHOD_NAME__DMA)
+  *              user_function   - Called for each resource
+  *              context         - Passed to user_function
+  *
+@@ -641,11 +641,12 @@ acpi_walk_resources(acpi_handle device_handle,
+ 	if (!device_handle || !user_function || !name ||
+ 	    (!ACPI_COMPARE_NAME(name, METHOD_NAME__CRS) &&
+ 	     !ACPI_COMPARE_NAME(name, METHOD_NAME__PRS) &&
+-	     !ACPI_COMPARE_NAME(name, METHOD_NAME__AEI))) {
++	     !ACPI_COMPARE_NAME(name, METHOD_NAME__AEI) &&
++	     !ACPI_COMPARE_NAME(name, METHOD_NAME__DMA))) {
+ 		return_ACPI_STATUS(AE_BAD_PARAMETER);
+ 	}
+ 
+-	/* Get the _CRS/_PRS/_AEI resource list */
++	/* Get the _CRS/_PRS/_AEI/_DMA resource list */
+ 
+ 	buffer.length = ACPI_ALLOCATE_LOCAL_BUFFER;
+ 	status = acpi_rs_get_method_data(device_handle, name, &buffer);
+diff --git a/include/acpi/acnames.h b/include/acpi/acnames.h
+index b421584..d8dd3bf 100644
+--- a/include/acpi/acnames.h
++++ b/include/acpi/acnames.h
+@@ -54,6 +54,7 @@
+ #define METHOD_NAME__CLS        "_CLS"
+ #define METHOD_NAME__CRS        "_CRS"
+ #define METHOD_NAME__DDN        "_DDN"
++#define METHOD_NAME__DMA        "_DMA"
+ #define METHOD_NAME__HID        "_HID"
+ #define METHOD_NAME__INI        "_INI"
+ #define METHOD_NAME__PLD        "_PLD"
 -- 
 2.10.0
