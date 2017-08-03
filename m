@@ -1,44 +1,83 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 3 Aug 2017 18:46:10 +0100
-Subject: [PATCH v2] arm64: Decode information from ESR upon mem faults
-In-Reply-To: <1500888078-50231-1-git-send-email-julien.thierry@arm.com>
-References: <1500888078-50231-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <20170803174609.m43amupy4vxkjsen@armageddon.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 3 Aug 2017 12:47:50 -0500
+Subject: [PATCH] dt-bindings: mtd: add new compatible strings for mtk nor
+ controller
+In-Reply-To: <1501726602.4381.23.camel@mhfsdcap03>
+References: <1500948617-19627-1-git-send-email-guochun.mao@mediatek.com>
+ <1500948617-19627-2-git-send-email-guochun.mao@mediatek.com>
+ <03016ea3-51ad-0b2d-e824-0a20913bd7c1@gmail.com>
+ <20170802103637.16cd6548@bbrezillon>
+ <535cc2d5-7bc9-2cb7-42cf-9d7058e64226@wedev4u.fr>
+ <1501726602.4381.23.camel@mhfsdcap03>
+Message-ID: <20170803174750.bipdynhyyyozzjk6@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
-
-On Mon, Jul 24, 2017 at 10:21:18AM +0100, Julien Thierry wrote:
-> When receiving unhandled faults from the CPU, description is very sparse.
-> Adding information about faults decoded from ESR.
+On Thu, Aug 03, 2017 at 10:16:42AM +0800, Guochun Mao wrote:
+> Hi Cyrille,
 > 
-> Added defines to esr.h corresponding ESR fields. Values are based on ARM
-> Archtecture Reference Manual (DDI 0487B.a), section D7.2.28 ESR_ELx, Exception
-> Syndrome Register (ELx) (pages D7-2275 to D7-2280).
+> On Wed, 2017-08-02 at 17:31 +0200, Cyrille Pitchen wrote:
+> > Hi Guochun,
+> > 
+> > Le 02/08/2017 ? 10:36, Boris Brezillon a ?crit :
+> > > Hi Matthias,
+> > > 
+> > > On Tue, 1 Aug 2017 14:33:22 +0200
+> > > Matthias Brugger <matthias.bgg@gmail.com> wrote:
+> > > 
+> > >> On 07/25/2017 04:10 AM, Guochun Mao wrote:
+> > >>> Add "mediatek,mt2712-nor" and "mediatek,mt7622-nor"
+> > >>> for nor flash node's compatible strings.
+> > >>>
+> > >>> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+> > >>> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+> > >>> ---
+> > >>>   .../devicetree/bindings/mtd/mtk-quadspi.txt        |    2 ++
+> > >>>   1 file changed, 2 insertions(+)
+> > >>>
+> > >>> diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> > >>> index 5ded66a..9845ff4 100644
+> > >>> --- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> > >>> +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> > >>> @@ -3,6 +3,8 @@
+> > >>>   Required properties:
+> > >>>   - compatible: 	  The possible values are:
+> > >>>   		  "mediatek,mt2701-nor"
+> > >>> +		  "mediatek,mt2712-nor"
+> > >>> +		  "mediatek,mt7622-nor"
+> > >>>   		  "mediatek,mt7623-nor"
+> > >>>   		  "mediatek,mt8173-nor"
+> > >>>   		  For mt8173, compatible should be "mediatek,mt8173-nor".
+> > >>>
+> > 
+> > There should be another patch to update the mtk_nor_of_ids[] array in
+> > the mtk-quadspi.c driver, shouldn't it?
+> > 
+> > Currently, I only see the "mediatek,mt8173-nor" compatible string at the
+> > driver side. The driver and its documentation should be aligned and both
+> > patches should be applied at the same time.
 > 
-> New output is of the form:
-> [   77.818059] Mem abort info:
-> [   77.820826]   Exception class = DABT (current EL), IL = 32 bits
-> [   77.826706]   SET = 0, FnV = 0
-> [   77.829742]   EA = 0, S1PTW = 0
-> [   77.832849] Data abort info:
-> [   77.835713]   ISV = 0, ISS = 0x00000070
-> [   77.839522]   CM = 0, WnR = 1
+> > Best regards,
+> > 
+> > Cyrille
 > 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
->  arch/arm64/include/asm/esr.h | 38 ++++++++++++++++++++++++++---------
->  arch/arm64/mm/fault.c        | 47 ++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 76 insertions(+), 9 deletions(-)
+> 
+> From my designer's info, these IPs' nor controller could use same
+> driver, and I had verified it. I think there's no need to update
+> mtk_nor_of_ids[], unless we find difference between these IPs(exactly
+> compared with mt8173).
+> How do you think?
 
-This patch doesn't apply against latest mainline. Would you mind
-reposting against a newer tag like v4.13-rc3?
+That is perfectly fine, but then the documentation needs to be explicit 
+as to what are the fallback compatibles. It's one valid combination per 
+line, not 1 compatible string per line.
 
-Thanks.
+Rob
 
--- 
-Catalin
+> 
+> And, we will add dts patches for new SOCs, are these patches should
+> applied with this documentation?
+> 
+> Best regards,
+> Guochun
+> 
