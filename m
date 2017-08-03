@@ -1,24 +1,42 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 3 Aug 2017 11:17:48 -0500
-Subject: [PATCH v3 1/2] gpio: davinci: Add keystone-k2g compatible
-In-Reply-To: <1501051524-5990-1-git-send-email-j-keerthy@ti.com>
-References: <1501051524-5990-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <20170803161748.u7ier3kt3xmm25jw@rob-hp-laptop>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu,  3 Aug 2017 17:23:20 +0100
+Subject: [PATCH 2/5] arm64: neon: Add missing header guard in <asm/neon.h>
+In-Reply-To: <1501777403-9782-1-git-send-email-Dave.Martin@arm.com>
+References: <1501777403-9782-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1501777403-9782-3-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 12:15:23PM +0530, Keerthy wrote:
-> The patch adds keystone-k2g compatible, specific properties and
-> an example.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
-> 
-> Changes in v3:
-> 
->   * Added details about family of SoCs corresponding to compatibles.
-> 
->  .../devicetree/bindings/gpio/gpio-davinci.txt      | 40 +++++++++++++++++++++-
->  1 file changed, 39 insertions(+), 1 deletion(-)
+asm/neon.h doesn't have a header inclusion guard, but it should
+have one for consistency with other headers.
 
-Acked-by: Rob Herring <robh@kernel.org>
+This patch adds a suitable guard.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/include/asm/neon.h | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
+index ad4cdc9..5368bd0 100644
+--- a/arch/arm64/include/asm/neon.h
++++ b/arch/arm64/include/asm/neon.h
+@@ -8,6 +8,9 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#ifndef __ASM_NEON_H
++#define __ASM_NEON_H
++
+ #include <linux/types.h>
+ #include <asm/fpsimd.h>
+ 
+@@ -17,3 +20,5 @@
+ 
+ void kernel_neon_begin_partial(u32 num_regs);
+ void kernel_neon_end(void);
++
++#endif /* ! __ASM_NEON_H */
+-- 
+2.1.4
