@@ -1,694 +1,108 @@
-From: jacobchen110@gmail.com (Jacob Chen)
-Date: Thu, 3 Aug 2017 18:34:28 +0800
-Subject: [PATCH 1/2] arm64: dts: rockchip: Add support for rk3399 sapphire
- SOM
-In-Reply-To: <1501756357-10511-1-git-send-email-jacob-chen@iotwrt.com>
-References: <1501756357-10511-1-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <CAFLEztQOD5rkDRyL9es4vkyFDX-S+WqVuVUH+q4N6YvSaKmoXw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 3 Aug 2017 12:40:10 +0200
+Subject: [PATCH 00/16] omap_hsmmc: Add ADMA support and UHS/HS200/DDR
+ support
+In-Reply-To: <27776609-2425-9423-3eaa-dc128c4b07f0@ti.com>
+References: <20170616124544.15046-1-kishon@ti.com>
+ <CAPDyKFo+ORA=OpdikiUZWj3gpx+ssuqbC5MtqiFJneyJhu84dA@mail.gmail.com>
+ <fc9c1576-7419-b174-ea42-97ccf4666cee@ti.com>
+ <27776609-2425-9423-3eaa-dc128c4b07f0@ti.com>
+Message-ID: <CAPDyKFp1oenb0Kq-SCf-ezG9p3gY9xUSq6-S_SQ4DpoRiKiOdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
++Adrian
 
-2017-08-03 18:32 GMT+08:00 Jacob Chen <jacob-chen@iotwrt.com>:
-> Add support for the rk3399 sapphire SOM board.
-> This board works in a combination with the excavator main board.
+On 20 July 2017 at 15:36, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi Ulf,
 >
-> You can get more info from below link:
-> http://opensource.rock-chips.com/wiki_Excavator_sapphire_board
+> On Tuesday 11 July 2017 07:27 PM, Kishon Vijay Abraham I wrote:
+>> Hi Ulf,
+>>
+>> On Tuesday 11 July 2017 06:40 PM, Ulf Hansson wrote:
+>>> On 16 June 2017 at 14:45, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>> This is the final part of the series originally sent as
+>>>> part of [2].
+>>>>
+>>>> This series adds UHS, HS200, DDR mode and ADMA support to
+>>>> omap_hsmmc driver used to improve the throughput of MMC/SD in dra7
+>>>> SoCs.
+>>>>
+>>>> Changes from [2]:
+>>>> *) No more updating omap2plus_defconfig or multi_v7_defconfig is
+>>>>    required, so those patches are removed.
+>>>> *) Addressed Rob Herring's comment on implementing a function
+>>>>    instead of having a macro while getting pinctrl state.
+>>>>
+>>>> This series is created on top of [3], [4], [5] AND [6]
+>>>> (i.e after
+>>>>   ARM: dts: omap3-overo: Remove "vqmmc-supply" property from MMC dt node
+>>>>   omap_hsmmc: use mmc_regulator_get_supply() to get regulators
+>>>>   omap*: Fixes/Cleanups for MMC devicetree node
+>>>>   ARM: dts: Add iodelay data for MMC)
+>>>>
+>>>> The functionality implemented in this series was sent before ([1]) but
+>>>> was never followed up since supporting high speed modes in dra7 required
+>>>> IODelay values to be configured. With IODelay driver being merged into
+>>>> kernel, sending it as a fresh series with support for configuring IODelay
+>>>> values.
+>>>
+>>> Is it safe to queue this via mmc tree for 4.14 or is there a
+>>> dependency I must consider? The above didn't quite tell me that, could
+>>> you please elaborate.
+>>
+>> There is a dependency with https://www.spinics.net/lists/arm-kernel/msg586215.html.
+>>
+>> I'll resend the series after all the platform data specific stuff is merged.
+>>>
+>>>>
+>>>> Suggestions of migrating to sdhci driver (from omap_hsmmc driver) is not
+>>>> addressed since
+>>>> *) tuning ratio of MMC in dra7 is different from sdhci
+>>>> *) IOdelay is required for dra7
+>>>> *) GPIO based card detect is not supported in sdhci
+>>>
+>>> Lots of sdhci drivers calls mmc_of_parse(), and uses the mmc slot gpio
+>>> APIs, so I don't this this is correct statement.
+>>>
+>>>> *) Some of the registers don't always have correct values as in sdhci
+>>>>    (like PSTATE).
+>>>> Supporting all of these in sdhci will result in adding lot of quirks in
+>>>> sdhci driver.
+>>>
+>>> Is it really that much different? It would be nice if some really took
+>>> on the challenge of converting omap_hsmmc into an sdhci variant.
+>>
+>> Okay. I'll give that a shot and see how far I can get.
 >
-> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
-> ---
->  arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi | 646 ++++++++++++++++++++++
->  1 file changed, 646 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi
+> I created a sdhci variant and was able to get it working with high speed mode
+> in dra7.
+
+That's very nice!
+
 >
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi
-> new file mode 100644
-> index 0000000..4c6b369
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi
-> @@ -0,0 +1,646 @@
-> +/*
-> + * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +#include "dt-bindings/pwm/pwm.h"
-> +#include "rk3399.dtsi"
-> +#include "rk3399-opp.dtsi"
-> +
-> +/ {
-> +       compatible = "rockchip,rk3399-sapphire", "rockchip,rk3399";
-> +
-> +       backlight: backlight {
-> +               compatible = "pwm-backlight";
-> +               pwms = <&pwm0 0 25000 0>;
-> +               brightness-levels = <
-> +                         0   1   2   3   4   5   6   7
-> +                         8   9  10  11  12  13  14  15
-> +                        16  17  18  19  20  21  22  23
-> +                        24  25  26  27  28  29  30  31
-> +                        32  33  34  35  36  37  38  39
-> +                        40  41  42  43  44  45  46  47
-> +                        48  49  50  51  52  53  54  55
-> +                        56  57  58  59  60  61  62  63
-> +                        64  65  66  67  68  69  70  71
-> +                        72  73  74  75  76  77  78  79
-> +                        80  81  82  83  84  85  86  87
-> +                        88  89  90  91  92  93  94  95
-> +                        96  97  98  99 100 101 102 103
-> +                       104 105 106 107 108 109 110 111
-> +                       112 113 114 115 116 117 118 119
-> +                       120 121 122 123 124 125 126 127
-> +                       128 129 130 131 132 133 134 135
-> +                       136 137 138 139 140 141 142 143
-> +                       144 145 146 147 148 149 150 151
-> +                       152 153 154 155 156 157 158 159
-> +                       160 161 162 163 164 165 166 167
-> +                       168 169 170 171 172 173 174 175
-> +                       176 177 178 179 180 181 182 183
-> +                       184 185 186 187 188 189 190 191
-> +                       192 193 194 195 196 197 198 199
-> +                       200 201 202 203 204 205 206 207
-> +                       208 209 210 211 212 213 214 215
-> +                       216 217 218 219 220 221 222 223
-> +                       224 225 226 227 228 229 230 231
-> +                       232 233 234 235 236 237 238 239
-> +                       240 241 242 243 244 245 246 247
-> +                       248 249 250 251 252 253 254 255>;
-> +               default-brightness-level = <200>;
-> +       };
-> +
-> +       clkin_gmac: external-gmac-clock {
-> +               compatible = "fixed-clock";
-> +               clock-frequency = <125000000>;
-> +               clock-output-names = "clkin_gmac";
-> +               #clock-cells = <0>;
-> +       };
-> +
-> +       dc_12v: dc-12v {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "dc_12v";
-> +               regulator-always-on;
-> +               regulator-boot-on;
-> +               regulator-min-microvolt = <12000000>;
-> +               regulator-max-microvolt = <12000000>;
-> +       };
-> +
-> +       /* switched by pmic_sleep */
-> +       vcc1v8_s3: vcca1v8_s3: vcc1v8-s3 {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "vcc1v8_s3";
-> +               regulator-always-on;
-> +               regulator-boot-on;
-> +               regulator-min-microvolt = <1800000>;
-> +               regulator-max-microvolt = <1800000>;
-> +               vin-supply = <&vcc_1v8>;
-> +       };
-> +
-> +       vcc3v3_sys: vcc3v3-sys {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "vcc3v3_sys";
-> +               regulator-always-on;
-> +               regulator-boot-on;
-> +               regulator-min-microvolt = <3300000>;
-> +               regulator-max-microvolt = <3300000>;
-> +               vin-supply = <&vcc_sys>;
-> +       };
-> +
-> +       vcc_sys: vcc-sys {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "vcc_sys";
-> +               regulator-always-on;
-> +               regulator-boot-on;
-> +               regulator-min-microvolt = <5000000>;
-> +               regulator-max-microvolt = <5000000>;
-> +               vin-supply = <&dc_12v>;
-> +       };
-> +
-> +       vcc5v0_host: vcc5v0-host-regulator {
-> +               compatible = "regulator-fixed";
-> +               enable-active-high;
-> +               gpio = <&gpio1 RK_PD1 GPIO_ACTIVE_HIGH>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&vcc5v0_host_en>;
-> +               regulator-name = "vcc5v0_host";
-> +               regulator-always-on;
-> +               vin-supply = <&vcc_sys>;
-> +       };
-> +};
-> +
-> +&cpu_l0 {
-> +       cpu-supply = <&vdd_cpu_l>;
-> +};
-> +
-> +&cpu_l1 {
-> +       cpu-supply = <&vdd_cpu_l>;
-> +};
-> +
-> +&cpu_l2 {
-> +       cpu-supply = <&vdd_cpu_l>;
-> +};
-> +
-> +&cpu_l3 {
-> +       cpu-supply = <&vdd_cpu_l>;
-> +};
-> +
-> +&cpu_b0 {
-> +       cpu-supply = <&vdd_cpu_b>;
-> +};
-> +
-> +&cpu_b1 {
-> +       cpu-supply = <&vdd_cpu_b>;
-> +};
-> +
-> +&emmc_phy {
-> +       status = "okay";
-> +};
-> +
-> +&gmac {
-> +       assigned-clocks = <&cru SCLK_RMII_SRC>;
-> +       assigned-clock-parents = <&clkin_gmac>;
-> +       clock_in_out = "input";
-> +       phy-supply = <&vcc_lan>;
-> +       phy-mode = "rgmii";
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&rgmii_pins>;
-> +       snps,reset-gpio = <&gpio3 RK_PB7 GPIO_ACTIVE_LOW>;
-> +       snps,reset-active-low;
-> +       snps,reset-delays-us = <0 10000 50000>;
-> +       tx_delay = <0x28>;
-> +       rx_delay = <0x11>;
-> +       status = "okay";
-> +};
-> +
-> +&gpu {
-> +       mali-supply = <&vdd_gpu>;
-> +       status = "okay";
-> +};
-> +
-> +&hdmi {
-> +       ddc-i2c-bus = <&i2c3>;
-> +       status = "okay";
-> +};
-> +
-> +&i2c0 {
-> +       clock-frequency = <400000>;
-> +       i2c-scl-rising-time-ns = <168>;
-> +       i2c-scl-falling-time-ns = <4>;
-> +       status = "okay";
-> +
-> +       rk808: pmic at 1b {
-> +               compatible = "rockchip,rk808";
-> +               reg = <0x1b>;
-> +               interrupt-parent = <&gpio1>;
-> +               interrupts = <21 IRQ_TYPE_LEVEL_LOW>;
-> +               #clock-cells = <1>;
-> +               clock-output-names = "xin32k", "rk808-clkout2";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pmic_int_l &pmic_dvs2>;
-> +               rockchip,system-power-controller;
-> +               wakeup-source;
-> +
-> +               vcc1-supply = <&vcc_sys>;
-> +               vcc2-supply = <&vcc_sys>;
-> +               vcc3-supply = <&vcc_sys>;
-> +               vcc4-supply = <&vcc_sys>;
-> +               vcc6-supply = <&vcc_sys>;
-> +               vcc7-supply = <&vcc_sys>;
-> +               vcc8-supply = <&vcc3v3_sys>;
-> +               vcc9-supply = <&vcc_sys>;
-> +               vcc10-supply = <&vcc_sys>;
-> +               vcc11-supply = <&vcc_sys>;
-> +               vcc12-supply = <&vcc3v3_sys>;
-> +               vddio-supply = <&vcc1v8_pmu>;
-> +
-> +               regulators {
-> +                       vdd_center: DCDC_REG1 {
-> +                               regulator-name = "vdd_center";
-> +                               regulator-always-on;
-> +                               regulator-boot-on;
-> +                               regulator-min-microvolt = <750000>;
-> +                               regulator-max-microvolt = <1350000>;
-> +                               regulator-ramp-delay = <6001>;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
-> +                       };
-> +
-> +                       vdd_cpu_l: DCDC_REG2 {
-> +                               regulator-name = "vdd_cpu_l";
-> +                               regulator-always-on;
-> +                               regulator-boot-on;
-> +                               regulator-min-microvolt = <750000>;
-> +                               regulator-max-microvolt = <1350000>;
-> +                               regulator-ramp-delay = <6001>;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
-> +                       };
-> +
-> +                       vcc_ddr: DCDC_REG3 {
-> +                               regulator-name = "vcc_ddr";
-> +                               regulator-always-on;
-> +                               regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-on-in-suspend;
-> +                               };
-> +                       };
-> +
-> +                       vcc_1v8: DCDC_REG4 {
-> +                               regulator-name = "vcc_1v8";
-> +                               regulator-always-on;
-> +                               regulator-boot-on;
-> +                               regulator-min-microvolt = <1800000>;
-> +                               regulator-max-microvolt = <1800000>;
-> +                               regulator-state-mem {
-> +                                       regulator-on-in-suspend;
-> +                                       regulator-suspend-microvolt = <1800000>;
-> +                               };
-> +                       };
-> +
-> +                       vcc1v8_dvp: LDO_REG1 {
-> +                               regulator-name = "vcc1v8_dvp";
-> +                               regulator-always-on;
-> +                               regulator-boot-on;
-> +                               regulator-min-microvolt = <1800000>;
-> +                               regulator-max-microvolt = <1800000>;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
-> +                       };
-> +
-> +                       vcc3v0_tp: LDO_REG2 {
-> +                               regulator-name = "vcc3v0_tp";
-> +                               regulator-always-on;
-> +                               regulator-boot-on;
-> +                               regulator-min-microvolt = <3000000>;
-> +                               regulator-max-microvolt = <3000000>;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
-> +                       };
-> +
-> +                       vcc1v8_pmu: LDO_REG3 {
-> +                               regulator-name = "vcc1v8_pmu";
-> +                               regulator-always-on;
-> +                               regulator-boot-on;
-> +                               regulator-min-microvolt = <1800000>;
-> +                               regulator-max-microvolt = <1800000>;
-> +                               regulator-state-mem {
-> +                                       regulator-on-in-suspend;
-> +                                       regulator-suspend-microvolt = <1800000>;
-> +                               };
-> +                       };
-> +
-> +                       vcc_sdio: LDO_REG4 {
-> +                               regulator-name = "vcc_sdio";
-> +                               regulator-always-on;
-> +                               regulator-boot-on;
-> +                               regulator-min-microvolt = <1800000>;
-> +                               regulator-max-microvolt = <3300000>;
-> +                               regulator-state-mem {
-> +                                       regulator-on-in-suspend;
-> +                                       regulator-suspend-microvolt = <3300000>;
-> +                               };
-> +                       };
-> +
-> +                       vcca3v0_codec: LDO_REG5 {
-> +                               regulator-name = "vcca3v0_codec";
-> +                               regulator-always-on;
-> +                               regulator-boot-on;
-> +                               regulator-min-microvolt = <3000000>;
-> +                               regulator-max-microvolt = <3000000>;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
-> +                       };
-> +
-> +                       vcc_1v5: LDO_REG6 {
-> +                               regulator-name = "vcc_1v5";
-> +                               regulator-always-on;
-> +                               regulator-boot-on;
-> +                               regulator-min-microvolt = <1500000>;
-> +                               regulator-max-microvolt = <1500000>;
-> +                               regulator-state-mem {
-> +                                       regulator-on-in-suspend;
-> +                                       regulator-suspend-microvolt = <1500000>;
-> +                               };
-> +                       };
-> +
-> +                       vcca1v8_codec: LDO_REG7 {
-> +                               regulator-name = "vcca1v8_codec";
-> +                               regulator-always-on;
-> +                               regulator-boot-on;
-> +                               regulator-min-microvolt = <1800000>;
-> +                               regulator-max-microvolt = <1800000>;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
-> +                       };
-> +
-> +                       vcc_3v0: LDO_REG8 {
-> +                               regulator-name = "vcc_3v0";
-> +                               regulator-always-on;
-> +                               regulator-boot-on;
-> +                               regulator-min-microvolt = <3000000>;
-> +                               regulator-max-microvolt = <3000000>;
-> +                               regulator-state-mem {
-> +                                       regulator-on-in-suspend;
-> +                                       regulator-suspend-microvolt = <3000000>;
-> +                               };
-> +                       };
-> +
-> +                       vcc3v3_s3: vcc_lan: SWITCH_REG1 {
-> +                               regulator-name = "vcc3v3_s3";
-> +                               regulator-always-on;
-> +                               regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
-> +                       };
-> +
-> +                       vcc3v3_s0: SWITCH_REG2 {
-> +                               regulator-name = "vcc3v3_s0";
-> +                               regulator-always-on;
-> +                               regulator-boot-on;
-> +                               regulator-state-mem {
-> +                                       regulator-off-in-suspend;
-> +                               };
-> +                       };
-> +               };
-> +       };
-> +
-> +       vdd_cpu_b: regulator at 40 {
-> +               compatible = "silergy,syr827";
-> +               reg = <0x40>;
-> +               fcs,suspend-voltage-selector = <1>;
-> +               regulator-name = "vdd_cpu_b";
-> +               regulator-min-microvolt = <712500>;
-> +               regulator-max-microvolt = <1500000>;
-> +               regulator-ramp-delay = <1000>;
-> +               regulator-always-on;
-> +               regulator-boot-on;
-> +               vin-supply = <&vcc_sys>;
-> +
-> +               regulator-state-mem {
-> +                       regulator-off-in-suspend;
-> +               };
-> +       };
-> +
-> +       vdd_gpu: regulator at 41 {
-> +               compatible = "silergy,syr828";
-> +               reg = <0x41>;
-> +               fcs,suspend-voltage-selector = <1>;
-> +               regulator-name = "vdd_gpu";
-> +               regulator-min-microvolt = <712500>;
-> +               regulator-max-microvolt = <1500000>;
-> +               regulator-ramp-delay = <1000>;
-> +               regulator-always-on;
-> +               regulator-boot-on;
-> +               vin-supply = <&vcc_sys>;
-> +
-> +               regulator-state-mem {
-> +                       regulator-off-in-suspend;
-> +               };
-> +       };
-> +
-> +       vdd_log: vdd-log {
-> +               compatible = "pwm-regulator";
-> +               pwms = <&pwm2 0 25000 1>;
-> +               regulator-name = "vdd_log";
-> +               regulator-always-on;
-> +               regulator-boot-on;
-> +               regulator-min-microvolt = <800000>;
-> +               regulator-max-microvolt = <1400000>;
-> +               vin-supply = <&vcc_sys>;
-> +       };
-> +};
-> +
-> +&i2c3 {
-> +       i2c-scl-rising-time-ns = <450>;
-> +       i2c-scl-falling-time-ns = <15>;
-> +       status = "okay";
-> +};
-> +
-> +&io_domains {
-> +       status = "okay";
-> +
-> +       bt656-supply = <&vcc_3v0>;
-> +       audio-supply = <&vcca1v8_codec>;
-> +       sdmmc-supply = <&vcc_sdio>;
-> +       gpio1830-supply = <&vcc_3v0>;
-> +};
-> +
-> +&pcie_phy {
-> +       status = "okay";
-> +};
-> +
-> +&pcie0 {
-> +       assigned-clocks = <&cru SCLK_PCIEPHY_REF>;
-> +       assigned-clock-parents = <&cru SCLK_PCIEPHY_REF100M>;
-> +       assigned-clock-rates = <100000000>;
-> +       ep-gpios = <&gpio3 RK_PB5 GPIO_ACTIVE_HIGH>;
-> +       num-lanes = <4>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pcie_clkreqn>;
-> +       status = "okay";
-> +};
-> +
-> +&pmu_io_domains {
-> +       pmu1830-supply = <&vcc_3v0>;
-> +       status = "okay";
-> +};
-> +
-> +&pinctrl {
-> +       pmic {
-> +               pmic_int_l: pmic-int-l {
-> +                       rockchip,pins =
-> +                               <1 RK_PC5 RK_FUNC_GPIO &pcfg_pull_up>;
-> +               };
-> +
-> +               pmic_dvs2: pmic-dvs2 {
-> +                       rockchip,pins =
-> +                               <1 RK_PC2 RK_FUNC_GPIO &pcfg_pull_down>;
-> +               };
-> +
-> +               vsel1_gpio: vsel1-gpio {
-> +                       rockchip,pins = <1 RK_PC1 RK_FUNC_GPIO &pcfg_pull_down>;
-> +               };
-> +
-> +               vsel2_gpio: vsel2-gpio {
-> +                       rockchip,pins = <1 RK_PB6 RK_FUNC_GPIO &pcfg_pull_down>;
-> +               };
-> +       };
-> +
-> +       usb2 {
-> +               vcc5v0_host_en: vcc5v0-host-en {
-> +                       rockchip,pins =
-> +                               <4 RK_PD1 RK_FUNC_GPIO &pcfg_pull_none>;
-> +               };
-> +       };
-> +};
-> +
-> +&pwm0 {
-> +       status = "okay";
-> +};
-> +
-> +&pwm2 {
-> +       status = "okay";
-> +};
-> +
-> +&saradc {
-> +       vref-supply = <&vcca1v8_s3>;
-> +       status = "okay";
-> +};
-> +
-> +&sdhci {
-> +       bus-width = <8>;
-> +       keep-power-in-suspend;
-> +       mmc-hs400-1_8v;
-> +       mmc-hs400-enhanced-strobe;
-> +       non-removable;
-> +       status = "okay";
-> +};
-> +
-> +&sdio0 {
-> +       clock-frequency = <50000000>;
-> +       clock-freq-min-max = <200000 50000000>;
-> +       bus-width = <4>;
-> +       disable-wp;
-> +       cap-sd-highspeed;
-> +       cap-sdio-irq;
-> +       keep-power-in-suspend;
-> +       mmc-pwrseq = <&sdio_pwrseq>;
-> +       non-removable;
-> +       num-slots = <1>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk>;
-> +       sd-uhs-sdr104;
-> +       status = "okay";
-> +};
-> +
-> +&sdmmc {
-> +       clock-frequency = <150000000>;
-> +       clock-freq-min-max = <100000 150000000>;
-> +       bus-width = <4>;
-> +       cap-mmc-highspeed;
-> +       cap-sd-highspeed;
-> +       disable-wp;
-> +       num-slots = <1>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
-> +       vqmmc-supply = <&vcc_sdio>;
-> +       status = "okay";
-> +};
-> +
-> +&tsadc {
-> +       /* tshut mode 0:CRU 1:GPIO */
-> +       rockchip,hw-tshut-mode = <1>;
-> +       /* tshut polarity 0:LOW 1:HIGH */
-> +       rockchip,hw-tshut-polarity = <1>;
-> +       status = "okay";
-> +};
-> +
-> +&u2phy0 {
-> +       status = "okay";
-> +
-> +       u2phy0_otg: otg-port {
-> +               status = "okay";
-> +       };
-> +
-> +       u2phy0_host: host-port {
-> +               phy-supply = <&vcc5v0_host>;
-> +               status = "okay";
-> +       };
-> +};
-> +
-> +&u2phy1 {
-> +       status = "okay";
-> +
-> +       u2phy1_otg: otg-port {
-> +               status = "okay";
-> +       };
-> +
-> +       u2phy1_host: host-port {
-> +               phy-supply = <&vcc5v0_host>;
-> +               status = "okay";
-> +       };
-> +};
-> +
-> +&uart0 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&uart0_xfer &uart0_cts>;
-> +       status = "okay";
-> +};
-> +
-> +&uart2 {
-> +       status = "okay";
-> +};
-> +
-> +&usb_host0_ehci {
-> +       status = "okay";
-> +};
-> +
-> +&usb_host0_ohci {
-> +       status = "okay";
-> +};
-> +
-> +&usb_host1_ehci {
-> +       status = "okay";
-> +};
-> +
-> +&usb_host1_ohci {
-> +       status = "okay";
-> +};
-> +
-> +&usbdrd3_0 {
-> +       status = "okay";
-> +};
-> +
-> +&usbdrd_dwc3_0 {
-> +       status = "okay";
-> +       dr_mode = "otg";
-> +};
-> +
-> +&usbdrd3_1 {
-> +       status = "okay";
-> +};
-> +
-> +&usbdrd_dwc3_1 {
-> +       status = "okay";
-> +       dr_mode = "host";
-> +};
-> +
-> +&vopb {
-> +       status = "okay";
-> +};
-> +
-> +&vopb_mmu {
-> +       status = "okay";
-> +};
-> +
-> +&vopl {
-> +       status = "okay";
-> +};
-> +
-> +&vopl_mmu {
-> +       status = "okay";
-> +};
-> --
-> 2.7.4
->
+> I have a query on sdhci_set_power_noreg() in sdhci.c. sdhci_set_power_noreg
+> sets SDHCI_POWER_CONTROL based on *vdd* value. However SDHCI_POWER_CONTROL is
+> for setting bus voltage and need not be based on *vdd*. IMHO
+> SDHCI_POWER_CONTROL should be set based on "ios->signal_voltage".
 
-http://imgur.com/a/6K0t8
+According to the implementation in sdhci_set_power_noreg(), I
+understand it as the SDHCI_POWER_CONTROL register actually controls
+the power to the card (VDD) and the not the I/O voltage level
+(ios->signal_voltage).
 
-I can have display in this board,
-but need some assigned clock-rate
+However, if I read the SDHCI spec, it seems to be mentioning the "SD
+bus voltage", which to me is about the I/O voltage level. So either
+the spec is unclear or the code is wrong. :-)
 
-assigned-clocks = <&cru ACLK_VOP0>, <&cru HCLK_VOP0>;
-assigned-clock-rates = <400000000>, <200000000>;
+Are you saying that the omap_hsmmc variant is using the
+SDHCI_POWER_CONTROL to control the I/O voltage level?
 
-assigned-clocks = <&cru ACLK_VOP1>, <&cru HCLK_VOP1>;
-assigned-clock-rates = <400000000>, <200000000>;
+I am wondering how other variants use it. Perhaps most variants
+actually have an external regulator and thus calls
+sdhci_set_power_reg() instead.
 
+Looping in Adrian, to see if he has some thoughts on this.
 
-Is it a issue? Are there any pacthes in 4.14 will fix it?
+Kind regards
+Uffe
