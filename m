@@ -1,30 +1,30 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 03 Aug 2017 18:03:52 +0100
-Subject: [PATCH v2 11/16] arm64: kernel: Handle deferred SError on kernel
- entry
-In-Reply-To: <20170728141019.9084-12-james.morse@arm.com>
-References: <20170728141019.9084-1-james.morse@arm.com>
- <20170728141019.9084-12-james.morse@arm.com>
-Message-ID: <59835778.80702@arm.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Thu, 3 Aug 2017 20:09:05 +0300
+Subject: [PATCH 0/6] Support for LEGO MINDSTORMS EV3 LCD display
+In-Reply-To: <cf740449-c952-08d4-d63c-d92e71fa3092@lechnology.com>
+References: <1501355870-13960-1-git-send-email-david@lechnology.com>
+ <5d8f6518-8d7e-c029-2da4-e3417afb3e40@lechnology.com>
+ <28188f5c-1daf-121b-6daf-1899668c3875@tronnes.org>
+ <1ce36d43-b9dd-807e-23aa-bac4fda70fdc@lechnology.com>
+ <bfb3d541-856b-0233-dd85-72512788939f@tronnes.org>
+ <bbec0574-311a-e1b4-d7fd-f6fb15b078d2@lechnology.com>
+ <b8ec0511-afd1-2a1b-6ffe-dfe951d79bf7@tronnes.org>
+ <cf740449-c952-08d4-d63c-d92e71fa3092@lechnology.com>
+Message-ID: <CAHp75Vdaq0ersEa2_XneUQtsJMj2GCRZL4Wi=1HQorLkb4SaVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On Thu, Aug 3, 2017 at 6:18 PM, David Lechner <david@lechnology.com> wrote:
 
-On 28/07/17 15:10, James Morse wrote:
-> Before we can enable Implicit ESB on exception level change, we need to
-> handle deferred SErrors that may appear on exception entry.
+> The particular display I have is this one:
+> http://wiki.seeed.cc/Grove-OLED_Display_1.12inch/
+>
+> It looks like it uses a command/data scheme like the MIPI displays, but
+> doesn't use any of the standard values for the commands. The controller can
+> do parallel, SPI and I2C, but the display I have is wired for I2C.
 
-Christoffer has pointed out on patch 16 that I've miss-understood IESB's behaviour:
-> The implicit form of Error Synchronization Barrier: [...] Has no effect on
-> DISR_EL1
+It looks very similar to ssd1306. Some description refers to ssd1308.
 
-Turns out the ARM-ARM psuedocode means subtly different things by 'ESB' and
-'ErrorSynchronizationBarrier'.
-
-Patches 11->16 will need rethinking, but it looks like they can be simplified.
-
-
-Thanks,
-
-James
+-- 
+With Best Regards,
+Andy Shevchenko
