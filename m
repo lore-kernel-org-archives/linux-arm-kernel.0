@@ -1,36 +1,41 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 3 Aug 2017 10:50:18 +0800
-Subject: [PATCH] soc: imx: gpcv2: fix regulator deferred probe
-In-Reply-To: <20170802195129.20442-1-stefan@agner.ch>
-References: <20170802195129.20442-1-stefan@agner.ch>
-Message-ID: <20170803025017.GJ31819@dragon>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 3 Aug 2017 10:53:30 +0800
+Subject: [xlnx:master 841/864] ERROR: "dwc3_set_simple_data"
+ [drivers/usb/dwc3/dwc3.ko] undefined!
+Message-ID: <201708031029.Um9SIoJt%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 02, 2017 at 12:51:29PM -0700, Stefan Agner wrote:
-> If a regulator requests a deferred probe, the power domain gets
-> initialized twice. This leads to a list double add (without
-> list debugging the kernel hangs due to the double add later):
-> 
->   WARNING: CPU: 0 PID: 19 at lib/list_debug.c:31 __list_add_valid+0xbc/0xc4
->   list_add double add: new=c1229754, prev=c12383b4, next=c1229754.
-> 
-> Initialize the power domain after we get the regulator. Also do
-> not print an error in case the regulator defers probing.
-> 
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Andrey Smirnov <andrew.smirnov@gmail.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Fixes: 03aa12629fc4 ("soc: imx: Add GPCv2 power gating driver")
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
-> Hi Shawn,
-> 
-> Since this leads to a Kernel hang in v4.13-rc3, can you get this
-> into v4.13 still?
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   00346d2eba7634f4fb2c2117ac371e0c104a2870
+commit: a4769f84c50a769e655d4bb9c1a8a45586cdc1f4 [841/864] dwc3: Add support for removing vbus when suspended
+config: arm-omap2plus_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout a4769f84c50a769e655d4bb9c1a8a45586cdc1f4
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Sure.  But before doing that, I would like to get an ACK from Andrey on
-this fix.
+All errors (new ones prefixed by >>):
 
-Shawn
+   ERROR: "dwc3_host_wakeup_capable" [drivers/usb/host/xhci-plat-hcd.ko] undefined!
+   ERROR: "dwc3_set_phydata" [drivers/usb/dwc3/dwc3.ko] undefined!
+   ERROR: "dwc3_enable_hw_coherency" [drivers/usb/dwc3/dwc3.ko] undefined!
+>> ERROR: "dwc3_set_simple_data" [drivers/usb/dwc3/dwc3.ko] undefined!
+   ERROR: "dwc3_simple_wakeup_capable" [drivers/usb/dwc3/dwc3.ko] undefined!
+   ERROR: "of_add_property" [drivers/usb/dwc3/dwc3-of-simple.ko] undefined!
+>> ERROR: "dwc3_trace" [drivers/usb/dwc3/dwc3-of-simple.ko] undefined!
+>> ERROR: "__tracepoint_dwc3_writel" [drivers/usb/dwc3/dwc3-of-simple.ko] undefined!
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 28524 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170803/5cc5d79a/attachment-0001.gz>
