@@ -1,111 +1,94 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  3 Aug 2017 16:14:10 +0800
-Subject: [PATCH 7/8] ARM: sun8i: a83t: cubietruck-plus: Enable onboard USB
- peripherals
+Date: Thu,  3 Aug 2017 16:14:08 +0800
+Subject: [PATCH 5/8] ARM: sun8i: a83t: Add USB PHY and host device nodes
 In-Reply-To: <20170803081411.22389-1-wens@csie.org>
 References: <20170803081411.22389-1-wens@csie.org>
-Message-ID: <20170803081411.22389-8-wens@csie.org>
+Message-ID: <20170803081411.22389-6-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cubietruck-plus has a GL830 USB-to-SATA bridge connected to EHCI0,
-and a USB3503 HSIC USB 2.0 hub connected to EHCI1. The USB3503's I2C
-control interface is not connected.
-
-This patch enables both EHCI controllers, adds a device node for the
-USB hub, and includes sunxi-common-regulators.dtsi for the VBUS
-regulators. The existing reg_vcc3v3 is dropped as it is also available
-in the set of common regulators. Other unused regulators are disabled.
+The A83T has 3 USB PHYs, 1 for USB OTG, 1 for standard USB 2.0, 1 for
+USB HSIC. EHCI0/OHCI0 are the standard USB host pair, while EHCI1 is
+the host controller for HSIC. OTG is not added yet.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts | 49 +++++++++++++++++++++---
- 1 file changed, 44 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 62 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-index f583e5b9a1c8..716a205c6dbb 100644
---- a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-@@ -44,6 +44,7 @@
- 
- /dts-v1/;
- #include "sun8i-a83t.dtsi"
-+#include "sunxi-common-regulators.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
- 
-@@ -83,11 +84,15 @@
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 61304761e8f6..6039f1ea6810 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -242,6 +242,68 @@
+ 			#size-cells = <0>;
  		};
- 	};
  
--	reg_vcc3v3: vcc3v3 {
--		compatible = "regulator-fixed";
--		regulator-name = "vcc3v3";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
-+	usb-hub {
-+		/* I2C is not connected */
-+		compatible = "smsc,usb3503";
-+		initial-mode = <1>; /* initialize in HUB mode */
-+		disabled-ports = <1>;
-+		intn-gpios = <&pio 7 5 GPIO_ACTIVE_HIGH>; /* PH5 */
-+		reset-gpios = <&pio 4 16 GPIO_ACTIVE_HIGH>; /* PE16 */
-+		connect-gpios = <&pio 4 17 GPIO_ACTIVE_HIGH>; /* PE17 */
-+		refclk-frequency = <19200000>;
- 	};
- 
- 	sound {
-@@ -109,6 +114,16 @@
- 	};
- };
- 
-+&ehci0 {
-+	/* GL830 USB-to-SATA bridge here */
-+	status = "okay";
-+};
++		usbphy: phy at 1c19400 {
++			compatible = "allwinner,sun8i-a83t-usb-phy";
++			reg = <0x01c19400 0x10>,
++			      <0x01c1a800 0x14>,
++			      <0x01c1b800 0x14>;
++			reg-names = "phy_ctrl",
++				    "pmu1",
++				    "pmu2";
++			clocks = <&ccu CLK_USB_PHY0>,
++				 <&ccu CLK_USB_PHY1>,
++				 <&ccu CLK_USB_HSIC>,
++				 <&ccu CLK_USB_HSIC_12M>;
++			clock-names = "usb0_phy",
++				      "usb1_phy",
++				      "usb2_phy",
++				      "usb2_hsic_12M";
++			resets = <&ccu RST_USB_PHY0>,
++				 <&ccu RST_USB_PHY1>,
++				 <&ccu RST_USB_HSIC>;
++			reset-names = "usb0_reset",
++				      "usb1_reset",
++				      "usb2_reset";
++			status = "disabled";
++			#phy-cells = <1>;
++		};
 +
-+&ehci1 {
-+	/* USB3503 HSIC USB 2.0 hub here */
-+	status = "okay";
-+};
++		ehci0: usb at 1c1a000 {
++			compatible = "allwinner,sun8i-a83t-ehci",
++				     "generic-ehci";
++			reg = <0x01c1a000 0x100>;
++			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_EHCI0>;
++			resets = <&ccu RST_BUS_EHCI0>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
 +
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
-@@ -164,6 +179,24 @@
- 	};
- };
- 
-+&reg_usb1_vbus {
-+	gpio = <&pio 3 29 GPIO_ACTIVE_HIGH>; /* PD29 */
-+	status = "okay";
-+};
++		ohci0: usb at 1c1a400 {
++			compatible = "allwinner,sun8i-a83t-ohci",
++				     "generic-ohci";
++			reg = <0x01c1a400 0x100>;
++			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_OHCI0>, <&ccu CLK_USB_OHCI0>;
++			resets = <&ccu RST_BUS_OHCI0>;
++			phys = <&usbphy 1>;
++			phy-names = "usb";
++			status = "disabled";
++		};
 +
-+&reg_usb2_vbus {
-+	gpio = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
-+	status = "okay";
-+};
++		ehci1: usb at 1c1b000 {
++			compatible = "allwinner,sun8i-a83t-ehci",
++				     "generic-ehci";
++			reg = <0x01c1b000 0x100>;
++			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_EHCI1>;
++			resets = <&ccu RST_BUS_EHCI1>;
++			phys = <&usbphy 2>;
++			phy-names = "usb";
++			status = "disabled";
++		};
 +
-+&reg_vcc3v0 {
-+	status = "disabled";
-+};
-+
-+&reg_vcc5v0 {
-+	status = "disabled";
-+};
-+
- &spdif {
- 	status = "okay";
- };
-@@ -173,3 +206,9 @@
- 	pinctrl-0 = <&uart0_pb_pins>;
- 	status = "okay";
- };
-+
-+&usbphy {
-+	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_usb2_vbus>;
-+	status = "okay";
-+};
+ 		ccu: clock at 1c20000 {
+ 			compatible = "allwinner,sun8i-a83t-ccu";
+ 			reg = <0x01c20000 0x400>;
 -- 
 2.13.3
