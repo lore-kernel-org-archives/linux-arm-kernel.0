@@ -1,40 +1,34 @@
-From: sandy.huang@rock-chips.com (Sandy Huang)
-Date: Thu, 3 Aug 2017 21:06:27 +0800
-Subject: [PATCH 2/6] drm/rockchip: vop: fix iommu page fault when resume
-In-Reply-To: <1501494582-6934-1-git-send-email-mark.yao@rock-chips.com>
-References: <1501494569-6825-1-git-send-email-mark.yao@rock-chips.com>
- <1501494582-6934-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <5c613e33-f5f2-6b5f-69a6-cc3a7aa93a71@rock-chips.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 3 Aug 2017 21:13:22 +0800
+Subject: [xlnx:2017.2_video_ea 11/28] warning: (VIDEO_XILINX_HDMI_RX && ..)
+ selects PHY_XILINX_VPHY which has unmet direct dependencies (STAGING && ..)
+Message-ID: <201708032121.nduGOIdG%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi mark,
+tree:   https://github.com/Xilinx/linux-xlnx 2017.2_video_ea
+head:   d9c9ef883408d0622d075cc2ca805d7d96d5b28b
+commit: c33ee6950b34e8b00d9c77238dd7dfe0789dc91f [11/28] staging: xilinx: Add xilinx hdmi drivers to staging area
+config: xtensa-allmodconfig (attached as .config)
+compiler: xtensa-linux-gcc (GCC) 4.9.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout c33ee6950b34e8b00d9c77238dd7dfe0789dc91f
+        # save the attached .config to linux build tree
+        make.cross ARCH=xtensa 
 
-? 2017/7/31 17:49, Mark Yao ??:
-> Iommu would get page fault with following path:
->     vop_disable:
->        1, disable all windows and set vop config done
->        2, vop enter to standy, all windows not works, but their registers
->           are not clean, when you read window's enable bit, may found the
->           window is enable.
-> 
->     vop_enable:
->        1, memcpy(vop->regsbak, vop->regs, len)
->           save current vop registers to vop->regsbak, then you can found
->           window is enable on regsbak.
->        2, VOP_WIN_SET(vop, win, gate, 1);
->           force enable window gate, but gate and enable are on same
->           hardware register, then window enable bit rewrite to vop hardware.
->        3, vop power on, and vop might try to scan destroyed buffer,
->           then iommu get page fault.
-> 
-> Move windows disable after vop regsbak restore, then vop regsbak mechanism
-> would keep tracing the modify, everything would be safe.
-> 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> ---
->   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 33 +++++++++++++----------------
->   1 file changed, 15 insertions(+), 18 deletions(-)
-> 
+All warnings (new ones prefixed by >>):
 
-Reviewed-by: Sandy huang <sandy.huang@rock-chips.com>
+warning: (VIDEO_XILINX_HDMI_RX && DRM_XILINX_HDMI) selects PHY_XILINX_VPHY which has unmet direct dependencies (STAGING && ARCH_ZYNQMP)
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 47264 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170803/021e2716/attachment-0001.gz>
