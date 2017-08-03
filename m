@@ -1,55 +1,32 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu,  3 Aug 2017 17:33:47 -0500
-Subject: [PATCH v3 3/6] dt-bindings: add binding for Sitronix ST7586 display
- panels
+Date: Thu,  3 Aug 2017 17:33:50 -0500
+Subject: [PATCH v3 6/6] ARM: davinci_all_defconfig: enable tinydrm and ST7586
 In-Reply-To: <1501799630-1650-1-git-send-email-david@lechnology.com>
 References: <1501799630-1650-1-git-send-email-david@lechnology.com>
-Message-ID: <1501799630-1650-4-git-send-email-david@lechnology.com>
+Message-ID: <1501799630-1650-7-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a new binding for Sitronix ST7586 display panels.
-
-Using lego as the vendor prefix in the compatible string because the display
-panel I am working with is an integral part of the LEGO MINDSTORMS EV3.
+This enables the tinydrm and ST7586 panel modules used by the display
+on LEGO MINDSTORMS EV3.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
- .../bindings/display/sitronix,st7586.txt           | 26 ++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/sitronix,st7586.txt
+ arch/arm/configs/davinci_all_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/sitronix,st7586.txt b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
-new file mode 100644
-index 0000000..dfb0b7b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
-@@ -0,0 +1,26 @@
-+Sitronix ST7586 display panel
-+
-+Required properties:
-+- compatible:	"lego,ev3-lcd".
-+
-+The node for this driver must be a child node of a SPI controller, hence
-+all mandatory properties described in ../spi/spi-bus.txt must be specified.
-+
-+Optional properties:
-+- dc-gpios:	D/C pin. The presence/absence of this GPIO determines
-+		the panel interface operation mode (IF[3:1] pins):
-+		- present: IF=011 4-wire 8-bit data serial interface
-+		- absent:  IF=010 3-wire 9-bit data serial interface
-+- reset-gpios:	Reset pin
-+- power-supply:	A regulator node for the supply voltage.
-+- backlight:	phandle of the backlight device attached to the panel
-+- rotation:	panel rotation in degrees counter clockwise (0,90,180,270)
-+
-+Example:
-+	display at 0{
-+		compatible = "lego,ev3-lcd";
-+		reg = <0>;
-+		spi-max-frequency = <10000000>;
-+		dc-gpios = <&gpio 43 GPIO_ACTIVE_HIGH>;
-+		reset-gpios = <&gpio 80 GPIO_ACTIVE_HIGH>;
-+	};
+diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+index 06e2e2a..27d9720 100644
+--- a/arch/arm/configs/davinci_all_defconfig
++++ b/arch/arm/configs/davinci_all_defconfig
+@@ -143,6 +143,8 @@ CONFIG_VIDEO_ADV7343=m
+ CONFIG_DRM=m
+ CONFIG_DRM_TILCDC=m
+ CONFIG_DRM_DUMB_VGA_DAC=m
++CONFIG_DRM_TINYDRM=m
++CONFIG_TINYDRM_ST7586=m
+ CONFIG_FB=y
+ CONFIG_FIRMWARE_EDID=y
+ CONFIG_FB_DA8XX=y
 -- 
 2.7.4
