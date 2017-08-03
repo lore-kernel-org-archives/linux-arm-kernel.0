@@ -1,63 +1,76 @@
 From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Thu,  3 Aug 2017 17:23:44 -0400
-Subject: [v5 06/15] sparc64: simplify vmemmap_populate
+Date: Thu,  3 Aug 2017 17:23:49 -0400
+Subject: [v5 11/15] arm64/kasan: explicitly zero kasan shadow memory
 In-Reply-To: <1501795433-982645-1-git-send-email-pasha.tatashin@oracle.com>
 References: <1501795433-982645-1-git-send-email-pasha.tatashin@oracle.com>
-Message-ID: <1501795433-982645-7-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <1501795433-982645-12-git-send-email-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove duplicating code by using common functions
-vmemmap_pud_populate and vmemmap_pgd_populate.
+To optimize the performance of struct page initialization,
+vmemmap_populate() will no longer zero memory.
+
+We must explicitly zero the memory that is allocated by vmemmap_populate()
+for kasan, as this memory does not go through struct page initialization
+path.
 
 Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
 Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
 Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
 Reviewed-by: Bob Picco <bob.picco@oracle.com>
 ---
- arch/sparc/mm/init_64.c | 23 ++++++-----------------
- 1 file changed, 6 insertions(+), 17 deletions(-)
+ arch/arm64/mm/kasan_init.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-diff --git a/arch/sparc/mm/init_64.c b/arch/sparc/mm/init_64.c
-index ba957b763c07..e18947e9ab6c 100644
---- a/arch/sparc/mm/init_64.c
-+++ b/arch/sparc/mm/init_64.c
-@@ -2567,30 +2567,19 @@ int __meminit vmemmap_populate(unsigned long vstart, unsigned long vend,
- 	vstart = vstart & PMD_MASK;
- 	vend = ALIGN(vend, PMD_SIZE);
- 	for (; vstart < vend; vstart += PMD_SIZE) {
--		pgd_t *pgd = pgd_offset_k(vstart);
-+		pgd_t *pgd = vmemmap_pgd_populate(vstart, node);
- 		unsigned long pte;
- 		pud_t *pud;
- 		pmd_t *pmd;
+diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+index 81f03959a4ab..a57104bc54b8 100644
+--- a/arch/arm64/mm/kasan_init.c
++++ b/arch/arm64/mm/kasan_init.c
+@@ -135,6 +135,31 @@ static void __init clear_pgds(unsigned long start,
+ 		set_pgd(pgd_offset_k(start), __pgd(0));
+ }
  
--		if (pgd_none(*pgd)) {
--			pud_t *new = vmemmap_alloc_block(PAGE_SIZE, node);
-+		if (!pgd)
-+			return -ENOMEM;
++/*
++ * Memory that was allocated by vmemmap_populate is not zeroed, so we must
++ * zero it here explicitly.
++ */
++static void
++zero_vemmap_populated_memory(void)
++{
++	struct memblock_region *reg;
++	u64 start, end;
++
++	for_each_memblock(memory, reg) {
++		start = __phys_to_virt(reg->base);
++		end = __phys_to_virt(reg->base + reg->size);
++
++		if (start >= end)
++			break;
++
++		memset((void *)start, 0, end - start);
++	}
++
++	start = (u64)kasan_mem_to_shadow(_stext);
++	end = (u64)kasan_mem_to_shadow(_end);
++	memset((void *)start, 0, end - start);
++}
++
+ void __init kasan_init(void)
+ {
+ 	u64 kimg_shadow_start, kimg_shadow_end;
+@@ -205,6 +230,13 @@ void __init kasan_init(void)
+ 			pfn_pte(sym_to_pfn(kasan_zero_page), PAGE_KERNEL_RO));
  
--			if (!new)
--				return -ENOMEM;
--			pgd_populate(&init_mm, pgd, new);
--		}
--
--		pud = pud_offset(pgd, vstart);
--		if (pud_none(*pud)) {
--			pmd_t *new = vmemmap_alloc_block(PAGE_SIZE, node);
--
--			if (!new)
--				return -ENOMEM;
--			pud_populate(&init_mm, pud, new);
--		}
-+		pud = vmemmap_pud_populate(pgd, vstart, node);
-+		if (!pud)
-+			return -ENOMEM;
+ 	memset(kasan_zero_page, 0, PAGE_SIZE);
++
++	/*
++	 * vmemmap_populate does not zero the memory, so we need to zero it
++	 * explicitly
++	 */
++	zero_vemmap_populated_memory();
++
+ 	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
  
- 		pmd = pmd_offset(pud, vstart);
--
- 		pte = pmd_val(*pmd);
- 		if (!(pte & _PAGE_VALID)) {
- 			void *block = vmemmap_alloc_block(PMD_SIZE, node);
+ 	/* At this point kasan is fully initialized. Enable error messages */
 -- 
 2.13.4
