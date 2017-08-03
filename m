@@ -1,55 +1,45 @@
-From: oleksandrs@mellanox.com (Oleksandr Shamray)
-Date: Thu, 3 Aug 2017 15:26:08 +0000
-Subject: [patch v1 0/2] JTAG driver introduction
-In-Reply-To: <20170802141209.GB25781@lunn.ch>
-References: <1501679918-20486-1-git-send-email-oleksandrs@mellanox.com>
- <20170802141209.GB25781@lunn.ch>
-Message-ID: <AM4PR0501MB2194E6B8D14EC15356C1C0BFB1B10@AM4PR0501MB2194.eurprd05.prod.outlook.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 03 Aug 2017 16:25:19 +0100
+Subject: [PATCH v3 0/5] ARM64: disable irq between breakpoint and step
+ exception
+In-Reply-To: <883651ba-2178-b5cf-7f6c-bfb2f6999a01@redhat.com>
+References: <cover.1501496603.git.panand@redhat.com>
+ <597F65BD.3070200@arm.com> <e78a8e67-48ab-421c-c316-3b55821f0eec@redhat.com>
+ <59820835.1020301@arm.com> <883651ba-2178-b5cf-7f6c-bfb2f6999a01@redhat.com>
+Message-ID: <5983405F.4010002@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Andrew Lunn [mailto:andrew at lunn.ch]
-> Sent: Wednesday, August 2, 2017 5:12 PM
-> To: Oleksandr Shamray <oleksandrs@mellanox.com>
-> Cc: gregkh at linuxfoundation.org; arnd at arndb.de; devicetree at vger.kernel.org;
-> jiri at resnulli.us; system-sw-low-level <system-sw-low-level@mellanox.com>;
-> openbmc at lists.ozlabs.org; linux-kernel at vger.kernel.org; mec at shout.net;
-> joel at jms.id.au; linux-serial at vger.kernel.org; vadimp at maellanox.com;
-> tklauser at distanz.ch; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [patch v1 0/2] JTAG driver introduction
-> 
-> On Wed, Aug 02, 2017 at 04:18:36PM +0300, Oleksandr Shamray wrote:
-> > When a need raise up to use JTAG interface for system's devices
-> > programming or CPU debugging, it could be done from the external JTAG
-> > master controller.
-> >
-> > For such purpose, usually the user layer application implements jtag
-> > protocol or using a proprietary connection to vendor hardware.
-> > This method is slow and not generic.
-> >
-> > We propose to implement general JTAG interface and infrastructure to
-> > communicate with user layer application. In such way, we can have the
-> > standard JTAG interface core part and separation from specific HW
-> > implementation.
-> > This allow new capability to debug the CPU or program system's device
-> > via BMC without additional devices nor cost.
-> 
-> Hi Oleksandr
-> 
-> Do you have patches for OpenOCD? Or maybe i should ask it another way, what
-> user space tools are you using?
-> 
-> Thanks
-> 	Andrew
+Hi Pratyush,
 
-Hi Andrew
+On 02/08/17 19:46, Pratyush Anand wrote:
+> In my understanding problems are:
+> (1) Single stepping of unwanted instruction (ie. instruction  next to enable_dbg
+> from el1_irq)
+> (2) We do not have memory at the end of el1_irq, so that we can set watchpoint
+> exception generating instruction for single stepping.
 
-Thanks a lot for review.
+Yes, for (2) the PSTATE.SS bit is saved in SPSR.SS when we take the irq, but it
+isn't restored because we ERET from the irq handler with PSTATE.D clear.
 
-We used user space tool for that, which is an adaptation of some Lattice tools, which allows programming of SVF files. We are using it for Lattice CPLD burning, since we have for such devices on our system, but this tool could be used for programming other devices from other vendors as well.
 
-https://github.com/mellanoxbmc/mellanox-bmc-tools
+> I think, we can find a way to take care for (2), but not sure how (1) can be
+> taken care, without the approach I am taking.
 
-Thanks
-Oleksandr
+We can fix (1) by making 'enable_dbg' inherit the debug state of the interrupted
+EL1, unless the SPSR.SS bit is set, in which case we interrupted a
+single-stepped instruction and shouldn't re-enable debug because we know must
+MDSCR_EL1.SS be set.
+
+This way a synchronous data-abort from a single-stepped instruction with
+interrupts unmasked can unmask interrupts in el1_sync but keep debug disabled.
+This should give us the least surprises if we call core-code.
+
+I've posted a series that (in addition to your perf/watchpoint patches) fixes
+all the issues I saw with your example. Can you test it fixes the
+single-step:interrupt interaction on your platform?
+
+
+Thanks,
+
+James
