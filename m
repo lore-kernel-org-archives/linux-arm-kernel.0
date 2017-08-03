@@ -1,57 +1,48 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  3 Aug 2017 16:28:54 +0100
-Subject: [PATCH 1/4] KVM: arm/arm64: Fix bug in advertising KVM_CAP_MSI_DEVID
- capability
+Date: Thu,  3 Aug 2017 16:28:57 +0100
+Subject: [PATCH 4/4] KVM: arm/arm64: vgic: Use READ_ONCE fo cmpxchg
 In-Reply-To: <20170803152857.32055-1-marc.zyngier@arm.com>
 References: <20170803152857.32055-1-marc.zyngier@arm.com>
-Message-ID: <20170803152857.32055-2-marc.zyngier@arm.com>
+Message-ID: <20170803152857.32055-5-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shanker Donthineni <shankerd@codeaurora.org>
+From: Christoffer Dall <cdall@linaro.org>
 
-Commit 0e4e82f154e3 ("KVM: arm64: vgic-its: Enable ITS emulation as
-a virtual MSI controller") tried to advertise KVM_CAP_MSI_DEVID, but
-the code logic was not updating the dist->msis_require_devid field
-correctly. If hypervisor tool creates the ITS device after VGIC
-initialization then we don't advertise KVM_CAP_MSI_DEVID capability.
+There is a small chance that the compiler could generate separate loads
+for the dist->propbaser which could be modified from another CPU.  As we
+want to make sure we atomically update the entire value, and don't race
+with other updates, guarantee that the cmpxchg operation compares
+against the original value.
 
-Update the field msis_require_devid to true inside vgic_its_create()
-to fix the issue.
-
-Fixes: 0e4e82f154e3 ("vgic-its: Enable ITS emulation as a virtual MSI controller")
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-init.c | 3 ---
- virt/kvm/arm/vgic/vgic-its.c  | 1 +
- 2 files changed, 1 insertion(+), 3 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 3a0b8999f011..5801261f3add 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -285,9 +285,6 @@ int vgic_init(struct kvm *kvm)
- 	if (ret)
- 		goto out;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 714fa3933546..408ef06638fc 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -369,7 +369,7 @@ static void vgic_mmio_write_propbase(struct kvm_vcpu *vcpu,
+ 		return;
  
--	if (vgic_has_its(kvm))
--		dist->msis_require_devid = true;
--
- 	kvm_for_each_vcpu(i, vcpu, kvm)
- 		kvm_vgic_vcpu_enable(vcpu);
+ 	do {
+-		old_propbaser = dist->propbaser;
++		old_propbaser = READ_ONCE(dist->propbaser);
+ 		propbaser = old_propbaser;
+ 		propbaser = update_64bit_reg(propbaser, addr & 4, len, val);
+ 		propbaser = vgic_sanitise_propbaser(propbaser);
+@@ -397,7 +397,7 @@ static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
+ 		return;
  
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 2dff288b3a66..aa6b68db80b4 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1598,6 +1598,7 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
- 	INIT_LIST_HEAD(&its->device_list);
- 	INIT_LIST_HEAD(&its->collection_list);
- 
-+	dev->kvm->arch.vgic.msis_require_devid = true;
- 	dev->kvm->arch.vgic.has_its = true;
- 	its->enabled = false;
- 	its->dev = dev;
+ 	do {
+-		old_pendbaser = vgic_cpu->pendbaser;
++		old_pendbaser = READ_ONCE(vgic_cpu->pendbaser);
+ 		pendbaser = old_pendbaser;
+ 		pendbaser = update_64bit_reg(pendbaser, addr & 4, len, val);
+ 		pendbaser = vgic_sanitise_pendbaser(pendbaser);
 -- 
 2.11.0
