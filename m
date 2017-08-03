@@ -1,138 +1,107 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 3 Aug 2017 10:18:44 -0500
-Subject: [PATCH 0/6] Support for LEGO MINDSTORMS EV3 LCD display
-In-Reply-To: <b8ec0511-afd1-2a1b-6ffe-dfe951d79bf7@tronnes.org>
-References: <1501355870-13960-1-git-send-email-david@lechnology.com>
- <5d8f6518-8d7e-c029-2da4-e3417afb3e40@lechnology.com>
- <28188f5c-1daf-121b-6daf-1899668c3875@tronnes.org>
- <1ce36d43-b9dd-807e-23aa-bac4fda70fdc@lechnology.com>
- <bfb3d541-856b-0233-dd85-72512788939f@tronnes.org>
- <bbec0574-311a-e1b4-d7fd-f6fb15b078d2@lechnology.com>
- <b8ec0511-afd1-2a1b-6ffe-dfe951d79bf7@tronnes.org>
-Message-ID: <cf740449-c952-08d4-d63c-d92e71fa3092@lechnology.com>
+From: nwatters@codeaurora.org (Nate Watterson)
+Date: Thu, 3 Aug 2017 11:45:04 -0400
+Subject: [PATCH v3 0/5] ACPI: DMA ranges management
+In-Reply-To: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
+References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
+Message-ID: <3ccac0b0-dd5a-6a70-f253-99f038f69b8c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/2017 09:07 AM, Noralf Tr?nnes wrote:
-> 
-> Den 02.08.2017 00.26, skrev David Lechner:
->> On 08/01/2017 01:08 PM, Noralf Tr?nnes wrote:
->>> (cc: Daniel Vetter)
->>>
->>>
->>> Den 01.08.2017 18.51, skrev David Lechner:
->>>> On 07/30/2017 12:14 PM, Noralf Tr?nnes wrote:
->>>>>
->>>>> Den 29.07.2017 21.40, skrev David Lechner:
->>>>>> On 07/29/2017 02:17 PM, David Lechner wrote:
->>>>>>> The goal of this series is to get the built-in LCD of the LEGO 
->>>>>>> MINDSTORMS EV3
->>>>>>> working. But, most of the content here is building up the 
->>>>>>> infrastructure to do
->>>>>>> that.
->>>>>>>
->>>>>>
->>>>>> Some general comments/questions:
->>>>>>
->>>>>> I have noticed that DRM doesn't really have support for monochrome 
->>>>>> displays. I'm guessing that is because no one really uses them 
->>>>>> anymore?
->>>>>>
->>>>>
->>>>> The repaper driver was the first monochrome drm driver and I chose to
->>>>> present it to userspace as XRGB8888 and convert it to monochrome.
->>>>> The reason for this is that everything, libraries, apps, plymouth 
->>>>> (boot
->>>>> splash, no rgb565) supports it. I didn't see any point in adding a new
->>>>> monochrome drm format that didn't have, or probably wouldn't get
->>>>> userspace support (by libraries at least). The application of course
->>>>> needs to know this to get a good result.
->>>>>
->>>>> tinydrm_xrgb8888_to_gray8() does the conversion:
->>>>> https://cgit.freedesktop.org/drm/drm-misc/commit/drivers/gpu/drm/tinydrm?id=379ea9a1a59a5a32c8db6f164e80a3fd00cb3781 
->>>>>
->>>>>
->>>>>> The LEGO EV3 display is just an LCD (not the backlit kind). It has 
->>>>>> two modes of operation. It can to 2bbp grayscale or it can do 1bpp 
->>>>>> monochrome. The grayscale isn't the best (looks splotchy in 
->>>>>> places), so it would be nice to be able to choose between these 
->>>>>> two modes. How would I implement something like that?
->>>>>>
->>>>>
->>>>> Do you expect anyone to use grayscale if it doesn't look good?
->>>>> Maybe better to add it later if there's a demand for it.
->>>>
->>>> I don't expect many people to use it at all. The people that do will 
->>>> be hackers like me that want to see what it is capable of, so I 
->>>> think I will keep it grayscale by default.
->>>>
->>>
->>> It looks like the best way to satisfy your needs is to add specific 
->>> formats.
->>>
->>> Video for Linux have these:
->>>
->>> include/uapi/linux/videodev2.h
->>>
->>> /* Grey formats */
->>> #define V4L2_PIX_FMT_GREY    v4l2_fourcc('G', 'R', 'E', 'Y') /* 8 
->>> Greyscale     */
->>> #define V4L2_PIX_FMT_Y4      v4l2_fourcc('Y', '0', '4', ' ') /* 4 
->>> Greyscale     */
->>> #define V4L2_PIX_FMT_Y6      v4l2_fourcc('Y', '0', '6', ' ') /* 6 
->>> Greyscale     */
->>> #define V4L2_PIX_FMT_Y10     v4l2_fourcc('Y', '1', '0', ' ') /* 10 
->>> Greyscale     */
->>> #define V4L2_PIX_FMT_Y12     v4l2_fourcc('Y', '1', '2', ' ') /* 12 
->>> Greyscale     */
->>> #define V4L2_PIX_FMT_Y16     v4l2_fourcc('Y', '1', '6', ' ') /* 16 
->>> Greyscale     */
->>> #define V4L2_PIX_FMT_Y16_BE  v4l2_fourcc_be('Y', '1', '6', ' ') /* 16 
->>> Greyscale BE  */
->>>
->>>
->>> Maybe we can add formats like these:
->>>
->>> include/uapi/drm/drm_fourcc.h
->>>
->>> #define DRM_FORMAT_MONO        fourcc_code('Y', '0', '1', ' ') /* [0] 
->>> Monochrome */
->>> or
->>> #define DRM_FORMAT_Y1        fourcc_code('Y', '0', '1', ' ') /* [0] 
->>> Monochrome */
->>>
->>> #define DRM_FORMAT_Y2        fourcc_code('Y', '0', '2', ' ') /* [1:0] 
->>> Greyscale */
->>>
->>> Daniel, what do you think?
->>
->> 2 of the first 3 tinydrm drivers are monochrome (and I would like to 
->> write a driver for the Seeed/Grove I2C OLED displays which are also 
->> monochrome), so I think the 1bpp modes would definitely be useful.
-> 
-> David, I'm curious about those displays what controller/interface they use.
-> I have been hoping that it would be possible to use regmap as an
-> abstraction for many of these controllers and their registers.
+Hi Lorenzo,
 
-The particular display I have is this one: 
-http://wiki.seeed.cc/Grove-OLED_Display_1.12inch/
+On 8/3/2017 8:32 AM, Lorenzo Pieralisi wrote:
+> This patch series is v3 of a previous posting:
+> 
+> v2->v3:
+> 	- Fixed DMA masks computation
+>          - Fixed size computation overflow in acpi_dma_get_range()
+> 
+> v1->v2:
+> 	- Reworked acpi_dma_get_range() flow and logs
+> 	- Added IORT named component address limits
+> 	- Renamed acpi_dev_get_resources() helper function
+> 	- Rebased against v4.13-rc3
+> 
+> v2: http://lkml.kernel.org/r/20170731152323.32488-1-lorenzo.pieralisi at arm.com
+> v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
+> 
+> -- Original cover letter --
+> 
+> As reported in:
+> 
+> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
+> 
+> the bus connecting devices to an IOMMU bus can be smaller in size than
+> the IOMMU input address bits which results in devices DMA HW bugs in
+> particular related to IOVA allocation (ie chopping of higher address
+> bits owing to system bus HW capabilities mismatch with the IOMMU).
+> 
+> Fortunately this problem can be solved through an already present but never
+> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
+> window for a specific bus in ACPI and therefore all upstream devices
+> connected to it.
+> 
+> This small patch series enables _DMA parsing in ACPI core code and
+> use it in ACPI IORT code in order to detect DMA ranges for devices and
+> update their data structures to make them work with their related DMA
+> addressing restrictions.
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Feng Kan <fkan@apm.com>
+> Cc: Jon Masters <jcm@redhat.com>
+> Cc: Robert Moore <robert.moore@intel.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> 
+> Lorenzo Pieralisi (5):
+>    ACPICA: resource_mgr: Allow _DMA method in walk resources
+>    ACPI: Make acpi_dev_get_resources() method agnostic
+>    ACPI: Introduce DMA ranges parsing
+>    ACPI: Make acpi_dma_configure() DMA regions aware
+>    ACPI/IORT: Add IORT named component memory address limits
+> 
+>   drivers/acpi/acpica/rsxface.c |  7 ++--
+>   drivers/acpi/arm64/iort.c     | 57 ++++++++++++++++++++++++++-
+>   drivers/acpi/resource.c       | 82 +++++++++++++++++++++++++++++---------
+>   drivers/acpi/scan.c           | 91 +++++++++++++++++++++++++++++++++++++++----
+>   include/acpi/acnames.h        |  1 +
+>   include/acpi/acpi_bus.h       |  2 +
+>   include/linux/acpi.h          |  8 ++++
+>   include/linux/acpi_iort.h     |  5 ++-
+>   8 files changed, 219 insertions(+), 34 deletions(-)
+> 
 
-It looks like it uses a command/data scheme like the MIPI displays, but 
-doesn't use any of the standard values for the commands. The controller 
-can do parallel, SPI and I2C, but the display I have is wired for I2C.
+I tested with named components and with _DMA objects at a variety of
+sizes and verified the configured masks matched the expected values.
 
-> 
-> For MIPI DCS it wasn't possible because it's command oriented with
-> arguments. Since zero arguments is possible, a register with no value
-> is nonsense, even though the regmap implementation happily let me do it.
-> There's also the problem that regmap doesn't support registers with
-> different widths. Which is a problem if all registers are 8-bit wide,
-> except the GRAM register being 16-bit on RGB565 formats.
-> 
-> regmap is especially helpful with controllers that also have
-> gpios/keypad/touch/pwm, since the mfd (multi function device) subsystem
-> has good support for sharing regmaps between drivers. Multi function
-> devices are split into several drivers.
-> 
-> Noralf.
-> 
+Tested-by: Nate Watterson <nwatters@codeaurora.org>
+
+One general question I had while testing the patch is whether it is
+possible to define a complete 64-bit range using the _DMA method. For
+instance, to get a 64-bit dma_mask I had to use a non-zero MIN value
+so that LEN would not overflow.
+
+QWORDMemory(
+	ResourceConsumer,
+	PosDecode,       // _DEC
+	MinFixed,        // _MIF
+	MaxFixed,        // _MAF
+	Prefetchable,    // _MEM
+	ReadWrite,       // _RW
+	0,               // _GRA
+	0x1000,               // _MIN
+	0xffffffffffffffff,   // _MAX
+	0x0,                  // _TRA
+	0xfffffffffffff000,   // _LEN
+	,
+	,
+	,
+)
+
+-Nate
+
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
