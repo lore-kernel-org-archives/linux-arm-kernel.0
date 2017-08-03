@@ -1,82 +1,71 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 03 Aug 2017 14:26:19 +0200
-Subject: [PATCH] arm64: defconfig: enable fine-grained task level IRQ time
- accounting
-In-Reply-To: <1501532531-4499-1-git-send-email-mw@semihalf.com> (Marcin
- Wojtas's message of "Mon, 31 Jul 2017 22:22:11 +0200")
-References: <1501532531-4499-1-git-send-email-mw@semihalf.com>
-Message-ID: <87tw1o96s4.fsf@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu,  3 Aug 2017 13:32:34 +0100
+Subject: [PATCH v3 0/5] ACPI: DMA ranges management
+Message-ID: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On lun., juil. 31 2017, Marcin Wojtas <mw@semihalf.com> wrote:
+This patch series is v3 of a previous posting:
 
-> Tests showed, that under certain conditions, the summary number of jiffies
-> spent on softirq/idle, which are counted by system statistics can be even
-> below 10% of expected value, resulting in false load presentation.
->
-> The issue was observed on the quad-core Marvell Armada 8k SoC, whose two
-> 10G ports were bound into L2 bridge. Load was controlled by bidirectional
-> UDP traffic, produced by a packet generator. Under such condition,
-> the dominant load is softirq. With 100% single CPU occupation or without
-> any activity (all CPUs 100% idle), total number of jiffies is 10000 (2500
-> per each core) in 10s interval. Also with other kind of load this was
-> true.
->
-> However below a saturation threshold it was observed, that with CPU which
-> was occupied almost by softirqs only, the statistic were awkward. See
-> the mpstat output:
->
-> CPU %usr %nice %sys %iowait %irq %soft %steal %guest %gnice %idle
-> all 0.00  0.00 0.13    0.00 0.00  0.55   0.00   0.00   0.00 99.32
->   0 0.00  0.00 0.00    0.00 0.00 23.08   0.00   0.00   0.00 76.92
->   1 0.00  0.00 0.40    0.00 0.00  0.00   0.00   0.00   0.00 99.60
->   2 0.00  0.00 0.00    0.00 0.00  0.00   0.00   0.00   0.00 100.00
->   3 0.00  0.00 0.00    0.00 0.00  0.00   0.00   0.00   0.00 100.00
->
-> Above would mean basically no total load, debug CPU0 occupied in 25%.
-> Raw statistics, printed every 10s from /proc/stat unveiled a root
-> cause - summary idle/softirq jiffies on loaded CPU were below 200,
-> i.e. over 90% samples lost. All problems were gone after enabling
-> fine granulity IRQ time accounting.
->
-> This patch fixes possible wrong statistics processing by enabling
-> CONFIG_IRQ_TIME_ACCOUNTING for arm64 platfroms, which is by
-> default done on other architectures, e.g. x86 and arm. Tests
-> showed no noticeable performance penalty, nor stability impact.
->
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+v2->v3:
+	- Fixed DMA masks computation
+        - Fixed size computation overflow in acpi_dma_get_range()
 
-Applied on mvebu/arm64
+v1->v2:
+	- Reworked acpi_dma_get_range() flow and logs
+	- Added IORT named component address limits
+	- Renamed acpi_dev_get_resources() helper function
+	- Rebased against v4.13-rc3
 
-Thanks,
+v2: http://lkml.kernel.org/r/20170731152323.32488-1-lorenzo.pieralisi at arm.com
+v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
 
-Gregory
+-- Original cover letter --
 
-> ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 44423e6..ed51ac6 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -3,6 +3,7 @@ CONFIG_POSIX_MQUEUE=y
->  CONFIG_AUDIT=y
->  CONFIG_NO_HZ_IDLE=y
->  CONFIG_HIGH_RES_TIMERS=y
-> +CONFIG_IRQ_TIME_ACCOUNTING=y
->  CONFIG_BSD_PROCESS_ACCT=y
->  CONFIG_BSD_PROCESS_ACCT_V3=y
->  CONFIG_TASKSTATS=y
-> -- 
-> 1.8.3.1
->
+As reported in:
+
+http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
+
+the bus connecting devices to an IOMMU bus can be smaller in size than
+the IOMMU input address bits which results in devices DMA HW bugs in
+particular related to IOVA allocation (ie chopping of higher address
+bits owing to system bus HW capabilities mismatch with the IOMMU).
+
+Fortunately this problem can be solved through an already present but never
+used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
+window for a specific bus in ACPI and therefore all upstream devices
+connected to it.
+
+This small patch series enables _DMA parsing in ACPI core code and
+use it in ACPI IORT code in order to detect DMA ranges for devices and
+update their data structures to make them work with their related DMA
+addressing restrictions.
+
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Feng Kan <fkan@apm.com>
+Cc: Jon Masters <jcm@redhat.com>
+Cc: Robert Moore <robert.moore@intel.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+
+Lorenzo Pieralisi (5):
+  ACPICA: resource_mgr: Allow _DMA method in walk resources
+  ACPI: Make acpi_dev_get_resources() method agnostic
+  ACPI: Introduce DMA ranges parsing
+  ACPI: Make acpi_dma_configure() DMA regions aware
+  ACPI/IORT: Add IORT named component memory address limits
+
+ drivers/acpi/acpica/rsxface.c |  7 ++--
+ drivers/acpi/arm64/iort.c     | 57 ++++++++++++++++++++++++++-
+ drivers/acpi/resource.c       | 82 +++++++++++++++++++++++++++++---------
+ drivers/acpi/scan.c           | 91 +++++++++++++++++++++++++++++++++++++++----
+ include/acpi/acnames.h        |  1 +
+ include/acpi/acpi_bus.h       |  2 +
+ include/linux/acpi.h          |  8 ++++
+ include/linux/acpi_iort.h     |  5 ++-
+ 8 files changed, 219 insertions(+), 34 deletions(-)
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.10.0
