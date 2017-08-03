@@ -1,93 +1,101 @@
 From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 3 Aug 2017 21:44:46 +0800
-Subject: [PATCH v8 1/4] PCI: Add new PCIe Fabric End Node flag,
- PCI_DEV_FLAGS_NO_RELAXED_ORDERING
-In-Reply-To: <1501767889-7772-1-git-send-email-dingtianhong@huawei.com>
-References: <1501767889-7772-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1501767889-7772-2-git-send-email-dingtianhong@huawei.com>
+Date: Thu, 3 Aug 2017 21:44:45 +0800
+Subject: [PATCH v8 0/4] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+Message-ID: <1501767889-7772-1-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Casey Leedom <leedom@chelsio.com>
+Some devices have problems with Transaction Layer Packets with the Relaxed
+Ordering Attribute set.  This patch set adds a new PCIe Device Flag,
+PCI_DEV_FLAGS_NO_RELAXED_ORDERING, a set of PCI Quirks to catch some known
+devices with Relaxed Ordering issues, and a use of this new flag by the
+cxgb4 driver to avoid using Relaxed Ordering with problematic Root Complex
+Ports.
 
-The patch adds a new flag PCI_DEV_FLAGS_NO_RELAXED_ORDERING to indicate that
-Relaxed Ordering (RO) attribute should not be used for Transaction Layer
-Packets (TLP) targetted towards these affected root complexes. Current list
-of affected parts include Intel E5-26xx root complex which suffers from 
-flow control credits that result in performance issues. On these affected
-parts RO can still be used for peer-2-peer traffic. AMD A1100 ARM ("SEATTLE")
-Root complexes don't obey PCIe 3.0 ordering rules, hence could lead to
-data-corruption.
+It's been years since I've submitted kernel.org patches, I appolgise for the
+almost certain submission errors.
 
-Signed-off-by: Casey Leedom <leedom@chelsio.com>
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-Acked-by: Ashok Raj <ashok.raj@intel.com>
----
- drivers/pci/quirks.c | 38 ++++++++++++++++++++++++++++++++++++++
- include/linux/pci.h  |  2 ++
- 2 files changed, 40 insertions(+)
+v2: Alexander point out that the v1 was only a part of the whole solution,
+    some platform which has some issues could use the new flag to indicate
+    that it is not safe to enable relaxed ordering attribute, then we need
+    to clear the relaxed ordering enable bits in the PCI configuration when
+    initializing the device. So add a new second patch to modify the PCI
+    initialization code to clear the relaxed ordering enable bit in the
+    event that the root complex doesn't want relaxed ordering enabled.
 
-diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index 6967c6b..1e1cdbe 100644
---- a/drivers/pci/quirks.c
-+++ b/drivers/pci/quirks.c
-@@ -4016,6 +4016,44 @@ static void quirk_tw686x_class(struct pci_dev *pdev)
- 			      quirk_tw686x_class);
- 
- /*
-+ * Some devices have problems with Transaction Layer Packets with the Relaxed
-+ * Ordering Attribute set.  Such devices should mark themselves and other
-+ * Device Drivers should check before sending TLPs with RO set.
-+ */
-+static void quirk_relaxedordering_disable(struct pci_dev *dev)
-+{
-+	dev->dev_flags |= PCI_DEV_FLAGS_NO_RELAXED_ORDERING;
-+}
-+
-+/*
-+ * Intel E5-26xx Root Complex has a Flow Control Credit issue which can
-+ * cause performance problems with Upstream Transaction Layer Packets with
-+ * Relaxed Ordering set.
-+ */
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f02, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f04, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f08, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+
-+/*
-+ * The AMD ARM A1100 (AKA "SEATTLE") SoC has a bug in its PCIe Root Complex
-+ * where Upstream Transaction Layer Packets with the Relaxed Ordering
-+ * Attribute clear are allowed to bypass earlier TLPs with Relaxed Ordering
-+ * set.  This is a violation of the PCIe 3.0 Transaction Ordering Rules
-+ * outlined in Section 2.4.1 (PCI Express(r) Base Specification Revision 3.0
-+ * November 10, 2010).  As a result, on this platform we can't use Relaxed
-+ * Ordering for Upstream TLPs.
-+ */
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a00, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a01, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a02, PCI_CLASS_NOT_DEFINED, 8,
-+			      quirk_relaxedordering_disable);
-+
-+/*
-  * Per PCIe r3.0, sec 2.2.9, "Completion headers must supply the same
-  * values for the Attribute as were supplied in the header of the
-  * corresponding Request, except as explicitly allowed when IDO is used."
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 4869e66..412ec1c 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -188,6 +188,8 @@ enum pci_dev_flags {
- 	 * the direct_complete optimization.
- 	 */
- 	PCI_DEV_FLAGS_NEEDS_RESUME = (__force pci_dev_flags_t) (1 << 11),
-+	/* Don't use Relaxed Ordering for TLPs directed@this device */
-+	PCI_DEV_FLAGS_NO_RELAXED_ORDERING = (__force pci_dev_flags_t) (1 << 12),
- };
- 
- enum pci_irq_reroute_variant {
+    The third patch was base on the v1's second patch and only be changed
+    to query the relaxed ordering enable bit in the PCI configuration space
+    to allow the Chelsio NIC to send TLPs with the relaxed ordering attributes
+    set.
+
+    This version didn't plan to drop the defines for Intel Drivers to use the
+    new checking way to enable relaxed ordering because it is not the hardest
+    part of the moment, we could fix it in next patchset when this patches
+    reach the goal.
+
+v3: Redesigned the logic for pci_configure_relaxed_ordering when configuration,
+    If a PCIe device didn't enable the relaxed ordering attribute default,
+    we should not do anything in the PCIe configuration, otherwise we
+    should check if any of the devices above us do not support relaxed
+    ordering by the PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag, then base on
+    the result if we get a return that indicate that the relaxed ordering
+    is not supported we should update our device to disable relaxed ordering
+    in configuration space. If the device above us doesn't exist or isn't
+    the PCIe device, we shouldn't do anything and skip updating relaxed ordering
+    because we are probably running in a guest.
+
+v4: Rename the functions pcie_get_relaxed_ordering and pcie_disable_relaxed_ordering
+    according John's suggestion, and modify the description, use the true/false
+    as the return value.
+
+    We shouldn't enable relaxed ordering attribute by the setting in the root
+    complex configuration space for PCIe device, so fix it for cxgb4.
+
+    Fix some format issues.
+
+v5: Removed the unnecessary code for some function which only return the bool
+    value, and add the check for VF device.
+
+    Make this patch set base on 4.12-rc5.
+
+v6: Fix the logic error in the need to enable the relaxed ordering attribute for cxgb4.
+
+v7: The cxgb4 drivers will enable the PCIe Capability Device Control[Relaxed
+    Ordering Enable] in PCI Probe() routine, this will break our current
+    solution for some platform which has problematic when enable the relaxed
+    ordering attribute. According to the latest recommendations, remove the
+    enable_pcie_relaxed_ordering(), although it could not cover the Peer-to-Peer
+    scene, but we agree to leave this problem until we really trigger it.
+
+    Make this patch set base on 4.12 release version.
+
+v8: Modify the change log for first 2 patches to make it more reasonable, and
+    add the Acked-by from Alex and Ashok.
+
+    Add a new patch to enable the Relaxed Ordering Attribute for cxgb4vf driver.
+
+    Make this patch set base on 4.13-rc2.
+
+Casey Leedom (3):
+  PCI: Add new PCIe Fabric End Node flag,
+    PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+  net/cxgb4: Use new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+  net/cxgb4vf: Use new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+
+Ding Tianhong (1):
+  PCI: Disable PCIe Relaxed Ordering if unsupported
+
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h         |  1 +
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c    | 23 +++++++++----
+ drivers/net/ethernet/chelsio/cxgb4/sge.c           |  5 +--
+ drivers/net/ethernet/chelsio/cxgb4vf/adapter.h     |  1 +
+ .../net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c    | 18 ++++++++++
+ drivers/net/ethernet/chelsio/cxgb4vf/sge.c         |  3 ++
+ drivers/pci/pci.c                                  | 29 +++++++++++++++++
+ drivers/pci/probe.c                                | 37 +++++++++++++++++++++
+ drivers/pci/quirks.c                               | 38 ++++++++++++++++++++++
+ include/linux/pci.h                                |  4 +++
+ 10 files changed, 151 insertions(+), 8 deletions(-)
+
 -- 
 1.8.3.1
