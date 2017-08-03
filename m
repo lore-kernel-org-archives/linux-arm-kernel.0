@@ -1,57 +1,37 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 3 Aug 2017 20:12:46 +0800
-Subject: [patch v1 2/2] drivers: jtag: Add Aspeed SoC 24xx and 25xx
- families JTAG master driver
-In-Reply-To: <1501679918-20486-3-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <201708032035.PvPxwkZr%fengguang.wu@intel.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Thu, 03 Aug 2017 13:18:09 +0100
+Subject: [RFC PATCH v2 0/2] nb8800 suspend/resume support
+In-Reply-To: <71dd7987-8c43-2548-5058-51a95658da71@free.fr> (Mason's message
+ of "Wed, 2 Aug 2017 22:02:24 +0200")
+References: <33d1ab47-6098-5e3f-8a3c-f72626d07113@free.fr>
+ <aa8885b8-e6bb-3624-2bf9-0bb40505ac54@free.fr>
+ <dd883398-1511-0bfd-972b-a11ef8709f0d@free.fr>
+ <yw1xshhagexd.fsf@mansr.com>
+ <9e8e12b1-74e2-8323-ec16-eebda46b2a3d@free.fr>
+ <yw1xo9rygdyu.fsf@mansr.com>
+ <6906dccf-bec9-0fc8-a34a-c39c05ada917@free.fr>
+ <yw1xk22mgdcx.fsf@mansr.com>
+ <f1554ee7-2151-1304-c5c1-35264b9be5be@free.fr>
+ <71dd7987-8c43-2548-5058-51a95658da71@free.fr>
+Message-ID: <yw1x3798hmke.fsf@mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oleksandr,
+Mason <slash.tmp@free.fr> writes:
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.13-rc3 next-20170802]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> On 02/08/2017 19:31, Mason wrote:
+>
+>> # iperf3 -c 172.27.64.45 -u -b 950M
+>> Connecting to host 172.27.64.45, port 5201
+>> [  4] local 172.27.64.1 port 55533 connected to 172.27.64.45 port 5201
+>> [ ID] Interval           Transfer     Bandwidth       Total Datagrams
+>> [  4]   0.00-1.00   sec   102 MBytes   858 Mbits/sec  13091  
+>> [  4]   1.00-2.00   sec   114 MBytes   953 Mbits/sec  14541  
+>
+> 114 MB in 14541 packets => 7840 bytes per packet
+> Is iperf3 sending jumbo frames??
 
-url:    https://github.com/0day-ci/linux/commits/Oleksandr-Shamray/JTAG-driver-introduction/20170803-110721
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+It's probably sending fragmented packets.
 
-All errors (new ones prefixed by >>):
-
->> drivers/jtag/jtag-aspeed.c:34:28: fatal error: asm/mach-types.h: No such file or directory
-    #include <asm/mach-types.h>
-                               ^
-   compilation terminated.
-
-vim +34 drivers/jtag/jtag-aspeed.c
-
-  > 34	#include <asm/mach-types.h>
-    35	#include <asm/mach/arch.h>
-    36	#include <linux/clk.h>
-    37	#include <linux/device.h>
-    38	#include <linux/interrupt.h>
-    39	#include <linux/jtag.h>
-    40	#include <linux/kernel.h>
-    41	#include <linux/module.h>
-    42	#include <linux/of_address.h>
-    43	#include <linux/platform_device.h>
-    44	#include <linux/slab.h>
-    45	#include <uapi/linux/jtag.h>
-    46	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 56842 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170803/33b4b638/attachment-0001.gz>
+-- 
+M?ns Rullg?rd
