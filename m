@@ -1,59 +1,89 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu,  3 Aug 2017 16:14:04 +0800
-Subject: [PATCH 1/8] dt-bindings: phy: sun4i-usb-phy: Add property
- descriptions for H3
+Date: Thu,  3 Aug 2017 16:14:06 +0800
+Subject: [PATCH 3/8] phy: sun4i-usb: Support secondary clock for HSIC PHY
 In-Reply-To: <20170803081411.22389-1-wens@csie.org>
 References: <20170803081411.22389-1-wens@csie.org>
-Message-ID: <20170803081411.22389-2-wens@csie.org>
+Message-ID: <20170803081411.22389-4-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner H3 SoC has 4 USB PHYs, so it needs four sets of pmu
-regions, clocks, resets, and optional vbus properties. These were
-not described when the H3 compatible string was added.
+On the Allwinner A83T SoC, the last USB PHY is an HSIC PHY. It requires
+two clocks instead of one.
 
-Fixes: 626a630e003c ("phy-sun4i-usb: Add support for the host usb-phys
-		      found on the H3 SoC")
+On all Allwinner SoCs that share the common USB PHY design supported by
+the phy-sun4i-usb driver, the first PHY is always tied to OTG, and there
+is at most one HSIC PHY, typically the last.
+
+In this patch we take advantage of these known constraints and store an
+index in the compatible-string-related config structure describing which
+PHY is HSIC, needing the extra hsic_12M clock.
+
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/phy/allwinner/phy-sun4i-usb.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-index 005bc22938ff..893dd01dfe64 100644
---- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-@@ -17,18 +17,21 @@ Required properties:
-   * "phy_ctrl"
-   * "pmu0" for H3, V3s and A64
-   * "pmu1"
--  * "pmu2" for sun4i, sun6i or sun7i
-+  * "pmu2" for sun4i, sun6i, sun7i or sun8i-h3
-+  * "pmu3" for sun8i-h3
- - #phy-cells : from the generic phy bindings, must be 1
- - clocks : phandle + clock specifier for the phy clocks
- - clock-names :
-   * "usb_phy" for sun4i, sun5i or sun7i
-   * "usb0_phy", "usb1_phy" and "usb2_phy" for sun6i
-   * "usb0_phy", "usb1_phy" for sun8i
-+  * "usb0_phy", "usb1_phy", "usb2_phy" and "usb3_phy" for sun8i-h3
- - resets : a list of phandle + reset specifier pairs
- - reset-names :
-   * "usb0_reset"
-   * "usb1_reset"
--  * "usb2_reset" for sun4i, sun6i or sun7i
-+  * "usb2_reset" for sun4i, sun6i, sun7i or sun8i-h3
-+  * "usb3_reset" for sun8i-h3
+diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c b/drivers/phy/allwinner/phy-sun4i-usb.c
+index bbf06cfe5898..79157eced75a 100644
+--- a/drivers/phy/allwinner/phy-sun4i-usb.c
++++ b/drivers/phy/allwinner/phy-sun4i-usb.c
+@@ -107,6 +107,7 @@ enum sun4i_usb_phy_type {
  
- Optional properties:
- - usb0_id_det-gpios : gpio phandle for reading the otg id pin value
-@@ -37,6 +40,7 @@ Optional properties:
- - usb0_vbus-supply : regulator phandle for controller usb0 vbus
- - usb1_vbus-supply : regulator phandle for controller usb1 vbus
- - usb2_vbus-supply : regulator phandle for controller usb2 vbus
-+- usb3_vbus-supply : regulator phandle for controller usb3 vbus
+ struct sun4i_usb_phy_cfg {
+ 	int num_phys;
++	int hsic_index;
+ 	enum sun4i_usb_phy_type type;
+ 	u32 disc_thresh;
+ 	u8 phyctl_offset;
+@@ -126,6 +127,7 @@ struct sun4i_usb_phy_data {
+ 		struct regulator *vbus;
+ 		struct reset_control *reset;
+ 		struct clk *clk;
++		struct clk *clk2;
+ 		bool regulator_on;
+ 		int index;
+ 	} phys[MAX_PHYS];
+@@ -261,8 +263,15 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+ 	if (ret)
+ 		return ret;
  
- Example:
- 	usbphy: phy at 0x01c13400 {
++	ret = clk_prepare_enable(phy->clk2);
++	if (ret) {
++		clk_disable_unprepare(phy->clk);
++		return ret;
++	}
++
+ 	ret = reset_control_deassert(phy->reset);
+ 	if (ret) {
++		clk_disable_unprepare(phy->clk2);
+ 		clk_disable_unprepare(phy->clk);
+ 		return ret;
+ 	}
+@@ -315,6 +324,7 @@ static int sun4i_usb_phy_exit(struct phy *_phy)
+ 
+ 	sun4i_usb_phy_passby(phy, 0);
+ 	reset_control_assert(phy->reset);
++	clk_disable_unprepare(phy->clk2);
+ 	clk_disable_unprepare(phy->clk);
+ 
+ 	return 0;
+@@ -706,6 +716,17 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 			return PTR_ERR(phy->clk);
+ 		}
+ 
++		/* The first PHY is always tied to OTG, and never HSIC */
++		if (data->cfg->hsic_index && i == data->cfg->hsic_index) {
++			/* HSIC needs secondary clock */
++			snprintf(name, sizeof(name), "usb%d_hsic_12M", i);
++			phy->clk2 = devm_clk_get(dev, name);
++			if (IS_ERR(phy->clk2)) {
++				dev_err(dev, "failed to get clock %s\n", name);
++				return PTR_ERR(phy->clk2);
++			}
++		}
++
+ 		snprintf(name, sizeof(name), "usb%d_reset", i);
+ 		phy->reset = devm_reset_control_get(dev, name);
+ 		if (IS_ERR(phy->reset)) {
 -- 
 2.13.3
