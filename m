@@ -1,287 +1,163 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Thu, 3 Aug 2017 16:38:58 +0800
-Subject: [PATCH v3] arm: dts: mt7623: Add SD-card and EMMC to bananapi-r2
-In-Reply-To: <687af2dc98feffc678945f130c03ca020d9ca7b5.1501748754.git.sean.wang@mediatek.com>
-References: <687af2dc98feffc678945f130c03ca020d9ca7b5.1501748754.git.sean.wang@mediatek.com>
-Message-ID: <1501749538.4398.6.camel@mtkswgap22>
+From: andy.tang@nxp.com (Andy Tang)
+Date: Thu, 3 Aug 2017 08:39:16 +0000
+Subject: [PATCH 2/2] arm64: dts: ls2088a: add cpu idle support
+In-Reply-To: <20170803014007.GC31819@dragon>
+References: <1501053893-20897-1-git-send-email-andy.tang@nxp.com>
+ <1501053893-20897-2-git-send-email-andy.tang@nxp.com>
+ <20170803014007.GC31819@dragon>
+Message-ID: <AM5PR0402MB2818861202D11C4255689532F3B10@AM5PR0402MB2818.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Matthias,
+Hi Shawn,
 
-Ryder and me tried to make the patch better, so the delivery is made in
-v3,  including add missing pin  state for mmc1 and remove wp-gpio
-because the board only has micro-sd slot that can't be adjusted for the
-lock manually. And also some cleanups are made for nodes sorted in
-alphabetical order. Thanks for Ryder to catch.
+Please see my explanation inline.
 
-	Sean
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Thursday, August 03, 2017 9:40 AM
+> To: Andy Tang <andy.tang@nxp.com>
+> Cc: mark.rutland at arm.com; devicetree at vger.kernel.org;
+> catalin.marinas at arm.com; will.deacon at arm.com; linux-
+> kernel at vger.kernel.org; robh+dt at kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 2/2] arm64: dts: ls2088a: add cpu idle support
+> 
+> On Wed, Jul 26, 2017 at 03:24:53PM +0800, andy.tang at nxp.com wrote:
+> > From: Yuantian Tang <andy.tang@nxp.com>
+> >
+> > ls2088a supports another cpu idle state which is pw20 which saves more
+> > power when cpu is idle.
+> > It was implemented through psci firmware.
+> >
+> > Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
+> 
+> Can you explain a bit in the commit log why psci node is being added in fsl-
+> ls208xa.dtsi while you are only adding idle state for ls2088a?  Does that mean
+> ls2088a and ls2080a gets different idle implementation?
+> 
+IDLE implementation is same on both ls2080a and ls2088a.  it is just there is no 
+Requirement for ls2080a though. Still it is better to update both.
 
-On Thu, 2017-08-03 at 16:29 +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+I will resend the patch adding ls2080a supports.
+
+Regards,
+Andy
+
+> Shawn
 > 
-> The bananapi-r2 board has an SD-card controller and built-in
-> EMMC storage so enables those devices in the devicetree. Also
-> cleanup nodes in alphabetical order in the patch.
-> 
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt7623.dtsi                 | 73 ++++++++++++++-------------
->  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 73 ++++++++++++++++++++-------
->  2 files changed, 94 insertions(+), 52 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-> index 2a877ed..ec8a074 100644
-> --- a/arch/arm/boot/dts/mt7623.dtsi
-> +++ b/arch/arm/boot/dts/mt7623.dtsi
-> @@ -91,6 +91,7 @@
->  			cooling-max-level = <7>;
->  			clock-frequency = <1300000000>;
->  		};
-> +
->  		cpu1: cpu at 1 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a7";
-> @@ -98,6 +99,7 @@
->  			operating-points-v2 = <&cpu_opp_table>;
->  			clock-frequency = <1300000000>;
->  		};
-> +
->  		cpu2: cpu at 2 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a7";
-> @@ -105,6 +107,7 @@
->  			operating-points-v2 = <&cpu_opp_table>;
->  			clock-frequency = <1300000000>;
->  		};
-> +
->  		cpu3: cpu at 3 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a7";
-> @@ -172,10 +175,12 @@
->  					trip = <&cpu_passive>;
->  					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
->  				};
-> +
->  				map1 {
->  					trip = <&cpu_active>;
->  					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
->  				};
-> +
->  				map2 {
->  					trip = <&cpu_hot>;
->  					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-> @@ -481,6 +486,31 @@
->  		nvmem-cell-names = "calibration-data";
->  	};
->  
-> +	nandc: nfi at 1100d000 {
-> +		compatible = "mediatek,mt7623-nfc",
-> +			     "mediatek,mt2701-nfc";
-> +		reg = <0 0x1100d000 0 0x1000>;
-> +		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_LOW>;
-> +		power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
-> +		clocks = <&pericfg CLK_PERI_NFI>,
-> +			 <&pericfg CLK_PERI_NFI_PAD>;
-> +		clock-names = "nfi_clk", "pad_clk";
-> +		status = "disabled";
-> +		ecc-engine = <&bch>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +	};
-> +
-> +	bch: ecc at 1100e000 {
-> +		compatible = "mediatek,mt7623-ecc",
-> +			     "mediatek,mt2701-ecc";
-> +		reg = <0 0x1100e000 0 0x1000>;
-> +		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&pericfg CLK_PERI_NFI_ECC>;
-> +		clock-names = "nfiecc_clk";
-> +		status = "disabled";
-> +	};
-> +
->  	spi1: spi at 11016000 {
->  		compatible = "mediatek,mt7623-spi",
->  			     "mediatek,mt2701-spi";
-> @@ -509,31 +539,6 @@
->  		status = "disabled";
->  	};
->  
-> -	nandc: nfi at 1100d000 {
-> -		compatible = "mediatek,mt7623-nfc",
-> -			     "mediatek,mt2701-nfc";
-> -		reg = <0 0x1100d000 0 0x1000>;
-> -		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_LOW>;
-> -		power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
-> -		clocks = <&pericfg CLK_PERI_NFI>,
-> -			 <&pericfg CLK_PERI_NFI_PAD>;
-> -		clock-names = "nfi_clk", "pad_clk";
-> -		status = "disabled";
-> -		ecc-engine = <&bch>;
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
-> -	};
-> -
-> -	bch: ecc at 1100e000 {
-> -		compatible = "mediatek,mt7623-ecc",
-> -			     "mediatek,mt2701-ecc";
-> -		reg = <0 0x1100e000 0 0x1000>;
-> -		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_LOW>;
-> -		clocks = <&pericfg CLK_PERI_NFI_ECC>;
-> -		clock-names = "nfiecc_clk";
-> -		status = "disabled";
-> -	};
-> -
->  	afe: audio-controller at 11220000 {
->  		compatible = "mediatek,mt7623-audio",
->  			     "mediatek,mt2701-audio";
-> @@ -655,6 +660,15 @@
->  		status = "disabled";
->  	};
->  
-> +	hifsys: syscon at 1a000000 {
-> +		compatible = "mediatek,mt7623-hifsys",
-> +			     "mediatek,mt2701-hifsys",
-> +			     "syscon";
-> +		reg = <0 0x1a000000 0 0x1000>;
-> +		#clock-cells = <1>;
-> +		#reset-cells = <1>;
-> +	};
-> +
->  	usb1: usb at 1a1c0000 {
->  		compatible = "mediatek,mt7623-xhci",
->  			     "mediatek,mt8173-xhci";
-> @@ -733,15 +747,6 @@
->  		};
->  	};
->  
-> -	hifsys: syscon at 1a000000 {
-> -		compatible = "mediatek,mt7623-hifsys",
-> -			     "mediatek,mt2701-hifsys",
-> -			     "syscon";
-> -		reg = <0 0x1a000000 0 0x1000>;
-> -		#clock-cells = <1>;
-> -		#reset-cells = <1>;
-> -	};
-> -
->  	ethsys: syscon at 1b000000 {
->  		compatible = "mediatek,mt7623-ethsys",
->  			     "mediatek,mt2701-ethsys",
-> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> index 9f3e6dd..0aa1c69 100644
-> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-> @@ -179,6 +179,32 @@
->  	status = "okay";
->  };
->  
-> +&mmc0 {
-> +	pinctrl-names = "default", "state_uhs";
-> +	pinctrl-0 = <&mmc0_pins_default>;
-> +	pinctrl-1 = <&mmc0_pins_uhs>;
-> +	status = "okay";
-> +	bus-width = <8>;
-> +	max-frequency = <50000000>;
-> +	cap-mmc-highspeed;
-> +	vmmc-supply = <&mt6323_vemc3v3_reg>;
-> +	vqmmc-supply = <&mt6323_vio18_reg>;
-> +	non-removable;
-> +};
-> +
-> +&mmc1 {
-> +	pinctrl-names = "default", "state_uhs";
-> +	pinctrl-0 = <&mmc1_pins_default>;
-> +	pinctrl-1 = <&mmc1_pins_uhs>;
-> +	status = "okay";
-> +	bus-width = <4>;
-> +	max-frequency = <50000000>;
-> +	cap-sd-highspeed;
-> +	cd-gpios = <&pio 261 0>;
-> +	vmmc-supply = <&mt6323_vmch_reg>;
-> +	vqmmc-supply = <&mt6323_vio18_reg>;
-> +};
-> +
->  &pio {
->  	cir_pins_a:cir at 0 {
->  		pins_cir {
-> @@ -314,6 +340,17 @@
->  			bias-pull-down;
->  			drive-strength = <MTK_DRIVE_4mA>;
->  		};
-> +
-> +		pins_wp {
-> +			pinmux = <MT7623_PIN_29_EINT7_FUNC_MSDC1_WP>;
-> +			input-enable;
-> +			bias-pull-up;
-> +		};
-> +
-> +		pins_insert {
-> +			pinmux = <MT7623_PIN_261_MSDC1_INS_FUNC_GPIO261>;
-> +			bias-pull-up;
-> +		};
->  	};
->  
->  	mmc1_pins_uhs: mmc1 {
-> @@ -335,16 +372,6 @@
->  		};
->  	};
->  
-> -	spi0_pins_a: spi at 0 {
-> -		pins_spi {
-> -			pinmux = <MT7623_PIN_53_SPI0_CSN_FUNC_SPI0_CS>,
-> -				<MT7623_PIN_54_SPI0_CK_FUNC_SPI0_CK>,
-> -				<MT7623_PIN_55_SPI0_MI_FUNC_SPI0_MI>,
-> -				<MT7623_PIN_56_SPI0_MO_FUNC_SPI0_MO>;
-> -			bias-disable;
-> -		};
-> -	};
-> -
->  	pwm_pins_a: pwm at 0 {
->  		pins_pwm {
->  			pinmux = <MT7623_PIN_203_PWM0_FUNC_PWM0>,
-> @@ -355,6 +382,16 @@
->  		};
->  	};
->  
-> +	spi0_pins_a: spi at 0 {
-> +		pins_spi {
-> +			pinmux = <MT7623_PIN_53_SPI0_CSN_FUNC_SPI0_CS>,
-> +				<MT7623_PIN_54_SPI0_CK_FUNC_SPI0_CK>,
-> +				<MT7623_PIN_55_SPI0_MI_FUNC_SPI0_MI>,
-> +				<MT7623_PIN_56_SPI0_MO_FUNC_SPI0_MO>;
-> +			bias-disable;
-> +		};
-> +	};
-> +
->  	uart0_pins_a: uart at 0 {
->  		pins_dat {
->  			pinmux = <MT7623_PIN_79_URXD0_FUNC_URXD0>,
-> @@ -414,14 +451,6 @@
->  	status = "disabled";
->  };
->  
-> -&u3phy1 {
-> -	status = "okay";
-> -};
-> -
-> -&u3phy2 {
-> -	status = "okay";
-> -};
-> -
->  &uart1 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&uart1_pins_a>;
-> @@ -441,3 +470,11 @@
->  	vusb33-supply = <&mt6323_vusb_reg>;
->  	status = "okay";
->  };
-> +
-> +&u3phy1 {
-> +	status = "okay";
-> +};
-> +
-> +&u3phy2 {
-> +	status = "okay";
-> +};
+> > ---
+> >  arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi | 17 +++++++++++++++++
+> > arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi |  5 +++++
+> >  2 files changed, 22 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+> > b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+> > index 5c695c6..6aa319d 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+> > @@ -53,6 +53,7 @@
+> >  		compatible = "arm,cortex-a72";
+> >  		reg = <0x0>;
+> >  		clocks = <&clockgen 1 0>;
+> > +		cpu-idle-states = <&CPU_PW20>;
+> >  		next-level-cache = <&cluster0_l2>;
+> >  		#cooling-cells = <2>;
+> >  	};
+> > @@ -62,6 +63,7 @@
+> >  		compatible = "arm,cortex-a72";
+> >  		reg = <0x1>;
+> >  		clocks = <&clockgen 1 0>;
+> > +		cpu-idle-states = <&CPU_PW20>;
+> >  		next-level-cache = <&cluster0_l2>;
+> >  	};
+> >
+> > @@ -70,6 +72,7 @@
+> >  		compatible = "arm,cortex-a72";
+> >  		reg = <0x100>;
+> >  		clocks = <&clockgen 1 1>;
+> > +		cpu-idle-states = <&CPU_PW20>;
+> >  		next-level-cache = <&cluster1_l2>;
+> >  		#cooling-cells = <2>;
+> >  	};
+> > @@ -79,6 +82,7 @@
+> >  		compatible = "arm,cortex-a72";
+> >  		reg = <0x101>;
+> >  		clocks = <&clockgen 1 1>;
+> > +		cpu-idle-states = <&CPU_PW20>;
+> >  		next-level-cache = <&cluster1_l2>;
+> >  	};
+> >
+> > @@ -88,6 +92,7 @@
+> >  		reg = <0x200>;
+> >  		clocks = <&clockgen 1 2>;
+> >  		next-level-cache = <&cluster2_l2>;
+> > +		cpu-idle-states = <&CPU_PW20>;
+> >  		#cooling-cells = <2>;
+> >  	};
+> >
+> > @@ -96,6 +101,7 @@
+> >  		compatible = "arm,cortex-a72";
+> >  		reg = <0x201>;
+> >  		clocks = <&clockgen 1 2>;
+> > +		cpu-idle-states = <&CPU_PW20>;
+> >  		next-level-cache = <&cluster2_l2>;
+> >  	};
+> >
+> > @@ -104,6 +110,7 @@
+> >  		compatible = "arm,cortex-a72";
+> >  		reg = <0x300>;
+> >  		clocks = <&clockgen 1 3>;
+> > +		cpu-idle-states = <&CPU_PW20>;
+> >  		next-level-cache = <&cluster3_l2>;
+> >  		#cooling-cells = <2>;
+> >  	};
+> > @@ -113,6 +120,7 @@
+> >  		compatible = "arm,cortex-a72";
+> >  		reg = <0x301>;
+> >  		clocks = <&clockgen 1 3>;
+> > +		cpu-idle-states = <&CPU_PW20>;
+> >  		next-level-cache = <&cluster3_l2>;
+> >  	};
+> >
+> > @@ -131,6 +139,15 @@
+> >  	cluster3_l2: l2-cache3 {
+> >  		compatible = "cache";
+> >  	};
+> > +
+> > +	CPU_PW20: cpu-pw20 {
+> > +		compatible = "arm,idle-state";
+> > +		idle-state-name = "PW20";
+> > +		arm,psci-suspend-param = <0x00010000>;
+> > +		entry-latency-us = <2000>;
+> > +		exit-latency-us = <2000>;
+> > +		min-residency-us = <6000>;
+> > +	};
+> >  };
+> >
+> >  &pcie1 {
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> > b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> > index 94cdd30..205b7f7 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> > @@ -118,6 +118,11 @@
+> >  		interrupts = <1 7 0x8>; /* PMU PPI, Level low type */
+> >  	};
+> >
+> > +	psci {
+> > +		compatible = "arm,psci-0.2";
+> > +		method = "smc";
+> > +	};
+> > +
+> >  	soc {
+> >  		compatible = "simple-bus";
+> >  		#address-cells = <2>;
+> > --
+> > 2.1.0.27.g96db324
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
