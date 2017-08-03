@@ -1,74 +1,95 @@
-From: luaraneda@gmail.com (Luis Araneda)
-Date: Wed,  2 Aug 2017 22:28:30 -0400
-Subject: [PATCH v3] ARM: dts: sun8i: h3: Enable EMAC with external PHY on
- NanoPi M1 Plus
-Message-ID: <20170803022830.5210-1-luaraneda@gmail.com>
+From: huibin.hong@rock-chips.com (Huibin Hong)
+Date: Thu,  3 Aug 2017 10:36:49 +0800
+Subject: [PATCH v2] ARM: dts: rockchip: rk322x: add spi node and spi pinctrl
+Message-ID: <1501727810-31761-1-git-send-email-huibin.hong@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Nanopi M1 Plus uses an external Realtek RTL8211E PHY in RGMII mode,
-enabled by a GPIO-based regulator.
+Add spi node and spi pinctrl for rk322x
 
-Signed-off-by: Luis Araneda <luaraneda@gmail.com>
-
+Signed-off-by: Huibin Hong <huibin.hong@rock-chips.com>
 ---
-Changes v2 -> v3:
-- Changed PHY address from broadcast to board specific
 
-Changes v1 -> v2:
-- Removed unnecessary property
-- Corrected part address to match reg value
+Changes in v2:
+- Remove the changeid, and add commit for this patch
 
- arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 30 +++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ arch/arm/boot/dts/rk322x.dtsi | 50 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-index 8ddd1b2cc..ba054cf77 100644
---- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-@@ -45,6 +45,20 @@
- / {
- 	model = "FriendlyArm NanoPi M1 Plus";
- 	compatible = "friendlyarm,nanopi-m1-plus", "allwinner,sun8i-h3";
-+
-+	aliases {
-+		ethernet0 = &emac;
-+	};
-+
-+	reg_gmac_3v3: gmac-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "gmac-3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		enable-active-high;
-+		gpio = <&pio 3 6 GPIO_ACTIVE_HIGH>; /* PD6 */
-+	};
- };
+diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
+index 678daf7..b47f58e 100644
+--- a/arch/arm/boot/dts/rk322x.dtsi
++++ b/arch/arm/boot/dts/rk322x.dtsi
+@@ -54,6 +54,7 @@
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
+ 		serial2 = &uart2;
++		spi0 = &spi0;
+ 	};
  
- &ehci1 {
-@@ -55,6 +69,22 @@
- 	status = "okay";
- };
+ 	cpus {
+@@ -401,6 +402,19 @@
+ 		status = "disabled";
+ 	};
  
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_rgmii_pins>;
-+	phy-supply = <&reg_gmac_3v3>;
-+	phy-handle = <&ext_rgmii_phy>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+};
-+
-+&mdio {
-+	ext_rgmii_phy: ethernet-phy at 7 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <7>;
++	spi0: spi at 11090000 {
++		compatible = "rockchip,rk3228-spi";
++		reg = <0x11090000 0x1000>;
++		interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&spi0_clk &spi0_tx &spi0_rx &spi0_cs0 &spi0_cs1>;
++		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
++		clock-names = "spiclk", "apb_pclk";
++		status = "disabled";
 +	};
-+};
 +
- &ohci1 {
- 	status = "okay";
- };
+ 	wdt: watchdog at 110a0000 {
+ 		compatible = "rockchip,rk322x-wdt", "snps,dw-wdt";
+ 		reg = <0x110a0000 0x100>;
+@@ -1058,6 +1072,42 @@
+ 			};
+ 		};
+ 
++		spi-0 {
++			spi0_clk: spi0-clk {
++				rockchip,pins = <0 9 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi0_cs0: spi0-cs0 {
++				rockchip,pins = <0 14 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi0_tx: spi0-tx {
++				rockchip,pins = <0 11 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi0_rx: spi0-rx {
++				rockchip,pins = <0 13 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi0_cs1: spi0-cs1 {
++				rockchip,pins = <1 12 RK_FUNC_1 &pcfg_pull_up>;
++			};
++		};
++
++		spi-1 {
++			spi1_clk: spi1-clk {
++				rockchip,pins = <0 23 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi1_cs0: spi1-cs0 {
++				rockchip,pins = <2 2 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi1_rx: spi1-rx {
++				rockchip,pins = <2 0 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi1_tx: spi1-tx {
++				rockchip,pins = <2 1 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi1_cs1: spi1-cs1 {
++				rockchip,pins = <2 3 RK_FUNC_2 &pcfg_pull_up>;
++			};
++		};
++
+ 		i2s1 {
+ 			i2s1_bus: i2s1-bus {
+ 				rockchip,pins = <0 8 RK_FUNC_1 &pcfg_pull_none>,
 -- 
-2.13.3
+1.9.1
