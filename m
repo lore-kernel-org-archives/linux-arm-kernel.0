@@ -1,36 +1,59 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 03 Aug 2017 17:11:22 +0900
-Subject: [PATCH 2/5] phy: rockchip-inno-usb2: Replace the extcon API
-In-Reply-To: <06154871-a821-edab-23d8-340c5b0f5081@ti.com>
-References: <1500254456-6525-1-git-send-email-cw00.choi@samsung.com>
- <CGME20170717012058epcas1p157e9a296eb5e415ae24bb51a1e6026db@epcas1p1.samsung.com>
- <1500254456-6525-3-git-send-email-cw00.choi@samsung.com>
- <06154871-a821-edab-23d8-340c5b0f5081@ti.com>
-Message-ID: <5982DAAA.8060201@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu,  3 Aug 2017 16:14:04 +0800
+Subject: [PATCH 1/8] dt-bindings: phy: sun4i-usb-phy: Add property
+ descriptions for H3
+In-Reply-To: <20170803081411.22389-1-wens@csie.org>
+References: <20170803081411.22389-1-wens@csie.org>
+Message-ID: <20170803081411.22389-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The Allwinner H3 SoC has 4 USB PHYs, so it needs four sets of pmu
+regions, clocks, resets, and optional vbus properties. These were
+not described when the H3 compatible string was added.
 
-On 2017? 08? 02? 14:12, Kishon Vijay Abraham I wrote:
-> 
-> 
-> On Monday 17 July 2017 06:50 AM, Chanwoo Choi wrote:
->> This patch uses the resource-managed extcon API for extcon_register_notifier()
->> and replaces the deprecated extcon API as following:
->> - extcon_get_cable_state_() -> extcon_get_state()
->> - extcon_set_cable_state_() -> extcon_set_state_sync()
->>
->> Cc: linux-rockchip at lists.infradead.org
->> acked-by: Kishon Vijay Abraham I <kishon@ti.com>
->   ^
-> should be 'A' here.
+Fixes: 626a630e003c ("phy-sun4i-usb: Add support for the host usb-phys
+		      found on the H3 SoC")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-My mistake. I'll fix it.
-
-[snip]
-
+diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+index 005bc22938ff..893dd01dfe64 100644
+--- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
++++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
+@@ -17,18 +17,21 @@ Required properties:
+   * "phy_ctrl"
+   * "pmu0" for H3, V3s and A64
+   * "pmu1"
+-  * "pmu2" for sun4i, sun6i or sun7i
++  * "pmu2" for sun4i, sun6i, sun7i or sun8i-h3
++  * "pmu3" for sun8i-h3
+ - #phy-cells : from the generic phy bindings, must be 1
+ - clocks : phandle + clock specifier for the phy clocks
+ - clock-names :
+   * "usb_phy" for sun4i, sun5i or sun7i
+   * "usb0_phy", "usb1_phy" and "usb2_phy" for sun6i
+   * "usb0_phy", "usb1_phy" for sun8i
++  * "usb0_phy", "usb1_phy", "usb2_phy" and "usb3_phy" for sun8i-h3
+ - resets : a list of phandle + reset specifier pairs
+ - reset-names :
+   * "usb0_reset"
+   * "usb1_reset"
+-  * "usb2_reset" for sun4i, sun6i or sun7i
++  * "usb2_reset" for sun4i, sun6i, sun7i or sun8i-h3
++  * "usb3_reset" for sun8i-h3
+ 
+ Optional properties:
+ - usb0_id_det-gpios : gpio phandle for reading the otg id pin value
+@@ -37,6 +40,7 @@ Optional properties:
+ - usb0_vbus-supply : regulator phandle for controller usb0 vbus
+ - usb1_vbus-supply : regulator phandle for controller usb1 vbus
+ - usb2_vbus-supply : regulator phandle for controller usb2 vbus
++- usb3_vbus-supply : regulator phandle for controller usb3 vbus
+ 
+ Example:
+ 	usbphy: phy at 0x01c13400 {
 -- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+2.13.3
