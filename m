@@ -1,67 +1,43 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 3 Aug 2017 15:43:04 +0800
-Subject: [PATCH] serial: 8250_of: Add basic PM runtime support
-In-Reply-To: <20170802163218.14377-1-fcooper@ti.com>
-Message-ID: <201708031530.elCfGZbv%fengguang.wu@intel.com>
+From: horia.geanta@nxp.com (=?iso-8859-2?Q?Horia_Geant=E3?=)
+Date: Thu, 3 Aug 2017 08:07:04 +0000
+Subject: [PATCH 0/4] crypto: caam - add Job Ring support for DPAA2 parts
+References: <20170718153050.15330-1-horia.geanta@nxp.com>
+ <20170725132129.GB29754@dragon>
+ <VI1PR0401MB2591E386907CD8EA92DED08498B80@VI1PR0401MB2591.eurprd04.prod.outlook.com>
+ <20170725135000.GC29754@dragon>
+Message-ID: <VI1PR0401MB2591CA6951BDA1C4F5834D9F98B10@VI1PR0401MB2591.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Franklin,
+On 7/25/2017 4:50 PM, Shawn Guo wrote:
+> On Tue, Jul 25, 2017 at 01:31:52PM +0000, Horia Geant? wrote:
+>> On 7/25/2017 4:22 PM, Shawn Guo wrote:
+>>> On Tue, Jul 18, 2017 at 06:30:46PM +0300, Horia Geant? wrote:
+>>>> This patch set adds support for CAAM's legacy Job Ring backend / interface
+>>>> on platforms having DPAA2 (Datapath Acceleration Architecture v2), like
+>>>> LS1088A or LS2088A.
+>>>>
+>>>> I would like to get the DT patches through the crypto list (to make sure
+>>>> they don't end up merged before driver support).
+>>>
+>>> Unless it's really urgent (usually critical bug fix), the DTS patches
+>>> should go through arm-soc tree.  We usually take DTS patches after the
+>>> driver counterpart has been accepted by subsystem maintainers, or in the
+>>> best case, has landed on mainline.
+>>
+>> Thanks for the clarification.
+>>
+>> Do I have to re-post the DTS patches once the driver is accepted or a
+>> ping should suffice or...?
+> 
+> A ping is sufficient.
 
-[auto build test ERROR on tty/tty-testing]
-[also build test ERROR on next-20170802]
-[cannot apply to v4.13-rc3]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Shawn,
 
-url:    https://github.com/0day-ci/linux/commits/Franklin-S-Cooper-Jr/serial-8250_of-Add-basic-PM-runtime-support/20170803-151414
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
-config: sparc64-allmodconfig (attached as .config)
-compiler: sparc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=sparc64 
+Driver support (patch 1/4) has just been applied to the cryptodev-2.6 tree:
+297b9cebd2fc crypto: caam/jr - add support for DPAA2 parts
 
-All errors (new ones prefixed by >>):
+Could you please pick up the DTS patches (2-4/4) in this series?
 
-   drivers/tty//serial/8250/8250_of.c: In function 'of_serial_suspend':
->> drivers/tty//serial/8250/8250_of.c:273:24: error: 'ofdev' undeclared (first use in this function)
-      pm_runtime_put_sync(&ofdev->dev);
-                           ^~~~~
-   drivers/tty//serial/8250/8250_of.c:273:24: note: each undeclared identifier is reported only once for each function it appears in
-   drivers/tty//serial/8250/8250_of.c: In function 'of_serial_resume':
-   drivers/tty//serial/8250/8250_of.c:286:24: error: 'ofdev' undeclared (first use in this function)
-      pm_runtime_get_sync(&ofdev->dev);
-                           ^~~~~
-
-vim +/ofdev +273 drivers/tty//serial/8250/8250_of.c
-
-   262	
-   263	#ifdef CONFIG_PM_SLEEP
-   264	static int of_serial_suspend(struct device *dev)
-   265	{
-   266		struct of_serial_info *info = dev_get_drvdata(dev);
-   267		struct uart_8250_port *port8250 = serial8250_get_port(info->line);
-   268		struct uart_port *port = &port8250->port;
-   269	
-   270		serial8250_suspend_port(info->line);
-   271	
-   272		if ((!uart_console(port) || console_suspend_enabled)) {
- > 273			pm_runtime_put_sync(&ofdev->dev);
-   274			clk_disable_unprepare(info->clk);
-   275		}
-   276		return 0;
-   277	}
-   278	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 51285 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170803/57cf4453/attachment-0001.gz>
+Thanks,
+Horia
