@@ -1,59 +1,55 @@
 From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Thu,  3 Aug 2017 17:23:50 -0400
-Subject: [v5 12/15] mm: explicitly zero pagetable memory
+Date: Thu,  3 Aug 2017 17:23:46 -0400
+Subject: [v5 08/15] mm: zero struct pages during initialization
 In-Reply-To: <1501795433-982645-1-git-send-email-pasha.tatashin@oracle.com>
 References: <1501795433-982645-1-git-send-email-pasha.tatashin@oracle.com>
-Message-ID: <1501795433-982645-13-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <1501795433-982645-9-git-send-email-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Soon vmemmap_alloc_block() will no longer zero the block, so zero memory
-at its call sites for everything except struct pages.  Struct page memory
-is zero'd by struct page initialization.
+Add struct page zeroing as a part of initialization of other fields in
+__init_single_page().
 
 Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
 Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
 Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
 Reviewed-by: Bob Picco <bob.picco@oracle.com>
 ---
- mm/sparse-vmemmap.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ include/linux/mm.h | 9 +++++++++
+ mm/page_alloc.c    | 1 +
+ 2 files changed, 10 insertions(+)
 
-diff --git a/mm/sparse-vmemmap.c b/mm/sparse-vmemmap.c
-index c50b1a14d55e..d40c721ab19f 100644
---- a/mm/sparse-vmemmap.c
-+++ b/mm/sparse-vmemmap.c
-@@ -191,6 +191,7 @@ pmd_t * __meminit vmemmap_pmd_populate(pud_t *pud, unsigned long addr, int node)
- 		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
- 		if (!p)
- 			return NULL;
-+		memset(p, 0, PAGE_SIZE);
- 		pmd_populate_kernel(&init_mm, pmd, p);
- 	}
- 	return pmd;
-@@ -203,6 +204,7 @@ pud_t * __meminit vmemmap_pud_populate(p4d_t *p4d, unsigned long addr, int node)
- 		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
- 		if (!p)
- 			return NULL;
-+		memset(p, 0, PAGE_SIZE);
- 		pud_populate(&init_mm, pud, p);
- 	}
- 	return pud;
-@@ -215,6 +217,7 @@ p4d_t * __meminit vmemmap_p4d_populate(pgd_t *pgd, unsigned long addr, int node)
- 		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
- 		if (!p)
- 			return NULL;
-+		memset(p, 0, PAGE_SIZE);
- 		p4d_populate(&init_mm, p4d, p);
- 	}
- 	return p4d;
-@@ -227,6 +230,7 @@ pgd_t * __meminit vmemmap_pgd_populate(unsigned long addr, int node)
- 		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
- 		if (!p)
- 			return NULL;
-+		memset(p, 0, PAGE_SIZE);
- 		pgd_populate(&init_mm, pgd, p);
- 	}
- 	return pgd;
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index 46b9ac5e8569..183ac5e733db 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -94,6 +94,15 @@ extern int mmap_rnd_compat_bits __read_mostly;
+ #endif
+ 
+ /*
++ * On some architectures it is expensive to call memset() for small sizes.
++ * Those architectures should provide their own implementation of "struct page"
++ * zeroing by defining this macro in <asm/pgtable.h>.
++ */
++#ifndef mm_zero_struct_page
++#define mm_zero_struct_page(pp)  ((void)memset((pp), 0, sizeof(struct page)))
++#endif
++
++/*
+  * Default maximum number of active map areas, this limits the number of vmas
+  * per mm struct. Users can overwrite this number by sysctl but there is a
+  * problem.
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 05110ae50aca..cbcdd53ad9f8 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -1168,6 +1168,7 @@ static void free_one_page(struct zone *zone,
+ static void __meminit __init_single_page(struct page *page, unsigned long pfn,
+ 				unsigned long zone, int nid)
+ {
++	mm_zero_struct_page(page);
+ 	set_page_links(page, zone, nid, pfn);
+ 	init_page_count(page);
+ 	page_mapcount_reset(page);
 -- 
 2.13.4
