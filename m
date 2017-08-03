@@ -1,112 +1,79 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 03 Aug 2017 14:23:32 +0200
-Subject: [PATCH] arm64: dts: marvell: Fully re-order nodes in Marvell
- CP110 dtsi files
-In-Reply-To: <20170718144224.7228-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Tue, 18 Jul 2017 16:42:24 +0200")
-References: <20170718144224.7228-1-gregory.clement@free-electrons.com>
-Message-ID: <87y3r096wr.fsf@free-electrons.com>
+Date: Thu, 03 Aug 2017 14:26:19 +0200
+Subject: [PATCH] arm64: defconfig: enable fine-grained task level IRQ time
+ accounting
+In-Reply-To: <1501532531-4499-1-git-send-email-mw@semihalf.com> (Marcin
+ Wojtas's message of "Mon, 31 Jul 2017 22:22:11 +0200")
+References: <1501532531-4499-1-git-send-email-mw@semihalf.com>
+Message-ID: <87tw1o96s4.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Marcin,
  
- On mar., juil. 18 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+ On lun., juil. 31 2017, Marcin Wojtas <mw@semihalf.com> wrote:
 
-> Since the introduction of the CP110 dt files, the sata node was
-> misplaced. Move it at the right place. Thanks to this, the files are
-> completely ordered.
+> Tests showed, that under certain conditions, the summary number of jiffies
+> spent on softirq/idle, which are counted by system statistics can be even
+> below 10% of expected value, resulting in false load presentation.
 >
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> The issue was observed on the quad-core Marvell Armada 8k SoC, whose two
+> 10G ports were bound into L2 bridge. Load was controlled by bidirectional
+> UDP traffic, produced by a packet generator. Under such condition,
+> the dominant load is softirq. With 100% single CPU occupation or without
+> any activity (all CPUs 100% idle), total number of jiffies is 10000 (2500
+> per each core) in 10s interval. Also with other kind of load this was
+> true.
+>
+> However below a saturation threshold it was observed, that with CPU which
+> was occupied almost by softirqs only, the statistic were awkward. See
+> the mpstat output:
+>
+> CPU %usr %nice %sys %iowait %irq %soft %steal %guest %gnice %idle
+> all 0.00  0.00 0.13    0.00 0.00  0.55   0.00   0.00   0.00 99.32
+>   0 0.00  0.00 0.00    0.00 0.00 23.08   0.00   0.00   0.00 76.92
+>   1 0.00  0.00 0.40    0.00 0.00  0.00   0.00   0.00   0.00 99.60
+>   2 0.00  0.00 0.00    0.00 0.00  0.00   0.00   0.00   0.00 100.00
+>   3 0.00  0.00 0.00    0.00 0.00  0.00   0.00   0.00   0.00 100.00
+>
+> Above would mean basically no total load, debug CPU0 occupied in 25%.
+> Raw statistics, printed every 10s from /proc/stat unveiled a root
+> cause - summary idle/softirq jiffies on loaded CPU were below 200,
+> i.e. over 90% samples lost. All problems were gone after enabling
+> fine granulity IRQ time accounting.
+>
+> This patch fixes possible wrong statistics processing by enabling
+> CONFIG_IRQ_TIME_ACCOUNTING for arm64 platfroms, which is by
+> default done on other architectures, e.g. x86 and arm. Tests
+> showed no noticeable performance penalty, nor stability impact.
+>
+> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 
-Applied on mvebu/dt64
+Applied on mvebu/arm64
+
+Thanks,
 
 Gregory
+
 > ---
->  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 18 +++++++++---------
->  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 18 +++++++++---------
->  2 files changed, 18 insertions(+), 18 deletions(-)
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 >
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> index 394e54d37fff..1acd6a92d1a7 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> @@ -162,15 +162,6 @@
->  				};
->  			};
->  
-> -			cpm_sata0: sata at 540000 {
-> -				compatible = "marvell,armada-8k-ahci",
-> -					     "generic-ahci";
-> -				reg = <0x540000 0x30000>;
-> -				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&cpm_clk 1 15>;
-> -				status = "disabled";
-> -			};
-> -
->  			cpm_usb3_0: usb3 at 500000 {
->  				compatible = "marvell,armada-8k-xhci",
->  					     "generic-xhci";
-> @@ -191,6 +182,15 @@
->  				status = "disabled";
->  			};
->  
-> +			cpm_sata0: sata at 540000 {
-> +				compatible = "marvell,armada-8k-ahci",
-> +					     "generic-ahci";
-> +				reg = <0x540000 0x30000>;
-> +				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&cpm_clk 1 15>;
-> +				status = "disabled";
-> +			};
-> +
->  			cpm_xor0: xor at 6a0000 {
->  				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
->  				reg = <0x6a0000 0x1000>,
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index 2e6422a66d76..a21814855799 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -163,15 +163,6 @@
->  
->  			};
->  
-> -			cps_sata0: sata at 540000 {
-> -				compatible = "marvell,armada-8k-ahci",
-> -					     "generic-ahci";
-> -				reg = <0x540000 0x30000>;
-> -				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
-> -				clocks = <&cps_clk 1 15>;
-> -				status = "disabled";
-> -			};
-> -
->  			cps_usb3_0: usb3 at 500000 {
->  				compatible = "marvell,armada-8k-xhci",
->  					     "generic-xhci";
-> @@ -192,6 +183,15 @@
->  				status = "disabled";
->  			};
->  
-> +			cps_sata0: sata at 540000 {
-> +				compatible = "marvell,armada-8k-ahci",
-> +					     "generic-ahci";
-> +				reg = <0x540000 0x30000>;
-> +				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&cps_clk 1 15>;
-> +				status = "disabled";
-> +			};
-> +
->  			cps_xor0: xor at 6a0000 {
->  				compatible = "marvell,armada-7k-xor", "marvell,xor-v2";
->  				reg = <0x6a0000 0x1000>,
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 44423e6..ed51ac6 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -3,6 +3,7 @@ CONFIG_POSIX_MQUEUE=y
+>  CONFIG_AUDIT=y
+>  CONFIG_NO_HZ_IDLE=y
+>  CONFIG_HIGH_RES_TIMERS=y
+> +CONFIG_IRQ_TIME_ACCOUNTING=y
+>  CONFIG_BSD_PROCESS_ACCT=y
+>  CONFIG_BSD_PROCESS_ACCT_V3=y
+>  CONFIG_TASKSTATS=y
 > -- 
-> 2.13.2
+> 1.8.3.1
 >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
 Gregory Clement, Free Electrons
