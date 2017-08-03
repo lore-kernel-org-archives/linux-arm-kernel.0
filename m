@@ -1,456 +1,160 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu,  3 Aug 2017 17:23:23 +0100
-Subject: [PATCH 5/5] arm64: neon: Remove support for nested or hardirq
- kernel-mode NEON
+Date: Thu,  3 Aug 2017 17:23:22 +0100
+Subject: [PATCH 4/5] arm64: neon: Allow EFI runtime services to use FPSIMD in
+ irq context
 In-Reply-To: <1501777403-9782-1-git-send-email-Dave.Martin@arm.com>
 References: <1501777403-9782-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1501777403-9782-6-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1501777403-9782-5-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support for kernel-mode NEON to be nested and/or used in hardirq
-context adds significant complexity, and the benefits may be
-marginal.  In practice, kernel-mode NEON is not used in hardirq
-context, and is rarely used in softirq context (by certain mac80211
-drivers).
+In order to be able to cope with kernel-mode NEON being unavailable
+in hardirq/nmi context and non-nestable, we need special handling
+for EFI runtime service calls that may be made during an interrupt
+that interrupted a kernel_neon_begin()..._end() block.  This will
+occur if the kernel tries to write diagnostic data to EFI
+persistent storage during a panic triggered by an NMI for example.
 
-This patch implements an arm64 may_use_simd() function to allow
-clients to check whether kernel-mode NEON is usable in the current
-context, and simplifies kernel_neon_{begin,end}() to handle only
-saving of the task FPSIMD state (if any).  Without nesting, there
-is no other state to save.
+EFI runtime services specify an ABI that clobbers the FPSIMD state,
+rather than being able to use it optionally as an accelerator.
+This means that EFI is really a special case and can be handled
+specially.
 
-The partial fpsimd save/restore functions become redundant as a
-result of these changes, so they are removed too.
-
-The save/restore model is changed to operate directly on
-task_struct without additional percpu storage.  This simplifies the
-code and saves a bit of memory, but means that softirqs must now be
-disabled when manipulating the task fpsimd state from task context:
-correspondingly, preempt_{en,dis}sable() calls are upgraded to
-local_bh_{en,dis}able() as appropriate.  fpsimd_thread_switch()
-already runs with hardirqs disabled and so is already protected
-from softirqs.
-
-These changes should make it easier to support kernel-mode NEON in
-the presence of the Scalable Vector extension in the future.
+To enable EFI calls from interrupts, this patch creates dedicated
+__efi_fpsimd_{begin,end}() helpers solely for this purpose, which
+save/restore to a separate percpu buffer if called in a context
+where kernel_neon_begin() is not usable.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/fpsimd.h       |  14 -----
- arch/arm64/include/asm/fpsimdmacros.h |  56 -----------------
- arch/arm64/include/asm/neon.h         |   4 +-
- arch/arm64/include/asm/simd.h         |  33 +++++++++-
- arch/arm64/kernel/entry-fpsimd.S      |  24 -------
- arch/arm64/kernel/fpsimd.c            | 115 +++++++++++++++++++++++-----------
- 6 files changed, 111 insertions(+), 135 deletions(-)
+ arch/arm64/include/asm/efi.h    |  5 ++--
+ arch/arm64/include/asm/fpsimd.h |  4 ++++
+ arch/arm64/kernel/fpsimd.c      | 52 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 59 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index 8f3043a..8358222 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -3,6 +3,7 @@
+ 
+ #include <asm/boot.h>
+ #include <asm/cpufeature.h>
++#include <asm/fpsimd.h>
+ #include <asm/io.h>
+ #include <asm/mmu_context.h>
+ #include <asm/neon.h>
+@@ -20,8 +21,8 @@ int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
+ 
+ #define arch_efi_call_virt_setup()					\
+ ({									\
+-	kernel_neon_begin();						\
+ 	efi_virtmap_load();						\
++	__efi_fpsimd_begin();						\
+ })
+ 
+ #define arch_efi_call_virt(p, f, args...)				\
+@@ -33,8 +34,8 @@ int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
+ 
+ #define arch_efi_call_virt_teardown()					\
+ ({									\
++	__efi_fpsimd_end();						\
+ 	efi_virtmap_unload();						\
+-	kernel_neon_end();						\
+ })
+ 
+ #define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
 diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-index 5155f21..410c481 100644
+index 50f559f..5155f21 100644
 --- a/arch/arm64/include/asm/fpsimd.h
 +++ b/arch/arm64/include/asm/fpsimd.h
-@@ -41,16 +41,6 @@ struct fpsimd_state {
- 	unsigned int cpu;
- };
+@@ -81,6 +81,10 @@ extern void fpsimd_save_partial_state(struct fpsimd_partial_state *state,
+ 				      u32 num_regs);
+ extern void fpsimd_load_partial_state(struct fpsimd_partial_state *state);
  
--/*
-- * Struct for stacking the bottom 'n' FP/SIMD registers.
-- */
--struct fpsimd_partial_state {
--	u32		fpsr;
--	u32		fpcr;
--	u32		num_regs;
--	__uint128_t	vregs[32];
--};
--
- 
- #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
- /* Masks for extracting the FPSR and FPCR from the FPSCR */
-@@ -77,10 +67,6 @@ extern void fpsimd_update_current_state(struct fpsimd_state *state);
- 
- extern void fpsimd_flush_task_state(struct task_struct *target);
- 
--extern void fpsimd_save_partial_state(struct fpsimd_partial_state *state,
--				      u32 num_regs);
--extern void fpsimd_load_partial_state(struct fpsimd_partial_state *state);
--
- /* For use by EFI runtime services calls only */
- extern void __efi_fpsimd_begin(void);
- extern void __efi_fpsimd_end(void);
-diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
-index a2daf12..0f5fdd3 100644
---- a/arch/arm64/include/asm/fpsimdmacros.h
-+++ b/arch/arm64/include/asm/fpsimdmacros.h
-@@ -75,59 +75,3 @@
- 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
- 	fpsimd_restore_fpcr x\tmpnr, \state
- .endm
--
--.macro fpsimd_save_partial state, numnr, tmpnr1, tmpnr2
--	mrs	x\tmpnr1, fpsr
--	str	w\numnr, [\state, #8]
--	mrs	x\tmpnr2, fpcr
--	stp	w\tmpnr1, w\tmpnr2, [\state]
--	adr	x\tmpnr1, 0f
--	add	\state, \state, x\numnr, lsl #4
--	sub	x\tmpnr1, x\tmpnr1, x\numnr, lsl #1
--	br	x\tmpnr1
--	stp	q30, q31, [\state, #-16 * 30 - 16]
--	stp	q28, q29, [\state, #-16 * 28 - 16]
--	stp	q26, q27, [\state, #-16 * 26 - 16]
--	stp	q24, q25, [\state, #-16 * 24 - 16]
--	stp	q22, q23, [\state, #-16 * 22 - 16]
--	stp	q20, q21, [\state, #-16 * 20 - 16]
--	stp	q18, q19, [\state, #-16 * 18 - 16]
--	stp	q16, q17, [\state, #-16 * 16 - 16]
--	stp	q14, q15, [\state, #-16 * 14 - 16]
--	stp	q12, q13, [\state, #-16 * 12 - 16]
--	stp	q10, q11, [\state, #-16 * 10 - 16]
--	stp	q8, q9, [\state, #-16 * 8 - 16]
--	stp	q6, q7, [\state, #-16 * 6 - 16]
--	stp	q4, q5, [\state, #-16 * 4 - 16]
--	stp	q2, q3, [\state, #-16 * 2 - 16]
--	stp	q0, q1, [\state, #-16 * 0 - 16]
--0:
--.endm
--
--.macro fpsimd_restore_partial state, tmpnr1, tmpnr2
--	ldp	w\tmpnr1, w\tmpnr2, [\state]
--	msr	fpsr, x\tmpnr1
--	fpsimd_restore_fpcr x\tmpnr2, x\tmpnr1
--	adr	x\tmpnr1, 0f
--	ldr	w\tmpnr2, [\state, #8]
--	add	\state, \state, x\tmpnr2, lsl #4
--	sub	x\tmpnr1, x\tmpnr1, x\tmpnr2, lsl #1
--	br	x\tmpnr1
--	ldp	q30, q31, [\state, #-16 * 30 - 16]
--	ldp	q28, q29, [\state, #-16 * 28 - 16]
--	ldp	q26, q27, [\state, #-16 * 26 - 16]
--	ldp	q24, q25, [\state, #-16 * 24 - 16]
--	ldp	q22, q23, [\state, #-16 * 22 - 16]
--	ldp	q20, q21, [\state, #-16 * 20 - 16]
--	ldp	q18, q19, [\state, #-16 * 18 - 16]
--	ldp	q16, q17, [\state, #-16 * 16 - 16]
--	ldp	q14, q15, [\state, #-16 * 14 - 16]
--	ldp	q12, q13, [\state, #-16 * 12 - 16]
--	ldp	q10, q11, [\state, #-16 * 10 - 16]
--	ldp	q8, q9, [\state, #-16 * 8 - 16]
--	ldp	q6, q7, [\state, #-16 * 6 - 16]
--	ldp	q4, q5, [\state, #-16 * 4 - 16]
--	ldp	q2, q3, [\state, #-16 * 2 - 16]
--	ldp	q0, q1, [\state, #-16 * 0 - 16]
--0:
--.endm
-diff --git a/arch/arm64/include/asm/neon.h b/arch/arm64/include/asm/neon.h
-index 5368bd0..fb9d137 100644
---- a/arch/arm64/include/asm/neon.h
-+++ b/arch/arm64/include/asm/neon.h
-@@ -16,9 +16,7 @@
- 
- #define cpu_has_neon()		system_supports_fpsimd()
- 
--#define kernel_neon_begin()	kernel_neon_begin_partial(32)
--
--void kernel_neon_begin_partial(u32 num_regs);
-+void kernel_neon_begin(void);
- void kernel_neon_end(void);
- 
- #endif /* ! __ASM_NEON_H */
-diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
-index 96959b5..5a1a927 100644
---- a/arch/arm64/include/asm/simd.h
-+++ b/arch/arm64/include/asm/simd.h
-@@ -9,15 +9,46 @@
- #ifndef __ASM_SIMD_H
- #define __ASM_SIMD_H
- 
-+#include <linux/compiler.h>
-+#include <linux/percpu.h>
-+#include <linux/preempt.h>
- #include <linux/types.h>
- 
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+
-+DECLARE_PER_CPU(bool, kernel_neon_busy);
-+
- /*
-  * may_use_simd - whether it is allowable at this time to issue SIMD
-  *                instructions or access the SIMD register file
-+ *
-+ * Callers must not assume that the result remains true beyond the next
-+ * preempt_enable() or return from softirq context.
-  */
- static __must_check inline bool may_use_simd(void)
- {
--	return true;
-+	/*
-+	 * The raw_cpu_read() is racy if called with preemption enabled.
-+	 * This is not a bug: kernel_neon_busy is only set when
-+	 * preemption is disabled, so we cannot migrate to another CPU
-+	 * while it is set, nor can we migrate to a CPU where it is set.
-+	 * So, if we find it clear on some CPU then we're guaranteed to
-+	 * find it clear on any CPU we could migrate to.
-+	 *
-+	 * If we are in between kernel_neon_begin()...kernel_neon_end(),
-+	 * the flag will be set, but preemption is also disabled, so we
-+	 * can't migrate to another CPU and spuriously see it become
-+	 * false.
-+	 */
-+	return !in_irq() && !in_nmi() && !raw_cpu_read(kernel_neon_busy);
- }
- 
-+#else /* ! CONFIG_KERNEL_MODE_NEON */
-+
-+static __must_check inline bool may_use_simd(void) {
-+	return false;
-+}
-+
-+#endif /* ! CONFIG_KERNEL_MODE_NEON */
++/* For use by EFI runtime services calls only */
++extern void __efi_fpsimd_begin(void);
++extern void __efi_fpsimd_end(void);
 +
  #endif
-diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
-index c44a82f..6a27cd6 100644
---- a/arch/arm64/kernel/entry-fpsimd.S
-+++ b/arch/arm64/kernel/entry-fpsimd.S
-@@ -41,27 +41,3 @@ ENTRY(fpsimd_load_state)
- 	fpsimd_restore x0, 8
- 	ret
- ENDPROC(fpsimd_load_state)
--
--#ifdef CONFIG_KERNEL_MODE_NEON
--
--/*
-- * Save the bottom n FP registers.
-- *
-- * x0 - pointer to struct fpsimd_partial_state
-- */
--ENTRY(fpsimd_save_partial_state)
--	fpsimd_save_partial x0, 1, 8, 9
--	ret
--ENDPROC(fpsimd_save_partial_state)
--
--/*
-- * Load the bottom n FP registers.
-- *
-- * x0 - pointer to struct fpsimd_partial_state
-- */
--ENTRY(fpsimd_load_partial_state)
--	fpsimd_restore_partial x0, 8, 9
--	ret
--ENDPROC(fpsimd_load_partial_state)
--
--#endif
+ 
+ #endif
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index bcde88e..138fcfa 100644
+index d7e5f8a..bcde88e 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -17,18 +17,18 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/bottom_half.h>
- #include <linux/cpu.h>
+@@ -21,12 +21,15 @@
  #include <linux/cpu_pm.h>
  #include <linux/kernel.h>
  #include <linux/init.h>
-+#include <linux/percpu.h>
- #include <linux/preempt.h>
++#include <linux/preempt.h>
  #include <linux/sched/signal.h>
  #include <linux/signal.h>
--#include <linux/hardirq.h>
+ #include <linux/hardirq.h>
  
  #include <asm/fpsimd.h>
  #include <asm/cputype.h>
--#include <asm/neon.h>
- #include <asm/simd.h>
++#include <asm/neon.h>
++#include <asm/simd.h>
  
  #define FPEXC_IOF	(1 << 0)
-@@ -65,6 +65,13 @@
-  * CPU currently contain the most recent userland FPSIMD state of the current
-  * task.
-  *
-+ * In order to allow softirq handlers to use FPSIMD, kernel_neon_begin() may
-+ * save the task's FPSIMD context back to task_struct from softirq context.
-+ * To prevent this from racing with the manipulation of the task's FPSIMD state
-+ * from task context and thereby corrupting the state, it is necessary to
-+ * protect any manipulation of a task's fpsimd_state or TIF_FOREIGN_FPSTATE
-+ * flag with local_bh_disable() unless softirqs are already masked.
-+ *
-  * For a certain task, the sequence may look something like this:
-  * - the task gets scheduled in; if both the task's fpsimd_state.cpu field
-  *   contains the id of the current CPU, and the CPU's fpsimd_last_state per-cpu
-@@ -164,9 +171,14 @@ void fpsimd_flush_thread(void)
- {
- 	if (!system_supports_fpsimd())
- 		return;
-+
-+	local_bh_disable();
-+
- 	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
- 	fpsimd_flush_task_state(current);
- 	set_thread_flag(TIF_FOREIGN_FPSTATE);
-+
-+	local_bh_enable();
- }
- 
- /*
-@@ -177,10 +189,13 @@ void fpsimd_preserve_current_state(void)
- {
- 	if (!system_supports_fpsimd())
- 		return;
--	preempt_disable();
-+
-+	local_bh_disable();
-+
- 	if (!test_thread_flag(TIF_FOREIGN_FPSTATE))
- 		fpsimd_save_state(&current->thread.fpsimd_state);
--	preempt_enable();
-+
-+	local_bh_enable();
- }
- 
- /*
-@@ -192,7 +207,9 @@ void fpsimd_restore_current_state(void)
- {
- 	if (!system_supports_fpsimd())
- 		return;
--	preempt_disable();
-+
-+	local_bh_disable();
-+
- 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
- 		struct fpsimd_state *st = &current->thread.fpsimd_state;
- 
-@@ -200,7 +217,8 @@ void fpsimd_restore_current_state(void)
- 		__this_cpu_write(fpsimd_last_state, st);
- 		st->cpu = smp_processor_id();
- 	}
--	preempt_enable();
-+
-+	local_bh_enable();
- }
- 
- /*
-@@ -212,7 +230,9 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
- {
- 	if (!system_supports_fpsimd())
- 		return;
--	preempt_disable();
-+
-+	local_bh_disable();
-+
- 	fpsimd_load_state(state);
- 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
- 		struct fpsimd_state *st = &current->thread.fpsimd_state;
-@@ -220,7 +240,8 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
- 		__this_cpu_write(fpsimd_last_state, st);
- 		st->cpu = smp_processor_id();
- 	}
--	preempt_enable();
-+
-+	local_bh_enable();
- }
- 
- /*
-@@ -233,49 +254,69 @@ void fpsimd_flush_task_state(struct task_struct *t)
- 
- #ifdef CONFIG_KERNEL_MODE_NEON
- 
--static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
--static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
-+DEFINE_PER_CPU(bool, kernel_neon_busy);
- 
- /*
-  * Kernel-side NEON support functions
-  */
--void kernel_neon_begin_partial(u32 num_regs)
-+
-+/*
-+ * kernel_neon_begin(): obtain the CPU FPSIMD registers for use by the calling
-+ * context
-+ *
-+ * Must not be called unless may_use_simd() returns true.
-+ * Task context in the FPSIMD registers is saved back to memory as necessary.
-+ *
-+ * A matching call to kernel_neon_end() must be made before returning from the
-+ * calling context.
-+ *
-+ * The caller may freely use the FPSIMD registers until kernel_neon_end() is
-+ * called.
-+ */
-+void kernel_neon_begin(void)
- {
- 	if (WARN_ON(!system_supports_fpsimd()))
- 		return;
--	if (in_interrupt()) {
--		struct fpsimd_partial_state *s = this_cpu_ptr(
--			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
- 
--		BUG_ON(num_regs > 32);
--		fpsimd_save_partial_state(s, roundup(num_regs, 2));
--	} else {
--		/*
--		 * Save the userland FPSIMD state if we have one and if we
--		 * haven't done so already. Clear fpsimd_last_state to indicate
--		 * that there is no longer userland FPSIMD state in the
--		 * registers.
--		 */
--		preempt_disable();
--		if (current->mm &&
--		    !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
--			fpsimd_save_state(&current->thread.fpsimd_state);
--		this_cpu_write(fpsimd_last_state, NULL);
--	}
-+	BUG_ON(!may_use_simd());
-+
-+	local_bh_disable();
-+
-+	__this_cpu_write(kernel_neon_busy, true);
-+
-+	/* Save unsaved task fpsimd state, if any: */
-+	if (current->mm && !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
-+		fpsimd_save_state(&current->thread.fpsimd_state);
-+
-+	/* Invalidate any task state remaining in the fpsimd regs: */
-+	__this_cpu_write(fpsimd_last_state, NULL);
-+
-+	preempt_disable();
-+
-+	local_bh_enable();
- }
--EXPORT_SYMBOL(kernel_neon_begin_partial);
-+EXPORT_SYMBOL(kernel_neon_begin);
- 
-+/*
-+ * kernel_neon_end(): give the CPU FPSIMD registers back to the current task
-+ *
-+ * Must be called from a context in which kernel_neon_begin() was previously
-+ * called, with no call to kernel_neon_end() in the meantime.
-+ *
-+ * The caller must not use the FPSIMD registers after this function is called,
-+ * unless kernel_neon_begin() is called again in the meantime.
-+ */
- void kernel_neon_end(void)
- {
-+	bool busy;
-+
- 	if (!system_supports_fpsimd())
- 		return;
--	if (in_interrupt()) {
--		struct fpsimd_partial_state *s = this_cpu_ptr(
--			in_irq() ? &hardirq_fpsimdstate : &softirq_fpsimdstate);
--		fpsimd_load_partial_state(s);
--	} else {
--		preempt_enable();
--	}
-+
-+	busy = __this_cpu_xchg(kernel_neon_busy, false);
-+	WARN_ON(!busy);	/* No matching kernel_neon_begin()? */
-+
-+	preempt_enable();
+ #define FPEXC_DZF	(1 << 1)
+@@ -276,6 +279,55 @@ void kernel_neon_end(void)
  }
  EXPORT_SYMBOL(kernel_neon_end);
  
++DEFINE_PER_CPU(struct fpsimd_state, efi_fpsimd_state);
++DEFINE_PER_CPU(bool, efi_fpsimd_state_used);
++
++/*
++ * EFI runtime services support functions
++ *
++ * The ABI for EFI runtime services allows EFI to use FPSIMD during the call.
++ * This means that for EFI (and only for EFI), we have to assume that FPSIMD
++ * is always used rather than being an optional accelerator.
++ *
++ * These functions provide the necessary support for ensuring FPSIMD
++ * save/restore in the contexts from which EFI is used.
++ *
++ * Do not use them for any other purpose -- if tempted to do so, you are
++ * either doing something wrong or you need to propose some refactoring.
++ */
++
++/*
++ * __efi_fpsimd_begin(): prepare FPSIMD for making an EFI runtime services call
++ */
++void __efi_fpsimd_begin(void)
++{
++	if (!system_supports_fpsimd())
++		return;
++
++	WARN_ON(preemptible());
++
++	if (may_use_simd())
++		kernel_neon_begin();
++	else {
++		fpsimd_save_state(this_cpu_ptr(&efi_fpsimd_state));
++		__this_cpu_write(efi_fpsimd_state_used, true);
++	}
++}
++
++/*
++ * __efi_fpsimd_end(): clean up FPSIMD after an EFI runtime services call
++ */
++void __efi_fpsimd_end(void)
++{
++	if (!system_supports_fpsimd())
++		return;
++
++	if (__this_cpu_xchg(efi_fpsimd_state_used, false))
++		fpsimd_load_state(this_cpu_ptr(&efi_fpsimd_state));
++	else
++		kernel_neon_end();
++}
++
+ #endif /* CONFIG_KERNEL_MODE_NEON */
+ 
+ #ifdef CONFIG_CPU_PM
 -- 
 2.1.4
