@@ -1,30 +1,41 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 03 Aug 2017 15:16:31 -0700 (PDT)
-Subject: [PATCH net-next v2 0/7] net: mvpp2: add TX interrupts support
-In-Reply-To: <20170803084201.30305-1-thomas.petazzoni@free-electrons.com>
-References: <20170803084201.30305-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170803.151631.1327349080053900395.davem@davemloft.net>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 3 Aug 2017 17:32:18 -0500
+Subject: [PATCH 2/2] char: xilinx_hwicap: Fix warnings in the driver
+In-Reply-To: <79e2e616a8b7dbf38eb72ba0b620230017dcbc65.1501247838.git.michal.simek@xilinx.com>
+References: <6da0afe2afd2c7a21d16da9a9c7acab09385ae2c.1501247838.git.michal.simek@xilinx.com>
+ <79e2e616a8b7dbf38eb72ba0b620230017dcbc65.1501247838.git.michal.simek@xilinx.com>
+Message-ID: <20170803223218.ilryp5spqztsr3cz@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Date: Thu,  3 Aug 2017 10:41:54 +0200
+On Fri, Jul 28, 2017 at 03:17:26PM +0200, Michal Simek wrote:
+> From: Nava kishore Manne <nava.manne@xilinx.com>
+> 
+> This patch fixes the below warning
+>         --> Use #include <linux/io.h> instead of <asm/io.h>
+>         --> Use #include <linux/uaccess.h> instead of <asm/uaccess.h>
+>         --> please, no space before tabs
+>         --> Block comments use a trailing */ on a separate line
+>         --> Possible unnecessary 'out of memory' message
+>         --> Block comments use * on subsequent lines
+>         --> Block comments use a trailing */ on a separate line
+>         --> braces {} are not necessary for any arm of this statement
+>         --> DT compatible string "xlnx,opb-hwicap-1.00.b"
+> 	    appears un-documented
+>         --> DT compatible string "xlnx,xps-hwicap-1.00.a"
+>             appears un-documented
+> 
+> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+>  Documentation/devicetree/bindings/xilinx.txt |  2 ++
 
-> So far, the mvpp2 driver was using an hrtimer to handle TX
-> completion. This patch series adds support for using TX interrupts
-> (for each CPU) on PPv2.2, the variant of the IP used on Marvell Armada
-> 7K/8K.
-> 
-> Dave: this version can be applied right away, it no longer depends on
-> Antoine's patch series. Antoine series had some comments, so he will
-> have to respin later on. Therefore, let's merge this smaller patch
-> series first.
-> 
-> Changes since v1:
-> 
->  - Rebased on top of net-next, instead of on top of Antoine's series.
-> 
->  - Removed the Device Tree patch, as it shouldn't go through the net
->    tree.
+It's preferred to split bindings to separate patches. No need unless you 
+respin:
 
-Series applied.
+Acked-by: Rob Herring <robh@kernel.org>
+
+>  drivers/char/xilinx_hwicap/xilinx_hwicap.c   | 35 ++++++++++++++--------------
+>  drivers/char/xilinx_hwicap/xilinx_hwicap.h   |  6 +++--
+>  3 files changed, 23 insertions(+), 20 deletions(-)
