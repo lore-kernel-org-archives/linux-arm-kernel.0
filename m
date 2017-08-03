@@ -1,105 +1,163 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu,  3 Aug 2017 17:33:45 -0500
-Subject: [PATCH v3 1/6] drm/tinydrm: remove call to mipi_dbi_init() from
- mipi_dbi_spi_init()
+Date: Thu,  3 Aug 2017 17:33:46 -0500
+Subject: [PATCH v3 2/6] drm/tinydrm: generalize tinydrm_xrgb8888_to_gray8()
 In-Reply-To: <1501799630-1650-1-git-send-email-david@lechnology.com>
 References: <1501799630-1650-1-git-send-email-david@lechnology.com>
-Message-ID: <1501799630-1650-2-git-send-email-david@lechnology.com>
+Message-ID: <1501799630-1650-3-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This removes the call to mipi_dbi_init() from mipi_dbi_spi_init() so that
-drivers can have a driver-specific implementation if needed.
+This adds parameters for vaddr and clip to tinydrm_xrgb8888_to_gray8() to
+make it more generic.
 
-Suggested-by: Noralf Tr?nnes <noralf@tronnes.org>
+dma_buf_{begin,end}_cpu_access() are moved out to the repaper driver.
+
 Signed-off-by: David Lechner <david@lechnology.com>
-Reviewed-by: Noralf Tr?nnes <noralf@tronnes.org>
 ---
- drivers/gpu/drm/tinydrm/mi0283qt.c |  8 ++++++--
- drivers/gpu/drm/tinydrm/mipi-dbi.c | 17 +++++------------
- include/drm/tinydrm/mipi-dbi.h     |  6 +-----
- 3 files changed, 12 insertions(+), 19 deletions(-)
+ drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c | 35 ++++++++++----------------
+ drivers/gpu/drm/tinydrm/repaper.c              | 21 +++++++++++++++-
+ include/drm/tinydrm/tinydrm-helpers.h          |  3 ++-
+ 3 files changed, 35 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/gpu/drm/tinydrm/mi0283qt.c b/drivers/gpu/drm/tinydrm/mi0283qt.c
-index 482ff1c3..7e5bb7d 100644
---- a/drivers/gpu/drm/tinydrm/mi0283qt.c
-+++ b/drivers/gpu/drm/tinydrm/mi0283qt.c
-@@ -195,8 +195,12 @@ static int mi0283qt_probe(struct spi_device *spi)
- 
- 	device_property_read_u32(dev, "rotation", &rotation);
- 
--	ret = mipi_dbi_spi_init(spi, mipi, dc, &mi0283qt_pipe_funcs,
--				&mi0283qt_driver, &mi0283qt_mode, rotation);
-+	ret = mipi_dbi_spi_init(spi, mipi, dc);
-+	if (ret)
-+		return ret;
-+
-+	ret = mipi_dbi_init(&spi->dev, mipi, &mi0283qt_pipe_funcs,
-+			    &mi0283qt_driver, &mi0283qt_mode, rotation);
- 	if (ret)
- 		return ret;
- 
-diff --git a/drivers/gpu/drm/tinydrm/mipi-dbi.c b/drivers/gpu/drm/tinydrm/mipi-dbi.c
-index e10fa4b..cba9784 100644
---- a/drivers/gpu/drm/tinydrm/mipi-dbi.c
-+++ b/drivers/gpu/drm/tinydrm/mipi-dbi.c
-@@ -777,15 +777,12 @@ static int mipi_dbi_typec3_command(struct mipi_dbi *mipi, u8 cmd,
+diff --git a/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c b/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c
+index 75808bb..5915ba8 100644
+--- a/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c
++++ b/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c
+@@ -185,7 +185,9 @@ EXPORT_SYMBOL(tinydrm_xrgb8888_to_rgb565);
  /**
-  * mipi_dbi_spi_init - Initialize MIPI DBI SPI interfaced controller
-  * @spi: SPI device
-- * @dc: D/C gpio (optional)
-  * @mipi: &mipi_dbi structure to initialize
-- * @pipe_funcs: Display pipe functions
-- * @driver: DRM driver
-- * @mode: Display mode
-- * @rotation: Initial rotation in degrees Counter Clock Wise
-+ * @dc: D/C gpio (optional)
+  * tinydrm_xrgb8888_to_gray8 - Convert XRGB8888 to grayscale
+  * @dst: 8-bit grayscale destination buffer
++ * @vaddr: XRGB8888 source buffer
+  * @fb: DRM framebuffer
++ * @clip: Clip rectangle area to copy
   *
-  * This function sets &mipi_dbi->command, enables &mipi->read_commands for the
-- * usual read commands and initializes @mipi using mipi_dbi_init().
-+ * usual read commands. It should be followed by a call to mipi_dbi_init() or
-+ * a driver-specific init.
-  *
-  * If @dc is set, a Type C Option 3 interface is assumed, if not
-  * Type C Option 1.
-@@ -800,11 +797,7 @@ static int mipi_dbi_typec3_command(struct mipi_dbi *mipi, u8 cmd,
+  * Drm doesn't have native monochrome or grayscale support.
+  * Such drivers can announce the commonly supported XR24 format to userspace
+@@ -199,12 +201,11 @@ EXPORT_SYMBOL(tinydrm_xrgb8888_to_rgb565);
+  * Returns:
   * Zero on success, negative error code on failure.
   */
- int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
--		      struct gpio_desc *dc,
--		      const struct drm_simple_display_pipe_funcs *pipe_funcs,
--		      struct drm_driver *driver,
--		      const struct drm_display_mode *mode,
--		      unsigned int rotation)
-+		      struct gpio_desc *dc)
+-int tinydrm_xrgb8888_to_gray8(u8 *dst, struct drm_framebuffer *fb)
++int tinydrm_xrgb8888_to_gray8(u8 *dst, void *vaddr, struct drm_framebuffer *fb,
++			      struct drm_clip_rect *clip)
  {
- 	size_t tx_size = tinydrm_spi_max_transfer_size(spi, 0);
- 	struct device *dev = &spi->dev;
-@@ -850,7 +843,7 @@ int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
- 			return -ENOMEM;
+-	struct drm_gem_cma_object *cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
+-	struct dma_buf_attachment *import_attach = cma_obj->base.import_attach;
+-	unsigned int x, y, pitch = fb->pitches[0];
+-	int ret = 0;
++	unsigned int len = (clip->x2 - clip->x1) * sizeof(u32);
++	unsigned int x, y;
+ 	void *buf;
+ 	u32 *src;
+ 
+@@ -214,22 +215,16 @@ int tinydrm_xrgb8888_to_gray8(u8 *dst, struct drm_framebuffer *fb)
+ 	 * The cma memory is write-combined so reads are uncached.
+ 	 * Speed up by fetching one line at a time.
+ 	 */
+-	buf = kmalloc(pitch, GFP_KERNEL);
++	buf = kmalloc(len, GFP_KERNEL);
+ 	if (!buf)
+ 		return -ENOMEM;
+ 
+-	if (import_attach) {
+-		ret = dma_buf_begin_cpu_access(import_attach->dmabuf,
+-					       DMA_FROM_DEVICE);
+-		if (ret)
+-			goto err_free;
+-	}
+-
+-	for (y = 0; y < fb->height; y++) {
+-		src = cma_obj->vaddr + (y * pitch);
+-		memcpy(buf, src, pitch);
++	for (y = clip->y1; y < clip->y2; y++) {
++		src = vaddr + (y * fb->pitches[0]);
++		src += clip->x1;
++		memcpy(buf, src, len);
+ 		src = buf;
+-		for (x = 0; x < fb->width; x++) {
++		for (x = clip->x1; x < clip->x2; x++) {
+ 			u8 r = (*src & 0x00ff0000) >> 16;
+ 			u8 g = (*src & 0x0000ff00) >> 8;
+ 			u8 b =  *src & 0x000000ff;
+@@ -240,13 +235,9 @@ int tinydrm_xrgb8888_to_gray8(u8 *dst, struct drm_framebuffer *fb)
+ 		}
  	}
  
--	return mipi_dbi_init(dev, mipi, pipe_funcs, driver, mode, rotation);
+-	if (import_attach)
+-		ret = dma_buf_end_cpu_access(import_attach->dmabuf,
+-					     DMA_FROM_DEVICE);
+-err_free:
+ 	kfree(buf);
+ 
+-	return ret;
 +	return 0;
  }
- EXPORT_SYMBOL(mipi_dbi_spi_init);
+ EXPORT_SYMBOL(tinydrm_xrgb8888_to_gray8);
  
-diff --git a/include/drm/tinydrm/mipi-dbi.h b/include/drm/tinydrm/mipi-dbi.h
-index d137b16..83346dd 100644
---- a/include/drm/tinydrm/mipi-dbi.h
-+++ b/include/drm/tinydrm/mipi-dbi.h
-@@ -62,11 +62,7 @@ mipi_dbi_from_tinydrm(struct tinydrm_device *tdev)
- }
+diff --git a/drivers/gpu/drm/tinydrm/repaper.c b/drivers/gpu/drm/tinydrm/repaper.c
+index 3343d3f..d34cd9b 100644
+--- a/drivers/gpu/drm/tinydrm/repaper.c
++++ b/drivers/gpu/drm/tinydrm/repaper.c
+@@ -18,6 +18,7 @@
+  */
  
- int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
--		      struct gpio_desc *dc,
--		      const struct drm_simple_display_pipe_funcs *pipe_funcs,
--		      struct drm_driver *driver,
--		      const struct drm_display_mode *mode,
--		      unsigned int rotation);
-+		      struct gpio_desc *dc);
- int mipi_dbi_init(struct device *dev, struct mipi_dbi *mipi,
- 		  const struct drm_simple_display_pipe_funcs *pipe_funcs,
- 		  struct drm_driver *driver,
+ #include <linux/delay.h>
++#include <linux/dma-buf.h>
+ #include <linux/gpio/consumer.h>
+ #include <linux/module.h>
+ #include <linux/of_device.h>
+@@ -525,11 +526,20 @@ static int repaper_fb_dirty(struct drm_framebuffer *fb,
+ 			    struct drm_clip_rect *clips,
+ 			    unsigned int num_clips)
+ {
++	struct drm_gem_cma_object *cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
++	struct dma_buf_attachment *import_attach = cma_obj->base.import_attach;
+ 	struct tinydrm_device *tdev = fb->dev->dev_private;
+ 	struct repaper_epd *epd = epd_from_tinydrm(tdev);
++	struct drm_clip_rect clip;
+ 	u8 *buf = NULL;
+ 	int ret = 0;
+ 
++	/* repaper can't do partial updates */
++	clip.x1 = 0;
++	clip.x2 = fb->width;
++	clip.y1 = 0;
++	clip.y2 = fb->height;
++
+ 	mutex_lock(&tdev->dirty_lock);
+ 
+ 	if (!epd->enabled)
+@@ -550,7 +560,16 @@ static int repaper_fb_dirty(struct drm_framebuffer *fb,
+ 		goto out_unlock;
+ 	}
+ 
+-	ret = tinydrm_xrgb8888_to_gray8(buf, fb);
++	if (import_attach) {
++		ret = dma_buf_begin_cpu_access(import_attach->dmabuf,
++					       DMA_FROM_DEVICE);
++		if (ret)
++			goto out_unlock;
++	}
++
++	ret = tinydrm_xrgb8888_to_gray8(buf, cma_obj->vaddr, fb, &clip);
++	if (import_attach)
++		dma_buf_end_cpu_access(import_attach->dmabuf, DMA_FROM_DEVICE);
+ 	if (ret)
+ 		goto out_unlock;
+ 
+diff --git a/include/drm/tinydrm/tinydrm-helpers.h b/include/drm/tinydrm/tinydrm-helpers.h
+index a6c387f..9e13ef5 100644
+--- a/include/drm/tinydrm/tinydrm-helpers.h
++++ b/include/drm/tinydrm/tinydrm-helpers.h
+@@ -43,7 +43,8 @@ void tinydrm_swab16(u16 *dst, void *vaddr, struct drm_framebuffer *fb,
+ void tinydrm_xrgb8888_to_rgb565(u16 *dst, void *vaddr,
+ 				struct drm_framebuffer *fb,
+ 				struct drm_clip_rect *clip, bool swap);
+-int tinydrm_xrgb8888_to_gray8(u8 *dst, struct drm_framebuffer *fb);
++int tinydrm_xrgb8888_to_gray8(u8 *dst, void *vaddr, struct drm_framebuffer *fb,
++			      struct drm_clip_rect *clip);
+ 
+ struct backlight_device *tinydrm_of_find_backlight(struct device *dev);
+ int tinydrm_enable_backlight(struct backlight_device *backlight);
 -- 
 2.7.4
