@@ -1,32 +1,57 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 03 Aug 2017 14:23:29 -0700
-Subject: [PATCH V2 0/3] ARM: bcm283x: Raspberry Pi Zero W support
-In-Reply-To: <1501434634-2325-1-git-send-email-stefan.wahren@i2se.com>
-References: <1501434634-2325-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <87d18cxs4u.fsf@eliezer.anholt.net>
+From: pasha.tatashin@oracle.com (Pavel Tatashin)
+Date: Thu,  3 Aug 2017 17:23:52 -0400
+Subject: [v5 14/15] mm: optimize early system hash allocations
+In-Reply-To: <1501795433-982645-1-git-send-email-pasha.tatashin@oracle.com>
+References: <1501795433-982645-1-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <1501795433-982645-15-git-send-email-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+Clients can call alloc_large_system_hash() with flag: HASH_ZERO to specify
+that memory that was allocated for system hash needs to be zeroed,
+otherwise the memory does not need to be zeroed, and client will initialize
+it.
 
-> This patch series adds support for the Raspberry Pi Zero W. It depends
-> on "V2 ARM: dts: bcm283x: Move the BCM2837 DT contents from arm64 to arm."
->
-> Currently there is a regression [1] in the brcmfmac driver. This hack [2]
-> avoids the issue and make wifi probe on RPi Zero W.
->
-> Changes in V2:
-> - add aliases comment and gpio-line-names into bcm2835-rpi-zero-w.dts
-> - rebased on V2 of arm64 to arm patch
->
-> [1] - http://marc.info/?l=linux-wireless&m=150029709021719&w=2
-> [2] - https://github.com/lategoodbye/rpi-zero/commit/95ef5b8fbc05d9ec086970648767cafa10483622
+If memory does not need to be zero'd, call the new
+memblock_virt_alloc_raw() interface, and thus improve the boot performance.
 
-Reviewed and pushed to my dt-next, will try to get a PR out soon.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170803/d94a5ac2/attachment.sig>
+Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+Reviewed-by: Bob Picco <bob.picco@oracle.com>
+---
+ mm/page_alloc.c | 15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
+
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index cbcdd53ad9f8..53d16590dc01 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -7352,18 +7352,17 @@ void *__init alloc_large_system_hash(const char *tablename,
+ 
+ 	log2qty = ilog2(numentries);
+ 
+-	/*
+-	 * memblock allocator returns zeroed memory already, so HASH_ZERO is
+-	 * currently not used when HASH_EARLY is specified.
+-	 */
+ 	gfp_flags = (flags & HASH_ZERO) ? GFP_ATOMIC | __GFP_ZERO : GFP_ATOMIC;
+ 	do {
+ 		size = bucketsize << log2qty;
+-		if (flags & HASH_EARLY)
+-			table = memblock_virt_alloc_nopanic(size, 0);
+-		else if (hashdist)
++		if (flags & HASH_EARLY) {
++			if (flags & HASH_ZERO)
++				table = memblock_virt_alloc_nopanic(size, 0);
++			else
++				table = memblock_virt_alloc_raw(size, 0);
++		} else if (hashdist) {
+ 			table = __vmalloc(size, gfp_flags, PAGE_KERNEL);
+-		else {
++		} else {
+ 			/*
+ 			 * If bucketsize is not a power-of-two, we may free
+ 			 * some pages@the end of hash table which
+-- 
+2.13.4
