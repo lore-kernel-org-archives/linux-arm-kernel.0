@@ -1,83 +1,29 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 3 Aug 2017 12:47:50 -0500
-Subject: [PATCH] dt-bindings: mtd: add new compatible strings for mtk nor
- controller
-In-Reply-To: <1501726602.4381.23.camel@mhfsdcap03>
-References: <1500948617-19627-1-git-send-email-guochun.mao@mediatek.com>
- <1500948617-19627-2-git-send-email-guochun.mao@mediatek.com>
- <03016ea3-51ad-0b2d-e824-0a20913bd7c1@gmail.com>
- <20170802103637.16cd6548@bbrezillon>
- <535cc2d5-7bc9-2cb7-42cf-9d7058e64226@wedev4u.fr>
- <1501726602.4381.23.camel@mhfsdcap03>
-Message-ID: <20170803174750.bipdynhyyyozzjk6@rob-hp-laptop>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 3 Aug 2017 19:48:22 +0200
+Subject: [patch v1 0/2] JTAG driver introduction
+In-Reply-To: <AM4PR0501MB2194E6B8D14EC15356C1C0BFB1B10@AM4PR0501MB2194.eurprd05.prod.outlook.com>
+References: <1501679918-20486-1-git-send-email-oleksandrs@mellanox.com>
+ <20170802141209.GB25781@lunn.ch>
+ <AM4PR0501MB2194E6B8D14EC15356C1C0BFB1B10@AM4PR0501MB2194.eurprd05.prod.outlook.com>
+Message-ID: <20170803174822.GI15018@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 03, 2017 at 10:16:42AM +0800, Guochun Mao wrote:
-> Hi Cyrille,
+> Hi Andrew
 > 
-> On Wed, 2017-08-02 at 17:31 +0200, Cyrille Pitchen wrote:
-> > Hi Guochun,
-> > 
-> > Le 02/08/2017 ? 10:36, Boris Brezillon a ?crit :
-> > > Hi Matthias,
-> > > 
-> > > On Tue, 1 Aug 2017 14:33:22 +0200
-> > > Matthias Brugger <matthias.bgg@gmail.com> wrote:
-> > > 
-> > >> On 07/25/2017 04:10 AM, Guochun Mao wrote:
-> > >>> Add "mediatek,mt2712-nor" and "mediatek,mt7622-nor"
-> > >>> for nor flash node's compatible strings.
-> > >>>
-> > >>> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
-> > >>> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
-> > >>> ---
-> > >>>   .../devicetree/bindings/mtd/mtk-quadspi.txt        |    2 ++
-> > >>>   1 file changed, 2 insertions(+)
-> > >>>
-> > >>> diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > >>> index 5ded66a..9845ff4 100644
-> > >>> --- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > >>> +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > >>> @@ -3,6 +3,8 @@
-> > >>>   Required properties:
-> > >>>   - compatible: 	  The possible values are:
-> > >>>   		  "mediatek,mt2701-nor"
-> > >>> +		  "mediatek,mt2712-nor"
-> > >>> +		  "mediatek,mt7622-nor"
-> > >>>   		  "mediatek,mt7623-nor"
-> > >>>   		  "mediatek,mt8173-nor"
-> > >>>   		  For mt8173, compatible should be "mediatek,mt8173-nor".
-> > >>>
-> > 
-> > There should be another patch to update the mtk_nor_of_ids[] array in
-> > the mtk-quadspi.c driver, shouldn't it?
-> > 
-> > Currently, I only see the "mediatek,mt8173-nor" compatible string at the
-> > driver side. The driver and its documentation should be aligned and both
-> > patches should be applied at the same time.
+> Thanks a lot for review.
 > 
-> > Best regards,
-> > 
-> > Cyrille
-> 
-> 
-> From my designer's info, these IPs' nor controller could use same
-> driver, and I had verified it. I think there's no need to update
-> mtk_nor_of_ids[], unless we find difference between these IPs(exactly
-> compared with mt8173).
-> How do you think?
 
-That is perfectly fine, but then the documentation needs to be explicit 
-as to what are the fallback compatibles. It's one valid combination per 
-line, not 1 compatible string per line.
+> We used user space tool for that, which is an adaptation of some
+> Lattice tools, which allows programming of SVF files. We are using
+> it for Lattice CPLD burning, since we have for such devices on our
+> system, but this tool could be used for programming other devices
+> from other vendors as well.
+ 
+> https://github.com/mellanoxbmc/mellanox-bmc-tools
 
-Rob
+Since you are defining a new Kernel ABI here, it would be good to get
+some buy-in from potential users for the ABI. Maybe for the next
+version of the patchset you can cross post to the OpenOCD-devel list?
 
-> 
-> And, we will add dts patches for new SOCs, are these patches should
-> applied with this documentation?
-> 
-> Best regards,
-> Guochun
-> 
+	Andrew
