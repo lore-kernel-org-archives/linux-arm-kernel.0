@@ -1,60 +1,121 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 3 Aug 2017 18:20:32 +0100
-Subject: [PATCH] arm64: avoid overflow in VA_START and PAGE_OFFSET
-In-Reply-To: <20170803171117.107992-1-ndesaulniers@google.com>
-References: <20170803132035.gixd7m7oxtehpquu@yury-thinkpad>
- <20170803171117.107992-1-ndesaulniers@google.com>
-Message-ID: <CAKv+Gu-sKku1R6RQHoRsoskk+n5ns+4BfChH7gvR-JCmksdVsA@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 3 Aug 2017 18:21:33 +0100
+Subject: [PATCH v3 0/5] ACPI: DMA ranges management
+In-Reply-To: <3ccac0b0-dd5a-6a70-f253-99f038f69b8c@codeaurora.org>
+References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
+ <3ccac0b0-dd5a-6a70-f253-99f038f69b8c@codeaurora.org>
+Message-ID: <14c1f547-31de-6c7c-2b37-2c902f9d3d78@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 August 2017 at 18:11, Nick Desaulniers <ndesaulniers@google.com> wrote:
-> The bitmask used to define these values produces overflow, as seen by
-> this compiler warning:
->
-> arch/arm64/kernel/head.S:47:8: warning:
->       integer overflow in preprocessor expression
->   #elif (PAGE_OFFSET & 0x1fffff) != 0
->          ^~~~~~~~~~~
-> arch/arm64/include/asm/memory.h:52:46: note:
->       expanded from macro 'PAGE_OFFSET'
->   #define PAGE_OFFSET             (UL(0xffffffffffffffff) << (VA_BITS -
-> 1))
->                                       ~~~~~~~~~~~~~~~~~~  ^
->
-> It would be preferrable to use GENMASK_ULL() instead, but it's not set
-> up to be used from assembly (the UL() macro token pastes UL suffixes
-> when not included in assembly sources).
->
-> Suggested-by: Yury Norov <ynorov@caviumnetworks.com>
-> Suggested-by: Matthias Kaehlcke <mka@chromium.org>
-> Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
-> ---
->  arch/arm64/include/asm/memory.h | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index 32f82723338a..dde717a31dee 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -64,8 +64,9 @@
->   * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
->   */
->  #define VA_BITS                        (CONFIG_ARM64_VA_BITS)
-> -#define VA_START               (UL(0xffffffffffffffff) << VA_BITS)
-> -#define PAGE_OFFSET            (UL(0xffffffffffffffff) << (VA_BITS - 1))
-> +#define VA_START               ((UL(0xffffffffffffffff) >> VA_BITS) << VA_BITS)
-> +#define PAGE_OFFSET            ((UL(0xffffffffffffffff) >> (VA_BITS - 1)) \
-> +       << (VA_BITS - 1))
->  #define KIMAGE_VADDR           (MODULES_END)
->  #define MODULES_END            (MODULES_VADDR + MODULES_VSIZE)
->  #define MODULES_VADDR          (VA_START + KASAN_SHADOW_SIZE)
-> --
-> 2.14.0.rc1.383.gd1ce394fe2-goog
->
+On 03/08/17 16:45, Nate Watterson wrote:
+> Hi Lorenzo,
+> 
+> On 8/3/2017 8:32 AM, Lorenzo Pieralisi wrote:
+>> This patch series is v3 of a previous posting:
+>>
+>> v2->v3:
+>>     - Fixed DMA masks computation
+>>          - Fixed size computation overflow in acpi_dma_get_range()
+>>
+>> v1->v2:
+>>     - Reworked acpi_dma_get_range() flow and logs
+>>     - Added IORT named component address limits
+>>     - Renamed acpi_dev_get_resources() helper function
+>>     - Rebased against v4.13-rc3
+>>
+>> v2:
+>> http://lkml.kernel.org/r/20170731152323.32488-1-lorenzo.pieralisi at arm.com
+>> v1:
+>> http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
+>>
+>> -- Original cover letter --
+>>
+>> As reported in:
+>>
+>> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
+>>
+>>
+>> the bus connecting devices to an IOMMU bus can be smaller in size than
+>> the IOMMU input address bits which results in devices DMA HW bugs in
+>> particular related to IOVA allocation (ie chopping of higher address
+>> bits owing to system bus HW capabilities mismatch with the IOMMU).
+>>
+>> Fortunately this problem can be solved through an already present but
+>> never
+>> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define
+>> the DMA
+>> window for a specific bus in ACPI and therefore all upstream devices
+>> connected to it.
+>>
+>> This small patch series enables _DMA parsing in ACPI core code and
+>> use it in ACPI IORT code in order to detect DMA ranges for devices and
+>> update their data structures to make them work with their related DMA
+>> addressing restrictions.
+>>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+>> Cc: Feng Kan <fkan@apm.com>
+>> Cc: Jon Masters <jcm@redhat.com>
+>> Cc: Robert Moore <robert.moore@intel.com>
+>> Cc: Robin Murphy <robin.murphy@arm.com>
+>> Cc: Zhang Rui <rui.zhang@intel.com>
+>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>>
+>> Lorenzo Pieralisi (5):
+>>    ACPICA: resource_mgr: Allow _DMA method in walk resources
+>>    ACPI: Make acpi_dev_get_resources() method agnostic
+>>    ACPI: Introduce DMA ranges parsing
+>>    ACPI: Make acpi_dma_configure() DMA regions aware
+>>    ACPI/IORT: Add IORT named component memory address limits
+>>
+>>   drivers/acpi/acpica/rsxface.c |  7 ++--
+>>   drivers/acpi/arm64/iort.c     | 57 ++++++++++++++++++++++++++-
+>>   drivers/acpi/resource.c       | 82
+>> +++++++++++++++++++++++++++++---------
+>>   drivers/acpi/scan.c           | 91
+>> +++++++++++++++++++++++++++++++++++++++----
+>>   include/acpi/acnames.h        |  1 +
+>>   include/acpi/acpi_bus.h       |  2 +
+>>   include/linux/acpi.h          |  8 ++++
+>>   include/linux/acpi_iort.h     |  5 ++-
+>>   8 files changed, 219 insertions(+), 34 deletions(-)
+>>
+> 
+> I tested with named components and with _DMA objects at a variety of
+> sizes and verified the configured masks matched the expected values.
+> 
+> Tested-by: Nate Watterson <nwatters@codeaurora.org>
+> 
+> One general question I had while testing the patch is whether it is
+> possible to define a complete 64-bit range using the _DMA method. For
+> instance, to get a 64-bit dma_mask I had to use a non-zero MIN value
+> so that LEN would not overflow.
 
-Would
+As far as I understand ACPI, all addresses are at most 64-bit. Thus the
+only valid DMA range of size 2^64 would be one with a minimum of 0 and
+no offset, and that can already be described by the simple absence of a
+_DMA object.
 
-#define VA_START (UL(0xffffffffffffffff) - (1 << VA_BITS) + 1)
+Robin.
 
-also work?
+> 
+> QWORDMemory(
+>     ResourceConsumer,
+>     PosDecode,       // _DEC
+>     MinFixed,        // _MIF
+>     MaxFixed,        // _MAF
+>     Prefetchable,    // _MEM
+>     ReadWrite,       // _RW
+>     0,               // _GRA
+>     0x1000,               // _MIN
+>     0xffffffffffffffff,   // _MAX
+>     0x0,                  // _TRA
+>     0xfffffffffffff000,   // _LEN
+>     ,
+>     ,
+>     ,
+> )
+> 
+> -Nate
+> 
