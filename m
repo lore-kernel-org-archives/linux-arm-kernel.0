@@ -1,30 +1,64 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 3 Aug 2017 14:26:00 +0800
-Subject: [PATCH v6 3/3] hwrng: add a driver for Freescale RNGC
-In-Reply-To: <1500832146-8660-3-git-send-email-martin@kaiser.cx>
-References: <1457705200-16951-1-git-send-email-s.trumtrar@pengutronix.de>
- <1500832146-8660-1-git-send-email-martin@kaiser.cx>
- <1500832146-8660-3-git-send-email-martin@kaiser.cx>
-Message-ID: <20170803062600.GM12039@gondor.apana.org.au>
+Date: Thu, 3 Aug 2017 14:26:53 +0800
+Subject: [PATCH resend 00/18] crypto: ARM/arm64 roundup for v4.14
+In-Reply-To: <20170724102820.16534-1-ard.biesheuvel@linaro.org>
+References: <20170724102820.16534-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170803062653.GR12039@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 23, 2017 at 07:49:06PM +0200, Martin Kaiser wrote:
-> The driver is ported from Freescale's Linux git and can be
-> found in the
+On Mon, Jul 24, 2017 at 11:28:02AM +0100, Ard Biesheuvel wrote:
+> This is a resend of all the patches I sent out recently that I would
+> like to be considered for v4.14. Their main purpose is to prepare the
+> arm64 crypto code to deal with situations where the SIMD register file
+> is unavailable, which never occurs at present, but this will change in
+> the future when support for SVE is added.
 > 
-> 	vendor/freescale/imx_2.6.35_maintain
+> Patches #1 and #2 have been sent out last week as 'crypto/algapi - refactor
+> crypto_xor() to avoid memcpy()s' (v2). This version of #2 fixes an error
+> caught by kbuild. The non-SIMD fallback code added in the remaining patches
+> relies on crypto_xor() extensively, which is why these patches have been
+> included here.
 > 
-> branch.
+> Patches #3 - #13 implement the non-SIMD fallbacks for the various NEON
+> based drivers.
 > 
-> The driver supports both RNG version C that's part of some Freescale
-> i.MX3 SoCs and version B that is available on i.MX2x chipsets.
+> Patch #14 implements AES-GCM natively instead of relying on the generic
+> GCM module to wire accelerated AES-CTR and GHASH together, resulting in
+> a ~37% speedup.
 > 
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
-> Reviewed-by: PrasannaKumar Muralidharan <prasannatsmkumar@gmail.com>
+> Patches #15 and #16 implement an accelerated GHASH algorithm for ARM cores
+> that lack the 64x64 PMULL instruction.
+> 
+> Patches #17 and #18 update the scalar AES implementations to stop using
+> the expanded lookup tables for the final round. This reduces the Dcache
+> footprint, and thus the key correlated jitter.
+> 
+> This supersedes all other crypto patches I have outstanding, including the
+> AES refactor ones which I will rework later.
+> 
+> Ard Biesheuvel (18):
+>   crypto/algapi - use separate dst and src operands for __crypto_xor()
+>   crypto/algapi - make crypto_xor() take separate dst and src arguments
+>   crypto: arm64/ghash-ce - add non-SIMD scalar fallback
+>   crypto: arm64/crct10dif - add non-SIMD generic fallback
+>   crypto: arm64/crc32 - add non-SIMD scalar fallback
+>   crypto: arm64/sha1-ce - add non-SIMD generic fallback
+>   crypto: arm64/sha2-ce - add non-SIMD scalar fallback
+>   crypto: arm64/aes-ce-cipher - match round key endianness with generic
+>     code
+>   crypto: arm64/aes-ce-cipher: add non-SIMD generic fallback
+>   crypto: arm64/aes-ce-ccm: add non-SIMD generic fallback
+>   crypto: arm64/aes-blk - add a non-SIMD fallback for synchronous CTR
+>   crypto: arm64/chacha20 - take may_use_simd() into account
+>   crypto: arm64/aes-bs - implement non-SIMD fallback for AES-CTR
+>   crypto: arm64/gcm - implement native driver using v8 Crypto Extensions
+>   crypto: arm/ghash - add NEON accelerated fallback for vmull.p64
+>   crypto: arm64/ghash - add NEON accelerated fallback for 64-bit PMULL
+>   crypto: arm/aes - avoid expanded lookup tables in the final round
+>   crypto: arm64/aes - avoid expanded lookup tables in the final round
 
-Patch applied.  Thanks.
+All applied.  Thanks.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
