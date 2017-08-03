@@ -1,107 +1,128 @@
-From: nwatters@codeaurora.org (Nate Watterson)
-Date: Thu, 3 Aug 2017 11:45:04 -0400
-Subject: [PATCH v3 0/5] ACPI: DMA ranges management
-In-Reply-To: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
-References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
-Message-ID: <3ccac0b0-dd5a-6a70-f253-99f038f69b8c@codeaurora.org>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Thu,  3 Aug 2017 21:30:18 +0530
+Subject: [PATCH 0/2] ASoC: make snd_soc_codec_driver structures const
+Message-ID: <1501776020-3328-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Declare snd_soc_codec_driver structures as const.
 
-On 8/3/2017 8:32 AM, Lorenzo Pieralisi wrote:
-> This patch series is v3 of a previous posting:
-> 
-> v2->v3:
-> 	- Fixed DMA masks computation
->          - Fixed size computation overflow in acpi_dma_get_range()
-> 
-> v1->v2:
-> 	- Reworked acpi_dma_get_range() flow and logs
-> 	- Added IORT named component address limits
-> 	- Renamed acpi_dev_get_resources() helper function
-> 	- Rebased against v4.13-rc3
-> 
-> v2: http://lkml.kernel.org/r/20170731152323.32488-1-lorenzo.pieralisi at arm.com
-> v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
-> 
-> -- Original cover letter --
-> 
-> As reported in:
-> 
-> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
-> 
-> the bus connecting devices to an IOMMU bus can be smaller in size than
-> the IOMMU input address bits which results in devices DMA HW bugs in
-> particular related to IOVA allocation (ie chopping of higher address
-> bits owing to system bus HW capabilities mismatch with the IOMMU).
-> 
-> Fortunately this problem can be solved through an already present but never
-> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
-> window for a specific bus in ACPI and therefore all upstream devices
-> connected to it.
-> 
-> This small patch series enables _DMA parsing in ACPI core code and
-> use it in ACPI IORT code in order to detect DMA ranges for devices and
-> update their data structures to make them work with their related DMA
-> addressing restrictions.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Feng Kan <fkan@apm.com>
-> Cc: Jon Masters <jcm@redhat.com>
-> Cc: Robert Moore <robert.moore@intel.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> 
-> Lorenzo Pieralisi (5):
->    ACPICA: resource_mgr: Allow _DMA method in walk resources
->    ACPI: Make acpi_dev_get_resources() method agnostic
->    ACPI: Introduce DMA ranges parsing
->    ACPI: Make acpi_dma_configure() DMA regions aware
->    ACPI/IORT: Add IORT named component memory address limits
-> 
->   drivers/acpi/acpica/rsxface.c |  7 ++--
->   drivers/acpi/arm64/iort.c     | 57 ++++++++++++++++++++++++++-
->   drivers/acpi/resource.c       | 82 +++++++++++++++++++++++++++++---------
->   drivers/acpi/scan.c           | 91 +++++++++++++++++++++++++++++++++++++++----
->   include/acpi/acnames.h        |  1 +
->   include/acpi/acpi_bus.h       |  2 +
->   include/linux/acpi.h          |  8 ++++
->   include/linux/acpi_iort.h     |  5 ++-
->   8 files changed, 219 insertions(+), 34 deletions(-)
-> 
+Bhumika Goyal (2):
+  ASoC: codecs: add const to snd_soc_codec_driver structures
+  ASoC: sunxi: make snd_soc_codec_driver structures as const
 
-I tested with named components and with _DMA objects at a variety of
-sizes and verified the configured masks matched the expected values.
-
-Tested-by: Nate Watterson <nwatters@codeaurora.org>
-
-One general question I had while testing the patch is whether it is
-possible to define a complete 64-bit range using the _DMA method. For
-instance, to get a 64-bit dma_mask I had to use a non-zero MIN value
-so that LEN would not overflow.
-
-QWORDMemory(
-	ResourceConsumer,
-	PosDecode,       // _DEC
-	MinFixed,        // _MIF
-	MaxFixed,        // _MAF
-	Prefetchable,    // _MEM
-	ReadWrite,       // _RW
-	0,               // _GRA
-	0x1000,               // _MIN
-	0xffffffffffffffff,   // _MAX
-	0x0,                  // _TRA
-	0xfffffffffffff000,   // _LEN
-	,
-	,
-	,
-)
-
--Nate
+ sound/soc/codecs/88pm860x-codec.c      | 2 +-
+ sound/soc/codecs/ab8500-codec.c        | 2 +-
+ sound/soc/codecs/ac97.c                | 2 +-
+ sound/soc/codecs/ad1836.c              | 2 +-
+ sound/soc/codecs/ad193x.c              | 2 +-
+ sound/soc/codecs/ad1980.c              | 2 +-
+ sound/soc/codecs/ad73311.c             | 2 +-
+ sound/soc/codecs/adau1373.c            | 2 +-
+ sound/soc/codecs/adau1701.c            | 2 +-
+ sound/soc/codecs/adau1977.c            | 2 +-
+ sound/soc/codecs/adav80x.c             | 2 +-
+ sound/soc/codecs/ads117x.c             | 2 +-
+ sound/soc/codecs/ak4104.c              | 2 +-
+ sound/soc/codecs/ak4535.c              | 2 +-
+ sound/soc/codecs/ak4554.c              | 2 +-
+ sound/soc/codecs/ak4613.c              | 2 +-
+ sound/soc/codecs/ak4641.c              | 2 +-
+ sound/soc/codecs/ak4642.c              | 2 +-
+ sound/soc/codecs/ak4671.c              | 2 +-
+ sound/soc/codecs/ak5386.c              | 2 +-
+ sound/soc/codecs/alc5623.c             | 2 +-
+ sound/soc/codecs/bt-sco.c              | 2 +-
+ sound/soc/codecs/cq93vc.c              | 2 +-
+ sound/soc/codecs/cs35l33.c             | 2 +-
+ sound/soc/codecs/cs35l34.c             | 2 +-
+ sound/soc/codecs/cs35l35.c             | 2 +-
+ sound/soc/codecs/cs4271.c              | 2 +-
+ sound/soc/codecs/cs42l51.c             | 2 +-
+ sound/soc/codecs/cs4349.c              | 2 +-
+ sound/soc/codecs/cs47l24.c             | 2 +-
+ sound/soc/codecs/cs53l30.c             | 2 +-
+ sound/soc/codecs/cx20442.c             | 2 +-
+ sound/soc/codecs/da7210.c              | 2 +-
+ sound/soc/codecs/da7213.c              | 2 +-
+ sound/soc/codecs/da7218.c              | 2 +-
+ sound/soc/codecs/da7219.c              | 2 +-
+ sound/soc/codecs/da732x.c              | 2 +-
+ sound/soc/codecs/da9055.c              | 2 +-
+ sound/soc/codecs/dmic.c                | 2 +-
+ sound/soc/codecs/es7134.c              | 2 +-
+ sound/soc/codecs/es8316.c              | 2 +-
+ sound/soc/codecs/es8328.c              | 2 +-
+ sound/soc/codecs/hdac_hdmi.c           | 2 +-
+ sound/soc/codecs/hdmi-codec.c          | 2 +-
+ sound/soc/codecs/ics43432.c            | 2 +-
+ sound/soc/codecs/inno_rk3036.c         | 2 +-
+ sound/soc/codecs/isabelle.c            | 2 +-
+ sound/soc/codecs/jz4740.c              | 2 +-
+ sound/soc/codecs/lm49453.c             | 2 +-
+ sound/soc/codecs/max98088.c            | 2 +-
+ sound/soc/codecs/max98090.c            | 2 +-
+ sound/soc/codecs/max98095.c            | 2 +-
+ sound/soc/codecs/max98357a.c           | 2 +-
+ sound/soc/codecs/max9850.c             | 2 +-
+ sound/soc/codecs/max9860.c             | 2 +-
+ sound/soc/codecs/max9867.c             | 2 +-
+ sound/soc/codecs/max98926.c            | 2 +-
+ sound/soc/codecs/mc13783.c             | 2 +-
+ sound/soc/codecs/ml26124.c             | 2 +-
+ sound/soc/codecs/msm8916-wcd-analog.c  | 2 +-
+ sound/soc/codecs/msm8916-wcd-digital.c | 2 +-
+ sound/soc/codecs/nau8540.c             | 2 +-
+ sound/soc/codecs/nau8810.c             | 2 +-
+ sound/soc/codecs/nau8824.c             | 2 +-
+ sound/soc/codecs/nau8825.c             | 2 +-
+ sound/soc/codecs/pcm1681.c             | 2 +-
+ sound/soc/codecs/pcm179x.c             | 2 +-
+ sound/soc/codecs/pcm3008.c             | 2 +-
+ sound/soc/codecs/pcm512x.c             | 2 +-
+ sound/soc/codecs/rt274.c               | 2 +-
+ sound/soc/codecs/rt286.c               | 2 +-
+ sound/soc/codecs/rt298.c               | 2 +-
+ sound/soc/codecs/rt5514.c              | 2 +-
+ sound/soc/codecs/rt5616.c              | 2 +-
+ sound/soc/codecs/rt5631.c              | 2 +-
+ sound/soc/codecs/rt5640.c              | 2 +-
+ sound/soc/codecs/rt5645.c              | 2 +-
+ sound/soc/codecs/rt5651.c              | 2 +-
+ sound/soc/codecs/rt5659.c              | 2 +-
+ sound/soc/codecs/rt5660.c              | 2 +-
+ sound/soc/codecs/rt5663.c              | 2 +-
+ sound/soc/codecs/rt5665.c              | 2 +-
+ sound/soc/codecs/rt5670.c              | 2 +-
+ sound/soc/codecs/rt5677.c              | 2 +-
+ sound/soc/codecs/sgtl5000.c            | 2 +-
+ sound/soc/codecs/si476x.c              | 2 +-
+ sound/soc/codecs/sirf-audio-codec.c    | 2 +-
+ sound/soc/codecs/sn95031.c             | 2 +-
+ sound/soc/codecs/spdif_receiver.c      | 2 +-
+ sound/soc/codecs/spdif_transmitter.c   | 2 +-
+ sound/soc/codecs/ssm2518.c             | 2 +-
+ sound/soc/codecs/ssm2602.c             | 2 +-
+ sound/soc/codecs/ssm4567.c             | 2 +-
+ sound/soc/codecs/stac9766.c            | 2 +-
+ sound/soc/codecs/tas2552.c             | 2 +-
+ sound/soc/codecs/tas5086.c             | 2 +-
+ sound/soc/codecs/tas5720.c             | 2 +-
+ sound/soc/codecs/tlv320aic23.c         | 2 +-
+ sound/soc/codecs/tlv320aic26.c         | 2 +-
+ sound/soc/codecs/tlv320aic31xx.c       | 2 +-
+ sound/soc/codecs/tlv320aic32x4.c       | 2 +-
+ sound/soc/codecs/tlv320aic3x.c         | 2 +-
+ sound/soc/codecs/tlv320dac33.c         | 2 +-
+ sound/soc/codecs/twl4030.c             | 2 +-
+ sound/soc/codecs/twl6040.c             | 2 +-
+ sound/soc/codecs/uda134x.c             | 2 +-
+ sound/soc/codecs/uda1380.c             | 2 +-
+ sound/soc/codecs/wl1273.c              | 2 +-
+ sound/soc/codecs/zx_aud96p22.c         | 2 +-
+ sound/soc/sunxi/sun4i-codec.c          | 6 +++---
+ sound/soc/sunxi/sun8i-codec.c          | 2 +-
+ 111 files changed, 113 insertions(+), 113 deletions(-)
 
 -- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+1.9.1
