@@ -1,98 +1,39 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 3 Aug 2017 10:03:22 +0800
-Subject: [PATCH 1/1] cpufreq: imx6q: imx6ull: use PLL1 for frequency
- higher than 528MHz
-In-Reply-To: <1501230993-15812-1-git-send-email-sebastien.szymanski@armadeus.com>
-References: <1501230993-15812-1-git-send-email-sebastien.szymanski@armadeus.com>
-Message-ID: <20170803020320.GG31819@dragon>
+Date: Thu, 3 Aug 2017 10:12:09 +0800
+Subject: [PATCH] ARM: dts: imx6ul-liteboard: Support poweroff
+In-Reply-To: <20170801141456.10844-1-m.niestroj@grinn-global.com>
+References: <20170801141456.10844-1-m.niestroj@grinn-global.com>
+Message-ID: <20170803021207.GH31819@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 10:36:33AM +0200, S?bastien Szymanski wrote:
-> Setting the frequency higher than 528Mhz actually sets the ARM
-> clock to 528MHz. That's because PLL2 is used as the root clock when the
-> frequency is higher than 396MHz.
+On Tue, Aug 01, 2017 at 04:14:56PM +0200, Marcin Niestroj wrote:
+> Support proper system power-off, which disables main regulator. This
+> results in much lower power consumption and support of power-on issued
+> by button press.
 > 
-> cpupower frequency-set -f 792000
+> Signed-off-by: Marcin Niestroj <m.niestroj@grinn-global.com>
+> ---
+>  arch/arm/boot/dts/imx6ul-liteboard.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> arm_clk_root on the CCM_CLKO2 signal is 528MHz instead of 792MHz.
-> 
-> [   61.606383] cpu cpu0: 396 MHz, 1025 mV --> 792 MHz, 1225 mV
-> 
-> pll2                         1  1  528000000 0 0
->    pll2_bypass               1  1  528000000 0 0
->       pll2_bus               3  3  528000000 0 0
-> 	 ca7_secondary_sel   1  1  528000000 0 0
-> 	    step             1  1  528000000 0 0
-> 	       pll1_sw       1  1  528000000 0 0
-> 		  arm        1  1  528000000 0 0
-> 
-> Fixes this by using the PLL1 as the root clock when the frequency is
-> higher than 528MHz.
-> 
-> cpupower frequency-set -f 792000
-> 
-> arm_clk_root on the CCM_CLKO2 signal is now 792MHz as expected.
-> 
-> [   69.717987] cpu cpu0: 198 MHz, 950 mV --> 792 MHz, 1225 mV
-> 
-> pll1               1 1 792000000 0 0
->    pll1_bypass     1 1 792000000 0 0
->       pll1_sys     1 1 792000000 0 0
-> 	 pll1_sw   1 1 792000000 0 0
-> 	    arm    1 1 792000000 0 0
-> 
-> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+> diff --git a/arch/arm/boot/dts/imx6ul-liteboard.dts b/arch/arm/boot/dts/imx6ul-liteboard.dts
+> index ed1d891d6a89..c4fb5ea28e86 100644
+> --- a/arch/arm/boot/dts/imx6ul-liteboard.dts
+> +++ b/arch/arm/boot/dts/imx6ul-liteboard.dts
+> @@ -145,3 +145,7 @@
+>  	wakeup-source;
+>  	status = "okay";
+>  };
+> +
+> +&snvs_poweroff {
+> +	status = "okay";
+> +};
 
-Can you please specify on which SoCs you are seeing this problem?  And I
-would like invite Anson and Leonard to review it.
+Please add the labelled node in alphabetical order.
 
 Shawn
 
-> ---
->  drivers/cpufreq/imx6q-cpufreq.c | 11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> index b6edd3c..e5fba50 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -18,6 +18,7 @@
->  
->  #define PU_SOC_VOLTAGE_NORMAL	1250000
->  #define PU_SOC_VOLTAGE_HIGH	1275000
-> +#define FREQ_528_MHZ		528000000
->  #define FREQ_1P2_GHZ		1200000000
->  
->  static struct regulator *arm_reg;
-> @@ -110,14 +111,20 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->  		 * voltage of 528MHz, so lower the CPU frequency to one
->  		 * half before changing CPU frequency.
->  		 */
-> -		clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
-> -		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> +		if ((old_freq * 1000) <= FREQ_528_MHZ) {
-> +			clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
-> +			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> +		}
->  		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
->  			clk_set_parent(secondary_sel_clk, pll2_bus_clk);
->  		else
->  			clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
->  		clk_set_parent(step_clk, secondary_sel_clk);
->  		clk_set_parent(pll1_sw_clk, step_clk);
-> +		if (freq_hz > FREQ_528_MHZ) {
-> +			clk_set_rate(pll1_sys_clk, freq_hz);
-> +			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
-> +		}
->  	} else {
->  		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
->  		clk_set_parent(pll1_sw_clk, step_clk);
 > -- 
-> 2.7.3
+> 2.13.3
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
