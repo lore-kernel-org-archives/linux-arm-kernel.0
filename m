@@ -1,95 +1,36 @@
-From: huibin.hong@rock-chips.com (Huibin Hong)
-Date: Thu,  3 Aug 2017 10:36:49 +0800
-Subject: [PATCH v2] ARM: dts: rockchip: rk322x: add spi node and spi pinctrl
-Message-ID: <1501727810-31761-1-git-send-email-huibin.hong@rock-chips.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 3 Aug 2017 10:50:18 +0800
+Subject: [PATCH] soc: imx: gpcv2: fix regulator deferred probe
+In-Reply-To: <20170802195129.20442-1-stefan@agner.ch>
+References: <20170802195129.20442-1-stefan@agner.ch>
+Message-ID: <20170803025017.GJ31819@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add spi node and spi pinctrl for rk322x
+On Wed, Aug 02, 2017 at 12:51:29PM -0700, Stefan Agner wrote:
+> If a regulator requests a deferred probe, the power domain gets
+> initialized twice. This leads to a list double add (without
+> list debugging the kernel hangs due to the double add later):
+> 
+>   WARNING: CPU: 0 PID: 19 at lib/list_debug.c:31 __list_add_valid+0xbc/0xc4
+>   list_add double add: new=c1229754, prev=c12383b4, next=c1229754.
+> 
+> Initialize the power domain after we get the regulator. Also do
+> not print an error in case the regulator defers probing.
+> 
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Andrey Smirnov <andrew.smirnov@gmail.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Fixes: 03aa12629fc4 ("soc: imx: Add GPCv2 power gating driver")
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+> Hi Shawn,
+> 
+> Since this leads to a Kernel hang in v4.13-rc3, can you get this
+> into v4.13 still?
 
-Signed-off-by: Huibin Hong <huibin.hong@rock-chips.com>
----
+Sure.  But before doing that, I would like to get an ACK from Andrey on
+this fix.
 
-Changes in v2:
-- Remove the changeid, and add commit for this patch
-
- arch/arm/boot/dts/rk322x.dtsi | 50 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
-
-diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-index 678daf7..b47f58e 100644
---- a/arch/arm/boot/dts/rk322x.dtsi
-+++ b/arch/arm/boot/dts/rk322x.dtsi
-@@ -54,6 +54,7 @@
- 		serial0 = &uart0;
- 		serial1 = &uart1;
- 		serial2 = &uart2;
-+		spi0 = &spi0;
- 	};
- 
- 	cpus {
-@@ -401,6 +402,19 @@
- 		status = "disabled";
- 	};
- 
-+	spi0: spi at 11090000 {
-+		compatible = "rockchip,rk3228-spi";
-+		reg = <0x11090000 0x1000>;
-+		interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&spi0_clk &spi0_tx &spi0_rx &spi0_cs0 &spi0_cs1>;
-+		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
-+		clock-names = "spiclk", "apb_pclk";
-+		status = "disabled";
-+	};
-+
- 	wdt: watchdog at 110a0000 {
- 		compatible = "rockchip,rk322x-wdt", "snps,dw-wdt";
- 		reg = <0x110a0000 0x100>;
-@@ -1058,6 +1072,42 @@
- 			};
- 		};
- 
-+		spi-0 {
-+			spi0_clk: spi0-clk {
-+				rockchip,pins = <0 9 RK_FUNC_2 &pcfg_pull_up>;
-+			};
-+			spi0_cs0: spi0-cs0 {
-+				rockchip,pins = <0 14 RK_FUNC_2 &pcfg_pull_up>;
-+			};
-+			spi0_tx: spi0-tx {
-+				rockchip,pins = <0 11 RK_FUNC_2 &pcfg_pull_up>;
-+			};
-+			spi0_rx: spi0-rx {
-+				rockchip,pins = <0 13 RK_FUNC_2 &pcfg_pull_up>;
-+			};
-+			spi0_cs1: spi0-cs1 {
-+				rockchip,pins = <1 12 RK_FUNC_1 &pcfg_pull_up>;
-+			};
-+		};
-+
-+		spi-1 {
-+			spi1_clk: spi1-clk {
-+				rockchip,pins = <0 23 RK_FUNC_2 &pcfg_pull_up>;
-+			};
-+			spi1_cs0: spi1-cs0 {
-+				rockchip,pins = <2 2 RK_FUNC_2 &pcfg_pull_up>;
-+			};
-+			spi1_rx: spi1-rx {
-+				rockchip,pins = <2 0 RK_FUNC_2 &pcfg_pull_up>;
-+			};
-+			spi1_tx: spi1-tx {
-+				rockchip,pins = <2 1 RK_FUNC_2 &pcfg_pull_up>;
-+			};
-+			spi1_cs1: spi1-cs1 {
-+				rockchip,pins = <2 3 RK_FUNC_2 &pcfg_pull_up>;
-+			};
-+		};
-+
- 		i2s1 {
- 			i2s1_bus: i2s1-bus {
- 				rockchip,pins = <0 8 RK_FUNC_1 &pcfg_pull_none>,
--- 
-1.9.1
+Shawn
