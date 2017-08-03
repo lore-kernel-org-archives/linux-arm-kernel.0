@@ -1,126 +1,132 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Thu, 3 Aug 2017 11:00:55 +0200
-Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
-In-Reply-To: <f0db566e-5613-8914-e070-915c8c4d9b9f@ti.com>
-References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
- <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
- <20170722065133.GT3053@localhost>
- <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
- <20170726052930.GF3053@localhost>
- <f2908e38-dc4d-3886-4058-52a7ad845415@st.com>
- <20170731123157.GJ3053@localhost>
- <e3a76a50-4160-d111-cce9-132b46b66c33@st.com>
- <20170802045522.GU3053@localhost>
- <7d2091fe-a2e5-78bb-b63d-9cb66bdb7e84@ti.com>
- <7bcad698-fa1a-3dc2-e918-4400639ca6d7@st.com>
- <47ceba83-1097-072e-bed6-d1964bce7a25@ti.com>
- <0e16a519-3d60-f683-5517-12a520e0e521@st.com>
- <f0db566e-5613-8914-e070-915c8c4d9b9f@ti.com>
-Message-ID: <71b7ef2a-d745-d16b-4538-567c856cce9a@st.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Thu, 3 Aug 2017 11:14:14 +0200
+Subject: [PATCH 3/3] iio: trigger: stm32-timer: add output compare triggers
+In-Reply-To: <1501751654-14153-1-git-send-email-fabrice.gasnier@st.com>
+References: <1501751654-14153-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1501751654-14153-4-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add output compare trigger sources available on some instances.
 
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ drivers/iio/trigger/stm32-timer-trigger.c     | 31 +++++++++++++++++----------
+ include/linux/iio/timer/stm32-timer-trigger.h | 12 +++++++++++
+ 2 files changed, 32 insertions(+), 11 deletions(-)
 
-On 08/03/2017 08:42 AM, Peter Ujfalusi wrote:
-> our mail server started to mangle outgoing mails, sorry for that, we are 
-> trying to resolve that...
-
-No problem ;)
-
-> 
-> 
-> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
-> 
-> On 2017-08-02 17:28, Pierre Yves MORDRET wrote:
->> Correct router needs 3 parameters and among those 2 are forwarded though out
->> dma_spec. But when you say "ChannelID is dynamically allocated" you mean
->> dma_get_any_slave_channel ? If yes I can use the already existing bindings to
->> carry the channelID to DMA. No changes need to peripheral...
-> 
-> What I actually mean is that you should not need to modify the DMA 
-> driver at all.
-> According to stm32-dma.txt:
-> #dma-cells = <4>;
-> 1. channelID
-> 2. request line number
-> 3. - 4. some parameters
-> 
-> I believe if you don't have the event router (directly using the DMA 
-> node) you always need to provide these, right?
-
-Correct
-
-> If I'm not mistaken, when you use the event router you want to omit the 
-> ChannelID and get a random channel via dma_get_any_slave_channel in the 
-> DMA driver and feed back the channelID to the event router driver?
-
-Again correct.
-
-> I believe the reason for this is that you want to keep mixed binding 
-> use, to have direct DMA bindings and bindings via event router.
-> 
-
-Well no. peripheral has to use DMAMUX and mixing up is to be avoided. This is
-more for backward compatibility with SoC which doesn't have a DMAMUX.
-
-> Now what happens if you have direct binding:
-> device1 {
-> 	dmas = <&dma2 1 4 0x10400 0x3>;
-> };
-> 
-> and via event router:
-> device2 {
-> 	dmas =	<&dma_router 10 0x10400 0x3>,
-> 		<&dma_router 11 0x10400 0x3>;
-> };
-> 
-> device2 probes first, will get channelID 0 and 1 via 
-> dma_get_any_slave_channel.
-> 
-> When device1 tries to probe, the channelID 1 is already taken..
-
-Yes this is a flaw if we mix up bindings.
-
-> 
-> You need to convert all peripherals to use the event router to avoid 
-> such a races. I have done the same for the dra7.
-> Add the event router driver,
-> add the event router node and convert existing users to use that
-> when adding new devices, use the event router node.
-> 
-> The event router's binding would have 3 parameters, it manages the 
-> available channelIDs, like the ti-dma-crossbar does for dra7. At 
-> allocate time it would pick an unused channelID and craft the dma-spec 
-> with the four parameters as documented.
-> The main DMA driver will not need any modification as everything will be 
-> taken care of by the event router.
-> 
-
-I look up what has been done in ti-dma-crossbar and actually this DMAMUX driver
-has been well inspired from ti-dma-crossbar.
-Nonetheless I understand what you meant. The channelID doesn't come from the
-dmaengine and a piece a code is devised to allocate those. I could copy/paste
-such code in my side but I do believe this would be better if such information
-would come from dmaengine instead : this is what I did but a link/callback is
-missing to craft this info until DMA. ChannelID is computed in two places in
-dmaemgine and in your driver. Moreover any router is going to develop its own
-channelID allocator, info which normally comes from dmaengine.
-
-Vinod, I can update my driver to mimic what ti-dma-crossbar did to avoid the
-custom API. This is s rather big change to evaluate in my side though.
-However it seems to me such info should have come from dmaengine and not from
-driver.
-Let me know your thought about this
-
-> The only gotcha is with memcpy type of transfers as they might also need 
-> unique channelID, but not requested via the slave binding. For that I 
-> have added properties to the event router to mask out certain channels 
-> (and I needed to do the same for the eDMA, but it is unrelated to the 
-> router itself).
-> 
-> 
-> - P?ter
-> 
-
-Py
+diff --git a/drivers/iio/trigger/stm32-timer-trigger.c b/drivers/iio/trigger/stm32-timer-trigger.c
+index 33890f9..a9bc5b6 100644
+--- a/drivers/iio/trigger/stm32-timer-trigger.c
++++ b/drivers/iio/trigger/stm32-timer-trigger.c
+@@ -29,12 +29,14 @@
+ 	{ TIM7_TRGO,},
+ 	{ TIM8_TRGO, TIM8_TRGO2, TIM8_CH1, TIM8_CH2, TIM8_CH3, TIM8_CH4,},
+ 	{ TIM9_TRGO, TIM9_CH1, TIM9_CH2,},
+-	{ }, /* timer 10 */
+-	{ }, /* timer 11 */
++	{ TIM10_OC1,},
++	{ TIM11_OC1,},
+ 	{ TIM12_TRGO, TIM12_CH1, TIM12_CH2,},
+-	{ }, /* timer 13 */
+-	{ }, /* timer 14 */
++	{ TIM13_OC1,},
++	{ TIM14_OC1,},
+ 	{ TIM15_TRGO,},
++	{ TIM16_OC1,},
++	{ TIM17_OC1,},
+ };
+ 
+ /* List the triggers accepted by each timer */
+@@ -47,10 +49,10 @@
+ 	{ }, /* timer 6 */
+ 	{ }, /* timer 7 */
+ 	{ TIM1_TRGO, TIM2_TRGO, TIM4_TRGO, TIM5_TRGO,},
+-	{ TIM2_TRGO, TIM3_TRGO,},
++	{ TIM2_TRGO, TIM3_TRGO, TIM10_OC1, TIM11_OC1,},
+ 	{ }, /* timer 10 */
+ 	{ }, /* timer 11 */
+-	{ TIM4_TRGO, TIM5_TRGO,},
++	{ TIM4_TRGO, TIM5_TRGO, TIM13_OC1, TIM14_OC1,},
+ };
+ 
+ static const void *stm32h7_valids_table[][MAX_VALIDS] = {
+@@ -65,10 +67,12 @@
+ 	{ }, /* timer 9 */
+ 	{ }, /* timer 10 */
+ 	{ }, /* timer 11 */
+-	{ TIM4_TRGO, TIM5_TRGO,},
++	{ TIM4_TRGO, TIM5_TRGO, TIM13_OC1, TIM14_OC1,},
+ 	{ }, /* timer 13 */
+ 	{ }, /* timer 14 */
+-	{ TIM1_TRGO, TIM3_TRGO,},
++	{ TIM1_TRGO, TIM3_TRGO, TIM16_OC1, TIM17_OC1,},
++	{ }, /* timer 16 */
++	{ }, /* timer 17 */
+ };
+ 
+ struct stm32_timer_trigger {
+@@ -91,6 +95,11 @@ static bool stm32_timer_is_trgo2_name(const char *name)
+ 	return !!strstr(name, "trgo2");
+ }
+ 
++static bool stm32_timer_is_trgo_name(const char *name)
++{
++	return (!!strstr(name, "trgo") && !strstr(name, "trgo2"));
++}
++
+ static int stm32_timer_start(struct stm32_timer_trigger *priv,
+ 			     struct iio_trigger *trig,
+ 			     unsigned int frequency)
+@@ -355,6 +364,7 @@ static int stm32_setup_iio_triggers(struct stm32_timer_trigger *priv)
+ 
+ 	while (cur && *cur) {
+ 		struct iio_trigger *trig;
++		bool cur_is_trgo = stm32_timer_is_trgo_name(*cur);
+ 		bool cur_is_trgo2 = stm32_timer_is_trgo2_name(*cur);
+ 
+ 		if (cur_is_trgo2 && !priv->has_trgo2) {
+@@ -371,10 +381,9 @@ static int stm32_setup_iio_triggers(struct stm32_timer_trigger *priv)
+ 
+ 		/*
+ 		 * sampling frequency and master mode attributes
+-		 * should only be available on trgo trigger which
+-		 * is always the first in the list.
++		 * should only be available on trgo/trgo2 triggers
+ 		 */
+-		if (cur == priv->triggers || cur_is_trgo2)
++		if (cur_is_trgo || cur_is_trgo2)
+ 			trig->dev.groups = stm32_trigger_attr_groups;
+ 
+ 		iio_trigger_set_drvdata(trig, priv);
+diff --git a/include/linux/iio/timer/stm32-timer-trigger.h b/include/linux/iio/timer/stm32-timer-trigger.h
+index 20f4653..d68add8 100644
+--- a/include/linux/iio/timer/stm32-timer-trigger.h
++++ b/include/linux/iio/timer/stm32-timer-trigger.h
+@@ -55,12 +55,24 @@
+ #define TIM9_CH1	"tim9_ch1"
+ #define TIM9_CH2	"tim9_ch2"
+ 
++#define TIM10_OC1	"tim10_oc1"
++
++#define TIM11_OC1	"tim11_oc1"
++
+ #define TIM12_TRGO	"tim12_trgo"
+ #define TIM12_CH1	"tim12_ch1"
+ #define TIM12_CH2	"tim12_ch2"
+ 
++#define TIM13_OC1	"tim13_oc1"
++
++#define TIM14_OC1	"tim14_oc1"
++
+ #define TIM15_TRGO	"tim15_trgo"
+ 
++#define TIM16_OC1	"tim16_oc1"
++
++#define TIM17_OC1	"tim17_oc1"
++
+ bool is_stm32_timer_trigger(struct iio_trigger *trig);
+ 
+ #endif
+-- 
+1.9.1
