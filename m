@@ -1,77 +1,29 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 3 Aug 2017 09:01:35 -0700
-Subject: [PATCH 1/2] usb: mtu3: add a vbus debugfs interface
-In-Reply-To: <20170803160057.GB20736@kroah.com>
-References: <1501749439-8837-1-git-send-email-chunfeng.yun@mediatek.com>
- <20170803160057.GB20736@kroah.com>
-Message-ID: <20170803160135.GC20736@kroah.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 3 Aug 2017 11:31:57 -0500
+Subject: [PATCH v3 1/5] dt-bindings: update the Allwinner GPADC device
+ tree binding for H3
+In-Reply-To: <20170723141354.42646-2-icenowy@aosc.io>
+References: <20170723141354.42646-1-icenowy@aosc.io>
+ <20170723141354.42646-2-icenowy@aosc.io>
+Message-ID: <20170803163157.atqcerzehrihvvtb@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 03, 2017 at 09:00:57AM -0700, Greg Kroah-Hartman wrote:
-> On Thu, Aug 03, 2017 at 04:37:18PM +0800, Chunfeng Yun wrote:
-> > +static ssize_t ssusb_vbus_write(struct file *file,
-> > +	const char __user *ubuf, size_t count, loff_t *ppos)
-> > +{
-> > +	struct seq_file *sf = file->private_data;
-> > +	struct ssusb_mtk *ssusb = sf->private;
-> > +	struct otg_switch_mtk *otg_sx = &ssusb->otg_switch;
-> > +	char buf[16];
-> > +
-> > +	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
-> > +		return -EFAULT;
-> > +
-> > +	if (!strncmp(buf, "on", 2)) {
-> > +		ssusb_set_vbus(otg_sx, 1);
-> > +	} else if (!strncmp(buf, "off", 3)) {
-> > +		ssusb_set_vbus(otg_sx, 0);
+On Sun, Jul 23, 2017 at 10:13:50PM +0800, Icenowy Zheng wrote:
+> Allwinner H3 features a thermal sensor like the one in A33, but has its
+> register re-arranged, the clock divider moved to CCU (originally the
+> clock divider is in ADC) and added a pair of bus clock and reset.
 > 
-> kstrtobool() is better to use here.
+> Update the binding document to cover H3.
 > 
-> > +static int ssusb_debugfs_init(struct ssusb_mtk *ssusb)
-> >  {
-> >  	struct dentry *root;
-> >  	struct dentry *file;
-> >  
-> >  	root = debugfs_create_dir(dev_name(ssusb->dev), usb_debug_root);
-> >  	if (IS_ERR_OR_NULL(root)) {
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+> Changes in v3:
+> - Clock name changes.
+> - Example node name changes.
+> - Add interupts (not yet used by the driver).
 > 
-> That test is wrong, you should never need to care about the return value
-> of a debugfs call.  You can always just use it in your next call (if it
-> is a dentry *), or just ignore it.
-> 
-> > -		if (!root)
-> > -			dev_err(ssusb->dev, "create debugfs root failed\n");
-> > -		return;
-> > +		dev_err(ssusb->dev, "create debugfs root failed\n");
-> > +		goto err_dbgfs;
-> >  	}
-> >  	ssusb->dbgfs_root = root;
-> >  
-> > -	file = debugfs_create_file("mode", S_IRUGO | S_IWUSR, root,
-> > -			ssusb, &ssusb_mode_fops);
-> > -	if (!file)
-> > -		dev_dbg(ssusb->dev, "create debugfs mode failed\n");
-> > +	file = debugfs_create_file("mode", 0644, root, ssusb, &ssusb_mode_fops);
-> > +	if (!file) {
-> > +		dev_err(ssusb->dev, "create debugfs mode failed\n");
-> 
-> Same here, do not care, as it does not matter.  Actually, you don't even
-> need to keep the file pointer around, right?
-> 
-> > +		goto err_dbgfs;
-> > +	}
-> > +
-> > +	file = debugfs_create_file("vbus", 0644, root, ssusb, &ssusb_vbus_fops);
-> > +	if (!file) {
-> 
-> Same here, you don't care if debugfs fails or not, it should never
-> affect your code flow.
-> 
-> And don't you need to remove the directory when your module/hardware is
-> removed?  I don't see that happening here as you are not saving root off
-> anywhere.
+>  .../devicetree/bindings/mfd/sun4i-gpadc.txt        | 25 ++++++++++++++++++++--
+>  1 file changed, 23 insertions(+), 2 deletions(-)
 
-Oh nevermind, you do save it, sorry for the noise...
-
-greg k-h
+Acked-by: Rob Herring <robh@kernel.org>
