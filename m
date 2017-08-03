@@ -1,117 +1,81 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  3 Aug 2017 10:41:58 +0200
-Subject: [PATCH net-next v2 4/7] net: mvpp2: move from cpu-centric naming to
- "software thread" naming
+Date: Thu,  3 Aug 2017 10:42:01 +0200
+Subject: [PATCH net-next v2 7/7] dt-bindings: net: marvell-pp2: update
+ interrupt-names with TX interrupts
 In-Reply-To: <20170803084201.30305-1-thomas.petazzoni@free-electrons.com>
 References: <20170803084201.30305-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170803084201.30305-5-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170803084201.30305-8-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PPv2.2 IP has a concept of "software thread", with all registers
-of the PPv2.2 mapped 8 times, for concurrent accesses by 8 "software
-threads". In addition, interrupts on RX queues are associated to such
-"software thread".
+The PPv2.2 unit has several interrupts used for TX completion
+notification. This commit updates the Device Tree binding describing
+this HW block to mention such interrupts.
 
-For most cases, we map a "software thread" to the more conventional
-concept of CPU, but we will soon have one exception: we will have a
-model where we have one TX interrupt per CPU (each using one software
-thread), and all RX events mapped to another software thread
-(associated to another interrupt).
-
-In preparation for this change, it makes sense to change the naming
-from MVPP2_MAX_CPUS to MVPP2_MAX_THREADS, and plan for 8 software
-threads instead of 4 currently.
+While at it, we update the example to use a recent Device Tree
+example, that uses interrupts going through the ICU, and not to the
+GIC directly.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 25 +++++++++++++------------
- 1 file changed, 13 insertions(+), 12 deletions(-)
+ .../devicetree/bindings/net/marvell-pp2.txt        | 28 +++++++++++++++++++---
+ 1 file changed, 25 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 84908aa..af38a21 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -685,7 +685,7 @@ enum mvpp2_prs_l3_cast {
- #define MVPP21_ADDR_SPACE_SZ		0
- #define MVPP22_ADDR_SPACE_SZ		SZ_64K
+diff --git a/Documentation/devicetree/bindings/net/marvell-pp2.txt b/Documentation/devicetree/bindings/net/marvell-pp2.txt
+index 6b4956b..8918ad3 100644
+--- a/Documentation/devicetree/bindings/net/marvell-pp2.txt
++++ b/Documentation/devicetree/bindings/net/marvell-pp2.txt
+@@ -41,6 +41,10 @@ Optional properties (port):
+ - marvell,loopback: port is loopback mode
+ - phy: a phandle to a phy node defining the PHY address (as the reg
+   property, a single integer).
++- interrupt-names: if more than a single interrupt for rx is given, must
++                   be the name associated to the interrupts listed. Valid
++                   names are: "tx-cpu0", "tx-cpu1", "tx-cpu2", "tx-cpu3",
++		   "rx-shared".
  
--#define MVPP2_MAX_CPUS			4
-+#define MVPP2_MAX_THREADS		8
+ Example for marvell,armada-375-pp2:
  
- enum mvpp2_bm_type {
- 	MVPP2_BM_FREE,
-@@ -701,11 +701,12 @@ struct mvpp2 {
- 	void __iomem *lms_base;
- 	void __iomem *iface_base;
+@@ -80,19 +84,37 @@ cpm_ethernet: ethernet at 0 {
+ 	clock-names = "pp_clk", "gop_clk", "gp_clk";
  
--	/* On PPv2.2, each CPU can access the base register through a
--	 * separate address space, each 64 KB apart from each
--	 * other.
-+	/* On PPv2.2, each "software thread" can access the base
-+	 * register through a separate address space, each 64 KB apart
-+	 * from each other. Typically, such address spaces will be
-+	 * used per CPU.
- 	 */
--	void __iomem *cpu_base[MVPP2_MAX_CPUS];
-+	void __iomem *swth_base[MVPP2_MAX_THREADS];
+ 	eth0: eth0 {
+-		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <ICU_GRP_NSR 39 IRQ_TYPE_LEVEL_HIGH>,
++			     <ICU_GRP_NSR 43 IRQ_TYPE_LEVEL_HIGH>,
++			     <ICU_GRP_NSR 47 IRQ_TYPE_LEVEL_HIGH>,
++			     <ICU_GRP_NSR 51 IRQ_TYPE_LEVEL_HIGH>,
++			     <ICU_GRP_NSR 55 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
++				  "tx-cpu3", "rx-shared";
+ 		port-id = <0>;
+ 		gop-port-id = <0>;
+ 	};
  
- 	/* Common clocks */
- 	struct clk *pp_clk;
-@@ -1071,12 +1072,12 @@ struct mvpp2_bm_pool {
+ 	eth1: eth1 {
+-		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <ICU_GRP_NSR 40 IRQ_TYPE_LEVEL_HIGH>,
++			     <ICU_GRP_NSR 44 IRQ_TYPE_LEVEL_HIGH>,
++			     <ICU_GRP_NSR 48 IRQ_TYPE_LEVEL_HIGH>,
++			     <ICU_GRP_NSR 52 IRQ_TYPE_LEVEL_HIGH>,
++			     <ICU_GRP_NSR 56 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
++				  "tx-cpu3", "rx-shared";
+ 		port-id = <1>;
+ 		gop-port-id = <2>;
+ 	};
  
- static void mvpp2_write(struct mvpp2 *priv, u32 offset, u32 data)
- {
--	writel(data, priv->cpu_base[0] + offset);
-+	writel(data, priv->swth_base[0] + offset);
- }
- 
- static u32 mvpp2_read(struct mvpp2 *priv, u32 offset)
- {
--	return readl(priv->cpu_base[0] + offset);
-+	return readl(priv->swth_base[0] + offset);
- }
- 
- /* These accessors should be used to access:
-@@ -1118,13 +1119,13 @@ static u32 mvpp2_read(struct mvpp2 *priv, u32 offset)
- static void mvpp2_percpu_write(struct mvpp2 *priv, int cpu,
- 			       u32 offset, u32 data)
- {
--	writel(data, priv->cpu_base[cpu] + offset);
-+	writel(data, priv->swth_base[cpu] + offset);
- }
- 
- static u32 mvpp2_percpu_read(struct mvpp2 *priv, int cpu,
- 			     u32 offset)
- {
--	return readl(priv->cpu_base[cpu] + offset);
-+	return readl(priv->swth_base[cpu] + offset);
- }
- 
- static dma_addr_t mvpp2_txdesc_dma_addr_get(struct mvpp2_port *port,
-@@ -6874,7 +6875,7 @@ static int mvpp2_probe(struct platform_device *pdev)
- 	struct mvpp2 *priv;
- 	struct resource *res;
- 	void __iomem *base;
--	int port_count, cpu;
-+	int port_count, i;
- 	int err;
- 
- 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-@@ -6901,12 +6902,12 @@ static int mvpp2_probe(struct platform_device *pdev)
- 			return PTR_ERR(priv->iface_base);
- 	}
- 
--	for_each_present_cpu(cpu) {
-+	for (i = 0; i < MVPP2_MAX_THREADS; i++) {
- 		u32 addr_space_sz;
- 
- 		addr_space_sz = (priv->hw_version == MVPP21 ?
- 				 MVPP21_ADDR_SPACE_SZ : MVPP22_ADDR_SPACE_SZ);
--		priv->cpu_base[cpu] = base + cpu * addr_space_sz;
-+		priv->swth_base[i] = base + i * addr_space_sz;
- 	}
- 
- 	if (priv->hw_version == MVPP21)
+ 	eth2: eth2 {
+-		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
++		interrupts = <ICU_GRP_NSR 41 IRQ_TYPE_LEVEL_HIGH>,
++			     <ICU_GRP_NSR 45 IRQ_TYPE_LEVEL_HIGH>,
++			     <ICU_GRP_NSR 49 IRQ_TYPE_LEVEL_HIGH>,
++			     <ICU_GRP_NSR 53 IRQ_TYPE_LEVEL_HIGH>,
++			     <ICU_GRP_NSR 57 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-names = "tx-cpu0", "tx-cpu1", "tx-cpu2",
++				  "tx-cpu3", "rx-shared";
+ 		port-id = <2>;
+ 		gop-port-id = <3>;
+ 	};
 -- 
 2.9.4
