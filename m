@@ -1,128 +1,153 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu,  3 Aug 2017 16:15:33 +0100
-Subject: [PATCH 3/3] arm64: entry: Exceptions from single-step should leave
- debug masked
-In-Reply-To: <20170803151533.29438-1-james.morse@arm.com>
-References: <20170803151533.29438-1-james.morse@arm.com>
-Message-ID: <20170803151533.29438-4-james.morse@arm.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Thu, 3 Aug 2017 11:23:40 -0400
+Subject: [PATCH v2 5/6] phy: Add USB3 PHY support for Broadcom NS2 SoC
+In-Reply-To: <9f25daa0-13b3-2a56-34bb-f3705672fae5@ti.com>
+References: <1501109787-15489-1-git-send-email-jon.mason@broadcom.com>
+ <1501109787-15489-6-git-send-email-jon.mason@broadcom.com>
+ <9f25daa0-13b3-2a56-34bb-f3705672fae5@ti.com>
+Message-ID: <CAC3K-4qLfSBgvLZRUZCRursxUhfL2cDNsi_AM1fWX_bYT=F9Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we interrupted an instruction being single-stepped we may end up
-taking a single-step exception from the interrupt handler. This
-confuses single-step users who are typically just waiting for 'the next'
-single step exception before re-enabling {break,watch}points.
-Returning from the interrupt causes us to hit the {break,watch}point
-again.
+On Wed, Aug 2, 2017 at 2:36 AM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> Hi,
+>
+> On Thursday 27 July 2017 04:26 AM, Jon Mason wrote:
+>> From: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+>>
+>> This patch adds support for Broadcom NS2 USB3 PHY
+>>
+>> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+>> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+>> ---
+>>  drivers/phy/broadcom/Kconfig            |   9 +
+>>  drivers/phy/broadcom/Makefile           |   1 +
+>>  drivers/phy/broadcom/phy-bcm-ns2-usb3.c | 580 ++++++++++++++++++++++++++++++++
+>>  3 files changed, 590 insertions(+)
+>>  create mode 100644 drivers/phy/broadcom/phy-bcm-ns2-usb3.c
+>>
+>> diff --git a/drivers/phy/broadcom/Kconfig b/drivers/phy/broadcom/Kconfig
+>> index 37371b89b14f..e7d238efd539 100644
+>> --- a/drivers/phy/broadcom/Kconfig
+>> +++ b/drivers/phy/broadcom/Kconfig
+>> @@ -45,6 +45,15 @@ config PHY_NS2_PCIE
+>>         Enable this to support the Broadcom Northstar2 PCIe PHY.
+>>         If unsure, say N.
+>>
+>> +config PHY_NS2_USB3
+>> +     tristate "Broadcom NorthStar2 USB3 PHY driver"
+>> +     depends on OF && (ARCH_BCM_IPROC || COMPILE_TEST)
+>> +     select GENERIC_PHY
+>
+> depends on MDIO_BUS?
+>> +     default ARCH_BCM_IPROC
+>> +     help
+>> +       Enable this to support the Broadcom Northstar2 USB3 PHY.
+>> +       If unsure, say N.
+>> +
+>>  config PHY_NS2_USB_DRD
+>>       tristate "Broadcom Northstar2 USB DRD PHY support"
+>>       depends on OF && (ARCH_BCM_IPROC || COMPILE_TEST)
+>> diff --git a/drivers/phy/broadcom/Makefile b/drivers/phy/broadcom/Makefile
+>> index 4eb82ec8d491..a40e6e6f56b8 100644
+>> --- a/drivers/phy/broadcom/Makefile
+>> +++ b/drivers/phy/broadcom/Makefile
+>> @@ -3,5 +3,6 @@ obj-$(CONFIG_BCM_KONA_USB2_PHY)               += phy-bcm-kona-usb2.o
+>>  obj-$(CONFIG_PHY_BCM_NS_USB2)                += phy-bcm-ns-usb2.o
+>>  obj-$(CONFIG_PHY_BCM_NS_USB3)                += phy-bcm-ns-usb3.o
+>>  obj-$(CONFIG_PHY_NS2_PCIE)           += phy-bcm-ns2-pcie.o
+>> +obj-$(CONFIG_PHY_NS2_USB3)           += phy-bcm-ns2-usb3.o
+>>  obj-$(CONFIG_PHY_NS2_USB_DRD)                += phy-bcm-ns2-usbdrd.o
+>>  obj-$(CONFIG_PHY_BRCM_SATA)          += phy-brcm-sata.o
+>> diff --git a/drivers/phy/broadcom/phy-bcm-ns2-usb3.c b/drivers/phy/broadcom/phy-bcm-ns2-usb3.c
+>> new file mode 100644
+>> index 000000000000..7f272757434b
+>> --- /dev/null
+>> +++ b/drivers/phy/broadcom/phy-bcm-ns2-usb3.c
+>> @@ -0,0 +1,580 @@
+>> +/*
+>> + * Copyright (C) 2016 Broadcom
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> + * modify it under the terms of the GNU General Public License as
+>> + * published by the Free Software Foundation version 2.
+>> + *
+>> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+>> + * kind, whether express or implied; without even the implied warranty
+>> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/delay.h>
+>> +#include <linux/io.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/mfd/syscon.h>
+>> +#include <linux/mdio.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/phy/phy.h>
+>> +
+>> +#define NS2_USB3_PHY_MAX                     0x02
+>> +
+>> +#define NS2_USB3_PHY_CONFIG_CTRL_REG         0x10
+>> +#define NS2_USB3_PHY_CONFIG_CTRL_MASK                (BIT(3) | BIT(4) | BIT(5))
+>> +#define NS2_USB3_PHY_CONFIG_CTRL_PLL_SEQ_START       BIT(6)
+>> +
+>> +#define NS2_USB3_PHY_P0CTL_REG                       0x14
+>> +#define NS2_USB3_PHY_P1CTL_REG                       0x18
+>> +#define NS2_USB3_PHY_PXCTL_I_BIT             BIT(1)
+>> +
+>> +#define NS2_USB3_PHY_MISC_STATUS_REG         0x20
+>> +
+>> +#define NS2_IDM_RST_CTRL_P0_OFFSET           0x800
+>> +#define NS2_IDM_RST_CTRL_P1_OFFSET           0x1800
+>> +#define NS2_IDM_RESET_CONTROL_BIT            BIT(0)
+>> +
+>> +#define NS2_IDM_IO_CTRL_P0_OFFSET            0x408
+>> +#define NS2_IDM_IO_CTRL_P1_OFFSET            0x1408
+>> +/* Bit 23 for PPC Polarity, Bit 24 for PPC NANDNOR select */
+>> +#define NS2_IDM_IO_CTRL_PPC_CFG                      (BIT(23) | BIT(24))
+>> +
+>> +#define NS2_PHY_RESET_BIT                    BIT(5)
+>> +#define NS2_PHY_PLL_RESET_BIT                        BIT(6)
+>> +
+>> +/* NS2 USB3 MDIO */
+>> +#define NS2_USB3_MDIO_PLL30_ADDR             0x8000
+>> +#define NS2_USB3_MDIO_BLK_ACCESS             0x1F
+>> +#define NS2_USB3_MDIO_PLL30_ANAPLL_CTRL              0x14
+>> +#define NS2_USB3_MDIO_PLL30_ANAPLL_CTRL_VAL  0x23
+>> +#define NS2_USB3_MDIO_PLL30_GEN_PLL          0xF
+>> +#define NS2_USB3_MDIO_PLL30_GEN_PLL_PCLK_SEL BIT(11)
+>> +#define NS2_USB3_MDIO_P0_AFE30_ADDR          0x8080
+>> +#define NS2_USB3_MDIO_P1_AFE30_ADDR          0x9080
+>> +#define NS2_USB3_MDIO_AFE30_RX_SIG_DETECT    0x5
+>> +#define NS2_USB3_MDIO_AFE30_RX_SIG_DETECT_VAL        0xAC0D
+>> +
+>> +#define NS2_USB3_MDIO_P0_PIPE_BLK_ADDR               0x8060
+>> +#define NS2_USB3_MDIO_P1_PIPE_BLK_ADDR               0x9060
+>> +#define NS2_USB3_MDIO_PIPE_BLK_REG_1_OFFSET  0x1
+>> +#define NS2_USB3_MDIO_PIPE_BLK_REG_1_VAL     0x207
+>> +
+>> +#define NS2_USB3_MDIO_P0_AEQ_BLK_ADDR                0x80E0
+>> +#define NS2_USB3_MDIO_P1_AEQ_BLK_ADDR                0x90E0
+>
+> Looking at the register offsets, P0 and P1 can be abstracted IMO. i.e you can
+> simply have 'NS2_USB3_MDIO_PIPE_BLK_ADDR_OFFSET 0x60' and the base address can
+> come from dt. For P0 it should be 0x8000 and P1 it should be 0x9000.
+>
+> Then when the consumer requests for initialization of P0, it can be just
+> P0 base address + S2_USB3_MDIO_PIPE_BLK_ADDR_OFFSET and likewise for P1.
+>
+> Same thing is applicable for NS2_USB3_MDIO_P0_AEQ_BLK_ADDR,
+> NS2_USB3_MDIO_P0_AFE30_ADDR etc.
 
-For the least-surprising results, lets confine single-step to its
-intended context.
+Thanks for the input.  These are good suggestions.  I'll make the
+changes and push a new version shortly.
 
->From the ARM-ARM DDI 0487B.a, D.12.5 'Behaviour in the active-not-pending
-state's 'If the PE takes an exception' section, we enter the inactive
-state because the exception sets PSTATE.D.
+Thanks,
+Jon
 
-D2.12.6 'Entering the active-pending state', from the inactive state, we
-re-enter active-pending if we clear PSTATE.D. This causes a debug
-single step exception and we we step the exception handler.
-
-Change the EL1 entry.S handlers to inherit their debug state if the
-SPSR.SS bit is clear, instead of unconditionally unmasking it.
-
-This bit will be set if we took this exception instead of stepping an
-instruction.
-
-This isn't needed for the EL0 entry.S handlers as we will have cleared
-MDSCR_EL1.SS on entry from EL0.
-
-Signed-off-by: James Morse <james.morse@arm.com>
-CC: Pratyush Anand <panand@redhat.com>
-CC: AKASHI Takahiro <takahiro.akashi@linaro.org>
-
----
- arch/arm64/include/asm/assembler.h | 14 ++++++++++++++
- arch/arm64/kernel/entry.S          | 10 +++++-----
- 2 files changed, 19 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 1c490c578a2e..96f01cc33d0e 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -25,6 +25,7 @@
- 
- #include <asm/asm-offsets.h>
- #include <asm/cpufeature.h>
-+#include <asm/debug-monitors.h>
- #include <asm/mmu_context.h>
- #include <asm/page.h>
- #include <asm/pgtable-hwdef.h>
-@@ -66,6 +67,19 @@
- 	msr	daifclr, #8
- 	.endm
- 
-+	/*
-+	 * If we interrupted single step from EL1 then we may end up stepping
-+	 * the exception handler. Leave debug masked. Otherwise inherit
-+	 * the value we interrupted.
-+	 */
-+	.macro	inherit_dbg, pstate, reg
-+	mov_q	\reg, (PSR_D_BIT | DBG_SPSR_SS)
-+	and	\reg, \reg, \pstate
-+	cbnz	\reg, 9998f
-+	enable_dbg
-+9998:
-+	.endm
-+
- 	.macro	disable_step_tsk, flgs, tmp
- 	tbz	\flgs, #TIF_SINGLESTEP, 9990f
- 	mrs	\tmp, mdscr_el1
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index eed2d51e16e6..9788bb47a7f7 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -431,7 +431,7 @@ el1_da:
- 	 * Data abort handling
- 	 */
- 	mrs	x3, far_el1
--	enable_dbg
-+	inherit_dbg, pstate=x23 reg=x0
- 	// re-enable interrupts if they were enabled in the aborted context
- 	tbnz	x23, #7, 1f			// PSR_I_BIT
- 	enable_irq
-@@ -446,14 +446,14 @@ el1_sp_pc:
- 	 * Stack or PC alignment exception handling
- 	 */
- 	mrs	x0, far_el1
--	enable_dbg
-+	inherit_dbg, pstate=x23 reg=x2
- 	mov	x2, sp
- 	b	do_sp_pc_abort
- el1_undef:
- 	/*
- 	 * Undefined instruction
- 	 */
--	enable_dbg
-+	inherit_dbg, pstate=x23 reg=x0
- 	mov	x0, sp
- 	b	do_undefinstr
- el1_dbg:
-@@ -469,7 +469,7 @@ el1_dbg:
- 	kernel_exit 1
- el1_inv:
- 	// TODO: add support for undefined instructions in kernel mode
--	enable_dbg
-+	inherit_dbg, pstate=x23 reg=x0
- 	mov	x0, sp
- 	mov	x2, x1
- 	mov	x1, #BAD_SYNC
-@@ -479,7 +479,7 @@ ENDPROC(el1_sync)
- 	.align	6
- el1_irq:
- 	kernel_entry 1
--	enable_dbg
-+	inherit_dbg, pstate=x23 reg=x0
- #ifdef CONFIG_TRACE_IRQFLAGS
- 	bl	trace_hardirqs_off
- #endif
--- 
-2.13.3
+>
+> Thanks
+> Kishon
