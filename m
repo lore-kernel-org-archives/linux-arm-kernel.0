@@ -1,118 +1,54 @@
-From: sebastien.szymanski@armadeus.com (=?UTF-8?Q?S=c3=a9bastien_Szymanski?=)
-Date: Thu, 3 Aug 2017 09:32:24 +0200
-Subject: [PATCH 1/1] cpufreq: imx6q: imx6ull: use PLL1 for frequency
- higher than 528MHz
-In-Reply-To: <20170803020320.GG31819@dragon>
-References: <1501230993-15812-1-git-send-email-sebastien.szymanski@armadeus.com>
- <20170803020320.GG31819@dragon>
-Message-ID: <737b6166-1594-677b-1a08-4f9b795d9410@armadeus.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Thu, 3 Aug 2017 13:04:01 +0530
+Subject: net: thunderx: Buffer overwrite on bgx_probe
+In-Reply-To: <86a1b4d9-db67-4380-13c9-f759d2e05ed9@ispras.ru>
+References: <86a1b4d9-db67-4380-13c9-f759d2e05ed9@ispras.ru>
+Message-ID: <CA+sq2CeQB0OSNadQNd5oofmmsNsHtinShe2OZhGBGk6sU5xYkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Aug 2, 2017 at 10:29 PM, Anton Vasilyev <vasilyev@ispras.ru> wrote:
+> Hello.
+>
+> While searching for memory errors in Linux kernel I've come across
+> drivers/net/ethernet/cavium/thunder/thunder_bgx.ko module.
+>
+> I've found buffer overwrite at bgx_probe():
+> Consider device PCI_SUBSYS_DEVID_83XX_BGX.
+> max_bgx_per_node is set to 4 by set_max_bgx_per_node().
+> Then on branch:
+>     pci_read_config_word(pdev, PCI_DEVICE_ID, &sdevid);
+>     if (sdevid != PCI_DEVICE_ID_THUNDER_RGX) {
+>         bgx->bgx_id = (pci_resource_start(pdev,
+>             PCI_CFG_REG_BAR_NUM) >> 24) & BGX_ID_MASK;
+>         bgx->bgx_id += nic_get_node_id(pdev) * max_bgx_per_node;
+>
+> bgx->bgx_id could achieve value 3 + 3 * 4 = 15,
 
-On 08/03/2017 04:03 AM, Shawn Guo wrote:
-> On Fri, Jul 28, 2017 at 10:36:33AM +0200, S?bastien Szymanski wrote:
->> Setting the frequency higher than 528Mhz actually sets the ARM
->> clock to 528MHz. That's because PLL2 is used as the root clock when the
->> frequency is higher than 396MHz.
->>
->> cpupower frequency-set -f 792000
->>
->> arm_clk_root on the CCM_CLKO2 signal is 528MHz instead of 792MHz.
->>
->> [   61.606383] cpu cpu0: 396 MHz, 1025 mV --> 792 MHz, 1225 mV
->>
->> pll2                         1  1  528000000 0 0
->>    pll2_bypass               1  1  528000000 0 0
->>       pll2_bus               3  3  528000000 0 0
->> 	 ca7_secondary_sel   1  1  528000000 0 0
->> 	    step             1  1  528000000 0 0
->> 	       pll1_sw       1  1  528000000 0 0
->> 		  arm        1  1  528000000 0 0
->>
->> Fixes this by using the PLL1 as the root clock when the frequency is
->> higher than 528MHz.
->>
->> cpupower frequency-set -f 792000
->>
->> arm_clk_root on the CCM_CLKO2 signal is now 792MHz as expected.
->>
->> [   69.717987] cpu cpu0: 198 MHz, 950 mV --> 792 MHz, 1225 mV
->>
->> pll1               1 1 792000000 0 0
->>    pll1_bypass     1 1 792000000 0 0
->>       pll1_sys     1 1 792000000 0 0
->> 	 pll1_sw   1 1 792000000 0 0
->> 	    arm    1 1 792000000 0 0
->>
->> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
-> 
-> Can you please specify on which SoCs you are seeing this problem?  And I
-> would like invite Anson and Leonard to review it.
-
-My SoC is MCIMX6Y2CVM08AA which is a 792MHz i.MX6ULL. I forgot to
-mention that I added the following operating points in my device tree:
-
-operating-points: 792000  1225000
-fsl,soc-operating-points: 792000  1175000
-
-Best regards,
-
-> 
-> Shawn
-> 
->> ---
->>  drivers/cpufreq/imx6q-cpufreq.c | 11 +++++++++--
->>  1 file changed, 9 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
->> index b6edd3c..e5fba50 100644
->> --- a/drivers/cpufreq/imx6q-cpufreq.c
->> +++ b/drivers/cpufreq/imx6q-cpufreq.c
->> @@ -18,6 +18,7 @@
->>  
->>  #define PU_SOC_VOLTAGE_NORMAL	1250000
->>  #define PU_SOC_VOLTAGE_HIGH	1275000
->> +#define FREQ_528_MHZ		528000000
->>  #define FREQ_1P2_GHZ		1200000000
->>  
->>  static struct regulator *arm_reg;
->> @@ -110,14 +111,20 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
->>  		 * voltage of 528MHz, so lower the CPU frequency to one
->>  		 * half before changing CPU frequency.
->>  		 */
->> -		clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
->> -		clk_set_parent(pll1_sw_clk, pll1_sys_clk);
->> +		if ((old_freq * 1000) <= FREQ_528_MHZ) {
->> +			clk_set_rate(arm_clk, (old_freq >> 1) * 1000);
->> +			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
->> +		}
->>  		if (freq_hz > clk_get_rate(pll2_pfd2_396m_clk))
->>  			clk_set_parent(secondary_sel_clk, pll2_bus_clk);
->>  		else
->>  			clk_set_parent(secondary_sel_clk, pll2_pfd2_396m_clk);
->>  		clk_set_parent(step_clk, secondary_sel_clk);
->>  		clk_set_parent(pll1_sw_clk, step_clk);
->> +		if (freq_hz > FREQ_528_MHZ) {
->> +			clk_set_rate(pll1_sys_clk, freq_hz);
->> +			clk_set_parent(pll1_sw_clk, pll1_sys_clk);
->> +		}
->>  	} else {
->>  		clk_set_parent(step_clk, pll2_pfd2_396m_clk);
->>  		clk_set_parent(pll1_sw_clk, step_clk);
->> -- 
->> 2.7.3
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+No, this will never be the case, the maximum no of NUMA nodes supported
+on these platforms is 2, so the bgx_id will never go beyond 7.
+And the platform 83XX taken as an example deosn't support NUMA, it's only
+88XX which supports NUMA  and maximum no of BGX supported on that is only 2.
 
 
--- 
-S?bastien Szymanski
-Software engineer, Armadeus Systems
-Tel: +33 (0)9 72 29 41 44
-Fax: +33 (0)9 72 28 79 26
+> which lead to buffer overwrite on
+>         bgx_vnic[bgx->bgx_id] = bgx;
+>
+> Question: is it enough for fix to change bgx_vnic's size?
+>
+> Found by Linux Driver Verification project (linuxtesting.org).
+>
+> --
+> Anton Vasilyev
+> Linux Verification Center, ISPRAS
+> web: http://linuxtesting.org
+> e-mail: vasilyev at ispras.ru
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Thanks,
+Sunil.
