@@ -1,30 +1,41 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Thu, 3 Aug 2017 10:53:12 -0700
-Subject: [PATCH] arm64: avoid overflow in VA_START and PAGE_OFFSET
-In-Reply-To: <CAKv+Gu-sKku1R6RQHoRsoskk+n5ns+4BfChH7gvR-JCmksdVsA@mail.gmail.com>
-References: <20170803132035.gixd7m7oxtehpquu@yury-thinkpad>
- <20170803171117.107992-1-ndesaulniers@google.com>
- <CAKv+Gu-sKku1R6RQHoRsoskk+n5ns+4BfChH7gvR-JCmksdVsA@mail.gmail.com>
-Message-ID: <CAKwvOdk1A-wvuNDaLokYu1oNPUV-ab24=NzdL5Sbh6QcV_vDMQ@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 3 Aug 2017 10:57:08 -0700
+Subject: [PATCH 01/11] arm64: docs: describe ELF hwcaps
+In-Reply-To: <1500480092-28480-2-git-send-email-mark.rutland@arm.com>
+References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
+ <1500480092-28480-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAGXu5jJnhy5F698QFmXrMb3szmtXnfzqc+=QsukG4+p2k9xEdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Would
+On Wed, Jul 19, 2017 at 9:01 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> We don't document our ELF hwcaps, leaving developers to interpret them
+> according to hearsay, guesswork, or (in exceptional cases) inspection of
+> the current kernel code.
 >
-> #define VA_START (UL(0xffffffffffffffff) - (1 << VA_BITS) + 1)
+> This is less than optimal, and it would be far better if we had some
+> definitive description of each of the ELF hwcaps that developers could
+> refer to.
 >
-> also work?
+> This patch adds a document describing the (native) arm64 ELF hwcaps.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Dave Martin <Dave.Martin@arm.com>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  Documentation/arm64/elf_hwcaps.txt | 133 +++++++++++++++++++++++++++++++++++++
 
-I think you'd have to wrap the 1 in a UL(), ex:
+With the kernel docs moving to ReST markup[1], perhaps reformat this
+to a .rst file and link to it from somewhere sensible in the ReST
+tree, perhaps the userspace API section in
+Documentation/userspace-api/index.rst?
 
-#define VA_START (UL(0xffffffffffffffff) - (UL(1) << VA_BITS) + 1)
+-Kees
 
-Otherwise IIUC a integral literal (`1`) is treated as an int, which on
-arm64 is LP64 making it 32b, where most configs set VA_BITS
-to larger than 32b.  Shifting by more than the width is undefined
-behavior. And without it, I get compile errors.
+[1] https://www.kernel.org/doc/html/latest/doc-guide/sphinx.html
 
-I'll send v2 with your suggestion, thanks.
 -- 
-Thanks,
-~Nick Desaulniers
+Kees Cook
+Pixel Security
