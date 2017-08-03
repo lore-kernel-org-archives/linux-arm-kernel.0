@@ -1,26 +1,114 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Thu,  3 Aug 2017 13:40:31 +0200
-Subject: [PATCH RFC 0/2] spi: pxa2xx: gpiod cleanups and late CS GPIO
- allocation
-Message-ID: <cover.1501760433.git.jan.kiszka@siemens.com>
+From: cakturk@gmail.com (Cihangir Akturk)
+Date: Thu,  3 Aug 2017 14:58:24 +0300
+Subject: [PATCH 09/29] drm/exynos: switch to drm_*{get,put} helpers
+In-Reply-To: <1501761585-11757-1-git-send-email-cakturk@gmail.com>
+References: <1501761585-11757-1-git-send-email-cakturk@gmail.com>
+Message-ID: <1501761585-11757-10-git-send-email-cakturk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a follow-up to the discussion on
-https://lkml.org/lkml/2017/7/8/42. It tries to convert more of pxa2xx
-driver to gpio descriptors, and it does that late CS GPIO binding, but
-now hopefully without violating the GPIO API and while taking multiple
-calls to setup_cs into account.
+drm_*_reference() and drm_*_unreference() functions are just
+compatibility alias for drm_*_get() and drm_*_put() adn should not be
+used by new code. So convert all users of compatibility functions to use
+the new APIs.
 
-Jan
+Signed-off-by: Cihangir Akturk <cakturk@gmail.com>
+---
+ drivers/gpu/drm/exynos/exynos_drm_fb.c    |  4 ++--
+ drivers/gpu/drm/exynos/exynos_drm_gem.c   | 12 ++++++------
+ drivers/gpu/drm/exynos/exynos_drm_plane.c |  2 +-
+ 3 files changed, 9 insertions(+), 9 deletions(-)
 
-Jan Kiszka (2):
-  spi: pxa2xx: Convert to GPIO descriptor API where possible
-  spi: pxa2xx: Only claim CS GPIOs when the slave device is created
-
- drivers/spi/spi-pxa2xx.c | 92 ++++++++++++++++++++++--------------------------
- drivers/spi/spi-pxa2xx.h |  5 ++-
- 2 files changed, 44 insertions(+), 53 deletions(-)
-
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fb.c b/drivers/gpu/drm/exynos/exynos_drm_fb.c
+index d48fd7c..3dccdee 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fb.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fb.c
+@@ -80,7 +80,7 @@ static void exynos_drm_fb_destroy(struct drm_framebuffer *fb)
+ 			continue;
+ 
+ 		obj = &exynos_fb->exynos_gem[i]->base;
+-		drm_gem_object_unreference_unlocked(obj);
++		drm_gem_object_put_unlocked(obj);
+ 	}
+ 
+ 	kfree(exynos_fb);
+@@ -172,7 +172,7 @@ exynos_user_fb_create(struct drm_device *dev, struct drm_file *file_priv,
+ 
+ err:
+ 	while (i--)
+-		drm_gem_object_unreference_unlocked(&exynos_gem[i]->base);
++		drm_gem_object_put_unlocked(&exynos_gem[i]->base);
+ 
+ 	return ERR_PTR(ret);
+ }
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_gem.c b/drivers/gpu/drm/exynos/exynos_drm_gem.c
+index c23479b..1c8d2f9 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_gem.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_gem.c
+@@ -143,7 +143,7 @@ static int exynos_drm_gem_handle_create(struct drm_gem_object *obj,
+ 	DRM_DEBUG_KMS("gem handle = 0x%x\n", *handle);
+ 
+ 	/* drop reference from allocate - handle holds it now. */
+-	drm_gem_object_unreference_unlocked(obj);
++	drm_gem_object_put_unlocked(obj);
+ 
+ 	return 0;
+ }
+@@ -186,7 +186,7 @@ unsigned long exynos_drm_gem_get_size(struct drm_device *dev,
+ 
+ 	exynos_gem = to_exynos_gem(obj);
+ 
+-	drm_gem_object_unreference_unlocked(obj);
++	drm_gem_object_put_unlocked(obj);
+ 
+ 	return exynos_gem->size;
+ }
+@@ -320,13 +320,13 @@ void exynos_drm_gem_put_dma_addr(struct drm_device *dev,
+ 		return;
+ 	}
+ 
+-	drm_gem_object_unreference_unlocked(obj);
++	drm_gem_object_put_unlocked(obj);
+ 
+ 	/*
+ 	 * decrease obj->refcount one more time because we has already
+ 	 * increased it at exynos_drm_gem_get_dma_addr().
+ 	 */
+-	drm_gem_object_unreference_unlocked(obj);
++	drm_gem_object_put_unlocked(obj);
+ }
+ 
+ static int exynos_drm_gem_mmap_buffer(struct exynos_drm_gem *exynos_gem,
+@@ -374,7 +374,7 @@ int exynos_drm_gem_get_ioctl(struct drm_device *dev, void *data,
+ 	args->flags = exynos_gem->flags;
+ 	args->size = exynos_gem->size;
+ 
+-	drm_gem_object_unreference_unlocked(obj);
++	drm_gem_object_put_unlocked(obj);
+ 
+ 	return 0;
+ }
+@@ -444,7 +444,7 @@ int exynos_drm_gem_dumb_map_offset(struct drm_file *file_priv,
+ 	*offset = drm_vma_node_offset_addr(&obj->vma_node);
+ 	DRM_DEBUG_KMS("offset = 0x%lx\n", (unsigned long)*offset);
+ 
+-	drm_gem_object_unreference_unlocked(obj);
++	drm_gem_object_put_unlocked(obj);
+ 	return ret;
+ }
+ 
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_plane.c b/drivers/gpu/drm/exynos/exynos_drm_plane.c
+index 611b6fd..c19de47 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_plane.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_plane.c
+@@ -132,7 +132,7 @@ static void exynos_drm_plane_reset(struct drm_plane *plane)
+ 	if (plane->state) {
+ 		exynos_state = to_exynos_plane_state(plane->state);
+ 		if (exynos_state->base.fb)
+-			drm_framebuffer_unreference(exynos_state->base.fb);
++			drm_framebuffer_put(exynos_state->base.fb);
+ 		kfree(exynos_state);
+ 		plane->state = NULL;
+ 	}
 -- 
-2.12.3
+2.7.4
