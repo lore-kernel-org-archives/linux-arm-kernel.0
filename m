@@ -1,59 +1,140 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 3 Aug 2017 14:02:42 +0200
-Subject: [PATCH v3 00/10] ARM: sun8i: a83t: Add support for MMC controllers
-In-Reply-To: <CAGb2v648K1Nguf8nVjfunow7+xwS0MHazzMXJd1xZ3uNM2WesA@mail.gmail.com>
-References: <20170724135905.28855-1-wens@csie.org>
- <CAGb2v66DQ3H2Mta7h+t1P+UzSRLnMABRebeYcopaPkN0gOiwxA@mail.gmail.com>
- <20170726194522.7d64f7c2danrknfi@flea>
- <CAPDyKFrssySjKW0E7sB3D-UjVea8_Yxvrkkr7sKf47x6jwgVSQ@mail.gmail.com>
- <CAGb2v648K1Nguf8nVjfunow7+xwS0MHazzMXJd1xZ3uNM2WesA@mail.gmail.com>
-Message-ID: <CAPDyKFrBfQ-mNTNitcpgo1FCa1068ZzC_J4efsxmU2X6tOJgzw@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 03 Aug 2017 14:07:24 +0200
+Subject: [PATCH] arm64: dts: marvell: armada-3720-espressobin: Add vqmmc
+ regulator for SD slot
+In-Reply-To: <20170803081011.101dcccd@xps13> (Miquel RAYNAL's message of "Thu,
+ 3 Aug 2017 08:10:11 +0200")
+References: <20170729104411.3602-1-sean@nyekjaer.dk>
+ <20170802193440.21226c2a@xps13>
+ <CAKv0xJx-Jrr8gh30SeFb3A3zRXo2YDG8KtNp7vp25qTqtMfd9g@mail.gmail.com>
+ <20170803081011.101dcccd@xps13>
+Message-ID: <87a83gam83.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 August 2017 at 13:25, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Thu, Aug 3, 2017 at 7:19 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> On 26 July 2017 at 21:45, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->>> On Wed, Jul 26, 2017 at 10:09:41PM +0800, Chen-Yu Tsai wrote:
->>>> On Mon, Jul 24, 2017 at 9:58 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->>>> > Hi everyone,
->>>> >
->>>> > This is v3 of my MMC controller support series.
->>>> >
->>>>
->>>> [...]
->>>>
->>>> > Chen-Yu Tsai (10):
->>>> >   clk: sunxi-ng: Add interface to query or configure MMC timing modes.
->>>> >   clk: sunxi-ng: Add MP_MMC clocks that support MMC timing modes
->>>> >     switching
->>>> >   clk: sunxi-ng: a83t: Support new timing mode for mmc2 clock
->>>> >   mmc: sunxi: Support controllers that can use both old and new timings
->>>> >   mmc: sunxi: Support MMC DDR52 transfer mode with new timing mode
->>>> >   mmc: sunxi: Add support for A83T eMMC (MMC2)
->>>>
->>>> So this series seems to be ready for inclusion, unless Ulf has further
->>>> concerns about the clk usage.
->>>>
->>>> The first mmc patch have build time dependencies on the first clk patch.
->>>> Shall we put the clk patch on a separate immutable branch for both trees
->>>> to pull? Or we could just merge everything through the mmc tree? I don't
->>>> think we'll touch this part of the sunxi-ng clk driver for the remainder
->>>> of this cycle.
->>>
->>> I guess the easiest would be for it to go through Ulf tree, unless he
->>> says otherwise of course :)
->>
->> Okay, I have picked up the series and applied it for my next branch.
->
-> I guess I wasn't very clear. When I meant "everything" I meant the mmc
-> and clk patches. We will take the dts patches through the sunxi tree.
->
-> Can you drop the four dts patches from your tree? That would be the
-> last four patches on mmc/next at the moment.
+Hi Sean,
+ 
+ On jeu., ao?t 03 2017, Miquel RAYNAL <miquel.raynal@free-electrons.com> wrote:
 
-Done!
+> Hi,
+>
+> On Thu, 3 Aug 2017 08:03:24 +0200
+> Sean Nyekj?r <sean@nyekjaer.dk> wrote:
+>
+>> On 2 August 2017 at 19:34, Miquel RAYNAL
+>> <miquel.raynal@free-electrons.com> wrote:
+>> > Hi,
+>> >
+>> > On Sat, 29 Jul 2017 12:44:11 +0200
+>> > Sean Nyekjaer <sean@nyekjaer.dk> wrote:
+>> >  
+>> >> By adding this regulator, the SD cards are usable at higher speed
+>> >> protocols such as SDR104.
+>> >>
+>> >> This patch was tested with an SDHC card compatible with UHS-I.
+>> >>
+>> >> Signed-off-by: Sean Nyekjaer <sean@nyekjaer.dk>  
+>> >
+>> > The patch does the job, but does not apply as is.  
+>> Try applying  "[PATCH] arm64: dts: marvell: Add microsd card
+>> definition for the ESPRESSObin" first :-)
+>
+> I know, but I was pointing the dependency again because there is at
+> least one other patch that does the same uSD addition in ESPRESSObin DT
+> and I do not know which one will be selected by the maintainer.
 
-Kind regards
-Uffe
+As you didn't copy any of the mvebu maintainer I missed your patch. And
+I saw this one only thanks to the patch "ARM64: dts: marvell:
+armada-37xx: Enable uSD on ESPRESSObin", because I thought your patch
+was a follow-up of this one.
+
+I will still apply ""ARM64: dts: marvell: armada-37xx: Enable uSD on
+ESPRESSObin" which is already well formatted and enables everything in a
+single patch, I will just have to remove the "no-1-8-v" that Marcin
+should have let by mistake.
+
+Next time please don't forget to CC the maintainers.
+
+Thanks,
+
+Gregory
+
+>
+> BR,
+> Miqu?l
+>
+>> 
+>> Br
+>> Sean
+>> >
+>> > Tested-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+>> >
+>> > Regards,
+>> > Miqu?l
+>> >  
+>> >> ---
+>> >>
+>> >> This patch depends on "[PATCH] arm64: dts: marvell: Add microsd
+>> >> card definition for the ESPRESSObin"
+>> >>
+>> >>  arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 15
+>> >> ++++++++++++++- 1 file changed, 14 insertions(+), 1 deletion(-)
+>> >>
+>> >> diff --git
+>> >> a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+>> >> b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts index
+>> >> 2dadd77e08eb..d5ab5b47f8d4 100644 ---
+>> >> a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts +++
+>> >> b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts @@ -60,6
+>> >> +60,19 @@ device_type = "memory"; reg = <0x00000000 0x00000000
+>> >> 0x00000000 0x20000000>; };
+>> >> +
+>> >> +     vcc_sd_reg1: regulator {
+>> >> +             compatible = "regulator-gpio";
+>> >> +             regulator-name= "vcc_sd1";
+>> >> +             regulator-min-microvolt = <1800000>;
+>> >> +             regulator-max-microvolt = <3300000>;
+>> >> +
+>> >> +             gpios = <&gpionb 4 GPIO_ACTIVE_HIGH>;
+>> >> +             gpios-states = <0>;
+>> >> +             states = <1800000 0x1
+>> >> +                       3300000 0x0>;
+>> >> +             enable-active-high;
+>> >> +     };
+>> >>  };
+>> >>
+>> >>  /* J9 */
+>> >> @@ -82,7 +95,7 @@
+>> >>       wp-inverted;
+>> >>       bus-width = <4>;
+>> >>       cd-gpios = <&gpionb 3 GPIO_ACTIVE_LOW>;
+>> >> -     no-1-8-v;
+>> >> +     vqmmc-supply = <&vcc_sd_reg1>;
+>> >>       marvell,pad-type = "sd";
+>> >>       status = "okay";
+>> >>  };  
+>> >
+>> >
+>> >
+>> > --
+>> > Miquel Raynal, Free Electrons
+>> > Embedded Linux and Kernel engineering
+>> > http://free-electrons.com  
+>
+>
+>
+> -- 
+> Miquel Raynal, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
