@@ -1,163 +1,60 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu,  3 Aug 2017 17:33:46 -0500
-Subject: [PATCH v3 2/6] drm/tinydrm: generalize tinydrm_xrgb8888_to_gray8()
+Date: Thu,  3 Aug 2017 17:33:49 -0500
+Subject: [PATCH v3 5/6] ARM: dts: da850-lego-ev3: Add node for LCD display
 In-Reply-To: <1501799630-1650-1-git-send-email-david@lechnology.com>
 References: <1501799630-1650-1-git-send-email-david@lechnology.com>
-Message-ID: <1501799630-1650-3-git-send-email-david@lechnology.com>
+Message-ID: <1501799630-1650-6-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds parameters for vaddr and clip to tinydrm_xrgb8888_to_gray8() to
-make it more generic.
-
-dma_buf_{begin,end}_cpu_access() are moved out to the repaper driver.
+This adds a new node for the LEGO MINDSTORMS EV3 LCD display.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
- drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c | 35 ++++++++++----------------
- drivers/gpu/drm/tinydrm/repaper.c              | 21 +++++++++++++++-
- include/drm/tinydrm/tinydrm-helpers.h          |  3 ++-
- 3 files changed, 35 insertions(+), 24 deletions(-)
+ arch/arm/boot/dts/da850-lego-ev3.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c b/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c
-index 75808bb..5915ba8 100644
---- a/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c
-+++ b/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c
-@@ -185,7 +185,9 @@ EXPORT_SYMBOL(tinydrm_xrgb8888_to_rgb565);
- /**
-  * tinydrm_xrgb8888_to_gray8 - Convert XRGB8888 to grayscale
-  * @dst: 8-bit grayscale destination buffer
-+ * @vaddr: XRGB8888 source buffer
-  * @fb: DRM framebuffer
-+ * @clip: Clip rectangle area to copy
-  *
-  * Drm doesn't have native monochrome or grayscale support.
-  * Such drivers can announce the commonly supported XR24 format to userspace
-@@ -199,12 +201,11 @@ EXPORT_SYMBOL(tinydrm_xrgb8888_to_rgb565);
-  * Returns:
-  * Zero on success, negative error code on failure.
-  */
--int tinydrm_xrgb8888_to_gray8(u8 *dst, struct drm_framebuffer *fb)
-+int tinydrm_xrgb8888_to_gray8(u8 *dst, void *vaddr, struct drm_framebuffer *fb,
-+			      struct drm_clip_rect *clip)
- {
--	struct drm_gem_cma_object *cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
--	struct dma_buf_attachment *import_attach = cma_obj->base.import_attach;
--	unsigned int x, y, pitch = fb->pitches[0];
--	int ret = 0;
-+	unsigned int len = (clip->x2 - clip->x1) * sizeof(u32);
-+	unsigned int x, y;
- 	void *buf;
- 	u32 *src;
- 
-@@ -214,22 +215,16 @@ int tinydrm_xrgb8888_to_gray8(u8 *dst, struct drm_framebuffer *fb)
- 	 * The cma memory is write-combined so reads are uncached.
- 	 * Speed up by fetching one line at a time.
- 	 */
--	buf = kmalloc(pitch, GFP_KERNEL);
-+	buf = kmalloc(len, GFP_KERNEL);
- 	if (!buf)
- 		return -ENOMEM;
- 
--	if (import_attach) {
--		ret = dma_buf_begin_cpu_access(import_attach->dmabuf,
--					       DMA_FROM_DEVICE);
--		if (ret)
--			goto err_free;
--	}
--
--	for (y = 0; y < fb->height; y++) {
--		src = cma_obj->vaddr + (y * pitch);
--		memcpy(buf, src, pitch);
-+	for (y = clip->y1; y < clip->y2; y++) {
-+		src = vaddr + (y * fb->pitches[0]);
-+		src += clip->x1;
-+		memcpy(buf, src, len);
- 		src = buf;
--		for (x = 0; x < fb->width; x++) {
-+		for (x = clip->x1; x < clip->x2; x++) {
- 			u8 r = (*src & 0x00ff0000) >> 16;
- 			u8 g = (*src & 0x0000ff00) >> 8;
- 			u8 b =  *src & 0x000000ff;
-@@ -240,13 +235,9 @@ int tinydrm_xrgb8888_to_gray8(u8 *dst, struct drm_framebuffer *fb)
- 		}
- 	}
- 
--	if (import_attach)
--		ret = dma_buf_end_cpu_access(import_attach->dmabuf,
--					     DMA_FROM_DEVICE);
--err_free:
- 	kfree(buf);
- 
--	return ret;
-+	return 0;
- }
- EXPORT_SYMBOL(tinydrm_xrgb8888_to_gray8);
- 
-diff --git a/drivers/gpu/drm/tinydrm/repaper.c b/drivers/gpu/drm/tinydrm/repaper.c
-index 3343d3f..d34cd9b 100644
---- a/drivers/gpu/drm/tinydrm/repaper.c
-+++ b/drivers/gpu/drm/tinydrm/repaper.c
-@@ -18,6 +18,7 @@
-  */
- 
- #include <linux/delay.h>
-+#include <linux/dma-buf.h>
- #include <linux/gpio/consumer.h>
- #include <linux/module.h>
- #include <linux/of_device.h>
-@@ -525,11 +526,20 @@ static int repaper_fb_dirty(struct drm_framebuffer *fb,
- 			    struct drm_clip_rect *clips,
- 			    unsigned int num_clips)
- {
-+	struct drm_gem_cma_object *cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
-+	struct dma_buf_attachment *import_attach = cma_obj->base.import_attach;
- 	struct tinydrm_device *tdev = fb->dev->dev_private;
- 	struct repaper_epd *epd = epd_from_tinydrm(tdev);
-+	struct drm_clip_rect clip;
- 	u8 *buf = NULL;
- 	int ret = 0;
- 
-+	/* repaper can't do partial updates */
-+	clip.x1 = 0;
-+	clip.x2 = fb->width;
-+	clip.y1 = 0;
-+	clip.y2 = fb->height;
+diff --git a/arch/arm/boot/dts/da850-lego-ev3.dts b/arch/arm/boot/dts/da850-lego-ev3.dts
+index 45983c0..249b317 100644
+--- a/arch/arm/boot/dts/da850-lego-ev3.dts
++++ b/arch/arm/boot/dts/da850-lego-ev3.dts
+@@ -249,6 +249,15 @@
+ 			0x4c 0x00000080 0x000000f0
+ 		>;
+ 	};
 +
- 	mutex_lock(&tdev->dirty_lock);
++	ev3_lcd_pins: pinmux_lcd {
++		pinctrl-single,bits = <
++			/* SIMO, GP2[11], GP2[12], CLK */
++			0x14 0x00188100 0x00ffff00
++			/* GP5[0] */
++			0x30 0x80000000 0xf0000000
++		>;
++	};
+ };
  
- 	if (!epd->enabled)
-@@ -550,7 +560,16 @@ static int repaper_fb_dirty(struct drm_framebuffer *fb,
- 		goto out_unlock;
- 	}
+ &pinconf {
+@@ -357,6 +366,21 @@
+ 	};
+ };
  
--	ret = tinydrm_xrgb8888_to_gray8(buf, fb);
-+	if (import_attach) {
-+		ret = dma_buf_begin_cpu_access(import_attach->dmabuf,
-+					       DMA_FROM_DEVICE);
-+		if (ret)
-+			goto out_unlock;
-+	}
++&spi1 {
++	status = "okay";
++	pinctrl-0 = <&ev3_lcd_pins>;
++	pinctrl-names = "default";
++	cs-gpios = <&gpio 44 GPIO_ACTIVE_LOW>;
 +
-+	ret = tinydrm_xrgb8888_to_gray8(buf, cma_obj->vaddr, fb, &clip);
-+	if (import_attach)
-+		dma_buf_end_cpu_access(import_attach->dmabuf, DMA_FROM_DEVICE);
- 	if (ret)
- 		goto out_unlock;
- 
-diff --git a/include/drm/tinydrm/tinydrm-helpers.h b/include/drm/tinydrm/tinydrm-helpers.h
-index a6c387f..9e13ef5 100644
---- a/include/drm/tinydrm/tinydrm-helpers.h
-+++ b/include/drm/tinydrm/tinydrm-helpers.h
-@@ -43,7 +43,8 @@ void tinydrm_swab16(u16 *dst, void *vaddr, struct drm_framebuffer *fb,
- void tinydrm_xrgb8888_to_rgb565(u16 *dst, void *vaddr,
- 				struct drm_framebuffer *fb,
- 				struct drm_clip_rect *clip, bool swap);
--int tinydrm_xrgb8888_to_gray8(u8 *dst, struct drm_framebuffer *fb);
-+int tinydrm_xrgb8888_to_gray8(u8 *dst, void *vaddr, struct drm_framebuffer *fb,
-+			      struct drm_clip_rect *clip);
- 
- struct backlight_device *tinydrm_of_find_backlight(struct device *dev);
- int tinydrm_enable_backlight(struct backlight_device *backlight);
++	display at 0{
++		compatible = "lego,ev3-lcd";
++		reg = <0>;
++		spi-max-frequency = <10000000>;
++		dc-gpios = <&gpio 43 GPIO_ACTIVE_HIGH>;
++		reset-gpios = <&gpio 80 GPIO_ACTIVE_HIGH>;
++	};
++};
++
+ &ehrpwm0 {
+ 	status = "okay";
+ };
 -- 
 2.7.4
