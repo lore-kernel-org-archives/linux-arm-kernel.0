@@ -1,60 +1,51 @@
 From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
-Date: Thu, 3 Aug 2017 15:32:36 -0400
-Subject: [PATCH v5 0/8] Add board support for TS-4600
-In-Reply-To: <20170803012652.GB31819@dragon>
-References: <20170714203218.14409-1-sebastien.bourdelin@savoirfairelinux.com>
- <20170803012652.GB31819@dragon>
-Message-ID: <d40e5ff1-2741-af5c-9dee-b24cd5780aae@savoirfairelinux.com>
+Date: Thu,  3 Aug 2017 15:38:14 -0400
+Subject: [PATCH v6 1/2] of: documentation: add bindings documentation for
+ TS-4600
+Message-ID: <20170803193815.4127-1-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This adds the documentation for the TS-4600 by Technologic Systems.
 
+Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+Changes v5 -> v6:
+  - rebase on master
+  - split the previous patch series into series by subsystem
 
-On 08/02/2017 09:26 PM, Shawn Guo wrote:
-> On Fri, Jul 14, 2017 at 04:32:10PM -0400, Sebastien Bourdelin wrote:
->> This patch serie adds support for the TS-4600 boards rev A and B. These
->> boards, manufactured by Technologic Systems, are based on an i.MX28.
->>
->> This serie include the support for the watchdog which could be enable
->> at Linux boot time depending on the bootloader.
->>
->> The watchdog and few peripherals are implemented in a FPGA, and can
->> only be access using a custom GPIOs bit-banged bus which is called the
->> NBUS by Technologic Systems.
->> A driver for this bus is also included and used by the watchdog.
->>
->> Sebastien Bourdelin (8):
->>   of: documentation: add bindings documentation for TS-4600
->>   ARM: dts: TS-4600: add basic device tree
->>   dt-bindings: bus: Add documentation for the Technologic Systems NBUS
->>   bus: add driver for the Technologic Systems NBUS
->>   ARM: dts: TS-4600: add NBUS support
->>   dt-bindings: watchdog: add documentation for TS4600 watchdog
->>     controller
->>   watchdog: TS-4600: add driver for TS-4600 watchdog controller
->>   ARM: dts: TS-4600: add watchdog support
-> 
-> You are mixing changes on 3 subsystem in a single patch series.  It
-> makes the merge process unnecessarily hard.  I suggest you split the
-> series as following:
-> 
->  - nbus dt-bindings and driver
->  - watchdog dt-bindings and driver
->  - ts-4600 board bindings and dts
-> 
-> You should get the first two into mainline through corresponding
-> subsystem tree, and then submit the last one to me.  In that case, NBUS
-> and watchdog dts changes do not have to be separate patches.
-> 
-> Shawn
-> 
+Changes v4 -> v5:
+  - fix missing signed off
 
-Hi Shawn,
+Changes v3 -> v4:
+  - rebase on master
 
-Thanks i understand, however if it's ok, i would like to process in the
-same time with the TS4600 board bindings and initial dts without the
-part related to the nbus and watchdog.
-There is no dependencies here and we can accellerate the process.
+Changes v2 -> v3:
+  - rebase on master
 
-Regards,
-Sebastien.
+Changes v1 -> v2:
+  - rebase on master
+  - add ack by Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/technologic.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/technologic.txt b/Documentation/devicetree/bindings/arm/technologic.txt
+index 33797acad846..e9d6d6575566 100644
+--- a/Documentation/devicetree/bindings/arm/technologic.txt
++++ b/Documentation/devicetree/bindings/arm/technologic.txt
+@@ -1,6 +1,11 @@
+ Technologic Systems Platforms Device Tree Bindings
+ --------------------------------------------------
+ 
++TS-4600 is a System-on-Module based on the Freescale i.MX28 System-on-Chip.
++It can be mounted on a carrier board providing additional peripheral connectors.
++Required root node properties:
++	- compatible = "technologic,imx28-ts4600", "fsl,imx28"
++
+ TS-4800 board
+ Required root node properties:
+ 	- compatible = "technologic,imx51-ts4800", "fsl,imx51";
+-- 
+2.13.4
