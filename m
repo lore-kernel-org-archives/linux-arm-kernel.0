@@ -1,9 +1,9 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 3 Aug 2017 18:01:01 +0800
+Date: Thu, 3 Aug 2017 18:01:05 +0800
 Subject: [PATCH 2/4] phy: phy-mt65xx-usb3: add SATA PHY support
 In-Reply-To: <72854b92d5d86698e5cbb427b1009e346eb15978.1501753328.git.chunfeng.yun@mediatek.com>
 References: <72854b92d5d86698e5cbb427b1009e346eb15978.1501753328.git.chunfeng.yun@mediatek.com>
-Message-ID: <fd56b3edd61f047d161558e74dfb3afd43140797.1501753328.git.chunfeng.yun@mediatek.com>
+Message-ID: <1501754483-10392-2-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,6 +11,7 @@ From: Ryder Lee <ryder.lee@mediatek.com>
 
 This patch adds SATA setting part.
 
+Change-Id: Icb1fc15ebe9f6172c56a46d40c359c7cff922976
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
