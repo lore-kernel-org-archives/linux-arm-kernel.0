@@ -1,56 +1,63 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 03 Aug 2017 15:17:20 +0200
-Subject: [PATCH 1/2] ARM: mvebu: enable ARM_GLOBAL_TIMER compilation
- Armada 38x platforms
-In-Reply-To: <1501605383-24748-2-git-send-email-mw@semihalf.com> (Marcin
- Wojtas's message of "Tue, 1 Aug 2017 18:36:22 +0200")
-References: <1501605383-24748-1-git-send-email-mw@semihalf.com>
- <1501605383-24748-2-git-send-email-mw@semihalf.com>
-Message-ID: <87efss94f3.fsf@free-electrons.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 3 Aug 2017 16:20:35 +0300
+Subject: [PATCH 2/2] arm64: Define PAGE_OFFSET using GENMASK_ULL
+In-Reply-To: <20170802225159.159536-2-mka@chromium.org>
+References: <20170802225159.159536-1-mka@chromium.org>
+ <20170802225159.159536-2-mka@chromium.org>
+Message-ID: <20170803132035.gixd7m7oxtehpquu@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On mar., ao?t 01 2017, Marcin Wojtas <mw@semihalf.com> wrote:
+Hi Matthias,
 
-> Armada 38x SoCs along with legacy timer (time-armada-370-xp.c),
-> comprise generic Cortex-A9 global timer (arm_global_timer.c).
-> Enable its compilation. The system clocksource subsystem
-> will pick one of above two available ones in case the global
-> timer node is present in the device tree.
->
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
-
-Applied on mvebu/soc
-
-Thanks,
-
-Gregory
-
+On Wed, Aug 02, 2017 at 03:51:59PM -0700, Matthias Kaehlcke wrote:
+> As is the definition causes an integer overflow, which is expected,
+> however clang raises the following warning:
+> 
+> arch/arm64/kernel/head.S:47:8: warning:
+>       integer overflow in preprocessor expression
+>   #elif (PAGE_OFFSET & 0x1fffff) != 0
+>          ^~~~~~~~~~~
+> arch/arm64/include/asm/memory.h:52:46: note:
+>       expanded from macro 'PAGE_OFFSET'
+>   #define PAGE_OFFSET             (UL(0xffffffffffffffff) << (VA_BITS - 1))
+>                                       ~~~~~~~~~~~~~~~~~~  ^  ~~~~~~~~~~~~~
+> 
+> Use GENMASK_ULL() instead of shifting explicitly, the macro takes care
+> of avoiding the overflow.
+> 
+> Reported-by: Nick Desaulniers <ndesaulniers@google.com>
+> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
 > ---
->  arch/arm/mach-mvebu/Kconfig | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
-> index 541647f..9b49867 100644
-> --- a/arch/arm/mach-mvebu/Kconfig
-> +++ b/arch/arm/mach-mvebu/Kconfig
-> @@ -60,6 +60,8 @@ config MACH_ARMADA_38X
->  	select ARM_ERRATA_720789
->  	select ARM_ERRATA_753970
->  	select ARM_GIC
-> +	select ARM_GLOBAL_TIMER
-> +	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
->  	select ARMADA_370_XP_IRQ
->  	select ARMADA_38X_CLK
->  	select HAVE_ARM_SCU
-> -- 
-> 1.8.3.1
->
+>  arch/arm64/include/asm/memory.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index 32f82723338a..732d4eed8edd 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -65,7 +65,7 @@
+>   */
+>  #define VA_BITS			(CONFIG_ARM64_VA_BITS)
+>  #define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+IIUC VA_START should also produce warnings and should be also reworked.
+
+> -#define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
+> +#define PAGE_OFFSET		GENMASK_ULL(BITS_PER_LONG_LONG - 1, VA_BITS - 1)
+
+The original type of PAGE_OFFSET is UL, and after your patch becomes ULL.
+This is the same for arm64. But it would be less questionable if you
+will specify it explicitly, or use GENMASK() instead of GENMASK_ULL().
+
+>  #define KIMAGE_VADDR		(MODULES_END)
+>  #define MODULES_END		(MODULES_VADDR + MODULES_VSIZE)
+>  #define MODULES_VADDR		(VA_START + KASAN_SHADOW_SIZE)
+> -- 
+> 2.14.0.rc1.383.gd1ce394fe2-goog
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
