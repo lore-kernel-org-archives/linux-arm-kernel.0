@@ -1,45 +1,138 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 3 Aug 2017 09:26:54 +0800
-Subject: [PATCH v5 0/8] Add board support for TS-4600
-In-Reply-To: <20170714203218.14409-1-sebastien.bourdelin@savoirfairelinux.com>
-References: <20170714203218.14409-1-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <20170803012652.GB31819@dragon>
+Date: Thu, 3 Aug 2017 09:40:08 +0800
+Subject: [PATCH 2/2] arm64: dts: ls2088a: add cpu idle support
+In-Reply-To: <1501053893-20897-2-git-send-email-andy.tang@nxp.com>
+References: <1501053893-20897-1-git-send-email-andy.tang@nxp.com>
+ <1501053893-20897-2-git-send-email-andy.tang@nxp.com>
+Message-ID: <20170803014007.GC31819@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 14, 2017 at 04:32:10PM -0400, Sebastien Bourdelin wrote:
-> This patch serie adds support for the TS-4600 boards rev A and B. These
-> boards, manufactured by Technologic Systems, are based on an i.MX28.
+On Wed, Jul 26, 2017 at 03:24:53PM +0800, andy.tang at nxp.com wrote:
+> From: Yuantian Tang <andy.tang@nxp.com>
 > 
-> This serie include the support for the watchdog which could be enable
-> at Linux boot time depending on the bootloader.
+> ls2088a supports another cpu idle state which is pw20 which saves
+> more power when cpu is idle.
+> It was implemented through psci firmware.
 > 
-> The watchdog and few peripherals are implemented in a FPGA, and can
-> only be access using a custom GPIOs bit-banged bus which is called the
-> NBUS by Technologic Systems.
-> A driver for this bus is also included and used by the watchdog.
-> 
-> Sebastien Bourdelin (8):
->   of: documentation: add bindings documentation for TS-4600
->   ARM: dts: TS-4600: add basic device tree
->   dt-bindings: bus: Add documentation for the Technologic Systems NBUS
->   bus: add driver for the Technologic Systems NBUS
->   ARM: dts: TS-4600: add NBUS support
->   dt-bindings: watchdog: add documentation for TS4600 watchdog
->     controller
->   watchdog: TS-4600: add driver for TS-4600 watchdog controller
->   ARM: dts: TS-4600: add watchdog support
+> Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
 
-You are mixing changes on 3 subsystem in a single patch series.  It
-makes the merge process unnecessarily hard.  I suggest you split the
-series as following:
-
- - nbus dt-bindings and driver
- - watchdog dt-bindings and driver
- - ts-4600 board bindings and dts
-
-You should get the first two into mainline through corresponding
-subsystem tree, and then submit the last one to me.  In that case, NBUS
-and watchdog dts changes do not have to be separate patches.
+Can you explain a bit in the commit log why psci node is being added in
+fsl-ls208xa.dtsi while you are only adding idle state for ls2088a?  Does
+that mean ls2088a and ls2080a gets different idle implementation?
 
 Shawn
+
+> ---
+>  arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi | 17 +++++++++++++++++
+>  arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi |  5 +++++
+>  2 files changed, 22 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+> index 5c695c6..6aa319d 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+> @@ -53,6 +53,7 @@
+>  		compatible = "arm,cortex-a72";
+>  		reg = <0x0>;
+>  		clocks = <&clockgen 1 0>;
+> +		cpu-idle-states = <&CPU_PW20>;
+>  		next-level-cache = <&cluster0_l2>;
+>  		#cooling-cells = <2>;
+>  	};
+> @@ -62,6 +63,7 @@
+>  		compatible = "arm,cortex-a72";
+>  		reg = <0x1>;
+>  		clocks = <&clockgen 1 0>;
+> +		cpu-idle-states = <&CPU_PW20>;
+>  		next-level-cache = <&cluster0_l2>;
+>  	};
+>  
+> @@ -70,6 +72,7 @@
+>  		compatible = "arm,cortex-a72";
+>  		reg = <0x100>;
+>  		clocks = <&clockgen 1 1>;
+> +		cpu-idle-states = <&CPU_PW20>;
+>  		next-level-cache = <&cluster1_l2>;
+>  		#cooling-cells = <2>;
+>  	};
+> @@ -79,6 +82,7 @@
+>  		compatible = "arm,cortex-a72";
+>  		reg = <0x101>;
+>  		clocks = <&clockgen 1 1>;
+> +		cpu-idle-states = <&CPU_PW20>;
+>  		next-level-cache = <&cluster1_l2>;
+>  	};
+>  
+> @@ -88,6 +92,7 @@
+>  		reg = <0x200>;
+>  		clocks = <&clockgen 1 2>;
+>  		next-level-cache = <&cluster2_l2>;
+> +		cpu-idle-states = <&CPU_PW20>;
+>  		#cooling-cells = <2>;
+>  	};
+>  
+> @@ -96,6 +101,7 @@
+>  		compatible = "arm,cortex-a72";
+>  		reg = <0x201>;
+>  		clocks = <&clockgen 1 2>;
+> +		cpu-idle-states = <&CPU_PW20>;
+>  		next-level-cache = <&cluster2_l2>;
+>  	};
+>  
+> @@ -104,6 +110,7 @@
+>  		compatible = "arm,cortex-a72";
+>  		reg = <0x300>;
+>  		clocks = <&clockgen 1 3>;
+> +		cpu-idle-states = <&CPU_PW20>;
+>  		next-level-cache = <&cluster3_l2>;
+>  		#cooling-cells = <2>;
+>  	};
+> @@ -113,6 +120,7 @@
+>  		compatible = "arm,cortex-a72";
+>  		reg = <0x301>;
+>  		clocks = <&clockgen 1 3>;
+> +		cpu-idle-states = <&CPU_PW20>;
+>  		next-level-cache = <&cluster3_l2>;
+>  	};
+>  
+> @@ -131,6 +139,15 @@
+>  	cluster3_l2: l2-cache3 {
+>  		compatible = "cache";
+>  	};
+> +
+> +	CPU_PW20: cpu-pw20 {
+> +		compatible = "arm,idle-state";
+> +		idle-state-name = "PW20";
+> +		arm,psci-suspend-param = <0x00010000>;
+> +		entry-latency-us = <2000>;
+> +		exit-latency-us = <2000>;
+> +		min-residency-us = <6000>;
+> +	};
+>  };
+>  
+>  &pcie1 {
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> index 94cdd30..205b7f7 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
+> @@ -118,6 +118,11 @@
+>  		interrupts = <1 7 0x8>; /* PMU PPI, Level low type */
+>  	};
+>  
+> +	psci {
+> +		compatible = "arm,psci-0.2";
+> +		method = "smc";
+> +	};
+> +
+>  	soc {
+>  		compatible = "simple-bus";
+>  		#address-cells = <2>;
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
