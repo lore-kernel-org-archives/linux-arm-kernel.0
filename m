@@ -1,41 +1,53 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 3 Aug 2017 10:57:08 -0700
-Subject: [PATCH 01/11] arm64: docs: describe ELF hwcaps
-In-Reply-To: <1500480092-28480-2-git-send-email-mark.rutland@arm.com>
-References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
- <1500480092-28480-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAGXu5jJnhy5F698QFmXrMb3szmtXnfzqc+=QsukG4+p2k9xEdg@mail.gmail.com>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Thu,  3 Aug 2017 11:03:58 -0700
+Subject: [PATCH v2] arm64: avoid overflow in VA_START and PAGE_OFFSET
+In-Reply-To: <CAKwvOdk1A-wvuNDaLokYu1oNPUV-ab24=NzdL5Sbh6QcV_vDMQ@mail.gmail.com>
+References: <CAKwvOdk1A-wvuNDaLokYu1oNPUV-ab24=NzdL5Sbh6QcV_vDMQ@mail.gmail.com>
+Message-ID: <20170803180400.119270-1-ndesaulniers@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 9:01 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> We don't document our ELF hwcaps, leaving developers to interpret them
-> according to hearsay, guesswork, or (in exceptional cases) inspection of
-> the current kernel code.
->
-> This is less than optimal, and it would be far better if we had some
-> definitive description of each of the ELF hwcaps that developers could
-> refer to.
->
-> This patch adds a document describing the (native) arm64 ELF hwcaps.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Dave Martin <Dave.Martin@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  Documentation/arm64/elf_hwcaps.txt | 133 +++++++++++++++++++++++++++++++++++++
+The bitmask used to define these values produces overflow, as seen by
+this compiler warning:
 
-With the kernel docs moving to ReST markup[1], perhaps reformat this
-to a .rst file and link to it from somewhere sensible in the ReST
-tree, perhaps the userspace API section in
-Documentation/userspace-api/index.rst?
+arch/arm64/kernel/head.S:47:8: warning:
+      integer overflow in preprocessor expression
+  #elif (PAGE_OFFSET & 0x1fffff) != 0
+         ^~~~~~~~~~~
+arch/arm64/include/asm/memory.h:52:46: note:
+      expanded from macro 'PAGE_OFFSET'
+  #define PAGE_OFFSET             (UL(0xffffffffffffffff) << (VA_BITS -
+1))
+                                      ~~~~~~~~~~~~~~~~~~  ^
 
--Kees
+It would be preferrable to use GENMASK_ULL() instead, but it's not set
+up to be used from assembly (the UL() macro token pastes UL suffixes
+when not included in assembly sources).
 
-[1] https://www.kernel.org/doc/html/latest/doc-guide/sphinx.html
+Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Suggested-by: Yury Norov <ynorov@caviumnetworks.com>
+Suggested-by: Matthias Kaehlcke <mka@chromium.org>
+Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
+---
+ arch/arm64/include/asm/memory.h | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 32f82723338a..ef39dcb9ca6a 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -64,8 +64,10 @@
+  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
+  */
+ #define VA_BITS			(CONFIG_ARM64_VA_BITS)
+-#define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
+-#define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
++#define VA_START		(UL(0xffffffffffffffff) - \
++	(UL(1) << VA_BITS) + 1)
++#define PAGE_OFFSET		(UL(0xffffffffffffffff) - \
++	(UL(1) << (VA_BITS - 1)) + 1)
+ #define KIMAGE_VADDR		(MODULES_END)
+ #define MODULES_END		(MODULES_VADDR + MODULES_VSIZE)
+ #define MODULES_VADDR		(VA_START + KASAN_SHADOW_SIZE)
 -- 
-Kees Cook
-Pixel Security
+2.14.0.rc1.383.gd1ce394fe2-goog
