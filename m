@@ -1,57 +1,21 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 03 Aug 2017 15:14:46 +0200
-Subject: [PATCH 2/2] ARM: dts: armada-38x: Add arm_global_timer node
-In-Reply-To: <1501605383-24748-3-git-send-email-mw@semihalf.com> (Marcin
- Wojtas's message of "Tue, 1 Aug 2017 18:36:23 +0200")
-References: <1501605383-24748-1-git-send-email-mw@semihalf.com>
- <1501605383-24748-3-git-send-email-mw@semihalf.com>
-Message-ID: <87lgn094jd.fsf@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 3 Aug 2017 15:31:29 +0200
+Subject: [PATCH v2 1/2] Documentation: dt: pinctrl: Add pmi8994 gpio
+ support
+In-Reply-To: <1501247893-30226-1-git-send-email-vivek.gautam@codeaurora.org>
+References: <1501247893-30226-1-git-send-email-vivek.gautam@codeaurora.org>
+Message-ID: <CACRpkdZuEsiT4vLXACR=gcWw_EZj5g-YCZ7_bKUKNjC4ktaajg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On mar., ao?t 01 2017, Marcin Wojtas <mw@semihalf.com> wrote:
+On Fri, Jul 28, 2017 at 3:18 PM, Vivek Gautam
+<vivek.gautam@codeaurora.org> wrote:
 
-> Since generic Cortex-A9 global timer is available after adding
-> it to compilation, enable its node in armada-38x.dtsi.
+> Update the binding doc for qcom pmi8994-gpio devices.
 >
-> Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
 
-Applied on mvebu/dt
+Patch applied with Stephen's review tag.
 
-Thanks,
-
-Gregory
-
-> ---
->  arch/arm/boot/dts/armada-38x.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-> index af31f5d..7ff0811e 100644
-> --- a/arch/arm/boot/dts/armada-38x.dtsi
-> +++ b/arch/arm/boot/dts/armada-38x.dtsi
-> @@ -154,6 +154,13 @@
->  				reg = <0xc000 0x58>;
->  			};
->  
-> +			timer at c200 {
-> +				compatible = "arm,cortex-a9-global-timer";
-> +				reg = <0xc200 0x20>;
-> +				interrupts = <GIC_PPI 11 (IRQ_TYPE_EDGE_RISING | GIC_CPU_MASK_SIMPLE(2))>;
-> +				clocks = <&coreclk 2>;
-> +			};
-> +
->  			timer at c600 {
->  				compatible = "arm,cortex-a9-twd-timer";
->  				reg = <0xc600 0x20>;
-> -- 
-> 1.8.3.1
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yours,
+Linus Walleij
