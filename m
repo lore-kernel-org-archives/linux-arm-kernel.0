@@ -1,351 +1,117 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  3 Aug 2017 10:41:57 +0200
-Subject: [PATCH net-next v2 3/7] net: mvpp2: introduce per-port nrxqs/ntxqs
- variables
+Date: Thu,  3 Aug 2017 10:41:58 +0200
+Subject: [PATCH net-next v2 4/7] net: mvpp2: move from cpu-centric naming to
+ "software thread" naming
 In-Reply-To: <20170803084201.30305-1-thomas.petazzoni@free-electrons.com>
 References: <20170803084201.30305-1-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170803084201.30305-4-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170803084201.30305-5-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the global variables rxq_number and txq_number hold the
-number of per-port TXQs and RXQs. Until now, such numbers were
-constant regardless of the driver configuration. As we are going to
-introduce different modes for TX and RX queues, these numbers will
-depend on the configuration (PPv2.1 vs. PPv2.2, exact queue
-distribution logic).
+The PPv2.2 IP has a concept of "software thread", with all registers
+of the PPv2.2 mapped 8 times, for concurrent accesses by 8 "software
+threads". In addition, interrupts on RX queues are associated to such
+"software thread".
 
-Therefore, as a preparation, we move the number of RXQs and TXQs in
-the 'struct mvpp2_port' structure, next to the RXQs and TXQs
-descriptor arrays.
+For most cases, we map a "software thread" to the more conventional
+concept of CPU, but we will soon have one exception: we will have a
+model where we have one TX interrupt per CPU (each using one software
+thread), and all RX events mapped to another software thread
+(associated to another interrupt).
 
-For now, they remain initialized to the same default values as
-rxq_number/txq_number used to be initialized, but this will change in
-future commits.
-
-The only non-mechanical change in this patch is that the check to
-verify hardware constraints on the number of RXQs and TXQs is moved
-from mvpp2_probe() to mvpp2_port_probe(), since it's now in
-mvpp2_port_probe() that we initialize the per-port count of RXQ and
-TXQ.
+In preparation for this change, it makes sense to change the naming
+from MVPP2_MAX_CPUS to MVPP2_MAX_THREADS, and plan for 8 software
+threads instead of 4 currently.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 83 ++++++++++++++++++------------------
- 1 file changed, 41 insertions(+), 42 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 25 +++++++++++++------------
+ 1 file changed, 13 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 537d2b4..84908aa 100644
+index 84908aa..af38a21 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -768,7 +768,9 @@ struct mvpp2_port {
- 	void __iomem *base;
+@@ -685,7 +685,7 @@ enum mvpp2_prs_l3_cast {
+ #define MVPP21_ADDR_SPACE_SZ		0
+ #define MVPP22_ADDR_SPACE_SZ		SZ_64K
  
- 	struct mvpp2_rx_queue **rxqs;
-+	unsigned int nrxqs;
- 	struct mvpp2_tx_queue **txqs;
-+	unsigned int ntxqs;
- 	struct net_device *dev;
+-#define MVPP2_MAX_CPUS			4
++#define MVPP2_MAX_THREADS		8
  
- 	int pkt_size;
-@@ -1062,13 +1064,6 @@ struct mvpp2_bm_pool {
- 	u32 port_map;
- };
+ enum mvpp2_bm_type {
+ 	MVPP2_BM_FREE,
+@@ -701,11 +701,12 @@ struct mvpp2 {
+ 	void __iomem *lms_base;
+ 	void __iomem *iface_base;
  
--/* Static declaractions */
--
--/* Number of RXQs used by single port */
--static int rxq_number = MVPP2_DEFAULT_RXQ;
--/* Number of TXQs used by single port */
--static int txq_number = MVPP2_MAX_TXQ;
--
- #define MVPP2_DRIVER_NAME "mvpp2"
- #define MVPP2_DRIVER_VERSION "1.0"
+-	/* On PPv2.2, each CPU can access the base register through a
+-	 * separate address space, each 64 KB apart from each
+-	 * other.
++	/* On PPv2.2, each "software thread" can access the base
++	 * register through a separate address space, each 64 KB apart
++	 * from each other. Typically, such address spaces will be
++	 * used per CPU.
+ 	 */
+-	void __iomem *cpu_base[MVPP2_MAX_CPUS];
++	void __iomem *swth_base[MVPP2_MAX_THREADS];
  
-@@ -4070,7 +4065,7 @@ static int mvpp2_swf_bm_pool_init(struct mvpp2_port *port)
+ 	/* Common clocks */
+ 	struct clk *pp_clk;
+@@ -1071,12 +1072,12 @@ struct mvpp2_bm_pool {
  
- 		port->pool_long->port_map |= (1 << port->id);
- 
--		for (rxq = 0; rxq < rxq_number; rxq++)
-+		for (rxq = 0; rxq < port->nrxqs; rxq++)
- 			mvpp2_rxq_long_pool_set(port, rxq, port->pool_long->id);
- 	}
- 
-@@ -4084,7 +4079,7 @@ static int mvpp2_swf_bm_pool_init(struct mvpp2_port *port)
- 
- 		port->pool_short->port_map |= (1 << port->id);
- 
--		for (rxq = 0; rxq < rxq_number; rxq++)
-+		for (rxq = 0; rxq < port->nrxqs; rxq++)
- 			mvpp2_rxq_short_pool_set(port, rxq,
- 						 port->pool_short->id);
- 	}
-@@ -4376,7 +4371,7 @@ static void mvpp2_defaults_set(struct mvpp2_port *port)
- 		    MVPP2_RX_LOW_LATENCY_PKT_SIZE(256));
- 
- 	/* Enable Rx cache snoop */
--	for (lrxq = 0; lrxq < rxq_number; lrxq++) {
-+	for (lrxq = 0; lrxq < port->nrxqs; lrxq++) {
- 		queue = port->rxqs[lrxq]->id;
- 		val = mvpp2_read(port->priv, MVPP2_RXQ_CONFIG_REG(queue));
- 		val |= MVPP2_SNOOP_PKT_SIZE_MASK |
-@@ -4394,7 +4389,7 @@ static void mvpp2_ingress_enable(struct mvpp2_port *port)
- 	u32 val;
- 	int lrxq, queue;
- 
--	for (lrxq = 0; lrxq < rxq_number; lrxq++) {
-+	for (lrxq = 0; lrxq < port->nrxqs; lrxq++) {
- 		queue = port->rxqs[lrxq]->id;
- 		val = mvpp2_read(port->priv, MVPP2_RXQ_CONFIG_REG(queue));
- 		val &= ~MVPP2_RXQ_DISABLE_MASK;
-@@ -4407,7 +4402,7 @@ static void mvpp2_ingress_disable(struct mvpp2_port *port)
- 	u32 val;
- 	int lrxq, queue;
- 
--	for (lrxq = 0; lrxq < rxq_number; lrxq++) {
-+	for (lrxq = 0; lrxq < port->nrxqs; lrxq++) {
- 		queue = port->rxqs[lrxq]->id;
- 		val = mvpp2_read(port->priv, MVPP2_RXQ_CONFIG_REG(queue));
- 		val |= MVPP2_RXQ_DISABLE_MASK;
-@@ -4426,7 +4421,7 @@ static void mvpp2_egress_enable(struct mvpp2_port *port)
- 
- 	/* Enable all initialized TXs. */
- 	qmap = 0;
--	for (queue = 0; queue < txq_number; queue++) {
-+	for (queue = 0; queue < port->ntxqs; queue++) {
- 		struct mvpp2_tx_queue *txq = port->txqs[queue];
- 
- 		if (txq->descs)
-@@ -4712,7 +4707,7 @@ static void mvpp2_txq_sent_counter_clear(void *arg)
- 	struct mvpp2_port *port = arg;
- 	int queue;
- 
--	for (queue = 0; queue < txq_number; queue++) {
-+	for (queue = 0; queue < port->ntxqs; queue++) {
- 		int id = port->txqs[queue]->id;
- 
- 		mvpp2_percpu_read(port->priv, smp_processor_id(),
-@@ -4753,7 +4748,7 @@ static void mvpp2_txp_max_tx_size_set(struct mvpp2_port *port)
- 		mvpp2_write(port->priv, MVPP2_TXP_SCHED_TOKEN_SIZE_REG, val);
- 	}
- 
--	for (txq = 0; txq < txq_number; txq++) {
-+	for (txq = 0; txq < port->ntxqs; txq++) {
- 		val = mvpp2_read(port->priv,
- 				 MVPP2_TXQ_SCHED_TOKEN_SIZE_REG(txq));
- 		size = val & MVPP2_TXQ_TOKEN_SIZE_MAX;
-@@ -5229,7 +5224,7 @@ static void mvpp2_cleanup_txqs(struct mvpp2_port *port)
- 	val |= MVPP2_TX_PORT_FLUSH_MASK(port->id);
- 	mvpp2_write(port->priv, MVPP2_TX_PORT_FLUSH_REG, val);
- 
--	for (queue = 0; queue < txq_number; queue++) {
-+	for (queue = 0; queue < port->ntxqs; queue++) {
- 		txq = port->txqs[queue];
- 		mvpp2_txq_clean(port, txq);
- 		mvpp2_txq_deinit(port, txq);
-@@ -5246,7 +5241,7 @@ static void mvpp2_cleanup_rxqs(struct mvpp2_port *port)
+ static void mvpp2_write(struct mvpp2 *priv, u32 offset, u32 data)
  {
- 	int queue;
- 
--	for (queue = 0; queue < rxq_number; queue++)
-+	for (queue = 0; queue < port->nrxqs; queue++)
- 		mvpp2_rxq_deinit(port, port->rxqs[queue]);
+-	writel(data, priv->cpu_base[0] + offset);
++	writel(data, priv->swth_base[0] + offset);
  }
  
-@@ -5255,7 +5250,7 @@ static int mvpp2_setup_rxqs(struct mvpp2_port *port)
+ static u32 mvpp2_read(struct mvpp2 *priv, u32 offset)
  {
- 	int queue, err;
+-	return readl(priv->cpu_base[0] + offset);
++	return readl(priv->swth_base[0] + offset);
+ }
  
--	for (queue = 0; queue < rxq_number; queue++) {
-+	for (queue = 0; queue < port->nrxqs; queue++) {
- 		err = mvpp2_rxq_init(port, port->rxqs[queue]);
- 		if (err)
- 			goto err_cleanup;
-@@ -5273,7 +5268,7 @@ static int mvpp2_setup_txqs(struct mvpp2_port *port)
- 	struct mvpp2_tx_queue *txq;
- 	int queue, err;
+ /* These accessors should be used to access:
+@@ -1118,13 +1119,13 @@ static u32 mvpp2_read(struct mvpp2 *priv, u32 offset)
+ static void mvpp2_percpu_write(struct mvpp2 *priv, int cpu,
+ 			       u32 offset, u32 data)
+ {
+-	writel(data, priv->cpu_base[cpu] + offset);
++	writel(data, priv->swth_base[cpu] + offset);
+ }
  
--	for (queue = 0; queue < txq_number; queue++) {
-+	for (queue = 0; queue < port->ntxqs; queue++) {
- 		txq = port->txqs[queue];
- 		err = mvpp2_txq_init(port, txq);
- 		if (err)
-@@ -5385,7 +5380,7 @@ static void mvpp2_tx_proc_cb(unsigned long data)
- 	port_pcpu->timer_scheduled = false;
+ static u32 mvpp2_percpu_read(struct mvpp2 *priv, int cpu,
+ 			     u32 offset)
+ {
+-	return readl(priv->cpu_base[cpu] + offset);
++	return readl(priv->swth_base[cpu] + offset);
+ }
  
- 	/* Process all the Tx queues */
--	cause = (1 << txq_number) - 1;
-+	cause = (1 << port->ntxqs) - 1;
- 	tx_todo = mvpp2_tx_done(port, cause);
+ static dma_addr_t mvpp2_txdesc_dma_addr_get(struct mvpp2_port *port,
+@@ -6874,7 +6875,7 @@ static int mvpp2_probe(struct platform_device *pdev)
+ 	struct mvpp2 *priv;
+ 	struct resource *res;
+ 	void __iomem *base;
+-	int port_count, cpu;
++	int port_count, i;
+ 	int err;
  
- 	/* Set the timer in case not all the packets were processed */
-@@ -6228,7 +6223,7 @@ static int mvpp2_ethtool_set_coalesce(struct net_device *dev,
- 	struct mvpp2_port *port = netdev_priv(dev);
- 	int queue;
- 
--	for (queue = 0; queue < rxq_number; queue++) {
-+	for (queue = 0; queue < port->nrxqs; queue++) {
- 		struct mvpp2_rx_queue *rxq = port->rxqs[queue];
- 
- 		rxq->time_coal = c->rx_coalesce_usecs;
-@@ -6237,7 +6232,7 @@ static int mvpp2_ethtool_set_coalesce(struct net_device *dev,
- 		mvpp2_rx_time_coal_set(port, rxq);
+ 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+@@ -6901,12 +6902,12 @@ static int mvpp2_probe(struct platform_device *pdev)
+ 			return PTR_ERR(priv->iface_base);
  	}
  
--	for (queue = 0; queue < txq_number; queue++) {
-+	for (queue = 0; queue < port->ntxqs; queue++) {
- 		struct mvpp2_tx_queue *txq = port->txqs[queue];
+-	for_each_present_cpu(cpu) {
++	for (i = 0; i < MVPP2_MAX_THREADS; i++) {
+ 		u32 addr_space_sz;
  
- 		txq->done_pkts_coal = c->tx_max_coalesced_frames;
-@@ -6373,15 +6368,20 @@ static int mvpp2_port_init(struct mvpp2_port *port)
- 	struct mvpp2_txq_pcpu *txq_pcpu;
- 	int queue, cpu, err;
- 
--	if (port->first_rxq + rxq_number >
-+	/* Checks for hardware constraints */
-+	if (port->first_rxq + port->nrxqs >
- 	    MVPP2_MAX_PORTS * priv->max_port_rxqs)
- 		return -EINVAL;
- 
-+	if (port->nrxqs % 4 || (port->nrxqs > priv->max_port_rxqs) ||
-+	    (port->ntxqs > MVPP2_MAX_TXQ))
-+		return -EINVAL;
-+
- 	/* Disable port */
- 	mvpp2_egress_disable(port);
- 	mvpp2_port_disable(port);
- 
--	port->txqs = devm_kcalloc(dev, txq_number, sizeof(*port->txqs),
-+	port->txqs = devm_kcalloc(dev, port->ntxqs, sizeof(*port->txqs),
- 				  GFP_KERNEL);
- 	if (!port->txqs)
- 		return -ENOMEM;
-@@ -6389,7 +6389,7 @@ static int mvpp2_port_init(struct mvpp2_port *port)
- 	/* Associate physical Tx queues to this port and initialize.
- 	 * The mapping is predefined.
- 	 */
--	for (queue = 0; queue < txq_number; queue++) {
-+	for (queue = 0; queue < port->ntxqs; queue++) {
- 		int queue_phy_id = mvpp2_txq_phys(port->id, queue);
- 		struct mvpp2_tx_queue *txq;
- 
-@@ -6416,7 +6416,7 @@ static int mvpp2_port_init(struct mvpp2_port *port)
- 		port->txqs[queue] = txq;
+ 		addr_space_sz = (priv->hw_version == MVPP21 ?
+ 				 MVPP21_ADDR_SPACE_SZ : MVPP22_ADDR_SPACE_SZ);
+-		priv->cpu_base[cpu] = base + cpu * addr_space_sz;
++		priv->swth_base[i] = base + i * addr_space_sz;
  	}
  
--	port->rxqs = devm_kcalloc(dev, rxq_number, sizeof(*port->rxqs),
-+	port->rxqs = devm_kcalloc(dev, port->nrxqs, sizeof(*port->rxqs),
- 				  GFP_KERNEL);
- 	if (!port->rxqs) {
- 		err = -ENOMEM;
-@@ -6424,7 +6424,7 @@ static int mvpp2_port_init(struct mvpp2_port *port)
- 	}
- 
- 	/* Allocate and initialize Rx queue for this port */
--	for (queue = 0; queue < rxq_number; queue++) {
-+	for (queue = 0; queue < port->nrxqs; queue++) {
- 		struct mvpp2_rx_queue *rxq;
- 
- 		/* Map physical Rx queue to port's logical Rx queue */
-@@ -6444,19 +6444,19 @@ static int mvpp2_port_init(struct mvpp2_port *port)
- 	/* Configure Rx queue group interrupt for this port */
- 	if (priv->hw_version == MVPP21) {
- 		mvpp2_write(priv, MVPP21_ISR_RXQ_GROUP_REG(port->id),
--			    rxq_number);
-+			    port->nrxqs);
- 	} else {
- 		u32 val;
- 
- 		val = (port->id << MVPP22_ISR_RXQ_GROUP_INDEX_GROUP_OFFSET);
- 		mvpp2_write(priv, MVPP22_ISR_RXQ_GROUP_INDEX_REG, val);
- 
--		val = (rxq_number << MVPP22_ISR_RXQ_SUB_GROUP_SIZE_OFFSET);
-+		val = (port->nrxqs << MVPP22_ISR_RXQ_SUB_GROUP_SIZE_OFFSET);
- 		mvpp2_write(priv, MVPP22_ISR_RXQ_SUB_GROUP_CONFIG_REG, val);
- 	}
- 
- 	/* Create Rx descriptor rings */
--	for (queue = 0; queue < rxq_number; queue++) {
-+	for (queue = 0; queue < port->nrxqs; queue++) {
- 		struct mvpp2_rx_queue *rxq = port->rxqs[queue];
- 
- 		rxq->size = port->rx_ring_size;
-@@ -6484,7 +6484,7 @@ static int mvpp2_port_init(struct mvpp2_port *port)
- 	return 0;
- 
- err_free_percpu:
--	for (queue = 0; queue < txq_number; queue++) {
-+	for (queue = 0; queue < port->ntxqs; queue++) {
- 		if (!port->txqs[queue])
- 			continue;
- 		free_percpu(port->txqs[queue]->pcpu);
-@@ -6505,12 +6505,16 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 	const char *dt_mac_addr;
- 	const char *mac_from;
- 	char hw_mac_addr[ETH_ALEN];
-+	unsigned int ntxqs, nrxqs;
- 	u32 id;
- 	int features;
- 	int phy_mode;
- 	int err, i, cpu;
- 
--	dev = alloc_etherdev_mqs(sizeof(*port), txq_number, rxq_number);
-+	ntxqs = MVPP2_MAX_TXQ;
-+	nrxqs = MVPP2_DEFAULT_RXQ;
-+
-+	dev = alloc_etherdev_mqs(sizeof(*port), ntxqs, nrxqs);
- 	if (!dev)
- 		return -ENOMEM;
- 
-@@ -6540,6 +6544,8 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 	dev->ethtool_ops = &mvpp2_eth_tool_ops;
- 
- 	port = netdev_priv(dev);
-+	port->ntxqs = ntxqs;
-+	port->nrxqs = nrxqs;
- 
- 	port->irq = irq_of_parse_and_map(port_node, 0);
- 	if (port->irq <= 0) {
-@@ -6553,7 +6559,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 	port->priv = priv;
- 	port->id = id;
  	if (priv->hw_version == MVPP21)
--		port->first_rxq = port->id * rxq_number;
-+		port->first_rxq = port->id * port->nrxqs;
- 	else
- 		port->first_rxq = port->id * priv->max_port_rxqs;
- 
-@@ -6662,7 +6668,7 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- err_free_port_pcpu:
- 	free_percpu(port->pcpu);
- err_free_txq_pcpu:
--	for (i = 0; i < txq_number; i++)
-+	for (i = 0; i < port->ntxqs; i++)
- 		free_percpu(port->txqs[i]->pcpu);
- err_free_stats:
- 	free_percpu(port->stats);
-@@ -6683,7 +6689,7 @@ static void mvpp2_port_remove(struct mvpp2_port *port)
- 	of_node_put(port->phy_node);
- 	free_percpu(port->pcpu);
- 	free_percpu(port->stats);
--	for (i = 0; i < txq_number; i++)
-+	for (i = 0; i < port->ntxqs; i++)
- 		free_percpu(port->txqs[i]->pcpu);
- 	irq_dispose_mapping(port->irq);
- 	free_netdev(port->dev);
-@@ -6800,13 +6806,6 @@ static int mvpp2_init(struct platform_device *pdev, struct mvpp2 *priv)
- 	int err, i;
- 	u32 val;
- 
--	/* Checks for hardware constraints */
--	if (rxq_number % 4 || (rxq_number > priv->max_port_rxqs) ||
--	    (txq_number > MVPP2_MAX_TXQ)) {
--		dev_err(&pdev->dev, "invalid queue size parameter\n");
--		return -EINVAL;
--	}
--
- 	/* MBUS windows configuration */
- 	dram_target_info = mv_mbus_dram_info();
- 	if (dram_target_info)
 -- 
 2.9.4
