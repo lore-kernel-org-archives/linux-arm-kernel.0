@@ -1,50 +1,138 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  3 Aug 2017 16:28:56 +0100
-Subject: [PATCH 3/4] KVM: arm/arm64: Handle hva aging while destroying the vm
-In-Reply-To: <20170803152857.32055-1-marc.zyngier@arm.com>
-References: <20170803152857.32055-1-marc.zyngier@arm.com>
-Message-ID: <20170803152857.32055-4-marc.zyngier@arm.com>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 3 Aug 2017 10:18:44 -0500
+Subject: [PATCH 0/6] Support for LEGO MINDSTORMS EV3 LCD display
+In-Reply-To: <b8ec0511-afd1-2a1b-6ffe-dfe951d79bf7@tronnes.org>
+References: <1501355870-13960-1-git-send-email-david@lechnology.com>
+ <5d8f6518-8d7e-c029-2da4-e3417afb3e40@lechnology.com>
+ <28188f5c-1daf-121b-6daf-1899668c3875@tronnes.org>
+ <1ce36d43-b9dd-807e-23aa-bac4fda70fdc@lechnology.com>
+ <bfb3d541-856b-0233-dd85-72512788939f@tronnes.org>
+ <bbec0574-311a-e1b4-d7fd-f6fb15b078d2@lechnology.com>
+ <b8ec0511-afd1-2a1b-6ffe-dfe951d79bf7@tronnes.org>
+Message-ID: <cf740449-c952-08d4-d63c-d92e71fa3092@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suzuki K Poulose <Suzuki.Poulose@arm.com>
+On 08/03/2017 09:07 AM, Noralf Tr?nnes wrote:
+> 
+> Den 02.08.2017 00.26, skrev David Lechner:
+>> On 08/01/2017 01:08 PM, Noralf Tr?nnes wrote:
+>>> (cc: Daniel Vetter)
+>>>
+>>>
+>>> Den 01.08.2017 18.51, skrev David Lechner:
+>>>> On 07/30/2017 12:14 PM, Noralf Tr?nnes wrote:
+>>>>>
+>>>>> Den 29.07.2017 21.40, skrev David Lechner:
+>>>>>> On 07/29/2017 02:17 PM, David Lechner wrote:
+>>>>>>> The goal of this series is to get the built-in LCD of the LEGO 
+>>>>>>> MINDSTORMS EV3
+>>>>>>> working. But, most of the content here is building up the 
+>>>>>>> infrastructure to do
+>>>>>>> that.
+>>>>>>>
+>>>>>>
+>>>>>> Some general comments/questions:
+>>>>>>
+>>>>>> I have noticed that DRM doesn't really have support for monochrome 
+>>>>>> displays. I'm guessing that is because no one really uses them 
+>>>>>> anymore?
+>>>>>>
+>>>>>
+>>>>> The repaper driver was the first monochrome drm driver and I chose to
+>>>>> present it to userspace as XRGB8888 and convert it to monochrome.
+>>>>> The reason for this is that everything, libraries, apps, plymouth 
+>>>>> (boot
+>>>>> splash, no rgb565) supports it. I didn't see any point in adding a new
+>>>>> monochrome drm format that didn't have, or probably wouldn't get
+>>>>> userspace support (by libraries at least). The application of course
+>>>>> needs to know this to get a good result.
+>>>>>
+>>>>> tinydrm_xrgb8888_to_gray8() does the conversion:
+>>>>> https://cgit.freedesktop.org/drm/drm-misc/commit/drivers/gpu/drm/tinydrm?id=379ea9a1a59a5a32c8db6f164e80a3fd00cb3781 
+>>>>>
+>>>>>
+>>>>>> The LEGO EV3 display is just an LCD (not the backlit kind). It has 
+>>>>>> two modes of operation. It can to 2bbp grayscale or it can do 1bpp 
+>>>>>> monochrome. The grayscale isn't the best (looks splotchy in 
+>>>>>> places), so it would be nice to be able to choose between these 
+>>>>>> two modes. How would I implement something like that?
+>>>>>>
+>>>>>
+>>>>> Do you expect anyone to use grayscale if it doesn't look good?
+>>>>> Maybe better to add it later if there's a demand for it.
+>>>>
+>>>> I don't expect many people to use it at all. The people that do will 
+>>>> be hackers like me that want to see what it is capable of, so I 
+>>>> think I will keep it grayscale by default.
+>>>>
+>>>
+>>> It looks like the best way to satisfy your needs is to add specific 
+>>> formats.
+>>>
+>>> Video for Linux have these:
+>>>
+>>> include/uapi/linux/videodev2.h
+>>>
+>>> /* Grey formats */
+>>> #define V4L2_PIX_FMT_GREY    v4l2_fourcc('G', 'R', 'E', 'Y') /* 8 
+>>> Greyscale     */
+>>> #define V4L2_PIX_FMT_Y4      v4l2_fourcc('Y', '0', '4', ' ') /* 4 
+>>> Greyscale     */
+>>> #define V4L2_PIX_FMT_Y6      v4l2_fourcc('Y', '0', '6', ' ') /* 6 
+>>> Greyscale     */
+>>> #define V4L2_PIX_FMT_Y10     v4l2_fourcc('Y', '1', '0', ' ') /* 10 
+>>> Greyscale     */
+>>> #define V4L2_PIX_FMT_Y12     v4l2_fourcc('Y', '1', '2', ' ') /* 12 
+>>> Greyscale     */
+>>> #define V4L2_PIX_FMT_Y16     v4l2_fourcc('Y', '1', '6', ' ') /* 16 
+>>> Greyscale     */
+>>> #define V4L2_PIX_FMT_Y16_BE  v4l2_fourcc_be('Y', '1', '6', ' ') /* 16 
+>>> Greyscale BE  */
+>>>
+>>>
+>>> Maybe we can add formats like these:
+>>>
+>>> include/uapi/drm/drm_fourcc.h
+>>>
+>>> #define DRM_FORMAT_MONO        fourcc_code('Y', '0', '1', ' ') /* [0] 
+>>> Monochrome */
+>>> or
+>>> #define DRM_FORMAT_Y1        fourcc_code('Y', '0', '1', ' ') /* [0] 
+>>> Monochrome */
+>>>
+>>> #define DRM_FORMAT_Y2        fourcc_code('Y', '0', '2', ' ') /* [1:0] 
+>>> Greyscale */
+>>>
+>>> Daniel, what do you think?
+>>
+>> 2 of the first 3 tinydrm drivers are monochrome (and I would like to 
+>> write a driver for the Seeed/Grove I2C OLED displays which are also 
+>> monochrome), so I think the 1bpp modes would definitely be useful.
+> 
+> David, I'm curious about those displays what controller/interface they use.
+> I have been hoping that it would be possible to use regmap as an
+> abstraction for many of these controllers and their registers.
 
-The mmu_notifier_release() callback of KVM triggers cleaning up
-the stage2 page table on kvm-arm. However there could be other
-notifier callbacks in parallel with the mmu_notifier_release(),
-which could cause the call backs ending up in an empty stage2
-page table. Make sure we check it for all the notifier callbacks.
+The particular display I have is this one: 
+http://wiki.seeed.cc/Grove-OLED_Display_1.12inch/
 
-Cc: stable at vger.kernel.org
-Fixes: commit 293f29363 ("kvm-arm: Unmap shadow pagetables properly")
-Reported-by: Alex Graf <agraf@suse.de>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/mmu.c | 4 ++++
- 1 file changed, 4 insertions(+)
+It looks like it uses a command/data scheme like the MIPI displays, but 
+doesn't use any of the standard values for the commands. The controller 
+can do parallel, SPI and I2C, but the display I have is wired for I2C.
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 0e1fc75f3585..2ea21dac0b44 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1718,12 +1718,16 @@ static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, u64 size, void *
- 
- int kvm_age_hva(struct kvm *kvm, unsigned long start, unsigned long end)
- {
-+	if (!kvm->arch.pgd)
-+		return 0;
- 	trace_kvm_age_hva(start, end);
- 	return handle_hva_to_gpa(kvm, start, end, kvm_age_hva_handler, NULL);
- }
- 
- int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
- {
-+	if (!kvm->arch.pgd)
-+		return 0;
- 	trace_kvm_test_age_hva(hva);
- 	return handle_hva_to_gpa(kvm, hva, hva, kvm_test_age_hva_handler, NULL);
- }
--- 
-2.11.0
+> 
+> For MIPI DCS it wasn't possible because it's command oriented with
+> arguments. Since zero arguments is possible, a register with no value
+> is nonsense, even though the regmap implementation happily let me do it.
+> There's also the problem that regmap doesn't support registers with
+> different widths. Which is a problem if all registers are 8-bit wide,
+> except the GRAM register being 16-bit on RGB565 formats.
+> 
+> regmap is especially helpful with controllers that also have
+> gpios/keypad/touch/pwm, since the mfd (multi function device) subsystem
+> has good support for sharing regmaps between drivers. Multi function
+> devices are split into several drivers.
+> 
+> Noralf.
+> 
