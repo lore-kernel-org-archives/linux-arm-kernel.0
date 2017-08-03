@@ -1,45 +1,69 @@
-From: felipe.balbi@linux.intel.com (Felipe Balbi)
-Date: Thu, 03 Aug 2017 12:23:09 +0300
-Subject: [PATCH 2/2] MAINTAINERS: add entry for mediatek usb3 DRD IP driver
-In-Reply-To: <1501749439-8837-2-git-send-email-chunfeng.yun@mediatek.com>
-References: <1501749439-8837-1-git-send-email-chunfeng.yun@mediatek.com>
- <1501749439-8837-2-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <87y3r1dmyq.fsf@linux.intel.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Thu, 3 Aug 2017 15:05:55 +0530
+Subject: rk3288: mmcblk0: error -110 sending status command, retrying
+In-Reply-To: <18c3b93d-9db2-eb82-8232-7d141e00324e@rock-chips.com>
+References: <CAD6G_RRgPB_FVTr0OUdtUXeViben6pSakEcskzwQXkqUeaT2kw@mail.gmail.com>
+ <18c3b93d-9db2-eb82-8232-7d141e00324e@rock-chips.com>
+Message-ID: <CAD6G_RQQJ+i7OPO3M0HvvsjgoP52uHNvtur419eBDtBf9JzKgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-Chunfeng Yun <chunfeng.yun@mediatek.com> writes:
-> Add myself as maintainer of MediaTek USB3 DRD IP driver
+On Thu, Aug 3, 2017 at 1:48 PM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
 >
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  MAINTAINERS |    7 +++++++
->  1 file changed, 7 insertions(+)
+> On 2017/8/2 19:09, Jagan Teki wrote:
+>>
+>> Hi,
+>>
+>> Did anyone observing error -110 and -84 during boot on rk3288 target?
+>> full log here[1] and used dts node is[2].
 >
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 205d397..0f0bcc7 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -8472,6 +8472,13 @@ M:      Sean Wang <sean.wang@mediatek.com>
->  S:      Maintained
->  F:      drivers/char/hw_random/mtk-rng.c
->  
-> +MEDIATEK USB3 DRD IP DRIVER
-> +M:	Chunfeng Yun <chunfeng.yun@mediatek.com>
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +L:	linux-mediatek at lists.infradead.org (moderated for non-subscribers)
+>
+> -100 is -ETIMEDOUT and -84 is CRC error. So that seems much likely HW
+> relevant. Have you check the SI of SD slot?
 
-everything USB should go to linux-usb too.
+Does it means Serial Interface of SD, if yes. I've been added sdio0
+for the same.
 
+&sdio0 {
+        bus-width = <4>;
+        disable-wp;
+        non-removable;
+        pinctrl-names = "default";
+        pinctrl-0 = <&sdio0_bus4>, <&sdio0_cmd>, <&sdio0_clk>;
+        vmmc-supply = <&vcc_wl>;
+        vqmmc-supply = <&vccio_wl>;
+        status = "okay";
+};
+
+>
+> You don't enable UHS mode so the tuning process won't help.
+
+For UHS switch I've added vqmmc-supply
+        vccio_sd: vccio-sd-regulator {
+                compatible = "regulator-fixed";
+                regulator-name = "vccio_sd";
+                regulator-min-microvolt = <3300000>;
+                regulator-max-microvolt = <3300000>;
+                vin-supply = <&vcc_io>;
+        };
+
+And the slot detecting still 50MHz and timeout still effecting.
+# fdisk -l
+[  120.572927] mmcblk0: error -110 sending status command, retrying
+[  120.579880] mmcblk0: error -110 sending status command, retrying
+[  120.586707] mmcblk0: error -110 sending status command, aborting
+[  120.596373] mmc_host mmc0: Regulator set non-error 0 - 3.3 V
+[  120.627875] mmc_host mmc0: Bus speed (slot 0) = 400000Hz (slot req
+400000Hz, actual 400000HZ div = 0)
+[  120.701757] mmc_host mmc0: Bus speed (slot 0) = 50000000Hz (slot
+req 50000000Hz, actual 50000000HZ div = 0)
+Disk /dev/mmcblk0: 59 GB, 63483936768 bytes, 123992064 sectors
+1937376 cylinders, 4 heads, 16 sectors/track
+Units: cylinders of 64 * 512 = 32768 bytes
+
+thanks!
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170803/46a7e8e8/attachment.sig>
+Jagan Teki
+Free Software Engineer | www.openedev.com
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
