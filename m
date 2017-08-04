@@ -1,70 +1,103 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri,  4 Aug 2017 19:43:53 +0200
-Subject: [PATCH 14/14] mmc: meson-gx: implement voltage switch callback
-In-Reply-To: <20170804174353.16486-1-jbrunet@baylibre.com>
-References: <20170804174353.16486-1-jbrunet@baylibre.com>
-Message-ID: <20170804174353.16486-15-jbrunet@baylibre.com>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Fri, 4 Aug 2017 20:04:25 +0200
+Subject: [PATCH v3 3/6] dt-bindings: add binding for Sitronix ST7586
+ display panels
+In-Reply-To: <e824aca6-b668-1d63-65a0-c56bfd8bec79@lechnology.com>
+References: <1501799630-1650-1-git-send-email-david@lechnology.com>
+ <1501799630-1650-4-git-send-email-david@lechnology.com>
+ <66f0b765-928e-1fca-9588-99da747749a5@tronnes.org>
+ <e824aca6-b668-1d63-65a0-c56bfd8bec79@lechnology.com>
+Message-ID: <20c044a4-cefe-7fed-8c5d-af27829c0648@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement voltage switch callback (shamelessly copied from sunxi mmc
-driver). This allow, with the appropriate tuning function, to use
-SD ultra high speed modes.
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- drivers/mmc/host/meson-gx-mmc.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+Den 04.08.2017 18.51, skrev David Lechner:
+> On 08/04/2017 04:48 AM, Noralf Tr?nnes wrote:
+>>
+>> Den 04.08.2017 00.33, skrev David Lechner:
+>>> This adds a new binding for Sitronix ST7586 display panels.
+>>>
+>>> Using lego as the vendor prefix in the compatible string because the 
+>>> display
+>>> panel I am working with is an integral part of the LEGO MINDSTORMS EV3.
+>>
+>> Is this display available outside of this Lego part?
+> No, it is not.
+>
+>> If not you can remove the properties you don't need for this particular
+>> display setup. Another st7586 display with a different panel would need
+>> a different initialization sequence and compatible string, so we can
+>> add properties when/if that happens.
+>
+> OK. so I will drop power-supply and backlight.
+>
 
-diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index e991c9e452ab..de2d7b8a9d97 100644
---- a/drivers/mmc/host/meson-gx-mmc.c
-+++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -38,6 +38,8 @@
- #include <linux/interrupt.h>
- #include <linux/bitfield.h>
- 
-+#include <linux/delay.h>
-+
- #define DRIVER_NAME "meson-gx-mmc"
- 
- #define SD_EMMC_CLOCK 0x0
-@@ -1024,6 +1026,28 @@ static int meson_mmc_card_busy(struct mmc_host *mmc)
- 	return !(FIELD_GET(STATUS_DATI, regval) & 0xf);
- }
- 
-+static int meson_mmc_voltage_switch(struct mmc_host *mmc, struct mmc_ios *ios)
-+{
-+	/* vqmmc regulator is available */
-+	if (!IS_ERR(mmc->supply.vqmmc)) {
-+		/*
-+		 * The usual amlogic setup uses a GPIO to switch from one
-+		 * regulator to the other. While the voltage ramp up is
-+		 * pretty fast, care must be taken when switching from 3.3v
-+		 * to 1.8v. Please make sure the regulator framework is aware
-+		 * of your own regulator constraints
-+		 */
-+		return mmc_regulator_set_vqmmc(mmc, ios);
-+
-+	}
-+
-+	/* no vqmmc regulator, assume fixed regulator at 3/3.3V */
-+	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330)
-+		return 0;
-+
-+	return -EINVAL;
-+}
-+
- static const struct mmc_host_ops meson_mmc_ops = {
- 	.request	= meson_mmc_request,
- 	.set_ios	= meson_mmc_set_ios,
-@@ -1032,6 +1056,7 @@ static const struct mmc_host_ops meson_mmc_ops = {
- 	.post_req	= meson_mmc_post_req,
- 	.execute_tuning = meson_mmc_execute_tuning,
- 	.card_busy	= meson_mmc_card_busy,
-+	.start_signal_voltage_switch = meson_mmc_voltage_switch,
- };
- 
- static int meson_mmc_probe(struct platform_device *pdev)
--- 
-2.9.4
+And the dc/reset gpios should be required properties since your display
+won't work without them (or rather they're hardwired that way).
+
+> Should I remove these from the driver as well? There are some panels 
+> out there that could use them.[1]
+>
+> [1]: 
+> http://www.buydisplay.com/download/manual/ERC240160-1_Series_Datasheet.pdf
+>
+
+Yes, because that display won't work with the driver as-is, so it's
+really dead code. If someone wants to add support for that display,
+they'll add the necessary code. When maintaining code for 10-20 years,
+it's important to not add code that 'might' be used in the future.
+Let the future take care of itself and keep the codebase slim :-)
+
+Noralf.
+
+>>
+>> Noralf.
+>>
+>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>> ---
+>>>   .../bindings/display/sitronix,st7586.txt           | 26 
+>>> ++++++++++++++++++++++
+>>>   1 file changed, 26 insertions(+)
+>>>   create mode 100644 
+>>> Documentation/devicetree/bindings/display/sitronix,st7586.txt
+>>>
+>>> diff --git 
+>>> a/Documentation/devicetree/bindings/display/sitronix,st7586.txt 
+>>> b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
+>>> new file mode 100644
+>>> index 0000000..dfb0b7b
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
+>>> @@ -0,0 +1,26 @@
+>>> +Sitronix ST7586 display panel
+>>> +
+>>> +Required properties:
+>>> +- compatible:    "lego,ev3-lcd".
+>>> +
+>>> +The node for this driver must be a child node of a SPI controller, 
+>>> hence
+>>> +all mandatory properties described in ../spi/spi-bus.txt must be 
+>>> specified.
+>>> +
+>>> +Optional properties:
+>>> +- dc-gpios:    D/C pin. The presence/absence of this GPIO determines
+>>> +        the panel interface operation mode (IF[3:1] pins):
+>>> +        - present: IF=011 4-wire 8-bit data serial interface
+>>> +        - absent:  IF=010 3-wire 9-bit data serial interface
+>>> +- reset-gpios:    Reset pin
+>>> +- power-supply:    A regulator node for the supply voltage.
+>>> +- backlight:    phandle of the backlight device attached to the panel
+>>> +- rotation:    panel rotation in degrees counter clockwise 
+>>> (0,90,180,270)
+>>> +
+>>> +Example:
+>>> +    display at 0{
+>>> +        compatible = "lego,ev3-lcd";
+>>> +        reg = <0>;
+>>> +        spi-max-frequency = <10000000>;
+>>> +        dc-gpios = <&gpio 43 GPIO_ACTIVE_HIGH>;
+>>> +        reset-gpios = <&gpio 80 GPIO_ACTIVE_HIGH>;
+>>> +    };
+>>
+>
