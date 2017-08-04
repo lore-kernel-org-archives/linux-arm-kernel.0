@@ -1,37 +1,39 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat,  5 Aug 2017 05:35:54 +0800
-Subject: [PATCH 1/2] mmc: sunxi: fix support for new timings mode only SoCs
-Message-ID: <20170804213555.6024-1-icenowy@aosc.io>
+Date: Sat,  5 Aug 2017 05:35:55 +0800
+Subject: [PATCH 2/2] mmc: sunxi: fix new timings mode on A64 EMMC (MMC2)
+ controller
+In-Reply-To: <20170804213555.6024-1-icenowy@aosc.io>
+References: <20170804213555.6024-1-icenowy@aosc.io>
+Message-ID: <20170804213555.6024-2-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A83T MMC support code introduces the timings mode switch, however
-such a switch doesn't exist on new SoCs with only new timings mode.
+The configuration struct of A64 EMMC(MMC2) compatible used to
+have the needs_new_timings variable missing, which lead to NULL
+pointer dereference now when trying to set up the old timings mode, as
+the old timings mode doesn't exist at all on A64.
 
-Only execute the switch if the SoC really have the timings mode switch,
-to fix the regression shown on new timings mode only SoCs (A64, H5,
-etc).
+Fix this issue by adding this variable and setting it to true in
+the configuration struct.
 
-Fixes: b0600daebf31 ("mmc: sunxi: Support controllers that can use both
-old and new timings")
+Fixes: 4fb3ce07eafa ("mmc: sunxi: Add EMMC (MMC2) controller compatible")
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/mmc/host/sunxi-mmc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mmc/host/sunxi-mmc.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 3777517982dd..59aba93beffb 100644
+index 59aba93beffb..4ad643e37014 100644
 --- a/drivers/mmc/host/sunxi-mmc.c
 +++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -784,7 +784,7 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 		clock <<= 1;
- 	}
+@@ -1142,6 +1142,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_emmc_cfg = {
+ 	.idma_des_size_bits = 13,
+ 	.clk_delays = NULL,
+ 	.can_calibrate = true,
++	.needs_new_timings = true,
+ };
  
--	if (host->use_new_timings) {
-+	if (host->use_new_timings && host->cfg->has_timings_switch) {
- 		ret = sunxi_ccu_set_mmc_timing_mode(host->clk_mmc, true);
- 		if (ret) {
- 			dev_err(mmc_dev(mmc),
+ static const struct of_device_id sunxi_mmc_of_match[] = {
 -- 
 2.13.0
