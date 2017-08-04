@@ -1,66 +1,83 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 4 Aug 2017 19:35:48 +0100
-Subject: [PATCH 5/6] arm64: Implement pmem API support
-In-Reply-To: <CAPcyv4i0=Na5Y5pZDAk5=K9nirfyo-eQJRuikETF82VuS_xY=Q@mail.gmail.com>
-References: <cover.1500397441.git.robin.murphy@arm.com>
- <ba8c28bcffc3bc856163441793bb4ef0fefa0f75.1500397441.git.robin.murphy@arm.com>
- <20170804152542.7h3mbyxnhjwroddc@armageddon.cambridge.arm.com>
- <74521a9d-45fa-7e29-d9f9-960c478306ec@arm.com>
- <CAPcyv4i0=Na5Y5pZDAk5=K9nirfyo-eQJRuikETF82VuS_xY=Q@mail.gmail.com>
-Message-ID: <777df912-0d7f-447f-10fe-a178489a4fb8@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri,  4 Aug 2017 19:43:46 +0200
+Subject: [PATCH 07/14] mmc: meson-gx: rework clk_set function
+In-Reply-To: <20170804174353.16486-1-jbrunet@baylibre.com>
+References: <20170804174353.16486-1-jbrunet@baylibre.com>
+Message-ID: <20170804174353.16486-8-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/17 19:09, Dan Williams wrote:
-> On Fri, Aug 4, 2017 at 10:43 AM, Robin Murphy <robin.murphy@arm.com> wrote:
->> On 04/08/17 16:25, Catalin Marinas wrote:
->>> Two minor comments below.
->>>
->>> On Tue, Jul 25, 2017 at 11:55:42AM +0100, Robin Murphy wrote:
->>>> --- a/arch/arm64/Kconfig
->>>> +++ b/arch/arm64/Kconfig
->>>> @@ -960,6 +960,17 @@ config ARM64_UAO
->>>>        regular load/store instructions if the cpu does not implement the
->>>>        feature.
->>>>
->>>> +config ARM64_PMEM
->>>> +    bool "Enable support for persistent memory"
->>>> +    select ARCH_HAS_PMEM_API
->>>> +    help
->>>> +      Say Y to enable support for the persistent memory API based on the
->>>> +      ARMv8.2 DCPoP feature.
->>>> +
->>>> +      The feature is detected at runtime, and the kernel will use DC CVAC
->>>> +      operations if DC CVAP is not supported (following the behaviour of
->>>> +      DC CVAP itself if the system does not define a point of persistence).
->>>
->>> Any reason not to have this default y?
->>
->> Mostly because it's untested, and not actually useful without some way
->> of describing persistent memory regions to the kernel (I'm currently
->> trying to make sense of what exactly ARCH_HAS_MMIO_FLUSH is supposed to
->> mean in order to enable ACPI NFIT support).
-> 
-> This is related to block-aperture support described by the NFIT where
-> a sliding-memory-mapped window can be programmed to access different
-> ranges of the NVDIMM. Before the window is programmed to a new
-> DIMM-address we need to flush any dirty data through the current
-> window setting to media. See the call to mmio_flush_range() in
-> acpi_nfit_blk_single_io(). I think it's ok to omit ARCH_HAS_MMIO_FLUSH
-> support, and add a configuration option to compile out the
-> block-aperture support.
+Clean-up clk_set function to prepare the next changes (DDR and clk-stop)
 
-Oh, I have every intention of implementing it one way or another if
-necessary - it's not difficult, it's just been a question of working
-through the NFIT code to figure out the subtleties of translation to
-arm64 ;)
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ drivers/mmc/host/meson-gx-mmc.c | 30 +++++++++---------------------
+ 1 file changed, 9 insertions(+), 21 deletions(-)
 
-If mmio_flush_range() is for true MMIO (i.e. __iomem) mappings, then
-arm64 should only need a barrier, rather than actual cache operations.
-If on the other hand it's misleadingly named and only actually used on
-MEMREMAP_WB mappings (as I'm staring to think it might be), then I can't
-help thinking it could simply go away in favour of arch_wb_pmem(), since
-that now seems to have those same semantics and intent, plus a much more
-appropriate name.
-
-Robin.
+diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
+index 18fff28025d8..8f9ba5190c18 100644
+--- a/drivers/mmc/host/meson-gx-mmc.c
++++ b/drivers/mmc/host/meson-gx-mmc.c
+@@ -139,7 +139,7 @@ struct meson_host {
+ 	struct clk *core_clk;
+ 	struct clk_mux mux;
+ 	struct clk *mux_clk;
+-	unsigned long current_clock;
++	unsigned long req_rate;
+ 
+ 	struct clk_divider cfg_div;
+ 	struct clk *cfg_div_clk;
+@@ -275,29 +275,18 @@ static int meson_mmc_clk_set(struct meson_host *host, unsigned long clk_rate)
+ 	int ret;
+ 	u32 cfg;
+ 
+-	if (clk_rate) {
+-		if (WARN_ON(clk_rate > mmc->f_max))
+-			clk_rate = mmc->f_max;
+-		else if (WARN_ON(clk_rate < mmc->f_min))
+-			clk_rate = mmc->f_min;
+-	}
+-
+-	if (clk_rate == host->current_clock)
++	/* Same request - bail-out */
++	if (host->req_rate == clk_rate)
+ 		return 0;
+ 
+ 	/* stop clock */
+ 	cfg = readl(host->regs + SD_EMMC_CFG);
+-	if (!(cfg & CFG_STOP_CLOCK)) {
+-		cfg |= CFG_STOP_CLOCK;
+-		writel(cfg, host->regs + SD_EMMC_CFG);
+-	}
+-
+-	dev_dbg(host->dev, "change clock rate %u -> %lu\n",
+-		mmc->actual_clock, clk_rate);
++	cfg |= CFG_STOP_CLOCK;
++	writel(cfg, host->regs + SD_EMMC_CFG);
++	host->req_rate = 0;
+ 
+ 	if (!clk_rate) {
+ 		mmc->actual_clock = 0;
+-		host->current_clock = 0;
+ 		/* return with clock being stopped */
+ 		return 0;
+ 	}
+@@ -309,13 +298,12 @@ static int meson_mmc_clk_set(struct meson_host *host, unsigned long clk_rate)
+ 		return ret;
+ 	}
+ 
++	host->req_rate = clk_rate;
+ 	mmc->actual_clock = clk_get_rate(host->cfg_div_clk);
+-	host->current_clock = clk_rate;
+ 
++	dev_dbg(host->dev, "clk rate: %u Hz\n", mmc->actual_clock);
+ 	if (clk_rate != mmc->actual_clock)
+-		dev_dbg(host->dev,
+-			"divider requested rate %lu != actual rate %u\n",
+-			clk_rate, mmc->actual_clock);
++		dev_dbg(host->dev, "requested rate was %lu\n", clk_rate);
+ 
+ 	/* (re)start clock */
+ 	cfg = readl(host->regs + SD_EMMC_CFG);
+-- 
+2.9.4
