@@ -1,35 +1,186 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 4 Aug 2017 10:29:49 +0200
-Subject: [PATCH 1/2] mtd: nand: pxa3xx_nand: enable building on mvebu
- 64-bit platforms
-In-Reply-To: <20170719174006.1ca20652@windsurf>
-References: <20170719153126.16905-1-gregory.clement@free-electrons.com>
- <20170719153126.16905-2-gregory.clement@free-electrons.com>
- <20170719174006.1ca20652@windsurf>
-Message-ID: <20170804102949.770ec88d@bbrezillon>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri,  4 Aug 2017 09:31:42 +0100
+Subject: [PATCH v3] arm64: Decode information from ESR upon mem faults
+Message-ID: <1501835502-36301-1-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 19 Jul 2017 17:40:06 +0200
-Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+When receiving unhandled faults from the CPU, description is very sparse.
+Adding information about faults decoded from ESR.
 
-> Hello,
-> 
-> On Wed, 19 Jul 2017 17:31:25 +0200, Gregory CLEMENT wrote:
-> 
-> >  config MTD_NAND_PXA3xx
-> >  	tristate "NAND support on PXA3xx and Armada 370/XP"
-> > -	depends on PXA3xx || ARCH_MMP || PLAT_ORION
-> > +	depends on PXA3xx || ARCH_MMP || PLAT_ORION  || ARCH_MVEBU  
-> 
->                                                    ^^^
-> 
-> Stupid minor nit: there are two spaces here, there should be one. No
-> need to send a v2 just for this, I'm sure Boris will happily fix this
-> when applying :-)
+Added defines to esr.h corresponding ESR fields. Values are based on ARM
+Archtecture Reference Manual (DDI 0487B.a), section D7.2.28 ESR_ELx, Exception
+Syndrome Register (ELx) (pages D7-2275 to D7-2280).
 
-Applied after removing the extra whitespace.
+New output is of the form:
+[   77.818059] Mem abort info:
+[   77.820826]   Exception class = DABT (current EL), IL = 32 bits
+[   77.826706]   SET = 0, FnV = 0
+[   77.829742]   EA = 0, S1PTW = 0
+[   77.832849] Data abort info:
+[   77.835713]   ISV = 0, ISS = 0x00000070
+[   77.839522]   CM = 0, WnR = 1
 
-Thanks,
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/include/asm/esr.h | 39 ++++++++++++++++++++++++++----------
+ arch/arm64/mm/fault.c        | 47 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 76 insertions(+), 10 deletions(-)
 
-Boris
+* V2:
+  - Slight change of display format so info spans over fewer lines
+  - When ISV is 0, display raw value of ISS
+
+* V3:
+  - Rebase on v4.13-rc3
+
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 8cabd57..130b534 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -77,16 +77,23 @@
+ #define ESR_ELx_EC_MASK		(UL(0x3F) << ESR_ELx_EC_SHIFT)
+ #define ESR_ELx_EC(esr)		(((esr) & ESR_ELx_EC_MASK) >> ESR_ELx_EC_SHIFT)
+
+-#define ESR_ELx_IL		(UL(1) << 25)
++#define ESR_ELx_IL_SHIFT	(25)
++#define ESR_ELx_IL		(UL(1) << ESR_ELx_IL_SHIFT)
+ #define ESR_ELx_ISS_MASK	(ESR_ELx_IL - 1)
+
+ /* ISS field definitions shared by different classes */
+-#define ESR_ELx_WNR		(UL(1) << 6)
++#define ESR_ELx_WNR_SHIFT	(6)
++#define ESR_ELx_WNR		(UL(1) << ESR_ELx_WNR_SHIFT)
+
+ /* Shared ISS field definitions for Data/Instruction aborts */
+-#define ESR_ELx_FnV		(UL(1) << 10)
+-#define ESR_ELx_EA		(UL(1) << 9)
+-#define ESR_ELx_S1PTW		(UL(1) << 7)
++#define ESR_ELx_SET_SHIFT	(11)
++#define ESR_ELx_SET_MASK	(UL(3) << ESR_ELx_SET_SHIFT)
++#define ESR_ELx_FnV_SHIFT	(10)
++#define ESR_ELx_FnV		(UL(1) << ESR_ELx_FnV_SHIFT)
++#define ESR_ELx_EA_SHIFT	(9)
++#define ESR_ELx_EA		(UL(1) << ESR_ELx_EA_SHIFT)
++#define ESR_ELx_S1PTW_SHIFT	(7)
++#define ESR_ELx_S1PTW		(UL(1) << ESR_ELx_S1PTW_SHIFT)
+
+ /* Shared ISS fault status code(IFSC/DFSC) for Data/Instruction aborts */
+ #define ESR_ELx_FSC		(0x3F)
+@@ -97,15 +104,20 @@
+ #define ESR_ELx_FSC_PERM	(0x0C)
+
+ /* ISS field definitions for Data Aborts */
+-#define ESR_ELx_ISV		(UL(1) << 24)
++#define ESR_ELx_ISV_SHIFT	(24)
++#define ESR_ELx_ISV		(UL(1) << ESR_ELx_ISV_SHIFT)
+ #define ESR_ELx_SAS_SHIFT	(22)
+ #define ESR_ELx_SAS		(UL(3) << ESR_ELx_SAS_SHIFT)
+-#define ESR_ELx_SSE		(UL(1) << 21)
++#define ESR_ELx_SSE_SHIFT	(21)
++#define ESR_ELx_SSE		(UL(1) << ESR_ELx_SSE_SHIFT)
+ #define ESR_ELx_SRT_SHIFT	(16)
+ #define ESR_ELx_SRT_MASK	(UL(0x1F) << ESR_ELx_SRT_SHIFT)
+-#define ESR_ELx_SF 		(UL(1) << 15)
+-#define ESR_ELx_AR 		(UL(1) << 14)
+-#define ESR_ELx_CM 		(UL(1) << 8)
++#define ESR_ELx_SF_SHIFT	(15)
++#define ESR_ELx_SF 		(UL(1) << ESR_ELx_SF_SHIFT)
++#define ESR_ELx_AR_SHIFT	(14)
++#define ESR_ELx_AR 		(UL(1) << ESR_ELx_AR_SHIFT)
++#define ESR_ELx_CM_SHIFT	(8)
++#define ESR_ELx_CM 		(UL(1) << ESR_ELx_CM_SHIFT)
+
+ /* ISS field definitions for exceptions taken in to Hyp */
+ #define ESR_ELx_CV		(UL(1) << 24)
+@@ -209,6 +221,13 @@
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
+
++static inline bool esr_is_data_abort(u32 esr)
++{
++	const u32 ec = ESR_ELx_EC(esr);
++
++	return ec == ESR_ELx_EC_DABT_LOW || ec == ESR_ELx_EC_DABT_CUR;
++}
++
+ const char *esr_get_class_string(u32 esr);
+ #endif /* __ASSEMBLY */
+
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index c7861c9..e093922 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -82,6 +82,49 @@ static inline int notify_page_fault(struct pt_regs *regs, unsigned int esr)
+ }
+ #endif
+
++static void data_abort_decode(unsigned int esr)
++{
++	pr_alert("Data abort info:\n");
++
++	if (esr & ESR_ELx_ISV) {
++		pr_alert("  Access size = %u byte(s)\n",
++			 1U << ((esr & ESR_ELx_SAS) >> ESR_ELx_SAS_SHIFT));
++		pr_alert("  SSE = %lu, SRT = %lu\n",
++			 (esr & ESR_ELx_SSE) >> ESR_ELx_SSE_SHIFT,
++			 (esr & ESR_ELx_SRT_MASK) >> ESR_ELx_SRT_SHIFT);
++		pr_alert("  SF = %lu, AR = %lu\n",
++			 (esr & ESR_ELx_SF) >> ESR_ELx_SF_SHIFT,
++			 (esr & ESR_ELx_AR) >> ESR_ELx_AR_SHIFT);
++	} else {
++		pr_alert("  ISV = 0, ISS = 0x%08lu\n", esr & ESR_ELx_ISS_MASK);
++	}
++
++	pr_alert("  CM = %lu, WnR = %lu\n",
++		 (esr & ESR_ELx_CM) >> ESR_ELx_CM_SHIFT,
++		 (esr & ESR_ELx_WNR) >> ESR_ELx_WNR_SHIFT);
++}
++
++/*
++ * Decode mem abort information
++ */
++static void mem_abort_decode(unsigned int esr)
++{
++	pr_alert("Mem abort info:\n");
++
++	pr_alert("  Exception class = %s, IL = %lu bits\n",
++		 esr_get_class_string(esr),
++		 (esr & ESR_ELx_IL) ? 32 : 16);
++	pr_alert("  SET = %lu, FnV = %lu\n",
++		 (esr & ESR_ELx_SET_MASK) >> ESR_ELx_SET_SHIFT,
++		 (esr & ESR_ELx_FnV) >> ESR_ELx_FnV_SHIFT);
++	pr_alert("  EA = %lu, S1PTW = %lu\n",
++		 (esr & ESR_ELx_EA) >> ESR_ELx_EA_SHIFT,
++		 (esr & ESR_ELx_S1PTW) >> ESR_ELx_S1PTW_SHIFT);
++
++	if (esr_is_data_abort(esr))
++		data_abort_decode(esr);
++}
++
+ /*
+  * Dump out the page tables associated with 'addr' in the currently active mm.
+  */
+@@ -247,6 +290,8 @@ static void __do_kernel_fault(unsigned long addr, unsigned int esr,
+ 	pr_alert("Unable to handle kernel %s at virtual address %08lx\n", msg,
+ 		 addr);
+
++	mem_abort_decode(esr);
++
+ 	show_pte(addr);
+ 	die("Oops", regs, esr);
+ 	bust_spinlocks(0);
+@@ -701,6 +746,8 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+ 	pr_alert("Unhandled fault: %s (0x%08x) at 0x%016lx\n",
+ 		 inf->name, esr, addr);
+
++	mem_abort_decode(esr);
++
+ 	info.si_signo = inf->sig;
+ 	info.si_errno = 0;
+ 	info.si_code  = inf->code;
+--
+1.9.1
