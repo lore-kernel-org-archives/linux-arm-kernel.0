@@ -1,77 +1,134 @@
-From: hoeun.ryu@gmail.com (Hoeun Ryu)
-Date: Fri, 4 Aug 2017 22:33:50 +0900
-Subject: [PATCH] arm64:kexec: have own crash_smp_send_stop() for crash
- dump for nonpanic cores
-In-Reply-To: <20170804114300.GA22805@linaro.org>
-References: <1501830173-15989-1-git-send-email-hoeun.ryu@gmail.com>
- <59844E98.3020507@arm.com> <20170804114300.GA22805@linaro.org>
-Message-ID: <BB038411-7999-40CA-9454-7936368C0A80@gmail.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Fri, 4 Aug 2017 19:06:16 +0530
+Subject: [PATCH v2 1/4] drm/bridge: dw-hdmi: add cec notifier support
+In-Reply-To: <a8d2cea3-68b5-d975-836a-14201a6974f6@xs4all.nl>
+References: <20170731142906.GX31807@n2100.armlinux.org.uk>
+ <E1dcBhV-00088e-8x@rmk-PC.armlinux.org.uk>
+ <a8d2cea3-68b5-d975-836a-14201a6974f6@xs4all.nl>
+Message-ID: <b68d6c53-4028-b963-5298-696e759bfe19@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On 4 Aug 2017, at 8:43 PM, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+
+On 07/31/2017 08:55 PM, Hans Verkuil wrote:
+> On 07/31/2017 04:29 PM, Russell King wrote:
+>> Add CEC notifier support to the HDMI bridge driver, so that the CEC
+>> part of the IP can receive its physical address.
+>>
+>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 > 
->> On Fri, Aug 04, 2017 at 11:38:16AM +0100, James Morse wrote:
->> Hi Hoeun,
->> 
->>> On 04/08/17 08:02, Hoeun Ryu wrote:
->>> Commit 0ee5941 : (x86/panic: replace smp_send_stop() with kdump friendly
->>> version in panic path) introduced crash_smp_send_stop() which is a weak
->>> function and can be overriden by architecture codes to fix the side effect
->>> caused by commit f06e515 : (kernel/panic.c: add "crash_kexec_post_
->>> notifiers" option).
->> 
->> If I've understood correctly: if we boot with this option core code doesn't use
->> our machine_crash_shutdown(), and instead calls crash_smp_send_stop(), which we
-> 
-> No. Machine_crash_shutdown() is always called, but at that time,
-> all the cpus other than the crashing cpu have already died in this case.
+> Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
 > 
 
-You're right.
+Queued to drm-misc-next.
 
->> don't have, so it uses the default smp_send_stop(), which doesn't save the regs.
->> 
->> Thanks for catching this!
->> 
->> 
->> Could we rename smp_send_crash_stop() crash_smp_send_stop() and add the
->> called-twice logic there? They are similar enough that I'm getting them muddled
->> already!
->> 
-> 
-> Nice.
+Thanks,
+Archit
 
-I'll reflect it in v2.
-Thank you for the review.
+> Regards,
+> 
+> 	Hans
+> 
+>> ---
+>>   drivers/gpu/drm/bridge/synopsys/Kconfig   |  1 +
+>>   drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 22 +++++++++++++++++++++-
+>>   2 files changed, 22 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/gpu/drm/bridge/synopsys/Kconfig b/drivers/gpu/drm/bridge/synopsys/Kconfig
+>> index 53e78d092d18..351db000599a 100644
+>> --- a/drivers/gpu/drm/bridge/synopsys/Kconfig
+>> +++ b/drivers/gpu/drm/bridge/synopsys/Kconfig
+>> @@ -2,6 +2,7 @@ config DRM_DW_HDMI
+>>   	tristate
+>>   	select DRM_KMS_HELPER
+>>   	select REGMAP_MMIO
+>> +	select CEC_CORE if CEC_NOTIFIER
+>>   
+>>   config DRM_DW_HDMI_AHB_AUDIO
+>>   	tristate "Synopsys Designware AHB Audio interface"
+>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> index ead11242c4b9..82e55ee8e4fa 100644
+>> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> @@ -36,7 +36,10 @@
+>>   #include "dw-hdmi.h"
+>>   #include "dw-hdmi-audio.h"
+>>   
+>> +#include <media/cec-notifier.h>
+>> +
+>>   #define DDC_SEGMENT_ADDR	0x30
+>> +
+>>   #define HDMI_EDID_LEN		512
+>>   
+>>   enum hdmi_datamap {
+>> @@ -175,6 +178,8 @@ struct dw_hdmi {
+>>   	struct regmap *regm;
+>>   	void (*enable_audio)(struct dw_hdmi *hdmi);
+>>   	void (*disable_audio)(struct dw_hdmi *hdmi);
+>> +
+>> +	struct cec_notifier *cec_notifier;
+>>   };
+>>   
+>>   #define HDMI_IH_PHY_STAT0_RX_SENSE \
+>> @@ -1896,6 +1901,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
+>>   		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
+>>   		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
+>>   		drm_mode_connector_update_edid_property(connector, edid);
+>> +		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
+>>   		ret = drm_add_edid_modes(connector, edid);
+>>   		/* Store the ELD */
+>>   		drm_edid_to_eld(connector, edid);
+>> @@ -2119,11 +2125,16 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
+>>   	 * ask the source to re-read the EDID.
+>>   	 */
+>>   	if (intr_stat &
+>> -	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD))
+>> +	    (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
+>>   		__dw_hdmi_setup_rx_sense(hdmi,
+>>   					 phy_stat & HDMI_PHY_HPD,
+>>   					 phy_stat & HDMI_PHY_RX_SENSE);
+>>   
+>> +		if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) == 0)
+>> +			cec_notifier_set_phys_addr(hdmi->cec_notifier,
+>> +						   CEC_PHYS_ADDR_INVALID);
+>> +	}
+>> +
+>>   	if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
+>>   		dev_dbg(hdmi->dev, "EVENT=%s\n",
+>>   			phy_int_pol & HDMI_PHY_HPD ? "plugin" : "plugout");
+>> @@ -2376,6 +2387,12 @@ __dw_hdmi_probe(struct platform_device *pdev,
+>>   	if (ret)
+>>   		goto err_iahb;
+>>   
+>> +	hdmi->cec_notifier = cec_notifier_get(dev);
+>> +	if (!hdmi->cec_notifier) {
+>> +		ret = -ENOMEM;
+>> +		goto err_iahb;
+>> +	}
+>> +
+>>   	/*
+>>   	 * To prevent overflows in HDMI_IH_FC_STAT2, set the clk regenerator
+>>   	 * N and cts values before enabling phy
+>> @@ -2452,6 +2469,9 @@ __dw_hdmi_probe(struct platform_device *pdev,
+>>   		hdmi->ddc = NULL;
+>>   	}
+>>   
+>> +	if (hdmi->cec_notifier)
+>> +		cec_notifier_put(hdmi->cec_notifier);
+>> +
+>>   	clk_disable_unprepare(hdmi->iahb_clk);
+>>   err_isfr:
+>>   	clk_disable_unprepare(hdmi->isfr_clk);
+>>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-> 
-> -Takahiro AKASHI
-> 
->> 
->> Thanks,
->> 
->> James
->> 
->> 
->>> ARM64 architecture uses the weak version function and the problem is that
->>> the weak function simply calls smp_send_stop() which makes other CPUs
->>> offline and takes away the chance to save crash information for nonpanic
->>> CPUs in machine_crash_shutdown() when crash_kexec_post_notifiers kernel
->>> option is enabled.
->>> 
->>> Calling smp_send_crash_stop() in the function is useless because all
->>> nonpanic CPUs are already offline by smp_send_stop() in this case and
->>> smp_send_crash_stop() only works against online CPUs.
->>> 
->>> The result is that /proc/vmcore is not available with the error messages;
->>> "Warning: Zero PT_NOTE entries found", "Kdump: vmcore not initialized".
->>> 
->>> crash_smp_send_stop() is implemented for ARM64 architecture to fix this
->>> problem and the function (strong symbol version) saves crash information
->>> for nonpanic CPUs using smp_send_crash_stop() and machine_crash_shutdown()
->>> tries to save crash information for nonpanic CPUs only when
->>> crash_kexec_post_notifiers kernel option is disabled.
->> 
->> 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
