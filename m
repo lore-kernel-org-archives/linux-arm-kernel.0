@@ -1,83 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Aug 2017 15:00:00 +0100
-Subject: [PATCH 0/5] Simplify kernel-mode NEON
-In-Reply-To: <CAKv+Gu_va4hD-MztzRUhXxTwqnbKcmOmV8NN9j+TG8_jWA0wNA@mail.gmail.com>
-References: <1501777403-9782-1-git-send-email-Dave.Martin@arm.com>
- <20170804120858.ff3772f3zzik37pp@armageddon.cambridge.arm.com>
- <20170804122225.jiceb2vbgrld2y7z@armageddon.cambridge.arm.com>
- <CAKv+Gu-YG1EbpvaL46T0fzD=RZ7itqizrH=AkYAN1YmTupmKGw@mail.gmail.com>
- <20170804131211.2wn2zi74kuzuwneo@armageddon.cambridge.arm.com>
- <CAKv+Gu_va4hD-MztzRUhXxTwqnbKcmOmV8NN9j+TG8_jWA0wNA@mail.gmail.com>
-Message-ID: <20170804135959.xzzvwsdsxcwy3uzc@armageddon.cambridge.arm.com>
+From: pasha.tatashin@oracle.com (Pasha Tatashin)
+Date: Fri, 4 Aug 2017 10:01:15 -0400
+Subject: [v5 11/15] arm64/kasan: explicitly zero kasan shadow memory
+In-Reply-To: <CAKv+Gu_V_T56qPS=c3kq73TLFwqpP4YHtggCrjGRmgW1itq3pQ@mail.gmail.com>
+References: <1501795433-982645-1-git-send-email-pasha.tatashin@oracle.com>
+ <1501795433-982645-12-git-send-email-pasha.tatashin@oracle.com>
+ <CAKv+Gu_V_T56qPS=c3kq73TLFwqpP4YHtggCrjGRmgW1itq3pQ@mail.gmail.com>
+Message-ID: <85cce150-74b7-c89b-678c-8fdd0be6c066@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 04, 2017 at 02:21:52PM +0100, Ard Biesheuvel wrote:
-> On 4 August 2017 at 14:12, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Fri, Aug 04, 2017 at 01:25:03PM +0100, Ard Biesheuvel wrote:
-> >> On 4 August 2017 at 13:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> > On Fri, Aug 04, 2017 at 01:08:58PM +0100, Catalin Marinas wrote:
-> >> >> On Thu, Aug 03, 2017 at 05:23:18PM +0100, Dave P Martin wrote:
-> >> >> > This series depends on Ard's v4.14 crypto rework [2].
-> >> > [...]
-> >> >> > [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-July/520664.html
-> >> > [...]
-> >> >> > Ard Biesheuvel (1):
-> >> >> >   arm64: neon: replace generic definition of may_use_simd()
-> >> >> >
-> >> >> > Dave Martin (4):
-> >> >> >   arm64: neon: Add missing header guard in <asm/neon.h>
-> >> >> >   arm64: fpsimd: Consistently use __this_cpu_ ops where appropriate
-> >> >> >   arm64: neon: Allow EFI runtime services to use FPSIMD in irq context
-> >> >> >   arm64: neon: Remove support for nested or hardirq kernel-mode NEON
-> >> >>
-> >> >> Queued for 4.14. Thanks.
-> >> >
-> >> > ... and reverted.
-> >> >
-> >> > I now realised that it doesn't build without Ard's crypto series (I had
-> >> > the wrong impression it is just a performance impact). I get errors
-> >> > like:
-> >> >
-> >> > arch/arm64/crypto/sha1-ce-glue.c|41 col 2| error: implicit declaration
-> >> > of function ?kernel_neon_begin_partial?
-> >>
-> >> Ah yes. Apologies for failing to mention that. Apparently, there are
-> >> in fact build time cross-dependencies that I forgot about.
-> >>
-> >> To avoid delaying this unnecessarily, we just alias
-> >> kernel_neon_begin_partial() to kernel_neon_begin() and ignore the
-> >> argument. We can remove that again when everything has gone upstream.
-> >
-> > But would kernel_neon_begin() be called in an interrupt context from the
-> > crypto code? I'd like the arm64 for-next/core branch (to be based on
-> > -rc4 next week) to still be fully working.
+Hi Ard,
+
+Thank you very much for reviewing this. I will fix the bug you found in 
+the next iteration.
+>> +zero_vemmap_populated_memory(void)
 > 
-> Well, theoretically. In the new situation we allow KMN from process
-> and softirq context, but the latter only if no process context KMN is
-> in progress. This last rule could be violated by the old crypto code,
-> but the chances of actually hitting that are very low: if your wifi
-> chip lacks a h/w implementation of CCMP (which is uncommon these
-> days), and it gets invoked while KMN crypto is being used on the same
-> core, i.e., for IPsec or block encryption, you may get a splat. It
-> wouldn't corrupt your encrypted file system.
+> Typo here: vemmap -> vmemmap
 
-Just to make sure I understand correctly, even if may_use_simd() returns
-false, the crypto code could still call kernel_neon_begin_partial() in
-an interrupt context. I guess this is still fine with this series until
-the last patch when we would get a BUG_ON (if we define
-kernel_neon_begin_partial to kernel_neon_begin).
+Yeap, will rename here, and in Intel variant.
 
-> Perhaps we could stick it on a separate branch for this cycle (with
-> the suggested tweak) and get it pulled it into -next separately? That
-> way, you can forward it as a late pull, after Herbert's stuff gets in.
+> 
+>> +{
+>> +       struct memblock_region *reg;
+>> +       u64 start, end;
+>> +
+>> +       for_each_memblock(memory, reg) {
+>> +               start = __phys_to_virt(reg->base);
+>> +               end = __phys_to_virt(reg->base + reg->size);
+>> +
+>> +               if (start >= end)
+> How would this ever be true? And why is it a stop condition?
 
-I'll push it to a branch for now (with a fix to be able to build) and
-look at the merge later (I don't think I'll ever hit the BUG_ON with my
-hardware but you never know; linux-next should be fine since the other
-crypto patches are merged). In hindsight, we should have put your crypto
-patches on a common branch but Herbert already merged them on top of
-others.
+Yes this is a stop condition. Also look at the way kasan allocates its 
+shadow memory in this file kasan_init():
 
--- 
-Catalin
+187  	for_each_memblock(memory, reg) {
+188  		void *start = (void *)__phys_to_virt(reg->base);
+189  		void *end = (void *)__phys_to_virt(reg->base + reg->size);
+190
+191  		if (start >= end)
+192  			break;
+...
+200  		vmemmap_populate(...)
+
+>> +
+> 
+> Are you missing a couple of kasan_mem_to_shadow() calls here? I can't
+> believe your intention is to wipe all of DRAM.
+
+True. Thank you for catching this bug. I have not really tested on arm, 
+only compiled for sanity checking. Need to figure out how to configure 
+qemu to run most generic arm code. I tested on x86 and sparc both real 
+and qemu hardware.
+
+> 
+> KASAN uses vmemmap_populate as a convenience: kasan has nothing to do
+> with vmemmap, but the function already existed and happened to do what
+> KASAN requires.
+> 
+> Given that that will no longer be the case, it would be far better to
+> stop using vmemmap_populate altogether, and clone it into a KASAN
+> specific version (with an appropriate name) with the zeroing folded
+> into it.
+
+I agree, but this would be outside of the scope of this project.
+
+Pasha
