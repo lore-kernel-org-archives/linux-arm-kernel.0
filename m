@@ -1,56 +1,47 @@
-From: david.wu@rock-chips.com (David.Wu)
-Date: Fri, 4 Aug 2017 10:38:26 +0800
-Subject: [PATCH v2 3/7] pwm: rockchip: Remove the dumplicate
- rockchip_pwm_ops ops
-In-Reply-To: <20170802134011.1124f1dd@bbrezillon>
-References: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
- <1499486629-9659-4-git-send-email-david.wu@rock-chips.com>
- <20170802105902.2d137072@bbrezillon>
- <af056420-5c33-e6c8-62cb-bcd3456000a7@rock-chips.com>
- <20170802134011.1124f1dd@bbrezillon>
-Message-ID: <6d1f60ee-2402-5ee0-54f6-9521c039c36c@rock-chips.com>
+From: sandy.huang@rock-chips.com (Sandy Huang)
+Date: Fri, 4 Aug 2017 11:20:25 +0800
+Subject: [PATCH v1.1] drm/rockchip: fix race with kms hotplug and fbdev
+In-Reply-To: <1501575103-20136-1-git-send-email-mark.yao@rock-chips.com>
+References: <1501494601-7140-1-git-send-email-mark.yao@rock-chips.com>
+ <1501575103-20136-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <3084b854-1b82-5a72-ad51-f7b12e5a57a0@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris?
+Hi Mark,
 
-? 2017/8/2 19:40, Boris Brezillon ??:
-> Yep, just define 3 different pwm_ops (one for each IP), each of them
-> implementing ->apply() and ->get_state() and that's all.
+? 2017/8/1 16:11, Mark Yao ??:
+> According to the kerneldoc[0], should do fbdev setup before calling
+> drm_kms_helper_poll_init(), otherwise, Kms hotplug event may race
+> into fbdev helper initial, and fb_helper->dev may be NULL pointer,
+> that would cause the bug:
+> [    0.735411] [00000200] *pgd=00000000f6ffe003, *pud=00000000f6ffe003, *pmd=0000000000000000
+> [    0.736156] Internal error: Oops: 96000005 [#1] PREEMPT SMP
+> [    0.736648] Modules linked in:
+> [    0.736930] CPU: 2 PID: 20 Comm: kworker/2:0 Not tainted 4.4.41 #20
+> [    0.737480] Hardware name: Rockchip RK3399 Board rev2 (BOX) (DT)
+> [    0.738020] Workqueue: events cdn_dp_pd_event_work
+> [    0.738447] task: ffffffc0f21f3100 ti: ffffffc0f2218000 task.ti: ffffffc0f2218000
+> [    0.739109] PC is at mutex_lock+0x14/0x44
+> [    0.739469] LR is at drm_fb_helper_hotplug_event+0x30/0x114
+> [    0.756253] [<ffffff8008a344f4>] mutex_lock+0x14/0x44
+> [    0.756260] [<ffffff8008445708>] drm_fb_helper_hotplug_event+0x30/0x114
+> [    0.756271] [<ffffff8008473c84>] rockchip_drm_output_poll_changed+0x18/0x20
+> [    0.756280] [<ffffff8008439fcc>] drm_kms_helper_hotplug_event+0x28/0x34
+> [    0.756286] [<ffffff800846c444>] cdn_dp_pd_event_work+0x394/0x3c4
+> [    0.756295] [<ffffff80080b2b38>] process_one_work+0x218/0x3e0
+> [    0.756302] [<ffffff80080b3538>] worker_thread+0x2e8/0x404
+> [    0.756308] [<ffffff80080b7e70>] kthread+0xe8/0xf0
+> [    0.756316] [<ffffff8008082690>] ret_from_fork+0x10/0x40
 > 
-> Something like:
+> [0]: https://01.org/linuxgraphics/gfx-docs/drm/gpu/drm-kms-helpers.html
 > 
-> static const struct pwm_ops rockchip_pwm_ops_v1 = {
-> 	.get_state = rockchip_pwm_v1_get_state,
-> 	.apply = rockchip_pwm_v1_apply,
-> 	.owner = THIS_MODULE,
-> };
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> ---
+> Changes in v1.1:
+> - According to the kerneldoc, fix the race bug in generic way.
 > 
-> static const struct pwm_ops rockchip_pwm_ops_v2 = {
-> 	.get_state = rockchip_pwm_v2_get_state,
-> 	.apply = rockchip_pwm_v2_apply,
-> 	.owner = THIS_MODULE,
-> };
+>   drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 13 ++++++-------
+>   1 file changed, 6 insertions(+), 7 deletions(-)
 > 
-> static const struct pwm_ops rockchip_pwm_ops_vop = {
-> 	.get_state = rockchip_pwm_vop_get_state,
-> 	.apply = rockchip_pwm_vop_apply,
-> 	.owner = THIS_MODULE,
-> };
-> 
-> static const struct of_device_id rockchip_pwm_dt_ids[] = {
-> 	{ .compatible = "rockchip,rk2928-pwm", .data = &rockchip_pwm_ops_v1 },
-> 	{ .compatible = "rockchip,rk3288-pwm", .data = &rockchip_pwm_ops_v2 },
-> 	{ .compatible = "rockchip,vop-pwm", .data = &rockchip_pwm_ops_vop },
-> 	{ /* sentinel */ }
-> };
-> MODULE_DEVICE_TABLE(of, rockchip_pwm_dt_ids);
-
-I think we should keep the data members in the rockchip_pwm_data?like 
-supports_polarity and regs...
-
-The supports_polarity is needed for of_pwm_n_cells when pwm registered.
-And the other data members is helpful for us to use common code.
-
-It's okay for just define 3 different pwm_ops (one for each IP), but 
-they are with other data members in the struct of rockchip_pwm_data.
+Reviewed-by: Sandy huang <sandy.huang@rock-chips.com>
