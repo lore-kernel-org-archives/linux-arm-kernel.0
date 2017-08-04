@@ -1,29 +1,67 @@
-From: shiju.jose@huawei.com (Shiju Jose)
-Date: Fri, 4 Aug 2017 12:23:18 +0100
-Subject: [RFC PATCH v4.13-rc3] arm64: defconfig: enable EDAC GHES option
-Message-ID: <a0846b9e-f92f-a361-01e6-2594e56d8edd@huawei.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 4 Aug 2017 20:43:01 +0900
+Subject: [PATCH] arm64:kexec: have own crash_smp_send_stop() for crash
+ dump for nonpanic cores
+In-Reply-To: <59844E98.3020507@arm.com>
+References: <1501830173-15989-1-git-send-email-hoeun.ryu@gmail.com>
+ <59844E98.3020507@arm.com>
+Message-ID: <20170804114300.GA22805@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable EDAC GHES support for ARM64,
-so that memory errors are reported to the user space.
+On Fri, Aug 04, 2017 at 11:38:16AM +0100, James Morse wrote:
+> Hi Hoeun,
+> 
+> On 04/08/17 08:02, Hoeun Ryu wrote:
+> >  Commit 0ee5941 : (x86/panic: replace smp_send_stop() with kdump friendly
+> > version in panic path) introduced crash_smp_send_stop() which is a weak
+> > function and can be overriden by architecture codes to fix the side effect
+> > caused by commit f06e515 : (kernel/panic.c: add "crash_kexec_post_
+> > notifiers" option).
+> 
+> If I've understood correctly: if we boot with this option core code doesn't use
+> our machine_crash_shutdown(), and instead calls crash_smp_send_stop(), which we
 
-Signed-off-by: Shiju Jose <shiju.jose@huawei.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+No. Machine_crash_shutdown() is always called, but at that time,
+all the cpus other than the crashing cpu have already died in this case.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 6c7d147..50429c0 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -438,6 +438,7 @@ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_LEDS_TRIGGER_CPU=y
- CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_EDAC=y
-+CONFIG_EDAC_GHES=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_MAX77686=y
- CONFIG_RTC_DRV_RK808=m
--- 
-1.9.1
+> don't have, so it uses the default smp_send_stop(), which doesn't save the regs.
+> 
+> Thanks for catching this!
+> 
+> 
+> Could we rename smp_send_crash_stop() crash_smp_send_stop() and add the
+> called-twice logic there? They are similar enough that I'm getting them muddled
+> already!
+> 
+
+Nice.
+
+-Takahiro AKASHI
+
+> 
+> Thanks,
+> 
+> James
+> 
+> 
+> >  ARM64 architecture uses the weak version function and the problem is that
+> > the weak function simply calls smp_send_stop() which makes other CPUs
+> > offline and takes away the chance to save crash information for nonpanic
+> > CPUs in machine_crash_shutdown() when crash_kexec_post_notifiers kernel
+> > option is enabled.
+> > 
+> >  Calling smp_send_crash_stop() in the function is useless because all
+> > nonpanic CPUs are already offline by smp_send_stop() in this case and
+> > smp_send_crash_stop() only works against online CPUs.
+> > 
+> >  The result is that /proc/vmcore is not available with the error messages;
+> > "Warning: Zero PT_NOTE entries found", "Kdump: vmcore not initialized".
+> > 
+> >  crash_smp_send_stop() is implemented for ARM64 architecture to fix this
+> > problem and the function (strong symbol version) saves crash information
+> > for nonpanic CPUs using smp_send_crash_stop() and machine_crash_shutdown()
+> > tries to save crash information for nonpanic CPUs only when
+> > crash_kexec_post_notifiers kernel option is disabled.
+> 
+> 
