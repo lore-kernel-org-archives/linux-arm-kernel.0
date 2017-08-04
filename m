@@ -1,37 +1,56 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 4 Aug 2017 10:32:47 +0800
-Subject: [PATCH v2 2/2] MAINTAINERS: add entry for mediatek usb3 DRD IP driver
-In-Reply-To: <1501813967-21868-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1501813967-21868-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1501813967-21868-2-git-send-email-chunfeng.yun@mediatek.com>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Fri, 4 Aug 2017 10:38:26 +0800
+Subject: [PATCH v2 3/7] pwm: rockchip: Remove the dumplicate
+ rockchip_pwm_ops ops
+In-Reply-To: <20170802134011.1124f1dd@bbrezillon>
+References: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
+ <1499486629-9659-4-git-send-email-david.wu@rock-chips.com>
+ <20170802105902.2d137072@bbrezillon>
+ <af056420-5c33-e6c8-62cb-bcd3456000a7@rock-chips.com>
+ <20170802134011.1124f1dd@bbrezillon>
+Message-ID: <6d1f60ee-2402-5ee0-54f6-9521c039c36c@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add myself as maintainer of MediaTek USB3 DRD IP driver
+Hi Boris?
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- MAINTAINERS |    8 ++++++++
- 1 file changed, 8 insertions(+)
+? 2017/8/2 19:40, Boris Brezillon ??:
+> Yep, just define 3 different pwm_ops (one for each IP), each of them
+> implementing ->apply() and ->get_state() and that's all.
+> 
+> Something like:
+> 
+> static const struct pwm_ops rockchip_pwm_ops_v1 = {
+> 	.get_state = rockchip_pwm_v1_get_state,
+> 	.apply = rockchip_pwm_v1_apply,
+> 	.owner = THIS_MODULE,
+> };
+> 
+> static const struct pwm_ops rockchip_pwm_ops_v2 = {
+> 	.get_state = rockchip_pwm_v2_get_state,
+> 	.apply = rockchip_pwm_v2_apply,
+> 	.owner = THIS_MODULE,
+> };
+> 
+> static const struct pwm_ops rockchip_pwm_ops_vop = {
+> 	.get_state = rockchip_pwm_vop_get_state,
+> 	.apply = rockchip_pwm_vop_apply,
+> 	.owner = THIS_MODULE,
+> };
+> 
+> static const struct of_device_id rockchip_pwm_dt_ids[] = {
+> 	{ .compatible = "rockchip,rk2928-pwm", .data = &rockchip_pwm_ops_v1 },
+> 	{ .compatible = "rockchip,rk3288-pwm", .data = &rockchip_pwm_ops_v2 },
+> 	{ .compatible = "rockchip,vop-pwm", .data = &rockchip_pwm_ops_vop },
+> 	{ /* sentinel */ }
+> };
+> MODULE_DEVICE_TABLE(of, rockchip_pwm_dt_ids);
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 205d397..0cf5e31 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -8472,6 +8472,14 @@ M:      Sean Wang <sean.wang@mediatek.com>
- S:      Maintained
- F:      drivers/char/hw_random/mtk-rng.c
- 
-+MEDIATEK USB3 DRD IP DRIVER
-+M:	Chunfeng Yun <chunfeng.yun@mediatek.com>
-+L:	linux-usb at vger.kernel.org (moderated for non-subscribers)
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+L:	linux-mediatek at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	drivers/usb/mtu3/
-+
- MEGACHIPS STDPXXXX-GE-B850V3-FW LVDS/DP++ BRIDGES
- M:	Peter Senna Tschudin <peter.senna@collabora.com>
- M:	Martin Donnelly <martin.donnelly@ge.com>
--- 
-1.7.9.5
+I think we should keep the data members in the rockchip_pwm_data?like 
+supports_polarity and regs...
+
+The supports_polarity is needed for of_pwm_n_cells when pwm registered.
+And the other data members is helpful for us to use common code.
+
+It's okay for just define 3 different pwm_ops (one for each IP), but 
+they are with other data members in the struct of rockchip_pwm_data.
