@@ -1,73 +1,66 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri,  4 Aug 2017 15:31:41 +0100
-Subject: [PATCH v2 15/18] clk: add support for clocks provided by SCMI
+Date: Fri,  4 Aug 2017 15:31:40 +0100
+Subject: [PATCH v2 14/18] firmware: arm_scmi: add device power domain support
+ using genpd
 In-Reply-To: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
 References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1501857104-11279-16-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1501857104-11279-15-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some ARM based systems, a separate Cortex-M based System Control
-Processor(SCP) provides the overall power, clock, reset and system
-control. System Control and Management Interface(SCMI) Message Protocol
-is defined for the communication between the Application Cores(AP)
-and the SCP.
+This patch hooks up the support for device power domain provided by
+SCMI using the Linux generic power domain infrastructure.
 
-This patch adds support for the clocks provided by SCP using SCMI
-protocol.
-
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: linux-clk at vger.kernel.org
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/clk/Kconfig    |  10 +++
- drivers/clk/Makefile   |   1 +
- drivers/clk/clk-scmi.c | 216 +++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 227 insertions(+)
- create mode 100644 drivers/clk/clk-scmi.c
+ drivers/firmware/Kconfig                   |  13 +++
+ drivers/firmware/arm_scmi/Makefile         |   1 +
+ drivers/firmware/arm_scmi/scmi_pm_domain.c | 134 +++++++++++++++++++++++++++++
+ 3 files changed, 148 insertions(+)
+ create mode 100644 drivers/firmware/arm_scmi/scmi_pm_domain.c
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 68ca2d9fcd73..68b442b2c742 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -55,6 +55,16 @@ config COMMON_CLK_HI655X
- 	  multi-function device has one fixed-rate oscillator, clocked
- 	  at 32KHz.
+diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+index c3d1a12763ce..a4462bc661c8 100644
+--- a/drivers/firmware/Kconfig
++++ b/drivers/firmware/Kconfig
+@@ -40,6 +40,19 @@ config ARM_SCMI_PROTOCOL
+ 	  This protocol library provides interface for all the client drivers
+ 	  making use of the features offered by the SCMI.
  
-+config COMMON_CLK_SCMI
-+	tristate "Clock driver controlled via SCMI interface"
-+	depends on ARM_SCMI_PROTOCOL || COMPILE_TEST
-+	  ---help---
-+	  This driver provides support for clocks that are controlled
-+	  by firmware that implements the SCMI interface.
++config ARM_SCMI_POWER_DOMAIN
++	tristate "SCMI power domain driver"
++	depends on ARM_SCMI_PROTOCOL || (COMPILE_TEST && OF)
++	default y
++	select PM_GENERIC_DOMAINS if PM
++	help
++	  This enables support for the SCMI power domains which can be
++	  enabled or disabled via the SCP firmware
 +
-+	  This driver uses SCMI Message Protocol to interact with the
-+	  firmware providing all the clock controls.
++	  This driver can also be built as a module.  If so, the module
++	  will be called scmi_pm_domain. Note this may needed early in boot
++	  before rootfs may be available.
 +
- config COMMON_CLK_SCPI
- 	tristate "Clock driver controlled via SCPI interface"
- 	depends on ARM_SCPI_PROTOCOL || COMPILE_TEST
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index cd376b3fb47a..74a8ae081923 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -39,6 +39,7 @@ obj-$(CONFIG_CLK_QORIQ)			+= clk-qoriq.o
- obj-$(CONFIG_COMMON_CLK_RK808)		+= clk-rk808.o
- obj-$(CONFIG_COMMON_CLK_HI655X)		+= clk-hi655x.o
- obj-$(CONFIG_COMMON_CLK_S2MPS11)	+= clk-s2mps11.o
-+obj-$(CONFIG_COMMON_CLK_SCMI)           += clk-scmi.o
- obj-$(CONFIG_COMMON_CLK_SCPI)           += clk-scpi.o
- obj-$(CONFIG_COMMON_CLK_SI5351)		+= clk-si5351.o
- obj-$(CONFIG_COMMON_CLK_SI514)		+= clk-si514.o
-diff --git a/drivers/clk/clk-scmi.c b/drivers/clk/clk-scmi.c
+ config ARM_SCPI_PROTOCOL
+ 	tristate "ARM System Control and Power Interface (SCPI) Message Protocol"
+ 	depends on ARM || ARM64 || COMPILE_TEST
+diff --git a/drivers/firmware/arm_scmi/Makefile b/drivers/firmware/arm_scmi/Makefile
+index f9dee5ad0aa0..93e399d8f0ce 100644
+--- a/drivers/firmware/arm_scmi/Makefile
++++ b/drivers/firmware/arm_scmi/Makefile
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_ARM_SCMI_PROTOCOL)	= arm_scmi.o
+ arm_scmi-y = base.o clock.o driver.o perf.o power.o sensors.o
++obj-$(CONFIG_ARM_SCMI_POWER_DOMAIN) += scmi_pm_domain.o
+diff --git a/drivers/firmware/arm_scmi/scmi_pm_domain.c b/drivers/firmware/arm_scmi/scmi_pm_domain.c
 new file mode 100644
-index 000000000000..37f98a6439a0
+index 000000000000..e53aa9d0af6e
 --- /dev/null
-+++ b/drivers/clk/clk-scmi.c
-@@ -0,0 +1,216 @@
++++ b/drivers/firmware/arm_scmi/scmi_pm_domain.c
+@@ -0,0 +1,134 @@
 +/*
-+ * System Control and Power Interface (SCMI) Protocol based clock driver
++ * SCMI Generic power domain support.
 + *
 + * Copyright (C) 2017 ARM Ltd.
 + *
@@ -80,207 +73,125 @@ index 000000000000..37f98a6439a0
 + * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
 + * more details.
 + *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program. If not, see <http://www.gnu.org/licenses/>.
++ * You should have received a copy of the GNU General Public License along
++ * with this program. If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/clk-provider.h>
-+#include <linux/device.h>
 +#include <linux/err.h>
-+#include <linux/of.h>
++#include <linux/io.h>
 +#include <linux/module.h>
 +#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
++#include <linux/pm_domain.h>
 +#include <linux/scmi_protocol.h>
 +
-+struct scmi_clk {
-+	u32 id;
-+	struct clk_hw hw;
-+	const struct scmi_clock_info *info;
++struct scmi_pm_domain {
++	struct generic_pm_domain genpd;
 +	const struct scmi_handle *handle;
++	const char *name;
++	u32 domain;
 +};
 +
-+#define to_scmi_clk(clk) container_of(clk, struct scmi_clk, hw)
++#define to_scmi_pd(gpd) container_of(gpd, struct scmi_pm_domain, genpd)
 +
-+static unsigned long scmi_clk_recalc_rate(struct clk_hw *hw,
-+					  unsigned long parent_rate)
++static int scmi_pd_power(struct generic_pm_domain *domain, bool power_on)
 +{
 +	int ret;
-+	u64 rate;
-+	struct scmi_clk *clk = to_scmi_clk(hw);
++	u32 state, ret_state;
++	struct scmi_pm_domain *pd = to_scmi_pd(domain);
++	const struct scmi_power_ops *ops = pd->handle->power_ops;
 +
-+	ret = clk->handle->clk_ops->rate_get(clk->handle, clk->id, &rate);
-+	if (ret)
-+		return 0;
-+	return rate;
-+}
++	if (power_on)
++		state = SCMI_POWER_STATE_GENERIC_ON;
++	else
++		state = SCMI_POWER_STATE_GENERIC_OFF;
 +
-+static long scmi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long *parent_rate)
-+{
-+	u64 fmin, fmax, ftmp;
-+	struct scmi_clk *clk = to_scmi_clk(hw);
-+
-+	/*
-+	 * We can't figure out what rate it will be, so just return the
-+	 * rate back to the caller. scmi_clk_recalc_rate() will be called
-+	 * after the rate is set and we'll know what rate the clock is
-+	 * running at then.
-+	 */
-+	if (clk->info->rate_discrete)
-+		return rate;
-+
-+	fmin = clk->info->range.min_rate;
-+	fmax = clk->info->range.max_rate;
-+	for (ftmp = fmin; ftmp <= fmax; ftmp += clk->info->range.step_size) {
-+		if (ftmp >= rate) {
-+			if (ftmp <= fmax)
-+				fmax = ftmp;
-+			break;
-+		} else if (ftmp >= fmin) {
-+			fmin = ftmp;
-+		}
-+	}
-+	return fmax != clk->info->range.max_rate ? fmax : fmin;
-+}
-+
-+static int scmi_clk_set_rate(struct clk_hw *hw, unsigned long rate,
-+			     unsigned long parent_rate)
-+{
-+	struct scmi_clk *clk = to_scmi_clk(hw);
-+
-+	return clk->handle->clk_ops->rate_set(clk->handle, clk->id, 0, rate);
-+}
-+
-+static int scmi_clk_enable(struct clk_hw *hw)
-+{
-+	struct scmi_clk *clk = to_scmi_clk(hw);
-+
-+	return clk->handle->clk_ops->enable(clk->handle, clk->id);
-+}
-+
-+static void scmi_clk_disable(struct clk_hw *hw)
-+{
-+	struct scmi_clk *clk = to_scmi_clk(hw);
-+
-+	clk->handle->clk_ops->disable(clk->handle, clk->id);
-+}
-+
-+static const struct clk_ops scmi_clk_ops = {
-+	.recalc_rate = scmi_clk_recalc_rate,
-+	.round_rate = scmi_clk_round_rate,
-+	.set_rate = scmi_clk_set_rate,
-+	/*
-+	 * We can't provide enable/disable callback as we can't perform the same
-+	 * in atomic context. Since the clock framework provides standard API
-+	 * clk_prepare_enable that helps cases using clk_enable in non-atomic
-+	 * context, it should be fine providing prepare/unprepare.
-+	 */
-+	.prepare = scmi_clk_enable,
-+	.unprepare = scmi_clk_disable,
-+};
-+
-+static int scmi_clk_ops_init(struct device *dev, struct scmi_clk *sclk)
-+{
-+	int ret;
-+	struct clk_init_data init;
-+
-+	init.flags = CLK_GET_RATE_NOCACHE;
-+	init.num_parents = 0;
-+	init.ops = &scmi_clk_ops;
-+	init.name = sclk->info->name;
-+	sclk->hw.init = &init;
-+
-+	ret = devm_clk_hw_register(dev, &sclk->hw);
++	ret = ops->state_set(pd->handle, pd->domain, state);
 +	if (!ret)
-+		clk_hw_set_rate_range(&sclk->hw, sclk->info->range.min_rate,
-+				      sclk->info->range.max_rate);
++		ret = ops->state_get(pd->handle, pd->domain, &ret_state);
++	if (!ret && state != ret_state)
++		return -EIO;
++
 +	return ret;
 +}
 +
-+static int scmi_clk_add(struct device *dev, struct device_node *np,
-+			const struct scmi_handle *handle)
++static int scmi_pd_power_on(struct generic_pm_domain *domain)
 +{
-+	int idx, count, err;
-+	struct clk_hw **hws;
-+	struct clk_hw_onecell_data *clk_data;
-+
-+	count = handle->clk_ops->count_get(handle);
-+	if (count < 0) {
-+		dev_err(dev, "%s: invalid clock output count\n", np->name);
-+		return -EINVAL;
-+	}
-+
-+	clk_data = devm_kzalloc(dev, sizeof(*clk_data) +
-+				sizeof(*clk_data->hws) * count, GFP_KERNEL);
-+	if (!clk_data)
-+		return -ENOMEM;
-+
-+	clk_data->num = count;
-+	hws = clk_data->hws;
-+
-+	for (idx = 0; idx < count; idx++) {
-+		struct scmi_clk *sclk;
-+
-+		sclk = devm_kzalloc(dev, sizeof(*sclk), GFP_KERNEL);
-+		if (!sclk)
-+			return -ENOMEM;
-+
-+		sclk->info = handle->clk_ops->info_get(handle, idx);
-+		if (!sclk->info) {
-+			dev_dbg(dev, "invalid clock info for idx %d\n", idx);
-+			continue;
-+		}
-+
-+		sclk->id = idx;
-+		sclk->handle = handle;
-+
-+		err = scmi_clk_ops_init(dev, sclk);
-+		if (err) {
-+			dev_err(dev, "failed to register clock %d\n", idx);
-+			devm_kfree(dev, sclk);
-+			hws[idx] = NULL;
-+		} else {
-+			dev_dbg(dev, "Registered clock:%s\n", sclk->info->name);
-+			hws[idx] = &sclk->hw;
-+		}
-+	}
-+
-+	return of_clk_add_hw_provider(np, of_clk_hw_onecell_get, clk_data);
++	return scmi_pd_power(domain, true);
 +}
 +
-+static int scmi_clocks_remove(struct platform_device *pdev)
++static int scmi_pd_power_off(struct generic_pm_domain *domain)
++{
++	return scmi_pd_power(domain, false);
++}
++
++static int scmi_pm_domain_probe(struct platform_device *pdev)
 +{
 +	struct device *dev = &pdev->dev;
 +	struct device_node *np = dev->of_node;
++	struct scmi_pm_domain *scmi_pd;
++	struct genpd_onecell_data *scmi_pd_data;
++	struct generic_pm_domain **domains;
++	int num_domains, i;
++	const struct scmi_handle *handle = devm_scmi_handle_get(dev);
 +
-+	of_clk_del_provider(np);
++	if (IS_ERR_OR_NULL(handle) || !handle->power_ops)
++		return -EPROBE_DEFER;
++
++	num_domains = handle->power_ops->num_domains_get(handle);
++	if (num_domains < 0) {
++		dev_err(dev, "number of domains not found\n");
++		return num_domains;
++	}
++
++	scmi_pd = devm_kcalloc(dev, num_domains, sizeof(*scmi_pd), GFP_KERNEL);
++	if (!scmi_pd)
++		return -ENOMEM;
++
++	scmi_pd_data = devm_kzalloc(dev, sizeof(*scmi_pd_data), GFP_KERNEL);
++	if (!scmi_pd_data)
++		return -ENOMEM;
++
++	domains = devm_kcalloc(dev, num_domains, sizeof(*domains), GFP_KERNEL);
++	if (!domains)
++		return -ENOMEM;
++
++	for (i = 0; i < num_domains; i++, scmi_pd++) {
++		domains[i] = &scmi_pd->genpd;
++
++		scmi_pd->domain = i;
++		scmi_pd->handle = handle;
++		scmi_pd->name = handle->power_ops->name_get(handle, i);
++		scmi_pd->genpd.name = scmi_pd->name;
++		scmi_pd->genpd.power_off = scmi_pd_power_off;
++		scmi_pd->genpd.power_on = scmi_pd_power_on;
++
++		/*
++		 * Treat all power domains as off at boot.
++		 *
++		 * The SCP firmware itself may have switched on some domains,
++		 * but for reference counting purpose, keep it this way.
++		 */
++		pm_genpd_init(&scmi_pd->genpd, NULL, true);
++	}
++
++	scmi_pd_data->domains = domains;
++	scmi_pd_data->num_domains = num_domains;
++
++	of_genpd_add_provider_onecell(np, scmi_pd_data);
++
 +	return 0;
 +}
 +
-+static int scmi_clocks_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	const struct scmi_handle *handle = devm_scmi_handle_get(dev);
-+
-+	if (IS_ERR_OR_NULL(handle) || !handle->clk_ops)
-+		return -EPROBE_DEFER;
-+
-+	return scmi_clk_add(dev, np, handle);
-+}
-+
-+static struct platform_driver scmi_clocks_driver = {
++static struct platform_driver scmi_power_domain_driver = {
 +	.driver	= {
-+		.name = "scmi-clocks",
++		.name = "scmi-power-domain",
 +	},
-+	.probe = scmi_clocks_probe,
-+	.remove = scmi_clocks_remove,
++	.probe = scmi_pm_domain_probe,
 +};
-+module_platform_driver(scmi_clocks_driver);
++module_platform_driver(scmi_power_domain_driver);
 +
 +MODULE_AUTHOR("Sudeep Holla <sudeep.holla@arm.com>");
-+MODULE_DESCRIPTION("ARM SCMI clock driver");
++MODULE_DESCRIPTION("ARM SCMI power domain driver");
 +MODULE_LICENSE("GPL v2");
 -- 
 2.7.4
