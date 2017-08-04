@@ -1,54 +1,92 @@
-From: finley.xiao@rock-chips.com (Finley Xiao)
-Date: Fri,  4 Aug 2017 11:33:38 +0800
-Subject: [PATCH 2/2] arm64: dts: rockchip: Add efuse device node for RK3328 SoC
-In-Reply-To: <1501817618-65504-1-git-send-email-finley.xiao@rock-chips.com>
-References: <1501817618-65504-1-git-send-email-finley.xiao@rock-chips.com>
-Message-ID: <1501817618-65504-3-git-send-email-finley.xiao@rock-chips.com>
+From: guochun.mao@mediatek.com (Guochun Mao)
+Date: Fri, 4 Aug 2017 11:44:10 +0800
+Subject: [PATCH] dt-bindings: mtd: add new compatible strings for mtk
+ nor controller
+In-Reply-To: <20170803174750.bipdynhyyyozzjk6@rob-hp-laptop>
+References: <1500948617-19627-1-git-send-email-guochun.mao@mediatek.com>
+ <1500948617-19627-2-git-send-email-guochun.mao@mediatek.com>
+ <03016ea3-51ad-0b2d-e824-0a20913bd7c1@gmail.com>
+ <20170802103637.16cd6548@bbrezillon>
+ <535cc2d5-7bc9-2cb7-42cf-9d7058e64226@wedev4u.fr>
+ <1501726602.4381.23.camel@mhfsdcap03>
+ <20170803174750.bipdynhyyyozzjk6@rob-hp-laptop>
+Message-ID: <1501818250.4381.26.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an efuse node in the device tree for rk3228 SoC.
+On Thu, 2017-08-03 at 12:47 -0500, Rob Herring wrote:
+> On Thu, Aug 03, 2017 at 10:16:42AM +0800, Guochun Mao wrote:
+> > Hi Cyrille,
+> > 
+> > On Wed, 2017-08-02 at 17:31 +0200, Cyrille Pitchen wrote:
+> > > Hi Guochun,
+> > > 
+> > > Le 02/08/2017 ? 10:36, Boris Brezillon a ?crit :
+> > > > Hi Matthias,
+> > > > 
+> > > > On Tue, 1 Aug 2017 14:33:22 +0200
+> > > > Matthias Brugger <matthias.bgg@gmail.com> wrote:
+> > > > 
+> > > >> On 07/25/2017 04:10 AM, Guochun Mao wrote:
+> > > >>> Add "mediatek,mt2712-nor" and "mediatek,mt7622-nor"
+> > > >>> for nor flash node's compatible strings.
+> > > >>>
+> > > >>> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+> > > >>> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+> > > >>> ---
+> > > >>>   .../devicetree/bindings/mtd/mtk-quadspi.txt        |    2 ++
+> > > >>>   1 file changed, 2 insertions(+)
+> > > >>>
+> > > >>> diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> > > >>> index 5ded66a..9845ff4 100644
+> > > >>> --- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> > > >>> +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> > > >>> @@ -3,6 +3,8 @@
+> > > >>>   Required properties:
+> > > >>>   - compatible: 	  The possible values are:
+> > > >>>   		  "mediatek,mt2701-nor"
+> > > >>> +		  "mediatek,mt2712-nor"
+> > > >>> +		  "mediatek,mt7622-nor"
+> > > >>>   		  "mediatek,mt7623-nor"
+> > > >>>   		  "mediatek,mt8173-nor"
+> > > >>>   		  For mt8173, compatible should be "mediatek,mt8173-nor".
+> > > >>>
+> > > 
+> > > There should be another patch to update the mtk_nor_of_ids[] array in
+> > > the mtk-quadspi.c driver, shouldn't it?
+> > > 
+> > > Currently, I only see the "mediatek,mt8173-nor" compatible string at the
+> > > driver side. The driver and its documentation should be aligned and both
+> > > patches should be applied at the same time.
+> > 
+> > > Best regards,
+> > > 
+> > > Cyrille
+> > 
+> > 
+> > From my designer's info, these IPs' nor controller could use same
+> > driver, and I had verified it. I think there's no need to update
+> > mtk_nor_of_ids[], unless we find difference between these IPs(exactly
+> > compared with mt8173).
+> > How do you think?
+> 
+> That is perfectly fine, but then the documentation needs to be explicit 
+> as to what are the fallback compatibles. It's one valid combination per 
+> line, not 1 compatible string per line.
 
-Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
----
- arch/arm64/boot/dts/rockchip/rk3328.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+OK, I'll corret the description in next version.
+Thanks a lot.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-index 81fd8cb..cc8dd80 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-@@ -367,6 +367,31 @@
- 		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- 
-+	efuse: efuse at ff260000 {
-+		compatible = "rockchip,rk3328-efuse";
-+		reg = <0x0 0xff260000 0x0 0x50>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		clocks = <&cru SCLK_EFUSE>;
-+		clock-names = "pclk_efuse";
-+		rockchip,efuse-size = <0x20>;
-+
-+		/* Data cells */
-+		efuse_id: id at 7 {
-+			reg = <0x07 0x10>;
-+		};
-+		cpu_leakage: cpu-leakage at 17 {
-+			reg = <0x17 0x1>;
-+		};
-+		logic_leakage: logic-leakage at 19 {
-+			reg = <0x19 0x1>;
-+		};
-+		efuse_cpu_version: cpu-version at 1a {
-+			reg = <0x1a 0x1>;
-+			bits = <3 3>;
-+		};
-+	};
-+
- 	saradc: adc at ff280000 {
- 		compatible = "rockchip,rk3328-saradc", "rockchip,rk3399-saradc";
- 		reg = <0x0 0xff280000 0x0 0x100>;
--- 
-2.7.4
+Guochun
+
+
+> 
+> Rob
+> 
+> > 
+> > And, we will add dts patches for new SOCs, are these patches should
+> > applied with this documentation?
+> > 
+> > Best regards,
+> > Guochun
+> > 
