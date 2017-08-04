@@ -1,45 +1,24 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Fri, 04 Aug 2017 11:48:25 +0800
-Subject: [linux-sunxi] [PATCH] pinctrl: sunxi: fix V3s pinctrl driver IRQ
- bank base
-In-Reply-To: <CAGb2v64BBJrr+yo-7n1DkZjYvdB2ws+0OHD_Dwt_MCS85-U19Q@mail.gmail.com>
-References: <20170801145416.61854-1-icenowy@aosc.io>
- <CAGb2v64BBJrr+yo-7n1DkZjYvdB2ws+0OHD_Dwt_MCS85-U19Q@mail.gmail.com>
-Message-ID: <ee6eccabe2e9279278430013c943bbd9@aosc.io>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 4 Aug 2017 11:56:22 +0800
+Subject: [linux-sunxi] [PATCH 03/13] drm: sun4i: add support for H3's TCON
+In-Reply-To: <20170801131304.7741-4-icenowy@aosc.io>
+References: <20170801131304.7741-1-icenowy@aosc.io>
+ <20170801131304.7741-4-icenowy@aosc.io>
+Message-ID: <CAGb2v65gxoQgcdhyZVWFNeKxUJj34FuN7EJx-a6DkquyQhLYRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-08-04 10:23?Chen-Yu Tsai ???
-> On Tue, Aug 1, 2017 at 10:54 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->> The V3s pin controller doesn't have the bank 0 (starts at address
->> 0x200), which is like A33. However, this is not workarounded when
-> 
->                                            was not worked around
-> 
-> "Work around" is a verb phrase. "Workaround" is a noun.
-> 
->> developing the driver, which makes IRQ not working.
-> 
->                                broke the IRQs.
-> 
->> 
->> Fix the IRQ bank base.
->> 
->> Fixes: 56d9e4a76039 ("pinctrl: sunxi: add driver for V3s SoC")
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> 
-> Confirmed this is the same thing we saw on A33.
-> The fix is the same.
-> 
-> Apart from the typo / grammar errors above,
-> 
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+On Tue, Aug 1, 2017 at 9:12 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> From: Icenowy Zheng <icenowy@aosc.xyz>
+>
+> Allwinner H3 has two special TCONs without channel 0.
+>
+> Add support for this kind of TCON.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Should I send a v2 now to fix the language errors?
+Ideally you would split this into two patches. The first one would add
+the quirks support for TCONs without channel 0. I can also use this for
+the A80. The second would add the H3 TCON.
 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ChenYu
