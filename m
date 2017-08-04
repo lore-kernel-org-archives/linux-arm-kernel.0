@@ -1,109 +1,41 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 4 Aug 2017 18:43:27 +0100
-Subject: [PATCH 5/6] arm64: Implement pmem API support
-In-Reply-To: <20170804152542.7h3mbyxnhjwroddc@armageddon.cambridge.arm.com>
-References: <cover.1500397441.git.robin.murphy@arm.com>
- <ba8c28bcffc3bc856163441793bb4ef0fefa0f75.1500397441.git.robin.murphy@arm.com>
- <20170804152542.7h3mbyxnhjwroddc@armageddon.cambridge.arm.com>
-Message-ID: <74521a9d-45fa-7e29-d9f9-960c478306ec@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri,  4 Aug 2017 19:43:39 +0200
+Subject: [PATCH 00/14] mmc: meson-gx: driver fixups and upgrade
+Message-ID: <20170804174353.16486-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/17 16:25, Catalin Marinas wrote:
-> Two minor comments below.
-> 
-> On Tue, Jul 25, 2017 at 11:55:42AM +0100, Robin Murphy wrote:
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -960,6 +960,17 @@ config ARM64_UAO
->>  	  regular load/store instructions if the cpu does not implement the
->>  	  feature.
->>  
->> +config ARM64_PMEM
->> +	bool "Enable support for persistent memory"
->> +	select ARCH_HAS_PMEM_API
->> +	help
->> +	  Say Y to enable support for the persistent memory API based on the
->> +	  ARMv8.2 DCPoP feature.
->> +
->> +	  The feature is detected at runtime, and the kernel will use DC CVAC
->> +	  operations if DC CVAP is not supported (following the behaviour of
->> +	  DC CVAP itself if the system does not define a point of persistence).
-> 
-> Any reason not to have this default y?
+The patchset features several bugfixes, rework and upgrade for the
+meson-gx MMC driver.
 
-Mostly because it's untested, and not actually useful without some way
-of describing persistent memory regions to the kernel (I'm currently
-trying to make sense of what exactly ARCH_HAS_MMIO_FLUSH is supposed to
-mean in order to enable ACPI NFIT support).
+The main goal is to improve readability and enable new high speed
+modes, such as eMMC DDR52 and sdcard UHS modes up to SDR50 (100Mhz)
 
-There's also the potential issue that we can't disable ARCH_HAS_PMEM_API
-at runtime on pre-v8.2 systems where DC CVAC may not strictly give the
-guarantee of persistence that that is supposed to imply. However, I
-guess that's more of an open problem, since even on a v8.2 CPU reporting
-(mandatory) DC CVAP support we've still no way to actually know whether
-the interconnect/memory controller/etc. of any old system is up to the
-job. At this point I'm mostly hoping that people will only be sticking
-NVDIMMs into systems that *are* properly designed to support them, v8.2
-CPUs or not.
+While full speed SDR104 is stable with most cards, a few seems to
+require an even more precise tuning. For this, we'll probably have
+to implement per-line delay calibration.
 
->> --- a/arch/arm64/mm/cache.S
->> +++ b/arch/arm64/mm/cache.S
->> @@ -172,6 +172,20 @@ ENDPIPROC(__clean_dcache_area_poc)
->>  ENDPROC(__dma_clean_area)
->>  
->>  /*
->> + *	__clean_dcache_area_pop(kaddr, size)
->> + *
->> + * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
->> + * 	are cleaned to the PoP.
->> + *
->> + *	- kaddr   - kernel address
->> + *	- size    - size in question
->> + */
->> +ENTRY(__clean_dcache_area_pop)
->> +	dcache_by_line_op cvap, sy, x0, x1, x2, x3
->> +	ret
->> +ENDPIPROC(__clean_dcache_area_pop)
->> +
->> +/*
->>   *	__dma_flush_area(start, size)
->>   *
->>   *	clean & invalidate D / U line
->> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
->> index a682a0a2a0fa..a461a00ceb3e 100644
->> --- a/arch/arm64/mm/pageattr.c
->> +++ b/arch/arm64/mm/pageattr.c
->> @@ -183,3 +183,21 @@ bool kernel_page_present(struct page *page)
->>  }
->>  #endif /* CONFIG_HIBERNATION */
->>  #endif /* CONFIG_DEBUG_PAGEALLOC */
->> +
->> +#ifdef CONFIG_ARCH_HAS_PMEM_API
->> +#include <asm/cacheflush.h>
->> +
->> +static inline void arch_wb_cache_pmem(void *addr, size_t size)
->> +{
->> +	/* Ensure order against any prior non-cacheable writes */
->> +	dmb(sy);
->> +	__clean_dcache_area_pop(addr, size);
->> +}
-> 
-> Could we keep the dmb() in the actual __clean_dcache_area_pop()
-> implementation?
+This series has been tested on gxbb-p200, gxbb-nanopi-k2 and
+gxl-s905x-libretech
 
-Mark held the opinion that it should follow the same pattern as the
-other cache maintenance primitives - e.g. we don't have such a dmb in
-__inval_cache_range(), but do place them at callsites where we know it
-may be necessary (head.S) - and I found it hard to disagree. The callers
-in patch #6 should never need a barrier, and arguably we may not even
-need this one, since it looks like pmem should currently always be
-mapped as MEMREMAP_WB if ARCH_HAS_PMEM_API.
+Jerome Brunet (14):
+  mmc: meson-gx: fix mux mask definition
+  mmc: meson-gx: remove CLK_DIVIDER_ALLOW_ZERO clock flag
+  mmc: meson-gx: clean up some constants
+  mmc: meson-gx: use _irqsave variant of spinlock
+  mmc: meson-gx: cfg init overwrite values
+  mmc: meson-gx: rework set_ios function
+  mmc: meson-gx: rework clk_set function
+  mmc: meson-gx: rework clock init function
+  mmc: meson-gx: simplify interrupt handler
+  mmc: meson-gx: implement card_busy callback
+  mmc: meson-gx: rework tuning function
+  mmc: meson-gx: fix dual data rate mode frequencies
+  mmc: meson-gx: work around clk-stop issue
+  mmc: meson-gx: implement voltage switch callback
 
-> I can do the changes myself if you don't have any objections.
+ drivers/mmc/host/meson-gx-mmc.c | 611 ++++++++++++++++++++++++++--------------
+ 1 file changed, 396 insertions(+), 215 deletions(-)
 
-If you would prefer to play safe and move it back into the assembly
-that's fine by me, but note that the associated comments in patch #6
-should also be removed if so.
-
-Robin.
+-- 
+2.9.4
