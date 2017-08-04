@@ -1,91 +1,103 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Fri, 4 Aug 2017 11:17:34 +0530
-Subject: [PATCH v4 2/2] ARM: dts: keystone-k2g: Add gpio nodes
-In-Reply-To: <1501825654-19266-1-git-send-email-j-keerthy@ti.com>
-References: <1501825654-19266-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1501825654-19266-2-git-send-email-j-keerthy@ti.com>
+From: hoeun.ryu@gmail.com (Hoeun Ryu)
+Date: Fri,  4 Aug 2017 15:04:23 +0900
+Subject: [PATCH] arm:kexec: have own crash_smp_send_stop() for crash dump for
+ nonpanic cores
+Message-ID: <1501826682-14148-1-git-send-email-hoeun.ryu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-66AK2G has 2 instances of gpio. The first one has all the 144 GPIOs
-functional. 9 banks with 16 gpios making a total of 144. The second
-instance has only the GPIO0:GPIO67 functional and rest are marked
-reserved.
+ Commit 0ee5941 : (x86/panic: replace smp_send_stop() with kdump friendly
+version in panic path) introduced crash_smp_send_stop() which is a weak
+function and can be overriden by architecture codes to fix the side effect
+caused by commit f06e515 : (kernel/panic.c: add "crash_kexec_post_
+notifiers" option).
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+ ARM architecture uses the weak version function and the problem is that
+the weak function simply calls smp_send_stop() which makes other CPUs
+offline and takes away the chance to save crash information for nonpanic
+CPUs in machine_crash_shutdown() when crash_kexec_post_notifiers kernel
+option is enabled.
+
+ Calling smp_call_function(machine_crash_nonpanic_core, NULL, false) in
+the function is useless because all nonpanic CPUs are already offline by
+smp_send_stop() in this case and smp_call_function() only works against
+online CPUs.
+
+ The result is that /proc/vmcore is not available with the error messages;
+"Warning: Zero PT_NOTE entries found", "Kdump: vmcore not initialized".
+
+ crash_smp_send_stop() is implemented for ARM architecture to fix this
+problem and the function (strong symbol version) saves crash information
+for nonpanic CPUs using smp_call_function() and machine_crash_shutdown()
+saves crash information only for the panic CPU.
+
+ We might be able to implement the function like arm64 or x86 using a
+dedicated IPI (let's say IPI_CPU_CRASH_STOP), but we cannot implement this
+function like that because of the lack of IPI slot. Please see the commit
+e7273ff4 : (ARM: 8488/1: Make IPI_CPU_BACKTRACE a "non-secure" SGI)
+
+Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
 ---
+ arch/arm/kernel/machine_kexec.c | 37 ++++++++++++++++++++++++++-----------
+ 1 file changed, 26 insertions(+), 11 deletions(-)
 
-Changes in v4:
-
-  * Couple of rephrasing in the commit log.
-  * Changed compatible to ti,k2g-gpio.
-
-Changes in v2:
-
-  * Split the documentation part into a separate patch.
-
- arch/arm/boot/dts/keystone-k2g.dtsi | 42 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
-
-diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
-index bf4d1fa..4eb1ba8 100644
---- a/arch/arm/boot/dts/keystone-k2g.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2g.dtsi
-@@ -15,6 +15,7 @@
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index fe1419e..18d084a 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -94,6 +94,31 @@ void machine_crash_nonpanic_core(void *unused)
+ 		cpu_relax();
+ }
  
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/pinctrl/keystone.h>
-+#include <dt-bindings/gpio/gpio.h>
++void crash_smp_send_stop(void)
++{
++	static int cpus_stopped;
++	unsigned long msecs;
++
++	/*
++	 * This function can be called twice in panic path, but obviously
++	 * we execute this only once.
++	 */
++	if (cpus_stopped)
++		return;
++
++	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
++	smp_call_function(machine_crash_nonpanic_core, NULL, false);
++	msecs = 1000; /* Wait at most a second for the other cpus to stop */
++	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
++		mdelay(1);
++		msecs--;
++	}
++	if (atomic_read(&waiting_for_crash_ipi) > 0)
++		pr_warn("Non-crashing CPUs did not react to IPI\n");
++
++	cpus_stopped = 1;
++}
++
+ static void machine_kexec_mask_interrupts(void)
+ {
+ 	unsigned int i;
+@@ -119,20 +144,10 @@ static void machine_kexec_mask_interrupts(void)
  
- / {
- 	compatible = "ti,k2g","ti,keystone";
-@@ -168,5 +169,46 @@
- 				#reset-cells = <2>;
- 			};
- 		};
-+
-+		gpio0: gpio at 2603000 {
-+			compatible = "ti,k2g-gpio", "ti,keystone-gpio";
-+			reg = <0x02603000 0x100>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+
-+			interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			ti,ngpio = <144>;
-+			ti,davinci-gpio-unbanked = <0>;
-+			clocks = <&k2g_clks 0x001b 0x0>;
-+			clock-names = "gpio";
-+		};
-+
-+		gpio1: gpio at 260a000 {
-+			compatible = "ti,k2g-gpio", "ti,keystone-gpio";
-+			reg = <0x0260a000 0x100>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupts = <GIC_SPI 442 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 443 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 444 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 445 IRQ_TYPE_EDGE_RISING>,
-+					<GIC_SPI 446 IRQ_TYPE_EDGE_RISING>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			ti,ngpio = <68>;
-+			ti,davinci-gpio-unbanked = <0>;
-+			clocks = <&k2g_clks 0x001c 0x0>;
-+			clock-names = "gpio";
-+		};
- 	};
- };
+ void machine_crash_shutdown(struct pt_regs *regs)
+ {
+-	unsigned long msecs;
++	WARN_ON(num_online_cpus() > 1);
+ 
+ 	local_irq_disable();
+ 
+-	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
+-	smp_call_function(machine_crash_nonpanic_core, NULL, false);
+-	msecs = 1000; /* Wait at most a second for the other cpus to stop */
+-	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
+-		mdelay(1);
+-		msecs--;
+-	}
+-	if (atomic_read(&waiting_for_crash_ipi) > 0)
+-		pr_warn("Non-crashing CPUs did not react to IPI\n");
+-
+ 	crash_save_cpu(regs, smp_processor_id());
+ 	machine_kexec_mask_interrupts();
+ 
 -- 
-1.9.1
+2.7.4
