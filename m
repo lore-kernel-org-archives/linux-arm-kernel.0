@@ -1,54 +1,21 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 04 Aug 2017 11:38:16 +0100
-Subject: [PATCH] arm64:kexec: have own crash_smp_send_stop() for crash
- dump for nonpanic cores
-In-Reply-To: <1501830173-15989-1-git-send-email-hoeun.ryu@gmail.com>
-References: <1501830173-15989-1-git-send-email-hoeun.ryu@gmail.com>
-Message-ID: <59844E98.3020507@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 4 Aug 2017 12:49:29 +0200
+Subject: [GIT PULL] Rockchip dts32 fixes for 4.13
+In-Reply-To: <3943171.Z7m20BX0pe@phil>
+References: <3943171.Z7m20BX0pe@phil>
+Message-ID: <CAK8P3a1OTiCsdzS3v_PYtjnGPdyGNS8gkMqf+yJ8nM-TBat6_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hoeun,
+On Fri, Aug 4, 2017 at 11:16 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> Hi Arnd, Kevin, Olof,
+>
+> please find below a fixup for 32bit devicetree parts for 4.13.
+> As the tag describes it is meant to stop proliferation of the
+> wrong example through copy-pastes.
+>
+> So please pull
 
-On 04/08/17 08:02, Hoeun Ryu wrote:
->  Commit 0ee5941 : (x86/panic: replace smp_send_stop() with kdump friendly
-> version in panic path) introduced crash_smp_send_stop() which is a weak
-> function and can be overriden by architecture codes to fix the side effect
-> caused by commit f06e515 : (kernel/panic.c: add "crash_kexec_post_
-> notifiers" option).
+Pulled into fixes, thanks!
 
-If I've understood correctly: if we boot with this option core code doesn't use
-our machine_crash_shutdown(), and instead calls crash_smp_send_stop(), which we
-don't have, so it uses the default smp_send_stop(), which doesn't save the regs.
-
-Thanks for catching this!
-
-
-Could we rename smp_send_crash_stop() crash_smp_send_stop() and add the
-called-twice logic there? They are similar enough that I'm getting them muddled
-already!
-
-
-Thanks,
-
-James
-
-
->  ARM64 architecture uses the weak version function and the problem is that
-> the weak function simply calls smp_send_stop() which makes other CPUs
-> offline and takes away the chance to save crash information for nonpanic
-> CPUs in machine_crash_shutdown() when crash_kexec_post_notifiers kernel
-> option is enabled.
-> 
->  Calling smp_send_crash_stop() in the function is useless because all
-> nonpanic CPUs are already offline by smp_send_stop() in this case and
-> smp_send_crash_stop() only works against online CPUs.
-> 
->  The result is that /proc/vmcore is not available with the error messages;
-> "Warning: Zero PT_NOTE entries found", "Kdump: vmcore not initialized".
-> 
->  crash_smp_send_stop() is implemented for ARM64 architecture to fix this
-> problem and the function (strong symbol version) saves crash information
-> for nonpanic CPUs using smp_send_crash_stop() and machine_crash_shutdown()
-> tries to save crash information for nonpanic CPUs only when
-> crash_kexec_post_notifiers kernel option is disabled.
+        Arnd
