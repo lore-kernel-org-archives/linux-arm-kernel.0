@@ -1,119 +1,111 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 4 Aug 2017 15:12:36 +0200
-Subject: [PATCH v2 16/16] KVM: arm64: Handle deferred SErrors consumed on
- guest exit
-In-Reply-To: <59835765.7020604@arm.com>
-References: <20170728141019.9084-1-james.morse@arm.com>
- <20170728141019.9084-17-james.morse@arm.com>
- <20170801131855.GH5176@cbox> <59835765.7020604@arm.com>
-Message-ID: <20170804131236.GC27784@cbox>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Fri, 4 Aug 2017 15:16:25 +0200
+Subject: [PATCH v3 1/6] drm/tinydrm: remove call to mipi_dbi_init() from
+ mipi_dbi_spi_init()
+In-Reply-To: <1501799630-1650-2-git-send-email-david@lechnology.com>
+References: <1501799630-1650-1-git-send-email-david@lechnology.com>
+ <1501799630-1650-2-git-send-email-david@lechnology.com>
+Message-ID: <899f6103-694d-1eef-8f28-3ecda91e580d@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 03, 2017 at 06:03:33PM +0100, James Morse wrote:
-> Hi Christoffer,
-> 
-> On 01/08/17 14:18, Christoffer Dall wrote:
-> > On Fri, Jul 28, 2017 at 03:10:19PM +0100, James Morse wrote:
-> >> On systems with VHE, the RAS extensions and IESB support, KVM gets an
-> >> implicit ESB whenever it enters/exits a guest, because the host sets
-> >> SCTLR_EL1.IESB.
-> >>
-> >> To prevent errors being lost, add code to __guest_exit() to read DISR_EL1,
-> >> and save it in the kvm_vcpu_fault_info. Add code to handle_exit() to
-> >> process this deferred SError. This data is in addition to the reason the
-> >> guest exitted.
-> > 
-> > Two questions:
-> > 
-> > First, am I reading the spec incorrectly when it says "The implicit form
-> > of Error Synchronization Barrier: [...] Has no effect on DISR_EL1 or
-> > VDISR_EL2" and I understand this as we wouldn't actually read anything
-> > from DISR_EL1 if we rely on the IESB?
-> 
-> (This is from section 2.4.5 Extension for barrier at exception entry and exit of
-> DDI 0587A.)
-> 
-> Well spotted ... that's embarrassing!
 
-Not at all, that spec is a little dense.
+Den 04.08.2017 00.33, skrev David Lechner:
+> This removes the call to mipi_dbi_init() from mipi_dbi_spi_init() so that
+> drivers can have a driver-specific implementation if needed.
+>
+> Suggested-by: Noralf Tr?nnes <noralf@tronnes.org>
+> Signed-off-by: David Lechner <david@lechnology.com>
+> Reviewed-by: Noralf Tr?nnes <noralf@tronnes.org>
+> ---
 
-> 
-> The DISR write is in the pseudocode's ESBOperation() which is not the same as
-> ErrorSynchronizationBarrier(). Running an 'ESB' does both, but an IESB only does
-> ErrorSynchronizationBarrier().
-> 
-> I think this distinction is because the CPU may know about RAS errors it hasn't
-> yet made pending SErrors. (they must have to have a severity for the ESR by this
-> point).
-> 
-> So IESB makes hidden RAS errors pending SErrors, it doesn't do what ESB does.
-> 
-> Yes, this means the DISR_EL1 check on kernel-entry and guest exit is useless.
-> Given this the host kernel entry/exit can be simplified, probably getting rid of
-> the SError over eret horror. I will need to re-think the KVM changes, (we may
-> just need the ESR from the existing vaxorcism code).
-> 
-> 
-> > Second, what if we have several SErrors, and one happens upon entering
-> > the guest and another one happens when returning from the guest - do we
-> > end up overwriting the DISR_EL1 by only looking at it during exit and
-> > potentially miss errors?
-> 
-> There can only be one pending SError at a time, but if we have PSTATE.A set, a
-> pending SError and a hidden RAS error, then ESB must have to pick one to defer,
-> and IESB must have to discard one. I suspect the answer is 'implementation
-> defined', but I will ask!
-> 
+Thanks, applied to drm-misc.
 
-As long as we're doing what we can, and we're not missing something that
-the architecture gives us a way to retrieve, then that's probably the
-best we can do.
+Noralf.
 
-> 
-> >> Future patches may add a firmware-first callout from
-> >> kvm_handle_deferred_serror() to decode CPER records populated by firmware,
-> >> or call some arm64 arch code to process the RAS 'ERR' registers for
-> >> kernel-first handling. Without either of these, we just make a judgement
-> >> on the severity: corrected and restartable errors are ignored, all others
-> >> result it an SError being given to the guest.
-> > 
-> > *in an* ?
-> 
-> 
-> > Why do we give the remaining types of SErrors to the guest?
-> 
-> Just because that is what KVM does today.
-> 
-> > What would the kernel normally do for any other workload than running a VM when
-> > discovering this type of error?
-> 
-> I'm trying to make that clearer! Today we 'kill the running task', if its the
-> kernel, we would panic(). But because the CPU masks SError on exception entry,
-> and we never touch PSTATE.A, its always masked in the kernel, so we take the
-> SError and kill the next user space task that gets run.
-> 
-> We should panic() like we do in the early boot code if an SError was pending
-> from firmware.
-> 
-> 
-> Should the host panic because of an SError taken during a guest?, not
-> necessarily. All the system registers are save/restored by world-switch, and the
-> host doesn't depend on anything in guest memory. The host should be immune to
-> any corruption that occurs while a guest was running.
-> Gengdongjiu's example of device pass-through is the exception to this reasoning,
-> I think we need a way for the host to contain/reset pass-through devices that
-> trigger an SError.
-> 
-
-I'm not an expert on what can generate the SError.  If it's because the
-guest misprogrammed a system register, then it makes sense to just tell
-the guest.
-
-However, if this could be related to corrupted memory, or a CPU fault,
-or really any resource that the guest is using which can be used by the
-host later on (memory, CPU, GIC, passthrough devices, ...) then it feels
-a little dangerous to just signal the guest and carry on.
-
-Thanks,
--Christoffer
+>   drivers/gpu/drm/tinydrm/mi0283qt.c |  8 ++++++--
+>   drivers/gpu/drm/tinydrm/mipi-dbi.c | 17 +++++------------
+>   include/drm/tinydrm/mipi-dbi.h     |  6 +-----
+>   3 files changed, 12 insertions(+), 19 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/tinydrm/mi0283qt.c b/drivers/gpu/drm/tinydrm/mi0283qt.c
+> index 482ff1c3..7e5bb7d 100644
+> --- a/drivers/gpu/drm/tinydrm/mi0283qt.c
+> +++ b/drivers/gpu/drm/tinydrm/mi0283qt.c
+> @@ -195,8 +195,12 @@ static int mi0283qt_probe(struct spi_device *spi)
+>   
+>   	device_property_read_u32(dev, "rotation", &rotation);
+>   
+> -	ret = mipi_dbi_spi_init(spi, mipi, dc, &mi0283qt_pipe_funcs,
+> -				&mi0283qt_driver, &mi0283qt_mode, rotation);
+> +	ret = mipi_dbi_spi_init(spi, mipi, dc);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = mipi_dbi_init(&spi->dev, mipi, &mi0283qt_pipe_funcs,
+> +			    &mi0283qt_driver, &mi0283qt_mode, rotation);
+>   	if (ret)
+>   		return ret;
+>   
+> diff --git a/drivers/gpu/drm/tinydrm/mipi-dbi.c b/drivers/gpu/drm/tinydrm/mipi-dbi.c
+> index e10fa4b..cba9784 100644
+> --- a/drivers/gpu/drm/tinydrm/mipi-dbi.c
+> +++ b/drivers/gpu/drm/tinydrm/mipi-dbi.c
+> @@ -777,15 +777,12 @@ static int mipi_dbi_typec3_command(struct mipi_dbi *mipi, u8 cmd,
+>   /**
+>    * mipi_dbi_spi_init - Initialize MIPI DBI SPI interfaced controller
+>    * @spi: SPI device
+> - * @dc: D/C gpio (optional)
+>    * @mipi: &mipi_dbi structure to initialize
+> - * @pipe_funcs: Display pipe functions
+> - * @driver: DRM driver
+> - * @mode: Display mode
+> - * @rotation: Initial rotation in degrees Counter Clock Wise
+> + * @dc: D/C gpio (optional)
+>    *
+>    * This function sets &mipi_dbi->command, enables &mipi->read_commands for the
+> - * usual read commands and initializes @mipi using mipi_dbi_init().
+> + * usual read commands. It should be followed by a call to mipi_dbi_init() or
+> + * a driver-specific init.
+>    *
+>    * If @dc is set, a Type C Option 3 interface is assumed, if not
+>    * Type C Option 1.
+> @@ -800,11 +797,7 @@ static int mipi_dbi_typec3_command(struct mipi_dbi *mipi, u8 cmd,
+>    * Zero on success, negative error code on failure.
+>    */
+>   int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
+> -		      struct gpio_desc *dc,
+> -		      const struct drm_simple_display_pipe_funcs *pipe_funcs,
+> -		      struct drm_driver *driver,
+> -		      const struct drm_display_mode *mode,
+> -		      unsigned int rotation)
+> +		      struct gpio_desc *dc)
+>   {
+>   	size_t tx_size = tinydrm_spi_max_transfer_size(spi, 0);
+>   	struct device *dev = &spi->dev;
+> @@ -850,7 +843,7 @@ int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
+>   			return -ENOMEM;
+>   	}
+>   
+> -	return mipi_dbi_init(dev, mipi, pipe_funcs, driver, mode, rotation);
+> +	return 0;
+>   }
+>   EXPORT_SYMBOL(mipi_dbi_spi_init);
+>   
+> diff --git a/include/drm/tinydrm/mipi-dbi.h b/include/drm/tinydrm/mipi-dbi.h
+> index d137b16..83346dd 100644
+> --- a/include/drm/tinydrm/mipi-dbi.h
+> +++ b/include/drm/tinydrm/mipi-dbi.h
+> @@ -62,11 +62,7 @@ mipi_dbi_from_tinydrm(struct tinydrm_device *tdev)
+>   }
+>   
+>   int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
+> -		      struct gpio_desc *dc,
+> -		      const struct drm_simple_display_pipe_funcs *pipe_funcs,
+> -		      struct drm_driver *driver,
+> -		      const struct drm_display_mode *mode,
+> -		      unsigned int rotation);
+> +		      struct gpio_desc *dc);
+>   int mipi_dbi_init(struct device *dev, struct mipi_dbi *mipi,
+>   		  const struct drm_simple_display_pipe_funcs *pipe_funcs,
+>   		  struct drm_driver *driver,
