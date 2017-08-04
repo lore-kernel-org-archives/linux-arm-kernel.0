@@ -1,78 +1,41 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 4 Aug 2017 18:18:22 +0200
-Subject: [GIT PULL] Amlogic clock driver updates for 4.14
-Message-ID: <894174b4-63d5-1e7d-c518-5bba150178ab@baylibre.com>
+From: tyreld@linux.vnet.ibm.com (Tyrel Datwyler)
+Date: Fri, 4 Aug 2017 09:38:42 -0700
+Subject: [PATCH] PCI: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-41-robh@kernel.org>
+References: <20170718214339.7774-41-robh@kernel.org>
+Message-ID: <dd5a317b-9e72-97bc-0386-8470998421c3@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Stephen,
+On 07/18/2017 02:43 PM, Rob Herring wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Jonathan Hunter <jonathanh@nvidia.com>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Michael Ellerman <mpe@ellerman.id.au>
+> Cc: linux-pci at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-tegra at vger.kernel.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> ---
+>  drivers/pci/host/pci-mvebu.c        | 8 ++++----
+>  drivers/pci/host/pci-tegra.c        | 3 +--
+>  drivers/pci/hotplug/pnv_php.c       | 4 ++--
+>  drivers/pci/hotplug/rpadlpar_core.c | 4 ++--
+>  drivers/pci/hotplug/rpaphp_core.c   | 2 +-
+>  drivers/pci/hotplug/rpaphp_pci.c    | 4 ++--
+>  drivers/pci/hotplug/rpaphp_slot.c   | 4 ++--
+>  drivers/pci/pci-sysfs.c             | 4 ++--
+>  drivers/pci/pci.c                   | 4 ++--
+>  9 files changed, 18 insertions(+), 19 deletions(-)
+> 
 
-Below is a request to pull the Amlogic clock driver updates for 4.14.
-
-Thanks,
-Neil
-
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
-
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  git://github.com/baylibre/clk-meson.git tags/meson-clk-for-4.14
-
-for you to fetch changes up to 62ec0b9754aced0b4c02694886cbe9bfd3d00f2f:
-
-  clk: meson: gxbb-aoclk: Add CEC 32k clock (2017-08-04 18:02:02 +0200)
-
-----------------------------------------------------------------
-Amlogic clock driver updates for 4.14
-
-* meson8b: add the reset controller to the clkc
-* meson: expose all clk ids
-* gxbb-aoclk: Add CEC 32k clock
-* gxbb: add mmc input 0 clocks
-* meson: fix protection against undefined clks
-* gxbb: fix audio divider flags
-
-----------------------------------------------------------------
-Jerome Brunet (8):
-      clk: meson: meson8b: fix protection against undefined clks
-      clk: meson: gxbb: fix protection against undefined clks
-      clk: meson8b: expose every clock in the bindings
-      clk: meson-gxbb: expose almost every clock in the bindings
-      clk: meson: gxbb: Add sd_emmc clk0 clkids
-      clk: meson: gxbb: fix meson cts_amclk divider flags
-      clk: meson: gxbb: fix clk_mclk_i958 divider flags
-      clk: meson: gxbb: Add sd_emmc clk0 clocks
-
-Martin Blumenstingl (2):
-      dt-bindings: clock: meson8b: describe the embedded reset controller
-      clk: meson: meson8b: register the built-in reset controller
-
-Neil Armstrong (4):
-      dt-bindings: clock: gxbb-aoclk: Add CEC 32k clock
-      dt-bindings: clock: amlogic, gxbb-aoclkc: Update bindings
-      clk: meson: gxbb-aoclk: Switch to regmap for register access
-      clk: meson: gxbb-aoclk: Add CEC 32k clock
-
- .../bindings/clock/amlogic,gxbb-aoclkc.txt         |  22 ++-
- .../bindings/clock/amlogic,meson8b-clkc.txt        |   9 +-
- drivers/clk/meson/Kconfig                          |   1 +
- drivers/clk/meson/Makefile                         |   2 +-
- drivers/clk/meson/gxbb-aoclk-32k.c                 | 194 +++++++++++++++++++++
- drivers/clk/meson/gxbb-aoclk-regmap.c              |  46 +++++
- drivers/clk/meson/gxbb-aoclk.c                     |  65 ++++---
- drivers/clk/meson/gxbb-aoclk.h                     |  42 +++++
- drivers/clk/meson/gxbb.c                           | 189 +++++++++++++++++++-
- drivers/clk/meson/gxbb.h                           | 125 ++-----------
- drivers/clk/meson/meson8b.c                        | 160 +++++++++++++++--
- drivers/clk/meson/meson8b.h                        | 112 ++----------
- include/dt-bindings/clock/gxbb-aoclkc.h            |   1 +
- include/dt-bindings/clock/gxbb-clkc.h              |  63 +++++++
- include/dt-bindings/clock/meson8b-clkc.h           |  70 ++++++++
- .../dt-bindings/reset/amlogic,meson8b-clkc-reset.h |  27 +++
- 16 files changed, 870 insertions(+), 258 deletions(-)
- create mode 100644 drivers/clk/meson/gxbb-aoclk-32k.c
- create mode 100644 drivers/clk/meson/gxbb-aoclk-regmap.c
- create mode 100644 drivers/clk/meson/gxbb-aoclk.h
- create mode 100644 include/dt-bindings/reset/amlogic,meson8b-clkc-reset.h
+Reviewed-by: Tyrel Datwyler <tyreld@linux.vnet.ibm.com>
