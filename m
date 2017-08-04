@@ -1,31 +1,25 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 4 Aug 2017 12:52:51 +0200
-Subject: [GIT PULL] Amlogic fixes for v4.13-rc
-In-Reply-To: <7hefswqyrr.fsf@baylibre.com>
-References: <7hefswqyrr.fsf@baylibre.com>
-Message-ID: <CAK8P3a2seX3f3O1sURh8nTKDu-V6kY4mzAN4+t_NBxE23Xb20Q@mail.gmail.com>
+Date: Fri, 4 Aug 2017 12:54:15 +0200
+Subject: [GIT PULL] ARM: mvebu: fixes for v4.13 (#2)
+In-Reply-To: <87fuda9icy.fsf@free-electrons.com>
+References: <87fuda9icy.fsf@free-electrons.com>
+Message-ID: <CAK8P3a1C7D8ZeqSBzPk1-P6vZJYTELHCHeSbPF6n9JjhCP=_HA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 7:52 PM, Kevin Hilman <khilman@baylibre.com> wrote:
-> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
->
->   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-fixes
->
-> for you to fetch changes up to 72fb2c852188ad75ab3badb55bf491925b9eba46:
->
->   ARM64: dts: meson-gxl-s905x-libretech-cc: fixup board definition (2017-07-20 17:50:22 -0700)
->
+On Wed, Aug 2, 2017 at 4:03 PM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
 > ----------------------------------------------------------------
-> Amlogic fixes for v4.13-rc
-> - 2 minor DT fixes
+> mvebu fixes for 4.13 (part 2)
+>
+> All the fixes are for ARM64 mvebu:
+>
+>  - Fix the RTC interrupt on A7K/A8K which was missed when switching
+>    from GIC to ICU
+>  - Mark the A7K/A8K crypto engine as dma coherent
+>  - Fix the number of GPIO on south bridge on Armada 3700
+>
 
-Pulled into fixes, thanks! The second patch looks fairly large for a
-"minor fix", but I see
-that it doesn't really do that much.
+Pulled into fixes, thanks!
 
-      Arnd
+       Arnd
