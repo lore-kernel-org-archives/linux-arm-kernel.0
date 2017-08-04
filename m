@@ -1,76 +1,77 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri,  4 Aug 2017 15:31:42 +0100
-Subject: [PATCH v2 16/18] hwmon: add support for sensors exported via ARM SCMI
+Date: Fri,  4 Aug 2017 15:31:43 +0100
+Subject: [PATCH v2 17/18] cpufreq: add support for CPU DVFS based on SCMI
+ message protocol
 In-Reply-To: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
 References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1501857104-11279-17-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1501857104-11279-18-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a driver to add support for SoC sensors exported by the System
-Control Processor (SCP) via the System Control and Management Interface
-(SCMI). The supported sensor types is one of voltage, temperature,
-current, and power.
+On some ARM based systems, a separate Cortex-M based System Control
+Processor(SCP) provides the overall power, clock, reset and system
+control including CPU DVFS. SCMI Message Protocol is used to
+communicate with the SCP.
 
-The sensor labels and values provided by the SCP are exported via the
-hwmon sysfs interface.
+This patch adds a cpufreq driver for such systems using SCMI interface
+to drive CPU DVFS.
 
-Cc: Guenter Roeck <linux@roeck-us.net>
-Cc: linux-hwmon at vger.kernel.org
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: linux-pm at vger.kernel.org
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/hwmon/Kconfig      |  12 +++
- drivers/hwmon/Makefile     |   1 +
- drivers/hwmon/scmi-hwmon.c | 261 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 274 insertions(+)
- create mode 100644 drivers/hwmon/scmi-hwmon.c
+ drivers/cpufreq/Kconfig.arm    |  11 ++
+ drivers/cpufreq/Makefile       |   1 +
+ drivers/cpufreq/scmi-cpufreq.c | 268 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 280 insertions(+)
+ create mode 100644 drivers/cpufreq/scmi-cpufreq.c
 
-diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-index 5ef2814345ef..2bb63af8d674 100644
---- a/drivers/hwmon/Kconfig
-+++ b/drivers/hwmon/Kconfig
-@@ -321,6 +321,18 @@ config SENSORS_APPLESMC
- 	  Say Y here if you have an applicable laptop and want to experience
- 	  the awesome power of applesmc.
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 2011fec2d6ad..c34633855bc7 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -215,6 +215,17 @@ config ARM_SA1100_CPUFREQ
+ config ARM_SA1110_CPUFREQ
+ 	bool
  
-+config SENSORS_ARM_SCMI
-+	tristate "ARM SCMI Sensors"
-+	depends on ARM_SCMI_PROTOCOL
-+	depends on THERMAL || !THERMAL_OF
-+	help
-+	  This driver provides support for temperature, voltage, current
-+	  and power sensors available on SCMI based platforms. The actual
-+	  number and type of sensors exported depend on the platform.
++config ARM_SCMI_CPUFREQ
++        tristate "SCMI based CPUfreq driver"
++	depends on ARM_SCMI_PROTOCOL || COMPILE_TEST
++	select PM_OPP
++        help
++	  This adds the CPUfreq driver support for ARM platforms using SCMI
++	  protocol for CPU power management.
 +
-+	  This driver can also be built as a module.  If so, the module
-+	  will be called scmi-hwmon.
++	  This driver uses SCMI Message Protocol driver to interact with the
++	  firmware providing the CPU DVFS functionality.
 +
- config SENSORS_ARM_SCPI
- 	tristate "ARM SCPI Sensors"
- 	depends on ARM_SCPI_PROTOCOL
-diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
-index d4641a9f16c1..02c3783c319f 100644
---- a/drivers/hwmon/Makefile
-+++ b/drivers/hwmon/Makefile
-@@ -44,6 +44,7 @@ obj-$(CONFIG_SENSORS_ADT7462)	+= adt7462.o
- obj-$(CONFIG_SENSORS_ADT7470)	+= adt7470.o
- obj-$(CONFIG_SENSORS_ADT7475)	+= adt7475.o
- obj-$(CONFIG_SENSORS_APPLESMC)	+= applesmc.o
-+obj-$(CONFIG_SENSORS_ARM_SCMI)	+= scmi-hwmon.o
- obj-$(CONFIG_SENSORS_ARM_SCPI)	+= scpi-hwmon.o
- obj-$(CONFIG_SENSORS_ASC7621)	+= asc7621.o
- obj-$(CONFIG_SENSORS_ASPEED)	+= aspeed-pwm-tacho.o
-diff --git a/drivers/hwmon/scmi-hwmon.c b/drivers/hwmon/scmi-hwmon.c
+ config ARM_SCPI_CPUFREQ
+         tristate "SCPI based CPUfreq driver"
+ 	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL && COMMON_CLK_SCPI
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index ab3a42cd29ef..4810b45568d3 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -72,6 +72,7 @@ obj-$(CONFIG_ARM_S3C64XX_CPUFREQ)	+= s3c64xx-cpufreq.o
+ obj-$(CONFIG_ARM_S5PV210_CPUFREQ)	+= s5pv210-cpufreq.o
+ obj-$(CONFIG_ARM_SA1100_CPUFREQ)	+= sa1100-cpufreq.o
+ obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
++obj-$(CONFIG_ARM_SCMI_CPUFREQ)		+= scmi-cpufreq.o
+ obj-$(CONFIG_ARM_SCPI_CPUFREQ)		+= scpi-cpufreq.o
+ obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
+ obj-$(CONFIG_ARM_STI_CPUFREQ)		+= sti-cpufreq.o
+diff --git a/drivers/cpufreq/scmi-cpufreq.c b/drivers/cpufreq/scmi-cpufreq.c
 new file mode 100644
-index 000000000000..f38c9708d99c
+index 000000000000..034359cafea5
 --- /dev/null
-+++ b/drivers/hwmon/scmi-hwmon.c
-@@ -0,0 +1,261 @@
++++ b/drivers/cpufreq/scmi-cpufreq.c
+@@ -0,0 +1,268 @@
 +/*
-+ * System Control and Management Interface(SCMI) based hwmon sensor driver
++ * System Control and Power Interface (SCMI) based CPUFreq Interface driver
 + *
 + * Copyright (C) 2017 ARM Ltd.
-+ * Punit Agrawal <punit.agrawal@arm.com>
++ * Sudeep Holla <sudeep.holla@arm.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -82,250 +83,257 @@ index 000000000000..f38c9708d99c
 + * GNU General Public License for more details.
 + */
 +
-+#include <linux/hwmon.h>
++#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
++
++#include <linux/cpu.h>
++#include <linux/cpufreq.h>
++#include <linux/cpumask.h>
++#include <linux/cpu_cooling.h>
++#include <linux/export.h>
 +#include <linux/module.h>
 +#include <linux/platform_device.h>
-+#include <linux/scmi_protocol.h>
++#include <linux/pm_opp.h>
 +#include <linux/slab.h>
-+#include <linux/sysfs.h>
-+#include <linux/thermal.h>
++#include <linux/scmi_protocol.h>
++#include <linux/types.h>
 +
-+struct sensor_data {
-+	const struct scmi_sensor_info *info;
-+	struct device_attribute dev_attr_input;
-+	struct device_attribute dev_attr_label;
-+	char input[20];
-+	char label[20];
-+};
-+
-+struct scmi_thermal_zone {
-+	int sensor_id;
-+	struct scmi_sensors *scmi_sensors;
-+};
-+
-+struct scmi_sensors {
++struct scmi_data {
++	int domain_id;
++	struct device *cpu_dev;
++	struct thermal_cooling_device *cdev;
 +	const struct scmi_handle *handle;
-+	struct sensor_data *data;
-+	struct list_head thermal_zones;
-+	struct attribute **attrs;
-+	struct attribute_group group;
-+	const struct attribute_group *groups[2];
 +};
 +
-+static int scmi_read_temp(void *dev, int *temp)
++static const struct scmi_handle *handle;
++
++unsigned int scmi_cpufreq_get_rate(unsigned int cpu)
 +{
-+	struct scmi_thermal_zone *zone = dev;
-+	struct scmi_sensors *scmi_sensors = zone->scmi_sensors;
-+	const struct scmi_handle *handle = scmi_sensors->handle;
-+	struct sensor_data *sensor = &scmi_sensors->data[zone->sensor_id];
-+	u64 value;
 +	int ret;
++	unsigned long rate;
++	struct cpufreq_policy *policy = cpufreq_cpu_get_raw(cpu);
++	struct scmi_data *priv = policy->driver_data;
++	struct scmi_perf_ops *perf_ops = priv->handle->perf_ops;
 +
-+	ret = handle->sensor_ops->reading_get(handle, sensor->info->id,
-+					      false, &value);
++	ret = perf_ops->freq_get(priv->handle, priv->domain_id, &rate, false);
 +	if (ret)
-+		return ret;
++		return CPUFREQ_ENTRY_INVALID;
++	return rate / 1000;
++}
 +
-+	*temp = value;
++static int
++scmi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
++{
++	struct scmi_data *priv = policy->driver_data;
++	struct scmi_perf_ops *perf_ops = priv->handle->perf_ops;
++	u64 freq = policy->freq_table[index].frequency * 1000;
++
++	return perf_ops->freq_set(priv->handle, priv->domain_id, freq, false);
++}
++
++static int
++scmi_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpumask)
++{
++	int cpu, domain, ret = 0;
++	struct device *tcpu_dev;
++
++	domain = handle->perf_ops->device_domain_id(cpu_dev);
++	if (domain < 0)
++		return domain;
++
++	cpumask_set_cpu(cpu_dev->id, cpumask);
++
++	for_each_possible_cpu(cpu) {
++		if (cpu == cpu_dev->id)
++			continue;
++
++		tcpu_dev = get_cpu_device(cpu);
++		if (!tcpu_dev)
++			continue;
++
++		ret = handle->perf_ops->device_domain_id(tcpu_dev);
++		if (ret == domain)
++			cpumask_set_cpu(cpu, cpumask);
++	}
++
 +	return 0;
 +}
 +
-+/* hwmon callback functions */
-+static ssize_t
-+scmi_show_sensor(struct device *dev, struct device_attribute *attr, char *buf)
++static int scmi_cpufreq_init(struct cpufreq_policy *policy)
 +{
-+	struct scmi_sensors *scmi_sensors = dev_get_drvdata(dev);
-+	const struct scmi_handle *handle = scmi_sensors->handle;
-+	struct sensor_data *sensor;
-+	u64 value;
 +	int ret;
++	unsigned int latency;
++	struct device *cpu_dev;
++	struct scmi_data *priv;
++	struct cpufreq_frequency_table *freq_table;
 +
-+	sensor = container_of(attr, struct sensor_data, dev_attr_input);
-+
-+	ret = handle->sensor_ops->reading_get(handle, sensor->info->id,
-+					      false, &value);
-+	if (ret)
-+		return ret;
-+
-+	return sprintf(buf, "%llu\n", value);
-+}
-+
-+static ssize_t
-+scmi_show_label(struct device *dev, struct device_attribute *attr, char *buf)
-+{
-+	struct sensor_data *sensor;
-+
-+	sensor = container_of(attr, struct sensor_data, dev_attr_label);
-+
-+	return sprintf(buf, "%s\n", sensor->info->name);
-+}
-+
-+static struct thermal_zone_of_device_ops scmi_sensor_ops = {
-+	.get_temp = scmi_read_temp,
-+};
-+
-+static int scmi_hwmon_probe(struct platform_device *pdev)
-+{
-+	int idx;
-+	u16 nr_sensors, i;
-+	int num_temp = 0, num_volt = 0, num_current = 0, num_power = 0;
-+	int num_energy = 0;
-+	struct device *hwdev, *dev = &pdev->dev;
-+	struct scmi_sensors *scmi_sensors;
-+	const struct scmi_handle *handle = devm_scmi_handle_get(dev);
-+
-+	if (IS_ERR_OR_NULL(handle) || !handle->sensor_ops)
-+		return -EPROBE_DEFER;
-+
-+	nr_sensors = handle->sensor_ops->count_get(handle);
-+	if (!nr_sensors)
-+		return -EIO;
-+
-+	scmi_sensors = devm_kzalloc(dev, sizeof(*scmi_sensors), GFP_KERNEL);
-+	if (!scmi_sensors)
-+		return -ENOMEM;
-+
-+	scmi_sensors->data = devm_kcalloc(dev, nr_sensors,
-+					  sizeof(*scmi_sensors->data),
-+					  GFP_KERNEL);
-+	if (!scmi_sensors->data)
-+		return -ENOMEM;
-+
-+	scmi_sensors->attrs = devm_kcalloc(dev, (nr_sensors * 2) + 1,
-+					   sizeof(*scmi_sensors->attrs),
-+					   GFP_KERNEL);
-+	if (!scmi_sensors->attrs)
-+		return -ENOMEM;
-+
-+	scmi_sensors->handle = handle;
-+
-+	for (i = 0, idx = 0; i < nr_sensors; i++) {
-+		struct sensor_data *sensor = &scmi_sensors->data[idx];
-+
-+		sensor->info = handle->sensor_ops->info_get(handle, i);
-+		if (!sensor->info)
-+			return PTR_ERR(sensor->info);
-+
-+		switch (sensor->info->type) {
-+		case TEMPERATURE_C:
-+			snprintf(sensor->input, sizeof(sensor->input),
-+				 "temp%d_input", num_temp + 1);
-+			snprintf(sensor->label, sizeof(sensor->input),
-+				 "temp%d_label", num_temp + 1);
-+			num_temp++;
-+			break;
-+		case VOLTAGE:
-+			snprintf(sensor->input, sizeof(sensor->input),
-+				 "in%d_input", num_volt);
-+			snprintf(sensor->label, sizeof(sensor->input),
-+				 "in%d_label", num_volt);
-+			num_volt++;
-+			break;
-+		case CURRENT:
-+			snprintf(sensor->input, sizeof(sensor->input),
-+				 "curr%d_input", num_current + 1);
-+			snprintf(sensor->label, sizeof(sensor->input),
-+				 "curr%d_label", num_current + 1);
-+			num_current++;
-+			break;
-+		case POWER:
-+			snprintf(sensor->input, sizeof(sensor->input),
-+				 "power%d_input", num_power + 1);
-+			snprintf(sensor->label, sizeof(sensor->input),
-+				 "power%d_label", num_power + 1);
-+			num_power++;
-+			break;
-+		case ENERGY:
-+			snprintf(sensor->input, sizeof(sensor->input),
-+				 "energy%d_input", num_energy + 1);
-+			snprintf(sensor->label, sizeof(sensor->input),
-+				 "energy%d_label", num_energy + 1);
-+			num_energy++;
-+			break;
-+		default:
-+			continue;
-+		}
-+
-+		sensor->dev_attr_input.attr.mode = S_IRUGO;
-+		sensor->dev_attr_input.show = scmi_show_sensor;
-+		sensor->dev_attr_input.attr.name = sensor->input;
-+
-+		sensor->dev_attr_label.attr.mode = S_IRUGO;
-+		sensor->dev_attr_label.show = scmi_show_label;
-+		sensor->dev_attr_label.attr.name = sensor->label;
-+
-+		scmi_sensors->attrs[idx << 1] = &sensor->dev_attr_input.attr;
-+		scmi_sensors->attrs[(idx << 1) + 1] =
-+					&sensor->dev_attr_label.attr;
-+
-+		sysfs_attr_init(scmi_sensors->attrs[idx << 1]);
-+		sysfs_attr_init(scmi_sensors->attrs[(idx << 1) + 1]);
-+		idx++;
++	cpu_dev = get_cpu_device(policy->cpu);
++	if (!cpu_dev) {
++		pr_err("failed to get cpu%d device\n", policy->cpu);
++		return -ENODEV;
 +	}
 +
-+	scmi_sensors->group.attrs = scmi_sensors->attrs;
-+	scmi_sensors->groups[0] = &scmi_sensors->group;
++	ret = handle->perf_ops->add_opps_to_device(cpu_dev);
++	if (ret) {
++		dev_warn(cpu_dev, "failed to add opps to the device\n");
++		return ret;
++	}
 +
-+	platform_set_drvdata(pdev, scmi_sensors);
++	ret = scmi_get_sharing_cpus(cpu_dev, policy->cpus);
++	if (ret) {
++		dev_warn(cpu_dev, "failed to get sharing cpumask\n");
++		return ret;
++	}
 +
-+	hwdev = devm_hwmon_device_register_with_groups(dev, "scmi_sensors",
-+						       scmi_sensors,
-+						       scmi_sensors->groups);
-+
-+	if (IS_ERR(hwdev))
-+		return PTR_ERR(hwdev);
++	ret = dev_pm_opp_set_sharing_cpus(cpu_dev, policy->cpus);
++	if (ret) {
++		dev_err(cpu_dev, "%s: failed to mark OPPs as shared: %d\n",
++			__func__, ret);
++		return ret;
++	}
 +
 +	/*
-+	 * Register the temperature sensors with the thermal framework
-+	 * to allow their usage in setting up the thermal zones from
-+	 * device tree.
-+	 *
-+	 * NOTE: Not all temperature sensors maybe used for thermal
-+	 * control
++	 * But we need OPP table to function so if it is not there let's
++	 * give platform code chance to provide it for us.
 +	 */
-+	INIT_LIST_HEAD(&scmi_sensors->thermal_zones);
-+	for (i = 0; i < nr_sensors; i++) {
-+		struct sensor_data *sensor = &scmi_sensors->data[i];
-+		const struct scmi_sensor_info *info = sensor->info;
-+		struct thermal_zone_device *z;
-+		struct scmi_thermal_zone *zone;
-+
-+		if (info->type != TEMPERATURE_C)
-+			continue;
-+
-+		zone = devm_kzalloc(dev, sizeof(*zone), GFP_KERNEL);
-+		if (!zone)
-+			return -ENOMEM;
-+
-+		zone->sensor_id = i;
-+		zone->scmi_sensors = scmi_sensors;
-+		z = devm_thermal_zone_of_sensor_register(dev, info->id, zone,
-+							 &scmi_sensor_ops);
-+		/*
-+		 * The call to thermal_zone_of_sensor_register returns
-+		 * an error for sensors that are not associated with
-+		 * any thermal zones or if the thermal subsystem is
-+		 * not configured.
-+		 */
-+		if (IS_ERR(z)) {
-+			devm_kfree(dev, zone);
-+			continue;
-+		}
++	ret = dev_pm_opp_get_opp_count(cpu_dev);
++	if (ret <= 0) {
++		dev_dbg(cpu_dev, "OPP table is not ready, deferring probe\n");
++		ret = -EPROBE_DEFER;
++		goto out_free_opp;
 +	}
++
++	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
++	if (!priv) {
++		ret = -ENOMEM;
++		goto out_free_opp;
++	}
++
++	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
++	if (ret) {
++		dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
++		goto out_free_priv;
++	}
++
++	priv->handle = handle;
++	priv->cpu_dev = cpu_dev;
++	priv->domain_id = handle->perf_ops->device_domain_id(cpu_dev);
++
++	policy->driver_data = priv;
++
++	ret = cpufreq_table_validate_and_show(policy, freq_table);
++	if (ret) {
++		dev_err(cpu_dev, "%s: invalid frequency table: %d\n", __func__,
++			ret);
++		goto out_free_cpufreq_table;
++	}
++
++	latency = handle->perf_ops->get_transition_latency(cpu_dev);
++	if (!latency)
++		latency = CPUFREQ_ETERNAL;
++
++	policy->cpuinfo.transition_latency = latency;
++
++	return 0;
++
++out_free_cpufreq_table:
++	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
++out_free_priv:
++	kfree(priv);
++out_free_opp:
++	dev_pm_opp_cpumask_remove_table(policy->cpus);
++
++	return ret;
++}
++
++static int scmi_cpufreq_exit(struct cpufreq_policy *policy)
++{
++	struct scmi_data *priv = policy->driver_data;
++
++	cpufreq_cooling_unregister(priv->cdev);
++	dev_pm_opp_free_cpufreq_table(priv->cpu_dev, &policy->freq_table);
++	dev_pm_opp_cpumask_remove_table(policy->related_cpus);
++	kfree(priv);
 +
 +	return 0;
 +}
 +
-+static struct platform_driver scmi_hwmon_platdrv = {
-+	.driver = {
-+		.name	= "scmi-hwmon",
-+	},
-+	.probe		= scmi_hwmon_probe,
-+};
-+module_platform_driver(scmi_hwmon_platdrv);
++static void scmi_cpufreq_ready(struct cpufreq_policy *policy)
++{
++	struct scmi_data *priv = policy->driver_data;
++	struct device_node *np = of_node_get(priv->cpu_dev->of_node);
 +
-+MODULE_AUTHOR("Punit Agrawal <punit.agrawal@arm.com>");
-+MODULE_DESCRIPTION("ARM SCMI HWMON interface driver");
++	if (WARN_ON(!np))
++		return;
++
++	if (of_find_property(np, "#cooling-cells", NULL)) {
++		u32 pcoeff = 0;
++
++		of_property_read_u32(np, "dynamic-power-coefficient",
++				     &pcoeff);
++
++		priv->cdev = of_cpufreq_power_cooling_register(np, policy,
++							       pcoeff, NULL);
++		if (IS_ERR(priv->cdev)) {
++			dev_err(priv->cpu_dev,
++				"running cpufreq without cooling device: %ld\n",
++				PTR_ERR(priv->cdev));
++
++			priv->cdev = NULL;
++		}
++	}
++
++	of_node_put(np);
++}
++
++static struct cpufreq_driver scmi_cpufreq_driver = {
++	.name			= "scmi",
++	.flags			= CPUFREQ_STICKY |
++					CPUFREQ_HAVE_GOVERNOR_PER_POLICY |
++					CPUFREQ_NEED_INITIAL_FREQ_CHECK,
++	.verify			= cpufreq_generic_frequency_table_verify,
++	.attr			= cpufreq_generic_attr,
++	.target_index		= scmi_cpufreq_set_target,
++	.get			= scmi_cpufreq_get_rate,
++	.init			= scmi_cpufreq_init,
++	.exit			= scmi_cpufreq_exit,
++	.ready			= scmi_cpufreq_ready,
++};
++
++static int scmi_cpufreq_probe(struct platform_device *pdev)
++{
++	int ret;
++
++	handle = devm_scmi_handle_get(&pdev->dev);
++
++	if (IS_ERR_OR_NULL(handle) || !handle->perf_ops)
++		return -EPROBE_DEFER;
++
++	ret = cpufreq_register_driver(&scmi_cpufreq_driver);
++	if (ret) {
++		dev_err(&pdev->dev, "%s: registering cpufreq failed, err: %d\n",
++			__func__, ret);
++	}
++
++	return ret;
++}
++
++static int scmi_cpufreq_remove(struct platform_device *pdev)
++{
++	cpufreq_unregister_driver(&scmi_cpufreq_driver);
++	return 0;
++}
++
++static struct platform_driver scmi_cpufreq_platdrv = {
++	.driver = {
++		.name	= "scmi-cpufreq",
++	},
++	.probe		= scmi_cpufreq_probe,
++	.remove		= scmi_cpufreq_remove,
++};
++module_platform_driver(scmi_cpufreq_platdrv);
++
++MODULE_AUTHOR("Sudeep Holla <sudeep.holla@arm.com>");
++MODULE_DESCRIPTION("ARM SCMI CPUFreq interface driver");
 +MODULE_LICENSE("GPL v2");
 -- 
 2.7.4
