@@ -1,130 +1,125 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 4 Aug 2017 22:16:56 +0800
-Subject: [linux-sunxi] [PATCH 10/13] [NOT FOR REVIEW NOW] clk: sunxi: Add
- CLK_SET_RATE_PARENT flag for H3 HDMI clock
-In-Reply-To: <18315912.JHEzglLTUl@jernej-laptop>
-References: <20170801131304.7741-1-icenowy@aosc.io>
- <13060066.Dl610HiJ2r@jernej-laptop>
- <CAGb2v64hQGwZtcRMhkSejKFozZu7rbL+47NbOuYrc7pKoOYLkw@mail.gmail.com>
- <18315912.JHEzglLTUl@jernej-laptop>
-Message-ID: <CAGb2v67B_8kHBtnLd_1vB-pHR7bV6p2M3H8iZ7njeSztE0pMVA@mail.gmail.com>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Fri, 4 Aug 2017 23:17:21 +0900
+Subject: [PATCH v7 2/4] clk: samsung: Add support for runtime PM
+In-Reply-To: <1501839294-478-3-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20170804093515eucas1p1cc2273ba02d86767c5b2533430577698@eucas1p1.samsung.com>
+ <1501839294-478-1-git-send-email-m.szyprowski@samsung.com>
+ <1501839294-478-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAGTfZH3hK0BTTLHFrh+BNph4mak8-O1vh7LOni_AFpzi-QE28Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 4, 2017 at 9:49 PM, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
-> Hi Chen-Yu,
+Hi,
+
+I tested these patches on Exynos5433-based TM2.
+It is well working and it is necessary for Exynos.
+
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+Regards,
+Chanwoo Choi
+
+
+On Fri, Aug 4, 2017 at 6:34 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> This patch adds struct device pointer to samsung_clk_provider and forwarding it
+> to clk_register_* functions, so drivers can register clocks, which use runtime
+> pm feature.
 >
-> Dne petek, 04. avgust 2017 ob 11:27:33 CEST je Chen-Yu Tsai napisal(a):
->> On Fri, Aug 4, 2017 at 4:59 PM, Jernej ?krabec <jernej.skrabec@siol.net>
-> wrote:
->> > Hi Chen-Yu,
->> >
->> > Dne petek, 04. avgust 2017 ob 06:29:50 CEST je Chen-Yu Tsai napisal(a):
->> >> On Fri, Aug 4, 2017 at 12:16 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->> >> > ? 2017?8?4? GMT+08:00 ??12:15:27, Chen-Yu Tsai <wens@csie.org> ??:
->> >> >>Hi,
->> >> >>
->> >> >>On Tue, Aug 1, 2017 at 9:13 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->> >> >>> From: Jernej Skrabec <jernej.skrabec@siol.net>
->> >> >>>
->> >> >>> When setting the HDMI clock of H3, the PLL_VIDEO clock needs to be
->> >> >>
->> >> >>set.
->> >> >>
->> >> >>> Add CLK_SET_RATE_PARENT flag for H3 HDMI clock.
->> >> >>>
->> >> >>> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
->> >> >>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> >> >>> ---
->> >> >>>
->> >> >>>  drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 2 +-
->> >> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
->> >> >>>
->> >> >>> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
->> >> >>
->> >> >>b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
->> >> >>
->> >> >>> index b1127e8629d9..2ebb3d865b01 100644
->> >> >>> --- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
->> >> >>> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
->> >> >>> @@ -474,7 +474,7 @@ static SUNXI_CCU_GATE(avs_clk,
->> >> >>
->> >> >>"avs",          "osc24M",
->> >> >>
->> >> >>>  static const char * const hdmi_parents[] = { "pll-video" };
->> >> >>>  static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_clk, "hdmi", hdmi_parents,
->> >> >>>
->> >> >>> -                                0x150, 0, 4, 24, 2, BIT(31), 0);
->> >> >>> +                                0x150, 0, 4, 24, 2, BIT(31),
->> >> >>
->> >> >>CLK_SET_RATE_PARENT);
->> >> >>
->> >> >>Line is longer than 80 characters.
->> >> >>
->> >> >>This looks independent enough so I've merged this for 4.14 with the
->> >> >>offending line wrapped and the following tag added:
->> >> >>
->> >> >>Fixes: 0577e4853bfb ("clk: sunxi-ng: Add H3 clocks")
->> >> >>
->> >> > Please don't merge this now until Jernej send it.
->> >>
->> >> (Dropped Rob, devicetree and dri mailing lists)
->> >>
->> >> Hi Jernej,
->> >>
->> >> Is it OK if we take this patch for the next release? Or rather,
->> >> if there anything blocking this patch?
->> >
->> > I just made last check now and this patch is indeed OK. Before merging,
->> > please read explanation below.
->>
->> Ack.
->>
->> > Background:
->> > According to H3 datasheet and BSP driver, HDMI clock has M factor
->> > (divider) to correctly set pixel clock to desired value. However, Jens
->> > Kuske discovered that this factor doesn't play any role whatsoever and
->> > instead, division factor set in PHY registers is the important one. I
->> > confirmed that on BSP kernel by tying M factor to 0. Both, HDMI video and
->> > audio, still worked correctly.
->> Great. Sounds like what we have on A31 and earlier SoCs.
->>
->> > So that flag is necessary to set pll-video to pixel clock * div factor. I
->> > can also change HDMI clock type to SUNXI_CCU_GATE (without M factor) and
->> > document discrepancy with datasheet in ccu-sun8i-h3.c. Alternatively to
->> > this patch, just in case, to be on the safe side, I can add pll-video
->> > clock phandle to the dt node. However, as far as I know, that might
->> > prevent selecting another parent on SoCs where HDMI clock has multiple
->> > parents.
->>
->> It could be that the HDMI clock only drives the DW-HDMI sampler and other
->> internal logic, while the PHY takes the PLL input directly for the TMDS
->> clock? I'm not sure how you could verify this though. Maybe increase M
->> to the maximum, and see if there is any tearing or other artifacts?
->> Ideally we could just ask Allwinner...
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  drivers/clk/samsung/clk-pll.c |  2 +-
+>  drivers/clk/samsung/clk.c     | 12 ++++++------
+>  drivers/clk/samsung/clk.h     |  1 +
+>  3 files changed, 8 insertions(+), 7 deletions(-)
 >
-> I just made quick test with maximum divider and everything seems to be ok.
-> Unfortunately, I don't have time to do extensive test.
+> diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+> index 037c61484098..41ebb94d2855 100644
+> --- a/drivers/clk/samsung/clk-pll.c
+> +++ b/drivers/clk/samsung/clk-pll.c
+> @@ -1388,7 +1388,7 @@ static void __init _samsung_clk_register_pll(struct samsung_clk_provider *ctx,
+>         pll->lock_reg = base + pll_clk->lock_offset;
+>         pll->con_reg = base + pll_clk->con_offset;
 >
-> I will forward the question to Tl Lim and let's see if he can get the answer,
-> since the situation for A64 is completely the same.
-
-That would be much appreciated.
-
->>
->> You should change it to SUNXI_CCU_MUX_WITH_GATE if you want to change it.
->> If there are mux bits, even if there's only one valid setting, you should
->> still have the mux, so the kernel can actually correct any invalid settings
->> that may be incorrectly programmed into the hardware by the bootloader or
->> user. This would be a separate patch.
+> -       ret = clk_hw_register(NULL, &pll->hw);
+> +       ret = clk_hw_register(ctx->dev, &pll->hw);
+>         if (ret) {
+>                 pr_err("%s: failed to register pll clock %s : %d\n",
+>                         __func__, pll_clk->name, ret);
+> diff --git a/drivers/clk/samsung/clk.c b/drivers/clk/samsung/clk.c
+> index 7ce0fa86c5ff..aef97b091b50 100644
+> --- a/drivers/clk/samsung/clk.c
+> +++ b/drivers/clk/samsung/clk.c
+> @@ -134,7 +134,7 @@ void __init samsung_clk_register_fixed_rate(struct samsung_clk_provider *ctx,
+>         unsigned int idx, ret;
 >
-> I will leave it as it is for now. Will you still merge the patch?
-
-I'll drop it for now. Although we have this how A10s and A31, the hardware
-is not wired to actually use, as I mentioned above. We can do something
-about it once we have a better understanding of the hardware.
-
-Thanks for all the explanation and testing.
-
-Regards
-ChenYu
+>         for (idx = 0; idx < nr_clk; idx++, list++) {
+> -               clk_hw = clk_hw_register_fixed_rate(NULL, list->name,
+> +               clk_hw = clk_hw_register_fixed_rate(ctx->dev, list->name,
+>                         list->parent_name, list->flags, list->fixed_rate);
+>                 if (IS_ERR(clk_hw)) {
+>                         pr_err("%s: failed to register clock %s\n", __func__,
+> @@ -163,7 +163,7 @@ void __init samsung_clk_register_fixed_factor(struct samsung_clk_provider *ctx,
+>         unsigned int idx;
+>
+>         for (idx = 0; idx < nr_clk; idx++, list++) {
+> -               clk_hw = clk_hw_register_fixed_factor(NULL, list->name,
+> +               clk_hw = clk_hw_register_fixed_factor(ctx->dev, list->name,
+>                         list->parent_name, list->flags, list->mult, list->div);
+>                 if (IS_ERR(clk_hw)) {
+>                         pr_err("%s: failed to register clock %s\n", __func__,
+> @@ -184,7 +184,7 @@ void __init samsung_clk_register_mux(struct samsung_clk_provider *ctx,
+>         unsigned int idx, ret;
+>
+>         for (idx = 0; idx < nr_clk; idx++, list++) {
+> -               clk_hw = clk_hw_register_mux(NULL, list->name,
+> +               clk_hw = clk_hw_register_mux(ctx->dev, list->name,
+>                         list->parent_names, list->num_parents, list->flags,
+>                         ctx->reg_base + list->offset,
+>                         list->shift, list->width, list->mux_flags, &ctx->lock);
+> @@ -217,13 +217,13 @@ void __init samsung_clk_register_div(struct samsung_clk_provider *ctx,
+>
+>         for (idx = 0; idx < nr_clk; idx++, list++) {
+>                 if (list->table)
+> -                       clk_hw = clk_hw_register_divider_table(NULL,
+> +                       clk_hw = clk_hw_register_divider_table(ctx->dev,
+>                                 list->name, list->parent_name, list->flags,
+>                                 ctx->reg_base + list->offset,
+>                                 list->shift, list->width, list->div_flags,
+>                                 list->table, &ctx->lock);
+>                 else
+> -                       clk_hw = clk_hw_register_divider(NULL, list->name,
+> +                       clk_hw = clk_hw_register_divider(ctx->dev, list->name,
+>                                 list->parent_name, list->flags,
+>                                 ctx->reg_base + list->offset, list->shift,
+>                                 list->width, list->div_flags, &ctx->lock);
+> @@ -255,7 +255,7 @@ void __init samsung_clk_register_gate(struct samsung_clk_provider *ctx,
+>         unsigned int idx, ret;
+>
+>         for (idx = 0; idx < nr_clk; idx++, list++) {
+> -               clk_hw = clk_hw_register_gate(NULL, list->name, list->parent_name,
+> +               clk_hw = clk_hw_register_gate(ctx->dev, list->name, list->parent_name,
+>                                 list->flags, ctx->reg_base + list->offset,
+>                                 list->bit_idx, list->gate_flags, &ctx->lock);
+>                 if (IS_ERR(clk_hw)) {
+> diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
+> index b8ca0dd3a38b..f0acae4f5d1b 100644
+> --- a/drivers/clk/samsung/clk.h
+> +++ b/drivers/clk/samsung/clk.h
+> @@ -24,6 +24,7 @@
+>   */
+>  struct samsung_clk_provider {
+>         void __iomem *reg_base;
+> +       struct device *dev;
+>         spinlock_t lock;
+>         /* clk_data must be the last entry due to variable lenght 'hws' array */
+>         struct clk_hw_onecell_data clk_data;
+> --
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
