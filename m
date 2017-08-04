@@ -1,41 +1,179 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri,  4 Aug 2017 12:29:53 +0200
-Subject: [PATCH 1/2] devicetree: ARM: zynq: Add DT binding for eFuse controller
-Message-ID: <4b4bfaad88f16d7229bf3da58be8f50f9d82a461.1501842586.git.michal.simek@xilinx.com>
+Date: Fri,  4 Aug 2017 12:29:54 +0200
+Subject: [PATCH 2/2] ARM: zynq: Add support for Zynq-7000S devices
+In-Reply-To: <4b4bfaad88f16d7229bf3da58be8f50f9d82a461.1501842586.git.michal.simek@xilinx.com>
+References: <4b4bfaad88f16d7229bf3da58be8f50f9d82a461.1501842586.git.michal.simek@xilinx.com>
+Message-ID: <84fc91f48dffbd68aa569f482a178dc9c1703339.1501842586.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT binding for eFuse controller available at Xilinx Zynq
-SoC.
+Patch adds detection of Zynq-7000 base silicon configuration,
+namely Dual or Single CPU. Device trees attempting to enable DUAL CORE
+behavior on SINGLE CPU Zynq-7000S devices are prevented from corrupting
+system behavior.
+
+Detection of Dual or Single CPU is done via eFuses.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 ---
 
- Documentation/devicetree/bindings/arm/zynq/zynq-efuse.txt | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/zynq/zynq-efuse.txt
+ arch/arm/boot/dts/zynq-7000.dtsi |  5 +++
+ arch/arm/mach-zynq/Makefile      |  2 +-
+ arch/arm/mach-zynq/common.c      |  1 +
+ arch/arm/mach-zynq/common.h      |  3 ++
+ arch/arm/mach-zynq/efuse.c       | 75 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-zynq/platsmp.c     |  3 ++
+ 6 files changed, 88 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-zynq/efuse.c
 
-diff --git a/Documentation/devicetree/bindings/arm/zynq/zynq-efuse.txt b/Documentation/devicetree/bindings/arm/zynq/zynq-efuse.txt
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index f3ac9bfe580e..ac37d46b2eab 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -305,6 +305,11 @@
+ 			syscon = <&slcr>;
+ 		};
+ 
++		efuse: efuse at f800d000 {
++			compatible = "xlnx,zynq-efuse";
++			reg = <0xf800d000 0x20>;
++		};
++
+ 		global_timer: timer at f8f00200 {
+ 			compatible = "arm,cortex-a9-global-timer";
+ 			reg = <0xf8f00200 0x20>;
+diff --git a/arch/arm/mach-zynq/Makefile b/arch/arm/mach-zynq/Makefile
+index b03a97eb7501..1fc2d4b53a5e 100644
+--- a/arch/arm/mach-zynq/Makefile
++++ b/arch/arm/mach-zynq/Makefile
+@@ -3,5 +3,5 @@
+ #
+ 
+ # Common support
+-obj-y				:= common.o slcr.o pm.o
++obj-y				:= common.o efuse.o slcr.o pm.o
+ obj-$(CONFIG_SMP)		+= headsmp.o platsmp.o
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index 6aba9ebf8041..5f28f7220d48 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -182,6 +182,7 @@ static void __init zynq_map_io(void)
+ 
+ static void __init zynq_irq_init(void)
+ {
++	zynq_early_efuse_init();
+ 	zynq_early_slcr_init();
+ 	irqchip_init();
+ }
+diff --git a/arch/arm/mach-zynq/common.h b/arch/arm/mach-zynq/common.h
+index e771933db7e8..33742c3308e0 100644
+--- a/arch/arm/mach-zynq/common.h
++++ b/arch/arm/mach-zynq/common.h
+@@ -25,6 +25,9 @@
+ extern void zynq_slcr_cpu_state_write(int cpu, bool die);
+ extern u32 zynq_slcr_get_device_id(void);
+ 
++extern bool zynq_efuse_cpu_state(int cpu);
++extern int zynq_early_efuse_init(void);
++
+ #ifdef CONFIG_SMP
+ extern char zynq_secondary_trampoline;
+ extern char zynq_secondary_trampoline_jump;
+diff --git a/arch/arm/mach-zynq/efuse.c b/arch/arm/mach-zynq/efuse.c
 new file mode 100644
-index 000000000000..39817e9750c3
+index 000000000000..d31a5822ec65
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/zynq/zynq-efuse.txt
-@@ -0,0 +1,15 @@
-+Device tree bindings for Zynq's eFuse Controller
++++ b/arch/arm/mach-zynq/efuse.c
+@@ -0,0 +1,75 @@
++/*
++ * Xilinx EFUSE driver
++ *
++ * Copyright (c) 2016 Xilinx Inc.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
++ */
 +
-+The Zynq eFuse controller provides the access to the chip efuses which contain
-+information about device DNA, security settings and also device status.
++#include <linux/io.h>
++#include <linux/of_address.h>
++#include "common.h"
 +
-+Required properties:
-+ compatible: Compatibility string. Must be "xlnx,zynq-efuse".
-+ reg: Specify the base and size of the EFUSE controller registers
-+      in the memory map. E.g.: reg = <0xf800d000 0x20>;
++#define EFUSE_STATUS_OFFSET	0x10
 +
-+Example:
-+efuse: efuse at f800d000 {
-+	compatible = "xlnx,zynq-efuse";
-+	reg = <0xf800d000 0x20>;
-+};
++/* 0 means cpu1 is working, 1 means cpu1 is broken */
++#define EFUSE_STATUS_CPU_BIT	BIT(7)
++
++void __iomem *zynq_efuse_base;
++
++/**
++ * zynq_efuse_cpu_state - Read/write cpu state
++ * @cpu:	cpu number
++ *
++ * Return: true if cpu is running, false if cpu is broken
++ */
++bool zynq_efuse_cpu_state(int cpu)
++{
++	u32 state;
++
++	if (!cpu)
++		return true;
++
++	state = readl(zynq_efuse_base + EFUSE_STATUS_OFFSET);
++	state &= EFUSE_STATUS_CPU_BIT;
++
++	if (!state)
++		return true;
++
++	return false;
++}
++
++/**
++ * zynq_early_efuse_init - Early efuse init function
++ *
++ * Return:	0 on success, negative errno otherwise.
++ *
++ * Called very early during boot from platform code.
++ */
++int __init zynq_early_efuse_init(void)
++{
++	struct device_node *np;
++
++	np = of_find_compatible_node(NULL, NULL, "xlnx,zynq-efuse");
++	if (!np) {
++		pr_err("%s: no efuse node found\n", __func__);
++		BUG();
++	}
++
++	zynq_efuse_base = of_iomap(np, 0);
++	if (!zynq_efuse_base) {
++		pr_err("%s: Unable to map I/O memory\n", __func__);
++		BUG();
++	}
++
++	np->data = (__force void *)zynq_efuse_base;
++
++	pr_info("%s mapped to %p\n", np->name, zynq_efuse_base);
++
++	of_node_put(np);
++
++	return 0;
++}
+diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
+index caa6d5fe9078..3d81e0f2972f 100644
+--- a/arch/arm/mach-zynq/platsmp.c
++++ b/arch/arm/mach-zynq/platsmp.c
+@@ -89,6 +89,9 @@ int zynq_cpun_start(u32 address, int cpu)
+ 
+ static int zynq_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
++	if (!zynq_efuse_cpu_state(cpu))
++		return -1;
++
+ 	return zynq_cpun_start(__pa_symbol(secondary_startup), cpu);
+ }
+ 
 -- 
 1.9.1
