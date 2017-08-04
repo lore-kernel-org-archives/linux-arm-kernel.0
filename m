@@ -1,186 +1,488 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri,  4 Aug 2017 09:31:42 +0100
-Subject: [PATCH v3] arm64: Decode information from ESR upon mem faults
-Message-ID: <1501835502-36301-1-git-send-email-julien.thierry@arm.com>
+From: honghui.zhang@mediatek.com (Honghui Zhang)
+Date: Fri, 4 Aug 2017 16:39:36 +0800
+Subject: [PATCH v2 4/5] PCI: mediatek: Add new generation controller
+ support
+In-Reply-To: <20170803224206.GN20308@bhelgaas-glaptop.roam.corp.google.com>
+References: <cover.1501122135.git.honghui.zhang@mediatek.com>
+ <824c61d13fe2731d812df8a0a878ca1a36399e76.1501122135.git.honghui.zhang@mediatek.com>
+ <20170803224206.GN20308@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <1501835976.24341.21.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When receiving unhandled faults from the CPU, description is very sparse.
-Adding information about faults decoded from ESR.
+Hi, Bjorn,
+	Thanks very much for your reviews.
+The mis-spells will be fixed in next version.
 
-Added defines to esr.h corresponding ESR fields. Values are based on ARM
-Archtecture Reference Manual (DDI 0487B.a), section D7.2.28 ESR_ELx, Exception
-Syndrome Register (ELx) (pages D7-2275 to D7-2280).
 
-New output is of the form:
-[   77.818059] Mem abort info:
-[   77.820826]   Exception class = DABT (current EL), IL = 32 bits
-[   77.826706]   SET = 0, FnV = 0
-[   77.829742]   EA = 0, S1PTW = 0
-[   77.832849] Data abort info:
-[   77.835713]   ISV = 0, ISS = 0x00000070
-[   77.839522]   CM = 0, WnR = 1
+On Thu, 2017-08-03 at 17:42 -0500, Bjorn Helgaas wrote:
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm64/include/asm/esr.h | 39 ++++++++++++++++++++++++++----------
- arch/arm64/mm/fault.c        | 47 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 76 insertions(+), 10 deletions(-)
 
-* V2:
-  - Slight change of display format so info spans over fewer lines
-  - When ISV is 0, display raw value of ISS
+......
+> > +}
+> > +
+> > +static struct mtk_pcie_port *mtk_pcie_find_port(struct mtk_pcie *pcie,
+> > +						struct pci_bus *bus, int devfn)
+> > +{
+> > +	struct pci_dev *dev;
+> > +	struct pci_bus *pbus;
+> > +	struct mtk_pcie_port *port, *tmp;
+> > +
+> > +	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
+> > +		if (bus->number == 0 && port->index == PCI_SLOT(devfn)) {
+> > +			return port;
+> > +		} else if (bus->number != 0) {
+> > +			pbus = bus;
+> > +			do {
+> > +				dev = pbus->self;
+> > +				if (port->index == PCI_SLOT(dev->devfn))
+> > +					return port;
+> > +				pbus = dev->bus;
+> > +			} while (dev->bus->number != 0);
+> > +		}
+> > +	}
+> > +
+> > +	return NULL;
+> 
+> You should be able to use sysdata to avoid searching the list.
+> See drivers/pci/host/pci-aardvark.c, for example.
+> 
 
-* V3:
-  - Rebase on v4.13-rc3
+I could put the mtk_pcie * in sysdata, but still need to searching the
+list to get the mtk_pcie_port *, how about:
 
-diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-index 8cabd57..130b534 100644
---- a/arch/arm64/include/asm/esr.h
-+++ b/arch/arm64/include/asm/esr.h
-@@ -77,16 +77,23 @@
- #define ESR_ELx_EC_MASK		(UL(0x3F) << ESR_ELx_EC_SHIFT)
- #define ESR_ELx_EC(esr)		(((esr) & ESR_ELx_EC_MASK) >> ESR_ELx_EC_SHIFT)
+	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
+		if (port->index == PCI_SLOT(devfn))
+			return port;
+	}
 
--#define ESR_ELx_IL		(UL(1) << 25)
-+#define ESR_ELx_IL_SHIFT	(25)
-+#define ESR_ELx_IL		(UL(1) << ESR_ELx_IL_SHIFT)
- #define ESR_ELx_ISS_MASK	(ESR_ELx_IL - 1)
+> > +}
+> > +
+> > +static int mtk_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
+> > +				int where, int size, u32 *val)
+> > +{
+> > +	struct mtk_pcie_port *port;
+> > +	struct pci_host_bridge *host = pci_find_host_bridge(bus);
+> > +	struct mtk_pcie *pcie = pci_host_bridge_priv(host);
+> 
+> Sysdata should make this very simple; see advk_pcie_rd_conf().
 
- /* ISS field definitions shared by different classes */
--#define ESR_ELx_WNR		(UL(1) << 6)
-+#define ESR_ELx_WNR_SHIFT	(6)
-+#define ESR_ELx_WNR		(UL(1) << ESR_ELx_WNR_SHIFT)
+thanks.
 
- /* Shared ISS field definitions for Data/Instruction aborts */
--#define ESR_ELx_FnV		(UL(1) << 10)
--#define ESR_ELx_EA		(UL(1) << 9)
--#define ESR_ELx_S1PTW		(UL(1) << 7)
-+#define ESR_ELx_SET_SHIFT	(11)
-+#define ESR_ELx_SET_MASK	(UL(3) << ESR_ELx_SET_SHIFT)
-+#define ESR_ELx_FnV_SHIFT	(10)
-+#define ESR_ELx_FnV		(UL(1) << ESR_ELx_FnV_SHIFT)
-+#define ESR_ELx_EA_SHIFT	(9)
-+#define ESR_ELx_EA		(UL(1) << ESR_ELx_EA_SHIFT)
-+#define ESR_ELx_S1PTW_SHIFT	(7)
-+#define ESR_ELx_S1PTW		(UL(1) << ESR_ELx_S1PTW_SHIFT)
+> 
+> > +	u32 bn = bus->number;
+> > +	int ret;
+> > +
+> > +	port = mtk_pcie_find_port(pcie, bus, devfn);
+> > +	if (!port) {
+> > +		*val = ~0;
+> > +		return PCIBIOS_DEVICE_NOT_FOUND;
+> > +	}
+> > +
+> > +	ret = mtk_pcie_hw_rd_cfg(port, bn, devfn, where, size, val);
+> > +	if (ret)
+> > +		*val = ~0;
+> > +
+> > +	return ret;
+> > +}
+> > +
+> > +static int mtk_pcie_config_write(struct pci_bus *bus, unsigned int devfn,
+> > +				 int where, int size, u32 val)
+> > +{
+> > +	u32 bn = bus->number;
+> > +	struct pci_host_bridge *host = pci_find_host_bridge(bus);
+> > +	struct mtk_pcie *pcie = pci_host_bridge_priv(host);
+> > +	struct mtk_pcie_port *port;
+> > +
+> > +	port = mtk_pcie_find_port(pcie, bus, devfn);
+> > +	if (!port)
+> > +		return PCIBIOS_DEVICE_NOT_FOUND;
+> > +
+> > +	return mtk_pcie_hw_wr_cfg(port, bn, devfn, where, size, val);
+> > +}
+> > +
+> > +static struct pci_ops mtk_pcie_ops_v2 = {
+> > +	.read  = mtk_pcie_config_read,
+> > +	.write = mtk_pcie_config_write,
+> > +};
+> > +
+> > +static int mtk_pcie_startup_ports_v2(struct mtk_pcie_port *port)
+> > +{
+> > +	struct mtk_pcie *pcie = port->pcie;
+> > +	struct resource *mem = &pcie->mem;
+> > +	u32 val;
+> > +	size_t size;
+> > +	int err;
+> > +
+> > +	/* mt7622 platforms need to enable LTSSM and ASPM from PCIe subsys */
+> > +	if (pcie->base) {
+> > +		val = readl(pcie->base + PCIE_SYS_CFG_V2);
+> > +		val |= PCIE_CSR_LTSSM_EN(port->index) |
+> > +		       PCIE_CSR_ASPM_L1_EN(port->index);
+> > +		writel(val, pcie->base + PCIE_SYS_CFG_V2);
+> > +	}
+> > +
+> > +	/* Assert all reset signals */
+> > +	writel(0, port->base + PCIE_RST_CTRL);
+> > +
+> > +	/*
+> > +	 * Enable rc internal reset.
+> > +	 * The reset will work when the link is from link up to link down.
+> 
+> ?  That sentence doesn't parse for me.
 
- /* Shared ISS fault status code(IFSC/DFSC) for Data/Instruction aborts */
- #define ESR_ELx_FSC		(0x3F)
-@@ -97,15 +104,20 @@
- #define ESR_ELx_FSC_PERM	(0x0C)
+What about:
 
- /* ISS field definitions for Data Aborts */
--#define ESR_ELx_ISV		(UL(1) << 24)
-+#define ESR_ELx_ISV_SHIFT	(24)
-+#define ESR_ELx_ISV		(UL(1) << ESR_ELx_ISV_SHIFT)
- #define ESR_ELx_SAS_SHIFT	(22)
- #define ESR_ELx_SAS		(UL(3) << ESR_ELx_SAS_SHIFT)
--#define ESR_ELx_SSE		(UL(1) << 21)
-+#define ESR_ELx_SSE_SHIFT	(21)
-+#define ESR_ELx_SSE		(UL(1) << ESR_ELx_SSE_SHIFT)
- #define ESR_ELx_SRT_SHIFT	(16)
- #define ESR_ELx_SRT_MASK	(UL(0x1F) << ESR_ELx_SRT_SHIFT)
--#define ESR_ELx_SF 		(UL(1) << 15)
--#define ESR_ELx_AR 		(UL(1) << 14)
--#define ESR_ELx_CM 		(UL(1) << 8)
-+#define ESR_ELx_SF_SHIFT	(15)
-+#define ESR_ELx_SF 		(UL(1) << ESR_ELx_SF_SHIFT)
-+#define ESR_ELx_AR_SHIFT	(14)
-+#define ESR_ELx_AR 		(UL(1) << ESR_ELx_AR_SHIFT)
-+#define ESR_ELx_CM_SHIFT	(8)
-+#define ESR_ELx_CM 		(UL(1) << ESR_ELx_CM_SHIFT)
+	/*
+	 * Enable PCIe link down reset, if link status changed from link up to
+	 * link down, this will reset MAC control registers and configuration
+	 * space.
+	 */
 
- /* ISS field definitions for exceptions taken in to Hyp */
- #define ESR_ELx_CV		(UL(1) << 24)
-@@ -209,6 +221,13 @@
- #ifndef __ASSEMBLY__
- #include <asm/types.h>
+> 
+> > +	 */
+> > +	writel(PCI_LINKDOWN_RST_EN, port->base + PCIE_RST_CTRL);
+> > +
+> > +	/* De-assert phy, pe, pipe, mac and configuration reset	*/
+> > +	val = readl(port->base + PCIE_RST_CTRL);
+> > +	val |= PCIE_PHY_RSTB | PCIE_PERSTB | PCIE_PIPE_SRSTB |
+> > +	       PCIE_MAC_SRSTB | PCIE_CRSTB;
+> > +	writel(val, port->base + PCIE_RST_CTRL);
+> > +
+> > +	/* PCIe v2.0 need at least 100ms delay to train from Gen1 to Gen2 */
+> > +	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS_V2, val,
+> > +				 !!(val & PCIE_PORT_LINKUP_V2), 20,
+> > +				 100 * USEC_PER_MSEC);
+> > +	if (err)
+> > +		return -ETIMEDOUT;
+> > +
+> > +	/* Set INTx mask */
+> > +	val = readl(port->base + PCIE_INT_MASK);
+> > +	val &= ~INTX_MASK;
+> > +	writel(val, port->base + PCIE_INT_MASK);
+> > +
+> > +	/* Set AHB to PCIe translation windows */
+> > +	size = mem->end - mem->start;
+> > +	val = AHB2PCIE_BASEL(mem->start) | AHB2PCIE_SIZE(fls(size));
+> > +	writel(val, port->base + PCIE_AHB_TRANS_BASE0_L);
+> > +
+> > +	val = AHB2PCIE_BASEH(mem->start);
+> > +	writel(val, port->base + PCIE_AHB_TRANS_BASE0_H);
+> > +
+> > +	/* Set PCIe to axi translation memory space.*/
+> 
+> s/axi/AXI/
+> 
+> > +	val = fls(0xffffffff) | WIN_ENABLE;
+> > +	writel(val, port->base + PCIE_AXI_WINDOW0);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int mtk_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+> > +			     irq_hw_number_t hwirq)
+> > +{
+> > +	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
+> > +	irq_set_chip_data(irq, domain->host_data);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct irq_domain_ops intx_domain_ops = {
+> > +	.map = mtk_pcie_intx_map,
+> > +};
+> > +
+> > +static int mtk_pcie_init_irq_domain(struct mtk_pcie_port *port,
+> > +				    struct device_node *node)
+> > +{
+> > +	struct device *dev = port->pcie->dev;
+> > +	struct device_node *pcie_intc_node;
+> > +
+> > +	/* Setup INTx */
+> > +	pcie_intc_node = of_get_next_child(node, NULL);
+> > +	if (!pcie_intc_node) {
+> > +		dev_err(dev, "No PCIe Intc node found\n");
+> > +		return PTR_ERR(pcie_intc_node);
+> > +	}
+> > +
+> > +	port->irq_domain = irq_domain_add_linear(pcie_intc_node, INTX_NUM,
+> > +						 &intx_domain_ops, port);
+> 
+> I think there's an issue here with a 4-element IRQ domain and the
+> hwirq numbers 1-4 from the of_irq_parse_and_map_pci() path, so INTD
+> may not work correctly.
+> 
+> See
+> http://lkml.kernel.org/r/20170801212931.GA26498 at bhelgaas-glaptop.roam.corp.google.com
+> and related discussion.
+> 
 
-+static inline bool esr_is_data_abort(u32 esr)
-+{
-+	const u32 ec = ESR_ELx_EC(esr);
-+
-+	return ec == ESR_ELx_EC_DABT_LOW || ec == ESR_ELx_EC_DABT_CUR;
-+}
-+
- const char *esr_get_class_string(u32 esr);
- #endif /* __ASSEMBLY */
+Sorry, I did not get this,
+I do some test with an intel E350T4 PCIe NICs, it's a x1 lane
+multi-function device.
+What I got from the log is below:
+->of_irq_parse_and_map_pci
+	->of_irq_parse_pci
+		->irq_create_of_mapping
+			->irq_create_fwspec_mapping
+				->irq_domain_translate
+				which will go through
+				d->ops->translate #the hwirq really start from 0
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index c7861c9..e093922 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -82,6 +82,49 @@ static inline int notify_page_fault(struct pt_regs *regs, unsigned int esr)
- }
- #endif
+And I tested every NIC port of the Intel E350T4 with tftp transfer data,
+seems all are OK with this code.
 
-+static void data_abort_decode(unsigned int esr)
-+{
-+	pr_alert("Data abort info:\n");
-+
-+	if (esr & ESR_ELx_ISV) {
-+		pr_alert("  Access size = %u byte(s)\n",
-+			 1U << ((esr & ESR_ELx_SAS) >> ESR_ELx_SAS_SHIFT));
-+		pr_alert("  SSE = %lu, SRT = %lu\n",
-+			 (esr & ESR_ELx_SSE) >> ESR_ELx_SSE_SHIFT,
-+			 (esr & ESR_ELx_SRT_MASK) >> ESR_ELx_SRT_SHIFT);
-+		pr_alert("  SF = %lu, AR = %lu\n",
-+			 (esr & ESR_ELx_SF) >> ESR_ELx_SF_SHIFT,
-+			 (esr & ESR_ELx_AR) >> ESR_ELx_AR_SHIFT);
-+	} else {
-+		pr_alert("  ISV = 0, ISS = 0x%08lu\n", esr & ESR_ELx_ISS_MASK);
-+	}
-+
-+	pr_alert("  CM = %lu, WnR = %lu\n",
-+		 (esr & ESR_ELx_CM) >> ESR_ELx_CM_SHIFT,
-+		 (esr & ESR_ELx_WNR) >> ESR_ELx_WNR_SHIFT);
-+}
-+
-+/*
-+ * Decode mem abort information
-+ */
-+static void mem_abort_decode(unsigned int esr)
-+{
-+	pr_alert("Mem abort info:\n");
-+
-+	pr_alert("  Exception class = %s, IL = %lu bits\n",
-+		 esr_get_class_string(esr),
-+		 (esr & ESR_ELx_IL) ? 32 : 16);
-+	pr_alert("  SET = %lu, FnV = %lu\n",
-+		 (esr & ESR_ELx_SET_MASK) >> ESR_ELx_SET_SHIFT,
-+		 (esr & ESR_ELx_FnV) >> ESR_ELx_FnV_SHIFT);
-+	pr_alert("  EA = %lu, S1PTW = %lu\n",
-+		 (esr & ESR_ELx_EA) >> ESR_ELx_EA_SHIFT,
-+		 (esr & ESR_ELx_S1PTW) >> ESR_ELx_S1PTW_SHIFT);
-+
-+	if (esr_is_data_abort(esr))
-+		data_abort_decode(esr);
-+}
-+
- /*
-  * Dump out the page tables associated with 'addr' in the currently active mm.
-  */
-@@ -247,6 +290,8 @@ static void __do_kernel_fault(unsigned long addr, unsigned int esr,
- 	pr_alert("Unable to handle kernel %s at virtual address %08lx\n", msg,
- 		 addr);
+What I got from the proc is as below:
+cat /proc/interrupts
+           CPU0       CPU1       CPU2       
+  1:          0          0          0     GICv2  25 Level     vgic
+  3:       5042        224        206     GICv2  30 Level     arch_timer
+  4:          0          0          0     GICv2  27 Level     kvm guest
+timer
+  6:        201          0          0  MT_SYSIRQ  91 Level     ttyS0
+  7:         57          0          0  MT_SYSIRQ 115 Level     mtk-pcie
+  8:          0          0          0  MT_SYSIRQ 117 Level     mtk-pcie
+  9:          9          0          0     dummy   0 Edge      eth0
+ 10:         40          0          0     dummy   1 Edge      eth1
+ 11:          5          0          0     dummy   2 Edge      eth2
+ 12:          3          0          0     dummy   3 Edge      eth3
+IPI0:       314        507       1164       Rescheduling interrupts
 
-+	mem_abort_decode(esr);
-+
- 	show_pte(addr);
- 	die("Oops", regs, esr);
- 	bust_spinlocks(0);
-@@ -701,6 +746,8 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
- 	pr_alert("Unhandled fault: %s (0x%08x) at 0x%016lx\n",
- 		 inf->name, esr, addr);
+or did I missed something?
 
-+	mem_abort_decode(esr);
-+
- 	info.si_signo = inf->sig;
- 	info.si_errno = 0;
- 	info.si_code  = inf->code;
---
-1.9.1
+
+> > +	if (!port->irq_domain) {
+> > +		dev_err(dev, "Failed to get INTx IRQ domain\n");
+> > +		return PTR_ERR(port->irq_domain);
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static irqreturn_t mtk_pcie_intr_handler(int irq, void *data)
+> > +{
+> > +	struct mtk_pcie_port *port = (struct mtk_pcie_port *)data;
+> > +	struct device *dev = port->pcie->dev;
+> > +	unsigned long status;
+> > +	u32 virq;
+> > +	u32 bit = INTX_SHIFT;
+> > +
+> > +	while ((status = readl(port->base + PCIE_INT_STATUS)) & INTX_MASK) {
+> > +		for_each_set_bit_from(bit, &status, INTX_NUM + INTX_SHIFT) {
+> > +			/* Clear the INTx */
+> > +			writel(1 << bit, port->base + PCIE_INT_STATUS);
+> > +			virq = irq_find_mapping(port->irq_domain,
+> > +						bit - INTX_SHIFT);
+> > +			if (virq)
+> > +				generic_handle_irq(virq);
+> > +			else
+> > +				dev_err(dev, "unexpected IRQ, INT%d\n",
+> > +					bit - INTX_SHIFT);
+> 
+> PCI INTx are conventionally INTA, INTB, INTC, INTD (not INT1, INT2,
+> etc).
+> 
+> > +		}
+> > +	}
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +static int mtk_pcie_setup_irq(struct mtk_pcie_port *port,
+> > +			      struct device_node *node)
+> > +{
+> > +	struct mtk_pcie *pcie = port->pcie;
+> > +	struct device *dev = pcie->dev;
+> > +	struct platform_device *pdev = to_platform_device(dev);
+> > +	int err, irq;
+> > +
+> > +	irq = platform_get_irq(pdev, port->index);
+> > +	err = devm_request_irq(dev, irq, mtk_pcie_intr_handler,
+> > +			       IRQF_SHARED, "mtk-pcie", port);
+> > +	if (err) {
+> > +		dev_err(dev, "unable to request irq %d\n", irq);
+> 
+> s/irq/IRQ/
+> 
+> > +		return err;
+> > +	}
+> > +
+> > +	err = mtk_pcie_init_irq_domain(port, node);
+> > +	if (err) {
+> > +		dev_err(dev, "failed to init pcie lagecy irq domain\n");
+> 
+> s/lagecy/legacy/
+> s/irq/IRQ/
+> s/pcie/PCIe/
+> 
+> > +		return -ENODEV;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> >  static void __iomem *mtk_pcie_map_bus(struct pci_bus *bus,
+> >  				      unsigned int devfn, int where)
+> >  {
+> > @@ -249,13 +625,49 @@ static void mtk_pcie_enable_ports(struct mtk_pcie_port *port)
+> >  
+> >  	err = clk_prepare_enable(port->sys_ck);
+> >  	if (err) {
+> > -		dev_err(dev, "failed to enable port%d clock\n", port->index);
+> > +		dev_err(dev, "failed to enable sys_ck%d\n", port->index);
+> >  		goto err_sys_clk;
+> >  	}
+> >  
+> > +	err = clk_prepare_enable(port->ahb_ck);
+> > +	if (err) {
+> > +		dev_err(dev, "failed to enable ahb_ck%d\n", port->index);
+> > +		goto err_ahb_clk;
+> > +	}
+> > +
+> > +	err = clk_prepare_enable(port->aux_ck);
+> > +	if (err) {
+> > +		dev_err(dev, "failed to enable aux_ck%d\n", port->index);
+> > +		goto err_aux_clk;
+> > +	}
+> > +
+> > +	err = clk_prepare_enable(port->axi_ck);
+> > +	if (err) {
+> > +		dev_err(dev, "failed to enable axi_ck%d\n", port->index);
+> > +		goto err_axi_clk;
+> > +	}
+> > +
+> > +	err = clk_prepare_enable(port->obff_ck);
+> > +	if (err) {
+> > +		dev_err(dev, "failed to enable obff_ck%d\n", port->index);
+> > +		goto err_obff_clk;
+> > +	}
+> > +
+> > +	err = clk_prepare_enable(port->pipe_ck);
+> > +	if (err) {
+> > +		dev_err(dev, "failed to enable pipe_ck%d\n", port->index);
+> > +		goto err_pipe_clk;
+> > +	}
+> > +
+> >  	reset_control_assert(port->reset);
+> >  	reset_control_deassert(port->reset);
+> >  
+> > +	err = phy_init(port->phy);
+> > +	if (err) {
+> > +		dev_err(dev, "failed to initialize port%d phy\n", port->index);
+> > +		goto err_phy_init;
+> > +	}
+> > +
+> >  	err = phy_power_on(port->phy);
+> >  	if (err) {
+> >  		dev_err(dev, "failed to power on port%d phy\n", port->index);
+> > @@ -269,6 +681,18 @@ static void mtk_pcie_enable_ports(struct mtk_pcie_port *port)
+> >  
+> >  	phy_power_off(port->phy);
+> >  err_phy_on:
+> > +	phy_exit(port->phy);
+> > +err_phy_init:
+> > +	clk_disable_unprepare(port->pipe_ck);
+> > +err_pipe_clk:
+> > +	clk_disable_unprepare(port->obff_ck);
+> > +err_obff_clk:
+> > +	clk_disable_unprepare(port->axi_ck);
+> > +err_axi_clk:
+> > +	clk_disable_unprepare(port->aux_ck);
+> > +err_aux_clk:
+> > +	clk_disable_unprepare(port->ahb_ck);
+> > +err_ahb_clk:
+> >  	clk_disable_unprepare(port->sys_ck);
+> >  err_sys_clk:
+> >  	mtk_pcie_port_free(port);
+> > @@ -306,10 +730,56 @@ static int mtk_pcie_parse_ports(struct mtk_pcie *pcie,
+> >  	snprintf(name, sizeof(name), "sys_ck%d", index);
+> >  	port->sys_ck = devm_clk_get(dev, name);
+> >  	if (IS_ERR(port->sys_ck)) {
+> > -		dev_err(dev, "failed to get port%d clock\n", index);
+> > +		dev_err(dev, "failed to get sys_ck%d\n", index);
+> >  		return PTR_ERR(port->sys_ck);
+> >  	}
+> >  
+> > +	/* sys_ck might be divided into the following parts in some chips */
+> > +	snprintf(name, sizeof(name), "ahb_ck%d", index);
+> > +	port->ahb_ck = devm_clk_get(dev, name);
+> > +	if (IS_ERR(port->ahb_ck)) {
+> > +		if (PTR_ERR(port->ahb_ck) == -EPROBE_DEFER)
+> > +			return -EPROBE_DEFER;
+> > +
+> > +		port->ahb_ck = NULL;
+> > +	}
+> > +
+> > +	snprintf(name, sizeof(name), "axi_ck%d", index);
+> > +	port->axi_ck = devm_clk_get(dev, name);
+> > +	if (IS_ERR(port->axi_ck)) {
+> > +		if (PTR_ERR(port->axi_ck) == -EPROBE_DEFER)
+> > +			return -EPROBE_DEFER;
+> > +
+> > +		port->axi_ck = NULL;
+> > +	}
+> > +
+> > +	snprintf(name, sizeof(name), "aux_ck%d", index);
+> > +	port->aux_ck = devm_clk_get(dev, name);
+> > +	if (IS_ERR(port->aux_ck)) {
+> > +		if (PTR_ERR(port->aux_ck) == -EPROBE_DEFER)
+> > +			return -EPROBE_DEFER;
+> > +
+> > +		port->aux_ck = NULL;
+> > +	}
+> > +
+> > +	snprintf(name, sizeof(name), "obff_ck%d", index);
+> > +	port->obff_ck = devm_clk_get(dev, name);
+> > +	if (IS_ERR(port->obff_ck)) {
+> > +		if (PTR_ERR(port->obff_ck) == -EPROBE_DEFER)
+> > +			return -EPROBE_DEFER;
+> > +
+> > +		port->obff_ck = NULL;
+> > +	}
+> > +
+> > +	snprintf(name, sizeof(name), "pipe_ck%d", index);
+> > +	port->pipe_ck = devm_clk_get(dev, name);
+> > +	if (IS_ERR(port->pipe_ck)) {
+> > +		if (PTR_ERR(port->pipe_ck) == -EPROBE_DEFER)
+> > +			return -EPROBE_DEFER;
+> > +
+> > +		port->pipe_ck = NULL;
+> > +	}
+> > +
+> >  	snprintf(name, sizeof(name), "pcie-rst%d", index);
+> >  	port->reset = devm_reset_control_get_optional(dev, name);
+> >  	if (PTR_ERR(port->reset) == -EPROBE_DEFER)
+> > @@ -324,6 +794,12 @@ static int mtk_pcie_parse_ports(struct mtk_pcie *pcie,
+> >  	port->index = index;
+> >  	port->pcie = pcie;
+> >  
+> > +	if (pcie->soc->setup_irq) {
+> > +		err = pcie->soc->setup_irq(port, node);
+> > +		if (err)
+> > +			return err;
+> > +	}
+> > +
+> >  	INIT_LIST_HEAD(&port->list);
+> >  	list_add_tail(&port->list, &pcie->ports);
+> >  
+> > @@ -553,9 +1029,17 @@ static struct mtk_pcie_soc mtk_pcie_soc_v1 = {
+> >  	.startup = mtk_pcie_startup_ports,
+> >  };
+> >  
+> > +static struct mtk_pcie_soc mtk_pcie_soc_v2 = {
+> > +	.ops = &mtk_pcie_ops_v2,
+> > +	.startup = mtk_pcie_startup_ports_v2,
+> > +	.setup_irq = mtk_pcie_setup_irq,
+> > +};
+> > +
+> >  static const struct of_device_id mtk_pcie_ids[] = {
+> >  	{ .compatible = "mediatek,mt2701-pcie", .data = &mtk_pcie_soc_v1 },
+> >  	{ .compatible = "mediatek,mt7623-pcie", .data = &mtk_pcie_soc_v1 },
+> > +	{ .compatible = "mediatek,mt2712-pcie", .data = &mtk_pcie_soc_v2 },
+> > +	{ .compatible = "mediatek,mt7622-pcie", .data = &mtk_pcie_soc_v2 },
+> >  	{},
+> >  };
+> >  
+> > -- 
+> > 2.6.4
+> > 
