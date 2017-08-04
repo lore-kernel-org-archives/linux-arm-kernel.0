@@ -1,83 +1,81 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 4 Aug 2017 15:58:35 +0100
-Subject: [PATCH 1/2] perf/aux: Make aux_{head, wakeup} ring_buffer members
- long
-In-Reply-To: <87ini8uci6.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1501260863-14687-1-git-send-email-will.deacon@arm.com>
- <87ini8uci6.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <20170804145835.GB6780@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 4 Aug 2017 16:25:42 +0100
+Subject: [PATCH 5/6] arm64: Implement pmem API support
+In-Reply-To: <ba8c28bcffc3bc856163441793bb4ef0fefa0f75.1500397441.git.robin.murphy@arm.com>
+References: <cover.1500397441.git.robin.murphy@arm.com>
+ <ba8c28bcffc3bc856163441793bb4ef0fefa0f75.1500397441.git.robin.murphy@arm.com>
+Message-ID: <20170804152542.7h3mbyxnhjwroddc@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 01:28:01PM +0300, Alexander Shishkin wrote:
-> Will Deacon <will.deacon@arm.com> writes:
-> 
-> > The aux_head and aux_wakeup members of struct ring_buffer are defined
-> > using the local_t type, despite the fact that they are only accessed via
-> > the perf_aux_output_* functions, which cannot race with each other for a
-> > given ring buffer.
-> >
-> > This patch changes the type of the members to long, so we can avoid
-> > using the local_* API where it isn't needed.
-> 
-> Thanks for digging this up! Some minor nits below.
-> 
-> > @@ -434,12 +434,12 @@ void perf_aux_output_end(struct perf_output_handle *handle, unsigned long size)
-> >  		handle->aux_flags |= PERF_AUX_FLAG_OVERWRITE;
-> >  
-> >  		aux_head = handle->head;
-> > -		local_set(&rb->aux_head, aux_head);
-> > +		rb->aux_head = aux_head;
-> >  	} else {
-> >  		handle->aux_flags &= ~PERF_AUX_FLAG_OVERWRITE;
-> >  
-> > -		aux_head = local_read(&rb->aux_head);
-> > -		local_add(size, &rb->aux_head);
-> > +		aux_head = rb->aux_head;
-> > +		rb->aux_head += size;
-> >  	}
-> >  
-> >  	if (size || handle->aux_flags) {
-> > @@ -451,11 +451,11 @@ void perf_aux_output_end(struct perf_output_handle *handle, unsigned long size)
-> >  		                     handle->aux_flags);
-> >  	}
-> >  
-> > -	aux_head = rb->user_page->aux_head = local_read(&rb->aux_head);
-> > +	aux_head = rb->user_page->aux_head = rb->aux_head;
-> >  
-> > -	if (aux_head - local_read(&rb->aux_wakeup) >= rb->aux_watermark) {
-> > +	if (aux_head - rb->aux_wakeup >= rb->aux_watermark) {
-> 
-> Can't we just do away with aux_head here:
-> 
->   rb->user_page->aux_head = rb->aux_head;
->   if (rb->aux_head - rb->aux_wakeup >= rb->aux_watermark) { ...
-> 
-> ?
-> 
-> > @@ -485,14 +485,13 @@ int perf_aux_output_skip(struct perf_output_handle *handle, unsigned long size)
-> >  	if (size > handle->size)
-> >  		return -ENOSPC;
-> >  
-> > -	local_add(size, &rb->aux_head);
-> > +	rb->aux_head += size;
-> >  
-> > -	aux_head = rb->user_page->aux_head = local_read(&rb->aux_head);
-> > -	if (aux_head - local_read(&rb->aux_wakeup) >= rb->aux_watermark) {
-> > +	aux_head = rb->user_page->aux_head = rb->aux_head;
-> > +	if (aux_head - rb->aux_wakeup >= rb->aux_watermark) {
-> >  		perf_output_wakeup(handle);
-> > -		local_add(rb->aux_watermark, &rb->aux_wakeup);
-> > -		handle->wakeup = local_read(&rb->aux_wakeup) +
-> > -				 rb->aux_watermark;
-> > +		rb->aux_wakeup += rb->aux_watermark;
-> > +		handle->wakeup = rb->aux_wakeup + rb->aux_watermark;
-> >  	}
-> >  
-> >  	handle->head = aux_head;
-> 
-> And here I think we don't need aux_head at all.
+Two minor comments below.
 
-Agreed on both counts. Will fix for v2.
+On Tue, Jul 25, 2017 at 11:55:42AM +0100, Robin Murphy wrote:
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -960,6 +960,17 @@ config ARM64_UAO
+>  	  regular load/store instructions if the cpu does not implement the
+>  	  feature.
+>  
+> +config ARM64_PMEM
+> +	bool "Enable support for persistent memory"
+> +	select ARCH_HAS_PMEM_API
+> +	help
+> +	  Say Y to enable support for the persistent memory API based on the
+> +	  ARMv8.2 DCPoP feature.
+> +
+> +	  The feature is detected at runtime, and the kernel will use DC CVAC
+> +	  operations if DC CVAP is not supported (following the behaviour of
+> +	  DC CVAP itself if the system does not define a point of persistence).
 
-Will
+Any reason not to have this default y?
+
+> --- a/arch/arm64/mm/cache.S
+> +++ b/arch/arm64/mm/cache.S
+> @@ -172,6 +172,20 @@ ENDPIPROC(__clean_dcache_area_poc)
+>  ENDPROC(__dma_clean_area)
+>  
+>  /*
+> + *	__clean_dcache_area_pop(kaddr, size)
+> + *
+> + * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
+> + * 	are cleaned to the PoP.
+> + *
+> + *	- kaddr   - kernel address
+> + *	- size    - size in question
+> + */
+> +ENTRY(__clean_dcache_area_pop)
+> +	dcache_by_line_op cvap, sy, x0, x1, x2, x3
+> +	ret
+> +ENDPIPROC(__clean_dcache_area_pop)
+> +
+> +/*
+>   *	__dma_flush_area(start, size)
+>   *
+>   *	clean & invalidate D / U line
+> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+> index a682a0a2a0fa..a461a00ceb3e 100644
+> --- a/arch/arm64/mm/pageattr.c
+> +++ b/arch/arm64/mm/pageattr.c
+> @@ -183,3 +183,21 @@ bool kernel_page_present(struct page *page)
+>  }
+>  #endif /* CONFIG_HIBERNATION */
+>  #endif /* CONFIG_DEBUG_PAGEALLOC */
+> +
+> +#ifdef CONFIG_ARCH_HAS_PMEM_API
+> +#include <asm/cacheflush.h>
+> +
+> +static inline void arch_wb_cache_pmem(void *addr, size_t size)
+> +{
+> +	/* Ensure order against any prior non-cacheable writes */
+> +	dmb(sy);
+> +	__clean_dcache_area_pop(addr, size);
+> +}
+
+Could we keep the dmb() in the actual __clean_dcache_area_pop()
+implementation?
+
+I can do the changes myself if you don't have any objections.
+
+-- 
+Catalin
