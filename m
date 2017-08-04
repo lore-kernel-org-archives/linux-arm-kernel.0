@@ -1,67 +1,34 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 4 Aug 2017 20:43:01 +0900
-Subject: [PATCH] arm64:kexec: have own crash_smp_send_stop() for crash
- dump for nonpanic cores
-In-Reply-To: <59844E98.3020507@arm.com>
-References: <1501830173-15989-1-git-send-email-hoeun.ryu@gmail.com>
- <59844E98.3020507@arm.com>
-Message-ID: <20170804114300.GA22805@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 4 Aug 2017 12:43:26 +0100
+Subject: [PATCH RFC 1/2] spi: pxa2xx: Convert to GPIO descriptor API
+ where possible
+In-Reply-To: <20170804102408.GX2369@lahna.fi.intel.com>
+References: <cover.1501760433.git.jan.kiszka@siemens.com>
+ <6bfd2b29b888c14f1a6feb9dee5bb54b74e761b0.1501760433.git.jan.kiszka@siemens.com>
+ <20170804101029.GV2369@lahna.fi.intel.com>
+ <b411858d-6a09-a3bc-555d-b1e648b9c8ed@siemens.com>
+ <20170804102408.GX2369@lahna.fi.intel.com>
+Message-ID: <20170804114326.isnsz6zgstpvuftt@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 04, 2017 at 11:38:16AM +0100, James Morse wrote:
-> Hi Hoeun,
-> 
-> On 04/08/17 08:02, Hoeun Ryu wrote:
-> >  Commit 0ee5941 : (x86/panic: replace smp_send_stop() with kdump friendly
-> > version in panic path) introduced crash_smp_send_stop() which is a weak
-> > function and can be overriden by architecture codes to fix the side effect
-> > caused by commit f06e515 : (kernel/panic.c: add "crash_kexec_post_
-> > notifiers" option).
-> 
-> If I've understood correctly: if we boot with this option core code doesn't use
-> our machine_crash_shutdown(), and instead calls crash_smp_send_stop(), which we
+On Fri, Aug 04, 2017 at 01:24:08PM +0300, Mika Westerberg wrote:
+> On Fri, Aug 04, 2017 at 12:18:28PM +0200, Jan Kiszka wrote:
 
-No. Machine_crash_shutdown() is always called, but at that time,
-all the cpus other than the crashing cpu have already died in this case.
+> > It shouldn't cause problems (famous last words) because I refrained from
+> > changing the interfaces to them. References that come in as legacy GPIO
+> > are still treated like that.
 
-> don't have, so it uses the default smp_send_stop(), which doesn't save the regs.
-> 
-> Thanks for catching this!
-> 
-> 
-> Could we rename smp_send_crash_stop() crash_smp_send_stop() and add the
-> called-twice logic there? They are similar enough that I'm getting them muddled
-> already!
-> 
+> OK. I hope someone with a PXA2xx machine could still test it.
 
-Nice.
+> Acked-by: Mika Westerberg <mika.westerberg@linux.intel.com>
 
--Takahiro AKASHI
-
-> 
-> Thanks,
-> 
-> James
-> 
-> 
-> >  ARM64 architecture uses the weak version function and the problem is that
-> > the weak function simply calls smp_send_stop() which makes other CPUs
-> > offline and takes away the chance to save crash information for nonpanic
-> > CPUs in machine_crash_shutdown() when crash_kexec_post_notifiers kernel
-> > option is enabled.
-> > 
-> >  Calling smp_send_crash_stop() in the function is useless because all
-> > nonpanic CPUs are already offline by smp_send_stop() in this case and
-> > smp_send_crash_stop() only works against online CPUs.
-> > 
-> >  The result is that /proc/vmcore is not available with the error messages;
-> > "Warning: Zero PT_NOTE entries found", "Kdump: vmcore not initialized".
-> > 
-> >  crash_smp_send_stop() is implemented for ARM64 architecture to fix this
-> > problem and the function (strong symbol version) saves crash information
-> > for nonpanic CPUs using smp_send_crash_stop() and machine_crash_shutdown()
-> > tries to save crash information for nonpanic CPUs only when
-> > crash_kexec_post_notifiers kernel option is disabled.
-> 
-> 
+This path should be very well covered - there's plenty of things that
+convert GPIO numbers into descriptors out there.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170804/c50af111/attachment.sig>
