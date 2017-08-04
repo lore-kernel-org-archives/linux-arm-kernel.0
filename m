@@ -1,47 +1,19 @@
-From: sandy.huang@rock-chips.com (Sandy Huang)
-Date: Fri, 4 Aug 2017 11:20:25 +0800
-Subject: [PATCH v1.1] drm/rockchip: fix race with kms hotplug and fbdev
-In-Reply-To: <1501575103-20136-1-git-send-email-mark.yao@rock-chips.com>
-References: <1501494601-7140-1-git-send-email-mark.yao@rock-chips.com>
- <1501575103-20136-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <3084b854-1b82-5a72-ad51-f7b12e5a57a0@rock-chips.com>
+From: finley.xiao@rock-chips.com (Finley Xiao)
+Date: Fri,  4 Aug 2017 11:33:36 +0800
+Subject: [PATCH 0/2] arm64: dts: rockchip: add cpu operating points and efuse
+ node for RK3328 SoC
+Message-ID: <1501817618-65504-1-git-send-email-finley.xiao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Add cpu operating points and an efuse node in the device tree for rk3228 SoC
 
-? 2017/8/1 16:11, Mark Yao ??:
-> According to the kerneldoc[0], should do fbdev setup before calling
-> drm_kms_helper_poll_init(), otherwise, Kms hotplug event may race
-> into fbdev helper initial, and fb_helper->dev may be NULL pointer,
-> that would cause the bug:
-> [    0.735411] [00000200] *pgd=00000000f6ffe003, *pud=00000000f6ffe003, *pmd=0000000000000000
-> [    0.736156] Internal error: Oops: 96000005 [#1] PREEMPT SMP
-> [    0.736648] Modules linked in:
-> [    0.736930] CPU: 2 PID: 20 Comm: kworker/2:0 Not tainted 4.4.41 #20
-> [    0.737480] Hardware name: Rockchip RK3399 Board rev2 (BOX) (DT)
-> [    0.738020] Workqueue: events cdn_dp_pd_event_work
-> [    0.738447] task: ffffffc0f21f3100 ti: ffffffc0f2218000 task.ti: ffffffc0f2218000
-> [    0.739109] PC is at mutex_lock+0x14/0x44
-> [    0.739469] LR is at drm_fb_helper_hotplug_event+0x30/0x114
-> [    0.756253] [<ffffff8008a344f4>] mutex_lock+0x14/0x44
-> [    0.756260] [<ffffff8008445708>] drm_fb_helper_hotplug_event+0x30/0x114
-> [    0.756271] [<ffffff8008473c84>] rockchip_drm_output_poll_changed+0x18/0x20
-> [    0.756280] [<ffffff8008439fcc>] drm_kms_helper_hotplug_event+0x28/0x34
-> [    0.756286] [<ffffff800846c444>] cdn_dp_pd_event_work+0x394/0x3c4
-> [    0.756295] [<ffffff80080b2b38>] process_one_work+0x218/0x3e0
-> [    0.756302] [<ffffff80080b3538>] worker_thread+0x2e8/0x404
-> [    0.756308] [<ffffff80080b7e70>] kthread+0xe8/0xf0
-> [    0.756316] [<ffffff8008082690>] ret_from_fork+0x10/0x40
-> 
-> [0]: https://01.org/linuxgraphics/gfx-docs/drm/gpu/drm-kms-helpers.html
-> 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> ---
-> Changes in v1.1:
-> - According to the kerneldoc, fix the race bug in generic way.
-> 
->   drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 13 ++++++-------
->   1 file changed, 6 insertions(+), 7 deletions(-)
-> 
-Reviewed-by: Sandy huang <sandy.huang@rock-chips.com>
+Finley Xiao (2):
+  arm64: dts: rockchip: Add cpu operating points for RK3328 SoC
+  arm64: dts: rockchip: Add efuse device node for RK3328 SoC
+
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi | 66 ++++++++++++++++++++++++++++++++
+ 1 file changed, 66 insertions(+)
+
+-- 
+2.7.4
