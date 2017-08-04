@@ -1,7 +1,7 @@
 From: david@lechnology.com (David Lechner)
-Date: Thu, 3 Aug 2017 20:08:57 -0500
+Date: Thu, 3 Aug 2017 20:16:54 -0500
 Subject: [PATCH 0/6] Support for LEGO MINDSTORMS EV3 LCD display
-In-Reply-To: <260320c5-8064-6388-168b-acad5a1aa0f2@tronnes.org>
+In-Reply-To: <03f423be-7b4c-13ec-7126-c0d9af6ebe4a@lechnology.com>
 References: <1501355870-13960-1-git-send-email-david@lechnology.com>
  <5d8f6518-8d7e-c029-2da4-e3417afb3e40@lechnology.com>
  <28188f5c-1daf-121b-6daf-1899668c3875@tronnes.org>
@@ -13,40 +13,45 @@ References: <1501355870-13960-1-git-send-email-david@lechnology.com>
  <CAHp75Vdaq0ersEa2_XneUQtsJMj2GCRZL4Wi=1HQorLkb4SaVg@mail.gmail.com>
  <CAHp75Vf2GVASatG_aJrBPNHR-jQLoYtOPan5ezcoWRDuEsXbNw@mail.gmail.com>
  <260320c5-8064-6388-168b-acad5a1aa0f2@tronnes.org>
-Message-ID: <03f423be-7b4c-13ec-7126-c0d9af6ebe4a@lechnology.com>
+ <03f423be-7b4c-13ec-7126-c0d9af6ebe4a@lechnology.com>
+Message-ID: <959f607c-f2ee-51d8-db39-1ef91859f22f@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/2017 03:11 PM, Noralf Tr?nnes wrote:
-> 
-> Den 03.08.2017 19.11, skrev Andy Shevchenko:
->> On Thu, Aug 3, 2017 at 8:09 PM, Andy Shevchenko
->> <andy.shevchenko@gmail.com> wrote:
->>> On Thu, Aug 3, 2017 at 6:18 PM, David Lechner <david@lechnology.com> 
->>> wrote:
->>>
->>>> The particular display I have is this one:
->>>> http://wiki.seeed.cc/Grove-OLED_Display_1.12inch/
+On 08/03/2017 08:08 PM, David Lechner wrote:
+> On 08/03/2017 03:11 PM, Noralf Tr?nnes wrote:
+>>
+>> Den 03.08.2017 19.11, skrev Andy Shevchenko:
+>>> On Thu, Aug 3, 2017 at 8:09 PM, Andy Shevchenko
+>>> <andy.shevchenko@gmail.com> wrote:
+>>>> On Thu, Aug 3, 2017 at 6:18 PM, David Lechner <david@lechnology.com> 
+>>>> wrote:
 >>>>
->>>> It looks like it uses a command/data scheme like the MIPI displays, but
->>>> doesn't use any of the standard values for the commands. The 
->>>> controller can
->>>> do parallel, SPI and I2C, but the display I have is wired for I2C.
->>> It looks very similar to ssd1306. Some description refers to ssd1308.
->> http://www.mouser.com/catalog/specsheets/Seeed_104030008.pdf
+>>>>> The particular display I have is this one:
+>>>>> http://wiki.seeed.cc/Grove-OLED_Display_1.12inch/
+>>>>>
+>>>>> It looks like it uses a command/data scheme like the MIPI displays, 
+>>>>> but
+>>>>> doesn't use any of the standard values for the commands. The 
+>>>>> controller can
+>>>>> do parallel, SPI and I2C, but the display I have is wired for I2C.
+>>>> It looks very similar to ssd1306. Some description refers to ssd1308.
+>>> http://www.mouser.com/catalog/specsheets/Seeed_104030008.pdf
+>>>
+>>
+>> That pdf refers to another one: 
+>> http://wiki.seeed.cc/Grove-OLED_Display_0.96inch/
+>> There's an fbdev driver that supports ssd1305, ssd1306, ssd1307 and 
+>> ssd1309:
+>> https://www.kernel.org/doc/Documentation/devicetree/bindings/display/ssd1307fb.txt 
+>>
+>> http://elixir.free-electrons.com/linux/latest/source/drivers/video/fbdev/ssd1307fb.c 
+>>
+>> Maybe the ssd1308 will work with that driver...
 >>
 > 
-> That pdf refers to another one: 
-> http://wiki.seeed.cc/Grove-OLED_Display_0.96inch/
-> There's an fbdev driver that supports ssd1305, ssd1306, ssd1307 and 
-> ssd1309:
-> https://www.kernel.org/doc/Documentation/devicetree/bindings/display/ssd1307fb.txt 
-> 
-> http://elixir.free-electrons.com/linux/latest/source/drivers/video/fbdev/ssd1307fb.c 
-> 
-> Maybe the ssd1308 will work with that driver...
-> 
+> The display I have uses a ssd1327 controller. It is 16-bit grayscale. 
+> The ssd130x are all 1-bit monochrome. So, probably more like the ssd1325 
+> driver in fbftf.
 
-The display I have uses a ssd1327 controller. It is 16-bit grayscale. 
-The ssd130x are all 1-bit monochrome. So, probably more like the ssd1325 
-driver in fbftf.
+correction, 4-bit grayscale
