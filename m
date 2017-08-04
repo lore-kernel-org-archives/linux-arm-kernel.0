@@ -1,23 +1,26 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 4 Aug 2017 12:06:33 +0200
-Subject: [PATCH v3 0/4] Add larbid init routine for mediatek's gen1 smi
- larb driver
-In-Reply-To: <1501810348-20997-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1501810348-20997-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <20170804100632.GC17443@8bytes.org>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Fri, 4 Aug 2017 13:10:29 +0300
+Subject: [PATCH RFC 1/2] spi: pxa2xx: Convert to GPIO descriptor API
+ where possible
+In-Reply-To: <6bfd2b29b888c14f1a6feb9dee5bb54b74e761b0.1501760433.git.jan.kiszka@siemens.com>
+References: <cover.1501760433.git.jan.kiszka@siemens.com>
+ <6bfd2b29b888c14f1a6feb9dee5bb54b74e761b0.1501760433.git.jan.kiszka@siemens.com>
+Message-ID: <20170804101029.GV2369@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 04, 2017 at 09:32:24AM +0800, honghui.zhang at mediatek.com wrote:
-> Honghui Zhang (4):
->   memory: mtk-smi: Use of_device_get_match_data helper
->   memory: mtk-smi: add larbid handle routine
->   dt-bindings: mediatek: add descriptions for larbid
->   arm: dts: mediatek: add larbid property for larb
+On Thu, Aug 03, 2017 at 01:40:32PM +0200, Jan Kiszka wrote:
+> From: Jan Kiszka <jan.kiszka@siemens.com>
 > 
->  .../memory-controllers/mediatek,smi-larb.txt       | 15 +++++++++++++
->  arch/arm/boot/dts/mt2701.dtsi                      |  3 +++
->  drivers/memory/mtk-smi.c                           | 26 ++++++++++++----------
->  3 files changed, 32 insertions(+), 12 deletions(-)
+> We still need to request/free GPIOs passed via the legacy path of
+> pxa2xx_spi_chip::gpio_cs, but we can use the gpiod API otherwise.
+> 
+> Consistently use the descriptor API instead of the legacy one.
+> 
+> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
 
-Applied, thanks.
+There are some PXA2xx platforms under arch/arm/* which use this driver
+and legacy GPIOs. I wonder if this causes any problems with them?
+
+That was one of the reasons I did not convert the whole driver over GPIO
+descriptors.
