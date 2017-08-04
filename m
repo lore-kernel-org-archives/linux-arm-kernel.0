@@ -1,86 +1,109 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Aug 2017 18:38:10 +0100
-Subject: [PATCH RFC] arm64: introduce mm_context_t flags
-In-Reply-To: <20170802172940.ejiyl4j2ywlwhbme@yury-thinkpad>
-References: <20170731144825.31322-1-ynorov@caviumnetworks.com>
- <20170802163900.66gnhogililb3uak@armageddon.cambridge.arm.com>
- <20170802172940.ejiyl4j2ywlwhbme@yury-thinkpad>
-Message-ID: <20170804173809.aviva53kccexghul@armageddon.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 4 Aug 2017 18:43:27 +0100
+Subject: [PATCH 5/6] arm64: Implement pmem API support
+In-Reply-To: <20170804152542.7h3mbyxnhjwroddc@armageddon.cambridge.arm.com>
+References: <cover.1500397441.git.robin.murphy@arm.com>
+ <ba8c28bcffc3bc856163441793bb4ef0fefa0f75.1500397441.git.robin.murphy@arm.com>
+ <20170804152542.7h3mbyxnhjwroddc@armageddon.cambridge.arm.com>
+Message-ID: <74521a9d-45fa-7e29-d9f9-960c478306ec@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 02, 2017 at 08:29:40PM +0300, Yury Norov wrote:
-> On Wed, Aug 02, 2017 at 05:39:01PM +0100, Catalin Marinas wrote:
-> > On Mon, Jul 31, 2017 at 05:48:25PM +0300, Yury Norov wrote:
-> > > In patch 06beb72fbe23e ("arm64: introduce mm context flag to keep 32 bit task
-> > > information") you introduce the field flags but use it only for a single flag -
-> > > TIF_32BIT. It looks hacky to me for three reasons:
-> > >  - The flag is introduced for the case where it's impossible to get the thread
-> > >    info structure for the thread associated with mm. So thread_info flags (TIF)
-> > >    may also be unavailable at place. This is not the case for the only existing
-> > >    user of if - uprobes, but in general this approach requires to include thread
-> > >    headers in mm code, which may become unwanted dependency.
-> > >  - New flag, if it uses TIF bits, for consistency should for example set/clear
-> > >    TIF_32BIT_AARCH64 for ILP32 tasks. And to be completely consistent, with
-> > >    current approach we'd mirror thread_info flags to mm_context flags. And keep
-> > >    it syncronized.
-> > >  - If we start using TIF flags here, we cannot easily add new mm_context
-> > >    specific bits because they may mess with TIF ones.
-> > > 
-> > > I think that this is not what was intended when you added new field in
-> > > mm_context_t.
-> > 
-> > TIF_32BIT was handy at the time but it indeed denotes AArch32 user
-> > task. For ILP32 we wouldn't need to set this bit since the instruction
-> > set is A64 and uprobe should support it (though not sure anyone tried).
-> > I noticed in your patch introducing binfmt_ilp32.c that SET_PERSONALITY
-> > actually sets this flag in the mm context.
+On 04/08/17 16:25, Catalin Marinas wrote:
+> Two minor comments below.
 > 
-> Depending on what will be decided here, I'll change ilp32 patch
-> accordingly.
-
-Since this was meant to keep track of AArch32 tasks, the ILP32
-personality macros need to clear it.
-
-> > As with the TIF bits, the PERSONALITY macros become more complicated
-> > with more bits to set/clear. Since we don't have any plans for other mm
-> > context flags (independent of TIF), should we simply rename it to
-> > thread_flags and just copy the thread_info flags:
-> > 
-> > 	current->mm->context.thread_flags = current_thread_info()->flags;
+> On Tue, Jul 25, 2017 at 11:55:42AM +0100, Robin Murphy wrote:
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -960,6 +960,17 @@ config ARM64_UAO
+>>  	  regular load/store instructions if the cpu does not implement the
+>>  	  feature.
+>>  
+>> +config ARM64_PMEM
+>> +	bool "Enable support for persistent memory"
+>> +	select ARCH_HAS_PMEM_API
+>> +	help
+>> +	  Say Y to enable support for the persistent memory API based on the
+>> +	  ARMv8.2 DCPoP feature.
+>> +
+>> +	  The feature is detected at runtime, and the kernel will use DC CVAC
+>> +	  operations if DC CVAP is not supported (following the behaviour of
+>> +	  DC CVAP itself if the system does not define a point of persistence).
 > 
-> This will also work. But it may raise questions to one who reads the
-> code.
-> - if mm_context needs the threads flags, why you copy it? Why not to
->   move flags to the mm_context_t? It is always available for
->   thread_info users.
-> - for multithreaded applications there might be different set of bits
->   in the flags field in different theads. So what exactly will be in
->   context.thread_flags is a matter of case, and you'd explain somehow
->   which bits are reliable, and which are not.
+> Any reason not to have this default y?
 
-That's a valid argument.
+Mostly because it's untested, and not actually useful without some way
+of describing persistent memory regions to the kernel (I'm currently
+trying to make sense of what exactly ARCH_HAS_MMIO_FLUSH is supposed to
+mean in order to enable ACPI NFIT support).
 
-> - It doesn't sound convincing to me that there are no other candidates
->   for mm_context.flags bits. 6 month ago we didn't need the flags at all.
->   ARM64 is under intensive development, and it's highly probable that
->   candidates may appear one day.
+There's also the potential issue that we can't disable ARCH_HAS_PMEM_API
+at runtime on pre-v8.2 systems where DC CVAC may not strictly give the
+guarantee of persistence that that is supposed to imply. However, I
+guess that's more of an open problem, since even on a v8.2 CPU reporting
+(mandatory) DC CVAP support we've still no way to actually know whether
+the interconnect/memory controller/etc. of any old system is up to the
+job. At this point I'm mostly hoping that people will only be sticking
+NVDIMMs into systems that *are* properly designed to support them, v8.2
+CPUs or not.
 
-I'm fine with changing the macro to MMCF_AARCH32, however, could move
-the flag setting out of the SET_PERSONALITY macros, just to keep these
-macros strictly to the TIF flags? We can probably add it to
-arch_setup_new_exec(), something like:
+>> --- a/arch/arm64/mm/cache.S
+>> +++ b/arch/arm64/mm/cache.S
+>> @@ -172,6 +172,20 @@ ENDPIPROC(__clean_dcache_area_poc)
+>>  ENDPROC(__dma_clean_area)
+>>  
+>>  /*
+>> + *	__clean_dcache_area_pop(kaddr, size)
+>> + *
+>> + * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
+>> + * 	are cleaned to the PoP.
+>> + *
+>> + *	- kaddr   - kernel address
+>> + *	- size    - size in question
+>> + */
+>> +ENTRY(__clean_dcache_area_pop)
+>> +	dcache_by_line_op cvap, sy, x0, x1, x2, x3
+>> +	ret
+>> +ENDPIPROC(__clean_dcache_area_pop)
+>> +
+>> +/*
+>>   *	__dma_flush_area(start, size)
+>>   *
+>>   *	clean & invalidate D / U line
+>> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+>> index a682a0a2a0fa..a461a00ceb3e 100644
+>> --- a/arch/arm64/mm/pageattr.c
+>> +++ b/arch/arm64/mm/pageattr.c
+>> @@ -183,3 +183,21 @@ bool kernel_page_present(struct page *page)
+>>  }
+>>  #endif /* CONFIG_HIBERNATION */
+>>  #endif /* CONFIG_DEBUG_PAGEALLOC */
+>> +
+>> +#ifdef CONFIG_ARCH_HAS_PMEM_API
+>> +#include <asm/cacheflush.h>
+>> +
+>> +static inline void arch_wb_cache_pmem(void *addr, size_t size)
+>> +{
+>> +	/* Ensure order against any prior non-cacheable writes */
+>> +	dmb(sy);
+>> +	__clean_dcache_area_pop(addr, size);
+>> +}
+> 
+> Could we keep the dmb() in the actual __clean_dcache_area_pop()
+> implementation?
 
-static inline void arch_setup_new_exec(void)
-{
-	current->mm->context.flags = 0;
-	if (test_thread_flag(TIF_32BIT))
-		current->mm->context.flags |= MMCF_AARCH32;
-}
-#define arch_setup_new_exec	arch_setup_new_exec
+Mark held the opinion that it should follow the same pattern as the
+other cache maintenance primitives - e.g. we don't have such a dmb in
+__inval_cache_range(), but do place them at callsites where we know it
+may be necessary (head.S) - and I found it hard to disagree. The callers
+in patch #6 should never need a barrier, and arguably we may not even
+need this one, since it looks like pmem should currently always be
+mapped as MEMREMAP_WB if ARCH_HAS_PMEM_API.
 
-I would go for always initialising the flags to 0 rather than clearing
-certain bits, just to make it clear that we don't inherit them.
+> I can do the changes myself if you don't have any objections.
 
--- 
-Catalin
+If you would prefer to play safe and move it back into the assembly
+that's fine by me, but note that the associated comments in patch #6
+should also be removed if so.
+
+Robin.
