@@ -1,49 +1,32 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 4 Aug 2017 15:25:05 +0100
-Subject: [PATCH 0/5] Simplify kernel-mode NEON
-In-Reply-To: <20170804140526.cu3ojheqomsxzyjb@armageddon.cambridge.arm.com>
-References: <1501777403-9782-1-git-send-email-Dave.Martin@arm.com>
- <20170804120858.ff3772f3zzik37pp@armageddon.cambridge.arm.com>
- <20170804122225.jiceb2vbgrld2y7z@armageddon.cambridge.arm.com>
- <CAKv+Gu-YG1EbpvaL46T0fzD=RZ7itqizrH=AkYAN1YmTupmKGw@mail.gmail.com>
- <20170804131211.2wn2zi74kuzuwneo@armageddon.cambridge.arm.com>
- <CAKv+Gu_va4hD-MztzRUhXxTwqnbKcmOmV8NN9j+TG8_jWA0wNA@mail.gmail.com>
- <20170804132606.GQ989@e103592.cambridge.arm.com>
- <20170804140526.cu3ojheqomsxzyjb@armageddon.cambridge.arm.com>
-Message-ID: <20170804142505.GM6321@e103592.cambridge.arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 4 Aug 2017 16:28:36 +0200
+Subject: [PATCH v3 0/4] Add larbid init routine for mediatek's gen1 smi
+ larb driver
+In-Reply-To: <20170804100632.GC17443@8bytes.org>
+References: <1501810348-20997-1-git-send-email-honghui.zhang@mediatek.com>
+ <20170804100632.GC17443@8bytes.org>
+Message-ID: <781f5dee-9a2d-30b6-b080-8b027de41b03@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 04, 2017 at 03:05:26PM +0100, Catalin Marinas wrote:
-> On Fri, Aug 04, 2017 at 02:26:06PM +0100, Dave P Martin wrote:
-> > On Fri, Aug 04, 2017 at 02:21:52PM +0100, Ard Biesheuvel wrote:
 
-[...]
 
-> > > >> On 4 August 2017 at 13:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
-
-[...]
-
-> > > >> > ... and reverted.
-
-[...]
-
-> > > Perhaps we could stick it on a separate branch for this cycle (with
-> > > the suggested tweak) and get it pulled it into -next separately? That
-> > > way, you can forward it as a late pull, after Herbert's stuff gets in.
-> > 
-> > Or I could prepend the patches to the SVE series, and we wait for Linux
-> > to pull the crypto branch before merging that.  (I still need to repost
-> > and the SVE patches need to be reviewed, so that isn't imminent.)
+On 08/04/2017 12:06 PM, Joerg Roedel wrote:
+> On Fri, Aug 04, 2017 at 09:32:24AM +0800, honghui.zhang at mediatek.com wrote:
+>> Honghui Zhang (4):
+>>    memory: mtk-smi: Use of_device_get_match_data helper
+>>    memory: mtk-smi: add larbid handle routine
+>>    dt-bindings: mediatek: add descriptions for larbid
+>>    arm: dts: mediatek: add larbid property for larb
+>>
+>>   .../memory-controllers/mediatek,smi-larb.txt       | 15 +++++++++++++
+>>   arch/arm/boot/dts/mt2701.dtsi                      |  3 +++
+>>   drivers/memory/mtk-smi.c                           | 26 ++++++++++++----------
+>>   3 files changed, 32 insertions(+), 12 deletions(-)
 > 
-> I'll publish a branch early next week with the kernel mode neon patches
-> and you can base the SVE on top. We can test them together but I'll
-> wait for the crypto stuff to go in before sending this branch to Linus.
+> Applied, thanks.
+> 
 
-OK, this sounds like a good approach.
+I just pushed patch 4/4 to v4.13-next/dts32
 
-Ping me when you have a branch, but anyway I'll drop those patches from
-the SVE series.
-
-Thanks
----Dave
+Thanks everybody!
