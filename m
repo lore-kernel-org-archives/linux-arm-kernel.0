@@ -1,73 +1,83 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 04 Aug 2017 17:54:27 +0300
-Subject: [PATCH v3 3/6] dt-bindings: add binding for Sitronix ST7586
- display panels
-In-Reply-To: <1501799630-1650-4-git-send-email-david@lechnology.com>
-References: <1501799630-1650-1-git-send-email-david@lechnology.com>
- <1501799630-1650-4-git-send-email-david@lechnology.com>
-Message-ID: <2434051.fAH1OaXNrL@avalon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 4 Aug 2017 15:58:35 +0100
+Subject: [PATCH 1/2] perf/aux: Make aux_{head, wakeup} ring_buffer members
+ long
+In-Reply-To: <87ini8uci6.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1501260863-14687-1-git-send-email-will.deacon@arm.com>
+ <87ini8uci6.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20170804145835.GB6780@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
-
-Thank you for the patch.
-
-On Thursday 03 Aug 2017 17:33:47 David Lechner wrote:
-> This adds a new binding for Sitronix ST7586 display panels.
+On Mon, Jul 31, 2017 at 01:28:01PM +0300, Alexander Shishkin wrote:
+> Will Deacon <will.deacon@arm.com> writes:
 > 
-> Using lego as the vendor prefix in the compatible string because the display
-> panel I am working with is an integral part of the LEGO MINDSTORMS EV3.
+> > The aux_head and aux_wakeup members of struct ring_buffer are defined
+> > using the local_t type, despite the fact that they are only accessed via
+> > the perf_aux_output_* functions, which cannot race with each other for a
+> > given ring buffer.
+> >
+> > This patch changes the type of the members to long, so we can avoid
+> > using the local_* API where it isn't needed.
 > 
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
->  .../bindings/display/sitronix,st7586.txt           | 26 +++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644
-> Documentation/devicetree/bindings/display/sitronix,st7586.txt
+> Thanks for digging this up! Some minor nits below.
 > 
-> diff --git a/Documentation/devicetree/bindings/display/sitronix,st7586.txt
-> b/Documentation/devicetree/bindings/display/sitronix,st7586.txt new file
-> mode 100644
-> index 0000000..dfb0b7b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
-> @@ -0,0 +1,26 @@
-> +Sitronix ST7586 display panel
-> +
-> +Required properties:
-> +- compatible:	"lego,ev3-lcd".
-> +
-> +The node for this driver must be a child node of a SPI controller, hence
-> +all mandatory properties described in ../spi/spi-bus.txt must be specified.
-> +
-> +Optional properties:
-> +- dc-gpios:	D/C pin. The presence/absence of this GPIO determines
-> +		the panel interface operation mode (IF[3:1] pins):
-> +		- present: IF=011 4-wire 8-bit data serial interface
-> +		- absent:  IF=010 3-wire 9-bit data serial interface
+> > @@ -434,12 +434,12 @@ void perf_aux_output_end(struct perf_output_handle *handle, unsigned long size)
+> >  		handle->aux_flags |= PERF_AUX_FLAG_OVERWRITE;
+> >  
+> >  		aux_head = handle->head;
+> > -		local_set(&rb->aux_head, aux_head);
+> > +		rb->aux_head = aux_head;
+> >  	} else {
+> >  		handle->aux_flags &= ~PERF_AUX_FLAG_OVERWRITE;
+> >  
+> > -		aux_head = local_read(&rb->aux_head);
+> > -		local_add(size, &rb->aux_head);
+> > +		aux_head = rb->aux_head;
+> > +		rb->aux_head += size;
+> >  	}
+> >  
+> >  	if (size || handle->aux_flags) {
+> > @@ -451,11 +451,11 @@ void perf_aux_output_end(struct perf_output_handle *handle, unsigned long size)
+> >  		                     handle->aux_flags);
+> >  	}
+> >  
+> > -	aux_head = rb->user_page->aux_head = local_read(&rb->aux_head);
+> > +	aux_head = rb->user_page->aux_head = rb->aux_head;
+> >  
+> > -	if (aux_head - local_read(&rb->aux_wakeup) >= rb->aux_watermark) {
+> > +	if (aux_head - rb->aux_wakeup >= rb->aux_watermark) {
+> 
+> Can't we just do away with aux_head here:
+> 
+>   rb->user_page->aux_head = rb->aux_head;
+>   if (rb->aux_head - rb->aux_wakeup >= rb->aux_watermark) { ...
+> 
+> ?
+> 
+> > @@ -485,14 +485,13 @@ int perf_aux_output_skip(struct perf_output_handle *handle, unsigned long size)
+> >  	if (size > handle->size)
+> >  		return -ENOSPC;
+> >  
+> > -	local_add(size, &rb->aux_head);
+> > +	rb->aux_head += size;
+> >  
+> > -	aux_head = rb->user_page->aux_head = local_read(&rb->aux_head);
+> > -	if (aux_head - local_read(&rb->aux_wakeup) >= rb->aux_watermark) {
+> > +	aux_head = rb->user_page->aux_head = rb->aux_head;
+> > +	if (aux_head - rb->aux_wakeup >= rb->aux_watermark) {
+> >  		perf_output_wakeup(handle);
+> > -		local_add(rb->aux_watermark, &rb->aux_wakeup);
+> > -		handle->wakeup = local_read(&rb->aux_wakeup) +
+> > -				 rb->aux_watermark;
+> > +		rb->aux_wakeup += rb->aux_watermark;
+> > +		handle->wakeup = rb->aux_wakeup + rb->aux_watermark;
+> >  	}
+> >  
+> >  	handle->head = aux_head;
+> 
+> And here I think we don't need aux_head at all.
 
-How does this work ? Do you have a single GPIO on your system connected to 
-IF[1], with IF[3:2] hardwired to 01 ?
+Agreed on both counts. Will fix for v2.
 
-> +- reset-gpios:	Reset pin
-> +- power-supply:	A regulator node for the supply voltage.
-> +- backlight:	phandle of the backlight device attached to the panel
-> +- rotation:	panel rotation in degrees counter clockwise (0,90,180,270)
-
-Please use the OF graph DT bindings (a.k.a. ports) to describe the connection 
-between the panel and its source.
-
-> +Example:
-> +	display at 0{
-> +		compatible = "lego,ev3-lcd";
-> +		reg = <0>;
-> +		spi-max-frequency = <10000000>;
-> +		dc-gpios = <&gpio 43 GPIO_ACTIVE_HIGH>;
-> +		reset-gpios = <&gpio 80 GPIO_ACTIVE_HIGH>;
-> +	};
-
--- 
-Regards,
-
-Laurent Pinchart
+Will
