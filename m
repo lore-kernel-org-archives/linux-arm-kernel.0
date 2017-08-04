@@ -1,81 +1,59 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Aug 2017 16:25:42 +0100
-Subject: [PATCH 5/6] arm64: Implement pmem API support
-In-Reply-To: <ba8c28bcffc3bc856163441793bb4ef0fefa0f75.1500397441.git.robin.murphy@arm.com>
-References: <cover.1500397441.git.robin.murphy@arm.com>
- <ba8c28bcffc3bc856163441793bb4ef0fefa0f75.1500397441.git.robin.murphy@arm.com>
-Message-ID: <20170804152542.7h3mbyxnhjwroddc@armageddon.cambridge.arm.com>
+From: douly.fnst@cn.fujitsu.com (Dou Liyang)
+Date: Fri, 4 Aug 2017 23:28:36 +0800
+Subject: [PATCH 01/11] arm64: numa: Remove the unused parent_node() macro
+In-Reply-To: <20170804133017.GD15287@arm.com>
+References: <1501076076-1974-1-git-send-email-douly.fnst@cn.fujitsu.com>
+ <1501076076-1974-2-git-send-email-douly.fnst@cn.fujitsu.com>
+ <20170804133017.GD15287@arm.com>
+Message-ID: <0e088b13-12eb-3bf6-696d-9fdd79e96670@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two minor comments below.
+Hi will,
 
-On Tue, Jul 25, 2017 at 11:55:42AM +0100, Robin Murphy wrote:
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -960,6 +960,17 @@ config ARM64_UAO
->  	  regular load/store instructions if the cpu does not implement the
->  	  feature.
->  
-> +config ARM64_PMEM
-> +	bool "Enable support for persistent memory"
-> +	select ARCH_HAS_PMEM_API
-> +	help
-> +	  Say Y to enable support for the persistent memory API based on the
-> +	  ARMv8.2 DCPoP feature.
-> +
-> +	  The feature is detected at runtime, and the kernel will use DC CVAC
-> +	  operations if DC CVAP is not supported (following the behaviour of
-> +	  DC CVAP itself if the system does not define a point of persistence).
+At 08/04/2017 09:30 PM, Will Deacon wrote:
+> On Wed, Jul 26, 2017 at 09:34:26PM +0800, Dou Liyang wrote:
+>> Commit a7be6e5a7f8d ("mm: drop useless local parameters of
+>> __register_one_node()") removes the last user of parent_node().
+>>
+>> The parent_node() macro in ARM64 platform is unnecessary.
+>>
+>> Remove it for cleanup.
+>>
+>> Reported-by: Michael Ellerman <mpe@ellerman.id.au>
+>> Signed-off-by: Dou Liyang <douly.fnst@cn.fujitsu.com>
+>> Cc: Michael Ellerman <mpe@ellerman.id.au>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> ---
+>>  arch/arm64/include/asm/numa.h | 3 ---
+>>  1 file changed, 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
+>> index bf466d1..ef7b238 100644
+>> --- a/arch/arm64/include/asm/numa.h
+>> +++ b/arch/arm64/include/asm/numa.h
+>> @@ -7,9 +7,6 @@
+>>
+>>  #define NR_NODE_MEMBLKS		(MAX_NUMNODES * 2)
+>>
+>> -/* currently, arm64 implements flat NUMA topology */
+>> -#define parent_node(node)	(node)
+>> -
+>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> Where you intending for this to go via the arm64 tree?
+>
 
-Any reason not to have this default y?
+I intend for this to go to upstream tree. shall we?
 
-> --- a/arch/arm64/mm/cache.S
-> +++ b/arch/arm64/mm/cache.S
-> @@ -172,6 +172,20 @@ ENDPIPROC(__clean_dcache_area_poc)
->  ENDPROC(__dma_clean_area)
->  
->  /*
-> + *	__clean_dcache_area_pop(kaddr, size)
-> + *
-> + * 	Ensure that any D-cache lines for the interval [kaddr, kaddr+size)
-> + * 	are cleaned to the PoP.
-> + *
-> + *	- kaddr   - kernel address
-> + *	- size    - size in question
-> + */
-> +ENTRY(__clean_dcache_area_pop)
-> +	dcache_by_line_op cvap, sy, x0, x1, x2, x3
-> +	ret
-> +ENDPIPROC(__clean_dcache_area_pop)
-> +
-> +/*
->   *	__dma_flush_area(start, size)
->   *
->   *	clean & invalidate D / U line
-> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-> index a682a0a2a0fa..a461a00ceb3e 100644
-> --- a/arch/arm64/mm/pageattr.c
-> +++ b/arch/arm64/mm/pageattr.c
-> @@ -183,3 +183,21 @@ bool kernel_page_present(struct page *page)
->  }
->  #endif /* CONFIG_HIBERNATION */
->  #endif /* CONFIG_DEBUG_PAGEALLOC */
-> +
-> +#ifdef CONFIG_ARCH_HAS_PMEM_API
-> +#include <asm/cacheflush.h>
-> +
-> +static inline void arch_wb_cache_pmem(void *addr, size_t size)
-> +{
-> +	/* Ensure order against any prior non-cacheable writes */
-> +	dmb(sy);
-> +	__clean_dcache_area_pop(addr, size);
-> +}
+Thanks
 
-Could we keep the dmb() in the actual __clean_dcache_area_pop()
-implementation?
+	dou.
 
-I can do the changes myself if you don't have any objections.
 
--- 
-Catalin
+> Will
+>
+>
+>
