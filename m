@@ -1,145 +1,91 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Fri, 4 Aug 2017 11:15:38 +0530
-Subject: [v4 1/2] dt-bindings: gpio: davinci: Add keystone-k2g compatible
-Message-ID: <1501825539-19110-1-git-send-email-j-keerthy@ti.com>
+Date: Fri, 4 Aug 2017 11:15:39 +0530
+Subject: [v4 2/2] ARM: dts: keystone-k2g: Add gpio nodes
+In-Reply-To: <1501825539-19110-1-git-send-email-j-keerthy@ti.com>
+References: <1501825539-19110-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1501825539-19110-2-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds keystone-k2g compatible, specific properties and
-an example. The patch also adds the details of supported SoCs
-for each compatible.
+66AK2G has 2 instances of gpio. The first one has all the 144 GPIOs
+functional. 9 banks with 16 gpios making a total of 144. The second
+instance has only the GPIO0:GPIO67 functional and rest are marked
+reserved.
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 
 Changes in v4:
 
-  * Changed documentation links.
-  * Added Rob's Ack.
-  * Replaced keystone-k2g with 66AK2G
-  * Corrected the $Subject
-  * Changed compatible to ti,k2g-gpio
+  * Couple of rephrasing in the commit log.
+  * Changed compatible to ti,k2g-gpio.
 
-Changes in v3:
+Changes in v2:
 
-  * Added details about family of SoCs corresponding to compatibles.
+  * Split the documentation part into a separate patch.
 
- .../devicetree/bindings/gpio/gpio-davinci.txt      | 91 +++++++++++++++++++++-
- 1 file changed, 89 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/keystone-k2g.dtsi | 42 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-index 5079ba7..5ad08b2 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-@@ -1,7 +1,10 @@
- Davinci/Keystone GPIO controller bindings
+diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+index bf4d1fa..4eb1ba8 100644
+--- a/arch/arm/boot/dts/keystone-k2g.dtsi
++++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+@@ -15,6 +15,7 @@
  
- Required Properties:
--- compatible: should be "ti,dm6441-gpio", "ti,keystone-gpio"
-+- compatible: should be "ti,dm6441-gpio": for Davinci da850 SoCs
-+			"ti,keystone-gpio": for Keystone 2 66AK2H/K, 66AK2L,
-+						66AK2E SoCs
-+			"ti,k2g-gpio", "ti,keystone-gpio": for 66AK2G
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/pinctrl/keystone.h>
++#include <dt-bindings/gpio/gpio.h>
  
- - reg: Physical base address of the controller and the size of memory mapped
-        registers.
-@@ -20,7 +23,21 @@ Required Properties:
- - ti,ngpio: The number of GPIO pins supported.
- 
- - ti,davinci-gpio-unbanked: The number of GPIOs that have an individual interrupt
--		             line to processor.
-+		            line to processor.
+ / {
+ 	compatible = "ti,k2g","ti,keystone";
+@@ -168,5 +169,46 @@
+ 				#reset-cells = <2>;
+ 			};
+ 		};
 +
-+- clocks: Should contain the device's input clock, and should be defined as per
-+          the appropriate clock bindings consumer usage in,
++		gpio0: gpio at 2603000 {
++			compatible = "ti,k2g-gpio", "ti,keystone-gpio";
++			reg = <0x02603000 0x100>;
++			gpio-controller;
++			#gpio-cells = <2>;
 +
-+          Documentation/devicetree/bindings/clock/keystone-gate.txt
-+                            for 66AK2HK/66AK2L/66AK2E SoCs or,
++			interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			ti,ngpio = <144>;
++			ti,davinci-gpio-unbanked = <0>;
++			clocks = <&k2g_clks 0x001b 0x0>;
++			clock-names = "gpio";
++		};
 +
-+          Documentation/devicetree/bindings/clock/ti,sci-clk.txt
-+                            for 66AK2G SoCs
-+
-+- clock-names: Name should be "gpio";
-+
-+Currently clock-names and clocks are needed for all keystone 2 platforms
-+Davinci platforms do not have DT clocks as of now.
- 
- The GPIO controller also acts as an interrupt controller. It uses the default
- two cells specifier as described in Documentation/devicetree/bindings/
-@@ -60,3 +77,73 @@ leds {
- 		...
++		gpio1: gpio at 260a000 {
++			compatible = "ti,k2g-gpio", "ti,keystone-gpio";
++			reg = <0x0260a000 0x100>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupts = <GIC_SPI 442 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 443 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 444 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 445 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 446 IRQ_TYPE_EDGE_RISING>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			ti,ngpio = <68>;
++			ti,davinci-gpio-unbanked = <0>;
++			clocks = <&k2g_clks 0x001c 0x0>;
++			clock-names = "gpio";
++		};
  	};
  };
-+
-+Example for 66AK2G:
-+
-+gpio0: gpio at 2603000 {
-+	compatible = "ti,k2g-gpio", "ti,keystone-gpio";
-+	reg = <0x02603000 0x100>;
-+	gpio-controller;
-+	#gpio-cells = <2>;
-+	interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
-+	interrupt-controller;
-+	#interrupt-cells = <2>;
-+	ti,ngpio = <144>;
-+	ti,davinci-gpio-unbanked = <0>;
-+	clocks = <&k2g_clks 0x001b 0x0>;
-+	clock-names = "gpio";
-+};
-+
-+Example for 66AK2HK/66AK2L/66AK2E:
-+
-+gpio0: gpio at 260bf00 {
-+	compatible = "ti,keystone-gpio";
-+	reg = <0x0260bf00 0x100>;
-+	gpio-controller;
-+	#gpio-cells = <2>;
-+	/* HW Interrupts mapped to GPIO pins */
-+	interrupts = <GIC_SPI 120 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 121 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 122 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 123 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 124 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 125 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 126 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 127 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 128 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 129 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 130 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 131 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 132 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 133 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 134 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 135 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 136 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 137 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 138 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 139 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 140 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 141 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 142 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 143 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 144 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 145 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 146 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 147 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 148 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 149 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 150 IRQ_TYPE_EDGE_RISING>,
-+			<GIC_SPI 151 IRQ_TYPE_EDGE_RISING>;
-+			clocks = <&clkgpio>;
-+	clock-names = "gpio";
-+	ti,ngpio = <32>;
-+	ti,davinci-gpio-unbanked = <32>;
-+};
 -- 
 1.9.1
