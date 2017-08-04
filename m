@@ -1,22 +1,39 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 4 Aug 2017 11:59:59 +0200
-Subject: [PATCH 0/2] iommu/omap: Rework cache functionality with DMA
- Streaming API
-In-Reply-To: <1501274954-20973-1-git-send-email-j-albarran@ti.com>
-References: <1501274954-20973-1-git-send-email-j-albarran@ti.com>
-Message-ID: <20170804095959.GB17443@8bytes.org>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 4 Aug 2017 12:04:29 +0200
+Subject: [PATCH] dt-bindings: watchdog: mediatek: add support for MediaTek
+ MT7623 and MT7622 SoC
+In-Reply-To: <b0058a0a9f948f17edf3c1a476665c715922ebc3.1501830388.git.sean.wang@mediatek.com>
+References: <b0058a0a9f948f17edf3c1a476665c715922ebc3.1501830388.git.sean.wang@mediatek.com>
+Message-ID: <b6014dc9-405f-49a2-a9d2-674090c58179@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 03:49:12PM -0500, Josue Albarran wrote:
-> Fernando Guzman Lugo (1):
->   iommu/omap: Fix disabling of MMU upon a fault
-> 
-> Josue Albarran (1):
->   iommu/omap: Use DMA-API for performing cache flushes
-> 
->  drivers/iommu/omap-iommu.c | 125 +++++++++++++++++++++++++++++----------------
->  drivers/iommu/omap-iommu.h |   1 +
->  2 files changed, 81 insertions(+), 45 deletions(-)
 
-Applied, thanks.
+
+On 08/04/2017 09:14 AM, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> This updates dt-binding documentation for MediaTek MT7622 and
+> MT7623 SoC. For the both SoCs supported all rely on the fallback
+> binding of the case with "mediatek,mt6589-wdt".
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>   Documentation/devicetree/bindings/watchdog/mtk-wdt.txt | 2 ++
+>   1 file changed, 2 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+> index 6a00939..096bbfb 100644
+> --- a/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/mtk-wdt.txt
+> @@ -4,6 +4,8 @@ Required properties:
+>   
+>   - compatible should contain:
+>   	* "mediatek,mt2701-wdt" for MT2701 compatible watchdog timers
+> +	* "mediatek,mt7622-wdt", "mediatek,mt6589-wdt": for MT7622
+> +	* "mediatek,mt7623-wdt", "mediatek,mt6589-wdt": for MT7623
+>   	* "mediatek,mt6589-wdt" for all compatible watchdog timers (MT2701,
+>   		MT6589)
+>   
+
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
