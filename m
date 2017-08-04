@@ -1,59 +1,73 @@
-From: douly.fnst@cn.fujitsu.com (Dou Liyang)
-Date: Fri, 4 Aug 2017 23:28:36 +0800
-Subject: [PATCH 01/11] arm64: numa: Remove the unused parent_node() macro
-In-Reply-To: <20170804133017.GD15287@arm.com>
-References: <1501076076-1974-1-git-send-email-douly.fnst@cn.fujitsu.com>
- <1501076076-1974-2-git-send-email-douly.fnst@cn.fujitsu.com>
- <20170804133017.GD15287@arm.com>
-Message-ID: <0e088b13-12eb-3bf6-696d-9fdd79e96670@cn.fujitsu.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri,  4 Aug 2017 17:32:32 +0200
+Subject: [PATCH v2] ARM64: dts: marvell: add NAND support on the CP110
+Message-ID: <20170804153232.10686-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi will,
+The NAND controller used in A7K/A8K is present on the CP110. It is
+compatible with the pxa-nand driver.
 
-At 08/04/2017 09:30 PM, Will Deacon wrote:
-> On Wed, Jul 26, 2017 at 09:34:26PM +0800, Dou Liyang wrote:
->> Commit a7be6e5a7f8d ("mm: drop useless local parameters of
->> __register_one_node()") removes the last user of parent_node().
->>
->> The parent_node() macro in ARM64 platform is unnecessary.
->>
->> Remove it for cleanup.
->>
->> Reported-by: Michael Ellerman <mpe@ellerman.id.au>
->> Signed-off-by: Dou Liyang <douly.fnst@cn.fujitsu.com>
->> Cc: Michael Ellerman <mpe@ellerman.id.au>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> ---
->>  arch/arm64/include/asm/numa.h | 3 ---
->>  1 file changed, 3 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
->> index bf466d1..ef7b238 100644
->> --- a/arch/arm64/include/asm/numa.h
->> +++ b/arch/arm64/include/asm/numa.h
->> @@ -7,9 +7,6 @@
->>
->>  #define NR_NODE_MEMBLKS		(MAX_NUMNODES * 2)
->>
->> -/* currently, arm64 implements flat NUMA topology */
->> -#define parent_node(node)	(node)
->> -
->
-> Acked-by: Will Deacon <will.deacon@arm.com>
->
-> Where you intending for this to go via the arm64 tree?
->
+However, due to the limiation of the pins available this controller is
+only usable on the CPM for A7K and on the CPS for A8K.
 
-I intend for this to go to upstream tree. shall we?
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 15 +++++++++++++++
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 15 +++++++++++++++
+ 2 files changed, 30 insertions(+)
 
-Thanks
-
-	dou.
-
-
-> Will
->
->
->
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+index 5586a732e1be..8b019a9f4f59 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+@@ -249,6 +249,21 @@
+ 				status = "disabled";
+ 			};
+ 
++			cpm_nand: nand at 720000 {
++				/*
++				 * Due to the limiation of the pin available
++				 * this controller is only usable on the CPM
++				 * for A7K and on the CPS for A8K.
++				 */
++				compatible = "marvell,armada370-nand";
++				reg = <0x720000 0x54>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				interrupts = <ICU_GRP_NSR 115 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&cpm_clk 1 2>;
++				status = "disabled";
++			};
++
+ 			cpm_trng: trng at 760000 {
+ 				compatible = "marvell,armada-8k-rng", "inside-secure,safexcel-eip76";
+ 				reg = <0x760000 0x7d>;
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index 4be43f1f5aa2..7c1100133731 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -250,6 +250,21 @@
+ 				status = "disabled";
+ 			};
+ 
++			cps_nand: nand at 720000 {
++				/*
++				 * Due to the limiation of the pin available
++				 * this controller is only usable on the CPM
++				 * for A7K and on the CPS for A8K.
++				 */
++				compatible = "marvell,armada370-nand";
++				reg = <0x720000 0x54>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				interrupts = <ICU_GRP_NSR 115 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&cps_clk 1 2>;
++				status = "disabled";
++			};
++
+ 			cps_trng: trng at 760000 {
+ 				compatible = "marvell,armada-8k-rng", "inside-secure,safexcel-eip76";
+ 				reg = <0x760000 0x7d>;
+-- 
+2.13.2
