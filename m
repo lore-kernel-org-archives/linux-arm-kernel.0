@@ -1,61 +1,29 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri,  4 Aug 2017 13:01:25 +0900
-Subject: [PATCH] pinctrl: uniphier: widen all pinconf-derived arguments to u32
-Message-ID: <1501819285-12827-1-git-send-email-yamada.masahiro@socionext.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 4 Aug 2017 12:09:22 +0800
+Subject: [linux-sunxi] [PATCH 05/10] clk: sunxi-ng: h3: gate then ungate
+ PLL CPU clk after rate change
+In-Reply-To: <CAGb2v66jK+iAbKVsv6=4tb0470KBdwU+AHjWDnWwKKTY+U+W6g@mail.gmail.com>
+References: <20170723102749.17323-1-icenowy@aosc.io>
+ <20170723102749.17323-6-icenowy@aosc.io>
+ <CAGb2v66jK+iAbKVsv6=4tb0470KBdwU+AHjWDnWwKKTY+U+W6g@mail.gmail.com>
+Message-ID: <CAGb2v67LWirnWuQzzkNx4MU6Z-pERJBr6vcVfdoddFwLC=FXoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 58957d2edfa1 ("pinctrl: Widen the generic pinconf argument
-from 16 to 24 bits"), the generic pinconf arguments are handled by u32.
+On Wed, Jul 26, 2017 at 3:14 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Sun, Jul 23, 2017 at 6:27 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>> From: Chen-Yu Tsai <wens@csie.org>
+>>
+>> This patch utilizes the new PLL clk notifier to gate then ungate the
+>> PLL CPU clock after rate changes. This should prevent any system hangs
+>> resulting from cpufreq changes to the clk.
+>>
+>> Reported-by: Ondrej Jirman <megous@megous.com>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> Tested-by: Icenowy Zheng <icenowy@aosc.io>
+>
+> This is missing
+>
+> Fixes: 0577e4853bfb ("clk: sunxi-ng: Add H3 clocks")
 
-UniPhier pinctrl drivers do not support debouncing, so u16 is working,
-but align the argument type to u32 for consistency.
-
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- drivers/pinctrl/uniphier/pinctrl-uniphier-core.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-index 5d8c9efd8135..f9267fabe6b0 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-@@ -198,7 +198,7 @@ static int uniphier_conf_pin_bias_get(struct pinctrl_dev *pctldev,
- }
- 
- static int uniphier_conf_pin_drive_get(struct pinctrl_dev *pctldev,
--				       unsigned int pin, u16 *strength)
-+				       unsigned int pin, u32 *strength)
- {
- 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
- 	const struct pin_desc *desc = pin_desc_get(pctldev, pin);
-@@ -289,7 +289,7 @@ static int uniphier_conf_pin_config_get(struct pinctrl_dev *pctldev,
- {
- 	enum pin_config_param param = pinconf_to_config_param(*configs);
- 	bool has_arg = false;
--	u16 arg;
-+	u32 arg;
- 	int ret;
- 
- 	switch (param) {
-@@ -393,7 +393,7 @@ static int uniphier_conf_pin_bias_set(struct pinctrl_dev *pctldev,
- }
- 
- static int uniphier_conf_pin_drive_set(struct pinctrl_dev *pctldev,
--				       unsigned int pin, u16 strength)
-+				       unsigned int pin, u32 strength)
- {
- 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
- 	const struct pin_desc *desc = pin_desc_get(pctldev, pin);
-@@ -454,7 +454,7 @@ static int uniphier_conf_pin_drive_set(struct pinctrl_dev *pctldev,
- }
- 
- static int uniphier_conf_pin_input_enable(struct pinctrl_dev *pctldev,
--					  unsigned int pin, u16 enable)
-+					  unsigned int pin, u32 enable)
- {
- 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
- 	const struct pin_desc *desc = pin_desc_get(pctldev, pin);
--- 
-2.7.4
+Applied for 4.14 with the Fixes tag and Stephen's ack.
