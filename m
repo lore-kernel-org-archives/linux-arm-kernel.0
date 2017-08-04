@@ -1,66 +1,23 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 4 Aug 2017 11:04:55 +0100
-Subject: [PATCH] arm:lpae: build TTB control register value from scratch
- in v7_ttb_setup
-In-Reply-To: <1501826879.28554.47.camel@gmail.com>
-References: <1497232084-31907-1-git-send-email-hoeun.ryu@gmail.com>
- <1501826879.28554.47.camel@gmail.com>
-Message-ID: <2618aca3-c638-1496-7dbe-f865a17b1fbd@arm.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 4 Aug 2017 12:06:33 +0200
+Subject: [PATCH v3 0/4] Add larbid init routine for mediatek's gen1 smi
+ larb driver
+In-Reply-To: <1501810348-20997-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1501810348-20997-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <20170804100632.GC17443@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/08/17 07:07, Hoeun Ryu wrote:
-> Hello, Russell King.
+On Fri, Aug 04, 2017 at 09:32:24AM +0800, honghui.zhang at mediatek.com wrote:
+> Honghui Zhang (4):
+>   memory: mtk-smi: Use of_device_get_match_data helper
+>   memory: mtk-smi: add larbid handle routine
+>   dt-bindings: mediatek: add descriptions for larbid
+>   arm: dts: mediatek: add larbid property for larb
 > 
-> The following patch has not merged yet.
-> Do you have a plan to accept and merge this patch ?
+>  .../memory-controllers/mediatek,smi-larb.txt       | 15 +++++++++++++
+>  arch/arm/boot/dts/mt2701.dtsi                      |  3 +++
+>  drivers/memory/mtk-smi.c                           | 26 ++++++++++++----------
+>  3 files changed, 32 insertions(+), 12 deletions(-)
 
-This should probably go through the ARM tree, so please submit it to
-Russell's patch-tracking system here:
-
-http://www.armlinux.org.uk/developer/patches/
-
-Robin.
-
-> 
-> Thank you.
-> 
-> On Mon, 2017-06-12 at 10:47 +0900, Hoeun Ryu wrote:
->>  Reading TTBCR in early boot stage might return the value of the previous
->> kernel's configuration, especially in case of kexec. For example, if
->> normal kernel (first kernel) had run on a configuration of PHYS_OFFSET <=
->> PAGE_OFFSET and crash kernel (second kernel) is running on a configuration
->> PHYS_OFFSET > PAGE_OFFSET, which can happen because it depends on the
->> reserved area for crash kernel, reading TTBCR and using the value to OR
->> other bit fields might be risky because it doesn't have a reset value for
->> TTBCR.
->>
->> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
->> Suggested-by: Robin Murphy <robin.murphy@arm.com>
->> Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
->>
->> ---
->>
->>  * add Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
->>  * v1: amended based on
->>      - "[PATCHv2] arm: LPAE: kexec: clear TTBCR.T1SZ explicitly when
->>         PHYS_OFFSET > PAGE_OFFSET"
->>      - https://lkml.org/lkml/2017/6/5/239
->>
->>  arch/arm/mm/proc-v7-3level.S | 3 +--
->>  1 file changed, 1 insertion(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
->> index 5e5720e..7d16bbc 100644
->> --- a/arch/arm/mm/proc-v7-3level.S
->> +++ b/arch/arm/mm/proc-v7-3level.S
->> @@ -129,8 +129,7 @@ ENDPROC(cpu_v7_set_pte_ext)
->>  	.macro	v7_ttb_setup, zero, ttbr0l, ttbr0h, ttbr1, tmp
->>  	ldr	\tmp, =swapper_pg_dir		@ swapper_pg_dir virtual address
->>  	cmp	\ttbr1, \tmp, lsr #12		@ PHYS_OFFSET > PAGE_OFFSET?
->> -	mrc	p15, 0, \tmp, c2, c0, 2		@ TTB control egister
->> -	orr	\tmp, \tmp, #TTB_EAE
->> +	mov	\tmp, #TTB_EAE			@ for TTB control egister
->>  	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP)
->>  	ALT_UP(orr	\tmp, \tmp, #TTB_FLAGS_UP)
->>  	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP << 16)
+Applied, thanks.
