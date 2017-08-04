@@ -1,30 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 4 Aug 2017 13:23:06 +0200
-Subject: [GIT PULL] DaVinci fixes for v4.13
-In-Reply-To: <6dc06dd1-0d7b-1988-d5c9-9cfafcf847f3@ti.com>
-References: <6dc06dd1-0d7b-1988-d5c9-9cfafcf847f3@ti.com>
-Message-ID: <CAK8P3a32iCexgo=ivt-dugSLDDS3WWOyVQ1duNy5tjojOGYPDQ@mail.gmail.com>
+Date: Fri, 4 Aug 2017 13:23:32 +0200
+Subject: [GIT PULL] Allwinner fixes for 4.13
+In-Reply-To: <20170727183804.wzof76mcek7frigk@flea.lan>
+References: <20170727145453.il2nepmrrr355fgp@wens.csie.org>
+ <20170727183804.wzof76mcek7frigk@flea.lan>
+Message-ID: <CAK8P3a1O5=a1=WMJ4e+4dZaD2QObj7RNdCK1jcO3g31AKp-TVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 27, 2017 at 1:23 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> The following changes since commit 520eccdfe187591a51ea9ab4c1a024ae4d0f68d9:
+On Thu, Jul 27, 2017 at 8:38 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Arnd, Olof,
 >
->   Linux 4.13-rc2 (2017-07-23 16:15:17 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.13
->
-> for you to fetch changes up to 6ea57ad6b9526f8106d0bf410b41a7223462ff89:
->
->   ARM: dts: da850-lcdk: drop unused VPIF endpoints (2017-07-27 16:29:44 +0530)
->
-> ----------------------------------------------------------------
-> Drop unused VPIF endpoints from device-tree.
-> They should be used only when an actual
-> remote-endpoint is connected.
+> On Thu, Jul 27, 2017 at 10:54:53PM +0800, Chen-Yu Tsai wrote:
+>> I will be handling some of the pull requests this cycle.
+>> Here are some fixes we would like merged for 4.13.
 
-Pulled into fixes, thanks!
+Pulled into fixes now.
+
+> As you might have noticed, Chen-Yu has been a co-maintainer for the
+> Allwinner stuff. He will handle most (if not all) the pull requests
+> for this cycle, so you should expect to see more PR's from him.
+
+Ok.
+
+Thanks,
 
        Arnd
