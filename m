@@ -1,199 +1,66 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Fri, 4 Aug 2017 15:20:21 +0200
-Subject: [PATCH v3 2/6] drm/tinydrm: generalize tinydrm_xrgb8888_to_gray8()
-In-Reply-To: <e53e6ff2-ae9b-a710-a9f4-410992c29a66@tronnes.org>
-References: <1501799630-1650-1-git-send-email-david@lechnology.com>
- <1501799630-1650-3-git-send-email-david@lechnology.com>
- <e53e6ff2-ae9b-a710-a9f4-410992c29a66@tronnes.org>
-Message-ID: <9713028d-ac77-40d6-fe62-9be2e9a5dd28@tronnes.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 4 Aug 2017 14:21:52 +0100
+Subject: [PATCH 0/5] Simplify kernel-mode NEON
+In-Reply-To: <20170804131211.2wn2zi74kuzuwneo@armageddon.cambridge.arm.com>
+References: <1501777403-9782-1-git-send-email-Dave.Martin@arm.com>
+ <20170804120858.ff3772f3zzik37pp@armageddon.cambridge.arm.com>
+ <20170804122225.jiceb2vbgrld2y7z@armageddon.cambridge.arm.com>
+ <CAKv+Gu-YG1EbpvaL46T0fzD=RZ7itqizrH=AkYAN1YmTupmKGw@mail.gmail.com>
+ <20170804131211.2wn2zi74kuzuwneo@armageddon.cambridge.arm.com>
+Message-ID: <CAKv+Gu_va4hD-MztzRUhXxTwqnbKcmOmV8NN9j+TG8_jWA0wNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Den 04.08.2017 09.27, skrev Noralf Tr?nnes:
->
-> Den 04.08.2017 00.33, skrev David Lechner:
->> This adds parameters for vaddr and clip to 
->> tinydrm_xrgb8888_to_gray8() to
->> make it more generic.
+On 4 August 2017 at 14:12, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Fri, Aug 04, 2017 at 01:25:03PM +0100, Ard Biesheuvel wrote:
+>> On 4 August 2017 at 13:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Fri, Aug 04, 2017 at 01:08:58PM +0100, Catalin Marinas wrote:
+>> >> On Thu, Aug 03, 2017 at 05:23:18PM +0100, Dave P Martin wrote:
+>> >> > This series depends on Ard's v4.14 crypto rework [2].
+>> > [...]
+>> >> > [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-July/520664.html
+>> > [...]
+>> >> > Ard Biesheuvel (1):
+>> >> >   arm64: neon: replace generic definition of may_use_simd()
+>> >> >
+>> >> > Dave Martin (4):
+>> >> >   arm64: neon: Add missing header guard in <asm/neon.h>
+>> >> >   arm64: fpsimd: Consistently use __this_cpu_ ops where appropriate
+>> >> >   arm64: neon: Allow EFI runtime services to use FPSIMD in irq context
+>> >> >   arm64: neon: Remove support for nested or hardirq kernel-mode NEON
+>> >>
+>> >> Queued for 4.14. Thanks.
+>> >
+>> > ... and reverted.
+>> >
+>> > I now realised that it doesn't build without Ard's crypto series (I had
+>> > the wrong impression it is just a performance impact). I get errors
+>> > like:
+>> >
+>> > arch/arm64/crypto/sha1-ce-glue.c|41 col 2| error: implicit declaration
+>> > of function ?kernel_neon_begin_partial?
 >>
->> dma_buf_{begin,end}_cpu_access() are moved out to the repaper driver.
+>> Ah yes. Apologies for failing to mention that. Apparently, there are
+>> in fact build time cross-dependencies that I forgot about.
 >>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
->>   drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c | 35 
->> ++++++++++----------------
->>   drivers/gpu/drm/tinydrm/repaper.c              | 21 +++++++++++++++-
->>   include/drm/tinydrm/tinydrm-helpers.h          |  3 ++-
->>   3 files changed, 35 insertions(+), 24 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c 
->> b/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c
->> index 75808bb..5915ba8 100644
->> --- a/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c
->> +++ b/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c
->> @@ -185,7 +185,9 @@ EXPORT_SYMBOL(tinydrm_xrgb8888_to_rgb565);
->>   /**
->>    * tinydrm_xrgb8888_to_gray8 - Convert XRGB8888 to grayscale
->>    * @dst: 8-bit grayscale destination buffer
->> + * @vaddr: XRGB8888 source buffer
->>    * @fb: DRM framebuffer
->> + * @clip: Clip rectangle area to copy
->>    *
->>    * Drm doesn't have native monochrome or grayscale support.
->>    * Such drivers can announce the commonly supported XR24 format to 
->> userspace
->> @@ -199,12 +201,11 @@ EXPORT_SYMBOL(tinydrm_xrgb8888_to_rgb565);
->>    * Returns:
->>    * Zero on success, negative error code on failure.
->>    */
->> -int tinydrm_xrgb8888_to_gray8(u8 *dst, struct drm_framebuffer *fb)
->> +int tinydrm_xrgb8888_to_gray8(u8 *dst, void *vaddr, struct 
->> drm_framebuffer *fb,
->> +                  struct drm_clip_rect *clip)
->>   {
->> -    struct drm_gem_cma_object *cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
->> -    struct dma_buf_attachment *import_attach = 
->> cma_obj->base.import_attach;
->> -    unsigned int x, y, pitch = fb->pitches[0];
->> -    int ret = 0;
->> +    unsigned int len = (clip->x2 - clip->x1) * sizeof(u32);
->> +    unsigned int x, y;
->>       void *buf;
->>       u32 *src;
->>   @@ -214,22 +215,16 @@ int tinydrm_xrgb8888_to_gray8(u8 *dst, struct 
->> drm_framebuffer *fb)
->>        * The cma memory is write-combined so reads are uncached.
->>        * Speed up by fetching one line at a time.
->>        */
->> -    buf = kmalloc(pitch, GFP_KERNEL);
->> +    buf = kmalloc(len, GFP_KERNEL);
->>       if (!buf)
->>           return -ENOMEM;
->>   -    if (import_attach) {
->> -        ret = dma_buf_begin_cpu_access(import_attach->dmabuf,
->> -                           DMA_FROM_DEVICE);
->> -        if (ret)
->> -            goto err_free;
->> -    }
->> -
->> -    for (y = 0; y < fb->height; y++) {
->> -        src = cma_obj->vaddr + (y * pitch);
->> -        memcpy(buf, src, pitch);
->> +    for (y = clip->y1; y < clip->y2; y++) {
->> +        src = vaddr + (y * fb->pitches[0]);
->> +        src += clip->x1;
->> +        memcpy(buf, src, len);
->>           src = buf;
->> -        for (x = 0; x < fb->width; x++) {
->> +        for (x = clip->x1; x < clip->x2; x++) {
->>               u8 r = (*src & 0x00ff0000) >> 16;
->>               u8 g = (*src & 0x0000ff00) >> 8;
->>               u8 b =  *src & 0x000000ff;
->> @@ -240,13 +235,9 @@ int tinydrm_xrgb8888_to_gray8(u8 *dst, struct 
->> drm_framebuffer *fb)
->>           }
->>       }
->>   -    if (import_attach)
->> -        ret = dma_buf_end_cpu_access(import_attach->dmabuf,
->> -                         DMA_FROM_DEVICE);
->> -err_free:
->>       kfree(buf);
->>   -    return ret;
->> +    return 0;
->>   }
->>   EXPORT_SYMBOL(tinydrm_xrgb8888_to_gray8);
->>   diff --git a/drivers/gpu/drm/tinydrm/repaper.c 
->> b/drivers/gpu/drm/tinydrm/repaper.c
->> index 3343d3f..d34cd9b 100644
->> --- a/drivers/gpu/drm/tinydrm/repaper.c
->> +++ b/drivers/gpu/drm/tinydrm/repaper.c
->> @@ -18,6 +18,7 @@
->>    */
->>     #include <linux/delay.h>
->> +#include <linux/dma-buf.h>
->>   #include <linux/gpio/consumer.h>
->>   #include <linux/module.h>
->>   #include <linux/of_device.h>
->> @@ -525,11 +526,20 @@ static int repaper_fb_dirty(struct 
->> drm_framebuffer *fb,
->>                   struct drm_clip_rect *clips,
->>                   unsigned int num_clips)
->>   {
->> +    struct drm_gem_cma_object *cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
->> +    struct dma_buf_attachment *import_attach = 
->> cma_obj->base.import_attach;
->>       struct tinydrm_device *tdev = fb->dev->dev_private;
->>       struct repaper_epd *epd = epd_from_tinydrm(tdev);
->> +    struct drm_clip_rect clip;
->>       u8 *buf = NULL;
->>       int ret = 0;
->>   +    /* repaper can't do partial updates */
->> +    clip.x1 = 0;
->> +    clip.x2 = fb->width;
->> +    clip.y1 = 0;
->> +    clip.y2 = fb->height;
->> +
->>       mutex_lock(&tdev->dirty_lock);
->>         if (!epd->enabled)
->> @@ -550,7 +560,16 @@ static int repaper_fb_dirty(struct 
->> drm_framebuffer *fb,
->>           goto out_unlock;
->>       }
->>   -    ret = tinydrm_xrgb8888_to_gray8(buf, fb);
->> +    if (import_attach) {
->> +        ret = dma_buf_begin_cpu_access(import_attach->dmabuf,
->> +                           DMA_FROM_DEVICE);
->> +        if (ret)
->> +            goto out_unlock;
->> +    }
->> +
->> +    ret = tinydrm_xrgb8888_to_gray8(buf, cma_obj->vaddr, fb, &clip);
->> +    if (import_attach)
->> +        dma_buf_end_cpu_access(import_attach->dmabuf, DMA_FROM_DEVICE);
+>> To avoid delaying this unnecessarily, we just alias
+>> kernel_neon_begin_partial() to kernel_neon_begin() and ignore the
+>> argument. We can remove that again when everything has gone upstream.
 >
-> I think we can make tinydrm_xrgb8888_to_gray8() return void like the
-> other copy functions. We loose the error if the line buffer can't be
-> allocated, but that's no big deal. If we can't allocate <4k of memory,
-> then we have much bigger problems elsewhere.
-> This simplifies returning an error from dma_buf_end_cpu_access().
-> The error is propagated to userspace who called the dirty ioctl.
->
-> When I have switched from cma to shmem buffers backing the framebuffer
-> (ongoing work), we don't need the line buffer copy to speed up the
-> uncached reads from write combined memory mappings. But we will
-> probably need it on buffers imported with PRIME, since we don't know
-> the memory mapping. At least I don't think we can find that out.
+> But would kernel_neon_begin() be called in an interrupt context from the
+> crypto code? I'd like the arm64 for-next/core branch (to be based on
+> -rc4 next week) to still be fully working.
 >
 
-I realised that we can just do a slow copy, if we can't allocate a buffer.
-I will sort that out in all the copy functions when we switch to shmem.
-So please make tinydrm_xrgb8888_to_gray8() void.
+Well, theoretically. In the new situation we allow KMN from process
+and softirq context, but the latter only if no process context KMN is
+in progress. This last rule could be violated by the old crypto code,
+but the chances of actually hitting that are very low: if your wifi
+chip lacks a h/w implementation of CCMP (which is uncommon these
+days), and it gets invoked while KMN crypto is being used on the same
+core, i.e., for IPsec or block encryption, you may get a splat. It
+wouldn't corrupt your encrypted file system.
 
-> Noralf.
->
->>       if (ret)
->>           goto out_unlock;
->>   diff --git a/include/drm/tinydrm/tinydrm-helpers.h 
->> b/include/drm/tinydrm/tinydrm-helpers.h
->> index a6c387f..9e13ef5 100644
->> --- a/include/drm/tinydrm/tinydrm-helpers.h
->> +++ b/include/drm/tinydrm/tinydrm-helpers.h
->> @@ -43,7 +43,8 @@ void tinydrm_swab16(u16 *dst, void *vaddr, struct 
->> drm_framebuffer *fb,
->>   void tinydrm_xrgb8888_to_rgb565(u16 *dst, void *vaddr,
->>                   struct drm_framebuffer *fb,
->>                   struct drm_clip_rect *clip, bool swap);
->> -int tinydrm_xrgb8888_to_gray8(u8 *dst, struct drm_framebuffer *fb);
->> +int tinydrm_xrgb8888_to_gray8(u8 *dst, void *vaddr, struct 
->> drm_framebuffer *fb,
->> +                  struct drm_clip_rect *clip);
->>     struct backlight_device *tinydrm_of_find_backlight(struct device 
->> *dev);
->>   int tinydrm_enable_backlight(struct backlight_device *backlight);
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
->
+Perhaps we could stick it on a separate branch for this cycle (with
+the suggested tweak) and get it pulled it into -next separately? That
+way, you can forward it as a late pull, after Herbert's stuff gets in.
