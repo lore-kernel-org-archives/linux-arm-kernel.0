@@ -1,48 +1,35 @@
-From: guochun.mao@mediatek.com (Guochun Mao)
-Date: Fri, 4 Aug 2017 16:10:39 +0800
-Subject: [PATCH v5 1/1] dt-bindings: mtd: add new compatible strings and
- improve description
-In-Reply-To: <1501834239-25581-1-git-send-email-guochun.mao@mediatek.com>
-References: <1501834239-25581-1-git-send-email-guochun.mao@mediatek.com>
-Message-ID: <1501834239-25581-2-git-send-email-guochun.mao@mediatek.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 4 Aug 2017 10:29:49 +0200
+Subject: [PATCH 1/2] mtd: nand: pxa3xx_nand: enable building on mvebu
+ 64-bit platforms
+In-Reply-To: <20170719174006.1ca20652@windsurf>
+References: <20170719153126.16905-1-gregory.clement@free-electrons.com>
+ <20170719153126.16905-2-gregory.clement@free-electrons.com>
+ <20170719174006.1ca20652@windsurf>
+Message-ID: <20170804102949.770ec88d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add "mediatek,mt2712-nor" and "mediatek,mt7622-nor"
-for nor flash node's compatible strings.
-Explicate the fallback compatible.
+On Wed, 19 Jul 2017 17:40:06 +0200
+Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
----
- .../devicetree/bindings/mtd/mtk-quadspi.txt        |   15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+> Hello,
+> 
+> On Wed, 19 Jul 2017 17:31:25 +0200, Gregory CLEMENT wrote:
+> 
+> >  config MTD_NAND_PXA3xx
+> >  	tristate "NAND support on PXA3xx and Armada 370/XP"
+> > -	depends on PXA3xx || ARCH_MMP || PLAT_ORION
+> > +	depends on PXA3xx || ARCH_MMP || PLAT_ORION  || ARCH_MVEBU  
+> 
+>                                                    ^^^
+> 
+> Stupid minor nit: there are two spaces here, there should be one. No
+> need to send a v2 just for this, I'm sure Boris will happily fix this
+> when applying :-)
 
-diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-index 5ded66a..f97d601 100644
---- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-+++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-@@ -1,13 +1,16 @@
- * Serial NOR flash controller for MTK MT81xx (and similar)
- 
- Required properties:
--- compatible: 	  The possible values are:
--		  "mediatek,mt2701-nor"
--		  "mediatek,mt7623-nor"
-+- compatible: 	  For mt8173, compatible should be "mediatek,mt8173-nor",
-+		  and it's the fallback compatible for other Soc.
-+		  For every other SoC, should contain both the SoC-specific compatible
-+		  string and "mediatek,mt8173-nor".
-+		  The possible values are:
-+		  "mediatek,mt2701-nor", "mediatek,mt8173-nor"
-+		  "mediatek,mt2712-nor", "mediatek,mt8173-nor"
-+		  "mediatek,mt7622-nor", "mediatek,mt8173-nor"
-+		  "mediatek,mt7623-nor", "mediatek,mt8173-nor"
- 		  "mediatek,mt8173-nor"
--		  For mt8173, compatible should be "mediatek,mt8173-nor".
--		  For every other SoC, should contain both the SoC-specific compatible string
--		  and "mediatek,mt8173-nor".
- - reg: 		  physical base address and length of the controller's register
- - clocks: 	  the phandle of the clocks needed by the nor controller
- - clock-names: 	  the names of the clocks
--- 
-1.7.9.5
+Applied after removing the extra whitespace.
+
+Thanks,
+
+Boris
