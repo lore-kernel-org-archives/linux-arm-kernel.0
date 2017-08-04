@@ -1,84 +1,62 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 4 Aug 2017 10:11:03 +0800
-Subject: [PATCH 1/2] usb: mtu3: add a vbus debugfs interface
-In-Reply-To: <20170803160135.GC20736@kroah.com>
-References: <1501749439-8837-1-git-send-email-chunfeng.yun@mediatek.com>
- <20170803160057.GB20736@kroah.com> <20170803160135.GC20736@kroah.com>
-Message-ID: <1501812663.25536.116.camel@mhfsdcap03>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 4 Aug 2017 10:16:48 +0800
+Subject: [PATCH v3 00/10] ARM: sun8i: a83t: Add support for MMC controllers
+In-Reply-To: <CAPDyKFrBfQ-mNTNitcpgo1FCa1068ZzC_J4efsxmU2X6tOJgzw@mail.gmail.com>
+References: <20170724135905.28855-1-wens@csie.org>
+ <CAGb2v66DQ3H2Mta7h+t1P+UzSRLnMABRebeYcopaPkN0gOiwxA@mail.gmail.com>
+ <20170726194522.7d64f7c2danrknfi@flea>
+ <CAPDyKFrssySjKW0E7sB3D-UjVea8_Yxvrkkr7sKf47x6jwgVSQ@mail.gmail.com>
+ <CAGb2v648K1Nguf8nVjfunow7+xwS0MHazzMXJd1xZ3uNM2WesA@mail.gmail.com>
+ <CAPDyKFrBfQ-mNTNitcpgo1FCa1068ZzC_J4efsxmU2X6tOJgzw@mail.gmail.com>
+Message-ID: <CAGb2v67O2SECXPeq3Q2rE7wMG54rnXNCq_+pJoeh18CEpae-VA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-08-03 at 09:01 -0700, Greg Kroah-Hartman wrote:
-> On Thu, Aug 03, 2017 at 09:00:57AM -0700, Greg Kroah-Hartman wrote:
-> > On Thu, Aug 03, 2017 at 04:37:18PM +0800, Chunfeng Yun wrote:
-> > > +static ssize_t ssusb_vbus_write(struct file *file,
-> > > +	const char __user *ubuf, size_t count, loff_t *ppos)
-> > > +{
-> > > +	struct seq_file *sf = file->private_data;
-> > > +	struct ssusb_mtk *ssusb = sf->private;
-> > > +	struct otg_switch_mtk *otg_sx = &ssusb->otg_switch;
-> > > +	char buf[16];
-> > > +
-> > > +	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
-> > > +		return -EFAULT;
-> > > +
-> > > +	if (!strncmp(buf, "on", 2)) {
-> > > +		ssusb_set_vbus(otg_sx, 1);
-> > > +	} else if (!strncmp(buf, "off", 3)) {
-> > > +		ssusb_set_vbus(otg_sx, 0);
-> > 
-> > kstrtobool() is better to use here.
-Ok
-> > 
-> > > +static int ssusb_debugfs_init(struct ssusb_mtk *ssusb)
-> > >  {
-> > >  	struct dentry *root;
-> > >  	struct dentry *file;
-> > >  
-> > >  	root = debugfs_create_dir(dev_name(ssusb->dev), usb_debug_root);
-> > >  	if (IS_ERR_OR_NULL(root)) {
-> > 
-> > That test is wrong, you should never need to care about the return value
-> > of a debugfs call.  You can always just use it in your next call (if it
-> > is a dentry *), or just ignore it.
-Ok, I'll just test NULL pointer, and ignore other ERROR value
-> > 
-> > > -		if (!root)
-> > > -			dev_err(ssusb->dev, "create debugfs root failed\n");
-> > > -		return;
-> > > +		dev_err(ssusb->dev, "create debugfs root failed\n");
-> > > +		goto err_dbgfs;
-> > >  	}
-> > >  	ssusb->dbgfs_root = root;
-> > >  
-> > > -	file = debugfs_create_file("mode", S_IRUGO | S_IWUSR, root,
-> > > -			ssusb, &ssusb_mode_fops);
-> > > -	if (!file)
-> > > -		dev_dbg(ssusb->dev, "create debugfs mode failed\n");
-> > > +	file = debugfs_create_file("mode", 0644, root, ssusb, &ssusb_mode_fops);
-> > > +	if (!file) {
-> > > +		dev_err(ssusb->dev, "create debugfs mode failed\n");
-> > 
-> > Same here, do not care, as it does not matter.  Actually, you don't even
-> > need to keep the file pointer around, right?
-Yes, you are right
-> > 
-> > > +		goto err_dbgfs;
-> > > +	}
-> > > +
-> > > +	file = debugfs_create_file("vbus", 0644, root, ssusb, &ssusb_vbus_fops);
-> > > +	if (!file) {
-> > 
-> > Same here, you don't care if debugfs fails or not, it should never
-> > affect your code flow.
-Ok
+On Thu, Aug 3, 2017 at 8:02 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> On 3 August 2017 at 13:25, Chen-Yu Tsai <wens@csie.org> wrote:
+>> On Thu, Aug 3, 2017 at 7:19 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+>>> On 26 July 2017 at 21:45, Maxime Ripard
+>>> <maxime.ripard@free-electrons.com> wrote:
+>>>> On Wed, Jul 26, 2017 at 10:09:41PM +0800, Chen-Yu Tsai wrote:
+>>>>> On Mon, Jul 24, 2017 at 9:58 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+>>>>> > Hi everyone,
+>>>>> >
+>>>>> > This is v3 of my MMC controller support series.
+>>>>> >
+>>>>>
+>>>>> [...]
+>>>>>
+>>>>> > Chen-Yu Tsai (10):
+>>>>> >   clk: sunxi-ng: Add interface to query or configure MMC timing modes.
+>>>>> >   clk: sunxi-ng: Add MP_MMC clocks that support MMC timing modes
+>>>>> >     switching
+>>>>> >   clk: sunxi-ng: a83t: Support new timing mode for mmc2 clock
+>>>>> >   mmc: sunxi: Support controllers that can use both old and new timings
+>>>>> >   mmc: sunxi: Support MMC DDR52 transfer mode with new timing mode
+>>>>> >   mmc: sunxi: Add support for A83T eMMC (MMC2)
+>>>>>
+>>>>> So this series seems to be ready for inclusion, unless Ulf has further
+>>>>> concerns about the clk usage.
+>>>>>
+>>>>> The first mmc patch have build time dependencies on the first clk patch.
+>>>>> Shall we put the clk patch on a separate immutable branch for both trees
+>>>>> to pull? Or we could just merge everything through the mmc tree? I don't
+>>>>> think we'll touch this part of the sunxi-ng clk driver for the remainder
+>>>>> of this cycle.
+>>>>
+>>>> I guess the easiest would be for it to go through Ulf tree, unless he
+>>>> says otherwise of course :)
+>>>
+>>> Okay, I have picked up the series and applied it for my next branch.
+>>
+>> I guess I wasn't very clear. When I meant "everything" I meant the mmc
+>> and clk patches. We will take the dts patches through the sunxi tree.
+>>
+>> Can you drop the four dts patches from your tree? That would be the
+>> last four patches on mmc/next at the moment.
+>
+> Done!
 
-Thanks a lot
-> > 
-> > And don't you need to remove the directory when your module/hardware is
-> > removed?  I don't see that happening here as you are not saving root off
-> > anywhere.
-> 
-> Oh nevermind, you do save it, sorry for the noise...
-> 
-> greg k-h
+Thanks! I applied the remaining dts patches to the sunxi tree.
+
+ChenYu
