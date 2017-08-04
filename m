@@ -1,36 +1,80 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri,  4 Aug 2017 19:43:41 +0200
-Subject: [PATCH 02/14] mmc: meson-gx: remove CLK_DIVIDER_ALLOW_ZERO clock flag
+Date: Fri,  4 Aug 2017 19:43:45 +0200
+Subject: [PATCH 06/14] mmc: meson-gx: rework set_ios function
 In-Reply-To: <20170804174353.16486-1-jbrunet@baylibre.com>
 References: <20170804174353.16486-1-jbrunet@baylibre.com>
-Message-ID: <20170804174353.16486-3-jbrunet@baylibre.com>
+Message-ID: <20170804174353.16486-7-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove CLK_DIVIDER_ALLOW_ZERO. This flag means that a 1 based divider
-with a 0 value will behave as a bypass clock
+Remove conditional write of cfg register. Warn if set_clk fails for some
+reason. Consistently use host->dev instead of mixing with mmc_dev(mmc)
 
-The mmc divider does not behave like this, a 0 value disables the clock
-Remove this flag so CCF never allows a 0 value on this clock
-
-Fixes: 51c5d8447bd7 ("MMC: meson: initial support for GX platforms")
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/mmc/host/meson-gx-mmc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mmc/host/meson-gx-mmc.c | 22 +++++++++-------------
+ 1 file changed, 9 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index 4217287923d4..d480a8052a06 100644
+index 61668891b4fc..18fff28025d8 100644
 --- a/drivers/mmc/host/meson-gx-mmc.c
 +++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -389,7 +389,7 @@ static int meson_mmc_clk_init(struct meson_host *host)
- 	host->cfg_div.width = __builtin_popcountl(CLK_DIV_MASK);
- 	host->cfg_div.hw.init = &init;
- 	host->cfg_div.flags = CLK_DIVIDER_ONE_BASED |
--		CLK_DIVIDER_ROUND_CLOSEST | CLK_DIVIDER_ALLOW_ZERO;
-+		CLK_DIVIDER_ROUND_CLOSEST;
+@@ -445,8 +445,8 @@ static void meson_mmc_set_tuning_params(struct mmc_host *mmc)
+ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ {
+ 	struct meson_host *host = mmc_priv(mmc);
+-	u32 bus_width;
+-	u32 val, orig;
++	u32 bus_width, val;
++	int err;
  
- 	host->cfg_div_clk = devm_clk_register(host->dev, &host->cfg_div.hw);
- 	if (WARN_ON(PTR_ERR_OR_ZERO(host->cfg_div_clk)))
+ 	/*
+ 	 * GPIO regulator, only controls switching between 1v8 and
+@@ -474,7 +474,7 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 			int ret = regulator_enable(mmc->supply.vqmmc);
+ 
+ 			if (ret < 0)
+-				dev_err(mmc_dev(mmc),
++				dev_err(host->dev,
+ 					"failed to enable vqmmc regulator\n");
+ 			else
+ 				host->vqmmc_enabled = true;
+@@ -483,9 +483,6 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		break;
+ 	}
+ 
+-
+-	meson_mmc_clk_set(host, ios->clock);
+-
+ 	/* Bus width */
+ 	switch (ios->bus_width) {
+ 	case MMC_BUS_WIDTH_1:
+@@ -504,8 +501,6 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	}
+ 
+ 	val = readl(host->regs + SD_EMMC_CFG);
+-	orig = val;
+-
+ 	val &= ~CFG_BUS_WIDTH_MASK;
+ 	val |= FIELD_PREP(CFG_BUS_WIDTH_MASK, bus_width);
+ 
+@@ -519,11 +514,12 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	if (ios->timing == MMC_TIMING_MMC_HS400)
+ 		val |= CFG_CHK_DS;
+ 
+-	if (val != orig) {
+-		writel(val, host->regs + SD_EMMC_CFG);
+-		dev_dbg(host->dev, "%s: SD_EMMC_CFG: 0x%08x -> 0x%08x\n",
+-			__func__, orig, val);
+-	}
++	err = meson_mmc_clk_set(host, ios->clock);
++	if (err)
++		dev_err(host->dev, "Failed to set clock: %d\n,", err);
++
++	writel(val, host->regs + SD_EMMC_CFG);
++	dev_dbg(host->dev, "SD_EMMC_CFG:  0x%08x\n", val);
+ }
+ 
+ static void meson_mmc_request_done(struct mmc_host *mmc,
 -- 
 2.9.4
