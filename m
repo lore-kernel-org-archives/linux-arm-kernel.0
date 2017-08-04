@@ -1,29 +1,64 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Fri, 4 Aug 2017 11:44:49 +0200
-Subject: [PATCH v2] memory: mtk-smi: Use of_device_get_match_data helper
-In-Reply-To: <1501639370.5572.8.camel@mtksdaap41>
-References: <1501072660-10435-1-git-send-email-honghui.zhang@mediatek.com>
- <1501639370.5572.8.camel@mtksdaap41>
-Message-ID: <20170804094448.GB30515@8bytes.org>
+From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
+Date: Fri, 4 Aug 2017 11:48:09 +0200
+Subject: [PATCH v3 3/6] dt-bindings: add binding for Sitronix ST7586
+ display panels
+In-Reply-To: <1501799630-1650-4-git-send-email-david@lechnology.com>
+References: <1501799630-1650-1-git-send-email-david@lechnology.com>
+ <1501799630-1650-4-git-send-email-david@lechnology.com>
+Message-ID: <66f0b765-928e-1fca-9588-99da747749a5@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 02, 2017 at 10:02:50AM +0800, Honghui Zhang wrote:
-> On Wed, 2017-07-26 at 20:37 +0800, honghui.zhang at mediatek.com wrote:
-> > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> > 
-> > Replace custom code with generic helper to retrieve driver data.
-> 
-> Hi, Joerg, would you please take this one, because my last
-> patch[1]([patch v2 0/3] Add larbid init routine for mediatek's gen1 smi
-> larb driver) was base on this patch. Or should I put this one together
-> with the last patchset[1] and resend it with Matthias's reviewed-by
-> tag[2]?
 
-Yes, please send everything together. That makes it more easy for me to
-apply it.
+Den 04.08.2017 00.33, skrev David Lechner:
+> This adds a new binding for Sitronix ST7586 display panels.
+>
+> Using lego as the vendor prefix in the compatible string because the display
+> panel I am working with is an integral part of the LEGO MINDSTORMS EV3.
 
+Is this display available outside of this Lego part?
+If not you can remove the properties you don't need for this particular
+display setup. Another st7586 display with a different panel would need
+a different initialization sequence and compatible string, so we can
+add properties when/if that happens.
 
-Thanks,
+Noralf.
 
-	Joerg
+> Signed-off-by: David Lechner <david@lechnology.com>
+> ---
+>   .../bindings/display/sitronix,st7586.txt           | 26 ++++++++++++++++++++++
+>   1 file changed, 26 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/display/sitronix,st7586.txt
+>
+> diff --git a/Documentation/devicetree/bindings/display/sitronix,st7586.txt b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
+> new file mode 100644
+> index 0000000..dfb0b7b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
+> @@ -0,0 +1,26 @@
+> +Sitronix ST7586 display panel
+> +
+> +Required properties:
+> +- compatible:	"lego,ev3-lcd".
+> +
+> +The node for this driver must be a child node of a SPI controller, hence
+> +all mandatory properties described in ../spi/spi-bus.txt must be specified.
+> +
+> +Optional properties:
+> +- dc-gpios:	D/C pin. The presence/absence of this GPIO determines
+> +		the panel interface operation mode (IF[3:1] pins):
+> +		- present: IF=011 4-wire 8-bit data serial interface
+> +		- absent:  IF=010 3-wire 9-bit data serial interface
+> +- reset-gpios:	Reset pin
+> +- power-supply:	A regulator node for the supply voltage.
+> +- backlight:	phandle of the backlight device attached to the panel
+> +- rotation:	panel rotation in degrees counter clockwise (0,90,180,270)
+> +
+> +Example:
+> +	display at 0{
+> +		compatible = "lego,ev3-lcd";
+> +		reg = <0>;
+> +		spi-max-frequency = <10000000>;
+> +		dc-gpios = <&gpio 43 GPIO_ACTIVE_HIGH>;
+> +		reset-gpios = <&gpio 80 GPIO_ACTIVE_HIGH>;
+> +	};
