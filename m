@@ -1,41 +1,85 @@
-From: tyreld@linux.vnet.ibm.com (Tyrel Datwyler)
-Date: Fri, 4 Aug 2017 09:38:42 -0700
-Subject: [PATCH] PCI: Convert to using %pOF instead of full_name
-In-Reply-To: <20170718214339.7774-41-robh@kernel.org>
-References: <20170718214339.7774-41-robh@kernel.org>
-Message-ID: <dd5a317b-9e72-97bc-0386-8470998421c3@linux.vnet.ibm.com>
+From: david@lechnology.com (David Lechner)
+Date: Fri, 4 Aug 2017 11:51:22 -0500
+Subject: [PATCH v3 3/6] dt-bindings: add binding for Sitronix ST7586
+ display panels
+In-Reply-To: <66f0b765-928e-1fca-9588-99da747749a5@tronnes.org>
+References: <1501799630-1650-1-git-send-email-david@lechnology.com>
+ <1501799630-1650-4-git-send-email-david@lechnology.com>
+ <66f0b765-928e-1fca-9588-99da747749a5@tronnes.org>
+Message-ID: <e824aca6-b668-1d63-65a0-c56bfd8bec79@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/18/2017 02:43 PM, Rob Herring wrote:
-> Now that we have a custom printf format specifier, convert users of
-> full_name to use %pOF instead. This is preparation to remove storing
-> of the full path string for each node.
+On 08/04/2017 04:48 AM, Noralf Tr?nnes wrote:
 > 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Jonathan Hunter <jonathanh@nvidia.com>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Michael Ellerman <mpe@ellerman.id.au>
-> Cc: linux-pci at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-tegra at vger.kernel.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> ---
->  drivers/pci/host/pci-mvebu.c        | 8 ++++----
->  drivers/pci/host/pci-tegra.c        | 3 +--
->  drivers/pci/hotplug/pnv_php.c       | 4 ++--
->  drivers/pci/hotplug/rpadlpar_core.c | 4 ++--
->  drivers/pci/hotplug/rpaphp_core.c   | 2 +-
->  drivers/pci/hotplug/rpaphp_pci.c    | 4 ++--
->  drivers/pci/hotplug/rpaphp_slot.c   | 4 ++--
->  drivers/pci/pci-sysfs.c             | 4 ++--
->  drivers/pci/pci.c                   | 4 ++--
->  9 files changed, 18 insertions(+), 19 deletions(-)
+> Den 04.08.2017 00.33, skrev David Lechner:
+>> This adds a new binding for Sitronix ST7586 display panels.
+>>
+>> Using lego as the vendor prefix in the compatible string because the 
+>> display
+>> panel I am working with is an integral part of the LEGO MINDSTORMS EV3.
 > 
+> Is this display available outside of this Lego part?
+No, it is not.
 
-Reviewed-by: Tyrel Datwyler <tyreld@linux.vnet.ibm.com>
+> If not you can remove the properties you don't need for this particular
+> display setup. Another st7586 display with a different panel would need
+> a different initialization sequence and compatible string, so we can
+> add properties when/if that happens.
+
+OK. so I will drop power-supply and backlight.
+
+Should I remove these from the driver as well? There are some panels out 
+there that could use them.[1]
+
+[1]: 
+http://www.buydisplay.com/download/manual/ERC240160-1_Series_Datasheet.pdf
+
+> 
+> Noralf.
+> 
+>> Signed-off-by: David Lechner <david@lechnology.com>
+>> ---
+>>   .../bindings/display/sitronix,st7586.txt           | 26 
+>> ++++++++++++++++++++++
+>>   1 file changed, 26 insertions(+)
+>>   create mode 100644 
+>> Documentation/devicetree/bindings/display/sitronix,st7586.txt
+>>
+>> diff --git 
+>> a/Documentation/devicetree/bindings/display/sitronix,st7586.txt 
+>> b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
+>> new file mode 100644
+>> index 0000000..dfb0b7b
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
+>> @@ -0,0 +1,26 @@
+>> +Sitronix ST7586 display panel
+>> +
+>> +Required properties:
+>> +- compatible:    "lego,ev3-lcd".
+>> +
+>> +The node for this driver must be a child node of a SPI controller, hence
+>> +all mandatory properties described in ../spi/spi-bus.txt must be 
+>> specified.
+>> +
+>> +Optional properties:
+>> +- dc-gpios:    D/C pin. The presence/absence of this GPIO determines
+>> +        the panel interface operation mode (IF[3:1] pins):
+>> +        - present: IF=011 4-wire 8-bit data serial interface
+>> +        - absent:  IF=010 3-wire 9-bit data serial interface
+>> +- reset-gpios:    Reset pin
+>> +- power-supply:    A regulator node for the supply voltage.
+>> +- backlight:    phandle of the backlight device attached to the panel
+>> +- rotation:    panel rotation in degrees counter clockwise 
+>> (0,90,180,270)
+>> +
+>> +Example:
+>> +    display at 0{
+>> +        compatible = "lego,ev3-lcd";
+>> +        reg = <0>;
+>> +        spi-max-frequency = <10000000>;
+>> +        dc-gpios = <&gpio 43 GPIO_ACTIVE_HIGH>;
+>> +        reset-gpios = <&gpio 80 GPIO_ACTIVE_HIGH>;
+>> +    };
+> 
