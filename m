@@ -1,86 +1,86 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Fri, 4 Aug 2017 19:36:06 +0200
-Subject: [PATCH v3 3/6] dt-bindings: add binding for Sitronix ST7586
- display panels
-In-Reply-To: <2434051.fAH1OaXNrL@avalon>
-References: <1501799630-1650-1-git-send-email-david@lechnology.com>
- <1501799630-1650-4-git-send-email-david@lechnology.com>
- <2434051.fAH1OaXNrL@avalon>
-Message-ID: <226e7391-2f4f-60ca-f258-ad7b02463359@tronnes.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 4 Aug 2017 18:38:10 +0100
+Subject: [PATCH RFC] arm64: introduce mm_context_t flags
+In-Reply-To: <20170802172940.ejiyl4j2ywlwhbme@yury-thinkpad>
+References: <20170731144825.31322-1-ynorov@caviumnetworks.com>
+ <20170802163900.66gnhogililb3uak@armageddon.cambridge.arm.com>
+ <20170802172940.ejiyl4j2ywlwhbme@yury-thinkpad>
+Message-ID: <20170804173809.aviva53kccexghul@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On Wed, Aug 02, 2017 at 08:29:40PM +0300, Yury Norov wrote:
+> On Wed, Aug 02, 2017 at 05:39:01PM +0100, Catalin Marinas wrote:
+> > On Mon, Jul 31, 2017 at 05:48:25PM +0300, Yury Norov wrote:
+> > > In patch 06beb72fbe23e ("arm64: introduce mm context flag to keep 32 bit task
+> > > information") you introduce the field flags but use it only for a single flag -
+> > > TIF_32BIT. It looks hacky to me for three reasons:
+> > >  - The flag is introduced for the case where it's impossible to get the thread
+> > >    info structure for the thread associated with mm. So thread_info flags (TIF)
+> > >    may also be unavailable at place. This is not the case for the only existing
+> > >    user of if - uprobes, but in general this approach requires to include thread
+> > >    headers in mm code, which may become unwanted dependency.
+> > >  - New flag, if it uses TIF bits, for consistency should for example set/clear
+> > >    TIF_32BIT_AARCH64 for ILP32 tasks. And to be completely consistent, with
+> > >    current approach we'd mirror thread_info flags to mm_context flags. And keep
+> > >    it syncronized.
+> > >  - If we start using TIF flags here, we cannot easily add new mm_context
+> > >    specific bits because they may mess with TIF ones.
+> > > 
+> > > I think that this is not what was intended when you added new field in
+> > > mm_context_t.
+> > 
+> > TIF_32BIT was handy at the time but it indeed denotes AArch32 user
+> > task. For ILP32 we wouldn't need to set this bit since the instruction
+> > set is A64 and uprobe should support it (though not sure anyone tried).
+> > I noticed in your patch introducing binfmt_ilp32.c that SET_PERSONALITY
+> > actually sets this flag in the mm context.
+> 
+> Depending on what will be decided here, I'll change ilp32 patch
+> accordingly.
 
+Since this was meant to keep track of AArch32 tasks, the ILP32
+personality macros need to clear it.
 
-Den 04.08.2017 16.54, skrev Laurent Pinchart:
-> Hi David,
->
-> Thank you for the patch.
->
-> On Thursday 03 Aug 2017 17:33:47 David Lechner wrote:
->> This adds a new binding for Sitronix ST7586 display panels.
->>
->> Using lego as the vendor prefix in the compatible string because the display
->> panel I am working with is an integral part of the LEGO MINDSTORMS EV3.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
->>   .../bindings/display/sitronix,st7586.txt           | 26 +++++++++++++++++++
->>   1 file changed, 26 insertions(+)
->>   create mode 100644
->> Documentation/devicetree/bindings/display/sitronix,st7586.txt
->>
->> diff --git a/Documentation/devicetree/bindings/display/sitronix,st7586.txt
->> b/Documentation/devicetree/bindings/display/sitronix,st7586.txt new file
->> mode 100644
->> index 0000000..dfb0b7b
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
->> @@ -0,0 +1,26 @@
->> +Sitronix ST7586 display panel
->> +
->> +Required properties:
->> +- compatible:	"lego,ev3-lcd".
->> +
->> +The node for this driver must be a child node of a SPI controller, hence
->> +all mandatory properties described in ../spi/spi-bus.txt must be specified.
->> +
->> +Optional properties:
->> +- dc-gpios:	D/C pin. The presence/absence of this GPIO determines
->> +		the panel interface operation mode (IF[3:1] pins):
->> +		- present: IF=011 4-wire 8-bit data serial interface
->> +		- absent:  IF=010 3-wire 9-bit data serial interface
-> How does this work ? Do you have a single GPIO on your system connected to
-> IF[1], with IF[3:2] hardwired to 01 ?
->
->> +- reset-gpios:	Reset pin
->> +- power-supply:	A regulator node for the supply voltage.
->> +- backlight:	phandle of the backlight device attached to the panel
->> +- rotation:	panel rotation in degrees counter clockwise (0,90,180,270)
-> Please use the OF graph DT bindings (a.k.a. ports) to describe the connection
-> between the panel and its source.
+> > As with the TIF bits, the PERSONALITY macros become more complicated
+> > with more bits to set/clear. Since we don't have any plans for other mm
+> > context flags (independent of TIF), should we simply rename it to
+> > thread_flags and just copy the thread_info flags:
+> > 
+> > 	current->mm->context.thread_flags = current_thread_info()->flags;
+> 
+> This will also work. But it may raise questions to one who reads the
+> code.
+> - if mm_context needs the threads flags, why you copy it? Why not to
+>   move flags to the mm_context_t? It is always available for
+>   thread_info users.
+> - for multithreaded applications there might be different set of bits
+>   in the flags field in different theads. So what exactly will be in
+>   context.thread_flags is a matter of case, and you'd explain somehow
+>   which bits are reliable, and which are not.
 
-This display has a controller with onboard memory that is scanned out
-to the panel. The controller is connected, in this instance, through SPI.
-Both initialization and pixel data is transferred over SPI. It resembles
-the MIPI DCS/DBI standard except that it misses some of the commands and
-has non standard formats: 2-bit greyscale and monochrome. MIPI DBI only
-supports rgb formats (3, 8, 12, 16 and 18-bits). So it isn't a drm panel
-in the sense as one connected through MIPI DSI or MIPI DPI.
+That's a valid argument.
 
-MIPI DBI has 3 interface types:
-- 8/9/16/18 bit parallel bus + Data/Command signal (8080 or motorola bus)
-- 8/16 bit SPI + D/C signal
-- 9 bit SPI (D/C as first bit)
+> - It doesn't sound convincing to me that there are no other candidates
+>   for mm_context.flags bits. 6 month ago we didn't need the flags at all.
+>   ARM64 is under intensive development, and it's highly probable that
+>   candidates may appear one day.
 
-Noralf.
+I'm fine with changing the macro to MMCF_AARCH32, however, could move
+the flag setting out of the SET_PERSONALITY macros, just to keep these
+macros strictly to the TIF flags? We can probably add it to
+arch_setup_new_exec(), something like:
 
->> +Example:
->> +	display at 0{
->> +		compatible = "lego,ev3-lcd";
->> +		reg = <0>;
->> +		spi-max-frequency = <10000000>;
->> +		dc-gpios = <&gpio 43 GPIO_ACTIVE_HIGH>;
->> +		reset-gpios = <&gpio 80 GPIO_ACTIVE_HIGH>;
->> +	};
+static inline void arch_setup_new_exec(void)
+{
+	current->mm->context.flags = 0;
+	if (test_thread_flag(TIF_32BIT))
+		current->mm->context.flags |= MMCF_AARCH32;
+}
+#define arch_setup_new_exec	arch_setup_new_exec
+
+I would go for always initialising the flags to 0 rather than clearing
+certain bits, just to make it clear that we don't inherit them.
+
+-- 
+Catalin
