@@ -1,67 +1,79 @@
 From: dja@axtens.net (Daniel Axtens)
-Date: Fri,  4 Aug 2017 20:20:30 +1000
-Subject: [PATCH 0/3] Split VGA default selection from VGA arbiter
-Message-ID: <20170804102033.27731-1-dja@axtens.net>
+Date: Fri,  4 Aug 2017 20:20:31 +1000
+Subject: [PATCH 1/3] powerpc: simplify and fix VGA default device behaviour
+In-Reply-To: <20170804102033.27731-1-dja@axtens.net>
+References: <20170804102033.27731-1-dja@axtens.net>
+Message-ID: <20170804102033.27731-2-dja@axtens.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is approach 3 of my patch series to sort out Xorg
-autoconfiguration for the Hibmc card beind a Hisilicon bridge on
-arm64.
+Some powerpc devices provide a PCI display that isn't picked up by
+the VGA arbiter, presumably because it doesn't support the PCI
+legacy VGA ranges.
 
-Approach 1 was a simple quirk for the card+bridge to mark it as
-default. This higlighted the fact that the default card was picked by
-the arbiter, which assumed legacy resources. The lack of legacy
-resources leads to quirks in ppc and concerns in arm land, so a more
-generic approach was desired.
+Commit c2e1d84523ad ("powerpc: Set default VGA device") introduced
+an arch quirk to mark these devices as default to fix X autoconfig.
 
-Approach 2 allowed platforms to opt in to a class enable hook that
-added a card as default if there was no default. This:
+The commit message stated that the patch:
 
- - was possibly racy as ACPI PCI init and vgaarb are both subsys
-   initcalls.
+    Ensures a default VGA is always set if a graphics adapter is present,
+    even if firmware did not initialize it. If more than one graphics
+    adapter is present, ensure the one initialized by firmware is set
+    as the default VGA device.
 
- - didn't check to see if a card had a driver.
+The patch used the following test to decide whether or not to mark
+a device as default:
 
- - meant that platforms for which the vga arbiter didn't make sense
-   still needed it.
+  pci_read_config_word(pdev, PCI_COMMAND, &cmd);
+  if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
+          vga_set_default_device(pdev);
 
-This is approach 3. It pulls the default handling out of the arbiter,
-into its own file and behind its own Kconfig option. It adds the extra
-detection as a late initcall and an enable hook that only operates
-after the initcall, so it's not racy. It checks for drivers. It means
-people can turn off the vga arbiter. It works sensibly for modules
-too.
+This doesn't seem like it works quite as intended. Because of the
+logical OR, the default device will be set in 2 cases:
 
-Patch 1 cleans up the powerpc fixup, as with approach 2.
-Patch 2 is the big split.
-Patch 3 moves ppc over, as with approach 2.
-There is no need for an arm-specific patch this time as the Kconfig option
-is on by default.
+ 1) if there is no default device
+OR
+ 2) if this device has normal memory/IO decoding turned on
 
-Regards,
-Daniel
+This will work as intended if there is only one device, but if
+there are multiple devices, we may override the device the VGA
+arbiter picked.
 
-Daniel Axtens (3):
-  powerpc: simplify and fix VGA default device behaviour
-  Split VGA default device handler out of VGA arbiter
-  powerpc: replace vga_fixup() with generic code
+Instead, set a device as default if there is no default device AND
+this device decodes.
 
- arch/ia64/pci/fixup.c            |   2 +-
- arch/powerpc/kernel/pci-common.c |  13 ----
- arch/x86/pci/fixup.c             |   2 +-
- arch/x86/video/fbdev.c           |   2 +-
- drivers/gpu/vga/Kconfig          |  12 +++
- drivers/gpu/vga/Makefile         |   1 +
- drivers/gpu/vga/vga_default.c    | 159 +++++++++++++++++++++++++++++++++++++++
- drivers/gpu/vga/vga_switcheroo.c |   2 +-
- drivers/gpu/vga/vgaarb.c         |  41 +---------
- drivers/pci/pci-sysfs.c          |   2 +-
- include/linux/vga_default.h      |  44 +++++++++++
- include/linux/vgaarb.h           |  14 ----
- 12 files changed, 224 insertions(+), 70 deletions(-)
- create mode 100644 drivers/gpu/vga/vga_default.c
- create mode 100644 include/linux/vga_default.h
+This will not change behaviour on single-headed systems.
 
+Cc: Brian King <brking@linux.vnet.ibm.com>
+Signed-off-by: Daniel Axtens <dja@axtens.net>
+
+---
+
+Tested in TCG (the card provided by qemu doesn't automatically
+register with vgaarb, so the relevant code path has been tested)
+but I would appreciate any tests on real hardware.
+
+Informal benh ack: https://patchwork.kernel.org/patch/9850235/
+---
+ arch/powerpc/kernel/pci-common.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/powerpc/kernel/pci-common.c b/arch/powerpc/kernel/pci-common.c
+index 341a7469cab8..c95fdda3a2dc 100644
+--- a/arch/powerpc/kernel/pci-common.c
++++ b/arch/powerpc/kernel/pci-common.c
+@@ -1746,8 +1746,11 @@ static void fixup_vga(struct pci_dev *pdev)
+ {
+ 	u16 cmd;
+ 
++	if (vga_default_device())
++		return;
++
+ 	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
+-	if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
++	if (cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY))
+ 		vga_set_default_device(pdev);
+ 
+ }
 -- 
 2.11.0
