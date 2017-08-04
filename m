@@ -1,81 +1,130 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Aug 2017 15:05:26 +0100
-Subject: [PATCH 0/5] Simplify kernel-mode NEON
-In-Reply-To: <20170804132606.GQ989@e103592.cambridge.arm.com>
-References: <1501777403-9782-1-git-send-email-Dave.Martin@arm.com>
- <20170804120858.ff3772f3zzik37pp@armageddon.cambridge.arm.com>
- <20170804122225.jiceb2vbgrld2y7z@armageddon.cambridge.arm.com>
- <CAKv+Gu-YG1EbpvaL46T0fzD=RZ7itqizrH=AkYAN1YmTupmKGw@mail.gmail.com>
- <20170804131211.2wn2zi74kuzuwneo@armageddon.cambridge.arm.com>
- <CAKv+Gu_va4hD-MztzRUhXxTwqnbKcmOmV8NN9j+TG8_jWA0wNA@mail.gmail.com>
- <20170804132606.GQ989@e103592.cambridge.arm.com>
-Message-ID: <20170804140526.cu3ojheqomsxzyjb@armageddon.cambridge.arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 4 Aug 2017 22:16:56 +0800
+Subject: [linux-sunxi] [PATCH 10/13] [NOT FOR REVIEW NOW] clk: sunxi: Add
+ CLK_SET_RATE_PARENT flag for H3 HDMI clock
+In-Reply-To: <18315912.JHEzglLTUl@jernej-laptop>
+References: <20170801131304.7741-1-icenowy@aosc.io>
+ <13060066.Dl610HiJ2r@jernej-laptop>
+ <CAGb2v64hQGwZtcRMhkSejKFozZu7rbL+47NbOuYrc7pKoOYLkw@mail.gmail.com>
+ <18315912.JHEzglLTUl@jernej-laptop>
+Message-ID: <CAGb2v67B_8kHBtnLd_1vB-pHR7bV6p2M3H8iZ7njeSztE0pMVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 04, 2017 at 02:26:06PM +0100, Dave P Martin wrote:
-> On Fri, Aug 04, 2017 at 02:21:52PM +0100, Ard Biesheuvel wrote:
-> > On 4 August 2017 at 14:12, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > On Fri, Aug 04, 2017 at 01:25:03PM +0100, Ard Biesheuvel wrote:
-> > >> On 4 August 2017 at 13:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > >> > On Fri, Aug 04, 2017 at 01:08:58PM +0100, Catalin Marinas wrote:
-> > >> >> On Thu, Aug 03, 2017 at 05:23:18PM +0100, Dave P Martin wrote:
-> > >> >> > This series depends on Ard's v4.14 crypto rework [2].
-> > >> > [...]
-> > >> >> > [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-July/520664.html
-> > >> > [...]
-> > >> >> > Ard Biesheuvel (1):
-> > >> >> >   arm64: neon: replace generic definition of may_use_simd()
-> > >> >> >
-> > >> >> > Dave Martin (4):
-> > >> >> >   arm64: neon: Add missing header guard in <asm/neon.h>
-> > >> >> >   arm64: fpsimd: Consistently use __this_cpu_ ops where appropriate
-> > >> >> >   arm64: neon: Allow EFI runtime services to use FPSIMD in irq context
-> > >> >> >   arm64: neon: Remove support for nested or hardirq kernel-mode NEON
-> > >> >>
-> > >> >> Queued for 4.14. Thanks.
-> > >> >
-> > >> > ... and reverted.
-> > >> >
-> > >> > I now realised that it doesn't build without Ard's crypto series (I had
-> > >> > the wrong impression it is just a performance impact). I get errors
-> > >> > like:
-> > >> >
-> > >> > arch/arm64/crypto/sha1-ce-glue.c|41 col 2| error: implicit declaration
-> > >> > of function ?kernel_neon_begin_partial?
-> > >>
-> > >> Ah yes. Apologies for failing to mention that. Apparently, there are
-> > >> in fact build time cross-dependencies that I forgot about.
-> > >>
-> > >> To avoid delaying this unnecessarily, we just alias
-> > >> kernel_neon_begin_partial() to kernel_neon_begin() and ignore the
-> > >> argument. We can remove that again when everything has gone upstream.
-> > >
-> > > But would kernel_neon_begin() be called in an interrupt context from the
-> > > crypto code? I'd like the arm64 for-next/core branch (to be based on
-> > > -rc4 next week) to still be fully working.
-> > >
-> >
-> > Well, theoretically. In the new situation we allow KMN from process
-> > and softirq context, but the latter only if no process context KMN is
-> > in progress. This last rule could be violated by the old crypto code,
-> > but the chances of actually hitting that are very low: if your wifi
-> > chip lacks a h/w implementation of CCMP (which is uncommon these
-> > days), and it gets invoked while KMN crypto is being used on the same
-> > core, i.e., for IPsec or block encryption, you may get a splat. It
-> > wouldn't corrupt your encrypted file system.
-> >
-> > Perhaps we could stick it on a separate branch for this cycle (with
-> > the suggested tweak) and get it pulled it into -next separately? That
-> > way, you can forward it as a late pull, after Herbert's stuff gets in.
-> 
-> Or I could prepend the patches to the SVE series, and we wait for Linux
-> to pull the crypto branch before merging that.  (I still need to repost
-> and the SVE patches need to be reviewed, so that isn't imminent.)
+On Fri, Aug 4, 2017 at 9:49 PM, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
+> Hi Chen-Yu,
+>
+> Dne petek, 04. avgust 2017 ob 11:27:33 CEST je Chen-Yu Tsai napisal(a):
+>> On Fri, Aug 4, 2017 at 4:59 PM, Jernej ?krabec <jernej.skrabec@siol.net>
+> wrote:
+>> > Hi Chen-Yu,
+>> >
+>> > Dne petek, 04. avgust 2017 ob 06:29:50 CEST je Chen-Yu Tsai napisal(a):
+>> >> On Fri, Aug 4, 2017 at 12:16 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>> >> > ? 2017?8?4? GMT+08:00 ??12:15:27, Chen-Yu Tsai <wens@csie.org> ??:
+>> >> >>Hi,
+>> >> >>
+>> >> >>On Tue, Aug 1, 2017 at 9:13 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>> >> >>> From: Jernej Skrabec <jernej.skrabec@siol.net>
+>> >> >>>
+>> >> >>> When setting the HDMI clock of H3, the PLL_VIDEO clock needs to be
+>> >> >>
+>> >> >>set.
+>> >> >>
+>> >> >>> Add CLK_SET_RATE_PARENT flag for H3 HDMI clock.
+>> >> >>>
+>> >> >>> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+>> >> >>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> >> >>> ---
+>> >> >>>
+>> >> >>>  drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 2 +-
+>> >> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>> >> >>>
+>> >> >>> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+>> >> >>
+>> >> >>b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+>> >> >>
+>> >> >>> index b1127e8629d9..2ebb3d865b01 100644
+>> >> >>> --- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+>> >> >>> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+>> >> >>> @@ -474,7 +474,7 @@ static SUNXI_CCU_GATE(avs_clk,
+>> >> >>
+>> >> >>"avs",          "osc24M",
+>> >> >>
+>> >> >>>  static const char * const hdmi_parents[] = { "pll-video" };
+>> >> >>>  static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_clk, "hdmi", hdmi_parents,
+>> >> >>>
+>> >> >>> -                                0x150, 0, 4, 24, 2, BIT(31), 0);
+>> >> >>> +                                0x150, 0, 4, 24, 2, BIT(31),
+>> >> >>
+>> >> >>CLK_SET_RATE_PARENT);
+>> >> >>
+>> >> >>Line is longer than 80 characters.
+>> >> >>
+>> >> >>This looks independent enough so I've merged this for 4.14 with the
+>> >> >>offending line wrapped and the following tag added:
+>> >> >>
+>> >> >>Fixes: 0577e4853bfb ("clk: sunxi-ng: Add H3 clocks")
+>> >> >>
+>> >> > Please don't merge this now until Jernej send it.
+>> >>
+>> >> (Dropped Rob, devicetree and dri mailing lists)
+>> >>
+>> >> Hi Jernej,
+>> >>
+>> >> Is it OK if we take this patch for the next release? Or rather,
+>> >> if there anything blocking this patch?
+>> >
+>> > I just made last check now and this patch is indeed OK. Before merging,
+>> > please read explanation below.
+>>
+>> Ack.
+>>
+>> > Background:
+>> > According to H3 datasheet and BSP driver, HDMI clock has M factor
+>> > (divider) to correctly set pixel clock to desired value. However, Jens
+>> > Kuske discovered that this factor doesn't play any role whatsoever and
+>> > instead, division factor set in PHY registers is the important one. I
+>> > confirmed that on BSP kernel by tying M factor to 0. Both, HDMI video and
+>> > audio, still worked correctly.
+>> Great. Sounds like what we have on A31 and earlier SoCs.
+>>
+>> > So that flag is necessary to set pll-video to pixel clock * div factor. I
+>> > can also change HDMI clock type to SUNXI_CCU_GATE (without M factor) and
+>> > document discrepancy with datasheet in ccu-sun8i-h3.c. Alternatively to
+>> > this patch, just in case, to be on the safe side, I can add pll-video
+>> > clock phandle to the dt node. However, as far as I know, that might
+>> > prevent selecting another parent on SoCs where HDMI clock has multiple
+>> > parents.
+>>
+>> It could be that the HDMI clock only drives the DW-HDMI sampler and other
+>> internal logic, while the PHY takes the PLL input directly for the TMDS
+>> clock? I'm not sure how you could verify this though. Maybe increase M
+>> to the maximum, and see if there is any tearing or other artifacts?
+>> Ideally we could just ask Allwinner...
+>
+> I just made quick test with maximum divider and everything seems to be ok.
+> Unfortunately, I don't have time to do extensive test.
+>
+> I will forward the question to Tl Lim and let's see if he can get the answer,
+> since the situation for A64 is completely the same.
 
-I'll publish a branch early next week with the kernel mode neon patches
-and you can base the SVE on top. We can test them together but I'll
-wait for the crypto stuff to go in before sending this branch to Linus.
+That would be much appreciated.
 
--- 
-Catalin
+>>
+>> You should change it to SUNXI_CCU_MUX_WITH_GATE if you want to change it.
+>> If there are mux bits, even if there's only one valid setting, you should
+>> still have the mux, so the kernel can actually correct any invalid settings
+>> that may be incorrectly programmed into the hardware by the bootloader or
+>> user. This would be a separate patch.
+>
+> I will leave it as it is for now. Will you still merge the patch?
+
+I'll drop it for now. Although we have this how A10s and A31, the hardware
+is not wired to actually use, as I mentioned above. We can do something
+about it once we have a better understanding of the hardware.
+
+Thanks for all the explanation and testing.
+
+Regards
+ChenYu
