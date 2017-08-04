@@ -1,159 +1,44 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 04 Aug 2017 17:03:03 +0800
-Subject: [linux-sunxi] [PATCH 10/13] [NOT FOR REVIEW NOW] clk: sunxi: Add
- CLK_SET_RATE_PARENT flag for H3 HDMI clock
-In-Reply-To: <13060066.Dl610HiJ2r@jernej-laptop>
-References: <20170801131304.7741-1-icenowy@aosc.io>
- <55076172-DD11-4AF5-AEAF-A16C757BF5F0@aosc.io>
- <CAGb2v67ihCOmjojidpGfp9WvLiWWbwL+27tm7vOrKX0rRH4O1w@mail.gmail.com>
- <13060066.Dl610HiJ2r@jernej-laptop>
-Message-ID: <E50F5E8C-2121-493C-A7B2-D1535E916471@aosc.io>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 04 Aug 2017 11:16:29 +0200
+Subject: [GIT PULL] Rockchip dts32 fixes for 4.13
+Message-ID: <3943171.Z7m20BX0pe@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd, Kevin, Olof,
+
+please find below a fixup for 32bit devicetree parts for 4.13.
+As the tag describes it is meant to stop proliferation of the
+wrong example through copy-pastes.
+
+So please pull
+
+Thanks
+Heiko
 
 
-? 2017?8?4? GMT+08:00 ??4:59:03, "Jernej ?krabec" <jernej.skrabec@siol.net> ??:
->Hi Chen-Yu,
->
->Dne petek, 04. avgust 2017 ob 06:29:50 CEST je Chen-Yu Tsai napisal(a):
->> On Fri, Aug 4, 2017 at 12:16 PM, Icenowy Zheng <icenowy@aosc.io>
->wrote:
->> > ? 2017?8?4? GMT+08:00 ??12:15:27, Chen-Yu Tsai <wens@csie.org> ??:
->> >>Hi,
->> >>
->> >>On Tue, Aug 1, 2017 at 9:13 PM, Icenowy Zheng <icenowy@aosc.io>
->wrote:
->> >>> From: Jernej Skrabec <jernej.skrabec@siol.net>
->> >>> 
->> >>> When setting the HDMI clock of H3, the PLL_VIDEO clock needs to
->be
->> >>
->> >>set.
->> >>
->> >>> Add CLK_SET_RATE_PARENT flag for H3 HDMI clock.
->> >>> 
->> >>> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
->> >>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> >>> ---
->> >>> 
->> >>>  drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 2 +-
->> >>>  1 file changed, 1 insertion(+), 1 deletion(-)
->> >>> 
->> >>> diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
->> >>
->> >>b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
->> >>
->> >>> index b1127e8629d9..2ebb3d865b01 100644
->> >>> --- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
->> >>> +++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
->> >>> @@ -474,7 +474,7 @@ static SUNXI_CCU_GATE(avs_clk,
->> >>
->> >>"avs",          "osc24M",
->> >>
->> >>>  static const char * const hdmi_parents[] = { "pll-video" };
->> >>>  static SUNXI_CCU_M_WITH_MUX_GATE(hdmi_clk, "hdmi", hdmi_parents,
->> >>> 
->> >>> -                                0x150, 0, 4, 24, 2, BIT(31), 0);
->> >>> +                                0x150, 0, 4, 24, 2, BIT(31),
->> >>
->> >>CLK_SET_RATE_PARENT);
->> >>
->> >>Line is longer than 80 characters.
->> >>
->> >>This looks independent enough so I've merged this for 4.14 with the
->> >>offending line wrapped and the following tag added:
->> >>
->> >>Fixes: 0577e4853bfb ("clk: sunxi-ng: Add H3 clocks")
->> >>
->> > Please don't merge this now until Jernej send it.
->> 
->> (Dropped Rob, devicetree and dri mailing lists)
->> 
->> Hi Jernej,
->> 
->> Is it OK if we take this patch for the next release? Or rather,
->> if there anything blocking this patch?
->
->I just made last check now and this patch is indeed OK. Before merging,
->please 
->read explanation below.
->
->Background:
->According to H3 datasheet and BSP driver, HDMI clock has M factor
->(divider) to 
->correctly set pixel clock to desired value. However, Jens Kuske
->discovered 
->that this factor doesn't play any role whatsoever and instead, division
->factor 
->set in PHY registers is the important one. I confirmed that on BSP
->kernel by 
->tying M factor to 0. Both, HDMI video and audio, still worked
->correctly.
->
->So that flag is necessary to set pll-video to pixel clock * div factor.
->I can 
->also change HDMI clock type to SUNXI_CCU_GATE (without M factor) and
->document 
->discrepancy with datasheet in ccu-sun8i-h3.c. Alternatively to this
->patch, 
->just in case, to be on the safe side, I can add pll-video clock phandle
->to the 
->dt node. However, as far as I know, that might prevent selecting
->another 
->parent on SoCs where HDMI clock has multiple parents.
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
-Unfortunately A64 is this situation -- A64 TCON1/HDMI clocks can
-use pll-video0/1 as parent, but TCON0 can only use pll-video0 or
-pll-mipi (also a downstream clock of pll-video0), and by default
-TCON1/HDMI also uses pll-video0.
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 
-Because of this I have never succeeded in multihead (LCD+HDMI)
-on Pinebook.
+are available in the git repository at:
 
->
->Regards,
->Jernej
->
->> 
->> Thanks
->> ChenYu
->> 
->> >>ChenYu
->> >>
->> >>>  static SUNXI_CCU_GATE(hdmi_ddc_clk,    "hdmi-ddc",     "osc24M",
->> >>>  
->> >>>                       0x154, BIT(31), 0);
->> >>> 
->> >>> --
->> >>> 2.13.0
->> >>> 
->> >>> --
->> >>> You received this message because you are subscribed to the
->Google
->> >>
->> >>Groups "linux-sunxi" group.
->> >>
->> >>> To unsubscribe from this group and stop receiving emails from it,
->> >>
->> >>send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> >>
->> >>> For more options, visit https://groups.google.com/d/optout.
->> > 
->> > --
->> > You received this message because you are subscribed to the Google
->Groups
->> > "linux-sunxi" group. To unsubscribe from this group and stop
->receiving
->> > emails from it, send an email to
->> > linux-sunxi+unsubscribe at googlegroups.com. For more options, visit
->> > https://groups.google.com/d/optout.
->> 
->> --
->> You received this message because you are subscribed to the Google
->Groups
->> "linux-sunxi" group. To unsubscribe from this group and stop
->receiving
->> emails from it, send an email to
->linux-sunxi+unsubscribe at googlegroups.com.
->> For more options, visit https://groups.google.com/d/optout.
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.13-rockchip-dts32fixes-1
+
+for you to fetch changes up to ca12437303f35b0a5b97c856d88886ce9df6a0d7:
+
+  ARM: dts: rockchip: fix mali gpu node on rk3288 (2017-07-16 17:04:50 +0200)
+
+----------------------------------------------------------------
+Fix for the recently added mali dt support. The example
+showed a wrong value, so fix it before it gets copy-pasted
+to much.
+
+----------------------------------------------------------------
+Heiko Stuebner (2):
+      dt-bindings: gpu: drop wrong compatible from midgard binding example
+      ARM: dts: rockchip: fix mali gpu node on rk3288
+
+ Documentation/devicetree/bindings/gpu/arm,mali-midgard.txt | 2 +-
+ arch/arm/boot/dts/rk3288.dtsi                              | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
