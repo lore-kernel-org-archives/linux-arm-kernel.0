@@ -1,28 +1,34 @@
 From: rocky.hao@rock-chips.com (Rocky Hao)
-Date: Fri,  4 Aug 2017 16:06:11 +0800
-Subject: [PATCH v2 0/5] thermal: rockchip: add tsadc support in thermal driver
- and IPA thermal control for rk3328 in dts
-Message-ID: <1501833976-1100-1-git-send-email-rocky.hao@rock-chips.com>
+Date: Fri,  4 Aug 2017 16:06:12 +0800
+Subject: [PATCH v2 1/5] dt-bindings: rockchip-thermal: Support the RK3328 SoC
+ compatible
+In-Reply-To: <1501833976-1100-1-git-send-email-rocky.hao@rock-chips.com>
+References: <1501833976-1100-1-git-send-email-rocky.hao@rock-chips.com>
+Message-ID: <1501833976-1100-2-git-send-email-rocky.hao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series patches add the tsadc support in thermal driver and in devicetree for rk3328.
-Also add thermal control with Intelligent Power Allocation (IPA) policy by default.  Please
-refer to https://developer.arm.com/open-source/intelligent-power-allocation for more information
-about IPA.
+attempt to new compatible for thermal founding on RK3328 SoC.
 
-Rocky Hao (5):
-  dt-bindings: rockchip-thermal: Support the RK3328 SoC compatible
-  thermal: rockchip: Support the RK3328 SOC in thermal driver
-  arm64: dts: rockchip: add tsadc node for rk3328 SoC
-  arm64: dts: rockchip: add thermal nodes for rk3328 SoC
-  arm64: dts: rockchip: Enable tsadc module on RK3328 eavluation board
+Signed-off-by: Rocky Hao <rocky.hao@rock-chips.com>
+---
+Change in v2:
+- remove gerrit Change-Id
 
- .../bindings/thermal/rockchip-thermal.txt          |  1 +
- arch/arm64/boot/dts/rockchip/rk3328-evb.dts        |  4 ++
- arch/arm64/boot/dts/rockchip/rk3328.dtsi           | 63 +++++++++++++++++++++
- drivers/thermal/rockchip_thermal.c                 | 65 ++++++++++++++++++++++
- 4 files changed, 133 insertions(+)
+ Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+index 43003aec94bd..e3a6234fb1ac 100644
+--- a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
++++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+@@ -4,6 +4,7 @@ Required properties:
+ - compatible : should be "rockchip,<name>-tsadc"
+    "rockchip,rk3228-tsadc": found on RK3228 SoCs
+    "rockchip,rk3288-tsadc": found on RK3288 SoCs
++   "rockchip,rk3328-tsadc": found on RK3328 SoCs
+    "rockchip,rk3368-tsadc": found on RK3368 SoCs
+    "rockchip,rk3399-tsadc": found on RK3399 SoCs
+ - reg : physical base address of the controller and length of memory mapped
 -- 
 1.9.1
