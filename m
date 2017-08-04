@@ -1,57 +1,73 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 3 Aug 2017 20:16:54 -0500
-Subject: [PATCH 0/6] Support for LEGO MINDSTORMS EV3 LCD display
-In-Reply-To: <03f423be-7b4c-13ec-7126-c0d9af6ebe4a@lechnology.com>
-References: <1501355870-13960-1-git-send-email-david@lechnology.com>
- <5d8f6518-8d7e-c029-2da4-e3417afb3e40@lechnology.com>
- <28188f5c-1daf-121b-6daf-1899668c3875@tronnes.org>
- <1ce36d43-b9dd-807e-23aa-bac4fda70fdc@lechnology.com>
- <bfb3d541-856b-0233-dd85-72512788939f@tronnes.org>
- <bbec0574-311a-e1b4-d7fd-f6fb15b078d2@lechnology.com>
- <b8ec0511-afd1-2a1b-6ffe-dfe951d79bf7@tronnes.org>
- <cf740449-c952-08d4-d63c-d92e71fa3092@lechnology.com>
- <CAHp75Vdaq0ersEa2_XneUQtsJMj2GCRZL4Wi=1HQorLkb4SaVg@mail.gmail.com>
- <CAHp75Vf2GVASatG_aJrBPNHR-jQLoYtOPan5ezcoWRDuEsXbNw@mail.gmail.com>
- <260320c5-8064-6388-168b-acad5a1aa0f2@tronnes.org>
- <03f423be-7b4c-13ec-7126-c0d9af6ebe4a@lechnology.com>
-Message-ID: <959f607c-f2ee-51d8-db39-1ef91859f22f@lechnology.com>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Fri, 4 Aug 2017 09:32:25 +0800
+Subject: [PATCH v3 1/4] memory: mtk-smi: Use of_device_get_match_data helper
+In-Reply-To: <1501810348-20997-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1501810348-20997-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1501810348-20997-2-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/03/2017 08:08 PM, David Lechner wrote:
-> On 08/03/2017 03:11 PM, Noralf Tr?nnes wrote:
->>
->> Den 03.08.2017 19.11, skrev Andy Shevchenko:
->>> On Thu, Aug 3, 2017 at 8:09 PM, Andy Shevchenko
->>> <andy.shevchenko@gmail.com> wrote:
->>>> On Thu, Aug 3, 2017 at 6:18 PM, David Lechner <david@lechnology.com> 
->>>> wrote:
->>>>
->>>>> The particular display I have is this one:
->>>>> http://wiki.seeed.cc/Grove-OLED_Display_1.12inch/
->>>>>
->>>>> It looks like it uses a command/data scheme like the MIPI displays, 
->>>>> but
->>>>> doesn't use any of the standard values for the commands. The 
->>>>> controller can
->>>>> do parallel, SPI and I2C, but the display I have is wired for I2C.
->>>> It looks very similar to ssd1306. Some description refers to ssd1308.
->>> http://www.mouser.com/catalog/specsheets/Seeed_104030008.pdf
->>>
->>
->> That pdf refers to another one: 
->> http://wiki.seeed.cc/Grove-OLED_Display_0.96inch/
->> There's an fbdev driver that supports ssd1305, ssd1306, ssd1307 and 
->> ssd1309:
->> https://www.kernel.org/doc/Documentation/devicetree/bindings/display/ssd1307fb.txt 
->>
->> http://elixir.free-electrons.com/linux/latest/source/drivers/video/fbdev/ssd1307fb.c 
->>
->> Maybe the ssd1308 will work with that driver...
->>
-> 
-> The display I have uses a ssd1327 controller. It is 16-bit grayscale. 
-> The ssd130x are all 1-bit monochrome. So, probably more like the ssd1325 
-> driver in fbftf.
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-correction, 4-bit grayscale
+Replace custom code with generic helper to retrieve driver data.
+
+Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+---
+ drivers/memory/mtk-smi.c | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+index 4afbc41..2b798bb4 100644
+--- a/drivers/memory/mtk-smi.c
++++ b/drivers/memory/mtk-smi.c
+@@ -240,20 +240,15 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *smi_node;
+ 	struct platform_device *smi_pdev;
+-	const struct of_device_id *of_id;
+ 
+ 	if (!dev->pm_domain)
+ 		return -EPROBE_DEFER;
+ 
+-	of_id = of_match_node(mtk_smi_larb_of_ids, pdev->dev.of_node);
+-	if (!of_id)
+-		return -EINVAL;
+-
+ 	larb = devm_kzalloc(dev, sizeof(*larb), GFP_KERNEL);
+ 	if (!larb)
+ 		return -ENOMEM;
+ 
+-	larb->larb_gen = of_id->data;
++	larb->larb_gen = of_device_get_match_data(dev);
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	larb->base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(larb->base))
+@@ -319,7 +314,6 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct mtk_smi *common;
+ 	struct resource *res;
+-	const struct of_device_id *of_id;
+ 	enum mtk_smi_gen smi_gen;
+ 
+ 	if (!dev->pm_domain)
+@@ -338,17 +332,13 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+ 	if (IS_ERR(common->clk_smi))
+ 		return PTR_ERR(common->clk_smi);
+ 
+-	of_id = of_match_node(mtk_smi_common_of_ids, pdev->dev.of_node);
+-	if (!of_id)
+-		return -EINVAL;
+-
+ 	/*
+ 	 * for mtk smi gen 1, we need to get the ao(always on) base to config
+ 	 * m4u port, and we need to enable the aync clock for transform the smi
+ 	 * clock into emi clock domain, but for mtk smi gen2, there's no smi ao
+ 	 * base.
+ 	 */
+-	smi_gen = (enum mtk_smi_gen)of_id->data;
++	smi_gen = (enum mtk_smi_gen)of_device_get_match_data(dev);
+ 	if (smi_gen == MTK_SMI_GEN1) {
+ 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 		common->smi_ao_base = devm_ioremap_resource(dev, res);
+-- 
+2.6.4
