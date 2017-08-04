@@ -1,55 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Aug 2017 15:50:31 +0100
-Subject: [PATCH 0/5] Simplify kernel-mode NEON
-In-Reply-To: <20170804142505.GM6321@e103592.cambridge.arm.com>
-References: <1501777403-9782-1-git-send-email-Dave.Martin@arm.com>
- <20170804120858.ff3772f3zzik37pp@armageddon.cambridge.arm.com>
- <20170804122225.jiceb2vbgrld2y7z@armageddon.cambridge.arm.com>
- <CAKv+Gu-YG1EbpvaL46T0fzD=RZ7itqizrH=AkYAN1YmTupmKGw@mail.gmail.com>
- <20170804131211.2wn2zi74kuzuwneo@armageddon.cambridge.arm.com>
- <CAKv+Gu_va4hD-MztzRUhXxTwqnbKcmOmV8NN9j+TG8_jWA0wNA@mail.gmail.com>
- <20170804132606.GQ989@e103592.cambridge.arm.com>
- <20170804140526.cu3ojheqomsxzyjb@armageddon.cambridge.arm.com>
- <20170804142505.GM6321@e103592.cambridge.arm.com>
-Message-ID: <20170804145030.7dun77kcwjdfal23@armageddon.cambridge.arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 04 Aug 2017 17:54:27 +0300
+Subject: [PATCH v3 3/6] dt-bindings: add binding for Sitronix ST7586
+ display panels
+In-Reply-To: <1501799630-1650-4-git-send-email-david@lechnology.com>
+References: <1501799630-1650-1-git-send-email-david@lechnology.com>
+ <1501799630-1650-4-git-send-email-david@lechnology.com>
+Message-ID: <2434051.fAH1OaXNrL@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 04, 2017 at 03:25:05PM +0100, Dave P Martin wrote:
-> On Fri, Aug 04, 2017 at 03:05:26PM +0100, Catalin Marinas wrote:
-> > On Fri, Aug 04, 2017 at 02:26:06PM +0100, Dave P Martin wrote:
-> > > On Fri, Aug 04, 2017 at 02:21:52PM +0100, Ard Biesheuvel wrote:
-> 
-> [...]
-> 
-> > > > >> On 4 August 2017 at 13:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> 
-> [...]
-> 
-> > > > >> > ... and reverted.
-> 
-> [...]
-> 
-> > > > Perhaps we could stick it on a separate branch for this cycle (with
-> > > > the suggested tweak) and get it pulled it into -next separately? That
-> > > > way, you can forward it as a late pull, after Herbert's stuff gets in.
-> > > 
-> > > Or I could prepend the patches to the SVE series, and we wait for Linux
-> > > to pull the crypto branch before merging that.  (I still need to repost
-> > > and the SVE patches need to be reviewed, so that isn't imminent.)
-> > 
-> > I'll publish a branch early next week with the kernel mode neon patches
-> > and you can base the SVE on top. We can test them together but I'll
-> > wait for the crypto stuff to go in before sending this branch to Linus.
-> 
-> OK, this sounds like a good approach.
-> 
-> Ping me when you have a branch, but anyway I'll drop those patches from
-> the SVE series.
+Hi David,
 
-Here it is:
+Thank you for the patch.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux for-next/kernel-mode-neon
+On Thursday 03 Aug 2017 17:33:47 David Lechner wrote:
+> This adds a new binding for Sitronix ST7586 display panels.
+> 
+> Using lego as the vendor prefix in the compatible string because the display
+> panel I am working with is an integral part of the LEGO MINDSTORMS EV3.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
+> ---
+>  .../bindings/display/sitronix,st7586.txt           | 26 +++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644
+> Documentation/devicetree/bindings/display/sitronix,st7586.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/display/sitronix,st7586.txt
+> b/Documentation/devicetree/bindings/display/sitronix,st7586.txt new file
+> mode 100644
+> index 0000000..dfb0b7b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
+> @@ -0,0 +1,26 @@
+> +Sitronix ST7586 display panel
+> +
+> +Required properties:
+> +- compatible:	"lego,ev3-lcd".
+> +
+> +The node for this driver must be a child node of a SPI controller, hence
+> +all mandatory properties described in ../spi/spi-bus.txt must be specified.
+> +
+> +Optional properties:
+> +- dc-gpios:	D/C pin. The presence/absence of this GPIO determines
+> +		the panel interface operation mode (IF[3:1] pins):
+> +		- present: IF=011 4-wire 8-bit data serial interface
+> +		- absent:  IF=010 3-wire 9-bit data serial interface
+
+How does this work ? Do you have a single GPIO on your system connected to 
+IF[1], with IF[3:2] hardwired to 01 ?
+
+> +- reset-gpios:	Reset pin
+> +- power-supply:	A regulator node for the supply voltage.
+> +- backlight:	phandle of the backlight device attached to the panel
+> +- rotation:	panel rotation in degrees counter clockwise (0,90,180,270)
+
+Please use the OF graph DT bindings (a.k.a. ports) to describe the connection 
+between the panel and its source.
+
+> +Example:
+> +	display at 0{
+> +		compatible = "lego,ev3-lcd";
+> +		reg = <0>;
+> +		spi-max-frequency = <10000000>;
+> +		dc-gpios = <&gpio 43 GPIO_ACTIVE_HIGH>;
+> +		reset-gpios = <&gpio 80 GPIO_ACTIVE_HIGH>;
+> +	};
 
 -- 
-Catalin
+Regards,
+
+Laurent Pinchart
