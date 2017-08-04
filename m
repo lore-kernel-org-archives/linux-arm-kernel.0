@@ -1,48 +1,45 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Fri, 4 Aug 2017 09:32:28 +0800
-Subject: [PATCH v3 4/4] arm: dts: mediatek: add larbid property for larb
-In-Reply-To: <1501810348-20997-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1501810348-20997-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1501810348-20997-5-git-send-email-honghui.zhang@mediatek.com>
+Date: Fri, 4 Aug 2017 09:32:24 +0800
+Subject: [PATCH v3 0/4] Add larbid init routine for mediatek's gen1 smi larb
+ driver
+Message-ID: <1501810348-20997-1-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-Add mediatek's hardware id information for smi larb.
+Mediatek's gen1 smi need the hardware larb-id to identify the offset for
+the register which controls whether enable iommu for this larb.
+In the commit 3c8f4ad85c4b ("memory/mediatek: add support for mt2701"),
+the larbid was used without properly initialized. This patchset fixed
+that.
+Also include a patch which using the of_device_get_match_data helper to
+simplify the code.
+This patchset was base on 4.13-rc1.
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
----
- arch/arm/boot/dts/mt2701.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+Change since v2:
+ - Using compatible strings of "mediatek,larb-id" instead of "mediatek,larbid"
+   to make it a bit easier to read.
+ - Put the v2 of the patch ("memory: mtk-smi: Use of_device_get_match_data helper")[1]
+   in this patchset to make the changes easier for review.
+ - Add the reivewer's tag in commit messages.
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index f1efdc6..d95bfe0 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -533,6 +533,7 @@
- 		compatible = "mediatek,mt2701-smi-larb";
- 		reg = <0 0x14010000 0 0x1000>;
- 		mediatek,smi = <&smi_common>;
-+		mediatek,larb-id = <0>;
- 		clocks = <&mmsys CLK_MM_SMI_LARB0>,
- 			 <&mmsys CLK_MM_SMI_LARB0>;
- 		clock-names = "apb", "smi";
-@@ -549,6 +550,7 @@
- 		compatible = "mediatek,mt2701-smi-larb";
- 		reg = <0 0x15001000 0 0x1000>;
- 		mediatek,smi = <&smi_common>;
-+		mediatek,larb-id = <2>;
- 		clocks = <&imgsys CLK_IMG_SMI_COMM>,
- 			 <&imgsys CLK_IMG_SMI_COMM>;
- 		clock-names = "apb", "smi";
-@@ -579,6 +581,7 @@
- 		compatible = "mediatek,mt2701-smi-larb";
- 		reg = <0 0x16010000 0 0x1000>;
- 		mediatek,smi = <&smi_common>;
-+		mediatek,larb-id = <1>;
- 		clocks = <&vdecsys CLK_VDEC_CKGEN>,
- 			 <&vdecsys CLK_VDEC_LARB>;
- 		clock-names = "apb", "smi";
+Change since v1:
+ - Using mtk_smi_larb_gen to identify whether larbid was needed instead of
+   checking hard code bindings.
+
+[1] https://patchwork.kernel.org/patch/9864719
+
+Honghui Zhang (4):
+  memory: mtk-smi: Use of_device_get_match_data helper
+  memory: mtk-smi: add larbid handle routine
+  dt-bindings: mediatek: add descriptions for larbid
+  arm: dts: mediatek: add larbid property for larb
+
+ .../memory-controllers/mediatek,smi-larb.txt       | 15 +++++++++++++
+ arch/arm/boot/dts/mt2701.dtsi                      |  3 +++
+ drivers/memory/mtk-smi.c                           | 26 ++++++++++++----------
+ 3 files changed, 32 insertions(+), 12 deletions(-)
+
 -- 
 2.6.4
