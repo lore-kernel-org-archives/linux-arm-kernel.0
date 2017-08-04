@@ -1,26 +1,41 @@
-From: mika.westerberg@linux.intel.com (Mika Westerberg)
-Date: Fri, 4 Aug 2017 13:29:29 +0300
-Subject: [PATCH RFC 2/2] spi: pxa2xx: Only claim CS GPIOs when the slave
- device is created
-In-Reply-To: <5a691263ccf9d61134d6184861b37eaf37b13b77.1501760433.git.jan.kiszka@siemens.com>
-References: <cover.1501760433.git.jan.kiszka@siemens.com>
- <5a691263ccf9d61134d6184861b37eaf37b13b77.1501760433.git.jan.kiszka@siemens.com>
-Message-ID: <20170804102929.GY2369@lahna.fi.intel.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri,  4 Aug 2017 12:29:53 +0200
+Subject: [PATCH 1/2] devicetree: ARM: zynq: Add DT binding for eFuse controller
+Message-ID: <4b4bfaad88f16d7229bf3da58be8f50f9d82a461.1501842586.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 03, 2017 at 01:40:33PM +0200, Jan Kiszka wrote:
-> From: Jan Kiszka <jan.kiszka@siemens.com>
-> 
-> Avoid hogging chip select GPIOs just because they are listed for the
-> master. They might be mulitplexed and, if no slave device is attached,
-> used for different purposes. Moreover, this strategy avoids having to
-> allocate a cs_gpiods structure.
-> 
-> Tested on the IOT2000 where the second SPI bus is connected to an
-> Arduino-compatible connector and multiplexed between SPI, GPIO and PWM
-> usage.
-> 
-> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+Add DT binding for eFuse controller available at Xilinx Zynq
+SoC.
 
-Acked-by: Mika Westerberg <mika.westerberg@linux.intel.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+---
+
+ Documentation/devicetree/bindings/arm/zynq/zynq-efuse.txt | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/zynq/zynq-efuse.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/zynq/zynq-efuse.txt b/Documentation/devicetree/bindings/arm/zynq/zynq-efuse.txt
+new file mode 100644
+index 000000000000..39817e9750c3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/zynq/zynq-efuse.txt
+@@ -0,0 +1,15 @@
++Device tree bindings for Zynq's eFuse Controller
++
++The Zynq eFuse controller provides the access to the chip efuses which contain
++information about device DNA, security settings and also device status.
++
++Required properties:
++ compatible: Compatibility string. Must be "xlnx,zynq-efuse".
++ reg: Specify the base and size of the EFUSE controller registers
++      in the memory map. E.g.: reg = <0xf800d000 0x20>;
++
++Example:
++efuse: efuse at f800d000 {
++	compatible = "xlnx,zynq-efuse";
++	reg = <0xf800d000 0x20>;
++};
+-- 
+1.9.1
