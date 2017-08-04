@@ -1,88 +1,78 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 4 Aug 2017 10:51:37 -0500
-Subject: [PATCH v3 3/6] dt-bindings: add binding for Sitronix ST7586
- display panels
-In-Reply-To: <2434051.fAH1OaXNrL@avalon>
-References: <1501799630-1650-1-git-send-email-david@lechnology.com>
- <1501799630-1650-4-git-send-email-david@lechnology.com>
- <2434051.fAH1OaXNrL@avalon>
-Message-ID: <cc04e31c-2206-2f0c-0f92-7ef096bfd9da@lechnology.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 4 Aug 2017 18:18:22 +0200
+Subject: [GIT PULL] Amlogic clock driver updates for 4.14
+Message-ID: <894174b4-63d5-1e7d-c518-5bba150178ab@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04/2017 09:54 AM, Laurent Pinchart wrote:
-> Hi David,
-> 
-> Thank you for the patch.
-> 
-> On Thursday 03 Aug 2017 17:33:47 David Lechner wrote:
->> This adds a new binding for Sitronix ST7586 display panels.
->>
->> Using lego as the vendor prefix in the compatible string because the display
->> panel I am working with is an integral part of the LEGO MINDSTORMS EV3.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
->>   .../bindings/display/sitronix,st7586.txt           | 26 +++++++++++++++++++
->>   1 file changed, 26 insertions(+)
->>   create mode 100644
->> Documentation/devicetree/bindings/display/sitronix,st7586.txt
->>
->> diff --git a/Documentation/devicetree/bindings/display/sitronix,st7586.txt
->> b/Documentation/devicetree/bindings/display/sitronix,st7586.txt new file
->> mode 100644
->> index 0000000..dfb0b7b
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
->> @@ -0,0 +1,26 @@
->> +Sitronix ST7586 display panel
->> +
->> +Required properties:
->> +- compatible:	"lego,ev3-lcd".
->> +
->> +The node for this driver must be a child node of a SPI controller, hence
->> +all mandatory properties described in ../spi/spi-bus.txt must be specified.
->> +
->> +Optional properties:
->> +- dc-gpios:	D/C pin. The presence/absence of this GPIO determines
->> +		the panel interface operation mode (IF[3:1] pins):
->> +		- present: IF=011 4-wire 8-bit data serial interface
->> +		- absent:  IF=010 3-wire 9-bit data serial interface
-> 
-> How does this work ? Do you have a single GPIO on your system connected to
-> IF[1], with IF[3:2] hardwired to 01 ?
+Hi Mike, Stephen,
 
-LEGO has not made the internals of the display publicly available, so I 
-cannot say for sure. But I assume that IF[3:1] is hardwired to 011. This 
-causes pin D1 to assigned to the signal A0, which is what we are calling 
-the dc gpio here.
+Below is a request to pull the Amlogic clock driver updates for 4.14.
 
-If IF[3:1] were hardwired to 010, then pin D1 would be not not used and 
-there would be no A0 signal.
+Thanks,
+Neil
 
-So, basically, we can infer the state of IF[3:1] by the fact that we 
-have a dc pin or not.
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
-> 
->> +- reset-gpios:	Reset pin
->> +- power-supply:	A regulator node for the supply voltage.
->> +- backlight:	phandle of the backlight device attached to the panel
->> +- rotation:	panel rotation in degrees counter clockwise (0,90,180,270)
-> 
-> Please use the OF graph DT bindings (a.k.a. ports) to describe the connection
-> between the panel and its source.
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 
-I am afraid that I do not understand this request. What would the source 
-of the panel be? There is nothing like a SoC LCD controller that is 
-driving this panel.
+are available in the git repository at:
 
-> 
->> +Example:
->> +	display at 0{
->> +		compatible = "lego,ev3-lcd";
->> +		reg = <0>;
->> +		spi-max-frequency = <10000000>;
->> +		dc-gpios = <&gpio 43 GPIO_ACTIVE_HIGH>;
->> +		reset-gpios = <&gpio 80 GPIO_ACTIVE_HIGH>;
->> +	};
-> 
+  git://github.com/baylibre/clk-meson.git tags/meson-clk-for-4.14
+
+for you to fetch changes up to 62ec0b9754aced0b4c02694886cbe9bfd3d00f2f:
+
+  clk: meson: gxbb-aoclk: Add CEC 32k clock (2017-08-04 18:02:02 +0200)
+
+----------------------------------------------------------------
+Amlogic clock driver updates for 4.14
+
+* meson8b: add the reset controller to the clkc
+* meson: expose all clk ids
+* gxbb-aoclk: Add CEC 32k clock
+* gxbb: add mmc input 0 clocks
+* meson: fix protection against undefined clks
+* gxbb: fix audio divider flags
+
+----------------------------------------------------------------
+Jerome Brunet (8):
+      clk: meson: meson8b: fix protection against undefined clks
+      clk: meson: gxbb: fix protection against undefined clks
+      clk: meson8b: expose every clock in the bindings
+      clk: meson-gxbb: expose almost every clock in the bindings
+      clk: meson: gxbb: Add sd_emmc clk0 clkids
+      clk: meson: gxbb: fix meson cts_amclk divider flags
+      clk: meson: gxbb: fix clk_mclk_i958 divider flags
+      clk: meson: gxbb: Add sd_emmc clk0 clocks
+
+Martin Blumenstingl (2):
+      dt-bindings: clock: meson8b: describe the embedded reset controller
+      clk: meson: meson8b: register the built-in reset controller
+
+Neil Armstrong (4):
+      dt-bindings: clock: gxbb-aoclk: Add CEC 32k clock
+      dt-bindings: clock: amlogic, gxbb-aoclkc: Update bindings
+      clk: meson: gxbb-aoclk: Switch to regmap for register access
+      clk: meson: gxbb-aoclk: Add CEC 32k clock
+
+ .../bindings/clock/amlogic,gxbb-aoclkc.txt         |  22 ++-
+ .../bindings/clock/amlogic,meson8b-clkc.txt        |   9 +-
+ drivers/clk/meson/Kconfig                          |   1 +
+ drivers/clk/meson/Makefile                         |   2 +-
+ drivers/clk/meson/gxbb-aoclk-32k.c                 | 194 +++++++++++++++++++++
+ drivers/clk/meson/gxbb-aoclk-regmap.c              |  46 +++++
+ drivers/clk/meson/gxbb-aoclk.c                     |  65 ++++---
+ drivers/clk/meson/gxbb-aoclk.h                     |  42 +++++
+ drivers/clk/meson/gxbb.c                           | 189 +++++++++++++++++++-
+ drivers/clk/meson/gxbb.h                           | 125 ++-----------
+ drivers/clk/meson/meson8b.c                        | 160 +++++++++++++++--
+ drivers/clk/meson/meson8b.h                        | 112 ++----------
+ include/dt-bindings/clock/gxbb-aoclkc.h            |   1 +
+ include/dt-bindings/clock/gxbb-clkc.h              |  63 +++++++
+ include/dt-bindings/clock/meson8b-clkc.h           |  70 ++++++++
+ .../dt-bindings/reset/amlogic,meson8b-clkc-reset.h |  27 +++
+ 16 files changed, 870 insertions(+), 258 deletions(-)
+ create mode 100644 drivers/clk/meson/gxbb-aoclk-32k.c
+ create mode 100644 drivers/clk/meson/gxbb-aoclk-regmap.c
+ create mode 100644 drivers/clk/meson/gxbb-aoclk.h
+ create mode 100644 include/dt-bindings/reset/amlogic,meson8b-clkc-reset.h
