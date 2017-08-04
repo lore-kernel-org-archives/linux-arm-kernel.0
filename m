@@ -1,65 +1,38 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 4 Aug 2017 12:14:45 +0200
-Subject: [PATCH v3.1 0/4] clk: meson: gxbb-aoclk: Add CEC 32k clock
-In-Reply-To: <1501588619-10991-1-git-send-email-narmstrong@baylibre.com>
-References: <1501588619-10991-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <d7c27631-e50a-501a-a94f-28a124f9aa74@baylibre.com>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Fri, 4 Aug 2017 12:18:28 +0200
+Subject: [PATCH RFC 1/2] spi: pxa2xx: Convert to GPIO descriptor API where
+ possible
+In-Reply-To: <20170804101029.GV2369@lahna.fi.intel.com>
+References: <cover.1501760433.git.jan.kiszka@siemens.com>
+ <6bfd2b29b888c14f1a6feb9dee5bb54b74e761b0.1501760433.git.jan.kiszka@siemens.com>
+ <20170804101029.GV2369@lahna.fi.intel.com>
+Message-ID: <b411858d-6a09-a3bc-555d-b1e648b9c8ed@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/01/2017 01:56 PM, Neil Armstrong wrote:
-> In order to support the standalone CEC Controller on the Amlogic SoCs,
-> a specific CEC 32K clock must be handled in the AO domain.
+On 2017-08-04 12:10, Mika Westerberg wrote:
+> On Thu, Aug 03, 2017 at 01:40:32PM +0200, Jan Kiszka wrote:
+>> From: Jan Kiszka <jan.kiszka@siemens.com>
+>>
+>> We still need to request/free GPIOs passed via the legacy path of
+>> pxa2xx_spi_chip::gpio_cs, but we can use the gpiod API otherwise.
+>>
+>> Consistently use the descriptor API instead of the legacy one.
+>>
+>> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
 > 
-> The CEC 32K AO Clock is a dual divider with dual counter to provide a more
-> precise 32768Hz clock for the CEC subsystem from the external xtal.
+> There are some PXA2xx platforms under arch/arm/* which use this driver
+> and legacy GPIOs. I wonder if this causes any problems with them?
 > 
-> The AO clocks management registers are spread among the AO register space,
-> so this patch also adds management of these registers mappings then uses them
-> for the CEC 32K AO clock management.
-> 
-> This patchset :
->  - updates the bindings accordingly
->  - switch driver to new bindings
->  - adds the CEC 32k clock
->  - adds the clock binding entry
-> 
-> The DT Update will be sent in another patchset.
-> 
-> Changes since v3 at [3] :
->  - fix typo in cec_32k set_rate
-> 
-> Changes since v2 at [2] :
->  - fix round_rate invalid handling
->  - enhance set_rate code thanks to Chris Moore
->  - add more explicit comments thanks to Martin
-> 
-> Changes since v1 at [1] :
->  - move bindings to parent syscon node and move clkc to subnode
->  - switch aoclkc to use regmap only register access
->  - introduce aoclk-regmap-gate for this purpose until regmap clocks are generic
-> 
-> [1] https://lkml.kernel.org/r/1499336663-23875-1-git-send-email-narmstrong at baylibre.com
-> [2] https://lkml.kernel.org/r/1501235589-318-1-git-send-email-narmstrong at baylibre.com
-> [3] https://lkml.kernel.org/r/1501504957-19476-1-git-send-email-narmstrong at baylibre.com
-> 
-> Neil Armstrong (4):
->   dt-bindings: clock: amlogic,gxbb-aoclkc: Update bindings
->   clk: meson: gxbb-aoclk: Switch to regmap for register access
->   dt-bindings: clock: gxbb-aoclk: Add CEC 32k clock
->   clk: meson: gxbb-aoclk: Add CEC 32k clock
-> 
->  .../bindings/clock/amlogic,gxbb-aoclkc.txt         |  22 ++-
->  drivers/clk/meson/Makefile                         |   2 +-
->  drivers/clk/meson/gxbb-aoclk-32k.c                 | 194 +++++++++++++++++++++
->  drivers/clk/meson/gxbb-aoclk-regmap.c              |  46 +++++
->  drivers/clk/meson/gxbb-aoclk.c                     |  65 ++++---
->  drivers/clk/meson/gxbb-aoclk.h                     |  42 +++++
->  include/dt-bindings/clock/gxbb-aoclkc.h            |   1 +
->  7 files changed, 342 insertions(+), 30 deletions(-)
->  create mode 100644 drivers/clk/meson/gxbb-aoclk-32k.c
->  create mode 100644 drivers/clk/meson/gxbb-aoclk-regmap.c
->  create mode 100644 drivers/clk/meson/gxbb-aoclk.h
-> 
+> That was one of the reasons I did not convert the whole driver over GPIO
+> descriptors.
 
-Applied to clk-meson's next/drivers except for patch 3 to next/headers
+It shouldn't cause problems (famous last words) because I refrained from
+changing the interfaces to them. References that come in as legacy GPIO
+are still treated like that.
+
+Jan
+
+-- 
+Siemens AG, Corporate Technology, CT RDA ITP SES-DE
+Corporate Competence Center Embedded Linux
