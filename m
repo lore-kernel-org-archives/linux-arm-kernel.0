@@ -1,75 +1,421 @@
-From: hoeun.ryu@gmail.com (Hoeun Ryu)
-Date: Fri, 4 Aug 2017 22:26:31 +0900
-Subject: [PATCH] arm:lpae: build TTB control register value from scratch
- in v7_ttb_setup
-In-Reply-To: <2618aca3-c638-1496-7dbe-f865a17b1fbd@arm.com>
-References: <1497232084-31907-1-git-send-email-hoeun.ryu@gmail.com>
- <1501826879.28554.47.camel@gmail.com>
- <2618aca3-c638-1496-7dbe-f865a17b1fbd@arm.com>
-Message-ID: <B1449568-246F-4DDC-A04D-344AF61D227A@gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  4 Aug 2017 15:26:20 +0200
+Subject: [PATCH] arm64: dts: r8a7795: Add OPPs table for cpu devices
+Message-ID: <1501853180-23939-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Dien Pham <dien.pham.ry@rvc.renesas.com>
 
+Current, OPP tables are defined temporary,
+they are being evaluated and adjust in future.
 
-2017. 8. 4. ?? 7:04 Robin Murphy <robin.murphy@arm.com> ??:
+Based in part on work by Hien Dang.
 
->> On 04/08/17 07:07, Hoeun Ryu wrote:
->> Hello, Russell King.
->> 
->> The following patch has not merged yet.
->> Do you have a plan to accept and merge this patch ?
-> 
-> This should probably go through the ARM tree, so please submit it to
-> Russell's patch-tracking system here:
-> 
-> http://www.armlinux.org.uk/developer/patches/
+Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+[simon: consolidated sseveral patches into one]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 309 +++++++++++++++++++++++++++++++
+ 1 file changed, 309 insertions(+)
 
-Thank you for the reply, I'll try it.
+I am not aware of any build-time depdendencies of this patch.
 
-> 
-> Robin.
-> 
->> 
->> Thank you.
->> 
->>> On Mon, 2017-06-12 at 10:47 +0900, Hoeun Ryu wrote:
->>> Reading TTBCR in early boot stage might return the value of the previous
->>> kernel's configuration, especially in case of kexec. For example, if
->>> normal kernel (first kernel) had run on a configuration of PHYS_OFFSET <=
->>> PAGE_OFFSET and crash kernel (second kernel) is running on a configuration
->>> PHYS_OFFSET > PAGE_OFFSET, which can happen because it depends on the
->>> reserved area for crash kernel, reading TTBCR and using the value to OR
->>> other bit fields might be risky because it doesn't have a reset value for
->>> TTBCR.
->>> 
->>> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
->>> Suggested-by: Robin Murphy <robin.murphy@arm.com>
->>> Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
->>> 
->>> ---
->>> 
->>> * add Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
->>> * v1: amended based on
->>>     - "[PATCHv2] arm: LPAE: kexec: clear TTBCR.T1SZ explicitly when
->>>        PHYS_OFFSET > PAGE_OFFSET"
->>>     - https://lkml.org/lkml/2017/6/5/239
->>> 
->>> arch/arm/mm/proc-v7-3level.S | 3 +--
->>> 1 file changed, 1 insertion(+), 2 deletions(-)
->>> 
->>> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
->>> index 5e5720e..7d16bbc 100644
->>> --- a/arch/arm/mm/proc-v7-3level.S
->>> +++ b/arch/arm/mm/proc-v7-3level.S
->>> @@ -129,8 +129,7 @@ ENDPROC(cpu_v7_set_pte_ext)
->>>    .macro    v7_ttb_setup, zero, ttbr0l, ttbr0h, ttbr1, tmp
->>>    ldr    \tmp, =swapper_pg_dir        @ swapper_pg_dir virtual address
->>>    cmp    \ttbr1, \tmp, lsr #12        @ PHYS_OFFSET > PAGE_OFFSET?
->>> -    mrc    p15, 0, \tmp, c2, c0, 2        @ TTB control egister
->>> -    orr    \tmp, \tmp, #TTB_EAE
->>> +    mov    \tmp, #TTB_EAE            @ for TTB control egister
->>>    ALT_SMP(orr    \tmp, \tmp, #TTB_FLAGS_SMP)
->>>    ALT_UP(orr    \tmp, \tmp, #TTB_FLAGS_UP)
->>>    ALT_SMP(orr    \tmp, \tmp, #TTB_FLAGS_SMP << 16)
-> 
+This patch has run-time depdnencies on:
+* [PATCH] cpufreq: rcar: Add support for R8A7795 SoC
+* [PATCH 0/4] r8a7795: Add Z and Z2 clock support
+
+I have provided an integration patch with this patch, those DTS changes,
+and Renesas clock updates also depended on by the DTS changes. The result
+is working CPUFreq for the r8a7795 (R-Car H3) ES1.0.
+
+https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/r8a7795-cpufreq
+
+A description of steps taken to lightly exercise the above can be found here:
+
+http://elinux.org/Tests:R-CAR-GEN3-CPUFreq
+
+If this work is acceptable I plan to follow up with patches to
+enable CPUFreq on the r8a7796 (R-Car M3-W).
+
+This patch is based on renesas-arm64-dt-for-v4.14
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index a87ae76880ab..f34da4c9ea52 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -46,6 +46,12 @@
+ 			power-domains = <&sysc R8A7795_PD_CA57_CPU0>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
++			clocks =<&cpg CPG_CORE R8A7795_CLK_Z>;
++			operating-points-v2 = <&cluster0_opp_tb0>,
++				<&cluster0_opp_tb1>, <&cluster0_opp_tb2>,
++				<&cluster0_opp_tb3>, <&cluster0_opp_tb4>,
++				<&cluster0_opp_tb5>, <&cluster0_opp_tb6>,
++				<&cluster0_opp_tb7>;
+ 		};
+ 
+ 		a57_1: cpu at 1 {
+@@ -55,6 +61,11 @@
+ 			power-domains = <&sysc R8A7795_PD_CA57_CPU1>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
++			operating-points-v2 = <&cluster0_opp_tb0>,
++				<&cluster0_opp_tb1>, <&cluster0_opp_tb2>,
++				<&cluster0_opp_tb3>, <&cluster0_opp_tb4>,
++				<&cluster0_opp_tb5>, <&cluster0_opp_tb6>,
++				<&cluster0_opp_tb7>;
+ 		};
+ 
+ 		a57_2: cpu at 2 {
+@@ -64,6 +75,11 @@
+ 			power-domains = <&sysc R8A7795_PD_CA57_CPU2>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
++			operating-points-v2 = <&cluster0_opp_tb0>,
++				<&cluster0_opp_tb1>, <&cluster0_opp_tb2>,
++				<&cluster0_opp_tb3>, <&cluster0_opp_tb4>,
++				<&cluster0_opp_tb5>, <&cluster0_opp_tb6>,
++				<&cluster0_opp_tb7>;
+ 		};
+ 
+ 		a57_3: cpu at 3 {
+@@ -73,6 +89,11 @@
+ 			power-domains = <&sysc R8A7795_PD_CA57_CPU3>;
+ 			next-level-cache = <&L2_CA57>;
+ 			enable-method = "psci";
++			operating-points-v2 = <&cluster0_opp_tb0>,
++				<&cluster0_opp_tb1>, <&cluster0_opp_tb2>,
++				<&cluster0_opp_tb3>, <&cluster0_opp_tb4>,
++				<&cluster0_opp_tb5>, <&cluster0_opp_tb6>,
++				<&cluster0_opp_tb7>;
+ 		};
+ 
+ 		a53_0: cpu at 100 {
+@@ -82,6 +103,8 @@
+ 			power-domains = <&sysc R8A7795_PD_CA53_CPU0>;
+ 			next-level-cache = <&L2_CA53>;
+ 			enable-method = "psci";
++			clocks =<&cpg CPG_CORE R8A7795_CLK_Z2>;
++			operating-points-v2 = <&cluster1_opp_tb0>;
+ 		};
+ 
+ 		a53_1: cpu at 101 {
+@@ -91,6 +114,7 @@
+ 			power-domains = <&sysc R8A7795_PD_CA53_CPU1>;
+ 			next-level-cache = <&L2_CA53>;
+ 			enable-method = "psci";
++			operating-points-v2 = <&cluster1_opp_tb0>;
+ 		};
+ 
+ 		a53_2: cpu at 102 {
+@@ -100,6 +124,7 @@
+ 			power-domains = <&sysc R8A7795_PD_CA53_CPU2>;
+ 			next-level-cache = <&L2_CA53>;
+ 			enable-method = "psci";
++			operating-points-v2 = <&cluster1_opp_tb0>;
+ 		};
+ 
+ 		a53_3: cpu at 103 {
+@@ -109,6 +134,7 @@
+ 			power-domains = <&sysc R8A7795_PD_CA53_CPU3>;
+ 			next-level-cache = <&L2_CA53>;
+ 			enable-method = "psci";
++			operating-points-v2 = <&cluster1_opp_tb0>;
+ 		};
+ 
+ 		L2_CA57: cache-controller-0 {
+@@ -126,6 +152,289 @@
+ 		};
+ 	};
+ 
++	cluster0_opp_tb0: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <830000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <830000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1500000000 {
++			opp-hz = /bits/ 64 <1500000000>;
++			opp-microvolt = <830000>;
++			clock-latency-ns = <300000>;
++			opp-suspend;
++		};
++		opp at 1600000000 {
++			opp-hz = /bits/ 64 <1600000000>;
++			opp-microvolt = <900000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++		opp at 1700000000 {
++			opp-hz = /bits/ 64 <1700000000>;
++			opp-microvolt = <960000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++	};
++
++	cluster0_opp_tb1: opp_table1 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <820000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <820000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1500000000 {
++			opp-hz = /bits/ 64 <1500000000>;
++			opp-microvolt = <820000>;
++			clock-latency-ns = <300000>;
++			opp-suspend;
++		};
++		opp at 1600000000 {
++			opp-hz = /bits/ 64 <1600000000>;
++			opp-microvolt = <890000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++		opp at 1700000000 {
++			opp-hz = /bits/ 64 <1700000000>;
++			opp-microvolt = <950000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++	};
++
++	cluster0_opp_tb2: opp_table2 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <810000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <810000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1500000000 {
++			opp-hz = /bits/ 64 <1500000000>;
++			opp-microvolt = <810000>;
++			clock-latency-ns = <300000>;
++			opp-suspend;
++		};
++		opp at 1600000000 {
++			opp-hz = /bits/ 64 <1600000000>;
++			opp-microvolt = <880000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++		opp at 1700000000 {
++			opp-hz = /bits/ 64 <1700000000>;
++			opp-microvolt = <930000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++	};
++
++	cluster0_opp_tb3: opp_table3 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <800000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <800000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1500000000 {
++			opp-hz = /bits/ 64 <1500000000>;
++			opp-microvolt = <800000>;
++			clock-latency-ns = <300000>;
++			opp-suspend;
++		};
++		opp at 1600000000 {
++			opp-hz = /bits/ 64 <1600000000>;
++			opp-microvolt = <870000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++		opp at 1700000000 {
++			opp-hz = /bits/ 64 <1700000000>;
++			opp-microvolt = <910000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++	};
++
++	cluster0_opp_tb4: opp_table4 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <790000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <790000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1500000000 {
++			opp-hz = /bits/ 64 <1500000000>;
++			opp-microvolt = <790000>;
++			clock-latency-ns = <300000>;
++			opp-suspend;
++		};
++		opp at 1600000000 {
++			opp-hz = /bits/ 64 <1600000000>;
++			opp-microvolt = <860000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++		opp at 1700000000 {
++			opp-hz = /bits/ 64 <1700000000>;
++			opp-microvolt = <890000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++	};
++
++	cluster0_opp_tb5: opp_table5 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <780000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <780000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1500000000 {
++			opp-hz = /bits/ 64 <1500000000>;
++			opp-microvolt = <780000>;
++			clock-latency-ns = <300000>;
++			opp-suspend;
++		};
++		opp at 1600000000 {
++			opp-hz = /bits/ 64 <1600000000>;
++			opp-microvolt = <850000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++		opp at 1700000000 {
++			opp-hz = /bits/ 64 <1700000000>;
++			opp-microvolt = <880000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++	};
++
++	cluster0_opp_tb6: opp_table6 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <770000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <770000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1500000000 {
++			opp-hz = /bits/ 64 <1500000000>;
++			opp-microvolt = <770000>;
++			clock-latency-ns = <300000>;
++			opp-suspend;
++		};
++		opp at 1600000000 {
++			opp-hz = /bits/ 64 <1600000000>;
++			opp-microvolt = <840000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++		opp at 1700000000 {
++			opp-hz = /bits/ 64 <1700000000>;
++			opp-microvolt = <870000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++	};
++
++	cluster0_opp_tb7: opp_table7 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <760000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <760000>;
++			clock-latency-ns = <300000>;
++		};
++		opp at 1500000000 {
++			opp-hz = /bits/ 64 <1500000000>;
++			opp-microvolt = <760000>;
++			clock-latency-ns = <300000>;
++			opp-suspend;
++		};
++		opp at 1600000000 {
++			opp-hz = /bits/ 64 <1600000000>;
++			opp-microvolt = <830000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++		opp at 1700000000 {
++			opp-hz = /bits/ 64 <1700000000>;
++			opp-microvolt = <860000>;
++			clock-latency-ns = <300000>;
++			turbo-mode;
++		};
++	};
++
++	cluster1_opp_tb0: opp_table10 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp at 1200000000 {
++			opp-hz = /bits/ 64 <1200000000>;
++			opp-microvolt = <820000>;
++			clock-latency-ns = <300000>;
++		};
++	};
++
+ 	extal_clk: extal {
+ 		compatible = "fixed-clock";
+ 		#clock-cells = <0>;
+-- 
+2.1.4
