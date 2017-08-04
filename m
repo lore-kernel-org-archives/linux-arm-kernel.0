@@ -1,52 +1,97 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Fri, 4 Aug 2017 07:37:01 +0200
-Subject: [v5 09/15] sparc64: optimized struct page zeroing
-In-Reply-To: <1501795433-982645-10-git-send-email-pasha.tatashin@oracle.com>
-References: <1501795433-982645-1-git-send-email-pasha.tatashin@oracle.com>
- <1501795433-982645-10-git-send-email-pasha.tatashin@oracle.com>
-Message-ID: <20170804053701.GA30068@ravnborg.org>
+From: j-keerthy@ti.com (Keerthy)
+Date: Fri, 4 Aug 2017 11:16:30 +0530
+Subject: [v4 2/2] ARM: dts: keystone-k2g: Add gpio nodes
+In-Reply-To: <1501825539-19110-2-git-send-email-j-keerthy@ti.com>
+References: <1501825539-19110-1-git-send-email-j-keerthy@ti.com>
+ <1501825539-19110-2-git-send-email-j-keerthy@ti.com>
+Message-ID: <e510748a-9834-6c0e-0f27-1b0d6e68371c@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel.
 
-On Thu, Aug 03, 2017 at 05:23:47PM -0400, Pavel Tatashin wrote:
-> Add an optimized mm_zero_struct_page(), so struct page's are zeroed without
-> calling memset(). We do eight regular stores, thus avoid cost of membar.
 
-The commit message does no longer reflect the implementation,
-and should be updated.
+On Friday 04 August 2017 11:15 AM, Keerthy wrote:
+> 66AK2G has 2 instances of gpio. The first one has all the 144 GPIOs
+> functional. 9 banks with 16 gpios making a total of 144. The second
+> instance has only the GPIO0:GPIO67 functional and rest are marked
+> reserved.
+
+Oops. I will send with the $subject fixed please ignore this.
 
 > 
-> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  arch/sparc/include/asm/pgtable_64.h | 32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
 > 
-> diff --git a/arch/sparc/include/asm/pgtable_64.h b/arch/sparc/include/asm/pgtable_64.h
-> index 6fbd931f0570..be47537e84c5 100644
-> --- a/arch/sparc/include/asm/pgtable_64.h
-> +++ b/arch/sparc/include/asm/pgtable_64.h
-> @@ -230,6 +230,38 @@ extern unsigned long _PAGE_ALL_SZ_BITS;
->  extern struct page *mem_map_zero;
->  #define ZERO_PAGE(vaddr)	(mem_map_zero)
+> Changes in v4:
+> 
+>   * Couple of rephrasing in the commit log.
+>   * Changed compatible to ti,k2g-gpio.
+> 
+> Changes in v2:
+> 
+>   * Split the documentation part into a separate patch.
+> 
+>  arch/arm/boot/dts/keystone-k2g.dtsi | 42 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+> index bf4d1fa..4eb1ba8 100644
+> --- a/arch/arm/boot/dts/keystone-k2g.dtsi
+> +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+> @@ -15,6 +15,7 @@
 >  
-> +/* This macro must be updated when the size of struct page grows above 80
-> + * or reduces below 64.
-> + * The idea that compiler optimizes out switch() statement, and only
-> + * leaves clrx instructions or memset() call.
-> + */
-> +#define	mm_zero_struct_page(pp) do {					\
-> +	unsigned long *_pp = (void *)(pp);				\
-> +									\
-> +	/* Check that struct page is 8-byte aligned */			\
-> +	BUILD_BUG_ON(sizeof(struct page) & 7);				\
-Would also be good to catch if sizeof > 80 so we do not silently
-migrate to the suboptimal version (silent at build time).
-Can you at build time catch if size is no any of: 64, 72, 80
-and simplify the below a little?
-
-	Sam
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/pinctrl/keystone.h>
+> +#include <dt-bindings/gpio/gpio.h>
+>  
+>  / {
+>  	compatible = "ti,k2g","ti,keystone";
+> @@ -168,5 +169,46 @@
+>  				#reset-cells = <2>;
+>  			};
+>  		};
+> +
+> +		gpio0: gpio at 2603000 {
+> +			compatible = "ti,k2g-gpio", "ti,keystone-gpio";
+> +			reg = <0x02603000 0x100>;
+> +			gpio-controller;
+> +			#gpio-cells = <2>;
+> +
+> +			interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
+> +					<GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
+> +					<GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
+> +					<GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
+> +					<GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
+> +					<GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
+> +					<GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
+> +					<GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
+> +					<GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
+> +			interrupt-controller;
+> +			#interrupt-cells = <2>;
+> +			ti,ngpio = <144>;
+> +			ti,davinci-gpio-unbanked = <0>;
+> +			clocks = <&k2g_clks 0x001b 0x0>;
+> +			clock-names = "gpio";
+> +		};
+> +
+> +		gpio1: gpio at 260a000 {
+> +			compatible = "ti,k2g-gpio", "ti,keystone-gpio";
+> +			reg = <0x0260a000 0x100>;
+> +			gpio-controller;
+> +			#gpio-cells = <2>;
+> +			interrupts = <GIC_SPI 442 IRQ_TYPE_EDGE_RISING>,
+> +					<GIC_SPI 443 IRQ_TYPE_EDGE_RISING>,
+> +					<GIC_SPI 444 IRQ_TYPE_EDGE_RISING>,
+> +					<GIC_SPI 445 IRQ_TYPE_EDGE_RISING>,
+> +					<GIC_SPI 446 IRQ_TYPE_EDGE_RISING>;
+> +			interrupt-controller;
+> +			#interrupt-cells = <2>;
+> +			ti,ngpio = <68>;
+> +			ti,davinci-gpio-unbanked = <0>;
+> +			clocks = <&k2g_clks 0x001c 0x0>;
+> +			clock-names = "gpio";
+> +		};
+>  	};
+>  };
+> 
