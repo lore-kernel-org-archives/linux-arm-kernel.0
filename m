@@ -1,103 +1,49 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Fri, 4 Aug 2017 20:04:25 +0200
-Subject: [PATCH v3 3/6] dt-bindings: add binding for Sitronix ST7586
- display panels
-In-Reply-To: <e824aca6-b668-1d63-65a0-c56bfd8bec79@lechnology.com>
-References: <1501799630-1650-1-git-send-email-david@lechnology.com>
- <1501799630-1650-4-git-send-email-david@lechnology.com>
- <66f0b765-928e-1fca-9588-99da747749a5@tronnes.org>
- <e824aca6-b668-1d63-65a0-c56bfd8bec79@lechnology.com>
-Message-ID: <20c044a4-cefe-7fed-8c5d-af27829c0648@tronnes.org>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri,  4 Aug 2017 20:08:10 +0200
+Subject: [PATCH 0/6] ARM64: dts: meson: update around mmc
+Message-ID: <20170804180816.18737-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The patchset feature update around mmc. It is linked to this series [0]
+but does not strictly depends on it. It adds:
 
-Den 04.08.2017 18.51, skrev David Lechner:
-> On 08/04/2017 04:48 AM, Noralf Tr?nnes wrote:
->>
->> Den 04.08.2017 00.33, skrev David Lechner:
->>> This adds a new binding for Sitronix ST7586 display panels.
->>>
->>> Using lego as the vendor prefix in the compatible string because the 
->>> display
->>> panel I am working with is an integral part of the LEGO MINDSTORMS EV3.
->>
->> Is this display available outside of this Lego part?
-> No, it is not.
->
->> If not you can remove the properties you don't need for this particular
->> display setup. Another st7586 display with a different panel would need
->> a different initialization sequence and compatible string, so we can
->> add properties when/if that happens.
->
-> OK. so I will drop power-supply and backlight.
->
+* The regulator settling times for the gpio regulator of nanopi-k2 and
+  the libretech-cc.
+* UHS modes for the p20x and nanopi-k2. SDR104 is left out because the
+  p20x does not support it and the driver requires more work to enable
+  it on the nanopi-k2
+* clk-gate pins: these are the pinmuxes used for the clk-stop work
+  around explained here [0]
 
-And the dc/reset gpios should be required properties since your display
-won't work without them (or rather they're hardwired that way).
+It also removes cap-sd-highspeed from eMMC nodes.
 
-> Should I remove these from the driver as well? There are some panels 
-> out there that could use them.[1]
->
-> [1]: 
-> http://www.buydisplay.com/download/manual/ERC240160-1_Series_Datasheet.pdf
->
+This series has been tested on the gxbb-200, the gxbb-nanopi-k2 and the
+gxl-s905x-libretech-cc
 
-Yes, because that display won't work with the driver as-is, so it's
-really dead code. If someone wants to add support for that display,
-they'll add the necessary code. When maintaining code for 10-20 years,
-it's important to not add code that 'might' be used in the future.
-Let the future take care of itself and keep the codebase slim :-)
+Jerome Brunet (6):
+  ARM64: dts: meson-gxbb: nanopi-k2: add card regulator settle times
+  ARM64: dts: meson-gxl: libretech-cc: add card regulator settle times
+  ARM64: dts: meson-gxbb: p20x: enable sdcard UHS modes
+  ARM64: dts: meson-gxbb: nanopi-k2: enable sdcard UHS modes
+  ARM64: dts: meson: add mmc clk gate pins
+  ARM64: dts: meson: remove cap-sd-highspeed from emmc nodes
 
-Noralf.
+ .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi | 10 ++++---
+ .../boot/dts/amlogic/meson-gxbb-nanopi-k2.dts      | 18 ++++++++----
+ .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 12 ++++----
+ .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts |  9 +++---
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   | 13 ++++++---
+ .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      | 10 ++++---
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 33 ++++++++++++++++++++++
+ .../dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts |  7 +++--
+ .../dts/amlogic/meson-gxl-s905x-libretech-cc.dts   |  9 ++++--
+ .../dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    | 10 ++++---
+ .../boot/dts/amlogic/meson-gxl-s905x-p212.dtsi     | 10 ++++---
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 33 ++++++++++++++++++++++
+ .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts |  7 +++--
+ arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts |  1 -
+ 14 files changed, 139 insertions(+), 43 deletions(-)
 
->>
->> Noralf.
->>
->>> Signed-off-by: David Lechner <david@lechnology.com>
->>> ---
->>>   .../bindings/display/sitronix,st7586.txt           | 26 
->>> ++++++++++++++++++++++
->>>   1 file changed, 26 insertions(+)
->>>   create mode 100644 
->>> Documentation/devicetree/bindings/display/sitronix,st7586.txt
->>>
->>> diff --git 
->>> a/Documentation/devicetree/bindings/display/sitronix,st7586.txt 
->>> b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
->>> new file mode 100644
->>> index 0000000..dfb0b7b
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
->>> @@ -0,0 +1,26 @@
->>> +Sitronix ST7586 display panel
->>> +
->>> +Required properties:
->>> +- compatible:    "lego,ev3-lcd".
->>> +
->>> +The node for this driver must be a child node of a SPI controller, 
->>> hence
->>> +all mandatory properties described in ../spi/spi-bus.txt must be 
->>> specified.
->>> +
->>> +Optional properties:
->>> +- dc-gpios:    D/C pin. The presence/absence of this GPIO determines
->>> +        the panel interface operation mode (IF[3:1] pins):
->>> +        - present: IF=011 4-wire 8-bit data serial interface
->>> +        - absent:  IF=010 3-wire 9-bit data serial interface
->>> +- reset-gpios:    Reset pin
->>> +- power-supply:    A regulator node for the supply voltage.
->>> +- backlight:    phandle of the backlight device attached to the panel
->>> +- rotation:    panel rotation in degrees counter clockwise 
->>> (0,90,180,270)
->>> +
->>> +Example:
->>> +    display at 0{
->>> +        compatible = "lego,ev3-lcd";
->>> +        reg = <0>;
->>> +        spi-max-frequency = <10000000>;
->>> +        dc-gpios = <&gpio 43 GPIO_ACTIVE_HIGH>;
->>> +        reset-gpios = <&gpio 80 GPIO_ACTIVE_HIGH>;
->>> +    };
->>
->
+-- 
+2.9.4
