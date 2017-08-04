@@ -1,69 +1,57 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Fri, 4 Aug 2017 09:32:26 +0800
-Subject: [PATCH v3 2/4] memory: mtk-smi: add larbid handle routine
-In-Reply-To: <1501810348-20997-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1501810348-20997-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1501810348-20997-3-git-send-email-honghui.zhang@mediatek.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Fri, 4 Aug 2017 01:42:30 +0000
+Subject: [PATCH v2 0/9] EDAC drivers for Armada XP L2 and DDR
+References: <20170802123922.11498-1-jlu@pengutronix.de>
+Message-ID: <d2f15f565315468f899398a415fa4558@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+On 03/08/17 00:39, Jan Luebbe wrote:
+> This series adds drivers for the L2 cache and DDR RAM ECC functionality as
+> found on the MV78230/MV78x60 SoCs. I've tested these changes with the MV78460
+> (on a custom board with a DDR3 ECC DIMM).
+> 
+> Also contained in this series are an additional debugfs wrapper and devm_
+> helpers for edac_mc_/edac_device_ allocation and registration, which make error
+> handing and cleanup simpler.
+> 
+> Compared to the previous v1 series, the following changes have been made:
+> - Add the aurora-l2 register defines earlier in the series (suggested by
+>    Russell King and Gregory CLEMENT )
+> - Changed the DT vendor prefix from "arm" to "marvell" for the ecc-enable/disable
+>    properties on the aurora-l2 (suggested by Russell King)
+> - Fix some warnings reported by checkpatch
+> 
+> Compared to the original RFC series, the following changes have been made:
+> - Integrated Chris' patches for parity and ECC configuration via DT
+> - Merged the DDR RAM and L2 cache drivers (as requested by Borislav, analogous
+>    to fsl_ddr_edac.c and mpc85xx_edac.c)
+> - Added myself to MAINTAINERS (requested by Borislav)
+> - L2 cache: Track the msg size and use snprintf (review comment by Chris)
+> - L2 cache: Split error injection from the check function (review comment by
+>    Chris)
+> - DDR RAM: Allow 16 bit width in addition to 32 and 64 bit (review comment by
+>    Chris)
 
-In the commit 3c8f4ad85c4b ("memory/mediatek: add support for mt2701"),
-the larb->larbid was added but not initialized.
-Mediatek's gen1 smi need this hardware larbid information to get the
-register offset which controls whether enable iommu for this larb.
-This patch add the initialize routine for larbid.
+Thanks for that. I'll make my life easier when I add support for the 
+narrower bus-width.
 
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
----
- drivers/memory/mtk-smi.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
-index 2b798bb4..a3ff19a 100644
---- a/drivers/memory/mtk-smi.c
-+++ b/drivers/memory/mtk-smi.c
-@@ -42,6 +42,7 @@
- #define SMI_SECUR_CON_VAL_DOMAIN(id)	(0x3 << ((((id) & 0x7) << 2) + 1))
- 
- struct mtk_smi_larb_gen {
-+	bool need_larbid;
- 	int port_in_larb[MTK_LARB_NR_MAX + 1];
- 	void (*config_port)(struct device *);
- };
-@@ -214,6 +215,7 @@ static const struct mtk_smi_larb_gen mtk_smi_larb_mt8173 = {
- };
- 
- static const struct mtk_smi_larb_gen mtk_smi_larb_mt2701 = {
-+	.need_larbid = true,
- 	.port_in_larb = {
- 		LARB0_PORT_OFFSET, LARB1_PORT_OFFSET,
- 		LARB2_PORT_OFFSET, LARB3_PORT_OFFSET
-@@ -240,6 +242,7 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct device_node *smi_node;
- 	struct platform_device *smi_pdev;
-+	int err;
- 
- 	if (!dev->pm_domain)
- 		return -EPROBE_DEFER;
-@@ -263,6 +266,15 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
- 		return PTR_ERR(larb->smi.clk_smi);
- 	larb->smi.dev = dev;
- 
-+	if (larb->larb_gen->need_larbid) {
-+		err = of_property_read_u32(dev->of_node, "mediatek,larb-id",
-+					   &larb->larbid);
-+		if (err) {
-+			dev_err(dev, "missing larbid property\n");
-+			return err;
-+		}
-+	}
-+
- 	smi_node = of_parse_phandle(dev->of_node, "mediatek,smi", 0);
- 	if (!smi_node)
- 		return -EINVAL;
--- 
-2.6.4
+> - Use of_match_ptr() (review comments by Chris)
+> - Minor checkpatch cleanups
+> 
+> Chris Packham (2):
+>    ARM: l2x0: support parity-enable/disable on aurora
+>    ARM: l2x0: add marvell,ecc-enable property for aurora
+> 
+> Jan Luebbe (7):
+>    ARM: l2c: move cache-aurora-l2.h to asm/hardware
+>    ARM: aurora-l2: add prefix to MAX_RANGE_SIZE
+>    ARM: aurora-l2: add defines for parity and ECC registers
+>    EDAC: Add missing debugfs_create_x32 wrapper
+>    EDAC: Add devres helpers for
+>      edac_mc_alloc/edac_mc_add_mc(_with_groups)
+>    EDAC: Add devres helpers for
+>      edac_device_alloc_ctl_info/edac_device_add_device
+>    EDAC: Add driver for the Marvell Armada XP SDRAM and L2 cache ECC
+	
+Reviewed-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
