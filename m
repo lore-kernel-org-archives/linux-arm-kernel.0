@@ -1,89 +1,66 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri,  4 Aug 2017 13:07:03 +0200
-Subject: [PATCH] ARM: zynq: Remove earlycon from bootargs
-Message-ID: <dff4b3c7a291fca6648134f5c8950e7ec472eec0.1501844819.git.michal.simek@xilinx.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Fri, 4 Aug 2017 14:17:28 +0300
+Subject: [PATCH 1/1] cpufreq: imx6q: imx6ull: use PLL1 for frequency
+ higher than 528MHz
+In-Reply-To: <737b6166-1594-677b-1a08-4f9b795d9410@armadeus.com>
+References: <1501230993-15812-1-git-send-email-sebastien.szymanski@armadeus.com>
+ <20170803020320.GG31819@dragon>
+ <737b6166-1594-677b-1a08-4f9b795d9410@armadeus.com>
+Message-ID: <1501845448.17254.31.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Earlyconsole is used for early kernel debugging that's why this option
-shouldn't be enabled by default.
-Earlyconsole is partially copying the part of the bootlog after
-"bootconsole [uart0] disabled".
+On Thu, 2017-08-03 at 09:32 +0200, S?bastien Szymanski wrote:
+> On 08/03/2017 04:03 AM, Shawn Guo wrote:
+> > On Fri, Jul 28, 2017 at 10:36:33AM +0200, S?bastien Szymanski wrote:
+> > > Setting the frequency higher than 528Mhz actually sets the ARM
+> > > clock to 528MHz. That's because PLL2 is used as the root clock when the
+> > > frequency is higher than 396MHz.
+> > > 
+> > > cpupower frequency-set -f 792000
+> > > 
+> > > arm_clk_root on the CCM_CLKO2 signal is 528MHz instead of 792MHz.
+> > > 
+> > > [   61.606383] cpu cpu0: 396 MHz, 1025 mV --> 792 MHz, 1225 mV
+> > > 
+> > > pll2                         1  1  528000000 0 0
+> > >    pll2_bypass               1  1  528000000 0 0
+> > >       pll2_bus               3  3  528000000 0 0
+> > > 	 ca7_secondary_sel   1  1  528000000 0 0
+> > > 	    step             1  1  528000000 0 0
+> > > 	       pll1_sw       1  1  528000000 0 0
+> > > 		  arm        1  1  528000000 0 0
+> > > 
+> > > Fixes this by using the PLL1 as the root clock when the frequency is
+> > > higher than 528MHz.
+> > > 
+> > > cpupower frequency-set -f 792000
+> > > 
+> > > arm_clk_root on the CCM_CLKO2 signal is now 792MHz as expected.
+> > > 
+> > > [   69.717987] cpu cpu0: 198 MHz, 950 mV --> 792 MHz, 1225 mV
+> > > 
+> > > pll1               1 1 792000000 0 0
+> > >    pll1_bypass     1 1 792000000 0 0
+> > >       pll1_sys     1 1 792000000 0 0
+> > > 	 pll1_sw   1 1 792000000 0 0
+> > > 	    arm    1 1 792000000 0 0
+> > > 
+> > > Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+> > 
+> > Can you please specify on which SoCs you are seeing this problem?  And I
+> > would like invite Anson and Leonard to review it.
+> 
+> My SoC is MCIMX6Y2CVM08AA which is a 792MHz i.MX6ULL. I forgot to
+> mention that I added the following operating points in my device tree:
+> 
+> operating-points: 792000  1225000
+> fsl,soc-operating-points: 792000  1175000
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Yeah, I was wondering about that.
 
- arch/arm/boot/dts/zynq-parallella.dts | 2 +-
- arch/arm/boot/dts/zynq-zc702.dts      | 2 +-
- arch/arm/boot/dts/zynq-zc706.dts      | 2 +-
- arch/arm/boot/dts/zynq-zed.dts        | 2 +-
- arch/arm/boot/dts/zynq-zybo.dts       | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+Adding support for higher imx6ul/ull frequencies "properly" requires adding the extra OPPs to .dtsi (they are different between 6ul and 6ull) and reading the speed grading from OCOTP to check if they are supported.
 
-diff --git a/arch/arm/boot/dts/zynq-parallella.dts b/arch/arm/boot/dts/zynq-parallella.dts
-index 77f6f10bf685..0144acfa9793 100644
---- a/arch/arm/boot/dts/zynq-parallella.dts
-+++ b/arch/arm/boot/dts/zynq-parallella.dts
-@@ -34,7 +34,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "earlycon root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait";
-+		bootargs = "root=/dev/mmcblk0p2 rootfstype=ext4 rw rootwait";
- 		stdout-path = "serial0:115200n8";
- 	};
- };
-diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
-index a096275d903d..34e8277fce0d 100644
---- a/arch/arm/boot/dts/zynq-zc702.dts
-+++ b/arch/arm/boot/dts/zynq-zc702.dts
-@@ -30,7 +30,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "earlycon";
-+		bootargs = "";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-index 689ec9d6f7b9..7ebc8c5ae39d 100644
---- a/arch/arm/boot/dts/zynq-zc706.dts
-+++ b/arch/arm/boot/dts/zynq-zc706.dts
-@@ -30,7 +30,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "earlycon";
-+		bootargs = "";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
-index c6a5749c8930..5e44dc12fd60 100644
---- a/arch/arm/boot/dts/zynq-zed.dts
-+++ b/arch/arm/boot/dts/zynq-zed.dts
-@@ -29,7 +29,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "earlycon";
-+		bootargs = "";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-diff --git a/arch/arm/boot/dts/zynq-zybo.dts b/arch/arm/boot/dts/zynq-zybo.dts
-index 8b42fb199a8e..e40cafc5ee5b 100644
---- a/arch/arm/boot/dts/zynq-zybo.dts
-+++ b/arch/arm/boot/dts/zynq-zybo.dts
-@@ -29,7 +29,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "earlycon";
-+		bootargs = "";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
--- 
-1.9.1
+This patch can only work if you hack OPPs for a specific board.
+
+Reading the speed grading is essential because otherwise you risk causing random crashes while running at frequencies not supported by the hardware.
