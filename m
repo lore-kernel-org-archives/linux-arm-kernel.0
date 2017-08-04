@@ -1,275 +1,52 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 4 Aug 2017 10:56:55 +0530
-Subject: [PATCH v2 2/4] phy: add inno-usb2-phy driver for hi3798cv200 SoC
-In-Reply-To: <1501049163-18892-3-git-send-email-xuejiancheng@hisilicon.com>
-References: <1501049163-18892-1-git-send-email-xuejiancheng@hisilicon.com>
- <1501049163-18892-3-git-send-email-xuejiancheng@hisilicon.com>
-Message-ID: <94beaddf-96ec-9c0b-a4ed-a39ac78b839a@ti.com>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Fri, 4 Aug 2017 07:37:01 +0200
+Subject: [v5 09/15] sparc64: optimized struct page zeroing
+In-Reply-To: <1501795433-982645-10-git-send-email-pasha.tatashin@oracle.com>
+References: <1501795433-982645-1-git-send-email-pasha.tatashin@oracle.com>
+ <1501795433-982645-10-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <20170804053701.GA30068@ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Pavel.
 
-On Wednesday 26 July 2017 11:36 AM, Jiancheng Xue wrote:
-> From: Pengcheng Li <lpc.li@hisilicon.com>
+On Thu, Aug 03, 2017 at 05:23:47PM -0400, Pavel Tatashin wrote:
+> Add an optimized mm_zero_struct_page(), so struct page's are zeroed without
+> calling memset(). We do eight regular stores, thus avoid cost of membar.
+
+The commit message does no longer reflect the implementation,
+and should be updated.
+
 > 
-> Add inno-usb2-phy driver for hi3798cv200 SoC.
-> 
-> Signed-off-by: Pengcheng Li <lpc.li@hisilicon.com>
-> Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
+> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+> Reviewed-by: Bob Picco <bob.picco@oracle.com>
 > ---
->  drivers/phy/hisilicon/Kconfig              |  11 +-
->  drivers/phy/hisilicon/Makefile             |   1 +
->  drivers/phy/hisilicon/phy-hisi-inno-usb2.c | 236 +++++++++++++++++++++++++++++
->  3 files changed, 247 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/phy/hisilicon/phy-hisi-inno-usb2.c
+>  arch/sparc/include/asm/pgtable_64.h | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
 > 
-> diff --git a/drivers/phy/hisilicon/Kconfig b/drivers/phy/hisilicon/Kconfig
-> index 6164c4c..6a675c5 100644
-> --- a/drivers/phy/hisilicon/Kconfig
-> +++ b/drivers/phy/hisilicon/Kconfig
-> @@ -8,9 +8,18 @@ config PHY_HI6220_USB
->  	select MFD_SYSCON
->  	help
->  	  Enable this to support the HISILICON HI6220 USB PHY.
-> -
-  ^^
-not related to $patch.
->  	  To compile this driver as a module, choose M here.
+> diff --git a/arch/sparc/include/asm/pgtable_64.h b/arch/sparc/include/asm/pgtable_64.h
+> index 6fbd931f0570..be47537e84c5 100644
+> --- a/arch/sparc/include/asm/pgtable_64.h
+> +++ b/arch/sparc/include/asm/pgtable_64.h
+> @@ -230,6 +230,38 @@ extern unsigned long _PAGE_ALL_SZ_BITS;
+>  extern struct page *mem_map_zero;
+>  #define ZERO_PAGE(vaddr)	(mem_map_zero)
 >  
-> +config PHY_HISI_INNO_USB2
-> +       tristate "HiSilicon INNO USB2 PHY support"
-> +       depends on (ARCH_HISI) || COMPILE_TEST
-> +       select GENERIC_PHY
-> +       select MFD_SYSCON
-> +       help
-> +         Support for INNO USB2 PHY on HiSilicon SoCs. This Phy supports
-> +         USB 1.5Mb/s, USB 12Mb/s, USB 480Mb/s speeds. It supports one
-> +         USB host port to accept one USB device.
-> +
->  config PHY_HIX5HD2_SATA
->  	tristate "HIX5HD2 SATA PHY Driver"
->  	depends on ARCH_HIX5HD2 && OF && HAS_IOMEM
-> diff --git a/drivers/phy/hisilicon/Makefile b/drivers/phy/hisilicon/Makefile
-> index 541b348..e6c9794 100644
-> --- a/drivers/phy/hisilicon/Makefile
-> +++ b/drivers/phy/hisilicon/Makefile
-> @@ -1,2 +1,3 @@
->  obj-$(CONFIG_PHY_HI6220_USB)		+= phy-hi6220-usb.o
-> +obj-$(CONFIG_PHY_HISI_INNO_USB2)	+= phy-hisi-inno-usb2.o
->  obj-$(CONFIG_PHY_HIX5HD2_SATA)		+= phy-hix5hd2-sata.o
-> diff --git a/drivers/phy/hisilicon/phy-hisi-inno-usb2.c b/drivers/phy/hisilicon/phy-hisi-inno-usb2.c
-> new file mode 100644
-> index 0000000..7edf4a3
-> --- /dev/null
-> +++ b/drivers/phy/hisilicon/phy-hisi-inno-usb2.c
-> @@ -0,0 +1,236 @@
-> +/*
-> + * HiSilicon INNO USB2 PHY Driver.
-> + *
-> + * Copyright (c) 2016-2017 HiSilicon Technologies Co., Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+> +/* This macro must be updated when the size of struct page grows above 80
+> + * or reduces below 64.
+> + * The idea that compiler optimizes out switch() statement, and only
+> + * leaves clrx instructions or memset() call.
 > + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/phy/phy.h>
-> +#include <linux/regmap.h>
-> +#include <linux/reset.h>
-> +
-> +#define INNO_PHY_PORT_NUM	2
-> +#define REF_CLK_STABLE_TIME	100	/* unit:us */
-> +#define UTMI_CLK_STABLE_TIME	200	/* unit:us */
-> +#define TEST_CLK_STABLE_TIME	2	/* unit:ms */
-> +#define PHY_CLK_STABLE_TIME	2	/* unit:ms */
-> +#define UTMI_RST_COMPLETE_TIME	2	/* unit:ms */
-> +#define TEST_RST_COMPLETE_TIME	100	/* unit:us */
-> +#define POR_RST_COMPLETE_TIME	300	/* unit:us */
-> +#define PHY_TEST_DATA	GENMASK(7, 0)
-> +#define PHY_TEST_ADDR	GENMASK(15, 8)
-> +#define PHY_TEST_PORT	GENMASK(18, 16)
-> +#define PHY_TEST_WREN	BIT(21)
-> +#define PHY_TEST_CLK	BIT(22)	/* rising edge active */
-> +#define PHY_TEST_RST	BIT(23)	/* low active */
-> +#define PHY_CLK_ENABLE	BIT(2)
-> +
-> +struct hisi_inno_phy_priv {
-> +	struct regmap *syscon;
-> +	u32 reg;
-> +	struct clk *ref_clk;
-> +	struct reset_control *por_rst;
-> +	struct reset_control *test_rst;
-> +	struct reset_control *utmi_rst[INNO_PHY_PORT_NUM];
-> +	u32 port_num;
-> +};
-> +
-> +static void hisi_inno_phy_write_reg(struct regmap *syscon,
-> +			u32 reg, u8 port, u32 addr, u32 data)
-> +{
-> +	u32 value;
-> +
-> +	value = (data & PHY_TEST_DATA)
-> +		| ((addr << 8) & PHY_TEST_ADDR)
-> +		| ((port << 16) & PHY_TEST_PORT)
-> +		| PHY_TEST_WREN | PHY_TEST_RST;
-> +	regmap_write(syscon, reg, value);
-> +	value |= PHY_TEST_CLK;
-> +	regmap_write(syscon, reg, value);
-> +	value &= ~PHY_TEST_CLK;
-> +	regmap_write(syscon, reg, value);
-> +}
-> +
-> +static void hisi_inno_phy_setup(struct hisi_inno_phy_priv *priv)
-> +{
-> +	/* The phy clk is controlled by the port0 register 0x06. */
-> +	hisi_inno_phy_write_reg(priv->syscon,
-> +			priv->reg, 0, 0x06, PHY_CLK_ENABLE);
-> +	msleep(PHY_CLK_STABLE_TIME);
-> +}
-> +
-> +static int hisi_inno_phy_init(struct phy *phy)
-> +{
-> +	struct hisi_inno_phy_priv *priv = phy_get_drvdata(phy);
-> +	int ret, i;
-> +
-> +	ret = clk_prepare_enable(priv->ref_clk);
-> +	if (ret)
-> +		return ret;
-> +	udelay(REF_CLK_STABLE_TIME);
-> +
-> +	if (priv->test_rst) {
-> +		reset_control_deassert(priv->test_rst);
-> +		udelay(TEST_RST_COMPLETE_TIME);
-> +	}
-> +
-> +	reset_control_deassert(priv->por_rst);
-> +	udelay(POR_RST_COMPLETE_TIME);
-> +
-> +	/* config phy clk and phy eye diagram */
-> +	hisi_inno_phy_setup(priv);
-> +
-> +	for (i = 0; i < priv->port_num; i++) {
-> +		reset_control_deassert(priv->utmi_rst[i]);
-> +		udelay(UTMI_RST_COMPLETE_TIME);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static void hisi_inno_phy_disable(struct phy *phy)
-> +{
-> +	struct hisi_inno_phy_priv *priv = phy_get_drvdata(phy);
-> +	int i;
-> +
-> +	for (i = 0; i < priv->port_num; i++)
-> +		reset_control_assert(priv->utmi_rst[i]);
-> +
-> +	reset_control_assert(priv->por_rst);
-> +	if (priv->test_rst)
-> +		reset_control_assert(priv->test_rst);
-> +	clk_disable_unprepare(priv->ref_clk);
-> +}
-> +
-> +static int hisi_inno_phy_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct phy *phy;
-> +	struct hisi_inno_phy_priv *priv;
-> +	struct device_node *node = dev->of_node;
-> +	int ret, i;
-> +
-> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	priv->syscon = syscon_regmap_lookup_by_phandle(node,
-> +			"hisilicon,peripheral-syscon");
-> +	if (IS_ERR(priv->syscon)) {
-> +		dev_err(dev, "no hisilicon,peripheral-syscon\n");
-> +		return PTR_ERR(priv->syscon);
-> +	}
-> +
-> +	ret = device_property_read_u32(dev,
-> +			"hisilicon,phycon-reg", &priv->reg);
-> +	if (ret)
-> +		return ret;
-> +
-> +	priv->ref_clk = devm_clk_get(dev, NULL);
-> +	if (IS_ERR(priv->ref_clk))
-> +		return PTR_ERR(priv->ref_clk);
-> +
-> +	priv->por_rst = devm_reset_control_get_exclusive(dev, "power_on");
-> +	if (IS_ERR(priv->por_rst))
-> +		return PTR_ERR(priv->por_rst);
-> +
-> +	ret = device_property_read_u32(dev,
-> +					"hisilicon,port-num", &priv->port_num);
-> +	if (ret)
-> +		return ret;
-> +
-> +	if (priv->port_num <= 0
-> +		|| priv->port_num > INNO_PHY_PORT_NUM)
-> +		return -EINVAL;
-> +
-> +	for (i = 0; i < priv->port_num; i++) {
-> +		char id[6];
-> +
-> +		snprintf(id, 6, "utmi%1d\n", i);
-> +		priv->utmi_rst[i] = devm_reset_control_get_exclusive(dev, id);
-> +		if (IS_ERR(priv->utmi_rst[i]))
-> +			return PTR_ERR(priv->utmi_rst[i]);
-> +	}
-> +
-> +	priv->test_rst = devm_reset_control_get_optional_exclusive(dev, "test");
-> +	if (IS_ERR(priv->test_rst))
-> +		return PTR_ERR(priv->test_rst);
-> +
-> +	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
-> +	if (!phy)
-> +		return -ENOMEM;
-> +
-> +	platform_set_drvdata(pdev, phy);
-> +	phy_set_drvdata(phy, priv);
-> +
-> +	return hisi_inno_phy_init(phy);
+> +#define	mm_zero_struct_page(pp) do {					\
+> +	unsigned long *_pp = (void *)(pp);				\
+> +									\
+> +	/* Check that struct page is 8-byte aligned */			\
+> +	BUILD_BUG_ON(sizeof(struct page) & 7);				\
+Would also be good to catch if sizeof > 80 so we do not silently
+migrate to the suboptimal version (silent at build time).
+Can you at build time catch if size is no any of: 64, 72, 80
+and simplify the below a little?
 
-why don't you use the phy framework and initialize the phy only when required
-by the usb host controller?
-> +}
-> +
-> +static int hisi_inno_phy_remove(struct platform_device *pdev)
-> +{
-> +	struct phy *phy = platform_get_drvdata(pdev);
-> +
-> +	hisi_inno_phy_disable(phy);
-> +
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int hisi_inno_phy_suspend(struct device *dev)
-> +{
-> +	struct phy *phy = dev_get_drvdata(dev);
-> +
-> +	hisi_inno_phy_disable(phy);
-
-How do you make sure, usb is not using the phy when suspend is invoked? We
-don't want to be disabling the phy when usb controller is using it.
-
-Thanks
-Kishon
+	Sam
