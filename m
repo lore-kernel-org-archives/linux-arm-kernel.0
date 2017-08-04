@@ -1,186 +1,69 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri,  4 Aug 2017 14:00:23 +0200
-Subject: [PATCH 1/5] edac: synopsys: Add platform specific structures ddrc
- controller
-Message-ID: <60ff19f90adfd252cf296fe8988c614c4c3e43fd.1501848023.git.michal.simek@xilinx.com>
+Date: Fri,  4 Aug 2017 14:00:26 +0200
+Subject: [PATCH 4/5] edac: synopsys: Update ecc error message info
+In-Reply-To: <60ff19f90adfd252cf296fe8988c614c4c3e43fd.1501848023.git.michal.simek@xilinx.com>
+References: <60ff19f90adfd252cf296fe8988c614c4c3e43fd.1501848023.git.michal.simek@xilinx.com>
+Message-ID: <1c27213cd2dd9880c49fc0f65d9c2aa44c404db7.1501848023.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
 
-This patch adds platform specific structures, so that we can add
-different IP support later using quirks.
+This patch updates the ecc error message info
+for zynqmp ddrc. added Block number and Bankgroup
+in the message info.
 
 Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- drivers/edac/synopsys_edac.c | 70 ++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 58 insertions(+), 12 deletions(-)
+ drivers/edac/synopsys_edac.c | 27 +++++++++++++++++++++------
+ 1 file changed, 21 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
-index 1c01dec78ec3..65f3b04d5a87 100644
+index 546adc243bca..501ef447df37 100644
 --- a/drivers/edac/synopsys_edac.c
 +++ b/drivers/edac/synopsys_edac.c
-@@ -22,6 +22,7 @@
- #include <linux/edac.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
+@@ -418,9 +418,17 @@ static void synps_edac_handle_error(struct mem_ctl_info *mci,
  
- #include "edac_module.h"
- 
-@@ -95,6 +96,9 @@
- #define SCRUB_MODE_MASK		0x7
- #define SCRUB_MODE_SECDED	0x4
- 
-+/* DDR ECC Quirks */
-+#define DDR_ECC_INTR_SUPPORT    BIT(0)
+ 	if (p->ce_cnt) {
+ 		pinf = &p->ceinfo;
+-		snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
+-			 "DDR ECC error type :%s Row %d Bank %d Col %d ",
+-			 "CE", pinf->row, pinf->bank, pinf->col);
++		if (priv->p_data->quirks == 0)
++			snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
++				 "DDR ECC error type :%s Row %d Bank %d Col %d ",
++				 "CE", pinf->row, pinf->bank, pinf->col);
++		else
++			snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
++				 "DDR ECC error type :%s Row %d Bank %d Col %d "
++				 "BankGroup Number %d Block Number %d",
++				 "CE", pinf->row, pinf->bank, pinf->col,
++				 pinf->bankgrpnr, pinf->blknr);
 +
- /**
-  * struct ecc_error_info - ECC error log information
-  * @row:	Row number
-@@ -130,6 +134,7 @@ struct synps_ecc_status {
-  * @baseaddr:	Base address of the DDR controller
-  * @message:	Buffer for framing the event specific info
-  * @stat:	ECC status information
-+ * @p_data:	Pointer to platform data
-  * @ce_cnt:	Correctable Error count
-  * @ue_cnt:	Uncorrectable Error count
-  */
-@@ -137,11 +142,29 @@ struct synps_edac_priv {
- 	void __iomem *baseaddr;
- 	char message[SYNPS_EDAC_MSG_SIZE];
- 	struct synps_ecc_status stat;
-+	const struct synps_platform_data *p_data;
- 	u32 ce_cnt;
- 	u32 ue_cnt;
- };
+ 		edac_mc_handle_error(HW_EVENT_ERR_CORRECTED, mci,
+ 				     p->ce_cnt, 0, 0, 0, 0, 0, -1,
+ 				     priv->message, "");
+@@ -428,9 +436,16 @@ static void synps_edac_handle_error(struct mem_ctl_info *mci,
  
- /**
-+ * struct synps_platform_data -  synps platform data structure
-+ * @synps_edac_geterror_info:	function pointer to synps edac error info
-+ * @synps_edac_get_mtype:	function pointer to synps edac mtype
-+ * @synps_edac_get_dtype:	function pointer to synps edac dtype
-+ * @synps_edac_get_eccstate:	function pointer to synps edac eccstate
-+ * @quirks:			to differentiate IPs
-+ */
-+struct synps_platform_data {
-+	int (*synps_edac_geterror_info)(void __iomem *base,
-+					 struct synps_ecc_status *p);
-+	enum mem_type (*synps_edac_get_mtype)(const void __iomem *base);
-+	enum dev_type (*synps_edac_get_dtype)(const void __iomem *base);
-+	bool (*synps_edac_get_eccstate)(void __iomem *base);
-+	int quirks;
-+};
-+
-+/**
-  * synps_edac_geterror_info - Get the current ecc error info
-  * @base:	Pointer to the base address of the ddr memory controller
-  * @p:		Pointer to the synopsys ecc status structure
-@@ -242,7 +265,8 @@ static void synps_edac_check(struct mem_ctl_info *mci)
- 	struct synps_edac_priv *priv = mci->pvt_info;
- 	int status;
- 
--	status = synps_edac_geterror_info(priv->baseaddr, &priv->stat);
-+	status = priv->p_data->synps_edac_geterror_info(priv->baseaddr,
-+							&priv->stat);
- 	if (status)
- 		return;
- 
-@@ -372,10 +396,12 @@ static int synps_edac_init_csrows(struct mem_ctl_info *mci)
- 		for (j = 0; j < csi->nr_channels; j++) {
- 			dimm            = csi->channels[j]->dimm;
- 			dimm->edac_mode = EDAC_FLAG_SECDED;
--			dimm->mtype     = synps_edac_get_mtype(priv->baseaddr);
-+			dimm->mtype     = priv->p_data->synps_edac_get_mtype(
-+						priv->baseaddr);
- 			dimm->nr_pages  = (size >> PAGE_SHIFT) / csi->nr_channels;
- 			dimm->grain     = SYNPS_EDAC_ERR_GRAIN;
--			dimm->dtype     = synps_edac_get_dtype(priv->baseaddr);
-+			dimm->dtype     = priv->p_data->synps_edac_get_dtype(
-+						priv->baseaddr);
- 		}
- 	}
- 
-@@ -424,6 +450,21 @@ static int synps_edac_mc_init(struct mem_ctl_info *mci,
- 	return status;
- }
- 
-+static const struct synps_platform_data zynq_edac_def = {
-+	.synps_edac_geterror_info	= synps_edac_geterror_info,
-+	.synps_edac_get_mtype		= synps_edac_get_mtype,
-+	.synps_edac_get_dtype		= synps_edac_get_dtype,
-+	.synps_edac_get_eccstate	= synps_edac_get_eccstate,
-+	.quirks				= 0,
-+};
-+
-+static const struct of_device_id synps_edac_match[] = {
-+	{ .compatible = "xlnx,zynq-ddrc-a05", .data = (void *)&zynq_edac_def },
-+	{ /* end of table */ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, synps_edac_match);
-+
- /**
-  * synps_edac_mc_probe - Check controller and bind driver
-  * @pdev:	Pointer to the platform_device struct
-@@ -441,13 +482,22 @@ static int synps_edac_mc_probe(struct platform_device *pdev)
- 	int rc;
- 	struct resource *res;
- 	void __iomem *baseaddr;
-+	const struct of_device_id *match;
-+	const struct synps_platform_data *p_data;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	baseaddr = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(baseaddr))
- 		return PTR_ERR(baseaddr);
- 
--	if (!synps_edac_get_eccstate(baseaddr)) {
-+	match = of_match_node(synps_edac_match, pdev->dev.of_node);
-+	if (!match && !match->data) {
-+		dev_err(&pdev->dev, "of_match_node() failed\n");
-+		return -EINVAL;
-+	}
-+
-+	p_data = (struct synps_platform_data *)match->data;
-+	if (!(p_data->synps_edac_get_eccstate(baseaddr))) {
- 		edac_printk(KERN_INFO, EDAC_MC, "ECC not enabled\n");
- 		return -ENXIO;
- 	}
-@@ -469,6 +519,8 @@ static int synps_edac_mc_probe(struct platform_device *pdev)
- 
- 	priv = mci->pvt_info;
- 	priv->baseaddr = baseaddr;
-+	priv->p_data = match->data;
-+
- 	rc = synps_edac_mc_init(mci, pdev);
- 	if (rc) {
- 		edac_printk(KERN_ERR, EDAC_MC,
-@@ -487,7 +539,8 @@ static int synps_edac_mc_probe(struct platform_device *pdev)
- 	 * Start capturing the correctable and uncorrectable errors. A write of
- 	 * 0 starts the counters.
- 	 */
--	writel(0x0, baseaddr + ECC_CTRL_OFST);
-+	if (!(priv->p_data->quirks & DDR_ECC_INTR_SUPPORT))
-+		writel(0x0, baseaddr + ECC_CTRL_OFST);
- 	return rc;
- 
- free_edac_mc:
-@@ -512,13 +565,6 @@ static int synps_edac_mc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--static const struct of_device_id synps_edac_match[] = {
--	{ .compatible = "xlnx,zynq-ddrc-a05", },
--	{ /* end of table */ }
--};
--
--MODULE_DEVICE_TABLE(of, synps_edac_match);
--
- static struct platform_driver synps_edac_mc_driver = {
- 	.driver = {
- 		   .name = "synopsys-edac",
+ 	if (p->ue_cnt) {
+ 		pinf = &p->ueinfo;
+-		snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
+-			 "DDR ECC error type :%s Row %d Bank %d Col %d ",
+-			 "UE", pinf->row, pinf->bank, pinf->col);
++		if (priv->p_data->quirks == 0)
++			snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
++				 "DDR ECC error type :%s Row %d Bank %d Col %d ",
++				"UE", pinf->row, pinf->bank, pinf->col);
++		else
++			snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
++				 "DDR ECC error type :%s Row %d Bank %d Col %d "
++				 "BankGroup Number %d Block Number %d",
++				 "UE", pinf->row, pinf->bank, pinf->col,
++				 pinf->bankgrpnr, pinf->blknr);
+ 		edac_mc_handle_error(HW_EVENT_ERR_UNCORRECTED, mci,
+ 				     p->ue_cnt, 0, 0, 0, 0, 0, -1,
+ 				     priv->message, "");
 -- 
 1.9.1
