@@ -1,73 +1,108 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 4 Aug 2017 12:36:06 -0700
-Subject: [PATCH 5/6] arm64: Implement pmem API support
-In-Reply-To: <777df912-0d7f-447f-10fe-a178489a4fb8@arm.com>
-References: <cover.1500397441.git.robin.murphy@arm.com>
- <ba8c28bcffc3bc856163441793bb4ef0fefa0f75.1500397441.git.robin.murphy@arm.com>
- <20170804152542.7h3mbyxnhjwroddc@armageddon.cambridge.arm.com>
- <74521a9d-45fa-7e29-d9f9-960c478306ec@arm.com>
- <CAPcyv4i0=Na5Y5pZDAk5=K9nirfyo-eQJRuikETF82VuS_xY=Q@mail.gmail.com>
- <777df912-0d7f-447f-10fe-a178489a4fb8@arm.com>
-Message-ID: <CAPcyv4ijSPsp+-P7i1zyy61LC4+mEHdKZDFOcwwvfQAVvntJJg@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 04 Aug 2017 22:39:37 +0300
+Subject: [PATCH v3 3/6] dt-bindings: add binding for Sitronix ST7586
+ display panels
+In-Reply-To: <cc04e31c-2206-2f0c-0f92-7ef096bfd9da@lechnology.com>
+References: <1501799630-1650-1-git-send-email-david@lechnology.com>
+ <2434051.fAH1OaXNrL@avalon>
+ <cc04e31c-2206-2f0c-0f92-7ef096bfd9da@lechnology.com>
+Message-ID: <2830608.h203mxr23Z@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 4, 2017 at 11:35 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 04/08/17 19:09, Dan Williams wrote:
->> On Fri, Aug 4, 2017 at 10:43 AM, Robin Murphy <robin.murphy@arm.com> wrote:
->>> On 04/08/17 16:25, Catalin Marinas wrote:
->>>> Two minor comments below.
->>>>
->>>> On Tue, Jul 25, 2017 at 11:55:42AM +0100, Robin Murphy wrote:
->>>>> --- a/arch/arm64/Kconfig
->>>>> +++ b/arch/arm64/Kconfig
->>>>> @@ -960,6 +960,17 @@ config ARM64_UAO
->>>>>        regular load/store instructions if the cpu does not implement the
->>>>>        feature.
->>>>>
->>>>> +config ARM64_PMEM
->>>>> +    bool "Enable support for persistent memory"
->>>>> +    select ARCH_HAS_PMEM_API
->>>>> +    help
->>>>> +      Say Y to enable support for the persistent memory API based on the
->>>>> +      ARMv8.2 DCPoP feature.
->>>>> +
->>>>> +      The feature is detected at runtime, and the kernel will use DC CVAC
->>>>> +      operations if DC CVAP is not supported (following the behaviour of
->>>>> +      DC CVAP itself if the system does not define a point of persistence).
->>>>
->>>> Any reason not to have this default y?
->>>
->>> Mostly because it's untested, and not actually useful without some way
->>> of describing persistent memory regions to the kernel (I'm currently
->>> trying to make sense of what exactly ARCH_HAS_MMIO_FLUSH is supposed to
->>> mean in order to enable ACPI NFIT support).
->>
->> This is related to block-aperture support described by the NFIT where
->> a sliding-memory-mapped window can be programmed to access different
->> ranges of the NVDIMM. Before the window is programmed to a new
->> DIMM-address we need to flush any dirty data through the current
->> window setting to media. See the call to mmio_flush_range() in
->> acpi_nfit_blk_single_io(). I think it's ok to omit ARCH_HAS_MMIO_FLUSH
->> support, and add a configuration option to compile out the
->> block-aperture support.
->
-> Oh, I have every intention of implementing it one way or another if
-> necessary - it's not difficult, it's just been a question of working
-> through the NFIT code to figure out the subtleties of translation to
-> arm64 ;)
->
-> If mmio_flush_range() is for true MMIO (i.e. __iomem) mappings, then
-> arm64 should only need a barrier, rather than actual cache operations.
-> If on the other hand it's misleadingly named and only actually used on
-> MEMREMAP_WB mappings (as I'm staring to think it might be), then I can't
-> help thinking it could simply go away in favour of arch_wb_pmem(), since
-> that now seems to have those same semantics and intent, plus a much more
-> appropriate name.
->
+Hi David,
 
-The mapping type of block-apertures is up to the architecture, so you
-could mark them uncacheable and not worry about mmio_flush_range().
-Also, arch_wb_pmem() is not a replacement for mmio_flush_range() since
-we also need the cache to be invalidated. arch_wb_pmem() is allowed to
-leave clean cache lines present.
+On Friday 04 Aug 2017 10:51:37 David Lechner wrote:
+> On 08/04/2017 09:54 AM, Laurent Pinchart wrote:
+> > On Thursday 03 Aug 2017 17:33:47 David Lechner wrote:
+> >> This adds a new binding for Sitronix ST7586 display panels.
+> >> 
+> >> Using lego as the vendor prefix in the compatible string because the
+> >> display panel I am working with is an integral part of the LEGO
+> >> MINDSTORMS EV3.
+> >> 
+> >> Signed-off-by: David Lechner <david@lechnology.com>
+> >> ---
+> >> 
+> >>   .../bindings/display/sitronix,st7586.txt           | 26
+> >>   +++++++++++++++++++
+> >>   1 file changed, 26 insertions(+)
+> >>   create mode 100644
+> >> 
+> >> Documentation/devicetree/bindings/display/sitronix,st7586.txt
+> >> 
+> >> diff --git
+> >> a/Documentation/devicetree/bindings/display/sitronix,st7586.txt
+> >> b/Documentation/devicetree/bindings/display/sitronix,st7586.txt new file
+> >> mode 100644
+> >> index 0000000..dfb0b7b
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
+> >> @@ -0,0 +1,26 @@
+> >> +Sitronix ST7586 display panel
+> >> +
+> >> +Required properties:
+> >> +- compatible:	"lego,ev3-lcd".
+> >> +
+> >> +The node for this driver must be a child node of a SPI controller, hence
+> >> +all mandatory properties described in ../spi/spi-bus.txt must be
+> >> specified. +
+> >> +Optional properties:
+> >> +- dc-gpios:	D/C pin. The presence/absence of this GPIO determines
+> >> +		the panel interface operation mode (IF[3:1] pins):
+> >> +		- present: IF=011 4-wire 8-bit data serial interface
+> >> +		- absent:  IF=010 3-wire 9-bit data serial interface
+> > 
+> > How does this work ? Do you have a single GPIO on your system connected to
+> > IF[1], with IF[3:2] hardwired to 01 ?
+> 
+> LEGO has not made the internals of the display publicly available, so I
+> cannot say for sure. But I assume that IF[3:1] is hardwired to 011. This
+> causes pin D1 to assigned to the signal A0, which is what we are calling
+> the dc gpio here.
+> 
+> If IF[3:1] were hardwired to 010, then pin D1 would be not not used and
+> there would be no A0 signal.
+> 
+> So, basically, we can infer the state of IF[3:1] by the fact that we
+> have a dc pin or not.
+
+OK, now I understand what you mean. Maybe you should phrase it a bit 
+differently to make it clearer ? How about
+
+dc-gpios: Specified or the GPIO connected to the panel's D/C pin (also called 
+A0). The property is required when the panel operates in 4-wire mode (IF[3:1] 
+= 011) and prohibited when the panel operates in 3-wire mode (IF[3:1] = 010).
+
+By the way, if the signal is named A0, why don't you call the property a0-
+gpios ?
+
+> >> +- reset-gpios:	Reset pin
+> >> +- power-supply:	A regulator node for the supply voltage.
+> >> +- backlight:	phandle of the backlight device attached to the panel
+> >> +- rotation:	panel rotation in degrees counter clockwise 
+(0,90,180,270)
+> > 
+> > Please use the OF graph DT bindings (a.k.a. ports) to describe the
+> > connection between the panel and its source.
+> 
+> I am afraid that I do not understand this request. What would the source
+> of the panel be? There is nothing like a SoC LCD controller that is
+> driving this panel.
+
+My bad, I should have read the panel datasheet before replying :-S Please 
+ignore this comment.
+
+> >> +Example:
+> >> +	display at 0{
+> >> +		compatible = "lego,ev3-lcd";
+> >> +		reg = <0>;
+> >> +		spi-max-frequency = <10000000>;
+> >> +		dc-gpios = <&gpio 43 GPIO_ACTIVE_HIGH>;
+> >> +		reset-gpios = <&gpio 80 GPIO_ACTIVE_HIGH>;
+> >> +	};
+
+-- 
+Regards,
+
+Laurent Pinchart
