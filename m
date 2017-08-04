@@ -1,39 +1,59 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 4 Aug 2017 13:02:25 +0100
-Subject: [PATCH v3] arm64: Decode information from ESR upon mem faults
-In-Reply-To: <1501835502-36301-1-git-send-email-julien.thierry@arm.com>
-References: <1501835502-36301-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <20170804120224.wkeatkeigrbye5ds@armageddon.cambridge.arm.com>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Fri, 4 Aug 2017 20:06:36 +0800
+Subject: [PATCH v3 0/6] PCI: MediaTek: Add support for new generation host
+ controller
+Message-ID: <cover.1501846816.git.honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 04, 2017 at 09:31:42AM +0100, Julien Thierry wrote:
-> When receiving unhandled faults from the CPU, description is very sparse.
-> Adding information about faults decoded from ESR.
-> 
-> Added defines to esr.h corresponding ESR fields. Values are based on ARM
-> Archtecture Reference Manual (DDI 0487B.a), section D7.2.28 ESR_ELx, Exception
-> Syndrome Register (ELx) (pages D7-2275 to D7-2280).
-> 
-> New output is of the form:
-> [   77.818059] Mem abort info:
-> [   77.820826]   Exception class = DABT (current EL), IL = 32 bits
-> [   77.826706]   SET = 0, FnV = 0
-> [   77.829742]   EA = 0, S1PTW = 0
-> [   77.832849] Data abort info:
-> [   77.835713]   ISV = 0, ISS = 0x00000070
-> [   77.839522]   CM = 0, WnR = 1
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
->  arch/arm64/include/asm/esr.h | 39 ++++++++++++++++++++++++++----------
->  arch/arm64/mm/fault.c        | 47 ++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 76 insertions(+), 10 deletions(-)
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-Queued for 4.14. Thanks.
+MediaTek's PCIe host controller has two generation HWs, the new
+generation HW has two root ports, it shares most probing flow with the
+legacy controller. But the read/write config space logical is different
+from the legacy controller. The per-port register must be touched for
+read/write config space, And the per-port register base are in separate
+address space.
+
+This patchset abstract the common probing flow, and add support for the
+new generation controller.
+
+Changes since v2:
+ - Split the Gen2 training change to a separate patch.
+ - Simplify the config_read/write logical and get rid of mtk_pcie_find_port.
+ - Using bus->sysdata to simplify the code.
+ - Rebase to commit 65b83b13204a ("PCI: mediatek: Explicitly request exclusive
+   reset control")[1].
+ - Fix some misspells.
+ - Add review tags in commit message.
+
+Changes since v1:
+ - Fix build warnings in arm arch.
+ - Using SoC specific compatible instead of generic compatible.
+ - Add devicetree binding example for mt7622.
+ - Unified the register define names with PCIE_ prefix.
+ - Cleanup some un-necessary condition determine when starup port.
+ - minor code cleanups.
+
+[1] https://patchwork.kernel.org/patch/9852591/
+
+Honghui Zhang (1):
+  PCI: mediatek: Add a structure to abstract the controller generations
+
+Ryder Lee (5):
+  PCI: mediatek: Using readl_poll_timeout to wait Gen2 training
+  PCI: mediatek: switch to use platform_get_resource_byname()
+  dt-bindings: PCI: rename and cleanup MediaTek binding text
+  PCI: mediatek: Add new generation controller support
+  dt-bindings: PCI: add support for new generation controller
+
+ .../bindings/pci/mediatek,mt7623-pcie.txt          | 130 -----
+ .../devicetree/bindings/pci/mediatek-pcie.txt      | 284 ++++++++++
+ drivers/pci/host/Kconfig                           |   5 +-
+ drivers/pci/host/pcie-mediatek.c                   | 571 +++++++++++++++++++--
+ 4 files changed, 812 insertions(+), 178 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/pci/mediatek,mt7623-pcie.txt
+ create mode 100644 Documentation/devicetree/bindings/pci/mediatek-pcie.txt
 
 -- 
-Catalin
+2.6.4
