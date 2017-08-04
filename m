@@ -1,247 +1,446 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Fri, 4 Aug 2017 19:59:37 +0800
-Subject: [PATCH v6 2/2] arm64: dts: Add Mediatek SoC MT2712 and evaluation
- board dts and Makefile
-In-Reply-To: <1501847977-4023-1-git-send-email-yt.shen@mediatek.com>
-References: <1501847977-4023-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1501847977-4023-3-git-send-email-yt.shen@mediatek.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri,  4 Aug 2017 14:00:24 +0200
+Subject: [PATCH 2/5] edac: synopsys: Add EDAC ECC support for ZynqMP DDRC
+In-Reply-To: <60ff19f90adfd252cf296fe8988c614c4c3e43fd.1501848023.git.michal.simek@xilinx.com>
+References: <60ff19f90adfd252cf296fe8988c614c4c3e43fd.1501848023.git.michal.simek@xilinx.com>
+Message-ID: <00da9d8dcdbc95c170a9b52abcc2580c271bdd9d.1501848023.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds basic chip support for Mediatek 2712
+From: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
 
-Signed-off-by: YT Shen <yt.shen@mediatek.com>
+This patch adds EDAC ECC support for ZynqMP DDRC IP
+
+Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
- arch/arm64/boot/dts/mediatek/Makefile       |   1 +
- arch/arm64/boot/dts/mediatek/mt2712-evb.dts |  32 ++++++
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi   | 171 ++++++++++++++++++++++++++++
- 3 files changed, 204 insertions(+)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
- create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
 
-diff --git a/arch/arm64/boot/dts/mediatek/Makefile b/arch/arm64/boot/dts/mediatek/Makefile
-index 015eb07..f323936 100644
---- a/arch/arm64/boot/dts/mediatek/Makefile
-+++ b/arch/arm64/boot/dts/mediatek/Makefile
-@@ -1,3 +1,4 @@
-+dtb-$(CONFIG_ARCH_MEDIATEK) += mt2712-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6755-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6795-evb.dtb
- dtb-$(CONFIG_ARCH_MEDIATEK) += mt6797-evb.dtb
-diff --git a/arch/arm64/boot/dts/mediatek/mt2712-evb.dts b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-new file mode 100644
-index 0000000..8c804df
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt2712-evb.dts
-@@ -0,0 +1,32 @@
-+/*
-+ * Copyright (c) 2017 MediaTek Inc.
-+ * Author: YT Shen <yt.shen@mediatek.com>
+ drivers/edac/Kconfig         |   2 +-
+ drivers/edac/synopsys_edac.c | 306 ++++++++++++++++++++++++++++++++++++++++++-
+ 2 files changed, 302 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+index 96afb2aeed18..e2f62dda8944 100644
+--- a/drivers/edac/Kconfig
++++ b/drivers/edac/Kconfig
+@@ -445,7 +445,7 @@ config EDAC_ALTERA_SDMMC
+ 
+ config EDAC_SYNOPSYS
+ 	tristate "Synopsys DDR Memory Controller"
+-	depends on ARCH_ZYNQ
++	depends on ARCH_ZYNQ || ARM64
+ 	help
+ 	  Support for error detection and correction on the Synopsys DDR
+ 	  memory controller.
+diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
+index 65f3b04d5a87..fdf1186151c1 100644
+--- a/drivers/edac/synopsys_edac.c
++++ b/drivers/edac/synopsys_edac.c
+@@ -22,6 +22,7 @@
+ #include <linux/edac.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
++#include <linux/interrupt.h>
+ #include <linux/of.h>
+ 
+ #include "edac_module.h"
+@@ -99,6 +100,87 @@
+ /* DDR ECC Quirks */
+ #define DDR_ECC_INTR_SUPPORT    BIT(0)
+ 
++/* ZynqMP Enhanced DDR memory controller registers that are relevant to ECC */
++/* ECC Configuration Registers */
++#define ECC_CFG0_OFST	0x70
++#define ECC_CFG1_OFST	0x74
++
++/* ECC Status Register */
++#define ECC_STAT_OFST	0x78
++
++/* ECC Clear Register */
++#define ECC_CLR_OFST	0x7C
++
++/* ECC Error count Register */
++#define ECC_ERRCNT_OFST	0x80
++
++/* ECC Corrected Error Address Register */
++#define ECC_CEADDR0_OFST	0x84
++#define ECC_CEADDR1_OFST	0x88
++
++/* ECC Syndrome Registers */
++#define ECC_CSYND0_OFST	0x8C
++#define ECC_CSYND1_OFST	0x90
++#define ECC_CSYND2_OFST	0x94
++
++/* ECC Bit Mask0 Address Register */
++#define ECC_BITMASK0_OFST	0x98
++#define ECC_BITMASK1_OFST	0x9C
++#define ECC_BITMASK2_OFST	0xA0
++
++/* ECC UnCorrected Error Address Register */
++#define ECC_UEADDR0_OFST	0xA4
++#define ECC_UEADDR1_OFST	0xA8
++
++/* ECC Syndrome Registers */
++#define ECC_UESYND0_OFST	0xAC
++#define ECC_UESYND1_OFST	0xB0
++#define ECC_UESYND2_OFST	0xB4
++
++/* ECC Poison Address Reg */
++#define ECC_POISON0_OFST	0xB8
++#define ECC_POISON1_OFST	0xBC
++
++/* Control register bitfield definitions */
++#define ECC_CTRL_BUSWIDTH_MASK	0x3000
++#define ECC_CTRL_BUSWIDTH_SHIFT	12
++#define ECC_CTRL_CLR_CE_ERRCNT	BIT(2)
++#define ECC_CTRL_CLR_UE_ERRCNT	BIT(3)
++
++/* DDR Control Register width definitions  */
++#define DDRCTL_EWDTH_16		2
++#define DDRCTL_EWDTH_32		1
++#define DDRCTL_EWDTH_64		0
++
++/* ECC status register definitions */
++#define ECC_STAT_UECNT_MASK	0xF0000
++#define ECC_STAT_UECNT_SHIFT	16
++#define ECC_STAT_CECNT_MASK	0xF00
++#define ECC_STAT_CECNT_SHIFT	8
++#define ECC_STAT_BITNUM_MASK	0x7F
++
++/* DDR QOS Interrupt register definitions */
++#define DDR_QOS_IRQ_STAT_OFST	0x20200
++#define DDR_QOSUE_MASK		0x4
++#define	DDR_QOSCE_MASK		0x2
++#define	ECC_CE_UE_INTR_MASK	0x6
++
++/* ECC Corrected Error Register Mask and Shifts*/
++#define ECC_CEADDR0_RW_MASK	0x3FFFF
++#define ECC_CEADDR0_RNK_MASK	BIT(24)
++#define ECC_CEADDR1_BNKGRP_MASK	0x3000000
++#define ECC_CEADDR1_BNKNR_MASK	0x70000
++#define ECC_CEADDR1_BLKNR_MASK	0xFFF
++#define ECC_CEADDR1_BNKGRP_SHIFT	24
++#define ECC_CEADDR1_BNKNR_SHIFT	16
++
++/* DDR Memory type defines */
++#define MEM_TYPE_DDR3 0x1
++#define MEM_TYPE_LPDDR3 0x1
++#define MEM_TYPE_DDR2 0x4
++#define MEM_TYPE_DDR4 0x10
++#define MEM_TYPE_LPDDR4 0x10
++
+ /**
+  * struct ecc_error_info - ECC error log information
+  * @row:	Row number
+@@ -106,6 +188,8 @@
+  * @bank:	Bank number
+  * @bitpos:	Bit position
+  * @data:	Data causing the error
++ * @bankgrpnr:	Bank group number
++ * @blknr:	Block number
+  */
+ struct ecc_error_info {
+ 	u32 row;
+@@ -113,6 +197,8 @@ struct ecc_error_info {
+ 	u32 bank;
+ 	u32 bitpos;
+ 	u32 data;
++	u32 bankgrpnr;
++	u32 blknr;
+ };
+ 
+ /**
+@@ -171,7 +257,7 @@ struct synps_platform_data {
+  *
+  * Determines there is any ecc error or not
+  *
+- * Return: one if there is no error otherwise returns zero
++ * Return: 1 if there is no error otherwise returns 0
+  */
+ static int synps_edac_geterror_info(void __iomem *base,
+ 				    struct synps_ecc_status *p)
+@@ -219,6 +305,65 @@ static int synps_edac_geterror_info(void __iomem *base,
+ }
+ 
+ /**
++ * synps_enh_edac_geterror_info - Get the current ecc error info
++ * @base:	Pointer to the base address of the ddr memory controller
++ * @p:		Pointer to the synopsys ecc status structure
 + *
-+ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-+ */
-+
-+/dts-v1/;
-+#include "mt2712e.dtsi"
-+
-+/ {
-+	model = "MediaTek MT2712 evaluation board";
-+	compatible = "mediatek,mt2712-evb", "mediatek,mt2712";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x80000000>;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:921600n8";
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-new file mode 100644
-index 0000000..57d0396
---- /dev/null
-+++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-@@ -0,0 +1,171 @@
-+/*
-+ * Copyright (c) 2017 MediaTek Inc.
-+ * Author: YT Shen <yt.shen@mediatek.com>
++ * Determines there is any ecc error or not
 + *
-+ * SPDX-License-Identifier: (GPL-2.0 OR MIT)
++ * Return: one if there is no error otherwise returns zero
 + */
++static int synps_enh_edac_geterror_info(void __iomem *base,
++					struct synps_ecc_status *p)
++{
++	u32 regval, clearval = 0;
 +
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
++	regval = readl(base + ECC_STAT_OFST);
++	if (!regval)
++		return 1;
 +
-+/ {
-+	compatible = "mediatek,mt2712";
-+	interrupt-parent = <&sysirq>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
++	p->ce_cnt = (regval & ECC_STAT_CECNT_MASK) >> ECC_STAT_CECNT_SHIFT;
++	p->ue_cnt = (regval & ECC_STAT_UECNT_MASK) >> ECC_STAT_UECNT_SHIFT;
++	p->ceinfo.bitpos = (regval & ECC_STAT_BITNUM_MASK);
 +
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++	regval = readl(base + ECC_CEADDR0_OFST);
++	if (!(p->ce_cnt))
++		goto ue_err;
 +
-+		cpu-map {
-+			cluster0 {
-+				core0 {
-+					cpu = <&cpu0>;
-+				};
-+				core1 {
-+					cpu = <&cpu1>;
-+				};
-+			};
++	p->ceinfo.row = (regval & ECC_CEADDR0_RW_MASK);
++	regval = readl(base + ECC_CEADDR1_OFST);
++	p->ceinfo.bank = (regval & ECC_CEADDR1_BNKNR_MASK) >>
++					ECC_CEADDR1_BNKNR_SHIFT;
++	p->ceinfo.bankgrpnr = (regval &	ECC_CEADDR1_BNKGRP_MASK) >>
++					ECC_CEADDR1_BNKGRP_SHIFT;
++	p->ceinfo.blknr = (regval & ECC_CEADDR1_BLKNR_MASK);
++	p->ceinfo.data = readl(base + ECC_CSYND0_OFST);
++	edac_dbg(3, "ce bit position: %d data: %d\n", p->ceinfo.bitpos,
++		 p->ceinfo.data);
 +
-+			cluster1 {
-+				core0 {
-+					cpu = <&cpu2>;
-+				};
-+			};
-+		};
++ue_err:
++	regval = readl(base + ECC_UEADDR0_OFST);
++	if (!(p->ue_cnt))
++		goto out;
 +
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a35";
-+			reg = <0x000>;
-+		};
++	p->ueinfo.row = (regval & ECC_CEADDR0_RW_MASK);
++	regval = readl(base + ECC_UEADDR1_OFST);
++	p->ueinfo.bankgrpnr = (regval & ECC_CEADDR1_BNKGRP_MASK) >>
++					ECC_CEADDR1_BNKGRP_SHIFT;
++	p->ueinfo.bank = (regval & ECC_CEADDR1_BNKNR_MASK) >>
++					ECC_CEADDR1_BNKNR_SHIFT;
++	p->ueinfo.blknr = (regval & ECC_CEADDR1_BLKNR_MASK);
++	p->ueinfo.data = readl(base + ECC_UESYND0_OFST);
++out:
++	clearval = ECC_CTRL_CLR_CE_ERR | ECC_CTRL_CLR_CE_ERRCNT;
++	clearval |= ECC_CTRL_CLR_UE_ERR | ECC_CTRL_CLR_UE_ERRCNT;
++	writel(clearval, base + ECC_CLR_OFST);
++	writel(0x0, base + ECC_CLR_OFST);
 +
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a35";
-+			reg = <0x001>;
-+			enable-method = "psci";
-+		};
++	return 0;
++}
 +
-+		cpu2: cpu at 200 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a72";
-+			reg = <0x200>;
-+			enable-method = "psci";
-+		};
-+	};
++/**
+  * synps_edac_handle_error - Handle controller error types CE and UE
+  * @mci:	Pointer to the edac memory controller instance
+  * @p:		Pointer to the synopsys ecc status structure
+@@ -255,6 +400,41 @@ static void synps_edac_handle_error(struct mem_ctl_info *mci,
+ }
+ 
+ /**
++ * synps_edac_intr_handler - synps edac isr
++ * @irq:        irq number
++ * @dev_id:     device id poniter
++ *
++ * This is the Isr routine called by edac core interrupt thread.
++ * Used to check and post ECC errors.
++ *
++ * Return: IRQ_NONE, if interrupt not set or IRQ_HANDLED otherwise
++ */
++static irqreturn_t synps_edac_intr_handler(int irq, void *dev_id)
++{
++	struct mem_ctl_info *mci = dev_id;
++	struct synps_edac_priv *priv = mci->pvt_info;
++	int status, regval;
 +
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
++	regval = readl(priv->baseaddr + DDR_QOS_IRQ_STAT_OFST) &
++			(DDR_QOSCE_MASK | DDR_QOSUE_MASK);
++	if (!(regval & ECC_CE_UE_INTR_MASK))
++		return IRQ_NONE;
++	status = priv->p_data->synps_edac_geterror_info(priv->baseaddr,
++				&priv->stat);
++	if (status)
++		return IRQ_NONE;
 +
-+	baud_clk: dummy26m {
-+		compatible = "fixed-clock";
-+		clock-frequency = <26000000>;
-+		#clock-cells = <0>;
-+	};
++	priv->ce_cnt += priv->stat.ce_cnt;
++	priv->ue_cnt += priv->stat.ue_cnt;
++	synps_edac_handle_error(mci, &priv->stat);
 +
-+	sys_clk: dummyclk {
-+		compatible = "fixed-clock";
-+		clock-frequency = <26000000>;
-+		#clock-cells = <0>;
-+	};
++	edac_dbg(3, "Total error count ce %d ue %d\n",
++		 priv->ce_cnt, priv->ue_cnt);
++	writel(regval, priv->baseaddr + DDR_QOS_IRQ_STAT_OFST);
++	return IRQ_HANDLED;
++}
 +
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_PPI 13
-+			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14
-+			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11
-+			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10
-+			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
++/**
+  * synps_edac_check - Check controller for ECC errors
+  * @mci:	Pointer to the edac memory controller instance
+  *
+@@ -310,6 +490,40 @@ static enum dev_type synps_edac_get_dtype(const void __iomem *base)
+ }
+ 
+ /**
++ * synps_enh_edac_get_dtype - Return the controller memory width
++ * @base:	Pointer to the ddr memory controller base address
++ *
++ * Get the EDAC device type width appropriate for the current controller
++ * configuration.
++ *
++ * Return: a device type width enumeration.
++ */
++static enum dev_type synps_enh_edac_get_dtype(const void __iomem *base)
++{
++	enum dev_type dt;
++	u32 width;
 +
-+	uart5: serial at 1000f000 {
-+		compatible = "mediatek,mt2712-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0 0x1000f000 0 0x400>;
-+		interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&baud_clk>, <&sys_clk>;
-+		clock-names = "baud", "bus";
-+		status = "disabled";
-+	};
++	width = readl(base + CTRL_OFST);
++	width = (width & ECC_CTRL_BUSWIDTH_MASK) >>
++		ECC_CTRL_BUSWIDTH_SHIFT;
++	switch (width) {
++	case DDRCTL_EWDTH_16:
++		dt = DEV_X2;
++		break;
++	case DDRCTL_EWDTH_32:
++		dt = DEV_X4;
++		break;
++	case DDRCTL_EWDTH_64:
++		dt = DEV_X8;
++		break;
++	default:
++		dt = DEV_UNKNOWN;
++	}
 +
-+	sysirq: interrupt-controller at 10220a80 {
-+		compatible = "mediatek,mt2712-sysirq",
-+			     "mediatek,mt6577-sysirq";
-+		interrupt-controller;
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&gic>;
-+		reg = <0 0x10220a80 0 0x40>;
-+	};
++	return dt;
++}
 +
-+	gic: interrupt-controller at 10510000 {
-+		compatible = "arm,gic-400";
-+		#interrupt-cells = <3>;
-+		interrupt-parent = <&gic>;
-+		interrupt-controller;
-+		reg = <0 0x10510000 0 0x10000>,
-+		      <0 0x10520000 0 0x20000>,
-+		      <0 0x10540000 0 0x20000>,
-+		      <0 0x10560000 0 0x20000>;
-+		interrupts = <GIC_PPI 9
-+			 (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_HIGH)>;
-+	};
++/**
+  * synps_edac_get_eccstate - Return the controller ecc enable/disable status
+  * @base:	Pointer to the ddr memory controller base address
+  *
+@@ -335,6 +549,32 @@ static bool synps_edac_get_eccstate(void __iomem *base)
+ }
+ 
+ /**
++ * synps_enh_edac_get_eccstate - Return the controller ecc enable/disable status
++ * @base:	Pointer to the ddr memory controller base address
++ *
++ * Get the ECC enable/disable status for the controller
++ *
++ * Return: a ecc status boolean i.e true/false - enabled/disabled.
++ */
++static bool synps_enh_edac_get_eccstate(void __iomem *base)
++{
++	enum dev_type dt;
++	u32 ecctype;
++	bool state = false;
 +
-+	uart0: serial at 11002000 {
-+		compatible = "mediatek,mt2712-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0 0x11002000 0 0x400>;
-+		interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&baud_clk>, <&sys_clk>;
-+		clock-names = "baud", "bus";
-+		status = "disabled";
-+	};
++	dt = synps_enh_edac_get_dtype(base);
++	if (dt == DEV_UNKNOWN)
++		return state;
 +
-+	uart1: serial at 11003000 {
-+		compatible = "mediatek,mt2712-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0 0x11003000 0 0x400>;
-+		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&baud_clk>, <&sys_clk>;
-+		clock-names = "baud", "bus";
-+		status = "disabled";
-+	};
++	ecctype = readl(base + ECC_CFG0_OFST) & SCRUB_MODE_MASK;
++	if ((ecctype == SCRUB_MODE_SECDED) &&
++	    ((dt == DEV_X2) || (dt == DEV_X4) || (dt == DEV_X8)))
++		state = true;
 +
-+	uart2: serial at 11004000 {
-+		compatible = "mediatek,mt2712-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0 0x11004000 0 0x400>;
-+		interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&baud_clk>, <&sys_clk>;
-+		clock-names = "baud", "bus";
-+		status = "disabled";
-+	};
++	return state;
++}
 +
-+	uart3: serial at 11005000 {
-+		compatible = "mediatek,mt2712-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0 0x11005000 0 0x400>;
-+		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&baud_clk>, <&sys_clk>;
-+		clock-names = "baud", "bus";
-+		status = "disabled";
-+	};
++/**
+  * synps_edac_get_memsize - reads the size of the attached memory device
+  *
+  * Return: the memory size in bytes
+@@ -373,6 +613,32 @@ static enum mem_type synps_edac_get_mtype(const void __iomem *base)
+ }
+ 
+ /**
++ * synps_enh_edac_get_mtype - Returns controller memory type
++ * @base:	pointer to the synopsys ecc status structure
++ *
++ * Get the EDAC memory type appropriate for the current controller
++ * configuration.
++ *
++ * Return: a memory type enumeration.
++ */
++static enum mem_type synps_enh_edac_get_mtype(const void __iomem *base)
++{
++	enum mem_type mt;
++	u32 memtype;
 +
-+	uart4: serial at 11019000 {
-+		compatible = "mediatek,mt2712-uart",
-+			     "mediatek,mt6577-uart";
-+		reg = <0 0x11019000 0 0x400>;
-+		interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&baud_clk>, <&sys_clk>;
-+		clock-names = "baud", "bus";
-+		status = "disabled";
-+	};
++	memtype = readl(base + CTRL_OFST);
++
++	if ((memtype & MEM_TYPE_DDR3) || (memtype & MEM_TYPE_LPDDR3))
++		mt = MEM_DDR3;
++	else if (memtype & MEM_TYPE_DDR2)
++		mt = MEM_RDDR2;
++	else if ((memtype & MEM_TYPE_LPDDR4) || (memtype & MEM_TYPE_DDR4))
++		mt = MEM_DDR4;
++
++	return mt;
++}
++
++/**
+  * synps_edac_init_csrows - Initialize the cs row data
+  * @mci:	Pointer to the edac memory controller instance
+  *
+@@ -440,9 +706,12 @@ static int synps_edac_mc_init(struct mem_ctl_info *mci,
+ 	mci->dev_name = SYNPS_EDAC_MOD_STRING;
+ 	mci->mod_name = SYNPS_EDAC_MOD_VER;
+ 	mci->mod_ver = "1";
+-
+-	edac_op_state = EDAC_OPSTATE_POLL;
+-	mci->edac_check = synps_edac_check;
++	if (priv->p_data->quirks & DDR_ECC_INTR_SUPPORT) {
++		edac_op_state = EDAC_OPSTATE_INT;
++	} else {
++		edac_op_state = EDAC_OPSTATE_POLL;
++		mci->edac_check = synps_edac_check;
++	}
+ 	mci->ctl_page_to_phys = NULL;
+ 
+ 	status = synps_edac_init_csrows(mci);
+@@ -458,8 +727,18 @@ static int synps_edac_mc_init(struct mem_ctl_info *mci,
+ 	.quirks				= 0,
+ };
+ 
++static const struct synps_platform_data zynqmp_enh_edac_def = {
++	.synps_edac_geterror_info	= synps_enh_edac_geterror_info,
++	.synps_edac_get_mtype		= synps_enh_edac_get_mtype,
++	.synps_edac_get_dtype		= synps_enh_edac_get_dtype,
++	.synps_edac_get_eccstate	= synps_enh_edac_get_eccstate,
++	.quirks				= DDR_ECC_INTR_SUPPORT,
 +};
 +
+ static const struct of_device_id synps_edac_match[] = {
+ 	{ .compatible = "xlnx,zynq-ddrc-a05", .data = (void *)&zynq_edac_def },
++	{ .compatible = "xlnx,zynqmp-ddrc-2.40a",
++				.data = (void *)&zynqmp_enh_edac_def},
+ 	{ /* end of table */ }
+ };
+ 
+@@ -479,7 +758,7 @@ static int synps_edac_mc_probe(struct platform_device *pdev)
+ 	struct mem_ctl_info *mci;
+ 	struct edac_mc_layer layers[2];
+ 	struct synps_edac_priv *priv;
+-	int rc;
++	int rc, irq, status;
+ 	struct resource *res;
+ 	void __iomem *baseaddr;
+ 	const struct of_device_id *match;
+@@ -528,6 +807,23 @@ static int synps_edac_mc_probe(struct platform_device *pdev)
+ 		goto free_edac_mc;
+ 	}
+ 
++	if (priv->p_data->quirks & DDR_ECC_INTR_SUPPORT) {
++		irq = platform_get_irq(pdev, 0);
++		if (irq < 0) {
++			edac_printk(KERN_ERR, EDAC_MC,
++					"No irq %d in DT\n", irq);
++			return -ENODEV;
++		}
++
++		status = devm_request_irq(&pdev->dev, irq,
++			synps_edac_intr_handler,
++			0, dev_name(&pdev->dev), mci);
++		if (status < 0) {
++			edac_printk(KERN_ERR, EDAC_MC, "Failed to request Irq\n");
++			goto free_edac_mc;
++		}
++	}
++
+ 	rc = edac_mc_add_mc(mci);
+ 	if (rc) {
+ 		edac_printk(KERN_ERR, EDAC_MC,
 -- 
 1.9.1
