@@ -1,60 +1,106 @@
 From: Zhiqiang.Hou@nxp.com (Zhiqiang Hou)
-Date: Fri, 4 Aug 2017 14:44:04 +0800
-Subject: [PATCHv2 1/3] dts: ls2088a: add pcie support
+Date: Fri, 4 Aug 2017 14:44:06 +0800
+Subject: [PATCHv2 3/3] dts: ls1088a: add PCIe controller DT nodes
 In-Reply-To: <1501829046-3761-1-git-send-email-Zhiqiang.Hou@nxp.com>
 References: <1501829046-3761-1-git-send-email-Zhiqiang.Hou@nxp.com>
-Message-ID: <1501829046-3761-2-git-send-email-Zhiqiang.Hou@nxp.com>
+Message-ID: <1501829046-3761-4-git-send-email-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-The physical memory map address and CCSR registers map address are
-different between LS2088A and other LS2080A series SoCs.
+The LS1088a implements 3 PCIe 3.0 controllers.
 
 Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 ---
 V2:
- - None
+ - Remove the "fsl,ls2088a-pcie" from the compatible list.
 
- arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 72 ++++++++++++++++++++++++++
+ 1 file changed, 72 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-index 5c695c6..7d26531 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-@@ -134,6 +134,7 @@
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+index 5f35797..df83e19 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+@@ -378,6 +378,78 @@
+ 			dma-coherent;
+ 			status = "disabled";
+ 		};
++		pcie at 3400000 {
++			compatible = "fsl,ls1088a-pcie", "snps,dw-pcie";
++			reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
++			       0x20 0x00000000 0x0 0x00002000>; /* configuration space */
++			reg-names = "regs", "config";
++			interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>; /* aer interrupt */
++			interrupt-names = "aer";
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			dma-coherent;
++			num-lanes = <4>;
++			bus-range = <0x0 0xff>;
++			ranges = <0x81000000 0x0 0x00000000 0x20 0x00010000 0x0 0x00010000   /* downstream I/O */
++				  0x82000000 0x0 0x40000000 0x20 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
++			msi-parent = <&its>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 7>;
++			interrupt-map = <0000 0 0 1 &gic 0 0 0 109 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 2 &gic 0 0 0 110 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 3 &gic 0 0 0 111 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 4 &gic 0 0 0 112 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		pcie at 3500000 {
++			compatible = "fsl,ls1088a-pcie", "snps,dw-pcie";
++			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
++			       0x28 0x00000000 0x0 0x00002000>; /* configuration space */
++			reg-names = "regs", "config";
++			interrupts = <0 113 IRQ_TYPE_LEVEL_HIGH>; /* aer interrupt */
++			interrupt-names = "aer";
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			dma-coherent;
++			num-lanes = <4>;
++			bus-range = <0x0 0xff>;
++			ranges = <0x81000000 0x0 0x00000000 0x28 0x00010000 0x0 0x00010000   /* downstream I/O */
++				  0x82000000 0x0 0x40000000 0x28 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
++			msi-parent = <&its>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 7>;
++			interrupt-map = <0000 0 0 1 &gic 0 0 0 114 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 2 &gic 0 0 0 115 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 3 &gic 0 0 0 116 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 4 &gic 0 0 0 117 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		pcie at 3600000 {
++			compatible = "fsl,ls1088a-pcie", "snps,dw-pcie";
++			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
++			       0x30 0x00000000 0x0 0x00002000>; /* configuration space */
++			reg-names = "regs", "config";
++			interrupts = <0 118 IRQ_TYPE_LEVEL_HIGH>; /* aer interrupt */
++			interrupt-names = "aer";
++			#address-cells = <3>;
++			#size-cells = <2>;
++			device_type = "pci";
++			dma-coherent;
++			num-lanes = <8>;
++			bus-range = <0x0 0xff>;
++			ranges = <0x81000000 0x0 0x00000000 0x30 0x00010000 0x0 0x00010000   /* downstream I/O */
++				  0x82000000 0x0 0x40000000 0x30 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
++			msi-parent = <&its>;
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 7>;
++			interrupt-map = <0000 0 0 1 &gic 0 0 0 119 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 2 &gic 0 0 0 120 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 3 &gic 0 0 0 121 IRQ_TYPE_LEVEL_HIGH>,
++					<0000 0 0 4 &gic 0 0 0 122 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
+ 	};
+ 
  };
- 
- &pcie1 {
-+	compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
- 	reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
- 	       0x20 0x00000000 0x0 0x00002000>; /* configuration space */
- 
-@@ -142,6 +143,7 @@
- };
- 
- &pcie2 {
-+	compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
- 	reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
- 	       0x28 0x00000000 0x0 0x00002000>; /* configuration space */
- 
-@@ -150,6 +152,7 @@
- };
- 
- &pcie3 {
-+	compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
- 	reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
- 	       0x30 0x00000000 0x0 0x00002000>; /* configuration space */
- 
-@@ -158,6 +161,7 @@
- };
- 
- &pcie4 {
-+	compatible = "fsl,ls2088a-pcie", "snps,dw-pcie";
- 	reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
- 	       0x38 0x00000000 0x0 0x00002000>; /* configuration space */
- 
 -- 
 2.1.0.27.g96db324
