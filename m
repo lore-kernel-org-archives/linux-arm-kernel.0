@@ -1,25 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 4 Aug 2017 12:58:41 +0200
-Subject: [PATCH v2] bus: uniphier-system-bus: set up registers when
- resuming
-In-Reply-To: <1501480165-10527-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1501480165-10527-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK8P3a05scVFb_0BLfnzwXDSsrbAKxrZyrSddcWkmDBtpUW0jQ@mail.gmail.com>
+Date: Fri, 4 Aug 2017 13:02:57 +0200
+Subject: [PATCH v3] ARM: dts: tango4: Request RGMII RX and TX clock delays
+In-Reply-To: <d669e207-ae47-4c9e-67c5-75424fde501f@sigmadesigns.com>
+References: <d669e207-ae47-4c9e-67c5-75424fde501f@sigmadesigns.com>
+Message-ID: <CAK8P3a2fdzrvoN5FLzmH20igc4Jxg1N1L0SmDq7idFvMeFhc_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 7:49 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> When resuming, set up registers that have been lost in the sleep state.
+On Fri, Jul 28, 2017 at 3:27 PM, Marc Gonzalez
+<marc_gonzalez@sigmadesigns.com> wrote:
+> RX and TX clock delays are required. Request them explicitly.
 >
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Fixes: cad008b8a77e6 ("ARM: dts: tango4: Initial device trees")
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> ---
+> Arnd, Kevin, Olof, can one of you take this patch through arm-soc?
 
-Applied to fixes. I assume you want this in 4.13, but not backported
-to stable kernels.
-If that is incorrect, please let me know. Ideally that information
-should be in the email
-though, after the --- line.
+Applied to the fixes branch now.
 
-Thanks,
+> Greg will apply it to all stable branches, right?
 
-       Arnd
+He usually looks at random patches that have a 'Fixes:' line, but if you already
+know that you want a bugfix to be backported, it should also come with a
+'Cc: stable at vger.kernel.org' line. I've added that manually this time, but
+please include it yourself if you have another patch like that.
+
+ Thanks,
+
+      Arnd
