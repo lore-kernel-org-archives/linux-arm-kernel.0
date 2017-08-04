@@ -1,32 +1,29 @@
 From: shiju.jose@huawei.com (Shiju Jose)
-Date: Fri, 4 Aug 2017 12:23:43 +0100
-Subject: [RFC PATCH v4.13-rc3] arm64: defconfig: enable
- CONFIG_ACPI_APEI_MEMORY_FAILURE
-Message-ID: <cff81f88-8040-f2ca-35b8-6047378aa504@huawei.com>
+Date: Fri, 4 Aug 2017 12:23:18 +0100
+Subject: [RFC PATCH v4.13-rc3] arm64: defconfig: enable EDAC GHES option
+Message-ID: <a0846b9e-f92f-a361-01e6-2594e56d8edd@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable ACPI APEI MEMORY FAILURE option for ARM64,
-so that memory errors can be handled.
+Enable EDAC GHES support for ARM64,
+so that memory errors are reported to the user space.
 
 Signed-off-by: Shiju Jose <shiju.jose@huawei.com>
 ---
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 50429c0..6748583 100644
+index 6c7d147..50429c0 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -521,7 +521,9 @@ CONFIG_EFI_CAPSULE_LOADER=y
- CONFIG_ACPI=y
- CONFIG_ACPI_APEI=y
- CONFIG_ACPI_APEI_GHES=y
-+CONFIG_ACPI_APEI_MEMORY_FAILURE=y
- CONFIG_ACPI_APEI_PCIEAER=y
-+CONFIG_MEMORY_FAILURE=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT4_FS_POSIX_ACL=y
+@@ -438,6 +438,7 @@ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_CPU=y
+ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+ CONFIG_EDAC=y
++CONFIG_EDAC_GHES=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_MAX77686=y
+ CONFIG_RTC_DRV_RK808=m
 -- 
 1.9.1
