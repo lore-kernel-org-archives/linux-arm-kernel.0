@@ -1,92 +1,99 @@
-From: guochun.mao@mediatek.com (Guochun Mao)
-Date: Fri, 4 Aug 2017 11:44:10 +0800
-Subject: [PATCH] dt-bindings: mtd: add new compatible strings for mtk
- nor controller
-In-Reply-To: <20170803174750.bipdynhyyyozzjk6@rob-hp-laptop>
-References: <1500948617-19627-1-git-send-email-guochun.mao@mediatek.com>
- <1500948617-19627-2-git-send-email-guochun.mao@mediatek.com>
- <03016ea3-51ad-0b2d-e824-0a20913bd7c1@gmail.com>
- <20170802103637.16cd6548@bbrezillon>
- <535cc2d5-7bc9-2cb7-42cf-9d7058e64226@wedev4u.fr>
- <1501726602.4381.23.camel@mhfsdcap03>
- <20170803174750.bipdynhyyyozzjk6@rob-hp-laptop>
-Message-ID: <1501818250.4381.26.camel@mhfsdcap03>
+From: zhiqiang.hou@nxp.com (Z.q. Hou)
+Date: Fri, 4 Aug 2017 03:45:22 +0000
+Subject: [PATCH] PCI: layerscape: Add support for ls2088a and ls1088a
+In-Reply-To: <20170803181915.GU20308@bhelgaas-glaptop.roam.corp.google.com>
+References: <1499333984-17668-1-git-send-email-Zhiqiang.Hou@nxp.com>
+ <20170802212942.GA7667@bhelgaas-glaptop.roam.corp.google.com>
+ <AM5PR0402MB2771BBF476E6A3DEFADE43F484B10@AM5PR0402MB2771.eurprd04.prod.outlook.com>
+ <20170803181915.GU20308@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <AM5PR0402MB27710ADE6D6B36445B1EA79084B60@AM5PR0402MB2771.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-08-03 at 12:47 -0500, Rob Herring wrote:
-> On Thu, Aug 03, 2017 at 10:16:42AM +0800, Guochun Mao wrote:
-> > Hi Cyrille,
-> > 
-> > On Wed, 2017-08-02 at 17:31 +0200, Cyrille Pitchen wrote:
-> > > Hi Guochun,
-> > > 
-> > > Le 02/08/2017 ? 10:36, Boris Brezillon a ?crit :
-> > > > Hi Matthias,
-> > > > 
-> > > > On Tue, 1 Aug 2017 14:33:22 +0200
-> > > > Matthias Brugger <matthias.bgg@gmail.com> wrote:
-> > > > 
-> > > >> On 07/25/2017 04:10 AM, Guochun Mao wrote:
-> > > >>> Add "mediatek,mt2712-nor" and "mediatek,mt7622-nor"
-> > > >>> for nor flash node's compatible strings.
-> > > >>>
-> > > >>> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
-> > > >>> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
-> > > >>> ---
-> > > >>>   .../devicetree/bindings/mtd/mtk-quadspi.txt        |    2 ++
-> > > >>>   1 file changed, 2 insertions(+)
-> > > >>>
-> > > >>> diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > > >>> index 5ded66a..9845ff4 100644
-> > > >>> --- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > > >>> +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > > >>> @@ -3,6 +3,8 @@
-> > > >>>   Required properties:
-> > > >>>   - compatible: 	  The possible values are:
-> > > >>>   		  "mediatek,mt2701-nor"
-> > > >>> +		  "mediatek,mt2712-nor"
-> > > >>> +		  "mediatek,mt7622-nor"
-> > > >>>   		  "mediatek,mt7623-nor"
-> > > >>>   		  "mediatek,mt8173-nor"
-> > > >>>   		  For mt8173, compatible should be "mediatek,mt8173-nor".
-> > > >>>
-> > > 
-> > > There should be another patch to update the mtk_nor_of_ids[] array in
-> > > the mtk-quadspi.c driver, shouldn't it?
-> > > 
-> > > Currently, I only see the "mediatek,mt8173-nor" compatible string at the
-> > > driver side. The driver and its documentation should be aligned and both
-> > > patches should be applied at the same time.
-> > 
-> > > Best regards,
-> > > 
-> > > Cyrille
-> > 
-> > 
-> > From my designer's info, these IPs' nor controller could use same
-> > driver, and I had verified it. I think there's no need to update
-> > mtk_nor_of_ids[], unless we find difference between these IPs(exactly
-> > compared with mt8173).
-> > How do you think?
+Hi Bjorn,
+
+Thanks a lot for your comments!
+
+> -----Original Message-----
+> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> Sent: 2017?8?4? 2:19
+> To: Z.q. Hou <zhiqiang.hou@nxp.com>
+> Cc: linux-pci at vger.kernel.org; Minghuan Lian
+> <minghuan.Lian@freescale.com>; robh+dt at kernel.org;
+> bhelgaas at google.com; Mingkai Hu <mingkai.hu@freescale.com>; Roy Zang
+> <tie-fei.zang@freescale.com>; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] PCI: layerscape: Add support for ls2088a and ls1088a
 > 
-> That is perfectly fine, but then the documentation needs to be explicit 
-> as to what are the fallback compatibles. It's one valid combination per 
-> line, not 1 compatible string per line.
-
-OK, I'll corret the description in next version.
-Thanks a lot.
-
-Guochun
-
-
+> On Thu, Aug 03, 2017 at 03:35:46AM +0000, Z.q. Hou wrote:
+> > Hi Bjorn,
+> >
+> > Thanks a lot for your comments!
+> >
+> > > -----Original Message-----
+> > > From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> > > Sent: 2017?8?3? 5:30
+> > > To: Z.q. Hou <zhiqiang.hou@nxp.com>
+> > > Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > > bhelgaas at google.com; robh+dt at kernel.org; Minghuan Lian
+> > > <minghuan.Lian@freescale.com>; Mingkai Hu
+> > > <mingkai.hu@freescale.com>; Roy Zang <tie-fei.zang@freescale.com>
+> > > Subject: Re: [PATCH] PCI: layerscape: Add support for ls2088a and
+> > > ls1088a
+> > >
+> > > [+cc Minghuan, Mingkai, Roy]
+> > >
+> > > On Thu, Jul 06, 2017 at 05:39:44PM +0800, Zhiqiang Hou wrote:
+> > > > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> > > >
+> > > > The ls1088a and ls2088a has the same PCIe controller, so the
+> > > > ls1088a will reuse the ls2088a's pcie compatible.
+> > > >
+> > > > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> > > > ---
+> > > >  Documentation/devicetree/bindings/pci/layerscape-pci.txt | 1 +
+> > > >  drivers/pci/dwc/pci-layerscape.c                         | 9
+> > > +++++++++
+> > > >  2 files changed, 10 insertions(+)
+> > > >
+> > > > diff --git
+> > > > a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > > > b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > > > index ee1c72d5..cb735e1 100644
+> > > > --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > > > +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > > > @@ -15,6 +15,7 @@ Required properties:
+> > > >  - compatible: should contain the platform identifier such as:
+> > > >          "fsl,ls1021a-pcie", "snps,dw-pcie"
+> > > >          "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
+> > > > +        "fsl,ls2088a-pcie", "fsl,ls1088a-pcie"
+> > >
+> > > You add "fsl,ls1088a-pcie" here, but not in the ls_pcie_of_match[]
+> > > table in the driver, so I don't think this will actually make the
+> > > driver claim ls1088a devices, will it?
+> >
+> > I mean the ls1088a pcie DT nodes will use the "fsl,ls2088a-pcie"
+> > too, so I didn't add an entry for ls1088a pcie to ls_pcie_of_match[].
+> > Is it reasonable? Or it's better to add "fsl,ls1088a-pcie" to
+> > ls_pcie_of_match[], then ls1088a pcie DT nodes use the compatible
+> > string "fsl,ls1088a-pcie"?
 > 
-> Rob
+> Your binding says "fsl,ls1088a-pcie" is a valid value for "compatible".  But if a
+> DT actually *uses* that, I don't think the driver will claim it.
 > 
-> > 
-> > And, we will add dts patches for new SOCs, are these patches should
-> > applied with this documentation?
-> > 
-> > Best regards,
-> > Guochun
-> > 
+> If you want to describe ls1088a devices with "fsl,ls2088a-pcie", I think you
+> could do that, but then why would you even mention "fsl,ls1088a-pcie" in the
+> binding?
+> 
+> Personally, if ls1088a and ls2088a are different in any way, I would think you
+> should use different identifiers for them (and add them both to the binding and
+> to the driver).  That way if a future feature depends on the difference, you'll
+> have a way to test for it.
+
+Got it, will add both of them to driver and the bingding doc.
+Thanks for the suggestion!
+
+> But I'm not a DT guy.  Maybe Rob has a better recommendation?
+> 
+
+Thanks,
+Zhiqiang
