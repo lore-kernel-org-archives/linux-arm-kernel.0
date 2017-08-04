@@ -1,100 +1,38 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 4 Aug 2017 14:19:33 +0200
-Subject: [PATCH v4 1/2] arm: dts: mt7623: Add SD-card and EMMC to
- bananapi-r2
-In-Reply-To: <1501841664.17551.2.camel@mtkswgap22>
-References: <1c83eae1944992f7c5a9af946e03bc2c4e62c874.1501819056.git.sean.wang@mediatek.com>
- <1501841664.17551.2.camel@mtkswgap22>
-Message-ID: <9fd98b55-8c71-f697-3a41-bb8b70b7dcf1@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 4 Aug 2017 13:22:26 +0100
+Subject: [PATCH 0/5] Simplify kernel-mode NEON
+In-Reply-To: <20170804120858.ff3772f3zzik37pp@armageddon.cambridge.arm.com>
+References: <1501777403-9782-1-git-send-email-Dave.Martin@arm.com>
+ <20170804120858.ff3772f3zzik37pp@armageddon.cambridge.arm.com>
+Message-ID: <20170804122225.jiceb2vbgrld2y7z@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Aug 04, 2017 at 01:08:58PM +0100, Catalin Marinas wrote:
+> On Thu, Aug 03, 2017 at 05:23:18PM +0100, Dave P Martin wrote:
+> > This series depends on Ard's v4.14 crypto rework [2].
+[...]
+> > [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-July/520664.html
+[...]
+> > Ard Biesheuvel (1):
+> >   arm64: neon: replace generic definition of may_use_simd()
+> > 
+> > Dave Martin (4):
+> >   arm64: neon: Add missing header guard in <asm/neon.h>
+> >   arm64: fpsimd: Consistently use __this_cpu_ ops where appropriate
+> >   arm64: neon: Allow EFI runtime services to use FPSIMD in irq context
+> >   arm64: neon: Remove support for nested or hardirq kernel-mode NEON
+> 
+> Queued for 4.14. Thanks.
 
+... and reverted.
 
-On 08/04/2017 12:14 PM, Sean Wang wrote:
-> On Fri, 2017-08-04 at 11:59 +0800, sean.wang at mediatek.com wrote:
->> From: Sean Wang <sean.wang@mediatek.com>
->>
->> The bananapi-r2 board has an SD-card controller and built-in
->> EMMC storage so enables those devices in the devicetree. Also
->> cleanup nodes in alphabetical order in the patch.
->>
-> 
-> Hi, Matthias
-> 
-> could your help remove those words "Also cleanup nodes in alphabetical
-> order in the patch." when merging, i was forgetting to do it.
-> 
-> or prefer wanting me to resend it again?
+I now realised that it doesn't build without Ard's crypto series (I had
+the wrong impression it is just a performance impact). I get errors
+like:
 
-Yes I can do that. No need to resend.
+arch/arm64/crypto/sha1-ce-glue.c|41 col 2| error: implicit declaration
+of function ?kernel_neon_begin_partial?
 
-Regards,
-Matthias
-
-> 
-> 	Sean
-> 
->> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
->> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->> ---
->>   arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 37 +++++++++++++++++++++++++++
->>   1 file changed, 37 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
->> index 9f3e6dd..444ed93 100644
->> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
->> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
->> @@ -179,6 +179,32 @@
->>   	status = "okay";
->>   };
->>   
->> +&mmc0 {
->> +	pinctrl-names = "default", "state_uhs";
->> +	pinctrl-0 = <&mmc0_pins_default>;
->> +	pinctrl-1 = <&mmc0_pins_uhs>;
->> +	status = "okay";
->> +	bus-width = <8>;
->> +	max-frequency = <50000000>;
->> +	cap-mmc-highspeed;
->> +	vmmc-supply = <&mt6323_vemc3v3_reg>;
->> +	vqmmc-supply = <&mt6323_vio18_reg>;
->> +	non-removable;
->> +};
->> +
->> +&mmc1 {
->> +	pinctrl-names = "default", "state_uhs";
->> +	pinctrl-0 = <&mmc1_pins_default>;
->> +	pinctrl-1 = <&mmc1_pins_uhs>;
->> +	status = "okay";
->> +	bus-width = <4>;
->> +	max-frequency = <50000000>;
->> +	cap-sd-highspeed;
->> +	cd-gpios = <&pio 261 0>;
->> +	vmmc-supply = <&mt6323_vmch_reg>;
->> +	vqmmc-supply = <&mt6323_vio18_reg>;
->> +};
->> +
->>   &pio {
->>   	cir_pins_a:cir at 0 {
->>   		pins_cir {
->> @@ -314,6 +340,17 @@
->>   			bias-pull-down;
->>   			drive-strength = <MTK_DRIVE_4mA>;
->>   		};
->> +
->> +		pins_wp {
->> +			pinmux = <MT7623_PIN_29_EINT7_FUNC_MSDC1_WP>;
->> +			input-enable;
->> +			bias-pull-up;
->> +		};
->> +
->> +		pins_insert {
->> +			pinmux = <MT7623_PIN_261_MSDC1_INS_FUNC_GPIO261>;
->> +			bias-pull-up;
->> +		};
->>   	};
->>   
->>   	mmc1_pins_uhs: mmc1 {
-> 
-> 
+-- 
+Catalin
