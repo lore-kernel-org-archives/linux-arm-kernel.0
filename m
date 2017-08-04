@@ -1,148 +1,286 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri,  4 Aug 2017 15:31:35 +0100
-Subject: [PATCH v2 09/18] firmware: arm_scmi: probe and initialise all the
- supported protocols
+Date: Fri,  4 Aug 2017 15:31:41 +0100
+Subject: [PATCH v2 15/18] clk: add support for clocks provided by SCMI
 In-Reply-To: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
 References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1501857104-11279-10-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1501857104-11279-16-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have basic support for all the protocols in the
-specification, let's probe them individually and initialise them.
+On some ARM based systems, a separate Cortex-M based System Control
+Processor(SCP) provides the overall power, clock, reset and system
+control. System Control and Management Interface(SCMI) Message Protocol
+is defined for the communication between the Application Cores(AP)
+and the SCP.
 
-Cc: Arnd Bergmann <arnd@arndb.de>
+This patch adds support for the clocks provided by SCP using SCMI
+protocol.
+
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: linux-clk at vger.kernel.org
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/firmware/arm_scmi/common.h |  5 +++
- drivers/firmware/arm_scmi/driver.c | 80 +++++++++++++++++++++++++++++++++++++-
- 2 files changed, 84 insertions(+), 1 deletion(-)
+ drivers/clk/Kconfig    |  10 +++
+ drivers/clk/Makefile   |   1 +
+ drivers/clk/clk-scmi.c | 216 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 227 insertions(+)
+ create mode 100644 drivers/clk/clk-scmi.c
 
-diff --git a/drivers/firmware/arm_scmi/common.h b/drivers/firmware/arm_scmi/common.h
-index 7473dfcad4ee..d7c73a8d260b 100644
---- a/drivers/firmware/arm_scmi/common.h
-+++ b/drivers/firmware/arm_scmi/common.h
-@@ -118,4 +118,9 @@ int scmi_version_get(const struct scmi_handle *h, u8 protocol, u32 *version);
- void scmi_setup_protocol_implemented(const struct scmi_handle *handle,
- 				     u8 *prot_imp);
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 68ca2d9fcd73..68b442b2c742 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -55,6 +55,16 @@ config COMMON_CLK_HI655X
+ 	  multi-function device has one fixed-rate oscillator, clocked
+ 	  at 32KHz.
  
-+typedef int (*scmi_init_fn_t)(struct scmi_handle *);
- int scmi_base_protocol_init(struct scmi_handle *h);
-+int scmi_perf_protocol_init(struct scmi_handle *h);
-+int scmi_sensors_protocol_init(struct scmi_handle *h);
-+int scmi_power_protocol_init(struct scmi_handle *h);
-+int scmi_clock_protocol_init(struct scmi_handle *h);
-diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
-index 601d0d7210d9..6f31761043e2 100644
---- a/drivers/firmware/arm_scmi/driver.c
-+++ b/drivers/firmware/arm_scmi/driver.c
-@@ -157,6 +157,12 @@ struct scmi_shared_mem {
- 	u8 msg_payload[0];
- };
- 
-+struct scmi_protocol_match {
-+	u8 protocol_id;
-+	scmi_init_fn_t fn;
-+	char name[32];
++config COMMON_CLK_SCMI
++	tristate "Clock driver controlled via SCMI interface"
++	depends on ARM_SCMI_PROTOCOL || COMPILE_TEST
++	  ---help---
++	  This driver provides support for clocks that are controlled
++	  by firmware that implements the SCMI interface.
++
++	  This driver uses SCMI Message Protocol to interact with the
++	  firmware providing all the clock controls.
++
+ config COMMON_CLK_SCPI
+ 	tristate "Clock driver controlled via SCPI interface"
+ 	depends on ARM_SCPI_PROTOCOL || COMPILE_TEST
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index cd376b3fb47a..74a8ae081923 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -39,6 +39,7 @@ obj-$(CONFIG_CLK_QORIQ)			+= clk-qoriq.o
+ obj-$(CONFIG_COMMON_CLK_RK808)		+= clk-rk808.o
+ obj-$(CONFIG_COMMON_CLK_HI655X)		+= clk-hi655x.o
+ obj-$(CONFIG_COMMON_CLK_S2MPS11)	+= clk-s2mps11.o
++obj-$(CONFIG_COMMON_CLK_SCMI)           += clk-scmi.o
+ obj-$(CONFIG_COMMON_CLK_SCPI)           += clk-scpi.o
+ obj-$(CONFIG_COMMON_CLK_SI5351)		+= clk-si5351.o
+ obj-$(CONFIG_COMMON_CLK_SI514)		+= clk-si514.o
+diff --git a/drivers/clk/clk-scmi.c b/drivers/clk/clk-scmi.c
+new file mode 100644
+index 000000000000..37f98a6439a0
+--- /dev/null
++++ b/drivers/clk/clk-scmi.c
+@@ -0,0 +1,216 @@
++/*
++ * System Control and Power Interface (SCMI) Protocol based clock driver
++ *
++ * Copyright (C) 2017 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/device.h>
++#include <linux/err.h>
++#include <linux/of.h>
++#include <linux/module.h>
++#include <linux/of_platform.h>
++#include <linux/platform_device.h>
++#include <linux/scmi_protocol.h>
++
++struct scmi_clk {
++	u32 id;
++	struct clk_hw hw;
++	const struct scmi_clock_info *info;
++	const struct scmi_handle *handle;
 +};
 +
- static int scmi_linux_errmap[] = {
- 	/* better than switch case as long as return value is continuous */
- 	0,			/* SCMI_SUCCESS */
-@@ -687,6 +693,41 @@ static int scmi_xfer_info_init(struct scmi_info *sinfo)
- 	return 0;
- }
- 
-+static const struct scmi_protocol_match scmi_protocols[] = {
-+	{
-+		.protocol_id = SCMI_PROTOCOL_PERF,
-+		.fn = scmi_perf_protocol_init,
-+		.name = "scmi-cpufreq",
-+	}, {
-+		.protocol_id = SCMI_PROTOCOL_CLOCK,
-+		.fn = scmi_clock_protocol_init,
-+		.name = "scmi-clocks",
-+	}, {
-+		.protocol_id = SCMI_PROTOCOL_POWER,
-+		.fn = scmi_power_protocol_init,
-+		.name = "scmi-power-domain",
-+	}, {
-+		.protocol_id = SCMI_PROTOCOL_SENSOR,
-+		.fn = scmi_sensors_protocol_init,
-+		.name = "scmi-hwmon",
-+	},
-+	{}
-+};
++#define to_scmi_clk(clk) container_of(clk, struct scmi_clk, hw)
 +
-+static const struct scmi_protocol_match *scmi_protocol_match_get(u8 protocol_id)
++static unsigned long scmi_clk_recalc_rate(struct clk_hw *hw,
++					  unsigned long parent_rate)
 +{
-+	int i;
-+	const struct scmi_protocol_match *match = NULL, *loop = scmi_protocols;
++	int ret;
++	u64 rate;
++	struct scmi_clk *clk = to_scmi_clk(hw);
 +
-+	for (i = 0; i < ARRAY_SIZE(scmi_protocols); i++, loop++)
-+		if (loop->protocol_id == protocol_id) {
-+			match = loop;
-+			break;
-+		}
-+
-+	return match;
++	ret = clk->handle->clk_ops->rate_get(clk->handle, clk->id, &rate);
++	if (ret)
++		return 0;
++	return rate;
 +}
 +
- static int scmi_mailbox_check(struct device_node *np)
- {
- 	struct of_phandle_args arg;
-@@ -778,7 +819,7 @@ static int scmi_probe(struct platform_device *pdev)
- 	const struct scmi_desc *desc;
- 	struct scmi_info *info;
- 	struct device *dev = &pdev->dev;
--	struct device_node *np = dev->of_node;
-+	struct device_node *child, *np = dev->of_node;
- 
- 	/* Only mailbox method supported, check for the presence of one */
- 	if (scmi_mailbox_check(np)) {
-@@ -817,6 +858,43 @@ static int scmi_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	for_each_available_child_of_node(np, child) {
-+		int init_ret;
-+		u32 prot_id;
-+		const struct scmi_protocol_match *match;
++static long scmi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long *parent_rate)
++{
++	u64 fmin, fmax, ftmp;
++	struct scmi_clk *clk = to_scmi_clk(hw);
 +
-+		if (of_property_read_u32(child, "reg", &prot_id))
-+			continue;
++	/*
++	 * We can't figure out what rate it will be, so just return the
++	 * rate back to the caller. scmi_clk_recalc_rate() will be called
++	 * after the rate is set and we'll know what rate the clock is
++	 * running at then.
++	 */
++	if (clk->info->rate_discrete)
++		return rate;
 +
-+		prot_id &= MSG_PROTOCOL_ID_MASK;
++	fmin = clk->info->range.min_rate;
++	fmax = clk->info->range.max_rate;
++	for (ftmp = fmin; ftmp <= fmax; ftmp += clk->info->range.step_size) {
++		if (ftmp >= rate) {
++			if (ftmp <= fmax)
++				fmax = ftmp;
++			break;
++		} else if (ftmp >= fmin) {
++			fmin = ftmp;
++		}
++	}
++	return fmax != clk->info->range.max_rate ? fmax : fmin;
++}
 +
-+		if (!scmi_is_protocol_implemented(handle, prot_id)) {
-+			dev_err(dev, "SCMI protocol %d not implemented\n",
-+				prot_id);
++static int scmi_clk_set_rate(struct clk_hw *hw, unsigned long rate,
++			     unsigned long parent_rate)
++{
++	struct scmi_clk *clk = to_scmi_clk(hw);
++
++	return clk->handle->clk_ops->rate_set(clk->handle, clk->id, 0, rate);
++}
++
++static int scmi_clk_enable(struct clk_hw *hw)
++{
++	struct scmi_clk *clk = to_scmi_clk(hw);
++
++	return clk->handle->clk_ops->enable(clk->handle, clk->id);
++}
++
++static void scmi_clk_disable(struct clk_hw *hw)
++{
++	struct scmi_clk *clk = to_scmi_clk(hw);
++
++	clk->handle->clk_ops->disable(clk->handle, clk->id);
++}
++
++static const struct clk_ops scmi_clk_ops = {
++	.recalc_rate = scmi_clk_recalc_rate,
++	.round_rate = scmi_clk_round_rate,
++	.set_rate = scmi_clk_set_rate,
++	/*
++	 * We can't provide enable/disable callback as we can't perform the same
++	 * in atomic context. Since the clock framework provides standard API
++	 * clk_prepare_enable that helps cases using clk_enable in non-atomic
++	 * context, it should be fine providing prepare/unprepare.
++	 */
++	.prepare = scmi_clk_enable,
++	.unprepare = scmi_clk_disable,
++};
++
++static int scmi_clk_ops_init(struct device *dev, struct scmi_clk *sclk)
++{
++	int ret;
++	struct clk_init_data init;
++
++	init.flags = CLK_GET_RATE_NOCACHE;
++	init.num_parents = 0;
++	init.ops = &scmi_clk_ops;
++	init.name = sclk->info->name;
++	sclk->hw.init = &init;
++
++	ret = devm_clk_hw_register(dev, &sclk->hw);
++	if (!ret)
++		clk_hw_set_rate_range(&sclk->hw, sclk->info->range.min_rate,
++				      sclk->info->range.max_rate);
++	return ret;
++}
++
++static int scmi_clk_add(struct device *dev, struct device_node *np,
++			const struct scmi_handle *handle)
++{
++	int idx, count, err;
++	struct clk_hw **hws;
++	struct clk_hw_onecell_data *clk_data;
++
++	count = handle->clk_ops->count_get(handle);
++	if (count < 0) {
++		dev_err(dev, "%s: invalid clock output count\n", np->name);
++		return -EINVAL;
++	}
++
++	clk_data = devm_kzalloc(dev, sizeof(*clk_data) +
++				sizeof(*clk_data->hws) * count, GFP_KERNEL);
++	if (!clk_data)
++		return -ENOMEM;
++
++	clk_data->num = count;
++	hws = clk_data->hws;
++
++	for (idx = 0; idx < count; idx++) {
++		struct scmi_clk *sclk;
++
++		sclk = devm_kzalloc(dev, sizeof(*sclk), GFP_KERNEL);
++		if (!sclk)
++			return -ENOMEM;
++
++		sclk->info = handle->clk_ops->info_get(handle, idx);
++		if (!sclk->info) {
++			dev_dbg(dev, "invalid clock info for idx %d\n", idx);
 +			continue;
 +		}
 +
-+		match = scmi_protocol_match_get(prot_id);
-+		if (match) {
-+			struct platform_device *cdev;
++		sclk->id = idx;
++		sclk->handle = handle;
 +
-+			cdev = of_platform_device_create(child, match->name,
-+							 dev);
-+			if (!cdev) {
-+				dev_err(dev, "failed to create %s device\n",
-+					match->name);
-+				continue;
-+			}
-+
-+			init_ret = match->fn(handle);
-+			if (init_ret) {
-+				dev_err(dev, "SCMI protocol %d init error %d\n",
-+					prot_id, init_ret);
-+				of_platform_device_destroy(&cdev->dev, NULL);
-+			}
++		err = scmi_clk_ops_init(dev, sclk);
++		if (err) {
++			dev_err(dev, "failed to register clock %d\n", idx);
++			devm_kfree(dev, sclk);
++			hws[idx] = NULL;
++		} else {
++			dev_dbg(dev, "Registered clock:%s\n", sclk->info->name);
++			hws[idx] = &sclk->hw;
 +		}
 +	}
 +
- 	mutex_lock(&scmi_list_mutex);
- 	list_add_tail(&info->node, &scmi_list);
- 	mutex_unlock(&scmi_list_mutex);
++	return of_clk_add_hw_provider(np, of_clk_hw_onecell_get, clk_data);
++}
++
++static int scmi_clocks_remove(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++
++	of_clk_del_provider(np);
++	return 0;
++}
++
++static int scmi_clocks_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	const struct scmi_handle *handle = devm_scmi_handle_get(dev);
++
++	if (IS_ERR_OR_NULL(handle) || !handle->clk_ops)
++		return -EPROBE_DEFER;
++
++	return scmi_clk_add(dev, np, handle);
++}
++
++static struct platform_driver scmi_clocks_driver = {
++	.driver	= {
++		.name = "scmi-clocks",
++	},
++	.probe = scmi_clocks_probe,
++	.remove = scmi_clocks_remove,
++};
++module_platform_driver(scmi_clocks_driver);
++
++MODULE_AUTHOR("Sudeep Holla <sudeep.holla@arm.com>");
++MODULE_DESCRIPTION("ARM SCMI clock driver");
++MODULE_LICENSE("GPL v2");
 -- 
 2.7.4
