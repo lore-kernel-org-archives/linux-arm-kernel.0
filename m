@@ -1,41 +1,52 @@
-From: sandy.huang@rock-chips.com (Sandy Huang)
-Date: Fri, 4 Aug 2017 08:57:12 +0800
-Subject: [PATCH 5/6] drm/rockchip: vop: report error when check resource
- error
-In-Reply-To: <1501494596-7090-1-git-send-email-mark.yao@rock-chips.com>
-References: <1501494569-6825-1-git-send-email-mark.yao@rock-chips.com>
- <1501494596-7090-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <2fc3b65f-de19-b55d-7425-1d50aeb22a6e@rock-chips.com>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 3 Aug 2017 20:08:57 -0500
+Subject: [PATCH 0/6] Support for LEGO MINDSTORMS EV3 LCD display
+In-Reply-To: <260320c5-8064-6388-168b-acad5a1aa0f2@tronnes.org>
+References: <1501355870-13960-1-git-send-email-david@lechnology.com>
+ <5d8f6518-8d7e-c029-2da4-e3417afb3e40@lechnology.com>
+ <28188f5c-1daf-121b-6daf-1899668c3875@tronnes.org>
+ <1ce36d43-b9dd-807e-23aa-bac4fda70fdc@lechnology.com>
+ <bfb3d541-856b-0233-dd85-72512788939f@tronnes.org>
+ <bbec0574-311a-e1b4-d7fd-f6fb15b078d2@lechnology.com>
+ <b8ec0511-afd1-2a1b-6ffe-dfe951d79bf7@tronnes.org>
+ <cf740449-c952-08d4-d63c-d92e71fa3092@lechnology.com>
+ <CAHp75Vdaq0ersEa2_XneUQtsJMj2GCRZL4Wi=1HQorLkb4SaVg@mail.gmail.com>
+ <CAHp75Vf2GVASatG_aJrBPNHR-jQLoYtOPan5ezcoWRDuEsXbNw@mail.gmail.com>
+ <260320c5-8064-6388-168b-acad5a1aa0f2@tronnes.org>
+Message-ID: <03f423be-7b4c-13ec-7126-c0d9af6ebe4a@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi mark,
+On 08/03/2017 03:11 PM, Noralf Tr?nnes wrote:
+> 
+> Den 03.08.2017 19.11, skrev Andy Shevchenko:
+>> On Thu, Aug 3, 2017 at 8:09 PM, Andy Shevchenko
+>> <andy.shevchenko@gmail.com> wrote:
+>>> On Thu, Aug 3, 2017 at 6:18 PM, David Lechner <david@lechnology.com> 
+>>> wrote:
+>>>
+>>>> The particular display I have is this one:
+>>>> http://wiki.seeed.cc/Grove-OLED_Display_1.12inch/
+>>>>
+>>>> It looks like it uses a command/data scheme like the MIPI displays, but
+>>>> doesn't use any of the standard values for the commands. The 
+>>>> controller can
+>>>> do parallel, SPI and I2C, but the display I have is wired for I2C.
+>>> It looks very similar to ssd1306. Some description refers to ssd1308.
+>> http://www.mouser.com/catalog/specsheets/Seeed_104030008.pdf
+>>
+> 
+> That pdf refers to another one: 
+> http://wiki.seeed.cc/Grove-OLED_Display_0.96inch/
+> There's an fbdev driver that supports ssd1305, ssd1306, ssd1307 and 
+> ssd1309:
+> https://www.kernel.org/doc/Documentation/devicetree/bindings/display/ssd1307fb.txt 
+> 
+> http://elixir.free-electrons.com/linux/latest/source/drivers/video/fbdev/ssd1307fb.c 
+> 
+> Maybe the ssd1308 will work with that driver...
+> 
 
-? 2017/7/31 17:49, Mark Yao ??:
-> The user would be confused while facing a error commit without
-> any error report.
-> 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> ---
->   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 +++-
->   1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index fa0d9f7..999c2e0 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -674,8 +674,10 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
->   	 * Src.x1 can be odd when do clip, but yuv plane start point
->   	 * need align with 2 pixel.
->   	 */
-> -	if (is_yuv_support(fb->format->format) && ((state->src.x1 >> 16) % 2))
-> +	if (is_yuv_support(fb->format->format) && ((state->src.x1 >> 16) % 2)) {
-> +		DRM_ERROR("Invalid Source: Yuv format not support odd xpos\n");
->   		return -EINVAL;
-> +	}
->   
->   	return 0;
->   }
-> 
-
-Reviewed-by: Sandy huang <sandy.huang@rock-chips.com>
+The display I have uses a ssd1327 controller. It is 16-bit grayscale. 
+The ssd130x are all 1-bit monochrome. So, probably more like the ssd1325 
+driver in fbftf.
