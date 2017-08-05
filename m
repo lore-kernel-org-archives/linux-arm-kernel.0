@@ -1,132 +1,122 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat,  5 Aug 2017 21:52:19 +0100
-Subject: [PATCH 12/15] arm-soc: omap: replace open coded VA->PA calculations
-In-Reply-To: <20170805205222.19868-1-ard.biesheuvel@linaro.org>
-References: <20170805205222.19868-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170805205222.19868-13-ard.biesheuvel@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 5 Aug 2017 23:41:11 +0200
+Subject: [PATCH] ARM: dts: Add DTS file for D-Link DIR-685
+In-Reply-To: <CAMuHMdXmCOOuM_s1MS8o1RcAnV5mVfOwtj9DEuVisnQAT1tCVw@mail.gmail.com>
+References: <20170715170511.16312-1-linus.walleij@linaro.org>
+ <CAMuHMdXmCOOuM_s1MS8o1RcAnV5mVfOwtj9DEuVisnQAT1tCVw@mail.gmail.com>
+Message-ID: <CACRpkdZtmMVQAsRsxfdyWH5xHv+5yP1AGpSTtNLCs+bAKbNYrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This replaces a couple of open coded calculations to obtain the
-physical address of a far symbol with calls to the new adr_l etc
-macros.
+On Mon, Jul 17, 2017 at 9:54 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Sat, Jul 15, 2017 at 7:05 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> This adds a device tree file for the Gemini-based D-Link DIR-685
+>> router, supporting all devices that are currently supported in
+>> the main DTSI SoC file.
+>>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/mach-omap2/sleep34xx.S | 21 ++++----------------
- arch/arm/mach-omap2/sleep44xx.S | 12 ++---------
- 2 files changed, 6 insertions(+), 27 deletions(-)
+>> +       chosen {
+>> +               bootargs = "console=ttyS0,19200n8";
+>
+> I think you can drop bootargs, as stdout-path is present.
+>
+>> +               stdout-path = &uart0;
+>
+> stdout-path = "uart0:115200n8";
 
-diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
-index 1b9f0520dea9..418a4478622d 100644
---- a/arch/arm/mach-omap2/sleep34xx.S
-+++ b/arch/arm/mach-omap2/sleep34xx.S
-@@ -86,9 +86,7 @@ ENTRY(enable_omap3630_toggle_l2_on_restore)
- 	stmfd	sp!, {lr}	@ save registers on stack
- 	/* Setup so that we will disable and enable l2 */
- 	mov	r1, #0x1
--	adrl	r3, l2dis_3630_offset	@ may be too distant for plain adr
--	ldr	r2, [r3]		@ value for offset
--	str	r1, [r2, r3]		@ write to l2dis_3630
-+	str_l	r1, l2dis_3630, r2	@ write to l2dis_3630
- 	ldmfd	sp!, {pc}	@ restore regs and return
- ENDPROC(enable_omap3630_toggle_l2_on_restore)
- 
-@@ -422,9 +420,7 @@ ENTRY(omap3_restore)
- 	cmp	r2, #0x0	@ Check if target power state was OFF or RET
- 	bne	logic_l1_restore
- 
--	adr	r1, l2dis_3630_offset	@ address for offset
--	ldr	r0, [r1]		@ value for offset
--	ldr	r0, [r1, r0]		@ value at l2dis_3630
-+	ldr_l	r0, l2dis_3630	@ value at l2dis_3630
- 	cmp	r0, #0x1	@ should we disable L2 on 3630?
- 	bne	skipl2dis
- 	mrc	p15, 0, r0, c1, c0, 1
-@@ -436,9 +432,7 @@ skipl2dis:
- 	and	r1, #0x700
- 	cmp	r1, #0x300
- 	beq	l2_inv_gp
--	adr	r0, l2_inv_api_params_offset
--	ldr	r3, [r0]
--	add	r3, r3, r0		@ r3 points to dummy parameters
-+	adr_l	r3, l2_inv_api_params	@ r3 points to dummy parameters
- 	mov	r0, #40			@ set service ID for PPA
- 	mov	r12, r0			@ copy secure Service ID in r12
- 	mov	r1, #0			@ set task id for ROM code in r1
-@@ -476,9 +470,6 @@ skipl2dis:
- #endif
- 	b	logic_l1_restore
- 
--	.align
--l2_inv_api_params_offset:
--	.long	l2_inv_api_params - .
- l2_inv_gp:
- 	/* Execute smi to invalidate L2 cache */
- 	mov r12, #0x1			@ set up to invalidate L2
-@@ -495,9 +486,7 @@ l2_inv_gp:
- 	mov	r12, #0x2
- 	smc	#0			@ Call SMI monitor (smieq)
- logic_l1_restore:
--	adr	r0, l2dis_3630_offset	@ adress for offset
--	ldr	r1, [r0]		@ value for offset
--	ldr	r1, [r0, r1]		@ value at l2dis_3630
-+	ldr_l	r1, l2dis_3630		@ value at l2dis_3630
- 	cmp	r1, #0x1		@ Test if L2 re-enable needed on 3630
- 	bne	skipl2reen
- 	mrc	p15, 0, r1, c1, c0, 1
-@@ -526,8 +515,6 @@ control_stat:
- 	.word	CONTROL_STAT
- control_mem_rta:
- 	.word	CONTROL_MEM_RTA_CTRL
--l2dis_3630_offset:
--	.long	l2dis_3630 - .
- 
- 	.data
- l2dis_3630:
-diff --git a/arch/arm/mach-omap2/sleep44xx.S b/arch/arm/mach-omap2/sleep44xx.S
-index c7a3b4aab4b5..274fbb91f08f 100644
---- a/arch/arm/mach-omap2/sleep44xx.S
-+++ b/arch/arm/mach-omap2/sleep44xx.S
-@@ -260,9 +260,7 @@ ENTRY(omap4_cpu_resume)
- 	beq	skip_ns_smp_enable
- ppa_actrl_retry:
- 	mov     r0, #OMAP4_PPA_CPU_ACTRL_SMP_INDEX
--	adr	r1, ppa_zero_params_offset
--	ldr	r3, [r1]
--	add	r3, r3, r1			@ Pointer to ppa_zero_params
-+	adr_l	r3, ppa_zero_params		@ Pointer to ppa_zero_params
- 	mov	r1, #0x0			@ Process ID
- 	mov	r2, #0x4			@ Flag
- 	mov	r6, #0xff
-@@ -299,9 +297,7 @@ skip_ns_smp_enable:
- 	ldr     r0, =OMAP4_PPA_L2_POR_INDEX
- 	ldr     r1, =OMAP44XX_SAR_RAM_BASE
- 	ldr     r4, [r1, #L2X0_PREFETCH_CTRL_OFFSET]
--	adr     r1, ppa_por_params_offset
--	ldr	r3, [r1]
--	add	r3, r3, r1			@ Pointer to ppa_por_params
-+	adr_l	r3, ppa_por_params		@ Pointer to ppa_por_params
- 	str     r4, [r3, #0x04]
- 	mov	r1, #0x0			@ Process ID
- 	mov	r2, #0x4			@ Flag
-@@ -326,8 +322,6 @@ skip_l2en:
- #endif
- 
- 	b	cpu_resume			@ Jump to generic resume
--ppa_por_params_offset:
--	.long	ppa_por_params - .
- ENDPROC(omap4_cpu_resume)
- #endif	/* CONFIG_ARCH_OMAP4 */
- 
-@@ -380,8 +374,6 @@ ENTRY(omap_do_wfi)
- 	nop
- 
- 	ldmfd	sp!, {pc}
--ppa_zero_params_offset:
--	.long	ppa_zero_params - .
- ENDPROC(omap_do_wfi)
- 
- 	.data
--- 
-2.11.0
+OK this works fine! Thanks.
+
+>> +               button at 8 {
+>
+> button-esc { ... } ?
+
+>> +               button at 13 {
+>
+> button-eject { ... } ?
+
+OK fixed this.
+
+>> +               led at 7 {
+>
+> led-wps?
+>
+>> +               led at 11 {
+>
+> led-blue? (does it have a label on the box? HD1?)
+
+OK fixed this.
+
+>> +                       label = "dir685:blue:HD";
+>
+> Looks like a legacy platform device name, not a DT label.
+
+That is coincidental. I was told in the past (by other reviewers)
+to name LEDs as "platform:color:function".
+
+c.f.
+armada-370-dlink-dns327l.dts:
+
+gpio-leds {
+        sata-l-amber-pin {
+                label = "dns327l:amber:sata-l";
+(...)
+
+>> +       gpio-i2c {
+>> +               compatible = "i2c-gpio";
+>> +               gpios = <&gpio0 5 0>, /* SDA */
+>> +                       <&gpio0 6 0>; /* SCL */
+>
+> The i2c-gpio DT bindings really should be amended to support (optional)
+> gpio-names.
+
+It's not needed I think, I can name the lines with gpio-line-names
+and the labels added by the subsystem in Linux looks really nice
+in lsgpio:
+
+GPIO chip: gpiochip0, "FTGPIO010", 32 GPIO lines
+        line  0: unnamed unused
+        line  1: unnamed unused
+        line  2: unnamed unused
+        line  3: unnamed unused
+        line  4: unnamed unused
+        line  5: unnamed "sda" [kernel]
+        line  6: unnamed "scl" [kernel]
+        line  7: unnamed "dir685:blue:WPS" [kernel output active-low]
+        line  8: unnamed "reset" [kernel active-low]
+
+Cool eh? :)
+
+>> +                       /*
+>> +                        * This "RedBoot" is the Storlink derivative.
+>> +                        */
+>> +                       partition at 0 {
+>
+> Shouldn't partitions be in a subnode named "partitions"?
+
+Hm yeah that is the new style I guess. That requires a separate
+patch to patch all DT[I|S] files though.
+
+>> +               sata: sata at 46000000 {
+>
+> "&sata {", and move outside hierarchy.
+>
+> Add "pci" label to gemini.dtsi, "&pci {", and move outside hiearchy.
+>
+> Add "ata" label to gemini.dtsi, "&pci {", and move outside hiearchy.
+
+I am under the impression that whether to use the &node style or
+overlay style (use the same node names) is a matter of taste.
+All other DTS files for this platform use this style, so I prefer to keep
+to it.
+
+Older DTSes and qcom DTs do this too... but others such as Marvell
+use this &node style.
+
+If some DT maintainers step out and say they want all to be done
+this way for everyone I guess I can make a patch changing them
+all and the base DTSI as well, but on top of this patch.
+
+Yours,
+Linus Walleij
