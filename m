@@ -1,220 +1,77 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Sat, 5 Aug 2017 21:54:33 +0200
-Subject: [PATCH v3 4/6] drm/tinydrm: add support for LEGO MINDSTORMS EV3
- LCD
-In-Reply-To: <d814508b-1225-b385-6a90-091487bee2b5@tronnes.org>
-References: <1501799630-1650-1-git-send-email-david@lechnology.com>
- <1501799630-1650-5-git-send-email-david@lechnology.com>
- <d814508b-1225-b385-6a90-091487bee2b5@tronnes.org>
-Message-ID: <20b8dda7-f569-614c-e628-20d22dada0bd@tronnes.org>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Sat, 5 Aug 2017 22:07:18 +0200
+Subject: Warning dump on OMAP-L138 when g_zero module is removed
+In-Reply-To: <7c53882e-b70b-91dc-df2f-9f67fdd3cf40@baylibre.com>
+References: <748a9491-e834-34cb-993f-e8c7e2538961@ti.com>
+ <260e5199-624d-b402-5481-2d818d282ce7@baylibre.com>
+ <d3e5f067-81eb-80bb-c8e9-c7f147fe0145@ti.com>
+ <7c53882e-b70b-91dc-df2f-9f67fdd3cf40@baylibre.com>
+Message-ID: <f97d12c0-3aaa-b666-292d-cad9c3af54df@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Den 05.08.2017 20.19, skrev Noralf Tr?nnes:
+Hi Sekhar,
+On 07/21/2017 05:18 PM, Alexandre Bailon wrote:
+> Hi Sekhar,
 >
-> Den 04.08.2017 00.33, skrev David Lechner:
->> LEGO MINDSTORMS EV3 has an LCD with a ST7586 controller. This adds a new
->> module for the ST7586 controller with parameters for the LEGO MINDSTORMS
->> EV3 LCD display.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
->> ---
-
-[...]
-
->> diff --git a/drivers/gpu/drm/tinydrm/st7586.c 
->> b/drivers/gpu/drm/tinydrm/st7586.c
-
-[...]
-
->> +static void st7586_xrgb8888_to_gray332(u8 *dst, void *vaddr,
+> On 07/10/2017 01:00 PM, Sekhar Nori wrote:
+> > On Thursday 06 July 2017 10:43 PM, Alexandre Bailon wrote:
+> >> On 06/29/2017 03:50 PM, Sekhar Nori wrote:
+> >>> Hi Alexandre, Bin,
+> >>>
+> >>> With latest linux-next, I see a warning dump when I remove g_zero[1] on
+> >>> OMAP-L138 LCDK board. I am building the kernel with davinci_all_defconfig.
+> >>>
+> >>> It is not present in latest mainline because the warnings are introduced
+> >>> with CPPI DMA getting enabled in latest -next.
+> >>>
+> >>> Subsequent insertion of g_ether leads to a warning too[2], although the
+> >>> gadget seems to work (ping test).
+> >>>
+> >>> Since these are pretty annoying, it will be nice to get rid of them. I
+> >>> have not been able to debug any further. But if you have
+> >>> ideas/experiments to try, I can do that.
+> >
+> >> I got a lot of these warnings during development but it was only for the
+> >> host mode.
+> >> If I remember correctly, the cause was a race between the teardown
+> >> function and the interrupt handler.
+> >> The teardwon descriptor was pop from the queue by the interrupt handler,
+> >> preventing cppi41_tear_down_chan() to get it, which will result after
+> >> some retries to a couple of warnings.
+> >>
+> >> I will take a look to see if that is the same issue.
+> That is not the same issue. Still, for some reasons, we never get the
+> teardown descriptor.
+> Two possibilities:
+>  - Like the issue I had, the teardown is pop at the wrong place.
+>  - The teardown doesn't complete or the descriptor is not queued.
+The teardown descriptor is not queued. I have figured out the reason.
+The function cppi41_dma_channel_abort() enable the teardown by setting the bit corresponding to the endpoint number.
+The address of the register is USB_TDOWN but actually the address is wrong in the case of DA8xx.
+Using the right address (0x1c) fix the teardown warnings.
+I will work on a fix.
+> I think we should eliminate the first one before to work on the second one.
+> I think adding some logs to cppi41_pop_desc() could help to figure out
+> what is happening.
+> >
+> > Thanks! I also see similar warnings under fast ping traffic and g_ether
+> > inserted on LCDK. They dont come immediately though. Only after an hour
+> > or so under traffic.
+The fix should also fix this issue.
+> I would not have expected to have them during a ping but this probably
+> happens because some USB packet have timed out, which cause may a teardown.
+> >
+> > I can those provide logs too if its going to be helpful.
+> Currently, I think we should focus on the warnings that happens during
+> the rmmod as they are always reproducible.
 >
-> Could you put a comment somewhere explaining what grey332 means, that 
-> it's not
-> a 332 pixel format that I first thought, but that you store 3x 2-bit 
-> pixles in one byte.
+> Thanks,
+> Alexandre
 >
->> +                       struct drm_framebuffer *fb,
->> +                       struct drm_clip_rect *clip)
->> +{
->> +    size_t len = (clip->x2 - clip->x1) * (clip->y2 - clip->y1);
->> +    unsigned int x, y;
->> +    u8 *src, *buf, val;
->> +
->> +    /* 3 pixels per byte, so grow clip to nearest multiple of 3 */
->> +    clip->x1 = clip->x1 / 3 * 3;
->
-> Something wrong here: 3 * 3.
->
->> +    clip->x2 = (clip->x2 + 2) / 3 * 3;
->
-> You can use DIV_ROUND_UP().
->
+Note that the teardown is not the only thing that doesn't work correctly.
+I think same kind of issue should apply to the autoreq and the dma mode.
+I will work on a patch that should solve all of them.
 
-Now I see what you're doing, can you use roundup() and rounddown()?
-
->> +
->> +    buf = kmalloc(len, GFP_KERNEL);
->> +    if (!buf)
->> +        return;
->> +
->> +    tinydrm_xrgb8888_to_gray8(buf, vaddr, fb, clip);
->> +    src = buf;
->> +
->> +    for (y = clip->y1; y < clip->y2; y++) {
->> +        for (x = clip->x1; x < clip->x2; x += 3) {
->> +            val = *src++ & 0xc0;
->> +            if (val & 0xc0)
->> +                val |= 0x20;
->> +            val |= (*src++ & 0xc0) >> 3;
->> +            if (val & 0x18)
->> +                val |= 0x04;
->> +            val |= *src++ >> 6;
->> +            *dst++ = ~val;
->
-> I don't understand how this pixel packing matches the one described in
-> the datasheet. Why do you flip the bits at the end?
->
->> +        }
->> +    }
->> +
->> +    /* now adjust the clip so it applies to dst */
->> +    clip->x1 /= 3;
->> +    clip->x2 /= 3;
-
-I don't like this, you are changing the clip into a buffer length.
-Better do the calculation before you call mipi_dbi_command_buf().
-
->> +
->> +    kfree(buf);
->> +}
->> +
->> +static int st7586_buf_copy(void *dst, struct drm_framebuffer *fb,
->> +               struct drm_clip_rect *clip)
->> +{
->> +    struct drm_gem_cma_object *cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
->> +    struct dma_buf_attachment *import_attach = 
->> cma_obj->base.import_attach;
->> +    struct drm_format_name_buf format_name;
->> +    void *src = cma_obj->vaddr;
->> +    int ret = 0;
->> +
->> +    if (import_attach) {
->> +        ret = dma_buf_begin_cpu_access(import_attach->dmabuf,
->> +                           DMA_FROM_DEVICE);
->> +        if (ret)
->> +            return ret;
->> +    }
->> +
->> +    switch (fb->format->format) {
->> +    case DRM_FORMAT_XRGB8888:
->> +        st7586_xrgb8888_to_gray332(dst, src, fb, clip);
->> +        break;
-
-I assume you will be adding monochrome and greyscale formats here soon.
-Maybe you should have a function st7586_grey8_pack() or something, and do:
-
-switch (fb->format->format) {
-         case DRM_FORMAT_XRGB8888:
-                 buf = kmalloc();
-                 tinydrm_xrgb8888_to_gray8(buf, src, fb, clip);
-                 st7586_grey8_to_packed8(dst, buf, clip);
-                 kfree();
-                 break;
-
-And then later add:
-
-         case DRM_FORMAT_Y8:
-                 st7586_grey8_to_packed8(dst, src,...);
-                 break;
-         case DRM_FORMAT_Y1:
-                 st7586_mono_to_packed8(dst, src,...);
-                 break;
-
-Just a suggestion, feel free to do what you want.
-
-A patch adding greyscale came today:
-https://lists.freedesktop.org/archives/dri-devel/2017-August/149445.html
-
->> +    default:
->> +        dev_err_once(fb->dev->dev, "Format is not supported: %s\n",
->> +                 drm_get_format_name(fb->format->format,
->> +                         &format_name));
->> +        ret = -EINVAL;
->> +        break;
->
-> You don't need this default, because you can only get the ones in 
-> st7586_formats.
->
->> +    }
->> +
->> +    if (import_attach)
->> +        dma_buf_end_cpu_access(import_attach->dmabuf, DMA_FROM_DEVICE);
->
-> ret = dma_buf_end_cpu_access(...)
->
->> +
->> +    return ret;
->> +}
->> +
->> +static int st7586_fb_dirty(struct drm_framebuffer *fb,
->> +               struct drm_file *file_priv, unsigned int flags,
->> +               unsigned int color, struct drm_clip_rect *clips,
->> +               unsigned int num_clips)
->> +{
->> +    struct tinydrm_device *tdev = fb->dev->dev_private;
->> +    struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
->> +    struct drm_clip_rect clip;
->> +    int ret = 0;
->> +
->> +    mutex_lock(&tdev->dirty_lock);
->> +
->> +    if (!mipi->enabled)
->> +        goto out_unlock;
->> +
->> +    /* fbdev can flush even when we're not interested */
->> +    if (tdev->pipe.plane.fb != fb)
->> +        goto out_unlock;
->> +
->> +    tinydrm_merge_clips(&clip, clips, num_clips, flags, fb->width,
->> +                fb->height);
->> +
-
-I suggest you adjust the clip here since it applies to all formats:
-
-     /* pixels are packed in threes */
-     clip->x1 = rounddown(clip->x1, 3);
-     clip->x2 = roundup(clip->x2, 3);
-
->> +    DRM_DEBUG("Flushing [FB:%d] x1=%u, x2=%u, y1=%u, y2=%u\n", 
->> fb->base.id,
->> +          clip.x1, clip.x2, clip.y1, clip.y2);
->> +
->> +    ret = st7586_buf_copy(mipi->tx_buf, fb, &clip);
->> +    if (ret)
->> +        goto out_unlock;
->> +
->> +    /* NB: st7586_buf_copy() modifies clip */
->> +
->> +    mipi_dbi_command(mipi, MIPI_DCS_SET_COLUMN_ADDRESS,
->> +             (clip.x1 >> 8) & 0xFF, clip.x1 & 0xFF,
->> +             (clip.x2 >> 8) & 0xFF, (clip.x2 - 1) & 0xFF);
->> +    mipi_dbi_command(mipi, MIPI_DCS_SET_PAGE_ADDRESS,
->> +             (clip.y1 >> 8) & 0xFF, clip.y1 & 0xFF,
->> +             (clip.y2 >> 8) & 0xFF, (clip.y2 - 1) & 0xFF);
->> +
->> +    ret = mipi_dbi_command_buf(mipi, MIPI_DCS_WRITE_MEMORY_START,
->> +                   (u8 *)mipi->tx_buf,
->> +                   (clip.x2 - clip.x1) * (clip.y2 - clip.y1));
->> +
->> +out_unlock:
->> +    mutex_unlock(&tdev->dirty_lock);
->> +
->> +    if (ret)
->> +        dev_err_once(fb->dev->dev, "Failed to update display %d\n",
->> +                 ret);
->> +
->> +    return ret;
->> +}
->> +
+Thanks,
+Alexandre
