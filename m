@@ -1,110 +1,118 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sat,  5 Aug 2017 17:40:22 +0300
-Subject: [PATCH 2/2] arm64: cleanup {COMPAT_,}SET_PERSONALITY() macro
-In-Reply-To: <20170805144022.17260-1-ynorov@caviumnetworks.com>
-References: <20170805144022.17260-1-ynorov@caviumnetworks.com>
-Message-ID: <20170805144022.17260-3-ynorov@caviumnetworks.com>
+From: david@lechnology.com (David Lechner)
+Date: Sat, 5 Aug 2017 11:13:47 -0500
+Subject: [PATCH v3 3/6] dt-bindings: add binding for Sitronix ST7586
+ display panels
+In-Reply-To: <2830608.h203mxr23Z@avalon>
+References: <1501799630-1650-1-git-send-email-david@lechnology.com>
+ <2434051.fAH1OaXNrL@avalon>
+ <cc04e31c-2206-2f0c-0f92-7ef096bfd9da@lechnology.com>
+ <2830608.h203mxr23Z@avalon>
+Message-ID: <2b06fff0-679b-4597-d129-cd4c0b34a4d7@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Originally {COMPAT_,}SET_PERSONALITY() only sets the 32-bit flag in thread_info
-structure. But there is some work that should be done after setting the personality.
-Currently it's done in the macro, which is not the best idea.
+On 08/04/2017 02:39 PM, Laurent Pinchart wrote:
+> Hi David,
+> 
+> On Friday 04 Aug 2017 10:51:37 David Lechner wrote:
+>> On 08/04/2017 09:54 AM, Laurent Pinchart wrote:
+>>> On Thursday 03 Aug 2017 17:33:47 David Lechner wrote:
+>>>> This adds a new binding for Sitronix ST7586 display panels.
+>>>>
+>>>> Using lego as the vendor prefix in the compatible string because the
+>>>> display panel I am working with is an integral part of the LEGO
+>>>> MINDSTORMS EV3.
+>>>>
+>>>> Signed-off-by: David Lechner <david@lechnology.com>
+>>>> ---
+>>>>
+>>>>    .../bindings/display/sitronix,st7586.txt           | 26
+>>>>    +++++++++++++++++++
+>>>>    1 file changed, 26 insertions(+)
+>>>>    create mode 100644
+>>>>
+>>>> Documentation/devicetree/bindings/display/sitronix,st7586.txt
+>>>>
+>>>> diff --git
+>>>> a/Documentation/devicetree/bindings/display/sitronix,st7586.txt
+>>>> b/Documentation/devicetree/bindings/display/sitronix,st7586.txt new file
+>>>> mode 100644
+>>>> index 0000000..dfb0b7b
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
+>>>> @@ -0,0 +1,26 @@
+>>>> +Sitronix ST7586 display panel
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible:	"lego,ev3-lcd".
+>>>> +
+>>>> +The node for this driver must be a child node of a SPI controller, hence
+>>>> +all mandatory properties described in ../spi/spi-bus.txt must be
+>>>> specified. +
+>>>> +Optional properties:
+>>>> +- dc-gpios:	D/C pin. The presence/absence of this GPIO determines
+>>>> +		the panel interface operation mode (IF[3:1] pins):
+>>>> +		- present: IF=011 4-wire 8-bit data serial interface
+>>>> +		- absent:  IF=010 3-wire 9-bit data serial interface
+>>>
+>>> How does this work ? Do you have a single GPIO on your system connected to
+>>> IF[1], with IF[3:2] hardwired to 01 ?
+>>
+>> LEGO has not made the internals of the display publicly available, so I
+>> cannot say for sure. But I assume that IF[3:1] is hardwired to 011. This
+>> causes pin D1 to assigned to the signal A0, which is what we are calling
+>> the dc gpio here.
+>>
+>> If IF[3:1] were hardwired to 010, then pin D1 would be not not used and
+>> there would be no A0 signal.
+>>
+>> So, basically, we can infer the state of IF[3:1] by the fact that we
+>> have a dc pin or not.
+> 
+> OK, now I understand what you mean. Maybe you should phrase it a bit
+> differently to make it clearer ? How about
+> 
+> dc-gpios: Specified or the GPIO connected to the panel's D/C pin (also called
+> A0). The property is required when the panel operates in 4-wire mode (IF[3:1]
+> = 011) and prohibited when the panel operates in 3-wire mode (IF[3:1] = 010).
 
-In this patch new arch_setup_new_exec() routine is introduced, and all setup code
-is moved there, as suggested by Catalin:
-https://lkml.org/lkml/2017/8/4/494
+Yes, this is more clear. Thank you for the suggestion.
 
-Note: mm->context.flags doesn't require the atomic strong ordered acceess to the
-field, so use __set_bit() there;
+> 
+> By the way, if the signal is named A0, why don't you call the property a0-
+> gpios ?
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-CC: Pratyush Anand <panand@redhat.com>
-CC: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/include/asm/elf.h         | 15 +++++++++------
- arch/arm64/include/asm/thread_info.h |  3 +++
- arch/arm64/kernel/process.c          | 17 +++++++++++++++++
- 3 files changed, 29 insertions(+), 6 deletions(-)
+I consider "dc-gpios" to be a generic name since it is used by many 
+different panels. But I would be OK with calling it "a0-gpios" as well. 
+It will just require more explanation that this is the A0 *signal* and 
+not the A0 *pin*. The actual pin used is labeled *D1* on the controller.
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index de11ed1484e3..615953243961 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -137,11 +137,14 @@ typedef struct user_fpsimd_state elf_fpregset_t;
-  */
- #define ELF_PLAT_INIT(_r, load_addr)	(_r)->regs[0] = 0
- 
-+/*
-+ * Don't modify this macro unless you add new personality.
-+ * All personality-related setup should be done at proper place.
-+ * If not sure, consider the arch_setup_new_exec() function.
-+ */
- #define SET_PERSONALITY(ex)						\
- ({									\
--	clear_bit(MMCF_AARCH32, &current->mm->context.flags);		\
- 	clear_thread_flag(TIF_32BIT);					\
--	current->personality &= ~READ_IMPLIES_EXEC;			\
- })
- 
- /* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
-@@ -188,14 +191,14 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
- 					 ((x)->e_flags & EF_ARM_EABI_MASK))
- 
- #define compat_start_thread		compat_start_thread
-+
- /*
-- * Unlike the native SET_PERSONALITY macro, the compat version inherits
-- * READ_IMPLIES_EXEC across a fork() since this is the behaviour on
-- * arch/arm/.
-+ * Don't modify this macro unless you add new personality.
-+ * All personality-related setup should be done at proper place.
-+ * If not sure, consider the arch_setup_new_exec() function.
-  */
- #define COMPAT_SET_PERSONALITY(ex)					\
- ({									\
--	set_bit(MMCF_AARCH32, &current->mm->context.flags);		\
- 	set_thread_flag(TIF_32BIT);					\
-  })
- #define COMPAT_ARCH_DLINFO
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 46c3b93cf865..c823d2f12b4c 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -68,6 +68,9 @@ struct thread_info {
- #define thread_saved_fp(tsk)	\
- 	((unsigned long)(tsk->thread.cpu_context.fp))
- 
-+void arch_setup_new_exec(void);
-+#define arch_setup_new_exec     arch_setup_new_exec
-+
- #endif
- 
- /*
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 659ae8094ed5..ebca9e4f62c7 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -417,3 +417,20 @@ unsigned long arch_randomize_brk(struct mm_struct *mm)
- 	else
- 		return randomize_page(mm->brk, SZ_1G);
- }
-+
-+/*
-+ * Called immediately after a successful exec.
-+ */
-+void arch_setup_new_exec(void)
-+{
-+	current->mm->context.flags = 0;
-+
-+	/*
-+	 * Unlike the native one, the compat version of exec() inherits
-+	 * READ_IMPLIES_EXEC since this is the behaviour on arch/arm/.
-+	 */
-+	if (is_compat_task())
-+		__set_bit(MMCF_AARCH32, &current->mm->context.flags);
-+	else
-+		current->personality &= ~READ_IMPLIES_EXEC;
-+}
--- 
-2.11.0
+On the other hand, it is labeled as A0 on LEGO's schematic, so perhaps 
+a0 is better.
+
+> 
+>>>> +- reset-gpios:	Reset pin
+>>>> +- power-supply:	A regulator node for the supply voltage.
+>>>> +- backlight:	phandle of the backlight device attached to the panel
+>>>> +- rotation:	panel rotation in degrees counter clockwise
+> (0,90,180,270)
+>>>
+>>> Please use the OF graph DT bindings (a.k.a. ports) to describe the
+>>> connection between the panel and its source.
+>>
+>> I am afraid that I do not understand this request. What would the source
+>> of the panel be? There is nothing like a SoC LCD controller that is
+>> driving this panel.
+> 
+> My bad, I should have read the panel datasheet before replying :-S Please
+> ignore this comment.
+> 
+>>>> +Example:
+>>>> +	display at 0{
+>>>> +		compatible = "lego,ev3-lcd";
+>>>> +		reg = <0>;
+>>>> +		spi-max-frequency = <10000000>;
+>>>> +		dc-gpios = <&gpio 43 GPIO_ACTIVE_HIGH>;
+>>>> +		reset-gpios = <&gpio 80 GPIO_ACTIVE_HIGH>;
+>>>> +	};
+> 
