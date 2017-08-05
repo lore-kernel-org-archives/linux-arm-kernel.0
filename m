@@ -1,107 +1,147 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Sat, 5 Aug 2017 15:15:09 +0800
-Subject: [PATCH v9 0/4] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-Message-ID: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Sat, 5 Aug 2017 11:23:24 +0200
+Subject: [PATCH v2 1/4] drm/bridge: dw-hdmi: add cec notifier support
+In-Reply-To: <b68d6c53-4028-b963-5298-696e759bfe19@codeaurora.org>
+References: <20170731142906.GX31807@n2100.armlinux.org.uk>
+ <E1dcBhV-00088e-8x@rmk-PC.armlinux.org.uk>
+ <a8d2cea3-68b5-d975-836a-14201a6974f6@xs4all.nl>
+ <b68d6c53-4028-b963-5298-696e759bfe19@codeaurora.org>
+Message-ID: <11ae421e-2d02-73c2-5dbb-79f1bd763235@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some devices have problems with Transaction Layer Packets with the Relaxed
-Ordering Attribute set.  This patch set adds a new PCIe Device Flag,
-PCI_DEV_FLAGS_NO_RELAXED_ORDERING, a set of PCI Quirks to catch some known
-devices with Relaxed Ordering issues, and a use of this new flag by the
-cxgb4 driver to avoid using Relaxed Ordering with problematic Root Complex
-Ports.
+Archit,
 
-It's been years since I've submitted kernel.org patches, I appolgise for the
-almost certain submission errors.
+I posted a v3 that added a missing cec_notifier_put to the remove() function.
+Apparently you missed that. The chunk in question from the v3 patch is this:
 
-v2: Alexander point out that the v1 was only a part of the whole solution,
-    some platform which has some issues could use the new flag to indicate
-    that it is not safe to enable relaxed ordering attribute, then we need
-    to clear the relaxed ordering enable bits in the PCI configuration when
-    initializing the device. So add a new second patch to modify the PCI
-    initialization code to clear the relaxed ordering enable bit in the
-    event that the root complex doesn't want relaxed ordering enabled.
+@@ -2469,6 +2489,9 @@ static void __dw_hdmi_remove(struct dw_hdmi *hdmi)
+ 	/* Disable all interrupts */
+ 	hdmi_writeb(hdmi, ~0, HDMI_IH_MUTE_PHY_STAT0);
 
-    The third patch was base on the v1's second patch and only be changed
-    to query the relaxed ordering enable bit in the PCI configuration space
-    to allow the Chelsio NIC to send TLPs with the relaxed ordering attributes
-    set.
++	if (hdmi->cec_notifier)
++		cec_notifier_put(hdmi->cec_notifier);
++
+ 	clk_disable_unprepare(hdmi->iahb_clk);
+ 	clk_disable_unprepare(hdmi->isfr_clk);
 
-    This version didn't plan to drop the defines for Intel Drivers to use the
-    new checking way to enable relaxed ordering because it is not the hardest
-    part of the moment, we could fix it in next patchset when this patches
-    reach the goal.
+Can you add that or should I make a new patch?
 
-v3: Redesigned the logic for pci_configure_relaxed_ordering when configuration,
-    If a PCIe device didn't enable the relaxed ordering attribute default,
-    we should not do anything in the PCIe configuration, otherwise we
-    should check if any of the devices above us do not support relaxed
-    ordering by the PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag, then base on
-    the result if we get a return that indicate that the relaxed ordering
-    is not supported we should update our device to disable relaxed ordering
-    in configuration space. If the device above us doesn't exist or isn't
-    the PCIe device, we shouldn't do anything and skip updating relaxed ordering
-    because we are probably running in a guest.
+Regards,
 
-v4: Rename the functions pcie_get_relaxed_ordering and pcie_disable_relaxed_ordering
-    according John's suggestion, and modify the description, use the true/false
-    as the return value.
+	Hans
 
-    We shouldn't enable relaxed ordering attribute by the setting in the root
-    complex configuration space for PCIe device, so fix it for cxgb4.
-
-    Fix some format issues.
-
-v5: Removed the unnecessary code for some function which only return the bool
-    value, and add the check for VF device.
-
-    Make this patch set base on 4.12-rc5.
-
-v6: Fix the logic error in the need to enable the relaxed ordering attribute for cxgb4.
-
-v7: The cxgb4 drivers will enable the PCIe Capability Device Control[Relaxed
-    Ordering Enable] in PCI Probe() routine, this will break our current
-    solution for some platform which has problematic when enable the relaxed
-    ordering attribute. According to the latest recommendations, remove the
-    enable_pcie_relaxed_ordering(), although it could not cover the Peer-to-Peer
-    scene, but we agree to leave this problem until we really trigger it.
-
-    Make this patch set base on 4.12 release version.
-
-v8: Change the second patch title and description to make it more reasonable,
-    add the acked-by from Alex and Ashok.
-
-    Add a new patch to enable the Relaxed Ordering Attribute for cxgb4vf driver.
-
-    Make this patch set base on 4.13-rc2.
-
-v9: The document (https://software.intel.com/sites/default/files/managed/9e/
-    bc/64-ia-32-architectures-optimization-manual.pdf) indicate that the Xeon
-    processors based on Broadwell/Haswell microarchitecture has the problem
-    with Relaxed Ordering Attribute enabled, so add the whole list Device ID
-    from Intel to the patch.
-
-Casey Leedom (3):
-  PCI: Add new PCIe Fabric End Node flag,
-    PCI_DEV_FLAGS_NO_RELAXED_ORDERING
-  net/cxgb4: Use new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-  net/cxgb4vf: Use new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-
-Ding Tianhong (1):
-  PCI: Disable PCIe Relaxed Ordering if unsupported
-
- drivers/net/ethernet/chelsio/cxgb4/cxgb4.h         |  1 +
- drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c    | 23 +++++++++----
- drivers/net/ethernet/chelsio/cxgb4/sge.c           |  5 +--
- drivers/net/ethernet/chelsio/cxgb4vf/adapter.h     |  1 +
- .../net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c    | 18 ++++++++++
- drivers/net/ethernet/chelsio/cxgb4vf/sge.c         |  3 ++
- drivers/pci/pci.c                                  | 29 +++++++++++++++++
- drivers/pci/probe.c                                | 37 +++++++++++++++++++++
- drivers/pci/quirks.c                               | 88 ++++++++++++++++++++++
- include/linux/pci.h                                |  4 +++
- 10 files changed, 151 insertions(+), 8 deletions(-)
-
--- 
-1.8.3.1
+On 04/08/17 15:36, Archit Taneja wrote:
+> 
+> 
+> On 07/31/2017 08:55 PM, Hans Verkuil wrote:
+>> On 07/31/2017 04:29 PM, Russell King wrote:
+>>> Add CEC notifier support to the HDMI bridge driver, so that the CEC
+>>> part of the IP can receive its physical address.
+>>>
+>>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+>>
+>> Acked-by: Hans Verkuil <hans.verkuil@cisco.com>
+>>
+> 
+> Queued to drm-misc-next.
+> 
+> Thanks,
+> Archit
+> 
+>> Regards,
+>>
+>>     Hans
+>>
+>>> ---
+>>>   drivers/gpu/drm/bridge/synopsys/Kconfig   |  1 +
+>>>   drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 22 +++++++++++++++++++++-
+>>>   2 files changed, 22 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/bridge/synopsys/Kconfig b/drivers/gpu/drm/bridge/synopsys/Kconfig
+>>> index 53e78d092d18..351db000599a 100644
+>>> --- a/drivers/gpu/drm/bridge/synopsys/Kconfig
+>>> +++ b/drivers/gpu/drm/bridge/synopsys/Kconfig
+>>> @@ -2,6 +2,7 @@ config DRM_DW_HDMI
+>>>       tristate
+>>>       select DRM_KMS_HELPER
+>>>       select REGMAP_MMIO
+>>> +    select CEC_CORE if CEC_NOTIFIER
+>>>     config DRM_DW_HDMI_AHB_AUDIO
+>>>       tristate "Synopsys Designware AHB Audio interface"
+>>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>>> index ead11242c4b9..82e55ee8e4fa 100644
+>>> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>>> @@ -36,7 +36,10 @@
+>>>   #include "dw-hdmi.h"
+>>>   #include "dw-hdmi-audio.h"
+>>>   +#include <media/cec-notifier.h>
+>>> +
+>>>   #define DDC_SEGMENT_ADDR    0x30
+>>> +
+>>>   #define HDMI_EDID_LEN        512
+>>>     enum hdmi_datamap {
+>>> @@ -175,6 +178,8 @@ struct dw_hdmi {
+>>>       struct regmap *regm;
+>>>       void (*enable_audio)(struct dw_hdmi *hdmi);
+>>>       void (*disable_audio)(struct dw_hdmi *hdmi);
+>>> +
+>>> +    struct cec_notifier *cec_notifier;
+>>>   };
+>>>     #define HDMI_IH_PHY_STAT0_RX_SENSE \
+>>> @@ -1896,6 +1901,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
+>>>           hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
+>>>           hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
+>>>           drm_mode_connector_update_edid_property(connector, edid);
+>>> +        cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
+>>>           ret = drm_add_edid_modes(connector, edid);
+>>>           /* Store the ELD */
+>>>           drm_edid_to_eld(connector, edid);
+>>> @@ -2119,11 +2125,16 @@ static irqreturn_t dw_hdmi_irq(int irq, void *dev_id)
+>>>        * ask the source to re-read the EDID.
+>>>        */
+>>>       if (intr_stat &
+>>> -        (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD))
+>>> +        (HDMI_IH_PHY_STAT0_RX_SENSE | HDMI_IH_PHY_STAT0_HPD)) {
+>>>           __dw_hdmi_setup_rx_sense(hdmi,
+>>>                        phy_stat & HDMI_PHY_HPD,
+>>>                        phy_stat & HDMI_PHY_RX_SENSE);
+>>>   +        if ((phy_stat & (HDMI_PHY_RX_SENSE | HDMI_PHY_HPD)) == 0)
+>>> +            cec_notifier_set_phys_addr(hdmi->cec_notifier,
+>>> +                           CEC_PHYS_ADDR_INVALID);
+>>> +    }
+>>> +
+>>>       if (intr_stat & HDMI_IH_PHY_STAT0_HPD) {
+>>>           dev_dbg(hdmi->dev, "EVENT=%s\n",
+>>>               phy_int_pol & HDMI_PHY_HPD ? "plugin" : "plugout");
+>>> @@ -2376,6 +2387,12 @@ __dw_hdmi_probe(struct platform_device *pdev,
+>>>       if (ret)
+>>>           goto err_iahb;
+>>>   +    hdmi->cec_notifier = cec_notifier_get(dev);
+>>> +    if (!hdmi->cec_notifier) {
+>>> +        ret = -ENOMEM;
+>>> +        goto err_iahb;
+>>> +    }
+>>> +
+>>>       /*
+>>>        * To prevent overflows in HDMI_IH_FC_STAT2, set the clk regenerator
+>>>        * N and cts values before enabling phy
+>>> @@ -2452,6 +2469,9 @@ __dw_hdmi_probe(struct platform_device *pdev,
+>>>           hdmi->ddc = NULL;
+>>>       }
+>>>   +    if (hdmi->cec_notifier)
+>>> +        cec_notifier_put(hdmi->cec_notifier);
+>>> +
+>>>       clk_disable_unprepare(hdmi->iahb_clk);
+>>>   err_isfr:
+>>>       clk_disable_unprepare(hdmi->isfr_clk);
+>>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+> 
