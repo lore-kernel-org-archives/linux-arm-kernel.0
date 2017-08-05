@@ -1,83 +1,100 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Sat, 5 Aug 2017 14:16:53 +0800
-Subject: [PATCH v2 4/5] PCI: mediatek: Add new generation controller
- support
-In-Reply-To: <1501908763.8298.11.camel@mtkswgap22>
-References: <cover.1501122135.git.honghui.zhang@mediatek.com>
- <824c61d13fe2731d812df8a0a878ca1a36399e76.1501122135.git.honghui.zhang@mediatek.com>
- <20170803224206.GN20308@bhelgaas-glaptop.roam.corp.google.com>
- <1501835976.24341.21.camel@mtksdaap41>
- <20170804131808.GA16580@bhelgaas-glaptop.roam.corp.google.com>
- <1501908763.8298.11.camel@mtkswgap22>
-Message-ID: <1501913813.12086.17.camel@mtkswgap22>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Sat, 5 Aug 2017 14:28:43 +0800
+Subject: [PATCH v8 1/4] PCI: Add new PCIe Fabric End Node flag,
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+In-Reply-To: <MWHPR12MB1600F5F2E2C4A5A7C5449896C8B60@MWHPR12MB1600.namprd12.prod.outlook.com>
+References: <1501767889-7772-1-git-send-email-dingtianhong@huawei.com>
+ <1501767889-7772-2-git-send-email-dingtianhong@huawei.com>
+ <MWHPR12MB1600F5F2E2C4A5A7C5449896C8B60@MWHPR12MB1600.namprd12.prod.outlook.com>
+Message-ID: <c91556e4-a0e3-d553-adba-431049504a7d@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2017-08-05 at 12:52 +0800, Ryder Lee wrote:
-> Hi Honghui, Bjorn,
-> 
-> On Fri, 2017-08-04 at 08:18 -0500, Bjorn Helgaas wrote:
-> > On Fri, Aug 04, 2017 at 04:39:36PM +0800, Honghui Zhang wrote:
-> > > On Thu, 2017-08-03 at 17:42 -0500, Bjorn Helgaas wrote:
-> > > > > +
-> > > > > +static struct mtk_pcie_port *mtk_pcie_find_port(struct mtk_pcie *pcie,
-> > > > > +						struct pci_bus *bus, int devfn)
-> > > > > +{
-> > > > > +	struct pci_dev *dev;
-> > > > > +	struct pci_bus *pbus;
-> > > > > +	struct mtk_pcie_port *port, *tmp;
-> > > > > +
-> > > > > +	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
-> > > > > +		if (bus->number == 0 && port->index == PCI_SLOT(devfn)) {
-> > > > > +			return port;
-> > > > > +		} else if (bus->number != 0) {
-> > > > > +			pbus = bus;
-> > > > > +			do {
-> > > > > +				dev = pbus->self;
-> > > > > +				if (port->index == PCI_SLOT(dev->devfn))
-> > > > > +					return port;
-> > > > > +				pbus = dev->bus;
-> > > > > +			} while (dev->bus->number != 0);
-> > > > > +		}
-> > > > > +	}
-> > > > > +
-> > > > > +	return NULL;
-> > > > 
-> > > > You should be able to use sysdata to avoid searching the list.
-> > > > See drivers/pci/host/pci-aardvark.c, for example.
-> > > > 
-> > > 
-> > > I could put the mtk_pcie * in sysdata, but still need to searching the
-> > > list to get the mtk_pcie_port *, how about:
-> > > 
-> > > 	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
-> > > 		if (port->index == PCI_SLOT(devfn))
-> > > 			return port;
-> > > 	}
-> > 
-> > No.  Other drivers don't need to search the list.  Please take a look
-> > at them and see how they solve this problem.  I don't think your
-> > hardware is fundamentally different in a way that means you need to
-> > search when the others don't.
-> > 
-> 
-> I'm not directly involved in this generation, but I guess the main reason why Honghui need to do that is just because this hardware access configuration space via per-port registers, not just for the guard.  
-> Currently, We had a host bridge with two ports (two subnodes in binding text), thus he tried to tells them apart so that he can get the correct registers.
-> 
-> Some platforms don't need to do that since they just have a single port (no more subnodes), the others might have specific/shared registers to access configuration space. (e.g. Tegra, MTK legacy IP block).
-> Or, he can split them into two independent nodes, but it will break common probing flow by doing so. (I'd prefer to use subnodes.)
-> 
-> Ryder
-> 
 
-Sorry for the typesetting in previous mail and noise again,
 
-I've took a look at pci-rcar-gen2.c, this is a similar case I can found
-for Honghui's case. It gathers two ports reg regions into one, and uses
-the "slot id" to calculate the cfg base of each port.
+On 2017/8/5 5:06, Casey Leedom wrote:
+> | From: Ding Tianhong <dingtianhong@huawei.com>
+> | Sent: Thursday, August 3, 2017 6:44 AM
+> |
+> | diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+> | index 6967c6b..1e1cdbe 100644
+> | --- a/drivers/pci/quirks.c
+> | +++ b/drivers/pci/quirks.c
+> | @@ -4016,6 +4016,44 @@ static void quirk_tw686x_class(struct pci_dev *pdev)
+> |                                quirk_tw686x_class);
+> |
+> |  /*
+> | + * Some devices have problems with Transaction Layer Packets with the Relaxed
+> | + * Ordering Attribute set.  Such devices should mark themselves and other
+> | + * Device Drivers should check before sending TLPs with RO set.
+> | + */
+> | +static void quirk_relaxedordering_disable(struct pci_dev *dev)
+> | +{
+> | +       dev->dev_flags |= PCI_DEV_FLAGS_NO_RELAXED_ORDERING;
+> | +}
+> | +
+> | +/*
+> | + * Intel E5-26xx Root Complex has a Flow Control Credit issue which can
+> | + * cause performance problems with Upstream Transaction Layer Packets with
+> | + * Relaxed Ordering set.
+> | + */
+> | +DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f02, PCI_CLASS_NOT_DEFINED, 8,
+> | +                             quirk_relaxedordering_disable);
+> | +DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f04, PCI_CLASS_NOT_DEFINED, 8,
+> | +                             quirk_relaxedordering_disable);
+> | +DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f08, PCI_CLASS_NOT_DEFINED, 8,
+> | +                             quirk_relaxedordering_disable);
+> | + ...
+> 
+> It looks like this is missing the set of Root Complex IDs that were noted in
+> the document to which Patrick Cramer sent us a reference:
+> 
+> https://software.intel.com/sites/default/files/managed/9e/bc/64-ia-32-architectures-optimization-manual.pdf
+> 
+> In section 3.9.1 we have:
+> 
+>     3.9.1 Optimizing PCIe Performance for Accesses Toward Coherent Memory
+>           and Toward MMIO Regions (P2P)
+> 
+>     In order to maximize performance for PCIe devices in the processors
+>     listed in Table 3-6 below, the soft- ware should determine whether the
+>     accesses are toward coherent memory (system memory) or toward MMIO
+>     regions (P2P access to other devices). If the access is toward MMIO
+>     region, then software can command HW to set the RO bit in the TLP
+>     header, as this would allow hardware to achieve maximum throughput for
+>     these types of accesses. For accesses toward coherent memory, software
+>     can command HW to clear the RO bit in the TLP header (no RO), as this
+>     would allow hardware to achieve maximum throughput for these types of
+>     accesses.
+> 
+>     Table 3-6. Intel Processor CPU RP Device IDs for Processors Optimizing
+>                PCIe Performance
+> 
+>     Processor                            CPU RP Device IDs
+> 
+>     Intel Xeon processors based on       6F01H-6F0EH
+>     Broadwell microarchitecture
+> 
+>     Intel Xeon processors based on       2F01H-2F0EH
+>     Haswell microarchitecture
+> 
+> The PCI Device IDs you have there are the first ones that I guessed at
+> having the performance problem with Relaxed Ordering.  We now apparently
+> have a complete list from Intel.
+> 
+> I don't want to phrase this as a "NAK" because you've gone around the
+> mulberry bush a bunch of times already.  So maybe just go with what you've
+> got in version 8 of your patch and then do a follow on patch to complete the
+> table?
+> 
+Casey:
 
-Perhaps this is a example for those who need to use subnodes and use
-port registers for cfg operation. Not sure whether it's worthwhile doing
-that since we need to changes ports/host structures.
+Thanks for the good catch, I found that the Ashok has notice this 3 month before, I am so sorry to
+miss it, it was really a long discussion for this problem, but don't worry, It is not a big work to fix it,
+I will send the v9 version. :)
 
-Ryder.
+Ding
+
+> Casey
+> .
+> 
