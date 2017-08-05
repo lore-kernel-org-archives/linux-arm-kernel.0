@@ -1,68 +1,37 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Sat, 5 Aug 2017 12:52:43 +0800
-Subject: [PATCH v2 4/5] PCI: mediatek: Add new generation controller
- support
-In-Reply-To: <20170804131808.GA16580@bhelgaas-glaptop.roam.corp.google.com>
-References: <cover.1501122135.git.honghui.zhang@mediatek.com>
- <824c61d13fe2731d812df8a0a878ca1a36399e76.1501122135.git.honghui.zhang@mediatek.com>
- <20170803224206.GN20308@bhelgaas-glaptop.roam.corp.google.com>
- <1501835976.24341.21.camel@mtksdaap41>
- <20170804131808.GA16580@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <1501908763.8298.11.camel@mtkswgap22>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat, 5 Aug 2017 13:31:24 +0800
+Subject: [PATCH] ARM: dts: i.MX25: add ranges to tscadc
+In-Reply-To: <20170803162948.GA28042@botnar.kaiser.cx>
+References: <1501704371-28151-1-git-send-email-martin@kaiser.cx>
+ <20170803022007.GI31819@dragon>
+ <20170803162948.GA28042@botnar.kaiser.cx>
+Message-ID: <20170805053122.GR31819@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Honghui, Bjorn,
-
-On Fri, 2017-08-04 at 08:18 -0500, Bjorn Helgaas wrote:
-> On Fri, Aug 04, 2017 at 04:39:36PM +0800, Honghui Zhang wrote:
-> > On Thu, 2017-08-03 at 17:42 -0500, Bjorn Helgaas wrote:
-> > > > +
-> > > > +static struct mtk_pcie_port *mtk_pcie_find_port(struct mtk_pcie *pcie,
-> > > > +						struct pci_bus *bus, int devfn)
-> > > > +{
-> > > > +	struct pci_dev *dev;
-> > > > +	struct pci_bus *pbus;
-> > > > +	struct mtk_pcie_port *port, *tmp;
-> > > > +
-> > > > +	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
-> > > > +		if (bus->number == 0 && port->index == PCI_SLOT(devfn)) {
-> > > > +			return port;
-> > > > +		} else if (bus->number != 0) {
-> > > > +			pbus = bus;
-> > > > +			do {
-> > > > +				dev = pbus->self;
-> > > > +				if (port->index == PCI_SLOT(dev->devfn))
-> > > > +					return port;
-> > > > +				pbus = dev->bus;
-> > > > +			} while (dev->bus->number != 0);
-> > > > +		}
-> > > > +	}
-> > > > +
-> > > > +	return NULL;
-> > > 
-> > > You should be able to use sysdata to avoid searching the list.
-> > > See drivers/pci/host/pci-aardvark.c, for example.
-> > > 
-> > 
-> > I could put the mtk_pcie * in sysdata, but still need to searching the
-> > list to get the mtk_pcie_port *, how about:
-> > 
-> > 	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
-> > 		if (port->index == PCI_SLOT(devfn))
-> > 			return port;
-> > 	}
+On Thu, Aug 03, 2017 at 06:29:48PM +0200, Martin Kaiser wrote:
+> Hi Shawn,
 > 
-> No.  Other drivers don't need to search the list.  Please take a look
-> at them and see how they solve this problem.  I don't think your
-> hardware is fundamentally different in a way that means you need to
-> search when the others don't.
+> Thus wrote Shawn Guo (shawnguo at kernel.org):
 > 
+> > On Wed, Aug 02, 2017 at 10:06:11PM +0200, Martin Kaiser wrote:
+> > > Add a ranges; line to the tscadc node. This creates a 1:1 mapping between
+> > > the addresses used by tscadc and those in its child nodes (adc, tsc).
+> 
+> > > Without such a mapping, the reg = ... lines in the tsc and adc nodes do
+> > > not create a resource. Probing the fsl-imx25-tcq and fsl-imx25-tsadc
+> > > drivers will then fail since there's no IORESOURCE_MEM.
+> 
+> > > Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+> 
+> > Do we need the following Fixes tag?
+> 
+> > Fixes: 92f651f39b42 ("ARM: dts: imx25: Add TSC and ADC support")
+> 
+> yes, looks like this has never worked correctly.
+> 
+> If you're ok with the fix, I can add the tag in v2.
 
-I'm not directly involved in this generation, but I guess the main reason why Honghui need to do that is just because this hardware access configuration space via per-port registers, not just for the guard.  
-Currently, We had a host bridge with two ports (two subnodes in binding text), thus he tried to tells them apart so that he can get the correct registers.
+I added the Fixes tag and applied the patch.  Thanks.
 
-Some platforms don't need to do that since they just have a single port (no more subnodes), the others might have specific/shared registers to access configuration space. (e.g. Tegra, MTK legacy IP block).
-Or, he can split them into two independent nodes, but it will break common probing flow by doing so. (I'd prefer to use subnodes.)
-
-Ryder
+Shawn
