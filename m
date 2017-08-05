@@ -1,10 +1,10 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat,  5 Aug 2017 22:37:16 +0200
-Subject: [PATCH 3/4] thermal: exynos: constify thermal_zone_of_device_ops
+Date: Sat,  5 Aug 2017 22:37:17 +0200
+Subject: [PATCH 4/4] thermal: bcm2835: constify thermal_zone_of_device_ops
  structures
 In-Reply-To: <1501965437-30730-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1501965437-30730-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1501965437-30730-4-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1501965437-30730-5-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -46,19 +46,19 @@ static
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- drivers/thermal/samsung/exynos_tmu.c |    2 +-
+ drivers/thermal/broadcom/bcm2835_thermal.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index 7b8ef09..ed805c7 100644
---- a/drivers/thermal/samsung/exynos_tmu.c
-+++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -1286,7 +1286,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
- 	return 0;
+diff --git a/drivers/thermal/broadcom/bcm2835_thermal.c b/drivers/thermal/broadcom/bcm2835_thermal.c
+index e6863c8..a4d6a0e 100644
+--- a/drivers/thermal/broadcom/bcm2835_thermal.c
++++ b/drivers/thermal/broadcom/bcm2835_thermal.c
+@@ -145,7 +145,7 @@ static void bcm2835_thermal_debugfs(struct platform_device *pdev)
+ 	debugfs_create_regset32("regset", 0444, data->debugfsdir, regset);
  }
  
--static struct thermal_zone_of_device_ops exynos_sensor_ops = {
-+static const struct thermal_zone_of_device_ops exynos_sensor_ops = {
- 	.get_temp = exynos_get_temp,
- 	.set_emul_temp = exynos_tmu_set_emulation,
+-static struct thermal_zone_of_device_ops bcm2835_thermal_ops = {
++static const struct thermal_zone_of_device_ops bcm2835_thermal_ops = {
+ 	.get_temp = bcm2835_thermal_get_temp,
  };
+ 
