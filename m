@@ -1,26 +1,28 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 5 Aug 2017 13:38:21 +0800
-Subject: [PATCH v6 2/2] ARM: dts: TS-4600: add basic device tree
-In-Reply-To: <20170803193815.4127-2-sebastien.bourdelin@savoirfairelinux.com>
-References: <20170803193815.4127-1-sebastien.bourdelin@savoirfairelinux.com>
- <20170803193815.4127-2-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <20170805053820.GT31819@dragon>
+Date: Sat, 5 Aug 2017 13:46:29 +0800
+Subject: [PATCHv2 0/3] dts: add ls2088a and 1088a pcie DT nodes
+In-Reply-To: <1501829046-3761-1-git-send-email-Zhiqiang.Hou@nxp.com>
+References: <1501829046-3761-1-git-send-email-Zhiqiang.Hou@nxp.com>
+Message-ID: <20170805054627.GU31819@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 03, 2017 at 03:38:15PM -0400, Sebastien Bourdelin wrote:
-> These device trees add support for the TS-4600 by Technologic Systems.
+On Fri, Aug 04, 2017 at 02:44:03PM +0800, Zhiqiang Hou wrote:
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > 
-> More details here:
->   http://wiki.embeddedarm.com/wiki/TS-4600
+> Add GICv3 ITS DT node for ls1088a, because the PCIe nodes must
+> have a msi-parent.
 > 
-> Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
-> ---
-> Changes v5 -> v6:
->   - rebase on master
->   - split the previous patch series into series by subsystem
+> Hou Zhiqiang (3):
+>   dts: ls2088a: add pcie support
+>   dts: ls1088a: add gicv3 ITS DT node
+>   dts: ls1088a: add PCIe controller DT nodes
 
-Thanks for splitting the series.  I didn't see this and had the review
-comments on v5.  Sorry.
+Please have an additional 'arm64: ' prefix for these arm64 dts patches.
 
 Shawn
+
+> 
+>  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 81 ++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi |  4 ++
+>  2 files changed, 85 insertions(+)
