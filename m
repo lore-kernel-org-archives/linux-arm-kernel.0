@@ -1,41 +1,20 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat,  5 Aug 2017 21:52:22 +0100
-Subject: [PATCH 15/15] ARM: l2c: replace open coded VA->PA calculation
-In-Reply-To: <20170805205222.19868-1-ard.biesheuvel@linaro.org>
-References: <20170805205222.19868-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170805205222.19868-16-ard.biesheuvel@linaro.org>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sat,  5 Aug 2017 22:37:13 +0200
+Subject: [PATCH 0/4] constify thermal_zone_of_device_ops structures
+Message-ID: <1501965437-30730-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This replaces an open coded calculation to obtain the physical
-address of a far symbol with a call to the new adr_l macro.
+The thermal_zone_of_device_ops structures are only passed as the fourth
+argument to thermal_zone_of_sensor_register, which is declared as const.
+Thus the thermal_zone_of_device_ops structures themselves can be const.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Done with the help of Coccinelle.
+
 ---
- arch/arm/mm/l2c-l2x0-resume.S | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/arch/arm/mm/l2c-l2x0-resume.S b/arch/arm/mm/l2c-l2x0-resume.S
-index fda415e4ca8f..3e75aa8c1aff 100644
---- a/arch/arm/mm/l2c-l2x0-resume.S
-+++ b/arch/arm/mm/l2c-l2x0-resume.S
-@@ -12,9 +12,7 @@
- 	.text
- 
- ENTRY(l2c310_early_resume)
--	adr	r0, 1f
--	ldr	r2, [r0]
--	add	r0, r2, r0
-+	adr_l	r0, l2x0_saved_regs
- 
- 	ldmia	r0, {r1, r2, r3, r4, r5, r6, r7, r8}
- 	@ r1 = phys address of L2C-310 controller
-@@ -54,6 +52,3 @@ ENTRY(l2c310_early_resume)
- 	str	r9, [r1, #L2X0_CTRL]
- 	ret	lr
- ENDPROC(l2c310_early_resume)
--
--	.align
--1:	.long	l2x0_saved_regs - .
--- 
-2.11.0
+ drivers/thermal/broadcom/bcm2835_thermal.c |    2 +-
+ drivers/thermal/qoriq_thermal.c            |    2 +-
+ drivers/thermal/samsung/exynos_tmu.c       |    2 +-
+ drivers/thermal/zx2967_thermal.c           |    2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
