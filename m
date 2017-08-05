@@ -1,122 +1,234 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 5 Aug 2017 23:41:11 +0200
-Subject: [PATCH] ARM: dts: Add DTS file for D-Link DIR-685
-In-Reply-To: <CAMuHMdXmCOOuM_s1MS8o1RcAnV5mVfOwtj9DEuVisnQAT1tCVw@mail.gmail.com>
-References: <20170715170511.16312-1-linus.walleij@linaro.org>
- <CAMuHMdXmCOOuM_s1MS8o1RcAnV5mVfOwtj9DEuVisnQAT1tCVw@mail.gmail.com>
-Message-ID: <CACRpkdZtmMVQAsRsxfdyWH5xHv+5yP1AGpSTtNLCs+bAKbNYrQ@mail.gmail.com>
+Date: Sat,  5 Aug 2017 23:44:36 +0200
+Subject: [PATCH v2] ARM: dts: Add DTS file for D-Link DIR-685
+Message-ID: <20170805214436.6581-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 9:54 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Sat, Jul 15, 2017 at 7:05 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> This adds a device tree file for the Gemini-based D-Link DIR-685
->> router, supporting all devices that are currently supported in
->> the main DTSI SoC file.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+This adds a device tree file for the Gemini-based D-Link DIR-685
+router, supporting all devices that are currently supported in
+the main DTSI SoC file.
 
->> +       chosen {
->> +               bootargs = "console=ttyS0,19200n8";
->
-> I think you can drop bootargs, as stdout-path is present.
->
->> +               stdout-path = &uart0;
->
-> stdout-path = "uart0:115200n8";
+Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Drop bootargs, use stdout-path = "uart0:115200n8";
+- Give sensible names to GPIO keys and GPIO LEDs
+---
+ arch/arm/boot/dts/Makefile                 |   1 +
+ arch/arm/boot/dts/gemini-dlink-dir-685.dts | 191 +++++++++++++++++++++++++++++
+ 2 files changed, 192 insertions(+)
+ create mode 100644 arch/arm/boot/dts/gemini-dlink-dir-685.dts
 
-OK this works fine! Thanks.
-
->> +               button at 8 {
->
-> button-esc { ... } ?
-
->> +               button at 13 {
->
-> button-eject { ... } ?
-
-OK fixed this.
-
->> +               led at 7 {
->
-> led-wps?
->
->> +               led at 11 {
->
-> led-blue? (does it have a label on the box? HD1?)
-
-OK fixed this.
-
->> +                       label = "dir685:blue:HD";
->
-> Looks like a legacy platform device name, not a DT label.
-
-That is coincidental. I was told in the past (by other reviewers)
-to name LEDs as "platform:color:function".
-
-c.f.
-armada-370-dlink-dns327l.dts:
-
-gpio-leds {
-        sata-l-amber-pin {
-                label = "dns327l:amber:sata-l";
-(...)
-
->> +       gpio-i2c {
->> +               compatible = "i2c-gpio";
->> +               gpios = <&gpio0 5 0>, /* SDA */
->> +                       <&gpio0 6 0>; /* SCL */
->
-> The i2c-gpio DT bindings really should be amended to support (optional)
-> gpio-names.
-
-It's not needed I think, I can name the lines with gpio-line-names
-and the labels added by the subsystem in Linux looks really nice
-in lsgpio:
-
-GPIO chip: gpiochip0, "FTGPIO010", 32 GPIO lines
-        line  0: unnamed unused
-        line  1: unnamed unused
-        line  2: unnamed unused
-        line  3: unnamed unused
-        line  4: unnamed unused
-        line  5: unnamed "sda" [kernel]
-        line  6: unnamed "scl" [kernel]
-        line  7: unnamed "dir685:blue:WPS" [kernel output active-low]
-        line  8: unnamed "reset" [kernel active-low]
-
-Cool eh? :)
-
->> +                       /*
->> +                        * This "RedBoot" is the Storlink derivative.
->> +                        */
->> +                       partition at 0 {
->
-> Shouldn't partitions be in a subnode named "partitions"?
-
-Hm yeah that is the new style I guess. That requires a separate
-patch to patch all DT[I|S] files though.
-
->> +               sata: sata at 46000000 {
->
-> "&sata {", and move outside hierarchy.
->
-> Add "pci" label to gemini.dtsi, "&pci {", and move outside hiearchy.
->
-> Add "ata" label to gemini.dtsi, "&pci {", and move outside hiearchy.
-
-I am under the impression that whether to use the &node style or
-overlay style (use the same node names) is a matter of taste.
-All other DTS files for this platform use this style, so I prefer to keep
-to it.
-
-Older DTSes and qcom DTs do this too... but others such as Marvell
-use this &node style.
-
-If some DT maintainers step out and say they want all to be done
-this way for everyone I guess I can make a patch changing them
-all and the base DTSI as well, but on top of this patch.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 4b17f35dc9a7..dc00f3ec1b23 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -180,6 +180,7 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
+ 	exynos5440-ssdk5440.dtb \
+ 	exynos5800-peach-pi.dtb
+ dtb-$(CONFIG_ARCH_GEMINI) += \
++	gemini-dlink-dir-685.dtb \
+ 	gemini-nas4220b.dtb \
+ 	gemini-rut1xx.dtb \
+ 	gemini-sq201.dtb \
+diff --git a/arch/arm/boot/dts/gemini-dlink-dir-685.dts b/arch/arm/boot/dts/gemini-dlink-dir-685.dts
+new file mode 100644
+index 000000000000..10ab4d878513
+--- /dev/null
++++ b/arch/arm/boot/dts/gemini-dlink-dir-685.dts
+@@ -0,0 +1,191 @@
++/*
++ * Device Tree file for D-Link DIR-685 Xtreme N Storage Router
++ */
++
++/dts-v1/;
++
++#include "gemini.dtsi"
++#include <dt-bindings/input/input.h>
++
++/ {
++	model = "D-Link DIR-685 Xtreme N Storage Router";
++	compatible = "dlink,dir-685", "cortina,gemini";
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	memory {
++		/* 128 MB SDRAM in 2 x Hynix HY5DU121622DTP-D43 */
++		device_type = "memory";
++		reg = <0x00000000 0x8000000>;
++	};
++
++	chosen {
++		stdout-path = "uart0:115200n8";
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		button-esc {
++			debounce_interval = <50>;
++			wakeup-source;
++			linux,code = <KEY_ESC>;
++			label = "reset";
++			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
++		};
++		button-eject {
++			debounce_interval = <50>;
++			wakeup-source;
++			linux,code = <KEY_EJECTCD>;
++			label = "unmount";
++			gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		led-wps {
++			label = "dir685:blue:WPS";
++			gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
++			default-state = "on";
++			linux,default-trigger = "heartbeat";
++		};
++		/*
++		 * These two LEDs are on the side of the device.
++		 * For electrical reasons, both LEDs cannot be active
++		 * at the same time so only blue or orange can on at
++		 * one time. Enabling both makes the LED go dark.
++		 * The LEDs both sit inside the unmount button and the
++		 * label on the case says "unmount".
++		 */
++		led-blue-hd {
++			label = "dir685:blue:HD";
++			gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++		led-orange-hd {
++			label = "dir685:orange:HD";
++			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++	};
++
++	/*
++	 * This is a Sunon Maglev GM0502PFV2-8 cooling fan @10000 RPM.
++	 * Since the platform has no temperature sensor, this is controlled
++	 * from userspace by using the hard disks S.M.A.R.T. temperature
++	 * sensor. It is turned on when the temperature exceeds 46 degrees
++	 * and turned off when the temperatures goes below 41 degrees
++	 * (celsius).
++	 */
++	gpio-fan {
++		compatible = "gpio-fan";
++		gpios = <&gpio1 6 GPIO_ACTIVE_HIGH>;
++		gpio-fan,speed-map = <0 0>, <10000 1>;
++		#cooling-cells = <2>;
++	};
++
++	/*
++	 * The touchpad input is connected to a GPIO bit-banged
++	 * I2C bus.
++	 */
++	gpio-i2c {
++		compatible = "i2c-gpio";
++		gpios = <&gpio0 5 0>, /* SDA */
++			<&gpio0 6 0>; /* SCL */
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		touchkeys at 26 {
++			compatible = "dlink,dir685-touchkeys";
++			reg = <0x26>;
++			interrupt-parent = <&gpio0>;
++			interrupts = <17 IRQ_TYPE_EDGE_FALLING>;
++		};
++	};
++
++	soc {
++		flash at 30000000 {
++			status = "okay";
++			/* 32MB of flash */
++			reg = <0x30000000 0x02000000>;
++
++			/*
++			 * This "RedBoot" is the Storlink derivative.
++			 */
++			partition at 0 {
++				label = "RedBoot";
++				reg = <0x00000000 0x00040000>;
++				read-only;
++			};
++			/*
++			 * Between the boot loader and the rootfs is the kernel
++			 * in a custom Storlink format flashed from the boot
++			 * menu. The rootfs is in squashfs format.
++			 */
++			partition at 1800c0 {
++				label = "rootfs";
++				reg = <0x001800c0 0x01dbff40>;
++				read-only;
++			};
++			partition at 1f40000 {
++				label = "upgrade";
++				reg = <0x01f40000 0x00040000>;
++				read-only;
++			};
++			partition at 1f80000 {
++				label = "rgdb";
++				reg = <0x01f80000 0x00040000>;
++				read-only;
++			};
++			/*
++			 * This partition contains MAC addresses for WAN,
++			 * WLAN and LAN, and the country code (for wireless
++			 * I guess).
++			 */
++			partition at 1fc0000 {
++				label = "nvram";
++				reg = <0x01fc0000 0x00020000>;
++				read-only;
++			};
++			partition at 1fe0000 {
++				label = "LangPack";
++				reg = <0x01fe0000 0x00020000>;
++				read-only;
++			};
++		};
++
++		sata: sata at 46000000 {
++			cortina,gemini-ata-muxmode = <0>;
++			cortina,gemini-enable-sata-bridge;
++			status = "okay";
++		};
++
++		pci at 50000000 {
++			status = "okay";
++			interrupt-map-mask = <0xf800 0 0 7>;
++			interrupt-map =
++				<0x4800 0 0 1 &pci_intc 0>, /* Slot 9 */
++				<0x4800 0 0 2 &pci_intc 1>,
++				<0x4800 0 0 3 &pci_intc 2>,
++				<0x4800 0 0 4 &pci_intc 3>,
++				<0x5000 0 0 1 &pci_intc 1>, /* Slot 10 */
++				<0x5000 0 0 2 &pci_intc 2>,
++				<0x5000 0 0 3 &pci_intc 3>,
++				<0x5000 0 0 4 &pci_intc 0>,
++				<0x5800 0 0 1 &pci_intc 2>, /* Slot 11 */
++				<0x5800 0 0 2 &pci_intc 3>,
++				<0x5800 0 0 3 &pci_intc 0>,
++				<0x5800 0 0 4 &pci_intc 1>,
++				<0x6000 0 0 1 &pci_intc 3>, /* Slot 12 */
++				<0x6000 0 0 2 &pci_intc 0>,
++				<0x6000 0 0 3 &pci_intc 1>,
++				<0x6000 0 0 4 &pci_intc 2>;
++		};
++
++		ata at 63000000 {
++			status = "okay";
++		};
++	};
++};
+-- 
+2.9.4
