@@ -1,32 +1,89 @@
-From: lukas@wunner.de (Lukas Wunner)
-Date: Sat, 5 Aug 2017 08:57:54 +0200
-Subject: [PATCH 2/3] Split VGA default device handler out of VGA arbiter
-In-Reply-To: <20170804102033.27731-3-dja@axtens.net>
-References: <20170804102033.27731-1-dja@axtens.net>
- <20170804102033.27731-3-dja@axtens.net>
-Message-ID: <20170805065754.GA8509@wunner.de>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Sat, 5 Aug 2017 15:15:13 +0800
+Subject: [PATCH v9 4/4] net/cxgb4vf: Use new PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+ flag
+In-Reply-To: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
+References: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
+Message-ID: <1501917313-9812-5-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 04, 2017 at 08:20:32PM +1000, Daniel Axtens wrote:
-> A system without PCI legacy resources (e.g. ARM64, powerpc) may
-> find that no default/boot VGA device has been marked, because the
-> VGA arbiter checks for legacy resource decoding before marking a
-> card as default.
+From: Casey Leedom <leedom@chelsio.com>
 
-Would it be feasible to just sprinkle some "if (IS_ENABLED(CONFIG_X86))"
-over the portions of vgaarb.c that deal with legacy resources?
+cxgb4vf Ethernet driver now queries PCIe configuration space to
+determine if it can send TLPs to it with the Relaxed Ordering
+Attribute set, just like the pf did.
 
-I'm missing some context as to the negative consequences you're
-experiencing on other arches (the cover letter merely refers to
-"quirks in ppc and concerns in arm land" and is missing links to
-archived versions of v1 and v2), but clearly legacy resources are
-x86-specific so any code dealing with them seems superfluous on
-other arches and should be marked as such.
+Signed-off-by: Casey Leedom <leedom@chelsio.com>
+Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+Reviewed-by: Casey Leedom <leedom@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb4vf/adapter.h      |  1 +
+ drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c | 18 ++++++++++++++++++
+ drivers/net/ethernet/chelsio/cxgb4vf/sge.c          |  3 +++
+ 3 files changed, 22 insertions(+)
 
-Please cc dri-devel when proposing changes to vgaarb.c (see
-MAINTAINERS).
-
-Thanks,
-
-Lukas
+diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h b/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h
+index 109bc63..08c6ddb 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h
++++ b/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h
+@@ -408,6 +408,7 @@ enum { /* adapter flags */
+ 	USING_MSI          = (1UL << 1),
+ 	USING_MSIX         = (1UL << 2),
+ 	QUEUES_BOUND       = (1UL << 3),
++	ROOT_NO_RELAXED_ORDERING = (1UL << 4),
+ };
+ 
+ /*
+diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c b/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c
+index ac7a150..59e7639 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c
+@@ -2888,6 +2888,24 @@ static int cxgb4vf_pci_probe(struct pci_dev *pdev,
+ 	 */
+ 	adapter->name = pci_name(pdev);
+ 	adapter->msg_enable = DFLT_MSG_ENABLE;
++
++	/* If possible, we use PCIe Relaxed Ordering Attribute to deliver
++	 * Ingress Packet Data to Free List Buffers in order to allow for
++	 * chipset performance optimizations between the Root Complex and
++	 * Memory Controllers.  (Messages to the associated Ingress Queue
++	 * notifying new Packet Placement in the Free Lists Buffers will be
++	 * send without the Relaxed Ordering Attribute thus guaranteeing that
++	 * all preceding PCIe Transaction Layer Packets will be processed
++	 * first.)  But some Root Complexes have various issues with Upstream
++	 * Transaction Layer Packets with the Relaxed Ordering Attribute set.
++	 * The PCIe devices which under the Root Complexes will be cleared the
++	 * Relaxed Ordering bit in the configuration space, So we check our
++	 * PCIe configuration space to see if it's flagged with advice against
++	 * using Relaxed Ordering.
++	 */
++	if (!pcie_relaxed_ordering_supported(pdev))
++		adapter->flags |= ROOT_NO_RELAXED_ORDERING;
++
+ 	err = adap_init0(adapter);
+ 	if (err)
+ 		goto err_unmap_bar;
+diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/sge.c b/drivers/net/ethernet/chelsio/cxgb4vf/sge.c
+index e37dde2..05498e7 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4vf/sge.c
++++ b/drivers/net/ethernet/chelsio/cxgb4vf/sge.c
+@@ -2205,6 +2205,7 @@ int t4vf_sge_alloc_rxq(struct adapter *adapter, struct sge_rspq *rspq,
+ 	struct port_info *pi = netdev_priv(dev);
+ 	struct fw_iq_cmd cmd, rpl;
+ 	int ret, iqandst, flsz = 0;
++	int relaxed = !(adapter->flags & ROOT_NO_RELAXED_ORDERING);
+ 
+ 	/*
+ 	 * If we're using MSI interrupts and we're not initializing the
+@@ -2300,6 +2301,8 @@ int t4vf_sge_alloc_rxq(struct adapter *adapter, struct sge_rspq *rspq,
+ 			cpu_to_be32(
+ 				FW_IQ_CMD_FL0HOSTFCMODE_V(SGE_HOSTFCMODE_NONE) |
+ 				FW_IQ_CMD_FL0PACKEN_F |
++				FW_IQ_CMD_FL0FETCHRO_V(relaxed) |
++				FW_IQ_CMD_FL0DATARO_V(relaxed) |
+ 				FW_IQ_CMD_FL0PADEN_F);
+ 
+ 		/* In T6, for egress queue type FL there is internal overhead
+-- 
+1.8.3.1
