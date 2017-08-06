@@ -1,9 +1,9 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 06 Aug 2017 11:50:24 +0200
-Subject: [GIT PULL 3/4] Rockchip dts32 changes for 4.14
+Date: Sun, 06 Aug 2017 11:51:04 +0200
+Subject: [GIT PULL 4/4] Rockchip dts64 changes for 4.14
 In-Reply-To: <12145142.47nS8LyXIe@phil>
 References: <12145142.47nS8LyXIe@phil>
-Message-ID: <3167861.YfTzp5M1RE@phil>
+Message-ID: <3713539.z1Eee8O6DN@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,104 +13,78 @@ The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.14-rockchip-dts32-1
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.14-rockchip-dts64-1
 
-for you to fetch changes up to 0f4dc7e154d054303c4dd6b5c3e3207f9a7f8714:
+for you to fetch changes up to 45a995c054e116ea9578dd6186be35f65cc0a7d0:
 
-  ARM: dts: rockchip: fix property-ordering in rv1108 mmc nodes (2017-07-22 22:41:35 +0200)
-
-----------------------------------------------------------------
-Removal of the deprectated num-slots property from all Rockchip dw-mmc
-nodes. The rv1108 gains support for sd-cards on the evaluation board and
-the general nodes get a bit of cosmetic. On rk3288 the evb gains support
-saradc and the adc-key connected to it while some more boards also get
-their mali gpu enabled (fennec, evb, tinker).
-
-The biggest set of changes can be found on the rk3228/rk3229 combo this
-time. It gets core support for efuse, sdmmc, sdio, io-domans and spdif
-as well as a separate rk3229.dtsi that will keep the slight differences
-between the two brothers rk3228/rk3229. The evaluation board also gets
-some attention and abled nodes (regulators, io-domains, emmc, tsadc keys)
-
-But I think the most interesting change is the cpu enable-method for it.
-Instead of using the older in-kernel method, we're now also moving to
-handling this in firmware via the psci interface on 32bit Rockchip socs.
-In a recently merged pull request [0] support for the rk3228/rk3229 was
-added to OP-TEE including the psci support and it seems supporting other
-32bit Rockchip socs that way is also planned for the future.
-
-[0] https://github.com/OP-TEE/optee_os/pull/1666
+  arm64: dts: rockchip: update dynamic-power-coefficient for rk3399 (2017-08-01 01:00:55 +0200)
 
 ----------------------------------------------------------------
-Andy Yan (1):
-      ARM: dts: rockchip: enable sdmmc for rv1108 evb
+64bit Rockchip devicetree changes containing fixes for pinctrl typos
+and the use of keep-power-in-suspend in non-sdio nodes as well as the
+removal of the deprecated num-slots property from dwmmc nodes.
 
-David Wu (2):
-      ARM: dts: rockchip: Add io-domain node for rk3228
-      ARM: dts: rockchip: enable io-domain for rk3229-evb
+rk3328 gets support for spdif, io-domains and usb (including enablement
+of usb on the evaluation board), while rk3368 gains support for spdif.
 
-Finley Xiao (2):
-      ARM: dts: rockchip: add cpu-supply property for cpu node of rk3229-evb
-      ARM: dts: rockchip: add efuse device node for rk3228
+The biggest chunk of course aims for the rk3399 with a number of pcie
+changes, support for the mali gpu, a new power-domain, sdmmc support
+on the firefly board and dynamic-power-coefficients.
 
-Frank Wang (6):
-      ARM: dts: rockchip: add basic dtsi file for RK3229 SoC
-      ARM: dts: rockchip: add cpu enable method for rk3228 SoC
-      ARM: dts: rockchip: add regulator nodes for rk3229-evb
-      ARM: dts: rockchip: enable eMMC for rk3229-evb
-      ARM: dts: rockchip: enable tsadc for rk3229-evb
-      ARM: dts: rockchip: add gpio power-key for rk3229-evb
+The gru family also gets support for their quite central pwm regulators
+using the newly introduced vctrl regulator types.
 
-Heiko Stuebner (1):
-      ARM: dts: rockchip: fix property-ordering in rv1108 mmc nodes
+----------------------------------------------------------------
+Brian Norris (1):
+      arm64: dts: rockchip: set rk3399 dynamic CPU power coefficients
 
-Jacob Chen (5):
-      ARM: dts: rockchip: enable ARM Mali GPU on rk3288-tinker
-      ARM: dts: rockchip: enable ARM Mali GPU on rk3288-evb
-      ARM: dts: rockchip: enable ARM Mali GPU on rk3288-fennec
-      ARM: dts: rockchip: enable saradc for rk3288-evb
-      ARM: dts: rockchip: enable adc key for rk3288-evb
+Caesar Wang (5):
+      arm64: dts: rockchip: add SdioAudio pd control for rk3399
+      dt-bindings: gpu: add the RK3399 mali for rockchip specifics
+      arm64: dts: rockchip: add ARM Mali GPU node for RK3399 SoCs
+      arm64: dts: rockchip: enable the GPU for RK3399-GRU
+      arm64: dts: rockchip: update dynamic-power-coefficient for rk3399
 
-Jaehoon Chung (1):
-      ARM: dts: rockchip: change to "max-frequency" from "clock-freq-min-max" on rv1108
+David Wu (1):
+      arm64: dts: rockchip: Add rk3328 io-domain node
 
 Klaus Goger (1):
-      ARM: dts: rockchip: fix typo in rk3036 mmc pinctrl
+      arm64: dts: rockchip: fix typo in mmc pinctrl
 
-Shawn Lin (3):
-      ARM: dts: rockchip: remove num-slots from all platforms
-      ARM: dts: rockchip: fix compatible string for eMMC node of rk3228 SoC
-      ARM: dts: rockchip: add sdmmc and sdio nodes for rk3228 SoC
+Matthias Kaehlcke (2):
+      arm64: dts: rockchip: Update CPU regulator voltage ranges for Gru
+      arm64: dts: rockchip: Use vctrl regulators for dynamic CPU voltages on Gru/Kevin
 
-Sugar Zhang (1):
-      ARM: dts: rockchip: add rk322x spdif node
+Shawn Lin (6):
+      arm64: dts: rockchip: change clkreq mode for rk3399-evb
+      arm64: dts: rockchip: remove num-slots from all platforms
+      arm64: dts: rockchip: remove abused keep-power-in-suspend
+      arm64: dts: rockchip: change clkreq mode for rk3399-firefly
+      arm64: dts: rockchip: kill pcie_clkreqn and pcie_clkreqnb for rk3399
+      arm64: dts: rockchip: enable sdmmc controller on rk3399-firefly
 
- arch/arm/boot/dts/rk3036-kylin.dts                |   2 -
- arch/arm/boot/dts/rk3036.dtsi                     |   3 +-
- arch/arm/boot/dts/rk3066a-bqcurie2.dts            |   2 -
- arch/arm/boot/dts/rk3066a-mk808.dts               |   2 -
- arch/arm/boot/dts/rk3066a-rayeager.dts            |   3 -
- arch/arm/boot/dts/rk3188-px3-evb.dts              |   2 -
- arch/arm/boot/dts/rk3188-radxarock.dts            |   1 -
- arch/arm/boot/dts/rk3229-evb.dts                  | 129 +++++++++++++++++++++-
- arch/arm/boot/dts/rk3229.dtsi                     |  89 +++++++++++++++
- arch/arm/boot/dts/rk322x.dtsi                     | 113 ++++++++++++++++++-
- arch/arm/boot/dts/rk3288-evb.dtsi                 |  49 +++++++-
- arch/arm/boot/dts/rk3288-fennec.dts               |   6 +-
- arch/arm/boot/dts/rk3288-firefly-reload-core.dtsi |   1 -
- arch/arm/boot/dts/rk3288-firefly-reload.dts       |   2 -
- arch/arm/boot/dts/rk3288-firefly.dtsi             |   3 -
- arch/arm/boot/dts/rk3288-miqi.dts                 |   2 -
- arch/arm/boot/dts/rk3288-phycore-rdk.dts          |   1 -
- arch/arm/boot/dts/rk3288-phycore-som.dtsi         |   1 -
- arch/arm/boot/dts/rk3288-popmetal.dts             |   2 -
- arch/arm/boot/dts/rk3288-r89.dts                  |   1 -
- arch/arm/boot/dts/rk3288-rock2-som.dtsi           |   1 -
- arch/arm/boot/dts/rk3288-rock2-square.dts         |   2 -
- arch/arm/boot/dts/rk3288-tinker.dts               |   6 +-
- arch/arm/boot/dts/rk3288-veyron-sdmmc.dtsi        |   1 -
- arch/arm/boot/dts/rk3288-veyron.dtsi              |   2 -
- arch/arm/boot/dts/rv1108-evb.dts                  |   4 +
- arch/arm/boot/dts/rv1108.dtsi                     |  20 ++--
- 27 files changed, 401 insertions(+), 49 deletions(-)
- create mode 100644 arch/arm/boot/dts/rk3229.dtsi
+Sugar Zhang (2):
+      arm64: dts: rockchip: add rk3368 spdif node
+      arm64: dts: rockchip: add rk3328 spdif node
+
+William Wu (2):
+      arm64: dts: rockchip: add usb2 nodes for RK3328 SoCs
+      arm64: dts: rockchip: enable usb2 for RK3328 evaluation board
+
+ .../devicetree/bindings/gpu/arm,mali-midgard.txt   |   1 +
+ arch/arm64/boot/dts/rockchip/rk3328-evb.dts        |  24 +++++
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi           |  94 ++++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi       |   1 -
+ arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts    |   1 -
+ .../boot/dts/rockchip/rk3368-orion-r68-meta.dts    |   2 -
+ arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts    |   3 -
+ arch/arm64/boot/dts/rockchip/rk3368-r88.dts        |   2 -
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi           |  19 ++++
+ arch/arm64/boot/dts/rockchip/rk3399-evb.dts        |   2 +-
+ arch/arm64/boot/dts/rockchip/rk3399-firefly.dts    |  15 ++-
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts  |  44 ++++++++
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       | 119 ++++++++++++++-------
+ arch/arm64/boot/dts/rockchip/rk3399-op1-opp.dtsi   |  33 ++++++
+ arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi       |  33 ++++++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |  41 +++++--
+ 16 files changed, 374 insertions(+), 60 deletions(-)
