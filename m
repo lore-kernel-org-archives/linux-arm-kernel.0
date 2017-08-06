@@ -1,218 +1,111 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Sun, 6 Aug 2017 10:06:30 +0800
-Subject: [PATCH v3 5/6] PCI: mediatek: Add new generation controller
- support
-In-Reply-To: <2adcb5f915eb8bd5817592ea32974eb25da02e4f.1501846816.git.honghui.zhang@mediatek.com>
-References: <cover.1501846816.git.honghui.zhang@mediatek.com>
- <2adcb5f915eb8bd5817592ea32974eb25da02e4f.1501846816.git.honghui.zhang@mediatek.com>
-Message-ID: <1501985190.8058.20.camel@mtkswgap22>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 6 Aug 2017 10:39:54 +0800
+Subject: [linux-sunxi] [PATCH 2/2] mmc: sunxi: fix new timings mode on
+ A64 EMMC (MMC2) controller
+In-Reply-To: <20170804213555.6024-2-icenowy@aosc.io>
+References: <20170804213555.6024-1-icenowy@aosc.io>
+ <20170804213555.6024-2-icenowy@aosc.io>
+Message-ID: <20170806023954.wwaredjwcm2p5pw7@wens.csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Honghui,
+On Sat, Aug 05, 2017 at 05:35:55AM +0800, Icenowy Zheng wrote:
+> The configuration struct of A64 EMMC(MMC2) compatible used to
+> have the needs_new_timings variable missing, which lead to NULL
+> pointer dereference now when trying to set up the old timings mode, as
+> the old timings mode doesn't exist at all on A64.
 
-If you plan to send next version, then I would suggest some minor
-changes.
+I'm not familiar with the A64's eMMC controller. The datasheet says
+it does not have the timing switch register. It does not say whether
+it is always in the old or new timing mode. "needs_new_timings"
+probably meant that the switch has to be set.
 
-On Fri, 2017-08-04 at 20:06 +0800, honghui.zhang at mediatek.com wrote:
-> +#define PCIE_CRSTB		BIT(3)
-> +#define PCIE_PERSTB		BIT(8)
-> +#define PCI_LINKDOWN_RST_EN	GENMASK(15, 13)
+This fix doesn't really fix the underlying issue, which is the check
+for clk_delays was incorrectly replaced. sun4i/sun5i is also broken.
 
-PCIE_LINKDOWN_RST_EN
+Could you try this patch instead:
 
-> +#define PCIE_LINK_STATUS_V2	0x804
-> +#define PCIE_PORT_LINKUP_V2	BIT(10)
-> +
-> +
-> +static int mtk_pcie_hw_rd_cfg(struct mtk_pcie_port *port, u32 bus, u32 devfn,
-> +			      int where, int size, u32 *val)
-> +{
-> +	int reg, shift = 8 * (where & 3);
+<---
 
-int reg => u32
+>From 23b841a11294cb6a0cf1e146616b068f60c2ec7d Mon Sep 17 00:00:00 2001
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Sun, 6 Aug 2017 10:24:47 +0800
+Subject: [PATCH] mmc: sunxi: Fix NULL pointer reference on clk_delays
 
-> +	/* Write PCIe Configuration Transaction Header for cfgrd */
-> +	writel(CFG_HEADER_DW0(CFG_WRRD_TYPE_0, CFG_RD_FMT),
-> +	       port->base + PCIE_CFG_HEADER0);
-> +	writel(CFG_HEADER_DW1(where, size), port->base + PCIE_CFG_HEADER1);
-> +	writel(CFG_HEADER_DW2(where, PCI_FUNC(devfn), PCI_SLOT(devfn), bus),
-> +	       port->base + PCIE_CFG_HEADER2);
-> +
-> +	/* Trigger h/w to transmit Cfgrd TLP */
-> +	reg = readl(port->base + PCIE_APP_TLP_REQ);
-> +	writel(reg | APP_CFG_REQ, port->base + PCIE_APP_TLP_REQ);
-> +
-> +	/* Check completion status */
-> +	if (mtk_pcie_check_cfg_cpld(port))
-> +		return PCIBIOS_SET_FAILED;
-> +
-> +	/* Read cpld payload of Cfgrd */
-> +	*val = readl(port->base + PCIE_CFG_RDATA);
-> +
-> +	switch (size) {
-> +	case 4:
-> +		break;
-> +	case 3:
-> +		*val = (*val >> shift) & 0xffffff;
-> +		break;
-> +	case 2:
-> +		*val = (*val >> shift) & 0xffff;
-> +		break;
-> +	case 1:
-> +		*val = (*val >> shift) & 0xff;
-> +		break;
-> +	default:
-> +		return PCIBIOS_BAD_REGISTER_NUMBER;
-> +	}
+Some SoCs do not support clk delays for MMC in the clock control unit.
+These include the old controllers in A10/A10s/A13/R8, and the new eMMC
+controller in A64. The config structure for these controllers do not
+specify clk_delays, but the check for this was replaced in commit
+b0600daebf31 ("mmc: sunxi: Support controllers that can use both old
+and new timings").
 
-Do we really need case 3? I guess case 1, 2 or 4 should be enough.
+This patch adds back the check for clk_delays, and also adds comments
+for both checks in sunxi_mmc_clk_set_phase().
 
-> +	return PCIBIOS_SUCCESSFUL;
-> +}
-> +
-> +static int mtk_pcie_hw_wr_cfg(struct mtk_pcie_port *port, u32 bus, u32 devfn,
-> +			      int where, int size, u32 val)
-> +{
-> +	/* Write PCIe Configuration Transaction Header for Cfgwr */
-> +	writel(CFG_HEADER_DW0(CFG_WRRD_TYPE_0, CFG_WR_FMT),
-> +	       port->base + PCIE_CFG_HEADER0);
-> +	writel(CFG_HEADER_DW1(where, size), port->base + PCIE_CFG_HEADER1);
-> +	writel(CFG_HEADER_DW2(where, PCI_FUNC(devfn), PCI_SLOT(devfn), bus),
-> +	       port->base + PCIE_CFG_HEADER2);
-> +
-> +	/* Write cfgwr data */
-> +	val = val << 8 * (where & 3);
-> +	writel(val, port->base + PCIE_CFG_WDATA);
-> +
-> +	/* Trigger h/w to transmit Cfgwr TLP */
-> +	val = readl(port->base + PCIE_APP_TLP_REQ);
-> +	val |= APP_CFG_REQ;
-> +	writel(val, port->base + PCIE_APP_TLP_REQ);
-> +
-> +	/* Check completion status */
-> +	return mtk_pcie_check_cfg_cpld(port);
-> +}
-> +
-> +static int mtk_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
-> +				int where, int size, u32 *val)
-> +{
-> +	struct mtk_pcie_port *port = NULL, *iter, *tmp;
-> +	struct mtk_pcie *pcie = bus->sysdata;
-> +	u32 bn = bus->number;
-> +	int ret;
-> +
-> +	list_for_each_entry_safe(iter, tmp, &pcie->ports, list)
-> +		if (iter->index == PCI_SLOT(devfn)) {
-> +			port = iter;
-> +			break;
-> +		}
-> +
-> +	if (!port) {
-> +		*val = ~0;
-> +		return PCIBIOS_DEVICE_NOT_FOUND;
-> +	}
+Fixes: b0600daebf31 ("mmc: sunxi: Support controllers that can use
+		      both old and new timings")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/mmc/host/sunxi-mmc.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-list_for_each_entry(), since you don't really remove or free something.
-
-I know you need to find port->base to write/read configuration space. I
-think it's better to move this part to another function. You can take a
-look at pci-mvebu.c mvebu_pcie_find_portmvebu().
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 3777517982dd..020547e5fa45 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -722,9 +722,14 @@ static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
+ {
+ 	int index;
  
-> +	ret = mtk_pcie_hw_rd_cfg(port, bn, devfn, where, size, val);
-> +	if (ret)
-> +		*val = ~0;
-> +
-> +	return ret;
-> +}
-> +
-> +static int mtk_pcie_config_write(struct pci_bus *bus, unsigned int devfn,
-> +				 int where, int size, u32 val)
-> +{
-> +	struct mtk_pcie_port *port = NULL, *iter, *tmp;
-> +	struct mtk_pcie *pcie = bus->sysdata;
-> +	u32 bn = bus->number;
-> +
-> +	list_for_each_entry_safe(iter, tmp, &pcie->ports, list)
-> +		if (iter->index == PCI_SLOT(devfn)) {
-> +			port = iter;
-> +			break;
-> +		}
-> +
-> +	if (!port)
-> +		return PCIBIOS_DEVICE_NOT_FOUND;
++	/* No need to set clk controller delays under new timings */
+ 	if (host->use_new_timings)
+ 		return 0;
+ 
++	/* Some old controllers don't support delays */
++	if (!host->cfg->clk_delays)
++		return 0;
++
+ 	/* determine delays */
+ 	if (rate <= 400000) {
+ 		index = SDXC_CLK_400K;
+-- 
+2.13.3
 
-Ditto.
+<---
 
-> +	return mtk_pcie_hw_wr_cfg(port, bn, devfn, where, size, val);
-> +}
-> +
-> +static struct pci_ops mtk_pcie_ops_v2 = {
-> +	.read  = mtk_pcie_config_read,
-> +	.write = mtk_pcie_config_write,
-> +};
-> +
-> +static int mtk_pcie_startup_ports_v2(struct mtk_pcie_port *port)
-> +{
-> +	struct mtk_pcie *pcie = port->pcie;
-> +	struct resource *mem = &pcie->mem;
-> +	u32 val;
-> +	size_t size;
-> +	int err;
-> +
-> +	/* mt7622 platforms need to enable LTSSM and ASPM from PCIe subsys */
-> +	if (pcie->base) {
-> +		val = readl(pcie->base + PCIE_SYS_CFG_V2);
-> +		val |= PCIE_CSR_LTSSM_EN(port->index) |
-> +		       PCIE_CSR_ASPM_L1_EN(port->index);
-> +		writel(val, pcie->base + PCIE_SYS_CFG_V2);
-> +	}
-> +
-> +	/* Assert all reset signals */
-> +	writel(0, port->base + PCIE_RST_CTRL);
-> +
-> +	/*
-> +	 * Enable PCIe link down reset, if link status changed from link up to
-> +	 * link down, this will reset MAC control registers and configuration
-> +	 * space.
-> +	 */
-> +	writel(PCI_LINKDOWN_RST_EN, port->base + PCIE_RST_CTRL);
-> +
-> +	/* De-assert PHY, PE, PIPE, MAC and configuration reset	*/
-> +	val = readl(port->base + PCIE_RST_CTRL);
-> +	val |= PCIE_PHY_RSTB | PCIE_PERSTB | PCIE_PIPE_SRSTB |
-> +	       PCIE_MAC_SRSTB | PCIE_CRSTB;
-> +	writel(val, port->base + PCIE_RST_CTRL);
-> +
-> +	/* PCIe v2.0 need at least 100ms delay to train from Gen1 to Gen2 */
+Separately we should ask what is the proper set of config flags that
+describes the A64 EMMC controller.
 
-/* 100ms timeout value should be enough for Gen1/2 training */ for
-consistency.
+Regards
+ChenYu
 
-> +	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS_V2, val,
-> +				 !!(val & PCIE_PORT_LINKUP_V2), 20,
-> +				 100 * USEC_PER_MSEC);
-> +	if (err)
-> +		return -ETIMEDOUT;
-> +
-> +	/* Set INTx mask */
-> +	val = readl(port->base + PCIE_INT_MASK);
-> +	val &= ~INTX_MASK;
-> +	writel(val, port->base + PCIE_INT_MASK);
-> +
-> +	/* Set AHB to PCIe translation windows */
-> +	size = mem->end - mem->start;
-> +	val = AHB2PCIE_BASEL(mem->start) | AHB2PCIE_SIZE(fls(size));
-> +	writel(val, port->base + PCIE_AHB_TRANS_BASE0_L);
-> +
-> +	val = AHB2PCIE_BASEH(mem->start);
-> +	writel(val, port->base + PCIE_AHB_TRANS_BASE0_H);
-> +
-> +	/* Set PCIe to AXI translation memory space.*/
-> +	val = fls(0xffffffff) | WIN_ENABLE;
-> +	writel(val, port->base + PCIE_AXI_WINDOW0);
-> +
-> +	return 0;
-> +}
-
-Ryder
+> 
+> Fix this issue by adding this variable and setting it to true in
+> the configuration struct.
+> 
+> Fixes: 4fb3ce07eafa ("mmc: sunxi: Add EMMC (MMC2) controller compatible")
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 59aba93beffb..4ad643e37014 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -1142,6 +1142,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_emmc_cfg = {
+>  	.idma_des_size_bits = 13,
+>  	.clk_delays = NULL,
+>  	.can_calibrate = true,
+> +	.needs_new_timings = true,
+>  };
+>  
+>  static const struct of_device_id sunxi_mmc_of_match[] = {
+> -- 
+> 2.13.0
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
