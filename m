@@ -1,42 +1,28 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 6 Aug 2017 13:25:21 +0800
-Subject: [PATCH] ARM64: dts: meson-gx: Use correct mmc clock source 0
-In-Reply-To: <20170731120552.31606-1-jbrunet@baylibre.com>
-Message-ID: <201708061316.vyrWnnKm%fengguang.wu@intel.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sun,  6 Aug 2017 10:25:09 +0200
+Subject: [PATCH 00/12] constify v4l2_m2m_ops structures
+Message-ID: <1502007921-22968-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jerome,
+The v4l2_m2m_ops structures are only passed as the only
+argument to v4l2_m2m_init, which is declared as const.
+Thus the v4l2_m2m_ops structures themselves can be const.
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.13-rc3 next-20170804]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Jerome-Brunet/ARM64-dts-meson-gx-Use-correct-mmc-clock-source-0/20170801-002221
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm64-allyesconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
-
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi:655.11-12 syntax error
-   FATAL ERROR: Unable to parse input tree
---
->> Error: arch/arm64/boot/dts/amlogic/meson-gxl.dtsi:596.11-12 syntax error
-   FATAL ERROR: Unable to parse input tree
+Done with the help of Coccinelle.
 
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 56922 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170806/127e1b70/attachment-0001.gz>
+
+ drivers/media/platform/exynos-gsc/gsc-m2m.c     |    2 +-
+ drivers/media/platform/exynos4-is/fimc-m2m.c    |    2 +-
+ drivers/media/platform/m2m-deinterlace.c        |    2 +-
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c |    2 +-
+ drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c    |    2 +-
+ drivers/media/platform/mx2_emmaprp.c            |    2 +-
+ drivers/media/platform/rcar_jpu.c               |    2 +-
+ drivers/media/platform/s5p-g2d/g2d.c            |    2 +-
+ drivers/media/platform/sti/bdisp/bdisp-v4l2.c   |    2 +-
+ drivers/media/platform/sti/delta/delta-v4l2.c   |    2 +-
+ drivers/media/platform/ti-vpe/vpe.c             |    2 +-
+ drivers/media/platform/vim2m.c                  |    2 +-
+ 12 files changed, 12 insertions(+), 12 deletions(-)
