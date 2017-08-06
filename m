@@ -1,42 +1,43 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 06 Aug 2017 17:44:20 +0200
+Date: Sun, 06 Aug 2017 17:46:01 +0200
 Subject: [PATCH 2/2] arm64: dts: rockchip: Add support for rk3399
  excavator main board
-In-Reply-To: <1501756357-10511-2-git-send-email-jacob-chen@iotwrt.com>
-References: <1501756357-10511-1-git-send-email-jacob-chen@iotwrt.com>
- <1501756357-10511-2-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <1833135.MvGxPPiF9h@phil>
+In-Reply-To: <201708040551.mSxlH21s%fengguang.wu@intel.com>
+References: <201708040551.mSxlH21s%fengguang.wu@intel.com>
+Message-ID: <3974482.WU7faVNnLz@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 3. August 2017, 18:32:37 CEST schrieb Jacob Chen:
-> Add support for the rk3399 excavator main board.
-> This board works in a combination with the sapphire SOM.
+Am Freitag, 4. August 2017, 05:28:40 CEST schrieb kbuild test robot:
+> Hi Jacob,
 > 
-> This board have been sold as the rk3399 evaluation board for commercial customers.
-> You can get more info from below link:
-> http://opensource.rock-chips.com/wiki_Excavator_sapphire_board
+> [auto build test ERROR on rockchip/for-next]
+> [also build test ERROR on v4.13-rc3 next-20170803]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 > 
-> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+> url:    https://github.com/0day-ci/linux/commits/Jacob-Chen/arm64-dts-rockchip-Add-support-for-rk3399-sapphire-SOM/20170804-002840
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git for-next
+> config: arm64-defconfig (attached as .config)
+> compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+> reproduce:
+>         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm64 
+> 
+> All errors (new ones prefixed by >>):
+> 
+> >> Error: arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi:197.1-6 Label or path hdmi not found
+> >> Error: arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi:632.1-6 Label or path vopb not found
+> >> Error: arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi:636.1-10 Label or path vopb_mmu not found
+> >> Error: arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi:640.1-6 Label or path vopl not found
+> >> Error: arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi:644.1-10 Label or path vopl_mmu not found
+> >> Error: arch/arm64/boot/dts/rockchip/rk3399-sapphire-excavator.dts:157.1-5 Label or path edp not found
+>    FATAL ERROR: Syntax error parsing input tree
+
+that's ok, it just depended on the series from Jacob adding these
+display-related nodes and I've applied that series before picking up
+this new board, so everything still compiles fine.
 
 
-> +&spdif {
-> +	pinctrl-0 = <&spdif_bus>;
-
-part of the core spdif node in rk3399 so dropped this one
-
-> +	i2c-scl-rising-time-ns = <450>;
-> +	i2c-scl-falling-time-ns = <15>;
-> +	#sound-dai-cells = <0>;
-> +	status = "okay";
-> +};
-
-applied for 4.14 with the above and some property reordering.
-I've also added an entry to
-	Documentation/devicetree/bindings/arm/rockchip.txt
-for the board. When adding future boards, please always also add an
-entry for that.
-
-
-Thanks
 Heiko
