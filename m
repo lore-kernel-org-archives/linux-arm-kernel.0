@@ -1,72 +1,146 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 6 Aug 2017 13:12:55 +0800
-Subject: [PATCH v3 3/5] ACPI: Introduce DMA ranges parsing
-In-Reply-To: <20170803123239.11359-4-lorenzo.pieralisi@arm.com>
-Message-ID: <201708061311.4aEB8P1Q%fengguang.wu@intel.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Sun, 6 Aug 2017 07:18:30 +0200
+Subject: [PATCH 1/5] edac: synopsys: Add platform specific structures
+ ddrc controller
+In-Reply-To: <60ff19f90adfd252cf296fe8988c614c4c3e43fd.1501848023.git.michal.simek@xilinx.com>
+References: <60ff19f90adfd252cf296fe8988c614c4c3e43fd.1501848023.git.michal.simek@xilinx.com>
+Message-ID: <20170806051830.GC28006@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Fri, Aug 04, 2017 at 02:00:23PM +0200, Michal Simek wrote:
+> From: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
 
-[auto build test ERROR on pm/linux-next]
-[also build test ERROR on v4.13-rc3 next-20170804]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+That subject:
+ Subject: [PATCH 1/5] edac: synopsys: Add platform specific structures ddrc controller
 
-url:    https://github.com/0day-ci/linux/commits/Lorenzo-Pieralisi/ACPICA-resource_mgr-Allow-_DMA-method-in-walk-resources/20170804-185152
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
-config: ia64-allnoconfig (attached as .config)
-compiler: ia64-linux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=ia64 
+doesn't read like a proper sentence to me.
 
-Note: the linux-review/Lorenzo-Pieralisi/ACPICA-resource_mgr-Allow-_DMA-method-in-walk-resources/20170804-185152 HEAD 37e91dddbbeb771d4df0001f716607f1dd8719f8 builds fine.
-      It only hurts bisectibility.
+> This patch adds platform specific structures, so that we can add
 
-All errors (new ones prefixed by >>):
+"This patch" in a commit message is tautologically redundant.
 
-   drivers/acpi/scan.c: In function 'acpi_dma_configure':
->> drivers/acpi/scan.c:1451:2: error: implicit declaration of function 'iort_dma_setup' [-Werror=implicit-function-declaration]
-     iort_dma_setup(dev, &dma_addr, &size);
-     ^~~~~~~~~~~~~~
-   cc1: some warnings being treated as errors
+> different IP support later using quirks.
+> 
+> Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+>  drivers/edac/synopsys_edac.c | 70 ++++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 58 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
+> index 1c01dec78ec3..65f3b04d5a87 100644
+> --- a/drivers/edac/synopsys_edac.c
+> +++ b/drivers/edac/synopsys_edac.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/edac.h>
+>  #include <linux/module.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/of.h>
+>  
+>  #include "edac_module.h"
+>  
+> @@ -95,6 +96,9 @@
+>  #define SCRUB_MODE_MASK		0x7
+>  #define SCRUB_MODE_SECDED	0x4
+>  
+> +/* DDR ECC Quirks */
+> +#define DDR_ECC_INTR_SUPPORT    BIT(0)
+> +
+>  /**
+>   * struct ecc_error_info - ECC error log information
+>   * @row:	Row number
+> @@ -130,6 +134,7 @@ struct synps_ecc_status {
+>   * @baseaddr:	Base address of the DDR controller
+>   * @message:	Buffer for framing the event specific info
+>   * @stat:	ECC status information
+> + * @p_data:	Pointer to platform data
+>   * @ce_cnt:	Correctable Error count
+>   * @ue_cnt:	Uncorrectable Error count
+>   */
+> @@ -137,11 +142,29 @@ struct synps_edac_priv {
+>  	void __iomem *baseaddr;
+>  	char message[SYNPS_EDAC_MSG_SIZE];
+>  	struct synps_ecc_status stat;
+> +	const struct synps_platform_data *p_data;
+>  	u32 ce_cnt;
+>  	u32 ue_cnt;
+>  };
+>  
+>  /**
+> + * struct synps_platform_data -  synps platform data structure
+> + * @synps_edac_geterror_info:	function pointer to synps edac error info
+> + * @synps_edac_get_mtype:	function pointer to synps edac mtype
+> + * @synps_edac_get_dtype:	function pointer to synps edac dtype
+> + * @synps_edac_get_eccstate:	function pointer to synps edac eccstate
 
-vim +/iort_dma_setup +1451 drivers/acpi/scan.c
+"function pointer to" and then something, doesn't look like an optimal
+explanation to me. How about:
 
-  1440	
-  1441	/**
-  1442	 * acpi_dma_configure - Set-up DMA configuration for the device.
-  1443	 * @dev: The pointer to the device
-  1444	 * @attr: device dma attributes
-  1445	 */
-  1446	int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
-  1447	{
-  1448		const struct iommu_ops *iommu;
-  1449		u64 dma_addr = 0, size = 0;
-  1450	
-> 1451		iort_dma_setup(dev, &dma_addr, &size);
-  1452	
-  1453		iommu = iort_iommu_configure(dev);
-  1454		if (IS_ERR(iommu) && PTR_ERR(iommu) == -EPROBE_DEFER)
-  1455			return -EPROBE_DEFER;
-  1456	
-  1457		arch_setup_dma_ops(dev, dma_addr, size,
-  1458					iommu, attr == DEV_DMA_COHERENT);
-  1459	
-  1460		return 0;
-  1461	}
-  1462	EXPORT_SYMBOL_GPL(acpi_dma_configure);
-  1463	
+"Function which returns the DIMM type"
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 6018 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170806/ed737158/attachment.gz>
+and so on.
+
+> + * @quirks:			to differentiate IPs
+> + */
+> +struct synps_platform_data {
+> +	int (*synps_edac_geterror_info)(void __iomem *base,
+> +					 struct synps_ecc_status *p);
+> +	enum mem_type (*synps_edac_get_mtype)(const void __iomem *base);
+> +	enum dev_type (*synps_edac_get_dtype)(const void __iomem *base);
+> +	bool (*synps_edac_get_eccstate)(void __iomem *base);
+> +	int quirks;
+> +};
+> +
+> +/**
+>   * synps_edac_geterror_info - Get the current ecc error info
+>   * @base:	Pointer to the base address of the ddr memory controller
+>   * @p:		Pointer to the synopsys ecc status structure
+> @@ -242,7 +265,8 @@ static void synps_edac_check(struct mem_ctl_info *mci)
+>  	struct synps_edac_priv *priv = mci->pvt_info;
+>  	int status;
+>  
+> -	status = synps_edac_geterror_info(priv->baseaddr, &priv->stat);
+> +	status = priv->p_data->synps_edac_geterror_info(priv->baseaddr,
+> +							&priv->stat);
+>  	if (status)
+>  		return;
+>  
+> @@ -372,10 +396,12 @@ static int synps_edac_init_csrows(struct mem_ctl_info *mci)
+>  		for (j = 0; j < csi->nr_channels; j++) {
+>  			dimm            = csi->channels[j]->dimm;
+>  			dimm->edac_mode = EDAC_FLAG_SECDED;
+> -			dimm->mtype     = synps_edac_get_mtype(priv->baseaddr);
+> +			dimm->mtype     = priv->p_data->synps_edac_get_mtype(
+> +						priv->baseaddr);
+>  			dimm->nr_pages  = (size >> PAGE_SHIFT) / csi->nr_channels;
+>  			dimm->grain     = SYNPS_EDAC_ERR_GRAIN;
+> -			dimm->dtype     = synps_edac_get_dtype(priv->baseaddr);
+> +			dimm->dtype     = priv->p_data->synps_edac_get_dtype(
+> +						priv->baseaddr);
+>  		}
+>  	}
+>  
+> @@ -424,6 +450,21 @@ static int synps_edac_mc_init(struct mem_ctl_info *mci,
+>  	return status;
+>  }
+>  
+> +static const struct synps_platform_data zynq_edac_def = {
+> +	.synps_edac_geterror_info	= synps_edac_geterror_info,
+> +	.synps_edac_get_mtype		= synps_edac_get_mtype,
+> +	.synps_edac_get_dtype		= synps_edac_get_dtype,
+> +	.synps_edac_get_eccstate	= synps_edac_get_eccstate,
+> +	.quirks				= 0,
+> +};
+
+Please make the actual function names and function pointer names
+different. For example, the function pointer names don't need to have
+the "synpc_" prefix as they're used all locally.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
