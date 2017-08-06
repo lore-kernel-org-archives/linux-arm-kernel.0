@@ -1,35 +1,80 @@
-From: phucduc.bui@gmail.com (Bui Duc Phuc (Fukuda))
-Date: Sun,  6 Aug 2017 20:55:02 +0700
-Subject: [PATCH] ARM:dts:armadillo800eva: Add console parametters
-In-Reply-To: <1502027702-4366-1-git-send-email-phucduc.bui@gmail.com>
-References: <1502027702-4366-1-git-send-email-phucduc.bui@gmail.com>
-Message-ID: <1502027702-4366-2-git-send-email-phucduc.bui@gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 06 Aug 2017 15:55:50 +0200
+Subject: [PATCH v2 4/5] arm64: dts: rockchip: add rk3399 mipi nodes
+In-Reply-To: <1500301019-9960-5-git-send-email-jacob-chen@iotwrt.com>
+References: <1500301019-9960-1-git-send-email-jacob-chen@iotwrt.com>
+ <1500301019-9960-5-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <1762581.zRg8RSfhNk@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bui Duc Phuc <phucduc.bui@gmail.com>
+Am Montag, 17. Juli 2017, 22:16:58 CEST schrieb Jacob Chen:
+> Add an mipi node, and also add mipi endpoints to vopb and vopl
+> output port nodes.
+> 
+> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 44 ++++++++++++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index c0371af..5c5c9d9 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -1475,6 +1475,11 @@
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  
+> +			vopl_out_mipi: endpoint at 0 {
+> +				reg = <0>;
+> +				remote-endpoint = <&mipi_in_vopl>;
+> +			};
+> +
+>  			vopl_out_edp: endpoint at 1 {
+>  				reg = <1>;
+>  				remote-endpoint = <&edp_in_vopl>;
+> @@ -1516,6 +1521,11 @@
+>  				remote-endpoint = <&edp_in_vopb>;
+>  			};
+>  
+> +			vopb_out_mipi: endpoint at 1 {
+> +				reg = <1>;
+> +				remote-endpoint = <&mipi_in_vopb>;
+> +			};
+> +
+>  		};
+>  	};
+>  
+> @@ -1531,6 +1541,40 @@
+>  		status = "disabled";
+>  	};
+>  
+> +	mipi_dsi: mipi at ff960000 {
+> +		compatible = "rockchip,rk3399-mipi-dsi", "snps,dw-mipi-dsi";
+> +		reg = <0x0 0xff960000 0x0 0x8000>;
+> +		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH 0>;
+> +		clocks = <&cru SCLK_MIPIDPHY_REF>, <&cru PCLK_MIPI_DSI0>,
+> +			 <&cru SCLK_DPHY_TX0_CFG>;
+> +		clock-names = "ref", "pclk", "phy_cfg";
+> +		power-domains = <&power RK3399_PD_VIO>;
+> +		rockchip,grf = <&grf>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
 
-After the kernel boot, the login prompt doesn't appear.
-This patch will add console parametters to bootargs to fix it.
+I've dropped these, as the ports node does not need a regs property.
+Similar to edp and hdmi.
 
-Signed-off-by: Bui Duc Phuc <phucduc.bui@gmail.com>
----
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> +		status = "disabled";
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <1>;
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-index 1788e18..d383b37 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-@@ -24,7 +24,8 @@
- 	};
- 
- 	chosen {
--		bootargs = "earlyprintk ignore_loglevel root=/dev/nfs ip=dhcp rw";
-+		bootargs = "console=tty0 console=ttySC0,115200 earlyprintk
-+				ignore_loglevel root=/dev/nfs ip=dhcp rw";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
--- 
-2.7.4
+dropped this reg as well - see above
+
+and applied the rest for 4.14
+
+
+Thanks
+Heiko
