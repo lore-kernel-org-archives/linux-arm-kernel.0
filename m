@@ -1,9 +1,9 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun,  6 Aug 2017 10:25:15 +0200
-Subject: [PATCH 06/12] [media] exynos-gsc: constify v4l2_m2m_ops structures
+Date: Sun,  6 Aug 2017 10:25:21 +0200
+Subject: [PATCH 12/12] [media] mtk-mdp: constify v4l2_m2m_ops structures
 In-Reply-To: <1502007921-22968-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1502007921-22968-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1502007921-22968-7-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1502007921-22968-13-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -44,19 +44,19 @@ static
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- drivers/media/platform/exynos-gsc/gsc-m2m.c |    2 +-
+ drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/media/platform/exynos-gsc/gsc-m2m.c b/drivers/media/platform/exynos-gsc/gsc-m2m.c
-index 33611a4..2a2994e 100644
---- a/drivers/media/platform/exynos-gsc/gsc-m2m.c
-+++ b/drivers/media/platform/exynos-gsc/gsc-m2m.c
-@@ -747,7 +747,7 @@ static int gsc_m2m_mmap(struct file *file, struct vm_area_struct *vma)
- 	.mmap		= gsc_m2m_mmap,
+diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+index 3038d62..583d477 100644
+--- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
++++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+@@ -1225,7 +1225,7 @@ static int mtk_mdp_m2m_release(struct file *file)
+ 	.mmap		= v4l2_m2m_fop_mmap,
  };
  
--static struct v4l2_m2m_ops gsc_m2m_ops = {
-+static const struct v4l2_m2m_ops gsc_m2m_ops = {
- 	.device_run	= gsc_m2m_device_run,
- 	.job_abort	= gsc_m2m_job_abort,
+-static struct v4l2_m2m_ops mtk_mdp_m2m_ops = {
++static const struct v4l2_m2m_ops mtk_mdp_m2m_ops = {
+ 	.device_run	= mtk_mdp_m2m_device_run,
+ 	.job_abort	= mtk_mdp_m2m_job_abort,
  };
