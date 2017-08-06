@@ -1,24 +1,32 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 6 Aug 2017 18:19:19 +0300
-Subject: [PATCH v2 2/2] ARM: OMAP4+: PRM: fix of_irq_get() result checks
-In-Reply-To: <20170806151714.108596802@cogentembedded.com>
-References: <20170806151714.108596802@cogentembedded.com>
-Message-ID: <80dd8051-456b-2331-b847-0631d94f85b1@cogentembedded.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 06 Aug 2017 17:41:56 +0200
+Subject: [PATCH 1/2] arm64: dts: rockchip: Add support for rk3399 sapphire
+ SOM
+In-Reply-To: <1501756357-10511-1-git-send-email-jacob-chen@iotwrt.com>
+References: <1501756357-10511-1-git-send-email-jacob-chen@iotwrt.com>
+Message-ID: <4583753.YODAZBW2BI@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/2017 06:14 PM, Sergei Shtylyov wrote:
-
-> of_irq_get() may return 0 as well as a nagative error number on failure,
-
-    Oops, forgot to kill comma...
-
-> (and never on success), however omap44xx_prm_late_init() regards 0 as a
-> valid IRQ -- fix this.
+Am Donnerstag, 3. August 2017, 18:32:36 CEST schrieb Jacob Chen:
+> Add support for the rk3399 sapphire SOM board.
+> This board works in a combination with the excavator main board.
 > 
-> Fixes: a8f83aefcd5a ("ARM: OMAP4+: PRM: register interrupt information from DT")
-> Fixes: c5b3955828ba ("ARM: OMAP4: Fix legacy code clean-up regression")
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-[...]
+> You can get more info from below link:
+> http://opensource.rock-chips.com/wiki_Excavator_sapphire_board
+> 
+> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
 
-MBR, Sergei
+applied for 4.14 with some property reordering and also replacing
+the clkreqn pinctrl with the clkreqn_cpm pinctrl as clkreqn was removed
+as nonworking, see
+
+https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=75ea96deec456c3e7aba375115ed530b425d5897
+and
+https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git/commit/?id=461a00bb9d539e0a78ad48e5c593f3d145f45c13
+
+Please double check that I didn't break anything
+
+
+Thanks
+Heiko
