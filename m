@@ -1,35 +1,45 @@
-From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon,  7 Aug 2017 10:30:05 +1200
-Subject: [PATCH 2/3] ARM: dts: mvebu: set reduced-width property for SDRAM on
- 98dx3236
-In-Reply-To: <20170806223006.14231-1-chris.packham@alliedtelesis.co.nz>
-References: <20170806223006.14231-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170806223006.14231-3-chris.packham@alliedtelesis.co.nz>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon,  7 Aug 2017 00:32:10 +0200
+Subject: [PATCH 2/3] ARM: dts: bcm283x: Add 32-bit enable method for SMP
+In-Reply-To: <1502058731-12462-1-git-send-email-stefan.wahren@i2se.com>
+References: <1502058731-12462-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1502058731-12462-3-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because the 98dx3236 and similar SoCs are switch chips with integrated
-CPUs they use a reduced pin count for the SDRAM interface. As such
-"full" with is 32-bits and "half" width is 16-bits (as opposed to 64/32
-on the discrete SoC). Set the reduced-width property on the sdramc node
-to indicate this.
+This patch adds the missing 32-bit enable method for SMP on BCM2836 and
+BCM2837. The BCM2837 already has an enabled method, but this one only
+works for 64-bit.
 
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/boot/dts/armada-xp-98dx3236.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/bcm2836.dtsi | 1 +
+ arch/arm/boot/dts/bcm2837.dtsi | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-index 0e12816d961e..4d6a2acc1b55 100644
---- a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-@@ -129,6 +129,7 @@
- 			sdramc at 1400 {
- 				compatible = "marvell,armada-xp-sdram-controller";
- 				reg = <0x1400 0x500>;
-+				marvell,reduced-width;
- 			};
+diff --git a/arch/arm/boot/dts/bcm2836.dtsi b/arch/arm/boot/dts/bcm2836.dtsi
+index da3deeb..2c26d0b 100644
+--- a/arch/arm/boot/dts/bcm2836.dtsi
++++ b/arch/arm/boot/dts/bcm2836.dtsi
+@@ -36,6 +36,7 @@
+ 	cpus: cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "brcm,bcm2836-smp";
  
- 			L2: l2-cache at 8000 {
+ 		v7_cpu0: cpu at 0 {
+ 			device_type = "cpu";
+diff --git a/arch/arm/boot/dts/bcm2837.dtsi b/arch/arm/boot/dts/bcm2837.dtsi
+index 2d5de6f0..bc1cca5 100644
+--- a/arch/arm/boot/dts/bcm2837.dtsi
++++ b/arch/arm/boot/dts/bcm2837.dtsi
+@@ -30,6 +30,7 @@
+ 	cpus: cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "brcm,bcm2836-smp"; // for ARM 32-bit
+ 
+ 		cpu0: cpu at 0 {
+ 			device_type = "cpu";
 -- 
-2.13.0
+2.7.4
