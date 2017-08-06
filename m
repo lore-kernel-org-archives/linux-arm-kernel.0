@@ -1,113 +1,81 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun,  6 Aug 2017 11:44:02 +0900
-Subject: [PATCH 2/2] reset: uniphier: do not use per-SoC macro for system
- reset block
-In-Reply-To: <1501987442-2583-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1501987442-2583-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1501987442-2583-3-git-send-email-yamada.masahiro@socionext.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sun, 06 Aug 2017 11:20:49 +0800
+Subject: [linux-sunxi] [PATCH 2/2] mmc: sunxi: fix new timings mode on A64
+ EMMC (MMC2) controller
+In-Reply-To: <20170806023954.wwaredjwcm2p5pw7@wens.csie.org>
+References: <20170804213555.6024-1-icenowy@aosc.io>
+ <20170804213555.6024-2-icenowy@aosc.io>
+ <20170806023954.wwaredjwcm2p5pw7@wens.csie.org>
+Message-ID: <8F9C9945-2AB8-4E2D-82BE-97D7A9E6DD6A@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This macro turned out not so useful as I had expected.
 
-Hardware engineers said they would change reset bit assignments for
-every SoC going forward.  This means we can not share the macros
-among SoCs.  Just use primitive macros.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+? 2017?8?6? GMT+08:00 ??10:39:54, Chen-Yu Tsai <wens@csie.org> ??:
+>On Sat, Aug 05, 2017 at 05:35:55AM +0800, Icenowy Zheng wrote:
+>> The configuration struct of A64 EMMC(MMC2) compatible used to
+>> have the needs_new_timings variable missing, which lead to NULL
+>> pointer dereference now when trying to set up the old timings mode,
+>as
+>> the old timings mode doesn't exist at all on A64.
+>
+>I'm not familiar with the A64's eMMC controller. The datasheet says
+>it does not have the timing switch register. It does not say whether
+>it is always in the old or new timing mode. "needs_new_timings"
+>probably meant that the switch has to be set.
 
- drivers/reset/reset-uniphier.c | 48 +++++++++++++-----------------------------
- 1 file changed, 15 insertions(+), 33 deletions(-)
+As I know, it supports DDR mode, but the CCU has no clk delays.
+So it should be the new timings mode.
 
-diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
-index 3947fc2ef52c..954b2c4e6ca7 100644
---- a/drivers/reset/reset-uniphier.c
-+++ b/drivers/reset/reset-uniphier.c
-@@ -50,24 +50,6 @@ struct uniphier_reset_data {
- 	}
- 
- /* System reset data */
--#define UNIPHIER_LD11_SYS_RESET_NAND(id)		\
--	UNIPHIER_RESETX((id), 0x200c, 0)
--
--#define UNIPHIER_LD11_SYS_RESET_EMMC(id)		\
--	UNIPHIER_RESETX((id), 0x200c, 2)
--
--#define UNIPHIER_LD11_SYS_RESET_STDMAC(id)		\
--	UNIPHIER_RESETX((id), 0x200c, 8)
--
--#define UNIPHIER_PRO4_SYS_RESET_GIO(id)			\
--	UNIPHIER_RESETX((id), 0x2000, 6)
--
--#define UNIPHIER_LD20_SYS_RESET_GIO(id)			\
--	UNIPHIER_RESETX((id), 0x200c, 5)
--
--#define UNIPHIER_PRO4_SYS_RESET_USB3(id, ch)		\
--	UNIPHIER_RESETX((id), 0x2000 + 0x4 * (ch), 17)
--
- static const struct uniphier_reset_data uniphier_ld4_sys_reset_data[] = {
- 	UNIPHIER_RESETX(2, 0x2000, 2),		/* NAND */
- 	UNIPHIER_RESETX(8, 0x2000, 10),		/* STDMAC (Ether, HSC, MIO) */
-@@ -77,26 +59,26 @@ static const struct uniphier_reset_data uniphier_ld4_sys_reset_data[] = {
- static const struct uniphier_reset_data uniphier_pro4_sys_reset_data[] = {
- 	UNIPHIER_RESETX(2, 0x2000, 2),		/* NAND */
- 	UNIPHIER_RESETX(8, 0x2000, 10),		/* STDMAC (HSC, MIO, RLE) */
--	UNIPHIER_PRO4_SYS_RESET_GIO(12),	/* Ether, SATA, USB3 */
--	UNIPHIER_PRO4_SYS_RESET_USB3(14, 0),
--	UNIPHIER_PRO4_SYS_RESET_USB3(15, 1),
-+	UNIPHIER_RESETX(12, 0x2000, 6),		/* GIO (Ether, SATA, USB3) */
-+	UNIPHIER_RESETX(14, 0x2000, 17),	/* USB30 */
-+	UNIPHIER_RESETX(15, 0x2004, 17),	/* USB31 */
- 	UNIPHIER_RESET_END,
- };
- 
- static const struct uniphier_reset_data uniphier_pro5_sys_reset_data[] = {
- 	UNIPHIER_RESETX(2, 0x2000, 2),		/* NAND */
- 	UNIPHIER_RESETX(8, 0x2000, 10),		/* STDMAC (HSC) */
--	UNIPHIER_PRO4_SYS_RESET_GIO(12),	/* PCIe, USB3 */
--	UNIPHIER_PRO4_SYS_RESET_USB3(14, 0),
--	UNIPHIER_PRO4_SYS_RESET_USB3(15, 1),
-+	UNIPHIER_RESETX(12, 0x2000, 6),		/* GIO (PCIe, USB3) */
-+	UNIPHIER_RESETX(14, 0x2000, 17),	/* USB30 */
-+	UNIPHIER_RESETX(15, 0x2004, 17),	/* USB31 */
- 	UNIPHIER_RESET_END,
- };
- 
- static const struct uniphier_reset_data uniphier_pxs2_sys_reset_data[] = {
- 	UNIPHIER_RESETX(2, 0x2000, 2),		/* NAND */
- 	UNIPHIER_RESETX(8, 0x2000, 10),		/* STDMAC (HSC, RLE) */
--	UNIPHIER_PRO4_SYS_RESET_USB3(14, 0),
--	UNIPHIER_PRO4_SYS_RESET_USB3(15, 1),
-+	UNIPHIER_RESETX(14, 0x2000, 17),	/* USB30 */
-+	UNIPHIER_RESETX(15, 0x2004, 17),	/* USB31 */
- 	UNIPHIER_RESETX(16, 0x2014, 4),		/* USB30-PHY0 */
- 	UNIPHIER_RESETX(17, 0x2014, 0),		/* USB30-PHY1 */
- 	UNIPHIER_RESETX(18, 0x2014, 2),		/* USB30-PHY2 */
-@@ -108,17 +90,17 @@ static const struct uniphier_reset_data uniphier_pxs2_sys_reset_data[] = {
- };
- 
- static const struct uniphier_reset_data uniphier_ld11_sys_reset_data[] = {
--	UNIPHIER_LD11_SYS_RESET_NAND(2),
--	UNIPHIER_LD11_SYS_RESET_EMMC(4),
--	UNIPHIER_LD11_SYS_RESET_STDMAC(8),	/* HSC, MIO */
-+	UNIPHIER_RESETX(2, 0x200c, 0),		/* NAND */
-+	UNIPHIER_RESETX(4, 0x200c, 2),		/* eMMC */
-+	UNIPHIER_RESETX(8, 0x200c, 8),		/* STDMAC (HSC, MIO) */
- 	UNIPHIER_RESET_END,
- };
- 
- static const struct uniphier_reset_data uniphier_ld20_sys_reset_data[] = {
--	UNIPHIER_LD11_SYS_RESET_NAND(2),
--	UNIPHIER_LD11_SYS_RESET_EMMC(4),
--	UNIPHIER_LD11_SYS_RESET_STDMAC(8),	/* HSC */
--	UNIPHIER_LD20_SYS_RESET_GIO(12),	/* PCIe, USB3 */
-+	UNIPHIER_RESETX(2, 0x200c, 0),		/* NAND */
-+	UNIPHIER_RESETX(4, 0x200c, 2),		/* eMMC */
-+	UNIPHIER_RESETX(8, 0x200c, 8),		/* STDMAC (HSC) */
-+	UNIPHIER_RESETX(12, 0x200c, 5),		/* GIO (PCIe, USB3) */
- 	UNIPHIER_RESETX(16, 0x200c, 12),	/* USB30-PHY0 */
- 	UNIPHIER_RESETX(17, 0x200c, 13),	/* USB30-PHY1 */
- 	UNIPHIER_RESETX(18, 0x200c, 14),	/* USB30-PHY2 */
--- 
-2.7.4
+>
+>This fix doesn't really fix the underlying issue, which is the check
+>for clk_delays was incorrectly replaced. sun4i/sun5i is also broken.
+>
+>Could you try this patch instead:
+>
+><---
+>
+>From 23b841a11294cb6a0cf1e146616b068f60c2ec7d Mon Sep 17 00:00:00 2001
+>From: Chen-Yu Tsai <wens@csie.org>
+>Date: Sun, 6 Aug 2017 10:24:47 +0800
+>Subject: [PATCH] mmc: sunxi: Fix NULL pointer reference on clk_delays
+>
+>Some SoCs do not support clk delays for MMC in the clock control unit.
+>These include the old controllers in A10/A10s/A13/R8, and the new eMMC
+>controller in A64. The config structure for these controllers do not
+>specify clk_delays, but the check for this was replaced in commit
+>b0600daebf31 ("mmc: sunxi: Support controllers that can use both old
+>and new timings").
+>
+>This patch adds back the check for clk_delays, and also adds comments
+>for both checks in sunxi_mmc_clk_set_phase().
+>
+>Fixes: b0600daebf31 ("mmc: sunxi: Support controllers that can use
+>		      both old and new timings")
+>Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>---
+> drivers/mmc/host/sunxi-mmc.c | 5 +++++
+> 1 file changed, 5 insertions(+)
+>
+>diff --git a/drivers/mmc/host/sunxi-mmc.c
+>b/drivers/mmc/host/sunxi-mmc.c
+>index 3777517982dd..020547e5fa45 100644
+>--- a/drivers/mmc/host/sunxi-mmc.c
+>+++ b/drivers/mmc/host/sunxi-mmc.c
+>@@ -722,9 +722,14 @@ static int sunxi_mmc_clk_set_phase(struct
+>sunxi_mmc_host *host,
+> {
+> 	int index;
+> 
+>+	/* No need to set clk controller delays under new timings */
+> 	if (host->use_new_timings)
+> 		return 0;
+> 
+>+	/* Some old controllers don't support delays */
+>+	if (!host->cfg->clk_delays)
+>+		return 0;
+>+
+> 	/* determine delays */
+> 	if (rate <= 400000) {
+> 		index = SDXC_CLK_400K;
