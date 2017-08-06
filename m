@@ -1,32 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 5 Aug 2017 23:57:43 +0200
-Subject: [PATCH] ARM: dts: gemini: Switch to using macros
-In-Reply-To: <CACRpkdYCcqqQMPyApnZekS-7eSchQbgWRyWWnq7tFVO-iQPHhw@mail.gmail.com>
-References: <20170707223227.20477-1-linus.walleij@linaro.org>
- <CACRpkdYCcqqQMPyApnZekS-7eSchQbgWRyWWnq7tFVO-iQPHhw@mail.gmail.com>
-Message-ID: <CACRpkdYGqVKaPTedJdqpg-=khEfJcz-8OFH=1A1oW1skfLKyxQ@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 6 Aug 2017 10:01:39 +0800
+Subject: [linux-sunxi] [PATCH 1/2] mmc: sunxi: fix support for new timings
+ mode only SoCs
+In-Reply-To: <20170804213555.6024-1-icenowy@aosc.io>
+References: <20170804213555.6024-1-icenowy@aosc.io>
+Message-ID: <CAGb2v66j-EFZ6P5uAXwtJB-+tMv0NSa2XS6QMm_B9GrDA3CzJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 11:44 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Sat, Jul 8, 2017 at 12:32 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Sat, Aug 5, 2017 at 5:35 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> The A83T MMC support code introduces the timings mode switch, however
+> such a switch doesn't exist on new SoCs with only new timings mode.
 >
->> The macros for reset and clock lines were merged during the merge
->> window, this switches the Gemini to use these macros rather than
->> numerical defines.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> ARM SoC folks: The required header files are now upstream. Please
->> apply and merge this at -rc1 or whenever fits you best (it can be
->> applied to Torvald's tree right now.)
+> Only execute the switch if the SoC really have the timings mode switch,
+> to fix the regression shown on new timings mode only SoCs (A64, H5,
+> etc).
 >
-> Ping on this, this should go in right after -rc1, we are now at -rc2
-> and I need it for new development baseline.
+> Fixes: b0600daebf31 ("mmc: sunxi: Support controllers that can use both
+> old and new timings")
 
-Whatever, I will put it first in the stack for the next kernel cycle
-instead. That works too.
+You could make it easier to read by aligning the wrapped line with
+opening parenthesis and double quote.
 
-Yours,
-Linus Walleij
+And you don't need the newline here.
+
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+
+This must have slipped through when I reworked the mmc quirks.
+
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
