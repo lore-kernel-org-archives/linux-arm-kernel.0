@@ -1,25 +1,24 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 06 Aug 2017 15:53:24 +0200
-Subject: [PATCH v2 3/5] arm64: dts: rockchip: add rk3399 edp nodes
-In-Reply-To: <1500301019-9960-4-git-send-email-jacob-chen@iotwrt.com>
-References: <1500301019-9960-1-git-send-email-jacob-chen@iotwrt.com>
- <1500301019-9960-4-git-send-email-jacob-chen@iotwrt.com>
-Message-ID: <1647218.4UM7NyvqRo@phil>
+From: phucduc.bui@gmail.com (Bui Duc Phuc (Fukuda))
+Date: Sun,  6 Aug 2017 20:55:01 +0700
+Subject: [PATCH] ARM:dts:armadillo800eva: Add console parametters
+Message-ID: <1502027702-4366-1-git-send-email-phucduc.bui@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 17. Juli 2017, 22:16:57 CEST schrieb Jacob Chen:
-> From: Yakir Yang <ykk@rock-chips.com>
-> 
-> Add an edp node, and also add edp endpoints to vopb and vopl
-> output port nodes.
-> 
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+From: Bui Duc Phuc <phucduc.bui@gmail.com>
 
-applied for 4.14 after some minimal property reordering
+Hi, Everyone!  
 
+I have a patch for the armadillo board device-tree.
+Please consider this patch.
 
-Thanks
-Heiko
+Best regards.
+
+Bui Duc Phuc (1):
+  ARM:dts:armadillo800eva: Add console parametters
+
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+-- 
+2.7.4
