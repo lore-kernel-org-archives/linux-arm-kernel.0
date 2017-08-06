@@ -1,20 +1,32 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 06 Aug 2017 12:26:00 +0200
-Subject: [PATCH] arm64: dts: rockchip: include opp dtsi for rk3399 firefly
-In-Reply-To: <1501743720-6778-1-git-send-email-jay.xu@rock-chips.com>
-References: <1501743720-6778-1-git-send-email-jay.xu@rock-chips.com>
-Message-ID: <2788126.ZpFMTqABjc@phil>
+Date: Sun, 06 Aug 2017 12:38:36 +0200
+Subject: [PATCH v2] ARM: dts: rockchip: rk322x: add spi node and spi
+ pinctrl
+In-Reply-To: <1501727810-31761-1-git-send-email-huibin.hong@rock-chips.com>
+References: <1501727810-31761-1-git-send-email-huibin.hong@rock-chips.com>
+Message-ID: <2042865.sKzShaQPbs@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 3. August 2017, 15:02:00 CEST schrieb Jianqun Xu:
-> Add opp tables for cpu cluster0 and cluster1 by including
-> rk3399-opp.dtsi.
+Hi,
+
+Am Donnerstag, 3. August 2017, 10:36:49 CEST schrieb Huibin Hong:
+> Add spi node and spi pinctrl for rk322x
 > 
-> Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+> Signed-off-by: Huibin Hong <huibin.hong@rock-chips.com>
 
-applied for 4.14
+[...]
 
 
-Thanks
+> +	};
+> +
+>  	wdt: watchdog at 110a0000 {
+>  		compatible = "rockchip,rk322x-wdt", "snps,dw-wdt";
+
+Please make sure a patch actually applies against the mainline tree,
+as here the the compatible for the watchdog looks slightly different.
+
+In any case I've fixed that and applied it for 4.14
+
+
 Heiko
