@@ -1,32 +1,218 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 6 Aug 2017 10:01:39 +0800
-Subject: [linux-sunxi] [PATCH 1/2] mmc: sunxi: fix support for new timings
- mode only SoCs
-In-Reply-To: <20170804213555.6024-1-icenowy@aosc.io>
-References: <20170804213555.6024-1-icenowy@aosc.io>
-Message-ID: <CAGb2v66j-EFZ6P5uAXwtJB-+tMv0NSa2XS6QMm_B9GrDA3CzJA@mail.gmail.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Sun, 6 Aug 2017 10:06:30 +0800
+Subject: [PATCH v3 5/6] PCI: mediatek: Add new generation controller
+ support
+In-Reply-To: <2adcb5f915eb8bd5817592ea32974eb25da02e4f.1501846816.git.honghui.zhang@mediatek.com>
+References: <cover.1501846816.git.honghui.zhang@mediatek.com>
+ <2adcb5f915eb8bd5817592ea32974eb25da02e4f.1501846816.git.honghui.zhang@mediatek.com>
+Message-ID: <1501985190.8058.20.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 5, 2017 at 5:35 AM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> The A83T MMC support code introduces the timings mode switch, however
-> such a switch doesn't exist on new SoCs with only new timings mode.
->
-> Only execute the switch if the SoC really have the timings mode switch,
-> to fix the regression shown on new timings mode only SoCs (A64, H5,
-> etc).
->
-> Fixes: b0600daebf31 ("mmc: sunxi: Support controllers that can use both
-> old and new timings")
+Hi Honghui,
 
-You could make it easier to read by aligning the wrapped line with
-opening parenthesis and double quote.
+If you plan to send next version, then I would suggest some minor
+changes.
 
-And you don't need the newline here.
+On Fri, 2017-08-04 at 20:06 +0800, honghui.zhang at mediatek.com wrote:
+> +#define PCIE_CRSTB		BIT(3)
+> +#define PCIE_PERSTB		BIT(8)
+> +#define PCI_LINKDOWN_RST_EN	GENMASK(15, 13)
 
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+PCIE_LINKDOWN_RST_EN
 
-This must have slipped through when I reworked the mmc quirks.
+> +#define PCIE_LINK_STATUS_V2	0x804
+> +#define PCIE_PORT_LINKUP_V2	BIT(10)
+> +
+> +
+> +static int mtk_pcie_hw_rd_cfg(struct mtk_pcie_port *port, u32 bus, u32 devfn,
+> +			      int where, int size, u32 *val)
+> +{
+> +	int reg, shift = 8 * (where & 3);
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+int reg => u32
+
+> +	/* Write PCIe Configuration Transaction Header for cfgrd */
+> +	writel(CFG_HEADER_DW0(CFG_WRRD_TYPE_0, CFG_RD_FMT),
+> +	       port->base + PCIE_CFG_HEADER0);
+> +	writel(CFG_HEADER_DW1(where, size), port->base + PCIE_CFG_HEADER1);
+> +	writel(CFG_HEADER_DW2(where, PCI_FUNC(devfn), PCI_SLOT(devfn), bus),
+> +	       port->base + PCIE_CFG_HEADER2);
+> +
+> +	/* Trigger h/w to transmit Cfgrd TLP */
+> +	reg = readl(port->base + PCIE_APP_TLP_REQ);
+> +	writel(reg | APP_CFG_REQ, port->base + PCIE_APP_TLP_REQ);
+> +
+> +	/* Check completion status */
+> +	if (mtk_pcie_check_cfg_cpld(port))
+> +		return PCIBIOS_SET_FAILED;
+> +
+> +	/* Read cpld payload of Cfgrd */
+> +	*val = readl(port->base + PCIE_CFG_RDATA);
+> +
+> +	switch (size) {
+> +	case 4:
+> +		break;
+> +	case 3:
+> +		*val = (*val >> shift) & 0xffffff;
+> +		break;
+> +	case 2:
+> +		*val = (*val >> shift) & 0xffff;
+> +		break;
+> +	case 1:
+> +		*val = (*val >> shift) & 0xff;
+> +		break;
+> +	default:
+> +		return PCIBIOS_BAD_REGISTER_NUMBER;
+> +	}
+
+Do we really need case 3? I guess case 1, 2 or 4 should be enough.
+
+> +	return PCIBIOS_SUCCESSFUL;
+> +}
+> +
+> +static int mtk_pcie_hw_wr_cfg(struct mtk_pcie_port *port, u32 bus, u32 devfn,
+> +			      int where, int size, u32 val)
+> +{
+> +	/* Write PCIe Configuration Transaction Header for Cfgwr */
+> +	writel(CFG_HEADER_DW0(CFG_WRRD_TYPE_0, CFG_WR_FMT),
+> +	       port->base + PCIE_CFG_HEADER0);
+> +	writel(CFG_HEADER_DW1(where, size), port->base + PCIE_CFG_HEADER1);
+> +	writel(CFG_HEADER_DW2(where, PCI_FUNC(devfn), PCI_SLOT(devfn), bus),
+> +	       port->base + PCIE_CFG_HEADER2);
+> +
+> +	/* Write cfgwr data */
+> +	val = val << 8 * (where & 3);
+> +	writel(val, port->base + PCIE_CFG_WDATA);
+> +
+> +	/* Trigger h/w to transmit Cfgwr TLP */
+> +	val = readl(port->base + PCIE_APP_TLP_REQ);
+> +	val |= APP_CFG_REQ;
+> +	writel(val, port->base + PCIE_APP_TLP_REQ);
+> +
+> +	/* Check completion status */
+> +	return mtk_pcie_check_cfg_cpld(port);
+> +}
+> +
+> +static int mtk_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
+> +				int where, int size, u32 *val)
+> +{
+> +	struct mtk_pcie_port *port = NULL, *iter, *tmp;
+> +	struct mtk_pcie *pcie = bus->sysdata;
+> +	u32 bn = bus->number;
+> +	int ret;
+> +
+> +	list_for_each_entry_safe(iter, tmp, &pcie->ports, list)
+> +		if (iter->index == PCI_SLOT(devfn)) {
+> +			port = iter;
+> +			break;
+> +		}
+> +
+> +	if (!port) {
+> +		*val = ~0;
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +	}
+
+list_for_each_entry(), since you don't really remove or free something.
+
+I know you need to find port->base to write/read configuration space. I
+think it's better to move this part to another function. You can take a
+look at pci-mvebu.c mvebu_pcie_find_portmvebu().
+ 
+> +	ret = mtk_pcie_hw_rd_cfg(port, bn, devfn, where, size, val);
+> +	if (ret)
+> +		*val = ~0;
+> +
+> +	return ret;
+> +}
+> +
+> +static int mtk_pcie_config_write(struct pci_bus *bus, unsigned int devfn,
+> +				 int where, int size, u32 val)
+> +{
+> +	struct mtk_pcie_port *port = NULL, *iter, *tmp;
+> +	struct mtk_pcie *pcie = bus->sysdata;
+> +	u32 bn = bus->number;
+> +
+> +	list_for_each_entry_safe(iter, tmp, &pcie->ports, list)
+> +		if (iter->index == PCI_SLOT(devfn)) {
+> +			port = iter;
+> +			break;
+> +		}
+> +
+> +	if (!port)
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+
+Ditto.
+
+> +	return mtk_pcie_hw_wr_cfg(port, bn, devfn, where, size, val);
+> +}
+> +
+> +static struct pci_ops mtk_pcie_ops_v2 = {
+> +	.read  = mtk_pcie_config_read,
+> +	.write = mtk_pcie_config_write,
+> +};
+> +
+> +static int mtk_pcie_startup_ports_v2(struct mtk_pcie_port *port)
+> +{
+> +	struct mtk_pcie *pcie = port->pcie;
+> +	struct resource *mem = &pcie->mem;
+> +	u32 val;
+> +	size_t size;
+> +	int err;
+> +
+> +	/* mt7622 platforms need to enable LTSSM and ASPM from PCIe subsys */
+> +	if (pcie->base) {
+> +		val = readl(pcie->base + PCIE_SYS_CFG_V2);
+> +		val |= PCIE_CSR_LTSSM_EN(port->index) |
+> +		       PCIE_CSR_ASPM_L1_EN(port->index);
+> +		writel(val, pcie->base + PCIE_SYS_CFG_V2);
+> +	}
+> +
+> +	/* Assert all reset signals */
+> +	writel(0, port->base + PCIE_RST_CTRL);
+> +
+> +	/*
+> +	 * Enable PCIe link down reset, if link status changed from link up to
+> +	 * link down, this will reset MAC control registers and configuration
+> +	 * space.
+> +	 */
+> +	writel(PCI_LINKDOWN_RST_EN, port->base + PCIE_RST_CTRL);
+> +
+> +	/* De-assert PHY, PE, PIPE, MAC and configuration reset	*/
+> +	val = readl(port->base + PCIE_RST_CTRL);
+> +	val |= PCIE_PHY_RSTB | PCIE_PERSTB | PCIE_PIPE_SRSTB |
+> +	       PCIE_MAC_SRSTB | PCIE_CRSTB;
+> +	writel(val, port->base + PCIE_RST_CTRL);
+> +
+> +	/* PCIe v2.0 need at least 100ms delay to train from Gen1 to Gen2 */
+
+/* 100ms timeout value should be enough for Gen1/2 training */ for
+consistency.
+
+> +	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS_V2, val,
+> +				 !!(val & PCIE_PORT_LINKUP_V2), 20,
+> +				 100 * USEC_PER_MSEC);
+> +	if (err)
+> +		return -ETIMEDOUT;
+> +
+> +	/* Set INTx mask */
+> +	val = readl(port->base + PCIE_INT_MASK);
+> +	val &= ~INTX_MASK;
+> +	writel(val, port->base + PCIE_INT_MASK);
+> +
+> +	/* Set AHB to PCIe translation windows */
+> +	size = mem->end - mem->start;
+> +	val = AHB2PCIE_BASEL(mem->start) | AHB2PCIE_SIZE(fls(size));
+> +	writel(val, port->base + PCIE_AHB_TRANS_BASE0_L);
+> +
+> +	val = AHB2PCIE_BASEH(mem->start);
+> +	writel(val, port->base + PCIE_AHB_TRANS_BASE0_H);
+> +
+> +	/* Set PCIe to AXI translation memory space.*/
+> +	val = fls(0xffffffff) | WIN_ENABLE;
+> +	writel(val, port->base + PCIE_AXI_WINDOW0);
+> +
+> +	return 0;
+> +}
+
+Ryder
