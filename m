@@ -1,129 +1,137 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun,  6 Aug 2017 23:36:10 +0200
-Subject: [PATCH v5 09/12] ASoC: wm9712: add ac97 new bus support
+Date: Sun,  6 Aug 2017 23:36:08 +0200
+Subject: [PATCH v5 07/12] Input: wm97xx: add new AC97 bus support
 In-Reply-To: <20170806213613.5600-1-robert.jarzmik@free.fr>
 References: <20170806213613.5600-1-robert.jarzmik@free.fr>
-Message-ID: <20170806213613.5600-10-robert.jarzmik@free.fr>
+Message-ID: <20170806213613.5600-8-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the new ac97 bus model, where devices are automatically
-discovered on AC-Links.
+This adds support for the new AC97 bus code, which discovers the devices
+rather than uses platform data.
+
+As part of this discovery, it enables a multi-function device wm97xx,
+which supports touchscreen, battery, ADC and an audio codec. This patch
+adds the code to bind the touchscreen "cell" as the touchscreen driver.
+
+This was tested on the pxa architecture with a pxa270 + wm9713 + the
+mioa701 touchscreen.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 ---
-Since v4:
- - added #ifdef spotted by Charles
----
- sound/soc/codecs/Kconfig  |  3 ++-
- sound/soc/codecs/wm9712.c | 39 ++++++++++++++++++++++++++-------------
- 2 files changed, 28 insertions(+), 14 deletions(-)
+ drivers/input/touchscreen/Kconfig       |  2 +-
+ drivers/input/touchscreen/wm97xx-core.c | 56 ++++++++++++++++++++++++++++++++-
+ 2 files changed, 56 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/codecs/Kconfig b/sound/soc/codecs/Kconfig
-index aebf148d7e4d..f17af3592785 100644
---- a/sound/soc/codecs/Kconfig
-+++ b/sound/soc/codecs/Kconfig
-@@ -206,7 +206,7 @@ config SND_SOC_ALL_CODECS
- 	select SND_SOC_WM9081 if I2C
- 	select SND_SOC_WM9090 if I2C
- 	select SND_SOC_WM9705 if SND_SOC_AC97_BUS
--	select SND_SOC_WM9712 if SND_SOC_AC97_BUS
-+	select SND_SOC_WM9712 if (SND_SOC_AC97_BUS || SND_SOC_AC97_BUS_NEW)
- 	select SND_SOC_WM9713 if (SND_SOC_AC97_BUS || SND_SOC_AC97_BUS_NEW)
-         help
-           Normally ASoC codec drivers are only built if a machine driver which
-@@ -1087,6 +1087,7 @@ config SND_SOC_WM9705
- config SND_SOC_WM9712
- 	tristate
- 	select REGMAP_AC97
-+	select AC97_BUS_COMPAT if AC97_BUS_NEW
+diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
+index 033599777651..22257f3e1059 100644
+--- a/drivers/input/touchscreen/Kconfig
++++ b/drivers/input/touchscreen/Kconfig
+@@ -725,7 +725,7 @@ config TOUCHSCREEN_WM831X
  
- config SND_SOC_WM9713
- 	tristate
-diff --git a/sound/soc/codecs/wm9712.c b/sound/soc/codecs/wm9712.c
-index 1a3e1797994a..7ebbb48b18c5 100644
---- a/sound/soc/codecs/wm9712.c
-+++ b/sound/soc/codecs/wm9712.c
-@@ -12,6 +12,7 @@
- 
- #include <linux/init.h>
- #include <linux/slab.h>
+ config TOUCHSCREEN_WM97XX
+ 	tristate "Support for WM97xx AC97 touchscreen controllers"
+-	depends on AC97_BUS
++	depends on AC97_BUS || AC97_BUS_NEW
+ 	help
+ 	  Say Y here if you have a Wolfson Microelectronics WM97xx
+ 	  touchscreen connected to your system. Note that this option
+diff --git a/drivers/input/touchscreen/wm97xx-core.c b/drivers/input/touchscreen/wm97xx-core.c
+index 39869ffdc4fa..fd714ee881f7 100644
+--- a/drivers/input/touchscreen/wm97xx-core.c
++++ b/drivers/input/touchscreen/wm97xx-core.c
+@@ -44,6 +44,7 @@
+ #include <linux/pm.h>
+ #include <linux/interrupt.h>
+ #include <linux/bitops.h>
 +#include <linux/mfd/wm97xx.h>
- #include <linux/module.h>
- #include <linux/kernel.h>
- #include <linux/device.h>
-@@ -19,6 +20,8 @@
- #include <sound/core.h>
- #include <sound/pcm.h>
- #include <sound/ac97_codec.h>
-+#include <sound/ac97/codec.h>
-+#include <sound/ac97/compat.h>
- #include <sound/initval.h>
- #include <sound/soc.h>
- #include <sound/tlv.h>
-@@ -30,6 +33,7 @@ struct wm9712_priv {
- 	struct snd_ac97 *ac97;
- 	unsigned int hp_mixer[2];
- 	struct mutex lock;
-+	struct wm97xx_platform_data *mfd_pdata;
- };
- 
- static const struct reg_default wm9712_reg_defaults[] = {
-@@ -636,18 +640,25 @@ static int wm9712_soc_probe(struct snd_soc_codec *codec)
- 	struct regmap *regmap;
- 	int ret;
- 
--	wm9712->ac97 = snd_soc_new_ac97_codec(codec, WM9712_VENDOR_ID,
--		WM9712_VENDOR_ID_MASK);
--	if (IS_ERR(wm9712->ac97)) {
--		ret = PTR_ERR(wm9712->ac97);
--		dev_err(codec->dev, "Failed to register AC97 codec: %d\n", ret);
--		return ret;
--	}
--
--	regmap = regmap_init_ac97(wm9712->ac97, &wm9712_regmap_config);
--	if (IS_ERR(regmap)) {
--		ret = PTR_ERR(regmap);
--		goto err_free_ac97_codec;
-+	if (wm9712->mfd_pdata) {
-+		wm9712->ac97 = wm9712->mfd_pdata->ac97;
-+		regmap = wm9712->mfd_pdata->regmap;
-+	} else {
-+#ifdef CONFIG_SND_SOC_AC97_BUS
-+		wm9712->ac97 = snd_soc_new_ac97_codec(codec, WM9712_VENDOR_ID,
-+						      WM9712_VENDOR_ID_MASK);
-+		if (IS_ERR(wm9712->ac97)) {
-+			ret = PTR_ERR(wm9712->ac97);
-+			dev_err(codec->dev,
-+				"Failed to register AC97 codec: %d\n", ret);
-+			return ret;
-+		}
-+
-+		regmap = regmap_init_ac97(wm9712->ac97, &wm9712_regmap_config);
-+		if (IS_ERR(regmap)) {
-+			ret = PTR_ERR(regmap);
-+			goto err_free_ac97_codec;
-+#endif
- 	}
- 
- 	snd_soc_codec_init_regmap(codec, regmap);
-@@ -666,7 +677,8 @@ static int wm9712_soc_remove(struct snd_soc_codec *codec)
- 	struct wm9712_priv *wm9712 = snd_soc_codec_get_drvdata(codec);
- 
- 	snd_soc_codec_exit_regmap(codec);
--	snd_soc_free_ac97_codec(wm9712->ac97);
-+	if (!wm9712->mfd_pdata)
-+		snd_soc_free_ac97_codec(wm9712->ac97);
+ #include <linux/workqueue.h>
+ #include <linux/wm97xx.h>
+ #include <linux/uaccess.h>
+@@ -766,6 +767,39 @@ static int wm97xx_remove(struct device *dev)
  	return 0;
  }
  
-@@ -697,6 +709,7 @@ static int wm9712_probe(struct platform_device *pdev)
++static int wm97xx_mfd_probe(struct platform_device *pdev)
++{
++	struct wm97xx *wm;
++	struct wm97xx_platform_data *mfd_pdata = dev_get_platdata(&pdev->dev);
++	int ret;
++
++	wm = devm_kzalloc(&pdev->dev, sizeof(struct wm97xx), GFP_KERNEL);
++	if (!wm)
++		return -ENOMEM;
++
++	wm->dev = &pdev->dev;
++	wm->ac97 = mfd_pdata->ac97;
++
++	ret =  _wm97xx_probe(wm);
++	if (ret)
++		return ret;
++
++	ret = wm97xx_add_battery(wm, mfd_pdata->batt_pdata);
++	if (ret < 0)
++		goto batt_err;
++
++	return ret;
++
++batt_err:
++	wm97xx_unregister_touch(wm);
++	return ret;
++}
++
++static int wm97xx_mfd_remove(struct platform_device *pdev)
++{
++	return wm97xx_remove(&pdev->dev);
++}
++
+ static int __maybe_unused wm97xx_suspend(struct device *dev)
+ {
+ 	struct wm97xx *wm = dev_get_drvdata(dev);
+@@ -862,21 +896,41 @@ EXPORT_SYMBOL_GPL(wm97xx_unregister_mach_ops);
  
- 	mutex_init(&wm9712->lock);
+ static struct device_driver wm97xx_driver = {
+ 	.name =		"wm97xx-ts",
++#ifdef CONFIG_AC97_BUS
+ 	.bus =		&ac97_bus_type,
++#endif
+ 	.owner =	THIS_MODULE,
+ 	.probe =	wm97xx_probe,
+ 	.remove =	wm97xx_remove,
+ 	.pm =		&wm97xx_pm_ops,
+ };
  
-+	wm9712->mfd_pdata = dev_get_platdata(&pdev->dev);
- 	platform_set_drvdata(pdev, wm9712);
++static struct platform_driver wm97xx_mfd_driver = {
++	.driver = {
++		.name =		"wm97xx-ts",
++		.pm =		&wm97xx_pm_ops,
++	},
++	.probe =	wm97xx_mfd_probe,
++	.remove =	wm97xx_mfd_remove,
++};
++
+ static int __init wm97xx_init(void)
+ {
+-	return driver_register(&wm97xx_driver);
++	int ret;
++
++	ret = platform_driver_register(&wm97xx_mfd_driver);
++	if (ret)
++		return ret;
++
++	if (IS_BUILTIN(CONFIG_AC97_BUS))
++		ret =  driver_register(&wm97xx_driver);
++	return ret;
+ }
  
- 	return snd_soc_register_codec(&pdev->dev,
+ static void __exit wm97xx_exit(void)
+ {
+ 	driver_unregister(&wm97xx_driver);
++	platform_driver_unregister(&wm97xx_mfd_driver);
+ }
+ 
+ module_init(wm97xx_init);
 -- 
 2.11.0
