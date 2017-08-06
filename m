@@ -1,32 +1,21 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 06 Aug 2017 12:38:36 +0200
-Subject: [PATCH v2] ARM: dts: rockchip: rk322x: add spi node and spi
- pinctrl
-In-Reply-To: <1501727810-31761-1-git-send-email-huibin.hong@rock-chips.com>
-References: <1501727810-31761-1-git-send-email-huibin.hong@rock-chips.com>
-Message-ID: <2042865.sKzShaQPbs@phil>
+Date: Sun, 06 Aug 2017 12:58:35 +0200
+Subject: [PATCH] ARM: dts: rockchip: convert rk3288 device tree files to
+ 64 bits
+In-Reply-To: <1501730496-1893-1-git-send-email-huangtao@rock-chips.com>
+References: <1501730496-1893-1-git-send-email-huangtao@rock-chips.com>
+Message-ID: <3943637.qfjA7HYY3v@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Donnerstag, 3. August 2017, 10:36:49 CEST schrieb Huibin Hong:
-> Add spi node and spi pinctrl for rk322x
+Am Donnerstag, 3. August 2017, 11:21:36 CEST schrieb Tao Huang:
+> In order to be able to use more than 4GB of RAM when the LPAE is
+> activated, the dts must be converted in 64 bits.
 > 
-> Signed-off-by: Huibin Hong <huibin.hong@rock-chips.com>
+> Signed-off-by: Tao Huang <huangtao@rock-chips.com>
 
-[...]
-
-
-> +	};
-> +
->  	wdt: watchdog at 110a0000 {
->  		compatible = "rockchip,rk322x-wdt", "snps,dw-wdt";
-
-Please make sure a patch actually applies against the mainline tree,
-as here the the compatible for the watchdog looks slightly different.
-
-In any case I've fixed that and applied it for 4.14
+applied for 4.14
 
 
+Thanks
 Heiko
