@@ -1,39 +1,32 @@
-From: mikko.rapeli@iki.fi (Mikko Rapeli)
-Date: Sun,  6 Aug 2017 18:44:05 +0200
-Subject: [PATCH v06 14/36] arm uapi asm/signal.h: include <stddef.h> for
- size_t in userspace
-In-Reply-To: <20170806164428.2273-1-mikko.rapeli@iki.fi>
-References: <20170806164428.2273-1-mikko.rapeli@iki.fi>
-Message-ID: <20170806164428.2273-15-mikko.rapeli@iki.fi>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Sun, 6 Aug 2017 21:57:21 +0300
+Subject: [PATCH v2 0/2] OMAP3+/4+ PRM: fix of_irq_get() result checks
+In-Reply-To: <20170806151420.104225294@cogentembedded.com>
+References: <20170806151420.104225294@cogentembedded.com>
+Message-ID: <CAHp75VfdGkac6PUMSJLydR9GcZ8UAmqRR6zq2xNhYL8mMe3iUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> doubts that __kernel_size_t could be used here
-so trying to fall back to gcc's <stddef.h>.
+On Sun, Aug 6, 2017 at 6:14 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Hello!
+>
+> Here's the set of 2 patches against the 'omap-for-v4.13/fixes' branch of Tony
+> Lingren's 'linux-omap.git' repo.  I'm  fixing of_irq_get() DT API result
+> checks.
+>
+> [1/2] ARM: OMAP3+: PRM: fix of_irq_get() result check
+> [2/2] ARM: OMAP4+: PRM: fix of_irq_get() result checks
 
-Fixes uapi header compilation error from userspace on ARCH=arm:
+What IRQ domain did you consider? In case of STRICT the mapping will
+be 1:1 and 0 is _valid_ IRQ number for hwirq.
+0 in Linux kernel IRQ numbering often means NO_IRQ. But there might be
+exceptions.
 
-asm/signal.h:112:2: error: unknown type name ?size_t?
-  size_t ss_size;
+So, it would be nice to see if there is a problem on certain platform
+if the patch is not applied, or is it problem on OF IRQ code, or
+wrong interpratation of 0?
 
-Signed-off-by: Mikko Rapeli <mikko.rapeli@iki.fi>
-Cc: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/include/uapi/asm/signal.h | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/include/uapi/asm/signal.h b/arch/arm/include/uapi/asm/signal.h
-index 33073bdcf091..63066f624c10 100644
---- a/arch/arm/include/uapi/asm/signal.h
-+++ b/arch/arm/include/uapi/asm/signal.h
-@@ -12,6 +12,8 @@ struct siginfo;
- #define NSIG		32
- typedef unsigned long sigset_t;
- 
-+#include <stddef.h>
-+
- #endif /* __KERNEL__ */
- 
- #define SIGHUP		 1
 -- 
-2.13.3
+With Best Regards,
+Andy Shevchenko
