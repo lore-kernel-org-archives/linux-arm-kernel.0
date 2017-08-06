@@ -1,81 +1,105 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 06 Aug 2017 11:20:49 +0800
-Subject: [linux-sunxi] [PATCH 2/2] mmc: sunxi: fix new timings mode on A64
- EMMC (MMC2) controller
-In-Reply-To: <20170806023954.wwaredjwcm2p5pw7@wens.csie.org>
-References: <20170804213555.6024-1-icenowy@aosc.io>
- <20170804213555.6024-2-icenowy@aosc.io>
- <20170806023954.wwaredjwcm2p5pw7@wens.csie.org>
-Message-ID: <8F9C9945-2AB8-4E2D-82BE-97D7A9E6DD6A@aosc.io>
+From: stefan@agner.ch (Stefan Agner)
+Date: Sat, 05 Aug 2017 20:31:11 -0700
+Subject: [PATCH] lib/mpi: fix build with clang
+In-Reply-To: <20170420034022.24109-1-stefan@agner.ch>
+References: <20170420034022.24109-1-stefan@agner.ch>
+Message-ID: <a614598d896b9fcdde4e6a209c7e45a4@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Herbert,
+
+This still applies fine on 4.13-rc3, any chance to get it merged through
+one of your trees?
+
+--
+Stefan
 
 
-? 2017?8?6? GMT+08:00 ??10:39:54, Chen-Yu Tsai <wens@csie.org> ??:
->On Sat, Aug 05, 2017 at 05:35:55AM +0800, Icenowy Zheng wrote:
->> The configuration struct of A64 EMMC(MMC2) compatible used to
->> have the needs_new_timings variable missing, which lead to NULL
->> pointer dereference now when trying to set up the old timings mode,
->as
->> the old timings mode doesn't exist at all on A64.
->
->I'm not familiar with the A64's eMMC controller. The datasheet says
->it does not have the timing switch register. It does not say whether
->it is always in the old or new timing mode. "needs_new_timings"
->probably meant that the switch has to be set.
-
-As I know, it supports DDR mode, but the CCU has no clk delays.
-So it should be the new timings mode.
-
->
->This fix doesn't really fix the underlying issue, which is the check
->for clk_delays was incorrectly replaced. sun4i/sun5i is also broken.
->
->Could you try this patch instead:
->
-><---
->
->From 23b841a11294cb6a0cf1e146616b068f60c2ec7d Mon Sep 17 00:00:00 2001
->From: Chen-Yu Tsai <wens@csie.org>
->Date: Sun, 6 Aug 2017 10:24:47 +0800
->Subject: [PATCH] mmc: sunxi: Fix NULL pointer reference on clk_delays
->
->Some SoCs do not support clk delays for MMC in the clock control unit.
->These include the old controllers in A10/A10s/A13/R8, and the new eMMC
->controller in A64. The config structure for these controllers do not
->specify clk_delays, but the check for this was replaced in commit
->b0600daebf31 ("mmc: sunxi: Support controllers that can use both old
->and new timings").
->
->This patch adds back the check for clk_delays, and also adds comments
->for both checks in sunxi_mmc_clk_set_phase().
->
->Fixes: b0600daebf31 ("mmc: sunxi: Support controllers that can use
->		      both old and new timings")
->Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->---
-> drivers/mmc/host/sunxi-mmc.c | 5 +++++
-> 1 file changed, 5 insertions(+)
->
->diff --git a/drivers/mmc/host/sunxi-mmc.c
->b/drivers/mmc/host/sunxi-mmc.c
->index 3777517982dd..020547e5fa45 100644
->--- a/drivers/mmc/host/sunxi-mmc.c
->+++ b/drivers/mmc/host/sunxi-mmc.c
->@@ -722,9 +722,14 @@ static int sunxi_mmc_clk_set_phase(struct
->sunxi_mmc_host *host,
-> {
-> 	int index;
+On 2017-04-19 20:40, Stefan Agner wrote:
+> Use just @ to denote comments which works with gcc and clang.
+> Otherwise clang reports an escape sequence error:
+>   error: invalid % escape in inline assembly string
 > 
->+	/* No need to set clk controller delays under new timings */
-> 	if (host->use_new_timings)
-> 		return 0;
+> Use %0-%3 as operand references, this avoids:
+>   error: invalid operand in inline asm: 'umull ${1:r}, ${0:r}, ${2:r}, ${3:r}'
 > 
->+	/* Some old controllers don't support delays */
->+	if (!host->cfg->clk_delays)
->+		return 0;
->+
-> 	/* determine delays */
-> 	if (rate <= 400000) {
-> 		index = SDXC_CLK_400K;
+> Also remove superfluous casts on output operands to avoid warnings
+> such as:
+>   warning: invalid use of a cast in an inline asm context requiring an l-value
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+> I checked the output of gcc with -S switch before and after this change,
+> gcc generated the same assembly.
+> 
+> --
+> Stefan
+> 
+>  lib/mpi/longlong.h | 24 ++++++++++++------------
+>  1 file changed, 12 insertions(+), 12 deletions(-)
+> 
+> diff --git a/lib/mpi/longlong.h b/lib/mpi/longlong.h
+> index 93336502af08..57fd45ab7af1 100644
+> --- a/lib/mpi/longlong.h
+> +++ b/lib/mpi/longlong.h
+> @@ -176,8 +176,8 @@ extern UDItype __udiv_qrnnd(UDItype *, UDItype,
+> UDItype, UDItype);
+>  #define add_ssaaaa(sh, sl, ah, al, bh, bl) \
+>  	__asm__ ("adds %1, %4, %5\n" \
+>  		"adc  %0, %2, %3" \
+> -	: "=r" ((USItype)(sh)), \
+> -		"=&r" ((USItype)(sl)) \
+> +	: "=r" (sh), \
+> +		"=&r" (sl) \
+>  	: "%r" ((USItype)(ah)), \
+>  		"rI" ((USItype)(bh)), \
+>  		"%r" ((USItype)(al)), \
+> @@ -185,15 +185,15 @@ extern UDItype __udiv_qrnnd(UDItype *, UDItype,
+> UDItype, UDItype);
+>  #define sub_ddmmss(sh, sl, ah, al, bh, bl) \
+>  	__asm__ ("subs %1, %4, %5\n" \
+>  		"sbc  %0, %2, %3" \
+> -	: "=r" ((USItype)(sh)), \
+> -		"=&r" ((USItype)(sl)) \
+> +	: "=r" (sh), \
+> +		"=&r" (sl) \
+>  	: "r" ((USItype)(ah)), \
+>  		"rI" ((USItype)(bh)), \
+>  		"r" ((USItype)(al)), \
+>  		"rI" ((USItype)(bl)))
+>  #if defined __ARM_ARCH_2__ || defined __ARM_ARCH_3__
+>  #define umul_ppmm(xh, xl, a, b) \
+> -	__asm__ ("%@ Inlined umul_ppmm\n" \
+> +	__asm__ ("@ Inlined umul_ppmm\n" \
+>  		"mov	%|r0, %2, lsr #16		@ AAAA\n" \
+>  		"mov	%|r2, %3, lsr #16		@ BBBB\n" \
+>  		"bic	%|r1, %2, %|r0, lsl #16		@ aaaa\n" \
+> @@ -206,19 +206,19 @@ extern UDItype __udiv_qrnnd(UDItype *, UDItype,
+> UDItype, UDItype);
+>  		"addcs	%|r2, %|r2, #65536\n" \
+>  		"adds	%1, %|r1, %|r0, lsl #16\n" \
+>  		"adc	%0, %|r2, %|r0, lsr #16" \
+> -	: "=&r" ((USItype)(xh)), \
+> -		"=r" ((USItype)(xl)) \
+> +	: "=&r" (xh), \
+> +		"=r" (xl) \
+>  	: "r" ((USItype)(a)), \
+>  		"r" ((USItype)(b)) \
+>  	: "r0", "r1", "r2")
+>  #else
+>  #define umul_ppmm(xh, xl, a, b) \
+> -	__asm__ ("%@ Inlined umul_ppmm\n" \
+> -		"umull %r1, %r0, %r2, %r3" \
+> -	: "=&r" ((USItype)(xh)), \
+> -			"=&r" ((USItype)(xl)) \
+> +	__asm__ ("@ Inlined umul_ppmm\n" \
+> +		"umull %1, %0, %2, %3" \
+> +	: "=&r" (xh), \
+> +		"=&r" (xl) \
+>  	: "r" ((USItype)(a)), \
+> -			"r" ((USItype)(b)) \
+> +		"r" ((USItype)(b)) \
+>  	: "r0", "r1")
+>  #endif
+>  #define UMUL_TIME 20
