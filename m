@@ -1,113 +1,35 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun,  6 Aug 2017 23:36:11 +0200
-Subject: [PATCH v5 10/12] ASoC: wm9705: add private structure
-In-Reply-To: <20170806213613.5600-1-robert.jarzmik@free.fr>
-References: <20170806213613.5600-1-robert.jarzmik@free.fr>
-Message-ID: <20170806213613.5600-11-robert.jarzmik@free.fr>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Mon,  7 Aug 2017 10:30:05 +1200
+Subject: [PATCH 2/3] ARM: dts: mvebu: set reduced-width property for SDRAM on
+ 98dx3236
+In-Reply-To: <20170806223006.14231-1-chris.packham@alliedtelesis.co.nz>
+References: <20170806223006.14231-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20170806223006.14231-3-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a private data structure. This is a preparation for a codec which
-would need an another data on top of snd_ac97, which will be the case
-when an MFD wm97xx device will probe wm9705.
+Because the 98dx3236 and similar SoCs are switch chips with integrated
+CPUs they use a reduced pin count for the SDRAM interface. As such
+"full" with is 32-bits and "half" width is 16-bits (as opposed to 64/32
+on the discrete SoC). Set the reduced-width property on the sdramc node
+to indicate this.
 
-Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-Acked-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 ---
- sound/soc/codecs/wm9705.c | 36 ++++++++++++++++++++++++------------
- 1 file changed, 24 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/armada-xp-98dx3236.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/sound/soc/codecs/wm9705.c b/sound/soc/codecs/wm9705.c
-index f6d5c0f2aea5..08477d040028 100644
---- a/sound/soc/codecs/wm9705.c
-+++ b/sound/soc/codecs/wm9705.c
-@@ -24,6 +24,10 @@
- #define WM9705_VENDOR_ID 0x574d4c05
- #define WM9705_VENDOR_ID_MASK 0xffffffff
+diff --git a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
+index 0e12816d961e..4d6a2acc1b55 100644
+--- a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
++++ b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
+@@ -129,6 +129,7 @@
+ 			sdramc at 1400 {
+ 				compatible = "marvell,armada-xp-sdram-controller";
+ 				reg = <0x1400 0x500>;
++				marvell,reduced-width;
+ 			};
  
-+struct wm9705_priv {
-+	struct snd_ac97 *ac97;
-+};
-+
- static const struct reg_default wm9705_reg_defaults[] = {
- 	{ 0x02, 0x8000 },
- 	{ 0x04, 0x8000 },
-@@ -292,10 +296,10 @@ static int wm9705_soc_suspend(struct snd_soc_codec *codec)
- 
- static int wm9705_soc_resume(struct snd_soc_codec *codec)
- {
--	struct snd_ac97 *ac97 = snd_soc_codec_get_drvdata(codec);
-+	struct wm9705_priv *wm9705 = snd_soc_codec_get_drvdata(codec);
- 	int ret;
- 
--	ret = snd_ac97_reset(ac97, true, WM9705_VENDOR_ID,
-+	ret = snd_ac97_reset(wm9705->ac97, true, WM9705_VENDOR_ID,
- 		WM9705_VENDOR_ID_MASK);
- 	if (ret < 0)
- 		return ret;
-@@ -311,38 +315,38 @@ static int wm9705_soc_resume(struct snd_soc_codec *codec)
- 
- static int wm9705_soc_probe(struct snd_soc_codec *codec)
- {
--	struct snd_ac97 *ac97;
-+	struct wm9705_priv *wm9705 = snd_soc_codec_get_drvdata(codec);
- 	struct regmap *regmap;
- 	int ret;
- 
--	ac97 = snd_soc_new_ac97_codec(codec, WM9705_VENDOR_ID,
--		WM9705_VENDOR_ID_MASK);
--	if (IS_ERR(ac97)) {
-+	wm9705->ac97 = snd_soc_new_ac97_codec(codec, WM9705_VENDOR_ID,
-+					      WM9705_VENDOR_ID_MASK);
-+	if (IS_ERR(wm9705->ac97)) {
- 		dev_err(codec->dev, "Failed to register AC97 codec\n");
--		return PTR_ERR(ac97);
-+		return PTR_ERR(wm9705->ac97);
- 	}
- 
--	regmap = regmap_init_ac97(ac97, &wm9705_regmap_config);
-+	regmap = regmap_init_ac97(wm9705->ac97, &wm9705_regmap_config);
- 	if (IS_ERR(regmap)) {
- 		ret = PTR_ERR(regmap);
- 		goto err_free_ac97_codec;
- 	}
- 
--	snd_soc_codec_set_drvdata(codec, ac97);
-+	snd_soc_codec_set_drvdata(codec, wm9705->ac97);
- 	snd_soc_codec_init_regmap(codec, regmap);
- 
- 	return 0;
- err_free_ac97_codec:
--	snd_soc_free_ac97_codec(ac97);
-+	snd_soc_free_ac97_codec(wm9705->ac97);
- 	return ret;
- }
- 
- static int wm9705_soc_remove(struct snd_soc_codec *codec)
- {
--	struct snd_ac97 *ac97 = snd_soc_codec_get_drvdata(codec);
-+	struct wm9705_priv *wm9705 = snd_soc_codec_get_drvdata(codec);
- 
- 	snd_soc_codec_exit_regmap(codec);
--	snd_soc_free_ac97_codec(ac97);
-+	snd_soc_free_ac97_codec(wm9705->ac97);
- 	return 0;
- }
- 
-@@ -364,6 +368,14 @@ static const struct snd_soc_codec_driver soc_codec_dev_wm9705 = {
- 
- static int wm9705_probe(struct platform_device *pdev)
- {
-+	struct wm9705_priv *wm9705;
-+
-+	wm9705 = devm_kzalloc(&pdev->dev, sizeof(*wm9705), GFP_KERNEL);
-+	if (wm9705 == NULL)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, wm9705);
-+
- 	return snd_soc_register_codec(&pdev->dev,
- 			&soc_codec_dev_wm9705, wm9705_dai, ARRAY_SIZE(wm9705_dai));
- }
+ 			L2: l2-cache at 8000 {
 -- 
-2.11.0
+2.13.0
