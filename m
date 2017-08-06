@@ -1,39 +1,53 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon,  7 Aug 2017 00:32:08 +0200
-Subject: [PATCH 0/3] ARM: bcm2836: Move SMP startup code to arch/arm
-Message-ID: <1502058731-12462-1-git-send-email-stefan.wahren@i2se.com>
+From: dja@axtens.net (Daniel Axtens)
+Date: Mon, 07 Aug 2017 09:49:24 +1000
+Subject: [PATCH 2/3] Split VGA default device handler out of VGA arbiter
+In-Reply-To: <20170805065754.GA8509@wunner.de>
+References: <20170804102033.27731-1-dja@axtens.net>
+ <20170804102033.27731-3-dja@axtens.net> <20170805065754.GA8509@wunner.de>
+Message-ID: <87zibcqmt7.fsf@linkitivity.dja.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series move the SMP startup code of BCM2836 and
-BCM2837 to the right place. There was already a patch from Marc Zyngier [1],
-but it breaks SMP for RPI 3 on 32-bit (other cores stays offline).
+Hi Lukas,
 
-I based my patch series on Marc's patch with the following changes:
- * define enable-method and use it in the dts files
- * place SMP code into platsmp.c
- * rename bcm2836_smp_boot_secondary() to bcm2836_boot_secondary()
- * use of_find_compatible_node() instead of of_find_matching_node()
+Let me reply "back-to-front":
 
-This series requires the patch "ARM: dts: bcm283x: Move the BCM2837
-DT contents from arm64 to arm."
+> Please cc dri-devel when proposing changes to vgaarb.c (see
+> MAINTAINERS).
 
-[1] - https://patchwork.kernel.org/patch/9719845/
+Sorry, will do in future.
 
-Stefan Wahren (3):
-  dt-bindings: arm: add SMP enable-method for BCM2836
-  ARM: dts: bcm283x: Add 32-bit enable method for SMP
-  irqchip: bcm2836: Move SMP startup code to arch/arm
+> I'm missing some context as to the negative consequences you're
+> experiencing on other arches (the cover letter merely refers to
+> "quirks in ppc and concerns in arm land" and is missing links to
+> archived versions of v1 and v2), but clearly legacy resources are
+> x86-specific so any code dealing with them seems superfluous on
+> other arches and should be marked as such.
 
- Documentation/devicetree/bindings/arm/cpus.txt |  1 +
- arch/arm/boot/dts/bcm2836.dtsi                 |  1 +
- arch/arm/boot/dts/bcm2837.dtsi                 |  1 +
- arch/arm/mach-bcm/Makefile                     |  3 +
- arch/arm/mach-bcm/platsmp.c                    | 35 ++++++++++++
- drivers/irqchip/irq-bcm2836.c                  | 79 +-------------------------
- include/linux/irqchip/irq-bcm2836.h            | 70 +++++++++++++++++++++++
- 7 files changed, 113 insertions(+), 77 deletions(-)
- create mode 100644 include/linux/irqchip/irq-bcm2836.h
+Quirk/v1: https://www.spinics.net/lists/linux-pci/msg62865.html
+Approach 2: https://www.spinics.net/lists/linux-pci/msg63092.html
+            https://www.spinics.net/lists/linux-pci/msg63083.html
 
--- 
-2.7.4
+The quirk in powerpc land that I'm referring to is
+arch/powerpc/kernel/pci-common.c::fixup_vga() which is a class enable
+hook that marks the first VGA device it comes across as default if the
+arbiter has not marked one.
+
+The arm concerns are ventaliated in the threads I linked - they boil
+down to "why do we need the arbiter at all on platforms without legacy
+resources? Can't we do this more simply?"
+
+> Would it be feasible to just sprinkle some "if (IS_ENABLED(CONFIG_X86))"
+> over the portions of vgaarb.c that deal with legacy resources?
+
+Yes and no. That would disable the unnecessary chunks of the VGA
+arbiter, but we then still have to figure out how to mark devices as
+default if not with the arbiter.
+
+Regards,
+Daniel
+
+>
+> Thanks,
+>
+> Lukas
