@@ -1,32 +1,95 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 7 Aug 2017 10:30:37 -0700
-Subject: [PATCH 0/7] Add more DT nodes for Stingray SoC
-In-Reply-To: <1501303349-30007-1-git-send-email-abhishek.shah@broadcom.com>
-References: <1501303349-30007-1-git-send-email-abhishek.shah@broadcom.com>
-Message-ID: <77f099ec-5cbe-b2c9-241a-c00ea63ee3ae@gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon,  7 Aug 2017 10:31:20 -0700
+Subject: [PATCH RESEND] lib/mpi: fix build with clang
+Message-ID: <20170807173120.15463-1-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28/2017 09:42 PM, Abhishek Shah wrote:
-> This is round two of adding DT nodes for Stingray SoC.
-> Corresponding drivers and dt binding documents are already
-> checked in the kernel and will be present in v4.14.
-> 
-> Abhishek Shah (1):
->   arm64: dts: Add DT node to enable BGMAC driver on Stingray
-> 
-> Anup Patel (3):
->   arm64: dts: Add sp804 DT nodes for Stingray SoC
->   arm64: dts: Add FlexRM DT nodes for Stingray
->   arm64: dts: Add SBA-RAID DT nodes for Stingray SoC
-> 
-> Srinath Mannam (2):
->   arm64: dts: Add MDIO multiplexer DT node for Stingray
->   arm64: dts: Add SATA DT nodes for Stingray SoC
-> 
-> Velibor Markovski (1):
->   arm64: dts: Enable stats for CCN-502 interconnect on Stingray
+Use just @ to denote comments which works with gcc and clang.
+Otherwise clang reports an escape sequence error:
+  error: invalid % escape in inline assembly string
 
-Series applied, thanks
+Use %0-%3 as operand references, this avoids:
+  error: invalid operand in inline asm: 'umull ${1:r}, ${0:r}, ${2:r}, ${3:r}'
+
+Also remove superfluous casts on output operands to avoid warnings
+such as:
+  warning: invalid use of a cast in an inline asm context requiring an l-value
+
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+I checked the output of gcc with -S switch before and after this change,
+gcc generated the same assembly.
+
+Resend this time with linux-crypto ML.
+
+--
+Stefan
+
+ lib/mpi/longlong.h | 24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
+
+diff --git a/lib/mpi/longlong.h b/lib/mpi/longlong.h
+index 93336502af08..57fd45ab7af1 100644
+--- a/lib/mpi/longlong.h
++++ b/lib/mpi/longlong.h
+@@ -176,8 +176,8 @@ extern UDItype __udiv_qrnnd(UDItype *, UDItype, UDItype, UDItype);
+ #define add_ssaaaa(sh, sl, ah, al, bh, bl) \
+ 	__asm__ ("adds %1, %4, %5\n" \
+ 		"adc  %0, %2, %3" \
+-	: "=r" ((USItype)(sh)), \
+-		"=&r" ((USItype)(sl)) \
++	: "=r" (sh), \
++		"=&r" (sl) \
+ 	: "%r" ((USItype)(ah)), \
+ 		"rI" ((USItype)(bh)), \
+ 		"%r" ((USItype)(al)), \
+@@ -185,15 +185,15 @@ extern UDItype __udiv_qrnnd(UDItype *, UDItype, UDItype, UDItype);
+ #define sub_ddmmss(sh, sl, ah, al, bh, bl) \
+ 	__asm__ ("subs %1, %4, %5\n" \
+ 		"sbc  %0, %2, %3" \
+-	: "=r" ((USItype)(sh)), \
+-		"=&r" ((USItype)(sl)) \
++	: "=r" (sh), \
++		"=&r" (sl) \
+ 	: "r" ((USItype)(ah)), \
+ 		"rI" ((USItype)(bh)), \
+ 		"r" ((USItype)(al)), \
+ 		"rI" ((USItype)(bl)))
+ #if defined __ARM_ARCH_2__ || defined __ARM_ARCH_3__
+ #define umul_ppmm(xh, xl, a, b) \
+-	__asm__ ("%@ Inlined umul_ppmm\n" \
++	__asm__ ("@ Inlined umul_ppmm\n" \
+ 		"mov	%|r0, %2, lsr #16		@ AAAA\n" \
+ 		"mov	%|r2, %3, lsr #16		@ BBBB\n" \
+ 		"bic	%|r1, %2, %|r0, lsl #16		@ aaaa\n" \
+@@ -206,19 +206,19 @@ extern UDItype __udiv_qrnnd(UDItype *, UDItype, UDItype, UDItype);
+ 		"addcs	%|r2, %|r2, #65536\n" \
+ 		"adds	%1, %|r1, %|r0, lsl #16\n" \
+ 		"adc	%0, %|r2, %|r0, lsr #16" \
+-	: "=&r" ((USItype)(xh)), \
+-		"=r" ((USItype)(xl)) \
++	: "=&r" (xh), \
++		"=r" (xl) \
+ 	: "r" ((USItype)(a)), \
+ 		"r" ((USItype)(b)) \
+ 	: "r0", "r1", "r2")
+ #else
+ #define umul_ppmm(xh, xl, a, b) \
+-	__asm__ ("%@ Inlined umul_ppmm\n" \
+-		"umull %r1, %r0, %r2, %r3" \
+-	: "=&r" ((USItype)(xh)), \
+-			"=&r" ((USItype)(xl)) \
++	__asm__ ("@ Inlined umul_ppmm\n" \
++		"umull %1, %0, %2, %3" \
++	: "=&r" (xh), \
++		"=&r" (xl) \
+ 	: "r" ((USItype)(a)), \
+-			"r" ((USItype)(b)) \
++		"r" ((USItype)(b)) \
+ 	: "r0", "r1")
+ #endif
+ #define UMUL_TIME 20
 -- 
-Florian
+2.12.2
