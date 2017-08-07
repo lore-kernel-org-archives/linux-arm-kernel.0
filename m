@@ -1,39 +1,43 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 7 Aug 2017 09:59:20 +0200
-Subject: [PATCH] ARM:dts:armadillo800eva: Add console parametters
-In-Reply-To: <1502027702-4366-2-git-send-email-phucduc.bui@gmail.com>
-References: <1502027702-4366-1-git-send-email-phucduc.bui@gmail.com>
- <1502027702-4366-2-git-send-email-phucduc.bui@gmail.com>
-Message-ID: <20170807075920.GD7175@verge.net.au>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Mon,  7 Aug 2017 16:13:18 +0800
+Subject: [PATCH 0/7] arm64: dts: hi3660: add more device nodes
+Message-ID: <20170807081325.11406-1-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 06, 2017 at 08:55:02PM +0700, Bui Duc Phuc (Fukuda) wrote:
-> From: Bui Duc Phuc <phucduc.bui@gmail.com>
-> 
-> After the kernel boot, the login prompt doesn't appear.
-> This patch will add console parametters to bootargs to fix it.
-> 
-> Signed-off-by: Bui Duc Phuc <phucduc.bui@gmail.com>
-> ---
->  arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-> index 1788e18..d383b37 100644
-> --- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-> +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-> @@ -24,7 +24,8 @@
->  	};
->  
->  	chosen {
-> -		bootargs = "earlyprintk ignore_loglevel root=/dev/nfs ip=dhcp rw";
-> +		bootargs = "console=tty0 console=ttySC0,115200 earlyprintk
-> +				ignore_loglevel root=/dev/nfs ip=dhcp rw";
->  		stdout-path = "serial0:115200n8";
->  	};
+This patchset adds more device nodes for hi3660 and hikey960, including:
+ - cpu idle states
+ - L2 cache
+ - PMU
+ - OP-TEE
+ - reboot
+ - pstore
 
-Hi,
+Patch 7 fixes an issue in mmc nodes, by adding 'reset'
 
-this feels wrong. My understanding is that stdout-path should be enough
-to get the console.
+HiKey960 is one of 96boards. For details information about it, please
+refer to [1].
+
+[1] https://github.com/96boards/documentation/tree/master/ConsumerEdition/HiKey960
+
+Guodong Xu (3):
+  arm64: dts: hikey960: Add support for syscon-reboot-mode
+  arm64: dts: hikey960: Add pstore support
+  arm64: dts: hi3660: Reset the mmc hosts
+
+Leo Yan (2):
+  arm64: dts: hi3660: enable idle states
+  arm64: dts: hi3660: add L2 cache topology
+
+Victor Chong (1):
+  arm64: dts: hikey960: Add optee node
+
+YiPing Xu (1):
+  arm64: dts: hi3660: add pmu dt node for hi3660
+
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  35 ++++++++
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 101 ++++++++++++++++++++++
+ 2 files changed, 136 insertions(+)
+
+-- 
+2.10.2
