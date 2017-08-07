@@ -1,91 +1,92 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Mon, 7 Aug 2017 08:59:44 +0800
-Subject: [PATCH] arm64: dts: hisi: add PCIe host controller node for hip07
- SoC
-In-Reply-To: <5984703A.4060302@hisilicon.com>
-References: <1500366820-58555-1-git-send-email-wangzhou1@hisilicon.com>
- <5984703A.4060302@hisilicon.com>
-Message-ID: <5987BB80.8060701@hisilicon.com>
+From: huibin.hong@rock-chips.com (Huibin Hong)
+Date: Mon,  7 Aug 2017 09:45:11 +0800
+Subject: [PATCH] RM: dts: rockchip: rk322x: add spi node and spi pinctrl
+Message-ID: <1502070311-19663-1-git-send-email-huibin.hong@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/8/4 21:01, Wei Xu wrote:
-> Hi Zhou,
-> 
-> On 2017/7/18 9:33, Zhou Wang wrote:
->> Add one PCIe host controller node for HiSilicon Hip07 SoC and enable it in
->> D05 board.
->>
->> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
->> ---
->>  arch/arm64/boot/dts/hisilicon/hip07-d05.dts |  4 ++++
->>  arch/arm64/boot/dts/hisilicon/hip07.dtsi    | 21 +++++++++++++++++++++
->>  2 files changed, 25 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/hisilicon/hip07-d05.dts b/arch/arm64/boot/dts/hisilicon/hip07-d05.dts
->> index f5d7f08..fe7c16c 100644
->> --- a/arch/arm64/boot/dts/hisilicon/hip07-d05.dts
->> +++ b/arch/arm64/boot/dts/hisilicon/hip07-d05.dts
->> @@ -84,3 +84,7 @@
->>  &sas1 {
->>  	status = "ok";
->>  };
->> +
->> +&p0_pcie2_a {
->> +	status = "ok";
->> +};
->> diff --git a/arch/arm64/boot/dts/hisilicon/hip07.dtsi b/arch/arm64/boot/dts/hisilicon/hip07.dtsi
->> index 283d7b5..077b2d7b 100644
->> --- a/arch/arm64/boot/dts/hisilicon/hip07.dtsi
->> +++ b/arch/arm64/boot/dts/hisilicon/hip07.dtsi
->> @@ -1534,5 +1534,26 @@
->>  				     <637 1>,<638 1>,<639 1>;
->>  			status = "disabled";
->>  		};
->> +
->> +		p0_pcie2_a: pcie at a00a0000 {
->> +			compatible = "hisilicon,pcie-almost-ecam";
-> 
-> The compatible string should be "hisilicon,hip07-pcie-ecam".
+Add spi node and spi pinctrl for rk322x
 
-OK, I will modify this and resend it later.
+Signed-off-by: Huibin Hong <huibin.hong@rock-chips.com>
+---
 
-> 
->> +			reg = <0 0xa8000000 0 0x800000>,<0 0xa00a0000 0 0x10000>;
->> +			bus-range = <0x80 0x87>;
->> +			msi-map = <0x8000 &p0_its_dsa_a 0x8000 0x800>;
->> +			msi-map-mask = <0xffff>;
->> +			#address-cells = <3>;
->> +			#size-cells = <2>;
->> +			device_type = "pci";
->> +			dma-coherent;
->> +			ranges = <0x02000000 0 0xa8800000 0 0xa8800000 0 0x77f0000
->> +				  0x01000000 0 0 0 0xafff0000 0 0x10000>;
-> 
-> Can you also check whether the ranges are working or not with current UEFI?
-> Thanks!
+ arch/arm/boot/dts/rk322x.dtsi | 50 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
 
-Sure.
-
-Thanks,
-Zhou
-
-> 
-> Best Regards,
-> Wei
-> 
->> +			#interrupt-cells = <1>;
->> +			interrupt-map-mask = <0xf800 0 0 7>;
->> +			interrupt-map = <0x0 0 0 1 &mbigen_pcie2_a 671 4
->> +					 0x0 0 0 2 &mbigen_pcie2_a 671 4
->> +					 0x0 0 0 3 &mbigen_pcie2_a 671 4
->> +					 0x0 0 0 4 &mbigen_pcie2_a 671 4>;
->> +			status = "disabled";
->> +		};
->>  	};
->>  };
->>
-> 
-> 
-> .
-> 
+diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
+index f3e4ffd..1a7afef 100644
+--- a/arch/arm/boot/dts/rk322x.dtsi
++++ b/arch/arm/boot/dts/rk322x.dtsi
+@@ -55,6 +55,7 @@
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
+ 		serial2 = &uart2;
++		spi0 = &spi0;
+ 	};
+ 
+ 	cpus {
+@@ -361,6 +362,19 @@
+ 		status = "disabled";
+ 	};
+ 
++	spi0: spi at 11090000 {
++		compatible = "rockchip,rk3228-spi";
++		reg = <0x11090000 0x1000>;
++		interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&spi0_clk &spi0_tx &spi0_rx &spi0_cs0 &spi0_cs1>;
++		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
++		clock-names = "spiclk", "apb_pclk";
++		status = "disabled";
++	};
++
+ 	wdt: watchdog at 110a0000 {
+ 		compatible = "snps,dw-wdt";
+ 		reg = <0x110a0000 0x100>;
+@@ -797,6 +811,42 @@
+ 			};
+ 		};
+ 
++		spi-0 {
++			spi0_clk: spi0-clk {
++				rockchip,pins = <0 9 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi0_cs0: spi0-cs0 {
++				rockchip,pins = <0 14 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi0_tx: spi0-tx {
++				rockchip,pins = <0 11 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi0_rx: spi0-rx {
++				rockchip,pins = <0 13 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi0_cs1: spi0-cs1 {
++				rockchip,pins = <1 12 RK_FUNC_1 &pcfg_pull_up>;
++			};
++		};
++
++		spi-1 {
++			spi1_clk: spi1-clk {
++				rockchip,pins = <0 23 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi1_cs0: spi1-cs0 {
++				rockchip,pins = <2 2 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi1_rx: spi1-rx {
++				rockchip,pins = <2 0 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi1_tx: spi1-tx {
++				rockchip,pins = <2 1 RK_FUNC_2 &pcfg_pull_up>;
++			};
++			spi1_cs1: spi1-cs1 {
++				rockchip,pins = <2 3 RK_FUNC_2 &pcfg_pull_up>;
++			};
++		};
++
+ 		i2s1 {
+ 			i2s1_bus: i2s1-bus {
+ 				rockchip,pins = <0 8 RK_FUNC_1 &pcfg_pull_none>,
+-- 
+1.9.1
