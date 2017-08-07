@@ -1,87 +1,108 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  7 Aug 2017 19:36:04 +0100
-Subject: [PATCH 13/14] arm64: add on_accessible_stack()
+Date: Mon,  7 Aug 2017 19:36:00 +0100
+Subject: [PATCH 09/14] arm64: factor out entry stack manipulation
 In-Reply-To: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
 References: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1502130965-18710-14-git-send-email-mark.rutland@arm.com>
+Message-ID: <1502130965-18710-10-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both unwind_frame() and dump_backtrace() try to check whether a stack
-address is sane to access, with very similar logic. Both will need
-updating in order to handle overflow stacks.
+In subsequent patches, we will detect stack overflow in our exception
+entry code, by verifying the SP after it has been decremented to make
+space for the exception regs.
 
-Factor out this logic into a helper, so that we can avoid further
-duplication when we add overflow stacks.
+This verification code is small, and we can minimize its impact by
+placing it directly in the vectors. To avoid redundant modification of
+the SP, we also need to move the initial decrement of the SP into the
+vectors.
 
+As a preparatory step, this patch introduces kernel_ventry, which
+performs this decrement, and updates the entry code accordingly.
+Subsequent patches will fold SP verification into kernel_ventry.
+
+There should be no functional change as a result of this patch.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+[Mark: turn into prep patch, expand commit msg]
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: James Morse <james.morse@arm.com>
 Cc: Laura Abbott <labbott@redhat.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/stacktrace.h | 16 ++++++++++++++++
- arch/arm64/kernel/stacktrace.c      |  7 +------
- arch/arm64/kernel/traps.c           |  3 +--
- 3 files changed, 18 insertions(+), 8 deletions(-)
+ arch/arm64/kernel/entry.S | 47 ++++++++++++++++++++++++++---------------------
+ 1 file changed, 26 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
-index 4c68d8a..92ddb6d 100644
---- a/arch/arm64/include/asm/stacktrace.h
-+++ b/arch/arm64/include/asm/stacktrace.h
-@@ -57,4 +57,20 @@ static inline bool on_task_stack(struct task_struct *tsk, unsigned long sp)
- 	return (low <= sp && sp < high);
- }
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 1c0f787..bd3b6de 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -69,8 +69,13 @@
+ #define BAD_FIQ		2
+ #define BAD_ERROR	3
  
-+/*
-+ * We can only safely access per-cpu stacks from current in a non-preemptible
-+ * context.
-+ */
-+static inline bool on_accessible_stack(struct task_struct *tsk, unsigned long sp)
-+{
-+	if (on_task_stack(tsk, sp))
-+		return true;
-+	if (tsk != current || preemptible())
-+		return false;
-+	if (on_irq_stack(sp))
-+		return true;
+-	.macro	kernel_entry, el, regsize = 64
++	.macro kernel_ventry	label
++	.align 7
+ 	sub	sp, sp, #S_FRAME_SIZE
++	b	\label
++	.endm
 +
-+	return false;
-+}
-+
- #endif	/* __ASM_STACKTRACE_H */
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index 54f3463..d9b80eb 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -50,12 +50,7 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- 	if (!tsk)
- 		tsk = current;
++	.macro	kernel_entry, el, regsize = 64
+ 	.if	\regsize == 32
+ 	mov	w0, w0				// zero upper 32 bits of x0
+ 	.endif
+@@ -315,31 +320,31 @@ tsk	.req	x28		// current thread_info
  
--	/*
--	 * Switching between stacks is valid when tracing current and in
--	 * non-preemptible context.
--	 */
--	if (!(tsk == current && !preemptible() && on_irq_stack(fp)) &&
--	    !on_task_stack(tsk, fp))
-+	if (!on_accessible_stack(tsk, fp))
- 		return -EINVAL;
+ 	.align	11
+ ENTRY(vectors)
+-	ventry	el1_sync_invalid		// Synchronous EL1t
+-	ventry	el1_irq_invalid			// IRQ EL1t
+-	ventry	el1_fiq_invalid			// FIQ EL1t
+-	ventry	el1_error_invalid		// Error EL1t
++	kernel_ventry	el1_sync_invalid		// Synchronous EL1t
++	kernel_ventry	el1_irq_invalid			// IRQ EL1t
++	kernel_ventry	el1_fiq_invalid			// FIQ EL1t
++	kernel_ventry	el1_error_invalid		// Error EL1t
  
- 	frame->fp = READ_ONCE_NOCHECK(*(unsigned long *)(fp));
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 9633773..d01c598 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -193,8 +193,7 @@ void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 		if (in_entry_text(frame.pc)) {
- 			stack = frame.fp - offsetof(struct pt_regs, stackframe);
+-	ventry	el1_sync			// Synchronous EL1h
+-	ventry	el1_irq				// IRQ EL1h
+-	ventry	el1_fiq_invalid			// FIQ EL1h
+-	ventry	el1_error_invalid		// Error EL1h
++	kernel_ventry	el1_sync			// Synchronous EL1h
++	kernel_ventry	el1_irq				// IRQ EL1h
++	kernel_ventry	el1_fiq_invalid			// FIQ EL1h
++	kernel_ventry	el1_error_invalid		// Error EL1h
  
--			if (on_task_stack(tsk, stack) ||
--			    (tsk == current && !preemptible() && on_irq_stack(stack)))
-+			if (on_accessible_stack(tsk, stack))
- 				dump_mem("", "Exception stack", stack,
- 					 stack + sizeof(struct pt_regs));
- 		}
+-	ventry	el0_sync			// Synchronous 64-bit EL0
+-	ventry	el0_irq				// IRQ 64-bit EL0
+-	ventry	el0_fiq_invalid			// FIQ 64-bit EL0
+-	ventry	el0_error_invalid		// Error 64-bit EL0
++	kernel_ventry	el0_sync			// Synchronous 64-bit EL0
++	kernel_ventry	el0_irq				// IRQ 64-bit EL0
++	kernel_ventry	el0_fiq_invalid			// FIQ 64-bit EL0
++	kernel_ventry	el0_error_invalid		// Error 64-bit EL0
+ 
+ #ifdef CONFIG_COMPAT
+-	ventry	el0_sync_compat			// Synchronous 32-bit EL0
+-	ventry	el0_irq_compat			// IRQ 32-bit EL0
+-	ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
+-	ventry	el0_error_invalid_compat	// Error 32-bit EL0
++	kernel_ventry	el0_sync_compat			// Synchronous 32-bit EL0
++	kernel_ventry	el0_irq_compat			// IRQ 32-bit EL0
++	kernel_ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
++	kernel_ventry	el0_error_invalid_compat	// Error 32-bit EL0
+ #else
+-	ventry	el0_sync_invalid		// Synchronous 32-bit EL0
+-	ventry	el0_irq_invalid			// IRQ 32-bit EL0
+-	ventry	el0_fiq_invalid			// FIQ 32-bit EL0
+-	ventry	el0_error_invalid		// Error 32-bit EL0
++	kernel_ventry	el0_sync_invalid		// Synchronous 32-bit EL0
++	kernel_ventry	el0_irq_invalid			// IRQ 32-bit EL0
++	kernel_ventry	el0_fiq_invalid			// FIQ 32-bit EL0
++	kernel_ventry	el0_error_invalid		// Error 32-bit EL0
+ #endif
+ END(vectors)
+ 
 -- 
 1.9.1
