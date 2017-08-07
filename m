@@ -1,34 +1,42 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Mon, 07 Aug 2017 17:18:12 +1000
-Subject: [PATCH 3/3] powerpc: replace vga_fixup() with generic code
-In-Reply-To: <20170804102033.27731-4-dja@axtens.net>
-References: <20170804102033.27731-1-dja@axtens.net>
- <20170804102033.27731-4-dja@axtens.net>
-Message-ID: <87efsnq217.fsf@concordia.ellerman.id.au>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Mon,  7 Aug 2017 12:52:32 +0530
+Subject: [PATCH 00/10] Add support for Ixora V1.1 and Apalis Evaluation Board
+Message-ID: <cover.1502087184.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Axtens <dja@axtens.net> writes:
+Hello,
 
-> Currently, we do a PCI fixup to mark a default card so that Xorg
-> autoconfiguration works.
->
-> There is a new generic method to do this sort of vga fixup, and
-> it occurs by default.
->
-> Drop our old method.
->
-> This method is different:
->  - it will only mark a card as default if a driver is bound
->  - the marking will happen at late_initcall time, or even later
->    if a card is enabled later on (via an ENABLE hook). Currently
->    things are enabled in a FINAL hook.
->
-> This *does* change behaviour under some circumstances.
->
-> For example, pseries_le_defconfig doesn't have DRM drivers for
-> many of the qemu GPU models, including the 'standard' vga.
+This patch series adds support for Toradex Ixora V1.1 and Apalis
+Evaluation Board along with some cleanups.
 
-Should we enable them/it?
+Patch series has been generated on top of shawn's for-next branch.
 
-cheers
+Regards,
+Sanchayan.
+
+Marcel Ziswiler (6):
+  ARM: dts: imx6q-apalis-ixora: combine aliases
+  ARM: dts: imx6qdl-apalis: imx6q-apalis-ixora: get rid of tegra legacy gen1_i2c comment
+  ARM: dts: imx6qdl-apalis: reword cam i2c comment
+  ARM: dts: imx6q-apalis-ixora: get rid of obsolete fusion comment
+  ARM: dts: imx6q-apalis-ixora: add camera i2c bus definition
+  ARM: dts: imx6qdl-apalis: imx6q-apalis-ixora: use i2c from dwc hdmi
+
+Sanchayan Maity (4):
+  ARM: dts: imx6q-apalis-ixora: fix usdhc2 pinctrl property
+  ARM: dts: imx6qdl-apalis: split usdhc1 pinctrl to support 4- and 8-bit
+  ARM: dts: imx6: add support for Toradex Ixora V1.1 carrier board
+  ARM: dts: imx6q-apalis-eval: add support for Apalis Evaluation Board
+
+ arch/arm/boot/dts/Makefile                    |   2 +
+ arch/arm/boot/dts/imx6q-apalis-eval.dts       | 278 ++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts | 291 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6q-apalis-ixora.dts      |  32 ++-
+ arch/arm/boot/dts/imx6qdl-apalis.dtsi         |  44 ++--
+ 5 files changed, 605 insertions(+), 42 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx6q-apalis-eval.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
+
+-- 
+2.13.3
