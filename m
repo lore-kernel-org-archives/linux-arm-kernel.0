@@ -1,63 +1,162 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Aug 2017 12:08:57 +0100
-Subject: [PATCH RFC] arm64: introduce mm_context_t flags
-In-Reply-To: <20170804214919.2ej6kj2mqmddfe3z@yury-thinkpad>
-References: <20170731144825.31322-1-ynorov@caviumnetworks.com>
- <20170802163900.66gnhogililb3uak@armageddon.cambridge.arm.com>
- <20170802172940.ejiyl4j2ywlwhbme@yury-thinkpad>
- <20170804173809.aviva53kccexghul@armageddon.cambridge.arm.com>
- <20170804214919.2ej6kj2mqmddfe3z@yury-thinkpad>
-Message-ID: <20170807110857.ek5ymq5234sxtub4@armageddon.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 7 Aug 2017 12:17:16 +0100
+Subject: [PATCH 1/2] acpi: arm64: add iort support for PMCG
+In-Reply-To: <1501876754-1064-2-git-send-email-nleeder@codeaurora.org>
+References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+ <1501876754-1064-2-git-send-email-nleeder@codeaurora.org>
+Message-ID: <22df7d0e-3017-b3f6-67e2-21b9ece433c3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 05, 2017 at 12:49:19AM +0300, Yury Norov wrote:
-> On Fri, Aug 04, 2017 at 06:38:10PM +0100, Catalin Marinas wrote:
-> > On Wed, Aug 02, 2017 at 08:29:40PM +0300, Yury Norov wrote:
-> > > On Wed, Aug 02, 2017 at 05:39:01PM +0100, Catalin Marinas wrote:
-> > > > On Mon, Jul 31, 2017 at 05:48:25PM +0300, Yury Norov wrote:
-> > > > > In patch 06beb72fbe23e ("arm64: introduce mm context flag to keep 32 bit task
-> > > > > information") you introduce the field flags but use it only for a single flag -
-> > > > > TIF_32BIT. It looks hacky to me for three reasons:
-> > > > >  - The flag is introduced for the case where it's impossible to get the thread
-> > > > >    info structure for the thread associated with mm. So thread_info flags (TIF)
-> > > > >    may also be unavailable at place. This is not the case for the only existing
-> > > > >    user of if - uprobes, but in general this approach requires to include thread
-> > > > >    headers in mm code, which may become unwanted dependency.
-> > > > >  - New flag, if it uses TIF bits, for consistency should for example set/clear
-> > > > >    TIF_32BIT_AARCH64 for ILP32 tasks. And to be completely consistent, with
-> > > > >    current approach we'd mirror thread_info flags to mm_context flags. And keep
-> > > > >    it syncronized.
-> > > > >  - If we start using TIF flags here, we cannot easily add new mm_context
-> > > > >    specific bits because they may mess with TIF ones.
-> > > > > 
-> > > > > I think that this is not what was intended when you added new field in
-> > > > > mm_context_t.
-> > > > 
-> > > > TIF_32BIT was handy at the time but it indeed denotes AArch32 user
-> > > > task. For ILP32 we wouldn't need to set this bit since the instruction
-> > > > set is A64 and uprobe should support it (though not sure anyone tried).
-> > > > I noticed in your patch introducing binfmt_ilp32.c that SET_PERSONALITY
-> > > > actually sets this flag in the mm context.
-> > > 
-> > > Depending on what will be decided here, I'll change ilp32 patch
-> > > accordingly.
-> > 
-> > Since this was meant to keep track of AArch32 tasks, the ILP32
-> > personality macros need to clear it.
->  
-> I understand it. I meant that the exact fix will depend on what we
-> will figure out here.
+Hi Neil,
+
+On 04/08/17 20:59, Neil Leeder wrote:
+> Add support for the SMMU Performance Monitor Counter Group
+> information from ACPI. This is in preparation for its use
+> in the SMMU v3 PMU driver.
 > 
-> I have also fixed small issue with headers in the patch "arm64: signal:
-> share lp64 signal structures and routines to ilp32", so I think I will
-> create rc4-based branch that will incorporate all changes. But if you
-> need I can also update rc3-based branch. And 4.12 - do you need the
-> updated version of it?
+> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
+> ---
+>  drivers/acpi/arm64/iort.c | 54 +++++++++++++++++++++++++++++++++++++++++++++++
+>  include/acpi/actbl2.h     |  9 +++++++-
+>  2 files changed, 62 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index a3215ee..5a998cd 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -970,6 +970,40 @@ static bool __init arm_smmu_is_coherent(struct acpi_iort_node *node)
+>  	return smmu->flags & ACPI_IORT_SMMU_COHERENT_WALK;
+>  }
+>  
+> +static int __init arm_smmu_pmu_count_resources(struct acpi_iort_node *node)
+> +{
+> +	struct acpi_iort_pmcg *pmcg;
+> +
+> +	/* Retrieve PMCG specific data */
+> +	pmcg = (struct acpi_iort_pmcg *)node->node_data;
+> +
+> +	/*
+> +	 * There are always 2 memory resources.
+> +	 * If the overflow_gsiv is present then add that for a total of 3.
+> +	 */
+> +	return pmcg->overflow_gsiv > 0 ? 3 : 2;
+> +}
+> +
+> +static void __init arm_smmu_pmu_init_resources(struct resource *res,
+> +					       struct acpi_iort_node *node)
+> +{
+> +	struct acpi_iort_pmcg *pmcg;
+> +
+> +	/* Retrieve PMCG specific data */
+> +	pmcg = (struct acpi_iort_pmcg *)node->node_data;
+> +
+> +	res[0].start = pmcg->base_address;
+> +	res[0].end = pmcg->base_address + SZ_4K - 1;
+> +	res[0].flags = IORESOURCE_MEM;
+> +	res[1].start = pmcg->base_address + SZ_64K;
 
-Not for 4.12, I'll just take it as it is with a fixup for
-SET_PERSONALITY. I will hold off with an 4.13 branch until the final
-4.13 is actually released, so you can rebase your -rc3/rc4 branch.
+Ugh, I see there's a nasty spec hole here - IORT only defines one base
+address, but SMMUv3 says *both* pages have imp-def base addresses. I
+guess this assumption of them being in consecutive 64K regions holds for
+your platform, but as things stand it doesn't appear possible to rely on
+it generally :(
 
--- 
-Catalin
+I'll follow up internally to see if we need to get IORT and/or SBSA
+updated or clarified.
+
+> +	res[1].end = pmcg->base_address + SZ_64K + SZ_4K - 1;
+> +	res[1].flags = IORESOURCE_MEM;
+> +
+> +	if (pmcg->overflow_gsiv)
+> +		acpi_iort_register_irq(pmcg->overflow_gsiv, "overflow",
+> +				       ACPI_EDGE_SENSITIVE, &res[2]);
+> +}
+> +
+>  struct iort_iommu_config {
+>  	const char *name;
+>  	int (*iommu_init)(struct acpi_iort_node *node);
+> @@ -993,6 +1027,12 @@ struct iort_iommu_config {
+>  	.iommu_init_resources = arm_smmu_init_resources
+>  };
+>  
+> +static const struct iort_iommu_config iort_arm_smmu_pmcg_cfg __initconst = {
+> +	.name = "arm-smmu-pmu",
+> +	.iommu_count_resources = arm_smmu_pmu_count_resources,
+> +	.iommu_init_resources = arm_smmu_pmu_init_resources
+> +};
+> +
+>  static __init
+>  const struct iort_iommu_config *iort_get_iommu_cfg(struct acpi_iort_node *node)
+>  {
+> @@ -1001,6 +1041,8 @@ const struct iort_iommu_config *iort_get_iommu_cfg(struct acpi_iort_node *node)
+>  		return &iort_arm_smmu_v3_cfg;
+>  	case ACPI_IORT_NODE_SMMU:
+>  		return &iort_arm_smmu_cfg;
+> +	case ACPI_IORT_NODE_PMCG:
+> +		return &iort_arm_smmu_pmcg_cfg;
+>  	default:
+>  		return NULL;
+>  	}
+> @@ -1056,6 +1098,15 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
+>  	if (ret)
+>  		goto dev_put;
+>  
+> +	/* End of init for PMCG */
+> +	if (node->type == ACPI_IORT_NODE_PMCG) {
+> +		ret = platform_device_add(pdev);
+> +		if (ret)
+> +			goto dev_put;
+> +
+> +		return 0;
+> +	}
+> +
+>  	/*
+>  	 * We expect the dma masks to be equivalent for
+>  	 * all SMMUs set-ups
+> @@ -1131,6 +1182,9 @@ static void __init iort_init_platform_devices(void)
+>  				acpi_free_fwnode_static(fwnode);
+>  				return;
+>  			}
+> +		} else if (iort_node->type == ACPI_IORT_NODE_PMCG) {
+> +			if (iort_add_smmu_platform_device(iort_node))
+> +				return;
+>  		}
+>  
+>  		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
+> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
+> index 707dda74..2169b6f 100644
+> --- a/include/acpi/actbl2.h
+> +++ b/include/acpi/actbl2.h
+
+Hopefully these changes are merely here for reference, but just in case
+it needs to be said, they should go as a separate patch via ACPICA
+(presumably there's also some corresponding iASL stuff to compile PMCG
+nodes in the first place).
+
+Robin.
+
+> @@ -695,7 +695,8 @@ enum acpi_iort_node_type {
+>  	ACPI_IORT_NODE_NAMED_COMPONENT = 0x01,
+>  	ACPI_IORT_NODE_PCI_ROOT_COMPLEX = 0x02,
+>  	ACPI_IORT_NODE_SMMU = 0x03,
+> -	ACPI_IORT_NODE_SMMU_V3 = 0x04
+> +	ACPI_IORT_NODE_SMMU_V3 = 0x04,
+> +	ACPI_IORT_NODE_PMCG = 0x05
+>  };
+>  
+>  struct acpi_iort_id_mapping {
+> @@ -811,6 +812,12 @@ struct acpi_iort_smmu_v3 {
+>  #define ACPI_IORT_SMMU_V3_COHACC_OVERRIDE   (1)
+>  #define ACPI_IORT_SMMU_V3_HTTU_OVERRIDE     (1<<1)
+>  
+> +struct acpi_iort_pmcg {
+> +	u64 base_address;	/* PMCG base address */
+> +	u32 overflow_gsiv;
+> +	u32 node_reference;
+> +};
+> +
+>  /*******************************************************************************
+>   *
+>   * IVRS - I/O Virtualization Reporting Structure
+> 
