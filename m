@@ -1,58 +1,80 @@
 From: chen.zhong@mediatek.com (Chen Zhong)
-Date: Mon, 7 Aug 2017 09:57:41 +0800
-Subject: [PATCH v2 1/5] mfd: mt6397: create irq mappings in mfd core driver
+Date: Mon, 7 Aug 2017 09:57:45 +0800
+Subject: [PATCH v2 5/5] mfd: mt6397: Add PMIC keys support to MT6397 driver
 In-Reply-To: <1502071065-6745-1-git-send-email-chen.zhong@mediatek.com>
 References: <1502071065-6745-1-git-send-email-chen.zhong@mediatek.com>
-Message-ID: <1502071065-6745-2-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <1502071065-6745-6-git-send-email-chen.zhong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The core driver should create and manage irq mappings instead of
-leaf drivers. This patch change to pass irq domain to
-devm_mfd_add_devices() and it will create mapping for irq resources
-automatically. And remove irq mapping in rtc driver since this has
-been done in core driver.
+This patch adds compatible strings and interrupts for pmic keys
+which serves as child device of MFD.
 
 Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
 ---
- drivers/mfd/mt6397-core.c |    4 ++--
- drivers/rtc/rtc-mt6397.c  |    2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/mfd/mt6397-core.c |   36 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 35 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-index 04a601f..6546d7f 100644
+index 6546d7f..3c6a765 100644
 --- a/drivers/mfd/mt6397-core.c
 +++ b/drivers/mfd/mt6397-core.c
-@@ -289,7 +289,7 @@ static int mt6397_probe(struct platform_device *pdev)
+@@ -43,6 +43,30 @@
+ 	},
+ };
  
- 		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6323_devs,
- 					   ARRAY_SIZE(mt6323_devs), NULL,
--					   0, NULL);
-+					   0, pmic->irq_domain);
- 		break;
++static const struct resource mt6323_keys_resources[] = {
++	{
++		.start = MT6323_IRQ_STATUS_PWRKEY,
++		.end   = MT6323_IRQ_STATUS_PWRKEY,
++		.flags = IORESOURCE_IRQ,
++	}, {
++		.start = MT6323_IRQ_STATUS_FCHRKEY,
++		.end   = MT6323_IRQ_STATUS_FCHRKEY,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static const struct resource mt6397_keys_resources[] = {
++	{
++		.start = MT6397_IRQ_PWRKEY,
++		.end   = MT6397_IRQ_PWRKEY,
++		.flags = IORESOURCE_IRQ,
++	}, {
++		.start = MT6397_IRQ_HOMEKEY,
++		.end   = MT6397_IRQ_HOMEKEY,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
+ static const struct mfd_cell mt6323_devs[] = {
+ 	{
+ 		.name = "mt6323-regulator",
+@@ -50,6 +74,11 @@
+ 	}, {
+ 		.name = "mt6323-led",
+ 		.of_compatible = "mediatek,mt6323-led"
++	}, {
++		.name = "mtk-pmic-keys",
++		.num_resources = ARRAY_SIZE(mt6323_keys_resources),
++		.resources = mt6323_keys_resources,
++		.of_compatible = "mediatek,mt6323-keys"
+ 	},
+ };
  
- 	case MT6397_CID_CODE:
-@@ -304,7 +304,7 @@ static int mt6397_probe(struct platform_device *pdev)
+@@ -71,7 +100,12 @@
+ 	}, {
+ 		.name = "mt6397-pinctrl",
+ 		.of_compatible = "mediatek,mt6397-pinctrl",
+-	},
++	}, {
++		.name = "mtk-pmic-keys",
++		.num_resources = ARRAY_SIZE(mt6397_keys_resources),
++		.resources = mt6397_keys_resources,
++		.of_compatible = "mediatek,mt6397-keys"
++	}
+ };
  
- 		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6397_devs,
- 					   ARRAY_SIZE(mt6397_devs), NULL,
--					   0, NULL);
-+					   0, pmic->irq_domain);
- 		break;
- 
- 	default:
-diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
-index 1a61fa5..22c52f7 100644
---- a/drivers/rtc/rtc-mt6397.c
-+++ b/drivers/rtc/rtc-mt6397.c
-@@ -323,7 +323,7 @@ static int mtk_rtc_probe(struct platform_device *pdev)
- 	rtc->addr_base = res->start;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
--	rtc->irq = irq_create_mapping(mt6397_chip->irq_domain, res->start);
-+	rtc->irq = res->start;
- 	if (rtc->irq <= 0)
- 		return -EINVAL;
- 
+ static void mt6397_irq_lock(struct irq_data *data)
 -- 
 1.7.9.5
