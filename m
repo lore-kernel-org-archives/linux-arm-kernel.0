@@ -1,45 +1,95 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 7 Aug 2017 16:41:24 +0100
-Subject: [PATCH v2 1/3] mfd: syscon: update Atmel SMC binding doc
-In-Reply-To: <20170718132220.25018-2-ludovic.desroches@microchip.com>
-References: <20170718132220.25018-1-ludovic.desroches@microchip.com>
- <20170718132220.25018-2-ludovic.desroches@microchip.com>
-Message-ID: <20170807154124.norjlxavx4u75yzs@dell>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 07 Aug 2017 16:53:26 +0100
+Subject: Applied "spi: rockchip: Fix clock handling in suspend/resume" to the
+ spi tree
+In-Reply-To: <1502109620-26813-4-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <E1dekLO-0005bc-H0@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enjoy!
+The patch
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+   spi: rockchip: Fix clock handling in suspend/resume
 
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+has been applied to the spi tree at
 
-are available in the git repository at:
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git ib-mfd-arm-v4.14
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-for you to fetch changes up to 5df46ec0f4cf3b2cb0791abe5c68821a4f7ffffe:
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-  ARM: dts: at91: sama5d2: Use sama5d2 compatible string for SMC (2017-08-07 16:38:30 +0100)
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-----------------------------------------------------------------
-Immutable branch between MFD and ARM due for the v4.14 merge window
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
-----------------------------------------------------------------
-Ludovic Desroches (3):
-      mfd: syscon: Update Atmel SMC binding doc
-      mfd: syscon: atmel-smc: Add helper to retrieve register layout
-      ARM: dts: at91: sama5d2: Use sama5d2 compatible string for SMC
+Thanks,
+Mark
 
- .../devicetree/bindings/mfd/atmel-smc.txt          |  1 +
- arch/arm/boot/dts/sama5d2.dtsi                     |  2 +-
- drivers/memory/atmel-ebi.c                         | 13 +++--
- drivers/mfd/atmel-smc.c                            | 67 +++++++++++++++++-----
- drivers/mtd/nand/atmel/nand-controller.c           | 10 +++-
- include/linux/mfd/syscon/atmel-smc.h               | 32 ++++++++---
+>From d38c4ae194bb8a3d8cf7d95378c5b2799cdd0a3b Mon Sep 17 00:00:00 2001
+From: Jeffy Chen <jeffy.chen@rock-chips.com>
+Date: Mon, 7 Aug 2017 20:40:20 +0800
+Subject: [PATCH] spi: rockchip: Fix clock handling in suspend/resume
+
+The runtime suspend callback might be called by pm domain framework at
+suspend_noirq stage. It would try to disable the clocks which already
+been disabled by rockchip_spi_suspend.
+
+Call pm_runtime_force_suspend/pm_runtime_force_resume when
+suspend/resume to avoid that.
+
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-rockchip.c | 21 ++++++---------------
+ 1 file changed, 6 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+index a75fd9bb76de..34f6440a5255 100644
+--- a/drivers/spi/spi-rockchip.c
++++ b/drivers/spi/spi-rockchip.c
+@@ -846,10 +846,9 @@ static int rockchip_spi_suspend(struct device *dev)
+ 	if (ret < 0)
+ 		return ret;
  
+-	if (!pm_runtime_suspended(dev)) {
+-		clk_disable_unprepare(rs->spiclk);
+-		clk_disable_unprepare(rs->apb_pclk);
+-	}
++	ret = pm_runtime_force_suspend(dev);
++	if (ret < 0)
++		return ret;
+ 
+ 	pinctrl_pm_select_sleep_state(dev);
+ 
+@@ -864,17 +863,9 @@ static int rockchip_spi_resume(struct device *dev)
+ 
+ 	pinctrl_pm_select_default_state(dev);
+ 
+-	if (!pm_runtime_suspended(dev)) {
+-		ret = clk_prepare_enable(rs->apb_pclk);
+-		if (ret < 0)
+-			return ret;
+-
+-		ret = clk_prepare_enable(rs->spiclk);
+-		if (ret < 0) {
+-			clk_disable_unprepare(rs->apb_pclk);
+-			return ret;
+-		}
+-	}
++	ret = pm_runtime_force_resume(dev);
++	if (ret < 0)
++		return ret;
+ 
+ 	ret = spi_master_resume(rs->master);
+ 	if (ret < 0) {
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.13.3
