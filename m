@@ -1,147 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Aug 2017 18:19:17 +0100
-Subject: [PATCH v5 4/9] arm64: hugetlb: Add break-before-make logic for
- contiguous entries
-In-Reply-To: <20170802094904.27749-5-punit.agrawal@arm.com>
-References: <20170802094904.27749-1-punit.agrawal@arm.com>
- <20170802094904.27749-5-punit.agrawal@arm.com>
-Message-ID: <20170807171916.vdplrndrdyeontho@armageddon.cambridge.arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 7 Aug 2017 20:26:21 +0300
+Subject: [PATCH v2 0/2] OMAP3+/4+ PRM: fix of_irq_get() result checks
+In-Reply-To: <CAHp75Vfg9k5e=9O=Be=irKE88U-zKLM3WdQit6BZVBKZR2SVCA@mail.gmail.com>
+References: <20170806151420.104225294@cogentembedded.com>
+ <CAHp75VfdGkac6PUMSJLydR9GcZ8UAmqRR6zq2xNhYL8mMe3iUg@mail.gmail.com>
+ <CAHp75Vfg9k5e=9O=Be=irKE88U-zKLM3WdQit6BZVBKZR2SVCA@mail.gmail.com>
+Message-ID: <4a63fd34-2822-e887-e485-c24568981448@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 02, 2017 at 10:48:59AM +0100, Punit Agrawal wrote:
-> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> index 08deed7c71f0..f2c976464f39 100644
-> --- a/arch/arm64/mm/hugetlbpage.c
-> +++ b/arch/arm64/mm/hugetlbpage.c
-> @@ -68,6 +68,47 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
->  	return CONT_PTES;
->  }
->  
-> +/*
-> + * Changing some bits of contiguous entries requires us to follow a
-> + * Break-Before-Make approach, breaking the whole contiguous set
-> + * before we can change any entries. See ARM DDI 0487A.k_iss10775,
-> + * "Misprogramming of the Contiguous bit", page D4-1762.
-> + *
-> + * This helper performs the break step.
-> + */
-> +static pte_t get_clear_flush(struct mm_struct *mm,
-> +			     unsigned long addr,
-> +			     pte_t *ptep,
-> +			     unsigned long pgsize,
-> +			     unsigned long ncontig)
-> +{
-> +	unsigned long i, saddr = addr;
-> +	struct vm_area_struct vma = { .vm_mm = mm };
-> +	pte_t orig_pte = huge_ptep_get(ptep);
-> +
-> +	/*
-> +	 * If we already have a faulting entry then we don't need
-> +	 * to break before make (there won't be a tlb entry cached).
-> +	 */
-> +	if (!pte_present(orig_pte))
-> +		return orig_pte;
-> +
-> +	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++) {
-> +		pte_t pte = ptep_get_and_clear(mm, addr, ptep);
-> +
-> +		/*
-> +		 * If HW_AFDBM is enabled, then the HW could turn on
-> +		 * the dirty bit for any page in the set, so check
-> +		 * them all.  All hugetlb entries are already young.
-> +		 */
-> +		if (IS_ENABLED(CONFIG_ARM64_HW_AFDBM) && pte_dirty(pte))
-> +			orig_pte = pte_mkdirty(orig_pte);
-> +	}
-> +
-> +	flush_tlb_range(&vma, saddr, addr);
-> +	return orig_pte;
-> +}
-> +
->  void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
->  			    pte_t *ptep, pte_t pte)
->  {
-> @@ -93,6 +134,8 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
->  	dpfn = pgsize >> PAGE_SHIFT;
->  	hugeprot = pte_pgprot(pte);
->  
-> +	get_clear_flush(mm, addr, ptep, pgsize, ncontig);
-> +
->  	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
->  		pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
->  			 pte_val(pfn_pte(pfn, hugeprot)));
+On 08/06/2017 10:38 PM, Andy Shevchenko wrote:
 
-Is there any risk of the huge pte being accessed (from user space on
-another CPU) in the short break-before-make window? Not that we can do
-much about it but just checking.
+>>> Hello!
+>>>
+>>> Here's the set of 2 patches against the 'omap-for-v4.13/fixes' branch of Tony
+>>> Lingren's 'linux-omap.git' repo.  I'm  fixing of_irq_get() DT API result
+>>> checks.
+>>>
+>>> [1/2] ARM: OMAP3+: PRM: fix of_irq_get() result check
+>>> [2/2] ARM: OMAP4+: PRM: fix of_irq_get() result checks
+>>
+>> What IRQ domain did you consider? In case of STRICT the mapping will
+>> be 1:1 and 0 is _valid_ IRQ number for hwirq.
+>> 0 in Linux kernel IRQ numbering often means NO_IRQ. But there might be
+>> exceptions.
+>>
+>> So, it would be nice to see if there is a problem on certain platform
+>> if the patch is not applied, or is it problem on OF IRQ code, or
+>> wrong interpratation of 0?
+> 
+> Okay, I have looked into OF code and it seems always allocating
 
-BTW, it seems a bit overkill to use ptep_get_and_clear() (via
-get_clear_flush) when we just want to zero the entries. Probably not
-much overhead though.
+    Heh, I was going to send you down the of_irq_get()'s call chains -- it 
+became obvious to me that 0 is a "bad IRQ" indication from looking at 
+irq_create_fwspec_mapping()...
 
-> @@ -222,6 +256,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
->  	int ncontig, i, changed = 0;
->  	size_t pgsize = 0;
->  	unsigned long pfn = pte_pfn(pte), dpfn;
-> +	pte_t orig_pte;
->  	pgprot_t hugeprot;
->  
->  	if (!pte_cont(pte))
-> @@ -231,10 +266,12 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
->  	dpfn = pgsize >> PAGE_SHIFT;
->  	hugeprot = pte_pgprot(pte);
->  
-> -	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
-> -		changed |= ptep_set_access_flags(vma, addr, ptep,
-> -				pfn_pte(pfn, hugeprot), dirty);
-> -	}
-> +	orig_pte = get_clear_flush(vma->vm_mm, addr, ptep, pgsize, ncontig);
-> +	if (!pte_same(orig_pte, pte))
-> +		changed = 1;
-> +
-> +	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
-> +		set_pte_at(vma->vm_mm, addr, ptep, pfn_pte(pfn, hugeprot));
->  
->  	return changed;
->  }
+> descriptors where numbering starts from 1 (see hint variable deep in
+> the code).
 
-If hugeprot isn't dirty but orig_pte became dirty, it looks like we just
-drop such information from the new pte.
+    In kernel/irq/irqdomain.c::irq_domain_alloc_descs(), you mean?
+I haven't plunged so deep. :-) But it's hardly an OF code, IIRC...
 
-Same comment here about the window. huge_ptep_set_access_flags() is
-called on a present (huge) pte and we briefly make it invalid. Can the
-mm subsystem cope with a fault on another CPU here? Same for the
-huge_ptep_set_wrprotect() below.
+> This series is a good fix.
 
-> @@ -244,6 +281,9 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
->  {
->  	int ncontig, i;
->  	size_t pgsize;
-> +	pte_t pte = pte_wrprotect(huge_ptep_get(ptep)), orig_pte;
-> +	unsigned long pfn = pte_pfn(pte), dpfn;
-> +	pgprot_t hugeprot;
->  
->  	if (!pte_cont(*ptep)) {
->  		ptep_set_wrprotect(mm, addr, ptep);
-> @@ -251,8 +291,15 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
->  	}
->  
->  	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
-> -	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize)
-> -		ptep_set_wrprotect(mm, addr, ptep);
-> +	dpfn = pgsize >> PAGE_SHIFT;
-> +
-> +	orig_pte = get_clear_flush(mm, addr, ptep, pgsize, ncontig);
-> +	if (pte_dirty(orig_pte))
-> +		pte = pte_mkdirty(pte);
-> +
-> +	hugeprot = pte_pgprot(pte);
-> +	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
-> +		set_pte_at(mm, addr, ptep, pfn_pte(pfn, hugeprot));
->  }
->  
->  void huge_ptep_clear_flush(struct vm_area_struct *vma,
+    Thank you (especially for spending your Sunday time)! :-)
 
--- 
-Catalin
+MBR, Sergei
