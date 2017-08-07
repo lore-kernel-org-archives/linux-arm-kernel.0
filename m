@@ -1,24 +1,31 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 7 Aug 2017 17:19:39 +0530
-Subject: [PATCH 0/4] K2G: Add support for PWM ECAP
-Message-ID: <20170807114943.22612-1-vigneshr@ti.com>
+Date: Mon, 7 Aug 2017 17:19:40 +0530
+Subject: [PATCH 1/4] pwm: pwm-tiecap: Add TI 66AK2G SoC specific compatible
+In-Reply-To: <20170807114943.22612-1-vigneshr@ti.com>
+References: <20170807114943.22612-1-vigneshr@ti.com>
+Message-ID: <20170807114943.22612-2-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for TI ECAP PWM IP present in 66AK2G SoC.
-Based on linux-next.
+Add a new compatible string "ti,k2g-ecap" to support PWM ECAP IP of
+TI 66AK2G SoC.
 
-Vignesh R (4):
-  pwm: pwm-tiecap: Add TI 66AK2G SoC specific compatible
-  ARM: dts: keystone-k2g: Add ECAP PWM DT nodes
-  ARM: dts: keystone-k2g-evm: Enable PWM ECAP0
-  ARM: configs: keystone: Enable TIECAP PWM driver
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
+ Documentation/devicetree/bindings/pwm/pwm-tiecap.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
- Documentation/devicetree/bindings/pwm/pwm-tiecap.txt |  1 +
- arch/arm/boot/dts/keystone-k2g-evm.dts               | 12 ++++++++++++
- arch/arm/boot/dts/keystone-k2g.dtsi                  | 20 ++++++++++++++++++++
- arch/arm/configs/keystone_defconfig                  |  2 ++
- 4 files changed, 35 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+index 8007e839a716..06a363d9ccef 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm-tiecap.txt
+@@ -6,6 +6,7 @@ Required properties:
+   for am4372 - compatible = "ti,am4372-ecap", "ti,am3352-ecap", "ti,am33xx-ecap";
+   for da850  - compatible = "ti,da850-ecap", "ti,am3352-ecap", "ti,am33xx-ecap";
+   for dra746 - compatible = "ti,dra746-ecap", "ti,am3352-ecap";
++  for 66ak2g - compatible = "ti,k2g-ecap", "ti,am3352-ecap";
+ - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
+   the cells format. The PWM channel index ranges from 0 to 4. The only third
+   cell flag supported by this binding is PWM_POLARITY_INVERTED.
 -- 
 2.13.3
