@@ -1,70 +1,90 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 7 Aug 2017 23:32:44 +0200
-Subject: [PATCH v2 1/5] mfd: mt6397: create irq mappings in mfd core driver
-In-Reply-To: <1502071065-6745-2-git-send-email-chen.zhong@mediatek.com>
-References: <1502071065-6745-1-git-send-email-chen.zhong@mediatek.com>
- <1502071065-6745-2-git-send-email-chen.zhong@mediatek.com>
-Message-ID: <20170807213244.7hrd3isq5jj44dgd@piout.net>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 07 Aug 2017 14:34:06 -0700
+Subject: [PATCH 08/14] mmc: meson-gx: rework clock init function
+In-Reply-To: <20170804174353.16486-9-jbrunet@baylibre.com> (Jerome Brunet's
+ message of "Fri, 4 Aug 2017 19:43:47 +0200")
+References: <20170804174353.16486-1-jbrunet@baylibre.com>
+ <20170804174353.16486-9-jbrunet@baylibre.com>
+Message-ID: <7h4ltjoyep.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2017 at 09:57:41 +0800, Chen Zhong wrote:
-> The core driver should create and manage irq mappings instead of
-> leaf drivers. This patch change to pass irq domain to
-> devm_mfd_add_devices() and it will create mapping for irq resources
-> automatically. And remove irq mapping in rtc driver since this has
-> been done in core driver.
-> 
-> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-For the RTC part:
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
+> Perform basic initialisation of the clk register before providing it to
+> the CCF.
+>
+> Thanks to devm, carrying the clock structure around after init is not
+> necessary. Rework the function to remove these from the controller host
+> data.
+>
+> Finally, set initial mmc clock rate before enabling it, simplifying the
+> exit condition.
+>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 > ---
->  drivers/mfd/mt6397-core.c |    4 ++--
->  drivers/rtc/rtc-mt6397.c  |    2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-> index 04a601f..6546d7f 100644
-> --- a/drivers/mfd/mt6397-core.c
-> +++ b/drivers/mfd/mt6397-core.c
-> @@ -289,7 +289,7 @@ static int mt6397_probe(struct platform_device *pdev)
+>  drivers/mmc/host/meson-gx-mmc.c | 101 +++++++++++++++++++---------------------
+>  1 file changed, 49 insertions(+), 52 deletions(-)
+>
+> diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
+> index 8f9ba5190c18..4cc7d6530536 100644
+> --- a/drivers/mmc/host/meson-gx-mmc.c
+> +++ b/drivers/mmc/host/meson-gx-mmc.c
+> @@ -42,10 +42,7 @@
 >  
->  		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6323_devs,
->  					   ARRAY_SIZE(mt6323_devs), NULL,
-> -					   0, NULL);
-> +					   0, pmic->irq_domain);
->  		break;
+>  #define SD_EMMC_CLOCK 0x0
+>  #define   CLK_DIV_MASK GENMASK(5, 0)
+> -#define   CLK_DIV_MAX 63
+>  #define   CLK_SRC_MASK GENMASK(7, 6)
+> -#define   CLK_SRC_XTAL 0   /* external crystal */
+> -#define   CLK_SRC_PLL 1    /* FCLK_DIV2 */
+>  #define   CLK_CORE_PHASE_MASK GENMASK(9, 8)
+>  #define   CLK_TX_PHASE_MASK GENMASK(11, 10)
+>  #define   CLK_RX_PHASE_MASK GENMASK(13, 12)
+> @@ -137,13 +134,9 @@ struct meson_host {
+>  	spinlock_t lock;
+>  	void __iomem *regs;
+>  	struct clk *core_clk;
+> -	struct clk_mux mux;
+> -	struct clk *mux_clk;
+> +	struct clk *signal_clk;
+>  	unsigned long req_rate;
 >  
->  	case MT6397_CID_CODE:
-> @@ -304,7 +304,7 @@ static int mt6397_probe(struct platform_device *pdev)
+> -	struct clk_divider cfg_div;
+> -	struct clk *cfg_div_clk;
+> -
+>  	unsigned int bounce_buf_size;
+>  	void *bounce_buf;
+>  	dma_addr_t bounce_dma_addr;
+> @@ -291,7 +284,7 @@ static int meson_mmc_clk_set(struct meson_host *host, unsigned long clk_rate)
+>  		return 0;
+>  	}
 >  
->  		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6397_devs,
->  					   ARRAY_SIZE(mt6397_devs), NULL,
-> -					   0, NULL);
-> +					   0, pmic->irq_domain);
->  		break;
->  
->  	default:
-> diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
-> index 1a61fa5..22c52f7 100644
-> --- a/drivers/rtc/rtc-mt6397.c
-> +++ b/drivers/rtc/rtc-mt6397.c
-> @@ -323,7 +323,7 @@ static int mtk_rtc_probe(struct platform_device *pdev)
->  	rtc->addr_base = res->start;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> -	rtc->irq = irq_create_mapping(mt6397_chip->irq_domain, res->start);
-> +	rtc->irq = res->start;
->  	if (rtc->irq <= 0)
->  		return -EINVAL;
->  
-> -- 
-> 1.7.9.5
-> 
+> -	ret = clk_set_rate(host->cfg_div_clk, clk_rate);
+> +	ret = clk_set_rate(host->signal_clk, clk_rate);
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+minor nit: where does the name "signal" come from?  I called this
+"div_clk" because it's the output of the divider right before the
+sd/emmc IP block.   Admittedly, that's not a great name either, and I'm
+not too picky about the naming, just curious...
+
+Looking at the diagram we have since I initially wrote the driver, this
+is more commonly referred to as device_clk.
+
+Anyways, if you're going to rename...
+
+[...]
+
+>  static void meson_mmc_set_tuning_params(struct mmc_host *mmc)
+> @@ -987,7 +984,7 @@ static int meson_mmc_probe(struct platform_device *pdev)
+>  	dma_free_coherent(host->dev, host->bounce_buf_size,
+>  			  host->bounce_buf, host->bounce_dma_addr);
+>  err_div_clk:
+
+... probably should rename this too.
+
+Otherwise,
+
+Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+
+Kevin
