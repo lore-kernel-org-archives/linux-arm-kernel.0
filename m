@@ -1,19 +1,33 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 07 Aug 2017 23:30:55 +0200
-Subject: [PATCH v1 1/2] arm64: dts: rockchip: add rk3328 i2s nodes
-In-Reply-To: <1501143365-76104-2-git-send-email-sugar.zhang@rock-chips.com>
-References: <1501143365-76104-1-git-send-email-sugar.zhang@rock-chips.com>
- <1501143365-76104-2-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <1918910.fG6X1AiR1q@phil>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Mon, 7 Aug 2017 16:31:43 -0500
+Subject: [PATCH 0/3] ARM: dts: keystone-k2g: Add DCAN instances to 66AK2G
+In-Reply-To: <69995971-2fe7-87f4-a46a-8ef4f729ffc5@oracle.com>
+References: <20170802201822.11532-1-fcooper@ti.com>
+ <69995971-2fe7-87f4-a46a-8ef4f729ffc5@oracle.com>
+Message-ID: <8930852b-6995-3d41-440e-86f440b313ad@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 27. Juli 2017, 16:16:03 CEST schrieb Sugar Zhang:
-> This patch add the i2s dt nodes for rk3328.
+
+Hi Santosh,
+On 08/04/2017 12:07 PM, Santosh Shilimkar wrote:
+> Hi Franklin,
 > 
-> Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
+> On 8/2/2017 1:18 PM, Franklin S Cooper Jr wrote:
+>> Add D CAN nodes to 66AK2G based SoC dtsi.
+>>
+>> Franklin S Cooper Jr (2):
+>>    dt-bindings: net: c_can: Update binding for clock and power-domains
+>>      property
+>>    ARM: configs: keystone: Enable D_CAN driver
+>>
+>> Lokesh Vutla (1):
+>>    ARM: dts: k2g: Add DCAN nodes
+>>
+> Any DCAN driver dependency with these patchset ? If not, I can
+> queue this up so do let me know.
 
-as the binding patch got applied I've now also applied thos one for 4.14
-
-
-Heiko
+There aren't any dependencies.
+> 
+> Regards,
+> Santosh
