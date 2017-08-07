@@ -1,84 +1,114 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 7 Aug 2017 10:20:11 +0530
-Subject: Warning dump on OMAP-L138 when g_zero module is removed
-In-Reply-To: <f97d12c0-3aaa-b666-292d-cad9c3af54df@baylibre.com>
-References: <748a9491-e834-34cb-993f-e8c7e2538961@ti.com>
- <260e5199-624d-b402-5481-2d818d282ce7@baylibre.com>
- <d3e5f067-81eb-80bb-c8e9-c7f147fe0145@ti.com>
- <7c53882e-b70b-91dc-df2f-9f67fdd3cf40@baylibre.com>
- <f97d12c0-3aaa-b666-292d-cad9c3af54df@baylibre.com>
-Message-ID: <c40f167d-c70d-7582-9e27-5236b052ecca@ti.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon,  7 Aug 2017 13:01:29 +0800
+Subject: [PATCH] arm64: dts: hi6220: improve g-tx-fifo-size setting for usb
+ device
+Message-ID: <1502082090-22017-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+From: Shawn Guo <shawn.guo@linaro.org>
 
-On Sunday 06 August 2017 01:37 AM, Alexandre Bailon wrote:
-> Hi Sekhar,
-> On 07/21/2017 05:18 PM, Alexandre Bailon wrote:
->> Hi Sekhar,
->>
->> On 07/10/2017 01:00 PM, Sekhar Nori wrote:
->>> On Thursday 06 July 2017 10:43 PM, Alexandre Bailon wrote:
->>>> On 06/29/2017 03:50 PM, Sekhar Nori wrote:
->>>>> Hi Alexandre, Bin,
->>>>>
->>>>> With latest linux-next, I see a warning dump when I remove g_zero[1] on
->>>>> OMAP-L138 LCDK board. I am building the kernel with davinci_all_defconfig.
->>>>>
->>>>> It is not present in latest mainline because the warnings are introduced
->>>>> with CPPI DMA getting enabled in latest -next.
->>>>>
->>>>> Subsequent insertion of g_ether leads to a warning too[2], although the
->>>>> gadget seems to work (ping test).
->>>>>
->>>>> Since these are pretty annoying, it will be nice to get rid of them. I
->>>>> have not been able to debug any further. But if you have
->>>>> ideas/experiments to try, I can do that.
->>>
->>>> I got a lot of these warnings during development but it was only for the
->>>> host mode.
->>>> If I remember correctly, the cause was a race between the teardown
->>>> function and the interrupt handler.
->>>> The teardwon descriptor was pop from the queue by the interrupt handler,
->>>> preventing cppi41_tear_down_chan() to get it, which will result after
->>>> some retries to a couple of warnings.
->>>>
->>>> I will take a look to see if that is the same issue.
->> That is not the same issue. Still, for some reasons, we never get the
->> teardown descriptor.
->> Two possibilities:
->>  - Like the issue I had, the teardown is pop at the wrong place.
->>  - The teardown doesn't complete or the descriptor is not queued.
-> The teardown descriptor is not queued. I have figured out the reason.
-> The function cppi41_dma_channel_abort() enable the teardown by setting the bit corresponding to the endpoint number.
-> The address of the register is USB_TDOWN but actually the address is wrong in the case of DA8xx.
-> Using the right address (0x1c) fix the teardown warnings.
-> I will work on a fix.
->> I think we should eliminate the first one before to work on the second one.
->> I think adding some logs to cppi41_pop_desc() could help to figure out
->> what is happening.
->>>
->>> Thanks! I also see similar warnings under fast ping traffic and g_ether
->>> inserted on LCDK. They dont come immediately though. Only after an hour
->>> or so under traffic.
-> The fix should also fix this issue.
->> I would not have expected to have them during a ping but this probably
->> happens because some USB packet have timed out, which cause may a teardown.
->>>
->>> I can those provide logs too if its going to be helpful.
->> Currently, I think we should focus on the warnings that happens during
->> the rmmod as they are always reproducible.
->>
->> Thanks,
->> Alexandre
->>
-> Note that the teardown is not the only thing that doesn't work correctly.
-> I think same kind of issue should apply to the autoreq and the dma mode.
-> I will work on a patch that should solve all of them.
+The current usb device g-tx-fifo-size setting in DT causes two problems
+for kernel driver.
 
-Glad you found the issue. When you have a patch, I will be happy to test
-it out.
+1. On hi6220, there are 15 tx_fifo dedicated for all EPs except EP0,
+   while DT only provides tx_fifo settings for 6 EPs.  It results in the
+   following annoying complaints from kernel.
 
-Thanks,
-Sekhar
+[    4.451623] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[7]=0
+[    4.461303] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[8]=0
+[    4.470969] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[9]=0
+[    4.480632] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[10]=0
+[    4.490385] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[11]=0
+[    4.500140] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[12]=0
+[    4.509892] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[13]=0
+[    4.519646] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[14]=0
+[    4.529399] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[15]=0
+[    4.539244] dwc2 f72c0000.usb: EPs: 16, dedicated fifos, 1920 entries in SPRAM
+
+   Besides of that, the total 1920 fifo entries isn't fully utilized.
+   Endpoint Info Control block consumes 128 entries, g-rx-fifo-size
+   is 512, and g-np-tx-fifo-size is 128.  So the fifi entries available
+   for tx_fifo is: 1920 - 128 - 512 - 128 = 1152.  Considering that
+   the minimal valid tx_fifo size for each EP is 16, it should be
+   reasonable to allocate 1152 entries as: 128 x 8 + 16 x 7 = 1136 (only
+   16 entries unused).  With this new setting, we can get more EPs to
+   use while removing the above warning messages in the meantime.
+
+2. Another consequence of above invalid g_tx_fifo_size parameter is that
+   kernel driver will use values read from hardware register as the
+   fall-back.  The value is 2048 for each EP fifo.  That's obviously
+   invalid either, because even fifo entries for one EP exceeds the
+   total entries 1920.  That's why we see the following fat warning from
+   function dwc2_hsotg_init_fifo().  The new g-tx-fifo-size settings
+   help to remove the warning as well.
+
+[   65.431634] dwc2 f72c0000.usb: Do port resume before switching to device mode
+[   65.624176] insufficient fifo memory
+[   65.624369] ------------[ cut here ]------------
+[   65.633633] WARNING: CPU: 0 PID: 5 at drivers/usb/dwc2/gadget.c:330 dwc2_hsotg_init_fifo+0x164/0x1ac
+[   65.643808] CPU: 0 PID: 5 Comm: kworker/u16:0 Not tainted 4.13.0-rc1-00022-g50861cf9dc1b-dirty #81
+[   65.653769] Hardware name: HiKey Development Board (DT)
+[   65.659624] Workqueue: dwc2 dwc2_conn_id_status_change
+[   65.665377] task: ffffffc005f73400 task.stack: ffffffc005f98000
+[   65.671987] PC is at dwc2_hsotg_init_fifo+0x164/0x1ac
+[   65.677633] LR is at dwc2_hsotg_init_fifo+0x164/0x1ac
+[   65.683275] pc : [<ffffff8008638044>] lr : [<ffffff8008638044>] pstate: 600001c5
+[   65.691504] sp : ffffffc005f9bce0
+[   65.695218] x29: ffffffc005f9bce0 x28: ffffffc005f6ac00
+[   65.701172] x27: ffffffc005f73400 x26: 0000000008000580
+[   65.707124] x25: ffffff8008bb4af0 x24: ffffff8008d02b70
+[   65.713074] x23: 0000003fcc831084 x22: ffffffc0337cf0bc
+[   65.719024] x21: 0000000000000580 x20: ffffffc0337cf018
+[   65.724976] x19: ffffffc0337cf098 x18: 0000000000000000
+[   65.730926] x17: 0000000000000000 x16: 0000000000000000
+[   65.736873] x15: 0000000000000000 x14: ffffff8008ca8900
+[   65.742825] x13: 0000004035299000 x12: 0000000034d5d91d
+[   65.748775] x11: 0000000000000000 x10: 00000000000008d0
+[   65.754726] x9 : ffffffc005f9bce0 x8 : 00000000000001b5
+[   65.760674] x7 : 66696620746e6569 x6 : ffffff8008d60050
+[   65.766623] x5 : 0000000000000000 x4 : 0000000000000000
+[   65.772573] x3 : 0000000000000002 x2 : 0000000000000002
+[   65.778521] x1 : 0000000000000001 x0 : 0000000000000018
+[   65.784469] Call trace:
+[   65.787236] Exception stack(0xffffffc005f9bb10 to 0xffffffc005f9bc40)
+[   65.794420] bb00:                                   ffffffc0337cf098 0000008000000000
+[   65.803145] bb20: ffffffc005f9bce0 ffffff8008638044 ffffff8008bb4af0 0000000008000580
+[   65.811870] bb40: ffffffc005f73400 ffffffc005f6ac00 0000000000000000 ffffff8008da2998
+[   65.820595] bb60: ffffffc005f9bce0 ffffffc005f9bce0 ffffffc005f9bca0 00000000ffffffc8
+[   65.829315] bb80: ffffffc005f9bbb0 ffffff80081046a0 ffffffc005f9bce0 ffffffc005f9bce0
+[   65.838038] bba0: ffffffc005f9bca0 00000000ffffffc8 0000000000000018 0000000000000001
+[   65.846761] bbc0: 0000000000000002 0000000000000002 0000000000000000 0000000000000000
+[   65.855485] bbe0: ffffff8008d60050 66696620746e6569 00000000000001b5 ffffffc005f9bce0
+[   65.864207] bc00: 00000000000008d0 0000000000000000 0000000034d5d91d 0000004035299000
+[   65.872928] bc20: ffffff8008ca8900 0000000000000000 0000000000000000 0000000000000000
+[   65.900856] [<ffffff8008638044>] dwc2_hsotg_init_fifo+0x164/0x1ac
+[   65.927195] [<ffffff800863b390>] dwc2_hsotg_core_init_disconnected+0x80/0x3c0
+[   65.954736] [<ffffff800862fef0>] dwc2_conn_id_status_change+0xfc/0x21c
+[   65.981561] [<ffffff80080d1ca8>] process_one_work+0x124/0x294
+[   66.007419] [<ffffff80080d1e70>] worker_thread+0x58/0x3c8
+[   66.023243] [<ffffff80080d79a0>] kthread+0x100/0x12c
+[   66.032455] [<ffffff8008082ec0>] ret_from_fork+0x10/0x50
+[   66.041987] ---[ end trace 7079dcaa2d9e46fa ]---
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index eacbe0db5bc2..a1a65ac0f713 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -755,7 +755,8 @@
+ 			dr_mode = "otg";
+ 			g-rx-fifo-size = <512>;
+ 			g-np-tx-fifo-size = <128>;
+-			g-tx-fifo-size = <128 128 128 128 128 128>;
++			g-tx-fifo-size = <128 128 128 128 128 128 128 128
++					   16  16  16  16  16  16  16>;
+ 			interrupts = <0 77 0x4>;
+ 		};
+ 
+-- 
+1.9.1
