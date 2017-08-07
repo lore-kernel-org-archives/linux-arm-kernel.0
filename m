@@ -1,36 +1,26 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Mon,  7 Aug 2017 13:15:19 +0530
-Subject: [PATCH 2/2] dmaengine: at_xdmac: Handle return value of
- clk_prepare_enable.
-In-Reply-To: <878f9486ee507c227cb8835417c520b489c768c8.1502091778.git.arvind.yadav.cs@gmail.com>
-References: <878f9486ee507c227cb8835417c520b489c768c8.1502091778.git.arvind.yadav.cs@gmail.com>
-Message-ID: <3c5d3448f8d00995698e2dd905ba0d11a645b35f.1502091778.git.arvind.yadav.cs@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 7 Aug 2017 08:41:10 +0100
+Subject: [PATCH 3/3] irqchip: bcm2836: Move SMP startup code to arch/arm
+In-Reply-To: <1502058731-12462-4-git-send-email-stefan.wahren@i2se.com>
+References: <1502058731-12462-1-git-send-email-stefan.wahren@i2se.com>
+ <1502058731-12462-4-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <0f587b52-d9db-3bbe-968d-66b40fba508c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_prepare_enable() can fail here and we must check its return value.
+On 06/08/17 23:32, Stefan Wahren wrote:
+> In order to easily provide SMP for BCM2837 on 32-bit and 64-bit
+> the SMP startup code was placed in irq-bcm2836. That's not the
+> right approach. So move this code where it belongs.
+> 
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Fixes: 41f4988cc287 ("irqchip/bcm2836: Add SMP support for the 2836")
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/dma/at_xdmac.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index 6a3cf97..c00e392 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -1883,8 +1883,11 @@ static int atmel_xdmac_resume(struct device *dev)
- 	struct at_xdmac_chan	*atchan;
- 	struct dma_chan		*chan, *_chan;
- 	int			i;
-+	int ret;
- 
--	clk_prepare_enable(atxdmac->clk);
-+	ret = clk_prepare_enable(atxdmac->clk);
-+	if (ret)
-+		return ret;
- 
- 	/* Clear pending interrupts. */
- 	for (i = 0; i < atxdmac->dma.chancnt; i++) {
+How do you want to get this merged? I can either take it via the irqchip
+tree, or you take it via arm-soc. Just let me know.
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
