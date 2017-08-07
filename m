@@ -1,40 +1,40 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Mon,  7 Aug 2017 12:52:42 +0530
-Subject: [PATCH 10/10] ARM: dts: imx6q-apalis-eval: add support for Apalis
- Evaluation Board
+Date: Mon,  7 Aug 2017 12:52:41 +0530
+Subject: [PATCH 09/10] ARM: dts: imx6: add support for Toradex Ixora V1.1
+ carrier board
 In-Reply-To: <cover.1502087184.git.maitysanchayan@gmail.com>
 References: <cover.1502087184.git.maitysanchayan@gmail.com>
-Message-ID: <fd12d8b098612db413250d98237382dc6d9d3c85.1502087184.git.maitysanchayan@gmail.com>
+Message-ID: <51ee987c6e23e77600ac8fdbaa539893f7614414.1502087184.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Toradex Apalis Evaluation Board.
+Add support for the Toradex Ixora V1.1 carrier board.
 
 Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 ---
- arch/arm/boot/dts/Makefile              |   1 +
- arch/arm/boot/dts/imx6q-apalis-eval.dts | 278 ++++++++++++++++++++++++++++++++
- 2 files changed, 279 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-apalis-eval.dts
+ arch/arm/boot/dts/Makefile                    |   1 +
+ arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts | 291 ++++++++++++++++++++++++++
+ 2 files changed, 292 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 1c16e891a76a..2c5aca56a29f 100644
+index ccfaf8e9e397..1c16e891a76a 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -392,6 +392,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-udoo.dtb \
+@@ -393,6 +393,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
  	imx6dl-wandboard.dtb \
  	imx6dl-wandboard-revb1.dtb \
-+	imx6q-apalis-eval.dtb \
  	imx6q-apalis-ixora.dtb \
- 	imx6q-apalis-ixora-v1.1.dtb \
++	imx6q-apalis-ixora-v1.1.dtb \
  	imx6q-apf6dev.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-apalis-eval.dts b/arch/arm/boot/dts/imx6q-apalis-eval.dts
+ 	imx6q-arm2.dtb \
+ 	imx6q-b450v3.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts b/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
 new file mode 100644
-index 000000000000..4bbfe3d61027
+index 000000000000..a35c7a54ad3b
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-apalis-eval.dts
-@@ -0,0 +1,278 @@
++++ b/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
+@@ -0,0 +1,291 @@
 +/*
 + * Copyright 2014-2017 Toradex AG
 + * Copyright 2012 Freescale Semiconductor, Inc.
@@ -87,8 +87,9 @@ index 000000000000..4bbfe3d61027
 +#include "imx6qdl-apalis.dtsi"
 +
 +/ {
-+	model = "Toradex Apalis iMX6Q/D Module on Apalis Evaluation Board";
-+	compatible = "toradex,apalis_imx6q-eval", "toradex,apalis_imx6q",
++	model = "Toradex Apalis iMX6Q/D Module on Ixora Carrier Board V1.1";
++	compatible = "toradex,apalis_imx6q-ixora-v1.1",
++		     "toradex,apalis_imx6q-ixora", "toradex,apalis_imx6q",
 +		     "fsl,imx6q";
 +
 +	aliases {
@@ -154,15 +155,31 @@ index 000000000000..4bbfe3d61027
 +		};
 +	};
 +
-+	reg_pcie_switch: regulator-pcie-switch {
-+		compatible = "regulator-fixed";
-+		regulator-name = "pcie_switch";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		gpio = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-+		startup-delay-us = <100000>;
-+		enable-active-high;
-+		status = "okay";
++	leds {
++		compatible = "gpio-leds";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_leds_ixora>;
++
++		led4-green {
++			label = "LED_4_GREEN";
++			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
++		};
++
++		led4-red {
++			label = "LED_4_RED";
++			gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
++		};
++
++		led5-green {
++			label = "LED_5_GREEN";
++			gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;
++		};
++
++		led5-red {
++			label = "LED_5_RED";
++			gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
++		};
 +	};
 +};
 +
@@ -187,11 +204,6 @@ index 000000000000..4bbfe3d61027
 +/* I2C1_SDA/SCL on MXM3 209/211 (e.g. RTC on carrier board) */
 +&i2c1 {
 +	status = "okay";
-+
-+	pcie-switch at 58 {
-+		compatible = "plx,pex8605";
-+		reg = <0x58>;
-+	};
 +
 +	/* M41T0M6 real time clock on carrier board */
 +	rtc_i2c: rtc at 68 {
@@ -220,7 +232,6 @@ index 000000000000..4bbfe3d61027
 +	/* active-high meaning opposite of regular PERST# active-low polarity */
 +	reset-gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
 +	reset-gpio-active-high;
-+	vpcie-supply = <&reg_pcie_switch>;
 +	status = "okay";
 +};
 +
@@ -289,16 +300,9 @@ index 000000000000..4bbfe3d61027
 +/* MMC1 */
 +&usdhc1 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc1_4bit &pinctrl_usdhc1_8bit &pinctrl_mmc_cd>;
++	pinctrl-0 = <&pinctrl_usdhc1_4bit &pinctrl_mmc_cd>;
 +	cd-gpios = <&gpio4 20 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
-+/* SD1 */
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2 &pinctrl_sd_cd>;
-+	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
++	bus-width = <4>;
 +	status = "okay";
 +};
 +
@@ -312,6 +316,15 @@ index 000000000000..4bbfe3d61027
 +		     &pinctrl_apalis_gpio5 &pinctrl_apalis_gpio6
 +		     &pinctrl_apalis_gpio7 &pinctrl_apalis_gpio8
 +		    >;
++
++	pinctrl_leds_ixora: ledsixoragrp {
++		fsl,pins = <
++			MX6QDL_PAD_SD2_DAT1__GPIO1_IO14 0x1b0b0
++			MX6QDL_PAD_SD2_DAT3__GPIO1_IO12 0x1b0b0
++			MX6QDL_PAD_NANDF_D1__GPIO2_IO01 0x1b0b0
++			MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x1b0b0
++		>;
++	};
 +};
 -- 
 2.13.3
