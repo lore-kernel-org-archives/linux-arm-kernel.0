@@ -1,105 +1,57 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 7 Aug 2017 13:39:48 -0700
-Subject: [PATCH] lkdtm: Test VMAP_STACK allocates leading/trailing guard pages
-Message-ID: <20170807203948.GA22298@beast>
+From: pasha.tatashin@oracle.com (Pavel Tatashin)
+Date: Mon,  7 Aug 2017 16:38:48 -0400
+Subject: [v6 14/15] mm: optimize early system hash allocations
+In-Reply-To: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <1502138329-123460-15-git-send-email-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two new tests STACK_GUARD_PAGE_LEADING and STACK_GUARD_PAGE_TRAILING
-attempt to read the byte before and after, respectively, of the current
-stack frame, which should fault under VMAP_STACK.
+Clients can call alloc_large_system_hash() with flag: HASH_ZERO to specify
+that memory that was allocated for system hash needs to be zeroed,
+otherwise the memory does not need to be zeroed, and client will initialize
+it.
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
+If memory does not need to be zero'd, call the new
+memblock_virt_alloc_raw() interface, and thus improve the boot performance.
+
+Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+Reviewed-by: Bob Picco <bob.picco@oracle.com>
 ---
-Do these tests both trip with the new arm64 VMAP_STACK code?
----
- drivers/misc/lkdtm.h      |  2 ++
- drivers/misc/lkdtm_bugs.c | 30 ++++++++++++++++++++++++++++++
- drivers/misc/lkdtm_core.c |  2 ++
- 3 files changed, 34 insertions(+)
+ mm/page_alloc.c | 15 +++++++--------
+ 1 file changed, 7 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/misc/lkdtm.h b/drivers/misc/lkdtm.h
-index 063f5d651076..3c8627ca5f42 100644
---- a/drivers/misc/lkdtm.h
-+++ b/drivers/misc/lkdtm.h
-@@ -22,6 +22,8 @@ void lkdtm_HUNG_TASK(void);
- void lkdtm_CORRUPT_LIST_ADD(void);
- void lkdtm_CORRUPT_LIST_DEL(void);
- void lkdtm_CORRUPT_USER_DS(void);
-+void lkdtm_STACK_GUARD_PAGE_LEADING(void);
-+void lkdtm_STACK_GUARD_PAGE_TRAILING(void);
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 4d32c1fa4c6c..000806298dfb 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -7354,18 +7354,17 @@ void *__init alloc_large_system_hash(const char *tablename,
  
- /* lkdtm_heap.c */
- void lkdtm_OVERWRITE_ALLOCATION(void);
-diff --git a/drivers/misc/lkdtm_bugs.c b/drivers/misc/lkdtm_bugs.c
-index ef3d06f901fc..041fe6e9532a 100644
---- a/drivers/misc/lkdtm_bugs.c
-+++ b/drivers/misc/lkdtm_bugs.c
-@@ -8,6 +8,7 @@
- #include <linux/list.h>
- #include <linux/sched.h>
- #include <linux/sched/signal.h>
-+#include <linux/sched/task_stack.h>
- #include <linux/uaccess.h>
+ 	log2qty = ilog2(numentries);
  
- struct lkdtm_list {
-@@ -199,6 +200,7 @@ void lkdtm_CORRUPT_LIST_DEL(void)
- 		pr_err("list_del() corruption not detected!\n");
- }
- 
-+/* Test if unbalanced set_fs(KERNEL_DS)/set_fs(USER_DS) check exists. */
- void lkdtm_CORRUPT_USER_DS(void)
- {
- 	pr_info("setting bad task size limit\n");
-@@ -207,3 +209,31 @@ void lkdtm_CORRUPT_USER_DS(void)
- 	/* Make sure we do not keep running with a KERNEL_DS! */
- 	force_sig(SIGKILL, current);
- }
-+
-+/* Test that VMAP_STACK is actually allocating with a leading guard page */
-+void lkdtm_STACK_GUARD_PAGE_LEADING(void)
-+{
-+	const unsigned char *stack = task_stack_page(current);
-+	const unsigned char *ptr = stack - 1;
-+	volatile unsigned char byte;
-+
-+	pr_info("attempting bad read from page below current stack\n");
-+
-+	byte = *ptr;
-+
-+	pr_err("FAIL: accessed page before stack!\n");
-+}
-+
-+/* Test that VMAP_STACK is actually allocating with a trailing guard page */
-+void lkdtm_STACK_GUARD_PAGE_TRAILING(void)
-+{
-+	const unsigned char *stack = task_stack_page(current);
-+	const unsigned char *ptr = stack + THREAD_SIZE;
-+	volatile unsigned char byte;
-+
-+	pr_info("attempting bad read from page above current stack\n");
-+
-+	byte = *ptr;
-+
-+	pr_err("FAIL: accessed page after stack!\n");
-+}
-diff --git a/drivers/misc/lkdtm_core.c b/drivers/misc/lkdtm_core.c
-index 51decc07eeda..9e98d7ef5503 100644
---- a/drivers/misc/lkdtm_core.c
-+++ b/drivers/misc/lkdtm_core.c
-@@ -201,6 +201,8 @@ struct crashtype crashtypes[] = {
- 	CRASHTYPE(CORRUPT_LIST_DEL),
- 	CRASHTYPE(CORRUPT_USER_DS),
- 	CRASHTYPE(CORRUPT_STACK),
-+	CRASHTYPE(STACK_GUARD_PAGE_LEADING),
-+	CRASHTYPE(STACK_GUARD_PAGE_TRAILING),
- 	CRASHTYPE(UNALIGNED_LOAD_STORE_WRITE),
- 	CRASHTYPE(OVERWRITE_ALLOCATION),
- 	CRASHTYPE(WRITE_AFTER_FREE),
+-	/*
+-	 * memblock allocator returns zeroed memory already, so HASH_ZERO is
+-	 * currently not used when HASH_EARLY is specified.
+-	 */
+ 	gfp_flags = (flags & HASH_ZERO) ? GFP_ATOMIC | __GFP_ZERO : GFP_ATOMIC;
+ 	do {
+ 		size = bucketsize << log2qty;
+-		if (flags & HASH_EARLY)
+-			table = memblock_virt_alloc_nopanic(size, 0);
+-		else if (hashdist)
++		if (flags & HASH_EARLY) {
++			if (flags & HASH_ZERO)
++				table = memblock_virt_alloc_nopanic(size, 0);
++			else
++				table = memblock_virt_alloc_raw(size, 0);
++		} else if (hashdist) {
+ 			table = __vmalloc(size, gfp_flags, PAGE_KERNEL);
+-		else {
++		} else {
+ 			/*
+ 			 * If bucketsize is not a power-of-two, we may free
+ 			 * some pages@the end of hash table which
 -- 
-2.7.4
-
-
--- 
-Kees Cook
-Pixel Security
+2.14.0
