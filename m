@@ -1,27 +1,31 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 7 Aug 2017 11:30:09 +0200
-Subject: [PATCH 1/5] edac: synopsys: Add platform specific structures ddrc
- controller
-In-Reply-To: <20170807092750.GA18992@nazgul.tnic>
-References: <60ff19f90adfd252cf296fe8988c614c4c3e43fd.1501848023.git.michal.simek@xilinx.com>
- <20170806051830.GC28006@nazgul.tnic>
- <abf22c6a-0694-e869-fda1-5672907bf3a7@xilinx.com>
- <20170807092750.GA18992@nazgul.tnic>
-Message-ID: <f0a22f57-1f04-ab03-c3b4-27677332d04f@xilinx.com>
+From: yunzhi.li@deephi.tech (Yunzhi Li)
+Date: Mon,  7 Aug 2017 17:33:22 +0800
+Subject: [PATCH] ARM: hisi: Fix typo in comment
+Message-ID: <20170807093322.26050-1-yunzhi.li@deephi.tech>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7.8.2017 11:27, Borislav Petkov wrote:
-> On Mon, Aug 07, 2017 at 09:39:57AM +0200, Michal Simek wrote:
->>> "This patch" in a commit message is tautologically redundant.
->>
->> Fixed in v2.
-> 
-> You forgot to remove "This patch" in the remaining patches. But please
-> wait with sending v3 until I go through all of them.
-> 
+Fix the rc vs. pc typo. There is no a register named rc, I felt
+confused when I read this assembler command in comment.
 
-Fair enough - will wait and will remove in v3.
+Signed-off-by: Yunzhi Li <yunzhi.li@deephi.tech>
+---
 
-Thanks,
-Michal
+ arch/arm/mach-hisi/platsmp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-hisi/platsmp.c b/arch/arm/mach-hisi/platsmp.c
+index 91bb02dec20f..da5689ababf7 100644
+--- a/arch/arm/mach-hisi/platsmp.c
++++ b/arch/arm/mach-hisi/platsmp.c
+@@ -109,7 +109,7 @@ static void hix5hd2_set_scu_boot_addr(phys_addr_t start_addr, phys_addr_t jump_a
+ 
+ 	virt = ioremap(start_addr, PAGE_SIZE);
+ 
+-	writel_relaxed(0xe51ff004, virt);	/* ldr pc, [rc, #-4] */
++	writel_relaxed(0xe51ff004, virt);	/* ldr pc, [pc, #-4] */
+ 	writel_relaxed(jump_addr, virt + 4);	/* pc jump phy address */
+ 	iounmap(virt);
+ }
+-- 
+2.11.0
