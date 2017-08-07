@@ -1,25 +1,50 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 6 Aug 2017 22:59:49 -0400
-Subject: [PATCH V8 1/2] PCI: handle CRS returned by device after FLR
-In-Reply-To: <1502071792-15263-1-git-send-email-okaya@codeaurora.org>
-References: <1502071792-15263-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <b841281a-cb6c-dfb2-001c-bc13a261c741@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 7 Aug 2017 11:19:10 +0800
+Subject: [GIT PULL 1/3] Allwinner defconfig changes for 4.14
+Message-ID: <20170807031910.66qj742m3egmdex5@wens.csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/6/2017 10:09 PM, Sinan Kaya wrote:
-> +	pcie_capability_read_word(dev, PCI_EXP_RTCAP, &root_cap);
-> +	if (root_cap & PCI_EXP_RTCAP_CRSVIS) {
-> +		/* don't touch the HW before waiting 100ms */
-> +		msleep(100);
+Hi Arnd, Olof,
 
-This is obviously broken. I should have checked the capability
-on the root port. I was trying to get it out before Monday.
+Here is the first round of Allwinner pull requests for 4.14.
+This one is for the defconfigs. Please have a look and merge
+if nothing stands out.
 
-However, I still want to hear about the preference of this
-methodology.
+Thanks
+ChenYu
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-defconfig-for-4.14
+
+for you to fetch changes up to a679e5f52d0209789eb3f542d857a4ead2e85167:
+
+  arm: sunxi: Add AXP20X_ADC (2017-07-24 11:39:02 +0200)
+
+----------------------------------------------------------------
+Allwinner defconfig changes for 4.14
+
+Sunxi_defconfig is refreshed and various power supply and ADC drivers
+of the AXP PMICs have been enabled.
+
+----------------------------------------------------------------
+Maxime Ripard (3):
+      arm: sunxi: refresh the defconfig
+      arm: sunxi: Add additional power supplies
+      arm: sunxi: Add AXP20X_ADC
+
+ arch/arm/configs/sunxi_defconfig | 15 +++++----------
+ 1 file changed, 5 insertions(+), 10 deletions(-)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170807/b3b391c8/attachment.sig>
