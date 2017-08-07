@@ -1,75 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 7 Aug 2017 13:56:19 +0200
-Subject: [PATCH 2/2] pinctrl: armada-37xx: Fix number of pin in south
- bridge
-In-Reply-To: <20170801155720.10229-3-gregory.clement@free-electrons.com>
-References: <20170801155720.10229-1-gregory.clement@free-electrons.com>
- <20170801155720.10229-3-gregory.clement@free-electrons.com>
-Message-ID: <CACRpkdaUHX+_=z-BPHaQhnw8MGss2ZH5hBHooB=hjmK=GhkwFg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 7 Aug 2017 13:58:29 +0200
+Subject: [PATCH] ASoC: pxa: don't select SSP for COMPILE_TESTing
+In-Reply-To: <20170807114837.3bqsroayi3sipf4h@sirena.org.uk>
+References: <20170807104101.3540159-1-arnd@arndb.de>
+ <20170807112030.zvz3flujilsixdj4@sirena.org.uk>
+ <CAK8P3a3Zuu7HE4CphQR_wpbGvnupYRSdy3xFZu5UgsuvoOjnLQ@mail.gmail.com>
+ <20170807114837.3bqsroayi3sipf4h@sirena.org.uk>
+Message-ID: <CAK8P3a0tjwxq+P+Ww+Rxjt9Z4+AsJMgvn3z0bHiPgO+4EWQHZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 1, 2017 at 5:57 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-
-> On the south bridge we have pin from to 29, so it gives 30 pins (and not
-> 29).
+On Mon, Aug 7, 2017 at 1:48 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Mon, Aug 07, 2017 at 01:36:09PM +0200, Arnd Bergmann wrote:
+>> On Mon, Aug 7, 2017 at 1:20 PM, Mark Brown <broonie@kernel.org> wrote:
+>> > On Mon, Aug 07, 2017 at 12:40:44PM +0200, Arnd Bergmann wrote:
+>> >> When the audio driver selects CONFIG_PXA_SSP to be a loadable
+>> >> module on a platform other than PXA, and the PXA SPI driver
+>> >> is built-in, we get a link error in the SPI driver:
 >
-> Without this patch the kernel complain with the following traces:
-> cat /sys/kernel/debug/pinctrl/d0018800.pinctrl/pingroups
-> [  154.530205] armada-37xx-pinctrl d0018800.pinctrl: failed to get pin(29) name
-> [  154.537567] ------------[ cut here ]------------
-> [  154.542348] WARNING: CPU: 1 PID: 1347 at /home/gclement/open/kernel/marvell-mainline-linux/drivers/pinctrl/core.c:1610 pinctrl_groups_show+0x15c/0x1a0
-> [  154.555918] Modules linked in:
-> [  154.558890] CPU: 1 PID: 1347 Comm: cat Tainted: G        W       4.13.0-rc1-00001-g19e1b9fa219d #525
-> [  154.568316] Hardware name: Marvell Armada 3720 Development Board DB-88F3720-DDR3 (DT)
-> [  154.576311] task: ffff80001d32d100 task.stack: ffff80001bdc0000
-> [  154.583048] PC is at pinctrl_groups_show+0x15c/0x1a0
-> [  154.587816] LR is at pinctrl_groups_show+0x148/0x1a0
-> [  154.592847] pc : [<ffff0000083e3adc>] lr : [<ffff0000083e3ac8>] pstate: 00000145
-> [  154.600840] sp : ffff80001bdc3c80
-> [  154.604255] x29: ffff80001bdc3c80 x28: 00000000f7750000
-> [  154.609825] x27: ffff80001d05d198 x26: 0000000000000009
-> [  154.615224] x25: ffff0000089ead20 x24: 0000000000000002
-> [  154.620705] x23: ffff000008c8e1d0 x22: ffff80001be55700
-> [  154.626187] x21: ffff80001d05d100 x20: 0000000000000005
-> [  154.631667] x19: 0000000000000006 x18: 0000000000000010
-> [  154.637238] x17: 0000000000000000 x16: ffff0000081fc4b8
-> [  154.642726] x15: 0000000000000006 x14: ffff0000899e537f
-> [  154.648214] x13: ffff0000099e538d x12: 206f742064656c69
-> [  154.653613] x11: 6166203a6c727463 x10: 0000000005f5e0ff
-> [  154.659094] x9 : ffff80001bdc38c0 x8 : 286e697020746567
-> [  154.664576] x7 : ffff000008551870 x6 : 000000000000011b
-> [  154.670146] x5 : 0000000000000000 x4 : 0000000000000000
-> [  154.675544] x3 : 0000000000000000 x2 : 0000000000000000
-> [  154.681025] x1 : ffff000008c8e1d0 x0 : ffff80001be55700
-> [  154.686507] Call trace:
-> [  154.688668] Exception stack(0xffff80001bdc3ab0 to 0xffff80001bdc3be0)
-> [  154.695224] 3aa0:                                   0000000000000006 0001000000000000
-> [  154.703310] 3ac0: ffff80001bdc3c80 ffff0000083e3adc ffff80001bdc3bb0 00000000ffffffd8
-> [  154.711304] 3ae0: 4554535953425553 6f6674616c703d4d 4349564544006d72 6674616c702b3d45
-> [  154.719478] 3b00: 313030643a6d726f 6e69702e30303838 ffff80006c727463 ffff0000089635d8
-> [  154.727562] 3b20: ffff80001d1ca0cb ffff000008af0fa4 ffff80001bdc3b40 ffff000008c8e1dc
-> [  154.735648] 3b40: ffff80001bdc3bc0 ffff000008223174 ffff80001be55700 ffff000008c8e1d0
-> [  154.743731] 3b60: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
-> [  154.752354] 3b80: 000000000000011b ffff000008551870 286e697020746567 ffff80001bdc38c0
-> [  154.760446] 3ba0: 0000000005f5e0ff 6166203a6c727463 206f742064656c69 ffff0000099e538d
-> [  154.767910] 3bc0: ffff0000899e537f 0000000000000006 ffff0000081fc4b8 0000000000000000
-> [  154.776085] [<ffff0000083e3adc>] pinctrl_groups_show+0x15c/0x1a0
-> [  154.782823] [<ffff000008222abc>] seq_read+0x184/0x460
-> [  154.787505] [<ffff000008344120>] full_proxy_read+0x60/0xa8
-> [  154.793431] [<ffff0000081f9bec>] __vfs_read+0x1c/0x110
-> [  154.799001] [<ffff0000081faff4>] vfs_read+0x84/0x140
-> [  154.803860] [<ffff0000081fc4fc>] SyS_read+0x44/0xa0
-> [  154.808983] [<ffff000008082f30>] el0_svc_naked+0x24/0x28
-> [  154.814459] ---[ end trace 4cbb00a92d616b95 ]---
+>> > Why doesn't this cause problems on PXA?
 >
-> Cc: stable at vger.kernel.org
-> Fixes: 87466ccd9401 ("pinctrl: armada-37xx: Add pin controller support
-> for Armada 37xx")
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> On PXA, we 'make' descends into arch/arm/plat-pxa/, where ssp.o
+>> is located. On other ARM platforms (I guess except for MMP),
+>> PLAT_PXA is not set, and on non-ARM architectures, we can't
+>> get there anyway.
+>
+> Still missing a few steps of reasoning here...
 
-Patch applied for fixes.
+Sorry, I just realized that you were trying to point out the incomplete
+changelog. I must have accidentally closed the editor while working on
+it, and then sent it out today after getting no regressions.
 
-Yours,
-Linus Walleij
+I'll resend with a proper changelog.
+
+        Arnd
