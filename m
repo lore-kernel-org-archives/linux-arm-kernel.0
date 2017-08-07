@@ -1,112 +1,82 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  7 Aug 2017 19:35:55 +0100
-Subject: [PATCH 04/14] arm64: factor out PAGE_* and CONT_* definitions
+Date: Mon,  7 Aug 2017 19:35:59 +0100
+Subject: [PATCH 08/14] efi/arm64: add EFI_KIMG_ALIGN
 In-Reply-To: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
 References: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1502130965-18710-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <1502130965-18710-9-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some headers rely on PAGE_* definitions from <asm/page.h>, but cannot
-include this due to potential circular includes. For example, a number
-of definitions in <asm/memory.h> rely on PAGE_SHIFT, and <asm/page.h>
-includes <asm/memory.h>.
+The EFI stub is intimately coupled with the kernel, and takes advantage
+of this by relocating the kernel at a weaker alignment than the
+documented boot protocol mandates.
 
-This requires users of these definitions to include both headers, which
-is fragile and error-prone.
+However, it does so by assuming it can align the kernel to the segment
+alignment, and assumes that this is 64K. In subsequent patches, we'll
+have to consider other details to determine this de-facto alignment
+constraint.
 
-This patch ameliorates matters by moving the basic definitions out to a
-new header, <asm/page-def.h>. Both <asm/page.h> and <asm/memory.h> are
-updated to include this, avoiding this fragility, and avoiding the
-possibility of circular include dependencies.
+This patch adds a new EFI_KIMG_ALIGN definition that will track the
+kernel's de-facto alignment requirements. Subsequent patches will modify
+this as required.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: James Morse <james.morse@arm.com>
 Cc: Laura Abbott <labbott@redhat.com>
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/memory.h   |  1 +
- arch/arm64/include/asm/page-def.h | 34 ++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/page.h     | 12 +-----------
- 3 files changed, 36 insertions(+), 11 deletions(-)
- create mode 100644 arch/arm64/include/asm/page-def.h
+ arch/arm64/include/asm/efi.h              | 3 +++
+ drivers/firmware/efi/libstub/arm64-stub.c | 6 ++++--
+ 2 files changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 32f827233..77d55dc 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -25,6 +25,7 @@
- #include <linux/const.h>
- #include <linux/types.h>
- #include <asm/bug.h>
-+#include <asm/page-def.h>
- #include <asm/sizes.h>
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index 8f3043a..0e8cc3b 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -4,6 +4,7 @@
+ #include <asm/boot.h>
+ #include <asm/cpufeature.h>
+ #include <asm/io.h>
++#include <asm/memory.h>
+ #include <asm/mmu_context.h>
+ #include <asm/neon.h>
+ #include <asm/ptrace.h>
+@@ -48,6 +49,8 @@
+  */
+ #define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
  
- /*
-diff --git a/arch/arm64/include/asm/page-def.h b/arch/arm64/include/asm/page-def.h
-new file mode 100644
-index 0000000..01591a2
---- /dev/null
-+++ b/arch/arm64/include/asm/page-def.h
-@@ -0,0 +1,34 @@
-+/*
-+ * Based on arch/arm/include/asm/page.h
-+ *
-+ * Copyright (C) 1995-2003 Russell King
-+ * Copyright (C) 2017 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_PAGE_DEF_H
-+#define __ASM_PAGE_DEF_H
++#define EFI_KIMG_ALIGN	SEGMENT_ALIGN
 +
-+#include <linux/const.h>
-+
-+/* PAGE_SHIFT determines the page size */
-+/* CONT_SHIFT determines the number of pages which can be tracked together  */
-+#define PAGE_SHIFT		CONFIG_ARM64_PAGE_SHIFT
-+#define CONT_SHIFT		CONFIG_ARM64_CONT_SHIFT
-+#define PAGE_SIZE		(_AC(1, UL) << PAGE_SHIFT)
-+#define PAGE_MASK		(~(PAGE_SIZE-1))
-+
-+#define CONT_SIZE		(_AC(1, UL) << (CONT_SHIFT + PAGE_SHIFT))
-+#define CONT_MASK		(~(CONT_SIZE-1))
-+
-+#endif /* __ASM_PAGE_DEF_H */
-diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
-index 8472c6d..60d02c8 100644
---- a/arch/arm64/include/asm/page.h
-+++ b/arch/arm64/include/asm/page.h
-@@ -19,17 +19,7 @@
- #ifndef __ASM_PAGE_H
- #define __ASM_PAGE_H
+ /* on arm64, the FDT may be located anywhere in system RAM */
+ static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
+ {
+diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
+index b4c2589..af6ae95 100644
+--- a/drivers/firmware/efi/libstub/arm64-stub.c
++++ b/drivers/firmware/efi/libstub/arm64-stub.c
+@@ -11,6 +11,7 @@
+  */
+ #include <linux/efi.h>
+ #include <asm/efi.h>
++#include <asm/memory.h>
+ #include <asm/sections.h>
+ #include <asm/sysreg.h>
  
--#include <linux/const.h>
--
--/* PAGE_SHIFT determines the page size */
--/* CONT_SHIFT determines the number of pages which can be tracked together  */
--#define PAGE_SHIFT		CONFIG_ARM64_PAGE_SHIFT
--#define CONT_SHIFT		CONFIG_ARM64_CONT_SHIFT
--#define PAGE_SIZE		(_AC(1, UL) << PAGE_SHIFT)
--#define PAGE_MASK		(~(PAGE_SIZE-1))
--
--#define CONT_SIZE		(_AC(1, UL) << (CONT_SHIFT + PAGE_SHIFT))
--#define CONT_MASK		(~(CONT_SIZE-1))
-+#include <asm/page-def.h>
- 
- #ifndef __ASSEMBLY__
+@@ -81,9 +82,10 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table_arg,
+ 		/*
+ 		 * If CONFIG_DEBUG_ALIGN_RODATA is not set, produce a
+ 		 * displacement in the interval [0, MIN_KIMG_ALIGN) that
+-		 * is a multiple of the minimal segment alignment (SZ_64K)
++		 * doesn't violate this kernel's de-facto alignment
++		 * constraints.
+ 		 */
+-		u32 mask = (MIN_KIMG_ALIGN - 1) & ~(SZ_64K - 1);
++		u32 mask = (MIN_KIMG_ALIGN - 1) & ~(EFI_KIMG_ALIGN - 1);
+ 		u32 offset = !IS_ENABLED(CONFIG_DEBUG_ALIGN_RODATA) ?
+ 			     (phys_seed >> 32) & mask : TEXT_OFFSET;
  
 -- 
 1.9.1
