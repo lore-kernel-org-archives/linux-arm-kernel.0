@@ -1,7 +1,7 @@
 From: yunzhi.li@deephi.tech (Yunzhi Li)
-Date: Mon,  7 Aug 2017 17:33:22 +0800
+Date: Mon,  7 Aug 2017 17:37:04 +0800
 Subject: [PATCH] ARM: hisi: Fix typo in comment
-Message-ID: <20170807093322.26050-1-yunzhi.li@deephi.tech>
+Message-ID: <20170807093704.26313-1-yunzhi.li@deephi.tech>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
