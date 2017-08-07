@@ -1,44 +1,63 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Mon,  7 Aug 2017 20:40:19 +0800
-Subject: [PATCH 2/3] spi: rockchip: Fix clock handling in remove
+Date: Mon,  7 Aug 2017 20:40:20 +0800
+Subject: [PATCH 3/3] spi: rockchip: Fix clock handling in suspend/resume
 In-Reply-To: <1502109620-26813-1-git-send-email-jeffy.chen@rock-chips.com>
 References: <1502109620-26813-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <1502109620-26813-3-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <1502109620-26813-4-git-send-email-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are assuming clocks enabled when calling rockchip_spi_remove, which
-is not always true. Those clocks might already been disabled by the
-runtime PM at that time.
+The runtime suspend callback might be called by pm domain framework at
+suspend_noirq stage. It would try to disable the clocks which already
+been disabled by rockchip_spi_suspend.
 
-Call pm_runtime_get_sync before trying to disable clocks to avoid that.
+Call pm_runtime_force_suspend/pm_runtime_force_resume when
+suspend/resume to avoid that.
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 ---
 
- drivers/spi/spi-rockchip.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/spi/spi-rockchip.c | 21 ++++++---------------
+ 1 file changed, 6 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 5497650..a75fd9b 100644
+index a75fd9b..34f6440 100644
 --- a/drivers/spi/spi-rockchip.c
 +++ b/drivers/spi/spi-rockchip.c
-@@ -816,11 +816,15 @@ static int rockchip_spi_remove(struct platform_device *pdev)
- 	struct spi_master *master = spi_master_get(platform_get_drvdata(pdev));
- 	struct rockchip_spi *rs = spi_master_get_devdata(master);
+@@ -846,10 +846,9 @@ static int rockchip_spi_suspend(struct device *dev)
+ 	if (ret < 0)
+ 		return ret;
  
--	pm_runtime_disable(&pdev->dev);
-+	pm_runtime_get_sync(&pdev->dev);
+-	if (!pm_runtime_suspended(dev)) {
+-		clk_disable_unprepare(rs->spiclk);
+-		clk_disable_unprepare(rs->apb_pclk);
+-	}
++	ret = pm_runtime_force_suspend(dev);
++	if (ret < 0)
++		return ret;
  
- 	clk_disable_unprepare(rs->spiclk);
- 	clk_disable_unprepare(rs->apb_pclk);
+ 	pinctrl_pm_select_sleep_state(dev);
  
-+	pm_runtime_put_noidle(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
-+	pm_runtime_set_suspended(&pdev->dev);
-+
- 	if (rs->dma_tx.ch)
- 		dma_release_channel(rs->dma_tx.ch);
- 	if (rs->dma_rx.ch)
+@@ -864,17 +863,9 @@ static int rockchip_spi_resume(struct device *dev)
+ 
+ 	pinctrl_pm_select_default_state(dev);
+ 
+-	if (!pm_runtime_suspended(dev)) {
+-		ret = clk_prepare_enable(rs->apb_pclk);
+-		if (ret < 0)
+-			return ret;
+-
+-		ret = clk_prepare_enable(rs->spiclk);
+-		if (ret < 0) {
+-			clk_disable_unprepare(rs->apb_pclk);
+-			return ret;
+-		}
+-	}
++	ret = pm_runtime_force_resume(dev);
++	if (ret < 0)
++		return ret;
+ 
+ 	ret = spi_master_resume(rs->master);
+ 	if (ret < 0) {
 -- 
 2.1.4
