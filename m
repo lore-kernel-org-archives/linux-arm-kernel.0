@@ -1,61 +1,23 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 7 Aug 2017 23:00:56 +0100
-Subject: [PATCH] lkdtm: Test VMAP_STACK allocates leading/trailing guard
- pages
-In-Reply-To: <20170807203948.GA22298@beast>
-References: <20170807203948.GA22298@beast>
-Message-ID: <20170807220056.GA29059@remoulade>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 08 Aug 2017 00:52:13 +0200
+Subject: [PATCH v2 04/23] clk: rockchip: support more rates for cpuclk
+In-Reply-To: <1501662743-11920-1-git-send-email-andy.yan@rock-chips.com>
+References: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
+ <1501662743-11920-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <3401435.hitepWLYJ1@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Aug 07, 2017 at 01:39:48PM -0700, Kees Cook wrote:
-> Two new tests STACK_GUARD_PAGE_LEADING and STACK_GUARD_PAGE_TRAILING
-> attempt to read the byte before and after, respectively, of the current
-> stack frame, which should fault under VMAP_STACK.
+Am Mittwoch, 2. August 2017, 16:32:23 CEST schrieb Andy Yan:
+> From: Elaine Zhang <zhangqing@rock-chips.com>
 > 
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
-> Do these tests both trip with the new arm64 VMAP_STACK code?
+> fix up the cpuclk rates table for support more freqs.
+> fix up the mux_core_mask describe error.
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
-> +/* Test that VMAP_STACK is actually allocating with a leading guard page */
-> +void lkdtm_STACK_GUARD_PAGE_LEADING(void)
-> +{
-> +	const unsigned char *stack = task_stack_page(current);
-> +	const unsigned char *ptr = stack - 1;
-> +	volatile unsigned char byte;
-> +
-> +	pr_info("attempting bad read from page below current stack\n");
-> +
-> +	byte = *ptr;
-> +
-> +	pr_err("FAIL: accessed page before stack!\n");
-> +}
-> +
-> +/* Test that VMAP_STACK is actually allocating with a trailing guard page */
-> +void lkdtm_STACK_GUARD_PAGE_TRAILING(void)
-> +{
-> +	const unsigned char *stack = task_stack_page(current);
-> +	const unsigned char *ptr = stack + THREAD_SIZE;
-> +	volatile unsigned char byte;
-> +
-> +	pr_info("attempting bad read from page above current stack\n");
-> +
-> +	byte = *ptr;
-> +
-> +	pr_err("FAIL: accessed page after stack!\n");
-> +}
+applied for 4.14
 
-I can give these a go tomorrow.
-
-These *should* fault, and IIUC should trigger the usual "Unable to handle
-kernel %s at virtual address %08lx\n" splat from arm64's __do_kernel_fault(),
-which should end up with an Oops().
-
-Since these don't mess with the SP, they shouldn't trigger the overflow
-detection, which detects whether we have sufficient stack space to store the
-exception context to the stack. That caught the LKDTM overflow test reliably.
-
-Thanks,
-Mark.
+Thanks
+Heiko
