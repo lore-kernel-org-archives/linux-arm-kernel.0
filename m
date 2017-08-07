@@ -1,39 +1,79 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 7 Aug 2017 08:09:32 +0200
-Subject: [PATCH 0/3] arm64 xilinx zynqmp firmware interface
-In-Reply-To: <34C9E6FB-A8CA-462F-8B10-3E15F9EC87D4@suse.de>
-References: <cover.1501854302.git.michal.simek@xilinx.com>
- <34C9E6FB-A8CA-462F-8B10-3E15F9EC87D4@suse.de>
-Message-ID: <1182e5f8-2588-32ff-8380-04273c28d1cd@xilinx.com>
+From: codekipper@gmail.com (Code Kipper)
+Date: Mon, 7 Aug 2017 08:20:27 +0200
+Subject: [linux-sunxi] [PATCH v3 02/12] ASoC: sun4i-i2s: Add clkdiv
+ offsets to quirks
+In-Reply-To: <CAGb2v66cKxXuh_8o=0_yoLauHHqGjY1rkoDu_NQyC+bO8fNoPA@mail.gmail.com>
+References: <20170729141753.20174-1-codekipper@gmail.com>
+ <20170729141753.20174-3-codekipper@gmail.com>
+ <CAGb2v66cKxXuh_8o=0_yoLauHHqGjY1rkoDu_NQyC+bO8fNoPA@mail.gmail.com>
+Message-ID: <CAEKpxBnPHFt3wHBnPSrkbsgxf2tHVfFryGM0ywMNX0v8bJ5_ZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5.8.2017 06:23, Alexander Graf wrote:
-> 
-> 
->> Am 04.08.2017 um 15:45 schrieb Michal Simek <michal.simek@xilinx.com>:
+On 1 August 2017 at 04:55, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Sat, Jul 29, 2017 at 10:17 PM,  <codekipper@gmail.com> wrote:
+>> From: Marcus Cooper <codekipper@gmail.com>
 >>
->> Hi,
+>> The BCLKDIV and MCLKDIV found on newer SoCs start from an offset of 1.
+>> Add the functionality to adjust the division values according to the
+>> needs to the device being used.
 >>
->> xilinx is using this interface for very long time and we can't merge our
->> driver changes to Linux because of missing communication layer with
->> firmware. This interface was developed before scpi and scmi was
->> available. In connection to power management scpi and scmi are missing
->> pieces which we already use. There is a separate discussion how to
->> extend scmi to support all our use cases.
->> This simply patch is not adding any power management features but only
->> adding minimum functionality which are needed for drivers.
-> 
-> If you're thinking of changing the interface later down the road, wouldn't it make sense to probe EL3 for its existence? 
-You could then expose this interface on today's EL3 and something
-scpi/scmi based on tomorrow's.
-
-Right now driver is checking pmu firmware version. Based on this it is
-clear how to communicate with it. The same checking could be there for
-ATF version. Both of these should tell you exactly what's the
-communication channel.
-If we decide to use scmi or any other implementation we will increase
-versions.
-
-Thanks,
-Michal
+>> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+>> ---
+>>  sound/soc/sunxi/sun4i-i2s.c | 8 ++++++--
+>>  1 file changed, 6 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+>> index d7ee7a443e4e..1d538de4e4d0 100644
+>> --- a/sound/soc/sunxi/sun4i-i2s.c
+>> +++ b/sound/soc/sunxi/sun4i-i2s.c
+>> @@ -94,9 +94,13 @@
+>>   * struct sun4i_i2s_quirks - Differences between SoC variants.
+>>   *
+>>   * @has_reset: SoC needs reset deasserted.
+>> + * @mclk_offset: Value by which mclkdiv needs to be adjusted.
+>> + * @bclk_offset: Value by which bclkdiv needs to be adjusted.
+>>   */
+>>  struct sun4i_i2s_quirks {
+>>         bool                            has_reset;
+>> +       unsigned int                    mclk_offset;
+>> +       unsigned int                    bclk_offset;
+>>  };
+>>
+>>  struct sun4i_i2s {
+>> @@ -149,7 +153,7 @@ static int sun4i_i2s_get_bclk_div(struct sun4i_i2s *i2s,
+>>                 const struct sun4i_i2s_clk_div *bdiv = &sun4i_i2s_bclk_div[i];
+>>
+>>                 if (bdiv->div == div)
+>> -                       return bdiv->val;
+>> +                       return bdiv->val + i2s->variant->bclk_offset;
+>
+> The offset should best be applied when the value is written to the register,
+> in sun4i_i2s_set_clk_rate(). sun4i_i2s_get_*_div() should do what the name
+> says, that is calculate a divider based on the parameters it is given.
+>
+ACK,
+Thanks for the review,
+CK
+> Regards
+> ChenYu
+>
+>>         }
+>>
+>>         return -EINVAL;
+>> @@ -167,7 +171,7 @@ static int sun4i_i2s_get_mclk_div(struct sun4i_i2s *i2s,
+>>                 const struct sun4i_i2s_clk_div *mdiv = &sun4i_i2s_mclk_div[i];
+>>
+>>                 if (mdiv->div == div)
+>> -                       return mdiv->val;
+>> +                       return mdiv->val + i2s->variant->mclk_offset;
+>>         }
+>>
+>>         return -EINVAL;
+>> --
+>> 2.13.3
+>>
+>> --
+>> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
