@@ -1,64 +1,33 @@
-From: zhangshaokun@hisilicon.com (Zhangshaokun)
-Date: Mon, 7 Aug 2017 16:57:48 +0800
-Subject: [PATCH v4 0/6] Add HiSilicon SoC uncore Performance Monitoring
- Unit driver
-In-Reply-To: <1500984642-204676-1-git-send-email-zhangshaokun@hisilicon.com>
-References: <1500984642-204676-1-git-send-email-zhangshaokun@hisilicon.com>
-Message-ID: <a27a6e8e-6e26-977c-7df1-ab1cedae2a2c@hisilicon.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Mon, 7 Aug 2017 09:04:19 +0000
+Subject: [PATCH v7 2/3] PCI: Enable PCIe Relaxed Ordering if supported
+In-Reply-To: <MWHPR12MB160086C4B4FA8F3B2EC1D5F9C8B60@MWHPR12MB1600.namprd12.prod.outlook.com>
+References: <67be791f-e0cf-8284-9229-17174dc741ef@codeaurora.org>
+ <5f9b8bfb-41a8-a17c-6fea-581aec1d5573@huawei.com>
+ <20170724090516.2e0f0d2a@w520.home>
+ <MWHPR12MB1600065968964410EDFBDA3BC8B90@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <75213fca-4522-2297-3cb8-338e643d3552@huawei.com>
+ <CAKgT0UcqdRCwDDxD=22Q_jLuqz8KVHwH1-V45Aq-1WzQw=agcA@mail.gmail.com>
+ <14218972-553d-eb60-0207-460ac7f4b064@huawei.com>
+ <MWHPR12MB1600A6986E4AD13D302F2DC9C8B00@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <20170803083153.GB4883@otc-nc-03>
+ <MWHPR12MB1600400EC7DEE92E4A3ADC5BC8B60@MWHPR12MB1600.namprd12.prod.outlook.com>,
+ <20170804202141.GA39054@otc-nc-03>
+ <MWHPR12MB160086C4B4FA8F3B2EC1D5F9C8B60@MWHPR12MB1600.namprd12.prod.outlook.com>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6DD004C785@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark/Will,
+From: Casey Leedom
+> Sent: 04 August 2017 21:49
+...
+> Whenever our Hardware Designers implement new functionality in our hardware,
+> they almost always put in A. several "knobs" which can control fundamental
+> parameters of the new Hardware Feature, and B.  a mechanism of completely
+> disabling it if necessary.  This stems from the incredibly long Design ->
+> Deployment cyle for Hardware (as opposed to the edit->compile->run cycle for s!
 
-Appreciate your comments.
+Indeed, I'd also expect there to be an undocumented flag to turn
+it on (broken) in earlier parts to allow testing.
 
-Thanks.
-Shaokun
-
-On 2017/7/25 20:10, Shaokun Zhang wrote:
-> This patchset adds support for HiSilicon SoC uncore PMUs driver. It
-> includes L3C, Hydra Home Agent (HHA) and DDRC.
-> 
-> Changes in v4:
-> * remove redundant code and comments
-> * reverse the functions order in exit function
-> * remove some GPL information
-> * revise including header file
-> * fix Jonathan's other comments
-> 
-> Changes in v3:
-> * rebase to 4.13-rc1
-> * add dev_err if ioremap fails for PMUs
->  
-> Changes in v2:
-> * fix kbuild test robot error
-> * make hisi_uncore_ops static
-> 
-> Shaokun Zhang (6):
->   Documentation: perf: hisi: Documentation for HiSilicon SoC PMU driver
->   perf: hisi: Add support for HiSilicon SoC uncore PMU driver
->   perf: hisi: Add support for HiSilicon SoC L3C PMU driver
->   perf: hisi: Add support for HiSilicon SoC HHA PMU driver
->   perf: hisi: Add support for HiSilicon SoC DDRC PMU driver
->   arm64: MAINTAINERS: hisi: Add HiSilicon SoC PMU support
-> 
->  Documentation/perf/hisi-pmu.txt               |  52 +++
->  MAINTAINERS                                   |   7 +
->  drivers/perf/Kconfig                          |   7 +
->  drivers/perf/Makefile                         |   1 +
->  drivers/perf/hisilicon/Makefile               |   1 +
->  drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c | 420 ++++++++++++++++++++
->  drivers/perf/hisilicon/hisi_uncore_hha_pmu.c  | 436 +++++++++++++++++++++
->  drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c  | 538 ++++++++++++++++++++++++++
->  drivers/perf/hisilicon/hisi_uncore_pmu.c      | 398 +++++++++++++++++++
->  drivers/perf/hisilicon/hisi_uncore_pmu.h      | 103 +++++
->  include/linux/cpuhotplug.h                    |   1 +
->  11 files changed, 1964 insertions(+)
->  create mode 100644 Documentation/perf/hisi-pmu.txt
->  create mode 100644 drivers/perf/hisilicon/Makefile
->  create mode 100644 drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c
->  create mode 100644 drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
->  create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c
->  create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
->  create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
-> 
+	David
