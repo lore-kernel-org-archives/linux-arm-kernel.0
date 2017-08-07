@@ -1,63 +1,68 @@
 From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Mon,  7 Aug 2017 16:38:40 -0400
-Subject: [v6 06/15] sparc64: simplify vmemmap_populate
+Date: Mon,  7 Aug 2017 16:38:47 -0400
+Subject: [v6 13/15] mm: stop zeroing memory during allocation in vmemmap
 In-Reply-To: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
 References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
-Message-ID: <1502138329-123460-7-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <1502138329-123460-14-git-send-email-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove duplicating code by using common functions
-vmemmap_pud_populate and vmemmap_pgd_populate.
+Replace allocators in sprase-vmemmap to use the non-zeroing version. So,
+we will get the performance improvement by zeroing the memory in parallel
+when struct pages are zeroed.
 
 Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
 Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
 Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
 Reviewed-by: Bob Picco <bob.picco@oracle.com>
 ---
- arch/sparc/mm/init_64.c | 23 ++++++-----------------
- 1 file changed, 6 insertions(+), 17 deletions(-)
+ mm/sparse-vmemmap.c | 6 +++---
+ mm/sparse.c         | 6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/sparc/mm/init_64.c b/arch/sparc/mm/init_64.c
-index 25ded711ab6c..ffb25be19389 100644
---- a/arch/sparc/mm/init_64.c
-+++ b/arch/sparc/mm/init_64.c
-@@ -2590,30 +2590,19 @@ int __meminit vmemmap_populate(unsigned long vstart, unsigned long vend,
- 	vstart = vstart & PMD_MASK;
- 	vend = ALIGN(vend, PMD_SIZE);
- 	for (; vstart < vend; vstart += PMD_SIZE) {
--		pgd_t *pgd = pgd_offset_k(vstart);
-+		pgd_t *pgd = vmemmap_pgd_populate(vstart, node);
- 		unsigned long pte;
- 		pud_t *pud;
- 		pmd_t *pmd;
+diff --git a/mm/sparse-vmemmap.c b/mm/sparse-vmemmap.c
+index d40c721ab19f..3b646b5ce1b6 100644
+--- a/mm/sparse-vmemmap.c
++++ b/mm/sparse-vmemmap.c
+@@ -41,7 +41,7 @@ static void * __ref __earlyonly_bootmem_alloc(int node,
+ 				unsigned long align,
+ 				unsigned long goal)
+ {
+-	return memblock_virt_alloc_try_nid(size, align, goal,
++	return memblock_virt_alloc_try_nid_raw(size, align, goal,
+ 					    BOOTMEM_ALLOC_ACCESSIBLE, node);
+ }
  
--		if (pgd_none(*pgd)) {
--			pud_t *new = vmemmap_alloc_block(PAGE_SIZE, node);
-+		if (!pgd)
-+			return -ENOMEM;
+@@ -56,11 +56,11 @@ void * __meminit vmemmap_alloc_block(unsigned long size, int node)
  
--			if (!new)
--				return -ENOMEM;
--			pgd_populate(&init_mm, pgd, new);
--		}
--
--		pud = pud_offset(pgd, vstart);
--		if (pud_none(*pud)) {
--			pmd_t *new = vmemmap_alloc_block(PAGE_SIZE, node);
--
--			if (!new)
--				return -ENOMEM;
--			pud_populate(&init_mm, pud, new);
--		}
-+		pud = vmemmap_pud_populate(pgd, vstart, node);
-+		if (!pud)
-+			return -ENOMEM;
+ 		if (node_state(node, N_HIGH_MEMORY))
+ 			page = alloc_pages_node(
+-				node, GFP_KERNEL | __GFP_ZERO | __GFP_RETRY_MAYFAIL,
++				node, GFP_KERNEL | __GFP_RETRY_MAYFAIL,
+ 				get_order(size));
+ 		else
+ 			page = alloc_pages(
+-				GFP_KERNEL | __GFP_ZERO | __GFP_RETRY_MAYFAIL,
++				GFP_KERNEL | __GFP_RETRY_MAYFAIL,
+ 				get_order(size));
+ 		if (page)
+ 			return page_address(page);
+diff --git a/mm/sparse.c b/mm/sparse.c
+index 7b4be3fd5cac..0e315766ad11 100644
+--- a/mm/sparse.c
++++ b/mm/sparse.c
+@@ -441,9 +441,9 @@ void __init sparse_mem_maps_populate_node(struct page **map_map,
+ 	}
  
- 		pmd = pmd_offset(pud, vstart);
--
- 		pte = pmd_val(*pmd);
- 		if (!(pte & _PAGE_VALID)) {
- 			void *block = vmemmap_alloc_block(PMD_SIZE, node);
+ 	size = PAGE_ALIGN(size);
+-	map = memblock_virt_alloc_try_nid(size * map_count,
+-					  PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
+-					  BOOTMEM_ALLOC_ACCESSIBLE, nodeid);
++	map = memblock_virt_alloc_try_nid_raw(size * map_count,
++					      PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
++					      BOOTMEM_ALLOC_ACCESSIBLE, nodeid);
+ 	if (map) {
+ 		for (pnum = pnum_begin; pnum < pnum_end; pnum++) {
+ 			if (!present_section_nr(pnum))
 -- 
 2.14.0
