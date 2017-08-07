@@ -1,149 +1,90 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon,  7 Aug 2017 11:29:49 +0100
-Subject: [UPDATE PATCH v3 4/5] ACPI: Make acpi_dma_configure() DMA regions
- aware
-In-Reply-To: <20170807102949.29701-1-lorenzo.pieralisi@arm.com>
-References: <20170807102949.29701-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170807102949.29701-2-lorenzo.pieralisi@arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 7 Aug 2017 18:20:16 +0800
+Subject: [RFC 0/4] Parse ACPI/PPTT for cache information
+In-Reply-To: <20170805001159.12769-1-jeremy.linton@arm.com>
+References: <20170805001159.12769-1-jeremy.linton@arm.com>
+Message-ID: <39b916f8-4d38-6c24-fc5f-4d2ad3888e49@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current ACPI DMA configuration set-up device DMA capabilities through
-kernel defaults that do not take into account platform specific DMA
-configurations reported by firmware.
++Cc Xiongfeng (who is also working on the PPTT but focusing on
+CPU topology)
 
-By leveraging the ACPI acpi_dev_get_dma_resources() API, add code
-in acpi_dma_configure() to retrieve the DMA regions to correctly
-set-up PCI devices DMA parameters.
+Hi Jeremy,
 
-Rework the ACPI IORT kernel API to make sure they can accommodate
-the DMA set-up required by firmware. By making PCI devices DMA set-up
-ACPI IORT specific, the kernel is shielded from unwanted regressions
-that could be triggered by parsing DMA resources on arches that were
-previously ignoring them (ie x86/ia64), leaving kernel behaviour
-unchanged on those arches.
+On 2017/8/5 8:11, Jeremy Linton wrote:
+> ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
+> used to describe the processor and cache topologies. Ideally it is
+> used to extend/override information provided by the hardware, but
+> right now ARM64 is entirely dependent on firmware provided tables.
+> 
+> This patch parses the table for the cache topology only. Its quite
+> trivial to add processor/cluster/???/socket level parsing as well,
+> but that information isn't as useful as the already provided NUMA
+> SRAT/SLIT information which provides relative distances. The one
+> useful thing, is the number of physical sockets but due to the
+> way arm64 considers "clusters" to be sockets, a larger discussion
+> is required here.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
----
- drivers/acpi/arm64/iort.c | 37 +++++++++++++++++++++++++++++++++++--
- drivers/acpi/scan.c       | 12 ++++--------
- include/linux/acpi_iort.h |  5 +++--
- 3 files changed, 42 insertions(+), 12 deletions(-)
+I think we need the socket to represent the true topology of
+the SoC, which means that considering clusters to be sockets is
+wrong on ARM64 server platforms, a "socket" needs to be a memory
+controller attached I think.
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index a3215ee..606af87 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -681,12 +681,17 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
- }
- 
- /**
-- * iort_set_dma_mask - Set-up dma mask for a device.
-+ * iort_dma_setup() - Set-up device DMA parameters.
-  *
-  * @dev: device to configure
-+ * @dma_addr: device DMA address result pointer
-+ * @size: DMA range size result pointer
-  */
--void iort_set_dma_mask(struct device *dev)
-+void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
- {
-+	u64 mask, dmaaddr = 0, size = 0, offset = 0;
-+	int ret, msb;
-+
- 	/*
- 	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
- 	 * setup the correct supported mask.
-@@ -700,6 +705,34 @@ void iort_set_dma_mask(struct device *dev)
- 	 */
- 	if (!dev->dma_mask)
- 		dev->dma_mask = &dev->coherent_dma_mask;
-+
-+	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
-+
-+	if (dev_is_pci(dev)) {
-+		ret = acpi_dma_get_range(dev, &dmaaddr, &offset, &size);
-+		if (!ret) {
-+			msb = fls64(dmaaddr + size - 1);
-+			/*
-+			 * Round-up to the power-of-two mask or set
-+			 * the mask to the whole 64-bit address space
-+			 * in case the DMA region covers the full
-+			 * memory window.
-+			 */
-+			mask = msb == 64 ? U64_MAX : (1ULL << msb) - 1;
-+			/*
-+			 * Limit coherent and dma mask based on size
-+			 * retrieved from firmware.
-+			 */
-+			dev->coherent_dma_mask = mask;
-+			*dev->dma_mask = mask;
-+		}
-+	}
-+
-+	*dma_addr = dmaaddr;
-+	*dma_size = size;
-+
-+	dev->dma_pfn_offset = PFN_DOWN(offset);
-+	dev_dbg(dev, "dma_pfn_offset(%#08llx)\n", offset);
- }
- 
- /**
-diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
-index 842658c..f024996 100644
---- a/drivers/acpi/scan.c
-+++ b/drivers/acpi/scan.c
-@@ -1446,20 +1446,16 @@ int acpi_dma_get_range(struct device *dev, u64 *dma_addr, u64 *offset,
- int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
- {
- 	const struct iommu_ops *iommu;
--	u64 size;
-+	u64 dma_addr = 0, size = 0;
- 
--	iort_set_dma_mask(dev);
-+	iort_dma_setup(dev, &dma_addr, &size);
- 
- 	iommu = iort_iommu_configure(dev);
- 	if (IS_ERR(iommu) && PTR_ERR(iommu) == -EPROBE_DEFER)
- 		return -EPROBE_DEFER;
- 
--	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
--	/*
--	 * Assume dma valid range starts at 0 and covers the whole
--	 * coherent_dma_mask.
--	 */
--	arch_setup_dma_ops(dev, 0, size, iommu, attr == DEV_DMA_COHERENT);
-+	arch_setup_dma_ops(dev, dma_addr, size,
-+				iommu, attr == DEV_DMA_COHERENT);
- 
- 	return 0;
- }
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index 8379d40..8d3f0bf 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -36,7 +36,7 @@
- void acpi_configure_pmsi_domain(struct device *dev);
- int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id);
- /* IOMMU interface */
--void iort_set_dma_mask(struct device *dev);
-+void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *size);
- const struct iommu_ops *iort_iommu_configure(struct device *dev);
- #else
- static inline void acpi_iort_init(void) { }
-@@ -47,7 +47,8 @@ static inline struct irq_domain *iort_get_device_domain(struct device *dev,
- { return NULL; }
- static inline void acpi_configure_pmsi_domain(struct device *dev) { }
- /* IOMMU interface */
--static inline void iort_set_dma_mask(struct device *dev) { }
-+static inline void iort_dma_setup(struct device *dev, u64 *dma_addr,
-+				  u64 *size) { }
- static inline
- const struct iommu_ops *iort_iommu_configure(struct device *dev)
- { return NULL; }
--- 
-1.9.1
+Take D05 for example, there are two physical SoC sockets on
+the board but with two CPU DIE (with memory controller) on each
+physical socket, and 4 clusters on each CPU DIE.
+
+When considering clusters as sockets (that's the code for now),
+there are 16 "sockets" to represent to OS for schedule input,
+but only 4 NUMA nodes, which are confusing the scheduler a lot...
+
+Xiongfeng was working on the CPU topology based on PPTT, and the code
+is under internal review, if it's OK for you, we can send them out
+for review comments to see if we can join our effort together, or
+we can work on top of your patches, as you like :)
+
+> 
+> An example of lstopo with this patch:
+> 
+> [root at mammon-juno-rh ~]# lstopo-no-graphics
+> Machine (8072MB)
+>    Package L#0 + L2 L#0 (1024KB)
+>      L1d L#0 (32KB) + L1i L#0 (32KB) + Core L#0 + PU L#0 (P#0)
+>      L1d L#1 (32KB) + L1i L#1 (32KB) + Core L#1 + PU L#1 (P#1)
+>      L1d L#2 (32KB) + L1i L#2 (32KB) + Core L#2 + PU L#2 (P#2)
+>      L1d L#3 (32KB) + L1i L#3 (32KB) + Core L#3 + PU L#3 (P#3)
+>    Package L#1 + L2 L#1 (2048KB)
+>      L1d L#4 (32KB) + L1i L#4 (48KB) + Core L#4 + PU L#4 (P#4)
+>      L1d L#5 (32KB) + L1i L#5 (48KB) + Core L#5 + PU L#5 (P#5)
+>    HostBridge L#0
+>      PCIBridge
+>        PCIBridge
+>          PCIBridge
+>            PCI 1095:3132
+>              Block(Disk) L#0 "sda"
+>          PCIBridge
+>            PCI 11ab:4380
+>              Net L#1 "enp8s0"
+> 
+> Jeremy Linton (4):
+>    drivers: base: cacheinfo: Add support for ACPI based firmware tables
+>    arm64: cacheinfo: Add support for ACPI/PPTT generated topology
+>    ACPI/PPTT: Add Processor Properties Topology Table parsing
+>    ACPI: Enable PPTT support on ARM64
+> 
+>   arch/arm64/kernel/cacheinfo.c |  23 ++-
+>   drivers/acpi/arm64/Kconfig    |   3 +
+>   drivers/acpi/arm64/Makefile   |   1 +
+>   drivers/acpi/arm64/pptt.c     | 389 ++++++++++++++++++++++++++++++++++++++++++
+
+I think PPTT is not ARM64 only, can be used for x86 too,
+shall we locate them on drivers/acpi?
+
+Rafael was working a lot on the PPTT proposal for the
+spec, I think he can comment on this :)
+
+Rafael, what do you think?
+
+Thanks
+Hanjun
