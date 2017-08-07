@@ -1,50 +1,53 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Tue, 8 Aug 2017 01:43:04 +0800
-Subject: [PATCH] KVM: arm64: add esr_el2 and far_el2 to sysreg
-In-Reply-To: <59889C59.80207@arm.com>
-References: <1502122117-6276-1-git-send-email-gengdongjiu@huawei.com>
- <9fe6aa3a-98f9-6cae-6932-054858b54744@arm.com>
- <b834276b-b47d-51fb-7661-3eb5a2f6a68d@huawei.com> <59889C59.80207@arm.com>
-Message-ID: <7569b9a7-ce5f-8cb2-2997-a2818ac7d854@huawei.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 7 Aug 2017 10:46:08 -0700
+Subject: [GIT PULL 1/2] bcm2835-dt-next-2017-08-07
+In-Reply-To: <20170807163531.2940-1-eric@anholt.net>
+References: <20170807163531.2940-1-eric@anholt.net>
+Message-ID: <3cccdbaa-7350-447f-1740-7ec56c236737@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok, thanks for James's confirmation.
+On 08/07/2017 09:35 AM, Eric Anholt wrote:
+> The following changes since commit 3bfe25fa9f8a56c5c877c7fd854d89238787c6d8:
+> 
+>   ARM: dts: bcm283x: Move the BCM2837 DT contents from arm64 to arm. (2017-07-28 16:54:15 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/anholt/linux tags/bcm2835-dt-next-2017-08-07
+> 
+> for you to fetch changes up to 2c7c040c73e9e5686a5b451674b0592551a52345:
+> 
+>   ARM: dts: bcm2835: Add Raspberry Pi Zero W (2017-08-02 15:25:36 -0700)
+> 
+> ----------------------------------------------------------------
+> This pull request brings in a new DT for the Raspberry Pi Zero W.
+> 
+> ----------------------------------------------------------------
 
-Another question, For the SEI, I want to also use SIGBUS both for the KVM user and non-kvm user, if SEA and SEI Error all use the SIGBUS to notify user space(Qemu),
-the user space(Qemu) will be confused, and do not know whether this is SEA or SEI error. so here I pass the sysreg ESR_EL2(vcpu->arch.fault.esr_el2) to the user space, let user space judges the (vcpu->arch.fault.esr_el2)'s value
-to know this is a SEA or SEI Error. do you agree my solution for the SEI? thanks.
+Merged, thanks Eric!
 
-because the vcpu->arch.fault.esr_el2 can not directly passed to userspace, so I defined the vcpu->arch.fault.esr_el2 to sysreg ESR_EL2/FAR_EL2, sysreg register can pass to user space.
+> Stefan Wahren (3):
+>       ARM: bcm283x: Define UART pinmuxing on board level
+>       dt-bindings: bcm: Add Raspberry Pi Zero W
+>       ARM: dts: bcm2835: Add Raspberry Pi Zero W
+> 
+>  .../devicetree/bindings/arm/bcm/brcm,bcm2835.txt   |   4 +
+>  arch/arm/boot/dts/Makefile                         |   3 +-
+>  arch/arm/boot/dts/bcm2835-rpi-a-plus.dts           |   6 +
+>  arch/arm/boot/dts/bcm2835-rpi-a.dts                |   6 +
+>  arch/arm/boot/dts/bcm2835-rpi-b-plus.dts           |   6 +
+>  arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts           |   6 +
+>  arch/arm/boot/dts/bcm2835-rpi-b.dts                |   6 +
+>  arch/arm/boot/dts/bcm2835-rpi-zero-w.dts           | 139 +++++++++++++++++++++
+>  arch/arm/boot/dts/bcm2835-rpi-zero.dts             |   6 +
+>  arch/arm/boot/dts/bcm2835-rpi.dtsi                 |   2 +-
+>  arch/arm/boot/dts/bcm2836-rpi-2-b.dts              |   6 +
+>  arch/arm/boot/dts/bcm2837-rpi-3-b.dts              |  10 ++
+>  12 files changed, 198 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
+> 
 
 
-+		vcpu_sys_reg(vcpu,ESR_EL2) = kvm_vcpu_get_hsr(vcpu);
-+		vcpu_sys_reg(vcpu,FAR_EL2) = kvm_vcpu_get_hfar(vcpu);
-
-
-
-On 2017/8/8 0:59, James Morse wrote:
-> Hi gengdongjiu,
-> 
-> On 07/08/17 17:23, gengdongjiu wrote:
->>   As James's suggestion, I move injection SEA Error logic to the user space(Qemu), Qemu sets the related guest OS esr/elr/pstate/spsr
-> 
-> (because for firmware-first its the CPER records that matter, and only QEMU
-> knows where it reserved the memory for these, and what it told the guest it
-> would use as the notification method).
-> 
->> through IOCTL KVM_SET_ONE_REG. For the SEA, when Qemu sets the esr_el1.IL bit, it needs to refer to esr_el2.IL, else Qemu does not know the trapped
->> instruction was a 16-bit or a 32-bit instruction, also it needs to set far_el1 using far_el2, because this is synchronization abort.
-> 
-> The 32bit kernel doesn't support ACPI firmware first, and aarch64 doesn't
-> support 16-bit instructions.
- thanks, so how about the SEA's error FAR_EL1's value? may be FAR_EL1's value get from FAR_EL2's value.
-
-> 
-> 
-> James
-> 
-> 
-> 
-> .
-> 
+-- 
+Florian
