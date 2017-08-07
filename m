@@ -1,109 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  7 Aug 2017 19:36:02 +0100
-Subject: [PATCH 11/14] arm64: use an irq stack pointer
-In-Reply-To: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
-References: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1502130965-18710-12-git-send-email-mark.rutland@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 7 Aug 2017 13:15:42 -0700
+Subject: [PATCH] mm: Revert x86_64 and arm64 ELF_ET_DYN_BASE base
+Message-ID: <20170807201542.GA21271@beast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We allocate our IRQ stacks using a percpu array. This allows us to generate our
-IRQ stack pointers with adr_this_cpu, but bloats the kernel Image with the boot
-CPU's IRQ stack. Additionally, these are packed with other percpu variables,
-and aren't guaranteed to have guard pages.
+Moving the x86_64 and arm64 PIE base from 0x555555554000 to 0x000100000000
+broke AddressSanitizer. This is a partial revert of:
 
-When we enable VMAP_STACK we'll want to vmap our IRQ stacks also, in order to
-provide guard pages and to permit more stringent alignment requirements. Doing
-so will require that we use a percpu pointer to each IRQ stack, rather than
-allocating a percpu IRQ stack in the kernel image.
+  commit eab09532d400 ("binfmt_elf: use ELF_ET_DYN_BASE only for PIE")
+  commit 02445990a96e ("arm64: move ELF_ET_DYN_BASE to 4GB / 4MB")
 
-This patch updates our IRQ stack code to use a percpu pointer to the base of
-each IRQ stack. This will allow us to change the way the stack is allocated
-with minimal changes elsewhere. In some cases we may try to backtrace before
-the IRQ stack pointers are initialised, so on_irq_stack() is updated to account
-for this.
+The AddressSanitizer tool has hard-coded expectations about where
+executable mappings are loaded. The motivation for changing the PIE
+base in the above commits was to avoid the Stack-Clash CVEs that
+allowed executable mappings to get too close to heap and stack. This
+was mainly a problem on 32-bit, but the 64-bit bases were moved too,
+in an effort to proactively protect those systems (proofs of concept
+do exist that show 64-bit collisions, but other recent changes to fix
+stack accounting and setuid behaviors will minimize the impact).
 
-In testing with cyclictest, there was no measureable difference between using
-adr_this_cpu (for irq_stack) and ldr_this_cpu (for irq_stack_ptr) in the IRQ
-entry path.
+The new 32-bit PIE base is fine for ASan (since it matches the ET_EXEC
+base), so only the 64-bit PIE base needs to be reverted to let x86 and
+arm64 ASan binaries run again. Future changes to the 64-bit PIE base on
+these architectures can be made optional once a more dynamic method for
+dealing with AddressSanitizer is found. (e.g. always loading PIE into
+the mmap region for marked binaries.)
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Laura Abbott <labbott@redhat.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Reported-by: Kostya Serebryany <kcc@google.com>
+Cc: stable at vger.kernel.org
+Signed-off-by: Kees Cook <keescook@chromium.org>
 ---
- arch/arm64/include/asm/stacktrace.h |  7 +++++--
- arch/arm64/kernel/entry.S           |  2 +-
- arch/arm64/kernel/irq.c             | 10 ++++++++++
- 3 files changed, 16 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/elf.h | 4 ++--
+ arch/x86/include/asm/elf.h   | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
-index 000e2418..4c68d8a 100644
---- a/arch/arm64/include/asm/stacktrace.h
-+++ b/arch/arm64/include/asm/stacktrace.h
-@@ -36,13 +36,16 @@ extern void walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
- 			    int (*fn)(struct stackframe *, void *), void *data);
- extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk);
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index acae781f7359..3288c2b36731 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -114,10 +114,10 @@
  
--DECLARE_PER_CPU(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack);
-+DECLARE_PER_CPU(unsigned long *, irq_stack_ptr);
+ /*
+  * This is the base location for PIE (ET_DYN with INTERP) loads. On
+- * 64-bit, this is raised to 4GB to leave the entire 32-bit address
++ * 64-bit, this is above 4GB to leave the entire 32-bit address
+  * space open for things that want to use the area for 32-bit pointers.
+  */
+-#define ELF_ET_DYN_BASE		0x100000000UL
++#define ELF_ET_DYN_BASE		(2 * TASK_SIZE_64 / 3)
  
- static inline bool on_irq_stack(unsigned long sp)
- {
--	unsigned long low = (unsigned long)raw_cpu_ptr(irq_stack);
-+	unsigned long low = (unsigned long)raw_cpu_read(irq_stack_ptr);
- 	unsigned long high = low + IRQ_STACK_SIZE;
+ #ifndef __ASSEMBLY__
  
-+	if (!low)
-+		return false;
-+
- 	return (low <= sp && sp < high);
- }
+diff --git a/arch/x86/include/asm/elf.h b/arch/x86/include/asm/elf.h
+index 1c18d83d3f09..9aeb91935ce0 100644
+--- a/arch/x86/include/asm/elf.h
++++ b/arch/x86/include/asm/elf.h
+@@ -247,11 +247,11 @@ extern int force_personality32;
  
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index bd3b6de..e5aa866 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -272,7 +272,7 @@ alternative_else_nop_endif
- 	and	x25, x25, #~(THREAD_SIZE - 1)
- 	cbnz	x25, 9998f
+ /*
+  * This is the base location for PIE (ET_DYN with INTERP) loads. On
+- * 64-bit, this is raised to 4GB to leave the entire 32-bit address
++ * 64-bit, this is above 4GB to leave the entire 32-bit address
+  * space open for things that want to use the area for 32-bit pointers.
+  */
+ #define ELF_ET_DYN_BASE		(mmap_is_ia32() ? 0x000400000UL : \
+-						  0x100000000UL)
++						  (TASK_SIZE / 3 * 2))
  
--	adr_this_cpu x25, irq_stack, x26
-+	ldr_this_cpu x25, irq_stack_ptr, x26
- 	mov	x26, #IRQ_STACK_SIZE
- 	add	x26, x25, x26
- 
-diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-index 2386b26..5141282 100644
---- a/arch/arm64/kernel/irq.c
-+++ b/arch/arm64/kernel/irq.c
-@@ -32,6 +32,7 @@
- 
- /* irq stack only needs to be 16 byte aligned - not IRQ_STACK_SIZE aligned. */
- DEFINE_PER_CPU(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack) __aligned(16);
-+DEFINE_PER_CPU(unsigned long *, irq_stack_ptr);
- 
- int arch_show_interrupts(struct seq_file *p, int prec)
- {
-@@ -50,8 +51,17 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
- 	handle_arch_irq = handle_irq;
- }
- 
-+static void init_irq_stacks(void)
-+{
-+	int cpu;
-+
-+	for_each_possible_cpu(cpu)
-+		per_cpu(irq_stack_ptr, cpu) = per_cpu(irq_stack, cpu);
-+}
-+
- void __init init_IRQ(void)
- {
-+	init_irq_stacks();
- 	irqchip_init();
- 	if (!handle_arch_irq)
- 		panic("No interrupt controller found.");
+ /* This yields a mask that user programs can use to figure out what
+    instruction set this CPU supports.  This could be done in user space,
 -- 
-1.9.1
+2.7.4
+
+
+-- 
+Kees Cook
+Pixel Security
