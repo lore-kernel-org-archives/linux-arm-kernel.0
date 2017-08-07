@@ -1,14 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 07 Aug 2017 12:51:57 +0100
-Subject: Applied "ASoC: rockchip: add bindings for i2s" to the asoc tree
-In-Reply-To: <1501465671-22863-1-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <E1degZh-0006lR-R0@debutante>
+Date: Mon, 07 Aug 2017 12:52:07 +0100
+Subject: Applied "ASoC: mediatek: Fix an error checking code" to the asoc tree
+In-Reply-To: <20170807002315.3512-1-christophe.jaillet@wanadoo.fr>
+Message-ID: <E1degZr-0006pT-7Y@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: rockchip: add bindings for i2s
+   ASoC: mediatek: Fix an error checking code
 
 has been applied to the asoc tree at
 
@@ -33,36 +33,33 @@ to this mail.
 Thanks,
 Mark
 
->From 3508cade13ba43ebafbee9064fa6114e857afd20 Mon Sep 17 00:00:00 2001
-From: Sugar Zhang <sugar.zhang@rock-chips.com>
-Date: Mon, 31 Jul 2017 09:47:51 +0800
-Subject: [PATCH] ASoC: rockchip: add bindings for i2s
+>From 8d7313bfb1bb7d71a6ebc503215e4fb4a8964741 Mon Sep 17 00:00:00 2001
+From: Christophe Jaillet <christophe.jaillet@wanadoo.fr>
+Date: Mon, 7 Aug 2017 02:23:15 +0200
+Subject: [PATCH] ASoC: mediatek: Fix an error checking code
 
-This patch add bindings for rk3036/rk3228/rk3328/rk3366 i2s.
+Check the value returned by 'devm_clk_get()' instead of the clock
+identifier which can never be an ERR code.
 
-Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Fixes: d6f3710a56e1 ("ASoC: mediatek: add structure define and clock control for 2701")
+Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- Documentation/devicetree/bindings/sound/rockchip-i2s.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
-index 206aba1b34bb..b208a752576c 100644
---- a/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/rockchip-i2s.txt
-@@ -7,8 +7,12 @@ Required properties:
+diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c b/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
+index b815ecc6bbf6..affa7fb25dd9 100644
+--- a/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
++++ b/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
+@@ -75,7 +75,7 @@ int mt2701_init_clock(struct mtk_base_afe *afe)
  
- - compatible: should be one of the following:
-    - "rockchip,rk3066-i2s": for rk3066
-+   - "rockchip,rk3036-i2s", "rockchip,rk3066-i2s": for rk3036
-    - "rockchip,rk3188-i2s", "rockchip,rk3066-i2s": for rk3188
-+   - "rockchip,rk3228-i2s", "rockchip,rk3066-i2s": for rk3228
-    - "rockchip,rk3288-i2s", "rockchip,rk3066-i2s": for rk3288
-+   - "rockchip,rk3328-i2s", "rockchip,rk3066-i2s": for rk3328
-+   - "rockchip,rk3366-i2s", "rockchip,rk3066-i2s": for rk3366
-    - "rockchip,rk3368-i2s", "rockchip,rk3066-i2s": for rk3368
-    - "rockchip,rk3399-i2s", "rockchip,rk3066-i2s": for rk3399
- - reg: physical base address of the controller and length of memory mapped
+ 	for (i = 0; i < MT2701_CLOCK_NUM; i++) {
+ 		afe_priv->clocks[i] = devm_clk_get(afe->dev, aud_clks[i]);
+-		if (IS_ERR(aud_clks[i])) {
++		if (IS_ERR(afe_priv->clocks[i])) {
+ 			dev_warn(afe->dev, "%s devm_clk_get %s fail\n",
+ 				 __func__, aud_clks[i]);
+ 			return PTR_ERR(aud_clks[i]);
 -- 
 2.13.3
