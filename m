@@ -1,93 +1,91 @@
-From: yong.deng@magewell.com (Yong)
-Date: Mon, 7 Aug 2017 09:00:09 +0800
-Subject: [PATCH v2 2/3] dt-bindings: media: Add Allwinner V3s Camera
- Sensor Interface (CSI)
-In-Reply-To: <20170803191415.iyyzjsvlyviftalj@rob-hp-laptop>
-References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
- <1501131697-1359-3-git-send-email-yong.deng@magewell.com>
- <20170803191415.iyyzjsvlyviftalj@rob-hp-laptop>
-Message-ID: <20170807090009.4af79df794e881d441c18196@magewell.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Mon, 7 Aug 2017 08:59:44 +0800
+Subject: [PATCH] arm64: dts: hisi: add PCIe host controller node for hip07
+ SoC
+In-Reply-To: <5984703A.4060302@hisilicon.com>
+References: <1500366820-58555-1-git-send-email-wangzhou1@hisilicon.com>
+ <5984703A.4060302@hisilicon.com>
+Message-ID: <5987BB80.8060701@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Aug 2017 14:14:15 -0500
-Rob Herring <robh@kernel.org> wrote:
-
-> On Thu, Jul 27, 2017 at 01:01:36PM +0800, Yong Deng wrote:
-> > Add binding documentation for Allwinner V3s CSI.
-> > 
-> > Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> > ---
-> >  .../devicetree/bindings/media/sun6i-csi.txt        | 49 ++++++++++++++++++++++
-> >  1 file changed, 49 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > new file mode 100644
-> > index 0000000..f8d83f6
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > @@ -0,0 +1,49 @@
-> > +Allwinner V3s Camera Sensor Interface
-> > +------------------------------
-> > +
-> > +Required properties:
-> > +  - compatible: value must be "allwinner,sun8i-v3s-csi"
-> > +  - reg: base address and size of the memory-mapped region.
-> > +  - interrupts: interrupt associated to this IP
-> > +  - clocks: phandles to the clocks feeding the CSI
-> > +    * ahb: the CSI interface clock
-> > +    * mod: the CSI module clock
-> > +    * ram: the CSI DRAM clock
-> > +  - clock-names: the clock names mentioned above
-> > +  - resets: phandles to the reset line driving the CSI
-> > +
-> > +- ports: A ports node with endpoint definitions as defined in
-> > +  Documentation/devicetree/bindings/media/video-interfaces.txt.
+On 2017/8/4 21:01, Wei Xu wrote:
+> Hi Zhou,
 > 
-> Need to be explicit about how many ports and endpoints and what each one 
-> represents.
+> On 2017/7/18 9:33, Zhou Wang wrote:
+>> Add one PCIe host controller node for HiSilicon Hip07 SoC and enable it in
+>> D05 board.
+>>
+>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+>> ---
+>>  arch/arm64/boot/dts/hisilicon/hip07-d05.dts |  4 ++++
+>>  arch/arm64/boot/dts/hisilicon/hip07.dtsi    | 21 +++++++++++++++++++++
+>>  2 files changed, 25 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/hisilicon/hip07-d05.dts b/arch/arm64/boot/dts/hisilicon/hip07-d05.dts
+>> index f5d7f08..fe7c16c 100644
+>> --- a/arch/arm64/boot/dts/hisilicon/hip07-d05.dts
+>> +++ b/arch/arm64/boot/dts/hisilicon/hip07-d05.dts
+>> @@ -84,3 +84,7 @@
+>>  &sas1 {
+>>  	status = "ok";
+>>  };
+>> +
+>> +&p0_pcie2_a {
+>> +	status = "ok";
+>> +};
+>> diff --git a/arch/arm64/boot/dts/hisilicon/hip07.dtsi b/arch/arm64/boot/dts/hisilicon/hip07.dtsi
+>> index 283d7b5..077b2d7b 100644
+>> --- a/arch/arm64/boot/dts/hisilicon/hip07.dtsi
+>> +++ b/arch/arm64/boot/dts/hisilicon/hip07.dtsi
+>> @@ -1534,5 +1534,26 @@
+>>  				     <637 1>,<638 1>,<639 1>;
+>>  			status = "disabled";
+>>  		};
+>> +
+>> +		p0_pcie2_a: pcie at a00a0000 {
+>> +			compatible = "hisilicon,pcie-almost-ecam";
+> 
+> The compatible string should be "hisilicon,hip07-pcie-ecam".
 
-OK.
+OK, I will modify this and resend it later.
 
 > 
-> > +
-> > +Example:
-> > +
-> > +	csi1: csi at 01cb4000 {
-> > +		compatible = "allwinner,sun8i-v3s-csi";
-> > +		reg = <0x01cb4000 0x1000>;
-> > +		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> > +		clocks = <&ccu CLK_BUS_CSI>,
-> > +			 <&ccu CLK_CSI1_SCLK>,
-> > +			 <&ccu CLK_DRAM_CSI>;
-> > +		clock-names = "ahb", "mod", "ram";
-> > +		resets = <&ccu RST_BUS_CSI>;
-> > +
-> > +		port {
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +
-> > +			/* Parallel bus endpoint */
-> > +			csi1_ep: endpoint {
-> > +				remote-endpoint = <&adv7611_ep>;
-> > +				bus-width = <16>;
-> > +				data-shift = <0>;
-> > +
-> > +				/* If hsync-active/vsync-active are missing,
-> > +				   embedded BT.656 sync is used */
-> > +				hsync-active = <0>; /* Active low */
-> > +				vsync-active = <0>; /* Active low */
-> > +				data-active = <1>;  /* Active high */
-> > +				pclk-sample = <1>;  /* Rising */
-> > +			};
-> > +		};
-> > +	};
-> > +
-> > -- 
-> > 1.8.3.1
-> > 
+>> +			reg = <0 0xa8000000 0 0x800000>,<0 0xa00a0000 0 0x10000>;
+>> +			bus-range = <0x80 0x87>;
+>> +			msi-map = <0x8000 &p0_its_dsa_a 0x8000 0x800>;
+>> +			msi-map-mask = <0xffff>;
+>> +			#address-cells = <3>;
+>> +			#size-cells = <2>;
+>> +			device_type = "pci";
+>> +			dma-coherent;
+>> +			ranges = <0x02000000 0 0xa8800000 0 0xa8800000 0 0x77f0000
+>> +				  0x01000000 0 0 0 0xafff0000 0 0x10000>;
+> 
+> Can you also check whether the ranges are working or not with current UEFI?
+> Thanks!
 
+Sure.
 
 Thanks,
-Yong
+Zhou
+
+> 
+> Best Regards,
+> Wei
+> 
+>> +			#interrupt-cells = <1>;
+>> +			interrupt-map-mask = <0xf800 0 0 7>;
+>> +			interrupt-map = <0x0 0 0 1 &mbigen_pcie2_a 671 4
+>> +					 0x0 0 0 2 &mbigen_pcie2_a 671 4
+>> +					 0x0 0 0 3 &mbigen_pcie2_a 671 4
+>> +					 0x0 0 0 4 &mbigen_pcie2_a 671 4>;
+>> +			status = "disabled";
+>> +		};
+>>  	};
+>>  };
+>>
+> 
+> 
+> .
+> 
