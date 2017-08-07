@@ -1,79 +1,92 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 7 Aug 2017 13:15:42 -0700
-Subject: [PATCH] mm: Revert x86_64 and arm64 ELF_ET_DYN_BASE base
-Message-ID: <20170807201542.GA21271@beast>
+From: pasha.tatashin@oracle.com (Pavel Tatashin)
+Date: Mon,  7 Aug 2017 16:38:34 -0400
+Subject: [v6 00/15] complete deferred page initialization
+Message-ID: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving the x86_64 and arm64 PIE base from 0x555555554000 to 0x000100000000
-broke AddressSanitizer. This is a partial revert of:
+Changelog:
+v6 - v4
+- Fixed ARM64 + kasan code, as reported by Ard Biesheuvel
+- Tested ARM64 code in qemu and found few more issues, that I fixed in this
+  iteration
+- Added page roundup/rounddown to x86 and arm zeroing routines to zero the
+  whole allocated range, instead of only provided address range.
+- Addressed SPARC related comment from Sam Ravnborg
+- Fixed section mismatch warnings related to memblock_discard().
 
-  commit eab09532d400 ("binfmt_elf: use ELF_ET_DYN_BASE only for PIE")
-  commit 02445990a96e ("arm64: move ELF_ET_DYN_BASE to 4GB / 4MB")
+v5 - v4
+- Fixed build issues reported by kbuild on various configurations
 
-The AddressSanitizer tool has hard-coded expectations about where
-executable mappings are loaded. The motivation for changing the PIE
-base in the above commits was to avoid the Stack-Clash CVEs that
-allowed executable mappings to get too close to heap and stack. This
-was mainly a problem on 32-bit, but the 64-bit bases were moved too,
-in an effort to proactively protect those systems (proofs of concept
-do exist that show 64-bit collisions, but other recent changes to fix
-stack accounting and setuid behaviors will minimize the impact).
+v4 - v3
+- Rewrote code to zero sturct pages in __init_single_page() as
+  suggested by Michal Hocko
+- Added code to handle issues related to accessing struct page
+  memory before they are initialized.
 
-The new 32-bit PIE base is fine for ASan (since it matches the ET_EXEC
-base), so only the 64-bit PIE base needs to be reverted to let x86 and
-arm64 ASan binaries run again. Future changes to the 64-bit PIE base on
-these architectures can be made optional once a more dynamic method for
-dealing with AddressSanitizer is found. (e.g. always loading PIE into
-the mmap region for marked binaries.)
+v3 - v2
+- Addressed David Miller comments about one change per patch:
+    * Splited changes to platforms into 4 patches
+    * Made "do not zero vmemmap_buf" as a separate patch
 
-Reported-by: Kostya Serebryany <kcc@google.com>
-Cc: stable at vger.kernel.org
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
- arch/arm64/include/asm/elf.h | 4 ++--
- arch/x86/include/asm/elf.h   | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+v2 - v1
+- Per request, added s390 to deferred "struct page" zeroing
+- Collected performance data on x86 which proofs the importance to
+  keep memset() as prefetch (see below).
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index acae781f7359..3288c2b36731 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -114,10 +114,10 @@
- 
- /*
-  * This is the base location for PIE (ET_DYN with INTERP) loads. On
-- * 64-bit, this is raised to 4GB to leave the entire 32-bit address
-+ * 64-bit, this is above 4GB to leave the entire 32-bit address
-  * space open for things that want to use the area for 32-bit pointers.
-  */
--#define ELF_ET_DYN_BASE		0x100000000UL
-+#define ELF_ET_DYN_BASE		(2 * TASK_SIZE_64 / 3)
- 
- #ifndef __ASSEMBLY__
- 
-diff --git a/arch/x86/include/asm/elf.h b/arch/x86/include/asm/elf.h
-index 1c18d83d3f09..9aeb91935ce0 100644
---- a/arch/x86/include/asm/elf.h
-+++ b/arch/x86/include/asm/elf.h
-@@ -247,11 +247,11 @@ extern int force_personality32;
- 
- /*
-  * This is the base location for PIE (ET_DYN with INTERP) loads. On
-- * 64-bit, this is raised to 4GB to leave the entire 32-bit address
-+ * 64-bit, this is above 4GB to leave the entire 32-bit address
-  * space open for things that want to use the area for 32-bit pointers.
-  */
- #define ELF_ET_DYN_BASE		(mmap_is_ia32() ? 0x000400000UL : \
--						  0x100000000UL)
-+						  (TASK_SIZE / 3 * 2))
- 
- /* This yields a mask that user programs can use to figure out what
-    instruction set this CPU supports.  This could be done in user space,
+SMP machines can benefit from the DEFERRED_STRUCT_PAGE_INIT config option,
+which defers initializing struct pages until all cpus have been started so
+it can be done in parallel.
+
+However, this feature is sub-optimal, because the deferred page
+initialization code expects that the struct pages have already been zeroed,
+and the zeroing is done early in boot with a single thread only.  Also, we
+access that memory and set flags before struct pages are initialized. All
+of this is fixed in this patchset.
+
+In this work we do the following:
+- Never read access struct page until it was initialized
+- Never set any fields in struct pages before they are initialized
+- Zero struct page at the beginning of struct page initialization
+
+Performance improvements on x86 machine with 8 nodes:
+Intel(R) Xeon(R) CPU E7-8895 v3 @ 2.60GHz
+
+Single threaded struct page init: 7.6s/T improvement
+Deferred struct page init: 10.2s/T improvement
+
+Pavel Tatashin (15):
+  x86/mm: reserve only exiting low pages
+  x86/mm: setting fields in deferred pages
+  sparc64/mm: setting fields in deferred pages
+  mm: discard memblock data later
+  mm: don't accessed uninitialized struct pages
+  sparc64: simplify vmemmap_populate
+  mm: defining memblock_virt_alloc_try_nid_raw
+  mm: zero struct pages during initialization
+  sparc64: optimized struct page zeroing
+  x86/kasan: explicitly zero kasan shadow memory
+  arm64/kasan: explicitly zero kasan shadow memory
+  mm: explicitly zero pagetable memory
+  mm: stop zeroing memory during allocation in vmemmap
+  mm: optimize early system hash allocations
+  mm: debug for raw alloctor
+
+ arch/arm64/mm/kasan_init.c          |  42 ++++++++++
+ arch/sparc/include/asm/pgtable_64.h |  30 +++++++
+ arch/sparc/mm/init_64.c             |  31 +++-----
+ arch/x86/kernel/setup.c             |   5 +-
+ arch/x86/mm/init_64.c               |   9 ++-
+ arch/x86/mm/kasan_init_64.c         |  67 ++++++++++++++++
+ include/linux/bootmem.h             |  27 +++++++
+ include/linux/memblock.h            |   9 ++-
+ include/linux/mm.h                  |   9 +++
+ mm/memblock.c                       | 152 ++++++++++++++++++++++++++++--------
+ mm/nobootmem.c                      |  16 ----
+ mm/page_alloc.c                     |  31 +++++---
+ mm/sparse-vmemmap.c                 |  10 ++-
+ mm/sparse.c                         |   6 +-
+ 14 files changed, 356 insertions(+), 88 deletions(-)
+
 -- 
-2.7.4
-
-
--- 
-Kees Cook
-Pixel Security
+2.14.0
