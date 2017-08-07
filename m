@@ -1,88 +1,44 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Mon, 7 Aug 2017 06:03:00 +0200
-Subject: [PATCH 2/5] edac: synopsys: Add EDAC ECC support for ZynqMP DDRC
-In-Reply-To: <00da9d8dcdbc95c170a9b52abcc2580c271bdd9d.1501848023.git.michal.simek@xilinx.com>
-References: <60ff19f90adfd252cf296fe8988c614c4c3e43fd.1501848023.git.michal.simek@xilinx.com>
- <00da9d8dcdbc95c170a9b52abcc2580c271bdd9d.1501848023.git.michal.simek@xilinx.com>
-Message-ID: <20170807040300.GC7516@nazgul.tnic>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Mon, 7 Aug 2017 12:13:17 +0800
+Subject: [PATCH v9 0/4] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+In-Reply-To: <20170806.204744.1934067595236180060.davem@davemloft.net>
+References: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
+ <20170806.204744.1934067595236180060.davem@davemloft.net>
+Message-ID: <588b378c-249a-36b0-8890-769258fbb708@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 04, 2017 at 02:00:24PM +0200, Michal Simek wrote:
-> From: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
+
+
+On 2017/8/7 11:47, David Miller wrote:
+> From: Ding Tianhong <dingtianhong@huawei.com>
+> Date: Sat, 5 Aug 2017 15:15:09 +0800
 > 
-> This patch adds EDAC ECC support for ZynqMP DDRC IP
+>> Some devices have problems with Transaction Layer Packets with the Relaxed
+>> Ordering Attribute set.  This patch set adds a new PCIe Device Flag,
+>> PCI_DEV_FLAGS_NO_RELAXED_ORDERING, a set of PCI Quirks to catch some known
+>> devices with Relaxed Ordering issues, and a use of this new flag by the
+>> cxgb4 driver to avoid using Relaxed Ordering with problematic Root Complex
+>> Ports.
+>>
+>> It's been years since I've submitted kernel.org patches, I appolgise for the
+>> almost certain submission errors.
 > 
-> Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
+> Which tree should merge this?  The PCI tree or my networking tree?
 > 
->  drivers/edac/Kconfig         |   2 +-
->  drivers/edac/synopsys_edac.c | 306 ++++++++++++++++++++++++++++++++++++++++++-
->  2 files changed, 302 insertions(+), 6 deletions(-)
 
-...
+Hi David?
 
-> @@ -440,9 +706,12 @@ static int synps_edac_mc_init(struct mem_ctl_info *mci,
->  	mci->dev_name = SYNPS_EDAC_MOD_STRING;
->  	mci->mod_name = SYNPS_EDAC_MOD_VER;
->  	mci->mod_ver = "1";
-> -
-> -	edac_op_state = EDAC_OPSTATE_POLL;
-> -	mci->edac_check = synps_edac_check;
-> +	if (priv->p_data->quirks & DDR_ECC_INTR_SUPPORT) {
-> +		edac_op_state = EDAC_OPSTATE_INT;
-> +	} else {
-> +		edac_op_state = EDAC_OPSTATE_POLL;
-> +		mci->edac_check = synps_edac_check;
-> +	}
->  	mci->ctl_page_to_phys = NULL;
->  
->  	status = synps_edac_init_csrows(mci);
+I think networking tree merge it is a better choice, as it mainly used to tell the NIC
+drivers how to use the Relaxed Ordering Attribute, and later we need send patch to enable
+RO for ixgbe driver base on this patch. But I am not sure whether Bjorn has some of his own
+view. :)
 
-This hunk doesn't apply cleanly:
+Hi Bjorn:
 
-$ test-apply.sh -q /tmp/02-edac-synopsys-add_edac_ecc_support_for_zynqmp_ddrc.patch 
-checking file drivers/edac/Kconfig
-checking file drivers/edac/synopsys_edac.c
-Hunk #11 FAILED at 706.
-Hunk #12 succeeded at 723 (offset -1 lines).
-Hunk #13 succeeded at 754 (offset -1 lines).
-Hunk #14 succeeded at 803 (offset -1 lines).
-1 out of 14 hunks FAILED
+Could you help review this patch or give some feedback ?
 
-Please redo your patches against this branch:
-
-https://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git/log/?h=for-next
-
-Thx.
-
-> @@ -458,8 +727,18 @@ static int synps_edac_mc_init(struct mem_ctl_info *mci,
->  	.quirks				= 0,
->  };
->  
-> +static const struct synps_platform_data zynqmp_enh_edac_def = {
-> +	.synps_edac_geterror_info	= synps_enh_edac_geterror_info,
-> +	.synps_edac_get_mtype		= synps_enh_edac_get_mtype,
-> +	.synps_edac_get_dtype		= synps_enh_edac_get_dtype,
-> +	.synps_edac_get_eccstate	= synps_enh_edac_get_eccstate,
-> +	.quirks				= DDR_ECC_INTR_SUPPORT,
-> +};
-> +
->  static const struct of_device_id synps_edac_match[] = {
->  	{ .compatible = "xlnx,zynq-ddrc-a05", .data = (void *)&zynq_edac_def },
-> +	{ .compatible = "xlnx,zynqmp-ddrc-2.40a",
-> +				.data = (void *)&zynqmp_enh_edac_def},
-
-WARNING: DT compatible string "xlnx,zynqmp-ddrc-2.40a" appears un-documented -- check ./Documentation/devicetree/bindings/
-#414: FILE: drivers/edac/synopsys_edac.c:740:
-+       { .compatible = "xlnx,zynqmp-ddrc-2.40a",
-
-Please integrate checkpatch.pl into your patch creation workflow.
-
--- 
-Regards/Gruss,
-    Boris.
-
-ECO tip #101: Trim your mails when you reply.
---
+Thanks
+Ding
+> .
+> 
