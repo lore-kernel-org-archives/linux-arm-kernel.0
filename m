@@ -1,41 +1,54 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 7 Aug 2017 10:47:23 -0700
-Subject: [GIT PULL 2/2] bcm2835-defconfig-next-2017-08-07
-In-Reply-To: <20170807163531.2940-2-eric@anholt.net>
-References: <20170807163531.2940-1-eric@anholt.net>
- <20170807163531.2940-2-eric@anholt.net>
-Message-ID: <8f84d891-8bb1-1a79-645f-218763d798dd@gmail.com>
+Date: Mon, 7 Aug 2017 10:52:51 -0700
+Subject: [PATCH v3 0/4] thermal: add brcmstb AVS TMON driver
+In-Reply-To: <20170731192633.58747-1-code@mmayer.net>
+References: <20170731192633.58747-1-code@mmayer.net>
+Message-ID: <a29d8aef-8d24-9e63-c078-48c3a1a6fccf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/2017 09:35 AM, Eric Anholt wrote:
-> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+On 07/31/2017 12:26 PM, Markus Mayer wrote:
+> From: Markus Mayer <mmayer@broadcom.com>
 > 
->   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+> This series adds the brcmstb AVS TMON driver.
 > 
-> are available in the git repository at:
+> The driver was originally written by Brian Norris.
 > 
->   git://github.com/anholt/linux tags/bcm2835-defconfig-next-2017-08-07
-> 
-> for you to fetch changes up to 6235a80a5475d10ebef646c06cf7cf0f4aba688c:
-> 
->   ARM: bcm2835_defconfig: Enable wifi driver for RPi Zero W (2017-07-19 13:37:34 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request brings in defconfig changes for the Raspberry Pi
-> Zero W.
-> 
-> ----------------------------------------------------------------
-> Stefan Wahren (3):
->       ARM: bcm2835_defconfig: Enable Mini UART console support
->       ARM: bcm2835_defconfig: Increase CMA for VC4
->       ARM: bcm2835_defconfig: Enable wifi driver for RPi Zero W
+> v1 of this series can be found at https://lkml.org/lkml/2017/6/5/921
+> v2 of this series can be found at https://lkml.org/lkml/2017/7/21/585
 
-Also merged, thanks Eric!
+FWIW, this looks good to me, Eduardo, Rui, can we get this moving?
 
 > 
->  arch/arm/configs/bcm2835_defconfig | 7 +++++++
->  1 file changed, 7 insertions(+)
+> Changes since v2:
+> - replaced calls to pr_debug() with calls to dev_dbg() [PATCH 2/4 only]
+> - all other patches are unchanged from v2
+> 
+> Changes since v1:
+> - Fixed wording in binding document
+> - Fixed lincensing to consistently mention GPL v2
+> - Use thermal_zone_get_slope() and thermal_zone_get_offset()
+> - Some minor clean-ups
+> 
+> Brian Norris (2):
+>   Documentation: devicetree: add binding for Broadcom STB AVS TMON
+>   thermal: add brcmstb AVS TMON driver
+> 
+> Markus Mayer (2):
+>   ARM: multi_v7_defconfig: add CONFIG_BRCMSTB_THERMAL
+>   arm64: defconfig: add CONFIG_BRCMSTB_THERMAL
+> 
+>  .../devicetree/bindings/thermal/brcm,avs-tmon.txt  |  20 ++
+>  MAINTAINERS                                        |   8 +
+>  arch/arm/configs/multi_v7_defconfig                |   1 +
+>  arch/arm64/configs/defconfig                       |   1 +
+>  drivers/thermal/Kconfig                            |   2 +-
+>  drivers/thermal/broadcom/Kconfig                   |   7 +
+>  drivers/thermal/broadcom/Makefile                  |   1 +
+>  drivers/thermal/broadcom/brcmstb_thermal.c         | 386 +++++++++++++++++++++
+>  8 files changed, 425 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
+>  create mode 100644 drivers/thermal/broadcom/brcmstb_thermal.c
 > 
 
 
