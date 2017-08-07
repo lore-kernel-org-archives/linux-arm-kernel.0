@@ -1,96 +1,42 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Tue, 8 Aug 2017 00:23:31 +0800
-Subject: [PATCH] KVM: arm64: add esr_el2 and far_el2 to sysreg
-In-Reply-To: <9fe6aa3a-98f9-6cae-6932-054858b54744@arm.com>
-References: <1502122117-6276-1-git-send-email-gengdongjiu@huawei.com>
- <9fe6aa3a-98f9-6cae-6932-054858b54744@arm.com>
-Message-ID: <b834276b-b47d-51fb-7661-3eb5a2f6a68d@huawei.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon,  7 Aug 2017 09:35:30 -0700
+Subject: [GIT PULL 1/2] bcm2835-dt-next-2017-08-07
+Message-ID: <20170807163531.2940-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-  As James's suggestion, I move injection SEA Error logic to the user space(Qemu), Qemu sets the related guest OS esr/elr/pstate/spsr
-through IOCTL KVM_SET_ONE_REG. For the SEA, when Qemu sets the esr_el1.IL bit, it needs to refer to esr_el2.IL, else Qemu does not know the trapped
-instruction was a 16-bit or a 32-bit instruction, also it needs to set far_el1 using far_el2, because this is synchronization abort.
+The following changes since commit 3bfe25fa9f8a56c5c877c7fd854d89238787c6d8:
 
+  ARM: dts: bcm283x: Move the BCM2837 DT contents from arm64 to arm. (2017-07-28 16:54:15 -0700)
 
+are available in the git repository at:
 
+  git://github.com/anholt/linux tags/bcm2835-dt-next-2017-08-07
 
-On 2017/8/7 23:57, Marc Zyngier wrote:
-> +James, since he deals with all things RAS. Please keep him on CC at all
-> times.
-> 
-> On 07/08/17 17:08, Dongjiu Geng wrote:
->> For the firmware-first RAS solution, SEA and SEI is injected
->> by the user space, user space needs to know the esr_el2 and
->> far_el2's value, so add them to sysreg. user space uses
->> the IOCTL KVM_GET_ONE_REG can get their value.
-> 
-> No.
-> 
-> This has zero purpose being exposed to userspace. Userspace sees a VM
-> that runs at EL1, and nothing else, so exposing EL2 registers doesn't
-> make *any* sense.
-> 
-> If you want something to be exposed to userspace, it has to be properly
-> abstracted and describe something that is relevant to the VM. An EL2
-> register satisfies none of these conditions.
-> 
->>
->> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
->> Signed-off-by: Quanming Wu <wuquanming@huawei.com>
->> ---
->>  arch/arm64/include/asm/kvm_host.h | 6 ++++--
->>  arch/arm64/kvm/sys_regs.c         | 6 ++++++
->>  2 files changed, 10 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index b6242fb..6063eec 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -103,10 +103,12 @@ enum vcpu_sysreg {
->>  	TTBR0_EL1,	/* Translation Table Base Register 0 */
->>  	TTBR1_EL1,	/* Translation Table Base Register 1 */
->>  	TCR_EL1,	/* Translation Control Register */
->> -	ESR_EL1,	/* Exception Syndrome Register */
->> +	ESR_EL1,	/* Exception Syndrome Register for EL1 */
->> +	ESR_EL2,	/* Exception Syndrome Register for EL2 */
->>  	AFSR0_EL1,	/* Auxiliary Fault Status Register 0 */
->>  	AFSR1_EL1,	/* Auxiliary Fault Status Register 1 */
->> -	FAR_EL1,	/* Fault Address Register */
->> +	FAR_EL1,	/* Fault Address Register for EL1 */
->> +	FAR_EL2,	/* Fault Address Register for EL2 */
->>  	MAIR_EL1,	/* Memory Attribute Indirection Register */
->>  	VBAR_EL1,	/* Vector Base Address Register */
->>  	CONTEXTIDR_EL1,	/* Context ID Register */
->> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->> index 0e26f8c..0c286bf 100644
->> --- a/arch/arm64/kvm/sys_regs.c
->> +++ b/arch/arm64/kvm/sys_regs.c
->> @@ -987,9 +987,15 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->>  	/* ESR_EL1 */
->>  	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0010), Op2(0b000),
->>  	  access_vm_reg, reset_unknown, ESR_EL1 },
->> +	/* ESR_EL2 */
->> +	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0010), Op2(0b000),
->> +	  access_vm_reg, reset_unknown, ESR_EL2 },
->>  	/* FAR_EL1 */
->>  	{ Op0(0b11), Op1(0b000), CRn(0b0110), CRm(0b0000), Op2(0b000),
->>  	  access_vm_reg, reset_unknown, FAR_EL1 },
->> +	/* FAR_EL2 */
->> +	{ Op0(0b11), Op1(0b100), CRn(0b0110), CRm(0b0000), Op2(0b000),
->> +	  access_vm_reg, reset_unknown, FAR_EL2 },
->>  	/* PAR_EL1 */
->>  	{ Op0(0b11), Op1(0b000), CRn(0b0111), CRm(0b0100), Op2(0b000),
->>  	  NULL, reset_unknown, PAR_EL1 },
->>
-> 
-> Also, what do you return here? All you're doing to return to userspace
-> is 0x1de7ec7edbadc0deULL (which perfectly matches this patch).
-> 
-> So for all intents and purposes, this patch is pretty useless.
-> 
-> Thanks,
-> 
-> 	M.
-> 
+for you to fetch changes up to 2c7c040c73e9e5686a5b451674b0592551a52345:
+
+  ARM: dts: bcm2835: Add Raspberry Pi Zero W (2017-08-02 15:25:36 -0700)
+
+----------------------------------------------------------------
+This pull request brings in a new DT for the Raspberry Pi Zero W.
+
+----------------------------------------------------------------
+Stefan Wahren (3):
+      ARM: bcm283x: Define UART pinmuxing on board level
+      dt-bindings: bcm: Add Raspberry Pi Zero W
+      ARM: dts: bcm2835: Add Raspberry Pi Zero W
+
+ .../devicetree/bindings/arm/bcm/brcm,bcm2835.txt   |   4 +
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts           |   6 +
+ arch/arm/boot/dts/bcm2835-rpi-a.dts                |   6 +
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts           |   6 +
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts           |   6 +
+ arch/arm/boot/dts/bcm2835-rpi-b.dts                |   6 +
+ arch/arm/boot/dts/bcm2835-rpi-zero-w.dts           | 139 +++++++++++++++++++++
+ arch/arm/boot/dts/bcm2835-rpi-zero.dts             |   6 +
+ arch/arm/boot/dts/bcm2835-rpi.dtsi                 |   2 +-
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts              |   6 +
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts              |  10 ++
+ 12 files changed, 198 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
