@@ -1,27 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 7 Aug 2017 15:09:31 +0200
-Subject: [PATCH] pinctrl: sunxi: fix V3s pinctrl driver IRQ bank base
-In-Reply-To: <20170801145416.61854-1-icenowy@aosc.io>
-References: <20170801145416.61854-1-icenowy@aosc.io>
-Message-ID: <CACRpkdYJX6SX5NjLMopoD7nKkmhseBMMTei-FoxzXwRnNDUaFg@mail.gmail.com>
+Date: Mon, 7 Aug 2017 15:10:50 +0200
+Subject: [PATCH] pinctrl: uniphier: widen all pinconf-derived arguments to
+ u32
+In-Reply-To: <1501819285-12827-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1501819285-12827-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdYvZwQaoHEi0rC+OgSrk2gLjp4ibJvOBCVT0Ss2KVCLyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 1, 2017 at 4:54 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+On Fri, Aug 4, 2017 at 6:01 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-> The V3s pin controller doesn't have the bank 0 (starts at address
-> 0x200), which is like A33. However, this is not workarounded when
-> developing the driver, which makes IRQ not working.
+> Since commit 58957d2edfa1 ("pinctrl: Widen the generic pinconf argument
+> from 16 to 24 bits"), the generic pinconf arguments are handled by u32.
 >
-> Fix the IRQ bank base.
+> UniPhier pinctrl drivers do not support debouncing, so u16 is working,
+> but align the argument type to u32 for consistency.
 >
-> Fixes: 56d9e4a76039 ("pinctrl: sunxi: add driver for V3s SoC")
-> Cc: stable at vger.kernel.org
-
-This patch only applies on the devel branch so I don't see why it is tagged
-for stable.
-
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
 Patch applied.
 
