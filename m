@@ -1,90 +1,43 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 7 Aug 2017 16:43:59 +0100
-Subject: [PATCH v2 4/9] mfd: axp20x: use correct platform device id for
- many PEK
-In-Reply-To: <20170726082832.16789-5-wens@csie.org>
-References: <20170726082832.16789-1-wens@csie.org>
- <20170726082832.16789-5-wens@csie.org>
-Message-ID: <20170807154359.434kux3urxhrt7ew@dell>
+Date: Mon, 7 Aug 2017 16:41:24 +0100
+Subject: [PATCH v2 1/3] mfd: syscon: update Atmel SMC binding doc
+In-Reply-To: <20170718132220.25018-2-ludovic.desroches@microchip.com>
+References: <20170718132220.25018-1-ludovic.desroches@microchip.com>
+ <20170718132220.25018-2-ludovic.desroches@microchip.com>
+Message-ID: <20170807154124.norjlxavx4u75yzs@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 26 Jul 2017, Chen-Yu Tsai wrote:
+Enjoy!
 
-> From: Quentin Schulz <quentin.schulz@free-electrons.com>
-> 
-> According to their datasheets, the AXP221, AXP223, AXP288, AXP803,
-> AXP809 and AXP813 PEK have different values for startup time bits from
-> the AXP20X, let's use the platform device id with the correct values.
-> 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/mfd/axp20x.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
-Applied, thanks.
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index ec4271ca065c..336de66ca408 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -677,7 +677,7 @@ static struct mfd_cell axp20x_cells[] = {
->  
->  static struct mfd_cell axp221_cells[] = {
->  	{
-> -		.name		= "axp20x-pek",
-> +		.name		= "axp221-pek",
->  		.num_resources	= ARRAY_SIZE(axp22x_pek_resources),
->  		.resources	= axp22x_pek_resources,
->  	}, {
-> @@ -702,7 +702,7 @@ static struct mfd_cell axp221_cells[] = {
->  
->  static struct mfd_cell axp223_cells[] = {
->  	{
-> -		.name			= "axp20x-pek",
-> +		.name			= "axp221-pek",
->  		.num_resources		= ARRAY_SIZE(axp22x_pek_resources),
->  		.resources		= axp22x_pek_resources,
->  	}, {
-> @@ -835,7 +835,7 @@ static struct mfd_cell axp288_cells[] = {
->  		.resources = axp288_fuel_gauge_resources,
->  	},
->  	{
-> -		.name = "axp20x-pek",
-> +		.name = "axp221-pek",
->  		.num_resources = ARRAY_SIZE(axp288_power_button_resources),
->  		.resources = axp288_power_button_resources,
->  	},
-> @@ -846,7 +846,7 @@ static struct mfd_cell axp288_cells[] = {
->  
->  static struct mfd_cell axp803_cells[] = {
->  	{
-> -		.name			= "axp20x-pek",
-> +		.name			= "axp221-pek",
->  		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
->  		.resources		= axp803_pek_resources,
->  	},
-> @@ -862,7 +862,7 @@ static struct mfd_cell axp806_cells[] = {
->  
->  static struct mfd_cell axp809_cells[] = {
->  	{
-> -		.name			= "axp20x-pek",
-> +		.name			= "axp221-pek",
->  		.num_resources		= ARRAY_SIZE(axp809_pek_resources),
->  		.resources		= axp809_pek_resources,
->  	}, {
-> @@ -873,7 +873,7 @@ static struct mfd_cell axp809_cells[] = {
->  
->  static struct mfd_cell axp813_cells[] = {
->  	{
-> -		.name			= "axp20x-pek",
-> +		.name			= "axp221-pek",
->  		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
->  		.resources		= axp803_pek_resources,
->  	}
+are available in the git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git ib-mfd-arm-v4.14
+
+for you to fetch changes up to 5df46ec0f4cf3b2cb0791abe5c68821a4f7ffffe:
+
+  ARM: dts: at91: sama5d2: Use sama5d2 compatible string for SMC (2017-08-07 16:38:30 +0100)
+
+----------------------------------------------------------------
+Immutable branch between MFD and ARM due for the v4.14 merge window
+
+----------------------------------------------------------------
+Ludovic Desroches (3):
+      mfd: syscon: Update Atmel SMC binding doc
+      mfd: syscon: atmel-smc: Add helper to retrieve register layout
+      ARM: dts: at91: sama5d2: Use sama5d2 compatible string for SMC
+
+ .../devicetree/bindings/mfd/atmel-smc.txt          |  1 +
+ arch/arm/boot/dts/sama5d2.dtsi                     |  2 +-
+ drivers/memory/atmel-ebi.c                         | 13 +++--
+ drivers/mfd/atmel-smc.c                            | 67 +++++++++++++++++-----
+ drivers/mtd/nand/atmel/nand-controller.c           | 10 +++-
+ include/linux/mfd/syscon/atmel-smc.h               | 32 ++++++++---
+ 
 -- 
 Lee Jones
 Linaro STMicroelectronics Landing Team Lead
