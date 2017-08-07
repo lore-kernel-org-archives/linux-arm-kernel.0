@@ -1,28 +1,45 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 07 Aug 2017 17:59:05 +0100
-Subject: [PATCH] KVM: arm64: add esr_el2 and far_el2 to sysreg
-In-Reply-To: <b834276b-b47d-51fb-7661-3eb5a2f6a68d@huawei.com>
-References: <1502122117-6276-1-git-send-email-gengdongjiu@huawei.com>
- <9fe6aa3a-98f9-6cae-6932-054858b54744@arm.com>
- <b834276b-b47d-51fb-7661-3eb5a2f6a68d@huawei.com>
-Message-ID: <59889C59.80207@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 7 Aug 2017 20:04:41 +0300
+Subject: [PATCH v2 0/2] OMAP3+/4+ PRM: fix of_irq_get() result checks
+In-Reply-To: <CAHp75VfdGkac6PUMSJLydR9GcZ8UAmqRR6zq2xNhYL8mMe3iUg@mail.gmail.com>
+References: <20170806151420.104225294@cogentembedded.com>
+ <CAHp75VfdGkac6PUMSJLydR9GcZ8UAmqRR6zq2xNhYL8mMe3iUg@mail.gmail.com>
+Message-ID: <8deff01d-2e0c-d511-0557-7712c0358dcc@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
+On 08/06/2017 09:57 PM, Andy Shevchenko wrote:
 
-On 07/08/17 17:23, gengdongjiu wrote:
->   As James's suggestion, I move injection SEA Error logic to the user space(Qemu), Qemu sets the related guest OS esr/elr/pstate/spsr
+>> Here's the set of 2 patches against the 'omap-for-v4.13/fixes' branch of Tony
+>> Lingren's 'linux-omap.git' repo.  I'm  fixing of_irq_get() DT API result
+>> checks.
+>>
+>> [1/2] ARM: OMAP3+: PRM: fix of_irq_get() result check
+>> [2/2] ARM: OMAP4+: PRM: fix of_irq_get() result checks
+> 
+> What IRQ domain did you consider? In case of STRICT the mapping will
+> be 1:1 and 0 is _valid_ IRQ number for hwirq.
 
-(because for firmware-first its the CPER records that matter, and only QEMU
-knows where it reserved the memory for these, and what it told the guest it
-would use as the notification method).
+    of_irq_get() returns virtual IRQ #'s, no? And for those 0 is considered 
+non-valid by Linus (I personally don't agree with that).
 
-> through IOCTL KVM_SET_ONE_REG. For the SEA, when Qemu sets the esr_el1.IL bit, it needs to refer to esr_el2.IL, else Qemu does not know the trapped
-> instruction was a 16-bit or a 32-bit instruction, also it needs to set far_el1 using far_el2, because this is synchronization abort.
+> 0 in Linux kernel IRQ numbering often means NO_IRQ.
 
-The 32bit kernel doesn't support ACPI firmware first, and aarch64 doesn't
-support 16-bit instructions.
+    NO_IRQ was "considered harmful" AFAIK. :-)
 
+> But there might be exceptions.
 
-James
+> So, it would be nice to see if there is a problem on certain platform
+> if the patch is not applied, or is it problem on OF IRQ code, or
+> wrong interpratation of 0?
+
+    of_irq_get() is certainly problematic with its returning both 0 and 
+negative error # on failure. I tried to fix that back in 2016 but that patch 
+got shot down:
+
+http://marc.info/?t=146447243300002&r=1
+
+    I've now audited all the call sites of of_irq_get() and that resulted in a 
+number of fixes.
+
+MBR, Sergei
