@@ -1,52 +1,317 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Mon, 7 Aug 2017 15:24:36 +0800
-Subject: [PATCH v3 3/4] soc: mediatek: add header files required for MT7622
- SCPSYS dt-binding
-In-Reply-To: <cover.1502090240.git.sean.wang@mediatek.com>
-References: <cover.1502090240.git.sean.wang@mediatek.com>
-Message-ID: <7926d07478ffdfc5baccfe91d6960ea6ca207c9d.1502090240.git.sean.wang@mediatek.com>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Mon,  7 Aug 2017 12:52:42 +0530
+Subject: [PATCH 10/10] ARM: dts: imx6q-apalis-eval: add support for Apalis
+ Evaluation Board
+In-Reply-To: <cover.1502087184.git.maitysanchayan@gmail.com>
+References: <cover.1502087184.git.maitysanchayan@gmail.com>
+Message-ID: <fd12d8b098612db413250d98237382dc6d9d3c85.1502087184.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chen Zhong <chen.zhong@mediatek.com>
+Add support for the Toradex Apalis Evaluation Board.
 
-Add relevant header files required for dt-bindings of SCPSYS power domain
-control for all subsystems found on MT7622 SoC.
-
-Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 ---
- include/dt-bindings/power/mt7622-power.h | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 include/dt-bindings/power/mt7622-power.h
+ arch/arm/boot/dts/Makefile              |   1 +
+ arch/arm/boot/dts/imx6q-apalis-eval.dts | 278 ++++++++++++++++++++++++++++++++
+ 2 files changed, 279 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-apalis-eval.dts
 
-diff --git a/include/dt-bindings/power/mt7622-power.h b/include/dt-bindings/power/mt7622-power.h
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 1c16e891a76a..2c5aca56a29f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -392,6 +392,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6dl-udoo.dtb \
+ 	imx6dl-wandboard.dtb \
+ 	imx6dl-wandboard-revb1.dtb \
++	imx6q-apalis-eval.dtb \
+ 	imx6q-apalis-ixora.dtb \
+ 	imx6q-apalis-ixora-v1.1.dtb \
+ 	imx6q-apf6dev.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-apalis-eval.dts b/arch/arm/boot/dts/imx6q-apalis-eval.dts
 new file mode 100644
-index 0000000..1b63926
+index 000000000000..4bbfe3d61027
 --- /dev/null
-+++ b/include/dt-bindings/power/mt7622-power.h
-@@ -0,0 +1,22 @@
++++ b/arch/arm/boot/dts/imx6q-apalis-eval.dts
+@@ -0,0 +1,278 @@
 +/*
-+ * Copyright (C) 2017 MediaTek Inc.
++ * Copyright 2014-2017 Toradex AG
++ * Copyright 2012 Freescale Semiconductor, Inc.
++ * Copyright 2011 Linaro Ltd.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#ifndef _DT_BINDINGS_POWER_MT7622_POWER_H
-+#define _DT_BINDINGS_POWER_MT7622_POWER_H
++/dts-v1/;
 +
-+#define MT7622_POWER_DOMAIN_ETHSYS	0
-+#define MT7622_POWER_DOMAIN_HIF0	1
-+#define MT7622_POWER_DOMAIN_HIF1	2
-+#define MT7622_POWER_DOMAIN_WB		3
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include "imx6q.dtsi"
++#include "imx6qdl-apalis.dtsi"
 +
-+#endif /* _DT_BINDINGS_POWER_MT7622_POWER_H */
++/ {
++	model = "Toradex Apalis iMX6Q/D Module on Apalis Evaluation Board";
++	compatible = "toradex,apalis_imx6q-eval", "toradex,apalis_imx6q",
++		     "fsl,imx6q";
++
++	aliases {
++		i2c0 = &i2c1;
++		i2c1 = &i2c3;
++		i2c2 = &i2c2;
++		rtc0 = &rtc_i2c;
++		rtc1 = &snvs_rtc;
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpio_keys>;
++
++		wakeup {
++			label = "Wake-Up";
++			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_WAKEUP>;
++			debounce-interval = <10>;
++			wakeup-source;
++		};
++	};
++
++	lcd_display: display at di0 {
++		compatible = "fsl,imx-parallel-display";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interface-pix-fmt = "rgb24";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_ipu1_lcdif>;
++		status = "okay";
++
++		port at 0 {
++			reg = <0>;
++
++			lcd_display_in: endpoint {
++				remote-endpoint = <&ipu1_di1_disp1>;
++			};
++		};
++
++		port at 1 {
++			reg = <1>;
++
++			lcd_display_out: endpoint {
++				remote-endpoint = <&lcd_panel_in>;
++			};
++		};
++	};
++
++	panel: panel {
++		/*
++		 * edt,et057090dhu: EDT 5.7" LCD TFT
++		 * edt,et070080dh6: EDT 7.0" LCD TFT
++		 */
++		compatible = "edt,et057090dhu";
++		backlight = <&backlight>;
++
++		port {
++			lcd_panel_in: endpoint {
++				remote-endpoint = <&lcd_display_out>;
++			};
++		};
++	};
++
++	reg_pcie_switch: regulator-pcie-switch {
++		compatible = "regulator-fixed";
++		regulator-name = "pcie_switch";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		gpio = <&gpio1 2 GPIO_ACTIVE_HIGH>;
++		startup-delay-us = <100000>;
++		enable-active-high;
++		status = "okay";
++	};
++};
++
++&backlight {
++	brightness-levels = <0 127 191 223 239 247 251 255>;
++	default-brightness-level = <1>;
++	status = "okay";
++};
++
++&can1 {
++	status = "okay";
++};
++
++&can2 {
++	status = "okay";
++};
++
++&hdmi {
++	status = "okay";
++};
++
++/* I2C1_SDA/SCL on MXM3 209/211 (e.g. RTC on carrier board) */
++&i2c1 {
++	status = "okay";
++
++	pcie-switch at 58 {
++		compatible = "plx,pex8605";
++		reg = <0x58>;
++	};
++
++	/* M41T0M6 real time clock on carrier board */
++	rtc_i2c: rtc at 68 {
++		compatible = "st,m41t00";
++		reg = <0x68>;
++	};
++};
++
++/*
++ * I2C3_SDA/SCL (CAM) on MXM3 pin 201/203 (e.g. camera sensor on carrier
++ * board)
++ */
++&i2c3 {
++	status = "okay";
++};
++
++&ipu1_di1_disp1 {
++	remote-endpoint = <&lcd_display_in>;
++};
++
++&ldb {
++	status = "okay";
++};
++
++&pcie {
++	/* active-high meaning opposite of regular PERST# active-low polarity */
++	reset-gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
++	reset-gpio-active-high;
++	vpcie-supply = <&reg_pcie_switch>;
++	status = "okay";
++};
++
++&pwm1 {
++	status = "okay";
++};
++
++&pwm2 {
++	status = "okay";
++};
++
++&pwm3 {
++	status = "okay";
++};
++
++&pwm4 {
++	status = "okay";
++};
++
++&reg_usb_otg_vbus {
++	status = "okay";
++};
++
++&reg_usb_host_vbus {
++	status = "okay";
++};
++
++&sata {
++	status = "okay";
++};
++
++&sound_spdif {
++	status = "okay";
++};
++
++&spdif {
++	status = "okay";
++};
++
++&uart1 {
++	status = "okay";
++};
++
++&uart2 {
++	status = "okay";
++};
++
++&uart4 {
++	status = "okay";
++};
++
++&uart5 {
++	status = "okay";
++};
++
++&usbh1 {
++	vbus-supply = <&reg_usb_host_vbus>;
++	status = "okay";
++};
++
++&usbotg {
++	vbus-supply = <&reg_usb_otg_vbus>;
++	status = "okay";
++};
++
++/* MMC1 */
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1_4bit &pinctrl_usdhc1_8bit &pinctrl_mmc_cd>;
++	cd-gpios = <&gpio4 20 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
++
++/* SD1 */
++&usdhc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2 &pinctrl_sd_cd>;
++	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
++
++&iomuxc {
++	/*
++	 * Mux the Apalis GPIOs
++	 */
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_apalis_gpio1 &pinctrl_apalis_gpio2
++		     &pinctrl_apalis_gpio3 &pinctrl_apalis_gpio4
++		     &pinctrl_apalis_gpio5 &pinctrl_apalis_gpio6
++		     &pinctrl_apalis_gpio7 &pinctrl_apalis_gpio8
++		    >;
++};
 -- 
-2.7.4
+2.13.3
