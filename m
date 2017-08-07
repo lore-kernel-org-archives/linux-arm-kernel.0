@@ -1,38 +1,26 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon,  7 Aug 2017 16:13:25 +0800
-Subject: [PATCH 7/7] arm64: dts: hi3660: Reset the mmc hosts
-In-Reply-To: <20170807081325.11406-1-guodong.xu@linaro.org>
-References: <20170807081325.11406-1-guodong.xu@linaro.org>
-Message-ID: <20170807081325.11406-8-guodong.xu@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 7 Aug 2017 10:50:48 +0200
+Subject: [PATCH v2 10/23] pinctrl: rockchip: add schmitt input mode
+ support for rv1108
+In-Reply-To: <1501663217-12255-1-git-send-email-andy.yan@rock-chips.com>
+References: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
+ <1501663217-12255-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <CACRpkdZZh_vix_+atNk-r8ZCGV3HR-SJ6fzbFwFS6GEodqAbCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add reset-names = "reset" into mmc nodes.
+On Wed, Aug 2, 2017 at 10:40 AM, Andy Yan <andy.yan@rock-chips.com> wrote:
 
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+> Some pins like i2c SCL/SDA need the schmitt input function
+> to avoid crosstalk problems.
+>
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>
+> Changes in v2: None
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 5fd5686..41841f7 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -909,6 +909,7 @@
- 			clock-names = "ciu", "biu";
- 			clock-frequency = <3200000>;
- 			resets = <&crg_rst 0x94 18>;
-+			reset-names = "reset";
- 			cd-gpios = <&gpio25 3 0>;
- 			hisilicon,peripheral-syscon = <&sctrl>;
- 			pinctrl-names = "default";
-@@ -938,6 +939,7 @@
- 				 <&crg_ctrl HI3660_HCLK_GATE_SDIO0>;
- 			clock-names = "ciu", "biu";
- 			resets = <&crg_rst 0x94 20>;
-+			reset-names = "reset";
- 			card-detect-delay = <200>;
- 			supports-highspeed;
- 			keep-power-in-suspend;
--- 
-2.10.2
+Already applied v1 with Heiko's ACK so should be fine then.
+
+Yours,
+Linus Walleij
