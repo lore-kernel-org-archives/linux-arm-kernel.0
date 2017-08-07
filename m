@@ -1,51 +1,41 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 7 Aug 2017 10:46:08 -0700
-Subject: [GIT PULL 1/2] bcm2835-dt-next-2017-08-07
-In-Reply-To: <20170807163531.2940-1-eric@anholt.net>
+Date: Mon, 7 Aug 2017 10:47:23 -0700
+Subject: [GIT PULL 2/2] bcm2835-defconfig-next-2017-08-07
+In-Reply-To: <20170807163531.2940-2-eric@anholt.net>
 References: <20170807163531.2940-1-eric@anholt.net>
-Message-ID: <3cccdbaa-7350-447f-1740-7ec56c236737@gmail.com>
+ <20170807163531.2940-2-eric@anholt.net>
+Message-ID: <8f84d891-8bb1-1a79-645f-218763d798dd@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 08/07/2017 09:35 AM, Eric Anholt wrote:
-> The following changes since commit 3bfe25fa9f8a56c5c877c7fd854d89238787c6d8:
+> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 > 
->   ARM: dts: bcm283x: Move the BCM2837 DT contents from arm64 to arm. (2017-07-28 16:54:15 -0700)
+>   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://github.com/anholt/linux tags/bcm2835-dt-next-2017-08-07
+>   git://github.com/anholt/linux tags/bcm2835-defconfig-next-2017-08-07
 > 
-> for you to fetch changes up to 2c7c040c73e9e5686a5b451674b0592551a52345:
+> for you to fetch changes up to 6235a80a5475d10ebef646c06cf7cf0f4aba688c:
 > 
->   ARM: dts: bcm2835: Add Raspberry Pi Zero W (2017-08-02 15:25:36 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request brings in a new DT for the Raspberry Pi Zero W.
+>   ARM: bcm2835_defconfig: Enable wifi driver for RPi Zero W (2017-07-19 13:37:34 -0700)
 > 
 > ----------------------------------------------------------------
-
-Merged, thanks Eric!
-
+> This pull request brings in defconfig changes for the Raspberry Pi
+> Zero W.
+> 
+> ----------------------------------------------------------------
 > Stefan Wahren (3):
->       ARM: bcm283x: Define UART pinmuxing on board level
->       dt-bindings: bcm: Add Raspberry Pi Zero W
->       ARM: dts: bcm2835: Add Raspberry Pi Zero W
+>       ARM: bcm2835_defconfig: Enable Mini UART console support
+>       ARM: bcm2835_defconfig: Increase CMA for VC4
+>       ARM: bcm2835_defconfig: Enable wifi driver for RPi Zero W
+
+Also merged, thanks Eric!
+
 > 
->  .../devicetree/bindings/arm/bcm/brcm,bcm2835.txt   |   4 +
->  arch/arm/boot/dts/Makefile                         |   3 +-
->  arch/arm/boot/dts/bcm2835-rpi-a-plus.dts           |   6 +
->  arch/arm/boot/dts/bcm2835-rpi-a.dts                |   6 +
->  arch/arm/boot/dts/bcm2835-rpi-b-plus.dts           |   6 +
->  arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts           |   6 +
->  arch/arm/boot/dts/bcm2835-rpi-b.dts                |   6 +
->  arch/arm/boot/dts/bcm2835-rpi-zero-w.dts           | 139 +++++++++++++++++++++
->  arch/arm/boot/dts/bcm2835-rpi-zero.dts             |   6 +
->  arch/arm/boot/dts/bcm2835-rpi.dtsi                 |   2 +-
->  arch/arm/boot/dts/bcm2836-rpi-2-b.dts              |   6 +
->  arch/arm/boot/dts/bcm2837-rpi-3-b.dts              |  10 ++
->  12 files changed, 198 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
+>  arch/arm/configs/bcm2835_defconfig | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
 
 
