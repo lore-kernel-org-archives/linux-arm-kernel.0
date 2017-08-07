@@ -1,40 +1,33 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon,  7 Aug 2017 22:31:57 +0800
-Subject: [PATCH 2/5] arm64: defconfig: enable support hi6421v530 PMIC
+Date: Mon,  7 Aug 2017 22:31:56 +0800
+Subject: [PATCH 1/5] arm64: defconfig: enable Kirin PCIe
 In-Reply-To: <20170807143200.6764-1-guodong.xu@linaro.org>
 References: <20170807143200.6764-1-guodong.xu@linaro.org>
-Message-ID: <20170807143200.6764-3-guodong.xu@linaro.org>
+Message-ID: <20170807143200.6764-2-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable configs for hi6421v530 mfd and regulator driver
- + CONFIG_MFD_HI6421_PMIC=y
- + CONFIG_REGULATOR_HI6421V530=y
+From: Xiaowei Song <songxiaowei@hisilicon.com>
+
+Enable HiSilicon Kirin series SoCs PCIe controllers
 
 Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+Signed-off-by: Xiaowei Song <songxiaowei@hisilicon.com>
 ---
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 4e14c6d..d752beb 100644
+index b4ca115..4e14c6d 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -317,6 +317,7 @@ CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_I2C=y
- CONFIG_MFD_CROS_EC_SPI=y
- CONFIG_MFD_EXYNOS_LPASS=m
-+CONFIG_MFD_HI6421_PMIC=y
- CONFIG_MFD_HI655X_PMIC=y
- CONFIG_MFD_MAX77620=y
- CONFIG_MFD_SPMI_PMIC=y
-@@ -325,6 +326,7 @@ CONFIG_MFD_SEC_CORE=y
- CONFIG_REGULATOR_FAN53555=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_GPIO=y
-+CONFIG_REGULATOR_HI6421V530=y
- CONFIG_REGULATOR_HI655X=y
- CONFIG_REGULATOR_MAX77620=y
- CONFIG_REGULATOR_PWM=y
+@@ -68,6 +68,7 @@ CONFIG_HOTPLUG_PCI_ACPI=y
+ CONFIG_PCI_LAYERSCAPE=y
+ CONFIG_PCI_HISI=y
+ CONFIG_PCIE_QCOM=y
++CONFIG_PCIE_KIRIN=y
+ CONFIG_PCIE_ARMADA_8K=y
+ CONFIG_PCI_AARDVARK=y
+ CONFIG_PCIE_RCAR=y
 -- 
 2.10.2
