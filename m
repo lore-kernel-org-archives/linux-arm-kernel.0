@@ -1,145 +1,89 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 7 Aug 2017 16:43:48 +0100
-Subject: [PATCH v2 3/9] mfd: axp20x: Add support for AXP813 PMIC
-In-Reply-To: <20170726082832.16789-4-wens@csie.org>
+Date: Mon, 7 Aug 2017 16:43:59 +0100
+Subject: [PATCH v2 4/9] mfd: axp20x: use correct platform device id for
+ many PEK
+In-Reply-To: <20170726082832.16789-5-wens@csie.org>
 References: <20170726082832.16789-1-wens@csie.org>
- <20170726082832.16789-4-wens@csie.org>
-Message-ID: <20170807154348.plqxm6oht54nb52g@dell>
+ <20170726082832.16789-5-wens@csie.org>
+Message-ID: <20170807154359.434kux3urxhrt7ew@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 26 Jul 2017, Chen-Yu Tsai wrote:
 
-> The X-Powers AXP813 PMIC is normally used with Allwinner's A83T SoC.
-> It has the same range of functions as other X-Powers PMICs, such as
-> DC-DC buck converter and linear regulator outputs, AC-IN and VBUS
-> power supplies, power button trigger, GPIOs, ADCs, and a battery
-> charger.
+> From: Quentin Schulz <quentin.schulz@free-electrons.com>
 > 
-> Note that the IRQ table given in the datasheet is incorrect: in IRQ
-> enable/status registers 1, there are separate IRQs for ACIN and VBUS,
-> instead of bits [7:5] being the same as bits [4:2]. So it shares the
-> same IRQs as the AXP803, rather than the AXP288.
+> According to their datasheets, the AXP221, AXP223, AXP288, AXP803,
+> AXP809 and AXP813 PEK have different values for startup time bits from
+> the AXP20X, let's use the platform device id with the correct values.
 > 
-> This patch adds basic mfd support for it, with only the power button
-> enabled.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 > Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  drivers/mfd/axp20x-rsb.c   |  1 +
->  drivers/mfd/axp20x.c       | 22 ++++++++++++++++++++++
->  include/linux/mfd/axp20x.h | 29 +++++++++++++++++++++++++++++
->  3 files changed, 52 insertions(+)
+>  drivers/mfd/axp20x.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
 
 Applied, thanks.
 
-> diff --git a/drivers/mfd/axp20x-rsb.c b/drivers/mfd/axp20x-rsb.c
-> index fd5c7267b136..7ddbd9e8dd03 100644
-> --- a/drivers/mfd/axp20x-rsb.c
-> +++ b/drivers/mfd/axp20x-rsb.c
-> @@ -64,6 +64,7 @@ static const struct of_device_id axp20x_rsb_of_match[] = {
->  	{ .compatible = "x-powers,axp803", .data = (void *)AXP803_ID },
->  	{ .compatible = "x-powers,axp806", .data = (void *)AXP806_ID },
->  	{ .compatible = "x-powers,axp809", .data = (void *)AXP809_ID },
-> +	{ .compatible = "x-powers,axp813", .data = (void *)AXP813_ID },
->  	{ },
->  };
->  MODULE_DEVICE_TABLE(of, axp20x_rsb_of_match);
 > diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 917b6ddc4f15..ec4271ca065c 100644
+> index ec4271ca065c..336de66ca408 100644
 > --- a/drivers/mfd/axp20x.c
 > +++ b/drivers/mfd/axp20x.c
-> @@ -44,6 +44,7 @@ static const char * const axp20x_model_names[] = {
->  	"AXP803",
->  	"AXP806",
->  	"AXP809",
-> +	"AXP813",
->  };
+> @@ -677,7 +677,7 @@ static struct mfd_cell axp20x_cells[] = {
 >  
->  static const struct regmap_range axp152_writeable_ranges[] = {
-> @@ -870,6 +871,14 @@ static struct mfd_cell axp809_cells[] = {
+>  static struct mfd_cell axp221_cells[] = {
+>  	{
+> -		.name		= "axp20x-pek",
+> +		.name		= "axp221-pek",
+>  		.num_resources	= ARRAY_SIZE(axp22x_pek_resources),
+>  		.resources	= axp22x_pek_resources,
+>  	}, {
+> @@ -702,7 +702,7 @@ static struct mfd_cell axp221_cells[] = {
+>  
+>  static struct mfd_cell axp223_cells[] = {
+>  	{
+> -		.name			= "axp20x-pek",
+> +		.name			= "axp221-pek",
+>  		.num_resources		= ARRAY_SIZE(axp22x_pek_resources),
+>  		.resources		= axp22x_pek_resources,
+>  	}, {
+> @@ -835,7 +835,7 @@ static struct mfd_cell axp288_cells[] = {
+>  		.resources = axp288_fuel_gauge_resources,
 >  	},
->  };
+>  	{
+> -		.name = "axp20x-pek",
+> +		.name = "axp221-pek",
+>  		.num_resources = ARRAY_SIZE(axp288_power_button_resources),
+>  		.resources = axp288_power_button_resources,
+>  	},
+> @@ -846,7 +846,7 @@ static struct mfd_cell axp288_cells[] = {
 >  
-> +static struct mfd_cell axp813_cells[] = {
-> +	{
-> +		.name			= "axp20x-pek",
-> +		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
-> +		.resources		= axp803_pek_resources,
-> +	}
-> +};
-> +
->  static struct axp20x_dev *axp20x_pm_power_off;
->  static void axp20x_power_off(void)
->  {
-> @@ -956,6 +965,19 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
->  		axp20x->regmap_cfg = &axp22x_regmap_config;
->  		axp20x->regmap_irq_chip = &axp809_regmap_irq_chip;
->  		break;
-> +	case AXP813_ID:
-> +		axp20x->nr_cells = ARRAY_SIZE(axp813_cells);
-> +		axp20x->cells = axp813_cells;
-> +		axp20x->regmap_cfg = &axp288_regmap_config;
-> +		/*
-> +		 * The IRQ table given in the datasheet is incorrect.
-> +		 * In IRQ enable/status registers 1, there are separate
-> +		 * IRQs for ACIN and VBUS, instead of bits [7:5] being
-> +		 * the same as bits [4:2]. So it shares the same IRQs
-> +		 * as the AXP803, rather than the AXP288.
-> +		 */
-> +		axp20x->regmap_irq_chip = &axp803_regmap_irq_chip;
-> +		break;
->  	default:
->  		dev_err(dev, "unsupported AXP20X ID %lu\n", axp20x->variant);
->  		return -EINVAL;
-> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-> index 965b027e31b3..e9c908c4fba8 100644
-> --- a/include/linux/mfd/axp20x.h
-> +++ b/include/linux/mfd/axp20x.h
-> @@ -23,6 +23,7 @@ enum axp20x_variants {
->  	AXP803_ID,
->  	AXP806_ID,
->  	AXP809_ID,
-> +	AXP813_ID,
->  	NR_AXP20X_VARIANTS,
->  };
+>  static struct mfd_cell axp803_cells[] = {
+>  	{
+> -		.name			= "axp20x-pek",
+> +		.name			= "axp221-pek",
+>  		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
+>  		.resources		= axp803_pek_resources,
+>  	},
+> @@ -862,7 +862,7 @@ static struct mfd_cell axp806_cells[] = {
 >  
-> @@ -387,6 +388,34 @@ enum {
->  	AXP803_REG_ID_MAX,
->  };
+>  static struct mfd_cell axp809_cells[] = {
+>  	{
+> -		.name			= "axp20x-pek",
+> +		.name			= "axp221-pek",
+>  		.num_resources		= ARRAY_SIZE(axp809_pek_resources),
+>  		.resources		= axp809_pek_resources,
+>  	}, {
+> @@ -873,7 +873,7 @@ static struct mfd_cell axp809_cells[] = {
 >  
-> +enum {
-> +	AXP813_DCDC1 = 0,
-> +	AXP813_DCDC2,
-> +	AXP813_DCDC3,
-> +	AXP813_DCDC4,
-> +	AXP813_DCDC5,
-> +	AXP813_DCDC6,
-> +	AXP813_DCDC7,
-> +	AXP813_ALDO1,
-> +	AXP813_ALDO2,
-> +	AXP813_ALDO3,
-> +	AXP813_DLDO1,
-> +	AXP813_DLDO2,
-> +	AXP813_DLDO3,
-> +	AXP813_DLDO4,
-> +	AXP813_ELDO1,
-> +	AXP813_ELDO2,
-> +	AXP813_ELDO3,
-> +	AXP813_FLDO1,
-> +	AXP813_FLDO2,
-> +	AXP813_FLDO3,
-> +	AXP813_RTC_LDO,
-> +	AXP813_LDO_IO0,
-> +	AXP813_LDO_IO1,
-> +	AXP813_SW,
-> +	AXP813_REG_ID_MAX,
-> +};
-> +
->  /* IRQs */
->  enum {
->  	AXP152_IRQ_LDO0IN_CONNECT = 1,
+>  static struct mfd_cell axp813_cells[] = {
+>  	{
+> -		.name			= "axp20x-pek",
+> +		.name			= "axp221-pek",
+>  		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
+>  		.resources		= axp803_pek_resources,
+>  	}
 
 -- 
 Lee Jones
