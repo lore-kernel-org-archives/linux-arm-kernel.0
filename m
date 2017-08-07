@@ -1,57 +1,50 @@
-From: pasha.tatashin@oracle.com (Pavel Tatashin)
-Date: Mon,  7 Aug 2017 16:38:48 -0400
-Subject: [v6 14/15] mm: optimize early system hash allocations
-In-Reply-To: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
-Message-ID: <1502138329-123460-15-git-send-email-pasha.tatashin@oracle.com>
+From: nleeder@codeaurora.org (Leeder, Neil)
+Date: Mon, 7 Aug 2017 16:52:02 -0400
+Subject: [PATCH 1/2] acpi: arm64: add iort support for PMCG
+In-Reply-To: <22df7d0e-3017-b3f6-67e2-21b9ece433c3@arm.com>
+References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+ <1501876754-1064-2-git-send-email-nleeder@codeaurora.org>
+ <22df7d0e-3017-b3f6-67e2-21b9ece433c3@arm.com>
+Message-ID: <a8cd5d9c-3443-9864-48aa-c9c56d010fad@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clients can call alloc_large_system_hash() with flag: HASH_ZERO to specify
-that memory that was allocated for system hash needs to be zeroed,
-otherwise the memory does not need to be zeroed, and client will initialize
-it.
+Hi Robin,
+Thank you for the review.
 
-If memory does not need to be zero'd, call the new
-memblock_virt_alloc_raw() interface, and thus improve the boot performance.
+On 8/7/2017 7:17 AM, Robin Murphy wrote:
+> Hi Neil,
+> 
+> On 04/08/17 20:59, Neil Leeder wrote:
+[...]
+>> +	res[1].start = pmcg->base_address + SZ_64K;
+> 
+> Ugh, I see there's a nasty spec hole here - IORT only defines one base
+> address, but SMMUv3 says *both* pages have imp-def base addresses. I
+> guess this assumption of them being in consecutive 64K regions holds for
+> your platform, but as things stand it doesn't appear possible to rely on
+> it generally :(
+> 
+> I'll follow up internally to see if we need to get IORT and/or SBSA
+> updated or clarified.
+> 
+Thanks. I'll wait for the outcome before submitting a new patch.
 
-Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-Reviewed-by: Bob Picco <bob.picco@oracle.com>
----
- mm/page_alloc.c | 15 +++++++--------
- 1 file changed, 7 insertions(+), 8 deletions(-)
+[...]
+>> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
+>> index 707dda74..2169b6f 100644
+>> --- a/include/acpi/actbl2.h
+>> +++ b/include/acpi/actbl2.h
+> 
+> Hopefully these changes are merely here for reference, but just in case
+> it needs to be said, they should go as a separate patch via ACPICA
+> (presumably there's also some corresponding iASL stuff to compile PMCG
+> nodes in the first place).
+> 
+Yes, I'll submit this to ACPICA once the IORT addresses get figured out.
 
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 4d32c1fa4c6c..000806298dfb 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -7354,18 +7354,17 @@ void *__init alloc_large_system_hash(const char *tablename,
- 
- 	log2qty = ilog2(numentries);
- 
--	/*
--	 * memblock allocator returns zeroed memory already, so HASH_ZERO is
--	 * currently not used when HASH_EARLY is specified.
--	 */
- 	gfp_flags = (flags & HASH_ZERO) ? GFP_ATOMIC | __GFP_ZERO : GFP_ATOMIC;
- 	do {
- 		size = bucketsize << log2qty;
--		if (flags & HASH_EARLY)
--			table = memblock_virt_alloc_nopanic(size, 0);
--		else if (hashdist)
-+		if (flags & HASH_EARLY) {
-+			if (flags & HASH_ZERO)
-+				table = memblock_virt_alloc_nopanic(size, 0);
-+			else
-+				table = memblock_virt_alloc_raw(size, 0);
-+		} else if (hashdist) {
- 			table = __vmalloc(size, gfp_flags, PAGE_KERNEL);
--		else {
-+		} else {
- 			/*
- 			 * If bucketsize is not a power-of-two, we may free
- 			 * some pages@the end of hash table which
+Neil
 -- 
-2.14.0
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
