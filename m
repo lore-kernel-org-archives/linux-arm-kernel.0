@@ -1,15 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 07 Aug 2017 16:53:26 +0100
-Subject: Applied "spi: rockchip: Fix clock handling in suspend/resume" to the
- spi tree
-In-Reply-To: <1502109620-26813-4-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <E1dekLO-0005bc-H0@debutante>
+Date: Mon, 07 Aug 2017 16:53:31 +0100
+Subject: Applied "spi: rockchip: Fix clock handling in remove" to the spi tree
+In-Reply-To: <1502109620-26813-3-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <E1dekLT-0005cd-N7@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: rockchip: Fix clock handling in suspend/resume
+   spi: rockchip: Fix clock handling in remove
 
 has been applied to the spi tree at
 
@@ -34,62 +33,43 @@ to this mail.
 Thanks,
 Mark
 
->From d38c4ae194bb8a3d8cf7d95378c5b2799cdd0a3b Mon Sep 17 00:00:00 2001
+>From 6a06e895b262621a81b3b08126b4bc5e1b8eef05 Mon Sep 17 00:00:00 2001
 From: Jeffy Chen <jeffy.chen@rock-chips.com>
-Date: Mon, 7 Aug 2017 20:40:20 +0800
-Subject: [PATCH] spi: rockchip: Fix clock handling in suspend/resume
+Date: Mon, 7 Aug 2017 20:40:19 +0800
+Subject: [PATCH] spi: rockchip: Fix clock handling in remove
 
-The runtime suspend callback might be called by pm domain framework at
-suspend_noirq stage. It would try to disable the clocks which already
-been disabled by rockchip_spi_suspend.
+We are assuming clocks enabled when calling rockchip_spi_remove, which
+is not always true. Those clocks might already been disabled by the
+runtime PM at that time.
 
-Call pm_runtime_force_suspend/pm_runtime_force_resume when
-suspend/resume to avoid that.
+Call pm_runtime_get_sync before trying to disable clocks to avoid that.
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-rockchip.c | 21 ++++++---------------
- 1 file changed, 6 insertions(+), 15 deletions(-)
+ drivers/spi/spi-rockchip.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index a75fd9bb76de..34f6440a5255 100644
+index 5497650992c7..a75fd9bb76de 100644
 --- a/drivers/spi/spi-rockchip.c
 +++ b/drivers/spi/spi-rockchip.c
-@@ -846,10 +846,9 @@ static int rockchip_spi_suspend(struct device *dev)
- 	if (ret < 0)
- 		return ret;
+@@ -816,11 +816,15 @@ static int rockchip_spi_remove(struct platform_device *pdev)
+ 	struct spi_master *master = spi_master_get(platform_get_drvdata(pdev));
+ 	struct rockchip_spi *rs = spi_master_get_devdata(master);
  
--	if (!pm_runtime_suspended(dev)) {
--		clk_disable_unprepare(rs->spiclk);
--		clk_disable_unprepare(rs->apb_pclk);
--	}
-+	ret = pm_runtime_force_suspend(dev);
-+	if (ret < 0)
-+		return ret;
+-	pm_runtime_disable(&pdev->dev);
++	pm_runtime_get_sync(&pdev->dev);
  
- 	pinctrl_pm_select_sleep_state(dev);
+ 	clk_disable_unprepare(rs->spiclk);
+ 	clk_disable_unprepare(rs->apb_pclk);
  
-@@ -864,17 +863,9 @@ static int rockchip_spi_resume(struct device *dev)
- 
- 	pinctrl_pm_select_default_state(dev);
- 
--	if (!pm_runtime_suspended(dev)) {
--		ret = clk_prepare_enable(rs->apb_pclk);
--		if (ret < 0)
--			return ret;
--
--		ret = clk_prepare_enable(rs->spiclk);
--		if (ret < 0) {
--			clk_disable_unprepare(rs->apb_pclk);
--			return ret;
--		}
--	}
-+	ret = pm_runtime_force_resume(dev);
-+	if (ret < 0)
-+		return ret;
- 
- 	ret = spi_master_resume(rs->master);
- 	if (ret < 0) {
++	pm_runtime_put_noidle(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
++	pm_runtime_set_suspended(&pdev->dev);
++
+ 	if (rs->dma_tx.ch)
+ 		dma_release_channel(rs->dma_tx.ch);
+ 	if (rs->dma_rx.ch)
 -- 
 2.13.3
