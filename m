@@ -1,38 +1,59 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon,  7 Aug 2017 22:51:56 +0800
-Subject: [PATCH] clk: hi3660: fix incorrect uart3 clock freqency
-Message-ID: <20170807145156.7880-1-guodong.xu@linaro.org>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 07 Aug 2017 17:21:26 +0200
+Subject: [PATCH 3/4] thermal: exynos: constify
+ thermal_zone_of_device_ops structures
+In-Reply-To: <1501965437-30730-4-git-send-email-Julia.Lawall@lip6.fr>
+References: <1501965437-30730-1-git-send-email-Julia.Lawall@lip6.fr>
+ <CGME20170805210250epcas2p2f6a808ee6e3e20cd1dc19457b96ddbf4@epcas2p2.samsung.com>
+ <1501965437-30730-4-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <2246245.2R0fntX3Po@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zhong Kaihua <zhongkaihua@huawei.com>
+On Saturday, August 05, 2017 10:37:16 PM Julia Lawall wrote:
+> The thermal_zone_of_device_ops structure is only passed as the fourth
+> argument to thermal_zone_of_sensor_register, which is declared as const.
+> Thus the thermal_zone_of_device_ops structure itself can be const.
+> 
+> Done with the help of Coccinelle.
+> 
+> // <smpl>
+> @r disable optional_qualifier@
+> identifier i;
+> position p;
+> @@
+> static struct thermal_zone_of_device_ops i at p = { ... };
+> 
+> @ok1@
+> identifier r.i;
+> expression e1,e2,e3;
+> position p;
+> @@
+> thermal_zone_of_sensor_register(e1,e2,e3,&i at p)
+> 
+> @bad@
+> position p != {r.p,ok1.p};
+> identifier r.i;
+> struct thermal_zone_of_device_ops e;
+> @@
+> e at i@p
+> 
+> @depends on !bad disable optional_qualifier@
+> identifier r.i;
+> @@
+> static
+> +const
+>  struct thermal_zone_of_device_ops i = { ... };
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-UART3 clock rate is doubled in previous commit.
+Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-This error is not detected until recently a mezzanine board which makes
-real use of uart3 port (through LS connector of 96boards) was setup
-and tested on hi3660-hikey960 board.
+Eduardo/Zhang, Please queue this patch for upstream, thanks!
 
-This patch changes clock source rate of clk_factor_uart3 to 100000000.
-
-Signed-off-by: Zhong Kaihua <zhongkaihua@huawei.com>
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- drivers/clk/hisilicon/clk-hi3660.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/hisilicon/clk-hi3660.c b/drivers/clk/hisilicon/clk-hi3660.c
-index a18258e..f404199 100644
---- a/drivers/clk/hisilicon/clk-hi3660.c
-+++ b/drivers/clk/hisilicon/clk-hi3660.c
-@@ -34,7 +34,7 @@ static const struct hisi_fixed_rate_clock hi3660_fixed_rate_clks[] = {
- 
- /* crgctrl */
- static const struct hisi_fixed_factor_clock hi3660_crg_fixed_factor_clks[] = {
--	{ HI3660_FACTOR_UART3, "clk_factor_uart3", "iomcu_peri0", 1, 8, 0, },
-+	{ HI3660_FACTOR_UART3, "clk_factor_uart3", "iomcu_peri0", 1, 16, 0, },
- 	{ HI3660_CLK_FACTOR_MMC, "clk_factor_mmc", "clkin_sys", 1, 6, 0, },
- 	{ HI3660_CLK_GATE_I2C0, "clk_gate_i2c0", "clk_i2c0_iomcu", 1, 4, 0, },
- 	{ HI3660_CLK_GATE_I2C1, "clk_gate_i2c1", "clk_i2c1_iomcu", 1, 4, 0, },
--- 
-2.10.2
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
