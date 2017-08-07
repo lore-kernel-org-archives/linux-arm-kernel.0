@@ -1,53 +1,93 @@
-From: dja@axtens.net (Daniel Axtens)
-Date: Mon, 07 Aug 2017 09:49:24 +1000
-Subject: [PATCH 2/3] Split VGA default device handler out of VGA arbiter
-In-Reply-To: <20170805065754.GA8509@wunner.de>
-References: <20170804102033.27731-1-dja@axtens.net>
- <20170804102033.27731-3-dja@axtens.net> <20170805065754.GA8509@wunner.de>
-Message-ID: <87zibcqmt7.fsf@linkitivity.dja.id.au>
+From: yong.deng@magewell.com (Yong)
+Date: Mon, 7 Aug 2017 09:00:09 +0800
+Subject: [PATCH v2 2/3] dt-bindings: media: Add Allwinner V3s Camera
+ Sensor Interface (CSI)
+In-Reply-To: <20170803191415.iyyzjsvlyviftalj@rob-hp-laptop>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-3-git-send-email-yong.deng@magewell.com>
+ <20170803191415.iyyzjsvlyviftalj@rob-hp-laptop>
+Message-ID: <20170807090009.4af79df794e881d441c18196@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lukas,
+On Thu, 3 Aug 2017 14:14:15 -0500
+Rob Herring <robh@kernel.org> wrote:
 
-Let me reply "back-to-front":
+> On Thu, Jul 27, 2017 at 01:01:36PM +0800, Yong Deng wrote:
+> > Add binding documentation for Allwinner V3s CSI.
+> > 
+> > Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> > ---
+> >  .../devicetree/bindings/media/sun6i-csi.txt        | 49 ++++++++++++++++++++++
+> >  1 file changed, 49 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> > new file mode 100644
+> > index 0000000..f8d83f6
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
+> > @@ -0,0 +1,49 @@
+> > +Allwinner V3s Camera Sensor Interface
+> > +------------------------------
+> > +
+> > +Required properties:
+> > +  - compatible: value must be "allwinner,sun8i-v3s-csi"
+> > +  - reg: base address and size of the memory-mapped region.
+> > +  - interrupts: interrupt associated to this IP
+> > +  - clocks: phandles to the clocks feeding the CSI
+> > +    * ahb: the CSI interface clock
+> > +    * mod: the CSI module clock
+> > +    * ram: the CSI DRAM clock
+> > +  - clock-names: the clock names mentioned above
+> > +  - resets: phandles to the reset line driving the CSI
+> > +
+> > +- ports: A ports node with endpoint definitions as defined in
+> > +  Documentation/devicetree/bindings/media/video-interfaces.txt.
+> 
+> Need to be explicit about how many ports and endpoints and what each one 
+> represents.
 
-> Please cc dri-devel when proposing changes to vgaarb.c (see
-> MAINTAINERS).
+OK.
 
-Sorry, will do in future.
+> 
+> > +
+> > +Example:
+> > +
+> > +	csi1: csi at 01cb4000 {
+> > +		compatible = "allwinner,sun8i-v3s-csi";
+> > +		reg = <0x01cb4000 0x1000>;
+> > +		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+> > +		clocks = <&ccu CLK_BUS_CSI>,
+> > +			 <&ccu CLK_CSI1_SCLK>,
+> > +			 <&ccu CLK_DRAM_CSI>;
+> > +		clock-names = "ahb", "mod", "ram";
+> > +		resets = <&ccu RST_BUS_CSI>;
+> > +
+> > +		port {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +
+> > +			/* Parallel bus endpoint */
+> > +			csi1_ep: endpoint {
+> > +				remote-endpoint = <&adv7611_ep>;
+> > +				bus-width = <16>;
+> > +				data-shift = <0>;
+> > +
+> > +				/* If hsync-active/vsync-active are missing,
+> > +				   embedded BT.656 sync is used */
+> > +				hsync-active = <0>; /* Active low */
+> > +				vsync-active = <0>; /* Active low */
+> > +				data-active = <1>;  /* Active high */
+> > +				pclk-sample = <1>;  /* Rising */
+> > +			};
+> > +		};
+> > +	};
+> > +
+> > -- 
+> > 1.8.3.1
+> > 
 
-> I'm missing some context as to the negative consequences you're
-> experiencing on other arches (the cover letter merely refers to
-> "quirks in ppc and concerns in arm land" and is missing links to
-> archived versions of v1 and v2), but clearly legacy resources are
-> x86-specific so any code dealing with them seems superfluous on
-> other arches and should be marked as such.
 
-Quirk/v1: https://www.spinics.net/lists/linux-pci/msg62865.html
-Approach 2: https://www.spinics.net/lists/linux-pci/msg63092.html
-            https://www.spinics.net/lists/linux-pci/msg63083.html
-
-The quirk in powerpc land that I'm referring to is
-arch/powerpc/kernel/pci-common.c::fixup_vga() which is a class enable
-hook that marks the first VGA device it comes across as default if the
-arbiter has not marked one.
-
-The arm concerns are ventaliated in the threads I linked - they boil
-down to "why do we need the arbiter at all on platforms without legacy
-resources? Can't we do this more simply?"
-
-> Would it be feasible to just sprinkle some "if (IS_ENABLED(CONFIG_X86))"
-> over the portions of vgaarb.c that deal with legacy resources?
-
-Yes and no. That would disable the unnecessary chunks of the VGA
-arbiter, but we then still have to figure out how to mark devices as
-default if not with the arbiter.
-
-Regards,
-Daniel
-
->
-> Thanks,
->
-> Lukas
+Thanks,
+Yong
