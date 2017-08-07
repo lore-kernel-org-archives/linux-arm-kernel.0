@@ -1,39 +1,114 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 07 Aug 2017 10:08:41 -0700
-Subject: [PATCH 3/3] irqchip: bcm2836: Move SMP startup code to arch/arm
-In-Reply-To: <0f587b52-d9db-3bbe-968d-66b40fba508c@arm.com>
-References: <1502058731-12462-1-git-send-email-stefan.wahren@i2se.com>
- <1502058731-12462-4-git-send-email-stefan.wahren@i2se.com>
- <0f587b52-d9db-3bbe-968d-66b40fba508c@arm.com>
-Message-ID: <87valzb90m.fsf@eliezer.anholt.net>
+From: jhugo@codeaurora.org (Jeffrey Hugo)
+Date: Mon, 7 Aug 2017 11:10:12 -0600
+Subject: [RFC 0/4] Parse ACPI/PPTT for cache information
+In-Reply-To: <39b916f8-4d38-6c24-fc5f-4d2ad3888e49@linaro.org>
+References: <20170805001159.12769-1-jeremy.linton@arm.com>
+ <39b916f8-4d38-6c24-fc5f-4d2ad3888e49@linaro.org>
+Message-ID: <de7ec511-182d-9739-ce4f-d39760730227@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Zyngier <marc.zyngier@arm.com> writes:
+On 8/7/2017 4:20 AM, Hanjun Guo wrote:
+> +Cc Xiongfeng (who is also working on the PPTT but focusing on
+> CPU topology)
+> 
+> Hi Jeremy,
+> 
+> On 2017/8/5 8:11, Jeremy Linton wrote:
+>> ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
+>> used to describe the processor and cache topologies. Ideally it is
+>> used to extend/override information provided by the hardware, but
+>> right now ARM64 is entirely dependent on firmware provided tables.
+>>
+>> This patch parses the table for the cache topology only. Its quite
+>> trivial to add processor/cluster/???/socket level parsing as well,
+>> but that information isn't as useful as the already provided NUMA
+>> SRAT/SLIT information which provides relative distances. The one
+>> useful thing, is the number of physical sockets but due to the
+>> way arm64 considers "clusters" to be sockets, a larger discussion
+>> is required here.
+> 
+> I think we need the socket to represent the true topology of
+> the SoC, which means that considering clusters to be sockets is
+> wrong on ARM64 server platforms, a "socket" needs to be a memory
+> controller attached I think.
+> 
+> Take D05 for example, there are two physical SoC sockets on
+> the board but with two CPU DIE (with memory controller) on each
+> physical socket, and 4 clusters on each CPU DIE.
+> 
+> When considering clusters as sockets (that's the code for now),
+> there are 16 "sockets" to represent to OS for schedule input,
+> but only 4 NUMA nodes, which are confusing the scheduler a lot...
+> 
+> Xiongfeng was working on the CPU topology based on PPTT, and the code
+> is under internal review, if it's OK for you, we can send them out
+> for review comments to see if we can join our effort together, or
+> we can work on top of your patches, as you like :)
+> 
+>>
+>> An example of lstopo with this patch:
+>>
+>> [root at mammon-juno-rh ~]# lstopo-no-graphics
+>> Machine (8072MB)
+>>    Package L#0 + L2 L#0 (1024KB)
+>>      L1d L#0 (32KB) + L1i L#0 (32KB) + Core L#0 + PU L#0 (P#0)
+>>      L1d L#1 (32KB) + L1i L#1 (32KB) + Core L#1 + PU L#1 (P#1)
+>>      L1d L#2 (32KB) + L1i L#2 (32KB) + Core L#2 + PU L#2 (P#2)
+>>      L1d L#3 (32KB) + L1i L#3 (32KB) + Core L#3 + PU L#3 (P#3)
+>>    Package L#1 + L2 L#1 (2048KB)
+>>      L1d L#4 (32KB) + L1i L#4 (48KB) + Core L#4 + PU L#4 (P#4)
+>>      L1d L#5 (32KB) + L1i L#5 (48KB) + Core L#5 + PU L#5 (P#5)
+>>    HostBridge L#0
+>>      PCIBridge
+>>        PCIBridge
+>>          PCIBridge
+>>            PCI 1095:3132
+>>              Block(Disk) L#0 "sda"
+>>          PCIBridge
+>>            PCI 11ab:4380
+>>              Net L#1 "enp8s0"
+>>
+>> Jeremy Linton (4):
+>>    drivers: base: cacheinfo: Add support for ACPI based firmware tables
+>>    arm64: cacheinfo: Add support for ACPI/PPTT generated topology
+>>    ACPI/PPTT: Add Processor Properties Topology Table parsing
+>>    ACPI: Enable PPTT support on ARM64
+>>
+>>   arch/arm64/kernel/cacheinfo.c |  23 ++-
+>>   drivers/acpi/arm64/Kconfig    |   3 +
+>>   drivers/acpi/arm64/Makefile   |   1 +
+>>   drivers/acpi/arm64/pptt.c     | 389 
+>> ++++++++++++++++++++++++++++++++++++++++++
+> 
+> I think PPTT is not ARM64 only, can be used for x86 too,
+> shall we locate them on drivers/acpi?
 
-> On 06/08/17 23:32, Stefan Wahren wrote:
->> In order to easily provide SMP for BCM2837 on 32-bit and 64-bit
->> the SMP startup code was placed in irq-bcm2836. That's not the
->> right approach. So move this code where it belongs.
->> 
->> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->> Fixes: 41f4988cc287 ("irqchip/bcm2836: Add SMP support for the 2836")
->
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->
-> How do you want to get this merged? I can either take it via the irqchip
-> tree, or you take it via arm-soc. Just let me know.
+Austin and I have been working on the CPU topology.  Sounds like we have 
+some overlap with your work.  We have a working prototype at 
+https://source.codeaurora.org/quic/server/kernel/log/?h=jhugo/pptt but 
+are still doing some cleanup and fixes for our needs.
 
-The series is:
+Drivers/acpi makes sense to us, and was our working assumption.
 
-Tested-by: Eric Anholt <eric@anholt.net>
+> 
+> Rafael was working a lot on the PPTT proposal for the
+> spec, I think he can comment on this :)
+> 
+> Rafael, what do you think?
+> 
+> Thanks
+> Hanjun
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-We'll need to get the DT binding ack, then I'm fine with it going
-through arm-soc.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170807/f8f13976/attachment-0001.sig>
+
+-- 
+Jeffrey Hugo
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
