@@ -1,112 +1,63 @@
-From: andy.tang@nxp.com (andy.tang at nxp.com)
-Date: Mon, 7 Aug 2017 09:54:38 +0800
-Subject: [PATCH 1/2 v2] arm64: dts: ls1088a: add cpu idle support
-Message-ID: <1502070879-14106-1-git-send-email-andy.tang@nxp.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 07 Aug 2017 11:07:21 +0900
+Subject: [PATCH v2 4/5] usb: gadget: udc: Replace the deprecated extcon API
+In-Reply-To: <1501748448-26821-5-git-send-email-cw00.choi@samsung.com>
+References: <1501748448-26821-1-git-send-email-cw00.choi@samsung.com>
+ <CGME20170803082050epcas1p2491eedf2f26510f55cd15ce777356fce@epcas1p2.samsung.com>
+ <1501748448-26821-5-git-send-email-cw00.choi@samsung.com>
+Message-ID: <5987CB59.9070008@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yuantian Tang <andy.tang@nxp.com>
+Dear Felipe,
 
-ls1088a supports another cpu idle state which is ph20 which saves
-more power when cpu is idle.
-It was implemented through psci firmware.
+Could you please review this patch?
+I hope to remove the deprecated extcon API.
 
-Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
----
-v2:
-  -- no change
+Regards,
+Chanwoo Choi
 
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index c144d06..adc1ff5 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -62,6 +62,7 @@
- 			compatible = "arm,cortex-a53";
- 			reg = <0x0>;
- 			clocks = <&clockgen 1 0>;
-+			cpu-idle-states = <&CPU_PH20>;
- 			#cooling-cells = <2>;
- 		};
- 
-@@ -70,6 +71,7 @@
- 			compatible = "arm,cortex-a53";
- 			reg = <0x1>;
- 			clocks = <&clockgen 1 0>;
-+			cpu-idle-states = <&CPU_PH20>;
- 		};
- 
- 		cpu2: cpu at 2 {
-@@ -77,6 +79,7 @@
- 			compatible = "arm,cortex-a53";
- 			reg = <0x2>;
- 			clocks = <&clockgen 1 0>;
-+			cpu-idle-states = <&CPU_PH20>;
- 		};
- 
- 		cpu3: cpu at 3 {
-@@ -84,6 +87,7 @@
- 			compatible = "arm,cortex-a53";
- 			reg = <0x3>;
- 			clocks = <&clockgen 1 0>;
-+			cpu-idle-states = <&CPU_PH20>;
- 		};
- 
- 		cpu4: cpu at 100 {
-@@ -91,6 +95,7 @@
- 			compatible = "arm,cortex-a53";
- 			reg = <0x100>;
- 			clocks = <&clockgen 1 1>;
-+			cpu-idle-states = <&CPU_PH20>;
- 			#cooling-cells = <2>;
- 		};
- 
-@@ -99,6 +104,7 @@
- 			compatible = "arm,cortex-a53";
- 			reg = <0x101>;
- 			clocks = <&clockgen 1 1>;
-+			cpu-idle-states = <&CPU_PH20>;
- 		};
- 
- 		cpu6: cpu at 102 {
-@@ -106,6 +112,7 @@
- 			compatible = "arm,cortex-a53";
- 			reg = <0x102>;
- 			clocks = <&clockgen 1 1>;
-+			cpu-idle-states = <&CPU_PH20>;
- 		};
- 
- 		cpu7: cpu at 103 {
-@@ -113,6 +120,16 @@
- 			compatible = "arm,cortex-a53";
- 			reg = <0x103>;
- 			clocks = <&clockgen 1 1>;
-+			cpu-idle-states = <&CPU_PH20>;
-+		};
-+
-+		CPU_PH20: cpu-ph20 {
-+			compatible = "arm,idle-state";
-+			idle-state-name = "PH20";
-+			arm,psci-suspend-param = <0x00010000>;
-+			entry-latency-us = <1000>;
-+			exit-latency-us = <1000>;
-+			min-residency-us = <3000>;
- 		};
- 	};
- 
-@@ -136,6 +153,11 @@
- 			     <1 10 IRQ_TYPE_LEVEL_LOW>;/* Hypervisor PPI */
- 	};
- 
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
- 	sysclk: sysclk {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
--- 
-2.1.0.27.g96db324
+On 2017? 08? 03? 17:20, Chanwoo Choi wrote:
+> This patch replaces the deprecated extcon API as following:
+> - extcon_get_cable_state_() -> extcon_get_state()
+> 
+> Cc: Felipe Balbi <balbi@kernel.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Raviteja Garimella <raviteja.garimella@broadcom.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> ---
+>  drivers/usb/gadget/udc/snps_udc_plat.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/udc/snps_udc_plat.c b/drivers/usb/gadget/udc/snps_udc_plat.c
+> index 2e11f19e07ae..0ce7b3ba60ff 100644
+> --- a/drivers/usb/gadget/udc/snps_udc_plat.c
+> +++ b/drivers/usb/gadget/udc/snps_udc_plat.c
+> @@ -184,7 +184,7 @@ static int udc_plat_probe(struct platform_device *pdev)
+>  			goto exit_phy;
+>  		}
+>  
+> -		ret = extcon_get_cable_state_(udc->edev, EXTCON_USB);
+> +		ret = extcon_get_state(udc->edev, EXTCON_USB);
+>  		if (ret < 0) {
+>  			dev_err(dev, "Can't get cable state\n");
+>  			goto exit_extcon;
+> @@ -273,7 +273,7 @@ static int udc_plat_suspend(struct device *dev)
+>  	udc = dev_get_drvdata(dev);
+>  	stop_udc(udc);
+>  
+> -	if (extcon_get_cable_state_(udc->edev, EXTCON_USB) > 0) {
+> +	if (extcon_get_state(udc->edev, EXTCON_USB) > 0) {
+>  		dev_dbg(udc->dev, "device -> idle\n");
+>  		stop_udc(udc);
+>  	}
+> @@ -303,7 +303,7 @@ static int udc_plat_resume(struct device *dev)
+>  		return ret;
+>  	}
+>  
+> -	if (extcon_get_cable_state_(udc->edev, EXTCON_USB) > 0) {
+> +	if (extcon_get_state(udc->edev, EXTCON_USB) > 0) {
+>  		dev_dbg(udc->dev, "idle -> device\n");
+>  		start_udc(udc);
+>  	}
+> 
