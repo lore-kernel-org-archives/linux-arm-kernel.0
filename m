@@ -1,330 +1,72 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Mon,  7 Aug 2017 12:52:41 +0530
-Subject: [PATCH 09/10] ARM: dts: imx6: add support for Toradex Ixora V1.1
- carrier board
-In-Reply-To: <cover.1502087184.git.maitysanchayan@gmail.com>
-References: <cover.1502087184.git.maitysanchayan@gmail.com>
-Message-ID: <51ee987c6e23e77600ac8fdbaa539893f7614414.1502087184.git.maitysanchayan@gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon,  7 Aug 2017 09:39:27 +0200
+Subject: [PATCH v2 5/6] edac: synopsys: Update ECC error message info
+In-Reply-To: <91fd6532076e4c905b5a228d852bba4941c54a28.1502091561.git.michal.simek@xilinx.com>
+References: <91fd6532076e4c905b5a228d852bba4941c54a28.1502091561.git.michal.simek@xilinx.com>
+Message-ID: <b0fa5fc740ccbe8c13cec9886c6836df2e3042cd.1502091561.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Toradex Ixora V1.1 carrier board.
+From: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
 
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+This patch updates the ECC error message info
+for zynqmp ddrc. added Block number and Bankgroup
+in the message info.
+
+Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts | 291 ++++++++++++++++++++++++++
- 2 files changed, 292 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index ccfaf8e9e397..1c16e891a76a 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -393,6 +393,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-wandboard.dtb \
- 	imx6dl-wandboard-revb1.dtb \
- 	imx6q-apalis-ixora.dtb \
-+	imx6q-apalis-ixora-v1.1.dtb \
- 	imx6q-apf6dev.dtb \
- 	imx6q-arm2.dtb \
- 	imx6q-b450v3.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts b/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
-new file mode 100644
-index 000000000000..a35c7a54ad3b
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-apalis-ixora-v1.1.dts
-@@ -0,0 +1,291 @@
-+/*
-+ * Copyright 2014-2017 Toradex AG
-+ * Copyright 2012 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
+Changes in v2:
+- s/ecc/ECC/ in commit message
+
+ drivers/edac/synopsys_edac.c | 27 +++++++++++++++++++++------
+ 1 file changed, 21 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
+index 4cd9e3d8161c..24490334a4f2 100644
+--- a/drivers/edac/synopsys_edac.c
++++ b/drivers/edac/synopsys_edac.c
+@@ -418,9 +418,17 @@ static void synps_edac_handle_error(struct mem_ctl_info *mci,
+ 
+ 	if (p->ce_cnt) {
+ 		pinf = &p->ceinfo;
+-		snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
+-			 "DDR ECC error type :%s Row %d Bank %d Col %d ",
+-			 "CE", pinf->row, pinf->bank, pinf->col);
++		if (priv->p_data->quirks == 0)
++			snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
++				 "DDR ECC error type :%s Row %d Bank %d Col %d ",
++				 "CE", pinf->row, pinf->bank, pinf->col);
++		else
++			snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
++				 "DDR ECC error type :%s Row %d Bank %d Col %d "
++				 "BankGroup Number %d Block Number %d",
++				 "CE", pinf->row, pinf->bank, pinf->col,
++				 pinf->bankgrpnr, pinf->blknr);
 +
-+/dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include "imx6q.dtsi"
-+#include "imx6qdl-apalis.dtsi"
-+
-+/ {
-+	model = "Toradex Apalis iMX6Q/D Module on Ixora Carrier Board V1.1";
-+	compatible = "toradex,apalis_imx6q-ixora-v1.1",
-+		     "toradex,apalis_imx6q-ixora", "toradex,apalis_imx6q",
-+		     "fsl,imx6q";
-+
-+	aliases {
-+		i2c0 = &i2c1;
-+		i2c1 = &i2c3;
-+		i2c2 = &i2c2;
-+		rtc0 = &rtc_i2c;
-+		rtc1 = &snvs_rtc;
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_keys>;
-+
-+		wakeup {
-+			label = "Wake-Up";
-+			gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_WAKEUP>;
-+			debounce-interval = <10>;
-+			wakeup-source;
-+		};
-+	};
-+
-+	lcd_display: display at di0 {
-+		compatible = "fsl,imx-parallel-display";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		interface-pix-fmt = "rgb24";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ipu1_lcdif>;
-+		status = "okay";
-+
-+		port at 0 {
-+			reg = <0>;
-+
-+			lcd_display_in: endpoint {
-+				remote-endpoint = <&ipu1_di1_disp1>;
-+			};
-+		};
-+
-+		port at 1 {
-+			reg = <1>;
-+
-+			lcd_display_out: endpoint {
-+				remote-endpoint = <&lcd_panel_in>;
-+			};
-+		};
-+	};
-+
-+	panel: panel {
-+		/*
-+		 * edt,et057090dhu: EDT 5.7" LCD TFT
-+		 * edt,et070080dh6: EDT 7.0" LCD TFT
-+		 */
-+		compatible = "edt,et057090dhu";
-+		backlight = <&backlight>;
-+
-+		port {
-+			lcd_panel_in: endpoint {
-+				remote-endpoint = <&lcd_display_out>;
-+			};
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_leds_ixora>;
-+
-+		led4-green {
-+			label = "LED_4_GREEN";
-+			gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led4-red {
-+			label = "LED_4_RED";
-+			gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led5-green {
-+			label = "LED_5_GREEN";
-+			gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		led5-red {
-+			label = "LED_5_RED";
-+			gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+&backlight {
-+	brightness-levels = <0 127 191 223 239 247 251 255>;
-+	default-brightness-level = <1>;
-+	status = "okay";
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&can2 {
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	status = "okay";
-+};
-+
-+/* I2C1_SDA/SCL on MXM3 209/211 (e.g. RTC on carrier board) */
-+&i2c1 {
-+	status = "okay";
-+
-+	/* M41T0M6 real time clock on carrier board */
-+	rtc_i2c: rtc at 68 {
-+		compatible = "st,m41t00";
-+		reg = <0x68>;
-+	};
-+};
-+
-+/*
-+ * I2C3_SDA/SCL (CAM) on MXM3 pin 201/203 (e.g. camera sensor on carrier
-+ * board)
-+ */
-+&i2c3 {
-+	status = "okay";
-+};
-+
-+&ipu1_di1_disp1 {
-+	remote-endpoint = <&lcd_display_in>;
-+};
-+
-+&ldb {
-+	status = "okay";
-+};
-+
-+&pcie {
-+	/* active-high meaning opposite of regular PERST# active-low polarity */
-+	reset-gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
-+	reset-gpio-active-high;
-+	status = "okay";
-+};
-+
-+&pwm1 {
-+	status = "okay";
-+};
-+
-+&pwm2 {
-+	status = "okay";
-+};
-+
-+&pwm3 {
-+	status = "okay";
-+};
-+
-+&pwm4 {
-+	status = "okay";
-+};
-+
-+&reg_usb_otg_vbus {
-+	status = "okay";
-+};
-+
-+&reg_usb_host_vbus {
-+	status = "okay";
-+};
-+
-+&sata {
-+	status = "okay";
-+};
-+
-+&sound_spdif {
-+	status = "okay";
-+};
-+
-+&spdif {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	status = "okay";
-+};
-+
-+&uart5 {
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	vbus-supply = <&reg_usb_host_vbus>;
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	status = "okay";
-+};
-+
-+/* MMC1 */
-+&usdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc1_4bit &pinctrl_mmc_cd>;
-+	cd-gpios = <&gpio4 20 GPIO_ACTIVE_LOW>;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	/*
-+	 * Mux the Apalis GPIOs
-+	 */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_apalis_gpio1 &pinctrl_apalis_gpio2
-+		     &pinctrl_apalis_gpio3 &pinctrl_apalis_gpio4
-+		     &pinctrl_apalis_gpio5 &pinctrl_apalis_gpio6
-+		     &pinctrl_apalis_gpio7 &pinctrl_apalis_gpio8
-+		    >;
-+
-+	pinctrl_leds_ixora: ledsixoragrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD2_DAT1__GPIO1_IO14 0x1b0b0
-+			MX6QDL_PAD_SD2_DAT3__GPIO1_IO12 0x1b0b0
-+			MX6QDL_PAD_NANDF_D1__GPIO2_IO01 0x1b0b0
-+			MX6QDL_PAD_NANDF_D2__GPIO2_IO02 0x1b0b0
-+		>;
-+	};
-+};
+ 		edac_mc_handle_error(HW_EVENT_ERR_CORRECTED, mci,
+ 				     p->ce_cnt, 0, 0, 0, 0, 0, -1,
+ 				     priv->message, "");
+@@ -428,9 +436,16 @@ static void synps_edac_handle_error(struct mem_ctl_info *mci,
+ 
+ 	if (p->ue_cnt) {
+ 		pinf = &p->ueinfo;
+-		snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
+-			 "DDR ECC error type :%s Row %d Bank %d Col %d ",
+-			 "UE", pinf->row, pinf->bank, pinf->col);
++		if (priv->p_data->quirks == 0)
++			snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
++				 "DDR ECC error type :%s Row %d Bank %d Col %d ",
++				"UE", pinf->row, pinf->bank, pinf->col);
++		else
++			snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
++				 "DDR ECC error type :%s Row %d Bank %d Col %d "
++				 "BankGroup Number %d Block Number %d",
++				 "UE", pinf->row, pinf->bank, pinf->col,
++				 pinf->bankgrpnr, pinf->blknr);
+ 		edac_mc_handle_error(HW_EVENT_ERR_UNCORRECTED, mci,
+ 				     p->ue_cnt, 0, 0, 0, 0, 0, -1,
+ 				     priv->message, "");
 -- 
-2.13.3
+1.9.1
