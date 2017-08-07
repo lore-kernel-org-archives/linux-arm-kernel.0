@@ -1,452 +1,204 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon,  7 Aug 2017 09:39:25 +0200
-Subject: [PATCH v2 3/6] edac: synopsys: Add EDAC ECC support for ZynqMP DDRC
-In-Reply-To: <91fd6532076e4c905b5a228d852bba4941c54a28.1502091561.git.michal.simek@xilinx.com>
-References: <91fd6532076e4c905b5a228d852bba4941c54a28.1502091561.git.michal.simek@xilinx.com>
-Message-ID: <144221fcb30f984fa3b438ccbdd64388395e4e2f.1502091561.git.michal.simek@xilinx.com>
+From: codekipper@gmail.com (Code Kipper)
+Date: Mon, 7 Aug 2017 09:39:45 +0200
+Subject: [linux-sunxi] [PATCH v3 05/12] ASoC: sun4i-i2s: Add regmap fields
+ for channels
+In-Reply-To: <CAGb2v640QLn4oDWoFeT51xJqSN7FSBP9KRNdpRB4MuATSE2rVA@mail.gmail.com>
+References: <20170729141753.20174-1-codekipper@gmail.com>
+ <20170729141753.20174-6-codekipper@gmail.com>
+ <CAGb2v640QLn4oDWoFeT51xJqSN7FSBP9KRNdpRB4MuATSE2rVA@mail.gmail.com>
+Message-ID: <CAEKpxBnFu4ZKmGfRop-2c_Db9ELoaWzF5nsY1_bvQRPiA7OhDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
-
-This patch adds EDAC ECC support for ZynqMP DDRC IP
-
-Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
-
-Changes in v2:
-- Add binding doc to this series to resolve checkpatch warning
-- Rebased on the top of
-  https://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git/log/?h=for-next
-  and resolve conflict caused by "EDAC: Get rid of mci->mod_ver" patch
-- Add changes done in previous patch
-
- drivers/edac/Kconfig         |   2 +-
- drivers/edac/synopsys_edac.c | 305 ++++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 302 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
-index 96afb2aeed18..e2f62dda8944 100644
---- a/drivers/edac/Kconfig
-+++ b/drivers/edac/Kconfig
-@@ -445,7 +445,7 @@ config EDAC_ALTERA_SDMMC
- 
- config EDAC_SYNOPSYS
- 	tristate "Synopsys DDR Memory Controller"
--	depends on ARCH_ZYNQ
-+	depends on ARCH_ZYNQ || ARM64
- 	help
- 	  Support for error detection and correction on the Synopsys DDR
- 	  memory controller.
-diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
-index 293380f884fe..11016cd13a08 100644
---- a/drivers/edac/synopsys_edac.c
-+++ b/drivers/edac/synopsys_edac.c
-@@ -22,6 +22,7 @@
- #include <linux/edac.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/interrupt.h>
- #include <linux/of.h>
- 
- #include "edac_module.h"
-@@ -99,6 +100,87 @@
- /* DDR ECC Quirks */
- #define DDR_ECC_INTR_SUPPORT		BIT(0)
- 
-+/* ZynqMP Enhanced DDR memory controller registers that are relevant to ECC */
-+/* ECC Configuration Registers */
-+#define ECC_CFG0_OFST	0x70
-+#define ECC_CFG1_OFST	0x74
-+
-+/* ECC Status Register */
-+#define ECC_STAT_OFST	0x78
-+
-+/* ECC Clear Register */
-+#define ECC_CLR_OFST	0x7C
-+
-+/* ECC Error count Register */
-+#define ECC_ERRCNT_OFST	0x80
-+
-+/* ECC Corrected Error Address Register */
-+#define ECC_CEADDR0_OFST	0x84
-+#define ECC_CEADDR1_OFST	0x88
-+
-+/* ECC Syndrome Registers */
-+#define ECC_CSYND0_OFST	0x8C
-+#define ECC_CSYND1_OFST	0x90
-+#define ECC_CSYND2_OFST	0x94
-+
-+/* ECC Bit Mask0 Address Register */
-+#define ECC_BITMASK0_OFST	0x98
-+#define ECC_BITMASK1_OFST	0x9C
-+#define ECC_BITMASK2_OFST	0xA0
-+
-+/* ECC UnCorrected Error Address Register */
-+#define ECC_UEADDR0_OFST	0xA4
-+#define ECC_UEADDR1_OFST	0xA8
-+
-+/* ECC Syndrome Registers */
-+#define ECC_UESYND0_OFST	0xAC
-+#define ECC_UESYND1_OFST	0xB0
-+#define ECC_UESYND2_OFST	0xB4
-+
-+/* ECC Poison Address Reg */
-+#define ECC_POISON0_OFST	0xB8
-+#define ECC_POISON1_OFST	0xBC
-+
-+/* Control register bitfield definitions */
-+#define ECC_CTRL_BUSWIDTH_MASK	0x3000
-+#define ECC_CTRL_BUSWIDTH_SHIFT	12
-+#define ECC_CTRL_CLR_CE_ERRCNT	BIT(2)
-+#define ECC_CTRL_CLR_UE_ERRCNT	BIT(3)
-+
-+/* DDR Control Register width definitions  */
-+#define DDRCTL_EWDTH_16		2
-+#define DDRCTL_EWDTH_32		1
-+#define DDRCTL_EWDTH_64		0
-+
-+/* ECC status register definitions */
-+#define ECC_STAT_UECNT_MASK	0xF0000
-+#define ECC_STAT_UECNT_SHIFT	16
-+#define ECC_STAT_CECNT_MASK	0xF00
-+#define ECC_STAT_CECNT_SHIFT	8
-+#define ECC_STAT_BITNUM_MASK	0x7F
-+
-+/* DDR QOS Interrupt register definitions */
-+#define DDR_QOS_IRQ_STAT_OFST	0x20200
-+#define DDR_QOSUE_MASK		0x4
-+#define DDR_QOSCE_MASK		0x2
-+#define ECC_CE_UE_INTR_MASK	0x6
-+
-+/* ECC Corrected Error Register Mask and Shifts*/
-+#define ECC_CEADDR0_RW_MASK	0x3FFFF
-+#define ECC_CEADDR0_RNK_MASK	BIT(24)
-+#define ECC_CEADDR1_BNKGRP_MASK	0x3000000
-+#define ECC_CEADDR1_BNKNR_MASK	0x70000
-+#define ECC_CEADDR1_BLKNR_MASK	0xFFF
-+#define ECC_CEADDR1_BNKGRP_SHIFT	24
-+#define ECC_CEADDR1_BNKNR_SHIFT	16
-+
-+/* DDR Memory type defines */
-+#define MEM_TYPE_DDR3	0x1
-+#define MEM_TYPE_LPDDR3	0x1
-+#define MEM_TYPE_DDR2	0x4
-+#define MEM_TYPE_DDR4	0x10
-+#define MEM_TYPE_LPDDR4	0x10
-+
- /**
-  * struct ecc_error_info - ECC error log information
-  * @row:	Row number
-@@ -106,6 +188,8 @@
-  * @bank:	Bank number
-  * @bitpos:	Bit position
-  * @data:	Data causing the error
-+ * @bankgrpnr:	Bank group number
-+ * @blknr:	Block number
-  */
- struct ecc_error_info {
- 	u32 row;
-@@ -113,6 +197,8 @@ struct ecc_error_info {
- 	u32 bank;
- 	u32 bitpos;
- 	u32 data;
-+	u32 bankgrpnr;
-+	u32 blknr;
- };
- 
- /**
-@@ -171,7 +257,7 @@ struct synps_platform_data {
-  *
-  * Determines there is any ecc error or not
-  *
-- * Return: one if there is no error otherwise returns zero
-+ * Return: 1 if there is no error otherwise returns 0
-  */
- static int synps_edac_geterror_info(void __iomem *base,
- 				    struct synps_ecc_status *p)
-@@ -219,6 +305,65 @@ static int synps_edac_geterror_info(void __iomem *base,
- }
- 
- /**
-+ * synps_enh_edac_geterror_info - Get the current ecc error info
-+ * @base:	Pointer to the base address of the ddr memory controller
-+ * @p:		Pointer to the synopsys ecc status structure
-+ *
-+ * Determines there is any ecc error or not
-+ *
-+ * Return: one if there is no error otherwise returns zero
-+ */
-+static int synps_enh_edac_geterror_info(void __iomem *base,
-+					struct synps_ecc_status *p)
-+{
-+	u32 regval, clearval = 0;
-+
-+	regval = readl(base + ECC_STAT_OFST);
-+	if (!regval)
-+		return 1;
-+
-+	p->ce_cnt = (regval & ECC_STAT_CECNT_MASK) >> ECC_STAT_CECNT_SHIFT;
-+	p->ue_cnt = (regval & ECC_STAT_UECNT_MASK) >> ECC_STAT_UECNT_SHIFT;
-+	p->ceinfo.bitpos = (regval & ECC_STAT_BITNUM_MASK);
-+
-+	regval = readl(base + ECC_CEADDR0_OFST);
-+	if (!(p->ce_cnt))
-+		goto ue_err;
-+
-+	p->ceinfo.row = (regval & ECC_CEADDR0_RW_MASK);
-+	regval = readl(base + ECC_CEADDR1_OFST);
-+	p->ceinfo.bank = (regval & ECC_CEADDR1_BNKNR_MASK) >>
-+					ECC_CEADDR1_BNKNR_SHIFT;
-+	p->ceinfo.bankgrpnr = (regval &	ECC_CEADDR1_BNKGRP_MASK) >>
-+					ECC_CEADDR1_BNKGRP_SHIFT;
-+	p->ceinfo.blknr = (regval & ECC_CEADDR1_BLKNR_MASK);
-+	p->ceinfo.data = readl(base + ECC_CSYND0_OFST);
-+	edac_dbg(3, "ce bit position: %d data: %d\n", p->ceinfo.bitpos,
-+		 p->ceinfo.data);
-+
-+ue_err:
-+	regval = readl(base + ECC_UEADDR0_OFST);
-+	if (!(p->ue_cnt))
-+		goto out;
-+
-+	p->ueinfo.row = (regval & ECC_CEADDR0_RW_MASK);
-+	regval = readl(base + ECC_UEADDR1_OFST);
-+	p->ueinfo.bankgrpnr = (regval & ECC_CEADDR1_BNKGRP_MASK) >>
-+					ECC_CEADDR1_BNKGRP_SHIFT;
-+	p->ueinfo.bank = (regval & ECC_CEADDR1_BNKNR_MASK) >>
-+					ECC_CEADDR1_BNKNR_SHIFT;
-+	p->ueinfo.blknr = (regval & ECC_CEADDR1_BLKNR_MASK);
-+	p->ueinfo.data = readl(base + ECC_UESYND0_OFST);
-+out:
-+	clearval = ECC_CTRL_CLR_CE_ERR | ECC_CTRL_CLR_CE_ERRCNT;
-+	clearval |= ECC_CTRL_CLR_UE_ERR | ECC_CTRL_CLR_UE_ERRCNT;
-+	writel(clearval, base + ECC_CLR_OFST);
-+	writel(0x0, base + ECC_CLR_OFST);
-+
-+	return 0;
-+}
-+
-+/**
-  * synps_edac_handle_error - Handle controller error types CE and UE
-  * @mci:	Pointer to the edac memory controller instance
-  * @p:		Pointer to the synopsys ecc status structure
-@@ -255,6 +400,41 @@ static void synps_edac_handle_error(struct mem_ctl_info *mci,
- }
- 
- /**
-+ * synps_edac_intr_handler - synps edac isr
-+ * @irq:	irq number
-+ * @dev_id:	device id poniter
-+ *
-+ * This is the Isr routine called by edac core interrupt thread.
-+ * Used to check and post ECC errors.
-+ *
-+ * Return: IRQ_NONE, if interrupt not set or IRQ_HANDLED otherwise
-+ */
-+static irqreturn_t synps_edac_intr_handler(int irq, void *dev_id)
-+{
-+	struct mem_ctl_info *mci = dev_id;
-+	struct synps_edac_priv *priv = mci->pvt_info;
-+	int status, regval;
-+
-+	regval = readl(priv->baseaddr + DDR_QOS_IRQ_STAT_OFST) &
-+			(DDR_QOSCE_MASK | DDR_QOSUE_MASK);
-+	if (!(regval & ECC_CE_UE_INTR_MASK))
-+		return IRQ_NONE;
-+	status = priv->p_data->edac_geterror_info(priv->baseaddr,
-+						  &priv->stat);
-+	if (status)
-+		return IRQ_NONE;
-+
-+	priv->ce_cnt += priv->stat.ce_cnt;
-+	priv->ue_cnt += priv->stat.ue_cnt;
-+	synps_edac_handle_error(mci, &priv->stat);
-+
-+	edac_dbg(3, "Total error count ce %d ue %d\n",
-+		 priv->ce_cnt, priv->ue_cnt);
-+	writel(regval, priv->baseaddr + DDR_QOS_IRQ_STAT_OFST);
-+	return IRQ_HANDLED;
-+}
-+
-+/**
-  * synps_edac_check - Check controller for ECC errors
-  * @mci:	Pointer to the edac memory controller instance
-  *
-@@ -310,6 +490,40 @@ static enum dev_type synps_edac_get_dtype(const void __iomem *base)
- }
- 
- /**
-+ * synps_enh_edac_get_dtype - Return the controller memory width
-+ * @base:	Pointer to the ddr memory controller base address
-+ *
-+ * Get the EDAC device type width appropriate for the current controller
-+ * configuration.
-+ *
-+ * Return: a device type width enumeration.
-+ */
-+static enum dev_type synps_enh_edac_get_dtype(const void __iomem *base)
-+{
-+	enum dev_type dt;
-+	u32 width;
-+
-+	width = readl(base + CTRL_OFST);
-+	width = (width & ECC_CTRL_BUSWIDTH_MASK) >>
-+		ECC_CTRL_BUSWIDTH_SHIFT;
-+	switch (width) {
-+	case DDRCTL_EWDTH_16:
-+		dt = DEV_X2;
-+		break;
-+	case DDRCTL_EWDTH_32:
-+		dt = DEV_X4;
-+		break;
-+	case DDRCTL_EWDTH_64:
-+		dt = DEV_X8;
-+		break;
-+	default:
-+		dt = DEV_UNKNOWN;
-+	}
-+
-+	return dt;
-+}
-+
-+/**
-  * synps_edac_get_eccstate - Return the controller ecc enable/disable status
-  * @base:	Pointer to the ddr memory controller base address
-  *
-@@ -335,6 +549,32 @@ static bool synps_edac_get_eccstate(void __iomem *base)
- }
- 
- /**
-+ * synps_enh_edac_get_eccstate - Return the controller ecc enable/disable status
-+ * @base:	Pointer to the ddr memory controller base address
-+ *
-+ * Get the ECC enable/disable status for the controller
-+ *
-+ * Return: a ecc status boolean i.e true/false - enabled/disabled.
-+ */
-+static bool synps_enh_edac_get_eccstate(void __iomem *base)
-+{
-+	enum dev_type dt;
-+	u32 ecctype;
-+	bool state = false;
-+
-+	dt = synps_enh_edac_get_dtype(base);
-+	if (dt == DEV_UNKNOWN)
-+		return state;
-+
-+	ecctype = readl(base + ECC_CFG0_OFST) & SCRUB_MODE_MASK;
-+	if ((ecctype == SCRUB_MODE_SECDED) &&
-+	    ((dt == DEV_X2) || (dt == DEV_X4) || (dt == DEV_X8)))
-+		state = true;
-+
-+	return state;
-+}
-+
-+/**
-  * synps_edac_get_memsize - reads the size of the attached memory device
-  *
-  * Return: the memory size in bytes
-@@ -373,6 +613,32 @@ static enum mem_type synps_edac_get_mtype(const void __iomem *base)
- }
- 
- /**
-+ * synps_enh_edac_get_mtype - Returns controller memory type
-+ * @base:	pointer to the synopsys ecc status structure
-+ *
-+ * Get the EDAC memory type appropriate for the current controller
-+ * configuration.
-+ *
-+ * Return: a memory type enumeration.
-+ */
-+static enum mem_type synps_enh_edac_get_mtype(const void __iomem *base)
-+{
-+	enum mem_type mt = MEM_UNKNOWN;
-+	u32 memtype;
-+
-+	memtype = readl(base + CTRL_OFST);
-+
-+	if ((memtype & MEM_TYPE_DDR3) || (memtype & MEM_TYPE_LPDDR3))
-+		mt = MEM_DDR3;
-+	else if (memtype & MEM_TYPE_DDR2)
-+		mt = MEM_RDDR2;
-+	else if ((memtype & MEM_TYPE_LPDDR4) || (memtype & MEM_TYPE_DDR4))
-+		mt = MEM_DDR4;
-+
-+	return mt;
-+}
-+
-+/**
-  * synps_edac_init_csrows - Initialize the cs row data
-  * @mci:	Pointer to the edac memory controller instance
-  *
-@@ -440,8 +706,12 @@ static int synps_edac_mc_init(struct mem_ctl_info *mci,
- 	mci->dev_name = SYNPS_EDAC_MOD_STRING;
- 	mci->mod_name = SYNPS_EDAC_MOD_VER;
- 
--	edac_op_state = EDAC_OPSTATE_POLL;
--	mci->edac_check = synps_edac_check;
-+	if (priv->p_data->quirks & DDR_ECC_INTR_SUPPORT) {
-+		edac_op_state = EDAC_OPSTATE_INT;
-+	} else {
-+		edac_op_state = EDAC_OPSTATE_POLL;
-+		mci->edac_check = synps_edac_check;
-+	}
- 	mci->ctl_page_to_phys = NULL;
- 
- 	status = synps_edac_init_csrows(mci);
-@@ -457,8 +727,18 @@ static int synps_edac_mc_init(struct mem_ctl_info *mci,
- 	.quirks			= 0,
- };
- 
-+static const struct synps_platform_data zynqmp_enh_edac_def = {
-+	.edac_geterror_info	= synps_enh_edac_geterror_info,
-+	.edac_get_mtype		= synps_enh_edac_get_mtype,
-+	.edac_get_dtype		= synps_enh_edac_get_dtype,
-+	.edac_get_eccstate	= synps_enh_edac_get_eccstate,
-+	.quirks			= DDR_ECC_INTR_SUPPORT,
-+};
-+
- static const struct of_device_id synps_edac_match[] = {
- 	{ .compatible = "xlnx,zynq-ddrc-a05", .data = (void *)&zynq_edac_def },
-+	{ .compatible = "xlnx,zynqmp-ddrc-2.40a",
-+				.data = (void *)&zynqmp_enh_edac_def},
- 	{ /* end of table */ }
- };
- 
-@@ -478,7 +758,7 @@ static int synps_edac_mc_probe(struct platform_device *pdev)
- 	struct mem_ctl_info *mci;
- 	struct edac_mc_layer layers[2];
- 	struct synps_edac_priv *priv;
--	int rc;
-+	int rc, irq, status;
- 	struct resource *res;
- 	void __iomem *baseaddr;
- 	const struct of_device_id *match;
-@@ -527,6 +807,23 @@ static int synps_edac_mc_probe(struct platform_device *pdev)
- 		goto free_edac_mc;
- 	}
- 
-+	if (priv->p_data->quirks & DDR_ECC_INTR_SUPPORT) {
-+		irq = platform_get_irq(pdev, 0);
-+		if (irq < 0) {
-+			edac_printk(KERN_ERR, EDAC_MC,
-+				    "No irq %d in DT\n", irq);
-+			return -ENODEV;
-+		}
-+
-+		status = devm_request_irq(&pdev->dev, irq,
-+					  synps_edac_intr_handler,
-+					  0, dev_name(&pdev->dev), mci);
-+		if (status < 0) {
-+			edac_printk(KERN_ERR, EDAC_MC, "Failed to request Irq\n");
-+			goto free_edac_mc;
-+		}
-+	}
-+
- 	rc = edac_mc_add_mc(mci);
- 	if (rc) {
- 		edac_printk(KERN_ERR, EDAC_MC,
--- 
-1.9.1
+On 1 August 2017 at 10:31, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Sat, Jul 29, 2017 at 10:17 PM,  <codekipper@gmail.com> wrote:
+>> From: Marcus Cooper <codekipper@gmail.com>
+>>
+>> On the original i2s block the channel mapping and selection were
+>> configured for stereo audio by default: This is not the case with
+>> the newer SoCs and they are also located at different offsets.
+>>
+>> To support the newer SoC then regmap fields have been added to the
+>> quirks and these are initialised to their correct settings during
+>> probing.
+>>
+>> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+>> ---
+>>  sound/soc/sunxi/sun4i-i2s.c | 80 ++++++++++++++++++++++++++++++++++++++++-----
+>>  1 file changed, 72 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+>> index 2a25df22c2f8..120f797a38e8 100644
+>> --- a/sound/soc/sunxi/sun4i-i2s.c
+>> +++ b/sound/soc/sunxi/sun4i-i2s.c
+>> @@ -82,7 +82,7 @@
+>>  #define SUN4I_I2S_TX_CNT_REG           0x2c
+>>
+>>  #define SUN4I_I2S_TX_CHAN_SEL_REG      0x30
+>> -#define SUN4I_I2S_TX_CHAN_SEL(num_chan)                (((num_chan) - 1) << 0)
+>> +#define SUN4I_I2S_CHAN_SEL(num_chan)           (((num_chan) - 1) << 0)
+>>
+>>  #define SUN4I_I2S_TX_CHAN_MAP_REG      0x34
+>>  #define SUN4I_I2S_TX_CHAN_MAP(chan, sample)    ((sample) << (chan << 2))
+>> @@ -98,6 +98,10 @@
+>>   * @sun4i_i2s_regmap: regmap config to use.
+>>   * @mclk_offset: Value by which mclkdiv needs to be adjusted.
+>>   * @bclk_offset: Value by which bclkdiv needs to be adjusted.
+>> + * @field_txchanmap: location of the tx channel mapping register.
+>> + * @field_rxchanmap: location of the rx channel mapping register.
+>> + * @field_txchansel: location of the tx channel select bit fields.
+>> + * @field_rxchansel: location of the rx channel select bit fields.
+>>   */
+>>  struct sun4i_i2s_quirks {
+>>         bool                            has_reset;
+>> @@ -105,6 +109,12 @@ struct sun4i_i2s_quirks {
+>>         const struct regmap_config      *sun4i_i2s_regmap;
+>>         unsigned int                    mclk_offset;
+>>         unsigned int                    bclk_offset;
+>> +
+>> +       /* Register fields for i2s */
+>> +       struct reg_field                field_txchanmap;
+>> +       struct reg_field                field_rxchanmap;
+>> +       struct reg_field                field_txchansel;
+>> +       struct reg_field                field_rxchansel;
+>>  };
+>>
+>>  struct sun4i_i2s {
+>> @@ -118,6 +128,12 @@ struct sun4i_i2s {
+>>         struct snd_dmaengine_dai_dma_data       capture_dma_data;
+>>         struct snd_dmaengine_dai_dma_data       playback_dma_data;
+>>
+>> +       /* Register fields for i2s */
+>> +       struct regmap_field     *field_txchanmap;
+>> +       struct regmap_field     *field_rxchanmap;
+>> +       struct regmap_field     *field_txchansel;
+>> +       struct regmap_field     *field_rxchansel;
+>> +
+>>         const struct sun4i_i2s_quirks   *variant;
+>>  };
+>>
+>> @@ -264,6 +280,18 @@ static int sun4i_i2s_hw_params(struct snd_pcm_substream *substream,
+>>         if (params_channels(params) != 2)
+>>                 return -EINVAL;
+>>
+>> +       /* Map the channels for playback and capture */
+>> +       regmap_field_write(i2s->field_txchanmap, 0x76543210);
+>> +       regmap_field_write(i2s->field_rxchanmap, 0x00003210);
+>> +
+>> +       /* Configure the channels */
+>> +       regmap_field_write(i2s->field_txchansel,
+>> +                          SUN4I_I2S_CHAN_SEL(params_channels(params)));
+>> +
+>> +       regmap_field_write(i2s->field_rxchansel,
+>> +                          SUN4I_I2S_CHAN_SEL(params_channels(params)));
+>> +
+>> +
+>
+> Checkpatch says don't use multiple blank lines.
+>
+>>         switch (params_physical_width(params)) {
+>>         case 16:
+>>                 width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+>> @@ -486,13 +514,6 @@ static int sun4i_i2s_startup(struct snd_pcm_substream *substream,
+>>                            SUN4I_I2S_CTRL_SDO_EN_MASK,
+>>                            SUN4I_I2S_CTRL_SDO_EN(0));
+>>
+>> -       /* Enable the first two channels */
+>> -       regmap_write(i2s->regmap, SUN4I_I2S_TX_CHAN_SEL_REG,
+>> -                    SUN4I_I2S_TX_CHAN_SEL(2));
+>> -
+>> -       /* Map them to the two first samples coming in */
+>> -       regmap_write(i2s->regmap, SUN4I_I2S_TX_CHAN_MAP_REG,
+>> -                    SUN4I_I2S_TX_CHAN_MAP(0, 0) | SUN4I_I2S_TX_CHAN_MAP(1, 1));
+>>
+>>         return clk_prepare_enable(i2s->mod_clk);
+>>  }
+>> @@ -677,14 +698,51 @@ static const struct sun4i_i2s_quirks sun4i_a10_i2s_quirks = {
+>>         .has_reset              = false,
+>>         .reg_offset_txdata      = SUN4I_I2S_FIFO_TX_REG,
+>>         .sun4i_i2s_regmap       = &sun4i_i2s_regmap_config,
+>> +       .field_txchanmap        = REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
+>> +       .field_rxchanmap        = REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
+>> +       .field_txchansel        = REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
+>> +       .field_rxchansel        = REG_FIELD(SUN4I_I2S_RX_CHAN_SEL_REG, 0, 2),
+>>  };
+>>
+>>  static const struct sun4i_i2s_quirks sun6i_a31_i2s_quirks = {
+>>         .has_reset              = true,
+>>         .reg_offset_txdata      = SUN4I_I2S_FIFO_TX_REG,
+>>         .sun4i_i2s_regmap       = &sun4i_i2s_regmap_config,
+>> +       .field_txchanmap        = REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
+>> +       .field_rxchanmap        = REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
+>> +       .field_txchansel        = REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
+>> +       .field_rxchansel        = REG_FIELD(SUN4I_I2S_RX_CHAN_SEL_REG, 0, 2),
+>>  };
+>>
+>> +static int sun4i_i2s_init_regmap_fields(struct device *dev, struct sun4i_i2s *i2s)
+>
+> This line is over 80 characters. Please wrap the line.
+>
+>> +{
+>> +       i2s->field_txchanmap =
+>> +               devm_regmap_field_alloc(dev, i2s->regmap,
+>> +                                       i2s->variant->field_txchanmap);
+>> +       if (IS_ERR(i2s->field_txchanmap))
+>> +               return PTR_ERR(i2s->field_txchanmap);
+>> +
+>> +       i2s->field_rxchanmap =
+>> +               devm_regmap_field_alloc(dev, i2s->regmap,
+>> +                                       i2s->variant->field_rxchanmap);
+>> +       if (IS_ERR(i2s->field_rxchanmap))
+>> +               return PTR_ERR(i2s->field_rxchanmap);
+>> +
+>> +       i2s->field_txchansel =
+>> +               devm_regmap_field_alloc(dev, i2s->regmap,
+>> +                                       i2s->variant->field_txchansel);
+>> +       if (IS_ERR(i2s->field_txchansel))
+>> +               return PTR_ERR(i2s->field_txchansel);
+>> +
+>> +       i2s->field_rxchansel =
+>> +               devm_regmap_field_alloc(dev, i2s->regmap,
+>> +                                       i2s->variant->field_rxchansel);
+>> +       if (IS_ERR(i2s->field_rxchansel))
+>> +               return PTR_ERR(i2s->field_rxchansel);
+>> +
+>> +       return 0;
+>
+> This seems to be the last "if (IS_ERR()) return PTR_ERR()" sequence.
+> So it looks like you could apply the PTR_ERR_OR_ZERO hunk from the
+> kbuild test robot. I wasn't aware of this preference before, and to
+> be honest I'm fine either way.
+>
+ACK,
+BR,
+CK
+> Otherwise,
+>
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+>
+>
+>> +}
+>> +
+>>  static int sun4i_i2s_probe(struct platform_device *pdev)
+>>  {
+>>         struct sun4i_i2s *i2s;
+>> @@ -778,6 +836,12 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
+>>                 goto err_suspend;
+>>         }
+>>
+>> +       ret = sun4i_i2s_init_regmap_fields(&pdev->dev, i2s);
+>> +       if (ret) {
+>> +               dev_err(&pdev->dev, "Could not initialise regmap fields\n");
+>> +               goto err_suspend;
+>> +       }
+>> +
+>>         return 0;
+>>
+>>  err_suspend:
+>> --
+>> 2.13.3
+>>
+>> --
+>> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
