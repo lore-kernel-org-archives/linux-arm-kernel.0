@@ -1,165 +1,56 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 7 Aug 2017 17:44:00 +0100
-Subject: [PATCH 1/2] acpi: arm64: add iort support for PMCG
-In-Reply-To: <1501876754-1064-2-git-send-email-nleeder@codeaurora.org>
-References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
- <1501876754-1064-2-git-send-email-nleeder@codeaurora.org>
-Message-ID: <20170807164400.GA27830@red-moon>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 07 Aug 2017 18:48:22 +0200
+Subject: [PATCH 00/14] mmc: meson-gx: driver fixups and upgrade
+In-Reply-To: <20170804174353.16486-1-jbrunet@baylibre.com>
+References: <20170804174353.16486-1-jbrunet@baylibre.com>
+Message-ID: <1502124502.2759.32.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 04, 2017 at 03:59:13PM -0400, Neil Leeder wrote:
-> Add support for the SMMU Performance Monitor Counter Group
-> information from ACPI. This is in preparation for its use
-> in the SMMU v3 PMU driver.
+On Fri, 2017-08-04 at 19:43 +0200, Jerome Brunet wrote:
+> The patchset features several bugfixes, rework and upgrade for the
+> meson-gx MMC driver.
 > 
-> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
-> ---
->  drivers/acpi/arm64/iort.c | 54 +++++++++++++++++++++++++++++++++++++++++++++++
->  include/acpi/actbl2.h     |  9 +++++++-
->  2 files changed, 62 insertions(+), 1 deletion(-)
+> The main goal is to improve readability and enable new high speed
+> modes, such as eMMC DDR52 and sdcard UHS modes up to SDR50 (100Mhz)
+> 
+> While full speed SDR104 is stable with most cards, a few seems to
+> require an even more precise tuning. For this, we'll probably have
+> to implement per-line delay calibration.
+> 
+> This series has been tested on gxbb-p200, gxbb-nanopi-k2 and
+> gxl-s905x-libretech
+> 
 
-Please CC me for next versions.
+Ulf, Kevin,
 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index a3215ee..5a998cd 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -970,6 +970,40 @@ static bool __init arm_smmu_is_coherent(struct acpi_iort_node *node)
->  	return smmu->flags & ACPI_IORT_SMMU_COHERENT_WALK;
->  }
->  
-> +static int __init arm_smmu_pmu_count_resources(struct acpi_iort_node *node)
-> +{
-> +	struct acpi_iort_pmcg *pmcg;
-> +
-> +	/* Retrieve PMCG specific data */
-> +	pmcg = (struct acpi_iort_pmcg *)node->node_data;
-> +
-> +	/*
-> +	 * There are always 2 memory resources.
-> +	 * If the overflow_gsiv is present then add that for a total of 3.
-> +	 */
-> +	return pmcg->overflow_gsiv > 0 ? 3 : 2;
-> +}
-> +
-> +static void __init arm_smmu_pmu_init_resources(struct resource *res,
-> +					       struct acpi_iort_node *node)
-> +{
-> +	struct acpi_iort_pmcg *pmcg;
-> +
-> +	/* Retrieve PMCG specific data */
-> +	pmcg = (struct acpi_iort_pmcg *)node->node_data;
-> +
-> +	res[0].start = pmcg->base_address;
-> +	res[0].end = pmcg->base_address + SZ_4K - 1;
-> +	res[0].flags = IORESOURCE_MEM;
-> +	res[1].start = pmcg->base_address + SZ_64K;
-> +	res[1].end = pmcg->base_address + SZ_64K + SZ_4K - 1;
-> +	res[1].flags = IORESOURCE_MEM;
-> +
-> +	if (pmcg->overflow_gsiv)
-> +		acpi_iort_register_irq(pmcg->overflow_gsiv, "overflow",
-> +				       ACPI_EDGE_SENSITIVE, &res[2]);
-> +}
-> +
->  struct iort_iommu_config {
->  	const char *name;
->  	int (*iommu_init)(struct acpi_iort_node *node);
-> @@ -993,6 +1027,12 @@ struct iort_iommu_config {
->  	.iommu_init_resources = arm_smmu_init_resources
->  };
->  
-> +static const struct iort_iommu_config iort_arm_smmu_pmcg_cfg __initconst = {
-> +	.name = "arm-smmu-pmu",
-> +	.iommu_count_resources = arm_smmu_pmu_count_resources,
-> +	.iommu_init_resources = arm_smmu_pmu_init_resources
-> +};
-> +
->  static __init
->  const struct iort_iommu_config *iort_get_iommu_cfg(struct acpi_iort_node *node)
->  {
-> @@ -1001,6 +1041,8 @@ const struct iort_iommu_config *iort_get_iommu_cfg(struct acpi_iort_node *node)
->  		return &iort_arm_smmu_v3_cfg;
->  	case ACPI_IORT_NODE_SMMU:
->  		return &iort_arm_smmu_cfg;
-> +	case ACPI_IORT_NODE_PMCG:
-> +		return &iort_arm_smmu_pmcg_cfg;
->  	default:
->  		return NULL;
->  	}
-> @@ -1056,6 +1098,15 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
->  	if (ret)
->  		goto dev_put;
->  
-> +	/* End of init for PMCG */
-> +	if (node->type == ACPI_IORT_NODE_PMCG) {
-> +		ret = platform_device_add(pdev);
-> +		if (ret)
-> +			goto dev_put;
-> +
-> +		return 0;
-> +	}
-> +
->  	/*
->  	 * We expect the dma masks to be equivalent for
->  	 * all SMMUs set-ups
-> @@ -1131,6 +1182,9 @@ static void __init iort_init_platform_devices(void)
->  				acpi_free_fwnode_static(fwnode);
->  				return;
->  			}
-> +		} else if (iort_node->type == ACPI_IORT_NODE_PMCG) {
-> +			if (iort_add_smmu_platform_device(iort_node))
-> +				return;
+Please ignore this series. I'll resend it soon
 
+I've discovered new things around the tuning capabilities of the SoC.
+I'll probably rework the tuning function again.
 
-It is becoming a bit messy, probably it makes sense to rework the
-iommu platform device creation to make room for more generic (ie
-iommu platform device creation is not really iommu specific) behaviour
-that can accommodate the PMCG too, it can be made cleaner.
+Sorry for the noise
 
-I do not know if we can make it for this cycle but I am happy to put
-a patch together shortly with this in mind.
+Regards
+Jerome
 
->  		}
->  
->  		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
-> diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
-> index 707dda74..2169b6f 100644
-> --- a/include/acpi/actbl2.h
-> +++ b/include/acpi/actbl2.h
-> @@ -695,7 +695,8 @@ enum acpi_iort_node_type {
->  	ACPI_IORT_NODE_NAMED_COMPONENT = 0x01,
->  	ACPI_IORT_NODE_PCI_ROOT_COMPLEX = 0x02,
->  	ACPI_IORT_NODE_SMMU = 0x03,
-> -	ACPI_IORT_NODE_SMMU_V3 = 0x04
-> +	ACPI_IORT_NODE_SMMU_V3 = 0x04,
-> +	ACPI_IORT_NODE_PMCG = 0x05
->  };
->  
->  struct acpi_iort_id_mapping {
-> @@ -811,6 +812,12 @@ struct acpi_iort_smmu_v3 {
->  #define ACPI_IORT_SMMU_V3_COHACC_OVERRIDE   (1)
->  #define ACPI_IORT_SMMU_V3_HTTU_OVERRIDE     (1<<1)
->  
-> +struct acpi_iort_pmcg {
-> +	u64 base_address;	/* PMCG base address */
-> +	u32 overflow_gsiv;
-> +	u32 node_reference;
-> +};
-
-As Robin already said this hunk should be made an ACPICA pull but
-NOT before seeking IORT specs clarification as per his comments.
-
-Thanks,
-Lorenzo
-
-> +
->  /*******************************************************************************
->   *
->   * IVRS - I/O Virtualization Reporting Structure
-> -- 
-> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies Inc.
-> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project.
+> Jerome Brunet (14):
+> ? mmc: meson-gx: fix mux mask definition
+> ? mmc: meson-gx: remove CLK_DIVIDER_ALLOW_ZERO clock flag
+> ? mmc: meson-gx: clean up some constants
+> ? mmc: meson-gx: use _irqsave variant of spinlock
+> ? mmc: meson-gx: cfg init overwrite values
+> ? mmc: meson-gx: rework set_ios function
+> ? mmc: meson-gx: rework clk_set function
+> ? mmc: meson-gx: rework clock init function
+> ? mmc: meson-gx: simplify interrupt handler
+> ? mmc: meson-gx: implement card_busy callback
+> ? mmc: meson-gx: rework tuning function
+> ? mmc: meson-gx: fix dual data rate mode frequencies
+> ? mmc: meson-gx: work around clk-stop issue
+> ? mmc: meson-gx: implement voltage switch callback
+> 
+> ?drivers/mmc/host/meson-gx-mmc.c | 611 ++++++++++++++++++++++++++-------------
+> -
+> ?1 file changed, 396 insertions(+), 215 deletions(-)
 > 
