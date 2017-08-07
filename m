@@ -1,79 +1,118 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon,  7 Aug 2017 15:47:56 +0200
-Subject: [PATCH 1/2] can: xilinx: Fix ksoftirq CPU monopolization
-Message-ID: <21850c76207942f5ae5c225f2627fb068d5234d0.1502113674.git.michal.simek@xilinx.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 7 Aug 2017 22:50:50 +0900
+Subject: [PATCH] gpio: uniphier: add UniPhier GPIO controller driver
+In-Reply-To: <CACRpkdZWxjwDnVy5f2rLAWs=+T=5SnwyU8dz1FW1eg8dk8JN_Q@mail.gmail.com>
+References: <1501758371-25316-1-git-send-email-yamada.masahiro@socionext.com>
+ <CACRpkdZWxjwDnVy5f2rLAWs=+T=5SnwyU8dz1FW1eg8dk8JN_Q@mail.gmail.com>
+Message-ID: <CAK7LNAT4FvsX2-hYrKYmrftEZZb_RZOrfZoKWvR8hopt9jT8-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthias Auchmann <m.auchmann@artech.at>
+Hi Linus,
 
-When using both the RXOK and the RXNEMP interrupt, when there were more
-than one receive messages in the FIFO, ksoftirqd started to go crazy
-and monopolize one CPU. The reason being is that RXOK just fires once
-even if there are multiple frames sitting in the RX FIFO, so the code
-didn't reflect that properly.
 
-Changed that to only use the RXNEMP interrupt and thereby got rid of the
-bug.
+2017-08-07 21:42 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Thu, Aug 3, 2017 at 1:06 PM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>
+>> This GPIO controller device is used on UniPhier SoCs.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> (...)
+>> +static const u32 uniphier_gpio_irq_parent_hwirqs[] = {
+>> +       80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95,
+>> +       186, 187, 188, 189, 190, 249, 250, 251,
+>> +};
+> (..)
+>> +               /* parent is UniPhier AIDET */
+>> +               parent_fwspec.fwnode = domain->parent->fwnode;
+>> +               parent_fwspec.param_count = 2;
+>> +               parent_fwspec.param[0] = uniphier_gpio_irq_parent_hwirqs[hwirq];
+>> +               parent_fwspec.param[1] = type;
+>> +
+>> +               ret = irq_domain_alloc_irqs_parent(domain, virq, 1,
+>> +                                                  &parent_fwspec);
+>
+> This is not right.
+>
+> That parent IRQ needs to come from the device tree, not from a static array
+> like this, and it is definately to use hierarchical irqdomain.
+>
+> Please look at similar drivers merged recently for inspiration:
+> gpio/gpio-xgene-sb.c
+> pinctrl/stm32/pinctrl-stm32.c
+>
 
-Signed-off-by: Matthias Auchmann <m.auchmann@artech.at>
-Acked-by: Kedareswara rao Appana <appanad@xilinx.com>
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+I was waiting for such a comment!
 
- drivers/net/can/xilinx_can.c | 18 +++++-------------
- 1 file changed, 5 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
-index 89aec07c225f..05ea2820d27b 100644
---- a/drivers/net/can/xilinx_can.c
-+++ b/drivers/net/can/xilinx_can.c
-@@ -101,7 +101,7 @@ enum xcan_reg {
- #define XCAN_INTR_ALL		(XCAN_IXR_TXOK_MASK | XCAN_IXR_BSOFF_MASK |\
- 				 XCAN_IXR_WKUP_MASK | XCAN_IXR_SLP_MASK | \
- 				 XCAN_IXR_RXNEMP_MASK | XCAN_IXR_ERROR_MASK | \
--				 XCAN_IXR_ARBLST_MASK | XCAN_IXR_RXOK_MASK)
-+				 XCAN_IXR_ARBLST_MASK)
- 
- /* CAN register bit shift - XCAN_<REG>_<BIT>_SHIFT */
- #define XCAN_BTR_SJW_SHIFT		7  /* Synchronous jump width */
-@@ -709,15 +709,7 @@ static int xcan_rx_poll(struct napi_struct *napi, int quota)
- 
- 	isr = priv->read_reg(priv, XCAN_ISR_OFFSET);
- 	while ((isr & XCAN_IXR_RXNEMP_MASK) && (work_done < quota)) {
--		if (isr & XCAN_IXR_RXOK_MASK) {
--			priv->write_reg(priv, XCAN_ICR_OFFSET,
--				XCAN_IXR_RXOK_MASK);
--			work_done += xcan_rx(ndev);
--		} else {
--			priv->write_reg(priv, XCAN_ICR_OFFSET,
--				XCAN_IXR_RXNEMP_MASK);
--			break;
--		}
-+		work_done += xcan_rx(ndev);
- 		priv->write_reg(priv, XCAN_ICR_OFFSET, XCAN_IXR_RXNEMP_MASK);
- 		isr = priv->read_reg(priv, XCAN_ISR_OFFSET);
- 	}
-@@ -728,7 +720,7 @@ static int xcan_rx_poll(struct napi_struct *napi, int quota)
- 	if (work_done < quota) {
- 		napi_complete_done(napi, work_done);
- 		ier = priv->read_reg(priv, XCAN_IER_OFFSET);
--		ier |= (XCAN_IXR_RXOK_MASK | XCAN_IXR_RXNEMP_MASK);
-+		ier |= XCAN_IXR_RXNEMP_MASK;
- 		priv->write_reg(priv, XCAN_IER_OFFSET, ier);
- 	}
- 	return work_done;
-@@ -800,9 +792,9 @@ static irqreturn_t xcan_interrupt(int irq, void *dev_id)
- 	}
- 
- 	/* Check for the type of receive interrupt and Processing it */
--	if (isr & (XCAN_IXR_RXNEMP_MASK | XCAN_IXR_RXOK_MASK)) {
-+	if (isr & XCAN_IXR_RXNEMP_MASK) {
- 		ier = priv->read_reg(priv, XCAN_IER_OFFSET);
--		ier &= ~(XCAN_IXR_RXNEMP_MASK | XCAN_IXR_RXOK_MASK);
-+		ier &= ~XCAN_IXR_RXNEMP_MASK;
- 		priv->write_reg(priv, XCAN_IER_OFFSET, ier);
- 		napi_schedule(&priv->napi);
- 	}
+I was actually tackling to specify IRQ-mapping
+with "interrupts" property.
+
+Adding "interrupts" property in DT causes
+of_pupulate_default_populate() to assign virtual IRQ numbers
+before driver probing.  So it does not work well with IRQ domain hierarchy.
+
+
+I send a question:
+https://lkml.org/lkml/2017/7/6/758
+
+But, I did not get any answer.
+
+So, I thought the only solution is to specify the IRQ-remapping
+somehow in the driver.
+
+
+
+
+
+For gpio/gpio-xgene-sb.c, the driver code seems suspicious.
+
+
+As you see xgene_gpio_sb_probe(),
+it uses the first entry of "interrupts" for just getting the ->parent_irq_base.
+The assigned virtual IRQs will not be used.
+
+
+      ret = platform_get_irq(pdev, 0);
+      if (ret > 0) {
+              priv->parent_irq_base = irq_get_irq_data(ret)->hwirq;
+              parent_domain = irq_get_irq_data(ret)->domain;
+      }
+
+
+
+Then, xgene_gpio_sb_domain_alloc() allocates different virtual IRQs
+expecting a particular binding between the parent.
+
+    parent_fwspec.fwnode = domain->parent->fwnode;
+    if (is_of_node(parent_fwspec.fwnode)) {
+            parent_fwspec.param_count = 3;
+            parent_fwspec.param[0] = 0;/* SPI */
+            /* Skip SGIs and PPIs*/
+            parent_fwspec.param[1] = hwirq + priv->parent_irq_base - 32;
+            parent_fwspec.param[2] = fwspec->param[1];
+    } else if (is_fwnode_irqchip(parent_fwspec.fwnode)) {
+            parent_fwspec.param_count = 2;
+            parent_fwspec.param[0] = hwirq + priv->parent_irq_base;
+            parent_fwspec.param[1] = fwspec->param[1];
+    } else
+            return -EINVAL;
+
+
+
+It uses ->parent_irq_base derived from DT,
+but other parts are really hard-coded.
+
+
+
+For pinctrl/stm32/pinctrl-stm32.c,
+I do not see "interrupts", so it just straight maps the irq numbers.
+
+
+
+
+
 -- 
-1.9.1
+Best Regards
+Masahiro Yamada
