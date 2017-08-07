@@ -1,34 +1,37 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon,  7 Aug 2017 13:46:41 +1200
-Subject: [RESEND PATCH 4/4] EDAC: add support for reduced-width Armada-XP SDRAM
+Date: Mon,  7 Aug 2017 13:46:39 +1200
+Subject: [RESEND PATCH 2/4] dt-bindings: add "reduced-width" property for
+ Armada XP SDRAM controller
 In-Reply-To: <20170807014641.4003-1-chris.packham@alliedtelesis.co.nz>
 References: <20170807014641.4003-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170807014641.4003-5-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20170807014641.4003-3-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some integrated Armada XP SoCs use a reduced pin count so the width of
-the SDRAM interface is smaller than the traditional discrete SoCs. This
-means that the definition of "full" and "half" width is further reduced.
+Some SoC implementations that use this controller have a reduced pin
+count so the meaning of "full" and "half" with change.
 
 Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 ---
- drivers/edac/armada_xp_edac.c | 3 +++
- 1 file changed, 3 insertions(+)
+ .../bindings/memory-controllers/mvebu-sdram-controller.txt          | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/edac/armada_xp_edac.c b/drivers/edac/armada_xp_edac.c
-index 68e88b180928..d8edcaac87c0 100644
---- a/drivers/edac/armada_xp_edac.c
-+++ b/drivers/edac/armada_xp_edac.c
-@@ -350,6 +350,9 @@ static int armada_xp_mc_edac_probe(struct platform_device *pdev)
- 	if (armada_xp_mc_edac_read_config(mci))
- 		return -EINVAL;
+diff --git a/Documentation/devicetree/bindings/memory-controllers/mvebu-sdram-controller.txt b/Documentation/devicetree/bindings/memory-controllers/mvebu-sdram-controller.txt
+index 89657d1d4cd4..3041868321c8 100644
+--- a/Documentation/devicetree/bindings/memory-controllers/mvebu-sdram-controller.txt
++++ b/Documentation/devicetree/bindings/memory-controllers/mvebu-sdram-controller.txt
+@@ -13,6 +13,12 @@ Required properties:
+  - reg: a resource specifier for the register space, which should
+    include all SDRAM controller registers as per the datasheet.
  
-+	if (of_property_read_bool(pdev->dev.of_node, "marvell,reduced-width"))
-+		drvdata->width /= 2;
++Optional properties:
++ - marvell,reduced-width: some SoCs that use this SDRAM controller have
++   a reduced pin count. On such systems "full" width is 32-bits and
++   "half" width is 16-bits. Set this property to indicate that the SoC
++   used is such a system.
 +
- 	/* configure SBE threshold */
- 	/* it seems that SBEs are not captured otherwise */
- 	writel(1 << SDRAM_ERR_CTRL_ERR_THR_OFFSET,
+ Example:
+ 
+ sdramc at 1400 {
 -- 
 2.13.0
