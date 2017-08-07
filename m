@@ -1,20 +1,39 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Tue, 8 Aug 2017 07:53:36 +0800
-Subject: [PATCH v2] KVM: arm64: pass vcpu esr_el2 and far_el2 sysre to
- user space
-In-Reply-To: <86r2wnxkm7.fsf@arm.com>
-References: <1502133454-5905-1-git-send-email-gengdongjiu@huawei.com>
- <86r2wnxkm7.fsf@arm.com>
-Message-ID: <4f79970c-5341-f8ef-56bc-e0a9cf227363@huawei.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 8 Aug 2017 03:31:48 +0800
+Subject: [arm64:for-next/kernel-mode-neon 6/6] ERROR: "kernel_neon_busy"
+ [crypto/crypto_simd.ko] undefined!
+Message-ID: <201708080336.L3L2uC4U%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
+Hi Catalin,
 
-On 2017/8/8 3:07, Marc Zyngier wrote:
-> So if you want that information, extract it, expose what is required,
-> strictly what is required, and only when it is required.
-> 
-> In the meantime, I'm NAKing this patch, and any patch that will expose
-> _EL2 registers outside of nested virtualization.
-Thanks for your comments, I will follow your suggestion.
+First bad commit (maybe != root cause):
+
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/kernel-mode-neon
+head:   174dfb12860eac361f3ced9fefb51393fec5bd32
+commit: 174dfb12860eac361f3ced9fefb51393fec5bd32 [6/6] arm64: neon: Temporarily add a kernel_mode_begin_partial() definition
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 174dfb12860eac361f3ced9fefb51393fec5bd32
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
+
+All errors (new ones prefixed by >>):
+
+>> ERROR: "kernel_neon_busy" [crypto/crypto_simd.ko] undefined!
+>> ERROR: "kernel_neon_busy" [arch/arm64/crypto/sha256-arm64.ko] undefined!
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 56833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170808/c8fad0f7/attachment-0001.gz>
