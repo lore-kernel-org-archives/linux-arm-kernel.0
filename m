@@ -1,70 +1,67 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 7 Aug 2017 08:41:22 +0200
-Subject: [PATCH 4/4] thermal: bcm2835: constify thermal_zone_of_device_ops
- structures
-In-Reply-To: <1501965437-30730-5-git-send-email-Julia.Lawall@lip6.fr>
-References: <1501965437-30730-1-git-send-email-Julia.Lawall@lip6.fr>
- <1501965437-30730-5-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <69716e67-d210-5599-426e-61c629dea523@i2se.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 6 Aug 2017 23:48:14 -0700
+Subject: [PATCH v2 0/8] omap*: Fixes/Cleanups for MMC devicetree node
+In-Reply-To: <e9c1cce6-5d6d-3762-8a84-28f36fa3bc33@ti.com>
+References: <20170607093749.15656-1-kishon@ti.com>
+ <CAPDyKFrJh9qAz6q2-TH8rMshuMjDTkT5pHP==FUUH9KZEOehOQ@mail.gmail.com>
+ <e9c1cce6-5d6d-3762-8a84-28f36fa3bc33@ti.com>
+Message-ID: <20170807064813.GA5487@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 05.08.2017 um 22:37 schrieb Julia Lawall:
-> The thermal_zone_of_device_ops structure is only passed as the fourth
-> argument to thermal_zone_of_sensor_register, which is declared as const.
-> Thus the thermal_zone_of_device_ops structure itself can be const.
->
-> Done with the help of Coccinelle.
->
-> // <smpl>
-> @r disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
-> static struct thermal_zone_of_device_ops i at p = { ... };
->
-> @ok1@
-> identifier r.i;
-> expression e1,e2,e3;
-> position p;
-> @@
-> thermal_zone_of_sensor_register(e1,e2,e3,&i at p)
->
-> @bad@
-> position p != {r.p,ok1.p};
-> identifier r.i;
-> struct thermal_zone_of_device_ops e;
-> @@
-> e at i@p
->
-> @depends on !bad disable optional_qualifier@
-> identifier r.i;
-> @@
-> static
-> +const
->  struct thermal_zone_of_device_ops i = { ... };
-> // </smpl>
->
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+* Kishon Vijay Abraham I <kishon@ti.com> [170803 04:20]:
+> Hi Tony.
+> 
+> On Thursday 08 June 2017 12:50 PM, Ulf Hansson wrote:
+> > On 7 June 2017 at 11:37, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+> >> There are the set of fixes that were sent initially as part
+> >> of [1].
+> >>
+> >> These are mostly fixes w.r.t populating regulators in
+> >> mmc dt node. It was working before because the regulators
+> >> connecting to the IO lines are always on regulators. This will
+> >> break once we add UHS support where voltage has to be changed
+> >> dynamically.
+> >>
+> >> It also includes a patch to replace all vmmc_aux-supply
+> >> with vqmmc-supply (In omap3-overo-base.dtsi remove the existing
+> >> vqmmc-supply and then replace vmmc_aux-supply with vqmmc-supply).
+> >> This will break old dt compatibility but not sure how better
+> >> to handle this.
+> >>
+> >> Performed enumeration testing on dra72-evm-revc, dra72-evm,
+> >> dra7-evm, am572x-evm, am571x-idk, am572x-idk, omap5-evm,
+> >> pandaboard-es, am43xx-evm, am335x-evm, beagleboard etc.,
+> >>
+> >> This is a preparation series for adding UHS mode support in
+> >> the above mentioned platforms.
+> >>
+> >> Changes from v1:
+> >> *) Included a patch to replace deprecated "vmmc_aux" with
+> >>    "vqmmc"
+> 
+> Have you already merged this series in your for-next? I could see all the
+> patches except "ARM: dts: omap*: Replace deprecated "vmmc_aux" with "vqmmc" in
+> your for-next.
 
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+Sorry it got delayed, I was planning to send it at -rc1 time but
+had a pending pull request for fixes that got delayed, and it's
+too late now until next merge window.
 
->
-> ---
->  drivers/thermal/broadcom/bcm2835_thermal.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/thermal/broadcom/bcm2835_thermal.c b/drivers/thermal/broadcom/bcm2835_thermal.c
-> index e6863c8..a4d6a0e 100644
-> --- a/drivers/thermal/broadcom/bcm2835_thermal.c
-> +++ b/drivers/thermal/broadcom/bcm2835_thermal.c
-> @@ -145,7 +145,7 @@ static void bcm2835_thermal_debugfs(struct platform_device *pdev)
->  	debugfs_create_regset32("regset", 0444, data->debugfsdir, regset);
->  }
->  
-> -static struct thermal_zone_of_device_ops bcm2835_thermal_ops = {
-> +static const struct thermal_zone_of_device_ops bcm2835_thermal_ops = {
->  	.get_temp = bcm2835_thermal_get_temp,
->  };
->  
->
+> Do you want me to resend the entire series or only "ARM: dts: omap*: Replace
+> deprecated "vmmc_aux" with "vqmmc"?
+
+Seems that the missing one is safe to apply now? If so, let me just
+take a look at that since I do have a branch already set up that
+I can use.
+
+Also, I was offline last week so I'll first have to check for any
+pending fixes that might need attention.
+
+> Please note having vqmmc property is required when we move to sdhci driver.
+
+OK
+
+Regards,
+
+Tony
