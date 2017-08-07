@@ -1,31 +1,39 @@
-From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Mon,  7 Aug 2017 02:23:15 +0200
-Subject: [PATCH] ASoC: mediatek: Fix an error checking code
-Message-ID: <20170807002315.3512-1-christophe.jaillet@wanadoo.fr>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 7 Aug 2017 08:09:32 +0200
+Subject: [PATCH 0/3] arm64 xilinx zynqmp firmware interface
+In-Reply-To: <34C9E6FB-A8CA-462F-8B10-3E15F9EC87D4@suse.de>
+References: <cover.1501854302.git.michal.simek@xilinx.com>
+ <34C9E6FB-A8CA-462F-8B10-3E15F9EC87D4@suse.de>
+Message-ID: <1182e5f8-2588-32ff-8380-04273c28d1cd@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check the value returned by 'devm_clk_get()' instead of the clock
-identifier which can never be an ERR code.
+On 5.8.2017 06:23, Alexander Graf wrote:
+> 
+> 
+>> Am 04.08.2017 um 15:45 schrieb Michal Simek <michal.simek@xilinx.com>:
+>>
+>> Hi,
+>>
+>> xilinx is using this interface for very long time and we can't merge our
+>> driver changes to Linux because of missing communication layer with
+>> firmware. This interface was developed before scpi and scmi was
+>> available. In connection to power management scpi and scmi are missing
+>> pieces which we already use. There is a separate discussion how to
+>> extend scmi to support all our use cases.
+>> This simply patch is not adding any power management features but only
+>> adding minimum functionality which are needed for drivers.
+> 
+> If you're thinking of changing the interface later down the road, wouldn't it make sense to probe EL3 for its existence? 
+You could then expose this interface on today's EL3 and something
+scpi/scmi based on tomorrow's.
 
-Fixes: d6f3710a56e1 ("ASoC: mediatek: add structure define and clock control for 2701")
-Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
----
- sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Right now driver is checking pmu firmware version. Based on this it is
+clear how to communicate with it. The same checking could be there for
+ATF version. Both of these should tell you exactly what's the
+communication channel.
+If we decide to use scmi or any other implementation we will increase
+versions.
 
-diff --git a/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c b/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
-index b815ecc6bbf6..affa7fb25dd9 100644
---- a/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
-+++ b/sound/soc/mediatek/mt2701/mt2701-afe-clock-ctrl.c
-@@ -75,7 +75,7 @@ int mt2701_init_clock(struct mtk_base_afe *afe)
- 
- 	for (i = 0; i < MT2701_CLOCK_NUM; i++) {
- 		afe_priv->clocks[i] = devm_clk_get(afe->dev, aud_clks[i]);
--		if (IS_ERR(aud_clks[i])) {
-+		if (IS_ERR(afe_priv->clocks[i])) {
- 			dev_warn(afe->dev, "%s devm_clk_get %s fail\n",
- 				 __func__, aud_clks[i]);
- 			return PTR_ERR(aud_clks[i]);
--- 
-2.11.0
+Thanks,
+Michal
