@@ -1,55 +1,75 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 7 Aug 2017 12:23:43 +0100
-Subject: [PATCH 5/5] arm64: neon: Remove support for nested or hardirq
- kernel-mode NEON
-In-Reply-To: <1501777403-9782-6-git-send-email-Dave.Martin@arm.com>
-References: <1501777403-9782-1-git-send-email-Dave.Martin@arm.com>
- <1501777403-9782-6-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170807112343.inxrf3k7qxkgziaj@armageddon.cambridge.arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon,  7 Aug 2017 13:24:23 +0200
+Subject: [PATCH 2/2] watchdog: of_xilinx_wdt: Add suspend/resume support
+In-Reply-To: <d081ea43fc2b3b75cae2e19716920e1bb6c81328.1502105061.git.michal.simek@xilinx.com>
+References: <d081ea43fc2b3b75cae2e19716920e1bb6c81328.1502105061.git.michal.simek@xilinx.com>
+Message-ID: <1e1307808bd32591ea4f03ec3d70d0eadb38b91e.1502105061.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 03, 2017 at 05:23:23PM +0100, Dave P Martin wrote:
-> diff --git a/arch/arm64/include/asm/simd.h b/arch/arm64/include/asm/simd.h
-> index 96959b5..5a1a927 100644
-> --- a/arch/arm64/include/asm/simd.h
-> +++ b/arch/arm64/include/asm/simd.h
-> @@ -9,15 +9,46 @@
->  #ifndef __ASM_SIMD_H
->  #define __ASM_SIMD_H
->  
-> +#include <linux/compiler.h>
-> +#include <linux/percpu.h>
-> +#include <linux/preempt.h>
->  #include <linux/types.h>
->  
-> +#ifdef CONFIG_KERNEL_MODE_NEON
-> +
-> +DECLARE_PER_CPU(bool, kernel_neon_busy);
-[...]
-> @@ -233,49 +254,69 @@ void fpsimd_flush_task_state(struct task_struct *t)
->  
->  #ifdef CONFIG_KERNEL_MODE_NEON
->  
-> -static DEFINE_PER_CPU(struct fpsimd_partial_state, hardirq_fpsimdstate);
-> -static DEFINE_PER_CPU(struct fpsimd_partial_state, softirq_fpsimdstate);
-> +DEFINE_PER_CPU(bool, kernel_neon_busy);
+Add suspend/resume support to driver.
 
-This variable needs to be exported to modules (allmodconfig fails to
-build with these patches). Any preference for GPL vs non-GPL export?
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 138fcfaeadc1..5dde6f5961a1 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -255,6 +255,7 @@ void fpsimd_flush_task_state(struct task_struct *t)
- #ifdef CONFIG_KERNEL_MODE_NEON
+ drivers/watchdog/of_xilinx_wdt.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+
+diff --git a/drivers/watchdog/of_xilinx_wdt.c b/drivers/watchdog/of_xilinx_wdt.c
+index 41edeb93a327..1cf286945b7a 100644
+--- a/drivers/watchdog/of_xilinx_wdt.c
++++ b/drivers/watchdog/of_xilinx_wdt.c
+@@ -264,6 +264,43 @@ static int xwdt_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
- DEFINE_PER_CPU(bool, kernel_neon_busy);
-+EXPORT_PER_CPU_SYMBOL_GPL(kernel_neon_busy);
++/**
++ * xwdt_suspend - Suspend the device.
++ *
++ * @dev: handle to the device structure.
++ * Return: 0 always.
++ */
++static int __maybe_unused xwdt_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct xwdt_device *xdev = platform_get_drvdata(pdev);
++
++	if (watchdog_active(&xdev->xilinx_wdt_wdd))
++		xilinx_wdt_stop(&xdev->xilinx_wdt_wdd);
++
++	return 0;
++}
++
++/**
++ * xwdt_resume - Resume the device.
++ *
++ * @dev: handle to the device structure.
++ * Return: 0 on success, errno otherwise.
++ */
++static int __maybe_unused xwdt_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct xwdt_device *xdev = platform_get_drvdata(pdev);
++	int ret = 0;
++
++	if (watchdog_active(&xdev->xilinx_wdt_wdd))
++		ret = xilinx_wdt_start(&xdev->xilinx_wdt_wdd);
++
++	return ret;
++}
++
++static SIMPLE_DEV_PM_OPS(xwdt_pm_ops, xwdt_suspend, xwdt_resume);
++
+ /* Match table for of_platform binding */
+ static const struct of_device_id xwdt_of_match[] = {
+ 	{ .compatible = "xlnx,xps-timebase-wdt-1.00.a", },
+@@ -278,6 +315,7 @@ static int xwdt_remove(struct platform_device *pdev)
+ 	.driver = {
+ 		.name  = WATCHDOG_NAME,
+ 		.of_match_table = xwdt_of_match,
++		.pm = &xwdt_pm_ops,
+ 	},
+ };
  
- /*
-  * Kernel-side NEON support functions
-
 -- 
-Catalin
+1.9.1
