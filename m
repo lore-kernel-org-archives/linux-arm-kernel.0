@@ -1,211 +1,102 @@
-From: andy.tang@nxp.com (andy.tang at nxp.com)
-Date: Mon, 7 Aug 2017 09:54:39 +0800
-Subject: [PATCH 2/2 v2] arm64: dts: ls208xa: add cpu idle support
-In-Reply-To: <1502070879-14106-1-git-send-email-andy.tang@nxp.com>
-References: <1502070879-14106-1-git-send-email-andy.tang@nxp.com>
-Message-ID: <1502070879-14106-2-git-send-email-andy.tang@nxp.com>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Mon, 7 Aug 2017 10:33:15 +0800
+Subject: [PATCH] RM: dts: rockchip: rk322x: add spi node and spi pinctrl
+In-Reply-To: <1502070311-19663-1-git-send-email-huibin.hong@rock-chips.com>
+References: <1502070311-19663-1-git-send-email-huibin.hong@rock-chips.com>
+Message-ID: <7b4b3bce-e467-51ae-3295-20933c85e6ef@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yuantian Tang <andy.tang@nxp.com>
+Hi Huibing,
 
-ls208xa supports another cpu idle state which is pw20 which saves
-more power when cpu is idle.
-It was implemented through psci firmware.
+     Does this patch suppose to be V3?
 
-Signed-off-by: Tang Yuantian <andy.tang@nxp.com>
----
-v2:
-  - add ls2080a support and update the commit message accordingly
+     and there is a typo in subject.
 
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 17 +++++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi | 17 +++++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi |  5 +++++
- 3 files changed, 39 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-index d789c68..8d73930 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-@@ -53,6 +53,7 @@
- 		compatible = "arm,cortex-a57";
- 		reg = <0x0>;
- 		clocks = <&clockgen 1 0>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster0_l2>;
- 		#cooling-cells = <2>;
- 	};
-@@ -62,6 +63,7 @@
- 		compatible = "arm,cortex-a57";
- 		reg = <0x1>;
- 		clocks = <&clockgen 1 0>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster0_l2>;
- 	};
- 
-@@ -70,6 +72,7 @@
- 		compatible = "arm,cortex-a57";
- 		reg = <0x100>;
- 		clocks = <&clockgen 1 1>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster1_l2>;
- 		#cooling-cells = <2>;
- 	};
-@@ -79,6 +82,7 @@
- 		compatible = "arm,cortex-a57";
- 		reg = <0x101>;
- 		clocks = <&clockgen 1 1>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster1_l2>;
- 	};
- 
-@@ -87,6 +91,7 @@
- 		compatible = "arm,cortex-a57";
- 		reg = <0x200>;
- 		clocks = <&clockgen 1 2>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster2_l2>;
- 		#cooling-cells = <2>;
- 	};
-@@ -96,6 +101,7 @@
- 		compatible = "arm,cortex-a57";
- 		reg = <0x201>;
- 		clocks = <&clockgen 1 2>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster2_l2>;
- 	};
- 
-@@ -105,6 +111,7 @@
- 		reg = <0x300>;
- 		clocks = <&clockgen 1 3>;
- 		next-level-cache = <&cluster3_l2>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		#cooling-cells = <2>;
- 	};
- 
-@@ -113,6 +120,7 @@
- 		compatible = "arm,cortex-a57";
- 		reg = <0x301>;
- 		clocks = <&clockgen 1 3>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster3_l2>;
- 	};
- 
-@@ -131,6 +139,15 @@
- 	cluster3_l2: l2-cache3 {
- 		compatible = "cache";
- 	};
-+
-+	CPU_PW20: cpu-pw20 {
-+		compatible = "arm,idle-state";
-+		idle-state-name = "PW20";
-+		arm,psci-suspend-param = <0x00010000>;
-+		entry-latency-us = <2000>;
-+		exit-latency-us = <2000>;
-+		min-residency-us = <6000>;
-+	};
- };
- 
- &pcie1 {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-index 5c695c6..6aa319d 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
-@@ -53,6 +53,7 @@
- 		compatible = "arm,cortex-a72";
- 		reg = <0x0>;
- 		clocks = <&clockgen 1 0>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster0_l2>;
- 		#cooling-cells = <2>;
- 	};
-@@ -62,6 +63,7 @@
- 		compatible = "arm,cortex-a72";
- 		reg = <0x1>;
- 		clocks = <&clockgen 1 0>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster0_l2>;
- 	};
- 
-@@ -70,6 +72,7 @@
- 		compatible = "arm,cortex-a72";
- 		reg = <0x100>;
- 		clocks = <&clockgen 1 1>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster1_l2>;
- 		#cooling-cells = <2>;
- 	};
-@@ -79,6 +82,7 @@
- 		compatible = "arm,cortex-a72";
- 		reg = <0x101>;
- 		clocks = <&clockgen 1 1>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster1_l2>;
- 	};
- 
-@@ -88,6 +92,7 @@
- 		reg = <0x200>;
- 		clocks = <&clockgen 1 2>;
- 		next-level-cache = <&cluster2_l2>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		#cooling-cells = <2>;
- 	};
- 
-@@ -96,6 +101,7 @@
- 		compatible = "arm,cortex-a72";
- 		reg = <0x201>;
- 		clocks = <&clockgen 1 2>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster2_l2>;
- 	};
- 
-@@ -104,6 +110,7 @@
- 		compatible = "arm,cortex-a72";
- 		reg = <0x300>;
- 		clocks = <&clockgen 1 3>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster3_l2>;
- 		#cooling-cells = <2>;
- 	};
-@@ -113,6 +120,7 @@
- 		compatible = "arm,cortex-a72";
- 		reg = <0x301>;
- 		clocks = <&clockgen 1 3>;
-+		cpu-idle-states = <&CPU_PW20>;
- 		next-level-cache = <&cluster3_l2>;
- 	};
- 
-@@ -131,6 +139,15 @@
- 	cluster3_l2: l2-cache3 {
- 		compatible = "cache";
- 	};
-+
-+	CPU_PW20: cpu-pw20 {
-+		compatible = "arm,idle-state";
-+		idle-state-name = "PW20";
-+		arm,psci-suspend-param = <0x00010000>;
-+		entry-latency-us = <2000>;
-+		exit-latency-us = <2000>;
-+		min-residency-us = <6000>;
-+	};
- };
- 
- &pcie1 {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-index 94cdd30..205b7f7 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi
-@@ -118,6 +118,11 @@
- 		interrupts = <1 7 0x8>; /* PMU PPI, Level low type */
- 	};
- 
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
--- 
-2.1.0.27.g96db324
+Thanks,
+- Kever
+On 08/07/2017 09:45 AM, Huibin Hong wrote:
+> Add spi node and spi pinctrl for rk322x
+>
+> Signed-off-by: Huibin Hong <huibin.hong@rock-chips.com>
+> ---
+>
+>   arch/arm/boot/dts/rk322x.dtsi | 50 +++++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 50 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
+> index f3e4ffd..1a7afef 100644
+> --- a/arch/arm/boot/dts/rk322x.dtsi
+> +++ b/arch/arm/boot/dts/rk322x.dtsi
+> @@ -55,6 +55,7 @@
+>   		serial0 = &uart0;
+>   		serial1 = &uart1;
+>   		serial2 = &uart2;
+> +		spi0 = &spi0;
+>   	};
+>   
+>   	cpus {
+> @@ -361,6 +362,19 @@
+>   		status = "disabled";
+>   	};
+>   
+> +	spi0: spi at 11090000 {
+> +		compatible = "rockchip,rk3228-spi";
+> +		reg = <0x11090000 0x1000>;
+> +		interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&spi0_clk &spi0_tx &spi0_rx &spi0_cs0 &spi0_cs1>;
+> +		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
+> +		clock-names = "spiclk", "apb_pclk";
+> +		status = "disabled";
+> +	};
+> +
+>   	wdt: watchdog at 110a0000 {
+>   		compatible = "snps,dw-wdt";
+>   		reg = <0x110a0000 0x100>;
+> @@ -797,6 +811,42 @@
+>   			};
+>   		};
+>   
+> +		spi-0 {
+> +			spi0_clk: spi0-clk {
+> +				rockchip,pins = <0 9 RK_FUNC_2 &pcfg_pull_up>;
+> +			};
+> +			spi0_cs0: spi0-cs0 {
+> +				rockchip,pins = <0 14 RK_FUNC_2 &pcfg_pull_up>;
+> +			};
+> +			spi0_tx: spi0-tx {
+> +				rockchip,pins = <0 11 RK_FUNC_2 &pcfg_pull_up>;
+> +			};
+> +			spi0_rx: spi0-rx {
+> +				rockchip,pins = <0 13 RK_FUNC_2 &pcfg_pull_up>;
+> +			};
+> +			spi0_cs1: spi0-cs1 {
+> +				rockchip,pins = <1 12 RK_FUNC_1 &pcfg_pull_up>;
+> +			};
+> +		};
+> +
+> +		spi-1 {
+> +			spi1_clk: spi1-clk {
+> +				rockchip,pins = <0 23 RK_FUNC_2 &pcfg_pull_up>;
+> +			};
+> +			spi1_cs0: spi1-cs0 {
+> +				rockchip,pins = <2 2 RK_FUNC_2 &pcfg_pull_up>;
+> +			};
+> +			spi1_rx: spi1-rx {
+> +				rockchip,pins = <2 0 RK_FUNC_2 &pcfg_pull_up>;
+> +			};
+> +			spi1_tx: spi1-tx {
+> +				rockchip,pins = <2 1 RK_FUNC_2 &pcfg_pull_up>;
+> +			};
+> +			spi1_cs1: spi1-cs1 {
+> +				rockchip,pins = <2 3 RK_FUNC_2 &pcfg_pull_up>;
+> +			};
+> +		};
+> +
+>   		i2s1 {
+>   			i2s1_bus: i2s1-bus {
+>   				rockchip,pins = <0 8 RK_FUNC_1 &pcfg_pull_none>,
