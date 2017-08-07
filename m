@@ -1,28 +1,60 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 07 Aug 2017 14:14:48 -0700 (PDT)
-Subject: [PATCH v9 0/4] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-In-Reply-To: <588b378c-249a-36b0-8890-769258fbb708@huawei.com>
-References: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
- <20170806.204744.1934067595236180060.davem@davemloft.net>
- <588b378c-249a-36b0-8890-769258fbb708@huawei.com>
-Message-ID: <20170807.141448.1388035794329323595.davem@davemloft.net>
+From: john.stultz@linaro.org (John Stultz)
+Date: Mon, 7 Aug 2017 14:18:14 -0700
+Subject: [PATCH] arm64: dts: hi6220: improve g-tx-fifo-size setting for
+ usb device
+In-Reply-To: <1502082090-22017-1-git-send-email-shawnguo@kernel.org>
+References: <1502082090-22017-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <CALAqxLU2FzNwETSVggbdW1Yb01ZcNgRHp5vgYNNDh9tjNukZTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ding Tianhong <dingtianhong@huawei.com>
-Date: Mon, 7 Aug 2017 12:13:17 +0800
+On Sun, Aug 6, 2017 at 10:01 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> From: Shawn Guo <shawn.guo@linaro.org>
+>
+> The current usb device g-tx-fifo-size setting in DT causes two problems
+> for kernel driver.
+>
+> 1. On hi6220, there are 15 tx_fifo dedicated for all EPs except EP0,
+>    while DT only provides tx_fifo settings for 6 EPs.  It results in the
+>    following annoying complaints from kernel.
+>
+> [    4.451623] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[7]=0
+> [    4.461303] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[8]=0
+> [    4.470969] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[9]=0
+> [    4.480632] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[10]=0
+> [    4.490385] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[11]=0
+> [    4.500140] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[12]=0
+> [    4.509892] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[13]=0
+> [    4.519646] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[14]=0
+> [    4.529399] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[15]=0
+> [    4.539244] dwc2 f72c0000.usb: EPs: 16, dedicated fifos, 1920 entries in SPRAM
+>
+>    Besides of that, the total 1920 fifo entries isn't fully utilized.
+>    Endpoint Info Control block consumes 128 entries, g-rx-fifo-size
+>    is 512, and g-np-tx-fifo-size is 128.  So the fifi entries available
+>    for tx_fifo is: 1920 - 128 - 512 - 128 = 1152.  Considering that
+>    the minimal valid tx_fifo size for each EP is 16, it should be
+>    reasonable to allocate 1152 entries as: 128 x 8 + 16 x 7 = 1136 (only
+>    16 entries unused).  With this new setting, we can get more EPs to
+>    use while removing the above warning messages in the meantime.
+>
+> 2. Another consequence of above invalid g_tx_fifo_size parameter is that
+>    kernel driver will use values read from hardware register as the
+>    fall-back.  The value is 2048 for each EP fifo.  That's obviously
+>    invalid either, because even fifo entries for one EP exceeds the
+>    total entries 1920.  That's why we see the following fat warning from
+>    function dwc2_hsotg_init_fifo().  The new g-tx-fifo-size settings
+>    help to remove the warning as well.
 
-> Hi David?
-> 
-> I think networking tree merge it is a better choice, as it mainly used to tell the NIC
-> drivers how to use the Relaxed Ordering Attribute, and later we need send patch to enable
-> RO for ixgbe driver base on this patch. But I am not sure whether Bjorn has some of his own
-> view. :)
-> 
-> Hi Bjorn:
-> 
-> Could you help review this patch or give some feedback ?
 
-I'm still waiting on this...
+Nice! This has been bothering me for awhile, and your fix seems to
+resolve it well! I can now remove one of the hack patches I've been
+carrying.
 
-Bjorn?
+Tested-by: John Stultz <john.stultz@linaro.org>
+(if its useful: Acked-by: John Stultz <john.stultz@linaro.org>)
+
+Wei: Can we be sure to get this queued for 4.14?
+
+thanks
+-john
