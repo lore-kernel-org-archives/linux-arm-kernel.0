@@ -1,62 +1,31 @@
-From: dja@axtens.net (Daniel Axtens)
-Date: Tue, 08 Aug 2017 09:01:06 +1000
-Subject: [PATCH 3/3] powerpc: replace vga_fixup() with generic code
-In-Reply-To: <87efsnq217.fsf@concordia.ellerman.id.au>
-References: <20170804102033.27731-1-dja@axtens.net>
- <20170804102033.27731-4-dja@axtens.net>
- <87efsnq217.fsf@concordia.ellerman.id.au>
-Message-ID: <87wp6fq8y5.fsf@linkitivity.dja.id.au>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 7 Aug 2017 16:02:30 -0700
+Subject: [PATCH 1/2] clk: fractional-divider: allow overriding of
+ approximation
+In-Reply-To: <5453089.AIzWDZk3ey@phil>
+References: <1500624187-12165-1-git-send-email-zhangqing@rock-chips.com>
+ <5990882.df1suBpf8V@phil> <5453089.AIzWDZk3ey@phil>
+Message-ID: <20170807230230.GY2146@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Ellerman <mpe@ellerman.id.au> writes:
+On 08/01, Heiko Stuebner wrote:
+> From: Elaine Zhang <zhangqing@rock-chips.com>
+> 
+> Fractional dividers may have special requirements concerning numerator
+> and denominator selection that differ from just getting the best
+> approximation.
+> 
+> For example on Rockchip socs the denominator must be at least 20 times
+> larger than the numerator to generate precise clock frequencies.
+> 
+> Therefore add the ability to provide custom approximation functions.
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+> ---
 
-> Daniel Axtens <dja@axtens.net> writes:
->
->> Currently, we do a PCI fixup to mark a default card so that Xorg
->> autoconfiguration works.
->>
->> There is a new generic method to do this sort of vga fixup, and
->> it occurs by default.
->>
->> Drop our old method.
->>
->> This method is different:
->>  - it will only mark a card as default if a driver is bound
->>  - the marking will happen at late_initcall time, or even later
->>    if a card is enabled later on (via an ENABLE hook). Currently
->>    things are enabled in a FINAL hook.
->>
->> This *does* change behaviour under some circumstances.
->>
->> For example, pseries_le_defconfig doesn't have DRM drivers for
->> many of the qemu GPU models, including the 'standard' vga.
->
-> Should we enable them/it?
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Hard to say.
-
-The 'standard' vga module (bochs_drm) was blacklisted by Ubuntu -
-apparently at IBM's request [0] - some years back. Even if you
-un-blacklist it, I had trouble with getting it and the openfirmware
-framebuffer driver to play nicely together. It may not be worth the
-trouble for bochs_drm.
-
-There's a better case for including some of the more modern drivers -
-maybe QXL and virtio - but I wasn't able to test them: my particular
-build of qemu/TCG refused to start with them and I didn't feel like
-rebuilding/debugging qemu.
-
-It would also be legitmate to say that you're focussing on headless use
-with pseries_*defconfig and not include them: you need to bring in the
-DRM core if you want these drivers.
-
-HTH.
-
-Regards,
-Daniel
-
-[0] https://bugs.launchpad.net/ubuntu/+source/kmod/+bug/1378648
-
->
-> cheers
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
