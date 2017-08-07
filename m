@@ -1,102 +1,69 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Mon, 7 Aug 2017 10:33:15 +0800
-Subject: [PATCH] RM: dts: rockchip: rk322x: add spi node and spi pinctrl
-In-Reply-To: <1502070311-19663-1-git-send-email-huibin.hong@rock-chips.com>
-References: <1502070311-19663-1-git-send-email-huibin.hong@rock-chips.com>
-Message-ID: <7b4b3bce-e467-51ae-3295-20933c85e6ef@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 7 Aug 2017 10:43:59 +0800
+Subject: [GIT PULL] Allwinner clock changes for 4.14
+Message-ID: <20170807024359.s6jj5wlgrd3fxe2k@wens.csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Huibing,
+Hi Mike, Stephen,
 
-     Does this patch suppose to be V3?
+Here is the first and possibly only bunch of patches for 4.14.
+These are all non critical fixes.
 
-     and there is a typo in subject.
+Thanks!
+ChenYu
 
 
-Thanks,
-- Kever
-On 08/07/2017 09:45 AM, Huibin Hong wrote:
-> Add spi node and spi pinctrl for rk322x
->
-> Signed-off-by: Huibin Hong <huibin.hong@rock-chips.com>
-> ---
->
->   arch/arm/boot/dts/rk322x.dtsi | 50 +++++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 50 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-> index f3e4ffd..1a7afef 100644
-> --- a/arch/arm/boot/dts/rk322x.dtsi
-> +++ b/arch/arm/boot/dts/rk322x.dtsi
-> @@ -55,6 +55,7 @@
->   		serial0 = &uart0;
->   		serial1 = &uart1;
->   		serial2 = &uart2;
-> +		spi0 = &spi0;
->   	};
->   
->   	cpus {
-> @@ -361,6 +362,19 @@
->   		status = "disabled";
->   	};
->   
-> +	spi0: spi at 11090000 {
-> +		compatible = "rockchip,rk3228-spi";
-> +		reg = <0x11090000 0x1000>;
-> +		interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&spi0_clk &spi0_tx &spi0_rx &spi0_cs0 &spi0_cs1>;
-> +		clocks = <&cru SCLK_SPI0>, <&cru PCLK_SPI0>;
-> +		clock-names = "spiclk", "apb_pclk";
-> +		status = "disabled";
-> +	};
-> +
->   	wdt: watchdog at 110a0000 {
->   		compatible = "snps,dw-wdt";
->   		reg = <0x110a0000 0x100>;
-> @@ -797,6 +811,42 @@
->   			};
->   		};
->   
-> +		spi-0 {
-> +			spi0_clk: spi0-clk {
-> +				rockchip,pins = <0 9 RK_FUNC_2 &pcfg_pull_up>;
-> +			};
-> +			spi0_cs0: spi0-cs0 {
-> +				rockchip,pins = <0 14 RK_FUNC_2 &pcfg_pull_up>;
-> +			};
-> +			spi0_tx: spi0-tx {
-> +				rockchip,pins = <0 11 RK_FUNC_2 &pcfg_pull_up>;
-> +			};
-> +			spi0_rx: spi0-rx {
-> +				rockchip,pins = <0 13 RK_FUNC_2 &pcfg_pull_up>;
-> +			};
-> +			spi0_cs1: spi0-cs1 {
-> +				rockchip,pins = <1 12 RK_FUNC_1 &pcfg_pull_up>;
-> +			};
-> +		};
-> +
-> +		spi-1 {
-> +			spi1_clk: spi1-clk {
-> +				rockchip,pins = <0 23 RK_FUNC_2 &pcfg_pull_up>;
-> +			};
-> +			spi1_cs0: spi1-cs0 {
-> +				rockchip,pins = <2 2 RK_FUNC_2 &pcfg_pull_up>;
-> +			};
-> +			spi1_rx: spi1-rx {
-> +				rockchip,pins = <2 0 RK_FUNC_2 &pcfg_pull_up>;
-> +			};
-> +			spi1_tx: spi1-tx {
-> +				rockchip,pins = <2 1 RK_FUNC_2 &pcfg_pull_up>;
-> +			};
-> +			spi1_cs1: spi1-cs1 {
-> +				rockchip,pins = <2 3 RK_FUNC_2 &pcfg_pull_up>;
-> +			};
-> +		};
-> +
->   		i2s1 {
->   			i2s1_bus: i2s1-bus {
->   				rockchip,pins = <0 8 RK_FUNC_1 &pcfg_pull_none>,
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-clk-for-4.14
+
+for you to fetch changes up to 913c3d85b4b562e38242765baa95113c8c7f1c14:
+
+  clk: sunxi-ng: allow set parent clock (PLL_CPUX) for CPUX clock on H3 (2017-08-04 12:05:33 +0800)
+
+----------------------------------------------------------------
+Allwinner clock changes for 4.14
+
+Non critical fixes:
+
+  - Fix sunxi-ng/ccu-sunxi-r.h header file guard macro typo
+
+  - Make fractional clock modes really used and correctly configured
+
+  - Make H3 cpu clock rate change correctly to be used with cpufreq
+
+----------------------------------------------------------------
+Chen-Yu Tsai (1):
+      clk: sunxi-ng: h3: gate then ungate PLL CPU clk after rate change
+
+Icenowy Zheng (1):
+      clk: sunxi-ng: allow set parent clock (PLL_CPUX) for CPUX clock on H3
+
+Jernej ??krabec (4):
+      clk: sunxi-ng: Fix fractional mode for N-M clocks
+      clk: sunxi-ng: multiplier: Fix fractional mode
+      clk: sunxi-ng: Make fractional helper less chatty
+      clk: sunxi-ng: Wait for lock when using fractional mode
+
+Matthias Kaehlcke (1):
+      clk: sunxi-ng: Fix header guard of ccu-sun8i-r.h
+
+ drivers/clk/sunxi-ng/ccu-sun8i-h3.c | 13 ++++++++++++-
+ drivers/clk/sunxi-ng/ccu-sun8i-r.h  |  2 +-
+ drivers/clk/sunxi-ng/ccu_frac.c     | 14 ++++++++------
+ drivers/clk/sunxi-ng/ccu_frac.h     |  2 +-
+ drivers/clk/sunxi-ng/ccu_mult.c     | 10 +++++++---
+ drivers/clk/sunxi-ng/ccu_nm.c       | 19 ++++++++++++++++---
+ 6 files changed, 45 insertions(+), 15 deletions(-)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170807/8e45ece6/attachment.sig>
