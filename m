@@ -1,98 +1,71 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  7 Aug 2017 10:52:36 +0100
-Subject: [PATCH v4 2/6] of: Add helper for mapping device node to logical CPU
- number
+Date: Mon,  7 Aug 2017 10:52:38 +0100
+Subject: [PATCH v4 4/6] irqchip: gic-v3: Use of_cpu_node_to_id helper
 In-Reply-To: <1502099560-6267-1-git-send-email-suzuki.poulose@arm.com>
 References: <1502099560-6267-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1502099560-6267-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1502099560-6267-5-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper to map a device node to a logical CPU number to avoid
-duplication. Currently this is open coded in different places (e.g
-gic-v3, coresight). The helper tries to map device node to a "possible"
-logical CPU id, which may not be online yet. It is the responsibility
-of the user to make sure that the CPU is online. The helper uses
-of_get_cpu_node() which uses arch specific backends to match the phyiscal
-ids.
+Use the new generic helper of_cpu_node_to_id() instead
+of using our own version to map a device node to logical CPU
+number.
 
-Cc: devicetree at vger.kernel.org
-Cc: Frank Rowand <frowand.list@gmail.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
 Changes since V3:
- - Renamed the helper to of_cpu_node_to_id(), suggested by Rob
- - Return -ENODEV on failure than nr_cpus_id
+ - Reflect the change in the helper name and return value.
 ---
- drivers/of/base.c  | 26 ++++++++++++++++++++++++++
- include/linux/of.h |  7 +++++++
- 2 files changed, 33 insertions(+)
+ drivers/irqchip/irq-gic-v3.c | 29 ++---------------------------
+ 1 file changed, 2 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 686628d..e8625ff 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -420,6 +420,32 @@ struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
- EXPORT_SYMBOL(of_get_cpu_node);
- 
- /**
-+ * of_cpu_node_to_id: Get the logical CPU number for a given device_node
-+ *
-+ * @cpu_node: Pointer to the device_node for CPU.
-+ *
-+ * Returns the logical CPU number of the given CPU device_node.
-+ * Returns -ENODEV if the CPU is not found.
-+ */
-+int of_cpu_node_to_id(struct device_node *cpu_node)
-+{
-+	int cpu;
-+	bool found = false;
-+	struct device_node *np;
-+
-+	for_each_possible_cpu(cpu) {
-+		np = of_get_cpu_node(cpu, NULL);
-+		found = (cpu_node == np);
-+		of_node_put(np);
-+		if (found)
-+			return cpu;
-+	}
-+
-+	return -ENODEV;
-+}
-+EXPORT_SYMBOL(of_cpu_node_to_id);
-+
-+/**
-  * __of_device_is_compatible() - Check if the node matches given constraints
-  * @device: pointer to node
-  * @compat: required compatible string, NULL or "" for any match
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 4a8a709..23cf02d 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -539,6 +539,8 @@ const char *of_prop_next_string(struct property *prop, const char *cur);
- 
- bool of_console_check(struct device_node *dn, char *name, int index);
- 
-+extern int of_cpu_node_to_id(struct device_node *np);
-+
- #else /* CONFIG_OF */
- 
- static inline void of_core_init(void)
-@@ -863,6 +865,11 @@ static inline void of_property_clear_flag(struct property *p, unsigned long flag
- {
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index dbffb7a..ada931d 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -978,31 +978,6 @@ static int __init gic_validate_dist_version(void __iomem *dist_base)
+ 	return 0;
  }
  
-+static inline int of_cpu_node_to_id(struct device_node *np)
-+{
-+	return -ENODEV;
-+}
-+
- #define of_match_ptr(_ptr)	NULL
- #define of_match_node(_matches, _node)	NULL
- #endif /* CONFIG_OF */
+-static int get_cpu_number(struct device_node *dn)
+-{
+-	const __be32 *cell;
+-	u64 hwid;
+-	int i;
+-
+-	cell = of_get_property(dn, "reg", NULL);
+-	if (!cell)
+-		return -1;
+-
+-	hwid = of_read_number(cell, of_n_addr_cells(dn));
+-
+-	/*
+-	 * Non affinity bits must be set to 0 in the DT
+-	 */
+-	if (hwid & ~MPIDR_HWID_BITMASK)
+-		return -1;
+-
+-	for (i = 0; i < num_possible_cpus(); i++)
+-		if (cpu_logical_map(i) == hwid)
+-			return i;
+-
+-	return -1;
+-}
+-
+ /* Create all possible partitions@boot time */
+ static void __init gic_populate_ppi_partitions(struct device_node *gic_node)
+ {
+@@ -1053,8 +1028,8 @@ static void __init gic_populate_ppi_partitions(struct device_node *gic_node)
+ 			if (WARN_ON(!cpu_node))
+ 				continue;
+ 
+-			cpu = get_cpu_number(cpu_node);
+-			if (WARN_ON(cpu == -1))
++			cpu = of_cpu_node_to_id(cpu_node);
++			if (WARN_ON(cpu < 0))
+ 				continue;
+ 
+ 			pr_cont("%s[%d] ", cpu_node->full_name, cpu);
 -- 
 2.7.5
