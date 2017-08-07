@@ -1,51 +1,62 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 08 Aug 2017 00:57:45 +0200
-Subject: [PATCH v2 06/23] clk: rockchip: support more clks for rv1108
-In-Reply-To: <1501662837-12029-1-git-send-email-andy.yan@rock-chips.com>
-References: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
- <1501662837-12029-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <11738434.oWbxbgkgjP@phil>
+From: dja@axtens.net (Daniel Axtens)
+Date: Tue, 08 Aug 2017 09:01:06 +1000
+Subject: [PATCH 3/3] powerpc: replace vga_fixup() with generic code
+In-Reply-To: <87efsnq217.fsf@concordia.ellerman.id.au>
+References: <20170804102033.27731-1-dja@axtens.net>
+ <20170804102033.27731-4-dja@axtens.net>
+ <87efsnq217.fsf@concordia.ellerman.id.au>
+Message-ID: <87wp6fq8y5.fsf@linkitivity.dja.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+Michael Ellerman <mpe@ellerman.id.au> writes:
 
-Am Mittwoch, 2. August 2017, 16:33:57 CEST schrieb Andy Yan:
-> From: Elaine Zhang <zhangqing@rock-chips.com>
-> 
-> Added the description of the missing clock,
-> make the clock tree more complete.
-> 
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> Daniel Axtens <dja@axtens.net> writes:
+>
+>> Currently, we do a PCI fixup to mark a default card so that Xorg
+>> autoconfiguration works.
+>>
+>> There is a new generic method to do this sort of vga fixup, and
+>> it occurs by default.
+>>
+>> Drop our old method.
+>>
+>> This method is different:
+>>  - it will only mark a card as default if a driver is bound
+>>  - the marking will happen at late_initcall time, or even later
+>>    if a card is enabled later on (via an ENABLE hook). Currently
+>>    things are enabled in a FINAL hook.
+>>
+>> This *does* change behaviour under some circumstances.
+>>
+>> For example, pseries_le_defconfig doesn't have DRM drivers for
+>> many of the qemu GPU models, including the 'standard' vga.
+>
+> Should we enable them/it?
 
-[...]
+Hard to say.
 
->  	FACTOR(0, "xin12m", "xin24m", 0, 1, 2),
->  
-> -	COMPOSITE(0, "i2s0_src", mux_pll_src_2plls_p, 0,
-> +	/* PD_BUS */
-> +	GATE(0, "aclk_bus_src_gpll", "gpll", CLK_IGNORE_UNUSED,
-> +			RV1108_CLKGATE_CON(1), 0, GFLAGS),
-> +	GATE(0, "aclk_bus_src_apll", "apll", CLK_IGNORE_UNUSED,
-> +			RV1108_CLKGATE_CON(1), 1, GFLAGS),
-> +	GATE(0, "aclk_bus_src_dpll", "dpll", CLK_IGNORE_UNUSED,
-> +			RV1108_CLKGATE_CON(1), 2, GFLAGS),
-> +	COMPOSITE_NOGATE(ACLK_PRE, "aclk_bus_pre", mux_aclk_bus_src_p, 0,
-> +			RV1108_CLKSEL_CON(2), 8, 2, MFLAGS, 0, 5, DFLAGS),
-> +	COMPOSITE_NOMUX(HCLK_BUS, "hclk_bus_pre", "aclk_bus_pre", 0,
-> +			RV1108_CLKSEL_CON(3), 0, 5, DFLAGS,
-> +			RV1108_CLKGATE_CON(1), 4, GFLAGS),
+The 'standard' vga module (bochs_drm) was blacklisted by Ubuntu -
+apparently at IBM's request [0] - some years back. Even if you
+un-blacklist it, I had trouble with getting it and the openfirmware
+framebuffer driver to play nicely together. It may not be worth the
+trouble for bochs_drm.
 
-you're adding a (new / second) hclk_bus_pre here, but only drop the
-old in patch 7. Please structure patch-contents in a way that each patch
-is self-contained and works on its own ... aka the clock tree should not
-get worse if only patch 6 is applied (like in a random git bisect), but
-here the state is bad between these 2 patches.
+There's a better case for including some of the more modern drivers -
+maybe QXL and virtio - but I wasn't able to test them: my particular
+build of qemu/TCG refused to start with them and I didn't feel like
+rebuilding/debugging qemu.
 
-hclk_bus_pre also is only _one_ example and there are probably more of
-those hiding in these clock patches. So please fix these issues.
+It would also be legitmate to say that you're focussing on headless use
+with pseries_*defconfig and not include them: you need to bring in the
+DRM core if you want these drivers.
 
+HTH.
 
-Thanks
-Heiko
+Regards,
+Daniel
+
+[0] https://bugs.launchpad.net/ubuntu/+source/kmod/+bug/1378648
+
+>
+> cheers
