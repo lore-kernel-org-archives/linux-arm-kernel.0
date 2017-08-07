@@ -1,95 +1,116 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon,  7 Aug 2017 10:31:20 -0700
-Subject: [PATCH RESEND] lib/mpi: fix build with clang
-Message-ID: <20170807173120.15463-1-stefan@agner.ch>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Mon, 7 Aug 2017 12:33:32 -0500
+Subject: [RFC 0/4] Parse ACPI/PPTT for cache information
+In-Reply-To: <39b916f8-4d38-6c24-fc5f-4d2ad3888e49@linaro.org>
+References: <20170805001159.12769-1-jeremy.linton@arm.com>
+ <39b916f8-4d38-6c24-fc5f-4d2ad3888e49@linaro.org>
+Message-ID: <edf59d9d-7c5c-2fca-7478-7c15a5f273ca@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use just @ to denote comments which works with gcc and clang.
-Otherwise clang reports an escape sequence error:
-  error: invalid % escape in inline assembly string
 
-Use %0-%3 as operand references, this avoids:
-  error: invalid operand in inline asm: 'umull ${1:r}, ${0:r}, ${2:r}, ${3:r}'
+Hi,
 
-Also remove superfluous casts on output operands to avoid warnings
-such as:
-  warning: invalid use of a cast in an inline asm context requiring an l-value
+On 08/07/2017 05:20 AM, Hanjun Guo wrote:
+> +Cc Xiongfeng (who is also working on the PPTT but focusing on
+> CPU topology)
+> 
+> Hi Jeremy,
+> 
+> On 2017/8/5 8:11, Jeremy Linton wrote:
+>> ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
+>> used to describe the processor and cache topologies. Ideally it is
+>> used to extend/override information provided by the hardware, but
+>> right now ARM64 is entirely dependent on firmware provided tables.
+>>
+>> This patch parses the table for the cache topology only. Its quite
+>> trivial to add processor/cluster/???/socket level parsing as well,
+>> but that information isn't as useful as the already provided NUMA
+>> SRAT/SLIT information which provides relative distances. The one
+>> useful thing, is the number of physical sockets but due to the
+>> way arm64 considers "clusters" to be sockets, a larger discussion
+>> is required here.
+> 
+> I think we need the socket to represent the true topology of
+> the SoC, which means that considering clusters to be sockets is
+> wrong on ARM64 server platforms, a "socket" needs to be a memory
+> controller attached I think.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
----
-I checked the output of gcc with -S switch before and after this change,
-gcc generated the same assembly.
+If I understand correctly, your suggesting that the socket isn't really 
+the physical socket, but a grouping at the memory controller level?
 
-Resend this time with linux-crypto ML.
+My general take was that thread/core/socket is now insufficient as even 
+x86 designs now have more levels of hierarchy than that. Mapping those 
+layers, and the numa weighting into something meaningful for linux, well 
+that was more than I wanted to start with. Particularly since the PPTT 
+spec is silent about memory controller attachments at particular node 
+levels, as well as a few other possible short comings.
 
---
-Stefan
 
- lib/mpi/longlong.h | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/lib/mpi/longlong.h b/lib/mpi/longlong.h
-index 93336502af08..57fd45ab7af1 100644
---- a/lib/mpi/longlong.h
-+++ b/lib/mpi/longlong.h
-@@ -176,8 +176,8 @@ extern UDItype __udiv_qrnnd(UDItype *, UDItype, UDItype, UDItype);
- #define add_ssaaaa(sh, sl, ah, al, bh, bl) \
- 	__asm__ ("adds %1, %4, %5\n" \
- 		"adc  %0, %2, %3" \
--	: "=r" ((USItype)(sh)), \
--		"=&r" ((USItype)(sl)) \
-+	: "=r" (sh), \
-+		"=&r" (sl) \
- 	: "%r" ((USItype)(ah)), \
- 		"rI" ((USItype)(bh)), \
- 		"%r" ((USItype)(al)), \
-@@ -185,15 +185,15 @@ extern UDItype __udiv_qrnnd(UDItype *, UDItype, UDItype, UDItype);
- #define sub_ddmmss(sh, sl, ah, al, bh, bl) \
- 	__asm__ ("subs %1, %4, %5\n" \
- 		"sbc  %0, %2, %3" \
--	: "=r" ((USItype)(sh)), \
--		"=&r" ((USItype)(sl)) \
-+	: "=r" (sh), \
-+		"=&r" (sl) \
- 	: "r" ((USItype)(ah)), \
- 		"rI" ((USItype)(bh)), \
- 		"r" ((USItype)(al)), \
- 		"rI" ((USItype)(bl)))
- #if defined __ARM_ARCH_2__ || defined __ARM_ARCH_3__
- #define umul_ppmm(xh, xl, a, b) \
--	__asm__ ("%@ Inlined umul_ppmm\n" \
-+	__asm__ ("@ Inlined umul_ppmm\n" \
- 		"mov	%|r0, %2, lsr #16		@ AAAA\n" \
- 		"mov	%|r2, %3, lsr #16		@ BBBB\n" \
- 		"bic	%|r1, %2, %|r0, lsl #16		@ aaaa\n" \
-@@ -206,19 +206,19 @@ extern UDItype __udiv_qrnnd(UDItype *, UDItype, UDItype, UDItype);
- 		"addcs	%|r2, %|r2, #65536\n" \
- 		"adds	%1, %|r1, %|r0, lsl #16\n" \
- 		"adc	%0, %|r2, %|r0, lsr #16" \
--	: "=&r" ((USItype)(xh)), \
--		"=r" ((USItype)(xl)) \
-+	: "=&r" (xh), \
-+		"=r" (xl) \
- 	: "r" ((USItype)(a)), \
- 		"r" ((USItype)(b)) \
- 	: "r0", "r1", "r2")
- #else
- #define umul_ppmm(xh, xl, a, b) \
--	__asm__ ("%@ Inlined umul_ppmm\n" \
--		"umull %r1, %r0, %r2, %r3" \
--	: "=&r" ((USItype)(xh)), \
--			"=&r" ((USItype)(xl)) \
-+	__asm__ ("@ Inlined umul_ppmm\n" \
-+		"umull %1, %0, %2, %3" \
-+	: "=&r" (xh), \
-+		"=&r" (xl) \
- 	: "r" ((USItype)(a)), \
--			"r" ((USItype)(b)) \
-+		"r" ((USItype)(b)) \
- 	: "r0", "r1")
- #endif
- #define UMUL_TIME 20
--- 
-2.12.2
+> 
+> Take D05 for example, there are two physical SoC sockets on
+> the board but with two CPU DIE (with memory controller) on each
+> physical socket, and 4 clusters on each CPU DIE.
+> 
+> When considering clusters as sockets (that's the code for now),
+> there are 16 "sockets" to represent to OS for schedule input,
+> but only 4 NUMA nodes, which are confusing the scheduler a lot...
+> 
+> Xiongfeng was working on the CPU topology based on PPTT, and the code
+> is under internal review, if it's OK for you, we can send them out
+> for review comments to see if we can join our effort together, or
+> we can work on top of your patches, as you like :)
+> 
+>>
+>> An example of lstopo with this patch:
+>>
+>> [root at mammon-juno-rh ~]# lstopo-no-graphics
+>> Machine (8072MB)
+>>    Package L#0 + L2 L#0 (1024KB)
+>>      L1d L#0 (32KB) + L1i L#0 (32KB) + Core L#0 + PU L#0 (P#0)
+>>      L1d L#1 (32KB) + L1i L#1 (32KB) + Core L#1 + PU L#1 (P#1)
+>>      L1d L#2 (32KB) + L1i L#2 (32KB) + Core L#2 + PU L#2 (P#2)
+>>      L1d L#3 (32KB) + L1i L#3 (32KB) + Core L#3 + PU L#3 (P#3)
+>>    Package L#1 + L2 L#1 (2048KB)
+>>      L1d L#4 (32KB) + L1i L#4 (48KB) + Core L#4 + PU L#4 (P#4)
+>>      L1d L#5 (32KB) + L1i L#5 (48KB) + Core L#5 + PU L#5 (P#5)
+>>    HostBridge L#0
+>>      PCIBridge
+>>        PCIBridge
+>>          PCIBridge
+>>            PCI 1095:3132
+>>              Block(Disk) L#0 "sda"
+>>          PCIBridge
+>>            PCI 11ab:4380
+>>              Net L#1 "enp8s0"
+>>
+>> Jeremy Linton (4):
+>>    drivers: base: cacheinfo: Add support for ACPI based firmware tables
+>>    arm64: cacheinfo: Add support for ACPI/PPTT generated topology
+>>    ACPI/PPTT: Add Processor Properties Topology Table parsing
+>>    ACPI: Enable PPTT support on ARM64
+>>
+>>   arch/arm64/kernel/cacheinfo.c |  23 ++-
+>>   drivers/acpi/arm64/Kconfig    |   3 +
+>>   drivers/acpi/arm64/Makefile   |   1 +
+>>   drivers/acpi/arm64/pptt.c     | 389 
+>> ++++++++++++++++++++++++++++++++++++++++++
+> 
+> I think PPTT is not ARM64 only, can be used for x86 too,
+> shall we locate them on drivers/acpi?
+
+Sure.. But, I was using the assumption that the table would only really 
+be useful on arm64. On x86 the table is unnecessary and generally would 
+have to be dynamically generated by the firmware (as it should be on 
+arm) anyway. Put another way, does anyone want to use it on another 
+platform?
+
+
+> 
+> Rafael was working a lot on the PPTT proposal for the
+> spec, I think he can comment on this :) >
+> Rafael, what do you think?
+> 
+> Thanks
+> Hanjun
