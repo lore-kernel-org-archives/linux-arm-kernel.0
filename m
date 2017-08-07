@@ -1,40 +1,59 @@
-From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Mon, 7 Aug 2017 02:05:06 +0000
-Subject: [PATCHv2 0/3] dts: add ls2088a and 1088a pcie DT nodes
-In-Reply-To: <20170805054627.GU31819@dragon>
-References: <1501829046-3761-1-git-send-email-Zhiqiang.Hou@nxp.com>
- <20170805054627.GU31819@dragon>
-Message-ID: <VI1PR0402MB278248A2FD55FD70FA9B262184B50@VI1PR0402MB2782.eurprd04.prod.outlook.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sun,  6 Aug 2017 22:09:51 -0400
+Subject: [PATCH V8 1/2] PCI: handle CRS returned by device after FLR
+Message-ID: <1502071792-15263-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+An endpoint is allowed to issue Configuration Request Retry Status (CRS)
+following a Function Level Reset (FLR) request to indicate that it is
+not ready to accept new requests. CRS is defined in PCIe r3.1, sec 2.3.1.
+Request Handling Rules and CRS usage in FLR context is mentioned in
+PCIe r3.1, sec 6.6.2. Function-Level Reset.
 
-Thanks a lot for your comments!
+A CRS indication will only be given if the address to be read is vendor ID
+register. pci_bus_read_dev_vendor_id() knows how to deal with CRS returned
+0xFFFF0001 value and will continue polling until a value other than
+0xFFFF0001 is returned within a given timeout.
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: 2017?8?5? 13:46
-> To: Z.q. Hou <zhiqiang.hou@nxp.com>
-> Cc: linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> robh+dt at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
-> will.deacon at arm.com; Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
-> Subject: Re: [PATCHv2 0/3] dts: add ls2088a and 1088a pcie DT nodes
-> 
-> On Fri, Aug 04, 2017 at 02:44:03PM +0800, Zhiqiang Hou wrote:
-> > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> >
-> > Add GICv3 ITS DT node for ls1088a, because the PCIe nodes must have a
-> > msi-parent.
-> >
-> > Hou Zhiqiang (3):
-> >   dts: ls2088a: add pcie support
-> >   dts: ls1088a: add gicv3 ITS DT node
-> >   dts: ls1088a: add PCIe controller DT nodes
-> 
-> Please have an additional 'arm64: ' prefix for these arm64 dts patches.
+Try to discover device presence via CRS if supported. Otherwise, fall
+through to old behavior.
 
-yes, will add next version.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/pci.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-Thanks,
-Zhiqiang
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index af0cc34..cc9f1c0 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -3819,8 +3819,26 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
+  */
+ static void pci_flr_wait(struct pci_dev *dev)
+ {
++	u16 root_cap = 0;
+ 	int i = 0;
+ 	u32 id;
++	bool ret;
++
++	pcie_capability_read_word(dev, PCI_EXP_RTCAP, &root_cap);
++	if (root_cap & PCI_EXP_RTCAP_CRSVIS) {
++		/* don't touch the HW before waiting 100ms */
++		msleep(100);
++
++		/*
++		 * Physical functions return from here if found,
++		 * virtual functions fall through as they return ~0 on vendor
++		 * id read once CRS is completed.
++		 */
++		ret = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
++						 60000);
++		if (ret)
++			return;
++	}
+ 
+ 	do {
+ 		msleep(100);
+-- 
+1.9.1
