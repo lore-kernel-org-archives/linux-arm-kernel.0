@@ -1,9 +1,9 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 7 Aug 2017 15:12:16 +0200
-Subject: [PATCH] pinctrl: armada-37xx: add static to local data
-In-Reply-To: <1501822020-22511-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1501822020-22511-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdYSUcfy9g-+vr-zZW5duUHPR5cKnuRLWsM-b0zcYZCRyg@mail.gmail.com>
+Date: Mon, 7 Aug 2017 15:13:16 +0200
+Subject: [PATCH] pinctrl: sirf: add static to local data
+In-Reply-To: <1501822057-22628-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1501822057-22628-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdanzTEeZ0GDd_txmXvACp0Wx+wD2TYyk4xeRX4XKdDRsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
