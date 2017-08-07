@@ -1,93 +1,70 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 7 Aug 2017 08:20:53 +0200
-Subject: [PATCH 2/5] edac: synopsys: Add EDAC ECC support for ZynqMP DDRC
-In-Reply-To: <20170807040300.GC7516@nazgul.tnic>
-References: <60ff19f90adfd252cf296fe8988c614c4c3e43fd.1501848023.git.michal.simek@xilinx.com>
- <00da9d8dcdbc95c170a9b52abcc2580c271bdd9d.1501848023.git.michal.simek@xilinx.com>
- <20170807040300.GC7516@nazgul.tnic>
-Message-ID: <14045ee2-6da2-c0f2-55a2-b2dfd742c811@xilinx.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 7 Aug 2017 08:41:22 +0200
+Subject: [PATCH 4/4] thermal: bcm2835: constify thermal_zone_of_device_ops
+ structures
+In-Reply-To: <1501965437-30730-5-git-send-email-Julia.Lawall@lip6.fr>
+References: <1501965437-30730-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1501965437-30730-5-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <69716e67-d210-5599-426e-61c629dea523@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7.8.2017 06:03, Borislav Petkov wrote:
-> On Fri, Aug 04, 2017 at 02:00:24PM +0200, Michal Simek wrote:
->> From: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
->>
->> This patch adds EDAC ECC support for ZynqMP DDRC IP
->>
->> Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>
->>  drivers/edac/Kconfig         |   2 +-
->>  drivers/edac/synopsys_edac.c | 306 ++++++++++++++++++++++++++++++++++++++++++-
->>  2 files changed, 302 insertions(+), 6 deletions(-)
-> 
-> ...
-> 
->> @@ -440,9 +706,12 @@ static int synps_edac_mc_init(struct mem_ctl_info *mci,
->>  	mci->dev_name = SYNPS_EDAC_MOD_STRING;
->>  	mci->mod_name = SYNPS_EDAC_MOD_VER;
->>  	mci->mod_ver = "1";
->> -
->> -	edac_op_state = EDAC_OPSTATE_POLL;
->> -	mci->edac_check = synps_edac_check;
->> +	if (priv->p_data->quirks & DDR_ECC_INTR_SUPPORT) {
->> +		edac_op_state = EDAC_OPSTATE_INT;
->> +	} else {
->> +		edac_op_state = EDAC_OPSTATE_POLL;
->> +		mci->edac_check = synps_edac_check;
->> +	}
->>  	mci->ctl_page_to_phys = NULL;
->>  
->>  	status = synps_edac_init_csrows(mci);
-> 
-> This hunk doesn't apply cleanly:
-> 
-> $ test-apply.sh -q /tmp/02-edac-synopsys-add_edac_ecc_support_for_zynqmp_ddrc.patch 
-> checking file drivers/edac/Kconfig
-> checking file drivers/edac/synopsys_edac.c
-> Hunk #11 FAILED at 706.
-> Hunk #12 succeeded at 723 (offset -1 lines).
-> Hunk #13 succeeded at 754 (offset -1 lines).
-> Hunk #14 succeeded at 803 (offset -1 lines).
-> 1 out of 14 hunks FAILED
-> 
-> Please redo your patches against this branch:
-> 
-> https://git.kernel.org/pub/scm/linux/kernel/git/bp/bp.git/log/?h=for-next
-> 
+Am 05.08.2017 um 22:37 schrieb Julia Lawall:
+> The thermal_zone_of_device_ops structure is only passed as the fourth
+> argument to thermal_zone_of_sensor_register, which is declared as const.
+> Thus the thermal_zone_of_device_ops structure itself can be const.
+>
+> Done with the help of Coccinelle.
+>
+> // <smpl>
+> @r disable optional_qualifier@
+> identifier i;
+> position p;
+> @@
+> static struct thermal_zone_of_device_ops i at p = { ... };
+>
+> @ok1@
+> identifier r.i;
+> expression e1,e2,e3;
+> position p;
+> @@
+> thermal_zone_of_sensor_register(e1,e2,e3,&i at p)
+>
+> @bad@
+> position p != {r.p,ok1.p};
+> identifier r.i;
+> struct thermal_zone_of_device_ops e;
+> @@
+> e at i@p
+>
+> @depends on !bad disable optional_qualifier@
+> identifier r.i;
+> @@
+> static
+> +const
+>  struct thermal_zone_of_device_ops i = { ... };
+> // </smpl>
+>
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-The patch "EDAC: Get rid of mci->mod_ver" is causing that collision.
-Will fix.
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-
-
-> Thx.
-> 
->> @@ -458,8 +727,18 @@ static int synps_edac_mc_init(struct mem_ctl_info *mci,
->>  	.quirks				= 0,
->>  };
->>  
->> +static const struct synps_platform_data zynqmp_enh_edac_def = {
->> +	.synps_edac_geterror_info	= synps_enh_edac_geterror_info,
->> +	.synps_edac_get_mtype		= synps_enh_edac_get_mtype,
->> +	.synps_edac_get_dtype		= synps_enh_edac_get_dtype,
->> +	.synps_edac_get_eccstate	= synps_enh_edac_get_eccstate,
->> +	.quirks				= DDR_ECC_INTR_SUPPORT,
->> +};
->> +
->>  static const struct of_device_id synps_edac_match[] = {
->>  	{ .compatible = "xlnx,zynq-ddrc-a05", .data = (void *)&zynq_edac_def },
->> +	{ .compatible = "xlnx,zynqmp-ddrc-2.40a",
->> +				.data = (void *)&zynqmp_enh_edac_def},
-> 
-> WARNING: DT compatible string "xlnx,zynqmp-ddrc-2.40a" appears un-documented -- check ./Documentation/devicetree/bindings/
-> #414: FILE: drivers/edac/synopsys_edac.c:740:
-> +       { .compatible = "xlnx,zynqmp-ddrc-2.40a",
-> 
-> Please integrate checkpatch.pl into your patch creation workflow.
-> 
-
-Thanks,
-Michal
+>
+> ---
+>  drivers/thermal/broadcom/bcm2835_thermal.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/thermal/broadcom/bcm2835_thermal.c b/drivers/thermal/broadcom/bcm2835_thermal.c
+> index e6863c8..a4d6a0e 100644
+> --- a/drivers/thermal/broadcom/bcm2835_thermal.c
+> +++ b/drivers/thermal/broadcom/bcm2835_thermal.c
+> @@ -145,7 +145,7 @@ static void bcm2835_thermal_debugfs(struct platform_device *pdev)
+>  	debugfs_create_regset32("regset", 0444, data->debugfsdir, regset);
+>  }
+>  
+> -static struct thermal_zone_of_device_ops bcm2835_thermal_ops = {
+> +static const struct thermal_zone_of_device_ops bcm2835_thermal_ops = {
+>  	.get_temp = bcm2835_thermal_get_temp,
+>  };
+>  
+>
