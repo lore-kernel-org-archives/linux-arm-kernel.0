@@ -1,29 +1,109 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 07 Aug 2017 20:07:12 +0100
-Subject: [PATCH v2] KVM: arm64: pass vcpu esr_el2 and far_el2 sysre to
- user space
-In-Reply-To: <1502133454-5905-1-git-send-email-gengdongjiu@huawei.com>
- (Dongjiu Geng's message of "Tue, 8 Aug 2017 03:17:34 +0800")
-References: <1502133454-5905-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <86r2wnxkm7.fsf@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon,  7 Aug 2017 19:36:02 +0100
+Subject: [PATCH 11/14] arm64: use an irq stack pointer
+In-Reply-To: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
+References: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1502130965-18710-12-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08 2017 at  3:17:34 am BST, Dongjiu Geng <gengdongjiu@huawei.com> wrote:
-> For the firmware-first RAS solution, SEA and SEI is injected
-> by the user space, user space needs to know the vcpu's esr_el2 and
-> far_el2 value, so add them to sysreg. user space uses
-> the IOCTL KVM_GET_ONE_REG can get their value.
+We allocate our IRQ stacks using a percpu array. This allows us to generate our
+IRQ stack pointers with adr_this_cpu, but bloats the kernel Image with the boot
+CPU's IRQ stack. Additionally, these are packed with other percpu variables,
+and aren't guaranteed to have guard pages.
 
-Are we playing a game here? Look at my earlier reply: No _EL2 register
-will ever be exposed as such to userspace in the context of an EL1 VM.
+When we enable VMAP_STACK we'll want to vmap our IRQ stacks also, in order to
+provide guard pages and to permit more stringent alignment requirements. Doing
+so will require that we use a percpu pointer to each IRQ stack, rather than
+allocating a percpu IRQ stack in the kernel image.
 
-So if you want that information, extract it, expose what is required,
-strictly what is required, and only when it is required.
+This patch updates our IRQ stack code to use a percpu pointer to the base of
+each IRQ stack. This will allow us to change the way the stack is allocated
+with minimal changes elsewhere. In some cases we may try to backtrace before
+the IRQ stack pointers are initialised, so on_irq_stack() is updated to account
+for this.
 
-In the meantime, I'm NAKing this patch, and any patch that will expose
-_EL2 registers outside of nested virtualization.
+In testing with cyclictest, there was no measureable difference between using
+adr_this_cpu (for irq_stack) and ldr_this_cpu (for irq_stack_ptr) in the IRQ
+entry path.
 
-	M.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Laura Abbott <labbott@redhat.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/stacktrace.h |  7 +++++--
+ arch/arm64/kernel/entry.S           |  2 +-
+ arch/arm64/kernel/irq.c             | 10 ++++++++++
+ 3 files changed, 16 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
+index 000e2418..4c68d8a 100644
+--- a/arch/arm64/include/asm/stacktrace.h
++++ b/arch/arm64/include/asm/stacktrace.h
+@@ -36,13 +36,16 @@ extern void walk_stackframe(struct task_struct *tsk, struct stackframe *frame,
+ 			    int (*fn)(struct stackframe *, void *), void *data);
+ extern void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk);
+ 
+-DECLARE_PER_CPU(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack);
++DECLARE_PER_CPU(unsigned long *, irq_stack_ptr);
+ 
+ static inline bool on_irq_stack(unsigned long sp)
+ {
+-	unsigned long low = (unsigned long)raw_cpu_ptr(irq_stack);
++	unsigned long low = (unsigned long)raw_cpu_read(irq_stack_ptr);
+ 	unsigned long high = low + IRQ_STACK_SIZE;
+ 
++	if (!low)
++		return false;
++
+ 	return (low <= sp && sp < high);
+ }
+ 
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index bd3b6de..e5aa866 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -272,7 +272,7 @@ alternative_else_nop_endif
+ 	and	x25, x25, #~(THREAD_SIZE - 1)
+ 	cbnz	x25, 9998f
+ 
+-	adr_this_cpu x25, irq_stack, x26
++	ldr_this_cpu x25, irq_stack_ptr, x26
+ 	mov	x26, #IRQ_STACK_SIZE
+ 	add	x26, x25, x26
+ 
+diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+index 2386b26..5141282 100644
+--- a/arch/arm64/kernel/irq.c
++++ b/arch/arm64/kernel/irq.c
+@@ -32,6 +32,7 @@
+ 
+ /* irq stack only needs to be 16 byte aligned - not IRQ_STACK_SIZE aligned. */
+ DEFINE_PER_CPU(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack) __aligned(16);
++DEFINE_PER_CPU(unsigned long *, irq_stack_ptr);
+ 
+ int arch_show_interrupts(struct seq_file *p, int prec)
+ {
+@@ -50,8 +51,17 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
+ 	handle_arch_irq = handle_irq;
+ }
+ 
++static void init_irq_stacks(void)
++{
++	int cpu;
++
++	for_each_possible_cpu(cpu)
++		per_cpu(irq_stack_ptr, cpu) = per_cpu(irq_stack, cpu);
++}
++
+ void __init init_IRQ(void)
+ {
++	init_irq_stacks();
+ 	irqchip_init();
+ 	if (!handle_arch_irq)
+ 		panic("No interrupt controller found.");
 -- 
-Jazz is not dead. It just smells funny.
+1.9.1
