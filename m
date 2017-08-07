@@ -1,156 +1,129 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 7 Aug 2017 09:39:57 +0200
-Subject: [PATCH 1/5] edac: synopsys: Add platform specific structures ddrc
- controller
-In-Reply-To: <20170806051830.GC28006@nazgul.tnic>
-References: <60ff19f90adfd252cf296fe8988c614c4c3e43fd.1501848023.git.michal.simek@xilinx.com>
- <20170806051830.GC28006@nazgul.tnic>
-Message-ID: <abf22c6a-0694-e869-fda1-5672907bf3a7@xilinx.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Mon, 7 Aug 2017 13:14:50 +0530
+Subject: [PATCH] iommu/arm-smmu: Defer TLB flush in case of unmap op
+In-Reply-To: <fd13c041-7dd8-140b-1d02-36ff2bc3a633@arm.com>
+References: <CAFp+6iFfu2-qrDDim7fzKKLqMcSVMmOr7esqBZ-xEeLTOOTNLA@mail.gmail.com>
+ <1501667598-16404-1-git-send-email-vivek.gautam@codeaurora.org>
+ <35aeb7dd-4fe6-3175-2252-41c3c54873a9@arm.com>
+ <d9cdeeee-36a9-40d4-457e-b1a865c3b83f@codeaurora.org>
+ <fd13c041-7dd8-140b-1d02-36ff2bc3a633@arm.com>
+Message-ID: <CAFp+6iF=6W_X7Aq=Z4T+HuQT2x4sO+L3wCHuCOu8tQqK2QeTkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6.8.2017 07:18, Borislav Petkov wrote:
-> On Fri, Aug 04, 2017 at 02:00:23PM +0200, Michal Simek wrote:
->> From: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
-> 
-> That subject:
->  Subject: [PATCH 1/5] edac: synopsys: Add platform specific structures ddrc controller
-> 
-> doesn't read like a proper sentence to me.
+Hi Robin,
 
-Fixed in v2.
 
-> 
->> This patch adds platform specific structures, so that we can add
-> 
-> "This patch" in a commit message is tautologically redundant.
-
-Fixed in v2.
-
-> 
->> different IP support later using quirks.
+On Fri, Aug 4, 2017 at 10:34 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 03/08/17 06:35, Vivek Gautam wrote:
+>> Hi Robin,
 >>
->> Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
 >>
->>  drivers/edac/synopsys_edac.c | 70 ++++++++++++++++++++++++++++++++++++--------
->>  1 file changed, 58 insertions(+), 12 deletions(-)
 >>
->> diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
->> index 1c01dec78ec3..65f3b04d5a87 100644
->> --- a/drivers/edac/synopsys_edac.c
->> +++ b/drivers/edac/synopsys_edac.c
->> @@ -22,6 +22,7 @@
->>  #include <linux/edac.h>
->>  #include <linux/module.h>
->>  #include <linux/platform_device.h>
->> +#include <linux/of.h>
->>  
->>  #include "edac_module.h"
->>  
->> @@ -95,6 +96,9 @@
->>  #define SCRUB_MODE_MASK		0x7
->>  #define SCRUB_MODE_SECDED	0x4
->>  
->> +/* DDR ECC Quirks */
->> +#define DDR_ECC_INTR_SUPPORT    BIT(0)
->> +
->>  /**
->>   * struct ecc_error_info - ECC error log information
->>   * @row:	Row number
->> @@ -130,6 +134,7 @@ struct synps_ecc_status {
->>   * @baseaddr:	Base address of the DDR controller
->>   * @message:	Buffer for framing the event specific info
->>   * @stat:	ECC status information
->> + * @p_data:	Pointer to platform data
->>   * @ce_cnt:	Correctable Error count
->>   * @ue_cnt:	Uncorrectable Error count
->>   */
->> @@ -137,11 +142,29 @@ struct synps_edac_priv {
->>  	void __iomem *baseaddr;
->>  	char message[SYNPS_EDAC_MSG_SIZE];
->>  	struct synps_ecc_status stat;
->> +	const struct synps_platform_data *p_data;
->>  	u32 ce_cnt;
->>  	u32 ue_cnt;
->>  };
->>  
->>  /**
->> + * struct synps_platform_data -  synps platform data structure
->> + * @synps_edac_geterror_info:	function pointer to synps edac error info
->> + * @synps_edac_get_mtype:	function pointer to synps edac mtype
->> + * @synps_edac_get_dtype:	function pointer to synps edac dtype
->> + * @synps_edac_get_eccstate:	function pointer to synps edac eccstate
-> 
-> "function pointer to" and then something, doesn't look like an optimal
-> explanation to me. How about:
-> 
-> "Function which returns the DIMM type"
-> 
-> and so on.
+>> On 08/02/2017 05:47 PM, Robin Murphy wrote:
+>>> On 02/08/17 10:53, Vivek Gautam wrote:
+>>>> We don't want to touch the TLB when smmu is suspended.
+>>>> Defer it until resume.
+>>>>
+>>>> Signed-off-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+>>>> ---
+>>>>
+>>>> Hi all,
+>>>>
+>>>> Here's the small patch in response of suggestion to defer tlb operations
+>>>> when smmu is in suspend state.
+>>>> The patch stores the TLB requests in 'unmap' when the smmu device is
+>>>> suspended. On resume, it checks all the pending TLB requests, and
+>>>> performs the unmap over those.
+>>>>
+>>>> Right now, I have applied the patch on top of the pm runtime series.
+>>>> Let me know what you think of the change. It will also be helpful if
+>>>> somebody can please test a valid use case with this.
+>>> The patch itself doesn't make much sense to me, but more crucially it's
+>>> definitely broken in concept. We can't return from arm_smmu_unmap()
+>>> without having actually unmapped anything, because that leaves the page
+>>> tables out of sync with what the caller expects - they may immmediately
+>>> reuse that IOVA to map something else for a different device and hit an
+>>> unexpected failure from io-pgtable when the PTE turns out to be
+>>> non-empty.
+>>
+>> To understand things bit more,
+>> once we don't *unmap* in arm_smmu_unmap(), and leave the TLBs as is,
+>> the next mapping can happen only with the *knowledge* of smmu, i.e.,
+>> smmu should be active at that time.
+>> If that's true then, the _runtime()_resume() method will take care of
+>> invalidating the TLBs when we call arm_smmu_unmap() from _runtime_resume().
+>> Is my understanding correct here?
+>
+> What I mean is that it's OK for arm_smmu_unmap() to defer the physical
+> TLB maintenance for an unmap request if the SMMU is suspended, but it
+> *must* still update the pagetable so that the given address is logically
+> unmapped before returning. In other words, the place to make decisions
+> based on the SMMU PM state would be in the .tlb_add_flush and .tlb_sync
+> callbacks, rather than at the top level.
 
-Fixed in v2
+Okay, i understand it better now.
+.tlb_add_flush and .tlb_sync callbacks should be the right place.
 
-> 
->> + * @quirks:			to differentiate IPs
->> + */
->> +struct synps_platform_data {
->> +	int (*synps_edac_geterror_info)(void __iomem *base,
->> +					 struct synps_ecc_status *p);
->> +	enum mem_type (*synps_edac_get_mtype)(const void __iomem *base);
->> +	enum dev_type (*synps_edac_get_dtype)(const void __iomem *base);
->> +	bool (*synps_edac_get_eccstate)(void __iomem *base);
->> +	int quirks;
->> +};
->> +
->> +/**
->>   * synps_edac_geterror_info - Get the current ecc error info
->>   * @base:	Pointer to the base address of the ddr memory controller
->>   * @p:		Pointer to the synopsys ecc status structure
->> @@ -242,7 +265,8 @@ static void synps_edac_check(struct mem_ctl_info *mci)
->>  	struct synps_edac_priv *priv = mci->pvt_info;
->>  	int status;
->>  
->> -	status = synps_edac_geterror_info(priv->baseaddr, &priv->stat);
->> +	status = priv->p_data->synps_edac_geterror_info(priv->baseaddr,
->> +							&priv->stat);
->>  	if (status)
->>  		return;
->>  
->> @@ -372,10 +396,12 @@ static int synps_edac_init_csrows(struct mem_ctl_info *mci)
->>  		for (j = 0; j < csi->nr_channels; j++) {
->>  			dimm            = csi->channels[j]->dimm;
->>  			dimm->edac_mode = EDAC_FLAG_SECDED;
->> -			dimm->mtype     = synps_edac_get_mtype(priv->baseaddr);
->> +			dimm->mtype     = priv->p_data->synps_edac_get_mtype(
->> +						priv->baseaddr);
->>  			dimm->nr_pages  = (size >> PAGE_SHIFT) / csi->nr_channels;
->>  			dimm->grain     = SYNPS_EDAC_ERR_GRAIN;
->> -			dimm->dtype     = synps_edac_get_dtype(priv->baseaddr);
->> +			dimm->dtype     = priv->p_data->synps_edac_get_dtype(
->> +						priv->baseaddr);
->>  		}
->>  	}
->>  
->> @@ -424,6 +450,21 @@ static int synps_edac_mc_init(struct mem_ctl_info *mci,
->>  	return status;
->>  }
->>  
->> +static const struct synps_platform_data zynq_edac_def = {
->> +	.synps_edac_geterror_info	= synps_edac_geterror_info,
->> +	.synps_edac_get_mtype		= synps_edac_get_mtype,
->> +	.synps_edac_get_dtype		= synps_edac_get_dtype,
->> +	.synps_edac_get_eccstate	= synps_edac_get_eccstate,
->> +	.quirks				= 0,
->> +};
-> 
-> Please make the actual function names and function pointer names
-> different. For example, the function pointer names don't need to have
-> the "synpc_" prefix as they're used all locally.
-> 
+>
+>>> However, if in general suspend *might* power-gate any part of the SMMU,
+>>> then I don't think we have any guarantee of what state any TLBs could be
+>>> in upon resume. Therefore any individual invalidations we skip while
+>>> suspended are probably moot, since resume would almost certainly have to
+>>> invalidate everything to get back to a safe state anyway.
+>>
+>> Right, in case when the suspend power-gates the SMMU, then
+>> the TLB context is lost anyways. So resume path can freshly start.
+>> This is something that exynos does at present.
+>
+> Yes, in general I don't think we can assume any SMMU state is preserved,
+> so the only safe option would be for .runtime_resume to do the same
+> thing as .resume, which does at least make things nice and simple.
 
-Fixed in v2 and v2 sent.
+Let me try to find out more about the state of TLBs. As far as the
+programmable registers are concerned, qcom platforms have retention
+enabled for them. So they don't loose state after SMMU power down.
 
-Thanks,
-Michal
+>
+>>> Conversely though, the situation that still concerns me is whether this
+>>> can work at all for a distributed SMMU if things *don't* lose state. Say
+>>> the GPU and its local TBU are in the same clock domain - if the GPU has
+>>> just gone idle and we've clock-gated it, but "the SMMU" (i.e. the TCU)
+>>> is still active servicing other devices, we will assume we can happily
+>>> unmap GPU buffers and issue TLBIs, but what happens with entries held in
+>>> the unclocked TBU's micro-TLB?
+>>
+>> We know of platforms we have that have shared TCU and multiple TBUs.
+>> Each TBU is available in its own power domain, not in master's power
+>> domain.
+>> In such cases we may want to runtime_get() the TBUs, so that unmap()
+>> call with
+>> master clock gated gets through.
+>>
+>> Can we have a situation where the TBU and master are in the same power
+>> domain, and the unmap is called when the master is not runtime active?
+>> How will such a situation be handled?
+>
+> Having thought about it a bit more, I think the
+> unmap-after-master-suspended case is only one facet of the problem - if
+> we can power down individual TBUs/micro-TLBs without suspending the rest
+> of the SMMU, do we also have any guarantee that such TLBs don't power
+> back on full of valid-looking random junk?
+>
+> I'm starting to think the only way to be generally safe would be to
+> globally invalidate all TLBs after any *master* is resumed, and I'm not
+> even sure that's feasible :/
+>
+> Robin.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+regards
+Vivek
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
