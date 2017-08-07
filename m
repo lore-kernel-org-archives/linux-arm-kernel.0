@@ -1,32 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 7 Aug 2017 13:00:37 +0100
-Subject: [PATCH] ASoC: pxa: don't select SSP for COMPILE_TESTing
-In-Reply-To: <CAK8P3a0tjwxq+P+Ww+Rxjt9Z4+AsJMgvn3z0bHiPgO+4EWQHZw@mail.gmail.com>
-References: <20170807104101.3540159-1-arnd@arndb.de>
- <20170807112030.zvz3flujilsixdj4@sirena.org.uk>
- <CAK8P3a3Zuu7HE4CphQR_wpbGvnupYRSdy3xFZu5UgsuvoOjnLQ@mail.gmail.com>
- <20170807114837.3bqsroayi3sipf4h@sirena.org.uk>
- <CAK8P3a0tjwxq+P+Ww+Rxjt9Z4+AsJMgvn3z0bHiPgO+4EWQHZw@mail.gmail.com>
-Message-ID: <20170807120037.la3kt4amtfiosn7b@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 7 Aug 2017 14:05:25 +0200
+Subject: [PATCH V2 1/1] gpio: gpio-vf610: add imx7ulp support
+In-Reply-To: <1501596257-20825-1-git-send-email-aisheng.dong@nxp.com>
+References: <1501596257-20825-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <CACRpkda6AmCUyDz-zNQbh9XCCDjUcKqhMH07oET6CEXzXV=0rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 01:58:29PM +0200, Arnd Bergmann wrote:
-> On Mon, Aug 7, 2017 at 1:48 PM, Mark Brown <broonie@kernel.org> wrote:
+On Tue, Aug 1, 2017 at 4:04 PM, Dong Aisheng <aisheng.dong@nxp.com> wrote:
 
-> > Still missing a few steps of reasoning here...
+> The Rapid General-Purpose Input and Output with 2 Ports (RGPIO2P)
+> on MX7ULP is similar to GPIO on Vibrid. But unlike Vibrid, the
+> RGPIO2P has an extra Port Data Direction Register (PDDR) used
+> to configure the individual port pins for input or output.
+>
+> We introduce a bool have_paddr with fsl_gpio_soc_data data
+> to distinguish this differences. And we support getting the output
+> status by checking the GPIO direction in PDDR.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Stefan Agner <stefan@agner.ch>
+> Cc: Fugang Duan <fugang.duan@nxp.com>
+> Cc: Peter Chen <peter.chen@nxp.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+>
+> ---
+> ChangeLog:
+> v1->v2:
+>  * remove flags and use bool have_paddr instead
 
-> Sorry, I just realized that you were trying to point out the incomplete
-> changelog. I must have accidentally closed the editor while working on
-> it, and then sent it out today after getting no regressions.
+Patch applied.
 
-> I'll resend with a proper changelog.
-
-Thanks!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170807/3472be73/attachment.sig>
+Yours,
+Linus Walleij
