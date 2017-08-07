@@ -1,101 +1,57 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 7 Aug 2017 10:35:57 -0700
-Subject: [PATCH v2 2/3] arm/syscalls: Optimize address limit check
-In-Reply-To: <20170726170051.28328-2-thgarnie@google.com>
-References: <20170726170051.28328-1-thgarnie@google.com>
- <20170726170051.28328-2-thgarnie@google.com>
-Message-ID: <CAGXu5jLbJuokv+B_Nn8uRDVadi05ywJM7FSgpOr+maO2pQrd0w@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Mon,  7 Aug 2017 12:39:38 -0500
+Subject: [PATCH v4 2/5] dt-bindings: add binding for Sitronix ST7586 display
+ panels
+In-Reply-To: <1502127581-10517-1-git-send-email-david@lechnology.com>
+References: <1502127581-10517-1-git-send-email-david@lechnology.com>
+Message-ID: <1502127581-10517-3-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 10:00 AM, Thomas Garnier <thgarnie@google.com> wrote:
-> Disable the generic address limit check in favor of an architecture
-> specific optimized implementation. The generic implementation using
-> pending work flags did not work well with ARM and alignment faults.
->
-> The address limit is checked on each syscall return path to user-mode
-> path as well as the irq user-mode return function. If the address limit
-> was changed, a function is called to stop the kernel with an explicit
-> message.
->
-> The address limit check has to be done before any pending work because
-> they can reset the address limit. For example the lkdtm address limit
-> check does not work because the signal to kill the process will reset
-> the user-mode address limit.
->
-> Signed-off-by: Thomas Garnier <thgarnie@google.com>
-> ---
->  arch/arm/kernel/entry-common.S | 11 +++++++++++
->  arch/arm/kernel/signal.c       |  5 +++++
->  2 files changed, 16 insertions(+)
->
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index 0b60adf4a5d9..99c908226065 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -12,6 +12,7 @@
->  #include <asm/unistd.h>
->  #include <asm/ftrace.h>
->  #include <asm/unwind.h>
-> +#include <asm/memory.h>
->  #ifdef CONFIG_AEABI
->  #include <asm/unistd-oabi.h>
->  #endif
-> @@ -48,10 +49,14 @@ ret_fast_syscall:
->   UNWIND(.fnstart       )
->   UNWIND(.cantunwind    )
->         disable_irq_notrace                     @ disable interrupts
-> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
-> +       cmp     r2, #TASK_SIZE
-> +       blne    addr_limit_check_failed
->         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
->         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
->         bne     fast_work_pending
->
-> +
->         /* perform architecture specific actions before user return */
->         arch_ret_to_user r1, lr
->
-> @@ -74,6 +79,9 @@ ret_fast_syscall:
->   UNWIND(.cantunwind    )
->         str     r0, [sp, #S_R0 + S_OFF]!        @ save returned r0
->         disable_irq_notrace                     @ disable interrupts
-> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
-> +       cmp     r2, #TASK_SIZE
-> +       blne    addr_limit_check_failed
->         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
->         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
->         beq     no_work_pending
-> @@ -106,6 +114,9 @@ ENTRY(ret_to_user)
->  ret_slow_syscall:
->         disable_irq_notrace                     @ disable interrupts
->  ENTRY(ret_to_user_from_irq)
-> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
-> +       cmp     r2, #TASK_SIZE
-> +       blne    addr_limit_check_failed
->         ldr     r1, [tsk, #TI_FLAGS]
->         tst     r1, #_TIF_WORK_MASK
->         bne     slow_work_pending
-> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-> index 5814298ef0b7..5769c15cff89 100644
-> --- a/arch/arm/kernel/signal.c
-> +++ b/arch/arm/kernel/signal.c
-> @@ -673,3 +673,8 @@ struct page *get_signal_page(void)
->
->         return page;
->  }
-> +
-> +asmlinkage void addr_limit_check_failed(void)
-> +{
-> +       panic("Incorrect address limit while returning to user-mode.");
-> +}
+This adds a new binding for Sitronix ST7586 display panels.
 
-Instead of taking the entire system down, how about a WARN/kill combo
-instead? If it's too late for "force_sig(SIGKILL, current)", then
-likely we should perform a "do_group_exit(SIGKILL)".
+Using lego as the vendor prefix in the compatible string because the display
+panel I am working with is an integral part of the LEGO MINDSTORMS EV3.
 
--Kees
+Signed-off-by: David Lechner <david@lechnology.com>
+---
 
+v4 changes:
+* Dropped optional properties and only use pins actually used on LEGO EV3.
+* Rename dc to a0 since that is what is on the datasheet/LEGO schematic.
+
+
+ .../bindings/display/sitronix,st7586.txt           | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/sitronix,st7586.txt
+
+diff --git a/Documentation/devicetree/bindings/display/sitronix,st7586.txt b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
+new file mode 100644
+index 0000000..1d0dad1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/sitronix,st7586.txt
+@@ -0,0 +1,22 @@
++Sitronix ST7586 display panel
++
++Required properties:
++- compatible:	"lego,ev3-lcd".
++- a0-gpios:	The A0 signal (since this binding is for serial mode, this is
++                the pin labeled D1 on the controller, not the pin labeled A0)
++- reset-gpios:	Reset pin
++
++The node for this driver must be a child node of a SPI controller, hence
++all mandatory properties described in ../spi/spi-bus.txt must be specified.
++
++Optional properties:
++- rotation:	panel rotation in degrees counter clockwise (0,90,180,270)
++
++Example:
++	display at 0{
++		compatible = "lego,ev3-lcd";
++		reg = <0>;
++		spi-max-frequency = <10000000>;
++		a0-gpios = <&gpio 43 GPIO_ACTIVE_HIGH>;
++		reset-gpios = <&gpio 80 GPIO_ACTIVE_HIGH>;
++	};
 -- 
-Kees Cook
-Pixel Security
+2.7.4
