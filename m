@@ -1,41 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 7 Aug 2017 14:42:19 +0200
-Subject: [PATCH] gpio: uniphier: add UniPhier GPIO controller driver
-In-Reply-To: <1501758371-25316-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1501758371-25316-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdZWxjwDnVy5f2rLAWs=+T=5SnwyU8dz1FW1eg8dk8JN_Q@mail.gmail.com>
+Date: Mon, 7 Aug 2017 15:09:31 +0200
+Subject: [PATCH] pinctrl: sunxi: fix V3s pinctrl driver IRQ bank base
+In-Reply-To: <20170801145416.61854-1-icenowy@aosc.io>
+References: <20170801145416.61854-1-icenowy@aosc.io>
+Message-ID: <CACRpkdYJX6SX5NjLMopoD7nKkmhseBMMTei-FoxzXwRnNDUaFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 3, 2017 at 1:06 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+On Tue, Aug 1, 2017 at 4:54 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
 
-> This GPIO controller device is used on UniPhier SoCs.
+> The V3s pin controller doesn't have the bank 0 (starts at address
+> 0x200), which is like A33. However, this is not workarounded when
+> developing the driver, which makes IRQ not working.
 >
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-(...)
-> +static const u32 uniphier_gpio_irq_parent_hwirqs[] = {
-> +       80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95,
-> +       186, 187, 188, 189, 190, 249, 250, 251,
-> +};
-(..)
-> +               /* parent is UniPhier AIDET */
-> +               parent_fwspec.fwnode = domain->parent->fwnode;
-> +               parent_fwspec.param_count = 2;
-> +               parent_fwspec.param[0] = uniphier_gpio_irq_parent_hwirqs[hwirq];
-> +               parent_fwspec.param[1] = type;
-> +
-> +               ret = irq_domain_alloc_irqs_parent(domain, virq, 1,
-> +                                                  &parent_fwspec);
+> Fix the IRQ bank base.
+>
+> Fixes: 56d9e4a76039 ("pinctrl: sunxi: add driver for V3s SoC")
+> Cc: stable at vger.kernel.org
 
-This is not right.
+This patch only applies on the devel branch so I don't see why it is tagged
+for stable.
 
-That parent IRQ needs to come from the device tree, not from a static array
-like this, and it is definately to use hierarchical irqdomain.
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Please look at similar drivers merged recently for inspiration:
-gpio/gpio-xgene-sb.c
-pinctrl/stm32/pinctrl-stm32.c
+Patch applied.
 
 Yours,
 Linus Walleij
