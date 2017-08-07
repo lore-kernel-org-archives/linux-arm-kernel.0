@@ -1,108 +1,90 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  7 Aug 2017 19:36:00 +0100
-Subject: [PATCH 09/14] arm64: factor out entry stack manipulation
-In-Reply-To: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
-References: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1502130965-18710-10-git-send-email-mark.rutland@arm.com>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Tue, 8 Aug 2017 03:17:34 +0800
+Subject: [PATCH v2] KVM: arm64: pass vcpu esr_el2 and far_el2 sysre to user
+ space
+Message-ID: <1502133454-5905-1-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In subsequent patches, we will detect stack overflow in our exception
-entry code, by verifying the SP after it has been decremented to make
-space for the exception regs.
+For the firmware-first RAS solution, SEA and SEI is injected
+by the user space, user space needs to know the vcpu's esr_el2 and
+far_el2 value, so add them to sysreg. user space uses
+the IOCTL KVM_GET_ONE_REG can get their value.
 
-This verification code is small, and we can minimize its impact by
-placing it directly in the vectors. To avoid redundant modification of
-the SP, we also need to move the initial decrement of the SP into the
-vectors.
-
-As a preparatory step, this patch introduces kernel_ventry, which
-performs this decrement, and updates the entry code accordingly.
-Subsequent patches will fold SP verification into kernel_ventry.
-
-There should be no functional change as a result of this patch.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-[Mark: turn into prep patch, expand commit msg]
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Laura Abbott <labbott@redhat.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 ---
- arch/arm64/kernel/entry.S | 47 ++++++++++++++++++++++++++---------------------
- 1 file changed, 26 insertions(+), 21 deletions(-)
+ arch/arm64/include/asm/kvm_host.h | 6 ++++--
+ arch/arm64/include/asm/sysreg.h   | 2 ++
+ arch/arm64/kvm/hyp/switch.c       | 2 ++
+ arch/arm64/kvm/sys_regs.c         | 2 ++
+ 4 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 1c0f787..bd3b6de 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -69,8 +69,13 @@
- #define BAD_FIQ		2
- #define BAD_ERROR	3
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index d68630007b14..075ff9fba0af 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -104,10 +104,12 @@ enum vcpu_sysreg {
+ 	TTBR0_EL1,	/* Translation Table Base Register 0 */
+ 	TTBR1_EL1,	/* Translation Table Base Register 1 */
+ 	TCR_EL1,	/* Translation Control Register */
+-	ESR_EL1,	/* Exception Syndrome Register */
++	ESR_EL1,	/* Exception Syndrome Register for EL1 */
++	ESR_EL2,        /* Exception Syndrome Register for EL2 */
+ 	AFSR0_EL1,	/* Auxiliary Fault Status Register 0 */
+ 	AFSR1_EL1,	/* Auxiliary Fault Status Register 1 */
+-	FAR_EL1,	/* Fault Address Register */
++	FAR_EL1,	/* Fault Address Register for EL1 */
++	FAR_EL2,        /* Fault Address Register for EL2 */
+ 	MAIR_EL1,	/* Memory Attribute Indirection Register */
+ 	VBAR_EL1,	/* Vector Base Address Register */
+ 	CONTEXTIDR_EL1,	/* Context ID Register */
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 248339e4aaf5..b019141a8c29 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -252,7 +252,9 @@
  
--	.macro	kernel_entry, el, regsize = 64
-+	.macro kernel_ventry	label
-+	.align 7
- 	sub	sp, sp, #S_FRAME_SIZE
-+	b	\label
-+	.endm
-+
-+	.macro	kernel_entry, el, regsize = 64
- 	.if	\regsize == 32
- 	mov	w0, w0				// zero upper 32 bits of x0
- 	.endif
-@@ -315,31 +320,31 @@ tsk	.req	x28		// current thread_info
+ #define SYS_DACR32_EL2			sys_reg(3, 4, 3, 0, 0)
+ #define SYS_IFSR32_EL2			sys_reg(3, 4, 5, 0, 1)
++#define SYS_ESR_EL2			sys_reg(3, 4, 5, 2, 0)
+ #define SYS_FPEXC32_EL2			sys_reg(3, 4, 5, 3, 0)
++#define SYS_FAR_EL2			sys_reg(3, 4, 6, 0, 0)
  
- 	.align	11
- ENTRY(vectors)
--	ventry	el1_sync_invalid		// Synchronous EL1t
--	ventry	el1_irq_invalid			// IRQ EL1t
--	ventry	el1_fiq_invalid			// FIQ EL1t
--	ventry	el1_error_invalid		// Error EL1t
-+	kernel_ventry	el1_sync_invalid		// Synchronous EL1t
-+	kernel_ventry	el1_irq_invalid			// IRQ EL1t
-+	kernel_ventry	el1_fiq_invalid			// FIQ EL1t
-+	kernel_ventry	el1_error_invalid		// Error EL1t
+ #define __SYS__AP0Rx_EL2(x)		sys_reg(3, 4, 12, 8, x)
+ #define SYS_ICH_AP0R0_EL2		__SYS__AP0Rx_EL2(0)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index c6f17c7675ad..6ec9ecd68d20 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -229,6 +229,7 @@ static bool __hyp_text __translate_far_to_hpfar(u64 far, u64 *hpfar)
+ static void __hyp_text __populate_fault_info_esr(struct kvm_vcpu *vcpu)
+ {
+ 	vcpu->arch.fault.esr_el2 = read_sysreg_el2(esr);
++	vcpu_sys_reg(vcpu,ESR_EL2) = read_sysreg_el2(esr);
+ }
  
--	ventry	el1_sync			// Synchronous EL1h
--	ventry	el1_irq				// IRQ EL1h
--	ventry	el1_fiq_invalid			// FIQ EL1h
--	ventry	el1_error_invalid		// Error EL1h
-+	kernel_ventry	el1_sync			// Synchronous EL1h
-+	kernel_ventry	el1_irq				// IRQ EL1h
-+	kernel_ventry	el1_fiq_invalid			// FIQ EL1h
-+	kernel_ventry	el1_error_invalid		// Error EL1h
+ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+@@ -267,6 +268,7 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
  
--	ventry	el0_sync			// Synchronous 64-bit EL0
--	ventry	el0_irq				// IRQ 64-bit EL0
--	ventry	el0_fiq_invalid			// FIQ 64-bit EL0
--	ventry	el0_error_invalid		// Error 64-bit EL0
-+	kernel_ventry	el0_sync			// Synchronous 64-bit EL0
-+	kernel_ventry	el0_irq				// IRQ 64-bit EL0
-+	kernel_ventry	el0_fiq_invalid			// FIQ 64-bit EL0
-+	kernel_ventry	el0_error_invalid		// Error 64-bit EL0
+ 	vcpu->arch.fault.far_el2 = far;
+ 	vcpu->arch.fault.hpfar_el2 = hpfar;
++	vcpu_sys_reg(vcpu,FAR_EL2) = far;
+ 	return true;
+ }
  
- #ifdef CONFIG_COMPAT
--	ventry	el0_sync_compat			// Synchronous 32-bit EL0
--	ventry	el0_irq_compat			// IRQ 32-bit EL0
--	ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
--	ventry	el0_error_invalid_compat	// Error 32-bit EL0
-+	kernel_ventry	el0_sync_compat			// Synchronous 32-bit EL0
-+	kernel_ventry	el0_irq_compat			// IRQ 32-bit EL0
-+	kernel_ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
-+	kernel_ventry	el0_error_invalid_compat	// Error 32-bit EL0
- #else
--	ventry	el0_sync_invalid		// Synchronous 32-bit EL0
--	ventry	el0_irq_invalid			// IRQ 32-bit EL0
--	ventry	el0_fiq_invalid			// FIQ 32-bit EL0
--	ventry	el0_error_invalid		// Error 32-bit EL0
-+	kernel_ventry	el0_sync_invalid		// Synchronous 32-bit EL0
-+	kernel_ventry	el0_irq_invalid			// IRQ 32-bit EL0
-+	kernel_ventry	el0_fiq_invalid			// FIQ 32-bit EL0
-+	kernel_ventry	el0_error_invalid		// Error 32-bit EL0
- #endif
- END(vectors)
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 2e070d3baf9f..c730d593efbb 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -1079,7 +1079,9 @@ static const struct sys_reg_desc sys_reg_descs[] = {
  
+ 	{ SYS_DESC(SYS_DACR32_EL2), NULL, reset_unknown, DACR32_EL2 },
+ 	{ SYS_DESC(SYS_IFSR32_EL2), NULL, reset_unknown, IFSR32_EL2 },
++	{ SYS_DESC(SYS_ESR_EL2), access_vm_reg, reset_unknown, ESR_EL2 },
+ 	{ SYS_DESC(SYS_FPEXC32_EL2), NULL, reset_val, FPEXC32_EL2, 0x70 },
++	{ SYS_DESC(SYS_FAR_EL2), access_vm_reg, reset_unknown, FAR_EL2 },
+ };
+ 
+ static bool trap_dbgidr(struct kvm_vcpu *vcpu,
 -- 
-1.9.1
+2.13.4
