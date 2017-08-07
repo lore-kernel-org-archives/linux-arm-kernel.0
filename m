@@ -1,112 +1,84 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 7 Aug 2017 18:55:33 +0100
-Subject: [PATCH v2 2/3] arm/syscalls: Optimize address limit check
-In-Reply-To: <CAJcbSZHfoHNPv3tk11iCj49UkLGU-QdeyMj2BS60wng5z5L4pg@mail.gmail.com>
-References: <20170726170051.28328-1-thgarnie@google.com>
- <20170726170051.28328-2-thgarnie@google.com>
- <CAGXu5jLbJuokv+B_Nn8uRDVadi05ywJM7FSgpOr+maO2pQrd0w@mail.gmail.com>
- <CAJcbSZHfoHNPv3tk11iCj49UkLGU-QdeyMj2BS60wng5z5L4pg@mail.gmail.com>
-Message-ID: <20170807175533.GA20805@n2100.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 7 Aug 2017 19:32:18 +0100
+Subject: [PATCH 6/6] arm64: uaccess: Implement *_flushcache variants
+In-Reply-To: <a82a48f72b8099c1ef6a32a63819619637797ef8.1500397441.git.robin.murphy@arm.com>
+References: <cover.1500397441.git.robin.murphy@arm.com>
+ <a82a48f72b8099c1ef6a32a63819619637797ef8.1500397441.git.robin.murphy@arm.com>
+Message-ID: <20170807183217.GB29632@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 10:42:14AM -0700, Thomas Garnier wrote:
-> On Mon, Aug 7, 2017 at 10:35 AM, Kees Cook <keescook@chromium.org> wrote:
-> > On Wed, Jul 26, 2017 at 10:00 AM, Thomas Garnier <thgarnie@google.com> wrote:
-> >> Disable the generic address limit check in favor of an architecture
-> >> specific optimized implementation. The generic implementation using
-> >> pending work flags did not work well with ARM and alignment faults.
-> >>
-> >> The address limit is checked on each syscall return path to user-mode
-> >> path as well as the irq user-mode return function. If the address limit
-> >> was changed, a function is called to stop the kernel with an explicit
-> >> message.
-> >>
-> >> The address limit check has to be done before any pending work because
-> >> they can reset the address limit. For example the lkdtm address limit
-> >> check does not work because the signal to kill the process will reset
-> >> the user-mode address limit.
-> >>
-> >> Signed-off-by: Thomas Garnier <thgarnie@google.com>
-> >> ---
-> >>  arch/arm/kernel/entry-common.S | 11 +++++++++++
-> >>  arch/arm/kernel/signal.c       |  5 +++++
-> >>  2 files changed, 16 insertions(+)
-> >>
-> >> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> >> index 0b60adf4a5d9..99c908226065 100644
-> >> --- a/arch/arm/kernel/entry-common.S
-> >> +++ b/arch/arm/kernel/entry-common.S
-> >> @@ -12,6 +12,7 @@
-> >>  #include <asm/unistd.h>
-> >>  #include <asm/ftrace.h>
-> >>  #include <asm/unwind.h>
-> >> +#include <asm/memory.h>
-> >>  #ifdef CONFIG_AEABI
-> >>  #include <asm/unistd-oabi.h>
-> >>  #endif
-> >> @@ -48,10 +49,14 @@ ret_fast_syscall:
-> >>   UNWIND(.fnstart       )
-> >>   UNWIND(.cantunwind    )
-> >>         disable_irq_notrace                     @ disable interrupts
-> >> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
-> >> +       cmp     r2, #TASK_SIZE
-> >> +       blne    addr_limit_check_failed
-> >>         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
-> >>         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
-> >>         bne     fast_work_pending
-> >>
-> >> +
-> >>         /* perform architecture specific actions before user return */
-> >>         arch_ret_to_user r1, lr
-> >>
-> >> @@ -74,6 +79,9 @@ ret_fast_syscall:
-> >>   UNWIND(.cantunwind    )
-> >>         str     r0, [sp, #S_R0 + S_OFF]!        @ save returned r0
-> >>         disable_irq_notrace                     @ disable interrupts
-> >> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
-> >> +       cmp     r2, #TASK_SIZE
-> >> +       blne    addr_limit_check_failed
-> >>         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
-> >>         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
-> >>         beq     no_work_pending
-> >> @@ -106,6 +114,9 @@ ENTRY(ret_to_user)
-> >>  ret_slow_syscall:
-> >>         disable_irq_notrace                     @ disable interrupts
-> >>  ENTRY(ret_to_user_from_irq)
-> >> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
-> >> +       cmp     r2, #TASK_SIZE
-> >> +       blne    addr_limit_check_failed
-> >>         ldr     r1, [tsk, #TI_FLAGS]
-> >>         tst     r1, #_TIF_WORK_MASK
-> >>         bne     slow_work_pending
-> >
-> > Instead of taking the entire system down, how about a WARN/kill combo
-> > instead? If it's too late for "force_sig(SIGKILL, current)", then
-> > likely we should perform a "do_group_exit(SIGKILL)".
+On Tue, Jul 25, 2017 at 11:55:43AM +0100, Robin Murphy wrote:
+> Implement the set of copy functions with guarantees of a clean cache
+> upon completion necessary to support the pmem driver.
 > 
-> Sure, why not. I can also change the others architectures to move to a
-> do_group_exit(SIGKILL).
-> 
-> Before the next iteration, I want to know if Russel has any feedback
-> on this implementation, given the previous thread.
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  arch/arm64/Kconfig                  |  1 +
+>  arch/arm64/include/asm/string.h     |  4 ++++
+>  arch/arm64/include/asm/uaccess.h    | 12 ++++++++++
+>  arch/arm64/lib/Makefile             |  2 ++
+>  arch/arm64/lib/uaccess_flushcache.c | 47 +++++++++++++++++++++++++++++++++++++
+>  5 files changed, 66 insertions(+)
+>  create mode 100644 arch/arm64/lib/uaccess_flushcache.c
 
-It's better in so far as it avoids the problems previously highlighted.
+[...]
 
-However, it depends how efficient we want these paths to be - the
-difference between your assembly and the assembly I've previously
-supplied is that mine fills in any delay slots with some useful work
-and avoids adding extra delay slots in this path.
+> diff --git a/arch/arm64/lib/uaccess_flushcache.c b/arch/arm64/lib/uaccess_flushcache.c
+> new file mode 100644
+> index 000000000000..b6ceafdb8b72
+> --- /dev/null
+> +++ b/arch/arm64/lib/uaccess_flushcache.c
+> @@ -0,0 +1,47 @@
+> +/*
+> + * Copyright (C) 2017 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/uaccess.h>
+> +#include <asm/barrier.h>
+> +#include <asm/cacheflush.h>
+> +
+> +void memcpy_flushcache(void *dst, const void *src, size_t cnt)
+> +{
+> +	/*
+> +	 * We assume this should not be called with @dst pointing to
+> +	 * non-cacheable memory, such that we don't need an explicit
+> +	 * barrier to order the cache maintenance against the memcpy.
+> +	 */
+> +	memcpy(dst, src, cnt);
+> +	__clean_dcache_area_pop(dst, cnt);
+> +}
+> +EXPORT_SYMBOL_GPL(memcpy_flushcache);
+> +
+> +void memcpy_page_flushcache(char *to, struct page *page, size_t offset,
+> +			    size_t len)
+> +{
+> +	memcpy_flushcache(to, page_address(page) + offset, len);
+> +}
+> +
+> +unsigned long __copy_user_flushcache(void *to, const void __user *from,
+> +				     unsigned long n)
+> +{
+> +	unsigned long rc = __arch_copy_from_user(to, from, n);
 
-Arguably, the system call exit path is as important as the system
-call entry path for OS performance, so I think we should strive to
-make it as efficient as possible - much as I already did when I
-posted code on this topic previously.
+I'm a bit nervous calling the bare user accessor here without an access_ok
+check beforehand. Can we rely on the caller having done the check for us? I
+tried to follow the breadcrumbs back out, but I noticed that other iov
+iterators (such as copy_from_iter) *do* do the bounds check, whereas the
+pmem version (copy_from_iter_nocache) doesn't appear to check the address.
 
-I think that code can simply be adapted to call your C function
-instead of the assembly "addr_limit_fail" label.
+Is that right?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Will
