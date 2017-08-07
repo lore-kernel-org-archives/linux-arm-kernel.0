@@ -1,35 +1,37 @@
-From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon,  7 Aug 2017 13:46:40 +1200
-Subject: [RESEND PATCH 3/4] ARM: dts: mvebu: set reduced-width property for
- SDRAM on 98dx3236
-In-Reply-To: <20170807014641.4003-1-chris.packham@alliedtelesis.co.nz>
-References: <20170807014641.4003-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170807014641.4003-4-chris.packham@alliedtelesis.co.nz>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Mon, 7 Aug 2017 09:57:40 +0800
+Subject: [PATCH v2 0/5] Add MediaTek PMIC keys support
+Message-ID: <1502071065-6745-1-git-send-email-chen.zhong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because the 98dx3236 and similar SoCs are switch chips with integrated
-CPUs they use a reduced pin count for the SDRAM interface. As such
-"full" with is 32-bits and "half" width is 16-bits (as opposed to 64/32
-on the discrete SoC). Set the reduced-width property on the sdramc node
-to indicate this.
+MediaTek PMIC are multi-function devices that can handle key interrupts,
+typically there are two keys attached to PMIC, which called pwrkey
+and homekey. PWRKEY usually used to wake up system from sleep. Homekey
+can used as volume down key due to board design. Long press keys can
+shutdown PMIC, the mode can be choose to be one key only or two keys
+together.
 
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
----
- arch/arm/boot/dts/armada-xp-98dx3236.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+This series add support for key functions for MediaTek PMIC MT6397/MT6323.
 
-diff --git a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-index 0e12816d961e..4d6a2acc1b55 100644
---- a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-@@ -129,6 +129,7 @@
- 			sdramc at 1400 {
- 				compatible = "marvell,armada-xp-sdram-controller";
- 				reg = <0x1400 0x500>;
-+				marvell,reduced-width;
- 			};
- 
- 			L2: l2-cache at 8000 {
+Chen Zhong (5):
+  mfd: mt6397: create irq mappings in mfd core driver
+  dt-bindings: input: Add document bindings for mtk-pmic-keys
+  dt-bindings: mfd: Add bindings for the keys as subnode of PMIC
+  input: Add MediaTek PMIC keys support
+  mfd: mt6397: Add PMIC keys support to MT6397 driver
+
+ .../devicetree/bindings/input/mtk-pmic-keys.txt    |   36 +++
+ Documentation/devicetree/bindings/mfd/mt6397.txt   |    6 +
+ drivers/input/keyboard/Kconfig                     |    9 +
+ drivers/input/keyboard/Makefile                    |    1 +
+ drivers/input/keyboard/mtk-pmic-keys.c             |  331 ++++++++++++++++++++
+ drivers/mfd/mt6397-core.c                          |   40 ++-
+ drivers/rtc/rtc-mt6397.c                           |    2 +-
+ 7 files changed, 421 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+ create mode 100644 drivers/input/keyboard/mtk-pmic-keys.c
+
 -- 
-2.13.0
+1.7.9.5
+ 
