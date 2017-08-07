@@ -1,38 +1,38 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon,  7 Aug 2017 22:32:00 +0800
-Subject: [PATCH 5/5] arm64: defconfig: enable OP-TEE
-In-Reply-To: <20170807143200.6764-1-guodong.xu@linaro.org>
-References: <20170807143200.6764-1-guodong.xu@linaro.org>
-Message-ID: <20170807143200.6764-6-guodong.xu@linaro.org>
+Date: Mon,  7 Aug 2017 22:31:55 +0800
+Subject: [PATCH 0/5] arm64: defconfig: enable configs for HiKey960
+Message-ID: <20170807143200.6764-1-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Chong <victor.chong@linaro.org>
+This patchset enables config items in arm64/defconfig for HiKey960. All
+of them correspond to real functions on HiKey960.
 
-This patch enables configs for Trusted Execution Environment (TEE) and
-OP-TEE.
+Including:
+ - Kirin PCIe
+ - PMIC support, hi6421v530
+ - syscon reboot mode
+ - serdev bus
+ - OP-TEE
 
-+CONFIG_TEE=y
-+CONFIG_OPTEE=y
+HiKey960 is one of 96boards. For details information about it, please
+refer to [1].
 
-Signed-off-by: Victor Chong <victor.chong@linaro.org>
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+[1] https://github.com/96boards/documentation/tree/master/ConsumerEdition/HiKey960
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 99f7e06..81008e1 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -521,6 +521,8 @@ CONFIG_PHY_XGENE=y
- CONFIG_PHY_TEGRA_XUSB=y
- CONFIG_QCOM_L2_PMU=y
- CONFIG_QCOM_L3_PMU=y
-+CONFIG_TEE=y
-+CONFIG_OPTEE=y
- CONFIG_ARM_SCPI_PROTOCOL=y
- CONFIG_RASPBERRYPI_FIRMWARE=y
- CONFIG_EFI_CAPSULE_LOADER=y
+Guodong Xu (3):
+  arm64: defconfig: enable support hi6421v530 PMIC
+  arm64: defconfig: enable CONFIG_SYSCON_REBOOT_MODE
+  arm64: defconfig: enable support for serial port connected device
+
+Victor Chong (1):
+  arm64: defconfig: enable OP-TEE
+
+Xiaowei Song (1):
+  arm64: defconfig: enable Kirin PCIe
+
+ arch/arm64/configs/defconfig | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
 -- 
 2.10.2
