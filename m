@@ -1,103 +1,54 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon,  7 Aug 2017 16:13:20 +0800
-Subject: [PATCH 2/7] arm64: dts: hi3660: add L2 cache topology
+Date: Mon,  7 Aug 2017 16:13:21 +0800
+Subject: [PATCH 3/7] arm64: dts: hi3660: add pmu dt node for hi3660
 In-Reply-To: <20170807081325.11406-1-guodong.xu@linaro.org>
 References: <20170807081325.11406-1-guodong.xu@linaro.org>
-Message-ID: <20170807081325.11406-3-guodong.xu@linaro.org>
+Message-ID: <20170807081325.11406-4-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leo Yan <leo.yan@linaro.org>
+From: YiPing Xu <xuyiping@hisilicon.com>
 
-This patch adds the L2 cache topology on 96boards Hikey960.
+Add pmu dt node for hi3660
 
+Signed-off-by: YiPing Xu <xuyiping@hisilicon.com>
+Signed-off-by: Zhong Kaihua <zhongkaihua@huawei.com>
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Tested-by: Jumana Mundichipparakkal <jumana.mp@arm.com>
 ---
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 8921310..1cdd03b 100644
+index 1cdd03b..5fd5686 100644
 --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
 +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -58,6 +58,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
-+			next-level-cache = <&A53_L2>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
- 		};
- 
-@@ -66,6 +67,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
-+			next-level-cache = <&A53_L2>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
- 		};
- 
-@@ -74,6 +76,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
-+			next-level-cache = <&A53_L2>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
- 		};
- 
-@@ -82,6 +85,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
-+			next-level-cache = <&A53_L2>;
- 			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP_0>;
- 		};
- 
-@@ -90,6 +94,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x100>;
- 			enable-method = "psci";
-+			next-level-cache = <&A73_L2>;
- 			cpu-idle-states = <
- 					&CPU_NAP
- 					&CPU_SLEEP
-@@ -102,6 +107,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x101>;
- 			enable-method = "psci";
-+			next-level-cache = <&A73_L2>;
- 			cpu-idle-states = <
- 					&CPU_NAP
- 					&CPU_SLEEP
-@@ -114,6 +120,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x102>;
- 			enable-method = "psci";
-+			next-level-cache = <&A73_L2>;
- 			cpu-idle-states = <
- 					&CPU_NAP
- 					&CPU_SLEEP
-@@ -126,6 +133,7 @@
- 			device_type = "cpu";
- 			reg = <0x0 0x103>;
- 			enable-method = "psci";
-+			next-level-cache = <&A73_L2>;
- 			cpu-idle-states = <
- 					&CPU_NAP
- 					&CPU_SLEEP
-@@ -171,6 +179,14 @@
- 				min-residency-us = <20000>;
- 			};
- 		};
-+
-+		A53_L2: l2-cache0 {
-+			compatible = "cache";
-+		};
-+
-+		A73_L2: l2-cache1 {
-+			compatible = "cache";
-+		};
+@@ -202,6 +202,26 @@
+ 					 IRQ_TYPE_LEVEL_HIGH)>;
  	};
  
- 	gic: interrupt-controller at e82b0000 {
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&cpu0>,
++				     <&cpu1>,
++				     <&cpu2>,
++				     <&cpu3>,
++				     <&cpu4>,
++				     <&cpu5>,
++				     <&cpu6>,
++				     <&cpu7>;
++	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupt-parent = <&gic>;
 -- 
 2.10.2
