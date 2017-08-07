@@ -1,38 +1,38 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon,  7 Aug 2017 22:31:55 +0800
-Subject: [PATCH 0/5] arm64: defconfig: enable configs for HiKey960
-Message-ID: <20170807143200.6764-1-guodong.xu@linaro.org>
+Date: Mon,  7 Aug 2017 22:51:56 +0800
+Subject: [PATCH] clk: hi3660: fix incorrect uart3 clock freqency
+Message-ID: <20170807145156.7880-1-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset enables config items in arm64/defconfig for HiKey960. All
-of them correspond to real functions on HiKey960.
+From: Zhong Kaihua <zhongkaihua@huawei.com>
 
-Including:
- - Kirin PCIe
- - PMIC support, hi6421v530
- - syscon reboot mode
- - serdev bus
- - OP-TEE
+UART3 clock rate is doubled in previous commit.
 
-HiKey960 is one of 96boards. For details information about it, please
-refer to [1].
+This error is not detected until recently a mezzanine board which makes
+real use of uart3 port (through LS connector of 96boards) was setup
+and tested on hi3660-hikey960 board.
 
-[1] https://github.com/96boards/documentation/tree/master/ConsumerEdition/HiKey960
+This patch changes clock source rate of clk_factor_uart3 to 100000000.
 
-Guodong Xu (3):
-  arm64: defconfig: enable support hi6421v530 PMIC
-  arm64: defconfig: enable CONFIG_SYSCON_REBOOT_MODE
-  arm64: defconfig: enable support for serial port connected device
+Signed-off-by: Zhong Kaihua <zhongkaihua@huawei.com>
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+---
+ drivers/clk/hisilicon/clk-hi3660.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Victor Chong (1):
-  arm64: defconfig: enable OP-TEE
-
-Xiaowei Song (1):
-  arm64: defconfig: enable Kirin PCIe
-
- arch/arm64/configs/defconfig | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
+diff --git a/drivers/clk/hisilicon/clk-hi3660.c b/drivers/clk/hisilicon/clk-hi3660.c
+index a18258e..f404199 100644
+--- a/drivers/clk/hisilicon/clk-hi3660.c
++++ b/drivers/clk/hisilicon/clk-hi3660.c
+@@ -34,7 +34,7 @@ static const struct hisi_fixed_rate_clock hi3660_fixed_rate_clks[] = {
+ 
+ /* crgctrl */
+ static const struct hisi_fixed_factor_clock hi3660_crg_fixed_factor_clks[] = {
+-	{ HI3660_FACTOR_UART3, "clk_factor_uart3", "iomcu_peri0", 1, 8, 0, },
++	{ HI3660_FACTOR_UART3, "clk_factor_uart3", "iomcu_peri0", 1, 16, 0, },
+ 	{ HI3660_CLK_FACTOR_MMC, "clk_factor_mmc", "clkin_sys", 1, 6, 0, },
+ 	{ HI3660_CLK_GATE_I2C0, "clk_gate_i2c0", "clk_i2c0_iomcu", 1, 4, 0, },
+ 	{ HI3660_CLK_GATE_I2C1, "clk_gate_i2c1", "clk_i2c1_iomcu", 1, 4, 0, },
 -- 
 2.10.2
