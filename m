@@ -1,116 +1,101 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Mon, 7 Aug 2017 12:33:32 -0500
-Subject: [RFC 0/4] Parse ACPI/PPTT for cache information
-In-Reply-To: <39b916f8-4d38-6c24-fc5f-4d2ad3888e49@linaro.org>
-References: <20170805001159.12769-1-jeremy.linton@arm.com>
- <39b916f8-4d38-6c24-fc5f-4d2ad3888e49@linaro.org>
-Message-ID: <edf59d9d-7c5c-2fca-7478-7c15a5f273ca@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 7 Aug 2017 10:35:57 -0700
+Subject: [PATCH v2 2/3] arm/syscalls: Optimize address limit check
+In-Reply-To: <20170726170051.28328-2-thgarnie@google.com>
+References: <20170726170051.28328-1-thgarnie@google.com>
+ <20170726170051.28328-2-thgarnie@google.com>
+Message-ID: <CAGXu5jLbJuokv+B_Nn8uRDVadi05ywJM7FSgpOr+maO2pQrd0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jul 26, 2017 at 10:00 AM, Thomas Garnier <thgarnie@google.com> wrote:
+> Disable the generic address limit check in favor of an architecture
+> specific optimized implementation. The generic implementation using
+> pending work flags did not work well with ARM and alignment faults.
+>
+> The address limit is checked on each syscall return path to user-mode
+> path as well as the irq user-mode return function. If the address limit
+> was changed, a function is called to stop the kernel with an explicit
+> message.
+>
+> The address limit check has to be done before any pending work because
+> they can reset the address limit. For example the lkdtm address limit
+> check does not work because the signal to kill the process will reset
+> the user-mode address limit.
+>
+> Signed-off-by: Thomas Garnier <thgarnie@google.com>
+> ---
+>  arch/arm/kernel/entry-common.S | 11 +++++++++++
+>  arch/arm/kernel/signal.c       |  5 +++++
+>  2 files changed, 16 insertions(+)
+>
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index 0b60adf4a5d9..99c908226065 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -12,6 +12,7 @@
+>  #include <asm/unistd.h>
+>  #include <asm/ftrace.h>
+>  #include <asm/unwind.h>
+> +#include <asm/memory.h>
+>  #ifdef CONFIG_AEABI
+>  #include <asm/unistd-oabi.h>
+>  #endif
+> @@ -48,10 +49,14 @@ ret_fast_syscall:
+>   UNWIND(.fnstart       )
+>   UNWIND(.cantunwind    )
+>         disable_irq_notrace                     @ disable interrupts
+> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
+> +       cmp     r2, #TASK_SIZE
+> +       blne    addr_limit_check_failed
+>         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
+>         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+>         bne     fast_work_pending
+>
+> +
+>         /* perform architecture specific actions before user return */
+>         arch_ret_to_user r1, lr
+>
+> @@ -74,6 +79,9 @@ ret_fast_syscall:
+>   UNWIND(.cantunwind    )
+>         str     r0, [sp, #S_R0 + S_OFF]!        @ save returned r0
+>         disable_irq_notrace                     @ disable interrupts
+> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
+> +       cmp     r2, #TASK_SIZE
+> +       blne    addr_limit_check_failed
+>         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
+>         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+>         beq     no_work_pending
+> @@ -106,6 +114,9 @@ ENTRY(ret_to_user)
+>  ret_slow_syscall:
+>         disable_irq_notrace                     @ disable interrupts
+>  ENTRY(ret_to_user_from_irq)
+> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
+> +       cmp     r2, #TASK_SIZE
+> +       blne    addr_limit_check_failed
+>         ldr     r1, [tsk, #TI_FLAGS]
+>         tst     r1, #_TIF_WORK_MASK
+>         bne     slow_work_pending
+> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> index 5814298ef0b7..5769c15cff89 100644
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -673,3 +673,8 @@ struct page *get_signal_page(void)
+>
+>         return page;
+>  }
+> +
+> +asmlinkage void addr_limit_check_failed(void)
+> +{
+> +       panic("Incorrect address limit while returning to user-mode.");
+> +}
 
-Hi,
+Instead of taking the entire system down, how about a WARN/kill combo
+instead? If it's too late for "force_sig(SIGKILL, current)", then
+likely we should perform a "do_group_exit(SIGKILL)".
 
-On 08/07/2017 05:20 AM, Hanjun Guo wrote:
-> +Cc Xiongfeng (who is also working on the PPTT but focusing on
-> CPU topology)
-> 
-> Hi Jeremy,
-> 
-> On 2017/8/5 8:11, Jeremy Linton wrote:
->> ACPI 6.2 adds the Processor Properties Topology Table (PPTT), which is
->> used to describe the processor and cache topologies. Ideally it is
->> used to extend/override information provided by the hardware, but
->> right now ARM64 is entirely dependent on firmware provided tables.
->>
->> This patch parses the table for the cache topology only. Its quite
->> trivial to add processor/cluster/???/socket level parsing as well,
->> but that information isn't as useful as the already provided NUMA
->> SRAT/SLIT information which provides relative distances. The one
->> useful thing, is the number of physical sockets but due to the
->> way arm64 considers "clusters" to be sockets, a larger discussion
->> is required here.
-> 
-> I think we need the socket to represent the true topology of
-> the SoC, which means that considering clusters to be sockets is
-> wrong on ARM64 server platforms, a "socket" needs to be a memory
-> controller attached I think.
+-Kees
 
-If I understand correctly, your suggesting that the socket isn't really 
-the physical socket, but a grouping at the memory controller level?
-
-My general take was that thread/core/socket is now insufficient as even 
-x86 designs now have more levels of hierarchy than that. Mapping those 
-layers, and the numa weighting into something meaningful for linux, well 
-that was more than I wanted to start with. Particularly since the PPTT 
-spec is silent about memory controller attachments at particular node 
-levels, as well as a few other possible short comings.
-
-
-
-> 
-> Take D05 for example, there are two physical SoC sockets on
-> the board but with two CPU DIE (with memory controller) on each
-> physical socket, and 4 clusters on each CPU DIE.
-> 
-> When considering clusters as sockets (that's the code for now),
-> there are 16 "sockets" to represent to OS for schedule input,
-> but only 4 NUMA nodes, which are confusing the scheduler a lot...
-> 
-> Xiongfeng was working on the CPU topology based on PPTT, and the code
-> is under internal review, if it's OK for you, we can send them out
-> for review comments to see if we can join our effort together, or
-> we can work on top of your patches, as you like :)
-> 
->>
->> An example of lstopo with this patch:
->>
->> [root at mammon-juno-rh ~]# lstopo-no-graphics
->> Machine (8072MB)
->>    Package L#0 + L2 L#0 (1024KB)
->>      L1d L#0 (32KB) + L1i L#0 (32KB) + Core L#0 + PU L#0 (P#0)
->>      L1d L#1 (32KB) + L1i L#1 (32KB) + Core L#1 + PU L#1 (P#1)
->>      L1d L#2 (32KB) + L1i L#2 (32KB) + Core L#2 + PU L#2 (P#2)
->>      L1d L#3 (32KB) + L1i L#3 (32KB) + Core L#3 + PU L#3 (P#3)
->>    Package L#1 + L2 L#1 (2048KB)
->>      L1d L#4 (32KB) + L1i L#4 (48KB) + Core L#4 + PU L#4 (P#4)
->>      L1d L#5 (32KB) + L1i L#5 (48KB) + Core L#5 + PU L#5 (P#5)
->>    HostBridge L#0
->>      PCIBridge
->>        PCIBridge
->>          PCIBridge
->>            PCI 1095:3132
->>              Block(Disk) L#0 "sda"
->>          PCIBridge
->>            PCI 11ab:4380
->>              Net L#1 "enp8s0"
->>
->> Jeremy Linton (4):
->>    drivers: base: cacheinfo: Add support for ACPI based firmware tables
->>    arm64: cacheinfo: Add support for ACPI/PPTT generated topology
->>    ACPI/PPTT: Add Processor Properties Topology Table parsing
->>    ACPI: Enable PPTT support on ARM64
->>
->>   arch/arm64/kernel/cacheinfo.c |  23 ++-
->>   drivers/acpi/arm64/Kconfig    |   3 +
->>   drivers/acpi/arm64/Makefile   |   1 +
->>   drivers/acpi/arm64/pptt.c     | 389 
->> ++++++++++++++++++++++++++++++++++++++++++
-> 
-> I think PPTT is not ARM64 only, can be used for x86 too,
-> shall we locate them on drivers/acpi?
-
-Sure.. But, I was using the assumption that the table would only really 
-be useful on arm64. On x86 the table is unnecessary and generally would 
-have to be dynamically generated by the firmware (as it should be on 
-arm) anyway. Put another way, does anyone want to use it on another 
-platform?
-
-
-> 
-> Rafael was working a lot on the PPTT proposal for the
-> spec, I think he can comment on this :) >
-> Rafael, what do you think?
-> 
-> Thanks
-> Hanjun
+-- 
+Kees Cook
+Pixel Security
