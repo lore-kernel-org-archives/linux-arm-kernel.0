@@ -1,433 +1,156 @@
-From: jonnyc@amazon.com (Chocron, Jonathan)
-Date: Mon, 7 Aug 2017 07:39:59 +0000
-Subject: [PATCH net-next 4/8] net: ethernet: add the Alpine Ethernet driver
-In-Reply-To: <20170203205823.GA22572@lunn.ch>
-References: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
- <20170203181216.30214-5-antoine.tenart@free-electrons.com>,
- <20170203205823.GA22572@lunn.ch>
-Message-ID: <1502091598623.10609@amazon.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 7 Aug 2017 09:39:57 +0200
+Subject: [PATCH 1/5] edac: synopsys: Add platform specific structures ddrc
+ controller
+In-Reply-To: <20170806051830.GC28006@nazgul.tnic>
+References: <60ff19f90adfd252cf296fe8988c614c4c3e43fd.1501848023.git.michal.simek@xilinx.com>
+ <20170806051830.GC28006@nazgul.tnic>
+Message-ID: <abf22c6a-0694-e869-fda1-5672907bf3a7@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 6.8.2017 07:18, Borislav Petkov wrote:
+> On Fri, Aug 04, 2017 at 02:00:23PM +0200, Michal Simek wrote:
+>> From: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
+> 
+> That subject:
+>  Subject: [PATCH 1/5] edac: synopsys: Add platform specific structures ddrc controller
+> 
+> doesn't read like a proper sentence to me.
 
-________________________________________
-From: Andrew Lunn <andrew@lunn.ch>
-Sent: Friday, February 3, 2017 22:58
-To: Antoine Tenart
-Cc: netdev at vger.kernel.org; davem at davemloft.net; linux-arm-kernel at lists.infradead.org; tsahee at annapurnalabs.com; rshitrit at annapurnalabs.com; saeed at annapurnalabs.com; barak at annapurnalabs.com; talz at annapurnalabs.com; thomas.petazzoni at free-electrons.com; arnd at arndb.de
-Subject: Re: [PATCH net-next 4/8] net: ethernet: add the Alpine Ethernet driver
+Fixed in v2.
 
-> +/* MDIO */
-> +#define AL_ETH_MDIO_C45_DEV_MASK     0x1f0000
-> +#define AL_ETH_MDIO_C45_DEV_SHIFT    16
-> +#define AL_ETH_MDIO_C45_REG_MASK     0xffff
-> +
-> +static int al_mdio_read(struct mii_bus *bp, int mii_id, int reg)
-> +{
-> +     struct al_eth_adapter *adapter = bp->priv;
-> +     u16 value = 0;
-> +     int rc;
-> +     int timeout = MDIO_TIMEOUT_MSEC;
-> +
-> +     while (timeout > 0) {
-> +             if (reg & MII_ADDR_C45) {
-> +                     netdev_dbg(adapter->netdev, "[c45]: dev %x reg %x val %x\n",
-> +                                ((reg & AL_ETH_MDIO_C45_DEV_MASK) >> AL_ETH_MDIO_C45_DEV_SHIFT),
-> +                                (reg & AL_ETH_MDIO_C45_REG_MASK), value);
-> +                     rc = al_eth_mdio_read(&adapter->hw_adapter, adapter->phy_addr,
-> +                             ((reg & AL_ETH_MDIO_C45_DEV_MASK) >> AL_ETH_MDIO_C45_DEV_SHIFT),
-> +                             (reg & AL_ETH_MDIO_C45_REG_MASK), &value);
-> +             } else {
-> +                     rc = al_eth_mdio_read(&adapter->hw_adapter, adapter->phy_addr,
-> +                                           MDIO_DEVAD_NONE, reg, &value);
-> +             }
-> +
-> +             if (rc == 0)
-> +                     return value;
-> +
-> +             netdev_dbg(adapter->netdev,
-> +                        "mdio read failed. try again in 10 msec\n");
-> +
-> +             timeout -= 10;
-> +             msleep(10);
-> +     }
+> 
+>> This patch adds platform specific structures, so that we can add
+> 
+> "This patch" in a commit message is tautologically redundant.
 
-This is rather unusual, retrying MDIO operations. Are you working
-around a hardware bug? I suspect this also opens up race conditions,
-in particular with PHY interrupts, which can be clear on read.
+Fixed in v2.
 
-The MDIO bus is shared between the ethernet units. There is a HW lock used to arbitrate between different interfaces trying to access the bus, 
-therefore there is a retry loop. The reg isn't accessed before obtaining the lock, so there shouldn't be any clear on read issues.
+> 
+>> different IP support later using quirks.
+>>
+>> Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> ---
+>>
+>>  drivers/edac/synopsys_edac.c | 70 ++++++++++++++++++++++++++++++++++++--------
+>>  1 file changed, 58 insertions(+), 12 deletions(-)
+>>
+>> diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
+>> index 1c01dec78ec3..65f3b04d5a87 100644
+>> --- a/drivers/edac/synopsys_edac.c
+>> +++ b/drivers/edac/synopsys_edac.c
+>> @@ -22,6 +22,7 @@
+>>  #include <linux/edac.h>
+>>  #include <linux/module.h>
+>>  #include <linux/platform_device.h>
+>> +#include <linux/of.h>
+>>  
+>>  #include "edac_module.h"
+>>  
+>> @@ -95,6 +96,9 @@
+>>  #define SCRUB_MODE_MASK		0x7
+>>  #define SCRUB_MODE_SECDED	0x4
+>>  
+>> +/* DDR ECC Quirks */
+>> +#define DDR_ECC_INTR_SUPPORT    BIT(0)
+>> +
+>>  /**
+>>   * struct ecc_error_info - ECC error log information
+>>   * @row:	Row number
+>> @@ -130,6 +134,7 @@ struct synps_ecc_status {
+>>   * @baseaddr:	Base address of the DDR controller
+>>   * @message:	Buffer for framing the event specific info
+>>   * @stat:	ECC status information
+>> + * @p_data:	Pointer to platform data
+>>   * @ce_cnt:	Correctable Error count
+>>   * @ue_cnt:	Uncorrectable Error count
+>>   */
+>> @@ -137,11 +142,29 @@ struct synps_edac_priv {
+>>  	void __iomem *baseaddr;
+>>  	char message[SYNPS_EDAC_MSG_SIZE];
+>>  	struct synps_ecc_status stat;
+>> +	const struct synps_platform_data *p_data;
+>>  	u32 ce_cnt;
+>>  	u32 ue_cnt;
+>>  };
+>>  
+>>  /**
+>> + * struct synps_platform_data -  synps platform data structure
+>> + * @synps_edac_geterror_info:	function pointer to synps edac error info
+>> + * @synps_edac_get_mtype:	function pointer to synps edac mtype
+>> + * @synps_edac_get_dtype:	function pointer to synps edac dtype
+>> + * @synps_edac_get_eccstate:	function pointer to synps edac eccstate
+> 
+> "function pointer to" and then something, doesn't look like an optimal
+> explanation to me. How about:
+> 
+> "Function which returns the DIMM type"
+> 
+> and so on.
 
-> +
-> +static int al_eth_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
-> +{
-> +     struct al_eth_adapter *adapter = netdev_priv(netdev);
-> +     struct mii_ioctl_data *mdio = if_mii(ifr);
-> +     struct phy_device *phydev;
-> +
-> +     netdev_info(adapter->netdev, "ioctl: phy id 0x%x, reg 0x%x, val_in 0x%x\n",
-> +                 mdio->phy_id, mdio->reg_num, mdio->val_in);
+Fixed in v2
 
-netdev_info() for an ioctl?
+> 
+>> + * @quirks:			to differentiate IPs
+>> + */
+>> +struct synps_platform_data {
+>> +	int (*synps_edac_geterror_info)(void __iomem *base,
+>> +					 struct synps_ecc_status *p);
+>> +	enum mem_type (*synps_edac_get_mtype)(const void __iomem *base);
+>> +	enum dev_type (*synps_edac_get_dtype)(const void __iomem *base);
+>> +	bool (*synps_edac_get_eccstate)(void __iomem *base);
+>> +	int quirks;
+>> +};
+>> +
+>> +/**
+>>   * synps_edac_geterror_info - Get the current ecc error info
+>>   * @base:	Pointer to the base address of the ddr memory controller
+>>   * @p:		Pointer to the synopsys ecc status structure
+>> @@ -242,7 +265,8 @@ static void synps_edac_check(struct mem_ctl_info *mci)
+>>  	struct synps_edac_priv *priv = mci->pvt_info;
+>>  	int status;
+>>  
+>> -	status = synps_edac_geterror_info(priv->baseaddr, &priv->stat);
+>> +	status = priv->p_data->synps_edac_geterror_info(priv->baseaddr,
+>> +							&priv->stat);
+>>  	if (status)
+>>  		return;
+>>  
+>> @@ -372,10 +396,12 @@ static int synps_edac_init_csrows(struct mem_ctl_info *mci)
+>>  		for (j = 0; j < csi->nr_channels; j++) {
+>>  			dimm            = csi->channels[j]->dimm;
+>>  			dimm->edac_mode = EDAC_FLAG_SECDED;
+>> -			dimm->mtype     = synps_edac_get_mtype(priv->baseaddr);
+>> +			dimm->mtype     = priv->p_data->synps_edac_get_mtype(
+>> +						priv->baseaddr);
+>>  			dimm->nr_pages  = (size >> PAGE_SHIFT) / csi->nr_channels;
+>>  			dimm->grain     = SYNPS_EDAC_ERR_GRAIN;
+>> -			dimm->dtype     = synps_edac_get_dtype(priv->baseaddr);
+>> +			dimm->dtype     = priv->p_data->synps_edac_get_dtype(
+>> +						priv->baseaddr);
+>>  		}
+>>  	}
+>>  
+>> @@ -424,6 +450,21 @@ static int synps_edac_mc_init(struct mem_ctl_info *mci,
+>>  	return status;
+>>  }
+>>  
+>> +static const struct synps_platform_data zynq_edac_def = {
+>> +	.synps_edac_geterror_info	= synps_edac_geterror_info,
+>> +	.synps_edac_get_mtype		= synps_edac_get_mtype,
+>> +	.synps_edac_get_dtype		= synps_edac_get_dtype,
+>> +	.synps_edac_get_eccstate	= synps_edac_get_eccstate,
+>> +	.quirks				= 0,
+>> +};
+> 
+> Please make the actual function names and function pointer names
+> different. For example, the function pointer names don't need to have
+> the "synpc_" prefix as they're used all locally.
+> 
 
-> +static int al_eth_flow_ctrl_config(struct al_eth_adapter *adapter);
-> +static u8 al_eth_flow_ctrl_mutual_cap_get(struct al_eth_adapter *adapter);
-> +static void al_eth_down(struct al_eth_adapter *adapter);
-> +static int al_eth_up(struct al_eth_adapter *adapter);
+Fixed in v2 and v2 sent.
 
-Forward declarations are generally not liked. Can you move the code
-around to remove them?
-
-> +
-> +static void al_eth_adjust_link(struct net_device *dev)
-> +{
-> +     struct al_eth_adapter *adapter = netdev_priv(dev);
-> +     struct al_eth_link_config *link_config = &adapter->link_config;
-> +     struct phy_device *phydev = adapter->phydev;
-> +     enum al_eth_mac_mode mac_mode_needed = AL_ETH_MAC_MODE_RGMII;
-> +     int new_state = 0;
-> +     bool force_1000_base_x = false;
-> +
-> +     if (phydev->link) {
-> +             if (phydev->duplex != link_config->active_duplex) {
-> +                     new_state = 1;
-> +                     link_config->active_duplex = phydev->duplex;
-> +             }
-> +
-> +             if (phydev->speed != link_config->active_speed) {
-> +                     new_state = 1;
-> +                     switch (phydev->speed) {
-> +                     case SPEED_1000:
-> +                     case SPEED_100:
-> +                     case SPEED_10:
-> +                             mac_mode_needed = (adapter->mac_mode == AL_ETH_MAC_MODE_RGMII) ?
-> +                                     AL_ETH_MAC_MODE_RGMII : AL_ETH_MAC_MODE_SGMII;
-> +                             break;
-> +                     case SPEED_10000:
-> +                     case SPEED_2500:
-> +                             mac_mode_needed = AL_ETH_MAC_MODE_10GbE_Serial;
-> +                             break;
-> +                     default:
-> +                             if (netif_msg_link(adapter))
-> +                                     netdev_warn(adapter->netdev,
-> +                                                 "Ack!  Speed (%d) is not 10/100/1000!",
-
-Not particularly accurate, since 2.5G and 10G is supported.
-
-> +                                                 phydev->speed);
-> +static int al_eth_phy_init(struct al_eth_adapter *adapter)
-> +{
-> +     struct phy_device *phydev = mdiobus_get_phy(adapter->mdio_bus, adapter->phy_addr);
-> +
-> +     adapter->link_config.old_link = 0;
-> +     adapter->link_config.active_duplex = DUPLEX_UNKNOWN;
-> +     adapter->link_config.active_speed = SPEED_UNKNOWN;
-> +
-> +     /* Attach the MAC to the PHY. */
-> +     phydev = phy_connect(adapter->netdev, dev_name(&phydev->mdio.dev), al_eth_adjust_link,
-> +                          PHY_INTERFACE_MODE_RGMII);
-> +     if (IS_ERR(phydev)) {
-> +             netdev_err(adapter->netdev, "Could not attach to PHY\n");
-> +             return PTR_ERR(phydev);
-> +     }
-> +
-> +     netdev_info(adapter->netdev, "phy[%d]: device %s, driver %s\n",
-> +                 phydev->mdio.addr, dev_name(&phydev->mdio.dev),
-> +                 phydev->drv ? phydev->drv->name : "unknown");
-> +
-
-phy_attached_info()?
-
-> +     /* Mask with MAC supported features. */
-> +     phydev->supported &= (PHY_GBIT_FEATURES |
-> +                             SUPPORTED_Pause |
-> +                             SUPPORTED_Asym_Pause);
-> +
-> +     phydev->advertising = phydev->supported;
-> +
-> +     netdev_info(adapter->netdev, "phy[%d]:supported %x adv %x\n",
-> +                 phydev->mdio.addr, phydev->supported, phydev->advertising);
-> +
-
-More output?
-
-> +     adapter->phydev = phydev;
-> +     /* Bring the PHY up */
-> +     phy_start(adapter->phydev);
-
-This is normally done in the open() call.
-
-> +/* al_eth_mdiobus_setup - initialize mdiobus and register to kernel */
-> +static int al_eth_mdiobus_setup(struct al_eth_adapter *adapter)
-> +{
-> +     struct phy_device *phydev;
-> +     int i;
-> +     int ret = 0;
-> +
-> +     adapter->mdio_bus = mdiobus_alloc();
-> +     if (!adapter->mdio_bus)
-> +             return -ENOMEM;
-> +
-> +     adapter->mdio_bus->name     = "al mdio bus";
-> +     snprintf(adapter->mdio_bus->id, MII_BUS_ID_SIZE, "%x",
-> +              (adapter->pdev->bus->number << 8) | adapter->pdev->devfn);
-> +     adapter->mdio_bus->priv     = adapter;
-> +     adapter->mdio_bus->parent   = &adapter->pdev->dev;
-> +     adapter->mdio_bus->read     = &al_mdio_read;
-> +     adapter->mdio_bus->write    = &al_mdio_write;
-> +     adapter->mdio_bus->phy_mask = ~BIT(adapter->phy_addr);
-
-Why do this?
-
-Since the MDIO bus is shared, we want each interface to probe only for the PHY associated with it.
-
-
-> +     for (i = 0; i < PHY_MAX_ADDR; i++)
-> +             adapter->mdio_bus->irq[i] = PHY_POLL;
-
-Not needed. The core will do this.
-
-> +
-> +     if (adapter->phy_if != AL_ETH_BOARD_PHY_IF_XMDIO) {
-> +             i = mdiobus_register(adapter->mdio_bus);
-> +             if (i) {
-> +                     netdev_warn(adapter->netdev,
-> +                                 "mdiobus_reg failed (0x%x)\n", i);
-> +                     mdiobus_free(adapter->mdio_bus);
-> +                     return i;
-> +             }
-> +
-> +             phydev = mdiobus_get_phy(adapter->mdio_bus, adapter->phy_addr);
-> +     } else {
-> +             adapter->mdio_bus->phy_mask = 0xffffffff;
-> +             i = mdiobus_register(adapter->mdio_bus);
-> +             if (i) {
-> +                     netdev_warn(adapter->netdev,
-> +                                 "mdiobus_reg failed (0x%x)\n", i);
-> +                     mdiobus_free(adapter->mdio_bus);
-> +                     return i;
-> +             }
-> +
-> +             phydev = get_phy_device(adapter->mdio_bus, adapter->phy_addr,
-> +                                     true);
-> +             if (!phydev) {
-> +                     netdev_err(adapter->netdev, "phy device get failed\n");
-> +                     goto error;
-> +             }
-> +
-> +             ret = phy_device_register(phydev);
-> +             if (ret) {
-> +                     netdev_err(adapter->netdev,
-> +                                "phy device register failed\n");
-> +                     goto error;
-> +             }
-> +     }
-
-It seems like this should be split up into two. One function to
-register the MDIO bus, and a second to handle the PHY on the mdio bus.
-
-> +
-> +     if (!phydev || !phydev->drv)
-> +             goto error;
-> +
-> +     return 0;
-> +
-> +error:
-> +     netdev_warn(adapter->netdev, "No PHY devices\n");
-
-Yet more warnings....
-
-> +     mdiobus_unregister(adapter->mdio_bus);
-> +     mdiobus_free(adapter->mdio_bus);
-> +     return -ENODEV;
-> +}
-> +
-> +/* al_eth_mdiobus_teardown - mdiobus unregister */
-> +static void al_eth_mdiobus_teardown(struct al_eth_adapter *adapter)
-> +{
-> +     if (!adapter->mdio_bus)
-> +             return;
-> +
-> +     mdiobus_unregister(adapter->mdio_bus);
-> +     mdiobus_free(adapter->mdio_bus);
-> +     phy_device_free(adapter->phydev);
-
-Humm, you might want to think about the ordering here.
-
-> +}
-> +
-> +static void al_eth_tx_timeout(struct net_device *dev)
-> +{
-> +     struct al_eth_adapter *adapter = netdev_priv(dev);
-> +
-> +     if (netif_msg_tx_err(adapter))
-> +             netdev_err(dev, "transmit timed out!!!!\n");
-> +}
-> +
-> +static int al_eth_change_mtu(struct net_device *dev, int new_mtu)
-> +{
-> +     struct al_eth_adapter *adapter = netdev_priv(dev);
-> +     int max_frame = new_mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
-> +
-> +     if ((new_mtu < AL_ETH_MIN_FRAME_LEN) || (new_mtu > AL_ETH_MAX_MTU) ||
-> +         (max_frame > AL_ETH_MAX_FRAME_LEN)) {
-> +             netdev_err(dev, "Invalid MTU setting\n");
-> +             return -EINVAL;
-> +     }
-
-The core will do this check for you, if you tell it to.
-
-> +             switch (params.speed) {
-> +             default:
-> +                     dev_warn(&adapter->pdev->dev,
-> +                              "invalid speed (%d)\n", params.speed);
-
-It is a bit unusual having the default first. And that leads me to a C
-question. Can it fall through into the next case statement if there is no break?
-
-> +static int al_eth_nway_reset(struct net_device *netdev)
-> +{
-> +     struct al_eth_adapter *adapter = netdev_priv(netdev);
-> +     struct phy_device *phydev = adapter->phydev;
-> +
-> +     if (!phydev)
-> +             return -ENODEV;
-> +
-> +     return phy_start_aneg(phydev);
-> +}
-
-phy_ethtool_nway_reset() should be used.
-
-> +static int al_eth_set_mac_addr(struct net_device *dev, void *p)
-> +{
-> +     struct al_eth_adapter *adapter = netdev_priv(dev);
-> +     struct sockaddr *addr = p;
-> +     int err = 0;
-> +
-> +     if (!is_valid_ether_addr(addr->sa_data))
-> +             return -EADDRNOTAVAIL;
-
-Seems like the core should be doing that for you. Not checked though.
-If it does not, i suggest you do add it to the core.
-
-> +static void al_eth_mdio_1g_mac_read(struct al_hw_eth_adapter *adapter,
-> +                                 u32 phy_addr, u32 reg, u16 *val)
-> +{
-> +     *val = readl(&adapter->mac_regs_base->mac_1g.phy_regs_base + reg);
-> +}
-> +
-> +static void al_eth_mdio_1g_mac_write(struct al_hw_eth_adapter *adapter,
-> +                                  u32 phy_addr, u32 reg, u16 val)
-> +{
-> +     writel(val, &adapter->mac_regs_base->mac_1g.phy_regs_base + reg);
-> +}
-
-Are there range checks made on reg before these functions are called?
-Just thinking about SIOCSMIIREG ioctl.
-
-> +
-> +static int al_eth_mdio_10g_mac_wait_busy(struct al_hw_eth_adapter *adapter)
-> +{
-> +     int count = 0;
-> +     u32 mdio_cfg_status;
-> +
-> +     do {
-> +             mdio_cfg_status = readl(&adapter->mac_regs_base->mac_10g.mdio_cfg_status);
-> +             if (mdio_cfg_status & BIT(0)) {
-
-Would be nice to have a #define for this 0 bit, and it seems bit 1 is an error?
-
-> +                     if (count > 0)
-> +                             netdev_dbg(adapter->netdev,
-> +                                        "eth [%s] mdio: still busy!\n",
-> +                                        adapter->name);
-> +             } else {
-> +                     return 0;
-> +             }
-> +             udelay(AL_ETH_MDIO_DELAY_PERIOD);
-> +     } while (count++ < AL_ETH_MDIO_DELAY_COUNT);
-> +
-> +     return -ETIMEDOUT;
-> +}
-> +
-> +static int al_eth_mdio_10g_mac_type22(struct al_hw_eth_adapter *adapter,
-> +                                   int read, u32 phy_addr, u32 reg, u16 *val)
-> +{
-> +     int rc;
-> +     const char *op = (read == 1) ? "read" : "write";
-> +     u32 mdio_cfg_status;
-> +     u16 mdio_cmd;
-> +
-> +     /* wait if the HW is busy */
-> +     rc = al_eth_mdio_10g_mac_wait_busy(adapter);
-> +     if (rc) {
-> +             netdev_err(adapter->netdev,
-> +                        " eth [%s] mdio %s failed. HW is busy\n",
-> +                        adapter->name, op);
-
-How about moving this netdev_err() inside
-al_eth_mdio_10g_mac_wait_busy() so you only need it once?
-
-> +             return rc;
-> +     }
-> +
-> +     mdio_cmd = (u16)(0x1F & reg);
-> +     mdio_cmd |= (0x1F & phy_addr) << 5;
-> +
-> +     if (read)
-> +             mdio_cmd |= BIT(15); /* READ command */
-
-Another #define please.
-
-> + * acquire mdio interface ownership
-> + * when mdio interface shared between multiple eth controllers, this function waits until the ownership granted for this controller.
-> + * this function does nothing when the mdio interface is used only by this controller.
-> + *
-> + * @param adapter
-> + * @return 0 on success, -ETIMEDOUT  on timeout.
-> + */
-> +static int al_eth_mdio_lock(struct al_hw_eth_adapter *adapter)
-> +{
-> +     int count = 0;
-> +     u32 mdio_ctrl_1;
-> +
-> +     if (!adapter->shared_mdio_if)
-> +             return 0; /* nothing to do when interface is not shared */
-> +
-> +     do {
-> +             mdio_ctrl_1 = readl(&adapter->mac_regs_base->gen.mdio_ctrl_1);
-> +             if (mdio_ctrl_1 & BIT(0)) {
-> +                     if (count > 0)
-> +                             netdev_dbg(adapter->netdev,
-> +                                        "eth %s mdio interface still busy!\n",
-> +                                        adapter->name);
-> +             } else {
-> +                     return 0;
-> +             }
-> +             udelay(AL_ETH_MDIO_DELAY_PERIOD);
-> +     } while (count++ < (AL_ETH_MDIO_DELAY_COUNT * 4));
-
-This needs explaining. How can a read alone perform a lock? How is
-this race free?
-
-This is how this HW lock works: when the bit is 0 this means the lock is free. When a read transaction arrives  to the lock, it changes its value to 1 but sends 0 as the response,
-basically taking ownership. When the owner is done, it writes  a 0 which essentially "frees" the lock.
-
-> +             if (adapter->mdio_type == AL_ETH_MDIO_TYPE_CLAUSE_22)
-> +                     rc = al_eth_mdio_10g_mac_type22(adapter, 1, phy_addr,
-> +                                                     reg, val);
-> +             else
-> +                     rc = al_eth_mdio_10g_mac_type45(adapter, 1, phy_addr,
-> +                                                     device, reg, val);
-
-This seems odd. My understanding is that the device on the MDIO bus,
-the PHY, is either c22 or c45. The PHY driver will tell you this, not
-the adaptor.
-
-The current implementation sets mdio_type according to information which is originally deduced from the DeviceTree (the bootloader parses the ethernet node of the DeviceTree and saves this data to HW registers, which are then read by this driver).
-How can this information be obtained by the PHY driver?
-
-    Andrew
-
-Jonathan
+Thanks,
+Michal
