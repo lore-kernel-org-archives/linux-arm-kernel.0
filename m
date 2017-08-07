@@ -1,114 +1,116 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon,  7 Aug 2017 13:01:29 +0800
-Subject: [PATCH] arm64: dts: hi6220: improve g-tx-fifo-size setting for usb
- device
-Message-ID: <1502082090-22017-1-git-send-email-shawnguo@kernel.org>
+From: hoeun.ryu@gmail.com (Hoeun Ryu)
+Date: Mon,  7 Aug 2017 14:09:22 +0900
+Subject: [PATCHv2] arm64:kexec: have own crash_smp_send_stop() for crash dump
+ for nonpanic cores
+Message-ID: <1502082623-23952-1-git-send-email-hoeun.ryu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
+ Commit 0ee5941 : (x86/panic: replace smp_send_stop() with kdump friendly
+version in panic path) introduced crash_smp_send_stop() which is a weak
+function and can be overriden by architecture codes to fix the side effect
+caused by commit f06e515 : (kernel/panic.c: add "crash_kexec_post_
+notifiers" option).
 
-The current usb device g-tx-fifo-size setting in DT causes two problems
-for kernel driver.
+ ARM64 architecture uses the weak version function and the problem is that
+the weak function simply calls smp_send_stop() which makes other CPUs
+offline and takes away the chance to save crash information for nonpanic
+CPUs in machine_crash_shutdown() when crash_kexec_post_notifiers kernel
+option is enabled.
 
-1. On hi6220, there are 15 tx_fifo dedicated for all EPs except EP0,
-   while DT only provides tx_fifo settings for 6 EPs.  It results in the
-   following annoying complaints from kernel.
+ Calling smp_send_crash_stop() in machine_crash_shutdown() is useless
+because all nonpanic CPUs are already offline by smp_send_stop() in this
+case and smp_send_crash_stop() only works against online CPUs.
 
-[    4.451623] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[7]=0
-[    4.461303] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[8]=0
-[    4.470969] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[9]=0
-[    4.480632] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[10]=0
-[    4.490385] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[11]=0
-[    4.500140] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[12]=0
-[    4.509892] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[13]=0
-[    4.519646] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[14]=0
-[    4.529399] dwc2 f72c0000.usb: dwc2_check_param_tx_fifo_sizes: Invalid parameter g_tx_fifo_size[15]=0
-[    4.539244] dwc2 f72c0000.usb: EPs: 16, dedicated fifos, 1920 entries in SPRAM
+ The result is that /proc/vmcore is not available with the error messages;
+"Warning: Zero PT_NOTE entries found", "Kdump: vmcore not initialized".
 
-   Besides of that, the total 1920 fifo entries isn't fully utilized.
-   Endpoint Info Control block consumes 128 entries, g-rx-fifo-size
-   is 512, and g-np-tx-fifo-size is 128.  So the fifi entries available
-   for tx_fifo is: 1920 - 128 - 512 - 128 = 1152.  Considering that
-   the minimal valid tx_fifo size for each EP is 16, it should be
-   reasonable to allocate 1152 entries as: 128 x 8 + 16 x 7 = 1136 (only
-   16 entries unused).  With this new setting, we can get more EPs to
-   use while removing the above warning messages in the meantime.
+ crash_smp_send_stop() is implemented to fix this problem by replacing the
+exising smp_send_crash_stop() and adding a check for multiple calling to
+the function. The function (strong symbol version) saves crash information
+for nonpanic CPUs and machine_crash_shutdown() tries to save crash
+information for nonpanic CPUs only when crash_kexec_post_notifiers kernel
+option is disabled.
 
-2. Another consequence of above invalid g_tx_fifo_size parameter is that
-   kernel driver will use values read from hardware register as the
-   fall-back.  The value is 2048 for each EP fifo.  That's obviously
-   invalid either, because even fifo entries for one EP exceeds the
-   total entries 1920.  That's why we see the following fat warning from
-   function dwc2_hsotg_init_fifo().  The new g-tx-fifo-size settings
-   help to remove the warning as well.
+* crash_kexec_post_notifiers : false
 
-[   65.431634] dwc2 f72c0000.usb: Do port resume before switching to device mode
-[   65.624176] insufficient fifo memory
-[   65.624369] ------------[ cut here ]------------
-[   65.633633] WARNING: CPU: 0 PID: 5 at drivers/usb/dwc2/gadget.c:330 dwc2_hsotg_init_fifo+0x164/0x1ac
-[   65.643808] CPU: 0 PID: 5 Comm: kworker/u16:0 Not tainted 4.13.0-rc1-00022-g50861cf9dc1b-dirty #81
-[   65.653769] Hardware name: HiKey Development Board (DT)
-[   65.659624] Workqueue: dwc2 dwc2_conn_id_status_change
-[   65.665377] task: ffffffc005f73400 task.stack: ffffffc005f98000
-[   65.671987] PC is at dwc2_hsotg_init_fifo+0x164/0x1ac
-[   65.677633] LR is at dwc2_hsotg_init_fifo+0x164/0x1ac
-[   65.683275] pc : [<ffffff8008638044>] lr : [<ffffff8008638044>] pstate: 600001c5
-[   65.691504] sp : ffffffc005f9bce0
-[   65.695218] x29: ffffffc005f9bce0 x28: ffffffc005f6ac00
-[   65.701172] x27: ffffffc005f73400 x26: 0000000008000580
-[   65.707124] x25: ffffff8008bb4af0 x24: ffffff8008d02b70
-[   65.713074] x23: 0000003fcc831084 x22: ffffffc0337cf0bc
-[   65.719024] x21: 0000000000000580 x20: ffffffc0337cf018
-[   65.724976] x19: ffffffc0337cf098 x18: 0000000000000000
-[   65.730926] x17: 0000000000000000 x16: 0000000000000000
-[   65.736873] x15: 0000000000000000 x14: ffffff8008ca8900
-[   65.742825] x13: 0000004035299000 x12: 0000000034d5d91d
-[   65.748775] x11: 0000000000000000 x10: 00000000000008d0
-[   65.754726] x9 : ffffffc005f9bce0 x8 : 00000000000001b5
-[   65.760674] x7 : 66696620746e6569 x6 : ffffff8008d60050
-[   65.766623] x5 : 0000000000000000 x4 : 0000000000000000
-[   65.772573] x3 : 0000000000000002 x2 : 0000000000000002
-[   65.778521] x1 : 0000000000000001 x0 : 0000000000000018
-[   65.784469] Call trace:
-[   65.787236] Exception stack(0xffffffc005f9bb10 to 0xffffffc005f9bc40)
-[   65.794420] bb00:                                   ffffffc0337cf098 0000008000000000
-[   65.803145] bb20: ffffffc005f9bce0 ffffff8008638044 ffffff8008bb4af0 0000000008000580
-[   65.811870] bb40: ffffffc005f73400 ffffffc005f6ac00 0000000000000000 ffffff8008da2998
-[   65.820595] bb60: ffffffc005f9bce0 ffffffc005f9bce0 ffffffc005f9bca0 00000000ffffffc8
-[   65.829315] bb80: ffffffc005f9bbb0 ffffff80081046a0 ffffffc005f9bce0 ffffffc005f9bce0
-[   65.838038] bba0: ffffffc005f9bca0 00000000ffffffc8 0000000000000018 0000000000000001
-[   65.846761] bbc0: 0000000000000002 0000000000000002 0000000000000000 0000000000000000
-[   65.855485] bbe0: ffffff8008d60050 66696620746e6569 00000000000001b5 ffffffc005f9bce0
-[   65.864207] bc00: 00000000000008d0 0000000000000000 0000000034d5d91d 0000004035299000
-[   65.872928] bc20: ffffff8008ca8900 0000000000000000 0000000000000000 0000000000000000
-[   65.900856] [<ffffff8008638044>] dwc2_hsotg_init_fifo+0x164/0x1ac
-[   65.927195] [<ffffff800863b390>] dwc2_hsotg_core_init_disconnected+0x80/0x3c0
-[   65.954736] [<ffffff800862fef0>] dwc2_conn_id_status_change+0xfc/0x21c
-[   65.981561] [<ffffff80080d1ca8>] process_one_work+0x124/0x294
-[   66.007419] [<ffffff80080d1e70>] worker_thread+0x58/0x3c8
-[   66.023243] [<ffffff80080d79a0>] kthread+0x100/0x12c
-[   66.032455] [<ffffff8008082ec0>] ret_from_fork+0x10/0x50
-[   66.041987] ---[ end trace 7079dcaa2d9e46fa ]---
+  panic()
+    __crash_kexec()
+      machine_crash_shutdown()
+        crash_smp_send_stop()    <= save crash dump for nonpanic cores
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+* crash_kexec_post_notifiers : true
+
+  panic()
+    crash_smp_send_stop()        <= save crash dump for nonpanic cores
+    __crash_kexec()
+      machine_crash_shutdown()
+        crash_smp_send_stop()    <= just return.
+
+Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
 ---
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ v2:
+   - replace the existing smp_send_crash_stop() with crash_smp_send_stop()
+     and adding called-twice logic to it.
+   - modify the commit message
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index eacbe0db5bc2..a1a65ac0f713 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -755,7 +755,8 @@
- 			dr_mode = "otg";
- 			g-rx-fifo-size = <512>;
- 			g-np-tx-fifo-size = <128>;
--			g-tx-fifo-size = <128 128 128 128 128 128>;
-+			g-tx-fifo-size = <128 128 128 128 128 128 128 128
-+					   16  16  16  16  16  16  16>;
- 			interrupts = <0 77 0x4>;
- 		};
+ arch/arm64/include/asm/smp.h      |  2 +-
+ arch/arm64/kernel/machine_kexec.c |  2 +-
+ arch/arm64/kernel/smp.c           | 12 +++++++++++-
+ 3 files changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+index 55f08c5..f82b447 100644
+--- a/arch/arm64/include/asm/smp.h
++++ b/arch/arm64/include/asm/smp.h
+@@ -148,7 +148,7 @@ static inline void cpu_panic_kernel(void)
+  */
+ bool cpus_are_stuck_in_kernel(void);
+ 
+-extern void smp_send_crash_stop(void);
++extern void crash_smp_send_stop(void);
+ extern bool smp_crash_stop_failed(void);
+ 
+ #endif /* ifndef __ASSEMBLY__ */
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index 481f54a..11121f6 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -252,7 +252,7 @@ void machine_crash_shutdown(struct pt_regs *regs)
+ 	local_irq_disable();
+ 
+ 	/* shutdown non-crashing cpus */
+-	smp_send_crash_stop();
++	crash_smp_send_stop();
+ 
+ 	/* for crashing cpu */
+ 	crash_save_cpu(regs, smp_processor_id());
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index dc66e6e..73d8f5e 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -977,11 +977,21 @@ void smp_send_stop(void)
+ }
+ 
+ #ifdef CONFIG_KEXEC_CORE
+-void smp_send_crash_stop(void)
++void crash_smp_send_stop(void)
+ {
++	static int cpus_stopped;
+ 	cpumask_t mask;
+ 	unsigned long timeout;
+ 
++	/*
++	 * This function can be called twice in panic path, but obviously
++	 * we execute this only once.
++	 */
++	if (cpus_stopped)
++		return;
++
++	cpus_stopped = 1;
++
+ 	if (num_online_cpus() == 1)
+ 		return;
  
 -- 
-1.9.1
+2.7.4
