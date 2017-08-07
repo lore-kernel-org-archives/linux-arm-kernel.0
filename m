@@ -1,50 +1,40 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 07 Aug 2017 14:44:00 -0700
-Subject: [PATCH 00/14] mmc: meson-gx: driver fixups and upgrade
-In-Reply-To: <1502124502.2759.32.camel@baylibre.com> (Jerome Brunet's message
- of "Mon, 07 Aug 2017 18:48:22 +0200")
-References: <20170804174353.16486-1-jbrunet@baylibre.com>
- <1502124502.2759.32.camel@baylibre.com>
-Message-ID: <7hshh3njdr.fsf@baylibre.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 7 Aug 2017 14:44:22 -0700
+Subject: [kernel-hardening] [PATCH] lkdtm: Test VMAP_STACK allocates
+ leading/trailing guard pages
+In-Reply-To: <CAKv+Gu-DUk9xqzpWt_FNBzpbLhdi9Cc5vU5J-tZZ4b8wD87UTQ@mail.gmail.com>
+References: <20170807203948.GA22298@beast>
+ <CAKv+Gu-DUk9xqzpWt_FNBzpbLhdi9Cc5vU5J-tZZ4b8wD87UTQ@mail.gmail.com>
+Message-ID: <CAGXu5jL27FsZLi_L-mJnySe3H_3LiyFr2Odav+Xm=xhOHc25uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jerome Brunet <jbrunet@baylibre.com> writes:
-
-> On Fri, 2017-08-04 at 19:43 +0200, Jerome Brunet wrote:
->> The patchset features several bugfixes, rework and upgrade for the
->> meson-gx MMC driver.
->> 
->> The main goal is to improve readability and enable new high speed
->> modes, such as eMMC DDR52 and sdcard UHS modes up to SDR50 (100Mhz)
->> 
->> While full speed SDR104 is stable with most cards, a few seems to
->> require an even more precise tuning. For this, we'll probably have
->> to implement per-line delay calibration.
->> 
->> This series has been tested on gxbb-p200, gxbb-nanopi-k2 and
->> gxl-s905x-libretech
->> 
+On Mon, Aug 7, 2017 at 2:27 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 7 August 2017 at 21:39, Kees Cook <keescook@chromium.org> wrote:
+>> Two new tests STACK_GUARD_PAGE_LEADING and STACK_GUARD_PAGE_TRAILING
+>> attempt to read the byte before and after, respectively, of the current
+>> stack frame, which should fault under VMAP_STACK.
+>>
+>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>> ---
+>> Do these tests both trip with the new arm64 VMAP_STACK code?
 >
-> Ulf, Kevin,
+> Probably not. On arm64, the registers are stacked by software at
+> exception entry,  and so we decrement the sp first by the size of the
+> register file, and if the resulting value overflows the stack, the
+> situation is handled as if the exception was caused by a faulting
+> stack access while it may be caused by something else in reality.
+> Since the act of handling the exception is guaranteed to overflow the
+> stack anyway, this does not really make a huge difference, and it
+> prevents the recursive fault from wiping the context that we need to
+> produce the diagnostics.
 >
-> Please ignore this series. I'll resend it soon
->
-> I've discovered new things around the tuning capabilities of the SoC.
-> I'll probably rework the tuning function again.
->
-> Sorry for the noise
+> This means an illegal access right above the stack will go undetected.
 
-No worries, I had a couple very minor comments on some individual
-patches. Other than that, LGTM.
+I thought vmap entries provided guard pages around allocations?
+Shouldn't that catch it?
 
-Feel free to add:
-
-Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-
-to anything that doesn't need major rework.
-
-Also, You might want to separate out the fixups/cleanups from the
-voltage/clock changes stuff.
-
-Kevin
+-- 
+Kees Cook
+Pixel Security
