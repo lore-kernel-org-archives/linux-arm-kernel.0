@@ -1,61 +1,108 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 7 Aug 2017 15:01:39 +0100
-Subject: [PATCH] arm64: correct modules range of kernel virtual memory
- layout
-In-Reply-To: <CAKv+Gu9qD_-GNHus5txiqj9eHLpU5S7RX8QxYeUG17Ok0QNz-A@mail.gmail.com>
-References: <1502103886-19725-1-git-send-email-miles.chen@mediatek.com>
- <20170807131608.GA18817@arm.com>
- <CAKv+Gu9qD_-GNHus5txiqj9eHLpU5S7RX8QxYeUG17Ok0QNz-A@mail.gmail.com>
-Message-ID: <20170807140138.GB18817@arm.com>
+From: oleksandrs@mellanox.com (Oleksandr Shamray)
+Date: Mon,  7 Aug 2017 17:17:45 +0300
+Subject: [patch v2 0/2]
+Message-ID: <1502115467-1735-1-git-send-email-oleksandrs@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 02:18:00PM +0100, Ard Biesheuvel wrote:
-> On 7 August 2017 at 14:16, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Aug 07, 2017 at 07:04:46PM +0800, Miles Chen wrote:
-> >> The commit f80fb3a3d508 ("arm64: add support for kernel ASLR")
-> >> moved module virtual address to
-> >> [module_alloc_base, module_alloc_base + MODULES_VSIZE).
-> >>
-> >> Display module information of the virtual kernel
-> >> memory layout by using module_alloc_base.
-> >>
-> >> testing output:
-> >> 1) Current implementation:
-> >> Virtual kernel memory layout:
-> >>       modules : 0xffffff8000000000 - 0xffffff8008000000   (   128 MB)
-> >> 2) this patch + KASLR:
-> >> Virtual kernel memory layout:
-> >>       modules : 0xffffff8000560000 - 0xffffff8008560000   (   128 MB)
-> >> 3) this patch + KASLR and a dummy seed:
-> >> Virtual kernel memory layout:
-> >>       modules : 0xffffffa7df637000 - 0xffffffa7e7637000   (   128 MB)
-> >>
-> >> Signed-off-by: Miles Chen <miles.chen@mediatek.com>
-> >> ---
-> >>  arch/arm64/mm/init.c | 5 +++--
-> >>  1 file changed, 3 insertions(+), 2 deletions(-)
-> >
-> > Does this mean the modules code in our pt dumper is busted
-> > (arch/arm64/mm/dump.c)? Also, what about KASAN, which uses these addresses
-> > too (in kasan_init)? Should we just remove MODULES_VADDR and MODULES_END
-> > altogether?
-> >
-> 
-> I don't think we need this patch. The 'module' line simply prints the
-> VA region that is reserved for modules. The fact that we end up
-> putting them elsewhere when running randomized does not necessarily
-> mean this line should reflect that.
+When a need raise up to use JTAG interface for system's devices
+programming or CPU debugging, it could be done from the external
+JTAG master controller.
+ 
+For such purpose, usually the user layer
+application implements jtag protocol or using a proprietary
+connection to vendor hardware.
+This method is slow and not generic.
+ 
+We propose to implement general JTAG interface and infrastructure
+to communicate with user layer application. In such way, we can
+have the standard JTAG interface core part and separation from
+specific HW implementation.
+This allow new capability to debug the CPU or program system's 
+device via BMC without additional devices nor cost. 
 
-I was more concerned by other users of MODULES_VADDR tbh, although I see
-now that we don't randomize the module region if kasan is enabled. Still,
-the kcore code adds the modules region as a separate area (distinct from
-vmalloc) if MODULES_VADDR is defined, the page table dumping code uses
-MODULES_VADDR to identify the module region and I think we'll get false
-positives from is_vmalloc_or_module_addr, which again uses the static
-region.
+This patch purpose is to add JTAG master core infrastructure by 
+defining new JTAG class and provide generic JTAG interface
+to allow hardware specific drivers to connect this interface.
+This will enable all JTAG drivers to use the common interface
+part and will have separate for hardware implementation.
 
-So, given that MODULES_VADDR never points at the module area, can't we get
-rid of it?
+The JTAG (Joint Test Action Group) core driver provides minimal generic
+JTAG interface, which can be used by hardware specific JTAG master
+controllers. By providing common interface for the JTAG controllers,
+user space device programing is hardware independent.
+ 
+Modern SoC which in use for embedded system' equipped with
+internal JTAG master interface.
+This interface is used for programming and debugging system's
+hardware components, like CPLD, FPGA, CPU, voltage and
+industrial controllers.
+Firmware for such devices can be upgraded through JTAG interface during
+Runtime. The JTAG standard support for multiple devices programming,
+is in case their lines are daisy-chained together.
 
-Will
+For example, systems which equipped with host CPU, BMC SoC or/and 
+number of programmable devices are capable to connect a pin and
+select system components dynamically for programming and debugging,
+This is using by the BMC which is equipped with internal SoC master
+controller.
+For example:
+
+BMC JTAG master --> pin selected to CPLDs chain for programming (filed
+upgrade, production) 
+BMC JTAG master --> pin selected to voltage monitors for programming 
+(field upgrade, production) 
+BMC JTAG master --> pin selected to host CPU (on-site debugging 
+and developers debugging)
+
+For example, we can have application in user space which using calls
+to JTAG driver executes CPLD programming directly from SVF file
+ 
+The JTAG standard (IEEE 1149.1) defines the next connector pins:
+- TDI (Test Data In);
+- TDO (Test Data Out);
+- TCK (Test Clock);
+- TMS (Test Mode Select);
+- TRST (Test Reset) (Optional);
+
+The SoC equipped with JTAG master controller, performs
+device programming on command or vector level. For example
+a file in a standard SVF (Serial Vector Format) that contains
+boundary scan vectors, can be used by sending each vector
+to the JTAG interface and the JTAG controller will execute
+the programming.
+
+Initial version provides the system calls set for:
+- SIR (Scan Instruction Register, IEEE 1149.1 Data Register scan);
+- SDR (Scan Data Register, IEEE 1149.1 Instruction Register scan);
+- RUNTEST (Forces the IEEE 1149.1 bus to a run state for a specified
+  number of clocks.
+
+SoC which are not equipped with JTAG master interface, can be built
+on top of JTAG core driver infrastructure, by applying bit-banging of
+TDI, TDO, TCK and TMS pins within the hardware specific driver.
+
+Oleksandr Shamray (2):
+  drivers: jtag: Add JTAG core driver
+  drivers: jtag: Add Aspeed SoC 24xx and 25xx families JTAG master
+    driver
+
+ .../devicetree/bindings/jtag/aspeed-jtag.txt       |   27 +
+ Documentation/ioctl/ioctl-number.txt               |    2 +
+ MAINTAINERS                                        |    8 +
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    1 +
+ drivers/jtag/Kconfig                               |   29 +
+ drivers/jtag/Makefile                              |    2 +
+ drivers/jtag/jtag-aspeed.c                         |  774 ++++++++++++++++++++
+ drivers/jtag/jtag.c                                |  313 ++++++++
+ include/linux/jtag.h                               |   42 ++
+ include/uapi/linux/jtag.h                          |  113 +++
+ 11 files changed, 1313 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+ create mode 100644 drivers/jtag/Kconfig
+ create mode 100644 drivers/jtag/Makefile
+ create mode 100644 drivers/jtag/jtag-aspeed.c
+ create mode 100644 drivers/jtag/jtag.c
+ create mode 100644 include/linux/jtag.h
+ create mode 100644 include/uapi/linux/jtag.h
