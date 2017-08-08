@@ -1,25 +1,50 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 08 Aug 2017 14:49:47 -0700
-Subject: [PATCH v5.1 2/2] ARM: dts: meson6: use stable UART bindings
-In-Reply-To: <1498056132-18508-3-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Wed, 21 Jun 2017 16:42:12 +0200")
-References: <1498056132-18508-1-git-send-email-narmstrong@baylibre.com>
- <1498056132-18508-3-git-send-email-narmstrong@baylibre.com>
-Message-ID: <7hwp6dn30k.fsf@baylibre.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 9 Aug 2017 06:39:47 +0800
+Subject: [PATCH 2/2] arm64: dts: move rpi into rpi directory
+In-Reply-To: <1500483950-9217-3-git-send-email-scott.branden@broadcom.com>
+Message-ID: <201708090619.AOiafigN%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+Hi Scott,
 
-> The UART bindings needs specifying a SoC family, use the meson6 family
-> for the UART nodes like the other nodes.
-> Switch to the stable UART bindings for meson6 by adding a XTAL node and
-> using the proper compatible strings.
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+[auto build test ERROR on v4.13-rc1]
+[cannot apply to robh/for-next arm64/for-next/core next-20170808]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Applied to v4.14/dt,
+url:    https://github.com/0day-ci/linux/commits/Scott-Branden/arm64-dts-move-ns2-into-northstar2-directory/20170721-023618
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Thanks,
+All errors (new ones prefixed by >>):
 
-Kevin
+>> arch/arm/boot/dts/bcm2837-rpi-3-b.dts:1:46: fatal error: arm64/broadcom/bcm2837-rpi-3-b.dts: No such file or directory
+    #include "arm64/broadcom/bcm2837-rpi-3-b.dts"
+                                                 ^
+   compilation terminated.
+
+vim +1 arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+
+072f58af Eric Anholt 2017-04-25 @1  #include "arm64/broadcom/bcm2837-rpi-3-b.dts"
+
+:::::: The code at line 1 was first introduced by commit
+:::::: 072f58af1dfbc39f8daf6be170d90c2465df4771 ARM: dts: Add devicetree for the Raspberry Pi 3, for arm32 (v6)
+
+:::::: TO: Eric Anholt <eric@anholt.net>
+:::::: CC: Eric Anholt <eric@anholt.net>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 23094 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170809/de59c3ef/attachment-0001.gz>
