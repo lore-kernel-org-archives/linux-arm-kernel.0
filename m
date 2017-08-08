@@ -1,100 +1,100 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  8 Aug 2017 10:39:27 +0200
-Subject: [PATCH 09/10] arm64: dts: r8a7795: Use R-Car GPIO Gen3 fallback
- compat string
+Date: Tue,  8 Aug 2017 10:39:25 +0200
+Subject: [PATCH 07/10] ARM: dts: r8a7793: Use R-Car GPIO Gen2 fallback compat
+ string
 In-Reply-To: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
 References: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1502181568-12299-10-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1502181568-12299-8-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use newly added R-Car GPIO Gen3 fallback compat string
+Use newly added R-Car GPIO Gen2 fallback compat string
 in place of now deprecated non-generation specific
-R-Car GPIO fallback compat string in the DT of the r8a7795 SoC.
+R-Car GPIO fallback compat string in the DT of the r8a7793 SoC.
 
 This should have no run-time effect as the driver matches against
 the per-SoC compat string before considering the fallback compat string.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 16 ++++++++--------
+ arch/arm/boot/dts/r8a7793.dtsi | 16 ++++++++--------
  1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index a87ae76880ab..79d611db142a 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -220,7 +220,7 @@
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 497716b6fbe2..8f905dacb10c 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -114,7 +114,7 @@
+ 	};
  
- 		gpio0: gpio at e6050000 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6050000 0 0x50>;
- 			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -235,7 +235,7 @@
+ 	gpio0: gpio at e6050000 {
+-		compatible = "renesas,gpio-r8a7793", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7793", "renesas,rcar-gen2-gpio";
+ 		reg = <0 0xe6050000 0 0x50>;
+ 		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -127,7 +127,7 @@
+ 	};
  
- 		gpio1: gpio at e6051000 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6051000 0 0x50>;
- 			interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -250,7 +250,7 @@
+ 	gpio1: gpio at e6051000 {
+-		compatible = "renesas,gpio-r8a7793", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7793", "renesas,rcar-gen2-gpio";
+ 		reg = <0 0xe6051000 0 0x50>;
+ 		interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -140,7 +140,7 @@
+ 	};
  
- 		gpio2: gpio at e6052000 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6052000 0 0x50>;
- 			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -265,7 +265,7 @@
+ 	gpio2: gpio at e6052000 {
+-		compatible = "renesas,gpio-r8a7793", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7793", "renesas,rcar-gen2-gpio";
+ 		reg = <0 0xe6052000 0 0x50>;
+ 		interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -153,7 +153,7 @@
+ 	};
  
- 		gpio3: gpio at e6053000 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6053000 0 0x50>;
- 			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -280,7 +280,7 @@
+ 	gpio3: gpio at e6053000 {
+-		compatible = "renesas,gpio-r8a7793", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7793", "renesas,rcar-gen2-gpio";
+ 		reg = <0 0xe6053000 0 0x50>;
+ 		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -166,7 +166,7 @@
+ 	};
  
- 		gpio4: gpio at e6054000 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6054000 0 0x50>;
- 			interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -295,7 +295,7 @@
+ 	gpio4: gpio at e6054000 {
+-		compatible = "renesas,gpio-r8a7793", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7793", "renesas,rcar-gen2-gpio";
+ 		reg = <0 0xe6054000 0 0x50>;
+ 		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -179,7 +179,7 @@
+ 	};
  
- 		gpio5: gpio at e6055000 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6055000 0 0x50>;
- 			interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -310,7 +310,7 @@
+ 	gpio5: gpio at e6055000 {
+-		compatible = "renesas,gpio-r8a7793", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7793", "renesas,rcar-gen2-gpio";
+ 		reg = <0 0xe6055000 0 0x50>;
+ 		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -192,7 +192,7 @@
+ 	};
  
- 		gpio6: gpio at e6055400 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6055400 0 0x50>;
- 			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
-@@ -325,7 +325,7 @@
+ 	gpio6: gpio at e6055400 {
+-		compatible = "renesas,gpio-r8a7793", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7793", "renesas,rcar-gen2-gpio";
+ 		reg = <0 0xe6055400 0 0x50>;
+ 		interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -205,7 +205,7 @@
+ 	};
  
- 		gpio7: gpio at e6055800 {
- 			compatible = "renesas,gpio-r8a7795",
--				     "renesas,gpio-rcar";
-+				     "renesas,rcar-gen3-gpio";
- 			reg = <0 0xe6055800 0 0x50>;
- 			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
- 			#gpio-cells = <2>;
+ 	gpio7: gpio at e6055800 {
+-		compatible = "renesas,gpio-r8a7793", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7793", "renesas,rcar-gen2-gpio";
+ 		reg = <0 0xe6055800 0 0x50>;
+ 		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
 -- 
 2.1.4
