@@ -1,50 +1,33 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 8 Aug 2017 19:29:28 +0900
-Subject: [PATCH 00/10] ARM, arm64: dts: renesas: Use R-Car GPIO Gen[123]
- fallback compat strings
-In-Reply-To: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
-References: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CANqRtoRcsAhvFB=DNoJHzJt4dejKX+Z8ar04D8O1cFq1XkxWkw@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 8 Aug 2017 12:34:44 +0200
+Subject: linux-next 2017-08-08 failure on Nokia N900
+In-Reply-To: <20170808101756.GA12922@amd>
+References: <20170808101756.GA12922@amd>
+Message-ID: <20170808103444.GA18247@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi!
 
-On Tue, Aug 8, 2017 at 5:39 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> Use newly added R-Car GPIO Gen 1, 2 and 3 fallback compat strings in place
-> of now deprecated non-generation specific R-Car GPIO fallback compat string
-> in the DT of Renesas ARM and arm64 based SoCs.
->
-> This should have no run-time effect as the driver matches against the
-> per-SoC compat string before considering the fallback compat string.
+> I tried today's linux-next. It boots on n900 (up to X), but then my
+> screen locks and I can't get back. Touchscreen worked, so my guess is
+> keyboard does not...? Ssh connection over usb still works.
 
-Thanks for your efforts.I have no issue with your series (apart from
-the GPIO and SATA mistake), but at the same time I believe the GPIO
-hardware itself is backwards compatible between various generations.
+Confirmed, its the keyboard.
 
-In the nitpick department I would like to point out that the level of
-hardware difference between say R-Car Gen1 GPIO and R-Car Gen2 GPIO is
-similar to say good old uarts like 8250 and 16450 hardware. Basically
-a couple of registers were added to the hardware in a
-backwards-compatible way if I recall correctly.
+Additionally, battery monitoring fails, because neither
 
-So if we are going to use "compatible" to point out if hardware is
-compatible or not then I would do this instead:
+/sys/class/power_supply/{n900-,rx51-}battery/voltage_now
 
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -214,7 +214,7 @@
-
-                gpio0: gpio at e6050000 {
-                        compatible = "renesas,gpio-r8a7796",
-+                                    "renesas,rcar-gen3-gpio";
-                                     "renesas,gpio-rcar";
-                        reg = <0 0xe6050000 0 0x50>;
-                        interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-                        #gpio-cells = <2>;
-
-At the same time I'm not sure if I care _that_ much. =)
-
-Thanks,
-
-/ magnus
+exists.
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170808/fdec8f57/attachment.sig>
