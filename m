@@ -1,71 +1,34 @@
-From: gary.hook@amd.com (Gary R Hook)
-Date: Tue, 8 Aug 2017 10:24:49 -0500
-Subject: [PATCH v4 02/19] crypto: ccm: use -EAGAIN for transient busy
- indication
-In-Reply-To: <1502193834-11289-3-git-send-email-gilad@benyossef.com>
-References: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
- <1502193834-11289-3-git-send-email-gilad@benyossef.com>
-Message-ID: <4600c898-a2f2-f95f-15b4-0adcc6acc0b5@amd.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 8 Aug 2017 16:31:12 +0100
+Subject: [PATCHv2 1/7] arm64: Add ASM_BUG()
+In-Reply-To: <1501093110-3844-2-git-send-email-mark.rutland@arm.com>
+References: <1501093110-3844-1-git-send-email-mark.rutland@arm.com>
+ <1501093110-3844-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170808153112.GF19207@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2017 07:03 AM, Gilad Ben-Yossef wrote:
-> Replace -EBUSY with -EAGAIN when reporting transient busy
-> indication in the absence of backlog.
->
-> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+On Wed, Jul 26, 2017 at 07:18:24PM +0100, Mark Rutland wrote:
+> +#define __BUG_ENTRY(flags) 				\
+> +		.pushsection __bug_table,"a";		\
+> +		.align 2;				\
+> +	0:	.long 1f - 0b;				\
+> +_BUGVERBOSE_LOCATION(__FILE__, __LINE__)		\
+> +		.short flags; 				\
+> +		.popsection;				\
+> +	1:
+> +#else
+> +#define __BUG_ENTRY(flags)
+> +#endif
+> +
+> +#define ASM_BUG_FLAGS(flags)				\
+> +	__BUG_ENTRY(0)					\
+> +	brk	BUG_BRK_IMM
 
-Could we use "ccp" in the subject line, please?
+I accidentally dropped the flags here, which turns all WARN*s into BUGs.
 
-> ---
->  drivers/crypto/ccp/ccp-crypto-main.c | 8 +++-----
->  drivers/crypto/ccp/ccp-dev.c         | 7 +++++--
->  2 files changed, 8 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/crypto/ccp/ccp-crypto-main.c b/drivers/crypto/ccp/ccp-crypto-main.c
-> index 35a9de7..403ff0a 100644
-> --- a/drivers/crypto/ccp/ccp-crypto-main.c
-> +++ b/drivers/crypto/ccp/ccp-crypto-main.c
-> @@ -222,9 +222,10 @@ static int ccp_crypto_enqueue_cmd(struct ccp_crypto_cmd *crypto_cmd)
->
->  	/* Check if the cmd can/should be queued */
->  	if (req_queue.cmd_count >= CCP_CRYPTO_MAX_QLEN) {
-> -		ret = -EBUSY;
-> -		if (!(crypto_cmd->cmd->flags & CCP_CMD_MAY_BACKLOG))
-> +		if (!(crypto_cmd->cmd->flags & CCP_CMD_MAY_BACKLOG)) {
-> +			ret = -EAGAIN;
->  			goto e_lock;
-> +		}
->  	}
->
->  	/* Look for an entry with the same tfm.  If there is a cmd
-> @@ -243,9 +244,6 @@ static int ccp_crypto_enqueue_cmd(struct ccp_crypto_cmd *crypto_cmd)
->  		ret = ccp_enqueue_cmd(crypto_cmd->cmd);
->  		if (!ccp_crypto_success(ret))
->  			goto e_lock;	/* Error, don't queue it */
-> -		if ((ret == -EBUSY) &&
-> -		    !(crypto_cmd->cmd->flags & CCP_CMD_MAY_BACKLOG))
-> -			goto e_lock;	/* Not backlogging, don't queue it */
->  	}
->
->  	if (req_queue.cmd_count >= CCP_CRYPTO_MAX_QLEN) {
-> diff --git a/drivers/crypto/ccp/ccp-dev.c b/drivers/crypto/ccp/ccp-dev.c
-> index 4e029b1..3d637e3 100644
-> --- a/drivers/crypto/ccp/ccp-dev.c
-> +++ b/drivers/crypto/ccp/ccp-dev.c
-> @@ -292,9 +292,12 @@ int ccp_enqueue_cmd(struct ccp_cmd *cmd)
->  	i = ccp->cmd_q_count;
->
->  	if (ccp->cmd_count >= MAX_CMD_QLEN) {
-> -		ret = -EBUSY;
-> -		if (cmd->flags & CCP_CMD_MAY_BACKLOG)
-> +		if (cmd->flags & CCP_CMD_MAY_BACKLOG) {
-> +			ret = -EBUSY;
->  			list_add_tail(&cmd->entry, &ccp->backlog);
-> +		} else {
-> +			ret = -EAGAIN;
-> +		}
->  	} else {
->  		ret = -EINPROGRESS;
->  		ccp->cmd_count++;
->
+I've fixed this up to pass the flags to __BUG_ENTRY(). I've pushed out
+updated arm64/exception-stack and arm64/vmap-stack branches.
+
+Thanks,
+Mark.
