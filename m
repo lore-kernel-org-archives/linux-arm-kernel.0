@@ -1,372 +1,211 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue,  8 Aug 2017 17:46:14 +0100
-Subject: [PATCH v2 09/11] firmware: arm_sdei: Add support for CPU and system
- power states
+Date: Tue,  8 Aug 2017 17:46:16 +0100
+Subject: [PATCH v2 11/11] KVM: arm64: Allow user-space to claim guest SMC-CC
+ ranges for SDEI
 In-Reply-To: <20170808164616.25949-1-james.morse@arm.com>
 References: <20170808164616.25949-1-james.morse@arm.com>
-Message-ID: <20170808164616.25949-10-james.morse@arm.com>
+Message-ID: <20170808164616.25949-12-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU enters an idle lower-power state or is powering off, we
-need to mask SDE events so that no events can be delivered while we
-are messing with the MMU as the registered entry points won't be valid.
+Instead of supporting SDEI in KVM, and providing a new API to
+control and configure the in-kernel support, allow user-space to
+request particular SMC-CC ranges from guest HVC calls to be handled
+by user-space.
 
-If the system reboots, we want to unregister all events and mask the CPUs.
-For kexec this allows us to hand a clean slate to the next kernel
-instead of relying on it to call sdei_{private,system}_data_reset().
+This requires two KVM capabilities, KVM_CAP_ARM_SDEI_1_0 advertises
+that KVM knows how match SDEI SMC-CC calls from a guest. To pass these
+calls to user-space requires this cap to be enabled using
+KVM_CAP_ENABLE_CAP_VM.
 
-For hibernate we unregister all events and re-register them on restore,
-in case we restored with the SDE code loaded at a different address.
-(e.g. KASLR).
-
-Add all the notifiers necessary to do this. We only support shared events
-so all events are left registered and enabled over CPU hotplug.
+Calls are passed with exit_reason = KVM_EXIT_HYPERCALL, the kvm_run
+structure has copies of the first 6 registers and the guest pstate.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- drivers/firmware/arm_sdei.c | 228 +++++++++++++++++++++++++++++++++++++++++++-
- include/linux/cpuhotplug.h  |   1 +
- include/linux/sdei.h        |   3 +
- 3 files changed, 231 insertions(+), 1 deletion(-)
+While I'm in here, remove KVM_CAP_ARM_SET_DEVICE_ADDR's extra entry
+for r=1;break?
 
-diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
-index 74e84de5bf0b..abe032560663 100644
---- a/drivers/firmware/arm_sdei.c
-+++ b/drivers/firmware/arm_sdei.c
-@@ -22,6 +22,8 @@
- #include <linux/arm-smccc.h>
- #include <linux/bitops.h>
- #include <linux/compiler.h>
-+#include <linux/cpuhotplug.h>
-+#include <linux/cpu_pm.h>
- #include <linux/errno.h>
- #include <linux/hardirq.h>
- #include <linux/kernel.h>
-@@ -29,12 +31,15 @@
- #include <linux/kvm_host.h>
- #include <linux/list.h>
- #include <linux/lockdep.h>
-+#include <linux/notifier.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
- #include <linux/percpu.h>
- #include <linux/platform_device.h>
-+#include <linux/pm.h>
- #include <linux/ptrace.h>
- #include <linux/preempt.h>
-+#include <linux/reboot.h>
- #include <linux/sdei.h>
- #include <linux/slab.h>
- #include <linux/smp.h>
-@@ -256,6 +261,11 @@ static void _ipi_mask_cpu(void *ignored)
- 	sdei_mask_local_cpu();
- }
+Changes from v1:
+ * all of it
+
+ Documentation/virtual/kvm/api.txt | 12 +++++++++---
+ arch/arm64/include/asm/kvm_host.h |  6 ++++++
+ arch/arm64/kvm/handle_exit.c      | 28 +++++++++++++++++++++++++++-
+ include/uapi/linux/kvm.h          |  1 +
+ virt/kvm/arm/arm.c                | 29 +++++++++++++++++++++++++++--
+ 5 files changed, 70 insertions(+), 6 deletions(-)
+
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index e63a35fafef0..740288d6e894 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -1012,7 +1012,7 @@ documentation when it pops into existence).
+ 4.37 KVM_ENABLE_CAP
  
-+static int sdei_cpuhp_down(unsigned int ignored)
-+{
-+	return sdei_mask_local_cpu();
-+}
-+
- int sdei_unmask_local_cpu(void)
- {
- 	int err;
-@@ -277,6 +287,11 @@ static void _ipi_unmask_cpu(void *ignored)
- 	sdei_unmask_local_cpu();
- }
+ Capability: KVM_CAP_ENABLE_CAP, KVM_CAP_ENABLE_CAP_VM
+-Architectures: x86 (only KVM_CAP_ENABLE_CAP_VM),
++Architectures: x86, arm, arm64 (only KVM_CAP_ENABLE_CAP_VM),
+ 	       mips (only KVM_CAP_ENABLE_CAP), ppc, s390
+ Type: vcpu ioctl, vm ioctl (with KVM_CAP_ENABLE_CAP_VM)
+ Parameters: struct kvm_enable_cap (in)
+@@ -3540,10 +3540,16 @@ pending operations.
+ 			__u32 pad;
+ 		} hypercall;
  
-+static int sdei_cpuhp_up(unsigned int ignored)
-+{
-+	return sdei_unmask_local_cpu();
-+}
-+
- static void _ipi_private_reset(void *ignored)
- {
- 	int err;
-@@ -315,6 +330,12 @@ static int sdei_platform_reset(void)
- 	return err;
- }
+-Unused.  This was once used for 'hypercall to userspace'.  To implement
+-such functionality, use KVM_EXIT_IO (x86) or KVM_EXIT_MMIO (all except s390).
++This was once used for 'hypercall to userspace'.  To implement such
++functionality, use KVM_EXIT_IO (x86) or KVM_EXIT_MMIO (all except s390).
+ Note KVM_EXIT_IO is significantly faster than KVM_EXIT_MMIO.
  
-+static int sdei_api_event_status(u32 event_num, u64 *result)
-+{
-+	return invoke_sdei_fn(SDEI_1_0_FN_SDEI_EVENT_STATUS, event_num, 0, 0, 0,
-+			      0, result);
-+}
++On arm64 this is used to complete guest hypercalls (HVC) in user space.
++e.g. Configuring SDEI or communicating with an emulated TEE.
++The required HVC ranges must first be enabled by KVM_CAP_ENABLE_CAP_VM.
++The 'args' array contains a copy of r0-r5 and 'longmode' contains a copy
++of the CPSR/PSTATE.
 +
- static int sdei_api_event_enable(u32 event_num)
- {
- 	return invoke_sdei_fn(SDEI_1_0_FN_SDEI_EVENT_ENABLE, event_num, 0, 0, 0,
-@@ -369,8 +390,23 @@ static int sdei_api_event_unregister(u32 event_num)
+ 		/* KVM_EXIT_TPR_ACCESS */
+ 		struct {
+ 			__u64 rip;
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 7733492d9a35..77b8436e745e 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -71,8 +71,14 @@ struct kvm_arch {
  
- static int _sdei_event_unregister(struct sdei_event *event)
- {
--	if (event->type == SDEI_EVENT_TYPE_SHARED)
-+	int err;
-+	u64 result;
-+	bool enabled;
+ 	/* Interrupt controller */
+ 	struct vgic_dist	vgic;
 +
-+	if (event->type == SDEI_EVENT_TYPE_SHARED) {
-+		/*
-+		 * We re-register events after power-management, remember if
-+		 * this event was previously enabled.
-+		 */
-+		err = sdei_api_event_status(event->event_num, &result);
-+		if (err)
-+			return err;
-+		enabled = !!(result & BIT(SDEI_EVENT_STATUS_ENABLED));
-+		event->registered->was_enabled = enabled;
-+
- 		return sdei_api_event_unregister(event->event_num);
-+	}
- 
- 	return -EINVAL;
- }
-@@ -403,6 +439,26 @@ int sdei_event_unregister(u32 event_num)
- }
- EXPORT_SYMBOL(sdei_event_unregister);
- 
-+/*
-+ * unregister events, but don't destroy them as they are re-registered by
-+ * sdei_reregister_events().
-+ */
-+static int sdei_event_unregister_all(void)
-+{
-+	int err = 0;
-+	struct sdei_event *event;
-+
-+	spin_lock(&sdei_events_lock);
-+	list_for_each_entry(event, &sdei_events, list) {
-+		err = _sdei_event_unregister(event);
-+		if (err)
-+			break;
-+	}
-+	spin_unlock(&sdei_events_lock);
-+
-+	return err;
-+}
-+
- static int sdei_api_event_register(u32 event_num, unsigned long entry_point,
- 				   void *arg, u64 flags, u64 affinity)
- {
-@@ -459,6 +515,148 @@ int sdei_event_register(u32 event_num, sdei_event_callback *cb, void *arg,
- }
- EXPORT_SYMBOL(sdei_event_register);
- 
-+static int sdei_reregister_event(struct sdei_event *event)
-+{
-+	int err;
-+
-+	lockdep_assert_held(&sdei_events_lock);
-+
-+	err = _sdei_event_register(event);
-+	if (err) {
-+		pr_err("Failed to re-register event %u\n", event->event_num);
-+		sdei_event_destroy(event);
-+		return err;
-+	}
-+
-+	if (event->type == SDEI_EVENT_TYPE_SHARED) {
-+		if (event->registered->was_enabled)
-+			err = sdei_api_event_enable(event->event_num);
-+	}
-+
-+	if (err)
-+		pr_err("Failed to re-enable event %u\n", event->event_num);
-+
-+	return err;
-+}
-+
-+static int sdei_reregister_events(void)
-+{
-+	int err = 0;
-+	struct sdei_event *event;
-+
-+	spin_lock(&sdei_events_lock);
-+	list_for_each_entry(event, &sdei_events, list) {
-+		err = sdei_reregister_event(event);
-+		if (err)
-+			break;
-+	}
-+	spin_unlock(&sdei_events_lock);
-+
-+	return err;
-+}
-+
-+/* When entering idle, mask/unmask events for this cpu */
-+static int sdei_pm_notifier(struct notifier_block *nb, unsigned long action,
-+			    void *data)
-+{
-+	int rv;
-+
-+	switch (action) {
-+	case CPU_PM_ENTER:
-+		rv = sdei_mask_local_cpu();
-+		break;
-+	case CPU_PM_EXIT:
-+		rv = sdei_unmask_local_cpu();
-+		break;
-+	default:
-+		return NOTIFY_DONE;
-+	}
-+
-+	if (rv)
-+		return notifier_from_errno(rv);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block sdei_pm_nb = {
-+	.notifier_call = sdei_pm_notifier,
-+};
-+
-+static int sdei_device_suspend(struct device *dev)
-+{
-+	on_each_cpu(_ipi_mask_cpu, NULL, true);
-+
-+	return 0;
-+}
-+
-+static int sdei_device_resume(struct device *dev)
-+{
-+	on_each_cpu(_ipi_unmask_cpu, NULL, true);
-+
-+	return 0;
-+}
-+
-+/*
-+ * We need all events to be reregistered when we resume from hibernate.
-+ *
-+ * The sequence is freeze->thaw. Reboot. freeze->restore. We unregister
-+ * events during freeze and save the enabled state, then re-register and
-+ * enable them during thaw and restore.
-+ */
-+static int sdei_device_freeze(struct device *dev)
-+{
-+	int err;
-+
-+	err = sdei_event_unregister_all();
-+	if (err)
-+		return err;
-+
-+	return sdei_device_suspend(dev);
-+}
-+
-+static int sdei_device_thaw(struct device *dev)
-+{
-+	sdei_device_resume(dev);
-+
-+	return sdei_reregister_events();
-+}
-+
-+static int sdei_device_restore(struct device *dev)
-+{
-+	int err;
-+
-+	err = sdei_platform_reset();
-+	if (err)
-+		return err;
-+
-+	return sdei_device_thaw(dev);
-+}
-+
-+static const struct dev_pm_ops sdei_pm_ops = {
-+	.suspend = sdei_device_suspend,
-+	.resume = sdei_device_resume,
-+	.freeze = sdei_device_freeze,
-+	.thaw = sdei_device_thaw,
-+	.restore = sdei_device_restore,
-+};
-+
-+/*
-+ * Mask all CPUs and unregister all events on panic, reboot or kexec.
-+ */
-+static int sdei_reboot_notifier(struct notifier_block *nb, unsigned long action,
-+				void *data)
-+{
-+	on_each_cpu(&_ipi_mask_cpu, NULL, true);
-+
-+	sdei_platform_reset();
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block sdei_reboot_nb = {
-+	.notifier_call = sdei_reboot_notifier,
-+};
-+
- static void sdei_smccc_smc(unsigned long function_id,
- 			   unsigned long arg0, unsigned long arg1,
- 			   unsigned long arg2, unsigned long arg3,
-@@ -541,9 +739,36 @@ static int sdei_probe(struct platform_device *pdev)
- 		return 0;
- 	}
- 
-+	err = cpuhp_setup_state_nocalls(CPUHP_AP_SDEI_STARTING, "SDEI",
-+				&sdei_cpuhp_up, &sdei_cpuhp_down);
-+	if (err) {
-+		pr_warn("Failed to register CPU hotplug notifier...\n");
-+		return err;
-+	}
-+
-+	err = cpu_pm_register_notifier(&sdei_pm_nb);
-+	if (err) {
-+		pr_warn("Failed to register CPU PM notifier...\n");
-+		goto remove_cpuhp;
-+	}
-+
-+	err = register_reboot_notifier(&sdei_reboot_nb);
-+	if (err) {
-+		pr_warn("Failed to register reboot notifier...\n");
-+		goto remove_cpupm;
-+	}
-+
- 	on_each_cpu(&_ipi_unmask_cpu, NULL, false);
- 
- 	return 0;
-+
-+remove_cpupm:
-+	cpu_pm_unregister_notifier(&sdei_pm_nb);
-+
-+remove_cpuhp:
-+	cpuhp_remove_state_nocalls(CPUHP_AP_SDEI_STARTING);
-+
-+	return err;
- }
- 
- static const struct of_device_id sdei_of_match[] = {
-@@ -554,6 +779,7 @@ static const struct of_device_id sdei_of_match[] = {
- static struct platform_driver sdei_driver = {
- 	.driver		= {
- 		.name			= "sdei",
-+		.pm			= &sdei_pm_ops,
- 		.of_match_table		= sdei_of_match,
- 	},
- 	.probe		= sdei_probe,
-diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-index b56573bf440d..48420a6dfdaa 100644
---- a/include/linux/cpuhotplug.h
-+++ b/include/linux/cpuhotplug.h
-@@ -90,6 +90,7 @@ enum cpuhp_state {
- 	CPUHP_AP_PERF_XTENSA_STARTING,
- 	CPUHP_AP_PERF_METAG_STARTING,
- 	CPUHP_AP_MIPS_OP_LOONGSON3_STARTING,
-+	CPUHP_AP_SDEI_STARTING,
- 	CPUHP_AP_ARM_VFP_STARTING,
- 	CPUHP_AP_ARM64_DEBUG_MONITORS_STARTING,
- 	CPUHP_AP_PERF_ARM_HW_BREAKPOINT_STARTING,
-diff --git a/include/linux/sdei.h b/include/linux/sdei.h
-index d19dbf2f29ca..431443536c11 100644
---- a/include/linux/sdei.h
-+++ b/include/linux/sdei.h
-@@ -89,6 +89,9 @@ struct sdei_registered_event {
- 	sdei_event_callback	*callback;
- 	void			*callback_arg;
- 	u32			 event_num;
-+
-+	/* Only valid over power management events. */
-+	bool			 was_enabled;
++	/* SMC-CC/HVC ranges user space has requested */
++	u32	hvc_passthrough_ranges;
  };
  
- /* The arch code entry point should then call this when an event arrives. */
++/* SMC-CC/HVC ranges that can be passed to user space */
++#define	KVM_HVC_RANGE_SDEI	1
++
+ #define KVM_NR_MEM_OBJS     40
+ 
+ /*
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 17d8a1677a0b..22eadf2cd82f 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -21,6 +21,7 @@
+ 
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
++#include <linux/sdei.h>
+ 
+ #include <asm/esr.h>
+ #include <asm/kvm_asm.h>
+@@ -34,15 +35,40 @@
+ 
+ typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
+ 
++#define HVC_PASSTHROUGH(kvm, range) (kvm->arch.hvc_passthrough_ranges & range)
++
++/*
++ * The guest made an SMC-CC call that user-space has claimed.
++ */
++static int populate_hypercall_exit(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	int i;
++
++	run->exit_reason = KVM_EXIT_HYPERCALL;
++
++	for (i = 0 ; i < ARRAY_SIZE(run->hypercall.args); i++)
++		run->hypercall.args[i] = vcpu_get_reg(vcpu, i);
++
++	run->hypercall.longmode = *vcpu_cpsr(vcpu);
++
++	return 0;
++}
++
+ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+ 	int ret;
++	struct kvm *kvm = vcpu->kvm;
++	unsigned long x0 = vcpu_get_reg(vcpu, 0);
+ 
+ 	trace_kvm_hvc_arm64(*vcpu_pc(vcpu), vcpu_get_reg(vcpu, 0),
+ 			    kvm_vcpu_hvc_get_imm(vcpu));
+ 	vcpu->stat.hvc_exit_stat++;
+ 
+-	ret = kvm_psci_call(vcpu);
++	if (IS_SDEI_CALL(x0) && HVC_PASSTHROUGH(kvm, KVM_HVC_RANGE_SDEI))
++		ret = populate_hypercall_exit(vcpu, run);
++	else
++		ret = kvm_psci_call(vcpu);
++
+ 	if (ret < 0) {
+ 		kvm_inject_undefined(vcpu);
+ 		return 1;
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 6cd63c18708a..8e6bc6ba918d 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -929,6 +929,7 @@ struct kvm_ppc_resize_hpt {
+ #define KVM_CAP_PPC_SMT_POSSIBLE 147
+ #define KVM_CAP_HYPERV_SYNIC2 148
+ #define KVM_CAP_HYPERV_VP_INDEX 149
++#define KVM_CAP_ARM_SDEI_1_0 150
+ 
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index e9765ee6d769..b8657b68fea7 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -206,8 +206,10 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	case KVM_CAP_READONLY_MEM:
+ 	case KVM_CAP_MP_STATE:
+ 	case KVM_CAP_IMMEDIATE_EXIT:
+-		r = 1;
+-		break;
++	case KVM_CAP_ENABLE_CAP_VM:
++#ifdef CONFIG_ARM64
++	case KVM_CAP_ARM_SDEI_1_0:
++#endif
+ 	case KVM_CAP_ARM_SET_DEVICE_ADDR:
+ 		r = 1;
+ 		break;
+@@ -1082,6 +1084,21 @@ static int kvm_vm_ioctl_set_device_addr(struct kvm *kvm,
+ 	}
+ }
+ 
++static int kvm_vm_ioctl_enable_cap(struct kvm *kvm, struct kvm_enable_cap *req)
++{
++	int err = -EINVAL;
++
++	if (req->flags)
++		return err;
++
++	if (IS_ENABLED(CONFIG_ARM64) && req->cap == KVM_CAP_ARM_SDEI_1_0) {
++		kvm->arch.hvc_passthrough_ranges |= KVM_HVC_RANGE_SDEI;
++		err = 0;
++	}
++
++	return err;
++}
++
+ long kvm_arch_vm_ioctl(struct file *filp,
+ 		       unsigned int ioctl, unsigned long arg)
+ {
+@@ -1118,6 +1135,14 @@ long kvm_arch_vm_ioctl(struct file *filp,
+ 
+ 		return 0;
+ 	}
++	case KVM_ENABLE_CAP: {
++		struct kvm_enable_cap req;
++
++		if (copy_from_user(&req, argp, sizeof(req)))
++			return -EFAULT;
++
++		return kvm_vm_ioctl_enable_cap(kvm, &req);
++	}
+ 	default:
+ 		return -EINVAL;
+ 	}
 -- 
 2.13.3
