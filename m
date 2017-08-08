@@ -1,32 +1,39 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Tue, 08 Aug 2017 21:43:58 +0800
-Subject: [PATCH 0/4] constify thermal_zone_of_device_ops structures
-In-Reply-To: <1501965437-30730-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1501965437-30730-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1502199838.4296.64.camel@intel.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Tue, 8 Aug 2017 16:45:36 +0300
+Subject: [PATCH v4 06/19] crypto: move algif to generic async completion
+In-Reply-To: <8585274.Umn6qnzcUd@tauon.chronox.de>
+References: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
+ <1502193834-11289-7-git-send-email-gilad@benyossef.com>
+ <8585274.Umn6qnzcUd@tauon.chronox.de>
+Message-ID: <CAOtvUMfp7Hie_RA8XNmWS084PvyO_xB0VAf2Vt9nR68cQhz3=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2017-08-05 at 22:37 +0200, Julia Lawall wrote:
-> The thermal_zone_of_device_ops structures are only passed as the
-> fourth
-> argument to thermal_zone_of_sensor_register, which is declared as
-> const.
-> Thus the thermal_zone_of_device_ops structures themselves can be
-> const.
-> 
-> Done with the help of Coccinelle.
+On Tue, Aug 8, 2017 at 4:10 PM, Stephan Mueller <smueller@chronox.de> wrote:
+> Am Dienstag, 8. August 2017, 14:03:37 CEST schrieb Gilad Ben-Yossef:
+>
+> Hi Gilad,
+>
+>> algif starts several async crypto ops and waits for their completion.
+>> Move it over to generic code doing the same.
+>
+> Just FYI: your patch set and my patch [1] will clash.
+>
+> [1] https://patchwork.kernel.org/patch/9875959/
 
-I still see the same problem in other thermal drivers, which is not
-covered by this patch set. Can we fix them all in one time?
+I'll try to rebase on linux-next + your patch than.
 
-thanks,
-rui
-> 
-> ---
-> 
-> ?drivers/thermal/broadcom/bcm2835_thermal.c |????2 +-
-> ?drivers/thermal/qoriq_thermal.c????????????|????2 +-
-> ?drivers/thermal/samsung/exynos_tmu.c???????|????2 +-
-> ?drivers/thermal/zx2967_thermal.c???????????|????2 +-
-> ?4 files changed, 4 insertions(+), 4 deletions(-)
+Thanks for letting me know.
+
+Gilad
+
+
+
+
+-- 
+Gilad Ben-Yossef
+Chief Coffee Drinker
+
+"If you take a class in large-scale robotics, can you end up in a
+situation where the homework eats your dog?"
+ -- Jean-Baptiste Queru
