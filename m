@@ -1,49 +1,75 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 8 Aug 2017 21:58:07 +0200 (CEST)
-Subject: [PATCH 7/9 v2] thermal: bcm2835: constify
- thermal_zone_of_device_ops structures
-In-Reply-To: <1502204943-20075-8-git-send-email-Julia.Lawall@lip6.fr>
-References: <1502204943-20075-1-git-send-email-Julia.Lawall@lip6.fr>
- <1502204943-20075-8-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1239025469.165778.1502222287761@email.1und1.de>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 8 Aug 2017 14:59:05 -0500
+Subject: linux-next 2017-08-08 keyboard failure on Nokia N900
+In-Reply-To: <20170808111243.GA20328@amd>
+References: <20170808101756.GA12922@amd> <20170808103444.GA18247@amd>
+ <20170808111243.GA20328@amd>
+Message-ID: <61264d43-eda3-df9d-0c06-28611f373ce7@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> Julia Lawall <Julia.Lawall@lip6.fr> hat am 8. August 2017 um 17:09 geschrieben:
-> 
-> 
-> The thermal_zone_of_device_ops structure is only passed as the fourth
-> argument to thermal_zone_of_sensor_register, which is declared as const.
-> Thus the thermal_zone_of_device_ops structure itself can be const.
-> 
-> Done with the help of Coccinelle.
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-Still
+On 08/08/2017 06:12 AM, Pavel Machek wrote:
+> Hi!
+> 
+>>> I tried today's linux-next. It boots on n900 (up to X), but then my
+>>> screen locks and I can't get back. Touchscreen worked, so my guess is
+>>> keyboard does not...? Ssh connection over usb still works.
+>>
+>> Confirmed, its the keyboard.
+>>
+>> Additionally, battery monitoring fails, because neither
+>>
+>> /sys/class/power_supply/{n900-,rx51-}battery/voltage_now
+>>
+>> exists.
+> 
+> And dmesg is helpful in this case:
+> 
+> [    0.675201] input: twl4030_pwrbutton as
+> /devices/platform/68000000.ocp/48070000.i2c/i2c-1/1-0048/48070000.i2c:twl at 48:pwrbutton/input/input1
+> [    0.676635] input: TWL4030 Keypad as
+> /devices/platform/68000000.ocp/48070000.i2c/i2c-1/1-0048/48070000.i2c:twl at 48:keypad/input/input2
+> [    0.679138] twl4030_keypad 48070000.i2c:twl at 48:keypad: request_irq
+> failed for irq no=156: -13
+> [    0.679779] twl4030_keypad: probe of 48070000.i2c:twl at 48:keypad
+> failed with error -13
+> [    0.682769] twl4030_madc 48070000.i2c:twl at 48:madc: could not
+> request irq
+> [    0.684051] twl4030_madc: probe of 48070000.i2c:twl at 48:madc failed
+> with error -13
+> [    0.685852] input: twl4030:vibrator as
+> /devices/platform/68000000.ocp/48070000.i2c/i2c-1/1-0048/48070000.i2c:twl at 48:audio/twl4030-vibra/input/input3
+> [    0.768890] omap_i2c 48070000.i2c: bus 1 rev3.3 at 2200 kHz
+> 
 
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+I've not precisely checked it, but smth is telling me that below 
+patch  can cause this:
 
-> 
-> ---
-> 
-> v2: This patch was present in the original series
-> 
->  drivers/thermal/broadcom/bcm2835_thermal.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/thermal/broadcom/bcm2835_thermal.c b/drivers/thermal/broadcom/bcm2835_thermal.c
-> index e6863c8..a4d6a0e 100644
-> --- a/drivers/thermal/broadcom/bcm2835_thermal.c
-> +++ b/drivers/thermal/broadcom/bcm2835_thermal.c
-> @@ -145,7 +145,7 @@ static void bcm2835_thermal_debugfs(struct platform_device *pdev)
->  	debugfs_create_regset32("regset", 0444, data->debugfsdir, regset);
->  }
->  
-> -static struct thermal_zone_of_device_ops bcm2835_thermal_ops = {
-> +static const struct thermal_zone_of_device_ops bcm2835_thermal_ops = {
->  	.get_temp = bcm2835_thermal_get_temp,
->  };
->  
->
+commit 78daaca78ee57dead0f4aa5ee399f0499e81cd9e
+Author: Julia Lawall <Julia.Lawall@lip6.fr>
+Date:   Thu May 4 22:10:50 2017 +0200
+
+    mfd: twl4030-irq: Drop unnecessary static
+    
+    Drop static on a local variable, when the variable is initialized before
+    any use, on every possible execution path through the function.
+
+--- a/drivers/mfd/twl4030-irq.c
++++ b/drivers/mfd/twl4030-irq.c
+@@ -685,7 +685,7 @@ int twl4030_sih_setup(struct device *dev, int module, int irq_base)
+ 
+ int twl4030_init_irq(struct device *dev, int irq_num)
+ {
+-       static struct irq_chip  twl4030_irq_chip;
++       struct irq_chip twl4030_irq_chip;
+
+
+but if we will look at code - it can be seen that this variable is passed by reference to
+irq_set_chip_and_handler(). 
+Ops. And what will happen when twl4030_init_irq() returns ;)
+
+-- 
+regards,
+-grygorii
