@@ -1,48 +1,113 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 8 Aug 2017 18:22:00 -0500
-Subject: [PATCH v9 1/4] PCI: Add new PCIe Fabric End Node flag,
- PCI_DEV_FLAGS_NO_RELAXED_ORDERING
-In-Reply-To: <1501917313-9812-2-git-send-email-dingtianhong@huawei.com>
-References: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
- <1501917313-9812-2-git-send-email-dingtianhong@huawei.com>
-Message-ID: <20170808232200.GO16580@bhelgaas-glaptop.roam.corp.google.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 8 Aug 2017 19:39:38 -0400
+Subject: [PATCH V8 1/2] PCI: handle CRS returned by device after FLR
+In-Reply-To: <20170808211926.GN16580@bhelgaas-glaptop.roam.corp.google.com>
+References: <1502071792-15263-1-git-send-email-okaya@codeaurora.org>
+ <20170808211926.GN16580@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <adaeb2e6-988d-a9af-b344-25b25198e1f0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 05, 2017 at 03:15:10PM +0800, Ding Tianhong wrote:
-> From: Casey Leedom <leedom@chelsio.com>
+On 8/8/2017 5:19 PM, Bjorn Helgaas wrote:
+> On Sun, Aug 06, 2017 at 10:09:51PM -0400, Sinan Kaya wrote:
 > 
-> The patch adds a new flag PCI_DEV_FLAGS_NO_RELAXED_ORDERING to indicate that
-> Relaxed Ordering (RO) attribute should not be used for Transaction Layer
-> Packets (TLP) targetted towards these affected root complexes. Current list
-> of affected parts include some Intel Xeon processors root complex which suffers from
-> flow control credits that result in performance issues. On these affected
-> parts RO can still be used for peer-2-peer traffic. AMD A1100 ARM ("SEATTLE")
-> Root complexes don't obey PCIe 3.0 ordering rules, hence could lead to
-> data-corruption.
+> We should include some high-level description of the problem we're
+> trying to solve here.
+> 
+> I *think* the problem is that we do something like this:
+> 
+>   - perform an FLR
+>   - sleep up to 1000ms total
+>   - read ~0 from PCI_COMMAND
+>   - warn that the device didn't return from FLR
+>   - touch the device before it's ready
+> 
+> When in fact the device is still initializing after the FLR and would
+> return CRS status if we looked for it.  So we should be looking for
+> CRS and waiting longer before we start using the device.
 
-This needs to include a link to the Intel spec
-(https://software.intel.com/sites/default/files/managed/9e/bc/64-ia-32-architectures-optimization-manual.pdf,
-sec 3.9.1).
+OK. I'll reuse your sentences towards an introductory paragraph. Yes, the
+issue describing is what is happening.
 
-It should also include a pointer to the AMD erratum, if available, or
-at least some reference to how we know it doesn't obey the rules.
+> 
+>> An endpoint is allowed to issue Configuration Request Retry Status (CRS)
+>> following a Function Level Reset (FLR) request to indicate that it is
+>> not ready to accept new requests. CRS is defined in PCIe r3.1, sec 2.3.1.
+>> Request Handling Rules and CRS usage in FLR context is mentioned in
+>> PCIe r3.1, sec 6.6.2. Function-Level Reset.
+>>
+>> A CRS indication will only be given if the address to be read is vendor ID
+>> register. pci_bus_read_dev_vendor_id() knows how to deal with CRS returned
+>> 0xFFFF0001 value and will continue polling until a value other than
+>> 0xFFFF0001 is returned within a given timeout.
+>>
+>> Try to discover device presence via CRS if supported. Otherwise, fall
+>> through to old behavior.
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>  drivers/pci/pci.c | 18 ++++++++++++++++++
+>>  1 file changed, 18 insertions(+)
+>>
+>> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+>> index af0cc34..cc9f1c0 100644
+>> --- a/drivers/pci/pci.c
+>> +++ b/drivers/pci/pci.c
+>> @@ -3819,8 +3819,26 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
+>>   */
+>>  static void pci_flr_wait(struct pci_dev *dev)
+>>  {
+>> +	u16 root_cap = 0;
+>>  	int i = 0;
+>>  	u32 id;
+>> +	bool ret;
+>> +
+>> +	pcie_capability_read_word(dev, PCI_EXP_RTCAP, &root_cap);
+>> +	if (root_cap & PCI_EXP_RTCAP_CRSVIS) {
+> 
+> Why do we want to look at PCI_EXP_RTCAP_CRSVIS here?  We don't look at
+> it in other paths that call pci_bus_read_dev_vendor_id().
 
-Ashok, thanks for chiming in.  Now that you have, I have a few more
-questions for you:
+OK. I was trying to separate old cold path from new code path for CRS capable
+HW. There is no harm in removing this check like you mentioned.  
 
-  - Is the above doc the one you mentioned as being now public?
-  
-  - Is this considered a hardware erratum?
-  
-  - If so, is there a pointer to that as well?
-  
-  - If this is not considered an erratum, can you provide any guidance
-    about how an OS should determine when it should use RO?
-    
-Relying on a list of device IDs in an optimization manual is OK for an
-erratum, but if it's *not* an erratum, it seems like a hole in the
-specs because as far as I know there's no generic way for the OS to
-discover whether to use RO.
+> 
+>> +		/* don't touch the HW before waiting 100ms */
+> 
+> I believe this, but would like to include a reference to the section
+> of the spec that contains this number.  Otherwise it's just a magic
+> number and makes future maintenance hard.
 
-Bjorn
+OK.
+
+> 
+>> +		msleep(100);
+>> +
+>> +		/*
+>> +		 * Physical functions return from here if found,
+>> +		 * virtual functions fall through as they return ~0 on vendor
+>> +		 * id read once CRS is completed.
+>> +		 */
+>> +		ret = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
+>> +						 60000);
+>> +		if (ret)
+>> +			return;
+>> +	}
+>>  
+>>  	do {
+>>  		msleep(100);
+>> -- 
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
