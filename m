@@ -1,27 +1,75 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 8 Aug 2017 08:16:24 +0530
-Subject: [PATCH v2 03/18] firmware: arm_scmi: add basic driver
- infrastructure for SCMI
-In-Reply-To: <1501857104-11279-4-git-send-email-sudeep.holla@arm.com>
-References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
- <1501857104-11279-4-git-send-email-sudeep.holla@arm.com>
-Message-ID: <CABb+yY0DQ1H8Apb6PoqKg-HrTfbyxShum9YtJit96T4Yo9+zrQ@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 7 Aug 2017 19:53:28 -0700
+Subject: [PATCH v2 1/5] mfd: mt6397: create irq mappings in mfd core driver
+In-Reply-To: <20170807213244.7hrd3isq5jj44dgd@piout.net>
+References: <1502071065-6745-1-git-send-email-chen.zhong@mediatek.com>
+ <1502071065-6745-2-git-send-email-chen.zhong@mediatek.com>
+ <20170807213244.7hrd3isq5jj44dgd@piout.net>
+Message-ID: <20170808025328.GB12328@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 4, 2017 at 8:01 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+On Mon, Aug 07, 2017 at 11:32:44PM +0200, Alexandre Belloni wrote:
+> On 07/08/2017 at 09:57:41 +0800, Chen Zhong wrote:
+> > The core driver should create and manage irq mappings instead of
+> > leaf drivers. This patch change to pass irq domain to
+> > devm_mfd_add_devices() and it will create mapping for irq resources
+> > automatically. And remove irq mapping in rtc driver since this has
+> > been done in core driver.
+> > 
+> > Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+> 
+> For the RTC part:
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> > ---
+> >  drivers/mfd/mt6397-core.c |    4 ++--
+> >  drivers/rtc/rtc-mt6397.c  |    2 +-
+> >  2 files changed, 3 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+> > index 04a601f..6546d7f 100644
+> > --- a/drivers/mfd/mt6397-core.c
+> > +++ b/drivers/mfd/mt6397-core.c
+> > @@ -289,7 +289,7 @@ static int mt6397_probe(struct platform_device *pdev)
+> >  
+> >  		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6323_devs,
+> >  					   ARRAY_SIZE(mt6323_devs), NULL,
+> > -					   0, NULL);
+> > +					   0, pmic->irq_domain);
+> >  		break;
+> >  
+> >  	case MT6397_CID_CODE:
+> > @@ -304,7 +304,7 @@ static int mt6397_probe(struct platform_device *pdev)
+> >  
+> >  		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6397_devs,
+> >  					   ARRAY_SIZE(mt6397_devs), NULL,
+> > -					   0, NULL);
+> > +					   0, pmic->irq_domain);
+> >  		break;
+> >  
+> >  	default:
+> > diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
+> > index 1a61fa5..22c52f7 100644
+> > --- a/drivers/rtc/rtc-mt6397.c
+> > +++ b/drivers/rtc/rtc-mt6397.c
+> > @@ -323,7 +323,7 @@ static int mtk_rtc_probe(struct platform_device *pdev)
+> >  	rtc->addr_base = res->start;
+> >  
+> >  	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> > -	rtc->irq = irq_create_mapping(mt6397_chip->irq_domain, res->start);
+> > +	rtc->irq = res->start;
 
-....
-> +int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
-> +{
-> +       int ret;
-> +       int timeout;
-> +       struct scmi_info *info = handle_to_scmi_info(handle);
-> +       struct device *dev = info->dev;
-> +
-> +       ret = mbox_send_message(info->tx_chan, xfer);
->
-NAK
+Why not
 
-This is still not fixed. For the reasons mentioned many times like
-here...   https://lkml.org/lkml/2017/7/7/465
+	rtc->irq = platform_get_irq(pdev, 0);
+	if (rtc->irq < 0)
+		return rtc->irq;
+?
+
+This way you propagate error properly.
+
+Thanks.
+
+-- 
+Dmitry
