@@ -1,67 +1,32 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 8 Aug 2017 12:37:44 +0200
-Subject: [PATCH v2] mmc: sunxi: Fix NULL pointer reference on clk_delays
-In-Reply-To: <20170808070244.27410-1-wens@csie.org>
-References: <20170808070244.27410-1-wens@csie.org>
-Message-ID: <CAPDyKFr+Ajx5yBcTR2555w-7tamSY8ozpn-1S2gWCQSZaGAWcQ@mail.gmail.com>
+Date: Tue, 8 Aug 2017 12:38:20 +0200
+Subject: [PATCH 0/5] constify sdhci_pltfm_data and sdhci_ops structures
+In-Reply-To: <1502099444-10473-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1502099444-10473-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <CAPDyKFq_o4miacACc_hFdCD78s+tAxQ3sTHn9KPjV7vWNKX-iw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 August 2017 at 09:02, Chen-Yu Tsai <wens@csie.org> wrote:
-> Some SoCs do not support clk delays for MMC in the clock control unit.
-> These include the old controllers in A10/A10s/A13/R8, and the new eMMC
-> controller in A64. The config structure for these controllers do not
-> specify clk_delays, but the check for this was replaced in commit
-> b0600daebf31 ("mmc: sunxi: Support controllers that can use both old
-> and new timings").
+On 7 August 2017 at 11:50, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
+> The sdhci_pltfm_data structures are only passed as the second
+> argument of sdhci_pltfm_init, which is const, while the sdhci_ops
+> structures are only stored in the ops field of a sdhci_pltfm_data
+> structure, which is also const.  Thus both kinds of structures can
+> be const as well.
 >
-> This patch adds back the check for clk_delays, and also adds comments
-> for both checks in sunxi_mmc_clk_set_phase().
+> Done with the help of Coccinelle.
 >
-> Fixes: b0600daebf31 ("mmc: sunxi: Support controllers that can use
->                       both old and new timings")
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>
+>  drivers/mmc/host/sdhci-bcm-kona.c  |    4 ++--
+>  drivers/mmc/host/sdhci-brcmstb.c   |    2 +-
+>  drivers/mmc/host/sdhci-of-arasan.c |    4 ++--
+>  drivers/mmc/host/sdhci-pic32.c     |    2 +-
+>  drivers/mmc/host/sdhci-pxav3.c     |    2 +-
+>  drivers/mmc/host/sdhci-sirf.c      |    4 ++--
+>  6 files changed, 9 insertions(+), 9 deletions(-)
 
 Thanks, applied for next!
 
 Kind regards
 Uffe
-
-> ---
-> This fixes an mmc regression on A10/A10s/A13/R8 and A64 introduced
-> by the A83T mmc patches.
->
-> v1 was inlined in a reply to "mmc: sunxi: fix new timings mode on A64
-> EMMC (MMC2) controller"
->
-> Changes since v1:
->
->   - Polished comments
->
-> I've tested this on my A10 Cubieboard and A20 Cubieboard2.
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 3777517982dd..9dc6d726ec49 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -722,9 +722,14 @@ static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
->  {
->         int index;
->
-> +       /* clk controller delays not used under new timings mode */
->         if (host->use_new_timings)
->                 return 0;
->
-> +       /* some old controllers don't support delays */
-> +       if (!host->cfg->clk_delays)
-> +               return 0;
-> +
->         /* determine delays */
->         if (rate <= 400000) {
->                 index = SDXC_CLK_400K;
-> --
-> 2.13.3
->
