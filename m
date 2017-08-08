@@ -1,38 +1,28 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Tue,  8 Aug 2017 17:08:59 +0200
-Subject: [PATCH 5/9 v2] thermal: exynos: constify thermal_zone_of_device_ops
- structures
-In-Reply-To: <1502204943-20075-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1502204943-20075-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1502204943-20075-6-git-send-email-Julia.Lawall@lip6.fr>
+From: david.wu@rock-chips.com (David Wu)
+Date: Tue,  8 Aug 2017 23:38:28 +0800
+Subject: [PATCH v3 0/7] Add rk3328 pwm support
+Message-ID: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The thermal_zone_of_device_ops structure is only passed as the fourth
-argument to thermal_zone_of_sensor_register, which is declared as const.
-Thus the thermal_zone_of_device_ops structure itself can be const.
+There are two features of rk3328 pwm module.
+ - PWM APB and function clocks are different.
+ - Add pwm atomic hardware update
 
-Done with the help of Coccinelle.
+David Wu (7):
+  pwm: rockchip: Add APB and function both clocks support
+  pwm: rockchip: Remove the judge from return value of pwm_config
+  pwm: rockchip: Use pwm_apply instead of the pwm_enable
+  pwm: rockchip: Move the configuration of polarity from
+    rockchip_pwm_set_enable() to rockchip_pwm_config()
+  pwm: rockchip: Use same pwm ops for each IP
+  pwm: rockchip: Add rk3328 pwm support
+  arm64: dts: rockchip: Add pwm nodes for rk3328
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+ .../devicetree/bindings/pwm/pwm-rockchip.txt       |   8 +-
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi           |  45 ++++
+ drivers/pwm/pwm-rockchip.c                         | 281 +++++++++++----------
+ 3 files changed, 199 insertions(+), 135 deletions(-)
 
----
-
-v2: This patch was present in the original series
-
- drivers/thermal/samsung/exynos_tmu.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-index 7b8ef09..ed805c7 100644
---- a/drivers/thermal/samsung/exynos_tmu.c
-+++ b/drivers/thermal/samsung/exynos_tmu.c
-@@ -1286,7 +1286,7 @@ static int exynos_map_dt_data(struct platform_device *pdev)
- 	return 0;
- }
- 
--static struct thermal_zone_of_device_ops exynos_sensor_ops = {
-+static const struct thermal_zone_of_device_ops exynos_sensor_ops = {
- 	.get_temp = exynos_get_temp,
- 	.set_emul_temp = exynos_tmu_set_emulation,
- };
+-- 
+1.9.1
