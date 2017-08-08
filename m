@@ -1,61 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 8 Aug 2017 10:22:07 +0100
-Subject: [PATCH RFC] irqchip: gic-v3: Support forced cpu irq affinity
- setting
-In-Reply-To: <1502183093-30327-1-git-send-email-alim.akhtar@samsung.com>
-References: <CGME20170808091129epcas1p48d0523675178cb841d97e64d5baab75f@epcas1p4.samsung.com>
- <1502183093-30327-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <7ea6b8d3-762a-d4e9-3b64-609b534c3960@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 8 Aug 2017 10:23:48 +0100
+Subject: [PATCH] lkdtm: Test VMAP_STACK allocates leading/trailing guard
+ pages
+In-Reply-To: <0e9a80c2-3e5e-db98-dff6-b45e9e4817fd@redhat.com>
+References: <20170807203948.GA22298@beast> <20170807220056.GA29059@remoulade>
+ <0e9a80c2-3e5e-db98-dff6-b45e9e4817fd@redhat.com>
+Message-ID: <20170808092348.GA19207@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/17 10:04, Alim Akhtar wrote:
-> Skip check for online cpu mask when setting irq affinity of per cpu timer
-> during early startup of not yet online cpu.
-> 
-> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
-> Signed-off-by: Aswani Reddy <aswani.reddy@samsung.com>
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> ---
->  drivers/irqchip/irq-gic-v3.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> Currently when non boot CPUs comes up and if setting of IRQ affinity gets called
-> before cpu online status gets updated, gic_mpidr_to_affinity() returns
-> undesirable cpu number. Using __force__ flag ignore cpu_online_mask and setup
-> the intended cpu affinity for the irq.
-> 
-> The same approch is used in gicv2 
-> (commit: ffde1de64012c: irqchip: Gic: Support forced affinity setting)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index dbffb7a..c238c64 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -640,11 +640,16 @@ static void gic_smp_init(void)
->  static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->  			    bool force)
->  {
-> -	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
-> +	unsigned int cpu;
->  	void __iomem *reg;
->  	int enabled;
->  	u64 val;
->  
-> +	if (!force)
-> +		cpu = cpumask_any_and(mask_val, cpu_online_mask);
-> +	else
-> +		cpu = cpumask_first(mask_val);
-> +
->  	if (cpu >= nr_cpu_ids)
->  		return -EINVAL;
->  
-> 
+On Mon, Aug 07, 2017 at 03:55:22PM -0700, Laura Abbott wrote:
+> On 08/07/2017 03:00 PM, Mark Rutland wrote:
+> > On Mon, Aug 07, 2017 at 01:39:48PM -0700, Kees Cook wrote:
 
-See
+> >> Do these tests both trip with the new arm64 VMAP_STACK code?
+> > 
+> >> +/* Test that VMAP_STACK is actually allocating with a leading guard page */
+> >> +void lkdtm_STACK_GUARD_PAGE_LEADING(void)
 
-https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/irqchip-4.13&id=65a30f8b300107266f316d550f060ccc186201a3
+> >> +/* Test that VMAP_STACK is actually allocating with a trailing guard page */
+> >> +void lkdtm_STACK_GUARD_PAGE_TRAILING(void)
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> > I can give these a go tomorrow.
+> > 
+> > These *should* fault, and IIUC should trigger the usual "Unable to handle
+> > kernel %s at virtual address %08lx\n" splat from arm64's __do_kernel_fault(),
+> > which should end up with an Oops().
+
+> I gave these a quick test in QEMU and they seem to do the correct thing:
+
+> # echo STACK_GUARD_PAGE_LEADING > /sys/kernel/debug/provoke-crash/DIRECT 
+> [   24.593306] lkdtm: Performing direct entry STACK_GUARD_PAGE_LEADING
+> [   24.593780] lkdtm: attempting bad read from page below current stack
+> [   24.594289] Unable to handle kernel paging request at virtual address ffff000009b77fff
+> [   24.594747] swapper pgtable: 4k pages, 48-bit VAs, pgd = ffff000009050000
+> [   24.595443] [ffff000009b77fff] *pgd=000000007effe003, *pud=000000007effd003, *pmd=000000007cc43003, *pte=0000000000000000
+> [   24.596743] Internal error: Oops: 96000007 [#1] PREEMPT SMP
+
+> # echo STACK_GUARD_PAGE_TRAILING > /sys/kernel/debug/provoke-crash/DIRECT 
+> [  103.144313] lkdtm: Performing direct entry STACK_GUARD_PAGE_TRAILING
+> [  103.144749] lkdtm: attempting bad read from page above current stack
+> [  103.145100] Unable to handle kernel paging request at virtual address ffff000009c2c000
+> [  103.145477] swapper pgtable: 4k pages, 48-bit VAs, pgd = ffff000009050000
+> [  103.145836] [ffff000009c2c000] *pgd=000000007effe003, *pud=000000007effd003, *pmd=000000007d014003, *pte=0000000000000000
+> [  103.146445] Internal error: Oops: 96000007 [#2] PREEMPT SMP
+
+Great! thanks for giving those a spin.
+
+I can confirm likewise on Juno with 64K pages (not that this should make
+any difference).
+
+Mark.
