@@ -1,60 +1,91 @@
-From: venkata.ravi.jonnalagadda@xilinx.com (Ravi Shankar Jonnalagadda)
-Date: Tue, 8 Aug 2017 16:42:16 +0530
-Subject: [PATCH 1/4] PCI:xilinx-nwl: Enable Root DMA
-In-Reply-To: <1502190739-13474-1-git-send-email-vjonnal@xilinx.com>
-References: <1502190739-13474-1-git-send-email-vjonnal@xilinx.com>
-Message-ID: <1502190739-13474-2-git-send-email-vjonnal@xilinx.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 8 Aug 2017 12:15:56 +0100
+Subject: [PATCH v2 5/5] mfd: mt6397: Add PMIC keys support to MT6397 driver
+In-Reply-To: <1502071065-6745-6-git-send-email-chen.zhong@mediatek.com>
+References: <1502071065-6745-1-git-send-email-chen.zhong@mediatek.com>
+ <1502071065-6745-6-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <20170808111556.dmx2s6bcwnsccrkn@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling Root DMA interrupts
+On Mon, 07 Aug 2017, Chen Zhong wrote:
 
-Adding Root DMA translations to bridge for Register Access
+> This patch adds compatible strings and interrupts for pmic keys
+> which serves as child device of MFD.
+> 
+> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+> ---
+>  drivers/mfd/mt6397-core.c |   36 +++++++++++++++++++++++++++++++++++-
+>  1 file changed, 35 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+> index 6546d7f..3c6a765 100644
+> --- a/drivers/mfd/mt6397-core.c
+> +++ b/drivers/mfd/mt6397-core.c
+> @@ -43,6 +43,30 @@
+>  	},
+>  };
+>  
+> +static const struct resource mt6323_keys_resources[] = {
+> +	{
+> +		.start = MT6323_IRQ_STATUS_PWRKEY,
+> +		.end   = MT6323_IRQ_STATUS_PWRKEY,
+> +		.flags = IORESOURCE_IRQ,
+> +	}, {
+> +		.start = MT6323_IRQ_STATUS_FCHRKEY,
+> +		.end   = MT6323_IRQ_STATUS_FCHRKEY,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static const struct resource mt6397_keys_resources[] = {
+> +	{
+> +		.start = MT6397_IRQ_PWRKEY,
+> +		.end   = MT6397_IRQ_PWRKEY,
+> +		.flags = IORESOURCE_IRQ,
+> +	}, {
+> +		.start = MT6397_IRQ_HOMEKEY,
+> +		.end   = MT6397_IRQ_HOMEKEY,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +};
 
-Signed-off-by: Ravi Shankar Jonnalagadda <vjonnal@xilinx.com>
----
- drivers/pci/host/pcie-xilinx-nwl.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+We have better ways to define these now.
 
-diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-index eec641a..5766582 100644
---- a/drivers/pci/host/pcie-xilinx-nwl.c
-+++ b/drivers/pci/host/pcie-xilinx-nwl.c
-@@ -39,6 +39,11 @@
- #define E_ECAM_CONTROL			0x00000228
- #define E_ECAM_BASE_LO			0x00000230
- #define E_ECAM_BASE_HI			0x00000234
-+#define E_DREG_CTRL			0x00000288
-+#define E_DREG_BASE_LO			0x00000290
-+
-+#define DREG_DMA_EN			BIT(0)
-+#define DREG_DMA_BASE_LO		0xFD0F0000
- 
- /* Ingress - address translations */
- #define I_MSII_CAPABILITIES		0x00000300
-@@ -57,6 +62,10 @@
- #define MSGF_MSI_STATUS_HI		0x00000444
- #define MSGF_MSI_MASK_LO		0x00000448
- #define MSGF_MSI_MASK_HI		0x0000044C
-+/* Root DMA Interrupt register */
-+#define MSGF_DMA_MASK			0x00000464
-+
-+#define MSGF_INTR_EN			BIT(0)
- 
- /* Msg filter mask bits */
- #define CFG_ENABLE_PM_MSG_FWD		BIT(1)
-@@ -766,6 +775,12 @@ static int nwl_pcie_bridge_init(struct nwl_pcie *pcie)
- 	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, MSGF_LEG_STATUS) &
- 			  MSGF_LEG_SR_MASKALL, MSGF_LEG_STATUS);
- 
-+	/* Enabling DREG translations */
-+	nwl_bridge_writel(pcie, DREG_DMA_EN, E_DREG_CTRL);
-+	nwl_bridge_writel(pcie, DREG_DMA_BASE_LO, E_DREG_BASE_LO);
-+	/* Enabling Root DMA interrupts */
-+	nwl_bridge_writel(pcie, MSGF_INTR_EN, MSGF_DMA_MASK);
-+
- 	/* Enable all legacy interrupts */
- 	nwl_bridge_writel(pcie, MSGF_LEG_SR_MASKALL, MSGF_LEG_MASK);
- 
+Please grep for "DEFINE_RES_"
+
+>  static const struct mfd_cell mt6323_devs[] = {
+>  	{
+>  		.name = "mt6323-regulator",
+> @@ -50,6 +74,11 @@
+>  	}, {
+>  		.name = "mt6323-led",
+>  		.of_compatible = "mediatek,mt6323-led"
+> +	}, {
+> +		.name = "mtk-pmic-keys",
+> +		.num_resources = ARRAY_SIZE(mt6323_keys_resources),
+> +		.resources = mt6323_keys_resources,
+> +		.of_compatible = "mediatek,mt6323-keys"
+>  	},
+>  };
+>  
+> @@ -71,7 +100,12 @@
+>  	}, {
+>  		.name = "mt6397-pinctrl",
+>  		.of_compatible = "mediatek,mt6397-pinctrl",
+> -	},
+> +	}, {
+> +		.name = "mtk-pmic-keys",
+> +		.num_resources = ARRAY_SIZE(mt6397_keys_resources),
+> +		.resources = mt6397_keys_resources,
+> +		.of_compatible = "mediatek,mt6397-keys"
+> +	}
+>  };
+>  
+>  static void mt6397_irq_lock(struct irq_data *data)
+
 -- 
-2.1.1
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
