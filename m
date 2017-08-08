@@ -1,43 +1,82 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  8 Aug 2017 10:39:18 +0200
-Subject: [PATCH 00/10] ARM,
- arm64: dts: renesas: Use R-Car GPIO Gen[123] fallback compat strings
-Message-ID: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
+Date: Tue,  8 Aug 2017 10:39:22 +0200
+Subject: [PATCH 04/10] ARM: dts: r8a7790: Use R-Car GPIO Gen2 fallback compat
+ string
+In-Reply-To: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
+References: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1502181568-12299-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use newly added R-Car GPIO Gen 1, 2 and 3 fallback compat strings in place
-of now deprecated non-generation specific R-Car GPIO fallback compat string
-in the DT of Renesas ARM and arm64 based SoCs.
+Use newly added R-Car GPIO Gen2 fallback compat string
+in place of now deprecated non-generation specific
+R-Car GPIO fallback compat string in the DT of the r8a7790 SoC.
 
-This should have no run-time effect as the driver matches against the
-per-SoC compat string before considering the fallback compat string.
+This should have no run-time effect as the driver matches against
+the per-SoC compat string before considering the fallback compat string.
 
-Based on renesas-devel-20170807-v4.13-rc4
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-Simon Horman (10):
-  ARM: dts: r8a7778: Use R-Car GPIO Gen1 fallback compat string
-  ARM: dts: r8a7779: Use R-Car GPIO Gen1 fallback compat string
-  ARM: dts: r8a7743: Use R-Car GPIO Gen2 fallback compat string
-  ARM: dts: r8a7790: Use R-Car GPIO Gen2 fallback compat string
-  ARM: dts: r8a7791: Use R-Car GPIO Gen2 fallback compat string
-  ARM: dts: r8a7792: Use R-Car GPIO Gen2 fallback compat string
-  ARM: dts: r8a7793: Use R-Car GPIO Gen2 fallback compat string
-  ARM: dts: r8a7794: Use R-Car GPIO Gen2 fallback compat string
-  arm64: dts: r8a7795: Use R-Car GPIO Gen3 fallback compat string
-  arm64: dts: r8a7796: Use R-Car GPIO Gen3 fallback compat string
-
- arch/arm/boot/dts/r8a7743.dtsi           | 16 ++++++++--------
- arch/arm/boot/dts/r8a7778.dtsi           | 10 +++++-----
- arch/arm/boot/dts/r8a7779.dtsi           | 14 +++++++-------
- arch/arm/boot/dts/r8a7790.dtsi           | 12 ++++++------
- arch/arm/boot/dts/r8a7791.dtsi           | 16 ++++++++--------
- arch/arm/boot/dts/r8a7792.dtsi           | 24 ++++++++++++------------
- arch/arm/boot/dts/r8a7793.dtsi           | 16 ++++++++--------
- arch/arm/boot/dts/r8a7794.dtsi           | 14 +++++++-------
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 16 ++++++++--------
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 16 ++++++++--------
- 10 files changed, 77 insertions(+), 77 deletions(-)
-
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 167fd57aea68..34cc293ac087 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -191,7 +191,7 @@
+ 	};
+ 
+ 	gpio0: gpio at e6050000 {
+-		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7790", "renesas,rcar-gen2-gpio";
+ 		reg = <0 0xe6050000 0 0x50>;
+ 		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -204,7 +204,7 @@
+ 	};
+ 
+ 	gpio1: gpio at e6051000 {
+-		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7790", "renesas,rcar-gen2-gpio";
+ 		reg = <0 0xe6051000 0 0x50>;
+ 		interrupts = <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -217,7 +217,7 @@
+ 	};
+ 
+ 	gpio2: gpio at e6052000 {
+-		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7790", "renesas,rcar-gen2-gpio";
+ 		reg = <0 0xe6052000 0 0x50>;
+ 		interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -230,7 +230,7 @@
+ 	};
+ 
+ 	gpio3: gpio at e6053000 {
+-		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7790", "renesas,rcar-gen2-gpio";
+ 		reg = <0 0xe6053000 0 0x50>;
+ 		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -243,7 +243,7 @@
+ 	};
+ 
+ 	gpio4: gpio at e6054000 {
+-		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7790", "renesas,rcar-gen2-gpio";
+ 		reg = <0 0xe6054000 0 0x50>;
+ 		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -256,7 +256,7 @@
+ 	};
+ 
+ 	gpio5: gpio at e6055000 {
+-		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7790", "renesas,rcar-gen2-gpio";
+ 		reg = <0 0xe6055000 0 0x50>;
+ 		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
 -- 
 2.1.4
