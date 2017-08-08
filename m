@@ -1,52 +1,50 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Tue, 8 Aug 2017 09:06:13 -0700
-Subject: [PATCH v2 2/3] arm/syscalls: Optimize address limit check
-In-Reply-To: <20170807175533.GA20805@n2100.armlinux.org.uk>
-References: <20170726170051.28328-1-thgarnie@google.com>
- <20170726170051.28328-2-thgarnie@google.com>
- <CAGXu5jLbJuokv+B_Nn8uRDVadi05ywJM7FSgpOr+maO2pQrd0w@mail.gmail.com>
- <CAJcbSZHfoHNPv3tk11iCj49UkLGU-QdeyMj2BS60wng5z5L4pg@mail.gmail.com>
- <20170807175533.GA20805@n2100.armlinux.org.uk>
-Message-ID: <CAJcbSZHkWXeLwBj+HOzmEhZCqgyawytgn8PMseTvtb-he5nq6Q@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 8 Aug 2017 17:10:51 +0100
+Subject: [PATCHv2 1/7] arm64: Add ASM_BUG()
+In-Reply-To: <20170808155853.ropux7lxk6rgbd2r@armageddon.cambridge.arm.com>
+References: <1501093110-3844-1-git-send-email-mark.rutland@arm.com>
+ <1501093110-3844-2-git-send-email-mark.rutland@arm.com>
+ <20170808153112.GF19207@leverpostej>
+ <20170808155853.ropux7lxk6rgbd2r@armageddon.cambridge.arm.com>
+Message-ID: <20170808161050.GH19207@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 7, 2017 at 10:55 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
->
-> It's better in so far as it avoids the problems previously highlighted.
->
-> However, it depends how efficient we want these paths to be - the
-> difference between your assembly and the assembly I've previously
-> supplied is that mine fills in any delay slots with some useful work
-> and avoids adding extra delay slots in this path.
+On Tue, Aug 08, 2017 at 04:58:53PM +0100, Catalin Marinas wrote:
+> On Tue, Aug 08, 2017 at 04:31:12PM +0100, Mark Rutland wrote:
+> > On Wed, Jul 26, 2017 at 07:18:24PM +0100, Mark Rutland wrote:
+> > > +#define __BUG_ENTRY(flags) 				\
+> > > +		.pushsection __bug_table,"a";		\
+> > > +		.align 2;				\
+> > > +	0:	.long 1f - 0b;				\
+> > > +_BUGVERBOSE_LOCATION(__FILE__, __LINE__)		\
+> > > +		.short flags; 				\
+> > > +		.popsection;				\
+> > > +	1:
+> > > +#else
+> > > +#define __BUG_ENTRY(flags)
+> > > +#endif
+> > > +
+> > > +#define ASM_BUG_FLAGS(flags)				\
+> > > +	__BUG_ENTRY(0)					\
+> > > +	brk	BUG_BRK_IMM
+> > 
+> > I accidentally dropped the flags here, which turns all WARN*s into BUGs.
+> > 
+> > I've fixed this up to pass the flags to __BUG_ENTRY(). I've pushed out
+> > updated arm64/exception-stack and arm64/vmap-stack branches.
+> 
+> I'll pull arm64/exception-stack into for-next/core (I haven't got to the
+> vmap-stack series yet).
 
-The previous assembly implementation we did was design as you
-described but all checks were done after the pending work was managed.
-I would like the address limit check to be done before, especially if
-we move from panic to a SIGKILL approach.
+If you could hold off for a day, I'd like to make one final change and prevent
+use of the final record's LR value, where FP is NULL, since that LR isn't
+meaningful, and makes the backtrace look weird:
 
->
-> Arguably, the system call exit path is as important as the system
-> call entry path for OS performance, so I think we should strive to
-> make it as efficient as possible - much as I already did when I
-> posted code on this topic previously.
+[ 2785.650646] [<ffff000008082cb0>] el0_svc_naked+0x24/0x28
+[ 2785.656016] [<0000ffffaf717554>] 0xffffaf717554
 
-How do you think it could improve while keeping the check before pending work?
+Otherwise, I can do that as a fixup.
 
->
-> I think that code can simply be adapted to call your C function
-> instead of the assembly "addr_limit_fail" label.
-
-I don't use the label anymore on this version.
-
->
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-> According to speedtest.net: 8.21Mbps down 510kbps up
-
-
-
--- 
-Thomas
+Thanks,
+Mark.
