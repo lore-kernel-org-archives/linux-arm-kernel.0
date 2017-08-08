@@ -1,49 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  8 Aug 2017 21:08:18 +0200
-Subject: [PATCH] clk: gemini: hands off PCI OE bit
-Message-ID: <20170808190818.11740-1-linus.walleij@linaro.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 8 Aug 2017 21:58:07 +0200 (CEST)
+Subject: [PATCH 7/9 v2] thermal: bcm2835: constify
+ thermal_zone_of_device_ops structures
+In-Reply-To: <1502204943-20075-8-git-send-email-Julia.Lawall@lip6.fr>
+References: <1502204943-20075-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1502204943-20075-8-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1239025469.165778.1502222287761@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This bit is pin control, and needs to be carefully managed by the
-new pin control driver.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/clk/clk-gemini.c | 7 -------
- 1 file changed, 7 deletions(-)
+> Julia Lawall <Julia.Lawall@lip6.fr> hat am 8. August 2017 um 17:09 geschrieben:
+> 
+> 
+> The thermal_zone_of_device_ops structure is only passed as the fourth
+> argument to thermal_zone_of_sensor_register, which is declared as const.
+> Thus the thermal_zone_of_device_ops structure itself can be const.
+> 
+> Done with the help of Coccinelle.
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-diff --git a/drivers/clk/clk-gemini.c b/drivers/clk/clk-gemini.c
-index b4cf2f699a21..f940e5af845b 100644
---- a/drivers/clk/clk-gemini.c
-+++ b/drivers/clk/clk-gemini.c
-@@ -37,7 +37,6 @@ static DEFINE_SPINLOCK(gemini_clk_lock);
- 
- #define GEMINI_GLOBAL_MISC_CONTROL	0x30
- #define PCI_CLK_66MHZ			BIT(18)
--#define PCI_CLK_OE			BIT(17)
- 
- #define GEMINI_GLOBAL_CLOCK_CONTROL	0x34
- #define PCI_CLKRUN_EN			BIT(16)
-@@ -159,9 +158,6 @@ static int gemini_pci_enable(struct clk_hw *hw)
- 
- 	regmap_update_bits(pciclk->map, GEMINI_GLOBAL_CLOCK_CONTROL,
- 			   0, PCI_CLKRUN_EN);
--	regmap_update_bits(pciclk->map,
--			   GEMINI_GLOBAL_MISC_CONTROL,
--			   0, PCI_CLK_OE);
- 	return 0;
- }
- 
-@@ -169,9 +165,6 @@ static void gemini_pci_disable(struct clk_hw *hw)
- {
- 	struct clk_gemini_pci *pciclk = to_pciclk(hw);
- 
--	regmap_update_bits(pciclk->map,
--			   GEMINI_GLOBAL_MISC_CONTROL,
--			   PCI_CLK_OE, 0);
- 	regmap_update_bits(pciclk->map, GEMINI_GLOBAL_CLOCK_CONTROL,
- 			   PCI_CLKRUN_EN, 0);
- }
--- 
-2.9.4
+Still
+
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+
+> 
+> ---
+> 
+> v2: This patch was present in the original series
+> 
+>  drivers/thermal/broadcom/bcm2835_thermal.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/thermal/broadcom/bcm2835_thermal.c b/drivers/thermal/broadcom/bcm2835_thermal.c
+> index e6863c8..a4d6a0e 100644
+> --- a/drivers/thermal/broadcom/bcm2835_thermal.c
+> +++ b/drivers/thermal/broadcom/bcm2835_thermal.c
+> @@ -145,7 +145,7 @@ static void bcm2835_thermal_debugfs(struct platform_device *pdev)
+>  	debugfs_create_regset32("regset", 0444, data->debugfsdir, regset);
+>  }
+>  
+> -static struct thermal_zone_of_device_ops bcm2835_thermal_ops = {
+> +static const struct thermal_zone_of_device_ops bcm2835_thermal_ops = {
+>  	.get_temp = bcm2835_thermal_get_temp,
+>  };
+>  
+>
