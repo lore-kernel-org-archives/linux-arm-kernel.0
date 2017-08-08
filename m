@@ -1,69 +1,64 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 8 Aug 2017 23:44:01 +0200
-Subject: linux-next 2017-08-08 keyboard failure on Nokia N900
-In-Reply-To: <alpine.DEB.2.20.1708082228400.4939@hadrien>
-References: <20170808101756.GA12922@amd> <20170808103444.GA18247@amd>
- <20170808111243.GA20328@amd>
- <61264d43-eda3-df9d-0c06-28611f373ce7@ti.com>
- <alpine.DEB.2.20.1708082203510.2095@hadrien>
- <43d915d2-3260-88b6-095d-4de8240ff29e@ti.com>
- <alpine.DEB.2.20.1708082228400.4939@hadrien>
-Message-ID: <20170808214400.GA18961@amd>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 8 Aug 2017 23:44:39 +0200
+Subject: [PATCH] mtd: physmap_of: Retire Gemini pad control
+In-Reply-To: <20170808190510.11496-1-linus.walleij@linaro.org>
+References: <20170808190510.11496-1-linus.walleij@linaro.org>
+Message-ID: <4afc385a-688c-6dff-eabf-7f90ea92ca12@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > > > I've not precisely checked it, but smth is telling me that below
-> > > > patch  can cause this:
-> > > >
-> > > > commit 78daaca78ee57dead0f4aa5ee399f0499e81cd9e
-...
-> > > >      mfd: twl4030-irq: Drop unnecessary static
-> > > >
-> > > >      Drop static on a local variable, when the variable is initialized
-> > > > before
-> > > >      any use, on every possible execution path through the function.
-> > > >
-> > > > --- a/drivers/mfd/twl4030-irq.c
-> > > > +++ b/drivers/mfd/twl4030-irq.c
-...
-> > > >   int twl4030_init_irq(struct device *dev, int irq_num)
-> > > >   {
-> > > > -       static struct irq_chip  twl4030_irq_chip;
-> > > > +       struct irq_chip twl4030_irq_chip;
-> > > >
-> > > >
-> > > > but if we will look at code - it can be seen that this variable is passed
-> > > > by reference to
-> > > > irq_set_chip_and_handler().
-> > > > Ops. And what will happen when twl4030_init_irq() returns ;)
-> > >
-> > > The patch is not correct as was already noted when it was submitted:
-..
-> > Hm. This one is in linux-next, but shouldn't. Right?
-> >
-> >  git log --oneline  -10 linux-next/master
-> > c0b96db Add linux-next specific files for 20170808
-> >
-> > git log --oneline  linux-next/master | grep "Drop unnecessary static"
-> > 78daaca mfd: twl4030-irq: Drop unnecessary static
+On 08/08/2017 09:05 PM, Linus Walleij wrote:
+> I wrote a proper pin control driver for the Gemini. Retire this
+> SoC-specific pad control and rely on the pin controller to manage
+> this.
 > 
-> OK, it seems like the patch was made twice, the second one was commented
-> on and the first one was applied.  78daaca should not be there.
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Lee, it has your sign-off, can you drop the patch from your tree? It
-is known bad.
+Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
 
-Thanks,
-								Pavel
+Thanks!
+
+> ---
+>  drivers/mtd/maps/physmap_of_gemini.c | 16 ----------------
+>  1 file changed, 16 deletions(-)
+> 
+> diff --git a/drivers/mtd/maps/physmap_of_gemini.c b/drivers/mtd/maps/physmap_of_gemini.c
+> index 05b286b5289f..4ed1a6bb4d3c 100644
+> --- a/drivers/mtd/maps/physmap_of_gemini.c
+> +++ b/drivers/mtd/maps/physmap_of_gemini.c
+> @@ -43,13 +43,6 @@
+>  
+>  #define FLASH_PARALLEL_HIGH_PIN_CNT	(1 << 20)	/* else low pin cnt */
+>  
+> -/* Miscellaneous Control Register */
+> -#define GLOBAL_MISC_CTRL		0x30
+> -#define FLASH_PADS_MASK			0x07
+> -#define NAND_PADS_DISABLE		BIT(2)
+> -#define PFLASH_PADS_DISABLE		BIT(1)
+> -#define SFLASH_PADS_DISABLE		BIT(0)
+> -
+>  static const struct of_device_id syscon_match[] = {
+>  	{ .compatible = "cortina,gemini-syscon" },
+>  	{ },
+> @@ -102,15 +95,6 @@ int of_flash_probe_gemini(struct platform_device *pdev,
+>  				 map->bankwidth * 8);
+>  	}
+>  
+> -	/* Activate parallel (NOR flash) mode */
+> -	ret = regmap_update_bits(rmap, GLOBAL_MISC_CTRL,
+> -				 FLASH_PADS_MASK,
+> -				 SFLASH_PADS_DISABLE | NAND_PADS_DISABLE);
+> -	if (ret) {
+> -		dev_err(dev, "unable to set up physmap pads\n");
+> -		return -ENODEV;
+> -	}
+> -
+>  	dev_info(&pdev->dev, "initialized Gemini-specific physmap control\n");
+>  
+>  	return 0;
+> 
+
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170808/bff17b2d/attachment.sig>
+Best regards,
+Marek Vasut
