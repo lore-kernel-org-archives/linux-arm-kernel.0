@@ -1,428 +1,372 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue,  8 Aug 2017 17:46:15 +0100
-Subject: [PATCH v2 10/11] firmware: arm_sdei: add support for CPU private
- events
+Date: Tue,  8 Aug 2017 17:46:14 +0100
+Subject: [PATCH v2 09/11] firmware: arm_sdei: Add support for CPU and system
+ power states
 In-Reply-To: <20170808164616.25949-1-james.morse@arm.com>
 References: <20170808164616.25949-1-james.morse@arm.com>
-Message-ID: <20170808164616.25949-11-james.morse@arm.com>
+Message-ID: <20170808164616.25949-10-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Private SDE events are per-cpu, and need to be registered and enabled
-on each CPU.
+When a CPU enters an idle lower-power state or is powering off, we
+need to mask SDE events so that no events can be delivered while we
+are messing with the MMU as the registered entry points won't be valid.
 
-Hide this detail from the caller by adapting our {,un}register and
-{en,dis}able calls to send an IPI to each CPU if the event is private.
+If the system reboots, we want to unregister all events and mask the CPUs.
+For kexec this allows us to hand a clean slate to the next kernel
+instead of relying on it to call sdei_{private,system}_data_reset().
 
-CPU private events are unregistered when the CPU is powered-off, and
-re-registered when the CPU is brought back online. This saves bringing
-secondary cores back online to call private_reset() on shutdown, kexec
-and resume from hibernate.
+For hibernate we unregister all events and re-register them on restore,
+in case we restored with the SDE code loaded at a different address.
+(e.g. KASLR).
+
+Add all the notifiers necessary to do this. We only support shared events
+so all events are left registered and enabled over CPU hotplug.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
-Changes since v1:
- * Made unregister on cpu-down print an error and continue as returning an error
-   from here is ignored.
-
- drivers/firmware/arm_sdei.c | 241 +++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 227 insertions(+), 14 deletions(-)
+ drivers/firmware/arm_sdei.c | 228 +++++++++++++++++++++++++++++++++++++++++++-
+ include/linux/cpuhotplug.h  |   1 +
+ include/linux/sdei.h        |   3 +
+ 3 files changed, 231 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
-index abe032560663..67f941246711 100644
+index 74e84de5bf0b..abe032560663 100644
 --- a/drivers/firmware/arm_sdei.c
 +++ b/drivers/firmware/arm_sdei.c
-@@ -20,9 +20,11 @@
- 
- #include <linux/acpi.h>
+@@ -22,6 +22,8 @@
  #include <linux/arm-smccc.h>
-+#include <linux/atomic.h>
  #include <linux/bitops.h>
  #include <linux/compiler.h>
- #include <linux/cpuhotplug.h>
-+#include <linux/cpu.h>
- #include <linux/cpu_pm.h>
++#include <linux/cpuhotplug.h>
++#include <linux/cpu_pm.h>
  #include <linux/errno.h>
  #include <linux/hardirq.h>
-@@ -65,12 +67,49 @@ struct sdei_event {
- 	u64			priority;
- 
- 	/* This pointer is handed to firmware as the event argument. */
--	struct sdei_registered_event *registered;
-+	union {
-+		/* Shared events */
-+		struct sdei_registered_event *registered;
-+
-+		/* CPU private events */
-+		struct sdei_registered_event __percpu *private_registered;
-+	};
- };
- 
- static LIST_HEAD(sdei_events);
- static DEFINE_SPINLOCK(sdei_events_lock);
- 
-+/* When frozen, cpu-hotplug notifiers shouldn't unregister/re-register events */
-+static bool frozen;
-+
-+/* Private events are registered/enabled via IPI passing one of these */
-+struct sdei_crosscall_args {
-+	struct sdei_event *event;
-+	atomic_t errors;
-+	int first_error;
-+};
-+
-+#define CROSSCALL_INIT(arg, event)	(arg.event = event, \
-+					 arg.first_error = 0, \
-+					 atomic_set(&arg.errors, 0))
-+
-+static inline int sdei_do_cross_call(void *fn, struct sdei_event *event)
-+{
-+	struct sdei_crosscall_args arg;
-+
-+	CROSSCALL_INIT(arg, event);
-+	on_each_cpu(fn, &arg, true);
-+
-+	return arg.first_error;
-+}
-+
-+static inline void
-+sdei_cross_call_return(struct sdei_crosscall_args *arg, int err)
-+{
-+	if (err && (atomic_inc_return(&arg->errors) == 1))
-+		arg->first_error = err;
-+}
-+
- static int sdei_to_linux_errno(unsigned long sdei_err)
- {
- 	switch (sdei_err) {
-@@ -210,6 +249,25 @@ static struct sdei_event *sdei_event_create(u32 event_num,
- 		reg->callback = cb;
- 		reg->callback_arg = cb_arg;
- 		event->registered = reg;
-+	} else {
-+		int cpu;
-+		struct sdei_registered_event __percpu *regs;
-+
-+		regs = alloc_percpu(struct sdei_registered_event);
-+		if (!regs) {
-+			kfree(event);
-+			return ERR_PTR(-ENOMEM);
-+		}
-+
-+		for_each_possible_cpu(cpu) {
-+			reg = per_cpu_ptr(regs, cpu);
-+
-+			reg->event_num = event->event_num;
-+			reg->callback = cb;
-+			reg->callback_arg = cb_arg;
-+		}
-+
-+		event->private_registered = regs;
- 	}
- 
- 	if (sdei_event_find(event_num)) {
-@@ -231,6 +289,8 @@ static void sdei_event_destroy(struct sdei_event *event)
- 
- 	if (event->type == SDEI_EVENT_TYPE_SHARED)
- 		kfree(event->registered);
-+	else
-+		free_percpu(event->private_registered);
- 
- 	kfree(event);
- }
-@@ -261,11 +321,6 @@ static void _ipi_mask_cpu(void *ignored)
+ #include <linux/kernel.h>
+@@ -29,12 +31,15 @@
+ #include <linux/kvm_host.h>
+ #include <linux/list.h>
+ #include <linux/lockdep.h>
++#include <linux/notifier.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+ #include <linux/percpu.h>
+ #include <linux/platform_device.h>
++#include <linux/pm.h>
+ #include <linux/ptrace.h>
+ #include <linux/preempt.h>
++#include <linux/reboot.h>
+ #include <linux/sdei.h>
+ #include <linux/slab.h>
+ #include <linux/smp.h>
+@@ -256,6 +261,11 @@ static void _ipi_mask_cpu(void *ignored)
  	sdei_mask_local_cpu();
  }
  
--static int sdei_cpuhp_down(unsigned int ignored)
--{
--	return sdei_mask_local_cpu();
--}
--
- int sdei_unmask_local_cpu(void)
- {
- 	int err;
-@@ -287,11 +342,6 @@ static void _ipi_unmask_cpu(void *ignored)
- 	sdei_unmask_local_cpu();
- }
- 
--static int sdei_cpuhp_up(unsigned int ignored)
--{
--	return sdei_unmask_local_cpu();
--}
--
- static void _ipi_private_reset(void *ignored)
- {
- 	int err;
-@@ -342,6 +392,16 @@ static int sdei_api_event_enable(u32 event_num)
- 			      0, NULL);
- }
- 
-+static void _ipi_event_enable(void *data)
++static int sdei_cpuhp_down(unsigned int ignored)
 +{
-+	int err;
-+	struct sdei_crosscall_args *arg = data;
-+
-+	err = sdei_api_event_enable(arg->event->event_num);
-+
-+	sdei_cross_call_return(arg, err);
-+}
-+
- int sdei_event_enable(u32 event_num)
- {
- 	int err = -EINVAL;
-@@ -353,6 +413,8 @@ int sdei_event_enable(u32 event_num)
- 		err = -ENOENT;
- 	else if (event->type == SDEI_EVENT_TYPE_SHARED)
- 		err = sdei_api_event_enable(event->event_num);
-+	else
-+		err = sdei_do_cross_call(_ipi_event_enable, event);
- 	spin_unlock(&sdei_events_lock);
- 
- 	return err;
-@@ -365,6 +427,16 @@ static int sdei_api_event_disable(u32 event_num)
- 			      0, 0, NULL);
- }
- 
-+static void _ipi_event_disable(void *data)
-+{
-+	int err;
-+	struct sdei_crosscall_args *arg = data;
-+
-+	err = sdei_api_event_disable(arg->event->event_num);
-+
-+	sdei_cross_call_return(arg, err);
-+}
-+
- int sdei_event_disable(u32 event_num)
- {
- 	int err = -EINVAL;
-@@ -376,6 +448,9 @@ int sdei_event_disable(u32 event_num)
- 		err = -ENOENT;
- 	else if (event->type == SDEI_EVENT_TYPE_SHARED)
- 		err = sdei_api_event_disable(event->event_num);
-+	else
-+		err = sdei_do_cross_call(_ipi_event_disable, event);
-+
- 	spin_unlock(&sdei_events_lock);
- 
- 	return err;
-@@ -388,6 +463,27 @@ static int sdei_api_event_unregister(u32 event_num)
- 			      0, 0, 0, NULL);
- }
- 
-+static void _local_event_unregister(void *data)
-+{
-+	int err;
-+	u64 result;
-+	struct sdei_registered_event *reg;
-+	struct sdei_crosscall_args *arg = data;
-+
-+	WARN_ON_ONCE(preemptible());
-+	lockdep_assert_held(&sdei_events_lock);
-+
-+	reg = per_cpu_ptr(arg->event->private_registered, smp_processor_id());
-+	err = sdei_api_event_status(reg->event_num, &result);
-+	if (!err) {
-+		reg->was_enabled = !!(result & BIT(SDEI_EVENT_STATUS_ENABLED));
-+
-+		err = sdei_api_event_unregister(arg->event->event_num);
-+	}
-+
-+	sdei_cross_call_return(arg, err);
-+}
-+
- static int _sdei_event_unregister(struct sdei_event *event)
- {
- 	int err;
-@@ -408,7 +504,7 @@ static int _sdei_event_unregister(struct sdei_event *event)
- 		return sdei_api_event_unregister(event->event_num);
- 	}
- 
--	return -EINVAL;
-+	return sdei_do_cross_call(_local_event_unregister, event);
- }
- 
- int sdei_event_unregister(u32 event_num)
-@@ -467,15 +563,41 @@ static int sdei_api_event_register(u32 event_num, unsigned long entry_point,
- 			      flags, affinity, NULL);
- }
- 
-+static void _local_event_register(void *data)
-+{
-+	int err;
-+	struct sdei_registered_event *reg;
-+	struct sdei_crosscall_args *arg = data;
-+
-+	WARN_ON(preemptible());
-+	lockdep_assert_held(&sdei_events_lock);
-+
-+	reg = per_cpu_ptr(arg->event->private_registered, smp_processor_id());
-+	err = sdei_api_event_register(arg->event->event_num, sdei_entry_point,
-+				      reg, 0, 0);
-+
-+	sdei_cross_call_return(arg, err);
-+}
-+
- static int _sdei_event_register(struct sdei_event *event)
- {
-+	int err;
-+
- 	if (event->type == SDEI_EVENT_TYPE_SHARED)
- 		return sdei_api_event_register(event->event_num,
- 					       sdei_entry_point,
- 					       event->registered,
- 					       SDEI_EVENT_REGISTER_RM_ANY, 0);
- 
--	return -EINVAL;
-+	get_online_cpus();
-+
-+	err = sdei_do_cross_call(_local_event_register, event);
-+	if (err)
-+		sdei_do_cross_call(_local_event_unregister, event);
-+
-+	put_online_cpus();
-+
-+	return err;
- }
- 
- int sdei_event_register(u32 event_num, sdei_event_callback *cb, void *arg,
-@@ -515,6 +637,22 @@ int sdei_event_register(u32 event_num, sdei_event_callback *cb, void *arg,
- }
- EXPORT_SYMBOL(sdei_event_register);
- 
-+static void _local_event_reenable(void *data)
-+{
-+	int err = 0;
-+	struct sdei_registered_event *reg;
-+	struct sdei_crosscall_args *arg = data;
-+
-+	WARN_ON_ONCE(preemptible());
-+	lockdep_assert_held(&sdei_events_lock);
-+
-+	reg = per_cpu_ptr(arg->event->private_registered, smp_processor_id());
-+	if (reg->was_enabled)
-+		err = sdei_api_event_enable(arg->event->event_num);
-+
-+	sdei_cross_call_return(arg, err);
-+}
-+
- static int sdei_reregister_event(struct sdei_event *event)
- {
- 	int err;
-@@ -531,6 +669,8 @@ static int sdei_reregister_event(struct sdei_event *event)
- 	if (event->type == SDEI_EVENT_TYPE_SHARED) {
- 		if (event->registered->was_enabled)
- 			err = sdei_api_event_enable(event->event_num);
-+	} else {
-+		err = sdei_do_cross_call(_local_event_reenable, event);
- 	}
- 
- 	if (err)
-@@ -555,6 +695,68 @@ static int sdei_reregister_events(void)
- 	return err;
- }
- 
-+static int sdei_cpuhp_down(unsigned int cpu)
-+{
-+	struct sdei_event *event;
-+	struct sdei_crosscall_args arg;
-+
-+	if (frozen) {
-+		/* All events unregistered  */
-+		return sdei_mask_local_cpu();
-+	}
-+
-+	/* un-register private events */
-+	spin_lock(&sdei_events_lock);
-+	list_for_each_entry(event, &sdei_events, list) {
-+		if (event->type == SDEI_EVENT_TYPE_SHARED)
-+			continue;
-+
-+		CROSSCALL_INIT(arg, event);
-+		/* call the cross-call function locally... */
-+		_local_event_unregister(&arg);
-+		if (arg.first_error)
-+			pr_err("Failed to unregister event %u: %d\n",
-+			       event->event_num, arg.first_error);
-+	}
-+	spin_unlock(&sdei_events_lock);
-+
 +	return sdei_mask_local_cpu();
 +}
 +
-+static int sdei_cpuhp_up(unsigned int cpu)
+ int sdei_unmask_local_cpu(void)
+ {
+ 	int err;
+@@ -277,6 +287,11 @@ static void _ipi_unmask_cpu(void *ignored)
+ 	sdei_unmask_local_cpu();
+ }
+ 
++static int sdei_cpuhp_up(unsigned int ignored)
 +{
-+	struct sdei_event *event;
-+	struct sdei_crosscall_args arg;
-+
-+	if (frozen) {
-+		/* Events will be re-registered when we thaw. */
-+		return sdei_unmask_local_cpu();
-+	}
-+
-+	/* re-register/enable private events */
-+	spin_lock(&sdei_events_lock);
-+	list_for_each_entry(event, &sdei_events, list) {
-+		if (event->type == SDEI_EVENT_TYPE_SHARED)
-+			continue;
-+
-+		CROSSCALL_INIT(arg, event);
-+		/* call the cross-call function locally... */
-+		_local_event_register(&arg);
-+		if (arg.first_error)
-+			pr_err("Failed to re-register event %u: %d\n",
-+			       event->event_num, arg.first_error);
-+
-+		CROSSCALL_INIT(arg, event);
-+		_local_event_reenable(&arg);
-+		if (arg.first_error)
-+			pr_err("Failed to re-enable event %u: %d\n",
-+			       event->event_num, arg.first_error);
-+	}
-+	spin_unlock(&sdei_events_lock);
-+
 +	return sdei_unmask_local_cpu();
 +}
 +
- /* When entering idle, mask/unmask events for this cpu */
- static int sdei_pm_notifier(struct notifier_block *nb, unsigned long action,
- 			    void *data)
-@@ -607,6 +809,7 @@ static int sdei_device_freeze(struct device *dev)
+ static void _ipi_private_reset(void *ignored)
  {
  	int err;
+@@ -315,6 +330,12 @@ static int sdei_platform_reset(void)
+ 	return err;
+ }
  
-+	frozen = true;
- 	err = sdei_event_unregister_all();
- 	if (err)
- 		return err;
-@@ -616,9 +819,13 @@ static int sdei_device_freeze(struct device *dev)
- 
- static int sdei_device_thaw(struct device *dev)
++static int sdei_api_event_status(u32 event_num, u64 *result)
++{
++	return invoke_sdei_fn(SDEI_1_0_FN_SDEI_EVENT_STATUS, event_num, 0, 0, 0,
++			      0, result);
++}
++
+ static int sdei_api_event_enable(u32 event_num)
  {
+ 	return invoke_sdei_fn(SDEI_1_0_FN_SDEI_EVENT_ENABLE, event_num, 0, 0, 0,
+@@ -369,8 +390,23 @@ static int sdei_api_event_unregister(u32 event_num)
+ 
+ static int _sdei_event_unregister(struct sdei_event *event)
+ {
+-	if (event->type == SDEI_EVENT_TYPE_SHARED)
++	int err;
++	u64 result;
++	bool enabled;
++
++	if (event->type == SDEI_EVENT_TYPE_SHARED) {
++		/*
++		 * We re-register events after power-management, remember if
++		 * this event was previously enabled.
++		 */
++		err = sdei_api_event_status(event->event_num, &result);
++		if (err)
++			return err;
++		enabled = !!(result & BIT(SDEI_EVENT_STATUS_ENABLED));
++		event->registered->was_enabled = enabled;
++
+ 		return sdei_api_event_unregister(event->event_num);
++	}
+ 
+ 	return -EINVAL;
+ }
+@@ -403,6 +439,26 @@ int sdei_event_unregister(u32 event_num)
+ }
+ EXPORT_SYMBOL(sdei_event_unregister);
+ 
++/*
++ * unregister events, but don't destroy them as they are re-registered by
++ * sdei_reregister_events().
++ */
++static int sdei_event_unregister_all(void)
++{
++	int err = 0;
++	struct sdei_event *event;
++
++	spin_lock(&sdei_events_lock);
++	list_for_each_entry(event, &sdei_events, list) {
++		err = _sdei_event_unregister(event);
++		if (err)
++			break;
++	}
++	spin_unlock(&sdei_events_lock);
++
++	return err;
++}
++
+ static int sdei_api_event_register(u32 event_num, unsigned long entry_point,
+ 				   void *arg, u64 flags, u64 affinity)
+ {
+@@ -459,6 +515,148 @@ int sdei_event_register(u32 event_num, sdei_event_callback *cb, void *arg,
+ }
+ EXPORT_SYMBOL(sdei_event_register);
+ 
++static int sdei_reregister_event(struct sdei_event *event)
++{
 +	int err;
 +
- 	sdei_device_resume(dev);
++	lockdep_assert_held(&sdei_events_lock);
++
++	err = _sdei_event_register(event);
++	if (err) {
++		pr_err("Failed to re-register event %u\n", event->event_num);
++		sdei_event_destroy(event);
++		return err;
++	}
++
++	if (event->type == SDEI_EVENT_TYPE_SHARED) {
++		if (event->registered->was_enabled)
++			err = sdei_api_event_enable(event->event_num);
++	}
++
++	if (err)
++		pr_err("Failed to re-enable event %u\n", event->event_num);
++
++	return err;
++}
++
++static int sdei_reregister_events(void)
++{
++	int err = 0;
++	struct sdei_event *event;
++
++	spin_lock(&sdei_events_lock);
++	list_for_each_entry(event, &sdei_events, list) {
++		err = sdei_reregister_event(event);
++		if (err)
++			break;
++	}
++	spin_unlock(&sdei_events_lock);
++
++	return err;
++}
++
++/* When entering idle, mask/unmask events for this cpu */
++static int sdei_pm_notifier(struct notifier_block *nb, unsigned long action,
++			    void *data)
++{
++	int rv;
++
++	switch (action) {
++	case CPU_PM_ENTER:
++		rv = sdei_mask_local_cpu();
++		break;
++	case CPU_PM_EXIT:
++		rv = sdei_unmask_local_cpu();
++		break;
++	default:
++		return NOTIFY_DONE;
++	}
++
++	if (rv)
++		return notifier_from_errno(rv);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block sdei_pm_nb = {
++	.notifier_call = sdei_pm_notifier,
++};
++
++static int sdei_device_suspend(struct device *dev)
++{
++	on_each_cpu(_ipi_mask_cpu, NULL, true);
++
++	return 0;
++}
++
++static int sdei_device_resume(struct device *dev)
++{
++	on_each_cpu(_ipi_unmask_cpu, NULL, true);
++
++	return 0;
++}
++
++/*
++ * We need all events to be reregistered when we resume from hibernate.
++ *
++ * The sequence is freeze->thaw. Reboot. freeze->restore. We unregister
++ * events during freeze and save the enabled state, then re-register and
++ * enable them during thaw and restore.
++ */
++static int sdei_device_freeze(struct device *dev)
++{
++	int err;
++
++	err = sdei_event_unregister_all();
++	if (err)
++		return err;
++
++	return sdei_device_suspend(dev);
++}
++
++static int sdei_device_thaw(struct device *dev)
++{
++	sdei_device_resume(dev);
++
++	return sdei_reregister_events();
++}
++
++static int sdei_device_restore(struct device *dev)
++{
++	int err;
++
++	err = sdei_platform_reset();
++	if (err)
++		return err;
++
++	return sdei_device_thaw(dev);
++}
++
++static const struct dev_pm_ops sdei_pm_ops = {
++	.suspend = sdei_device_suspend,
++	.resume = sdei_device_resume,
++	.freeze = sdei_device_freeze,
++	.thaw = sdei_device_thaw,
++	.restore = sdei_device_restore,
++};
++
++/*
++ * Mask all CPUs and unregister all events on panic, reboot or kexec.
++ */
++static int sdei_reboot_notifier(struct notifier_block *nb, unsigned long action,
++				void *data)
++{
++	on_each_cpu(&_ipi_mask_cpu, NULL, true);
++
++	sdei_platform_reset();
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block sdei_reboot_nb = {
++	.notifier_call = sdei_reboot_notifier,
++};
++
+ static void sdei_smccc_smc(unsigned long function_id,
+ 			   unsigned long arg0, unsigned long arg1,
+ 			   unsigned long arg2, unsigned long arg3,
+@@ -541,9 +739,36 @@ static int sdei_probe(struct platform_device *pdev)
+ 		return 0;
+ 	}
  
--	return sdei_reregister_events();
-+	err = sdei_reregister_events();
-+	frozen = false;
++	err = cpuhp_setup_state_nocalls(CPUHP_AP_SDEI_STARTING, "SDEI",
++				&sdei_cpuhp_up, &sdei_cpuhp_down);
++	if (err) {
++		pr_warn("Failed to register CPU hotplug notifier...\n");
++		return err;
++	}
++
++	err = cpu_pm_register_notifier(&sdei_pm_nb);
++	if (err) {
++		pr_warn("Failed to register CPU PM notifier...\n");
++		goto remove_cpuhp;
++	}
++
++	err = register_reboot_notifier(&sdei_reboot_nb);
++	if (err) {
++		pr_warn("Failed to register reboot notifier...\n");
++		goto remove_cpupm;
++	}
++
+ 	on_each_cpu(&_ipi_unmask_cpu, NULL, false);
+ 
+ 	return 0;
++
++remove_cpupm:
++	cpu_pm_unregister_notifier(&sdei_pm_nb);
++
++remove_cpuhp:
++	cpuhp_remove_state_nocalls(CPUHP_AP_SDEI_STARTING);
++
 +	return err;
  }
  
- static int sdei_device_restore(struct device *dev)
-@@ -650,6 +857,12 @@ static int sdei_reboot_notifier(struct notifier_block *nb, unsigned long action,
- 
- 	sdei_platform_reset();
- 
-+	/*
-+	 * There is now no point trying to unregister private events if we go on
-+	 * to take CPUs offline.
-+	 */
-+	frozen = true;
+ static const struct of_device_id sdei_of_match[] = {
+@@ -554,6 +779,7 @@ static const struct of_device_id sdei_of_match[] = {
+ static struct platform_driver sdei_driver = {
+ 	.driver		= {
+ 		.name			= "sdei",
++		.pm			= &sdei_pm_ops,
+ 		.of_match_table		= sdei_of_match,
+ 	},
+ 	.probe		= sdei_probe,
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index b56573bf440d..48420a6dfdaa 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -90,6 +90,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_PERF_XTENSA_STARTING,
+ 	CPUHP_AP_PERF_METAG_STARTING,
+ 	CPUHP_AP_MIPS_OP_LOONGSON3_STARTING,
++	CPUHP_AP_SDEI_STARTING,
+ 	CPUHP_AP_ARM_VFP_STARTING,
+ 	CPUHP_AP_ARM64_DEBUG_MONITORS_STARTING,
+ 	CPUHP_AP_PERF_ARM_HW_BREAKPOINT_STARTING,
+diff --git a/include/linux/sdei.h b/include/linux/sdei.h
+index d19dbf2f29ca..431443536c11 100644
+--- a/include/linux/sdei.h
++++ b/include/linux/sdei.h
+@@ -89,6 +89,9 @@ struct sdei_registered_event {
+ 	sdei_event_callback	*callback;
+ 	void			*callback_arg;
+ 	u32			 event_num;
 +
- 	return NOTIFY_OK;
- }
++	/* Only valid over power management events. */
++	bool			 was_enabled;
+ };
  
+ /* The arch code entry point should then call this when an event arrives. */
 -- 
 2.13.3
