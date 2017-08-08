@@ -1,84 +1,167 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue,  8 Aug 2017 17:46:07 +0100
-Subject: [PATCH v2 02/11] KVM: arm/arm64: Convert kvm_host_cpu_state to a
- static per-cpu allocation
+Date: Tue,  8 Aug 2017 17:46:09 +0100
+Subject: [PATCH v2 04/11] arm64: alternatives: use tpidr_el2 on VHE hosts
 In-Reply-To: <20170808164616.25949-1-james.morse@arm.com>
 References: <20170808164616.25949-1-james.morse@arm.com>
-Message-ID: <20170808164616.25949-3-james.morse@arm.com>
+Message-ID: <20170808164616.25949-5-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kvm_host_cpu_state is a per-cpu allocation made from kvm_arch_init()
-used to store the host EL1 registers when KVM switches to a guest.
-
-Make it easier for ASM to generate pointers into this per-cpu memory
-by making it a static allocation.
+Now that KVM uses tpidr_el2 in the same way as Linux's cpu_offset in
+tpidr_el1, merge the two. This saves KVM from save/restoring tpidr_el1
+on VHE hosts, and allows future code to blindly access per-cpu variables
+without triggering world-switch.
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Acked-by: Christoffer Dall <cdall@linaro.org>
 ---
- virt/kvm/arm/arm.c | 18 +++---------------
- 1 file changed, 3 insertions(+), 15 deletions(-)
+Changes since v1:
+ * cpu_copy_el2regs()'s 'have I been patched' test now always sets a register,
+   just in case the compiler puts do_copyregs on the stack.
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index a39a1e161e63..e9765ee6d769 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -51,8 +51,8 @@
- __asm__(".arch_extension	virt");
- #endif
+ arch/arm64/include/asm/assembler.h |  8 ++++++++
+ arch/arm64/include/asm/percpu.h    | 11 +++++++++--
+ arch/arm64/include/asm/processor.h |  1 +
+ arch/arm64/kernel/cpufeature.c     | 23 +++++++++++++++++++++++
+ arch/arm64/mm/proc.S               |  8 ++++++++
+ 5 files changed, 49 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 1b67c3782d00..06252602901e 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -236,7 +236,11 @@ lr	.req	x30		// link register
+ 	 */
+ 	.macro adr_this_cpu, dst, sym, tmp
+ 	adr_l	\dst, \sym
++alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+ 	mrs	\tmp, tpidr_el1
++alternative_else
++	mrs	\tmp, tpidr_el2
++alternative_endif
+ 	add	\dst, \dst, \tmp
+ 	.endm
  
-+DEFINE_PER_CPU(kvm_cpu_context_t, kvm_host_cpu_state);
- static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
--static kvm_cpu_context_t __percpu *kvm_host_cpu_state;
+@@ -247,7 +251,11 @@ lr	.req	x30		// link register
+ 	 */
+ 	.macro ldr_this_cpu dst, sym, tmp
+ 	adr_l	\dst, \sym
++alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+ 	mrs	\tmp, tpidr_el1
++alternative_else
++	mrs	\tmp, tpidr_el2
++alternative_endif
+ 	ldr	\dst, [\dst, \tmp]
+ 	.endm
  
- /* Per-CPU variable containing the currently running vcpu. */
- static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
-@@ -351,7 +351,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
- 	}
+diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
+index 3bd498e4de4c..43393208229e 100644
+--- a/arch/arm64/include/asm/percpu.h
++++ b/arch/arm64/include/asm/percpu.h
+@@ -16,11 +16,15 @@
+ #ifndef __ASM_PERCPU_H
+ #define __ASM_PERCPU_H
  
- 	vcpu->cpu = cpu;
--	vcpu->arch.host_cpu_context = this_cpu_ptr(kvm_host_cpu_state);
-+	vcpu->arch.host_cpu_context = this_cpu_ptr(&kvm_host_cpu_state);
++#include <asm/alternative.h>
+ #include <asm/stack_pointer.h>
  
- 	kvm_arm_set_running_vcpu(vcpu);
- 
-@@ -1250,19 +1250,8 @@ static inline void hyp_cpu_pm_exit(void)
- }
- #endif
- 
--static void teardown_common_resources(void)
--{
--	free_percpu(kvm_host_cpu_state);
--}
--
- static int init_common_resources(void)
+ static inline void set_my_cpu_offset(unsigned long off)
  {
--	kvm_host_cpu_state = alloc_percpu(kvm_cpu_context_t);
--	if (!kvm_host_cpu_state) {
--		kvm_err("Cannot allocate host CPU state\n");
--		return -ENOMEM;
--	}
--
- 	/* set size of VMID supported by CPU */
- 	kvm_vmid_bits = kvm_get_vmid_bits();
- 	kvm_info("%d-bit VMID\n", kvm_vmid_bits);
-@@ -1407,7 +1396,7 @@ static int init_hyp_mode(void)
- 	for_each_possible_cpu(cpu) {
- 		kvm_cpu_context_t *cpu_ctxt;
- 
--		cpu_ctxt = per_cpu_ptr(kvm_host_cpu_state, cpu);
-+		cpu_ctxt = per_cpu_ptr(&kvm_host_cpu_state, cpu);
- 		err = create_hyp_mappings(cpu_ctxt, cpu_ctxt + 1, PAGE_HYP);
- 
- 		if (err) {
-@@ -1485,7 +1474,6 @@ int kvm_arch_init(void *opaque)
- out_hyp:
- 	teardown_hyp_mode();
- out_err:
--	teardown_common_resources();
- 	return err;
+-	asm volatile("msr tpidr_el1, %0" :: "r" (off) : "memory");
++	asm volatile(ALTERNATIVE("msr tpidr_el1, %0",
++				 "msr tpidr_el2, %0",
++				 ARM64_HAS_VIRT_HOST_EXTN)
++			:: "r" (off) : "memory");
  }
  
+ static inline unsigned long __my_cpu_offset(void)
+@@ -31,7 +35,10 @@ static inline unsigned long __my_cpu_offset(void)
+ 	 * We want to allow caching the value, so avoid using volatile and
+ 	 * instead use a fake stack read to hazard against barrier().
+ 	 */
+-	asm("mrs %0, tpidr_el1" : "=r" (off) :
++	asm(ALTERNATIVE("mrs %0, tpidr_el1",
++			"mrs %0, tpidr_el2",
++			ARM64_HAS_VIRT_HOST_EXTN)
++		: "=r" (off) :
+ 		"Q" (*(const unsigned long *)current_stack_pointer));
+ 
+ 	return off;
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 64c9e78f9882..6d4fdfccf869 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -193,5 +193,6 @@ static inline void spin_lock_prefetch(const void *ptr)
+ 
+ int cpu_enable_pan(void *__unused);
+ int cpu_enable_cache_maint_trap(void *__unused);
++int cpu_copy_el2regs(void *__unused);
+ 
+ #endif /* __ASM_PROCESSOR_H */
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 9f9e0064c8c1..1960706d2422 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -864,6 +864,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.capability = ARM64_HAS_VIRT_HOST_EXTN,
+ 		.def_scope = SCOPE_SYSTEM,
+ 		.matches = runs_at_el2,
++		.enable = cpu_copy_el2regs,
+ 	},
+ 	{
+ 		.desc = "32-bit EL0 Support",
+@@ -1295,3 +1296,25 @@ static int __init enable_mrs_emulation(void)
+ }
+ 
+ late_initcall(enable_mrs_emulation);
++
++int cpu_copy_el2regs(void *__unused)
++{
++	int do_copyregs = 0;
++
++	/*
++	 * Copy register values that aren't redirected by hardware.
++	 *
++	 * Before code patching, we only set tpidr_el1, all CPUs need to copy
++	 * this value to tpidr_el2 before we patch the code. Once we've done
++	 * that, freshly-onlined CPUs will set tpidr_el2, so we don't need to
++	 * do anything here.
++	 */
++	asm volatile(ALTERNATIVE("mov %0, #1", "mov %0, #0",
++				 ARM64_HAS_VIRT_HOST_EXTN)
++		    : "=r" (do_copyregs) : : );
++
++	if (do_copyregs)
++		write_sysreg(read_sysreg(tpidr_el1), tpidr_el2);
++
++	return 0;
++}
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 877d42fb0df6..109d43a15aaf 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -70,7 +70,11 @@ ENTRY(cpu_do_suspend)
+ 	mrs	x8, mdscr_el1
+ 	mrs	x9, oslsr_el1
+ 	mrs	x10, sctlr_el1
++alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+ 	mrs	x11, tpidr_el1
++alternative_else
++	mrs	x11, tpidr_el2
++alternative_endif
+ 	mrs	x12, sp_el0
+ 	stp	x2, x3, [x0]
+ 	stp	x4, xzr, [x0, #16]
+@@ -116,7 +120,11 @@ ENTRY(cpu_do_resume)
+ 	msr	mdscr_el1, x10
+ 
+ 	msr	sctlr_el1, x12
++alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+ 	msr	tpidr_el1, x13
++alternative_else
++	msr	tpidr_el2, x13
++alternative_endif
+ 	msr	sp_el0, x14
+ 	/*
+ 	 * Restore oslsr_el1 by writing oslar_el1
 -- 
 2.13.3
