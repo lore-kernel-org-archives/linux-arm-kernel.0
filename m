@@ -1,67 +1,25 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Tue, 08 Aug 2017 20:12:55 +1000
-Subject: [PATCH 3/3] powerpc: replace vga_fixup() with generic code
-In-Reply-To: <87wp6fq8y5.fsf@linkitivity.dja.id.au>
-References: <20170804102033.27731-1-dja@axtens.net>
- <20170804102033.27731-4-dja@axtens.net>
- <87efsnq217.fsf@concordia.ellerman.id.au>
- <87wp6fq8y5.fsf@linkitivity.dja.id.au>
-Message-ID: <8760dynza0.fsf@concordia.ellerman.id.au>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 8 Aug 2017 12:17:56 +0200
+Subject: linux-next 2017-08-08 failure on Nokia N900
+Message-ID: <20170808101756.GA12922@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Axtens <dja@axtens.net> writes:
+Hi!
 
-> Michael Ellerman <mpe@ellerman.id.au> writes:
->
->> Daniel Axtens <dja@axtens.net> writes:
->>
->>> Currently, we do a PCI fixup to mark a default card so that Xorg
->>> autoconfiguration works.
->>>
->>> There is a new generic method to do this sort of vga fixup, and
->>> it occurs by default.
->>>
->>> Drop our old method.
->>>
->>> This method is different:
->>>  - it will only mark a card as default if a driver is bound
->>>  - the marking will happen at late_initcall time, or even later
->>>    if a card is enabled later on (via an ENABLE hook). Currently
->>>    things are enabled in a FINAL hook.
->>>
->>> This *does* change behaviour under some circumstances.
->>>
->>> For example, pseries_le_defconfig doesn't have DRM drivers for
->>> many of the qemu GPU models, including the 'standard' vga.
->>
->> Should we enable them/it?
->
-> Hard to say.
->
-> The 'standard' vga module (bochs_drm) was blacklisted by Ubuntu -
-> apparently at IBM's request [0] - some years back. Even if you
-> un-blacklist it, I had trouble with getting it and the openfirmware
-> framebuffer driver to play nicely together. It may not be worth the
-> trouble for bochs_drm.
->
-> There's a better case for including some of the more modern drivers -
-> maybe QXL and virtio - but I wasn't able to test them: my particular
-> build of qemu/TCG refused to start with them and I didn't feel like
-> rebuilding/debugging qemu.
+I tried today's linux-next. It boots on n900 (up to X), but then my
+screen locks and I can't get back. Touchscreen worked, so my guess is
+keyboard does not...? Ssh connection over usb still works.
 
-Yeah OK. Sounds like a bit of mess :)
-
-I'll leave it unless someone who knows Qemu/Gfx etc. tells me otherwise.
-
-> It would also be legitmate to say that you're focussing on headless use
-> with pseries_*defconfig and not include them: you need to bring in the
-> DRM core if you want these drivers.
-
-True. There's a bit of a tension there between making them useful
-configs for developers and also turning on as much code as possible so
-it gets tested.
-
-Arguably we should have DRM enabled because the distros will.
-
-cheers
+Best regards,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170808/87b79610/attachment.sig>
