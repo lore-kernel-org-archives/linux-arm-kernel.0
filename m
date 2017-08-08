@@ -1,90 +1,91 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Tue,  8 Aug 2017 13:46:58 +0100
-Subject: [PATCH 2/2] ARM: dts: r8a7743: Add IIC cores to dtsi
-Message-ID: <1502196418-31341-1-git-send-email-biju.das@bp.renesas.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 8 Aug 2017 14:06:52 +0100
+Subject: [PATCH] arm64: dts: marvell: add Device Tree files for Armada-8KP
+In-Reply-To: <1502195474-9585-1-git-send-email-hannah@marvell.com>
+References: <1502195474-9585-1-git-send-email-hannah@marvell.com>
+Message-ID: <6017865e-e0a4-a316-45da-924af7126f91@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
----
-This patch has been tested against Linux-next tag 20170727 and renesas-dev branch.
-This patch depends on https://www.spinics.net/lists/arm-kernel/msg599220.html
+On 08/08/17 13:31, hannah at marvell.com wrote:
+> From: Hanna Hawa <hannah@marvell.com>
+> 
+> This commit adds the base Device Tree files for the Armada 8KPlus.
+> The Armada 8KP SoCs include several hardware blocks, and this
+> commit only adds support for the AP810 block, that contains the CPU
+> core and basic peripherals.
+> 
+> AP810 is a high-performance die, includes octal core application
+> processor based ARMv8-A architecture, two standard high speed DDR4
+> interface, and GIC-600 interrupt controller.
+> AP810 Built as part of Marvell?s MoChi AP family products.
+> 
+> Armada-8080 (8KPlus family), include an AP810 block that contains
+> the CPU core and basic peripherals.
+> 
+> This commit creates the following hierarchy:
+>  * armada-ap810-ap0.dtsi - definitions common to AP810
+>  	* armada-ap810-ap0-octa-core.dtsi - description of the octa cores
+> 		* armada-8080.dtsi - description of the 8080 SoC
+> 			* armada-8080-db.dts - description of the 8080 board
+> 
+> Signed-off-by: Hanna Hawa <hannah@marvell.com>
+> ---
+>  .../devicetree/bindings/arm/marvell/armada-8kp.txt |  15 ++
+>  arch/arm64/boot/dts/marvell/Makefile               |   1 +
+>  arch/arm64/boot/dts/marvell/armada-8080-db.dts     |  67 +++++++++
+>  arch/arm64/boot/dts/marvell/armada-8080.dtsi       |  53 +++++++
+>  .../dts/marvell/armada-ap810-ap0-octa-core.dtsi    | 104 ++++++++++++++
+>  arch/arm64/boot/dts/marvell/armada-ap810-ap0.dtsi  | 160 +++++++++++++++++++++
+>  6 files changed, 400 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-8kp.txt
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-8080-db.dts
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-8080.dtsi
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-ap810-ap0-octa-core.dtsi
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-ap810-ap0.dtsi
 
- arch/arm/boot/dts/r8a7743.dtsi | 55 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+[...]
 
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index 14222c72..5c2b140 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -25,6 +25,9 @@
- 		i2c3 = &i2c3;
- 		i2c4 = &i2c4;
- 		i2c5 = &i2c5;
-+		i2c6 = &i2c6;
-+		i2c7 = &i2c7;
-+		i2c8 = &i2c8;
- 	};
- 
- 	cpus {
-@@ -436,6 +439,58 @@
- 			status = "disabled";
- 		};
- 
-+		i2c6: i2c at e60b0000 {
-+			/* doesn't need pinmux */
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,iic-r8a7743",
-+				     "renesas,rcar-gen2-iic",
-+				     "renesas,rmobile-iic";
-+			reg = <0 0xe60b0000 0 0x425>;
-+			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 926>;
-+			dmas = <&dmac0 0x77>, <&dmac0 0x78>,
-+			       <&dmac1 0x77>, <&dmac1 0x78>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg CPG_MOD 926>;
-+			status = "disabled";
-+		};
-+
-+		i2c7: i2c at e6500000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,iic-r8a7743",
-+				     "renesas,rcar-gen2-iic",
-+				     "renesas,rmobile-iic";
-+			reg = <0 0xe6500000 0 0x425>;
-+			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 318>;
-+			dmas = <&dmac0 0x61>, <&dmac0 0x62>,
-+			       <&dmac1 0x61>, <&dmac1 0x62>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 318>;
-+			status = "disabled";
-+		};
-+
-+		i2c8: i2c at e6510000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,iic-r8a7743",
-+				     "renesas,rcar-gen2-iic",
-+				     "renesas,rmobile-iic";
-+			reg = <0 0xe6510000 0 0x425>;
-+			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 323>;
-+			dmas = <&dmac0 0x65>, <&dmac0 0x66>,
-+			       <&dmac1 0x65>, <&dmac1 0x66>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 323>;
-+			status = "disabled";
-+		};
-+
- 		scifa0: serial at e6c40000 {
- 			compatible = "renesas,scifa-r8a7743",
- 				     "renesas,rcar-gen2-scifa", "renesas,scifa";
+> +			gic: interrupt-controller at 3000000 {
+> +				compatible = "arm,gic-v3";
+> +				#interrupt-cells = <3>;
+> +				#address-cells = <1>;
+> +				#size-cells = <1>;
+> +				interrupt-controller;
+> +				interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+
+This is wrong. There is no such thing as an affinity mask for PPI on
+GICv3 (and 4 cpus seem unrelated in the context of this HW).
+
+> +				ranges;
+> +
+> +				reg = <0x3000000 0x10000>,     /* GICD */
+> +				      <0x3060000 0x100000>;    /* GICR */
+
+Where is the GICv2 compatibility region (GICV)that is provided by each
+A72 cores? It should be at PERIPHBASE+0x20000 (see
+http://infocenter.arm.com/help/topic/com.arm.doc.100095_0003_06_en/way1382452674438.html).
+
+> +
+> +				gic_its_ap0: interrupt-controller at 3040000 {
+> +					compatible = "arm,gic-v3-its";
+> +					msi-controller;
+> +					#msi-cells = <1>;
+> +					reg = <0x3040000 0x20000>;
+> +				};
+> +			};
+> +
+> +			timer {
+> +				compatible = "arm,armv8-timer";
+> +				interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +					     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +					     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+> +					     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+
+Same issue here.
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
