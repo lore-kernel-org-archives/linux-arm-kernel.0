@@ -1,28 +1,38 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Tue,  8 Aug 2017 23:38:28 +0800
-Subject: [PATCH v3 0/7] Add rk3328 pwm support
-Message-ID: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Tue,  8 Aug 2017 17:09:01 +0200
+Subject: [PATCH 7/9 v2] thermal: bcm2835: constify thermal_zone_of_device_ops
+ structures
+In-Reply-To: <1502204943-20075-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1502204943-20075-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1502204943-20075-8-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two features of rk3328 pwm module.
- - PWM APB and function clocks are different.
- - Add pwm atomic hardware update
+The thermal_zone_of_device_ops structure is only passed as the fourth
+argument to thermal_zone_of_sensor_register, which is declared as const.
+Thus the thermal_zone_of_device_ops structure itself can be const.
 
-David Wu (7):
-  pwm: rockchip: Add APB and function both clocks support
-  pwm: rockchip: Remove the judge from return value of pwm_config
-  pwm: rockchip: Use pwm_apply instead of the pwm_enable
-  pwm: rockchip: Move the configuration of polarity from
-    rockchip_pwm_set_enable() to rockchip_pwm_config()
-  pwm: rockchip: Use same pwm ops for each IP
-  pwm: rockchip: Add rk3328 pwm support
-  arm64: dts: rockchip: Add pwm nodes for rk3328
+Done with the help of Coccinelle.
 
- .../devicetree/bindings/pwm/pwm-rockchip.txt       |   8 +-
- arch/arm64/boot/dts/rockchip/rk3328.dtsi           |  45 ++++
- drivers/pwm/pwm-rockchip.c                         | 281 +++++++++++----------
- 3 files changed, 199 insertions(+), 135 deletions(-)
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
--- 
-1.9.1
+---
+
+v2: This patch was present in the original series
+
+ drivers/thermal/broadcom/bcm2835_thermal.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/thermal/broadcom/bcm2835_thermal.c b/drivers/thermal/broadcom/bcm2835_thermal.c
+index e6863c8..a4d6a0e 100644
+--- a/drivers/thermal/broadcom/bcm2835_thermal.c
++++ b/drivers/thermal/broadcom/bcm2835_thermal.c
+@@ -145,7 +145,7 @@ static void bcm2835_thermal_debugfs(struct platform_device *pdev)
+ 	debugfs_create_regset32("regset", 0444, data->debugfsdir, regset);
+ }
+ 
+-static struct thermal_zone_of_device_ops bcm2835_thermal_ops = {
++static const struct thermal_zone_of_device_ops bcm2835_thermal_ops = {
+ 	.get_temp = bcm2835_thermal_get_temp,
+ };
+ 
