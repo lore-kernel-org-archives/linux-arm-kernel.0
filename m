@@ -1,78 +1,96 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 08 Aug 2017 17:27:01 +0100
-Subject: [PATCH] KVM: arm64: add esr_el2 and far_el2 to sysreg
-In-Reply-To: <7569b9a7-ce5f-8cb2-2997-a2818ac7d854@huawei.com>
-References: <1502122117-6276-1-git-send-email-gengdongjiu@huawei.com>
- <9fe6aa3a-98f9-6cae-6932-054858b54744@arm.com>
- <b834276b-b47d-51fb-7661-3eb5a2f6a68d@huawei.com> <59889C59.80207@arm.com>
- <7569b9a7-ce5f-8cb2-2997-a2818ac7d854@huawei.com>
-Message-ID: <5989E655.2070905@arm.com>
+Date: Tue,  8 Aug 2017 17:46:06 +0100
+Subject: [PATCH v2 01/11] KVM: arm64: Store vcpu on the stack during
+ __guest_enter()
+In-Reply-To: <20170808164616.25949-1-james.morse@arm.com>
+References: <20170808164616.25949-1-james.morse@arm.com>
+Message-ID: <20170808164616.25949-2-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
+KVM uses tpidr_el2 as its private vcpu register, which makes sense for
+non-vhe world switch as only KVM can access this register. This means
+vhe Linux has to use tpidr_el1, which KVM has to save/restore as part
+of the host context.
 
-On 07/08/17 18:43, gengdongjiu wrote:
-> Another question, For the SEI, I want to also use SIGBUS both for the KVM user and non-kvm user,
-> if SEA and SEI Error all use the SIGBUS to notify user space(Qemu),
+__guest_enter() stores the host_ctxt on the stack, do the same with
+the vcpu.
 
-User-space shouldn't necessarily be notified about Synchronous External Aborts
-or SError Interrupts. You're really asking about RAS firmware-first
-notifications that use these as the notification mechanism.
+Signed-off-by: James Morse <james.morse@arm.com>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
+---
+ arch/arm64/kvm/hyp/entry.S     | 10 +++++++---
+ arch/arm64/kvm/hyp/hyp-entry.S |  6 +++---
+ 2 files changed, 10 insertions(+), 6 deletions(-)
 
-We should not notify user-space that the guest happened to be interrupted by a
-RAS firmware-first notification. It may not be relevant, and we can't know until
-we parse the CPER records. The notification mechanism is between firmware and
-the host kernel, we should never expose anything about it to user space or a guest.
-
-Linux should act on the CPER records first to determine if the host kernel can
-keep running. Once it has done this it can deliver signals to affected
-processes, but which signal and its properties depends on the CPER records.
-
-The example here is BUS_MCEERR_AO and BUS_MCEERR_AR. These notify userspace that
-si_addr_lsb bits of memory are corrupt at si_addr, this is either
-Action-Optional or Action-Required.
-
-For arm64 we just needed to turn this code on, it already presents the minimum
-necessary information to user-space in an architecture-agnostic way. We didn't
-need to do anything to this code to support NOTIFY_SEA, the notification
-mechanism is irrelevant, this is all driven by the CPER records.
-
-If you have a class of error that isn't covered by the memory-failure code, then
-we need to add something similar. This should be based on the CPER records, and
-should work in exactly the same way for all processes on all ACPI platforms.
-
-
-> do you agree my solution for the SEI? thanks.
-
-No, you are trying to notify userspace that firmware notified the host. This
-creates an ABI between EL3 firmware and EL0 user space that we can't possibly
-support.
-
-I think you've come to this because you are merging two steps together:
-1. The OS uses the v8.2 RAS extensions to isolate errors and notify firmware.
-2. If firmware has to tell the OS about the error, firmware generates CPER records.
-3. Firmware triggers the GHES notification mechanism for this error source.
-4. Linux receives the notification and calls ghes_proc(), (if KVM gets the
-notification because a guest happened to be running, it should switch back to
-the host and arrange for ghes_proc() to be called).
-5. ghes_proc() parses the CPER records and calls other kernel helpers to handle
-the specific type of error, e.g. memory_failure().
-6. If the helper knows the kernel can keep running, the error is visible to
-user-space and user space could do further processing to correct the error, an
-error-specific signal is sent.
-7. User-space reloads the webpage, notifies the guest or whatever is appropriate.
-
-You are merging steps 3 and 7.
-
-The notification method is an abstraction that only matters to steps 3&4, this
-lets us add more without rewriting the world.
-User-space signals are an abstraction between steps 6&7, this works across
-architectures, even those not using APEI firmware first.
-There are no shortcuts here. Doing anything else creates more work for user
-space, another platform or another architecture.
-
-
-Thanks,
-
-James
+diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+index 12ee62d6d410..9a8ab5dddd9e 100644
+--- a/arch/arm64/kvm/hyp/entry.S
++++ b/arch/arm64/kvm/hyp/entry.S
+@@ -62,8 +62,8 @@ ENTRY(__guest_enter)
+ 	// Store the host regs
+ 	save_callee_saved_regs x1
+ 
+-	// Store the host_ctxt for use at exit time
+-	str	x1, [sp, #-16]!
++	// Store host_ctxt and vcpu for use at exit time
++	stp	x1, x0, [sp, #-16]!
+ 
+ 	add	x18, x0, #VCPU_CONTEXT
+ 
+@@ -159,6 +159,10 @@ abort_guest_exit_end:
+ ENDPROC(__guest_exit)
+ 
+ ENTRY(__fpsimd_guest_restore)
++	// x0: esr
++	// x1: vcpu
++	// x2-x29,lr: vcpu regs
++	// vcpu x0-x1 on the stack
+ 	stp	x2, x3, [sp, #-16]!
+ 	stp	x4, lr, [sp, #-16]!
+ 
+@@ -173,7 +177,7 @@ alternative_else
+ alternative_endif
+ 	isb
+ 
+-	mrs	x3, tpidr_el2
++	mov	x3, x1
+ 
+ 	ldr	x0, [x3, #VCPU_HOST_CONTEXT]
+ 	kern_hyp_va x0
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 5170ce1021da..fce7cc507e0a 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -104,6 +104,7 @@ el1_trap:
+ 	/*
+ 	 * x0: ESR_EC
+ 	 */
++	ldr	x1, [sp, #16 + 8]	// vcpu stored by __guest_enter
+ 
+ 	/*
+ 	 * We trap the first access to the FP/SIMD to save the host context
+@@ -116,19 +117,18 @@ alternative_if_not ARM64_HAS_NO_FPSIMD
+ 	b.eq	__fpsimd_guest_restore
+ alternative_else_nop_endif
+ 
+-	mrs	x1, tpidr_el2
+ 	mov	x0, #ARM_EXCEPTION_TRAP
+ 	b	__guest_exit
+ 
+ el1_irq:
+ 	stp     x0, x1, [sp, #-16]!
+-	mrs	x1, tpidr_el2
++	ldr	x1, [sp, #16 + 8]
+ 	mov	x0, #ARM_EXCEPTION_IRQ
+ 	b	__guest_exit
+ 
+ el1_error:
+ 	stp     x0, x1, [sp, #-16]!
+-	mrs	x1, tpidr_el2
++	ldr	x1, [sp, #16 + 8]
+ 	mov	x0, #ARM_EXCEPTION_EL1_SERROR
+ 	b	__guest_exit
+ 
+-- 
+2.13.3
