@@ -1,30 +1,48 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Tue,  8 Aug 2017 12:58:26 +0200
-Subject: [PATCH 0/6] constify video_subdev structures
-Message-ID: <1502189912-28794-1-git-send-email-Julia.Lawall@lip6.fr>
+Date: Tue,  8 Aug 2017 12:58:31 +0200
+Subject: [PATCH 5/6] [media] exynos4-is: constify video_subdev structures
+In-Reply-To: <1502189912-28794-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1502189912-28794-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1502189912-28794-6-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The structures of type v4l2_subdev_ops are only passed as the second
-argument of v4l2_subdev_init or as the third argument of
-v4l2_i2c_subdev_init, both of which are const.  The structures of type
-v4l2_subdev_core_ops, v4l2_subdev_pad_ops, v4l2_subdev_sensor_ops,
-v4l2_subdev_video_ops are only stored in fields of v4l2_subdev_ops
-structures, all of which are const.  Thus all of these structures can be
-declared as const as well.
+The v4l2_subdev_ops structures are only passed as the second
+argument of v4l2_subdev_init, which is const, so the
+v4l2_subdev_ops structures can be const as well.
 
 Done with the help of Coccinelle.
 
----
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
- drivers/media/i2c/mt9m111.c                   |    6 +++---
- drivers/media/i2c/mt9t001.c                   |    8 ++++----
+---
  drivers/media/platform/exynos4-is/fimc-isp.c  |    2 +-
  drivers/media/platform/exynos4-is/fimc-lite.c |    2 +-
- drivers/media/platform/vimc/vimc-debayer.c    |    2 +-
- drivers/media/platform/vimc/vimc-scaler.c     |    2 +-
- drivers/media/platform/vimc/vimc-sensor.c     |    2 +-
- drivers/media/usb/uvc/uvc_entity.c            |    2 +-
- drivers/staging/media/atomisp/i2c/ap1302.c    |    2 +-
- drivers/staging/media/atomisp/i2c/mt9m114.c   |    2 +-
- 10 files changed, 15 insertions(+), 15 deletions(-)
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/media/platform/exynos4-is/fimc-isp.c b/drivers/media/platform/exynos4-is/fimc-isp.c
+index 8efe916..fd793d3 100644
+--- a/drivers/media/platform/exynos4-is/fimc-isp.c
++++ b/drivers/media/platform/exynos4-is/fimc-isp.c
+@@ -433,7 +433,7 @@ static void fimc_isp_subdev_unregistered(struct v4l2_subdev *sd)
+ 	.s_power = fimc_isp_subdev_s_power,
+ };
+ 
+-static struct v4l2_subdev_ops fimc_is_subdev_ops = {
++static const struct v4l2_subdev_ops fimc_is_subdev_ops = {
+ 	.core = &fimc_is_core_ops,
+ 	.video = &fimc_is_subdev_video_ops,
+ 	.pad = &fimc_is_subdev_pad_ops,
+diff --git a/drivers/media/platform/exynos4-is/fimc-lite.c b/drivers/media/platform/exynos4-is/fimc-lite.c
+index 7d3ec5c..30282c5 100644
+--- a/drivers/media/platform/exynos4-is/fimc-lite.c
++++ b/drivers/media/platform/exynos4-is/fimc-lite.c
+@@ -1361,7 +1361,7 @@ static void fimc_lite_subdev_unregistered(struct v4l2_subdev *sd)
+ 	.log_status = fimc_lite_log_status,
+ };
+ 
+-static struct v4l2_subdev_ops fimc_lite_subdev_ops = {
++static const struct v4l2_subdev_ops fimc_lite_subdev_ops = {
+ 	.core = &fimc_lite_core_ops,
+ 	.video = &fimc_lite_subdev_video_ops,
+ 	.pad = &fimc_lite_subdev_pad_ops,
