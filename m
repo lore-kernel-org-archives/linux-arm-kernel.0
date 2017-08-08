@@ -1,95 +1,185 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue,  8 Aug 2017 14:04:41 +0200
-Subject: [PATCH] iio: adc: Fix coding style violations
-Message-ID: <d310ac06b13cf803bd3a2a6bcfb92169445f929c.1502193860.git.michal.simek@xilinx.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Tue,  8 Aug 2017 15:03:34 +0300
+Subject: [PATCH v4 03/19] crypto: remove redundant backlog checks on EBUSY
+In-Reply-To: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
+References: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
+Message-ID: <1502193834-11289-4-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sai Krishna Potthuri <lakshmi.sai.krishna.potthuri@xilinx.com>
+Now that -EBUSY return code only indicates backlog queueing
+we can safely remove the now redundant check for the
+CRYPTO_TFM_REQ_MAY_BACKLOG flag when -EBUSY is returned.
 
-This patch fix following checkpatch warnings in xadc driver
-1. Prefer 'unsigned int' to bare use of 'unsigned'.
-2. else is not generally useful after a break or return.
-3. function definition argument 'struct xadc *' should also
-have an identifier name.
-
-Signed-off-by: Sai Krishna Potthuri <lakshmis@xilinx.com>
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
 ---
+ crypto/ahash.c        | 12 +++---------
+ crypto/cts.c          |  6 ++----
+ crypto/lrw.c          |  8 ++------
+ crypto/rsa-pkcs1pad.c | 16 ++++------------
+ crypto/xts.c          |  8 ++------
+ 5 files changed, 13 insertions(+), 37 deletions(-)
 
- drivers/iio/adc/xilinx-xadc-events.c | 38 +++++++++++++++++-------------------
- drivers/iio/adc/xilinx-xadc.h        |  2 +-
- 2 files changed, 19 insertions(+), 21 deletions(-)
-
-diff --git a/drivers/iio/adc/xilinx-xadc-events.c b/drivers/iio/adc/xilinx-xadc-events.c
-index 6d5c2a6f4e6e..dc0670308253 100644
---- a/drivers/iio/adc/xilinx-xadc-events.c
-+++ b/drivers/iio/adc/xilinx-xadc-events.c
-@@ -68,7 +68,7 @@ void xadc_handle_events(struct iio_dev *indio_dev, unsigned long events)
- 		xadc_handle_event(indio_dev, i);
- }
+diff --git a/crypto/ahash.c b/crypto/ahash.c
+index 826cd7a..d63eeef 100644
+--- a/crypto/ahash.c
++++ b/crypto/ahash.c
+@@ -334,9 +334,7 @@ static int ahash_op_unaligned(struct ahash_request *req,
+ 		return err;
  
--static unsigned xadc_get_threshold_offset(const struct iio_chan_spec *chan,
-+static unsigned int xadc_get_threshold_offset(const struct iio_chan_spec *chan,
- 	enum iio_event_direction dir)
- {
- 	unsigned int offset;
-@@ -90,26 +90,24 @@ static unsigned xadc_get_threshold_offset(const struct iio_chan_spec *chan,
+ 	err = op(req);
+-	if (err == -EINPROGRESS ||
+-	    (err == -EBUSY && (ahash_request_flags(req) &
+-			       CRYPTO_TFM_REQ_MAY_BACKLOG)))
++	if (err == -EINPROGRESS || err == -EBUSY)
+ 		return err;
  
- static unsigned int xadc_get_alarm_mask(const struct iio_chan_spec *chan)
- {
--	if (chan->type == IIO_TEMP) {
-+	if (chan->type == IIO_TEMP)
- 		return XADC_ALARM_OT_MASK;
--	} else {
--		switch (chan->channel) {
--		case 0:
--			return XADC_ALARM_VCCINT_MASK;
--		case 1:
--			return XADC_ALARM_VCCAUX_MASK;
--		case 2:
--			return XADC_ALARM_VCCBRAM_MASK;
--		case 3:
--			return XADC_ALARM_VCCPINT_MASK;
--		case 4:
--			return XADC_ALARM_VCCPAUX_MASK;
--		case 5:
--			return XADC_ALARM_VCCODDR_MASK;
--		default:
--			/* We will never get here */
--			return 0;
--		}
-+	switch (chan->channel) {
-+	case 0:
-+		return XADC_ALARM_VCCINT_MASK;
-+	case 1:
-+		return XADC_ALARM_VCCAUX_MASK;
-+	case 2:
-+		return XADC_ALARM_VCCBRAM_MASK;
-+	case 3:
-+		return XADC_ALARM_VCCPINT_MASK;
-+	case 4:
-+		return XADC_ALARM_VCCPAUX_MASK;
-+	case 5:
-+		return XADC_ALARM_VCCODDR_MASK;
-+	default:
-+		/* We will never get here */
-+		return 0;
+ 	ahash_restore_req(req, err);
+@@ -394,9 +392,7 @@ static int ahash_def_finup_finish1(struct ahash_request *req, int err)
+ 	req->base.complete = ahash_def_finup_done2;
+ 
+ 	err = crypto_ahash_reqtfm(req)->final(req);
+-	if (err == -EINPROGRESS ||
+-	    (err == -EBUSY && (ahash_request_flags(req) &
+-			       CRYPTO_TFM_REQ_MAY_BACKLOG)))
++	if (err == -EINPROGRESS || err == -EBUSY)
+ 		return err;
+ 
+ out:
+@@ -432,9 +428,7 @@ static int ahash_def_finup(struct ahash_request *req)
+ 		return err;
+ 
+ 	err = tfm->update(req);
+-	if (err == -EINPROGRESS ||
+-	    (err == -EBUSY && (ahash_request_flags(req) &
+-			       CRYPTO_TFM_REQ_MAY_BACKLOG)))
++	if (err == -EINPROGRESS || err == -EBUSY)
+ 		return err;
+ 
+ 	return ahash_def_finup_finish1(req, err);
+diff --git a/crypto/cts.c b/crypto/cts.c
+index 243f591..4773c18 100644
+--- a/crypto/cts.c
++++ b/crypto/cts.c
+@@ -136,8 +136,7 @@ static void crypto_cts_encrypt_done(struct crypto_async_request *areq, int err)
+ 		goto out;
+ 
+ 	err = cts_cbc_encrypt(req);
+-	if (err == -EINPROGRESS ||
+-	    (err == -EBUSY && req->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG))
++	if (err == -EINPROGRESS || err == -EBUSY)
+ 		return;
+ 
+ out:
+@@ -229,8 +228,7 @@ static void crypto_cts_decrypt_done(struct crypto_async_request *areq, int err)
+ 		goto out;
+ 
+ 	err = cts_cbc_decrypt(req);
+-	if (err == -EINPROGRESS ||
+-	    (err == -EBUSY && req->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG))
++	if (err == -EINPROGRESS || err == -EBUSY)
+ 		return;
+ 
+ out:
+diff --git a/crypto/lrw.c b/crypto/lrw.c
+index a8bfae4..695cea9 100644
+--- a/crypto/lrw.c
++++ b/crypto/lrw.c
+@@ -328,9 +328,7 @@ static int do_encrypt(struct skcipher_request *req, int err)
+ 		      crypto_skcipher_encrypt(subreq) ?:
+ 		      post_crypt(req);
+ 
+-		if (err == -EINPROGRESS ||
+-		    (err == -EBUSY &&
+-		     req->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG))
++		if (err == -EINPROGRESS || err == -EBUSY)
+ 			return err;
  	}
- }
  
-diff --git a/drivers/iio/adc/xilinx-xadc.h b/drivers/iio/adc/xilinx-xadc.h
-index f6f081965647..9069396d7622 100644
---- a/drivers/iio/adc/xilinx-xadc.h
-+++ b/drivers/iio/adc/xilinx-xadc.h
-@@ -76,7 +76,7 @@ struct xadc_ops {
- 	int (*setup)(struct platform_device *pdev, struct iio_dev *indio_dev,
- 			int irq);
- 	void (*update_alarm)(struct xadc *, unsigned int);
--	unsigned long (*get_dclk_rate)(struct xadc *);
-+	unsigned long (*get_dclk_rate)(struct xadc *xadc);
- 	irqreturn_t (*interrupt_handler)(int, void *);
+@@ -380,9 +378,7 @@ static int do_decrypt(struct skcipher_request *req, int err)
+ 		      crypto_skcipher_decrypt(subreq) ?:
+ 		      post_crypt(req);
  
- 	unsigned int flags;
+-		if (err == -EINPROGRESS ||
+-		    (err == -EBUSY &&
+-		     req->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG))
++		if (err == -EINPROGRESS || err == -EBUSY)
+ 			return err;
+ 	}
+ 
+diff --git a/crypto/rsa-pkcs1pad.c b/crypto/rsa-pkcs1pad.c
+index 407c64b..2908f93 100644
+--- a/crypto/rsa-pkcs1pad.c
++++ b/crypto/rsa-pkcs1pad.c
+@@ -279,9 +279,7 @@ static int pkcs1pad_encrypt(struct akcipher_request *req)
+ 				   req->dst, ctx->key_size - 1, req->dst_len);
+ 
+ 	err = crypto_akcipher_encrypt(&req_ctx->child_req);
+-	if (err != -EINPROGRESS &&
+-			(err != -EBUSY ||
+-			 !(req->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG)))
++	if (err != -EINPROGRESS && err != -EBUSY)
+ 		return pkcs1pad_encrypt_sign_complete(req, err);
+ 
+ 	return err;
+@@ -383,9 +381,7 @@ static int pkcs1pad_decrypt(struct akcipher_request *req)
+ 				   ctx->key_size);
+ 
+ 	err = crypto_akcipher_decrypt(&req_ctx->child_req);
+-	if (err != -EINPROGRESS &&
+-			(err != -EBUSY ||
+-			 !(req->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG)))
++	if (err != -EINPROGRESS && err != -EBUSY)
+ 		return pkcs1pad_decrypt_complete(req, err);
+ 
+ 	return err;
+@@ -440,9 +436,7 @@ static int pkcs1pad_sign(struct akcipher_request *req)
+ 				   req->dst, ctx->key_size - 1, req->dst_len);
+ 
+ 	err = crypto_akcipher_sign(&req_ctx->child_req);
+-	if (err != -EINPROGRESS &&
+-			(err != -EBUSY ||
+-			 !(req->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG)))
++	if (err != -EINPROGRESS && err != -EBUSY)
+ 		return pkcs1pad_encrypt_sign_complete(req, err);
+ 
+ 	return err;
+@@ -561,9 +555,7 @@ static int pkcs1pad_verify(struct akcipher_request *req)
+ 				   ctx->key_size);
+ 
+ 	err = crypto_akcipher_verify(&req_ctx->child_req);
+-	if (err != -EINPROGRESS &&
+-			(err != -EBUSY ||
+-			 !(req->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG)))
++	if (err != -EINPROGRESS && err != -EBUSY)
+ 		return pkcs1pad_verify_complete(req, err);
+ 
+ 	return err;
+diff --git a/crypto/xts.c b/crypto/xts.c
+index d86c11a..af68012 100644
+--- a/crypto/xts.c
++++ b/crypto/xts.c
+@@ -269,9 +269,7 @@ static int do_encrypt(struct skcipher_request *req, int err)
+ 		      crypto_skcipher_encrypt(subreq) ?:
+ 		      post_crypt(req);
+ 
+-		if (err == -EINPROGRESS ||
+-		    (err == -EBUSY &&
+-		     req->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG))
++		if (err == -EINPROGRESS || err == -EBUSY)
+ 			return err;
+ 	}
+ 
+@@ -321,9 +319,7 @@ static int do_decrypt(struct skcipher_request *req, int err)
+ 		      crypto_skcipher_decrypt(subreq) ?:
+ 		      post_crypt(req);
+ 
+-		if (err == -EINPROGRESS ||
+-		    (err == -EBUSY &&
+-		     req->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG))
++		if (err == -EINPROGRESS || err == -EBUSY)
+ 			return err;
+ 	}
+ 
 -- 
-1.9.1
+2.1.4
