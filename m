@@ -1,57 +1,39 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 8 Aug 2017 10:20:22 +0900
-Subject: [PATCH] irqchip: uniphier-aidet: add UniPhier AIDET irqchip driver
-In-Reply-To: <43777e45-c002-95b8-3b15-d57680f320ec@arm.com>
-References: <1501758910-3488-1-git-send-email-yamada.masahiro@socionext.com>
- <cae2ec7d-5f57-3e4f-7688-5a1523c66b82@arm.com>
- <CAK7LNAR=t2=6LbmFKUhSD-ttfxVcyOy6Qy=kj7hsFftDFWqmzQ@mail.gmail.com>
- <43777e45-c002-95b8-3b15-d57680f320ec@arm.com>
-Message-ID: <CAK7LNASiqYJ6iF35P78PNQwa8GNdTWE+GEbmFdJr8-_2J4Mgfw@mail.gmail.com>
+From: net147@gmail.com (Jonathan Liu)
+Date: Tue,  8 Aug 2017 11:25:40 +1000
+Subject: [PATCH] dt-bindings: clock: sunxi-ccu: Add compatibles for sun5i CCU
+ driver
+Message-ID: <20170808012540.16691-1-net147@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+The bindings were not updated when the sun5i CCU driver was added in
+commit 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver").
 
+Signed-off-by: Jonathan Liu <net147@gmail.com>
+---
+ Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-2017-08-07 22:36 GMT+09:00 Marc Zyngier <marc.zyngier@arm.com>:
-> On 07/08/17 12:59, Masahiro Yamada wrote:
->> Hi Marc,
->>
->> Thanks for your comments.
->>
->>
->> 2017-08-07 19:43 GMT+09:00 Marc Zyngier <marc.zyngier@arm.com>:
->>> On 03/08/17 12:15, Masahiro Yamada wrote:
->>>> UniPhier SoCs contain AIDET (ARM Interrupt Detector).  This is intended
->>>> to provide additional features that are not covered by GIC.  The main
->>>> purpose is to provide logic inverter to support low level and falling
->>>> edge trigger type for interrupt lines from on-board devices.
->>>>
->>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-
-
-Thanks.  I will send v2 based on your comments.
-
-
-
-If possible, could you help me with my GPIO driver?
-
-I implemented a similar IRQ domain hierarchy handling in the driver.
-
-This patch:
-http://patchwork.ozlabs.org/patch/797145/
-
-
-If I am understanding correctly, the IRQ mapping to the parent
-must be somehow hard-coded in the .alloc() hook of irq_domain_ops.
-
-I asked a question in the following.
-https://lkml.org/lkml/2017/7/6/758
-
-
-I do not have a solution to get the IRQ info from "interrupts" property,
-so I am hard-coding it in the driver.
-
+diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+index df9fad58facd..dbe0c1c58ab5 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+@@ -3,6 +3,8 @@ Allwinner Clock Control Unit Binding
+ 
+ Required properties :
+ - compatible: must contain one of the following compatibles:
++		- "allwinner,sun5i-a10s-ccu"
++		- "allwinner,sun5i-a13-ccu"
+ 		- "allwinner,sun6i-a31-ccu"
+ 		- "allwinner,sun8i-a23-ccu"
+ 		- "allwinner,sun8i-a33-ccu"
+@@ -15,6 +17,7 @@ Required properties :
+ 		- "allwinner,sun50i-a64-ccu"
+ 		- "allwinner,sun50i-a64-r-ccu"
+ 		- "allwinner,sun50i-h5-ccu"
++		- "nextthing,gr8-ccu"
+ 
+ - reg: Must contain the registers base address and length
+ - clocks: phandle to the oscillators feeding the CCU. Two are needed:
 -- 
-Best Regards
-Masahiro Yamada
+2.13.2
