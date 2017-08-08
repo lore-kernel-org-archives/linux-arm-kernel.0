@@ -1,27 +1,108 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 8 Aug 2017 14:51:17 +0100
-Subject: [PATCH 1/2] arm64: introduce separated bits for mm_context_t flags
-In-Reply-To: <20170805144022.17260-2-ynorov@caviumnetworks.com>
-References: <20170805144022.17260-1-ynorov@caviumnetworks.com>
- <20170805144022.17260-2-ynorov@caviumnetworks.com>
-Message-ID: <20170808135117.xxcpwonnrnqiqtq6@armageddon.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 8 Aug 2017 15:04:55 +0100
+Subject: [PATCH] arm64: correct modules range of kernel virtual memory
+ layout
+In-Reply-To: <20170808131909.GI13355@arm.com>
+References: <1502103886-19725-1-git-send-email-miles.chen@mediatek.com>
+ <20170807131608.GA18817@arm.com>
+ <CAKv+Gu9qD_-GNHus5txiqj9eHLpU5S7RX8QxYeUG17Ok0QNz-A@mail.gmail.com>
+ <20170807140138.GB18817@arm.com> <1502167450.24380.21.camel@mtkswgap22>
+ <1502170045.30154.5.camel@mtkswgap22> <20170808131909.GI13355@arm.com>
+Message-ID: <CAKv+Gu8RY7MLF85U7y0AQ5z4xm+t7nOSckL7r59D_N6t2pH2hQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 05, 2017 at 05:40:21PM +0300, Yury Norov wrote:
-> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-> index 5468c834b072..2c57b06b2883 100644
-> --- a/arch/arm64/include/asm/mmu.h
-> +++ b/arch/arm64/include/asm/mmu.h
-> @@ -16,6 +16,8 @@
->  #ifndef __ASM_MMU_H
->  #define __ASM_MMU_H
->  
-> +#define MMCF_AARCH32	0x0	/* MM hosts AArch32 executables */
+On 8 August 2017 at 14:19, Will Deacon <will.deacon@arm.com> wrote:
+> On Tue, Aug 08, 2017 at 01:27:25PM +0800, Miles Chen wrote:
+>> On Tue, 2017-08-08 at 12:44 +0800, Miles Chen wrote:
+>> > On Mon, 2017-08-07 at 15:01 +0100, Will Deacon wrote:
+>> > > On Mon, Aug 07, 2017 at 02:18:00PM +0100, Ard Biesheuvel wrote:
+>> > > > On 7 August 2017 at 14:16, Will Deacon <will.deacon@arm.com> wrote:
+>> > > > > On Mon, Aug 07, 2017 at 07:04:46PM +0800, Miles Chen wrote:
+>> > > > >> The commit f80fb3a3d508 ("arm64: add support for kernel ASLR")
+>> > > > >> moved module virtual address to
+>> > > > >> [module_alloc_base, module_alloc_base + MODULES_VSIZE).
+>> > > > >>
+>> > > > >> Display module information of the virtual kernel
+>> > > > >> memory layout by using module_alloc_base.
+>> > > > >>
+>> > > > >> testing output:
+>> > > > >> 1) Current implementation:
+>> > > > >> Virtual kernel memory layout:
+>> > > > >>       modules : 0xffffff8000000000 - 0xffffff8008000000   (   128 MB)
+>> > > > >> 2) this patch + KASLR:
+>> > > > >> Virtual kernel memory layout:
+>> > > > >>       modules : 0xffffff8000560000 - 0xffffff8008560000   (   128 MB)
+>> > > > >> 3) this patch + KASLR and a dummy seed:
+>> > > > >> Virtual kernel memory layout:
+>> > > > >>       modules : 0xffffffa7df637000 - 0xffffffa7e7637000   (   128 MB)
+>> > > > >>
+>> > > > >> Signed-off-by: Miles Chen <miles.chen@mediatek.com>
+>> > > > >> ---
+>> > > > >>  arch/arm64/mm/init.c | 5 +++--
+>> > > > >>  1 file changed, 3 insertions(+), 2 deletions(-)
+>> > > > >
+>> > > > > Does this mean the modules code in our pt dumper is busted
+>> > > > > (arch/arm64/mm/dump.c)? Also, what about KASAN, which uses these addresses
+>> > > > > too (in kasan_init)? Should we just remove MODULES_VADDR and MODULES_END
+>> > > > > altogether?
+>> > > > >
+>> > > >
+>> > > > I don't think we need this patch. The 'module' line simply prints the
+>> > > > VA region that is reserved for modules. The fact that we end up
+>> > > > putting them elsewhere when running randomized does not necessarily
+>> > > > mean this line should reflect that.
+>> > >
+>> > > I was more concerned by other users of MODULES_VADDR tbh, although I see
+>> > > now that we don't randomize the module region if kasan is enabled. Still,
+>> > > the kcore code adds the modules region as a separate area (distinct from
+>> > > vmalloc) if MODULES_VADDR is defined, the page table dumping code uses
+>> > > MODULES_VADDR to identify the module region and I think we'll get false
+>> > > positives from is_vmalloc_or_module_addr, which again uses the static
+>> > > region.
+>> > >
+>> > > So, given that MODULES_VADDR never points at the module area, can't we get
+>> > > rid of it?
+>> >
+>> > Agreed.MODULES_VADDR should be phased out. Considering the kernel
+>> > modules live somewhere between [VMALLOC_START, VMALLOC_END) now:
+>> > (arch/arm64/kernel/module.c:module_alloc). I suggest the following
+>> > changes:
+>> >
+>> > 1. is_vmalloc_or_module_addr() should return is_vmalloc_addr() directly
+>> > 2. arch/arm64/mm/dump.c does not need MODULES_VADDR and MODULES_END.
+>> > 3. kasan uses [module_alloc_base, module_alloc_base + MODULES_VSIZE) to
+>> > get the shadow memory? (the kernel modules still live in this range when
+>> > kasan is enabled)
+>> > 4. remove modules line in kernel memory layout
+>> > (optional, thanks for Ard's feedback)
+>> > 5. remove MODULE_VADDR, MODULES_END definition
+>>
+>> I was wrong about this. is_vmalloc_or_module_addr() is defined
+>> in mm/vmalloc and it uses MODULES_VADDR and MODULES_END.
+>> May it is better to give MODULES_VADDR and MODULES_END
+>> proper values, not remove them.
+>
+> I think the only cases where the modules area isn't completely contained
+> within vmalloc is where either randomization is disabled
+> (CONFIG_RANDOMIZE_BASE=n) or we fail in kaslr_early_init. However, in both
+> of these cases, module_alloc_base is set correctly, so perhaps we could
+> defined MODULES_VADDR in terms of that oto get is_vmalloc_or_module_addr
+> working properly.
 
-Nitpick: drop 0x since it's a bit number not a flag value. We could,
-however, make it a value and just stop using (set|clear)_bit functions.
-There is no atomicity issue here.
+is_vmalloc_or_module_addr() already works properly: modules are loaded
+into their own dedicated region, or in the vmalloc space otherwise.
+Note that this even applies when disregarding KASRL: the module PLT
+support uses the vmalloc region as overflow if the module region is
+exhausted.
 
--- 
-Catalin
+> We'd need to add some code to the table dumper to avoid
+> printing the module area if it's contained within vmalloc, and that could
+> also be used for the kernel memory layout print.
+>
+
+I agree it may be misleading if the module region is empty while
+modules have been loaded. But let's not conflate the module *region*
+with the actual locations where modules are loaded: without
+CONFIG_RANDOMIZE_MODULE_REGION_FULL=y, this is a 128 MB region that
+overlaps the kernel .text section.
