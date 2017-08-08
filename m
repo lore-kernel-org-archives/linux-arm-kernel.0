@@ -1,64 +1,41 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Tue,  8 Aug 2017 16:58:32 +0530
-Subject: [PATCH 3/3] drm/rockchip: make drm_connector_funcs structures const
-In-Reply-To: <1502191712-11231-1-git-send-email-bhumirks@gmail.com>
-References: <1502191712-11231-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <1502191712-11231-4-git-send-email-bhumirks@gmail.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Tue,  8 Aug 2017 12:20:31 +0100
+Subject: [PATCH  1/2] dt-bindings: i2c: Document r8a7743/5 support
+Message-ID: <1502191231-8682-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make these const as they are only passed to the function
-drm_connector_init and the corresponding argument is of type const.
-Done using Coccinelle
+Document i2c Device Tree support for RZ/G1[ME]
+(also known as r8aA774[35]) SoCs. They are compatible with
+R-Car Gen2 SoC family.
 
-@match disable optional_qualifier@
-identifier s;
-@@
-static struct drm_connector_funcs s = {...};
-
-@ref@
-position p;
-identifier match.s;
-@@
-s at p
-
-@good1@
-identifier match.s;
-expression e1,e2;
-position ref.p;
-@@
-drm_connector_init(e1,e2,&s at p,...)
-
-@bad depends on  !good1@
-position ref.p;
-identifier match.s;
-@@
-s at p
-
-@depends on forall !bad disable optional_qualifier@
-identifier match.s;
-@@
-static
-+ const
-struct drm_connector_funcs s;
-
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 ---
- drivers/gpu/drm/rockchip/inno_hdmi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/i2c/i2c-rcar.txt | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/rockchip/inno_hdmi.c b/drivers/gpu/drm/rockchip/inno_hdmi.c
-index 7149968..1a1a3dd 100644
---- a/drivers/gpu/drm/rockchip/inno_hdmi.c
-+++ b/drivers/gpu/drm/rockchip/inno_hdmi.c
-@@ -592,7 +592,7 @@ static void inno_hdmi_connector_destroy(struct drm_connector *connector)
- 	drm_connector_cleanup(connector);
- }
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-rcar.txt b/Documentation/devicetree/bindings/i2c/i2c-rcar.txt
+index 2b8bd33..cad39ae 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-rcar.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-rcar.txt
+@@ -2,6 +2,8 @@ I2C for R-Car platforms
  
--static struct drm_connector_funcs inno_hdmi_connector_funcs = {
-+static const struct drm_connector_funcs inno_hdmi_connector_funcs = {
- 	.dpms = drm_atomic_helper_connector_dpms,
- 	.fill_modes = inno_hdmi_probe_single_connector_modes,
- 	.detect = inno_hdmi_connector_detect,
+ Required properties:
+ - compatible:
++	"renesas,i2c-r8a7743" if the device is a part of a R8A7743 SoC.
++	"renesas,i2c-r8a7745" if the device is a part of a R8A7745 SoC.
+ 	"renesas,i2c-r8a7778" if the device is a part of a R8A7778 SoC.
+ 	"renesas,i2c-r8a7779" if the device is a part of a R8A7779 SoC.
+ 	"renesas,i2c-r8a7790" if the device is a part of a R8A7790 SoC.
+@@ -12,7 +14,8 @@ Required properties:
+ 	"renesas,i2c-r8a7795" if the device is a part of a R8A7795 SoC.
+ 	"renesas,i2c-r8a7796" if the device is a part of a R8A7796 SoC.
+ 	"renesas,rcar-gen1-i2c" for a generic R-Car Gen1 compatible device.
+-	"renesas,rcar-gen2-i2c" for a generic R-Car Gen2 compatible device.
++	"renesas,rcar-gen2-i2c" for a generic R-Car Gen2 or RZ/G1 compatible
++				device.
+ 	"renesas,rcar-gen3-i2c" for a generic R-Car Gen3 compatible device.
+ 	"renesas,i2c-rcar" (deprecated)
+ 
 -- 
 1.9.1
