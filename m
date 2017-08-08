@@ -1,88 +1,21 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Tue, 08 Aug 2017 20:36:35 +0800
-Subject: [PATCH v3 1/4] Documentation: devicetree: add binding for
- Broadcom STB AVS TMON
-In-Reply-To: <20170731192633.58747-2-code@mmayer.net>
-References: <20170731192633.58747-1-code@mmayer.net>
- <20170731192633.58747-2-code@mmayer.net>
-Message-ID: <1502195795.4296.37.camel@intel.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 08 Aug 2017 14:37:03 +0200
+Subject: [PATCH 5/6] [media] exynos4-is: constify video_subdev structures
+In-Reply-To: <1502189912-28794-6-git-send-email-Julia.Lawall@lip6.fr>
+References: <1502189912-28794-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1502189912-28794-6-git-send-email-Julia.Lawall@lip6.fr>
+ <CGME20170808123709epcas2p229a31cfa19e3a5bf3986e547162e2613@epcas2p2.samsung.com>
+Message-ID: <5c673a72-98f6-1501-845e-7d83fabfa659@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-07-31 at 12:26 -0700, Markus Mayer wrote:
-> From: Brian Norris <computersforpeace@gmail.com>
+On 08/08/2017 12:58 PM, Julia Lawall wrote:
+> The v4l2_subdev_ops structures are only passed as the second
+> argument of v4l2_subdev_init, which is const, so the
+> v4l2_subdev_ops structures can be const as well.
 > 
-> Add binding for Broadcom STB thermal.
+> Done with the help of Coccinelle.
 > 
-> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+> Signed-off-by: Julia Lawall<Julia.Lawall@lip6.fr>
 
-$ file v3-1-4-Documentation-devicetree-add-binding-for-Broadcom-STB-
-AVS-TMON.patch?
-unified diff output, UTF-8 Unicode text
-
-BTW, can you please rebase this patch set on top of v4.13-rc3?
-At least there are some conflicts in MAINTAINER file, introduced in
--rc2.
-
-thanks,
-rui
-> ---
-> ?.../devicetree/bindings/thermal/brcm,avs-tmon.txt????| 20
-> ++++++++++++++++++++
-> ?MAINTAINERS??????????????????????????????????????????|??8 ++++++++
-> ?2 files changed, 28 insertions(+)
-> ?create mode 100644
-> Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/thermal/brcm,avs-
-> tmon.txt b/Documentation/devicetree/bindings/thermal/brcm,avs-
-> tmon.txt
-> new file mode 100644
-> index 0000000..9d43553
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
-> @@ -0,0 +1,20 @@
-> +* Broadcom STB thermal management
-> +
-> +Thermal management core, provided by the AVS TMON hardware block.
-> +
-> +Required properties:
-> +- compatible: must be "brcm,avs-tmon" and/or "brcm,avs-tmon-bcm7445"
-> +- reg: address range for the AVS TMON registers
-> +- interrupts: temperature monitor interrupt, for high/low threshold
-> triggers
-> +- interrupt-names: should be "tmon"
-> +- interrupt-parent: the parent interrupt controller
-> +
-> +Example:
-> +
-> +	thermal at f04d1500 {
-> +		compatible = "brcm,avs-tmon-bcm7445", "brcm,avs-
-> tmon";
-> +		reg = <0xf04d1500 0x28>;
-> +		interrupts = <0x6>;
-> +		interrupt-names = "tmon";
-> +		interrupt-parent = <&avs_host_l2_intc>;
-> +	};
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 205d397..a683d4c 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -2928,6 +2928,14 @@ S:	Maintained
-> ?F:	Documentation/devicetree/bindings/cpufreq/brcm,stb-avs-
-> cpu-freq.txt
-> ?F:	drivers/cpufreq/brcmstb*
-> ?
-> +BROADCOM STB AVS TMON DRIVER
-> +M:	Markus Mayer <mmayer@broadcom.com>
-> +M:	bcm-kernel-feedback-list at broadcom.com
-> +L:	linux-pm at vger.kernel.org
-> +S:	Maintained
-> +F:	Documentation/devicetree/bindings/thermal/brcm,avs-
-> tmon.txt
-> +F:	drivers/thermal/broadcom/brcmstb*
-> +
-> ?BROADCOM SPECIFIC AMBA DRIVER (BCMA)
-> ?M:	Rafa? Mi?ecki <zajec5@gmail.com>
-> ?L:	linux-wireless at vger.kernel.org
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
