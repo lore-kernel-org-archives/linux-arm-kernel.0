@@ -1,70 +1,59 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Tue, 08 Aug 2017 20:26:57 +0800
-Subject: [PATCH v3 0/4] thermal: add brcmstb AVS TMON driver
-In-Reply-To: <a29d8aef-8d24-9e63-c078-48c3a1a6fccf@gmail.com>
-References: <20170731192633.58747-1-code@mmayer.net>
- <a29d8aef-8d24-9e63-c078-48c3a1a6fccf@gmail.com>
-Message-ID: <1502195217.4296.33.camel@intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 8 Aug 2017 14:25:28 +0200
+Subject: [GIT PULL] Gemini DTS updates for v4.14 take one
+Message-ID: <CACRpkdZYn1OXayC8ZdPeGJZ_ShQ5drRqVv5WBj3mdevqsHbCcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-08-07 at 10:52 -0700, Florian Fainelli wrote:
-> On 07/31/2017 12:26 PM, Markus Mayer wrote:
-> > 
-> > From: Markus Mayer <mmayer@broadcom.com>
-> > 
-> > This series adds the brcmstb AVS TMON driver.
-> > 
-> > The driver was originally written by Brian Norris.
-> > 
-> > v1 of this series can be found at https://lkml.org/lkml/2017/6/5/92
-> > 1
-> > v2 of this series can be found at https://lkml.org/lkml/2017/7/21/5
-> > 85
-> FWIW, this looks good to me, Eduardo, Rui, can we get this moving?
-> 
-Usually, Eduardo will take the arm soc thermal patches. But he is not
-able to take it this time as he is really busy.
-To me, the thermal framework related code looks good, and I will queue
-it for next merge window, although I don't have the knowledge about the
-hardware details.
+Hi ARM SoC guys,
 
-thanks,
-rui
+this is the first set of DTS patches for Gemini for v4.14.
 
-> > 
-> > 
-> > Changes since v2:
-> > - replaced calls to pr_debug() with calls to dev_dbg() [PATCH 2/4
-> > only]
-> > - all other patches are unchanged from v2
-> > 
-> > Changes since v1:
-> > - Fixed wording in binding document
-> > - Fixed lincensing to consistently mention GPL v2
-> > - Use thermal_zone_get_slope() and thermal_zone_get_offset()
-> > - Some minor clean-ups
-> > 
-> > Brian Norris (2):
-> > ? Documentation: devicetree: add binding for Broadcom STB AVS TMON
-> > ? thermal: add brcmstb AVS TMON driver
-> > 
-> > Markus Mayer (2):
-> > ? ARM: multi_v7_defconfig: add CONFIG_BRCMSTB_THERMAL
-> > ? arm64: defconfig: add CONFIG_BRCMSTB_THERMAL
-> > 
-> > ?.../devicetree/bindings/thermal/brcm,avs-tmon.txt??|??20 ++
-> > ?MAINTAINERS????????????????????????????????????????|???8 +
-> > ?arch/arm/configs/multi_v7_defconfig????????????????|???1 +
-> > ?arch/arm64/configs/defconfig???????????????????????|???1 +
-> > ?drivers/thermal/Kconfig????????????????????????????|???2 +-
-> > ?drivers/thermal/broadcom/Kconfig???????????????????|???7 +
-> > ?drivers/thermal/broadcom/Makefile??????????????????|???1 +
-> > ?drivers/thermal/broadcom/brcmstb_thermal.c?????????| 386
-> > +++++++++++++++++++++
-> > ?8 files changed, 425 insertions(+), 1 deletion(-)
-> > ?create mode 100644
-> > Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
-> > ?create mode 100644 drivers/thermal/broadcom/brcmstb_thermal.c
-> > 
-> 
+- Moves to using macros (patch submitted to be applied on
+  top of v4.13-rc1 but it was missed, whatever)
+
+- New DTS for the D-Link DIR-685
+
+- Modify all device trees to include proper pin control.
+
+This is infrastructure for any future extensions of the platform
+so it is all nice to have in place.
+
+Please pull it in on some appropriate branch!
+
+Yours,
+Linus Walleij
+
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
+tags/gemini-dts-1
+
+for you to fetch changes up to f328c2eac5d729a3654d2cef469b9e4acc338c4e:
+
+  ARM: dts: gemini: add pin control set-up for the SoC (2017-08-08
+14:20:00 +0200)
+
+----------------------------------------------------------------
+Gemini DTS updates for ARM SoC take one.
+
+----------------------------------------------------------------
+Linus Walleij (3):
+      ARM: dts: gemini: Switch to using macros
+      ARM: dts: Add DTS file for D-Link DIR-685
+      ARM: dts: gemini: add pin control set-up for the SoC
+
+ arch/arm/boot/dts/Makefile                 |   1 +
+ arch/arm/boot/dts/gemini-dlink-dir-685.dts | 246 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/gemini-nas4220b.dts      |  24 +++
+ arch/arm/boot/dts/gemini-rut1xx.dts        |  39 +++++
+ arch/arm/boot/dts/gemini-sq201.dts         |  36 ++++-
+ arch/arm/boot/dts/gemini-wbd111.dts        |  26 +++
+ arch/arm/boot/dts/gemini-wbd222.dts        |  26 +++
+ arch/arm/boot/dts/gemini.dtsi              | 173 ++++++++++++++++----
+ 8 files changed, 543 insertions(+), 28 deletions(-)
+ create mode 100644 arch/arm/boot/dts/gemini-dlink-dir-685.dts
