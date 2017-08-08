@@ -1,93 +1,56 @@
-From: pasha.tatashin@oracle.com (Pasha Tatashin)
-Date: Tue, 8 Aug 2017 07:49:22 -0400
-Subject: [v6 11/15] arm64/kasan: explicitly zero kasan shadow memory
-In-Reply-To: <20170808090743.GA12887@arm.com>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-12-git-send-email-pasha.tatashin@oracle.com>
- <20170808090743.GA12887@arm.com>
-Message-ID: <f8b2b9ed-abf0-0c16-faa2-98b66dcbed78@oracle.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 8 Aug 2017 13:50:06 +0200
+Subject: [PATCH  1/2] dt-bindings: i2c: Document r8a7743/5 support
+In-Reply-To: <1502191231-8682-1-git-send-email-biju.das@bp.renesas.com>
+References: <1502191231-8682-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <20170808115006.GC1674@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-Thank you for looking at this change. What you described was in my 
-previous iterations of this project.
-
-See for example here: https://lkml.org/lkml/2017/5/5/369
-
-I was asked to remove that flag, and only zero memory in place when 
-needed. Overall the current approach is better everywhere else in the 
-kernel, but it adds a little extra code to kasan initialization.
-
-Pasha
-
-On 08/08/2017 05:07 AM, Will Deacon wrote:
-> On Mon, Aug 07, 2017 at 04:38:45PM -0400, Pavel Tatashin wrote:
->> To optimize the performance of struct page initialization,
->> vmemmap_populate() will no longer zero memory.
->>
->> We must explicitly zero the memory that is allocated by vmemmap_populate()
->> for kasan, as this memory does not go through struct page initialization
->> path.
->>
->> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
->> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
->> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
->> Reviewed-by: Bob Picco <bob.picco@oracle.com>
->> ---
->>   arch/arm64/mm/kasan_init.c | 42 ++++++++++++++++++++++++++++++++++++++++++
->>   1 file changed, 42 insertions(+)
->>
->> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
->> index 81f03959a4ab..e78a9ecbb687 100644
->> --- a/arch/arm64/mm/kasan_init.c
->> +++ b/arch/arm64/mm/kasan_init.c
->> @@ -135,6 +135,41 @@ static void __init clear_pgds(unsigned long start,
->>   		set_pgd(pgd_offset_k(start), __pgd(0));
->>   }
->>   
->> +/*
->> + * Memory that was allocated by vmemmap_populate is not zeroed, so we must
->> + * zero it here explicitly.
->> + */
->> +static void
->> +zero_vmemmap_populated_memory(void)
->> +{
->> +	struct memblock_region *reg;
->> +	u64 start, end;
->> +
->> +	for_each_memblock(memory, reg) {
->> +		start = __phys_to_virt(reg->base);
->> +		end = __phys_to_virt(reg->base + reg->size);
->> +
->> +		if (start >= end)
->> +			break;
->> +
->> +		start = (u64)kasan_mem_to_shadow((void *)start);
->> +		end = (u64)kasan_mem_to_shadow((void *)end);
->> +
->> +		/* Round to the start end of the mapped pages */
->> +		start = round_down(start, SWAPPER_BLOCK_SIZE);
->> +		end = round_up(end, SWAPPER_BLOCK_SIZE);
->> +		memset((void *)start, 0, end - start);
->> +	}
->> +
->> +	start = (u64)kasan_mem_to_shadow(_text);
->> +	end = (u64)kasan_mem_to_shadow(_end);
->> +
->> +	/* Round to the start end of the mapped pages */
->> +	start = round_down(start, SWAPPER_BLOCK_SIZE);
->> +	end = round_up(end, SWAPPER_BLOCK_SIZE);
->> +	memset((void *)start, 0, end - start);
->> +}
+On Tue, Aug 08, 2017 at 12:20:31PM +0100, Biju Das wrote:
+> Document i2c Device Tree support for RZ/G1[ME]
+> (also known as r8aA774[35]) SoCs. They are compatible with
+> R-Car Gen2 SoC family.
 > 
-> I can't help but think this would be an awful lot nicer if you made
-> vmemmap_alloc_block take extra GFP flags as a parameter. That way, we could
-> implement a version of vmemmap_populate that does the zeroing when we need
-> it, without having to duplicate a bunch of the code like this. I think it
-> would also be less error-prone, because you wouldn't have to do the
-> allocation and the zeroing in two separate steps.
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+
+Looks good to me, yet I'd like an ack from Simon who is currently
+working on the generic fallback compatibles.
+
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-rcar.txt | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
-> Will
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-rcar.txt b/Documentation/devicetree/bindings/i2c/i2c-rcar.txt
+> index 2b8bd33..cad39ae 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-rcar.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-rcar.txt
+> @@ -2,6 +2,8 @@ I2C for R-Car platforms
+>  
+>  Required properties:
+>  - compatible:
+> +	"renesas,i2c-r8a7743" if the device is a part of a R8A7743 SoC.
+> +	"renesas,i2c-r8a7745" if the device is a part of a R8A7745 SoC.
+>  	"renesas,i2c-r8a7778" if the device is a part of a R8A7778 SoC.
+>  	"renesas,i2c-r8a7779" if the device is a part of a R8A7779 SoC.
+>  	"renesas,i2c-r8a7790" if the device is a part of a R8A7790 SoC.
+> @@ -12,7 +14,8 @@ Required properties:
+>  	"renesas,i2c-r8a7795" if the device is a part of a R8A7795 SoC.
+>  	"renesas,i2c-r8a7796" if the device is a part of a R8A7796 SoC.
+>  	"renesas,rcar-gen1-i2c" for a generic R-Car Gen1 compatible device.
+> -	"renesas,rcar-gen2-i2c" for a generic R-Car Gen2 compatible device.
+> +	"renesas,rcar-gen2-i2c" for a generic R-Car Gen2 or RZ/G1 compatible
+> +				device.
+>  	"renesas,rcar-gen3-i2c" for a generic R-Car Gen3 compatible device.
+>  	"renesas,i2c-rcar" (deprecated)
+>  
+> -- 
+> 1.9.1
 > 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170808/7c6e5af0/attachment.sig>
