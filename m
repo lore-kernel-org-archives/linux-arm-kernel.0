@@ -1,59 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 8 Aug 2017 14:25:28 +0200
-Subject: [GIT PULL] Gemini DTS updates for v4.14 take one
-Message-ID: <CACRpkdZYn1OXayC8ZdPeGJZ_ShQ5drRqVv5WBj3mdevqsHbCcw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Aug 2017 13:30:43 +0100
+Subject: [v6 11/15] arm64/kasan: explicitly zero kasan shadow memory
+In-Reply-To: <f8b2b9ed-abf0-0c16-faa2-98b66dcbed78@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-12-git-send-email-pasha.tatashin@oracle.com>
+ <20170808090743.GA12887@arm.com>
+ <f8b2b9ed-abf0-0c16-faa2-98b66dcbed78@oracle.com>
+Message-ID: <20170808123042.GG13355@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC guys,
+On Tue, Aug 08, 2017 at 07:49:22AM -0400, Pasha Tatashin wrote:
+> Hi Will,
+> 
+> Thank you for looking at this change. What you described was in my previous
+> iterations of this project.
+> 
+> See for example here: https://lkml.org/lkml/2017/5/5/369
+> 
+> I was asked to remove that flag, and only zero memory in place when needed.
+> Overall the current approach is better everywhere else in the kernel, but it
+> adds a little extra code to kasan initialization.
 
-this is the first set of DTS patches for Gemini for v4.14.
+Damn, I actually prefer the flag :)
 
-- Moves to using macros (patch submitted to be applied on
-  top of v4.13-rc1 but it was missed, whatever)
+But actually, if you look at our implementation of vmemmap_populate, then we
+have our own version of vmemmap_populate_basepages that terminates at the
+pmd level anyway if ARM64_SWAPPER_USES_SECTION_MAPS. If there's resistance
+to do this in the core code, then I'd be inclined to replace our
+vmemmap_populate implementation in the arm64 code with a single version that
+can terminate at either the PMD or the PTE level, and do zeroing if
+required. We're already special-casing it, so we don't really lose anything
+imo.
 
-- New DTS for the D-Link DIR-685
-
-- Modify all device trees to include proper pin control.
-
-This is infrastructure for any future extensions of the platform
-so it is all nice to have in place.
-
-Please pull it in on some appropriate branch!
-
-Yours,
-Linus Walleij
-
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
-
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/gemini-dts-1
-
-for you to fetch changes up to f328c2eac5d729a3654d2cef469b9e4acc338c4e:
-
-  ARM: dts: gemini: add pin control set-up for the SoC (2017-08-08
-14:20:00 +0200)
-
-----------------------------------------------------------------
-Gemini DTS updates for ARM SoC take one.
-
-----------------------------------------------------------------
-Linus Walleij (3):
-      ARM: dts: gemini: Switch to using macros
-      ARM: dts: Add DTS file for D-Link DIR-685
-      ARM: dts: gemini: add pin control set-up for the SoC
-
- arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/gemini-dlink-dir-685.dts | 246 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/gemini-nas4220b.dts      |  24 +++
- arch/arm/boot/dts/gemini-rut1xx.dts        |  39 +++++
- arch/arm/boot/dts/gemini-sq201.dts         |  36 ++++-
- arch/arm/boot/dts/gemini-wbd111.dts        |  26 +++
- arch/arm/boot/dts/gemini-wbd222.dts        |  26 +++
- arch/arm/boot/dts/gemini.dtsi              | 173 ++++++++++++++++----
- 8 files changed, 543 insertions(+), 28 deletions(-)
- create mode 100644 arch/arm/boot/dts/gemini-dlink-dir-685.dts
+Will
