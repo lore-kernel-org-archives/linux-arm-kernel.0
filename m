@@ -1,53 +1,93 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 8 Aug 2017 13:12:43 +0200
-Subject: linux-next 2017-08-08 keyboard failure on Nokia N900
-In-Reply-To: <20170808103444.GA18247@amd>
-References: <20170808101756.GA12922@amd>
- <20170808103444.GA18247@amd>
-Message-ID: <20170808111243.GA20328@amd>
+From: pasha.tatashin@oracle.com (Pasha Tatashin)
+Date: Tue, 8 Aug 2017 07:49:22 -0400
+Subject: [v6 11/15] arm64/kasan: explicitly zero kasan shadow memory
+In-Reply-To: <20170808090743.GA12887@arm.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-12-git-send-email-pasha.tatashin@oracle.com>
+ <20170808090743.GA12887@arm.com>
+Message-ID: <f8b2b9ed-abf0-0c16-faa2-98b66dcbed78@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Will,
 
-> > I tried today's linux-next. It boots on n900 (up to X), but then my
-> > screen locks and I can't get back. Touchscreen worked, so my guess is
-> > keyboard does not...? Ssh connection over usb still works.
-> 
-> Confirmed, its the keyboard.
-> 
-> Additionally, battery monitoring fails, because neither
-> 
-> /sys/class/power_supply/{n900-,rx51-}battery/voltage_now
-> 
-> exists.
+Thank you for looking at this change. What you described was in my 
+previous iterations of this project.
 
-And dmesg is helpful in this case:
+See for example here: https://lkml.org/lkml/2017/5/5/369
 
-[    0.675201] input: twl4030_pwrbutton as
-/devices/platform/68000000.ocp/48070000.i2c/i2c-1/1-0048/48070000.i2c:twl at 48:pwrbutton/input/input1
-[    0.676635] input: TWL4030 Keypad as
-/devices/platform/68000000.ocp/48070000.i2c/i2c-1/1-0048/48070000.i2c:twl at 48:keypad/input/input2
-[    0.679138] twl4030_keypad 48070000.i2c:twl at 48:keypad: request_irq
-failed for irq no=156: -13
-[    0.679779] twl4030_keypad: probe of 48070000.i2c:twl at 48:keypad
-failed with error -13
-[    0.682769] twl4030_madc 48070000.i2c:twl at 48:madc: could not
-request irq
-[    0.684051] twl4030_madc: probe of 48070000.i2c:twl at 48:madc failed
-with error -13
-[    0.685852] input: twl4030:vibrator as
-/devices/platform/68000000.ocp/48070000.i2c/i2c-1/1-0048/48070000.i2c:twl at 48:audio/twl4030-vibra/input/input3
-[    0.768890] omap_i2c 48070000.i2c: bus 1 rev3.3 at 2200 kHz
+I was asked to remove that flag, and only zero memory in place when 
+needed. Overall the current approach is better everywhere else in the 
+kernel, but it adds a little extra code to kasan initialization.
 
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170808/8265f7f0/attachment.sig>
+Pasha
+
+On 08/08/2017 05:07 AM, Will Deacon wrote:
+> On Mon, Aug 07, 2017 at 04:38:45PM -0400, Pavel Tatashin wrote:
+>> To optimize the performance of struct page initialization,
+>> vmemmap_populate() will no longer zero memory.
+>>
+>> We must explicitly zero the memory that is allocated by vmemmap_populate()
+>> for kasan, as this memory does not go through struct page initialization
+>> path.
+>>
+>> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+>> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+>> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+>> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+>> ---
+>>   arch/arm64/mm/kasan_init.c | 42 ++++++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 42 insertions(+)
+>>
+>> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+>> index 81f03959a4ab..e78a9ecbb687 100644
+>> --- a/arch/arm64/mm/kasan_init.c
+>> +++ b/arch/arm64/mm/kasan_init.c
+>> @@ -135,6 +135,41 @@ static void __init clear_pgds(unsigned long start,
+>>   		set_pgd(pgd_offset_k(start), __pgd(0));
+>>   }
+>>   
+>> +/*
+>> + * Memory that was allocated by vmemmap_populate is not zeroed, so we must
+>> + * zero it here explicitly.
+>> + */
+>> +static void
+>> +zero_vmemmap_populated_memory(void)
+>> +{
+>> +	struct memblock_region *reg;
+>> +	u64 start, end;
+>> +
+>> +	for_each_memblock(memory, reg) {
+>> +		start = __phys_to_virt(reg->base);
+>> +		end = __phys_to_virt(reg->base + reg->size);
+>> +
+>> +		if (start >= end)
+>> +			break;
+>> +
+>> +		start = (u64)kasan_mem_to_shadow((void *)start);
+>> +		end = (u64)kasan_mem_to_shadow((void *)end);
+>> +
+>> +		/* Round to the start end of the mapped pages */
+>> +		start = round_down(start, SWAPPER_BLOCK_SIZE);
+>> +		end = round_up(end, SWAPPER_BLOCK_SIZE);
+>> +		memset((void *)start, 0, end - start);
+>> +	}
+>> +
+>> +	start = (u64)kasan_mem_to_shadow(_text);
+>> +	end = (u64)kasan_mem_to_shadow(_end);
+>> +
+>> +	/* Round to the start end of the mapped pages */
+>> +	start = round_down(start, SWAPPER_BLOCK_SIZE);
+>> +	end = round_up(end, SWAPPER_BLOCK_SIZE);
+>> +	memset((void *)start, 0, end - start);
+>> +}
+> 
+> I can't help but think this would be an awful lot nicer if you made
+> vmemmap_alloc_block take extra GFP flags as a parameter. That way, we could
+> implement a version of vmemmap_populate that does the zeroing when we need
+> it, without having to duplicate a bunch of the code like this. I think it
+> would also be less error-prone, because you wouldn't have to do the
+> allocation and the zeroing in two separate steps.
+> 
+> Will
+> 
