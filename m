@@ -1,228 +1,87 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue,  8 Aug 2017 10:10:25 +0200
-Subject: [PATCH 1/2] video: fbdev: Fix multiple style issues in xilinxfb
-Message-ID: <b07b143769ed5dccf44e9de4cb0d5c6203b3eca0.1502179820.git.michal.simek@xilinx.com>
+From: prabhakar.kushwaha@nxp.com (Prabhakar Kushwaha)
+Date: Tue, 8 Aug 2017 08:30:49 +0000
+Subject: [U-Boot] [PATCH] config: ls1012aqds: Add USB EHCI support for
+ ls1012aqds
+In-Reply-To: <1501148945-11775-1-git-send-email-yinbo.zhu@nxp.com>
+References: <1501148945-11775-1-git-send-email-yinbo.zhu@nxp.com>
+Message-ID: <HE1PR04MB12410A493E08EB27A2F77F66978A0@HE1PR04MB1241.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hyun Kwon <hyun.kwon@xilinx.com>
 
-All reported by from checkpatch
-./scripts/checkpatch.pl --max-line-length 120 -strict -f
-drivers/video/fbdev/xilinxfb.c
+> -----Original Message-----
+> From: U-Boot [mailto:u-boot-bounces at lists.denx.de] On Behalf Of
+> yinbo.zhu at nxp.com
+> Sent: Thursday, July 27, 2017 3:19 PM
+> To: u-boot at lists.denx.de
+> Cc: open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS
+> <devicetree@vger.kernel.org>; Mihai Emilian Bantea <mihai.bantea@nxp.com>;
+> Horia Geant? <horia.geanta@nxp.com>; Marc Zyngier
+> <marc.zyngier@arm.com>; Gang Liu <gang.liu@nxp.com>; open list <linux-
+> kernel at vger.kernel.org>; Scott Wood <oss@buserror.net>; Rajat Srivastava
+> <rajat.srivastava@nxp.com>; Yinbo Zhu <yinbo.zhu@nxp.com>; moderated
+> list:ARM64 PORT (AARCH64 ARCHITECTURE) <linux-arm-
+> kernel at lists.infradead.org>
+> Subject: [U-Boot] [PATCH] config: ls1012aqds: Add USB EHCI support for
+> ls1012aqds
+> 
+> From: Rajesh Bhagat <rajesh.bhagat@nxp.com>
+> 
+> Add USB EHCI support for ls1012aqds platform
+> 
+> Signed-off-by: Rajat Srivastava <rajat.srivastava@nxp.com>
+> Signed-off-by: Rajesh Bhagat <rajesh.bhagat@nxp.com>
+> Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
+> ---
+>  arch/arm/include/asm/arch-fsl-layerscape/immap_lsch2.h | 1 +
+>  include/configs/ls1012aqds.h                           | 2 ++
+>  include/usb/ehci-ci.h                                  | 2 +-
+>  3 files changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/arch-fsl-layerscape/immap_lsch2.h
+> b/arch/arm/include/asm/arch-fsl-layerscape/immap_lsch2.h
+> index 8ad199f..4afc338 100644
+> --- a/arch/arm/include/asm/arch-fsl-layerscape/immap_lsch2.h
+> +++ b/arch/arm/include/asm/arch-fsl-layerscape/immap_lsch2.h
+> @@ -35,6 +35,7 @@
+>  #define CONFIG_SYS_XHCI_USB1_ADDR		(CONFIG_SYS_IMMR +
+> 0x01f00000)
+>  #define CONFIG_SYS_XHCI_USB2_ADDR		(CONFIG_SYS_IMMR +
+> 0x02000000)
+>  #define CONFIG_SYS_XHCI_USB3_ADDR		(CONFIG_SYS_IMMR +
+> 0x02100000)
+> +#define CONFIG_SYS_EHCI_USB1_ADDR		(CONFIG_SYS_IMMR +
+> 0x07600000)
+>  #define CONFIG_SYS_PCIE1_ADDR			(CONFIG_SYS_IMMR +
+> 0x2400000)
+>  #define CONFIG_SYS_PCIE2_ADDR			(CONFIG_SYS_IMMR +
+> 0x2500000)
+>  #define CONFIG_SYS_PCIE3_ADDR			(CONFIG_SYS_IMMR +
+> 0x2600000)
+> diff --git a/include/configs/ls1012aqds.h b/include/configs/ls1012aqds.h
+> index 5b8500b..55f2578 100644
+> --- a/include/configs/ls1012aqds.h
+> +++ b/include/configs/ls1012aqds.h
+> @@ -115,6 +115,8 @@
+> 
+>  #ifdef CONFIG_HAS_FSL_DR_USB
+>  #define CONFIG_USB_EHCI_FSL
+> +#define CONFIG_USB_ULPI
+> +#define CONFIG_USB_ULPI_VIEWPORT
+>  #define CONFIG_EHCI_HCD_INIT_AFTER_RESET
+>  #endif
+> 
+> diff --git a/include/usb/ehci-ci.h b/include/usb/ehci-ci.h
+> index 847b698..cd3eb47 100644
+> --- a/include/usb/ehci-ci.h
+> +++ b/include/usb/ehci-ci.h
+> @@ -156,7 +156,7 @@
+>  #elif defined(CONFIG_MPC85xx)
+>  #define CONFIG_SYS_FSL_USB1_ADDR CONFIG_SYS_MPC85xx_USB1_ADDR
+>  #define CONFIG_SYS_FSL_USB2_ADDR CONFIG_SYS_MPC85xx_USB2_ADDR
+> -#elif defined(CONFIG_ARCH_LS1021A)
+> +#elif defined(CONFIG_LS102XA) || defined(CONFIG_ARCH_LS1012A)
 
-WARNING: Block comments should align the * on each line
-WARNING: Block comments use a trailing */ on a separate line
-WARNING: Block comments use * on subsequent lines
-WARNING: please, no space before tabs
-WARNING: Prefer 'unsigned int' to bare use of 'unsigned'
-WARNING: braces {} are not necessary for single statement blocks
-WARNING: Missing a blank line after declarations
-WARNING: struct of_device_id should normally be const
-CHECK: Please don't use multiple blank lines
-CHECK: Blank lines aren't necessary after an open brace '{'
-CHECK: Alignment should match open parenthesis
-CHECK: 'Endianess' may be misspelled - perhaps 'Endianness'?
-CHECK: spaces preferred around that '*' (ctx:VxV)
-ERROR: that open brace { should be on the previous line
+Why CONFIG_ARCH_LS1021A has been replaced by CONFIG_LS102XA?
 
-Signed-off-by: Hyun Kwon <hyun.kwon@xilinx.com>
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
-
- drivers/video/fbdev/xilinxfb.c | 56 +++++++++++++++++++++---------------------
- 1 file changed, 28 insertions(+), 28 deletions(-)
-
-diff --git a/drivers/video/fbdev/xilinxfb.c b/drivers/video/fbdev/xilinxfb.c
-index 17dc119c7a98..0d828e46d704 100644
---- a/drivers/video/fbdev/xilinxfb.c
-+++ b/drivers/video/fbdev/xilinxfb.c
-@@ -41,7 +41,6 @@
- 
- #define DRIVER_NAME		"xilinxfb"
- 
--
- /*
-  * Xilinx calls it "TFT LCD Controller" though it can also be used for
-  * the VGA port on the Xilinx ML40x board. This is a hardware display
-@@ -92,8 +91,9 @@ struct xilinxfb_platform_data {
- 	u32 xvirt, yvirt;       /* resolution of memory buffer */
- 
- 	/* Physical address of framebuffer memory; If non-zero, driver
--	* will use provided memory address instead of allocating one from
--	* the consistent pool. */
-+	 * will use provided memory address instead of allocating one from
-+	 * the consistent pool.
-+	 */
- 	u32 fb_phys;
- };
- 
-@@ -128,18 +128,18 @@ struct xilinxfb_platform_data {
- 	.activate =	FB_ACTIVATE_NOW
- };
- 
--
- #define BUS_ACCESS_FLAG		0x1 /* 1 = BUS, 0 = DCR */
- #define LITTLE_ENDIAN_ACCESS	0x2 /* LITTLE ENDIAN IO functions */
- 
- struct xilinxfb_drvdata {
--
- 	struct fb_info	info;		/* FB driver info record */
- 
- 	phys_addr_t	regs_phys;	/* phys. address of the control
--						registers */
-+					 * registers
-+					 */
- 	void __iomem	*regs;		/* virt. address of the control
--						registers */
-+					 * registers
-+					 */
- #ifdef CONFIG_PPC_DCR
- 	dcr_host_t      dcr_host;
- 	unsigned int    dcr_len;
-@@ -148,7 +148,7 @@ struct xilinxfb_drvdata {
- 	dma_addr_t	fb_phys;	/* phys. address of the frame buffer */
- 	int		fb_alloced;	/* Flag, was the fb memory alloced? */
- 
--	u8 		flags;		/* features of the driver */
-+	u8		flags;		/* features of the driver */
- 
- 	u32		reg_ctrl_default;
- 
-@@ -165,7 +165,7 @@ struct xilinxfb_drvdata {
-  * which bus its connected and call the appropriate write API.
-  */
- static void xilinx_fb_out32(struct xilinxfb_drvdata *drvdata, u32 offset,
--				u32 val)
-+			    u32 val)
- {
- 	if (drvdata->flags & BUS_ACCESS_FLAG) {
- 		if (drvdata->flags & LITTLE_ENDIAN_ACCESS)
-@@ -195,8 +195,8 @@ static u32 xilinx_fb_in32(struct xilinxfb_drvdata *drvdata, u32 offset)
- }
- 
- static int
--xilinx_fb_setcolreg(unsigned regno, unsigned red, unsigned green, unsigned blue,
--	unsigned transp, struct fb_info *fbi)
-+xilinx_fb_setcolreg(unsigned int regno, unsigned int red, unsigned int green,
-+		    unsigned int blue, unsigned int transp, struct fb_info *fbi)
- {
- 	u32 *palette = fbi->pseudo_palette;
- 
-@@ -205,9 +205,11 @@ static u32 xilinx_fb_in32(struct xilinxfb_drvdata *drvdata, u32 offset)
- 
- 	if (fbi->var.grayscale) {
- 		/* Convert color to grayscale.
--		 * grayscale = 0.30*R + 0.59*G + 0.11*B */
--		red = green = blue =
--			(red * 77 + green * 151 + blue * 28 + 127) >> 8;
-+		 * grayscale = 0.30*R + 0.59*G + 0.11*B
-+		 */
-+		blue = (red * 77 + green * 151 + blue * 28 + 127) >> 8;
-+		green = blue;
-+		red = green;
- 	}
- 
- 	/* fbi->fix.visual is always FB_VISUAL_TRUECOLOR */
-@@ -241,13 +243,11 @@ static u32 xilinx_fb_in32(struct xilinxfb_drvdata *drvdata, u32 offset)
- 		xilinx_fb_out32(drvdata, REG_CTRL, 0);
- 	default:
- 		break;
--
- 	}
- 	return 0; /* success */
- }
- 
--static struct fb_ops xilinxfb_ops =
--{
-+static struct fb_ops xilinxfb_ops = {
- 	.owner			= THIS_MODULE,
- 	.fb_setcolreg		= xilinx_fb_setcolreg,
- 	.fb_blank		= xilinx_fb_blank,
-@@ -286,7 +286,8 @@ static int xilinxfb_assign(struct platform_device *pdev,
- 	} else {
- 		drvdata->fb_alloced = 1;
- 		drvdata->fb_virt = dma_alloc_coherent(dev, PAGE_ALIGN(fbsize),
--					&drvdata->fb_phys, GFP_KERNEL);
-+						      &drvdata->fb_phys,
-+						      GFP_KERNEL);
- 	}
- 
- 	if (!drvdata->fb_virt) {
-@@ -300,7 +301,7 @@ static int xilinxfb_assign(struct platform_device *pdev,
- 	/* Tell the hardware where the frame buffer is */
- 	xilinx_fb_out32(drvdata, REG_FB_ADDR, drvdata->fb_phys);
- 	rc = xilinx_fb_in32(drvdata, REG_FB_ADDR);
--	/* Endianess detection */
-+	/* Endianness detection */
- 	if (rc != drvdata->fb_phys) {
- 		drvdata->flags |= LITTLE_ENDIAN_ACCESS;
- 		xilinx_fb_out32(drvdata, REG_FB_ADDR, drvdata->fb_phys);
-@@ -310,8 +311,7 @@ static int xilinxfb_assign(struct platform_device *pdev,
- 	drvdata->reg_ctrl_default = REG_CTRL_ENABLE;
- 	if (pdata->rotate_screen)
- 		drvdata->reg_ctrl_default |= REG_CTRL_ROTATE;
--	xilinx_fb_out32(drvdata, REG_CTRL,
--					drvdata->reg_ctrl_default);
-+	xilinx_fb_out32(drvdata, REG_CTRL, drvdata->reg_ctrl_default);
- 
- 	/* Fill struct fb_info */
- 	drvdata->info.device = dev;
-@@ -364,7 +364,7 @@ static int xilinxfb_assign(struct platform_device *pdev,
- err_cmap:
- 	if (drvdata->fb_alloced)
- 		dma_free_coherent(dev, PAGE_ALIGN(fbsize), drvdata->fb_virt,
--			drvdata->fb_phys);
-+				  drvdata->fb_phys);
- 	else
- 		iounmap(drvdata->fb_virt);
- 
-@@ -435,12 +435,12 @@ static int xilinxfb_of_probe(struct platform_device *pdev)
- 	 * Fill the resource structure if its direct BUS interface
- 	 * otherwise fill the dcr_host structure.
- 	 */
--	if (tft_access) {
-+	if (tft_access)
- 		drvdata->flags |= BUS_ACCESS_FLAG;
--	}
- #ifdef CONFIG_PPC_DCR
- 	else {
- 		int start;
-+
- 		start = dcr_resource_start(pdev->dev.of_node, 0);
- 		drvdata->dcr_len = dcr_resource_len(pdev->dev.of_node, 0);
- 		drvdata->dcr_host = dcr_map(pdev->dev.of_node, start, drvdata->dcr_len);
-@@ -452,19 +452,19 @@ static int xilinxfb_of_probe(struct platform_device *pdev)
- #endif
- 
- 	prop = of_get_property(pdev->dev.of_node, "phys-size", &size);
--	if ((prop) && (size >= sizeof(u32)*2)) {
-+	if ((prop) && (size >= sizeof(u32) * 2)) {
- 		pdata.screen_width_mm = prop[0];
- 		pdata.screen_height_mm = prop[1];
- 	}
- 
- 	prop = of_get_property(pdev->dev.of_node, "resolution", &size);
--	if ((prop) && (size >= sizeof(u32)*2)) {
-+	if ((prop) && (size >= sizeof(u32) * 2)) {
- 		pdata.xres = prop[0];
- 		pdata.yres = prop[1];
- 	}
- 
- 	prop = of_get_property(pdev->dev.of_node, "virtual-resolution", &size);
--	if ((prop) && (size >= sizeof(u32)*2)) {
-+	if ((prop) && (size >= sizeof(u32) * 2)) {
- 		pdata.xvirt = prop[0];
- 		pdata.yvirt = prop[1];
- 	}
-@@ -482,7 +482,7 @@ static int xilinxfb_of_remove(struct platform_device *op)
- }
- 
- /* Match table for of_platform binding */
--static struct of_device_id xilinxfb_of_match[] = {
-+static const struct of_device_id xilinxfb_of_match[] = {
- 	{ .compatible = "xlnx,xps-tft-1.00.a", },
- 	{ .compatible = "xlnx,xps-tft-2.00.a", },
- 	{ .compatible = "xlnx,xps-tft-2.01.a", },
--- 
-1.9.1
+-prabhakar
