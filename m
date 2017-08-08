@@ -1,144 +1,28 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Tue,  8 Aug 2017 23:38:32 +0800
-Subject: [PATCH v3 4/7] pwm: rockchip: Move the configuration of polarity from
- rockchip_pwm_set_enable() to rockchip_pwm_config()
-In-Reply-To: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
-References: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1502206715-24174-5-git-send-email-david.wu@rock-chips.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Tue,  8 Aug 2017 17:08:54 +0200
+Subject: [PATCH 0/9 v2] constify thermal_zone_of_device_ops structures
+Message-ID: <1502204943-20075-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is usually possible to configure the polarity, cycle and duty all at once,
-so that the polarity and cycle and duty should be binding together. Move it
-into rockchip_pwm_config(), as well as prepared for the next atomic update
-commit.
+The thermal_zone_of_device_ops structures are only passed as the fourth
+argument to thermal_zone_of_sensor_register or
+devm_thermal_zone_of_sensor_register, both of which are declared as const.
+Thus the thermal_zone_of_device_ops structures themselves can be const.
 
-Signed-off-by: David Wu <david.wu@rock-chips.com>
+v2: add structures passed to devm_thermal_zone_of_sensor_register also.
+
+Done with the help of Coccinelle.
+
 ---
- drivers/pwm/pwm-rockchip.c | 48 +++++++++++++++++++++++-----------------------
- 1 file changed, 24 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
-index 4bbecbd..fbd9c1a 100644
---- a/drivers/pwm/pwm-rockchip.c
-+++ b/drivers/pwm/pwm-rockchip.c
-@@ -27,6 +27,7 @@
- #define PWM_DUTY_NEGATIVE	(0 << 3)
- #define PWM_INACTIVE_NEGATIVE	(0 << 4)
- #define PWM_INACTIVE_POSITIVE	(1 << 4)
-+#define PWM_POLARITY_MASK	(PWM_DUTY_POSITIVE | PWM_INACTIVE_POSITIVE)
- #define PWM_OUTPUT_LEFT		(0 << 5)
- #define PWM_LP_DISABLE		(0 << 8)
- 
-@@ -123,11 +124,12 @@ static void rockchip_pwm_get_state(struct pwm_chip *chip,
- }
- 
- static void rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
--			       int duty_ns, int period_ns)
-+			       struct pwm_state *state)
- {
- 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
- 	unsigned long period, duty;
- 	u64 clk_rate, div;
-+	u32 ctrl;
- 
- 	clk_rate = clk_get_rate(pc->clk);
- 
-@@ -136,22 +138,31 @@ static void rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	 * bits, every possible input period can be obtained using the
- 	 * default prescaler value for all practical clock rate values.
- 	 */
--	div = clk_rate * period_ns;
-+	div = clk_rate * state->period;
- 	period = DIV_ROUND_CLOSEST_ULL(div,
- 				       pc->data->prescaler * NSEC_PER_SEC);
- 
--	div = clk_rate * duty_ns;
-+	div = clk_rate * state->duty_cycle;
- 	duty = DIV_ROUND_CLOSEST_ULL(div, pc->data->prescaler * NSEC_PER_SEC);
- 
- 	writel(period, pc->base + pc->data->regs.period);
- 	writel(duty, pc->base + pc->data->regs.duty);
-+
-+	ctrl = readl_relaxed(pc->base + pc->data->regs.ctrl);
-+	if (pc->data->supports_polarity) {
-+		ctrl &= ~PWM_POLARITY_MASK;
-+		if (state->polarity == PWM_POLARITY_INVERSED)
-+			ctrl |= PWM_DUTY_NEGATIVE | PWM_INACTIVE_POSITIVE;
-+		else
-+			ctrl |= PWM_DUTY_POSITIVE | PWM_INACTIVE_NEGATIVE;
-+	}
-+	writel(ctrl, pc->base + pc->data->regs.ctrl);
- }
- 
- static int rockchip_pwm_enable(struct pwm_chip *chip,
--			 struct pwm_device *pwm,
--			 bool enable,
--			 enum pwm_polarity polarity,
--			 u32 enable_conf)
-+			       struct pwm_device *pwm,
-+			       bool enable,
-+			       u32 enable_conf)
- {
- 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
- 	int ret;
-@@ -163,15 +174,6 @@ static int rockchip_pwm_enable(struct pwm_chip *chip,
- 			return ret;
- 	}
- 
--	if (pc->data->supports_polarity) {
--		if (polarity == PWM_POLARITY_INVERSED)
--			enable_conf |= PWM_DUTY_NEGATIVE |
--				       PWM_INACTIVE_POSITIVE;
--		else
--			enable_conf |= PWM_DUTY_POSITIVE |
--				       PWM_INACTIVE_NEGATIVE;
--	}
--
- 	val = readl_relaxed(pc->base + pc->data->regs.ctrl);
- 
- 	if (enable)
-@@ -199,17 +201,16 @@ static int rockchip_pwm_apply_v1(struct pwm_chip *chip, struct pwm_device *pwm,
- 	enabled = curstate.enabled;
- 
- 	if (state->polarity != curstate.polarity && enabled) {
--		ret = rockchip_pwm_enable(chip, pwm, false, state->polarity,
--					  enable_conf);
-+		ret = rockchip_pwm_enable(chip, pwm, false, enable_conf);
- 		if (ret)
- 			return ret;
- 		enabled = false;
- 	}
- 
--	rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
-+	rockchip_pwm_config(chip, pwm, state);
- 	if (state->enabled != enabled)
- 		ret = rockchip_pwm_enable(chip, pwm, state->enabled,
--				    state->polarity, enable_conf);
-+					  enable_conf);
- 
- 	return ret;
- }
-@@ -227,17 +228,16 @@ static int rockchip_pwm_apply_v2(struct pwm_chip *chip, struct pwm_device *pwm,
- 	enabled = curstate.enabled;
- 
- 	if (state->polarity != curstate.polarity && enabled) {
--		ret = rockchip_pwm_enable(chip, pwm, false, state->polarity,
--					  enable_conf);
-+		ret = rockchip_pwm_enable(chip, pwm, false, enable_conf);
- 		if (ret)
- 			return ret;
- 		enabled = false;
- 	}
- 
--	rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
-+	rockchip_pwm_config(chip, pwm, state);
- 	if (state->enabled != enabled)
- 		ret = rockchip_pwm_enable(chip, pwm, state->enabled,
--					  state->polarity, enable_conf);
-+					  enable_conf);
- 
- 	return ret;
- }
--- 
-1.9.1
+ drivers/hwmon/hwmon.c                      |    2 +-
+ drivers/hwmon/scpi-hwmon.c                 |    2 +-
+ drivers/input/touchscreen/sun4i-ts.c       |    2 +-
+ drivers/thermal/broadcom/bcm2835_thermal.c |    2 +-
+ drivers/thermal/hisi_thermal.c             |    2 +-
+ drivers/thermal/qoriq_thermal.c            |    2 +-
+ drivers/thermal/rcar_gen3_thermal.c        |    2 +-
+ drivers/thermal/samsung/exynos_tmu.c       |    2 +-
+ drivers/thermal/zx2967_thermal.c           |    2 +-
+ 9 files changed, 9 insertions(+), 9 deletions(-)
