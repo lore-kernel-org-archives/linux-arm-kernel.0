@@ -1,40 +1,57 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Tue,  8 Aug 2017 11:16:38 +0530
-Subject: [PATCH] mmc: wmt-sdmmc: Handle return value of clk_prepare_enable
-Message-ID: <0d9fccf8e14a639274115cc43a97804ef059d8b1.1502171094.git.arvind.yadav.cs@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue,  8 Aug 2017 15:02:44 +0800
+Subject: [PATCH v2] mmc: sunxi: Fix NULL pointer reference on clk_delays
+Message-ID: <20170808070244.27410-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_prepare_enable() can fail here and we must check its return value.
+Some SoCs do not support clk delays for MMC in the clock control unit.
+These include the old controllers in A10/A10s/A13/R8, and the new eMMC
+controller in A64. The config structure for these controllers do not
+specify clk_delays, but the check for this was replaced in commit
+b0600daebf31 ("mmc: sunxi: Support controllers that can use both old
+and new timings").
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+This patch adds back the check for clk_delays, and also adds comments
+for both checks in sunxi_mmc_clk_set_phase().
+
+Fixes: b0600daebf31 ("mmc: sunxi: Support controllers that can use
+		      both old and new timings")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/mmc/host/wmt-sdmmc.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+This fixes an mmc regression on A10/A10s/A13/R8 and A64 introduced
+by the A83T mmc patches.
 
-diff --git a/drivers/mmc/host/wmt-sdmmc.c b/drivers/mmc/host/wmt-sdmmc.c
-index 21ebba8..e64f930 100644
---- a/drivers/mmc/host/wmt-sdmmc.c
-+++ b/drivers/mmc/host/wmt-sdmmc.c
-@@ -856,7 +856,9 @@ static int wmt_mci_probe(struct platform_device *pdev)
- 		goto fail5;
- 	}
+v1 was inlined in a reply to "mmc: sunxi: fix new timings mode on A64
+EMMC (MMC2) controller"
+
+Changes since v1:
+
+  - Polished comments 
+
+I've tested this on my A10 Cubieboard and A20 Cubieboard2.
+---
+ drivers/mmc/host/sunxi-mmc.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 3777517982dd..9dc6d726ec49 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -722,9 +722,14 @@ static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
+ {
+ 	int index;
  
--	clk_prepare_enable(priv->clk_sdmmc);
-+	ret = clk_prepare_enable(priv->clk_sdmmc);
-+	if (ret)
-+		goto fail6;
++	/* clk controller delays not used under new timings mode */
+ 	if (host->use_new_timings)
+ 		return 0;
  
- 	/* configure the controller to a known 'ready' state */
- 	wmt_reset_hardware(mmc);
-@@ -866,6 +868,8 @@ static int wmt_mci_probe(struct platform_device *pdev)
- 	dev_info(&pdev->dev, "WMT SDHC Controller initialized\n");
- 
- 	return 0;
-+fail6:
-+	clk_put(priv->clk_sdmmc);
- fail5:
- 	free_irq(dma_irq, priv);
- fail4:
++	/* some old controllers don't support delays */
++	if (!host->cfg->clk_delays)
++		return 0;
++
+ 	/* determine delays */
+ 	if (rate <= 400000) {
+ 		index = SDXC_CLK_400K;
 -- 
-1.9.1
+2.13.3
