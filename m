@@ -1,28 +1,67 @@
-From: vincent.abriou@st.com (Vincent ABRIOU)
-Date: Tue, 8 Aug 2017 10:03:00 +0000
-Subject: [PATCH 5/8] drm: Nuke drm_atomic_helper_plane_set_property
-In-Reply-To: <20170725080122.20548-6-daniel.vetter@ffwll.ch>
-References: <20170725080122.20548-1-daniel.vetter@ffwll.ch>
- <20170725080122.20548-6-daniel.vetter@ffwll.ch>
-Message-ID: <d7a0f3da-4254-a694-5975-db6fe395461f@st.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Tue, 08 Aug 2017 20:12:55 +1000
+Subject: [PATCH 3/3] powerpc: replace vga_fixup() with generic code
+In-Reply-To: <87wp6fq8y5.fsf@linkitivity.dja.id.au>
+References: <20170804102033.27731-1-dja@axtens.net>
+ <20170804102033.27731-4-dja@axtens.net>
+ <87efsnq217.fsf@concordia.ellerman.id.au>
+ <87wp6fq8y5.fsf@linkitivity.dja.id.au>
+Message-ID: <8760dynza0.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Daniel Axtens <dja@axtens.net> writes:
 
+> Michael Ellerman <mpe@ellerman.id.au> writes:
+>
+>> Daniel Axtens <dja@axtens.net> writes:
+>>
+>>> Currently, we do a PCI fixup to mark a default card so that Xorg
+>>> autoconfiguration works.
+>>>
+>>> There is a new generic method to do this sort of vga fixup, and
+>>> it occurs by default.
+>>>
+>>> Drop our old method.
+>>>
+>>> This method is different:
+>>>  - it will only mark a card as default if a driver is bound
+>>>  - the marking will happen at late_initcall time, or even later
+>>>    if a card is enabled later on (via an ENABLE hook). Currently
+>>>    things are enabled in a FINAL hook.
+>>>
+>>> This *does* change behaviour under some circumstances.
+>>>
+>>> For example, pseries_le_defconfig doesn't have DRM drivers for
+>>> many of the qemu GPU models, including the 'standard' vga.
+>>
+>> Should we enable them/it?
+>
+> Hard to say.
+>
+> The 'standard' vga module (bochs_drm) was blacklisted by Ubuntu -
+> apparently at IBM's request [0] - some years back. Even if you
+> un-blacklist it, I had trouble with getting it and the openfirmware
+> framebuffer driver to play nicely together. It may not be worth the
+> trouble for bochs_drm.
+>
+> There's a better case for including some of the more modern drivers -
+> maybe QXL and virtio - but I wasn't able to test them: my particular
+> build of qemu/TCG refused to start with them and I didn't feel like
+> rebuilding/debugging qemu.
 
-On 07/25/2017 10:01 AM, Daniel Vetter wrote:
-> It's dead code, the core handles all this directly now. This also
-> allows us to unexport drm_atomic_helper_plane_set_property.
-> 
-> Signed-off-by: Daniel Vetter <daniel.vetter@intel.com>
+Yeah OK. Sounds like a bit of mess :)
 
-[...]
+I'll leave it unless someone who knows Qemu/Gfx etc. tells me otherwise.
 
->   drivers/gpu/drm/sti/sti_cursor.c                |  1 -
->   drivers/gpu/drm/sti/sti_gdp.c                   |  1 -
->   drivers/gpu/drm/sti/sti_hqvdp.c                 |  1 -
+> It would also be legitmate to say that you're focussing on headless use
+> with pseries_*defconfig and not include them: you need to bring in the
+> DRM core if you want these drivers.
 
-Acked-by: Vincent Abriou <vincent.abriou@st.com>
+True. There's a bit of a tension there between making them useful
+configs for developers and also turning on as much code as possible so
+it gets tested.
 
-BR
-Vincent
+Arguably we should have DRM enabled because the distros will.
+
+cheers
