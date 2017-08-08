@@ -1,249 +1,84 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 8 Aug 2017 15:04:51 -0500
-Subject: [PATCH v3 6/6] dt-bindings: PCI: add support for new generation
- controller
-In-Reply-To: <721a9148b9e80ad52ec0b8fbd5f9fe9b9be0f23e.1501846816.git.honghui.zhang@mediatek.com>
-References: <cover.1501846816.git.honghui.zhang@mediatek.com>
- <721a9148b9e80ad52ec0b8fbd5f9fe9b9be0f23e.1501846816.git.honghui.zhang@mediatek.com>
-Message-ID: <20170808200450.GA19181@bhelgaas-glaptop.roam.corp.google.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Tue, 8 Aug 2017 22:09:01 +0200 (CEST)
+Subject: linux-next 2017-08-08 keyboard failure on Nokia N900
+In-Reply-To: <61264d43-eda3-df9d-0c06-28611f373ce7@ti.com>
+References: <20170808101756.GA12922@amd> <20170808103444.GA18247@amd>
+ <20170808111243.GA20328@amd> <61264d43-eda3-df9d-0c06-28611f373ce7@ti.com>
+Message-ID: <alpine.DEB.2.20.1708082203510.2095@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 04, 2017 at 08:06:42PM +0800, honghui.zhang at mediatek.com wrote:
-> From: Ryder Lee <ryder.lee@mediatek.com>
-> 
-> Add support for MediaTek new generation controller and update related
-> properities.
 
-When you update the series, can you update the subject and changelog
-to be more specific than "new generation" controller?
 
-Next year there will probably be another "new generation" controller,
-so it's useful to be more specific here, e.g., include
-"MT2701/MT7623", "MT2712/MT7622", or whatever is appropriate.
+On Tue, 8 Aug 2017, Grygorii Strashko wrote:
 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
->  .../devicetree/bindings/pci/mediatek-pcie.txt      | 168 ++++++++++++++++++++-
->  1 file changed, 161 insertions(+), 7 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/mediatek-pcie.txt b/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
-> index 0fdcb15..2e81742 100644
-> --- a/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/mediatek-pcie.txt
-> @@ -3,18 +3,31 @@ MediaTek Gen2 PCIe controller
->  Required properties:
->  - compatible: Should contain one of the following strings:
->  	"mediatek,mt2701-pcie"
-> +	"mediatek,mt2712-pcie"
-> +	"mediatek,mt7622-pcie"
->  	"mediatek,mt7623-pcie"
->  - device_type: Must be "pci"
-> -- reg: Base addresses and lengths of the PCIe controller.
-> +- reg: Base addresses and lengths of the PCIe subsys and root ports.
-> +- reg-names: Names of the above areas to use during resource look-up.
->  - #address-cells: Address representation for root ports (must be 3)
->  - #size-cells: Size representation for root ports (must be 2)
->  - clocks: Must contain an entry for each entry in clock-names.
->    See ../clocks/clock-bindings.txt for details.
-> -- clock-names: Must include the following entries:
-> -  - free_ck :for reference clock of PCIe subsys
-> -  - sys_ck0 :for clock of Port0
-> -  - sys_ck1 :for clock of Port1
-> -  - sys_ck2 :for clock of Port2
-> +- clock-names:
-> +  Mandatory entries:
-> +   - sys_ckN :transaction layer and data link layer clock
-> +  Required entries for MT2701/MT7623:
-> +   - free_ck :for reference clock of PCIe subsys
-> +  Required entries for MT2712/MT7622:
-> +   - ahb_ckN :AHB slave interface operating clock for CSR access and RC
-> +	      initiated MMIO access
-> +  Required entries for MT7622:
-> +   - axi_ckN :application layer MMIO channel operating clock
-> +   - aux_ckN :pe2_mac_bridge and pe2_mac_core operating clock when
-> +	      pcie_mac_ck/pcie_pipe_ck is turned off
-> +   - obff_ckN :OBFF functional block operating clock
-> +   - pipe_ckN :LTSSM and PHY/MAC layer operating clock
-> +  where N starting from 0 to one less than the number of root ports.
->  - phys: List of PHY specifiers (used by generic PHY framework).
->  - phy-names : Must be "pcie-phy0", "pcie-phy1", "pcie-phyN".. based on the
->    number of PHYs as specified in *phys* property.
-> @@ -33,6 +46,10 @@ Required properties for MT7623/MT2701:
->  - reset-names: Must be "pcie-rst0", "pcie-rst1", "pcie-rstN".. based on the
->    number of root ports.
->  
-> +Required properties for MT2712/MT7622:
-> +-interrupts: A list of interrupt outputs of the controller, must have one
-> +	     entry for each PCIe port
-> +
->  In addition, the device tree node must have sub-nodes describing each
->  PCIe port interface, having the following mandatory properties:
->  
-> @@ -50,7 +67,7 @@ Required properties:
->    property is sufficient.
->  - num-lanes: Number of lanes to use for this port.
->  
-> -Examples:
-> +Examples for MT7623:
->  
->  	hifsys: syscon at 1a000000 {
->  		compatible = "mediatek,mt7623-hifsys",
-> @@ -68,6 +85,7 @@ Examples:
->  		      <0 0x1a142000 0 0x1000>, /* Port0 registers */
->  		      <0 0x1a143000 0 0x1000>, /* Port1 registers */
->  		      <0 0x1a144000 0 0x1000>; /* Port2 registers */
-> +		reg-names = "subsys", "port0", "port1", "port2";
->  		#address-cells = <3>;
->  		#size-cells = <2>;
->  		#interrupt-cells = <1>;
-> @@ -128,3 +146,139 @@ Examples:
->  			num-lanes = <1>;
->  		};
->  	};
-> +
-> +Examples for MT2712:
-> +	pcie: pcie at 11700000 {
-> +		compatible = "mediatek,mt2712-pcie";
-> +		device_type = "pci";
-> +		reg = <0 0x11700000 0 0x1000>,
-> +		      <0 0x112ff000 0 0x1000>;
-> +		reg-names = "port0", "port1";
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&topckgen CLK_TOP_PE2_MAC_P0_SEL>,
-> +			 <&topckgen CLK_TOP_PE2_MAC_P1_SEL>,
-> +			 <&pericfg CLK_PERI_PCIE0>,
-> +			 <&pericfg CLK_PERI_PCIE1>;
-> +		clock-names = "sys_ck0", "sys_ck1", "ahb_ck0", "ahb_ck1";
-> +		phys = <&pcie0_phy PHY_TYPE_PCIE>, <&pcie1_phy PHY_TYPE_PCIE>;
-> +		phy-names = "pcie-phy0", "pcie-phy1";
-> +		bus-range = <0x00 0xff>;
-> +		ranges = <0x82000000 0 0x20000000  0x0 0x20000000  0 0x10000000>;
-> +
-> +		pcie0: pcie at 0,0 {
-> +			device_type = "pci";
-> +			reg = <0x0000 0 0 0 0>;
-> +			#address-cells = <3>;
-> +			#size-cells = <2>;
-> +			#interrupt-cells = <1>;
-> +			ranges;
-> +			num-lanes = <1>;
-> +			interrupt-map-mask = <0 0 0 7>;
-> +			interrupt-map = <0 0 0 1 &pcie_intc0 0>,
-> +					<0 0 0 2 &pcie_intc0 1>,
-> +					<0 0 0 3 &pcie_intc0 2>,
-> +					<0 0 0 4 &pcie_intc0 3>;
-> +			pcie_intc0: interrupt-controller {
-> +				interrupt-controller;
-> +				#address-cells = <0>;
-> +				#interrupt-cells = <1>;
-> +			};
-> +		};
-> +
-> +		pcie1: pcie at 1,0 {
-> +			device_type = "pci";
-> +			reg = <0x0800 0 0 0 0>;
-> +			#address-cells = <3>;
-> +			#size-cells = <2>;
-> +			#interrupt-cells = <1>;
-> +			ranges;
-> +			num-lanes = <1>;
-> +			interrupt-map-mask = <0 0 0 7>;
-> +			interrupt-map = <0 0 0 1 &pcie_intc1 0>,
-> +					<0 0 0 2 &pcie_intc1 1>,
-> +					<0 0 0 3 &pcie_intc1 2>,
-> +					<0 0 0 4 &pcie_intc1 3>;
-> +			pcie_intc1: interrupt-controller {
-> +				interrupt-controller;
-> +				#address-cells = <0>;
-> +				#interrupt-cells = <1>;
-> +			};
-> +		};
-> +	};
-> +
-> +Examples for MT7622:
-> +	pcie: pcie at 1a140000 {
-> +		compatible = "mediatek,mt7622-pcie";
-> +		device_type = "pci";
-> +		reg = <0 0x1a140000 0 0x1000>,
-> +		      <0 0x1a143000 0 0x1000>,
-> +		      <0 0x1a145000 0 0x1000>;
-> +		reg-names = "subsys", "port0", "port1";
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		interrupts = <GIC_SPI 228 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_SPI 229 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&pciesys CLK_PCIE_P0_MAC_EN>,
-> +			 <&pciesys CLK_PCIE_P1_MAC_EN>,
-> +			 <&pciesys CLK_PCIE_P0_AHB_EN>,
-> +			 <&pciesys CLK_PCIE_P1_AHB_EN>,
-> +			 <&pciesys CLK_PCIE_P0_AUX_EN>,
-> +			 <&pciesys CLK_PCIE_P1_AUX_EN>,
-> +			 <&pciesys CLK_PCIE_P0_AXI_EN>,
-> +			 <&pciesys CLK_PCIE_P1_AXI_EN>,
-> +			 <&pciesys CLK_PCIE_P0_OBFF_EN>,
-> +			 <&pciesys CLK_PCIE_P1_OBFF_EN>,
-> +			 <&pciesys CLK_PCIE_P0_PIPE_EN>,
-> +			 <&pciesys CLK_PCIE_P1_PIPE_EN>;
-> +		clock-names = "sys_ck0", "sys_ck1", "ahb_ck0", "ahb_ck1",
-> +			      "aux_ck0", "aux_ck1", "axi_ck0", "axi_ck1",
-> +			      "obff_ck0", "obff_ck1", "pipe_ck0", "pipe_ck1";
-> +		phys = <&pcie0_phy PHY_TYPE_PCIE>, <&pcie1_phy PHY_TYPE_PCIE>;
-> +		phy-names = "pcie-phy0", "pcie-phy1";
-> +		power-domains = <&scpsys MT7622_POWER_DOMAIN_HIF0>;
-> +		bus-range = <0x00 0xff>;
-> +		ranges = <0x82000000 0 0x20000000  0x0 0x20000000  0 0x10000000>;
-> +
-> +		pcie0: pcie at 0,0 {
-> +			device_type = "pci";
-> +			reg = <0x0000 0 0 0 0>;
-> +			#address-cells = <3>;
-> +			#size-cells = <2>;
-> +			#interrupt-cells = <1>;
-> +			ranges;
-> +			num-lanes = <1>;
-> +			interrupt-map-mask = <0 0 0 7>;
-> +			interrupt-map = <0 0 0 1 &pcie_intc0 0>,
-> +					<0 0 0 2 &pcie_intc0 1>,
-> +					<0 0 0 3 &pcie_intc0 2>,
-> +					<0 0 0 4 &pcie_intc0 3>;
-> +			pcie_intc0: interrupt-controller {
-> +				interrupt-controller;
-> +				#address-cells = <0>;
-> +				#interrupt-cells = <1>;
-> +			};
-> +		};
-> +
-> +		pcie1: pcie at 1,0 {
-> +			device_type = "pci";
-> +			reg = <0x0800 0 0 0 0>;
-> +			#address-cells = <3>;
-> +			#size-cells = <2>;
-> +			#interrupt-cells = <1>;
-> +			ranges;
-> +			num-lanes = <1>;
-> +			interrupt-map-mask = <0 0 0 7>;
-> +			interrupt-map = <0 0 0 1 &pcie_intc1 0>,
-> +					<0 0 0 2 &pcie_intc1 1>,
-> +					<0 0 0 3 &pcie_intc1 2>,
-> +					<0 0 0 4 &pcie_intc1 3>;
-> +			pcie_intc1: interrupt-controller {
-> +				interrupt-controller;
-> +				#address-cells = <0>;
-> +				#interrupt-cells = <1>;
-> +			};
-> +		};
-> +	};
-> -- 
-> 2.6.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+> On 08/08/2017 06:12 AM, Pavel Machek wrote:
+> > Hi!
+> >
+> >>> I tried today's linux-next. It boots on n900 (up to X), but then my
+> >>> screen locks and I can't get back. Touchscreen worked, so my guess is
+> >>> keyboard does not...? Ssh connection over usb still works.
+> >>
+> >> Confirmed, its the keyboard.
+> >>
+> >> Additionally, battery monitoring fails, because neither
+> >>
+> >> /sys/class/power_supply/{n900-,rx51-}battery/voltage_now
+> >>
+> >> exists.
+> >
+> > And dmesg is helpful in this case:
+> >
+> > [    0.675201] input: twl4030_pwrbutton as
+> > /devices/platform/68000000.ocp/48070000.i2c/i2c-1/1-0048/48070000.i2c:twl at 48:pwrbutton/input/input1
+> > [    0.676635] input: TWL4030 Keypad as
+> > /devices/platform/68000000.ocp/48070000.i2c/i2c-1/1-0048/48070000.i2c:twl at 48:keypad/input/input2
+> > [    0.679138] twl4030_keypad 48070000.i2c:twl at 48:keypad: request_irq
+> > failed for irq no=156: -13
+> > [    0.679779] twl4030_keypad: probe of 48070000.i2c:twl at 48:keypad
+> > failed with error -13
+> > [    0.682769] twl4030_madc 48070000.i2c:twl at 48:madc: could not
+> > request irq
+> > [    0.684051] twl4030_madc: probe of 48070000.i2c:twl at 48:madc failed
+> > with error -13
+> > [    0.685852] input: twl4030:vibrator as
+> > /devices/platform/68000000.ocp/48070000.i2c/i2c-1/1-0048/48070000.i2c:twl at 48:audio/twl4030-vibra/input/input3
+> > [    0.768890] omap_i2c 48070000.i2c: bus 1 rev3.3 at 2200 kHz
+> >
+>
+> I've not precisely checked it, but smth is telling me that below
+> patch  can cause this:
+>
+> commit 78daaca78ee57dead0f4aa5ee399f0499e81cd9e
+> Author: Julia Lawall <Julia.Lawall@lip6.fr>
+> Date:   Thu May 4 22:10:50 2017 +0200
+>
+>     mfd: twl4030-irq: Drop unnecessary static
+>
+>     Drop static on a local variable, when the variable is initialized before
+>     any use, on every possible execution path through the function.
+>
+> --- a/drivers/mfd/twl4030-irq.c
+> +++ b/drivers/mfd/twl4030-irq.c
+> @@ -685,7 +685,7 @@ int twl4030_sih_setup(struct device *dev, int module, int irq_base)
+>
+>  int twl4030_init_irq(struct device *dev, int irq_num)
+>  {
+> -       static struct irq_chip  twl4030_irq_chip;
+> +       struct irq_chip twl4030_irq_chip;
+>
+>
+> but if we will look at code - it can be seen that this variable is passed by reference to
+> irq_set_chip_and_handler().
+> Ops. And what will happen when twl4030_init_irq() returns ;)
+
+The patch is not correct as was already noted when it was submitted:
+
+https://lkml.org/lkml/2017/7/15/169
+https://lkml.org/lkml/2017/7/15/171
+
+Do you need a patch reverting this one?
+
+julia
