@@ -1,57 +1,63 @@
 From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Tue,  8 Aug 2017 10:00:29 +0200
-Subject: [PATCH v2 1/2] remoteproc: dt: Provide bindings for iMX6SX/7D Remote
- Processor Controller driver
-In-Reply-To: <20170808080030.2581-1-o.rempel@pengutronix.de>
-References: <20170808080030.2581-1-o.rempel@pengutronix.de>
-Message-ID: <20170808080030.2581-2-o.rempel@pengutronix.de>
+Date: Tue,  8 Aug 2017 10:00:28 +0200
+Subject: [PATCH v2 0/2] provide imx rproc driver
+Message-ID: <20170808080030.2581-1-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
----
- .../devicetree/bindings/remoteproc/imx-rproc.txt   | 33 ++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
+this patch set to provide remoteproc functionality on
+i.MX7D SoC.
 
-diff --git a/Documentation/devicetree/bindings/remoteproc/imx-rproc.txt b/Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
-new file mode 100644
-index 000000000000..faf30ef3d6cf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
-@@ -0,0 +1,33 @@
-+NXP iMX6SX/iMX7D Co-Processor Bindings
-+----------------------------------------
-+
-+This binding provides support for ARM Cortex M4 Co-processor found on some
-+NXP iMX SoCs.
-+
-+Required properties:
-+- compatible		Should be one of:
-+				"fsl,imx7d-rproc"
-+				"fsl,imx6sx-rproc"
-+- clocks		Clock for co-processor (See: ../clock/clock-bindings.txt)
-+- syscon		Phandle to syscon block which provide access to
-+			System Reset Controller
-+
-+Optional properties:
-+- memory-region		list of phandels to the reserved memory regions.
-+			(See: ../reserved-memory/reserved-memory.txt)
-+
-+Example:
-+	m4_reserved_sysmem1: rproc at 80000000 {
-+		reg = <0x80000000 0x80000>;
-+	};
-+
-+	m4_reserved_sysmem2: rproc at 81000000 {
-+		reg = <0x81000000 0x80000>;
-+	};
-+
-+	imx7d-rproc {
-+		compatible	= "fsl,imx7d-rproc";
-+		memory-region	= <&m4_reserved_sysmem1>, <&m4_reserved_sysmem2>;
-+		syscon		= <&src>;
-+		clocks		= <&clks IMX7D_ARM_M4_ROOT_CLK>;
-+	};
+For testing I used this simple counter written in ASM:
+======================================
+        .syntax unified
+        .text
+        .thumb
+        .int 0x10020000                 @ Initial SP value
+        .int reset + 1
+
+reset:
+
+        mov     r0, #0x55
+        ldr     r1, =(0x40)
+1:
+        str     r0, [r1]
+        add     r0, 1
+        b       1b
+
+        /* Dummy data, required by remoteproc loader */
+        /* Please FIXME, this part seem to be incorrect */
+        .data
+        .section .resource_table, "aw"
+        .word   1, 0, 0, 0      /* struct resource_table base */
+        .word   0               /* uint32_t offset[1] */
+============================================================
+compiled with:
+${CROSS}as -o imx7m4.o imx7m4.S
+${CROSS}ld -Ttext=0x0 -o imx7m4.elf imx7m4.o
+cp imx7m4.elf /srv/nfs/sid-armhf/lib/firmware/rproc-imx_rproc-fw
+
+Functionality was confirmed with current OpenOCD master.
+OpenOCD cfg file can be found here:
+https://github.com/olerem/openocd/blob/imx7-2017.06.14/tcl/target/imx7.cfg
+
+changes:
+v2:
+ - use memory-region instead of reg property
+ - remove memory ranges from documentation
+
+Oleksij Rempel (2):
+  remoteproc: dt: Provide bindings for iMX6SX/7D Remote Processor
+    Controller driver
+  remoteproc: imx_rproc: add a NXP/Freescale imx_rproc driver
+
+ .../devicetree/bindings/remoteproc/imx-rproc.txt   |  33 ++
+ drivers/remoteproc/Kconfig                         |  10 +
+ drivers/remoteproc/Makefile                        |   1 +
+ drivers/remoteproc/imx_rproc.c                     | 426 +++++++++++++++++++++
+ 4 files changed, 470 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
+ create mode 100644 drivers/remoteproc/imx_rproc.c
+
 -- 
 2.11.0
