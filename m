@@ -1,36 +1,221 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Aug 2017 13:30:43 +0100
-Subject: [v6 11/15] arm64/kasan: explicitly zero kasan shadow memory
-In-Reply-To: <f8b2b9ed-abf0-0c16-faa2-98b66dcbed78@oracle.com>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-12-git-send-email-pasha.tatashin@oracle.com>
- <20170808090743.GA12887@arm.com>
- <f8b2b9ed-abf0-0c16-faa2-98b66dcbed78@oracle.com>
-Message-ID: <20170808123042.GG13355@arm.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Tue,  8 Aug 2017 15:03:46 +0300
+Subject: [PATCH v4 15/19] crypto: tcrypt: move to generic async completion
+In-Reply-To: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
+References: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
+Message-ID: <1502193834-11289-16-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 07:49:22AM -0400, Pasha Tatashin wrote:
-> Hi Will,
-> 
-> Thank you for looking at this change. What you described was in my previous
-> iterations of this project.
-> 
-> See for example here: https://lkml.org/lkml/2017/5/5/369
-> 
-> I was asked to remove that flag, and only zero memory in place when needed.
-> Overall the current approach is better everywhere else in the kernel, but it
-> adds a little extra code to kasan initialization.
+tcrypt starts several async crypto ops and  waits for their completions.
+Move it over to generic code doing the same.
 
-Damn, I actually prefer the flag :)
+Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+---
+ crypto/tcrypt.c | 84 +++++++++++++++++----------------------------------------
+ 1 file changed, 25 insertions(+), 59 deletions(-)
 
-But actually, if you look at our implementation of vmemmap_populate, then we
-have our own version of vmemmap_populate_basepages that terminates at the
-pmd level anyway if ARM64_SWAPPER_USES_SECTION_MAPS. If there's resistance
-to do this in the core code, then I'd be inclined to replace our
-vmemmap_populate implementation in the arm64 code with a single version that
-can terminate at either the PMD or the PTE level, and do zeroing if
-required. We're already special-casing it, so we don't really lose anything
-imo.
-
-Will
+diff --git a/crypto/tcrypt.c b/crypto/tcrypt.c
+index 0022a18..802aa81 100644
+--- a/crypto/tcrypt.c
++++ b/crypto/tcrypt.c
+@@ -79,34 +79,11 @@ static char *check[] = {
+ 	NULL
+ };
+ 
+-struct tcrypt_result {
+-	struct completion completion;
+-	int err;
+-};
+-
+-static void tcrypt_complete(struct crypto_async_request *req, int err)
+-{
+-	struct tcrypt_result *res = req->data;
+-
+-	if (err == -EINPROGRESS)
+-		return;
+-
+-	res->err = err;
+-	complete(&res->completion);
+-}
+-
+ static inline int do_one_aead_op(struct aead_request *req, int ret)
+ {
+-	if (ret == -EINPROGRESS || ret == -EBUSY) {
+-		struct tcrypt_result *tr = req->base.data;
++	struct crypto_wait *wait = req->base.data;
+ 
+-		ret = wait_for_completion_interruptible(&tr->completion);
+-		if (!ret)
+-			ret = tr->err;
+-		reinit_completion(&tr->completion);
+-	}
+-
+-	return ret;
++	return crypto_wait_req(ret, wait);
+ }
+ 
+ static int test_aead_jiffies(struct aead_request *req, int enc,
+@@ -248,7 +225,7 @@ static void test_aead_speed(const char *algo, int enc, unsigned int secs,
+ 	char *axbuf[XBUFSIZE];
+ 	unsigned int *b_size;
+ 	unsigned int iv_len;
+-	struct tcrypt_result result;
++	struct crypto_wait wait;
+ 
+ 	iv = kzalloc(MAX_IVLEN, GFP_KERNEL);
+ 	if (!iv)
+@@ -284,7 +261,7 @@ static void test_aead_speed(const char *algo, int enc, unsigned int secs,
+ 		goto out_notfm;
+ 	}
+ 
+-	init_completion(&result.completion);
++	crypto_init_wait(&wait);
+ 	printk(KERN_INFO "\ntesting speed of %s (%s) %s\n", algo,
+ 			get_driver_name(crypto_aead, tfm), e);
+ 
+@@ -296,7 +273,7 @@ static void test_aead_speed(const char *algo, int enc, unsigned int secs,
+ 	}
+ 
+ 	aead_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+-				  tcrypt_complete, &result);
++				  crypto_req_done, &wait);
+ 
+ 	i = 0;
+ 	do {
+@@ -397,21 +374,16 @@ static void test_hash_sg_init(struct scatterlist *sg)
+ 
+ static inline int do_one_ahash_op(struct ahash_request *req, int ret)
+ {
+-	if (ret == -EINPROGRESS || ret == -EBUSY) {
+-		struct tcrypt_result *tr = req->base.data;
++	struct crypto_wait *wait = req->base.data;
+ 
+-		wait_for_completion(&tr->completion);
+-		reinit_completion(&tr->completion);
+-		ret = tr->err;
+-	}
+-	return ret;
++	return crypto_wait_req(ret, wait);
+ }
+ 
+ struct test_mb_ahash_data {
+ 	struct scatterlist sg[TVMEMSIZE];
+ 	char result[64];
+ 	struct ahash_request *req;
+-	struct tcrypt_result tresult;
++	struct crypto_wait wait;
+ 	char *xbuf[XBUFSIZE];
+ };
+ 
+@@ -440,7 +412,7 @@ static void test_mb_ahash_speed(const char *algo, unsigned int sec,
+ 		if (testmgr_alloc_buf(data[i].xbuf))
+ 			goto out;
+ 
+-		init_completion(&data[i].tresult.completion);
++		crypto_init_wait(&data[i].wait);
+ 
+ 		data[i].req = ahash_request_alloc(tfm, GFP_KERNEL);
+ 		if (!data[i].req) {
+@@ -449,8 +421,8 @@ static void test_mb_ahash_speed(const char *algo, unsigned int sec,
+ 			goto out;
+ 		}
+ 
+-		ahash_request_set_callback(data[i].req, 0,
+-					   tcrypt_complete, &data[i].tresult);
++		ahash_request_set_callback(data[i].req, 0, crypto_req_done,
++					   &data[i].wait);
+ 		test_hash_sg_init(data[i].sg);
+ 	}
+ 
+@@ -492,16 +464,16 @@ static void test_mb_ahash_speed(const char *algo, unsigned int sec,
+ 			if (ret)
+ 				break;
+ 
+-			complete(&data[k].tresult.completion);
+-			data[k].tresult.err = 0;
++			crypto_req_done(&data[k].req->base, 0);
+ 		}
+ 
+ 		for (j = 0; j < k; j++) {
+-			struct tcrypt_result *tr = &data[j].tresult;
++			struct crypto_wait *wait = &data[j].wait;
++			int wait_ret;
+ 
+-			wait_for_completion(&tr->completion);
+-			if (tr->err)
+-				ret = tr->err;
++			wait_ret = crypto_wait_req(-EINPROGRESS, wait);
++			if (wait_ret)
++				ret = wait_ret;
+ 		}
+ 
+ 		end = get_cycles();
+@@ -679,7 +651,7 @@ static void test_ahash_speed_common(const char *algo, unsigned int secs,
+ 				    struct hash_speed *speed, unsigned mask)
+ {
+ 	struct scatterlist sg[TVMEMSIZE];
+-	struct tcrypt_result tresult;
++	struct crypto_wait wait;
+ 	struct ahash_request *req;
+ 	struct crypto_ahash *tfm;
+ 	char *output;
+@@ -708,9 +680,9 @@ static void test_ahash_speed_common(const char *algo, unsigned int secs,
+ 		goto out;
+ 	}
+ 
+-	init_completion(&tresult.completion);
++	crypto_init_wait(&wait);
+ 	ahash_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+-				   tcrypt_complete, &tresult);
++				   crypto_req_done, &wait);
+ 
+ 	output = kmalloc(MAX_DIGEST_SIZE, GFP_KERNEL);
+ 	if (!output)
+@@ -765,15 +737,9 @@ static void test_hash_speed(const char *algo, unsigned int secs,
+ 
+ static inline int do_one_acipher_op(struct skcipher_request *req, int ret)
+ {
+-	if (ret == -EINPROGRESS || ret == -EBUSY) {
+-		struct tcrypt_result *tr = req->base.data;
+-
+-		wait_for_completion(&tr->completion);
+-		reinit_completion(&tr->completion);
+-		ret = tr->err;
+-	}
++	struct crypto_wait *wait = req->base.data;
+ 
+-	return ret;
++	return crypto_wait_req(ret, wait);
+ }
+ 
+ static int test_acipher_jiffies(struct skcipher_request *req, int enc,
+@@ -853,7 +819,7 @@ static void test_skcipher_speed(const char *algo, int enc, unsigned int secs,
+ 				unsigned int tcount, u8 *keysize, bool async)
+ {
+ 	unsigned int ret, i, j, k, iv_len;
+-	struct tcrypt_result tresult;
++	struct crypto_wait wait;
+ 	const char *key;
+ 	char iv[128];
+ 	struct skcipher_request *req;
+@@ -866,7 +832,7 @@ static void test_skcipher_speed(const char *algo, int enc, unsigned int secs,
+ 	else
+ 		e = "decryption";
+ 
+-	init_completion(&tresult.completion);
++	crypto_init_wait(&wait);
+ 
+ 	tfm = crypto_alloc_skcipher(algo, 0, async ? 0 : CRYPTO_ALG_ASYNC);
+ 
+@@ -887,7 +853,7 @@ static void test_skcipher_speed(const char *algo, int enc, unsigned int secs,
+ 	}
+ 
+ 	skcipher_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+-				      tcrypt_complete, &tresult);
++				      crypto_req_done, &wait);
+ 
+ 	i = 0;
+ 	do {
+-- 
+2.1.4
