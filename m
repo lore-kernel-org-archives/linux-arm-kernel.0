@@ -1,39 +1,20 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Tue,  8 Aug 2017 17:09:00 +0200
-Subject: [PATCH 6/9 v2] Input: sun4i-ts - constify thermal_zone_of_device_ops
- structures
-In-Reply-To: <1502204943-20075-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1502204943-20075-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1502204943-20075-7-git-send-email-Julia.Lawall@lip6.fr>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 08 Aug 2017 17:35:39 +0200
+Subject: [PATCH v3 2/9] clk: rockchip: rename the clk id for HCLK_I2S1_2CH
+In-Reply-To: <1502176547-30817-3-git-send-email-zhangqing@rock-chips.com>
+References: <1502176547-30817-1-git-send-email-zhangqing@rock-chips.com>
+ <1502176547-30817-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <7826906.vHv6rg8ahg@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The thermal_zone_of_device_ops structure is only passed as the fourth
-argument to devm_thermal_zone_of_sensor_register, which is declared
-as const.  Thus the thermal_zone_of_device_ops structure itself can
-be const.
+Am Dienstag, 8. August 2017, 15:15:40 CEST schrieb Elaine Zhang:
+> i2s1 has 2 channels but not 8 channels.
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 
-Done with the help of Coccinelle.
+I had already picked the one from v2 before noticing the
+issues in the previous clock-driver changes, so ignored.
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
----
-
-v2: New patch
-
- drivers/input/touchscreen/sun4i-ts.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
-index d07dd29..d2e14d9 100644
---- a/drivers/input/touchscreen/sun4i-ts.c
-+++ b/drivers/input/touchscreen/sun4i-ts.c
-@@ -206,7 +206,7 @@ static int sun4i_get_tz_temp(void *data, int *temp)
- 	return sun4i_get_temp(data, temp);
- }
- 
--static struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
-+static const struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
- 	.get_temp = sun4i_get_tz_temp,
- };
- 
+Heiko
