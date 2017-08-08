@@ -1,67 +1,80 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 8 Aug 2017 17:46:33 +0530
-Subject: [PATCH 1/8] dt-bindings: phy: sun4i-usb-phy: Add property
- descriptions for H3
-In-Reply-To: <20170803081411.22389-2-wens@csie.org>
-References: <20170803081411.22389-1-wens@csie.org>
- <20170803081411.22389-2-wens@csie.org>
-Message-ID: <c7dfc4e8-7a4e-e57d-e1e8-16f0a56cd505@ti.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Tue,  8 Aug 2017 15:03:48 +0300
+Subject: [PATCH v4 17/19] crypto: qce: move to generic async completion
+In-Reply-To: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
+References: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
+Message-ID: <1502193834-11289-18-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The qce driver starts several async crypto ops and  waits for their
+completions. Move it over to generic code doing the same.
 
+Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+---
+ drivers/crypto/qce/sha.c | 30 ++++--------------------------
+ 1 file changed, 4 insertions(+), 26 deletions(-)
 
-On Thursday 03 August 2017 01:44 PM, Chen-Yu Tsai wrote:
-> The Allwinner H3 SoC has 4 USB PHYs, so it needs four sets of pmu
-> regions, clocks, resets, and optional vbus properties. These were
-> not described when the H3 compatible string was added.
-> 
-> Fixes: 626a630e003c ("phy-sun4i-usb: Add support for the host usb-phys
-> 		      found on the H3 SoC")
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-
-Rob, can you give your Acked-by for this patch?
-
-Thanks
-Kishon
-> ---
->  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> index 005bc22938ff..893dd01dfe64 100644
-> --- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-> @@ -17,18 +17,21 @@ Required properties:
->    * "phy_ctrl"
->    * "pmu0" for H3, V3s and A64
->    * "pmu1"
-> -  * "pmu2" for sun4i, sun6i or sun7i
-> +  * "pmu2" for sun4i, sun6i, sun7i or sun8i-h3
-> +  * "pmu3" for sun8i-h3
->  - #phy-cells : from the generic phy bindings, must be 1
->  - clocks : phandle + clock specifier for the phy clocks
->  - clock-names :
->    * "usb_phy" for sun4i, sun5i or sun7i
->    * "usb0_phy", "usb1_phy" and "usb2_phy" for sun6i
->    * "usb0_phy", "usb1_phy" for sun8i
-> +  * "usb0_phy", "usb1_phy", "usb2_phy" and "usb3_phy" for sun8i-h3
->  - resets : a list of phandle + reset specifier pairs
->  - reset-names :
->    * "usb0_reset"
->    * "usb1_reset"
-> -  * "usb2_reset" for sun4i, sun6i or sun7i
-> +  * "usb2_reset" for sun4i, sun6i, sun7i or sun8i-h3
-> +  * "usb3_reset" for sun8i-h3
->  
->  Optional properties:
->  - usb0_id_det-gpios : gpio phandle for reading the otg id pin value
-> @@ -37,6 +40,7 @@ Optional properties:
->  - usb0_vbus-supply : regulator phandle for controller usb0 vbus
->  - usb1_vbus-supply : regulator phandle for controller usb1 vbus
->  - usb2_vbus-supply : regulator phandle for controller usb2 vbus
-> +- usb3_vbus-supply : regulator phandle for controller usb3 vbus
->  
->  Example:
->  	usbphy: phy at 0x01c13400 {
-> 
+diff --git a/drivers/crypto/qce/sha.c b/drivers/crypto/qce/sha.c
+index 47e114a..53227d7 100644
+--- a/drivers/crypto/qce/sha.c
++++ b/drivers/crypto/qce/sha.c
+@@ -349,28 +349,12 @@ static int qce_ahash_digest(struct ahash_request *req)
+ 	return qce->async_req_enqueue(tmpl->qce, &req->base);
+ }
+ 
+-struct qce_ahash_result {
+-	struct completion completion;
+-	int error;
+-};
+-
+-static void qce_digest_complete(struct crypto_async_request *req, int error)
+-{
+-	struct qce_ahash_result *result = req->data;
+-
+-	if (error == -EINPROGRESS)
+-		return;
+-
+-	result->error = error;
+-	complete(&result->completion);
+-}
+-
+ static int qce_ahash_hmac_setkey(struct crypto_ahash *tfm, const u8 *key,
+ 				 unsigned int keylen)
+ {
+ 	unsigned int digestsize = crypto_ahash_digestsize(tfm);
+ 	struct qce_sha_ctx *ctx = crypto_tfm_ctx(&tfm->base);
+-	struct qce_ahash_result result;
++	struct crypto_wait wait;
+ 	struct ahash_request *req;
+ 	struct scatterlist sg;
+ 	unsigned int blocksize;
+@@ -405,9 +389,9 @@ static int qce_ahash_hmac_setkey(struct crypto_ahash *tfm, const u8 *key,
+ 		goto err_free_ahash;
+ 	}
+ 
+-	init_completion(&result.completion);
++	crypto_init_wait(&wait);
+ 	ahash_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+-				   qce_digest_complete, &result);
++				   crypto_req_done, &wait);
+ 	crypto_ahash_clear_flags(ahash_tfm, ~0);
+ 
+ 	buf = kzalloc(keylen + QCE_MAX_ALIGN_SIZE, GFP_KERNEL);
+@@ -420,13 +404,7 @@ static int qce_ahash_hmac_setkey(struct crypto_ahash *tfm, const u8 *key,
+ 	sg_init_one(&sg, buf, keylen);
+ 	ahash_request_set_crypt(req, &sg, ctx->authkey, keylen);
+ 
+-	ret = crypto_ahash_digest(req);
+-	if (ret == -EINPROGRESS || ret == -EBUSY) {
+-		ret = wait_for_completion_interruptible(&result.completion);
+-		if (!ret)
+-			ret = result.error;
+-	}
+-
++	ret = crypto_wait_req(crypto_ahash_digest(req), &wait);
+ 	if (ret)
+ 		crypto_ahash_set_flags(tfm, CRYPTO_TFM_RES_BAD_KEY_LEN);
+ 
+-- 
+2.1.4
