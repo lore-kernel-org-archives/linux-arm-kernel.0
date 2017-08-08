@@ -1,35 +1,38 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 8 Aug 2017 19:03:05 +0800
-Subject: [PATCH] binder: let ANDROID_BINDER_IPC_32BIT be selectable on 32bit
- ARM
-Message-ID: <20170808110305.2748-1-jszhang@marvell.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Tue,  8 Aug 2017 11:56:31 +0100
+Subject: [PATCH  1/3] dt-bindings: apmu: Document r8a7743 support
+In-Reply-To: <1502189793-59679-1-git-send-email-biju.das@bp.renesas.com>
+References: <1502189793-59679-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <1502189793-59679-2-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As noted in commit d0bdff0db809 ("staging: Fix build issues with new
-binder API"), we can add back the choice for 32bit ARM "once a 64bit
-__get_user_asm_* implementation is merged." Commit e38361d032f1 ("ARM:
-8091/2: add get_user() support for 8 byte types") has added the
-support, so it's time to let ANDROID_BINDER_IPC_32BIT be selectable on
-32bit ARM
+Document APMU and SMP enable method for RZ/G1M
+(also known as r8a7743) SoC.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 ---
- drivers/android/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/power/renesas,apmu.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/android/Kconfig b/drivers/android/Kconfig
-index 832e885349b1..aca5dc30b97b 100644
---- a/drivers/android/Kconfig
-+++ b/drivers/android/Kconfig
-@@ -32,7 +32,7 @@ config ANDROID_BINDER_DEVICES
- 	  therefore logically separated from the other devices.
+diff --git a/Documentation/devicetree/bindings/power/renesas,apmu.txt b/Documentation/devicetree/bindings/power/renesas,apmu.txt
+index 84404c9..af21502 100644
+--- a/Documentation/devicetree/bindings/power/renesas,apmu.txt
++++ b/Documentation/devicetree/bindings/power/renesas,apmu.txt
+@@ -1,12 +1,13 @@
+ DT bindings for the Renesas Advanced Power Management Unit
  
- config ANDROID_BINDER_IPC_32BIT
--	bool
-+	bool "Use old (Android 4.4 and earlier) 32-bit binder API"
- 	depends on !64BIT && ANDROID_BINDER_IPC
- 	default y
- 	---help---
+-Renesas R-Car line of SoCs utilize one or more APMU hardware units
++Renesas R-Car and RZ/G1 SoCs utilize one or more APMU hardware units
+ for CPU core power domain control including SMP boot and CPU Hotplug.
+ 
+ Required properties:
+ 
+ - compatible: Should be "renesas,<soctype>-apmu", "renesas,apmu" as fallback.
+ 	      Examples with soctypes are:
++		- "renesas,r8a7743-apmu" (RZ/G1M)
+ 		- "renesas,r8a7790-apmu" (R-Car H2)
+ 		- "renesas,r8a7791-apmu" (R-Car M2-W)
+ 		- "renesas,r8a7792-apmu" (R-Car V2H)
 -- 
-2.14.0
+1.9.1
