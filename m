@@ -1,60 +1,52 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Aug 2017 12:21:44 +0100
-Subject: [PATCH v2] iommu/arm-smmu: fix null-pointer dereference in
- arm_smmu_add_device
-In-Reply-To: <d7a07e48-862d-a6f7-8bad-9c71f5a5be5b@arm.com>
-References: <20170808092614.GB12887@arm.com>
- <1502187962-16861-1-git-send-email-asavkov@redhat.com>
- <d7a07e48-862d-a6f7-8bad-9c71f5a5be5b@arm.com>
-Message-ID: <20170808112144.GE13355@arm.com>
+Date: Tue, 8 Aug 2017 12:18:17 +0100
+Subject: [PATCH 2/2] iommu/arm-smmu: Add system PM support
+In-Reply-To: <d8d6f3b606ed05d53b47d36e1c6a7f4b74eb3afc.1500381551.git.robin.murphy@arm.com>
+References: <71247263f4d88e7776f483fb1cc1139b516c0835.1500381551.git.robin.murphy@arm.com>
+ <d8d6f3b606ed05d53b47d36e1c6a7f4b74eb3afc.1500381551.git.robin.murphy@arm.com>
+Message-ID: <20170808111816.GD13355@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+ Joerg]
-
-On Tue, Aug 08, 2017 at 11:37:40AM +0100, Robin Murphy wrote:
-> On 08/08/17 11:26, Artem Savkov wrote:
-> > Commit c54451a "iommu/arm-smmu: Fix the error path in arm_smmu_add_device"
-> > removed fwspec assignment in legacy_binding path as redundant which is
-> > wrong. It needs to be updated after fwspec initialisation in
-> > arm_smmu_register_legacy_master() as it is dereferenced later. Without
-> > this there is a NULL-pointer dereference panic during boot on some hosts.
+On Tue, Jul 18, 2017 at 01:44:42PM +0100, Robin Murphy wrote:
+> With all our hardware state tracked in such a way that we can naturally
+> restore it as part of the necessary reset, resuming is trivial, and
+> there's nothing to do on suspend at all.
 > 
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 > 
-> Thanks for fixing it up, and sorry for failing to document the
-> unfortunately subtle logic in the first place!
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 86897b7b81d8..0f5f06e9abfa 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -2356,10 +2356,22 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +static int __maybe_unused arm_smmu_pm_resume(struct device *dev)
+> +{
 
-Well, I was the one that messed it up:
+Did you actually get a warning here without the __maybe_unused annotation?
+It looks like some other drivers just guard the thing with CONFIG_PM_SLEEP.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+> +	struct arm_smmu_device *smmu = dev_get_drvdata(dev);
+> +
+> +	arm_smmu_device_reset(smmu);
+> +	return 0;
+> +}
+> +
+> +
+> +static SIMPLE_DEV_PM_OPS(arm_smmu_pm_ops, NULL, arm_smmu_pm_resume);
+> +
+>  static struct platform_driver arm_smmu_driver = {
+>  	.driver	= {
+>  		.name		= "arm-smmu",
+>  		.of_match_table	= of_match_ptr(arm_smmu_of_match),
+> +		.pm = &arm_smmu_pm_ops,
 
-Joerg, can you pick this up as a fix for 4.13, please?
+Cosmetic: can you tab-align this assignment please?
 
 Will
-
-> > Signed-off-by: Artem Savkov <asavkov@redhat.com>
-> > ---
-> >  drivers/iommu/arm-smmu.c | 7 +++++++
-> >  1 file changed, 7 insertions(+)
-> > 
-> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > index b97188a..2d80fa8 100644
-> > --- a/drivers/iommu/arm-smmu.c
-> > +++ b/drivers/iommu/arm-smmu.c
-> > @@ -1519,6 +1519,13 @@ static int arm_smmu_add_device(struct device *dev)
-> >  
-> >  	if (using_legacy_binding) {
-> >  		ret = arm_smmu_register_legacy_master(dev, &smmu);
-> > +
-> > +		/*
-> > +		 * If dev->iommu_fwspec is initally NULL, arm_smmu_register_legacy_master()
-> > +		 * will allocate/initialise a new one. Thus we need to update fwspec for
-> > +		 * later use.
-> > +		 */
-> > +		fwspec = dev->iommu_fwspec;
-> >  		if (ret)
-> >  			goto out_free;
-> >  	} else if (fwspec && fwspec->ops == &arm_smmu_ops) {
-> > 
-> 
