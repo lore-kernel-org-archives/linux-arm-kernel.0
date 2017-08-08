@@ -1,49 +1,28 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 8 Aug 2017 23:44:38 +0800
-Subject: [PATCH] ARM: sunxi: add an help section to the Kconfig Sun8i SoC
- selection
-In-Reply-To: <20170808153636.26846-1-clabbe.montjoie@gmail.com>
-References: <20170808153636.26846-1-clabbe.montjoie@gmail.com>
-Message-ID: <CAGb2v65b6FVN6LrqSAJxDaQJ9_mB6xP1aH0Tnqm2f657AfNHpQ@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 8 Aug 2017 17:44:04 +0200
+Subject: [PATCH v7 2/4] clk: samsung: Add support for runtime PM
+In-Reply-To: <1501839294-478-3-git-send-email-m.szyprowski@samsung.com>
+References: <1501839294-478-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170804093515eucas1p1cc2273ba02d86767c5b2533430577698@eucas1p1.samsung.com>
+ <1501839294-478-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170808154404.GB2646@kozik-book>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Aug 8, 2017 at 11:36 PM, Corentin Labbe
-<clabbe.montjoie@gmail.com> wrote:
-> Since sun8i regroup lots of SoCs, it is helpful to list them in the help
-> section of Kconfig.
->
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+On Fri, Aug 04, 2017 at 11:34:52AM +0200, Marek Szyprowski wrote:
+> This patch adds struct device pointer to samsung_clk_provider and forwarding it
+> to clk_register_* functions, so drivers can register clocks, which use runtime
+> pm feature.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 > ---
->  arch/arm/mach-sunxi/Kconfig | 3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-> index 58153cdf025b..2ffcccda2688 100644
-> --- a/arch/arm/mach-sunxi/Kconfig
-> +++ b/arch/arm/mach-sunxi/Kconfig
-> @@ -42,6 +42,9 @@ config MACH_SUN8I
->         default ARCH_SUNXI
->         select ARM_GIC
->         select MFD_SUN6I_PRCM
-> +       help
-> +         Select this option if you have one of the following SoC:
-> +         A23 A33 A83T H2+ H3 R16 V3S
+>  drivers/clk/samsung/clk-pll.c |  2 +-
+>  drivers/clk/samsung/clk.c     | 12 ++++++------
+>  drivers/clk/samsung/clk.h     |  1 +
+>  3 files changed, 8 insertions(+), 7 deletions(-)
 
-IIRC Maxime was against having chip names in here, as we would end up
-updating this every time a new chip gets added.
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Instead, what about using Allwinner's explanation? I.e. sun8i is a
-chip with only Cortex-A7's, and sun9i is a chip with Cortex-A15's.
-And just tell the user to say yes if they are not sure.
-
-ChenYu
-
->
->  config MACH_SUN9I
->         bool "Allwinner (sun9i) SoCs support"
-> --
-> 2.13.0
->
+Best regards,
+Krzysztof
