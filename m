@@ -1,31 +1,52 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Tue,  8 Aug 2017 21:33:40 +0530
-Subject: [PATCH 27/35] wireless: mediatek: mt7601u: constify usb_device_id
-Message-ID: <1502208220-12224-1-git-send-email-arvind.yadav.cs@gmail.com>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Tue, 8 Aug 2017 09:06:13 -0700
+Subject: [PATCH v2 2/3] arm/syscalls: Optimize address limit check
+In-Reply-To: <20170807175533.GA20805@n2100.armlinux.org.uk>
+References: <20170726170051.28328-1-thgarnie@google.com>
+ <20170726170051.28328-2-thgarnie@google.com>
+ <CAGXu5jLbJuokv+B_Nn8uRDVadi05ywJM7FSgpOr+maO2pQrd0w@mail.gmail.com>
+ <CAJcbSZHfoHNPv3tk11iCj49UkLGU-QdeyMj2BS60wng5z5L4pg@mail.gmail.com>
+ <20170807175533.GA20805@n2100.armlinux.org.uk>
+Message-ID: <CAJcbSZHkWXeLwBj+HOzmEhZCqgyawytgn8PMseTvtb-he5nq6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-usb_device_id are not supposed to change at runtime. All functions
-working with usb_device_id provided by <linux/usb.h> work with
-const usb_device_id. So mark the non-const structs as const.
+On Mon, Aug 7, 2017 at 10:55 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+>
+> It's better in so far as it avoids the problems previously highlighted.
+>
+> However, it depends how efficient we want these paths to be - the
+> difference between your assembly and the assembly I've previously
+> supplied is that mine fills in any delay slots with some useful work
+> and avoids adding extra delay slots in this path.
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/net/wireless/mediatek/mt7601u/usb.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The previous assembly implementation we did was design as you
+described but all checks were done after the pending work was managed.
+I would like the address limit check to be done before, especially if
+we move from panic to a SIGKILL approach.
 
-diff --git a/drivers/net/wireless/mediatek/mt7601u/usb.c b/drivers/net/wireless/mediatek/mt7601u/usb.c
-index 416c604..b9e4f67 100644
---- a/drivers/net/wireless/mediatek/mt7601u/usb.c
-+++ b/drivers/net/wireless/mediatek/mt7601u/usb.c
-@@ -19,7 +19,7 @@
- #include "usb.h"
- #include "trace.h"
- 
--static struct usb_device_id mt7601u_device_table[] = {
-+static const struct usb_device_id mt7601u_device_table[] = {
- 	{ USB_DEVICE(0x0b05, 0x17d3) },
- 	{ USB_DEVICE(0x0e8d, 0x760a) },
- 	{ USB_DEVICE(0x0e8d, 0x760b) },
+>
+> Arguably, the system call exit path is as important as the system
+> call entry path for OS performance, so I think we should strive to
+> make it as efficient as possible - much as I already did when I
+> posted code on this topic previously.
+
+How do you think it could improve while keeping the check before pending work?
+
+>
+> I think that code can simply be adapted to call your C function
+> instead of the assembly "addr_limit_fail" label.
+
+I don't use the label anymore on this version.
+
+>
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> According to speedtest.net: 8.21Mbps down 510kbps up
+
+
+
 -- 
-2.7.4
+Thomas
