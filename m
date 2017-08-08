@@ -1,62 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Aug 2017 10:34:50 +0100
-Subject: [PATCH] mm: Revert x86_64 and arm64 ELF_ET_DYN_BASE base
-In-Reply-To: <20170807201542.GA21271@beast>
-References: <20170807201542.GA21271@beast>
-Message-ID: <20170808093450.GA13355@arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 8 Aug 2017 10:41:35 +0100
+Subject: [PATCH v4 3/6] coresight: of: Use of_cpu_node_to_id helper
+In-Reply-To: <201708081748.bujrMOmJ%fengguang.wu@intel.com>
+References: <201708081748.bujrMOmJ%fengguang.wu@intel.com>
+Message-ID: <5460b978-e624-6b38-fe3d-6427eed3ebd7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 01:15:42PM -0700, Kees Cook wrote:
-> Moving the x86_64 and arm64 PIE base from 0x555555554000 to 0x000100000000
-> broke AddressSanitizer. This is a partial revert of:
-> 
->   commit eab09532d400 ("binfmt_elf: use ELF_ET_DYN_BASE only for PIE")
->   commit 02445990a96e ("arm64: move ELF_ET_DYN_BASE to 4GB / 4MB")
-> 
-> The AddressSanitizer tool has hard-coded expectations about where
-> executable mappings are loaded. The motivation for changing the PIE
-> base in the above commits was to avoid the Stack-Clash CVEs that
-> allowed executable mappings to get too close to heap and stack. This
-> was mainly a problem on 32-bit, but the 64-bit bases were moved too,
-> in an effort to proactively protect those systems (proofs of concept
-> do exist that show 64-bit collisions, but other recent changes to fix
-> stack accounting and setuid behaviors will minimize the impact).
-> 
-> The new 32-bit PIE base is fine for ASan (since it matches the ET_EXEC
-> base), so only the 64-bit PIE base needs to be reverted to let x86 and
-> arm64 ASan binaries run again. Future changes to the 64-bit PIE base on
-> these architectures can be made optional once a more dynamic method for
-> dealing with AddressSanitizer is found. (e.g. always loading PIE into
-> the mmap region for marked binaries.)
-> 
-> Reported-by: Kostya Serebryany <kcc@google.com>
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> ---
->  arch/arm64/include/asm/elf.h | 4 ++--
->  arch/x86/include/asm/elf.h   | 4 ++--
->  2 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> index acae781f7359..3288c2b36731 100644
-> --- a/arch/arm64/include/asm/elf.h
-> +++ b/arch/arm64/include/asm/elf.h
-> @@ -114,10 +114,10 @@
->  
->  /*
->   * This is the base location for PIE (ET_DYN with INTERP) loads. On
-> - * 64-bit, this is raised to 4GB to leave the entire 32-bit address
-> + * 64-bit, this is above 4GB to leave the entire 32-bit address
->   * space open for things that want to use the area for 32-bit pointers.
->   */
-> -#define ELF_ET_DYN_BASE		0x100000000UL
-> +#define ELF_ET_DYN_BASE		(2 * TASK_SIZE_64 / 3)
->  
->  #ifndef __ASSEMBLY__
+On 08/08/17 10:18, kbuild test robot wrote:
+> Hi Suzuki,
+>
+> [auto build test ERROR on linus/master]
+> [also build test ERROR on v4.13-rc4 next-20170807]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+>
+> url:    https://github.com/0day-ci/linux/commits/Suzuki-K-Poulose/perf-Support-for-ARM-DynamIQ-Shared-Unit-PMU/20170808-124822
+> config: arm-allmodconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+> reproduce:
+>         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm
+>
+> Note: the linux-review/Suzuki-K-Poulose/perf-Support-for-ARM-DynamIQ-Shared-Unit-PMU/20170808-124822 HEAD 5757d34d451ed5a1452526b27b0f36664a8f2007 builds fine.
+>       It only hurts bisectibility.
+>
+> All errors (new ones prefixed by >>):
+>
+>    drivers//hwtracing/coresight/of_coresight.c: In function 'of_coresight_get_cpu':
+>>> drivers//hwtracing/coresight/of_coresight.c:117:19: error: expected ';' before numeric constant
+>      return (cpu < 0) 0 : cpu;
+>                       ^
+>
+> vim +117 drivers//hwtracing/coresight/of_coresight.c
+>
+>    103	
+>    104	int of_coresight_get_cpu(const struct device_node *node)
+>    105	{
+>    106		int cpu;
+>    107		struct device_node *dn;
+>    108	
+>    109		dn = of_parse_phandle(node, "cpu", 0);
+>    110		/* Affinity defaults to CPU0 */
+>    111		if (!dn)
+>    112			return 0;
+>    113		cpu = of_cpu_node_to_id(dn);
+>    114		of_node_put(dn);
+>    115	
+>    116		/* Affinity to CPU0 if no cpu nodes are found */
+>  > 117		return (cpu < 0) 0 : cpu;
+>    118	}
+>    119	EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
+>    120	
+>
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Thanks for the bug report, I will respin the series with a fix for this.
 
-I assume this is going via akpm like the original commit?
-
-Will
+Suzuki
