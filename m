@@ -1,20 +1,28 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 08 Aug 2017 17:36:27 +0200
-Subject: [PATCH v3 6/9] clk: rockchip: support more clks for rv1108
-In-Reply-To: <1502176723-32275-1-git-send-email-zhangqing@rock-chips.com>
-References: <1502176547-30817-1-git-send-email-zhangqing@rock-chips.com>
- <1502176723-32275-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <3884584.0gIWhf9E44@phil>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 08 Aug 2017 08:52:44 -0700
+Subject: [PATCH] iio: adc: Fix coding style violations
+In-Reply-To: <d310ac06b13cf803bd3a2a6bcfb92169445f929c.1502193860.git.michal.simek@xilinx.com>
+References: <d310ac06b13cf803bd3a2a6bcfb92169445f929c.1502193860.git.michal.simek@xilinx.com>
+Message-ID: <1502207564.2219.35.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 8. August 2017, 15:18:43 CEST schrieb Elaine Zhang:
-> Add the description of the missing clock,
-> make the clock more complete.
-> 
-> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+On Tue, 2017-08-08 at 14:04 +0200, Michal Simek wrote:
+> From: Sai Krishna Potthuri <lakshmi.sai.krishna.potthuri@xilinx.com>
+[]
+> diff --git a/drivers/iio/adc/xilinx-xadc.h b/drivers/iio/adc/xilinx-xadc.h
+[]
+> @@ -76,7 +76,7 @@ struct xadc_ops {
+>  	int (*setup)(struct platform_device *pdev, struct iio_dev *indio_dev,
+>  			int irq);
+>  	void (*update_alarm)(struct xadc *, unsigned int);
+> -	unsigned long (*get_dclk_rate)(struct xadc *);
+> +	unsigned long (*get_dclk_rate)(struct xadc *xadc);
+>  	irqreturn_t (*interrupt_handler)(int, void *);
 
-applied for 4.14
+Doesn't it seem odd to you that the lines above and below
+have the same form?
 
-Thanks for restructuring the patches
-Heiko
+checkpatch is an imperfect tool.
+It will always be imperfect.
+Please use your eyes and mind too.
