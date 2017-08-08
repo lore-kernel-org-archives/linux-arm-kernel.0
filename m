@@ -1,67 +1,117 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Tue, 8 Aug 2017 11:29:13 +0200
-Subject: [PATCH] MAINTAINERS: Update Cavium ThunderX2 entry
-In-Reply-To: <1502154424-3429-1-git-send-email-jnair@caviumnetworks.com>
-References: <1502154424-3429-1-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <20170808092913.GE17961@rric.localdomain>
+From: 0x7f454c46@gmail.com (Dmitry Safonov)
+Date: Tue, 8 Aug 2017 12:29:50 +0300
+Subject: [PATCH] arm64/vdso: Support mremap() for vDSO
+In-Reply-To: <20170802160401.GA16932@arm.com>
+References: <20170726170737.21696-1-dsafonov@virtuozzo.com>
+ <20170728164800.GD14170@arm.com>
+ <CAJwJo6bCxRvKvwmwwH7UZW2fRZkqTTqfnp0j85Si454pDQUjVw@mail.gmail.com>
+ <20170802160401.GA16932@arm.com>
+Message-ID: <CAJwJo6bKgZnH+3RRGb_G1SN06hyx=g49OMrrZS8F3PoMa3t-sA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.08.17 01:07:04, Jayachandran C wrote:
-> Add Robert Richter as the primary maintainer for this platform.
-> 
-> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 44cb004..f2d8963 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -3155,6 +3155,7 @@ S:	Supported
->  F:	drivers/crypto/cavium/cpt/
->  
->  CAVIUM THUNDERX2 ARM64 SOC
-> +M:	Robert Richter <rric@kernel.org>
+2017-08-02 19:04 GMT+03:00 Will Deacon <will.deacon@arm.com>:
+> On Fri, Jul 28, 2017 at 10:06:20PM +0300, Dmitry Safonov wrote:
+>> 2017-07-28 19:48 GMT+03:00 Will Deacon <will.deacon@arm.com>:
+>> > On Wed, Jul 26, 2017 at 08:07:37PM +0300, Dmitry Safonov wrote:
+>> >> vDSO VMA address is saved in mm_context for the purpose of using
+>> >> restorer from vDSO page to return to userspace after signal handling.
+>> >>
+>> >> In Checkpoint Restore in Userspace (CRIU) project we place vDSO VMA
+>> >> on restore back to the place where it was on the dump.
+>> >> With the exception for x86 (where there is API to map vDSO with
+>> >> arch_prctl()), we move vDSO inherited from CRIU task to restoree
+>> >> position by mremap().
+>> >>
+>> >> CRIU does support arm64 architecture, but kernel doesn't update
+>> >> context.vdso pointer after mremap(). Which results in translation
+>> >> fault after signal handling on restored application:
+>> >> https://github.com/xemul/criu/issues/288
+>> >>
+>> >> Make vDSO code track the VMA address by supplying .mremap() fops
+>> >> the same way it's done for x86 and arm32 by:
+>> >> commit b059a453b1cf ("x86/vdso: Add mremap hook to vm_special_mapping")
+>> >> commit 280e87e98c09 ("ARM: 8683/1: ARM32: Support mremap() for sigpage/vDSO").
+>> >>
+>> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> >> Cc: Will Deacon <will.deacon@arm.com>
+>> >> Cc: Russell King <rmk+kernel@armlinux.org.uk>
+>> >> Cc: linux-arm-kernel at lists.infradead.org
+>> >> Cc: Cyrill Gorcunov <gorcunov@openvz.org>
+>> >> Cc: Pavel Emelyanov <xemul@virtuozzo.com>
+>> >> Cc: Christopher Covington <cov@codeaurora.org>
+>> >> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
+>> >> ---
+>> >>  arch/arm64/kernel/vdso.c | 15 +++++++++++++++
+>> >>  1 file changed, 15 insertions(+)
+>> >>
+>> >> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+>> >> index e8f759f764f2..2d419006ad43 100644
+>> >> --- a/arch/arm64/kernel/vdso.c
+>> >> +++ b/arch/arm64/kernel/vdso.c
+>> >> @@ -110,12 +110,27 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
+>> >>  }
+>> >>  #endif /* CONFIG_COMPAT */
+>> >>
+>> >> +static int vdso_mremap(const struct vm_special_mapping *sm,
+>> >> +             struct vm_area_struct *new_vma)
+>> >> +{
+>> >> +     unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
+>> >> +     unsigned long vdso_size = vdso_end - vdso_start;
+>> >
+>> > You might be able to use vdso_pages here, but it depends on my question
+>> > below.
+>>
+>> Yes, shifting with PAGE_SHIFT.
+>> Is it just a preference?
+>
+> Yeah, just a minor thing, although thinking about it again, I don't know
+> what you're trying to achieve with the size check anyway. Userspace is only
+> going to hurt itself if it screws up the layout, so why police this?
 
-I better want to use my Cavium's email address here, see patch below.
+Well, it's for keeping the same semantics as on x86.
+The idea of restriction to partial mremap() is suggested by Andy
+so that userspace won't be allowed to hurt itself and to simplify
+kernel code on x86.
 
-Thanks,
+>
+>> >
+>> >> +
+>> >> +     if (vdso_size != new_size)
+>> >> +             return -EINVAL;
+>> >> +
+>> >> +     current->mm->context.vdso = (void *)new_vma->vm_start;
+>> >> +
+>> >> +     return 0;
+>> >> +}
+>> >> +
+>> >>  static struct vm_special_mapping vdso_spec[2] __ro_after_init = {
+>> >>       {
+>> >>               .name   = "[vvar]",
+>> >>       },
+>> >>       {
+>> >>               .name   = "[vdso]",
+>> >> +             .mremap = vdso_mremap,
+>> >
+>> > Does this mean we move the vdso text, but not the data page? How does that
+>> > work?
+>>
+>> Well, the kernel tracks only vdso pages - to find restorer addr after a signal.
+>> In userspace one needs to move vvar and vdso vma pair accordingly,
+>> with the same order and offset of course.
+>
+> Ah, I see. I misunderstood what the .mremap callback was actually doing.
+> I guess there's also no issue with not being able to do this atomically,
+> either, as long as you can avoid making syscalls via the vDSO until you've
+> relocated both mappings.
 
--Robert
+Yes, also one should keep in mind that there might be some linker
+work needed after mremap() of vdso. As some loaded libraries may
+have been linked to vdso's vma addresses.
 
->  M:	Jayachandran C <jnair@caviumnetworks.com>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
-> -- 
-> 2.7.4
-> 
+In CRIU we have `restorer' code which is PIE code, non-linked to
+libc and calling raw syscalls rather than using vdso. And restoree
+(the application being restored) is already linked to vdso's new position.
 
->From ac88ba1883fb7292993665dfc33f4ef22be2ff15 Mon Sep 17 00:00:00 2001
-From: Robert Richter <rrichter@cavium.com>
-Date: Tue, 8 Aug 2017 11:08:08 +0200
-Subject: [PATCH] MAINTAINERS: Update Cavium ThunderX2 entry
-
-Add Robert Richter as the primary maintainer for this platform.
-
-Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 205d3977ac46..d26629c2820b 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -3133,6 +3133,7 @@ S:	Maintained
- F:	drivers/iio/light/cm*
- 
- CAVIUM THUNDERX2 ARM64 SOC
-+M:	Robert Richter <rrichter@cavium.com>
- M:	Jayachandran C <jnair@caviumnetworks.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
 -- 
-2.11.0
+             Dmitry
