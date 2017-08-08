@@ -1,64 +1,28 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Tue, 8 Aug 2017 23:44:39 +0200
-Subject: [PATCH] mtd: physmap_of: Retire Gemini pad control
-In-Reply-To: <20170808190510.11496-1-linus.walleij@linaro.org>
-References: <20170808190510.11496-1-linus.walleij@linaro.org>
-Message-ID: <4afc385a-688c-6dff-eabf-7f90ea92ca12@gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 08 Aug 2017 14:49:27 -0700
+Subject: [PATCH v5.1 1/2] ARM64: dts: meson-gx: use stable UART bindings
+ with correct gate clock
+In-Reply-To: <1498056132-18508-2-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Wed, 21 Jun 2017 16:42:11 +0200")
+References: <1498056132-18508-1-git-send-email-narmstrong@baylibre.com>
+ <1498056132-18508-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <7h1solohlk.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2017 09:05 PM, Linus Walleij wrote:
-> I wrote a proper pin control driver for the Gemini. Retire this
-> SoC-specific pad control and rely on the pin controller to manage
-> this.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
+> From: Helmut Klein <hgkr.klein@gmail.com>
+>
+> This patch switches to the stable UART bindings but also add the correct
+> gate clock to the non-AO UART nodes for GXBB and GXL SoCs.
+>
+> Acked-by: Jerome Brunet <jbrunet@baylibre.com>
+> Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Thanks!
+Applied to v4.14/dt64,
 
-> ---
->  drivers/mtd/maps/physmap_of_gemini.c | 16 ----------------
->  1 file changed, 16 deletions(-)
-> 
-> diff --git a/drivers/mtd/maps/physmap_of_gemini.c b/drivers/mtd/maps/physmap_of_gemini.c
-> index 05b286b5289f..4ed1a6bb4d3c 100644
-> --- a/drivers/mtd/maps/physmap_of_gemini.c
-> +++ b/drivers/mtd/maps/physmap_of_gemini.c
-> @@ -43,13 +43,6 @@
->  
->  #define FLASH_PARALLEL_HIGH_PIN_CNT	(1 << 20)	/* else low pin cnt */
->  
-> -/* Miscellaneous Control Register */
-> -#define GLOBAL_MISC_CTRL		0x30
-> -#define FLASH_PADS_MASK			0x07
-> -#define NAND_PADS_DISABLE		BIT(2)
-> -#define PFLASH_PADS_DISABLE		BIT(1)
-> -#define SFLASH_PADS_DISABLE		BIT(0)
-> -
->  static const struct of_device_id syscon_match[] = {
->  	{ .compatible = "cortina,gemini-syscon" },
->  	{ },
-> @@ -102,15 +95,6 @@ int of_flash_probe_gemini(struct platform_device *pdev,
->  				 map->bankwidth * 8);
->  	}
->  
-> -	/* Activate parallel (NOR flash) mode */
-> -	ret = regmap_update_bits(rmap, GLOBAL_MISC_CTRL,
-> -				 FLASH_PADS_MASK,
-> -				 SFLASH_PADS_DISABLE | NAND_PADS_DISABLE);
-> -	if (ret) {
-> -		dev_err(dev, "unable to set up physmap pads\n");
-> -		return -ENODEV;
-> -	}
-> -
->  	dev_info(&pdev->dev, "initialized Gemini-specific physmap control\n");
->  
->  	return 0;
-> 
+Thanks,
 
-
--- 
-Best regards,
-Marek Vasut
+Kevin
