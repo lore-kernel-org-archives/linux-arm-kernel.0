@@ -1,117 +1,68 @@
-From: 0x7f454c46@gmail.com (Dmitry Safonov)
-Date: Tue, 8 Aug 2017 12:29:50 +0300
-Subject: [PATCH] arm64/vdso: Support mremap() for vDSO
-In-Reply-To: <20170802160401.GA16932@arm.com>
-References: <20170726170737.21696-1-dsafonov@virtuozzo.com>
- <20170728164800.GD14170@arm.com>
- <CAJwJo6bCxRvKvwmwwH7UZW2fRZkqTTqfnp0j85Si454pDQUjVw@mail.gmail.com>
- <20170802160401.GA16932@arm.com>
-Message-ID: <CAJwJo6bKgZnH+3RRGb_G1SN06hyx=g49OMrrZS8F3PoMa3t-sA@mail.gmail.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Tue, 8 Aug 2017 14:57:12 +0530
+Subject: [PATCH RFC] irqchip: gic-v3: Support forced cpu irq affinity
+ setting
+In-Reply-To: <7ea6b8d3-762a-d4e9-3b64-609b534c3960@arm.com>
+References: <CGME20170808091129epcas1p48d0523675178cb841d97e64d5baab75f@epcas1p4.samsung.com>
+ <1502183093-30327-1-git-send-email-alim.akhtar@samsung.com>
+ <7ea6b8d3-762a-d4e9-3b64-609b534c3960@arm.com>
+Message-ID: <a13295d7-40cc-24d7-a99a-3d349fbb91cb@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-08-02 19:04 GMT+03:00 Will Deacon <will.deacon@arm.com>:
-> On Fri, Jul 28, 2017 at 10:06:20PM +0300, Dmitry Safonov wrote:
->> 2017-07-28 19:48 GMT+03:00 Will Deacon <will.deacon@arm.com>:
->> > On Wed, Jul 26, 2017 at 08:07:37PM +0300, Dmitry Safonov wrote:
->> >> vDSO VMA address is saved in mm_context for the purpose of using
->> >> restorer from vDSO page to return to userspace after signal handling.
->> >>
->> >> In Checkpoint Restore in Userspace (CRIU) project we place vDSO VMA
->> >> on restore back to the place where it was on the dump.
->> >> With the exception for x86 (where there is API to map vDSO with
->> >> arch_prctl()), we move vDSO inherited from CRIU task to restoree
->> >> position by mremap().
->> >>
->> >> CRIU does support arm64 architecture, but kernel doesn't update
->> >> context.vdso pointer after mremap(). Which results in translation
->> >> fault after signal handling on restored application:
->> >> https://github.com/xemul/criu/issues/288
->> >>
->> >> Make vDSO code track the VMA address by supplying .mremap() fops
->> >> the same way it's done for x86 and arm32 by:
->> >> commit b059a453b1cf ("x86/vdso: Add mremap hook to vm_special_mapping")
->> >> commit 280e87e98c09 ("ARM: 8683/1: ARM32: Support mremap() for sigpage/vDSO").
->> >>
->> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> >> Cc: Will Deacon <will.deacon@arm.com>
->> >> Cc: Russell King <rmk+kernel@armlinux.org.uk>
->> >> Cc: linux-arm-kernel at lists.infradead.org
->> >> Cc: Cyrill Gorcunov <gorcunov@openvz.org>
->> >> Cc: Pavel Emelyanov <xemul@virtuozzo.com>
->> >> Cc: Christopher Covington <cov@codeaurora.org>
->> >> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
->> >> ---
->> >>  arch/arm64/kernel/vdso.c | 15 +++++++++++++++
->> >>  1 file changed, 15 insertions(+)
->> >>
->> >> diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
->> >> index e8f759f764f2..2d419006ad43 100644
->> >> --- a/arch/arm64/kernel/vdso.c
->> >> +++ b/arch/arm64/kernel/vdso.c
->> >> @@ -110,12 +110,27 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
->> >>  }
->> >>  #endif /* CONFIG_COMPAT */
->> >>
->> >> +static int vdso_mremap(const struct vm_special_mapping *sm,
->> >> +             struct vm_area_struct *new_vma)
->> >> +{
->> >> +     unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
->> >> +     unsigned long vdso_size = vdso_end - vdso_start;
->> >
->> > You might be able to use vdso_pages here, but it depends on my question
->> > below.
+
+
+On 08/08/2017 02:52 PM, Marc Zyngier wrote:
+> On 08/08/17 10:04, Alim Akhtar wrote:
+>> Skip check for online cpu mask when setting irq affinity of per cpu timer
+>> during early startup of not yet online cpu.
 >>
->> Yes, shifting with PAGE_SHIFT.
->> Is it just a preference?
->
-> Yeah, just a minor thing, although thinking about it again, I don't know
-> what you're trying to achieve with the size check anyway. Userspace is only
-> going to hurt itself if it screws up the layout, so why police this?
-
-Well, it's for keeping the same semantics as on x86.
-The idea of restriction to partial mremap() is suggested by Andy
-so that userspace won't be allowed to hurt itself and to simplify
-kernel code on x86.
-
->
->> >
->> >> +
->> >> +     if (vdso_size != new_size)
->> >> +             return -EINVAL;
->> >> +
->> >> +     current->mm->context.vdso = (void *)new_vma->vm_start;
->> >> +
->> >> +     return 0;
->> >> +}
->> >> +
->> >>  static struct vm_special_mapping vdso_spec[2] __ro_after_init = {
->> >>       {
->> >>               .name   = "[vvar]",
->> >>       },
->> >>       {
->> >>               .name   = "[vdso]",
->> >> +             .mremap = vdso_mremap,
->> >
->> > Does this mean we move the vdso text, but not the data page? How does that
->> > work?
+>> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+>> Signed-off-by: Aswani Reddy <aswani.reddy@samsung.com>
+>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> ---
+>>   drivers/irqchip/irq-gic-v3.c | 7 ++++++-
+>>   1 file changed, 6 insertions(+), 1 deletion(-)
 >>
->> Well, the kernel tracks only vdso pages - to find restorer addr after a signal.
->> In userspace one needs to move vvar and vdso vma pair accordingly,
->> with the same order and offset of course.
->
-> Ah, I see. I misunderstood what the .mremap callback was actually doing.
-> I guess there's also no issue with not being able to do this atomically,
-> either, as long as you can avoid making syscalls via the vDSO until you've
-> relocated both mappings.
+>> Currently when non boot CPUs comes up and if setting of IRQ affinity gets called
+>> before cpu online status gets updated, gic_mpidr_to_affinity() returns
+>> undesirable cpu number. Using __force__ flag ignore cpu_online_mask and setup
+>> the intended cpu affinity for the irq.
+>>
+>> The same approch is used in gicv2
+>> (commit: ffde1de64012c: irqchip: Gic: Support forced affinity setting)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>> index dbffb7a..c238c64 100644
+>> --- a/drivers/irqchip/irq-gic-v3.c
+>> +++ b/drivers/irqchip/irq-gic-v3.c
+>> @@ -640,11 +640,16 @@ static void gic_smp_init(void)
+>>   static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>>   			    bool force)
+>>   {
+>> -	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
+>> +	unsigned int cpu;
+>>   	void __iomem *reg;
+>>   	int enabled;
+>>   	u64 val;
+>>   
+>> +	if (!force)
+>> +		cpu = cpumask_any_and(mask_val, cpu_online_mask);
+>> +	else
+>> +		cpu = cpumask_first(mask_val);
+>> +
+>>   	if (cpu >= nr_cpu_ids)
+>>   		return -EINVAL;
+>>   
+>>
+> 
+> See
+> 
+> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/irqchip-4.13&id=65a30f8b300107266f316d550f060ccc186201a3
+> 
 
-Yes, also one should keep in mind that there might be some linker
-work needed after mremap() of vdso. As some loaded libraries may
-have been linked to vdso's vma addresses.
+Thanks Marc for above link. Is this already queued in some tree? I can't 
+find this is linux-next.
 
-In CRIU we have `restorer' code which is PIE code, non-linked to
-libc and calling raw syscalls rather than using vdso. And restoree
-(the application being restored) is already linked to vdso's new position.
-
--- 
-             Dmitry
+> 	M.
+> 
