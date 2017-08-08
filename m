@@ -1,75 +1,49 @@
-From: david.wu@rock-chips.com (David.Wu)
-Date: Tue, 8 Aug 2017 23:41:46 +0800
-Subject: [PATCH v2 3/7] pwm: rockchip: Remove the dumplicate
- rockchip_pwm_ops ops
-In-Reply-To: <20170804090935.6aba3351@bbrezillon>
-References: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
- <1499486629-9659-4-git-send-email-david.wu@rock-chips.com>
- <20170802105902.2d137072@bbrezillon>
- <af056420-5c33-e6c8-62cb-bcd3456000a7@rock-chips.com>
- <20170802134011.1124f1dd@bbrezillon>
- <6d1f60ee-2402-5ee0-54f6-9521c039c36c@rock-chips.com>
- <20170804090935.6aba3351@bbrezillon>
-Message-ID: <78121683-137a-eb5c-c447-e763b18ccd12@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 8 Aug 2017 23:44:38 +0800
+Subject: [PATCH] ARM: sunxi: add an help section to the Kconfig Sun8i SoC
+ selection
+In-Reply-To: <20170808153636.26846-1-clabbe.montjoie@gmail.com>
+References: <20170808153636.26846-1-clabbe.montjoie@gmail.com>
+Message-ID: <CAGb2v65b6FVN6LrqSAJxDaQJ9_mB6xP1aH0Tnqm2f657AfNHpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Hi,
 
-? 2017/8/4 15:09, Boris Brezillon ??:
-> On Fri, 4 Aug 2017 10:38:26 +0800
-> "David.Wu" <david.wu@rock-chips.com> wrote:
-> 
->> Hi Boris?
->>
->> ? 2017/8/2 19:40, Boris Brezillon ??:
->>> Yep, just define 3 different pwm_ops (one for each IP), each of them
->>> implementing ->apply() and ->get_state() and that's all.
->>>
->>> Something like:
->>>
->>> static const struct pwm_ops rockchip_pwm_ops_v1 = {
->>> 	.get_state = rockchip_pwm_v1_get_state,
->>> 	.apply = rockchip_pwm_v1_apply,
->>> 	.owner = THIS_MODULE,
->>> };
->>>
->>> static const struct pwm_ops rockchip_pwm_ops_v2 = {
->>> 	.get_state = rockchip_pwm_v2_get_state,
->>> 	.apply = rockchip_pwm_v2_apply,
->>> 	.owner = THIS_MODULE,
->>> };
->>>
->>> static const struct pwm_ops rockchip_pwm_ops_vop = {
->>> 	.get_state = rockchip_pwm_vop_get_state,
->>> 	.apply = rockchip_pwm_vop_apply,
->>> 	.owner = THIS_MODULE,
->>> };
->>>
->>> static const struct of_device_id rockchip_pwm_dt_ids[] = {
->>> 	{ .compatible = "rockchip,rk2928-pwm", .data = &rockchip_pwm_ops_v1 },
->>> 	{ .compatible = "rockchip,rk3288-pwm", .data = &rockchip_pwm_ops_v2 },
->>> 	{ .compatible = "rockchip,vop-pwm", .data = &rockchip_pwm_ops_vop },
->>> 	{ /* sentinel */ }
->>> };
->>> MODULE_DEVICE_TABLE(of, rockchip_pwm_dt_ids);
->>
->> I think we should keep the data members in the rockchip_pwm_data?like
->> supports_polarity and regs...
->>
->> The supports_polarity is needed for of_pwm_n_cells when pwm registered.
->> And the other data members is helpful for us to use common code.
->>
->> It's okay for just define 3 different pwm_ops (one for each IP), but
->> they are with other data members in the struct of rockchip_pwm_data.
->>
-> 
-> I think we could even get rid of the other fields in rockchip_pwm_data,
-> but ok, let's do that.
+On Tue, Aug 8, 2017 at 11:36 PM, Corentin Labbe
+<clabbe.montjoie@gmail.com> wrote:
+> Since sun8i regroup lots of SoCs, it is helpful to list them in the help
+> section of Kconfig.
+>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> ---
+>  arch/arm/mach-sunxi/Kconfig | 3 +++
+>  1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> index 58153cdf025b..2ffcccda2688 100644
+> --- a/arch/arm/mach-sunxi/Kconfig
+> +++ b/arch/arm/mach-sunxi/Kconfig
+> @@ -42,6 +42,9 @@ config MACH_SUN8I
+>         default ARCH_SUNXI
+>         select ARM_GIC
+>         select MFD_SUN6I_PRCM
+> +       help
+> +         Select this option if you have one of the following SoC:
+> +         A23 A33 A83T H2+ H3 R16 V3S
 
-I use the same pwm ops for each IP at V3's patch, but defined 3 
-different rockchip_pwm_data for use. I think this might look more clean.
+IIRC Maxime was against having chip names in here, as we would end up
+updating this every time a new chip gets added.
 
-> 
-> 
-> 
+Instead, what about using Allwinner's explanation? I.e. sun8i is a
+chip with only Cortex-A7's, and sun9i is a chip with Cortex-A15's.
+And just tell the user to say yes if they are not sure.
+
+ChenYu
+
+>
+>  config MACH_SUN9I
+>         bool "Allwinner (sun9i) SoCs support"
+> --
+> 2.13.0
+>
