@@ -1,77 +1,81 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Aug 2017 10:07:44 +0100
-Subject: [v6 11/15] arm64/kasan: explicitly zero kasan shadow memory
-In-Reply-To: <1502138329-123460-12-git-send-email-pasha.tatashin@oracle.com>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-12-git-send-email-pasha.tatashin@oracle.com>
-Message-ID: <20170808090743.GA12887@arm.com>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Tue, 8 Aug 2017 17:09:55 +0800
+Subject: [PATCH v2 1/5] mfd: mt6397: create irq mappings in mfd core driver
+In-Reply-To: <20170808025328.GB12328@dtor-ws>
+References: <1502071065-6745-1-git-send-email-chen.zhong@mediatek.com>
+ <1502071065-6745-2-git-send-email-chen.zhong@mediatek.com>
+ <20170807213244.7hrd3isq5jj44dgd@piout.net>
+ <20170808025328.GB12328@dtor-ws>
+Message-ID: <1502183395.28466.5.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 04:38:45PM -0400, Pavel Tatashin wrote:
-> To optimize the performance of struct page initialization,
-> vmemmap_populate() will no longer zero memory.
+On Mon, 2017-08-07 at 19:53 -0700, Dmitry Torokhov wrote:
+> On Mon, Aug 07, 2017 at 11:32:44PM +0200, Alexandre Belloni wrote:
+> > On 07/08/2017 at 09:57:41 +0800, Chen Zhong wrote:
+> > > The core driver should create and manage irq mappings instead of
+> > > leaf drivers. This patch change to pass irq domain to
+> > > devm_mfd_add_devices() and it will create mapping for irq resources
+> > > automatically. And remove irq mapping in rtc driver since this has
+> > > been done in core driver.
+> > > 
+> > > Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
+> > 
+> > For the RTC part:
+> > Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > 
+> > > ---
+> > >  drivers/mfd/mt6397-core.c |    4 ++--
+> > >  drivers/rtc/rtc-mt6397.c  |    2 +-
+> > >  2 files changed, 3 insertions(+), 3 deletions(-)
+> > > 
+> > > diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+> > > index 04a601f..6546d7f 100644
+> > > --- a/drivers/mfd/mt6397-core.c
+> > > +++ b/drivers/mfd/mt6397-core.c
+> > > @@ -289,7 +289,7 @@ static int mt6397_probe(struct platform_device *pdev)
+> > >  
+> > >  		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6323_devs,
+> > >  					   ARRAY_SIZE(mt6323_devs), NULL,
+> > > -					   0, NULL);
+> > > +					   0, pmic->irq_domain);
+> > >  		break;
+> > >  
+> > >  	case MT6397_CID_CODE:
+> > > @@ -304,7 +304,7 @@ static int mt6397_probe(struct platform_device *pdev)
+> > >  
+> > >  		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6397_devs,
+> > >  					   ARRAY_SIZE(mt6397_devs), NULL,
+> > > -					   0, NULL);
+> > > +					   0, pmic->irq_domain);
+> > >  		break;
+> > >  
+> > >  	default:
+> > > diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
+> > > index 1a61fa5..22c52f7 100644
+> > > --- a/drivers/rtc/rtc-mt6397.c
+> > > +++ b/drivers/rtc/rtc-mt6397.c
+> > > @@ -323,7 +323,7 @@ static int mtk_rtc_probe(struct platform_device *pdev)
+> > >  	rtc->addr_base = res->start;
+> > >  
+> > >  	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> > > -	rtc->irq = irq_create_mapping(mt6397_chip->irq_domain, res->start);
+> > > +	rtc->irq = res->start;
 > 
-> We must explicitly zero the memory that is allocated by vmemmap_populate()
-> for kasan, as this memory does not go through struct page initialization
-> path.
+> Why not
 > 
-> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-> Reviewed-by: Bob Picco <bob.picco@oracle.com>
-> ---
->  arch/arm64/mm/kasan_init.c | 42 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
+> 	rtc->irq = platform_get_irq(pdev, 0);
+> 	if (rtc->irq < 0)
+> 		return rtc->irq;
+> ?
 > 
-> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-> index 81f03959a4ab..e78a9ecbb687 100644
-> --- a/arch/arm64/mm/kasan_init.c
-> +++ b/arch/arm64/mm/kasan_init.c
-> @@ -135,6 +135,41 @@ static void __init clear_pgds(unsigned long start,
->  		set_pgd(pgd_offset_k(start), __pgd(0));
->  }
->  
-> +/*
-> + * Memory that was allocated by vmemmap_populate is not zeroed, so we must
-> + * zero it here explicitly.
-> + */
-> +static void
-> +zero_vmemmap_populated_memory(void)
-> +{
-> +	struct memblock_region *reg;
-> +	u64 start, end;
-> +
-> +	for_each_memblock(memory, reg) {
-> +		start = __phys_to_virt(reg->base);
-> +		end = __phys_to_virt(reg->base + reg->size);
-> +
-> +		if (start >= end)
-> +			break;
-> +
-> +		start = (u64)kasan_mem_to_shadow((void *)start);
-> +		end = (u64)kasan_mem_to_shadow((void *)end);
-> +
-> +		/* Round to the start end of the mapped pages */
-> +		start = round_down(start, SWAPPER_BLOCK_SIZE);
-> +		end = round_up(end, SWAPPER_BLOCK_SIZE);
-> +		memset((void *)start, 0, end - start);
-> +	}
-> +
-> +	start = (u64)kasan_mem_to_shadow(_text);
-> +	end = (u64)kasan_mem_to_shadow(_end);
-> +
-> +	/* Round to the start end of the mapped pages */
-> +	start = round_down(start, SWAPPER_BLOCK_SIZE);
-> +	end = round_up(end, SWAPPER_BLOCK_SIZE);
-> +	memset((void *)start, 0, end - start);
-> +}
+> This way you propagate error properly.
+> 
+> Thanks.
+> 
 
-I can't help but think this would be an awful lot nicer if you made
-vmemmap_alloc_block take extra GFP flags as a parameter. That way, we could
-implement a version of vmemmap_populate that does the zeroing when we need
-it, without having to duplicate a bunch of the code like this. I think it
-would also be less error-prone, because you wouldn't have to do the
-allocation and the zeroing in two separate steps.
+Hi Dmitry,
 
-Will
+	I'll modify it to get irq number via this way.
+
+Thank you.
