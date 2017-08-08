@@ -1,51 +1,49 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 8 Aug 2017 12:37:37 +0200
-Subject: [PATCH v2] mmc: sunxi: fix support for new timings mode only SoCs
-In-Reply-To: <20170808070903.16898-1-icenowy@aosc.io>
-References: <20170808070903.16898-1-icenowy@aosc.io>
-Message-ID: <CAPDyKFoddXKr19FZWs0ybxhDvEUnp357r3QEBJBEhDani3HR2A@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 8 Aug 2017 11:37:40 +0100
+Subject: [PATCH v2] iommu/arm-smmu: fix null-pointer dereference in
+ arm_smmu_add_device
+In-Reply-To: <1502187962-16861-1-git-send-email-asavkov@redhat.com>
+References: <20170808092614.GB12887@arm.com>
+ <1502187962-16861-1-git-send-email-asavkov@redhat.com>
+Message-ID: <d7a07e48-862d-a6f7-8bad-9c71f5a5be5b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 August 2017 at 09:09, Icenowy Zheng <icenowy@aosc.io> wrote:
-> The A83T MMC support code introduces the timings mode switch, however
-> such a switch doesn't exist on new SoCs with only new timings mode.
->
-> Only execute the switch if the SoC really have the timings mode switch,
-> to fix the regression shown on new timings mode only SoCs (A64, H5,
-> etc).
->
-> Fixes: b0600daebf31 ("mmc: sunxi: Support controllers that can use
->                       both old and new timings")
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+On 08/08/17 11:26, Artem Savkov wrote:
+> Commit c54451a "iommu/arm-smmu: Fix the error path in arm_smmu_add_device"
+> removed fwspec assignment in legacy_binding path as redundant which is
+> wrong. It needs to be updated after fwspec initialisation in
+> arm_smmu_register_legacy_master() as it is dereferenced later. Without
+> this there is a NULL-pointer dereference panic during boot on some hosts.
 
-Thanks, applied for next!
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-Kind regards
-Uffe
+Thanks for fixing it up, and sorry for failing to document the
+unfortunately subtle logic in the first place!
 
+Robin.
+
+> Signed-off-by: Artem Savkov <asavkov@redhat.com>
 > ---
-> Changes in v2:
-> - Slightly adjusted the format of the Fixes: line/
-> - Added review tag from Chen-Yu.
->
->  drivers/mmc/host/sunxi-mmc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 020547e5fa45..7447d41833ee 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -789,7 +789,7 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->                 clock <<= 1;
->         }
->
-> -       if (host->use_new_timings) {
-> +       if (host->use_new_timings && host->cfg->has_timings_switch) {
->                 ret = sunxi_ccu_set_mmc_timing_mode(host->clk_mmc, true);
->                 if (ret) {
->                         dev_err(mmc_dev(mmc),
-> --
-> 2.13.0
->
+>  drivers/iommu/arm-smmu.c | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index b97188a..2d80fa8 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1519,6 +1519,13 @@ static int arm_smmu_add_device(struct device *dev)
+>  
+>  	if (using_legacy_binding) {
+>  		ret = arm_smmu_register_legacy_master(dev, &smmu);
+> +
+> +		/*
+> +		 * If dev->iommu_fwspec is initally NULL, arm_smmu_register_legacy_master()
+> +		 * will allocate/initialise a new one. Thus we need to update fwspec for
+> +		 * later use.
+> +		 */
+> +		fwspec = dev->iommu_fwspec;
+>  		if (ret)
+>  			goto out_free;
+>  	} else if (fwspec && fwspec->ops == &arm_smmu_ops) {
+> 
