@@ -1,56 +1,35 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 08 Aug 2017 17:48:29 +0100
-Subject: [PATCH 01/11] KVM: arm64: Store vcpu on the stack during
- __guest_enter()
-In-Reply-To: <20170606195951.GN9464@cbox>
-References: <20170515174400.29735-1-james.morse@arm.com>
- <20170515174400.29735-2-james.morse@arm.com> <20170606195951.GN9464@cbox>
-Message-ID: <5989EB5D.6@arm.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 8 Aug 2017 12:56:31 -0400 (EDT)
+Subject: [PULL REQUEST] FDPIC ELF support on ARM
+Message-ID: <alpine.LFD.2.20.1708081236150.8927@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+Russell, please pull the following:
 
-On 06/06/17 20:59, Christoffer Dall wrote:
-> On Mon, May 15, 2017 at 06:43:49PM +0100, James Morse wrote:
->> KVM uses tpidr_el2 as its private vcpu register, which makes sense for
->> non-vhe world switch as only KVM can access this register. This means
->> vhe Linux has to use tpidr_el1, which KVM has to save/restore as part
->> of the host context.
->>
->> __guest_enter() stores the host_ctxt on the stack, do the same with
->> the vcpu.
+    http://git.linaro.org/people/nicolas.pitre/linux fdpic
 
->> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
->> index 12ee62d6d410..113735df7d01 100644
->> --- a/arch/arm64/kvm/hyp/entry.S
->> +++ b/arch/arm64/kvm/hyp/entry.S
->> @@ -159,9 +159,15 @@ abort_guest_exit_end:
->>  ENDPROC(__guest_exit)
->>  
->>  ENTRY(__fpsimd_guest_restore)
->> +	// x0: esr
->> +	// x1: vcpu
->> +	// x2-x29,lr: vcpu regs
->> +	// vcpu x0-x1 on the stack
->>  	stp	x2, x3, [sp, #-16]!
->>  	stp	x4, lr, [sp, #-16]!
->>  
->> +	mov	x3, x1
->> +
-> 
-> nit: can you avoid this by using x1 for the vcpu pointer in this routine
-> instead?
+This series provides the needed changes to enable the ELF_FDPIC
+binary format on ARM. Currently only no-MMU configs are supported
+but eventually adding MMU support is trivial. This format has many
+advantages over the FLAT format such as being actual ELF which can be
+parsed by standard tools, can support real dynamic shared libs, etc.
 
-Unfortunately x1 is clobbered by the __fpsimd_{save,restore}_state() macros that
-are called further down this function.
+This is based on v4.13-rc2.
 
-(its a bit obscure:
-> fpsimd_save	x0, 1
-that '1' is used to generate 'x1' or 'w1' in includes/asm/fpsimdmacros.h)
+A complete toolchain and prebuilt packages can be found here:
+https://github.com/mickael-guene/fdpic_manifest
 
+diffstat:
 
-
-Thanks,
-
-James
+ arch/arm/include/asm/elf.h         | 16 ++++++++++++++--
+ arch/arm/include/asm/mmu.h         |  4 ++++
+ arch/arm/include/asm/processor.h   | 17 +++++++++--------
+ arch/arm/include/uapi/asm/ptrace.h |  4 ++++
+ arch/arm/include/uapi/asm/unistd.h |  1 +
+ arch/arm/kernel/elf.c              |  2 +-
+ arch/arm/kernel/signal.c           | 28 ++++++++++++++++++++++++++++
+ arch/arm/kernel/sigreturn_codes.S  | 22 ++++++++++++++++++++++
+ arch/arm/kernel/traps.c            |  3 +++
+ fs/Kconfig.binfmt                  |  2 +-
+ 10 files changed, 87 insertions(+), 12 deletions(-)
