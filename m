@@ -1,60 +1,30 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Tue,  8 Aug 2017 15:15:42 +0800
-Subject: [PATCH v3 4/9] clk: rockchip: support more rates for cpuclk
-In-Reply-To: <1502176547-30817-1-git-send-email-zhangqing@rock-chips.com>
-References: <1502176547-30817-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1502176547-30817-5-git-send-email-zhangqing@rock-chips.com>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Tue, 8 Aug 2017 15:17:54 +0800
+Subject: [PATCH] ARM: multi_v7_defconfig: make eSDHC driver built-in
+Message-ID: <1502176674-30522-1-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fix up the cpuclk rates table for support more freqs.
-fix up the mux_core_mask describe error.
+Sometimes root file system is deployed on SD card. It's
+proper to always build eSDHC driver into kernel.
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
 ---
- drivers/clk/rockchip/clk-rv1108.c | 23 +++++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
+ arch/arm/configs/multi_v7_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/rockchip/clk-rv1108.c b/drivers/clk/rockchip/clk-rv1108.c
-index 7c05ab366348..3c670db16e18 100644
---- a/drivers/clk/rockchip/clk-rv1108.c
-+++ b/drivers/clk/rockchip/clk-rv1108.c
-@@ -93,9 +93,24 @@ enum rv1108_plls {
- 	}
- 
- static struct rockchip_cpuclk_rate_table rv1108_cpuclk_rates[] __initdata = {
--	RV1108_CPUCLK_RATE(816000000, 4),
--	RV1108_CPUCLK_RATE(600000000, 4),
--	RV1108_CPUCLK_RATE(312000000, 4),
-+	RV1108_CPUCLK_RATE(1608000000, 7),
-+	RV1108_CPUCLK_RATE(1512000000, 7),
-+	RV1108_CPUCLK_RATE(1488000000, 5),
-+	RV1108_CPUCLK_RATE(1416000000, 5),
-+	RV1108_CPUCLK_RATE(1392000000, 5),
-+	RV1108_CPUCLK_RATE(1296000000, 5),
-+	RV1108_CPUCLK_RATE(1200000000, 5),
-+	RV1108_CPUCLK_RATE(1104000000, 5),
-+	RV1108_CPUCLK_RATE(1008000000, 5),
-+	RV1108_CPUCLK_RATE(912000000, 5),
-+	RV1108_CPUCLK_RATE(816000000, 3),
-+	RV1108_CPUCLK_RATE(696000000, 3),
-+	RV1108_CPUCLK_RATE(600000000, 3),
-+	RV1108_CPUCLK_RATE(500000000, 3),
-+	RV1108_CPUCLK_RATE(408000000, 1),
-+	RV1108_CPUCLK_RATE(312000000, 1),
-+	RV1108_CPUCLK_RATE(216000000, 1),
-+	RV1108_CPUCLK_RATE(96000000, 1),
- };
- 
- static const struct rockchip_cpuclk_reg_data rv1108_cpuclk_data = {
-@@ -105,7 +120,7 @@ enum rv1108_plls {
- 	.mux_core_alt = 1,
- 	.mux_core_main = 0,
- 	.mux_core_shift = 8,
--	.mux_core_mask = 0x1,
-+	.mux_core_mask = 0x3,
- };
- 
- PNAME(mux_pll_p)		= { "xin24m", "xin24m"};
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 4d19c1b..d407468 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -711,7 +711,7 @@ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_OF_ARASAN=y
+ CONFIG_MMC_SDHCI_OF_AT91=y
+-CONFIG_MMC_SDHCI_OF_ESDHC=m
++CONFIG_MMC_SDHCI_OF_ESDHC=y
+ CONFIG_MMC_SDHCI_ESDHC_IMX=y
+ CONFIG_MMC_SDHCI_DOVE=y
+ CONFIG_MMC_SDHCI_TEGRA=y
 -- 
-1.9.1
+2.1.0.27.g96db324
