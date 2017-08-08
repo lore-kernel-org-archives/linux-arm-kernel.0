@@ -1,52 +1,94 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue,  8 Aug 2017 21:05:10 +0200
-Subject: [PATCH] mtd: physmap_of: Retire Gemini pad control
-Message-ID: <20170808190510.11496-1-linus.walleij@linaro.org>
+Date: Tue,  8 Aug 2017 21:07:04 +0200
+Subject: [PATCH 1/2] ata: sata_gemini: Retire custom pin control
+Message-ID: <20170808190704.11574-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I wrote a proper pin control driver for the Gemini. Retire this
-SoC-specific pad control and rely on the pin controller to manage
-this.
+I added a proper pin control driver for the Gemini SoC, so retire
+this custom code and rely on the pin controller to set up the pads.
+
+The "IOMUX" which is routing signals between the ATA and SATA
+bridge inside of the chip is not about pin control and remains in
+place.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/mtd/maps/physmap_of_gemini.c | 16 ----------------
- 1 file changed, 16 deletions(-)
+ drivers/ata/sata_gemini.c | 34 ----------------------------------
+ 1 file changed, 34 deletions(-)
 
-diff --git a/drivers/mtd/maps/physmap_of_gemini.c b/drivers/mtd/maps/physmap_of_gemini.c
-index 05b286b5289f..4ed1a6bb4d3c 100644
---- a/drivers/mtd/maps/physmap_of_gemini.c
-+++ b/drivers/mtd/maps/physmap_of_gemini.c
-@@ -43,13 +43,6 @@
+diff --git a/drivers/ata/sata_gemini.c b/drivers/ata/sata_gemini.c
+index 8c704523bae7..4990dd496598 100644
+--- a/drivers/ata/sata_gemini.c
++++ b/drivers/ata/sata_gemini.c
+@@ -43,17 +43,6 @@ struct sata_gemini {
+ 	struct clk *sata1_pclk;
+ };
  
- #define FLASH_PARALLEL_HIGH_PIN_CNT	(1 << 20)	/* else low pin cnt */
- 
--/* Miscellaneous Control Register */
--#define GLOBAL_MISC_CTRL		0x30
--#define FLASH_PADS_MASK			0x07
--#define NAND_PADS_DISABLE		BIT(2)
--#define PFLASH_PADS_DISABLE		BIT(1)
--#define SFLASH_PADS_DISABLE		BIT(0)
+-/* Global IDE PAD Skew Control Register */
+-#define GEMINI_GLOBAL_IDE_SKEW_CTRL		0x18
+-#define GEMINI_IDE1_HOST_STROBE_DELAY_SHIFT	28
+-#define GEMINI_IDE1_DEVICE_STROBE_DELAY_SHIFT	24
+-#define GEMINI_IDE1_OUTPUT_IO_SKEW_SHIFT	20
+-#define GEMINI_IDE1_INPUT_IO_SKEW_SHIFT		16
+-#define GEMINI_IDE0_HOST_STROBE_DELAY_SHIFT	12
+-#define GEMINI_IDE0_DEVICE_STROBE_DELAY_SHIFT	8
+-#define GEMINI_IDE0_OUTPUT_IO_SKEW_SHIFT	4
+-#define GEMINI_IDE0_INPUT_IO_SKEW_SHIFT		0
 -
- static const struct of_device_id syscon_match[] = {
- 	{ .compatible = "cortina,gemini-syscon" },
- 	{ },
-@@ -102,15 +95,6 @@ int of_flash_probe_gemini(struct platform_device *pdev,
- 				 map->bankwidth * 8);
+ /* Miscellaneous Control Register */
+ #define GEMINI_GLOBAL_MISC_CTRL		0x30
+ /*
+@@ -91,8 +80,6 @@ struct sata_gemini {
+ #define GEMINI_IDE_IOMUX_MODE2			(2 << 24)
+ #define GEMINI_IDE_IOMUX_MODE3			(3 << 24)
+ #define GEMINI_IDE_IOMUX_SHIFT			(24)
+-#define GEMINI_IDE_PADS_ENABLE			BIT(4)
+-#define GEMINI_PFLASH_PADS_DISABLE		BIT(1)
+ 
+ /*
+  * Registers directly controlling the PATA<->SATA adapters
+@@ -310,7 +297,6 @@ static int gemini_sata_probe(struct platform_device *pdev)
+ 	enum gemini_muxmode muxmode;
+ 	u32 gmode;
+ 	u32 gmask;
+-	u32 val;
+ 	int ret;
+ 
+ 	sg = devm_kzalloc(dev, sizeof(*sg), GFP_KERNEL);
+@@ -362,16 +348,6 @@ static int gemini_sata_probe(struct platform_device *pdev)
+ 	gmask = GEMINI_IDE_IOMUX_MASK;
+ 	gmode = (muxmode << GEMINI_IDE_IOMUX_SHIFT);
+ 
+-	/*
+-	 * If we mux out the IDE, parallel flash must be disabled.
+-	 * SATA0 and SATA1 have dedicated pins and may coexist with
+-	 * parallel flash.
+-	 */
+-	if (sg->ide_pins)
+-		gmode |= GEMINI_IDE_PADS_ENABLE | GEMINI_PFLASH_PADS_DISABLE;
+-	else
+-		gmask |= GEMINI_IDE_PADS_ENABLE;
+-
+ 	ret = regmap_update_bits(map, GEMINI_GLOBAL_MISC_CTRL, gmask, gmode);
+ 	if (ret) {
+ 		dev_err(dev, "unable to set up IDE muxing\n");
+@@ -379,16 +355,6 @@ static int gemini_sata_probe(struct platform_device *pdev)
+ 		goto out_unprep_clk;
  	}
  
--	/* Activate parallel (NOR flash) mode */
--	ret = regmap_update_bits(rmap, GLOBAL_MISC_CTRL,
--				 FLASH_PADS_MASK,
--				 SFLASH_PADS_DISABLE | NAND_PADS_DISABLE);
--	if (ret) {
--		dev_err(dev, "unable to set up physmap pads\n");
--		return -ENODEV;
+-	/* FIXME: add more elaborate IDE skew control handling */
+-	if (sg->ide_pins) {
+-		ret = regmap_read(map, GEMINI_GLOBAL_IDE_SKEW_CTRL, &val);
+-		if (ret) {
+-			dev_err(dev, "cannot read IDE skew control register\n");
+-			return ret;
+-		}
+-		dev_info(dev, "IDE skew control: %08x\n", val);
 -	}
 -
- 	dev_info(&pdev->dev, "initialized Gemini-specific physmap control\n");
- 
- 	return 0;
+ 	dev_info(dev, "set up the Gemini IDE/SATA nexus\n");
+ 	platform_set_drvdata(pdev, sg);
+ 	sg_singleton = sg;
 -- 
 2.9.4
