@@ -1,102 +1,71 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 8 Aug 2017 16:19:24 +0100
-Subject: [PATCH 01/15] ARM: assembler: introduce adr_l,
- ldr_l and str_l macros
-In-Reply-To: <alpine.LFD.2.20.1708081030030.8927@knanqh.ubzr>
-References: <20170805205222.19868-1-ard.biesheuvel@linaro.org>
- <20170805205222.19868-2-ard.biesheuvel@linaro.org>
- <alpine.LFD.2.20.1708081030030.8927@knanqh.ubzr>
-Message-ID: <CAKv+Gu8W68ruOsD9Fit0MrJ=JVDO3xF-SmQ-8qcpBSQm0si-UA@mail.gmail.com>
+From: gary.hook@amd.com (Gary R Hook)
+Date: Tue, 8 Aug 2017 10:24:49 -0500
+Subject: [PATCH v4 02/19] crypto: ccm: use -EAGAIN for transient busy
+ indication
+In-Reply-To: <1502193834-11289-3-git-send-email-gilad@benyossef.com>
+References: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
+ <1502193834-11289-3-git-send-email-gilad@benyossef.com>
+Message-ID: <4600c898-a2f2-f95f-15b4-0adcc6acc0b5@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 August 2017 at 16:10, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Sat, 5 Aug 2017, Ard Biesheuvel wrote:
+On 08/08/2017 07:03 AM, Gilad Ben-Yossef wrote:
+> Replace -EBUSY with -EAGAIN when reporting transient busy
+> indication in the absence of backlog.
 >
->> Like arm64, ARM supports position independent code sequences that
->> produce symbol references with a greater reach than the ordinary
->> adr/ldr instructions.
->>
->> Currently, we use open coded instruction sequences involving literals
->> and arithmetic operations. Instead, we can use movw/movt pairs on v7
->> CPUs, circumventing the D-cache entirely. For older CPUs, we can emit
->> the literal into a subsection, allowing it to be emitted out of line
->> while retaining the ability to perform arithmetic on label offsets.
->>
->> E.g., on pre-v7 CPUs, we can emit a PC-relative reference as follows:
->>
->>        ldr          <reg>, 222f
->>   111: add          <reg>, <reg>, pc
->>        .subsection  1
->>   222: .long        <sym> - (111b + 8)
->>        .previous
->>
->> This is allowed by the assembler because, unlike ordinary sections,
->> subsections are combined into a single section into the object file,
->> and so the label references are not true cross-section references that
->> are visible as relocations. Note that we could even do something like
->>
->>        add          <reg>, pc, #(222f - 111f) & ~0xfff
->>        ldr          <reg>, [<reg>, #(222f - 111f) & 0xfff]
->>   111: add          <reg>, <reg>, pc
->>        .subsection  1
->>   222: .long        <sym> - (111b + 8)
->>        .previous
->>
->> if it turns out that the 4 KB range of the ldr instruction is insufficient
->> to reach the literal in the subsection, although this is currently not a
->> problem (of the 98 objects built from .S files in a multi_v7_defconfig
->> build, only 11 have .text sections that are over 1 KB, and the largest one
->> [entry-armv.o] is 3308 bytes)
->>
->> Subsections have been available in binutils since 2004 at least, so
->> they should not cause any issues with older toolchains.
->>
->> So use the above to implement the macros mov_l, adr_l, adrm_l (using ldm
->> to load multiple literals at once), ldr_l and str_l, all of which will
->> use movw/movt pairs on v7 and later CPUs, and use PC-relative literals
->> otherwise.
+> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+
+Could we use "ccp" in the subject line, please?
+
+> ---
+>  drivers/crypto/ccp/ccp-crypto-main.c | 8 +++-----
+>  drivers/crypto/ccp/ccp-dev.c         | 7 +++++--
+>  2 files changed, 8 insertions(+), 7 deletions(-)
 >
-> There is no adrm_l definition in this patch.
+> diff --git a/drivers/crypto/ccp/ccp-crypto-main.c b/drivers/crypto/ccp/ccp-crypto-main.c
+> index 35a9de7..403ff0a 100644
+> --- a/drivers/crypto/ccp/ccp-crypto-main.c
+> +++ b/drivers/crypto/ccp/ccp-crypto-main.c
+> @@ -222,9 +222,10 @@ static int ccp_crypto_enqueue_cmd(struct ccp_crypto_cmd *crypto_cmd)
 >
-
-Ah yes, I played around with it but it becomes a bit clunky so I removed it:
-
-        adrl         <reg1>, 222f
-        ldm          <reg1>, {<reg1>, <reg2>}
-   111: add          <reg1>, <reg1>, pc
-        add          <reg2>, <reg2>, pc
-        .subsection  1
-   222: .long        <sym1> - (111b + 8)
-        .long        <sym2> - (111b + 12)
-        .previous
-
-The adrl pseudo op always assembles to two instructions, so you need 5
-instructions while using adr_l twice uses only 4. I am not sure if
-eliminating one of the loads would make a huge difference, given that
-there are no use cases for adrm_l on hot paths, at least not in this
-series.
-
-> Also, might it be better to change mov_l to movl? Tthis looks similar to
-> the ARM64 movl pseudo-instruction, and unlike all the other _l variants,
-> this is not producing a pc relative result.
+>  	/* Check if the cmd can/should be queued */
+>  	if (req_queue.cmd_count >= CCP_CRYPTO_MAX_QLEN) {
+> -		ret = -EBUSY;
+> -		if (!(crypto_cmd->cmd->flags & CCP_CMD_MAY_BACKLOG))
+> +		if (!(crypto_cmd->cmd->flags & CCP_CMD_MAY_BACKLOG)) {
+> +			ret = -EAGAIN;
+>  			goto e_lock;
+> +		}
+>  	}
 >
-
-On arm64, we have mov_q for a 64-bit absolute load, and I thought
-mov_l was less confusing than mov_w. In general, I like the underscore
-in the middle because on the one hand, it looks like a ordinary
-mnemonic but on the other hand, it is obvious that it is not a true
-instruction. mov_abs perhaps?
-
-> Talking about the _l suffix: I wonder if this could be more meaningful,
-> like _rel maybe? At least in the adr_l case, this could easily be
-> confused with adrl.
+>  	/* Look for an entry with the same tfm.  If there is a cmd
+> @@ -243,9 +244,6 @@ static int ccp_crypto_enqueue_cmd(struct ccp_crypto_cmd *crypto_cmd)
+>  		ret = ccp_enqueue_cmd(crypto_cmd->cmd);
+>  		if (!ccp_crypto_success(ret))
+>  			goto e_lock;	/* Error, don't queue it */
+> -		if ((ret == -EBUSY) &&
+> -		    !(crypto_cmd->cmd->flags & CCP_CMD_MAY_BACKLOG))
+> -			goto e_lock;	/* Not backlogging, don't queue it */
+>  	}
 >
-
-On arm64, we have ldr_l, str_l and adr_l as well, and I usually try to
-align between ARM and arm64 if I can.
-
-> Otherwise I like it pretty much.
+>  	if (req_queue.cmd_count >= CCP_CRYPTO_MAX_QLEN) {
+> diff --git a/drivers/crypto/ccp/ccp-dev.c b/drivers/crypto/ccp/ccp-dev.c
+> index 4e029b1..3d637e3 100644
+> --- a/drivers/crypto/ccp/ccp-dev.c
+> +++ b/drivers/crypto/ccp/ccp-dev.c
+> @@ -292,9 +292,12 @@ int ccp_enqueue_cmd(struct ccp_cmd *cmd)
+>  	i = ccp->cmd_q_count;
 >
-
-Thanks!
+>  	if (ccp->cmd_count >= MAX_CMD_QLEN) {
+> -		ret = -EBUSY;
+> -		if (cmd->flags & CCP_CMD_MAY_BACKLOG)
+> +		if (cmd->flags & CCP_CMD_MAY_BACKLOG) {
+> +			ret = -EBUSY;
+>  			list_add_tail(&cmd->entry, &ccp->backlog);
+> +		} else {
+> +			ret = -EAGAIN;
+> +		}
+>  	} else {
+>  		ret = -EINPROGRESS;
+>  		ccp->cmd_count++;
+>
