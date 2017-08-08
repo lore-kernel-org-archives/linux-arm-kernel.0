@@ -1,52 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Aug 2017 12:18:17 +0100
-Subject: [PATCH 2/2] iommu/arm-smmu: Add system PM support
-In-Reply-To: <d8d6f3b606ed05d53b47d36e1c6a7f4b74eb3afc.1500381551.git.robin.murphy@arm.com>
-References: <71247263f4d88e7776f483fb1cc1139b516c0835.1500381551.git.robin.murphy@arm.com>
- <d8d6f3b606ed05d53b47d36e1c6a7f4b74eb3afc.1500381551.git.robin.murphy@arm.com>
-Message-ID: <20170808111816.GD13355@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 8 Aug 2017 12:14:13 +0100
+Subject: [PATCH v2 1/5] mfd: mt6397: create irq mappings in mfd core driver
+In-Reply-To: <1502071065-6745-2-git-send-email-chen.zhong@mediatek.com>
+References: <1502071065-6745-1-git-send-email-chen.zhong@mediatek.com>
+ <1502071065-6745-2-git-send-email-chen.zhong@mediatek.com>
+Message-ID: <20170808111413.qt6qc2w6l6gdihpu@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 01:44:42PM +0100, Robin Murphy wrote:
-> With all our hardware state tracked in such a way that we can naturally
-> restore it as part of the necessary reset, resuming is trivial, and
-> there's nothing to do on suspend at all.
+On Mon, 07 Aug 2017, Chen Zhong wrote:
+
+> The core driver should create and manage irq mappings instead of
+> leaf drivers. This patch change to pass irq domain to
+> devm_mfd_add_devices() and it will create mapping for irq resources
+> automatically. And remove irq mapping in rtc driver since this has
+> been done in core driver.
 > 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
 > ---
->  drivers/iommu/arm-smmu.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 86897b7b81d8..0f5f06e9abfa 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -2356,10 +2356,22 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static int __maybe_unused arm_smmu_pm_resume(struct device *dev)
-> +{
+>  drivers/mfd/mt6397-core.c |    4 ++--
+>  drivers/rtc/rtc-mt6397.c  |    2 +-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
 
-Did you actually get a warning here without the __maybe_unused annotation?
-It looks like some other drivers just guard the thing with CONFIG_PM_SLEEP.
+Once you've fixed Dmitry's comment:
 
-> +	struct arm_smmu_device *smmu = dev_get_drvdata(dev);
-> +
-> +	arm_smmu_device_reset(smmu);
-> +	return 0;
-> +}
-> +
-> +
-> +static SIMPLE_DEV_PM_OPS(arm_smmu_pm_ops, NULL, arm_smmu_pm_resume);
-> +
->  static struct platform_driver arm_smmu_driver = {
->  	.driver	= {
->  		.name		= "arm-smmu",
->  		.of_match_table	= of_match_ptr(arm_smmu_of_match),
-> +		.pm = &arm_smmu_pm_ops,
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 
-Cosmetic: can you tab-align this assignment please?
-
-Will
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
