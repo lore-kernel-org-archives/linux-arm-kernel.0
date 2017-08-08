@@ -1,75 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 08 Aug 2017 12:06:43 +0100
-Subject: Applied "spi/bcm63xx: fix error return code in bcm63xx_spi_probe()"
- to the spi tree
-In-Reply-To: <20170808045234.GA18065@embeddedgus>
-Message-ID: <E1df2LT-000569-E6@finisterre>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 8 Aug 2017 19:03:05 +0800
+Subject: [PATCH] binder: let ANDROID_BINDER_IPC_32BIT be selectable on 32bit
+ ARM
+Message-ID: <20170808110305.2748-1-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+As noted in commit d0bdff0db809 ("staging: Fix build issues with new
+binder API"), we can add back the choice for 32bit ARM "once a 64bit
+__get_user_asm_* implementation is merged." Commit e38361d032f1 ("ARM:
+8091/2: add get_user() support for 8 byte types") has added the
+support, so it's time to let ANDROID_BINDER_IPC_32BIT be selectable on
+32bit ARM
 
-   spi/bcm63xx: fix error return code in bcm63xx_spi_probe()
-
-has been applied to the spi tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From ba8afe94723e9ba665aee9cca649fb2c80f7304c Mon Sep 17 00:00:00 2001
-From: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
-Date: Mon, 7 Aug 2017 23:52:34 -0500
-Subject: [PATCH] spi/bcm63xx: fix error return code in bcm63xx_spi_probe()
-
-platform_get_irq() returns an error code, but the spi-bcm63xx driver
-ignores it and always returns -ENXIO. This is not correct and,
-prevents -EPROBE_DEFER from being propagated properly.
-
-Notice that platform_get_irq() no longer returns 0 on error:
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=e330b9a6bb35dc7097a4f02cb1ae7b6f96df92af
-
-Print and propagate the return value of platform_get_irq on failure.
-
-This issue was detected with the help of Coccinelle.
-
-Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- drivers/spi/spi-bcm63xx.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/android/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/spi/spi-bcm63xx.c b/drivers/spi/spi-bcm63xx.c
-index 84c7356ce5b4..bfe5754768f9 100644
---- a/drivers/spi/spi-bcm63xx.c
-+++ b/drivers/spi/spi-bcm63xx.c
-@@ -530,8 +530,8 @@ static int bcm63xx_spi_probe(struct platform_device *pdev)
+diff --git a/drivers/android/Kconfig b/drivers/android/Kconfig
+index 832e885349b1..aca5dc30b97b 100644
+--- a/drivers/android/Kconfig
++++ b/drivers/android/Kconfig
+@@ -32,7 +32,7 @@ config ANDROID_BINDER_DEVICES
+ 	  therefore logically separated from the other devices.
  
- 	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
--		dev_err(dev, "no irq\n");
--		return -ENXIO;
-+		dev_err(dev, "no irq: %d\n", irq);
-+		return irq;
- 	}
- 
- 	clk = devm_clk_get(dev, "spi");
+ config ANDROID_BINDER_IPC_32BIT
+-	bool
++	bool "Use old (Android 4.4 and earlier) 32-bit binder API"
+ 	depends on !64BIT && ANDROID_BINDER_IPC
+ 	default y
+ 	---help---
 -- 
-2.13.2
+2.14.0
