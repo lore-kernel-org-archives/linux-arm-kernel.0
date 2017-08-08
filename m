@@ -1,41 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 8 Aug 2017 16:58:53 +0100
-Subject: [PATCHv2 1/7] arm64: Add ASM_BUG()
-In-Reply-To: <20170808153112.GF19207@leverpostej>
-References: <1501093110-3844-1-git-send-email-mark.rutland@arm.com>
- <1501093110-3844-2-git-send-email-mark.rutland@arm.com>
- <20170808153112.GF19207@leverpostej>
-Message-ID: <20170808155853.ropux7lxk6rgbd2r@armageddon.cambridge.arm.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Tue,  8 Aug 2017 21:33:40 +0530
+Subject: [PATCH 27/35] wireless: mediatek: mt7601u: constify usb_device_id
+Message-ID: <1502208220-12224-1-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 04:31:12PM +0100, Mark Rutland wrote:
-> On Wed, Jul 26, 2017 at 07:18:24PM +0100, Mark Rutland wrote:
-> > +#define __BUG_ENTRY(flags) 				\
-> > +		.pushsection __bug_table,"a";		\
-> > +		.align 2;				\
-> > +	0:	.long 1f - 0b;				\
-> > +_BUGVERBOSE_LOCATION(__FILE__, __LINE__)		\
-> > +		.short flags; 				\
-> > +		.popsection;				\
-> > +	1:
-> > +#else
-> > +#define __BUG_ENTRY(flags)
-> > +#endif
-> > +
-> > +#define ASM_BUG_FLAGS(flags)				\
-> > +	__BUG_ENTRY(0)					\
-> > +	brk	BUG_BRK_IMM
-> 
-> I accidentally dropped the flags here, which turns all WARN*s into BUGs.
-> 
-> I've fixed this up to pass the flags to __BUG_ENTRY(). I've pushed out
-> updated arm64/exception-stack and arm64/vmap-stack branches.
+usb_device_id are not supposed to change at runtime. All functions
+working with usb_device_id provided by <linux/usb.h> work with
+const usb_device_id. So mark the non-const structs as const.
 
-I'll pull arm64/exception-stack into for-next/core (I haven't got to the
-vmap-stack series yet).
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+ drivers/net/wireless/mediatek/mt7601u/usb.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks.
-
+diff --git a/drivers/net/wireless/mediatek/mt7601u/usb.c b/drivers/net/wireless/mediatek/mt7601u/usb.c
+index 416c604..b9e4f67 100644
+--- a/drivers/net/wireless/mediatek/mt7601u/usb.c
++++ b/drivers/net/wireless/mediatek/mt7601u/usb.c
+@@ -19,7 +19,7 @@
+ #include "usb.h"
+ #include "trace.h"
+ 
+-static struct usb_device_id mt7601u_device_table[] = {
++static const struct usb_device_id mt7601u_device_table[] = {
+ 	{ USB_DEVICE(0x0b05, 0x17d3) },
+ 	{ USB_DEVICE(0x0e8d, 0x760a) },
+ 	{ USB_DEVICE(0x0e8d, 0x760b) },
 -- 
-Catalin
+2.7.4
