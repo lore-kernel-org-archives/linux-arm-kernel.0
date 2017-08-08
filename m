@@ -1,129 +1,95 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Tue,  8 Aug 2017 15:03:32 +0300
-Subject: [PATCH v4 01/19] crypto: change transient busy return code to -EAGAIN
-In-Reply-To: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
-References: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1502193834-11289-2-git-send-email-gilad@benyossef.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue,  8 Aug 2017 14:04:41 +0200
+Subject: [PATCH] iio: adc: Fix coding style violations
+Message-ID: <d310ac06b13cf803bd3a2a6bcfb92169445f929c.1502193860.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The crypto API was using the -EBUSY return value to indicate
-both a hard failure to submit a crypto operation into a
-transformation provider when the latter was busy and the backlog
-mechanism was not enabled as well as a notification that the
-operation was queued into the backlog when the backlog mechanism
-was enabled.
+From: Sai Krishna Potthuri <lakshmi.sai.krishna.potthuri@xilinx.com>
 
-Having the same return code indicate two very different conditions
-depending on a flag is both error prone and requires extra runtime
-check like the following to discern between the cases:
+This patch fix following checkpatch warnings in xadc driver
+1. Prefer 'unsigned int' to bare use of 'unsigned'.
+2. else is not generally useful after a break or return.
+3. function definition argument 'struct xadc *' should also
+have an identifier name.
 
-	if (err == -EINPROGRESS ||
-	    (err == -EBUSY && (ahash_request_flags(req) &
-			       CRYPTO_TFM_REQ_MAY_BACKLOG)))
-
-This patch changes the return code used to indicate a crypto op
-failed due to the transformation provider being transiently busy
-to -EAGAIN.
-
-Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+Signed-off-by: Sai Krishna Potthuri <lakshmis@xilinx.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
- crypto/algapi.c     |  6 ++++--
- crypto/algif_hash.c | 20 +++++++++++++++++---
- crypto/cryptd.c     |  4 +---
- 3 files changed, 22 insertions(+), 8 deletions(-)
 
-diff --git a/crypto/algapi.c b/crypto/algapi.c
-index aa699ff..916bee3 100644
---- a/crypto/algapi.c
-+++ b/crypto/algapi.c
-@@ -897,9 +897,11 @@ int crypto_enqueue_request(struct crypto_queue *queue,
- 	int err = -EINPROGRESS;
+ drivers/iio/adc/xilinx-xadc-events.c | 38 +++++++++++++++++-------------------
+ drivers/iio/adc/xilinx-xadc.h        |  2 +-
+ 2 files changed, 19 insertions(+), 21 deletions(-)
+
+diff --git a/drivers/iio/adc/xilinx-xadc-events.c b/drivers/iio/adc/xilinx-xadc-events.c
+index 6d5c2a6f4e6e..dc0670308253 100644
+--- a/drivers/iio/adc/xilinx-xadc-events.c
++++ b/drivers/iio/adc/xilinx-xadc-events.c
+@@ -68,7 +68,7 @@ void xadc_handle_events(struct iio_dev *indio_dev, unsigned long events)
+ 		xadc_handle_event(indio_dev, i);
+ }
  
- 	if (unlikely(queue->qlen >= queue->max_qlen)) {
--		err = -EBUSY;
--		if (!(request->flags & CRYPTO_TFM_REQ_MAY_BACKLOG))
-+		if (!(request->flags & CRYPTO_TFM_REQ_MAY_BACKLOG)) {
-+			err = -EAGAIN;
- 			goto out;
-+		}
-+		err = -EBUSY;
- 		if (queue->backlog == &queue->list)
- 			queue->backlog = &request->list;
- 	}
-diff --git a/crypto/algif_hash.c b/crypto/algif_hash.c
-index 5e92bd2..3b3c154 100644
---- a/crypto/algif_hash.c
-+++ b/crypto/algif_hash.c
-@@ -39,6 +39,20 @@ struct algif_hash_tfm {
- 	bool has_key;
- };
- 
-+/* Previous versions of crypto_* ops used to return -EBUSY
-+ * rather than -EAGAIN to indicate being tied up. The in
-+ * kernel API changed but we don't want to break the user
-+ * space API. As only the hash user interface exposed this
-+ * error ever to the user, do the translation here.
-+ */
-+static inline int crypto_user_err(int err)
-+{
-+	if (err == -EAGAIN)
-+		return -EBUSY;
-+
-+	return err;
-+}
-+
- static int hash_alloc_result(struct sock *sk, struct hash_ctx *ctx)
+-static unsigned xadc_get_threshold_offset(const struct iio_chan_spec *chan,
++static unsigned int xadc_get_threshold_offset(const struct iio_chan_spec *chan,
+ 	enum iio_event_direction dir)
  {
- 	unsigned ds;
-@@ -136,7 +150,7 @@ static int hash_sendmsg(struct socket *sock, struct msghdr *msg,
- unlock:
- 	release_sock(sk);
+ 	unsigned int offset;
+@@ -90,26 +90,24 @@ static unsigned xadc_get_threshold_offset(const struct iio_chan_spec *chan,
  
--	return err ?: copied;
-+	return err ? crypto_user_err(err) : copied;
+ static unsigned int xadc_get_alarm_mask(const struct iio_chan_spec *chan)
+ {
+-	if (chan->type == IIO_TEMP) {
++	if (chan->type == IIO_TEMP)
+ 		return XADC_ALARM_OT_MASK;
+-	} else {
+-		switch (chan->channel) {
+-		case 0:
+-			return XADC_ALARM_VCCINT_MASK;
+-		case 1:
+-			return XADC_ALARM_VCCAUX_MASK;
+-		case 2:
+-			return XADC_ALARM_VCCBRAM_MASK;
+-		case 3:
+-			return XADC_ALARM_VCCPINT_MASK;
+-		case 4:
+-			return XADC_ALARM_VCCPAUX_MASK;
+-		case 5:
+-			return XADC_ALARM_VCCODDR_MASK;
+-		default:
+-			/* We will never get here */
+-			return 0;
+-		}
++	switch (chan->channel) {
++	case 0:
++		return XADC_ALARM_VCCINT_MASK;
++	case 1:
++		return XADC_ALARM_VCCAUX_MASK;
++	case 2:
++		return XADC_ALARM_VCCBRAM_MASK;
++	case 3:
++		return XADC_ALARM_VCCPINT_MASK;
++	case 4:
++		return XADC_ALARM_VCCPAUX_MASK;
++	case 5:
++		return XADC_ALARM_VCCODDR_MASK;
++	default:
++		/* We will never get here */
++		return 0;
+ 	}
  }
  
- static ssize_t hash_sendpage(struct socket *sock, struct page *page,
-@@ -188,7 +202,7 @@ static ssize_t hash_sendpage(struct socket *sock, struct page *page,
- unlock:
- 	release_sock(sk);
+diff --git a/drivers/iio/adc/xilinx-xadc.h b/drivers/iio/adc/xilinx-xadc.h
+index f6f081965647..9069396d7622 100644
+--- a/drivers/iio/adc/xilinx-xadc.h
++++ b/drivers/iio/adc/xilinx-xadc.h
+@@ -76,7 +76,7 @@ struct xadc_ops {
+ 	int (*setup)(struct platform_device *pdev, struct iio_dev *indio_dev,
+ 			int irq);
+ 	void (*update_alarm)(struct xadc *, unsigned int);
+-	unsigned long (*get_dclk_rate)(struct xadc *);
++	unsigned long (*get_dclk_rate)(struct xadc *xadc);
+ 	irqreturn_t (*interrupt_handler)(int, void *);
  
--	return err ?: size;
-+	return err ? crypto_user_err(err) : size;
- }
- 
- static int hash_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
-@@ -236,7 +250,7 @@ static int hash_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
- 	hash_free_result(sk, ctx);
- 	release_sock(sk);
- 
--	return err ?: len;
-+	return err ? crypto_user_err(err) : len;
- }
- 
- static int hash_accept(struct socket *sock, struct socket *newsock, int flags,
-diff --git a/crypto/cryptd.c b/crypto/cryptd.c
-index 0508c48..d1dbdce 100644
---- a/crypto/cryptd.c
-+++ b/crypto/cryptd.c
-@@ -137,16 +137,14 @@ static int cryptd_enqueue_request(struct cryptd_queue *queue,
- 	int cpu, err;
- 	struct cryptd_cpu_queue *cpu_queue;
- 	atomic_t *refcnt;
--	bool may_backlog;
- 
- 	cpu = get_cpu();
- 	cpu_queue = this_cpu_ptr(queue->cpu_queue);
- 	err = crypto_enqueue_request(&cpu_queue->queue, request);
- 
- 	refcnt = crypto_tfm_ctx(request->tfm);
--	may_backlog = request->flags & CRYPTO_TFM_REQ_MAY_BACKLOG;
- 
--	if (err == -EBUSY && !may_backlog)
-+	if (err == -EAGAIN)
- 		goto out_put_cpu;
- 
- 	queue_work_on(cpu, kcrypto_wq, &cpu_queue->work);
+ 	unsigned int flags;
 -- 
-2.1.4
+1.9.1
