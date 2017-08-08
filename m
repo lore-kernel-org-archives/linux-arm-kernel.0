@@ -1,34 +1,47 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 8 Aug 2017 12:14:13 +0100
-Subject: [PATCH v2 1/5] mfd: mt6397: create irq mappings in mfd core driver
-In-Reply-To: <1502071065-6745-2-git-send-email-chen.zhong@mediatek.com>
-References: <1502071065-6745-1-git-send-email-chen.zhong@mediatek.com>
- <1502071065-6745-2-git-send-email-chen.zhong@mediatek.com>
-Message-ID: <20170808111413.qt6qc2w6l6gdihpu@dell>
+From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
+Date: Tue, 08 Aug 2017 13:22:27 +0200
+Subject: [PATCH 0/5] s5p-jpeg fixes
+References: <CGME20170808112254eucas1p20aacd5bb0737ff85ba4756724af189aa@eucas1p2.samsung.com>
+Message-ID: <1502191352-11595-1-git-send-email-andrzej.p@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 07 Aug 2017, Chen Zhong wrote:
+Hi All,
 
-> The core driver should create and manage irq mappings instead of
-> leaf drivers. This patch change to pass irq domain to
-> devm_mfd_add_devices() and it will create mapping for irq resources
-> automatically. And remove irq mapping in rtc driver since this has
-> been done in core driver.
-> 
-> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-> ---
->  drivers/mfd/mt6397-core.c |    4 ++--
->  drivers/rtc/rtc-mt6397.c  |    2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
+This series contains a number of fixes to the s5p-jpeg driver.
 
-Once you've fixed Dmitry's comment:
+There are two patches from Tony K Nadackal, which got lost long time ago.
 
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+@Thierry:
+The patch changing the software reset routine you sent recently was
+actually a resend of Tony's patch. I investigated the question why
+this patch is needed. The encoder/decoder should be disabled as soon
+as possible, in the interrupt service routine; please see the commit message.
+I am resending Tony's patch again, with updated commit message.
+Thank you for reminding about the patch in question!
+
+There are also three patches from me, please see appropriate commit
+messages.
+
+Rebased onto Mauro's master.
+
+Andrzej Pietrasiewicz (3):
+  media: platform: s5p-jpeg: disable encoder/decoder in exynos4-like
+    hardware after use
+  media: platform: s5p-jpeg: fix number of components macro
+  media: platform: s5p-jpeg: directly use parsed subsampling on 5433
+
+Tony K Nadackal (2):
+  media: platform: s5p-jpeg: Fix crash in jpeg isr due to multiple
+    interrupts.
+  media: platform: s5p-jpeg: Clear JPEG_CODEC_ON bits in sw reset
+    function
+
+ drivers/media/platform/s5p-jpeg/jpeg-core.c       | 8 +++++++-
+ drivers/media/platform/s5p-jpeg/jpeg-core.h       | 1 +
+ drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c | 9 ++++++++-
+ drivers/media/platform/s5p-jpeg/jpeg-regs.h       | 2 +-
+ 4 files changed, 17 insertions(+), 3 deletions(-)
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
