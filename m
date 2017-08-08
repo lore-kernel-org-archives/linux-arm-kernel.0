@@ -1,99 +1,59 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Tue, 8 Aug 2017 09:36:22 +0200
-Subject: [PATCH] arm64: KVM: Reject non-compliant HVC calls from guest
- kernel
-In-Reply-To: <1502132608-26077-1-git-send-email-shankerd@codeaurora.org>
-References: <1502132608-26077-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <20170808073622.GA26652@cbox>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue,  8 Aug 2017 09:39:12 +0200
+Subject: [PATCH] arm64: dts: renesas: r8a7795: correct whitespace of companion
+ property
+Message-ID: <1502177952-27983-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shanker,
+Fixes: 4dad6dcdae7b ("arm64: dts: renesas: r8a7795: add usb2.0 host ch3 device nodes")
+Fixes: 1c422b4c501e ("arm64: dts: renesas: r8a7795: Add usb companion property in EHCI")
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-On Mon, Aug 07, 2017 at 02:03:28PM -0500, Shanker Donthineni wrote:
-> The SMC/HVC instructions with an immediate value non-zero are not compliant
-> according to 'SMC calling convention system software document'. Add a
-> validation check in handle_hvc() to avoid malicious HVC calls from VM, and
+ Based on renesas-devel-20170807-v4.13-rc4
 
-
-Why do the HVC calls become malicious if they have non-zero immediate
-values --- can it actually break something today?
-
-
-> inject an undefined instruction for those calls.
-> 
-> http://infocenter.arm.com/help/topic/com.arm.doc.den0028b/ARM_DEN0028B_SMC_Calling_Convention.pdf
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> ---
->  arch/arm64/include/asm/esr.h |  4 ++++
->  arch/arm64/kvm/handle_exit.c | 12 +++++++-----
->  2 files changed, 11 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-> index 8cabd57..fa988e5 100644
-> --- a/arch/arm64/include/asm/esr.h
-> +++ b/arch/arm64/include/asm/esr.h
-> @@ -107,6 +107,9 @@
->  #define ESR_ELx_AR 		(UL(1) << 14)
->  #define ESR_ELx_CM 		(UL(1) << 8)
->  
-> +/* ISS field definitions for HVC/SVC instruction execution traps */
-> +#define ESR_HVC_IMMEDIATE(esr)	((esr) & 0xFFFF)
-> +
->  /* ISS field definitions for exceptions taken in to Hyp */
->  #define ESR_ELx_CV		(UL(1) << 24)
->  #define ESR_ELx_COND_SHIFT	(20)
-> @@ -114,6 +117,7 @@
->  #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
->  #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
->  
-> +
->  /* ESR value templates for specific events */
->  
->  /* BRK instruction trap from AArch64 state */
-> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> index 17d8a16..a900dcd 100644
-> --- a/arch/arm64/kvm/handle_exit.c
-> +++ b/arch/arm64/kvm/handle_exit.c
-> @@ -42,13 +42,15 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  			    kvm_vcpu_hvc_get_imm(vcpu));
->  	vcpu->stat.hvc_exit_stat++;
->  
-> -	ret = kvm_psci_call(vcpu);
-> -	if (ret < 0) {
-> -		kvm_inject_undefined(vcpu);
-> -		return 1;
-> +	/* HVC immediate value must be zero for all compliant calls */
-> +	if (!ESR_HVC_IMMEDIATE(kvm_vcpu_get_hsr(vcpu))) {
-> +		ret = kvm_psci_call(vcpu);
-> +		if (ret >= 0)
-> +			return ret;
-
-Out of curiosity, have you seen guests or any bad behavior with a
-non-zero PSCI value, or are we just making sure we only support callers
-that follow the SMC calling convention?
-
-I hope we don't break any existing guests out there with this change,
-including UEFI, old versions of Linux, etc.
-
-(I do have this feeling that this check should be inside kvm_psci_call
-instead, but it really doesn't matter at this point and we can always
-move things around later if we start using other types of hypercalls
-for anything.)
-
-Thanks,
--Christoffer
-
->  	}
->  
-> -	return ret;
-> +	kvm_inject_undefined(vcpu);
-> +	return 1;
->  }
->  
->  static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> -- 
-> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
-> 
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index a87ae76880ab..efe2cb2b9951 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1623,7 +1623,7 @@
+ 			clocks = <&cpg CPG_MOD 703>;
+ 			phys = <&usb2_phy0>;
+ 			phy-names = "usb";
+-			companion= <&ohci0>;
++			companion = <&ohci0>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			resets = <&cpg 703>;
+ 			status = "disabled";
+@@ -1636,7 +1636,7 @@
+ 			clocks = <&cpg CPG_MOD 702>;
+ 			phys = <&usb2_phy1>;
+ 			phy-names = "usb";
+-			companion= <&ohci1>;
++			companion = <&ohci1>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			resets = <&cpg 702>;
+ 			status = "disabled";
+@@ -1649,7 +1649,7 @@
+ 			clocks = <&cpg CPG_MOD 701>;
+ 			phys = <&usb2_phy2>;
+ 			phy-names = "usb";
+-			companion= <&ohci2>;
++			companion = <&ohci2>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			resets = <&cpg 701>;
+ 			status = "disabled";
+@@ -1662,7 +1662,7 @@
+ 			clocks = <&cpg CPG_MOD 700>;
+ 			phys = <&usb2_phy3>;
+ 			phy-names = "usb";
+-			companion= <&ohci3>;
++			companion = <&ohci3>;
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			resets = <&cpg 700>;
+ 			status = "disabled";
+-- 
+2.1.4
