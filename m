@@ -1,9 +1,9 @@
 From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Tue,  8 Aug 2017 16:58:31 +0530
-Subject: [PATCH 2/3] drm/sun4i: make drm_connector_funcs structures const
+Date: Tue,  8 Aug 2017 16:58:32 +0530
+Subject: [PATCH 3/3] drm/rockchip: make drm_connector_funcs structures const
 In-Reply-To: <1502191712-11231-1-git-send-email-bhumirks@gmail.com>
 References: <1502191712-11231-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <1502191712-11231-3-git-send-email-bhumirks@gmail.com>
+Message-ID: <1502191712-11231-4-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -44,35 +44,21 @@ struct drm_connector_funcs s;
 
 Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_rgb.c | 2 +-
- drivers/gpu/drm/sun4i/sun4i_tv.c  | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/rockchip/inno_hdmi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index 76362c0..4a456de 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -119,7 +119,7 @@ static int sun4i_rgb_mode_valid(struct drm_connector *connector,
+diff --git a/drivers/gpu/drm/rockchip/inno_hdmi.c b/drivers/gpu/drm/rockchip/inno_hdmi.c
+index 7149968..1a1a3dd 100644
+--- a/drivers/gpu/drm/rockchip/inno_hdmi.c
++++ b/drivers/gpu/drm/rockchip/inno_hdmi.c
+@@ -592,7 +592,7 @@ static void inno_hdmi_connector_destroy(struct drm_connector *connector)
  	drm_connector_cleanup(connector);
  }
  
--static struct drm_connector_funcs sun4i_rgb_con_funcs = {
-+static const struct drm_connector_funcs sun4i_rgb_con_funcs = {
- 	.dpms			= drm_atomic_helper_connector_dpms,
- 	.fill_modes		= drm_helper_probe_single_connector_modes,
- 	.destroy		= sun4i_rgb_connector_destroy,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
-index 73bfe7b..d246794 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
-@@ -537,7 +537,7 @@ static int sun4i_tv_comp_mode_valid(struct drm_connector *connector,
- 	drm_connector_cleanup(connector);
- }
- 
--static struct drm_connector_funcs sun4i_tv_comp_connector_funcs = {
-+static const struct drm_connector_funcs sun4i_tv_comp_connector_funcs = {
- 	.dpms			= drm_atomic_helper_connector_dpms,
- 	.fill_modes		= drm_helper_probe_single_connector_modes,
- 	.destroy		= sun4i_tv_comp_connector_destroy,
+-static struct drm_connector_funcs inno_hdmi_connector_funcs = {
++static const struct drm_connector_funcs inno_hdmi_connector_funcs = {
+ 	.dpms = drm_atomic_helper_connector_dpms,
+ 	.fill_modes = inno_hdmi_probe_single_connector_modes,
+ 	.detect = inno_hdmi_connector_detect,
 -- 
 1.9.1
