@@ -1,47 +1,79 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 8 Aug 2017 13:57:52 +0200
-Subject: Nokia N900 camera support in linux-next
-Message-ID: <20170808115752.GA19585@amd>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 08 Aug 2017 15:03:49 +0300
+Subject: [PATCH 1/3] drm/bridge: make drm_connector_funcs structures const
+In-Reply-To: <1502191712-11231-2-git-send-email-bhumirks@gmail.com>
+References: <1502191712-11231-1-git-send-email-bhumirks@gmail.com>
+ <1502191712-11231-2-git-send-email-bhumirks@gmail.com>
+Message-ID: <5410432.rqMauYSQNE@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Bhumika,
 
-Most of CSI-1 / N900 camera support is there in linux-next tree:
-patches marked "n" are in, unmarked patches are only in Sakari's tree.
+Thank you for the patch.
 
-Is there something I can do to help merging patches to linux-next? We
-are quite close, and it would be nice to have camera support in v4.14...
+On Tuesday 08 Aug 2017 16:58:30 Bhumika Goyal wrote:
+> Make these const as they are only passed to the function
+> drm_connector_init and the corresponding argument is of type const.
+> Done using Coccinelle
+> 
+> @match disable optional_qualifier@
+> identifier s;
+> @@
+> static struct drm_connector_funcs s = {...};
+> 
+> @ref@
+> position p;
+> identifier match.s;
+> @@
+> s at p
+> 
+> @good1@
+> identifier match.s;
+> expression e1,e2;
+> position ref.p;
+> @@
+> drm_connector_init(e1,e2,&s at p,...)
+> 
+> @bad depends on  !good1@
+> position ref.p;
+> identifier match.s;
+> @@
+> s at p
+> 
+> @depends on forall !bad disable optional_qualifier@
+> identifier match.s;
+> @@
+> static
+> + const
+> struct drm_connector_funcs s;
+> 
+> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 
-Thanks,
-								Pavel
+I can't judge the semantic patch, but the C code change looks good to me.
 
-369e74605f768efa74483ab08e706347756e2092 omap3isp: Skip CSI-2 receiver initialisation in CCP2 configuratio$
-8f7dc67fed42fa3d36f590fb42769bcf1513e37a omap3isp: Correctly put the last iterated endpoint fwnode always
-d3e8774ca1119c264886b84d49ef28da0b459bb4 omap3isp: Always initialise isp and mutex for csiphy1
-n 259c3fa06348d8142406796d0e7beb5753d07d31 omap3isp: Return -EPROBE_DEFER if the required regulators can't$
-5034d8d8eceec96908c4659be58507177d0a462c omap3isp: Correctly set IO_OUT_SEL and VP_CLK_POL for CCP2 mode
-bf54a7459801bde07e3c1bfc7840f30abc296f62 omap3isp: Parse CSI1 configuration from the device tree
-n 07120f2667ea1c02d86dce1b3d46e28cb23e3a15 omap3isp: Ignore endpoints with invalid configuration
-n 5151d5af4010a2aeeaff1fb05de4661f2fd6d982 omap3isp: add CSI1 support
-n 7947670b57539df822cabaaf1d0e8a78fbcd1290 omap3isp: Explicitly set the number of CSI-2 lanes used in lane$
-n 7f52779e72e4c14ffdffcf0cebdefde193457a82 omap3isp: Destroy CSI-2 phy mutexes in error and module removal
-n dbd6d72970e87f39936bc036a1a9441e59177434 omap3isp: Check for valid port in endpoints
-n 8a61b9bf1134d7f57e2bd65aeac0b553ecc7301e smiapp: add CCP2 support
-n f71d8a1c3f33b510b379278ea171d3495ac98bb6 v4l: Add support for CSI-1 and CCP2 busses
-n 1d2e2bc5f4bf78db9aa63e68dfd44823f9b62237 v4l: fwnode: Obtain data bus type from FW
-n 3e4351a7e39775ef13c51950f83c51fb5d98b33c v4l: fwnode: Call CSI2 bus csi2, not csi
-n 5e8535c064363713855d975f2c9777bbc739c877 dt: bindings: Add strobe property for CCP2
-n 3c736565c543ec97f54f177df295ed729e80d39f dt: bindings: Explicitly specify bus type
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
+> ---
+>  drivers/gpu/drm/bridge/adv7511/adv7511_drv.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/bridge/adv7511/adv7511_drv.c
+> b/drivers/gpu/drm/bridge/adv7511/adv7511_drv.c index ff9792d..ee16635
+> 100644
+> --- a/drivers/gpu/drm/bridge/adv7511/adv7511_drv.c
+> +++ b/drivers/gpu/drm/bridge/adv7511/adv7511_drv.c
+> @@ -785,7 +785,7 @@ static int adv7511_connector_get_modes(struct
+> drm_connector *connector) return adv7511_detect(adv, connector);
+>  }
+> 
+> -static struct drm_connector_funcs adv7511_connector_funcs = {
+> +static const struct drm_connector_funcs adv7511_connector_funcs = {
+>  	.dpms = drm_atomic_helper_connector_dpms,
+>  	.fill_modes = drm_helper_probe_single_connector_modes,
+>  	.detect = adv7511_connector_detect,
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170808/a58ecdeb/attachment.sig>
+Regards,
+
+Laurent Pinchart
