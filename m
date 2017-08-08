@@ -1,35 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 8 Aug 2017 14:34:11 +0100
-Subject: [PATCH v8 00/20] ILP32 for ARM64
-In-Reply-To: <20170724112624.7ie6na7uszmsc5te@yury-thinkpad>
-References: <20170619155003.13218-1-ynorov@caviumnetworks.com>
- <20170629161036.ftedtbp2gdmyzloo@e104818-lin.cambridge.arm.com>
- <20170706215902.qtmbsidwvqlr7o56@yury-thinkpad>
- <20170707171135.h54fe4ea7xuxnrqt@armageddon.cambridge.arm.com>
- <20170724112624.7ie6na7uszmsc5te@yury-thinkpad>
-Message-ID: <20170808133411.opuh7pz3kmlhkhzy@armageddon.cambridge.arm.com>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Tue, 08 Aug 2017 21:43:58 +0800
+Subject: [PATCH 0/4] constify thermal_zone_of_device_ops structures
+In-Reply-To: <1501965437-30730-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1501965437-30730-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1502199838.4296.64.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 02:26:24PM +0300, Yury Norov wrote:
-> This is the 4.12 and linux-next - based kernel patches:
-> https://github.com/norov/linux/tree/ilp32-4.12
-> https://github.com/norov/linux/tree/ilp32-20170724
+On Sat, 2017-08-05 at 22:37 +0200, Julia Lawall wrote:
+> The thermal_zone_of_device_ops structures are only passed as the
+> fourth
+> argument to thermal_zone_of_sensor_register, which is declared as
+> const.
+> Thus the thermal_zone_of_device_ops structures themselves can be
+> const.
+> 
+> Done with the help of Coccinelle.
 
-I published the 4.12 branch here:
+I still see the same problem in other thermal drivers, which is not
+covered by this patch set. Can we fix them all in one time?
 
-https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=staging/ilp32-4.12
-
-(or git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git staging/ilp32-4.12)
-
-There are two patches on top, one to fix SET_PERSONALITY and the other
-to make ILP32 default y since you'd expect people using this branch to
-need such option enabled.
-
-I'll publish a 4.13-based branch when the corresponding kernel version
-is released.
-
-Thanks.
-
--- 
-Catalin
+thanks,
+rui
+> 
+> ---
+> 
+> ?drivers/thermal/broadcom/bcm2835_thermal.c |????2 +-
+> ?drivers/thermal/qoriq_thermal.c????????????|????2 +-
+> ?drivers/thermal/samsung/exynos_tmu.c???????|????2 +-
+> ?drivers/thermal/zx2967_thermal.c???????????|????2 +-
+> ?4 files changed, 4 insertions(+), 4 deletions(-)
