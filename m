@@ -1,58 +1,178 @@
 From: david.wu@rock-chips.com (David Wu)
-Date: Tue,  8 Aug 2017 23:38:30 +0800
-Subject: [PATCH v3 2/7] pwm: rockchip: Remove the judge from return value of
- pwm_config
+Date: Tue,  8 Aug 2017 23:38:29 +0800
+Subject: [PATCH v3 1/7] pwm: rockchip: Add APB and function both clocks support
 In-Reply-To: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
 References: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1502206715-24174-3-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1502206715-24174-2-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems the rockchip_pwm_config always returns the result 0,
-so remove the judge.
+New PWM module provides two individual clocks for APB clock
+and function clock.
 
 Signed-off-by: David Wu <david.wu@rock-chips.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/pwm/pwm-rockchip.c | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+changes in v3:
+ - clk_get with NULL argument again if it was error, when clk_get with "pwm" argument.
+ - To get clk count, use of_count_phandle_with_args instead of of_property_count_strings.
 
+ .../devicetree/bindings/pwm/pwm-rockchip.txt       |  8 ++-
+ drivers/pwm/pwm-rockchip.c                         | 58 ++++++++++++++++++----
+ 2 files changed, 56 insertions(+), 10 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt b/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
+index b8be3d0..2350ef9 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm-rockchip.txt
+@@ -6,7 +6,13 @@ Required properties:
+    "rockchip,rk3288-pwm": found on RK3288 SoC
+    "rockchip,vop-pwm": found integrated in VOP on RK3288 SoC
+  - reg: physical base address and length of the controller's registers
+- - clocks: phandle and clock specifier of the PWM reference clock
++ - clocks: See ../clock/clock-bindings.txt
++   - For older hardware (rk2928, rk3066, rk3188, rk3228, rk3288, rk3399):
++     - There is one clock that's used both to derive the functional clock
++       for the device and as the bus clock.
++   - For newer hardware (rk3328 and future socs): specified by name
++     - "pwm": This is used to derive the functional clock.
++     - "pclk": This is the APB bus clock.
+  - #pwm-cells: must be 2 (rk2928) or 3 (rk3288). See pwm.txt in this directory
+    for a description of the cell format.
+ 
 diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
-index ac3cd5e..33bbb5a 100644
+index 744d561..ac3cd5e 100644
 --- a/drivers/pwm/pwm-rockchip.c
 +++ b/drivers/pwm/pwm-rockchip.c
-@@ -165,7 +165,7 @@ static void rockchip_pwm_get_state(struct pwm_chip *chip,
- 	clk_disable(pc->pclk);
+@@ -33,6 +33,7 @@
+ struct rockchip_pwm_chip {
+ 	struct pwm_chip chip;
+ 	struct clk *clk;
++	struct clk *pclk;
+ 	const struct rockchip_pwm_data *data;
+ 	void __iomem *base;
+ };
+@@ -145,7 +146,7 @@ static void rockchip_pwm_get_state(struct pwm_chip *chip,
+ 	u64 tmp;
+ 	int ret;
+ 
+-	ret = clk_enable(pc->clk);
++	ret = clk_enable(pc->pclk);
+ 	if (ret)
+ 		return;
+ 
+@@ -161,7 +162,7 @@ static void rockchip_pwm_get_state(struct pwm_chip *chip,
+ 
+ 	pc->data->get_state(chip, pwm, state);
+ 
+-	clk_disable(pc->clk);
++	clk_disable(pc->pclk);
  }
  
--static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+static void rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 			       int duty_ns, int period_ns)
- {
- 	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
-@@ -188,8 +188,6 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+@@ -224,7 +225,7 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	pwm_get_state(pwm, &curstate);
+ 	enabled = curstate.enabled;
  
- 	writel(period, pc->base + pc->data->regs.period);
- 	writel(duty, pc->base + pc->data->regs.duty);
--
--	return 0;
+-	ret = clk_enable(pc->clk);
++	ret = clk_enable(pc->pclk);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -257,7 +258,7 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	rockchip_pwm_get_state(chip, pwm, state);
+ 
+ out:
+-	clk_disable(pc->clk);
++	clk_disable(pc->pclk);
+ 
+ 	return ret;
  }
+@@ -328,7 +329,7 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
+ 	const struct of_device_id *id;
+ 	struct rockchip_pwm_chip *pc;
+ 	struct resource *r;
+-	int ret;
++	int ret, count;
  
- static int rockchip_pwm_enable(struct pwm_chip *chip,
-@@ -236,13 +234,7 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 		enabled = false;
+ 	id = of_match_device(rockchip_pwm_dt_ids, &pdev->dev);
+ 	if (!id)
+@@ -343,13 +344,43 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
+ 	if (IS_ERR(pc->base))
+ 		return PTR_ERR(pc->base);
+ 
+-	pc->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(pc->clk))
+-		return PTR_ERR(pc->clk);
++	pc->clk = devm_clk_get(&pdev->dev, "pwm");
++	if (IS_ERR(pc->clk)) {
++		pc->clk = devm_clk_get(&pdev->dev, NULL);
++		if (IS_ERR(pc->clk)) {
++			ret = PTR_ERR(pc->clk);
++			if (ret != -EPROBE_DEFER)
++				dev_err(&pdev->dev, "Can't get bus clk: %d\n",
++					ret);
++			return ret;
++		}
++	}
++
++	count = of_count_phandle_with_args(pdev->dev.of_node,
++					   "clocks", "#clock-cells");
++	if (count == 2)
++		pc->pclk = devm_clk_get(&pdev->dev, "pclk");
++	else
++		pc->pclk = pc->clk;
++
++	if (IS_ERR(pc->pclk)) {
++		ret = PTR_ERR(pc->pclk);
++		if (ret != -EPROBE_DEFER)
++			dev_err(&pdev->dev, "Can't get APB clk: %d\n", ret);
++		return ret;
++	}
+ 
+ 	ret = clk_prepare_enable(pc->clk);
+-	if (ret)
++	if (ret) {
++		dev_err(&pdev->dev, "Can't prepare enable bus clk: %d\n", ret);
+ 		return ret;
++	}
++
++	ret = clk_prepare(pc->pclk);
++	if (ret) {
++		dev_err(&pdev->dev, "Can't prepare APB clk: %d\n", ret);
++		goto err_clk;
++	}
+ 
+ 	platform_set_drvdata(pdev, pc);
+ 
+@@ -368,12 +399,20 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
+ 	if (ret < 0) {
+ 		clk_unprepare(pc->clk);
+ 		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
++		goto err_pclk;
  	}
  
--	ret = rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
--	if (ret) {
--		if (enabled != curstate.enabled)
--			rockchip_pwm_enable(chip, pwm, !enabled,
--				      state->polarity);
--		goto out;
--	}
-+	rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
+ 	/* Keep the PWM clk enabled if the PWM appears to be up and running. */
+ 	if (!pwm_is_enabled(pc->chip.pwms))
+ 		clk_disable(pc->clk);
  
- 	if (state->enabled != enabled) {
- 		ret = rockchip_pwm_enable(chip, pwm, state->enabled,
++	return 0;
++
++err_pclk:
++	clk_unprepare(pc->pclk);
++err_clk:
++	clk_disable_unprepare(pc->clk);
++
+ 	return ret;
+ }
+ 
+@@ -395,6 +434,7 @@ static int rockchip_pwm_remove(struct platform_device *pdev)
+ 	if (pwm_is_enabled(pc->chip.pwms))
+ 		clk_disable(pc->clk);
+ 
++	clk_unprepare(pc->pclk);
+ 	clk_unprepare(pc->clk);
+ 
+ 	return pwmchip_remove(&pc->chip);
 -- 
 1.9.1
