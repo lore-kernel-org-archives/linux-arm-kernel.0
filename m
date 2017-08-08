@@ -1,81 +1,50 @@
-From: chen.zhong@mediatek.com (Chen Zhong)
-Date: Tue, 8 Aug 2017 17:09:55 +0800
-Subject: [PATCH v2 1/5] mfd: mt6397: create irq mappings in mfd core driver
-In-Reply-To: <20170808025328.GB12328@dtor-ws>
-References: <1502071065-6745-1-git-send-email-chen.zhong@mediatek.com>
- <1502071065-6745-2-git-send-email-chen.zhong@mediatek.com>
- <20170807213244.7hrd3isq5jj44dgd@piout.net>
- <20170808025328.GB12328@dtor-ws>
-Message-ID: <1502183395.28466.5.camel@mhfsdcap03>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Tue, 08 Aug 2017 14:34:53 +0530
+Subject: [PATCH RFC] irqchip: gic-v3: Support forced cpu irq affinity setting
+References: <CGME20170808091129epcas1p48d0523675178cb841d97e64d5baab75f@epcas1p4.samsung.com>
+Message-ID: <1502183093-30327-1-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-08-07 at 19:53 -0700, Dmitry Torokhov wrote:
-> On Mon, Aug 07, 2017 at 11:32:44PM +0200, Alexandre Belloni wrote:
-> > On 07/08/2017 at 09:57:41 +0800, Chen Zhong wrote:
-> > > The core driver should create and manage irq mappings instead of
-> > > leaf drivers. This patch change to pass irq domain to
-> > > devm_mfd_add_devices() and it will create mapping for irq resources
-> > > automatically. And remove irq mapping in rtc driver since this has
-> > > been done in core driver.
-> > > 
-> > > Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-> > 
-> > For the RTC part:
-> > Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > 
-> > > ---
-> > >  drivers/mfd/mt6397-core.c |    4 ++--
-> > >  drivers/rtc/rtc-mt6397.c  |    2 +-
-> > >  2 files changed, 3 insertions(+), 3 deletions(-)
-> > > 
-> > > diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-> > > index 04a601f..6546d7f 100644
-> > > --- a/drivers/mfd/mt6397-core.c
-> > > +++ b/drivers/mfd/mt6397-core.c
-> > > @@ -289,7 +289,7 @@ static int mt6397_probe(struct platform_device *pdev)
-> > >  
-> > >  		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6323_devs,
-> > >  					   ARRAY_SIZE(mt6323_devs), NULL,
-> > > -					   0, NULL);
-> > > +					   0, pmic->irq_domain);
-> > >  		break;
-> > >  
-> > >  	case MT6397_CID_CODE:
-> > > @@ -304,7 +304,7 @@ static int mt6397_probe(struct platform_device *pdev)
-> > >  
-> > >  		ret = devm_mfd_add_devices(&pdev->dev, -1, mt6397_devs,
-> > >  					   ARRAY_SIZE(mt6397_devs), NULL,
-> > > -					   0, NULL);
-> > > +					   0, pmic->irq_domain);
-> > >  		break;
-> > >  
-> > >  	default:
-> > > diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
-> > > index 1a61fa5..22c52f7 100644
-> > > --- a/drivers/rtc/rtc-mt6397.c
-> > > +++ b/drivers/rtc/rtc-mt6397.c
-> > > @@ -323,7 +323,7 @@ static int mtk_rtc_probe(struct platform_device *pdev)
-> > >  	rtc->addr_base = res->start;
-> > >  
-> > >  	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
-> > > -	rtc->irq = irq_create_mapping(mt6397_chip->irq_domain, res->start);
-> > > +	rtc->irq = res->start;
-> 
-> Why not
-> 
-> 	rtc->irq = platform_get_irq(pdev, 0);
-> 	if (rtc->irq < 0)
-> 		return rtc->irq;
-> ?
-> 
-> This way you propagate error properly.
-> 
-> Thanks.
-> 
+Skip check for online cpu mask when setting irq affinity of per cpu timer
+during early startup of not yet online cpu.
 
-Hi Dmitry,
+Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
+Signed-off-by: Aswani Reddy <aswani.reddy@samsung.com>
+Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+---
+ drivers/irqchip/irq-gic-v3.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-	I'll modify it to get irq number via this way.
+Currently when non boot CPUs comes up and if setting of IRQ affinity gets called
+before cpu online status gets updated, gic_mpidr_to_affinity() returns
+undesirable cpu number. Using __force__ flag ignore cpu_online_mask and setup
+the intended cpu affinity for the irq.
 
-Thank you.
+The same approch is used in gicv2 
+(commit: ffde1de64012c: irqchip: Gic: Support forced affinity setting)
+
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index dbffb7a..c238c64 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -640,11 +640,16 @@ static void gic_smp_init(void)
+ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 			    bool force)
+ {
+-	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
++	unsigned int cpu;
+ 	void __iomem *reg;
+ 	int enabled;
+ 	u64 val;
+ 
++	if (!force)
++		cpu = cpumask_any_and(mask_val, cpu_online_mask);
++	else
++		cpu = cpumask_first(mask_val);
++
+ 	if (cpu >= nr_cpu_ids)
+ 		return -EINVAL;
+ 
+-- 
+2.7.4
