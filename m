@@ -1,164 +1,228 @@
-From: chenjh@rock-chips.com (Joseph Chen)
-Date: Tue,  8 Aug 2017 16:07:24 +0800
-Subject: [PATCH v1] arm64: dts: rockchip: add rk805 node for rk3328-evb
-Message-ID: <1502179644-3220-1-git-send-email-chenjh@rock-chips.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue,  8 Aug 2017 10:10:25 +0200
+Subject: [PATCH 1/2] video: fbdev: Fix multiple style issues in xilinxfb
+Message-ID: <b07b143769ed5dccf44e9de4cb0d5c6203b3eca0.1502179820.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Joseph Chen <chenjh@rock-chips.com>
----
- arch/arm64/boot/dts/rockchip/rk3328-evb.dts | 137 ++++++++++++++++++++++++++++
- 1 file changed, 137 insertions(+)
+From: Hyun Kwon <hyun.kwon@xilinx.com>
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-index cf27239..e8705fd 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-@@ -50,8 +50,145 @@
- 	chosen {
- 		stdout-path = "serial2:1500000n8";
- 	};
-+
-+	dc_12v: dc-12v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "dc_12v";
-+		regulator-always-on;
-+		regulator-boot-on;
-+		regulator-min-microvolt = <12000000>;
-+		regulator-max-microvolt = <12000000>;
-+	};
-+
-+	vcc_sys: vcc-sys {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_sys";
-+		regulator-always-on;
-+		regulator-boot-on;
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		vin-supply = <&dc_12v>;
-+	};
+All reported by from checkpatch
+./scripts/checkpatch.pl --max-line-length 120 -strict -f
+drivers/video/fbdev/xilinxfb.c
+
+WARNING: Block comments should align the * on each line
+WARNING: Block comments use a trailing */ on a separate line
+WARNING: Block comments use * on subsequent lines
+WARNING: please, no space before tabs
+WARNING: Prefer 'unsigned int' to bare use of 'unsigned'
+WARNING: braces {} are not necessary for single statement blocks
+WARNING: Missing a blank line after declarations
+WARNING: struct of_device_id should normally be const
+CHECK: Please don't use multiple blank lines
+CHECK: Blank lines aren't necessary after an open brace '{'
+CHECK: Alignment should match open parenthesis
+CHECK: 'Endianess' may be misspelled - perhaps 'Endianness'?
+CHECK: spaces preferred around that '*' (ctx:VxV)
+ERROR: that open brace { should be on the previous line
+
+Signed-off-by: Hyun Kwon <hyun.kwon@xilinx.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
+
+ drivers/video/fbdev/xilinxfb.c | 56 +++++++++++++++++++++---------------------
+ 1 file changed, 28 insertions(+), 28 deletions(-)
+
+diff --git a/drivers/video/fbdev/xilinxfb.c b/drivers/video/fbdev/xilinxfb.c
+index 17dc119c7a98..0d828e46d704 100644
+--- a/drivers/video/fbdev/xilinxfb.c
++++ b/drivers/video/fbdev/xilinxfb.c
+@@ -41,7 +41,6 @@
+ 
+ #define DRIVER_NAME		"xilinxfb"
+ 
+-
+ /*
+  * Xilinx calls it "TFT LCD Controller" though it can also be used for
+  * the VGA port on the Xilinx ML40x board. This is a hardware display
+@@ -92,8 +91,9 @@ struct xilinxfb_platform_data {
+ 	u32 xvirt, yvirt;       /* resolution of memory buffer */
+ 
+ 	/* Physical address of framebuffer memory; If non-zero, driver
+-	* will use provided memory address instead of allocating one from
+-	* the consistent pool. */
++	 * will use provided memory address instead of allocating one from
++	 * the consistent pool.
++	 */
+ 	u32 fb_phys;
  };
  
- &uart2 {
- 	status = "okay";
+@@ -128,18 +128,18 @@ struct xilinxfb_platform_data {
+ 	.activate =	FB_ACTIVATE_NOW
  };
+ 
+-
+ #define BUS_ACCESS_FLAG		0x1 /* 1 = BUS, 0 = DCR */
+ #define LITTLE_ENDIAN_ACCESS	0x2 /* LITTLE ENDIAN IO functions */
+ 
+ struct xilinxfb_drvdata {
+-
+ 	struct fb_info	info;		/* FB driver info record */
+ 
+ 	phys_addr_t	regs_phys;	/* phys. address of the control
+-						registers */
++					 * registers
++					 */
+ 	void __iomem	*regs;		/* virt. address of the control
+-						registers */
++					 * registers
++					 */
+ #ifdef CONFIG_PPC_DCR
+ 	dcr_host_t      dcr_host;
+ 	unsigned int    dcr_len;
+@@ -148,7 +148,7 @@ struct xilinxfb_drvdata {
+ 	dma_addr_t	fb_phys;	/* phys. address of the frame buffer */
+ 	int		fb_alloced;	/* Flag, was the fb memory alloced? */
+ 
+-	u8 		flags;		/* features of the driver */
++	u8		flags;		/* features of the driver */
+ 
+ 	u32		reg_ctrl_default;
+ 
+@@ -165,7 +165,7 @@ struct xilinxfb_drvdata {
+  * which bus its connected and call the appropriate write API.
+  */
+ static void xilinx_fb_out32(struct xilinxfb_drvdata *drvdata, u32 offset,
+-				u32 val)
++			    u32 val)
+ {
+ 	if (drvdata->flags & BUS_ACCESS_FLAG) {
+ 		if (drvdata->flags & LITTLE_ENDIAN_ACCESS)
+@@ -195,8 +195,8 @@ static u32 xilinx_fb_in32(struct xilinxfb_drvdata *drvdata, u32 offset)
+ }
+ 
+ static int
+-xilinx_fb_setcolreg(unsigned regno, unsigned red, unsigned green, unsigned blue,
+-	unsigned transp, struct fb_info *fbi)
++xilinx_fb_setcolreg(unsigned int regno, unsigned int red, unsigned int green,
++		    unsigned int blue, unsigned int transp, struct fb_info *fbi)
+ {
+ 	u32 *palette = fbi->pseudo_palette;
+ 
+@@ -205,9 +205,11 @@ static u32 xilinx_fb_in32(struct xilinxfb_drvdata *drvdata, u32 offset)
+ 
+ 	if (fbi->var.grayscale) {
+ 		/* Convert color to grayscale.
+-		 * grayscale = 0.30*R + 0.59*G + 0.11*B */
+-		red = green = blue =
+-			(red * 77 + green * 151 + blue * 28 + 127) >> 8;
++		 * grayscale = 0.30*R + 0.59*G + 0.11*B
++		 */
++		blue = (red * 77 + green * 151 + blue * 28 + 127) >> 8;
++		green = blue;
++		red = green;
+ 	}
+ 
+ 	/* fbi->fix.visual is always FB_VISUAL_TRUECOLOR */
+@@ -241,13 +243,11 @@ static u32 xilinx_fb_in32(struct xilinxfb_drvdata *drvdata, u32 offset)
+ 		xilinx_fb_out32(drvdata, REG_CTRL, 0);
+ 	default:
+ 		break;
+-
+ 	}
+ 	return 0; /* success */
+ }
+ 
+-static struct fb_ops xilinxfb_ops =
+-{
++static struct fb_ops xilinxfb_ops = {
+ 	.owner			= THIS_MODULE,
+ 	.fb_setcolreg		= xilinx_fb_setcolreg,
+ 	.fb_blank		= xilinx_fb_blank,
+@@ -286,7 +286,8 @@ static int xilinxfb_assign(struct platform_device *pdev,
+ 	} else {
+ 		drvdata->fb_alloced = 1;
+ 		drvdata->fb_virt = dma_alloc_coherent(dev, PAGE_ALIGN(fbsize),
+-					&drvdata->fb_phys, GFP_KERNEL);
++						      &drvdata->fb_phys,
++						      GFP_KERNEL);
+ 	}
+ 
+ 	if (!drvdata->fb_virt) {
+@@ -300,7 +301,7 @@ static int xilinxfb_assign(struct platform_device *pdev,
+ 	/* Tell the hardware where the frame buffer is */
+ 	xilinx_fb_out32(drvdata, REG_FB_ADDR, drvdata->fb_phys);
+ 	rc = xilinx_fb_in32(drvdata, REG_FB_ADDR);
+-	/* Endianess detection */
++	/* Endianness detection */
+ 	if (rc != drvdata->fb_phys) {
+ 		drvdata->flags |= LITTLE_ENDIAN_ACCESS;
+ 		xilinx_fb_out32(drvdata, REG_FB_ADDR, drvdata->fb_phys);
+@@ -310,8 +311,7 @@ static int xilinxfb_assign(struct platform_device *pdev,
+ 	drvdata->reg_ctrl_default = REG_CTRL_ENABLE;
+ 	if (pdata->rotate_screen)
+ 		drvdata->reg_ctrl_default |= REG_CTRL_ROTATE;
+-	xilinx_fb_out32(drvdata, REG_CTRL,
+-					drvdata->reg_ctrl_default);
++	xilinx_fb_out32(drvdata, REG_CTRL, drvdata->reg_ctrl_default);
+ 
+ 	/* Fill struct fb_info */
+ 	drvdata->info.device = dev;
+@@ -364,7 +364,7 @@ static int xilinxfb_assign(struct platform_device *pdev,
+ err_cmap:
+ 	if (drvdata->fb_alloced)
+ 		dma_free_coherent(dev, PAGE_ALIGN(fbsize), drvdata->fb_virt,
+-			drvdata->fb_phys);
++				  drvdata->fb_phys);
+ 	else
+ 		iounmap(drvdata->fb_virt);
+ 
+@@ -435,12 +435,12 @@ static int xilinxfb_of_probe(struct platform_device *pdev)
+ 	 * Fill the resource structure if its direct BUS interface
+ 	 * otherwise fill the dcr_host structure.
+ 	 */
+-	if (tft_access) {
++	if (tft_access)
+ 		drvdata->flags |= BUS_ACCESS_FLAG;
+-	}
+ #ifdef CONFIG_PPC_DCR
+ 	else {
+ 		int start;
 +
-+&i2c1 {
-+	status = "okay";
-+
-+	rk805: rk805 at 18 {
-+		compatible = "rockchip,rk805";
-+		reg = <0x18>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
-+		#clock-cells = <1>;
-+		clock-output-names = "xin32k", "rk805-clkout2";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_int_l>;
-+		rockchip,system-power-controller;
-+		wakeup-source;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		vcc1-supply = <&vcc_sys>;
-+		vcc2-supply = <&vcc_sys>;
-+		vcc3-supply = <&vcc_sys>;
-+		vcc4-supply = <&vcc_sys>;
-+		vcc5-supply = <&vcc_io>;
-+		vcc6-supply = <&vcc_io>;
-+
-+		regulators {
-+			vdd_logic: DCDC_REG1 {
-+				regulator-name = "vdd_logic";
-+				regulator-min-microvolt = <712500>;
-+				regulator-max-microvolt = <1450000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
-+			};
-+
-+			vdd_arm: DCDC_REG2 {
-+				regulator-name = "vdd_arm";
-+				regulator-min-microvolt = <712500>;
-+				regulator-max-microvolt = <1450000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <950000>;
-+				};
-+			};
-+
-+			vcc_ddr: DCDC_REG3 {
-+				regulator-name = "vcc_ddr";
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			vcc_io: DCDC_REG4 {
-+				regulator-name = "vcc_io";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
-+			};
-+
-+			vcc_18: LDO_REG1 {
-+				regulator-name = "vcc_18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc18_emmc: LDO_REG2 {
-+				regulator-name = "vcc18_emmc";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vdd_10: LDO_REG3 {
-+				regulator-name = "vdd_10";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&pinctrl {
-+	pmic {
-+		pmic_int_l: pmic-int-l {
-+			rockchip,pins = <2 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+};
-+
+ 		start = dcr_resource_start(pdev->dev.of_node, 0);
+ 		drvdata->dcr_len = dcr_resource_len(pdev->dev.of_node, 0);
+ 		drvdata->dcr_host = dcr_map(pdev->dev.of_node, start, drvdata->dcr_len);
+@@ -452,19 +452,19 @@ static int xilinxfb_of_probe(struct platform_device *pdev)
+ #endif
+ 
+ 	prop = of_get_property(pdev->dev.of_node, "phys-size", &size);
+-	if ((prop) && (size >= sizeof(u32)*2)) {
++	if ((prop) && (size >= sizeof(u32) * 2)) {
+ 		pdata.screen_width_mm = prop[0];
+ 		pdata.screen_height_mm = prop[1];
+ 	}
+ 
+ 	prop = of_get_property(pdev->dev.of_node, "resolution", &size);
+-	if ((prop) && (size >= sizeof(u32)*2)) {
++	if ((prop) && (size >= sizeof(u32) * 2)) {
+ 		pdata.xres = prop[0];
+ 		pdata.yres = prop[1];
+ 	}
+ 
+ 	prop = of_get_property(pdev->dev.of_node, "virtual-resolution", &size);
+-	if ((prop) && (size >= sizeof(u32)*2)) {
++	if ((prop) && (size >= sizeof(u32) * 2)) {
+ 		pdata.xvirt = prop[0];
+ 		pdata.yvirt = prop[1];
+ 	}
+@@ -482,7 +482,7 @@ static int xilinxfb_of_remove(struct platform_device *op)
+ }
+ 
+ /* Match table for of_platform binding */
+-static struct of_device_id xilinxfb_of_match[] = {
++static const struct of_device_id xilinxfb_of_match[] = {
+ 	{ .compatible = "xlnx,xps-tft-1.00.a", },
+ 	{ .compatible = "xlnx,xps-tft-2.00.a", },
+ 	{ .compatible = "xlnx,xps-tft-2.01.a", },
 -- 
 1.9.1
