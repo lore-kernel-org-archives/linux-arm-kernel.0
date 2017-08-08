@@ -1,47 +1,82 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 8 Aug 2017 12:05:26 +0800
-Subject: [PATCH v2 0/9] mfd: axp20x: Add basic support for AXP813
-In-Reply-To: <20170726083242.k35gnk22h35as55n@flea>
-References: <20170726082832.16789-1-wens@csie.org>
- <20170726083242.k35gnk22h35as55n@flea>
-Message-ID: <CAGb2v67F0d3WZuiAr9Hp6vTenq2TjfRzwz-XhXtFPzNash-KTw@mail.gmail.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Tue, 8 Aug 2017 09:45:42 +0530
+Subject: [PATCH] gpio: uniphier: add UniPhier GPIO controller driver
+In-Reply-To: <CAK7LNATCZ9r6KCbFLAW68r9WtYrQ2OvWOZd0AXW4GbdHjHQDVw@mail.gmail.com>
+References: <1501758371-25316-1-git-send-email-yamada.masahiro@socionext.com>
+ <CACRpkdZWxjwDnVy5f2rLAWs=+T=5SnwyU8dz1FW1eg8dk8JN_Q@mail.gmail.com>
+ <CAK7LNAT4FvsX2-hYrKYmrftEZZb_RZOrfZoKWvR8hopt9jT8-Q@mail.gmail.com>
+ <CACRpkdZ26q09s-L2wVy+Vv5rV0Enjith0AJ_sJCAH3kvzvjn1Q@mail.gmail.com>
+ <CAK7LNATCZ9r6KCbFLAW68r9WtYrQ2OvWOZd0AXW4GbdHjHQDVw@mail.gmail.com>
+Message-ID: <059c7046-06cd-fce8-1603-3de7a3dc3d5d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 4:32 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Wed, Jul 26, 2017 at 04:28:23PM +0800, Chen-Yu Tsai wrote:
->> Hi everyone,
->>
->> This is v2 of my AXP813 support series. The device tree patches are
->> based on my A83T MMC support series. These will go through the sunxi
->> tree. The dt-binding and mfd patches are based on v4.13-rc1. These
->> will go through Lee's mfd tree.
->>
->> Changes since v1:
->>
->>   - Provided relative path for ac100.txt in dt-bindings/mfd/axp20x.txt
->>
->>   - Added Rob's acks to dt-binding patches
->>
->>   - Added Quentin's "mfd: axp20x: use correct platform device id for
->>     many PEK" patch to this series. This patch depends on mfd changes
->>     in this series. It is included so Lee can take them together in
->>     one go.
->>
->>   - Added Lee's mfd-acks to mfd patches
->>
->>   - Added axp818 compatible with axp813 fallback. The two chips are
->>     identical except for the markings. The added compatible matches
->>     what is actually on the board, to avoid confusing readers.
->>
->>   - Fixed up device tree patches to mention which board is changed
->>
->>   - Added device tree patches for the H8 homlet
->
-> For the whole serie,
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Applied the dts patches for 4.14.
 
-ChenYu
+On Tuesday 08 August 2017 06:36 AM, Masahiro Yamada wrote:
+> Hi Linus,
+> 
+> 2017-08-08 0:37 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+>> On Mon, Aug 7, 2017 at 3:50 PM, Masahiro Yamada
+>> <yamada.masahiro@socionext.com> wrote:
+>>
+>>> Adding "interrupts" property in DT causes
+>>> of_pupulate_default_populate() to assign virtual IRQ numbers
+>>> before driver probing.  So it does not work well with IRQ domain hierarchy.
+>>
+>> I think I heard some noise about this the week before.
+>>
+>>> For pinctrl/stm32/pinctrl-stm32.c,
+>>> I do not see "interrupts", so it just straight maps the irq numbers.
+>>
+>> I think OMAP and DaVinci does someting similar too. This is from a recent
+>> DaVinci patch from Keerthy:
+>>
+>> +Example for 66AK2G:
+>> +
+>> +gpio0: gpio at 2603000 {
+>> +       compatible = "ti,k2g-gpio", "ti,keystone-gpio";
+>> +       reg = <0x02603000 0x100>;
+>> +       gpio-controller;
+>> +       #gpio-cells = <2>;
+>> +       interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
+>> +                       <GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
+>> +                       <GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
+>> +                       <GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
+>> +                       <GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
+>> +                       <GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
+>> +                       <GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
+>> +                       <GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
+>> +                       <GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
+>> +       interrupt-controller;
+>> +       #interrupt-cells = <2>;
+>> +       ti,ngpio = <144>;
+>> +       ti,davinci-gpio-unbanked = <0>;
+>> +       clocks = <&k2g_clks 0x001b 0x0>;
+>> +       clock-names = "gpio";
+>> +};
+>>
+>>
+>> That looks fairly similar.
+>>
+> 
+> I do not think so.
+> 
+> 
+> I do not see .alloc hook in drivers/gpio/gpio-davinci.c
+> so this driver is unrelated to IRQ domain hierarchy.
+
+Hi Masahiro,
+
+Yes CONFIG_IRQ_DOMAIN_HIERARCHY is not enabled in keystone_defconfig or
+davinci_all_defconfig.
+
+Regards,
+Keerthy
+
+> 
+> 
+> 
+> 
+> 
+> 
