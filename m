@@ -1,47 +1,30 @@
-From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
-Date: Tue, 08 Aug 2017 13:22:27 +0200
-Subject: [PATCH 0/5] s5p-jpeg fixes
-References: <CGME20170808112254eucas1p20aacd5bb0737ff85ba4756724af189aa@eucas1p2.samsung.com>
-Message-ID: <1502191352-11595-1-git-send-email-andrzej.p@samsung.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Tue,  8 Aug 2017 12:58:26 +0200
+Subject: [PATCH 0/6] constify video_subdev structures
+Message-ID: <1502189912-28794-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+The structures of type v4l2_subdev_ops are only passed as the second
+argument of v4l2_subdev_init or as the third argument of
+v4l2_i2c_subdev_init, both of which are const.  The structures of type
+v4l2_subdev_core_ops, v4l2_subdev_pad_ops, v4l2_subdev_sensor_ops,
+v4l2_subdev_video_ops are only stored in fields of v4l2_subdev_ops
+structures, all of which are const.  Thus all of these structures can be
+declared as const as well.
 
-This series contains a number of fixes to the s5p-jpeg driver.
+Done with the help of Coccinelle.
 
-There are two patches from Tony K Nadackal, which got lost long time ago.
+---
 
-@Thierry:
-The patch changing the software reset routine you sent recently was
-actually a resend of Tony's patch. I investigated the question why
-this patch is needed. The encoder/decoder should be disabled as soon
-as possible, in the interrupt service routine; please see the commit message.
-I am resending Tony's patch again, with updated commit message.
-Thank you for reminding about the patch in question!
-
-There are also three patches from me, please see appropriate commit
-messages.
-
-Rebased onto Mauro's master.
-
-Andrzej Pietrasiewicz (3):
-  media: platform: s5p-jpeg: disable encoder/decoder in exynos4-like
-    hardware after use
-  media: platform: s5p-jpeg: fix number of components macro
-  media: platform: s5p-jpeg: directly use parsed subsampling on 5433
-
-Tony K Nadackal (2):
-  media: platform: s5p-jpeg: Fix crash in jpeg isr due to multiple
-    interrupts.
-  media: platform: s5p-jpeg: Clear JPEG_CODEC_ON bits in sw reset
-    function
-
- drivers/media/platform/s5p-jpeg/jpeg-core.c       | 8 +++++++-
- drivers/media/platform/s5p-jpeg/jpeg-core.h       | 1 +
- drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c | 9 ++++++++-
- drivers/media/platform/s5p-jpeg/jpeg-regs.h       | 2 +-
- 4 files changed, 17 insertions(+), 3 deletions(-)
-
--- 
-1.9.1
+ drivers/media/i2c/mt9m111.c                   |    6 +++---
+ drivers/media/i2c/mt9t001.c                   |    8 ++++----
+ drivers/media/platform/exynos4-is/fimc-isp.c  |    2 +-
+ drivers/media/platform/exynos4-is/fimc-lite.c |    2 +-
+ drivers/media/platform/vimc/vimc-debayer.c    |    2 +-
+ drivers/media/platform/vimc/vimc-scaler.c     |    2 +-
+ drivers/media/platform/vimc/vimc-sensor.c     |    2 +-
+ drivers/media/usb/uvc/uvc_entity.c            |    2 +-
+ drivers/staging/media/atomisp/i2c/ap1302.c    |    2 +-
+ drivers/staging/media/atomisp/i2c/mt9m114.c   |    2 +-
+ 10 files changed, 15 insertions(+), 15 deletions(-)
