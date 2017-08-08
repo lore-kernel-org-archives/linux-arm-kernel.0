@@ -1,49 +1,67 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 8 Aug 2017 11:37:40 +0100
-Subject: [PATCH v2] iommu/arm-smmu: fix null-pointer dereference in
- arm_smmu_add_device
-In-Reply-To: <1502187962-16861-1-git-send-email-asavkov@redhat.com>
-References: <20170808092614.GB12887@arm.com>
- <1502187962-16861-1-git-send-email-asavkov@redhat.com>
-Message-ID: <d7a07e48-862d-a6f7-8bad-9c71f5a5be5b@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 8 Aug 2017 12:37:44 +0200
+Subject: [PATCH v2] mmc: sunxi: Fix NULL pointer reference on clk_delays
+In-Reply-To: <20170808070244.27410-1-wens@csie.org>
+References: <20170808070244.27410-1-wens@csie.org>
+Message-ID: <CAPDyKFr+Ajx5yBcTR2555w-7tamSY8ozpn-1S2gWCQSZaGAWcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/17 11:26, Artem Savkov wrote:
-> Commit c54451a "iommu/arm-smmu: Fix the error path in arm_smmu_add_device"
-> removed fwspec assignment in legacy_binding path as redundant which is
-> wrong. It needs to be updated after fwspec initialisation in
-> arm_smmu_register_legacy_master() as it is dereferenced later. Without
-> this there is a NULL-pointer dereference panic during boot on some hosts.
+On 8 August 2017 at 09:02, Chen-Yu Tsai <wens@csie.org> wrote:
+> Some SoCs do not support clk delays for MMC in the clock control unit.
+> These include the old controllers in A10/A10s/A13/R8, and the new eMMC
+> controller in A64. The config structure for these controllers do not
+> specify clk_delays, but the check for this was replaced in commit
+> b0600daebf31 ("mmc: sunxi: Support controllers that can use both old
+> and new timings").
+>
+> This patch adds back the check for clk_delays, and also adds comments
+> for both checks in sunxi_mmc_clk_set_phase().
+>
+> Fixes: b0600daebf31 ("mmc: sunxi: Support controllers that can use
+>                       both old and new timings")
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+Thanks, applied for next!
 
-Thanks for fixing it up, and sorry for failing to document the
-unfortunately subtle logic in the first place!
+Kind regards
+Uffe
 
-Robin.
-
-> Signed-off-by: Artem Savkov <asavkov@redhat.com>
 > ---
->  drivers/iommu/arm-smmu.c | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index b97188a..2d80fa8 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -1519,6 +1519,13 @@ static int arm_smmu_add_device(struct device *dev)
->  
->  	if (using_legacy_binding) {
->  		ret = arm_smmu_register_legacy_master(dev, &smmu);
+> This fixes an mmc regression on A10/A10s/A13/R8 and A64 introduced
+> by the A83T mmc patches.
+>
+> v1 was inlined in a reply to "mmc: sunxi: fix new timings mode on A64
+> EMMC (MMC2) controller"
+>
+> Changes since v1:
+>
+>   - Polished comments
+>
+> I've tested this on my A10 Cubieboard and A20 Cubieboard2.
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 3777517982dd..9dc6d726ec49 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -722,9 +722,14 @@ static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
+>  {
+>         int index;
+>
+> +       /* clk controller delays not used under new timings mode */
+>         if (host->use_new_timings)
+>                 return 0;
+>
+> +       /* some old controllers don't support delays */
+> +       if (!host->cfg->clk_delays)
+> +               return 0;
 > +
-> +		/*
-> +		 * If dev->iommu_fwspec is initally NULL, arm_smmu_register_legacy_master()
-> +		 * will allocate/initialise a new one. Thus we need to update fwspec for
-> +		 * later use.
-> +		 */
-> +		fwspec = dev->iommu_fwspec;
->  		if (ret)
->  			goto out_free;
->  	} else if (fwspec && fwspec->ops == &arm_smmu_ops) {
-> 
+>         /* determine delays */
+>         if (rate <= 400000) {
+>                 index = SDXC_CLK_400K;
+> --
+> 2.13.3
+>
