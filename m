@@ -1,37 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  8 Aug 2017 10:54:59 +0200
-Subject: [PATCH 3/3] arm64: dts: r8a7795: Use R-Car GPIO Gen3 fallback compat
+Date: Tue,  8 Aug 2017 10:54:58 +0200
+Subject: [PATCH 2/3] ARM: dts: r8a7791: Use R-Car GPIO Gen2 fallback compat
  string
 In-Reply-To: <1502182499-16210-1-git-send-email-horms+renesas@verge.net.au>
 References: <1502182499-16210-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1502182499-16210-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1502182499-16210-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use newly added R-Car GPIO Gen3 fallback compat string
-in the DT of the r8a7795 SoC.
+Use newly added R-Car GPIO Gen2 fallback compat string
+in the DT of the r8a7791 SoC.
 
 This should have no run-time effect as the driver matches against
 the per-SoC compat string before the fallback compat string is considered.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index a87ae76880ab..c9f2b87e7ee3 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -1451,7 +1451,8 @@
- 		};
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index ea4a8147d995..f1d1a9772153 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -933,7 +933,7 @@
+ 	};
  
- 		sata: sata at ee300000 {
--			compatible = "renesas,sata-r8a7795";
-+			compatible = "renesas,sata-r8a7795",
-+				     "renesas,rcar-gen3-sata";
- 			reg = <0 0xee300000 0 0x200000>;
- 			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 815>;
+ 	sata0: sata at ee300000 {
+-		compatible = "renesas,sata-r8a7791";
++		compatible = "renesas,sata-r8a7791", "renesas,rcar-gen2-sata";
+ 		reg = <0 0xee300000 0 0x2000>;
+ 		interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp8_clks R8A7791_CLK_SATA0>;
+@@ -942,7 +942,7 @@
+ 	};
+ 
+ 	sata1: sata at ee500000 {
+-		compatible = "renesas,sata-r8a7791";
++		compatible = "renesas,sata-r8a7791", "renesas,rcar-gen2-sata";
+ 		reg = <0 0xee500000 0 0x2000>;
+ 		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&mstp8_clks R8A7791_CLK_SATA1>;
 -- 
 2.1.4
