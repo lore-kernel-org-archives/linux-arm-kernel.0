@@ -1,71 +1,60 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue,  8 Aug 2017 12:37:24 +0100
-Subject: [PATCH v5 4/6] irqchip: gic-v3: Use of_cpu_node_to_id helper
+Date: Tue,  8 Aug 2017 12:37:23 +0100
+Subject: [PATCH v5 3/6] coresight: of: Use of_cpu_node_to_id helper
 In-Reply-To: <1502192246-5623-1-git-send-email-suzuki.poulose@arm.com>
 References: <1502192246-5623-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1502192246-5623-5-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1502192246-5623-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new generic helper of_cpu_node_to_id() instead
-of using our own version to map a device node to logical CPU
-number.
+Reuse the new generic helper, of_cpu_node_to_id() to map a
+given CPU phandle to a logical CPU number.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Leo Yan <leo.yan@linaro.org>
+Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
+Changes since V4:
+ - Fix a regression introduced in v4, reported by bugrobot
 Changes since V3:
- - Reflect the change in the helper name and return value.
+ - Reflect the renaming of the helper and return value changes
 ---
- drivers/irqchip/irq-gic-v3.c | 29 ++---------------------------
- 1 file changed, 2 insertions(+), 27 deletions(-)
+ drivers/hwtracing/coresight/of_coresight.c | 15 +++------------
+ 1 file changed, 3 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index dbffb7a..ada931d 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -978,31 +978,6 @@ static int __init gic_validate_dist_version(void __iomem *dist_base)
- 	return 0;
- }
- 
--static int get_cpu_number(struct device_node *dn)
--{
--	const __be32 *cell;
--	u64 hwid;
--	int i;
--
--	cell = of_get_property(dn, "reg", NULL);
--	if (!cell)
--		return -1;
--
--	hwid = of_read_number(cell, of_n_addr_cells(dn));
--
--	/*
--	 * Non affinity bits must be set to 0 in the DT
--	 */
--	if (hwid & ~MPIDR_HWID_BITMASK)
--		return -1;
--
--	for (i = 0; i < num_possible_cpus(); i++)
--		if (cpu_logical_map(i) == hwid)
--			return i;
--
--	return -1;
--}
--
- /* Create all possible partitions@boot time */
- static void __init gic_populate_ppi_partitions(struct device_node *gic_node)
+diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+index a187941..7c37544 100644
+--- a/drivers/hwtracing/coresight/of_coresight.c
++++ b/drivers/hwtracing/coresight/of_coresight.c
+@@ -104,26 +104,17 @@ static int of_coresight_alloc_memory(struct device *dev,
+ int of_coresight_get_cpu(const struct device_node *node)
  {
-@@ -1053,8 +1028,8 @@ static void __init gic_populate_ppi_partitions(struct device_node *gic_node)
- 			if (WARN_ON(!cpu_node))
- 				continue;
+ 	int cpu;
+-	bool found;
+-	struct device_node *dn, *np;
++	struct device_node *dn;
  
--			cpu = get_cpu_number(cpu_node);
--			if (WARN_ON(cpu == -1))
-+			cpu = of_cpu_node_to_id(cpu_node);
-+			if (WARN_ON(cpu < 0))
- 				continue;
+ 	dn = of_parse_phandle(node, "cpu", 0);
+-
+ 	/* Affinity defaults to CPU0 */
+ 	if (!dn)
+ 		return 0;
+-
+-	for_each_possible_cpu(cpu) {
+-		np = of_cpu_device_node_get(cpu);
+-		found = (dn == np);
+-		of_node_put(np);
+-		if (found)
+-			break;
+-	}
++	cpu = of_cpu_node_to_id(dn);
+ 	of_node_put(dn);
  
- 			pr_cont("%s[%d] ", cpu_node->full_name, cpu);
+ 	/* Affinity to CPU0 if no cpu nodes are found */
+-	return found ? cpu : 0;
++	return (cpu < 0) ? 0 : cpu;
+ }
+ EXPORT_SYMBOL_GPL(of_coresight_get_cpu);
+ 
 -- 
 2.7.5
