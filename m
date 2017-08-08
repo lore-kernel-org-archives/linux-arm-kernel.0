@@ -1,45 +1,77 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue,  8 Aug 2017 10:54:58 +0200
-Subject: [PATCH 2/3] ARM: dts: r8a7791: Use R-Car GPIO Gen2 fallback compat
- string
-In-Reply-To: <1502182499-16210-1-git-send-email-horms+renesas@verge.net.au>
-References: <1502182499-16210-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1502182499-16210-3-git-send-email-horms+renesas@verge.net.au>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Aug 2017 10:07:44 +0100
+Subject: [v6 11/15] arm64/kasan: explicitly zero kasan shadow memory
+In-Reply-To: <1502138329-123460-12-git-send-email-pasha.tatashin@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-12-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <20170808090743.GA12887@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use newly added R-Car GPIO Gen2 fallback compat string
-in the DT of the r8a7791 SoC.
+On Mon, Aug 07, 2017 at 04:38:45PM -0400, Pavel Tatashin wrote:
+> To optimize the performance of struct page initialization,
+> vmemmap_populate() will no longer zero memory.
+> 
+> We must explicitly zero the memory that is allocated by vmemmap_populate()
+> for kasan, as this memory does not go through struct page initialization
+> path.
+> 
+> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+> ---
+>  arch/arm64/mm/kasan_init.c | 42 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+> 
+> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+> index 81f03959a4ab..e78a9ecbb687 100644
+> --- a/arch/arm64/mm/kasan_init.c
+> +++ b/arch/arm64/mm/kasan_init.c
+> @@ -135,6 +135,41 @@ static void __init clear_pgds(unsigned long start,
+>  		set_pgd(pgd_offset_k(start), __pgd(0));
+>  }
+>  
+> +/*
+> + * Memory that was allocated by vmemmap_populate is not zeroed, so we must
+> + * zero it here explicitly.
+> + */
+> +static void
+> +zero_vmemmap_populated_memory(void)
+> +{
+> +	struct memblock_region *reg;
+> +	u64 start, end;
+> +
+> +	for_each_memblock(memory, reg) {
+> +		start = __phys_to_virt(reg->base);
+> +		end = __phys_to_virt(reg->base + reg->size);
+> +
+> +		if (start >= end)
+> +			break;
+> +
+> +		start = (u64)kasan_mem_to_shadow((void *)start);
+> +		end = (u64)kasan_mem_to_shadow((void *)end);
+> +
+> +		/* Round to the start end of the mapped pages */
+> +		start = round_down(start, SWAPPER_BLOCK_SIZE);
+> +		end = round_up(end, SWAPPER_BLOCK_SIZE);
+> +		memset((void *)start, 0, end - start);
+> +	}
+> +
+> +	start = (u64)kasan_mem_to_shadow(_text);
+> +	end = (u64)kasan_mem_to_shadow(_end);
+> +
+> +	/* Round to the start end of the mapped pages */
+> +	start = round_down(start, SWAPPER_BLOCK_SIZE);
+> +	end = round_up(end, SWAPPER_BLOCK_SIZE);
+> +	memset((void *)start, 0, end - start);
+> +}
 
-This should have no run-time effect as the driver matches against
-the per-SoC compat string before the fallback compat string is considered.
+I can't help but think this would be an awful lot nicer if you made
+vmemmap_alloc_block take extra GFP flags as a parameter. That way, we could
+implement a version of vmemmap_populate that does the zeroing when we need
+it, without having to duplicate a bunch of the code like this. I think it
+would also be less error-prone, because you wouldn't have to do the
+allocation and the zeroing in two separate steps.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index ea4a8147d995..f1d1a9772153 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -933,7 +933,7 @@
- 	};
- 
- 	sata0: sata at ee300000 {
--		compatible = "renesas,sata-r8a7791";
-+		compatible = "renesas,sata-r8a7791", "renesas,rcar-gen2-sata";
- 		reg = <0 0xee300000 0 0x2000>;
- 		interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7791_CLK_SATA0>;
-@@ -942,7 +942,7 @@
- 	};
- 
- 	sata1: sata at ee500000 {
--		compatible = "renesas,sata-r8a7791";
-+		compatible = "renesas,sata-r8a7791", "renesas,rcar-gen2-sata";
- 		reg = <0 0xee500000 0 0x2000>;
- 		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R8A7791_CLK_SATA1>;
--- 
-2.1.4
+Will
