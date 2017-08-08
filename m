@@ -1,41 +1,34 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue,  8 Aug 2017 15:09:03 +0800
-Subject: [PATCH v2] mmc: sunxi: fix support for new timings mode only SoCs
-Message-ID: <20170808070903.16898-1-icenowy@aosc.io>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 8 Aug 2017 15:10:14 +0800
+Subject: [linux-sunxi] Re: [PATCH v2] mmc: sunxi: Fix NULL pointer
+ reference on clk_delays
+In-Reply-To: <bbd4680dc97d9913ff6a49e68c360d21@aosc.io>
+References: <20170808070244.27410-1-wens@csie.org>
+ <bbd4680dc97d9913ff6a49e68c360d21@aosc.io>
+Message-ID: <CAGb2v65qN9OFCnjSRH-=a-XnKEfOJXh=Gvv02vtPydgVEnKuGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A83T MMC support code introduces the timings mode switch, however
-such a switch doesn't exist on new SoCs with only new timings mode.
+On Tue, Aug 8, 2017 at 3:07 PM,  <icenowy@aosc.io> wrote:
+> ? 2017-08-08 15:02?Chen-Yu Tsai ???
+>>
+>> Some SoCs do not support clk delays for MMC in the clock control unit.
+>> These include the old controllers in A10/A10s/A13/R8, and the new eMMC
+>> controller in A64. The config structure for these controllers do not
+>> specify clk_delays, but the check for this was replaced in commit
+>> b0600daebf31 ("mmc: sunxi: Support controllers that can use both old
+>> and new timings").
+>>
+>> This patch adds back the check for clk_delays, and also adds comments
+>> for both checks in sunxi_mmc_clk_set_phase().
+>>
+>> Fixes: b0600daebf31 ("mmc: sunxi: Support controllers that can use
+>>                       both old and new timings")
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+>
+> Should I add a Tested-by here?
 
-Only execute the switch if the SoC really have the timings mode switch,
-to fix the regression shown on new timings mode only SoCs (A64, H5,
-etc).
+If you tested it, then yes. :)
 
-Fixes: b0600daebf31 ("mmc: sunxi: Support controllers that can use
-		      both old and new timings")
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
----
-Changes in v2:
-- Slightly adjusted the format of the Fixes: line/
-- Added review tag from Chen-Yu.
-
- drivers/mmc/host/sunxi-mmc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 020547e5fa45..7447d41833ee 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -789,7 +789,7 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 		clock <<= 1;
- 	}
- 
--	if (host->use_new_timings) {
-+	if (host->use_new_timings && host->cfg->has_timings_switch) {
- 		ret = sunxi_ccu_set_mmc_timing_mode(host->clk_mmc, true);
- 		if (ret) {
- 			dev_err(mmc_dev(mmc),
--- 
-2.13.0
+ChenYu
