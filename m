@@ -1,121 +1,69 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Tue,  8 Aug 2017 15:03:36 +0300
-Subject: [PATCH v4 05/19] crypto: introduce crypto wait for async op
-In-Reply-To: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
-References: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1502193834-11289-6-git-send-email-gilad@benyossef.com>
+From: rrichter@cavium.com (Robert Richter)
+Date: Tue,  8 Aug 2017 14:22:50 +0200
+Subject: [PATCH v3 0/8] irqchip/gic-v3-its: Implement ITS nodes as kernel
+ devices and use CMA
+Message-ID: <20170808122259.6299-1-rrichter@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Invoking a possibly async. crypto op and waiting for completion
-while correctly handling backlog processing is a common task
-in the crypto API implementation and outside users of it.
+This patch series implements ITS nodes as kernel devices. The
+advantage of that is that CMA can be used to allocate large ITS
+tables, where standard memory and page allocation fails (above
+MAX_ORDER - 1). This approach was suggested first here:
 
-This patch adds a generic implementation for doing so in
-preparation for using it across the board instead of hand
-rolled versions.
+ https://marc.info/?i=56D44812.6000309%40arm.com
 
-Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
-CC: Eric Biggers <ebiggers3@gmail.com>
----
- crypto/api.c           | 13 +++++++++++++
- include/linux/crypto.h | 41 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 54 insertions(+)
+Another advantage is that all memory resources of the device are now
+device managed, thus the code for releasing the device becomes much
+easier.
 
-diff --git a/crypto/api.c b/crypto/api.c
-index 941cd4c..2a2479d 100644
---- a/crypto/api.c
-+++ b/crypto/api.c
-@@ -24,6 +24,7 @@
- #include <linux/sched/signal.h>
- #include <linux/slab.h>
- #include <linux/string.h>
-+#include <linux/completion.h>
- #include "internal.h"
- 
- LIST_HEAD(crypto_alg_list);
-@@ -595,5 +596,17 @@ int crypto_has_alg(const char *name, u32 type, u32 mask)
- }
- EXPORT_SYMBOL_GPL(crypto_has_alg);
- 
-+void crypto_req_done(struct crypto_async_request *req, int err)
-+{
-+	struct crypto_wait *wait = req->data;
-+
-+	if (err == -EINPROGRESS)
-+		return;
-+
-+	wait->err = err;
-+	complete(&wait->completion);
-+}
-+EXPORT_SYMBOL_GPL(crypto_req_done);
-+
- MODULE_DESCRIPTION("Cryptographic core API");
- MODULE_LICENSE("GPL");
-diff --git a/include/linux/crypto.h b/include/linux/crypto.h
-index 84da997..bb00186 100644
---- a/include/linux/crypto.h
-+++ b/include/linux/crypto.h
-@@ -24,6 +24,7 @@
- #include <linux/slab.h>
- #include <linux/string.h>
- #include <linux/uaccess.h>
-+#include <linux/completion.h>
- 
- /*
-  * Autoloaded crypto modules should only use a prefixed name to avoid allowing
-@@ -468,6 +469,45 @@ struct crypto_alg {
- } CRYPTO_MINALIGN_ATTR;
- 
- /*
-+ * A helper struct for waiting for completion of async crypto ops
-+ */
-+struct crypto_wait {
-+	struct completion completion;
-+	int err;
-+};
-+
-+/*
-+ * Macro for declaring a crypto op async wait object on stack
-+ */
-+#define DECLARE_CRYPTO_WAIT(_wait) \
-+	struct crypto_wait _wait = { \
-+		COMPLETION_INITIALIZER_ONSTACK((_wait).completion), 0 }
-+
-+/*
-+ * Async ops completion helper functioons
-+ */
-+void crypto_req_done(struct crypto_async_request *req, int err);
-+
-+static inline int crypto_wait_req(int err, struct crypto_wait *wait)
-+{
-+	switch (err) {
-+	case -EINPROGRESS:
-+	case -EBUSY:
-+		wait_for_completion(&wait->completion);
-+		reinit_completion(&wait->completion);
-+		err = wait->err;
-+		break;
-+	};
-+
-+	return err;
-+}
-+
-+static inline void crypto_init_wait(struct crypto_wait *wait)
-+{
-+	init_completion(&wait->completion);
-+}
-+
-+/*
-  * Algorithm registration interface.
-  */
- int crypto_register_alg(struct crypto_alg *alg);
-@@ -1604,5 +1644,6 @@ static inline int crypto_comp_decompress(struct crypto_comp *tfm,
- 						    src, slen, dst, dlen);
- }
- 
-+
- #endif	/* _LINUX_CRYPTO_H */
- 
+The following is required to implement this:
+
+ * each ITS node must be assigned to a struct device each,
+
+ * the ITS initialization must be moved to a later point during boot,
+
+ * the ITS enablement must be separated from the GIC code (the GIC
+   still needs to be enabled early),
+
+ * the early ITS node probing by DT or ACPI must be separated from the
+   ITS initialization,
+
+ * ITS table allocation must be changed to use dma_alloc_coherent()
+   which uses CMA for allocation of large memory ranges.
+
+This is an update of my last patch submission here:
+
+ https://lkml.org/lkml/2017/3/6/570
+
+V3:
+ * rebased onto v4.13-rc1,
+ * fixed use after free in error path in its_init_one(),
+ * added comment for arch_setup_dma_ops() to describe coherency,
+
+V2:
+ * rebased onto v4.11-rc1,
+ * fixed syntax error in its_init() function (split probing patch),
+ * added comment in its_create_device(),
+ * fixed GITS_BASER_PAGE_SIZE_MASK usage in its_setup_baser()
+
+Robert Richter (8):
+  irqchip/gic-v3-its: Initialize its nodes in probe order
+  irqchip/gic-v3-its: Initialize MSIs with subsys_initcalls
+  irqchip/gic-v3-its: Split probing from its node initialization
+  irqchip/gic-v3-its: Decouple its initialization from gic
+  irqchip/gic-v3-its: Prevent its init ordering dependencies
+  irqchip/gic-v3-its: Initialize its nodes later
+  irqchip/gic-v3-its: Handle its nodes as kernel devices
+  irqchip, gicv3-its, cma: Use CMA for allocation of large device tables
+
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c      |   6 +-
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c |   6 +-
+ drivers/irqchip/irq-gic-v3-its.c              | 285 ++++++++++++++++----------
+ drivers/irqchip/irq-gic-v3.c                  |   8 +-
+ include/linux/cpuhotplug.h                    |   1 +
+ include/linux/irqchip/arm-gic-v3.h            |   5 +-
+ 6 files changed, 195 insertions(+), 116 deletions(-)
+
 -- 
-2.1.4
+2.11.0
