@@ -1,95 +1,39 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 8 Aug 2017 14:19:09 +0100
-Subject: [PATCH] arm64: correct modules range of kernel virtual memory
- layout
-In-Reply-To: <1502170045.30154.5.camel@mtkswgap22>
-References: <1502103886-19725-1-git-send-email-miles.chen@mediatek.com>
- <20170807131608.GA18817@arm.com>
- <CAKv+Gu9qD_-GNHus5txiqj9eHLpU5S7RX8QxYeUG17Ok0QNz-A@mail.gmail.com>
- <20170807140138.GB18817@arm.com>
- <1502167450.24380.21.camel@mtkswgap22>
- <1502170045.30154.5.camel@mtkswgap22>
-Message-ID: <20170808131909.GI13355@arm.com>
+Date: Tue, 8 Aug 2017 14:25:10 +0100
+Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
+ counters
+In-Reply-To: <20170728231233.GA29240@kroah.com>
+References: <20170726161949.GB15426@kroah.com>
+ <20170726163049.GG28875@nazgul.tnic>
+ <20170726173353.GB21705@kroah.com>
+ <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
+ <20170726200802.GA17722@kroah.com>
+ <b27cda60-8bf8-47a1-15b5-bf8b3a83fc45@gmail.com>
+ <20170727051157.GA4525@nazgul.tnic> <20170727090856.GB15784@hc>
+ <20170727131515.GC28548@nazgul.tnic>
+ <20170728231233.GA29240@kroah.com>
+Message-ID: <20170808132509.GJ13355@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 01:27:25PM +0800, Miles Chen wrote:
-> On Tue, 2017-08-08 at 12:44 +0800, Miles Chen wrote:
-> > On Mon, 2017-08-07 at 15:01 +0100, Will Deacon wrote:
-> > > On Mon, Aug 07, 2017 at 02:18:00PM +0100, Ard Biesheuvel wrote:
-> > > > On 7 August 2017 at 14:16, Will Deacon <will.deacon@arm.com> wrote:
-> > > > > On Mon, Aug 07, 2017 at 07:04:46PM +0800, Miles Chen wrote:
-> > > > >> The commit f80fb3a3d508 ("arm64: add support for kernel ASLR")
-> > > > >> moved module virtual address to
-> > > > >> [module_alloc_base, module_alloc_base + MODULES_VSIZE).
-> > > > >>
-> > > > >> Display module information of the virtual kernel
-> > > > >> memory layout by using module_alloc_base.
-> > > > >>
-> > > > >> testing output:
-> > > > >> 1) Current implementation:
-> > > > >> Virtual kernel memory layout:
-> > > > >>       modules : 0xffffff8000000000 - 0xffffff8008000000   (   128 MB)
-> > > > >> 2) this patch + KASLR:
-> > > > >> Virtual kernel memory layout:
-> > > > >>       modules : 0xffffff8000560000 - 0xffffff8008560000   (   128 MB)
-> > > > >> 3) this patch + KASLR and a dummy seed:
-> > > > >> Virtual kernel memory layout:
-> > > > >>       modules : 0xffffffa7df637000 - 0xffffffa7e7637000   (   128 MB)
-> > > > >>
-> > > > >> Signed-off-by: Miles Chen <miles.chen@mediatek.com>
-> > > > >> ---
-> > > > >>  arch/arm64/mm/init.c | 5 +++--
-> > > > >>  1 file changed, 3 insertions(+), 2 deletions(-)
-> > > > >
-> > > > > Does this mean the modules code in our pt dumper is busted
-> > > > > (arch/arm64/mm/dump.c)? Also, what about KASAN, which uses these addresses
-> > > > > too (in kasan_init)? Should we just remove MODULES_VADDR and MODULES_END
-> > > > > altogether?
-> > > > >
-> > > > 
-> > > > I don't think we need this patch. The 'module' line simply prints the
-> > > > VA region that is reserved for modules. The fact that we end up
-> > > > putting them elsewhere when running randomized does not necessarily
-> > > > mean this line should reflect that.
+On Fri, Jul 28, 2017 at 04:12:33PM -0700, Greg KH wrote:
+> On Thu, Jul 27, 2017 at 03:15:15PM +0200, Borislav Petkov wrote:
+> > On Thu, Jul 27, 2017 at 11:08:56AM +0200, Jan Glauber wrote:
+> > > OK. As fixing the firmware will take quite some time I'll go for the memory
+> > > controller driver that starts EDAC / PMU depending on their CONFIG_.
 > > > 
-> > > I was more concerned by other users of MODULES_VADDR tbh, although I see
-> > > now that we don't randomize the module region if kasan is enabled. Still,
-> > > the kcore code adds the modules region as a separate area (distinct from
-> > > vmalloc) if MODULES_VADDR is defined, the page table dumping code uses
-> > > MODULES_VADDR to identify the module region and I think we'll get false
-> > > positives from is_vmalloc_or_module_addr, which again uses the static
-> > > region.
-> > > 
-> > > So, given that MODULES_VADDR never points at the module area, can't we get
-> > > rid of it?
+> > > What would be the proper location for the multiplexer?
+> > > drivers/soc/cavium or drivers/misc?
 > > 
-> > Agreed.MODULES_VADDR should be phased out. Considering the kernel
-> > modules live somewhere between [VMALLOC_START, VMALLOC_END) now:
-> > (arch/arm64/kernel/module.c:module_alloc). I suggest the following
-> > changes:
-> > 
-> > 1. is_vmalloc_or_module_addr() should return is_vmalloc_addr() directly
-> > 2. arch/arm64/mm/dump.c does not need MODULES_VADDR and MODULES_END.
-> > 3. kasan uses [module_alloc_base, module_alloc_base + MODULES_VSIZE) to
-> > get the shadow memory? (the kernel modules still live in this range when
-> > kasan is enabled)
-> > 4. remove modules line in kernel memory layout
-> > (optional, thanks for Ard's feedback)
-> > 5. remove MODULE_VADDR, MODULES_END definition
+> > Uff, no idea. Greg? You're the special drivers guy. :-)
 > 
-> I was wrong about this. is_vmalloc_or_module_addr() is defined
-> in mm/vmalloc and it uses MODULES_VADDR and MODULES_END.
-> May it is better to give MODULES_VADDR and MODULES_END
-> proper values, not remove them.
+> Start out in misc/ and let's see the code to determine if it should be
+> moved elsewhere.
 
-I think the only cases where the modules area isn't completely contained
-within vmalloc is where either randomization is disabled
-(CONFIG_RANDOMIZE_BASE=n) or we fail in kaslr_early_init. However, in both
-of these cases, module_alloc_base is set correctly, so perhaps we could
-defined MODULES_VADDR in terms of that oto get is_vmalloc_or_module_addr
-working properly. We'd need to add some code to the table dumper to avoid
-printing the module area if it's contained within vmalloc, and that could
-also be used for the kernel memory layout print.
+Jan, are you ok making this change, or are you waiting for anything else
+from us? (Mark and I are just going through the pending PMU patches and
+we're not clear on the status of this one).
+
+Cheers,
 
 Will
