@@ -1,32 +1,61 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 7 Aug 2017 20:56:02 -0500
-Subject: [PATCH v9 0/4] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-In-Reply-To: <20170807.141448.1388035794329323595.davem@davemloft.net>
-References: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
- <20170806.204744.1934067595236180060.davem@davemloft.net>
- <588b378c-249a-36b0-8890-769258fbb708@huawei.com>
- <20170807.141448.1388035794329323595.davem@davemloft.net>
-Message-ID: <20170808015602.GH16580@bhelgaas-glaptop.roam.corp.google.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 8 Aug 2017 10:04:21 +0800
+Subject: [PATCH v3] irqchip/gic-v3-its: Allow GIC ITS number more than
+ MAX_NUMNODES
+In-Reply-To: <1501064149-37285-1-git-send-email-guohanjun@huawei.com>
+References: <1501064149-37285-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <100a52a8-d7c6-481c-dfe8-11c269d5b09b@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 02:14:48PM -0700, David Miller wrote:
-> From: Ding Tianhong <dingtianhong@huawei.com>
-> Date: Mon, 7 Aug 2017 12:13:17 +0800
+On 2017/7/26 18:15, Hanjun Guo wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
 > 
-> > Hi David?
-> > 
-> > I think networking tree merge it is a better choice, as it mainly used to tell the NIC
-> > drivers how to use the Relaxed Ordering Attribute, and later we need send patch to enable
-> > RO for ixgbe driver base on this patch. But I am not sure whether Bjorn has some of his own
-> > view. :)
-> > 
-> > Hi Bjorn:
-> > 
-> > Could you help review this patch or give some feedback ?
+> When enabling ITS NUMA support on D05, I got the boot log:
 > 
-> I'm still waiting on this...
+> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+> [    0.000000] SRAT: ITS affinity exceeding max count[4]
 > 
-> Bjorn?
+> This is wrong on D05 as we have 8 ITSs with 4 NUMA nodes.
+> 
+> So dynamically alloc the memory needed instead of using
+> its_srat_maps[MAX_NUMNODES], which count the number of
+> ITS entry(ies) in SRAT and alloc its_srat_maps as needed,
+> then build the mapping of numa node to ITS ID. Of course,
+> its_srat_maps will be freed after ITS probing because
+> we don't need that after boot.
+> 
+> After doing this, I got what I wanted:
+> 
+> [    0.000000] SRAT: PXM 0 -> ITS 0 -> Node 0
+> [    0.000000] SRAT: PXM 0 -> ITS 1 -> Node 0
+> [    0.000000] SRAT: PXM 0 -> ITS 2 -> Node 0
+> [    0.000000] SRAT: PXM 1 -> ITS 3 -> Node 1
+> [    0.000000] SRAT: PXM 2 -> ITS 4 -> Node 2
+> [    0.000000] SRAT: PXM 2 -> ITS 5 -> Node 2
+> [    0.000000] SRAT: PXM 2 -> ITS 6 -> Node 2
+> [    0.000000] SRAT: PXM 3 -> ITS 7 -> Node 3
+> 
+> Fixes: dbd2b8267233 ("irqchip/gic-v3-its: Add ACPI NUMA node mapping")
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> Cc: John Garry <john.garry@huawei.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> 
+> v2->v3:
+>    - Remove the NULL check for its_srat_maps as its_in_srat will be 0;
+>    - Add warning if alloc memory failed for its_srat_maps;
+>    - Update commit log as Lorenzo suggested;
+>    - Add review tag
 
-I was on vacation Friday-today, but I'll look at this series this week.
+Sorry for the ping, I'm not sure if I missed some review comments
+for v2, if I did, I'm sorry for that, please give me some hint if
+I need to respin another version.
+
+Thanks
+Hanjun
