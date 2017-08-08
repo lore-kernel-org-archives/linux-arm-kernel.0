@@ -1,56 +1,81 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 8 Aug 2017 13:50:06 +0200
-Subject: [PATCH  1/2] dt-bindings: i2c: Document r8a7743/5 support
-In-Reply-To: <1502191231-8682-1-git-send-email-biju.das@bp.renesas.com>
-References: <1502191231-8682-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <20170808115006.GC1674@katana>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Tue,  8 Aug 2017 17:20:55 +0530
+Subject: [PATCH] mfd: exynos-lpass: Handle return value of clk_prepare_enable
+Message-ID: <0e52a230fce95714a12b72aeb1ee9be0490de2a6.1502192959.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 12:20:31PM +0100, Biju Das wrote:
-> Document i2c Device Tree support for RZ/G1[ME]
-> (also known as r8aA774[35]) SoCs. They are compatible with
-> R-Car Gen2 SoC family.
-> 
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+clk_prepare_enable() can fail here and we must check its return value.
+we must call pm_runtime_disable() and pm_runtime_set_suspended(),
+If exynos_lpass_probe is not successful.
 
-Looks good to me, yet I'd like an ack from Simon who is currently
-working on the generic fallback compatibles.
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+ drivers/mfd/exynos-lpass.c | 23 ++++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
 
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-rcar.txt | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-rcar.txt b/Documentation/devicetree/bindings/i2c/i2c-rcar.txt
-> index 2b8bd33..cad39ae 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-rcar.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-rcar.txt
-> @@ -2,6 +2,8 @@ I2C for R-Car platforms
->  
->  Required properties:
->  - compatible:
-> +	"renesas,i2c-r8a7743" if the device is a part of a R8A7743 SoC.
-> +	"renesas,i2c-r8a7745" if the device is a part of a R8A7745 SoC.
->  	"renesas,i2c-r8a7778" if the device is a part of a R8A7778 SoC.
->  	"renesas,i2c-r8a7779" if the device is a part of a R8A7779 SoC.
->  	"renesas,i2c-r8a7790" if the device is a part of a R8A7790 SoC.
-> @@ -12,7 +14,8 @@ Required properties:
->  	"renesas,i2c-r8a7795" if the device is a part of a R8A7795 SoC.
->  	"renesas,i2c-r8a7796" if the device is a part of a R8A7796 SoC.
->  	"renesas,rcar-gen1-i2c" for a generic R-Car Gen1 compatible device.
-> -	"renesas,rcar-gen2-i2c" for a generic R-Car Gen2 compatible device.
-> +	"renesas,rcar-gen2-i2c" for a generic R-Car Gen2 or RZ/G1 compatible
-> +				device.
->  	"renesas,rcar-gen3-i2c" for a generic R-Car Gen3 compatible device.
->  	"renesas,i2c-rcar" (deprecated)
->  
-> -- 
-> 1.9.1
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170808/7c6e5af0/attachment.sig>
+diff --git a/drivers/mfd/exynos-lpass.c b/drivers/mfd/exynos-lpass.c
+index ca829f8..c74ff62 100644
+--- a/drivers/mfd/exynos-lpass.c
++++ b/drivers/mfd/exynos-lpass.c
+@@ -73,9 +73,13 @@ static void exynos_lpass_core_sw_reset(struct exynos_lpass *lpass, int mask)
+ 	regmap_write(lpass->top, SFR_LPASS_CORE_SW_RESET, val);
+ }
+ 
+-static void exynos_lpass_enable(struct exynos_lpass *lpass)
++static int exynos_lpass_enable(struct exynos_lpass *lpass)
+ {
+-	clk_prepare_enable(lpass->sfr0_clk);
++	int ret;
++
++	ret = clk_prepare_enable(lpass->sfr0_clk);
++	if (ret)
++		return ret;
+ 
+ 	/* Unmask SFR, DMA and I2S interrupt */
+ 	regmap_write(lpass->top, SFR_LPASS_INTR_CA5_MASK,
+@@ -87,6 +91,8 @@ static void exynos_lpass_enable(struct exynos_lpass *lpass)
+ 	exynos_lpass_core_sw_reset(lpass, LPASS_I2S_SW_RESET);
+ 	exynos_lpass_core_sw_reset(lpass, LPASS_DMA_SW_RESET);
+ 	exynos_lpass_core_sw_reset(lpass, LPASS_MEM_SW_RESET);
++
++	return 0;
+ }
+ 
+ static void exynos_lpass_disable(struct exynos_lpass *lpass)
+@@ -112,6 +118,7 @@ static int exynos_lpass_probe(struct platform_device *pdev)
+ 	struct exynos_lpass *lpass;
+ 	void __iomem *base_top;
+ 	struct resource *res;
++	int ret;
+ 
+ 	lpass = devm_kzalloc(dev, sizeof(*lpass), GFP_KERNEL);
+ 	if (!lpass)
+@@ -136,8 +143,12 @@ static int exynos_lpass_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, lpass);
+ 	pm_runtime_set_active(dev);
+ 	pm_runtime_enable(dev);
+-	exynos_lpass_enable(lpass);
+-
++	ret = exynos_lpass_enable(lpass);
++	if (ret) {
++		pm_runtime_disable(dev);
++		pm_runtime_set_suspended(dev);
++		return ret;
++	}
+ 	return devm_of_platform_populate(dev);
+ }
+ 
+@@ -167,9 +178,7 @@ static int __maybe_unused exynos_lpass_resume(struct device *dev)
+ {
+ 	struct exynos_lpass *lpass = dev_get_drvdata(dev);
+ 
+-	exynos_lpass_enable(lpass);
+-
+-	return 0;
++	return exynos_lpass_enable(lpass);
+ }
+ 
+ static const struct dev_pm_ops lpass_pm_ops = {
+-- 
+1.9.1
