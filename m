@@ -1,25 +1,52 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 08 Aug 2017 22:18:43 +0200
-Subject: [PATCH v1] arm64: dts: rockchip: add rk805 node for rk3328-evb
-In-Reply-To: <1502179644-3220-1-git-send-email-chenjh@rock-chips.com>
-References: <1502179644-3220-1-git-send-email-chenjh@rock-chips.com>
-Message-ID: <65316980.7aUheqkZzj@phil>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 8 Aug 2017 15:19:12 -0500
+Subject: [PATCH v2 4/5] PCI: mediatek: Add new generation controller
+ support
+In-Reply-To: <20170804131808.GA16580@bhelgaas-glaptop.roam.corp.google.com>
+References: <cover.1501122135.git.honghui.zhang@mediatek.com>
+ <824c61d13fe2731d812df8a0a878ca1a36399e76.1501122135.git.honghui.zhang@mediatek.com>
+ <20170803224206.GN20308@bhelgaas-glaptop.roam.corp.google.com>
+ <1501835976.24341.21.camel@mtksdaap41>
+ <20170804131808.GA16580@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170808201912.GJ16580@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joseph,
+On Fri, Aug 04, 2017 at 08:18:09AM -0500, Bjorn Helgaas wrote:
+> On Fri, Aug 04, 2017 at 04:39:36PM +0800, Honghui Zhang wrote:
+> > On Thu, 2017-08-03 at 17:42 -0500, Bjorn Helgaas wrote:
 
-Am Dienstag, 8. August 2017, 16:07:24 CEST schrieb Joseph Chen:
+> > > > +	port->irq_domain = irq_domain_add_linear(pcie_intc_node, INTX_NUM,
+> > > > +						 &intx_domain_ops, port);
+> > > 
+> > > I think there's an issue here with a 4-element IRQ domain and the
+> > > hwirq numbers 1-4 from the of_irq_parse_and_map_pci() path, so INTD
+> > > may not work correctly.
+> > > 
+> > > See
+> > > http://lkml.kernel.org/r/20170801212931.GA26498 at bhelgaas-glaptop.roam.corp.google.com
+> > > and related discussion.
+> > 
+> > Sorry, I did not get this,
+> > I do some test with an intel E350T4 PCIe NICs, it's a x1 lane
+> > multi-function device.
+> > What I got from the log is below:
+> > ->of_irq_parse_and_map_pci
+> > 	->of_irq_parse_pci
+> > 		->irq_create_of_mapping
+> > 			->irq_create_fwspec_mapping
+> > 				->irq_domain_translate
+> > 				which will go through
+> > 				d->ops->translate #the hwirq really start from 0
+> > 
+> > And I tested every NIC port of the Intel E350T4 with tftp transfer data,
+> > seems all are OK with this code.
+> 
+> OK.  I don't know what d->ops->translate is involved here, but if it
+> works, I guess this is OK for now.  We're trying to clean this up and
+> make it consistent across all the drivers.  Many of them allocate a
+> 5-element IRQ domain, some make a 4-element domain, and on some of
+> them INTD doesn't work.  It's a mess.
 
-please always provide some sort of commit message, even if it
-seems unnecessary
-
-> Signed-off-by: Joseph Chen <chenjh@rock-chips.com>
-
-In general looks ok, but of course needs the rk805 binding to go
-in first. Lee had a tiny nit about the first patch today, so hopefully
-once you fix that, the driver/binding can go in and I can pick this
-dts node after that.
-
-
-Heiko
+Paul Burton is cleaning this up.  Can you point out the d->ops->translate
+function that's involved here?
