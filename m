@@ -1,115 +1,59 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Tue,  8 Aug 2017 15:03:50 +0300
-Subject: [PATCH v4 19/19] crypto: adapt api sample to use async. op wait
-In-Reply-To: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
-References: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1502193834-11289-20-git-send-email-gilad@benyossef.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 8 Aug 2017 13:14:18 +0100
+Subject: [PATCH 2/2] iommu/arm-smmu: Add system PM support
+In-Reply-To: <20170808111816.GD13355@arm.com>
+References: <71247263f4d88e7776f483fb1cc1139b516c0835.1500381551.git.robin.murphy@arm.com>
+ <d8d6f3b606ed05d53b47d36e1c6a7f4b74eb3afc.1500381551.git.robin.murphy@arm.com>
+ <20170808111816.GD13355@arm.com>
+Message-ID: <7d0d846b-8ada-6514-ec27-22f4d8487014@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code sample is waiting for an async. crypto op completion.
-Adapt sample to use the new generic infrastructure to do the same.
+On 08/08/17 12:18, Will Deacon wrote:
+> On Tue, Jul 18, 2017 at 01:44:42PM +0100, Robin Murphy wrote:
+>> With all our hardware state tracked in such a way that we can naturally
+>> restore it as part of the necessary reset, resuming is trivial, and
+>> there's nothing to do on suspend at all.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>  drivers/iommu/arm-smmu.c | 12 ++++++++++++
+>>  1 file changed, 12 insertions(+)
+>>
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index 86897b7b81d8..0f5f06e9abfa 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -2356,10 +2356,22 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+>>  	return 0;
+>>  }
+>>  
+>> +static int __maybe_unused arm_smmu_pm_resume(struct device *dev)
+>> +{
+> 
+> Did you actually get a warning here without the __maybe_unused annotation?
+> It looks like some other drivers just guard the thing with CONFIG_PM_SLEEP.
 
-This also fixes a possible data coruption bug created by the
-use of wait_for_completion_interruptible() without dealing
-correctly with an interrupt aborting the wait prior to the
-async op finishing.
+I'm under the impression that the annotation is preferred over #ifdefs
+for new code (for the sake of coverage, I guess).
 
-Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
----
- Documentation/crypto/api-samples.rst | 52 +++++++-----------------------------
- 1 file changed, 10 insertions(+), 42 deletions(-)
+>> +	struct arm_smmu_device *smmu = dev_get_drvdata(dev);
+>> +
+>> +	arm_smmu_device_reset(smmu);
+>> +	return 0;
+>> +}
+>> +
+>> +
+>> +static SIMPLE_DEV_PM_OPS(arm_smmu_pm_ops, NULL, arm_smmu_pm_resume);
+>> +
+>>  static struct platform_driver arm_smmu_driver = {
+>>  	.driver	= {
+>>  		.name		= "arm-smmu",
+>>  		.of_match_table	= of_match_ptr(arm_smmu_of_match),
+>> +		.pm = &arm_smmu_pm_ops,
+> 
+> Cosmetic: can you tab-align this assignment please?
 
-diff --git a/Documentation/crypto/api-samples.rst b/Documentation/crypto/api-samples.rst
-index 2531948..006827e 100644
---- a/Documentation/crypto/api-samples.rst
-+++ b/Documentation/crypto/api-samples.rst
-@@ -7,59 +7,27 @@ Code Example For Symmetric Key Cipher Operation
- ::
- 
- 
--    struct tcrypt_result {
--        struct completion completion;
--        int err;
--    };
--
-     /* tie all data structures together */
-     struct skcipher_def {
-         struct scatterlist sg;
-         struct crypto_skcipher *tfm;
-         struct skcipher_request *req;
--        struct tcrypt_result result;
-+        struct crypto_wait wait;
-     };
- 
--    /* Callback function */
--    static void test_skcipher_cb(struct crypto_async_request *req, int error)
--    {
--        struct tcrypt_result *result = req->data;
--
--        if (error == -EINPROGRESS)
--            return;
--        result->err = error;
--        complete(&result->completion);
--        pr_info("Encryption finished successfully\n");
--    }
--
-     /* Perform cipher operation */
-     static unsigned int test_skcipher_encdec(struct skcipher_def *sk,
-                          int enc)
-     {
--        int rc = 0;
-+        int rc;
- 
-         if (enc)
--            rc = crypto_skcipher_encrypt(sk->req);
-+            rc = crypto_wait_req(crypto_skcipher_encrypt(sk->req), &sk->wait);
-         else
--            rc = crypto_skcipher_decrypt(sk->req);
--
--        switch (rc) {
--        case 0:
--            break;
--        case -EINPROGRESS:
--        case -EBUSY:
--            rc = wait_for_completion_interruptible(
--                &sk->result.completion);
--            if (!rc && !sk->result.err) {
--                reinit_completion(&sk->result.completion);
--                break;
--            }
--        default:
--            pr_info("skcipher encrypt returned with %d result %d\n",
--                rc, sk->result.err);
--            break;
--        }
--        init_completion(&sk->result.completion);
-+            rc = crypto_wait_req(crypto_skcipher_decrypt(sk->req), &sk->wait);
-+
-+	if (rc)
-+		pr_info("skcipher encrypt returned with result %d\n", rc);
- 
-         return rc;
-     }
-@@ -89,8 +57,8 @@ Code Example For Symmetric Key Cipher Operation
-         }
- 
-         skcipher_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
--                          test_skcipher_cb,
--                          &sk.result);
-+                          crypto_req_done,
-+                          &sk.wait);
- 
-         /* AES 256 with random key */
-         get_random_bytes(&key, 32);
-@@ -122,7 +90,7 @@ Code Example For Symmetric Key Cipher Operation
-         /* We encrypt one block */
-         sg_init_one(&sk.sg, scratchpad, 16);
-         skcipher_request_set_crypt(req, &sk.sg, &sk.sg, 16, ivdata);
--        init_completion(&sk.result.completion);
-+        crypto_init_wait(&sk.wait);
- 
-         /* encrypt data */
-         ret = test_skcipher_encdec(&sk, 1);
--- 
-2.1.4
+Oops, I missed that - will do.
+
+Robin.
