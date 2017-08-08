@@ -1,31 +1,22 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 08 Aug 2017 19:34:29 +0200
-Subject: [BUG] v4.12 breaks pxa25x
-In-Reply-To: <20170808103502.GB20805@n2100.armlinux.org.uk> (Russell King's
- message of "Tue, 8 Aug 2017 11:35:02 +0100")
-References: <87inirsgzk.fsf@belgarion.home>
- <20170717081518.GI31807@n2100.armlinux.org.uk>
- <87eftfrs0e.fsf@belgarion.home> <87o9s7qw64.fsf@belgarion.home>
- <20170726114139.GN31807@n2100.armlinux.org.uk>
- <20170726220334.2961ae22@roar.ozlabs.ibm.com>
- <87k22urjwp.fsf@belgarion.home>
- <20170808103502.GB20805@n2100.armlinux.org.uk>
-Message-ID: <87valyotei.fsf@belgarion.home>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 08 Aug 2017 17:37:10 +0200
+Subject: [PATCH v3 9/9] clk: rockchip: add some critical clocks for rv1108
+ SoC
+In-Reply-To: <1502176773-32415-1-git-send-email-zhangqing@rock-chips.com>
+References: <1502176547-30817-1-git-send-email-zhangqing@rock-chips.com>
+ <1502176773-32415-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <3649046.pOvQWI1C9i@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@armlinux.org.uk> writes:
+Am Dienstag, 8. August 2017, 15:19:33 CEST schrieb Elaine Zhang:
+> the bus/periph/nclk_ddrupctl/pclk_ddrmon/pclk_acodecphy/pclk_pmu
+> no driver to handle them,
+> Chip design requirements for these clock to always on.
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 
-> On Wed, Jul 26, 2017 at 11:02:46PM +0200, Robert Jarzmik wrote:
->> For what is worth, your patch, Russell, fixes the issue as well, I just
->> tested it.
->
-> Shall I take that as permission to add a Tested-by line to the patch?
-Most certainly.
+applied for 4.14
 
-Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
-
-Cheers.
-
--- 
-Robert
+Thanks
+Heiko
