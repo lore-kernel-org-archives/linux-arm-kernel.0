@@ -1,27 +1,22 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Tue, 8 Aug 2017 13:15:55 +0000
-Subject: [v6 11/15] arm64/kasan: explicitly zero kasan shadow memory
-In-Reply-To: <f8b2b9ed-abf0-0c16-faa2-98b66dcbed78@oracle.com>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-12-git-send-email-pasha.tatashin@oracle.com>
- <20170808090743.GA12887@arm.com>
- <f8b2b9ed-abf0-0c16-faa2-98b66dcbed78@oracle.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DD004DA79@AcuExch.aculab.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Tue,  8 Aug 2017 14:04:23 +0100
+Subject: [PATCH  0/2] Add BQ32000 RTC support for iWave RZ/G1M board
+Message-ID: <1502197465-61546-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pasha Tatashin
-> Sent: 08 August 2017 12:49
-> Thank you for looking at this change. What you described was in my
-> previous iterations of this project.
-> 
-> See for example here: https://lkml.org/lkml/2017/5/5/369
-> 
-> I was asked to remove that flag, and only zero memory in place when
-> needed. Overall the current approach is better everywhere else in the
-> kernel, but it adds a little extra code to kasan initialization.
+This series aims to add BQ32000 RTC support for iWave RZ/G1M board.
 
-Perhaps you could #define the function prototype(s?) so that the flags
-are not passed unless it is a kasan build?
+This series has been tested against Linux-next tag 20170727 and renesas-dev branch.
+This patch series depends on https://www.spinics.net/lists/arm-kernel/msg599220.html
 
-	David
+Biju Das (2):
+  ARM: dts: iwg20d-q7: Add RTC support
+  ARM: shmobile: Enable BQ32000 rtc in shmobile_defconfig
+
+ arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 18 ++++++++++++++++++
+ arch/arm/configs/shmobile_defconfig     |  1 +
+ 2 files changed, 19 insertions(+)
+
+-- 
+1.9.1
