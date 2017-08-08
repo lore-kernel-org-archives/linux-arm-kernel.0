@@ -1,28 +1,20 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 8 Aug 2017 17:44:04 +0200
-Subject: [PATCH v7 2/4] clk: samsung: Add support for runtime PM
-In-Reply-To: <1501839294-478-3-git-send-email-m.szyprowski@samsung.com>
-References: <1501839294-478-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170804093515eucas1p1cc2273ba02d86767c5b2533430577698@eucas1p1.samsung.com>
- <1501839294-478-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170808154404.GB2646@kozik-book>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 08 Aug 2017 17:36:27 +0200
+Subject: [PATCH v3 6/9] clk: rockchip: support more clks for rv1108
+In-Reply-To: <1502176723-32275-1-git-send-email-zhangqing@rock-chips.com>
+References: <1502176547-30817-1-git-send-email-zhangqing@rock-chips.com>
+ <1502176723-32275-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <3884584.0gIWhf9E44@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 04, 2017 at 11:34:52AM +0200, Marek Szyprowski wrote:
-> This patch adds struct device pointer to samsung_clk_provider and forwarding it
-> to clk_register_* functions, so drivers can register clocks, which use runtime
-> pm feature.
+Am Dienstag, 8. August 2017, 15:18:43 CEST schrieb Elaine Zhang:
+> Add the description of the missing clock,
+> make the clock more complete.
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
->  drivers/clk/samsung/clk-pll.c |  2 +-
->  drivers/clk/samsung/clk.c     | 12 ++++++------
->  drivers/clk/samsung/clk.h     |  1 +
->  3 files changed, 8 insertions(+), 7 deletions(-)
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+applied for 4.14
 
-Best regards,
-Krzysztof
+Thanks for restructuring the patches
+Heiko
