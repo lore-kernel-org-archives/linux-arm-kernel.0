@@ -1,82 +1,125 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 8 Aug 2017 20:25:59 +0200
-Subject: [PATCH] mfd: exynos-lpass: Handle return value of
- clk_prepare_enable
-In-Reply-To: <0e52a230fce95714a12b72aeb1ee9be0490de2a6.1502192959.git.arvind.yadav.cs@gmail.com>
-References: <0e52a230fce95714a12b72aeb1ee9be0490de2a6.1502192959.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20170808182559.b5muiyk5vmurtznc@kozik-lap>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Wed, 9 Aug 2017 02:27:19 +0800
+Subject: [PATCH] KVM: arm64: add esr_el2 and far_el2 to sysreg
+In-Reply-To: <5989E655.2070905@arm.com>
+References: <1502122117-6276-1-git-send-email-gengdongjiu@huawei.com>
+ <9fe6aa3a-98f9-6cae-6932-054858b54744@arm.com>
+ <b834276b-b47d-51fb-7661-3eb5a2f6a68d@huawei.com> <59889C59.80207@arm.com>
+ <7569b9a7-ce5f-8cb2-2997-a2818ac7d854@huawei.com> <5989E655.2070905@arm.com>
+Message-ID: <24d1038f-2f6c-92af-b308-9313853aaa0b@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 05:20:55PM +0530, Arvind Yadav wrote:
-> clk_prepare_enable() can fail here and we must check its return value.
-> we must call pm_runtime_disable() and pm_runtime_set_suspended(),
-> If exynos_lpass_probe is not successful.
+Hi James,
+
+On 2017/8/9 0:27, James Morse wrote:
+> Hi gengdongjiu,
 > 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-
-This is not a trivial change so please mark all such patches as RFT.
-Submit checklist mentions testing in multiple steps and last time your
-ASoC changes were not tested.
-
-> ---
->  drivers/mfd/exynos-lpass.c | 23 ++++++++++++++++-------
->  1 file changed, 16 insertions(+), 7 deletions(-)
+> On 07/08/17 18:43, gengdongjiu wrote:
+>> Another question, For the SEI, I want to also use SIGBUS both for the KVM user and non-kvm user,
+>> if SEA and SEI Error all use the SIGBUS to notify user space(Qemu),
 > 
-> diff --git a/drivers/mfd/exynos-lpass.c b/drivers/mfd/exynos-lpass.c
-> index ca829f8..c74ff62 100644
-> --- a/drivers/mfd/exynos-lpass.c
-> +++ b/drivers/mfd/exynos-lpass.c
-> @@ -73,9 +73,13 @@ static void exynos_lpass_core_sw_reset(struct exynos_lpass *lpass, int mask)
->  	regmap_write(lpass->top, SFR_LPASS_CORE_SW_RESET, val);
->  }
->  
-> -static void exynos_lpass_enable(struct exynos_lpass *lpass)
-> +static int exynos_lpass_enable(struct exynos_lpass *lpass)
->  {
-> -	clk_prepare_enable(lpass->sfr0_clk);
-> +	int ret;
-> +
-> +	ret = clk_prepare_enable(lpass->sfr0_clk);
-> +	if (ret)
-> +		return ret;
->  
->  	/* Unmask SFR, DMA and I2S interrupt */
->  	regmap_write(lpass->top, SFR_LPASS_INTR_CA5_MASK,
-> @@ -87,6 +91,8 @@ static void exynos_lpass_enable(struct exynos_lpass *lpass)
->  	exynos_lpass_core_sw_reset(lpass, LPASS_I2S_SW_RESET);
->  	exynos_lpass_core_sw_reset(lpass, LPASS_DMA_SW_RESET);
->  	exynos_lpass_core_sw_reset(lpass, LPASS_MEM_SW_RESET);
-> +
-> +	return 0;
->  }
->  
->  static void exynos_lpass_disable(struct exynos_lpass *lpass)
-> @@ -112,6 +118,7 @@ static int exynos_lpass_probe(struct platform_device *pdev)
->  	struct exynos_lpass *lpass;
->  	void __iomem *base_top;
->  	struct resource *res;
-> +	int ret;
->  
->  	lpass = devm_kzalloc(dev, sizeof(*lpass), GFP_KERNEL);
->  	if (!lpass)
-> @@ -136,8 +143,12 @@ static int exynos_lpass_probe(struct platform_device *pdev)
->  	platform_set_drvdata(pdev, lpass);
->  	pm_runtime_set_active(dev);
->  	pm_runtime_enable(dev);
-> -	exynos_lpass_enable(lpass);
-> -
-> +	ret = exynos_lpass_enable(lpass);
-> +	if (ret) {
-> +		pm_runtime_disable(dev);
-> +		pm_runtime_set_suspended(dev);
+> User-space shouldn't necessarily be notified about Synchronous External Aborts
+> or SError Interrupts. You're really asking about RAS firmware-first
+> notifications that use these as the notification mechanism.
+Firstly, we am talking the RAS firmware-first solution. I mainly
+want to let user space to know what is the Error type for this hardware error(Synchronous or asynchronous).
+we do not care the notification mechanism. As our agreement before , Qemu will record the CPER for the
+guest OS. if Qemu does not know the Error type, it can not record the CPER. because in the ghes there is a field to
+fill the error type.
 
-You need also regmap_exit().
+I paste the APEI table layout:
+https://wiki.linaro.org/LEG/Engineering/Kernel/RAS/APEITables
 
-> +		return ret;
-> +	}
+usual the notification type is classified by the hardware type
 
-Leave one blank line before return.
 
-Best regards,
-Krzysztof
+
+
+> 
+> We should not notify user-space that the guest happened to be interrupted by a
+> RAS firmware-first notification. It may not be relevant, and we can't know until
+> we parse the CPER records. The notification mechanism is between firmware and
+> the host kernel, we should never expose anything about it to user space or a guest.
+I agree with you this sentence, for the hardware error, host kernel will firstly deal with, and then decided whether to
+notified Qemu/KVM tools. In this process, we do not care what is the notification mechanism between
+firmware and host kernel. we only concern the hardware error type. different type, Qemu/KVM tools will have different behavior.
+
+> 
+> Linux should act on the CPER records first to determine if the host kernel can
+> keep running. Once it has done this it can deliver signals to affected
+> processes, but which signal and its properties depends on the CPER records.
+
+ if want Qemu to handle this Error, I think qemu/kvmtools should know hardware error type, else it will be confused and do not know how to deal with.
+
+> 
+> The example here is BUS_MCEERR_AO and BUS_MCEERR_AR. These notify userspace that
+> si_addr_lsb bits of memory are corrupt at si_addr, this is either
+> Action-Optional or Action-Required.
+> 
+> For arm64 we just needed to turn this code on, it already presents the minimum
+> necessary information to user-space in an architecture-agnostic way. We didn't
+> need to do anything to this code to support NOTIFY_SEA, the notification
+> mechanism is irrelevant, this is all driven by the CPER records.
+ we do not care the notification type, we are only care the hardware error type.
+ if user-space do not know the error type, it can not record the CPER and can not inject the proper Error to guest OS.
+ because record CPER and inject the Error to guest OS need this hardware error type. different Error type, there is
+ different behavior.
+
+ For different hardware error type, X86 Qemu/kvm tools code also have different behaviour in
+
+> 
+> If you have a class of error that isn't covered by the memory-failure code, then
+> we need to add something similar. This should be based on the CPER records, and
+> should work in exactly the same way for all processes on all ACPI platforms.
+> 
+> 
+>> do you agree my solution for the SEI? thanks.
+> 
+> No, you are trying to notify userspace that firmware notified the host. This
+> creates an ABI between EL3 firmware and EL0 user space that we can't possibly
+> support.
+
+you may misunderstand I mentioned solution here. I mean using memory-failure code to signal user space
+for the SError(SEI), this way does not creates any ABI. SEA/SEI all use same method.
+Qemu can judge the ESR to know the hardware type.
+
+
+> 
+> I think you've come to this because you are merging two steps together:
+> 1. The OS uses the v8.2 RAS extensions to isolate errors and notify firmware.
+> 2. If firmware has to tell the OS about the error, firmware generates CPER records.
+> 3. Firmware triggers the GHES notification mechanism for this error source.
+> 4. Linux receives the notification and calls ghes_proc(), (if KVM gets the
+> notification because a guest happened to be running, it should switch back to
+> the host and arrange for ghes_proc() to be called).
+> 5. ghes_proc() parses the CPER records and calls other kernel helpers to handle
+> the specific type of error, e.g. memory_failure().
+> 6. If the helper knows the kernel can keep running, the error is visible to
+> user-space and user space could do further processing to correct the error, an
+> error-specific signal is sent.
+> 7. User-space reloads the webpage, notifies the guest or whatever is appropriate.
+> 
+> You are merging steps 3 and 7.
+  No, not merge them. in above steps, the steps 7 needs to know the hardware type. if it does not know the
+  hardware error type, user space can not correctly do further processing. we do not care the notification type.
+  we only care what is the hardware error type.
+
+> 
+> The notification method is an abstraction that only matters to steps 3&4, this
+> lets us add more without rewriting the world.
+> User-space signals are an abstraction between steps 6&7, this works across
+> architectures, even those not using APEI firmware first.
+  so here can I understand that you also agree that SError type can also use signals to be delivered to user space?
+
+
+> There are no shortcuts here. Doing anything else creates more work for user
+> space, another platform or another architecture.
+> 
+> 
+> Thanks,
+> 
+> James
+> 
+> .
+> 
