@@ -1,24 +1,51 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 8 Aug 2017 11:35:02 +0100
-Subject: [BUG] v4.12 breaks pxa25x
-In-Reply-To: <87k22urjwp.fsf@belgarion.home>
-References: <87inirsgzk.fsf@belgarion.home>
- <20170717081518.GI31807@n2100.armlinux.org.uk>
- <87eftfrs0e.fsf@belgarion.home> <87o9s7qw64.fsf@belgarion.home>
- <20170726114139.GN31807@n2100.armlinux.org.uk>
- <20170726220334.2961ae22@roar.ozlabs.ibm.com>
- <87k22urjwp.fsf@belgarion.home>
-Message-ID: <20170808103502.GB20805@n2100.armlinux.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 8 Aug 2017 12:37:37 +0200
+Subject: [PATCH v2] mmc: sunxi: fix support for new timings mode only SoCs
+In-Reply-To: <20170808070903.16898-1-icenowy@aosc.io>
+References: <20170808070903.16898-1-icenowy@aosc.io>
+Message-ID: <CAPDyKFoddXKr19FZWs0ybxhDvEUnp357r3QEBJBEhDani3HR2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 26, 2017 at 11:02:46PM +0200, Robert Jarzmik wrote:
-> For what is worth, your patch, Russell, fixes the issue as well, I just
-> tested it.
+On 8 August 2017 at 09:09, Icenowy Zheng <icenowy@aosc.io> wrote:
+> The A83T MMC support code introduces the timings mode switch, however
+> such a switch doesn't exist on new SoCs with only new timings mode.
+>
+> Only execute the switch if the SoC really have the timings mode switch,
+> to fix the regression shown on new timings mode only SoCs (A64, H5,
+> etc).
+>
+> Fixes: b0600daebf31 ("mmc: sunxi: Support controllers that can use
+>                       both old and new timings")
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-Shall I take that as permission to add a Tested-by line to the patch?
+Thanks, applied for next!
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Kind regards
+Uffe
+
+> ---
+> Changes in v2:
+> - Slightly adjusted the format of the Fixes: line/
+> - Added review tag from Chen-Yu.
+>
+>  drivers/mmc/host/sunxi-mmc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 020547e5fa45..7447d41833ee 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -789,7 +789,7 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+>                 clock <<= 1;
+>         }
+>
+> -       if (host->use_new_timings) {
+> +       if (host->use_new_timings && host->cfg->has_timings_switch) {
+>                 ret = sunxi_ccu_set_mmc_timing_mode(host->clk_mmc, true);
+>                 if (ret) {
+>                         dev_err(mmc_dev(mmc),
+> --
+> 2.13.0
+>
