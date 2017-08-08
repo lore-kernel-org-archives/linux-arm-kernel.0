@@ -1,100 +1,111 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 8 Aug 2017 15:15:00 -0500
-Subject: linux-next 2017-08-08 keyboard failure on Nokia N900
-In-Reply-To: <alpine.DEB.2.20.1708082203510.2095@hadrien>
-References: <20170808101756.GA12922@amd> <20170808103444.GA18247@amd>
- <20170808111243.GA20328@amd> <61264d43-eda3-df9d-0c06-28611f373ce7@ti.com>
- <alpine.DEB.2.20.1708082203510.2095@hadrien>
-Message-ID: <43d915d2-3260-88b6-095d-4de8240ff29e@ti.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 8 Aug 2017 15:16:47 -0500
+Subject: [PATCH v2 4/5] PCI: mediatek: Add new generation controller
+ support
+In-Reply-To: <1501908763.8298.11.camel@mtkswgap22>
+References: <cover.1501122135.git.honghui.zhang@mediatek.com>
+ <824c61d13fe2731d812df8a0a878ca1a36399e76.1501122135.git.honghui.zhang@mediatek.com>
+ <20170803224206.GN20308@bhelgaas-glaptop.roam.corp.google.com>
+ <1501835976.24341.21.camel@mtksdaap41>
+ <20170804131808.GA16580@bhelgaas-glaptop.roam.corp.google.com>
+ <1501908763.8298.11.camel@mtkswgap22>
+Message-ID: <20170808201647.GI16580@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 08/08/2017 03:09 PM, Julia Lawall wrote:
+On Sat, Aug 05, 2017 at 12:52:43PM +0800, Ryder Lee wrote:
+> Hi Honghui, Bjorn,
 > 
+> On Fri, 2017-08-04 at 08:18 -0500, Bjorn Helgaas wrote:
+> > On Fri, Aug 04, 2017 at 04:39:36PM +0800, Honghui Zhang wrote:
+> > > On Thu, 2017-08-03 at 17:42 -0500, Bjorn Helgaas wrote:
+> > > > > +
+> > > > > +static struct mtk_pcie_port *mtk_pcie_find_port(struct mtk_pcie *pcie,
+> > > > > +						struct pci_bus *bus, int devfn)
+> > > > > +{
+> > > > > +	struct pci_dev *dev;
+> > > > > +	struct pci_bus *pbus;
+> > > > > +	struct mtk_pcie_port *port, *tmp;
+> > > > > +
+> > > > > +	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
+> > > > > +		if (bus->number == 0 && port->index == PCI_SLOT(devfn)) {
+> > > > > +			return port;
+> > > > > +		} else if (bus->number != 0) {
+> > > > > +			pbus = bus;
+> > > > > +			do {
+> > > > > +				dev = pbus->self;
+> > > > > +				if (port->index == PCI_SLOT(dev->devfn))
+> > > > > +					return port;
+> > > > > +				pbus = dev->bus;
+> > > > > +			} while (dev->bus->number != 0);
+> > > > > +		}
+> > > > > +	}
+> > > > > +
+> > > > > +	return NULL;
+> > > > 
+> > > > You should be able to use sysdata to avoid searching the list.
+> > > > See drivers/pci/host/pci-aardvark.c, for example.
+> > > > 
+> > > 
+> > > I could put the mtk_pcie * in sysdata, but still need to searching the
+> > > list to get the mtk_pcie_port *, how about:
+> > > 
+> > > 	list_for_each_entry_safe(port, tmp, &pcie->ports, list) {
+> > > 		if (port->index == PCI_SLOT(devfn))
+> > > 			return port;
+> > > 	}
+> > 
+> > No.  Other drivers don't need to search the list.  Please take a look
+> > at them and see how they solve this problem.  I don't think your
+> > hardware is fundamentally different in a way that means you need to
+> > search when the others don't.
+> > 
 > 
-> On Tue, 8 Aug 2017, Grygorii Strashko wrote:
+> I'm not directly involved in this generation, but I guess the main
+> reason why Honghui need to do that is just because this hardware
+> access configuration space via per-port registers, not just for the
+> guard.  Currently, We had a host bridge with two ports (two subnodes
+> in binding text), thus he tried to tells them apart so that he can
+> get the correct registers.
 > 
->>
->>
->> On 08/08/2017 06:12 AM, Pavel Machek wrote:
->>> Hi!
->>>
->>>>> I tried today's linux-next. It boots on n900 (up to X), but then my
->>>>> screen locks and I can't get back. Touchscreen worked, so my guess is
->>>>> keyboard does not...? Ssh connection over usb still works.
->>>>
->>>> Confirmed, its the keyboard.
->>>>
->>>> Additionally, battery monitoring fails, because neither
->>>>
->>>> /sys/class/power_supply/{n900-,rx51-}battery/voltage_now
->>>>
->>>> exists.
->>>
->>> And dmesg is helpful in this case:
->>>
->>> [    0.675201] input: twl4030_pwrbutton as
->>> /devices/platform/68000000.ocp/48070000.i2c/i2c-1/1-0048/48070000.i2c:twl at 48:pwrbutton/input/input1
->>> [    0.676635] input: TWL4030 Keypad as
->>> /devices/platform/68000000.ocp/48070000.i2c/i2c-1/1-0048/48070000.i2c:twl at 48:keypad/input/input2
->>> [    0.679138] twl4030_keypad 48070000.i2c:twl at 48:keypad: request_irq
->>> failed for irq no=156: -13
->>> [    0.679779] twl4030_keypad: probe of 48070000.i2c:twl at 48:keypad
->>> failed with error -13
->>> [    0.682769] twl4030_madc 48070000.i2c:twl at 48:madc: could not
->>> request irq
->>> [    0.684051] twl4030_madc: probe of 48070000.i2c:twl at 48:madc failed
->>> with error -13
->>> [    0.685852] input: twl4030:vibrator as
->>> /devices/platform/68000000.ocp/48070000.i2c/i2c-1/1-0048/48070000.i2c:twl at 48:audio/twl4030-vibra/input/input3
->>> [    0.768890] omap_i2c 48070000.i2c: bus 1 rev3.3 at 2200 kHz
->>>
->>
->> I've not precisely checked it, but smth is telling me that below
->> patch  can cause this:
->>
->> commit 78daaca78ee57dead0f4aa5ee399f0499e81cd9e
->> Author: Julia Lawall <Julia.Lawall@lip6.fr>
->> Date:   Thu May 4 22:10:50 2017 +0200
->>
->>      mfd: twl4030-irq: Drop unnecessary static
->>
->>      Drop static on a local variable, when the variable is initialized before
->>      any use, on every possible execution path through the function.
->>
->> --- a/drivers/mfd/twl4030-irq.c
->> +++ b/drivers/mfd/twl4030-irq.c
->> @@ -685,7 +685,7 @@ int twl4030_sih_setup(struct device *dev, int module, int irq_base)
->>
->>   int twl4030_init_irq(struct device *dev, int irq_num)
->>   {
->> -       static struct irq_chip  twl4030_irq_chip;
->> +       struct irq_chip twl4030_irq_chip;
->>
->>
->> but if we will look at code - it can be seen that this variable is passed by reference to
->> irq_set_chip_and_handler().
->> Ops. And what will happen when twl4030_init_irq() returns ;)
-> 
-> The patch is not correct as was already noted when it was submitted:
-> 
-> https://lkml.org/lkml/2017/7/15/169
-> https://lkml.org/lkml/2017/7/15/171
-> 
-> Do you need a patch reverting this one?
+> Some platforms don't need to do that since they just have a single
+> port (no more subnodes), the others might have specific/shared
+> registers to access configuration space. (e.g. Tegra, MTK legacy IP
+> block).  Or, he can split them into two independent nodes, but it
+> will break common probing flow by doing so. (I'd prefer to use
+> subnodes.)
 
-Hm. This one is in linux-next, but shouldn't. Right?
+The PCI core interface (pci_scan_root_bus_bridge()) starts with
+sysdata in the struct pci_host_bridge, so every PCI bus under that
+host bridge has the same sysdata.  
 
-  git log --oneline  -10 linux-next/master
-c0b96db Add linux-next specific files for 20170808
+You have multiple root ports (sounds like two ports in this case)
+under that host bridge.  Each port has independent interrupt mappings,
+but the MMIO address space routed to the ports is described in the
+upper-level host bridge (the "pcie" node in DT).  I assume the I/O and
+MMIO routing through the root ports works as described in the
+PCI-to-PCI bridge spec, using PCI_MEMORY_BASE, PCI_PREF_MEMORY_BASE,
+etc.
 
-git log --oneline  linux-next/master | grep "Drop unnecessary static"
-78daaca mfd: twl4030-irq: Drop unnecessary static
+If that's the case, I think your current DT "pcie" node is
+appropriate, and both ports should have the same sysdata (as they do
+in your current patch), and you do need some additional way to get
+from that sysdata (the struct mtk_pcie) to the per-port data (the
+struct mtk_pcie_port).
 
+Apparently the two root ports of this MT7622/MT2712 controller are
+hardwired at device (PCI_SLOT) 0 and 1.  Using a list to look that up
+seems like a little overkill, since you could index an array by
+PCI_SLOT(), but I guess you could do it either way.
 
+I would probably rename "port->index" to "port->slot" or similar to
+make it more obvious that it's not merely the Nth port we found; it's
+the one that is hardwired at PCI_SLOT N.
 
--- 
-regards,
--grygorii
+Also, s/mtk_pcie_parse_ports/mtk_pcie_parse_port/, since it parses one
+port each time you call it.
+
+And factor out the lookup as Ryder suggested so it's not duplicated in
+the mtk_pcie_config_read()/mtk_pcie_config_write() paths.
+
+Bjorn
