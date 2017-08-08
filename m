@@ -1,62 +1,63 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 8 Aug 2017 08:07:38 +0100
-Subject: [PATCH v2 3/3] ARM: dts: at91: sama5d2: use sama5d2 compatible
- string for SMC
-In-Reply-To: <20170807212813.hj5pfmlh4wl2mh47@piout.net>
-References: <20170718132220.25018-1-ludovic.desroches@microchip.com>
- <20170718132220.25018-4-ludovic.desroches@microchip.com>
- <20170807154100.hvl5ua3vdqttghfj@dell>
- <20170807212813.hj5pfmlh4wl2mh47@piout.net>
-Message-ID: <20170808070738.cd5esjyz6m35rj2b@dell>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Tue, 08 Aug 2017 15:07:59 +0800
+Subject: [PATCH v2] mmc: sunxi: Fix NULL pointer reference on clk_delays
+In-Reply-To: <20170808070244.27410-1-wens@csie.org>
+References: <20170808070244.27410-1-wens@csie.org>
+Message-ID: <bbd4680dc97d9913ff6a49e68c360d21@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 07 Aug 2017, Alexandre Belloni wrote:
-
-> Hi Lee,
+? 2017-08-08 15:02?Chen-Yu Tsai ???
+> Some SoCs do not support clk delays for MMC in the clock control unit.
+> These include the old controllers in A10/A10s/A13/R8, and the new eMMC
+> controller in A64. The config structure for these controllers do not
+> specify clk_delays, but the check for this was replaced in commit
+> b0600daebf31 ("mmc: sunxi: Support controllers that can use both old
+> and new timings").
 > 
-> On 07/08/2017 at 16:41:00 +0100, Lee Jones wrote:
-> > On Tue, 18 Jul 2017, Ludovic Desroches wrote:
-> > 
-> > > A new compatible string has been introduced for sama5d2 SMC to allow to
-> > > manage the registers mapping change.
-> > > 
-> > > Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> > > ---
-> > >  arch/arm/boot/dts/sama5d2.dtsi | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > Applied, thanks.
-> > 
+> This patch adds back the check for clk_delays, and also adds comments
+> for both checks in sunxi_mmc_clk_set_phase().
 > 
-> I've already applied that one and sent it to arm-soc as a fix for 4.13
-> (I think we agreed on that).
+> Fixes: b0600daebf31 ("mmc: sunxi: Support controllers that can use
+> 		      both old and new timings")
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Okay, I just looked through my mail and remember the conversation.
+Should I add a Tested-by here?
 
-So the question remains; why was the patch re-sent as part of this
-set *after* it had already been applied?
-
-Patch unapplied, thanks.
-
-> > > diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> > > index cc06da394366..3e6e2dbc2595 100644
-> > > --- a/arch/arm/boot/dts/sama5d2.dtsi
-> > > +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> > > @@ -1048,7 +1048,7 @@
-> > >  			};
-> > >  
-> > >  			hsmc: hsmc at f8014000 {
-> > > -				compatible = "atmel,sama5d3-smc", "syscon", "simple-mfd";
-> > > +				compatible = "atmel,sama5d2-smc", "syscon", "simple-mfd";
-> > >  				reg = <0xf8014000 0x1000>;
-> > >  				interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
-> > >  				clocks = <&hsmc_clk>;
-> > 
+> ---
+> This fixes an mmc regression on A10/A10s/A13/R8 and A64 introduced
+> by the A83T mmc patches.
 > 
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> v1 was inlined in a reply to "mmc: sunxi: fix new timings mode on A64
+> EMMC (MMC2) controller"
+> 
+> Changes since v1:
+> 
+>   - Polished comments
+> 
+> I've tested this on my A10 Cubieboard and A20 Cubieboard2.
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/mmc/host/sunxi-mmc.c 
+> b/drivers/mmc/host/sunxi-mmc.c
+> index 3777517982dd..9dc6d726ec49 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -722,9 +722,14 @@ static int sunxi_mmc_clk_set_phase(struct
+> sunxi_mmc_host *host,
+>  {
+>  	int index;
+> 
+> +	/* clk controller delays not used under new timings mode */
+>  	if (host->use_new_timings)
+>  		return 0;
+> 
+> +	/* some old controllers don't support delays */
+> +	if (!host->cfg->clk_delays)
+> +		return 0;
+> +
+>  	/* determine delays */
+>  	if (rate <= 400000) {
+>  		index = SDXC_CLK_400K;
