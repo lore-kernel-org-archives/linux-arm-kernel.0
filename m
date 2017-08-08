@@ -1,110 +1,75 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 8 Aug 2017 11:39:19 -0400 (EDT)
-Subject: [PATCH 01/15] ARM: assembler: introduce adr_l, ldr_l and str_l
- macros
-In-Reply-To: <CAKv+Gu8W68ruOsD9Fit0MrJ=JVDO3xF-SmQ-8qcpBSQm0si-UA@mail.gmail.com>
-References: <20170805205222.19868-1-ard.biesheuvel@linaro.org>
- <20170805205222.19868-2-ard.biesheuvel@linaro.org>
- <alpine.LFD.2.20.1708081030030.8927@knanqh.ubzr>
- <CAKv+Gu8W68ruOsD9Fit0MrJ=JVDO3xF-SmQ-8qcpBSQm0si-UA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.20.1708081131340.8927@knanqh.ubzr>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Tue, 8 Aug 2017 23:41:46 +0800
+Subject: [PATCH v2 3/7] pwm: rockchip: Remove the dumplicate
+ rockchip_pwm_ops ops
+In-Reply-To: <20170804090935.6aba3351@bbrezillon>
+References: <1499486629-9659-1-git-send-email-david.wu@rock-chips.com>
+ <1499486629-9659-4-git-send-email-david.wu@rock-chips.com>
+ <20170802105902.2d137072@bbrezillon>
+ <af056420-5c33-e6c8-62cb-bcd3456000a7@rock-chips.com>
+ <20170802134011.1124f1dd@bbrezillon>
+ <6d1f60ee-2402-5ee0-54f6-9521c039c36c@rock-chips.com>
+ <20170804090935.6aba3351@bbrezillon>
+Message-ID: <78121683-137a-eb5c-c447-e763b18ccd12@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Aug 2017, Ard Biesheuvel wrote:
+Hi Boris,
 
-> On 8 August 2017 at 16:10, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Sat, 5 Aug 2017, Ard Biesheuvel wrote:
-> >
-> >> Like arm64, ARM supports position independent code sequences that
-> >> produce symbol references with a greater reach than the ordinary
-> >> adr/ldr instructions.
-> >>
-> >> Currently, we use open coded instruction sequences involving literals
-> >> and arithmetic operations. Instead, we can use movw/movt pairs on v7
-> >> CPUs, circumventing the D-cache entirely. For older CPUs, we can emit
-> >> the literal into a subsection, allowing it to be emitted out of line
-> >> while retaining the ability to perform arithmetic on label offsets.
-> >>
-> >> E.g., on pre-v7 CPUs, we can emit a PC-relative reference as follows:
-> >>
-> >>        ldr          <reg>, 222f
-> >>   111: add          <reg>, <reg>, pc
-> >>        .subsection  1
-> >>   222: .long        <sym> - (111b + 8)
-> >>        .previous
-> >>
-> >> This is allowed by the assembler because, unlike ordinary sections,
-> >> subsections are combined into a single section into the object file,
-> >> and so the label references are not true cross-section references that
-> >> are visible as relocations. Note that we could even do something like
-> >>
-> >>        add          <reg>, pc, #(222f - 111f) & ~0xfff
-> >>        ldr          <reg>, [<reg>, #(222f - 111f) & 0xfff]
-> >>   111: add          <reg>, <reg>, pc
-> >>        .subsection  1
-> >>   222: .long        <sym> - (111b + 8)
-> >>        .previous
-> >>
-> >> if it turns out that the 4 KB range of the ldr instruction is insufficient
-> >> to reach the literal in the subsection, although this is currently not a
-> >> problem (of the 98 objects built from .S files in a multi_v7_defconfig
-> >> build, only 11 have .text sections that are over 1 KB, and the largest one
-> >> [entry-armv.o] is 3308 bytes)
-> >>
-> >> Subsections have been available in binutils since 2004 at least, so
-> >> they should not cause any issues with older toolchains.
-> >>
-> >> So use the above to implement the macros mov_l, adr_l, adrm_l (using ldm
-> >> to load multiple literals at once), ldr_l and str_l, all of which will
-> >> use movw/movt pairs on v7 and later CPUs, and use PC-relative literals
-> >> otherwise.
-> >
-> > There is no adrm_l definition in this patch.
-> >
+? 2017/8/4 15:09, Boris Brezillon ??:
+> On Fri, 4 Aug 2017 10:38:26 +0800
+> "David.Wu" <david.wu@rock-chips.com> wrote:
 > 
-> Ah yes, I played around with it but it becomes a bit clunky so I removed it:
+>> Hi Boris?
+>>
+>> ? 2017/8/2 19:40, Boris Brezillon ??:
+>>> Yep, just define 3 different pwm_ops (one for each IP), each of them
+>>> implementing ->apply() and ->get_state() and that's all.
+>>>
+>>> Something like:
+>>>
+>>> static const struct pwm_ops rockchip_pwm_ops_v1 = {
+>>> 	.get_state = rockchip_pwm_v1_get_state,
+>>> 	.apply = rockchip_pwm_v1_apply,
+>>> 	.owner = THIS_MODULE,
+>>> };
+>>>
+>>> static const struct pwm_ops rockchip_pwm_ops_v2 = {
+>>> 	.get_state = rockchip_pwm_v2_get_state,
+>>> 	.apply = rockchip_pwm_v2_apply,
+>>> 	.owner = THIS_MODULE,
+>>> };
+>>>
+>>> static const struct pwm_ops rockchip_pwm_ops_vop = {
+>>> 	.get_state = rockchip_pwm_vop_get_state,
+>>> 	.apply = rockchip_pwm_vop_apply,
+>>> 	.owner = THIS_MODULE,
+>>> };
+>>>
+>>> static const struct of_device_id rockchip_pwm_dt_ids[] = {
+>>> 	{ .compatible = "rockchip,rk2928-pwm", .data = &rockchip_pwm_ops_v1 },
+>>> 	{ .compatible = "rockchip,rk3288-pwm", .data = &rockchip_pwm_ops_v2 },
+>>> 	{ .compatible = "rockchip,vop-pwm", .data = &rockchip_pwm_ops_vop },
+>>> 	{ /* sentinel */ }
+>>> };
+>>> MODULE_DEVICE_TABLE(of, rockchip_pwm_dt_ids);
+>>
+>> I think we should keep the data members in the rockchip_pwm_data?like
+>> supports_polarity and regs...
+>>
+>> The supports_polarity is needed for of_pwm_n_cells when pwm registered.
+>> And the other data members is helpful for us to use common code.
+>>
+>> It's okay for just define 3 different pwm_ops (one for each IP), but
+>> they are with other data members in the struct of rockchip_pwm_data.
+>>
 > 
->         adrl         <reg1>, 222f
->         ldm          <reg1>, {<reg1>, <reg2>}
->    111: add          <reg1>, <reg1>, pc
->         add          <reg2>, <reg2>, pc
->         .subsection  1
->    222: .long        <sym1> - (111b + 8)
->         .long        <sym2> - (111b + 12)
->         .previous
-> 
-> The adrl pseudo op always assembles to two instructions, so you need 5
-> instructions while using adr_l twice uses only 4. I am not sure if
-> eliminating one of the loads would make a huge difference, given that
-> there are no use cases for adrm_l on hot paths, at least not in this
-> series.
+> I think we could even get rid of the other fields in rockchip_pwm_data,
+> but ok, let's do that.
 
-I'd suggest you keep it to a minimum.  Using adr_l twice is clear and 
-obvious.
+I use the same pwm ops for each IP at V3's patch, but defined 3 
+different rockchip_pwm_data for use. I think this might look more clean.
 
-> > Also, might it be better to change mov_l to movl? Tthis looks similar to
-> > the ARM64 movl pseudo-instruction, and unlike all the other _l variants,
-> > this is not producing a pc relative result.
-> >
 > 
-> On arm64, we have mov_q for a 64-bit absolute load, and I thought
-> mov_l was less confusing than mov_w. In general, I like the underscore
-> in the middle because on the one hand, it looks like a ordinary
-> mnemonic but on the other hand, it is obvious that it is not a true
-> instruction. mov_abs perhaps?
 > 
-> > Talking about the _l suffix: I wonder if this could be more meaningful,
-> > like _rel maybe? At least in the adr_l case, this could easily be
-> > confused with adrl.
-> >
 > 
-> On arm64, we have ldr_l, str_l and adr_l as well, and I usually try to
-> align between ARM and arm64 if I can.
-
-OK. I'm much less versed into ARM64 assembly so I'll defer to your 
-judgment.  It's good if this mnemonic scheme already exists there with 
-a similar meaning.
-
-
-Nicolas
