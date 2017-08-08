@@ -1,32 +1,75 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue,  8 Aug 2017 17:36:36 +0200
-Subject: [PATCH] ARM: sunxi: add an help section to the Kconfig Sun8i SoC
- selection
-Message-ID: <20170808153636.26846-1-clabbe.montjoie@gmail.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Tue,  8 Aug 2017 23:43:15 +0800
+Subject: [PATCH v3 7/7] arm64: dts: rockchip: Add pwm nodes for rk3328
+In-Reply-To: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
+References: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1502206995-24418-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since sun8i regroup lots of SoCs, it is helpful to list them in the help
-section of Kconfig.
+There are 4 pwm channels built in rk3328 soc, need to configure
+the both APB clock and bus clock.
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Signed-off-by: David Wu <david.wu@rock-chips.com>
 ---
- arch/arm/mach-sunxi/Kconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi | 45 ++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index 58153cdf025b..2ffcccda2688 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -42,6 +42,9 @@ config MACH_SUN8I
- 	default ARCH_SUNXI
- 	select ARM_GIC
- 	select MFD_SUN6I_PRCM
-+	help
-+	  Select this option if you have one of the following SoC:
-+	  A23 A33 A83T H2+ H3 R16 V3S
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+index 7e69f1f..1f945d3 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+@@ -308,6 +308,51 @@
+ 		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+ 	};
  
- config MACH_SUN9I
- 	bool "Allwinner (sun9i) SoCs support"
++	pwm0: pwm at ff1b0000 {
++		compatible = "rockchip,rk3328-pwm";
++		reg = <0x0 0xff1b0000 0x0 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm0_pin>;
++		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
++		clock-names = "pwm", "pclk";
++		status = "disabled";
++	};
++
++	pwm1: pwm at ff1b0010 {
++		compatible = "rockchip,rk3328-pwm";
++		reg = <0x0 0xff1b0010 0x0 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm1_pin>;
++		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
++		clock-names = "pwm", "pclk";
++		status = "disabled";
++	};
++
++	pwm2: pwm at ff1b0020 {
++		compatible = "rockchip,rk3328-pwm";
++		reg = <0x0 0xff1b0020 0x0 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm2_pin>;
++		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
++		clock-names = "pwm", "pclk";
++		status = "disabled";
++	};
++
++	pwm3: pwm at ff1b0030 {
++		compatible = "rockchip,rk3328-pwm";
++		reg = <0x0 0xff1b0030 0x0 0x10>;
++		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwmir_pin>;
++		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
++		clock-names = "pwm", "pclk";
++		status = "disabled";
++	};
++
+ 	saradc: adc at ff280000 {
+ 		compatible = "rockchip,rk3328-saradc", "rockchip,rk3399-saradc";
+ 		reg = <0x0 0xff280000 0x0 0x100>;
 -- 
-2.13.0
+1.9.1
