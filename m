@@ -1,28 +1,29 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 08 Aug 2017 08:52:44 -0700
-Subject: [PATCH] iio: adc: Fix coding style violations
-In-Reply-To: <d310ac06b13cf803bd3a2a6bcfb92169445f929c.1502193860.git.michal.simek@xilinx.com>
-References: <d310ac06b13cf803bd3a2a6bcfb92169445f929c.1502193860.git.michal.simek@xilinx.com>
-Message-ID: <1502207564.2219.35.camel@perches.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 08 Aug 2017 17:58:22 +0200
+Subject: [PATCH 1/2] clk: fractional-divider: allow overriding of
+ approximation
+In-Reply-To: <5453089.AIzWDZk3ey@phil>
+References: <1500624187-12165-1-git-send-email-zhangqing@rock-chips.com>
+ <5990882.df1suBpf8V@phil> <5453089.AIzWDZk3ey@phil>
+Message-ID: <1694589.HBVVhCKeO5@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-08-08 at 14:04 +0200, Michal Simek wrote:
-> From: Sai Krishna Potthuri <lakshmi.sai.krishna.potthuri@xilinx.com>
-[]
-> diff --git a/drivers/iio/adc/xilinx-xadc.h b/drivers/iio/adc/xilinx-xadc.h
-[]
-> @@ -76,7 +76,7 @@ struct xadc_ops {
->  	int (*setup)(struct platform_device *pdev, struct iio_dev *indio_dev,
->  			int irq);
->  	void (*update_alarm)(struct xadc *, unsigned int);
-> -	unsigned long (*get_dclk_rate)(struct xadc *);
-> +	unsigned long (*get_dclk_rate)(struct xadc *xadc);
->  	irqreturn_t (*interrupt_handler)(int, void *);
+Am Dienstag, 1. August 2017, 18:21:22 CEST schrieb Heiko Stuebner:
+> From: Elaine Zhang <zhangqing@rock-chips.com>
+> 
+> Fractional dividers may have special requirements concerning numerator
+> and denominator selection that differ from just getting the best
+> approximation.
+> 
+> For example on Rockchip socs the denominator must be at least 20 times
+> larger than the numerator to generate precise clock frequencies.
+> 
+> Therefore add the ability to provide custom approximation functions.
+> 
+> Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 
-Doesn't it seem odd to you that the lines above and below
-have the same form?
+applied for 4.14 with Stephen's Ack
 
-checkpatch is an imperfect tool.
-It will always be imperfect.
-Please use your eyes and mind too.
+
+Heiko
