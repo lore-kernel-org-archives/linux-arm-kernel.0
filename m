@@ -1,76 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 8 Aug 2017 10:44:53 +0100
-Subject: [PATCH RFC] irqchip: gic-v3: Support forced cpu irq affinity
- setting
-In-Reply-To: <a13295d7-40cc-24d7-a99a-3d349fbb91cb@samsung.com>
-References: <CGME20170808091129epcas1p48d0523675178cb841d97e64d5baab75f@epcas1p4.samsung.com>
- <1502183093-30327-1-git-send-email-alim.akhtar@samsung.com>
- <7ea6b8d3-762a-d4e9-3b64-609b534c3960@arm.com>
- <a13295d7-40cc-24d7-a99a-3d349fbb91cb@samsung.com>
-Message-ID: <c6720d49-e9d8-cbf8-88e1-8c94a09e0804@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 8 Aug 2017 10:29:31 +0100
+Subject: [PATCH v2 03/18] firmware: arm_scmi: add basic driver
+ infrastructure for SCMI
+In-Reply-To: <CABb+yY0DQ1H8Apb6PoqKg-HrTfbyxShum9YtJit96T4Yo9+zrQ@mail.gmail.com>
+References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
+ <1501857104-11279-4-git-send-email-sudeep.holla@arm.com>
+ <CABb+yY0DQ1H8Apb6PoqKg-HrTfbyxShum9YtJit96T4Yo9+zrQ@mail.gmail.com>
+Message-ID: <3279524c-d3e5-fe0f-ba7d-f715bfdcad9c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/17 10:27, Alim Akhtar wrote:
-> 
-> 
-> On 08/08/2017 02:52 PM, Marc Zyngier wrote:
->> On 08/08/17 10:04, Alim Akhtar wrote:
->>> Skip check for online cpu mask when setting irq affinity of per cpu timer
->>> during early startup of not yet online cpu.
->>>
->>> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
->>> Signed-off-by: Aswani Reddy <aswani.reddy@samsung.com>
->>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->>> ---
->>>   drivers/irqchip/irq-gic-v3.c | 7 ++++++-
->>>   1 file changed, 6 insertions(+), 1 deletion(-)
->>>
->>> Currently when non boot CPUs comes up and if setting of IRQ affinity gets called
->>> before cpu online status gets updated, gic_mpidr_to_affinity() returns
->>> undesirable cpu number. Using __force__ flag ignore cpu_online_mask and setup
->>> the intended cpu affinity for the irq.
->>>
->>> The same approch is used in gicv2
->>> (commit: ffde1de64012c: irqchip: Gic: Support forced affinity setting)
->>>
->>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->>> index dbffb7a..c238c64 100644
->>> --- a/drivers/irqchip/irq-gic-v3.c
->>> +++ b/drivers/irqchip/irq-gic-v3.c
->>> @@ -640,11 +640,16 @@ static void gic_smp_init(void)
->>>   static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->>>   			    bool force)
->>>   {
->>> -	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
->>> +	unsigned int cpu;
->>>   	void __iomem *reg;
->>>   	int enabled;
->>>   	u64 val;
->>>   
->>> +	if (!force)
->>> +		cpu = cpumask_any_and(mask_val, cpu_online_mask);
->>> +	else
->>> +		cpu = cpumask_first(mask_val);
->>> +
->>>   	if (cpu >= nr_cpu_ids)
->>>   		return -EINVAL;
->>>   
->>>
->>
->> See
->>
->> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/irqchip-4.13&id=65a30f8b300107266f316d550f060ccc186201a3
->>
-> 
-> Thanks Marc for above link. Is this already queued in some tree? I can't 
-> find this is linux-next.
 
-It is queued as a fix for 4.13, bug tglx is offline for the time being,
-so this has not hit -next yet.
 
-Thanks,
+On 08/08/17 03:46, Jassi Brar wrote:
+> On Fri, Aug 4, 2017 at 8:01 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> 
+> ....
+>> +int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+>> +{
+>> +       int ret;
+>> +       int timeout;
+>> +       struct scmi_info *info = handle_to_scmi_info(handle);
+>> +       struct device *dev = info->dev;
+>> +
+>> +       ret = mbox_send_message(info->tx_chan, xfer);
+>>
+> NAK
+> 
+> This is still not fixed. For the reasons mentioned many times like
+> here...   https://lkml.org/lkml/2017/7/7/465
+> 
 
-	M.
+Since SCPI and SCMI are based on doorbell designs like ACPI PCC, they
+can't send any data as all the data are part of shared memory.
+
+What data needs to be sent from SCPI/SCMI as part of mbox_send_message
+in your opinion ? I can't think of any generic way to form this data.
+
+It's not possible to generalize that and SCPI/SCMI's transport is
+specifically designed in that way to avoid any kind of dependency
+on the mailbox hardware so that the protocol can be generic exactly like
+ACPI PCC.
+
+I understand your concern on how existing mailbox controllers work with
+it. They can't as they stand today as they expect some specific data
+based on the hardware or the protocol they support on it.
+
+One option to deal with this is to have a generic DT based doorbell kind
+of controller driver but I am not sure if we can define register level
+bindings like ACPI PCC.
+
+Or we teach them to ignore the data if it's not present. I don't like
+the idea of adding shim layer for each of the controller as each one
+expect different format and more over SCPI/SCMI doesn't even require it
+to support SCMI on those mailbox controllers. That may end up with 2x
+drivers(one actual driver and and another shim layer for it)
+
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Sudeep
