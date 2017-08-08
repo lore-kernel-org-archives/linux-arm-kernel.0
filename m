@@ -1,91 +1,60 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 8 Aug 2017 12:15:56 +0100
-Subject: [PATCH v2 5/5] mfd: mt6397: Add PMIC keys support to MT6397 driver
-In-Reply-To: <1502071065-6745-6-git-send-email-chen.zhong@mediatek.com>
-References: <1502071065-6745-1-git-send-email-chen.zhong@mediatek.com>
- <1502071065-6745-6-git-send-email-chen.zhong@mediatek.com>
-Message-ID: <20170808111556.dmx2s6bcwnsccrkn@dell>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Aug 2017 12:21:44 +0100
+Subject: [PATCH v2] iommu/arm-smmu: fix null-pointer dereference in
+ arm_smmu_add_device
+In-Reply-To: <d7a07e48-862d-a6f7-8bad-9c71f5a5be5b@arm.com>
+References: <20170808092614.GB12887@arm.com>
+ <1502187962-16861-1-git-send-email-asavkov@redhat.com>
+ <d7a07e48-862d-a6f7-8bad-9c71f5a5be5b@arm.com>
+Message-ID: <20170808112144.GE13355@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 07 Aug 2017, Chen Zhong wrote:
+[+ Joerg]
 
-> This patch adds compatible strings and interrupts for pmic keys
-> which serves as child device of MFD.
+On Tue, Aug 08, 2017 at 11:37:40AM +0100, Robin Murphy wrote:
+> On 08/08/17 11:26, Artem Savkov wrote:
+> > Commit c54451a "iommu/arm-smmu: Fix the error path in arm_smmu_add_device"
+> > removed fwspec assignment in legacy_binding path as redundant which is
+> > wrong. It needs to be updated after fwspec initialisation in
+> > arm_smmu_register_legacy_master() as it is dereferenced later. Without
+> > this there is a NULL-pointer dereference panic during boot on some hosts.
 > 
-> Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
-> ---
->  drivers/mfd/mt6397-core.c |   36 +++++++++++++++++++++++++++++++++++-
->  1 file changed, 35 insertions(+), 1 deletion(-)
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 > 
-> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-> index 6546d7f..3c6a765 100644
-> --- a/drivers/mfd/mt6397-core.c
-> +++ b/drivers/mfd/mt6397-core.c
-> @@ -43,6 +43,30 @@
->  	},
->  };
->  
-> +static const struct resource mt6323_keys_resources[] = {
-> +	{
-> +		.start = MT6323_IRQ_STATUS_PWRKEY,
-> +		.end   = MT6323_IRQ_STATUS_PWRKEY,
-> +		.flags = IORESOURCE_IRQ,
-> +	}, {
-> +		.start = MT6323_IRQ_STATUS_FCHRKEY,
-> +		.end   = MT6323_IRQ_STATUS_FCHRKEY,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +};
-> +
-> +static const struct resource mt6397_keys_resources[] = {
-> +	{
-> +		.start = MT6397_IRQ_PWRKEY,
-> +		.end   = MT6397_IRQ_PWRKEY,
-> +		.flags = IORESOURCE_IRQ,
-> +	}, {
-> +		.start = MT6397_IRQ_HOMEKEY,
-> +		.end   = MT6397_IRQ_HOMEKEY,
-> +		.flags = IORESOURCE_IRQ,
-> +	},
-> +};
+> Thanks for fixing it up, and sorry for failing to document the
+> unfortunately subtle logic in the first place!
 
-We have better ways to define these now.
+Well, I was the one that messed it up:
 
-Please grep for "DEFINE_RES_"
+Acked-by: Will Deacon <will.deacon@arm.com>
 
->  static const struct mfd_cell mt6323_devs[] = {
->  	{
->  		.name = "mt6323-regulator",
-> @@ -50,6 +74,11 @@
->  	}, {
->  		.name = "mt6323-led",
->  		.of_compatible = "mediatek,mt6323-led"
-> +	}, {
-> +		.name = "mtk-pmic-keys",
-> +		.num_resources = ARRAY_SIZE(mt6323_keys_resources),
-> +		.resources = mt6323_keys_resources,
-> +		.of_compatible = "mediatek,mt6323-keys"
->  	},
->  };
->  
-> @@ -71,7 +100,12 @@
->  	}, {
->  		.name = "mt6397-pinctrl",
->  		.of_compatible = "mediatek,mt6397-pinctrl",
-> -	},
-> +	}, {
-> +		.name = "mtk-pmic-keys",
-> +		.num_resources = ARRAY_SIZE(mt6397_keys_resources),
-> +		.resources = mt6397_keys_resources,
-> +		.of_compatible = "mediatek,mt6397-keys"
-> +	}
->  };
->  
->  static void mt6397_irq_lock(struct irq_data *data)
+Joerg, can you pick this up as a fix for 4.13, please?
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Will
+
+> > Signed-off-by: Artem Savkov <asavkov@redhat.com>
+> > ---
+> >  drivers/iommu/arm-smmu.c | 7 +++++++
+> >  1 file changed, 7 insertions(+)
+> > 
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index b97188a..2d80fa8 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -1519,6 +1519,13 @@ static int arm_smmu_add_device(struct device *dev)
+> >  
+> >  	if (using_legacy_binding) {
+> >  		ret = arm_smmu_register_legacy_master(dev, &smmu);
+> > +
+> > +		/*
+> > +		 * If dev->iommu_fwspec is initally NULL, arm_smmu_register_legacy_master()
+> > +		 * will allocate/initialise a new one. Thus we need to update fwspec for
+> > +		 * later use.
+> > +		 */
+> > +		fwspec = dev->iommu_fwspec;
+> >  		if (ret)
+> >  			goto out_free;
+> >  	} else if (fwspec && fwspec->ops == &arm_smmu_ops) {
+> > 
+> 
