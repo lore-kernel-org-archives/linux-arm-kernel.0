@@ -1,93 +1,69 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 8 Aug 2017 16:19:26 -0500
-Subject: [PATCH V8 1/2] PCI: handle CRS returned by device after FLR
-In-Reply-To: <1502071792-15263-1-git-send-email-okaya@codeaurora.org>
-References: <1502071792-15263-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20170808211926.GN16580@bhelgaas-glaptop.roam.corp.google.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 8 Aug 2017 23:44:01 +0200
+Subject: linux-next 2017-08-08 keyboard failure on Nokia N900
+In-Reply-To: <alpine.DEB.2.20.1708082228400.4939@hadrien>
+References: <20170808101756.GA12922@amd> <20170808103444.GA18247@amd>
+ <20170808111243.GA20328@amd>
+ <61264d43-eda3-df9d-0c06-28611f373ce7@ti.com>
+ <alpine.DEB.2.20.1708082203510.2095@hadrien>
+ <43d915d2-3260-88b6-095d-4de8240ff29e@ti.com>
+ <alpine.DEB.2.20.1708082228400.4939@hadrien>
+Message-ID: <20170808214400.GA18961@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 06, 2017 at 10:09:51PM -0400, Sinan Kaya wrote:
+Hi!
 
-We should include some high-level description of the problem we're
-trying to solve here.
-
-I *think* the problem is that we do something like this:
-
-  - perform an FLR
-  - sleep up to 1000ms total
-  - read ~0 from PCI_COMMAND
-  - warn that the device didn't return from FLR
-  - touch the device before it's ready
-
-When in fact the device is still initializing after the FLR and would
-return CRS status if we looked for it.  So we should be looking for
-CRS and waiting longer before we start using the device.
-
-> An endpoint is allowed to issue Configuration Request Retry Status (CRS)
-> following a Function Level Reset (FLR) request to indicate that it is
-> not ready to accept new requests. CRS is defined in PCIe r3.1, sec 2.3.1.
-> Request Handling Rules and CRS usage in FLR context is mentioned in
-> PCIe r3.1, sec 6.6.2. Function-Level Reset.
+> > > > I've not precisely checked it, but smth is telling me that below
+> > > > patch  can cause this:
+> > > >
+> > > > commit 78daaca78ee57dead0f4aa5ee399f0499e81cd9e
+...
+> > > >      mfd: twl4030-irq: Drop unnecessary static
+> > > >
+> > > >      Drop static on a local variable, when the variable is initialized
+> > > > before
+> > > >      any use, on every possible execution path through the function.
+> > > >
+> > > > --- a/drivers/mfd/twl4030-irq.c
+> > > > +++ b/drivers/mfd/twl4030-irq.c
+...
+> > > >   int twl4030_init_irq(struct device *dev, int irq_num)
+> > > >   {
+> > > > -       static struct irq_chip  twl4030_irq_chip;
+> > > > +       struct irq_chip twl4030_irq_chip;
+> > > >
+> > > >
+> > > > but if we will look at code - it can be seen that this variable is passed
+> > > > by reference to
+> > > > irq_set_chip_and_handler().
+> > > > Ops. And what will happen when twl4030_init_irq() returns ;)
+> > >
+> > > The patch is not correct as was already noted when it was submitted:
+..
+> > Hm. This one is in linux-next, but shouldn't. Right?
+> >
+> >  git log --oneline  -10 linux-next/master
+> > c0b96db Add linux-next specific files for 20170808
+> >
+> > git log --oneline  linux-next/master | grep "Drop unnecessary static"
+> > 78daaca mfd: twl4030-irq: Drop unnecessary static
 > 
-> A CRS indication will only be given if the address to be read is vendor ID
-> register. pci_bus_read_dev_vendor_id() knows how to deal with CRS returned
-> 0xFFFF0001 value and will continue polling until a value other than
-> 0xFFFF0001 is returned within a given timeout.
-> 
-> Try to discover device presence via CRS if supported. Otherwise, fall
-> through to old behavior.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/pci/pci.c | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index af0cc34..cc9f1c0 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -3819,8 +3819,26 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
->   */
->  static void pci_flr_wait(struct pci_dev *dev)
->  {
-> +	u16 root_cap = 0;
->  	int i = 0;
->  	u32 id;
-> +	bool ret;
-> +
-> +	pcie_capability_read_word(dev, PCI_EXP_RTCAP, &root_cap);
-> +	if (root_cap & PCI_EXP_RTCAP_CRSVIS) {
+> OK, it seems like the patch was made twice, the second one was commented
+> on and the first one was applied.  78daaca should not be there.
 
-Why do we want to look at PCI_EXP_RTCAP_CRSVIS here?  We don't look at
-it in other paths that call pci_bus_read_dev_vendor_id().
+Lee, it has your sign-off, can you drop the patch from your tree? It
+is known bad.
 
-> +		/* don't touch the HW before waiting 100ms */
-
-I believe this, but would like to include a reference to the section
-of the spec that contains this number.  Otherwise it's just a magic
-number and makes future maintenance hard.
-
-> +		msleep(100);
-> +
-> +		/*
-> +		 * Physical functions return from here if found,
-> +		 * virtual functions fall through as they return ~0 on vendor
-> +		 * id read once CRS is completed.
-> +		 */
-> +		ret = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
-> +						 60000);
-> +		if (ret)
-> +			return;
-> +	}
->  
->  	do {
->  		msleep(100);
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks,
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170808/bff17b2d/attachment.sig>
