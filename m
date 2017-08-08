@@ -1,75 +1,110 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Tue,  8 Aug 2017 23:43:15 +0800
-Subject: [PATCH v3 7/7] arm64: dts: rockchip: Add pwm nodes for rk3328
-In-Reply-To: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
-References: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1502206995-24418-1-git-send-email-david.wu@rock-chips.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 8 Aug 2017 11:39:19 -0400 (EDT)
+Subject: [PATCH 01/15] ARM: assembler: introduce adr_l, ldr_l and str_l
+ macros
+In-Reply-To: <CAKv+Gu8W68ruOsD9Fit0MrJ=JVDO3xF-SmQ-8qcpBSQm0si-UA@mail.gmail.com>
+References: <20170805205222.19868-1-ard.biesheuvel@linaro.org>
+ <20170805205222.19868-2-ard.biesheuvel@linaro.org>
+ <alpine.LFD.2.20.1708081030030.8927@knanqh.ubzr>
+ <CAKv+Gu8W68ruOsD9Fit0MrJ=JVDO3xF-SmQ-8qcpBSQm0si-UA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.20.1708081131340.8927@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are 4 pwm channels built in rk3328 soc, need to configure
-the both APB clock and bus clock.
+On Tue, 8 Aug 2017, Ard Biesheuvel wrote:
 
-Signed-off-by: David Wu <david.wu@rock-chips.com>
----
- arch/arm64/boot/dts/rockchip/rk3328.dtsi | 45 ++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+> On 8 August 2017 at 16:10, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Sat, 5 Aug 2017, Ard Biesheuvel wrote:
+> >
+> >> Like arm64, ARM supports position independent code sequences that
+> >> produce symbol references with a greater reach than the ordinary
+> >> adr/ldr instructions.
+> >>
+> >> Currently, we use open coded instruction sequences involving literals
+> >> and arithmetic operations. Instead, we can use movw/movt pairs on v7
+> >> CPUs, circumventing the D-cache entirely. For older CPUs, we can emit
+> >> the literal into a subsection, allowing it to be emitted out of line
+> >> while retaining the ability to perform arithmetic on label offsets.
+> >>
+> >> E.g., on pre-v7 CPUs, we can emit a PC-relative reference as follows:
+> >>
+> >>        ldr          <reg>, 222f
+> >>   111: add          <reg>, <reg>, pc
+> >>        .subsection  1
+> >>   222: .long        <sym> - (111b + 8)
+> >>        .previous
+> >>
+> >> This is allowed by the assembler because, unlike ordinary sections,
+> >> subsections are combined into a single section into the object file,
+> >> and so the label references are not true cross-section references that
+> >> are visible as relocations. Note that we could even do something like
+> >>
+> >>        add          <reg>, pc, #(222f - 111f) & ~0xfff
+> >>        ldr          <reg>, [<reg>, #(222f - 111f) & 0xfff]
+> >>   111: add          <reg>, <reg>, pc
+> >>        .subsection  1
+> >>   222: .long        <sym> - (111b + 8)
+> >>        .previous
+> >>
+> >> if it turns out that the 4 KB range of the ldr instruction is insufficient
+> >> to reach the literal in the subsection, although this is currently not a
+> >> problem (of the 98 objects built from .S files in a multi_v7_defconfig
+> >> build, only 11 have .text sections that are over 1 KB, and the largest one
+> >> [entry-armv.o] is 3308 bytes)
+> >>
+> >> Subsections have been available in binutils since 2004 at least, so
+> >> they should not cause any issues with older toolchains.
+> >>
+> >> So use the above to implement the macros mov_l, adr_l, adrm_l (using ldm
+> >> to load multiple literals at once), ldr_l and str_l, all of which will
+> >> use movw/movt pairs on v7 and later CPUs, and use PC-relative literals
+> >> otherwise.
+> >
+> > There is no adrm_l definition in this patch.
+> >
+> 
+> Ah yes, I played around with it but it becomes a bit clunky so I removed it:
+> 
+>         adrl         <reg1>, 222f
+>         ldm          <reg1>, {<reg1>, <reg2>}
+>    111: add          <reg1>, <reg1>, pc
+>         add          <reg2>, <reg2>, pc
+>         .subsection  1
+>    222: .long        <sym1> - (111b + 8)
+>         .long        <sym2> - (111b + 12)
+>         .previous
+> 
+> The adrl pseudo op always assembles to two instructions, so you need 5
+> instructions while using adr_l twice uses only 4. I am not sure if
+> eliminating one of the loads would make a huge difference, given that
+> there are no use cases for adrm_l on hot paths, at least not in this
+> series.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-index 7e69f1f..1f945d3 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-@@ -308,6 +308,51 @@
- 		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
- 	};
- 
-+	pwm0: pwm at ff1b0000 {
-+		compatible = "rockchip,rk3328-pwm";
-+		reg = <0x0 0xff1b0000 0x0 0x10>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm0_pin>;
-+		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
-+		clock-names = "pwm", "pclk";
-+		status = "disabled";
-+	};
-+
-+	pwm1: pwm at ff1b0010 {
-+		compatible = "rockchip,rk3328-pwm";
-+		reg = <0x0 0xff1b0010 0x0 0x10>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm1_pin>;
-+		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
-+		clock-names = "pwm", "pclk";
-+		status = "disabled";
-+	};
-+
-+	pwm2: pwm at ff1b0020 {
-+		compatible = "rockchip,rk3328-pwm";
-+		reg = <0x0 0xff1b0020 0x0 0x10>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm2_pin>;
-+		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
-+		clock-names = "pwm", "pclk";
-+		status = "disabled";
-+	};
-+
-+	pwm3: pwm at ff1b0030 {
-+		compatible = "rockchip,rk3328-pwm";
-+		reg = <0x0 0xff1b0030 0x0 0x10>;
-+		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwmir_pin>;
-+		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
-+		clock-names = "pwm", "pclk";
-+		status = "disabled";
-+	};
-+
- 	saradc: adc at ff280000 {
- 		compatible = "rockchip,rk3328-saradc", "rockchip,rk3399-saradc";
- 		reg = <0x0 0xff280000 0x0 0x100>;
--- 
-1.9.1
+I'd suggest you keep it to a minimum.  Using adr_l twice is clear and 
+obvious.
+
+> > Also, might it be better to change mov_l to movl? Tthis looks similar to
+> > the ARM64 movl pseudo-instruction, and unlike all the other _l variants,
+> > this is not producing a pc relative result.
+> >
+> 
+> On arm64, we have mov_q for a 64-bit absolute load, and I thought
+> mov_l was less confusing than mov_w. In general, I like the underscore
+> in the middle because on the one hand, it looks like a ordinary
+> mnemonic but on the other hand, it is obvious that it is not a true
+> instruction. mov_abs perhaps?
+> 
+> > Talking about the _l suffix: I wonder if this could be more meaningful,
+> > like _rel maybe? At least in the adr_l case, this could easily be
+> > confused with adrl.
+> >
+> 
+> On arm64, we have ldr_l, str_l and adr_l as well, and I usually try to
+> align between ARM and arm64 if I can.
+
+OK. I'm much less versed into ARM64 assembly so I'll defer to your 
+judgment.  It's good if this mnemonic scheme already exists there with 
+a similar meaning.
+
+
+Nicolas
