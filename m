@@ -1,37 +1,35 @@
-From: pasha.tatashin@oracle.com (Pasha Tatashin)
-Date: Tue, 8 Aug 2017 09:30:58 -0400
-Subject: [v6 11/15] arm64/kasan: explicitly zero kasan shadow memory
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DD004DA79@AcuExch.aculab.com>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-12-git-send-email-pasha.tatashin@oracle.com>
- <20170808090743.GA12887@arm.com>
- <f8b2b9ed-abf0-0c16-faa2-98b66dcbed78@oracle.com>
- <063D6719AE5E284EB5DD2968C1650D6DD004DA79@AcuExch.aculab.com>
-Message-ID: <43c261e5-7568-0d5b-70ab-d1f82ef257ec@oracle.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 8 Aug 2017 14:34:11 +0100
+Subject: [PATCH v8 00/20] ILP32 for ARM64
+In-Reply-To: <20170724112624.7ie6na7uszmsc5te@yury-thinkpad>
+References: <20170619155003.13218-1-ynorov@caviumnetworks.com>
+ <20170629161036.ftedtbp2gdmyzloo@e104818-lin.cambridge.arm.com>
+ <20170706215902.qtmbsidwvqlr7o56@yury-thinkpad>
+ <20170707171135.h54fe4ea7xuxnrqt@armageddon.cambridge.arm.com>
+ <20170724112624.7ie6na7uszmsc5te@yury-thinkpad>
+Message-ID: <20170808133411.opuh7pz3kmlhkhzy@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-08-08 09:15, David Laight wrote:
-> From: Pasha Tatashin
->> Sent: 08 August 2017 12:49
->> Thank you for looking at this change. What you described was in my
->> previous iterations of this project.
->>
->> See for example here: https://lkml.org/lkml/2017/5/5/369
->>
->> I was asked to remove that flag, and only zero memory in place when
->> needed. Overall the current approach is better everywhere else in the
->> kernel, but it adds a little extra code to kasan initialization.
-> 
-> Perhaps you could #define the function prototype(s?) so that the flags
-> are not passed unless it is a kasan build?
-> 
+On Mon, Jul 24, 2017 at 02:26:24PM +0300, Yury Norov wrote:
+> This is the 4.12 and linux-next - based kernel patches:
+> https://github.com/norov/linux/tree/ilp32-4.12
+> https://github.com/norov/linux/tree/ilp32-20170724
 
-Hi David,
+I published the 4.12 branch here:
 
-Thank you for suggestion. I think a kasan specific vmemmap (what I 
-described in the previous e-mail) would be a better solution over having 
-different prototypes with different builds.  It would be cleaner to have 
-all kasan specific code in one place.
+https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=staging/ilp32-4.12
 
-Pasha
+(or git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git staging/ilp32-4.12)
+
+There are two patches on top, one to fix SET_PERSONALITY and the other
+to make ILP32 default y since you'd expect people using this branch to
+need such option enabled.
+
+I'll publish a 4.13-based branch when the corresponding kernel version
+is released.
+
+Thanks.
+
+-- 
+Catalin
