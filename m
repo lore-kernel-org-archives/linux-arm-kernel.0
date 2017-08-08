@@ -1,68 +1,62 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Tue, 8 Aug 2017 14:57:12 +0530
-Subject: [PATCH RFC] irqchip: gic-v3: Support forced cpu irq affinity
- setting
-In-Reply-To: <7ea6b8d3-762a-d4e9-3b64-609b534c3960@arm.com>
-References: <CGME20170808091129epcas1p48d0523675178cb841d97e64d5baab75f@epcas1p4.samsung.com>
- <1502183093-30327-1-git-send-email-alim.akhtar@samsung.com>
- <7ea6b8d3-762a-d4e9-3b64-609b534c3960@arm.com>
-Message-ID: <a13295d7-40cc-24d7-a99a-3d349fbb91cb@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 8 Aug 2017 10:34:50 +0100
+Subject: [PATCH] mm: Revert x86_64 and arm64 ELF_ET_DYN_BASE base
+In-Reply-To: <20170807201542.GA21271@beast>
+References: <20170807201542.GA21271@beast>
+Message-ID: <20170808093450.GA13355@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 08/08/2017 02:52 PM, Marc Zyngier wrote:
-> On 08/08/17 10:04, Alim Akhtar wrote:
->> Skip check for online cpu mask when setting irq affinity of per cpu timer
->> during early startup of not yet online cpu.
->>
->> Signed-off-by: Shaik Ameer Basha <shaik.ameer@samsung.com>
->> Signed-off-by: Aswani Reddy <aswani.reddy@samsung.com>
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
->> ---
->>   drivers/irqchip/irq-gic-v3.c | 7 ++++++-
->>   1 file changed, 6 insertions(+), 1 deletion(-)
->>
->> Currently when non boot CPUs comes up and if setting of IRQ affinity gets called
->> before cpu online status gets updated, gic_mpidr_to_affinity() returns
->> undesirable cpu number. Using __force__ flag ignore cpu_online_mask and setup
->> the intended cpu affinity for the irq.
->>
->> The same approch is used in gicv2
->> (commit: ffde1de64012c: irqchip: Gic: Support forced affinity setting)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->> index dbffb7a..c238c64 100644
->> --- a/drivers/irqchip/irq-gic-v3.c
->> +++ b/drivers/irqchip/irq-gic-v3.c
->> @@ -640,11 +640,16 @@ static void gic_smp_init(void)
->>   static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
->>   			    bool force)
->>   {
->> -	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
->> +	unsigned int cpu;
->>   	void __iomem *reg;
->>   	int enabled;
->>   	u64 val;
->>   
->> +	if (!force)
->> +		cpu = cpumask_any_and(mask_val, cpu_online_mask);
->> +	else
->> +		cpu = cpumask_first(mask_val);
->> +
->>   	if (cpu >= nr_cpu_ids)
->>   		return -EINVAL;
->>   
->>
+On Mon, Aug 07, 2017 at 01:15:42PM -0700, Kees Cook wrote:
+> Moving the x86_64 and arm64 PIE base from 0x555555554000 to 0x000100000000
+> broke AddressSanitizer. This is a partial revert of:
 > 
-> See
+>   commit eab09532d400 ("binfmt_elf: use ELF_ET_DYN_BASE only for PIE")
+>   commit 02445990a96e ("arm64: move ELF_ET_DYN_BASE to 4GB / 4MB")
 > 
-> https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git/commit/?h=irq/irqchip-4.13&id=65a30f8b300107266f316d550f060ccc186201a3
+> The AddressSanitizer tool has hard-coded expectations about where
+> executable mappings are loaded. The motivation for changing the PIE
+> base in the above commits was to avoid the Stack-Clash CVEs that
+> allowed executable mappings to get too close to heap and stack. This
+> was mainly a problem on 32-bit, but the 64-bit bases were moved too,
+> in an effort to proactively protect those systems (proofs of concept
+> do exist that show 64-bit collisions, but other recent changes to fix
+> stack accounting and setuid behaviors will minimize the impact).
 > 
+> The new 32-bit PIE base is fine for ASan (since it matches the ET_EXEC
+> base), so only the 64-bit PIE base needs to be reverted to let x86 and
+> arm64 ASan binaries run again. Future changes to the 64-bit PIE base on
+> these architectures can be made optional once a more dynamic method for
+> dealing with AddressSanitizer is found. (e.g. always loading PIE into
+> the mmap region for marked binaries.)
+> 
+> Reported-by: Kostya Serebryany <kcc@google.com>
+> Cc: stable at vger.kernel.org
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> ---
+>  arch/arm64/include/asm/elf.h | 4 ++--
+>  arch/x86/include/asm/elf.h   | 4 ++--
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> index acae781f7359..3288c2b36731 100644
+> --- a/arch/arm64/include/asm/elf.h
+> +++ b/arch/arm64/include/asm/elf.h
+> @@ -114,10 +114,10 @@
+>  
+>  /*
+>   * This is the base location for PIE (ET_DYN with INTERP) loads. On
+> - * 64-bit, this is raised to 4GB to leave the entire 32-bit address
+> + * 64-bit, this is above 4GB to leave the entire 32-bit address
+>   * space open for things that want to use the area for 32-bit pointers.
+>   */
+> -#define ELF_ET_DYN_BASE		0x100000000UL
+> +#define ELF_ET_DYN_BASE		(2 * TASK_SIZE_64 / 3)
+>  
+>  #ifndef __ASSEMBLY__
 
-Thanks Marc for above link. Is this already queued in some tree? I can't 
-find this is linux-next.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-> 	M.
-> 
+I assume this is going via akpm like the original commit?
+
+Will
