@@ -1,52 +1,91 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Tue, 8 Aug 2017 16:35:19 +0800
-Subject: [PATCH] memory: mtk-smi: Handle return value of clk_prepare_enable
-In-Reply-To: <2c1de1862ce9fdefe7653706915c146038b12c4c.1502167256.git.arvind.yadav.cs@gmail.com>
-References: <472bce58da459a7c64d0ad1cd39b74fa0fcf77f1.1502167256.git.arvind.yadav.cs@gmail.com>
- <2c1de1862ce9fdefe7653706915c146038b12c4c.1502167256.git.arvind.yadav.cs@gmail.com>
-Message-ID: <1502181319.24341.38.camel@mtksdaap41>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue,  8 Aug 2017 10:39:20 +0200
+Subject: [PATCH 02/10] ARM: dts: r8a7779: Use R-Car GPIO Gen1 fallback compat
+ string
+In-Reply-To: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
+References: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1502181568-12299-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-08-08 at 11:06 +0530, Arvind Yadav wrote:
-> clk_prepare_enable() can fail here and we must check its return value.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
+Use newly added R-Car GPIO Gen1 fallback compat string
+in place of now deprecated non-generation specific
+R-Car GPIO fallback compat string in DT of r8a7779 SoC.
 
-Hi, Arvind,
-please rebase this to my latest patchset[1], it's been applied by Joerg.
-And please send this one to Joerg and iommu mail list.
+This should have no run-time effect as the driver matches against
+the per-SoC compat string before considering the fallback compat string.
 
-otherwise:
-Acked-by: Honghui Zhang <honghui.zhang@mediatek.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7779.dtsi | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-[1]https://lkml.org/lkml/2017/8/3/968
-
-Thanks.
->  drivers/memory/mtk-smi.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
-> index 4afbc41..edf36f0 100644
-> --- a/drivers/memory/mtk-smi.c
-> +++ b/drivers/memory/mtk-smi.c
-> @@ -321,6 +321,7 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
->  	struct resource *res;
->  	const struct of_device_id *of_id;
->  	enum mtk_smi_gen smi_gen;
-> +	int ret;
->  
->  	if (!dev->pm_domain)
->  		return -EPROBE_DEFER;
-> @@ -359,7 +360,9 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
->  		if (IS_ERR(common->clk_async))
->  			return PTR_ERR(common->clk_async);
->  
-> -		clk_prepare_enable(common->clk_async);
-> +		ret = clk_prepare_enable(common->clk_async);
-> +		if (ret)
-> +			return ret;
->  	}
->  	pm_runtime_enable(dev);
->  	platform_set_drvdata(pdev, common);
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index 8ee0b2ca5d39..ccef2cfab6e0 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -76,7 +76,7 @@
+ 	};
+ 
+ 	gpio0: gpio at ffc40000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc40000 0x2c>;
+ 		interrupts = <GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -87,7 +87,7 @@
+ 	};
+ 
+ 	gpio1: gpio at ffc41000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc41000 0x2c>;
+ 		interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -98,7 +98,7 @@
+ 	};
+ 
+ 	gpio2: gpio at ffc42000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc42000 0x2c>;
+ 		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -109,7 +109,7 @@
+ 	};
+ 
+ 	gpio3: gpio at ffc43000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc43000 0x2c>;
+ 		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -120,7 +120,7 @@
+ 	};
+ 
+ 	gpio4: gpio at ffc44000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc44000 0x2c>;
+ 		interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -131,7 +131,7 @@
+ 	};
+ 
+ 	gpio5: gpio at ffc45000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc45000 0x2c>;
+ 		interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+@@ -142,7 +142,7 @@
+ 	};
+ 
+ 	gpio6: gpio at ffc46000 {
+-		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
++		compatible = "renesas,gpio-r8a7779", "renesas,rcar-gen1-gpio";
+ 		reg = <0xffc46000 0x2c>;
+ 		interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+ 		#gpio-cells = <2>;
+-- 
+2.1.4
