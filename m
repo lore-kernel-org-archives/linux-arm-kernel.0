@@ -1,151 +1,70 @@
-From: rrichter@cavium.com (Robert Richter)
-Date: Tue,  8 Aug 2017 14:22:58 +0200
-Subject: [PATCH v3 8/8] irqchip, gicv3-its,
- cma: Use CMA for allocation of large device tables
-In-Reply-To: <20170808122259.6299-1-rrichter@cavium.com>
-References: <20170808122259.6299-1-rrichter@cavium.com>
-Message-ID: <20170808122259.6299-9-rrichter@cavium.com>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Tue, 08 Aug 2017 20:26:57 +0800
+Subject: [PATCH v3 0/4] thermal: add brcmstb AVS TMON driver
+In-Reply-To: <a29d8aef-8d24-9e63-c078-48c3a1a6fccf@gmail.com>
+References: <20170731192633.58747-1-code@mmayer.net>
+ <a29d8aef-8d24-9e63-c078-48c3a1a6fccf@gmail.com>
+Message-ID: <1502195217.4296.33.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gicv3-its device table may have a size of up to 16MB. With 4k
-pagesize the maximum size of memory allocation is 4MB. Use CMA for
-allocation of large tables.
+On Mon, 2017-08-07 at 10:52 -0700, Florian Fainelli wrote:
+> On 07/31/2017 12:26 PM, Markus Mayer wrote:
+> > 
+> > From: Markus Mayer <mmayer@broadcom.com>
+> > 
+> > This series adds the brcmstb AVS TMON driver.
+> > 
+> > The driver was originally written by Brian Norris.
+> > 
+> > v1 of this series can be found at https://lkml.org/lkml/2017/6/5/92
+> > 1
+> > v2 of this series can be found at https://lkml.org/lkml/2017/7/21/5
+> > 85
+> FWIW, this looks good to me, Eduardo, Rui, can we get this moving?
+> 
+Usually, Eduardo will take the arm soc thermal patches. But he is not
+able to take it this time as he is really busy.
+To me, the thermal framework related code looks good, and I will queue
+it for next merge window, although I don't have the knowledge about the
+hardware details.
 
-We use the device managed version of dma_alloc_coherent(). Thus, we
-don't need to release it manually on device removal.
+thanks,
+rui
 
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 74 ++++++++++++++++++++++++----------------
- 1 file changed, 45 insertions(+), 29 deletions(-)
-
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index b7d853dd6b75..8da9b423f9e1 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -22,6 +22,7 @@
- #include <linux/delay.h>
- #include <linux/device.h>
- #include <linux/dma-iommu.h>
-+#include <linux/dma-mapping.h>
- #include <linux/interrupt.h>
- #include <linux/irqdomain.h>
- #include <linux/log2.h>
-@@ -866,6 +867,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
- 	u64 type = GITS_BASER_TYPE(val);
- 	u32 alloc_pages;
- 	void *base;
-+	dma_addr_t dma_handle;
- 	u64 tmp;
- 
- retry_alloc_baser:
-@@ -878,13 +880,26 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
- 		order = get_order(GITS_BASER_PAGES_MAX * psz);
- 	}
- 
--	base = (void *)devm_get_free_pages(&its->dev, GFP_KERNEL | __GFP_ZERO,
--					   order);
--	if (!base)
-+	base = dmam_alloc_coherent(&its->dev,
-+				PAGE_ORDER_TO_SIZE(order),
-+				&dma_handle,
-+				GFP_KERNEL | __GFP_ZERO);
-+
-+	if (!base && order >= MAX_ORDER) {
-+		order = MAX_ORDER - 1;
-+		dev_warn(&its->dev, "Device Table too large, reduce ids %u->%u, no CMA memory available\n",
-+			its->device_ids,
-+			ilog2(PAGE_ORDER_TO_SIZE(order) / (int)esz));
-+		goto retry_alloc_baser;
-+	}
-+
-+	if (!base) {
-+		dev_err(&its->dev, "Failed to allocate device table\n");
- 		return -ENOMEM;
-+	}
- 
- retry_baser:
--	val = (virt_to_phys(base)				 |
-+	val = (dma_handle					 |
- 		(type << GITS_BASER_TYPE_SHIFT)			 |
- 		((esz - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)	 |
- 		((alloc_pages - 1) << GITS_BASER_PAGES_SHIFT)	 |
-@@ -925,29 +940,28 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
- 		goto retry_baser;
- 	}
- 
--	if ((val ^ tmp) & GITS_BASER_PAGE_SIZE_MASK) {
--		/*
--		 * Page size didn't stick. Let's try a smaller
--		 * size and retry. If we reach 4K, then
--		 * something is horribly wrong...
--		 */
--		devm_free_pages(&its->dev, (unsigned long)base);
--		baser->base = NULL;
--
--		switch (psz) {
--		case SZ_16K:
--			psz = SZ_4K;
--			goto retry_alloc_baser;
--		case SZ_64K:
--			psz = SZ_16K;
--			goto retry_alloc_baser;
-+	if (val != tmp) {
-+		dmam_free_coherent(&its->dev, PAGE_ORDER_TO_SIZE(order),
-+				base, dma_handle);
-+
-+		if ((val ^ tmp) & GITS_BASER_PAGE_SIZE_MASK) {
-+			/*
-+			 * Page size didn't stick. Let's try a smaller
-+			 * size and retry. If we reach 4K, then
-+			 * something is horribly wrong...
-+			 */
-+			switch (psz) {
-+			case SZ_16K:
-+				psz = SZ_4K;
-+				goto retry_alloc_baser;
-+			case SZ_64K:
-+				psz = SZ_16K;
-+				goto retry_alloc_baser;
-+			}
- 		}
--	}
- 
--	if (val != tmp) {
- 		dev_err(&its->dev, "%s doesn't stick: %llx %llx\n",
- 		       its_base_type_string[type], val, tmp);
--		devm_free_pages(&its->dev, (unsigned long)base);
- 		return -ENXIO;
- 	}
- 
-@@ -1005,12 +1019,6 @@ static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser
- 	 * feature is not supported by hardware.
- 	 */
- 	new_order = max_t(u32, get_order(esz << ids), new_order);
--	if (new_order >= MAX_ORDER) {
--		new_order = MAX_ORDER - 1;
--		ids = ilog2(PAGE_ORDER_TO_SIZE(new_order) / (int)esz);
--		dev_warn(&its->dev, "Device Table too large, reduce ids %u->%u\n",
--			its->device_ids, ids);
--	}
- 
- 	*order = new_order;
- 
-@@ -1716,6 +1724,14 @@ static int __init its_init_one(struct its_node *its)
- 		return err;
- 	}
- 
-+	/*
-+	 * Setup dma_ops to be used with dmam_alloc_coherent() for its
-+	 * device table allocation. Since the device table is
-+	 * exclusively used by the device only we can mark this mem as
-+	 * coherent.
-+	 */
-+	arch_setup_dma_ops(&its->dev, 0, 0, NULL, true);
-+
- 	its_base = devm_ioremap(&its->dev, its->phys_base, its->phys_size);
- 	if (!its_base) {
- 		dev_warn(&its->dev, "Unable to map ITS registers\n");
--- 
-2.11.0
+> > 
+> > 
+> > Changes since v2:
+> > - replaced calls to pr_debug() with calls to dev_dbg() [PATCH 2/4
+> > only]
+> > - all other patches are unchanged from v2
+> > 
+> > Changes since v1:
+> > - Fixed wording in binding document
+> > - Fixed lincensing to consistently mention GPL v2
+> > - Use thermal_zone_get_slope() and thermal_zone_get_offset()
+> > - Some minor clean-ups
+> > 
+> > Brian Norris (2):
+> > ? Documentation: devicetree: add binding for Broadcom STB AVS TMON
+> > ? thermal: add brcmstb AVS TMON driver
+> > 
+> > Markus Mayer (2):
+> > ? ARM: multi_v7_defconfig: add CONFIG_BRCMSTB_THERMAL
+> > ? arm64: defconfig: add CONFIG_BRCMSTB_THERMAL
+> > 
+> > ?.../devicetree/bindings/thermal/brcm,avs-tmon.txt??|??20 ++
+> > ?MAINTAINERS????????????????????????????????????????|???8 +
+> > ?arch/arm/configs/multi_v7_defconfig????????????????|???1 +
+> > ?arch/arm64/configs/defconfig???????????????????????|???1 +
+> > ?drivers/thermal/Kconfig????????????????????????????|???2 +-
+> > ?drivers/thermal/broadcom/Kconfig???????????????????|???7 +
+> > ?drivers/thermal/broadcom/Makefile??????????????????|???1 +
+> > ?drivers/thermal/broadcom/brcmstb_thermal.c?????????| 386
+> > +++++++++++++++++++++
+> > ?8 files changed, 425 insertions(+), 1 deletion(-)
+> > ?create mode 100644
+> > Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
+> > ?create mode 100644 drivers/thermal/broadcom/brcmstb_thermal.c
+> > 
+> 
