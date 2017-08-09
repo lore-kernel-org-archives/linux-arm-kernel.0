@@ -1,21 +1,116 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 9 Aug 2017 18:12:37 +0800
-Subject: [PATCH 0/2] add cpufreq support to MT7622
-Message-ID: <cover.1502272372.git.sean.wang@mediatek.com>
+Date: Wed, 9 Aug 2017 18:12:38 +0800
+Subject: [PATCH 1/2] cpufreq: mediatek: add cleanups with the more generic
+ naming
+In-Reply-To: <cover.1502272372.git.sean.wang@mediatek.com>
+References: <cover.1502272372.git.sean.wang@mediatek.com>
+Message-ID: <c658e5aa68d26c645a8ecd58da69576c9fe237c5.1502272372.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-Add cpufreq support to MT7622 SoC and also include some cleanups
-with the generic naming to explicitly support all MediaTek SoCs.
+Since more MediaTek SoCs can be supported with the cpufreq driver and not
+limited to MT8173, a couple of cleanups are done here with renaming those
+functions and related structures with "mtk" instead of "mt8173".
 
-Sean Wang (2):
-  cpufreq: mediatek: add cleanups with the more generic naming
-  cpufreq: mediatek: add support of cpufreq to MT7622 SoC
+Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+---
+ drivers/cpufreq/mediatek-cpufreq.c | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
 
- drivers/cpufreq/mediatek-cpufreq.c | 27 ++++++++++++++-------------
- 1 file changed, 14 insertions(+), 13 deletions(-)
-
+diff --git a/drivers/cpufreq/mediatek-cpufreq.c b/drivers/cpufreq/mediatek-cpufreq.c
+index 008e088..9fa9291 100644
+--- a/drivers/cpufreq/mediatek-cpufreq.c
++++ b/drivers/cpufreq/mediatek-cpufreq.c
+@@ -507,7 +507,7 @@ static int mtk_cpufreq_exit(struct cpufreq_policy *policy)
+ 	return 0;
+ }
+ 
+-static struct cpufreq_driver mt8173_cpufreq_driver = {
++static struct cpufreq_driver mtk_cpufreq_driver = {
+ 	.flags = CPUFREQ_STICKY | CPUFREQ_NEED_INITIAL_FREQ_CHECK |
+ 		 CPUFREQ_HAVE_GOVERNOR_PER_POLICY,
+ 	.verify = cpufreq_generic_frequency_table_verify,
+@@ -520,7 +520,7 @@ static struct cpufreq_driver mt8173_cpufreq_driver = {
+ 	.attr = cpufreq_generic_attr,
+ };
+ 
+-static int mt8173_cpufreq_probe(struct platform_device *pdev)
++static int mtk_cpufreq_probe(struct platform_device *pdev)
+ {
+ 	struct mtk_cpu_dvfs_info *info, *tmp;
+ 	int cpu, ret;
+@@ -547,7 +547,7 @@ static int mt8173_cpufreq_probe(struct platform_device *pdev)
+ 		list_add(&info->list_head, &dvfs_info_list);
+ 	}
+ 
+-	ret = cpufreq_register_driver(&mt8173_cpufreq_driver);
++	ret = cpufreq_register_driver(&mtk_cpufreq_driver);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "failed to register mtk cpufreq driver\n");
+ 		goto release_dvfs_info_list;
+@@ -564,15 +564,15 @@ static int mt8173_cpufreq_probe(struct platform_device *pdev)
+ 	return ret;
+ }
+ 
+-static struct platform_driver mt8173_cpufreq_platdrv = {
++static struct platform_driver mtk_cpufreq_platdrv = {
+ 	.driver = {
+-		.name	= "mt8173-cpufreq",
++		.name	= "mtk-cpufreq",
+ 	},
+-	.probe		= mt8173_cpufreq_probe,
++	.probe		= mtk_cpufreq_probe,
+ };
+ 
+ /* List of machines supported by this driver */
+-static const struct of_device_id mt8173_cpufreq_machines[] __initconst = {
++static const struct of_device_id mtk_cpufreq_machines[] __initconst = {
+ 	{ .compatible = "mediatek,mt2701", },
+ 	{ .compatible = "mediatek,mt7623", },
+ 	{ .compatible = "mediatek,mt817x", },
+@@ -582,7 +582,7 @@ static const struct of_device_id mt8173_cpufreq_machines[] __initconst = {
+ 	{ }
+ };
+ 
+-static int __init mt8173_cpufreq_driver_init(void)
++static int __init mtk_cpufreq_driver_init(void)
+ {
+ 	struct device_node *np;
+ 	const struct of_device_id *match;
+@@ -593,14 +593,14 @@ static int __init mt8173_cpufreq_driver_init(void)
+ 	if (!np)
+ 		return -ENODEV;
+ 
+-	match = of_match_node(mt8173_cpufreq_machines, np);
++	match = of_match_node(mtk_cpufreq_machines, np);
+ 	of_node_put(np);
+ 	if (!match) {
+-		pr_warn("Machine is not compatible with mt8173-cpufreq\n");
++		pr_warn("Machine is not compatible with mtk-cpufreq\n");
+ 		return -ENODEV;
+ 	}
+ 
+-	err = platform_driver_register(&mt8173_cpufreq_platdrv);
++	err = platform_driver_register(&mtk_cpufreq_platdrv);
+ 	if (err)
+ 		return err;
+ 
+@@ -610,7 +610,7 @@ static int __init mt8173_cpufreq_driver_init(void)
+ 	 * and the device registration codes are put here to handle defer
+ 	 * probing.
+ 	 */
+-	pdev = platform_device_register_simple("mt8173-cpufreq", -1, NULL, 0);
++	pdev = platform_device_register_simple("mtk-cpufreq", -1, NULL, 0);
+ 	if (IS_ERR(pdev)) {
+ 		pr_err("failed to register mtk-cpufreq platform device\n");
+ 		return PTR_ERR(pdev);
+@@ -618,4 +618,4 @@ static int __init mt8173_cpufreq_driver_init(void)
+ 
+ 	return 0;
+ }
+-device_initcall(mt8173_cpufreq_driver_init);
++device_initcall(mtk_cpufreq_driver_init);
 -- 
 2.7.4
