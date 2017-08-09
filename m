@@ -1,111 +1,52 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 8 Aug 2017 22:25:03 -0500
-Subject: [PATCH v9 2/4] PCI: Disable PCIe Relaxed Ordering if unsupported
-In-Reply-To: <20170809022239.GP16580@bhelgaas-glaptop.roam.corp.google.com>
-References: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
- <1501917313-9812-3-git-send-email-dingtianhong@huawei.com>
- <20170809022239.GP16580@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170809032503.GB7191@bhelgaas-glaptop.roam.corp.google.com>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Wed, 9 Aug 2017 14:06:42 +1000
+Subject: [PATCH] scripts/dtc: fix '%zx' warning
+In-Reply-To: <20170808112818.GC20805@n2100.armlinux.org.uk>
+References: <E1da2Z7-0008GG-AV@rmk-PC.armlinux.org.uk>
+ <20170726013004.GJ8978@umbus.fritz.box>
+ <20170808112818.GC20805@n2100.armlinux.org.uk>
+Message-ID: <20170809040642.GG13670@umbus.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 09:22:39PM -0500, Bjorn Helgaas wrote:
-> On Sat, Aug 05, 2017 at 03:15:11PM +0800, Ding Tianhong wrote:
-> > When bit4 is set in the PCIe Device Control register, it indicates
-> > whether the device is permitted to use relaxed ordering.
-> > On some platforms using relaxed ordering can have performance issues or
-> > due to erratum can cause data-corruption. In such cases devices must avoid
-> > using relaxed ordering.
+On Tue, Aug 08, 2017 at 12:28:19PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 26, 2017 at 11:30:04AM +1000, David Gibson wrote:
+> > On Tue, Jul 25, 2017 at 05:20:09PM +0100, Russell King wrote:
+> > > dtc uses an incorrect format specifier for printing a uint64_t value.
+> > > uint64_t may be either 'unsigned long' or 'unsigned long long' depending
+> > > on the host architecture.
+> > > 
+> > > Fix this by using %llx and casting to unsigned long long, which ensures
+> > > that we always have a wide enough variable to print 64 bits of hex.
+> > > 
+> > >   HOSTCC  scripts/dtc/checks.o
+> > > scripts/dtc/checks.c: In function 'check_simple_bus_reg':
+> > > scripts/dtc/checks.c:876:2: warning: format '%zx' expects argument of type 'size_t', but argument 4 has type 'uint64_t' [-Wformat=]
+> > >   snprintf(unit_addr, sizeof(unit_addr), "%zx", reg);
+> > >   ^
+> > > scripts/dtc/checks.c:876:2: warning: format '%zx' expects argument of type 'size_t', but argument 4 has type 'uint64_t' [-Wformat=]
+> > > 
+> > > Fixes: 828d4cdd012c ("dtc: check.c fix compile error")
+> > > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 > > 
-> > This patch checks if there is any node in the hierarchy that indicates that
-> > using relaxed ordering is not safe. 
-...
-
-> > +EXPORT_SYMBOL(pcie_relaxed_ordering_supported);
+> > This (embarrassing) error is already fixed in upstream dtc.
 > 
-> This is misnamed.  This doesn't tell us anything about whether the
-> device *supports* relaxed ordering.  It only tells us whether the
-> device is *permitted* to use it.
-> 
-> When a device initiates a transaction, the hardware should set the RO
-> bit in the TLP with logic something like this:
-> 
->   RO = <this Function supports relaxed ordering> &&
->        <this transaction doesn't require strong write ordering> &&
->        <PCI_EXP_DEVCTL_RELAX_EN is set>
-> 
-> The issue you're fixing is that some Completers don't handle RO
-> correctly.  The determining factor is not the Requester, but the
-> Completer (for this series, a Root Port).  So I think this should be
-> something like:
-> 
->   int pcie_relaxed_ordering_broken(struct pci_dev *completer)
->   {
->     if (!completer)
->       return 0;
-> 
->     return completer->dev_flags & PCI_DEV_FLAGS_NO_RELAXED_ORDERING;
->   }
-> 
-> and the caller should do something like this:
-> 
->  if (pcie_relaxed_ordering_broken(pci_find_pcie_root_port(pdev)))
->    adapter->flags |= ROOT_NO_RELAXED_ORDERING;
-> 
-> That way it's obvious where the issue is, and it's obvious that the
-> answer might be different for peer-to-peer transactions than it is for
-> transactions to the root port, i.e., to coherent memory.
+> It remains unfixed in 4.13-rc4.  How do we get this fixed in the
+> kernel's dtc?  From what I can see, sending a patch to fix stuff
+> doesn't work.
 
-After looking at the driver, I wonder if it would be simpler like
-this:
+Um.. I don't know.  I haven't been the person doing updates of the
+kernel dtc to match upstream dtc for ages.
 
-  int pcie_relaxed_ordering_enabled(struct pci_dev *dev)
-  {
-    u16 ctl;
-
-    pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &ctl);
-    return ctl & PCI_EXP_DEVCTL_RELAX_EN;
-  }
-  EXPORT_SYMBOL(pcie_relaxed_ordering_enabled);
-
-  static void pci_configure_relaxed_ordering(struct pci_dev *dev)
-  {
-    struct pci_dev *root;
-
-    if (dev->is_virtfn)
-      return;  /* PCI_EXP_DEVCTL_RELAX_EN is RsvdP in VFs */
-
-    if (!pcie_relaxed_ordering_enabled(dev))
-      return;
-
-    /*
-     * For now, we only deal with Relaxed Ordering issues with Root
-     * Ports.  Peer-to-peer DMA is another can of worms.
-     */
-    root = pci_find_pcie_root_port(dev);
-    if (!root)
-      return;
-
-    if (root->relaxed_ordering_broken)
-      pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
-                                 PCI_EXP_DEVCTL_RELAX_EN);
-  }
-
-This doesn't check every intervening switch, but I don't think we know
-about any issues except with root ports.
-
-And the driver could do:
-
-  if (!pcie_relaxed_ordering_enabled(pdev))
-    adapter->flags |= ROOT_NO_RELAXED_ORDERING;
-
-The driver code wouldn't show anything about coherent memory vs.
-peer-to-peer, but we really don't have a clue about how to handle that
-yet anyway.
-
-I guess this is back to exactly what you proposed, except that I
-changed the name of pcie_relaxed_ordering_supported() to
-pcie_relaxed_ordering_enabled(), which I think is slightly more
-specific from the device's point of view.
-
-Bjorn
+-- 
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170809/a642415a/attachment.sig>
