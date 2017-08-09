@@ -1,227 +1,86 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 8 Aug 2017 21:22:39 -0500
-Subject: [PATCH v9 2/4] PCI: Disable PCIe Relaxed Ordering if unsupported
-In-Reply-To: <1501917313-9812-3-git-send-email-dingtianhong@huawei.com>
+Date: Tue, 8 Aug 2017 22:02:36 -0500
+Subject: [PATCH v9 1/4] PCI: Add new PCIe Fabric End Node flag,
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+In-Reply-To: <MWHPR12MB1600249E96C320D5472F77ADC88B0@MWHPR12MB1600.namprd12.prod.outlook.com>
 References: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
- <1501917313-9812-3-git-send-email-dingtianhong@huawei.com>
-Message-ID: <20170809022239.GP16580@bhelgaas-glaptop.roam.corp.google.com>
+ <1501917313-9812-2-git-send-email-dingtianhong@huawei.com>
+ <20170808232200.GO16580@bhelgaas-glaptop.roam.corp.google.com>
+ <MWHPR12MB1600249E96C320D5472F77ADC88B0@MWHPR12MB1600.namprd12.prod.outlook.com>
+Message-ID: <20170809030236.GA7191@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 05, 2017 at 03:15:11PM +0800, Ding Tianhong wrote:
-> When bit4 is set in the PCIe Device Control register, it indicates
-> whether the device is permitted to use relaxed ordering.
-> On some platforms using relaxed ordering can have performance issues or
-> due to erratum can cause data-corruption. In such cases devices must avoid
-> using relaxed ordering.
+On Wed, Aug 09, 2017 at 01:40:01AM +0000, Casey Leedom wrote:
+> | From: Bjorn Helgaas <helgaas@kernel.org>
+> | Sent: Tuesday, August 8, 2017 4:22 PM
+> | 
+> | This needs to include a link to the Intel spec
+> | (https://software.intel.com/sites/default/files/managed/9e/bc/64-ia-32-architectures-optimization-manual.pdf,
+> | sec 3.9.1).
 > 
-> This patch checks if there is any node in the hierarchy that indicates that
-> using relaxed ordering is not safe. 
-
-I think you only check the devices between the root port and the
-target device.  For example, you don't check siblings or cousins of
-the target device.
-
-> In such cases the patch turns off the
-> relaxed ordering by clearing the eapability for this device.
-
-s/eapability/capability/
-
-> And if the
-> device is probably running in a guest machine, we should do nothing.
-
-I don't know what this sentence means.  "Probably running in a guest
-machine" doesn't really make sense, and there's nothing in your patch
-that explicitly checks for being in a guest machine.
-
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> Acked-by: Alexander Duyck <alexander.h.duyck@intel.com>
-> Acked-by: Ashok Raj <ashok.raj@intel.com>
-> ---
->  drivers/pci/pci.c   | 29 +++++++++++++++++++++++++++++
->  drivers/pci/probe.c | 37 +++++++++++++++++++++++++++++++++++++
->  include/linux/pci.h |  2 ++
->  3 files changed, 68 insertions(+)
+>   In the commit message or as a comment?  Regardless, I agree.  It's always
+> nice to be able to go back and see what the official documentation says.
+> However, that said, links on the internet are ... fragile as time goes by,
+> so we might want to simply quote section 3.9.1 in the commit message since
+> it's relatively short:
 > 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index af0cc34..4f9d7c1 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -4854,6 +4854,35 @@ int pcie_set_mps(struct pci_dev *dev, int mps)
->  EXPORT_SYMBOL(pcie_set_mps);
->  
->  /**
-> + * pcie_clear_relaxed_ordering - clear PCI Express relaxed ordering bit
-> + * @dev: PCI device to query
-> + *
-> + * If possible clear relaxed ordering
-
-Why "If possible"?  The bit is required to be RW or hardwired to zero,
-so PCI_EXP_DEVCTL_RELAX_EN should *always* be zero when this returns.
-
-> + */
-> +int pcie_clear_relaxed_ordering(struct pci_dev *dev)
-> +{
-> +	return pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
-> +					  PCI_EXP_DEVCTL_RELAX_EN);
-> +}
-> +EXPORT_SYMBOL(pcie_clear_relaxed_ordering);
-
-The current series doesn't add any callers of this except
-pci_configure_relaxed_ordering(), so it doesn't need to be exported to
-modules.
-
-I think I would put both of these functions in drivers/pci/probe.c.
-Then this one could be static and you'd only have to add
-pcie_relaxed_ordering_supported() to include/linux/pci.h.
-
-> +
-> +/**
-> + * pcie_relaxed_ordering_supported - Probe for PCIe relexed ordering support
-
-s/relexed/relaxed/
-
-> + * @dev: PCI device to query
-> + *
-> + * Returns true if the device support relaxed ordering attribute.
-> + */
-> +bool pcie_relaxed_ordering_supported(struct pci_dev *dev)
-> +{
-> +	u16 v;
-> +
-> +	pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &v);
-> +
-> +	return !!(v & PCI_EXP_DEVCTL_RELAX_EN);
-> +}
-> +EXPORT_SYMBOL(pcie_relaxed_ordering_supported);
-
-This is misnamed.  This doesn't tell us anything about whether the
-device *supports* relaxed ordering.  It only tells us whether the
-device is *permitted* to use it.
-
-When a device initiates a transaction, the hardware should set the RO
-bit in the TLP with logic something like this:
-
-  RO = <this Function supports relaxed ordering> &&
-       <this transaction doesn't require strong write ordering> &&
-       <PCI_EXP_DEVCTL_RELAX_EN is set>
-
-The issue you're fixing is that some Completers don't handle RO
-correctly.  The determining factor is not the Requester, but the
-Completer (for this series, a Root Port).  So I think this should be
-something like:
-
-  int pcie_relaxed_ordering_broken(struct pci_dev *completer)
-  {
-    if (!completer)
-      return 0;
-
-    return completer->dev_flags & PCI_DEV_FLAGS_NO_RELAXED_ORDERING;
-  }
-
-and the caller should do something like this:
-
- if (pcie_relaxed_ordering_broken(pci_find_pcie_root_port(pdev)))
-   adapter->flags |= ROOT_NO_RELAXED_ORDERING;
-
-That way it's obvious where the issue is, and it's obvious that the
-answer might be different for peer-to-peer transactions than it is for
-transactions to the root port, i.e., to coherent memory.
-
-> +
-> +/**
->   * pcie_get_minimum_link - determine minimum link settings of a PCI device
->   * @dev: PCI device to query
->   * @speed: storage for minimum speed
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index c31310d..48df012 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1762,6 +1762,42 @@ static void pci_configure_extended_tags(struct pci_dev *dev)
->  					 PCI_EXP_DEVCTL_EXT_TAG);
->  }
->  
-> +/**
-> + * pci_dev_should_disable_relaxed_ordering - check if the PCI device
-> + * should disable the relaxed ordering attribute.
-> + * @dev: PCI device
-> + *
-> + * Return true if any of the PCI devices above us do not support
-> + * relaxed ordering.
-> + */
-> +static bool pci_dev_should_disable_relaxed_ordering(struct pci_dev *dev)
-> +{
-> +	while (dev) {
-> +		if (dev->dev_flags & PCI_DEV_FLAGS_NO_RELAXED_ORDERING)
-> +			return true;
-> +
-> +		dev = dev->bus->self;
-> +	}
-> +
-> +	return false;
-> +}
-> +
-> +static void pci_configure_relaxed_ordering(struct pci_dev *dev)
-> +{
-> +	/* We should not alter the relaxed ordering bit for the VF */
-> +	if (dev->is_virtfn)
-> +		return;
-> +
-> +	/* If the releaxed ordering enable bit is not set, do nothing. */
-
-s/releaxed/relaxed/
-
-> +	if (!pcie_relaxed_ordering_supported(dev))
-> +		return;
-> +
-> +	if (pci_dev_should_disable_relaxed_ordering(dev)) {
-> +		pcie_clear_relaxed_ordering(dev);
-> +		dev_info(&dev->dev, "Disable Relaxed Ordering\n");
-
-This associates the message with the Requester that may potentially
-use relaxed ordering.  But there's nothing wrong or unusual about the
-Requester; the issue is with the *Completer*, so I think the message
-should be in the quirk where we set PCI_DEV_FLAGS_NO_RELAXED_ORDERING.
-Maybe it should be both places; I dunno.
-
-This implementation assumes the device only initiates transactions to
-coherent memory, i.e., it assumes the device never does peer-to-peer
-DMA.  I guess we'll have to wait and see if we trip over any
-peer-to-peer issues, then figure out how to handle them.
-
-> +	}
-> +}
-> +
->  static void pci_configure_device(struct pci_dev *dev)
->  {
->  	struct hotplug_params hpp;
-> @@ -1769,6 +1805,7 @@ static void pci_configure_device(struct pci_dev *dev)
->  
->  	pci_configure_mps(dev);
->  	pci_configure_extended_tags(dev);
-> +	pci_configure_relaxed_ordering(dev);
->  
->  	memset(&hpp, 0, sizeof(hpp));
->  	ret = pci_get_hp_params(dev, &hpp);
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 412ec1c..3aa23a2 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -1127,6 +1127,8 @@ int pci_add_ext_cap_save_buffer(struct pci_dev *dev,
->  void pci_pme_wakeup_bus(struct pci_bus *bus);
->  void pci_d3cold_enable(struct pci_dev *dev);
->  void pci_d3cold_disable(struct pci_dev *dev);
-> +int pcie_clear_relaxed_ordering(struct pci_dev *dev);
-> +bool pcie_relaxed_ordering_supported(struct pci_dev *dev);
->  
->  /* PCI Virtual Channel */
->  int pci_save_vc_state(struct pci_dev *dev);
-> -- 
-> 1.8.3.1
+>     3.9.1 Optimizing PCIe Performance for Accesses Toward Coherent Memory
+>           and Toward MMIO Regions (P2P)
 > 
+>     In order to maximize performance for PCIe devices in the processors
+>     listed in Table 3-6 below, the soft- ware should determine whether the
+>     accesses are toward coherent memory (system memory) or toward MMIO
+>     regions (P2P access to other devices). If the access is toward MMIO
+>     region, then software can command HW to set the RO bit in the TLP
+>     header, as this would allow hardware to achieve maximum throughput for
+>     these types of accesses. For accesses toward coherent memory, software
+>     can command HW to clear the RO bit in the TLP header (no RO), as this
+>     would allow hardware to achieve maximum throughput for these types of
+>     accesses.
 > 
+>     Table 3-6. Intel Processor CPU RP Device IDs for Processors Optimizing
+>                PCIe Performance
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>     Processor                            CPU RP Device IDs
+> 
+>     Intel Xeon processors based on       6F01H-6F0EH
+>     Broadwell microarchitecture
+> 
+>     Intel Xeon processors based on       2F01H-2F0EH
+>     Haswell microarchitecture
+
+Agreed, links are prone to being broken.  I would include in the
+changelog the complete title and order number, along with the link as
+a footnote.  Wouldn't hurt to quote the section too, since it's short.
+
+> | It should also include a pointer to the AMD erratum, if available, or
+> | at least some reference to how we know it doesn't obey the rules.
+> 
+>   Getting an ACK from AMD seems like a forlorn cause at this point.  My
+> contact was Bob Shaw <Bob.Shaw@amd.com> and he stopped responding to me
+> messages almost a year ago saying that all of AMD's energies were being
+> redirected towards upcoming x86 products (likely Ryzen as we now know).  As
+> far as I can tell AMD has walked away from their A1100 (AKA "Seattle") ARM
+> SoC.
+> 
+>   On the specific issue, I can certainly write up somthing even more
+> extensive than I wrote up for the comment in drivers/pci/quirks.c.  Please
+> review the comment I wrote up and tell me if you'd like something even more
+> detailed -- I'm usually acused of writing comments which are too long, so
+> this would be a new one on me ... :-)
+
+If you have any bug reports with info about how you debugged it and
+concluded that Seattle is broken, you could include a link (probably
+in the changelog).  But if there isn't anything, there isn't anything.
+
+I might reorganize those patches as:
+
+  1) Add a PCI_DEV_FLAGS_RELAXED_ORDERING_BROKEN flag, the quirk that
+  sets it, and the current patch [2/4] that uses it.
+
+  2) Add the Intel DECLARE_PCI_FIXUP_CLASS_EARLY()s with the Intel
+  details.
+
+  3) Add the AMD DECLARE_PCI_FIXUP_CLASS_EARLY()s with the AMD
+  details.
