@@ -1,96 +1,53 @@
-From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Wed,  9 Aug 2017 10:19:49 +0200
-Subject: [PATCH] ARM64: dts: a7040: add regulator nodes to enable USB host VBUS
-Message-ID: <20170809081949.24343-1-miquel.raynal@free-electrons.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 9 Aug 2017 10:22:10 +0200
+Subject: [PATCH 00/10] ARM, arm64: dts: renesas: Use R-Car GPIO Gen[123]
+ fallback compat strings
+In-Reply-To: <20170809075526.GE2705@verge.net.au>
+References: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
+ <CANqRtoRcsAhvFB=DNoJHzJt4dejKX+Z8ar04D8O1cFq1XkxWkw@mail.gmail.com>
+ <20170809075526.GE2705@verge.net.au>
+Message-ID: <20170809082210.GH2705@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanna Hawa <hannah@marvell.com>
+On Wed, Aug 09, 2017 at 09:55:26AM +0200, Simon Horman wrote:
+> On Tue, Aug 08, 2017 at 07:29:28PM +0900, Magnus Damm wrote:
+> > Hi Simon,
+> > 
+> > On Tue, Aug 8, 2017 at 5:39 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> > > Use newly added R-Car GPIO Gen 1, 2 and 3 fallback compat strings in place
+> > > of now deprecated non-generation specific R-Car GPIO fallback compat string
+> > > in the DT of Renesas ARM and arm64 based SoCs.
+> > >
+> > > This should have no run-time effect as the driver matches against the
+> > > per-SoC compat string before considering the fallback compat string.
+> > 
+> > Thanks for your efforts.I have no issue with your series (apart from
+> > the GPIO and SATA mistake), but at the same time I believe the GPIO
+> > hardware itself is backwards compatible between various generations.
+> > 
+> > In the nitpick department I would like to point out that the level of
+> > hardware difference between say R-Car Gen1 GPIO and R-Car Gen2 GPIO is
+> > similar to say good old uarts like 8250 and 16450 hardware. Basically
+> > a couple of registers were added to the hardware in a
+> > backwards-compatible way if I recall correctly.
+> > 
+> > So if we are going to use "compatible" to point out if hardware is
+> > compatible or not then I would do this instead:
+> 
+> Thanks for your feedback.
+> 
+> When the generation specific compat strings were recently
+> added the renesas,gpio-rcar compat string was marked as deprecated
+> as I was under the understanding that it was only compatibile with gen 1 SoCs.
+> 
+> It now seems that was not the best thing to do and renesas,gpio-rcar should
+> be re-instated as being a generic fallback for all R-Car versions supported
+> in upstream.
+> 
+> Do you concur?
 
-Add I2C expander and USB host PHY (host 0 and host 1) to enable
-USB VBUS on USB ports of type A on Armada-7040-DB.
+I posted a patch to un-deprecate the renesas,gpio-rcar compat string
+in the bindings documentation.
 
-Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-7040-db.dts | 41 ++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-index 92c761c380d3..b14df53dda9d 100644
---- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-@@ -44,6 +44,7 @@
-  * Device Tree file for Marvell Armada 7040 Development board platform
-  */
- 
-+#include <dt-bindings/gpio/gpio.h>
- #include "armada-7040.dtsi"
- 
- / {
-@@ -59,6 +60,36 @@
- 		device_type = "memory";
- 		reg = <0x0 0x0 0x0 0x80000000>;
- 	};
-+
-+	exp_usb3h0_vbus: usb3-0-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb3-0-vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		enable-active-high;
-+		regulator-always-on;
-+		gpio = <&expander0 0 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	exp_usb3h1_vbus: usb3-1-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb3-1-vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		enable-active-high;
-+		regulator-always-on;
-+		gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	cpm_usb3_0_phy: cpm-usb3-0-phy {
-+		compatible = "usb-nop-xceiv";
-+		vcc-supply = <&exp_usb3h0_vbus>;
-+	};
-+
-+	cpm_usb3_1_phy: cpm-usb3-1-phy {
-+		compatible = "usb-nop-xceiv";
-+		vcc-supply = <&exp_usb3h1_vbus>;
-+	};
- };
- 
- &i2c0 {
-@@ -105,6 +136,14 @@
- &cpm_i2c0 {
- 	status = "okay";
- 	clock-frequency = <100000>;
-+
-+	expander0: pca9555 at 21 {
-+		compatible = "nxp,pca9555";
-+		pinctrl-names = "default";
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+		reg = <0x21>;
-+	};
- };
- 
- &cpm_spi1 {
-@@ -140,10 +179,12 @@
- };
- 
- &cpm_usb3_0 {
-+	usb-phy = <&cpm_usb3_0_phy>;
- 	status = "okay";
- };
- 
- &cpm_usb3_1 {
-+	usb-phy = <&cpm_usb3_1_phy>;
- 	status = "okay";
- };
- 
--- 
-2.11.0
+[PATCH] gpio: rcar: reinstate generic compat string
