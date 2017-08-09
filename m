@@ -1,135 +1,56 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed,  9 Aug 2017 16:56:26 +0800
-Subject: [PATCH 3/4] drivers: soc: sunxi: add support for remapping func value
- to reg value
+Date: Wed,  9 Aug 2017 16:56:27 +0800
+Subject: [PATCH 4/4] drivers: soc: sunxi: add support for A64 and its SRAM C
 In-Reply-To: <20170809085627.32687-1-icenowy@aosc.io>
 References: <20170809085627.32687-1-icenowy@aosc.io>
-Message-ID: <20170809085627.32687-4-icenowy@aosc.io>
+Message-ID: <20170809085627.32687-5-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some Allwinner SoCs, sometimes the value needed to write into the
-register to claim SRAM is not equal to the value specified in the
-device tree.
+Allwinner A64's display engine claims the SRAM C section to work.
 
-We now defines 0 as "CPU" and 1 as "Device", however, for VE SRAM, the
-register needs to be written 0x7FFFFFFF to claim it to VE, and for
-Allwinner A64's SRAM C the needed register value to claim it to DE2 is
-0, and the value that enables CPU's access to the SRAM is 1.
-
-Add a value remapping in sunxi_sram_func structure, and let the
-sunxi_sram_of_parse function set the remapped register value.
+Add support for the A64 SRAM controller and the SRAM C section of it.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- drivers/soc/sunxi/sunxi_sram.c | 43 +++++++++++++++++++++++++++++++++---------
- 1 file changed, 34 insertions(+), 9 deletions(-)
+ drivers/soc/sunxi/sunxi_sram.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
-index c1ff7fa62cb4..edc993480020 100644
+index edc993480020..882be5ed7e84 100644
 --- a/drivers/soc/sunxi/sunxi_sram.c
 +++ b/drivers/soc/sunxi/sunxi_sram.c
-@@ -23,6 +23,7 @@
- struct sunxi_sram_func {
- 	char	*func;
- 	u8	val;
-+	u32	reg_val;
+@@ -69,6 +69,12 @@ static struct sunxi_sram_desc sun4i_a10_sram_d = {
+ 				  SUNXI_SRAM_MAP(1, 1, "usb-otg")),
  };
  
- struct sunxi_sram_data {
-@@ -39,10 +40,11 @@ struct sunxi_sram_desc {
- 	bool			claimed;
- };
- 
--#define SUNXI_SRAM_MAP(_val, _func)				\
-+#define SUNXI_SRAM_MAP(_reg_val, _val, _func)			\
- 	{							\
- 		.func = _func,					\
- 		.val = _val,					\
-+		.reg_val = _reg_val,				\
- 	}
- 
- #define SUNXI_SRAM_DATA(_name, _reg, _off, _width, ...)		\
-@@ -57,14 +59,14 @@ struct sunxi_sram_desc {
- 
- static struct sunxi_sram_desc sun4i_a10_sram_a3_a4 = {
- 	.data	= SUNXI_SRAM_DATA("A3-A4", 0x4, 0x4, 2,
--				  SUNXI_SRAM_MAP(0, "cpu"),
--				  SUNXI_SRAM_MAP(1, "emac")),
-+				  SUNXI_SRAM_MAP(0, 0, "cpu"),
-+				  SUNXI_SRAM_MAP(1, 1, "emac")),
- };
- 
- static struct sunxi_sram_desc sun4i_a10_sram_d = {
- 	.data	= SUNXI_SRAM_DATA("D", 0x4, 0x0, 1,
--				  SUNXI_SRAM_MAP(0, "cpu"),
--				  SUNXI_SRAM_MAP(1, "usb-otg")),
-+				  SUNXI_SRAM_MAP(0, 0, "cpu"),
-+				  SUNXI_SRAM_MAP(1, 1, "usb-otg")),
- };
- 
++static struct sunxi_sram_desc sun50i_a64_sram_c = {
++	.data	= SUNXI_SRAM_DATA("C", 0x4, 24, 1,
++				  SUNXI_SRAM_MAP(0, 1, "cpu"),
++				  SUNXI_SRAM_MAP(1, 0, "de2")),
++};
++
  static const struct of_device_id sunxi_sram_dt_ids[] = {
-@@ -121,7 +123,8 @@ static int sunxi_sram_show(struct seq_file *s, void *data)
+ 	{
+ 		.compatible	= "allwinner,sun4i-a10-sram-a3-a4",
+@@ -78,6 +84,10 @@ static const struct of_device_id sunxi_sram_dt_ids[] = {
+ 		.compatible	= "allwinner,sun4i-a10-sram-d",
+ 		.data		= &sun4i_a10_sram_d.data,
+ 	},
++	{
++		.compatible	= "allwinner,sun50i-a64-sram-c",
++		.data		= &sun50i_a64_sram_c.data,
++	},
+ 	{}
+ };
  
- 			for (func = sram_data->func; func->func; func++) {
- 				seq_printf(s, "\t\t%s%c\n", func->func,
--					   func->val == val ? '*' : ' ');
-+					   func->reg_val == val ?
-+					   '*' : ' ');
- 			}
- 		}
+@@ -295,6 +305,7 @@ static int sunxi_sram_probe(struct platform_device *pdev)
  
-@@ -149,10 +152,13 @@ static inline struct sunxi_sram_desc *to_sram_desc(const struct sunxi_sram_data
- }
- 
- static const struct sunxi_sram_data *sunxi_sram_of_parse(struct device_node *node,
--							 unsigned int *value)
-+							 unsigned int *reg_value)
- {
- 	const struct of_device_id *match;
-+	const struct sunxi_sram_data *data;
-+	struct sunxi_sram_func *func;
- 	struct of_phandle_args args;
-+	u8 val;
- 	int ret;
- 
- 	ret = of_parse_phandle_with_fixed_args(node, "allwinner,sram", 1, 0,
-@@ -165,8 +171,7 @@ static const struct sunxi_sram_data *sunxi_sram_of_parse(struct device_node *nod
- 		goto err;
- 	}
- 
--	if (value)
--		*value = args.args[0];
-+	val = args.args[0];
- 
- 	match = of_match_node(sunxi_sram_dt_ids, args.np);
- 	if (!match) {
-@@ -174,6 +179,26 @@ static const struct sunxi_sram_data *sunxi_sram_of_parse(struct device_node *nod
- 		goto err;
- 	}
- 
-+	data = match->data;
-+	if (!data) {
-+		ret = -EINVAL;
-+		goto err;
-+	};
-+
-+	for (func = data->func; func->func; func++) {
-+		if (val == func->val) {
-+			if (reg_value)
-+				*reg_value = func->reg_val;
-+
-+			break;
-+		}
-+	}
-+
-+	if (!func->func) {
-+		ret = -EINVAL;
-+		goto err;
-+	}
-+
- 	of_node_put(args.np);
- 	return match->data;
- 
+ static const struct of_device_id sunxi_sram_dt_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-sram-controller" },
++	{ .compatible = "allwinner,sun50i-a64-sram-controller" },
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, sunxi_sram_dt_match);
 -- 
 2.13.0
