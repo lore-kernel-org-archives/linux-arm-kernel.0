@@ -1,49 +1,62 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed,  9 Aug 2017 13:05:28 +0100
-Subject: [PATCH 22/27] arm64/sve: KVM: Treat guest SVE use as undefined
- instruction execution
+Date: Wed,  9 Aug 2017 13:05:29 +0100
+Subject: [PATCH 23/27] arm64/sve: KVM: Hide SVE from CPU features exposed to
+ guests
 In-Reply-To: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
 References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1502280338-23002-23-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1502280338-23002-24-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When trapping forbidden attempts by a guest to use SVE, we want the
-guest to see a trap consistent with SVE not being implemented.
+KVM guests cannot currently use SVE, because SVE is always
+configured to trap to EL2.
 
-This patch injects an undefined instruction exception into the
-guest in response to such an exception.
+However, a guest that sees SVE reported as present in
+ID_AA64PFR0_EL1 may legitimately expect that SVE works and try to
+use it.  Instead of working, the guest will receive an injected
+undef exception, which may cause the guest to oops or go into a
+spin.
+
+To avoid misleading the guest into believing that SVE will work,
+this patch masks out the SVE field from ID_AA64PFR0_EL1 when a
+guest attempts to read this register.  No support is explicitly
+added for ID_AA64ZFR0_EL1 either, so that is still emulated as
+reading as zero, which is consistent with SVE not being
+implemented.
+
+This is a temporary measure, and will be removed in a later series
+when full KVM support for SVE is implemented.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/kvm/handle_exit.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/kvm/sys_regs.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 17d8a16..e3e42d0 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -147,6 +147,13 @@ static int kvm_handle_unknown_ec(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	return 1;
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 6583dd7..9e8c54e 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -897,8 +897,20 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
+ {
+ 	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
+ 			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
++	u64 val = raz ? 0 : read_sanitised_ftr_reg(id);
+ 
+-	return raz ? 0 : read_sanitised_ftr_reg(id);
++	if (id == SYS_ID_AA64PFR0_EL1) {
++		static bool printed;
++
++		if ((val & (0xfUL << ID_AA64PFR0_SVE_SHIFT)) && !printed) {
++			kvm_info("SVE unsupported for guests, suppressing\n");
++			printed = true;
++		}
++
++		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
++	}
++
++	return val;
  }
  
-+static int handle_sve(struct kvm_vcpu *vcpu, struct kvm_run *run)
-+{
-+	/* Until SVE is supported for guests: */
-+	kvm_inject_undefined(vcpu);
-+	return 1;
-+}
-+
- static exit_handle_fn arm_exit_handlers[] = {
- 	[0 ... ESR_ELx_EC_MAX]	= kvm_handle_unknown_ec,
- 	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
-@@ -160,6 +167,7 @@ static exit_handle_fn arm_exit_handlers[] = {
- 	[ESR_ELx_EC_HVC64]	= handle_hvc,
- 	[ESR_ELx_EC_SMC64]	= handle_smc,
- 	[ESR_ELx_EC_SYS64]	= kvm_handle_sys_reg,
-+	[ESR_ELx_EC_SVE]	= handle_sve,
- 	[ESR_ELx_EC_IABT_LOW]	= kvm_handle_guest_abort,
- 	[ESR_ELx_EC_DABT_LOW]	= kvm_handle_guest_abort,
- 	[ESR_ELx_EC_SOFTSTP_LOW]= kvm_handle_guest_debug,
+ /* cpufeature ID register access trap handlers */
 -- 
 2.1.4
