@@ -1,108 +1,111 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 9 Aug 2017 08:54:16 +0530
-Subject: [PATCH v2 0/4] Optimise 64-bit IOVA allocations
-In-Reply-To: <598A6877.4050307@huawei.com>
-References: <cover.1500636791.git.robin.murphy@arm.com>
- <20170726110807.GN15833@8bytes.org> <59787A48.6060200@huawei.com>
- <CAKTKpr5j8gfurks-7U__w5GQ4A9Wk2MKyqZy6Dbve=2CfVRvzw@mail.gmail.com>
- <598A6877.4050307@huawei.com>
-Message-ID: <CAKTKpr7vTzfGDvPDD4HipLYkkO4mfPLcL+3PXDHjb-bQwFMHUA@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 8 Aug 2017 22:25:03 -0500
+Subject: [PATCH v9 2/4] PCI: Disable PCIe Relaxed Ordering if unsupported
+In-Reply-To: <20170809022239.GP16580@bhelgaas-glaptop.roam.corp.google.com>
+References: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
+ <1501917313-9812-3-git-send-email-dingtianhong@huawei.com>
+ <20170809022239.GP16580@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170809032503.GB7191@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 9, 2017 at 7:12 AM, Leizhen (ThunderTown)
-<thunder.leizhen@huawei.com> wrote:
->
->
-> On 2017/8/8 20:03, Ganapatrao Kulkarni wrote:
->> On Wed, Jul 26, 2017 at 4:47 PM, Leizhen (ThunderTown)
->> <thunder.leizhen@huawei.com> wrote:
->>>
->>>
->>> On 2017/7/26 19:08, Joerg Roedel wrote:
->>>> Hi Robin.
->>>>
->>>> On Fri, Jul 21, 2017 at 12:41:57PM +0100, Robin Murphy wrote:
->>>>> Hi all,
->>>>>
->>>>> In the wake of the ARM SMMU optimisation efforts, it seems that certain
->>>>> workloads (e.g. storage I/O with large scatterlists) probably remain quite
->>>>> heavily influenced by IOVA allocation performance. Separately, Ard also
->>>>> reported massive performance drops for a graphical desktop on AMD Seattle
->>>>> when enabling SMMUs via IORT, which we traced to dma_32bit_pfn in the DMA
->>>>> ops domain getting initialised differently for ACPI vs. DT, and exposing
->>>>> the overhead of the rbtree slow path. Whilst we could go around trying to
->>>>> close up all the little gaps that lead to hitting the slowest case, it
->>>>> seems a much better idea to simply make said slowest case a lot less slow.
->>>>
->>>> Do you have some numbers here? How big was the impact before these
->>>> patches and how is it with the patches?
->>> Here are some numbers:
->>>
->>> (before)$ iperf -s
->>> ------------------------------------------------------------
->>> Server listening on TCP port 5001
->>> TCP window size: 85.3 KByte (default)
->>> ------------------------------------------------------------
->>> [  4] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 35898
->>> [ ID] Interval       Transfer     Bandwidth
->>> [  4]  0.0-10.2 sec  7.88 MBytes  6.48 Mbits/sec
->>> [  5] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 35900
->>> [  5]  0.0-10.3 sec  7.88 MBytes  6.43 Mbits/sec
->>> [  4] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 35902
->>> [  4]  0.0-10.3 sec  7.88 MBytes  6.43 Mbits/sec
->>>
->>> (after)$ iperf -s
->>> ------------------------------------------------------------
->>> Server listening on TCP port 5001
->>> TCP window size: 85.3 KByte (default)
->>> ------------------------------------------------------------
->>> [  4] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 36330
->>> [ ID] Interval       Transfer     Bandwidth
->>> [  4]  0.0-10.0 sec  1.09 GBytes   933 Mbits/sec
->>> [  5] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 36332
->>> [  5]  0.0-10.0 sec  1.10 GBytes   939 Mbits/sec
->>> [  4] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 36334
->>> [  4]  0.0-10.0 sec  1.10 GBytes   938 Mbits/sec
->>>
->>
->> Is this testing done on Host or on Guest/VM?
-> Host
+On Tue, Aug 08, 2017 at 09:22:39PM -0500, Bjorn Helgaas wrote:
+> On Sat, Aug 05, 2017 at 03:15:11PM +0800, Ding Tianhong wrote:
+> > When bit4 is set in the PCIe Device Control register, it indicates
+> > whether the device is permitted to use relaxed ordering.
+> > On some platforms using relaxed ordering can have performance issues or
+> > due to erratum can cause data-corruption. In such cases devices must avoid
+> > using relaxed ordering.
+> > 
+> > This patch checks if there is any node in the hierarchy that indicates that
+> > using relaxed ordering is not safe. 
+...
 
-As per your log, iperf throughput is improved to 938 Mbits/sec
-from  6.43 Mbits/sec.
-IMO, this seems to be unrealistic, some thing wrong with the testing?
+> > +EXPORT_SYMBOL(pcie_relaxed_ordering_supported);
+> 
+> This is misnamed.  This doesn't tell us anything about whether the
+> device *supports* relaxed ordering.  It only tells us whether the
+> device is *permitted* to use it.
+> 
+> When a device initiates a transaction, the hardware should set the RO
+> bit in the TLP with logic something like this:
+> 
+>   RO = <this Function supports relaxed ordering> &&
+>        <this transaction doesn't require strong write ordering> &&
+>        <PCI_EXP_DEVCTL_RELAX_EN is set>
+> 
+> The issue you're fixing is that some Completers don't handle RO
+> correctly.  The determining factor is not the Requester, but the
+> Completer (for this series, a Root Port).  So I think this should be
+> something like:
+> 
+>   int pcie_relaxed_ordering_broken(struct pci_dev *completer)
+>   {
+>     if (!completer)
+>       return 0;
+> 
+>     return completer->dev_flags & PCI_DEV_FLAGS_NO_RELAXED_ORDERING;
+>   }
+> 
+> and the caller should do something like this:
+> 
+>  if (pcie_relaxed_ordering_broken(pci_find_pcie_root_port(pdev)))
+>    adapter->flags |= ROOT_NO_RELAXED_ORDERING;
+> 
+> That way it's obvious where the issue is, and it's obvious that the
+> answer might be different for peer-to-peer transactions than it is for
+> transactions to the root port, i.e., to coherent memory.
 
->
->>
->>>>
->>>>
->>>>       Joerg
->>>>
->>>>
->>>> .
->>>>
->>>
->>> --
->>> Thanks!
->>> BestRegards
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->> thanks
->> Ganapat
->>
->> .
->>
->
-> --
-> Thanks!
-> BestRegards
->
+After looking at the driver, I wonder if it would be simpler like
+this:
 
-thanks
-Ganapat
+  int pcie_relaxed_ordering_enabled(struct pci_dev *dev)
+  {
+    u16 ctl;
+
+    pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &ctl);
+    return ctl & PCI_EXP_DEVCTL_RELAX_EN;
+  }
+  EXPORT_SYMBOL(pcie_relaxed_ordering_enabled);
+
+  static void pci_configure_relaxed_ordering(struct pci_dev *dev)
+  {
+    struct pci_dev *root;
+
+    if (dev->is_virtfn)
+      return;  /* PCI_EXP_DEVCTL_RELAX_EN is RsvdP in VFs */
+
+    if (!pcie_relaxed_ordering_enabled(dev))
+      return;
+
+    /*
+     * For now, we only deal with Relaxed Ordering issues with Root
+     * Ports.  Peer-to-peer DMA is another can of worms.
+     */
+    root = pci_find_pcie_root_port(dev);
+    if (!root)
+      return;
+
+    if (root->relaxed_ordering_broken)
+      pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
+                                 PCI_EXP_DEVCTL_RELAX_EN);
+  }
+
+This doesn't check every intervening switch, but I don't think we know
+about any issues except with root ports.
+
+And the driver could do:
+
+  if (!pcie_relaxed_ordering_enabled(pdev))
+    adapter->flags |= ROOT_NO_RELAXED_ORDERING;
+
+The driver code wouldn't show anything about coherent memory vs.
+peer-to-peer, but we really don't have a clue about how to handle that
+yet anyway.
+
+I guess this is back to exactly what you proposed, except that I
+changed the name of pcie_relaxed_ordering_supported() to
+pcie_relaxed_ordering_enabled(), which I think is slightly more
+specific from the device's point of view.
+
+Bjorn
