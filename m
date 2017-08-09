@@ -1,15 +1,15 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 9 Aug 2017 19:32:47 +0530
-Subject: [PATCH v2 1/3] ARM: dts: dra71-evm: workaround incorrect DP83867
+Date: Wed, 9 Aug 2017 19:32:48 +0530
+Subject: [PATCH v2 2/3] ARM: dts: dra72-evm-revc: workaround incorrect DP83867
  RX_CTRL pin strap
 In-Reply-To: <cover.1502284400.git.nsekhar@ti.com>
 References: <cover.1502284400.git.nsekhar@ti.com>
-Message-ID: <dfb0980a35c345bc82f42128028c4d08ac6ae58c.1502284400.git.nsekhar@ti.com>
+Message-ID: <a96549250204b80373ebf58abeed1c67441e6fb8.1502284400.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DRA71 EVM straps the DP83867 GigaBit Ethernet phy's RX_DV/RX_CTRL pin
-in mode 1. Unfortunately, the phy data manual disallows this.
+The DRA72 EVM Rev C straps the DP83867 GigaBit Ethernet phy's RX_DV/RX_CTRL
+pin in mode 1. Unfortunately, the phy data manual disallows this.
 
 Add "ti,dp83867-rxctrl-strap-quirk" property to the phy's device-tree node
 to allow kernel to enable software workaround for this incorrect strap
@@ -20,28 +20,28 @@ This needs to be done for both instances of this PHY present on the board.
 
 Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 ---
- arch/arm/boot/dts/dra71-evm.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/dra72-evm-revc.dts | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra71-evm.dts b/arch/arm/boot/dts/dra71-evm.dts
-index a6298eb56978..9897e8fa6845 100644
---- a/arch/arm/boot/dts/dra71-evm.dts
-+++ b/arch/arm/boot/dts/dra71-evm.dts
-@@ -191,6 +191,7 @@
- 		ti,tx-internal-delay = <DP83867_RGMIIDCTL_250_PS>;
- 		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_8_B_NIB>;
+diff --git a/arch/arm/boot/dts/dra72-evm-revc.dts b/arch/arm/boot/dts/dra72-evm-revc.dts
+index 3ecac56bf504..be18bc023c3f 100644
+--- a/arch/arm/boot/dts/dra72-evm-revc.dts
++++ b/arch/arm/boot/dts/dra72-evm-revc.dts
+@@ -70,6 +70,7 @@
  		ti,min-output-impedance;
+ 		interrupt-parent = <&gpio6>;
+ 		interrupts = <16 IRQ_TYPE_EDGE_FALLING>;
 +		ti,dp83867-rxctrl-strap-quirk;
  	};
  
  	dp83867_1: ethernet-phy at 3 {
-@@ -199,6 +200,7 @@
- 		ti,tx-internal-delay = <DP83867_RGMIIDCTL_250_PS>;
- 		ti,fifo-depth = <DP83867_PHYCR_FIFO_DEPTH_8_B_NIB>;
+@@ -80,5 +81,7 @@
  		ti,min-output-impedance;
+ 		interrupt-parent = <&gpio6>;
+ 		interrupts = <16 IRQ_TYPE_EDGE_FALLING>;
 +		ti,dp83867-rxctrl-strap-quirk;
  	};
  };
- 
++
 -- 
 2.9.0
