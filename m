@@ -1,43 +1,33 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed,  9 Aug 2017 13:05:11 +0100
-Subject: [PATCH 05/27] arm64: fpsimd: Simplify uses of {set,
- clear}_ti_thread_flag()
-In-Reply-To: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1502280338-23002-6-git-send-email-Dave.Martin@arm.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Wed,  9 Aug 2017 20:10:30 +0800
+Subject: [PATCH v4 05/12] Documentation: net: phy: Add phy-is-internal binding
+In-Reply-To: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
+References: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1502280630-2254-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The existing FPSIMD context switch code contains a couple of
-instances of {set,clear}_ti_thread(task_thread_info(task)).  Since
-there are thread flag manipulators that operate directly on
-task_struct, this verbosity isn't strictly needed.
+Add the documentation for internal phy. A boolean property
+indicates that a internal phy will be used.
 
-For consistency, this patch simplifies the affected calls.  This
-should have no impact on behaviour.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Signed-off-by: David Wu <david.wu@rock-chips.com>
 ---
- arch/arm64/kernel/fpsimd.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/net/phy.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 138fcfa..9c1f268e 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -159,11 +159,9 @@ void fpsimd_thread_switch(struct task_struct *next)
+diff --git a/Documentation/devicetree/bindings/net/phy.txt b/Documentation/devicetree/bindings/net/phy.txt
+index b558576..942c892 100644
+--- a/Documentation/devicetree/bindings/net/phy.txt
++++ b/Documentation/devicetree/bindings/net/phy.txt
+@@ -52,6 +52,9 @@ Optional Properties:
+   Mark the corresponding energy efficient ethernet mode as broken and
+   request the ethernet to stop advertising it.
  
- 		if (__this_cpu_read(fpsimd_last_state) == st
- 		    && st->cpu == smp_processor_id())
--			clear_ti_thread_flag(task_thread_info(next),
--					     TIF_FOREIGN_FPSTATE);
-+			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
- 		else
--			set_ti_thread_flag(task_thread_info(next),
--					   TIF_FOREIGN_FPSTATE);
-+			set_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
- 	}
- }
++- phy-is-internal: If set, indicates that phy will connect to the MAC as a
++  internal phy.
++
+ Example:
  
+ ethernet-phy at 0 {
 -- 
-2.1.4
+1.9.1
