@@ -1,164 +1,102 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 9 Aug 2017 13:13:33 +0100
-Subject: [PATCH v5 4/9] arm64: hugetlb: Add break-before-make logic for
- contiguous entries
-In-Reply-To: <20170807171916.vdplrndrdyeontho@armageddon.cambridge.arm.com>
-References: <20170802094904.27749-1-punit.agrawal@arm.com>
- <20170802094904.27749-5-punit.agrawal@arm.com>
- <20170807171916.vdplrndrdyeontho@armageddon.cambridge.arm.com>
-Message-ID: <20170809121332.GA21276@linaro.org>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Wed, 9 Aug 2017 20:17:31 +0800
+Subject: [PATCH v9 1/4] PCI: Add new PCIe Fabric End Node flag,
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+In-Reply-To: <20170809030236.GA7191@bhelgaas-glaptop.roam.corp.google.com>
+References: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
+ <1501917313-9812-2-git-send-email-dingtianhong@huawei.com>
+ <20170808232200.GO16580@bhelgaas-glaptop.roam.corp.google.com>
+ <MWHPR12MB1600249E96C320D5472F77ADC88B0@MWHPR12MB1600.namprd12.prod.outlook.com>
+ <20170809030236.GA7191@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <d168687d-f849-4d09-1a2d-c9c6718b3318@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
 
-On Mon, Aug 07, 2017 at 06:19:17PM +0100, Catalin Marinas wrote:
-> On Wed, Aug 02, 2017 at 10:48:59AM +0100, Punit Agrawal wrote:
-> > diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> > index 08deed7c71f0..f2c976464f39 100644
-> > --- a/arch/arm64/mm/hugetlbpage.c
-> > +++ b/arch/arm64/mm/hugetlbpage.c
-> > @@ -68,6 +68,47 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
-> >  	return CONT_PTES;
-> >  }
-> >  
-> > +/*
-> > + * Changing some bits of contiguous entries requires us to follow a
-> > + * Break-Before-Make approach, breaking the whole contiguous set
-> > + * before we can change any entries. See ARM DDI 0487A.k_iss10775,
-> > + * "Misprogramming of the Contiguous bit", page D4-1762.
-> > + *
-> > + * This helper performs the break step.
-> > + */
-> > +static pte_t get_clear_flush(struct mm_struct *mm,
-> > +			     unsigned long addr,
-> > +			     pte_t *ptep,
-> > +			     unsigned long pgsize,
-> > +			     unsigned long ncontig)
-> > +{
-> > +	unsigned long i, saddr = addr;
-> > +	struct vm_area_struct vma = { .vm_mm = mm };
-> > +	pte_t orig_pte = huge_ptep_get(ptep);
-> > +
-> > +	/*
-> > +	 * If we already have a faulting entry then we don't need
-> > +	 * to break before make (there won't be a tlb entry cached).
-> > +	 */
-> > +	if (!pte_present(orig_pte))
-> > +		return orig_pte;
-> > +
-> > +	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++) {
-> > +		pte_t pte = ptep_get_and_clear(mm, addr, ptep);
-> > +
-> > +		/*
-> > +		 * If HW_AFDBM is enabled, then the HW could turn on
-> > +		 * the dirty bit for any page in the set, so check
-> > +		 * them all.  All hugetlb entries are already young.
-> > +		 */
-> > +		if (IS_ENABLED(CONFIG_ARM64_HW_AFDBM) && pte_dirty(pte))
-> > +			orig_pte = pte_mkdirty(orig_pte);
-> > +	}
-> > +
-> > +	flush_tlb_range(&vma, saddr, addr);
-> > +	return orig_pte;
-> > +}
-> > +
-> >  void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
-> >  			    pte_t *ptep, pte_t pte)
-> >  {
-> > @@ -93,6 +134,8 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
-> >  	dpfn = pgsize >> PAGE_SHIFT;
-> >  	hugeprot = pte_pgprot(pte);
-> >  
-> > +	get_clear_flush(mm, addr, ptep, pgsize, ncontig);
-> > +
-> >  	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
-> >  		pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
-> >  			 pte_val(pfn_pte(pfn, hugeprot)));
+
+On 2017/8/9 11:02, Bjorn Helgaas wrote:
+> On Wed, Aug 09, 2017 at 01:40:01AM +0000, Casey Leedom wrote:
+>> | From: Bjorn Helgaas <helgaas@kernel.org>
+>> | Sent: Tuesday, August 8, 2017 4:22 PM
+>> | 
+>> | This needs to include a link to the Intel spec
+>> | (https://software.intel.com/sites/default/files/managed/9e/bc/64-ia-32-architectures-optimization-manual.pdf,
+>> | sec 3.9.1).
+>>
+>>   In the commit message or as a comment?  Regardless, I agree.  It's always
+>> nice to be able to go back and see what the official documentation says.
+>> However, that said, links on the internet are ... fragile as time goes by,
+>> so we might want to simply quote section 3.9.1 in the commit message since
+>> it's relatively short:
+>>
+>>     3.9.1 Optimizing PCIe Performance for Accesses Toward Coherent Memory
+>>           and Toward MMIO Regions (P2P)
+>>
+>>     In order to maximize performance for PCIe devices in the processors
+>>     listed in Table 3-6 below, the soft- ware should determine whether the
+>>     accesses are toward coherent memory (system memory) or toward MMIO
+>>     regions (P2P access to other devices). If the access is toward MMIO
+>>     region, then software can command HW to set the RO bit in the TLP
+>>     header, as this would allow hardware to achieve maximum throughput for
+>>     these types of accesses. For accesses toward coherent memory, software
+>>     can command HW to clear the RO bit in the TLP header (no RO), as this
+>>     would allow hardware to achieve maximum throughput for these types of
+>>     accesses.
+>>
+>>     Table 3-6. Intel Processor CPU RP Device IDs for Processors Optimizing
+>>                PCIe Performance
+>>
+>>     Processor                            CPU RP Device IDs
+>>
+>>     Intel Xeon processors based on       6F01H-6F0EH
+>>     Broadwell microarchitecture
+>>
+>>     Intel Xeon processors based on       2F01H-2F0EH
+>>     Haswell microarchitecture
 > 
-> Is there any risk of the huge pte being accessed (from user space on
-> another CPU) in the short break-before-make window? Not that we can do
-> much about it but just checking.
-
-IIUC we're protected by the huge_pte_lock(.).
-
-> 
-> BTW, it seems a bit overkill to use ptep_get_and_clear() (via
-> get_clear_flush) when we just want to zero the entries. Probably not
-> much overhead though.
->
-
-I think we need the TLB invalidate here to ensure there's zero possibility of
-conflicting TLB entries being in play.
- 
-> > @@ -222,6 +256,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-> >  	int ncontig, i, changed = 0;
-> >  	size_t pgsize = 0;
-> >  	unsigned long pfn = pte_pfn(pte), dpfn;
-> > +	pte_t orig_pte;
-> >  	pgprot_t hugeprot;
-> >  
-> >  	if (!pte_cont(pte))
-> > @@ -231,10 +266,12 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-> >  	dpfn = pgsize >> PAGE_SHIFT;
-> >  	hugeprot = pte_pgprot(pte);
-> >  
-> > -	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
-> > -		changed |= ptep_set_access_flags(vma, addr, ptep,
-> > -				pfn_pte(pfn, hugeprot), dirty);
-> > -	}
-> > +	orig_pte = get_clear_flush(vma->vm_mm, addr, ptep, pgsize, ncontig);
-> > +	if (!pte_same(orig_pte, pte))
-> > +		changed = 1;
-> > +
-> > +	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
-> > +		set_pte_at(vma->vm_mm, addr, ptep, pfn_pte(pfn, hugeprot));
-> >  
-> >  	return changed;
-> >  }
-> 
-> If hugeprot isn't dirty but orig_pte became dirty, it looks like we just
-> drop such information from the new pte.
-
-Ahhh... okay, I will have a think about this, thanks!
-
-> 
-> Same comment here about the window. huge_ptep_set_access_flags() is
-> called on a present (huge) pte and we briefly make it invalid. Can the
-> mm subsystem cope with a fault on another CPU here? Same for the
-> huge_ptep_set_wrprotect() below.
-
-I think the fault handler will wait for the huge_pte_lock(.).
-
-> 
-> > @@ -244,6 +281,9 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
-> >  {
-> >  	int ncontig, i;
-> >  	size_t pgsize;
-> > +	pte_t pte = pte_wrprotect(huge_ptep_get(ptep)), orig_pte;
-> > +	unsigned long pfn = pte_pfn(pte), dpfn;
-> > +	pgprot_t hugeprot;
-> >  
-> >  	if (!pte_cont(*ptep)) {
-> >  		ptep_set_wrprotect(mm, addr, ptep);
-> > @@ -251,8 +291,15 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
-> >  	}
-> >  
-> >  	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
-> > -	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize)
-> > -		ptep_set_wrprotect(mm, addr, ptep);
-> > +	dpfn = pgsize >> PAGE_SHIFT;
-> > +
-> > +	orig_pte = get_clear_flush(mm, addr, ptep, pgsize, ncontig);
-> > +	if (pte_dirty(orig_pte))
-> > +		pte = pte_mkdirty(pte);
-> > +
-> > +	hugeprot = pte_pgprot(pte);
-> > +	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
-> > +		set_pte_at(mm, addr, ptep, pfn_pte(pfn, hugeprot));
-> >  }
-> >  
-> >  void huge_ptep_clear_flush(struct vm_area_struct *vma,
+> Agreed, links are prone to being broken.  I would include in the
+> changelog the complete title and order number, along with the link as
+> a footnote.  Wouldn't hurt to quote the section too, since it's short.
 > 
 
-Cheers Catalin.
+OK
+
+>> | It should also include a pointer to the AMD erratum, if available, or
+>> | at least some reference to how we know it doesn't obey the rules.
+>>
+>>   Getting an ACK from AMD seems like a forlorn cause at this point.  My
+>> contact was Bob Shaw <Bob.Shaw@amd.com> and he stopped responding to me
+>> messages almost a year ago saying that all of AMD's energies were being
+>> redirected towards upcoming x86 products (likely Ryzen as we now know).  As
+>> far as I can tell AMD has walked away from their A1100 (AKA "Seattle") ARM
+>> SoC.
+>>
+>>   On the specific issue, I can certainly write up somthing even more
+>> extensive than I wrote up for the comment in drivers/pci/quirks.c.  Please
+>> review the comment I wrote up and tell me if you'd like something even more
+>> detailed -- I'm usually acused of writing comments which are too long, so
+>> this would be a new one on me ... :-)
+> 
+> If you have any bug reports with info about how you debugged it and
+> concluded that Seattle is broken, you could include a link (probably
+> in the changelog).  But if there isn't anything, there isn't anything.
+> 
+> I might reorganize those patches as:
+> 
+>   1) Add a PCI_DEV_FLAGS_RELAXED_ORDERING_BROKEN flag, the quirk that
+>   sets it, and the current patch [2/4] that uses it.
+> 
+>   2) Add the Intel DECLARE_PCI_FIXUP_CLASS_EARLY()s with the Intel
+>   details.
+> 
+>   3) Add the AMD DECLARE_PCI_FIXUP_CLASS_EARLY()s with the AMD
+>   details.
+> 
+
+OK, I could reorganize it, but still need the Casey to give me the link
+for the Seattle, otherwise I could remove the AMD part and wait until
+someone show it. Thanks
+
+Ding
+> .
+> 
