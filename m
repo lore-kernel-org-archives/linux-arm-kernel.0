@@ -1,62 +1,107 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed,  9 Aug 2017 13:05:29 +0100
-Subject: [PATCH 23/27] arm64/sve: KVM: Hide SVE from CPU features exposed to
- guests
-In-Reply-To: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1502280338-23002-24-git-send-email-Dave.Martin@arm.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Wed,  9 Aug 2017 20:11:50 +0800
+Subject: [PATCH v4 08/12] net: stmmac: dwmac-rk: Add internal phy supprot for
+ rk3328
+In-Reply-To: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
+References: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1502280710-2411-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM guests cannot currently use SVE, because SVE is always
-configured to trap to EL2.
+There are two mac controllers in the rk3328, the one connects
+to external phy, and the other one connects to internal phy.
+Like the mac of external phy, the internal phy's mac also needs to
+configure the related mac registers at GRF.
 
-However, a guest that sees SVE reported as present in
-ID_AA64PFR0_EL1 may legitimately expect that SVE works and try to
-use it.  Instead of working, the guest will receive an injected
-undef exception, which may cause the guest to oops or go into a
-spin.
-
-To avoid misleading the guest into believing that SVE will work,
-this patch masks out the SVE field from ID_AA64PFR0_EL1 when a
-guest attempts to read this register.  No support is explicitly
-added for ID_AA64ZFR0_EL1 either, so that is still emulated as
-reading as zero, which is consistent with SVE not being
-implemented.
-
-This is a temporary measure, and will be removed in a later series
-when full KVM support for SVE is implemented.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Signed-off-by: David Wu <david.wu@rock-chips.com>
 ---
- arch/arm64/kvm/sys_regs.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c | 26 +++++++++++++++++++++++---
+ 1 file changed, 23 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 6583dd7..9e8c54e 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -897,8 +897,20 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
- {
- 	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
- 			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
-+	u64 val = raz ? 0 : read_sanitised_ftr_reg(id);
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+index 5372631..be60fd7 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+@@ -323,6 +323,8 @@ static void rk3288_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
  
--	return raz ? 0 : read_sanitised_ftr_reg(id);
-+	if (id == SYS_ID_AA64PFR0_EL1) {
-+		static bool printed;
+ #define RK3328_GRF_MAC_CON0	0x0900
+ #define RK3328_GRF_MAC_CON1	0x0904
++#define RK3328_GRF_MAC_CON2	0x0908
++#define RK3328_GRF_MACPHY_CON1	0xb04
+ 
+ /* RK3328_GRF_MAC_CON0 */
+ #define RK3328_GMAC_CLK_RX_DL_CFG(val)	HIWORD_UPDATE(val, 0x7F, 7)
+@@ -349,6 +351,9 @@ static void rk3288_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
+ #define RK3328_GMAC_RXCLK_DLY_ENABLE	GRF_BIT(1)
+ #define RK3328_GMAC_RXCLK_DLY_DISABLE	GRF_CLR_BIT(0)
+ 
++/* RK3328_GRF_MACPHY_CON1 */
++#define RK3328_MACPHY_RMII_MODE		GRF_BIT(9)
 +
-+		if ((val & (0xfUL << ID_AA64PFR0_SVE_SHIFT)) && !printed) {
-+			kvm_info("SVE unsupported for guests, suppressing\n");
-+			printed = true;
-+		}
+ static void rk3328_set_to_rgmii(struct rk_priv_data *bsp_priv,
+ 				int tx_delay, int rx_delay)
+ {
+@@ -373,13 +378,17 @@ static void rk3328_set_to_rgmii(struct rk_priv_data *bsp_priv,
+ static void rk3328_set_to_rmii(struct rk_priv_data *bsp_priv)
+ {
+ 	struct device *dev = &bsp_priv->pdev->dev;
++	unsigned int reg;
+ 
+ 	if (IS_ERR(bsp_priv->grf)) {
+ 		dev_err(dev, "Missing rockchip,grf property\n");
+ 		return;
+ 	}
+ 
+-	regmap_write(bsp_priv->grf, RK3328_GRF_MAC_CON1,
++	reg = bsp_priv->internal_phy ? RK3328_GRF_MAC_CON2 :
++		  RK3328_GRF_MAC_CON1;
 +
-+		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
-+	}
++	regmap_write(bsp_priv->grf, reg,
+ 		     RK3328_GMAC_PHY_INTF_SEL_RMII |
+ 		     RK3328_GMAC_RMII_MODE);
+ }
+@@ -409,29 +418,40 @@ static void rk3328_set_rgmii_speed(struct rk_priv_data *bsp_priv, int speed)
+ static void rk3328_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
+ {
+ 	struct device *dev = &bsp_priv->pdev->dev;
++	unsigned int reg;
+ 
+ 	if (IS_ERR(bsp_priv->grf)) {
+ 		dev_err(dev, "Missing rockchip,grf property\n");
+ 		return;
+ 	}
+ 
++	reg = bsp_priv->internal_phy ? RK3328_GRF_MAC_CON2 :
++		  RK3328_GRF_MAC_CON1;
 +
-+	return val;
+ 	if (speed == 10)
+-		regmap_write(bsp_priv->grf, RK3328_GRF_MAC_CON1,
++		regmap_write(bsp_priv->grf, reg,
+ 			     RK3328_GMAC_RMII_CLK_2_5M |
+ 			     RK3328_GMAC_SPEED_10M);
+ 	else if (speed == 100)
+-		regmap_write(bsp_priv->grf, RK3328_GRF_MAC_CON1,
++		regmap_write(bsp_priv->grf, reg,
+ 			     RK3328_GMAC_RMII_CLK_25M |
+ 			     RK3328_GMAC_SPEED_100M);
+ 	else
+ 		dev_err(dev, "unknown speed value for RMII! speed=%d", speed);
  }
  
- /* cpufeature ID register access trap handlers */
++static void rk3328_internal_phy_powerup(struct rk_priv_data *priv)
++{
++	regmap_write(priv->grf, RK3328_GRF_MACPHY_CON1,
++		     RK3328_MACPHY_RMII_MODE);
++}
++
+ static const struct rk_gmac_ops rk3328_ops = {
+ 	.set_to_rgmii = rk3328_set_to_rgmii,
+ 	.set_to_rmii = rk3328_set_to_rmii,
+ 	.set_rgmii_speed = rk3328_set_rgmii_speed,
+ 	.set_rmii_speed = rk3328_set_rmii_speed,
++	.internal_phy_powerup =  rk3328_internal_phy_powerup,
+ };
+ 
+ #define RK3366_GRF_SOC_CON6	0x0418
 -- 
-2.1.4
+1.9.1
