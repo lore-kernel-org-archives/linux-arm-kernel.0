@@ -1,87 +1,110 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
-Date: Wed, 9 Aug 2017 11:07:12 +0100
-Subject: [PATCH v6 0/3] iommu/smmu-v3: Workaround for hisilicon 161010801
- erratum(reserve HW MSI)
-Message-ID: <20170809100715.870516-1-shameerali.kolothum.thodi@huawei.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 9 Aug 2017 11:09:02 +0100
+Subject: [PATCH v2 18/18] cpufreq: scmi: add support for fast frequency
+ switching
+In-Reply-To: <20170809042825.GI28857@vireshk-i7>
+References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
+ <1501857104-11279-19-git-send-email-sudeep.holla@arm.com>
+ <20170809042825.GI28857@vireshk-i7>
+Message-ID: <0f89f543-39a9-30a5-4976-0c447f5fe843@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On certain HiSilicon platforms (Hip06/Hip07) the GIC ITS and
-PCIe RC deviates from the standard implementation and this breaks
-PCIe MSI functionality when SMMU is enabled.
 
-The HiSilicon erratum 161010801 describes this limitation of certain
-HiSilicon platforms to support the SMMU mappings for MSI transactions.
-On these platforms GICv3 ITS translator is presented with the deviceID
-by extending the MSI payload data to 64 bits to include the deviceID.
-Hence, the PCIe controller on this platforms has to differentiate the
-MSI payload against other DMA payload and has to modify the MSI payload.
-This basically makes it difficult for this platforms to have a SMMU
-translation for MSI.
 
-To implement this quirk, the following changes are incorporated:
+On 09/08/17 05:28, Viresh Kumar wrote:
+> On 04-08-17, 15:31, Sudeep Holla wrote:
+>> The cpufreq core provides option for drivers to implement fast_switch
+>> callback which is invoked for frequency switching from interrupt context.
+>>
+>> This patch adds support for fast_switch callback in SCMI cpufreq driver
+>> by making use of polling based SCMI transfer. It also sets the flag
+>> fast_switch_possible.
+>>
+>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+>> Cc: linux-pm at vger.kernel.org
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  drivers/cpufreq/scmi-cpufreq.c | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>>
+>> diff --git a/drivers/cpufreq/scmi-cpufreq.c b/drivers/cpufreq/scmi-cpufreq.c
+>> index 034359cafea5..cb1084cb1ef1 100644
+>> --- a/drivers/cpufreq/scmi-cpufreq.c
+>> +++ b/drivers/cpufreq/scmi-cpufreq.c
+>> @@ -61,6 +61,19 @@ scmi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
+>>  	return perf_ops->freq_set(priv->handle, priv->domain_id, freq, false);
+>>  }
+>>  
+>> +static unsigned int scmi_cpufreq_fast_switch(struct cpufreq_policy *policy,
+>> +					     unsigned int target_freq)
+>> +{
+>> +	struct scmi_data *priv = policy->driver_data;
+>> +	struct scmi_perf_ops *perf_ops = priv->handle->perf_ops;
+>> +
+>> +	if (!perf_ops->freq_set(priv->handle, priv->domain_id,
+>> +				target_freq * 1000, true))
+>> +		return target_freq;
+>> +
+>> +	return CPUFREQ_ENTRY_INVALID;
+>> +}
+> 
+> This is very much similar to the target routine, perhaps we should write another
+> local routine which is used by both target and fast switch.
+> 
 
-1. Added a generic helper function to IORT code to retrieve and
-   reserve the HW ITS address regions.
-2. Added quirk to SMMUv3 to reserve HW ITS address regions based
-    on IORT SMMUv3 model with the help of a generic iommu helper
-    function.
+Just one difference, fast switch uses polling based mailbox while
+target_index uses interrupt based. I thought initially to reuse, but
+it's comes done to just perf_ops->freq_set, so dropped that idea.
 
-Thanks,
-Shameer
+> Do we guarantee that the frequency is changed by the time this routine returns?
 
-Changelog:
+No, firmware may return acknowledging the request not it's completion.
 
-v5 --> v6
-Addressed comments from Robin and Lorenzo:
--No change to patch#1 .
--Reverted v5 patch#2 as this might break the platforms where this quirk
-is not applicable. Provided a generic function in iommu code and
-added back the quirk implementation in SMMU v3 driver(patch#3)
- 
-v4 --> v5
-Addressed comments from Robin and Lorenzo:
--Added a comment to make it clear that, for now, only straightforward 
- HW topologies are handled while reserving ITS regions(patch #1).
+> Or we just send a SCMI request and return back ?
+> 
 
-v3 --> v4
-Rebased on 4.13-rc1.
-Addressed comments from Robin, Will and Lorenzo:
--As suggested by Robin, moved the ITS msi reservation into
- iommu_dma_get_resv_regions().
--Added its_count != resv region failure case(patch #1).
+Yes, exactly.
 
-v2 --> v3
-Addressed comments from Lorenzo and Robin:
--Removed dev_is_pci() check in smmuV3 driver.
--Don't treat device not having an ITS mapping as an error in
- iort helper function.
+> If we just send the request and don't wait for freq to get changed, what
+> protects another scmi_cpufreq_fast_switch() to get called before the first one
+> is finished? And what will happen on that call ?
 
-v1 --> v2
--patch 2/2: Invoke iort helper fn based on fwnode type(acpi).
+Firmware needs to serialize or override based on the timing of the two
+consecutive requests.
 
-RFCv2 -->PATCH
--Incorporated Lorenzo's review comments.
+> 
+>>  static int
+>>  scmi_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpumask)
+>>  {
+>> @@ -164,6 +177,7 @@ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
+>>  
+>>  	policy->cpuinfo.transition_latency = latency;
+>>  
+>> +	policy->fast_switch_possible = true;
+>>  	return 0;
+>>  
+>>  out_free_cpufreq_table:
+>> @@ -180,6 +194,7 @@ static int scmi_cpufreq_exit(struct cpufreq_policy *policy)
+>>  {
+>>  	struct scmi_data *priv = policy->driver_data;
+>>  
+>> +	policy->fast_switch_possible = false;
+>>  	cpufreq_cooling_unregister(priv->cdev);
+>>  	dev_pm_opp_free_cpufreq_table(priv->cpu_dev, &policy->freq_table);
+>>  	dev_pm_opp_cpumask_remove_table(policy->related_cpus);
+>> @@ -228,6 +243,7 @@ static struct cpufreq_driver scmi_cpufreq_driver = {
+>>  	.init			= scmi_cpufreq_init,
+>>  	.exit			= scmi_cpufreq_exit,
+>>  	.ready			= scmi_cpufreq_ready,
+>> +	.fast_switch		= scmi_cpufreq_fast_switch,
+> 
+> Maybe add it right after target_index ?
+> 
 
-RFC v1 --> RFC v2
-Based on Robin's review comments,
--Removed  the generic erratum framework.
--Using IORT/MADT tables to retrieve the ITS base addr instead
- of vendor specific CSRT table.
-
-Shameer Kolothum (3):
-  ACPI/IORT: Add ITS address regions reservation helper
-  iommu/dma: Add a helper function to reserve HW MSI address regions for
-    IOMMU drivers
-  iommu/arm-smmu-v3:Enable ACPI based HiSilicon erratum 161010801
-
- drivers/acpi/arm64/iort.c        | 95 ++++++++++++++++++++++++++++++++++++++--
- drivers/iommu/arm-smmu-v3.c      | 27 +++++++++---
- drivers/iommu/dma-iommu.c        | 19 ++++++++
- drivers/irqchip/irq-gic-v3-its.c |  3 +-
- include/linux/acpi_iort.h        |  7 ++-
- include/linux/dma-iommu.h        |  7 +++
- 6 files changed, 148 insertions(+), 10 deletions(-)
+Done
 
 -- 
-1.9.1
+Regards,
+Sudeep
