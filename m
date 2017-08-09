@@ -1,52 +1,81 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 9 Aug 2017 09:38:34 -0400
-Subject: [PATCH 0/6] drm/rockchip: Some fixes
-In-Reply-To: <1501494569-6825-1-git-send-email-mark.yao@rock-chips.com>
-References: <1501494569-6825-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <CAOw6vbJr5Ya5Lyd3MqhSZd=mPaKzCwcBeSGfJLtv=kFUDvXbhw@mail.gmail.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Wed, 9 Aug 2017 21:42:48 +0800
+Subject: [PATCH v9 2/4] PCI: Disable PCIe Relaxed Ordering if unsupported
+In-Reply-To: <20170809032503.GB7191@bhelgaas-glaptop.roam.corp.google.com>
+References: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
+ <1501917313-9812-3-git-send-email-dingtianhong@huawei.com>
+ <20170809022239.GP16580@bhelgaas-glaptop.roam.corp.google.com>
+ <20170809032503.GB7191@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <6a5b848d-1647-aa03-6af2-015b3a379adb@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 5:49 AM, Mark Yao <mark.yao@rock-chips.com> wrote:
-> Here are some fixes port from rockchip_linux project[0],
->
-> Tested on rk3399 and rk3288 board.
->
-> [0]: https://github.com/rockchip-linux/kernel
->
-> Mark Yao (6):
->   drm/rockchip: vop: no need wait vblank on crtc enable
->   drm/rockchip: vop: fix iommu page fault when resume
->   drm/rockchip: vop: fix NV12 video display error
->   drm/rockchip: vop: round_up pitches to word align
->   drm/rockchip: vop: report error when check resource error
->   drm/rockchip: fix race with kms hotplug and fbdev
+On 2017/8/9 11:25, Bjorn Helgaas wrote:
+> On Tue, Aug 08, 2017 at 09:22:39PM -0500, Bjorn Helgaas wrote:
+>> On Sat, Aug 05, 2017 at 03:15:11PM +0800, Ding Tianhong wrote:
+>>> When bit4 is set in the PCIe Device Control register, it indicates
 
+> After looking at the driver, I wonder if it would be simpler like
+> this:
+> 
+>   int pcie_relaxed_ordering_enabled(struct pci_dev *dev)
+>   {
+>     u16 ctl;
+> 
+>     pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &ctl);
+>     return ctl & PCI_EXP_DEVCTL_RELAX_EN;
+>   }
+>   EXPORT_SYMBOL(pcie_relaxed_ordering_enabled);
+> 
+>   static void pci_configure_relaxed_ordering(struct pci_dev *dev)
+>   {
+>     struct pci_dev *root;
+> 
+>     if (dev->is_virtfn)
+>       return;  /* PCI_EXP_DEVCTL_RELAX_EN is RsvdP in VFs */
+> 
+>     if (!pcie_relaxed_ordering_enabled(dev))
+>       return;
+> 
+>     /*
+>      * For now, we only deal with Relaxed Ordering issues with Root
+>      * Ports.  Peer-to-peer DMA is another can of worms.
+>      */
+>     root = pci_find_pcie_root_port(dev);
+>     if (!root)
+>       return;
+> 
+>     if (root->relaxed_ordering_broken)
+>       pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
+>                                  PCI_EXP_DEVCTL_RELAX_EN);
+>   }
+> 
+> This doesn't check every intervening switch, but I don't think we know
+> about any issues except with root ports.
+> 
 
-Hi Mark,
-I noticed you applied this set to both -misc-next and -misc-fixes. In
-the future, please do not apply patches in both places.
+Yes
 
-Instead, consult the flowchart under "Where Do I Apply My Patch?" at
-https://01.org/linuxgraphics/gfx-docs/maintainer-tools/drm-misc.html
-and choose the most appropriate place. If you are unsure, please reach
-out to a -misc maintainer.
+> And the driver could do:
+> 
+>   if (!pcie_relaxed_ordering_enabled(pdev))
+>     adapter->flags |= ROOT_NO_RELAXED_ORDERING;
+> 
+> The driver code wouldn't show anything about coherent memory vs.
+> peer-to-peer, but we really don't have a clue about how to handle that
+> yet anyway.
+> 
+> I guess this is back to exactly what you proposed, except that I
+> changed the name of pcie_relaxed_ordering_supported() to
+> pcie_relaxed_ordering_enabled(), which I think is slightly more
+> specific from the device's point of view.
+> 
 
-Thank you,
+OK, looks like we reach a consensus finally, I will follow your new opinion and resend, thanks.
 
-Sean
+Ding
 
->
->  drivers/gpu/drm/rockchip/rockchip_drm_fb.c  |  2 +-
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 77 ++++++++---------------------
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.h |  3 ++
->  3 files changed, 24 insertions(+), 58 deletions(-)
->
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> Bjorn
+> 
+> .
+> 
