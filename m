@@ -1,40 +1,26 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 9 Aug 2017 19:56:33 +0530
-Subject: [PATCH 2/2] cpufreq: mediatek: add support of cpufreq to MT7622
- SoC
-In-Reply-To: <8d96863368adb8a0435de9739e458035e6a6233b.1502272372.git.sean.wang@mediatek.com>
-References: <cover.1502272372.git.sean.wang@mediatek.com>
- <8d96863368adb8a0435de9739e458035e6a6233b.1502272372.git.sean.wang@mediatek.com>
-Message-ID: <20170809142633.GD29383@vireshk-i7>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 9 Aug 2017 15:31:08 +0100
+Subject: [PATCH] arm64: neon: Forbid when irqs are disabled
+In-Reply-To: <1502275408-16982-1-git-send-email-Dave.Martin@arm.com>
+References: <1502275408-16982-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170809143108.6bvo3jw275uoylyy@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09-08-17, 18:12, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+On Wed, Aug 09, 2017 at 11:43:28AM +0100, Dave P Martin wrote:
+> Currently, may_use_simd() can return true if IRQs are disabled.  If
+> the caller goes ahead and calls kernel_neon_begin(), this can
+> result in use of local_bh_enable() in an unsafe context.
 > 
-> MT7622 is a 64-bit ARMv8 based dual-core SoC (2 * Cortex-A53) with a
-> single cluster. The hardware is also compatible with the current driver,
-> so add MT7622 as one of the compatible string list.
+> In particular, __efi_fpsimd_begin() may do this when calling EFI as
+> part of system shutdown.
 > 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->  drivers/cpufreq/mediatek-cpufreq.c | 1 +
->  1 file changed, 1 insertion(+)
+> This patch ensures that callers don't think they can use
+> kernel_neon_begin() in such a context.
 > 
-> diff --git a/drivers/cpufreq/mediatek-cpufreq.c b/drivers/cpufreq/mediatek-cpufreq.c
-> index 9fa9291..18c4bd9 100644
-> --- a/drivers/cpufreq/mediatek-cpufreq.c
-> +++ b/drivers/cpufreq/mediatek-cpufreq.c
-> @@ -574,6 +574,7 @@ static struct platform_driver mtk_cpufreq_platdrv = {
->  /* List of machines supported by this driver */
->  static const struct of_device_id mtk_cpufreq_machines[] __initconst = {
->  	{ .compatible = "mediatek,mt2701", },
-> +	{ .compatible = "mediatek,mt7622", },
->  	{ .compatible = "mediatek,mt7623", },
->  	{ .compatible = "mediatek,mt817x", },
->  	{ .compatible = "mediatek,mt8173", },
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Thanks. I pushed it out to the for-next/kernel-mode-neon branch.
 
 -- 
-viresh
+Catalin
