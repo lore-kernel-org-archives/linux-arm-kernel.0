@@ -1,52 +1,40 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed,  9 Aug 2017 16:56:24 +0800
-Subject: [PATCH 1/4] dt-bindings: add binding for Allwinner A64 SRAM
- controller and SRAM C
-In-Reply-To: <20170809085627.32687-1-icenowy@aosc.io>
-References: <20170809085627.32687-1-icenowy@aosc.io>
-Message-ID: <20170809085627.32687-2-icenowy@aosc.io>
+Date: Wed,  9 Aug 2017 16:56:23 +0800
+Subject: [PATCH 0/4] Allwinner A64 SRAM C (DE2 SRAM) support
+Message-ID: <20170809085627.32687-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display engine on Allwinner A64 wants to claim the SRAM C section.
+The DE2 in Allwinner A64 SoC requires the SRAM C to be claimed to work.
 
-Add a SRAM controller compatible for A64, and a SRAM section compatible
-for its SRAM C.
+This patchset adds the support of SRAM C in A64 for the sunxi-sram driver.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- Documentation/devicetree/bindings/sram/sunxi-sram.txt | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+As the SRAM C controlling bit is a little different with other peripherals'
+SRAM controlling bit (inverted), a function value to register value
+remapping is added, which is also useful for the SRAM C1 (VE SRAM) on some
+SoCs.
 
-diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-index 8d5665468fe7..f34b3a553d7c 100644
---- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-+++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
-@@ -9,7 +9,9 @@ Controller Node
- ---------------
- 
- Required properties:
--- compatible : "allwinner,sun4i-a10-sram-controller"
-+- compatible : should be:
-+    - "allwinner,sun4i-a10-sram-controller"
-+    - "allwinner,sun50i-a64-sram-controller"
- - reg : sram controller register offset + length
- 
- SRAM nodes
-@@ -22,10 +24,13 @@ Each SRAM will have SRAM sections that are going to be handled by the
- SRAM controller as subnodes. These sections are represented following
- once again the representation described in the mmio-sram binding.
- 
--The valid sections compatible are:
-+The valid sections compatible for A10 are:
-     - allwinner,sun4i-a10-sram-a3-a4
-     - allwinner,sun4i-a10-sram-d
- 
-+The valid sections compatible for A64 are:
-+    - allwinner,sun50i-a64-sram-c
-+
- Devices using SRAM sections
- ---------------------------
- 
+Patch 1 is the device tree binding patch.
+
+Patch 2 is a fix for the usage of the DE2 SRAM -- as it's claimed by a
+clock driver, and kernel are trying to probe the DE2 clock driver before
+probing sunxi-sram driver; this patch fixed probe defering when claiming
+SRAM region.
+
+Patch 3 adds the remapping code.
+
+Patch 4 adds necessary codes for A64 SRAM C.
+
+Icenowy Zheng (4):
+  dt-bindings: add binding for Allwinner A64 SRAM controller and SRAM C
+  drivers: soc: sunxi: fix error processing on base address when
+    claiming
+  drivers: soc: sunxi: add support for remapping func value to reg value
+  drivers: soc: sunxi: add support for A64 and its SRAM C
+
+ .../devicetree/bindings/sram/sunxi-sram.txt        |  9 +++-
+ drivers/soc/sunxi/sunxi_sram.c                     | 57 ++++++++++++++++++----
+ 2 files changed, 55 insertions(+), 11 deletions(-)
+
 -- 
 2.13.0
