@@ -1,130 +1,87 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Wed, 9 Aug 2017 12:09:00 +0800
-Subject: [PATCH v2 0/4] Optimise 64-bit IOVA allocations
-In-Reply-To: <CAKTKpr7vTzfGDvPDD4HipLYkkO4mfPLcL+3PXDHjb-bQwFMHUA@mail.gmail.com>
-References: <cover.1500636791.git.robin.murphy@arm.com>
- <20170726110807.GN15833@8bytes.org> <59787A48.6060200@huawei.com>
- <CAKTKpr5j8gfurks-7U__w5GQ4A9Wk2MKyqZy6Dbve=2CfVRvzw@mail.gmail.com>
- <598A6877.4050307@huawei.com>
- <CAKTKpr7vTzfGDvPDD4HipLYkkO4mfPLcL+3PXDHjb-bQwFMHUA@mail.gmail.com>
-Message-ID: <598A8ADC.5080906@huawei.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 9 Aug 2017 09:58:25 +0530
+Subject: [PATCH v2 18/18] cpufreq: scmi: add support for fast frequency
+ switching
+In-Reply-To: <1501857104-11279-19-git-send-email-sudeep.holla@arm.com>
+References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
+ <1501857104-11279-19-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20170809042825.GI28857@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04-08-17, 15:31, Sudeep Holla wrote:
+> The cpufreq core provides option for drivers to implement fast_switch
+> callback which is invoked for frequency switching from interrupt context.
+> 
+> This patch adds support for fast_switch callback in SCMI cpufreq driver
+> by making use of polling based SCMI transfer. It also sets the flag
+> fast_switch_possible.
+> 
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: linux-pm at vger.kernel.org
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  drivers/cpufreq/scmi-cpufreq.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/drivers/cpufreq/scmi-cpufreq.c b/drivers/cpufreq/scmi-cpufreq.c
+> index 034359cafea5..cb1084cb1ef1 100644
+> --- a/drivers/cpufreq/scmi-cpufreq.c
+> +++ b/drivers/cpufreq/scmi-cpufreq.c
+> @@ -61,6 +61,19 @@ scmi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
+>  	return perf_ops->freq_set(priv->handle, priv->domain_id, freq, false);
+>  }
+>  
+> +static unsigned int scmi_cpufreq_fast_switch(struct cpufreq_policy *policy,
+> +					     unsigned int target_freq)
+> +{
+> +	struct scmi_data *priv = policy->driver_data;
+> +	struct scmi_perf_ops *perf_ops = priv->handle->perf_ops;
+> +
+> +	if (!perf_ops->freq_set(priv->handle, priv->domain_id,
+> +				target_freq * 1000, true))
+> +		return target_freq;
+> +
+> +	return CPUFREQ_ENTRY_INVALID;
+> +}
 
+This is very much similar to the target routine, perhaps we should write another
+local routine which is used by both target and fast switch.
 
-On 2017/8/9 11:24, Ganapatrao Kulkarni wrote:
-> On Wed, Aug 9, 2017 at 7:12 AM, Leizhen (ThunderTown)
-> <thunder.leizhen@huawei.com> wrote:
->>
->>
->> On 2017/8/8 20:03, Ganapatrao Kulkarni wrote:
->>> On Wed, Jul 26, 2017 at 4:47 PM, Leizhen (ThunderTown)
->>> <thunder.leizhen@huawei.com> wrote:
->>>>
->>>>
->>>> On 2017/7/26 19:08, Joerg Roedel wrote:
->>>>> Hi Robin.
->>>>>
->>>>> On Fri, Jul 21, 2017 at 12:41:57PM +0100, Robin Murphy wrote:
->>>>>> Hi all,
->>>>>>
->>>>>> In the wake of the ARM SMMU optimisation efforts, it seems that certain
->>>>>> workloads (e.g. storage I/O with large scatterlists) probably remain quite
->>>>>> heavily influenced by IOVA allocation performance. Separately, Ard also
->>>>>> reported massive performance drops for a graphical desktop on AMD Seattle
->>>>>> when enabling SMMUs via IORT, which we traced to dma_32bit_pfn in the DMA
->>>>>> ops domain getting initialised differently for ACPI vs. DT, and exposing
->>>>>> the overhead of the rbtree slow path. Whilst we could go around trying to
->>>>>> close up all the little gaps that lead to hitting the slowest case, it
->>>>>> seems a much better idea to simply make said slowest case a lot less slow.
->>>>>
->>>>> Do you have some numbers here? How big was the impact before these
->>>>> patches and how is it with the patches?
->>>> Here are some numbers:
->>>>
->>>> (before)$ iperf -s
->>>> ------------------------------------------------------------
->>>> Server listening on TCP port 5001
->>>> TCP window size: 85.3 KByte (default)
->>>> ------------------------------------------------------------
->>>> [  4] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 35898
->>>> [ ID] Interval       Transfer     Bandwidth
->>>> [  4]  0.0-10.2 sec  7.88 MBytes  6.48 Mbits/sec
->>>> [  5] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 35900
->>>> [  5]  0.0-10.3 sec  7.88 MBytes  6.43 Mbits/sec
->>>> [  4] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 35902
->>>> [  4]  0.0-10.3 sec  7.88 MBytes  6.43 Mbits/sec
->>>>
->>>> (after)$ iperf -s
->>>> ------------------------------------------------------------
->>>> Server listening on TCP port 5001
->>>> TCP window size: 85.3 KByte (default)
->>>> ------------------------------------------------------------
->>>> [  4] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 36330
->>>> [ ID] Interval       Transfer     Bandwidth
->>>> [  4]  0.0-10.0 sec  1.09 GBytes   933 Mbits/sec
->>>> [  5] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 36332
->>>> [  5]  0.0-10.0 sec  1.10 GBytes   939 Mbits/sec
->>>> [  4] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 36334
->>>> [  4]  0.0-10.0 sec  1.10 GBytes   938 Mbits/sec
->>>>
->>>
->>> Is this testing done on Host or on Guest/VM?
->> Host
-> 
-> As per your log, iperf throughput is improved to 938 Mbits/sec
-> from  6.43 Mbits/sec.
-> IMO, this seems to be unrealistic, some thing wrong with the testing?
-For 64bits non-pci devices, the iova allocation is always searched from the last rb-tree node.
-When many iovas allocated and keep a long time, the search process should check many rb nodes
-then find a suitable free space. As my tracking, the average times exceeds 10K.
-        [free-space][free][used][...][used]
-                      ^     ^          ^
-                      |     |          |-----rb_last
-                      |     |--------- maybe more than 10K allocated iova nodes
-                      |------- for 32bits devices, cached32_node remember the lastest freed node, which can help us reduce check times
+Do we guarantee that the frequency is changed by the time this routine returns?
+Or we just send a SCMI request and return back ?
 
-This patch series add a new member "cached_node" to service for 64bits devices, like cached32_node service for 32bits devices.
+If we just send the request and don't wait for freq to get changed, what
+protects another scmi_cpufreq_fast_switch() to get called before the first one
+is finished? And what will happen on that call ?
 
-> 
->>
->>>
->>>>>
->>>>>
->>>>>       Joerg
->>>>>
->>>>>
->>>>> .
->>>>>
->>>>
->>>> --
->>>> Thanks!
->>>> BestRegards
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>> thanks
->>> Ganapat
->>>
->>> .
->>>
->>
->> --
->> Thanks!
->> BestRegards
->>
-> 
-> thanks
-> Ganapat
-> 
-> .
-> 
+>  static int
+>  scmi_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpumask)
+>  {
+> @@ -164,6 +177,7 @@ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
+>  
+>  	policy->cpuinfo.transition_latency = latency;
+>  
+> +	policy->fast_switch_possible = true;
+>  	return 0;
+>  
+>  out_free_cpufreq_table:
+> @@ -180,6 +194,7 @@ static int scmi_cpufreq_exit(struct cpufreq_policy *policy)
+>  {
+>  	struct scmi_data *priv = policy->driver_data;
+>  
+> +	policy->fast_switch_possible = false;
+>  	cpufreq_cooling_unregister(priv->cdev);
+>  	dev_pm_opp_free_cpufreq_table(priv->cpu_dev, &policy->freq_table);
+>  	dev_pm_opp_cpumask_remove_table(policy->related_cpus);
+> @@ -228,6 +243,7 @@ static struct cpufreq_driver scmi_cpufreq_driver = {
+>  	.init			= scmi_cpufreq_init,
+>  	.exit			= scmi_cpufreq_exit,
+>  	.ready			= scmi_cpufreq_ready,
+> +	.fast_switch		= scmi_cpufreq_fast_switch,
+
+Maybe add it right after target_index ?
 
 -- 
-Thanks!
-BestRegards
+viresh
