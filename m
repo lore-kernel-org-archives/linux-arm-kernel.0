@@ -1,145 +1,217 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed,  9 Aug 2017 13:05:23 +0100
-Subject: [PATCH 17/27] arm64/sve: Preserve SVE registers around EFI runtime
- service calls
+Date: Wed,  9 Aug 2017 13:05:13 +0100
+Subject: [PATCH 07/27] arm64/sve: Low-level SVE architectural state
+ manipulation functions
 In-Reply-To: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
 References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1502280338-23002-18-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1502280338-23002-8-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EFI runtime services ABI allows EFI to make free use of the
-FPSIMD registers during EFI runtime service calls, subject to the
-callee-save requirements of the AArch64 procedure call standard.
+Manipulating the SVE architectural state, including the vector and
+predicate registers, first-fault register and the vector length,
+requires the use of dedicated instructions added by SVE.
 
-However, the SVE architecture allows upper bits of the SVE vector
-registers to be zeroed as a side-effect of FPSIMD V-register
-writes.  This means that the SVE vector registers must be saved in
-their entirety in order to avoid data loss: non-SVE-aware EFI
-implementations cannot restore them correctly.
+This patch adds suitable assembly functions for saving and
+restoring the SVE registers and querying the vector length.
+Setting of the vector length is done as part of register restore.
 
-The non-IRQ case is already handled gracefully by
-kernel_neon_begin().  For the IRQ case, this patch allocates a
-suitable per-CPU stash buffer for the full SVE register state and
-uses it to preserve the affected registers around EFI calls.  It is
-currently unclear how the EFI runtime services ABI will be
-clarified with respect to SVE, so it safest to assume that the
-predicate registers and FFR must be saved and restored too.
-
-No attempt is made to restore the restore the vector length after
-a call, for now.  It is deemed rather insane for EFI to change it,
-and contemporary EFI implementations certainly won't.
+Since people building kernels may not all get an SVE-enabled
+toolchain for a while, this patch uses macros that generate
+explicit opcodes in place of assembler mnemonics.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/kernel/fpsimd.c | 53 ++++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 49 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/fpsimd.h       |   5 ++
+ arch/arm64/include/asm/fpsimdmacros.h | 137 ++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/entry-fpsimd.S      |  17 +++++
+ 3 files changed, 159 insertions(+)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index b7fb836..c727b47 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -120,12 +120,14 @@ int sve_max_vl = -1;
- /* Set of available vector lengths, as vq_to_bit(vq): */
- static DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
- static bool sve_vq_map_finalised;
-+static void __percpu *efi_sve_state;
+diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+index 410c481..026a7c7 100644
+--- a/arch/arm64/include/asm/fpsimd.h
++++ b/arch/arm64/include/asm/fpsimd.h
+@@ -67,6 +67,11 @@ extern void fpsimd_update_current_state(struct fpsimd_state *state);
  
- #else /* ! CONFIG_ARM64_SVE */
+ extern void fpsimd_flush_task_state(struct task_struct *target);
  
- /* Dummy declaration for code that will be optimised out: */
- extern DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
- extern bool sve_vq_map_finalised;
-+extern void __percpu *efi_sve_state;
- 
- #endif /* ! CONFIG_ARM64_SVE */
- 
-@@ -416,6 +418,23 @@ int sve_verify_vq_map(void)
- 	return ret;
- }
- 
-+static void __init sve_kernel_mode_neon_setup(void)
-+{
-+	if (!IS_ENABLED(CONFIG_KERNEL_MODE_NEON))
-+		return;
++extern void sve_save_state(void *state, u32 *pfpsr);
++extern void sve_load_state(void const *state, u32 const *pfpsr,
++			   unsigned long vq_minus_1);
++extern unsigned int sve_get_vl(void);
 +
-+	/*
-+	 * alloc_percpu() warns and prints a backtrace if this goes wrong.
-+	 * This is evidence of a crippled system and we are returning void,
-+	 * so no attempt is made to handle this situation here.
-+	 */
-+	BUG_ON(!sve_vl_valid(sve_max_vl));
-+	efi_sve_state = __alloc_percpu(
-+		SVE_SIG_REGS_SIZE(sve_vq_from_vl(sve_max_vl)), 16);
-+	if (!efi_sve_state)
-+		panic("Cannot allocate percpu memory for EFI SVE save/restore");
-+}
+ /* For use by EFI runtime services calls only */
+ extern void __efi_fpsimd_begin(void);
+ extern void __efi_fpsimd_end(void);
+diff --git a/arch/arm64/include/asm/fpsimdmacros.h b/arch/arm64/include/asm/fpsimdmacros.h
+index 0f5fdd3..5023064 100644
+--- a/arch/arm64/include/asm/fpsimdmacros.h
++++ b/arch/arm64/include/asm/fpsimdmacros.h
+@@ -75,3 +75,140 @@
+ 	ldr	w\tmpnr, [\state, #16 * 2 + 4]
+ 	fpsimd_restore_fpcr x\tmpnr, \state
+ .endm
 +
- void __init sve_setup(void)
- {
- 	u64 zcr;
-@@ -455,6 +474,8 @@ void __init sve_setup(void)
- 		sve_max_vl);
- 	pr_info("SVE: default vector length %u bytes per vector\n",
- 		sve_default_vl);
++.macro _check_general_reg nr
++	.if (\nr) < 0 || (\nr) > 30
++		.error "Bad register number \nr."
++	.endif
++.endm
 +
-+	sve_kernel_mode_neon_setup();
- }
- 
- void fpsimd_release_thread(struct task_struct *dead_task)
-@@ -797,6 +818,7 @@ EXPORT_SYMBOL(kernel_neon_end);
- 
- DEFINE_PER_CPU(struct fpsimd_state, efi_fpsimd_state);
- DEFINE_PER_CPU(bool, efi_fpsimd_state_used);
-+DEFINE_PER_CPU(bool, efi_sve_state_used);
- 
- /*
-  * EFI runtime services support functions
-@@ -825,7 +847,20 @@ void __efi_fpsimd_begin(void)
- 	if (may_use_simd())
- 		kernel_neon_begin();
- 	else {
--		fpsimd_save_state(this_cpu_ptr(&efi_fpsimd_state));
-+		/*
-+		 * If !efi_sve_state, SVE can't be in use yet and doesn't need
-+		 * preserving:
-+		 */
-+		if (system_supports_sve() && likely(efi_sve_state)) {
-+			char *sve_state = this_cpu_ptr(efi_sve_state);
++.macro _sve_check_zreg znr
++	.if (\znr) < 0 || (\znr) > 31
++		.error "Bad Scalable Vector Extension vector register number \znr."
++	.endif
++.endm
 +
-+			__this_cpu_write(efi_sve_state_used, true);
++.macro _sve_check_preg pnr
++	.if (\pnr) < 0 || (\pnr) > 15
++		.error "Bad Scalable Vector Extension predicate register number \pnr."
++	.endif
++.endm
 +
-+			sve_save_state(sve_state + sve_ffr_offset(sve_max_vl),
-+				       &this_cpu_ptr(&efi_fpsimd_state)->fpsr);
-+		} else
-+			fpsimd_save_state(this_cpu_ptr(&efi_fpsimd_state));
++.macro _check_num n, min, max
++	.if (\n) < (\min) || (\n) > (\max)
++		.error "Number \n out of range [\min,\max]"
++	.endif
++.endm
 +
- 		__this_cpu_write(efi_fpsimd_state_used, true);
- 	}
- }
-@@ -838,10 +873,20 @@ void __efi_fpsimd_end(void)
- 	if (!system_supports_fpsimd())
- 		return;
- 
--	if (__this_cpu_xchg(efi_fpsimd_state_used, false))
--		fpsimd_load_state(this_cpu_ptr(&efi_fpsimd_state));
--	else
-+	if (!__this_cpu_xchg(efi_fpsimd_state_used, false))
- 		kernel_neon_end();
-+	else
-+		if (system_supports_sve() &&
-+		    likely(__this_cpu_read(efi_sve_state_used))) {
-+			char const *sve_state = this_cpu_ptr(efi_sve_state);
++.macro _sve_str_v nz, nxbase, offset=0
++	_sve_check_zreg \nz
++	_check_general_reg \nxbase
++	_check_num (\offset), -0x100, 0xff
++	.inst	0xe5804000			\
++		| (\nz)				\
++		| ((\nxbase) << 5)		\
++		| (((\offset) & 7) << 10)	\
++		| (((\offset) & 0x1f8) << 13)
++.endm
 +
-+			sve_load_state(sve_state + sve_ffr_offset(sve_max_vl),
-+				       &this_cpu_ptr(&efi_fpsimd_state)->fpsr,
-+				       sve_vq_from_vl(sve_get_vl()) - 1);
++.macro _sve_ldr_v nz, nxbase, offset=0
++	_sve_check_zreg \nz
++	_check_general_reg \nxbase
++	_check_num (\offset), -0x100, 0xff
++	.inst	0x85804000			\
++		| (\nz)				\
++		| ((\nxbase) << 5)		\
++		| (((\offset) & 7) << 10)	\
++		| (((\offset) & 0x1f8) << 13)
++.endm
 +
-+			__this_cpu_write(efi_sve_state_used, false);
-+		} else
-+			fpsimd_load_state(this_cpu_ptr(&efi_fpsimd_state));
- }
- 
- #endif /* CONFIG_KERNEL_MODE_NEON */
++.macro _sve_str_p np, nxbase, offset=0
++	_sve_check_preg \np
++	_check_general_reg \nxbase
++	_check_num (\offset), -0x100, 0xff
++	.inst	0xe5800000			\
++		| (\np)				\
++		| ((\nxbase) << 5)		\
++		| (((\offset) & 7) << 10)	\
++		| (((\offset) & 0x1f8) << 13)
++.endm
++
++.macro _sve_ldr_p np, nxbase, offset=0
++	_sve_check_preg \np
++	_check_general_reg \nxbase
++	_check_num (\offset), -0x100, 0xff
++	.inst	0x85800000			\
++		| (\np)				\
++		| ((\nxbase) << 5)		\
++		| (((\offset) & 7) << 10)	\
++		| (((\offset) & 0x1f8) << 13)
++.endm
++
++.macro _sve_rdvl nx, imm
++	_check_general_reg \nx
++	_check_num (\imm), -0x20, 0x1f
++	.inst	0x04bf5000			\
++		| (\nx)				\
++		| (((\imm) & 0x3f) << 5)
++.endm
++
++.macro _sve_rdffr np
++	_sve_check_preg \np
++	.inst	0x2519f000			\
++		| (\np)
++.endm
++
++.macro _sve_wrffr np
++	_sve_check_preg \np
++	.inst	0x25289000			\
++		| ((\np) << 5)
++.endm
++
++.macro __for from:req, to:req
++	.if (\from) == (\to)
++		_for__body \from
++	.else
++		__for \from, (\from) + ((\to) - (\from)) / 2
++		__for (\from) + ((\to) - (\from)) / 2 + 1, \to
++	.endif
++.endm
++
++.macro _for var:req, from:req, to:req, insn:vararg
++	.macro _for__body \var:req
++		\insn
++	.endm
++
++	__for \from, \to
++
++	.purgem _for__body
++.endm
++
++.macro sve_save nxbase, xpfpsr, nxtmp
++ _for n, 0, 31,	_sve_str_v	\n, \nxbase, \n - 34
++ _for n, 0, 15,	_sve_str_p	\n, \nxbase, \n - 16
++		_sve_rdffr	0
++		_sve_str_p	0, \nxbase
++		_sve_ldr_p	0, \nxbase, -16
++
++		mrs		x\nxtmp, fpsr
++		str		w\nxtmp, [\xpfpsr]
++		mrs		x\nxtmp, fpcr
++		str		w\nxtmp, [\xpfpsr, #4]
++.endm
++
++.macro sve_load nxbase, xpfpsr, xvqminus1, nxtmp
++		mrs_s		x\nxtmp, SYS_ZCR_EL1
++		bic		x\nxtmp, x\nxtmp, ZCR_ELx_LEN_MASK
++		orr		x\nxtmp, x\nxtmp, \xvqminus1
++		msr_s		SYS_ZCR_EL1, x\nxtmp	// self-synchronising
++
++ _for n, 0, 31,	_sve_ldr_v	\n, \nxbase, \n - 34
++		_sve_ldr_p	0, \nxbase
++		_sve_wrffr	0
++ _for n, 0, 15,	_sve_ldr_p	\n, \nxbase, \n - 16
++
++		ldr		w\nxtmp, [\xpfpsr]
++		msr		fpsr, x\nxtmp
++		ldr		w\nxtmp, [\xpfpsr, #4]
++		msr		fpcr, x\nxtmp
++.endm
+diff --git a/arch/arm64/kernel/entry-fpsimd.S b/arch/arm64/kernel/entry-fpsimd.S
+index 6a27cd6..73f17bf 100644
+--- a/arch/arm64/kernel/entry-fpsimd.S
++++ b/arch/arm64/kernel/entry-fpsimd.S
+@@ -41,3 +41,20 @@ ENTRY(fpsimd_load_state)
+ 	fpsimd_restore x0, 8
+ 	ret
+ ENDPROC(fpsimd_load_state)
++
++#ifdef CONFIG_ARM64_SVE
++ENTRY(sve_save_state)
++	sve_save 0, x1, 2
++	ret
++ENDPROC(sve_save_state)
++
++ENTRY(sve_load_state)
++	sve_load 0, x1, x2, 3
++	ret
++ENDPROC(sve_load_state)
++
++ENTRY(sve_get_vl)
++	_sve_rdvl	0, 1
++	ret
++ENDPROC(sve_get_vl)
++#endif /* CONFIG_ARM64_SVE */
 -- 
 2.1.4
