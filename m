@@ -1,34 +1,46 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Wed, 9 Aug 2017 08:18:03 +0300
-Subject: [PATCH v4 02/19] crypto: ccm: use -EAGAIN for transient busy
- indication
-In-Reply-To: <4600c898-a2f2-f95f-15b4-0adcc6acc0b5@amd.com>
-References: <1502193834-11289-1-git-send-email-gilad@benyossef.com>
- <1502193834-11289-3-git-send-email-gilad@benyossef.com>
- <4600c898-a2f2-f95f-15b4-0adcc6acc0b5@amd.com>
-Message-ID: <CAOtvUMeUHk9KxQumhuvJ52dp-_-LFOD8XGvCWvhU6LjEZhEF7A@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 9 Aug 2017 13:22:55 +0800
+Subject: [patch v2 1/2] drivers: jtag: Add JTAG core driver
+In-Reply-To: <1502115467-1735-2-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <201708091323.G1dgtioU%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 8, 2017 at 6:24 PM, Gary R Hook <gary.hook@amd.com> wrote:
-> On 08/08/2017 07:03 AM, Gilad Ben-Yossef wrote:
->>
->> Replace -EBUSY with -EAGAIN when reporting transient busy
->> indication in the absence of backlog.
->>
->> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
->
->
-> Could we use "ccp" in the subject line, please?
+Hi Oleksandr,
 
-Of course, sorry about the the typo.
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.13-rc4 next-20170808]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Gilad
+url:    https://github.com/0day-ci/linux/commits/Oleksandr-Shamray/drivers-jtag-Add-JTAG-core-driver/20170809-100030
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
--- 
-Gilad Ben-Yossef
-Chief Coffee Drinker
+All errors (new ones prefixed by >>):
 
-"If you take a class in large-scale robotics, can you end up in a
-situation where the homework eats your dog?"
- -- Jean-Baptiste Queru
+   In file included from include/linux/jtag.h:14:0,
+                    from drivers/jtag/jtag.c:13:
+>> include/uapi/linux/jtag.h:14:19: fatal error: types.h: No such file or directory
+    #include <types.h>
+                      ^
+   compilation terminated.
+
+vim +14 include/uapi/linux/jtag.h
+
+    13	
+  > 14	#include <types.h>
+    15	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 61093 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170809/2124f154/attachment-0001.gz>
