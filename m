@@ -1,210 +1,159 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 9 Aug 2017 10:50:11 +0200
-Subject: [PATCH v7 3/4] clk: samsung: exynos5433: Add runtime PM support
-In-Reply-To: <de027e15-0cac-c1b7-c98b-23369b9cec60@samsung.com>
-References: <1501839294-478-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170804093516eucas1p2267f819dad7c2e84eeca81a81d2687f2@eucas1p2.samsung.com>
- <1501839294-478-4-git-send-email-m.szyprowski@samsung.com>
- <20170808161119.GC2646@kozik-book>
- <de027e15-0cac-c1b7-c98b-23369b9cec60@samsung.com>
-Message-ID: <CAJKOXPdbo6jpf_s1=SN-0mMfPhsOwuTb=tKenwZ2FDwnoceTYA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 9 Aug 2017 10:52:38 +0200
+Subject: [PATCH  2/2] ARM: dts: r8a7743: Add I2C DT support
+In-Reply-To: <1502191449-16118-1-git-send-email-biju.das@bp.renesas.com>
+References: <1502191449-16118-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <20170809085238.GJ2705@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 9, 2017 at 10:19 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hi Krzysztof,
->
->
-> On 2017-08-08 18:11, Krzysztof Kozlowski wrote:
->>
->> On Fri, Aug 04, 2017 at 11:34:53AM +0200, Marek Szyprowski wrote:
->>>
->>> Add runtime pm support for all clock controller units (CMU), which
->>> belongs
->>
->> s/belongs/belong/
->>
->>> to power domains and require special handling during on/off operations.
->>> Typically special values has to be written to MUX registers to change
->>> internal clocks parents to OSC clock before turning power off. During
->>> such
->>> operation all clocks, which enters CMU has to be enabled to let MUX to
->>
->> s/enters/enter/
->>
->> Beside that, how about unifying the title with previous mail ("Add
->> support for runtime PM")?
->>
->>> stabilize. Also for each CMU there is one special parent clock, which has
->>> to be enabled all the time when any access to CMU registers is done.
->>>
->>> This patch solves most of the mysterious external abort and freeze issues
->>> caused by a lack of proper parent CMU clock enabled or incorrect turn off
->>> procedure.
->>>
->>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
->>> ---
->>>   .../devicetree/bindings/clock/exynos5433-clock.txt |  16 +
->>>   drivers/clk/samsung/clk-exynos5433.c               | 409
->>> ++++++++++++++++-----
->>>   drivers/clk/samsung/clk.h                          |   6 +
->>>   3 files changed, 346 insertions(+), 85 deletions(-)
->>>
->> Looks okay for me, few minor nits below and:
->> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
->>
->>
->>> diff --git a/Documentation/devicetree/bindings/clock/exynos5433-clock.txt
->>> b/Documentation/devicetree/bindings/clock/exynos5433-clock.txt
->>> index 1dc80f8811fe..5c7dd12e667a 100644
->>> --- a/Documentation/devicetree/bindings/clock/exynos5433-clock.txt
->>> +++ b/Documentation/devicetree/bindings/clock/exynos5433-clock.txt
->>> @@ -168,6 +168,11 @@ Required Properties:
->>>                 - aclk_cam1_400
->>>                 - aclk_cam1_552
->>>   +Optional properties:
->>> +  - power-domains: a phandle to respective power domain node as
->>> described by
->>> +       generic PM domain bindings (see power/power_domain.txt for more
->>> +       information).
->>> +
->>>   Each clock is assigned an identifier and client nodes can use this
->>> identifier
->>>   to specify the clock which they consume.
->>>   @@ -270,6 +275,7 @@ Example 2: Examples of clock controller nodes are
->>> listed below.
->>>                 clocks = <&xxti>,
->>>                        <&cmu_top CLK_ACLK_G2D_266>,
->>>                        <&cmu_top CLK_ACLK_G2D_400>;
->>> +               power-domains = <&pd_g2d>;
->>>         };
->>>         cmu_disp: clock-controller at 13b90000 {
->>> @@ -295,6 +301,7 @@ Example 2: Examples of clock controller nodes are
->>> listed below.
->>>                        <&cmu_mif CLK_SCLK_DECON_ECLK_DISP>,
->>>                        <&cmu_mif CLK_SCLK_DECON_TV_VCLK_DISP>,
->>>                        <&cmu_mif CLK_ACLK_DISP_333>;
->>> +               power-domains = <&pd_disp>;
->>>         };
->>>         cmu_aud: clock-controller at 114c0000 {
->>> @@ -304,6 +311,7 @@ Example 2: Examples of clock controller nodes are
->>> listed below.
->>>                 clock-names = "oscclk", "fout_aud_pll";
->>>                 clocks = <&xxti>, <&cmu_top CLK_FOUT_AUD_PLL>;
->>> +               power-domains = <&pd_aud>;
->>>         };
->>>         cmu_bus0: clock-controller at 13600000 {
->>> @@ -340,6 +348,7 @@ Example 2: Examples of clock controller nodes are
->>> listed below.
->>>                 clock-names = "oscclk", "aclk_g3d_400";
->>>                 clocks = <&xxti>, <&cmu_top CLK_ACLK_G3D_400>;
->>> +               power-domains = <&pd_g3d>;
->>>         };
->>>         cmu_gscl: clock-controller at 13cf0000 {
->>> @@ -353,6 +362,7 @@ Example 2: Examples of clock controller nodes are
->>> listed below.
->>>                 clocks = <&xxti>,
->>>                         <&cmu_top CLK_ACLK_GSCL_111>,
->>>                         <&cmu_top CLK_ACLK_GSCL_333>;
->>> +               power-domains = <&pd_gscl>;
->>>         };
->>>         cmu_apollo: clock-controller at 11900000 {
->>> @@ -384,6 +394,7 @@ Example 2: Examples of clock controller nodes are
->>> listed below.
->>>                 clocks = <&xxti>,
->>>                        <&cmu_top CLK_SCLK_JPEG_MSCL>,
->>>                        <&cmu_top CLK_ACLK_MSCL_400>;
->>> +               power-domains = <&pd_mscl>;
->>>         };
->>>         cmu_mfc: clock-controller at 15280000 {
->>> @@ -393,6 +404,7 @@ Example 2: Examples of clock controller nodes are
->>> listed below.
->>>                 clock-names = "oscclk", "aclk_mfc_400";
->>>                 clocks = <&xxti>, <&cmu_top CLK_ACLK_MFC_400>;
->>> +               power-domains = <&pd_mfc>;
->>>         };
->>>         cmu_hevc: clock-controller at 14f80000 {
->>> @@ -402,6 +414,7 @@ Example 2: Examples of clock controller nodes are
->>> listed below.
->>>                 clock-names = "oscclk", "aclk_hevc_400";
->>>                 clocks = <&xxti>, <&cmu_top CLK_ACLK_HEVC_400>;
->>> +               power-domains = <&pd_hevc>;
->>>         };
->>>         cmu_isp: clock-controller at 146d0000 {
->>> @@ -415,6 +428,7 @@ Example 2: Examples of clock controller nodes are
->>> listed below.
->>>                 clocks = <&xxti>,
->>>                        <&cmu_top CLK_ACLK_ISP_DIS_400>,
->>>                        <&cmu_top CLK_ACLK_ISP_400>;
->>> +               power-domains = <&pd_isp>;
->>>         };
->>>         cmu_cam0: clock-controller at 120d0000 {
->>> @@ -430,6 +444,7 @@ Example 2: Examples of clock controller nodes are
->>> listed below.
->>>                        <&cmu_top CLK_ACLK_CAM0_333>,
->>>                        <&cmu_top CLK_ACLK_CAM0_400>,
->>>                        <&cmu_top CLK_ACLK_CAM0_552>;
->>> +               power-domains = <&pd_cam0>;
->>>         };
->>>         cmu_cam1: clock-controller at 145d0000 {
->>> @@ -451,6 +466,7 @@ Example 2: Examples of clock controller nodes are
->>> listed below.
->>>                        <&cmu_top CLK_ACLK_CAM1_333>,
->>>                        <&cmu_top CLK_ACLK_CAM1_400>,
->>>                        <&cmu_top CLK_ACLK_CAM1_552>;
->>> +               power-domains = <&pd_cam1>;
->>>         };
->>>     Example 3: UART controller node that consumes the clock generated by
->>> the clock
->>> diff --git a/drivers/clk/samsung/clk-exynos5433.c
->>> b/drivers/clk/samsung/clk-exynos5433.c
->>> index 11343a597093..7ae9bccb1192 100644
->>> --- a/drivers/clk/samsung/clk-exynos5433.c
->>> +++ b/drivers/clk/samsung/clk-exynos5433.c
->>> @@ -9,9 +9,14 @@
->>>    * Common Clock Framework support for Exynos5433 SoC.
->>>    */
->>>   +#include <linux/clk.h>
->>>   #include <linux/clk-provider.h>
->>>   #include <linux/of.h>
->>>   #include <linux/of_address.h>
->>> +#include <linux/of_device.h>
->>> +#include <linux/platform_device.h>
->>> +#include <linux/pm_runtime.h>
->>> +#include <linux/slab.h>
->>
->> Why you need slab.h?
->
->
-> It was needed for kzalloc, which was later converted to devm_kzalloc. Maybe
-> it would make sense to include "linux/device.h" then to avoid indirect
-> inclusion.
+On Tue, Aug 08, 2017 at 12:24:09PM +0100, Biju Das wrote:
+> Add the I2C[0-5] devices to the r8a7743 device tree.
+> 
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> ---
+> This patch has been tested against Linux-next tag 20170727 and renesas-dev branch.
+> This patch depends on https://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg17008.html
 
-platform_device.h pulls device.h so I think this could be removed.
+As per the patch at the link above it seems that these patches are targeted
+at the renesas tree.  The best practice in that case is to base patches on
+the latest devel branch. Please consider doing so in future.
 
-(...)
+I would also slightly prefer if dependencies were referenced by name, in
+this case:
 
->>> +
->>> info->nr_fixed_factor_clks);
->>> +
->>> +       samsung_clk_of_add_provider(dev->of_node, ctx);
->>> +       pm_runtime_put_sync(dev);
->>> +
->>> +       return 0;
->>> +}
->>> +
->>> +static const struct of_device_id exynos5433_cmu_of_match[] = {
->>
->> Since this is used only when matching devices maybe it can be also
->> marked as refdata?
->
->
-> It is indirectly used by of_device_get_match_data() in probe(). I'm not sure
-> if this would be fine for refdata.
+*  [PATCH 2/3] ARM: dts: r8a7743: Add APMU node and second CPU core
 
-Yes, right, it shouldn't be refdata then. Thanks for explanation.
+or
 
-Best regards,
-Krzysztof
+* [PATCH  0/3] Add SMP support
+
+Also including a link is fine by me.
+
+
+It would also be useful if you described the dependency as a conflict
+(merge-time), compile-time or run-time.
+
+As for the patch itself, it looks good to me.
+
+>  arch/arm/boot/dts/r8a7743.dtsi | 97 ++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 97 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+> index 8c46f62..14222c72 100644
+> --- a/arch/arm/boot/dts/r8a7743.dtsi
+> +++ b/arch/arm/boot/dts/r8a7743.dtsi
+> @@ -18,6 +18,15 @@
+>  	#address-cells = <2>;
+>  	#size-cells = <2>;
+>  
+> +	aliases {
+> +		i2c0 = &i2c0;
+> +		i2c1 = &i2c1;
+> +		i2c2 = &i2c2;
+> +		i2c3 = &i2c3;
+> +		i2c4 = &i2c4;
+> +		i2c5 = &i2c5;
+> +	};
+> +
+>  	cpus {
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+> @@ -339,6 +348,94 @@
+>  			dma-channels = <15>;
+>  		};
+>  
+> +		/* The memory map in the User's Manual maps the cores to bus
+> +		 *  numbers
+> +		 */
+> +		i2c0: i2c at e6508000 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "renesas,i2c-r8a7743",
+> +				     "renesas,rcar-gen2-i2c";
+> +			reg = <0 0xe6508000 0 0x40>;
+> +			interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 931>;
+> +			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
+> +			resets = <&cpg 931>;
+> +			i2c-scl-internal-delay-ns = <6>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c1: i2c at e6518000 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "renesas,i2c-r8a7743",
+> +				     "renesas,rcar-gen2-i2c";
+> +			reg = <0 0xe6518000 0 0x40>;
+> +			interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 930>;
+> +			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
+> +			resets = <&cpg 930>;
+> +			i2c-scl-internal-delay-ns = <6>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c2: i2c at e6530000 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "renesas,i2c-r8a7743",
+> +				     "renesas,rcar-gen2-i2c";
+> +			reg = <0 0xe6530000 0 0x40>;
+> +			interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 929>;
+> +			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
+> +			resets = <&cpg 929>;
+> +			i2c-scl-internal-delay-ns = <6>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c3: i2c at e6540000 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "renesas,i2c-r8a7743",
+> +				     "renesas,rcar-gen2-i2c";
+> +			reg = <0 0xe6540000 0 0x40>;
+> +			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 928>;
+> +			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
+> +			resets = <&cpg 928>;
+> +			i2c-scl-internal-delay-ns = <6>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c4: i2c at e6520000 {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "renesas,i2c-r8a7743",
+> +				     "renesas,rcar-gen2-i2c";
+> +			reg = <0 0xe6520000 0 0x40>;
+> +			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 927>;
+> +			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
+> +			resets = <&cpg 927>;
+> +			i2c-scl-internal-delay-ns = <6>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c5: i2c at e6528000 {
+> +			/* doesn't need pinmux */
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "renesas,i2c-r8a7743",
+> +				     "renesas,rcar-gen2-i2c";
+> +			reg = <0 0xe6528000 0 0x40>;
+> +			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 925>;
+> +			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
+> +			resets = <&cpg 925>;
+> +			i2c-scl-internal-delay-ns = <110>;
+> +			status = "disabled";
+> +		};
+> +
+>  		scifa0: serial at e6c40000 {
+>  			compatible = "renesas,scifa-r8a7743",
+>  				     "renesas,rcar-gen2-scifa", "renesas,scifa";
+> -- 
+> 1.9.1
+> 
