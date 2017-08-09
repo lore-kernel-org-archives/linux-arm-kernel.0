@@ -1,28 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 9 Aug 2017 18:47:37 -0500
-Subject: [PATCH 1/5 v2] pinctrl: Add DT bindings for Cortina Gemini
-In-Reply-To: <20170731213050.4794-1-linus.walleij@linaro.org>
-References: <20170731213050.4794-1-linus.walleij@linaro.org>
-Message-ID: <20170809234737.tpjapxylixaqnmnl@rob-hp-laptop>
+From: briannorris@chromium.org (Brian Norris)
+Date: Wed, 9 Aug 2017 16:50:43 -0700
+Subject: [PATCH] drm/rockchip: Skip suspend/resume if no display is
+ attached
+In-Reply-To: <20170809230724.113819-1-mka@chromium.org>
+References: <20170809230724.113819-1-mka@chromium.org>
+Message-ID: <20170809235041.GA32566@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 11:30:50PM +0200, Linus Walleij wrote:
-> The Cortina Gemini pin controller uses the standard pin control
-> bindings for muxing functions with groups so these bindings
-> should be entirely uncontroversial.
+On Wed, Aug 09, 2017 at 04:07:24PM -0700, Matthias Kaehlcke wrote:
+> rockchip_drm_sys_suspend/resume() obains a struct drm_device pointer
+> from drvdata, the pointer is then dereferenced to obtain private data.
+> drvdata is set when a display is bound, on systems without a
+> (successfully probed) display drvdata is NULL and the PM functions
+> try to dereference a NULL pointer.
 > 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - State that the pin controller must be a subnode of the
->   system controller.
-> - Drop the phandle to the system controller: we can simply
->   look up the parent.
-> ---
->  .../bindings/pinctrl/cortina,gemini-pinctrl.txt    | 59 ++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
+> The suspend/resume code relies on a valid drm_device object, skip it if
+> the pointer is NULL.
+> 
+> Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
 
-Acked-by: Rob Herring <robh@kernel.org>
+For the record (I believe you found this already), Jeffy sent the same
+patch out (to the wrong mailing lists), but it got applied a bit ago:
+
+https://cgit.freedesktop.org/drm/drm-misc/log/?h=drm-misc-fixes
+
+commit 0fa375e6bc9023211eead30a6a79963c45a563da 
+drm/rockchip: Fix suspend crash when drm is not bound
+https://cgit.freedesktop.org/drm/drm-misc/commit/?h=drm-misc-fixes&id=0fa375e6bc9023211eead30a6a79963c45a563da
+
+Thanks,
+Brian
