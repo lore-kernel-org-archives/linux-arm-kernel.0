@@ -1,99 +1,42 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 9 Aug 2017 11:15:49 +0100
-Subject: [PATCH v2 17/18] cpufreq: add support for CPU DVFS based on SCMI
- message protocol
-In-Reply-To: <20170809100651.GA29383@vireshk-i7>
-References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
- <1501857104-11279-18-git-send-email-sudeep.holla@arm.com>
- <20170809041840.GH28857@vireshk-i7>
- <97497123-2c24-6297-2d12-4f407d101b66@arm.com>
- <20170809100651.GA29383@vireshk-i7>
-Message-ID: <d98703ce-7e66-4172-8d36-03c5200e3208@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 9 Aug 2017 11:13:41 +0100
+Subject: [PATCH] arm64/vdso: Support mremap() for vDSO
+In-Reply-To: <20170726170737.21696-1-dsafonov@virtuozzo.com>
+References: <20170726170737.21696-1-dsafonov@virtuozzo.com>
+Message-ID: <20170809101341.j7qvffmkgaxtfapb@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 09/08/17 11:06, Viresh Kumar wrote:
-> On 09-08-17, 10:59, Sudeep Holla wrote:
->> On 09/08/17 05:18, Viresh Kumar wrote:
+On Wed, Jul 26, 2017 at 08:07:37PM +0300, Dmitry Safonov wrote:
+> vDSO VMA address is saved in mm_context for the purpose of using
+> restorer from vDSO page to return to userspace after signal handling.
 > 
->>> This stores the same handle pointer which is stored in the global variable
->>> below. Right? Why keep a local variable here at all ?
->>
->> Yes, you are right. Initially, started with just private pointers and
->> then added global. I was thinking of calling devm_scmi_handle_get per
->> policy to reflect the refcount correctly and drop global variable. Let
->> me know what you think.
+> In Checkpoint Restore in Userspace (CRIU) project we place vDSO VMA
+> on restore back to the place where it was on the dump.
+> With the exception for x86 (where there is API to map vDSO with
+> arch_prctl()), we move vDSO inherited from CRIU task to restoree
+> position by mremap().
 > 
-> A refcount of 1 should be fine as well, i.e. For the cpufreq driver. Why would
-> SCMI care if we manage multiple policies here ? Unless it makes something within
-> SCMI core better.
+> CRIU does support arm64 architecture, but kernel doesn't update
+> context.vdso pointer after mremap(). Which results in translation
+> fault after signal handling on restored application:
+> https://github.com/xemul/criu/issues/288
 > 
-
-Not really, just we can get rid of global pointer which may be need in
-system with multiple scmi instances, but that's long way to go.
-
->>> This is something special which is used only when we are returning indexes and
->>> I am not sure if this will have benefit here. I will rather return 0 here.
->>> That's what other drivers are doing.
->>
->> Indeed had 0 initially but changed as per Juri's suggestion.
+> Make vDSO code track the VMA address by supplying .mremap() fops
+> the same way it's done for x86 and arm32 by:
+> commit b059a453b1cf ("x86/vdso: Add mremap hook to vm_special_mapping")
+> commit 280e87e98c09 ("ARM: 8683/1: ARM32: Support mremap() for sigpage/vDSO").
 > 
-> Maybe he suggested doing that in the fast switch routine ? As that's the normal
-> protocol there. Though I have sent a patch today to propose using 0 there as
-> well (you cc'd).
-> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <rmk+kernel@armlinux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Cyrill Gorcunov <gorcunov@openvz.org>
+> Cc: Pavel Emelyanov <xemul@virtuozzo.com>
+> Cc: Christopher Covington <cov@codeaurora.org>
+> Signed-off-by: Dmitry Safonov <dsafonov@virtuozzo.com>
 
-Yes, saw that. I have changed both to 0 for now. I will watch that
-thread and update if necessary before next posting.
-
->> But is 0
->> treated as failure and still running at current OPP ?
-> 
-> You have used that in the ->get() routine. So the OPP isn't changing, but we are
-> just trying to fetch it. cpufreq core doesn't do a lot with the value returned
-> from here, but at one place we break early if 0 is returned. And so all drivers
-> are returning that.
->
-
-Agreed, I assumed _INVALID is new thing and changed at both target_indes
-and fast_switch.
-
->> and not 0KHz I assume.
-> 
-> Yeah, 0 KHz is dead CPU really :)
-> 
-
-:)
-
->>> I suppose any CPU can change the frequency of any other CPU here, right? You
->>> must set policy->dvfs_possible_from_any_cpu = true, from ->init() then.
->>>
->>
->> OK, I missed to see something like that exists, will do.
-> 
-> Fairly recent stuff, present in pm/linux-next only.
-> 
-
-Oh OK.
-
->>>> +	/*
->>>> +	 * But we need OPP table to function so if it is not there let's
->>>> +	 * give platform code chance to provide it for us.
->>>> +	 */
->>>
->>> How are we getting the OPPs? DT or non DT ?
->>>
->>
->> Non DT :), from the firmware.
-> 
-> I would improve the above comment in that case to clearly say that OPPs are
-> added by the platform, lets wait for it.
-> 
-
-Done
+Queued for 4.14. Thanks.
 
 -- 
-Regards,
-Sudeep
+Catalin
