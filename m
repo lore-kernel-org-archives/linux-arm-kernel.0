@@ -1,54 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 9 Aug 2017 11:07:35 +0100
-Subject: [PATCHv2 1/7] arm64: Add ASM_BUG()
-In-Reply-To: <20170808161050.GH19207@leverpostej>
-References: <1501093110-3844-1-git-send-email-mark.rutland@arm.com>
- <1501093110-3844-2-git-send-email-mark.rutland@arm.com>
- <20170808153112.GF19207@leverpostej>
- <20170808155853.ropux7lxk6rgbd2r@armageddon.cambridge.arm.com>
- <20170808161050.GH19207@leverpostej>
-Message-ID: <20170809100734.oecy3xq7wwg5ixpd@armageddon.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 09 Aug 2017 11:20:42 +0100
+Subject: [PATCH] arm64: dts: marvell: add Device Tree files for Armada-8KP
+In-Reply-To: <022fd386-a9a9-6f9d-27a9-3a63b5a81bbf@marvell.com> (Hanna Hawa's
+ message of "Wed, 9 Aug 2017 09:29:25 +0300")
+References: <1502195474-9585-1-git-send-email-hannah@marvell.com>
+ <6017865e-e0a4-a316-45da-924af7126f91@arm.com>
+ <022fd386-a9a9-6f9d-27a9-3a63b5a81bbf@marvell.com>
+Message-ID: <86inhxxcsl.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 05:10:51PM +0100, Mark Rutland wrote:
-> On Tue, Aug 08, 2017 at 04:58:53PM +0100, Catalin Marinas wrote:
-> > On Tue, Aug 08, 2017 at 04:31:12PM +0100, Mark Rutland wrote:
-> > > On Wed, Jul 26, 2017 at 07:18:24PM +0100, Mark Rutland wrote:
-> > > > +#define __BUG_ENTRY(flags) 				\
-> > > > +		.pushsection __bug_table,"a";		\
-> > > > +		.align 2;				\
-> > > > +	0:	.long 1f - 0b;				\
-> > > > +_BUGVERBOSE_LOCATION(__FILE__, __LINE__)		\
-> > > > +		.short flags; 				\
-> > > > +		.popsection;				\
-> > > > +	1:
-> > > > +#else
-> > > > +#define __BUG_ENTRY(flags)
-> > > > +#endif
-> > > > +
-> > > > +#define ASM_BUG_FLAGS(flags)				\
-> > > > +	__BUG_ENTRY(0)					\
-> > > > +	brk	BUG_BRK_IMM
-> > > 
-> > > I accidentally dropped the flags here, which turns all WARN*s into BUGs.
-> > > 
-> > > I've fixed this up to pass the flags to __BUG_ENTRY(). I've pushed out
-> > > updated arm64/exception-stack and arm64/vmap-stack branches.
-> > 
-> > I'll pull arm64/exception-stack into for-next/core (I haven't got to the
-> > vmap-stack series yet).
-> 
-> If you could hold off for a day, I'd like to make one final change and prevent
-> use of the final record's LR value, where FP is NULL, since that LR isn't
-> meaningful, and makes the backtrace look weird:
-> 
-> [ 2785.650646] [<ffff000008082cb0>] el0_svc_naked+0x24/0x28
-> [ 2785.656016] [<0000ffffaf717554>] 0xffffaf717554
-> 
-> Otherwise, I can do that as a fixup.
+On Wed, Aug 09 2017 at  9:29:25 am BST, Hanna Hawa <hannah@marvell.com> wrote:
+> On 08/08/2017 04:06 PM, Marc Zyngier wrote:
+>> On 08/08/17 13:31, hannah at marvell.com wrote:
 
-I'll hold off, I haven't pushed the for-next/core branch out yet.
+[...]
 
+>>> +				ranges;
+>>> +
+>>> +				reg = <0x3000000 0x10000>,     /* GICD */
+>>> +				      <0x3060000 0x100000>;    /* GICR */
+>>
+>> Where is the GICv2 compatibility region (GICV)that is provided by each
+>> A72 cores? It should be at PERIPHBASE+0x20000 (see
+>> http://infocenter.arm.com/help/topic/com.arm.doc.100095_0003_06_en/way1382452674438.html).
+> Currently virtualization out of our focus, I add GICV region & it not
+> tested.
+
+To be completely blunt, this is a bit out of your hands. The HW exists
+(it is part of the Cortex-A72 core), and it should be described. If it
+doesn't work for one reason or another, then this is a defect and we
+should treat it as such.
+
+Also, you do describe the maintenance interrupt, whose sole purpose is
+to support virtualization.
+
+Thanks,
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny.
