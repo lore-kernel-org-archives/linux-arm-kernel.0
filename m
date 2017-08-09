@@ -1,39 +1,24 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 9 Aug 2017 10:23:08 -0700
-Subject: [PATCH] clk: gemini: hands off PCI OE bit
-In-Reply-To: <CACRpkda0cLMuiipEBX+mH6MJ3v6k=CY+q=Q6NUj=BM+6wnFO2A@mail.gmail.com>
-References: <20170808190818.11740-1-linus.walleij@linaro.org>
- <20170809014312.GZ2146@codeaurora.org>
- <CACRpkda0cLMuiipEBX+mH6MJ3v6k=CY+q=Q6NUj=BM+6wnFO2A@mail.gmail.com>
-Message-ID: <20170809172308.GC2146@codeaurora.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 9 Aug 2017 18:25:28 +0100
+Subject: [PATCH v2 06/16] arm64: entry.S: convert elX_sync
+In-Reply-To: <20170728141019.9084-7-james.morse@arm.com>
+References: <20170728141019.9084-1-james.morse@arm.com>
+ <20170728141019.9084-7-james.morse@arm.com>
+Message-ID: <20170809172527.yrkpthrrtqoxi4d7@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/09, Linus Walleij wrote:
-> On Wed, Aug 9, 2017 at 3:43 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 08/08, Linus Walleij wrote:
-> >> This bit is pin control, and needs to be carefully managed by the
-> >> new pin control driver.
-> >>
-> >> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> >
-> > Fixes tag?
-> 
-> It's not a fix, it'd just that we move the responsibility of managing the
-> pin from the clock driver to the pin control driver.
-> 
-> I initially thought the Gemini would not need a separate pin control
-> driver because it was "simple" ... so these bits could be handled here
-> and there among the peripherals. Little did I know. Mea culpa.
-> 
-> > Does this need to be merged now as a critical fix? Or we can wait
-> > on it for next release?
-> 
-> Just put it in for the next release, thanks!
-> 
+Hi James,
 
-Alright. Thanks!
+On Fri, Jul 28, 2017 at 03:10:09PM +0100, James Morse wrote:
+> @@ -520,9 +514,16 @@ el1_preempt:
+>  el0_sync:
+>  	kernel_entry 0
+>  	mrs	x25, esr_el1			// read the syndrome register
+> +	mrs	x26, far_el1
+
+Just checking, since we are going to access far_el1 even when we get a
+syscall, have you noticed any overhead?
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Catalin
