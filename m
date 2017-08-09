@@ -1,29 +1,30 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 9 Aug 2017 17:03:02 -0500
-Subject: [PATCH] bus: Convert to using %pOF instead of full_name
-In-Reply-To: <20170718214339.7774-11-robh@kernel.org>
-References: <20170718214339.7774-11-robh@kernel.org>
-Message-ID: <CAL_JsqJv6U9Pj05rrTsW04MXJGVS7K3b=oRZZ023vXmcLZXzFw@mail.gmail.com>
+Date: Wed, 9 Aug 2017 17:22:02 -0500
+Subject: [PATCH] memory: Convert to using %pOF instead of full_name
+In-Reply-To: <20170719054702.x6h2fkz6vplzyqg2@piout.net>
+References: <20170718214339.7774-34-robh@kernel.org>
+ <20170719054702.x6h2fkz6vplzyqg2@piout.net>
+Message-ID: <CAL_JsqKLCWVY09RHgU71oc+QMa_bWg+t_yhb60iKFShFT41YPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 18, 2017 at 4:42 PM, Rob Herring <robh@kernel.org> wrote:
-> Now that we have a custom printf format specifier, convert users of
-> full_name to use %pOF instead. This is preparation to remove storing
-> of the full path string for each node.
->
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/bus/arm-cci.c   | 12 ++++++------
->  drivers/bus/imx-weim.c  |  8 ++++----
->  drivers/bus/sunxi-rsb.c | 22 +++++++++++-----------
->  3 files changed, 21 insertions(+), 21 deletions(-)
+On Wed, Jul 19, 2017 at 12:47 AM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> On 18/07/2017 at 16:43:14 -0500, Rob Herring wrote:
+>> Now that we have a custom printf format specifier, convert users of
+>> full_name to use %pOF instead. This is preparation to remove storing
+>> of the full path string for each node.
+>>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+>> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>> Cc: Roger Quadros <rogerq@ti.com>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-omap at vger.kernel.org
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Arnd, Olof,
-
-Can you please apply this one.
+This can go through subsystem tree. Who normally takes drivers/memory/
+changes? arm-soc?
 
 Rob
