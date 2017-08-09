@@ -1,30 +1,33 @@
 From: david.wu@rock-chips.com (David Wu)
-Date: Wed,  9 Aug 2017 20:07:45 +0800
-Subject: [PATCH v4 02/12] multi_v7_defconfig: Make rockchip phy built-in
+Date: Wed,  9 Aug 2017 20:07:47 +0800
+Subject: [PATCH v4 04/12] net: stmmac: dwmac-rk: Remove unwanted code for
+ rk3328_set_to_rmii()
 In-Reply-To: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
 References: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1502280475-736-3-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1502280475-736-5-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the rockchip phy for multi_v7_defconfig builds.
+This is wrong setting for rk3328_set_to_rmii(), so remove it.
 
 Signed-off-by: David Wu <david.wu@rock-chips.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 4d19c1b..94d7e71 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -270,6 +270,7 @@ CONFIG_ICPLUS_PHY=y
- CONFIG_REALTEK_PHY=y
- CONFIG_MICREL_PHY=y
- CONFIG_FIXED_PHY=y
-+CONFIG_ROCKCHIP_PHY=y
- CONFIG_USB_PEGASUS=y
- CONFIG_USB_RTL8152=m
- CONFIG_USB_USBNET=y
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+index f0df519..a8e8fd5 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+@@ -365,9 +365,6 @@ static void rk3328_set_to_rmii(struct rk_priv_data *bsp_priv)
+ 	regmap_write(bsp_priv->grf, RK3328_GRF_MAC_CON1,
+ 		     RK3328_GMAC_PHY_INTF_SEL_RMII |
+ 		     RK3328_GMAC_RMII_MODE);
+-
+-	/* set MAC to RMII mode */
+-	regmap_write(bsp_priv->grf, RK3328_GRF_MAC_CON1, GRF_BIT(11));
+ }
+ 
+ static void rk3328_set_rgmii_speed(struct rk_priv_data *bsp_priv, int speed)
 -- 
 1.9.1
