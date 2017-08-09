@@ -1,30 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 9 Aug 2017 17:22:02 -0500
-Subject: [PATCH] memory: Convert to using %pOF instead of full_name
-In-Reply-To: <20170719054702.x6h2fkz6vplzyqg2@piout.net>
-References: <20170718214339.7774-34-robh@kernel.org>
- <20170719054702.x6h2fkz6vplzyqg2@piout.net>
-Message-ID: <CAL_JsqKLCWVY09RHgU71oc+QMa_bWg+t_yhb60iKFShFT41YPw@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 9 Aug 2017 17:26:37 -0500
+Subject: [PATCH v2 0/3] ARM: dts: omap: workarounds for Ethernet PHY strap
+ on DRA71 and DRA72 EVMs
+In-Reply-To: <cover.1502284400.git.nsekhar@ti.com>
+References: <cover.1502284400.git.nsekhar@ti.com>
+Message-ID: <ca0d0615-d813-d00b-e853-25df9a5c49b6@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 12:47 AM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> On 18/07/2017 at 16:43:14 -0500, Rob Herring wrote:
->> Now that we have a custom printf format specifier, convert users of
->> full_name to use %pOF instead. This is preparation to remove storing
->> of the full path string for each node.
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
->> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> Cc: Roger Quadros <rogerq@ti.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-omap at vger.kernel.org
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-This can go through subsystem tree. Who normally takes drivers/memory/
-changes? arm-soc?
 
-Rob
+On 08/09/2017 09:02 AM, Sekhar Nori wrote:
+> Hi Tony,
+> 
+> Here are some patches to overcome incorrect Ethernet PHY strap settings
+> on DRA72x EVM Rev C and DRA71 EVM. Both of these boards use TI's DP83867
+> PHY.
+> 
+> The incorrect PHY strap settings cause a voilation of PHY specification
+> and need to be worked around in software as documented in the commit
+> messages. But there is no known issue that these patches fix.
+> 
+> Changes from v1:
+> - Add Grygorii's reviewed-by to 3/3
+> - Rebase on latest mainline master
+> 
+> Sekhar Nori (3):
+>    ARM: dts: dra71-evm: workaround incorrect DP83867 RX_CTRL pin strap
+>    ARM: dts: dra72-evm-revc: workaround incorrect DP83867 RX_CTRL pin
+>      strap
+>    ARM: omap2plus_defconfig: enable DP83867 phy driver
+> 
+>   arch/arm/boot/dts/dra71-evm.dts      | 2 ++
+>   arch/arm/boot/dts/dra72-evm-revc.dts | 3 +++
+>   arch/arm/configs/omap2plus_defconfig | 1 +
+>   3 files changed, 6 insertions(+)
+> 
+
+Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+
+-- 
+regards,
+-grygorii
