@@ -1,95 +1,58 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 9 Aug 2017 10:45:41 +0200
-Subject: [PATCH v3 05/11] net: stmmac: dwmac-rk: Add internal phy support
-In-Reply-To: <CAGb2v65Rtw2B3Hcs4L0jTRQ2ApUduJ+Nf1W1XnqXBBmFwMaP-g@mail.gmail.com>
-References: <1501654546-17292-1-git-send-email-david.wu@rock-chips.com>
- <1501654888-19514-1-git-send-email-david.wu@rock-chips.com>
- <6b1ebf64-6903-6d35-b1fc-92ec47334425@gmail.com>
- <CAGb2v65Rtw2B3Hcs4L0jTRQ2ApUduJ+Nf1W1XnqXBBmFwMaP-g@mail.gmail.com>
-Message-ID: <20170809084541.GB7137@Red>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 9 Aug 2017 10:48:09 +0200
+Subject: [PATCH 01/11] KVM: arm64: Store vcpu on the stack during
+ __guest_enter()
+In-Reply-To: <5989EB5D.6@arm.com>
+References: <20170515174400.29735-1-james.morse@arm.com>
+ <20170515174400.29735-2-james.morse@arm.com>
+ <20170606195951.GN9464@cbox> <5989EB5D.6@arm.com>
+Message-ID: <20170809084809.GA16705@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 03, 2017 at 07:06:33PM +0800, Chen-Yu Tsai wrote:
-> On Thu, Aug 3, 2017 at 1:38 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> > On 08/01/2017 11:21 PM, David Wu wrote:
-> >> To make internal phy work, need to configure the phy_clock,
-> >> phy cru_reset and related registers.
+On Tue, Aug 08, 2017 at 05:48:29PM +0100, James Morse wrote:
+> Hi Christoffer,
+> 
+> On 06/06/17 20:59, Christoffer Dall wrote:
+> > On Mon, May 15, 2017 at 06:43:49PM +0100, James Morse wrote:
+> >> KVM uses tpidr_el2 as its private vcpu register, which makes sense for
+> >> non-vhe world switch as only KVM can access this register. This means
+> >> vhe Linux has to use tpidr_el1, which KVM has to save/restore as part
+> >> of the host context.
 > >>
-> >> Signed-off-by: David Wu <david.wu@rock-chips.com>
-> >> ---
-> >>  .../devicetree/bindings/net/rockchip-dwmac.txt     |  6 +-
-> >>  drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 81 ++++++++++++++++++++++
-> >>  2 files changed, 86 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> >> index 8f42755..ec39b31 100644
-> >> --- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> >> +++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
-> >> @@ -25,7 +25,8 @@ Required properties:
-> >>   - clock-names: One name for each entry in the clocks property.
-> >>   - phy-mode: See ethernet.txt file in the same directory.
-> >>   - pinctrl-names: Names corresponding to the numbered pinctrl states.
-> >> - - pinctrl-0: pin-control mode. can be <&rgmii_pins> or <&rmii_pins>.
-> >> + - pinctrl-0: pin-control mode. can be <&rgmii_pins>, <&rmii_pins> or led pins
-> >> +   for internal phy mode.
-> >>   - clock_in_out: For RGMII, it must be "input", means main clock(125MHz)
-> >>     is not sourced from SoC's PLL, but input from PHY; For RMII, "input" means
-> >>     PHY provides the reference clock(50MHz), "output" means GMAC provides the
-> >> @@ -40,6 +41,9 @@ Optional properties:
-> >>   - tx_delay: Delay value for TXD timing. Range value is 0~0x7F, 0x30 as default.
-> >>   - rx_delay: Delay value for RXD timing. Range value is 0~0x7F, 0x10 as default.
-> >>   - phy-supply: phandle to a regulator if the PHY needs one
-> >> + - clocks: <&cru MAC_PHY>: Clock selector for internal macphy
-> >> + - phy-is-internal: A boolean property allows us to know that MAC will connect to
-> >> +   internal phy.
-> >
-> > This is incorrect in two ways:
-> >
-> > - this is a property of the PHY, so it should be documented as such in
-> > Documentation/devicetree/bindings/net/phy.txt so other bindings can
-> > re-use it
-> >
-> > - if it was specific to your MAC you would expect a vendor prefix to
-> > this property, which is not there
-> >
-> > An alternative way to implement the external/internal logic selection
-> > would be mandate that your Ethernet PHY node have a compatible string
-> > like this:
-> >
-> > phy at 0 {
-> >         compatible = "ethernet-phy-id1234.d400", "ethernet-phy-802.3-c22";
-> > };
-> >
-> > Then you don't need this phy-is-internal property, because you can
-> > locate the PHY node by the phy-handle (see more about that in a reply to
-> > patch 10) and you can determine ahead of time whether this PHY is
-> > internal or not based on its compatible string.
+> >> __guest_enter() stores the host_ctxt on the stack, do the same with
+> >> the vcpu.
 > 
-> This doesn't really work for us (sunxi). The "internal" PHY of the H3
-> is also available in the X-Powers AC200 combo chip, which would be
-> external. Same ID. So if someone were to be stupid and put the two
-> together, you wouldn't know which one it actually is. Generically
-> it doesn't make sense to match against the ID either. The PHY is
-> only integrated or inlined into the SoC, meaning it could be moved
-> elsewhere or even be a discreet part.
+> >> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+> >> index 12ee62d6d410..113735df7d01 100644
+> >> --- a/arch/arm64/kvm/hyp/entry.S
+> >> +++ b/arch/arm64/kvm/hyp/entry.S
+> >> @@ -159,9 +159,15 @@ abort_guest_exit_end:
+> >>  ENDPROC(__guest_exit)
+> >>  
+> >>  ENTRY(__fpsimd_guest_restore)
+> >> +	// x0: esr
+> >> +	// x1: vcpu
+> >> +	// x2-x29,lr: vcpu regs
+> >> +	// vcpu x0-x1 on the stack
+> >>  	stp	x2, x3, [sp, #-16]!
+> >>  	stp	x4, lr, [sp, #-16]!
+> >>  
+> >> +	mov	x3, x1
+> >> +
+> > 
+> > nit: can you avoid this by using x1 for the vcpu pointer in this routine
+> > instead?
 > 
-> The way I see it is more like a reversed pinmux. The system should
-> select either the internal set or external set of xMII pins to use.
+> Unfortunately x1 is clobbered by the __fpsimd_{save,restore}_state() macros that
+> are called further down this function.
 > 
-> A phy-is-internal property in the PHY node would work for us. We
-> already need a PHY node to describe its clocks and resets.
-> 
-> A side note to this solution is that, since the internal PHY is defined
-> at the .dtsi level, any external PHYs at the same address would need to
-> make sure to delete the property, which is kind of counterintuitive, but
-> it is how device tree works. One would want to put the internal PHY's
-> address, assuming it is configurable, on something that is rarely used.
+> (its a bit obscure:
+> > fpsimd_save	x0, 1
+> that '1' is used to generate 'x1' or 'w1' in includes/asm/fpsimdmacros.h)
 > 
 
-Hello David, Florian, Andrew
+Ah, I guess I missed that.
 
-Could someone ack this ? or nack if you think that the chance for having two PHY id both internal and external is too low.
-Anyway, we need a choice.
-
-Regards
+Thanks,
+-Christoffer
