@@ -1,189 +1,73 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Wed, 9 Aug 2017 17:56:53 +0200
-Subject: [PATCH v4 1/5] drm/tinydrm: Generalize tinydrm_xrgb8888_to_gray8()
-In-Reply-To: <1502127581-10517-2-git-send-email-david@lechnology.com>
-References: <1502127581-10517-1-git-send-email-david@lechnology.com>
- <1502127581-10517-2-git-send-email-david@lechnology.com>
-Message-ID: <0972c604-36f8-ed60-bea8-2ed82f79645a@tronnes.org>
+From: ashok.raj@intel.com (Raj, Ashok)
+Date: Wed, 9 Aug 2017 08:58:43 -0700
+Subject: [PATCH v9 1/4] PCI: Add new PCIe Fabric End Node flag,
+ PCI_DEV_FLAGS_NO_RELAXED_ORDERING
+In-Reply-To: <20170808232200.GO16580@bhelgaas-glaptop.roam.corp.google.com>
+References: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
+ <1501917313-9812-2-git-send-email-dingtianhong@huawei.com>
+ <20170808232200.GO16580@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170809155841.GA8675@otc-nc-03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Bjorn
 
-Den 07.08.2017 19.39, skrev David Lechner:
-> This adds parameters for vaddr and clip to tinydrm_xrgb8888_to_gray8() to
-> make it more generic.
->
-> dma_buf_{begin,end}_cpu_access() are moved out to the repaper driver.
->
-> Return type is change to void to simplify error handling by callers.
->
-> Signed-off-by: David Lechner <david@lechnology.com>
-> ---
+On Tue, Aug 08, 2017 at 06:22:00PM -0500, Bjorn Helgaas wrote:
+> On Sat, Aug 05, 2017 at 03:15:10PM +0800, Ding Tianhong wrote:
+> > From: Casey Leedom <leedom@chelsio.com>
+> > 
+> > Root complexes don't obey PCIe 3.0 ordering rules, hence could lead to
+> > data-corruption.
+> 
+> This needs to include a link to the Intel spec
+> (https://software.intel.com/sites/default/files/managed/9e/bc/64-ia-32-architectures-optimization-manual.pdf,
+> sec 3.9.1).
+> 
+> It should also include a pointer to the AMD erratum, if available, or
+> at least some reference to how we know it doesn't obey the rules.
+> 
+> Ashok, thanks for chiming in.  Now that you have, I have a few more
+> questions for you:
+> 
+>   - Is the above doc the one you mentioned as being now public?
 
-Thanks for doing this, applied to drm-misc.
+Yes. 
+>   
+>   - Is this considered a hardware erratum?
 
-Noralf.
+I would think so. I have tried to pursue the publication in that direction
+but it morphed into the optimization guide instead. Once it got into some
+open doc i stopped pushing.. but will continue to get this into erratum. i do
+agree that's the right place holder for this.
 
-> v4 changes:
-> * Change return type to void.
->
->
->   drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c | 42 +++++++++-----------------
->   drivers/gpu/drm/tinydrm/repaper.c              | 28 +++++++++++++++--
->   include/drm/tinydrm/tinydrm-helpers.h          |  3 +-
->   3 files changed, 41 insertions(+), 32 deletions(-)
->
-> diff --git a/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c b/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c
-> index 75808bb..bd6cce0 100644
-> --- a/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c
-> +++ b/drivers/gpu/drm/tinydrm/core/tinydrm-helpers.c
-> @@ -185,7 +185,9 @@ EXPORT_SYMBOL(tinydrm_xrgb8888_to_rgb565);
->   /**
->    * tinydrm_xrgb8888_to_gray8 - Convert XRGB8888 to grayscale
->    * @dst: 8-bit grayscale destination buffer
-> + * @vaddr: XRGB8888 source buffer
->    * @fb: DRM framebuffer
-> + * @clip: Clip rectangle area to copy
->    *
->    * Drm doesn't have native monochrome or grayscale support.
->    * Such drivers can announce the commonly supported XR24 format to userspace
-> @@ -195,41 +197,31 @@ EXPORT_SYMBOL(tinydrm_xrgb8888_to_rgb565);
->    * where 1 means foreground color and 0 background color.
->    *
->    * ITU BT.601 is used for the RGB -> luma (brightness) conversion.
-> - *
-> - * Returns:
-> - * Zero on success, negative error code on failure.
->    */
-> -int tinydrm_xrgb8888_to_gray8(u8 *dst, struct drm_framebuffer *fb)
-> +void tinydrm_xrgb8888_to_gray8(u8 *dst, void *vaddr, struct drm_framebuffer *fb,
-> +			       struct drm_clip_rect *clip)
->   {
-> -	struct drm_gem_cma_object *cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
-> -	struct dma_buf_attachment *import_attach = cma_obj->base.import_attach;
-> -	unsigned int x, y, pitch = fb->pitches[0];
-> -	int ret = 0;
-> +	unsigned int len = (clip->x2 - clip->x1) * sizeof(u32);
-> +	unsigned int x, y;
->   	void *buf;
->   	u32 *src;
 >   
->   	if (WARN_ON(fb->format->format != DRM_FORMAT_XRGB8888))
-> -		return -EINVAL;
-> +		return;
->   	/*
->   	 * The cma memory is write-combined so reads are uncached.
->   	 * Speed up by fetching one line at a time.
->   	 */
-> -	buf = kmalloc(pitch, GFP_KERNEL);
-> +	buf = kmalloc(len, GFP_KERNEL);
->   	if (!buf)
-> -		return -ENOMEM;
-> -
-> -	if (import_attach) {
-> -		ret = dma_buf_begin_cpu_access(import_attach->dmabuf,
-> -					       DMA_FROM_DEVICE);
-> -		if (ret)
-> -			goto err_free;
-> -	}
-> +		return;
+>   - If so, is there a pointer to that as well?
 >   
-> -	for (y = 0; y < fb->height; y++) {
-> -		src = cma_obj->vaddr + (y * pitch);
-> -		memcpy(buf, src, pitch);
-> +	for (y = clip->y1; y < clip->y2; y++) {
-> +		src = vaddr + (y * fb->pitches[0]);
-> +		src += clip->x1;
-> +		memcpy(buf, src, len);
->   		src = buf;
-> -		for (x = 0; x < fb->width; x++) {
-> +		for (x = clip->x1; x < clip->x2; x++) {
->   			u8 r = (*src & 0x00ff0000) >> 16;
->   			u8 g = (*src & 0x0000ff00) >> 8;
->   			u8 b =  *src & 0x000000ff;
-> @@ -240,13 +232,7 @@ int tinydrm_xrgb8888_to_gray8(u8 *dst, struct drm_framebuffer *fb)
->   		}
->   	}
->   
-> -	if (import_attach)
-> -		ret = dma_buf_end_cpu_access(import_attach->dmabuf,
-> -					     DMA_FROM_DEVICE);
-> -err_free:
->   	kfree(buf);
-> -
-> -	return ret;
->   }
->   EXPORT_SYMBOL(tinydrm_xrgb8888_to_gray8);
->   
-> diff --git a/drivers/gpu/drm/tinydrm/repaper.c b/drivers/gpu/drm/tinydrm/repaper.c
-> index 3343d3f..30dc97b 100644
-> --- a/drivers/gpu/drm/tinydrm/repaper.c
-> +++ b/drivers/gpu/drm/tinydrm/repaper.c
-> @@ -18,6 +18,7 @@
->    */
->   
->   #include <linux/delay.h>
-> +#include <linux/dma-buf.h>
->   #include <linux/gpio/consumer.h>
->   #include <linux/module.h>
->   #include <linux/of_device.h>
-> @@ -525,11 +526,20 @@ static int repaper_fb_dirty(struct drm_framebuffer *fb,
->   			    struct drm_clip_rect *clips,
->   			    unsigned int num_clips)
->   {
-> +	struct drm_gem_cma_object *cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
-> +	struct dma_buf_attachment *import_attach = cma_obj->base.import_attach;
->   	struct tinydrm_device *tdev = fb->dev->dev_private;
->   	struct repaper_epd *epd = epd_from_tinydrm(tdev);
-> +	struct drm_clip_rect clip;
->   	u8 *buf = NULL;
->   	int ret = 0;
->   
-> +	/* repaper can't do partial updates */
-> +	clip.x1 = 0;
-> +	clip.x2 = fb->width;
-> +	clip.y1 = 0;
-> +	clip.y2 = fb->height;
-> +
->   	mutex_lock(&tdev->dirty_lock);
->   
->   	if (!epd->enabled)
-> @@ -550,9 +560,21 @@ static int repaper_fb_dirty(struct drm_framebuffer *fb,
->   		goto out_unlock;
->   	}
->   
-> -	ret = tinydrm_xrgb8888_to_gray8(buf, fb);
-> -	if (ret)
-> -		goto out_unlock;
-> +	if (import_attach) {
-> +		ret = dma_buf_begin_cpu_access(import_attach->dmabuf,
-> +					       DMA_FROM_DEVICE);
-> +		if (ret)
-> +			goto out_unlock;
-> +	}
-> +
-> +	tinydrm_xrgb8888_to_gray8(buf, cma_obj->vaddr, fb, &clip);
-> +
-> +	if (import_attach) {
-> +		ret = dma_buf_end_cpu_access(import_attach->dmabuf,
-> +					     DMA_FROM_DEVICE);
-> +		if (ret)
-> +			goto out_unlock;
-> +	}
->   
->   	repaper_gray8_to_mono_reversed(buf, fb->width, fb->height);
->   
-> diff --git a/include/drm/tinydrm/tinydrm-helpers.h b/include/drm/tinydrm/tinydrm-helpers.h
-> index a6c387f..d554ded 100644
-> --- a/include/drm/tinydrm/tinydrm-helpers.h
-> +++ b/include/drm/tinydrm/tinydrm-helpers.h
-> @@ -43,7 +43,8 @@ void tinydrm_swab16(u16 *dst, void *vaddr, struct drm_framebuffer *fb,
->   void tinydrm_xrgb8888_to_rgb565(u16 *dst, void *vaddr,
->   				struct drm_framebuffer *fb,
->   				struct drm_clip_rect *clip, bool swap);
-> -int tinydrm_xrgb8888_to_gray8(u8 *dst, struct drm_framebuffer *fb);
-> +void tinydrm_xrgb8888_to_gray8(u8 *dst, void *vaddr, struct drm_framebuffer *fb,
-> +			       struct drm_clip_rect *clip);
->   
->   struct backlight_device *tinydrm_of_find_backlight(struct device *dev);
->   int tinydrm_enable_backlight(struct backlight_device *backlight);
+>   - If this is not considered an erratum, can you provide any guidance
+>     about how an OS should determine when it should use RO?
+
+The optimization guide states that it only applies to transactions targetting
+system memory. For peer-2-peer RO is allowed and has perf upside.
+
+As Casey pointed out in an earlier thread, we choose the heavy hammer approach
+because there are some that can lead to data-corruption as opposed to perf
+degradation. 
+
+This looks ugly, but maybe we can have 2 flags. one that indicates its a strict
+no-no, and one that says no to system memory only. That way driver can
+determine when the device would turn the hint on in the TLP.
+
+>     
+> Relying on a list of device IDs in an optimization manual is OK for an
+> erratum, but if it's *not* an erratum, it seems like a hole in the
+
+Good point.. for this specific case its really an erratum, but for some
+reason they made the decision to use this doc vs. the generic errata
+data-sheet that would have been the preferred way to document.
+
+> specs because as far as I know there's no generic way for the OS to
+> discover whether to use RO.
+> 
+
+Cheers,
+Ashok
