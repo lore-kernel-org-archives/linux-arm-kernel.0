@@ -1,28 +1,52 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 9 Aug 2017 17:16:29 +0800
-Subject: [linux-sunxi] [PATCH 2/4] drivers: soc: sunxi: fix error
- processing on base address when claiming
-In-Reply-To: <20170809085627.32687-3-icenowy@aosc.io>
-References: <20170809085627.32687-1-icenowy@aosc.io>
- <20170809085627.32687-3-icenowy@aosc.io>
-Message-ID: <CAGb2v658CSUwSMdv5yCLtPSfDrsmMZDSBjZQsmi=2Y+EfJPmhg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 9 Aug 2017 12:17:06 +0300
+Subject: [PATCH 2/2] ARM: dts: r8a7743: Add IIC cores to dtsi
+In-Reply-To: <1502196418-31341-1-git-send-email-biju.das@bp.renesas.com>
+References: <1502196418-31341-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 9, 2017 at 4:56 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> When claiming SRAM, if the base is set to an error, it means that the
-> SRAM controller has been probed, but failed to remap the controller
-> memory zone. If the base is zero, thus the SRAM controller should be not
-> probed at all, and it should return -EPROBE_DEFER. However, currently we
-> returned -EPROBE_DEFER in the former situation, and ignored the latter
-> situation (which will lead to the kernel to panic).
->
-> Fix the behavior on abnormal base address processing when claiming.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+On 8/8/2017 3:46 PM, Biju Das wrote:
 
-Fixes: 4af34b572a85 ("drivers: soc: sunxi: Introduce SoC driver to map SRAMs") ?
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> ---
+> This patch has been tested against Linux-next tag 20170727 and renesas-dev branch.
+> This patch depends on https://www.spinics.net/lists/arm-kernel/msg599220.html
+> 
+>   arch/arm/boot/dts/r8a7743.dtsi | 55 ++++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 55 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+> index 14222c72..5c2b140 100644
+> --- a/arch/arm/boot/dts/r8a7743.dtsi
+> +++ b/arch/arm/boot/dts/r8a7743.dtsi
+[...]
+> @@ -436,6 +439,58 @@
+>   			status = "disabled";
+>   		};
+>   
+> +		i2c6: i2c at e60b0000 {
 
-I can add the tag when applying.
+    I'd use iic0 as the label.
 
-ChenYu
+> +			/* doesn't need pinmux */
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			compatible = "renesas,iic-r8a7743",
+> +				     "renesas,rcar-gen2-iic",
+> +				     "renesas,rmobile-iic";
+> +			reg = <0 0xe60b0000 0 0x425>;
+> +			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&cpg CPG_MOD 926>;
+> +			dmas = <&dmac0 0x77>, <&dmac0 0x78>,
+> +			       <&dmac1 0x77>, <&dmac1 0x78>;
+> +			dma-names = "tx", "rx", "tx", "rx";
+> +			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
+> +			resets = <&cpg CPG_MOD 926>;
+
+    CPG_MOD not needed here, it's not a "clocks" prop.
+
+[...]
+
+MBR, Sergei
