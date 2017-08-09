@@ -1,41 +1,75 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed,  9 Aug 2017 13:05:22 +0100
-Subject: [PATCH 16/27] arm64/sve: Preserve SVE registers around kernel-mode
- NEON use
+Date: Wed,  9 Aug 2017 13:05:27 +0100
+Subject: [PATCH 21/27] arm64/sve: KVM: Prevent guests from using SVE
 In-Reply-To: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
 References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1502280338-23002-17-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1502280338-23002-22-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kernel-mode NEON will corrupt the SVE vector registers, due to the
-way they alias the FPSIMD vector registers in the hardware.
+Until KVM has full SVE support, guests must not be allowed to
+execute SVE instructions.
 
-This patch ensures that any live SVE register content for the task
-is saved by kernel_neon_begin().  The data will be restored in the
-usual way on return to userspace.
+This patch enables the necessary traps, and also ensures that the
+traps are disabled again on exit from the guest so that the host
+can still use SVE if it wants to.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/kernel/fpsimd.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/kvm_arm.h | 3 ++-
+ arch/arm64/kvm/hyp/switch.c      | 6 +++---
+ 2 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 955c873..b7fb836 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -758,8 +758,10 @@ void kernel_neon_begin(void)
- 	__this_cpu_write(kernel_neon_busy, true);
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index dbf0537..8a19651 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -186,7 +186,7 @@
+ #define CPTR_EL2_TTA	(1 << 20)
+ #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
+ #define CPTR_EL2_TZ	(1 << 8)
+-#define CPTR_EL2_DEFAULT	0x000033ff
++#define CPTR_EL2_DEFAULT	(0x000033ff & ~CPTR_EL2_TZ)
  
- 	/* Save unsaved task fpsimd state, if any: */
--	if (current->mm && !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
--		fpsimd_save_state(&current->thread.fpsimd_state);
-+	if (current->mm) {
-+		task_fpsimd_save();
-+		set_thread_flag(TIF_FOREIGN_FPSTATE);
-+	}
+ /* Hyp Debug Configuration Register bits */
+ #define MDCR_EL2_TPMS		(1 << 14)
+@@ -237,5 +237,6 @@
  
- 	/* Invalidate any task state remaining in the fpsimd regs: */
- 	__this_cpu_write(fpsimd_last_state, NULL);
+ #define CPACR_EL1_FPEN		(3 << 20)
+ #define CPACR_EL1_TTA		(1 << 28)
++#define CPACR_EL1_DEFAULT	(CPACR_EL1_FPEN | CPACR_EL1_ZEN_EL1EN)
+ 
+ #endif /* __ARM64_KVM_ARM_H__ */
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 35a90b8..951f3eb 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -48,7 +48,7 @@ static void __hyp_text __activate_traps_vhe(void)
+ 
+ 	val = read_sysreg(cpacr_el1);
+ 	val |= CPACR_EL1_TTA;
+-	val &= ~CPACR_EL1_FPEN;
++	val &= ~(CPACR_EL1_FPEN | CPACR_EL1_ZEN);
+ 	write_sysreg(val, cpacr_el1);
+ 
+ 	write_sysreg(__kvm_hyp_vector, vbar_el1);
+@@ -59,7 +59,7 @@ static void __hyp_text __activate_traps_nvhe(void)
+ 	u64 val;
+ 
+ 	val = CPTR_EL2_DEFAULT;
+-	val |= CPTR_EL2_TTA | CPTR_EL2_TFP;
++	val |= CPTR_EL2_TTA | CPTR_EL2_TFP | CPTR_EL2_TZ;
+ 	write_sysreg(val, cptr_el2);
+ }
+ 
+@@ -117,7 +117,7 @@ static void __hyp_text __deactivate_traps_vhe(void)
+ 
+ 	write_sysreg(mdcr_el2, mdcr_el2);
+ 	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+-	write_sysreg(CPACR_EL1_FPEN, cpacr_el1);
++	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
+ 	write_sysreg(vectors, vbar_el1);
+ }
+ 
 -- 
 2.1.4
