@@ -1,33 +1,96 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Wed,  9 Aug 2017 21:55:54 +0900
-Subject: [PATCH] ARM: dts: uniphier: add audio out pin-mux node
-Message-ID: <20170809125554.31083-1-suzuki.katsuhiro@socionext.com>
+From: leedom@chelsio.com (Casey Leedom)
+Date: Wed, 9 Aug 2017 12:33:34 +0000
+Subject: [PATCH v9 2/4] PCI: Disable PCIe Relaxed Ordering if unsupported
+In-Reply-To: <20170809022239.GP16580@bhelgaas-glaptop.roam.corp.google.com>
+References: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
+ <1501917313-9812-3-git-send-email-dingtianhong@huawei.com>,
+ <20170809022239.GP16580@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <MWHPR12MB1600255ACFCD3FB3C80EB8B6C88B0@MWHPR12MB1600.namprd12.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The UniPhier AIO2013 audio system needs I2S and clock signal pins
-to connect external codec chip.
+| From: Bjorn Helgaas <helgaas@kernel.org>
+| Sent: Tuesday, August 8, 2017 7:22 PM
+| ...
+| and the caller should do something like this:
+| 
+|     if (pcie_relaxed_ordering_broken(pci_find_pcie_root_port(pdev)))
+|         adapter->flags |= ROOT_NO_RELAXED_ORDERING;
+| 
+| That way it's obvious where the issue is, and it's obvious that the
+| answer might be different for peer-to-peer transactions than it is for
+| transactions to the root port, i.e., to coherent memory.
+| ...
 
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
----
- arch/arm/boot/dts/uniphier-pinctrl.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+Which is back to something very close to what I initially suggested in my
+first patch submission.  Because you're right, this isn't about broken
+Source Devices, it's about broken Completing Devices.
 
-diff --git a/arch/arm/boot/dts/uniphier-pinctrl.dtsi b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-index 246f35ffb638..c70be5d78bd5 100644
---- a/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-@@ -44,6 +44,11 @@
-  */
- 
- &pinctrl {
-+	pinctrl_aout: aout_grp {
-+		groups = "aout";
-+		function = "aout";
-+	};
-+
- 	pinctrl_emmc: emmc_grp {
- 		groups = "emmc", "emmc_dat8";
- 		function = "emmc";
--- 
-2.13.2
+Unfortunately, as Alexander Duyck noted, in a Virtual Machine we won't be
+able to see our Root Port in order to make this determination.  (And in some
+Hypervisor implementations I've seen, there's not even a synthetic Root Port
+available to the VM at all, let alone read-only access to the real one.)
+
+So the current scheme was developed of having the Hypervisor kernel traverse
+down the PCIe Fabric when it finds a broken Root Port implementation (the
+issue that we've mostly been primarily focused upon), and turning off the
+PCIe Capability Device Control[Relaxed Ordering Enable].  This was to serve
+two purposes:
+
+ 1. Turn that off in order to prevent sending any Transaction Layer
+    Packets with the Relaxed Ordering Attribute to any Completer.
+    Which unfortunately would also prevent Peer-to-Peer use of the
+    Relaxed Ordering Attribute.
+
+ 2. Act as a message to Device Drivers for those downstream devices
+    that the they were dealing with a broken Root Port implementation.
+    And this would work even for a driver in a VM with an attached
+    device since it would be able to see the PCIe Configuration Space
+    for the attached device.
+
+I haven't been excited about any of this because:
+
+ A. While so far all of the examples we've talked about are broken
+    Root Port Completers, it's perfectly possible that other devices
+    could be broken -- say an NVMe Device which is not "Coherent
+    Memory".  How would this fit into the framework APIs being
+    described?
+
+ B. I have yet to see a n example of how the currently proposed
+    API framework would be used in a hybrid environment where
+    TLPs to the Root Port would not use Relaxed Ordering, but TLPs
+    to a Peer would use Relaxed Ordering.  So far its all been about
+    using a "big hammer" to completely disable the use of Relaxed
+    Ordering.
+
+But the VM problem keeps cropping up over and over.  A driver in a VM
+doesn't have access to the Root Port to determine if its on a "Black List"
+and our only way of communicating with the driver in the VM is to leave the
+device in a particular state (i.e. initialize the PCIe Capability Device
+Control[Relaxed Ordering Enable] to "off").
+
+Oh, and also, on the current patch submission's focus on broken Root Port
+implementations: one could suggest that even if we're stuck with the "Device
+attached to a VM Conundrum", that what we should really be thinking about is
+if ANY device within a PCIe Fabric has broken Relaxed Ordering completion
+problems, and, if so, "poisoning" the entire containing PCIe Fabric by
+turning off Relaxed Ordering Enable for every device, up, down sideways --
+including the Root Port itself.
+
+| ...
+| This associates the message with the Requester that may potentially
+| use relaxed ordering. But there's nothing wrong or unusual about the
+| Requester; the issue is with the *Completer*, so I think the message
+| should be in the quirk where we set PCI_DEV_FLAGS_NO_RELAXED_ORDERING.
+| Maybe it should be both places; I dunno.
+| 
+| This implementation assumes the device only initiates transactions to
+| coherent memory, i.e., it assumes the device never does peer-to-peer
+| DMA.  I guess we'll have to wait and see if we trip over any
+| peer-to-peer issues, then figure out how to handle them.
+| ...
+
+Yes, as soon as we want to implement the hybrid use of Relaxed Ordering I
+mentioned above.  And that the Intel document mentions itself.
+
+Casey
