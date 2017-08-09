@@ -1,130 +1,110 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 9 Aug 2017 17:17:57 +0800
-Subject: [PATCH 1/4] phy: rockchip: use of_device_get_match_data()
-Message-ID: <1502270280-13792-1-git-send-email-chunfeng.yun@mediatek.com>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Wed, 9 Aug 2017 17:38:18 +0800
+Subject: [PATCH v3 05/11] net: stmmac: dwmac-rk: Add internal phy support
+In-Reply-To: <20170809084541.GB7137@Red>
+References: <1501654546-17292-1-git-send-email-david.wu@rock-chips.com>
+ <1501654888-19514-1-git-send-email-david.wu@rock-chips.com>
+ <6b1ebf64-6903-6d35-b1fc-92ec47334425@gmail.com>
+ <CAGb2v65Rtw2B3Hcs4L0jTRQ2ApUduJ+Nf1W1XnqXBBmFwMaP-g@mail.gmail.com>
+ <20170809084541.GB7137@Red>
+Message-ID: <a9fae87c-9df5-a250-5bc1-230be4af15cd@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-reduce the boilerplate code to get the specific data
+Hello Corentin, Chen-Yu
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/phy/rockchip/phy-rockchip-inno-usb2.c |    9 +++------
- drivers/phy/rockchip/phy-rockchip-pcie.c      |    7 +++----
- drivers/phy/rockchip/phy-rockchip-usb.c       |   10 +++-------
- 3 files changed, 9 insertions(+), 17 deletions(-)
+? 2017/8/9 16:45, Corentin Labbe ??:
+> On Thu, Aug 03, 2017 at 07:06:33PM +0800, Chen-Yu Tsai wrote:
+>> On Thu, Aug 3, 2017 at 1:38 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>>> On 08/01/2017 11:21 PM, David Wu wrote:
+>>>> To make internal phy work, need to configure the phy_clock,
+>>>> phy cru_reset and related registers.
+>>>>
+>>>> Signed-off-by: David Wu <david.wu@rock-chips.com>
+>>>> ---
+>>>>   .../devicetree/bindings/net/rockchip-dwmac.txt     |  6 +-
+>>>>   drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 81 ++++++++++++++++++++++
+>>>>   2 files changed, 86 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+>>>> index 8f42755..ec39b31 100644
+>>>> --- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+>>>> +++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+>>>> @@ -25,7 +25,8 @@ Required properties:
+>>>>    - clock-names: One name for each entry in the clocks property.
+>>>>    - phy-mode: See ethernet.txt file in the same directory.
+>>>>    - pinctrl-names: Names corresponding to the numbered pinctrl states.
+>>>> - - pinctrl-0: pin-control mode. can be <&rgmii_pins> or <&rmii_pins>.
+>>>> + - pinctrl-0: pin-control mode. can be <&rgmii_pins>, <&rmii_pins> or led pins
+>>>> +   for internal phy mode.
+>>>>    - clock_in_out: For RGMII, it must be "input", means main clock(125MHz)
+>>>>      is not sourced from SoC's PLL, but input from PHY; For RMII, "input" means
+>>>>      PHY provides the reference clock(50MHz), "output" means GMAC provides the
+>>>> @@ -40,6 +41,9 @@ Optional properties:
+>>>>    - tx_delay: Delay value for TXD timing. Range value is 0~0x7F, 0x30 as default.
+>>>>    - rx_delay: Delay value for RXD timing. Range value is 0~0x7F, 0x10 as default.
+>>>>    - phy-supply: phandle to a regulator if the PHY needs one
+>>>> + - clocks: <&cru MAC_PHY>: Clock selector for internal macphy
+>>>> + - phy-is-internal: A boolean property allows us to know that MAC will connect to
+>>>> +   internal phy.
+>>>
+>>> This is incorrect in two ways:
+>>>
+>>> - this is a property of the PHY, so it should be documented as such in
+>>> Documentation/devicetree/bindings/net/phy.txt so other bindings can
+>>> re-use it
+>>>
+>>> - if it was specific to your MAC you would expect a vendor prefix to
+>>> this property, which is not there
+>>>
+>>> An alternative way to implement the external/internal logic selection
+>>> would be mandate that your Ethernet PHY node have a compatible string
+>>> like this:
+>>>
+>>> phy at 0 {
+>>>          compatible = "ethernet-phy-id1234.d400", "ethernet-phy-802.3-c22";
+>>> };
+>>>
+>>> Then you don't need this phy-is-internal property, because you can
+>>> locate the PHY node by the phy-handle (see more about that in a reply to
+>>> patch 10) and you can determine ahead of time whether this PHY is
+>>> internal or not based on its compatible string.
+>>
+>> This doesn't really work for us (sunxi). The "internal" PHY of the H3
+>> is also available in the X-Powers AC200 combo chip, which would be
+>> external. Same ID. So if someone were to be stupid and put the two
+>> together, you wouldn't know which one it actually is. Generically
+>> it doesn't make sense to match against the ID either. The PHY is
+>> only integrated or inlined into the SoC, meaning it could be moved
+>> elsewhere or even be a discreet part.
+>>
+>> The way I see it is more like a reversed pinmux. The system should
+>> select either the internal set or external set of xMII pins to use.
+>>
+>> A phy-is-internal property in the PHY node would work for us. We
+>> already need a PHY node to describe its clocks and resets.
+>>
+>> A side note to this solution is that, since the internal PHY is defined
+>> at the .dtsi level, any external PHYs at the same address would need to
+>> make sure to delete the property, which is kind of counterintuitive, but
+>> it is how device tree works. One would want to put the internal PHY's
+>> address, assuming it is configurable, on something that is rarely used.
+>>
+> 
+> Hello David, Florian, Andrew
+> 
+> Could someone ack this ? or nack if you think that the chance for having two PHY id both internal and external is too low.
+> Anyway, we need a choice.
+> 
 
-diff --git a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-index 626883d..c2379b2 100644
---- a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-+++ b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-@@ -27,6 +27,7 @@
- #include <linux/mutex.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/of_device.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/phy/phy.h>
-@@ -1024,7 +1025,6 @@ static int rockchip_usb2phy_probe(struct platform_device *pdev)
- 	struct phy_provider *provider;
- 	struct rockchip_usb2phy *rphy;
- 	const struct rockchip_usb2phy_cfg *phy_cfgs;
--	const struct of_device_id *match;
- 	unsigned int reg;
- 	int index, ret;
- 
-@@ -1032,11 +1032,9 @@ static int rockchip_usb2phy_probe(struct platform_device *pdev)
- 	if (!rphy)
- 		return -ENOMEM;
- 
--	match = of_match_device(dev->driver->of_match_table, dev);
--	if (!match || !match->data) {
--		dev_err(dev, "phy configs are not assigned!\n");
-+	phy_cfgs = of_device_get_match_data(dev);
-+	if (!phy_cfgs)
- 		return -EINVAL;
--	}
- 
- 	if (!dev->parent || !dev->parent->of_node)
- 		return -EINVAL;
-@@ -1052,7 +1050,6 @@ static int rockchip_usb2phy_probe(struct platform_device *pdev)
- 	}
- 
- 	rphy->dev = dev;
--	phy_cfgs = match->data;
- 	rphy->chg_state = USB_CHG_STATE_UNDEFINED;
- 	rphy->chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
- 	platform_set_drvdata(pdev, rphy);
-diff --git a/drivers/phy/rockchip/phy-rockchip-pcie.c b/drivers/phy/rockchip/phy-rockchip-pcie.c
-index 6904633..f7dc0d6 100644
---- a/drivers/phy/rockchip/phy-rockchip-pcie.c
-+++ b/drivers/phy/rockchip/phy-rockchip-pcie.c
-@@ -21,6 +21,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/of_device.h>
- #include <linux/of_platform.h>
- #include <linux/phy/phy.h>
- #include <linux/platform_device.h>
-@@ -286,7 +287,6 @@ static int rockchip_pcie_phy_probe(struct platform_device *pdev)
- 	struct phy *generic_phy;
- 	struct phy_provider *phy_provider;
- 	struct regmap *grf;
--	const struct of_device_id *of_id;
- 
- 	grf = syscon_node_to_regmap(dev->parent->of_node);
- 	if (IS_ERR(grf)) {
-@@ -298,11 +298,10 @@ static int rockchip_pcie_phy_probe(struct platform_device *pdev)
- 	if (!rk_phy)
- 		return -ENOMEM;
- 
--	of_id = of_match_device(rockchip_pcie_phy_dt_ids, &pdev->dev);
--	if (!of_id)
-+	rk_phy->phy_data = of_device_get_match_data(dev);
-+	if (!rk_phy->phy_data)
- 		return -EINVAL;
- 
--	rk_phy->phy_data = (struct rockchip_pcie_data *)of_id->data;
- 	rk_phy->reg_base = grf;
- 
- 	rk_phy->phy_rst = devm_reset_control_get(dev, "phy");
-diff --git a/drivers/phy/rockchip/phy-rockchip-usb.c b/drivers/phy/rockchip/phy-rockchip-usb.c
-index 3378eeb..7db1166 100644
---- a/drivers/phy/rockchip/phy-rockchip-usb.c
-+++ b/drivers/phy/rockchip/phy-rockchip-usb.c
-@@ -22,6 +22,7 @@
- #include <linux/mutex.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/of_device.h>
- #include <linux/of_platform.h>
- #include <linux/phy/phy.h>
- #include <linux/platform_device.h>
-@@ -417,7 +418,6 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct rockchip_usb_phy_base *phy_base;
- 	struct phy_provider *phy_provider;
--	const struct of_device_id *match;
- 	struct device_node *child;
- 	int err;
- 
-@@ -425,13 +425,9 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
- 	if (!phy_base)
- 		return -ENOMEM;
- 
--	match = of_match_device(dev->driver->of_match_table, dev);
--	if (!match || !match->data) {
--		dev_err(dev, "missing phy data\n");
-+	phy_base->pdata = of_device_get_match_data(dev);
-+	if (!phy_base->pdata)
- 		return -EINVAL;
--	}
--
--	phy_base->pdata = match->data;
- 
- 	phy_base->dev = dev;
- 	phy_base->reg_base = ERR_PTR(-ENODEV);
--- 
-1.7.9.5
+I think we should be specific to the situation, for us we have the 
+possibility that the Mac only picks up internal PHY, so this can be 
+fixed at the. DTSi level, also possible INTERNL PHY's Mac can also be 
+used to connect external PHY, while cutting off the connection with the 
+internal PHY, so we should define the internal PHY at the DTS level, so 
+I think Florian's approach is acceptable.
+
+> Regards
+> 
+> 
+> 
