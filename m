@@ -1,39 +1,60 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 10 Aug 2017 00:49:35 +0200
-Subject: [PATCH] cpufreq: dt: Add rk3328 compatible to use generic cpufreq
- driver
-In-Reply-To: <20170804051041.GB28857@vireshk-i7>
-References: <1501811551-39168-1-git-send-email-finley.xiao@rock-chips.com>
- <20170804051041.GB28857@vireshk-i7>
-Message-ID: <2561837.4o82W0B20K@aspire.rjw.lan>
+From: mka@chromium.org (Matthias Kaehlcke)
+Date: Wed,  9 Aug 2017 16:07:24 -0700
+Subject: [PATCH] drm/rockchip: Skip suspend/resume if no display is attached
+Message-ID: <20170809230724.113819-1-mka@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, August 4, 2017 7:10:41 AM CEST Viresh Kumar wrote:
-> On 04-08-17, 09:52, Finley Xiao wrote:
-> > This patch adds the rk3328 compatible string for supporting
-> > the generic cpufreq driver on RK3328.
-> > 
-> > Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
-> > ---
-> >  drivers/cpufreq/cpufreq-dt-platdev.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-> > index 096aea7..13c0c47 100644
-> > --- a/drivers/cpufreq/cpufreq-dt-platdev.c
-> > +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-> > @@ -76,6 +76,7 @@ static const struct of_device_id machines[] __initconst = {
-> >  	{ .compatible = "rockchip,rk3188", },
-> >  	{ .compatible = "rockchip,rk3228", },
-> >  	{ .compatible = "rockchip,rk3288", },
-> > +	{ .compatible = "rockchip,rk3328", },
-> >  	{ .compatible = "rockchip,rk3366", },
-> >  	{ .compatible = "rockchip,rk3368", },
-> >  	{ .compatible = "rockchip,rk3399", },
-> 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-> 
-> 
+rockchip_drm_sys_suspend/resume() obains a struct drm_device pointer
+from drvdata, the pointer is then dereferenced to obtain private data.
+drvdata is set when a display is bound, on systems without a
+(successfully probed) display drvdata is NULL and the PM functions
+try to dereference a NULL pointer.
 
-Applied, thanks!
+The suspend/resume code relies on a valid drm_device object, skip it if
+the pointer is NULL.
+
+Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index c6b1b7f3a2a3..6228145d9496 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -275,11 +275,16 @@ static void rockchip_drm_fb_resume(struct drm_device *drm)
+ static int rockchip_drm_sys_suspend(struct device *dev)
+ {
+ 	struct drm_device *drm = dev_get_drvdata(dev);
+-	struct rockchip_drm_private *priv = drm->dev_private;
++	struct rockchip_drm_private *priv;
++
++	if (!drm)
++		/* no display attached */
++		return 0;
+ 
+ 	drm_kms_helper_poll_disable(drm);
+ 	rockchip_drm_fb_suspend(drm);
+ 
++	priv = drm->dev_private;
+ 	priv->state = drm_atomic_helper_suspend(drm);
+ 	if (IS_ERR(priv->state)) {
+ 		rockchip_drm_fb_resume(drm);
+@@ -293,8 +298,13 @@ static int rockchip_drm_sys_suspend(struct device *dev)
+ static int rockchip_drm_sys_resume(struct device *dev)
+ {
+ 	struct drm_device *drm = dev_get_drvdata(dev);
+-	struct rockchip_drm_private *priv = drm->dev_private;
++	struct rockchip_drm_private *priv;
++
++	if (!drm)
++		/* no display attached */
++		return 0;
+ 
++	priv = drm->dev_private;
+ 	drm_atomic_helper_resume(drm, priv->state);
+ 	rockchip_drm_fb_resume(drm);
+ 	drm_kms_helper_poll_enable(drm);
+-- 
+2.14.0.434.g98096fd7a8-goog
