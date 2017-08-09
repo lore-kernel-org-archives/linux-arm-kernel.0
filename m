@@ -1,34 +1,23 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 9 Aug 2017 18:12:39 +0800
-Subject: [PATCH 2/2] cpufreq: mediatek: add support of cpufreq to MT7622 SoC
-In-Reply-To: <cover.1502272372.git.sean.wang@mediatek.com>
-References: <cover.1502272372.git.sean.wang@mediatek.com>
-Message-ID: <8d96863368adb8a0435de9739e458035e6a6233b.1502272372.git.sean.wang@mediatek.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 9 Aug 2017 15:43:01 +0530
+Subject: [PATCH v2 18/18] cpufreq: scmi: add support for fast frequency
+ switching
+In-Reply-To: <0f89f543-39a9-30a5-4976-0c447f5fe843@arm.com>
+References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
+ <1501857104-11279-19-git-send-email-sudeep.holla@arm.com>
+ <20170809042825.GI28857@vireshk-i7>
+ <0f89f543-39a9-30a5-4976-0c447f5fe843@arm.com>
+Message-ID: <20170809101301.GB29383@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On 09-08-17, 11:09, Sudeep Holla wrote:
+> Firmware needs to serialize or override based on the timing of the two
+> consecutive requests.
 
-MT7622 is a 64-bit ARMv8 based dual-core SoC (2 * Cortex-A53) with a
-single cluster. The hardware is also compatible with the current driver,
-so add MT7622 as one of the compatible string list.
+Maybe add a comment over that routine and detail its working a bit? Like its not
+synchronous, etc. I expect that you would also add a callback with SCMI, so that
+the cpufreq driver is notified when frequency is changed ?
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- drivers/cpufreq/mediatek-cpufreq.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/cpufreq/mediatek-cpufreq.c b/drivers/cpufreq/mediatek-cpufreq.c
-index 9fa9291..18c4bd9 100644
---- a/drivers/cpufreq/mediatek-cpufreq.c
-+++ b/drivers/cpufreq/mediatek-cpufreq.c
-@@ -574,6 +574,7 @@ static struct platform_driver mtk_cpufreq_platdrv = {
- /* List of machines supported by this driver */
- static const struct of_device_id mtk_cpufreq_machines[] __initconst = {
- 	{ .compatible = "mediatek,mt2701", },
-+	{ .compatible = "mediatek,mt7622", },
- 	{ .compatible = "mediatek,mt7623", },
- 	{ .compatible = "mediatek,mt817x", },
- 	{ .compatible = "mediatek,mt8173", },
 -- 
-2.7.4
+viresh
