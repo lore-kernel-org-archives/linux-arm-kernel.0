@@ -1,59 +1,45 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 10 Aug 2017 00:08:34 +0200
-Subject: [PATCH] misc: atmel_tclib: fix error return code in tc_probe()
-In-Reply-To: <20170809164250.GA7229@embeddedgus>
-References: <20170809164250.GA7229@embeddedgus>
-Message-ID: <20170809220834.sjol4cufvjqa6rde@piout.net>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 9 Aug 2017 17:09:36 -0500
+Subject: [PATCH] soc: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-49-robh@kernel.org>
+References: <20170718214339.7774-49-robh@kernel.org>
+Message-ID: <CAL_JsqLYz9ACd-YAtU0gEHkY8A++cCeBTW9jvUyc5OheEq4scQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/2017 at 11:42:50 -0500, Gustavo A. R. Silva wrote:
-> platform_get_irq() returns an error code, but the atmel_tclib driver
-> ignores it and always returns -EINVAL. This is not correct and,
-> prevents -EPROBE_DEFER from being propagated properly.
-> 
-
-Which will never happen because the kernel would not reach that point if
-the irqchip driver was not present. I would really love people to stop
-littering perfectly working drivers with unused error strings.
-
-> Print error message and propagate the return value of platform_get_irq
-> on failure.
-> 
-> This issue was detected with the help of Coccinelle.
-> 
-> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+On Tue, Jul 18, 2017 at 4:43 PM, Rob Herring <robh@kernel.org> wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
+>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Scott Wood <oss@buserror.net>
+> Cc: Qiang Zhao <qiang.zhao@nxp.com>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-mediatek at lists.infradead.org
+> Cc: linux-renesas-soc at vger.kernel.org
+> Cc: linux-samsung-soc at vger.kernel.org
 > ---
->  drivers/misc/atmel_tclib.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/misc/atmel_tclib.c b/drivers/misc/atmel_tclib.c
-> index ac24a4b..c5d3449 100644
-> --- a/drivers/misc/atmel_tclib.c
-> +++ b/drivers/misc/atmel_tclib.c
-> @@ -112,8 +112,10 @@ static int __init tc_probe(struct platform_device *pdev)
->  	unsigned int	i;
->  
->  	irq = platform_get_irq(pdev, 0);
-> -	if (irq < 0)
-> -		return -EINVAL;
-> +	if (irq < 0) {
-> +		dev_err(&pdev->dev, "Failed to get IRQ: %d\n", irq);
-> +		return irq;
-> +	}
->  
->  	tc = devm_kzalloc(&pdev->dev, sizeof(struct atmel_tc), GFP_KERNEL);
->  	if (!tc)
-> -- 
-> 2.5.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  drivers/soc/fsl/qbman/bman_ccsr.c    | 10 +++++-----
+>  drivers/soc/fsl/qbman/bman_portal.c  |  8 +++-----
+>  drivers/soc/fsl/qbman/qman_ccsr.c    | 12 ++++++------
+>  drivers/soc/fsl/qbman/qman_portal.c  | 11 ++++-------
+>  drivers/soc/fsl/qe/gpio.c            |  4 ++--
+>  drivers/soc/mediatek/mtk-pmic-wrap.c |  4 ++--
+>  drivers/soc/renesas/rcar-rst.c       |  4 ++--
+>  drivers/soc/renesas/rcar-sysc.c      |  6 +++---
+>  drivers/soc/samsung/pm_domains.c     |  8 ++++----
+>  9 files changed, 31 insertions(+), 36 deletions(-)
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Arnd, Olof,
+
+Can you please apply this one.
+
+Rob
