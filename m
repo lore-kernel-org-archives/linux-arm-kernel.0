@@ -1,44 +1,54 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 9 Aug 2017 15:56:13 +0800
-Subject: [PATCH 0/2] arm64 SMMUv3 PMU driver with IORT support
-In-Reply-To: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
-References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
-Message-ID: <394bd3b8-2583-01fa-02d3-6a49c2a6a6c0@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 9 Aug 2017 09:59:29 +0200
+Subject: [PATCH  1/2] dt-bindings: i2c: Document r8a7743/5 support
+In-Reply-To: <20170808115006.GC1674@katana>
+References: <1502191231-8682-1-git-send-email-biju.das@bp.renesas.com>
+ <20170808115006.GC1674@katana>
+Message-ID: <20170809075929.GG2705@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
-
-On 2017/8/5 3:59, Neil Leeder wrote:
-> This adds a driver for the SMMUv3 PMU into the perf framework.
-> It includes an IORT update to support PM Counter Groups.
+On Tue, Aug 08, 2017 at 01:50:06PM +0200, Wolfram Sang wrote:
+> On Tue, Aug 08, 2017 at 12:20:31PM +0100, Biju Das wrote:
+> > Document i2c Device Tree support for RZ/G1[ME]
+> > (also known as r8aA774[35]) SoCs. They are compatible with
+> > R-Car Gen2 SoC family.
+> > 
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 > 
-> IORT has no mechanism for determining device names so PMUs
-> are named based on their physical address.
+> Looks good to me, yet I'd like an ack from Simon who is currently
+> working on the generic fallback compatibles.
+
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
 > 
-> Tested on Qualcomm QDF2400. perf_fuzzer ran for 4+ hours
-> with no failures.
-> 
-> Neil Leeder (2):
->    acpi: arm64: add iort support for PMCG
->    perf: add arm64 smmuv3 pmu driver
-> 
->   drivers/acpi/arm64/iort.c     |  54 +++
-
-I would like to be Cced for next version.
-
->   drivers/perf/Kconfig          |   9 +
->   drivers/perf/Makefile         |   1 +
->   drivers/perf/arm_smmuv3_pmu.c | 823 ++++++++++++++++++++++++++++++++++++++++++
->   include/acpi/actbl2.h         |   9 +-
-
-Do you have the acpica support code? I'm currently
-working on SMMUv3 MSI support and I would like to test
-it with MSI support for PMCG as well.
-
-Thanks
-Hanjun
-
->   5 files changed, 895 insertions(+), 1 deletion(-)
->   create mode 100644 drivers/perf/arm_smmuv3_pmu.c
-> 
+> > ---
+> >  Documentation/devicetree/bindings/i2c/i2c-rcar.txt | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-rcar.txt b/Documentation/devicetree/bindings/i2c/i2c-rcar.txt
+> > index 2b8bd33..cad39ae 100644
+> > --- a/Documentation/devicetree/bindings/i2c/i2c-rcar.txt
+> > +++ b/Documentation/devicetree/bindings/i2c/i2c-rcar.txt
+> > @@ -2,6 +2,8 @@ I2C for R-Car platforms
+> >  
+> >  Required properties:
+> >  - compatible:
+> > +	"renesas,i2c-r8a7743" if the device is a part of a R8A7743 SoC.
+> > +	"renesas,i2c-r8a7745" if the device is a part of a R8A7745 SoC.
+> >  	"renesas,i2c-r8a7778" if the device is a part of a R8A7778 SoC.
+> >  	"renesas,i2c-r8a7779" if the device is a part of a R8A7779 SoC.
+> >  	"renesas,i2c-r8a7790" if the device is a part of a R8A7790 SoC.
+> > @@ -12,7 +14,8 @@ Required properties:
+> >  	"renesas,i2c-r8a7795" if the device is a part of a R8A7795 SoC.
+> >  	"renesas,i2c-r8a7796" if the device is a part of a R8A7796 SoC.
+> >  	"renesas,rcar-gen1-i2c" for a generic R-Car Gen1 compatible device.
+> > -	"renesas,rcar-gen2-i2c" for a generic R-Car Gen2 compatible device.
+> > +	"renesas,rcar-gen2-i2c" for a generic R-Car Gen2 or RZ/G1 compatible
+> > +				device.
+> >  	"renesas,rcar-gen3-i2c" for a generic R-Car Gen3 compatible device.
+> >  	"renesas,i2c-rcar" (deprecated)
+> >  
+> > -- 
+> > 1.9.1
+> > 
