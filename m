@@ -1,41 +1,41 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Thu, 10 Aug 2017 00:29:10 +0100
-Subject: [PATCH 1/3] dt-bindings: iio: timer: stm32: add support for
- STM32H7
-In-Reply-To: <1501751654-14153-2-git-send-email-fabrice.gasnier@st.com>
-References: <1501751654-14153-1-git-send-email-fabrice.gasnier@st.com>
- <1501751654-14153-2-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170810002910.6b8c4a15@archlinux>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 9 Aug 2017 18:46:59 -0500
+Subject: [PATCH] remoteproc/keystone: Add support for Keystone 66AK2G SOCs
+In-Reply-To: <20170731200502.30479-1-s-anna@ti.com>
+References: <20170731200502.30479-1-s-anna@ti.com>
+Message-ID: <20170809234659.bn63lheilpjqj55o@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Aug 2017 11:14:12 +0200
-Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
-
-> STM32H7 has slightly different triggers than previous versions.
-> Introduce st,stm32h7-timer-trigger compatible to handle this new variant.
+On Mon, Jul 31, 2017 at 03:05:02PM -0500, Suman Anna wrote:
+> Add support to the keystone remoteproc driver for managing the
+> DSP present in the Keystone 2 66AK2G SoC. The 66AK2G SoC has
+> a Power Management Micro Controller (PMMC) that manages the
+> individual device's power, clock and reset functionalities.
 > 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Applied to the togreg branch of iio.git and pushed out as testing.
-Thanks,
-
-Jonathan
+> The keystone remoteproc driver already uses standard frameworks
+> for reset and clock control, so it doesn't require any significant
+> modifications other than a new compatible suitable for 66AK2G DSP.
+> 
+> The binding document is also updated to reflect the modified
+> property values used by the 66AK2G DSP node as compared to the
+> values used by existing Keystone 2 DSPs.
+> 
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+> Signed-off-by: Andrew F. Davis <afd@ti.com>
 > ---
->  Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+> Hi Bjorn,
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
-> index 55a653d..b565ced 100644
-> --- a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
-> +++ b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
-> @@ -4,7 +4,9 @@ Must be a sub-node of an STM32 Timers device tree node.
->  See ../mfd/stm32-timers.txt for details about the parent node.
->  
->  Required parameters:
-> -- compatible:	Must be "st,stm32-timer-trigger".
-> +- compatible:	Must be one of:
-> +		"st,stm32-timer-trigger"
-> +		"st,stm32h7-timer-trigger"
->  - reg:		Identify trigger hardware block.
->  
->  Example:
+> This patch adds the support to the last remaining family of Keystone2 SoCs.
+> The SoC integration is slightly different for this family, and all the
+> dependent drivers were finally merged in 4.13-rc1. The patch is mainly
+> updating the binding, so didn't split the patch into two.
+> 
+> regards
+> Suman
+> 
+>  .../bindings/remoteproc/ti,keystone-rproc.txt      | 73 +++++++++++++++++++---
+>  drivers/remoteproc/keystone_remoteproc.c           |  1 +
+>  2 files changed, 65 insertions(+), 9 deletions(-)
+
+Acked-by: Rob Herring <robh@kernel.org>
