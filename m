@@ -1,466 +1,422 @@
-From: code@mmayer.net (Markus Mayer)
-Date: Wed,  9 Aug 2017 15:02:55 -0700
-Subject: [PATCH v4 2/4] thermal: add brcmstb AVS TMON driver
-In-Reply-To: <20170809220257.4234-1-code@mmayer.net>
-References: <20170809220257.4234-1-code@mmayer.net>
-Message-ID: <20170809220257.4234-3-code@mmayer.net>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 10 Aug 2017 00:04:08 +0200
+Subject: [PATCH] arm64: dts: rockchip: add rk3328-rock64 board
+Message-ID: <20170809220408.4301-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Brian Norris <computersforpeace@gmail.com>
+The ROCK64 is a credit card size 4K60P HDR Media Board Computer using the
+Rockchip RK3328 Quad-Core ARM Cortex A53 64-Bit Processor and supporting
+up to 4GB 1600MHz LPDDR3 memory. It provides eMMC module socket, MicroSD
+Card slot, Pi-2 Bus, Pi-P5+ Bus, USB 3.0 and many others peripheral
+devices interface for makers to integrate with sensors and devices.
 
-The AVS TMON core provides temperature readings, a pair of configurable
-high- and low-temperature threshold interrupts, and an emergency
-over-temperature chip reset. The driver utilizes the first two to
-provide temperature readings and high-temperature notifications to
-applications. The over-temperature reset is not exposed to
-applications; this reset threshold is critical to the system and should
-be set with care within the bootloader.
+The devicetree currently supports basic peripherals, with more to be
+added later on.
 
-Applications may choose to utilize the notification mechanism, the
-temperature reading mechanism (e.g., through polling), or both.
-
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-Signed-off-by: Doug Berger <opendmb@gmail.com>
-Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/thermal/Kconfig                    |   2 +-
- drivers/thermal/broadcom/Kconfig           |   7 +
- drivers/thermal/broadcom/Makefile          |   1 +
- drivers/thermal/broadcom/brcmstb_thermal.c | 386 +++++++++++++++++++++++++++++
- 4 files changed, 395 insertions(+), 1 deletion(-)
- create mode 100644 drivers/thermal/broadcom/brcmstb_thermal.c
+Depends on rk805 pmic support landing, which hopefully will happen
+in the next days.
 
-diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-index b5b5fac..396ad6b 100644
---- a/drivers/thermal/Kconfig
-+++ b/drivers/thermal/Kconfig
-@@ -408,7 +408,7 @@ config MTK_THERMAL
- 	  controller present in Mediatek SoCs
+ Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+ arch/arm64/boot/dts/rockchip/Makefile              |   1 +
+ arch/arm64/boot/dts/rockchip/rk3328-rock64.dts     | 362 +++++++++++++++++++++
+ 3 files changed, 367 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index 88d95323d301..b54e9bfd9562 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -134,6 +134,10 @@ Rockchip platforms device tree bindings
+     Required root node properties:
+      - compatible = "phytec,rk3288-pcm-947", "phytec,rk3288-phycore-som", "rockchip,rk3288";
  
- menu "Broadcom thermal drivers"
--depends on ARCH_BCM || COMPILE_TEST
-+depends on ARCH_BCM || ARCH_BRCMSTB || COMPILE_TEST
- source "drivers/thermal/broadcom/Kconfig"
- endmenu
- 
-diff --git a/drivers/thermal/broadcom/Kconfig b/drivers/thermal/broadcom/Kconfig
-index 42c098e..c106a15 100644
---- a/drivers/thermal/broadcom/Kconfig
-+++ b/drivers/thermal/broadcom/Kconfig
-@@ -6,6 +6,13 @@ config BCM2835_THERMAL
- 	help
- 	  Support for thermal sensors on Broadcom bcm2835 SoCs.
- 
-+config BRCMSTB_THERMAL
-+	tristate "Broadcom STB AVS TMON thermal driver"
-+	depends on ARCH_BRCMSTB || COMPILE_TEST
-+	help
-+	  Enable this driver if you have a Broadcom STB SoC and would like
-+	  thermal framework support.
++- Pine64 Rock64 board:
++    Required root node properties:
++    - compatible = "pine64,rock64", "rockchip,rk3328";
 +
- config BCM_NS_THERMAL
- 	tristate "Northstar thermal driver"
- 	depends on ARCH_BCM_IPROC || COMPILE_TEST
-diff --git a/drivers/thermal/broadcom/Makefile b/drivers/thermal/broadcom/Makefile
-index c6f62e4..fae10ec 100644
---- a/drivers/thermal/broadcom/Makefile
-+++ b/drivers/thermal/broadcom/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_BCM2835_THERMAL)		+= bcm2835_thermal.o
-+obj-$(CONFIG_BRCMSTB_THERMAL)		+= brcmstb_thermal.o
- obj-$(CONFIG_BCM_NS_THERMAL)		+= ns-thermal.o
-diff --git a/drivers/thermal/broadcom/brcmstb_thermal.c b/drivers/thermal/broadcom/brcmstb_thermal.c
+ - Rockchip PX3 Evaluation board:
+     Required root node properties:
+       - compatible = "rockchip,px3-evb", "rockchip,px3", "rockchip,rk3188";
+diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
+index d0ad366bbd12..106fb8e0f2f8 100644
+--- a/arch/arm64/boot/dts/rockchip/Makefile
++++ b/arch/arm64/boot/dts/rockchip/Makefile
+@@ -1,4 +1,5 @@
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-evb.dtb
++dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-rock64.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-orion-r68-meta.dtb
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
 new file mode 100644
-index 0000000..87b8e7a
+index 000000000000..a77a94200f96
 --- /dev/null
-+++ b/drivers/thermal/broadcom/brcmstb_thermal.c
-@@ -0,0 +1,386 @@
++++ b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+@@ -0,0 +1,362 @@
 +/*
-+ * Broadcom STB AVS TMON thermal sensor driver
++ * Copyright (c) 2017 PINE64
 + *
-+ * Copyright (c) 2015-2017 Broadcom
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
 + *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
 + *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#define DRV_NAME	"brcmstb_thermal"
++/dts-v1/;
++#include "rk3328.dtsi"
 +
-+#define pr_fmt(fmt)	DRV_NAME ": " fmt
++/ {
++	model = "Pine64 Rock64";
++	compatible = "pine64,rock64", "rockchip,rk3328";
 +
-+#include <linux/bitops.h>
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/irqreturn.h>
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/of_device.h>
-+#include <linux/thermal.h>
++	chosen {
++		stdout-path = "serial2:1500000n8";
++	};
 +
-+#define AVS_TMON_STATUS			0x00
-+ #define AVS_TMON_STATUS_valid_msk	BIT(11)
-+ #define AVS_TMON_STATUS_data_msk	GENMASK(10, 1)
-+ #define AVS_TMON_STATUS_data_shift	1
++	gmac_clkin: external-gmac-clock {
++		compatible = "fixed-clock";
++		clock-frequency = <125000000>;
++		clock-output-names = "gmac_clkin";
++		#clock-cells = <0>;
++	};
 +
-+#define AVS_TMON_EN_OVERTEMP_RESET	0x04
-+ #define AVS_TMON_EN_OVERTEMP_RESET_msk	BIT(0)
++	sdio_pwrseq: sdio-pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		pinctrl-names = "default";
++		pinctrl-0 = <&wifi_enable_h>;
 +
-+#define AVS_TMON_RESET_THRESH		0x08
-+ #define AVS_TMON_RESET_THRESH_msk	GENMASK(10, 1)
-+ #define AVS_TMON_RESET_THRESH_shift	1
++		/*
++		 * On the module itself this is one of these (depending
++		 * on the actual card populated):
++		 * - SDIO_RESET_L_WL_REG_ON
++		 * - PDN (power down when low)
++		 */
++		reset-gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
++	};
 +
-+#define AVS_TMON_INT_IDLE_TIME		0x10
++	vcc_sd: sdmmc-regulator {
++		compatible = "regulator-fixed";
++		gpio = <&gpio0 30 GPIO_ACTIVE_LOW>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&sdmmc0m1_gpio>;
++		regulator-name = "vcc_sd";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		vin-supply = <&vcc_io>;
++	};
 +
-+#define AVS_TMON_EN_TEMP_INT_SRCS	0x14
-+ #define AVS_TMON_EN_TEMP_INT_SRCS_high	BIT(1)
-+ #define AVS_TMON_EN_TEMP_INT_SRCS_low	BIT(0)
++	vcc_host_5v: vcc-host-5v-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&usb30_host_drv>;
++		regulator-name = "vcc_host_5v";
++		regulator-always-on;
++		vin-supply = <&vcc_sys>;
++	};
 +
-+#define AVS_TMON_INT_THRESH		0x18
-+ #define AVS_TMON_INT_THRESH_high_msk	GENMASK(26, 17)
-+ #define AVS_TMON_INT_THRESH_high_shift	17
-+ #define AVS_TMON_INT_THRESH_low_msk	GENMASK(10, 1)
-+ #define AVS_TMON_INT_THRESH_low_shift	1
++	vcc_host1_5v: vcc_otg_5v: vcc-host1-5v-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio0 RK_PD3 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&usb20_host_drv>;
++		regulator-name = "vcc_host1_5v";
++		regulator-always-on;
++		vin-supply = <&vcc_sys>;
++	};
 +
-+#define AVS_TMON_TEMP_INT_CODE		0x1c
-+#define AVS_TMON_TP_TEST_ENABLE		0x20
-+
-+/* Default coefficients */
-+#define AVS_TMON_TEMP_SLOPE		-487
-+#define AVS_TMON_TEMP_OFFSET		410040
-+
-+/* HW related temperature constants */
-+#define AVS_TMON_TEMP_MAX		0x3ff
-+#define AVS_TMON_TEMP_MIN		-88161
-+#define AVS_TMON_TEMP_MASK		AVS_TMON_TEMP_MAX
-+
-+enum avs_tmon_trip_type {
-+	TMON_TRIP_TYPE_LOW = 0,
-+	TMON_TRIP_TYPE_HIGH,
-+	TMON_TRIP_TYPE_RESET,
-+	TMON_TRIP_TYPE_MAX,
++	vcc_sys: vcc-sys {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_sys";
++		regulator-always-on;
++		regulator-boot-on;
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
 +};
 +
-+struct avs_tmon_trip {
-+	/* HW bit to enable the trip */
-+	u32 enable_offs;
-+	u32 enable_mask;
-+
-+	/* HW field to read the trip temperature */
-+	u32 reg_offs;
-+	u32 reg_msk;
-+	int reg_shift;
++&cpu0 {
++	cpu-supply = <&vdd_arm>;
 +};
 +
-+static struct avs_tmon_trip avs_tmon_trips[] = {
-+	/* Trips when temperature is below threshold */
-+	[TMON_TRIP_TYPE_LOW] = {
-+		.enable_offs	= AVS_TMON_EN_TEMP_INT_SRCS,
-+		.enable_mask	= AVS_TMON_EN_TEMP_INT_SRCS_low,
-+		.reg_offs	= AVS_TMON_INT_THRESH,
-+		.reg_msk	= AVS_TMON_INT_THRESH_low_msk,
-+		.reg_shift	= AVS_TMON_INT_THRESH_low_shift,
-+	},
-+	/* Trips when temperature is above threshold */
-+	[TMON_TRIP_TYPE_HIGH] = {
-+		.enable_offs	= AVS_TMON_EN_TEMP_INT_SRCS,
-+		.enable_mask	= AVS_TMON_EN_TEMP_INT_SRCS_high,
-+		.reg_offs	= AVS_TMON_INT_THRESH,
-+		.reg_msk	= AVS_TMON_INT_THRESH_high_msk,
-+		.reg_shift	= AVS_TMON_INT_THRESH_high_shift,
-+	},
-+	/* Automatically resets chip when above threshold */
-+	[TMON_TRIP_TYPE_RESET] = {
-+		.enable_offs	= AVS_TMON_EN_OVERTEMP_RESET,
-+		.enable_mask	= AVS_TMON_EN_OVERTEMP_RESET_msk,
-+		.reg_offs	= AVS_TMON_RESET_THRESH,
-+		.reg_msk	= AVS_TMON_RESET_THRESH_msk,
-+		.reg_shift	= AVS_TMON_RESET_THRESH_shift,
-+	},
++&emmc {
++	bus-width = <8>;
++	cap-mmc-highspeed;
++	supports-emmc;
++	disable-wp;
++	non-removable;
++	num-slots = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_bus8>;
++	status = "okay";
 +};
 +
-+struct brcmstb_thermal_priv {
-+	void __iomem *tmon_base;
-+	struct device *dev;
-+	struct thermal_zone_device *thermal;
++&gmac2io {
++	phy-supply = <&vcc_io>;
++	phy-mode = "rgmii";
++	clock_in_out = "input";
++	snps,reset-gpio = <&gpio1 RK_PC2 GPIO_ACTIVE_LOW>;
++	snps,reset-active-low;
++	snps,reset-delays-us = <0 10000 50000>;
++	assigned-clocks = <&cru SCLK_MAC2IO>, <&cru SCLK_MAC2IO_EXT>;
++	assigned-clock-parents = <&gmac_clkin>, <&gmac_clkin>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&rgmiim1_pins>;
++	tx_delay = <0x26>;
++	rx_delay = <0x11>;
++	status = "okay";
 +};
 +
-+static void avs_tmon_get_coeffs(struct thermal_zone_device *tz, int *slope,
-+				int *offset)
-+{
-+	*slope = thermal_zone_get_slope(tz);
-+	*offset = thermal_zone_get_offset(tz);
-+}
++&i2c1 {
++	status = "okay";
 +
-+/* Convert a HW code to a temperature reading (millidegree celsius) */
-+static inline int avs_tmon_code_to_temp(struct thermal_zone_device *tz,
-+					u32 code)
-+{
-+	const int val = code & AVS_TMON_TEMP_MASK;
-+	int slope, offset;
++	rk805: rk805 at 18 {
++		compatible = "rockchip,rk805";
++		reg = <0x18>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
++		#clock-cells = <1>;
++		clock-output-names = "xin32k", "rk805-clkout2";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pmic_int_l>;
++		rockchip,system-power-controller;
++		wakeup-source;
 +
-+	avs_tmon_get_coeffs(tz, &slope, &offset);
++		vcc1-supply = <&vcc_sys>;
++		vcc2-supply = <&vcc_sys>;
++		vcc3-supply = <&vcc_sys>;
++		vcc4-supply = <&vcc_sys>;
++		vcc5-supply = <&vcc_io>;
++		vcc6-supply = <&vcc_sys>;
 +
-+	return slope * val + offset;
-+}
++		regulators {
++			vdd_logic: DCDC_REG1 {
++				regulator-name = "vdd_logic";
++				regulator-min-microvolt = <712500>;
++				regulator-max-microvolt = <1450000>;
++				regulator-initial-mode = <0x1>;
++				regulator-ramp-delay = <12500>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-mode = <0x2>;
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <1000000>;
++				};
++			};
 +
-+/*
-+ * Convert a temperature value (millidegree celsius) to a HW code
-+ *
-+ * @temp: temperature to convert
-+ * @low: if true, round toward the low side
-+ */
-+static inline u32 avs_tmon_temp_to_code(struct thermal_zone_device *tz,
-+					int temp, bool low)
-+{
-+	int slope, offset;
++			vdd_arm: DCDC_REG2 {
++				regulator-name = "vdd_arm";
++				regulator-min-microvolt = <712500>;
++				regulator-max-microvolt = <1450000>;
++				regulator-initial-mode = <0x1>;
++				regulator-ramp-delay = <12500>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-mode = <0x2>;
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <950000>;
++				};
++			};
 +
-+	if (temp < AVS_TMON_TEMP_MIN)
-+		return AVS_TMON_TEMP_MAX; /* Maximum code value */
++			vcc_ddr: DCDC_REG3 {
++				regulator-name = "vcc_ddr";
++				regulator-initial-mode = <0x1>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-mode = <0x2>;
++					regulator-on-in-suspend;
++				};
++			};
 +
-+	avs_tmon_get_coeffs(tz, &slope, &offset);
++			vcc_io: DCDC_REG4 {
++				regulator-name = "vcc_io";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-initial-mode = <0x1>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-mode = <0x2>;
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <3300000>;
++				};
++			};
 +
-+	if (temp >= offset)
-+		return 0;	/* Minimum code value */
++			vcc_18: LDO_REG1 {
++				regulator-name = "vdd_18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <1800000>;
++				};
++			};
 +
-+	if (low)
-+		return (u32)(DIV_ROUND_UP(offset - temp, abs(slope)));
-+	else
-+		return (u32)((offset - temp) / abs(slope));
-+}
++			vcc18_emmc: LDO_REG2 {
++				regulator-name = "vcc_18emmc";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <1800000>;
++				};
++			};
 +
-+static int brcmstb_get_temp(void *data, int *temp)
-+{
-+	struct brcmstb_thermal_priv *priv = data;
-+	u32 val;
-+	long t;
-+
-+	val = __raw_readl(priv->tmon_base + AVS_TMON_STATUS);
-+
-+	if (!(val & AVS_TMON_STATUS_valid_msk)) {
-+		dev_err(priv->dev, "reading not valid\n");
-+		return -EIO;
-+	}
-+
-+	val = (val & AVS_TMON_STATUS_data_msk) >> AVS_TMON_STATUS_data_shift;
-+
-+	t = avs_tmon_code_to_temp(priv->thermal, val);
-+	if (t < 0)
-+		*temp = 0;
-+	else
-+		*temp = t;
-+
-+	return 0;
-+}
-+
-+static void avs_tmon_trip_enable(struct brcmstb_thermal_priv *priv,
-+				 enum avs_tmon_trip_type type, int en)
-+{
-+	struct avs_tmon_trip *trip = &avs_tmon_trips[type];
-+	u32 val = __raw_readl(priv->tmon_base + trip->enable_offs);
-+
-+	dev_dbg(priv->dev, "%sable trip, type %d\n", en ? "en" : "dis", type);
-+
-+	if (en)
-+		val |= trip->enable_mask;
-+	else
-+		val &= ~trip->enable_mask;
-+
-+	__raw_writel(val, priv->tmon_base + trip->enable_offs);
-+}
-+
-+static int avs_tmon_get_trip_temp(struct brcmstb_thermal_priv *priv,
-+				  enum avs_tmon_trip_type type)
-+{
-+	struct avs_tmon_trip *trip = &avs_tmon_trips[type];
-+	u32 val = __raw_readl(priv->tmon_base + trip->reg_offs);
-+
-+	val &= trip->reg_msk;
-+	val >>= trip->reg_shift;
-+
-+	return avs_tmon_code_to_temp(priv->thermal, val);
-+}
-+
-+static void avs_tmon_set_trip_temp(struct brcmstb_thermal_priv *priv,
-+				   enum avs_tmon_trip_type type,
-+				   int temp)
-+{
-+	struct avs_tmon_trip *trip = &avs_tmon_trips[type];
-+	u32 val, orig;
-+
-+	dev_dbg(priv->dev, "set temp %d to %d\n", type, temp);
-+
-+	/* round toward low temp for the low interrupt */
-+	val = avs_tmon_temp_to_code(priv->thermal, temp,
-+				    type == TMON_TRIP_TYPE_LOW);
-+
-+	val <<= trip->reg_shift;
-+	val &= trip->reg_msk;
-+
-+	orig = __raw_readl(priv->tmon_base + trip->reg_offs);
-+	orig &= ~trip->reg_msk;
-+	orig |= val;
-+	__raw_writel(orig, priv->tmon_base + trip->reg_offs);
-+}
-+
-+static int avs_tmon_get_intr_temp(struct brcmstb_thermal_priv *priv)
-+{
-+	u32 val;
-+
-+	val = __raw_readl(priv->tmon_base + AVS_TMON_TEMP_INT_CODE);
-+	return avs_tmon_code_to_temp(priv->thermal, val);
-+}
-+
-+static irqreturn_t brcmstb_tmon_irq_thread(int irq, void *data)
-+{
-+	struct brcmstb_thermal_priv *priv = data;
-+	int low, high, intr;
-+
-+	low = avs_tmon_get_trip_temp(priv, TMON_TRIP_TYPE_LOW);
-+	high = avs_tmon_get_trip_temp(priv, TMON_TRIP_TYPE_HIGH);
-+	intr = avs_tmon_get_intr_temp(priv);
-+
-+	dev_dbg(priv->dev, "low/intr/high: %d/%d/%d\n",
-+			low, intr, high);
-+
-+	/* Disable high-temp until next threshold shift */
-+	if (intr >= high)
-+		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_HIGH, 0);
-+	/* Disable low-temp until next threshold shift */
-+	if (intr <= low)
-+		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_LOW, 0);
-+
-+	/*
-+	 * Notify using the interrupt temperature, in case the temperature
-+	 * changes before it can next be read out
-+	 */
-+	thermal_zone_device_update(priv->thermal, intr);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int brcmstb_set_trips(void *data, int low, int high)
-+{
-+	struct brcmstb_thermal_priv *priv = data;
-+
-+	dev_dbg(priv->dev, "set trips %d <--> %d\n", low, high);
-+
-+	if (low) {
-+		if (low > INT_MAX)
-+			low = INT_MAX;
-+		avs_tmon_set_trip_temp(priv, TMON_TRIP_TYPE_LOW, low);
-+		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_LOW, 1);
-+	} else {
-+		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_LOW, 0);
-+	}
-+
-+	if (high < ULONG_MAX) {
-+		if (high > INT_MAX)
-+			high = INT_MAX;
-+		avs_tmon_set_trip_temp(priv, TMON_TRIP_TYPE_HIGH, high);
-+		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_HIGH, 1);
-+	} else {
-+		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_HIGH, 0);
-+	}
-+
-+	return 0;
-+}
-+
-+static struct thermal_zone_of_device_ops of_ops = {
-+	.get_temp	= brcmstb_get_temp,
-+	.set_trips	= brcmstb_set_trips,
++			vdd_10: LDO_REG3 {
++				regulator-name = "vdd_10";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <1000000>;
++				};
++			};
++		};
++	};
 +};
 +
-+static const struct of_device_id brcmstb_thermal_id_table[] = {
-+	{ .compatible = "brcm,avs-tmon" },
-+	{},
++&io_domains {
++	status = "okay";
++
++	vccio1-supply = <&vcc_io>;
++	vccio2-supply = <&vcc18_emmc>;
++	vccio3-supply = <&vcc_io>;
++	vccio4-supply = <&vcc_18>;
++	vccio5-supply = <&vcc_io>;
++	vccio6-supply = <&vcc_io>;
++	pmuio-supply = <&vcc_io>;
 +};
-+MODULE_DEVICE_TABLE(of, brcmstb_thermal_id_table);
 +
-+static int brcmstb_thermal_probe(struct platform_device *pdev)
-+{
-+	struct thermal_zone_device *thermal;
-+	struct brcmstb_thermal_priv *priv;
-+	struct resource *res;
-+	int irq, ret;
++&pinctrl {
++	pmic {
++		pmic_int_l: pmic-int-l {
++			rockchip,pins = <2 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
 +
-+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
++	sdio-pwrseq {
++		wifi_enable_h: wifi-enable-h {
++			rockchip,pins = <1 18 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	priv->tmon_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(priv->tmon_base))
-+		return PTR_ERR(priv->tmon_base);
++	usb2 {
++		usb20_host_drv: usb20-host-drv {
++			rockchip,pins = <0 RK_PD3 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
 +
-+	priv->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, priv);
-+
-+	thermal = thermal_zone_of_sensor_register(&pdev->dev, 0, priv, &of_ops);
-+	if (IS_ERR(thermal)) {
-+		ret = PTR_ERR(thermal);
-+		dev_err(&pdev->dev, "could not register sensor: %d\n", ret);
-+		return ret;
-+	}
-+
-+	priv->thermal = thermal;
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_err(&pdev->dev, "could not get IRQ\n");
-+		ret = irq;
-+		goto err;
-+	}
-+	ret = devm_request_threaded_irq(&pdev->dev, irq, NULL,
-+					brcmstb_tmon_irq_thread, IRQF_ONESHOT,
-+					DRV_NAME, priv);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "could not request IRQ: %d\n", ret);
-+		goto err;
-+	}
-+
-+	dev_info(&pdev->dev, "registered AVS TMON of-sensor driver\n");
-+
-+	return 0;
-+
-+err:
-+	thermal_zone_of_sensor_unregister(&pdev->dev, thermal);
-+	return ret;
-+}
-+
-+static int brcmstb_thermal_exit(struct platform_device *pdev)
-+{
-+	struct brcmstb_thermal_priv *priv = platform_get_drvdata(pdev);
-+	struct thermal_zone_device *thermal = priv->thermal;
-+
-+	if (thermal)
-+		thermal_zone_of_sensor_unregister(&pdev->dev, priv->thermal);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver brcmstb_thermal_driver = {
-+	.probe = brcmstb_thermal_probe,
-+	.remove = brcmstb_thermal_exit,
-+	.driver = {
-+		.name = DRV_NAME,
-+		.of_match_table = brcmstb_thermal_id_table,
-+	},
++	usb3 {
++		usb30_host_drv: usb30-host-drv {
++			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
 +};
-+module_platform_driver(brcmstb_thermal_driver);
 +
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR("Brian Norris");
-+MODULE_DESCRIPTION("Broadcom STB AVS TMON thermal driver");
++&sdio {
++	bus-width = <4>;
++	cap-sd-highspeed;
++	cap-sdio-irq;
++	disable-wp;
++	keep-power-in-suspend;
++	max-frequency = <150000000>;
++	mmc-pwrseq = <&sdio_pwrseq>;
++	non-removable;
++	num-slots = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdmmc1_bus4 &sdmmc1_cmd &sdmmc1_clk>;
++	supports-sdio;
++	status = "disabled";
++};
++
++&sdmmc {
++	bus-width = <4>;
++	cap-mmc-highspeed;
++	cap-sd-highspeed;
++	disable-wp;
++	max-frequency = <150000000>;
++	num-slots = <1>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdmmc0_clk &sdmmc0_cmd &sdmmc0_dectn &sdmmc0_bus4>;
++	supports-sd;
++	vmmc-supply = <&vcc_sd>;
++	status = "okay";
++};
++
++&uart2 {
++	status = "okay";
++};
++
++&u2phy {
++	status = "okay";
++
++	u2phy_host: host-port {
++		status = "okay";
++	};
++
++	u2phy_otg: otg-port {
++		status = "okay";
++	};
++};
++
++&usb20_otg {
++	dr_mode = "host";
++	status = "okay";
++};
++
++&usb_host0_ehci {
++	status = "okay";
++};
++
++&usb_host0_ohci {
++	status = "okay";
++};
 -- 
-2.7.4
+2.11.0
