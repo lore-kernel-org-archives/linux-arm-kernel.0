@@ -1,52 +1,39 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 10 Aug 2017 07:51:27 +0900
-Subject: [PATCH] gpio: brcmstb: check return value of gpiochip_irqchip_add()
-Message-ID: <1502319087-23396-1-git-send-email-yamada.masahiro@socionext.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 10 Aug 2017 00:49:35 +0200
+Subject: [PATCH] cpufreq: dt: Add rk3328 compatible to use generic cpufreq
+ driver
+In-Reply-To: <20170804051041.GB28857@vireshk-i7>
+References: <1501811551-39168-1-git-send-email-finley.xiao@rock-chips.com>
+ <20170804051041.GB28857@vireshk-i7>
+Message-ID: <2561837.4o82W0B20K@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because gpiochip_irqchip_add() may fail, its return value should
-be checked.
+On Friday, August 4, 2017 7:10:41 AM CEST Viresh Kumar wrote:
+> On 04-08-17, 09:52, Finley Xiao wrote:
+> > This patch adds the rk3328 compatible string for supporting
+> > the generic cpufreq driver on RK3328.
+> > 
+> > Signed-off-by: Finley Xiao <finley.xiao@rock-chips.com>
+> > ---
+> >  drivers/cpufreq/cpufreq-dt-platdev.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+> > index 096aea7..13c0c47 100644
+> > --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> > +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> > @@ -76,6 +76,7 @@ static const struct of_device_id machines[] __initconst = {
+> >  	{ .compatible = "rockchip,rk3188", },
+> >  	{ .compatible = "rockchip,rk3228", },
+> >  	{ .compatible = "rockchip,rk3288", },
+> > +	{ .compatible = "rockchip,rk3328", },
+> >  	{ .compatible = "rockchip,rk3366", },
+> >  	{ .compatible = "rockchip,rk3368", },
+> >  	{ .compatible = "rockchip,rk3399", },
+> 
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> 
+> 
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- drivers/gpio/gpio-brcmstb.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
-index e6489143721a..51485997f680 100644
---- a/drivers/gpio/gpio-brcmstb.c
-+++ b/drivers/gpio/gpio-brcmstb.c
-@@ -339,6 +339,7 @@ static int brcmstb_gpio_irq_setup(struct platform_device *pdev,
- 	struct brcmstb_gpio_priv *priv = bank->parent_priv;
- 	struct device *dev = &pdev->dev;
- 	struct device_node *np = dev->of_node;
-+	int err;
- 
- 	bank->irq_chip.name = dev_name(dev);
- 	bank->irq_chip.irq_mask = brcmstb_gpio_irq_mask;
-@@ -355,8 +356,6 @@ static int brcmstb_gpio_irq_setup(struct platform_device *pdev,
- 			dev_warn(dev,
- 				"Couldn't get wake IRQ - GPIOs will not be able to wake from sleep");
- 		} else {
--			int err;
--
- 			/*
- 			 * Set wakeup capability before requesting wakeup
- 			 * interrupt, so we can process boot-time "wakeups"
-@@ -383,8 +382,10 @@ static int brcmstb_gpio_irq_setup(struct platform_device *pdev,
- 	if (priv->can_wake)
- 		bank->irq_chip.irq_set_wake = brcmstb_gpio_irq_set_wake;
- 
--	gpiochip_irqchip_add(&bank->gc, &bank->irq_chip, 0,
--			handle_simple_irq, IRQ_TYPE_NONE);
-+	err = gpiochip_irqchip_add(&bank->gc, &bank->irq_chip, 0,
-+				   handle_simple_irq, IRQ_TYPE_NONE);
-+	if (err)
-+		return err;
- 	gpiochip_set_chained_irqchip(&bank->gc, &bank->irq_chip,
- 			priv->parent_irq, brcmstb_gpio_irq_handler);
- 
--- 
-2.7.4
+Applied, thanks!
