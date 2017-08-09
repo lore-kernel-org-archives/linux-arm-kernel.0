@@ -1,73 +1,83 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 9 Aug 2017 15:36:51 +0530
-Subject: [PATCH v2 17/18] cpufreq: add support for CPU DVFS based on SCMI
- message protocol
-In-Reply-To: <97497123-2c24-6297-2d12-4f407d101b66@arm.com>
-References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
- <1501857104-11279-18-git-send-email-sudeep.holla@arm.com>
- <20170809041840.GH28857@vireshk-i7>
- <97497123-2c24-6297-2d12-4f407d101b66@arm.com>
-Message-ID: <20170809100651.GA29383@vireshk-i7>
+From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
+Date: Wed, 9 Aug 2017 11:07:14 +0100
+Subject: [PATCH v6 2/3] iommu/dma: Add a helper function to reserve HW MSI
+ address regions for IOMMU drivers
+In-Reply-To: <20170809100715.870516-1-shameerali.kolothum.thodi@huawei.com>
+References: <20170809100715.870516-1-shameerali.kolothum.thodi@huawei.com>
+Message-ID: <20170809100715.870516-3-shameerali.kolothum.thodi@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09-08-17, 10:59, Sudeep Holla wrote:
-> On 09/08/17 05:18, Viresh Kumar wrote:
+IOMMU drivers can use this to implement their .get_resv_regions callback
+for HW MSI specific reservations(e.g. ARM GICv3 ITS MSI region).
 
-> > This stores the same handle pointer which is stored in the global variable
-> > below. Right? Why keep a local variable here at all ?
-> 
-> Yes, you are right. Initially, started with just private pointers and
-> then added global. I was thinking of calling devm_scmi_handle_get per
-> policy to reflect the refcount correctly and drop global variable. Let
-> me know what you think.
+Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
+---
+ drivers/iommu/dma-iommu.c | 19 +++++++++++++++++++
+ include/linux/dma-iommu.h |  7 +++++++
+ 2 files changed, 26 insertions(+)
 
-A refcount of 1 should be fine as well, i.e. For the cpufreq driver. Why would
-SCMI care if we manage multiple policies here ? Unless it makes something within
-SCMI core better.
-
-> > This is something special which is used only when we are returning indexes and
-> > I am not sure if this will have benefit here. I will rather return 0 here.
-> > That's what other drivers are doing.
-> 
-> Indeed had 0 initially but changed as per Juri's suggestion.
-
-Maybe he suggested doing that in the fast switch routine ? As that's the normal
-protocol there. Though I have sent a patch today to propose using 0 there as
-well (you cc'd).
-
-> But is 0
-> treated as failure and still running at current OPP ?
-
-You have used that in the ->get() routine. So the OPP isn't changing, but we are
-just trying to fetch it. cpufreq core doesn't do a lot with the value returned
-from here, but at one place we break early if 0 is returned. And so all drivers
-are returning that.
-
-> and not 0KHz I assume.
-
-Yeah, 0 KHz is dead CPU really :)
-
-> > I suppose any CPU can change the frequency of any other CPU here, right? You
-> > must set policy->dvfs_possible_from_any_cpu = true, from ->init() then.
-> > 
-> 
-> OK, I missed to see something like that exists, will do.
-
-Fairly recent stuff, present in pm/linux-next only.
-
-> >> +	/*
-> >> +	 * But we need OPP table to function so if it is not there let's
-> >> +	 * give platform code chance to provide it for us.
-> >> +	 */
-> > 
-> > How are we getting the OPPs? DT or non DT ?
-> > 
-> 
-> Non DT :), from the firmware.
-
-I would improve the above comment in that case to clearly say that OPPs are
-added by the platform, lets wait for it.
-
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 9d1cebe..952ecdd 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -19,6 +19,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/acpi_iort.h>
+ #include <linux/device.h>
+ #include <linux/dma-iommu.h>
+ #include <linux/gfp.h>
+@@ -198,6 +199,24 @@ void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list)
+ }
+ EXPORT_SYMBOL(iommu_dma_get_resv_regions);
+ 
++/**
++ * iommu_dma_get_msi_resv_regions - Reserved region driver helper
++ * @dev: Device from iommu_get_resv_regions()
++ * @list: Reserved region list from iommu_get_resv_regions()
++ *
++ * IOMMU drivers can use this to implement their .get_resv_regions
++ * callback for HW MSI specific reservations. For now, this only
++ * covers ITS MSI region reservation using ACPI IORT helper function.
++ */
++int iommu_dma_get_msi_resv_regions(struct device *dev, struct list_head *list)
++{
++	if (!is_of_node(dev->iommu_fwspec->iommu_fwnode))
++		return iort_iommu_its_get_resv_regions(dev, list);
++
++	return -ENODEV;
++}
++EXPORT_SYMBOL(iommu_dma_get_msi_resv_regions);
++
+ static int cookie_init_hw_msi_region(struct iommu_dma_cookie *cookie,
+ 		phys_addr_t start, phys_addr_t end)
+ {
+diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+index 92f2083..6062ef0 100644
+--- a/include/linux/dma-iommu.h
++++ b/include/linux/dma-iommu.h
+@@ -74,6 +74,8 @@ void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
+ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
+ void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list);
+ 
++int iommu_dma_get_msi_resv_regions(struct device *dev, struct list_head *list);
++
+ #else
+ 
+ struct iommu_domain;
+@@ -107,6 +109,11 @@ static inline void iommu_dma_get_resv_regions(struct device *dev, struct list_he
+ {
+ }
+ 
++static inline int iommu_dma_get_msi_resv_regions(struct device *dev, struct list_head *list)
++{
++	return -ENODEV;
++}
++
+ #endif	/* CONFIG_IOMMU_DMA */
+ #endif	/* __KERNEL__ */
+ #endif	/* __DMA_IOMMU_H */
 -- 
-viresh
+1.9.1
