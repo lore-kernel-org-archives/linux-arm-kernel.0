@@ -1,73 +1,53 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 9 Aug 2017 17:40:38 +0800
-Subject: [PATCH 2/2] i2c: mediatek: Add i2c compatible for MediaTek MT7622
-In-Reply-To: <1502264631-12572-3-git-send-email-jun.gao@mediatek.com>
-References: <1502264631-12572-1-git-send-email-jun.gao@mediatek.com>
- <1502264631-12572-3-git-send-email-jun.gao@mediatek.com>
-Message-ID: <1502271638.31781.3.camel@mtksdaap41>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 9 Aug 2017 10:57:29 +0100
+Subject: [GIT PULL] ARM64 ACPI IORT changes for v4.14
+Message-ID: <20170809095729.GA12715@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-08-09 at 15:43 +0800, Jun Gao wrote:
-> From: Jun Gao <jun.gao@mediatek.com>
-> 
-> Add i2c compatible for MT7622. Compare to MT8173 i2c controller,
-> MT7622 limit message size to 255, and not support 4GB DMA mode.
+Hi Catalin, Will,
 
+please find below IORT changes aimed at the v4.14 release window:
 
-Jun,
+- A patch from R.Murphy to improve current PCI aliases detection and
+  corresponding IOMMU streamid parsing/initialization
+- A patch from G.Kulkarni to add IOMMU IORT NUMA detection in the IORT
+  kernel layer following IORT specs update
 
-Do you mean message numbers?
+These are not the only IORT patches for this merge window - other
+changes will go via IOMMU/ACPI trees and I expect no conflicts
+with them.
 
+Please consider pulling, thanks,
 
-Joe.C
+Lorenzo
 
-> 
-> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
-> ---
->  drivers/i2c/busses/i2c-mt65xx.c | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-> index 9bedf0b..2c7f847 100644
-> --- a/drivers/i2c/busses/i2c-mt65xx.c
-> +++ b/drivers/i2c/busses/i2c-mt65xx.c
-> @@ -172,6 +172,14 @@ struct mtk_i2c {
->  	.max_comb_2nd_msg_len = 31,
->  };
->  
-> +static const struct i2c_adapter_quirks mt7622_i2c_quirks = {
-> +	.max_num_msgs = 255,
-> +	.max_write_len = 65535,
-> +	.max_read_len = 65535,
-> +	.max_comb_1st_msg_len = 65535,
-> +	.max_comb_2nd_msg_len = 65535,
-> +};
-> +
->  static const struct mtk_i2c_compatible mt6577_compat = {
->  	.quirks = &mt6577_i2c_quirks,
->  	.pmic_i2c = 0,
-> @@ -190,6 +198,15 @@ struct mtk_i2c {
->  	.support_33bits = 0,
->  };
->  
-> +static const struct mtk_i2c_compatible mt7622_compat = {
-> +	.quirks = &mt7622_i2c_quirks,
-> +	.pmic_i2c = 0,
-> +	.dcm = 1,
-> +	.auto_restart = 1,
-> +	.aux_len_reg = 1,
-> +	.support_33bits = 0,
-> +};
-> +
->  static const struct mtk_i2c_compatible mt8173_compat = {
->  	.pmic_i2c = 0,
->  	.dcm = 1,
-> @@ -201,6 +218,7 @@ struct mtk_i2c {
->  static const struct of_device_id mtk_i2c_of_match[] = {
->  	{ .compatible = "mediatek,mt6577-i2c", .data = &mt6577_compat },
->  	{ .compatible = "mediatek,mt6589-i2c", .data = &mt6589_compat },
-> +	{ .compatible = "mediatek,mt7622-i2c", .data = &mt7622_compat },
->  	{ .compatible = "mediatek,mt8173-i2c", .data = &mt8173_compat },
->  	{}
->  };
+The following changes since commit aae4e7a8bc44722fe70d58920a36916b1043195e:
+
+  Linux 4.13-rc4 (2017-08-06 18:44:49 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/arm64-iort-for-v4.14
+
+for you to fetch changes up to 5fe0ce3b9e514168427463d0c7a86dfa635da3d2:
+
+  ACPI/IORT: numa: Add numa node mapping for smmuv3 devices (2017-08-08 16:44:38 +0100)
+
+----------------------------------------------------------------
+Two patches for the 4.14 release merge window:
+
+- IORT PCI aliases detection improvement to cater for systems with
+  complex PCI topologies that current code mishandles (R.Murphy)
+- IORT SMMUv3 proximity domain (ie NUMA) handling (respective ACPICA
+  changes will be merged separately) (G. Kulkarni)
+
+----------------------------------------------------------------
+Ganapatrao Kulkarni (1):
+      ACPI/IORT: numa: Add numa node mapping for smmuv3 devices
+
+Robin Murphy (1):
+      ACPI/IORT: Handle PCI aliases properly for IOMMUs
+
+ drivers/acpi/arm64/iort.c | 140 ++++++++++++++++++++++++++++------------------
+ 1 file changed, 87 insertions(+), 53 deletions(-)
