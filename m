@@ -1,40 +1,60 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed,  9 Aug 2017 16:56:25 +0800
-Subject: [PATCH 2/4] drivers: soc: sunxi: fix error processing on base address
- when claiming
-In-Reply-To: <20170809085627.32687-1-icenowy@aosc.io>
-References: <20170809085627.32687-1-icenowy@aosc.io>
-Message-ID: <20170809085627.32687-3-icenowy@aosc.io>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 9 Aug 2017 11:02:30 +0200
+Subject: [PATCH  1/2] ARM: dts: iwg20d-q7: Add RTC support
+In-Reply-To: <1502197465-61546-2-git-send-email-biju.das@bp.renesas.com>
+References: <1502197465-61546-1-git-send-email-biju.das@bp.renesas.com>
+ <1502197465-61546-2-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <20170809090230.GM2705@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When claiming SRAM, if the base is set to an error, it means that the
-SRAM controller has been probed, but failed to remap the controller
-memory zone. If the base is zero, thus the SRAM controller should be not
-probed at all, and it should return -EPROBE_DEFER. However, currently we
-returned -EPROBE_DEFER in the former situation, and ignored the latter
-situation (which will lead to the kernel to panic).
+On Tue, Aug 08, 2017 at 02:04:24PM +0100, Biju Das wrote:
+> Define the iWave RainboW-G20D-Qseven board dependent part of the
+> RTC device node.
+> 
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> ---
+>  arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
 
-Fix the behavior on abnormal base address processing when claiming.
+This has a compile-time dependency on
+"[PATCH  2/2] ARM: dts: r8a7743: Add I2C DT support"
+for the i2c2 node, right?
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- drivers/soc/sunxi/sunxi_sram.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
-index 99e354c8f53f..c1ff7fa62cb4 100644
---- a/drivers/soc/sunxi/sunxi_sram.c
-+++ b/drivers/soc/sunxi/sunxi_sram.c
-@@ -190,6 +190,9 @@ int sunxi_sram_claim(struct device *dev)
- 	u32 val, mask;
- 
- 	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	if (!base)
- 		return -EPROBE_DEFER;
- 
- 	if (!dev || !dev->of_node)
--- 
-2.13.0
+> 
+> diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
+> index 081af01..b3a1efa 100644
+> --- a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
+> +++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
+> @@ -31,6 +31,11 @@
+>  		groups = "avb_mdio", "avb_gmii";
+>  		function = "avb";
+>  	};
+> +
+> +	i2c2_pins: i2c2 {
+> +		groups = "i2c2";
+> +		function = "i2c2";
+> +	};
+>  };
+>  
+>  &scif0 {
+> @@ -54,3 +59,16 @@
+>  		micrel,led-mode = <1>;
+>  	};
+>  };
+> +
+> +&i2c2 {
+> +	pinctrl-0 = <&i2c2_pins>;
+> +	pinctrl-names = "default";
+> +
+> +	status = "okay";
+> +	clock-frequency = <400000>;
+> +
+> +	rtc at 68 {
+> +		compatible = "bq32000";
+> +		reg = <0x68>;
+> +	};
+> +};
+> -- 
+> 1.9.1
+> 
