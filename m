@@ -1,88 +1,52 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Wed, 9 Aug 2017 21:23:58 +0800
-Subject: [PATCH v9 2/4] PCI: Disable PCIe Relaxed Ordering if unsupported
-In-Reply-To: <20170809022239.GP16580@bhelgaas-glaptop.roam.corp.google.com>
-References: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
- <1501917313-9812-3-git-send-email-dingtianhong@huawei.com>
- <20170809022239.GP16580@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <a016e598-bcda-32bc-bfb1-4862550e6794@huawei.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 9 Aug 2017 09:38:34 -0400
+Subject: [PATCH 0/6] drm/rockchip: Some fixes
+In-Reply-To: <1501494569-6825-1-git-send-email-mark.yao@rock-chips.com>
+References: <1501494569-6825-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <CAOw6vbJr5Ya5Lyd3MqhSZd=mPaKzCwcBeSGfJLtv=kFUDvXbhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn:
+On Mon, Jul 31, 2017 at 5:49 AM, Mark Yao <mark.yao@rock-chips.com> wrote:
+> Here are some fixes port from rockchip_linux project[0],
+>
+> Tested on rk3399 and rk3288 board.
+>
+> [0]: https://github.com/rockchip-linux/kernel
+>
+> Mark Yao (6):
+>   drm/rockchip: vop: no need wait vblank on crtc enable
+>   drm/rockchip: vop: fix iommu page fault when resume
+>   drm/rockchip: vop: fix NV12 video display error
+>   drm/rockchip: vop: round_up pitches to word align
+>   drm/rockchip: vop: report error when check resource error
+>   drm/rockchip: fix race with kms hotplug and fbdev
 
-On 2017/8/9 10:22, Bjorn Helgaas wrote:
-> On Sat, Aug 05, 2017 at 03:15:11PM +0800, Ding Tianhong wrote:
->> When bit4 is set in the PCIe Device Control register, it indicates
->> whether the device is permitted to use relaxed ordering.
->> On some platforms using relaxed ordering can have performance issues or
->> due to erratum can cause data-corruption. In such cases devices must avoid
->> using relaxed ordering.
->>
->> This patch checks if there is any node in the hierarchy that indicates that
->> using relaxed ordering is not safe. 
-> 
-> I think you only check the devices between the root port and the
-> target device.  For example, you don't check siblings or cousins of
-> the target device.
-> 
 
-OK, update the description.
+Hi Mark,
+I noticed you applied this set to both -misc-next and -misc-fixes. In
+the future, please do not apply patches in both places.
 
->> In such cases the patch turns off the
->> relaxed ordering by clearing the eapability for this device.
-> 
-> s/eapability/capability/
-> 
->> And if the
->> device is probably running in a guest machine, we should do nothing.
-> 
-> I don't know what this sentence means.  "Probably running in a guest
-> machine" doesn't really make sense, and there's nothing in your patch
-> that explicitly checks for being in a guest machine.
-> 
+Instead, consult the flowchart under "Where Do I Apply My Patch?" at
+https://01.org/linuxgraphics/gfx-docs/maintainer-tools/drm-misc.html
+and choose the most appropriate place. If you are unsure, please reach
+out to a -misc maintainer.
 
-Alex noticed that we should do nothing if in the virtual machine because
-the Root Complex is NULL at that time, so I think this word should be more
-clearly here.
+Thank you,
 
->> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->> Acked-by: Alexander Duyck <alexander.h.duyck@intel.com>
->> Acked-by: Ashok Raj <ashok.raj@intel.com>
->> ---
->>  drivers/pci/pci.c   | 29 +++++++++++++++++++++++++++++
->>  drivers/pci/probe.c | 37 +++++++++++++++++++++++++++++++++++++
->>  include/linux/pci.h |  2 ++
->>  3 files changed, 68 insertions(+)
->>
->> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
->> index af0cc34..4f9d7c1 100644
->> --- a/drivers/pci/pci.c
->> +++ b/drivers/pci/pci.c
->> @@ -4854,6 +4854,35 @@ int pcie_set_mps(struct pci_dev *dev, int mps)
->>  EXPORT_SYMBOL(pcie_set_mps);
->>  
->>  /**
->> + * pcie_clear_relaxed_ordering - clear PCI Express relaxed ordering bit
->> + * @dev: PCI device to query
->> + *
->> + * If possible clear relaxed ordering
-> 
-> Why "If possible"?  The bit is required to be RW or hardwired to zero,
-> so PCI_EXP_DEVCTL_RELAX_EN should *always* be zero when this returns.
-> 
+Sean
 
-OK
-
->> + */
->> +int pcie_clear_relaxed_ordering(struct pci_dev *dev)
->> +{
-...
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> .
-> 
+>
+>  drivers/gpu/drm/rockchip/rockchip_drm_fb.c  |  2 +-
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 77 ++++++++---------------------
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.h |  3 ++
+>  3 files changed, 24 insertions(+), 58 deletions(-)
+>
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
