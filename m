@@ -1,33 +1,41 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 9 Aug 2017 14:05:38 +0200
-Subject: [PATCH] ARM64: dts: a7040: add regulator nodes to enable USB
- host VBUS
-In-Reply-To: <20170809081949.24343-1-miquel.raynal@free-electrons.com>
-References: <20170809081949.24343-1-miquel.raynal@free-electrons.com>
-Message-ID: <20170809140538.692b3e6d@windsurf>
+From: david.wu@rock-chips.com (David Wu)
+Date: Wed,  9 Aug 2017 20:12:50 +0800
+Subject: [PATCH v4 09/12] ARM: dts: rk322x: Add support internal phy for gmac
+In-Reply-To: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
+References: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1502280770-2462-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This patch adds internal mac phy clock and internal mac phy reset
+for rk gmac using.
 
-On Wed,  9 Aug 2017 10:19:49 +0200, Miquel Raynal wrote:
-> From: Hanna Hawa <hannah@marvell.com>
-> 
-> Add I2C expander and USB host PHY (host 0 and host 1) to enable
-> USB VBUS on USB ports of type A on Armada-7040-DB.
-> 
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+---
+ arch/arm/boot/dts/rk322x.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-You should have kept Hanna's Signed-off-by here and add your own below
-it.
-
-The author of the patch should always match the first person signing
-off on the patch.
-
-Best regards,
-
-Thomas
+diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
+index f3e4ffd..3778f7d 100644
+--- a/arch/arm/boot/dts/rk322x.dtsi
++++ b/arch/arm/boot/dts/rk322x.dtsi
+@@ -611,13 +611,13 @@
+ 		clocks = <&cru SCLK_MAC>, <&cru SCLK_MAC_RX>,
+ 			<&cru SCLK_MAC_TX>, <&cru SCLK_MAC_REF>,
+ 			<&cru SCLK_MAC_REFOUT>, <&cru ACLK_GMAC>,
+-			<&cru PCLK_GMAC>;
++			<&cru PCLK_GMAC>, <&cru SCLK_MAC_PHY>;
+ 		clock-names = "stmmaceth", "mac_clk_rx",
+ 			"mac_clk_tx", "clk_mac_ref",
+ 			"clk_mac_refout", "aclk_mac",
+-			"pclk_mac";
+-		resets = <&cru SRST_GMAC>;
+-		reset-names = "stmmaceth";
++			"pclk_mac", "clk_macphy";
++		resets = <&cru SRST_GMAC>, <&cru SRST_MACPHY>;
++		reset-names = "stmmaceth", "mac-phy";
+ 		rockchip,grf = <&grf>;
+ 		status = "disabled";
+ 	};
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
