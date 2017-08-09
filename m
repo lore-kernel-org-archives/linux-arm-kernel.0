@@ -1,34 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 Aug 2017 15:02:30 -0700
-Subject: [PATCH v2 2/2] ARM: OMAP4+: PRM: fix of_irq_get() result checks
-In-Reply-To: <80dd8051-456b-2331-b847-0631d94f85b1@cogentembedded.com>
-References: <20170806151714.108596802@cogentembedded.com>
- <80dd8051-456b-2331-b847-0631d94f85b1@cogentembedded.com>
-Message-ID: <20170809220229.GI3934@atomide.com>
+From: code@mmayer.net (Markus Mayer)
+Date: Wed,  9 Aug 2017 15:02:53 -0700
+Subject: [PATCH v4 0/4] thermal: add brcmstb AVS TMON driver
+Message-ID: <20170809220257.4234-1-code@mmayer.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> [170806 08:20]:
-> On 08/06/2017 06:14 PM, Sergei Shtylyov wrote:
-> 
-> > of_irq_get() may return 0 as well as a nagative error number on failure,
-> 
->    Oops, forgot to kill comma...
+From: Markus Mayer <mmayer@broadcom.com>
 
-I can fix that while applying.
+This series adds the brcmstb AVS TMON driver.
 
-> > (and never on success), however omap44xx_prm_late_init() regards 0 as a
-> > valid IRQ -- fix this.
-> > 
-> > Fixes: a8f83aefcd5a ("ARM: OMAP4+: PRM: register interrupt information from DT")
-> > Fixes: c5b3955828ba ("ARM: OMAP4: Fix legacy code clean-up regression")
-> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> [...]
+The driver was originally written by Brian Norris.
 
-Seems these both should be safe to apply into fixes-not-urgent for
-v4.14 merge window as we have not seen any issues with this? Or
-are there some known bugs related to this?
+This series is also available at
+https://github.com/mmayer/linux/tree/brcmstb-thermal-4.13-v4.
 
-Regards,
+v1 of this series can be found at https://lkml.org/lkml/2017/6/5/921
+v2 of this series can be found at https://lkml.org/lkml/2017/7/21/585
+v3 of this series can be found at https://lkml.org/lkml/2017/7/31/710
 
-Tony
+Changes since v3:
+- Rebased on v4.13-rc3 to resolve conflicts in the MAINTAINERS file
+
+Changes since v2:
+- replaced calls to pr_debug() with calls to dev_dbg() [PATCH 2/4 only]
+- all other patches are unchanged from v2
+
+Changes since v1:
+- Fixed wording in binding document
+- Fixed lincensing to consistently mention GPL v2
+- Use thermal_zone_get_slope() and thermal_zone_get_offset()
+- Some minor clean-ups
+
+Brian Norris (2):
+  Documentation: devicetree: add binding for Broadcom STB AVS TMON
+  thermal: add brcmstb AVS TMON driver
+
+Markus Mayer (2):
+  ARM: multi_v7_defconfig: add CONFIG_BRCMSTB_THERMAL
+  arm64: defconfig: add CONFIG_BRCMSTB_THERMAL
+
+ .../devicetree/bindings/thermal/brcm,avs-tmon.txt  |  20 ++
+ MAINTAINERS                                        |   8 +
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm64/configs/defconfig                       |   1 +
+ drivers/thermal/Kconfig                            |   2 +-
+ drivers/thermal/broadcom/Kconfig                   |   7 +
+ drivers/thermal/broadcom/Makefile                  |   1 +
+ drivers/thermal/broadcom/brcmstb_thermal.c         | 386 +++++++++++++++++++++
+ 8 files changed, 425 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
+ create mode 100644 drivers/thermal/broadcom/brcmstb_thermal.c
+
+-- 
+2.7.4
