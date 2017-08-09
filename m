@@ -1,380 +1,215 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 10 Aug 2017 01:43:26 +0900
-Subject: [PATCH 1/6] ARM: dts: uniphier: remove sLD3 SoC support
-Message-ID: <1502297011-30201-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Thu, 10 Aug 2017 01:43:27 +0900
+Subject: [PATCH 2/6] ARM: dts: uniphier use #incluude instead of /include/
+In-Reply-To: <1502297011-30201-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1502297011-30201-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1502297011-30201-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This SoC is too old.  It is difficult to maintain any longer.
+To include dt-bindings headers.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/boot/dts/Makefile              |   1 -
- arch/arm/boot/dts/uniphier-sld3-ref.dts |  75 ---------
- arch/arm/boot/dts/uniphier-sld3.dtsi    | 260 --------------------------------
- 3 files changed, 336 deletions(-)
- delete mode 100644 arch/arm/boot/dts/uniphier-sld3-ref.dts
- delete mode 100644 arch/arm/boot/dts/uniphier-sld3.dtsi
+ arch/arm/boot/dts/uniphier-ld4-ref.dts     | 6 +++---
+ arch/arm/boot/dts/uniphier-ld4.dtsi        | 2 +-
+ arch/arm/boot/dts/uniphier-ld6b-ref.dts    | 6 +++---
+ arch/arm/boot/dts/uniphier-ld6b.dtsi       | 2 +-
+ arch/arm/boot/dts/uniphier-pro4-ace.dts    | 2 +-
+ arch/arm/boot/dts/uniphier-pro4-ref.dts    | 6 +++---
+ arch/arm/boot/dts/uniphier-pro4-sanji.dts  | 2 +-
+ arch/arm/boot/dts/uniphier-pro4.dtsi       | 2 +-
+ arch/arm/boot/dts/uniphier-pro5.dtsi       | 2 +-
+ arch/arm/boot/dts/uniphier-pxs2-gentil.dts | 2 +-
+ arch/arm/boot/dts/uniphier-pxs2-vodka.dts  | 2 +-
+ arch/arm/boot/dts/uniphier-pxs2.dtsi       | 2 +-
+ arch/arm/boot/dts/uniphier-sld8-ref.dts    | 6 +++---
+ arch/arm/boot/dts/uniphier-sld8.dtsi       | 2 +-
+ 14 files changed, 22 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 4b17f35dc9a7..ccf5b1da1948 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -970,7 +970,6 @@ dtb-$(CONFIG_ARCH_UNIPHIER) += \
- 	uniphier-pro4-sanji.dtb \
- 	uniphier-pxs2-gentil.dtb \
- 	uniphier-pxs2-vodka.dtb \
--	uniphier-sld3-ref.dtb \
- 	uniphier-sld8-ref.dtb
- dtb-$(CONFIG_ARCH_VERSATILE) += \
- 	versatile-ab.dtb \
-diff --git a/arch/arm/boot/dts/uniphier-sld3-ref.dts b/arch/arm/boot/dts/uniphier-sld3-ref.dts
-deleted file mode 100644
-index 70cda39a3dd2..000000000000
---- a/arch/arm/boot/dts/uniphier-sld3-ref.dts
-+++ /dev/null
-@@ -1,75 +0,0 @@
--/*
-- * Device Tree Source for UniPhier sLD3 Reference Board
-- *
-- * Copyright (C) 2015-2016 Socionext Inc.
-- *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-- *
-- * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-- */
--
--/dts-v1/;
--/include/ "uniphier-sld3.dtsi"
+diff --git a/arch/arm/boot/dts/uniphier-ld4-ref.dts b/arch/arm/boot/dts/uniphier-ld4-ref.dts
+index 4817ebb28eb2..86b089e9c163 100644
+--- a/arch/arm/boot/dts/uniphier-ld4-ref.dts
++++ b/arch/arm/boot/dts/uniphier-ld4-ref.dts
+@@ -8,9 +8,9 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "uniphier-ld4.dtsi"
 -/include/ "uniphier-ref-daughter.dtsi"
 -/include/ "uniphier-support-card.dtsi"
--
--/ {
--	model = "UniPhier sLD3 Reference Board";
--	compatible = "socionext,uniphier-sld3-ref", "socionext,uniphier-sld3";
--
--	chosen {
--		stdout-path = "serial0:115200n8";
--	};
--
--	aliases {
--		serial0 = &serial0;
--		serial1 = &serial1;
--		serial2 = &serial2;
--		i2c0 = &i2c0;
--		i2c1 = &i2c1;
--		i2c2 = &i2c2;
--		i2c3 = &i2c3;
--		i2c4 = &i2c4;
--	};
--
--	memory at 8000000 {
--		device_type = "memory";
--		reg = <0x80000000 0x20000000
--		       0xc0000000 0x20000000>;
--	};
--};
--
--&ethsc {
--	interrupts = <0 49 4>;
--};
--
--&serial0 {
--	status = "okay";
--};
--
--&serial1 {
--	status = "okay";
--};
--
--&serial2 {
--	status = "okay";
--};
--
--&i2c0 {
--	status = "okay";
--};
--
--&usb0 {
--	status = "okay";
--};
--
--&usb1 {
--	status = "okay";
--};
--
--&usb2 {
--	status = "okay";
--};
--
--&usb3 {
--	status = "okay";
--};
-diff --git a/arch/arm/boot/dts/uniphier-sld3.dtsi b/arch/arm/boot/dts/uniphier-sld3.dtsi
-deleted file mode 100644
-index 408287936613..000000000000
---- a/arch/arm/boot/dts/uniphier-sld3.dtsi
-+++ /dev/null
-@@ -1,260 +0,0 @@
--/*
-- * Device Tree Source for UniPhier sLD3 SoC
-- *
-- * Copyright (C) 2015-2016 Socionext Inc.
-- *   Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-- *
-- * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-- */
--
--/ {
--	compatible = "socionext,uniphier-sld3";
--	#address-cells = <1>;
--	#size-cells = <1>;
--
--	cpus {
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		cpu at 0 {
--			device_type = "cpu";
--			compatible = "arm,cortex-a9";
--			reg = <0>;
--			enable-method = "psci";
--			next-level-cache = <&l2>;
--		};
--
--		cpu at 1 {
--			device_type = "cpu";
--			compatible = "arm,cortex-a9";
--			reg = <1>;
--			enable-method = "psci";
--			next-level-cache = <&l2>;
--		};
--	};
--
--	psci {
--		compatible = "arm,psci-0.2";
--		method = "smc";
--	};
--
--	clocks {
--		refclk: ref {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			clock-frequency = <24576000>;
--		};
--
--		arm_timer_clk: arm_timer_clk {
--			#clock-cells = <0>;
--			compatible = "fixed-clock";
--			clock-frequency = <50000000>;
--		};
--	};
--
--	soc {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--		interrupt-parent = <&intc>;
--
--		timer at 20000200 {
--			compatible = "arm,cortex-a9-global-timer";
--			reg = <0x20000200 0x20>;
--			interrupts = <1 11 0x304>;
--			clocks = <&arm_timer_clk>;
--		};
--
--		timer at 20000600 {
--			compatible = "arm,cortex-a9-twd-timer";
--			reg = <0x20000600 0x20>;
--			interrupts = <1 13 0x304>;
--			clocks = <&arm_timer_clk>;
--		};
--
--		intc: interrupt-controller at 20001000 {
--			compatible = "arm,cortex-a9-gic";
--			#interrupt-cells = <3>;
--			interrupt-controller;
--			reg = <0x20001000 0x1000>,
--			      <0x20000100 0x100>;
--		};
--
--		l2: l2-cache at 500c0000 {
--			compatible = "socionext,uniphier-system-cache";
--			reg = <0x500c0000 0x2000>, <0x503c0100 0x4>,
--			      <0x506c0000 0x400>;
--			interrupts = <0 174 4>, <0 175 4>;
--			cache-unified;
--			cache-size = <(512 * 1024)>;
--			cache-sets = <256>;
--			cache-line-size = <128>;
--			cache-level = <2>;
--		};
--
--		serial0: serial at 54006800 {
--			compatible = "socionext,uniphier-uart";
--			status = "disabled";
--			reg = <0x54006800 0x40>;
--			interrupts = <0 33 4>;
--			clocks = <&sys_clk 0>;
--		};
--
--		serial1: serial at 54006900 {
--			compatible = "socionext,uniphier-uart";
--			status = "disabled";
--			reg = <0x54006900 0x40>;
--			interrupts = <0 35 4>;
--			clocks = <&sys_clk 0>;
--		};
--
--		serial2: serial at 54006a00 {
--			compatible = "socionext,uniphier-uart";
--			status = "disabled";
--			reg = <0x54006a00 0x40>;
--			interrupts = <0 37 4>;
--			clocks = <&sys_clk 0>;
--		};
--
--		i2c0: i2c at 58400000 {
--			compatible = "socionext,uniphier-i2c";
--			status = "disabled";
--			reg = <0x58400000 0x40>;
--			#address-cells = <1>;
--			#size-cells = <0>;
--			interrupts = <0 41 1>;
--			clocks = <&sys_clk 1>;
--			clock-frequency = <100000>;
--		};
--
--		i2c1: i2c at 58480000 {
--			compatible = "socionext,uniphier-i2c";
--			status = "disabled";
--			reg = <0x58480000 0x40>;
--			#address-cells = <1>;
--			#size-cells = <0>;
--			interrupts = <0 42 1>;
--			clocks = <&sys_clk 1>;
--			clock-frequency = <100000>;
--		};
--
--		i2c2: i2c at 58500000 {
--			compatible = "socionext,uniphier-i2c";
--			status = "disabled";
--			reg = <0x58500000 0x40>;
--			#address-cells = <1>;
--			#size-cells = <0>;
--			interrupts = <0 43 1>;
--			clocks = <&sys_clk 1>;
--			clock-frequency = <100000>;
--		};
--
--		i2c3: i2c at 58580000 {
--			compatible = "socionext,uniphier-i2c";
--			status = "disabled";
--			reg = <0x58580000 0x40>;
--			#address-cells = <1>;
--			#size-cells = <0>;
--			interrupts = <0 44 1>;
--			clocks = <&sys_clk 1>;
--			clock-frequency = <100000>;
--		};
--
--		/* chip-internal connection for DMD */
--		i2c4: i2c at 58600000 {
--			compatible = "socionext,uniphier-i2c";
--			reg = <0x58600000 0x40>;
--			#address-cells = <1>;
--			#size-cells = <0>;
--			interrupts = <0 45 1>;
--			clocks = <&sys_clk 1>;
--			clock-frequency = <400000>;
--		};
--
--		system_bus: system-bus at 58c00000 {
--			compatible = "socionext,uniphier-system-bus";
--			status = "disabled";
--			reg = <0x58c00000 0x400>;
--			#address-cells = <2>;
--			#size-cells = <1>;
--		};
--
--		smpctrl at 59801000 {
--			compatible = "socionext,uniphier-smpctrl";
--			reg = <0x59801000 0x400>;
--		};
--
--		mioctrl at 59810000 {
--			compatible = "socionext,uniphier-sld3-mioctrl",
--				     "simple-mfd", "syscon";
--			reg = <0x59810000 0x800>;
--
--			mio_clk: clock {
--				compatible = "socionext,uniphier-sld3-mio-clock";
--				#clock-cells = <1>;
--			};
--
--			mio_rst: reset {
--				compatible = "socionext,uniphier-sld3-mio-reset";
--				#reset-cells = <1>;
--			};
--		};
--
--		usb0: usb at 5a800100 {
--			compatible = "socionext,uniphier-ehci", "generic-ehci";
--			status = "disabled";
--			reg = <0x5a800100 0x100>;
--			interrupts = <0 80 4>;
--			clocks = <&mio_clk 7>, <&mio_clk 8>, <&mio_clk 12>;
--			resets = <&sys_rst 8>, <&mio_rst 7>, <&mio_rst 8>,
--				 <&mio_rst 12>;
--		};
--
--		usb1: usb at 5a810100 {
--			compatible = "socionext,uniphier-ehci", "generic-ehci";
--			status = "disabled";
--			reg = <0x5a810100 0x100>;
--			interrupts = <0 81 4>;
--			clocks = <&mio_clk 7>, <&mio_clk 9>, <&mio_clk 13>;
--			resets = <&sys_rst 8>, <&mio_rst 7>, <&mio_rst 9>,
--				 <&mio_rst 13>;
--		};
--
--		usb2: usb at 5a820100 {
--			compatible = "socionext,uniphier-ehci", "generic-ehci";
--			status = "disabled";
--			reg = <0x5a820100 0x100>;
--			interrupts = <0 82 4>;
--			clocks = <&mio_clk 7>, <&mio_clk 10>, <&mio_clk 14>;
--			resets = <&sys_rst 8>, <&mio_rst 7>, <&mio_rst 10>,
--				 <&mio_rst 14>;
--		};
--
--		usb3: usb at 5a830100 {
--			compatible = "socionext,uniphier-ehci", "generic-ehci";
--			status = "disabled";
--			reg = <0x5a830100 0x100>;
--			interrupts = <0 83 4>;
--			clocks = <&mio_clk 7>, <&mio_clk 11>, <&mio_clk 15>;
--			resets = <&sys_rst 8>, <&mio_rst 7>, <&mio_rst 11>,
--				 <&mio_rst 15>;
--		};
--
--		sysctrl at f1840000 {
--			compatible = "socionext,uniphier-sld3-sysctrl",
--				     "simple-mfd", "syscon";
--			reg = <0xf1840000 0x10000>;
--
--			sys_clk: clock {
--				compatible = "socionext,uniphier-sld3-clock";
--				#clock-cells = <1>;
--			};
--
--			sys_rst: reset {
--				compatible = "socionext,uniphier-sld3-reset";
--				#reset-cells = <1>;
--			};
--		};
--	};
--};
++#include "uniphier-ld4.dtsi"
++#include "uniphier-ref-daughter.dtsi"
++#include "uniphier-support-card.dtsi"
+ 
+ / {
+ 	model = "UniPhier LD4 Reference Board";
+diff --git a/arch/arm/boot/dts/uniphier-ld4.dtsi b/arch/arm/boot/dts/uniphier-ld4.dtsi
+index fb2fd9605b9d..5d3924c8568c 100644
+--- a/arch/arm/boot/dts/uniphier-ld4.dtsi
++++ b/arch/arm/boot/dts/uniphier-ld4.dtsi
+@@ -288,4 +288,4 @@
+ 	};
+ };
+ 
+-/include/ "uniphier-pinctrl.dtsi"
++#include "uniphier-pinctrl.dtsi"
+diff --git a/arch/arm/boot/dts/uniphier-ld6b-ref.dts b/arch/arm/boot/dts/uniphier-ld6b-ref.dts
+index 96db4abc02c3..6dbdc86225e9 100644
+--- a/arch/arm/boot/dts/uniphier-ld6b-ref.dts
++++ b/arch/arm/boot/dts/uniphier-ld6b-ref.dts
+@@ -8,9 +8,9 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "uniphier-ld6b.dtsi"
+-/include/ "uniphier-ref-daughter.dtsi"
+-/include/ "uniphier-support-card.dtsi"
++#include "uniphier-ld6b.dtsi"
++#include "uniphier-ref-daughter.dtsi"
++#include "uniphier-support-card.dtsi"
+ 
+ / {
+ 	model = "UniPhier LD6b Reference Board";
+diff --git a/arch/arm/boot/dts/uniphier-ld6b.dtsi b/arch/arm/boot/dts/uniphier-ld6b.dtsi
+index 8b9a79731bd3..9a7b25cc8233 100644
+--- a/arch/arm/boot/dts/uniphier-ld6b.dtsi
++++ b/arch/arm/boot/dts/uniphier-ld6b.dtsi
+@@ -12,7 +12,7 @@
+  * The D-chip (digital chip) is the same as the PXs2 die.
+  * Reuse the PXs2 device tree with some properties overridden.
+  */
+-/include/ "uniphier-pxs2.dtsi"
++#include "uniphier-pxs2.dtsi"
+ 
+ / {
+ 	compatible = "socionext,uniphier-ld6b";
+diff --git a/arch/arm/boot/dts/uniphier-pro4-ace.dts b/arch/arm/boot/dts/uniphier-pro4-ace.dts
+index 11690b57931c..089419cee273 100644
+--- a/arch/arm/boot/dts/uniphier-pro4-ace.dts
++++ b/arch/arm/boot/dts/uniphier-pro4-ace.dts
+@@ -8,7 +8,7 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "uniphier-pro4.dtsi"
++#include "uniphier-pro4.dtsi"
+ 
+ / {
+ 	model = "UniPhier Pro4 Ace Board";
+diff --git a/arch/arm/boot/dts/uniphier-pro4-ref.dts b/arch/arm/boot/dts/uniphier-pro4-ref.dts
+index 4cf539245f2e..d3be37b2ac35 100644
+--- a/arch/arm/boot/dts/uniphier-pro4-ref.dts
++++ b/arch/arm/boot/dts/uniphier-pro4-ref.dts
+@@ -8,9 +8,9 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "uniphier-pro4.dtsi"
+-/include/ "uniphier-ref-daughter.dtsi"
+-/include/ "uniphier-support-card.dtsi"
++#include "uniphier-pro4.dtsi"
++#include "uniphier-ref-daughter.dtsi"
++#include "uniphier-support-card.dtsi"
+ 
+ / {
+ 	model = "UniPhier Pro4 Reference Board";
+diff --git a/arch/arm/boot/dts/uniphier-pro4-sanji.dts b/arch/arm/boot/dts/uniphier-pro4-sanji.dts
+index 2763cebcd76a..adef212b45b2 100644
+--- a/arch/arm/boot/dts/uniphier-pro4-sanji.dts
++++ b/arch/arm/boot/dts/uniphier-pro4-sanji.dts
+@@ -8,7 +8,7 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "uniphier-pro4.dtsi"
++#include "uniphier-pro4.dtsi"
+ 
+ / {
+ 	model = "UniPhier Pro4 Sanji Board";
+diff --git a/arch/arm/boot/dts/uniphier-pro4.dtsi b/arch/arm/boot/dts/uniphier-pro4.dtsi
+index 37400becf4ba..394b35e1082d 100644
+--- a/arch/arm/boot/dts/uniphier-pro4.dtsi
++++ b/arch/arm/boot/dts/uniphier-pro4.dtsi
+@@ -308,4 +308,4 @@
+ 	};
+ };
+ 
+-/include/ "uniphier-pinctrl.dtsi"
++#include "uniphier-pinctrl.dtsi"
+diff --git a/arch/arm/boot/dts/uniphier-pro5.dtsi b/arch/arm/boot/dts/uniphier-pro5.dtsi
+index 140327ddde1c..df0506b58330 100644
+--- a/arch/arm/boot/dts/uniphier-pro5.dtsi
++++ b/arch/arm/boot/dts/uniphier-pro5.dtsi
+@@ -371,4 +371,4 @@
+ 	};
+ };
+ 
+-/include/ "uniphier-pinctrl.dtsi"
++#include "uniphier-pinctrl.dtsi"
+diff --git a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
+index 81560f75bfa7..7dfae2667f50 100644
+--- a/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
++++ b/arch/arm/boot/dts/uniphier-pxs2-gentil.dts
+@@ -8,7 +8,7 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "uniphier-pxs2.dtsi"
++#include "uniphier-pxs2.dtsi"
+ 
+ / {
+ 	model = "UniPhier PXs2 Gentil Board";
+diff --git a/arch/arm/boot/dts/uniphier-pxs2-vodka.dts b/arch/arm/boot/dts/uniphier-pxs2-vodka.dts
+index dc2d0579c666..0cf615463a82 100644
+--- a/arch/arm/boot/dts/uniphier-pxs2-vodka.dts
++++ b/arch/arm/boot/dts/uniphier-pxs2-vodka.dts
+@@ -8,7 +8,7 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "uniphier-pxs2.dtsi"
++#include "uniphier-pxs2.dtsi"
+ 
+ / {
+ 	model = "UniPhier PXs2 Vodka Board";
+diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
+index bace751d4023..c26d4ba1b9c3 100644
+--- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
++++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
+@@ -355,4 +355,4 @@
+ 	};
+ };
+ 
+-/include/ "uniphier-pinctrl.dtsi"
++#include "uniphier-pinctrl.dtsi"
+diff --git a/arch/arm/boot/dts/uniphier-sld8-ref.dts b/arch/arm/boot/dts/uniphier-sld8-ref.dts
+index 4536d5b71297..394f5df62eda 100644
+--- a/arch/arm/boot/dts/uniphier-sld8-ref.dts
++++ b/arch/arm/boot/dts/uniphier-sld8-ref.dts
+@@ -8,9 +8,9 @@
+  */
+ 
+ /dts-v1/;
+-/include/ "uniphier-sld8.dtsi"
+-/include/ "uniphier-ref-daughter.dtsi"
+-/include/ "uniphier-support-card.dtsi"
++#include "uniphier-sld8.dtsi"
++#include "uniphier-ref-daughter.dtsi"
++#include "uniphier-support-card.dtsi"
+ 
+ / {
+ 	model = "UniPhier sLD8 Reference Board";
+diff --git a/arch/arm/boot/dts/uniphier-sld8.dtsi b/arch/arm/boot/dts/uniphier-sld8.dtsi
+index 9fb9167f2db4..0c022fa5640c 100644
+--- a/arch/arm/boot/dts/uniphier-sld8.dtsi
++++ b/arch/arm/boot/dts/uniphier-sld8.dtsi
+@@ -288,4 +288,4 @@
+ 	};
+ };
+ 
+-/include/ "uniphier-pinctrl.dtsi"
++#include "uniphier-pinctrl.dtsi"
 -- 
 2.7.4
