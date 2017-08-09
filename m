@@ -1,39 +1,82 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 9 Aug 2017 14:41:59 +0200
-Subject: [PATCH v06 14/36] arm uapi asm/signal.h: include <stddef.h> for
- size_t in userspace
-In-Reply-To: <20170808225739.GF10552@altlinux.org>
-References: <20170806164428.2273-1-mikko.rapeli@iki.fi>
- <20170806164428.2273-15-mikko.rapeli@iki.fi>
- <20170808225739.GF10552@altlinux.org>
-Message-ID: <CAK8P3a30Vd2JquMvZ88tTO4jFAUMJGtUpvLuDmDPp2UFBYXDLQ@mail.gmail.com>
+From: jun.gao@mediatek.com (Jun Gao)
+Date: Wed, 9 Aug 2017 20:58:39 +0800
+Subject: [PATCH 2/2] i2c: mediatek: Add i2c compatible for MediaTek MT7622
+In-Reply-To: <1502271638.31781.3.camel@mtksdaap41>
+References: <1502264631-12572-1-git-send-email-jun.gao@mediatek.com>
+ <1502264631-12572-3-git-send-email-jun.gao@mediatek.com>
+ <1502271638.31781.3.camel@mtksdaap41>
+Message-ID: <1502283519.930.62.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 9, 2017 at 12:57 AM, Dmitry V. Levin <ldv@altlinux.org> wrote:
-> On Sun, Aug 06, 2017 at 06:44:05PM +0200, Mikko Rapeli wrote:
->> Arnd Bergmann <arnd@arndb.de> doubts that __kernel_size_t could be used here
->> so trying to fall back to gcc's <stddef.h>.
->
-> The only architecture where you cannot do this safely is x86 family
-> because of x32 exception.  If there is no chance that the change will
-> affect x32, feel free to replace size_t with __kernel_size_t like I did
-> some time ago, see
-> http://lkml.kernel.org/r/20170302002022.GB27097 at altlinux.org
+On Wed, 2017-08-09 at 17:40 +0800, Yingjoe Chen wrote:
+> On Wed, 2017-08-09 at 15:43 +0800, Jun Gao wrote:
+> > From: Jun Gao <jun.gao@mediatek.com>
+> > 
+> > Add i2c compatible for MT7622. Compare to MT8173 i2c controller,
+> > MT7622 limit message size to 255, and not support 4GB DMA mode.
+> 
+> 
+> Jun,
+> 
+> Do you mean message numbers?
+> 
+> 
+> Joe.C
+> 
 
-There is another problem: on some 32-bit architectures, size_t is
-defined as 'unsigned int', while '__kernel_size_t' is defined as 'unsigned
-long'. These obviously have the same size, but the man page
-explicitly defines it as 'size_t ss_size'.
+Yes, bit7~bit0 of i2c register TRANSAC_LEN will be used as message
+numbers.
 
-If a user space program accesses the field in a way requires an
-exact type match, it gets a warning or error, e.g.
-
-1. printf("signal with %zd bytes\n", stack->ss_size);
-2. size_t *pointer_to_size_t = &stack->ss_size;
-3. assert(__builtin_types_compatible_p(size_t, typeof(stack->ss_size)))
-
-Not sure how important those are, but I think there is at least a risk
-of any of those showing up in user space.
-
-         Arnd
+Jun
+> > 
+> > Signed-off-by: Jun Gao <jun.gao@mediatek.com>
+> > ---
+> >  drivers/i2c/busses/i2c-mt65xx.c | 18 ++++++++++++++++++
+> >  1 file changed, 18 insertions(+)
+> > 
+> > diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
+> > index 9bedf0b..2c7f847 100644
+> > --- a/drivers/i2c/busses/i2c-mt65xx.c
+> > +++ b/drivers/i2c/busses/i2c-mt65xx.c
+> > @@ -172,6 +172,14 @@ struct mtk_i2c {
+> >  	.max_comb_2nd_msg_len = 31,
+> >  };
+> >  
+> > +static const struct i2c_adapter_quirks mt7622_i2c_quirks = {
+> > +	.max_num_msgs = 255,
+> > +	.max_write_len = 65535,
+> > +	.max_read_len = 65535,
+> > +	.max_comb_1st_msg_len = 65535,
+> > +	.max_comb_2nd_msg_len = 65535,
+> > +};
+> > +
+> >  static const struct mtk_i2c_compatible mt6577_compat = {
+> >  	.quirks = &mt6577_i2c_quirks,
+> >  	.pmic_i2c = 0,
+> > @@ -190,6 +198,15 @@ struct mtk_i2c {
+> >  	.support_33bits = 0,
+> >  };
+> >  
+> > +static const struct mtk_i2c_compatible mt7622_compat = {
+> > +	.quirks = &mt7622_i2c_quirks,
+> > +	.pmic_i2c = 0,
+> > +	.dcm = 1,
+> > +	.auto_restart = 1,
+> > +	.aux_len_reg = 1,
+> > +	.support_33bits = 0,
+> > +};
+> > +
+> >  static const struct mtk_i2c_compatible mt8173_compat = {
+> >  	.pmic_i2c = 0,
+> >  	.dcm = 1,
+> > @@ -201,6 +218,7 @@ struct mtk_i2c {
+> >  static const struct of_device_id mtk_i2c_of_match[] = {
+> >  	{ .compatible = "mediatek,mt6577-i2c", .data = &mt6577_compat },
+> >  	{ .compatible = "mediatek,mt6589-i2c", .data = &mt6589_compat },
+> > +	{ .compatible = "mediatek,mt7622-i2c", .data = &mt7622_compat },
+> >  	{ .compatible = "mediatek,mt8173-i2c", .data = &mt8173_compat },
+> >  	{}
+> >  };
+> 
+> 
