@@ -1,54 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 9 Aug 2017 09:59:29 +0200
-Subject: [PATCH  1/2] dt-bindings: i2c: Document r8a7743/5 support
-In-Reply-To: <20170808115006.GC1674@katana>
-References: <1502191231-8682-1-git-send-email-biju.das@bp.renesas.com>
- <20170808115006.GC1674@katana>
-Message-ID: <20170809075929.GG2705@verge.net.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 9 Aug 2017 10:11:13 +0200
+Subject: [PATCH] clk: gemini: hands off PCI OE bit
+In-Reply-To: <20170809014312.GZ2146@codeaurora.org>
+References: <20170808190818.11740-1-linus.walleij@linaro.org>
+ <20170809014312.GZ2146@codeaurora.org>
+Message-ID: <CACRpkda0cLMuiipEBX+mH6MJ3v6k=CY+q=Q6NUj=BM+6wnFO2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 01:50:06PM +0200, Wolfram Sang wrote:
-> On Tue, Aug 08, 2017 at 12:20:31PM +0100, Biju Das wrote:
-> > Document i2c Device Tree support for RZ/G1[ME]
-> > (also known as r8aA774[35]) SoCs. They are compatible with
-> > R-Car Gen2 SoC family.
-> > 
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> 
-> Looks good to me, yet I'd like an ack from Simon who is currently
-> working on the generic fallback compatibles.
+On Wed, Aug 9, 2017 at 3:43 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 08/08, Linus Walleij wrote:
+>> This bit is pin control, and needs to be carefully managed by the
+>> new pin control driver.
+>>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Fixes tag?
 
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+It's not a fix, it'd just that we move the responsibility of managing the
+pin from the clock driver to the pin control driver.
 
-> 
-> > ---
-> >  Documentation/devicetree/bindings/i2c/i2c-rcar.txt | 5 ++++-
-> >  1 file changed, 4 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-rcar.txt b/Documentation/devicetree/bindings/i2c/i2c-rcar.txt
-> > index 2b8bd33..cad39ae 100644
-> > --- a/Documentation/devicetree/bindings/i2c/i2c-rcar.txt
-> > +++ b/Documentation/devicetree/bindings/i2c/i2c-rcar.txt
-> > @@ -2,6 +2,8 @@ I2C for R-Car platforms
-> >  
-> >  Required properties:
-> >  - compatible:
-> > +	"renesas,i2c-r8a7743" if the device is a part of a R8A7743 SoC.
-> > +	"renesas,i2c-r8a7745" if the device is a part of a R8A7745 SoC.
-> >  	"renesas,i2c-r8a7778" if the device is a part of a R8A7778 SoC.
-> >  	"renesas,i2c-r8a7779" if the device is a part of a R8A7779 SoC.
-> >  	"renesas,i2c-r8a7790" if the device is a part of a R8A7790 SoC.
-> > @@ -12,7 +14,8 @@ Required properties:
-> >  	"renesas,i2c-r8a7795" if the device is a part of a R8A7795 SoC.
-> >  	"renesas,i2c-r8a7796" if the device is a part of a R8A7796 SoC.
-> >  	"renesas,rcar-gen1-i2c" for a generic R-Car Gen1 compatible device.
-> > -	"renesas,rcar-gen2-i2c" for a generic R-Car Gen2 compatible device.
-> > +	"renesas,rcar-gen2-i2c" for a generic R-Car Gen2 or RZ/G1 compatible
-> > +				device.
-> >  	"renesas,rcar-gen3-i2c" for a generic R-Car Gen3 compatible device.
-> >  	"renesas,i2c-rcar" (deprecated)
-> >  
-> > -- 
-> > 1.9.1
-> > 
+I initially thought the Gemini would not need a separate pin control
+driver because it was "simple" ... so these bits could be handled here
+and there among the peripherals. Little did I know. Mea culpa.
+
+> Does this need to be merged now as a critical fix? Or we can wait
+> on it for next release?
+
+Just put it in for the next release, thanks!
+
+Yours,
+Linus Walleij
