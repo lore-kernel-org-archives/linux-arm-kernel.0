@@ -1,33 +1,42 @@
-From: sean@mess.org (Sean Young)
-Date: Wed, 9 Aug 2017 14:00:29 +0100
-Subject: [PATCH v2 3/3] rc: add zx-irdec remote control driver
-In-Reply-To: <1501420993-21977-4-git-send-email-shawnguo@kernel.org>
-References: <1501420993-21977-1-git-send-email-shawnguo@kernel.org>
- <1501420993-21977-4-git-send-email-shawnguo@kernel.org>
-Message-ID: <20170809130029.eneyqstlejfkotz2@gofer.mess.org>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Wed, 9 Aug 2017 14:13:41 +0100
+Subject: [PATCH v2 2/3] dt-bindings: iio: adc: stm32: add optional
+ st,min-sample-time-nsecs
+In-Reply-To: <20170803170154.bizlx2dvdbwtgmoy@rob-hp-laptop>
+References: <1500912640-23927-1-git-send-email-fabrice.gasnier@st.com>
+ <1500912640-23927-3-git-send-email-fabrice.gasnier@st.com>
+ <20170803170154.bizlx2dvdbwtgmoy@rob-hp-laptop>
+Message-ID: <20170809141341.777bdd85@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 30, 2017 at 09:23:13PM +0800, Shawn Guo wrote:
-> From: Shawn Guo <shawn.guo@linaro.org>
-> 
-> It adds the remote control driver and corresponding keymap file for
-> IRDEC block found on ZTE ZX family SoCs.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/media/rc/Kconfig               |  11 ++
->  drivers/media/rc/Makefile              |   1 +
->  drivers/media/rc/keymaps/Makefile      |   3 +-
->  drivers/media/rc/keymaps/rc-zx-irdec.c |  79 ++++++++++++++
->  drivers/media/rc/zx-irdec.c            | 183 +++++++++++++++++++++++++++++++++
->  include/media/rc-map.h                 |   1 +
->  6 files changed, 277 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/media/rc/keymaps/rc-zx-irdec.c
->  create mode 100644 drivers/media/rc/zx-irdec.c
+On Thu, 3 Aug 2017 12:01:54 -0500
+Rob Herring <robh@kernel.org> wrote:
 
-We're missing an MAINTAINERS entry for this driver. Could this be added
-please as a separate patch?
+> On Mon, Jul 24, 2017 at 06:10:39PM +0200, Fabrice Gasnier wrote:
+> > STM32 ADC allows each channel to be sampled with a different sampling
+> > time. There's an application note that deals with this: 'How to get
+> > the best ADC accuracy in STM32...' It basically depends on analog input
+> > signal electrical properties (depends on board).
+> > 
+> > Add optional 'st,min-sample-time-nsecs' property so this can be tuned
+> > in dt.
+> > 
+> > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> > ---
+> > Changes in v2:
+> > - Use 'st,min-sample-time-nsecs' instead of 'min-sample-time'.
+> > ---
+> >  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 5 +++++
+> >  1 file changed, 5 insertions(+)  
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+Applied to the togreg branch of iio.git and pushed out as testings.
 
-Thanks
-Sean
+Thanks for review Rob and thanks for the patch Fabrice.
+
+Jonathan
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
