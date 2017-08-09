@@ -1,33 +1,117 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 9 Aug 2017 18:53:34 +0800
-Subject: [RFC PATCH 1/4] ACPICA: Add SMMUv3 device ID mapping index support
+Date: Wed, 9 Aug 2017 18:53:37 +0800
+Subject: [RFC PATCH 4/4] ACPI: IORT: Add SMMUv3 MSI support
 In-Reply-To: <1502276017-63108-1-git-send-email-guohanjun@huawei.com>
 References: <1502276017-63108-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1502276017-63108-2-git-send-email-guohanjun@huawei.com>
+Message-ID: <1502276017-63108-5-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-SMMUv3 device ID mapping index is used for SMMUv3
-MSIs, update the IORT to support that.
+Since we have a mapping index for SMMUv3 MSI, we can
+directly use that index to get the map entry, then
+retrieve dev ID and ITS parent to add SMMUv3 MSI
+support.
 
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- include/acpi/actbl2.h | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/acpi/arm64/iort.c | 46 ++++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 36 insertions(+), 10 deletions(-)
 
-diff --git a/include/acpi/actbl2.h b/include/acpi/actbl2.h
-index d568948..e9a9842 100644
---- a/include/acpi/actbl2.h
-+++ b/include/acpi/actbl2.h
-@@ -809,6 +809,7 @@ struct acpi_iort_smmu_v3 {
- 	u8 pxm;
- 	u8 reserved1;
- 	u16 reserved2;
-+	u32 id_mapping_index;
- };
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 9439f02..ce03298 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -313,7 +313,8 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
+ 	/* Single mapping does not care for input id */
+ 	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
+ 		if (type == ACPI_IORT_NODE_NAMED_COMPONENT ||
+-		    type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
++		    type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX ||
++		    type == ACPI_IORT_NODE_SMMU_V3) {
+ 			*rid_out = map->output_base;
+ 			return 0;
+ 		}
+@@ -357,7 +358,8 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
  
- /* Values for Model field above */
+ 	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
+ 		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
+-		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
++		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX ||
++		    node->type == ACPI_IORT_NODE_SMMU_V3) {
+ 			*id_out = map->output_base;
+ 			return parent;
+ 		}
+@@ -549,9 +551,21 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
+ 	if (!node)
+ 		return -ENODEV;
+ 
+-	for (i = 0; i < node->mapping_count; i++) {
+-		if (iort_node_map_platform_id(node, dev_id, IORT_MSI_TYPE, i))
++	if (node->type == ACPI_IORT_NODE_SMMU_V3) {
++		u32 index;
++
++		if (iort_get_smmu_v3_id_mapping_index(node, &index))
++			return -ENODEV;
++
++		if (iort_node_map_platform_id(node, dev_id, IORT_MSI_TYPE,
++		    index))
+ 			return 0;
++	} else {
++		for (i = 0; i < node->mapping_count; i++) {
++			if (iort_node_map_platform_id(node, dev_id,
++			    IORT_MSI_TYPE, i))
++				return 0;
++		}
+ 	}
+ 
+ 	return -ENODEV;
+@@ -626,20 +640,30 @@ static struct irq_domain *iort_get_platform_device_domain(struct device *dev)
+ 	struct acpi_iort_node *node, *msi_parent;
+ 	struct fwnode_handle *iort_fwnode;
+ 	struct acpi_iort_its_group *its;
+-	int i;
+ 
+ 	/* find its associated iort node */
+-	node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+-			      iort_match_node_callback, dev);
++	node = iort_find_dev_node(dev);
+ 	if (!node)
+ 		return NULL;
+ 
+ 	/* then find its msi parent node */
+-	for (i = 0; i < node->mapping_count; i++) {
++	if (node->type == ACPI_IORT_NODE_SMMU_V3) {
++		u32 index;
++
++		if (iort_get_smmu_v3_id_mapping_index(node, &index))
++			return NULL;
++
+ 		msi_parent = iort_node_map_platform_id(node, NULL,
++						       IORT_MSI_TYPE, index);
++	} else {
++		int i;
++
++		for (i = 0; i < node->mapping_count; i++) {
++			msi_parent = iort_node_map_platform_id(node, NULL,
+ 						       IORT_MSI_TYPE, i);
+-		if (msi_parent)
+-			break;
++			if (msi_parent)
++				break;
++		}
+ 	}
+ 
+ 	if (!msi_parent)
+@@ -1233,6 +1257,8 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
+ 	/* Configure DMA for the page table walker */
+ 	acpi_dma_configure(&pdev->dev, attr);
+ 
++	acpi_configure_pmsi_domain(&pdev->dev);
++
+ 	ret = platform_device_add(pdev);
+ 	if (ret)
+ 		goto dma_deconfigure;
 -- 
 1.7.12.4
