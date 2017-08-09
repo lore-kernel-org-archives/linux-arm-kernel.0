@@ -1,139 +1,41 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Thu, 10 Aug 2017 00:30:11 +0100
-Subject: [PATCH 3/3] iio: trigger: stm32-timer: add output compare triggers
-In-Reply-To: <1501751654-14153-4-git-send-email-fabrice.gasnier@st.com>
+Date: Thu, 10 Aug 2017 00:29:10 +0100
+Subject: [PATCH 1/3] dt-bindings: iio: timer: stm32: add support for
+ STM32H7
+In-Reply-To: <1501751654-14153-2-git-send-email-fabrice.gasnier@st.com>
 References: <1501751654-14153-1-git-send-email-fabrice.gasnier@st.com>
- <1501751654-14153-4-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170810003011.11fdb081@archlinux>
+ <1501751654-14153-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170810002910.6b8c4a15@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 3 Aug 2017 11:14:14 +0200
+On Thu, 3 Aug 2017 11:14:12 +0200
 Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
 
-> Add output compare trigger sources available on some instances.
+> STM32H7 has slightly different triggers than previous versions.
+> Introduce st,stm32h7-timer-trigger compatible to handle this new variant.
 > 
 > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 Applied to the togreg branch of iio.git and pushed out as testing.
-
 Thanks,
 
 Jonathan
 > ---
->  drivers/iio/trigger/stm32-timer-trigger.c     | 31 +++++++++++++++++----------
->  include/linux/iio/timer/stm32-timer-trigger.h | 12 +++++++++++
->  2 files changed, 32 insertions(+), 11 deletions(-)
+>  Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/iio/trigger/stm32-timer-trigger.c b/drivers/iio/trigger/stm32-timer-trigger.c
-> index 33890f9..a9bc5b6 100644
-> --- a/drivers/iio/trigger/stm32-timer-trigger.c
-> +++ b/drivers/iio/trigger/stm32-timer-trigger.c
-> @@ -29,12 +29,14 @@
->  	{ TIM7_TRGO,},
->  	{ TIM8_TRGO, TIM8_TRGO2, TIM8_CH1, TIM8_CH2, TIM8_CH3, TIM8_CH4,},
->  	{ TIM9_TRGO, TIM9_CH1, TIM9_CH2,},
-> -	{ }, /* timer 10 */
-> -	{ }, /* timer 11 */
-> +	{ TIM10_OC1,},
-> +	{ TIM11_OC1,},
->  	{ TIM12_TRGO, TIM12_CH1, TIM12_CH2,},
-> -	{ }, /* timer 13 */
-> -	{ }, /* timer 14 */
-> +	{ TIM13_OC1,},
-> +	{ TIM14_OC1,},
->  	{ TIM15_TRGO,},
-> +	{ TIM16_OC1,},
-> +	{ TIM17_OC1,},
->  };
+> diff --git a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+> index 55a653d..b565ced 100644
+> --- a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+> +++ b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+> @@ -4,7 +4,9 @@ Must be a sub-node of an STM32 Timers device tree node.
+>  See ../mfd/stm32-timers.txt for details about the parent node.
 >  
->  /* List the triggers accepted by each timer */
-> @@ -47,10 +49,10 @@
->  	{ }, /* timer 6 */
->  	{ }, /* timer 7 */
->  	{ TIM1_TRGO, TIM2_TRGO, TIM4_TRGO, TIM5_TRGO,},
-> -	{ TIM2_TRGO, TIM3_TRGO,},
-> +	{ TIM2_TRGO, TIM3_TRGO, TIM10_OC1, TIM11_OC1,},
->  	{ }, /* timer 10 */
->  	{ }, /* timer 11 */
-> -	{ TIM4_TRGO, TIM5_TRGO,},
-> +	{ TIM4_TRGO, TIM5_TRGO, TIM13_OC1, TIM14_OC1,},
->  };
+>  Required parameters:
+> -- compatible:	Must be "st,stm32-timer-trigger".
+> +- compatible:	Must be one of:
+> +		"st,stm32-timer-trigger"
+> +		"st,stm32h7-timer-trigger"
+>  - reg:		Identify trigger hardware block.
 >  
->  static const void *stm32h7_valids_table[][MAX_VALIDS] = {
-> @@ -65,10 +67,12 @@
->  	{ }, /* timer 9 */
->  	{ }, /* timer 10 */
->  	{ }, /* timer 11 */
-> -	{ TIM4_TRGO, TIM5_TRGO,},
-> +	{ TIM4_TRGO, TIM5_TRGO, TIM13_OC1, TIM14_OC1,},
->  	{ }, /* timer 13 */
->  	{ }, /* timer 14 */
-> -	{ TIM1_TRGO, TIM3_TRGO,},
-> +	{ TIM1_TRGO, TIM3_TRGO, TIM16_OC1, TIM17_OC1,},
-> +	{ }, /* timer 16 */
-> +	{ }, /* timer 17 */
->  };
->  
->  struct stm32_timer_trigger {
-> @@ -91,6 +95,11 @@ static bool stm32_timer_is_trgo2_name(const char *name)
->  	return !!strstr(name, "trgo2");
->  }
->  
-> +static bool stm32_timer_is_trgo_name(const char *name)
-> +{
-> +	return (!!strstr(name, "trgo") && !strstr(name, "trgo2"));
-> +}
-> +
->  static int stm32_timer_start(struct stm32_timer_trigger *priv,
->  			     struct iio_trigger *trig,
->  			     unsigned int frequency)
-> @@ -355,6 +364,7 @@ static int stm32_setup_iio_triggers(struct stm32_timer_trigger *priv)
->  
->  	while (cur && *cur) {
->  		struct iio_trigger *trig;
-> +		bool cur_is_trgo = stm32_timer_is_trgo_name(*cur);
->  		bool cur_is_trgo2 = stm32_timer_is_trgo2_name(*cur);
->  
->  		if (cur_is_trgo2 && !priv->has_trgo2) {
-> @@ -371,10 +381,9 @@ static int stm32_setup_iio_triggers(struct stm32_timer_trigger *priv)
->  
->  		/*
->  		 * sampling frequency and master mode attributes
-> -		 * should only be available on trgo trigger which
-> -		 * is always the first in the list.
-> +		 * should only be available on trgo/trgo2 triggers
->  		 */
-> -		if (cur == priv->triggers || cur_is_trgo2)
-> +		if (cur_is_trgo || cur_is_trgo2)
->  			trig->dev.groups = stm32_trigger_attr_groups;
->  
->  		iio_trigger_set_drvdata(trig, priv);
-> diff --git a/include/linux/iio/timer/stm32-timer-trigger.h b/include/linux/iio/timer/stm32-timer-trigger.h
-> index 20f4653..d68add8 100644
-> --- a/include/linux/iio/timer/stm32-timer-trigger.h
-> +++ b/include/linux/iio/timer/stm32-timer-trigger.h
-> @@ -55,12 +55,24 @@
->  #define TIM9_CH1	"tim9_ch1"
->  #define TIM9_CH2	"tim9_ch2"
->  
-> +#define TIM10_OC1	"tim10_oc1"
-> +
-> +#define TIM11_OC1	"tim11_oc1"
-> +
->  #define TIM12_TRGO	"tim12_trgo"
->  #define TIM12_CH1	"tim12_ch1"
->  #define TIM12_CH2	"tim12_ch2"
->  
-> +#define TIM13_OC1	"tim13_oc1"
-> +
-> +#define TIM14_OC1	"tim14_oc1"
-> +
->  #define TIM15_TRGO	"tim15_trgo"
->  
-> +#define TIM16_OC1	"tim16_oc1"
-> +
-> +#define TIM17_OC1	"tim17_oc1"
-> +
->  bool is_stm32_timer_trigger(struct iio_trigger *trig);
->  
->  #endif
+>  Example:
