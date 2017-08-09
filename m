@@ -1,21 +1,20 @@
-From: mikko.rapeli@iki.fi (Mikko Rapeli)
-Date: Wed, 9 Aug 2017 10:18:04 +0300
-Subject: [PATCH v06 05/36] uapi linux/sysctl.h: use __kernel_size_t
- instead of size_t
-In-Reply-To: <20170808231711.GJ10552@altlinux.org>
- <20170808231543.GI10552@altlinux.org>
- <20170808225739.GF10552@altlinux.org>
- <20170808225417.GE10552@altlinux.org>
- <20170808225026.GD10552@altlinux.org>
- <20170808224555.GC10552@altlinux.org>
- <20170808224253.GB10552@altlinux.org>
- <20170808223420.GA10552@altlinux.org>
-Message-ID: <20170809071804.GD31101@lakka.kapsi.fi>
+From: jun.gao@mediatek.com (Jun Gao)
+Date: Wed, 9 Aug 2017 15:43:49 +0800
+Subject: [PATCH 0/2] Add i2c dt-binding and compatible for Mediatek MT7622 SoC
+Message-ID: <1502264631-12572-1-git-send-email-jun.gao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry and thanks for the comments.
+This patch series based on v4.13-rc1, include MT7622 i2c dt-binding
+and compatible.
 
-I have only one question: why haven't your patches been applied yet?
+Jun Gao (2):
+  dt-bindings: i2c: Add MediaTek MT7622 i2c binding
+  i2c: mediatek: Add i2c compatible for MediaTek MT7622
 
--Mikko
+ Documentation/devicetree/bindings/i2c/i2c-mtk.txt | 11 ++++++-----
+ drivers/i2c/busses/i2c-mt65xx.c                   | 18 ++++++++++++++++++
+ 2 files changed, 24 insertions(+), 5 deletions(-)
+
+--
+1.8.1.1
