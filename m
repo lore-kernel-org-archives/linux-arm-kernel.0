@@ -1,94 +1,78 @@
-From: markus.mayer@broadcom.com (Markus Mayer)
-Date: Wed, 9 Aug 2017 14:39:28 -0700
-Subject: [PATCH v3 1/4] Documentation: devicetree: add binding for
- Broadcom STB AVS TMON
-In-Reply-To: <1502195795.4296.37.camel@intel.com>
-References: <20170731192633.58747-1-code@mmayer.net>
- <20170731192633.58747-2-code@mmayer.net>
- <1502195795.4296.37.camel@intel.com>
-Message-ID: <CAGt4E5t5a9JsRcfqhe5cgKHqmS2Hz2Zx-yzENbUhwQCbPVuhgg@mail.gmail.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Wed, 9 Aug 2017 14:41:52 -0700
+Subject: [PATCH v2] iommu/arm-smmu: fix null-pointer dereference in
+ arm_smmu_add_device
+In-Reply-To: <20170808112144.GE13355@arm.com>
+References: <20170808092614.GB12887@arm.com>
+ <1502187962-16861-1-git-send-email-asavkov@redhat.com>
+ <d7a07e48-862d-a6f7-8bad-9c71f5a5be5b@arm.com>
+ <20170808112144.GE13355@arm.com>
+Message-ID: <c399a57d-074f-71ee-b467-91cf4e65b3d9@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 August 2017 at 05:36, Zhang Rui <rui.zhang@intel.com> wrote:
-> On Mon, 2017-07-31 at 12:26 -0700, Markus Mayer wrote:
->> From: Brian Norris <computersforpeace@gmail.com>
+On 08/08/2017 04:21 AM, Will Deacon wrote:
+> [+ Joerg]
+> 
+> On Tue, Aug 08, 2017 at 11:37:40AM +0100, Robin Murphy wrote:
+>> On 08/08/17 11:26, Artem Savkov wrote:
+>>> Commit c54451a "iommu/arm-smmu: Fix the error path in arm_smmu_add_device"
+>>> removed fwspec assignment in legacy_binding path as redundant which is
+>>> wrong. It needs to be updated after fwspec initialisation in
+>>> arm_smmu_register_legacy_master() as it is dereferenced later. Without
+>>> this there is a NULL-pointer dereference panic during boot on some hosts.
 >>
->> Add binding for Broadcom STB thermal.
+>> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 >>
->> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
->> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
->
-> $ file v3-1-4-Documentation-devicetree-add-binding-for-Broadcom-STB-
-> AVS-TMON.patch
-> unified diff output, UTF-8 Unicode text
+>> Thanks for fixing it up, and sorry for failing to document the
+>> unfortunately subtle logic in the first place!
+> 
+> Well, I was the one that messed it up:
+> 
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> Joerg, can you pick this up as a fix for 4.13, please?
 
-It's UTF-8 encoded, because of Rafa?'s name in the recipient list.
+I hit the Oops as well.  This patch fixes it for me on a Cavium CN88xx 
+system, so:
 
-> BTW, can you please rebase this patch set on top of v4.13-rc3?
-> At least there are some conflicts in MAINTAINER file, introduced in
-> -rc2.
+Acked-by: David Daney <david.daney@cavium.com>
 
-I'll send the rebased series shortly.
+Thanks for working on this.
 
-> thanks,
-> rui
->> ---
->>  .../devicetree/bindings/thermal/brcm,avs-tmon.txt    | 20
->> ++++++++++++++++++++
->>  MAINTAINERS                                          |  8 ++++++++
->>  2 files changed, 28 insertions(+)
->>  create mode 100644
->> Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
+
+
+> 
+> Will
+> 
+>>> Signed-off-by: Artem Savkov <asavkov@redhat.com>
+>>> ---
+>>>   drivers/iommu/arm-smmu.c | 7 +++++++
+>>>   1 file changed, 7 insertions(+)
+>>>
+>>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>>> index b97188a..2d80fa8 100644
+>>> --- a/drivers/iommu/arm-smmu.c
+>>> +++ b/drivers/iommu/arm-smmu.c
+>>> @@ -1519,6 +1519,13 @@ static int arm_smmu_add_device(struct device *dev)
+>>>   
+>>>   	if (using_legacy_binding) {
+>>>   		ret = arm_smmu_register_legacy_master(dev, &smmu);
+>>> +
+>>> +		/*
+>>> +		 * If dev->iommu_fwspec is initally NULL, arm_smmu_register_legacy_master()
+>>> +		 * will allocate/initialise a new one. Thus we need to update fwspec for
+>>> +		 * later use.
+>>> +		 */
+>>> +		fwspec = dev->iommu_fwspec;
+>>>   		if (ret)
+>>>   			goto out_free;
+>>>   	} else if (fwspec && fwspec->ops == &arm_smmu_ops) {
+>>>
 >>
->> diff --git a/Documentation/devicetree/bindings/thermal/brcm,avs-
->> tmon.txt b/Documentation/devicetree/bindings/thermal/brcm,avs-
->> tmon.txt
->> new file mode 100644
->> index 0000000..9d43553
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
->> @@ -0,0 +1,20 @@
->> +* Broadcom STB thermal management
->> +
->> +Thermal management core, provided by the AVS TMON hardware block.
->> +
->> +Required properties:
->> +- compatible: must be "brcm,avs-tmon" and/or "brcm,avs-tmon-bcm7445"
->> +- reg: address range for the AVS TMON registers
->> +- interrupts: temperature monitor interrupt, for high/low threshold
->> triggers
->> +- interrupt-names: should be "tmon"
->> +- interrupt-parent: the parent interrupt controller
->> +
->> +Example:
->> +
->> +     thermal at f04d1500 {
->> +             compatible = "brcm,avs-tmon-bcm7445", "brcm,avs-
->> tmon";
->> +             reg = <0xf04d1500 0x28>;
->> +             interrupts = <0x6>;
->> +             interrupt-names = "tmon";
->> +             interrupt-parent = <&avs_host_l2_intc>;
->> +     };
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 205d397..a683d4c 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -2928,6 +2928,14 @@ S:     Maintained
->>  F:   Documentation/devicetree/bindings/cpufreq/brcm,stb-avs-
->> cpu-freq.txt
->>  F:   drivers/cpufreq/brcmstb*
->>
->> +BROADCOM STB AVS TMON DRIVER
->> +M:   Markus Mayer <mmayer@broadcom.com>
->> +M:   bcm-kernel-feedback-list at broadcom.com
->> +L:   linux-pm at vger.kernel.org
->> +S:   Maintained
->> +F:   Documentation/devicetree/bindings/thermal/brcm,avs-
->> tmon.txt
->> +F:   drivers/thermal/broadcom/brcmstb*
->> +
->>  BROADCOM SPECIFIC AMBA DRIVER (BCMA)
->>  M:   Rafa? Mi?ecki <zajec5@gmail.com>
->>  L:   linux-wireless at vger.kernel.org
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
