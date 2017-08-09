@@ -1,53 +1,33 @@
-From: ldv@altlinux.org (Dmitry V. Levin)
-Date: Wed, 9 Aug 2017 15:52:35 +0300
-Subject: [PATCH v06 14/36] arm uapi asm/signal.h: include <stddef.h> for
- size_t in userspace
-In-Reply-To: <CAK8P3a30Vd2JquMvZ88tTO4jFAUMJGtUpvLuDmDPp2UFBYXDLQ@mail.gmail.com>
-References: <20170806164428.2273-1-mikko.rapeli@iki.fi>
- <20170806164428.2273-15-mikko.rapeli@iki.fi>
- <20170808225739.GF10552@altlinux.org>
- <CAK8P3a30Vd2JquMvZ88tTO4jFAUMJGtUpvLuDmDPp2UFBYXDLQ@mail.gmail.com>
-Message-ID: <20170809125235.GA19386@altlinux.org>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Wed,  9 Aug 2017 21:55:54 +0900
+Subject: [PATCH] ARM: dts: uniphier: add audio out pin-mux node
+Message-ID: <20170809125554.31083-1-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 09, 2017 at 02:41:59PM +0200, Arnd Bergmann wrote:
-> On Wed, Aug 9, 2017 at 12:57 AM, Dmitry V. Levin <ldv@altlinux.org> wrote:
-> > On Sun, Aug 06, 2017 at 06:44:05PM +0200, Mikko Rapeli wrote:
-> >> Arnd Bergmann <arnd@arndb.de> doubts that __kernel_size_t could be used here
-> >> so trying to fall back to gcc's <stddef.h>.
-> >
-> > The only architecture where you cannot do this safely is x86 family
-> > because of x32 exception.  If there is no chance that the change will
-> > affect x32, feel free to replace size_t with __kernel_size_t like I did
-> > some time ago, see
-> > http://lkml.kernel.org/r/20170302002022.GB27097 at altlinux.org
-> 
-> There is another problem: on some 32-bit architectures, size_t is
-> defined as 'unsigned int', while '__kernel_size_t' is defined as 'unsigned
-> long'. These obviously have the same size, but the man page
-> explicitly defines it as 'size_t ss_size'.
-> 
-> If a user space program accesses the field in a way requires an
-> exact type match, it gets a warning or error, e.g.
-> 
-> 1. printf("signal with %zd bytes\n", stack->ss_size);
-> 2. size_t *pointer_to_size_t = &stack->ss_size;
-> 3. assert(__builtin_types_compatible_p(size_t, typeof(stack->ss_size)))
-> 
-> Not sure how important those are, but I think there is at least a risk
-> of any of those showing up in user space.
+The UniPhier AIO2013 audio system needs I2S and clock signal pins
+to connect external codec chip.
 
-Agreed, one has to take this issue into consideration when replacing
-size_t with __kernel_size_t.
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+---
+ arch/arm/boot/dts/uniphier-pinctrl.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-
+diff --git a/arch/arm/boot/dts/uniphier-pinctrl.dtsi b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
+index 246f35ffb638..c70be5d78bd5 100644
+--- a/arch/arm/boot/dts/uniphier-pinctrl.dtsi
++++ b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
+@@ -44,6 +44,11 @@
+  */
+ 
+ &pinctrl {
++	pinctrl_aout: aout_grp {
++		groups = "aout";
++		function = "aout";
++	};
++
+ 	pinctrl_emmc: emmc_grp {
+ 		groups = "emmc", "emmc_dat8";
+ 		function = "emmc";
 -- 
-ldv
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170809/662ed8f2/attachment.sig>
+2.13.2
