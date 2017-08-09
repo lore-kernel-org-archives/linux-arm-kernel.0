@@ -1,31 +1,113 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 9 Aug 2017 14:05:17 -0700
-Subject: [PATCH 12/15] arm-soc: omap: replace open coded VA->PA
- calculations
-In-Reply-To: <CAKv+Gu-kdjN8nXVNL2frsegu-z7HVnG8qcXpQbvM-oBbxKjUGA@mail.gmail.com>
-References: <20170805205222.19868-1-ard.biesheuvel@linaro.org>
- <20170805205222.19868-13-ard.biesheuvel@linaro.org>
- <20170809190556.GD3934@atomide.com>
- <CAKv+Gu-kdjN8nXVNL2frsegu-z7HVnG8qcXpQbvM-oBbxKjUGA@mail.gmail.com>
-Message-ID: <20170809210517.GE3934@atomide.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 9 Aug 2017 16:14:43 -0500
+Subject: [PATCH v3 0/5] ACPI: DMA ranges management
+In-Reply-To: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
+References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
+Message-ID: <61e15178-a6da-0459-34fc-83ff4ded8864@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ard Biesheuvel <ard.biesheuvel@linaro.org> [170809 12:24]:
-> On 9 August 2017 at 20:05, Tony Lindgren <tony@atomide.com> wrote:
-> > * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170805 13:54]:
-> >> This replaces a couple of open coded calculations to obtain the
-> >> physical address of a far symbol with calls to the new adr_l etc
-> >> macros.
-> >
-> > I gave this series a quick test and omap3 no longer boots it seems.
-> >
+Hi,
+
+Better late than never I guess..
+
+On 08/03/2017 07:32 AM, Lorenzo Pieralisi wrote:
+> This patch series is v3 of a previous posting:
 > 
-> Thanks Tony. I will investigate
+> v2->v3:
+> 	- Fixed DMA masks computation
+>          - Fixed size computation overflow in acpi_dma_get_range()
+> 
+> v1->v2:
+> 	- Reworked acpi_dma_get_range() flow and logs
+> 	- Added IORT named component address limits
+> 	- Renamed acpi_dev_get_resources() helper function
+> 	- Rebased against v4.13-rc3
+> 
+> v2: http://lkml.kernel.org/r/20170731152323.32488-1-lorenzo.pieralisi at arm.com
+> v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
+> 
+> -- Original cover letter --
+> 
+> As reported in:
+> 
+> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
+> 
+> the bus connecting devices to an IOMMU bus can be smaller in size than
+> the IOMMU input address bits which results in devices DMA HW bugs in
+> particular related to IOVA allocation (ie chopping of higher address
+> bits owing to system bus HW capabilities mismatch with the IOMMU).
+> 
+> Fortunately this problem can be solved through an already present but never
+> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
+> window for a specific bus in ACPI and therefore all upstream devices
+> connected to it.
+> 
+> This small patch series enables _DMA parsing in ACPI core code and
+> use it in ACPI IORT code in order to detect DMA ranges for devices and
+> update their data structures to make them work with their related DMA
+> addressing restrictions.
+> 
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Feng Kan <fkan@apm.com>
+> Cc: Jon Masters <jcm@redhat.com>
+> Cc: Robert Moore <robert.moore@intel.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> 
+> Lorenzo Pieralisi (5):
+>    ACPICA: resource_mgr: Allow _DMA method in walk resources
+>    ACPI: Make acpi_dev_get_resources() method agnostic
+>    ACPI: Introduce DMA ranges parsing
+>    ACPI: Make acpi_dma_configure() DMA regions aware
+>    ACPI/IORT: Add IORT named component memory address limits
+> 
+>   drivers/acpi/acpica/rsxface.c |  7 ++--
+>   drivers/acpi/arm64/iort.c     | 57 ++++++++++++++++++++++++++-
+>   drivers/acpi/resource.c       | 82 +++++++++++++++++++++++++++++---------
+>   drivers/acpi/scan.c           | 91 +++++++++++++++++++++++++++++++++++++++----
+>   include/acpi/acnames.h        |  1 +
+>   include/acpi/acpi_bus.h       |  2 +
+>   include/linux/acpi.h          |  8 ++++
+>   include/linux/acpi_iort.h     |  5 ++-
+>   8 files changed, 219 insertions(+), 34 deletions(-)
 
-Thanks. Looks like omap4 still boots with all your patches, but
-omap3 won't boot even with patch 12 left out.
+Ok, despite being merged already I think its worthwhile to say that I've 
+been testing this with:
 
-Regards,
+Method(_DMA, 0, Serialized)
+{
+	Return (ResourceTemplate()
+	{
+		QWORDMemory(
+		ResourceConsumer,
+		PosDecode,          // _DEC
+		MinFixed,           // _MIF
+		MaxFixed,           // _MAF
+		Prefetchable,       // _MEM
+		ReadWrite,          // _RW
+		0,                  // _GRA
+		0x10000000,         // _MIN
+		0x1fffffff,         // _MAX
+		0x000000000,        // _TRA
+		0x10000000,         // _LEN
+		,
+		,
+		,
+		)
+	})
+} // Method(_DMA)
 
-Tony
+(and a couple minor variations)
+
+and a fair number of debug statements sprinkled around to verify that 
+the IOVAs are appropriately limited. So I don't see anything wrong with 
+the code and it appears to work and the devices behind a bridge limited 
+like this continue to work as long as sane values are placed in the 
+min/max/len fields.
+
+Thanks,
+
+Tested-by: Jeremy Linton <jeremy.linton@arm.com>
