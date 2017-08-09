@@ -1,48 +1,53 @@
-From: sean@mess.org (Sean Young)
-Date: Wed, 9 Aug 2017 15:42:44 +0100
-Subject: [PATCH v2 3/3] rc: add zx-irdec remote control driver
-In-Reply-To: <20170809134816.GA31819@dragon>
-References: <1501420993-21977-1-git-send-email-shawnguo@kernel.org>
- <1501420993-21977-4-git-send-email-shawnguo@kernel.org>
- <20170809130029.eneyqstlejfkotz2@gofer.mess.org>
- <20170809134816.GA31819@dragon>
-Message-ID: <20170809144244.6l6k2hllp7fc34pr@gofer.mess.org>
+From: nleeder@codeaurora.org (Leeder, Neil)
+Date: Wed, 9 Aug 2017 11:48:45 -0400
+Subject: [PATCH 0/2] arm64 SMMUv3 PMU driver with IORT support
+In-Reply-To: <394bd3b8-2583-01fa-02d3-6a49c2a6a6c0@linaro.org>
+References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+ <394bd3b8-2583-01fa-02d3-6a49c2a6a6c0@linaro.org>
+Message-ID: <3eac1295-dba2-ad79-d868-b538b13de91a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Hanjun,
 
-On Wed, Aug 09, 2017 at 09:48:18PM +0800, Shawn Guo wrote:
-> On Wed, Aug 09, 2017 at 02:00:29PM +0100, Sean Young wrote:
-> > On Sun, Jul 30, 2017 at 09:23:13PM +0800, Shawn Guo wrote:
-> > > From: Shawn Guo <shawn.guo@linaro.org>
-> > > 
-> > > It adds the remote control driver and corresponding keymap file for
-> > > IRDEC block found on ZTE ZX family SoCs.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > ---
-> > >  drivers/media/rc/Kconfig               |  11 ++
-> > >  drivers/media/rc/Makefile              |   1 +
-> > >  drivers/media/rc/keymaps/Makefile      |   3 +-
-> > >  drivers/media/rc/keymaps/rc-zx-irdec.c |  79 ++++++++++++++
-> > >  drivers/media/rc/zx-irdec.c            | 183 +++++++++++++++++++++++++++++++++
-> > >  include/media/rc-map.h                 |   1 +
-> > >  6 files changed, 277 insertions(+), 1 deletion(-)
-> > >  create mode 100644 drivers/media/rc/keymaps/rc-zx-irdec.c
-> > >  create mode 100644 drivers/media/rc/zx-irdec.c
-> > 
-> > We're missing an MAINTAINERS entry for this driver. Could this be added
-> > please as a separate patch?
+On 8/9/2017 3:56 AM, Hanjun Guo wrote:
+> Hi Neil,
 > 
-> We are using 'ARM/ZTE ARCHITECTURE' entry in MAINTAINERS for ZTE ZX
-> drivers.  I plan to send a separate patch going through arm-soc tree,
-> updating MAINTAINERS for those new ZTE ZX drivers landed on mainline
-> during 4.14 merge window.  IRDEC will be covered by that patch.  Is that
-> okay?
+> On 2017/8/5 3:59, Neil Leeder wrote:
+>> This adds a driver for the SMMUv3 PMU into the perf framework.
+>> It includes an IORT update to support PM Counter Groups.
+>>
+>> IORT has no mechanism for determining device names so PMUs
+>> are named based on their physical address.
+>>
+>> Tested on Qualcomm QDF2400. perf_fuzzer ran for 4+ hours
+>> with no failures.
+>>
+>> Neil Leeder (2):
+>>    acpi: arm64: add iort support for PMCG
+>>    perf: add arm64 smmuv3 pmu driver
+>>
+>>   drivers/acpi/arm64/iort.c     |  54 +++
+> 
+> I would like to be Cced for next version.
 
-Of course.
+I will. I apologise for not including all the interested parties on this patchset.
 
-Thanks,
+> 
+>>   drivers/perf/Kconfig          |   9 +
+>>   drivers/perf/Makefile         |   1 +
+>>   drivers/perf/arm_smmuv3_pmu.c | 823 ++++++++++++++++++++++++++++++++++++++++++
+>>   include/acpi/actbl2.h         |   9 +-
+> 
+> Do you have the acpica support code? I'm currently
+> working on SMMUv3 MSI support and I would like to test
+> it with MSI support for PMCG as well.
 
-Sean
+I don't have any code other than what was posted here.
+What additional ACPICA support code is needed?
+
+Neil
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
