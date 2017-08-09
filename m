@@ -1,96 +1,39 @@
-From: leedom@chelsio.com (Casey Leedom)
-Date: Wed, 9 Aug 2017 12:33:34 +0000
-Subject: [PATCH v9 2/4] PCI: Disable PCIe Relaxed Ordering if unsupported
-In-Reply-To: <20170809022239.GP16580@bhelgaas-glaptop.roam.corp.google.com>
-References: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
- <1501917313-9812-3-git-send-email-dingtianhong@huawei.com>,
- <20170809022239.GP16580@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <MWHPR12MB1600255ACFCD3FB3C80EB8B6C88B0@MWHPR12MB1600.namprd12.prod.outlook.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 9 Aug 2017 14:41:59 +0200
+Subject: [PATCH v06 14/36] arm uapi asm/signal.h: include <stddef.h> for
+ size_t in userspace
+In-Reply-To: <20170808225739.GF10552@altlinux.org>
+References: <20170806164428.2273-1-mikko.rapeli@iki.fi>
+ <20170806164428.2273-15-mikko.rapeli@iki.fi>
+ <20170808225739.GF10552@altlinux.org>
+Message-ID: <CAK8P3a30Vd2JquMvZ88tTO4jFAUMJGtUpvLuDmDPp2UFBYXDLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-| From: Bjorn Helgaas <helgaas@kernel.org>
-| Sent: Tuesday, August 8, 2017 7:22 PM
-| ...
-| and the caller should do something like this:
-| 
-|     if (pcie_relaxed_ordering_broken(pci_find_pcie_root_port(pdev)))
-|         adapter->flags |= ROOT_NO_RELAXED_ORDERING;
-| 
-| That way it's obvious where the issue is, and it's obvious that the
-| answer might be different for peer-to-peer transactions than it is for
-| transactions to the root port, i.e., to coherent memory.
-| ...
+On Wed, Aug 9, 2017 at 12:57 AM, Dmitry V. Levin <ldv@altlinux.org> wrote:
+> On Sun, Aug 06, 2017 at 06:44:05PM +0200, Mikko Rapeli wrote:
+>> Arnd Bergmann <arnd@arndb.de> doubts that __kernel_size_t could be used here
+>> so trying to fall back to gcc's <stddef.h>.
+>
+> The only architecture where you cannot do this safely is x86 family
+> because of x32 exception.  If there is no chance that the change will
+> affect x32, feel free to replace size_t with __kernel_size_t like I did
+> some time ago, see
+> http://lkml.kernel.org/r/20170302002022.GB27097 at altlinux.org
 
-Which is back to something very close to what I initially suggested in my
-first patch submission.  Because you're right, this isn't about broken
-Source Devices, it's about broken Completing Devices.
+There is another problem: on some 32-bit architectures, size_t is
+defined as 'unsigned int', while '__kernel_size_t' is defined as 'unsigned
+long'. These obviously have the same size, but the man page
+explicitly defines it as 'size_t ss_size'.
 
-Unfortunately, as Alexander Duyck noted, in a Virtual Machine we won't be
-able to see our Root Port in order to make this determination.  (And in some
-Hypervisor implementations I've seen, there's not even a synthetic Root Port
-available to the VM at all, let alone read-only access to the real one.)
+If a user space program accesses the field in a way requires an
+exact type match, it gets a warning or error, e.g.
 
-So the current scheme was developed of having the Hypervisor kernel traverse
-down the PCIe Fabric when it finds a broken Root Port implementation (the
-issue that we've mostly been primarily focused upon), and turning off the
-PCIe Capability Device Control[Relaxed Ordering Enable].  This was to serve
-two purposes:
+1. printf("signal with %zd bytes\n", stack->ss_size);
+2. size_t *pointer_to_size_t = &stack->ss_size;
+3. assert(__builtin_types_compatible_p(size_t, typeof(stack->ss_size)))
 
- 1. Turn that off in order to prevent sending any Transaction Layer
-    Packets with the Relaxed Ordering Attribute to any Completer.
-    Which unfortunately would also prevent Peer-to-Peer use of the
-    Relaxed Ordering Attribute.
+Not sure how important those are, but I think there is at least a risk
+of any of those showing up in user space.
 
- 2. Act as a message to Device Drivers for those downstream devices
-    that the they were dealing with a broken Root Port implementation.
-    And this would work even for a driver in a VM with an attached
-    device since it would be able to see the PCIe Configuration Space
-    for the attached device.
-
-I haven't been excited about any of this because:
-
- A. While so far all of the examples we've talked about are broken
-    Root Port Completers, it's perfectly possible that other devices
-    could be broken -- say an NVMe Device which is not "Coherent
-    Memory".  How would this fit into the framework APIs being
-    described?
-
- B. I have yet to see a n example of how the currently proposed
-    API framework would be used in a hybrid environment where
-    TLPs to the Root Port would not use Relaxed Ordering, but TLPs
-    to a Peer would use Relaxed Ordering.  So far its all been about
-    using a "big hammer" to completely disable the use of Relaxed
-    Ordering.
-
-But the VM problem keeps cropping up over and over.  A driver in a VM
-doesn't have access to the Root Port to determine if its on a "Black List"
-and our only way of communicating with the driver in the VM is to leave the
-device in a particular state (i.e. initialize the PCIe Capability Device
-Control[Relaxed Ordering Enable] to "off").
-
-Oh, and also, on the current patch submission's focus on broken Root Port
-implementations: one could suggest that even if we're stuck with the "Device
-attached to a VM Conundrum", that what we should really be thinking about is
-if ANY device within a PCIe Fabric has broken Relaxed Ordering completion
-problems, and, if so, "poisoning" the entire containing PCIe Fabric by
-turning off Relaxed Ordering Enable for every device, up, down sideways --
-including the Root Port itself.
-
-| ...
-| This associates the message with the Requester that may potentially
-| use relaxed ordering. But there's nothing wrong or unusual about the
-| Requester; the issue is with the *Completer*, so I think the message
-| should be in the quirk where we set PCI_DEV_FLAGS_NO_RELAXED_ORDERING.
-| Maybe it should be both places; I dunno.
-| 
-| This implementation assumes the device only initiates transactions to
-| coherent memory, i.e., it assumes the device never does peer-to-peer
-| DMA.  I guess we'll have to wait and see if we trip over any
-| peer-to-peer issues, then figure out how to handle them.
-| ...
-
-Yes, as soon as we want to implement the hybrid use of Relaxed Ordering I
-mentioned above.  And that the Intel document mentions itself.
-
-Casey
+         Arnd
