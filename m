@@ -1,358 +1,113 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 09 Aug 2017 12:35:03 +0200
-Subject: [PATCH v8 1/5] clk: Add support for runtime PM
+Date: Wed, 09 Aug 2017 12:35:06 +0200
+Subject: [PATCH v8 4/5] clk: samsung: exynos-audss: Use local variable for
+ controller's device
 In-Reply-To: <1502274907-11931-1-git-send-email-m.szyprowski@samsung.com>
 References: <1502274907-11931-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170809103512eucas1p2eb66401b357d82bed91182a5a1b1fea9@eucas1p2.samsung.com>
-Message-ID: <1502274907-11931-2-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170809103514eucas1p11fb5d1af243e882a5d51a25956d24a19@eucas1p1.samsung.com>
+Message-ID: <1502274907-11931-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Registers for some clocks might be located in the SOC area, which are under the
-power domain. To enable access to those registers respective domain has to be
-turned on. Additionally, registers for such clocks will usually loose its
-contents when power domain is turned off, so additional saving and restoring of
-them might be needed in the clock controller driver.
-
-This patch adds basic infrastructure in the clocks core to allow implementing
-driver for such clocks under power domains. Clock provider can supply a
-struct device pointer, which is the used by clock core for tracking and managing
-clock's controller runtime pm state. Each clk_prepare() operation
-will first call pm_runtime_get_sync() on the supplied device, while
-clk_unprepare() will do pm_runtime_put_sync() at the end.
-
-Additional calls to pm_runtime_get/put functions are required to ensure that any
-register access (like calculating/changing clock rates and unpreparing/disabling
-unused clocks on boot) will be done with clock controller in runtime resumend
-state.
-
-When one wants to register clock controller, which make use of this feature, he
-has to:
-1. Provide a struct device to the core when registering the provider.
-2. Ensure to enable runtime PM for that device before registering clocks.
-3. Make sure that the runtime PM status of the controller device reflects
-   the HW state.
+Store pointer to the controller's device in local variable to avoid
+extracting it from platform device in each call. This will also simplify
+code in the future, when runtime PM support is added.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- drivers/clk/clk.c | 129 +++++++++++++++++++++++++++++++++++++++++++++++-------
- 1 file changed, 114 insertions(+), 15 deletions(-)
+ drivers/clk/samsung/clk-exynos-audss.c | 25 +++++++++++++------------
+ 1 file changed, 13 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index fc58c52a26b4..eb11a6a0e1d0 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -21,6 +21,7 @@
- #include <linux/of.h>
- #include <linux/device.h>
- #include <linux/init.h>
-+#include <linux/pm_runtime.h>
- #include <linux/sched.h>
- #include <linux/clkdev.h>
+diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
+index 1fab56f396d4..6be52fb46ff3 100644
+--- a/drivers/clk/samsung/clk-exynos-audss.c
++++ b/drivers/clk/samsung/clk-exynos-audss.c
+@@ -135,6 +135,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+ 	const struct exynos_audss_clk_drvdata *variant;
+ 	struct clk_hw **clk_table;
+ 	struct resource *res;
++	struct device *dev = &pdev->dev;
+ 	int i, ret = 0;
  
-@@ -46,6 +47,7 @@ struct clk_core {
- 	const struct clk_ops	*ops;
- 	struct clk_hw		*hw;
- 	struct module		*owner;
-+	struct device		*dev;
- 	struct clk_core		*parent;
- 	const char		**parent_names;
- 	struct clk_core		**parents;
-@@ -87,6 +89,26 @@ struct clk {
- 	struct hlist_node clks_node;
- };
- 
-+/***           runtime pm          ***/
-+static int clk_pm_runtime_get(struct clk_core *core)
-+{
-+	int ret = 0;
-+
-+	if (!core->dev)
-+		return 0;
-+
-+	ret = pm_runtime_get_sync(core->dev);
-+	return ret < 0 ? ret : 0;
-+}
-+
-+static void clk_pm_runtime_put(struct clk_core *core)
-+{
-+	if (!core->dev)
-+		return;
-+
-+	pm_runtime_put_sync(core->dev);
-+}
-+
- /***           locking             ***/
- static void clk_prepare_lock(void)
- {
-@@ -150,6 +172,8 @@ static void clk_enable_unlock(unsigned long flags)
- 
- static bool clk_core_is_prepared(struct clk_core *core)
- {
-+	bool ret = false;
-+
- 	/*
- 	 * .is_prepared is optional for clocks that can prepare
- 	 * fall back to software usage counter if it is missing
-@@ -157,11 +181,18 @@ static bool clk_core_is_prepared(struct clk_core *core)
- 	if (!core->ops->is_prepared)
- 		return core->prepare_count;
- 
--	return core->ops->is_prepared(core->hw);
-+	if (!clk_pm_runtime_get(core)) {
-+		ret = core->ops->is_prepared(core->hw);
-+		clk_pm_runtime_put(core);
-+	}
-+
-+	return ret;
- }
- 
- static bool clk_core_is_enabled(struct clk_core *core)
- {
-+	bool ret = false;
-+
- 	/*
- 	 * .is_enabled is only mandatory for clocks that gate
- 	 * fall back to software usage counter if .is_enabled is missing
-@@ -169,7 +200,29 @@ static bool clk_core_is_enabled(struct clk_core *core)
- 	if (!core->ops->is_enabled)
- 		return core->enable_count;
- 
--	return core->ops->is_enabled(core->hw);
-+	/*
-+	 * Check if clock controller's device is runtime active before
-+	 * calling .is_enabled callback. If not, assume that clock is
-+	 * disabled, because we might be called from atomic context, from
-+	 * which pm_runtime_get() is not allowed.
-+	 * This function is called mainly from clk_disable_unused_subtree,
-+	 * which ensures proper runtime pm activation of controller before
-+	 * taking enable spinlock, but the below check is needed if one tries
-+	 * to call it from other places.
-+	 */
-+	if (core->dev) {
-+		pm_runtime_get_noresume(core->dev);
-+		if (!pm_runtime_active(core->dev)) {
-+			ret = false;
-+			goto done;
-+		}
-+	}
-+
-+	ret = core->ops->is_enabled(core->hw);
-+done:
-+	clk_pm_runtime_put(core);
-+
-+	return ret;
- }
- 
- /***    helper functions   ***/
-@@ -489,6 +542,8 @@ static void clk_core_unprepare(struct clk_core *core)
- 	if (core->ops->unprepare)
- 		core->ops->unprepare(core->hw);
- 
-+	clk_pm_runtime_put(core);
-+
- 	trace_clk_unprepare_complete(core);
- 	clk_core_unprepare(core->parent);
- }
-@@ -530,10 +585,14 @@ static int clk_core_prepare(struct clk_core *core)
- 		return 0;
- 
- 	if (core->prepare_count == 0) {
--		ret = clk_core_prepare(core->parent);
-+		ret = clk_pm_runtime_get(core);
- 		if (ret)
- 			return ret;
- 
-+		ret = clk_core_prepare(core->parent);
-+		if (ret)
-+			goto runtime_put;
-+
- 		trace_clk_prepare(core);
- 
- 		if (core->ops->prepare)
-@@ -541,15 +600,18 @@ static int clk_core_prepare(struct clk_core *core)
- 
- 		trace_clk_prepare_complete(core);
- 
--		if (ret) {
--			clk_core_unprepare(core->parent);
--			return ret;
--		}
-+		if (ret)
-+			goto unprepare;
- 	}
- 
- 	core->prepare_count++;
- 
- 	return 0;
-+unprepare:
-+	clk_core_unprepare(core->parent);
-+runtime_put:
-+	clk_pm_runtime_put(core);
-+	return ret;
- }
- 
- static int clk_core_prepare_lock(struct clk_core *core)
-@@ -745,6 +807,9 @@ static void clk_unprepare_unused_subtree(struct clk_core *core)
- 	if (core->flags & CLK_IGNORE_UNUSED)
- 		return;
- 
-+	if (clk_pm_runtime_get(core))
-+		return;
-+
- 	if (clk_core_is_prepared(core)) {
- 		trace_clk_unprepare(core);
- 		if (core->ops->unprepare_unused)
-@@ -753,6 +818,8 @@ static void clk_unprepare_unused_subtree(struct clk_core *core)
- 			core->ops->unprepare(core->hw);
- 		trace_clk_unprepare_complete(core);
- 	}
-+
-+	clk_pm_runtime_put(core);
- }
- 
- static void clk_disable_unused_subtree(struct clk_core *core)
-@@ -768,6 +835,9 @@ static void clk_disable_unused_subtree(struct clk_core *core)
- 	if (core->flags & CLK_OPS_PARENT_ENABLE)
- 		clk_core_prepare_enable(core->parent);
- 
-+	if (clk_pm_runtime_get(core))
-+		goto unprepare_out;
-+
- 	flags = clk_enable_lock();
- 
- 	if (core->enable_count)
-@@ -792,6 +862,8 @@ static void clk_disable_unused_subtree(struct clk_core *core)
- 
- unlock_out:
- 	clk_enable_unlock(flags);
-+	clk_pm_runtime_put(core);
-+unprepare_out:
- 	if (core->flags & CLK_OPS_PARENT_ENABLE)
- 		clk_core_disable_unprepare(core->parent);
- }
-@@ -1038,9 +1110,13 @@ long clk_get_accuracy(struct clk *clk)
- static unsigned long clk_recalc(struct clk_core *core,
- 				unsigned long parent_rate)
- {
--	if (core->ops->recalc_rate)
--		return core->ops->recalc_rate(core->hw, parent_rate);
--	return parent_rate;
-+	unsigned long rate = parent_rate;
-+
-+	if (core->ops->recalc_rate && !clk_pm_runtime_get(core)) {
-+		rate = core->ops->recalc_rate(core->hw, parent_rate);
-+		clk_pm_runtime_put(core);
-+	}
-+	return rate;
- }
- 
- /**
-@@ -1565,6 +1641,7 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
- {
- 	struct clk_core *top, *fail_clk;
- 	unsigned long rate = req_rate;
-+	int ret = 0;
- 
- 	if (!core)
- 		return 0;
-@@ -1581,21 +1658,28 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
- 	if (!top)
+ 	variant = of_device_get_match_data(&pdev->dev);
+@@ -142,15 +143,15 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
  		return -EINVAL;
  
-+	ret = clk_pm_runtime_get(core);
-+	if (ret)
-+		return ret;
-+
- 	/* notify that we are about to change rates */
- 	fail_clk = clk_propagate_rate_change(top, PRE_RATE_CHANGE);
- 	if (fail_clk) {
- 		pr_debug("%s: failed to set %s rate\n", __func__,
- 				fail_clk->name);
- 		clk_propagate_rate_change(top, ABORT_RATE_CHANGE);
--		return -EBUSY;
-+		ret = -EBUSY;
-+		goto err;
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	reg_base = devm_ioremap_resource(&pdev->dev, res);
++	reg_base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(reg_base)) {
+-		dev_err(&pdev->dev, "failed to map audss registers\n");
++		dev_err(dev, "failed to map audss registers\n");
+ 		return PTR_ERR(reg_base);
  	}
  
- 	/* change the rates */
- 	clk_change_rate(top);
+ 	epll = ERR_PTR(-ENODEV);
  
- 	core->req_rate = req_rate;
-+err:
-+	clk_pm_runtime_put(core);
+-	clk_data = devm_kzalloc(&pdev->dev,
++	clk_data = devm_kzalloc(dev,
+ 				sizeof(*clk_data) +
+ 				sizeof(*clk_data->hws) * EXYNOS_AUDSS_MAX_CLKS,
+ 				GFP_KERNEL);
+@@ -160,8 +161,8 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+ 	clk_data->num = variant->num_clks;
+ 	clk_table = clk_data->hws;
  
--	return 0;
-+	return ret;
- }
+-	pll_ref = devm_clk_get(&pdev->dev, "pll_ref");
+-	pll_in = devm_clk_get(&pdev->dev, "pll_in");
++	pll_ref = devm_clk_get(dev, "pll_ref");
++	pll_in = devm_clk_get(dev, "pll_in");
+ 	if (!IS_ERR(pll_ref))
+ 		mout_audss_p[0] = __clk_get_name(pll_ref);
+ 	if (!IS_ERR(pll_in)) {
+@@ -172,7 +173,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
  
- /**
-@@ -1826,12 +1910,16 @@ static int clk_core_set_parent(struct clk_core *core, struct clk_core *parent)
- 		p_rate = parent->rate;
+ 			ret = clk_prepare_enable(epll);
+ 			if (ret) {
+-				dev_err(&pdev->dev,
++				dev_err(dev,
+ 					"failed to prepare the epll clock\n");
+ 				return ret;
+ 			}
+@@ -183,8 +184,8 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+ 				CLK_SET_RATE_NO_REPARENT,
+ 				reg_base + ASS_CLK_SRC, 0, 1, 0, &lock);
+ 
+-	cdclk = devm_clk_get(&pdev->dev, "cdclk");
+-	sclk_audio = devm_clk_get(&pdev->dev, "sclk_audio");
++	cdclk = devm_clk_get(dev, "cdclk");
++	sclk_audio = devm_clk_get(dev, "sclk_audio");
+ 	if (!IS_ERR(cdclk))
+ 		mout_i2s_p[1] = __clk_get_name(cdclk);
+ 	if (!IS_ERR(sclk_audio))
+@@ -222,7 +223,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+ 				 "sclk_pcm", CLK_SET_RATE_PARENT,
+ 				reg_base + ASS_CLK_GATE, 4, 0, &lock);
+ 
+-	sclk_pcm_in = devm_clk_get(&pdev->dev, "sclk_pcm_in");
++	sclk_pcm_in = devm_clk_get(dev, "sclk_pcm_in");
+ 	if (!IS_ERR(sclk_pcm_in))
+ 		sclk_pcm_p = __clk_get_name(sclk_pcm_in);
+ 	clk_table[EXYNOS_SCLK_PCM] = clk_hw_register_gate(NULL, "sclk_pcm",
+@@ -237,16 +238,16 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+ 
+ 	for (i = 0; i < clk_data->num; i++) {
+ 		if (IS_ERR(clk_table[i])) {
+-			dev_err(&pdev->dev, "failed to register clock %d\n", i);
++			dev_err(dev, "failed to register clock %d\n", i);
+ 			ret = PTR_ERR(clk_table[i]);
+ 			goto unregister;
+ 		}
  	}
  
-+	ret = clk_pm_runtime_get(core);
-+	if (ret)
-+		goto out;
-+
- 	/* propagate PRE_RATE_CHANGE notifications */
- 	ret = __clk_speculate_rates(core, p_rate);
- 
- 	/* abort if a driver objects */
- 	if (ret & NOTIFY_STOP_MASK)
--		goto out;
-+		goto runtime_put;
- 
- 	/* do the re-parent */
- 	ret = __clk_set_parent(core, parent, p_index);
-@@ -1844,6 +1932,8 @@ static int clk_core_set_parent(struct clk_core *core, struct clk_core *parent)
- 		__clk_recalc_accuracies(core);
+-	ret = of_clk_add_hw_provider(pdev->dev.of_node, of_clk_hw_onecell_get,
++	ret = of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
+ 				     clk_data);
+ 	if (ret) {
+-		dev_err(&pdev->dev, "failed to add clock provider\n");
++		dev_err(dev, "failed to add clock provider\n");
+ 		goto unregister;
  	}
  
-+runtime_put:
-+	clk_pm_runtime_put(core);
- out:
- 	clk_prepare_unlock();
- 
-@@ -2583,6 +2673,12 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
- 		goto fail_name;
- 	}
- 	core->ops = hw->init->ops;
-+	if (dev && pm_runtime_enabled(dev)) {
-+		core->dev = dev;
-+		ret = clk_pm_runtime_get(core);
-+		if (ret)
-+			goto fail_pm;
-+	}
- 	if (dev && dev->driver)
- 		core->owner = dev->driver->owner;
- 	core->hw = hw;
-@@ -2629,12 +2725,13 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
- 	}
- 
- 	ret = __clk_core_init(core);
--	if (!ret)
-+	if (!ret) {
-+		clk_pm_runtime_put(core);
- 		return hw->clk;
-+	}
- 
- 	__clk_free_clk(hw->clk);
- 	hw->clk = NULL;
--
- fail_parents:
- 	kfree(core->parents);
- fail_parent_names_copy:
-@@ -2642,6 +2739,8 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
- 		kfree_const(core->parent_names[i]);
- 	kfree(core->parent_names);
- fail_parent_names:
-+	clk_pm_runtime_put(core);
-+fail_pm:
- 	kfree_const(core->name);
- fail_name:
- 	kfree(core);
 -- 
 1.9.1
