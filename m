@@ -1,32 +1,34 @@
-From: code@mmayer.net (Markus Mayer)
-Date: Wed,  9 Aug 2017 14:56:31 -0700
-Subject: [PATCH v3 3/4] ARM: multi_v7_defconfig: add CONFIG_BRCMSTB_THERMAL
-In-Reply-To: <20170809215632.4124-1-code@mmayer.net>
-References: <20170809215632.4124-1-code@mmayer.net>
-Message-ID: <20170809215632.4124-4-code@mmayer.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Aug 2017 15:02:30 -0700
+Subject: [PATCH v2 2/2] ARM: OMAP4+: PRM: fix of_irq_get() result checks
+In-Reply-To: <80dd8051-456b-2331-b847-0631d94f85b1@cogentembedded.com>
+References: <20170806151714.108596802@cogentembedded.com>
+ <80dd8051-456b-2331-b847-0631d94f85b1@cogentembedded.com>
+Message-ID: <20170809220229.GI3934@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Mayer <mmayer@broadcom.com>
+* Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> [170806 08:20]:
+> On 08/06/2017 06:14 PM, Sergei Shtylyov wrote:
+> 
+> > of_irq_get() may return 0 as well as a nagative error number on failure,
+> 
+>    Oops, forgot to kill comma...
 
-Turn on CONFIG_BRCMSTB_THERMAL as module.
+I can fix that while applying.
 
-Signed-off-by: Markus Mayer <mmayer@broadcom.com>
----
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+> > (and never on success), however omap44xx_prm_late_init() regards 0 as a
+> > valid IRQ -- fix this.
+> > 
+> > Fixes: a8f83aefcd5a ("ARM: OMAP4+: PRM: register interrupt information from DT")
+> > Fixes: c5b3955828ba ("ARM: OMAP4: Fix legacy code clean-up regression")
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> [...]
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 4d19c1b..230f7fa 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -455,6 +455,7 @@ CONFIG_SENSORS_NTC_THERMISTOR=m
- CONFIG_SENSORS_PWM_FAN=m
- CONFIG_SENSORS_INA2XX=m
- CONFIG_CPU_THERMAL=y
-+CONFIG_BRCMSTB_THERMAL=m
- CONFIG_ROCKCHIP_THERMAL=y
- CONFIG_RCAR_THERMAL=y
- CONFIG_ARMADA_THERMAL=y
--- 
-2.7.4
+Seems these both should be safe to apply into fixes-not-urgent for
+v4.14 merge window as we have not seen any issues with this? Or
+are there some known bugs related to this?
+
+Regards,
+
+Tony
