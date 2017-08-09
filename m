@@ -1,49 +1,44 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 9 Aug 2017 09:55:57 +0200
-Subject: [PATCH 3/3] arm64: dts: r8a7795: Use R-Car GPIO Gen3 fallback
- compat string
-In-Reply-To: <CANqRtoTBt34QOoubpYPS65-8qVJ8c2X=u+bmMACXGr3nyTEpkA@mail.gmail.com>
-References: <1502182499-16210-1-git-send-email-horms+renesas@verge.net.au>
- <1502182499-16210-4-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoTBt34QOoubpYPS65-8qVJ8c2X=u+bmMACXGr3nyTEpkA@mail.gmail.com>
-Message-ID: <20170809075557.GF2705@verge.net.au>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 9 Aug 2017 15:56:13 +0800
+Subject: [PATCH 0/2] arm64 SMMUv3 PMU driver with IORT support
+In-Reply-To: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+Message-ID: <394bd3b8-2583-01fa-02d3-6a49c2a6a6c0@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 07:24:58PM +0900, Magnus Damm wrote:
-> Hi Simon,
-> 
-> On Tue, Aug 8, 2017 at 5:54 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> > Use newly added R-Car GPIO Gen3 fallback compat string
-> > in the DT of the r8a7795 SoC.
-> >
-> > This should have no run-time effect as the driver matches against
-> > the per-SoC compat string before the fallback compat string is considered.
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> >  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > index a87ae76880ab..c9f2b87e7ee3 100644
-> > --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > @@ -1451,7 +1451,8 @@
-> >                 };
-> >
-> >                 sata: sata at ee300000 {
-> > -                       compatible = "renesas,sata-r8a7795";
-> > +                       compatible = "renesas,sata-r8a7795",
-> > +                                    "renesas,rcar-gen3-sata";
-> >                         reg = <0 0xee300000 0 0x200000>;
-> >                         interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
-> >                         clocks = <&cpg CPG_MOD 815>;
-> > --
-> > 2.1.4
-> 
-> This patch looks odd. The subject and patch description says GPIO but
-> the hunk above modifies SATA...?
+Hi Neil,
 
-Yes, it looks like I have made a cut-and-paste error there.
-I'll repost.
+On 2017/8/5 3:59, Neil Leeder wrote:
+> This adds a driver for the SMMUv3 PMU into the perf framework.
+> It includes an IORT update to support PM Counter Groups.
+> 
+> IORT has no mechanism for determining device names so PMUs
+> are named based on their physical address.
+> 
+> Tested on Qualcomm QDF2400. perf_fuzzer ran for 4+ hours
+> with no failures.
+> 
+> Neil Leeder (2):
+>    acpi: arm64: add iort support for PMCG
+>    perf: add arm64 smmuv3 pmu driver
+> 
+>   drivers/acpi/arm64/iort.c     |  54 +++
+
+I would like to be Cced for next version.
+
+>   drivers/perf/Kconfig          |   9 +
+>   drivers/perf/Makefile         |   1 +
+>   drivers/perf/arm_smmuv3_pmu.c | 823 ++++++++++++++++++++++++++++++++++++++++++
+>   include/acpi/actbl2.h         |   9 +-
+
+Do you have the acpica support code? I'm currently
+working on SMMUv3 MSI support and I would like to test
+it with MSI support for PMCG as well.
+
+Thanks
+Hanjun
+
+>   5 files changed, 895 insertions(+), 1 deletion(-)
+>   create mode 100644 drivers/perf/arm_smmuv3_pmu.c
+> 
