@@ -1,113 +1,94 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 9 Aug 2017 16:14:43 -0500
-Subject: [PATCH v3 0/5] ACPI: DMA ranges management
-In-Reply-To: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
-References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
-Message-ID: <61e15178-a6da-0459-34fc-83ff4ded8864@arm.com>
+From: markus.mayer@broadcom.com (Markus Mayer)
+Date: Wed, 9 Aug 2017 14:39:28 -0700
+Subject: [PATCH v3 1/4] Documentation: devicetree: add binding for
+ Broadcom STB AVS TMON
+In-Reply-To: <1502195795.4296.37.camel@intel.com>
+References: <20170731192633.58747-1-code@mmayer.net>
+ <20170731192633.58747-2-code@mmayer.net>
+ <1502195795.4296.37.camel@intel.com>
+Message-ID: <CAGt4E5t5a9JsRcfqhe5cgKHqmS2Hz2Zx-yzENbUhwQCbPVuhgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 8 August 2017 at 05:36, Zhang Rui <rui.zhang@intel.com> wrote:
+> On Mon, 2017-07-31 at 12:26 -0700, Markus Mayer wrote:
+>> From: Brian Norris <computersforpeace@gmail.com>
+>>
+>> Add binding for Broadcom STB thermal.
+>>
+>> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+>> Signed-off-by: Markus Mayer <mmayer@broadcom.com>
+>
+> $ file v3-1-4-Documentation-devicetree-add-binding-for-Broadcom-STB-
+> AVS-TMON.patch
+> unified diff output, UTF-8 Unicode text
 
-Better late than never I guess..
+It's UTF-8 encoded, because of Rafa?'s name in the recipient list.
 
-On 08/03/2017 07:32 AM, Lorenzo Pieralisi wrote:
-> This patch series is v3 of a previous posting:
-> 
-> v2->v3:
-> 	- Fixed DMA masks computation
->          - Fixed size computation overflow in acpi_dma_get_range()
-> 
-> v1->v2:
-> 	- Reworked acpi_dma_get_range() flow and logs
-> 	- Added IORT named component address limits
-> 	- Renamed acpi_dev_get_resources() helper function
-> 	- Rebased against v4.13-rc3
-> 
-> v2: http://lkml.kernel.org/r/20170731152323.32488-1-lorenzo.pieralisi at arm.com
-> v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
-> 
-> -- Original cover letter --
-> 
-> As reported in:
-> 
-> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
-> 
-> the bus connecting devices to an IOMMU bus can be smaller in size than
-> the IOMMU input address bits which results in devices DMA HW bugs in
-> particular related to IOVA allocation (ie chopping of higher address
-> bits owing to system bus HW capabilities mismatch with the IOMMU).
-> 
-> Fortunately this problem can be solved through an already present but never
-> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
-> window for a specific bus in ACPI and therefore all upstream devices
-> connected to it.
-> 
-> This small patch series enables _DMA parsing in ACPI core code and
-> use it in ACPI IORT code in order to detect DMA ranges for devices and
-> update their data structures to make them work with their related DMA
-> addressing restrictions.
-> 
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Feng Kan <fkan@apm.com>
-> Cc: Jon Masters <jcm@redhat.com>
-> Cc: Robert Moore <robert.moore@intel.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> 
-> Lorenzo Pieralisi (5):
->    ACPICA: resource_mgr: Allow _DMA method in walk resources
->    ACPI: Make acpi_dev_get_resources() method agnostic
->    ACPI: Introduce DMA ranges parsing
->    ACPI: Make acpi_dma_configure() DMA regions aware
->    ACPI/IORT: Add IORT named component memory address limits
-> 
->   drivers/acpi/acpica/rsxface.c |  7 ++--
->   drivers/acpi/arm64/iort.c     | 57 ++++++++++++++++++++++++++-
->   drivers/acpi/resource.c       | 82 +++++++++++++++++++++++++++++---------
->   drivers/acpi/scan.c           | 91 +++++++++++++++++++++++++++++++++++++++----
->   include/acpi/acnames.h        |  1 +
->   include/acpi/acpi_bus.h       |  2 +
->   include/linux/acpi.h          |  8 ++++
->   include/linux/acpi_iort.h     |  5 ++-
->   8 files changed, 219 insertions(+), 34 deletions(-)
+> BTW, can you please rebase this patch set on top of v4.13-rc3?
+> At least there are some conflicts in MAINTAINER file, introduced in
+> -rc2.
 
-Ok, despite being merged already I think its worthwhile to say that I've 
-been testing this with:
+I'll send the rebased series shortly.
 
-Method(_DMA, 0, Serialized)
-{
-	Return (ResourceTemplate()
-	{
-		QWORDMemory(
-		ResourceConsumer,
-		PosDecode,          // _DEC
-		MinFixed,           // _MIF
-		MaxFixed,           // _MAF
-		Prefetchable,       // _MEM
-		ReadWrite,          // _RW
-		0,                  // _GRA
-		0x10000000,         // _MIN
-		0x1fffffff,         // _MAX
-		0x000000000,        // _TRA
-		0x10000000,         // _LEN
-		,
-		,
-		,
-		)
-	})
-} // Method(_DMA)
-
-(and a couple minor variations)
-
-and a fair number of debug statements sprinkled around to verify that 
-the IOVAs are appropriately limited. So I don't see anything wrong with 
-the code and it appears to work and the devices behind a bridge limited 
-like this continue to work as long as sane values are placed in the 
-min/max/len fields.
-
-Thanks,
-
-Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+> thanks,
+> rui
+>> ---
+>>  .../devicetree/bindings/thermal/brcm,avs-tmon.txt    | 20
+>> ++++++++++++++++++++
+>>  MAINTAINERS                                          |  8 ++++++++
+>>  2 files changed, 28 insertions(+)
+>>  create mode 100644
+>> Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/thermal/brcm,avs-
+>> tmon.txt b/Documentation/devicetree/bindings/thermal/brcm,avs-
+>> tmon.txt
+>> new file mode 100644
+>> index 0000000..9d43553
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
+>> @@ -0,0 +1,20 @@
+>> +* Broadcom STB thermal management
+>> +
+>> +Thermal management core, provided by the AVS TMON hardware block.
+>> +
+>> +Required properties:
+>> +- compatible: must be "brcm,avs-tmon" and/or "brcm,avs-tmon-bcm7445"
+>> +- reg: address range for the AVS TMON registers
+>> +- interrupts: temperature monitor interrupt, for high/low threshold
+>> triggers
+>> +- interrupt-names: should be "tmon"
+>> +- interrupt-parent: the parent interrupt controller
+>> +
+>> +Example:
+>> +
+>> +     thermal at f04d1500 {
+>> +             compatible = "brcm,avs-tmon-bcm7445", "brcm,avs-
+>> tmon";
+>> +             reg = <0xf04d1500 0x28>;
+>> +             interrupts = <0x6>;
+>> +             interrupt-names = "tmon";
+>> +             interrupt-parent = <&avs_host_l2_intc>;
+>> +     };
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 205d397..a683d4c 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -2928,6 +2928,14 @@ S:     Maintained
+>>  F:   Documentation/devicetree/bindings/cpufreq/brcm,stb-avs-
+>> cpu-freq.txt
+>>  F:   drivers/cpufreq/brcmstb*
+>>
+>> +BROADCOM STB AVS TMON DRIVER
+>> +M:   Markus Mayer <mmayer@broadcom.com>
+>> +M:   bcm-kernel-feedback-list at broadcom.com
+>> +L:   linux-pm at vger.kernel.org
+>> +S:   Maintained
+>> +F:   Documentation/devicetree/bindings/thermal/brcm,avs-
+>> tmon.txt
+>> +F:   drivers/thermal/broadcom/brcmstb*
+>> +
+>>  BROADCOM SPECIFIC AMBA DRIVER (BCMA)
+>>  M:   Rafa? Mi?ecki <zajec5@gmail.com>
+>>  L:   linux-wireless at vger.kernel.org
