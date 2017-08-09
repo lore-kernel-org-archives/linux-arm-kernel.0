@@ -1,37 +1,40 @@
 From: gustavo@embeddedor.com (Gustavo A. R. Silva)
-Date: Wed, 9 Aug 2017 11:35:21 -0500
-Subject: [PATCH] mtd: nand: mtk: fix error return code in mtk_ecc_probe()
-Message-ID: <20170809163521.GA4941@embeddedgus>
+Date: Wed, 9 Aug 2017 11:42:50 -0500
+Subject: [PATCH] misc: atmel_tclib: fix error return code in tc_probe()
+Message-ID: <20170809164250.GA7229@embeddedgus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_get_irq() returns an error code, but the mtk_ecc driver
+platform_get_irq() returns an error code, but the atmel_tclib driver
 ignores it and always returns -EINVAL. This is not correct and,
 prevents -EPROBE_DEFER from being propagated properly.
 
-Print and propagate the return value of platform_get_irq on failure.
+Print error message and propagate the return value of platform_get_irq
+on failure.
 
 This issue was detected with the help of Coccinelle.
 
 Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
 ---
- drivers/mtd/nand/mtk_ecc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/misc/atmel_tclib.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mtd/nand/mtk_ecc.c b/drivers/mtd/nand/mtk_ecc.c
-index 6c3a4aa..7f3b065 100644
---- a/drivers/mtd/nand/mtk_ecc.c
-+++ b/drivers/mtd/nand/mtk_ecc.c
-@@ -464,8 +464,8 @@ static int mtk_ecc_probe(struct platform_device *pdev)
+diff --git a/drivers/misc/atmel_tclib.c b/drivers/misc/atmel_tclib.c
+index ac24a4b..c5d3449 100644
+--- a/drivers/misc/atmel_tclib.c
++++ b/drivers/misc/atmel_tclib.c
+@@ -112,8 +112,10 @@ static int __init tc_probe(struct platform_device *pdev)
+ 	unsigned int	i;
  
  	irq = platform_get_irq(pdev, 0);
- 	if (irq < 0) {
--		dev_err(dev, "failed to get irq\n");
+-	if (irq < 0)
 -		return -EINVAL;
-+		dev_err(dev, "failed to get irq: %d\n", irq);
++	if (irq < 0) {
++		dev_err(&pdev->dev, "Failed to get IRQ: %d\n", irq);
 +		return irq;
- 	}
++	}
  
- 	ret = dma_set_mask(dev, DMA_BIT_MASK(32));
+ 	tc = devm_kzalloc(&pdev->dev, sizeof(struct atmel_tc), GFP_KERNEL);
+ 	if (!tc)
 -- 
 2.5.0
