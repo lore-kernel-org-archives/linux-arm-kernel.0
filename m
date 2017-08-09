@@ -1,62 +1,48 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 9 Aug 2017 20:11:24 +0900
-Subject: [PATCH 00/10] ARM, arm64: dts: renesas: Use R-Car GPIO Gen[123]
- fallback compat strings
-In-Reply-To: <20170809082210.GH2705@verge.net.au>
-References: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoRcsAhvFB=DNoJHzJt4dejKX+Z8ar04D8O1cFq1XkxWkw@mail.gmail.com>
- <20170809075526.GE2705@verge.net.au> <20170809082210.GH2705@verge.net.au>
-Message-ID: <CANqRtoSnRnUWvf0uDv-gjyk6yD4JxxnrGMMvMkBYVQEk6ctDyA@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 09 Aug 2017 14:20:42 +0300
+Subject: [PATCH 0/2] iommu/omap: Rework cache functionality with DMA
+ Streaming API
+In-Reply-To: <1501274954-20973-1-git-send-email-j-albarran@ti.com>
+References: <1501274954-20973-1-git-send-email-j-albarran@ti.com>
+Message-ID: <1541952.tFANgzzemW@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Josue,
 
-On Wed, Aug 9, 2017 at 5:22 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Wed, Aug 09, 2017 at 09:55:26AM +0200, Simon Horman wrote:
->> On Tue, Aug 08, 2017 at 07:29:28PM +0900, Magnus Damm wrote:
->> > Hi Simon,
->> >
->> > On Tue, Aug 8, 2017 at 5:39 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
->> > > Use newly added R-Car GPIO Gen 1, 2 and 3 fallback compat strings in place
->> > > of now deprecated non-generation specific R-Car GPIO fallback compat string
->> > > in the DT of Renesas ARM and arm64 based SoCs.
->> > >
->> > > This should have no run-time effect as the driver matches against the
->> > > per-SoC compat string before considering the fallback compat string.
->> >
->> > Thanks for your efforts.I have no issue with your series (apart from
->> > the GPIO and SATA mistake), but at the same time I believe the GPIO
->> > hardware itself is backwards compatible between various generations.
->> >
->> > In the nitpick department I would like to point out that the level of
->> > hardware difference between say R-Car Gen1 GPIO and R-Car Gen2 GPIO is
->> > similar to say good old uarts like 8250 and 16450 hardware. Basically
->> > a couple of registers were added to the hardware in a
->> > backwards-compatible way if I recall correctly.
->> >
->> > So if we are going to use "compatible" to point out if hardware is
->> > compatible or not then I would do this instead:
->>
->> Thanks for your feedback.
->>
->> When the generation specific compat strings were recently
->> added the renesas,gpio-rcar compat string was marked as deprecated
->> as I was under the understanding that it was only compatibile with gen 1 SoCs.
->>
->> It now seems that was not the best thing to do and renesas,gpio-rcar should
->> be re-instated as being a generic fallback for all R-Car versions supported
->> in upstream.
->>
->> Do you concur?
->
-> I posted a patch to un-deprecate the renesas,gpio-rcar compat string
-> in the bindings documentation.
->
-> [PATCH] gpio: rcar: reinstate generic compat string
+Thank you for the patches.
 
-Thanks, this looks good to me. I would like to hear what Geert thinks as well!
+On Friday 28 Jul 2017 15:49:12 Josue Albarran wrote:
+> Hi Joerg,
+> 
+> This series adapts the OMAP IOMMU driver to use the DMA API to flush
+> the page table/directory table entries from the CPU caches instead of
+> the ARM assembly calls. The patches are baselined on 4.13-rc1.
+> 
+> Following is the patch summary:
+>  1. Patch 1 disables the OMAP IOMMU fault interrupts instead of
+>     disabling the MMU upon a fault, and resulted in recurring bus
+>     errors during remoteproc recovery on OMAP4. The MMU fault itself
+>     is triggered due to the missing PL310 L2 cache operations, and
+>     this patch fixes the recurring bus errors.
+>  2. The second patch makes the adaptation to the DMA API for flushing
+>     the caches. This fixes the MMU fault triggering issues in the
+>     first place on OMAP4.
+> 
+> I have tested these patches on DRA7, OMAP5, and OMAP4 platforms using
+> both OMAP IOMMU unit tests and some out-of-tree patches for exercising
+> the MMUs using the OMAP remoteproc driver.
+> 
+> Laurent,
+> Appreciate it if you can check the OMAP3ISP functionality with these
+> patches once.
 
-Cheers,
+I apologize for the delay, I had to resurrect my Beagleboard-xM, which 
+involved updating and then debugging U-Boot.
 
-/ magnus
+Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+-- 
+Regards,
+
+Laurent Pinchart
