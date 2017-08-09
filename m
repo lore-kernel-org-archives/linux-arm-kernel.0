@@ -1,480 +1,164 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed,  9 Aug 2017 13:05:31 +0100
-Subject: [PATCH 25/27] arm64/sve: Add documentation
-In-Reply-To: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1502280338-23002-26-git-send-email-Dave.Martin@arm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 9 Aug 2017 13:13:33 +0100
+Subject: [PATCH v5 4/9] arm64: hugetlb: Add break-before-make logic for
+ contiguous entries
+In-Reply-To: <20170807171916.vdplrndrdyeontho@armageddon.cambridge.arm.com>
+References: <20170802094904.27749-1-punit.agrawal@arm.com>
+ <20170802094904.27749-5-punit.agrawal@arm.com>
+ <20170807171916.vdplrndrdyeontho@armageddon.cambridge.arm.com>
+Message-ID: <20170809121332.GA21276@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic documentation of the user/kernel interface
-provided by the for SVE.
+Hi Catalin,
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- Documentation/arm64/sve.txt | 454 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 454 insertions(+)
- create mode 100644 Documentation/arm64/sve.txt
+On Mon, Aug 07, 2017 at 06:19:17PM +0100, Catalin Marinas wrote:
+> On Wed, Aug 02, 2017 at 10:48:59AM +0100, Punit Agrawal wrote:
+> > diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> > index 08deed7c71f0..f2c976464f39 100644
+> > --- a/arch/arm64/mm/hugetlbpage.c
+> > +++ b/arch/arm64/mm/hugetlbpage.c
+> > @@ -68,6 +68,47 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
+> >  	return CONT_PTES;
+> >  }
+> >  
+> > +/*
+> > + * Changing some bits of contiguous entries requires us to follow a
+> > + * Break-Before-Make approach, breaking the whole contiguous set
+> > + * before we can change any entries. See ARM DDI 0487A.k_iss10775,
+> > + * "Misprogramming of the Contiguous bit", page D4-1762.
+> > + *
+> > + * This helper performs the break step.
+> > + */
+> > +static pte_t get_clear_flush(struct mm_struct *mm,
+> > +			     unsigned long addr,
+> > +			     pte_t *ptep,
+> > +			     unsigned long pgsize,
+> > +			     unsigned long ncontig)
+> > +{
+> > +	unsigned long i, saddr = addr;
+> > +	struct vm_area_struct vma = { .vm_mm = mm };
+> > +	pte_t orig_pte = huge_ptep_get(ptep);
+> > +
+> > +	/*
+> > +	 * If we already have a faulting entry then we don't need
+> > +	 * to break before make (there won't be a tlb entry cached).
+> > +	 */
+> > +	if (!pte_present(orig_pte))
+> > +		return orig_pte;
+> > +
+> > +	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++) {
+> > +		pte_t pte = ptep_get_and_clear(mm, addr, ptep);
+> > +
+> > +		/*
+> > +		 * If HW_AFDBM is enabled, then the HW could turn on
+> > +		 * the dirty bit for any page in the set, so check
+> > +		 * them all.  All hugetlb entries are already young.
+> > +		 */
+> > +		if (IS_ENABLED(CONFIG_ARM64_HW_AFDBM) && pte_dirty(pte))
+> > +			orig_pte = pte_mkdirty(orig_pte);
+> > +	}
+> > +
+> > +	flush_tlb_range(&vma, saddr, addr);
+> > +	return orig_pte;
+> > +}
+> > +
+> >  void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+> >  			    pte_t *ptep, pte_t pte)
+> >  {
+> > @@ -93,6 +134,8 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+> >  	dpfn = pgsize >> PAGE_SHIFT;
+> >  	hugeprot = pte_pgprot(pte);
+> >  
+> > +	get_clear_flush(mm, addr, ptep, pgsize, ncontig);
+> > +
+> >  	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
+> >  		pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
+> >  			 pte_val(pfn_pte(pfn, hugeprot)));
+> 
+> Is there any risk of the huge pte being accessed (from user space on
+> another CPU) in the short break-before-make window? Not that we can do
+> much about it but just checking.
 
-diff --git a/Documentation/arm64/sve.txt b/Documentation/arm64/sve.txt
-new file mode 100644
-index 0000000..df25abf0
---- /dev/null
-+++ b/Documentation/arm64/sve.txt
-@@ -0,0 +1,454 @@
-+            Scalable Vector Extension support for AArch64 Linux
-+            ===================================================
-+
-+Author: Dave Martin <Dave.Martin@arm.com>
-+Date:   4 August 2017
-+
-+This document outlines briefly the interface provided to userspace by Linux in
-+order to support use of the ARM Scalable Vector Extension (SVE).
-+
-+This is an outline of the most important features and issues only and not
-+intended to be exhaustive.
-+
-+This document does not aim to describe the SVE architecture or programmer's
-+model.  To aid understanding, a minimal description of relevant programmer's
-+model features for SVE is included in Appendix A.
-+
-+
-+1.  General
-+-----------
-+
-+* SVE registers Z0..Z31, P0..P15 and FFR and the current vector length VL, are
-+  tracked per-thread.
-+
-+* The presence of SVE is reported to userspace via HWCAP_SVE in the aux vector
-+  AT_HWCAP entry.  SVE is reported in /proc/cpuinfo as "sve".
-+
-+
-+2.  Vector length terminology
-+-----------------------------
-+
-+The size of an SVE vector (Z) register is referred to as the "vector length".
-+
-+To avoid confusion about the units used to express vector length, the kernel
-+adopts the following conventions:
-+
-+* Vector length (VL) = size of a Z-register in bytes
-+
-+* Vector quadwords (VQ) = size of a Z-register in units of 128 bits
-+
-+(So, VL = 16 * VQ.)
-+
-+The VQ convention is used where the underlying granularity is important, such
-+as in data structure definitions.  In most other situations, the VL convention
-+is used.  This is consistent with the meaning of the "VL" pseudo-register in
-+the SVE instruction set architecture.
-+
-+
-+3.  System call behaviour
-+-------------------------
-+
-+* On syscall, V0..V31 are preserved (as without SVE).  Thus, bits [127:0] of
-+  Z0..Z31 are preserved.  All other bits of Z0..Z31, and all of P0..P15 and FFR
-+  become unspecified on return from a syscall.
-+
-+* The SVE registers are not used to pass arguments to or receive results from
-+  any syscall.
-+
-+* In practice the affected registers/bits will be preserved or will be replaced
-+  with zeros on return from a syscall, but userspace should not make
-+  assumptions about this.  The kernel behaviour may vary on a case-by-case
-+  basis.
-+
-+
-+4.  Signal handling
-+-------------------
-+
-+* A new signal frame record sve_context encodes the SVE registers on signal
-+  delivery. [1]
-+
-+* This record is supplementary to fpsimd_context.  The FPSR and FPCR registers
-+  are only present in fpsimd_context.  For convenience, the content of V0..V31
-+  is duplicated between sve_context and fpsimd_context.
-+
-+* The signal frame record for SVE always contains basic metadata, in particular
-+  the thread's vector length (in sve_context.vl).
-+
-+* The SVE registers may or may not be included in the record, depending on
-+  whether the registers are live for the thread.  The registers are present if
-+  and only if:
-+  sve_context.head.size >= SVE_SIG_CONTEXT_SIZE(sve_vq_from_vl(sve_context.vl)).
-+
-+* If the registers are present, the remainder of the record has a vl-dependent
-+  size and layout.  Macros SIG_SVE_* are defined [1] to facilitate access to
-+  the members.
-+
-+* If the SVE context is too big to fit in sigcontext.__reserved[], then extra
-+  space is allocated on the stack, an extra_context record is written in
-+  __reserved[] referencing this space.  sve_context is then written in the
-+  extra space.  Refer to [1] for further details about this mechanism.
-+
-+
-+5.  Signal return
-+-----------------
-+
-+When returning from a signal handler:
-+
-+* If there is no sve_context record in the signal frame, or if the record is
-+  present but contains no register data as desribed in the previous section,
-+  then the SVE registers/bits become non-live and take unspecified values.
-+
-+* If sve_context is present in the signal frame and contains full register
-+  data, the SVE registers become live and are populated with the specified
-+  data.  However, for backward compatibility reasons, bits [127:0] of Z0..Z31
-+  are always restored from the corresponding members of fpsimd_context.vregs[]
-+  and not from sve_context.  The remaining bits are restored from sve_context.
-+
-+* Inclusion of fpsimd_context in the signal frame remains mandatory,
-+  irrespective of whether sve_context is present or not.
-+
-+* The vector length cannot be changed via signal return.  If sve_context.vl in
-+  the signal frame does not match the current vector length, the signal return
-+  attempt is treated as illegal, resulting in a forced SIGSEGV.
-+
-+
-+6.  prctl extensions
-+--------------------
-+
-+Some new prctl() calls are added to allow programs to manage the SVE vector
-+length:
-+
-+prctl(PR_SVE_SET_VL, unsigned long arg)
-+
-+    Sets the vector length of the calling thread and related flags, where
-+    arg == vl | flags.
-+
-+    vl is the desired vector length, where sve_vl_valid(vl) must be true.
-+
-+    flags:
-+
-+	PR_SVE_SET_VL_INHERIT
-+
-+	    Inherit the current vector length across execve().  Otherwise, the
-+	    vector length is reset to the system default at execve().  (See
-+	    Section 9.)
-+
-+	PR_SVE_SET_VL_ONEXEC
-+
-+	    Defer the requested vector length change until the next execve().
-+	    This allows launching of a new program with a different vector
-+	    length, while avoiding runtime side effects in the caller.
-+
-+	    This also overrides the effect of PR_SVE_SET_VL_INHERIT for the
-+	    first execve().
-+
-+	    Without PR_SVE_SET_VL_ONEXEC, any outstanding deferred vector
-+	    length change is cancelled.
-+
-+    Return value: a nonnegative on success, or a negative value on error:
-+	EINVAL: SVE not supported, invalid vector length requested, or
-+	    invalid flags.
-+
-+    On success, the calling thread's vector length is changed to the largest
-+    value supported by the system that is less than or equal to vl.
-+    If vl == SVE_VL_MAX, the calling thread's vector length is changed to the
-+    largest value supported by the system.
-+
-+    The returned value describes the resulting configuration, encoded as for
-+    PR_SVE_GET_VL.
-+
-+    Changing the vector length causes all of P0..P15, FFR and all bits of
-+    Z0..V31 except for Z0 bits [127:0] .. Z31 bits [127:0] to become
-+    unspecified.  Calling PR_SVE_SET_VL with vl equal to the thread's current
-+    vector length does not constitute a change to the vector length for this
-+    purpose.
-+
-+
-+prctl(PR_SVE_GET_VL)
-+
-+    Gets the vector length of the calling thread.
-+
-+    The following flag may be OR-ed into the result:
-+
-+	PR_SVE_SET_VL_INHERIT
-+
-+	    Vector length will be inherited across execve().
-+
-+    There is no way to determine whether there is an outstanding deferred
-+    vector length change (which would only normally be the case between a
-+    fork() or vfork() and the corresponding execve() in typical use).
-+
-+    To extract the vector length from the result, and it with
-+    PR_SVE_VL_LEN_MASK.
-+
-+    Return value: a nonnegative value on success, or a negative value on error:
-+	EINVAL: SVE not supported.
-+
-+
-+7.  ptrace extensions
-+---------------------
-+
-+* A new regset NT_ARM_SVE is defined for use with PTRACE_GETREGSET and
-+  PTRACE_SETREGSET.
-+
-+  Refer to [2] for definitions.
-+
-+The regset data starts with struct user_sve_header, containing:
-+
-+    size
-+
-+	Size of the complete regset, in bytes.
-+	This depends on vl and possibly on other things in the future.
-+
-+	If a call to PTRACE_GETREGSET requests less data than the value of
-+	size, the caller can allocate a larger buffer and retry in order to
-+	read the complete regset.
-+
-+    max_size
-+
-+	Maximum size in bytes that the regset can grow to for the target
-+	thread.  The regset won't grow bigger than this even if the target
-+	thread changes its vector length etc.
-+
-+    vl
-+
-+	Target thread's current vector length, in bytes.
-+
-+    max_vl
-+
-+	Maximum possible vector length for the target thread.
-+
-+    flags
-+
-+	either
-+
-+	    SVE_PT_REGS_FPSIMD
-+
-+		SVE registers are not live (GETREGSET) or are to be made
-+		non-live (SETREGSET).
-+
-+		The payload is of type struct user_fpsimd_state, with the same
-+		meaning as for NT_PRFPREG, starting at offset
-+		SVE_PT_FPSIMD_OFFSET from the start of user_sve_header.
-+
-+		Extra data might be appended in the future: the size of the
-+		payload should be obtained using SVE_PT_FPSIMD_SIZE(vq, flags).
-+
-+		vq should be obtained using sve_vq_from_vl(vl).
-+
-+		or
-+
-+	    SVE_PT_REGS_SVE
-+
-+		SVE registers are live (GETREGSET) or are to be made live
-+		(SETREGSET).
-+
-+		The payload contains the SVE register data, starting at offset
-+		SVE_PT_SVE_OFFSET from the start of user_sve_header, and with
-+		size SVE_PT_SVE_SIZE(vq, flags);
-+
-+	... OR-ed with zero or more of the following flags, which have the same
-+	meaning and behaviour as the corresponding PR_SET_VL_* flags:
-+
-+	    SVE_PT_VL_INHERIT
-+
-+	    SVE_PT_VL_ONEXEC (SETREGSET only).
-+
-+* The effects of changing the vector length and/or flags are equivalent to
-+  those documented for PR_SVE_SET_VL.
-+
-+* In the SVE_PT_REGS_SVE case, the size and layout of the payload depends on
-+  the header fields.  The SVE_PT_SVE_*() macros are provided to facilitate
-+  access to the members.
-+
-+* In either case, for SETREGSET it is permissible to omit the payload, in which
-+  case only the vector length and flags are changed (along with any
-+  consequences of those changes).
-+
-+  The effect of writing a partial, incomplete payload is unspecified.
-+
-+
-+8.  ELF coredump extensions
-+---------------------------
-+
-+* A NT_ARM_SVE note will be added to each coredump for each thread of the
-+  dumped process.  The contents will be equivalent to the data that would have
-+  been read if a PTRACE_GETREGSET of NT_ARM_SVE were executed for each thread
-+  when the coredump was generated.
-+
-+  Each of these notes may be padded up to a larger size: if so, the surplus
-+  data should be ignored when parsing the coredump.
-+
-+
-+9.  System runtime configuration
-+--------------------------------
-+
-+* To mitigate the ABI impact of expansion of the signal frame, a policy
-+  mechanism is provided for administrators, distro maintainers and developers
-+  to set the default vector length for userspace processes:
-+
-+/proc/cpu/sve_default_vector_length
-+
-+    Writing the text representation of an integer to this file sets the system
-+    default vector length to the specified value, unless the value is greater
-+    than the maximum vector length supported by the system in which case the
-+    default vector length is set to that maximum.
-+
-+    The result can be determined by reopening the file and reading its
-+    contents.
-+
-+    At boot, the default vector length is initially set to 64 or the maximum
-+    supported vector length, whichever is smaller.  This determines the initial
-+    vector length of the init process (PID 1).
-+
-+    Reading this file returns the current system default vector length.
-+
-+* At every execve() call, the new vector length of the new process is set to
-+  the system default vector length, unless
-+
-+    * PR_SVE_SET_VL_INHERIT (or equivalently SVE_PT_VL_INHERIT) is set for the
-+      calling thread, or
-+
-+    * a deferred vector length change is pending, established via the
-+      PR_SVE_SET_VL_ONEXEC flag (or SVE_PT_VL_ONEXEC).
-+
-+* Modifying the system default vector length does not affect the vector length
-+  of any existing process or thread that does not make an execve() call.
-+
-+
-+Appendix A.  SVE programmer's model (informative)
-+=================================================
-+
-+This section provides a minimal description of the additions made by SVE to the
-+ARMv8-A programmer's model that are relevant to this document.
-+
-+Note: This section is for information only and not intended to be complete or
-+to replace any architectural specification.
-+
-+A.1.  Registers
-+---------------
-+
-+In A64 state, SVE adds the following:
-+
-+* 32 8VL-bit vector registers Z0..Z31
-+  For each Zn, Zn bits [127:0] alias the ARMv8-A vector register Vn.
-+
-+  A register write using a Vn register name zeros all bits of the corresponding
-+  Zn except for bits [127:0].
-+
-+* 16 VL-bit predicate registers P0..P15
-+
-+* 1 VL-bit special-purpose predicate register FFR (the "first-fault register")
-+
-+* a VL "pseudo-register" that determines the size of each vector register
-+
-+  The SVE instruction set architecture provides no way to write VL directly.
-+  Instead, it can be modified only by EL1 and above, by writing appropriate
-+  system registers.
-+
-+* The value of VL can be configured at runtime by EL1 and above:
-+  16 <= VL <= VLmax, where VL must be a multiple of 16.
-+
-+* The maximum vector length is determined by the hardware:
-+  16 <= VLmax <= 256.
-+
-+  (The SVE architecture specifies 256, but permits future architecture
-+  revisions to raise this limit.)
-+
-+* FPSR and FPCR are retained from ARMv8-A, and interact with SVE floating-point
-+  operations in a similar way to the way in which they interact with ARMv8
-+  floating-point operations.
-+
-+         8VL-1                       128               0  bit index
-+        +----          ////            -----------------+
-+     Z0 |                               :       V0      |
-+      :                                          :
-+     Z7 |                               :       V7      |
-+     Z8 |                               :     * V8      |
-+      :                                       :  :
-+    Z15 |                               :     *V15      |
-+    Z16 |                               :      V16      |
-+      :                                          :
-+    Z31 |                               :      V31      |
-+        +----          ////            -----------------+
-+                                                 31    0
-+         VL-1                  0                +-------+
-+        +----       ////      --+          FPSR |       |
-+     P0 |                       |               +-------+
-+      : |                       |         *FPCR |       |
-+    P15 |                       |               +-------+
-+        +----       ////      --+
-+    FFR |                       |               +-----+
-+        +----       ////      --+            VL |     |
-+                                                +-----+
-+
-+(*) callee-save:
-+    This only applies to bits [63:0] of Z-/V-registers.
-+    FPCR contains callee-save and caller-save bits.  See [3] for details.
-+
-+
-+A.2.  Procedure call standard
-+-----------------------------
-+
-+The ARMv8-A base procedure call standard is extended as follows with respect to
-+the additional SVE register state:
-+
-+* All SVE register bits that are not shared with FP/SIMD are caller-save.
-+
-+* Z8 bits [63:0] .. Z15 bits [63:0] are callee-save.
-+
-+  This follows from the way these bits are mapped to V8..V15, which are caller-
-+  save in the base procedure call standard.
-+
-+
-+Appendix B.  ARMv8-A FP/SIMD programmer's model
-+===============================================
-+
-+Note: This section is for information only and not intended to be complete or
-+to replace any architectural specification.
-+
-+Refer to [3] for for more information.
-+
-+ARMv8-A defines the following floating-point / SIMD register state:
-+
-+* 32 128-bit vector registers V0..V31
-+* 2 32-bit status/control registers FPSR, FPCR
-+
-+         127           0  bit index
-+        +---------------+
-+     V0 |               |
-+      : :               :
-+     V7 |               |
-+   * V8 |               |
-+   :  : :               :
-+   *V15 |               |
-+    V16 |               |
-+      : :               :
-+    V31 |               |
-+        +---------------+
-+
-+                 31    0
-+                +-------+
-+           FPSR |       |
-+                +-------+
-+          *FPCR |       |
-+                +-------+
-+
-+(*) callee-save:
-+    This only applies to bits [63:0] of V-registers.
-+    FPCR contains a mixture of callee-save and caller-save bits.
-+
-+
-+References
-+==========
-+
-+[1] arch/arm64/include/uapi/asm/sigcontext.h
-+    AArch64 Linux signal ABI definitions
-+
-+[2] arch/arm64/include/uapi/asm/ptrace.h
-+    AArch64 Linux ptrace ABI definitions
-+
-+[3] ARM IHI0055C
-+    http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055c/IHI0055C_beta_aapcs64.pdf
-+    http://infocenter.arm.com/help/topic/com.arm.doc.subset.swdev.abi/index.html
-+    Procedure Call Standard for the ARM 64-bit Architecture (AArch64)
--- 
-2.1.4
+IIUC we're protected by the huge_pte_lock(.).
+
+> 
+> BTW, it seems a bit overkill to use ptep_get_and_clear() (via
+> get_clear_flush) when we just want to zero the entries. Probably not
+> much overhead though.
+>
+
+I think we need the TLB invalidate here to ensure there's zero possibility of
+conflicting TLB entries being in play.
+ 
+> > @@ -222,6 +256,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+> >  	int ncontig, i, changed = 0;
+> >  	size_t pgsize = 0;
+> >  	unsigned long pfn = pte_pfn(pte), dpfn;
+> > +	pte_t orig_pte;
+> >  	pgprot_t hugeprot;
+> >  
+> >  	if (!pte_cont(pte))
+> > @@ -231,10 +266,12 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+> >  	dpfn = pgsize >> PAGE_SHIFT;
+> >  	hugeprot = pte_pgprot(pte);
+> >  
+> > -	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
+> > -		changed |= ptep_set_access_flags(vma, addr, ptep,
+> > -				pfn_pte(pfn, hugeprot), dirty);
+> > -	}
+> > +	orig_pte = get_clear_flush(vma->vm_mm, addr, ptep, pgsize, ncontig);
+> > +	if (!pte_same(orig_pte, pte))
+> > +		changed = 1;
+> > +
+> > +	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
+> > +		set_pte_at(vma->vm_mm, addr, ptep, pfn_pte(pfn, hugeprot));
+> >  
+> >  	return changed;
+> >  }
+> 
+> If hugeprot isn't dirty but orig_pte became dirty, it looks like we just
+> drop such information from the new pte.
+
+Ahhh... okay, I will have a think about this, thanks!
+
+> 
+> Same comment here about the window. huge_ptep_set_access_flags() is
+> called on a present (huge) pte and we briefly make it invalid. Can the
+> mm subsystem cope with a fault on another CPU here? Same for the
+> huge_ptep_set_wrprotect() below.
+
+I think the fault handler will wait for the huge_pte_lock(.).
+
+> 
+> > @@ -244,6 +281,9 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
+> >  {
+> >  	int ncontig, i;
+> >  	size_t pgsize;
+> > +	pte_t pte = pte_wrprotect(huge_ptep_get(ptep)), orig_pte;
+> > +	unsigned long pfn = pte_pfn(pte), dpfn;
+> > +	pgprot_t hugeprot;
+> >  
+> >  	if (!pte_cont(*ptep)) {
+> >  		ptep_set_wrprotect(mm, addr, ptep);
+> > @@ -251,8 +291,15 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
+> >  	}
+> >  
+> >  	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
+> > -	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize)
+> > -		ptep_set_wrprotect(mm, addr, ptep);
+> > +	dpfn = pgsize >> PAGE_SHIFT;
+> > +
+> > +	orig_pte = get_clear_flush(mm, addr, ptep, pgsize, ncontig);
+> > +	if (pte_dirty(orig_pte))
+> > +		pte = pte_mkdirty(pte);
+> > +
+> > +	hugeprot = pte_pgprot(pte);
+> > +	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
+> > +		set_pte_at(mm, addr, ptep, pfn_pte(pfn, hugeprot));
+> >  }
+> >  
+> >  void huge_ptep_clear_flush(struct vm_area_struct *vma,
+> 
+
+Cheers Catalin.
