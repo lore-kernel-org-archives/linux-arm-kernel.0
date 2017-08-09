@@ -1,46 +1,64 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 9 Aug 2017 13:22:55 +0800
-Subject: [patch v2 1/2] drivers: jtag: Add JTAG core driver
-In-Reply-To: <1502115467-1735-2-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <201708091323.G1dgtioU%fengguang.wu@intel.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 9 Aug 2017 13:29:49 +0800
+Subject: [PATCH v2 4/4] dt-bindings: phy-mt65xx-usb: supports PCIe,
+ SATA and rename file
+In-Reply-To: <d58705436a2563b87a67609a472db3c3d84b36f5.1502256365.git.chunfeng.yun@mediatek.com>
+References: <d58705436a2563b87a67609a472db3c3d84b36f5.1502256365.git.chunfeng.yun@mediatek.com>
+Message-ID: <b2d4141dd3c0dc33d60a727561014d91c5f70176.1502256365.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oleksandr,
+add support for PCIe and SATA, also add some new compatibles.
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.13-rc4 next-20170808]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+due to phy-mt65xx-usb.txt holds the bindings for all mediatek SoCs
+with T-PHY controller, change the name to phy-mtk-tphy.txt to
+reflect that.
 
-url:    https://github.com/0day-ci/linux/commits/Oleksandr-Shamray/drivers-jtag-Add-JTAG-core-driver/20170809-100030
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All errors (new ones prefixed by >>):
-
-   In file included from include/linux/jtag.h:14:0,
-                    from drivers/jtag/jtag.c:13:
->> include/uapi/linux/jtag.h:14:19: fatal error: types.h: No such file or directory
-    #include <types.h>
-                      ^
-   compilation terminated.
-
-vim +14 include/uapi/linux/jtag.h
-
-    13	
-  > 14	#include <types.h>
-    15	
-
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 61093 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170809/2124f154/attachment-0001.gz>
+ .../phy/{phy-mt65xx-usb.txt => phy-mtk-tphy.txt}        | 17 ++++++++++++-----
+ 1 file changed, 12 insertions(+), 5 deletions(-)
+ rename Documentation/devicetree/bindings/phy/{phy-mt65xx-usb.txt => phy-mtk-tphy.txt} (88%)
+
+diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
+similarity index 88%
+rename from Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+rename to Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
+index 0acc5a9..faf1808 100644
+--- a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
++++ b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
+@@ -1,13 +1,18 @@
+-mt65xx USB3.0 PHY binding
++MediaTek T-PHY binding
+ --------------------------
+ 
+-This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
++T-phy controller supports physical layer functionality for a number of
++controllers on MediaTek SoCs, such as, USB2.0, USB3.0, PCIe, and SATA.
+ 
+ Required properties (controller (parent) node):
+  - compatible	: should be one of
+-		  "mediatek,mt2701-u3phy"
+-		  "mediatek,mt2712-u3phy"
+-		  "mediatek,mt8173-u3phy"
++		  "mediatek,generic-tphy-v1"
++		  "mediatek,generic-tphy-v2"
++		  "mediatek,mt2701-u3phy" (deprecated)
++		  "mediatek,mt2712-u3phy" (deprecated)
++		  "mediatek,mt8173-u3phy";
++		  make use of "mediatek,generic-tphy-v1" on mt2701 instead and
++		  "mediatek,generic-tphy-v2" on mt2712 instead.
+  - clocks	: (deprecated, use port's clocks instead) a list of phandle +
+ 		  clock-specifier pairs, one for each entry in clock-names
+  - clock-names	: (deprecated, use port's one instead) must contain
+@@ -35,6 +40,8 @@ Required properties (port (child) node):
+ 		  cell after port phandle is phy type from:
+ 			- PHY_TYPE_USB2
+ 			- PHY_TYPE_USB3
++			- PHY_TYPE_PCIE
++			- PHY_TYPE_SATA
+ 
+ Example:
+ 
+-- 
+1.9.1
