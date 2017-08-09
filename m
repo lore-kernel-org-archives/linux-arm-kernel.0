@@ -1,86 +1,108 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 8 Aug 2017 22:02:36 -0500
-Subject: [PATCH v9 1/4] PCI: Add new PCIe Fabric End Node flag,
- PCI_DEV_FLAGS_NO_RELAXED_ORDERING
-In-Reply-To: <MWHPR12MB1600249E96C320D5472F77ADC88B0@MWHPR12MB1600.namprd12.prod.outlook.com>
-References: <1501917313-9812-1-git-send-email-dingtianhong@huawei.com>
- <1501917313-9812-2-git-send-email-dingtianhong@huawei.com>
- <20170808232200.GO16580@bhelgaas-glaptop.roam.corp.google.com>
- <MWHPR12MB1600249E96C320D5472F77ADC88B0@MWHPR12MB1600.namprd12.prod.outlook.com>
-Message-ID: <20170809030236.GA7191@bhelgaas-glaptop.roam.corp.google.com>
+From: gklkml16@gmail.com (Ganapatrao Kulkarni)
+Date: Wed, 9 Aug 2017 08:54:16 +0530
+Subject: [PATCH v2 0/4] Optimise 64-bit IOVA allocations
+In-Reply-To: <598A6877.4050307@huawei.com>
+References: <cover.1500636791.git.robin.murphy@arm.com>
+ <20170726110807.GN15833@8bytes.org> <59787A48.6060200@huawei.com>
+ <CAKTKpr5j8gfurks-7U__w5GQ4A9Wk2MKyqZy6Dbve=2CfVRvzw@mail.gmail.com>
+ <598A6877.4050307@huawei.com>
+Message-ID: <CAKTKpr7vTzfGDvPDD4HipLYkkO4mfPLcL+3PXDHjb-bQwFMHUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 09, 2017 at 01:40:01AM +0000, Casey Leedom wrote:
-> | From: Bjorn Helgaas <helgaas@kernel.org>
-> | Sent: Tuesday, August 8, 2017 4:22 PM
-> | 
-> | This needs to include a link to the Intel spec
-> | (https://software.intel.com/sites/default/files/managed/9e/bc/64-ia-32-architectures-optimization-manual.pdf,
-> | sec 3.9.1).
-> 
->   In the commit message or as a comment?  Regardless, I agree.  It's always
-> nice to be able to go back and see what the official documentation says.
-> However, that said, links on the internet are ... fragile as time goes by,
-> so we might want to simply quote section 3.9.1 in the commit message since
-> it's relatively short:
-> 
->     3.9.1 Optimizing PCIe Performance for Accesses Toward Coherent Memory
->           and Toward MMIO Regions (P2P)
-> 
->     In order to maximize performance for PCIe devices in the processors
->     listed in Table 3-6 below, the soft- ware should determine whether the
->     accesses are toward coherent memory (system memory) or toward MMIO
->     regions (P2P access to other devices). If the access is toward MMIO
->     region, then software can command HW to set the RO bit in the TLP
->     header, as this would allow hardware to achieve maximum throughput for
->     these types of accesses. For accesses toward coherent memory, software
->     can command HW to clear the RO bit in the TLP header (no RO), as this
->     would allow hardware to achieve maximum throughput for these types of
->     accesses.
-> 
->     Table 3-6. Intel Processor CPU RP Device IDs for Processors Optimizing
->                PCIe Performance
-> 
->     Processor                            CPU RP Device IDs
-> 
->     Intel Xeon processors based on       6F01H-6F0EH
->     Broadwell microarchitecture
-> 
->     Intel Xeon processors based on       2F01H-2F0EH
->     Haswell microarchitecture
+On Wed, Aug 9, 2017 at 7:12 AM, Leizhen (ThunderTown)
+<thunder.leizhen@huawei.com> wrote:
+>
+>
+> On 2017/8/8 20:03, Ganapatrao Kulkarni wrote:
+>> On Wed, Jul 26, 2017 at 4:47 PM, Leizhen (ThunderTown)
+>> <thunder.leizhen@huawei.com> wrote:
+>>>
+>>>
+>>> On 2017/7/26 19:08, Joerg Roedel wrote:
+>>>> Hi Robin.
+>>>>
+>>>> On Fri, Jul 21, 2017 at 12:41:57PM +0100, Robin Murphy wrote:
+>>>>> Hi all,
+>>>>>
+>>>>> In the wake of the ARM SMMU optimisation efforts, it seems that certain
+>>>>> workloads (e.g. storage I/O with large scatterlists) probably remain quite
+>>>>> heavily influenced by IOVA allocation performance. Separately, Ard also
+>>>>> reported massive performance drops for a graphical desktop on AMD Seattle
+>>>>> when enabling SMMUs via IORT, which we traced to dma_32bit_pfn in the DMA
+>>>>> ops domain getting initialised differently for ACPI vs. DT, and exposing
+>>>>> the overhead of the rbtree slow path. Whilst we could go around trying to
+>>>>> close up all the little gaps that lead to hitting the slowest case, it
+>>>>> seems a much better idea to simply make said slowest case a lot less slow.
+>>>>
+>>>> Do you have some numbers here? How big was the impact before these
+>>>> patches and how is it with the patches?
+>>> Here are some numbers:
+>>>
+>>> (before)$ iperf -s
+>>> ------------------------------------------------------------
+>>> Server listening on TCP port 5001
+>>> TCP window size: 85.3 KByte (default)
+>>> ------------------------------------------------------------
+>>> [  4] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 35898
+>>> [ ID] Interval       Transfer     Bandwidth
+>>> [  4]  0.0-10.2 sec  7.88 MBytes  6.48 Mbits/sec
+>>> [  5] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 35900
+>>> [  5]  0.0-10.3 sec  7.88 MBytes  6.43 Mbits/sec
+>>> [  4] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 35902
+>>> [  4]  0.0-10.3 sec  7.88 MBytes  6.43 Mbits/sec
+>>>
+>>> (after)$ iperf -s
+>>> ------------------------------------------------------------
+>>> Server listening on TCP port 5001
+>>> TCP window size: 85.3 KByte (default)
+>>> ------------------------------------------------------------
+>>> [  4] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 36330
+>>> [ ID] Interval       Transfer     Bandwidth
+>>> [  4]  0.0-10.0 sec  1.09 GBytes   933 Mbits/sec
+>>> [  5] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 36332
+>>> [  5]  0.0-10.0 sec  1.10 GBytes   939 Mbits/sec
+>>> [  4] local 192.168.1.106 port 5001 connected with 192.168.1.198 port 36334
+>>> [  4]  0.0-10.0 sec  1.10 GBytes   938 Mbits/sec
+>>>
+>>
+>> Is this testing done on Host or on Guest/VM?
+> Host
 
-Agreed, links are prone to being broken.  I would include in the
-changelog the complete title and order number, along with the link as
-a footnote.  Wouldn't hurt to quote the section too, since it's short.
+As per your log, iperf throughput is improved to 938 Mbits/sec
+from  6.43 Mbits/sec.
+IMO, this seems to be unrealistic, some thing wrong with the testing?
 
-> | It should also include a pointer to the AMD erratum, if available, or
-> | at least some reference to how we know it doesn't obey the rules.
-> 
->   Getting an ACK from AMD seems like a forlorn cause at this point.  My
-> contact was Bob Shaw <Bob.Shaw@amd.com> and he stopped responding to me
-> messages almost a year ago saying that all of AMD's energies were being
-> redirected towards upcoming x86 products (likely Ryzen as we now know).  As
-> far as I can tell AMD has walked away from their A1100 (AKA "Seattle") ARM
-> SoC.
-> 
->   On the specific issue, I can certainly write up somthing even more
-> extensive than I wrote up for the comment in drivers/pci/quirks.c.  Please
-> review the comment I wrote up and tell me if you'd like something even more
-> detailed -- I'm usually acused of writing comments which are too long, so
-> this would be a new one on me ... :-)
+>
+>>
+>>>>
+>>>>
+>>>>       Joerg
+>>>>
+>>>>
+>>>> .
+>>>>
+>>>
+>>> --
+>>> Thanks!
+>>> BestRegards
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>> thanks
+>> Ganapat
+>>
+>> .
+>>
+>
+> --
+> Thanks!
+> BestRegards
+>
 
-If you have any bug reports with info about how you debugged it and
-concluded that Seattle is broken, you could include a link (probably
-in the changelog).  But if there isn't anything, there isn't anything.
-
-I might reorganize those patches as:
-
-  1) Add a PCI_DEV_FLAGS_RELAXED_ORDERING_BROKEN flag, the quirk that
-  sets it, and the current patch [2/4] that uses it.
-
-  2) Add the Intel DECLARE_PCI_FIXUP_CLASS_EARLY()s with the Intel
-  details.
-
-  3) Add the AMD DECLARE_PCI_FIXUP_CLASS_EARLY()s with the AMD
-  details.
+thanks
+Ganapat
