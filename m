@@ -1,167 +1,48 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 9 Aug 2017 22:48:00 +0800
-Subject: [RFC PATCH 3/4] ACPI: IORT: Skip SMMUv3 device ID map for two
- steps mappings
-In-Reply-To: <a5d9600e-1461-492a-05d8-338f93fa04c4@arm.com>
-References: <1502276017-63108-1-git-send-email-guohanjun@huawei.com>
- <1502276017-63108-4-git-send-email-guohanjun@huawei.com>
- <a5d9600e-1461-492a-05d8-338f93fa04c4@arm.com>
-Message-ID: <CAGHbJ3Bif=Lg7AOErohFG_wkdXAJi+E+zbud4hJGHCzh=VTegQ@mail.gmail.com>
+From: sean@mess.org (Sean Young)
+Date: Wed, 9 Aug 2017 15:42:44 +0100
+Subject: [PATCH v2 3/3] rc: add zx-irdec remote control driver
+In-Reply-To: <20170809134816.GA31819@dragon>
+References: <1501420993-21977-1-git-send-email-shawnguo@kernel.org>
+ <1501420993-21977-4-git-send-email-shawnguo@kernel.org>
+ <20170809130029.eneyqstlejfkotz2@gofer.mess.org>
+ <20170809134816.GA31819@dragon>
+Message-ID: <20170809144244.6l6k2hllp7fc34pr@gofer.mess.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hi Shawn,
 
-On 9 August 2017 at 19:50, Robin Murphy <robin.murphy@arm.com> wrote:
-> Hi Hanjun,
->
-> It's a nice surprise to see this already; one less thing for us to do :)
+On Wed, Aug 09, 2017 at 09:48:18PM +0800, Shawn Guo wrote:
+> On Wed, Aug 09, 2017 at 02:00:29PM +0100, Sean Young wrote:
+> > On Sun, Jul 30, 2017 at 09:23:13PM +0800, Shawn Guo wrote:
+> > > From: Shawn Guo <shawn.guo@linaro.org>
+> > > 
+> > > It adds the remote control driver and corresponding keymap file for
+> > > IRDEC block found on ZTE ZX family SoCs.
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > ---
+> > >  drivers/media/rc/Kconfig               |  11 ++
+> > >  drivers/media/rc/Makefile              |   1 +
+> > >  drivers/media/rc/keymaps/Makefile      |   3 +-
+> > >  drivers/media/rc/keymaps/rc-zx-irdec.c |  79 ++++++++++++++
+> > >  drivers/media/rc/zx-irdec.c            | 183 +++++++++++++++++++++++++++++++++
+> > >  include/media/rc-map.h                 |   1 +
+> > >  6 files changed, 277 insertions(+), 1 deletion(-)
+> > >  create mode 100644 drivers/media/rc/keymaps/rc-zx-irdec.c
+> > >  create mode 100644 drivers/media/rc/zx-irdec.c
+> > 
+> > We're missing an MAINTAINERS entry for this driver. Could this be added
+> > please as a separate patch?
+> 
+> We are using 'ARM/ZTE ARCHITECTURE' entry in MAINTAINERS for ZTE ZX
+> drivers.  I plan to send a separate patch going through arm-soc tree,
+> updating MAINTAINERS for those new ZTE ZX drivers landed on mainline
+> during 4.14 merge window.  IRDEC will be covered by that patch.  Is that
+> okay?
 
-Glad to hear this patch set helps :)
+Of course.
 
->
-> On 09/08/17 11:53, Hanjun Guo wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.org>
->>
->> IORT revision C introduced SMMUv3 MSI support which adding a
->> device ID mapping index in SMMUv3 sub table, to get the SMMUv3
->> device ID mapping for the output ID (dev ID for ITS) and the
->> link to which ITS.
->>
->> So if a platform supports SMMUv3 MSI for control interrupt,
->> there will be a additional single map entry under SMMU, this
->> will not introduce any difference for devices just use one
->> step map to get its output ID and parent (ITS or SMMU), such
->> as PCI/NC/PMCG ---> ITS or PCI/NC ---> SMMU, but we need to
->> do the spcial handling for two steps map case such as
->> PCI/NC--->SMMUv3--->ITS.
->>
->> Take a PCI hostbridge for example,
->>
->> |----------------------|
->> |  Root Complex Node   |
->> |----------------------|
->> |    map entry[x]      |
->> |----------------------|
->> |       id value       |
->> | output_reference     |
->> |---|------------------|
->>     |
->>     |   |----------------------|
->>     |-->|        SMMUv3        |
->>         |----------------------|
->>         |     SMMU dev ID      |
->>         |     mapping index 0  |
->>         |----------------------|
->>         |      map entry[0]    |
->>         |----------------------|
->>         |       id value       |
->>         | output_reference-----------> ITS 1 (SMMU MSI domain)
->>         |----------------------|
->>         |      map entry[1]    |
->>         |----------------------|
->>         |       id value       |
->>         | output_reference-----------> ITS 2 (PCI MSI domain)
->>         |----------------------|
->>
->> When the SMMU dev ID mapping index is 0, there is entry[0]
->> to map to a ITS, we need to skip that map entry for PCI
->> or NC (named component), or we may get the wrong ITS parent.
->>
->> For now we have two APIs for ID mapping, iort_node_map_id()
->> and iort_node_map_platform_id(), and iort_node_map_id() is
->> used for optional two steps mapping, so we just need to
->> skip the map entry in iort_node_map_id() for non-SMMUv3
->> devices.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>  drivers/acpi/arm64/iort.c | 37 ++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 36 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
->> index 32bd4a4..9439f02 100644
->> --- a/drivers/acpi/arm64/iort.c
->> +++ b/drivers/acpi/arm64/iort.c
->> @@ -366,6 +366,28 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
->>       return NULL;
->>  }
->>
->> +static int iort_get_smmu_v3_id_mapping_index(struct acpi_iort_node *node,
->> +                                          u32 *index)
->> +{
->> +     struct acpi_iort_smmu_v3 *smmu;
->> +
->> +     /*
->> +      * SMMUv3 dev ID mapping index was introdueced in revision 1
->> +      * table, not avaible in revision 0
->> +      */
->> +     if (node->revision < 1)
->> +             return -EINVAL;
->> +
->> +     smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
->> +     /* if any of the gsi for control interrupts is not 0, ignore the MSI */
->
-> IORT says "If all the SMMU control interrupts are GSIV based, this
-> field is ignored" - not "any". There doesn't seem to be any reason to
-> disallow a mixture of MSIs and GSIs.
+Thanks,
 
-Hmm, since GSIV for control interrupts are SPI, those GSIVs should not
-be zero, does it mean we need the code below?
-
-if (smmu->event_gsiv && smmu->pri_gsiv && smmu->gerr_gsiv && smmu->sync_gsiv)
-        return -EINVAL;
-
-This seems not consistent with the code for now (parsing
-the SMMU GSIV for SMMU platform device).
-
->
->> +     if (smmu->event_gsiv || smmu->pri_gsiv || smmu->gerr_gsiv
->> +         || smmu->sync_gsiv)
->> +             return -EINVAL;
->> +
->> +     *index = smmu->id_mapping_index;
->> +     return 0;
->> +}
->> +
->>  static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
->>                                              u32 id_in, u32 *id_out,
->>                                              u8 type_mask)
->> @@ -375,7 +397,9 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
->>       /* Parse the ID mapping tree to find specified node type */
->>       while (node) {
->>               struct acpi_iort_id_mapping *map;
->> -             int i;
->> +             int i, ret = -EINVAL;
->> +             /* big enough for an invalid id index in practical */
->> +             u32 index = U32_MAX;
->>
->>               if (IORT_TYPE_MASK(node->type) & type_mask) {
->>                       if (id_out)
->> @@ -396,8 +420,19 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
->>                       goto fail_map;
->>               }
->>
->> +             /*
->> +              *  we need to get SMMUv3 dev ID mapping index and skip its
->> +              *  associated ID map for single mapping cases.
->> +              */
->> +             if (node->type == ACPI_IORT_NODE_SMMU_V3)
->> +                     ret = iort_get_smmu_v3_id_mapping_index(node, &index);
->> +
->>               /* Do the ID translation */
->>               for (i = 0; i < node->mapping_count; i++, map++) {
->> +                     /* if it's a SMMUv3 device id mapping index, skip it */
->> +                     if (!ret && i == index)
->
-> Given that i is an int anyway, there doesn't seem to be much need for
-> the ret dance - iort_get_smmu_v3_id_mapping_index() could just return
-> the index/error value as an int directly. You can rely on (i == index)
-> being false if index is negative, because for node->mapping_count to
-> overflow INT_MAX the IORT would have to be over 40GB in size, which is
-> definitely impossible.
-
-Good point, it will simplify the code, I will update this patch :)
-
-Thanks
-Hanjun
+Sean
