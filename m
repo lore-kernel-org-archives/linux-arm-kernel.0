@@ -1,69 +1,42 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 8 Aug 2017 19:00:32 -0700
-Subject: [PATCH] mm: Revert x86_64 and arm64 ELF_ET_DYN_BASE base
-In-Reply-To: <20170808093450.GA13355@arm.com>
-References: <20170807201542.GA21271@beast> <20170808093450.GA13355@arm.com>
-Message-ID: <CAGXu5jJPrgG9e6pRx_Yc9Y_X7hE8GC5JTbi2QaprfUt16xKaGA@mail.gmail.com>
+From: sz.lin@moxa.com (SZ Lin)
+Date: Wed,  9 Aug 2017 09:59:09 +0800
+Subject: [PATCH] ARM: dts: ls1021a: Add support for QSPI with ls1021a SoC
+Message-ID: <20170809015909.12969-1-sz.lin@moxa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 8, 2017 at 2:34 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Aug 07, 2017 at 01:15:42PM -0700, Kees Cook wrote:
->> Moving the x86_64 and arm64 PIE base from 0x555555554000 to 0x000100000000
->> broke AddressSanitizer. This is a partial revert of:
->>
->>   commit eab09532d400 ("binfmt_elf: use ELF_ET_DYN_BASE only for PIE")
->>   commit 02445990a96e ("arm64: move ELF_ET_DYN_BASE to 4GB / 4MB")
->>
->> The AddressSanitizer tool has hard-coded expectations about where
->> executable mappings are loaded. The motivation for changing the PIE
->> base in the above commits was to avoid the Stack-Clash CVEs that
->> allowed executable mappings to get too close to heap and stack. This
->> was mainly a problem on 32-bit, but the 64-bit bases were moved too,
->> in an effort to proactively protect those systems (proofs of concept
->> do exist that show 64-bit collisions, but other recent changes to fix
->> stack accounting and setuid behaviors will minimize the impact).
->>
->> The new 32-bit PIE base is fine for ASan (since it matches the ET_EXEC
->> base), so only the 64-bit PIE base needs to be reverted to let x86 and
->> arm64 ASan binaries run again. Future changes to the 64-bit PIE base on
->> these architectures can be made optional once a more dynamic method for
->> dealing with AddressSanitizer is found. (e.g. always loading PIE into
->> the mmap region for marked binaries.)
->>
->> Reported-by: Kostya Serebryany <kcc@google.com>
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->> ---
->>  arch/arm64/include/asm/elf.h | 4 ++--
->>  arch/x86/include/asm/elf.h   | 4 ++--
->>  2 files changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
->> index acae781f7359..3288c2b36731 100644
->> --- a/arch/arm64/include/asm/elf.h
->> +++ b/arch/arm64/include/asm/elf.h
->> @@ -114,10 +114,10 @@
->>
->>  /*
->>   * This is the base location for PIE (ET_DYN with INTERP) loads. On
->> - * 64-bit, this is raised to 4GB to leave the entire 32-bit address
->> + * 64-bit, this is above 4GB to leave the entire 32-bit address
->>   * space open for things that want to use the area for 32-bit pointers.
->>   */
->> -#define ELF_ET_DYN_BASE              0x100000000UL
->> +#define ELF_ET_DYN_BASE              (2 * TASK_SIZE_64 / 3)
->>
->>  #ifndef __ASSEMBLY__
->
-> Acked-by: Will Deacon <will.deacon@arm.com>
->
-> I assume this is going via akpm like the original commit?
+Add QSPI node support, and this function is disabled by default
+This setting could be overwritten in board-level definitions
 
-That's my expectation, yup. Thanks for the Ack!
+Signed-off-by: SZ Lin <sz.lin@moxa.com>
+---
+ arch/arm/boot/dts/ls1021a.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
--Kees
-
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index 7bb9df2c1460..9da876e47810 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -154,6 +154,20 @@
+ 			big-endian;
+ 		};
+ 
++		qspi: quadspi at 1550000 {
++			compatible = "fsl,ls1021a-qspi";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x0 0x1550000 0x0 0x10000>,
++			      <0x0 0x40000000 0x0 0x40000000>;
++			reg-names = "QuadSPI", "QuadSPI-memory";
++			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
++			clock-names = "qspi_en", "qspi";
++			clocks = <&clockgen 4 1>, <&clockgen 4 1>;
++			big-endian;
++			status = "disabled";
++		};
++
+ 		esdhc: esdhc at 1560000 {
+ 			compatible = "fsl,esdhc";
+ 			reg = <0x0 0x1560000 0x0 0x10000>;
 -- 
-Kees Cook
-Pixel Security
+2.14.0
