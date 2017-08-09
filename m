@@ -1,72 +1,53 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Wed,  9 Aug 2017 20:13:19 +0800
-Subject: [PATCH v4 10/12] ARM: dts: rk3228-evb: Enable the internal phy for
- gmac
-In-Reply-To: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
-References: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1502280799-2514-1-git-send-email-david.wu@rock-chips.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed,  9 Aug 2017 13:05:33 +0100
+Subject: [RFC PATCH 27/27] arm64/sve: signal: Include SVE when computing
+ AT_MINSIGSTKSZ
+In-Reply-To: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1502280338-23002-28-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the internal phy for rk3228 evb board
-by default.
-To use the external 1000M phy on evb board, need to make
-some switch of evb board to be on.
+The SVE context block in the signal frame needs to be considered
+too when computing the maximum possible signal frame size.
 
-Signed-off-by: David Wu <david.wu@rock-chips.com>
+Because the size of this block depends on the vector length, this
+patch computes the size based not on the thread's current vector
+length but instead on the maximum possible vector length: this
+determines the maximum size of SVE context block that can be
+observed in any signal frame for the lifetime of the process.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm/boot/dts/rk3228-evb.dts | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm64/kernel/signal.c | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3228-evb.dts b/arch/arm/boot/dts/rk3228-evb.dts
-index 5883433..3784f26 100644
---- a/arch/arm/boot/dts/rk3228-evb.dts
-+++ b/arch/arm/boot/dts/rk3228-evb.dts
-@@ -50,6 +50,16 @@
- 		device_type = "memory";
- 		reg = <0x60000000 0x40000000>;
- 	};
-+
-+	vcc_phy: vcc-phy-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		regulator-name = "vcc_phy";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
- };
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 221bcf2..cb01353 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -586,11 +586,18 @@ static int setup_sigframe_layout(struct rt_sigframe_user_layout *user,
+ 	}
  
- &emmc {
-@@ -60,6 +70,28 @@
- 	status = "okay";
- };
+ 	if (system_supports_sve()) {
+-		unsigned int vq = 0;
++		unsigned int vq;
  
-+&gmac {
-+	assigned-clocks = <&cru SCLK_MAC_SRC>;
-+	assigned-clock-rates = <50000000>;
-+	clock_in_out = "output";
-+	phy-supply = <&vcc_phy>;
-+	phy-mode = "rmii";
-+	phy-handle = <&phy0>;
-+	status = "okay";
+-		if (test_thread_flag(TIF_SVE)) {
+-			BUG_ON(!sve_vl_valid(current->thread.sve_vl));
+-			vq = sve_vq_from_vl(current->thread.sve_vl);
++		if (!add_all && !test_thread_flag(TIF_SVE))
++			vq = 0;
++		else {
++			unsigned int vl = sve_max_vl;
 +
-+	mdio {
-+		compatible = "snps,dwmac-mdio";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++			if (!add_all)
++				vl = current->thread.sve_vl;
 +
-+		phy at 0 {
-+			compatible = "ethernet-phy-id1234.d400", "ethernet-phy-802.3-c22";
-+			reg = <0>;
-+			phy-is-internal;
-+		};
-+	};
-+};
-+
- &tsadc {
- 	status = "okay";
++			BUG_ON(!sve_vl_valid(vl));
++			vq = sve_vq_from_vl(vl);
+ 		}
  
+ 		err = sigframe_alloc(user, &user->sve_offset,
 -- 
-1.9.1
+2.1.4
