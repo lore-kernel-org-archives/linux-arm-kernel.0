@@ -1,33 +1,21 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 9 Aug 2017 14:02:42 -0500
-Subject: [PATCH 2/3] [v3] pinctrl: qcom: disable GPIO groups with no pins
-In-Reply-To: <CACRpkdZj+tnMcEpic6PrQS-qMJDodmc_uFJVudxc=USCTXpyKg@mail.gmail.com>
-References: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
- <1501179565-26466-3-git-send-email-timur@codeaurora.org>
- <CACRpkdZj+tnMcEpic6PrQS-qMJDodmc_uFJVudxc=USCTXpyKg@mail.gmail.com>
-Message-ID: <d0b16753-b202-5756-1cba-1cd083af52ed@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 9 Aug 2017 12:05:57 -0700
+Subject: [PATCH 12/15] arm-soc: omap: replace open coded VA->PA
+ calculations
+In-Reply-To: <20170805205222.19868-13-ard.biesheuvel@linaro.org>
+References: <20170805205222.19868-1-ard.biesheuvel@linaro.org>
+ <20170805205222.19868-13-ard.biesheuvel@linaro.org>
+Message-ID: <20170809190556.GD3934@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/31/2017 08:36 AM, Linus Walleij wrote:
->> To support sparse GPIO maps, pinctrl-msm client drivers can specify
->> that a given GPIO has a pin count of zero.  These GPIOs will be
->> considered "hidden".  Any attempt to claim the GPIO will fail, and they
->> will not be listed in debugfs.
->>
->> During a kexec shutdown, machine_kexec_mask_interrupts() will attempt
->> to disable all IRQs, even those that aren't enabled.  This includes
->> GPIOs that are unavailable (npins == 0), so add a check to the irq mask
->> and unmask functions.
->>
->> Signed-off-by: Timur Tabi<timur@codeaurora.org>
+* Ard Biesheuvel <ard.biesheuvel@linaro.org> [170805 13:54]:
+> This replaces a couple of open coded calculations to obtain the
+> physical address of a far symbol with calls to the new adr_l etc
+> macros.
 
-> I'm waiting for Bj?rn's review of the two remaining patches.
+I gave this series a quick test and omap3 no longer boots it seems.
 
-Bj?rn, do you have time to review these patches?  I'm hoping to get them 
-into 4.14.
+Regards,
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Tony
