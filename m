@@ -1,110 +1,21 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 9 Aug 2017 11:09:02 +0100
-Subject: [PATCH v2 18/18] cpufreq: scmi: add support for fast frequency
- switching
-In-Reply-To: <20170809042825.GI28857@vireshk-i7>
-References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
- <1501857104-11279-19-git-send-email-sudeep.holla@arm.com>
- <20170809042825.GI28857@vireshk-i7>
-Message-ID: <0f89f543-39a9-30a5-4976-0c447f5fe843@arm.com>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Wed, 9 Aug 2017 18:12:37 +0800
+Subject: [PATCH 0/2] add cpufreq support to MT7622
+Message-ID: <cover.1502272372.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Sean Wang <sean.wang@mediatek.com>
 
+Add cpufreq support to MT7622 SoC and also include some cleanups
+with the generic naming to explicitly support all MediaTek SoCs.
 
-On 09/08/17 05:28, Viresh Kumar wrote:
-> On 04-08-17, 15:31, Sudeep Holla wrote:
->> The cpufreq core provides option for drivers to implement fast_switch
->> callback which is invoked for frequency switching from interrupt context.
->>
->> This patch adds support for fast_switch callback in SCMI cpufreq driver
->> by making use of polling based SCMI transfer. It also sets the flag
->> fast_switch_possible.
->>
->> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->> Cc: Viresh Kumar <viresh.kumar@linaro.org>
->> Cc: linux-pm at vger.kernel.org
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  drivers/cpufreq/scmi-cpufreq.c | 16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
->>
->> diff --git a/drivers/cpufreq/scmi-cpufreq.c b/drivers/cpufreq/scmi-cpufreq.c
->> index 034359cafea5..cb1084cb1ef1 100644
->> --- a/drivers/cpufreq/scmi-cpufreq.c
->> +++ b/drivers/cpufreq/scmi-cpufreq.c
->> @@ -61,6 +61,19 @@ scmi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
->>  	return perf_ops->freq_set(priv->handle, priv->domain_id, freq, false);
->>  }
->>  
->> +static unsigned int scmi_cpufreq_fast_switch(struct cpufreq_policy *policy,
->> +					     unsigned int target_freq)
->> +{
->> +	struct scmi_data *priv = policy->driver_data;
->> +	struct scmi_perf_ops *perf_ops = priv->handle->perf_ops;
->> +
->> +	if (!perf_ops->freq_set(priv->handle, priv->domain_id,
->> +				target_freq * 1000, true))
->> +		return target_freq;
->> +
->> +	return CPUFREQ_ENTRY_INVALID;
->> +}
-> 
-> This is very much similar to the target routine, perhaps we should write another
-> local routine which is used by both target and fast switch.
-> 
+Sean Wang (2):
+  cpufreq: mediatek: add cleanups with the more generic naming
+  cpufreq: mediatek: add support of cpufreq to MT7622 SoC
 
-Just one difference, fast switch uses polling based mailbox while
-target_index uses interrupt based. I thought initially to reuse, but
-it's comes done to just perf_ops->freq_set, so dropped that idea.
-
-> Do we guarantee that the frequency is changed by the time this routine returns?
-
-No, firmware may return acknowledging the request not it's completion.
-
-> Or we just send a SCMI request and return back ?
-> 
-
-Yes, exactly.
-
-> If we just send the request and don't wait for freq to get changed, what
-> protects another scmi_cpufreq_fast_switch() to get called before the first one
-> is finished? And what will happen on that call ?
-
-Firmware needs to serialize or override based on the timing of the two
-consecutive requests.
-
-> 
->>  static int
->>  scmi_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpumask)
->>  {
->> @@ -164,6 +177,7 @@ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
->>  
->>  	policy->cpuinfo.transition_latency = latency;
->>  
->> +	policy->fast_switch_possible = true;
->>  	return 0;
->>  
->>  out_free_cpufreq_table:
->> @@ -180,6 +194,7 @@ static int scmi_cpufreq_exit(struct cpufreq_policy *policy)
->>  {
->>  	struct scmi_data *priv = policy->driver_data;
->>  
->> +	policy->fast_switch_possible = false;
->>  	cpufreq_cooling_unregister(priv->cdev);
->>  	dev_pm_opp_free_cpufreq_table(priv->cpu_dev, &policy->freq_table);
->>  	dev_pm_opp_cpumask_remove_table(policy->related_cpus);
->> @@ -228,6 +243,7 @@ static struct cpufreq_driver scmi_cpufreq_driver = {
->>  	.init			= scmi_cpufreq_init,
->>  	.exit			= scmi_cpufreq_exit,
->>  	.ready			= scmi_cpufreq_ready,
->> +	.fast_switch		= scmi_cpufreq_fast_switch,
-> 
-> Maybe add it right after target_index ?
-> 
-
-Done
+ drivers/cpufreq/mediatek-cpufreq.c | 27 ++++++++++++++-------------
+ 1 file changed, 14 insertions(+), 13 deletions(-)
 
 -- 
-Regards,
-Sudeep
+2.7.4
