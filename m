@@ -1,78 +1,55 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Wed, 9 Aug 2017 14:41:52 -0700
-Subject: [PATCH v2] iommu/arm-smmu: fix null-pointer dereference in
- arm_smmu_add_device
-In-Reply-To: <20170808112144.GE13355@arm.com>
-References: <20170808092614.GB12887@arm.com>
- <1502187962-16861-1-git-send-email-asavkov@redhat.com>
- <d7a07e48-862d-a6f7-8bad-9c71f5a5be5b@arm.com>
- <20170808112144.GE13355@arm.com>
-Message-ID: <c399a57d-074f-71ee-b467-91cf4e65b3d9@caviumnetworks.com>
+From: code@mmayer.net (Markus Mayer)
+Date: Wed,  9 Aug 2017 14:56:28 -0700
+Subject: [PATCH v3 0/4] thermal: add brcmstb AVS TMON driver
+Message-ID: <20170809215632.4124-1-code@mmayer.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2017 04:21 AM, Will Deacon wrote:
-> [+ Joerg]
-> 
-> On Tue, Aug 08, 2017 at 11:37:40AM +0100, Robin Murphy wrote:
->> On 08/08/17 11:26, Artem Savkov wrote:
->>> Commit c54451a "iommu/arm-smmu: Fix the error path in arm_smmu_add_device"
->>> removed fwspec assignment in legacy_binding path as redundant which is
->>> wrong. It needs to be updated after fwspec initialisation in
->>> arm_smmu_register_legacy_master() as it is dereferenced later. Without
->>> this there is a NULL-pointer dereference panic during boot on some hosts.
->>
->> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
->>
->> Thanks for fixing it up, and sorry for failing to document the
->> unfortunately subtle logic in the first place!
-> 
-> Well, I was the one that messed it up:
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Joerg, can you pick this up as a fix for 4.13, please?
+From: Markus Mayer <mmayer@broadcom.com>
 
-I hit the Oops as well.  This patch fixes it for me on a Cavium CN88xx 
-system, so:
+This series adds the brcmstb AVS TMON driver.
 
-Acked-by: David Daney <david.daney@cavium.com>
+The driver was originally written by Brian Norris.
 
-Thanks for working on this.
+This series is also available at
+https://github.com/mmayer/linux/tree/brcmstb-thermal-4.13-v4.
 
+v1 of this series can be found at https://lkml.org/lkml/2017/6/5/921
+v2 of this series can be found at https://lkml.org/lkml/2017/7/21/585
+v3 of this series can be found at https://lkml.org/lkml/2017/7/31/710
 
+Changes since v3:
+- Rebased on v4.13-rc3 to resolve conflicts in the MAINTAINERS file
 
-> 
-> Will
-> 
->>> Signed-off-by: Artem Savkov <asavkov@redhat.com>
->>> ---
->>>   drivers/iommu/arm-smmu.c | 7 +++++++
->>>   1 file changed, 7 insertions(+)
->>>
->>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->>> index b97188a..2d80fa8 100644
->>> --- a/drivers/iommu/arm-smmu.c
->>> +++ b/drivers/iommu/arm-smmu.c
->>> @@ -1519,6 +1519,13 @@ static int arm_smmu_add_device(struct device *dev)
->>>   
->>>   	if (using_legacy_binding) {
->>>   		ret = arm_smmu_register_legacy_master(dev, &smmu);
->>> +
->>> +		/*
->>> +		 * If dev->iommu_fwspec is initally NULL, arm_smmu_register_legacy_master()
->>> +		 * will allocate/initialise a new one. Thus we need to update fwspec for
->>> +		 * later use.
->>> +		 */
->>> +		fwspec = dev->iommu_fwspec;
->>>   		if (ret)
->>>   			goto out_free;
->>>   	} else if (fwspec && fwspec->ops == &arm_smmu_ops) {
->>>
->>
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Changes since v2:
+- replaced calls to pr_debug() with calls to dev_dbg() [PATCH 2/4 only]
+- all other patches are unchanged from v2
+
+Changes since v1:
+- Fixed wording in binding document
+- Fixed lincensing to consistently mention GPL v2
+- Use thermal_zone_get_slope() and thermal_zone_get_offset()
+- Some minor clean-ups
+
+Brian Norris (2):
+  Documentation: devicetree: add binding for Broadcom STB AVS TMON
+  thermal: add brcmstb AVS TMON driver
+
+Markus Mayer (2):
+  ARM: multi_v7_defconfig: add CONFIG_BRCMSTB_THERMAL
+  arm64: defconfig: add CONFIG_BRCMSTB_THERMAL
+
+ .../devicetree/bindings/thermal/brcm,avs-tmon.txt  |  20 ++
+ MAINTAINERS                                        |   8 +
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ arch/arm64/configs/defconfig                       |   1 +
+ drivers/thermal/Kconfig                            |   2 +-
+ drivers/thermal/broadcom/Kconfig                   |   7 +
+ drivers/thermal/broadcom/Makefile                  |   1 +
+ drivers/thermal/broadcom/brcmstb_thermal.c         | 386 +++++++++++++++++++++
+ 8 files changed, 425 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
+ create mode 100644 drivers/thermal/broadcom/brcmstb_thermal.c
+
+-- 
+2.7.4
