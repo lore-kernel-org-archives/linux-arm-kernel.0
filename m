@@ -1,31 +1,33 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed,  9 Aug 2017 14:18:50 +0800
-Subject: [PATCH] arm64: select PINCTRL for ZTE platform
-Message-ID: <1502259530-4920-1-git-send-email-shawnguo@kernel.org>
+Date: Wed,  9 Aug 2017 14:30:41 +0800
+Subject: [PATCH 00/10] Update arm64 ZTE zx296718 device trees
+Message-ID: <1502260251-6316-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shawn Guo <shawn.guo@linaro.org>
 
-Select PINCTRL for ZTE platform, so that we can have ZX pinctrl driver
-options available for enabling.
+The series updates arm64 ZTE zx296718 device trees with new devices and
+a new zx296718-pcbox board support.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+Shawn Guo (10):
+  arm64: dts: zx296718: add VGA device support
+  arm64: dts: zx296718: add I2S and I2C audio codec
+  arm64: dts: zx296718: add pinctrl and gpio devices
+  arm64: dts: zx296718: set a better parent clock for I2S0
+  arm64: dts: zx296718: add voltage data into OPP table
+  arm64: dts: zx296718: add PWM device support
+  arm64: dts: zx296718: add irdec device for remote control
+  arm64: dts: zx296718-evb: use audio-graph-card for HDMI audio
+  arm64: dts: zx296718-evb: add I2S sound card support
+  arm64: dts: zte: add initial zx296718-pcbox board support
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index f5f0c813dfec..b65a7e876a26 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -250,6 +250,7 @@ config ARCH_XGENE
- 
- config ARCH_ZX
- 	bool "ZTE ZX SoC Family"
-+	select PINCTRL
- 	help
- 	  This enables support for ZTE ZX SoC Family
- 
+ arch/arm64/boot/dts/zte/Makefile           |   1 +
+ arch/arm64/boot/dts/zte/zx296718-evb.dts   |  68 ++++++++++--
+ arch/arm64/boot/dts/zte/zx296718-pcbox.dts | 143 ++++++++++++++++++++++++
+ arch/arm64/boot/dts/zte/zx296718.dtsi      | 169 +++++++++++++++++++++++++++++
+ 4 files changed, 373 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/zte/zx296718-pcbox.dts
+
 -- 
 1.9.1
