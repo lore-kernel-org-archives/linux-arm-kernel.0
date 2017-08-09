@@ -1,40 +1,66 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Wed,  9 Aug 2017 13:22:34 +0530
-Subject: [PATCH] staging: bcm2835-audio: constify snd_pcm_ops structures
-Message-ID: <9d78b0e65d59a2bcfed7ce9e347c9202408be5d5.1502264969.git.arvind.yadav.cs@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 9 Aug 2017 09:55:26 +0200
+Subject: [PATCH 00/10] ARM, arm64: dts: renesas: Use R-Car GPIO Gen[123]
+ fallback compat strings
+In-Reply-To: <CANqRtoRcsAhvFB=DNoJHzJt4dejKX+Z8ar04D8O1cFq1XkxWkw@mail.gmail.com>
+References: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
+ <CANqRtoRcsAhvFB=DNoJHzJt4dejKX+Z8ar04D8O1cFq1XkxWkw@mail.gmail.com>
+Message-ID: <20170809075526.GE2705@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-snd_pcm_ops are not supposed to change at runtime. All functions
-working with snd_pcm_ops provided by <sound/pcm.h> work with
-const snd_pcm_ops. So mark the non-const structs as const.
+On Tue, Aug 08, 2017 at 07:29:28PM +0900, Magnus Damm wrote:
+> Hi Simon,
+> 
+> On Tue, Aug 8, 2017 at 5:39 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> > Use newly added R-Car GPIO Gen 1, 2 and 3 fallback compat strings in place
+> > of now deprecated non-generation specific R-Car GPIO fallback compat string
+> > in the DT of Renesas ARM and arm64 based SoCs.
+> >
+> > This should have no run-time effect as the driver matches against the
+> > per-SoC compat string before considering the fallback compat string.
+> 
+> Thanks for your efforts.I have no issue with your series (apart from
+> the GPIO and SATA mistake), but at the same time I believe the GPIO
+> hardware itself is backwards compatible between various generations.
+> 
+> In the nitpick department I would like to point out that the level of
+> hardware difference between say R-Car Gen1 GPIO and R-Car Gen2 GPIO is
+> similar to say good old uarts like 8250 and 16450 hardware. Basically
+> a couple of registers were added to the hardware in a
+> backwards-compatible way if I recall correctly.
+> 
+> So if we are going to use "compatible" to point out if hardware is
+> compatible or not then I would do this instead:
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks for your feedback.
 
-diff --git a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-index 3637ddf..1bf34ce 100644
---- a/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-+++ b/drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c
-@@ -438,7 +438,7 @@ static int snd_bcm2835_pcm_lib_ioctl(struct snd_pcm_substream *substream,
- }
- 
- /* operators */
--static struct snd_pcm_ops snd_bcm2835_playback_ops = {
-+static const struct snd_pcm_ops snd_bcm2835_playback_ops = {
- 	.open = snd_bcm2835_playback_open,
- 	.close = snd_bcm2835_playback_close,
- 	.ioctl = snd_bcm2835_pcm_lib_ioctl,
-@@ -450,7 +450,7 @@ static int snd_bcm2835_pcm_lib_ioctl(struct snd_pcm_substream *substream,
- 	.ack = snd_bcm2835_pcm_ack,
- };
- 
--static struct snd_pcm_ops snd_bcm2835_playback_spdif_ops = {
-+static const struct snd_pcm_ops snd_bcm2835_playback_spdif_ops = {
- 	.open = snd_bcm2835_playback_spdif_open,
- 	.close = snd_bcm2835_playback_close,
- 	.ioctl = snd_bcm2835_pcm_lib_ioctl,
--- 
-1.9.1
+When the generation specific compat strings were recently
+added the renesas,gpio-rcar compat string was marked as deprecated
+as I was under the understanding that it was only compatibile with gen 1 SoCs.
+
+It now seems that was not the best thing to do and renesas,gpio-rcar should
+be re-instated as being a generic fallback for all R-Car versions supported
+in upstream.
+
+Do you concur?
+
+> 
+> --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> @@ -214,7 +214,7 @@
+> 
+>                 gpio0: gpio at e6050000 {
+>                         compatible = "renesas,gpio-r8a7796",
+> +                                    "renesas,rcar-gen3-gpio";
+>                                      "renesas,gpio-rcar";
+>                         reg = <0 0xe6050000 0 0x50>;
+>                         interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
+>                         #gpio-cells = <2>;
+> 
+> At the same time I'm not sure if I care _that_ much. =)
+> 
+> Thanks,
+> 
+> / magnus
+> 
