@@ -1,41 +1,28 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 9 Aug 2017 18:46:59 -0500
-Subject: [PATCH] remoteproc/keystone: Add support for Keystone 66AK2G SOCs
-In-Reply-To: <20170731200502.30479-1-s-anna@ti.com>
-References: <20170731200502.30479-1-s-anna@ti.com>
-Message-ID: <20170809234659.bn63lheilpjqj55o@rob-hp-laptop>
+Date: Wed, 9 Aug 2017 18:47:37 -0500
+Subject: [PATCH 1/5 v2] pinctrl: Add DT bindings for Cortina Gemini
+In-Reply-To: <20170731213050.4794-1-linus.walleij@linaro.org>
+References: <20170731213050.4794-1-linus.walleij@linaro.org>
+Message-ID: <20170809234737.tpjapxylixaqnmnl@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 03:05:02PM -0500, Suman Anna wrote:
-> Add support to the keystone remoteproc driver for managing the
-> DSP present in the Keystone 2 66AK2G SoC. The 66AK2G SoC has
-> a Power Management Micro Controller (PMMC) that manages the
-> individual device's power, clock and reset functionalities.
+On Mon, Jul 31, 2017 at 11:30:50PM +0200, Linus Walleij wrote:
+> The Cortina Gemini pin controller uses the standard pin control
+> bindings for muxing functions with groups so these bindings
+> should be entirely uncontroversial.
 > 
-> The keystone remoteproc driver already uses standard frameworks
-> for reset and clock control, so it doesn't require any significant
-> modifications other than a new compatible suitable for 66AK2G DSP.
-> 
-> The binding document is also updated to reflect the modified
-> property values used by the 66AK2G DSP node as compared to the
-> values used by existing Keystone 2 DSPs.
-> 
-> Signed-off-by: Suman Anna <s-anna@ti.com>
-> Signed-off-by: Andrew F. Davis <afd@ti.com>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
-> Hi Bjorn,
-> 
-> This patch adds the support to the last remaining family of Keystone2 SoCs.
-> The SoC integration is slightly different for this family, and all the
-> dependent drivers were finally merged in 4.13-rc1. The patch is mainly
-> updating the binding, so didn't split the patch into two.
-> 
-> regards
-> Suman
-> 
->  .../bindings/remoteproc/ti,keystone-rproc.txt      | 73 +++++++++++++++++++---
->  drivers/remoteproc/keystone_remoteproc.c           |  1 +
->  2 files changed, 65 insertions(+), 9 deletions(-)
+> ChangeLog v1->v2:
+> - State that the pin controller must be a subnode of the
+>   system controller.
+> - Drop the phandle to the system controller: we can simply
+>   look up the parent.
+> ---
+>  .../bindings/pinctrl/cortina,gemini-pinctrl.txt    | 59 ++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
