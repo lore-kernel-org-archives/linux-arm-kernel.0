@@ -1,20 +1,108 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 10 Aug 2017 15:52:40 -0500
-Subject: [PATCH 1/4] pwm: pwm-tiecap: Add TI 66AK2G SoC specific compatible
-In-Reply-To: <20170807114943.22612-2-vigneshr@ti.com>
-References: <20170807114943.22612-1-vigneshr@ti.com>
- <20170807114943.22612-2-vigneshr@ti.com>
-Message-ID: <20170810205240.5inhllnchgp4kqc6@rob-hp-laptop>
+Date: Thu, 10 Aug 2017 15:58:14 -0500
+Subject: [patch v2 2/2] drivers: jtag: Add Aspeed SoC 24xx and 25xx
+ families JTAG master driver
+In-Reply-To: <1502115467-1735-3-git-send-email-oleksandrs@mellanox.com>
+References: <1502115467-1735-1-git-send-email-oleksandrs@mellanox.com>
+ <1502115467-1735-3-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <20170810205814.mumwv2lxl6jn37gt@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 05:19:40PM +0530, Vignesh R wrote:
-> Add a new compatible string "ti,k2g-ecap" to support PWM ECAP IP of
-> TI 66AK2G SoC.
+On Mon, Aug 07, 2017 at 05:17:47PM +0300, Oleksandr Shamray wrote:
+> Driver adds support of Aspeed 2500/2400 series SOC JTAG master controller.
 > 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> Driver implements the following jtag ops:
+> - freq_get;
+> - freq_set;
+> - status_get;
+> - idle;
+> - xfer;
+> 
+> It has been tested on Mellanox system with BMC equipped with
+> Aspeed 2520 SoC for programming CPLD devices.
+> 
+> Signed-off-by: Jiri Pirko <jiri@resnulli.us>
+> Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
 > ---
->  Documentation/devicetree/bindings/pwm/pwm-tiecap.txt | 1 +
->  1 file changed, 1 insertion(+)
+> v1->v2
+> Comments pointed by Greg KH <gregkh@linuxfoundation.org>
+> - change license type from GPLv2/BSD to GPLv2
+> 
+> Comments pointed by Neil Armstrong <narmstrong@baylibre.com>
+> - Add clk_prepare_enable/clk_disable_unprepare in clock init/deinit
+> - Change .compatible to soc-specific compatible names
+>   aspeed,aspeed4000-jtag/aspeed5000-jtag
+> - Added dt-bindings
+> 
+> Comments pointed by Arnd Bergmann <arnd@arndb.de>
+> - Reorder functions and removed the forward declarations
+> - Add static const qualifier to state machine states transitions
+> - Change .compatible to soc-specific compatible names
+>   aspeed,aspeed4000-jtag/aspeed5000-jtag
+> - Add dt-bindings
+> 
+> Comments pointed by Randy Dunlap <rdunlap@infradead.org>
+> - Change module name jtag-aspeed in description in Kconfig
+> 
+> Comments pointed by kbuild test robot <lkp@intel.com>
+> - Remove invalid include <asm/mach-types.h>
+> - add resource_size instead of calculation
+> ---
+>  .../devicetree/bindings/jtag/aspeed-jtag.txt       |   27 +
 
-Acked-by: Rob Herring <robh@kernel.org>
+Please split binding to separate patch.
+
+>  drivers/jtag/Kconfig                               |   13 +
+>  drivers/jtag/Makefile                              |    1 +
+>  drivers/jtag/jtag-aspeed.c                         |  774 ++++++++++++++++++++
+>  4 files changed, 815 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+>  create mode 100644 drivers/jtag/jtag-aspeed.c
+> 
+> diff --git a/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+> new file mode 100644
+> index 0000000..27b1d34
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+> @@ -0,0 +1,27 @@
+> +Aspeed JTAG driver for ast2400 and ast2500 SoC
+> +
+> +Required properties:
+> +- compatible:		Should be one of
+> +      - "aspeed,aspeed2400-jtag"
+> +      - "aspeed,aspeed2500-jtag"
+> +- reg			contains the offset and length of the JTAG memory
+> +			region
+> +- clocks		root clock of bus, should reference the APB clock
+> +- reg-shift		device register offsets are shifted by this value
+
+It doesn't appear that you use this. It should be implied by the 
+compatible in any case.
+
+> +- interrupts		should contain JTAG controller interrupt
+> +
+> +Optional properties:
+> +- status 		 defines the operation status of the JTAG. Valid
+> +values are:
+> +      - "disabled"	 the JTAG is disabled
+> +      - "okay"		 the JTAG is enabled
+
+Don't need to document status. It's implied for any node.
+
+> +
+> +Example:
+> +jtag: jtag at 1e6e4000 {
+> +	compatible = "aspeed,aspeed2500-jtag";
+> +	reg = <0x1e6e4000 0x1c>;
+> +	reg-shift = <2>;
+> +	clocks = <&clk_apb>;
+> +	interrupts = <43>;
+> +	status = "disabled";
+
+Don't need to show status in examples either.
+
+> +};
+> \ No newline at end of file
+
+^^^
