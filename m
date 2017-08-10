@@ -1,53 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 10 Aug 2017 16:52:31 +0200
-Subject: [PATCH] arm64: fix pmem interface definition
-Message-ID: <20170810145253.2124019-1-arnd@arndb.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 10 Aug 2017 15:56:07 +0100
+Subject: [PATCH v2 3/3] dt-bindings: ASoC: rockchip: Add
+ rockchip,codec-names property
+In-Reply-To: <1502340898-28403-4-git-send-email-jeffy.chen@rock-chips.com>
+References: <1502340898-28403-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1502340898-28403-4-git-send-email-jeffy.chen@rock-chips.com>
+Message-ID: <20170810145607.g663oq7cfxjmaxtf@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Defining the two functions as 'static inline' and exporting them
-leads to the interesting case where we can use the interface
-from loadable modules, but not from built-in drivers, as shown
-in this link failure:
+On Thu, Aug 10, 2017 at 12:54:58PM +0800, Jeffy Chen wrote:
+> Add a new rockchip,codec-names property, so that the driver can parse
+> the codecs by name.
 
-vers/nvdimm/claim.o: In function `nsio_rw_bytes':
-claim.c:(.text+0x1b8): undefined reference to `arch_invalidate_pmem'
-drivers/nvdimm/pmem.o: In function `pmem_dax_flush':
-pmem.c:(.text+0x11c): undefined reference to `arch_wb_cache_pmem'
-drivers/nvdimm/pmem.o: In function `pmem_make_request':
-pmem.c:(.text+0x5a4): undefined reference to `arch_invalidate_pmem'
-pmem.c:(.text+0x650): undefined reference to `arch_invalidate_pmem'
-pmem.c:(.text+0x6d4): undefined reference to `arch_invalidate_pmem'
-
-This removes the bogus 'static inline'.
-
-Fixes: d50e071fdaa3 ("arm64: Implement pmem API support")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm64/mm/flush.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-index 280f90ff33a2..e36ed5087b5c 100644
---- a/arch/arm64/mm/flush.c
-+++ b/arch/arm64/mm/flush.c
-@@ -85,7 +85,7 @@ EXPORT_SYMBOL(flush_dcache_page);
- EXPORT_SYMBOL(flush_icache_range);
- 
- #ifdef CONFIG_ARCH_HAS_PMEM_API
--static inline void arch_wb_cache_pmem(void *addr, size_t size)
-+void arch_wb_cache_pmem(void *addr, size_t size)
- {
- 	/* Ensure order against any prior non-cacheable writes */
- 	dmb(osh);
-@@ -93,7 +93,7 @@ static inline void arch_wb_cache_pmem(void *addr, size_t size)
- }
- EXPORT_SYMBOL_GPL(arch_wb_cache_pmem);
- 
--static inline void arch_invalidate_pmem(void *addr, size_t size)
-+void arch_invalidate_pmem(void *addr, size_t size)
- {
- 	__inval_dcache_area(addr, size);
- }
--- 
-2.9.0
+Why?  You're already referencing the CODECs by phandle and these names
+are not part of any ABI...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170810/30656a3a/attachment.sig>
