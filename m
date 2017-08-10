@@ -1,44 +1,35 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Thu, 10 Aug 2017 12:06:19 +0200
-Subject: [PATCH 07/17] pinctrl: digicolor: constify pinconf_ops, pinctrl_ops,
+Date: Thu, 10 Aug 2017 12:06:15 +0200
+Subject: [PATCH 03/17] pinctrl: armada-37xx: constify pinconf_ops, pinctrl_ops,
  and pinmux_ops structures
 In-Reply-To: <1502359589-15970-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1502359589-15970-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1502359589-15970-8-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1502359589-15970-4-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These structures are only stored in fields of a pinctrl_desc
-structure (pctlops and pmxops) that are const. Make the
-structures const as well.
+This pinconf_ops structure is only stored in the const pinconf_ops
+field of a pinctrl_desc structure. Make the pinconf_ops structure
+const as well.
 
 Done with the help of Coccinelle.
 
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- drivers/pinctrl/pinctrl-digicolor.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/pinctrl/mvebu/pinctrl-armada-37xx.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/pinctrl-digicolor.c b/drivers/pinctrl/pinctrl-digicolor.c
-index 639a57e..ce269ce 100644
---- a/drivers/pinctrl/pinctrl-digicolor.c
-+++ b/drivers/pinctrl/pinctrl-digicolor.c
-@@ -79,7 +79,7 @@ static int dc_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
- 	return 0;
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+index f024e25..997ff05 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+@@ -243,7 +243,7 @@ static int armada_37xx_pin_config_group_set(struct pinctrl_dev *pctldev,
+ 	return -ENOTSUPP;
  }
  
--static struct pinctrl_ops dc_pinctrl_ops = {
-+static const struct pinctrl_ops dc_pinctrl_ops = {
- 	.get_groups_count	= dc_get_groups_count,
- 	.get_group_name		= dc_get_group_name,
- 	.get_group_pins		= dc_get_group_pins,
-@@ -161,7 +161,7 @@ static int dc_pmx_request_gpio(struct pinctrl_dev *pcdev,
- 	return 0;
- }
- 
--static struct pinmux_ops dc_pmxops = {
-+static const struct pinmux_ops dc_pmxops = {
- 	.get_functions_count	= dc_get_functions_count,
- 	.get_function_name	= dc_get_fname,
- 	.get_function_groups	= dc_get_groups,
+-static struct pinconf_ops armada_37xx_pinconf_ops = {
++static const struct pinconf_ops armada_37xx_pinconf_ops = {
+ 	.is_generic = true,
+ 	.pin_config_group_get = armada_37xx_pin_config_group_get,
+ 	.pin_config_group_set = armada_37xx_pin_config_group_set,
