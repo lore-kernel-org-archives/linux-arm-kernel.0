@@ -1,48 +1,53 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 10 Aug 2017 15:41:17 +0100
-Subject: [PATCH] irqchip/gic-v3-its-platform-msi: Fix msi-parent parsing loop
-Message-ID: <20170810144117.17567-1-lorenzo.pieralisi@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Aug 2017 16:52:31 +0200
+Subject: [PATCH] arm64: fix pmem interface definition
+Message-ID: <20170810145253.2124019-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While parsing the msi-parent property to chase up the IRQ domain
-a given device belongs to, the index into the msi-parent tuple should
-be incremented to ensure all properties entries are taken into account.
+Defining the two functions as 'static inline' and exporting them
+leads to the interesting case where we can use the interface
+from loadable modules, but not from built-in drivers, as shown
+in this link failure:
 
-Current code missed the index update so the parsing loop does not work
-in case multiple msi-parent phandles are present and may turn into
-an infinite loop in of_pmsi_get_dev_id() if phandle at index 0 does
-not correspond to the domain we are actually looking-up.
+vers/nvdimm/claim.o: In function `nsio_rw_bytes':
+claim.c:(.text+0x1b8): undefined reference to `arch_invalidate_pmem'
+drivers/nvdimm/pmem.o: In function `pmem_dax_flush':
+pmem.c:(.text+0x11c): undefined reference to `arch_wb_cache_pmem'
+drivers/nvdimm/pmem.o: In function `pmem_make_request':
+pmem.c:(.text+0x5a4): undefined reference to `arch_invalidate_pmem'
+pmem.c:(.text+0x650): undefined reference to `arch_invalidate_pmem'
+pmem.c:(.text+0x6d4): undefined reference to `arch_invalidate_pmem'
 
-Fix the code by updating the phandle index at each iteration in
-of_pmsi_get_dev_id().
+This removes the bogus 'static inline'.
 
-Fixes: deac7fc1c87f ("irqchip/gic-v3-its: Parse new version of msi-parent property")
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Fixes: d50e071fdaa3 ("arm64: Implement pmem API support")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
-Marc,
+ arch/arm64/mm/flush.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-nothing urgent, I have just bumped into it while checking how ITS
-DeviceIDs are handled in DT.
-
-Thanks,
-Lorenzo
-
- drivers/irqchip/irq-gic-v3-its-platform-msi.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-index 249240d..833a90f 100644
---- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-@@ -43,6 +43,7 @@ static int of_pmsi_get_dev_id(struct irq_domain *domain, struct device *dev,
- 			*dev_id = args.args[0];
- 			break;
- 		}
-+		index++;
- 	} while (!ret);
+diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+index 280f90ff33a2..e36ed5087b5c 100644
+--- a/arch/arm64/mm/flush.c
++++ b/arch/arm64/mm/flush.c
+@@ -85,7 +85,7 @@ EXPORT_SYMBOL(flush_dcache_page);
+ EXPORT_SYMBOL(flush_icache_range);
  
- 	return ret;
+ #ifdef CONFIG_ARCH_HAS_PMEM_API
+-static inline void arch_wb_cache_pmem(void *addr, size_t size)
++void arch_wb_cache_pmem(void *addr, size_t size)
+ {
+ 	/* Ensure order against any prior non-cacheable writes */
+ 	dmb(osh);
+@@ -93,7 +93,7 @@ static inline void arch_wb_cache_pmem(void *addr, size_t size)
+ }
+ EXPORT_SYMBOL_GPL(arch_wb_cache_pmem);
+ 
+-static inline void arch_invalidate_pmem(void *addr, size_t size)
++void arch_invalidate_pmem(void *addr, size_t size)
+ {
+ 	__inval_dcache_area(addr, size);
+ }
 -- 
-2.10.0
+2.9.0
