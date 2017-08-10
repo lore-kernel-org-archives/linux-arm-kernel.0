@@ -1,23 +1,46 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 10 Aug 2017 12:09:51 -0500
-Subject: [PATCH 2/8] dt-bindings: phy: sun4i-usb-phy: Add compatible
- string for A83T
-In-Reply-To: <20170803081411.22389-3-wens@csie.org>
-References: <20170803081411.22389-1-wens@csie.org>
- <20170803081411.22389-3-wens@csie.org>
-Message-ID: <20170810170951.bacpgjwplmm5fz7g@rob-hp-laptop>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Thu, 10 Aug 2017 18:08:58 +0100
+Subject: [PATCH v6 1/9] arm64: hugetlb: set_huge_pte_at Add WARN_ON on
+ !pte_present
+In-Reply-To: <20170810170906.30772-1-punit.agrawal@arm.com>
+References: <20170810170906.30772-1-punit.agrawal@arm.com>
+Message-ID: <20170810170906.30772-2-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 03, 2017 at 04:14:05PM +0800, Chen-Yu Tsai wrote:
-> The A83T has 3 USB PHYs, 1 for OTG, 1 for standard USB, 1 for USB HSIC.
-> 
-> Add a compatible string for it, and describe the needed properties.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> Tested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+From: Steve Capper <steve.capper@arm.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
+This patch adds a WARN_ON to set_huge_pte_at as the accessor assumes
+that entries to be written down are all present. (There are separate
+accessors to clear huge ptes).
+
+We will need to handle the !pte_present case where memory offlining
+is used on hugetlb pages. swap and migration entries will be supplied
+to set_huge_pte_at in this case.
+
+Cc: David Woods <dwoods@mellanox.com>
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+---
+ arch/arm64/mm/hugetlbpage.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index 656e0ece2289..7b61e4833432 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -67,6 +67,12 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+ 	unsigned long pfn;
+ 	pgprot_t hugeprot;
+ 
++	/*
++	 * Code needs to be expanded to handle huge swap and migration
++	 * entries. Needed for HUGETLB and MEMORY_FAILURE.
++	 */
++	WARN_ON(!pte_present(pte));
++
+ 	if (!pte_cont(pte)) {
+ 		set_pte_at(mm, addr, ptep, pte);
+ 		return;
+-- 
+2.13.2
