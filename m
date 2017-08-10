@@ -1,24 +1,25 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 10 Aug 2017 11:18:00 -0500
-Subject: [PATCH v2 19/23] dt-bindings: adc: add description for rv1108
- saradc
-In-Reply-To: <1501663953-12768-1-git-send-email-andy.yan@rock-chips.com>
-References: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
- <1501663953-12768-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <20170810161800.m63tavdrawwkqejv@rob-hp-laptop>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 10 Aug 2017 12:21:11 -0400 (EDT)
+Subject: [PULL REQUEST] FDPIC ELF support on ARM
+In-Reply-To: <alpine.LFD.2.20.1708081236150.8927@knanqh.ubzr>
+References: <alpine.LFD.2.20.1708081236150.8927@knanqh.ubzr>
+Message-ID: <alpine.LFD.2.20.1708101216520.8927@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 02, 2017 at 04:52:33PM +0800, Andy Yan wrote:
-> Add device tree bindings document for saradc on
-> rockchip rv1108 soc.
-> 
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-> ---
-> 
-> Changes in v2: None
-> 
->  Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt | 1 +
->  1 file changed, 1 insertion(+)
+On Tue, 8 Aug 2017, Nicolas Pitre wrote:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> Russell, please pull the following:
+> 
+>     http://git.linaro.org/people/nicolas.pitre/linux fdpic
+> 
+> This series provides the needed changes to enable the ELF_FDPIC
+> binary format on ARM. Currently only no-MMU configs are supported
+> but eventually adding MMU support is trivial.
+
+Please don't merge this just yet. There are issues with the signal code 
+not compatible with ARMv4t interworking that I fixed. I'm also adding 
+the MMU support so test coverage will be better.
+
+
+Nicolas
