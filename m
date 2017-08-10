@@ -1,117 +1,63 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Thu, 10 Aug 2017 14:34:56 +0800
-Subject: [PATCH v4 3/7] PCI: mediatek: Add a structure to abstract the
- controller generations
+Date: Thu, 10 Aug 2017 14:34:57 +0800
+Subject: [PATCH v4 4/7] PCI: mediatek: switch to use
+ platform_get_resource_byname()
 In-Reply-To: <cover.1502336769.git.honghui.zhang@mediatek.com>
 References: <cover.1502336769.git.honghui.zhang@mediatek.com>
-Message-ID: <e60b42e3830ba65b3b1599fd25880bc244ccb752.1502336769.git.honghui.zhang@mediatek.com>
+Message-ID: <f7810da34df710a2b98f903e7a95247ee9387032.1502336769.git.honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+From: Ryder Lee <ryder.lee@mediatek.com>
 
-Introduce a structure "mtk_pcie_soc" to abstract the differences between
-controller generations, and the .startup() hook is used to encapsulate
-some SoC-dependent related setting. In doing so, the common code which
-will be reused by future chips.
+This is a transitional patch. We currently use platfarm_get_resource() for
+retrieving the IOMEM resources, but there might be some chips don't have
+subsys/shared registers part, which depends on platform design, and these
+will be introduced in further patches.
+
+Switch this function to use the platform_get_resource_byname() so that the
+binding can be agnostic of the resource order.
 
 Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
 ---
- drivers/pci/host/pcie-mediatek.c | 31 ++++++++++++++++++++++++++-----
- 1 file changed, 26 insertions(+), 5 deletions(-)
+ drivers/pci/host/pcie-mediatek.c | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-index 7d1b7cd..01caa98 100644
+index 01caa98..c649ab4 100644
 --- a/drivers/pci/host/pcie-mediatek.c
 +++ b/drivers/pci/host/pcie-mediatek.c
-@@ -64,6 +64,18 @@
- #define PCIE_FC_CREDIT_MASK	(GENMASK(31, 31) | GENMASK(28, 16))
- #define PCIE_FC_CREDIT_VAL(x)	((x) << 16)
- 
-+struct mtk_pcie_port;
-+
-+/**
-+ * struct mtk_pcie_soc - differentiate between host generations
-+ * @ops: pointer to configuration access functions
-+ * @startup: pointer to controller setting functions
-+ */
-+struct mtk_pcie_soc {
-+	struct pci_ops *ops;
-+	int (*startup)(struct mtk_pcie_port *port);
-+};
-+
- /**
-  * struct mtk_pcie_port - PCIe port information
-  * @base: IO mapped register base
-@@ -97,6 +109,7 @@ struct mtk_pcie_port {
-  * @busn: bus range
-  * @offset: IO / Memory offset
-  * @ports: pointer to PCIe port information
-+ * @soc: pointer to SoC-dependent operations
-  */
- struct mtk_pcie {
- 	struct device *dev;
-@@ -112,6 +125,7 @@ struct mtk_pcie {
- 		resource_size_t io;
- 	} offset;
- 	struct list_head ports;
-+	const struct mtk_pcie_soc *soc;
- };
- 
- static void mtk_pcie_subsys_powerdown(struct mtk_pcie *pcie)
-@@ -229,7 +243,8 @@ static int mtk_pcie_startup_port(struct mtk_pcie_port *port)
- 
- static void mtk_pcie_enable_port(struct mtk_pcie_port *port)
- {
--	struct device *dev = port->pcie->dev;
-+	struct mtk_pcie *pcie = port->pcie;
-+	struct device *dev = pcie->dev;
- 	int err;
- 
- 	err = clk_prepare_enable(port->sys_ck);
-@@ -247,7 +262,7 @@ static void mtk_pcie_enable_port(struct mtk_pcie_port *port)
- 		goto err_phy_on;
+@@ -295,7 +295,8 @@ static int mtk_pcie_parse_port(struct mtk_pcie *pcie,
+ 		return err;
  	}
  
--	if (!mtk_pcie_startup_port(port))
-+	if (!pcie->soc->startup(port))
- 		return;
+-	regs = platform_get_resource(pdev, IORESOURCE_MEM, slot + 1);
++	snprintf(name, sizeof(name), "port%d", slot);
++	regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, name);
+ 	port->base = devm_ioremap_resource(dev, regs);
+ 	if (IS_ERR(port->base)) {
+ 		dev_err(dev, "failed to map port%d base\n", slot);
+@@ -336,12 +337,14 @@ static int mtk_pcie_subsys_powerup(struct mtk_pcie *pcie)
+ 	struct resource *regs;
+ 	int err;
  
- 	dev_info(dev, "Port%d link down\n", port->slot);
-@@ -472,7 +487,7 @@ static int mtk_pcie_register_host(struct pci_host_bridge *host)
+-	/* get shared registers */
+-	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	pcie->base = devm_ioremap_resource(dev, regs);
+-	if (IS_ERR(pcie->base)) {
+-		dev_err(dev, "failed to map shared register\n");
+-		return PTR_ERR(pcie->base);
++	/* get shared registers, which are optional */
++	regs = platform_get_resource_byname(pdev, IORESOURCE_MEM, "subsys");
++	if (regs) {
++		pcie->base = devm_ioremap_resource(dev, regs);
++		if (IS_ERR(pcie->base)) {
++			dev_err(dev, "failed to map shared register\n");
++			return PTR_ERR(pcie->base);
++		}
+ 	}
  
- 	host->busnr = pcie->busn.start;
- 	host->dev.parent = pcie->dev;
--	host->ops = &mtk_pcie_ops;
-+	host->ops = pcie->soc->ops;
- 	host->map_irq = of_irq_parse_and_map_pci;
- 	host->swizzle_irq = pci_common_swizzle;
- 
-@@ -505,6 +520,7 @@ static int mtk_pcie_probe(struct platform_device *pdev)
- 	pcie = pci_host_bridge_priv(host);
- 
- 	pcie->dev = dev;
-+	pcie->soc = of_device_get_match_data(dev);
- 	platform_set_drvdata(pdev, pcie);
- 	INIT_LIST_HEAD(&pcie->ports);
- 
-@@ -529,9 +545,14 @@ static int mtk_pcie_probe(struct platform_device *pdev)
- 	return err;
- }
- 
-+static const struct mtk_pcie_soc mtk_pcie_soc_v1 = {
-+	.ops = &mtk_pcie_ops,
-+	.startup = mtk_pcie_startup_port,
-+};
-+
- static const struct of_device_id mtk_pcie_ids[] = {
--	{ .compatible = "mediatek,mt7623-pcie"},
--	{ .compatible = "mediatek,mt2701-pcie"},
-+	{ .compatible = "mediatek,mt2701-pcie", .data = &mtk_pcie_soc_v1 },
-+	{ .compatible = "mediatek,mt7623-pcie", .data = &mtk_pcie_soc_v1 },
- 	{},
- };
- 
+ 	pcie->free_ck = devm_clk_get(dev, "free_ck");
 -- 
 2.6.4
