@@ -1,33 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Aug 2017 09:57:14 -0700
-Subject: [PATCH 0/3] ARM: dts: am335x-evm: am437xx: dra7xx: Enable NAND
- DMA prefetch by default
-In-Reply-To: <2fd38d80-16ce-8548-0f8a-38eaf820f87e@ti.com>
-References: <20170726021552.19880-1-fcooper@ti.com>
- <2fd38d80-16ce-8548-0f8a-38eaf820f87e@ti.com>
-Message-ID: <20170810165713.GL8569@atomide.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 10 Aug 2017 17:57:48 +0100
+Subject: [PATCH v2 06/16] arm64: entry.S: convert elX_sync
+In-Reply-To: <20170809172527.yrkpthrrtqoxi4d7@armageddon.cambridge.arm.com>
+References: <20170728141019.9084-1-james.morse@arm.com>
+ <20170728141019.9084-7-james.morse@arm.com>
+ <20170809172527.yrkpthrrtqoxi4d7@armageddon.cambridge.arm.com>
+Message-ID: <598C908C.9030506@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Roger Quadros <rogerq@ti.com> [170808 03:04]:
-> On 26/07/17 05:15, Franklin S Cooper Jr wrote:
-> > Enable NAND DMA prefetch by default for AM335x, AM437x and DRA7x evms that
-> > include NAND.
-> > 
-> > The below commit went into additional details regarding performance numbers
-> > seen between the two modes.
-> > 
-> > commit aa7abd312c11 ("mtd: nand: omap2: Support parsing dma channel information from DT")
-> > 
-> > Franklin S Cooper Jr (3):
-> >   ARM: dts: am335x-evm: Enable NAND dma prefetch by default
-> >   ARM: dts: am437xx: Enable NAND dma prefetch by default
-> >   ARM: dts: dra7xx: Enable NAND dma prefetch by default
-> 
-> For all patches,
-> 
-> Acked-by: Roger Quadros <rogerq@ti.com>
+Hi Catalin,
 
-Applying all three into omap-for-v4.14/dt thanks.
+On 09/08/17 18:25, Catalin Marinas wrote:
+> On Fri, Jul 28, 2017 at 03:10:09PM +0100, James Morse wrote:
+>> @@ -520,9 +514,16 @@ el1_preempt:
+>>  el0_sync:
+>>  	kernel_entry 0
+>>  	mrs	x25, esr_el1			// read the syndrome register
+>> +	mrs	x26, far_el1
+> 
+> Just checking, since we are going to access far_el1 even when we get a
+> syscall, have you noticed any overhead?
 
-Tony
+Good point, I haven't checked because I've been doing all this with the software
+model.
+
+I will set this running on Seattle overnight, results in v3's cover letter.
+
+
+Thanks!
+
+James
