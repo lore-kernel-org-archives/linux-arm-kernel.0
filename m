@@ -1,37 +1,56 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Aug 2017 14:52:17 +0200
-Subject: [PATCH 0/4] Switch Ux500 to use generic DT cpufreq
-Message-ID: <20170810125221.25818-1-linus.walleij@linaro.org>
+Date: Thu, 10 Aug 2017 14:52:18 +0200
+Subject: [PATCH 1/4] ARM: dts: augment Ux500 to use DT cpufreq
+In-Reply-To: <20170810125221.25818-1-linus.walleij@linaro.org>
+References: <20170810125221.25818-1-linus.walleij@linaro.org>
+Message-ID: <20170810125221.25818-2-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series switches the Ux500 over to use the generic DT cpufreq.
-A pretty nice cleanup.
+This adds the operating points to the Ux500 device tree and
+deletes the old special-purpose cpufreq node, as we can now
+use the generic DT cpufreq driver.
 
-Merge plan:
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Viresh et al: I will merge this into ARM SoC separately from
+the rest of the patches once we agree on this approach.
+---
+ arch/arm/boot/dts/ste-dbx5x0.dtsi | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-- Merge patch 1/4 into ARM SoC DTS branches separately.
-
-- Merge the remaining three patches into the cpufreq tree
-  with Lee's ACK on the second (MFD) patch.
-
-This should make for a clean transition for v4.14.
-
-Linus Walleij (4):
-  ARM: dts: augment Ux500 to use DT cpufreq
-  cpufreq: enable the DT cpufreq driver on the Ux500
-  mfd: db8500-prcmu: Get rid of cpufreq dependency
-  cpufreq: dbx500: Delete obsolete driver
-
- arch/arm/boot/dts/ste-dbx5x0.dtsi    |  15 ++---
- arch/arm/mach-ux500/Kconfig          |   1 +
- drivers/cpufreq/Kconfig.arm          |   9 ---
- drivers/cpufreq/Makefile             |   1 -
- drivers/cpufreq/cpufreq-dt-platdev.c |   5 ++
- drivers/cpufreq/dbx500-cpufreq.c     | 103 -----------------------------------
- drivers/mfd/db8500-prcmu.c           |  59 ++++++--------------
- 7 files changed, 31 insertions(+), 162 deletions(-)
- delete mode 100644 drivers/cpufreq/dbx500-cpufreq.c
-
+diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+index 6c5affe2d0f5..2310a4e97768 100644
+--- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
++++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+@@ -37,6 +37,14 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0x300>;
++			/* cpufreq controls */
++			operating-points = <998400 0
++					    800000 0
++					    400000 0
++					    200000 0>;
++			clocks = <&prcmu_clk PRCMU_ARMSS>;
++			clock-names = "cpu";
++			clock-latency = <20000>;
+ 		};
+ 		CPU1: cpu at 301 {
+ 			device_type = "cpu";
+@@ -494,13 +502,6 @@
+ 				reg = <0x80157450 0xC>;
+ 			};
+ 
+-			cpufreq {
+-				compatible = "stericsson,cpufreq-ux500";
+-				clocks = <&prcmu_clk PRCMU_ARMSS>;
+-				clock-names = "armss";
+-				status = "disabled";
+-			};
+-
+ 			thermal at 801573c0 {
+ 				compatible = "stericsson,db8500-thermal";
+ 				reg = <0x801573c0 0x40>;
 -- 
 2.9.4
