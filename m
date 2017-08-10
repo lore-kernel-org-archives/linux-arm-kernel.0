@@ -1,65 +1,59 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 10 Aug 2017 11:27:52 -0500
-Subject: [PATCH 1/2] dt-bindings: serial: Add MediaTek BTIF controller
- bindings
-In-Reply-To: <6b2ad0dc976259563562e7ab23abdacf68c94aa5.1501692369.git.sean.wang@mediatek.com>
-References: <cover.1501692369.git.sean.wang@mediatek.com>
- <6b2ad0dc976259563562e7ab23abdacf68c94aa5.1501692369.git.sean.wang@mediatek.com>
-Message-ID: <20170810162752.2xncymekrhu544g7@rob-hp-laptop>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 10 Aug 2017 17:33:17 +0100
+Subject: [PATCH] arm64: fix pmem interface definition
+In-Reply-To: <20170810145253.2124019-1-arnd@arndb.de>
+References: <20170810145253.2124019-1-arnd@arndb.de>
+Message-ID: <de4edef8-cf9e-8d0f-b399-9a5796c29680@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 03, 2017 at 01:05:22AM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
+On 10/08/17 15:52, Arnd Bergmann wrote:
+> Defining the two functions as 'static inline' and exporting them
+> leads to the interesting case where we can use the interface
+> from loadable modules, but not from built-in drivers, as shown
+> in this link failure:
 > 
-> Document the devicetree bindings for MediaTek BTIF controller
-> which could be found on MT7622 and MT7623 SoC.
+> vers/nvdimm/claim.o: In function `nsio_rw_bytes':
+> claim.c:(.text+0x1b8): undefined reference to `arch_invalidate_pmem'
+> drivers/nvdimm/pmem.o: In function `pmem_dax_flush':
+> pmem.c:(.text+0x11c): undefined reference to `arch_wb_cache_pmem'
+> drivers/nvdimm/pmem.o: In function `pmem_make_request':
+> pmem.c:(.text+0x5a4): undefined reference to `arch_invalidate_pmem'
+> pmem.c:(.text+0x650): undefined reference to `arch_invalidate_pmem'
+> pmem.c:(.text+0x6d4): undefined reference to `arch_invalidate_pmem'
 > 
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> This removes the bogus 'static inline'.
+
+Oops, yes, this was clearly a silly copy-paste error on my part.
+
+Acked-by: Robin Murphy <robin.murphy@arm.com>
+
+> Fixes: d50e071fdaa3 ("arm64: Implement pmem API support")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  .../devicetree/bindings/serial/mtk-btif.txt        | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/serial/mtk-btif.txt
+>  arch/arm64/mm/flush.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/serial/mtk-btif.txt b/Documentation/devicetree/bindings/serial/mtk-btif.txt
-> new file mode 100644
-> index 0000000..80c1f5a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/serial/mtk-btif.txt
-> @@ -0,0 +1,26 @@
-> +Device-Tree bindings for MediaTek BTIF controller found on those
-> +MediaTek SoCs with Bluetooth feature
-> +
-> +Required properties:
-> +- compatible: Should be one of:
-> +	- "mediatek,mt7622-btif" : for MT7622 SoC
-> +	- "mediatek,mt7623-btif" : for MT7623 SoC
-> +- reg: The base address of the BTIF register bank;
-> +- interrupts: A single interrupt specifier;
-> +- clocks: list of clock specifiers, corresponding to
-> +	  entries in clock-names property;
-> +- clock-names: should contain "main" entries.
-> +
-> +Optional properties:
-> +- mediatek,loopback: Boolean; if defined, indicates that BTIF controller
-> +	running on the loopback mode.
-
-I don't think this belongs in DT, but should be a module param or sysfs 
-control.
-
-> +
-> +Example:
-> +
-> +	btif: btif at 1100c000 {
-
-bluetooth at ...
-
-> +		compatible = "mediatek,mt7623-btif";
-> +		reg = <0 0x1100c000 0 0x1000>;
-> +		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&pericfg CLK_PERI_BTIF>;
-> +		clock-names = "main";
-> +	};
-> -- 
-> 2.7.4
+> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+> index 280f90ff33a2..e36ed5087b5c 100644
+> --- a/arch/arm64/mm/flush.c
+> +++ b/arch/arm64/mm/flush.c
+> @@ -85,7 +85,7 @@ EXPORT_SYMBOL(flush_dcache_page);
+>  EXPORT_SYMBOL(flush_icache_range);
+>  
+>  #ifdef CONFIG_ARCH_HAS_PMEM_API
+> -static inline void arch_wb_cache_pmem(void *addr, size_t size)
+> +void arch_wb_cache_pmem(void *addr, size_t size)
+>  {
+>  	/* Ensure order against any prior non-cacheable writes */
+>  	dmb(osh);
+> @@ -93,7 +93,7 @@ static inline void arch_wb_cache_pmem(void *addr, size_t size)
+>  }
+>  EXPORT_SYMBOL_GPL(arch_wb_cache_pmem);
+>  
+> -static inline void arch_invalidate_pmem(void *addr, size_t size)
+> +void arch_invalidate_pmem(void *addr, size_t size)
+>  {
+>  	__inval_dcache_area(addr, size);
+>  }
 > 
