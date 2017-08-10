@@ -1,38 +1,21 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Thu, 10 Aug 2017 10:26:13 +0800
-Subject: [PATCH v2 7/9] arm64: dts: hi3660: Reset the mmc hosts
-In-Reply-To: <20170810022615.19204-1-guodong.xu@linaro.org>
-References: <20170810022615.19204-1-guodong.xu@linaro.org>
-Message-ID: <20170810022615.19204-8-guodong.xu@linaro.org>
+From: jun.gao@mediatek.com (Jun Gao)
+Date: Thu, 10 Aug 2017 10:27:39 +0800
+Subject: [RESEND PATCH 0/2] Add i2c dt-binding and compatible for Mediatek
+ MT7622 SoC
+Message-ID: <1502332061-25085-1-git-send-email-jun.gao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add reset-names = "reset" into mmc nodes.
+This patch series based on v4.13-rc1, include MT7622 i2c dt-binding
+and compatible.
 
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+Jun Gao (2):
+  dt-bindings: i2c: Add MediaTek MT7622 i2c binding
+  i2c: mediatek: Add i2c compatible for MediaTek MT7622
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 5fd5686..41841f7 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -909,6 +909,7 @@
- 			clock-names = "ciu", "biu";
- 			clock-frequency = <3200000>;
- 			resets = <&crg_rst 0x94 18>;
-+			reset-names = "reset";
- 			cd-gpios = <&gpio25 3 0>;
- 			hisilicon,peripheral-syscon = <&sctrl>;
- 			pinctrl-names = "default";
-@@ -938,6 +939,7 @@
- 				 <&crg_ctrl HI3660_HCLK_GATE_SDIO0>;
- 			clock-names = "ciu", "biu";
- 			resets = <&crg_rst 0x94 20>;
-+			reset-names = "reset";
- 			card-detect-delay = <200>;
- 			supports-highspeed;
- 			keep-power-in-suspend;
--- 
-2.10.2
+ Documentation/devicetree/bindings/i2c/i2c-mtk.txt | 11 ++++++-----
+ drivers/i2c/busses/i2c-mt65xx.c                   | 18 ++++++++++++++++++
+ 2 files changed, 24 insertions(+), 5 deletions(-)
+
+--
+1.8.1.1
