@@ -1,234 +1,199 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 10 Aug 2017 18:09:01 +0100
-Subject: [PATCH v6 4/9] arm64: hugetlb: Add break-before-make logic for
- contiguous entries
-In-Reply-To: <20170810170906.30772-1-punit.agrawal@arm.com>
-References: <20170810170906.30772-1-punit.agrawal@arm.com>
-Message-ID: <20170810170906.30772-5-punit.agrawal@arm.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 10 Aug 2017 12:23:15 -0500
+Subject: [RFC] interrupts DT property for irqdomain hierarchy
+In-Reply-To: <CAK7LNATme8P1uHx5hZr6Eez4KGweUi=jQ6zJ=bdBf1XmxZVoLg@mail.gmail.com>
+References: <CAK7LNATme8P1uHx5hZr6Eez4KGweUi=jQ6zJ=bdBf1XmxZVoLg@mail.gmail.com>
+Message-ID: <CAL_JsqLC2kUvhHHJdKd_UinvgRHpSv+vsPgRh0xGowfDX5BXYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Capper <steve.capper@arm.com>
+On Thu, Jul 6, 2017 at 4:58 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> Hi IRQ experts, DT exports,
+>
+>
+> I have a question about CONFIG_IRQ_DOMAIN_HIERARCHY.
+>
+> When IRQ domains are hierarchy,
+> how can we specify IRQ number re-mapping between the
+> parent irqchip and the child irqchip?
+>
+> The following figure shows a simplified example.
+>
+> |----------|        |----------|       |----------|
+> | parent   |        | child    |       |  IRQ     |
+> | IRQ chip | <----- | IRQ chip |<----- | consumer |
+> |          |        |          |       | Device   |
+> |----------|        |----------|       |----------|
+>
+> Perhaps, we may describe DT like follows
+>
+>     gic: interrupt-controller {
+>             ...
+>             interrupt-controller;
+>             #interrupt-cells = <3>;
+>     };
+>
+>     child_intc: child-interrupt-controller {
+>             ...
+>             interrupt-parent = <&gic>;
+>             interrupts = <0 50 0>, <0 51 0>, <0 52 0>, <0 53 0>;
+>             interrupt-controller;
+>             #interrupt-cells = <2>;
+>     };
+>
+>     i2c: i2c {
+>             ...
+>             interrupt-parent = <&child_intc>;
+>             interrupts = <0 4>;
+>     };
+>
+>
+> In this example, the I2C controller takes HWIRQ=0 of the child_intc device.
+> This goes through the child IRQ chip,
+> then connected to HWIRQ=50 of the parent intc.
+>
+> The DT above describes the hardware connection well,
+> but it actually does not work.
+>
+> The root irqchip is usually declared with IRQCHIP_DECLARE().
+> So, IRQ resources are allocated when platform devices are populated from DT.
+> This means IRQ allocation happens before drivers are probed.
+>
+> of_pupulate_default_populate() does not know the fact about irqdomain hierarchy.
 
+This has not been true for some time now. The irqs are resolved at
+probe time rather than statically created resources and deferred probe
+is supported if one of the interrupt controllers is not yet
+initialized.
 
-It has become apparent that one has to take special care when modifying
-attributes of memory mappings that employ the contiguous bit.
+>
+> As a result, interrupts = <0 50 0> in the child_intc,
+> and interrupts = <0 4> of the I2C are allocated with different virtual
+> IRQ numbers.
+>
+> We want to assign the same IRQ number if we want handle them
+> in the hierarchy IRQ manner.
+>
+> How can we make it work?
+>
+> Of course, we can remove the
+>           interrupts = <0 50 0>, <0 51 0>, <0 52 0>, <0 53 0>;
+> from the child_intc device node.
+>
+> But, we can not retrieve the IRQ remapping information from DT.
+>
+>
+> I saw some irqchip implementations and .alloc hook are often
+> hard-coded in the case.
+>
+>
+> For example, like this.
+>
+> static int child_intc_domain_alloc(struct irq_domain *domain,
+>                           unsigned int virq, unsigned int nr_irqs, void *arg)
+> {
+>         ....
+>
+>         for (i = 0; i < nr_irqs; i++) {
+>                 struct irq_fwspec parent_fwspec;
+>
+>                 ret = irq_domain_set_hwirq_and_chip(domain, virq, hwirq,
+>                                                     &priv->chip, priv);
+>                 if (ret)
+>                         return ret;
+>
+>                 /* CAUTION: parent irqchip must be GIC. */
+>
+>                 parent_fwspec.fwnode = domain->parent->fwnode;
+>                 parent_fwspec.param_count = 3;  /*GIC: #interrupt-cells = <3> */
+>                 parent_fwspec.param[0] = 0;   /* SPI of GIC */
+>                 /* HWIRQ=0 of this chip corresponds to HWIRQ=50 of the parent */
+>                 parent_fwspec.param[1] = hwirq + 50;
+>                 parent_fwspec.param[2] = type;
+>
+>                 ret = irq_domain_alloc_irqs_parent(domain, virq, 1,
+>                                                    &parent_fwspec);
+>                 if (ret)
+>                         return ret;
+>
+>                 virq++;
+>                 hwirq++;
+>         }
+>
+>         return 0;
+> }
+>
+>
+>
+> In order to avoid hard-coding, one possible idea is
+> to retrieve the IRQ information from DT, like this:
+>
+>         for (i = 0; i < nr_irqs; i++) {
+>                 struct of_phandle_args parent_irq;
+>                 struct irq_fwspec parent_fwspec;
+>
+>                 ret = irq_domain_set_hwirq_and_chip(domain, virq, hwirq,
+>                                                    &priv->chip, priv);
+>                 if (ret)
+>                         return ret;
+>
+>                 /* retrieve interrupt spec from DT */
+>                 ret = of_irq_parse_one(irq_domain_get_of_node(domain), hwirq,
+>                                        &parent_irq);
+>                 if (ret)
+>                         return ret;
+>
+>                 of_phandle_args_to_fwspec(&parent_irq, &parent_fwspec);
+>
+>                 ret = irq_domain_alloc_irqs_parent(domain, virq, 1,
+>                                                   &parent_fwspec);
+>                 if (ret)
+>                         return ret;
+>
+>                 virq++;
+>                 hwirq++;
+>         }
+>
+>
+>
+> Some possible solutions:
+>
+> [1] stop early irq allocation and make it completely on-the-fly
+> i.e. IRQ are allocated only when drivers explicitly call of_irq_get()
+> or friends.
+>
+> This does not address one problem.
+>
+> If there are many IRQ lines connected between the parent and the child,
+> interrupts will be very long.
+>
+>    #interrupts = <0 50 0>, <0 51 0>, <0 52 0>, <0 53 0>,
+>                  <0 54 0>, <0 55 0>, <0 56 0>, <0 57 0>,
+>                   ...
+>
+> This is a mess.
+>
+>
+>
+>
+> [2] Introduce DT property something like "interrupt-range"
+>
+> The idea is similar like "ranges" property transforms "reg".
+>
+> "interrupt-range" is an arbitrary number of
+> (child irqchip interrupt) (parent irqchip interrupt) (length) triplets.
+>
+> For example,
+>
+>    interrupt-ranges = <0 0 0 50 0 4>;
+>
+> This means   <0 0>, <0 1>, <0 2>, <0 3> in the child
+> should be mapped to  <0 50 0>, <0 51 0>, <0 52 0>, <0 53 0> in the parent,
+> respectively.
 
-Both the requirement and the architecturally correct "Break-Before-Make"
-technique of updating contiguous entries can be found described in:
-ARM DDI 0487A.k_iss10775, "Misprogramming of the Contiguous bit",
-page D4-1762.
+interrupt-map property does this. See here[1].
 
-The huge pte accessors currently replace the attributes of contiguous
-pte entries in place thus can, on certain platforms, lead to TLB
-conflict aborts or even erroneous results returned from TLB lookups.
+Rob
 
-This patch adds two helper functions -
-
-* get_clear_flush(.) - clears a contiguous entry and returns the head
-  pte (whilst taking care to retain dirty bit information that could
-  have been modified by DBM).
-
-* clear_flush(.) that clears a contiguous entry
-
-A tlb invalidate is performed to then ensure that there is no
-possibility of multiple tlb entries being present for the same region.
-
-Cc: David Woods <dwoods@mellanox.com>
-Signed-off-by: Steve Capper <steve.capper@arm.com>
-(Added helper clear_flush(), updated commit log, and comments cleanup)
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
----
-Hi Mark,
-
-I've dropped your reviewed-by tag due to the patch update. I'd
-appreciate if you could take a look at the new version.
-
-Thanks!
----
- arch/arm64/mm/hugetlbpage.c | 107 +++++++++++++++++++++++++++++++++++---------
- 1 file changed, 86 insertions(+), 21 deletions(-)
-
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 08deed7c71f0..d3a6713048a2 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -68,6 +68,62 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
- 	return CONT_PTES;
- }
- 
-+/*
-+ * Changing some bits of contiguous entries requires us to follow a
-+ * Break-Before-Make approach, breaking the whole contiguous set
-+ * before we can change any entries. See ARM DDI 0487A.k_iss10775,
-+ * "Misprogramming of the Contiguous bit", page D4-1762.
-+ *
-+ * This helper performs the break step.
-+ */
-+static pte_t get_clear_flush(struct mm_struct *mm,
-+			     unsigned long addr,
-+			     pte_t *ptep,
-+			     unsigned long pgsize,
-+			     unsigned long ncontig)
-+{
-+	unsigned long i, saddr = addr;
-+	struct vm_area_struct vma = { .vm_mm = mm };
-+	pte_t orig_pte = huge_ptep_get(ptep);
-+
-+	/*
-+	 * If we already have a faulting entry then we don't need
-+	 * to break before make (there won't be a tlb entry cached).
-+	 */
-+	if (!pte_present(orig_pte))
-+		return orig_pte;
-+
-+	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++) {
-+		pte_t pte = ptep_get_and_clear(mm, addr, ptep);
-+
-+		/*
-+		 * If HW_AFDBM is enabled, then the HW could turn on
-+		 * the dirty bit for any page in the set, so check
-+		 * them all.  All hugetlb entries are already young.
-+		 */
-+		if (IS_ENABLED(CONFIG_ARM64_HW_AFDBM) && pte_dirty(pte))
-+			orig_pte = pte_mkdirty(orig_pte);
-+	}
-+
-+	flush_tlb_range(&vma, saddr, addr);
-+	return orig_pte;
-+}
-+
-+static void clear_flush(struct mm_struct *mm,
-+			     unsigned long addr,
-+			     pte_t *ptep,
-+			     unsigned long pgsize,
-+			     unsigned long ncontig)
-+{
-+	unsigned long i, saddr = addr;
-+	struct vm_area_struct vma = { .vm_mm = mm };
-+
-+	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++)
-+		pte_clear(mm, addr, ptep);
-+
-+	flush_tlb_range(&vma, saddr, addr);
-+}
-+
- void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 			    pte_t *ptep, pte_t pte)
- {
-@@ -93,6 +149,8 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 	dpfn = pgsize >> PAGE_SHIFT;
- 	hugeprot = pte_pgprot(pte);
- 
-+	clear_flush(mm, addr, ptep, pgsize, ncontig);
-+
- 	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
- 		pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
- 			 pte_val(pfn_pte(pfn, hugeprot)));
-@@ -194,7 +252,7 @@ pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
- pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 			      unsigned long addr, pte_t *ptep)
- {
--	int ncontig, i;
-+	int ncontig;
- 	size_t pgsize;
- 	pte_t orig_pte = huge_ptep_get(ptep);
- 
-@@ -202,17 +260,8 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
- 		return ptep_get_and_clear(mm, addr, ptep);
- 
- 	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
--	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++) {
--		/*
--		 * If HW_AFDBM is enabled, then the HW could
--		 * turn on the dirty bit for any of the page
--		 * in the set, so check them all.
--		 */
--		if (pte_dirty(ptep_get_and_clear(mm, addr, ptep)))
--			orig_pte = pte_mkdirty(orig_pte);
--	}
- 
--	return orig_pte;
-+	return get_clear_flush(mm, addr, ptep, pgsize, ncontig);
- }
- 
- int huge_ptep_set_access_flags(struct vm_area_struct *vma,
-@@ -222,6 +271,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 	int ncontig, i, changed = 0;
- 	size_t pgsize = 0;
- 	unsigned long pfn = pte_pfn(pte), dpfn;
-+	pte_t orig_pte;
- 	pgprot_t hugeprot;
- 
- 	if (!pte_cont(pte))
-@@ -229,12 +279,18 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 
- 	ncontig = find_num_contig(vma->vm_mm, addr, ptep, &pgsize);
- 	dpfn = pgsize >> PAGE_SHIFT;
--	hugeprot = pte_pgprot(pte);
- 
--	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
--		changed |= ptep_set_access_flags(vma, addr, ptep,
--				pfn_pte(pfn, hugeprot), dirty);
--	}
-+	orig_pte = get_clear_flush(vma->vm_mm, addr, ptep, pgsize, ncontig);
-+	if (!pte_same(orig_pte, pte))
-+		changed = 1;
-+
-+	/* Make sure we don't lose the dirty state */
-+	if (pte_dirty(orig_pte))
-+		pte = pte_mkdirty(pte);
-+
-+	hugeprot = pte_pgprot(pte);
-+	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
-+		set_pte_at(vma->vm_mm, addr, ptep, pfn_pte(pfn, hugeprot));
- 
- 	return changed;
- }
-@@ -244,6 +300,9 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
- {
- 	int ncontig, i;
- 	size_t pgsize;
-+	pte_t pte = pte_wrprotect(huge_ptep_get(ptep)), orig_pte;
-+	unsigned long pfn = pte_pfn(pte), dpfn;
-+	pgprot_t hugeprot;
- 
- 	if (!pte_cont(*ptep)) {
- 		ptep_set_wrprotect(mm, addr, ptep);
-@@ -251,14 +310,21 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
- 	}
- 
- 	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
--	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize)
--		ptep_set_wrprotect(mm, addr, ptep);
-+	dpfn = pgsize >> PAGE_SHIFT;
-+
-+	orig_pte = get_clear_flush(mm, addr, ptep, pgsize, ncontig);
-+	if (pte_dirty(orig_pte))
-+		pte = pte_mkdirty(pte);
-+
-+	hugeprot = pte_pgprot(pte);
-+	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
-+		set_pte_at(mm, addr, ptep, pfn_pte(pfn, hugeprot));
- }
- 
- void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 			   unsigned long addr, pte_t *ptep)
- {
--	int ncontig, i;
-+	int ncontig;
- 	size_t pgsize;
- 
- 	if (!pte_cont(*ptep)) {
-@@ -267,8 +333,7 @@ void huge_ptep_clear_flush(struct vm_area_struct *vma,
- 	}
- 
- 	ncontig = find_num_contig(vma->vm_mm, addr, ptep, &pgsize);
--	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize)
--		ptep_clear_flush(vma, addr, ptep);
-+	clear_flush(vma->vm_mm, addr, ptep, pgsize, ncontig);
- }
- 
- static __init int setup_hugepagesz(char *opt)
--- 
-2.13.2
+[1] http://elinux.org/Device_Tree_Usage#Advanced_Interrupt_Mapping
