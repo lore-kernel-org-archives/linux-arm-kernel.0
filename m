@@ -1,54 +1,70 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 10 Aug 2017 19:10:34 +0200
-Subject: linux-next 2017-08-08 keyboard failure on Nokia N900
-In-Reply-To: <61264d43-eda3-df9d-0c06-28611f373ce7@ti.com>
-References: <20170808101756.GA12922@amd> <20170808103444.GA18247@amd>
- <20170808111243.GA20328@amd>
- <61264d43-eda3-df9d-0c06-28611f373ce7@ti.com>
-Message-ID: <20170810171034.GA26019@amd>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Thu, 10 Aug 2017 18:09:02 +0100
+Subject: [PATCH v6 5/9] arm64: hugetlb: Handle swap entries in
+ huge_pte_offset() for contiguous hugepages
+In-Reply-To: <20170810170906.30772-1-punit.agrawal@arm.com>
+References: <20170810170906.30772-1-punit.agrawal@arm.com>
+Message-ID: <20170810170906.30772-6-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+huge_pte_offset() was updated to correctly handle swap entries for
+hugepages. With the addition of the size parameter, it is now possible
+to disambiguate whether the request is for a regular hugepage or a
+contiguous hugepage.
 
-> >>> I tried today's linux-next. It boots on n900 (up to X), but then my
-> >>> screen locks and I can't get back. Touchscreen worked, so my guess is
-> >>> keyboard does not...? Ssh connection over usb still works.
-> >>
-> >> Confirmed, its the keyboard.
-> >>
-...
-> > [    0.682769] twl4030_madc 48070000.i2c:twl at 48:madc: could not
-> > request irq
-> > [    0.684051] twl4030_madc: probe of 48070000.i2c:twl at 48:madc failed
-> 
-> I've not precisely checked it, but smth is telling me that below 
-> patch  can cause this:
-> 
-> commit 78daaca78ee57dead0f4aa5ee399f0499e81cd9e
-...
->  int twl4030_init_irq(struct device *dev, int irq_num)
->  {
-> -       static struct irq_chip  twl4030_irq_chip;
-> +       struct irq_chip twl4030_irq_chip;
-> 
-> 
-> but if we will look at code - it can be seen that this variable is passed by reference to
-> irq_set_chip_and_handler(). 
-> Ops. And what will happen when twl4030_init_irq() returns ;)
+Fix huge_pte_offset() for contiguous hugepages by using the size to find
+the correct page table entry.
 
-Thanks, this would take me a while to figure out. I'm testing
-next-..-08-10, which should have this fixed... and yes, it does.
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+Cc: David Woods <dwoods@mellanox.com>
+---
+ arch/arm64/mm/hugetlbpage.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-Best regards,
-									Pavel
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index d3a6713048a2..09e79785c019 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -210,6 +210,7 @@ pte_t *huge_pte_offset(struct mm_struct *mm,
+ 	pgd_t *pgd;
+ 	pud_t *pud;
+ 	pmd_t *pmd;
++	pte_t *pte;
+ 
+ 	pgd = pgd_offset(mm, addr);
+ 	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
+@@ -217,19 +218,29 @@ pte_t *huge_pte_offset(struct mm_struct *mm,
+ 		return NULL;
+ 
+ 	pud = pud_offset(pgd, addr);
+-	if (pud_none(*pud))
++	if (pud_none(*pud) && sz != PUD_SIZE)
+ 		return NULL;
+ 	/* swap or huge page */
+ 	if (!pud_present(*pud) || pud_huge(*pud))
+ 		return (pte_t *)pud;
+ 	/* table; check the next level */
+ 
++	if (sz == CONT_PMD_SIZE)
++		addr &= CONT_PMD_MASK;
++
+ 	pmd = pmd_offset(pud, addr);
+-	if (pmd_none(*pmd))
++	if (pmd_none(*pmd) &&
++	    !(sz == PMD_SIZE || sz == CONT_PMD_SIZE))
+ 		return NULL;
+ 	if (!pmd_present(*pmd) || pmd_huge(*pmd))
+ 		return (pte_t *)pmd;
+ 
++	if (sz == CONT_PTE_SIZE) {
++		pte = pte_offset_kernel(
++			pmd, (addr & CONT_PTE_MASK));
++		return pte;
++	}
++
+ 	return NULL;
+ }
+ 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170810/ebae63d6/attachment.sig>
+2.13.2
