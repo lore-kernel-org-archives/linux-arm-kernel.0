@@ -1,60 +1,62 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 10 Aug 2017 12:37:34 +0200
-Subject: [PATCH 3/3] reset: uniphier: add analog amplifiers reset control
-In-Reply-To: <20170810072703.32433-3-suzuki.katsuhiro@socionext.com>
-References: <20170810072703.32433-1-suzuki.katsuhiro@socionext.com>
- <20170810072703.32433-3-suzuki.katsuhiro@socionext.com>
-Message-ID: <1502361454.10792.5.camel@pengutronix.de>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 10 Aug 2017 19:44:38 +0900
+Subject: [PATCH v3 1/2] ARM: dts: uniphier: add nodes of thermal monitor
+ and thermal zone for PXs2
+In-Reply-To: <1499255595-31805-2-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1499255595-31805-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1499255595-31805-2-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <CAK7LNAS2chLuW_PzeghNCTYf038qS_BgxMqJ6FoQbqT6hRJYSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Katsuhiro,
+Hayashi-san
 
-On Thu, 2017-08-10 at 16:27 +0900, Katsuhiro Suzuki wrote:
-> Add a reset line for analog signal amplifier core (ADAMV) on
-> UniPhier LD11/LD20 SoCs.
-> 
-> > Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+
+2017-07-05 20:53 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
+> Add nodes of thermal monitor and thermal zone for UniPhier PXs2 SoC.
+> The thermal monitor is included in sysctrl.
+> Furthermore, add cpuN labels for reference in cooling-device property.
+>
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 > ---
-> ?drivers/reset/reset-uniphier.c | 15 +++++++++++++++
-> ?1 file changed, 15 insertions(+)
-> 
-> diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
-> index f60c137c17cb..cda4a78a58e2 100644
-> --- a/drivers/reset/reset-uniphier.c
-> +++ b/drivers/reset/reset-uniphier.c
-> @@ -196,6 +196,12 @@ static const struct uniphier_reset_data uniphier_pro4_peri_reset_data[] = {
-> > ?	UNIPHIER_RESET_END,
-> ?};
-> ?
-> +/* Analog signal amplifiers reset data */
-> +static const struct uniphier_reset_data uniphier_ld11_adamv_reset_data[] = {
-> > +	UNIPHIER_RESETX(100, 0x10, 6), /* EVEA */
-> > +	UNIPHIER_RESET_END,
-> +};
+
+
+Please add socionext,tmod-calibration
+in case the efuse is not brown.
+
+
+>
+> +       thermal-zones {
+> +               cpu_thermal {
+> +                       polling-delay-passive = <250>;  /* 250ms */
+> +                       polling-delay = <1000>;         /* 1000ms */
+> +                       thermal-sensors = <&pvtctl>;
 > +
-> ?/* core implementaton */
-> ?struct uniphier_reset_priv {
-> > ?	struct reset_controller_dev rcdev;
-> @@ -415,6 +421,15 @@ static const struct of_device_id uniphier_reset_match[] = {
-> > ?		.compatible = "socionext,uniphier-ld20-peri-reset",
-> > ?		.data = uniphier_pro4_peri_reset_data,
-> > ?	},
-> > +	/* Analog signal amplifiers reset */
-> > +	{
-> > +		.compatible = "socionext,uniphier-ld11-adamv-reset",
-> > +		.data = uniphier_ld11_adamv_reset_data,
-> > +	},
-> > +	{
-> > +		.compatible = "socionext,uniphier-ld20-adamv-reset",
-> > +		.data = uniphier_ld11_adamv_reset_data,
-> > +	},
-> > ?	{ /* sentinel */ }
-> ?};
-> ?MODULE_DEVICE_TABLE(of, uniphier_reset_match);
+> +                       trips {
+> +                               cpu_crit: cpu_crit {
+> +                                       temperature = <95000>;  /* 95C */
+> +                                       hysteresis = <2000>;
+> +                                       type = "critical";
+> +                               };
+> +                               cpu_alert: cpu_alert {
+> +                                       temperature = <85000>;  /* 85C */
+> +                                       hysteresis = <2000>;
+> +                                       type = "passive";
+> +                               };
+> +                       };
+> +
+> +                       cooling-maps {
+> +                               map {
+> +                                       trip = <&cpu_alert>;
+> +                                       cooling-device = <&cpu0 (-1) (-1)>;
+> +                               };
 
-Please add a patch to describe the new compatible values in
-Documentation/devicetree/bindings/reset/uniphier-reset.txt.
 
-regards
-Philipp
+After all, I decided to use dt-bindings headers.
+Could you use THERMAL_NO_LIMIT for clarification?
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
