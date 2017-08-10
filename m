@@ -1,43 +1,43 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Thu, 10 Aug 2017 12:54:58 +0800
-Subject: [PATCH v2 3/3] dt-bindings: ASoC: rockchip: Add rockchip,
- codec-names property
-In-Reply-To: <1502340898-28403-1-git-send-email-jeffy.chen@rock-chips.com>
-References: <1502340898-28403-1-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <1502340898-28403-4-git-send-email-jeffy.chen@rock-chips.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Thu, 10 Aug 2017 10:47:32 +0530
+Subject: [PATCH v2] memory: mtk-smi: Handle return value of clk_prepare_enable
+Message-ID: <daeed02ff9e257286bbae9e4e496e40e4c5480c5.1502341483.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new rockchip,codec-names property, so that the driver can parse
-the codecs by name.
+clk_prepare_enable() can fail here and we must check its return value.
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
+changes in v2:
+             Rebase patch[1]https://lkml.org/lkml/2017/8/3/968
+             and apply this change. Otherwise will merge conflict.
 
-Changes in v2:
-Let rockchip,codec-names be a required property.
+ drivers/memory/mtk-smi.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
- Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-index eac91db..05351df 100644
---- a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-+++ b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-@@ -5,6 +5,7 @@ Required properties:
- - rockchip,cpu: The phandle of the Rockchip I2S controller that's
-   connected to the codecs
- - rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
-+- rockchip,codec-names: The names of the MAX98357A/RT5514/DA7219 codecs
+diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+index 2b798bb..583fb8d 100644
+--- a/drivers/memory/mtk-smi.c
++++ b/drivers/memory/mtk-smi.c
+@@ -315,6 +315,7 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+ 	struct mtk_smi *common;
+ 	struct resource *res;
+ 	enum mtk_smi_gen smi_gen;
++	int ret;
  
- Optional properties:
- - dmic-wakeup-delay-ms : specify delay time (ms) for DMIC ready.
-@@ -18,5 +19,6 @@ sound {
- 	compatible = "rockchip,rk3399-gru-sound";
- 	rockchip,cpu = <&i2s0>;
- 	rockchip,codec = <&max98357a &rt5514 &da7219>;
-+	rockchip,codec-names = "MAX98357A", "RT5514", "DA7219";
- 	dmic-wakeup-delay-ms = <20>;
- };
+ 	if (!dev->pm_domain)
+ 		return -EPROBE_DEFER;
+@@ -349,7 +350,9 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+ 		if (IS_ERR(common->clk_async))
+ 			return PTR_ERR(common->clk_async);
+ 
+-		clk_prepare_enable(common->clk_async);
++		ret = clk_prepare_enable(common->clk_async);
++		if (ret)
++			return ret;
+ 	}
+ 	pm_runtime_enable(dev);
+ 	platform_set_drvdata(pdev, common);
 -- 
-2.1.4
+1.9.1
