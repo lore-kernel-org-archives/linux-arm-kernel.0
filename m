@@ -1,39 +1,47 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 10 Aug 2017 10:05:24 -0500
-Subject: [PATCH v2 3/4] dt-bindings: remoteproc: Add bindings for Davinci
- DSP processors
-In-Reply-To: <20170810140157.osn5rtymykgdf6gp@rob-hp-laptop>
-References: <20170801154844.24662-1-s-anna@ti.com>
- <20170801154844.24662-4-s-anna@ti.com>
- <20170810140157.osn5rtymykgdf6gp@rob-hp-laptop>
-Message-ID: <1aec744a-5e9c-d33f-9a55-1ef4f937400d@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 Aug 2017 08:08:12 -0700
+Subject: [PATCH] ARM: OMAP2+: omap_device: drop broken RPM status update
+ from suspend_noirq
+In-Reply-To: <20170726083521.GE27516@localhost>
+References: <20170724095201.21601-1-johan@kernel.org>
+ <05ae4585-8da0-6fb1-8cfd-6b236ec3a8a2@ti.com>
+ <20170725082444.GL2729@localhost>
+ <3f0f8ed2-9466-d5c9-10e4-de95e5155653@ti.com>
+ <20170726075004.GD27516@localhost>
+ <20170726081716.GB10026@atomide.com>
+ <20170726083521.GE27516@localhost>
+Message-ID: <20170810150812.GB8569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2017 09:01 AM, Rob Herring wrote:
-> On Tue, Aug 01, 2017 at 10:48:43AM -0500, Suman Anna wrote:
->> Add the device tree bindings document for the DSP processor
->> subsystem devices on TI Davinci DA8xx/OMAP-L13x SoCs.
->>
->> Signed-off-by: Suman Anna <s-anna@ti.com>
->> ---
->> v2: 
->>  - Updated the patch header
->>  - Revised the binding status statement slightly
->>  - Updated the example to address Rob's comments
->>  - No changes in properties description themselves
->> v1: https://patchwork.kernel.org/patch/9751269/
->>
->>  .../bindings/remoteproc/ti,davinci-rproc.txt       | 86 ++++++++++++++++++++++
->>  1 file changed, 86 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/remoteproc/ti,davinci-rproc.txt
+* Johan Hovold <johan@kernel.org> [170726 01:36]:
+> On Wed, Jul 26, 2017 at 01:17:17AM -0700, Tony Lindgren wrote: > * Johan Hovold <johan@kernel.org> [170726 00:51]:
+> > > On Tue, Jul 25, 2017 at 12:48:40PM -0500, Grygorii Strashko wrote:
+> > > > So, thank you for your patches and sorry for the noise.
+> > > > 
+> > > > Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> > > 
+> > > Thanks for testing.
+> > 
+> > So does the patch description need updating?
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
+> I don't think so.
+> 
+> I did notice that I left out a "would" in the final sentence
+> 
+> 	"and either way, any such calls *would* have been causing
+> 	crashes since 4.10"
+> 	
+> which perhaps you could add when applying?
+> 
+> > And this is needed as a fix for the -rc cycle in addition to your musb
+> > patch?
+> 
+> Unlike the musb patch, this one is not critical and could possibly wait
+> for 4.14. But since all it does is to get rid of a (since 4.10) broken
+> state update, and thereby those warning messages on suspend, I'd say
+> it's -rc material.
 
-Thanks Rob.
+Applying into omap-for-v4.13/fixes finally thanks.
 
-Bjorn,
-Appreciate it if you can pick up the series for v4.14.
-
-Thanks,
-Suman
+Tony
