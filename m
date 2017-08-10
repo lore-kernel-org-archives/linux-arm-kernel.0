@@ -1,40 +1,107 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Thu, 10 Aug 2017 16:09:43 +0200
-Subject: [PATCH 4/5] media: platform: s5p-jpeg: fix number of components
- macro
-In-Reply-To: <1502191628-11958-4-git-send-email-andrzej.p@samsung.com>
-References: <1502191352-11595-1-git-send-email-andrzej.p@samsung.com>
- <1502191628-11958-1-git-send-email-andrzej.p@samsung.com>
- <CGME20170808112716eucas1p10a5069ad7ddad2eae5b8dca4f466feee@eucas1p1.samsung.com>
- <1502191628-11958-4-git-send-email-andrzej.p@samsung.com>
-Message-ID: <0069b10a-d42e-47ed-cea3-96ddfe2b9c19@samsung.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Thu, 10 Aug 2017 22:00:52 +0800
+Subject: [PATCH v5 08/11] net: stmmac: dwmac-rk: Add integrated PHY supprot
+ for rk3328
+In-Reply-To: <1502373410-2423-1-git-send-email-david.wu@rock-chips.com>
+References: <1502373410-2423-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1502373652-2716-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/08/2017 01:27 PM, Andrzej Pietrasiewicz wrote:
-> The value to be processed must be first masked and then shifted,
-> not the other way round.
-> 
-> Signed-off-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
-> ---
->   drivers/media/platform/s5p-jpeg/jpeg-regs.h | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-regs.h b/drivers/media/platform/s5p-jpeg/jpeg-regs.h
-> index 1870400..df790b1 100644
-> --- a/drivers/media/platform/s5p-jpeg/jpeg-regs.h
-> +++ b/drivers/media/platform/s5p-jpeg/jpeg-regs.h
-> @@ -371,7 +371,7 @@
->   #define EXYNOS4_NF_SHIFT			16
->   #define EXYNOS4_NF_MASK				0xff
->   #define EXYNOS4_NF(x)				\
-> -	(((x) << EXYNOS4_NF_SHIFT) & EXYNOS4_NF_MASK)
-> +	(((x) & EXYNOS4_NF_MASK) << EXYNOS4_NF_SHIFT)
+There are two mac controllers in the rk3328, the one connects
+to external PHY, and the other one connects to integrated PHY.
+Like the mac of external PHY, the integrated PHY's mac also
+needs to configure the related mac registers at GRF.
 
-I'm going to add below tag when applying this patch.
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+---
+ drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c | 26 +++++++++++++++++++++++---
+ 1 file changed, 23 insertions(+), 3 deletions(-)
 
-Fixes: 6c96dbbc2aa9f5b4a ("[media] s5p-jpeg: add support for 5433")
-
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+index b6db3ff..2176403 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+@@ -323,6 +323,8 @@ static void rk3288_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
+ 
+ #define RK3328_GRF_MAC_CON0	0x0900
+ #define RK3328_GRF_MAC_CON1	0x0904
++#define RK3328_GRF_MAC_CON2	0x0908
++#define RK3328_GRF_MACPHY_CON1	0xb04
+ 
+ /* RK3328_GRF_MAC_CON0 */
+ #define RK3328_GMAC_CLK_RX_DL_CFG(val)	HIWORD_UPDATE(val, 0x7F, 7)
+@@ -349,6 +351,9 @@ static void rk3288_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
+ #define RK3328_GMAC_RXCLK_DLY_ENABLE	GRF_BIT(1)
+ #define RK3328_GMAC_RXCLK_DLY_DISABLE	GRF_CLR_BIT(0)
+ 
++/* RK3328_GRF_MACPHY_CON1 */
++#define RK3328_MACPHY_RMII_MODE		GRF_BIT(9)
++
+ static void rk3328_set_to_rgmii(struct rk_priv_data *bsp_priv,
+ 				int tx_delay, int rx_delay)
+ {
+@@ -373,13 +378,17 @@ static void rk3328_set_to_rgmii(struct rk_priv_data *bsp_priv,
+ static void rk3328_set_to_rmii(struct rk_priv_data *bsp_priv)
+ {
+ 	struct device *dev = &bsp_priv->pdev->dev;
++	unsigned int reg;
+ 
+ 	if (IS_ERR(bsp_priv->grf)) {
+ 		dev_err(dev, "Missing rockchip,grf property\n");
+ 		return;
+ 	}
+ 
+-	regmap_write(bsp_priv->grf, RK3328_GRF_MAC_CON1,
++	reg = bsp_priv->integrated_phy ? RK3328_GRF_MAC_CON2 :
++		  RK3328_GRF_MAC_CON1;
++
++	regmap_write(bsp_priv->grf, reg,
+ 		     RK3328_GMAC_PHY_INTF_SEL_RMII |
+ 		     RK3328_GMAC_RMII_MODE);
+ }
+@@ -409,29 +418,40 @@ static void rk3328_set_rgmii_speed(struct rk_priv_data *bsp_priv, int speed)
+ static void rk3328_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
+ {
+ 	struct device *dev = &bsp_priv->pdev->dev;
++	unsigned int reg;
+ 
+ 	if (IS_ERR(bsp_priv->grf)) {
+ 		dev_err(dev, "Missing rockchip,grf property\n");
+ 		return;
+ 	}
+ 
++	reg = bsp_priv->integrated_phy ? RK3328_GRF_MAC_CON2 :
++		  RK3328_GRF_MAC_CON1;
++
+ 	if (speed == 10)
+-		regmap_write(bsp_priv->grf, RK3328_GRF_MAC_CON1,
++		regmap_write(bsp_priv->grf, reg,
+ 			     RK3328_GMAC_RMII_CLK_2_5M |
+ 			     RK3328_GMAC_SPEED_10M);
+ 	else if (speed == 100)
+-		regmap_write(bsp_priv->grf, RK3328_GRF_MAC_CON1,
++		regmap_write(bsp_priv->grf, reg,
+ 			     RK3328_GMAC_RMII_CLK_25M |
+ 			     RK3328_GMAC_SPEED_100M);
+ 	else
+ 		dev_err(dev, "unknown speed value for RMII! speed=%d", speed);
+ }
+ 
++static void rk3328_integrated_phy_powerup(struct rk_priv_data *priv)
++{
++	regmap_write(priv->grf, RK3328_GRF_MACPHY_CON1,
++		     RK3328_MACPHY_RMII_MODE);
++}
++
+ static const struct rk_gmac_ops rk3328_ops = {
+ 	.set_to_rgmii = rk3328_set_to_rgmii,
+ 	.set_to_rmii = rk3328_set_to_rmii,
+ 	.set_rgmii_speed = rk3328_set_rgmii_speed,
+ 	.set_rmii_speed = rk3328_set_rmii_speed,
++	.integrated_phy_powerup =  rk3328_integrated_phy_powerup,
+ };
+ 
+ #define RK3366_GRF_SOC_CON6	0x0418
 -- 
-Regards,
-Sylwester
+1.9.1
