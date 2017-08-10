@@ -1,27 +1,21 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Thu, 10 Aug 2017 13:13:22 -0700
-Subject: New assembler warnings with binutils 2.29
-Message-ID: <d101c48b-c47b-be60-4b40-de4f845e4965@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 10 Aug 2017 15:30:59 -0500
+Subject: [PATCH 1/2] reset: uniphier: remove sLD3 SoC support
+In-Reply-To: <1501987442-2583-2-git-send-email-yamada.masahiro@socionext.com>
+References: <1501987442-2583-1-git-send-email-yamada.masahiro@socionext.com>
+ <1501987442-2583-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20170810203059.abbmh4zhrk36shxb@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fedora rawhide recently upgraded to binutils 2.29 and this seems
-to produce new warnings:
+On Sun, Aug 06, 2017 at 11:44:01AM +0900, Masahiro Yamada wrote:
+> This SoC is too old.  It is difficult to maintain any longer.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+>  .../devicetree/bindings/reset/uniphier-reset.txt   |  2 -
+>  drivers/reset/reset-uniphier.c                     | 48 ++++++++--------------
+>  2 files changed, 16 insertions(+), 34 deletions(-)
 
-./arch/arm64/include/asm/assembler.h: Assembler messages:
-./arch/arm64/include/asm/assembler.h:125: Warning: ignoring attempt to redefine built-in register 'lr'
-
-This is
-
-/*
- * Register aliases.
- */
-lr      .req    x30             // link register
-
-https://kojipkgs.fedoraproject.org//packages/kernel/4.13.0/0.rc2.git2.1.fc27/data/logs/aarch64/build.log
-has an example log. As far as I can tell this doesn't affect anything at runtime.
-
-Any ideas?
-
-Thanks,
-Laura
+Acked-by: Rob Herring <robh@kernel.org>
