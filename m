@@ -1,58 +1,51 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 10 Aug 2017 15:39:15 +0300
-Subject: [PATCH 07/17] pinctrl: digicolor: constify pinconf_ops,
- pinctrl_ops, and pinmux_ops structures
-In-Reply-To: <1502359589-15970-8-git-send-email-Julia.Lawall@lip6.fr>
-References: <1502359589-15970-1-git-send-email-Julia.Lawall@lip6.fr>
- <1502359589-15970-8-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <20170810123915.3mqvg4f3qqx4e45f@tarshish>
+From: eugen.hristev@microchip.com (Eugen Hristev)
+Date: Thu, 10 Aug 2017 15:34:56 +0300
+Subject: [PATCH 0/3] iio: adc: at91-sama5d2_adc: add DMA support
+Message-ID: <1502368499-6739-1-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julia,
+This patch implements the DMA support for the ADC in sam5d2 SOC.
+After discussing on the mailing list, this approach is based on triggered
+kfifo buffer, with DMA support added on top of it.
+Thus, the trigger is enabled by the buffer. The ADC itself will not have
+an IRQ enabled if using DMA. With DMA, the channels are enabled, and DMA
+controller is configured to read from the data ready registers.
+When DMA starts, the trigger will start the conversion (external trigger
+configured), then the registers will have the conversion data ready, trigger
+the DMA controller to read from the registers, the DMA will copy the data into
+the software buffer, and trigger the DMA IRQ. In the bottom half, the
+trigger polled and the data from the DMA buffer is pushed to buffer.
 
-On Thu, Aug 10, 2017 at 12:06:19PM +0200, Julia Lawall wrote:
-> These structures are only stored in fields of a pinctrl_desc
-> structure (pctlops and pmxops) that are const. Make the
-> structures const as well.
-> 
-> Done with the help of Coccinelle.
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+The DMA will use a cyclic buffer to write to one half, and the software can
+read from the other half. The DMA operation doesn't stop until the buffer is
+disabled.
+The DMA coherent area is allocated when DMA is initially started, and
+deallocated only if the watermark is changed to 1 (no more DMA usage). The
+coherent area is large enough to cope with maximum fifo size for all possible
+channels enabled.
+The fifo size is set to 128 conversions by default in the driver.
 
-Acked-by: Baruch Siach <baruch@tkos.co.il>
+The implementation uses the user watermark  to decide whether DMA will be
+used or not. For watermark 1, DMA will not be used. If watermark is greater,
+DMA will be used.
+Sysfs attributes are created to indicate whether the DMA is used,
+with hwfifo_enabled, and the current DMA watermark is readable
+in hwfifo_watermark. Minimum and maximum values are in hwfifo_watermark_min
+and hwfifo_watermark_max.
 
-Thanks,
-baruch
+Devicetree binding added for dma as well.
+Modified devicetree for sama5d2 SoC to add connected DMA channel.
 
-> ---
->  drivers/pinctrl/pinctrl-digicolor.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-digicolor.c b/drivers/pinctrl/pinctrl-digicolor.c
-> index 639a57e..ce269ce 100644
-> --- a/drivers/pinctrl/pinctrl-digicolor.c
-> +++ b/drivers/pinctrl/pinctrl-digicolor.c
-> @@ -79,7 +79,7 @@ static int dc_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
->  	return 0;
->  }
->  
-> -static struct pinctrl_ops dc_pinctrl_ops = {
-> +static const struct pinctrl_ops dc_pinctrl_ops = {
->  	.get_groups_count	= dc_get_groups_count,
->  	.get_group_name		= dc_get_group_name,
->  	.get_group_pins		= dc_get_group_pins,
-> @@ -161,7 +161,7 @@ static int dc_pmx_request_gpio(struct pinctrl_dev *pcdev,
->  	return 0;
->  }
->  
-> -static struct pinmux_ops dc_pmxops = {
-> +static const struct pinmux_ops dc_pmxops = {
->  	.get_functions_count	= dc_get_functions_count,
->  	.get_function_name	= dc_get_fname,
->  	.get_function_groups	= dc_get_groups,
+Eugen Hristev (3):
+  Documentation: dt: iio: at91-sama5d2_adc: add optional dma property
+  ARM: dts: at91: sama5d2: added dma property for ADC device
+  iio: adc: at91-sama5d2_adc: add support for DMA
+
+ .../bindings/iio/adc/at91-sama5d2_adc.txt          |   7 +
+ arch/arm/boot/dts/sama5d2.dtsi                     |   2 +
+ drivers/iio/adc/at91-sama5d2_adc.c                 | 366 ++++++++++++++++++++-
+ 3 files changed, 359 insertions(+), 16 deletions(-)
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+2.7.4
