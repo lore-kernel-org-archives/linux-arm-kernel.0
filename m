@@ -1,97 +1,66 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 10 Aug 2017 08:01:40 +0200
-Subject: [RFT v2] mfd: exynos-lpass: Handle return value of
- clk_prepare_enable
-In-Reply-To: <8de486cf36afdf97792313a6b21432e04374e47e.1502253715.git.arvind.yadav.cs@gmail.com>
-References: <8de486cf36afdf97792313a6b21432e04374e47e.1502253715.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20170810060140.GA3625@kozik-book>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Thu, 10 Aug 2017 11:50:45 +0530
+Subject: [PATCH 0/3] drm: make drm_connector_funcs structures const
+In-Reply-To: <20170809163742.t6vl4rpzarmlyyrh@phenom.ffwll.local>
+References: <1502191712-11231-1-git-send-email-bhumirks@gmail.com>
+ <3bb03b50-5b73-4fee-2323-d3b67ed3553e@codeaurora.org>
+ <20170809163742.t6vl4rpzarmlyyrh@phenom.ffwll.local>
+Message-ID: <CAOH+1jEPKTEro=zPO7bzFLdHE_eMF3_n+6sjVWPJ-p-M37+M=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 09, 2017 at 10:18:10AM +0530, Arvind Yadav wrote:
-> clk_prepare_enable() can fail here and we must check its return value.
-> we must call pm_runtime_disable() and pm_runtime_set_suspended(),
-> If exynos_lpass_probe is not successful.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
-> changes in v2:
->              added regmap_exit(lpass->top) and blank line before return.
-> 
->  drivers/mfd/exynos-lpass.c | 23 +++++++++++++++++------
->  1 file changed, 17 insertions(+), 6 deletions(-)
+On Wed, Aug 9, 2017 at 10:07 PM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> On Wed, Aug 09, 2017 at 04:02:45PM +0530, Archit Taneja wrote:
+>>
+>>
+>> On 08/08/2017 04:58 PM, Bhumika Goyal wrote:
+>> > Declare drm_connector_funcs structures as const.
+>>
+>> Could you rebase this series over the latest drm-misc-next? The
+>> recently merged patch "drm: Nuke drm_atomic_helper_connector_dpms"
+>> causes conflicts with these.
+>
+> I got bored and fixed up the conflicts (wiggle pulled it off). All
+> applied, no need to resend.
 >
 
-For me looks ok although this requires testing and I do not have
-Exynos with LPASS (e.g. Exynos5433). Maybe folks from Samsung (Polish
-R&D or HQ as they are working on it) could help (Cced).
+Thank you :)
 
-Best regards,
-Krzysztof
+Thanks,
+Bhumika
 
-> diff --git a/drivers/mfd/exynos-lpass.c b/drivers/mfd/exynos-lpass.c
-> index ca829f8..1ab7210 100644
-> --- a/drivers/mfd/exynos-lpass.c
-> +++ b/drivers/mfd/exynos-lpass.c
-> @@ -73,9 +73,13 @@ static void exynos_lpass_core_sw_reset(struct exynos_lpass *lpass, int mask)
->  	regmap_write(lpass->top, SFR_LPASS_CORE_SW_RESET, val);
->  }
->  
-> -static void exynos_lpass_enable(struct exynos_lpass *lpass)
-> +static int exynos_lpass_enable(struct exynos_lpass *lpass)
->  {
-> -	clk_prepare_enable(lpass->sfr0_clk);
-> +	int ret;
-> +
-> +	ret = clk_prepare_enable(lpass->sfr0_clk);
-> +	if (ret)
-> +		return ret;
->  
->  	/* Unmask SFR, DMA and I2S interrupt */
->  	regmap_write(lpass->top, SFR_LPASS_INTR_CA5_MASK,
-> @@ -87,6 +91,8 @@ static void exynos_lpass_enable(struct exynos_lpass *lpass)
->  	exynos_lpass_core_sw_reset(lpass, LPASS_I2S_SW_RESET);
->  	exynos_lpass_core_sw_reset(lpass, LPASS_DMA_SW_RESET);
->  	exynos_lpass_core_sw_reset(lpass, LPASS_MEM_SW_RESET);
-> +
-> +	return 0;
->  }
->  
->  static void exynos_lpass_disable(struct exynos_lpass *lpass)
-> @@ -112,6 +118,7 @@ static int exynos_lpass_probe(struct platform_device *pdev)
->  	struct exynos_lpass *lpass;
->  	void __iomem *base_top;
->  	struct resource *res;
-> +	int ret;
->  
->  	lpass = devm_kzalloc(dev, sizeof(*lpass), GFP_KERNEL);
->  	if (!lpass)
-> @@ -136,7 +143,13 @@ static int exynos_lpass_probe(struct platform_device *pdev)
->  	platform_set_drvdata(pdev, lpass);
->  	pm_runtime_set_active(dev);
->  	pm_runtime_enable(dev);
-> -	exynos_lpass_enable(lpass);
-> +	ret = exynos_lpass_enable(lpass);
-> +	if (ret) {
-> +		pm_runtime_disable(dev);
-> +		pm_runtime_set_suspended(dev);
-> +		regmap_exit(lpass->top);
-> +		return ret;
-> +	}
->  
->  	return devm_of_platform_populate(dev);
->  }
-> @@ -167,9 +180,7 @@ static int __maybe_unused exynos_lpass_resume(struct device *dev)
->  {
->  	struct exynos_lpass *lpass = dev_get_drvdata(dev);
->  
-> -	exynos_lpass_enable(lpass);
-> -
-> -	return 0;
-> +	return exynos_lpass_enable(lpass);
->  }
->  
->  static const struct dev_pm_ops lpass_pm_ops = {
-> -- 
-> 1.9.1
-> 
+> Thanks, Daniel
+>
+>>
+>> drm-misc-next:
+>>
+>> https://cgit.freedesktop.org/drm/drm-misc/log/
+>>
+>> Thanks,
+>> Archit
+>>
+>> >
+>> > Bhumika Goyal (3):
+>> >    drm/bridge: make drm_connector_funcs structures const
+>> >    drm/sun4i: make drm_connector_funcs structures const
+>> >    drm/rockchip: make drm_connector_funcs structures const
+>> >
+>> >   drivers/gpu/drm/bridge/adv7511/adv7511_drv.c | 2 +-
+>> >   drivers/gpu/drm/rockchip/inno_hdmi.c         | 2 +-
+>> >   drivers/gpu/drm/sun4i/sun4i_rgb.c            | 2 +-
+>> >   drivers/gpu/drm/sun4i/sun4i_tv.c             | 2 +-
+>> >   4 files changed, 4 insertions(+), 4 deletions(-)
+>> >
+>>
+>> --
+>> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+>> a Linux Foundation Collaborative Project
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>
+> --
+> Daniel Vetter
+> Software Engineer, Intel Corporation
+> http://blog.ffwll.ch
