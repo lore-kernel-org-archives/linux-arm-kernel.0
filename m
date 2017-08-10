@@ -1,88 +1,63 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Thu, 10 Aug 2017 16:03:46 +0800
-Subject: [RESEND PATCH 2/2] i2c: mediatek: Add i2c compatible for
- MediaTek MT7622
-In-Reply-To: <1502349760.930.66.camel@mhfsdcap03>
-References: <1502332061-25085-1-git-send-email-jun.gao@mediatek.com>
- <1502332061-25085-3-git-send-email-jun.gao@mediatek.com>
- <1502349760.930.66.camel@mhfsdcap03>
-Message-ID: <1502352226.12382.1.camel@mtksdaap41>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 10 Aug 2017 10:09:13 +0200
+Subject: [PATCH 00/10] ARM, arm64: dts: renesas: Use R-Car GPIO Gen[123]
+ fallback compat strings
+In-Reply-To: <CANqRtoSnRnUWvf0uDv-gjyk6yD4JxxnrGMMvMkBYVQEk6ctDyA@mail.gmail.com>
+References: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
+ <CANqRtoRcsAhvFB=DNoJHzJt4dejKX+Z8ar04D8O1cFq1XkxWkw@mail.gmail.com>
+ <20170809075526.GE2705@verge.net.au>
+ <20170809082210.GH2705@verge.net.au>
+ <CANqRtoSnRnUWvf0uDv-gjyk6yD4JxxnrGMMvMkBYVQEk6ctDyA@mail.gmail.com>
+Message-ID: <20170810080912.GG16647@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-08-10 at 15:22 +0800, Jun Gao wrote:
-> On Thu, 2017-08-10 at 10:27 +0800, Jun Gao wrote:
-> > From: Jun Gao <jun.gao@mediatek.com>
-> > 
-> > Add i2c compatible for MT7622. Compare to MT8173 i2c controller,
-> > MT7622 limits message numbers to 255, and does not support 4GB
-> > DMA mode.
-> > 
+On Wed, Aug 09, 2017 at 08:11:24PM +0900, Magnus Damm wrote:
+> Hi Simon,
 > 
-> These two resend patches only modify commit message.
-> Thanks!
+> On Wed, Aug 9, 2017 at 5:22 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Wed, Aug 09, 2017 at 09:55:26AM +0200, Simon Horman wrote:
+> >> On Tue, Aug 08, 2017 at 07:29:28PM +0900, Magnus Damm wrote:
+> >> > Hi Simon,
+> >> >
+> >> > On Tue, Aug 8, 2017 at 5:39 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> >> > > Use newly added R-Car GPIO Gen 1, 2 and 3 fallback compat strings in place
+> >> > > of now deprecated non-generation specific R-Car GPIO fallback compat string
+> >> > > in the DT of Renesas ARM and arm64 based SoCs.
+> >> > >
+> >> > > This should have no run-time effect as the driver matches against the
+> >> > > per-SoC compat string before considering the fallback compat string.
+> >> >
+> >> > Thanks for your efforts.I have no issue with your series (apart from
+> >> > the GPIO and SATA mistake), but at the same time I believe the GPIO
+> >> > hardware itself is backwards compatible between various generations.
+> >> >
+> >> > In the nitpick department I would like to point out that the level of
+> >> > hardware difference between say R-Car Gen1 GPIO and R-Car Gen2 GPIO is
+> >> > similar to say good old uarts like 8250 and 16450 hardware. Basically
+> >> > a couple of registers were added to the hardware in a
+> >> > backwards-compatible way if I recall correctly.
+> >> >
+> >> > So if we are going to use "compatible" to point out if hardware is
+> >> > compatible or not then I would do this instead:
+> >>
+> >> Thanks for your feedback.
+> >>
+> >> When the generation specific compat strings were recently
+> >> added the renesas,gpio-rcar compat string was marked as deprecated
+> >> as I was under the understanding that it was only compatibile with gen 1 SoCs.
+> >>
+> >> It now seems that was not the best thing to do and renesas,gpio-rcar should
+> >> be re-instated as being a generic fallback for all R-Car versions supported
+> >> in upstream.
+> >>
+> >> Do you concur?
+> >
+> > I posted a patch to un-deprecate the renesas,gpio-rcar compat string
+> > in the bindings documentation.
+> >
+> > [PATCH] gpio: rcar: reinstate generic compat string
 > 
-> Jun
+> Thanks, this looks good to me. I would like to hear what Geert thinks as well!
 
-Looks good to me, so for new version:
-Reviewed-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-
-Joe.C
-
-
-> 
-> > Signed-off-by: Jun Gao <jun.gao@mediatek.com>
-> > ---
-> >  drivers/i2c/busses/i2c-mt65xx.c | 18 ++++++++++++++++++
-> >  1 file changed, 18 insertions(+)
-> > 
-> > diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-> > index 9bedf0b..2c7f847 100644
-> > --- a/drivers/i2c/busses/i2c-mt65xx.c
-> > +++ b/drivers/i2c/busses/i2c-mt65xx.c
-> > @@ -172,6 +172,14 @@ struct mtk_i2c {
-> >  	.max_comb_2nd_msg_len = 31,
-> >  };
-> >  
-> > +static const struct i2c_adapter_quirks mt7622_i2c_quirks = {
-> > +	.max_num_msgs = 255,
-> > +	.max_write_len = 65535,
-> > +	.max_read_len = 65535,
-> > +	.max_comb_1st_msg_len = 65535,
-> > +	.max_comb_2nd_msg_len = 65535,
-> > +};
-> > +
-> >  static const struct mtk_i2c_compatible mt6577_compat = {
-> >  	.quirks = &mt6577_i2c_quirks,
-> >  	.pmic_i2c = 0,
-> > @@ -190,6 +198,15 @@ struct mtk_i2c {
-> >  	.support_33bits = 0,
-> >  };
-> >  
-> > +static const struct mtk_i2c_compatible mt7622_compat = {
-> > +	.quirks = &mt7622_i2c_quirks,
-> > +	.pmic_i2c = 0,
-> > +	.dcm = 1,
-> > +	.auto_restart = 1,
-> > +	.aux_len_reg = 1,
-> > +	.support_33bits = 0,
-> > +};
-> > +
-> >  static const struct mtk_i2c_compatible mt8173_compat = {
-> >  	.pmic_i2c = 0,
-> >  	.dcm = 1,
-> > @@ -201,6 +218,7 @@ struct mtk_i2c {
-> >  static const struct of_device_id mtk_i2c_of_match[] = {
-> >  	{ .compatible = "mediatek,mt6577-i2c", .data = &mt6577_compat },
-> >  	{ .compatible = "mediatek,mt6589-i2c", .data = &mt6589_compat },
-> > +	{ .compatible = "mediatek,mt7622-i2c", .data = &mt7622_compat },
-> >  	{ .compatible = "mediatek,mt8173-i2c", .data = &mt8173_compat },
-> >  	{}
-> >  };
-> 
-> 
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+Thanks, good plan.
