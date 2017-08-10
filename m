@@ -1,82 +1,58 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Thu, 10 Aug 2017 11:19:10 +0000
-Subject: [PATCH  0/3] Add SMP support
-References: <1502189793-59679-1-git-send-email-biju.das@bp.renesas.com>
- <20170809083554.GI2705@verge.net.au>
-Message-ID: <KL1PR06MB1702C4E3CE94EFA111DE530BB8880@KL1PR06MB1702.apcprd06.prod.outlook.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 10 Aug 2017 20:23:17 +0900
+Subject: [PATCH 3/3] reset: uniphier: add analog amplifiers reset control
+In-Reply-To: <CAK7LNAT_dhx8+_G7yX9OX1yg7cWWpo7vJG5jDwdQe_O9uAe8rw@mail.gmail.com>
+References: <20170810072703.32433-1-suzuki.katsuhiro@socionext.com>
+ <20170810072703.32433-3-suzuki.katsuhiro@socionext.com>
+ <1502361454.10792.5.camel@pengutronix.de>
+ <CAK7LNAT_dhx8+_G7yX9OX1yg7cWWpo7vJG5jDwdQe_O9uAe8rw@mail.gmail.com>
+Message-ID: <CAK7LNAQ_N-Ji29WvyRVZpqxwezO5Z2ET84ctxE-zmJ386L2AbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi.
 
 
-> -----Original Message-----
-> From: Biju Das
-> Sent: 10 August 2017 10:17
-> To: 'Simon Horman' <horms@verge.net.au>
-> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
-> <mark.rutland@arm.com>; Magnus Damm <magnus.damm@gmail.com>;
-> Russell King <linux@armlinux.org.uk>; Chris Paterson
-> <Chris.Paterson2@renesas.com>; devicetree at vger.kernel.org; linux-renesas-
-> soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: RE: [PATCH 0/3] Add SMP support
->
->
-> > -----Original Message-----
-> > From: Simon Horman [mailto:horms at verge.net.au]
-> > Sent: 09 August 2017 09:36
-> > To: Biju Das <biju.das@bp.renesas.com>
-> > Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
-> > <mark.rutland@arm.com>; Magnus Damm <magnus.damm@gmail.com>;
-> Russell
-> > King <linux@armlinux.org.uk>; Chris Paterson
-> > <Chris.Paterson2@renesas.com>; devicetree at vger.kernel.org;
-> > linux-renesas- soc at vger.kernel.org;
-> > linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH 0/3] Add SMP support
-> >
-> > On Tue, Aug 08, 2017 at 11:56:30AM +0100, Biju Das wrote:
-> > > This series aims to add SMP support for r8a7743 SoC.
-> > >
-> > > This series has been tested against Linux-next tag 20170727 and
-> > > renesas-dev branch.
-> >
-> > It seems that these patches are targeted at the renesas tree.
-> > The best practice in that case is to base patches on the latest devel branch.
-> > Please consider doing so in future.
-> >
-> > The patches themselves seem good to me, however, I would like to
-> > enquire about testing. In particular, have you tested CPU hotplug and
-> > suspend to RAM with these patches (and without in the case of the latter)?
->
-> I have tested CPU hotplug with this patch and it works ok.
->
-> Currently iWave platform doesn't support STR I guess. But we should check the
-> changes on other M2 platforms to prove that things don't break.
+2017-08-10 20:11 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> 2017-08-10 19:37 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
+>> Hi Katsuhiro,
+>>
+>> On Thu, 2017-08-10 at 16:27 +0900, Katsuhiro Suzuki wrote:
+>>> Add a reset line for analog signal amplifier core (ADAMV) on
+>>> UniPhier LD11/LD20 SoCs.
+>>>
+>>> > Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+>>> ---
+>>>  drivers/reset/reset-uniphier.c | 15 +++++++++++++++
+>>>  1 file changed, 15 insertions(+)
+>>>
+>>> diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
+>>> index f60c137c17cb..cda4a78a58e2 100644
+>>> --- a/drivers/reset/reset-uniphier.c
+>>> +++ b/drivers/reset/reset-uniphier.c
+>>> @@ -196,6 +196,12 @@ static const struct uniphier_reset_data uniphier_pro4_peri_reset_data[] = {
+>>> >     UNIPHIER_RESET_END,
+>>>  };
+>>>
+>>> +/* Analog signal amplifiers reset data */
+>>> +static const struct uniphier_reset_data uniphier_ld11_adamv_reset_data[] = {
+>>> > +   UNIPHIER_RESETX(100, 0x10, 6), /* EVEA */
+>>> > +   UNIPHIER_RESET_END,
+>>> +};
 
-I have tested STR on RZ-G1M SK(r8a7743) platform using gpio-key as wake up source.
-It works fine with and without the patch . It is tested against renesas-developer branch.
 
-Also I have tested STR on R-Car M2 board.it works fine with gpio-key as wake up source.
+I take back my Acked-by.
 
-> [>]
-> > I am cautious about any regressions that may creep in when going from
-> > UP to SMP.
->
-> > >
-> > > Biju Das (3):
-> > >   dt-bindings: apmu: Document r8a7743 support
-> > >   ARM: dts: r8a7743: Add APMU node and second CPU core
-> > >   ARM: dts: r8a7743: Add OPP table for frequency scaling
-> > >
-> > >  .../devicetree/bindings/power/renesas,apmu.txt     |  3 ++-
-> > >  arch/arm/boot/dts/r8a7743.dtsi                     | 25
-> ++++++++++++++++++++++
-> > >  2 files changed, 27 insertions(+), 1 deletion(-)
-> > >
-> > > --
-> > > 1.9.1
-> > >
+
+The reset line index is independent from others
+because this block is a separate instance.
+
+Are you OK with starting from the reset ID 100?
 
 
 
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+
+
+-- 
+Best Regards
+Masahiro Yamada
