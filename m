@@ -1,100 +1,91 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 9 Aug 2017 19:03:08 -0500
-Subject: [PATCH 2/6] dt-bindings: ti, omap-hsmmc: Add 66AK2G mmc controller
-In-Reply-To: <20170801044119.16201-3-lokeshvutla@ti.com>
-References: <20170801044119.16201-1-lokeshvutla@ti.com>
- <20170801044119.16201-3-lokeshvutla@ti.com>
-Message-ID: <20170810000308.45bhcka2z4vk4yhm@rob-hp-laptop>
+Date: Wed, 9 Aug 2017 19:05:45 -0500
+Subject: [PATCH 1/7] mtd: spi-nor: cadence-quadspi: add a delay in write
+ sequence
+In-Reply-To: <20170801045434.8733-2-vigneshr@ti.com>
+References: <20170801045434.8733-1-vigneshr@ti.com>
+ <20170801045434.8733-2-vigneshr@ti.com>
+Message-ID: <20170810000545.hphnihd5ghugfbof@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 01, 2017 at 10:11:15AM +0530, Lokesh Vutla wrote:
-> Update the ti,omap-hsmmc.txt to include information about
-> 66AK2G specific mmc controller. Also cleanup the entries
-> under optional properties to look a bit nicer.
+On Tue, Aug 01, 2017 at 10:24:28AM +0530, Vignesh R wrote:
+> As per 66AK2G02 TRM[1] SPRUHY8F section 11.15.5.3 Indirect Access
+> Controller programming sequence, a delay equal to couple QSPI master
+> clock(~5ns) is required after setting CQSPI_REG_INDIRECTWR_START bit and
+> writing data to the flash. Add a new compatible to handle the couple of
+> cycles of delay required in the indirect write sequence, since this
+> delay is specific to TI 66AK2G SoC.
 > 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> [1]http://www.ti.com/lit/ug/spruhy8f/spruhy8f.pdf
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 > ---
->  .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      | 52 +++++++++++++++-------
->  1 file changed, 37 insertions(+), 15 deletions(-)
+>  Documentation/devicetree/bindings/mtd/cadence-quadspi.txt |  1 +
+>  drivers/mtd/spi-nor/cadence-quadspi.c                     | 13 +++++++++++++
+>  2 files changed, 14 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> index 0e026c151c1c..016741402e37 100644
-> --- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> @@ -1,33 +1,55 @@
-> -* TI Highspeed MMC host controller for OMAP
-> +* TI Highspeed MMC host controller for OMAP and 66AK2G family.
->  
-> -The Highspeed MMC Host Controller on TI OMAP family
-> +The Highspeed MMC Host Controller on TI OMAP and 66AK2G family
->  provides an interface for MMC, SD, and SDIO types of memory cards.
->  
->  This file documents differences between the core properties described
->  by mmc.txt and the properties used by the omap_hsmmc driver.
+> diff --git a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
+> index f248056da24c..fdd511a83511 100644
+> --- a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
+> +++ b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
+> @@ -2,6 +2,7 @@
 >  
 >  Required properties:
-> +--------------------
->  - compatible:
->   Should be "ti,omap2-hsmmc", for OMAP2 controllers
->   Should be "ti,omap3-hsmmc", for OMAP3 controllers
->   Should be "ti,omap3-pre-es3-hsmmc" for OMAP3 controllers pre ES3.0
->   Should be "ti,omap4-hsmmc", for OMAP4 controllers
->   Should be "ti,am33xx-hsmmc", for AM335x controllers
-> -- ti,hwmods: Must be "mmc<n>", n is controller instance starting 1
-> + Should be "ti,k2g-hsmmc", "ti,omap4-hsmmc" for 66AK2G controllers.
-
-Same comment here.
-
-> +
-> +SoC specific required properties:
-> +---------------------------------
-> +The following are mandatory properties for OMAPs, AM33xx and AM43xx SoCs only:
-> +- ti,hwmods: Must be "mmc<n>", n is controller instance starting 1.
-> +
-> +The following are mandatory properties for 66AK2G SoCs only:
-> +- power-domains:Should contain a phandle to a PM domain provider node
-> +		and an args specifier containing the MMC device id
-> +		value. This property is as per the binding,
-> +		Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
-> +- clocks:	Must contain an entry for each entry in clock-names. Should
-> +		be defined as per the he appropriate clock bindings consumer
-> +		usage in Documentation/devicetree/bindings/clock/ti,sci-clk.txt
-> +- clock-names:	Shall be "fck" for the functional clock,
-> +		and "mmchsdb_fck" for the debounce clock.
-> +
+>  - compatible : Should be "cdns,qspi-nor".
+> +	       Should be "ti,k2g-qspi" for TI 66AK2G platform.
+>  - reg : Contains two entries, each of which is a tuple consisting of a
+>  	physical address and length. The first entry is the address and
+>  	length of the controller register set. The second entry is the
+> diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
+> index 53c7d8e0327a..94571590371d 100644
+> --- a/drivers/mtd/spi-nor/cadence-quadspi.c
+> +++ b/drivers/mtd/spi-nor/cadence-quadspi.c
+> @@ -76,6 +76,7 @@ struct cqspi_st {
+>  	u32			fifo_depth;
+>  	u32			fifo_width;
+>  	u32			trigger_address;
+> +	u32			wr_delay;
+>  	struct cqspi_flash_pdata f_pdata[CQSPI_MAX_CHIPSELECT];
+>  };
 >  
->  Optional properties:
-> -ti,dual-volt: boolean, supports dual voltage cards
-> -<supply-name>-supply: phandle to the regulator device tree node
-> -"supply-name" examples are "vmmc", "vmmc_aux"(deprecated)/"vqmmc" etc
-> -ti,non-removable: non-removable slot (like eMMC)
-> -ti,needs-special-reset: Requires a special softreset sequence
-> -ti,needs-special-hs-handling: HSMMC IP needs special setting for handling High Speed
-> -dmas: List of DMA specifiers with the controller specific format
-> -as described in the generic DMA client binding. A tx and rx
-> -specifier is required.
-> -dma-names: List of DMA request names. These strings correspond
-> -1:1 with the DMA specifiers listed in dmas. The string naming is
-> -to be "rx" and "tx" for RX and TX DMA requests, respectively.
-> +--------------------
-> +- ti,dual-volt:		boolean, supports dual voltage cards
-> +- <supply-name>-supply:	phandle to the regulator device tree node
-> +			  "supply-name" examples are "vmmc",
-> +			  "vmmc_aux"(deprecated)/"vqmmc" etc
-> +- ti,non-removable:	non-removable slot (like eMMC)
-> +- ti,needs-special-reset:	Requires a special softreset sequence
-> +- ti,needs-special-hs-handling:	HSMMC IP needs special setting
-> +				  for handling High Speed
-> +- dmas:			List of DMA specifiers with the controller specific
-> +			format as described in the generic DMA client
-> +			binding. A tx and rx specifier is required.
-> +- dma-names:		List of DMA request names. These strings correspond
-> +			1:1 with the DMA specifiers listed in dmas.
-> +			The string naming is to be "rx" and "tx" for
-> +			RX and TX DMA requests, respectively.
+> @@ -608,6 +609,14 @@ static int cqspi_indirect_write_execute(struct spi_nor *nor,
+>  	reinit_completion(&cqspi->transfer_complete);
+>  	writel(CQSPI_REG_INDIRECTWR_START_MASK,
+>  	       reg_base + CQSPI_REG_INDIRECTWR);
+> +	/*
+> +	 * As per 66AK2G02 TRM SPRUHY8F section 11.15.5.3 Indirect Access
+> +	 * Controller programming sequence, couple of cycles of
+> +	 * QSPI_REF_CLK delay is required for the above bit to
+> +	 * be internally synchronized by the QSPI module. Provide 5
+> +	 * cycles of delay.
+> +	 */
+> +	ndelay(cqspi->wr_delay);
+>  
+>  	while (remaining > 0) {
+>  		write_bytes = remaining > page_size ? page_size : remaining;
+> @@ -1213,6 +1222,9 @@ static int cqspi_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	cqspi->master_ref_clk_hz = clk_get_rate(cqspi->clk);
+> +	if (of_device_is_compatible(dev->of_node, "ti,k2g-qspi"))
+> +		cqspi->wr_delay = 5 * DIV_ROUND_UP(NSEC_PER_SEC,
+> +						   cqspi->master_ref_clk_hz);
 
-Is there some change here or just reformatting? Please make reformatting 
-a separate patch.
+Use the data pointer in the of_device_id table and put the delay value 
+there.
 
-Rob
+>  
+>  	ret = devm_request_irq(dev, irq, cqspi_irq_handler, 0,
+>  			       pdev->name, cqspi);
+> @@ -1285,6 +1297,7 @@ static const struct dev_pm_ops cqspi__dev_pm_ops = {
+>  
+>  static const struct of_device_id cqspi_dt_ids[] = {
+>  	{.compatible = "cdns,qspi-nor",},
+> +	{.compatible = "ti,k2g-qspi",},
+>  	{ /* end of table */ }
+>  };
+>  
+> -- 
+> 2.13.3
+> 
