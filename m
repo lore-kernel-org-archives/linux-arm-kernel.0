@@ -1,15 +1,15 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Thu, 10 Aug 2017 12:06:16 +0200
-Subject: [PATCH 04/17] pinctrl: st: constify pinconf_ops, pinctrl_ops,
+Date: Thu, 10 Aug 2017 12:06:19 +0200
+Subject: [PATCH 07/17] pinctrl: digicolor: constify pinconf_ops, pinctrl_ops,
  and pinmux_ops structures
 In-Reply-To: <1502359589-15970-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1502359589-15970-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1502359589-15970-5-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1502359589-15970-8-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 These structures are only stored in fields of a pinctrl_desc
-structure (confops, pctlops, and pmxops) that are const. Make the
+structure (pctlops and pmxops) that are const. Make the
 structures const as well.
 
 Done with the help of Coccinelle.
@@ -17,37 +17,28 @@ Done with the help of Coccinelle.
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- drivers/pinctrl/pinctrl-st.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/pinctrl/pinctrl-digicolor.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-st.c b/drivers/pinctrl/pinctrl-st.c
-index 7ac8b1e..aed8006 100644
---- a/drivers/pinctrl/pinctrl-st.c
-+++ b/drivers/pinctrl/pinctrl-st.c
-@@ -861,7 +861,7 @@ static void st_pctl_dt_free_map(struct pinctrl_dev *pctldev,
- {
- }
- 
--static struct pinctrl_ops st_pctlops = {
-+static const struct pinctrl_ops st_pctlops = {
- 	.get_groups_count	= st_pctl_get_groups_count,
- 	.get_group_pins		= st_pctl_get_group_pins,
- 	.get_group_name		= st_pctl_get_group_name,
-@@ -928,7 +928,7 @@ static int st_pmx_set_gpio_direction(struct pinctrl_dev *pctldev,
+diff --git a/drivers/pinctrl/pinctrl-digicolor.c b/drivers/pinctrl/pinctrl-digicolor.c
+index 639a57e..ce269ce 100644
+--- a/drivers/pinctrl/pinctrl-digicolor.c
++++ b/drivers/pinctrl/pinctrl-digicolor.c
+@@ -79,7 +79,7 @@ static int dc_get_group_pins(struct pinctrl_dev *pctldev, unsigned selector,
  	return 0;
  }
  
--static struct pinmux_ops st_pmxops = {
-+static const struct pinmux_ops st_pmxops = {
- 	.get_functions_count	= st_pmx_get_funcs_count,
- 	.get_function_name	= st_pmx_get_fname,
- 	.get_function_groups	= st_pmx_get_groups,
-@@ -1025,7 +1025,7 @@ static void st_pinconf_dbg_show(struct pinctrl_dev *pctldev,
- 		ST_PINCONF_UNPACK_RT_DELAY(config));
+-static struct pinctrl_ops dc_pinctrl_ops = {
++static const struct pinctrl_ops dc_pinctrl_ops = {
+ 	.get_groups_count	= dc_get_groups_count,
+ 	.get_group_name		= dc_get_group_name,
+ 	.get_group_pins		= dc_get_group_pins,
+@@ -161,7 +161,7 @@ static int dc_pmx_request_gpio(struct pinctrl_dev *pcdev,
+ 	return 0;
  }
  
--static struct pinconf_ops st_confops = {
-+static const struct pinconf_ops st_confops = {
- 	.pin_config_get		= st_pinconf_get,
- 	.pin_config_set		= st_pinconf_set,
- 	.pin_config_dbg_show	= st_pinconf_dbg_show,
+-static struct pinmux_ops dc_pmxops = {
++static const struct pinmux_ops dc_pmxops = {
+ 	.get_functions_count	= dc_get_functions_count,
+ 	.get_function_name	= dc_get_fname,
+ 	.get_function_groups	= dc_get_groups,
