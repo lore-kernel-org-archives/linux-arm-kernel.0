@@ -1,54 +1,45 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Thu, 10 Aug 2017 10:26:09 +0800
-Subject: [PATCH v2 3/9] arm64: dts: hi3660: add pmu dt node for hi3660
+Date: Thu, 10 Aug 2017 10:26:11 +0800
+Subject: [PATCH v2 5/9] arm64: dts: hikey960: Add support for
+ syscon-reboot-mode
 In-Reply-To: <20170810022615.19204-1-guodong.xu@linaro.org>
 References: <20170810022615.19204-1-guodong.xu@linaro.org>
-Message-ID: <20170810022615.19204-4-guodong.xu@linaro.org>
+Message-ID: <20170810022615.19204-6-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: YiPing Xu <xuyiping@hisilicon.com>
+Add support to hikey960 dts for the syscon-reboot-mode driver.
 
-Add pmu dt node for hi3660
-
-Signed-off-by: YiPing Xu <xuyiping@hisilicon.com>
-Signed-off-by: Zhong Kaihua <zhongkaihua@huawei.com>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
-Tested-by: Jumana Mundichipparakkal <jumana.mp@arm.com>
+Cc: John Stultz <john.stultz@linaro.org>
+Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 ---
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 1cdd03b..5fd5686 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -202,6 +202,26 @@
- 					 IRQ_TYPE_LEVEL_HIGH)>;
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+index b96d865..ce5e874 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+@@ -39,6 +39,20 @@
+ 		reg = <0x0 0x0 0x0 0x0>;
  	};
  
-+	pmu {
-+		compatible = "arm,armv8-pmuv3";
-+		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&cpu0>,
-+				     <&cpu1>,
-+				     <&cpu2>,
-+				     <&cpu3>,
-+				     <&cpu4>,
-+				     <&cpu5>,
-+				     <&cpu6>,
-+				     <&cpu7>;
++	reboot-mode-syscon at 32100000 {
++		compatible = "syscon", "simple-mfd";
++		reg = <0x0 0x32100000 0x0 0x00001000>;
++
++		reboot-mode {
++			compatible = "syscon-reboot-mode";
++			offset = <0x0>;
++
++			mode-normal	= <0x77665501>;
++			mode-bootloader	= <0x77665500>;
++			mode-recovery	= <0x77665502>;
++		};
 +	};
 +
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupt-parent = <&gic>;
+ 	keys {
+ 		compatible = "gpio-keys";
+ 		pinctrl-names = "default";
 -- 
 2.10.2
