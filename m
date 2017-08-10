@@ -1,33 +1,83 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 10 Aug 2017 13:24:11 +0200
-Subject: [PATCH 2/2] ARM: dts: r8a7743: Add IIC cores to dtsi
-In-Reply-To: <20170810080121.GE16647@verge.net.au>
-References: <1502196418-31341-1-git-send-email-biju.das@bp.renesas.com>
- <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
- <20170810080121.GE16647@verge.net.au>
-Message-ID: <20170810112411.GA4380@katana>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 10 Aug 2017 12:30:21 +0100
+Subject: [PATCH] KVM: arm64: stop propagating DAIF flags between kernel and
+ VHE's world switch
+Message-ID: <20170810113021.1110-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+KVM calls __kvm_vcpu_run() in a loop with interrupts masked for the
+duration of the call. On a non-vhe system we HVC to EL2 and the
+host DAIF flags are save/restored via the SPSR.
 
-> > >+		i2c6: i2c at e60b0000 {
-> > 
-> >    I'd use iic0 as the label.
-> 
-> I have no preference here other than that we try to be consistent
-> in DT for different R-Car SoCs. Wolfram, do you have an opinion on this?
+On a system with vhe, we branch to the EL2 code because the kernel
+also runs at EL2. This means the other kernel DAIF flags propagate into
+KVMs EL2 code.
 
-Back then, for M2-W, I decided to go with the schematics/datasheets.
-And those mentioned i2c6 rather than iic0. For that reason, the comment
+The same happens in reverse, we take an exception to exit the guest
+and all the flags are masked. __guest_exit() unmasks SError, and we
+return with these flags through world switch and back into the host
+kernel. KVM unmasks interrupts as part of its __kvm_vcpu_run(), but
+debug exceptions remain disabled due to the guest exit exception,
+(as does SError: today this is the only time SError is unmasked in the
+kernel). The flags stay in this state until we return to userspace.
 
-"/* The memory map in the User's Manual maps the cores to bus numbers */"
+We have a __vhe_hyp_call() function that does the isb that we implicitly
+have on non-vhe systems, add the DAIF save/restore here, instead of in
+__sysreg_{save,restore}_host_state() which would require an extra isb()
+between the hosts VBAR_EL1 being restored and DAIF being restored.
 
-exists in r8a7791.dtsi. Dunno the manual of this SoC here.
+Signed-off-by: James Morse <james.morse@arm.com>
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170810/bb3d03e1/attachment.sig>
+---
+I don't like the host DAIF context being stored on the stack instead of
+kvm_host_cpu_state, but this should only be a problem for returns that
+don't go through __vhe_hyp_call(). That should just be hyp_panic() where we
+want to change DAIF anyway.
+
+If you want a fixes tag for this, I think its:
+Fixes: b81125c791a2 ("arm64: KVM: VHE: Patch out use of HVC")
+
+
+While this won't conflict with v3 of the RAS+IESB series, it will depend on
+this patches behaviour: Without this patch you will have SError unmasked
+on host->guest world switch, a v8.2 RAS error arriving during this window
+will HYP panic, but this is already the case today for guest->host.
+
+
+ arch/arm64/kvm/hyp/hyp-entry.S | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 5170ce1021da..5eaa336e5dd9 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -42,6 +42,11 @@
+ .endm
+ 
+ ENTRY(__vhe_hyp_call)
++	/* HVC->ERET implicitly save/restore DAIF, we do it manually here. */
++	mrs	x9, daif
++	str	x9, [sp, #-16]!
++	msr	daifset, #0xf
++
+ 	do_el2_call
+ 	/*
+ 	 * We used to rely on having an exception return to get
+@@ -50,6 +55,14 @@ ENTRY(__vhe_hyp_call)
+ 	 * before returning to the rest of the kernel.
+ 	 */
+ 	isb
++
++	/*
++	 * World-switch changes VBAR_EL1, we can only restore DAIF after
++	 * the hosts value has been synchronised by the above isb.
++	 */
++	ldr	x9, [sp], #16
++	msr	daif, x9
++
+ 	ret
+ ENDPROC(__vhe_hyp_call)
+ 
+-- 
+2.13.3
