@@ -1,103 +1,62 @@
-From: wenyou.yang@microchip.com (Wenyou Yang)
-Date: Thu, 10 Aug 2017 17:06:45 +0800
-Subject: [PATCH 2/2] media: ov7670: Add the s_power operation
-In-Reply-To: <20170810090645.24344-1-wenyou.yang@microchip.com>
-References: <20170810090645.24344-1-wenyou.yang@microchip.com>
-Message-ID: <20170810090645.24344-3-wenyou.yang@microchip.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Thu, 10 Aug 2017 09:18:13 +0000
+Subject: [PATCH  0/3] Add SMP support
+In-Reply-To: <20170809083554.GI2705@verge.net.au>
+References: <1502189793-59679-1-git-send-email-biju.das@bp.renesas.com>
+ <20170809083554.GI2705@verge.net.au>
+Message-ID: <KL1PR06MB17028862FF6D21E2D611B24AB8880@KL1PR06MB1702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the s_power operation which is responsible for manipulating the
-power dowm mode through the PWDN pin and the reset operation through
-the RESET pin.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
----
+> -----Original Message-----
+> From: Simon Horman [mailto:horms at verge.net.au]
+> Sent: 09 August 2017 09:36
+> To: Biju Das <biju.das@bp.renesas.com>
+> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
+> <mark.rutland@arm.com>; Magnus Damm <magnus.damm@gmail.com>;
+> Russell King <linux@armlinux.org.uk>; Chris Paterson
+> <Chris.Paterson2@renesas.com>; devicetree at vger.kernel.org; linux-renesas-
+> soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 0/3] Add SMP support
+>
+> On Tue, Aug 08, 2017 at 11:56:30AM +0100, Biju Das wrote:
+> > This series aims to add SMP support for r8a7743 SoC.
+> >
+> > This series has been tested against Linux-next tag 20170727 and
+> > renesas-dev branch.
+>
+> It seems that these patches are targeted at the renesas tree.
+> The best practice in that case is to base patches on the latest devel branch.
+> Please consider doing so in future.
+>
+> The patches themselves seem good to me, however, I would like to enquire
+> about testing. In particular, have you tested CPU hotplug and suspend to RAM
+> with these patches (and without in the case of the latter)?
 
- drivers/media/i2c/ov7670.c | 30 +++++++++++++++++++++++++++---
- 1 file changed, 27 insertions(+), 3 deletions(-)
+I have tested CPU hotplug with this patch and it works ok.
 
-diff --git a/drivers/media/i2c/ov7670.c b/drivers/media/i2c/ov7670.c
-index 5c8460ee65c3..5ed79ccfaf91 100644
---- a/drivers/media/i2c/ov7670.c
-+++ b/drivers/media/i2c/ov7670.c
-@@ -1506,6 +1506,22 @@ static int ov7670_s_register(struct v4l2_subdev *sd, const struct v4l2_dbg_regis
- }
- #endif
- 
-+static int ov7670_s_power(struct v4l2_subdev *sd, int on)
-+{
-+	struct ov7670_info *info = to_state(sd);
-+
-+	if (info->pwdn_gpio)
-+		gpiod_direction_output(info->pwdn_gpio, !on);
-+	if (on && info->resetb_gpio) {
-+		gpiod_set_value(info->resetb_gpio, 1);
-+		usleep_range(500, 1000);
-+		gpiod_set_value(info->resetb_gpio, 0);
-+		usleep_range(3000, 5000);
-+	}
-+
-+	return 0;
-+}
-+
- /* ----------------------------------------------------------------------- */
- 
- static const struct v4l2_subdev_core_ops ov7670_core_ops = {
-@@ -1515,6 +1531,7 @@ static const struct v4l2_subdev_core_ops ov7670_core_ops = {
- 	.g_register = ov7670_g_register,
- 	.s_register = ov7670_s_register,
- #endif
-+	.s_power = ov7670_s_power,
- };
- 
- static const struct v4l2_subdev_video_ops ov7670_video_ops = {
-@@ -1568,8 +1585,6 @@ static int ov7670_init_gpio(struct i2c_client *client, struct ov7670_info *info)
- 		return PTR_ERR(info->resetb_gpio);
- 	}
- 
--	usleep_range(3000, 5000);
--
- 	return 0;
- }
- 
-@@ -1630,13 +1645,19 @@ static int ov7670_probe(struct i2c_client *client,
- 		goto clk_disable;
- 	}
- 
-+	ret = ov7670_init_gpio(client, info);
-+	if (ret)
-+		goto clk_disable;
-+
-+	ov7670_s_power(sd, 1);
-+
- 	/* Make sure it's an ov7670 */
- 	ret = ov7670_detect(sd);
- 	if (ret) {
- 		v4l_dbg(1, debug, client,
- 			"chip found @ 0x%x (%s) is not an ov7670 chip.\n",
- 			client->addr << 1, client->adapter->name);
--		goto clk_disable;
-+		goto power_off;
- 	}
- 	v4l_info(client, "chip found @ 0x%02x (%s)\n",
- 			client->addr << 1, client->adapter->name);
-@@ -1708,6 +1729,8 @@ static int ov7670_probe(struct i2c_client *client,
- 	media_entity_cleanup(&info->sd.entity);
- hdl_free:
- 	v4l2_ctrl_handler_free(&info->hdl);
-+power_off:
-+	ov7670_s_power(sd, 0);
- clk_disable:
- 	clk_disable_unprepare(info->clk);
- 	return ret;
-@@ -1723,6 +1746,7 @@ static int ov7670_remove(struct i2c_client *client)
- 	v4l2_ctrl_handler_free(&info->hdl);
- 	clk_disable_unprepare(info->clk);
- 	media_entity_cleanup(&info->sd.entity);
-+	ov7670_s_power(sd, 0);
- 	return 0;
- }
- 
--- 
-2.13.0
+Currently iWave platform doesn't support STR I guess. But we should check the changes on other M2 platforms to prove that
+things don't break.
+
+[>]
+> I am cautious about any regressions that may creep in when going from UP to
+> SMP.
+
+> >
+> > Biju Das (3):
+> >   dt-bindings: apmu: Document r8a7743 support
+> >   ARM: dts: r8a7743: Add APMU node and second CPU core
+> >   ARM: dts: r8a7743: Add OPP table for frequency scaling
+> >
+> >  .../devicetree/bindings/power/renesas,apmu.txt     |  3 ++-
+> >  arch/arm/boot/dts/r8a7743.dtsi                     | 25 ++++++++++++++++++++++
+> >  2 files changed, 27 insertions(+), 1 deletion(-)
+> >
+> > --
+> > 1.9.1
+> >
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
