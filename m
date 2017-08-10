@@ -1,63 +1,137 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 10 Aug 2017 11:33:25 +0800
-Subject: [PATCH v2] arm64: arch_timer: avoid infinite recursion when
- ftrace is enabled
-In-Reply-To: <a53349bd-aa6c-cdc1-1476-a068a5cfc2c2@huawei.com>
-References: <a53349bd-aa6c-cdc1-1476-a068a5cfc2c2@huawei.com>
-Message-ID: <88a09999-3b89-ea49-1565-22e3fa7fbd7c@huawei.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 10 Aug 2017 10:40:10 +0800
+Subject: [PATCH v3 05/11] net: stmmac: dwmac-rk: Add internal phy support
+In-Reply-To: <a9fae87c-9df5-a250-5bc1-230be4af15cd@rock-chips.com>
+References: <1501654546-17292-1-git-send-email-david.wu@rock-chips.com>
+ <1501654888-19514-1-git-send-email-david.wu@rock-chips.com>
+ <6b1ebf64-6903-6d35-b1fc-92ec47334425@gmail.com>
+ <CAGb2v65Rtw2B3Hcs4L0jTRQ2ApUduJ+Nf1W1XnqXBBmFwMaP-g@mail.gmail.com>
+ <20170809084541.GB7137@Red>
+ <a9fae87c-9df5-a250-5bc1-230be4af15cd@rock-chips.com>
+Message-ID: <CAGb2v66ZG3Ct1aFBOXQd8vkMCF-UNk7bN-vsXasbe_j5FexENw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add Danial and Thomas.
+Hi David,
 
-On 2017/8/10 10:52, Ding Tianhong wrote:
-> On platforms with an arch timer erratum workaround, it's possible for
-> arch_timer_reg_read_stable() to recurse into itself when certain
-> tracing options are enabled, leading to stack overflows and related
-> problems.
-> 
-> For example, when PREEMPT_TRACER and FUNCTION_GRAPH_TRACER are
-> selected, it's possible to trigger this with:
-> 
-> $ mount -t debugfs nodev /sys/kernel/debug/
-> $ echo function_graph > /sys/kernel/debug/tracing/current_tracer
-> 
-> The problem is that in such cases, preempt_disable() instrumentation
-> attempts to acquire a timestamp via trace_clock(), resulting in a call
-> back to arch_timer_reg_read_stable(), and hence recursion.
-> 
-> This patch changes arch_timer_reg_read_stable() to use
-> preempt_{disable,enable}_notrace(), which avoids this.
-> 
-> This problem is similar to the fixed by upstream commit 96b3d28bf4
-> ("sched/clock: Prevent tracing recursion in sched_clock_cpu()").
-> 
-> Fixes: 6acc71ccac71 ("arm64: arch_timer: Allows a CPU-specific erratum to only affect a subset of CPUs")
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/arch_timer.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index 74d08e4..67bb7a4 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -65,13 +65,13 @@ struct arch_timer_erratum_workaround {
->  	u64 _val;							\
->  	if (needs_unstable_timer_counter_workaround()) {		\
->  		const struct arch_timer_erratum_workaround *wa;		\
-> -		preempt_disable();					\
-> +		preempt_disable_notrace();				\
->  		wa = __this_cpu_read(timer_unstable_counter_workaround); \
->  		if (wa && wa->read_##reg)				\
->  			_val = wa->read_##reg();			\
->  		else							\
->  			_val = read_sysreg(reg);			\
-> -		preempt_enable();					\
-> +		preempt_enable_notrace();				\
->  	} else {							\
->  		_val = read_sysreg(reg);				\
->  	}								\
-> 
+On Wed, Aug 9, 2017 at 5:38 PM, David.Wu <david.wu@rock-chips.com> wrote:
+> Hello Corentin, Chen-Yu
+>
+>
+> ? 2017/8/9 16:45, Corentin Labbe ??:
+>>
+>> On Thu, Aug 03, 2017 at 07:06:33PM +0800, Chen-Yu Tsai wrote:
+>>>
+>>> On Thu, Aug 3, 2017 at 1:38 AM, Florian Fainelli <f.fainelli@gmail.com>
+>>> wrote:
+>>>>
+>>>> On 08/01/2017 11:21 PM, David Wu wrote:
+>>>>>
+>>>>> To make internal phy work, need to configure the phy_clock,
+>>>>> phy cru_reset and related registers.
+>>>>>
+>>>>> Signed-off-by: David Wu <david.wu@rock-chips.com>
+>>>>> ---
+>>>>>   .../devicetree/bindings/net/rockchip-dwmac.txt     |  6 +-
+>>>>>   drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 81
+>>>>> ++++++++++++++++++++++
+>>>>>   2 files changed, 86 insertions(+), 1 deletion(-)
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+>>>>> b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+>>>>> index 8f42755..ec39b31 100644
+>>>>> --- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+>>>>> +++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+>>>>> @@ -25,7 +25,8 @@ Required properties:
+>>>>>    - clock-names: One name for each entry in the clocks property.
+>>>>>    - phy-mode: See ethernet.txt file in the same directory.
+>>>>>    - pinctrl-names: Names corresponding to the numbered pinctrl states.
+>>>>> - - pinctrl-0: pin-control mode. can be <&rgmii_pins> or <&rmii_pins>.
+>>>>> + - pinctrl-0: pin-control mode. can be <&rgmii_pins>, <&rmii_pins> or
+>>>>> led pins
+>>>>> +   for internal phy mode.
+>>>>>    - clock_in_out: For RGMII, it must be "input", means main
+>>>>> clock(125MHz)
+>>>>>      is not sourced from SoC's PLL, but input from PHY; For RMII,
+>>>>> "input" means
+>>>>>      PHY provides the reference clock(50MHz), "output" means GMAC
+>>>>> provides the
+>>>>> @@ -40,6 +41,9 @@ Optional properties:
+>>>>>    - tx_delay: Delay value for TXD timing. Range value is 0~0x7F, 0x30
+>>>>> as default.
+>>>>>    - rx_delay: Delay value for RXD timing. Range value is 0~0x7F, 0x10
+>>>>> as default.
+>>>>>    - phy-supply: phandle to a regulator if the PHY needs one
+>>>>> + - clocks: <&cru MAC_PHY>: Clock selector for internal macphy
+>>>>> + - phy-is-internal: A boolean property allows us to know that MAC will
+>>>>> connect to
+>>>>> +   internal phy.
+>>>>
+>>>>
+>>>> This is incorrect in two ways:
+>>>>
+>>>> - this is a property of the PHY, so it should be documented as such in
+>>>> Documentation/devicetree/bindings/net/phy.txt so other bindings can
+>>>> re-use it
+>>>>
+>>>> - if it was specific to your MAC you would expect a vendor prefix to
+>>>> this property, which is not there
+>>>>
+>>>> An alternative way to implement the external/internal logic selection
+>>>> would be mandate that your Ethernet PHY node have a compatible string
+>>>> like this:
+>>>>
+>>>> phy at 0 {
+>>>>          compatible = "ethernet-phy-id1234.d400",
+>>>> "ethernet-phy-802.3-c22";
+>>>> };
+>>>>
+>>>> Then you don't need this phy-is-internal property, because you can
+>>>> locate the PHY node by the phy-handle (see more about that in a reply to
+>>>> patch 10) and you can determine ahead of time whether this PHY is
+>>>> internal or not based on its compatible string.
+>>>
+>>>
+>>> This doesn't really work for us (sunxi). The "internal" PHY of the H3
+>>> is also available in the X-Powers AC200 combo chip, which would be
+>>> external. Same ID. So if someone were to be stupid and put the two
+>>> together, you wouldn't know which one it actually is. Generically
+>>> it doesn't make sense to match against the ID either. The PHY is
+>>> only integrated or inlined into the SoC, meaning it could be moved
+>>> elsewhere or even be a discreet part.
+>>>
+>>> The way I see it is more like a reversed pinmux. The system should
+>>> select either the internal set or external set of xMII pins to use.
+>>>
+>>> A phy-is-internal property in the PHY node would work for us. We
+>>> already need a PHY node to describe its clocks and resets.
+>>>
+>>> A side note to this solution is that, since the internal PHY is defined
+>>> at the .dtsi level, any external PHYs at the same address would need to
+>>> make sure to delete the property, which is kind of counterintuitive, but
+>>> it is how device tree works. One would want to put the internal PHY's
+>>> address, assuming it is configurable, on something that is rarely used.
+>>>
+>>
+>> Hello David, Florian, Andrew
+>>
+>> Could someone ack this ? or nack if you think that the chance for having
+>> two PHY id both internal and external is too low.
+>> Anyway, we need a choice.
+>>
+>
+> I think we should be specific to the situation, for us we have the
+> possibility that the Mac only picks up internal PHY, so this can be fixed at
+> the. DTSi level, also possible INTERNL PHY's Mac can also be used to connect
+> external PHY, while cutting off the connection with the internal PHY, so we
+> should define the internal PHY at the DTS level, so I think Florian's
+> approach is acceptable.
+
+So it looks like you have the clock for the internal/integrated PHY at the
+MAC level. I think this lets you define/add the PHY at the board level more
+easily without a lot of duplication?
+
+Sunxi has the clock and reset in the PHY node, which is defined in the dtsi
+file. (This part is already done.)
+
+ChenYu
