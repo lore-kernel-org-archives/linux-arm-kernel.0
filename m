@@ -1,110 +1,124 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 10 Aug 2017 08:24:33 +0200
-Subject: [RFT v2] mfd: exynos-lpass: Handle return value of
- clk_prepare_enable
-In-Reply-To: <20170810060140.GA3625@kozik-book>
-References: <8de486cf36afdf97792313a6b21432e04374e47e.1502253715.git.arvind.yadav.cs@gmail.com>
- <CGME20170810060203epcas1p28049ab1a01c6ac6f93e8945645b517e5@epcas1p2.samsung.com>
- <20170810060140.GA3625@kozik-book>
-Message-ID: <8365fa18-78c5-5fdf-f6d6-6c0491ce262f@samsung.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 10 Aug 2017 15:27:04 +0900
+Subject: [PATCH v8 4/5] clk: samsung: exynos-audss: Use local variable
+ for controller's device
+In-Reply-To: <1502274907-11931-5-git-send-email-m.szyprowski@samsung.com>
+References: <1502274907-11931-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170809103514eucas1p11fb5d1af243e882a5d51a25956d24a19@eucas1p1.samsung.com>
+ <1502274907-11931-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <598BFCB8.5070401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hi,
 
-On 2017-08-10 08:01, Krzysztof Kozlowski wrote:
-> On Wed, Aug 09, 2017 at 10:18:10AM +0530, Arvind Yadav wrote:
->> clk_prepare_enable() can fail here and we must check its return value.
->> we must call pm_runtime_disable() and pm_runtime_set_suspended(),
->> If exynos_lpass_probe is not successful.
->>
->> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
->> ---
->> changes in v2:
->>               added regmap_exit(lpass->top) and blank line before return.
->>
->>   drivers/mfd/exynos-lpass.c | 23 +++++++++++++++++------
->>   1 file changed, 17 insertions(+), 6 deletions(-)
->>
-> For me looks ok although this requires testing and I do not have
-> Exynos with LPASS (e.g. Exynos5433). Maybe folks from Samsung (Polish
-> R&D or HQ as they are working on it) could help (Cced).
+On 2017? 08? 09? 19:35, Marek Szyprowski wrote:
+> Store pointer to the controller's device in local variable to avoid
+> extracting it from platform device in each call. This will also simplify
+> code in the future, when runtime PM support is added.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos-audss.c | 25 +++++++++++++------------
+>  1 file changed, 13 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
+> index 1fab56f396d4..6be52fb46ff3 100644
+> --- a/drivers/clk/samsung/clk-exynos-audss.c
+> +++ b/drivers/clk/samsung/clk-exynos-audss.c
+> @@ -135,6 +135,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+>  	const struct exynos_audss_clk_drvdata *variant;
+>  	struct clk_hw **clk_table;
+>  	struct resource *res;
+> +	struct device *dev = &pdev->dev;
+>  	int i, ret = 0;
+>  
+>  	variant = of_device_get_match_data(&pdev->dev);
+> @@ -142,15 +143,15 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+>  		return -EINVAL;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	reg_base = devm_ioremap_resource(&pdev->dev, res);
+> +	reg_base = devm_ioremap_resource(dev, res);
+>  	if (IS_ERR(reg_base)) {
+> -		dev_err(&pdev->dev, "failed to map audss registers\n");
+> +		dev_err(dev, "failed to map audss registers\n");
+>  		return PTR_ERR(reg_base);
+>  	}
+>  
+>  	epll = ERR_PTR(-ENODEV);
+>  
+> -	clk_data = devm_kzalloc(&pdev->dev,
+> +	clk_data = devm_kzalloc(dev,
+>  				sizeof(*clk_data) +
+>  				sizeof(*clk_data->hws) * EXYNOS_AUDSS_MAX_CLKS,
+>  				GFP_KERNEL);
+> @@ -160,8 +161,8 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+>  	clk_data->num = variant->num_clks;
+>  	clk_table = clk_data->hws;
+>  
+> -	pll_ref = devm_clk_get(&pdev->dev, "pll_ref");
+> -	pll_in = devm_clk_get(&pdev->dev, "pll_in");
+> +	pll_ref = devm_clk_get(dev, "pll_ref");
+> +	pll_in = devm_clk_get(dev, "pll_in");
+>  	if (!IS_ERR(pll_ref))
+>  		mout_audss_p[0] = __clk_get_name(pll_ref);
+>  	if (!IS_ERR(pll_in)) {
+> @@ -172,7 +173,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+>  
+>  			ret = clk_prepare_enable(epll);
+>  			if (ret) {
+> -				dev_err(&pdev->dev,
+> +				dev_err(dev,
+>  					"failed to prepare the epll clock\n");
+>  				return ret;
+>  			}
+> @@ -183,8 +184,8 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+>  				CLK_SET_RATE_NO_REPARENT,
+>  				reg_base + ASS_CLK_SRC, 0, 1, 0, &lock);
+>  
+> -	cdclk = devm_clk_get(&pdev->dev, "cdclk");
+> -	sclk_audio = devm_clk_get(&pdev->dev, "sclk_audio");
+> +	cdclk = devm_clk_get(dev, "cdclk");
+> +	sclk_audio = devm_clk_get(dev, "sclk_audio");
+>  	if (!IS_ERR(cdclk))
+>  		mout_i2s_p[1] = __clk_get_name(cdclk);
+>  	if (!IS_ERR(sclk_audio))
+> @@ -222,7 +223,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+>  				 "sclk_pcm", CLK_SET_RATE_PARENT,
+>  				reg_base + ASS_CLK_GATE, 4, 0, &lock);
+>  
+> -	sclk_pcm_in = devm_clk_get(&pdev->dev, "sclk_pcm_in");
+> +	sclk_pcm_in = devm_clk_get(dev, "sclk_pcm_in");
+>  	if (!IS_ERR(sclk_pcm_in))
+>  		sclk_pcm_p = __clk_get_name(sclk_pcm_in);
+>  	clk_table[EXYNOS_SCLK_PCM] = clk_hw_register_gate(NULL, "sclk_pcm",
+> @@ -237,16 +238,16 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+>  
+>  	for (i = 0; i < clk_data->num; i++) {
+>  		if (IS_ERR(clk_table[i])) {
+> -			dev_err(&pdev->dev, "failed to register clock %d\n", i);
+> +			dev_err(dev, "failed to register clock %d\n", i);
+>  			ret = PTR_ERR(clk_table[i]);
+>  			goto unregister;
+>  		}
+>  	}
+>  
+> -	ret = of_clk_add_hw_provider(pdev->dev.of_node, of_clk_hw_onecell_get,
+> +	ret = of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
+>  				     clk_data);
+>  	if (ret) {
+> -		dev_err(&pdev->dev, "failed to add clock provider\n");
+> +		dev_err(dev, "failed to add clock provider\n");
+>  		goto unregister;
+>  	}
+>  
+> 
 
-Works fine on Exynos5433 based TM2e.
+Looks good to me.
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
->
-> Best regards,
-> Krzysztof
->
->> diff --git a/drivers/mfd/exynos-lpass.c b/drivers/mfd/exynos-lpass.c
->> index ca829f8..1ab7210 100644
->> --- a/drivers/mfd/exynos-lpass.c
->> +++ b/drivers/mfd/exynos-lpass.c
->> @@ -73,9 +73,13 @@ static void exynos_lpass_core_sw_reset(struct exynos_lpass *lpass, int mask)
->>   	regmap_write(lpass->top, SFR_LPASS_CORE_SW_RESET, val);
->>   }
->>   
->> -static void exynos_lpass_enable(struct exynos_lpass *lpass)
->> +static int exynos_lpass_enable(struct exynos_lpass *lpass)
->>   {
->> -	clk_prepare_enable(lpass->sfr0_clk);
->> +	int ret;
->> +
->> +	ret = clk_prepare_enable(lpass->sfr0_clk);
->> +	if (ret)
->> +		return ret;
->>   
->>   	/* Unmask SFR, DMA and I2S interrupt */
->>   	regmap_write(lpass->top, SFR_LPASS_INTR_CA5_MASK,
->> @@ -87,6 +91,8 @@ static void exynos_lpass_enable(struct exynos_lpass *lpass)
->>   	exynos_lpass_core_sw_reset(lpass, LPASS_I2S_SW_RESET);
->>   	exynos_lpass_core_sw_reset(lpass, LPASS_DMA_SW_RESET);
->>   	exynos_lpass_core_sw_reset(lpass, LPASS_MEM_SW_RESET);
->> +
->> +	return 0;
->>   }
->>   
->>   static void exynos_lpass_disable(struct exynos_lpass *lpass)
->> @@ -112,6 +118,7 @@ static int exynos_lpass_probe(struct platform_device *pdev)
->>   	struct exynos_lpass *lpass;
->>   	void __iomem *base_top;
->>   	struct resource *res;
->> +	int ret;
->>   
->>   	lpass = devm_kzalloc(dev, sizeof(*lpass), GFP_KERNEL);
->>   	if (!lpass)
->> @@ -136,7 +143,13 @@ static int exynos_lpass_probe(struct platform_device *pdev)
->>   	platform_set_drvdata(pdev, lpass);
->>   	pm_runtime_set_active(dev);
->>   	pm_runtime_enable(dev);
->> -	exynos_lpass_enable(lpass);
->> +	ret = exynos_lpass_enable(lpass);
->> +	if (ret) {
->> +		pm_runtime_disable(dev);
->> +		pm_runtime_set_suspended(dev);
->> +		regmap_exit(lpass->top);
->> +		return ret;
->> +	}
->>   
->>   	return devm_of_platform_populate(dev);
->>   }
->> @@ -167,9 +180,7 @@ static int __maybe_unused exynos_lpass_resume(struct device *dev)
->>   {
->>   	struct exynos_lpass *lpass = dev_get_drvdata(dev);
->>   
->> -	exynos_lpass_enable(lpass);
->> -
->> -	return 0;
->> +	return exynos_lpass_enable(lpass);
->>   }
->>   
->>   static const struct dev_pm_ops lpass_pm_ops = {
->> -- 
->> 1.9.1
-
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
