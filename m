@@ -1,157 +1,122 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Thu, 10 Aug 2017 08:34:05 +0200
-Subject: [PATCH v5 5/7] clk: at91: clk-generated: make gclk determine
- audio_pll rate
-In-Reply-To: <cover.ada7bc60e0b3a0f7429afc6ea9e4869131d1b757.1502346448.git-series.quentin.schulz@free-electrons.com>
-References: <cover.ada7bc60e0b3a0f7429afc6ea9e4869131d1b757.1502346448.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <600ed1e3623477c8083c6c4fa16299e33f7b76a9.1502346448.git-series.quentin.schulz@free-electrons.com>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Thu, 10 Aug 2017 14:34:54 +0800
+Subject: [PATCH v4 1/7] PCI: mediatek: Using readl_poll_timeout to wait Gen2
+ training
+In-Reply-To: <cover.1502336769.git.honghui.zhang@mediatek.com>
+References: <cover.1502336769.git.honghui.zhang@mediatek.com>
+Message-ID: <a996a93c48eb7797c7fd061e419d6c6c654af828.1502336769.git.honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows gclk to determine audio_pll rate and set the parent rate
-accordingly.
+From: Ryder Lee <ryder.lee@mediatek.com>
 
-However, there are multiple children clocks that could technically
-change the rate of audio_pll (via gck). With the rate locking, the first
-consumer to enable the clock will be the one definitely setting the rate
-of the clock.
+Wait Gen2 training by using readl_poll_timeout() calls, and simplify
+the hardware assert logical by merge it into the new interface
+mtk_pcie_startup_port.
 
-Since audio IPs are most likely to request the same rate, we enforce
-that the only clks able to modify gck rate are those of audio IPs.
-
-To remain consistent, we deny other clocks to be children of audio_pll.
-
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
 ---
- drivers/clk/at91/clk-generated.c | 63 +++++++++++++++++++++++++++++----
- 1 file changed, 57 insertions(+), 6 deletions(-)
+ drivers/pci/host/pcie-mediatek.c | 52 +++++++++++++++++-----------------------
+ 1 file changed, 22 insertions(+), 30 deletions(-)
 
-diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-index 7260e49..3348136 100644
---- a/drivers/clk/at91/clk-generated.c
-+++ b/drivers/clk/at91/clk-generated.c
-@@ -26,6 +26,13 @@
- #define GENERATED_SOURCE_MAX	6
- #define GENERATED_MAX_DIV	255
+diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
+index 9c9f89b..f4e4226 100644
+--- a/drivers/pci/host/pcie-mediatek.c
++++ b/drivers/pci/host/pcie-mediatek.c
+@@ -16,6 +16,7 @@
  
-+#define GCK_ID_SSC0		43
-+#define GCK_ID_SSC1		44
-+#define GCK_ID_I2S0		54
-+#define GCK_ID_I2S1		55
-+#define GCK_ID_CLASSD		59
-+#define GCK_INDEX_DT_AUDIO_PLL	5
-+
- struct clk_generated {
- 	struct clk_hw hw;
- 	struct regmap *regmap;
-@@ -34,6 +41,7 @@ struct clk_generated {
- 	u32 id;
- 	u32 gckdiv;
- 	u8 parent_id;
-+	bool audio_pll_allowed;
+ #include <linux/clk.h>
+ #include <linux/delay.h>
++#include <linux/iopoll.h>
+ #include <linux/kernel.h>
+ #include <linux/of_address.h>
+ #include <linux/of_pci.h>
+@@ -113,11 +114,6 @@ struct mtk_pcie {
+ 	struct list_head ports;
  };
  
- #define to_clk_generated(hw) \
-@@ -126,15 +134,14 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
- {
- 	struct clk_generated *gck = to_clk_generated(hw);
- 	struct clk_hw *parent = NULL;
-+	struct clk_rate_request req_parent = *req;
- 	long best_rate = -EINVAL;
--	unsigned long min_rate;
-+	unsigned long min_rate, parent_rate;
- 	int best_diff = -1;
- 	int i;
-+	u32 div;
- 
--	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
--		u32 div;
--		unsigned long parent_rate;
+-static inline bool mtk_pcie_link_up(struct mtk_pcie_port *port)
+-{
+-	return !!(readl(port->base + PCIE_LINK_STATUS) & PCIE_PORT_LINKUP);
+-}
 -
-+	for (i = 0; i < clk_hw_get_num_parents(hw) - 1; i++) {
- 		parent = clk_hw_get_parent_by_index(hw, i);
- 		if (!parent)
- 			continue;
-@@ -150,11 +157,38 @@ static int clk_generated_determine_rate(struct clk_hw *hw,
- 		clk_generated_best_diff(req, parent, parent_rate, div,
- 					&best_diff, &best_rate);
+ static void mtk_pcie_subsys_powerdown(struct mtk_pcie *pcie)
+ {
+ 	struct device *dev = pcie->dev;
+@@ -171,12 +167,30 @@ static struct pci_ops mtk_pcie_ops = {
+ 	.write = pci_generic_config_write,
+ };
  
-+		if (!best_diff)
-+			break;
-+	}
+-static void mtk_pcie_configure_rc(struct mtk_pcie_port *port)
++static int mtk_pcie_startup_port(struct mtk_pcie_port *port)
+ {
+ 	struct mtk_pcie *pcie = port->pcie;
+ 	u32 func = PCI_FUNC(port->index << 3);
+ 	u32 slot = PCI_SLOT(port->index << 3);
+ 	u32 val;
++	int err;
 +
-+	/*
-+	 * The audio_pll rate can be modified, unlike the five others clocks
-+	 * that should never be altered.
-+	 * The audio_pll can technically be used by multiple consumers. However,
-+	 * with the rate locking, the first consumer to enable to clock will be
-+	 * the one definitely setting the rate of the clock.
-+	 * Since audio IPs are most likely to request the same rate, we enforce
-+	 * that the only clks able to modify gck rate are those of audio IPs.
-+	 */
++	/* assert port PERST_N */
++	val = readl(pcie->base + PCIE_SYS_CFG);
++	val |= PCIE_PORT_PERST(port->index);
++	writel(val, pcie->base + PCIE_SYS_CFG);
 +
-+	if (!gck->audio_pll_allowed)
-+		goto end;
++	/* de-assert port PERST_N */
++	val = readl(pcie->base + PCIE_SYS_CFG);
++	val &= ~PCIE_PORT_PERST(port->index);
++	writel(val, pcie->base + PCIE_SYS_CFG);
 +
-+	parent = clk_hw_get_parent_by_index(hw, GCK_INDEX_DT_AUDIO_PLL);
-+	if (!parent)
-+		goto end;
-+
-+	for (div = 1; div < GENERATED_MAX_DIV + 2; div++) {
-+		req_parent.rate = req->rate * div;
-+		__clk_determine_rate(parent, &req_parent);
-+		clk_generated_best_diff(req, parent, req_parent.rate, div,
-+					&best_diff, &best_rate);
++	/* 100ms timeout value should be enough for Gen1/2 training */
++	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS, val,
++				 !!(val & PCIE_PORT_LINKUP), 20,
++				 100 * USEC_PER_MSEC);
++	if (err)
++		return -ETIMEDOUT;
  
- 		if (!best_diff)
- 			break;
+ 	/* enable interrupt */
+ 	val = readl(pcie->base + PCIE_INT_ENABLE);
+@@ -209,25 +223,8 @@ static void mtk_pcie_configure_rc(struct mtk_pcie_port *port)
+ 	writel(PCIE_CONF_ADDR(PCIE_FTS_NUM, func, slot, 0),
+ 	       pcie->base + PCIE_CFG_ADDR);
+ 	writel(val, pcie->base + PCIE_CFG_DATA);
+-}
+ 
+-static void mtk_pcie_assert_ports(struct mtk_pcie_port *port)
+-{
+-	struct mtk_pcie *pcie = port->pcie;
+-	u32 val;
+-
+-	/* assert port PERST_N */
+-	val = readl(pcie->base + PCIE_SYS_CFG);
+-	val |= PCIE_PORT_PERST(port->index);
+-	writel(val, pcie->base + PCIE_SYS_CFG);
+-
+-	/* de-assert port PERST_N */
+-	val = readl(pcie->base + PCIE_SYS_CFG);
+-	val &= ~PCIE_PORT_PERST(port->index);
+-	writel(val, pcie->base + PCIE_SYS_CFG);
+-
+-	/* PCIe v2.0 need at least 100ms delay to train from Gen1 to Gen2 */
+-	msleep(100);
++	return 0;
+ }
+ 
+ static void mtk_pcie_enable_ports(struct mtk_pcie_port *port)
+@@ -250,13 +247,8 @@ static void mtk_pcie_enable_ports(struct mtk_pcie_port *port)
+ 		goto err_phy_on;
  	}
  
-+end:
- 	pr_debug("GCLK: %s, best_rate = %ld, parent clk: %s @ %ld\n",
- 		 __func__, best_rate,
- 		 __clk_get_name((req->best_parent_hw)->clk),
-@@ -264,7 +298,8 @@ at91_clk_register_generated(struct regmap *regmap, spinlock_t *lock,
- 	init.ops = &generated_ops;
- 	init.parent_names = parent_names;
- 	init.num_parents = num_parents;
--	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
-+	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE |
-+		CLK_SET_RATE_PARENT;
+-	mtk_pcie_assert_ports(port);
+-
+-	/* if link up, then setup root port configuration space */
+-	if (mtk_pcie_link_up(port)) {
+-		mtk_pcie_configure_rc(port);
++	if (!mtk_pcie_startup_port(port))
+ 		return;
+-	}
  
- 	gck->id = id;
- 	gck->hw.init = &init;
-@@ -296,6 +331,7 @@ static void __init of_sama5d2_clk_generated_setup(struct device_node *np)
- 	struct device_node *gcknp;
- 	struct clk_range range = CLK_RANGE(0, 0);
- 	struct regmap *regmap;
-+	struct clk_generated *gck;
- 
- 	num_parents = of_clk_get_parent_count(np);
- 	if (num_parents == 0 || num_parents > GENERATED_SOURCE_MAX)
-@@ -327,6 +363,21 @@ static void __init of_sama5d2_clk_generated_setup(struct device_node *np)
- 		hw = at91_clk_register_generated(regmap, &pmc_pcr_lock, name,
- 						  parent_names, num_parents,
- 						  id, &range);
-+
-+		gck = to_clk_generated(hw);
-+
-+		if (of_device_is_compatible(np,
-+					    "atmel,sama5d2-clk-generated")) {
-+			if (gck->id == GCK_ID_SSC0 || gck->id == GCK_ID_SSC1 ||
-+			    gck->id == GCK_ID_I2S0 || gck->id == GCK_ID_I2S1 ||
-+			    gck->id == GCK_ID_CLASSD)
-+				gck->audio_pll_allowed = true;
-+			else
-+				gck->audio_pll_allowed = false;
-+		} else {
-+			gck->audio_pll_allowed = false;
-+		}
-+
- 		if (IS_ERR(hw))
- 			continue;
+ 	dev_info(dev, "Port%d link down\n", port->index);
  
 -- 
-git-series 0.9.1
+2.6.4
