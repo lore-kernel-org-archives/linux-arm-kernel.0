@@ -1,24 +1,66 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 10 Aug 2017 12:08:55 -0500
-Subject: [PATCH 1/8] dt-bindings: phy: sun4i-usb-phy: Add property
- descriptions for H3
-In-Reply-To: <20170803081411.22389-2-wens@csie.org>
-References: <20170803081411.22389-1-wens@csie.org>
- <20170803081411.22389-2-wens@csie.org>
-Message-ID: <20170810170855.txcvwjfb4kzx4q66@rob-hp-laptop>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Thu, 10 Aug 2017 18:08:57 +0100
+Subject: [PATCH v6 0/9] arm64: Enable contiguous pte hugepage support
+Message-ID: <20170810170906.30772-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 03, 2017 at 04:14:04PM +0800, Chen-Yu Tsai wrote:
-> The Allwinner H3 SoC has 4 USB PHYs, so it needs four sets of pmu
-> regions, clocks, resets, and optional vbus properties. These were
-> not described when the H3 compatible string was added.
-> 
-> Fixes: 626a630e003c ("phy-sun4i-usb: Add support for the host usb-phys
-> 		      found on the H3 SoC")
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
+Hi,
 
-Acked-by: Rob Herring <robh@kernel.org>
+This series re-enables contiguous hugepage support for arm64. In v6,
+I've addressed all the concerns raised on the previous version.
+
+Notable changes in this version -
+
+* Patch 4 - "Add break-before-make logic for contiguous entries"
+  - added clear_flush() and use it in set_huge_pte_at()
+  - Updated huge_ptep_clear_flush() to use clear_flush()
+  - Track dirty bit based on returned value from get_clear_flush() in
+    huge_ptep_set_access_flags()
+  - Dropped Mark's reviewed-by (please re-apply if you're still happy
+    with the patch)
+
+All the dependent series ([2], [3]) for enabling contiguous hugepage
+support have been merged in the previous cycle. Additionally, a patch
+to clarify the semantics of huge_pte_offset() in generic code[6] is
+currently in the -mm tree.
+
+Previous postings can be found at [0], [1], [4], [5], [7].
+
+The patches are based on v4.13-rc4. If there are no further comments
+please consider merging for the next release cycle.
+
+Thanks,
+Punit
+
+[0] https://www.spinics.net/lists/arm-kernel/msg570422.html
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/497027.html
+[2] https://www.spinics.net/lists/arm-kernel/msg581657.html
+[3] https://www.spinics.net/lists/arm-kernel/msg583342.html
+[4] https://www.spinics.net/lists/arm-kernel/msg583367.html
+[5] https://www.spinics.net/lists/arm-kernel/msg582758.html
+[6] https://lkml.org/lkml/2017/7/25/536
+[7] https://www.spinics.net/lists/arm-kernel/msg597777.html
+
+Punit Agrawal (4):
+  arm64: hugetlb: Handle swap entries in huge_pte_offset() for
+    contiguous hugepages
+  arm64: hugetlb: Override huge_pte_clear() to support contiguous
+    hugepages
+  arm64: hugetlb: Override set_huge_swap_pte_at() to support contiguous
+    hugepages
+  arm64: Re-enable support for contiguous hugepages
+
+Steve Capper (5):
+  arm64: hugetlb: set_huge_pte_at Add WARN_ON on !pte_present
+  arm64: hugetlb: Introduce pte_pgprot helper
+  arm64: hugetlb: Spring clean huge pte accessors
+  arm64: hugetlb: Add break-before-make logic for contiguous entries
+  arm64: hugetlb: Cleanup setup_hugepagesz
+
+ arch/arm64/include/asm/hugetlb.h |   9 +-
+ arch/arm64/mm/hugetlbpage.c      | 310 ++++++++++++++++++++++++++++-----------
+ 2 files changed, 236 insertions(+), 83 deletions(-)
+
+-- 
+2.13.2
