@@ -1,25 +1,22 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 10 Aug 2017 12:21:11 -0400 (EDT)
-Subject: [PULL REQUEST] FDPIC ELF support on ARM
-In-Reply-To: <alpine.LFD.2.20.1708081236150.8927@knanqh.ubzr>
-References: <alpine.LFD.2.20.1708081236150.8927@knanqh.ubzr>
-Message-ID: <alpine.LFD.2.20.1708101216520.8927@knanqh.ubzr>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 10 Aug 2017 11:25:15 -0500
+Subject: [PATCH 4/8] tty/bcm63xx_uart: allow naming clock in device tree
+In-Reply-To: <20170802093429.12572-5-jonas.gorski@gmail.com>
+References: <20170802093429.12572-1-jonas.gorski@gmail.com>
+ <20170802093429.12572-5-jonas.gorski@gmail.com>
+Message-ID: <20170810162515.qkmhcnsaoh4wjrzs@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 8 Aug 2017, Nicolas Pitre wrote:
-
-> Russell, please pull the following:
+On Wed, Aug 02, 2017 at 11:34:25AM +0200, Jonas Gorski wrote:
+> Codify using a named clock for the refclk of the uart. This makes it
+> easier if we might need to add a gating clock (like present on the
+> BCM6345).
 > 
->     http://git.linaro.org/people/nicolas.pitre/linux fdpic
-> 
-> This series provides the needed changes to enable the ELF_FDPIC
-> binary format on ARM. Currently only no-MMU configs are supported
-> but eventually adding MMU support is trivial.
+> Signed-off-by: Jonas Gorski <jonas.gorski@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/serial/brcm,bcm6345-uart.txt | 6 ++++++
+>  drivers/tty/serial/bcm63xx_uart.c                              | 6 ++++--
+>  2 files changed, 10 insertions(+), 2 deletions(-)
 
-Please don't merge this just yet. There are issues with the signal code 
-not compatible with ARMv4t interworking that I fixed. I'm also adding 
-the MMU support so test coverage will be better.
-
-
-Nicolas
+Acked-by: Rob Herring <robh@kernel.org>
