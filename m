@@ -1,58 +1,88 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 10 Aug 2017 10:01:21 +0200
-Subject: [PATCH 2/2] ARM: dts: r8a7743: Add IIC cores to dtsi
-In-Reply-To: <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
-References: <1502196418-31341-1-git-send-email-biju.das@bp.renesas.com>
- <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
-Message-ID: <20170810080121.GE16647@verge.net.au>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Thu, 10 Aug 2017 16:03:46 +0800
+Subject: [RESEND PATCH 2/2] i2c: mediatek: Add i2c compatible for
+ MediaTek MT7622
+In-Reply-To: <1502349760.930.66.camel@mhfsdcap03>
+References: <1502332061-25085-1-git-send-email-jun.gao@mediatek.com>
+ <1502332061-25085-3-git-send-email-jun.gao@mediatek.com>
+ <1502349760.930.66.camel@mhfsdcap03>
+Message-ID: <1502352226.12382.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 09, 2017 at 12:17:06PM +0300, Sergei Shtylyov wrote:
-> On 8/8/2017 3:46 PM, Biju Das wrote:
+On Thu, 2017-08-10 at 15:22 +0800, Jun Gao wrote:
+> On Thu, 2017-08-10 at 10:27 +0800, Jun Gao wrote:
+> > From: Jun Gao <jun.gao@mediatek.com>
+> > 
+> > Add i2c compatible for MT7622. Compare to MT8173 i2c controller,
+> > MT7622 limits message numbers to 255, and does not support 4GB
+> > DMA mode.
+> > 
 > 
-> >Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> >---
-> >This patch has been tested against Linux-next tag 20170727 and renesas-dev branch.
-> >This patch depends on https://www.spinics.net/lists/arm-kernel/msg599220.html
-> >
-> >  arch/arm/boot/dts/r8a7743.dtsi | 55 ++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 55 insertions(+)
-> >
-> >diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-> >index 14222c72..5c2b140 100644
-> >--- a/arch/arm/boot/dts/r8a7743.dtsi
-> >+++ b/arch/arm/boot/dts/r8a7743.dtsi
-> [...]
-> >@@ -436,6 +439,58 @@
-> >  			status = "disabled";
-> >  		};
-> >+		i2c6: i2c at e60b0000 {
+> These two resend patches only modify commit message.
+> Thanks!
 > 
->    I'd use iic0 as the label.
+> Jun
 
-I have no preference here other than that we try to be consistent
-in DT for different R-Car SoCs. Wolfram, do you have an opinion on this?
+Looks good to me, so for new version:
+Reviewed-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+
+Joe.C
+
 
 > 
-> >+			/* doesn't need pinmux */
-> >+			#address-cells = <1>;
-> >+			#size-cells = <0>;
-> >+			compatible = "renesas,iic-r8a7743",
-> >+				     "renesas,rcar-gen2-iic",
-> >+				     "renesas,rmobile-iic";
-> >+			reg = <0 0xe60b0000 0 0x425>;
-> >+			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
-> >+			clocks = <&cpg CPG_MOD 926>;
-> >+			dmas = <&dmac0 0x77>, <&dmac0 0x78>,
-> >+			       <&dmac1 0x77>, <&dmac1 0x78>;
-> >+			dma-names = "tx", "rx", "tx", "rx";
-> >+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-> >+			resets = <&cpg CPG_MOD 926>;
+> > Signed-off-by: Jun Gao <jun.gao@mediatek.com>
+> > ---
+> >  drivers/i2c/busses/i2c-mt65xx.c | 18 ++++++++++++++++++
+> >  1 file changed, 18 insertions(+)
+> > 
+> > diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
+> > index 9bedf0b..2c7f847 100644
+> > --- a/drivers/i2c/busses/i2c-mt65xx.c
+> > +++ b/drivers/i2c/busses/i2c-mt65xx.c
+> > @@ -172,6 +172,14 @@ struct mtk_i2c {
+> >  	.max_comb_2nd_msg_len = 31,
+> >  };
+> >  
+> > +static const struct i2c_adapter_quirks mt7622_i2c_quirks = {
+> > +	.max_num_msgs = 255,
+> > +	.max_write_len = 65535,
+> > +	.max_read_len = 65535,
+> > +	.max_comb_1st_msg_len = 65535,
+> > +	.max_comb_2nd_msg_len = 65535,
+> > +};
+> > +
+> >  static const struct mtk_i2c_compatible mt6577_compat = {
+> >  	.quirks = &mt6577_i2c_quirks,
+> >  	.pmic_i2c = 0,
+> > @@ -190,6 +198,15 @@ struct mtk_i2c {
+> >  	.support_33bits = 0,
+> >  };
+> >  
+> > +static const struct mtk_i2c_compatible mt7622_compat = {
+> > +	.quirks = &mt7622_i2c_quirks,
+> > +	.pmic_i2c = 0,
+> > +	.dcm = 1,
+> > +	.auto_restart = 1,
+> > +	.aux_len_reg = 1,
+> > +	.support_33bits = 0,
+> > +};
+> > +
+> >  static const struct mtk_i2c_compatible mt8173_compat = {
+> >  	.pmic_i2c = 0,
+> >  	.dcm = 1,
+> > @@ -201,6 +218,7 @@ struct mtk_i2c {
+> >  static const struct of_device_id mtk_i2c_of_match[] = {
+> >  	{ .compatible = "mediatek,mt6577-i2c", .data = &mt6577_compat },
+> >  	{ .compatible = "mediatek,mt6589-i2c", .data = &mt6589_compat },
+> > +	{ .compatible = "mediatek,mt7622-i2c", .data = &mt7622_compat },
+> >  	{ .compatible = "mediatek,mt8173-i2c", .data = &mt8173_compat },
+> >  	{}
+> >  };
 > 
->    CPG_MOD not needed here, it's not a "clocks" prop.
 > 
-> [...]
 > 
-> MBR, Sergei
-> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
