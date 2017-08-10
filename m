@@ -1,59 +1,157 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 10 Aug 2017 21:17:10 +0000
-Subject: [RESEND PATCH 2/4] dt-bindings: add "reduced-width" property for
- Armada XP SDRAM controller
-References: <20170807014641.4003-1-chris.packham@alliedtelesis.co.nz>
- <20170807014641.4003-3-chris.packham@alliedtelesis.co.nz>
- <20170810203801.jz5hl5onqci275ef@rob-hp-laptop>
-Message-ID: <4935472b6a44447fa764fa811a645b9f@svr-chch-ex1.atlnz.lc>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 10 Aug 2017 16:52:18 -0500
+Subject: [PATCH V9 1/2] PCI: handle CRS returned by device after FLR
+In-Reply-To: <1502240245-11714-1-git-send-email-okaya@codeaurora.org>
+References: <1502240245-11714-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20170810215218.GQ16580@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/17 08:38, Rob Herring wrote:
-> On Mon, Aug 07, 2017 at 01:46:39PM +1200, Chris Packham wrote:
->> Some SoC implementations that use this controller have a reduced pin
->> count so the meaning of "full" and "half" with change.
+On Tue, Aug 08, 2017 at 08:57:24PM -0400, Sinan Kaya wrote:
+> Sporadic reset issues have been observed with Intel 750 NVMe drive by
+> writing to the reset file in sysfs in a loop. The sequence of events
+> observed is as follows:
 > 
-> s/with/width/ ?
+> - perform a Function Level Reset (FLR)
+> - sleep up to 1000ms total
+> - read ~0 from PCI_COMMAND
+> - warn that the device didn't return from FLR
+> - touch the device before it's ready
+
+What's the driver-visible or user-visible effect of touching the
+device before it's ready?  This sequence is sort of like the joke
+without the punch line :)
+
+> An endpoint is allowed to issue Configuration Request Retry Status (CRS)
+> following a FLR request to indicate that it is not ready to accept new
+> requests. CRS is defined in PCIe r3.1, sec 2.3.1. Request Handling Rules
+> and CRS usage in FLR context is mentioned in PCIe r3.1a, sec 6.6.2.
+> Function-Level Reset.
+
+You reference both PCIe r3.1 and r3.1a.  Is there something new in
+r3.1a in this area?  If not, just reference r3.1 for both cases.
+
+> A CRS indication will only be given if the address to be read is vendor ID
+> register. pci_bus_read_dev_vendor_id() knows how to deal with CRS returned
+> 0xFFFF0001 value and will continue polling until a value other than
+> 0xFFFF0001 is returned within a given timeout.
 > 
-
-Yes will include in v2.
-
->>
->> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->> ---
->>   .../bindings/memory-controllers/mvebu-sdram-controller.txt          | 6 ++++++
->>   1 file changed, 6 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/memory-controllers/mvebu-sdram-controller.txt b/Documentation/devicetree/bindings/memory-controllers/mvebu-sdram-controller.txt
->> index 89657d1d4cd4..3041868321c8 100644
->> --- a/Documentation/devicetree/bindings/memory-controllers/mvebu-sdram-controller.txt
->> +++ b/Documentation/devicetree/bindings/memory-controllers/mvebu-sdram-controller.txt
->> @@ -13,6 +13,12 @@ Required properties:
->>    - reg: a resource specifier for the register space, which should
->>      include all SDRAM controller registers as per the datasheet.
->>   
->> +Optional properties:
->> + - marvell,reduced-width: some SoCs that use this SDRAM controller have
->> +   a reduced pin count. On such systems "full" width is 32-bits and
->> +   "half" width is 16-bits. Set this property to indicate that the SoC
->> +   used is such a system.
+> Try to discover device presence via CRS first. If device is not found, fall
+> through to old behavior.
+>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/pci/pci.c | 26 ++++++++++++++++++++++++--
+>  1 file changed, 24 insertions(+), 2 deletions(-)
 > 
-> Maybe you should just state what the width is.
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index af0cc34..4366299 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -3821,17 +3821,39 @@ static void pci_flr_wait(struct pci_dev *dev)
+>  {
+>  	int i = 0;
+>  	u32 id;
+> +	bool ret;
+> +
+> +	/*
+> +	 * Don't touch the HW before waiting 100ms. HW has to finish
+> +	 * within 100ms according to PCI Express Base Specification
+> +	 * Revision 3.1 Section 6.6.2: Function-Level Reset (FLR).
+> +	 */
+> +	msleep(100);
+> +
+> +	/*
+> +	 * See if we can find a device via CRS first. Physical functions
+> +	 * return from here if found, Virtual functions fall through as
+> +	 * they return ~0 on vendor id read once CRS is completed.
+> +	 */
+> +	ret = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
+> +					 60000);
+> +	if (ret)
+> +		return;
 
+Alex was concerned that pci_bus_read_dev_vendor_id() could return
+false ("no device here") with an ID value of ~0 for a functional VF
+[1].
 
-Specifying a number like 64/32/16 is done in for some other properties I 
-dismissed that because what this is about how we interpret a 
-pin-strapping option. I guess "max-width = <64>;" and "max-width = 
-<32>"; would achieve the same.
+I think that is indeed possible:
 
+  - a VF that is ready will return 0xffff as both Vendor ID and Device
+    ID (SR-IOV r1.1, sec 3.4.1.1, .2), so the very first read in
+    pci_bus_read_dev_vendor_id() would see 0xffffffff and return
+    "false".
 
-> Or your compatible string should just be specific enough to know the
-> width.
+  - a VF that needs more time will return CRS and we'll loop in
+    pci_bus_read_dev_vendor_id() until it becomes ready, and we'll
+    return "true".
 
-I decided against a new compatible sting that because the IP block 
-really is the Armada-XP one and the existing compatible string is used 
-in other places (using multiple compatible strings would solve that).
+Falling into the code below for the "false" case probably will work,
+but it's a little bit ugly because (a) we're using two mechanisms to
+figure out when the device is ready for config requests, and (b) we
+have to worry about VFs both in pci_bus_read_dev_vendor_id() and here
+in the caller.
 
-I'm not too fussed which of the 3 options are used. Is there any 
-particular preference?
+Here's an idea to make pci_bus_read_dev_vendor_id() work for both VFs
+and PFs.  It can't distinguish the 0xffffffff from a VF vs one from a
+non-existent device, but the caller might be able to pass that
+information in, e.g., when we're enumerating and don't know whether
+the device exists, we don't have a pci_dev and would use this:
+
+  pci_bus_read_dev_vendor_id(bus, devfn, &l, 60000, 0)
+
+While places where we do have a pci_dev and expect the device to exist
+(e.g., waiting after a reset), would do this:
+
+  pci_bus_read_dev_vendor_id(bus, devfn, &l, 60000, dev->is_virtfn)
+
+And we would skip the 0xffffffff check for VFs, e.g.,
+
+  bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
+                                  int crs_timeout, int is_vf)
+  {
+    if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
+      return false;
+
+    if (!is_vf &&
+        (*l == 0xffffffff || *l == 0x00000000 ||
+         *l == 0x0000ffff || *l == 0xffff0000))
+        return false;
+
+    while ((*l & 0xffff) == 0x0001) {
+      ...
+      if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
+	return false;
+    }
+
+    return true;
+  }
+
+Would that work?
+
+I don't know if this would be the best solution.  This is a messy
+area.  We're relying on the host bridge to fabricate the 0xffff data
+for non-existent devices, and most (maybe all) do that, but I don't
+think that's actually in the spec.
+
+> +	pci_read_config_dword(dev, PCI_COMMAND, &id);
+> +	if (id != ~0)
+> +		return;
+>  
+>  	do {
+>  		msleep(100);
+>  		pci_read_config_dword(dev, PCI_COMMAND, &id);
+> -	} while (i++ < 10 && id == ~0);
+> +	} while (i++ < 9 && id == ~0);
+>
+>  	if (id == ~0)
+>  		dev_warn(&dev->dev, "Failed to return from FLR\n");
+>  	else if (i > 1)
+>  		dev_info(&dev->dev, "Required additional %dms to return from FLR\n",
+> -			 (i - 1) * 100);
+> +			 i * 100);
+>  }
+>  
+>  /**
+
+[1] http://lkml.kernel.org/r/20170221135138.791ba4e2 at t450s.home
