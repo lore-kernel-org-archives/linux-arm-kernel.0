@@ -1,35 +1,154 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 10 Aug 2017 14:52:19 +0200
-Subject: [PATCH 2/4] cpufreq: enable the DT cpufreq driver on the Ux500
+Date: Thu, 10 Aug 2017 14:52:20 +0200
+Subject: [PATCH 3/4] mfd: db8500-prcmu: Get rid of cpufreq dependency
 In-Reply-To: <20170810125221.25818-1-linus.walleij@linaro.org>
 References: <20170810125221.25818-1-linus.walleij@linaro.org>
-Message-ID: <20170810125221.25818-3-linus.walleij@linaro.org>
+Message-ID: <20170810125221.25818-4-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the generic DT and OPP-based cpufreq driver on the
-ST-Ericsson Ux500 series.
+The ARMSS clock, also known as the operating point of the
+CPU, should not cross-depend on cpufreq like this. Move
+the code to use just frequencies and remove the false
+frequency (1GHz) and put in the actual frequency provided
+by the ARMSS clock (998400000 Hz) as part of the process.
 
+After this and the related cpufreq patch, the DB8500 will
+simply use the standard DT cpufreq driver to change the
+operating points through the common clock framework using
+the ARMSS clock.
+
+Cc: Lee Jones <lee.jones@linaro.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/cpufreq/cpufreq-dt-platdev.c | 5 +++++
- 1 file changed, 5 insertions(+)
+Lee, this needs to be merged together with the other
+related cpufreq patches, so an ACK to take this through
+the cpufreq subsystem would be appreciated once you're
+pleased with it.
+---
+ drivers/mfd/db8500-prcmu.c | 59 +++++++++++++---------------------------------
+ 1 file changed, 17 insertions(+), 42 deletions(-)
 
-diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-index 1c262923fe58..d80300251bc4 100644
---- a/drivers/cpufreq/cpufreq-dt-platdev.c
-+++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-@@ -88,6 +88,11 @@ static const struct of_device_id machines[] __initconst = {
- 	{ .compatible = "socionext,uniphier-ld11", },
- 	{ .compatible = "socionext,uniphier-ld20", },
+diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
+index 5c739ac752e8..a66be0203ece 100644
+--- a/drivers/mfd/db8500-prcmu.c
++++ b/drivers/mfd/db8500-prcmu.c
+@@ -33,7 +33,6 @@
+ #include <linux/mfd/abx500/ab8500.h>
+ #include <linux/regulator/db8500-prcmu.h>
+ #include <linux/regulator/machine.h>
+-#include <linux/cpufreq.h>
+ #include <linux/platform_data/ux500_wdt.h>
+ #include <linux/platform_data/db8500_thermal.h>
+ #include "dbx500-prcmu-regs.h"
+@@ -1692,32 +1691,22 @@ static long round_clock_rate(u8 clock, unsigned long rate)
+ 	return rounded_rate;
+ }
  
-+	{ .compatible = "st-ericsson,u8500", },
-+	{ .compatible = "st-ericsson,u8540", },
-+	{ .compatible = "st-ericsson,u9500", },
-+	{ .compatible = "st-ericsson,u9540", },
-+
- 	{ .compatible = "ti,omap2", },
- 	{ .compatible = "ti,omap3", },
- 	{ .compatible = "ti,omap4", },
+-/* CPU FREQ table, may be changed due to if MAX_OPP is supported. */
+-static struct cpufreq_frequency_table db8500_cpufreq_table[] = {
+-	{ .frequency = 200000, .driver_data = ARM_EXTCLK,},
+-	{ .frequency = 400000, .driver_data = ARM_50_OPP,},
+-	{ .frequency = 800000, .driver_data = ARM_100_OPP,},
+-	{ .frequency = CPUFREQ_TABLE_END,}, /* To be used for MAX_OPP. */
+-	{ .frequency = CPUFREQ_TABLE_END,},
+-};
++static const unsigned long armss_freqs[] = { 200000000, 400000000, 800000000, 998400000 };
+ 
+ static long round_armss_rate(unsigned long rate)
+ {
+-	struct cpufreq_frequency_table *pos;
+-	long freq = 0;
+-
+-	/* cpufreq table frequencies is in KHz. */
+-	rate = rate / 1000;
++	unsigned long freq = 0;
++	int i;
+ 
+ 	/* Find the corresponding arm opp from the cpufreq table. */
+-	cpufreq_for_each_entry(pos, db8500_cpufreq_table) {
+-		freq = pos->frequency;
+-		if (freq == rate)
++	for (i = 0; i < ARRAY_SIZE(armss_freqs); i++) {
++		freq = armss_freqs[i];
++		if (rate <= freq)
+ 			break;
+ 	}
+ 
+ 	/* Return the last valid value, even if a match was not found. */
+-	return freq * 1000;
++	return freq;
+ }
+ 
+ #define MIN_PLL_VCO_RATE 600000000ULL
+@@ -1854,21 +1843,23 @@ static void set_clock_rate(u8 clock, unsigned long rate)
+ 
+ static int set_armss_rate(unsigned long rate)
+ {
+-	struct cpufreq_frequency_table *pos;
+-
+-	/* cpufreq table frequencies is in KHz. */
+-	rate = rate / 1000;
++	unsigned long freq;
++	u8 opps[] = { ARM_EXTCLK, ARM_50_OPP, ARM_100_OPP, ARM_MAX_OPP };
++	int i;
+ 
+ 	/* Find the corresponding arm opp from the cpufreq table. */
+-	cpufreq_for_each_entry(pos, db8500_cpufreq_table)
+-		if (pos->frequency == rate)
++	for (i = 0; i < ARRAY_SIZE(armss_freqs); i++) {
++		freq = armss_freqs[i];
++		if (rate == freq)
+ 			break;
++	}
+ 
+-	if (pos->frequency != rate)
++	if (rate != freq)
+ 		return -EINVAL;
+ 
+ 	/* Set the new arm opp. */
+-	return db8500_prcmu_set_arm_opp(pos->driver_data);
++	pr_debug("SET ARM OPP 0x%02x\n", opps[i]);
++	return db8500_prcmu_set_arm_opp(opps[i]);
+ }
+ 
+ static int set_plldsi_rate(unsigned long rate)
+@@ -3049,12 +3040,6 @@ static const struct mfd_cell db8500_prcmu_devs[] = {
+ 		.pdata_size = sizeof(db8500_regulators),
+ 	},
+ 	{
+-		.name = "cpufreq-ux500",
+-		.of_compatible = "stericsson,cpufreq-ux500",
+-		.platform_data = &db8500_cpufreq_table,
+-		.pdata_size = sizeof(db8500_cpufreq_table),
+-	},
+-	{
+ 		.name = "cpuidle-dbx500",
+ 		.of_compatible = "stericsson,cpuidle-dbx500",
+ 	},
+@@ -3067,14 +3052,6 @@ static const struct mfd_cell db8500_prcmu_devs[] = {
+ 	},
+ };
+ 
+-static void db8500_prcmu_update_cpufreq(void)
+-{
+-	if (prcmu_has_arm_maxopp()) {
+-		db8500_cpufreq_table[3].frequency = 1000000;
+-		db8500_cpufreq_table[3].driver_data = ARM_MAX_OPP;
+-	}
+-}
+-
+ static int db8500_prcmu_register_ab8500(struct device *parent)
+ {
+ 	struct device_node *np;
+@@ -3160,8 +3137,6 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
+ 
+ 	prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
+ 
+-	db8500_prcmu_update_cpufreq();
+-
+ 	err = mfd_add_devices(&pdev->dev, 0, common_prcmu_devs,
+ 			      ARRAY_SIZE(common_prcmu_devs), NULL, 0, db8500_irq_domain);
+ 	if (err) {
 -- 
 2.9.4
