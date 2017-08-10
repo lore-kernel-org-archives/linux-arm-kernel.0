@@ -1,39 +1,52 @@
 From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Thu, 10 Aug 2017 16:27:01 +0900
-Subject: [PATCH 1/3] reset: uniphier: add audio systems reset control
-Message-ID: <20170810072703.32433-1-suzuki.katsuhiro@socionext.com>
+Date: Thu, 10 Aug 2017 16:27:03 +0900
+Subject: [PATCH 3/3] reset: uniphier: add analog amplifiers reset control
+In-Reply-To: <20170810072703.32433-1-suzuki.katsuhiro@socionext.com>
+References: <20170810072703.32433-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <20170810072703.32433-3-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add reset lines for audio subsystem (AIO) and
-SoC internal audio codec (EVEA) on UniPhier LD11/LD20 SoCs.
+Add a reset line for analog signal amplifier core (ADAMV) on
+UniPhier LD11/LD20 SoCs.
 
 Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 ---
- drivers/reset/reset-uniphier.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/reset/reset-uniphier.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
 diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
-index 954b2c4e6ca7..90c52a96f775 100644
+index f60c137c17cb..cda4a78a58e2 100644
 --- a/drivers/reset/reset-uniphier.c
 +++ b/drivers/reset/reset-uniphier.c
-@@ -93,6 +93,8 @@ static const struct uniphier_reset_data uniphier_ld11_sys_reset_data[] = {
- 	UNIPHIER_RESETX(2, 0x200c, 0),		/* NAND */
- 	UNIPHIER_RESETX(4, 0x200c, 2),		/* eMMC */
- 	UNIPHIER_RESETX(8, 0x200c, 8),		/* STDMAC (HSC, MIO) */
-+	UNIPHIER_RESETX(40, 0x2008, 0),		/* AIO */
-+	UNIPHIER_RESETX(41, 0x2008, 1),		/* EVEA */
+@@ -196,6 +196,12 @@ static const struct uniphier_reset_data uniphier_pro4_peri_reset_data[] = {
  	UNIPHIER_RESET_END,
  };
  
-@@ -105,6 +107,8 @@ static const struct uniphier_reset_data uniphier_ld20_sys_reset_data[] = {
- 	UNIPHIER_RESETX(17, 0x200c, 13),	/* USB30-PHY1 */
- 	UNIPHIER_RESETX(18, 0x200c, 14),	/* USB30-PHY2 */
- 	UNIPHIER_RESETX(19, 0x200c, 15),	/* USB30-PHY3 */
-+	UNIPHIER_RESETX(40, 0x2008, 0),		/* AIO */
-+	UNIPHIER_RESETX(41, 0x2008, 1),		/* EVEA */
- 	UNIPHIER_RESET_END,
++/* Analog signal amplifiers reset data */
++static const struct uniphier_reset_data uniphier_ld11_adamv_reset_data[] = {
++	UNIPHIER_RESETX(100, 0x10, 6), /* EVEA */
++	UNIPHIER_RESET_END,
++};
++
+ /* core implementaton */
+ struct uniphier_reset_priv {
+ 	struct reset_controller_dev rcdev;
+@@ -415,6 +421,15 @@ static const struct of_device_id uniphier_reset_match[] = {
+ 		.compatible = "socionext,uniphier-ld20-peri-reset",
+ 		.data = uniphier_pro4_peri_reset_data,
+ 	},
++	/* Analog signal amplifiers reset */
++	{
++		.compatible = "socionext,uniphier-ld11-adamv-reset",
++		.data = uniphier_ld11_adamv_reset_data,
++	},
++	{
++		.compatible = "socionext,uniphier-ld20-adamv-reset",
++		.data = uniphier_ld11_adamv_reset_data,
++	},
+ 	{ /* sentinel */ }
  };
- 
+ MODULE_DEVICE_TABLE(of, uniphier_reset_match);
 -- 
 2.13.2
