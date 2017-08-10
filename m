@@ -1,25 +1,60 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 9 Aug 2017 19:18:09 -0500
-Subject: [PATCH 01/13] dt-bindings: update the binding for Allwinner H3
- DE2 support
-In-Reply-To: <20170801131304.7741-2-icenowy@aosc.io>
-References: <20170801131304.7741-1-icenowy@aosc.io>
- <20170801131304.7741-2-icenowy@aosc.io>
-Message-ID: <20170810001809.6xhloimtgwsg5j5d@rob-hp-laptop>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 10 Aug 2017 02:20:41 +0200
+Subject: [PATCH v4 05/12] Documentation: net: phy: Add phy-is-internal
+ binding
+In-Reply-To: <778B0470-8ABD-46AD-A63D-F0CF4911C800@gmail.com>
+References: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
+ <1502280630-2254-1-git-send-email-david.wu@rock-chips.com>
+ <778B0470-8ABD-46AD-A63D-F0CF4911C800@gmail.com>
+Message-ID: <20170810002041.GA10776@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 01, 2017 at 09:12:52PM +0800, Icenowy Zheng wrote:
-> Allwinner H3 features a "Display Engine 2.0".
+On Wed, Aug 09, 2017 at 03:47:34PM -0700, Florian Fainelli wrote:
+> On August 9, 2017 5:10:30 AM PDT, David Wu <david.wu@rock-chips.com> wrote:
+> >Add the documentation for internal phy. A boolean property
+> >indicates that a internal phy will be used.
+> >
+> >Signed-off-by: David Wu <david.wu@rock-chips.com>
+> >---
+> > Documentation/devicetree/bindings/net/phy.txt | 3 +++
+> > 1 file changed, 3 insertions(+)
+> >
+> >diff --git a/Documentation/devicetree/bindings/net/phy.txt
+> >b/Documentation/devicetree/bindings/net/phy.txt
+> >index b558576..942c892 100644
+> >--- a/Documentation/devicetree/bindings/net/phy.txt
+> >+++ b/Documentation/devicetree/bindings/net/phy.txt
+> >@@ -52,6 +52,9 @@ Optional Properties:
+> >   Mark the corresponding energy efficient ethernet mode as broken and
+> >   request the ethernet to stop advertising it.
+> > 
+> >+- phy-is-internal: If set, indicates that phy will connect to the MAC
+> >as a
+> >+  internal phy.
 > 
-> Add device tree bindings for the following parts:
-> - H3 TCONs
-> - H3 Mixers
-> - H3 Display engine
+> Something along the lines of:
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  .../bindings/display/sunxi/sun4i-drm.txt           | 25 ++++++++++++++++++----
->  1 file changed, 21 insertions(+), 4 deletions(-)
+> If set, indicates that the PHY is integrated into the same physical package as the Ethernet MAC.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Hi Florian, David.
+
+I'm happy with the property name. But i think the text needs more
+description. We deal with Ethernet switches with integrated PHYs. Yet
+for us, this property is unneeded.
+
+Seeing this property means some bit of software needs to ensure the
+internal PHY should be used, when given the choice between an internal
+and external PHY. So i would say something like:
+
+    If set, indicates that the PHY is integrated into the same
+    physical package as the Ethernet MAC. If needed, muxers should be
+    configured to ensure the internal PHY is used. The absence of this
+    property indicates the muxers should be configured so that the
+    external PHY is used.
+
+This last part is important. If the bootloader has set the internal
+PHY to be used, you need to reset it. Otherwise we are going to get
+into a mess sometime later and need to add a phy-is-external property.
+
+     Andrew
