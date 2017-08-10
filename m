@@ -1,40 +1,28 @@
-From: david.wu@rock-chips.com (David.Wu)
-Date: Thu, 10 Aug 2017 18:57:40 +0800
-Subject: [PATCH v4 05/12] Documentation: net: phy: Add phy-is-internal
- binding
-In-Reply-To: <20170810002041.GA10776@lunn.ch>
-References: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
- <1502280630-2254-1-git-send-email-david.wu@rock-chips.com>
- <778B0470-8ABD-46AD-A63D-F0CF4911C800@gmail.com>
- <20170810002041.GA10776@lunn.ch>
-Message-ID: <1bff1793-fe46-f263-fbf5-ef65ffbc5dc9@rock-chips.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 10 Aug 2017 12:58:45 +0200
+Subject: [PATCH 6/6] arm64: uaccess: Implement *_flushcache variants
+In-Reply-To: <a82a48f72b8099c1ef6a32a63819619637797ef8.1500397441.git.robin.murphy@arm.com>
+References: <cover.1500397441.git.robin.murphy@arm.com>
+ <a82a48f72b8099c1ef6a32a63819619637797ef8.1500397441.git.robin.murphy@arm.com>
+Message-ID: <CAK8P3a1emRA_e_K+M-jRiXZD02nD38Vgn+V7R8NbSq0Wg=56Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew, Florian
+On Tue, Jul 25, 2017 at 12:55 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> Implement the set of copy functions with guarantees of a clean cache
+> upon completion necessary to support the pmem driver.
+>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  arch/arm64/Kconfig                  |  1 +
+>  arch/arm64/include/asm/string.h     |  4 ++++
+>  arch/arm64/include/asm/uaccess.h    | 12 ++++++++++
+>  arch/arm64/lib/Makefile             |  2 ++
+>  arch/arm64/lib/uaccess_flushcache.c | 47 +++++++++++++++++++++++++++++++++++++
+>  5 files changed, 66 insertions(+)
+>  create mode 100644 arch/arm64/lib/uaccess_flushcache.c
 
-? 2017/8/10 8:20, Andrew Lunn ??:
-> Hi Florian, David.
-> 
-> I'm happy with the property name. But i think the text needs more
-> description. We deal with Ethernet switches with integrated PHYs. Yet
-> for us, this property is unneeded.
-> 
-> Seeing this property means some bit of software needs to ensure the
-> internal PHY should be used, when given the choice between an internal
-> and external PHY. So i would say something like:
-> 
->      If set, indicates that the PHY is integrated into the same
->      physical package as the Ethernet MAC. If needed, muxers should be
->      configured to ensure the (internal) PHY is used. The absence of this
->      property indicates the muxers should be configured so that the
->      external PHY is used.
+It looks like Catalin applied part of this patch but forgot to add
+arch/arm64/lib/uaccess_flushcache.c
 
-Are we supposed to replace the words "internal" with "integrated" here?
-So we have three kinds of PHY, they are intenal, external and integrated 
-PHYs.
-
-> 
-> This last part is important. If the bootloader has set the internal
-> PHY to be used, you need to reset it. Otherwise we are going to get
-> into a mess sometime later and need to add a phy-is-external property.
+      Arnd
