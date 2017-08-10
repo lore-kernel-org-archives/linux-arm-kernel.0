@@ -1,47 +1,58 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 10 Aug 2017 09:01:16 +0100
-Subject: [arm64:for-next/kernel-mode-neon 5/8]
- arch/arm64/crypto/sha1-ce-glue.c:41:2: error: implicit declaration of
- function 'kernel_neon_begin_partial'
-In-Reply-To: <201708101207.xeLMkhqW%fengguang.wu@intel.com>
-References: <201708101207.xeLMkhqW%fengguang.wu@intel.com>
-Message-ID: <20170810080112.GP6321@e103592.cambridge.arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 10 Aug 2017 10:01:21 +0200
+Subject: [PATCH 2/2] ARM: dts: r8a7743: Add IIC cores to dtsi
+In-Reply-To: <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
+References: <1502196418-31341-1-git-send-email-biju.das@bp.renesas.com>
+ <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
+Message-ID: <20170810080121.GE16647@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 10, 2017 at 12:38:09PM +0800, kbuild test robot wrote:
-> tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/kernel-mode-neon
-> head:   66c3ec5a712005625437474cf5a04148d7890350
-> commit: cb84d11e1625aa3a081d898ca2640bf3a9ca0e96 [5/8] arm64: neon: Remove support for nested or hardirq kernel-mode NEON
-> config: arm64-defconfig (attached as .config)
-> compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         git checkout cb84d11e1625aa3a081d898ca2640bf3a9ca0e96
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm64 
+On Wed, Aug 09, 2017 at 12:17:06PM +0300, Sergei Shtylyov wrote:
+> On 8/8/2017 3:46 PM, Biju Das wrote:
 > 
-> Note: the arm64/for-next/kernel-mode-neon HEAD 66c3ec5a712005625437474cf5a04148d7890350 builds fine.
->       It only hurts bisectibility.
-
-[...]
-
-> All errors (new ones prefixed by >>):
+> >Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> >---
+> >This patch has been tested against Linux-next tag 20170727 and renesas-dev branch.
+> >This patch depends on https://www.spinics.net/lists/arm-kernel/msg599220.html
+> >
+> >  arch/arm/boot/dts/r8a7743.dtsi | 55 ++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 55 insertions(+)
+> >
+> >diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+> >index 14222c72..5c2b140 100644
+> >--- a/arch/arm/boot/dts/r8a7743.dtsi
+> >+++ b/arch/arm/boot/dts/r8a7743.dtsi
+> [...]
+> >@@ -436,6 +439,58 @@
+> >  			status = "disabled";
+> >  		};
+> >+		i2c6: i2c at e60b0000 {
 > 
->    arch/arm64/crypto/sha1-ce-glue.c: In function 'sha1_ce_update':
-> >> arch/arm64/crypto/sha1-ce-glue.c:41:2: error: implicit declaration of function 'kernel_neon_begin_partial' [-Werror=implicit-function-declaration]
->      kernel_neon_begin_partial(16);
->      ^~~~~~~~~~~~~~~~~~~~~~~~~
->    cc1: some warnings being treated as errors
+>    I'd use iic0 as the label.
 
-[...]
+I have no preference here other than that we try to be consistent
+in DT for different R-Car SoCs. Wolfram, do you have an opinion on this?
 
-AFAIK, this is expected, and will be fixed by merging the
-corresponding crypto patches first.  So I don't propose to do
-anything about it.
-
-Have I missed something?
-
-Cheers
----Dave
+> 
+> >+			/* doesn't need pinmux */
+> >+			#address-cells = <1>;
+> >+			#size-cells = <0>;
+> >+			compatible = "renesas,iic-r8a7743",
+> >+				     "renesas,rcar-gen2-iic",
+> >+				     "renesas,rmobile-iic";
+> >+			reg = <0 0xe60b0000 0 0x425>;
+> >+			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
+> >+			clocks = <&cpg CPG_MOD 926>;
+> >+			dmas = <&dmac0 0x77>, <&dmac0 0x78>,
+> >+			       <&dmac1 0x77>, <&dmac1 0x78>;
+> >+			dma-names = "tx", "rx", "tx", "rx";
+> >+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
+> >+			resets = <&cpg CPG_MOD 926>;
+> 
+>    CPG_MOD not needed here, it's not a "clocks" prop.
+> 
+> [...]
+> 
+> MBR, Sergei
+> 
