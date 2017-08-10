@@ -1,14 +1,14 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Thu, 10 Aug 2017 10:26:11 +0800
-Subject: [PATCH v2 5/9] arm64: dts: hikey960: Add support for
- syscon-reboot-mode
+Date: Thu, 10 Aug 2017 10:26:12 +0800
+Subject: [PATCH v2 6/9] arm64: dts: hikey960: Add pstore support
 In-Reply-To: <20170810022615.19204-1-guodong.xu@linaro.org>
 References: <20170810022615.19204-1-guodong.xu@linaro.org>
-Message-ID: <20170810022615.19204-6-guodong.xu@linaro.org>
+Message-ID: <20170810022615.19204-7-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to hikey960 dts for the syscon-reboot-mode driver.
+This patch reserves some memory in the DTS and sets up a
+pstore device tree node to enable pstore support on HiKey960.
 
 Cc: John Stultz <john.stultz@linaro.org>
 Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
@@ -17,29 +17,29 @@ Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
  1 file changed, 14 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-index b96d865..ce5e874 100644
+index ce5e874..7770ec7 100644
 --- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
 +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
 @@ -39,6 +39,20 @@
  		reg = <0x0 0x0 0x0 0x0>;
  	};
  
-+	reboot-mode-syscon at 32100000 {
-+		compatible = "syscon", "simple-mfd";
-+		reg = <0x0 0x32100000 0x0 0x00001000>;
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
 +
-+		reboot-mode {
-+			compatible = "syscon-reboot-mode";
-+			offset = <0x0>;
-+
-+			mode-normal	= <0x77665501>;
-+			mode-bootloader	= <0x77665500>;
-+			mode-recovery	= <0x77665502>;
++		ramoops at 32000000 {
++			compatible = "ramoops";
++			reg = <0x0 0x32000000 0x0 0x00100000>;
++			record-size	= <0x00020000>;
++			console-size	= <0x00020000>;
++			ftrace-size	= <0x00020000>;
 +		};
 +	};
 +
- 	keys {
- 		compatible = "gpio-keys";
- 		pinctrl-names = "default";
+ 	reboot-mode-syscon at 32100000 {
+ 		compatible = "syscon", "simple-mfd";
+ 		reg = <0x0 0x32100000 0x0 0x00001000>;
 -- 
 2.10.2
