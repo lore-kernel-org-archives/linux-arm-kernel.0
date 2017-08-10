@@ -1,48 +1,70 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Thu, 10 Aug 2017 16:19:00 +0800
-Subject: [RESEND PATCH 1/2] dt-bindings: i2c: Add MediaTek MT7622 i2c
- binding
-In-Reply-To: <1502332061-25085-2-git-send-email-jun.gao@mediatek.com>
-References: <1502332061-25085-1-git-send-email-jun.gao@mediatek.com>
- <1502332061-25085-2-git-send-email-jun.gao@mediatek.com>
-Message-ID: <1502353140.17420.7.camel@mtksdaap41>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 10 Aug 2017 10:25:32 +0200
+Subject: [PATCH] ARM:dts:armadillo800eva: Add console parametters
+In-Reply-To: <87o9rnyhhh.wl%kuninori.morimoto.gx@renesas.com>
+References: <1502027702-4366-1-git-send-email-phucduc.bui@gmail.com>
+ <1502027702-4366-2-git-send-email-phucduc.bui@gmail.com>
+ <20170807075920.GD7175@verge.net.au>
+ <CAABR9nHUuSw7m6BCBxDs28YtppHxwHNQR5f06H0n8xcXKx7gCw@mail.gmail.com>
+ <87o9rnyhhh.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <CAMuHMdWoCd85ROYjTn5Q023Re+sYW+B4TRRvZBt9bLBAkNHMbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-08-10 at 10:27 +0800, Jun Gao wrote:
-> From: Jun Gao <jun.gao@mediatek.com>
-> 
-> Add MT7622 i2c binding to binding file. Compare to MT8173 i2c
-> controller, MT7622 limits message numbers to 255, and does not
-> support 4GB DMA mode.
-> 
-> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-mtk.txt | 11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-> index bd5a7be..ff9ac61 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-> @@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
->  
->  Required properties:
->    - compatible: value should be either of the following.
-> -      "mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek mt2701
-> -      "mediatek,mt6577-i2c": for i2c compatible with mt6577.
-> -      "mediatek,mt6589-i2c": for i2c compatible with mt6589.
-> -      "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for i2c compatible with mt7623.
-> -      "mediatek,mt8173-i2c": for i2c compatible with mt8173.
-> +	"mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek MT2701
-> +	"mediatek,mt6577-i2c": for Mediatek MT6577
-> +	"mediatek,mt6589-i2c": for Mediatek MT6589
+Hi Morimoto-san, Phuc-san,
 
-Better not change those and just add compatible strings for mt7622.
+On Thu, Aug 10, 2017 at 10:12 AM, Kuninori Morimoto
+<kuninori.morimoto.gx@renesas.com> wrote:
+>>     >       chosen {
+>>     > -             bootargs = "earlyprintk ignore_loglevel root=/dev/nfs ip=dhcp rw";
+>>     > +             bootargs = "console=tty0 console=ttySC0,115200 earlyprintk
+>>     > +                             ignore_loglevel root=/dev/nfs ip=dhcp rw";
+>>     >               stdout-path = "serial0:115200n8";
+>>     >       };
+>>
+>>     Hi,
+>>
+>>     this feels wrong. My understanding is that stdout-path should be enough
+>>     to get the console.
+> (snip)
+>> Thank you for your comment.
+>> Before creating this patch, I have a patch reference of you and Geert.
+>> https://patchwork.kernel.org/patch/5184001/
+>
+> I think he want to say here is that it needs "console=" which
+> is indicated by Geert on https://patchwork.kernel.org/patch/5184001/
+>
+>         "Note that we have to keep the "console=ttySC1" parameter in
+>         chosen/bootargs, ..."
 
-> +	"mediatek,mt7622-i2c": for Mediatek MT7622
-> +	"mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for Mediatek MT7623
-> +	"mediatek,mt8173-i2c": for Mediatek MT8173
->    - reg: physical base address of the controller and dma base, length of memory
->      mapped region.
->    - interrupts: interrupt number to the cpu.
+        "... else we only get console messages on tty0, and because
+        this DTS is shared between legacy and multi-platform."
+
+That was needed at the time of commit 2c32622c3f3f9c7e ("ARM:
+shmobile: armadillo800eva dts: Add chosen/stdout-path").
+
+Due to generic DT/console updates later, the "console=" parameters were
+no longer needed, cfr. commit 1403e38b829acdad ("ARM: dts: armadillo800eva:
+Update console parameters").
+
+> I don't have armadillo800eva anymore, so I can't test this patch.
+> But according to Phuc-san, there is not command prompt after boot
+> without this patch.
+
+I'm quite sure I do get console output on both ttyS0 and tty0 with the current
+kernel (can't test right now due to board farm move/restructuring).
+
+For a userspace prompt, I guess Phuc-san uses /dev/console as the console
+device in e.g. /etc/inittab (or an equivalent)? If you want a prompt on tty0,
+you better specify /dev/tty0 instead of /dev/console.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
