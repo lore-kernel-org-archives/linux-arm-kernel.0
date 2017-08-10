@@ -1,70 +1,52 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 10 Aug 2017 10:25:32 +0200
-Subject: [PATCH] ARM:dts:armadillo800eva: Add console parametters
-In-Reply-To: <87o9rnyhhh.wl%kuninori.morimoto.gx@renesas.com>
-References: <1502027702-4366-1-git-send-email-phucduc.bui@gmail.com>
- <1502027702-4366-2-git-send-email-phucduc.bui@gmail.com>
- <20170807075920.GD7175@verge.net.au>
- <CAABR9nHUuSw7m6BCBxDs28YtppHxwHNQR5f06H0n8xcXKx7gCw@mail.gmail.com>
- <87o9rnyhhh.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <CAMuHMdWoCd85ROYjTn5Q023Re+sYW+B4TRRvZBt9bLBAkNHMbQ@mail.gmail.com>
+From: kevin.wangtao@hisilicon.com (Tao Wang)
+Date: Thu, 10 Aug 2017 16:32:12 +0800
+Subject: [PATCH v3 0/3] thermal: add thermal sensor driver for Hi3660
+In-Reply-To: <1498102923-68481-1-git-send-email-kevin.wangtao@hisilicon.com>
+References: <1498102923-68481-1-git-send-email-kevin.wangtao@hisilicon.com>
+Message-ID: <1502353935-92924-1-git-send-email-kevin.wangtao@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Morimoto-san, Phuc-san,
+From: Tao Wang <kevin.wangtao@linaro.org>
 
-On Thu, Aug 10, 2017 at 10:12 AM, Kuninori Morimoto
-<kuninori.morimoto.gx@renesas.com> wrote:
->>     >       chosen {
->>     > -             bootargs = "earlyprintk ignore_loglevel root=/dev/nfs ip=dhcp rw";
->>     > +             bootargs = "console=tty0 console=ttySC0,115200 earlyprintk
->>     > +                             ignore_loglevel root=/dev/nfs ip=dhcp rw";
->>     >               stdout-path = "serial0:115200n8";
->>     >       };
->>
->>     Hi,
->>
->>     this feels wrong. My understanding is that stdout-path should be enough
->>     to get the console.
-> (snip)
->> Thank you for your comment.
->> Before creating this patch, I have a patch reference of you and Geert.
->> https://patchwork.kernel.org/patch/5184001/
->
-> I think he want to say here is that it needs "console=" which
-> is indicated by Geert on https://patchwork.kernel.org/patch/5184001/
->
->         "Note that we have to keep the "console=ttySC1" parameter in
->         chosen/bootargs, ..."
+This series adds thermal support for Hi3660 Soc, which support
+all the hardware temperture sensors and two virtual sensors(one
+for maximum value of all and one for average value of all).
 
-        "... else we only get console messages on tty0, and because
-        this DTS is shared between legacy and multi-platform."
+Patch 1 add dt-binding document to describe how to config dt
+for the driver.
+Patch 2 introduces the thermal sensor driver.
+Patch 3 add dts for the thermal senor driver on Hi3660.
 
-That was needed at the time of commit 2c32622c3f3f9c7e ("ARM:
-shmobile: armadillo800eva dts: Add chosen/stdout-path").
+hardware document can be found on
+https://github.com/96boards/documentation/blob/master/ConsumerEdition/HiKey960/HardwareDocs/HiKey960_SoC_Reference_Manual.pdf
 
-Due to generic DT/console updates later, the "console=" parameters were
-no longer needed, cfr. commit 1403e38b829acdad ("ARM: dts: armadillo800eva:
-Update console parameters").
+Changes in v2:
+- correct alphabet order
+- correct compatible name
+- remove redundant property
+- rebase changes on linux next
 
-> I don't have armadillo800eva anymore, so I can't test this patch.
-> But according to Phuc-san, there is not command prompt after boot
-> without this patch.
+Changes in v3:
+- remove unnecessary log print
+- described all platform related parameters in DT
+- make the driver forward compatible
 
-I'm quite sure I do get console output on both ttyS0 and tty0 with the current
-kernel (can't test right now due to board farm move/restructuring).
+Tao Wang (3):
+  dt-bindings: Document the hi3660 thermal sensor bindings
+  thermal: hisilicon: add thermal sensor driver for Hi3660
+  arm64: dts: register Hi3660's thermal sensor
 
-For a userspace prompt, I guess Phuc-san uses /dev/console as the console
-device in e.g. /etc/inittab (or an equivalent)? If you want a prompt on tty0,
-you better specify /dev/tty0 instead of /dev/console.
+ .../devicetree/bindings/thermal/hisi-tsensor.txt   |  23 +++
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |  10 +
+ drivers/thermal/Kconfig                            |  13 ++
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/hisi_tsensor.c                     | 223 +++++++++++++++++++++
+ include/dt-bindings/thermal/hi3660-thermal.h       |  30 +++
+ 6 files changed, 300 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
+ create mode 100644 drivers/thermal/hisi_tsensor.c
+ create mode 100644 include/dt-bindings/thermal/hi3660-thermal.h
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+2.8.1
