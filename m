@@ -1,63 +1,79 @@
 From: david.wu@rock-chips.com (David Wu)
-Date: Thu, 10 Aug 2017 22:00:25 +0800
-Subject: [PATCH v5 07/11] net: stmmac: dwmac-rk: Add integrated PHY support
- for rk3228
+Date: Thu, 10 Aug 2017 22:01:08 +0800
+Subject: [PATCH v5 09/11] ARM: dts: rk3228-evb: Enable the integrated PHY for
+ gmac
 In-Reply-To: <1502373410-2423-1-git-send-email-david.wu@rock-chips.com>
 References: <1502373410-2423-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1502373625-2665-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <1502373668-2767-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is only one mac controller in rk3228, which could connect to
-external PHY or integrated PHY, use the grf_com_mux bit15 to route
-external/integrated PHY.
+This patch enables the integrated PHY for rk3228 evb board
+by default.
+To use the external 1000M PHY on evb board, need to make
+some switch of evb board to be on.
 
 Signed-off-by: David Wu <david.wu@rock-chips.com>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+changes in v5:
+ - Use phy-is-integrated property via PHY node.
+ - Move the PHY clock and reset control to PHY node.
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-index 9019917..b6db3ff 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-@@ -86,6 +86,8 @@ struct rk_priv_data {
- #define RK3228_GRF_MAC_CON0	0x0900
- #define RK3228_GRF_MAC_CON1	0x0904
- 
-+#define RK3228_GRF_CON_MUX	0x50
+ arch/arm/boot/dts/rk3228-evb.dts | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3228-evb.dts b/arch/arm/boot/dts/rk3228-evb.dts
+index 5883433..456ddf7 100644
+--- a/arch/arm/boot/dts/rk3228-evb.dts
++++ b/arch/arm/boot/dts/rk3228-evb.dts
+@@ -50,6 +50,16 @@
+ 		device_type = "memory";
+ 		reg = <0x60000000 0x40000000>;
+ 	};
 +
- /* RK3228_GRF_MAC_CON0 */
- #define RK3228_GMAC_CLK_RX_DL_CFG(val)	HIWORD_UPDATE(val, 0x7F, 7)
- #define RK3228_GMAC_CLK_TX_DL_CFG(val)	HIWORD_UPDATE(val, 0x7F, 0)
-@@ -111,6 +113,9 @@ struct rk_priv_data {
- #define RK3228_GMAC_RXCLK_DLY_ENABLE	GRF_BIT(1)
- #define RK3228_GMAC_RXCLK_DLY_DISABLE	GRF_CLR_BIT(1)
- 
-+/* RK3228_GRF_COM_MUX */
-+#define RK3228_GRF_CON_MUX_GMAC_INTEGRATED_PHY	GRF_BIT(15)
-+
- static void rk3228_set_to_rgmii(struct rk_priv_data *bsp_priv,
- 				int tx_delay, int rx_delay)
- {
-@@ -191,11 +196,18 @@ static void rk3228_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
- 		dev_err(dev, "unknown speed value for RMII! speed=%d", speed);
- }
- 
-+static void rk3228_integrated_phy_powerup(struct rk_priv_data *priv)
-+{
-+	regmap_write(priv->grf, RK3228_GRF_CON_MUX,
-+		     RK3228_GRF_CON_MUX_GMAC_INTEGRATED_PHY);
-+}
-+
- static const struct rk_gmac_ops rk3228_ops = {
- 	.set_to_rgmii = rk3228_set_to_rgmii,
- 	.set_to_rmii = rk3228_set_to_rmii,
- 	.set_rgmii_speed = rk3228_set_rgmii_speed,
- 	.set_rmii_speed = rk3228_set_rmii_speed,
-+	.integrated_phy_powerup =  rk3228_integrated_phy_powerup,
++	vcc_phy: vcc-phy-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		regulator-name = "vcc_phy";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
  };
  
- #define RK3288_GRF_SOC_CON1	0x0248
+ &emmc {
+@@ -60,6 +70,30 @@
+ 	status = "okay";
+ };
+ 
++&gmac {
++	assigned-clocks = <&cru SCLK_MAC_SRC>;
++	assigned-clock-rates = <50000000>;
++	clock_in_out = "output";
++	phy-supply = <&vcc_phy>;
++	phy-mode = "rmii";
++	phy-handle = <&phy0>;
++	status = "okay";
++
++	mdio {
++		compatible = "snps,dwmac-mdio";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		phy at 0 {
++			compatible = "ethernet-phy-id1234.d400", "ethernet-phy-ieee802.3-c22";
++			reg = <0>;
++			clocks = <&cru SCLK_MAC_PHY>;
++			resets = <&cru SRST_MACPHY>;
++			phy-is-integrated;
++		};
++	};
++};
++
+ &tsadc {
+ 	status = "okay";
+ 
 -- 
 1.9.1
