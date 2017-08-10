@@ -1,60 +1,133 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 10 Aug 2017 02:20:41 +0200
-Subject: [PATCH v4 05/12] Documentation: net: phy: Add phy-is-internal
- binding
-In-Reply-To: <778B0470-8ABD-46AD-A63D-F0CF4911C800@gmail.com>
-References: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
- <1502280630-2254-1-git-send-email-david.wu@rock-chips.com>
- <778B0470-8ABD-46AD-A63D-F0CF4911C800@gmail.com>
-Message-ID: <20170810002041.GA10776@lunn.ch>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 9 Aug 2017 19:21:21 -0500
+Subject: [linux-sunxi] [PATCH 01/13] dt-bindings: update the binding for
+ Allwinner H3 DE2 support
+In-Reply-To: <48442573.082BymFnMM@jernej-laptop>
+References: <20170801131304.7741-1-icenowy@aosc.io>
+ <79034825.lnfmIyYlWl@jernej-laptop>
+ <d6c7c6de29be2674ad6b37b184d1df7f@aosc.io>
+ <48442573.082BymFnMM@jernej-laptop>
+Message-ID: <20170810002121.jydgklyxpm3fuekl@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 09, 2017 at 03:47:34PM -0700, Florian Fainelli wrote:
-> On August 9, 2017 5:10:30 AM PDT, David Wu <david.wu@rock-chips.com> wrote:
-> >Add the documentation for internal phy. A boolean property
-> >indicates that a internal phy will be used.
-> >
-> >Signed-off-by: David Wu <david.wu@rock-chips.com>
-> >---
-> > Documentation/devicetree/bindings/net/phy.txt | 3 +++
-> > 1 file changed, 3 insertions(+)
-> >
-> >diff --git a/Documentation/devicetree/bindings/net/phy.txt
-> >b/Documentation/devicetree/bindings/net/phy.txt
-> >index b558576..942c892 100644
-> >--- a/Documentation/devicetree/bindings/net/phy.txt
-> >+++ b/Documentation/devicetree/bindings/net/phy.txt
-> >@@ -52,6 +52,9 @@ Optional Properties:
-> >   Mark the corresponding energy efficient ethernet mode as broken and
-> >   request the ethernet to stop advertising it.
+On Wed, Aug 02, 2017 at 09:06:26PM +0200, Jernej ?krabec wrote:
+> Hi,
+> 
+> Dne sreda, 02. avgust 2017 ob 07:02:39 CEST je icenowy at aosc.io napisal(a):
+> > ? 2017-08-02 12:53?Jernej ?krabec ???
 > > 
-> >+- phy-is-internal: If set, indicates that phy will connect to the MAC
-> >as a
-> >+  internal phy.
+> > > Hi Icenowy,
+> > > 
+> > > Dne torek, 01. avgust 2017 ob 15:12:52 CEST je Icenowy Zheng
+> > > 
+> > > napisal(a):
+> > >> Allwinner H3 features a "Display Engine 2.0".
+> > >> 
+> > >> Add device tree bindings for the following parts:
+> > >> - H3 TCONs
+> > >> - H3 Mixers
+> > >> - H3 Display engine
+> > >> 
+> > >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > >> ---
+> > >> 
+> > >>  .../bindings/display/sunxi/sun4i-drm.txt           | 25
+> > >> 
+> > >> ++++++++++++++++++---- 1 file changed, 21 insertions(+), 4
+> > >> deletions(-)
+> > >> 
+> > >> diff --git
+> > >> a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > >> b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt index
+> > >> 2ee6ff0ef98e..92512953943e 100644
+> > >> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > >> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > >> 
+> > >> @@ -87,18 +87,17 @@ Required properties:
+> > >>     * allwinner,sun6i-a31-tcon
+> > >>     * allwinner,sun6i-a31s-tcon
+> > >>     * allwinner,sun8i-a33-tcon
+> > >> 
+> > >> +   * allwinner,sun8i-h3-tcon
+> > >> 
+> > >>     * allwinner,sun8i-v3s-tcon
+> > >>   
+> > >>   - reg: base address and size of memory-mapped region
+> > >>   - interrupts: interrupt associated to this IP
+> > >>   
+> > >>   - clocks: phandles to the clocks feeding the TCON. Three are needed:
+> > >>     - 'ahb': the interface clocks
+> > >> 
+> > >> -   - 'tcon-ch0': The clock driving the TCON channel 0
+> > >> 
+> > >>   - resets: phandles to the reset controllers driving the encoder
+> > >>   
+> > >>     - "lcd": the reset line for the TCON channel 0
+> > >>   
+> > >>   - clock-names: the clock names mentioned above
+> > >>   - reset-names: the reset names mentioned above
+> > >> 
+> > >> - - clock-output-names: Name of the pixel clock created
+> > >> 
+> > >>  - ports: A ports node with endpoint definitions as defined in
+> > >>  
+> > >>    Documentation/devicetree/bindings/media/video-interfaces.txt. The
+> > >> 
+> > >> @@ -112,7 +111,23 @@ Required properties:
+> > >>    channel the endpoint is associated to. If that property is not
+> > >>    present, the endpoint number will be used as the channel number.
+> > >> 
+> > >> -On SoCs other than the A33 and V3s, there is one more clock required:
+> > >> +For the following compatibles:
+> > >> +   * allwinner,sun5i-a13-tcon
+> > >> +   * allwinner,sun6i-a31-tcon
+> > >> +   * allwinner,sun6i-a31s-tcon
+> > >> +   * allwinner,sun8i-a33-tcon
+> > >> +   * allwinner,sun8i-v3s-tcon
+> > >> +there is one more clock and one more property required:
+> > >> + - clocks:
+> > >> +   - 'tcon-ch0': The clock driving the TCON channel 0
+> > >> + - clock-output-names: Name of the pixel clock created
+> > >> +
+> > >> +For the following compatibles:
+> > >> +   * allwinner,sun5i-a13-tcon
+> > >> +   * allwinner,sun6i-a31-tcon
+> > >> +   * allwinner,sun6i-a31s-tcon
+> > >> +   * allwinner,sun8i-h3-tcon
+> > >> 
+> > >> +there is one more clock required:
+> > >>     - 'tcon-ch1': The clock driving the TCON channel 1
+> > >>  
+> > >>  DRC
+> > >> 
+> > >> @@ -207,6 +222,8 @@ supported.
+> > >> 
+> > >>  Required properties:
+> > >>    - compatible: value must be one of:
+> > >>      * allwinner,sun8i-v3s-de2-mixer
+> > >> 
+> > >> +    * allwinner,sun8i-h3-de2-mixer0
+> > >> +    * allwinner,sun8i-h3-de2-mixer1
+> > > 
+> > > About that, I concur with Maxime here, plane number properties would be
+> > > better. If we don't do this now, we will never have it.
+> > 
+> > But I still prefer different compatibles, as the capabilities are
+> > already
+> > proven to be different between mixer0 and mixer1, and furtherly we
+> > cannot
+> > promise Allwinner won't add more functions only available at mixer0.
+> > 
+> > Then we will be trapped into a situation that we describe more and more
+> > functions via properties, but they should be encoded into the
+> > compatible.
 > 
-> Something along the lines of:
-> 
-> If set, indicates that the PHY is integrated into the same physical package as the Ethernet MAC.
+> It is either multiple compatibles or multiple properties. I prefer the later, 
+> but it is up to maintainers to decide.
 
-Hi Florian, David.
+It's not the same. A compatible can imply an infinite number of 
+properties. I'm fine with properties too, but with only 2 instances I 
+don't think it makes much sense.
 
-I'm happy with the property name. But i think the text needs more
-description. We deal with Ethernet switches with integrated PHYs. Yet
-for us, this property is unneeded.
-
-Seeing this property means some bit of software needs to ensure the
-internal PHY should be used, when given the choice between an internal
-and external PHY. So i would say something like:
-
-    If set, indicates that the PHY is integrated into the same
-    physical package as the Ethernet MAC. If needed, muxers should be
-    configured to ensure the internal PHY is used. The absence of this
-    property indicates the muxers should be configured so that the
-    external PHY is used.
-
-This last part is important. If the bootloader has set the internal
-PHY to be used, you need to reset it. Otherwise we are going to get
-into a mess sometime later and need to add a phy-is-external property.
-
-     Andrew
+Rob
