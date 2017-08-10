@@ -1,58 +1,33 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 10 Aug 2017 20:23:17 +0900
-Subject: [PATCH 3/3] reset: uniphier: add analog amplifiers reset control
-In-Reply-To: <CAK7LNAT_dhx8+_G7yX9OX1yg7cWWpo7vJG5jDwdQe_O9uAe8rw@mail.gmail.com>
-References: <20170810072703.32433-1-suzuki.katsuhiro@socionext.com>
- <20170810072703.32433-3-suzuki.katsuhiro@socionext.com>
- <1502361454.10792.5.camel@pengutronix.de>
- <CAK7LNAT_dhx8+_G7yX9OX1yg7cWWpo7vJG5jDwdQe_O9uAe8rw@mail.gmail.com>
-Message-ID: <CAK7LNAQ_N-Ji29WvyRVZpqxwezO5Z2ET84ctxE-zmJ386L2AbQ@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 10 Aug 2017 13:24:11 +0200
+Subject: [PATCH 2/2] ARM: dts: r8a7743: Add IIC cores to dtsi
+In-Reply-To: <20170810080121.GE16647@verge.net.au>
+References: <1502196418-31341-1-git-send-email-biju.das@bp.renesas.com>
+ <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
+ <20170810080121.GE16647@verge.net.au>
+Message-ID: <20170810112411.GA4380@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
 
+> > >+		i2c6: i2c at e60b0000 {
+> > 
+> >    I'd use iic0 as the label.
+> 
+> I have no preference here other than that we try to be consistent
+> in DT for different R-Car SoCs. Wolfram, do you have an opinion on this?
 
-2017-08-10 20:11 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> 2017-08-10 19:37 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
->> Hi Katsuhiro,
->>
->> On Thu, 2017-08-10 at 16:27 +0900, Katsuhiro Suzuki wrote:
->>> Add a reset line for analog signal amplifier core (ADAMV) on
->>> UniPhier LD11/LD20 SoCs.
->>>
->>> > Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
->>> ---
->>>  drivers/reset/reset-uniphier.c | 15 +++++++++++++++
->>>  1 file changed, 15 insertions(+)
->>>
->>> diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
->>> index f60c137c17cb..cda4a78a58e2 100644
->>> --- a/drivers/reset/reset-uniphier.c
->>> +++ b/drivers/reset/reset-uniphier.c
->>> @@ -196,6 +196,12 @@ static const struct uniphier_reset_data uniphier_pro4_peri_reset_data[] = {
->>> >     UNIPHIER_RESET_END,
->>>  };
->>>
->>> +/* Analog signal amplifiers reset data */
->>> +static const struct uniphier_reset_data uniphier_ld11_adamv_reset_data[] = {
->>> > +   UNIPHIER_RESETX(100, 0x10, 6), /* EVEA */
->>> > +   UNIPHIER_RESET_END,
->>> +};
+Back then, for M2-W, I decided to go with the schematics/datasheets.
+And those mentioned i2c6 rather than iic0. For that reason, the comment
 
+"/* The memory map in the User's Manual maps the cores to bus numbers */"
 
-I take back my Acked-by.
+exists in r8a7791.dtsi. Dunno the manual of this SoC here.
 
-
-The reset line index is independent from others
-because this block is a separate instance.
-
-Are you OK with starting from the reset ID 100?
-
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170810/bb3d03e1/attachment.sig>
