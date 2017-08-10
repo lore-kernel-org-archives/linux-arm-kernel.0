@@ -1,60 +1,40 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 10 Aug 2017 19:50:25 +0900
-Subject: [PATCH v2] arm64: defconfig: enable CONFIG_UNIPHIER_WATCHDOG
-In-Reply-To: <1500359890-30358-1-git-send-email-hayashibara.keiji@socionext.com>
-References: <1500359890-30358-1-git-send-email-hayashibara.keiji@socionext.com>
-Message-ID: <CAK7LNAST_ZcicTtEj21qjmbGhxXUs6VKqmV7-mgg7w9Btsb=3A@mail.gmail.com>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Thu, 10 Aug 2017 18:57:40 +0800
+Subject: [PATCH v4 05/12] Documentation: net: phy: Add phy-is-internal
+ binding
+In-Reply-To: <20170810002041.GA10776@lunn.ch>
+References: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
+ <1502280630-2254-1-git-send-email-david.wu@rock-chips.com>
+ <778B0470-8ABD-46AD-A63D-F0CF4911C800@gmail.com>
+ <20170810002041.GA10776@lunn.ch>
+Message-ID: <1bff1793-fe46-f263-fbf5-ef65ffbc5dc9@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forwarding to ARM-SOC
+Hi Andrew, Florian
 
+? 2017/8/10 8:20, Andrew Lunn ??:
+> Hi Florian, David.
+> 
+> I'm happy with the property name. But i think the text needs more
+> description. We deal with Ethernet switches with integrated PHYs. Yet
+> for us, this property is unneeded.
+> 
+> Seeing this property means some bit of software needs to ensure the
+> internal PHY should be used, when given the choice between an internal
+> and external PHY. So i would say something like:
+> 
+>      If set, indicates that the PHY is integrated into the same
+>      physical package as the Ethernet MAC. If needed, muxers should be
+>      configured to ensure the (internal) PHY is used. The absence of this
+>      property indicates the muxers should be configured so that the
+>      external PHY is used.
 
-Hi Arnd, Olof,
+Are we supposed to replace the words "internal" with "integrated" here?
+So we have three kinds of PHY, they are intenal, external and integrated 
+PHYs.
 
-
-This patch was sent to arm64 maintainers a few weeks ago
-(but not picked up).
-
-I think the best home for this patch is the ARM-SOC tree.
-
-Could you pick it up, please?
-
-This patch:
-https://patchwork.kernel.org/patch/9847049/
-
-
-Thanks,
-Masahiro
-
-
-
-2017-07-18 15:38 GMT+09:00 Keiji Hayashibara <hayashibara.keiji@socionext.com>:
-> Enable the watchdog driver for UniPhier SoC
->
-> Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
-> ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 6c7d147..629c815 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -311,6 +311,7 @@ CONFIG_S3C2410_WATCHDOG=y
->  CONFIG_MESON_GXBB_WATCHDOG=m
->  CONFIG_MESON_WATCHDOG=m
->  CONFIG_RENESAS_WDT=y
-> +CONFIG_UNIPHIER_WATCHDOG=y
->  CONFIG_BCM2835_WDT=y
->  CONFIG_MFD_CROS_EC=y
->  CONFIG_MFD_CROS_EC_I2C=y
-> --
-> 2.7.4
->
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> 
+> This last part is important. If the bootloader has set the internal
+> PHY to be used, you need to reset it. Otherwise we are going to get
+> into a mess sometime later and need to add a phy-is-external property.
