@@ -1,25 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 9 Aug 2017 19:15:20 -0500
-Subject: [PATCH v3.1 1/4] dt-bindings: clock: amlogic, gxbb-aoclkc: Update
- bindings
-In-Reply-To: <1501588619-10991-2-git-send-email-narmstrong@baylibre.com>
-References: <1501588619-10991-1-git-send-email-narmstrong@baylibre.com>
- <1501588619-10991-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20170810001520.bpu2jyfdvx2isu4w@rob-hp-laptop>
+Date: Wed, 9 Aug 2017 19:18:09 -0500
+Subject: [PATCH 01/13] dt-bindings: update the binding for Allwinner H3
+ DE2 support
+In-Reply-To: <20170801131304.7741-2-icenowy@aosc.io>
+References: <20170801131304.7741-1-icenowy@aosc.io>
+ <20170801131304.7741-2-icenowy@aosc.io>
+Message-ID: <20170810001809.6xhloimtgwsg5j5d@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 01, 2017 at 01:56:56PM +0200, Neil Armstrong wrote:
-> On the first revision of the bindings, only the gates + resets were known
-> in the AO Clock HW, but more registers used to configures AO clock are known
-> to be spread among the AO register space.
-> This patch adds a parent node for the entire system control zone for the AO
-> domain then moves the clock controller as a subnode of the system control
-> node.
+On Tue, Aug 01, 2017 at 09:12:52PM +0800, Icenowy Zheng wrote:
+> Allwinner H3 features a "Display Engine 2.0".
 > 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> Add device tree bindings for the following parts:
+> - H3 TCONs
+> - H3 Mixers
+> - H3 Display engine
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > ---
->  .../bindings/clock/amlogic,gxbb-aoclkc.txt         | 22 ++++++++++++++++------
->  1 file changed, 16 insertions(+), 6 deletions(-)
+>  .../bindings/display/sunxi/sun4i-drm.txt           | 25 ++++++++++++++++++----
+>  1 file changed, 21 insertions(+), 4 deletions(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
