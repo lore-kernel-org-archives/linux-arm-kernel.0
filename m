@@ -1,142 +1,82 @@
 From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
-Date: Thu, 10 Aug 2017 20:42:46 +0300
-Subject: [RFC PATCH 03/10] staging: fsl-mc: dpio: add order preservation
- support
-In-Reply-To: <20170810174253.20951-1-horia.geanta@nxp.com>
-References: <20170810174253.20951-1-horia.geanta@nxp.com>
-Message-ID: <20170810174253.20951-4-horia.geanta@nxp.com>
+Date: Thu, 10 Aug 2017 20:42:43 +0300
+Subject: [RFC PATCH 00/10] crypto: caam - add DPAA2 (DPSECI) driver
+Message-ID: <20170810174253.20951-1-horia.geanta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Radu Alexe <radu.alexe@nxp.com>
+Hi,
 
-Order preservation is a feature that will be supported
-in dpni, dpseci and dpci devices.
-This is a preliminary patch for the changes to be
-introduced in the corresponding drivers.
+This patch set adds the CAAM crypto engine driver for DPAA2
+(Data Path Acceleration Architecture v2) found on ARMv8-based SoCs
+like LS1088A, LS2088A.
 
-Signed-off-by: Radu Alexe <radu.alexe@nxp.com>
-Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
----
- drivers/staging/fsl-mc/include/dpopr.h | 110 +++++++++++++++++++++++++++++++++
- 1 file changed, 110 insertions(+)
+Driver consists of:
+-DPSECI (Data Path SEC Interface) backend - low-level API that allows
+to manage DPSECI devices (DPAA2 objects) that sit on
+the Management Complex (MC) fsl-mc bus
+-algorithms frontend - AEAD and ablkcipher algorithms implementation
+
+Patches 1-4 include DPIO object dependencies.
+I am aware that DPIO is currently in staging, however I don't consider
+these to be a large feature set. Anyhow, please let me know if going
+with the patches through staging is acceptable.
+
+Patches 5-9 are the core of the patch set, adding the driver.
+For symmetric encryption the legacy ablkcipher interface is used; the
+plan is to convert to skcipher all CAAM frontends at once at a certain
+point in time.
+
+Patch 10 enables driver on arm64. It will be built only if dependency
+on DPIO (CONFIG_FSL_MC_DPIO) is satisfied.
+
+Thanks,
+Horia
+
+Horia Geant? (9):
+  staging: fsl-mc: dpio: add frame list format support
+  staging: fsl-mc: dpio: add congestion notification support
+  staging: fsl-dpaa2/eth: move generic FD defines to DPIO
+  crypto: caam/qi - prepare for gcm(aes) support
+  crypto: caam - add DPAA2-CAAM (DPSECI) backend API
+  crypto: caam - add Queue Interface v2 error codes
+  crypto: caam/qi2 - add DPAA2-CAAM driver
+  crypto: caam/qi2 - add ablkcipher algorithms
+  arm64: defconfig: enable CAAM crypto engine on QorIQ DPAA2 SoCs
+
+Radu Alexe (1):
+  staging: fsl-mc: dpio: add order preservation support
+
+ arch/arm64/configs/defconfig                   |    1 +
+ drivers/crypto/Makefile                        |    2 +-
+ drivers/crypto/caam/Kconfig                    |   57 +-
+ drivers/crypto/caam/Makefile                   |    9 +-
+ drivers/crypto/caam/caamalg.c                  |   19 +-
+ drivers/crypto/caam/caamalg_desc.c             |  165 +-
+ drivers/crypto/caam/caamalg_desc.h             |   24 +-
+ drivers/crypto/caam/caamalg_qi2.c              | 3949 ++++++++++++++++++++++++
+ drivers/crypto/caam/caamalg_qi2.h              |  243 ++
+ drivers/crypto/caam/compat.h                   |    1 +
+ drivers/crypto/caam/dpseci.c                   |  858 +++++
+ drivers/crypto/caam/dpseci.h                   |  395 +++
+ drivers/crypto/caam/dpseci_cmd.h               |  261 ++
+ drivers/crypto/caam/error.c                    |   75 +-
+ drivers/crypto/caam/error.h                    |    6 +-
+ drivers/crypto/caam/key_gen.c                  |   30 -
+ drivers/crypto/caam/key_gen.h                  |   30 +
+ drivers/crypto/caam/regs.h                     |    2 +
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.c |    8 +-
+ drivers/staging/fsl-dpaa2/ethernet/dpaa2-eth.h |   19 +-
+ drivers/staging/fsl-mc/include/dpaa2-fd.h      |  255 ++
+ drivers/staging/fsl-mc/include/dpaa2-io.h      |   43 +
+ drivers/staging/fsl-mc/include/dpopr.h         |  110 +
+ 23 files changed, 6463 insertions(+), 99 deletions(-)
+ create mode 100644 drivers/crypto/caam/caamalg_qi2.c
+ create mode 100644 drivers/crypto/caam/caamalg_qi2.h
+ create mode 100644 drivers/crypto/caam/dpseci.c
+ create mode 100644 drivers/crypto/caam/dpseci.h
+ create mode 100644 drivers/crypto/caam/dpseci_cmd.h
  create mode 100644 drivers/staging/fsl-mc/include/dpopr.h
 
-diff --git a/drivers/staging/fsl-mc/include/dpopr.h b/drivers/staging/fsl-mc/include/dpopr.h
-new file mode 100644
-index 000000000000..e1110af2fe54
---- /dev/null
-+++ b/drivers/staging/fsl-mc/include/dpopr.h
-@@ -0,0 +1,110 @@
-+/*
-+ * Copyright 2017 NXP
-+ *
-+ * Redistribution and use in source and binary forms, with or without
-+ * modification, are permitted provided that the following conditions are met:
-+ * * Redistributions of source code must retain the above copyright
-+ * notice, this list of conditions and the following disclaimer.
-+ * * Redistributions in binary form must reproduce the above copyright
-+ * notice, this list of conditions and the following disclaimer in the
-+ * documentation and/or other materials provided with the distribution.
-+ * * Neither the name of the above-listed copyright holders nor the
-+ * names of any contributors may be used to endorse or promote products
-+ * derived from this software without specific prior written permission.
-+ *
-+ *
-+ * ALTERNATIVELY, this software may be distributed under the terms of the
-+ * GNU General Public License ("GPL") as published by the Free Software
-+ * Foundation, either version 2 of that License or (at your option) any
-+ * later version.
-+ *
-+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
-+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-+ * POSSIBILITY OF SUCH DAMAGE.
-+ */
-+#ifndef __FSL_DPOPR_H_
-+#define __FSL_DPOPR_H_
-+
-+/* Data Path Order Restoration API
-+ * Contains initialization APIs and runtime APIs for the Order Restoration
-+ */
-+
-+/** Order Restoration properties */
-+
-+/**
-+ * Create a new Order Point Record option
-+ */
-+#define OPR_OPT_CREATE 0x1
-+/**
-+ * Retire an existing Order Point Record option
-+ */
-+#define OPR_OPT_RETIRE 0x2
-+
-+/**
-+ * struct opr_cfg - Structure representing OPR configuration
-+ * @oprrws: Order point record (OPR) restoration window size (0 to 5)
-+ *			0 - Window size is 32 frames.
-+ *			1 - Window size is 64 frames.
-+ *			2 - Window size is 128 frames.
-+ *			3 - Window size is 256 frames.
-+ *			4 - Window size is 512 frames.
-+ *			5 - Window size is 1024 frames.
-+ * @oa: OPR auto advance NESN window size (0 disabled, 1 enabled)
-+ * @olws: OPR acceptable late arrival window size (0 to 3)
-+ *			0 - Disabled. Late arrivals are always rejected.
-+ *			1 - Window size is 32 frames.
-+ *			2 - Window size is the same as the OPR restoration
-+ *				window size configured in the OPRRWS field.
-+ *			3 - Window size is 8192 frames. Late arrivals are
-+ *				always accepted.
-+ * @oeane: Order restoration list (ORL) resource exhaustion
-+ *			advance NESN enable (0 disabled, 1 enabled)
-+ * @oloe: OPR loose ordering enable (0 disabled, 1 enabled)
-+ */
-+struct opr_cfg {
-+	u8 oprrws;
-+	u8 oa;
-+	u8 olws;
-+	u8 oeane;
-+	u8 oloe;
-+};
-+
-+/**
-+ * struct opr_qry - Structure representing OPR configuration
-+ * @enable: Enabled state
-+ * @rip: Retirement In Progress
-+ * @ndsn: Next dispensed sequence number
-+ * @nesn: Next expected sequence number
-+ * @ea_hseq: Early arrival head sequence number
-+ * @hseq_nlis: HSEQ not last in sequence
-+ * @ea_tseq: Early arrival tail sequence number
-+ * @tseq_nlis: TSEQ not last in sequence
-+ * @ea_tptr: Early arrival tail pointer
-+ * @ea_hptr: Early arrival head pointer
-+ * @opr_id: Order Point Record ID
-+ * @opr_vid: Order Point Record Virtual ID
-+ */
-+struct opr_qry {
-+	char enable;
-+	char rip;
-+	u16 ndsn;
-+	u16 nesn;
-+	u16 ea_hseq;
-+	char hseq_nlis;
-+	u16 ea_tseq;
-+	char tseq_nlis;
-+	u16 ea_tptr;
-+	u16 ea_hptr;
-+	u16 opr_id;
-+	u16 opr_vid;
-+};
-+
-+#endif /* __FSL_DPOPR_H_ */
 -- 
 2.12.0.264.gd6db3f216544
