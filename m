@@ -1,35 +1,60 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Thu, 10 Aug 2017 12:06:15 +0200
-Subject: [PATCH 03/17] pinctrl: armada-37xx: constify pinconf_ops, pinctrl_ops,
- and pinmux_ops structures
-In-Reply-To: <1502359589-15970-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1502359589-15970-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1502359589-15970-4-git-send-email-Julia.Lawall@lip6.fr>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 10 Aug 2017 12:37:34 +0200
+Subject: [PATCH 3/3] reset: uniphier: add analog amplifiers reset control
+In-Reply-To: <20170810072703.32433-3-suzuki.katsuhiro@socionext.com>
+References: <20170810072703.32433-1-suzuki.katsuhiro@socionext.com>
+ <20170810072703.32433-3-suzuki.katsuhiro@socionext.com>
+Message-ID: <1502361454.10792.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This pinconf_ops structure is only stored in the const pinconf_ops
-field of a pinctrl_desc structure. Make the pinconf_ops structure
-const as well.
+Hi Katsuhiro,
 
-Done with the help of Coccinelle.
+On Thu, 2017-08-10 at 16:27 +0900, Katsuhiro Suzuki wrote:
+> Add a reset line for analog signal amplifier core (ADAMV) on
+> UniPhier LD11/LD20 SoCs.
+> 
+> > Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+> ---
+> ?drivers/reset/reset-uniphier.c | 15 +++++++++++++++
+> ?1 file changed, 15 insertions(+)
+> 
+> diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
+> index f60c137c17cb..cda4a78a58e2 100644
+> --- a/drivers/reset/reset-uniphier.c
+> +++ b/drivers/reset/reset-uniphier.c
+> @@ -196,6 +196,12 @@ static const struct uniphier_reset_data uniphier_pro4_peri_reset_data[] = {
+> > ?	UNIPHIER_RESET_END,
+> ?};
+> ?
+> +/* Analog signal amplifiers reset data */
+> +static const struct uniphier_reset_data uniphier_ld11_adamv_reset_data[] = {
+> > +	UNIPHIER_RESETX(100, 0x10, 6), /* EVEA */
+> > +	UNIPHIER_RESET_END,
+> +};
+> +
+> ?/* core implementaton */
+> ?struct uniphier_reset_priv {
+> > ?	struct reset_controller_dev rcdev;
+> @@ -415,6 +421,15 @@ static const struct of_device_id uniphier_reset_match[] = {
+> > ?		.compatible = "socionext,uniphier-ld20-peri-reset",
+> > ?		.data = uniphier_pro4_peri_reset_data,
+> > ?	},
+> > +	/* Analog signal amplifiers reset */
+> > +	{
+> > +		.compatible = "socionext,uniphier-ld11-adamv-reset",
+> > +		.data = uniphier_ld11_adamv_reset_data,
+> > +	},
+> > +	{
+> > +		.compatible = "socionext,uniphier-ld20-adamv-reset",
+> > +		.data = uniphier_ld11_adamv_reset_data,
+> > +	},
+> > ?	{ /* sentinel */ }
+> ?};
+> ?MODULE_DEVICE_TABLE(of, uniphier_reset_match);
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Please add a patch to describe the new compatible values in
+Documentation/devicetree/bindings/reset/uniphier-reset.txt.
 
----
- drivers/pinctrl/mvebu/pinctrl-armada-37xx.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-index f024e25..997ff05 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-@@ -243,7 +243,7 @@ static int armada_37xx_pin_config_group_set(struct pinctrl_dev *pctldev,
- 	return -ENOTSUPP;
- }
- 
--static struct pinconf_ops armada_37xx_pinconf_ops = {
-+static const struct pinconf_ops armada_37xx_pinconf_ops = {
- 	.is_generic = true,
- 	.pin_config_group_get = armada_37xx_pin_config_group_get,
- 	.pin_config_group_set = armada_37xx_pin_config_group_set,
+regards
+Philipp
