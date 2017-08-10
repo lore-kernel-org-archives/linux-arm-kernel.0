@@ -1,26 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 10 Aug 2017 18:28:54 +0100
-Subject: [RESEND PATCH 2/4] iommu: arm-smmu: split out register defines
-In-Reply-To: <20170809144310.22855-3-robdclark@gmail.com>
-References: <20170809144310.22855-1-robdclark@gmail.com>
- <20170809144310.22855-3-robdclark@gmail.com>
-Message-ID: <20170810172853.GE9980@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 Aug 2017 10:37:19 -0700
+Subject: [PATCH v2 0/3] ARM: dts: omap: workarounds for Ethernet PHY
+ strap on DRA71 and DRA72 EVMs
+In-Reply-To: <ca0d0615-d813-d00b-e853-25df9a5c49b6@ti.com>
+References: <cover.1502284400.git.nsekhar@ti.com>
+ <ca0d0615-d813-d00b-e853-25df9a5c49b6@ti.com>
+Message-ID: <20170810173718.GP8569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 09, 2017 at 10:43:03AM -0400, Rob Clark wrote:
-> I want to re-use some of these for qcom_iommu, which has (roughly) the
-> same context-bank registers.
-> 
-> Signed-off-by: Rob Clark <robdclark@gmail.com>
-> ---
->  drivers/iommu/arm-smmu-regs.h | 220 ++++++++++++++++++++++++++++++++++++++++++
->  drivers/iommu/arm-smmu.c      | 211 ++--------------------------------------
->  2 files changed, 229 insertions(+), 202 deletions(-)
->  create mode 100644 drivers/iommu/arm-smmu-regs.h
+* Grygorii Strashko <grygorii.strashko@ti.com> [170809 15:27]:
+> On 08/09/2017 09:02 AM, Sekhar Nori wrote:
+> > Here are some patches to overcome incorrect Ethernet PHY strap settings
+> > on DRA72x EVM Rev C and DRA71 EVM. Both of these boards use TI's DP83867
+> > PHY.
+> > 
+> > The incorrect PHY strap settings cause a voilation of PHY specification
+> > and need to be worked around in software as documented in the commit
+> > messages. But there is no known issue that these patches fix.
+...
 
-This looks like a reasonable split, thanks:
+> Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Applying dts changes into omap-for-v4.14/fixes-not-urgent
+and defconfig into omap-for-v4.14/defconfig.
 
-Will
+Thanks,
+
+Tony
