@@ -1,40 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 10 Aug 2017 16:28:41 +0100
-Subject: [PATCH] irqchip/gic-v3-its-platform-msi: Fix msi-parent parsing
- loop
-In-Reply-To: <20170810144117.17567-1-lorenzo.pieralisi@arm.com>
-References: <20170810144117.17567-1-lorenzo.pieralisi@arm.com>
-Message-ID: <5b33e776-802a-af30-f9e8-fa414df1b4e7@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 10 Aug 2017 16:31:58 +0100
+Subject: [PATCH 1/2] ASoC: codecs: add const to snd_soc_codec_driver
+ structures
+In-Reply-To: <CAOH+1jGe_Xo3o024H4xq8cJV10xta76QmovPKreXpncU86hqFA@mail.gmail.com>
+References: <1501776020-3328-1-git-send-email-bhumirks@gmail.com>
+ <1501776020-3328-2-git-send-email-bhumirks@gmail.com>
+ <20170810152010.hl2ea5tuyo7mhndf@sirena.org.uk>
+ <CAOH+1jGe_Xo3o024H4xq8cJV10xta76QmovPKreXpncU86hqFA@mail.gmail.com>
+Message-ID: <20170810153158.hfnzjzro7wnmc4mt@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/17 15:41, Lorenzo Pieralisi wrote:
-> While parsing the msi-parent property to chase up the IRQ domain
-> a given device belongs to, the index into the msi-parent tuple should
-> be incremented to ensure all properties entries are taken into account.
-> 
-> Current code missed the index update so the parsing loop does not work
-> in case multiple msi-parent phandles are present and may turn into
-> an infinite loop in of_pmsi_get_dev_id() if phandle at index 0 does
-> not correspond to the domain we are actually looking-up.
-> 
-> Fix the code by updating the phandle index at each iteration in
-> of_pmsi_get_dev_id().
-> 
-> Fixes: deac7fc1c87f ("irqchip/gic-v3-its: Parse new version of msi-parent property")
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> Marc,
-> 
-> nothing urgent, I have just bumped into it while checking how ITS
-> DeviceIDs are handled in DT.
+On Thu, Aug 10, 2017 at 08:56:35PM +0530, Bhumika Goyal wrote:
+> On Thu, Aug 10, 2017 at 8:50 PM, Mark Brown <broonie@kernel.org> wrote:
 
-Duh. Nice catch. Applied to the next batch of fixes (waiting for tglx to
-resurface...).
+> > This is difficult to apply against current code as it is a single commit
+> > over lots of files but the ASoC tree has lots of branches.  I've figured
+> > out the dependencies but it's easier to split things up (and avoids
+> > collisions with other changes causing the whole thing to not apply).
 
-Thanks,
+> Thanks for the response.
+> Should I make separate patches for each file or is there another way
+> to split this patch?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Splitting per driver would've been easier, or saying exactly where it
+applies if you don't split it.  Like I say I figured it out for this one.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170810/207114c1/attachment.sig>
