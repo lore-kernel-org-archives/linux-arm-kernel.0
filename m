@@ -1,107 +1,33 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Thu, 10 Aug 2017 22:00:52 +0800
-Subject: [PATCH v5 08/11] net: stmmac: dwmac-rk: Add integrated PHY supprot
- for rk3328
-In-Reply-To: <1502373410-2423-1-git-send-email-david.wu@rock-chips.com>
-References: <1502373410-2423-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <1502373652-2716-1-git-send-email-david.wu@rock-chips.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 10 Aug 2017 15:12:38 +0100
+Subject: [PATCH 6/6] arm64: uaccess: Implement *_flushcache variants
+In-Reply-To: <CAK8P3a1emRA_e_K+M-jRiXZD02nD38Vgn+V7R8NbSq0Wg=56Uw@mail.gmail.com>
+References: <cover.1500397441.git.robin.murphy@arm.com>
+ <a82a48f72b8099c1ef6a32a63819619637797ef8.1500397441.git.robin.murphy@arm.com>
+ <CAK8P3a1emRA_e_K+M-jRiXZD02nD38Vgn+V7R8NbSq0Wg=56Uw@mail.gmail.com>
+Message-ID: <20170810141238.oin7hfzi2vtyhjh4@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are two mac controllers in the rk3328, the one connects
-to external PHY, and the other one connects to integrated PHY.
-Like the mac of external PHY, the integrated PHY's mac also
-needs to configure the related mac registers at GRF.
+On Thu, Aug 10, 2017 at 12:58:45PM +0200, Arnd Bergmann wrote:
+> On Tue, Jul 25, 2017 at 12:55 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> > Implement the set of copy functions with guarantees of a clean cache
+> > upon completion necessary to support the pmem driver.
+> >
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> > ---
+> >  arch/arm64/Kconfig                  |  1 +
+> >  arch/arm64/include/asm/string.h     |  4 ++++
+> >  arch/arm64/include/asm/uaccess.h    | 12 ++++++++++
+> >  arch/arm64/lib/Makefile             |  2 ++
+> >  arch/arm64/lib/uaccess_flushcache.c | 47 +++++++++++++++++++++++++++++++++++++
+> >  5 files changed, 66 insertions(+)
+> >  create mode 100644 arch/arm64/lib/uaccess_flushcache.c
+> 
+> It looks like Catalin applied part of this patch but forgot to add
+> arch/arm64/lib/uaccess_flushcache.c
 
-Signed-off-by: David Wu <david.wu@rock-chips.com>
----
- drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c | 26 +++++++++++++++++++++++---
- 1 file changed, 23 insertions(+), 3 deletions(-)
+Added it now, thanks.
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-index b6db3ff..2176403 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-@@ -323,6 +323,8 @@ static void rk3288_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
- 
- #define RK3328_GRF_MAC_CON0	0x0900
- #define RK3328_GRF_MAC_CON1	0x0904
-+#define RK3328_GRF_MAC_CON2	0x0908
-+#define RK3328_GRF_MACPHY_CON1	0xb04
- 
- /* RK3328_GRF_MAC_CON0 */
- #define RK3328_GMAC_CLK_RX_DL_CFG(val)	HIWORD_UPDATE(val, 0x7F, 7)
-@@ -349,6 +351,9 @@ static void rk3288_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
- #define RK3328_GMAC_RXCLK_DLY_ENABLE	GRF_BIT(1)
- #define RK3328_GMAC_RXCLK_DLY_DISABLE	GRF_CLR_BIT(0)
- 
-+/* RK3328_GRF_MACPHY_CON1 */
-+#define RK3328_MACPHY_RMII_MODE		GRF_BIT(9)
-+
- static void rk3328_set_to_rgmii(struct rk_priv_data *bsp_priv,
- 				int tx_delay, int rx_delay)
- {
-@@ -373,13 +378,17 @@ static void rk3328_set_to_rgmii(struct rk_priv_data *bsp_priv,
- static void rk3328_set_to_rmii(struct rk_priv_data *bsp_priv)
- {
- 	struct device *dev = &bsp_priv->pdev->dev;
-+	unsigned int reg;
- 
- 	if (IS_ERR(bsp_priv->grf)) {
- 		dev_err(dev, "Missing rockchip,grf property\n");
- 		return;
- 	}
- 
--	regmap_write(bsp_priv->grf, RK3328_GRF_MAC_CON1,
-+	reg = bsp_priv->integrated_phy ? RK3328_GRF_MAC_CON2 :
-+		  RK3328_GRF_MAC_CON1;
-+
-+	regmap_write(bsp_priv->grf, reg,
- 		     RK3328_GMAC_PHY_INTF_SEL_RMII |
- 		     RK3328_GMAC_RMII_MODE);
- }
-@@ -409,29 +418,40 @@ static void rk3328_set_rgmii_speed(struct rk_priv_data *bsp_priv, int speed)
- static void rk3328_set_rmii_speed(struct rk_priv_data *bsp_priv, int speed)
- {
- 	struct device *dev = &bsp_priv->pdev->dev;
-+	unsigned int reg;
- 
- 	if (IS_ERR(bsp_priv->grf)) {
- 		dev_err(dev, "Missing rockchip,grf property\n");
- 		return;
- 	}
- 
-+	reg = bsp_priv->integrated_phy ? RK3328_GRF_MAC_CON2 :
-+		  RK3328_GRF_MAC_CON1;
-+
- 	if (speed == 10)
--		regmap_write(bsp_priv->grf, RK3328_GRF_MAC_CON1,
-+		regmap_write(bsp_priv->grf, reg,
- 			     RK3328_GMAC_RMII_CLK_2_5M |
- 			     RK3328_GMAC_SPEED_10M);
- 	else if (speed == 100)
--		regmap_write(bsp_priv->grf, RK3328_GRF_MAC_CON1,
-+		regmap_write(bsp_priv->grf, reg,
- 			     RK3328_GMAC_RMII_CLK_25M |
- 			     RK3328_GMAC_SPEED_100M);
- 	else
- 		dev_err(dev, "unknown speed value for RMII! speed=%d", speed);
- }
- 
-+static void rk3328_integrated_phy_powerup(struct rk_priv_data *priv)
-+{
-+	regmap_write(priv->grf, RK3328_GRF_MACPHY_CON1,
-+		     RK3328_MACPHY_RMII_MODE);
-+}
-+
- static const struct rk_gmac_ops rk3328_ops = {
- 	.set_to_rgmii = rk3328_set_to_rgmii,
- 	.set_to_rmii = rk3328_set_to_rmii,
- 	.set_rgmii_speed = rk3328_set_rgmii_speed,
- 	.set_rmii_speed = rk3328_set_rmii_speed,
-+	.integrated_phy_powerup =  rk3328_integrated_phy_powerup,
- };
- 
- #define RK3366_GRF_SOC_CON6	0x0418
 -- 
-1.9.1
+Catalin
