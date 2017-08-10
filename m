@@ -1,50 +1,33 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Thu, 10 Aug 2017 10:58:13 +0530
-Subject: [PATCH 1/7] mtd: spi-nor: cadence-quadspi: add a delay in write
- sequence
-In-Reply-To: <20170810000831.mtj5w4sgwa56ja24@rob-hp-laptop>
-References: <20170801045434.8733-1-vigneshr@ti.com>
- <20170801045434.8733-2-vigneshr@ti.com>
- <20170810000831.mtj5w4sgwa56ja24@rob-hp-laptop>
-Message-ID: <f756daf8-7880-2c0e-f182-1748b65e5c79@ti.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 10 Aug 2017 07:51:45 +0200
+Subject: [PATCH v8 5/5] clk: samsung: exynos-audss: Add support for
+ runtime PM
+In-Reply-To: <1502274907-11931-6-git-send-email-m.szyprowski@samsung.com>
+References: <1502274907-11931-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170809103515eucas1p19fcbdd113e191cc02f9e5aaa469376d3@eucas1p1.samsung.com>
+ <1502274907-11931-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170810055145.GA3268@kozik-book>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Thursday 10 August 2017 05:38 AM, Rob Herring wrote:
-> On Tue, Aug 01, 2017 at 10:24:28AM +0530, Vignesh R wrote:
->> As per 66AK2G02 TRM[1] SPRUHY8F section 11.15.5.3 Indirect Access
->> Controller programming sequence, a delay equal to couple QSPI master
->> clock(~5ns) is required after setting CQSPI_REG_INDIRECTWR_START bit and
->> writing data to the flash. Add a new compatible to handle the couple of
->> cycles of delay required in the indirect write sequence, since this
->> delay is specific to TI 66AK2G SoC.
->>
->> [1]http://www.ti.com/lit/ug/spruhy8f/spruhy8f.pdf
->>
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->> ---
->>  Documentation/devicetree/bindings/mtd/cadence-quadspi.txt |  1 +
->>  drivers/mtd/spi-nor/cadence-quadspi.c                     | 13 +++++++++++++
->>  2 files changed, 14 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
->> index f248056da24c..fdd511a83511 100644
->> --- a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
->> +++ b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
->> @@ -2,6 +2,7 @@
->>  
->>  Required properties:
->>  - compatible : Should be "cdns,qspi-nor".
->> +	       Should be "ti,k2g-qspi" for TI 66AK2G platform.
+On Wed, Aug 09, 2017 at 12:35:07PM +0200, Marek Szyprowski wrote:
+> This patch adds support for runtime PM to Exynos Audio SubSystem driver to
+> enable full support for audio power domain on Exynos5 SoCs. The main change
+> is moving register saving and restoring code from system sleep PM ops to
+> runtime PM ops and implementing system sleep PM ops with generic
+> pm_runtime_force_suspend/resume helpers. Runtime PM of the Exynos AudSS
+> device is managed from clock core depending on the preparation status
+> of the provided clocks.
 > 
-> Also, this doesn't indicate that "cdns,qspi-nor" is a fallback as you 
-> have in the dts files. Reformat to 1 valid combination per line.
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>  .../devicetree/bindings/clock/clk-exynos-audss.txt |  6 +++
+>  drivers/clk/samsung/clk-exynos-audss.c             | 51 ++++++++++++++--------
+>  2 files changed, 40 insertions(+), 17 deletions(-)
 > 
 
-Agreed, will fix it in v2.
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
--- 
-Regards
-Vignesh
+Best regards,
+Krzysztof
