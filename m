@@ -1,37 +1,33 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Thu, 10 Aug 2017 09:51:44 -0700
-Subject: [PATCH 0/3] ARM: dts: keystone-k2g: Add DCAN instances to 66AK2G
-In-Reply-To: <8930852b-6995-3d41-440e-86f440b313ad@ti.com>
-References: <20170802201822.11532-1-fcooper@ti.com>
- <69995971-2fe7-87f4-a46a-8ef4f729ffc5@oracle.com>
- <8930852b-6995-3d41-440e-86f440b313ad@ti.com>
-Message-ID: <76400dbd-2970-a5bc-d994-3cc7933c8496@oracle.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 Aug 2017 09:57:14 -0700
+Subject: [PATCH 0/3] ARM: dts: am335x-evm: am437xx: dra7xx: Enable NAND
+ DMA prefetch by default
+In-Reply-To: <2fd38d80-16ce-8548-0f8a-38eaf820f87e@ti.com>
+References: <20170726021552.19880-1-fcooper@ti.com>
+ <2fd38d80-16ce-8548-0f8a-38eaf820f87e@ti.com>
+Message-ID: <20170810165713.GL8569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/7/17 2:31 PM, Franklin S Cooper Jr wrote:
+* Roger Quadros <rogerq@ti.com> [170808 03:04]:
+> On 26/07/17 05:15, Franklin S Cooper Jr wrote:
+> > Enable NAND DMA prefetch by default for AM335x, AM437x and DRA7x evms that
+> > include NAND.
+> > 
+> > The below commit went into additional details regarding performance numbers
+> > seen between the two modes.
+> > 
+> > commit aa7abd312c11 ("mtd: nand: omap2: Support parsing dma channel information from DT")
+> > 
+> > Franklin S Cooper Jr (3):
+> >   ARM: dts: am335x-evm: Enable NAND dma prefetch by default
+> >   ARM: dts: am437xx: Enable NAND dma prefetch by default
+> >   ARM: dts: dra7xx: Enable NAND dma prefetch by default
 > 
-> Hi Santosh,
-> On 08/04/2017 12:07 PM, Santosh Shilimkar wrote:
->> Hi Franklin,
->>
->> On 8/2/2017 1:18 PM, Franklin S Cooper Jr wrote:
->>> Add D CAN nodes to 66AK2G based SoC dtsi.
->>>
->>> Franklin S Cooper Jr (2):
->>>     dt-bindings: net: c_can: Update binding for clock and power-domains
->>>       property
->>>     ARM: configs: keystone: Enable D_CAN driver
->>>
->>> Lokesh Vutla (1):
->>>     ARM: dts: k2g: Add DCAN nodes
->>>
->> Any DCAN driver dependency with these patchset ? If not, I can
->> queue this up so do let me know.
+> For all patches,
 > 
-> There aren't any dependencies.
+> Acked-by: Roger Quadros <rogerq@ti.com>
 
-Applied. Thanks !!
+Applying all three into omap-for-v4.14/dt thanks.
 
-Regards,
-Santosh
+Tony
