@@ -1,37 +1,39 @@
-From: Chris.Paterson2@renesas.com (Chris Paterson)
-Date: Thu, 10 Aug 2017 13:49:05 +0000
-Subject: [PATCH 2/2] ARM: dts: r8a7743: Add IIC cores to dtsi
-In-Reply-To: <20170810112411.GA4380@katana>
-References: <1502196418-31341-1-git-send-email-biju.das@bp.renesas.com>
- <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
- <20170810080121.GE16647@verge.net.au> <20170810112411.GA4380@katana>
-Message-ID: <TY1PR06MB0702EA22AFE7D8145BF623A6B7880@TY1PR06MB0702.apcprd06.prod.outlook.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Thu, 10 Aug 2017 21:56:39 +0800
+Subject: [PATCH v5 00/11] Add the integrated PHY support
+Message-ID: <1502373410-2423-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The rk3228 and rk3328 support integrated PHY inside, let's enable
+it to work. And the integrated PHY need to do some special setting,
+so register the rockchip integrated PHY driver.
 
-> From: Wolfram Sang [mailto:wsa at the-dreams.de]
-> Sent: 10 August 2017 12:24
-> 
-> 
-> > > >+		i2c6: i2c at e60b0000 {
-> > >
-> > >    I'd use iic0 as the label.
-> >
-> > I have no preference here other than that we try to be consistent in
-> > DT for different R-Car SoCs. Wolfram, do you have an opinion on this?
-> 
-> Back then, for M2-W, I decided to go with the schematics/datasheets.
-> And those mentioned i2c6 rather than iic0. For that reason, the comment
+David Wu (11):
+  net: phy: Add rockchip PHY driver support
+  multi_v7_defconfig: Make rockchip PHY built-in
+  arm64: defconfig: Enable CONFIG_ROCKCHIP_PHY
+  net: stmmac: dwmac-rk: Remove unwanted code for rk3328_set_to_rmii()
+  Documentation: net: phy: Add phy-is-integrated binding
+  net: stmmac: dwmac-rk: Add integrated PHY support
+  net: stmmac: dwmac-rk: Add integrated PHY support for rk3228
+  net: stmmac: dwmac-rk: Add integrated PHY supprot for rk3328
+  ARM: dts: rk3228-evb: Enable the integrated PHY for gmac
+  ARM64: dts: rockchip: Add gmac2phy node support for rk3328
+  ARM64: dts: rockchip: Enable gmac2phy for rk3328-evb
 
-The M2 schematics still use i2c6, and for consistency I'd vote to use the same with RZ/G1M.
+ Documentation/devicetree/bindings/net/phy.txt  |   5 +
+ arch/arm/boot/dts/rk3228-evb.dts               |  34 ++++
+ arch/arm/configs/multi_v7_defconfig            |   1 +
+ arch/arm64/boot/dts/rockchip/rk3328-evb.dts    |  17 ++
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi       |  39 +++++
+ arch/arm64/configs/defconfig                   |   1 +
+ drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c | 140 +++++++++++++--
+ drivers/net/phy/Kconfig                        |   5 +
+ drivers/net/phy/Makefile                       |   1 +
+ drivers/net/phy/rockchip.c                     | 233 +++++++++++++++++++++++++
+ 10 files changed, 466 insertions(+), 10 deletions(-)
+ create mode 100644 drivers/net/phy/rockchip.c
 
-> 
-> "/* The memory map in the User's Manual maps the cores to bus numbers */"
-> 
-> exists in r8a7791.dtsi. Dunno the manual of this SoC here.
-
-The manual for r8a7743 uses the same terminology as the r8a7791 manuals.
-
-Kind regards, Chris
+-- 
+1.9.1
