@@ -1,33 +1,35 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 10 Aug 2017 17:57:48 +0100
-Subject: [PATCH v2 06/16] arm64: entry.S: convert elX_sync
-In-Reply-To: <20170809172527.yrkpthrrtqoxi4d7@armageddon.cambridge.arm.com>
-References: <20170728141019.9084-1-james.morse@arm.com>
- <20170728141019.9084-7-james.morse@arm.com>
- <20170809172527.yrkpthrrtqoxi4d7@armageddon.cambridge.arm.com>
-Message-ID: <598C908C.9030506@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 10 Aug 2017 10:03:41 -0700
+Subject: [PATCH v2] arm, am335x: add support for Moxa UC-8100-ME-T open
+ platform
+In-Reply-To: <20170810155246.pfaii3zb5jblluwy@rob-hp-laptop>
+References: <20170802065757.1074-1-sz.lin@moxa.com>
+ <20170810155246.pfaii3zb5jblluwy@rob-hp-laptop>
+Message-ID: <20170810170341.GM8569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+* Rob Herring <robh@kernel.org> [170810 08:53]:
+> On Wed, Aug 02, 2017 at 02:57:57PM +0800, SZ Lin wrote:
+> > Add support for Moxa UC-8100-ME-T open platform
+...
 
-On 09/08/17 18:25, Catalin Marinas wrote:
-> On Fri, Jul 28, 2017 at 03:10:09PM +0100, James Morse wrote:
->> @@ -520,9 +514,16 @@ el1_preempt:
->>  el0_sync:
->>  	kernel_entry 0
->>  	mrs	x25, esr_el1			// read the syndrome register
->> +	mrs	x26, far_el1
+> > +	vbat: fixedregulator at 0 {
 > 
-> Just checking, since we are going to access far_el1 even when we get a
-> syscall, have you noticed any overhead?
+> Unit address without reg property is not valid (build with W=2). Perhaps 
+> vbat-regulator instead.
+...
 
-Good point, I haven't checked because I've been doing all this with the software
-model.
+> > +	/* Power supply provides a fixed 3.3V @3A */
+> > +	vmmcsd_fixed: fixedregulator at 1 {
+> 
+> Ditto
+> 
+> With those fixed,
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-I will set this running on Seattle overnight, results in v3's cover letter.
+I've fixed it up here and will apply into omap-for-v4.14/dt
+thanks.
 
-
-Thanks!
-
-James
+Tony
