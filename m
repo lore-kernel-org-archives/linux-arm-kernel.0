@@ -1,60 +1,33 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 10 Aug 2017 18:09:04 +0100
-Subject: [PATCH v6 7/9] arm64: hugetlb: Override set_huge_swap_pte_at() to
- support contiguous hugepages
-In-Reply-To: <20170810170906.30772-1-punit.agrawal@arm.com>
-References: <20170810170906.30772-1-punit.agrawal@arm.com>
-Message-ID: <20170810170906.30772-8-punit.agrawal@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 10 Aug 2017 18:14:34 +0100
+Subject: [PATCH] arm64: fix pmem interface definition
+In-Reply-To: <20170810145253.2124019-1-arnd@arndb.de>
+References: <20170810145253.2124019-1-arnd@arndb.de>
+Message-ID: <20170810171433.obchokljs43rmgk4@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The default implementation of set_huge_swap_pte_at() does not support
-hugepages consisting of contiguous ptes. Override it to add support for
-contiguous hugepages.
+On Thu, Aug 10, 2017 at 04:52:31PM +0200, Arnd Bergmann wrote:
+> Defining the two functions as 'static inline' and exporting them
+> leads to the interesting case where we can use the interface
+> from loadable modules, but not from built-in drivers, as shown
+> in this link failure:
+> 
+> vers/nvdimm/claim.o: In function `nsio_rw_bytes':
+> claim.c:(.text+0x1b8): undefined reference to `arch_invalidate_pmem'
+> drivers/nvdimm/pmem.o: In function `pmem_dax_flush':
+> pmem.c:(.text+0x11c): undefined reference to `arch_wb_cache_pmem'
+> drivers/nvdimm/pmem.o: In function `pmem_make_request':
+> pmem.c:(.text+0x5a4): undefined reference to `arch_invalidate_pmem'
+> pmem.c:(.text+0x650): undefined reference to `arch_invalidate_pmem'
+> pmem.c:(.text+0x6d4): undefined reference to `arch_invalidate_pmem'
+> 
+> This removes the bogus 'static inline'.
+> 
+> Fixes: d50e071fdaa3 ("arm64: Implement pmem API support")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: David Woods <dwoods@mellanox.com>
----
- arch/arm64/include/asm/hugetlb.h |  3 +++
- arch/arm64/mm/hugetlbpage.c      | 12 ++++++++++++
- 2 files changed, 15 insertions(+)
+Applied. Thanks.
 
-diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
-index df8c0aea0917..1dca41bea16a 100644
---- a/arch/arm64/include/asm/hugetlb.h
-+++ b/arch/arm64/include/asm/hugetlb.h
-@@ -84,6 +84,9 @@ extern void huge_ptep_clear_flush(struct vm_area_struct *vma,
- extern void huge_pte_clear(struct mm_struct *mm, unsigned long addr,
- 			   pte_t *ptep, unsigned long sz);
- #define huge_pte_clear huge_pte_clear
-+extern void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
-+				 pte_t *ptep, pte_t pte, unsigned long sz);
-+#define set_huge_swap_pte_at set_huge_swap_pte_at
- 
- #include <asm-generic/hugetlb.h>
- 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index b69430a04e87..f6b2ef23285d 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -182,6 +182,18 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 	}
- }
- 
-+void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
-+			  pte_t *ptep, pte_t pte, unsigned long sz)
-+{
-+	int i, ncontig;
-+	size_t pgsize;
-+
-+	ncontig = num_contig_ptes(sz, &pgsize);
-+
-+	for (i = 0; i < ncontig; i++, ptep++)
-+		set_pte(ptep, pte);
-+}
-+
- pte_t *huge_pte_alloc(struct mm_struct *mm,
- 		      unsigned long addr, unsigned long sz)
- {
 -- 
-2.13.2
+Catalin
