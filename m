@@ -1,47 +1,228 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Thu, 10 Aug 2017 13:16:18 -0600
-Subject: [PATCH 1/2] vfio/type1: Cope with hardware MSI reserved regions
-In-Reply-To: <d244103e295a81d7f556f297adc79c2ac45345cc.1501163100.git.robin.murphy@arm.com>
-References: <d244103e295a81d7f556f297adc79c2ac45345cc.1501163100.git.robin.murphy@arm.com>
-Message-ID: <20170810131618.30500ce6@w520.home>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 10 Aug 2017 14:28:38 -0500
+Subject: [PATCH v2 02/18] dt-bindings: arm: add support for ARM System
+ Control and Management Interface(SCMI) protocol
+In-Reply-To: <1501857104-11279-3-git-send-email-sudeep.holla@arm.com>
+References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
+ <1501857104-11279-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20170810192838.prslgnjvxv3xvyes@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 27 Jul 2017 15:54:13 +0100
-Robin Murphy <robin.murphy@arm.com> wrote:
-
-> For ARM-based systems with a GICv3 ITS to provide interrupt isolation,
-> but hardware limitations which are worked around by having MSIs bypass
-> SMMU translation (e.g. HiSilicon Hip06/Hip07), VFIO neglects to check
-> for the IRQ_DOMAIN_FLAG_MSI_REMAP capability, (and thus erroneously
-> demands unsafe_interrupts) if a software-managed MSI region is absent.
+On Fri, Aug 04, 2017 at 03:31:28PM +0100, Sudeep Holla wrote:
+> This patch adds devicetree binding for System Control and Management
+> Interface (SCMI) Message Protocol used between the Application Cores(AP)
+> and the System Control Processor(SCP). The MHU peripheral provides a
+> mechanism for inter-processor communication between SCP's M3 processor
+> and AP.
 > 
-> Fix this by always checking for isolation capability at both the IRQ
-> domain and IOMMU domain levels, rather than predicating that on whether
-> MSIs require an IOMMU mapping (which was always slightly tenuous logic).
+> SCP offers control and management of the core/cluster power states,
+> various power domain DVFS including the core/cluster, certain system
+> clocks configuration, thermal sensors and many others.
 > 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> SCMI protocol is developed as better replacement to the existing SCPI
+> which is not flexible and easily extensible.
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 > ---
->  drivers/vfio/vfio_iommu_type1.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  Documentation/devicetree/bindings/arm/arm,scmi.txt | 174 +++++++++++++++++++++
+>  1 file changed, 174 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/arm,scmi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/arm,scmi.txt b/Documentation/devicetree/bindings/arm/arm,scmi.txt
+> new file mode 100644
+> index 000000000000..33c16be58e72
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/arm,scmi.txt
+> @@ -0,0 +1,174 @@
+> +System Control and Management Interface (SCMI) Message Protocol
+> +----------------------------------------------------------
+> +
+> +The SCMI is intended to allow agents such as OSPM to manage various functions
+> +that are provided by the hardware platform it is running on, including power
+> +and performance functions.
+> +
+> +This binding is intended to define the interface the firmware implementing
+> +the SCMI as described in ARM document number ARM DUI 0922B ("ARM System Control
+> +and Management Interface Platform Design Document")[0] provide for OSPM in
+> +the device tree.
+> +
+> +Required properties:
 
-I've pushed these to my next branch with Eric's R-b and Shameerali's
-T-b for v4.14.  Thanks,
+Please define this is a subnode of /firmware node.
 
-Alex
+> +
+> +- compatible : shall be "arm,scmi"
+> +- mboxes: List of phandle and mailbox channel specifiers. It should contain
+> +	  exactly one or two mailboxes, one for transmitting messages("tx")
+> +	  and another optional for receiving the notifications("rx") if
+> +	  supported.
+> +- mbox-names: shall be "tx" or "rx"
+> +- shmem : List of phandle pointing to the shared memory(SHM) area as per
+> +	  generic mailbox client binding.
+> +
+> +See Documentation/devicetree/bindings/mailbox/mailbox.txt for more details
+> +about the generic mailbox controller and client driver bindings.
+> +
+> +The mailbox is the only permitted method of calling the SCMI firmware.
+> +Mailbox doorbell is used as a mechanism to alert the presence of a
+> +messages and/or notification.
+> +
+> +Each protocol supported shall have a sub-node with corresponding compatible
+> +as described in the following sections. If the platform supports dedicated
+> +communication channel for a particular protocol, the 3 properties namely:
+> +mboxes, mbox-names and shmem shall be present in the sub-node corresponding
+> +to that protocol.
+> +
+> +Clock/Performance bindings for the clocks/OPPs based on SCMI Message Protocol
+> +------------------------------------------------------------
+> +
+> +This binding uses the common clock binding[1].
+> +
+> +Required properties:
+> +- #clock-cells : Should be 1. Contains the Clock ID value used by SCMI commands.
+> +
+> +Power domain bindings for the power domains based on SCMI Message Protocol
+> +------------------------------------------------------------
+> +
+> +This binding uses the generic power domain binding[4].
+> +
+> +PM domain providers
+> +===================
+> +
+> +Required properties:
+> + - #power-domain-cells : Should be 1. Contains the device or the power
+> +			 domain ID value used by SCMI commands.
+> +
+> +PM domain consumers
+> +===================
 
-> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-> index 8549cb111627..2328be628f21 100644
-> --- a/drivers/vfio/vfio_iommu_type1.c
-> +++ b/drivers/vfio/vfio_iommu_type1.c
-> @@ -1265,8 +1265,8 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
->  	INIT_LIST_HEAD(&domain->group_list);
->  	list_add(&group->next, &domain->group_list);
->  
-> -	msi_remap = resv_msi ? irq_domain_check_msi_remap() :
-> -				iommu_capable(bus, IOMMU_CAP_INTR_REMAP);
-> +	msi_remap = irq_domain_check_msi_remap() ||
-> +		    iommu_capable(bus, IOMMU_CAP_INTR_REMAP);
->  
->  	if (!allow_unsafe_interrupts && !msi_remap) {
->  		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
+How consumers work is already defined elsewhere.
+
+> +
+> +Required properties:
+> + - power-domains : A phandle and PM domain specifier as defined by bindings of
+> +                   the power controller specified by phandle.
+> +
+> +Sensor bindings for the sensors based on SCMI Message Protocol
+> +--------------------------------------------------------------
+> +SCMI provides an API to access the various sensors on the SoC.
+> +
+> +Required properties:
+> +- #thermal-sensor-cells: should be set to 1. This property follows the
+> +			 thermal device tree bindings[2].
+> +
+> +			 Valid cell values are raw identifiers (Sensor ID)
+> +			 as used by the firmware. Refer to  platform details
+> +			 for your implementation for the IDs to use.
+> +
+> +SRAM and Shared Memory for SCMI
+> +-------------------------------
+> +
+> +A small area of SRAM is reserved for SCMI communication between application
+> +processors and SCP.
+> +
+> +The properties should follow the generic mmio-sram description found in [3]
+> +
+> +Each sub-node represents the reserved area for SCMI.
+> +
+> +Required sub-node properties:
+> +- reg : The base offset and size of the reserved area with the SRAM
+> +- compatible : should be "arm,scmi-shmem" for Non-secure SRAM based
+> +	       shared memory
+> +
+> +[0] http://infocenter.arm.com/help/topic/com.arm.doc.den0056a/index.html
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +[2] Documentation/devicetree/bindings/thermal/thermal.txt
+> +[3] Documentation/devicetree/bindings/sram/sram.txt
+> +[4] Documentation/devicetree/bindings/power/power_domain.txt
+> +
+> +Example:
+> +
+> +sram: sram at 50000000 {
+> +	compatible = "mmio-sram";
+> +	reg = <0x0 0x50000000 0x0 0x10000>;
+> +
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	ranges = <0 0x0 0x50000000 0x10000>;
+> +
+> +	cpu_scp_lpri: scp-shmem at 0 {
+> +		compatible = "arm,scmi-shmem";
+> +		reg = <0x0 0x200>;
+> +	};
+> +
+> +	cpu_scp_hpri: scp-shmem at 200 {
+> +		compatible = "arm,scmi-shmem";
+> +		reg = <0x200 0x200>;
+> +	};
+> +};
+> +
+> +mailbox: mailbox0 at 40000000 {
+> +	....
+> +	#mbox-cells = <1>;
+> +};
+> +
+> +scmi_protocol: scmi at 2e000000 {
+
+The unit address is not valid.
+
+> +	compatible = "arm,scmi";
+> +	method = "mailbox-doorbell";
+
+Is this not implied by the mboxes property? 
+
+> +	mboxes = <&mailbox 0 &mailbox 1>;
+> +	shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +
+> +	scmi_devpd: protocol at 11 {
+> +		reg = <0x11>;
+> +		#power-domain-cells = <1>;
+> +	};
+> +
+> +	scmi_dvfs: protocol at 13 {
+> +		reg = <0x13>;
+> +		#clock-cells = <1>;
+> +	};
+> +
+> +	scmi_clk: protocol at 14 {
+> +		reg = <0x14>;
+> +		#clock-cells = <1>;
+> +	};
+> +
+> +	scmi_sensors0: protocol at 15 {
+> +		reg = <0x15>;
+> +		#thermal-sensor-cells = <1>;
+> +	};
+> +};
+> +
+> +cpu at 0 {
+> +	...
+> +	reg = <0 0>;
+> +	clocks = <&scmi_dvfs 0>;
+> +};
+> +
+> +hdlcd at 7ff60000 {
+> +	...
+> +	reg = <0 0x7ff60000 0 0x1000>;
+> +	clocks = <&scmi_clk 4>;
+> +	power-domains = <&scmi_devpd 1>;
+> +};
+> +
+> +thermal-zones {
+> +	soc_thermal {
+> +		polling-delay-passive = <100>;
+> +		polling-delay = <1000>;
+> +
+> +				/* sensor         ID */
+> +		thermal-sensors = <&scmi_sensors0 3>;
+> +		...
+> +	};
+> +};
+> -- 
+> 2.7.4
+> 
