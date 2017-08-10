@@ -1,23 +1,27 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Aug 2017 09:36:02 -0700
-Subject: [PATCH] ARM: dts: am437x-gp-evm: Add support for buzzer
-In-Reply-To: <c135a805-868a-87fc-ce78-b4e49139211d@ti.com>
-References: <1497935361-11019-1-git-send-email-faiz_abbas@ti.com>
- <c135a805-868a-87fc-ce78-b4e49139211d@ti.com>
-Message-ID: <20170810163602.GG8569@atomide.com>
+Date: Thu, 10 Aug 2017 09:38:17 -0700
+Subject: [PATCH v2] arm: dts: omap3: Remove needless interrupt-parent
+ property
+In-Reply-To: <1498546060-5742-1-git-send-email-karthik@techveda.org>
+References: <41ab5d17-620e-34b6-bd1c-33ae7bb3234c@techveda.org>
+ <1498546060-5742-1-git-send-email-karthik@techveda.org>
+Message-ID: <20170810163816.GH8569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Faiz Abbas <faiz_abbas@ti.com> [170802 02:32]:
+* karthik at techveda.org <karthik@techveda.org> [170626 23:48]:
+> From: Karthik Tummala <karthik@techveda.org>
 > 
+> All nodes inhert "interrupt-parent" property from root
+> node. Removed the aforementioned property from usbhsohci,
+> usbhsehci, ssi_port1, ssi_port2 nodes to avoid duplication.
 > 
-> On Tuesday 20 June 2017 10:39 AM, Faiz Abbas wrote:
-> > Add support for onboard gpio buzzer. It works using
-> > the gpio-beeper driver. Pinmux entries for GPIO
-> > controlling the buzzer are also added.
-> 
-> Gentle ping
+> Signed-off-by: Karthik Tummala <karthik@techveda.org>
+> ---
+> Changes for v2:
+> - Made changes to subject & description as suggested by
+>   Suniel Mahesh.
 
-Applying finally into omap-for-v4.14/dt thanks.
+Applying into omap-for-v4.14/dt thanks.
 
 Tony
