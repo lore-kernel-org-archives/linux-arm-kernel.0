@@ -1,25 +1,39 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 10 Aug 2017 15:24:08 +0800
-Subject: [linux-sunxi] [PATCH v2 3/3] arm64: allwinner: a64: add proper
- support for the Wi-Fi on BPi M64
-In-Reply-To: <20170725124504.40242-3-icenowy@aosc.io>
-References: <20170725124504.40242-1-icenowy@aosc.io>
- <20170725124504.40242-3-icenowy@aosc.io>
-Message-ID: <CAGb2v64ME+t8nwhkMFExH=40Q-xKxOPssGXkKx6JSQXkBj5Khw@mail.gmail.com>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Thu, 10 Aug 2017 16:27:02 +0900
+Subject: [PATCH 2/3] reset: uniphier: add video input subsystem reset control
+In-Reply-To: <20170810072703.32433-1-suzuki.katsuhiro@socionext.com>
+References: <20170810072703.32433-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <20170810072703.32433-2-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 8:45 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> BPi M64 has an AP6212 Wi-Fi/Bluetooth combo module, and the Wi-Fi SDIO
-> card is connected to the mmc1 controller.
->
-> The pwrseq of the mmc1 (used to reset the card) used to missing, and the
-> out-of-band interrupt line of the card is not specified.
->
-> Fix these issues for proper Wi-Fi support of BPi M64.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Add a reset line for video input subsystem (EXIV) on
+UniPhier LD11/LD20 SoCs.
 
-Applied for 4.14.
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+---
+ drivers/reset/reset-uniphier.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Thanks.
+diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
+index 90c52a96f775..f60c137c17cb 100644
+--- a/drivers/reset/reset-uniphier.c
++++ b/drivers/reset/reset-uniphier.c
+@@ -95,6 +95,7 @@ static const struct uniphier_reset_data uniphier_ld11_sys_reset_data[] = {
+ 	UNIPHIER_RESETX(8, 0x200c, 8),		/* STDMAC (HSC, MIO) */
+ 	UNIPHIER_RESETX(40, 0x2008, 0),		/* AIO */
+ 	UNIPHIER_RESETX(41, 0x2008, 1),		/* EVEA */
++	UNIPHIER_RESETX(42, 0x2010, 2),		/* EXIV */
+ 	UNIPHIER_RESET_END,
+ };
+ 
+@@ -109,6 +110,7 @@ static const struct uniphier_reset_data uniphier_ld20_sys_reset_data[] = {
+ 	UNIPHIER_RESETX(19, 0x200c, 15),	/* USB30-PHY3 */
+ 	UNIPHIER_RESETX(40, 0x2008, 0),		/* AIO */
+ 	UNIPHIER_RESETX(41, 0x2008, 1),		/* EVEA */
++	UNIPHIER_RESETX(42, 0x2010, 2),		/* EXIV */
+ 	UNIPHIER_RESET_END,
+ };
+ 
+-- 
+2.13.2
