@@ -1,72 +1,25 @@
-From: jun.gao@mediatek.com (Jun Gao)
-Date: Thu, 10 Aug 2017 15:22:40 +0800
-Subject: [RESEND PATCH 2/2] i2c: mediatek: Add i2c compatible for
- MediaTek MT7622
-In-Reply-To: <1502332061-25085-3-git-send-email-jun.gao@mediatek.com>
-References: <1502332061-25085-1-git-send-email-jun.gao@mediatek.com>
- <1502332061-25085-3-git-send-email-jun.gao@mediatek.com>
-Message-ID: <1502349760.930.66.camel@mhfsdcap03>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 10 Aug 2017 15:24:08 +0800
+Subject: [linux-sunxi] [PATCH v2 3/3] arm64: allwinner: a64: add proper
+ support for the Wi-Fi on BPi M64
+In-Reply-To: <20170725124504.40242-3-icenowy@aosc.io>
+References: <20170725124504.40242-1-icenowy@aosc.io>
+ <20170725124504.40242-3-icenowy@aosc.io>
+Message-ID: <CAGb2v64ME+t8nwhkMFExH=40Q-xKxOPssGXkKx6JSQXkBj5Khw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-08-10 at 10:27 +0800, Jun Gao wrote:
-> From: Jun Gao <jun.gao@mediatek.com>
-> 
-> Add i2c compatible for MT7622. Compare to MT8173 i2c controller,
-> MT7622 limits message numbers to 255, and does not support 4GB
-> DMA mode.
-> 
+On Tue, Jul 25, 2017 at 8:45 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> BPi M64 has an AP6212 Wi-Fi/Bluetooth combo module, and the Wi-Fi SDIO
+> card is connected to the mmc1 controller.
+>
+> The pwrseq of the mmc1 (used to reset the card) used to missing, and the
+> out-of-band interrupt line of the card is not specified.
+>
+> Fix these issues for proper Wi-Fi support of BPi M64.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-These two resend patches only modify commit message.
-Thanks!
+Applied for 4.14.
 
-Jun
-
-> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
-> ---
->  drivers/i2c/busses/i2c-mt65xx.c | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-> index 9bedf0b..2c7f847 100644
-> --- a/drivers/i2c/busses/i2c-mt65xx.c
-> +++ b/drivers/i2c/busses/i2c-mt65xx.c
-> @@ -172,6 +172,14 @@ struct mtk_i2c {
->  	.max_comb_2nd_msg_len = 31,
->  };
->  
-> +static const struct i2c_adapter_quirks mt7622_i2c_quirks = {
-> +	.max_num_msgs = 255,
-> +	.max_write_len = 65535,
-> +	.max_read_len = 65535,
-> +	.max_comb_1st_msg_len = 65535,
-> +	.max_comb_2nd_msg_len = 65535,
-> +};
-> +
->  static const struct mtk_i2c_compatible mt6577_compat = {
->  	.quirks = &mt6577_i2c_quirks,
->  	.pmic_i2c = 0,
-> @@ -190,6 +198,15 @@ struct mtk_i2c {
->  	.support_33bits = 0,
->  };
->  
-> +static const struct mtk_i2c_compatible mt7622_compat = {
-> +	.quirks = &mt7622_i2c_quirks,
-> +	.pmic_i2c = 0,
-> +	.dcm = 1,
-> +	.auto_restart = 1,
-> +	.aux_len_reg = 1,
-> +	.support_33bits = 0,
-> +};
-> +
->  static const struct mtk_i2c_compatible mt8173_compat = {
->  	.pmic_i2c = 0,
->  	.dcm = 1,
-> @@ -201,6 +218,7 @@ struct mtk_i2c {
->  static const struct of_device_id mtk_i2c_of_match[] = {
->  	{ .compatible = "mediatek,mt6577-i2c", .data = &mt6577_compat },
->  	{ .compatible = "mediatek,mt6589-i2c", .data = &mt6589_compat },
-> +	{ .compatible = "mediatek,mt7622-i2c", .data = &mt7622_compat },
->  	{ .compatible = "mediatek,mt8173-i2c", .data = &mt8173_compat },
->  	{}
->  };
+Thanks.
