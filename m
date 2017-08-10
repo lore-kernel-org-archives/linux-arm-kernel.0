@@ -1,73 +1,59 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Thu, 10 Aug 2017 08:21:29 +0530
-Subject: [PATCH v4 0/4] Add support for ThunderX2 pmu events using json
- files
-In-Reply-To: <703853c0-eab2-df0a-43d4-5d3f26bd61dd@hisilicon.com>
-References: <20170720055608.5333-1-ganapatrao.kulkarni@cavium.com>
- <703853c0-eab2-df0a-43d4-5d3f26bd61dd@hisilicon.com>
-Message-ID: <CAKTKpr7HCR1D3rcMCNzvZbjBWF_bBRar63UEOETi1u4bUzvfxw@mail.gmail.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 10 Aug 2017 10:52:45 +0800
+Subject: [PATCH v2] arm64: arch_timer: avoid infinite recursion when ftrace is
+ enabled
+Message-ID: <a53349bd-aa6c-cdc1-1476-a068a5cfc2c2@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-can this be merged/queued to next, if no further comments please?
+On platforms with an arch timer erratum workaround, it's possible for
+arch_timer_reg_read_stable() to recurse into itself when certain
+tracing options are enabled, leading to stack overflows and related
+problems.
 
-On Wed, Jul 26, 2017 at 8:19 AM, Zhangshaokun
-<zhangshaokun@hisilicon.com> wrote:
->
-> Hi Ganapat
->
-> I have tested patch-v4 on Hisilicon's hip08 board for implementation defined PMU events,
-> and it works, So
-> Tested-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
->
-> Thanks.
-> Shaokun
->
-> On 2017/7/20 13:56, Ganapatrao Kulkarni wrote:
->> Extending json/jevent framework for parsing arm64 event files.
->> Adding jevents for ThunderX2 implementation defined PMU events.
->>
->> v4:
->>    - Rebased to 4.13-rc1
->>
->> v3:
->>    - Addressed comments from Will Deacon and Jayachandran C.
->>    - Rebased to 4.12-rc1
->>
->> v2:
->>    - Updated as per Mark Rutland's suggestions.
->>    - Added provision for get_cpuid_str to get cpu id string
->>      from associated cpus of pmu core device.
->>
->> v1: Initial patchset.
->>
->> Ganapatrao Kulkarni (4):
->>   perf utils: passing pmu as a parameter to function get_cpuid_str
->>   perf tools arm64: Add support for get_cpuid_str function.
->>   perf utils: Add helper function is_pmu_core to detect PMU CORE devices
->>   perf vendor events arm64: Add ThunderX2 implementation defined pmu
->>     core events
->>
->>  tools/perf/arch/arm64/util/Build                   |  1 +
->>  tools/perf/arch/arm64/util/header.c                | 59 ++++++++++++++++++++
->>  tools/perf/arch/powerpc/util/header.c              |  2 +-
->>  tools/perf/arch/x86/util/header.c                  |  2 +-
->>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
->>  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
->>  tools/perf/util/header.h                           |  3 +-
->>  tools/perf/util/pmu.c                              | 53 +++++++++++++++---
->>  8 files changed, 186 insertions(+), 11 deletions(-)
->>  create mode 100644 tools/perf/arch/arm64/util/header.c
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
->>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+For example, when PREEMPT_TRACER and FUNCTION_GRAPH_TRACER are
+selected, it's possible to trigger this with:
 
+$ mount -t debugfs nodev /sys/kernel/debug/
+$ echo function_graph > /sys/kernel/debug/tracing/current_tracer
 
-thanks
-Ganapat
+The problem is that in such cases, preempt_disable() instrumentation
+attempts to acquire a timestamp via trace_clock(), resulting in a call
+back to arch_timer_reg_read_stable(), and hence recursion.
+
+This patch changes arch_timer_reg_read_stable() to use
+preempt_{disable,enable}_notrace(), which avoids this.
+
+This problem is similar to the fixed by upstream commit 96b3d28bf4
+("sched/clock: Prevent tracing recursion in sched_clock_cpu()").
+
+Fixes: 6acc71ccac71 ("arm64: arch_timer: Allows a CPU-specific erratum to only affect a subset of CPUs")
+Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/arch_timer.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index 74d08e4..67bb7a4 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -65,13 +65,13 @@ struct arch_timer_erratum_workaround {
+ 	u64 _val;							\
+ 	if (needs_unstable_timer_counter_workaround()) {		\
+ 		const struct arch_timer_erratum_workaround *wa;		\
+-		preempt_disable();					\
++		preempt_disable_notrace();				\
+ 		wa = __this_cpu_read(timer_unstable_counter_workaround); \
+ 		if (wa && wa->read_##reg)				\
+ 			_val = wa->read_##reg();			\
+ 		else							\
+ 			_val = read_sysreg(reg);			\
+-		preempt_enable();					\
++		preempt_enable_notrace();				\
+ 	} else {							\
+ 		_val = read_sysreg(reg);				\
+ 	}								\
+-- 
+1.9.0
