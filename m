@@ -1,18 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 10 Aug 2017 10:06:18 -0700
-Subject: [PATCH] ARM: dts: DRA7: Add pcie1 dt node for EP mode
-In-Reply-To: <20170808054024.18507-1-kishon@ti.com>
-References: <20170808054024.18507-1-kishon@ti.com>
-Message-ID: <20170810170617.GN8569@atomide.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 10 Aug 2017 12:06:40 -0500
+Subject: [PATCH v3 4/5] dt-bindings: phy-rockchip-inno-usb2: add otg-mux
+ interrupt
+In-Reply-To: <1501747753-6983-5-git-send-email-frank.wang@rock-chips.com>
+References: <1501747753-6983-1-git-send-email-frank.wang@rock-chips.com>
+ <1501747753-6983-5-git-send-email-frank.wang@rock-chips.com>
+Message-ID: <20170810170640.xdntfubu3lzoqsad@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [170807 22:41]:
-> Add pcie1 dt node in order for the controller to operate in
-> endpoint mode. However since none of the dra7 based boards have
-> slots configured to operate in endpoint mode, keep EP mode
-> disabled.
+On Thu, Aug 03, 2017 at 04:09:12PM +0800, Frank Wang wrote:
+> Add otg-mux property to support multiplexed interrupt in otg-port
+> on some Rockchip SoC (e.g RV1108).
+> 
+> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+> ---
+>  Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+> index ddf868a..ed6aee4 100644
+> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+> @@ -32,10 +32,14 @@ Required nodes : a sub-node is required for each port the phy provides.
+>  Required properties (port (child) node):
+>   - #phy-cells : must be 0. See ./phy-bindings.txt for details.
+>   - interrupts : specify an interrupt for each entry in interrupt-names.
+> - - interrupt-names : a list which shall be the following entries:
+> + - interrupt-names : a list which should be one of the following cases:
+> +	Regular case:
+>  	* "otg-id" : for the otg id interrupt.
+>  	* "otg-bvalid" : for the otg vbus interrupt.
+>  	* "linestate" : for the host/otg linestate interrupt.
+> +	Some SoCs use one interrupt with the obove muxed together, so for these
 
-Applying into omap-for-v4.14/dt thanks.
+s/obove/above/
 
-Tony
+With that,
+
+Acked-by: Rob Herring <robh@kernel.org>
