@@ -1,63 +1,28 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 10 Aug 2017 10:09:13 +0200
-Subject: [PATCH 00/10] ARM, arm64: dts: renesas: Use R-Car GPIO Gen[123]
- fallback compat strings
-In-Reply-To: <CANqRtoSnRnUWvf0uDv-gjyk6yD4JxxnrGMMvMkBYVQEk6ctDyA@mail.gmail.com>
-References: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoRcsAhvFB=DNoJHzJt4dejKX+Z8ar04D8O1cFq1XkxWkw@mail.gmail.com>
- <20170809075526.GE2705@verge.net.au>
- <20170809082210.GH2705@verge.net.au>
- <CANqRtoSnRnUWvf0uDv-gjyk6yD4JxxnrGMMvMkBYVQEk6ctDyA@mail.gmail.com>
-Message-ID: <20170810080912.GG16647@verge.net.au>
+Date: Thu, 10 Aug 2017 10:11:48 +0200
+Subject: [PATCH repost 0/2] ARM: shmobile: document iWave's
+ iW-RainboW-G22D-SODIMM RZ/G1E SODIMM development platform
+In-Reply-To: <cover.1502274234.git.fabrizio.castro@bp.renesas.com>
+References: <cover.1502274234.git.fabrizio.castro@bp.renesas.com>
+Message-ID: <20170810081148.GH16647@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 09, 2017 at 08:11:24PM +0900, Magnus Damm wrote:
-> Hi Simon,
+On Wed, Aug 09, 2017 at 12:27:38PM +0100, Fabrizio Castro wrote:
+> Hello,
 > 
-> On Wed, Aug 9, 2017 at 5:22 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Wed, Aug 09, 2017 at 09:55:26AM +0200, Simon Horman wrote:
-> >> On Tue, Aug 08, 2017 at 07:29:28PM +0900, Magnus Damm wrote:
-> >> > Hi Simon,
-> >> >
-> >> > On Tue, Aug 8, 2017 at 5:39 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> >> > > Use newly added R-Car GPIO Gen 1, 2 and 3 fallback compat strings in place
-> >> > > of now deprecated non-generation specific R-Car GPIO fallback compat string
-> >> > > in the DT of Renesas ARM and arm64 based SoCs.
-> >> > >
-> >> > > This should have no run-time effect as the driver matches against the
-> >> > > per-SoC compat string before considering the fallback compat string.
-> >> >
-> >> > Thanks for your efforts.I have no issue with your series (apart from
-> >> > the GPIO and SATA mistake), but at the same time I believe the GPIO
-> >> > hardware itself is backwards compatible between various generations.
-> >> >
-> >> > In the nitpick department I would like to point out that the level of
-> >> > hardware difference between say R-Car Gen1 GPIO and R-Car Gen2 GPIO is
-> >> > similar to say good old uarts like 8250 and 16450 hardware. Basically
-> >> > a couple of registers were added to the hardware in a
-> >> > backwards-compatible way if I recall correctly.
-> >> >
-> >> > So if we are going to use "compatible" to point out if hardware is
-> >> > compatible or not then I would do this instead:
-> >>
-> >> Thanks for your feedback.
-> >>
-> >> When the generation specific compat strings were recently
-> >> added the renesas,gpio-rcar compat string was marked as deprecated
-> >> as I was under the understanding that it was only compatibile with gen 1 SoCs.
-> >>
-> >> It now seems that was not the best thing to do and renesas,gpio-rcar should
-> >> be re-instated as being a generic fallback for all R-Car versions supported
-> >> in upstream.
-> >>
-> >> Do you concur?
-> >
-> > I posted a patch to un-deprecate the renesas,gpio-rcar compat string
-> > in the bindings documentation.
-> >
-> > [PATCH] gpio: rcar: reinstate generic compat string
+> This series aims to add the documentation for the device tree bindings
+> of the iWave iW-RainboW-G22D-SODIMM RZ/G1E SODIMM development kit:
+> http://www.iwavesystems.com/product/development-platform/sodimm-evaluation-boards/rz-g1e-sodimm-development-kit-28/rz-g1e-sodimm-development-kit.html
 > 
-> Thanks, this looks good to me. I would like to hear what Geert thinks as well!
+> which consists of a System on Module (iW-RainboW-G22M-SM) and a carrier
+> card (iW-RainboW-G22D).
 
-Thanks, good plan.
+Hi Fabrizio,
+
+Thanks for reposting with myself and linux-renesas-soc CCed.
+
+As is the common practice for DT binding updates I will wait to see if Rob
+or others wish to Ack this change before applying it.  Please ping me, f.e.
+by a reply-to-all to this email, in one week if there has been no further
+activity.
