@@ -1,1558 +1,965 @@
 From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
-Date: Thu, 10 Aug 2017 20:42:49 +0300
-Subject: [RFC PATCH 06/10] crypto: caam - add DPAA2-CAAM (DPSECI) backend API
+Date: Thu, 10 Aug 2017 20:42:52 +0300
+Subject: [RFC PATCH 09/10] crypto: caam/qi2 - add ablkcipher algorithms
 In-Reply-To: <20170810174253.20951-1-horia.geanta@nxp.com>
 References: <20170810174253.20951-1-horia.geanta@nxp.com>
-Message-ID: <20170810174253.20951-7-horia.geanta@nxp.com>
+Message-ID: <20170810174253.20951-10-horia.geanta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the low-level API that allows to manage DPSECI DPAA2 objects
-that sit on the Management Complex (MC) fsl-mc bus.
-
-The API is compatible with MC firmware 10.2.0+.
+Add support to submit the following ablkcipher algorithms
+via the DPSECI backend:
+cbc({aes,des,des3_ede})
+ctr(aes), rfc3686(ctr(aes))
+xts(aes)
 
 Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
 ---
- drivers/crypto/caam/dpseci.c     | 858 +++++++++++++++++++++++++++++++++++++++
- drivers/crypto/caam/dpseci.h     | 395 ++++++++++++++++++
- drivers/crypto/caam/dpseci_cmd.h | 261 ++++++++++++
- 3 files changed, 1514 insertions(+)
- create mode 100644 drivers/crypto/caam/dpseci.c
- create mode 100644 drivers/crypto/caam/dpseci.h
- create mode 100644 drivers/crypto/caam/dpseci_cmd.h
+ drivers/crypto/caam/Kconfig       |   1 +
+ drivers/crypto/caam/caamalg_qi2.c | 816 ++++++++++++++++++++++++++++++++++++++
+ drivers/crypto/caam/caamalg_qi2.h |  23 +-
+ 3 files changed, 839 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/crypto/caam/dpseci.c b/drivers/crypto/caam/dpseci.c
-new file mode 100644
-index 000000000000..dec05ecbeab1
---- /dev/null
-+++ b/drivers/crypto/caam/dpseci.c
-@@ -0,0 +1,858 @@
-+/*
-+ * Copyright 2013-2016 Freescale Semiconductor Inc.
-+ * Copyright 2017 NXP
-+ *
-+ * Redistribution and use in source and binary forms, with or without
-+ * modification, are permitted provided that the following conditions are met:
-+ *     * Redistributions of source code must retain the above copyright
-+ *	 notice, this list of conditions and the following disclaimer.
-+ *     * Redistributions in binary form must reproduce the above copyright
-+ *	 notice, this list of conditions and the following disclaimer in the
-+ *	 documentation and/or other materials provided with the distribution.
-+ *     * Neither the names of the above-listed copyright holders nor the
-+ *	 names of any contributors may be used to endorse or promote products
-+ *	 derived from this software without specific prior written permission.
-+ *
-+ *
-+ * ALTERNATIVELY, this software may be distributed under the terms of the
-+ * GNU General Public License ("GPL") as published by the Free Software
-+ * Foundation, either version 2 of that License or (at your option) any
-+ * later version.
-+ *
-+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
-+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-+ * POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+#include "../../../drivers/staging/fsl-mc/include/mc.h"
-+#include "../../../drivers/staging/fsl-mc/include/dpopr.h"
-+#include "dpseci.h"
-+#include "dpseci_cmd.h"
-+
-+/**
-+ * dpseci_open() - Open a control session for the specified object
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @dpseci_id:	DPSECI unique ID
-+ * @token:	Returned token; use in subsequent API calls
-+ *
-+ * This function can be used to open a control session for an already created
-+ * object; an object may have been declared in the DPL or by calling the
-+ * dpseci_create() function.
-+ * This function returns a unique authentication token, associated with the
-+ * specific object ID and the specific MC portal; this token must be used in all
-+ * subsequent commands for this specific object.
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_open(struct fsl_mc_io *mc_io, u32 cmd_flags, int dpseci_id,
-+		u16 *token)
+diff --git a/drivers/crypto/caam/Kconfig b/drivers/crypto/caam/Kconfig
+index e45d39d9007e..eb202e59c4fa 100644
+--- a/drivers/crypto/caam/Kconfig
++++ b/drivers/crypto/caam/Kconfig
+@@ -159,6 +159,7 @@ config CRYPTO_DEV_FSL_DPAA2_CAAM
+ 	tristate "QorIQ DPAA2 CAAM (DPSECI) driver"
+ 	depends on FSL_MC_DPIO
+ 	select CRYPTO_DEV_FSL_CAAM_COMMON
++	select CRYPTO_BLKCIPHER
+ 	select CRYPTO_AUTHENC
+ 	select CRYPTO_AEAD
+ 	---help---
+diff --git a/drivers/crypto/caam/caamalg_qi2.c b/drivers/crypto/caam/caamalg_qi2.c
+index 9dc5e1184e80..f32c518bc680 100644
+--- a/drivers/crypto/caam/caamalg_qi2.c
++++ b/drivers/crypto/caam/caamalg_qi2.c
+@@ -1047,6 +1047,457 @@ static int rfc4543_setkey(struct crypto_aead *aead,
+ 	return ret;
+ }
+ 
++static int ablkcipher_setkey(struct crypto_ablkcipher *ablkcipher,
++			     const u8 *key, unsigned int keylen)
 +{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_open *cmd_params;
-+	int err;
++	struct caam_ctx *ctx = crypto_ablkcipher_ctx(ablkcipher);
++	struct crypto_tfm *tfm = crypto_ablkcipher_tfm(ablkcipher);
++	const char *alg_name = crypto_tfm_alg_name(tfm);
++	struct device *dev = ctx->dev;
++	struct caam_flc *flc;
++	unsigned int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
++	u32 *desc;
++	u32 ctx1_iv_off = 0;
++	const bool ctr_mode = ((ctx->cdata.algtype & OP_ALG_AAI_MASK) ==
++			       OP_ALG_AAI_CTR_MOD128);
++	const bool is_rfc3686 = (ctr_mode && strstr(alg_name, "rfc3686"));
 +
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_OPEN,
-+					  cmd_flags,
-+					  0);
-+	cmd_params = (struct dpseci_cmd_open *)cmd.params;
-+	cmd_params->dpseci_id = cpu_to_le32(dpseci_id);
-+	err = mc_send_command(mc_io, &cmd);
-+	if (err)
-+		return err;
++	memcpy(ctx->key, key, keylen);
++#ifdef DEBUG
++	print_hex_dump(KERN_ERR, "key in @" __stringify(__LINE__)": ",
++		       DUMP_PREFIX_ADDRESS, 16, 4, key, keylen, 1);
++#endif
++	/*
++	 * AES-CTR needs to load IV in CONTEXT1 reg
++	 * at an offset of 128bits (16bytes)
++	 * CONTEXT1[255:128] = IV
++	 */
++	if (ctr_mode)
++		ctx1_iv_off = 16;
 +
-+	*token = mc_cmd_hdr_read_token(&cmd);
++	/*
++	 * RFC3686 specific:
++	 *	| CONTEXT1[255:128] = {NONCE, IV, COUNTER}
++	 *	| *key = {KEY, NONCE}
++	 */
++	if (is_rfc3686) {
++		ctx1_iv_off = 16 + CTR_RFC3686_NONCE_SIZE;
++		keylen -= CTR_RFC3686_NONCE_SIZE;
++	}
++
++	ctx->key_dma = dma_map_single(dev, ctx->key, keylen, DMA_TO_DEVICE);
++	if (dma_mapping_error(dev, ctx->key_dma)) {
++		dev_err(dev, "unable to map key i/o memory\n");
++		return -ENOMEM;
++	}
++	ctx->cdata.keylen = keylen;
++	ctx->cdata.key_virt = ctx->key;
++	ctx->cdata.key_inline = true;
++
++	/* ablkcipher_encrypt shared descriptor */
++	flc = &ctx->flc[ENCRYPT];
++	desc = flc->sh_desc;
++
++	cnstr_shdsc_ablkcipher_encap(desc, &ctx->cdata, ivsize,
++				     is_rfc3686, ctx1_iv_off);
++
++	flc->flc[1] = desc_len(desc); /* SDL */
++	flc->flc_dma = dma_map_single(dev, flc, sizeof(flc->flc) +
++				      desc_bytes(desc), DMA_TO_DEVICE);
++	if (dma_mapping_error(dev, flc->flc_dma)) {
++		dev_err(dev, "unable to map shared descriptor\n");
++		return -ENOMEM;
++	}
++
++	/* ablkcipher_decrypt shared descriptor */
++	flc = &ctx->flc[DECRYPT];
++	desc = flc->sh_desc;
++
++	cnstr_shdsc_ablkcipher_decap(desc, &ctx->cdata, ivsize,
++				     is_rfc3686, ctx1_iv_off);
++
++	flc->flc[1] = desc_len(desc); /* SDL */
++	flc->flc_dma = dma_map_single(dev, flc, sizeof(flc->flc) +
++				      desc_bytes(desc), DMA_TO_DEVICE);
++	if (dma_mapping_error(dev, flc->flc_dma)) {
++		dev_err(dev, "unable to map shared descriptor\n");
++		return -ENOMEM;
++	}
++
++	/* ablkcipher_givencrypt shared descriptor */
++	flc = &ctx->flc[GIVENCRYPT];
++	desc = flc->sh_desc;
++
++	cnstr_shdsc_ablkcipher_givencap(desc, &ctx->cdata,
++					ivsize, is_rfc3686, ctx1_iv_off);
++
++	flc->flc[1] = desc_len(desc); /* SDL */
++	flc->flc_dma = dma_map_single(dev, flc, sizeof(flc->flc) +
++				      desc_bytes(desc), DMA_TO_DEVICE);
++	if (dma_mapping_error(dev, flc->flc_dma)) {
++		dev_err(dev, "unable to map shared descriptor\n");
++		return -ENOMEM;
++	}
 +
 +	return 0;
 +}
 +
-+/**
-+ * dpseci_close() - Close the control session of the object
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ *
-+ * After this function is called, no further operations are allowed on the
-+ * object without opening a new control session.
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_close(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
++static int xts_ablkcipher_setkey(struct crypto_ablkcipher *ablkcipher,
++				 const u8 *key, unsigned int keylen)
 +{
-+	struct mc_command cmd = { 0 };
++	struct caam_ctx *ctx = crypto_ablkcipher_ctx(ablkcipher);
++	struct device *dev = ctx->dev;
++	struct caam_flc *flc;
++	u32 *desc;
 +
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_CLOSE,
-+					  cmd_flags,
-+					  token);
-+	return mc_send_command(mc_io, &cmd);
-+}
++	if (keylen != 2 * AES_MIN_KEY_SIZE  && keylen != 2 * AES_MAX_KEY_SIZE) {
++		dev_err(dev, "key size mismatch\n");
++		crypto_ablkcipher_set_flags(ablkcipher,
++					    CRYPTO_TFM_RES_BAD_KEY_LEN);
++		return -EINVAL;
++	}
 +
-+/**
-+ * dpseci_create() - Create the DPSECI object
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @dprc_token:	Parent container token; '0' for default container
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @cfg:	Configuration structure
-+ * @obj_id:	returned object id
-+ *
-+ * Create the DPSECI object, allocate required resources and perform required
-+ * initialization.
-+ *
-+ * The object can be created either by declaring it in the DPL file, or by
-+ * calling this function.
-+ *
-+ * The function accepts an authentication token of a parent container that this
-+ * object should be assigned to. The token can be '0' so the object will be
-+ * assigned to the default container.
-+ * The newly created object can be opened with the returned object id and using
-+ * the container's associated tokens and MC portals.
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_create(struct fsl_mc_io *mc_io, u16 dprc_token, u32 cmd_flags,
-+		  const struct dpseci_cfg *cfg, u32 *obj_id)
-+{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_create *cmd_params;
-+	int i, err;
++	memcpy(ctx->key, key, keylen);
++	ctx->key_dma = dma_map_single(dev, ctx->key, keylen, DMA_TO_DEVICE);
++	if (dma_mapping_error(dev, ctx->key_dma)) {
++		dev_err(dev, "unable to map key i/o memory\n");
++		return -ENOMEM;
++	}
++	ctx->cdata.keylen = keylen;
++	ctx->cdata.key_virt = ctx->key;
++	ctx->cdata.key_inline = true;
 +
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_CREATE,
-+					  cmd_flags,
-+					  dprc_token);
-+	cmd_params = (struct dpseci_cmd_create *)cmd.params;
-+	for (i = 0; i < 8; i++)
-+		cmd_params->priorities[i] = cfg->priorities[i];
-+	cmd_params->num_tx_queues = cfg->num_tx_queues;
-+	cmd_params->num_rx_queues = cfg->num_rx_queues;
-+	cmd_params->options = cpu_to_le32(cfg->options);
-+	err = mc_send_command(mc_io, &cmd);
-+	if (err)
-+		return err;
++	/* xts_ablkcipher_encrypt shared descriptor */
++	flc = &ctx->flc[ENCRYPT];
++	desc = flc->sh_desc;
++	cnstr_shdsc_xts_ablkcipher_encap(desc, &ctx->cdata);
 +
-+	*obj_id = mc_cmd_read_object_id(&cmd);
++	flc->flc[1] = desc_len(desc); /* SDL */
++	flc->flc_dma = dma_map_single(dev, flc, sizeof(flc->flc) +
++				      desc_bytes(desc), DMA_TO_DEVICE);
++	if (dma_mapping_error(dev, flc->flc_dma)) {
++		dev_err(dev, "unable to map shared descriptor\n");
++		return -ENOMEM;
++	}
++
++	/* xts_ablkcipher_decrypt shared descriptor */
++	flc = &ctx->flc[DECRYPT];
++	desc = flc->sh_desc;
++
++	cnstr_shdsc_xts_ablkcipher_decap(desc, &ctx->cdata);
++
++	flc->flc[1] = desc_len(desc); /* SDL */
++	flc->flc_dma = dma_map_single(dev, flc, sizeof(flc->flc) +
++				      desc_bytes(desc), DMA_TO_DEVICE);
++	if (dma_mapping_error(dev, flc->flc_dma)) {
++		dev_err(dev, "unable to map shared descriptor\n");
++		return -ENOMEM;
++	}
 +
 +	return 0;
 +}
 +
-+/**
-+ * dpseci_destroy() - Destroy the DPSECI object and release all its resources
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @dprc_token: Parent container token; '0' for default container
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @object_id:	The object id; it must be a valid id within the container that
-+ *		created this object
-+ *
-+ * The function accepts the authentication token of the parent container that
-+ * created the object (not the one that currently owns the object). The object
-+ * is searched within parent using the provided 'object_id'.
-+ * All tokens to the object must be closed before calling destroy.
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_destroy(struct fsl_mc_io *mc_io, u16 dprc_token, u32 cmd_flags,
-+		   u32 object_id)
++static struct ablkcipher_edesc *ablkcipher_edesc_alloc(struct ablkcipher_request
++						       *req, bool encrypt)
 +{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_destroy *cmd_params;
++	struct crypto_ablkcipher *ablkcipher = crypto_ablkcipher_reqtfm(req);
++	struct caam_request *req_ctx = ablkcipher_request_ctx(req);
++	struct dpaa2_fl_entry *in_fle = &req_ctx->fd_flt[1];
++	struct dpaa2_fl_entry *out_fle = &req_ctx->fd_flt[0];
++	struct caam_ctx *ctx = crypto_ablkcipher_ctx(ablkcipher);
++	struct device *dev = ctx->dev;
++	gfp_t flags = (req->base.flags & (CRYPTO_TFM_REQ_MAY_BACKLOG |
++					  CRYPTO_TFM_REQ_MAY_SLEEP)) ?
++		       GFP_KERNEL : GFP_ATOMIC;
++	int src_nents, mapped_src_nents, dst_nents = 0, mapped_dst_nents = 0;
++	struct ablkcipher_edesc *edesc;
++	dma_addr_t iv_dma;
++	bool in_contig;
++	int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
++	int dst_sg_idx, qm_sg_ents;
++	struct dpaa2_sg_entry *sg_table;
++	enum optype op_type = encrypt ? ENCRYPT : DECRYPT;
 +
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_DESTROY,
-+					  cmd_flags,
-+					  dprc_token);
-+	cmd_params = (struct dpseci_cmd_destroy *)cmd.params;
-+	cmd_params->object_id = cpu_to_le32(object_id);
++	src_nents = sg_nents_for_len(req->src, req->nbytes);
++	if (unlikely(src_nents < 0)) {
++		dev_err(dev, "Insufficient bytes (%d) in src S/G\n",
++			req->nbytes);
++		return ERR_PTR(src_nents);
++	}
 +
-+	return mc_send_command(mc_io, &cmd);
++	if (unlikely(req->dst != req->src)) {
++		dst_nents = sg_nents_for_len(req->dst, req->nbytes);
++		if (unlikely(dst_nents < 0)) {
++			dev_err(dev, "Insufficient bytes (%d) in dst S/G\n",
++				req->nbytes);
++			return ERR_PTR(dst_nents);
++		}
++
++		mapped_src_nents = dma_map_sg(dev, req->src, src_nents,
++					      DMA_TO_DEVICE);
++		if (unlikely(!mapped_src_nents)) {
++			dev_err(dev, "unable to map source\n");
++			return ERR_PTR(-ENOMEM);
++		}
++
++		mapped_dst_nents = dma_map_sg(dev, req->dst, dst_nents,
++					      DMA_FROM_DEVICE);
++		if (unlikely(!mapped_dst_nents)) {
++			dev_err(dev, "unable to map destination\n");
++			dma_unmap_sg(dev, req->src, src_nents, DMA_TO_DEVICE);
++			return ERR_PTR(-ENOMEM);
++		}
++	} else {
++		mapped_src_nents = dma_map_sg(dev, req->src, src_nents,
++					      DMA_BIDIRECTIONAL);
++		if (unlikely(!mapped_src_nents)) {
++			dev_err(dev, "unable to map source\n");
++			return ERR_PTR(-ENOMEM);
++		}
++	}
++
++	iv_dma = dma_map_single(dev, req->info, ivsize, DMA_TO_DEVICE);
++	if (dma_mapping_error(dev, iv_dma)) {
++		dev_err(dev, "unable to map IV\n");
++		caam_unmap(dev, req->src, req->dst, src_nents, dst_nents, 0,
++			   0, 0, 0, 0);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	if (mapped_src_nents == 1 &&
++	    iv_dma + ivsize == sg_dma_address(req->src)) {
++		in_contig = true;
++		qm_sg_ents = 0;
++	} else {
++		in_contig = false;
++		qm_sg_ents = 1 + mapped_src_nents;
++	}
++	dst_sg_idx = qm_sg_ents;
++
++	qm_sg_ents += mapped_dst_nents > 1 ? mapped_dst_nents : 0;
++	if (unlikely(qm_sg_ents > CAAM_QI_MAX_ABLKCIPHER_SG)) {
++		dev_err(dev, "Insufficient S/G entries: %d > %lu\n",
++			qm_sg_ents, CAAM_QI_MAX_ABLKCIPHER_SG);
++		caam_unmap(dev, req->src, req->dst, src_nents, dst_nents,
++			   iv_dma, ivsize, op_type, 0, 0);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	/* allocate space for base edesc and link tables */
++	edesc = qi_cache_alloc(GFP_DMA | flags);
++	if (unlikely(!edesc)) {
++		dev_err(dev, "could not allocate extended descriptor\n");
++		caam_unmap(dev, req->src, req->dst, src_nents, dst_nents,
++			   iv_dma, ivsize, op_type, 0, 0);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	edesc->src_nents = src_nents;
++	edesc->dst_nents = dst_nents;
++	edesc->iv_dma = iv_dma;
++	sg_table = &edesc->sgt[0];
++	edesc->qm_sg_bytes = qm_sg_ents * sizeof(*sg_table);
++
++	if (!in_contig) {
++		dma_to_qm_sg_one(sg_table, iv_dma, ivsize, 0);
++		sg_to_qm_sg_last(req->src, mapped_src_nents, sg_table + 1, 0);
++	}
++
++	if (mapped_dst_nents > 1)
++		sg_to_qm_sg_last(req->dst, mapped_dst_nents, sg_table +
++				 dst_sg_idx, 0);
++
++	edesc->qm_sg_dma = dma_map_single(dev, sg_table, edesc->qm_sg_bytes,
++					  DMA_TO_DEVICE);
++	if (dma_mapping_error(dev, edesc->qm_sg_dma)) {
++		dev_err(dev, "unable to map S/G table\n");
++		caam_unmap(dev, req->src, req->dst, src_nents, dst_nents,
++			   iv_dma, ivsize, op_type, 0, 0);
++		qi_cache_free(edesc);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	memset(&req_ctx->fd_flt, 0, sizeof(req_ctx->fd_flt));
++	dpaa2_fl_set_final(in_fle, true);
++	dpaa2_fl_set_len(in_fle, req->nbytes + ivsize);
++	dpaa2_fl_set_len(out_fle, req->nbytes);
++
++	if (!in_contig) {
++		dpaa2_fl_set_format(in_fle, dpaa2_fl_sg);
++		dpaa2_fl_set_addr(in_fle, edesc->qm_sg_dma);
++	} else {
++		dpaa2_fl_set_format(in_fle, dpaa2_fl_single);
++		dpaa2_fl_set_addr(in_fle, iv_dma);
++	}
++
++	if (req->src == req->dst) {
++		if (!in_contig) {
++			dpaa2_fl_set_format(out_fle, dpaa2_fl_sg);
++			dpaa2_fl_set_addr(out_fle, edesc->qm_sg_dma +
++					  sizeof(*sg_table));
++		} else {
++			dpaa2_fl_set_format(out_fle, dpaa2_fl_single);
++			dpaa2_fl_set_addr(out_fle, sg_dma_address(req->src));
++		}
++	} else if (mapped_dst_nents > 1) {
++		dpaa2_fl_set_format(out_fle, dpaa2_fl_sg);
++		dpaa2_fl_set_addr(out_fle, edesc->qm_sg_dma + dst_sg_idx *
++				  sizeof(*sg_table));
++	} else {
++		dpaa2_fl_set_format(out_fle, dpaa2_fl_single);
++		dpaa2_fl_set_addr(out_fle, sg_dma_address(req->dst));
++	}
++
++	return edesc;
 +}
 +
-+/**
-+ * dpseci_enable() - Enable the DPSECI, allow sending and receiving frames
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
++static struct ablkcipher_edesc *ablkcipher_giv_edesc_alloc(
++	struct skcipher_givcrypt_request *greq)
 +{
-+	struct mc_command cmd = { 0 };
++	struct ablkcipher_request *req = &greq->creq;
++	struct crypto_ablkcipher *ablkcipher = crypto_ablkcipher_reqtfm(req);
++	struct caam_request *req_ctx = ablkcipher_request_ctx(req);
++	struct dpaa2_fl_entry *in_fle = &req_ctx->fd_flt[1];
++	struct dpaa2_fl_entry *out_fle = &req_ctx->fd_flt[0];
++	struct caam_ctx *ctx = crypto_ablkcipher_ctx(ablkcipher);
++	struct device *dev = ctx->dev;
++	gfp_t flags = (req->base.flags & (CRYPTO_TFM_REQ_MAY_BACKLOG |
++					  CRYPTO_TFM_REQ_MAY_SLEEP)) ?
++		       GFP_KERNEL : GFP_ATOMIC;
++	int src_nents, mapped_src_nents, dst_nents, mapped_dst_nents;
++	struct ablkcipher_edesc *edesc;
++	dma_addr_t iv_dma;
++	bool out_contig;
++	int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
++	struct dpaa2_sg_entry *sg_table;
++	int dst_sg_idx, qm_sg_ents;
 +
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_ENABLE,
-+					  cmd_flags,
-+					  token);
-+	return mc_send_command(mc_io, &cmd);
++	src_nents = sg_nents_for_len(req->src, req->nbytes);
++	if (unlikely(src_nents < 0)) {
++		dev_err(dev, "Insufficient bytes (%d) in src S/G\n",
++			req->nbytes);
++		return ERR_PTR(src_nents);
++	}
++
++	if (unlikely(req->dst != req->src)) {
++		dst_nents = sg_nents_for_len(req->dst, req->nbytes);
++		if (unlikely(dst_nents < 0)) {
++			dev_err(dev, "Insufficient bytes (%d) in dst S/G\n",
++				req->nbytes);
++			return ERR_PTR(dst_nents);
++		}
++
++		mapped_src_nents = dma_map_sg(dev, req->src, src_nents,
++					      DMA_TO_DEVICE);
++		if (unlikely(!mapped_src_nents)) {
++			dev_err(dev, "unable to map source\n");
++			return ERR_PTR(-ENOMEM);
++		}
++
++		mapped_dst_nents = dma_map_sg(dev, req->dst, dst_nents,
++					      DMA_FROM_DEVICE);
++		if (unlikely(!mapped_dst_nents)) {
++			dev_err(dev, "unable to map destination\n");
++			dma_unmap_sg(dev, req->src, src_nents, DMA_TO_DEVICE);
++			return ERR_PTR(-ENOMEM);
++		}
++	} else {
++		mapped_src_nents = dma_map_sg(dev, req->src, src_nents,
++					      DMA_BIDIRECTIONAL);
++		if (unlikely(!mapped_src_nents)) {
++			dev_err(dev, "unable to map source\n");
++			return ERR_PTR(-ENOMEM);
++		}
++
++		dst_nents = src_nents;
++		mapped_dst_nents = src_nents;
++	}
++
++	iv_dma = dma_map_single(dev, greq->giv, ivsize, DMA_FROM_DEVICE);
++	if (dma_mapping_error(dev, iv_dma)) {
++		dev_err(dev, "unable to map IV\n");
++		caam_unmap(dev, req->src, req->dst, src_nents, dst_nents, 0,
++			   0, 0, 0, 0);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	qm_sg_ents = mapped_src_nents > 1 ? mapped_src_nents : 0;
++	dst_sg_idx = qm_sg_ents;
++	if (mapped_dst_nents == 1 &&
++	    iv_dma + ivsize == sg_dma_address(req->dst)) {
++		out_contig = true;
++	} else {
++		out_contig = false;
++		qm_sg_ents += 1 + mapped_dst_nents;
++	}
++
++	if (unlikely(qm_sg_ents > CAAM_QI_MAX_ABLKCIPHER_SG)) {
++		dev_err(dev, "Insufficient S/G entries: %d > %lu\n",
++			qm_sg_ents, CAAM_QI_MAX_ABLKCIPHER_SG);
++		caam_unmap(dev, req->src, req->dst, src_nents, dst_nents,
++			   iv_dma, ivsize, GIVENCRYPT, 0, 0);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	/* allocate space for base edesc and link tables */
++	edesc = qi_cache_alloc(GFP_DMA | flags);
++	if (!edesc) {
++		dev_err(dev, "could not allocate extended descriptor\n");
++		caam_unmap(dev, req->src, req->dst, src_nents, dst_nents,
++			   iv_dma, ivsize, GIVENCRYPT, 0, 0);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	edesc->src_nents = src_nents;
++	edesc->dst_nents = dst_nents;
++	edesc->iv_dma = iv_dma;
++	sg_table = &edesc->sgt[0];
++	edesc->qm_sg_bytes = qm_sg_ents * sizeof(*sg_table);
++
++	if (mapped_src_nents > 1)
++		sg_to_qm_sg_last(req->src, mapped_src_nents, sg_table, 0);
++
++	if (!out_contig) {
++		dma_to_qm_sg_one(sg_table + dst_sg_idx, iv_dma, ivsize, 0);
++		sg_to_qm_sg_last(req->dst, mapped_dst_nents, sg_table +
++				 dst_sg_idx + 1, 0);
++	}
++
++	edesc->qm_sg_dma = dma_map_single(dev, sg_table, edesc->qm_sg_bytes,
++					  DMA_TO_DEVICE);
++	if (dma_mapping_error(dev, edesc->qm_sg_dma)) {
++		dev_err(dev, "unable to map S/G table\n");
++		caam_unmap(dev, req->src, req->dst, src_nents, dst_nents,
++			   iv_dma, ivsize, GIVENCRYPT, 0, 0);
++		qi_cache_free(edesc);
++		return ERR_PTR(-ENOMEM);
++	}
++
++	memset(&req_ctx->fd_flt, 0, sizeof(req_ctx->fd_flt));
++	dpaa2_fl_set_final(in_fle, true);
++	dpaa2_fl_set_len(in_fle, req->nbytes);
++	dpaa2_fl_set_len(out_fle, ivsize + req->nbytes);
++
++	if (mapped_src_nents > 1) {
++		dpaa2_fl_set_format(in_fle, dpaa2_fl_sg);
++		dpaa2_fl_set_addr(in_fle, edesc->qm_sg_dma);
++	} else {
++		dpaa2_fl_set_format(in_fle, dpaa2_fl_single);
++		dpaa2_fl_set_addr(in_fle, sg_dma_address(req->src));
++	}
++
++	if (!out_contig) {
++		dpaa2_fl_set_format(out_fle, dpaa2_fl_sg);
++		dpaa2_fl_set_addr(out_fle, edesc->qm_sg_dma + dst_sg_idx *
++				  sizeof(*sg_table));
++	} else {
++		dpaa2_fl_set_format(out_fle, dpaa2_fl_single);
++		dpaa2_fl_set_addr(out_fle, sg_dma_address(req->dst));
++	}
++
++	return edesc;
 +}
 +
-+/**
-+ * dpseci_disable() - Disable the DPSECI, stop sending and receiving frames
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_disable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
+ static void aead_unmap(struct device *dev, struct aead_edesc *edesc,
+ 		       struct aead_request *req)
+ {
+@@ -1060,6 +1511,19 @@ static void aead_unmap(struct device *dev, struct aead_edesc *edesc,
+ 	dma_unmap_single(dev, edesc->assoclen_dma, 4, DMA_TO_DEVICE);
+ }
+ 
++static void ablkcipher_unmap(struct device *dev,
++			     struct ablkcipher_edesc *edesc,
++			     struct ablkcipher_request *req)
 +{
-+	struct mc_command cmd = { 0 };
++	struct crypto_ablkcipher *ablkcipher = crypto_ablkcipher_reqtfm(req);
++	int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
++	struct caam_request *caam_req = ablkcipher_request_ctx(req);
 +
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_DISABLE,
-+					  cmd_flags,
-+					  token);
-+
-+	return mc_send_command(mc_io, &cmd);
++	caam_unmap(dev, req->src, req->dst, edesc->src_nents, edesc->dst_nents,
++		   edesc->iv_dma, ivsize, caam_req->op_type,
++		   edesc->qm_sg_dma, edesc->qm_sg_bytes);
 +}
 +
-+/**
-+ * dpseci_is_enabled() - Check if the DPSECI is enabled.
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @en:		Returns '1' if object is enabled; '0' otherwise
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_is_enabled(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+		      int *en)
+ static void aead_encrypt_done(void *cbk_ctx, u32 status)
+ {
+ 	struct crypto_async_request *areq = cbk_ctx;
+@@ -1189,6 +1653,133 @@ static int ipsec_gcm_decrypt(struct aead_request *req)
+ 	return aead_decrypt(req);
+ }
+ 
++static void ablkcipher_done(void *cbk_ctx, u32 status)
 +{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_rsp_is_enabled *rsp_params;
-+	int err;
++	struct crypto_async_request *areq = cbk_ctx;
++	struct ablkcipher_request *req = ablkcipher_request_cast(areq);
++	struct caam_request *req_ctx = to_caam_req(areq);
++	struct crypto_ablkcipher *ablkcipher = crypto_ablkcipher_reqtfm(req);
++	struct caam_ctx *ctx = crypto_ablkcipher_ctx(ablkcipher);
++	struct ablkcipher_edesc *edesc = req_ctx->edesc;
++	int ecode = 0;
++	int ivsize = crypto_ablkcipher_ivsize(ablkcipher);
 +
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_IS_ENABLED,
-+					  cmd_flags,
-+					  token);
-+	err = mc_send_command(mc_io, &cmd);
-+	if (err)
-+		return err;
++#ifdef DEBUG
++	dev_err(ctx->dev, "%s %d: err 0x%x\n", __func__, __LINE__, status);
++#endif
 +
-+	rsp_params = (struct dpseci_rsp_is_enabled *)cmd.params;
-+	*en = le32_to_cpu(rsp_params->is_enabled);
++	if (unlikely(status)) {
++		caam_qi2_strstatus(ctx->dev, status);
++		ecode = -EIO;
++	}
 +
-+	return 0;
++#ifdef DEBUG
++	print_hex_dump(KERN_ERR, "dstiv  @" __stringify(__LINE__)": ",
++		       DUMP_PREFIX_ADDRESS, 16, 4, req->info,
++		       edesc->src_nents > 1 ? 100 : ivsize, 1);
++	caam_dump_sg(KERN_ERR, "dst    @" __stringify(__LINE__)": ",
++		     DUMP_PREFIX_ADDRESS, 16, 4, req->dst,
++		     edesc->dst_nents > 1 ? 100 : req->nbytes, 1);
++#endif
++
++	ablkcipher_unmap(ctx->dev, edesc, req);
++	qi_cache_free(edesc);
++
++	/*
++	 * The crypto API expects us to set the IV (req->info) to the last
++	 * ciphertext block. This is used e.g. by the CTS mode.
++	 */
++	scatterwalk_map_and_copy(req->info, req->dst, req->nbytes - ivsize,
++				 ivsize, 0);
++
++	ablkcipher_request_complete(req, ecode);
 +}
 +
-+/**
-+ * dpseci_reset() - Reset the DPSECI, returns the object to initial state.
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_reset(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token)
++static int ablkcipher_encrypt(struct ablkcipher_request *req)
 +{
-+	struct mc_command cmd = { 0 };
++	struct ablkcipher_edesc *edesc;
++	struct crypto_ablkcipher *ablkcipher = crypto_ablkcipher_reqtfm(req);
++	struct caam_ctx *ctx = crypto_ablkcipher_ctx(ablkcipher);
++	struct caam_request *caam_req = ablkcipher_request_ctx(req);
++	int ret;
 +
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_RESET,
-+					  cmd_flags,
-+					  token);
++	/* allocate extended descriptor */
++	edesc = ablkcipher_edesc_alloc(req, true);
++	if (IS_ERR(edesc))
++		return PTR_ERR(edesc);
 +
-+	return mc_send_command(mc_io, &cmd);
++	caam_req->flc = &ctx->flc[ENCRYPT];
++	caam_req->op_type = ENCRYPT;
++	caam_req->cbk = ablkcipher_done;
++	caam_req->ctx = &req->base;
++	caam_req->edesc = edesc;
++	ret = dpaa2_caam_enqueue(ctx->dev, caam_req);
++	if (ret != -EINPROGRESS &&
++	    !(ret == -EBUSY && req->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG)) {
++		ablkcipher_unmap(ctx->dev, edesc, req);
++		qi_cache_free(edesc);
++	}
++
++	return ret;
 +}
 +
-+/**
-+ * dpseci_get_irq_enable() - Get overall interrupt state
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @irq_index:	The interrupt index to configure
-+ * @en:		Returned Interrupt state - enable = 1, disable = 0
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_get_irq_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			  u8 irq_index, u8 *en)
++static int ablkcipher_givencrypt(struct skcipher_givcrypt_request *greq)
 +{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_irq_enable *cmd_params;
-+	struct dpseci_rsp_get_irq_enable *rsp_params;
-+	int err;
++	struct ablkcipher_request *req = &greq->creq;
++	struct ablkcipher_edesc *edesc;
++	struct crypto_ablkcipher *ablkcipher = crypto_ablkcipher_reqtfm(req);
++	struct caam_ctx *ctx = crypto_ablkcipher_ctx(ablkcipher);
++	struct caam_request *caam_req = ablkcipher_request_ctx(req);
++	int ret;
 +
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_GET_IRQ_ENABLE,
-+					  cmd_flags,
-+					  token);
-+	cmd_params = (struct dpseci_cmd_irq_enable *)cmd.params;
-+	cmd_params->irq_index = irq_index;
-+	err = mc_send_command(mc_io, &cmd);
-+	if (err)
-+		return err;
++	/* allocate extended descriptor */
++	edesc = ablkcipher_giv_edesc_alloc(greq);
++	if (IS_ERR(edesc))
++		return PTR_ERR(edesc);
 +
-+	rsp_params = (struct dpseci_rsp_get_irq_enable *)cmd.params;
-+	*en = rsp_params->enable_state;
++	caam_req->flc = &ctx->flc[GIVENCRYPT];
++	caam_req->op_type = GIVENCRYPT;
++	caam_req->cbk = ablkcipher_done;
++	caam_req->ctx = &req->base;
++	caam_req->edesc = edesc;
++	ret = dpaa2_caam_enqueue(ctx->dev, caam_req);
++	if (ret != -EINPROGRESS &&
++	    !(ret == -EBUSY && req->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG)) {
++		ablkcipher_unmap(ctx->dev, edesc, req);
++		qi_cache_free(edesc);
++	}
 +
-+	return 0;
++	return ret;
 +}
 +
-+/**
-+ * dpseci_set_irq_enable() - Set overall interrupt state.
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @irq_index:	The interrupt index to configure
-+ * @en:		Interrupt state - enable = 1, disable = 0
-+ *
-+ * Allows GPP software to control when interrupts are generated.
-+ * Each interrupt can have up to 32 causes. The enable/disable control's the
-+ * overall interrupt state. If the interrupt is disabled no causes will cause
-+ * an interrupt.
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_set_irq_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			  u8 irq_index, u8 en)
++static int ablkcipher_decrypt(struct ablkcipher_request *req)
 +{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_irq_enable *cmd_params;
++	struct ablkcipher_edesc *edesc;
++	struct crypto_ablkcipher *ablkcipher = crypto_ablkcipher_reqtfm(req);
++	struct caam_ctx *ctx = crypto_ablkcipher_ctx(ablkcipher);
++	struct caam_request *caam_req = ablkcipher_request_ctx(req);
++	int ret;
 +
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_SET_IRQ_ENABLE,
-+					  cmd_flags,
-+					  token);
-+	cmd_params = (struct dpseci_cmd_irq_enable *)cmd.params;
-+	cmd_params->irq_index = irq_index;
-+	cmd_params->enable_state = en;
++	/* allocate extended descriptor */
++	edesc = ablkcipher_edesc_alloc(req, false);
++	if (IS_ERR(edesc))
++		return PTR_ERR(edesc);
 +
-+	return mc_send_command(mc_io, &cmd);
++	caam_req->flc = &ctx->flc[DECRYPT];
++	caam_req->op_type = DECRYPT;
++	caam_req->cbk = ablkcipher_done;
++	caam_req->ctx = &req->base;
++	caam_req->edesc = edesc;
++	ret = dpaa2_caam_enqueue(ctx->dev, caam_req);
++	if (ret != -EINPROGRESS &&
++	    !(ret == -EBUSY && req->base.flags & CRYPTO_TFM_REQ_MAY_BACKLOG)) {
++		ablkcipher_unmap(ctx->dev, edesc, req);
++		qi_cache_free(edesc);
++	}
++
++	return ret;
 +}
 +
-+/**
-+ * dpseci_get_irq_mask() - Get interrupt mask.
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @irq_index:	The interrupt index to configure
-+ * @mask:	Returned event mask to trigger interrupt
-+ *
-+ * Every interrupt can have up to 32 causes and the interrupt model supports
-+ * masking/unmasking each cause independently.
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_get_irq_mask(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			u8 irq_index, u32 *mask)
+ struct caam_crypto_alg {
+ 	struct list_head entry;
+ 	struct crypto_alg crypto_alg;
+@@ -1213,6 +1804,15 @@ static int caam_cra_init(struct crypto_tfm *tfm)
+ 	return 0;
+ }
+ 
++static int caam_cra_init_ablkcipher(struct crypto_tfm *tfm)
 +{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_irq_mask *cmd_params;
-+	int err;
++	struct ablkcipher_tfm *ablkcipher_tfm =
++		crypto_ablkcipher_crt(__crypto_ablkcipher_cast(tfm));
 +
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_GET_IRQ_MASK,
-+					  cmd_flags,
-+					  token);
-+	cmd_params = (struct dpseci_cmd_irq_mask *)cmd.params;
-+	cmd_params->irq_index = irq_index;
-+	err = mc_send_command(mc_io, &cmd);
-+	if (err)
-+		return err;
-+
-+	*mask = le32_to_cpu(cmd_params->mask);
-+
-+	return 0;
++	ablkcipher_tfm->reqsize = sizeof(struct caam_request);
++	return caam_cra_init(tfm);
 +}
 +
-+/**
-+ * dpseci_set_irq_mask() - Set interrupt mask.
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @irq_index:	The interrupt index to configure
-+ * @mask:	event mask to trigger interrupt;
-+ *		each bit:
-+ *			0 = ignore event
-+ *			1 = consider event for asserting IRQ
-+ *
-+ * Every interrupt can have up to 32 causes and the interrupt model supports
-+ * masking/unmasking each cause independently
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_set_irq_mask(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			u8 irq_index, u32 mask)
+ static int caam_cra_init_aead(struct crypto_aead *tfm)
+ {
+ 	crypto_aead_set_reqsize(tfm, sizeof(struct caam_request));
+@@ -1239,11 +1839,135 @@ static void caam_exit_common(struct crypto_tfm *tfm)
+ 				 DMA_TO_DEVICE);
+ }
+ 
++static void caam_cra_exit(struct crypto_tfm *tfm)
 +{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_irq_mask *cmd_params;
-+
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_SET_IRQ_MASK,
-+					  cmd_flags,
-+					  token);
-+	cmd_params = (struct dpseci_cmd_irq_mask *)cmd.params;
-+	cmd_params->mask = cpu_to_le32(mask);
-+	cmd_params->irq_index = irq_index;
-+
-+	return mc_send_command(mc_io, &cmd);
++	caam_exit_common(crypto_tfm_ctx(tfm));
 +}
 +
-+/**
-+ * dpseci_get_irq_status() - Get the current status of any pending interrupts
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @irq_index:	The interrupt index to configure
-+ * @status:	Returned interrupts status - one bit per cause:
-+ *			0 = no interrupt pending
-+ *			1 = interrupt pending
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_get_irq_status(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			  u8 irq_index, u32 *status)
-+{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_irq_status *cmd_params;
-+	int err;
-+
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_GET_IRQ_STATUS,
-+					  cmd_flags,
-+					  token);
-+	cmd_params = (struct dpseci_cmd_irq_status *)cmd.params;
-+	cmd_params->status = cpu_to_le32(*status);
-+	cmd_params->irq_index = irq_index;
-+	err = mc_send_command(mc_io, &cmd);
-+	if (err)
-+		return err;
-+
-+	*status = le32_to_cpu(cmd_params->status);
-+
-+	return 0;
-+}
-+
-+/**
-+ * dpseci_clear_irq_status() - Clear a pending interrupt's status
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @irq_index:	The interrupt index to configure
-+ * @status:	bits to clear (W1C) - one bit per cause:
-+ *			0 = don't change
-+ *			1 = clear status bit
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_clear_irq_status(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			    u8 irq_index, u32 status)
-+{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_irq_status *cmd_params;
-+
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_CLEAR_IRQ_STATUS,
-+					  cmd_flags,
-+					  token);
-+	cmd_params = (struct dpseci_cmd_irq_status *)cmd.params;
-+	cmd_params->status = cpu_to_le32(status);
-+	cmd_params->irq_index = irq_index;
-+
-+	return mc_send_command(mc_io, &cmd);
-+}
-+
-+/**
-+ * dpseci_get_attributes() - Retrieve DPSECI attributes
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @attr:	Returned object's attributes
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_get_attributes(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			  struct dpseci_attr *attr)
-+{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_rsp_get_attributes *rsp_params;
-+	int err;
-+
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_GET_ATTR,
-+					  cmd_flags,
-+					  token);
-+	err = mc_send_command(mc_io, &cmd);
-+	if (err)
-+		return err;
-+
-+	rsp_params = (struct dpseci_rsp_get_attributes *)cmd.params;
-+	attr->id = le32_to_cpu(rsp_params->id);
-+	attr->num_tx_queues = rsp_params->num_tx_queues;
-+	attr->num_rx_queues = rsp_params->num_rx_queues;
-+	attr->options = le32_to_cpu(rsp_params->options);
-+
-+	return 0;
-+}
-+
-+/**
-+ * dpseci_set_rx_queue() - Set Rx queue configuration
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @queue:	Select the queue relative to number of priorities configured at
-+ *		DPSECI creation; use DPSECI_ALL_QUEUES to configure all
-+ *		Rx queues identically.
-+ * @cfg:	Rx queue configuration
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_set_rx_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			u8 queue, const struct dpseci_rx_queue_cfg *cfg)
-+{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_queue *cmd_params;
-+
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_SET_RX_QUEUE,
-+					  cmd_flags,
-+					  token);
-+	cmd_params = (struct dpseci_cmd_queue *)cmd.params;
-+	cmd_params->dest_id = cpu_to_le32(cfg->dest_cfg.dest_id);
-+	cmd_params->priority = cfg->dest_cfg.priority;
-+	cmd_params->queue = queue;
-+	cmd_params->dest_type = cfg->dest_cfg.dest_type;
-+	cmd_params->user_ctx = cpu_to_le64(cfg->user_ctx);
-+	cmd_params->options = cpu_to_le32(cfg->options);
-+	cmd_params->order_preservation_en =
-+		cpu_to_le32(cfg->order_preservation_en);
-+
-+	return mc_send_command(mc_io, &cmd);
-+}
-+
-+/**
-+ * dpseci_get_rx_queue() - Retrieve Rx queue attributes
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @queue:	Select the queue relative to number of priorities configured at
-+ *		DPSECI creation
-+ * @attr:	Returned Rx queue attributes
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_get_rx_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			u8 queue, struct dpseci_rx_queue_attr *attr)
-+{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_queue *cmd_params;
-+	int err;
-+
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_GET_RX_QUEUE,
-+					  cmd_flags,
-+					  token);
-+	cmd_params = (struct dpseci_cmd_queue *)cmd.params;
-+	cmd_params->queue = queue;
-+	err = mc_send_command(mc_io, &cmd);
-+	if (err)
-+		return err;
-+
-+	attr->dest_cfg.dest_id = le32_to_cpu(cmd_params->dest_id);
-+	attr->dest_cfg.priority = cmd_params->priority;
-+	attr->dest_cfg.dest_type = cmd_params->dest_type;
-+	attr->user_ctx = le64_to_cpu(cmd_params->user_ctx);
-+	attr->fqid = le32_to_cpu(cmd_params->fqid);
-+	attr->order_preservation_en =
-+		le32_to_cpu(cmd_params->order_preservation_en);
-+
-+	return 0;
-+}
-+
-+/**
-+ * dpseci_get_tx_queue() - Retrieve Tx queue attributes
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @queue:	Select the queue relative to number of priorities configured at
-+ *		DPSECI creation
-+ * @attr:	Returned Tx queue attributes
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_get_tx_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			u8 queue, struct dpseci_tx_queue_attr *attr)
-+{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_queue *cmd_params;
-+	struct dpseci_rsp_get_tx_queue *rsp_params;
-+	int err;
-+
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_GET_TX_QUEUE,
-+					  cmd_flags,
-+					  token);
-+	cmd_params = (struct dpseci_cmd_queue *)cmd.params;
-+	cmd_params->queue = queue;
-+	err = mc_send_command(mc_io, &cmd);
-+	if (err)
-+		return err;
-+
-+	rsp_params = (struct dpseci_rsp_get_tx_queue *)cmd.params;
-+	attr->fqid = le32_to_cpu(rsp_params->fqid);
-+	attr->priority = rsp_params->priority;
-+
-+	return 0;
-+}
-+
-+/**
-+ * dpseci_get_sec_attr() - Retrieve SEC accelerator attributes
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @attr:	Returned SEC attributes
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_get_sec_attr(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			struct dpseci_sec_attr *attr)
-+{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_rsp_get_sec_attr *rsp_params;
-+	int err;
-+
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_GET_SEC_ATTR,
-+					  cmd_flags,
-+					  token);
-+	err = mc_send_command(mc_io, &cmd);
-+	if (err)
-+		return err;
-+
-+	rsp_params = (struct dpseci_rsp_get_sec_attr *)cmd.params;
-+	attr->ip_id = le16_to_cpu(rsp_params->ip_id);
-+	attr->major_rev = rsp_params->major_rev;
-+	attr->minor_rev = rsp_params->minor_rev;
-+	attr->era = rsp_params->era;
-+	attr->deco_num = rsp_params->deco_num;
-+	attr->zuc_auth_acc_num = rsp_params->zuc_auth_acc_num;
-+	attr->zuc_enc_acc_num = rsp_params->zuc_enc_acc_num;
-+	attr->snow_f8_acc_num = rsp_params->snow_f8_acc_num;
-+	attr->snow_f9_acc_num = rsp_params->snow_f9_acc_num;
-+	attr->crc_acc_num = rsp_params->crc_acc_num;
-+	attr->pk_acc_num = rsp_params->pk_acc_num;
-+	attr->kasumi_acc_num = rsp_params->kasumi_acc_num;
-+	attr->rng_acc_num = rsp_params->rng_acc_num;
-+	attr->md_acc_num = rsp_params->md_acc_num;
-+	attr->arc4_acc_num = rsp_params->arc4_acc_num;
-+	attr->des_acc_num = rsp_params->des_acc_num;
-+	attr->aes_acc_num = rsp_params->aes_acc_num;
-+
-+	return 0;
-+}
-+
-+/**
-+ * dpseci_get_sec_counters() - Retrieve SEC accelerator counters
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @counters:	Returned SEC counters
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_get_sec_counters(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			    struct dpseci_sec_counters *counters)
-+{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_rsp_get_sec_counters *rsp_params;
-+	int err;
-+
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_GET_SEC_COUNTERS,
-+					  cmd_flags,
-+					  token);
-+	err = mc_send_command(mc_io, &cmd);
-+	if (err)
-+		return err;
-+
-+	rsp_params = (struct dpseci_rsp_get_sec_counters *)cmd.params;
-+	counters->dequeued_requests =
-+		le64_to_cpu(rsp_params->dequeued_requests);
-+	counters->ob_enc_requests = le64_to_cpu(rsp_params->ob_enc_requests);
-+	counters->ib_dec_requests = le64_to_cpu(rsp_params->ib_dec_requests);
-+	counters->ob_enc_bytes = le64_to_cpu(rsp_params->ob_enc_bytes);
-+	counters->ob_prot_bytes = le64_to_cpu(rsp_params->ob_prot_bytes);
-+	counters->ib_dec_bytes = le64_to_cpu(rsp_params->ib_dec_bytes);
-+	counters->ib_valid_bytes = le64_to_cpu(rsp_params->ib_valid_bytes);
-+
-+	return 0;
-+}
-+
-+/**
-+ * dpseci_get_api_version() - Get Data Path SEC Interface API version
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @major_ver:	Major version of data path sec API
-+ * @minor_ver:	Minor version of data path sec API
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_get_api_version(struct fsl_mc_io *mc_io, u32 cmd_flags,
-+			   u16 *major_ver, u16 *minor_ver)
-+{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_rsp_get_api_version *rsp_params;
-+	int err;
-+
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_GET_API_VERSION,
-+					  cmd_flags, 0);
-+	err = mc_send_command(mc_io, &cmd);
-+	if (err)
-+		return err;
-+
-+	rsp_params = (struct dpseci_rsp_get_api_version *)cmd.params;
-+	*major_ver = le16_to_cpu(rsp_params->major);
-+	*minor_ver = le16_to_cpu(rsp_params->minor);
-+
-+	return 0;
-+}
-+
-+/**
-+ * dpseci_set_opr() - Set Order Restoration configuration
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @index:	The queue index
-+ * @options:	Configuration mode options; can be OPR_OPT_CREATE or
-+ *		OPR_OPT_RETIRE
-+ * @cfg:	Configuration options for the OPR
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_set_opr(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u8 index,
-+		   u8 options, struct opr_cfg *cfg)
-+{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_opr *cmd_params;
-+
-+	cmd.header = mc_encode_cmd_header(
-+			DPSECI_CMDID_SET_OPR,
-+			cmd_flags,
-+			token);
-+	cmd_params = (struct dpseci_cmd_opr *)cmd.params;
-+	cmd_params->index = index;
-+	cmd_params->options = options;
-+	cmd_params->oloe = cfg->oloe;
-+	cmd_params->oeane = cfg->oeane;
-+	cmd_params->olws = cfg->olws;
-+	cmd_params->oa = cfg->oa;
-+	cmd_params->oprrws = cfg->oprrws;
-+
-+	return mc_send_command(mc_io, &cmd);
-+}
-+
-+/**
-+ * dpseci_get_opr() - Retrieve Order Restoration config and query
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @index:	The queue index
-+ * @cfg:	Returned OPR configuration
-+ * @qry:	Returned OPR query
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_get_opr(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u8 index,
-+		   struct opr_cfg *cfg, struct opr_qry *qry)
-+{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_opr *cmd_params;
-+	struct dpseci_rsp_get_opr *rsp_params;
-+	int err;
-+
-+	cmd.header = mc_encode_cmd_header(DPSECI_CMDID_GET_OPR,
-+					  cmd_flags,
-+					  token);
-+	cmd_params = (struct dpseci_cmd_opr *)cmd.params;
-+	cmd_params->index = index;
-+	err = mc_send_command(mc_io, &cmd);
-+	if (err)
-+		return err;
-+
-+	rsp_params = (struct dpseci_rsp_get_opr *)cmd.params;
-+	qry->rip = dpseci_get_field(rsp_params->rip_enable, OPR_RIP);
-+	qry->enable = dpseci_get_field(rsp_params->rip_enable, OPR_ENABLE);
-+	cfg->oloe = rsp_params->oloe;
-+	cfg->oeane = rsp_params->oeane;
-+	cfg->olws = rsp_params->olws;
-+	cfg->oa = rsp_params->oa;
-+	cfg->oprrws = rsp_params->oprrws;
-+	qry->nesn = le16_to_cpu(rsp_params->nesn);
-+	qry->ndsn = le16_to_cpu(rsp_params->ndsn);
-+	qry->ea_tseq = le16_to_cpu(rsp_params->ea_tseq);
-+	qry->tseq_nlis = dpseci_get_field(rsp_params->tseq_nlis, OPR_TSEQ_NLIS);
-+	qry->ea_hseq = le16_to_cpu(rsp_params->ea_hseq);
-+	qry->hseq_nlis = dpseci_get_field(rsp_params->tseq_nlis, OPR_HSEQ_NLIS);
-+	qry->ea_hptr = le16_to_cpu(rsp_params->ea_hptr);
-+	qry->ea_tptr = le16_to_cpu(rsp_params->ea_tptr);
-+	qry->opr_vid = le16_to_cpu(rsp_params->opr_vid);
-+	qry->opr_id = le16_to_cpu(rsp_params->opr_id);
-+
-+	return 0;
-+}
-+
-+/**
-+ * dpseci_set_congestion_notification() - Set congestion group
-+ *	notification configuration
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @cfg:	congestion notification configuration
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_set_congestion_notification(struct fsl_mc_io *mc_io, u32 cmd_flags,
-+	u16 token, const struct dpseci_congestion_notification_cfg *cfg)
-+{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_congestion_notification *cmd_params;
-+
-+	cmd.header = mc_encode_cmd_header(
-+			DPSECI_CMDID_SET_CONGESTION_NOTIFICATION,
-+			cmd_flags,
-+			token);
-+	cmd_params = (struct dpseci_cmd_congestion_notification *)cmd.params;
-+	cmd_params->dest_id = cpu_to_le32(cfg->dest_cfg.dest_id);
-+	cmd_params->notification_mode = cpu_to_le16(cfg->notification_mode);
-+	cmd_params->priority = cfg->dest_cfg.priority;
-+	dpseci_set_field(cmd_params->options, CGN_DEST_TYPE,
-+			 cfg->dest_cfg.dest_type);
-+	dpseci_set_field(cmd_params->options, CGN_UNITS, cfg->units);
-+	cmd_params->message_iova = cpu_to_le64(cfg->message_iova);
-+	cmd_params->message_ctx = cpu_to_le64(cfg->message_ctx);
-+	cmd_params->threshold_entry = cpu_to_le32(cfg->threshold_entry);
-+	cmd_params->threshold_exit = cpu_to_le32(cfg->threshold_exit);
-+
-+	return mc_send_command(mc_io, &cmd);
-+}
-+
-+/**
-+ * dpseci_get_congestion_notification() - Get congestion group notification
-+ *	configuration
-+ * @mc_io:	Pointer to MC portal's I/O object
-+ * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-+ * @token:	Token of DPSECI object
-+ * @cfg:	congestion notification configuration
-+ *
-+ * Return:	'0' on success, error code otherwise
-+ */
-+int dpseci_get_congestion_notification(struct fsl_mc_io *mc_io, u32 cmd_flags,
-+	u16 token, struct dpseci_congestion_notification_cfg *cfg)
-+{
-+	struct mc_command cmd = { 0 };
-+	struct dpseci_cmd_congestion_notification *rsp_params;
-+	int err;
-+
-+	cmd.header = mc_encode_cmd_header(
-+			DPSECI_CMDID_GET_CONGESTION_NOTIFICATION,
-+			cmd_flags,
-+			token);
-+	err = mc_send_command(mc_io, &cmd);
-+	if (err)
-+		return err;
-+
-+	rsp_params = (struct dpseci_cmd_congestion_notification *)cmd.params;
-+	cfg->dest_cfg.dest_id = le32_to_cpu(rsp_params->dest_id);
-+	cfg->notification_mode = le16_to_cpu(rsp_params->notification_mode);
-+	cfg->dest_cfg.priority = rsp_params->priority;
-+	cfg->dest_cfg.dest_type = dpseci_get_field(rsp_params->options,
-+						   CGN_DEST_TYPE);
-+	cfg->units = dpseci_get_field(rsp_params->options, CGN_UNITS);
-+	cfg->message_iova = le64_to_cpu(rsp_params->message_iova);
-+	cfg->message_ctx = le64_to_cpu(rsp_params->message_ctx);
-+	cfg->threshold_entry = le32_to_cpu(rsp_params->threshold_entry);
-+	cfg->threshold_exit = le32_to_cpu(rsp_params->threshold_exit);
-+
-+	return 0;
-+}
-diff --git a/drivers/crypto/caam/dpseci.h b/drivers/crypto/caam/dpseci.h
-new file mode 100644
-index 000000000000..d37489c6842c
---- /dev/null
-+++ b/drivers/crypto/caam/dpseci.h
-@@ -0,0 +1,395 @@
-+/*
-+ * Copyright 2013-2016 Freescale Semiconductor Inc.
-+ * Copyright 2017 NXP
-+ *
-+ * Redistribution and use in source and binary forms, with or without
-+ * modification, are permitted provided that the following conditions are met:
-+ *     * Redistributions of source code must retain the above copyright
-+ *	 notice, this list of conditions and the following disclaimer.
-+ *     * Redistributions in binary form must reproduce the above copyright
-+ *	 notice, this list of conditions and the following disclaimer in the
-+ *	 documentation and/or other materials provided with the distribution.
-+ *     * Neither the names of the above-listed copyright holders nor the
-+ *	 names of any contributors may be used to endorse or promote products
-+ *	 derived from this software without specific prior written permission.
-+ *
-+ *
-+ * ALTERNATIVELY, this software may be distributed under the terms of the
-+ * GNU General Public License ("GPL") as published by the Free Software
-+ * Foundation, either version 2 of that License or (at your option) any
-+ * later version.
-+ *
-+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
-+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-+ * POSSIBILITY OF SUCH DAMAGE.
-+ */
-+#ifndef _DPSECI_H_
-+#define _DPSECI_H_
-+
-+/*
-+ * Data Path SEC Interface API
-+ * Contains initialization APIs and runtime control APIs for DPSECI
-+ */
-+
-+struct fsl_mc_io;
-+struct opr_cfg;
-+struct opr_qry;
-+
-+/**
-+ * General DPSECI macros
-+ */
-+
-+/**
-+ * Maximum number of Tx/Rx priorities per DPSECI object
-+ */
-+#define DPSECI_PRIO_NUM		8
-+
-+/**
-+ * All queues considered; see dpseci_set_rx_queue()
-+ */
-+#define DPSECI_ALL_QUEUES	(u8)(-1)
-+
-+int dpseci_open(struct fsl_mc_io *mc_io, u32 cmd_flags, int dpseci_id,
-+		u16 *token);
-+
-+int dpseci_close(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token);
-+
-+/**
-+ * Enable the Congestion Group support
-+ */
-+#define DPSECI_OPT_HAS_CG		0x000020
-+
-+/**
-+ * Enable the Order Restoration support
-+ */
-+#define DPSECI_OPT_HAS_OPR		0x000040
-+
-+/**
-+ * Order Point Records are shared for the entire DPSECI
-+ */
-+#define DPSECI_OPT_OPR_SHARED		0x000080
-+
-+/**
-+ * struct dpseci_cfg - Structure representing DPSECI configuration
-+ * @options: Any combination of the following options:
-+ *		DPSECI_OPT_HAS_CG
-+ *		DPSECI_OPT_HAS_OPR
-+ *		DPSECI_OPT_OPR_SHARED
-+ * @num_tx_queues: num of queues towards the SEC
-+ * @num_rx_queues: num of queues back from the SEC
-+ * @priorities: Priorities for the SEC hardware processing;
-+ *		each place in the array is the priority of the tx queue
-+ *		towards the SEC;
-+ *		valid priorities are configured with values 1-8;
-+ */
-+struct dpseci_cfg {
-+	u32 options;
-+	u8 num_tx_queues;
-+	u8 num_rx_queues;
-+	u8 priorities[DPSECI_PRIO_NUM];
-+};
-+
-+int dpseci_create(struct fsl_mc_io *mc_io, u16 dprc_token, u32 cmd_flags,
-+		  const struct dpseci_cfg *cfg, u32 *obj_id);
-+
-+int dpseci_destroy(struct fsl_mc_io *mc_io, u16 dprc_token, u32 cmd_flags,
-+		   u32 object_id);
-+
-+int dpseci_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token);
-+
-+int dpseci_disable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token);
-+
-+int dpseci_is_enabled(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+		      int *en);
-+
-+int dpseci_reset(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token);
-+
-+int dpseci_get_irq_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			  u8 irq_index, u8 *en);
-+
-+int dpseci_set_irq_enable(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			  u8 irq_index, u8 en);
-+
-+int dpseci_get_irq_mask(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			u8 irq_index, u32 *mask);
-+
-+int dpseci_set_irq_mask(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			u8 irq_index, u32 mask);
-+
-+int dpseci_get_irq_status(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			  u8 irq_index, u32 *status);
-+
-+int dpseci_clear_irq_status(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			    u8 irq_index, u32 status);
-+
-+/**
-+ * struct dpseci_attr - Structure representing DPSECI attributes
-+ * @id: DPSECI object ID
-+ * @num_tx_queues: number of queues towards the SEC
-+ * @num_rx_queues: number of queues back from the SEC
-+ * @options: any combination of the following options:
-+ *		DPSECI_OPT_HAS_CG
-+ *		DPSECI_OPT_HAS_OPR
-+ *		DPSECI_OPT_OPR_SHARED
-+ */
-+struct dpseci_attr {
-+	int id;
-+	u8 num_tx_queues;
-+	u8 num_rx_queues;
-+	u32 options;
-+};
-+
-+int dpseci_get_attributes(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			  struct dpseci_attr *attr);
-+
-+/**
-+ * enum dpseci_dest - DPSECI destination types
-+ * @DPSECI_DEST_NONE: Unassigned destination; The queue is set in parked mode
-+ *	and does not generate FQDAN notifications; user is expected to dequeue
-+ *	from the queue based on polling or other user-defined method
-+ * @DPSECI_DEST_DPIO: The queue is set in schedule mode and generates FQDAN
-+ *	notifications to the specified DPIO; user is expected to dequeue from
-+ *	the queue only after notification is received
-+ * @DPSECI_DEST_DPCON: The queue is set in schedule mode and does not generate
-+ *	FQDAN notifications, but is connected to the specified DPCON object;
-+ *	user is expected to dequeue from the DPCON channel
-+ */
-+enum dpseci_dest {
-+	DPSECI_DEST_NONE = 0,
-+	DPSECI_DEST_DPIO,
-+	DPSECI_DEST_DPCON
-+};
-+
-+/**
-+ * struct dpseci_dest_cfg - Structure representing DPSECI destination parameters
-+ * @dest_type: Destination type
-+ * @dest_id: Either DPIO ID or DPCON ID, depending on the destination type
-+ * @priority: Priority selection within the DPIO or DPCON channel; valid values
-+ *	are 0-1 or 0-7, depending on the number of priorities in that channel;
-+ *	not relevant for 'DPSECI_DEST_NONE' option
-+ */
-+struct dpseci_dest_cfg {
-+	enum dpseci_dest dest_type;
-+	int dest_id;
-+	u8 priority;
-+};
-+
-+/**
-+ * DPSECI queue modification options
-+ */
-+
-+/**
-+ * Select to modify the user's context associated with the queue
-+ */
-+#define DPSECI_QUEUE_OPT_USER_CTX		0x00000001
-+
-+/**
-+ * Select to modify the queue's destination
-+ */
-+#define DPSECI_QUEUE_OPT_DEST			0x00000002
-+
-+/**
-+ * Select to modify the queue's order preservation
-+ */
-+#define DPSECI_QUEUE_OPT_ORDER_PRESERVATION	0x00000004
-+
-+/**
-+ * struct dpseci_rx_queue_cfg - DPSECI RX queue configuration
-+ * @options: Flags representing the suggested modifications to the queue;
-+ *	Use any combination of 'DPSECI_QUEUE_OPT_<X>' flags
-+ * @order_preservation_en: order preservation configuration for the rx queue
-+ * valid only if 'DPSECI_QUEUE_OPT_ORDER_PRESERVATION' is contained in 'options'
-+ * @user_ctx: User context value provided in the frame descriptor of each
-+ *	dequeued frame;	valid only if 'DPSECI_QUEUE_OPT_USER_CTX' is contained
-+ *	in 'options'
-+ * @dest_cfg: Queue destination parameters; valid only if
-+ *	'DPSECI_QUEUE_OPT_DEST' is contained in 'options'
-+ */
-+struct dpseci_rx_queue_cfg {
-+	u32 options;
-+	int order_preservation_en;
-+	u64 user_ctx;
-+	struct dpseci_dest_cfg dest_cfg;
-+};
-+
-+int dpseci_set_rx_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			u8 queue, const struct dpseci_rx_queue_cfg *cfg);
-+
-+/**
-+ * struct dpseci_rx_queue_attr - Structure representing attributes of Rx queues
-+ * @user_ctx: User context value provided in the frame descriptor of each
-+ *	dequeued frame
-+ * @order_preservation_en: Status of the order preservation configuration on the
-+ *	queue
-+ * @dest_cfg: Queue destination configuration
-+ * @fqid: Virtual FQID value to be used for dequeue operations
-+ */
-+struct dpseci_rx_queue_attr {
-+	u64 user_ctx;
-+	int order_preservation_en;
-+	struct dpseci_dest_cfg dest_cfg;
-+	u32 fqid;
-+};
-+
-+int dpseci_get_rx_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			u8 queue, struct dpseci_rx_queue_attr *attr);
-+
-+/**
-+ * struct dpseci_tx_queue_attr - Structure representing attributes of Tx queues
-+ * @fqid: Virtual FQID to be used for sending frames to SEC hardware
-+ * @priority: SEC hardware processing priority for the queue
-+ */
-+struct dpseci_tx_queue_attr {
-+	u32 fqid;
-+	u8 priority;
-+};
-+
-+int dpseci_get_tx_queue(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			u8 queue, struct dpseci_tx_queue_attr *attr);
-+
-+/**
-+ * struct dpseci_sec_attr - Structure representing attributes of the SEC
-+ *	hardware accelerator
-+ * @ip_id: ID for SEC
-+ * @major_rev: Major revision number for SEC
-+ * @minor_rev: Minor revision number for SEC
-+ * @era: SEC Era
-+ * @deco_num: The number of copies of the DECO that are implemented in this
-+ *	version of SEC
-+ * @zuc_auth_acc_num: The number of copies of ZUCA that are implemented in this
-+ *	version of SEC
-+ * @zuc_enc_acc_num: The number of copies of ZUCE that are implemented in this
-+ *	version of SEC
-+ * @snow_f8_acc_num: The number of copies of the SNOW-f8 module that are
-+ *	implemented in this version of SEC
-+ * @snow_f9_acc_num: The number of copies of the SNOW-f9 module that are
-+ *	implemented in this version of SEC
-+ * @crc_acc_num: The number of copies of the CRC module that are implemented in
-+ *	this version of SEC
-+ * @pk_acc_num:  The number of copies of the Public Key module that are
-+ *	implemented in this version of SEC
-+ * @kasumi_acc_num: The number of copies of the Kasumi module that are
-+ *	implemented in this version of SEC
-+ * @rng_acc_num: The number of copies of the Random Number Generator that are
-+ *	implemented in this version of SEC
-+ * @md_acc_num: The number of copies of the MDHA (Hashing module) that are
-+ *	implemented in this version of SEC
-+ * @arc4_acc_num: The number of copies of the ARC4 module that are implemented
-+ *	in this version of SEC
-+ * @des_acc_num: The number of copies of the DES module that are implemented in
-+ *	this version of SEC
-+ * @aes_acc_num: The number of copies of the AES module that are implemented in
-+ *	this version of SEC
-+ **/
-+struct dpseci_sec_attr {
-+	u16 ip_id;
-+	u8 major_rev;
-+	u8 minor_rev;
-+	u8 era;
-+	u8 deco_num;
-+	u8 zuc_auth_acc_num;
-+	u8 zuc_enc_acc_num;
-+	u8 snow_f8_acc_num;
-+	u8 snow_f9_acc_num;
-+	u8 crc_acc_num;
-+	u8 pk_acc_num;
-+	u8 kasumi_acc_num;
-+	u8 rng_acc_num;
-+	u8 md_acc_num;
-+	u8 arc4_acc_num;
-+	u8 des_acc_num;
-+	u8 aes_acc_num;
-+};
-+
-+int dpseci_get_sec_attr(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			struct dpseci_sec_attr *attr);
-+
-+/**
-+ * struct dpseci_sec_counters - Structure representing global SEC counters and
-+ *				not per dpseci counters
-+ * @dequeued_requests:	Number of Requests Dequeued
-+ * @ob_enc_requests:	Number of Outbound Encrypt Requests
-+ * @ib_dec_requests:	Number of Inbound Decrypt Requests
-+ * @ob_enc_bytes:	Number of Outbound Bytes Encrypted
-+ * @ob_prot_bytes:	Number of Outbound Bytes Protected
-+ * @ib_dec_bytes:	Number of Inbound Bytes Decrypted
-+ * @ib_valid_bytes:	Number of Inbound Bytes Validated
-+ */
-+struct dpseci_sec_counters {
-+	u64 dequeued_requests;
-+	u64 ob_enc_requests;
-+	u64 ib_dec_requests;
-+	u64 ob_enc_bytes;
-+	u64 ob_prot_bytes;
-+	u64 ib_dec_bytes;
-+	u64 ib_valid_bytes;
-+};
-+
-+int dpseci_get_sec_counters(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token,
-+			    struct dpseci_sec_counters *counters);
-+
-+int dpseci_get_api_version(struct fsl_mc_io *mc_io, u32 cmd_flags,
-+			   u16 *major_ver, u16 *minor_ver);
-+
-+int dpseci_set_opr(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u8 index,
-+		   u8 options, struct opr_cfg *cfg);
-+
-+int dpseci_get_opr(struct fsl_mc_io *mc_io, u32 cmd_flags, u16 token, u8 index,
-+		   struct opr_cfg *cfg, struct opr_qry *qry);
-+
-+/**
-+ * enum dpseci_congestion_unit - DPSECI congestion units
-+ * @DPSECI_CONGESTION_UNIT_BYTES: bytes units
-+ * @DPSECI_CONGESTION_UNIT_FRAMES: frames units
-+ */
-+enum dpseci_congestion_unit {
-+	DPSECI_CONGESTION_UNIT_BYTES = 0,
-+	DPSECI_CONGESTION_UNIT_FRAMES
-+};
-+
-+#define DPSECI_CGN_MODE_WRITE_MEM_ON_ENTER		0x00000001
-+#define DPSECI_CGN_MODE_WRITE_MEM_ON_EXIT		0x00000002
-+#define DPSECI_CGN_MODE_COHERENT_WRITE			0x00000004
-+#define DPSECI_CGN_MODE_NOTIFY_DEST_ON_ENTER		0x00000008
-+#define DPSECI_CGN_MODE_NOTIFY_DEST_ON_EXIT		0x00000010
-+#define DPSECI_CGN_MODE_INTR_COALESCING_DISABLED	0x00000020
-+
-+/**
-+ * struct dpseci_congestion_notification_cfg - congestion notification
-+ *	configuration
-+ * @units: units type
-+ * @threshold_entry: above this threshold we enter a congestion state.
-+ *	set it to '0' to disable it
-+ * @threshold_exit: below this threshold we exit the congestion state.
-+ * @message_ctx: The context that will be part of the CSCN message
-+ * @message_iova: I/O virtual address (must be in DMA-able memory),
-+ *	must be 16B aligned;
-+ * @dest_cfg: CSCN can be send to either DPIO or DPCON WQ channel
-+ * @notification_mode: Mask of available options; use 'DPSECI_CGN_MODE_<X>'
-+ *	values
-+ */
-+struct dpseci_congestion_notification_cfg {
-+	enum dpseci_congestion_unit units;
-+	u32 threshold_entry;
-+	u32 threshold_exit;
-+	u64 message_ctx;
-+	u64 message_iova;
-+	struct dpseci_dest_cfg dest_cfg;
-+	u16 notification_mode;
-+};
-+
-+int dpseci_set_congestion_notification(struct fsl_mc_io *mc_io, u32 cmd_flags,
-+	u16 token, const struct dpseci_congestion_notification_cfg *cfg);
-+
-+int dpseci_get_congestion_notification(struct fsl_mc_io *mc_io, u32 cmd_flags,
-+	u16 token, struct dpseci_congestion_notification_cfg *cfg);
-+
-+#endif /* _DPSECI_H_ */
-diff --git a/drivers/crypto/caam/dpseci_cmd.h b/drivers/crypto/caam/dpseci_cmd.h
-new file mode 100644
-index 000000000000..7624315e986f
---- /dev/null
-+++ b/drivers/crypto/caam/dpseci_cmd.h
-@@ -0,0 +1,261 @@
-+/*
-+ * Copyright 2013-2016 Freescale Semiconductor Inc.
-+ * Copyright 2017 NXP
-+ *
-+ * Redistribution and use in source and binary forms, with or without
-+ * modification, are permitted provided that the following conditions are met:
-+ *     * Redistributions of source code must retain the above copyright
-+ *	 notice, this list of conditions and the following disclaimer.
-+ *     * Redistributions in binary form must reproduce the above copyright
-+ *	 notice, this list of conditions and the following disclaimer in the
-+ *	 documentation and/or other materials provided with the distribution.
-+ *     * Neither the names of the above-listed copyright holders nor the
-+ *	 names of any contributors may be used to endorse or promote products
-+ *	 derived from this software without specific prior written permission.
-+ *
-+ *
-+ * ALTERNATIVELY, this software may be distributed under the terms of the
-+ * GNU General Public License ("GPL") as published by the Free Software
-+ * Foundation, either version 2 of that License or (at your option) any
-+ * later version.
-+ *
-+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
-+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-+ * POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+#ifndef _DPSECI_CMD_H_
-+#define _DPSECI_CMD_H_
-+
-+/* DPSECI Version */
-+#define DPSECI_VER_MAJOR				5
-+#define DPSECI_VER_MINOR				1
-+
-+#define DPSECI_VER(maj, min)	(((maj) << 16) | (min))
-+#define DPSECI_VERSION		DPSECI_VER(DPSECI_VER_MAJOR, DPSECI_VER_MINOR)
-+
-+/* Command IDs */
-+
-+#define DPSECI_CMDID_CLOSE                              0x8001
-+#define DPSECI_CMDID_OPEN                               0x8091
-+#define DPSECI_CMDID_CREATE                             0x9092
-+#define DPSECI_CMDID_DESTROY                            0x9891
-+#define DPSECI_CMDID_GET_API_VERSION                    0xa091
-+
-+#define DPSECI_CMDID_ENABLE                             0x0021
-+#define DPSECI_CMDID_DISABLE                            0x0031
-+#define DPSECI_CMDID_GET_ATTR                           0x0041
-+#define DPSECI_CMDID_RESET                              0x0051
-+#define DPSECI_CMDID_IS_ENABLED                         0x0061
-+
-+#define DPSECI_CMDID_SET_IRQ_ENABLE                     0x0121
-+#define DPSECI_CMDID_GET_IRQ_ENABLE                     0x0131
-+#define DPSECI_CMDID_SET_IRQ_MASK                       0x0141
-+#define DPSECI_CMDID_GET_IRQ_MASK                       0x0151
-+#define DPSECI_CMDID_GET_IRQ_STATUS                     0x0161
-+#define DPSECI_CMDID_CLEAR_IRQ_STATUS                   0x0171
-+
-+#define DPSECI_CMDID_SET_RX_QUEUE                       0x1941
-+#define DPSECI_CMDID_GET_RX_QUEUE                       0x1961
-+#define DPSECI_CMDID_GET_TX_QUEUE                       0x1971
-+#define DPSECI_CMDID_GET_SEC_ATTR                       0x1981
-+#define DPSECI_CMDID_GET_SEC_COUNTERS                   0x1991
-+#define DPSECI_CMDID_SET_OPR				0x19A1
-+#define DPSECI_CMDID_GET_OPR				0x19B1
-+
-+#define DPSECI_CMDID_SET_CONGESTION_NOTIFICATION	0x1701
-+#define DPSECI_CMDID_GET_CONGESTION_NOTIFICATION	0x1711
-+
-+/* Macros for accessing command fields smaller than 1 byte */
-+#define DPSECI_MASK(field)	\
-+	GENMASK(DPSECI_##field##_SHIFT + DPSECI_##field##_SIZE - 1,	\
-+		DPSECI_##field##_SHIFT)
-+
-+#define dpseci_set_field(var, field, val)	\
-+	((var) |= (((val) << DPSECI_##field##_SHIFT) & DPSECI_MASK(field)))
-+
-+#define dpseci_get_field(var, field)	\
-+	(((var) & DPSECI_MASK(field)) >> DPSECI_##field##_SHIFT)
-+
-+struct dpseci_cmd_open {
-+	__le32 dpseci_id;
-+};
-+
-+struct dpseci_cmd_create {
-+	u8 priorities[8];
-+	u8 num_tx_queues;
-+	u8 num_rx_queues;
-+	__le16 pad;
-+	__le32 options;
-+};
-+
-+struct dpseci_cmd_destroy {
-+	__le32 object_id;
-+};
-+
-+struct dpseci_rsp_is_enabled {
-+	__le32 is_enabled;
-+};
-+
-+struct dpseci_cmd_irq_enable {
-+	u8 enable_state;
-+	u8 pad[3];
-+	u8 irq_index;
-+};
-+
-+struct dpseci_rsp_get_irq_enable {
-+	u8 enable_state;
-+};
-+
-+struct dpseci_cmd_irq_mask {
-+	__le32 mask;
-+	u8 irq_index;
-+};
-+
-+struct dpseci_cmd_irq_status {
-+	__le32 status;
-+	u8 irq_index;
-+};
-+
-+struct dpseci_rsp_get_attributes {
-+	__le32 id;
-+	__le32 pad0;
-+	u8 num_tx_queues;
-+	u8 num_rx_queues;
-+	u8 pad1[6];
-+	__le32 options;
-+};
-+
-+struct dpseci_cmd_queue {
-+	__le32 dest_id;
-+	u8 priority;
-+	u8 queue;
-+	u8 dest_type;
-+	u8 pad;
-+	__le64 user_ctx;
+ static void caam_cra_exit_aead(struct crypto_aead *tfm)
+ {
+ 	caam_exit_common(crypto_aead_ctx(tfm));
+ }
+ 
++#define template_ablkcipher	template_u.ablkcipher
++struct caam_alg_template {
++	char name[CRYPTO_MAX_ALG_NAME];
++	char driver_name[CRYPTO_MAX_ALG_NAME];
++	unsigned int blocksize;
++	u32 type;
 +	union {
-+		__le32 options;
-+		__le32 fqid;
-+	};
-+	__le32 order_preservation_en;
++		struct ablkcipher_alg ablkcipher;
++	} template_u;
++	u32 class1_alg_type;
++	u32 class2_alg_type;
 +};
 +
-+struct dpseci_rsp_get_tx_queue {
-+	__le32 pad;
-+	__le32 fqid;
-+	u8 priority;
++static struct caam_alg_template driver_algs[] = {
++	/* ablkcipher descriptor */
++	{
++		.name = "cbc(aes)",
++		.driver_name = "cbc-aes-caam-qi2",
++		.blocksize = AES_BLOCK_SIZE,
++		.type = CRYPTO_ALG_TYPE_GIVCIPHER,
++		.template_ablkcipher = {
++			.setkey = ablkcipher_setkey,
++			.encrypt = ablkcipher_encrypt,
++			.decrypt = ablkcipher_decrypt,
++			.givencrypt = ablkcipher_givencrypt,
++			.geniv = "<built-in>",
++			.min_keysize = AES_MIN_KEY_SIZE,
++			.max_keysize = AES_MAX_KEY_SIZE,
++			.ivsize = AES_BLOCK_SIZE,
++		},
++		.class1_alg_type = OP_ALG_ALGSEL_AES | OP_ALG_AAI_CBC,
++	},
++	{
++		.name = "cbc(des3_ede)",
++		.driver_name = "cbc-3des-caam-qi2",
++		.blocksize = DES3_EDE_BLOCK_SIZE,
++		.type = CRYPTO_ALG_TYPE_GIVCIPHER,
++		.template_ablkcipher = {
++			.setkey = ablkcipher_setkey,
++			.encrypt = ablkcipher_encrypt,
++			.decrypt = ablkcipher_decrypt,
++			.givencrypt = ablkcipher_givencrypt,
++			.geniv = "<built-in>",
++			.min_keysize = DES3_EDE_KEY_SIZE,
++			.max_keysize = DES3_EDE_KEY_SIZE,
++			.ivsize = DES3_EDE_BLOCK_SIZE,
++		},
++		.class1_alg_type = OP_ALG_ALGSEL_3DES | OP_ALG_AAI_CBC,
++	},
++	{
++		.name = "cbc(des)",
++		.driver_name = "cbc-des-caam-qi2",
++		.blocksize = DES_BLOCK_SIZE,
++		.type = CRYPTO_ALG_TYPE_GIVCIPHER,
++		.template_ablkcipher = {
++			.setkey = ablkcipher_setkey,
++			.encrypt = ablkcipher_encrypt,
++			.decrypt = ablkcipher_decrypt,
++			.givencrypt = ablkcipher_givencrypt,
++			.geniv = "<built-in>",
++			.min_keysize = DES_KEY_SIZE,
++			.max_keysize = DES_KEY_SIZE,
++			.ivsize = DES_BLOCK_SIZE,
++		},
++		.class1_alg_type = OP_ALG_ALGSEL_DES | OP_ALG_AAI_CBC,
++	},
++	{
++		.name = "ctr(aes)",
++		.driver_name = "ctr-aes-caam-qi2",
++		.blocksize = 1,
++		.type = CRYPTO_ALG_TYPE_ABLKCIPHER,
++		.template_ablkcipher = {
++			.setkey = ablkcipher_setkey,
++			.encrypt = ablkcipher_encrypt,
++			.decrypt = ablkcipher_decrypt,
++			.geniv = "chainiv",
++			.min_keysize = AES_MIN_KEY_SIZE,
++			.max_keysize = AES_MAX_KEY_SIZE,
++			.ivsize = AES_BLOCK_SIZE,
++		},
++		.class1_alg_type = OP_ALG_ALGSEL_AES | OP_ALG_AAI_CTR_MOD128,
++	},
++	{
++		.name = "rfc3686(ctr(aes))",
++		.driver_name = "rfc3686-ctr-aes-caam-qi2",
++		.blocksize = 1,
++		.type = CRYPTO_ALG_TYPE_GIVCIPHER,
++		.template_ablkcipher = {
++			.setkey = ablkcipher_setkey,
++			.encrypt = ablkcipher_encrypt,
++			.decrypt = ablkcipher_decrypt,
++			.givencrypt = ablkcipher_givencrypt,
++			.geniv = "<built-in>",
++			.min_keysize = AES_MIN_KEY_SIZE +
++				       CTR_RFC3686_NONCE_SIZE,
++			.max_keysize = AES_MAX_KEY_SIZE +
++				       CTR_RFC3686_NONCE_SIZE,
++			.ivsize = CTR_RFC3686_IV_SIZE,
++		},
++		.class1_alg_type = OP_ALG_ALGSEL_AES | OP_ALG_AAI_CTR_MOD128,
++	},
++	{
++		.name = "xts(aes)",
++		.driver_name = "xts-aes-caam-qi2",
++		.blocksize = AES_BLOCK_SIZE,
++		.type = CRYPTO_ALG_TYPE_ABLKCIPHER,
++		.template_ablkcipher = {
++			.setkey = xts_ablkcipher_setkey,
++			.encrypt = ablkcipher_encrypt,
++			.decrypt = ablkcipher_decrypt,
++			.geniv = "eseqiv",
++			.min_keysize = 2 * AES_MIN_KEY_SIZE,
++			.max_keysize = 2 * AES_MAX_KEY_SIZE,
++			.ivsize = AES_BLOCK_SIZE,
++		},
++		.class1_alg_type = OP_ALG_ALGSEL_AES | OP_ALG_AAI_XTS,
++	}
 +};
 +
-+struct dpseci_rsp_get_sec_attr {
-+	__le16 ip_id;
-+	u8 major_rev;
-+	u8 minor_rev;
-+	u8 era;
-+	u8 pad0[3];
-+	u8 deco_num;
-+	u8 zuc_auth_acc_num;
-+	u8 zuc_enc_acc_num;
-+	u8 pad1;
-+	u8 snow_f8_acc_num;
-+	u8 snow_f9_acc_num;
-+	u8 crc_acc_num;
-+	u8 pad2;
-+	u8 pk_acc_num;
-+	u8 kasumi_acc_num;
-+	u8 rng_acc_num;
-+	u8 pad3;
-+	u8 md_acc_num;
-+	u8 arc4_acc_num;
-+	u8 des_acc_num;
-+	u8 aes_acc_num;
+ static struct caam_aead_alg driver_aeads[] = {
+ 	{
+ 		.aead = {
+@@ -2406,6 +3130,48 @@ static struct caam_aead_alg driver_aeads[] = {
+ 	},
+ };
+ 
++static struct caam_crypto_alg *caam_alg_alloc(struct caam_alg_template
++					      *template)
++{
++	struct caam_crypto_alg *t_alg;
++	struct crypto_alg *alg;
++
++	t_alg = kzalloc(sizeof(*t_alg), GFP_KERNEL);
++	if (!t_alg)
++		return ERR_PTR(-ENOMEM);
++
++	alg = &t_alg->crypto_alg;
++
++	snprintf(alg->cra_name, CRYPTO_MAX_ALG_NAME, "%s", template->name);
++	snprintf(alg->cra_driver_name, CRYPTO_MAX_ALG_NAME, "%s",
++		 template->driver_name);
++	alg->cra_module = THIS_MODULE;
++	alg->cra_exit = caam_cra_exit;
++	alg->cra_priority = CAAM_CRA_PRIORITY;
++	alg->cra_blocksize = template->blocksize;
++	alg->cra_alignmask = 0;
++	alg->cra_ctxsize = sizeof(struct caam_ctx);
++	alg->cra_flags = CRYPTO_ALG_ASYNC | CRYPTO_ALG_KERN_DRIVER_ONLY |
++			 template->type;
++	switch (template->type) {
++	case CRYPTO_ALG_TYPE_GIVCIPHER:
++		alg->cra_init = caam_cra_init_ablkcipher;
++		alg->cra_type = &crypto_givcipher_type;
++		alg->cra_ablkcipher = template->template_ablkcipher;
++		break;
++	case CRYPTO_ALG_TYPE_ABLKCIPHER:
++		alg->cra_init = caam_cra_init_ablkcipher;
++		alg->cra_type = &crypto_ablkcipher_type;
++		alg->cra_ablkcipher = template->template_ablkcipher;
++		break;
++	}
++
++	t_alg->caam.class1_alg_type = template->class1_alg_type;
++	t_alg->caam.class2_alg_type = template->class2_alg_type;
++
++	return t_alg;
++}
++
+ static void caam_aead_alg_init(struct caam_aead_alg *t_alg)
+ {
+ 	struct aead_alg *alg = &t_alg->aead;
+@@ -2878,6 +3644,8 @@ static int __cold dpaa2_dpseci_disable(struct dpaa2_caam_priv *priv)
+ 	return 0;
+ }
+ 
++static struct list_head alg_list;
++
+ static int dpaa2_caam_probe(struct fsl_mc_device *dpseci_dev)
+ {
+ 	struct device *dev;
+@@ -2959,6 +3727,44 @@ static int dpaa2_caam_probe(struct fsl_mc_device *dpseci_dev)
+ 	}
+ 
+ 	/* register crypto algorithms the device supports */
++	INIT_LIST_HEAD(&alg_list);
++	for (i = 0; i < ARRAY_SIZE(driver_algs); i++) {
++		struct caam_crypto_alg *t_alg;
++		struct caam_alg_template *alg = driver_algs + i;
++		u32 alg_sel = alg->class1_alg_type & OP_ALG_ALGSEL_MASK;
++
++		/* Skip DES algorithms if not supported by device */
++		if (!priv->sec_attr.des_acc_num &&
++		    ((alg_sel == OP_ALG_ALGSEL_3DES) ||
++		     (alg_sel == OP_ALG_ALGSEL_DES)))
++			continue;
++
++		/* Skip AES algorithms if not supported by device */
++		if (!priv->sec_attr.aes_acc_num &&
++		    (alg_sel == OP_ALG_ALGSEL_AES))
++			continue;
++
++		t_alg = caam_alg_alloc(alg);
++		if (IS_ERR(t_alg)) {
++			err = PTR_ERR(t_alg);
++			dev_warn(dev, "%s alg allocation failed: %d\n",
++				 alg->driver_name, err);
++			continue;
++		}
++		t_alg->caam.dev = dev;
++
++		err = crypto_register_alg(&t_alg->crypto_alg);
++		if (err) {
++			dev_warn(dev, "%s alg registration failed: %d\n",
++				 t_alg->crypto_alg.cra_driver_name, err);
++			kfree(t_alg);
++			continue;
++		}
++
++		list_add_tail(&t_alg->entry, &alg_list);
++		registered = true;
++	}
++
+ 	for (i = 0; i < ARRAY_SIZE(driver_aeads); i++) {
+ 		struct caam_aead_alg *t_alg = driver_aeads + i;
+ 		u32 c1_alg_sel = t_alg->caam.class1_alg_type &
+@@ -3034,6 +3840,16 @@ static int __cold dpaa2_caam_remove(struct fsl_mc_device *ls_dev)
+ 			crypto_unregister_aead(&t_alg->aead);
+ 	}
+ 
++	if (alg_list.next) {
++		struct caam_crypto_alg *t_alg, *n;
++
++		list_for_each_entry_safe(t_alg, n, &alg_list, entry) {
++			crypto_unregister_alg(&t_alg->crypto_alg);
++			list_del(&t_alg->entry);
++			kfree(t_alg);
++		}
++	}
++
+ 	dpaa2_dpseci_disable(priv);
+ 	dpaa2_dpseci_dpio_free(priv);
+ 	dpaa2_dpseci_free(priv);
+diff --git a/drivers/crypto/caam/caamalg_qi2.h b/drivers/crypto/caam/caamalg_qi2.h
+index bfb3a6416f91..8840721595c8 100644
+--- a/drivers/crypto/caam/caamalg_qi2.h
++++ b/drivers/crypto/caam/caamalg_qi2.h
+@@ -170,6 +170,27 @@ struct aead_edesc {
+ 	struct dpaa2_sg_entry sgt[0];
+ };
+ 
++/*
++ * ablkcipher_edesc - s/w-extended ablkcipher descriptor
++ * @src_nents: number of segments in input scatterlist
++ * @dst_nents: number of segments in output scatterlist
++ * @iv_dma: dma address of iv for checking continuity and link table
++ * @qm_sg_bytes: length of dma mapped qm_sg space
++ * @qm_sg_dma: I/O virtual address of h/w link table
++ * @sgt: the h/w link table
++ */
++struct ablkcipher_edesc {
++	int src_nents;
++	int dst_nents;
++	dma_addr_t iv_dma;
++	int qm_sg_bytes;
++	dma_addr_t qm_sg_dma;
++#define CAAM_QI_MAX_ABLKCIPHER_SG					    \
++	((CAAM_QI_MEMCACHE_SIZE - offsetof(struct ablkcipher_edesc, sgt)) / \
++	 sizeof(struct dpaa2_sg_entry))
++	struct dpaa2_sg_entry sgt[0];
 +};
 +
-+struct dpseci_rsp_get_sec_counters {
-+	__le64 dequeued_requests;
-+	__le64 ob_enc_requests;
-+	__le64 ib_dec_requests;
-+	__le64 ob_enc_bytes;
-+	__le64 ob_prot_bytes;
-+	__le64 ib_dec_bytes;
-+	__le64 ib_valid_bytes;
-+};
-+
-+struct dpseci_rsp_get_api_version {
-+	__le16 major;
-+	__le16 minor;
-+};
-+
-+struct dpseci_cmd_opr {
-+	__le16 pad;
-+	u8 index;
-+	u8 options;
-+	u8 pad1[7];
-+	u8 oloe;
-+	u8 oeane;
-+	u8 olws;
-+	u8 oa;
-+	u8 oprrws;
-+};
-+
-+#define DPSECI_OPR_RIP_SHIFT		0
-+#define DPSECI_OPR_RIP_SIZE		1
-+#define DPSECI_OPR_ENABLE_SHIFT		1
-+#define DPSECI_OPR_ENABLE_SIZE		1
-+#define DPSECI_OPR_TSEQ_NLIS_SHIFT	1
-+#define DPSECI_OPR_TSEQ_NLIS_SIZE	1
-+#define DPSECI_OPR_HSEQ_NLIS_SHIFT	1
-+#define DPSECI_OPR_HSEQ_NLIS_SIZE	1
-+
-+struct dpseci_rsp_get_opr {
-+	__le64 pad;
-+	u8 rip_enable;
-+	u8 pad0[2];
-+	u8 oloe;
-+	u8 oeane;
-+	u8 olws;
-+	u8 oa;
-+	u8 oprrws;
-+	__le16 nesn;
-+	__le16 pad1;
-+	__le16 ndsn;
-+	__le16 pad2;
-+	__le16 ea_tseq;
-+	u8 tseq_nlis;
-+	u8 pad3;
-+	__le16 ea_hseq;
-+	u8 hseq_nlis;
-+	u8 pad4;
-+	__le16 ea_hptr;
-+	__le16 pad5;
-+	__le16 ea_tptr;
-+	__le16 pad6;
-+	__le16 opr_vid;
-+	__le16 pad7;
-+	__le16 opr_id;
-+};
-+
-+#define DPSECI_CGN_DEST_TYPE_SHIFT	0
-+#define DPSECI_CGN_DEST_TYPE_SIZE	4
-+#define DPSECI_CGN_UNITS_SHIFT		4
-+#define DPSECI_CGN_UNITS_SIZE		2
-+
-+struct dpseci_cmd_congestion_notification {
-+	__le32 dest_id;
-+	__le16 notification_mode;
-+	u8 priority;
-+	u8 options;
-+	__le64 message_iova;
-+	__le64 message_ctx;
-+	__le32 threshold_entry;
-+	__le32 threshold_exit;
-+};
-+
-+#endif /* _DPSECI_CMD_H_ */
+ /**
+  * caam_flc - Flow Context (FLC)
+  * @flc: Flow Context options
+@@ -200,7 +221,7 @@ enum optype {
+  * @op_type: operation type
+  * @cbk: Callback function to invoke when job is completed
+  * @ctx: arbit context attached with request by the application
+- * @edesc: extended descriptor; points to aead_edesc
++ * @edesc: extended descriptor; points to one of {ablkcipher,aead}_edesc
+  */
+ struct caam_request {
+ 	struct dpaa2_fl_entry fd_flt[2];
 -- 
 2.12.0.264.gd6db3f216544
