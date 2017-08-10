@@ -1,59 +1,64 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 10 Aug 2017 10:52:45 +0800
-Subject: [PATCH v2] arm64: arch_timer: avoid infinite recursion when ftrace is
- enabled
-Message-ID: <a53349bd-aa6c-cdc1-1476-a068a5cfc2c2@huawei.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 10 Aug 2017 11:29:54 +0800
+Subject: [PATCH] mmc: sunxi: Fix clock rate passed to sunxi_mmc_clk_set_phase
+Message-ID: <20170810032954.9104-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On platforms with an arch timer erratum workaround, it's possible for
-arch_timer_reg_read_stable() to recurse into itself when certain
-tracing options are enabled, leading to stack overflows and related
-problems.
+sunxi_mmc_clk_set_phase expects the actual card clock rate to be passed
+to it. When the internal divider code was reworked in commit 9a639c6073d3
+("mmc: sunxi: Support MMC DDR52 transfer mode with new timing mode"),
+this requirement was missed, and the module clock rate was passed in
+instead. This broke 8 bit DDR MMC on old controllers, as the module
+clock rate is double the card clock rate, for which we have no valid
+delay settings.
 
-For example, when PREEMPT_TRACER and FUNCTION_GRAPH_TRACER are
-selected, it's possible to trigger this with:
+Fix this by applying the internal divider to the clock rate right after
+we configure it in hardware.
 
-$ mount -t debugfs nodev /sys/kernel/debug/
-$ echo function_graph > /sys/kernel/debug/tracing/current_tracer
-
-The problem is that in such cases, preempt_disable() instrumentation
-attempts to acquire a timestamp via trace_clock(), resulting in a call
-back to arch_timer_reg_read_stable(), and hence recursion.
-
-This patch changes arch_timer_reg_read_stable() to use
-preempt_{disable,enable}_notrace(), which avoids this.
-
-This problem is similar to the fixed by upstream commit 96b3d28bf4
-("sched/clock: Prevent tracing recursion in sched_clock_cpu()").
-
-Fixes: 6acc71ccac71 ("arm64: arch_timer: Allows a CPU-specific erratum to only affect a subset of CPUs")
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Fixes: 9a639c6073d3 ("mmc: sunxi: Support MMC DDR52 transfer mode with
+		      new timing mode")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm64/include/asm/arch_timer.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index 74d08e4..67bb7a4 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -65,13 +65,13 @@ struct arch_timer_erratum_workaround {
- 	u64 _val;							\
- 	if (needs_unstable_timer_counter_workaround()) {		\
- 		const struct arch_timer_erratum_workaround *wa;		\
--		preempt_disable();					\
-+		preempt_disable_notrace();				\
- 		wa = __this_cpu_read(timer_unstable_counter_workaround); \
- 		if (wa && wa->read_##reg)				\
- 			_val = wa->read_##reg();			\
- 		else							\
- 			_val = read_sysreg(reg);			\
--		preempt_enable();					\
-+		preempt_enable_notrace();				\
- 	} else {							\
- 		_val = read_sysreg(reg);				\
- 	}								\
+Sorry for all the regressions the A83T MMC series has caused.
+I only caught this while testing some other patches on the H3.
+I really hope this is the last one.
+
+---
+ drivers/mmc/host/sunxi-mmc.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 6c7eb859ace1..da5f46a14497 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -821,6 +821,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 	rval |= div - 1;
+ 	mmc_writel(host, REG_CLKCR, rval);
+ 
++	/* update card clock rate to account for internal divider */
++	rate /= div;
++
+ 	if (host->use_new_timings) {
+ 		/* Don't touch the delay bits */
+ 		rval = mmc_readl(host, REG_SD_NTSR);
+@@ -828,6 +831,7 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 		mmc_writel(host, REG_SD_NTSR, rval);
+ 	}
+ 
++	/* sunxi_mmc_clk_set_phase expects the actual card clock rate */
+ 	ret = sunxi_mmc_clk_set_phase(host, ios, rate);
+ 	if (ret)
+ 		return ret;
+@@ -849,7 +853,7 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 		return ret;
+ 
+ 	/* And we just enabled our clock back */
+-	mmc->actual_clock = rate / div;
++	mmc->actual_clock = rate;
+ 
+ 	return 0;
+ }
 -- 
-1.9.0
+2.13.3
