@@ -1,133 +1,435 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 9 Aug 2017 19:21:21 -0500
-Subject: [linux-sunxi] [PATCH 01/13] dt-bindings: update the binding for
- Allwinner H3 DE2 support
-In-Reply-To: <48442573.082BymFnMM@jernej-laptop>
-References: <20170801131304.7741-1-icenowy@aosc.io>
- <79034825.lnfmIyYlWl@jernej-laptop>
- <d6c7c6de29be2674ad6b37b184d1df7f@aosc.io>
- <48442573.082BymFnMM@jernej-laptop>
-Message-ID: <20170810002121.jydgklyxpm3fuekl@rob-hp-laptop>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Thu, 10 Aug 2017 09:24:18 +0800
+Subject: [PATCH] arm64: dts: rockchip: add rk3328-rock64 board
+In-Reply-To: <20170809220408.4301-1-heiko@sntech.de>
+References: <20170809220408.4301-1-heiko@sntech.de>
+Message-ID: <8e116c15-905b-3392-5b1f-c6e31c342d94@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 02, 2017 at 09:06:26PM +0200, Jernej ?krabec wrote:
-> Hi,
-> 
-> Dne sreda, 02. avgust 2017 ob 07:02:39 CEST je icenowy at aosc.io napisal(a):
-> > ? 2017-08-02 12:53?Jernej ?krabec ???
-> > 
-> > > Hi Icenowy,
-> > > 
-> > > Dne torek, 01. avgust 2017 ob 15:12:52 CEST je Icenowy Zheng
-> > > 
-> > > napisal(a):
-> > >> Allwinner H3 features a "Display Engine 2.0".
-> > >> 
-> > >> Add device tree bindings for the following parts:
-> > >> - H3 TCONs
-> > >> - H3 Mixers
-> > >> - H3 Display engine
-> > >> 
-> > >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > >> ---
-> > >> 
-> > >>  .../bindings/display/sunxi/sun4i-drm.txt           | 25
-> > >> 
-> > >> ++++++++++++++++++---- 1 file changed, 21 insertions(+), 4
-> > >> deletions(-)
-> > >> 
-> > >> diff --git
-> > >> a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > >> b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt index
-> > >> 2ee6ff0ef98e..92512953943e 100644
-> > >> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > >> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > >> 
-> > >> @@ -87,18 +87,17 @@ Required properties:
-> > >>     * allwinner,sun6i-a31-tcon
-> > >>     * allwinner,sun6i-a31s-tcon
-> > >>     * allwinner,sun8i-a33-tcon
-> > >> 
-> > >> +   * allwinner,sun8i-h3-tcon
-> > >> 
-> > >>     * allwinner,sun8i-v3s-tcon
-> > >>   
-> > >>   - reg: base address and size of memory-mapped region
-> > >>   - interrupts: interrupt associated to this IP
-> > >>   
-> > >>   - clocks: phandles to the clocks feeding the TCON. Three are needed:
-> > >>     - 'ahb': the interface clocks
-> > >> 
-> > >> -   - 'tcon-ch0': The clock driving the TCON channel 0
-> > >> 
-> > >>   - resets: phandles to the reset controllers driving the encoder
-> > >>   
-> > >>     - "lcd": the reset line for the TCON channel 0
-> > >>   
-> > >>   - clock-names: the clock names mentioned above
-> > >>   - reset-names: the reset names mentioned above
-> > >> 
-> > >> - - clock-output-names: Name of the pixel clock created
-> > >> 
-> > >>  - ports: A ports node with endpoint definitions as defined in
-> > >>  
-> > >>    Documentation/devicetree/bindings/media/video-interfaces.txt. The
-> > >> 
-> > >> @@ -112,7 +111,23 @@ Required properties:
-> > >>    channel the endpoint is associated to. If that property is not
-> > >>    present, the endpoint number will be used as the channel number.
-> > >> 
-> > >> -On SoCs other than the A33 and V3s, there is one more clock required:
-> > >> +For the following compatibles:
-> > >> +   * allwinner,sun5i-a13-tcon
-> > >> +   * allwinner,sun6i-a31-tcon
-> > >> +   * allwinner,sun6i-a31s-tcon
-> > >> +   * allwinner,sun8i-a33-tcon
-> > >> +   * allwinner,sun8i-v3s-tcon
-> > >> +there is one more clock and one more property required:
-> > >> + - clocks:
-> > >> +   - 'tcon-ch0': The clock driving the TCON channel 0
-> > >> + - clock-output-names: Name of the pixel clock created
-> > >> +
-> > >> +For the following compatibles:
-> > >> +   * allwinner,sun5i-a13-tcon
-> > >> +   * allwinner,sun6i-a31-tcon
-> > >> +   * allwinner,sun6i-a31s-tcon
-> > >> +   * allwinner,sun8i-h3-tcon
-> > >> 
-> > >> +there is one more clock required:
-> > >>     - 'tcon-ch1': The clock driving the TCON channel 1
-> > >>  
-> > >>  DRC
-> > >> 
-> > >> @@ -207,6 +222,8 @@ supported.
-> > >> 
-> > >>  Required properties:
-> > >>    - compatible: value must be one of:
-> > >>      * allwinner,sun8i-v3s-de2-mixer
-> > >> 
-> > >> +    * allwinner,sun8i-h3-de2-mixer0
-> > >> +    * allwinner,sun8i-h3-de2-mixer1
-> > > 
-> > > About that, I concur with Maxime here, plane number properties would be
-> > > better. If we don't do this now, we will never have it.
-> > 
-> > But I still prefer different compatibles, as the capabilities are
-> > already
-> > proven to be different between mixer0 and mixer1, and furtherly we
-> > cannot
-> > promise Allwinner won't add more functions only available at mixer0.
-> > 
-> > Then we will be trapped into a situation that we describe more and more
-> > functions via properties, but they should be encoded into the
-> > compatible.
-> 
-> It is either multiple compatibles or multiple properties. I prefer the later, 
-> but it is up to maintainers to decide.
+Hi Heiko,
 
-It's not the same. A compatible can imply an infinite number of 
-properties. I'm fine with properties too, but with only 2 instances I 
-don't think it makes much sense.
+On 2017/8/10 6:04, Heiko Stuebner wrote:
+> The ROCK64 is a credit card size 4K60P HDR Media Board Computer using the
+> Rockchip RK3328 Quad-Core ARM Cortex A53 64-Bit Processor and supporting
+> up to 4GB 1600MHz LPDDR3 memory. It provides eMMC module socket, MicroSD
+> Card slot, Pi-2 Bus, Pi-P5+ Bus, USB 3.0 and many others peripheral
+> devices interface for makers to integrate with sensors and devices.
+> 
+> The devicetree currently supports basic peripherals, with more to be
+> added later on.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> Depends on rk805 pmic support landing, which hopefully will happen
+> in the next days.
+> 
+>   Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+>   arch/arm64/boot/dts/rockchip/Makefile              |   1 +
+>   arch/arm64/boot/dts/rockchip/rk3328-rock64.dts     | 362 +++++++++++++++++++++
+>   3 files changed, 367 insertions(+)
+>   create mode 100644 arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+> index 88d95323d301..b54e9bfd9562 100644
+> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
+> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+> @@ -134,6 +134,10 @@ Rockchip platforms device tree bindings
+>       Required root node properties:
+>        - compatible = "phytec,rk3288-pcm-947", "phytec,rk3288-phycore-som", "rockchip,rk3288";
+>   
+> +- Pine64 Rock64 board:
+> +    Required root node properties:
+> +    - compatible = "pine64,rock64", "rockchip,rk3328";
+> +
+>   - Rockchip PX3 Evaluation board:
+>       Required root node properties:
+>         - compatible = "rockchip,px3-evb", "rockchip,px3", "rockchip,rk3188";
+> diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
+> index d0ad366bbd12..106fb8e0f2f8 100644
+> --- a/arch/arm64/boot/dts/rockchip/Makefile
+> +++ b/arch/arm64/boot/dts/rockchip/Makefile
+> @@ -1,4 +1,5 @@
+>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-evb.dtb
+> +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-rock64.dtb
+>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
+>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
+>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-orion-r68-meta.dtb
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+> new file mode 100644
+> index 000000000000..a77a94200f96
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+> @@ -0,0 +1,362 @@
+> +/*
+> + * Copyright (c) 2017 PINE64
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "rk3328.dtsi"
+> +
+> +/ {
+> +	model = "Pine64 Rock64";
+> +	compatible = "pine64,rock64", "rockchip,rk3328";
+> +
+> +	chosen {
+> +		stdout-path = "serial2:1500000n8";
+> +	};
+> +
+> +	gmac_clkin: external-gmac-clock {
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <125000000>;
+> +		clock-output-names = "gmac_clkin";
+> +		#clock-cells = <0>;
+> +	};
+> +
+> +	sdio_pwrseq: sdio-pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&wifi_enable_h>;
+> +
+> +		/*
+> +		 * On the module itself this is one of these (depending
+> +		 * on the actual card populated):
+> +		 * - SDIO_RESET_L_WL_REG_ON
+> +		 * - PDN (power down when low)
+> +		 */
+> +		reset-gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
+> +	};
+> +
+> +	vcc_sd: sdmmc-regulator {
+> +		compatible = "regulator-fixed";
+> +		gpio = <&gpio0 30 GPIO_ACTIVE_LOW>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&sdmmc0m1_gpio>;
+> +		regulator-name = "vcc_sd";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		vin-supply = <&vcc_io>;
+> +	};
+> +
+> +	vcc_host_5v: vcc-host-5v-regulator {
+> +		compatible = "regulator-fixed";
+> +		enable-active-high;
+> +		gpio = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&usb30_host_drv>;
+> +		regulator-name = "vcc_host_5v";
+> +		regulator-always-on;
+> +		vin-supply = <&vcc_sys>;
+> +	};
+> +
+> +	vcc_host1_5v: vcc_otg_5v: vcc-host1-5v-regulator {
+> +		compatible = "regulator-fixed";
+> +		enable-active-high;
+> +		gpio = <&gpio0 RK_PD3 GPIO_ACTIVE_HIGH>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&usb20_host_drv>;
+> +		regulator-name = "vcc_host1_5v";
+> +		regulator-always-on;
+> +		vin-supply = <&vcc_sys>;
+> +	};
+> +
+> +	vcc_sys: vcc-sys {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vcc_sys";
+> +		regulator-always-on;
+> +		regulator-boot-on;
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +	};
+> +};
+> +
+> +&cpu0 {
+> +	cpu-supply = <&vdd_arm>;
+> +};
+> +
+> +&emmc {
+> +	bus-width = <8>;
+> +	cap-mmc-highspeed;
+> +	supports-emmc;
+> +	disable-wp;
+> +	non-removable;
+> +	num-slots = <1>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_bus8>;
+> +	status = "okay";
+> +};
+> +
 
-Rob
+supports-{emmc, sd, sdio} aren't vaild properties.
+If you do want to speedup the init process and you
+could add no-sd and no-sdio for emmc.
+
+num-slots is deprecated and would be cleaned from all dts for 4.14
+cycle. And disable-wp is only used for SD card now.
+
+The same comment for the following sd and sdio nodes.
+
+> +&gmac2io {
+> +	phy-supply = <&vcc_io>;
+> +	phy-mode = "rgmii";
+> +	clock_in_out = "input";
+> +	snps,reset-gpio = <&gpio1 RK_PC2 GPIO_ACTIVE_LOW>;
+> +	snps,reset-active-low;
+> +	snps,reset-delays-us = <0 10000 50000>;
+> +	assigned-clocks = <&cru SCLK_MAC2IO>, <&cru SCLK_MAC2IO_EXT>;
+> +	assigned-clock-parents = <&gmac_clkin>, <&gmac_clkin>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&rgmiim1_pins>;
+> +	tx_delay = <0x26>;
+> +	rx_delay = <0x11>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +	status = "okay";
+> +
+> +	rk805: rk805 at 18 {
+> +		compatible = "rockchip,rk805";
+> +		reg = <0x18>;
+> +		interrupt-parent = <&gpio2>;
+> +		interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
+> +		#clock-cells = <1>;
+> +		clock-output-names = "xin32k", "rk805-clkout2";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pmic_int_l>;
+> +		rockchip,system-power-controller;
+> +		wakeup-source;
+> +
+> +		vcc1-supply = <&vcc_sys>;
+> +		vcc2-supply = <&vcc_sys>;
+> +		vcc3-supply = <&vcc_sys>;
+> +		vcc4-supply = <&vcc_sys>;
+> +		vcc5-supply = <&vcc_io>;
+> +		vcc6-supply = <&vcc_sys>;
+> +
+> +		regulators {
+> +			vdd_logic: DCDC_REG1 {
+> +				regulator-name = "vdd_logic";
+> +				regulator-min-microvolt = <712500>;
+> +				regulator-max-microvolt = <1450000>;
+> +				regulator-initial-mode = <0x1>;
+> +				regulator-ramp-delay = <12500>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-state-mem {
+> +					regulator-mode = <0x2>;
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1000000>;
+> +				};
+> +			};
+> +
+> +			vdd_arm: DCDC_REG2 {
+> +				regulator-name = "vdd_arm";
+> +				regulator-min-microvolt = <712500>;
+> +				regulator-max-microvolt = <1450000>;
+> +				regulator-initial-mode = <0x1>;
+> +				regulator-ramp-delay = <12500>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-state-mem {
+> +					regulator-mode = <0x2>;
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <950000>;
+> +				};
+> +			};
+> +
+> +			vcc_ddr: DCDC_REG3 {
+> +				regulator-name = "vcc_ddr";
+> +				regulator-initial-mode = <0x1>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-state-mem {
+> +					regulator-mode = <0x2>;
+> +					regulator-on-in-suspend;
+> +				};
+> +			};
+> +
+> +			vcc_io: DCDC_REG4 {
+> +				regulator-name = "vcc_io";
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-initial-mode = <0x1>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-state-mem {
+> +					regulator-mode = <0x2>;
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <3300000>;
+> +				};
+> +			};
+> +
+> +			vcc_18: LDO_REG1 {
+> +				regulator-name = "vdd_18";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1800000>;
+> +				};
+> +			};
+> +
+> +			vcc18_emmc: LDO_REG2 {
+> +				regulator-name = "vcc_18emmc";
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1800000>;
+> +				};
+> +			};
+> +
+> +			vdd_10: LDO_REG3 {
+> +				regulator-name = "vdd_10";
+> +				regulator-min-microvolt = <1000000>;
+> +				regulator-max-microvolt = <1000000>;
+> +				regulator-boot-on;
+> +				regulator-always-on;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1000000>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&io_domains {
+> +	status = "okay";
+> +
+> +	vccio1-supply = <&vcc_io>;
+> +	vccio2-supply = <&vcc18_emmc>;
+> +	vccio3-supply = <&vcc_io>;
+> +	vccio4-supply = <&vcc_18>;
+> +	vccio5-supply = <&vcc_io>;
+> +	vccio6-supply = <&vcc_io>;
+> +	pmuio-supply = <&vcc_io>;
+> +};
+> +
+> +&pinctrl {
+> +	pmic {
+> +		pmic_int_l: pmic-int-l {
+> +			rockchip,pins = <2 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>;
+> +		};
+> +	};
+> +
+> +	sdio-pwrseq {
+> +		wifi_enable_h: wifi-enable-h {
+> +			rockchip,pins = <1 18 RK_FUNC_GPIO &pcfg_pull_none>;
+> +		};
+> +	};
+> +
+> +	usb2 {
+> +		usb20_host_drv: usb20-host-drv {
+> +			rockchip,pins = <0 RK_PD3 RK_FUNC_GPIO &pcfg_pull_none>;
+> +		};
+> +	};
+> +
+> +	usb3 {
+> +		usb30_host_drv: usb30-host-drv {
+> +			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
+> +		};
+> +	};
+> +};
+> +
+> +&sdio {
+> +	bus-width = <4>;
+> +	cap-sd-highspeed;
+> +	cap-sdio-irq;
+> +	disable-wp > +	keep-power-in-suspend;
+> +	max-frequency = <150000000>;
+> +	mmc-pwrseq = <&sdio_pwrseq>;
+> +	non-removable;
+> +	num-slots = <1>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&sdmmc1_bus4 &sdmmc1_cmd &sdmmc1_clk>;
+> +	supports-sdio;
+> +	status = "disabled";
+> +};
+> +
+> +&sdmmc {
+> +	bus-width = <4>;
+> +	cap-mmc-highspeed;
+> +	cap-sd-highspeed;
+> +	disable-wp;
+> +	max-frequency = <150000000>;
+> +	num-slots = <1>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&sdmmc0_clk &sdmmc0_cmd &sdmmc0_dectn &sdmmc0_bus4>;
+> +	supports-sd;
+> +	vmmc-supply = <&vcc_sd>;
+> +	status = "okay";
+> +};
+> +
+> +&uart2 {
+> +	status = "okay";
+> +};
+> +
+> +&u2phy {
+> +	status = "okay";
+> +
+> +	u2phy_host: host-port {
+> +		status = "okay";
+> +	};
+> +
+> +	u2phy_otg: otg-port {
+> +		status = "okay";
+> +	};
+> +};
+> +
+> +&usb20_otg {
+> +	dr_mode = "host";
+> +	status = "okay";
+> +};
+> +
+> +&usb_host0_ehci {
+> +	status = "okay";
+> +};
+> +
+> +&usb_host0_ohci {
+> +	status = "okay";
+> +};
+> 
