@@ -1,43 +1,95 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 9 Aug 2017 19:08:31 -0500
-Subject: [PATCH 1/7] mtd: spi-nor: cadence-quadspi: add a delay in write
- sequence
-In-Reply-To: <20170801045434.8733-2-vigneshr@ti.com>
-References: <20170801045434.8733-1-vigneshr@ti.com>
- <20170801045434.8733-2-vigneshr@ti.com>
-Message-ID: <20170810000831.mtj5w4sgwa56ja24@rob-hp-laptop>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 10 Aug 2017 09:09:19 +0900
+Subject: [PATCH v2 4/5] usb: gadget: udc: Replace the deprecated extcon API
+In-Reply-To: <5987CB59.9070008@samsung.com>
+References: <1501748448-26821-1-git-send-email-cw00.choi@samsung.com>
+ <CGME20170803082050epcas1p2491eedf2f26510f55cd15ce777356fce@epcas1p2.samsung.com>
+ <1501748448-26821-5-git-send-email-cw00.choi@samsung.com>
+ <5987CB59.9070008@samsung.com>
+Message-ID: <598BA42F.8060808@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 01, 2017 at 10:24:28AM +0530, Vignesh R wrote:
-> As per 66AK2G02 TRM[1] SPRUHY8F section 11.15.5.3 Indirect Access
-> Controller programming sequence, a delay equal to couple QSPI master
-> clock(~5ns) is required after setting CQSPI_REG_INDIRECTWR_START bit and
-> writing data to the flash. Add a new compatible to handle the couple of
-> cycles of delay required in the indirect write sequence, since this
-> delay is specific to TI 66AK2G SoC.
-> 
-> [1]http://www.ti.com/lit/ug/spruhy8f/spruhy8f.pdf
-> 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
->  Documentation/devicetree/bindings/mtd/cadence-quadspi.txt |  1 +
->  drivers/mtd/spi-nor/cadence-quadspi.c                     | 13 +++++++++++++
->  2 files changed, 14 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
-> index f248056da24c..fdd511a83511 100644
-> --- a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
-> +++ b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
-> @@ -2,6 +2,7 @@
->  
->  Required properties:
->  - compatible : Should be "cdns,qspi-nor".
-> +	       Should be "ti,k2g-qspi" for TI 66AK2G platform.
+Ping.
 
-Also, this doesn't indicate that "cdns,qspi-nor" is a fallback as you 
-have in the dts files. Reformat to 1 valid combination per line.
+Hi Felipe,
 
->  - reg : Contains two entries, each of which is a tuple consisting of a
->  	physical address and length. The first entry is the address and
->  	length of the controller register set. The second entry is the
+I sent the first patch[1] more than three weeks ago.
+But I didn't receive the any review.
+[1] https://lkml.org/lkml/2017/7/16/523
+
+This patch is very simple. After finishing the review
+I'll remove the deprecated extcon API and then send
+the immutable branch to both phy and usb maintainer.
+
+
+Usually, I send the extcon's pull request to the GregKH
+for the next merge after releasing 4.x-rc6.
+(4.x-rc4 was released)
+
+Please review this patch.
+
+
+On 2017? 08? 07? 11:07, Chanwoo Choi wrote:
+> Dear Felipe,
+> 
+> Could you please review this patch?
+> I hope to remove the deprecated extcon API.
+> 
+> Regards,
+> Chanwoo Choi
+> 
+> On 2017? 08? 03? 17:20, Chanwoo Choi wrote:
+>> This patch replaces the deprecated extcon API as following:
+>> - extcon_get_cable_state_() -> extcon_get_state()
+>>
+>> Cc: Felipe Balbi <balbi@kernel.org>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Raviteja Garimella <raviteja.garimella@broadcom.com>
+>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> ---
+>>  drivers/usb/gadget/udc/snps_udc_plat.c | 6 +++---
+>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/usb/gadget/udc/snps_udc_plat.c b/drivers/usb/gadget/udc/snps_udc_plat.c
+>> index 2e11f19e07ae..0ce7b3ba60ff 100644
+>> --- a/drivers/usb/gadget/udc/snps_udc_plat.c
+>> +++ b/drivers/usb/gadget/udc/snps_udc_plat.c
+>> @@ -184,7 +184,7 @@ static int udc_plat_probe(struct platform_device *pdev)
+>>  			goto exit_phy;
+>>  		}
+>>  
+>> -		ret = extcon_get_cable_state_(udc->edev, EXTCON_USB);
+>> +		ret = extcon_get_state(udc->edev, EXTCON_USB);
+>>  		if (ret < 0) {
+>>  			dev_err(dev, "Can't get cable state\n");
+>>  			goto exit_extcon;
+>> @@ -273,7 +273,7 @@ static int udc_plat_suspend(struct device *dev)
+>>  	udc = dev_get_drvdata(dev);
+>>  	stop_udc(udc);
+>>  
+>> -	if (extcon_get_cable_state_(udc->edev, EXTCON_USB) > 0) {
+>> +	if (extcon_get_state(udc->edev, EXTCON_USB) > 0) {
+>>  		dev_dbg(udc->dev, "device -> idle\n");
+>>  		stop_udc(udc);
+>>  	}
+>> @@ -303,7 +303,7 @@ static int udc_plat_resume(struct device *dev)
+>>  		return ret;
+>>  	}
+>>  
+>> -	if (extcon_get_cable_state_(udc->edev, EXTCON_USB) > 0) {
+>> +	if (extcon_get_state(udc->edev, EXTCON_USB) > 0) {
+>>  		dev_dbg(udc->dev, "idle -> device\n");
+>>  		start_udc(udc);
+>>  	}
+>>
+> 
+> 
+> 
+> 
+
+
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
