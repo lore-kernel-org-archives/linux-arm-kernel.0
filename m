@@ -1,24 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 10 Aug 2017 15:56:07 +0100
-Subject: [PATCH v2 3/3] dt-bindings: ASoC: rockchip: Add
- rockchip,codec-names property
-In-Reply-To: <1502340898-28403-4-git-send-email-jeffy.chen@rock-chips.com>
-References: <1502340898-28403-1-git-send-email-jeffy.chen@rock-chips.com>
- <1502340898-28403-4-git-send-email-jeffy.chen@rock-chips.com>
-Message-ID: <20170810145607.g663oq7cfxjmaxtf@sirena.org.uk>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 10 Aug 2017 10:05:24 -0500
+Subject: [PATCH v2 3/4] dt-bindings: remoteproc: Add bindings for Davinci
+ DSP processors
+In-Reply-To: <20170810140157.osn5rtymykgdf6gp@rob-hp-laptop>
+References: <20170801154844.24662-1-s-anna@ti.com>
+ <20170801154844.24662-4-s-anna@ti.com>
+ <20170810140157.osn5rtymykgdf6gp@rob-hp-laptop>
+Message-ID: <1aec744a-5e9c-d33f-9a55-1ef4f937400d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 10, 2017 at 12:54:58PM +0800, Jeffy Chen wrote:
-> Add a new rockchip,codec-names property, so that the driver can parse
-> the codecs by name.
+On 08/10/2017 09:01 AM, Rob Herring wrote:
+> On Tue, Aug 01, 2017 at 10:48:43AM -0500, Suman Anna wrote:
+>> Add the device tree bindings document for the DSP processor
+>> subsystem devices on TI Davinci DA8xx/OMAP-L13x SoCs.
+>>
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>> ---
+>> v2: 
+>>  - Updated the patch header
+>>  - Revised the binding status statement slightly
+>>  - Updated the example to address Rob's comments
+>>  - No changes in properties description themselves
+>> v1: https://patchwork.kernel.org/patch/9751269/
+>>
+>>  .../bindings/remoteproc/ti,davinci-rproc.txt       | 86 ++++++++++++++++++++++
+>>  1 file changed, 86 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/remoteproc/ti,davinci-rproc.txt
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Why?  You're already referencing the CODECs by phandle and these names
-are not part of any ABI...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170810/30656a3a/attachment.sig>
+Thanks Rob.
+
+Bjorn,
+Appreciate it if you can pick up the series for v4.14.
+
+Thanks,
+Suman
