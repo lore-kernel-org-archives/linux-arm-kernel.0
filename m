@@ -1,37 +1,23 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 10 Aug 2017 18:16:31 +0100
-Subject: [PATCH] ACPI/IORT: Fix build regression without IOMMU
-In-Reply-To: <20170810164522.25555-1-lorenzo.pieralisi@arm.com>
-References: <20170810164522.25555-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170810171631.iqj5k674ltjpj5va@armageddon.cambridge.arm.com>
+Date: Thu, 10 Aug 2017 18:17:59 +0100
+Subject: [PATCH] arm64: compat: Remove leftover variable declaration
+In-Reply-To: <20170804171710.21736-1-salyzyn@android.com>
+References: <20170804171710.21736-1-salyzyn@android.com>
+Message-ID: <20170810171758.dpk2h3jcykqz7q4p@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 10, 2017 at 05:45:22PM +0100, Lorenzo Pieralisi wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
+On Fri, Aug 04, 2017 at 10:17:00AM -0700, Mark Salyzyn wrote:
+> From: Kevin Brodsky <kevin.brodsky@arm.com>
 > 
-> A recent change reintroduced a bug that had previously been
-> fixed by commit d49f2dedf33b ("ACPI/IORT: Fix CONFIG_IOMMU_API
-> dependency"):
+> Commit a1d5ebaf8ccd ("arm64: big-endian: don't treat code as data when
+> copying sigret code") moved the 32-bit sigreturn trampoline code from
+> the aarch32_sigret_code array to kuser32.S. The commit removed the
+> array definition from signal32.c, but not its declaration in
+> signal32.h. Remove the leftover declaration.
 > 
-> drivers/acpi/arm64/iort.c: In function 'iort_iommu_configure':
-> drivers/acpi/arm64/iort.c:829:26: error: 'struct iommu_fwspec' has no member named 'ops'
-> 
-> Replace a direct reference to iommu_fwspec->ops with a helper function
-> call to fix the issue.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> ---
-> Catalin, Will,
-> 
-> unfortunately it slipped our kconfig checks (and the kbuild bot) but
-> not Arnd's.
-> 
-> It applies to arm64 for-next/core on top of v4.14 queue. Please apply.
+> Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
+> Signed-off-by: Mark Salyzyn <salyzyn@android.com>
 
 Applied. Thanks.
 
