@@ -1,59 +1,55 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 10 Aug 2017 17:33:17 +0100
-Subject: [PATCH] arm64: fix pmem interface definition
-In-Reply-To: <20170810145253.2124019-1-arnd@arndb.de>
-References: <20170810145253.2124019-1-arnd@arndb.de>
-Message-ID: <de4edef8-cf9e-8d0f-b399-9a5796c29680@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 10 Aug 2017 11:33:51 -0500
+Subject: [PATCH 2/3] dt-bindings: usb: keystone-usb: Update bindings pm
+ and clocks properties
+In-Reply-To: <20170802201724.11439-3-fcooper@ti.com>
+References: <20170802201724.11439-1-fcooper@ti.com>
+ <20170802201724.11439-3-fcooper@ti.com>
+Message-ID: <20170810163351.ykqkf353uk5ehjdn@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/08/17 15:52, Arnd Bergmann wrote:
-> Defining the two functions as 'static inline' and exporting them
-> leads to the interesting case where we can use the interface
-> from loadable modules, but not from built-in drivers, as shown
-> in this link failure:
+On Wed, Aug 02, 2017 at 03:17:23PM -0500, Franklin S Cooper Jr wrote:
+> Update varous properties to properly indicate their requirement depending
+> on the SoC.
 > 
-> vers/nvdimm/claim.o: In function `nsio_rw_bytes':
-> claim.c:(.text+0x1b8): undefined reference to `arch_invalidate_pmem'
-> drivers/nvdimm/pmem.o: In function `pmem_dax_flush':
-> pmem.c:(.text+0x11c): undefined reference to `arch_wb_cache_pmem'
-> drivers/nvdimm/pmem.o: In function `pmem_make_request':
-> pmem.c:(.text+0x5a4): undefined reference to `arch_invalidate_pmem'
-> pmem.c:(.text+0x650): undefined reference to `arch_invalidate_pmem'
-> pmem.c:(.text+0x6d4): undefined reference to `arch_invalidate_pmem'
-> 
-> This removes the bogus 'static inline'.
-
-Oops, yes, this was clearly a silly copy-paste error on my part.
-
-Acked-by: Robin Murphy <robin.murphy@arm.com>
-
-> Fixes: d50e071fdaa3 ("arm64: Implement pmem API support")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 > ---
->  arch/arm64/mm/flush.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  Documentation/devicetree/bindings/usb/keystone-usb.txt | 18 ++++++++++++++++--
+>  1 file changed, 16 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-> index 280f90ff33a2..e36ed5087b5c 100644
-> --- a/arch/arm64/mm/flush.c
-> +++ b/arch/arm64/mm/flush.c
-> @@ -85,7 +85,7 @@ EXPORT_SYMBOL(flush_dcache_page);
->  EXPORT_SYMBOL(flush_icache_range);
+> diff --git a/Documentation/devicetree/bindings/usb/keystone-usb.txt b/Documentation/devicetree/bindings/usb/keystone-usb.txt
+> index 60527d3..307531b 100644
+> --- a/Documentation/devicetree/bindings/usb/keystone-usb.txt
+> +++ b/Documentation/devicetree/bindings/usb/keystone-usb.txt
+> @@ -12,8 +12,22 @@ Required properties:
+>     MPU.
+>   - ranges: allows valid 1:1 translation between child's address space and
+>     parent's address space.
+> - - clocks: Clock IDs array as required by the controller.
+> - - clock-names: names of clocks correseponding to IDs in the clock property.
+> +
+> +SoC-specific Required Properties:
+> +The following are mandatory properties for Keystone 2 66AK2HK, 66AK2L and 66AK2E
+> +SoCs only:
+> +
+> +- clocks:		Clock IDs array as required by the controller.
+> +- clock-names:		names of clocks correseponding to IDs in the clock
+> +			property.
+
+This needs to be specific as to how many clocks and their names.
+
+> +
+> +
+> +The following are mandatory properties for Keystone 2 66AK2G SoCs only:
+> +
+> +- power-domains:	Should contain a phandle to a PM domain provider node
+> +			and an args specifier containing the USB device id
+> +			value. This property is as per the binding,
+> +			Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
 >  
->  #ifdef CONFIG_ARCH_HAS_PMEM_API
-> -static inline void arch_wb_cache_pmem(void *addr, size_t size)
-> +void arch_wb_cache_pmem(void *addr, size_t size)
->  {
->  	/* Ensure order against any prior non-cacheable writes */
->  	dmb(osh);
-> @@ -93,7 +93,7 @@ static inline void arch_wb_cache_pmem(void *addr, size_t size)
->  }
->  EXPORT_SYMBOL_GPL(arch_wb_cache_pmem);
->  
-> -static inline void arch_invalidate_pmem(void *addr, size_t size)
-> +void arch_invalidate_pmem(void *addr, size_t size)
->  {
->  	__inval_dcache_area(addr, size);
->  }
+>  Sub-nodes:
+>  The dwc3 core should be added as subnode to Keystone DWC3 glue.
+> -- 
+> 2.9.4.dirty
 > 
