@@ -1,52 +1,87 @@
 From: kevin.wangtao@hisilicon.com (Tao Wang)
-Date: Thu, 10 Aug 2017 16:32:12 +0800
-Subject: [PATCH v3 0/3] thermal: add thermal sensor driver for Hi3660
-In-Reply-To: <1498102923-68481-1-git-send-email-kevin.wangtao@hisilicon.com>
+Date: Thu, 10 Aug 2017 16:32:15 +0800
+Subject: [PATCH v3 3/3] arm64: dts: register Hi3660's thermal sensor
+In-Reply-To: <1502353935-92924-1-git-send-email-kevin.wangtao@hisilicon.com>
 References: <1498102923-68481-1-git-send-email-kevin.wangtao@hisilicon.com>
-Message-ID: <1502353935-92924-1-git-send-email-kevin.wangtao@hisilicon.com>
+ <1502353935-92924-1-git-send-email-kevin.wangtao@hisilicon.com>
+Message-ID: <1502353935-92924-4-git-send-email-kevin.wangtao@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tao Wang <kevin.wangtao@linaro.org>
 
-This series adds thermal support for Hi3660 Soc, which support
-all the hardware temperture sensors and two virtual sensors(one
-for maximum value of all and one for average value of all).
+Bind thermal sensor driver for Hi3660.
 
-Patch 1 add dt-binding document to describe how to config dt
-for the driver.
-Patch 2 introduces the thermal sensor driver.
-Patch 3 add dts for the thermal senor driver on Hi3660.
-
-hardware document can be found on
-https://github.com/96boards/documentation/blob/master/ConsumerEdition/HiKey960/HardwareDocs/HiKey960_SoC_Reference_Manual.pdf
-
-Changes in v2:
-- correct alphabet order
-- correct compatible name
-- remove redundant property
-- rebase changes on linux next
-
-Changes in v3:
-- remove unnecessary log print
-- described all platform related parameters in DT
-- make the driver forward compatible
-
-Tao Wang (3):
-  dt-bindings: Document the hi3660 thermal sensor bindings
-  thermal: hisilicon: add thermal sensor driver for Hi3660
-  arm64: dts: register Hi3660's thermal sensor
-
- .../devicetree/bindings/thermal/hisi-tsensor.txt   |  23 +++
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi          |  10 +
- drivers/thermal/Kconfig                            |  13 ++
- drivers/thermal/Makefile                           |   1 +
- drivers/thermal/hisi_tsensor.c                     | 223 +++++++++++++++++++++
- include/dt-bindings/thermal/hi3660-thermal.h       |  30 +++
- 6 files changed, 300 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
- create mode 100644 drivers/thermal/hisi_tsensor.c
+Signed-off-by: Tao Wang <kevin.wangtao@linaro.org>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi    | 10 ++++++++++
+ include/dt-bindings/thermal/hi3660-thermal.h | 30 ++++++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
  create mode 100644 include/dt-bindings/thermal/hi3660-thermal.h
 
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+index c6a1961..7e2081d 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+@@ -6,6 +6,7 @@
+ 
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/clock/hi3660-clock.h>
++#include <dt-bindings/thermal/hi3660-thermal.h>
+ 
+ / {
+ 	compatible = "hisilicon,hi3660";
+@@ -848,5 +849,14 @@
+ 				     &sdio_cfg_func>;
+ 			status = "disabled";
+ 		};
++
++		tsensor: tsensor at FFF3000 {
++			compatible = "hisilicon,tsensor";
++			reg = <0x0 0xfff30000 0x0 0x1000>;
++			offset = <0x1c 0x5c 0x9c>;
++			coefficients = <165000 (-40000)>;
++			hisi,adc-range = <0x74 0x39A>;
++			#thermal-sensor-cells = <1>;
++		};
+ 	};
+ };
+diff --git a/include/dt-bindings/thermal/hi3660-thermal.h b/include/dt-bindings/thermal/hi3660-thermal.h
+new file mode 100644
+index 0000000..1efe625
+--- /dev/null
++++ b/include/dt-bindings/thermal/hi3660-thermal.h
+@@ -0,0 +1,30 @@
++/*
++ *  Copyright (c) 2017 Hisilicon Limited.
++ *  Copyright (c) 2017 Linaro Limited.
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; version 2 of the License.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __DTS_HI3660_THERMAL_H
++#define __DTS_HI3660_THERMAL_H
++
++/* sensor id */
++#define LITTLE_CPU_TEMP		0
++#define BIG_CPU_TEMP		1
++#define GPU_TEMP		2
++#define MAX_TEMP		3
++#define AVG_TEMP		4
++
++#define THERMAL_NO_LIMIT		(~0)
++
++#endif
 -- 
 2.8.1
