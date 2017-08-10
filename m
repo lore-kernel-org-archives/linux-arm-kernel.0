@@ -1,71 +1,57 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 10 Aug 2017 19:48:22 +0900
-Subject: [PATCH v3 2/2] arm64: dts: uniphier: add nodes of thermal monitor
- and thermal zone for LD20
-In-Reply-To: <1499255595-31805-3-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1499255595-31805-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1499255595-31805-3-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <CAK7LNAS38+GDnhC3Hgymt1gg6QCPG-q5SJo27Qsc3ErZv5RsnA@mail.gmail.com>
+Date: Thu, 10 Aug 2017 19:50:25 +0900
+Subject: [PATCH v2] arm64: defconfig: enable CONFIG_UNIPHIER_WATCHDOG
+In-Reply-To: <1500359890-30358-1-git-send-email-hayashibara.keiji@socionext.com>
+References: <1500359890-30358-1-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <CAK7LNAST_ZcicTtEj21qjmbGhxXUs6VKqmV7-mgg7w9Btsb=3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hayashi-san,
+Forwarding to ARM-SOC
 
 
-2017-07-05 20:53 GMT+09:00 Kunihiko Hayashi <hayashi.kunihiko@socionext.com>:
-> Add nodes of thermal monitor and thermal zone for UniPhier LD20 SoC.
-> The thermal monitor is included in sysctrl.
+Hi Arnd, Olof,
+
+
+This patch was sent to arm64 maintainers a few weeks ago
+(but not picked up).
+
+I think the best home for this patch is the ARM-SOC tree.
+
+Could you pick it up, please?
+
+This patch:
+https://patchwork.kernel.org/patch/9847049/
+
+
+Thanks,
+Masahiro
+
+
+
+2017-07-18 15:38 GMT+09:00 Keiji Hayashibara <hayashibara.keiji@socionext.com>:
+> Enable the watchdog driver for UniPhier SoC
 >
-> Furthermore, since the reference board doesn't have a calibrated value of
-> thermal monitor, this patch gives the default value for LD20 reference
-> board.
->
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
 > ---
->  .../arm64/boot/dts/socionext/uniphier-ld20-ref.dts |  4 +++
->  arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   | 40 ++++++++++++++++++++++
->  2 files changed, 44 insertions(+)
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 >
-> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-> index 609162a..d7f6b39 100644
-> --- a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-> +++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-> @@ -86,3 +86,7 @@
->  &i2c0 {
->         status = "okay";
->  };
-> +
-> +&pvtctl {
-> +       socionext,tmod-calibration = <0x0f22 0x68ee>;
-> +};
-
-
-I think this calib value is shared among all boards
-(ref and global).
-
-
-Please move it to the SoC dtsi.
-
-
-
-
-> +                       cooling-maps {
-> +                               map0 {
-> +                                       trip = <&cpu_alert>;
-> +                                       cooling-device = <&cpu0 (-1) (-1)>;
-> +                               };
-> +                               map1 {
-> +                                       trip = <&cpu_alert>;
-> +                                       cooling-device = <&cpu2 (-1) (-1)>;
-> +                               };
-> +                       };
-> +               };
-> +       };
-> +
-
-After all, I decided to use dt-bindings headers.
-Could you use THERMAL_NO_LIMIT for clarification?
-
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 6c7d147..629c815 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -311,6 +311,7 @@ CONFIG_S3C2410_WATCHDOG=y
+>  CONFIG_MESON_GXBB_WATCHDOG=m
+>  CONFIG_MESON_WATCHDOG=m
+>  CONFIG_RENESAS_WDT=y
+> +CONFIG_UNIPHIER_WATCHDOG=y
+>  CONFIG_BCM2835_WDT=y
+>  CONFIG_MFD_CROS_EC=y
+>  CONFIG_MFD_CROS_EC_I2C=y
+> --
+> 2.7.4
+>
 
 
 
