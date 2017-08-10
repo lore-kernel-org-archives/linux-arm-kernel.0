@@ -1,53 +1,21 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 10 Aug 2017 17:45:22 +0100
-Subject: [PATCH] ACPI/IORT: Fix build regression without IOMMU
-Message-ID: <20170810164522.25555-1-lorenzo.pieralisi@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 10 Aug 2017 11:36:45 -0500
+Subject: [PATCH 3/4] dt-bindings: i2c: i2c-davinci: Update binding for
+ 66AK2Gx pwr dm property
+In-Reply-To: <20170802221753.13786-4-fcooper@ti.com>
+References: <20170802221753.13786-1-fcooper@ti.com>
+ <20170802221753.13786-4-fcooper@ti.com>
+Message-ID: <20170810163645.wt52uharpdxhnmbb@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+On Wed, Aug 02, 2017 at 05:17:52PM -0500, Franklin S Cooper Jr wrote:
+> Add pm-domains property which is required for 66AK2Gx. Also document 66AK2G
+> unique clocks property usage.
+> 
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-davinci.txt | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 
-A recent change reintroduced a bug that had previously been
-fixed by commit d49f2dedf33b ("ACPI/IORT: Fix CONFIG_IOMMU_API
-dependency"):
-
-drivers/acpi/arm64/iort.c: In function 'iort_iommu_configure':
-drivers/acpi/arm64/iort.c:829:26: error: 'struct iommu_fwspec' has no member named 'ops'
-
-Replace a direct reference to iommu_fwspec->ops with a helper function
-call to fix the issue.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
----
-Catalin, Will,
-
-unfortunately it slipped our kconfig checks (and the kbuild bot) but
-not Arnd's.
-
-It applies to arm64 for-next/core on top of v4.14 queue. Please apply.
-
-Apologies,
-Lorenzo
-
- drivers/acpi/arm64/iort.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 34972d7..736783c 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -773,7 +773,7 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
- 	 * add_device callback for dev, replay it to get things in order.
- 	 */
- 	if (!err) {
--		ops = dev->iommu_fwspec->ops;
-+		ops = iort_fwspec_iommu_ops(dev->iommu_fwspec);
- 		err = iort_add_device_replay(ops, dev);
- 	}
- 
--- 
-2.10.0
+Acked-by: Rob Herring <robh@kernel.org>
