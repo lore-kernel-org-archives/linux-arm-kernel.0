@@ -1,25 +1,21 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 10 Aug 2017 18:17:59 +0100
-Subject: [PATCH] arm64: compat: Remove leftover variable declaration
-In-Reply-To: <20170804171710.21736-1-salyzyn@android.com>
-References: <20170804171710.21736-1-salyzyn@android.com>
-Message-ID: <20170810171758.dpk2h3jcykqz7q4p@armageddon.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 10 Aug 2017 12:12:17 -0500
+Subject: [PATCH 1/3] dt-bindings: iio: timer: stm32: add support for
+ STM32H7
+In-Reply-To: <1501751654-14153-2-git-send-email-fabrice.gasnier@st.com>
+References: <1501751654-14153-1-git-send-email-fabrice.gasnier@st.com>
+ <1501751654-14153-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170810171217.gxms3ect2gpbizba@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 04, 2017 at 10:17:00AM -0700, Mark Salyzyn wrote:
-> From: Kevin Brodsky <kevin.brodsky@arm.com>
+On Thu, Aug 03, 2017 at 11:14:12AM +0200, Fabrice Gasnier wrote:
+> STM32H7 has slightly different triggers than previous versions.
+> Introduce st,stm32h7-timer-trigger compatible to handle this new variant.
 > 
-> Commit a1d5ebaf8ccd ("arm64: big-endian: don't treat code as data when
-> copying sigret code") moved the 32-bit sigreturn trampoline code from
-> the aarch32_sigret_code array to kuser32.S. The commit removed the
-> array definition from signal32.c, but not its declaration in
-> signal32.h. Remove the leftover declaration.
-> 
-> Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
-> Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+>  Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 
-Applied. Thanks.
-
--- 
-Catalin
+Acked-by: Rob Herring <robh@kernel.org>
