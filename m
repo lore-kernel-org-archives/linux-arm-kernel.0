@@ -1,72 +1,88 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 11 Aug 2017 15:01:17 +0800
-Subject: [PATCH 4/4] dt-bindings: mt8173-xhci: add generic compatible
- and rename file
-In-Reply-To: <20170811025617.s3wuqlkgjvgc4exi@rob-hp-laptop>
-References: <8f0cb0047b2aa195d818ad686cbbceabb3ad91a0.1502170518.git.chunfeng.yun@mediatek.com>
- <ed176bd0af123ad6a94982c628bb70a6a3bf7515.1502170518.git.chunfeng.yun@mediatek.com>
- <20170811025617.s3wuqlkgjvgc4exi@rob-hp-laptop>
-Message-ID: <1502434877.25536.126.camel@mhfsdcap03>
+From: chen.zhong@mediatek.com (Chen Zhong)
+Date: Fri, 11 Aug 2017 15:01:32 +0800
+Subject: [PATCH v2 2/5] dt-bindings: input: Add document bindings for
+ mtk-pmic-keys
+In-Reply-To: <20170810204136.eghsslqq6d5fqg5d@rob-hp-laptop>
+References: <1502071065-6745-1-git-send-email-chen.zhong@mediatek.com>
+ <1502071065-6745-3-git-send-email-chen.zhong@mediatek.com>
+ <20170810204136.eghsslqq6d5fqg5d@rob-hp-laptop>
+Message-ID: <1502434892.28466.18.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-08-10 at 21:56 -0500, Rob Herring wrote:
-> On Tue, Aug 08, 2017 at 01:42:52PM +0800, Chunfeng Yun wrote:
-> > The mt8173-xhci.txt actually holds the bindings for all mediatek
-> > SoCs with xHCI controller, so add a generic compatible and change
-> > the name to xhci-mtk.txt to reflect that.
+Hi Rob,
+
+On Thu, 2017-08-10 at 15:41 -0500, Rob Herring wrote:
+> On Mon, Aug 07, 2017 at 09:57:42AM +0800, Chen Zhong wrote:
+> > This patch adds the device tree binding documentation for the MediaTek
+> > pmic keys found on PMIC MT6397/MT6323.
 > > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > Signed-off-by: Chen Zhong <chen.zhong@mediatek.com>
 > > ---
-> >  .../bindings/usb/{mt8173-xhci.txt => xhci-mtk.txt} |   10 +++++++---
-> >  1 file changed, 7 insertions(+), 3 deletions(-)
-> >  rename Documentation/devicetree/bindings/usb/{mt8173-xhci.txt => xhci-mtk.txt} (92%)
+> >  .../devicetree/bindings/input/mtk-pmic-keys.txt    |   36 ++++++++++++++++++++
+> >  1 file changed, 36 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
 > > 
-> > diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/xhci-mtk.txt
-> > similarity index 92%
-> > rename from Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> > rename to Documentation/devicetree/bindings/usb/xhci-mtk.txt
+> > diff --git a/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+> > new file mode 100644
+> > index 0000000..c5b230f
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/input/mtk-pmic-keys.txt
+> > @@ -0,0 +1,36 @@
+> > +MediaTek MT6397/MT6323 PMIC Keys Device Driver
+> > +
+> > +There are two key functions provided by MT6397/MT6323 PMIC, pwrkey
+> > +and homekey. The key functions are defined as the subnode of the function
+> > +node provided by MT6397/MT6323 PMIC that is being defined as one kind
+> > +of Muti-Function Device (MFD)
+> > +
+> > +For MT6397/MT6323 MFD bindings see:
+> > +Documentation/devicetree/bindings/mfd/mt6397.txt
+> > +
+> > +Required properties:
+> > +- compatible: "mediatek,mt6397-keys" or "mediatek,mt6323-keys"
+> > +- mediatek,pwrkey-code: Keycode of pwrkey
+> > +
+> > +Optional Properties:
+> > +- mediatek,homekey-code: Keycode of homekey
+> > +- mediatek,long-press-mode: Long press key shutdown setting, 1 for
+> > +	pwrkey only, 2 for pwrkey/homekey together, others for disabled.
+> > +- mediatek,long-press-duration: Long press key shutdown duration setting,
+> > +	0/1/2/3 for 8/11/14/5 seconds.
 > 
-> mediatek,mtk-xhci.txt
-Ok
+> Surely this could be a common property.
+
+Sorry I'm not very clear about this. Could i move this to required
+properties or remove the "mediatek" string here?
+
 > 
-> > index 0acfc8a..1ce77c7 100644
-> > --- a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> > +++ b/Documentation/devicetree/bindings/usb/xhci-mtk.txt
-> > @@ -11,7 +11,9 @@ into two parts.
-> >  ------------------------------------------------------------------------
-> >  
-> >  Required properties:
-> > - - compatible : should contain "mediatek,mt8173-xhci"
-> > + - compatible : should be one of
-> > +	"mediatek,mt8173-xhci" (deprecated, use "mediatek,xhci-mtk" instead),
+> > +
+> > +Example:
+> > +
+> > +	pmic: mt6397 {
+> > +		compatible = "mediatek,mt6397";
+> > +
+> > +		...
+> > +
+> > +		mt6397keys: mt6397keys {
+> > +			compatible = "mediatek,mt6397-keys";
+> > +			mediatek,pwrkey-code = <116>;
+> > +			mediatek,homekey-code = <114>;
 > 
-> NAK for same reason.
-It's backward compatible
+> We have a standard properties for keycodes.
+
+Could i write them like this way?
+
+linux,keycodes = <KEY_POWER>, <KEY_VOLUMEDOWN>
+
 > 
-> > +	"mediatek,xhci-mtk"
-> 
-> mediatek,mtk-xhci would be more in line with conventions.
-Ok
-> 
-> >   - reg : specifies physical base address and size of the registers
-> >   - reg-names: should be "mac" for xHCI MAC and "ippc" for IP port control
-> >   - interrupts : interrupt used by the controller
-> > @@ -68,10 +70,12 @@ usb30: usb at 11270000 {
-> >  
-> >  In the case, xhci is added as subnode to mtu3. An example and the DT binding
-> >  details of mtu3 can be found in:
-> > -Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
-> > +Documentation/devicetree/bindings/usb/mtu3.txt
-> >  
-> >  Required properties:
-> > - - compatible : should contain "mediatek,mt8173-xhci"
-> > + - compatible : should be one of
-> > +	"mediatek,mt8173-xhci" (deprecated, use "mediatek,xhci-mtk" instead),
-> > +	"mediatek,xhci-mtk"
-> >   - reg : specifies physical base address and size of the registers
-> >   - reg-names: should be "mac" for xHCI MAC
-> >   - interrupts : interrupt used by the host controller
+> > +			mediatek,long-press-mode = <1>;
+> > +			mediatek,long-press-duration = <0>;
+> > +		};
+> > +	};
+> > \ No newline at end of file
 > > -- 
 > > 1.7.9.5
 > > 
+
+Thanks.
