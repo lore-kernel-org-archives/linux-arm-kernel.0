@@ -1,29 +1,36 @@
-From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
-Date: Fri, 11 Aug 2017 18:00:33 +0800
-Subject: [PATCH 3/3] core-arm: add a member about dma_map_ops in dev_archdata
- struct
-Message-ID: <1502445633-33772-1-git-send-email-yinbo.zhu@nxp.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 11 Aug 2017 12:20:10 +0200
+Subject: [GIT PULL] ARM: mvebu: soc for v4.14 (#1)
+Message-ID: <8760duiexx.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+Hi,
 
-Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
----
- arch/arm/include/asm/device.h | 1 +
- 1 file changed, 1 insertion(+)
+Here is the first pull request for soc for mvebu for v4.14.
 
-diff --git a/arch/arm/include/asm/device.h b/arch/arm/include/asm/device.h
-index 220ba20..c93d3df 100644
---- a/arch/arm/include/asm/device.h
-+++ b/arch/arm/include/asm/device.h
-@@ -7,6 +7,7 @@
- #define ASMARM_DEVICE_H
- 
- struct dev_archdata {
-+const struct dma_map_ops        *dma_ops;
- #ifdef CONFIG_DMABOUNCE
- 	struct dmabounce_device_info *dmabounce;
- #endif
--- 
-2.1.0.27.g96db324
+Gregory
+
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.14-1
+
+for you to fetch changes up to ca0a05a98f3090a77b678eaa778a30febc5795b8:
+
+  ARM: mvebu: enable ARM_GLOBAL_TIMER compilation Armada 38x platforms (2017-08-03 15:17:06 +0200)
+
+----------------------------------------------------------------
+mvebu soc for 4.14 (part 1)
+
+Enabling ARM_GLOBAL_TIMER in mvebu_v7_defconfig for Armada 38x
+
+----------------------------------------------------------------
+Marcin Wojtas (1):
+      ARM: mvebu: enable ARM_GLOBAL_TIMER compilation Armada 38x platforms
+
+ arch/arm/mach-mvebu/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
