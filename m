@@ -1,46 +1,76 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 11 Aug 2017 11:43:43 +0200
-Subject: [PATCH v2 2/6] edac: synopsys: Add platform specific structures
- for ddrc controller
-In-Reply-To: <20170811092225.GE9432@nazgul.tnic>
-References: <91fd6532076e4c905b5a228d852bba4941c54a28.1502091561.git.michal.simek@xilinx.com>
- <6c72eae7c1fbfd2b96d5dc1c7feb251bdbe3e591.1502091561.git.michal.simek@xilinx.com>
- <20170811090926.GC9432@nazgul.tnic>
- <9800a639-2e1b-5008-14fc-b2135a27f826@xilinx.com>
- <20170811092225.GE9432@nazgul.tnic>
-Message-ID: <c0fe2afe-75da-a18f-735f-d2c82e4a070b@xilinx.com>
+From: rocky.hao@rock-chips.com (rocky.hao)
+Date: Fri, 11 Aug 2017 17:45:00 +0800
+Subject: [PATCH v2 3/5] arm64: dts: rockchip: add tsadc node for rk3328 SoC
+In-Reply-To: <1ea7dab5-95c9-9d5f-5d4e-4c5a7f2a6254@rock-chips.com>
+References: <1501833976-1100-1-git-send-email-rocky.hao@rock-chips.com>
+ <1501833976-1100-4-git-send-email-rocky.hao@rock-chips.com>
+ <1ea7dab5-95c9-9d5f-5d4e-4c5a7f2a6254@rock-chips.com>
+Message-ID: <903bc8ea-a597-80b9-a2bf-551c1b6288fb@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.8.2017 11:22, Borislav Petkov wrote:
-> On Fri, Aug 11, 2017 at 11:16:15AM +0200, Michal Simek wrote:
->> https://lkml.org/lkml/2017/8/7/105
->> ACK by Rob yesterday.
+
+
+? 2017/8/11 14:38, Caesar Wang ??:
+> ? 2017?08?04? 16:06, Rocky Hao ??:
+>> add tsadc needed main information for rk3328 SoC.
+>> 50000Hz is the max clock rate supported by tsadc module.
+>>
+>> Signed-off-by: Rocky Hao <rocky.hao@rock-chips.com>
+>> ---
+>> Change in v2:
+>> - remove gerrit Change-Id
+>>
+>>   arch/arm64/boot/dts/rockchip/rk3328.dtsi | 20 ++++++++++++++++++++
+>>   1 file changed, 20 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi 
+>> b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+>> index db4b2708084d..186fb93fdffd 100644
+>> --- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+>> +++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+>> @@ -308,6 +308,26 @@
+>>           interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+>>       };
+>> +    tsadc: tsadc at ff250000 {
+>> +        compatible = "rockchip,rk3328-tsadc";
+>> +        reg = <0x0 0xff250000 0x0 0x100>;
+>> +        interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH 0>;
+>> +        rockchip,grf = <&grf>;
+>> +        clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
+>> +        clock-names = "tsadc", "apb_pclk";
+>> +        assigned-clocks = <&cru SCLK_TSADC>;
+>> +        assigned-clock-rates = <50000>;
+>> +        resets = <&cru SRST_TSADC>;
+>> +        reset-names = "tsadc-apb";
+>> +        pinctrl-names = "init", "default", "sleep";
+>> +        pinctrl-0 = <&otp_gpio>;
+>> +        pinctrl-1 = <&otp_out>;
+>> +        pinctrl-2 = <&otp_gpio>;
+>> +        #thermal-sensor-cells = <1>;
 > 
-> Ok, pls bounce it to me as I don't have it.
+> Only one sensor, so maybe the value should be 0.
+Caesar, #thermal-sensor-cells means parameter counts used to match the 
+proper sensor registered. Both 0 and 1 work well.
 
-ok.
+Case 0, i.e. #thermal-sensor-cells = <0>, it uses the default channel 
+number 0 to match tsadc channal.
+Case 1, i.e. #thermal-sensor-cells = <1>, it uses the setting 
+"thermal-sensors = <&tsadc 0>;" to match tsadc channal.
+
+Case 1 provides more readable info than case 0. By my understanding, 
+using the default value such as case 0, is not a good coding style.
 
 > 
-> Also, pls refrain from using lkml.org. Simply do:
+>> +        rockchip,hw-tshut-temp = <100000>;
+>> +        status = "disabled";
+>> +    };
+>> +
+>>       saradc: adc at ff280000 {
+>>           compatible = "rockchip,rk3328-saradc", 
+>> "rockchip,rk3399-saradc";
+>>           reg = <0x0 0xff280000 0x0 0x100>;
 > 
-> http://lkml.kernel.org/r/<Message-ID>
-
-Interesting. I have never seen this before.
-
-http://lkml.kernel.org/r/91fd6532076e4c905b5a228d852bba4941c54a28.1502091561.git.michal.simek at xilinx.com
-
 > 
->> I am using patman - u-boot tools for sending patch. It read MAINTAINERS
->> file and copy right people.
->> It has option to explicitly CC people. I need to resend this as v3
->> anyway that's why I will add you there.
 > 
-> Yes, if you send cross-maintainer changes, please make sure to CC them on all
-> patches because otherwise stuff like that happens and people start wondering
-> where is the rest and so on.
-
-ok. Anyway do you see something else what I should fix in v3?
-
-Thanks,
-Michal
+> 
