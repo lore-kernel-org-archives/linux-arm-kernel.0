@@ -1,62 +1,33 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Fri, 11 Aug 2017 10:17:06 +0800
-Subject: [RESEND PATCH 1/2] dt-bindings: i2c: Add MediaTek MT7622 i2c
- binding
-In-Reply-To: <1502415473.930.72.camel@mhfsdcap03>
-References: <1502332061-25085-1-git-send-email-jun.gao@mediatek.com>
- <1502332061-25085-2-git-send-email-jun.gao@mediatek.com>
- <1502353140.17420.7.camel@mtksdaap41> <1502415473.930.72.camel@mhfsdcap03>
-Message-ID: <1502417826.10379.1.camel@mtksdaap41>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Fri, 11 Aug 2017 10:36:31 +0800
+Subject: [PATCH] dt-bindings: watchdog: mediatek: add support for
+ MediaTek MT7623 and MT7622 SoC
+In-Reply-To: <20170810174343.7pejhh7wxkcaf3zj@rob-hp-laptop>
+References: <b0058a0a9f948f17edf3c1a476665c715922ebc3.1501830388.git.sean.wang@mediatek.com>
+ <20170810174343.7pejhh7wxkcaf3zj@rob-hp-laptop>
+Message-ID: <1502418991.19230.1.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-08-11 at 09:37 +0800, Jun Gao wrote:
-> On Thu, 2017-08-10 at 16:19 +0800, Honghui Zhang wrote:
-> > On Thu, 2017-08-10 at 10:27 +0800, Jun Gao wrote:
-> > > From: Jun Gao <jun.gao@mediatek.com>
-> > > 
-> > > Add MT7622 i2c binding to binding file. Compare to MT8173 i2c
-> > > controller, MT7622 limits message numbers to 255, and does not
-> > > support 4GB DMA mode.
-> > > 
-> > > Signed-off-by: Jun Gao <jun.gao@mediatek.com>
-> > > ---
-> > >  Documentation/devicetree/bindings/i2c/i2c-mtk.txt | 11 ++++++-----
-> > >  1 file changed, 6 insertions(+), 5 deletions(-)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-> > > index bd5a7be..ff9ac61 100644
-> > > --- a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-> > > +++ b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-> > > @@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
-> > >  
-> > >  Required properties:
-> > >    - compatible: value should be either of the following.
-> > > -      "mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek mt2701
-> > > -      "mediatek,mt6577-i2c": for i2c compatible with mt6577.
-> > > -      "mediatek,mt6589-i2c": for i2c compatible with mt6589.
-> > > -      "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for i2c compatible with mt7623.
-> > > -      "mediatek,mt8173-i2c": for i2c compatible with mt8173.
-> > > +	"mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek MT2701
-> > > +	"mediatek,mt6577-i2c": for Mediatek MT6577
-> > > +	"mediatek,mt6589-i2c": for Mediatek MT6589
+On Thu, 2017-08-10 at 12:43 -0500, Rob Herring wrote:
+> On Fri, Aug 04, 2017 at 03:14:07PM +0800, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
 > > 
-> > Better not change those and just add compatible strings for mt7622.
+> > This updates dt-binding documentation for MediaTek MT7622 and
+> > MT7623 SoC. For the both SoCs supported all rely on the fallback
+> > binding of the case with "mediatek,mt6589-wdt".
 > > 
-> It seems better to use the same format for all SoCs. 
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > ---
+> >  Documentation/devicetree/bindings/watchdog/mtk-wdt.txt | 2 ++
+> >  1 file changed, 2 insertions(+)
 > 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Alright, do you need to put those changes in commit message?
-Thanks.
+Hi, Rob
 
-> Jun
-> > > +	"mediatek,mt7622-i2c": for Mediatek MT7622
-> > > +	"mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for Mediatek MT7623
-> > > +	"mediatek,mt8173-i2c": for Mediatek MT8173
-> > >    - reg: physical base address of the controller and dma base, length of memory
-> > >      mapped region.
-> > >    - interrupts: interrupt number to the cpu.
-> > 
-> > 
-> 
-> 
+thanks a lot
+
+can the patch go through your tree?
+
+	Sean
