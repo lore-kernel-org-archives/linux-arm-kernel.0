@@ -1,190 +1,58 @@
-From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
-Date: Fri, 11 Aug 2017 17:59:56 +0800
-Subject: [PATCH 2/3] usb: dwc3 : Add support for USB snooping
-Message-ID: <1502445596-33716-1-git-send-email-yinbo.zhu@nxp.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 11 Aug 2017 11:17:02 +0100
+Subject: New assembler warnings with binutils 2.29
+In-Reply-To: <CAK8P3a1Bza56jpNcpbSDLXsHL08yiXEnKqNmevNpw_z9iym_qA@mail.gmail.com>
+References: <d101c48b-c47b-be60-4b40-de4f845e4965@redhat.com>
+ <20170811092213.mdmzqtm2lp6ltlxt@armageddon.cambridge.arm.com>
+ <CAKv+Gu8EQq+azTjMNDpE=TzEd_6b-VdQqUYbCc1=qGuYTU4Srg@mail.gmail.com>
+ <CAK8P3a1Bza56jpNcpbSDLXsHL08yiXEnKqNmevNpw_z9iym_qA@mail.gmail.com>
+Message-ID: <CAKv+Gu8N55-okeSNOgRKoxvFgr49PWU=QTLePufTy4kkFOdYaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajesh Bhagat <rajesh.bhagat@freescale.com>
+On 11 August 2017 at 10:34, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Fri, Aug 11, 2017 at 11:26 AM, Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+>> On 11 August 2017 at 10:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>>> On Thu, Aug 10, 2017 at 01:13:22PM -0700, Laura Abbott wrote:
+>>>> Fedora rawhide recently upgraded to binutils 2.29 and this seems
+>>>> to produce new warnings:
+>>>>
+>>>> ./arch/arm64/include/asm/assembler.h: Assembler messages:
+>>>> ./arch/arm64/include/asm/assembler.h:125: Warning: ignoring attempt to redefine built-in register 'lr'
+>>>>
+>>>> This is
+>>>>
+>>>> /*
+>>>>  * Register aliases.
+>>>>  */
+>>>> lr      .req    x30             // link register
+>>>
+>>> Strange, does gas now think 'lr' is a general purpose register (aliased
+>>> to x30)? It never was and IIRC the toolchain people many years ago
+>>> refused to add it, hence the alias above in the kernel. I wonder if they
+>>> added 'fp' as well...
+>>>
+>>> We could remove the alias and replace all 'lr' instances with 'x30'
+>>> throughout the kernel (no too many) or we add some #ifdef around the
+>>> above based on the binutils version.
+>>>
+>>
+>> This is annoying. Replacing x30 with lr achieves the opposite of the
 
-Add support for USB3 snooping by asserting bits
-in register DWC3_GSBUSCFG0 for data and descriptor
+Of course, I meant replacing lr with x30 in our code.
 
-Signed-off-by: Nikhil Badola <nikhil.badola@freescale.com>
-Signed-off-by: Rajesh Bhagat <rajesh.bhagat@freescale.com>
-Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
----
- drivers/usb/dwc3/core.c | 71 ++++++++++++++++++++++++++++++++++++-------------
- drivers/usb/dwc3/core.h |  3 +++
- drivers/usb/dwc3/host.c |  8 +++++-
- 3 files changed, 63 insertions(+), 19 deletions(-)
-
-diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-index 02a534a..b51b0d8 100644
---- a/drivers/usb/dwc3/core.c
-+++ b/drivers/usb/dwc3/core.c
-@@ -90,6 +90,7 @@ static int dwc3_get_dr_mode(struct dwc3 *dwc)
- 
- 		if (IS_ENABLED(CONFIG_USB_DWC3_HOST))
- 			mode = USB_DR_MODE_HOST;
-+
- 		else if (IS_ENABLED(CONFIG_USB_DWC3_GADGET))
- 			mode = USB_DR_MODE_PERIPHERAL;
- 	}
-@@ -305,14 +306,27 @@ static void dwc3_free_event_buffers(struct dwc3 *dwc)
-  */
- static int dwc3_alloc_event_buffers(struct dwc3 *dwc, unsigned length)
- {
--	struct dwc3_event_buffer *evt;
-+	int                     num;
-+	int                     i;
-+
-+	num = DWC3_NUM_INT(dwc->hwparams.hwparams1);
-+	dwc->num_event_buffers = num;
-+
-+	dwc->ev_buffs = devm_kzalloc(dwc->dev, sizeof(*dwc->ev_buffs) * num,
-+			GFP_KERNEL);
-+	if (!dwc->ev_buffs)
-+		return -ENOMEM;
- 
--	evt = dwc3_alloc_one_event_buffer(dwc, length);
--	if (IS_ERR(evt)) {
--		dev_err(dwc->dev, "can't allocate event buffer\n");
--		return PTR_ERR(evt);
-+	for (i = 0; i < num; i++) {
-+		struct dwc3_event_buffer        *evt;
-+
-+		evt = dwc3_alloc_one_event_buffer(dwc, length);
-+		if (IS_ERR(evt)) {
-+			dev_err(dwc->dev, "can't allocate event buffer\n");
-+			return PTR_ERR(evt);
-+		}
-+		dwc->ev_buffs[i] = evt;
- 	}
--	dwc->ev_buf = evt;
- 
- 	return 0;
- }
-@@ -325,17 +339,25 @@ static int dwc3_alloc_event_buffers(struct dwc3 *dwc, unsigned length)
-  */
- static int dwc3_event_buffers_setup(struct dwc3 *dwc)
- {
--	struct dwc3_event_buffer	*evt;
--
--	evt = dwc->ev_buf;
--	evt->lpos = 0;
--	dwc3_writel(dwc->regs, DWC3_GEVNTADRLO(0),
--			lower_32_bits(evt->dma));
--	dwc3_writel(dwc->regs, DWC3_GEVNTADRHI(0),
--			upper_32_bits(evt->dma));
--	dwc3_writel(dwc->regs, DWC3_GEVNTSIZ(0),
--			DWC3_GEVNTSIZ_SIZE(evt->length));
--	dwc3_writel(dwc->regs, DWC3_GEVNTCOUNT(0), 0);
-+	struct dwc3_event_buffer        *evt;
-+	int                             n;
-+
-+	for (n = 0; n < dwc->num_event_buffers; n++) {
-+		evt = dwc->ev_buffs[n];
-+		dev_dbg(dwc->dev, "Event buf %p dma %08llx length %d\n",
-+				evt->buf, (unsigned long long) evt->dma,
-+				evt->length);
-+
-+		evt->lpos = 0;
-+
-+		dwc3_writel(dwc->regs, DWC3_GEVNTADRLO(n),
-+				lower_32_bits(evt->dma));
-+		dwc3_writel(dwc->regs, DWC3_GEVNTADRHI(n),
-+				upper_32_bits(evt->dma));
-+		dwc3_writel(dwc->regs, DWC3_GEVNTSIZ(n),
-+				DWC3_GEVNTSIZ_SIZE(evt->length));
-+		dwc3_writel(dwc->regs, DWC3_GEVNTCOUNT(n), 0);
-+	}
- 
- 	return 0;
- }
-@@ -1181,6 +1203,7 @@ static void dwc3_check_params(struct dwc3 *dwc)
- static int dwc3_probe(struct platform_device *pdev)
- {
- 	struct device		*dev = &pdev->dev;
-+	struct device_node      *node = dev->of_node;
- 	struct resource		*res;
- 	struct dwc3		*dwc;
- 
-@@ -1188,7 +1211,6 @@ static int dwc3_probe(struct platform_device *pdev)
- 
- 	void __iomem		*regs;
- 
--	struct device_node      *node = dev->of_node;
- 	dwc = devm_kzalloc(dev, sizeof(*dwc), GFP_KERNEL);
- 	if (!dwc)
- 		return -ENOMEM;
-@@ -1260,6 +1282,19 @@ static int dwc3_probe(struct platform_device *pdev)
- 		goto err2;
- 	}
- 
-+	/* Change burst beat and outstanding pipelined transfers requests */
-+	dwc3_writel(dwc->regs, DWC3_GSBUSCFG0,
-+		(dwc3_readl(dwc->regs, DWC3_GSBUSCFG0) & ~0xff) | 0xf);
-+	dwc3_writel(dwc->regs, DWC3_GSBUSCFG1,
-+		dwc3_readl(dwc->regs, DWC3_GSBUSCFG1) | 0xf00);
-+
-+	/* Enable Snooping */
-+	if (node && of_dma_is_coherent(node)) {
-+		dwc3_writel(dwc->regs, DWC3_GSBUSCFG0,
-+		dwc3_readl(dwc->regs, DWC3_GSBUSCFG0) | 0x22220000);
-+		dev_dbg(dev, "enabled snooping for usb\n");
-+	}
-+
- 	ret = dwc3_get_dr_mode(dwc);
- 	if (ret)
- 		goto err3;
-diff --git a/drivers/usb/dwc3/core.h b/drivers/usb/dwc3/core.h
-index b83388f..e075665 100644
---- a/drivers/usb/dwc3/core.h
-+++ b/drivers/usb/dwc3/core.h
-@@ -29,6 +29,7 @@
- #include <linux/debugfs.h>
- #include <linux/wait.h>
- #include <linux/workqueue.h>
-+#include <linux/of_address.h>
- 
- #include <linux/usb/ch9.h>
- #include <linux/usb/gadget.h>
-@@ -913,6 +914,7 @@ struct dwc3 {
- 	struct platform_device	*xhci;
- 	struct resource		xhci_resources[DWC3_XHCI_RESOURCES_NUM];
- 
-+	struct dwc3_event_buffer **ev_buffs;
- 	struct dwc3_event_buffer *ev_buf;
- 	struct dwc3_ep		*eps[DWC3_ENDPOINTS_NUM];
- 
-@@ -946,6 +948,7 @@ struct dwc3 {
- 	u32			incrx_type[2];
- 	u32			irq_gadget;
- 	u32			nr_scratch;
-+	u32			num_event_buffers;
- 	u32			u1u2;
- 	u32			maximum_speed;
- 
-diff --git a/drivers/usb/dwc3/host.c b/drivers/usb/dwc3/host.c
-index 3e85616..0f2b86c 100644
---- a/drivers/usb/dwc3/host.c
-+++ b/drivers/usb/dwc3/host.c
-@@ -93,8 +93,14 @@ int dwc3_host_init(struct dwc3 *dwc)
- 		dma_set_coherent_mask(&xhci->dev, dwc->dev->coherent_dma_mask);
- 
- 	xhci->dev.parent = dwc->dev;
--
- 	xhci->dev.dma_mask = dwc->dev->dma_mask;
-+	xhci->dev.dma_parms     = dwc->dev->dma_parms;
-+
-+	/* set DMA operations */
-+	if (dwc->dev->of_node && of_dma_is_coherent(dwc->dev->of_node)) {
-+		xhci->dev.archdata.dma_ops = dwc->dev->archdata.dma_ops;
-+		dev_dbg(dwc->dev, "set dma_ops for usb\n");
-+	}
- 
- 	dwc->xhci = xhci;
- 
--- 
-2.1.0.27.g96db324
+>> intent of the binutils change. And using #ifdefs is inaccurate,
+>> because you can't really test the binutils version only the GCC
+>> version, and those are not tightly coupled.
+>>
+>> Can you .unreq it?
+>
+> adding the author of the change to cc
+>
+> https://sourceware.org/git/?p=binutils-gdb.git;a=commitdiff;h=62e20ed45e3da5f3ba695e4ee109317668180fe6
+>
+> There probably was some reasoning behind the change and an
+> intended method for using it.
+>
+>     Arnd
