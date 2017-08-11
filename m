@@ -1,78 +1,62 @@
-From: sean.wang@mediatek.com (Sean Wang)
-Date: Fri, 11 Aug 2017 10:53:08 +0800
-Subject: [PATCH 1/2] dt-bindings: serial: Add MediaTek BTIF controller
- bindings
-In-Reply-To: <20170810162752.2xncymekrhu544g7@rob-hp-laptop>
-References: <cover.1501692369.git.sean.wang@mediatek.com>
- <6b2ad0dc976259563562e7ab23abdacf68c94aa5.1501692369.git.sean.wang@mediatek.com>
- <20170810162752.2xncymekrhu544g7@rob-hp-laptop>
-Message-ID: <1502419988.19230.16.camel@mtkswgap22>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 10 Aug 2017 21:54:10 -0500
+Subject: [PATCH 3/4] dt-bindings: mt8173-mtu3: add generic compatible and
+ rename file
+In-Reply-To: <121eaec8845c62383701d4fdfe9649335937f025.1502170518.git.chunfeng.yun@mediatek.com>
+References: <8f0cb0047b2aa195d818ad686cbbceabb3ad91a0.1502170518.git.chunfeng.yun@mediatek.com>
+ <121eaec8845c62383701d4fdfe9649335937f025.1502170518.git.chunfeng.yun@mediatek.com>
+Message-ID: <20170811025410.65jvjmji4gfnmm6l@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-08-10 at 11:27 -0500, Rob Herring wrote:
-> On Thu, Aug 03, 2017 at 01:05:22AM +0800, sean.wang at mediatek.com wrote:
-> > From: Sean Wang <sean.wang@mediatek.com>
-> > 
-> > Document the devicetree bindings for MediaTek BTIF controller
-> > which could be found on MT7622 and MT7623 SoC.
-> > 
-> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/serial/mtk-btif.txt        | 26 ++++++++++++++++++++++
-> >  1 file changed, 26 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/serial/mtk-btif.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/serial/mtk-btif.txt b/Documentation/devicetree/bindings/serial/mtk-btif.txt
-> > new file mode 100644
-> > index 0000000..80c1f5a
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/serial/mtk-btif.txt
-> > @@ -0,0 +1,26 @@
-> > +Device-Tree bindings for MediaTek BTIF controller found on those
-> > +MediaTek SoCs with Bluetooth feature
-> > +
-> > +Required properties:
-> > +- compatible: Should be one of:
-> > +	- "mediatek,mt7622-btif" : for MT7622 SoC
-> > +	- "mediatek,mt7623-btif" : for MT7623 SoC
-> > +- reg: The base address of the BTIF register bank;
-> > +- interrupts: A single interrupt specifier;
-> > +- clocks: list of clock specifiers, corresponding to
-> > +	  entries in clock-names property;
-> > +- clock-names: should contain "main" entries.
-> > +
-> > +Optional properties:
-> > +- mediatek,loopback: Boolean; if defined, indicates that BTIF controller
-> > +	running on the loopback mode.
+On Tue, Aug 08, 2017 at 01:42:51PM +0800, Chunfeng Yun wrote:
+> The mt8173-mtu3.txt actually holds the bindings for all mediatek
+> SoCs with usb3 DRD IP, so add a generic compatible and change the
+> name to mtu3.txt.
 > 
-> I don't think this belongs in DT, but should be a module param or sysfs 
-> control.
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  .../bindings/usb/{mt8173-mtu3.txt => mtu3.txt}     |    6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+>  rename Documentation/devicetree/bindings/usb/{mt8173-mtu3.txt => mtu3.txt} (95%)
 > 
-the loopback actually is one of hardware setups so i add it as one
-property in the dt or could you kindly guide me how to make judgment
-accurately for listing those changes as either dt or a module param? 
+> diff --git a/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt b/Documentation/devicetree/bindings/usb/mtu3.txt
+> similarity index 95%
+> rename from Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
+> rename to Documentation/devicetree/bindings/usb/mtu3.txt
+> index 1d7c3bc..832741d 100644
+> --- a/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
+> +++ b/Documentation/devicetree/bindings/usb/mtu3.txt
 
+mediatek,mtu3.txt
 
-> > +
-> > +Example:
-> > +
-> > +	btif: btif at 1100c000 {
+> @@ -1,7 +1,9 @@
+>  The device node for Mediatek USB3.0 DRD controller
+>  
+>  Required properties:
+> - - compatible : should be "mediatek,mt8173-mtu3"
+> + - compatible : should be one of
+> +	"mediatek,mt8173-mtu3" (deprecated, use "mediatek,mtu3" instead),
+
+NAK. You can add generic compatibles, but you need SoC specific ones in 
+addition.
+
+> +	"mediatek,mtu3"
+>   - reg : specifies physical base address and size of the registers
+>   - reg-names: should be "mac" for device IP and "ippc" for IP port control
+>   - interrupts : interrupt used by the device IP
+> @@ -44,7 +46,7 @@ Optional properties:
+>  Sub-nodes:
+>  The xhci should be added as subnode to mtu3 as shown in the following example
+>  if host mode is enabled. The DT binding details of xhci can be found in:
+> -Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+> +Documentation/devicetree/bindings/usb/xhci-mtk.txt
+
+This should be in the patch that renames this file.
+
+>  
+>  Example:
+>  ssusb: usb at 11271000 {
+> -- 
+> 1.7.9.5
 > 
-> bluetooth at ...
-> 
-btif not bluetooth, which is just the interface hardware allowing the
-the main processor communicating with the bluetooth hardware built in
-the SoC, and is really like to the uart used by legacy bluetooth.
-So i will add bluetooth as the another node.
-
-
-> > +		compatible = "mediatek,mt7623-btif";
-> > +		reg = <0 0x1100c000 0 0x1000>;
-> > +		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_LOW>;
-> > +		clocks = <&pericfg CLK_PERI_BTIF>;
-> > +		clock-names = "main";
-> > +	};
-> > -- 
-> > 2.7.4
-> > 
