@@ -1,57 +1,40 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Fri, 11 Aug 2017 07:17:06 +0200 (CEST)
-Subject: [PATCH 0/9 v2] constify thermal_zone_of_device_ops structures
-In-Reply-To: <1502422611.2598.19.camel@intel.com>
-References: <1502204943-20075-1-git-send-email-Julia.Lawall@lip6.fr>
- <1502422611.2598.19.camel@intel.com>
-Message-ID: <alpine.DEB.2.20.1708110716270.2204@hadrien>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 11 Aug 2017 10:47:22 +0530
+Subject: [PATCH 2/4] cpufreq: enable the DT cpufreq driver on the Ux500
+In-Reply-To: <20170810125221.25818-3-linus.walleij@linaro.org>
+References: <20170810125221.25818-1-linus.walleij@linaro.org>
+ <20170810125221.25818-3-linus.walleij@linaro.org>
+Message-ID: <20170811051722.GF3638@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10-08-17, 14:52, Linus Walleij wrote:
+> This enables the generic DT and OPP-based cpufreq driver on the
+> ST-Ericsson Ux500 series.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/cpufreq/cpufreq-dt-platdev.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+> index 1c262923fe58..d80300251bc4 100644
+> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> @@ -88,6 +88,11 @@ static const struct of_device_id machines[] __initconst = {
+>  	{ .compatible = "socionext,uniphier-ld11", },
+>  	{ .compatible = "socionext,uniphier-ld20", },
+>  
+> +	{ .compatible = "st-ericsson,u8500", },
+> +	{ .compatible = "st-ericsson,u8540", },
+> +	{ .compatible = "st-ericsson,u9500", },
+> +	{ .compatible = "st-ericsson,u9540", },
+> +
+>  	{ .compatible = "ti,omap2", },
+>  	{ .compatible = "ti,omap3", },
+>  	{ .compatible = "ti,omap4", },
 
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-On Fri, 11 Aug 2017, Zhang Rui wrote:
-
-> On Tue, 2017-08-08 at 17:08 +0200, Julia Lawall wrote:
-> > The thermal_zone_of_device_ops structures are only passed as the
-> > fourth
-> > argument to thermal_zone_of_sensor_register or
-> > devm_thermal_zone_of_sensor_register, both of which are declared as
-> > const.
-> > Thus the thermal_zone_of_device_ops structures themselves can be
-> > const.
-> >
-> > v2: add structures passed to devm_thermal_zone_of_sensor_register
-> > also.
-> >
-> > Done with the help of Coccinelle.
-> >
-> I don't see the patches changes out of drivers/thermal.
->
-> As there is no dependencies between these patches, I guess I will only
-> take patches that changes drivers/thermal.
-
-No dependencies.  Each individual patch was only sent to its maintainers.
-
-julia
-
->
-> thanks,
-> rui
-> > ---
-> >
-> > ?drivers/hwmon/hwmon.c??????????????????????|????2 +-
-> > ?drivers/hwmon/scpi-hwmon.c?????????????????|????2 +-
-> > ?drivers/input/touchscreen/sun4i-ts.c???????|????2 +-
-> > ?drivers/thermal/broadcom/bcm2835_thermal.c |????2 +-
-> > ?drivers/thermal/hisi_thermal.c?????????????|????2 +-
-> > ?drivers/thermal/qoriq_thermal.c????????????|????2 +-
-> > ?drivers/thermal/rcar_gen3_thermal.c????????|????2 +-
-> > ?drivers/thermal/samsung/exynos_tmu.c???????|????2 +-
-> > ?drivers/thermal/zx2967_thermal.c???????????|????2 +-
-> > ?9 files changed, 9 insertions(+), 9 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+-- 
+viresh
