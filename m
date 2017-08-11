@@ -1,98 +1,34 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Fri, 11 Aug 2017 11:02:15 +0200
-Subject: [v6 02/15] x86/mm: setting fields in deferred pages
-In-Reply-To: <1502138329-123460-3-git-send-email-pasha.tatashin@oracle.com>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-3-git-send-email-pasha.tatashin@oracle.com>
-Message-ID: <20170811090214.GD30811@dhcp22.suse.cz>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 11 Aug 2017 11:09:26 +0200
+Subject: [PATCH v2 2/6] edac: synopsys: Add platform specific structures
+ for ddrc controller
+In-Reply-To: <6c72eae7c1fbfd2b96d5dc1c7feb251bdbe3e591.1502091561.git.michal.simek@xilinx.com>
+References: <91fd6532076e4c905b5a228d852bba4941c54a28.1502091561.git.michal.simek@xilinx.com>
+ <6c72eae7c1fbfd2b96d5dc1c7feb251bdbe3e591.1502091561.git.michal.simek@xilinx.com>
+Message-ID: <20170811090926.GC9432@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[CC Mel - the full series is here
-http://lkml.kernel.org/r/1502138329-123460-1-git-send-email-pasha.tatashin at oracle.com]
-
-On Mon 07-08-17 16:38:36, Pavel Tatashin wrote:
-> Without deferred struct page feature (CONFIG_DEFERRED_STRUCT_PAGE_INIT),
-> flags and other fields in "struct page"es are never changed prior to first
-> initializing struct pages by going through __init_single_page().
+On Mon, Aug 07, 2017 at 09:39:24AM +0200, Michal Simek wrote:
+> From: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
 > 
-> With deferred struct page feature enabled there is a case where we set some
-> fields prior to initializing:
+> Adds platform specific structures, so that we can add
+> different IP support later using quirks.
 > 
->         mem_init() {
->                 register_page_bootmem_info();
->                 free_all_bootmem();
->                 ...
->         }
-> 
-> When register_page_bootmem_info() is called only non-deferred struct pages
-> are initialized. But, this function goes through some reserved pages which
-> might be part of the deferred, and thus are not yet initialized.
-> 
->   mem_init
->    register_page_bootmem_info
->     register_page_bootmem_info_node
->      get_page_bootmem
->       .. setting fields here ..
->       such as: page->freelist = (void *)type;
-> 
-> We end-up with similar issue as in the previous patch, where currently we
-> do not observe problem as memory is zeroed. But, if flag asserts are
-> changed we can start hitting issues.
-> 
-> Also, because in this patch series we will stop zeroing struct page memory
-> during allocation, we must make sure that struct pages are properly
-> initialized prior to using them.
-> 
-> The deferred-reserved pages are initialized in free_all_bootmem().
-> Therefore, the fix is to switch the above calls.
-
-I have to confess that this part of the early struct page initialization
-is not my strongest point and I have to always re-read the code from the
-scratch but I really do not undestand what you are trying to achieve
-here.
-
-AFAIU register_page_bootmem_info_node is only about struct pages backing
-pgdat, usemap and memmap. Those should be in reserved memblocks and we
-do not initialize those at later times, they are not relevant to the
-deferred initialization as your changelog suggests so the ordering with
-get_page_bootmem shouldn't matter. Or am I missing something here?
- 
-> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+> Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 > ---
->  arch/x86/mm/init_64.c | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/x86/mm/init_64.c b/arch/x86/mm/init_64.c
-> index 136422d7d539..1e863baec847 100644
-> --- a/arch/x86/mm/init_64.c
-> +++ b/arch/x86/mm/init_64.c
-> @@ -1165,12 +1165,17 @@ void __init mem_init(void)
->  
->  	/* clear_bss() already clear the empty_zero_page */
->  
-> -	register_page_bootmem_info();
-> -
->  	/* this will put all memory onto the freelists */
->  	free_all_bootmem();
->  	after_bootmem = 1;
->  
-> +	/* Must be done after boot memory is put on freelist, because here we
-> +	 * might set fields in deferred struct pages that have not yet been
-> +	 * initialized, and free_all_bootmem() initializes all the reserved
-> +	 * deferred pages for us.
-> +	 */
-> +	register_page_bootmem_info();
-> +
->  	/* Register memory areas for /proc/kcore */
->  	kclist_add(&kcore_vsyscall, (void *)VSYSCALL_ADDR,
->  			 PAGE_SIZE, KCORE_OTHER);
-> -- 
-> 2.14.0
+> Changes in v2:
+
+Subject says "2/6" but I can't find 1/6 in my mbox. Nothing in spam
+folder either. What's up?
+
+Are you using the --cover-letter option to git format-patch ?
 
 -- 
-Michal Hocko
-SUSE Labs
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
