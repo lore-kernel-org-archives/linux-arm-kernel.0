@@ -1,99 +1,205 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 11 Aug 2017 10:36:13 +0100
-Subject: [PATCH v2 02/18] dt-bindings: arm: add support for ARM System
- Control and Management Interface(SCMI) protocol
-In-Reply-To: <20170810192838.prslgnjvxv3xvyes@rob-hp-laptop>
-References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
- <1501857104-11279-3-git-send-email-sudeep.holla@arm.com>
- <20170810192838.prslgnjvxv3xvyes@rob-hp-laptop>
-Message-ID: <f41b7ae8-affe-e782-7a4b-bbb3a5146247@arm.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Fri, 11 Aug 2017 11:37:47 +0200
+Subject: [v6 05/15] mm: don't accessed uninitialized struct pages
+In-Reply-To: <1502138329-123460-6-git-send-email-pasha.tatashin@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-6-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <20170811093746.GF30811@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 10/08/17 20:28, Rob Herring wrote:
-> On Fri, Aug 04, 2017 at 03:31:28PM +0100, Sudeep Holla wrote:
->> This patch adds devicetree binding for System Control and Management
->> Interface (SCMI) Message Protocol used between the Application Cores(AP)
->> and the System Control Processor(SCP). The MHU peripheral provides a
->> mechanism for inter-processor communication between SCP's M3 processor
->> and AP.
->>
->> SCP offers control and management of the core/cluster power states,
->> various power domain DVFS including the core/cluster, certain system
->> clocks configuration, thermal sensors and many others.
->>
->> SCMI protocol is developed as better replacement to the existing SCPI
->> which is not flexible and easily extensible.
->>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  Documentation/devicetree/bindings/arm/arm,scmi.txt | 174 +++++++++++++++++++++
->>  1 file changed, 174 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/arm,scmi.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/arm,scmi.txt b/Documentation/devicetree/bindings/arm/arm,scmi.txt
->> new file mode 100644
->> index 000000000000..33c16be58e72
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/arm,scmi.txt
->> @@ -0,0 +1,174 @@
->> +System Control and Management Interface (SCMI) Message Protocol
->> +----------------------------------------------------------
->> +
->> +The SCMI is intended to allow agents such as OSPM to manage various functions
->> +that are provided by the hardware platform it is running on, including power
->> +and performance functions.
->> +
->> +This binding is intended to define the interface the firmware implementing
->> +the SCMI as described in ARM document number ARM DUI 0922B ("ARM System Control
->> +and Management Interface Platform Design Document")[0] provide for OSPM in
->> +the device tree.
->> +
->> +Required properties:
+On Mon 07-08-17 16:38:39, Pavel Tatashin wrote:
+> In deferred_init_memmap() where all deferred struct pages are initialized
+> we have a check like this:
 > 
-> Please define this is a subnode of /firmware node.
+>     if (page->flags) {
+>             VM_BUG_ON(page_zone(page) != zone);
+>             goto free_range;
+>     }
 > 
-
-Thanks for pointing that out, I wasn't aware of that.
-
-Ideally, should we move PSCI and SCPI also under that ?
-
-Also should we contain all firmware bindings under
-Documentation/devicetree/bindings/arm/firmware/ ?
-
-[..]
-
->> +PM domain consumers
->> +===================
+> This way we are checking if the current deferred page has already been
+> initialized. It works, because memory for struct pages has been zeroed, and
+> the only way flags are not zero if it went through __init_single_page()
+> before.  But, once we change the current behavior and won't zero the memory
+> in memblock allocator, we cannot trust anything inside "struct page"es
+> until they are initialized. This patch fixes this.
 > 
-> How consumers work is already defined elsewhere.
+> This patch defines a new accessor memblock_get_reserved_pfn_range()
+> which returns successive ranges of reserved PFNs.  deferred_init_memmap()
+> calls it to determine if a PFN and its struct page has already been
+> initialized.
+
+Why don't we simply check the pfn against pgdat->first_deferred_pfn?
+
+> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+> ---
+>  include/linux/memblock.h |  3 +++
+>  mm/memblock.c            | 54 ++++++++++++++++++++++++++++++++++++++++++------
+>  mm/page_alloc.c          | 11 +++++++++-
+>  3 files changed, 61 insertions(+), 7 deletions(-)
 > 
-
-Agreed, will drop it.
-
-[..]
-
->> +
->> +scmi_protocol: scmi at 2e000000 {
-> 
-> The unit address is not valid.
-> 
-
-Ah, copy paste, will drop. Need to fix in scpi bindings too.
-
->> +	compatible = "arm,scmi";
->> +	method = "mailbox-doorbell";
-> 
-> Is this not implied by the mboxes property? 
-> 
-
-Indeed, remnants from v1. I removed in the definition but left in the
-example.
+> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+> index bae11c7e7bf3..b6a2a610f5e1 100644
+> --- a/include/linux/memblock.h
+> +++ b/include/linux/memblock.h
+> @@ -320,6 +320,9 @@ int memblock_is_map_memory(phys_addr_t addr);
+>  int memblock_is_region_memory(phys_addr_t base, phys_addr_t size);
+>  bool memblock_is_reserved(phys_addr_t addr);
+>  bool memblock_is_region_reserved(phys_addr_t base, phys_addr_t size);
+> +void memblock_get_reserved_pfn_range(unsigned long pfn,
+> +				     unsigned long *pfn_start,
+> +				     unsigned long *pfn_end);
+>  
+>  extern void __memblock_dump_all(void);
+>  
+> diff --git a/mm/memblock.c b/mm/memblock.c
+> index bf14aea6ab70..08f449acfdd1 100644
+> --- a/mm/memblock.c
+> +++ b/mm/memblock.c
+> @@ -1580,7 +1580,13 @@ void __init memblock_mem_limit_remove_map(phys_addr_t limit)
+>  	memblock_cap_memory_range(0, max_addr);
+>  }
+>  
+> -static int __init_memblock memblock_search(struct memblock_type *type, phys_addr_t addr)
+> +/**
+> + * Return index in regions array if addr is within the region. Otherwise
+> + * return -1. If -1 is returned and *next_idx is not %NULL, sets it to the
+> + * next region index or -1 if there is none.
+> + */
+> +static int __init_memblock memblock_search(struct memblock_type *type,
+> +					   phys_addr_t addr, int *next_idx)
+>  {
+>  	unsigned int left = 0, right = type->cnt;
+>  
+> @@ -1595,22 +1601,26 @@ static int __init_memblock memblock_search(struct memblock_type *type, phys_addr
+>  		else
+>  			return mid;
+>  	} while (left < right);
+> +
+> +	if (next_idx)
+> +		*next_idx = (right == type->cnt) ? -1 : right;
+> +
+>  	return -1;
+>  }
+>  
+>  bool __init memblock_is_reserved(phys_addr_t addr)
+>  {
+> -	return memblock_search(&memblock.reserved, addr) != -1;
+> +	return memblock_search(&memblock.reserved, addr, NULL) != -1;
+>  }
+>  
+>  bool __init_memblock memblock_is_memory(phys_addr_t addr)
+>  {
+> -	return memblock_search(&memblock.memory, addr) != -1;
+> +	return memblock_search(&memblock.memory, addr, NULL) != -1;
+>  }
+>  
+>  int __init_memblock memblock_is_map_memory(phys_addr_t addr)
+>  {
+> -	int i = memblock_search(&memblock.memory, addr);
+> +	int i = memblock_search(&memblock.memory, addr, NULL);
+>  
+>  	if (i == -1)
+>  		return false;
+> @@ -1622,7 +1632,7 @@ int __init_memblock memblock_search_pfn_nid(unsigned long pfn,
+>  			 unsigned long *start_pfn, unsigned long *end_pfn)
+>  {
+>  	struct memblock_type *type = &memblock.memory;
+> -	int mid = memblock_search(type, PFN_PHYS(pfn));
+> +	int mid = memblock_search(type, PFN_PHYS(pfn), NULL);
+>  
+>  	if (mid == -1)
+>  		return -1;
+> @@ -1646,7 +1656,7 @@ int __init_memblock memblock_search_pfn_nid(unsigned long pfn,
+>   */
+>  int __init_memblock memblock_is_region_memory(phys_addr_t base, phys_addr_t size)
+>  {
+> -	int idx = memblock_search(&memblock.memory, base);
+> +	int idx = memblock_search(&memblock.memory, base, NULL);
+>  	phys_addr_t end = base + memblock_cap_size(base, &size);
+>  
+>  	if (idx == -1)
+> @@ -1655,6 +1665,38 @@ int __init_memblock memblock_is_region_memory(phys_addr_t base, phys_addr_t size
+>  		 memblock.memory.regions[idx].size) >= end;
+>  }
+>  
+> +/**
+> + * memblock_get_reserved_pfn_range - search for the next reserved region
+> + *
+> + * @pfn: start searching from this pfn.
+> + *
+> + * RETURNS:
+> + * [start_pfn, end_pfn), where start_pfn >= pfn. If none is found
+> + * start_pfn, and end_pfn are both set to ULONG_MAX.
+> + */
+> +void __init_memblock memblock_get_reserved_pfn_range(unsigned long pfn,
+> +						     unsigned long *start_pfn,
+> +						     unsigned long *end_pfn)
+> +{
+> +	struct memblock_type *type = &memblock.reserved;
+> +	int next_idx, idx;
+> +
+> +	idx = memblock_search(type, PFN_PHYS(pfn), &next_idx);
+> +	if (idx == -1 && next_idx == -1) {
+> +		*start_pfn = ULONG_MAX;
+> +		*end_pfn = ULONG_MAX;
+> +		return;
+> +	}
+> +
+> +	if (idx == -1) {
+> +		idx = next_idx;
+> +		*start_pfn = PFN_DOWN(type->regions[idx].base);
+> +	} else {
+> +		*start_pfn = pfn;
+> +	}
+> +	*end_pfn = PFN_DOWN(type->regions[idx].base + type->regions[idx].size);
+> +}
+> +
+>  /**
+>   * memblock_is_region_reserved - check if a region intersects reserved memory
+>   * @base: base of region to check
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index 63d16c185736..983de0a8047b 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -1447,6 +1447,7 @@ static int __init deferred_init_memmap(void *data)
+>  	pg_data_t *pgdat = data;
+>  	int nid = pgdat->node_id;
+>  	struct mminit_pfnnid_cache nid_init_state = { };
+> +	unsigned long resv_start_pfn = 0, resv_end_pfn = 0;
+>  	unsigned long start = jiffies;
+>  	unsigned long nr_pages = 0;
+>  	unsigned long walk_start, walk_end;
+> @@ -1491,6 +1492,10 @@ static int __init deferred_init_memmap(void *data)
+>  			pfn = zone->zone_start_pfn;
+>  
+>  		for (; pfn < end_pfn; pfn++) {
+> +			if (pfn >= resv_end_pfn)
+> +				memblock_get_reserved_pfn_range(pfn,
+> +								&resv_start_pfn,
+> +								&resv_end_pfn);
+>  			if (!pfn_valid_within(pfn))
+>  				goto free_range;
+>  
+> @@ -1524,7 +1529,11 @@ static int __init deferred_init_memmap(void *data)
+>  				cond_resched();
+>  			}
+>  
+> -			if (page->flags) {
+> +			/*
+> +			 * Check if this page has already been initialized due
+> +			 * to being reserved during boot in memblock.
+> +			 */
+> +			if (pfn >= resv_start_pfn) {
+>  				VM_BUG_ON(page_zone(page) != zone);
+>  				goto free_range;
+>  			}
+> -- 
+> 2.14.0
 
 -- 
-Regards,
-Sudeep
+Michal Hocko
+SUSE Labs
