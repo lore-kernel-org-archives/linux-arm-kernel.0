@@ -1,45 +1,82 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 11 Aug 2017 10:05:43 +0200
-Subject: [PATCH 2/3] ARM: sun8i: sunxi-h3-h5: add phy-is-integrated
- property to internal PHY
-In-Reply-To: <CAGb2v64dBZgN6-8kHnnN1qiEXHnbXw_FM9WxGHPU0h-tZDbspA@mail.gmail.com>
-References: <20170810085129.20463-1-clabbe.montjoie@gmail.com>
- <20170810085129.20463-3-clabbe.montjoie@gmail.com>
- <CAGb2v64dBZgN6-8kHnnN1qiEXHnbXw_FM9WxGHPU0h-tZDbspA@mail.gmail.com>
-Message-ID: <20170811080543.GA25147@Red>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Fri, 11 Aug 2017 10:07:07 +0200
+Subject: [v6 01/15] x86/mm: reserve only exiting low pages
+In-Reply-To: <1502138329-123460-2-git-send-email-pasha.tatashin@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-2-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <20170811080706.GC30811@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 11, 2017 at 10:42:51AM +0800, Chen-Yu Tsai wrote:
-> Hi,
-> 
-> On Thu, Aug 10, 2017 at 4:51 PM, Corentin Labbe
-> <clabbe.montjoie@gmail.com> wrote:
-> > This patch add the new phy-is-integrated property to the internal PHY
-> > node.
-> >
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> > index 4b599b5d26f6..54fc24e4c569 100644
-> > --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> > +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> > @@ -425,6 +425,7 @@
-> >                                         reg = <1>;
-> >                                         clocks = <&ccu CLK_BUS_EPHY>;
-> >                                         resets = <&ccu RST_BUS_EPHY>;
-> > +                                       phy-is-integrated;
-> 
-> You also need to "delete" this property at the board level for
-> any board that has the external PHY at address <1>. Otherwise
-> they will stop working. This is due to the internal and external
-> PHYs having the same path and node name in the device tree, so
-> they are effectively the same node.
-> 
-> ChenYu
-> 
+On Mon 07-08-17 16:38:35, Pavel Tatashin wrote:
+> Struct pages are initialized by going through __init_single_page(). Since
+> the existing physical memory in memblock is represented in memblock.memory
+> list, struct page for every page from this list goes through
+> __init_single_page().
 
-They have not the same name, ext_rgmii_phy vs int_mii_phy.
+By a page _from_ this list you mean struct pages backing the physical
+memory of the memblock lists?
+ 
+> The second memblock list: memblock.reserved, manages the allocated memory.
+> The memory that won't be available to kernel allocator. So, every page from
+> this list goes through reserve_bootmem_region(), where certain struct page
+> fields are set, the assumption being that the struct pages have been
+> initialized beforehand.
+> 
+> In trim_low_memory_range() we unconditionally reserve memoryfrom PFN 0, but
+> memblock.memory might start at a later PFN. For example, in QEMU,
+> e820__memblock_setup() can use PFN 1 as the first PFN in memblock.memory,
+> so PFN 0 is not on memblock.memory (and hence isn't initialized via
+> __init_single_page) but is on memblock.reserved (and hence we set fields in
+> the uninitialized struct page).
+> 
+> Currently, the struct page memory is always zeroed during allocation,
+> which prevents this problem from being detected. But, if some asserts
+> provided by CONFIG_DEBUG_VM_PGFLAGS are tighten, this problem may become
+> visible in existing kernels.
+> 
+> In this patchset we will stop zeroing struct page memory during allocation.
+> Therefore, this bug must be fixed in order to avoid random assert failures
+> caused by CONFIG_DEBUG_VM_PGFLAGS triggers.
+> 
+> The fix is to reserve memory from the first existing PFN.
+
+Hmm, I assume this is a result of some assert triggering, right? Which
+one? Why don't we need the same treatment for other than x86 arch?
+
+> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+
+I guess that the review happened inhouse. I do not want to question its
+value but it is rather strange to not hear the specific review comments
+which might be useful in general and moreover even not include those
+people on the CC list so they are aware of the follow up discussion.
+
+> ---
+>  arch/x86/kernel/setup.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
+> index 3486d0498800..489cdc141bcb 100644
+> --- a/arch/x86/kernel/setup.c
+> +++ b/arch/x86/kernel/setup.c
+> @@ -790,7 +790,10 @@ early_param("reservelow", parse_reservelow);
+>  
+>  static void __init trim_low_memory_range(void)
+>  {
+> -	memblock_reserve(0, ALIGN(reserve_low, PAGE_SIZE));
+> +	unsigned long min_pfn = find_min_pfn_with_active_regions();
+> +	phys_addr_t base = min_pfn << PAGE_SHIFT;
+> +
+> +	memblock_reserve(base, ALIGN(reserve_low, PAGE_SIZE));
+>  }
+>  	
+>  /*
+> -- 
+> 2.14.0
+
+-- 
+Michal Hocko
+SUSE Labs
