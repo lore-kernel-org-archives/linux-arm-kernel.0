@@ -1,40 +1,80 @@
 From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Sat, 12 Aug 2017 00:28:13 +0200
-Subject: [PATCH 2/2] arm64: allwinner: pine64: Enable spi0/spi1
+Date: Sat, 12 Aug 2017 00:28:12 +0200
+Subject: [PATCH 1/2] arm64: allwinner: a64: add SPI nodes
 In-Reply-To: <20170811222813.1567-1-stefan.bruens@rwth-aachen.de>
 References: <20170811222813.1567-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <36eb917eabc044878607a8812b8e18f8@rwthex-w2-b.rwth-ad.de>
+Message-ID: <83987158c44545c7b8c1625049d1e65d@rwthex-w2-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The two spi channels/controllers are available on the PI-2 resp. Euler
-connector, enable both. Contrary to the Pi, the A64 SOC only supports
-one chip select, so the second chipselect is not available (though
-it can be emulated using gpio chipselect).
+The A64 SPI controllers are register compatible to the h3/h5 SPI
+controllers.
+
+The A64 has two SPI controllers, each with a single chip select.
+The handles for the DMA channels (23/24 for SPI0/SPI1) are omitted,
+as the A64 DMA support is currently missing.
 
 Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 40 +++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-index 08cda24ea194..f795d4074a3a 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -123,6 +123,14 @@
- 	status = "okay";
- };
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index bd0f33b77f57..373cd14f0206 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -325,6 +325,16 @@
+ 				drive-strength = <40>;
+ 			};
  
-+&spi0 {
-+	status = "okay";
-+};
++			spi0_pins: spi0 {
++				pins = "PC0", "PC1", "PC2", "PC3";
++				function = "spi0";
++			};
 +
-+&spi1 {
-+	status = "okay";
-+};
++			spi1_pins: spi1 {
++				pins = "PD0", "PD1", "PD2", "PD3";
++				function = "spi1";
++			};
 +
- /* On Exp and Euler connectors */
- &uart0 {
- 	pinctrl-names = "default";
+ 			uart0_pins_a: uart0 at 0 {
+ 				pins = "PB8", "PB9";
+ 				function = "uart0";
+@@ -527,5 +537,35 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 		};
++
++		spi0: spi at 01c68000 {
++			compatible = "allwinner,sun8i-h3-spi";
++			reg = <0x01c68000 0x1000>;
++			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_SPI0>, <&ccu CLK_SPI0>;
++			clock-names = "ahb", "mod";
++			pinctrl-names = "default";
++			pinctrl-0 = <&spi0_pins>;
++			resets = <&ccu RST_BUS_SPI0>;
++			status = "disabled";
++			num-cs = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		spi1: spi at 01c69000 {
++			compatible = "allwinner,sun8i-h3-spi";
++			reg = <0x01c69000 0x1000>;
++			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_SPI1>, <&ccu CLK_SPI1>;
++			clock-names = "ahb", "mod";
++			pinctrl-names = "default";
++			pinctrl-0 = <&spi1_pins>;
++			resets = <&ccu RST_BUS_SPI1>;
++			status = "disabled";
++			num-cs = <1>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
+ 	};
+ };
 -- 
 2.13.3
