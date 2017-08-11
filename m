@@ -1,54 +1,56 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Fri, 11 Aug 2017 09:46:34 +0800
-Subject: [PATCH v3 4/5] dt-bindings: phy-rockchip-inno-usb2: add otg-mux
- interrupt
-In-Reply-To: <20170810170640.xdntfubu3lzoqsad@rob-hp-laptop>
-References: <1501747753-6983-1-git-send-email-frank.wang@rock-chips.com>
- <1501747753-6983-5-git-send-email-frank.wang@rock-chips.com>
- <20170810170640.xdntfubu3lzoqsad@rob-hp-laptop>
-Message-ID: <4bba0de8-cb15-9f1a-5ecc-61d03804d5da@rock-chips.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Fri, 11 Aug 2017 09:50:21 +0800
+Subject: [PATCH v2 1/9] arm64: dts: hi3660: enable idle states
+In-Reply-To: <b3d8f55b-3d70-9b3a-a4c6-474a933a13a9@linaro.org>
+References: <20170810022615.19204-1-guodong.xu@linaro.org>
+ <20170810022615.19204-2-guodong.xu@linaro.org>
+ <b3d8f55b-3d70-9b3a-a4c6-474a933a13a9@linaro.org>
+Message-ID: <20170811015020.GF3819@leoy-ThinkPad-T440>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Daniel,
 
-On 2017/8/11 1:06, Rob Herring wrote:
-> On Thu, Aug 03, 2017 at 04:09:12PM +0800, Frank Wang wrote:
->> Add otg-mux property to support multiplexed interrupt in otg-port
->> on some Rockchip SoC (e.g RV1108).
->>
->> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
->> ---
->>   Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt | 6 +++++-
->>   1 file changed, 5 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
->> index ddf868a..ed6aee4 100644
->> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
->> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
->> @@ -32,10 +32,14 @@ Required nodes : a sub-node is required for each port the phy provides.
->>   Required properties (port (child) node):
->>    - #phy-cells : must be 0. See ./phy-bindings.txt for details.
->>    - interrupts : specify an interrupt for each entry in interrupt-names.
->> - - interrupt-names : a list which shall be the following entries:
->> + - interrupt-names : a list which should be one of the following cases:
->> +	Regular case:
->>   	* "otg-id" : for the otg id interrupt.
->>   	* "otg-bvalid" : for the otg vbus interrupt.
->>   	* "linestate" : for the host/otg linestate interrupt.
->> +	Some SoCs use one interrupt with the obove muxed together, so for these
-> s/obove/above/
+On Thu, Aug 10, 2017 at 12:07:07PM +0200, Daniel Lezcano wrote:
+> 
+> Hi Guodong, Leo,
+> 
+> there are several typos in the patch description. I *humbly* propose an
+> alternate description to make it a bit more English friendly.
+> 
+> """
+> 
+> There are two clusters on the Hi3660, the first one is Cortex-A53 based
+> and the other one is Cortex-A73 based. These two clusters have different
+> idle states.
+> 
+> Thanks to Daniel Lezcano's recent changes, the generic ARM cpuidle
+> driver can now support several clusters with different idle states, thus
+> supporting the big.Little architecture.
+> 
+> In addition to the WFI idle state which is the default shallowest state
+> for all ARM cpus, the Hi3660 supports the following states:
+> 
+>  - CA53 CPUs:
+> 	- CPU_SLEEP:       CPU power off state
+> 	- CLUSTER_SLEEP_0: Cluster power off state
+> 
+>  - CA73 CPUs:
+> 	- CPU_NAP:         CPU retention state
+> 	- CPU_SLEEP:       CPU power off state
+> 	- CLUSTER_SLEEP_1: Cluster power off state
+> 
+> This patch adds the idle states description for the Hi3660 to the device
+> tree.
+> 
+> """
+> 
+> 
+> Other than that.
+> 
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Sorry, thanks for your reminding and will fix.
+Thanks a lot for proposing commit log, it's much better :)
 
-
-BR.
-Frank
-
->
-> With that,
->
-> Acked-by: Rob Herring <robh@kernel.org>
->
->
->
+Thanks,
+Leo Yan
