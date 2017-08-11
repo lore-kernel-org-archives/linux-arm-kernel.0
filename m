@@ -1,34 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 11 Aug 2017 10:22:14 +0100
-Subject: New assembler warnings with binutils 2.29
-In-Reply-To: <d101c48b-c47b-be60-4b40-de4f845e4965@redhat.com>
-References: <d101c48b-c47b-be60-4b40-de4f845e4965@redhat.com>
-Message-ID: <20170811092213.mdmzqtm2lp6ltlxt@armageddon.cambridge.arm.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Fri, 11 Aug 2017 11:22:25 +0200
+Subject: [PATCH v2 2/6] edac: synopsys: Add platform specific structures
+ for ddrc controller
+In-Reply-To: <9800a639-2e1b-5008-14fc-b2135a27f826@xilinx.com>
+References: <91fd6532076e4c905b5a228d852bba4941c54a28.1502091561.git.michal.simek@xilinx.com>
+ <6c72eae7c1fbfd2b96d5dc1c7feb251bdbe3e591.1502091561.git.michal.simek@xilinx.com>
+ <20170811090926.GC9432@nazgul.tnic>
+ <9800a639-2e1b-5008-14fc-b2135a27f826@xilinx.com>
+Message-ID: <20170811092225.GE9432@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 10, 2017 at 01:13:22PM -0700, Laura Abbott wrote:
-> Fedora rawhide recently upgraded to binutils 2.29 and this seems
-> to produce new warnings:
-> 
-> ./arch/arm64/include/asm/assembler.h: Assembler messages:
-> ./arch/arm64/include/asm/assembler.h:125: Warning: ignoring attempt to redefine built-in register 'lr'
-> 
-> This is
-> 
-> /*
->  * Register aliases.
->  */
-> lr      .req    x30             // link register
+On Fri, Aug 11, 2017 at 11:16:15AM +0200, Michal Simek wrote:
+> https://lkml.org/lkml/2017/8/7/105
+> ACK by Rob yesterday.
 
-Strange, does gas now think 'lr' is a general purpose register (aliased
-to x30)? It never was and IIRC the toolchain people many years ago
-refused to add it, hence the alias above in the kernel. I wonder if they
-added 'fp' as well...
+Ok, pls bounce it to me as I don't have it.
 
-We could remove the alias and replace all 'lr' instances with 'x30'
-throughout the kernel (no too many) or we add some #ifdef around the
-above based on the binutils version.
+Also, pls refrain from using lkml.org. Simply do:
+
+http://lkml.kernel.org/r/<Message-ID>
+
+> I am using patman - u-boot tools for sending patch. It read MAINTAINERS
+> file and copy right people.
+> It has option to explicitly CC people. I need to resend this as v3
+> anyway that's why I will add you there.
+
+Yes, if you send cross-maintainer changes, please make sure to CC them on all
+patches because otherwise stuff like that happens and people start wondering
+where is the rest and so on.
+
+Thx.
 
 -- 
-Catalin
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
