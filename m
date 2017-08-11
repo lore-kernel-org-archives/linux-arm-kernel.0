@@ -1,63 +1,56 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Fri, 11 Aug 2017 13:35:56 +0800
-Subject: [PATCH v4 0/4] thermal: add brcmstb AVS TMON driver
-In-Reply-To: <20170809220257.4234-1-code@mmayer.net>
-References: <20170809220257.4234-1-code@mmayer.net>
-Message-ID: <1502429756.2470.9.camel@intel.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 11 Aug 2017 07:50:48 +0200
+Subject: [GIT PULL] pinctrl: samsung: Changes for v4.14
+Message-ID: <1502430648-3676-1-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-08-09 at 15:02 -0700, Markus Mayer wrote:
-> From: Markus Mayer <mmayer@broadcom.com>
-> 
-> This series adds the brcmstb AVS TMON driver.
-> 
-> The driver was originally written by Brian Norris.
-> 
-> This series is also available at
-> https://github.com/mmayer/linux/tree/brcmstb-thermal-4.13-v4.
-> 
-> v1 of this series can be found at https://lkml.org/lkml/2017/6/5/921
-> v2 of this series can be found at https://lkml.org/lkml/2017/7/21/585
-> v3 of this series can be found at https://lkml.org/lkml/2017/7/31/710
-> 
-> Changes since v3:
-> - Rebased on v4.13-rc3 to resolve conflicts in the MAINTAINERS file
-> 
-thanks, will apply this if we have ACK for patch 3 and 4.
+Hi,
 
-thanks,
-rui
-> Changes since v2:
-> - replaced calls to pr_debug() with calls to dev_dbg() [PATCH 2/4
-> only]
-> - all other patches are unchanged from v2
-> 
-> Changes since v1:
-> - Fixed wording in binding document
-> - Fixed lincensing to consistently mention GPL v2
-> - Use thermal_zone_get_slope() and thermal_zone_get_offset()
-> - Some minor clean-ups
-> 
-> Brian Norris (2):
-> ? Documentation: devicetree: add binding for Broadcom STB AVS TMON
-> ? thermal: add brcmstb AVS TMON driver
-> 
-> Markus Mayer (2):
-> ? ARM: multi_v7_defconfig: add CONFIG_BRCMSTB_THERMAL
-> ? arm64: defconfig: add CONFIG_BRCMSTB_THERMAL
-> 
-> ?.../devicetree/bindings/thermal/brcm,avs-tmon.txt??|??20 ++
-> ?MAINTAINERS????????????????????????????????????????|???8 +
-> ?arch/arm/configs/multi_v7_defconfig????????????????|???1 +
-> ?arch/arm64/configs/defconfig???????????????????????|???1 +
-> ?drivers/thermal/Kconfig????????????????????????????|???2 +-
-> ?drivers/thermal/broadcom/Kconfig???????????????????|???7 +
-> ?drivers/thermal/broadcom/Makefile??????????????????|???1 +
-> ?drivers/thermal/broadcom/brcmstb_thermal.c?????????| 386
-> +++++++++++++++++++++
-> ?8 files changed, 425 insertions(+), 1 deletion(-)
-> ?create mode 100644
-> Documentation/devicetree/bindings/thermal/brcm,avs-tmon.txt
-> ?create mode 100644 drivers/thermal/broadcom/brcmstb_thermal.c
-> 
+Two fixes in this pull request were not regressions from current merge
+window and one was known for some time, so I did not push them
+to this cycle.
+
+Best regards,
+Krzysztof
+
+
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pinctrl/samsung.git tags/samsung-pinctrl-4.14
+
+for you to fetch changes up to bbed85f45b2b727bb776b914b84c67e8fd825433:
+
+  pinctrl: samsung: Remove unneeded local variable initialization (2017-07-24 06:56:02 +0200)
+
+----------------------------------------------------------------
+Samsung pinctrl driver changes for v4.14:
+1. Fix NULL pointer dereference on S3C24XX.  This was reported some time ago and
+   unfortunately it took few releases to fix.
+2. Fix invalid register offset used for external interrupts on Exynos5433.
+   This was caused by the same commit as above, although on different path.
+3. Consolidate between drivers and bindings the defines for pin mux functions.
+4. Minor code improvements.
+
+----------------------------------------------------------------
+Krzysztof Kozlowski (7):
+      pinctrl: samsung: Fix NULL pointer exception on external interrupts on S3C24xx
+      pinctrl: samsung: Fix invalid register offset used for Exynos5433 external interrupts
+      pinctrl: samsung: dt-bindings: Use better name for external interrupt function
+      pinctrl: samsung: Use define from dt-bindings for pin mux function
+      pinctrl: samsung: Use unsigned int for number of controller IO mem resources
+      pinctrl: samsung: Consistently use unsigned instead of u32 for nr_banks
+      pinctrl: samsung: Remove unneeded local variable initialization
+
+ drivers/pinctrl/samsung/pinctrl-exynos.c  | 32 ++++++++++---------------
+ drivers/pinctrl/samsung/pinctrl-exynos.h  |  1 -
+ drivers/pinctrl/samsung/pinctrl-s3c24xx.c | 37 +++++++++++++++-------------
+ drivers/pinctrl/samsung/pinctrl-s3c64xx.c | 40 ++++++++++++++-----------------
+ drivers/pinctrl/samsung/pinctrl-samsung.c | 12 ++++++++--
+ drivers/pinctrl/samsung/pinctrl-samsung.h | 15 ++++++------
+ include/dt-bindings/pinctrl/samsung.h     |  3 ++-
+ 7 files changed, 71 insertions(+), 69 deletions(-)
