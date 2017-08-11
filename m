@@ -1,60 +1,127 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 11 Aug 2017 17:05:27 -0500
-Subject: [PATCH 0/4] Allow non-legacy cards to be vgaarb default
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E40B76A1A@FRAEML521-MBX.china.huawei.com>
-References: <20170719012839.20124-1-dja@axtens.net>
- <CAKv+Gu-SgeLXVEj_VtZHchaNmOwWO+GmfTg5CYcnOF43AJZGnA@mail.gmail.com>
- <87pocusm2x.fsf@linkitivity.dja.id.au>
- <CAKv+Gu-O7cyJSgDrqSNi6F_n9eBnFEgz==aqowMqhy+81YK=CQ@mail.gmail.com>
- <87r2x6vj7t.fsf@linkitivity.dja.id.au>
- <a61222c6-e548-1e3b-f6f7-63952b90ac13@redhat.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E40B76A1A@FRAEML521-MBX.china.huawei.com>
-Message-ID: <20170811220527.GJ17039@bhelgaas-glaptop.roam.corp.google.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 11 Aug 2017 17:11:19 -0500
+Subject: [PATCH 2/4] i2c: davinci: Add PM Runtime Support
+In-Reply-To: <20170802221753.13786-3-fcooper@ti.com>
+References: <20170802221753.13786-1-fcooper@ti.com>
+ <20170802221753.13786-3-fcooper@ti.com>
+Message-ID: <613570e5-706a-3a54-5cb1-a8f05deb52a3@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 03:56:20PM +0000, Gabriele Paoloni wrote:
-> > Having practically zero background in gfx development (either kernel or
-> > Xorg), I think the problem is that vga_default_device() /
-> > vga_set_default_device(), which -- apparently -- "boot_vga" is based
-> > upon, come from "drivers/gpu/vga/vgaarb.c". Namely, the concept of
-> > "primary / boot display device" is tied to the VGA arbiter, plus only a
-> > PCI device can currently be marked as primary/boot display device.
-> > 
-> > Can these concepts be split from each other? (I can fully imagine that
-> > this would result in a userspace visible interface change (or
-> > addition),
-> > so that e.g. "/sys/devices/**/boot_gpu" would have to be consulted by
-> > display servers.)
-> > 
-> > (Sorry if I'm totally wrong.)
-> > 
-> > ... Hm, reading the thread starter at
-> > <https://www.mail-archive.com/linuxppc-
-> > dev at lists.ozlabs.org/msg120851.html>,
-> > and the references within... It looks like this work is motivated by
-> > hardware that is supposed to be PCI, but actually breaks the specs. Is
-> > that correct? If so, then I don't think I can suggest anything useful.
+
+
+On 08/02/2017 05:17 PM, Franklin S Cooper Jr wrote:
+> This patch adds PM runtime support to the I2C Davinci driver.
 > 
-> My understanding is that the current PCIe HW is specs compliant but the
-> vgaarb, in order to make a VGA device the default one, requires all the
-> bridges on top of such device to have the "VGA Enable" bit set (optional
-> bit in the PCI Express? to PCI/PCI-X Bridge Spec). I.e. all the bridges
-> on top have to support legacy VGA devices; and this is not mandatory
-> from the specs...right?
+> Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+>   drivers/i2c/busses/i2c-davinci.c | 61 ++++++++++++++++++++++++++++++++++------
+>   1 file changed, 53 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
+> index 5749aac..62ff869 100644
+> --- a/drivers/i2c/busses/i2c-davinci.c
+> +++ b/drivers/i2c/busses/i2c-davinci.c
+> @@ -36,6 +36,7 @@
+>   #include <linux/gpio.h>
+>   #include <linux/of_device.h>
+>   #include <linux/platform_data/i2c-davinci.h>
+> +#include <linux/pm_runtime.h>
+>   
+>   /* ----- global defines ----------------------------------------------- */
+>   
+> @@ -122,6 +123,9 @@
+>   /* set the SDA GPIO low */
+>   #define DAVINCI_I2C_DCLR_PDCLR1	BIT(1)
+>   
+> +/* timeout for pm runtime autosuspend */
+> +#define DAVINCI_I2C_PM_TIMEOUT	1000	/* ms */
+> +
+>   struct davinci_i2c_dev {
+>   	struct device           *dev;
+>   	void __iomem		*base;
+> @@ -541,10 +545,17 @@ i2c_davinci_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>   
+>   	dev_dbg(dev->dev, "%s: msgs: %d\n", __func__, num);
+>   
+> +	ret = pm_runtime_get_sync(dev->dev);
+> +	if (ret < 0) {
+> +		dev_err(dev->dev, "Failed to runtime_get device: %d\n", ret);
+> +		pm_runtime_put_noidle(dev->dev);
+> +		return ret;
+> +	}
+> +
+>   	ret = i2c_davinci_wait_bus_not_busy(dev);
+>   	if (ret < 0) {
+>   		dev_warn(dev->dev, "timeout waiting for bus ready\n");
+> -		return ret;
+> +		goto out;
+>   	}
+>   
+>   	for (i = 0; i < num; i++) {
+> @@ -552,14 +563,19 @@ i2c_davinci_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>   		dev_dbg(dev->dev, "%s [%d/%d] ret: %d\n", __func__, i + 1, num,
+>   			ret);
+>   		if (ret < 0)
+> -			return ret;
+> +			goto out;
+>   	}
+>   
+> +	ret = num;
+>   #ifdef CONFIG_CPU_FREQ
+>   	complete(&dev->xfr_complete);
+>   #endif
+>   
+> -	return num;
+> +out:
+> +	pm_runtime_mark_last_busy(dev->dev);
+> +	pm_runtime_put_autosuspend(dev->dev);
+> +
+> +	return ret;
+>   }
+>   
+>   static u32 i2c_davinci_func(struct i2c_adapter *adap)
+> @@ -599,6 +615,9 @@ static irqreturn_t i2c_davinci_isr(int this_irq, void *dev_id)
+>   	int count = 0;
+>   	u16 w;
+>   
+> +	if (pm_runtime_suspended(dev->dev))
+> +		return IRQ_NONE;
+> +
+>   	while ((stat = davinci_i2c_read_reg(dev, DAVINCI_I2C_IVR_REG))) {
+>   		dev_dbg(dev->dev, "%s: stat=0x%x\n", __func__, stat);
+>   		if (count++ == 100) {
+> @@ -802,7 +821,6 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>   	dev->clk = devm_clk_get(&pdev->dev, NULL);
+>   	if (IS_ERR(dev->clk))
+>   		return PTR_ERR(dev->clk);
+> -	clk_prepare_enable(dev->clk);
+>   
+>   	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>   	dev->base = devm_ioremap_resource(&pdev->dev, mem);
+> @@ -811,6 +829,17 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>   		goto err_unuse_clocks;
+>   	}
+>   
+> +	pm_runtime_enable(dev->dev);
+> +	pm_runtime_set_autosuspend_delay(dev->dev,
+> +					 DAVINCI_I2C_PM_TIMEOUT);
+> +	pm_runtime_use_autosuspend(dev->dev);
 
-Per the PCIe-to-PCI Bridge spec r1.0, sec 5.1.2.13, the VGA Enable bit
-is optional, as you say.  The PCI-to-PCI Bridge spec r1.2, sec
-3.2.5.18, doesn't say VGA Enable is optional, *but* sec 4.5 says
-bridges need not support VGA.  I naively assume one would discover
-that by finding VGA Enable to be RO zero.
+Pls, move autosuspend configuration before pm_runtime_enable()
 
-Of course, in any case, I also assume that (a) there exist VGA cards
-that require legacy VGA resources, e.g., memory 0xa0000-0xbffff, and
-(b) such cards will not work behind bridges without VGA support.
+> +
+> +	r = pm_runtime_get_sync(dev->dev);
+> +	if (r < 0) {
+> +		dev_err(dev->dev, "failed to runtime_get device: %d\n", r);
+> +		goto err_unuse_clocks;
+> +	}
+> +
 
-I have no idea what if anything the VGA arbiter should do about
-bridges like this or VGA devices behind them, but it does sound like
-the arbiter might need to become smarter.
+Otherwise looks good to me.
 
-Bjorn
+-- 
+regards,
+-grygorii
