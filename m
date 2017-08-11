@@ -1,38 +1,29 @@
-From: rocky.hao@rock-chips.com (rocky.hao)
-Date: Fri, 11 Aug 2017 09:08:45 +0800
-Subject: [PATCH v2 1/5] dt-bindings: rockchip-thermal: Support the RK3328
- SoC compatible
-In-Reply-To: <20170810174947.r2wl4c4zimkyhamj@rob-hp-laptop>
-References: <1501833976-1100-1-git-send-email-rocky.hao@rock-chips.com>
- <1501833976-1100-2-git-send-email-rocky.hao@rock-chips.com>
- <20170810174947.r2wl4c4zimkyhamj@rob-hp-laptop>
-Message-ID: <fc8bb9cd-af82-c9cb-39bd-043c8d080ada@rock-chips.com>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Fri, 11 Aug 2017 09:30:21 +0800
+Subject: [PATCH v2 3/3] dt-bindings: ASoC: rockchip: Add rockchip,
+ codec-names property
+In-Reply-To: <20170810145607.g663oq7cfxjmaxtf@sirena.org.uk>
+References: <1502340898-28403-1-git-send-email-jeffy.chen@rock-chips.com>
+ <1502340898-28403-4-git-send-email-jeffy.chen@rock-chips.com>
+ <20170810145607.g663oq7cfxjmaxtf@sirena.org.uk>
+Message-ID: <598D08AD.8090609@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Mark,
 
-Thank you very much for your reply, and your ack of course.
+On 08/10/2017 10:56 PM, Mark Brown wrote:
+> On Thu, Aug 10, 2017 at 12:54:58PM +0800, Jeffy Chen wrote:
+>> Add a new rockchip,codec-names property, so that the driver can parse
+>> the codecs by name.
+>
+> Why?  You're already referencing the CODECs by phandle and these names
+> are not part of any ABI...
+>
 
-Best Regards,
-Rocky
+currently we are binding the phandles to a fixed codec list in the 
+driver. but we want to make it dynamic, since some exist codecs could be 
+optional, and some new codecs could be add for new board too.
 
-? 2017/8/11 1:49, Rob Herring ??:
-> On Fri, Aug 04, 2017 at 04:06:12PM +0800, Rocky Hao wrote:
->> attempt to new compatible for thermal founding on RK3328 SoC.
-> 
-> ? "Add a new compatible..."
-> 
->>
->> Signed-off-by: Rocky Hao <rocky.hao@rock-chips.com>
->> ---
->> Change in v2:
->> - remove gerrit Change-Id
->>
->>   Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 1 +
->>   1 file changed, 1 insertion(+)
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
-> 
-> 
+and the support of this new property in the driver is added in 
+https://patchwork.kernel.org/patch/9892737
