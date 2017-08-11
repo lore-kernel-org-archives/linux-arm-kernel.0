@@ -1,39 +1,126 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 11 Aug 2017 10:48:42 +0200
-Subject: [PATCH 2/2] ARM: dts: r8a7743: Add IIC cores to dtsi
-In-Reply-To: <TY1PR06MB0702EA22AFE7D8145BF623A6B7880@TY1PR06MB0702.apcprd06.prod.outlook.com>
-References: <1502196418-31341-1-git-send-email-biju.das@bp.renesas.com>
- <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
- <20170810080121.GE16647@verge.net.au>
- <20170810112411.GA4380@katana>
- <TY1PR06MB0702EA22AFE7D8145BF623A6B7880@TY1PR06MB0702.apcprd06.prod.outlook.com>
-Message-ID: <20170811084842.GB20909@verge.net.au>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 11 Aug 2017 09:52:07 +0100
+Subject: [PATCH v3 0/5] ACPI: DMA ranges management
+In-Reply-To: <61e15178-a6da-0459-34fc-83ff4ded8864@arm.com>
+References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
+ <61e15178-a6da-0459-34fc-83ff4ded8864@arm.com>
+Message-ID: <20170811085207.GB26039@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 10, 2017 at 01:49:05PM +0000, Chris Paterson wrote:
-> Hello,
+On Wed, Aug 09, 2017 at 04:14:43PM -0500, Jeremy Linton wrote:
+> Hi,
 > 
-> > From: Wolfram Sang [mailto:wsa at the-dreams.de]
-> > Sent: 10 August 2017 12:24
-> > 
-> > 
-> > > > >+		i2c6: i2c at e60b0000 {
-> > > >
-> > > >    I'd use iic0 as the label.
-> > >
-> > > I have no preference here other than that we try to be consistent in
-> > > DT for different R-Car SoCs. Wolfram, do you have an opinion on this?
-> > 
-> > Back then, for M2-W, I decided to go with the schematics/datasheets.
-> > And those mentioned i2c6 rather than iic0. For that reason, the comment
+> Better late than never I guess..
 > 
-> The M2 schematics still use i2c6, and for consistency I'd vote to use the same with RZ/G1M.
+> On 08/03/2017 07:32 AM, Lorenzo Pieralisi wrote:
+> >This patch series is v3 of a previous posting:
+> >
+> >v2->v3:
+> >	- Fixed DMA masks computation
+> >         - Fixed size computation overflow in acpi_dma_get_range()
+> >
+> >v1->v2:
+> >	- Reworked acpi_dma_get_range() flow and logs
+> >	- Added IORT named component address limits
+> >	- Renamed acpi_dev_get_resources() helper function
+> >	- Rebased against v4.13-rc3
+> >
+> >v2: http://lkml.kernel.org/r/20170731152323.32488-1-lorenzo.pieralisi at arm.com
+> >v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
+> >
+> >-- Original cover letter --
+> >
+> >As reported in:
+> >
+> >http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
+> >
+> >the bus connecting devices to an IOMMU bus can be smaller in size than
+> >the IOMMU input address bits which results in devices DMA HW bugs in
+> >particular related to IOVA allocation (ie chopping of higher address
+> >bits owing to system bus HW capabilities mismatch with the IOMMU).
+> >
+> >Fortunately this problem can be solved through an already present but never
+> >used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
+> >window for a specific bus in ACPI and therefore all upstream devices
+> >connected to it.
+> >
+> >This small patch series enables _DMA parsing in ACPI core code and
+> >use it in ACPI IORT code in order to detect DMA ranges for devices and
+> >update their data structures to make them work with their related DMA
+> >addressing restrictions.
+> >
+> >Cc: Will Deacon <will.deacon@arm.com>
+> >Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> >Cc: Feng Kan <fkan@apm.com>
+> >Cc: Jon Masters <jcm@redhat.com>
+> >Cc: Robert Moore <robert.moore@intel.com>
+> >Cc: Robin Murphy <robin.murphy@arm.com>
+> >Cc: Zhang Rui <rui.zhang@intel.com>
+> >Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> >
+> >Lorenzo Pieralisi (5):
+> >   ACPICA: resource_mgr: Allow _DMA method in walk resources
+> >   ACPI: Make acpi_dev_get_resources() method agnostic
+> >   ACPI: Introduce DMA ranges parsing
+> >   ACPI: Make acpi_dma_configure() DMA regions aware
+> >   ACPI/IORT: Add IORT named component memory address limits
+> >
+> >  drivers/acpi/acpica/rsxface.c |  7 ++--
+> >  drivers/acpi/arm64/iort.c     | 57 ++++++++++++++++++++++++++-
+> >  drivers/acpi/resource.c       | 82 +++++++++++++++++++++++++++++---------
+> >  drivers/acpi/scan.c           | 91 +++++++++++++++++++++++++++++++++++++++----
+> >  include/acpi/acnames.h        |  1 +
+> >  include/acpi/acpi_bus.h       |  2 +
+> >  include/linux/acpi.h          |  8 ++++
+> >  include/linux/acpi_iort.h     |  5 ++-
+> >  8 files changed, 219 insertions(+), 34 deletions(-)
+> 
+> Ok, despite being merged already I think its worthwhile to say that
+> I've been testing this with:
+> 
+> Method(_DMA, 0, Serialized)
+> {
+> 	Return (ResourceTemplate()
+> 	{
+> 		QWORDMemory(
+> 		ResourceConsumer,
 
-+1
+I asked to update the ACPI specifications because this should be
+ResourceProducer, we need an errata to sort this out before it
+becomes a problem.
 
-> > "/* The memory map in the User's Manual maps the cores to bus numbers */"
-> > 
-> > exists in r8a7791.dtsi. Dunno the manual of this SoC here.
+> 		PosDecode,          // _DEC
+> 		MinFixed,           // _MIF
+> 		MaxFixed,           // _MAF
+> 		Prefetchable,       // _MEM
+> 		ReadWrite,          // _RW
+> 		0,                  // _GRA
+> 		0x10000000,         // _MIN
+> 		0x1fffffff,         // _MAX
+> 		0x000000000,        // _TRA
+> 		0x10000000,         // _LEN
+> 		,
+> 		,
+> 		,
+> 		)
+> 	})
+> } // Method(_DMA)
 > 
-> The manual for r8a7743 uses the same terminology as the r8a7791 manuals.
+> (and a couple minor variations)
+> 
+> and a fair number of debug statements sprinkled around to verify
+> that the IOVAs are appropriately limited. So I don't see anything
+> wrong with the code and it appears to work and the devices behind a
+> bridge limited like this continue to work as long as sane values are
+> placed in the min/max/len fields.
+> 
+> Thanks,
+> 
+> Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+
+Thank you very much Jeremy for testing it, appreciated please let me
+know if you spot anything wrong with it on the machines you are
+running tests on.
+
+Lorenzo
