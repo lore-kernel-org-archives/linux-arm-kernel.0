@@ -1,31 +1,58 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Fri, 11 Aug 2017 22:23:31 +0530
-Subject: [linux-sunxi] [PATCH v4] arm64: allwinner: a64: Add initial
- NanoPi A64 support
-In-Reply-To: <7F473780-971A-44BB-8FED-CFEAA56247FF@aosc.io>
-References: <1502454711-8389-1-git-send-email-jteki@openedev.com>
- <7F473780-971A-44BB-8FED-CFEAA56247FF@aosc.io>
-Message-ID: <CAD6G_RTgHSU=knMW8YJSCBtQKLqA09fds6uHTJY+6nDAckTKOA@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 11 Aug 2017 12:54:47 -0400
+Subject: [PATCH V9 1/2] PCI: handle CRS returned by device after FLR
+In-Reply-To: <74b1fed6-4b3a-6053-2252-063462cffe4e@codeaurora.org>
+References: <1502240245-11714-1-git-send-email-okaya@codeaurora.org>
+ <20170810215218.GQ16580@bhelgaas-glaptop.roam.corp.google.com>
+ <74b1fed6-4b3a-6053-2252-063462cffe4e@codeaurora.org>
+Message-ID: <da77e691-d1a1-5c69-c23e-69656a82f8f5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 11, 2017 at 6:04 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->
->
-> ? 2017?8?11? GMT+08:00 ??8:31:43, Jagan Teki <jagannadh.teki@gmail.com> ??:
->>From: Jagan Teki <jagan@amarulasolutions.com>
+On 8/10/2017 6:32 PM, Sinan Kaya wrote:
+>> Alex was concerned that pci_bus_read_dev_vendor_id() could return
+>> false ("no device here") with an ID value of ~0 for a functional VF
+>> [1].
 >>
->>NanoPi A64 is a new board of high performance with low cost
->>designed by FriendlyElec., using the Allwinner A64 SOC.
->
-> As AXP803 regulators support now entered linux-next, please
-> add proper AXP803 support when supporting new boards.
+>> I think that is indeed possible:
+>>
+>>   - a VF that is ready will return 0xffff as both Vendor ID and Device
+>>     ID (SR-IOV r1.1, sec 3.4.1.1, .2), so the very first read in
+>>     pci_bus_read_dev_vendor_id() would see 0xffffffff and return
+>>     "false".
+>>
+>>   - a VF that needs more time will return CRS and we'll loop in
+>>     pci_bus_read_dev_vendor_id() until it becomes ready, and we'll
+>>     return "true".
+>>
+>> Falling into the code below for the "false" case probably will work,
+>> but it's a little bit ugly because (a) we're using two mechanisms to
+>> figure out when the device is ready for config requests, and (b) we
+>> have to worry about VFs both in pci_bus_read_dev_vendor_id() and here
+>> in the caller.
+> OK, I'm open to improving the code.
+> 
+>> Here's an idea to make pci_bus_read_dev_vendor_id() work for both VFs
+>> and PFs.  It can't distinguish the 0xffffffff from a VF vs one from a
+>> non-existent device, but the caller might be able to pass that
+>> information in, e.g., when we're enumerating and don't know whether
+>> the device exists, we don't have a pci_dev and would use this:
+> How about creating a pci_bus_wait_crs() function with the loop in 
+> pci_bus_read_dev_vendor_id() and calling it from both places?
+> 
 
-OK, but how do I need to verify it? I've booted pine64 but unable to verify it.
+I prototyped both of the options. I found pci_bus_wait_crs() to be cleaner
+due to this. 
 
-thanks!
+is_vf looked like another hack like mine to tap into the CRS handling
+inside the pci_bus_read_dev_vendor_id().
+
+I think the right thing is to make CRS handling a first class citizen rather
+than hiding it and overriding functions with unnecessary parameters.
+
+I'll post V10 in a minute. It passed my testing.
+
 -- 
-Jagan Teki
-Free Software Engineer | www.openedev.com
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
