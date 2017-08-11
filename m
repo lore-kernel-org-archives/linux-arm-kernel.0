@@ -1,51 +1,67 @@
-From: pasha.tatashin@oracle.com (Pasha Tatashin)
-Date: Fri, 11 Aug 2017 12:22:52 -0400
-Subject: [v6 04/15] mm: discard memblock data later
-In-Reply-To: <20170811160436.GS30811@dhcp22.suse.cz>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-5-git-send-email-pasha.tatashin@oracle.com>
- <20170811093249.GE30811@dhcp22.suse.cz>
- <6366171f-1a30-2faa-d776-01983fcb5a00@oracle.com>
- <20170811160436.GS30811@dhcp22.suse.cz>
-Message-ID: <a63eb223-455f-ae57-122f-7b2655e3de26@oracle.com>
+From: leoyang.li@nxp.com (Leo Li)
+Date: Fri, 11 Aug 2017 16:24:49 +0000
+Subject: [linux-devel] [PATCH 1/3] dts: usb3: Add configure-gfladj
+ property	to USB3 nod
+In-Reply-To: <1502443796-5255-1-git-send-email-yinbo.zhu@nxp.com>
+References: <1502443796-5255-1-git-send-email-yinbo.zhu@nxp.com>
+Message-ID: <AM4PR0401MB1699817496EBA074245E96A28F890@AM4PR0401MB1699.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> I will address your comment, and send out a new patch. Should I send it out
->> separately from the series or should I keep it inside?
+
+
+> -----Original Message-----
+> From: linux-devel-bounces at gforge.freescale.net [mailto:linux-devel-
+> bounces at gforge.freescale.net] On Behalf Of yinbo.zhu at nxp.com
+> Sent: Friday, August 11, 2017 4:30 AM
+> To: linux-devel at gforge.freescale.net; Yinbo Zhu <yinbo.zhu@nxp.com>; Rob
+> Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>;
+> Russell King <linux@armlinux.org.uk>; Felipe Balbi <balbi@kernel.org>
+> Cc: open list <devicetree@vger.kernel.org>; Laurent Pinchart
+> <laurent.pinchart+renesas@ideasonboard.com>; Catalin Marinas
+> <catalin.marinas@arm.com>; open list <linux-usb@vger.kernel.org>; open list
+> <linux-kernel@vger.kernel.org>; Doug Ledford <dledford@redhat.com>;
+> Stefano Stabellini <sstabellini@kernel.org>; Greg Kroah-Hartman
+> <gregkh@linuxfoundation.org>; Bart Van Assche
+> <bart.vanassche@sandisk.com>; moderated list <linux-arm-
+> kernel at lists.infradead.org>
+> Subject: [linux-devel] [PATCH 1/3] dts: usb3: Add configure-gfladj property to
+> USB3 nod
 > 
-> I would post it separatelly. It doesn't depend on the rest.
-
-OK, I will post it separately. No it does not depend on the rest, but 
-the reset depends on this. So, I am not sure how to enforce that this 
-comes before the rest.
-
+> From: "yinbo.zhu" <yinbo.zhu@nxp.com>
 > 
->> Also, before I send out a new patch, I will need to root cause and resolve
->> problem found by kernel test robot <fengguang.wu@intel.com>, and bisected
->> down to this patch.
->>
->> [  156.659400] BUG: Bad page state in process swapper  pfn:03147
->> [  156.660051] page:ffff88001ed8a1c0 count:0 mapcount:-127 mapping:
->> (null) index:0x1
->> [  156.660917] flags: 0x0()
->> [  156.661198] raw: 0000000000000000 0000000000000000 0000000000000001
->> 00000000ffffff80
->> [  156.662006] raw: ffff88001f4a8120 ffff88001ed85ce0 0000000000000000
->> 0000000000000000
->> [  156.662811] page dumped because: nonzero mapcount
->> [  156.663307] CPU: 0 PID: 1 Comm: swapper Not tainted
->> 4.13.0-rc3-00220-g1aad694 #1
->> [  156.664077] Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS
->> 1.9.3-20161025_171302-gandalf 04/01/2014
->> [  156.665129] Call Trace:
->> [  156.665422]  dump_stack+0x1e/0x20
->> [  156.665802]  bad_page+0x122/0x148
+
+There is no device tree binding for this property.  You need to add the binding first before you add it to the dts.  And normally you need to describe why the change is needed in the commit message.
+
+> Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
+> ---
+>  arch/arm/boot/dts/ls1021a.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> Was the report related with this patch?
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index ffbf3cf..f525297 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -731,6 +731,8 @@
+>  			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
+>  			dr_mode = "host";
+>  			snps,quirk-frame-length-adjustment = <0x20>;
+> +			configure-gfladj;
+> +			dma-coherent;
 
-Yes, they said that the problem was bisected down to this patch. Do you 
-know if there is a way to submit a patch to this test robot?
+This change is not aligned with your patch title.
 
-Thank you,
-Pasha
+>  			snps,dis_rxdet_inp3_quirk;
+>  		};
+> 
+> --
+> 2.1.0.27.g96db324
+> 
+> _______________________________________________
+> linux-devel mailing list
+> linux-devel at gforge.freescale.net
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fgforge.
+> freescale.net%2Fmailman%2Flistinfo%2Flinux-
+> devel&data=01%7C01%7Cleoyang.li%40nxp.com%7C015b054c76ad48399ea408
+> d4e09de91d%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0&sdata=7ioU%2Bb
+> QUP4X%2F8%2BFpcQZICVDHugioStScbrHc0XOqaQs%3D&reserved=0
