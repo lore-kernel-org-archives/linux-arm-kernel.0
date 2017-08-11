@@ -1,61 +1,39 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Fri, 11 Aug 2017 13:23:30 +0900
-Subject: [PATCH 3/3] reset: uniphier: add analog amplifiers reset control
-In-Reply-To: <CAK7LNAQ_N-Ji29WvyRVZpqxwezO5Z2ET84ctxE-zmJ386L2AbQ@mail.gmail.com>
-References: <20170810072703.32433-1-suzuki.katsuhiro@socionext.com>
- <20170810072703.32433-3-suzuki.katsuhiro@socionext.com>
- <1502361454.10792.5.camel@pengutronix.de>
- <CAK7LNAT_dhx8+_G7yX9OX1yg7cWWpo7vJG5jDwdQe_O9uAe8rw@mail.gmail.com>
- <CAK7LNAQ_N-Ji29WvyRVZpqxwezO5Z2ET84ctxE-zmJ386L2AbQ@mail.gmail.com>
-Message-ID: <00020e70-8a53-a461-ccf4-1bd8247b4a23@katsuster.net>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Fri, 11 Aug 2017 12:51:35 +0800
+Subject: [PATCH v2 0/5] thermal: rockchip: add tsadc support in thermal
+ driver and IPA thermal control for rk3328 in dts
+In-Reply-To: <1501833976-1100-1-git-send-email-rocky.hao@rock-chips.com>
+References: <1501833976-1100-1-git-send-email-rocky.hao@rock-chips.com>
+Message-ID: <1502427095.2598.21.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yamada-san,
+On Fri, 2017-08-04 at 16:06 +0800, Rocky Hao wrote:
+> This series patches add the tsadc support in thermal driver and in
+> devicetree for rk3328.
+> Also add thermal control with Intelligent Power Allocation (IPA)
+> policy by default.??Please
+> refer to https://developer.arm.com/open-source/intelligent-power-allo
+> cation for more information
+> about IPA.
+> 
+> Rocky Hao (5):
+> ? dt-bindings: rockchip-thermal: Support the RK3328 SoC compatible
+> ? thermal: rockchip: Support the RK3328 SOC in thermal driver
+> ? arm64: dts: rockchip: add tsadc node for rk3328 SoC
+> ? arm64: dts: rockchip: add thermal nodes for rk3328 SoC
+> ? arm64: dts: rockchip: Enable tsadc module on RK3328 eavluation
+> board
+> 
+I can take this patch set if we have ACK for patch 3, 4 and 5.
 
-On 2017?08?10? 20:23, Masahiro Yamada wrote:
-> Hi.
+thanks,
+rui
+> ?.../bindings/thermal/rockchip-thermal.txt??????????|??1 +
+> ?arch/arm64/boot/dts/rockchip/rk3328-evb.dts????????|??4 ++
+> ?arch/arm64/boot/dts/rockchip/rk3328.dtsi???????????| 63
+> +++++++++++++++++++++
+> ?drivers/thermal/rockchip_thermal.c?????????????????| 65
+> ++++++++++++++++++++++
+> ?4 files changed, 133 insertions(+)
 > 
-> 
-> 2017-08-10 20:11 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
->> 2017-08-10 19:37 GMT+09:00 Philipp Zabel <p.zabel@pengutronix.de>:
->>> Hi Katsuhiro,
->>>
->>> On Thu, 2017-08-10 at 16:27 +0900, Katsuhiro Suzuki wrote:
->>>> Add a reset line for analog signal amplifier core (ADAMV) on
->>>> UniPhier LD11/LD20 SoCs.
->>>>
->>>>> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
->>>> ---
->>>>   drivers/reset/reset-uniphier.c | 15 +++++++++++++++
->>>>   1 file changed, 15 insertions(+)
->>>>
->>>> diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
->>>> index f60c137c17cb..cda4a78a58e2 100644
->>>> --- a/drivers/reset/reset-uniphier.c
->>>> +++ b/drivers/reset/reset-uniphier.c
->>>> @@ -196,6 +196,12 @@ static const struct uniphier_reset_data uniphier_pro4_peri_reset_data[] = {
->>>>>      UNIPHIER_RESET_END,
->>>>   };
->>>>
->>>> +/* Analog signal amplifiers reset data */
->>>> +static const struct uniphier_reset_data uniphier_ld11_adamv_reset_data[] = {
->>>>> +   UNIPHIER_RESETX(100, 0x10, 6), /* EVEA */
->>>>> +   UNIPHIER_RESET_END,
->>>> +};
-> 
-> 
-> I take back my Acked-by.
-> 
-> 
-> The reset line index is independent from others
-> because this block is a separate instance.
-> 
-> Are you OK with starting from the reset ID 100?
-
-It's my mistake. This ID can start with 0.
-I will fix in next V2 series, thank you.
-
-Regards,
---
-Katsuhiro Suzuki
