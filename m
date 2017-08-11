@@ -1,84 +1,55 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Fri, 11 Aug 2017 09:58:26 +0200
-Subject: [v6 00/15] complete deferred page initialization
-In-Reply-To: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
-Message-ID: <20170811075826.GB30811@dhcp22.suse.cz>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Fri, 11 Aug 2017 16:01:28 +0800
+Subject: [PATCH v2 0/5] thermal: rockchip: add tsadc support in thermal
+ driver and IPA thermal control for rk3328 in dts
+In-Reply-To: <3025917.NAhhjSz36M@phil>
+References: <1501833976-1100-1-git-send-email-rocky.hao@rock-chips.com>
+ <1502427095.2598.21.camel@intel.com> <3025917.NAhhjSz36M@phil>
+Message-ID: <1502438488.2597.0.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[I am sorry I didn't get to your previous versions]
-
-On Mon 07-08-17 16:38:34, Pavel Tatashin wrote:
-[...]
-> SMP machines can benefit from the DEFERRED_STRUCT_PAGE_INIT config option,
-> which defers initializing struct pages until all cpus have been started so
-> it can be done in parallel.
+On Fri, 2017-08-11 at 08:27 +0200, Heiko Stuebner wrote:
+> Hi,
 > 
-> However, this feature is sub-optimal, because the deferred page
-> initialization code expects that the struct pages have already been zeroed,
-> and the zeroing is done early in boot with a single thread only.  Also, we
-> access that memory and set flags before struct pages are initialized. All
-> of this is fixed in this patchset.
+> Am Freitag, 11. August 2017, 12:51:35 CEST schrieb Zhang Rui:
+> > 
+> > On Fri, 2017-08-04 at 16:06 +0800, Rocky Hao wrote:
+> > > 
+> > > This series patches add the tsadc support in thermal driver and
+> > > in
+> > > devicetree for rk3328.
+> > > Also add thermal control with Intelligent Power Allocation (IPA)
+> > > policy by default.??Please
+> > > refer to https://developer.arm.com/open-source/intelligent-power-
+> > > allo
+> > > cation for more information
+> > > about IPA.
+> > > 
+> > > Rocky Hao (5):
+> > > ? dt-bindings: rockchip-thermal: Support the RK3328 SoC
+> > > compatible
+> > > ? thermal: rockchip: Support the RK3328 SOC in thermal driver
+> > > ? arm64: dts: rockchip: add tsadc node for rk3328 SoC
+> > > ? arm64: dts: rockchip: add thermal nodes for rk3328 SoC
+> > > ? arm64: dts: rockchip: Enable tsadc module on RK3328 eavluation
+> > > board
+> > > 
+> > I can take this patch set if we have ACK for patch 3, 4 and 5.
+> I would prefer if you would just apply patches 1+2 alone and I'd take
+> the devicetree patches through my tree.
 > 
-> In this work we do the following:
-> - Never read access struct page until it was initialized
-
-How is this enforced? What about pfn walkers? E.g. page_ext
-initialization code (page owner in particular)
-
-> - Never set any fields in struct pages before they are initialized
-> - Zero struct page at the beginning of struct page initialization
-
-Please give us a more highlevel description of how your reimplementation
-works and how is the patchset organized. I will go through those patches
-but it is always good to give an overview in the cover letter to make
-the review easier.
-
-> Performance improvements on x86 machine with 8 nodes:
-> Intel(R) Xeon(R) CPU E7-8895 v3 @ 2.60GHz
+> Having devicetree stuff mingle in a lot of trees produces unnecessary
+> conflicts, so the general best practice is having code + binding.txt
+> going through the driver tree and devicetree stuff through the
+> platform
+> tree.
 > 
-> Single threaded struct page init: 7.6s/T improvement
-> Deferred struct page init: 10.2s/T improvement
+OKay, I will take patch 1 and 2 and queue them for next merge window.
 
-What are before and after numbers and how have you measured them.
+thanks,
+rui
 > 
-> Pavel Tatashin (15):
->   x86/mm: reserve only exiting low pages
->   x86/mm: setting fields in deferred pages
->   sparc64/mm: setting fields in deferred pages
->   mm: discard memblock data later
->   mm: don't accessed uninitialized struct pages
->   sparc64: simplify vmemmap_populate
->   mm: defining memblock_virt_alloc_try_nid_raw
->   mm: zero struct pages during initialization
->   sparc64: optimized struct page zeroing
->   x86/kasan: explicitly zero kasan shadow memory
->   arm64/kasan: explicitly zero kasan shadow memory
->   mm: explicitly zero pagetable memory
->   mm: stop zeroing memory during allocation in vmemmap
->   mm: optimize early system hash allocations
->   mm: debug for raw alloctor
+> Thanks
+> Heiko
 > 
->  arch/arm64/mm/kasan_init.c          |  42 ++++++++++
->  arch/sparc/include/asm/pgtable_64.h |  30 +++++++
->  arch/sparc/mm/init_64.c             |  31 +++-----
->  arch/x86/kernel/setup.c             |   5 +-
->  arch/x86/mm/init_64.c               |   9 ++-
->  arch/x86/mm/kasan_init_64.c         |  67 ++++++++++++++++
->  include/linux/bootmem.h             |  27 +++++++
->  include/linux/memblock.h            |   9 ++-
->  include/linux/mm.h                  |   9 +++
->  mm/memblock.c                       | 152 ++++++++++++++++++++++++++++--------
->  mm/nobootmem.c                      |  16 ----
->  mm/page_alloc.c                     |  31 +++++---
->  mm/sparse-vmemmap.c                 |  10 ++-
->  mm/sparse.c                         |   6 +-
->  14 files changed, 356 insertions(+), 88 deletions(-)
-> 
-> -- 
-> 2.14.0
-
--- 
-Michal Hocko
-SUSE Labs
