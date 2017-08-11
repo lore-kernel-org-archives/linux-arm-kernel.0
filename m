@@ -1,20 +1,78 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 10 Aug 2017 21:51:34 -0500
-Subject: [PATCH] dt-bindings: clock: sunxi-ccu: Add compatibles for sun5i
- CCU driver
-In-Reply-To: <20170808012540.16691-1-net147@gmail.com>
-References: <20170808012540.16691-1-net147@gmail.com>
-Message-ID: <20170811025134.ee4v2tbol2pjcd4i@rob-hp-laptop>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Fri, 11 Aug 2017 10:53:08 +0800
+Subject: [PATCH 1/2] dt-bindings: serial: Add MediaTek BTIF controller
+ bindings
+In-Reply-To: <20170810162752.2xncymekrhu544g7@rob-hp-laptop>
+References: <cover.1501692369.git.sean.wang@mediatek.com>
+ <6b2ad0dc976259563562e7ab23abdacf68c94aa5.1501692369.git.sean.wang@mediatek.com>
+ <20170810162752.2xncymekrhu544g7@rob-hp-laptop>
+Message-ID: <1502419988.19230.16.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 11:25:40AM +1000, Jonathan Liu wrote:
-> The bindings were not updated when the sun5i CCU driver was added in
-> commit 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver").
+On Thu, 2017-08-10 at 11:27 -0500, Rob Herring wrote:
+> On Thu, Aug 03, 2017 at 01:05:22AM +0800, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > Document the devicetree bindings for MediaTek BTIF controller
+> > which could be found on MT7622 and MT7623 SoC.
+> > 
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/serial/mtk-btif.txt        | 26 ++++++++++++++++++++++
+> >  1 file changed, 26 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/serial/mtk-btif.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/serial/mtk-btif.txt b/Documentation/devicetree/bindings/serial/mtk-btif.txt
+> > new file mode 100644
+> > index 0000000..80c1f5a
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/serial/mtk-btif.txt
+> > @@ -0,0 +1,26 @@
+> > +Device-Tree bindings for MediaTek BTIF controller found on those
+> > +MediaTek SoCs with Bluetooth feature
+> > +
+> > +Required properties:
+> > +- compatible: Should be one of:
+> > +	- "mediatek,mt7622-btif" : for MT7622 SoC
+> > +	- "mediatek,mt7623-btif" : for MT7623 SoC
+> > +- reg: The base address of the BTIF register bank;
+> > +- interrupts: A single interrupt specifier;
+> > +- clocks: list of clock specifiers, corresponding to
+> > +	  entries in clock-names property;
+> > +- clock-names: should contain "main" entries.
+> > +
+> > +Optional properties:
+> > +- mediatek,loopback: Boolean; if defined, indicates that BTIF controller
+> > +	running on the loopback mode.
 > 
-> Signed-off-by: Jonathan Liu <net147@gmail.com>
-> ---
->  Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 3 +++
->  1 file changed, 3 insertions(+)
+> I don't think this belongs in DT, but should be a module param or sysfs 
+> control.
+> 
+the loopback actually is one of hardware setups so i add it as one
+property in the dt or could you kindly guide me how to make judgment
+accurately for listing those changes as either dt or a module param? 
 
-Acked-by: Rob Herring <robh@kernel.org>
+
+> > +
+> > +Example:
+> > +
+> > +	btif: btif at 1100c000 {
+> 
+> bluetooth at ...
+> 
+btif not bluetooth, which is just the interface hardware allowing the
+the main processor communicating with the bluetooth hardware built in
+the SoC, and is really like to the uart used by legacy bluetooth.
+So i will add bluetooth as the another node.
+
+
+> > +		compatible = "mediatek,mt7623-btif";
+> > +		reg = <0 0x1100c000 0 0x1000>;
+> > +		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_LOW>;
+> > +		clocks = <&pericfg CLK_PERI_BTIF>;
+> > +		clock-names = "main";
+> > +	};
+> > -- 
+> > 2.7.4
+> > 
