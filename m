@@ -1,42 +1,46 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Fri, 11 Aug 2017 11:36:51 +0800
-Subject: [PATCH 0/9 v2] constify thermal_zone_of_device_ops structures
-In-Reply-To: <1502204943-20075-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1502204943-20075-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1502422611.2598.19.camel@intel.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Fri, 11 Aug 2017 11:42:26 +0800
+Subject: [PATCH v3 05/13] ARM: dts: rockchip: add spi dt node for rv1108
+In-Reply-To: <1502422578-30611-1-git-send-email-andy.yan@rock-chips.com>
+References: <1502422578-30611-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1502422946-30885-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-08-08 at 17:08 +0200, Julia Lawall wrote:
-> The thermal_zone_of_device_ops structures are only passed as the
-> fourth
-> argument to thermal_zone_of_sensor_register or
-> devm_thermal_zone_of_sensor_register, both of which are declared as
-> const.
-> Thus the thermal_zone_of_device_ops structures themselves can be
-> const.
-> 
-> v2: add structures passed to devm_thermal_zone_of_sensor_register
-> also.
-> 
-> Done with the help of Coccinelle.
-> 
-I don't see the patches changes out of drivers/thermal.
+Add SPI device tree node for rv1108.
 
-As there is no dependencies between these patches, I guess I will only
-take patches that changes drivers/thermal.
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+---
 
-thanks,
-rui
-> ---
-> 
-> ?drivers/hwmon/hwmon.c??????????????????????|????2 +-
-> ?drivers/hwmon/scpi-hwmon.c?????????????????|????2 +-
-> ?drivers/input/touchscreen/sun4i-ts.c???????|????2 +-
-> ?drivers/thermal/broadcom/bcm2835_thermal.c |????2 +-
-> ?drivers/thermal/hisi_thermal.c?????????????|????2 +-
-> ?drivers/thermal/qoriq_thermal.c????????????|????2 +-
-> ?drivers/thermal/rcar_gen3_thermal.c????????|????2 +-
-> ?drivers/thermal/samsung/exynos_tmu.c???????|????2 +-
-> ?drivers/thermal/zx2967_thermal.c???????????|????2 +-
-> ?9 files changed, 9 insertions(+), 9 deletions(-)
+Changes in v3: None
+Changes in v2: None
+
+ arch/arm/boot/dts/rv1108.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
+index 663f2f2..b688f4a 100644
+--- a/arch/arm/boot/dts/rv1108.dtsi
++++ b/arch/arm/boot/dts/rv1108.dtsi
+@@ -200,6 +200,19 @@
+ 		status = "disabled";
+ 	};
+ 
++	spi: spi at 10270000 {
++		compatible = "rockchip,rv1108-spi";
++		reg = <0x10270000 0x1000>;
++		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clocks = <&cru SCLK_SPI>, <&cru PCLK_SPI>;
++		clock-names = "spiclk", "apb_pclk";
++		dmas = <&pdma 8>, <&pdma 9>;
++		#dma-cells = <2>;
++		status = "disabled";
++	};
++
+ 	grf: syscon at 10300000 {
+ 		compatible = "rockchip,rv1108-grf", "syscon";
+ 		reg = <0x10300000 0x1000>;
+-- 
+2.7.4
