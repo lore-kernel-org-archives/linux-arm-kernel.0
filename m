@@ -1,30 +1,48 @@
-From: alex.g@adaptrum.com (Alexandru Gagniuc)
-Date: Fri, 11 Aug 2017 10:47:04 -0700
-Subject: [PATCH v2 1/5] reset: add reset-simple to unify socfpga, stm32,
- sunxi, and zx2967
-In-Reply-To: <20170811130618.3676-2-p.zabel@pengutronix.de>
-References: <20170811130618.3676-1-p.zabel@pengutronix.de>
- <20170811130618.3676-2-p.zabel@pengutronix.de>
-Message-ID: <0d8e5468-866a-eac8-d9ec-b23f47df8bf3@adaptrum.com>
+From: sriram.dash@nxp.com (Sriram Dash)
+Date: Fri, 11 Aug 2017 17:56:25 +0000
+Subject: [linux-devel] [PATCH 1/3] dts: usb3: Add configure-gfladj
+ property	to USB3 nod
+In-Reply-To: <1502443796-5255-1-git-send-email-yinbo.zhu@nxp.com>
+References: <1502443796-5255-1-git-send-email-yinbo.zhu@nxp.com>
+Message-ID: <AM3PR04MB12018E640B04B627D7890AF5F5890@AM3PR04MB1201.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
-
-On 08/11/2017 06:06 AM, Philipp Zabel wrote:
-[snip]
-
-> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-> index 52d5251660b9b..f7ba01a71daee 100644
-> --- a/drivers/reset/Kconfig
-> +++ b/drivers/reset/Kconfig
-> @@ -68,6 +68,16 @@ config RESET_PISTACHIO
->  	help
->  	  This enables the reset driver for ImgTec Pistachio SoCs.
+From: linux-devel-bounces@gforge.freescale.net [mailto:linux-devel-
+>bounces at gforge.freescale.net] On Behalf Of yinbo.zhu at nxp.com
+>Subject: [linux-devel] [PATCH 1/3] dts: usb3: Add configure-gfladj property to USB3
+>nod
 >
-> +config RESET_SIMPLE
-> +	bool "Simple Reset Controller Driver" if COMPILE_TEST
+>From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+>
+>Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
+>---
+> arch/arm/boot/dts/ls1021a.dtsi | 2 ++
+> 1 file changed, 2 insertions(+)
+>
+>diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi index
+>ffbf3cf..f525297 100644
+>--- a/arch/arm/boot/dts/ls1021a.dtsi
+>+++ b/arch/arm/boot/dts/ls1021a.dtsi
+>@@ -731,6 +731,8 @@
+> 			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
+> 			dr_mode = "host";
+> 			snps,quirk-frame-length-adjustment = <0x20>;
+>+			configure-gfladj;
 
-Another question. Is there a reason this is depended on COMPILE_TEST ?
+I reckon the "configure-gfladj" is replaced with "snps,quirk-frame-length-adjustment"
+in open source, which sets fladj reg value.
+Please verify.
 
-Alex
+>+			dma-coherent;
+
+> 			snps,dis_rxdet_inp3_quirk;
+> 		};
+>
+>--
+>2.1.0.27.g96db324
+>
+>_______________________________________________
+>linux-devel mailing list
+>linux-devel at gforge.freescale.net
+>http://gforge.freescale.net/mailman/listinfo/linux-devel
