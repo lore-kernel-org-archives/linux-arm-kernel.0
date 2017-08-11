@@ -1,77 +1,142 @@
-From: edgar.iglesias@xilinx.com (Edgar E. Iglesias)
-Date: Fri, 11 Aug 2017 15:54:53 +0200
-Subject: [PATCH 1/3] dt: xilinx: zynqmp: Add bindings for PM firmware
-In-Reply-To: <4e5d9f8c-9e87-bdcd-388a-aab3c32415e8@xilinx.com>
-References: <cover.1501854302.git.michal.simek@xilinx.com>
- <8c27b7eec6cc00d37dfe9b3998212ce9c9c27a31.1501854302.git.michal.simek@xilinx.com>
- <20170810191056.ur5b3zdrcgmb6sim@rob-hp-laptop>
- <4e5d9f8c-9e87-bdcd-388a-aab3c32415e8@xilinx.com>
-Message-ID: <20170811135453.GU12347@toto>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 11 Aug 2017 21:56:31 +0800
+Subject: [RFC PATCH 4/4] ACPI: IORT: Add SMMUv3 MSI support
+In-Reply-To: <20170811093348.GC26039@red-moon>
+References: <1502276017-63108-1-git-send-email-guohanjun@huawei.com>
+ <1502276017-63108-5-git-send-email-guohanjun@huawei.com>
+ <20170811093348.GC26039@red-moon>
+Message-ID: <CAGHbJ3AgEvbpsPdeqJ+bFWa5hBMqxBX6g1eC4HiUvHarJf8H+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 11, 2017 at 02:58:03PM +0200, Michal Simek wrote:
-> Hi Rob, +Edgar,
-> 
-> On 10.8.2017 21:10, Rob Herring wrote:
-> > On Fri, Aug 04, 2017 at 03:45:30PM +0200, Michal Simek wrote:
-> >> From: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> >>
-> >> Document the DT bindings for the Zynq UltraScale+ PM Firmware.
-> >>
-> >> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> >> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> >> ---
-> >>
-> >>  .../devicetree/bindings/soc/xilinx/xlnx,zynqmp-pm.txt | 19 +++++++++++++++++++
-> > 
-> > bindings/firmware/
-> 
-> will move.
-> 
-> > 
-> >>  1 file changed, 19 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/soc/xilinx/xlnx,zynqmp-pm.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/soc/xilinx/xlnx,zynqmp-pm.txt b/Documentation/devicetree/bindings/soc/xilinx/xlnx,zynqmp-pm.txt
-> >> new file mode 100644
-> >> index 000000000000..222a18ce07fc
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/soc/xilinx/xlnx,zynqmp-pm.txt
-> >> @@ -0,0 +1,19 @@
-> >> +Xilinx Zynq MPSoC Firmware Device Tree Bindings
-> >> +
-> >> +The zynqmp-pm node describes the interface to platform firmware.
-> > 
-> > Please define this should be under /firmware node.
-> > 
-> >> +Required properties:
-> >> + - compatible:	Must contain:  "xlnx,zynqmp-pm"
-> >> + - method:	The method of calling the PM-API firmware layer.
-> >> +		Permitted values are:
-> >> +		 - "smc" : To be used in configurations without a hypervisor
-> >> +		 - "hvc" : To be used when hypervisor is present
-> > 
-> > Do you really use both?
-> > 
-> 
-> SMCs definitely yes.
-> 
-> Interface was designed in that way and I don't know if people are using
-> it or not.
-> 
-> Not sure if Xen is blocking SMCs. I know we have discussed it but not
-> sure if this is enabled by default or only for certain configurations.
-> Also not sure if xen contains handler for hvc.
-> Edgar: Do you know?
+Hi Lorenzo,
 
-We have patches for Xen that implement a power-management mediator.
-That implementation handles PM calls over both SMC and HVC insns.
-Patches are on the Xen mailing list.
+On 11 August 2017 at 17:33, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> On Wed, Aug 09, 2017 at 06:53:37PM +0800, Hanjun Guo wrote:
+>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>
+>> Since we have a mapping index for SMMUv3 MSI, we can
+>> directly use that index to get the map entry, then
+>> retrieve dev ID and ITS parent to add SMMUv3 MSI
+>> support.
+>>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> ---
+>>  drivers/acpi/arm64/iort.c | 46 ++++++++++++++++++++++++++++++++++++----------
+>>  1 file changed, 36 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+>> index 9439f02..ce03298 100644
+>> --- a/drivers/acpi/arm64/iort.c
+>> +++ b/drivers/acpi/arm64/iort.c
+>> @@ -313,7 +313,8 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
+>>       /* Single mapping does not care for input id */
+>>       if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
+>>               if (type == ACPI_IORT_NODE_NAMED_COMPONENT ||
+>> -                 type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
+>> +                 type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX ||
+>> +                 type == ACPI_IORT_NODE_SMMU_V3) {
+>>                       *rid_out = map->output_base;
+>>                       return 0;
+>>               }
+>> @@ -357,7 +358,8 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
+>>
+>>       if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
+>>               if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
+>> -                 node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
+>> +                 node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX ||
+>> +                 node->type == ACPI_IORT_NODE_SMMU_V3) {
+>>                       *id_out = map->output_base;
+>>                       return parent;
+>>               }
+>> @@ -549,9 +551,21 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
+>>       if (!node)
+>>               return -ENODEV;
+>>
+>> -     for (i = 0; i < node->mapping_count; i++) {
+>> -             if (iort_node_map_platform_id(node, dev_id, IORT_MSI_TYPE, i))
+>> +     if (node->type == ACPI_IORT_NODE_SMMU_V3) {
+>> +             u32 index;
+>> +
+>> +             if (iort_get_smmu_v3_id_mapping_index(node, &index))
+>> +                     return -ENODEV;
+>> +
+>> +             if (iort_node_map_platform_id(node, dev_id, IORT_MSI_TYPE,
+>> +                 index))
+>>                       return 0;
+>> +     } else {
+>> +             for (i = 0; i < node->mapping_count; i++) {
+>> +                     if (iort_node_map_platform_id(node, dev_id,
+>> +                         IORT_MSI_TYPE, i))
+>> +                             return 0;
+>> +             }
+>>       }
+>>
+>>       return -ENODEV;
+>> @@ -626,20 +640,30 @@ static struct irq_domain *iort_get_platform_device_domain(struct device *dev)
+>>       struct acpi_iort_node *node, *msi_parent;
+>>       struct fwnode_handle *iort_fwnode;
+>>       struct acpi_iort_its_group *its;
+>> -     int i;
+>>
+>>       /* find its associated iort node */
+>> -     node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+>> -                           iort_match_node_callback, dev);
+>> +     node = iort_find_dev_node(dev);
+>>       if (!node)
+>>               return NULL;
+>>
+>>       /* then find its msi parent node */
+>> -     for (i = 0; i < node->mapping_count; i++) {
+>> +     if (node->type == ACPI_IORT_NODE_SMMU_V3) {
+>> +             u32 index;
+>> +
+>> +             if (iort_get_smmu_v3_id_mapping_index(node, &index))
+>> +                     return NULL;
+>> +
+>>               msi_parent = iort_node_map_platform_id(node, NULL,
+>> +                                                    IORT_MSI_TYPE, index);
+>> +     } else {
+>> +             int i;
+>> +
+>> +             for (i = 0; i < node->mapping_count; i++) {
+>> +                     msi_parent = iort_node_map_platform_id(node, NULL,
+>>                                                      IORT_MSI_TYPE, i);
+>> -             if (msi_parent)
+>> -                     break;
+>> +                     if (msi_parent)
+>> +                             break;
+>> +             }
+>>       }
+>>
+>>       if (!msi_parent)
+>> @@ -1233,6 +1257,8 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
+>>       /* Configure DMA for the page table walker */
+>>       acpi_dma_configure(&pdev->dev, attr);
+>>
+>> +     acpi_configure_pmsi_domain(&pdev->dev);
+>
+> I think this is just overkill. There are two separate things to solve
+> here:
+>
+> 1) Make single mappings valid for SMMUv3 (and PMCG); that's fair enough
+>    and goes with the logic to skip the ITS DeviceID index for "normal"
+>    mappings, I can live with that
+> 2) Find the MSI domain for an SMMUv3 (or any other IORT table node); I
+>    do not think you need all this complexity to do it via
+>    acpi_configure_pmsi_domain(), it can be done in a easier way with
+>    an ad-hoc stub (it does not even have to be SMMUv3 specific)
+>
+> My worry is that we are peppering the generic IORT mapping code with
+> node types specific kludges and it is becoming a mess.
 
-Other hypervisors may work differently.
+Agreed.
 
-I think we should support both but I don't have a strong opinion on it.
+>
+> I can rework the patch to show you what I have in mind, please let
+> me know.
 
-Cheers,
-Edgar
+Please, thank you very much for doing so.
+
+Thanks
+Hanjun
