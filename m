@@ -1,106 +1,87 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 11 Aug 2017 12:56:34 -0400
-Subject: [PATCH V10 1/3] PCI: introduce pci_bus_wait_crs() function
-Message-ID: <1502470596-4112-1-git-send-email-okaya@codeaurora.org>
+Date: Fri, 11 Aug 2017 12:56:35 -0400
+Subject: [PATCH V10 2/3] PCI: handle CRS returned by device after FLR
+In-Reply-To: <1502470596-4112-1-git-send-email-okaya@codeaurora.org>
+References: <1502470596-4112-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1502470596-4112-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kernel is hiding Configuration Request Retry Status (CRS) inside
-pci_bus_read_dev_vendor_id() function. We are looking to add support for
-Function Level Reset (FLR) where vendor id read returns ~0.
+Sporadic reset issues have been observed with Intel 750 NVMe drive while
+assigning the physical function to the guest machine. The sequence of
+events observed is as follows:
 
-Move CRS handling into its own function so that it can be called from other
-places as well.
+- perform a Function Level Reset (FLR)
+- sleep up to 1000ms total
+- read ~0 from PCI_COMMAND
+- warn that the device didn't return from FLR
+- touch the device before it's ready
+- drop register read and writes performing register settings restore
+- incomplete reset operation and partial register restoration
+- second time device probe fails in the guest machine as HW is left in
+limbo.
+
+An endpoint is allowed to issue Configuration Request Retry Status (CRS)
+following a FLR request to indicate that it is not ready to accept new
+requests. CRS is defined in PCIe r3.1, sec 2.3.1. Request Handling Rules
+and CRS usage in FLR context is mentioned in PCIe r3.1, sec 6.6.2.
+Function-Level Reset.
+
+A CRS indication will only be given if the address to be read is vendor ID
+register. pci_bus_read_dev_vendor_id() knows how to deal with CRS returned
+0xFFFF0001 value and will continue polling until a value other than
+0xFFFF0001 is returned within a given timeout.
+
+Try to discover device presence via CRS first. If device is not found, fall
+through to old behavior.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/pci.h   |  2 ++
- drivers/pci/probe.c | 44 ++++++++++++++++++++++++++++++--------------
- 2 files changed, 32 insertions(+), 14 deletions(-)
+ drivers/pci/pci.c | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
-index 22e0617..1bbe851 100644
---- a/drivers/pci/pci.h
-+++ b/drivers/pci/pci.h
-@@ -235,6 +235,8 @@ enum pci_bar_type {
- 	pci_bar_mem64,		/* A 64-bit memory BAR */
- };
- 
-+bool pci_bus_wait_crs(struct pci_bus *bus, int devfn, u32 *l,
-+		      int crs_timeout);
- bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *pl,
- 				int crs_timeout);
- int pci_setup_device(struct pci_dev *dev);
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index c31310d..b1cb7bd 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1824,29 +1824,17 @@ struct pci_dev *pci_alloc_dev(struct pci_bus *bus)
- }
- EXPORT_SYMBOL(pci_alloc_dev);
- 
--bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
--				int crs_timeout)
-+bool pci_bus_wait_crs(struct pci_bus *bus, int devfn, u32 *l, int crs_timeout)
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index af0cc34..c853551 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -3821,17 +3821,36 @@ static void pci_flr_wait(struct pci_dev *dev)
  {
- 	int delay = 1;
- 
--	if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
--		return false;
--
--	/* some broken boards return 0 or ~0 if a slot is empty: */
--	if (*l == 0xffffffff || *l == 0x00000000 ||
--	    *l == 0x0000ffff || *l == 0xffff0000)
--		return false;
--
- 	/*
- 	 * Configuration Request Retry Status.  Some root ports return the
- 	 * actual device ID instead of the synthetic ID (0xFFFF) required
- 	 * by the PCIe spec.  Ignore the device ID and only check for
- 	 * (vendor id == 1).
- 	 */
--	while ((*l & 0xffff) == 0x0001) {
--		if (!crs_timeout)
--			return false;
--
-+	do {
- 		msleep(delay);
- 		delay *= 2;
- 		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
-@@ -1858,6 +1846,34 @@ bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
- 			       PCI_FUNC(devfn));
- 			return false;
- 		}
-+	} while ((*l & 0xffff) == 0x0001);
-+
-+	return true;
-+}
-+EXPORT_SYMBOL(pci_bus_wait_crs);
-+
-+bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
-+				int crs_timeout)
-+{
-+	if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
-+		return false;
-+
-+	/* some broken boards return 0 or ~0 if a slot is empty: */
-+	if (*l == 0xffffffff || *l == 0x00000000 ||
-+	    *l == 0x0000ffff || *l == 0xffff0000)
-+		return false;
+ 	int i = 0;
+ 	u32 id;
++	bool ret;
 +
 +	/*
-+	 * Configuration Request Retry Status.  Some root ports return the
-+	 * actual device ID instead of the synthetic ID (0xFFFF) required
-+	 * by the PCIe spec.  Ignore the device ID and only check for
-+	 * (vendor id == 1).
++	 * Don't touch the HW before waiting 100ms. HW has to finish
++	 * within 100ms according to PCI Express Base Specification
++	 * Revision 3.1 Section 6.6.2: Function-Level Reset (FLR).
 +	 */
-+	if ((*l & 0xffff) == 0x0001) {
-+		if (!crs_timeout)
-+			return false;
++	msleep(100);
 +
-+		return pci_bus_wait_crs(bus, devfn, l, crs_timeout);
- 	}
++	if (pci_bus_read_config_dword(dev->bus, dev->devfn, PCI_VENDOR_ID,
++				      &id))
++		return;
++
++	/* See if we can find a device via CRS first. */
++	if ((id & 0xffff) == 0x0001) {
++		ret = pci_bus_wait_crs(dev->bus, dev->devfn, &id, 60000);
++		if (ret)
++			return;
++	}
  
- 	return true;
+ 	do {
+ 		msleep(100);
+ 		pci_read_config_dword(dev, PCI_COMMAND, &id);
+-	} while (i++ < 10 && id == ~0);
++	} while (i++ < 9 && id == ~0);
+ 
+ 	if (id == ~0)
+ 		dev_warn(&dev->dev, "Failed to return from FLR\n");
+ 	else if (i > 1)
+ 		dev_info(&dev->dev, "Required additional %dms to return from FLR\n",
+-			 (i - 1) * 100);
++			 i * 100);
+ }
+ 
+ /**
 -- 
 1.9.1
