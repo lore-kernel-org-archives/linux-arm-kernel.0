@@ -1,83 +1,54 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 11 Aug 2017 17:38:31 +0200
-Subject: [PATCH 1/3] dt-bindings: display: Add Document for Rockchip Soc
- LVDS
-In-Reply-To: <1502272851-63997-1-git-send-email-hjc@rock-chips.com>
-References: <1502272846-63941-1-git-send-email-hjc@rock-chips.com>
- <1502272851-63997-1-git-send-email-hjc@rock-chips.com>
-Message-ID: <1502465911.2310.18.camel@pengutronix.de>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Fri, 11 Aug 2017 10:39:03 -0500
+Subject: [PATCH v2 1/5] reset: add reset-simple to unify socfpga, stm32,
+ sunxi, and zx2967
+In-Reply-To: <20170811130618.3676-2-p.zabel@pengutronix.de>
+References: <20170811130618.3676-1-p.zabel@pengutronix.de>
+ <20170811130618.3676-2-p.zabel@pengutronix.de>
+Message-ID: <ee7dd180-b1be-d780-00dc-7a5199833810@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-08-09 at 18:00 +0800, Sandy Huang wrote:
-> This patch add Document for Rockchip Soc RK3288 LVDS,
-> This based on the patches from Mark yao and Heiko Stuebner.
+Hi Phillip,
+
+This patch is failing to apply on both v4.13-rc4 and linux-next:
+
+error: patch failed: drivers/reset/reset-sunxi.c:108
+error: drivers/reset/reset-sunxi.c: patch does not apply
+Patch failed at 0001 reset: add reset-simple to unify socfpga, stm32,
+sunxi, and zx2967
+
+
+On 08/11/2017 08:06 AM, Philipp Zabel wrote:
+> Split reusable parts out of the sunxi driver, to add a driver for simple
+> reset controllers with reset lines that can be controlled by toggling
+> bits in exclusive, contiguous register ranges using read-modify-write
+> cycles under a spinlock. The separate sunxi driver still remains to
+> register the early reset controllers, but it reuses the reset-simple
+> ops.
 > 
-> > Signed-off-by: Sandy Huang <hjc@rock-chips.com>
-> > Signed-off-by: Mark yao <mark.yao@rock-chips.com>
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> The following patches will replace compatible reset drivers with
+> reset-simple, extending it where necessary.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 > ---
-> ?.../bindings/display/rockchip/rockchip-lvds.txt????| 104 +++++++++++++++++++++
-> ?1 file changed, 104 insertions(+)
-> ?create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
-> new file mode 100644
-> index 0000000..bf934ba
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
-> @@ -0,0 +1,104 @@
-> +Rockchip RK3288 LVDS interface
-> +================================
-> +
-> +Required properties:
-> +- compatible: matching the soc type, one of
-> > +	- "rockchip,rk3288-lvds";
-> +
-> +- reg: physical base address of the controller and length
-> > +	of memory mapped region.
-> +- clocks: must include clock specifiers corresponding to entries in the
-> > +	clock-names property.
-> +- clock-names: must contain "pclk_lvds"
-> +
-> +- avdd1v0-supply: regulator phandle for 1.0V analog power
-> +- avdd1v8-supply: regulator phandle for 1.8V analog power
-> +- avdd3v3-supply: regulator phandle for 3.3V analog power
-> +
-> +- rockchip,grf: phandle to the general register files syscon
-> +
-> +Optional properties
-> +- pinctrl-names: must contain a "lcdc" entry.
-> +- pinctrl-0: pin control group to be used for this controller.
-> +
-> +Required nodes:
-> +
-> +The lvds has two video ports as described by
-> > +	Documentation/devicetree/bindings/media/video-interfaces.txt.
-> +Their connections are modeled using the OF graph bindings specified in
-> > +	Documentation/devicetree/bindings/graph.txt.
-> +
-> +- video port 0 for the VOP inputs
-> +- video port 1 for either a panel or subsequent encoder
-> +
-> +the lvds panel described by
-> > +	Documentation/devicetree/bindings/display/panel/simple-panel.txt
-> +
-> +- rockchip,data-mapping: should be "vesa" or "jeida",
-> > +	This describes how the color bits are laid out in the
-> > +	serialized LVDS signal.
-> +- rockchip,data-width : should be <18> or <24>;
+> Changes since v1:
+> - Turn reset-simple into a complete platform driver.
+> - Move common code out of assert and deassert ops into a helper function.
+> - Add inverted flag to support both clear- and set-to-assert reset bits.
+> - Remove status readback, will be added in the next patch.
+> - Split out SoCFPGA and STM32 conversion into separate patches.
+> ---
 
-This can already be described by the panel itself, via the bus_format
-property in the panel_desc for panel-simple, or via the existing panel
-device tree property "data-mapping" in panel-lvds, which can be set to
-"jeida-18", "jeida-24", or "vesa-24".
+[snip]
 
-The LVDS driver can then read the panel bus information from the
-panel's connector->display_info.bus_formats.
+> @@ -108,8 +55,9 @@ static int sunxi_reset_init(struct device_node *np)
+>  
+>  	data->rcdev.owner = THIS_MODULE;
+>  	data->rcdev.nr_resets = size * 8;
 
-So if these properties are necessary at all, they at least should be
-optional (overrides).
+I think the problem the above line. On both linux-next and v4.13-rc4:
 
-regards
-Philipp
+data->rcdev.nr_resets = size * 32;
+
+Dinh
