@@ -1,55 +1,45 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Fri, 11 Aug 2017 16:01:28 +0800
-Subject: [PATCH v2 0/5] thermal: rockchip: add tsadc support in thermal
- driver and IPA thermal control for rk3328 in dts
-In-Reply-To: <3025917.NAhhjSz36M@phil>
-References: <1501833976-1100-1-git-send-email-rocky.hao@rock-chips.com>
- <1502427095.2598.21.camel@intel.com> <3025917.NAhhjSz36M@phil>
-Message-ID: <1502438488.2597.0.camel@intel.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 11 Aug 2017 10:05:43 +0200
+Subject: [PATCH 2/3] ARM: sun8i: sunxi-h3-h5: add phy-is-integrated
+ property to internal PHY
+In-Reply-To: <CAGb2v64dBZgN6-8kHnnN1qiEXHnbXw_FM9WxGHPU0h-tZDbspA@mail.gmail.com>
+References: <20170810085129.20463-1-clabbe.montjoie@gmail.com>
+ <20170810085129.20463-3-clabbe.montjoie@gmail.com>
+ <CAGb2v64dBZgN6-8kHnnN1qiEXHnbXw_FM9WxGHPU0h-tZDbspA@mail.gmail.com>
+Message-ID: <20170811080543.GA25147@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-08-11 at 08:27 +0200, Heiko Stuebner wrote:
+On Fri, Aug 11, 2017 at 10:42:51AM +0800, Chen-Yu Tsai wrote:
 > Hi,
 > 
-> Am Freitag, 11. August 2017, 12:51:35 CEST schrieb Zhang Rui:
-> > 
-> > On Fri, 2017-08-04 at 16:06 +0800, Rocky Hao wrote:
-> > > 
-> > > This series patches add the tsadc support in thermal driver and
-> > > in
-> > > devicetree for rk3328.
-> > > Also add thermal control with Intelligent Power Allocation (IPA)
-> > > policy by default.??Please
-> > > refer to https://developer.arm.com/open-source/intelligent-power-
-> > > allo
-> > > cation for more information
-> > > about IPA.
-> > > 
-> > > Rocky Hao (5):
-> > > ? dt-bindings: rockchip-thermal: Support the RK3328 SoC
-> > > compatible
-> > > ? thermal: rockchip: Support the RK3328 SOC in thermal driver
-> > > ? arm64: dts: rockchip: add tsadc node for rk3328 SoC
-> > > ? arm64: dts: rockchip: add thermal nodes for rk3328 SoC
-> > > ? arm64: dts: rockchip: Enable tsadc module on RK3328 eavluation
-> > > board
-> > > 
-> > I can take this patch set if we have ACK for patch 3, 4 and 5.
-> I would prefer if you would just apply patches 1+2 alone and I'd take
-> the devicetree patches through my tree.
+> On Thu, Aug 10, 2017 at 4:51 PM, Corentin Labbe
+> <clabbe.montjoie@gmail.com> wrote:
+> > This patch add the new phy-is-integrated property to the internal PHY
+> > node.
+> >
+> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> > index 4b599b5d26f6..54fc24e4c569 100644
+> > --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> > +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> > @@ -425,6 +425,7 @@
+> >                                         reg = <1>;
+> >                                         clocks = <&ccu CLK_BUS_EPHY>;
+> >                                         resets = <&ccu RST_BUS_EPHY>;
+> > +                                       phy-is-integrated;
 > 
-> Having devicetree stuff mingle in a lot of trees produces unnecessary
-> conflicts, so the general best practice is having code + binding.txt
-> going through the driver tree and devicetree stuff through the
-> platform
-> tree.
+> You also need to "delete" this property at the board level for
+> any board that has the external PHY at address <1>. Otherwise
+> they will stop working. This is due to the internal and external
+> PHYs having the same path and node name in the device tree, so
+> they are effectively the same node.
 > 
-OKay, I will take patch 1 and 2 and queue them for next merge window.
+> ChenYu
+> 
 
-thanks,
-rui
-> 
-> Thanks
-> Heiko
-> 
+They have not the same name, ext_rgmii_phy vs int_mii_phy.
