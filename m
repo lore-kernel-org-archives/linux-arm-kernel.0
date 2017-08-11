@@ -1,202 +1,121 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Fri, 11 Aug 2017 14:39:53 +0200
-Subject: [v6 07/15] mm: defining memblock_virt_alloc_try_nid_raw
-In-Reply-To: <1502138329-123460-8-git-send-email-pasha.tatashin@oracle.com>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-8-git-send-email-pasha.tatashin@oracle.com>
-Message-ID: <20170811123953.GI30811@dhcp22.suse.cz>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 11 Aug 2017 14:49:35 +0200
+Subject: [PATCH 1/2] drm/bridge/sii8620: add external connector handle
+In-Reply-To: <2097016.rlxulirhWA@avalon>
+References: <1502371530-32260-1-git-send-email-m.purski@samsung.com>
+ <6478480.TjcUCueU5y@avalon> <5ce6bd99-c50e-84c2-f21f-eb611cac94c2@samsung.com>
+ <CGME20170811094031epcas5p4ca089af7dba2f3fafed757c1fb40c798@epcas5p4.samsung.com>
+ <2097016.rlxulirhWA@avalon>
+Message-ID: <9232b812-7aef-c614-b122-612e19743df4@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 07-08-17 16:38:41, Pavel Tatashin wrote:
-> A new variant of memblock_virt_alloc_* allocations:
-> memblock_virt_alloc_try_nid_raw()
->     - Does not zero the allocated memory
->     - Does not panic if request cannot be satisfied
+Hi Laurent,
 
-OK, this looks good but I would not introduce memblock_virt_alloc_raw
-here because we do not have any users. Please move that to "mm: optimize
-early system hash allocations" which actually uses the API. It would be
-easier to review it that way.
+On 2017-08-11 11:40, Laurent Pinchart wrote:
+> Hi Marek,
+>
+> On Friday 11 Aug 2017 08:39:31 Marek Szyprowski wrote:
+>> On 2017-08-10 15:39, Laurent Pinchart wrote:
+>>> On Thursday 10 Aug 2017 15:25:29 Maciej Purski wrote:
+>>>> The driver should be switched on if an external connector is plugged and
+>>>> switched off if it is unplugged. Extcon is optional. If it is not found,
+>>>> the driver stays in "always-on" mode.
+>>>>
+>>>> Signed-off-by: Maciej Purski <m.purski@samsung.com>
+>>>> ---
+>>>>
+>>>>    .../bindings/display/bridge/sil-sii8620.txt        |  4 ++
+>>>>    drivers/gpu/drm/bridge/sil-sii8620.c               | 83 ++++++++++++++-
+>>>>    2 files changed, 85 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git
+>>>> a/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt
+>>>> b/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt index
+>>>> 9409d9c..1f230bf 100644
+>>>> --- a/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt
+>>>> +++ b/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt
+>>>> @@ -10,6 +10,9 @@ Required properties:
+>>>>    	- clocks, clock-names: specification and name of "xtal" clock
+>>>>    	- video interfaces: Device node can contain video interface port
+>>>>    			    node for HDMI encoder according to [1].
+>>>>
+>>>> +Optional properties:
+>>>> +	- extcon: phandle to external connector for MHL cable changes
+>>>> +		  detection
+>>> The sii8620 DT node should model its connection to the MHL connector using
+>>> OF graph, connecting a port to the MHL connector DT node through
+>>> endpoints. I believe the extcon property should then be added to the MHL
+>>> connector DT node, not the bridge.
+>> I don't get this. Generic extcon bindings doesn't define connector DT
+>> node, so I don't see how could we use endpoint DT approach here. Could you
+>> give the example?
+> Sure, here you are.
+>
+> &hsi2c_7 {
+> 	...
+>
+>          sii8620 at 39 {
+>                  reg = <0x39>;
+>                  compatible = "sil,sii8620";
+>                  cvcc10-supply = <&ldo36_reg>;
+>                  iovcc18-supply = <&ldo34_reg>;
+>                  interrupt-parent = <&gpf0>;
+>                  interrupts = <2 IRQ_TYPE_LEVEL_HIGH>;
+>                  reset-gpios = <&gpv7 0 GPIO_ACTIVE_LOW>;
+>                  clocks = <&pmu_system_controller 0>;
+>                  clock-names = "xtal";
+>
+> 		ports {
+> 			#address-cells = <1>;
+> 			#size-cells = <0>;
+>
+> 	                port at 0 {
+> 				reg = <0>;
+>          	                mhl_to_hdmi: endpoint {
+>                  	                remote-endpoint = <&hdmi_to_mhl>;
+> 	                        };
+>          	        };
+> 	                port at 1 {
+> 				reg = <1>;
+>          	                mhl_bridge_out: endpoint {
+>                  	                remote-endpoint = <&mhl_connector_in>;
+> 	                        };
+>          	        };
+> 		};
+>          };
+> };
+>
+> / {
+> 	mhl-connector {
+> 		compatible = "mhl-connector";
+> 		extcon = <&muic>;
+>
+> 	        port {
+>          	        mhl_connector_in: endpoint {
+>                  	        remote-endpoint = <&mhl_bridge_out>;
+> 	                };
+>          	};
+> 	};
+> };
+>
+> Note that there's currently no DT binding for MHL connectors. One needs to be
+> developed, the HDMI connector DT binding can be used as a source of
+> inspiration.
 
-> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+Ah, I see. I wasn't aware that display subsystem has bindings even for 
+the connectors.
+Other types of connectors already used together with extcon in device 
+tree (like usb
+and chargers) don't have dedicated bindings.
 
-other than that
-Acked-by: Michal Hocko <mhocko@suse.com>
+Do we need to add hdmi-connectors to all existing boards that have HDMI 
+module?
 
-> ---
->  include/linux/bootmem.h | 27 +++++++++++++++++++++++++
->  mm/memblock.c           | 53 ++++++++++++++++++++++++++++++++++++++++++-------
->  2 files changed, 73 insertions(+), 7 deletions(-)
-> 
-> diff --git a/include/linux/bootmem.h b/include/linux/bootmem.h
-> index e223d91b6439..ea30b3987282 100644
-> --- a/include/linux/bootmem.h
-> +++ b/include/linux/bootmem.h
-> @@ -160,6 +160,9 @@ extern void *__alloc_bootmem_low_node(pg_data_t *pgdat,
->  #define BOOTMEM_ALLOC_ANYWHERE		(~(phys_addr_t)0)
->  
->  /* FIXME: Move to memblock.h at a point where we remove nobootmem.c */
-> +void *memblock_virt_alloc_try_nid_raw(phys_addr_t size, phys_addr_t align,
-> +				      phys_addr_t min_addr,
-> +				      phys_addr_t max_addr, int nid);
->  void *memblock_virt_alloc_try_nid_nopanic(phys_addr_t size,
->  		phys_addr_t align, phys_addr_t min_addr,
->  		phys_addr_t max_addr, int nid);
-> @@ -176,6 +179,14 @@ static inline void * __init memblock_virt_alloc(
->  					    NUMA_NO_NODE);
->  }
->  
-> +static inline void * __init memblock_virt_alloc_raw(
-> +					phys_addr_t size,  phys_addr_t align)
-> +{
-> +	return memblock_virt_alloc_try_nid_raw(size, align, BOOTMEM_LOW_LIMIT,
-> +					    BOOTMEM_ALLOC_ACCESSIBLE,
-> +					    NUMA_NO_NODE);
-> +}
-> +
->  static inline void * __init memblock_virt_alloc_nopanic(
->  					phys_addr_t size, phys_addr_t align)
->  {
-> @@ -257,6 +268,14 @@ static inline void * __init memblock_virt_alloc(
->  	return __alloc_bootmem(size, align, BOOTMEM_LOW_LIMIT);
->  }
->  
-> +static inline void * __init memblock_virt_alloc_raw(
-> +					phys_addr_t size,  phys_addr_t align)
-> +{
-> +	if (!align)
-> +		align = SMP_CACHE_BYTES;
-> +	return __alloc_bootmem_nopanic(size, align, BOOTMEM_LOW_LIMIT);
-> +}
-> +
->  static inline void * __init memblock_virt_alloc_nopanic(
->  					phys_addr_t size, phys_addr_t align)
->  {
-> @@ -309,6 +328,14 @@ static inline void * __init memblock_virt_alloc_try_nid(phys_addr_t size,
->  					  min_addr);
->  }
->  
-> +static inline void * __init memblock_virt_alloc_try_nid_raw(
-> +			phys_addr_t size, phys_addr_t align,
-> +			phys_addr_t min_addr, phys_addr_t max_addr, int nid)
-> +{
-> +	return ___alloc_bootmem_node_nopanic(NODE_DATA(nid), size, align,
-> +				min_addr, max_addr);
-> +}
-> +
->  static inline void * __init memblock_virt_alloc_try_nid_nopanic(
->  			phys_addr_t size, phys_addr_t align,
->  			phys_addr_t min_addr, phys_addr_t max_addr, int nid)
-> diff --git a/mm/memblock.c b/mm/memblock.c
-> index 08f449acfdd1..3fbf3bcb52d9 100644
-> --- a/mm/memblock.c
-> +++ b/mm/memblock.c
-> @@ -1327,7 +1327,6 @@ static void * __init memblock_virt_alloc_internal(
->  	return NULL;
->  done:
->  	ptr = phys_to_virt(alloc);
-> -	memset(ptr, 0, size);
->  
->  	/*
->  	 * The min_count is set to 0 so that bootmem allocated blocks
-> @@ -1340,6 +1339,38 @@ static void * __init memblock_virt_alloc_internal(
->  	return ptr;
->  }
->  
-> +/**
-> + * memblock_virt_alloc_try_nid_raw - allocate boot memory block without zeroing
-> + * memory and without panicking
-> + * @size: size of memory block to be allocated in bytes
-> + * @align: alignment of the region and block's size
-> + * @min_addr: the lower bound of the memory region from where the allocation
-> + *	  is preferred (phys address)
-> + * @max_addr: the upper bound of the memory region from where the allocation
-> + *	      is preferred (phys address), or %BOOTMEM_ALLOC_ACCESSIBLE to
-> + *	      allocate only from memory limited by memblock.current_limit value
-> + * @nid: nid of the free area to find, %NUMA_NO_NODE for any node
-> + *
-> + * Public function, provides additional debug information (including caller
-> + * info), if enabled. Does not zero allocated memory, does not panic if request
-> + * cannot be satisfied.
-> + *
-> + * RETURNS:
-> + * Virtual address of allocated memory block on success, NULL on failure.
-> + */
-> +void * __init memblock_virt_alloc_try_nid_raw(
-> +			phys_addr_t size, phys_addr_t align,
-> +			phys_addr_t min_addr, phys_addr_t max_addr,
-> +			int nid)
-> +{
-> +	memblock_dbg("%s: %llu bytes align=0x%llx nid=%d from=0x%llx max_addr=0x%llx %pF\n",
-> +		     __func__, (u64)size, (u64)align, nid, (u64)min_addr,
-> +		     (u64)max_addr, (void *)_RET_IP_);
-> +
-> +	return memblock_virt_alloc_internal(size, align,
-> +					    min_addr, max_addr, nid);
-> +}
-> +
->  /**
->   * memblock_virt_alloc_try_nid_nopanic - allocate boot memory block
->   * @size: size of memory block to be allocated in bytes
-> @@ -1351,8 +1382,8 @@ static void * __init memblock_virt_alloc_internal(
->   *	      allocate only from memory limited by memblock.current_limit value
->   * @nid: nid of the free area to find, %NUMA_NO_NODE for any node
->   *
-> - * Public version of _memblock_virt_alloc_try_nid_nopanic() which provides
-> - * additional debug information (including caller info), if enabled.
-> + * Public function, provides additional debug information (including caller
-> + * info), if enabled. This function zeroes the allocated memory.
->   *
->   * RETURNS:
->   * Virtual address of allocated memory block on success, NULL on failure.
-> @@ -1362,11 +1393,17 @@ void * __init memblock_virt_alloc_try_nid_nopanic(
->  				phys_addr_t min_addr, phys_addr_t max_addr,
->  				int nid)
->  {
-> +	void *ptr;
-> +
->  	memblock_dbg("%s: %llu bytes align=0x%llx nid=%d from=0x%llx max_addr=0x%llx %pF\n",
->  		     __func__, (u64)size, (u64)align, nid, (u64)min_addr,
->  		     (u64)max_addr, (void *)_RET_IP_);
-> -	return memblock_virt_alloc_internal(size, align, min_addr,
-> -					     max_addr, nid);
-> +
-> +	ptr = memblock_virt_alloc_internal(size, align,
-> +					   min_addr, max_addr, nid);
-> +	if (ptr)
-> +		memset(ptr, 0, size);
-> +	return ptr;
->  }
->  
->  /**
-> @@ -1380,7 +1417,7 @@ void * __init memblock_virt_alloc_try_nid_nopanic(
->   *	      allocate only from memory limited by memblock.current_limit value
->   * @nid: nid of the free area to find, %NUMA_NO_NODE for any node
->   *
-> - * Public panicking version of _memblock_virt_alloc_try_nid_nopanic()
-> + * Public panicking version of memblock_virt_alloc_try_nid_nopanic()
->   * which provides debug information (including caller info), if enabled,
->   * and panics if the request can not be satisfied.
->   *
-> @@ -1399,8 +1436,10 @@ void * __init memblock_virt_alloc_try_nid(
->  		     (u64)max_addr, (void *)_RET_IP_);
->  	ptr = memblock_virt_alloc_internal(size, align,
->  					   min_addr, max_addr, nid);
-> -	if (ptr)
-> +	if (ptr) {
-> +		memset(ptr, 0, size);
->  		return ptr;
-> +	}
->  
->  	panic("%s: Failed to allocate %llu bytes align=0x%llx nid=%d from=0x%llx max_addr=0x%llx\n",
->  	      __func__, (u64)size, (u64)align, nid, (u64)min_addr,
-> -- 
-> 2.14.0
+>>>>    [1]: Documentation/devicetree/bindings/media/video-interfaces.txt
+>>>>
 
+Best regards
 -- 
-Michal Hocko
-SUSE Labs
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
