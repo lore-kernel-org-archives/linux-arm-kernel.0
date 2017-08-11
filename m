@@ -1,80 +1,68 @@
-From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Sat, 12 Aug 2017 00:28:12 +0200
-Subject: [PATCH 1/2] arm64: allwinner: a64: add SPI nodes
-In-Reply-To: <20170811222813.1567-1-stefan.bruens@rwth-aachen.de>
-References: <20170811222813.1567-1-stefan.bruens@rwth-aachen.de>
-Message-ID: <83987158c44545c7b8c1625049d1e65d@rwthex-w2-b.rwth-ad.de>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 12 Aug 2017 08:19:08 +0900
+Subject: [PATCH] gpio: uniphier: add UniPhier GPIO controller driver
+In-Reply-To: <CACRpkdZ26q09s-L2wVy+Vv5rV0Enjith0AJ_sJCAH3kvzvjn1Q@mail.gmail.com>
+References: <1501758371-25316-1-git-send-email-yamada.masahiro@socionext.com>
+ <CACRpkdZWxjwDnVy5f2rLAWs=+T=5SnwyU8dz1FW1eg8dk8JN_Q@mail.gmail.com>
+ <CAK7LNAT4FvsX2-hYrKYmrftEZZb_RZOrfZoKWvR8hopt9jT8-Q@mail.gmail.com>
+ <CACRpkdZ26q09s-L2wVy+Vv5rV0Enjith0AJ_sJCAH3kvzvjn1Q@mail.gmail.com>
+Message-ID: <CAK7LNASHO63yAJWicNL_+sSMxs3yqOt_R7z_xg+kU_iD=Aum9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 SPI controllers are register compatible to the h3/h5 SPI
-controllers.
+2017-08-08 0:37 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Mon, Aug 7, 2017 at 3:50 PM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>
+>> Adding "interrupts" property in DT causes
+>> of_pupulate_default_populate() to assign virtual IRQ numbers
+>> before driver probing.  So it does not work well with IRQ domain hierarchy.
+>
+> I think I heard some noise about this the week before.
+>
+>> For pinctrl/stm32/pinctrl-stm32.c,
+>> I do not see "interrupts", so it just straight maps the irq numbers.
+>
+> I think OMAP and DaVinci does someting similar too. This is from a recent
+> DaVinci patch from Keerthy:
+>
+> +Example for 66AK2G:
+> +
+> +gpio0: gpio at 2603000 {
+> +       compatible = "ti,k2g-gpio", "ti,keystone-gpio";
+> +       reg = <0x02603000 0x100>;
+> +       gpio-controller;
+> +       #gpio-cells = <2>;
+> +       interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
+> +                       <GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
+> +                       <GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
+> +                       <GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
+> +                       <GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
+> +                       <GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
+> +                       <GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
+> +                       <GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
+> +                       <GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
+> +       interrupt-controller;
+> +       #interrupt-cells = <2>;
+> +       ti,ngpio = <144>;
+> +       ti,davinci-gpio-unbanked = <0>;
+> +       clocks = <&k2g_clks 0x001b 0x0>;
+> +       clock-names = "gpio";
+> +};
+>
+>
+> That looks fairly similar.
+>
+> Yours,
+> Linus Walleij
+> --
 
-The A64 has two SPI controllers, each with a single chip select.
-The handles for the DMA channels (23/24 for SPI0/SPI1) are omitted,
-as the A64 DMA support is currently missing.
 
-Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 40 +++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+I will send v2 for this driver.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index bd0f33b77f57..373cd14f0206 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -325,6 +325,16 @@
- 				drive-strength = <40>;
- 			};
- 
-+			spi0_pins: spi0 {
-+				pins = "PC0", "PC1", "PC2", "PC3";
-+				function = "spi0";
-+			};
-+
-+			spi1_pins: spi1 {
-+				pins = "PD0", "PD1", "PD2", "PD3";
-+				function = "spi1";
-+			};
-+
- 			uart0_pins_a: uart0 at 0 {
- 				pins = "PB8", "PB9";
- 				function = "uart0";
-@@ -527,5 +537,35 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 		};
-+
-+		spi0: spi at 01c68000 {
-+			compatible = "allwinner,sun8i-h3-spi";
-+			reg = <0x01c68000 0x1000>;
-+			interrupts = <GIC_SPI 65 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_SPI0>, <&ccu CLK_SPI0>;
-+			clock-names = "ahb", "mod";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi0_pins>;
-+			resets = <&ccu RST_BUS_SPI0>;
-+			status = "disabled";
-+			num-cs = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		spi1: spi at 01c69000 {
-+			compatible = "allwinner,sun8i-h3-spi";
-+			reg = <0x01c69000 0x1000>;
-+			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_SPI1>, <&ccu CLK_SPI1>;
-+			clock-names = "ahb", "mod";
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&spi1_pins>;
-+			resets = <&ccu RST_BUS_SPI1>;
-+			status = "disabled";
-+			num-cs = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
- 	};
- };
+Thanks.
+
+
 -- 
-2.13.3
+Best Regards
+Masahiro Yamada
