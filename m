@@ -1,30 +1,64 @@
-From: mgorman@techsingularity.net (Mel Gorman)
-Date: Fri, 11 Aug 2017 10:50:09 +0100
-Subject: [v6 04/15] mm: discard memblock data later
-In-Reply-To: <20170811093249.GE30811@dhcp22.suse.cz>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-5-git-send-email-pasha.tatashin@oracle.com>
- <20170811093249.GE30811@dhcp22.suse.cz>
-Message-ID: <20170811095009.hz2vnatcwztffraw@techsingularity.net>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Fri, 11 Aug 2017 17:56:09 +0800
+Subject: [PATCH 0/8] MT2712 IOMMU SUPPORT
+Message-ID: <1502445377-26936-1-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 11, 2017 at 11:32:49AM +0200, Michal Hocko wrote:
-> > Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-> > Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-> > Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-> > Reviewed-by: Bob Picco <bob.picco@oracle.com>
-> 
-> Considering that some HW might behave strangely and this would be rather
-> hard to debug I would be tempted to mark this for stable. It should also
-> be merged separately from the rest of the series.
-> 
-> I have just one nit below
-> Acked-by: Michal Hocko <mhocko@suse.com>
-> 
+This patchset mainly adds support for M4U of mt2712.
 
-Agreed.
+The M4U in mt2712 is MTK's generation2 M4U which use the
+Short-descriptor like mt8173. The main difference is that there are 2
+M4Us and 2 smi-commons in mt2712, while there is only 1 M4U and 1
+smi-common in mt8173. The purpose is for balance the bandwidth.
+
+The mt2712 M4U-SMI HW diagram is as below:
+
+                            EMI
+                             |
+              -------------------------------
+              |                             |
+             M4U0                          M4U1
+              |                             |
+         smi-common0                   smi-common1
+              |                             |
+  -------------------------       --------------------
+  |     |     |     |     |       |         |        |
+  |     |     |     |     |       |         |        |
+larb0 larb1 larb2 larb3 larb6    larb4    larb5     larb7
+disp0 vdec  cam   venc   jpg  mdp1/disp1 mdp2/disp2  mdp3->larb names
+
+This patchset is based on v4.13-rc1, Also it base on Robin's[1],
+Honghui[2],Arvind[3]. Currently it don't contain the dtsi part
+as the ccf/power-domain has not been ready.
+
+The patch 1/2 adds the support of MT2712 IOMMU support,
+the patch 3/4 improve the m4u flow for mt2712,
+the last patch 5/6/7/8 mainly fix bug or improve code.
+
+[1]:https://patchwork.kernel.org/patch/9828671/
+[2]:https://patchwork.kernel.org/patch/9880223/
+[3]:https://patchwork.kernel.org/patch/9892759/
+
+Yong Wu (8):
+  dt-bindings: mediatek: Add binding for mt2712 IOMMU and SMI
+  iommu/mediatek: Add mt2712 IOMMU support
+  iommu/mediatek: Merge 2 M4U HWs into one iommu domain
+  iommu/mediatek: Move pgtable allocation into domain_alloc
+  iommu/mediatek: Disable iommu clock when system suspend
+  iommu/mediatek: Enlarge the validate PA range for 4GB mode
+  memory: mtk-smi: Rearrange some function position alphabetically
+  memory: mtk-smi: Degrade SMI init to module_init
+
+ .../devicetree/bindings/iommu/mediatek,iommu.txt   |   6 +-
+ .../memory-controllers/mediatek,smi-common.txt     |   6 +-
+ .../memory-controllers/mediatek,smi-larb.txt       |   5 +-
+ drivers/iommu/mtk_iommu.c                          | 184 ++++++++++++++-------
+ drivers/iommu/mtk_iommu.h                          |   9 +
+ drivers/memory/mtk-smi.c                           | 108 +++++++-----
+ include/dt-bindings/memory/mt2712-larb-port.h      |  91 ++++++++++
+ 7 files changed, 305 insertions(+), 104 deletions(-)
+ create mode 100644 include/dt-bindings/memory/mt2712-larb-port.h
 
 -- 
-Mel Gorman
-SUSE Labs
+1.9.1
