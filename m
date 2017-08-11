@@ -1,92 +1,77 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Fri, 11 Aug 2017 16:08:48 +0800
-Subject: [PATCH v4 5/5] phy: rockchip-inno-usb2: add support of usb2-phy for
- rv1108 SoCs
-In-Reply-To: <1502438871-9482-1-git-send-email-frank.wang@rock-chips.com>
-References: <1502438871-9482-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1502438928-9744-1-git-send-email-frank.wang@rock-chips.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 11 Aug 2017 10:39:23 +0200
+Subject: [PATCH 2/3] ARM: sun8i: sunxi-h3-h5: add phy-is-integrated
+ property to internal PHY
+In-Reply-To: <CAGb2v66SGAKnFoHNqWR+DqS-mY3KA853NmKpdHqf8huOkisLKg@mail.gmail.com>
+References: <20170810085129.20463-1-clabbe.montjoie@gmail.com>
+ <20170810085129.20463-3-clabbe.montjoie@gmail.com>
+ <CAGb2v64dBZgN6-8kHnnN1qiEXHnbXw_FM9WxGHPU0h-tZDbspA@mail.gmail.com>
+ <20170811080543.GA25147@Red>
+ <CAGb2v66wCRe8nFucJa5nAT1GhO75LmCyfNWQQbwxzh085Zwk+w@mail.gmail.com>
+ <20170811081920.GB25147@Red>
+ <CAGb2v66SGAKnFoHNqWR+DqS-mY3KA853NmKpdHqf8huOkisLKg@mail.gmail.com>
+Message-ID: <20170811083923.GC25147@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support usb2-phy for rv1108 SoCs and amend phy Documentation.
+On Fri, Aug 11, 2017 at 04:22:11PM +0800, Chen-Yu Tsai wrote:
+> On Fri, Aug 11, 2017 at 4:19 PM, Corentin Labbe
+> <clabbe.montjoie@gmail.com> wrote:
+> > On Fri, Aug 11, 2017 at 04:11:13PM +0800, Chen-Yu Tsai wrote:
+> >> On Fri, Aug 11, 2017 at 4:05 PM, Corentin Labbe
+> >> <clabbe.montjoie@gmail.com> wrote:
+> >> > On Fri, Aug 11, 2017 at 10:42:51AM +0800, Chen-Yu Tsai wrote:
+> >> >> Hi,
+> >> >>
+> >> >> On Thu, Aug 10, 2017 at 4:51 PM, Corentin Labbe
+> >> >> <clabbe.montjoie@gmail.com> wrote:
+> >> >> > This patch add the new phy-is-integrated property to the internal PHY
+> >> >> > node.
+> >> >> >
+> >> >> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> >> >> > ---
+> >> >> >  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 1 +
+> >> >> >  1 file changed, 1 insertion(+)
+> >> >> >
+> >> >> > diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> >> >> > index 4b599b5d26f6..54fc24e4c569 100644
+> >> >> > --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> >> >> > +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> >> >> > @@ -425,6 +425,7 @@
+> >> >> >                                         reg = <1>;
+> >> >> >                                         clocks = <&ccu CLK_BUS_EPHY>;
+> >> >> >                                         resets = <&ccu RST_BUS_EPHY>;
+> >> >> > +                                       phy-is-integrated;
+> >> >>
+> >> >> You also need to "delete" this property at the board level for
+> >> >> any board that has the external PHY at address <1>. Otherwise
+> >> >> they will stop working. This is due to the internal and external
+> >> >> PHYs having the same path and node name in the device tree, so
+> >> >> they are effectively the same node.
+> >> >>
+> >> >> ChenYu
+> >> >>
+> >> >
+> >> > They have not the same name, ext_rgmii_phy vs int_mii_phy.
+> >>
+> >> That is just the label. The label plays no part in device tree merging. The path
+> >>
+> >>     /soc/ethernet at 1c30000/mdio/ethernet-phy at 1
+> >>
+> >> is the same. You can look under
+> >>
+> >>     /proc/device-tree/soc/ethernet at 1c30000/mdio
+> >>
+> >> on the OrangePI Plus 2E or any other H3 board that uses an
+> >> external PHY at address 1.
+> >>
+> >> ChenYu
+> >
+> > Since we get the phy node by phy-handle and not by path, I think all should be good.
+> 
+> You are not getting me. The fact that the two seemingly separate
+> nodes are merged together means, whatever properties you put in
+> the internal PHY node, also affect the external PHY node. Once
+> compiled, they are the SAME node.
 
-Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../bindings/phy/phy-rockchip-inno-usb2.txt        |  1 +
- drivers/phy/rockchip/phy-rockchip-inno-usb2.c      | 43 ++++++++++++++++++++++
- 2 files changed, 44 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-index 68230b5..a67ef2a 100644
---- a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-+++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-@@ -6,6 +6,7 @@ Required properties (phy (parent) node):
- 	* "rockchip,rk3328-usb2phy"
- 	* "rockchip,rk3366-usb2phy"
- 	* "rockchip,rk3399-usb2phy"
-+	* "rockchip,rv1108-usb2phy"
-  - reg : the address offset of grf for usb-phy configuration.
-  - #clock-cells : should be 0.
-  - clock-output-names : specify the 480m output clock name.
-diff --git a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-index 22b7b02..994cc1a 100644
---- a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-+++ b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-@@ -1397,11 +1397,54 @@ static const struct rockchip_usb2phy_cfg rk3399_phy_cfgs[] = {
- 	{ /* sentinel */ }
- };
- 
-+static const struct rockchip_usb2phy_cfg rv1108_phy_cfgs[] = {
-+	{
-+		.reg = 0x100,
-+		.num_ports	= 2,
-+		.clkout_ctl	= { 0x108, 4, 4, 1, 0 },
-+		.port_cfgs	= {
-+			[USB2PHY_PORT_OTG] = {
-+				.phy_sus	= { 0x0100, 15, 0, 0, 0x1d1 },
-+				.bvalid_det_en	= { 0x0680, 3, 3, 0, 1 },
-+				.bvalid_det_st	= { 0x0690, 3, 3, 0, 1 },
-+				.bvalid_det_clr = { 0x06a0, 3, 3, 0, 1 },
-+				.ls_det_en	= { 0x0680, 2, 2, 0, 1 },
-+				.ls_det_st	= { 0x0690, 2, 2, 0, 1 },
-+				.ls_det_clr	= { 0x06a0, 2, 2, 0, 1 },
-+				.utmi_bvalid	= { 0x0804, 10, 10, 0, 1 },
-+				.utmi_ls	= { 0x0804, 13, 12, 0, 1 },
-+			},
-+			[USB2PHY_PORT_HOST] = {
-+				.phy_sus	= { 0x0104, 15, 0, 0, 0x1d1 },
-+				.ls_det_en	= { 0x0680, 4, 4, 0, 1 },
-+				.ls_det_st	= { 0x0690, 4, 4, 0, 1 },
-+				.ls_det_clr	= { 0x06a0, 4, 4, 0, 1 },
-+				.utmi_ls	= { 0x0804, 9, 8, 0, 1 },
-+				.utmi_hstdet	= { 0x0804, 7, 7, 0, 1 }
-+			}
-+		},
-+		.chg_det = {
-+			.opmode		= { 0x0100, 3, 0, 5, 1 },
-+			.cp_det		= { 0x0804, 1, 1, 0, 1 },
-+			.dcp_det	= { 0x0804, 0, 0, 0, 1 },
-+			.dp_det		= { 0x0804, 2, 2, 0, 1 },
-+			.idm_sink_en	= { 0x0108, 8, 8, 0, 1 },
-+			.idp_sink_en	= { 0x0108, 7, 7, 0, 1 },
-+			.idp_src_en	= { 0x0108, 9, 9, 0, 1 },
-+			.rdm_pdwn_en	= { 0x0108, 10, 10, 0, 1 },
-+			.vdm_src_en	= { 0x0108, 12, 12, 0, 1 },
-+			.vdp_src_en	= { 0x0108, 11, 11, 0, 1 },
-+		},
-+	},
-+	{ /* sentinel */ }
-+};
-+
- static const struct of_device_id rockchip_usb2phy_dt_match[] = {
- 	{ .compatible = "rockchip,rk3228-usb2phy", .data = &rk3228_phy_cfgs },
- 	{ .compatible = "rockchip,rk3328-usb2phy", .data = &rk3328_phy_cfgs },
- 	{ .compatible = "rockchip,rk3366-usb2phy", .data = &rk3366_phy_cfgs },
- 	{ .compatible = "rockchip,rk3399-usb2phy", .data = &rk3399_phy_cfgs },
-+	{ .compatible = "rockchip,rv1108-usb2phy", .data = &rv1108_phy_cfgs },
- 	{}
- };
- MODULE_DEVICE_TABLE(of, rockchip_usb2phy_dt_match);
--- 
-2.0.0
+So why not changing the internal node name from ethernet-phy to integrated-phy ?
