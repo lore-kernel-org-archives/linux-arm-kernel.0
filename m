@@ -1,34 +1,25 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 11 Aug 2017 13:43:47 +0200
-Subject: [PATCH] : ARM64: bcm2837: enable sdhost in device tree for the
- Raspberry Pi 3
-In-Reply-To: <55905056.400126.1502450854825@mail.yahoo.com>
-References: <55905056.400126.1502450854825.ref@mail.yahoo.com>
- <55905056.400126.1502450854825@mail.yahoo.com>
-Message-ID: <db939039-3f73-3436-6bad-da3153379457@i2se.com>
+From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
+Date: Fri, 11 Aug 2017 13:49:59 +0200
+Subject: [PATCH 0/2] More s5p-jpeg fixes
+In-Reply-To: <1502191352-11595-1-git-send-email-andrzej.p@samsung.com>
+References: <1502191352-11595-1-git-send-email-andrzej.p@samsung.com>
+ <CGME20170811115011eucas1p2d31daaa9e6f8d142291d9352ad5b732c@eucas1p2.samsung.com>
+Message-ID: <1502452201-17171-1-git-send-email-andrzej.p@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi All,
 
+The first patch in the series fixes decoding path,
+the second patch fixes encoding path. Please see
+appropriate commit messages.
 
-Am 11.08.2017 um 13:27 schrieb VOTARY GITHUB:
-> From a0eb079e9913c3290435c435ca00b988a6fe93f5 Mon Sep 17 00:00:00 2001
-> From: VT-Github-Raspberrypi <github.raspberrypi@votarytech.com>
-> Date: Mon, 7 Aug 2017 15:24:52 +0530
-> Subject: [PATCH] ARM64: bcm2837: enable sdhost in device tree for the
->
-> Raspberry Pi 3
->
-> Fix for https://github.com/raspberrypi/linux/issues/2151
->
-> Signed-off-by: VT-Github-Raspberrypi <github.raspberrypi@votarytech.com>
+Andrzej Pietrasiewicz (2):
+  media: s5p-jpeg: don't overwrite result's "size" member
+  media: s5p-jpeg: set w/h when encoding
 
-please stop sending patches against the foundation tree to mailing lists 
-which are dedicated for mainline. Your patches won't apply.
+ drivers/media/platform/s5p-jpeg/jpeg-core.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-In case you have questions feel free to ask them on 
-linux-rpi-kernel at lists.infradead.org (subscription required)
-
-Thanks
-Stefan
+-- 
+1.9.1
