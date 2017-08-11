@@ -1,41 +1,34 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 11 Aug 2017 11:16:15 +0200
-Subject: [PATCH v2 2/6] edac: synopsys: Add platform specific structures
- for ddrc controller
-In-Reply-To: <20170811090926.GC9432@nazgul.tnic>
-References: <91fd6532076e4c905b5a228d852bba4941c54a28.1502091561.git.michal.simek@xilinx.com>
- <6c72eae7c1fbfd2b96d5dc1c7feb251bdbe3e591.1502091561.git.michal.simek@xilinx.com>
- <20170811090926.GC9432@nazgul.tnic>
-Message-ID: <9800a639-2e1b-5008-14fc-b2135a27f826@xilinx.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 11 Aug 2017 10:22:14 +0100
+Subject: New assembler warnings with binutils 2.29
+In-Reply-To: <d101c48b-c47b-be60-4b40-de4f845e4965@redhat.com>
+References: <d101c48b-c47b-be60-4b40-de4f845e4965@redhat.com>
+Message-ID: <20170811092213.mdmzqtm2lp6ltlxt@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.8.2017 11:09, Borislav Petkov wrote:
-> On Mon, Aug 07, 2017 at 09:39:24AM +0200, Michal Simek wrote:
->> From: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
->>
->> Adds platform specific structures, so that we can add
->> different IP support later using quirks.
->>
->> Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>
->> Changes in v2:
+On Thu, Aug 10, 2017 at 01:13:22PM -0700, Laura Abbott wrote:
+> Fedora rawhide recently upgraded to binutils 2.29 and this seems
+> to produce new warnings:
 > 
-> Subject says "2/6" but I can't find 1/6 in my mbox. Nothing in spam
-> folder either. What's up?
-
-https://lkml.org/lkml/2017/8/7/105
-ACK by Rob yesterday.
-
+> ./arch/arm64/include/asm/assembler.h: Assembler messages:
+> ./arch/arm64/include/asm/assembler.h:125: Warning: ignoring attempt to redefine built-in register 'lr'
 > 
-> Are you using the --cover-letter option to git format-patch ?
+> This is
+> 
+> /*
+>  * Register aliases.
+>  */
+> lr      .req    x30             // link register
 
-I am using patman - u-boot tools for sending patch. It read MAINTAINERS
-file and copy right people.
-It has option to explicitly CC people. I need to resend this as v3
-anyway that's why I will add you there.
+Strange, does gas now think 'lr' is a general purpose register (aliased
+to x30)? It never was and IIRC the toolchain people many years ago
+refused to add it, hence the alias above in the kernel. I wonder if they
+added 'fp' as well...
 
-Thanks,
-Michal
+We could remove the alias and replace all 'lr' instances with 'x30'
+throughout the kernel (no too many) or we add some #ifdef around the
+above based on the binutils version.
+
+-- 
+Catalin
