@@ -1,67 +1,174 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 11 Aug 2017 14:31:36 +0200
-Subject: [PATCH 2/2] char: xilinx_hwicap: Fix warnings in the driver
-In-Reply-To: <CAL_JsqLy3yV60eoxL0s7vohpcCuh=d3-Z8zVyaEPe=g772yySA@mail.gmail.com>
-References: <6da0afe2afd2c7a21d16da9a9c7acab09385ae2c.1501247838.git.michal.simek@xilinx.com>
- <79e2e616a8b7dbf38eb72ba0b620230017dcbc65.1501247838.git.michal.simek@xilinx.com>
- <20170803223218.ilryp5spqztsr3cz@rob-hp-laptop>
- <0e40a687-e11b-b5bb-24f0-465144c98929@xilinx.com>
- <CAL_JsqLy3yV60eoxL0s7vohpcCuh=d3-Z8zVyaEPe=g772yySA@mail.gmail.com>
-Message-ID: <42e6baac-5b3f-5499-782f-9a8d901cac00@xilinx.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Fri, 11 Aug 2017 18:01:43 +0530
+Subject: [PATCH v4] arm64: allwinner: a64: Add initial NanoPi A64 support
+Message-ID: <1502454711-8389-1-git-send-email-jteki@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.8.2017 20:16, Rob Herring wrote:
-> On Fri, Aug 4, 2017 at 2:49 AM, Michal Simek <michal.simek@xilinx.com> wrote:
->> On 4.8.2017 00:32, Rob Herring wrote:
->>> On Fri, Jul 28, 2017 at 03:17:26PM +0200, Michal Simek wrote:
->>>> From: Nava kishore Manne <nava.manne@xilinx.com>
->>>>
->>>> This patch fixes the below warning
->>>>         --> Use #include <linux/io.h> instead of <asm/io.h>
->>>>         --> Use #include <linux/uaccess.h> instead of <asm/uaccess.h>
->>>>         --> please, no space before tabs
->>>>         --> Block comments use a trailing */ on a separate line
->>>>         --> Possible unnecessary 'out of memory' message
->>>>         --> Block comments use * on subsequent lines
->>>>         --> Block comments use a trailing */ on a separate line
->>>>         --> braces {} are not necessary for any arm of this statement
->>>>         --> DT compatible string "xlnx,opb-hwicap-1.00.b"
->>>>          appears un-documented
->>>>         --> DT compatible string "xlnx,xps-hwicap-1.00.a"
->>>>             appears un-documented
->>>>
->>>> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
->>>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->>>> ---
->>>>
->>>>  Documentation/devicetree/bindings/xilinx.txt |  2 ++
->>>
->>> It's preferred to split bindings to separate patches. No need unless you
->>> respin:
->>>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>
->> thanks. Was there any outcome from that discussion to extract binding
->> out of kernel source code?
-> 
-> Well, the reason to split the patches is so the history of the
-> filtered DT repository we generate from the kernel tree[1] looks
-> saner.
-> 
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-So many merge commits. It looks weird.
+NanoPi A64 is a new board of high performance with low cost
+designed by FriendlyElec., using the Allwinner A64 SOC.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/devicetree/devicetree-rebasing.git/log/
+Nanopi A64 features
+- Allwinner A64, 64-bit Quad-core Cortex-A53 at 648MHz to 1.152GHz, DVFS
+- 1GB DDR3 RAM
+- MicroSD
+- Gigabit Ethernet (RTL8211E)
+- Wi-Fi 802.11b/g/n
+- IR receiver
+- Audio In/Out
+- Video In/Out
+- Serial Debug Port
+- microUSB 5V 2A DC power-supply
 
-> As far as actually moving things out, no there's not been any
-> movement. My biggest concern with moving things out would be the loss
-> of kernel subsystem maintainers' review. Once it's a separate tree and
-> not merged thru their tree, we'd loose their reviews and I don't have
-> confidence that we'd be gaining reviews from other places. Though some
-> subsystem maintainers merge bindings and don't look at them already.
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v4:
+- Rebased and droped wi-fi related nodes, since it require 
+  other changes to taken care.
+Changes for v3:
+- Fix to use mmc1 for SDIO instead of mmc2
+- Replace buswidth by 4 instead of 8 mmc1
+- Drop cap-mmc-hw-reset for mmc1
+Changes for v2:
+- Added ohci0, ehci0, ohic1, ehci1, usbphy.
+- Tested on A64
 
-ok.
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   | 114 +++++++++++++++++++++
+ 2 files changed, 115 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
 
-Thanks,
-Michal
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index 108f12c..c997b5c 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -1,4 +1,5 @@
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+new file mode 100644
+index 0000000..e4c121a
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+@@ -0,0 +1,114 @@
++/*
++ * Copyright (C) 2017 Jagan Teki <jteki@openedev.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "sun50i-a64.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "FriendlyARM NanoPi A64";
++	compatible = "friendlyarm,nanopi-a64", "allwinner,sun50i-a64";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
++	status = "okay";
++};
++
++&i2c1_pins {
++	bias-pull-up;
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++	disable-wp;
++	bus-width = <4>;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	status = "okay";
++};
+-- 
+2.7.4
