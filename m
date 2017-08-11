@@ -1,9 +1,10 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 11 Aug 2017 21:08:40 +0200
-Subject: [PATCH 10/11] ASoC: pxa: Handle return value of
+Date: Fri, 11 Aug 2017 21:08:53 +0200
+Subject: [PATCH 11/11] ASoC: pxa-ssp: Handle return value of
  clk_prepare_enable.
 References: <1500977770-28142-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <874ltdq5vr.fsf@belgarion.home>
+ <1500977770-28142-2-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <87wp69oray.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
