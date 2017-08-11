@@ -1,65 +1,88 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 11 Aug 2017 16:17:41 +0200
-Subject: [PATCH 5/5] clocksource/drivers/arm_arch_timer: Avoid infinite
- recursion when ftrace is enabled
-In-Reply-To: <1502461061-28065-1-git-send-email-daniel.lezcano@linaro.org>
-References: <20170811141520.GA795@mai>
- <1502461061-28065-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1502461061-28065-5-git-send-email-daniel.lezcano@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 11 Aug 2017 09:31:13 -0500
+Subject: [PATCH 1/2] dt-bindings: serial: Add MediaTek BTIF controller
+ bindings
+In-Reply-To: <1502419988.19230.16.camel@mtkswgap22>
+References: <cover.1501692369.git.sean.wang@mediatek.com>
+ <6b2ad0dc976259563562e7ab23abdacf68c94aa5.1501692369.git.sean.wang@mediatek.com>
+ <20170810162752.2xncymekrhu544g7@rob-hp-laptop>
+ <1502419988.19230.16.camel@mtkswgap22>
+Message-ID: <CAL_Jsq+EhkmSKeu7Hp93Kgjms4G30Gbjy1jw-nUG+rngLKLaeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ding Tianhong <dingtianhong@huawei.com>
+On Thu, Aug 10, 2017 at 9:53 PM, Sean Wang <sean.wang@mediatek.com> wrote:
+> On Thu, 2017-08-10 at 11:27 -0500, Rob Herring wrote:
+>> On Thu, Aug 03, 2017 at 01:05:22AM +0800, sean.wang at mediatek.com wrote:
+>> > From: Sean Wang <sean.wang@mediatek.com>
+>> >
+>> > Document the devicetree bindings for MediaTek BTIF controller
+>> > which could be found on MT7622 and MT7623 SoC.
+>> >
+>> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+>> > ---
+>> >  .../devicetree/bindings/serial/mtk-btif.txt        | 26 ++++++++++++++++++++++
+>> >  1 file changed, 26 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/serial/mtk-btif.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/serial/mtk-btif.txt b/Documentation/devicetree/bindings/serial/mtk-btif.txt
+>> > new file mode 100644
+>> > index 0000000..80c1f5a
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/serial/mtk-btif.txt
+>> > @@ -0,0 +1,26 @@
+>> > +Device-Tree bindings for MediaTek BTIF controller found on those
+>> > +MediaTek SoCs with Bluetooth feature
+>> > +
+>> > +Required properties:
+>> > +- compatible: Should be one of:
+>> > +   - "mediatek,mt7622-btif" : for MT7622 SoC
+>> > +   - "mediatek,mt7623-btif" : for MT7623 SoC
+>> > +- reg: The base address of the BTIF register bank;
+>> > +- interrupts: A single interrupt specifier;
+>> > +- clocks: list of clock specifiers, corresponding to
+>> > +     entries in clock-names property;
+>> > +- clock-names: should contain "main" entries.
+>> > +
+>> > +Optional properties:
+>> > +- mediatek,loopback: Boolean; if defined, indicates that BTIF controller
+>> > +   running on the loopback mode.
+>>
+>> I don't think this belongs in DT, but should be a module param or sysfs
+>> control.
+>>
+> the loopback actually is one of hardware setups so i add it as one
+> property in the dt or could you kindly guide me how to make judgment
+> accurately for listing those changes as either dt or a module param?
 
-On platforms with an arch timer erratum workaround, it's possible for
-arch_timer_reg_read_stable() to recurse into itself when certain
-tracing options are enabled, leading to stack overflows and related
-problems.
+It's just a debug mode, right? Generally a user shouldn't have to
+modify the DT to change settings. Only if you wanted a given board to
+always be in loopback would this make sense in DT.
 
-For example, when PREEMPT_TRACER and FUNCTION_GRAPH_TRACER are
-selected, it's possible to trigger this with:
+>> > +
+>> > +Example:
+>> > +
+>> > +   btif: btif at 1100c000 {
+>>
+>> bluetooth at ...
+>>
+> btif not bluetooth, which is just the interface hardware allowing the
+> the main processor communicating with the bluetooth hardware built in
+> the SoC, and is really like to the uart used by legacy bluetooth.
+> So i will add bluetooth as the another node.
 
-$ mount -t debugfs nodev /sys/kernel/debug/
-$ echo function_graph > /sys/kernel/debug/tracing/current_tracer
+Right, I realized that after writing this. It should be "serial at ..." instead.
 
-The problem is that in such cases, preempt_disable() instrumentation
-attempts to acquire a timestamp via trace_clock(), resulting in a call
-back to arch_timer_reg_read_stable(), and hence recursion.
-
-This patch changes arch_timer_reg_read_stable() to use
-preempt_{disable,enable}_notrace(), which avoids this.
-
-This problem is similar to the fixed by upstream commit 96b3d28bf4
-("sched/clock: Prevent tracing recursion in sched_clock_cpu()").
-
-Fixes: 6acc71ccac71 ("arm64: arch_timer: Allows a CPU-specific erratum to only affect a subset of CPUs")
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm64/include/asm/arch_timer.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index 74d08e4..a652ce0 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -65,13 +65,13 @@ DECLARE_PER_CPU(const struct arch_timer_erratum_workaround *,
- 	u64 _val;							\
- 	if (needs_unstable_timer_counter_workaround()) {		\
- 		const struct arch_timer_erratum_workaround *wa;		\
--		preempt_disable();					\
-+		preempt_disable_notrace();				\
- 		wa = __this_cpu_read(timer_unstable_counter_workaround); \
- 		if (wa && wa->read_##reg)				\
- 			_val = wa->read_##reg();			\
- 		else							\
- 			_val = read_sysreg(reg);			\
--		preempt_enable();					\
-+		preempt_enable_notrace();				\
- 	} else {							\
- 		_val = read_sysreg(reg);				\
- 	}								\
--- 
-2.7.4
+>
+>
+>> > +           compatible = "mediatek,mt7623-btif";
+>> > +           reg = <0 0x1100c000 0 0x1000>;
+>> > +           interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_LOW>;
+>> > +           clocks = <&pericfg CLK_PERI_BTIF>;
+>> > +           clock-names = "main";
+>> > +   };
+>> > --
+>> > 2.7.4
+>> >
+>
+>
