@@ -1,44 +1,60 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 11 Aug 2017 14:48:27 +0100
-Subject: [PATCH 12/15] arm-soc: omap: replace open coded VA->PA
- calculations
-In-Reply-To: <20170810140357.GA8569@atomide.com>
-References: <20170805205222.19868-1-ard.biesheuvel@linaro.org>
- <20170805205222.19868-13-ard.biesheuvel@linaro.org>
- <20170809190556.GD3934@atomide.com>
- <CAKv+Gu-kdjN8nXVNL2frsegu-z7HVnG8qcXpQbvM-oBbxKjUGA@mail.gmail.com>
- <20170809210517.GE3934@atomide.com>
- <CAKv+Gu_vKJJAsEMY9o-MWLpY8jztcXWB25eQRAMo=FMZfVJfHg@mail.gmail.com>
- <20170810140357.GA8569@atomide.com>
-Message-ID: <CAKv+Gu-uwxF628w1WT-9bBnRbX9y98BH5YQWS+qA1pXFU97sqg@mail.gmail.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Fri, 11 Aug 2017 15:08:31 +0200
+Subject: [v6 15/15] mm: debug for raw alloctor
+In-Reply-To: <1502138329-123460-16-git-send-email-pasha.tatashin@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-16-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <20170811130831.GN30811@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 August 2017 at 15:03, Tony Lindgren <tony@atomide.com> wrote:
-> * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170810 02:23]:
->> On 9 August 2017 at 22:05, Tony Lindgren <tony@atomide.com> wrote:
->> > * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170809 12:24]:
->> >> On 9 August 2017 at 20:05, Tony Lindgren <tony@atomide.com> wrote:
->> >> > * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170805 13:54]:
->> >> >> This replaces a couple of open coded calculations to obtain the
->> >> >> physical address of a far symbol with calls to the new adr_l etc
->> >> >> macros.
->> >> >
->> >> > I gave this series a quick test and omap3 no longer boots it seems.
->> >> >
->> >>
->> >> Thanks Tony. I will investigate
->> >
->> > Thanks. Looks like omap4 still boots with all your patches, but
->> > omap3 won't boot even with patch 12 left out.
->> >
->>
->> Are you using the same image on both? Which .config?
->
-> Yes it's the same image compiled with omap2plus_defconfig.
->
+On Mon 07-08-17 16:38:49, Pavel Tatashin wrote:
+> When CONFIG_DEBUG_VM is enabled, this patch sets all the memory that is
+> returned by memblock_virt_alloc_try_nid_raw() to ones to ensure that no
+> places excpect zeroed memory.
 
-Unfortunately, I am failing to reproduce this on beaglebone white or
-QEMU's beagle-xm emulation.
+Please fold this into the patch which introduces
+memblock_virt_alloc_try_nid_raw. I am not sure CONFIG_DEBUG_VM is the
+best config because that tends to be enabled quite often. Maybe
+CONFIG_MEMBLOCK_DEBUG? Or even make it kernel command line parameter?
 
-Anything you can share regarding the failure mode? Do you get any output at all?
+> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+> ---
+>  mm/memblock.c | 11 +++++++++--
+>  1 file changed, 9 insertions(+), 2 deletions(-)
+> 
+> diff --git a/mm/memblock.c b/mm/memblock.c
+> index 3fbf3bcb52d9..29fcb1dd8a81 100644
+> --- a/mm/memblock.c
+> +++ b/mm/memblock.c
+> @@ -1363,12 +1363,19 @@ void * __init memblock_virt_alloc_try_nid_raw(
+>  			phys_addr_t min_addr, phys_addr_t max_addr,
+>  			int nid)
+>  {
+> +	void *ptr;
+> +
+>  	memblock_dbg("%s: %llu bytes align=0x%llx nid=%d from=0x%llx max_addr=0x%llx %pF\n",
+>  		     __func__, (u64)size, (u64)align, nid, (u64)min_addr,
+>  		     (u64)max_addr, (void *)_RET_IP_);
+>  
+> -	return memblock_virt_alloc_internal(size, align,
+> -					    min_addr, max_addr, nid);
+> +	ptr = memblock_virt_alloc_internal(size, align,
+> +					   min_addr, max_addr, nid);
+> +#ifdef CONFIG_DEBUG_VM
+> +	if (ptr && size > 0)
+> +		memset(ptr, 0xff, size);
+> +#endif
+> +	return ptr;
+>  }
+>  
+>  /**
+> -- 
+> 2.14.0
+
+-- 
+Michal Hocko
+SUSE Labs
