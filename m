@@ -1,9 +1,9 @@
 From: andy.yan@rock-chips.com (Andy Yan)
-Date: Fri, 11 Aug 2017 11:42:26 +0800
+Date: Fri, 11 Aug 2017 11:43:32 +0800
 Subject: [PATCH v3 05/13] ARM: dts: rockchip: add spi dt node for rv1108
 In-Reply-To: <1502422578-30611-1-git-send-email-andy.yan@rock-chips.com>
 References: <1502422578-30611-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1502422946-30885-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1502423012-30935-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
