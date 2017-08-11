@@ -1,82 +1,31 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 11 Aug 2017 18:50:41 +0200
-Subject: [PATCH v2 2/5] reset: socfpga: use the reset-simple driver
-In-Reply-To: <d1d06519-f676-5d36-2f82-e9537cef4f74@adaptrum.com>
-References: <20170811130618.3676-1-p.zabel@pengutronix.de>
- <20170811130618.3676-3-p.zabel@pengutronix.de>
- <d1d06519-f676-5d36-2f82-e9537cef4f74@adaptrum.com>
-Message-ID: <1502470241.2310.29.camel@pengutronix.de>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Fri, 11 Aug 2017 22:23:31 +0530
+Subject: [linux-sunxi] [PATCH v4] arm64: allwinner: a64: Add initial
+ NanoPi A64 support
+In-Reply-To: <7F473780-971A-44BB-8FED-CFEAA56247FF@aosc.io>
+References: <1502454711-8389-1-git-send-email-jteki@openedev.com>
+ <7F473780-971A-44BB-8FED-CFEAA56247FF@aosc.io>
+Message-ID: <CAD6G_RTgHSU=knMW8YJSCBtQKLqA09fds6uHTJY+6nDAckTKOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandru,
+On Fri, Aug 11, 2017 at 6:04 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>
+>
+> ? 2017?8?11? GMT+08:00 ??8:31:43, Jagan Teki <jagannadh.teki@gmail.com> ??:
+>>From: Jagan Teki <jagan@amarulasolutions.com>
+>>
+>>NanoPi A64 is a new board of high performance with low cost
+>>designed by FriendlyElec., using the Allwinner A64 SOC.
+>
+> As AXP803 regulators support now entered linux-next, please
+> add proper AXP803 support when supporting new boards.
 
-thank you for the comments.
+OK, but how do I need to verify it? I've booted pine64 but unable to verify it.
 
-On Fri, 2017-08-11 at 09:28 -0700, Alexandru Gagniuc wrote:
-> Hi Phillip,
-> 
-> On 08/11/2017 06:06 AM, Philipp Zabel wrote:
-> [snip]
-> 
-> > @@ -113,8 +137,33 @@ static int reset_simple_probe(struct platform_device *pdev)
-> > > > ?	data->rcdev.ops = &reset_simple_ops;
-> > > > ?	data->rcdev.of_node = dev->of_node;
-> > 
-> > > > -	if (devdata)
-> > +	if (devdata == &reset_simple_socfpga) {
-> 
-> This sort of special-case handling opens the gate to adding special-case?
-> handling for any new device, which somewhat defeats the purpose of a?
-> generic driver.
-
-That is why I initially only unified the reset ops and not the whole
-platorm driver.
-
-I could partially revert this latest change and keep the reset-socfpga
-driver, just reusing the reset-simple ops to avoid potential "quirk
-creep" in the reset-simple driver.
-
-Or I could drop the #reset-cells warning below and just read the
-altr,modrst-offset property for any reset controller, to avoid the
-special-case.
-
-> > +		u32 modrst_offset;
-> > +
-> > > > +		/*
-> > > > +		?* The binding was mainlined without the required property.
-> > > > +		?* Do not continue, when we encounter an old DT.
-> > > > +		?*/
-> > > > +		if (!of_find_property(dev->of_node, "#reset-cells", NULL)) {
-> > > > +			dev_err(dev, "%pOF missing #reset-cells property\n",
-> > > > +				dev->of_node);
-> > > > +			return -EINVAL;
-> > > > +		}
-> 
-> Is the check still required in this context, since?
-> (devm_)reset_control_get() complains really loudly if #reset-cells is?
-> missing?
-
-I'm fine with removing this. Ideally, this is something that the device
-tree compiler should check already.
-
-> > +
-> > > > +		if (of_property_read_u32(dev->of_node, "altr,modrst-offset",
-> > > > +					?&modrst_offset)) {
-> > > > +			dev_warn(dev, "missing altr,modrst-offset property, assuming 0x10!\n");
-> > > > +			modrst_offset = 0x10;
-> > +		}
-> 
-> This can be a generic "reg-offset" property. If and until the?
-> devicetrees are updated, "altr,modrst-offset" would also have to be read?
-> as an alternative.
-
-Possibly. Adding new device tree bindings is a separate discussion.
-
-> Since a platform data already exists,?reset_simple_devdata could be a
-> better place to store the default offset?of 0x10 for socfpga.
-
-I'll change this as you suggest.
-
-regards
-Philipp
+thanks!
+-- 
+Jagan Teki
+Free Software Engineer | www.openedev.com
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
