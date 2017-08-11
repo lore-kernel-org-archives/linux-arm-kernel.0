@@ -1,30 +1,63 @@
-From: yao.qi@arm.com (Yao Qi)
-Date: Fri, 11 Aug 2017 08:46:28 +0100
-Subject: [PATCH 07/11] arm64: add basic pointer authentication support
-In-Reply-To: <1500480092-28480-8-git-send-email-mark.rutland@arm.com>
-References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
- <1500480092-28480-8-git-send-email-mark.rutland@arm.com>
-Message-ID: <5a919df5-7f6d-2c6c-9c8e-e28fcebd4920@arm.com>
+From: surenderp@techveda.org (Surender Polsani)
+Date: Fri, 11 Aug 2017 13:26:05 +0530
+Subject: [PATCH] arm: boot: dts: artpec6: Remove unnecessary
+ interrupt-parent property from sub-nodes
+In-Reply-To: <d582c742-4bf9-c658-d105-572d180222a4@axis.com>
+References: <1498565735-8208-1-git-send-email-surenderp@techveda.org>
+ <d582c742-4bf9-c658-d105-572d180222a4@axis.com>
+Message-ID: <8475266d-de55-0760-7ae4-9fcafead36e4@techveda.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Tuesday 27 June 2017 05:57 PM, Niklas Cassel wrote:
+> Acked-by: Niklas Cassel <niklas.cassel@axis.com>
 
-On 19/07/17 17:01, Mark Rutland wrote:
-> +#define HWCAP_APIA           (1 << 16)
+Hi Nik, This patch has been Acknowledged but is not getting added / 
+applied to the
+respective git source tree. Please let me know if there is any problem.
 
-Can you rename it to HWCAP_ARM64_APIA or HWCAP_ARM_APIA?  When we
-use it in user space,@least in GDB, we usually do this,
-
-#ifndef HWCAP_APIA
-#define HWCAP_APIA (1 << 16)
-#endif
-
-However, the code use this macro can be compiled on !arm64 host.
-If HWCAP_APIA is defined on other !arm64 host and its value is not
-(1 << 16), the program "aarch64_hwcap & HWCAP_APIA ? XXX : XXX;" is
-wrong, and compiler doesn't complain.
-
-I notice that mips, mn10300, sparc, and s390 define their HWCAP this
-way, like HWCAP_SPARC_FLUSH, HWCAP_MIPS_R6, HWCAP_S390_DFP, etc.
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+Thanks
+Surender
+>
+> On 06/27/2017 02:15 PM, surenderp at techveda.org wrote:
+>> From: Surender Polsani <surenderp@techveda.org>
+>>
+>> "interrupt-parent" property is declared in root node, so it is global
+>> to all nodes. This property is re-declared in few sub-nodes. To avoid
+>> duplication this property is removed from following sub-nodes:
+>> pmu, amba at 0, amba at 0/ethernet.
+>>
+>> Signed-off-by: Surender Polsani <surenderp@techveda.org>
+>> ---
+>>   arch/arm/boot/dts/artpec6.dtsi | 3 ---
+>>   1 file changed, 3 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
+>> index 767cbe8..2ed1177 100644
+>> --- a/arch/arm/boot/dts/artpec6.dtsi
+>> +++ b/arch/arm/boot/dts/artpec6.dtsi
+>> @@ -151,7 +151,6 @@
+>>   		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
+>>   			<GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+>>   		interrupt-affinity = <&cpu0>, <&cpu1>;
+>> -		interrupt-parent = <&intc>;
+>>   	};
+>>   
+>>   	pcie: pcie at f8050000 {
+>> @@ -185,7 +184,6 @@
+>>   		compatible = "simple-bus";
+>>   		#address-cells = <0x1>;
+>>   		#size-cells = <0x1>;
+>> -		interrupt-parent = <&intc>;
+>>   		ranges;
+>>   		dma-ranges = <0x80000000 0x00000000 0x40000000>;
+>>   		dma-coherent;
+>> @@ -195,7 +193,6 @@
+>>   			clocks = <&eth_phy_ref_clk>,
+>>   				<&clkctrl ARTPEC6_CLK_ETH_ACLK>;
+>>   			compatible = "snps,dwc-qos-ethernet-4.10";
+>> -			interrupt-parent = <&intc>;
+>>   			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+>>   			reg = <0xf8010000 0x4000>;
+>>   
+>>
