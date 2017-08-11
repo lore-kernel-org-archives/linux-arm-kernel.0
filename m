@@ -1,51 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 11 Aug 2017 12:29:23 +0100
-Subject: [PATCH 00/11] ARMv8.3 pointer authentication userspace support
-In-Reply-To: <20170725120630.GA8116@leverpostej>
-References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
- <20170721170509.GC1538@e103592.cambridge.arm.com>
- <20170725120630.GA8116@leverpostej>
-Message-ID: <20170811112922.GE12985@leverpostej>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 11 Aug 2017 13:43:47 +0200
+Subject: [PATCH] : ARM64: bcm2837: enable sdhost in device tree for the
+ Raspberry Pi 3
+In-Reply-To: <55905056.400126.1502450854825@mail.yahoo.com>
+References: <55905056.400126.1502450854825.ref@mail.yahoo.com>
+ <55905056.400126.1502450854825@mail.yahoo.com>
+Message-ID: <db939039-3f73-3436-6bad-da3153379457@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 01:06:43PM +0100, Mark Rutland wrote:
-> On Fri, Jul 21, 2017 at 06:05:09PM +0100, Dave Martin wrote:
-> > On Wed, Jul 19, 2017 at 05:01:21PM +0100, Mark Rutland wrote:
-> > > This series adds support for the ARMv8.3 pointer authentication extension.
-> 
-> > > Open questions
-> > > ==============
-> > > 
-> > > * Should keys be per-thread rather than per-process?
-> > > 
-> > >   My understanding is that glibc can't (currently) handle threads having
-> > >   different keys, but it might be that another libc would prefer per-thread
-> > 
-> > Can you elaborate?
-> > 
-> > It's not valid to do a function return from one thread to another.
-> 
-> Regardless of whether it's valid per the C spec or POSIX, some people
-> use {set,get}context and {set,long}jmp in this manner (IIRC, QEMU does
-> this), and my understanding is that similar tricks are in use in the
-> bowels of glibc.
-> 
-> Otherwise, my preference would be to have per-thread keys from day one.
+Hi,
 
-Having considered comments I've received elsewhere, I've reversed my
-position here. I think per-process keys are the more
-sensible default since:
 
-* This will allow us to protect function pointers in shared
-  datastructures such as vtables.
+Am 11.08.2017 um 13:27 schrieb VOTARY GITHUB:
+> From a0eb079e9913c3290435c435ca00b988a6fe93f5 Mon Sep 17 00:00:00 2001
+> From: VT-Github-Raspberrypi <github.raspberrypi@votarytech.com>
+> Date: Mon, 7 Aug 2017 15:24:52 +0530
+> Subject: [PATCH] ARM64: bcm2837: enable sdhost in device tree for the
+>
+> Raspberry Pi 3
+>
+> Fix for https://github.com/raspberrypi/linux/issues/2151
+>
+> Signed-off-by: VT-Github-Raspberrypi <github.raspberrypi@votarytech.com>
 
-* Tasks have their own stacks, and values leaked from one stack cannot
-  be used to spoof return addresses on another.
+please stop sending patches against the foundation tree to mailing lists 
+which are dedicated for mainline. Your patches won't apply.
 
-* If an attacker can take control of one thread, they've already gained
-  code execution and/or primitives that can be used to attack the
-  process by other means.
+In case you have questions feel free to ask them on 
+linux-rpi-kernel at lists.infradead.org (subscription required)
 
-Thanks,
-Mark.
+Thanks
+Stefan
