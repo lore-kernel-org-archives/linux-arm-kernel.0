@@ -1,110 +1,46 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 11 Aug 2017 12:40:39 +0300
-Subject: [PATCH 1/2] drm/bridge/sii8620: add external connector handle
-In-Reply-To: <5ce6bd99-c50e-84c2-f21f-eb611cac94c2@samsung.com>
-References: <1502371530-32260-1-git-send-email-m.purski@samsung.com>
- <6478480.TjcUCueU5y@avalon>
- <5ce6bd99-c50e-84c2-f21f-eb611cac94c2@samsung.com>
-Message-ID: <2097016.rlxulirhWA@avalon>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 11 Aug 2017 11:43:43 +0200
+Subject: [PATCH v2 2/6] edac: synopsys: Add platform specific structures
+ for ddrc controller
+In-Reply-To: <20170811092225.GE9432@nazgul.tnic>
+References: <91fd6532076e4c905b5a228d852bba4941c54a28.1502091561.git.michal.simek@xilinx.com>
+ <6c72eae7c1fbfd2b96d5dc1c7feb251bdbe3e591.1502091561.git.michal.simek@xilinx.com>
+ <20170811090926.GC9432@nazgul.tnic>
+ <9800a639-2e1b-5008-14fc-b2135a27f826@xilinx.com>
+ <20170811092225.GE9432@nazgul.tnic>
+Message-ID: <c0fe2afe-75da-a18f-735f-d2c82e4a070b@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-On Friday 11 Aug 2017 08:39:31 Marek Szyprowski wrote:
-> On 2017-08-10 15:39, Laurent Pinchart wrote:
-> > On Thursday 10 Aug 2017 15:25:29 Maciej Purski wrote:
-> >> The driver should be switched on if an external connector is plugged and
-> >> switched off if it is unplugged. Extcon is optional. If it is not found,
-> >> the driver stays in "always-on" mode.
-> >> 
-> >> Signed-off-by: Maciej Purski <m.purski@samsung.com>
-> >> ---
-> >> 
-> >>   .../bindings/display/bridge/sil-sii8620.txt        |  4 ++
-> >>   drivers/gpu/drm/bridge/sil-sii8620.c               | 83 ++++++++++++++-
-> >>   2 files changed, 85 insertions(+), 2 deletions(-)
-> >> 
-> >> diff --git
-> >> a/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt
-> >> b/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt index
-> >> 9409d9c..1f230bf 100644
-> >> --- a/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt
-> >> +++ b/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt
-> >> @@ -10,6 +10,9 @@ Required properties:
-> >>   	- clocks, clock-names: specification and name of "xtal" clock
-> >>   	- video interfaces: Device node can contain video interface port
-> >>   			    node for HDMI encoder according to [1].
-> >> 
-> >> +Optional properties:
-> >> +	- extcon: phandle to external connector for MHL cable changes
-> >> +		  detection
-> > 
-> > The sii8620 DT node should model its connection to the MHL connector using
-> > OF graph, connecting a port to the MHL connector DT node through
-> > endpoints. I believe the extcon property should then be added to the MHL
-> > connector DT node, not the bridge.
+On 11.8.2017 11:22, Borislav Petkov wrote:
+> On Fri, Aug 11, 2017 at 11:16:15AM +0200, Michal Simek wrote:
+>> https://lkml.org/lkml/2017/8/7/105
+>> ACK by Rob yesterday.
 > 
-> I don't get this. Generic extcon bindings doesn't define connector DT
-> node, so I don't see how could we use endpoint DT approach here. Could you
-> give the example?
+> Ok, pls bounce it to me as I don't have it.
 
-Sure, here you are.
+ok.
 
-&hsi2c_7 {
-	...
+> 
+> Also, pls refrain from using lkml.org. Simply do:
+> 
+> http://lkml.kernel.org/r/<Message-ID>
 
-        sii8620 at 39 {
-                reg = <0x39>;
-                compatible = "sil,sii8620";
-                cvcc10-supply = <&ldo36_reg>;
-                iovcc18-supply = <&ldo34_reg>;
-                interrupt-parent = <&gpf0>;
-                interrupts = <2 IRQ_TYPE_LEVEL_HIGH>;
-                reset-gpios = <&gpv7 0 GPIO_ACTIVE_LOW>;
-                clocks = <&pmu_system_controller 0>;
-                clock-names = "xtal";
+Interesting. I have never seen this before.
 
-		ports {
-			#address-cells = <1>;
-			#size-cells = <0>;
+http://lkml.kernel.org/r/91fd6532076e4c905b5a228d852bba4941c54a28.1502091561.git.michal.simek at xilinx.com
 
-	                port at 0 {
-				reg = <0>;
-        	                mhl_to_hdmi: endpoint {
-                	                remote-endpoint = <&hdmi_to_mhl>;
-	                        };
-        	        };
-	                port at 1 {
-				reg = <1>;
-        	                mhl_bridge_out: endpoint {
-                	                remote-endpoint = <&mhl_connector_in>;
-	                        };
-        	        };
-		};
-        };
-};
+> 
+>> I am using patman - u-boot tools for sending patch. It read MAINTAINERS
+>> file and copy right people.
+>> It has option to explicitly CC people. I need to resend this as v3
+>> anyway that's why I will add you there.
+> 
+> Yes, if you send cross-maintainer changes, please make sure to CC them on all
+> patches because otherwise stuff like that happens and people start wondering
+> where is the rest and so on.
 
-/ {
-	mhl-connector {
-		compatible = "mhl-connector";
-		extcon = <&muic>;
+ok. Anyway do you see something else what I should fix in v3?
 
-	        port {
-        	        mhl_connector_in: endpoint {
-                	        remote-endpoint = <&mhl_bridge_out>;
-	                };
-        	};
-	};
-};
-
-Note that there's currently no DT binding for MHL connectors. One needs to be 
-developed, the HDMI connector DT binding can be used as a source of 
-inspiration.
-
-> >>   [1]: Documentation/devicetree/bindings/media/video-interfaces.txt
-
--- 
-Regards,
-
-Laurent Pinchart
+Thanks,
+Michal
