@@ -1,52 +1,53 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 11 Aug 2017 15:06:13 +0200
-Subject: [PATCH v2 0/5] Unify simple reset drivers
-Message-ID: <20170811130618.3676-1-p.zabel@pengutronix.de>
+Date: Fri, 11 Aug 2017 15:06:18 +0200
+Subject: [PATCH v2 5/5] reset: simple: read back to make sure changes are
+ applied
+In-Reply-To: <20170811130618.3676-1-p.zabel@pengutronix.de>
+References: <20170811130618.3676-1-p.zabel@pengutronix.de>
+Message-ID: <20170811130618.3676-6-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Read back the register after setting or clearing a reset bit to make
+sure that the changes are applied to the reset controller hardware.
+Theoretically, this avoids the write to stay stuck in a store buffer
+during the delay of an assert-delay-deassert sequence, and makes sure
+that the reset really is asserted for the specified duration.
 
-from time to time people notice that we are slowly accumulating reset drivers
-for simple reset controllers. "Simple" in this context means that they allow to
-directly control reset lines by setting and clearing bits in a single register
-or in a contiguous register range that is exclusive to the reset controller.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+Changes since v1:
+ - Rebased to only modify the reset_simple_set helper function.
+---
+ drivers/reset/reset-simple.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-I had previously suggested to add common reset ops for them [1], and Andre
-advised to combine them into a single platform driver instead. This series
-does that. It should allow to replace the socfpga, stm32, and zx2967 drivers
-entirely.
-The SoCFPGA device tree quirk parsing is now contained in reset-simple.c.
-The sunxi driver is kept around to register the early reset controllers,
-but it reuses the exported reset_simple_ops.
-
-[1] https://patchwork.kernel.org/patch/9610709/
-
-regards
-Philipp
-
-Philipp Zabel (5):
-  reset: add reset-simple to unify socfpga, stm32, sunxi, and zx2967
-  reset: socfpga: use the reset-simple driver
-  reset: stm32: use the reset-simple driver
-  reset: zx2967: use the reset-simple driver
-  reset: simple: read back to make sure changes are applied
-
- MAINTAINERS                   |   1 -
- drivers/reset/Kconfig         |  24 +++---
- drivers/reset/Makefile        |   4 +-
- drivers/reset/reset-simple.c  | 183 ++++++++++++++++++++++++++++++++++++++++++
- drivers/reset/reset-simple.h  |  33 ++++++++
- drivers/reset/reset-socfpga.c | 154 -----------------------------------
- drivers/reset/reset-stm32.c   | 108 -------------------------
- drivers/reset/reset-sunxi.c   | 104 ++----------------------
- drivers/reset/reset-zx2967.c  |  99 -----------------------
- 9 files changed, 232 insertions(+), 478 deletions(-)
- create mode 100644 drivers/reset/reset-simple.c
- create mode 100644 drivers/reset/reset-simple.h
- delete mode 100644 drivers/reset/reset-socfpga.c
- delete mode 100644 drivers/reset/reset-stm32.c
- delete mode 100644 drivers/reset/reset-zx2967.c
-
+diff --git a/drivers/reset/reset-simple.c b/drivers/reset/reset-simple.c
+index d2d6ac483d61d..1324ba45e138b 100644
+--- a/drivers/reset/reset-simple.c
++++ b/drivers/reset/reset-simple.c
+@@ -39,17 +39,20 @@ static int reset_simple_set(struct reset_controller_dev *rcdev,
+ 	int reg_width = sizeof(u32);
+ 	int bank = id / (reg_width * BITS_PER_BYTE);
+ 	int offset = id % (reg_width * BITS_PER_BYTE);
++	void __iomem *addr = data->membase + (bank * reg_width);
+ 	unsigned long flags;
+ 	u32 reg;
+ 
+ 	spin_lock_irqsave(&data->lock, flags);
+ 
+-	reg = readl(data->membase + (bank * reg_width));
++	reg = readl(addr);
+ 	if (assert ^ data->inverted)
+ 		reg |= BIT(offset);
+ 	else
+ 		reg &= ~BIT(offset);
+-	writel(reg, data->membase + (bank * reg_width));
++	writel(reg, addr);
++	/* Read back to make sure the write doesn't linger in a store buffer */
++	readl(addr);
+ 
+ 	spin_unlock_irqrestore(&data->lock, flags);
+ 
 -- 
 2.11.0
