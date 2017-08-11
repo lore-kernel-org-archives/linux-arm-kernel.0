@@ -1,69 +1,93 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 11 Aug 2017 12:24:03 +0200
-Subject: [GIT PULL] ARM: mvebu: dt for v4.14 (#1)
-Message-ID: <874lteierg.fsf@free-electrons.com>
+From: danilokrummrich@dk-develop.de (Danilo Krummrich)
+Date: Fri, 11 Aug 2017 13:05:20 +0200
+Subject: [PATCH] serio: PS2 gpio bit banging driver for the serio bus
+In-Reply-To: <CACRpkda=bYacXmv8SoQu3wPoZW9v+j8myZnme=QpofD=Y-gYTg@mail.gmail.com>
+References: <20170731222452.22887-1-danilokrummrich@dk-develop.de>
+ <CACRpkdYz_+soss4Rb9zMiP4eZZtXqjW_Xy7hH=wm1x2m_R9R3A@mail.gmail.com>
+ <20170807182207.348762301bf3d7f8509b1bf7@dk-develop.de>
+ <8e5e73575b3a70e0e60931698687471d@dk-develop.de>
+ <CACRpkda=bYacXmv8SoQu3wPoZW9v+j8myZnme=QpofD=Y-gYTg@mail.gmail.com>
+Message-ID: <180873724a3d2ee187178f12c09dfb9f@dk-develop.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2017-08-11 11:16, Linus Walleij wrote:
+> On Thu, Aug 10, 2017 at 4:38 PM, Danilo Krummrich
+> <danilokrummrich@dk-develop.de> wrote:
+>> On 2017-08-07 18:22, Danilo Krummrich wrote:
+>>>> 
+>>>> > +static int ps2_gpio_write(struct serio *serio, unsigned char val)
+>>>> > +{
+>>>> > +       struct ps2_gpio_data *drvdata = serio->port_data;
+>>>> > +
+>>>> > +       drvdata->mode = PS2_MODE_TX;
+>>>> > +       drvdata->tx_byte = val;
+>>>> > +       /* Make sure ISR running on other CPU notice changes. */
+>>>> > +       barrier();
+>>>> 
+>>>> This seems overengineered, is this really needed?
+>>>> 
+>>>> If we have races like this, the error is likely elsewhere, and 
+>>>> should be
+>>>> fixed in the GPIO driver MMIO access or so.
+>>>> 
+>>> Yes, seems it can be removed. I didn't saw any explicit barriers in 
+>>> the
+>>> GPIO
+>>> driver (I'm testing on bcm2835), but it seems MMIO operations on SMP 
+>>> archs
+>>> does contain barriers. Not sure if all do. If some do not this 
+>>> barrier
+>>> might
+>>> be needed to ensure ISR on other CPU notice the correct mode and byte 
+>>> to
+>>> send.
+>>> 
+>> I couldn't find any guarantee that the mode and tx_byte change is 
+>> implicitly
+>> covered by a barrier in this case. E.g. the bcm2835 driver does not 
+>> make
+>> sure stores are completed before the particular interrupt is enabled, 
+>> except by
+>> the fact that writel on ARM contains a wmb(). But this is nothing to 
+>> rely on.
+>> (Please tell me if I miss something.)
+> 
+> writel() should be guaranteeing that the values hit the hardware, wmb() 
+> is
+> spelled out "write memory barrier" I don't see what you're after here.
+> 
+Sorry for confusing wording. What I actually meant is if writel() is 
+guaranteed
+to make sure there's no reordering happening with other store 
+operations. Of
+course, in case of ARM it is sufficient as it contains a wmb. But I 
+wasn't aware
+that all writel() implementations guarantee this (if needed).
+Thanks for clarification.
 
-Here is the first pull request for dt for mvebu for v4.14.
+> If you think writel() doesn't do its job on some platform, then fix 
+> writel()
+> on that platform.
+> 
+> We can't randomly sprinkle things like this all over the kernel it 
+> makes
+> no sense.
+> 
+>> Therefore I would like to keep this barrier and replace it with 
+>> smp_wmb() if
+>> you are fine with that.
+> 
+> I do not think this is proper.
+> 
+As you explained writel() should guarantee no reordering with other 
+store operations
+(like drvdata->mode = PS2_MODE_TX in my case) is happening, I totally 
+agree and will
+fix this.
 
-Gregory
+> Yours,
+> Linus Walleij
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
-
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.14-1
-
-for you to fetch changes up to 0f015017a95c279a050ed953284451d2a0d29fb2:
-
-  ARM: dts: armada-38x: Add arm_global_timer node (2017-08-03 14:33:24 +0200)
-
-----------------------------------------------------------------
-mvebu dt for 4.14 (part 1)
-
-Add arm_global_timer node on Armada 38x
-
-Fix PCI bus dtc warnings on mvebu 32 bits device tree files
-
-----------------------------------------------------------------
-Marcin Wojtas (1):
-      ARM: dts: armada-38x: Add arm_global_timer node
-
-Rob Herring (1):
-      ARM: dts: marvell: fix PCI bus dtc warnings
-
- Documentation/devicetree/bindings/pci/mvebu-pci.txt |  2 +-
- arch/arm/boot/dts/armada-370.dtsi                   |  4 +++-
- arch/arm/boot/dts/armada-375.dtsi                   |  4 +++-
- arch/arm/boot/dts/armada-380.dtsi                   |  5 ++++-
- arch/arm/boot/dts/armada-385-db-ap.dts              |  2 +-
- arch/arm/boot/dts/armada-385-turris-omnia.dts       |  2 +-
- arch/arm/boot/dts/armada-385.dtsi                   |  6 +++++-
- arch/arm/boot/dts/armada-388-clearfog.dts           |  2 +-
- arch/arm/boot/dts/armada-388-clearfog.dtsi          |  2 +-
- arch/arm/boot/dts/armada-388-db.dts                 |  2 +-
- arch/arm/boot/dts/armada-388-gp.dts                 |  2 +-
- arch/arm/boot/dts/armada-388-rd.dts                 |  2 +-
- arch/arm/boot/dts/armada-38x.dtsi                   |  7 +++++++
- arch/arm/boot/dts/armada-390-db.dts                 |  2 +-
- arch/arm/boot/dts/armada-395-gp.dts                 |  2 +-
- arch/arm/boot/dts/armada-398-db.dts                 |  2 +-
- arch/arm/boot/dts/armada-39x.dtsi                   |  6 +++++-
- arch/arm/boot/dts/armada-xp-98dx3236.dtsi           |  3 ++-
- arch/arm/boot/dts/armada-xp-db.dts                  |  2 +-
- arch/arm/boot/dts/armada-xp-gp.dts                  |  2 +-
- arch/arm/boot/dts/armada-xp-mv78230.dtsi            |  7 ++++++-
- arch/arm/boot/dts/armada-xp-mv78260.dtsi            | 11 ++++++++++-
- arch/arm/boot/dts/armada-xp-mv78460.dtsi            | 14 ++++++++++++--
- arch/arm/boot/dts/dove-d3plug.dts                   |  4 ++--
- arch/arm/boot/dts/dove.dtsi                         |  8 +++++---
- arch/arm/boot/dts/kirkwood-6192.dtsi                |  3 ++-
- arch/arm/boot/dts/kirkwood-6281.dtsi                |  3 ++-
- arch/arm/boot/dts/kirkwood-6282.dtsi                |  4 +++-
- arch/arm/boot/dts/kirkwood-98dx4122.dtsi            |  3 ++-
- 29 files changed, 86 insertions(+), 32 deletions(-)
+Thanks,
+Danilo
