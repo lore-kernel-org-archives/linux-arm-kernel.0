@@ -1,91 +1,78 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 11 Aug 2017 20:37:00 +0100
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 11 Aug 2017 15:58:31 -0400 (EDT)
 Subject: [PATCH 05/15] ARM: head: use PC-relative insn sequence for
  __smp_alt
-In-Reply-To: <20170811151346.GR8569@atomide.com>
+In-Reply-To: <CAKv+Gu8d8BxRTy6-h5BHTyPvtJrrQraMaMJP+EG2RRRo-Wvv0Q@mail.gmail.com>
 References: <20170805205222.19868-1-ard.biesheuvel@linaro.org>
  <20170805205222.19868-6-ard.biesheuvel@linaro.org>
  <20170811151346.GR8569@atomide.com>
-Message-ID: <CAKv+Gu8d8BxRTy6-h5BHTyPvtJrrQraMaMJP+EG2RRRo-Wvv0Q@mail.gmail.com>
+ <CAKv+Gu8d8BxRTy6-h5BHTyPvtJrrQraMaMJP+EG2RRRo-Wvv0Q@mail.gmail.com>
+Message-ID: <alpine.LFD.2.20.1708111553360.8927@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 August 2017 at 16:13, Tony Lindgren <tony@atomide.com> wrote:
-> * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170805 13:54]:
->> Replace the open coded PC relative offset calculations with a pair
->> of adr_l invocations.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm/kernel/head.S | 12 ++----------
->>  1 file changed, 2 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
->> index 6e9df3663a57..aed341e0f530 100644
->> --- a/arch/arm/kernel/head.S
->> +++ b/arch/arm/kernel/head.S
->> @@ -523,19 +523,11 @@ ARM_BE8(rev     r0, r0)                 @ byteswap if big endian
->>       retne   lr
->>
->>  __fixup_smp_on_up:
->> -     adr     r0, 1f
->> -     ldmia   r0, {r3 - r5}
->> -     sub     r3, r0, r3
->> -     add     r4, r4, r3
->> -     add     r5, r5, r3
->> +     adr_l   r4, __smpalt_begin
->> +     adr_l   r5, __smpalt_end
->>       b       __do_fixup_smp_on_up
->>  ENDPROC(__fixup_smp)
->>
->> -     .align
->> -1:   .word   .
->> -     .word   __smpalt_begin
->> -     .word   __smpalt_end
->> -
->>       .pushsection .data
->>       .globl  smp_on_up
->>  smp_on_up:
->
-> Ard, it's this one that cause boot to fail on omap3.
-> The rest of your set works for me with just this one
-> left out.
->
+On Fri, 11 Aug 2017, Ard Biesheuvel wrote:
 
-I'm completely puzzled. The change is so simple that it is difficult
-to reduce it in parts, but if you still have the time to spare, mind
-trying the diff below?
+> On 11 August 2017 at 16:13, Tony Lindgren <tony@atomide.com> wrote:
+> > * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170805 13:54]:
+> >> Replace the open coded PC relative offset calculations with a pair
+> >> of adr_l invocations.
+> >>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  arch/arm/kernel/head.S | 12 ++----------
+> >>  1 file changed, 2 insertions(+), 10 deletions(-)
+> >>
+> >> diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+> >> index 6e9df3663a57..aed341e0f530 100644
+> >> --- a/arch/arm/kernel/head.S
+> >> +++ b/arch/arm/kernel/head.S
+> >> @@ -523,19 +523,11 @@ ARM_BE8(rev     r0, r0)                 @ byteswap if big endian
+> >>       retne   lr
+> >>
+> >>  __fixup_smp_on_up:
+> >> -     adr     r0, 1f
+> >> -     ldmia   r0, {r3 - r5}
+> >> -     sub     r3, r0, r3
+> >> -     add     r4, r4, r3
+> >> -     add     r5, r5, r3
+> >> +     adr_l   r4, __smpalt_begin
+> >> +     adr_l   r5, __smpalt_end
+> >>       b       __do_fixup_smp_on_up
+> >>  ENDPROC(__fixup_smp)
+> >>
+> >> -     .align
+> >> -1:   .word   .
+> >> -     .word   __smpalt_begin
+> >> -     .word   __smpalt_end
+> >> -
+> >>       .pushsection .data
+> >>       .globl  smp_on_up
+> >>  smp_on_up:
+> >
+> > Ard, it's this one that cause boot to fail on omap3.
+> > The rest of your set works for me with just this one
+> > left out.
+> >
+> 
+> I'm completely puzzled.
 
+Found it.
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 6e9df3663a57..c0361e608210 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -524,17 +524,15 @@ ARM_BE8(rev       r0, r0)                 @
-byteswap if big endian
+You replaced:
 
- __fixup_smp_on_up:
-        adr     r0, 1f
+-       adr     r0, 1f
 -       ldmia   r0, {r3 - r5}
 -       sub     r3, r0, r3
 -       add     r4, r4, r3
 -       add     r5, r5, r3
-+       ldmia   r0, {r4 - r5}
-+       add     r4, r4, r0
-+       add     r5, r5, r0
++       adr_l   r4, __smpalt_begin
++       adr_l   r5, __smpalt_end
         b       __do_fixup_smp_on_up
- ENDPROC(__fixup_smp)
 
-        .align
--1:     .word   .
--       .word   __smpalt_begin
--       .word   __smpalt_end
-+1:     .word   __smpalt_begin - 1b
-+       .word   __smpalt_end - 1b
+Notice that r3 is now uninitialized.
 
-        .pushsection .data
-        .globl  smp_on_up
+Now have a look at the code for __do_fixup_smp_on_up.
 
-The main point of these changes is to eliminate absolute references,
-not to use the new macros, so if this does work, I will go with this
-instead.
+
+Nicolas
