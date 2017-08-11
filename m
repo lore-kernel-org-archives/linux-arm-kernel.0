@@ -1,41 +1,42 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 11 Aug 2017 10:56:58 -0500
-Subject: [PATCH] PCI: Convert to using %pOF instead of full_name
-In-Reply-To: <CAL_JsqLznQdnWw+A2T8V8CTktYaPDF_800jGHAVa=G-Yhxyn+Q@mail.gmail.com>
-References: <20170718214339.7774-41-robh@kernel.org>
- <20170802223928.GQ20308@bhelgaas-glaptop.roam.corp.google.com>
- <CAL_JsqLznQdnWw+A2T8V8CTktYaPDF_800jGHAVa=G-Yhxyn+Q@mail.gmail.com>
-Message-ID: <20170811155658.GA17039@bhelgaas-glaptop.roam.corp.google.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 11 Aug 2017 17:57:24 +0200
+Subject: [PATCH v2 1/5] reset: add reset-simple to unify socfpga, stm32,
+ sunxi, and zx2967
+In-Reply-To: <CAGb2v64bNTn5H1k-=rdTLPGYMfhTT8BuriaSAh9dNM__rLUi=Q@mail.gmail.com>
+References: <20170811130618.3676-1-p.zabel@pengutronix.de>
+ <20170811130618.3676-2-p.zabel@pengutronix.de>
+ <CAGb2v64bNTn5H1k-=rdTLPGYMfhTT8BuriaSAh9dNM__rLUi=Q@mail.gmail.com>
+Message-ID: <1502467044.2310.21.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Tyrel]
-
-On Wed, Aug 09, 2017 at 05:04:43PM -0500, Rob Herring wrote:
-> On Wed, Aug 2, 2017 at 5:39 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > On Tue, Jul 18, 2017 at 04:43:21PM -0500, Rob Herring wrote:
-> >> Now that we have a custom printf format specifier, convert users of
-> >> full_name to use %pOF instead. This is preparation to remove storing
-> >> of the full path string for each node.
-> >>
-> >> Signed-off-by: Rob Herring <robh@kernel.org>
-> >> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> >> Cc: Jason Cooper <jason@lakedaemon.net>
-> >> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> >> Cc: Thierry Reding <thierry.reding@gmail.com>
-> >> Cc: Jonathan Hunter <jonathanh@nvidia.com>
-> >> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> >> Cc: Paul Mackerras <paulus@samba.org>
-> >> Cc: Michael Ellerman <mpe@ellerman.id.au>
-> >> Cc: linux-pci at vger.kernel.org
-> >> Cc: linux-arm-kernel at lists.infradead.org
-> >> Cc: linux-tegra at vger.kernel.org
-> >> Cc: linuxppc-dev at lists.ozlabs.org
-> >
-> > Applied to pci/misc for v4.14, thanks!
+On Fri, 2017-08-11 at 23:51 +0800, Chen-Yu Tsai wrote:
+> On Fri, Aug 11, 2017 at 9:06 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> > +static int reset_simple_probe(struct platform_device *pdev)
+> > +{
+> > +???????struct device *dev = &pdev->dev;
+> > +???????const struct of_device_id *of_id =
+> > +???????????????of_match_device(of_match_ptr(reset_simple_dt_ids), dev);
+> > +???????const struct reset_simple_devdata *devdata = of_id->data;
 > 
-> This hasn't shown up in -next.
+> Just use of_device_get_match_data().
 
-Thanks, it should be in next-20170811.
+Will do that, thanks.
 
-I updated it to add Tyrel's reviewed-by, but that's not in -next yet.
+> > +struct reset_simple_data {
+> > +???????spinlock_t??????????????????????lock;
+> > +???????void __iomem????????????????????*membase;
+> > +???????struct reset_controller_dev?????rcdev;
+> > +???????bool????????????????????????????inverted;
+> 
+> You should document this option. "Inverted" by itself does not
+> say a whole lot, as there is no mention about what the normal
+> or non-inverted behavior is. Is the reset active low (assert
+> reset when bit is cleared)? Or active high (assert reset when
+> bit is set)?
+
+You are right. Also, maybe I should rename this to
+"bool active_low;" to avoid confusion where it is used.
+
+regards
+Philipp
