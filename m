@@ -1,60 +1,57 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Fri, 11 Aug 2017 18:04:36 +0200
-Subject: [v6 04/15] mm: discard memblock data later
-In-Reply-To: <6366171f-1a30-2faa-d776-01983fcb5a00@oracle.com>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-5-git-send-email-pasha.tatashin@oracle.com>
- <20170811093249.GE30811@dhcp22.suse.cz>
- <6366171f-1a30-2faa-d776-01983fcb5a00@oracle.com>
-Message-ID: <20170811160436.GS30811@dhcp22.suse.cz>
+From: alex.g@adaptrum.com (Alexandru Gagniuc)
+Date: Fri, 11 Aug 2017 09:04:54 -0700
+Subject: [PATCH v2 1/5] reset: add reset-simple to unify socfpga, stm32,
+ sunxi, and zx2967
+In-Reply-To: <20170811130618.3676-2-p.zabel@pengutronix.de>
+References: <20170811130618.3676-1-p.zabel@pengutronix.de>
+ <20170811130618.3676-2-p.zabel@pengutronix.de>
+Message-ID: <fc0d0480-947b-a731-627c-32c99bbc2586@adaptrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 11-08-17 11:49:15, Pasha Tatashin wrote:
-> >I guess this goes all the way down to
-> >Fixes: 7e18adb4f80b ("mm: meminit: initialise remaining struct pages in parallel with kswapd")
-> 
-> I will add this to the patch.
-> 
-> >>Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
-> >>Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
-> >>Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
-> >>Reviewed-by: Bob Picco <bob.picco@oracle.com>
-> >
-> >Considering that some HW might behave strangely and this would be rather
-> >hard to debug I would be tempted to mark this for stable. It should also
-> >be merged separately from the rest of the series.
-> >
-> >I have just one nit below
-> >Acked-by: Michal Hocko <mhocko@suse.com>
-> 
-> I will address your comment, and send out a new patch. Should I send it out
-> separately from the series or should I keep it inside?
+Hi Phillip,
 
-I would post it separatelly. It doesn't depend on the rest.
+On 08/11/2017 06:06 AM, Philipp Zabel wrote:
+[snip]
 
-> Also, before I send out a new patch, I will need to root cause and resolve
-> problem found by kernel test robot <fengguang.wu@intel.com>, and bisected
-> down to this patch.
-> 
-> [  156.659400] BUG: Bad page state in process swapper  pfn:03147
-> [  156.660051] page:ffff88001ed8a1c0 count:0 mapcount:-127 mapping:
-> (null) index:0x1
-> [  156.660917] flags: 0x0()
-> [  156.661198] raw: 0000000000000000 0000000000000000 0000000000000001
-> 00000000ffffff80
-> [  156.662006] raw: ffff88001f4a8120 ffff88001ed85ce0 0000000000000000
-> 0000000000000000
-> [  156.662811] page dumped because: nonzero mapcount
-> [  156.663307] CPU: 0 PID: 1 Comm: swapper Not tainted
-> 4.13.0-rc3-00220-g1aad694 #1
-> [  156.664077] Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS
-> 1.9.3-20161025_171302-gandalf 04/01/2014
-> [  156.665129] Call Trace:
-> [  156.665422]  dump_stack+0x1e/0x20
-> [  156.665802]  bad_page+0x122/0x148
+> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+> index 52d5251660b9b..f7ba01a71daee 100644
+> --- a/drivers/reset/Kconfig
+> +++ b/drivers/reset/Kconfig
+> @@ -68,6 +68,16 @@ config RESET_PISTACHIO
+>  	help
+>  	  This enables the reset driver for ImgTec Pistachio SoCs.
+>
+> +config RESET_SIMPLE
+> +	bool "Simple Reset Controller Driver" if COMPILE_TEST
+> +	default ARCH_SUNXI
 
-Was the report related with this patch?
--- 
-Michal Hocko
-SUSE Labs
+This seems like a list with the potential to grow unbounded. I think it 
+would be better for the platforms to 'select RESET_SIMPLE' rather than 
+trying to guess all users in one big kconfig line.
+
+[snip]
+
+> +
+> +struct reset_simple_devdata {
+> +	bool inverted;
+> +};
+> +
+> +static const struct reset_simple_devdata reset_simple_inverted = {
+> +	.inverted = true,
+
+Hmm. I think it would be useful for new devices if there were have a way 
+to specify this in devicetree.
+
+> +};
+> +
+> +static const struct of_device_id reset_simple_dt_ids[] = {
+> +	{ .compatible = "allwinner,sun6i-a31-clock-reset",
+> +		.data = &reset_simple_inverted },
+> +	{ /* sentinel */ },
+
+Are plans to have a "simple-reset" compatible binding for new devices?
+
+Alex
+
+[snip]
