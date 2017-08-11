@@ -1,77 +1,66 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 11 Aug 2017 10:39:23 +0200
-Subject: [PATCH 2/3] ARM: sun8i: sunxi-h3-h5: add phy-is-integrated
- property to internal PHY
-In-Reply-To: <CAGb2v66SGAKnFoHNqWR+DqS-mY3KA853NmKpdHqf8huOkisLKg@mail.gmail.com>
-References: <20170810085129.20463-1-clabbe.montjoie@gmail.com>
- <20170810085129.20463-3-clabbe.montjoie@gmail.com>
- <CAGb2v64dBZgN6-8kHnnN1qiEXHnbXw_FM9WxGHPU0h-tZDbspA@mail.gmail.com>
- <20170811080543.GA25147@Red>
- <CAGb2v66wCRe8nFucJa5nAT1GhO75LmCyfNWQQbwxzh085Zwk+w@mail.gmail.com>
- <20170811081920.GB25147@Red>
- <CAGb2v66SGAKnFoHNqWR+DqS-mY3KA853NmKpdHqf8huOkisLKg@mail.gmail.com>
-Message-ID: <20170811083923.GC25147@Red>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 11 Aug 2017 09:45:19 +0100
+Subject: [PATCH 07/11] arm64: add basic pointer authentication support
+In-Reply-To: <5a919df5-7f6d-2c6c-9c8e-e28fcebd4920@arm.com>
+References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
+ <1500480092-28480-8-git-send-email-mark.rutland@arm.com>
+ <5a919df5-7f6d-2c6c-9c8e-e28fcebd4920@arm.com>
+Message-ID: <20170811084516.GQ6321@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 11, 2017 at 04:22:11PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Aug 11, 2017 at 4:19 PM, Corentin Labbe
-> <clabbe.montjoie@gmail.com> wrote:
-> > On Fri, Aug 11, 2017 at 04:11:13PM +0800, Chen-Yu Tsai wrote:
-> >> On Fri, Aug 11, 2017 at 4:05 PM, Corentin Labbe
-> >> <clabbe.montjoie@gmail.com> wrote:
-> >> > On Fri, Aug 11, 2017 at 10:42:51AM +0800, Chen-Yu Tsai wrote:
-> >> >> Hi,
-> >> >>
-> >> >> On Thu, Aug 10, 2017 at 4:51 PM, Corentin Labbe
-> >> >> <clabbe.montjoie@gmail.com> wrote:
-> >> >> > This patch add the new phy-is-integrated property to the internal PHY
-> >> >> > node.
-> >> >> >
-> >> >> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> >> >> > ---
-> >> >> >  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 1 +
-> >> >> >  1 file changed, 1 insertion(+)
-> >> >> >
-> >> >> > diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> >> >> > index 4b599b5d26f6..54fc24e4c569 100644
-> >> >> > --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> >> >> > +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> >> >> > @@ -425,6 +425,7 @@
-> >> >> >                                         reg = <1>;
-> >> >> >                                         clocks = <&ccu CLK_BUS_EPHY>;
-> >> >> >                                         resets = <&ccu RST_BUS_EPHY>;
-> >> >> > +                                       phy-is-integrated;
-> >> >>
-> >> >> You also need to "delete" this property at the board level for
-> >> >> any board that has the external PHY at address <1>. Otherwise
-> >> >> they will stop working. This is due to the internal and external
-> >> >> PHYs having the same path and node name in the device tree, so
-> >> >> they are effectively the same node.
-> >> >>
-> >> >> ChenYu
-> >> >>
-> >> >
-> >> > They have not the same name, ext_rgmii_phy vs int_mii_phy.
-> >>
-> >> That is just the label. The label plays no part in device tree merging. The path
-> >>
-> >>     /soc/ethernet at 1c30000/mdio/ethernet-phy at 1
-> >>
-> >> is the same. You can look under
-> >>
-> >>     /proc/device-tree/soc/ethernet at 1c30000/mdio
-> >>
-> >> on the OrangePI Plus 2E or any other H3 board that uses an
-> >> external PHY at address 1.
-> >>
-> >> ChenYu
-> >
-> > Since we get the phy node by phy-handle and not by path, I think all should be good.
+On Fri, Aug 11, 2017 at 08:46:28AM +0100, Yao Qi wrote:
+> Hi Mark,
 > 
-> You are not getting me. The fact that the two seemingly separate
-> nodes are merged together means, whatever properties you put in
-> the internal PHY node, also affect the external PHY node. Once
-> compiled, they are the SAME node.
+> On 19/07/17 17:01, Mark Rutland wrote:
+> >+#define HWCAP_APIA           (1 << 16)
+> 
+> Can you rename it to HWCAP_ARM64_APIA or HWCAP_ARM_APIA?  When we
+> use it in user space, at least in GDB, we usually do this,
+> 
+> #ifndef HWCAP_APIA
+> #define HWCAP_APIA (1 << 16)
+> #endif
+> 
+> However, the code use this macro can be compiled on !arm64 host.
+> If HWCAP_APIA is defined on other !arm64 host and its value is not
+> (1 << 16), the program "aarch64_hwcap & HWCAP_APIA ? XXX : XXX;" is
+> wrong, and compiler doesn't complain.
+> 
+> I notice that mips, mn10300, sparc, and s390 define their HWCAP this
+> way, like HWCAP_SPARC_FLUSH, HWCAP_MIPS_R6, HWCAP_S390_DFP, etc.
 
-So why not changing the internal node name from ethernet-phy to integrated-phy ?
+(Sticking my oar in because this would apply to HWCAP_SVE too.)
+
+It would have been a good idea I guess, but historically arm, arm64, x86
+(for the one HWCAP2_* flag I can find) and unicore32 don't do this.
+That can't change now without an API break, and changing the naming
+scheme just for new hwcaps just seems messy.
+
+Including multiple arches' headers in the same compilation unit isn't
+guaranteed to work sensibly at all AFAICT -- it seems best no to rely
+on it.
+
+In the above, you could be doing something like
+
+#ifdef HWCAP_APIA
+#if HWCAP_APIA != (1 << 16)
+#error "HWCAP_APIA value mismatch"
+#else
+#undef HWCAP_APIA
+#endif
+#endif
+
+#define HWCAP_APIA (1 << 16)
+
+...or...
+
+#define HWCAP_ARM64_APIA (1 << 16)
+
+(i.e., unconditionally, and with a well-behaved compile-time error if
+there is a definition already).
+
+[...]
+
+Cheers
+---Dave
