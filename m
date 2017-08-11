@@ -1,88 +1,168 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 11 Aug 2017 09:31:13 -0500
-Subject: [PATCH 1/2] dt-bindings: serial: Add MediaTek BTIF controller
- bindings
-In-Reply-To: <1502419988.19230.16.camel@mtkswgap22>
-References: <cover.1501692369.git.sean.wang@mediatek.com>
- <6b2ad0dc976259563562e7ab23abdacf68c94aa5.1501692369.git.sean.wang@mediatek.com>
- <20170810162752.2xncymekrhu544g7@rob-hp-laptop>
- <1502419988.19230.16.camel@mtkswgap22>
-Message-ID: <CAL_Jsq+EhkmSKeu7Hp93Kgjms4G30Gbjy1jw-nUG+rngLKLaeg@mail.gmail.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Fri, 11 Aug 2017 10:44:35 -0400
+Subject: [PATCH 3/3] drm/rockchip: Add support for Rockchip Soc LVDS
+In-Reply-To: <78abe787-c7f1-d8e4-3fcd-e08ea092be6f@rock-chips.com>
+References: <1502272846-63941-1-git-send-email-hjc@rock-chips.com>
+ <1502272861-64226-1-git-send-email-hjc@rock-chips.com>
+ <20170809195812.vtndofimdiojb4cr@art_vandelay>
+ <d24020c6-ef7f-6c7d-b655-99e56c8760d5@rock-chips.com>
+ <20170810180519.ezndiczwpheac4ih@art_vandelay>
+ <78abe787-c7f1-d8e4-3fcd-e08ea092be6f@rock-chips.com>
+Message-ID: <20170811144435.mo6jk5mn2vsj3sz3@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 10, 2017 at 9:53 PM, Sean Wang <sean.wang@mediatek.com> wrote:
-> On Thu, 2017-08-10 at 11:27 -0500, Rob Herring wrote:
->> On Thu, Aug 03, 2017 at 01:05:22AM +0800, sean.wang at mediatek.com wrote:
->> > From: Sean Wang <sean.wang@mediatek.com>
->> >
->> > Document the devicetree bindings for MediaTek BTIF controller
->> > which could be found on MT7622 and MT7623 SoC.
->> >
->> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
->> > ---
->> >  .../devicetree/bindings/serial/mtk-btif.txt        | 26 ++++++++++++++++++++++
->> >  1 file changed, 26 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/serial/mtk-btif.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/serial/mtk-btif.txt b/Documentation/devicetree/bindings/serial/mtk-btif.txt
->> > new file mode 100644
->> > index 0000000..80c1f5a
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/serial/mtk-btif.txt
->> > @@ -0,0 +1,26 @@
->> > +Device-Tree bindings for MediaTek BTIF controller found on those
->> > +MediaTek SoCs with Bluetooth feature
->> > +
->> > +Required properties:
->> > +- compatible: Should be one of:
->> > +   - "mediatek,mt7622-btif" : for MT7622 SoC
->> > +   - "mediatek,mt7623-btif" : for MT7623 SoC
->> > +- reg: The base address of the BTIF register bank;
->> > +- interrupts: A single interrupt specifier;
->> > +- clocks: list of clock specifiers, corresponding to
->> > +     entries in clock-names property;
->> > +- clock-names: should contain "main" entries.
->> > +
->> > +Optional properties:
->> > +- mediatek,loopback: Boolean; if defined, indicates that BTIF controller
->> > +   running on the loopback mode.
->>
->> I don't think this belongs in DT, but should be a module param or sysfs
->> control.
->>
-> the loopback actually is one of hardware setups so i add it as one
-> property in the dt or could you kindly guide me how to make judgment
-> accurately for listing those changes as either dt or a module param?
+On Fri, Aug 11, 2017 at 10:15:16AM +0800, Sandy Huang wrote:
+> 
+> 
+> ? 2017/8/11 2:05, Sean Paul ??:
+> > On Thu, Aug 10, 2017 at 05:35:52PM +0800, Sandy Huang wrote:
+> > > Hi Sean Paul,
+> > >      Thanks for your review.
+> > > 
+> > > ? 2017/8/10 3:58, Sean Paul ??:
+> > > > On Wed, Aug 09, 2017 at 06:00:59PM +0800, Sandy Huang wrote:
+> > > > > This adds support for Rockchip soc lvds found on rk3288
+> > > > > Based on the patches from Mark yao and Heiko Stuebner
+> > > > > 
+> > > > > Signed-off-by: Sandy Huang <hjc@rock-chips.com>
+> > > > > Signed-off-by: Mark yao <mark.yao@rock-chips.com>
+> > > > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > > > > ---
+> > > > >    drivers/gpu/drm/rockchip/Kconfig         |   9 +
+> > > > >    drivers/gpu/drm/rockchip/Makefile        |   1 +
+> > > > >    drivers/gpu/drm/rockchip/rockchip_lvds.c | 734 +++++++++++++++++++++++++++++++
+> > > > >    drivers/gpu/drm/rockchip/rockchip_lvds.h | 112 +++++
+> > > > >    4 files changed, 856 insertions(+)
+> > > > >    create mode 100644 drivers/gpu/drm/rockchip/rockchip_lvds.c
+> > > > >    create mode 100644 drivers/gpu/drm/rockchip/rockchip_lvds.h
+> > > > > 
+> > 
+> > <snip />
+> > 
+> > > > > diff --git a/drivers/gpu/drm/rockchip/rockchip_lvds.c b/drivers/gpu/drm/rockchip/rockchip_lvds.c
+> > > > > new file mode 100644
+> > > > > index 0000000..a4ad3f0
+> > > > > --- /dev/null
+> > > > > +++ b/drivers/gpu/drm/rockchip/rockchip_lvds.c
+> > 
+> > <snip />
+> > 
+> > > > > +	lvds->drm_dev = drm_dev;
+> > > > > +	port = of_graph_get_port_by_id(dev->of_node, 1);
+> > > > > +	if (!port) {
+> > > > > +		dev_err(dev, "can't found port point, please init lvds panel port!\n");
+> > > > > +		return -EINVAL;
+> > > > > +	}
+> > > > > +
+> > > > > +	for_each_child_of_node(port, endpoint) {
+> > > > > +		remote = of_graph_get_remote_port_parent(endpoint);
+> > > > > +		if (!remote) {
+> > > > > +			dev_err(dev, "can't found panel node, please init!\n");
+> > > > > +			ret = -EINVAL;
+> > > > > +			goto err_put_port;
+> > > > > +		}
+> > > > > +		if (!of_device_is_available(remote)) {
+> > > > > +			of_node_put(remote);
+> > > > > +			remote = NULL;
+> > > > > +			continue;
+> > > > > +		}
+> > > > > +		break;
+> > > > > +	}
+> > > > > +	if (!remote) {
+> > > > > +		dev_err(dev, "can't found remote node, please init!\n");
+> > > > > +		ret = -EINVAL;
+> > > > > +		goto err_put_port;
+> > > > > +	}
+> > > > > +
+> > > > > +	lvds->panel = of_drm_find_panel(remote);
+> > > > > +	if (!lvds->panel)
+> > > > > +		lvds->bridge = of_drm_find_bridge(remote);
+> > > > 
+> > > > drm_of_find_panel_or_bridge()
+> > > > 
+> > > 
+> > > because the lvds ports maybe connect to lvds-panel or connect to
+> > > rk1000(which is convert RGB to CVBS output), so i have to get the remote
+> > > port parent and check the status, and final get the active remote point.
+> > > 
+> > 
+> > 
+> > 
+> > > lvds_panel: lvds-panel {
+> > > 	status = "disabled";
+> > > 	ports {
+> > > 		panel_in_lvds: endpoint {
+> > > 			remote-endpoint = <&lvds_out_panel>;
+> > > 		};
+> > > 	};
+> > > };
+> > > 
+> > > rk1000: rk1000 at 0xff000000 {
+> > > 	status = "okay";
+> > > 	ports {
+> > > 		rk1000_in_lvds: endpoint {
+> > > 			remote-endpoint = <&lvds_out_panel>;
+> > > 		};
+> > > 	};
+> > > };
+> > > 
+> > > &lvds {
+> > > 	status = "okay";
+> > > 	ports {
+> > > 		lvds_out: port at 1 {
+> > > 			reg = <1>;
+> > > 			lvds_out_panel: endpoint at 0 {
+> > > 				reg = <0>;
+> > > 				remote-endpoint = <&panel_in_lvds>;
+> > > 			};
+> > > 			lvds_out_rk1000: endpoint at 1 {
+> > > 				reg = <1>;
+> > > 				remote-endpoint = <&rk1000_in_lvds>;
+> > > 			};
+> > > 		};
+> > > 
+> > > 	};
+> > > };
+> > 
+> > Hi Sandy,
+> > Forgive me, this is probably a stupid question. I don't see how this usecase is
+> > unique from the other users of drm_of_find_panel_or_bridge. Couldn't you change
+> > your devicetree bindings to conform to something drm_of_find_panel_or_bridge()
+> > can work with?
+> > 
+> > Thank you,
+> > 
+> Hi sean,
+>     Maybe i can use the following method to use
+> drm_of_find_panel_or_bridge() and no need to change my DT, but there is
+> another question:
+>     The LVDS output format(rockchip,output?rockchip,data-mapping etc.)
+> depend on different panel, so it should be put under remote panel point.
+> If use drm_of_find_panel_or_bridge?), this just return panel or bridge, so
+> i have to back to get remote panel point and get the output format.
 
-It's just a debug mode, right? Generally a user shouldn't have to
-modify the DT to change settings. Only if you wanted a given board to
-always be in loopback would this make sense in DT.
+This should be easy since you can grab dev->of_node from panel or bridge once
+it's found.
 
->> > +
->> > +Example:
->> > +
->> > +   btif: btif at 1100c000 {
->>
->> bluetooth at ...
->>
-> btif not bluetooth, which is just the interface hardware allowing the
-> the main processor communicating with the bluetooth hardware built in
-> the SoC, and is really like to the uart used by legacy bluetooth.
-> So i will add bluetooth as the another node.
+> 
+> ret = drm_of_find_panel_or_bridge(dev->of_node, 1, 0, &lvds->panel,
+>                                   &lvds->bridge);
+> if (ret)
+>     ret = drm_of_find_panel_or_bridge(dev->of_node, 1, 1, &lvds->panel,
+>                                       &lvds->bridge);
 
-Right, I realized that after writing this. It should be "serial at ..." instead.
+Would be easier to read in a for loop.
 
->
->
->> > +           compatible = "mediatek,mt7623-btif";
->> > +           reg = <0 0x1100c000 0 0x1000>;
->> > +           interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_LOW>;
->> > +           clocks = <&pericfg CLK_PERI_BTIF>;
->> > +           clock-names = "main";
->> > +   };
->> > --
->> > 2.7.4
->> >
->
->
+Sean
+
+> if (ret) {
+>     DRM_DEV_ERROR(dev, "failed to find panel and bridge node\n");
+>     ret  = -EPROBE_DEFER;
+>     goto err_put_remote;
+> }
+> 	
+> 
+
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
