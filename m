@@ -1,126 +1,90 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 11 Aug 2017 17:11:19 -0500
-Subject: [PATCH 2/4] i2c: davinci: Add PM Runtime Support
-In-Reply-To: <20170802221753.13786-3-fcooper@ti.com>
+Date: Fri, 11 Aug 2017 17:18:26 -0500
+Subject: [PATCH 4/4] ARM: dts: keystone-k2g: Add I2C nodes
+In-Reply-To: <20170802221753.13786-5-fcooper@ti.com>
 References: <20170802221753.13786-1-fcooper@ti.com>
- <20170802221753.13786-3-fcooper@ti.com>
-Message-ID: <613570e5-706a-3a54-5cb1-a8f05deb52a3@ti.com>
+ <20170802221753.13786-5-fcooper@ti.com>
+Message-ID: <69c0a96c-6bf8-984a-d029-d46bdf678284@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On 08/02/2017 05:17 PM, Franklin S Cooper Jr wrote:
-> This patch adds PM runtime support to the I2C Davinci driver.
+> From: Vitaly Andrianov <vitalya@ti.com>
 > 
-> Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> Add nodes for the various I2C instances.
+> 
+> Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+> [d-gerlach at ti.com: Add power domain and clock properties]
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> [fcooper at ti.com: Update subject and commit message]
 > Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+
+It might be better to send this patch separately as it will
+go to the different tree.
+
+Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+
 > ---
->   drivers/i2c/busses/i2c-davinci.c | 61 ++++++++++++++++++++++++++++++++++------
->   1 file changed, 53 insertions(+), 8 deletions(-)
+>   arch/arm/boot/dts/keystone-k2g.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+>   1 file changed, 36 insertions(+)
 > 
-> diff --git a/drivers/i2c/busses/i2c-davinci.c b/drivers/i2c/busses/i2c-davinci.c
-> index 5749aac..62ff869 100644
-> --- a/drivers/i2c/busses/i2c-davinci.c
-> +++ b/drivers/i2c/busses/i2c-davinci.c
-> @@ -36,6 +36,7 @@
->   #include <linux/gpio.h>
->   #include <linux/of_device.h>
->   #include <linux/platform_data/i2c-davinci.h>
-> +#include <linux/pm_runtime.h>
+> diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+> index bf4d1fa..5c0acf37 100644
+> --- a/arch/arm/boot/dts/keystone-k2g.dtsi
+> +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+> @@ -27,6 +27,9 @@
 >   
->   /* ----- global defines ----------------------------------------------- */
+>   	aliases {
+>   		serial0 = &uart0;
+> +		i2c0 = &i2c0;
+> +		i2c1 = &i2c1;
+> +		i2c2 = &i2c2;
+>   	};
 >   
-> @@ -122,6 +123,9 @@
->   /* set the SDA GPIO low */
->   #define DAVINCI_I2C_DCLR_PDCLR1	BIT(1)
+>   	cpus {
+> @@ -113,6 +116,39 @@
+>   			status = "disabled";
+>   		};
 >   
-> +/* timeout for pm runtime autosuspend */
-> +#define DAVINCI_I2C_PM_TIMEOUT	1000	/* ms */
+> +		i2c0: i2c at 2530000 {
+> +			compatible = "ti,keystone-i2c";
+> +			reg = <0x02530000 0x400>;
+> +			clocks = <&k2g_clks 0x003a 0>;
+> +			power-domains = <&k2g_pds 0x003a>;
+> +			interrupts = <GIC_SPI 88 IRQ_TYPE_EDGE_RISING>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
 > +
->   struct davinci_i2c_dev {
->   	struct device           *dev;
->   	void __iomem		*base;
-> @@ -541,10 +545,17 @@ i2c_davinci_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->   
->   	dev_dbg(dev->dev, "%s: msgs: %d\n", __func__, num);
->   
-> +	ret = pm_runtime_get_sync(dev->dev);
-> +	if (ret < 0) {
-> +		dev_err(dev->dev, "Failed to runtime_get device: %d\n", ret);
-> +		pm_runtime_put_noidle(dev->dev);
-> +		return ret;
-> +	}
+> +		i2c1: i2c at 2530400 {
+> +			compatible = "ti,keystone-i2c";
+> +			reg = <0x02530400 0x400>;
+> +			clocks = <&k2g_clks 0x003b 0>;
+> +			power-domains = <&k2g_pds 0x003b>;
+> +			interrupts = <GIC_SPI 89 IRQ_TYPE_EDGE_RISING>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
 > +
->   	ret = i2c_davinci_wait_bus_not_busy(dev);
->   	if (ret < 0) {
->   		dev_warn(dev->dev, "timeout waiting for bus ready\n");
-> -		return ret;
-> +		goto out;
->   	}
->   
->   	for (i = 0; i < num; i++) {
-> @@ -552,14 +563,19 @@ i2c_davinci_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
->   		dev_dbg(dev->dev, "%s [%d/%d] ret: %d\n", __func__, i + 1, num,
->   			ret);
->   		if (ret < 0)
-> -			return ret;
-> +			goto out;
->   	}
->   
-> +	ret = num;
->   #ifdef CONFIG_CPU_FREQ
->   	complete(&dev->xfr_complete);
->   #endif
->   
-> -	return num;
-> +out:
-> +	pm_runtime_mark_last_busy(dev->dev);
-> +	pm_runtime_put_autosuspend(dev->dev);
+> +		i2c2: i2c at 2530800 {
+> +			compatible = "ti,keystone-i2c";
+> +			reg = <0x02530800 0x400>;
+> +			clocks = <&k2g_clks 0x003c 0>;
+> +			power-domains = <&k2g_pds 0x003c>;
+> +			interrupts = <GIC_SPI 90 IRQ_TYPE_EDGE_RISING>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
 > +
-> +	return ret;
->   }
->   
->   static u32 i2c_davinci_func(struct i2c_adapter *adap)
-> @@ -599,6 +615,9 @@ static irqreturn_t i2c_davinci_isr(int this_irq, void *dev_id)
->   	int count = 0;
->   	u16 w;
->   
-> +	if (pm_runtime_suspended(dev->dev))
-> +		return IRQ_NONE;
-> +
->   	while ((stat = davinci_i2c_read_reg(dev, DAVINCI_I2C_IVR_REG))) {
->   		dev_dbg(dev->dev, "%s: stat=0x%x\n", __func__, stat);
->   		if (count++ == 100) {
-> @@ -802,7 +821,6 @@ static int davinci_i2c_probe(struct platform_device *pdev)
->   	dev->clk = devm_clk_get(&pdev->dev, NULL);
->   	if (IS_ERR(dev->clk))
->   		return PTR_ERR(dev->clk);
-> -	clk_prepare_enable(dev->clk);
->   
->   	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->   	dev->base = devm_ioremap_resource(&pdev->dev, mem);
-> @@ -811,6 +829,17 @@ static int davinci_i2c_probe(struct platform_device *pdev)
->   		goto err_unuse_clocks;
->   	}
->   
-> +	pm_runtime_enable(dev->dev);
-> +	pm_runtime_set_autosuspend_delay(dev->dev,
-> +					 DAVINCI_I2C_PM_TIMEOUT);
-> +	pm_runtime_use_autosuspend(dev->dev);
-
-Pls, move autosuspend configuration before pm_runtime_enable()
-
-> +
-> +	r = pm_runtime_get_sync(dev->dev);
-> +	if (r < 0) {
-> +		dev_err(dev->dev, "failed to runtime_get device: %d\n", r);
-> +		goto err_unuse_clocks;
-> +	}
-> +
-
-Otherwise looks good to me.
+>   		kirq0: keystone_irq at 026202a0 {
+>   			compatible = "ti,keystone-irq";
+>   			interrupts = <GIC_SPI 1 IRQ_TYPE_EDGE_RISING>;
+> 
 
 -- 
 regards,
