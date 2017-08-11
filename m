@@ -1,82 +1,73 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 11 Aug 2017 10:19:50 +0200
-Subject: simple-reset to de-duplicate reset drivers
-In-Reply-To: <f7918041-49ac-e878-d402-fae953d50035@adaptrum.com>
-References: <f7918041-49ac-e878-d402-fae953d50035@adaptrum.com>
-Message-ID: <1502439590.2310.10.camel@pengutronix.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 11 Aug 2017 16:22:11 +0800
+Subject: [PATCH 2/3] ARM: sun8i: sunxi-h3-h5: add phy-is-integrated
+ property to internal PHY
+In-Reply-To: <20170811081920.GB25147@Red>
+References: <20170810085129.20463-1-clabbe.montjoie@gmail.com>
+ <20170810085129.20463-3-clabbe.montjoie@gmail.com>
+ <CAGb2v64dBZgN6-8kHnnN1qiEXHnbXw_FM9WxGHPU0h-tZDbspA@mail.gmail.com>
+ <20170811080543.GA25147@Red>
+ <CAGb2v66wCRe8nFucJa5nAT1GhO75LmCyfNWQQbwxzh085Zwk+w@mail.gmail.com>
+ <20170811081920.GB25147@Red>
+Message-ID: <CAGb2v66SGAKnFoHNqWR+DqS-mY3KA853NmKpdHqf8huOkisLKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandru,
+On Fri, Aug 11, 2017 at 4:19 PM, Corentin Labbe
+<clabbe.montjoie@gmail.com> wrote:
+> On Fri, Aug 11, 2017 at 04:11:13PM +0800, Chen-Yu Tsai wrote:
+>> On Fri, Aug 11, 2017 at 4:05 PM, Corentin Labbe
+>> <clabbe.montjoie@gmail.com> wrote:
+>> > On Fri, Aug 11, 2017 at 10:42:51AM +0800, Chen-Yu Tsai wrote:
+>> >> Hi,
+>> >>
+>> >> On Thu, Aug 10, 2017 at 4:51 PM, Corentin Labbe
+>> >> <clabbe.montjoie@gmail.com> wrote:
+>> >> > This patch add the new phy-is-integrated property to the internal PHY
+>> >> > node.
+>> >> >
+>> >> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+>> >> > ---
+>> >> >  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 1 +
+>> >> >  1 file changed, 1 insertion(+)
+>> >> >
+>> >> > diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+>> >> > index 4b599b5d26f6..54fc24e4c569 100644
+>> >> > --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+>> >> > +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+>> >> > @@ -425,6 +425,7 @@
+>> >> >                                         reg = <1>;
+>> >> >                                         clocks = <&ccu CLK_BUS_EPHY>;
+>> >> >                                         resets = <&ccu RST_BUS_EPHY>;
+>> >> > +                                       phy-is-integrated;
+>> >>
+>> >> You also need to "delete" this property at the board level for
+>> >> any board that has the external PHY at address <1>. Otherwise
+>> >> they will stop working. This is due to the internal and external
+>> >> PHYs having the same path and node name in the device tree, so
+>> >> they are effectively the same node.
+>> >>
+>> >> ChenYu
+>> >>
+>> >
+>> > They have not the same name, ext_rgmii_phy vs int_mii_phy.
+>>
+>> That is just the label. The label plays no part in device tree merging. The path
+>>
+>>     /soc/ethernet at 1c30000/mdio/ethernet-phy at 1
+>>
+>> is the same. You can look under
+>>
+>>     /proc/device-tree/soc/ethernet at 1c30000/mdio
+>>
+>> on the OrangePI Plus 2E or any other H3 board that uses an
+>> external PHY at address 1.
+>>
+>> ChenYu
+>
+> Since we get the phy node by phy-handle and not by path, I think all should be good.
 
-On Thu, 2017-08-10 at 17:16 -0700, Alexandru Gagniuc wrote:
-> Hi,
-> 
-> I was looking at implementing a reset driver for our in-house SoC.
-> It's?
-> essentially a long bitfield, each bit controlling one sort of reset.?
-> That seems to be surprisingly common. I've identified the following?
-> drivers which control a very similar reset:
-> 
-> * reset-zynq
-> * reset-zx2967
-> * reset-sunxi
-> * reset-stm32
-> * reset-socfpga
-> * reset-oxynas
-> * reset-meson
-> * reset-berlin
-
-I think zx2967, sunxi, stm32, and socfpga could be unified using common
-ops.
-
-zynq, oxnas, and berlin are special because they use regmap to access
-shared syscon register space, or have special delays, or both. meson is
-different because the resets are self-clearing. It doesn't implement
-assert/deassert at all.
-
-> All of these have in common some form of another of:
-> 
-> 	int bank = id / BITS_PER_LONG;
-> 	int offset = id % BITS_PER_LONG;
-> 
-> It doesn't make sense to me why all these would be duplicated for every?
-> reset controller. I think it would make sense to have a common driver to?
-> handle these simple resets -- call it "simple-reset". I'm thinking of?
-> something similar to drivers/tty/serial/8250, where the following?
-> parameters can be specified:
-> 
-> - reg-offset
-> - reg-shift
-> - reg-io-width
-
-Drivers have to keep working with the existing, documented bindings, so
-we can't introduce new required device tree properties for them. That
-being said, adding optional properties with documented defaults that
-fit the current drivers should be possible.
-
-> I think a generic "simple-reset" driver which is configurable by a?
-> similar set of parameters would be a suitable replacement for all the?
-> aforementioned drivers. As far as our SoC goes, I've just added
-> 
-> 	compatible = "st,stm32-rcc";
-> 
-> to our devicetree, and I already have a fully-working reset driver. Do?
-> you think we should proceed in the direction of "simple-reset", and what?
-> other features do you estimate we'll need?
-
-Another difference between the simple reset controllers is whether the
-bits are set to assert or cleared to assert.
-
-Even without touching device trees, we can share the backend code by
-providing common ops to use for all compatible drivers, and we could
-also merge them into a single driver that determines the parameters
-from the compatible string.
-
-What do you think about this previous attempt to unify sunxi, stm32,
-and socfpga:
-
-https://patchwork.kernel.org/patch/9610709/
-
-regards
-Philipp
+You are not getting me. The fact that the two seemingly separate
+nodes are merged together means, whatever properties you put in
+the internal PHY node, also affect the external PHY node. Once
+compiled, they are the SAME node.
