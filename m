@@ -1,68 +1,436 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 12 Aug 2017 08:19:08 +0900
-Subject: [PATCH] gpio: uniphier: add UniPhier GPIO controller driver
-In-Reply-To: <CACRpkdZ26q09s-L2wVy+Vv5rV0Enjith0AJ_sJCAH3kvzvjn1Q@mail.gmail.com>
-References: <1501758371-25316-1-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdZWxjwDnVy5f2rLAWs=+T=5SnwyU8dz1FW1eg8dk8JN_Q@mail.gmail.com>
- <CAK7LNAT4FvsX2-hYrKYmrftEZZb_RZOrfZoKWvR8hopt9jT8-Q@mail.gmail.com>
- <CACRpkdZ26q09s-L2wVy+Vv5rV0Enjith0AJ_sJCAH3kvzvjn1Q@mail.gmail.com>
-Message-ID: <CAK7LNASHO63yAJWicNL_+sSMxs3yqOt_R7z_xg+kU_iD=Aum9Q@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 12 Aug 2017 01:29:47 +0200
+Subject: [PATCH v2] arm64: dts: rockchip: add rk3328-rock64 board
+Message-ID: <20170811232947.18698-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-08-08 0:37 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Mon, Aug 7, 2017 at 3:50 PM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->
->> Adding "interrupts" property in DT causes
->> of_pupulate_default_populate() to assign virtual IRQ numbers
->> before driver probing.  So it does not work well with IRQ domain hierarchy.
->
-> I think I heard some noise about this the week before.
->
->> For pinctrl/stm32/pinctrl-stm32.c,
->> I do not see "interrupts", so it just straight maps the irq numbers.
->
-> I think OMAP and DaVinci does someting similar too. This is from a recent
-> DaVinci patch from Keerthy:
->
-> +Example for 66AK2G:
-> +
-> +gpio0: gpio at 2603000 {
-> +       compatible = "ti,k2g-gpio", "ti,keystone-gpio";
-> +       reg = <0x02603000 0x100>;
-> +       gpio-controller;
-> +       #gpio-cells = <2>;
-> +       interrupts = <GIC_SPI 432 IRQ_TYPE_EDGE_RISING>,
-> +                       <GIC_SPI 433 IRQ_TYPE_EDGE_RISING>,
-> +                       <GIC_SPI 434 IRQ_TYPE_EDGE_RISING>,
-> +                       <GIC_SPI 435 IRQ_TYPE_EDGE_RISING>,
-> +                       <GIC_SPI 436 IRQ_TYPE_EDGE_RISING>,
-> +                       <GIC_SPI 437 IRQ_TYPE_EDGE_RISING>,
-> +                       <GIC_SPI 438 IRQ_TYPE_EDGE_RISING>,
-> +                       <GIC_SPI 439 IRQ_TYPE_EDGE_RISING>,
-> +                       <GIC_SPI 440 IRQ_TYPE_EDGE_RISING>;
-> +       interrupt-controller;
-> +       #interrupt-cells = <2>;
-> +       ti,ngpio = <144>;
-> +       ti,davinci-gpio-unbanked = <0>;
-> +       clocks = <&k2g_clks 0x001b 0x0>;
-> +       clock-names = "gpio";
-> +};
->
->
-> That looks fairly similar.
->
-> Yours,
-> Linus Walleij
-> --
+The ROCK64 is a credit card size 4K60P HDR Media Board Computer using the
+Rockchip RK3328 Quad-Core ARM Cortex A53 64-Bit Processor and supporting
+up to 4GB 1600MHz LPDDR3 memory. It provides eMMC module socket, MicroSD
+Card slot, Pi-2 Bus, Pi-P5+ Bus, USB 3.0 and many others peripheral
+devices interface for makers to integrate with sensors and devices.
 
+The devicetree currently supports basic peripherals, with more to be
+added later on.
 
-I will send v2 for this driver.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+changes in v2:
+- remove obsolete mmc properties found by Shawn
+- enable newly added tsadc node
 
-Thanks.
+ Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+ arch/arm64/boot/dts/rockchip/Makefile              |   1 +
+ arch/arm64/boot/dts/rockchip/rk3328-rock64.dts     | 375 +++++++++++++++++++++
+ 3 files changed, 380 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
 
-
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index 88d95323d301..b54e9bfd9562 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -134,6 +134,10 @@ Rockchip platforms device tree bindings
+     Required root node properties:
+      - compatible = "phytec,rk3288-pcm-947", "phytec,rk3288-phycore-som", "rockchip,rk3288";
+ 
++- Pine64 Rock64 board:
++    Required root node properties:
++    - compatible = "pine64,rock64", "rockchip,rk3328";
++
+ - Rockchip PX3 Evaluation board:
+     Required root node properties:
+       - compatible = "rockchip,px3-evb", "rockchip,px3", "rockchip,rk3188";
+diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
+index d0ad366bbd12..106fb8e0f2f8 100644
+--- a/arch/arm64/boot/dts/rockchip/Makefile
++++ b/arch/arm64/boot/dts/rockchip/Makefile
+@@ -1,4 +1,5 @@
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-evb.dtb
++dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-rock64.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-geekbox.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-orion-r68-meta.dtb
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+new file mode 100644
+index 000000000000..7b9bc57a1536
+--- /dev/null
++++ b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+@@ -0,0 +1,375 @@
++/*
++ * Copyright (c) 2017 PINE64
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "rk3328.dtsi"
++
++/ {
++	model = "Pine64 Rock64";
++	compatible = "pine64,rock64", "rockchip,rk3328";
++
++	chosen {
++		stdout-path = "serial2:1500000n8";
++	};
++
++	gmac_clkin: external-gmac-clock {
++		compatible = "fixed-clock";
++		clock-frequency = <125000000>;
++		clock-output-names = "gmac_clkin";
++		#clock-cells = <0>;
++	};
++
++	sdio_pwrseq: sdio-pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		pinctrl-names = "default";
++		pinctrl-0 = <&wifi_enable_h>;
++
++		/*
++		 * On the module itself this is one of these (depending
++		 * on the actual card populated):
++		 * - SDIO_RESET_L_WL_REG_ON
++		 * - PDN (power down when low)
++		 */
++		reset-gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
++	};
++
++	vcc_sd: sdmmc-regulator {
++		compatible = "regulator-fixed";
++		gpio = <&gpio0 30 GPIO_ACTIVE_LOW>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&sdmmc0m1_gpio>;
++		regulator-name = "vcc_sd";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		vin-supply = <&vcc_io>;
++	};
++
++	vcc_host_5v: vcc-host-5v-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&usb30_host_drv>;
++		regulator-name = "vcc_host_5v";
++		regulator-always-on;
++		vin-supply = <&vcc_sys>;
++	};
++
++	vcc_host1_5v: vcc_otg_5v: vcc-host1-5v-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio0 RK_PD3 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&usb20_host_drv>;
++		regulator-name = "vcc_host1_5v";
++		regulator-always-on;
++		vin-supply = <&vcc_sys>;
++	};
++
++	vcc_sys: vcc-sys {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc_sys";
++		regulator-always-on;
++		regulator-boot-on;
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++};
++
++&cpu0 {
++	cpu-supply = <&vdd_arm>;
++};
++
++&cpu1 {
++	cpu-supply = <&vdd_arm>;
++};
++
++&cpu2 {
++	cpu-supply = <&vdd_arm>;
++};
++
++&cpu3 {
++	cpu-supply = <&vdd_arm>;
++};
++
++&emmc {
++	bus-width = <8>;
++	cap-mmc-highspeed;
++	non-removable;
++	pinctrl-names = "default";
++	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_bus8>;
++	vmmc-supply = <&vcc_io>;
++	vqmmc-supply = <&vcc18_emmc>;
++	status = "okay";
++};
++
++&gmac2io {
++	phy-supply = <&vcc_io>;
++	phy-mode = "rgmii";
++	clock_in_out = "input";
++	snps,reset-gpio = <&gpio1 RK_PC2 GPIO_ACTIVE_LOW>;
++	snps,reset-active-low;
++	snps,reset-delays-us = <0 10000 50000>;
++	assigned-clocks = <&cru SCLK_MAC2IO>, <&cru SCLK_MAC2IO_EXT>;
++	assigned-clock-parents = <&gmac_clkin>, <&gmac_clkin>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&rgmiim1_pins>;
++	tx_delay = <0x26>;
++	rx_delay = <0x11>;
++	status = "okay";
++};
++
++&i2c1 {
++	status = "okay";
++
++	rk805: rk805 at 18 {
++		compatible = "rockchip,rk805";
++		reg = <0x18>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
++		#clock-cells = <1>;
++		clock-output-names = "xin32k", "rk805-clkout2";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pmic_int_l>;
++		rockchip,system-power-controller;
++		wakeup-source;
++
++		vcc1-supply = <&vcc_sys>;
++		vcc2-supply = <&vcc_sys>;
++		vcc3-supply = <&vcc_sys>;
++		vcc4-supply = <&vcc_sys>;
++		vcc5-supply = <&vcc_io>;
++		vcc6-supply = <&vcc_sys>;
++
++		regulators {
++			vdd_logic: DCDC_REG1 {
++				regulator-name = "vdd_logic";
++				regulator-min-microvolt = <712500>;
++				regulator-max-microvolt = <1450000>;
++				regulator-initial-mode = <0x1>;
++				regulator-ramp-delay = <12500>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-mode = <0x2>;
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <1000000>;
++				};
++			};
++
++			vdd_arm: DCDC_REG2 {
++				regulator-name = "vdd_arm";
++				regulator-min-microvolt = <712500>;
++				regulator-max-microvolt = <1450000>;
++				regulator-initial-mode = <0x1>;
++				regulator-ramp-delay = <12500>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-mode = <0x2>;
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <950000>;
++				};
++			};
++
++			vcc_ddr: DCDC_REG3 {
++				regulator-name = "vcc_ddr";
++				regulator-initial-mode = <0x1>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-mode = <0x2>;
++					regulator-on-in-suspend;
++				};
++			};
++
++			vcc_io: DCDC_REG4 {
++				regulator-name = "vcc_io";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-initial-mode = <0x1>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-mode = <0x2>;
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <3300000>;
++				};
++			};
++
++			vcc_18: LDO_REG1 {
++				regulator-name = "vdd_18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <1800000>;
++				};
++			};
++
++			vcc18_emmc: LDO_REG2 {
++				regulator-name = "vcc_18emmc";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <1800000>;
++				};
++			};
++
++			vdd_10: LDO_REG3 {
++				regulator-name = "vdd_10";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-on-in-suspend;
++					regulator-suspend-microvolt = <1000000>;
++				};
++			};
++		};
++	};
++};
++
++&io_domains {
++	status = "okay";
++
++	vccio1-supply = <&vcc_io>;
++	vccio2-supply = <&vcc18_emmc>;
++	vccio3-supply = <&vcc_io>;
++	vccio4-supply = <&vcc_18>;
++	vccio5-supply = <&vcc_io>;
++	vccio6-supply = <&vcc_io>;
++	pmuio-supply = <&vcc_io>;
++};
++
++&pinctrl {
++	pmic {
++		pmic_int_l: pmic-int-l {
++			rockchip,pins = <2 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>;
++		};
++	};
++
++	sdio-pwrseq {
++		wifi_enable_h: wifi-enable-h {
++			rockchip,pins = <1 18 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	usb2 {
++		usb20_host_drv: usb20-host-drv {
++			rockchip,pins = <0 RK_PD3 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++
++	usb3 {
++		usb30_host_drv: usb30-host-drv {
++			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
++		};
++	};
++};
++
++&sdio {
++	bus-width = <4>;
++	cap-sd-highspeed;
++	cap-sdio-irq;
++	keep-power-in-suspend;
++	max-frequency = <150000000>;
++	mmc-pwrseq = <&sdio_pwrseq>;
++	non-removable;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdmmc1_bus4 &sdmmc1_cmd &sdmmc1_clk>;
++	status = "disabled";
++};
++
++&sdmmc {
++	bus-width = <4>;
++	cap-mmc-highspeed;
++	cap-sd-highspeed;
++	disable-wp;
++	max-frequency = <150000000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdmmc0_clk &sdmmc0_cmd &sdmmc0_dectn &sdmmc0_bus4>;
++	supports-sd;
++	vmmc-supply = <&vcc_sd>;
++	status = "okay";
++};
++
++&tsadc {
++	rockchip,hw-tshut-mode = <0>;
++	rockchip,hw-tshut-polarity = <0>;
++	status = "okay";
++};
++
++&uart2 {
++	status = "okay";
++};
++
++&u2phy {
++	status = "okay";
++
++	u2phy_host: host-port {
++		status = "okay";
++	};
++
++	u2phy_otg: otg-port {
++		status = "okay";
++	};
++};
++
++&usb20_otg {
++	dr_mode = "host";
++	status = "okay";
++};
++
++&usb_host0_ehci {
++	status = "okay";
++};
++
++&usb_host0_ohci {
++	status = "okay";
++};
 -- 
-Best Regards
-Masahiro Yamada
+2.11.0
