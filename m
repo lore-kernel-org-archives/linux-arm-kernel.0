@@ -1,125 +1,82 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 11 Aug 2017 17:29:57 +0100
-Subject: [PATCH 2/2] of: Restrict DMA configuration
-In-Reply-To: <0819179085df6c41c70e83a2c5c138b95c0386b3.1502468875.git.robin.murphy@arm.com>
-References: <0819179085df6c41c70e83a2c5c138b95c0386b3.1502468875.git.robin.murphy@arm.com>
-Message-ID: <82633e62b64e28dc18bc466319065b92faf2414f.1502468875.git.robin.murphy@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 11 Aug 2017 18:37:20 +0200
+Subject: [PATCH v2 1/5] reset: add reset-simple to unify socfpga, stm32,
+ sunxi, and zx2967
+In-Reply-To: <fc0d0480-947b-a731-627c-32c99bbc2586@adaptrum.com>
+References: <20170811130618.3676-1-p.zabel@pengutronix.de>
+ <20170811130618.3676-2-p.zabel@pengutronix.de>
+ <fc0d0480-947b-a731-627c-32c99bbc2586@adaptrum.com>
+Message-ID: <1502469440.2310.27.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving DMA configuration to happen later at driver probe time had the
-unnoticed side-effect that we now perform DMA configuration for *every*
-device represented in DT, rather than only those explicitly created by
-the of_platform and PCI code.
+Hi Alexandru,
 
-As Christoph points out, this is not really the best thing to do. Whilst
-there may well be other DMA-capable buses that can benefit from having
-their children automatically configured after the bridge has probed,
-there are also plenty of others like USB, MDIO, etc. that definitely do
-not support DMA and should not be indiscriminately processed.
+On Fri, 2017-08-11 at 09:04 -0700, Alexandru Gagniuc wrote:
+> Hi Phillip,
+> 
+> On 08/11/2017 06:06 AM, Philipp Zabel wrote:
+> [snip]
+> 
+> > diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+> > index 52d5251660b9b..f7ba01a71daee 100644
+> > --- a/drivers/reset/Kconfig
+> > +++ b/drivers/reset/Kconfig
+> > @@ -68,6 +68,16 @@ config RESET_PISTACHIO
+> > > > ?	help
+> > > > ?	??This enables the reset driver for ImgTec Pistachio SoCs.
+> > 
+> > +config RESET_SIMPLE
+> > > > +	bool "Simple Reset Controller Driver" if COMPILE_TEST
+> > +	default ARCH_SUNXI
+> 
+> This seems like a list with the potential to grow unbounded. I think it?
+> would be better for the platforms to 'select RESET_SIMPLE' rather than?
+> trying to guess all users in one big kconfig line.
 
-The good news is that DT already gives us the ammunition to do the right
-thing - anything lacking a "dma-ranges" property should be considered
-not to have a mapping of DMA address space from its children to its
-parent, thus anything for which of_dma_get_range() does not succeed does
-not need DMA configuration.
+That is a good point. Before that can be done, though, I have to hide
+the RESET_CONTROLLER symbol and make drivers select it, instead of
+hiding them behind "if RESET_CONTROLLER".
 
-The bad news is that strictly enforcing that would likely break just
-about every FDT platform out there, since most authors have either not
-considered the property at all or have mistakenly assumed that omitting
-"dma-ranges" is equivalent to including the empty property. Thus we have
-little choice but to special-case platform, AMBA and PCI devices so they
-continue to receive configuration unconditionally as before. At least
-anything new will have to get it right in future...
+> > +struct reset_simple_devdata {
+> > > > +	bool inverted;
+> > +};
+> > +
+> > +static const struct reset_simple_devdata reset_simple_inverted = {
+> > +	.inverted = true,
+> 
+> Hmm. I think it would be useful for new devices if there were have a way?
+> to specify this in devicetree.
 
-Fixes: 09515ef5ddad ("of/acpi: Configure dma operations at probe time for platform/amba/pci bus devices")
-Reported-by: Christoph Hellwig <hch@lst.de>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- drivers/of/device.c | 48 ++++++++++++++++++++++++++++++++----------------
- 1 file changed, 32 insertions(+), 16 deletions(-)
+This is a separate issue, and it should be discussed including the
+device tree list.
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index e0a28ea341fe..04c4c952dc57 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -9,6 +9,9 @@
- #include <linux/module.h>
- #include <linux/mod_devicetable.h>
- #include <linux/slab.h>
-+#include <linux/pci.h>
-+#include <linux/platform_device.h>
-+#include <linux/amba/bus.h>
- 
- #include <asm/errno.h>
- #include "of_private.h"
-@@ -84,31 +87,28 @@ int of_device_add(struct platform_device *ofdev)
-  */
- int of_dma_configure(struct device *dev, struct device_node *np)
- {
--	u64 dma_addr, paddr, size;
-+	u64 dma_addr, paddr, size = 0;
- 	int ret;
- 	bool coherent;
- 	unsigned long offset;
- 	const struct iommu_ops *iommu;
- 	u64 mask;
- 
--	/*
--	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
--	 * setup the correct supported mask.
--	 */
--	if (!dev->coherent_dma_mask)
--		dev->coherent_dma_mask = DMA_BIT_MASK(32);
--
--	/*
--	 * Set it to coherent_dma_mask by default if the architecture
--	 * code has not set it.
--	 */
--	if (!dev->dma_mask)
--		dev->dma_mask = &dev->coherent_dma_mask;
--
- 	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
- 	if (ret < 0) {
-+		/*
-+		 * For legacy reasons, we have to assume some devices need
-+		 * DMA configuration regardless of whether "dma-ranges" is
-+		 * correctly specified or not.
-+		 */
-+		if (!dev_is_pci(dev) &&
-+#ifdef CONFIG_ARM_AMBA
-+		    dev->bus != &amba_bustype &&
-+#endif
-+		    dev->bus != &platform_bus_type)
-+			return ret == -ENODEV ? 0 : ret;
-+
- 		dma_addr = offset = 0;
--		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
- 	} else {
- 		offset = PFN_DOWN(paddr - dma_addr);
- 
-@@ -129,6 +129,22 @@ int of_dma_configure(struct device *dev, struct device_node *np)
- 		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
- 	}
- 
-+	/*
-+	 * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
-+	 * setup the correct supported mask.
-+	 */
-+	if (!dev->coherent_dma_mask)
-+		dev->coherent_dma_mask = DMA_BIT_MASK(32);
-+	/*
-+	 * Set it to coherent_dma_mask by default if the architecture
-+	 * code has not set it.
-+	 */
-+	if (!dev->dma_mask)
-+		dev->dma_mask = &dev->coherent_dma_mask;
-+
-+	if (!size)
-+		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
-+
- 	dev->dma_pfn_offset = offset;
- 
- 	/*
--- 
-2.13.4.dirty
+It could be as simple as a boolean "active-low;" property. But then
+absence of that property would not mean active-high for existing
+active-low drivers, which is confusing.
+
+It could also reuse the flags already defined in
+dt-bindings/reset/ti-syscon.h and have some kind of
+    reset-flags = <ASSERT_SET | DEASSERT_CLEAR | STATUS_SET>;
+property.
+
+Suggestions welcome.
+
+> > +};
+> > +
+> > +static const struct of_device_id reset_simple_dt_ids[] = {
+> > +	{ .compatible = "allwinner,sun6i-a31-clock-reset",
+> > +		.data = &reset_simple_inverted },
+> > +	{ /* sentinel */ },
+> 
+> Are plans to have a "simple-reset" compatible binding for new
+> devices?
+
+This would go hand in hand with the above discussion.
+I'm not convinced this properly describes the hardware, and I'd like to
+avoid leaking Linuxisms into the device trees. But this is a decision
+for the device tree maintainers, and if they like it, I'm going to
+comply.
+
+regards
+Philipp
