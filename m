@@ -1,22 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 11 Aug 2017 08:39:07 -0700
-Subject: [PATCH v3 0/4] ARM: OMAP2+: AM33XX/AM43XX: Add suspend-resume
- support
-In-Reply-To: <20170725144414.7129-1-d-gerlach@ti.com>
-References: <20170725144414.7129-1-d-gerlach@ti.com>
-Message-ID: <20170811153906.GS8569@atomide.com>
+From: pasha.tatashin@oracle.com (Pasha Tatashin)
+Date: Fri, 11 Aug 2017 11:39:41 -0400
+Subject: [v6 02/15] x86/mm: setting fields in deferred pages
+In-Reply-To: <20170811090214.GD30811@dhcp22.suse.cz>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-3-git-send-email-pasha.tatashin@oracle.com>
+ <20170811090214.GD30811@dhcp22.suse.cz>
+Message-ID: <b0422e38-a6da-081a-71c5-82a36dd2a5bb@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [170725 07:45]:
-> Hi,
-> This series contains the remaining code to enable suspend to mem and standby on
-> am335x and am437x platforms. It depends on the ti-emif-sram series sent here
-> [1].
+> AFAIU register_page_bootmem_info_node is only about struct pages backing
+> pgdat, usemap and memmap. Those should be in reserved memblocks and we
+> do not initialize those at later times, they are not relevant to the
+> deferred initialization as your changelog suggests so the ordering with
+> get_page_bootmem shouldn't matter. Or am I missing something here?
 
-Looks good to me. Please ping me once ti-emif-sram series
-is in Linux next.
+The pages for pgdata, usemap, and memmap are part of reserved, and thus 
+getting initialized when free_all_bootmem() is called.
 
-Regards,
+So, we have something like this in mem_init()
 
-Tony
+register_page_bootmem_info
+  register_page_bootmem_info_node
+   get_page_bootmem
+    .. setting fields here ..
+    such as: page->freelist = (void *)type;
+
+free_all_bootmem()
+  free_low_memory_core_early()
+   for_each_reserved_mem_region()
+    reserve_bootmem_region()
+     init_reserved_page() <- Only if this is deferred reserved page
+      __init_single_pfn()
+       __init_single_page()
+           memset(0) <-- Loose the set fields here!
+
+memblock does not know about deferred pages, and can be requested to 
+allocate physical pages anywhere. So, the reserved pages in memblock can 
+be both in non-deferred and deferred part of the memory.
+
+Without deferred pages enabled, by the time register_page_bootmem_info() 
+is called every page went through __init_single_page(), but with 
+deferred pages enabled, there is scenario where fields can be set before 
+pages go through __init_single_page(). This patch fixes it.
