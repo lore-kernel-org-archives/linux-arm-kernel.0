@@ -1,72 +1,57 @@
-From: pasha.tatashin@oracle.com (Pasha Tatashin)
-Date: Fri, 11 Aug 2017 15:00:47 -0400
-Subject: [v6 04/15] mm: discard memblock data later
-In-Reply-To: <20170811093249.GE30811@dhcp22.suse.cz>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-5-git-send-email-pasha.tatashin@oracle.com>
- <20170811093249.GE30811@dhcp22.suse.cz>
-Message-ID: <42a04441-47ad-2fa0-ca3c-784c717213f7@oracle.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 11 Aug 2017 21:08:22 +0200
+Subject: [PATCH v5 06/12] mfd: wm97xx-core: core support for wm97xx Codec
+References: <20170806213613.5600-1-robert.jarzmik@free.fr>
+ <20170806213613.5600-7-robert.jarzmik@free.fr>
+ <20170808110204.dt7bjfwkyfpbfr2w@dell>
+Message-ID: <87bmnlq5w9.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Lee Jones <lee.jones@linaro.org> writes:
 
-This suggestion won't work, because there are arches without memblock 
-support: tile, sh...
+> On Sun, 06 Aug 2017, Robert Jarzmik wrote:
 
-So, I would still need to have:
+Hi Lee,
 
-#ifdef CONFIG_MEMBLOCK in page_alloc, or define memblock_discard() stubs 
-in nobootmem headfile. In either case it would become messier than what 
-it is right now.
+I basically agree with all your comments, so I will only answer to your
+questions.
+>> +#include <linux/module.h>
+>
+> Why separate this?
+No point, for v6.
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>
+> Can you use the short version?
+Yeah, sure.
 
-Pasha
+>> +#ifndef __LINUX_MFD_WM97XX_H
+>> +#define __LINUX_MFD_WM97XX_H
+>> +
+>> +struct regmap;
+>> +struct wm97xx_batt_pdata;
+>> +struct snd_ac97;
+>
+> What are you using these for?
+There are for the structure just below, which doesn't need the implementation
+details of these structures, but does need the definition to properly compile.
 
-> I have just one nit below
-> Acked-by: Michal Hocko <mhocko@suse.com>
-> 
-> [...]
->> diff --git a/mm/memblock.c b/mm/memblock.c
->> index 2cb25fe4452c..bf14aea6ab70 100644
->> --- a/mm/memblock.c
->> +++ b/mm/memblock.c
->> @@ -285,31 +285,27 @@ static void __init_memblock memblock_remove_region(struct memblock_type *type, u
->>   }
->>   
->>   #ifdef CONFIG_ARCH_DISCARD_MEMBLOCK
-> 
-> pull this ifdef inside memblock_discard and you do not have an another
-> one in page_alloc_init_late
-> 
-> [...]
->> +/**
->> + * Discard memory and reserved arrays if they were allocated
->> + */
->> +void __init memblock_discard(void)
->>   {
-> 
-> here
-> 
->> -	if (memblock.memory.regions == memblock_memory_init_regions)
->> -		return 0;
->> +	phys_addr_t addr, size;
->>   
->> -	*addr = __pa(memblock.memory.regions);
->> +	if (memblock.reserved.regions != memblock_reserved_init_regions) {
->> +		addr = __pa(memblock.reserved.regions);
->> +		size = PAGE_ALIGN(sizeof(struct memblock_region) *
->> +				  memblock.reserved.max);
->> +		__memblock_free_late(addr, size);
->> +	}
->>   
->> -	return PAGE_ALIGN(sizeof(struct memblock_region) *
->> -			  memblock.memory.max);
->> +	if (memblock.memory.regions == memblock_memory_init_regions) {
->> +		addr = __pa(memblock.memory.regions);
->> +		size = PAGE_ALIGN(sizeof(struct memblock_region) *
->> +				  memblock.memory.max);
->> +		__memblock_free_late(addr, size);
->> +	}
->>   }
->> -
->>   #endif
+>> +struct wm97xx_platform_data {
+>> +	struct snd_ac97 *ac97;
+>> +	struct regmap *regmap;
+>> +	struct wm97xx_batt_pdata *batt_pdata;
+>> +};
+This is the structure "just below" I'm speaking of.
+
+Thanks for the review.
+
+-- 
+Robert
