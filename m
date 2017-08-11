@@ -1,87 +1,112 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 11 Aug 2017 12:56:35 -0400
-Subject: [PATCH V10 2/3] PCI: handle CRS returned by device after FLR
-In-Reply-To: <1502470596-4112-1-git-send-email-okaya@codeaurora.org>
-References: <1502470596-4112-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1502470596-4112-2-git-send-email-okaya@codeaurora.org>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 11 Aug 2017 18:02:54 +0100
+Subject: [PATCHv2] arm64:kexec: have own crash_smp_send_stop() for crash
+ dump for nonpanic cores
+In-Reply-To: <1502082623-23952-1-git-send-email-hoeun.ryu@gmail.com>
+References: <1502082623-23952-1-git-send-email-hoeun.ryu@gmail.com>
+Message-ID: <598DE33E.6050606@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sporadic reset issues have been observed with Intel 750 NVMe drive while
-assigning the physical function to the guest machine. The sequence of
-events observed is as follows:
+Hi Hoeun,
 
-- perform a Function Level Reset (FLR)
-- sleep up to 1000ms total
-- read ~0 from PCI_COMMAND
-- warn that the device didn't return from FLR
-- touch the device before it's ready
-- drop register read and writes performing register settings restore
-- incomplete reset operation and partial register restoration
-- second time device probe fails in the guest machine as HW is left in
-limbo.
+On 07/08/17 06:09, Hoeun Ryu wrote:
+>  Commit 0ee5941 : (x86/panic: replace smp_send_stop() with kdump friendly
+> version in panic path) introduced crash_smp_send_stop() which is a weak
+> function and can be overriden by architecture codes to fix the side effect
 
-An endpoint is allowed to issue Configuration Request Retry Status (CRS)
-following a FLR request to indicate that it is not ready to accept new
-requests. CRS is defined in PCIe r3.1, sec 2.3.1. Request Handling Rules
-and CRS usage in FLR context is mentioned in PCIe r3.1, sec 6.6.2.
-Function-Level Reset.
+(overridden)
 
-A CRS indication will only be given if the address to be read is vendor ID
-register. pci_bus_read_dev_vendor_id() knows how to deal with CRS returned
-0xFFFF0001 value and will continue polling until a value other than
-0xFFFF0001 is returned within a given timeout.
 
-Try to discover device presence via CRS first. If device is not found, fall
-through to old behavior.
+> caused by commit f06e515 : (kernel/panic.c: add "crash_kexec_post_
+> notifiers" option).
+> 
+>  ARM64 architecture uses the weak version function and the problem is that
+> the weak function simply calls smp_send_stop() which makes other CPUs
+> offline and takes away the chance to save crash information for nonpanic
+> CPUs in machine_crash_shutdown() when crash_kexec_post_notifiers kernel
+> option is enabled.
+> 
+>  Calling smp_send_crash_stop() in machine_crash_shutdown() is useless
+> because all nonpanic CPUs are already offline by smp_send_stop() in this
+> case and smp_send_crash_stop() only works against online CPUs.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/pci.c | 23 +++++++++++++++++++++--
- 1 file changed, 21 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index af0cc34..c853551 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -3821,17 +3821,36 @@ static void pci_flr_wait(struct pci_dev *dev)
- {
- 	int i = 0;
- 	u32 id;
-+	bool ret;
-+
-+	/*
-+	 * Don't touch the HW before waiting 100ms. HW has to finish
-+	 * within 100ms according to PCI Express Base Specification
-+	 * Revision 3.1 Section 6.6.2: Function-Level Reset (FLR).
-+	 */
-+	msleep(100);
-+
-+	if (pci_bus_read_config_dword(dev->bus, dev->devfn, PCI_VENDOR_ID,
-+				      &id))
-+		return;
-+
-+	/* See if we can find a device via CRS first. */
-+	if ((id & 0xffff) == 0x0001) {
-+		ret = pci_bus_wait_crs(dev->bus, dev->devfn, &id, 60000);
-+		if (ret)
-+			return;
-+	}
- 
- 	do {
- 		msleep(100);
- 		pci_read_config_dword(dev, PCI_COMMAND, &id);
--	} while (i++ < 10 && id == ~0);
-+	} while (i++ < 9 && id == ~0);
- 
- 	if (id == ~0)
- 		dev_warn(&dev->dev, "Failed to return from FLR\n");
- 	else if (i > 1)
- 		dev_info(&dev->dev, "Required additional %dms to return from FLR\n",
--			 (i - 1) * 100);
-+			 i * 100);
- }
- 
- /**
--- 
-1.9.1
+>  The result is that /proc/vmcore is not available with the error messages;
+> "Warning: Zero PT_NOTE entries found", "Kdump: vmcore not initialized".
+
+When I tried this I got one of these warnings for each secondary CPU, but the
+vmcore file was still available. When I ran 'crash' on the vmcore it reported:
+> CPUS: 6 [OFFLINE: 5]
+
+Did I miss as step to reproduce this? If not, can we change this paragraph to
+say something like:
+> The result is that secondary CPUs registers are not saved by crash_save_cpu()
+> and the vmcore file misreports these CPUs as being offline.
+
+
+>  crash_smp_send_stop() is implemented to fix this problem by replacing the
+> exising smp_send_crash_stop() and adding a check for multiple calling to
+
+(existing)
+
+
+> the function. The function (strong symbol version) saves crash information
+> for nonpanic CPUs and machine_crash_shutdown() tries to save crash
+> information for nonpanic CPUs only when crash_kexec_post_notifiers kernel
+> option is disabled.
+> 
+> * crash_kexec_post_notifiers : false
+> 
+>   panic()
+>     __crash_kexec()
+>       machine_crash_shutdown()
+>         crash_smp_send_stop()    <= save crash dump for nonpanic cores
+> 
+> * crash_kexec_post_notifiers : true
+> 
+>   panic()
+>     crash_smp_send_stop()        <= save crash dump for nonpanic cores
+>     __crash_kexec()
+>       machine_crash_shutdown()
+>         crash_smp_send_stop()    <= just return.
+
+
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index dc66e6e..73d8f5e 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -977,11 +977,21 @@ void smp_send_stop(void)
+>  }
+>  
+>  #ifdef CONFIG_KEXEC_CORE
+> -void smp_send_crash_stop(void)
+> +void crash_smp_send_stop(void)
+>  {
+> +	static int cpus_stopped;
+>  	cpumask_t mask;
+>  	unsigned long timeout;
+>  
+> +	/*
+> +	 * This function can be called twice in panic path, but obviously
+> +	 * we execute this only once.
+> +	 */
+> +	if (cpus_stopped)
+> +		return;
+> +
+> +	cpus_stopped = 1;
+> +
+
+This cpus_stopped=1 can't happen on multiple CPUs at the same time as any second
+call is guaranteed to be on the same CPU, both are behind panic()s
+'atomic_cmpxchg()'.
+
+
+Other than my '/proc/vmcore is not available' question above, this looks fine to me:
+Reviewed-by: James Morse <james.morse@arm.com>
+Tested-by: James Morse <james.morse@arm.com>
+
+
+Thanks!
+
+James
