@@ -1,63 +1,84 @@
-From: surenderp@techveda.org (Surender Polsani)
-Date: Fri, 11 Aug 2017 13:26:05 +0530
-Subject: [PATCH] arm: boot: dts: artpec6: Remove unnecessary
- interrupt-parent property from sub-nodes
-In-Reply-To: <d582c742-4bf9-c658-d105-572d180222a4@axis.com>
-References: <1498565735-8208-1-git-send-email-surenderp@techveda.org>
- <d582c742-4bf9-c658-d105-572d180222a4@axis.com>
-Message-ID: <8475266d-de55-0760-7ae4-9fcafead36e4@techveda.org>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Fri, 11 Aug 2017 09:58:26 +0200
+Subject: [v6 00/15] complete deferred page initialization
+In-Reply-To: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <20170811075826.GB30811@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 June 2017 05:57 PM, Niklas Cassel wrote:
-> Acked-by: Niklas Cassel <niklas.cassel@axis.com>
+[I am sorry I didn't get to your previous versions]
 
-Hi Nik, This patch has been Acknowledged but is not getting added / 
-applied to the
-respective git source tree. Please let me know if there is any problem.
+On Mon 07-08-17 16:38:34, Pavel Tatashin wrote:
+[...]
+> SMP machines can benefit from the DEFERRED_STRUCT_PAGE_INIT config option,
+> which defers initializing struct pages until all cpus have been started so
+> it can be done in parallel.
+> 
+> However, this feature is sub-optimal, because the deferred page
+> initialization code expects that the struct pages have already been zeroed,
+> and the zeroing is done early in boot with a single thread only.  Also, we
+> access that memory and set flags before struct pages are initialized. All
+> of this is fixed in this patchset.
+> 
+> In this work we do the following:
+> - Never read access struct page until it was initialized
 
-Thanks
-Surender
->
-> On 06/27/2017 02:15 PM, surenderp at techveda.org wrote:
->> From: Surender Polsani <surenderp@techveda.org>
->>
->> "interrupt-parent" property is declared in root node, so it is global
->> to all nodes. This property is re-declared in few sub-nodes. To avoid
->> duplication this property is removed from following sub-nodes:
->> pmu, amba at 0, amba at 0/ethernet.
->>
->> Signed-off-by: Surender Polsani <surenderp@techveda.org>
->> ---
->>   arch/arm/boot/dts/artpec6.dtsi | 3 ---
->>   1 file changed, 3 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/artpec6.dtsi b/arch/arm/boot/dts/artpec6.dtsi
->> index 767cbe8..2ed1177 100644
->> --- a/arch/arm/boot/dts/artpec6.dtsi
->> +++ b/arch/arm/boot/dts/artpec6.dtsi
->> @@ -151,7 +151,6 @@
->>   		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
->>   			<GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
->>   		interrupt-affinity = <&cpu0>, <&cpu1>;
->> -		interrupt-parent = <&intc>;
->>   	};
->>   
->>   	pcie: pcie at f8050000 {
->> @@ -185,7 +184,6 @@
->>   		compatible = "simple-bus";
->>   		#address-cells = <0x1>;
->>   		#size-cells = <0x1>;
->> -		interrupt-parent = <&intc>;
->>   		ranges;
->>   		dma-ranges = <0x80000000 0x00000000 0x40000000>;
->>   		dma-coherent;
->> @@ -195,7 +193,6 @@
->>   			clocks = <&eth_phy_ref_clk>,
->>   				<&clkctrl ARTPEC6_CLK_ETH_ACLK>;
->>   			compatible = "snps,dwc-qos-ethernet-4.10";
->> -			interrupt-parent = <&intc>;
->>   			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
->>   			reg = <0xf8010000 0x4000>;
->>   
->>
+How is this enforced? What about pfn walkers? E.g. page_ext
+initialization code (page owner in particular)
+
+> - Never set any fields in struct pages before they are initialized
+> - Zero struct page at the beginning of struct page initialization
+
+Please give us a more highlevel description of how your reimplementation
+works and how is the patchset organized. I will go through those patches
+but it is always good to give an overview in the cover letter to make
+the review easier.
+
+> Performance improvements on x86 machine with 8 nodes:
+> Intel(R) Xeon(R) CPU E7-8895 v3 @ 2.60GHz
+> 
+> Single threaded struct page init: 7.6s/T improvement
+> Deferred struct page init: 10.2s/T improvement
+
+What are before and after numbers and how have you measured them.
+> 
+> Pavel Tatashin (15):
+>   x86/mm: reserve only exiting low pages
+>   x86/mm: setting fields in deferred pages
+>   sparc64/mm: setting fields in deferred pages
+>   mm: discard memblock data later
+>   mm: don't accessed uninitialized struct pages
+>   sparc64: simplify vmemmap_populate
+>   mm: defining memblock_virt_alloc_try_nid_raw
+>   mm: zero struct pages during initialization
+>   sparc64: optimized struct page zeroing
+>   x86/kasan: explicitly zero kasan shadow memory
+>   arm64/kasan: explicitly zero kasan shadow memory
+>   mm: explicitly zero pagetable memory
+>   mm: stop zeroing memory during allocation in vmemmap
+>   mm: optimize early system hash allocations
+>   mm: debug for raw alloctor
+> 
+>  arch/arm64/mm/kasan_init.c          |  42 ++++++++++
+>  arch/sparc/include/asm/pgtable_64.h |  30 +++++++
+>  arch/sparc/mm/init_64.c             |  31 +++-----
+>  arch/x86/kernel/setup.c             |   5 +-
+>  arch/x86/mm/init_64.c               |   9 ++-
+>  arch/x86/mm/kasan_init_64.c         |  67 ++++++++++++++++
+>  include/linux/bootmem.h             |  27 +++++++
+>  include/linux/memblock.h            |   9 ++-
+>  include/linux/mm.h                  |   9 +++
+>  mm/memblock.c                       | 152 ++++++++++++++++++++++++++++--------
+>  mm/nobootmem.c                      |  16 ----
+>  mm/page_alloc.c                     |  31 +++++---
+>  mm/sparse-vmemmap.c                 |  10 ++-
+>  mm/sparse.c                         |   6 +-
+>  14 files changed, 356 insertions(+), 88 deletions(-)
+> 
+> -- 
+> 2.14.0
+
+-- 
+Michal Hocko
+SUSE Labs
