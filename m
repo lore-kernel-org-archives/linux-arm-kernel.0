@@ -1,55 +1,58 @@
-From: jun.gao@mediatek.com (Jun Gao)
-Date: Fri, 11 Aug 2017 09:37:53 +0800
-Subject: [RESEND PATCH 1/2] dt-bindings: i2c: Add MediaTek MT7622 i2c
- binding
-In-Reply-To: <1502353140.17420.7.camel@mtksdaap41>
-References: <1502332061-25085-1-git-send-email-jun.gao@mediatek.com>
- <1502332061-25085-2-git-send-email-jun.gao@mediatek.com>
- <1502353140.17420.7.camel@mtksdaap41>
-Message-ID: <1502415473.930.72.camel@mhfsdcap03>
+From: frank.wang@rock-chips.com (Frank Wang)
+Date: Fri, 11 Aug 2017 09:43:14 +0800
+Subject: [PATCH v3 2/5] dt-bindings: phy-rockchip-inno-usb2: add companion
+ grf quirk
+In-Reply-To: <20170810170508.pwf35mud4ffnrzzd@rob-hp-laptop>
+References: <1501747753-6983-1-git-send-email-frank.wang@rock-chips.com>
+ <1501747753-6983-3-git-send-email-frank.wang@rock-chips.com>
+ <20170810170508.pwf35mud4ffnrzzd@rob-hp-laptop>
+Message-ID: <553ed6db-9d5a-d453-92f1-677bc63fdb5b@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-08-10 at 16:19 +0800, Honghui Zhang wrote:
-> On Thu, 2017-08-10 at 10:27 +0800, Jun Gao wrote:
-> > From: Jun Gao <jun.gao@mediatek.com>
-> > 
-> > Add MT7622 i2c binding to binding file. Compare to MT8173 i2c
-> > controller, MT7622 limits message numbers to 255, and does not
-> > support 4GB DMA mode.
-> > 
-> > Signed-off-by: Jun Gao <jun.gao@mediatek.com>
-> > ---
-> >  Documentation/devicetree/bindings/i2c/i2c-mtk.txt | 11 ++++++-----
-> >  1 file changed, 6 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-> > index bd5a7be..ff9ac61 100644
-> > --- a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-> > +++ b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-> > @@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
-> >  
-> >  Required properties:
-> >    - compatible: value should be either of the following.
-> > -      "mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek mt2701
-> > -      "mediatek,mt6577-i2c": for i2c compatible with mt6577.
-> > -      "mediatek,mt6589-i2c": for i2c compatible with mt6589.
-> > -      "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for i2c compatible with mt7623.
-> > -      "mediatek,mt8173-i2c": for i2c compatible with mt8173.
-> > +	"mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek MT2701
-> > +	"mediatek,mt6577-i2c": for Mediatek MT6577
-> > +	"mediatek,mt6589-i2c": for Mediatek MT6589
-> 
-> Better not change those and just add compatible strings for mt7622.
-> 
-It seems better to use the same format for all SoCs. 
+Hi Rob,
 
-Jun
-> > +	"mediatek,mt7622-i2c": for Mediatek MT7622
-> > +	"mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for Mediatek MT7623
-> > +	"mediatek,mt8173-i2c": for Mediatek MT8173
-> >    - reg: physical base address of the controller and dma base, length of memory
-> >      mapped region.
-> >    - interrupts: interrupt number to the cpu.
-> 
-> 
+On 2017/8/11 1:05, Rob Herring wrote:
+> On Thu, Aug 03, 2017 at 04:09:10PM +0800, Frank Wang wrote:
+>> Add rockchip,usbgrf and rockchip,companion_grf_quirk to support
+>> the registers of usb-phy that are distributed in grf and usbgrf
+>> on some special Rockchip SoCs (e.g RV1108).
+>>
+>> Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
+>> ---
+>>   Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt | 4 ++++
+>>   1 file changed, 4 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+>> index 84d59b0..ddf868a 100644
+>> --- a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+>> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
+>> @@ -18,6 +18,10 @@ Optional properties:
+>>   		 usb-phy output 480m and xin24m.
+>>   		 Refer to clk/clock-bindings.txt for generic clock
+>>   		 consumer properties.
+>> + - rockchip,usbgrf : phandle to the syscon managing the "usb general
+>> +		 register files".
+>> + - rockchip,companion_grf_quirk : when set driver will request
+>> +		 "rockchip,usbgrf" phandle as one companion-grf.
+> Why isn't presence of rockchip,usbgrf or being implied by an SoC
+> specific compatible string enough?
+>
+> In any case, use '-' rather than '_'.
+
+All right, thanks for your comments, I will fix it with matching SoC 
+specific compatible string.
+
+
+BR.
+Frank
+
+>>   
+>>   Required nodes : a sub-node is required for each port the phy provides.
+>>   		 The sub-node name is used to identify host or otg port,
+>> -- 
+>> 2.0.0
+>>
+>>
+>
+>
