@@ -1,141 +1,128 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 11 Aug 2017 10:33:48 +0100
-Subject: [RFC PATCH 4/4] ACPI: IORT: Add SMMUv3 MSI support
-In-Reply-To: <1502276017-63108-5-git-send-email-guohanjun@huawei.com>
-References: <1502276017-63108-1-git-send-email-guohanjun@huawei.com>
- <1502276017-63108-5-git-send-email-guohanjun@huawei.com>
-Message-ID: <20170811093348.GC26039@red-moon>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Fri, 11 Aug 2017 11:32:49 +0200
+Subject: [v6 04/15] mm: discard memblock data later
+In-Reply-To: <1502138329-123460-5-git-send-email-pasha.tatashin@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-5-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <20170811093249.GE30811@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 09, 2017 at 06:53:37PM +0800, Hanjun Guo wrote:
-> From: Hanjun Guo <hanjun.guo@linaro.org>
+[CC Mel]
+
+On Mon 07-08-17 16:38:38, Pavel Tatashin wrote:
+> There is existing use after free bug when deferred struct pages are
+> enabled:
 > 
-> Since we have a mapping index for SMMUv3 MSI, we can
-> directly use that index to get the map entry, then
-> retrieve dev ID and ITS parent to add SMMUv3 MSI
-> support.
+> The memblock_add() allocates memory for the memory array if more than
+> 128 entries are needed.  See comment in e820__memblock_setup():
 > 
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  drivers/acpi/arm64/iort.c | 46 ++++++++++++++++++++++++++++++++++++----------
->  1 file changed, 36 insertions(+), 10 deletions(-)
+>   * The bootstrap memblock region count maximum is 128 entries
+>   * (INIT_MEMBLOCK_REGIONS), but EFI might pass us more E820 entries
+>   * than that - so allow memblock resizing.
 > 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index 9439f02..ce03298 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -313,7 +313,8 @@ static int iort_id_map(struct acpi_iort_id_mapping *map, u8 type, u32 rid_in,
->  	/* Single mapping does not care for input id */
->  	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
->  		if (type == ACPI_IORT_NODE_NAMED_COMPONENT ||
-> -		    type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-> +		    type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX ||
-> +		    type == ACPI_IORT_NODE_SMMU_V3) {
->  			*rid_out = map->output_base;
->  			return 0;
->  		}
-> @@ -357,7 +358,8 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
->  
->  	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
->  		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
-> -		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX) {
-> +		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX ||
-> +		    node->type == ACPI_IORT_NODE_SMMU_V3) {
->  			*id_out = map->output_base;
->  			return parent;
->  		}
-> @@ -549,9 +551,21 @@ int iort_pmsi_get_dev_id(struct device *dev, u32 *dev_id)
->  	if (!node)
->  		return -ENODEV;
->  
-> -	for (i = 0; i < node->mapping_count; i++) {
-> -		if (iort_node_map_platform_id(node, dev_id, IORT_MSI_TYPE, i))
-> +	if (node->type == ACPI_IORT_NODE_SMMU_V3) {
-> +		u32 index;
-> +
-> +		if (iort_get_smmu_v3_id_mapping_index(node, &index))
-> +			return -ENODEV;
-> +
-> +		if (iort_node_map_platform_id(node, dev_id, IORT_MSI_TYPE,
-> +		    index))
->  			return 0;
-> +	} else {
-> +		for (i = 0; i < node->mapping_count; i++) {
-> +			if (iort_node_map_platform_id(node, dev_id,
-> +			    IORT_MSI_TYPE, i))
-> +				return 0;
-> +		}
->  	}
->  
->  	return -ENODEV;
-> @@ -626,20 +640,30 @@ static struct irq_domain *iort_get_platform_device_domain(struct device *dev)
->  	struct acpi_iort_node *node, *msi_parent;
->  	struct fwnode_handle *iort_fwnode;
->  	struct acpi_iort_its_group *its;
-> -	int i;
->  
->  	/* find its associated iort node */
-> -	node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
-> -			      iort_match_node_callback, dev);
-> +	node = iort_find_dev_node(dev);
->  	if (!node)
->  		return NULL;
->  
->  	/* then find its msi parent node */
-> -	for (i = 0; i < node->mapping_count; i++) {
-> +	if (node->type == ACPI_IORT_NODE_SMMU_V3) {
-> +		u32 index;
-> +
-> +		if (iort_get_smmu_v3_id_mapping_index(node, &index))
-> +			return NULL;
-> +
->  		msi_parent = iort_node_map_platform_id(node, NULL,
-> +						       IORT_MSI_TYPE, index);
-> +	} else {
-> +		int i;
-> +
-> +		for (i = 0; i < node->mapping_count; i++) {
-> +			msi_parent = iort_node_map_platform_id(node, NULL,
->  						       IORT_MSI_TYPE, i);
-> -		if (msi_parent)
-> -			break;
-> +			if (msi_parent)
-> +				break;
-> +		}
->  	}
->  
->  	if (!msi_parent)
-> @@ -1233,6 +1257,8 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
->  	/* Configure DMA for the page table walker */
->  	acpi_dma_configure(&pdev->dev, attr);
->  
-> +	acpi_configure_pmsi_domain(&pdev->dev);
+> This memblock memory is freed here:
+>         free_low_memory_core_early()
+> 
+> We access the freed memblock.memory later in boot when deferred pages are
+> initialized in this path:
+> 
+>         deferred_init_memmap()
+>                 for_each_mem_pfn_range()
+>                   __next_mem_pfn_range()
+>                     type = &memblock.memory;
 
-I think this is just overkill. There are two separate things to solve
-here:
+Yes you seem to be right.
+>
+> One possible explanation for why this use-after-free hasn't been hit
+> before is that the limit of INIT_MEMBLOCK_REGIONS has never been exceeded
+> at least on systems where deferred struct pages were enabled.
 
-1) Make single mappings valid for SMMUv3 (and PMCG); that's fair enough
-   and goes with the logic to skip the ITS DeviceID index for "normal"
-   mappings, I can live with that
-2) Find the MSI domain for an SMMUv3 (or any other IORT table node); I
-   do not think you need all this complexity to do it via
-   acpi_configure_pmsi_domain(), it can be done in a easier way with
-   an ad-hoc stub (it does not even have to be SMMUv3 specific)
+Yeah this sounds like the case.
+ 
+> Another reason why we want this problem fixed in this patch series is,
+> in the next patch, we will need to access memblock.reserved from
+> deferred_init_memmap().
+> 
 
-My worry is that we are peppering the generic IORT mapping code with
-node types specific kludges and it is becoming a mess.
+I guess this goes all the way down to 
+Fixes: 7e18adb4f80b ("mm: meminit: initialise remaining struct pages in parallel with kswapd")
+> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+> Reviewed-by: Bob Picco <bob.picco@oracle.com>
 
-I can rework the patch to show you what I have in mind, please let
-me know.
+Considering that some HW might behave strangely and this would be rather
+hard to debug I would be tempted to mark this for stable. It should also
+be merged separately from the rest of the series.
 
-Thanks,
-Lorenzo
+I have just one nit below
+Acked-by: Michal Hocko <mhocko@suse.com>
 
-> +
->  	ret = platform_device_add(pdev);
->  	if (ret)
->  		goto dma_deconfigure;
+[...]
+> diff --git a/mm/memblock.c b/mm/memblock.c
+> index 2cb25fe4452c..bf14aea6ab70 100644
+> --- a/mm/memblock.c
+> +++ b/mm/memblock.c
+> @@ -285,31 +285,27 @@ static void __init_memblock memblock_remove_region(struct memblock_type *type, u
+>  }
+>  
+>  #ifdef CONFIG_ARCH_DISCARD_MEMBLOCK
+
+pull this ifdef inside memblock_discard and you do not have an another
+one in page_alloc_init_late
+
+[...]
+> +/**
+> + * Discard memory and reserved arrays if they were allocated
+> + */
+> +void __init memblock_discard(void)
+>  {
+
+here
+
+> -	if (memblock.memory.regions == memblock_memory_init_regions)
+> -		return 0;
+> +	phys_addr_t addr, size;
+>  
+> -	*addr = __pa(memblock.memory.regions);
+> +	if (memblock.reserved.regions != memblock_reserved_init_regions) {
+> +		addr = __pa(memblock.reserved.regions);
+> +		size = PAGE_ALIGN(sizeof(struct memblock_region) *
+> +				  memblock.reserved.max);
+> +		__memblock_free_late(addr, size);
+> +	}
+>  
+> -	return PAGE_ALIGN(sizeof(struct memblock_region) *
+> -			  memblock.memory.max);
+> +	if (memblock.memory.regions == memblock_memory_init_regions) {
+> +		addr = __pa(memblock.memory.regions);
+> +		size = PAGE_ALIGN(sizeof(struct memblock_region) *
+> +				  memblock.memory.max);
+> +		__memblock_free_late(addr, size);
+> +	}
+>  }
+> -
+>  #endif
+[...]
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index fc32aa81f359..63d16c185736 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -1584,6 +1584,10 @@ void __init page_alloc_init_late(void)
+>  	/* Reinit limits that are based on free pages after the kernel is up */
+>  	files_maxfiles_init();
+>  #endif
+> +#ifdef CONFIG_ARCH_DISCARD_MEMBLOCK
+> +	/* Discard memblock private memory */
+> +	memblock_discard();
+> +#endif
+>  
+>  	for_each_populated_zone(zone)
+>  		set_zone_contiguous(zone);
 > -- 
-> 1.7.12.4
-> 
+> 2.14.0
+
+-- 
+Michal Hocko
+SUSE Labs
