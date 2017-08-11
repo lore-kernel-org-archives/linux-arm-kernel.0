@@ -1,48 +1,28 @@
-From: sriram.dash@nxp.com (Sriram Dash)
-Date: Fri, 11 Aug 2017 17:56:25 +0000
-Subject: [linux-devel] [PATCH 1/3] dts: usb3: Add configure-gfladj
- property	to USB3 nod
-In-Reply-To: <1502443796-5255-1-git-send-email-yinbo.zhu@nxp.com>
-References: <1502443796-5255-1-git-send-email-yinbo.zhu@nxp.com>
-Message-ID: <AM3PR04MB12018E640B04B627D7890AF5F5890@AM3PR04MB1201.eurprd04.prod.outlook.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Fri, 11 Aug 2017 19:56:41 +0200
+Subject: [PATCH 1/2] of: Fix DMA mask generation
+In-Reply-To: <0819179085df6c41c70e83a2c5c138b95c0386b3.1502468875.git.robin.murphy@arm.com>
+References: <0819179085df6c41c70e83a2c5c138b95c0386b3.1502468875.git.robin.murphy@arm.com>
+Message-ID: <20170811175641.GA1921@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: linux-devel-bounces@gforge.freescale.net [mailto:linux-devel-
->bounces at gforge.freescale.net] On Behalf Of yinbo.zhu at nxp.com
->Subject: [linux-devel] [PATCH 1/3] dts: usb3: Add configure-gfladj property to USB3
->nod
->
->From: "yinbo.zhu" <yinbo.zhu@nxp.com>
->
->Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
->---
-> arch/arm/boot/dts/ls1021a.dtsi | 2 ++
-> 1 file changed, 2 insertions(+)
->
->diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi index
->ffbf3cf..f525297 100644
->--- a/arch/arm/boot/dts/ls1021a.dtsi
->+++ b/arch/arm/boot/dts/ls1021a.dtsi
->@@ -731,6 +731,8 @@
-> 			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
-> 			dr_mode = "host";
-> 			snps,quirk-frame-length-adjustment = <0x20>;
->+			configure-gfladj;
+On Fri, Aug 11, 2017 at 05:29:56PM +0100, Robin Murphy wrote:
+> Historically, DMA masks have suffered some ambiguity between whether
+> they represent the range of physical memory a device can access, or the
+> address bits a device is capable of driving, particularly since on many
+> platforms the two are equivalent. Whilst there are some stragglers left
+> (dma_max_pfn(), I'm looking at you...), the majority of DMA code has
+> been cleaned up to follow the latter definition, not least since it is
+> the only one which makes sense once IOMMUs are involved.
 
-I reckon the "configure-gfladj" is replaced with "snps,quirk-frame-length-adjustment"
-in open source, which sets fladj reg value.
-Please verify.
+I think it always was supposed to be the latter, but that doesn't mean
+that everyone got the message :)
 
->+			dma-coherent;
+> Either of these patches alone should be sufficient to un-break RPi3,
+> and they apply independently, so I'm quite happy for one to go in as a
+> fix now and the other to wait for 4.14.
 
-> 			snps,dis_rxdet_inp3_quirk;
-> 		};
->
->--
->2.1.0.27.g96db324
->
->_______________________________________________
->linux-devel mailing list
->linux-devel at gforge.freescale.net
->http://gforge.freescale.net/mailman/listinfo/linux-devel
+This one is something I'm comfortable feeding to Linus for 4.13
+if I get a few ACKs from people familar with the OF code and intended
+meaning of the ranges in the device tree.
