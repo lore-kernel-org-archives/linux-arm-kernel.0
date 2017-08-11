@@ -1,21 +1,40 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 11 Aug 2017 17:19:44 +0200
-Subject: [PATCH v2 5/5] arm64: dts: rockchip: Enable tsadc module on
- RK3328 eavluation board
-In-Reply-To: <1501834180-1830-1-git-send-email-rocky.hao@rock-chips.com>
-References: <1501833976-1100-1-git-send-email-rocky.hao@rock-chips.com>
- <1501834180-1830-1-git-send-email-rocky.hao@rock-chips.com>
-Message-ID: <5078808.S6BN0MdrH9@phil>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Fri, 11 Aug 2017 17:22:41 +0200
+Subject: [v6 00/15] complete deferred page initialization
+In-Reply-To: <23e22449-89f0-507d-e92a-9ee947a7c363@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <20170811075826.GB30811@dhcp22.suse.cz>
+ <23e22449-89f0-507d-e92a-9ee947a7c363@oracle.com>
+Message-ID: <20170811152240.GQ30811@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 4. August 2017, 16:09:40 CEST schrieb Rocky Hao:
-> enable tsadc module on RK3328 eavluation board
+On Fri 11-08-17 11:13:07, Pasha Tatashin wrote:
+> On 08/11/2017 03:58 AM, Michal Hocko wrote:
+> >[I am sorry I didn't get to your previous versions]
 > 
-> Signed-off-by: Rocky Hao <rocky.hao@rock-chips.com>
+> Thank you for reviewing this work. I will address your comments, and
+> send-out a new patches.
+> 
+> >>
+> >>In this work we do the following:
+> >>- Never read access struct page until it was initialized
+> >
+> >How is this enforced? What about pfn walkers? E.g. page_ext
+> >initialization code (page owner in particular)
+> 
+> This is hard to enforce 100%. But, because we have a patch in this series
+> that sets all memory that was allocated by memblock_virt_alloc_try_nid_raw()
+> to ones with debug options enabled, and because Linux has a good set of
+> asserts in place that check struct pages to be sane, especially the ones
+> that are enabled with this config: CONFIG_DEBUG_VM_PGFLAGS. I was able to
+> find many places in linux which accessed struct pages before
+> __init_single_page() is performed, and fix them. Most of these places happen
+> only when deferred struct page initialization code is enabled.
 
-applied for 4.14
-
-
-Thanks
-Heiko
+Yes, I am very well aware of how hard is this to guarantee. I was merely
+pointing out that the changelog should be more verbose about your
+testing and assumptions so that we can revalidate them.
+-- 
+Michal Hocko
+SUSE Labs
