@@ -1,49 +1,29 @@
-From: pasha.tatashin@oracle.com (Pasha Tatashin)
-Date: Fri, 11 Aug 2017 11:24:55 -0400
-Subject: [v6 01/15] x86/mm: reserve only exiting low pages
-In-Reply-To: <20170811080706.GC30811@dhcp22.suse.cz>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-2-git-send-email-pasha.tatashin@oracle.com>
- <20170811080706.GC30811@dhcp22.suse.cz>
-Message-ID: <47ebf53b-ea8b-1822-a63a-3682ed2f4753@oracle.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 11 Aug 2017 17:21:25 +0200
+Subject: [PATCH 0/4] IOMMU group cleanup
+In-Reply-To: <cover.1500637633.git.robin.murphy@arm.com>
+References: <cover.1500637633.git.robin.murphy@arm.com>
+Message-ID: <20170811152124.GH30515@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Struct pages are initialized by going through __init_single_page(). Since
->> the existing physical memory in memblock is represented in memblock.memory
->> list, struct page for every page from this list goes through
->> __init_single_page().
+On Fri, Jul 21, 2017 at 01:12:34PM +0100, Robin Murphy wrote:
+> Hi all,
 > 
-> By a page _from_ this list you mean struct pages backing the physical
-> memory of the memblock lists?
-
-Correct: "for every page from this list...", for every page represented 
-by this list the struct page is initialized through __init_single_page()
-
->> In this patchset we will stop zeroing struct page memory during allocation.
->> Therefore, this bug must be fixed in order to avoid random assert failures
->> caused by CONFIG_DEBUG_VM_PGFLAGS triggers.
->>
->> The fix is to reserve memory from the first existing PFN.
+> Prompted by some discussion around the questionable usefulness of
+> iommu_present() for SoC topologies, I took a look at what was left to
+> finish off the intention of making groups mandatory. Turns out it
+> wasn't much, so here it is. As well as the general rationalisation
+> aspect, between this and the probe-deferral changes in 4.12, we should
+> now be able to rely on the presence of a group unambiguously indicating
+> whether a given device is associated with an IOMMU or not.
 > 
-> Hmm, I assume this is a result of some assert triggering, right? Which
-> one? Why don't we need the same treatment for other than x86 arch?
-
-Correct, the pgflags asserts were triggered when we were setting 
-reserved flags to struct page for PFN 0 in which was never initialized 
-through __init_single_page(). The reason they were triggered is because 
-we set all uninitialized memory to ones in one of the debug patches.
-
->> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
->> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
->> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
->> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+> Robin.
 > 
-> I guess that the review happened inhouse. I do not want to question its
-> value but it is rather strange to not hear the specific review comments
-> which might be useful in general and moreover even not include those
-> people on the CC list so they are aware of the follow up discussion.
+> Robin Murphy (4):
+>   iommu/msm: Add iommu_group support
+>   iommu/tegra-smmu: Add iommu_group support
+>   iommu/tegra-gart: Add iommu_group support
+>   iommu: Finish making iommu_group support mandatory
 
-I will bring this up with my colleagues to how to handle this better in 
-the future. I will also CC the reviewers when I sent out the updated 
-patch series.
+Applied, thanks Robin.
