@@ -1,41 +1,56 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Fri, 11 Aug 2017 14:10:08 +0300
-Subject: [PATCH 1/3] dts: usb3: Add configure-gfladj property to USB3 nod
-In-Reply-To: <1502443796-5255-1-git-send-email-yinbo.zhu@nxp.com>
-References: <1502443796-5255-1-git-send-email-yinbo.zhu@nxp.com>
-Message-ID: <87r2wi8inj.fsf@linux.intel.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Fri, 11 Aug 2017 16:39:57 +0530
+Subject: [PATCH 5/8] iommu/mediatek: Disable iommu clock when system
+ suspend
+In-Reply-To: <1502445377-26936-6-git-send-email-yong.wu@mediatek.com>
+References: <1502445377-26936-1-git-send-email-yong.wu@mediatek.com>
+ <1502445377-26936-6-git-send-email-yong.wu@mediatek.com>
+Message-ID: <b451cb47-505e-c300-42fd-9cb73c09ef0b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Youn,
 
-Hi,
 
-yinbo.zhu at nxp.com writes:
-> From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+On Friday 11 August 2017 03:26 PM, Yong Wu wrote:
+> When system suspend, infra power domain may be off, and the iommu's
+> clock must be disabled when system off, or the iommu's bclk clock maybe
+> disabled after system resume.
 >
-> Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
+> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
 > ---
->  arch/arm/boot/dts/ls1021a.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
+>   drivers/iommu/mtk_iommu.c | 4 +++-
+>   1 file changed, 3 insertions(+), 1 deletion(-)
 >
-> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-> index ffbf3cf..f525297 100644
-> --- a/arch/arm/boot/dts/ls1021a.dtsi
-> +++ b/arch/arm/boot/dts/ls1021a.dtsi
-> @@ -731,6 +731,8 @@
->  			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
->  			dr_mode = "host";
->  			snps,quirk-frame-length-adjustment = <0x20>;
-> +			configure-gfladj;
-
-this binding isn't documented, nor is it used anywhere.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170811/b86f4b7e/attachment.sig>
+> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+> index e81ed9a..b7c8e52 100644
+> --- a/drivers/iommu/mtk_iommu.c
+> +++ b/drivers/iommu/mtk_iommu.c
+> @@ -675,6 +675,7 @@ static int __maybe_unused mtk_iommu_suspend(struct device *dev)
+>   	reg->ctrl_reg = readl_relaxed(base + REG_MMU_CTRL_REG);
+>   	reg->int_control0 = readl_relaxed(base + REG_MMU_INT_CONTROL0);
+>   	reg->int_main_control = readl_relaxed(base + REG_MMU_INT_MAIN_CONTROL);
+> +	clk_disable_unprepare(data->bclk);
+>   	return 0;
+>   }
+>   
+> @@ -684,6 +685,7 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+>   	struct mtk_iommu_suspend_reg *reg = &data->reg;
+>   	void __iomem *base = data->base;
+>   
+> +	clk_prepare_enable(data->bclk);
+Please handle return value of clk_prepare_enable. It can fail
+>   	writel_relaxed(reg->standard_axi_mode,
+>   		       base + REG_MMU_STANDARD_AXI_MODE);
+>   	writel_relaxed(reg->dcm_dis, base + REG_MMU_DCM_DIS);
+> @@ -699,7 +701,7 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+>   }
+>   
+>   static const struct dev_pm_ops mtk_iommu_pm_ops = {
+> -	SET_SYSTEM_SLEEP_PM_OPS(mtk_iommu_suspend, mtk_iommu_resume)
+> +	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_iommu_suspend, mtk_iommu_resume)
+>   };
+>   
+>   static const struct of_device_id mtk_iommu_of_ids[] = {
+~arvind
