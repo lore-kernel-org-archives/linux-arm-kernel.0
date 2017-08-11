@@ -1,36 +1,61 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Fri, 11 Aug 2017 16:07:48 +0800
-Subject: [PATCH v4 2/5] dt-bindings: phy-rockchip-inno-usb2: add rockchip,
- usbgrf property
-In-Reply-To: <1502438871-9482-1-git-send-email-frank.wang@rock-chips.com>
-References: <1502438871-9482-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1502438871-9482-3-git-send-email-frank.wang@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 11 Aug 2017 16:11:13 +0800
+Subject: [PATCH 2/3] ARM: sun8i: sunxi-h3-h5: add phy-is-integrated
+ property to internal PHY
+In-Reply-To: <20170811080543.GA25147@Red>
+References: <20170810085129.20463-1-clabbe.montjoie@gmail.com>
+ <20170810085129.20463-3-clabbe.montjoie@gmail.com>
+ <CAGb2v64dBZgN6-8kHnnN1qiEXHnbXw_FM9WxGHPU0h-tZDbspA@mail.gmail.com>
+ <20170811080543.GA25147@Red>
+Message-ID: <CAGb2v66wCRe8nFucJa5nAT1GhO75LmCyfNWQQbwxzh085Zwk+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add rockchip,usbgrf property to support the registers of usb-phy
-that are distributed in grf and usbgrf on some special Rockchip
-SoCs (e.g RV1108).
+On Fri, Aug 11, 2017 at 4:05 PM, Corentin Labbe
+<clabbe.montjoie@gmail.com> wrote:
+> On Fri, Aug 11, 2017 at 10:42:51AM +0800, Chen-Yu Tsai wrote:
+>> Hi,
+>>
+>> On Thu, Aug 10, 2017 at 4:51 PM, Corentin Labbe
+>> <clabbe.montjoie@gmail.com> wrote:
+>> > This patch add the new phy-is-integrated property to the internal PHY
+>> > node.
+>> >
+>> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+>> > ---
+>> >  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 1 +
+>> >  1 file changed, 1 insertion(+)
+>> >
+>> > diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+>> > index 4b599b5d26f6..54fc24e4c569 100644
+>> > --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+>> > +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+>> > @@ -425,6 +425,7 @@
+>> >                                         reg = <1>;
+>> >                                         clocks = <&ccu CLK_BUS_EPHY>;
+>> >                                         resets = <&ccu RST_BUS_EPHY>;
+>> > +                                       phy-is-integrated;
+>>
+>> You also need to "delete" this property at the board level for
+>> any board that has the external PHY at address <1>. Otherwise
+>> they will stop working. This is due to the internal and external
+>> PHYs having the same path and node name in the device tree, so
+>> they are effectively the same node.
+>>
+>> ChenYu
+>>
+>
+> They have not the same name, ext_rgmii_phy vs int_mii_phy.
 
-Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
----
- Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+That is just the label. The label plays no part in device tree merging. The path
 
-diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-index 84d59b0..69041373 100644
---- a/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-+++ b/Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt
-@@ -18,6 +18,10 @@ Optional properties:
- 		 usb-phy output 480m and xin24m.
- 		 Refer to clk/clock-bindings.txt for generic clock
- 		 consumer properties.
-+ - rockchip,usbgrf : phandle to the syscon managing the "usb general
-+		 register files". When set driver will request its
-+		 phandle as one companion-grf for some special SoCs
-+		 (e.g RV1108).
- 
- Required nodes : a sub-node is required for each port the phy provides.
- 		 The sub-node name is used to identify host or otg port,
--- 
-2.0.0
+    /soc/ethernet at 1c30000/mdio/ethernet-phy at 1
+
+is the same. You can look under
+
+    /proc/device-tree/soc/ethernet at 1c30000/mdio
+
+on the OrangePI Plus 2E or any other H3 board that uses an
+external PHY at address 1.
+
+ChenYu
