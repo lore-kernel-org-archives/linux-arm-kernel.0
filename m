@@ -1,58 +1,43 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 11 Aug 2017 11:17:02 +0100
-Subject: New assembler warnings with binutils 2.29
-In-Reply-To: <CAK8P3a1Bza56jpNcpbSDLXsHL08yiXEnKqNmevNpw_z9iym_qA@mail.gmail.com>
-References: <d101c48b-c47b-be60-4b40-de4f845e4965@redhat.com>
- <20170811092213.mdmzqtm2lp6ltlxt@armageddon.cambridge.arm.com>
- <CAKv+Gu8EQq+azTjMNDpE=TzEd_6b-VdQqUYbCc1=qGuYTU4Srg@mail.gmail.com>
- <CAK8P3a1Bza56jpNcpbSDLXsHL08yiXEnKqNmevNpw_z9iym_qA@mail.gmail.com>
-Message-ID: <CAKv+Gu8N55-okeSNOgRKoxvFgr49PWU=QTLePufTy4kkFOdYaA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 11 Aug 2017 12:16:58 +0200
+Subject: [GIT PULL] ARM: mvebu: arm64 for v4.14 (#1)
+Message-ID: <877eyaif39.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 August 2017 at 10:34, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Fri, Aug 11, 2017 at 11:26 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> On 11 August 2017 at 10:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
->>> On Thu, Aug 10, 2017 at 01:13:22PM -0700, Laura Abbott wrote:
->>>> Fedora rawhide recently upgraded to binutils 2.29 and this seems
->>>> to produce new warnings:
->>>>
->>>> ./arch/arm64/include/asm/assembler.h: Assembler messages:
->>>> ./arch/arm64/include/asm/assembler.h:125: Warning: ignoring attempt to redefine built-in register 'lr'
->>>>
->>>> This is
->>>>
->>>> /*
->>>>  * Register aliases.
->>>>  */
->>>> lr      .req    x30             // link register
->>>
->>> Strange, does gas now think 'lr' is a general purpose register (aliased
->>> to x30)? It never was and IIRC the toolchain people many years ago
->>> refused to add it, hence the alias above in the kernel. I wonder if they
->>> added 'fp' as well...
->>>
->>> We could remove the alias and replace all 'lr' instances with 'x30'
->>> throughout the kernel (no too many) or we add some #ifdef around the
->>> above based on the binutils version.
->>>
->>
->> This is annoying. Replacing x30 with lr achieves the opposite of the
+Hi,
 
-Of course, I meant replacing lr with x30 in our code.
+Here is the first pull request for arm64 for mvebu for v4.14.
 
->> intent of the binutils change. And using #ifdefs is inaccurate,
->> because you can't really test the binutils version only the GCC
->> version, and those are not tightly coupled.
->>
->> Can you .unreq it?
->
-> adding the author of the change to cc
->
-> https://sourceware.org/git/?p=binutils-gdb.git;a=commitdiff;h=62e20ed45e3da5f3ba695e4ee109317668180fe6
->
-> There probably was some reasoning behind the change and an
-> intended method for using it.
->
->     Arnd
+Gregory
+
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-arm64-4.14-1
+
+for you to fetch changes up to a168f2a80458095ccdc03ea777d5d469be3934ed:
+
+  arm64: defconfig: enable fine-grained task level IRQ time accounting (2017-08-03 14:25:52 +0200)
+
+----------------------------------------------------------------
+mvebu arm64 for 4.14 (part 1)
+
+Enabling nop-xceiv PHY driver in the defconfig, needed for USB support
+on A8K SoC based board.
+
+Enabling fine-grained task level IRQ time accounting for ARMv8 as it was
+already done for x86
+
+----------------------------------------------------------------
+Marcin Wojtas (1):
+      arm64: defconfig: enable fine-grained task level IRQ time accounting
+
+Thomas Petazzoni (1):
+      arm64: defconfig: enable nop-xceiv PHY driver
+
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
