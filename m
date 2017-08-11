@@ -1,168 +1,57 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Fri, 11 Aug 2017 10:44:35 -0400
-Subject: [PATCH 3/3] drm/rockchip: Add support for Rockchip Soc LVDS
-In-Reply-To: <78abe787-c7f1-d8e4-3fcd-e08ea092be6f@rock-chips.com>
-References: <1502272846-63941-1-git-send-email-hjc@rock-chips.com>
- <1502272861-64226-1-git-send-email-hjc@rock-chips.com>
- <20170809195812.vtndofimdiojb4cr@art_vandelay>
- <d24020c6-ef7f-6c7d-b655-99e56c8760d5@rock-chips.com>
- <20170810180519.ezndiczwpheac4ih@art_vandelay>
- <78abe787-c7f1-d8e4-3fcd-e08ea092be6f@rock-chips.com>
-Message-ID: <20170811144435.mo6jk5mn2vsj3sz3@art_vandelay>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 11 Aug 2017 08:00:10 -0700
+Subject: [PATCH 12/15] arm-soc: omap: replace open coded VA->PA
+ calculations
+In-Reply-To: <CAKv+Gu-uwxF628w1WT-9bBnRbX9y98BH5YQWS+qA1pXFU97sqg@mail.gmail.com>
+References: <20170805205222.19868-1-ard.biesheuvel@linaro.org>
+ <20170805205222.19868-13-ard.biesheuvel@linaro.org>
+ <20170809190556.GD3934@atomide.com>
+ <CAKv+Gu-kdjN8nXVNL2frsegu-z7HVnG8qcXpQbvM-oBbxKjUGA@mail.gmail.com>
+ <20170809210517.GE3934@atomide.com>
+ <CAKv+Gu_vKJJAsEMY9o-MWLpY8jztcXWB25eQRAMo=FMZfVJfHg@mail.gmail.com>
+ <20170810140357.GA8569@atomide.com>
+ <CAKv+Gu-uwxF628w1WT-9bBnRbX9y98BH5YQWS+qA1pXFU97sqg@mail.gmail.com>
+Message-ID: <20170811150007.GQ8569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 11, 2017 at 10:15:16AM +0800, Sandy Huang wrote:
+* Ard Biesheuvel <ard.biesheuvel@linaro.org> [170811 06:48]:
+> On 10 August 2017 at 15:03, Tony Lindgren <tony@atomide.com> wrote:
+> > * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170810 02:23]:
+> >> On 9 August 2017 at 22:05, Tony Lindgren <tony@atomide.com> wrote:
+> >> > * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170809 12:24]:
+> >> >> On 9 August 2017 at 20:05, Tony Lindgren <tony@atomide.com> wrote:
+> >> >> > * Ard Biesheuvel <ard.biesheuvel@linaro.org> [170805 13:54]:
+> >> >> >> This replaces a couple of open coded calculations to obtain the
+> >> >> >> physical address of a far symbol with calls to the new adr_l etc
+> >> >> >> macros.
+> >> >> >
+> >> >> > I gave this series a quick test and omap3 no longer boots it seems.
+> >> >> >
+> >> >>
+> >> >> Thanks Tony. I will investigate
+> >> >
+> >> > Thanks. Looks like omap4 still boots with all your patches, but
+> >> > omap3 won't boot even with patch 12 left out.
+> >> >
+> >>
+> >> Are you using the same image on both? Which .config?
+> >
+> > Yes it's the same image compiled with omap2plus_defconfig.
+> >
 > 
+> Unfortunately, I am failing to reproduce this on beaglebone white or
+> QEMU's beagle-xm emulation.
 > 
-> ? 2017/8/11 2:05, Sean Paul ??:
-> > On Thu, Aug 10, 2017 at 05:35:52PM +0800, Sandy Huang wrote:
-> > > Hi Sean Paul,
-> > >      Thanks for your review.
-> > > 
-> > > ? 2017/8/10 3:58, Sean Paul ??:
-> > > > On Wed, Aug 09, 2017 at 06:00:59PM +0800, Sandy Huang wrote:
-> > > > > This adds support for Rockchip soc lvds found on rk3288
-> > > > > Based on the patches from Mark yao and Heiko Stuebner
-> > > > > 
-> > > > > Signed-off-by: Sandy Huang <hjc@rock-chips.com>
-> > > > > Signed-off-by: Mark yao <mark.yao@rock-chips.com>
-> > > > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > > > > ---
-> > > > >    drivers/gpu/drm/rockchip/Kconfig         |   9 +
-> > > > >    drivers/gpu/drm/rockchip/Makefile        |   1 +
-> > > > >    drivers/gpu/drm/rockchip/rockchip_lvds.c | 734 +++++++++++++++++++++++++++++++
-> > > > >    drivers/gpu/drm/rockchip/rockchip_lvds.h | 112 +++++
-> > > > >    4 files changed, 856 insertions(+)
-> > > > >    create mode 100644 drivers/gpu/drm/rockchip/rockchip_lvds.c
-> > > > >    create mode 100644 drivers/gpu/drm/rockchip/rockchip_lvds.h
-> > > > > 
-> > 
-> > <snip />
-> > 
-> > > > > diff --git a/drivers/gpu/drm/rockchip/rockchip_lvds.c b/drivers/gpu/drm/rockchip/rockchip_lvds.c
-> > > > > new file mode 100644
-> > > > > index 0000000..a4ad3f0
-> > > > > --- /dev/null
-> > > > > +++ b/drivers/gpu/drm/rockchip/rockchip_lvds.c
-> > 
-> > <snip />
-> > 
-> > > > > +	lvds->drm_dev = drm_dev;
-> > > > > +	port = of_graph_get_port_by_id(dev->of_node, 1);
-> > > > > +	if (!port) {
-> > > > > +		dev_err(dev, "can't found port point, please init lvds panel port!\n");
-> > > > > +		return -EINVAL;
-> > > > > +	}
-> > > > > +
-> > > > > +	for_each_child_of_node(port, endpoint) {
-> > > > > +		remote = of_graph_get_remote_port_parent(endpoint);
-> > > > > +		if (!remote) {
-> > > > > +			dev_err(dev, "can't found panel node, please init!\n");
-> > > > > +			ret = -EINVAL;
-> > > > > +			goto err_put_port;
-> > > > > +		}
-> > > > > +		if (!of_device_is_available(remote)) {
-> > > > > +			of_node_put(remote);
-> > > > > +			remote = NULL;
-> > > > > +			continue;
-> > > > > +		}
-> > > > > +		break;
-> > > > > +	}
-> > > > > +	if (!remote) {
-> > > > > +		dev_err(dev, "can't found remote node, please init!\n");
-> > > > > +		ret = -EINVAL;
-> > > > > +		goto err_put_port;
-> > > > > +	}
-> > > > > +
-> > > > > +	lvds->panel = of_drm_find_panel(remote);
-> > > > > +	if (!lvds->panel)
-> > > > > +		lvds->bridge = of_drm_find_bridge(remote);
-> > > > 
-> > > > drm_of_find_panel_or_bridge()
-> > > > 
-> > > 
-> > > because the lvds ports maybe connect to lvds-panel or connect to
-> > > rk1000(which is convert RGB to CVBS output), so i have to get the remote
-> > > port parent and check the status, and final get the active remote point.
-> > > 
-> > 
-> > 
-> > 
-> > > lvds_panel: lvds-panel {
-> > > 	status = "disabled";
-> > > 	ports {
-> > > 		panel_in_lvds: endpoint {
-> > > 			remote-endpoint = <&lvds_out_panel>;
-> > > 		};
-> > > 	};
-> > > };
-> > > 
-> > > rk1000: rk1000 at 0xff000000 {
-> > > 	status = "okay";
-> > > 	ports {
-> > > 		rk1000_in_lvds: endpoint {
-> > > 			remote-endpoint = <&lvds_out_panel>;
-> > > 		};
-> > > 	};
-> > > };
-> > > 
-> > > &lvds {
-> > > 	status = "okay";
-> > > 	ports {
-> > > 		lvds_out: port at 1 {
-> > > 			reg = <1>;
-> > > 			lvds_out_panel: endpoint at 0 {
-> > > 				reg = <0>;
-> > > 				remote-endpoint = <&panel_in_lvds>;
-> > > 			};
-> > > 			lvds_out_rk1000: endpoint at 1 {
-> > > 				reg = <1>;
-> > > 				remote-endpoint = <&rk1000_in_lvds>;
-> > > 			};
-> > > 		};
-> > > 
-> > > 	};
-> > > };
-> > 
-> > Hi Sandy,
-> > Forgive me, this is probably a stupid question. I don't see how this usecase is
-> > unique from the other users of drm_of_find_panel_or_bridge. Couldn't you change
-> > your devicetree bindings to conform to something drm_of_find_panel_or_bridge()
-> > can work with?
-> > 
-> > Thank you,
-> > 
-> Hi sean,
->     Maybe i can use the following method to use
-> drm_of_find_panel_or_bridge() and no need to change my DT, but there is
-> another question:
->     The LVDS output format(rockchip,output?rockchip,data-mapping etc.)
-> depend on different panel, so it should be put under remote panel point.
-> If use drm_of_find_panel_or_bridge?), this just return panel or bridge, so
-> i have to back to get remote panel point and get the output format.
+> Anything you can share regarding the failure mode? Do you get any output at all?
 
-This should be easy since you can grab dev->of_node from panel or bridge once
-it's found.
+No output at all, I've tried omap3-evm, logicpd torpedo
+and n900. We do copy some of the PM code to SRAM on
+omap3 though that's not done on am335x.
 
-> 
-> ret = drm_of_find_panel_or_bridge(dev->of_node, 1, 0, &lvds->panel,
->                                   &lvds->bridge);
-> if (ret)
->     ret = drm_of_find_panel_or_bridge(dev->of_node, 1, 1, &lvds->panel,
->                                       &lvds->bridge);
+But as it's not caused by this patch, I'll try to
+narrow it down to the patch causing it.
 
-Would be easier to read in a for loop.
+Regards,
 
-Sean
-
-> if (ret) {
->     DRM_DEV_ERROR(dev, "failed to find panel and bridge node\n");
->     ret  = -EPROBE_DEFER;
->     goto err_put_remote;
-> }
-> 	
-> 
-
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+Tony
