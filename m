@@ -1,126 +1,98 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 11 Aug 2017 09:52:07 +0100
-Subject: [PATCH v3 0/5] ACPI: DMA ranges management
-In-Reply-To: <61e15178-a6da-0459-34fc-83ff4ded8864@arm.com>
-References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
- <61e15178-a6da-0459-34fc-83ff4ded8864@arm.com>
-Message-ID: <20170811085207.GB26039@red-moon>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Fri, 11 Aug 2017 11:02:15 +0200
+Subject: [v6 02/15] x86/mm: setting fields in deferred pages
+In-Reply-To: <1502138329-123460-3-git-send-email-pasha.tatashin@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-3-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <20170811090214.GD30811@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 09, 2017 at 04:14:43PM -0500, Jeremy Linton wrote:
-> Hi,
-> 
-> Better late than never I guess..
-> 
-> On 08/03/2017 07:32 AM, Lorenzo Pieralisi wrote:
-> >This patch series is v3 of a previous posting:
-> >
-> >v2->v3:
-> >	- Fixed DMA masks computation
-> >         - Fixed size computation overflow in acpi_dma_get_range()
-> >
-> >v1->v2:
-> >	- Reworked acpi_dma_get_range() flow and logs
-> >	- Added IORT named component address limits
-> >	- Renamed acpi_dev_get_resources() helper function
-> >	- Rebased against v4.13-rc3
-> >
-> >v2: http://lkml.kernel.org/r/20170731152323.32488-1-lorenzo.pieralisi at arm.com
-> >v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
-> >
-> >-- Original cover letter --
-> >
-> >As reported in:
-> >
-> >http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
-> >
-> >the bus connecting devices to an IOMMU bus can be smaller in size than
-> >the IOMMU input address bits which results in devices DMA HW bugs in
-> >particular related to IOVA allocation (ie chopping of higher address
-> >bits owing to system bus HW capabilities mismatch with the IOMMU).
-> >
-> >Fortunately this problem can be solved through an already present but never
-> >used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
-> >window for a specific bus in ACPI and therefore all upstream devices
-> >connected to it.
-> >
-> >This small patch series enables _DMA parsing in ACPI core code and
-> >use it in ACPI IORT code in order to detect DMA ranges for devices and
-> >update their data structures to make them work with their related DMA
-> >addressing restrictions.
-> >
-> >Cc: Will Deacon <will.deacon@arm.com>
-> >Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> >Cc: Feng Kan <fkan@apm.com>
-> >Cc: Jon Masters <jcm@redhat.com>
-> >Cc: Robert Moore <robert.moore@intel.com>
-> >Cc: Robin Murphy <robin.murphy@arm.com>
-> >Cc: Zhang Rui <rui.zhang@intel.com>
-> >Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> >
-> >Lorenzo Pieralisi (5):
-> >   ACPICA: resource_mgr: Allow _DMA method in walk resources
-> >   ACPI: Make acpi_dev_get_resources() method agnostic
-> >   ACPI: Introduce DMA ranges parsing
-> >   ACPI: Make acpi_dma_configure() DMA regions aware
-> >   ACPI/IORT: Add IORT named component memory address limits
-> >
-> >  drivers/acpi/acpica/rsxface.c |  7 ++--
-> >  drivers/acpi/arm64/iort.c     | 57 ++++++++++++++++++++++++++-
-> >  drivers/acpi/resource.c       | 82 +++++++++++++++++++++++++++++---------
-> >  drivers/acpi/scan.c           | 91 +++++++++++++++++++++++++++++++++++++++----
-> >  include/acpi/acnames.h        |  1 +
-> >  include/acpi/acpi_bus.h       |  2 +
-> >  include/linux/acpi.h          |  8 ++++
-> >  include/linux/acpi_iort.h     |  5 ++-
-> >  8 files changed, 219 insertions(+), 34 deletions(-)
-> 
-> Ok, despite being merged already I think its worthwhile to say that
-> I've been testing this with:
-> 
-> Method(_DMA, 0, Serialized)
-> {
-> 	Return (ResourceTemplate()
-> 	{
-> 		QWORDMemory(
-> 		ResourceConsumer,
+[CC Mel - the full series is here
+http://lkml.kernel.org/r/1502138329-123460-1-git-send-email-pasha.tatashin at oracle.com]
 
-I asked to update the ACPI specifications because this should be
-ResourceProducer, we need an errata to sort this out before it
-becomes a problem.
+On Mon 07-08-17 16:38:36, Pavel Tatashin wrote:
+> Without deferred struct page feature (CONFIG_DEFERRED_STRUCT_PAGE_INIT),
+> flags and other fields in "struct page"es are never changed prior to first
+> initializing struct pages by going through __init_single_page().
+> 
+> With deferred struct page feature enabled there is a case where we set some
+> fields prior to initializing:
+> 
+>         mem_init() {
+>                 register_page_bootmem_info();
+>                 free_all_bootmem();
+>                 ...
+>         }
+> 
+> When register_page_bootmem_info() is called only non-deferred struct pages
+> are initialized. But, this function goes through some reserved pages which
+> might be part of the deferred, and thus are not yet initialized.
+> 
+>   mem_init
+>    register_page_bootmem_info
+>     register_page_bootmem_info_node
+>      get_page_bootmem
+>       .. setting fields here ..
+>       such as: page->freelist = (void *)type;
+> 
+> We end-up with similar issue as in the previous patch, where currently we
+> do not observe problem as memory is zeroed. But, if flag asserts are
+> changed we can start hitting issues.
+> 
+> Also, because in this patch series we will stop zeroing struct page memory
+> during allocation, we must make sure that struct pages are properly
+> initialized prior to using them.
+> 
+> The deferred-reserved pages are initialized in free_all_bootmem().
+> Therefore, the fix is to switch the above calls.
 
-> 		PosDecode,          // _DEC
-> 		MinFixed,           // _MIF
-> 		MaxFixed,           // _MAF
-> 		Prefetchable,       // _MEM
-> 		ReadWrite,          // _RW
-> 		0,                  // _GRA
-> 		0x10000000,         // _MIN
-> 		0x1fffffff,         // _MAX
-> 		0x000000000,        // _TRA
-> 		0x10000000,         // _LEN
-> 		,
-> 		,
-> 		,
-> 		)
-> 	})
-> } // Method(_DMA)
-> 
-> (and a couple minor variations)
-> 
-> and a fair number of debug statements sprinkled around to verify
-> that the IOVAs are appropriately limited. So I don't see anything
-> wrong with the code and it appears to work and the devices behind a
-> bridge limited like this continue to work as long as sane values are
-> placed in the min/max/len fields.
-> 
-> Thanks,
-> 
-> Tested-by: Jeremy Linton <jeremy.linton@arm.com>
+I have to confess that this part of the early struct page initialization
+is not my strongest point and I have to always re-read the code from the
+scratch but I really do not undestand what you are trying to achieve
+here.
 
-Thank you very much Jeremy for testing it, appreciated please let me
-know if you spot anything wrong with it on the machines you are
-running tests on.
+AFAIU register_page_bootmem_info_node is only about struct pages backing
+pgdat, usemap and memmap. Those should be in reserved memblocks and we
+do not initialize those at later times, they are not relevant to the
+deferred initialization as your changelog suggests so the ordering with
+get_page_bootmem shouldn't matter. Or am I missing something here?
+ 
+> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+> ---
+>  arch/x86/mm/init_64.c | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/x86/mm/init_64.c b/arch/x86/mm/init_64.c
+> index 136422d7d539..1e863baec847 100644
+> --- a/arch/x86/mm/init_64.c
+> +++ b/arch/x86/mm/init_64.c
+> @@ -1165,12 +1165,17 @@ void __init mem_init(void)
+>  
+>  	/* clear_bss() already clear the empty_zero_page */
+>  
+> -	register_page_bootmem_info();
+> -
+>  	/* this will put all memory onto the freelists */
+>  	free_all_bootmem();
+>  	after_bootmem = 1;
+>  
+> +	/* Must be done after boot memory is put on freelist, because here we
+> +	 * might set fields in deferred struct pages that have not yet been
+> +	 * initialized, and free_all_bootmem() initializes all the reserved
+> +	 * deferred pages for us.
+> +	 */
+> +	register_page_bootmem_info();
+> +
+>  	/* Register memory areas for /proc/kcore */
+>  	kclist_add(&kcore_vsyscall, (void *)VSYSCALL_ADDR,
+>  			 PAGE_SIZE, KCORE_OTHER);
+> -- 
+> 2.14.0
 
-Lorenzo
+-- 
+Michal Hocko
+SUSE Labs
