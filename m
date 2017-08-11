@@ -1,59 +1,48 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Fri, 11 Aug 2017 08:42:32 -0700
-Subject: [PATCH v4 0/4] OF phandle nexus support + GPIO nexus
-Message-ID: <20170811154236.12891-1-stephen.boyd@linaro.org>
+Date: Fri, 11 Aug 2017 08:42:36 -0700
+Subject: [PATCH v4 4/4] gpio: Support gpio nexus dt bindings
+In-Reply-To: <20170811154236.12891-1-stephen.boyd@linaro.org>
+References: <20170811154236.12891-1-stephen.boyd@linaro.org>
+Message-ID: <20170811154236.12891-5-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a continutation of my phandle remapping/nexus node series
-from a while ago. I finally got around to writing the documentation
-in the spec for this, but it's really rough around the edges and
-could use some review/suggestions to get it into shape. Please
-review!
+Platforms like 96boards have a standardized connector/expansion
+slot that exposes signals like GPIOs to expansion boards in an
+SoC agnostic way. We'd like the DT overlays for the expansion
+boards to be written once without knowledge of the SoC on the
+other side of the connector. This avoids the unscalable
+combinatorial explosion of a different DT overlay for each
+expansion board and SoC pair.
 
-This is one small chunk of work related to DT overlays for expansion
-boards. It would be good to have a way to expose #<list>-cells types of
-providers through a connector in a standard way. So we introduce a way
-to make "nexus" nodes for these types of properties to remap the consumer
-number space to the other side of the connector's number space. It's
-basically a copy of the interrupt nexus implementation, but without
-the address space matching design and interrupt-parent walking.
+Now that we have nexus support in the OF core let's change the
+function call here that parses the phandle lists of gpios to use
+the nexus variant. This allows us to remap phandles and their
+arguments through any number of nexus nodes and end up with the
+actual gpio provider being used.
 
-Changes since v3:
- * Added devicetree spec patch
- * Rebased to v4.13-rc1
+Cc: Pantelis Antoniou <pantelis.antoniou@konsulko.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Cc: Mark Brown <broonie@kernel.org>
+Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+---
+ drivers/gpio/gpiolib-of.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Changes since v2:
- * Picked up Linus' ack on the gpio core patch
- * Made const stack arrays static (Rob Herring)
- * Used of_property_read_u32() instead of open coding (Rob Herring)
-
-Changes since v1:
- * Addition of optional pass-thru parameter
- * Reduction of strings passed to 1 instead of 3 (or 4 now)
- * Updated gpio patch for the new function signature
- * Updated test-case for new funciton signature and pass-thru parameter
- * Updated kernel-doc to be correct and highlighted difference between this
-   API and of_parse_phandle_with_args()
-
-Stephen Boyd (3):
-  Document nexus nodes/specifier remapping
-  of: Support parsing phandle argument lists through a nexus node
-  of: unittest: Add phandle remapping test
-  gpio: Support gpio nexus dt bindings
-
-Kernel:
- drivers/gpio/gpiolib-of.c                   |   4 +-
- drivers/of/base.c                           | 184 ++++++++++++++++++++++++++++
- drivers/of/unittest-data/testcases.dts      |  11 ++
- drivers/of/unittest-data/tests-phandle.dtsi |  25 ++++
- drivers/of/unittest.c                       | 120 ++++++++++++++++++
- include/linux/of.h                          |  12 ++
- 6 files changed, 354 insertions(+), 2 deletions(-)
-
-Spec:
- source/devicetree-basics.rst | 208 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 208 insertions(+)
-
+diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+index 54ce8dc58ad0..0d968c758129 100644
+--- a/drivers/gpio/gpiolib-of.c
++++ b/drivers/gpio/gpiolib-of.c
+@@ -75,8 +75,8 @@ struct gpio_desc *of_get_named_gpiod_flags(struct device_node *np,
+ 	struct gpio_desc *desc;
+ 	int ret;
+ 
+-	ret = of_parse_phandle_with_args(np, propname, "#gpio-cells", index,
+-					 &gpiospec);
++	ret = of_parse_phandle_with_args_map(np, propname, "gpio", index,
++					     &gpiospec);
+ 	if (ret) {
+ 		pr_debug("%s: can't parse '%s' property of node '%s[%d]'\n",
+ 			__func__, propname, np->full_name, index);
 -- 
 2.7.4
