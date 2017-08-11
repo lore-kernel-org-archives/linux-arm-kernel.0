@@ -1,255 +1,302 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Fri, 11 Aug 2017 08:42:33 -0700
-Subject: [RFC/PATCH v4 1/4] Document nexus nodes/specifier remapping
+Date: Fri, 11 Aug 2017 08:42:34 -0700
+Subject: [PATCH v4 2/4] of: Support parsing phandle argument lists through a
+ nexus node
 In-Reply-To: <20170811154236.12891-1-stephen.boyd@linaro.org>
 References: <20170811154236.12891-1-stephen.boyd@linaro.org>
-Message-ID: <20170811154236.12891-2-stephen.boyd@linaro.org>
+Message-ID: <20170811154236.12891-3-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the generic nexus node properties. This can be used by
-any specifier that conforms to #<specifier>-cells where they
-want to support remapping phandle lists through nexus nodes. This
-is similar to interrupt remapping, but slightly different because
-we don't consider unit addresses when doing mappings. This is
-mostly a copy/paste of the interrupt specification, with the unit
-address parts removed and generalized to any specifier. There's
-also the addition of a pass through mechanism to make things more
-compact if desired in the mapping table.
+Platforms like 96boards have a standardized connector/expansion
+slot that exposes signals like GPIOs to expansion boards in an
+SoC agnostic way. We'd like the DT overlays for the expansion
+boards to be written once without knowledge of the SoC on the
+other side of the connector. This avoids the unscalable
+combinatorial explosion of a different DT overlay for each
+expansion board and SoC pair.
 
+We need a way to describe the GPIOs routed through the connector
+in an SoC agnostic way. Let's introduce nexus property parsing
+into the OF core to do this. This is largely based on the
+interrupt nexus support we already have. This allows us to remap
+a phandle list in a consumer node (e.g. reset-gpios) through a
+connector in a generic way (e.g. via gpio-map). Do this in a
+generic routine so that we can remap any sort of variable length
+phandle list.
+
+Taking GPIOs as an example, the connector would be a GPIO nexus,
+supporting the remapping of a GPIO specifier space to multiple
+GPIO providers on the SoC. DT would look as shown below, where
+'soc_gpio1' and 'soc_gpio2' are inside the SoC, 'connector' is an
+expansion port where boards can be plugged in, and
+'expansion_device' is a device on the expansion board.
+
+	soc {
+		soc_gpio1: gpio-controller1 {
+			#gpio-cells = <2>;
+		};
+
+		soc_gpio2: gpio-controller2 {
+			#gpio-cells = <2>;
+		};
+	};
+
+	connector: connector {
+		#gpio-cells = <2>;
+		gpio-map = <0 0 &soc_gpio1 1 0>,
+			   <1 0 &soc_gpio2 4 0>,
+			   <2 0 &soc_gpio1 3 0>,
+			   <3 0 &soc_gpio2 2 0>;
+		gpio-map-mask = <0xf 0x0>;
+		gpio-map-pass-thru = <0x0 0x1>
+	};
+
+	expansion_device {
+		reset-gpios = <&connector 2 GPIO_ACTIVE_LOW>;
+	};
+
+The GPIO core would use of_parse_phandle_with_args_map() instead
+of of_parse_phandle_with_args() and arrive at the same type of
+result, a phandle and argument list. The difference is that the
+phandle and arguments will be remapped through the nexus node to
+the underlying SoC GPIO controller node. In the example above,
+we would remap 'reset-gpios' from <&connector 2 GPIO_ACTIVE_LOW>
+to <&soc_gpio1 3 GPIO_ACTIVE_LOW>.
+
+Cc: Pantelis Antoniou <pantelis.antoniou@konsulko.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Mark Brown <broonie@kernel.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
+ drivers/of/base.c  | 184 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of.h |  12 ++++
+ 2 files changed, 196 insertions(+)
 
-I still need to write the blurb about what this is all about, but
-I wanted to send this out now to get early feedback. Some starting
-points:
-
- 1) Replace child/parent with incoming/outgoing everywhere?
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 686628d1dfa6..60f15bf56534 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -1366,6 +1366,190 @@ int of_parse_phandle_with_args(const struct device_node *np, const char *list_na
+ EXPORT_SYMBOL(of_parse_phandle_with_args);
  
- 2) Make a pretty picture to describe remapping phandle+specifiers
-    similar to the interrupt hierarchy diagram?
-
- 3) Come up with some better name than <specifier>? Kernel-doc uses <list>
-    but I'm not sure that's any better.
-
- source/devicetree-basics.rst | 208 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 208 insertions(+)
-
-diff --git a/source/devicetree-basics.rst b/source/devicetree-basics.rst
-index 02696bac15c7..b0571145ee40 100644
---- a/source/devicetree-basics.rst
-+++ b/source/devicetree-basics.rst
-@@ -1280,3 +1280,211 @@ performed:
- *  That result is looked up in the *interrupt-map* table, which maps to
-    the parent interrupt specifier ``<4 1>``.
+ /**
++ * of_parse_phandle_with_args_map() - Find a node pointed by phandle in a list and remap it
++ * @np:		pointer to a device tree node containing a list
++ * @list_name:	property name that contains a list
++ * @stem_name:	stem of property names that specify phandles' arguments count
++ * @index:	index of a phandle to parse out
++ * @out_args:	optional pointer to output arguments structure (will be filled)
++ *
++ * This function is useful to parse lists of phandles and their arguments.
++ * Returns 0 on success and fills out_args, on error returns appropriate errno
++ * value. The difference between this function and of_parse_phandle_with_args()
++ * is that this API remaps a phandle if the node the phandle points to has
++ * a <@stem_name>-map property.
++ *
++ * Caller is responsible to call of_node_put() on the returned out_args->np
++ * pointer.
++ *
++ * Example:
++ *
++ * phandle1: node1 {
++ *	#list-cells = <2>;
++ * }
++ *
++ * phandle2: node2 {
++ *	#list-cells = <1>;
++ * }
++ *
++ * phandle3: node3 {
++ * 	#list-cells = <1>;
++ * 	list-map = <0 &phandle2 3>,
++ * 		   <1 &phandle2 2>,
++ * 		   <2 &phandle1 5 1>;
++ *	list-map-mask = <0x3>;
++ * };
++ *
++ * node4 {
++ *	list = <&phandle1 1 2 &phandle3 0>;
++ * }
++ *
++ * To get a device_node of the `node2' node you may call this:
++ * of_parse_phandle_with_args(node4, "list", "list", 1, &args);
++ */
++int of_parse_phandle_with_args_map(const struct device_node *np,
++				   const char *list_name,
++				   const char *stem_name,
++				   int index, struct of_phandle_args *out_args)
++{
++	char *cells_name, *map_name = NULL, *mask_name = NULL;
++	char *pass_name = NULL;
++	struct device_node *cur, *new = NULL;
++	const __be32 *map, *mask, *pass;
++	static const __be32 dummy_mask[] = { [0 ... MAX_PHANDLE_ARGS] = ~0 };
++	static const __be32 dummy_pass[] = { [0 ... MAX_PHANDLE_ARGS] = 0 };
++	__be32 initial_match_array[MAX_PHANDLE_ARGS];
++	const __be32 *match_array = initial_match_array;
++	int i, ret, map_len, match;
++	u32 list_size, new_size;
++
++	if (index < 0)
++		return -EINVAL;
++
++	cells_name = kasprintf(GFP_KERNEL, "#%s-cells", stem_name);
++	if (!cells_name)
++		return -ENOMEM;
++
++	ret = -ENOMEM;
++	map_name = kasprintf(GFP_KERNEL, "%s-map", stem_name);
++	if (!map_name)
++		goto free;
++
++	mask_name = kasprintf(GFP_KERNEL, "%s-map-mask", stem_name);
++	if (!mask_name)
++		goto free;
++
++	pass_name = kasprintf(GFP_KERNEL, "%s-map-pass-thru", stem_name);
++	if (!pass_name)
++		goto free;
++
++	ret = __of_parse_phandle_with_args(np, list_name, cells_name, 0, index,
++					   out_args);
++	if (ret)
++		goto free;
++
++	/* Get the #<list>-cells property */
++	cur = out_args->np;
++	ret = of_property_read_u32(cur, cells_name, &list_size);
++	if (ret < 0)
++		goto put;
++
++	/* Precalculate the match array - this simplifies match loop */
++	for (i = 0; i < list_size; i++)
++		initial_match_array[i] = cpu_to_be32(out_args->args[i]);
++
++	ret = -EINVAL;
++	while (cur) {
++		/* Get the <list>-map property */
++		map = of_get_property(cur, map_name, &map_len);
++		if (!map) {
++			ret = 0;
++			goto free;
++		}
++		map_len /= sizeof(u32);
++
++		/* Get the <list>-map-mask property (optional) */
++		mask = of_get_property(cur, mask_name, NULL);
++		if (!mask)
++			mask = dummy_mask;
++		/* Iterate through <list>-map property */
++		match = 0;
++		while (map_len > (list_size + 1) && !match) {
++			/* Compare specifiers */
++			match = 1;
++			for (i = 0; i < list_size; i++, map_len--)
++				match &= !((match_array[i] ^ *map++) & mask[i]);
++
++			of_node_put(new);
++			new = of_find_node_by_phandle(be32_to_cpup(map));
++			map++;
++			map_len--;
++
++			/* Check if not found */
++			if (!new)
++				goto put;
++
++			if (!of_device_is_available(new))
++				match = 0;
++
++			ret = of_property_read_u32(new, cells_name, &new_size);
++			if (ret)
++				goto put;
++
++			/* Check for malformed properties */
++			if (WARN_ON(new_size > MAX_PHANDLE_ARGS))
++				goto put;
++			if (map_len < new_size)
++				goto put;
++
++			/* Move forward by new node's #<list>-cells amount */
++			map += new_size;
++			map_len -= new_size;
++		}
++		if (!match)
++			goto put;
++
++		/* Get the <list>-map-pass-thru property (optional) */
++		pass = of_get_property(cur, pass_name, NULL);
++		if (!pass)
++			pass = dummy_pass;
++
++		/*
++		 * Successfully parsed a <list>-map translation; copy new
++		 * specifier into the out_args structure, keeping the
++		 * bits specified in <list>-map-pass-thru.
++		 */
++		match_array = map - new_size;
++		for (i = 0; i < new_size; i++) {
++			__be32 val = *(map - new_size + i);
++
++			if (i < list_size) {
++				val &= ~pass[i];
++				val |= cpu_to_be32(out_args->args[i]) & pass[i];
++			}
++
++			out_args->args[i] = be32_to_cpu(val);
++		}
++		out_args->args_count = list_size = new_size;
++		/* Iterate again with new provider */
++		out_args->np = new;
++		of_node_put(cur);
++		cur = new;
++	}
++put:
++	of_node_put(cur);
++	of_node_put(new);
++free:
++	kfree(mask_name);
++	kfree(map_name);
++	kfree(cells_name);
++	kfree(pass_name);
++
++	return ret;
++}
++EXPORT_SYMBOL(of_parse_phandle_with_args_map);
++
++/**
+  * of_parse_phandle_with_fixed_args() - Find a node pointed by phandle in a list
+  * @np:		pointer to a device tree node containing a list
+  * @list_name:	property name that contains a list
+diff --git a/include/linux/of.h b/include/linux/of.h
+index 23bf46ee8686..92fd032b76c7 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -362,6 +362,9 @@ extern struct device_node *of_parse_phandle(const struct device_node *np,
+ extern int of_parse_phandle_with_args(const struct device_node *np,
+ 	const char *list_name, const char *cells_name, int index,
+ 	struct of_phandle_args *out_args);
++extern int of_parse_phandle_with_args_map(const struct device_node *np,
++	const char *list_name, const char *stem_name, int index,
++	struct of_phandle_args *out_args);
+ extern int of_parse_phandle_with_fixed_args(const struct device_node *np,
+ 	const char *list_name, int cells_count, int index,
+ 	struct of_phandle_args *out_args);
+@@ -764,6 +767,15 @@ static inline int of_parse_phandle_with_args(const struct device_node *np,
+ 	return -ENOSYS;
+ }
  
-+.. _sect-nexus:
++static inline int of_parse_phandle_with_args_map(const struct device_node *np,
++						 const char *list_name,
++						 const char *stem_name,
++						 int index,
++						 struct of_phandle_args *out_args)
++{
++	return -ENOSYS;
++}
 +
-+Nexus Nodes and Specifier Mapping
-+---------------------------------
-+
-+TODO: Write blurb here about nexus nodes and remapping them
-+
-+Nexus Node Properties
-+~~~~~~~~~~~~~~~~~~~~~
-+
-+A nexus node shall have a *#<specifier>-cells* property, where <specifier> is
-+some specifier space like 'gpio', 'clock', 'reset', etc.
-+
-+<specifier>-map
-+^^^^^^^^^^^^^^^
-+
-+Property: ``<specifier>-map``
-+
-+Value type: ``<prop-encoded-array>`` encoded as an arbitrary number of
-+specifier mapping entries.
-+
-+Description:
-+
-+   A *<specifier>-map* is a property in a nexus node that bridges one
-+   specifier domain with a set of parent specifier domains and describes
-+   how specifiers in the child domain are mapped to their respective parent
-+   domains.
-+
-+   The map is a table where each row is a mapping entry
-+   consisting of three components: *child specifier*, *specifier parent*, and
-+   *parent specifier*.
-+
-+   child specifier
-+       The specifier of the child node being mapped. The number
-+       of 32-bit cells required to specify this component is described by
-+       the *#<specifier>-cells* property of this node?the nexus node
-+       containing the *<specifier>-map* property.
-+
-+   specifier parent
-+       A single *<phandle>* value that points to the specifier parent to
-+       which the child domain is being mapped.
-+
-+   parent specifier
-+       The specifier in the parent domain. The number of 32-bit
-+       cells required to specify this component is described by the
-+       *#<specifier>-cells* property of the specifier parent node.
-+
-+   Lookups are performed on the mapping table by matching a specifier against
-+   the child specifier in the map. Because some fields in the specifier may
-+   not be relevant or need to be modified, a mask is applied before the lookup
-+   is done. This mask is defined in the *<specifier>-map-mask* property (see
-+   section :ref:`sect-specifier-map-mask`).
-+
-+   Similarly, when the specifier is mapped some fields in the unit specifier
-+   may need to be kept unmodified and passed through from the child node to the
-+   parent node. In this case, a *<specifier>-map-pass-thru* property (see
-+   section :ref:`sect-specifier-map-pass-thru`) may be specified to apply
-+   a mask to the incoming specifier and copy any bits that match to the outgoing
-+   unit specifier.
-+
-+.. _sect-specifier-map-mask:
-+
-+<specifier>-map-mask
-+^^^^^^^^^^^^^^^^^^^^
-+
-+Property: ``<specifier>-map-mask``
-+
-+Value type: ``<prop-encoded-array>`` encoded as a bit mask
-+
-+Description:
-+
-+   A *<specifier>-map-mask* property may be specified for a nexus node.
-+   This property specifies a mask that is applied to the incoming unit
-+   specifier being looked up in the table specified in the *<specifier>-map*
-+   property. If this property is not specified, the mask is assumed to be
-+   a mask with all bits set.
-+
-+.. _sect-specifier-map-pass-thru:
-+
-+<specifier>-map-pass-thru
-+^^^^^^^^^^^^^^^^^^^^^^^^^
-+
-+Property: ``<specifier>-map-pass-thru``
-+
-+Value type: ``<prop-encoded-array>`` encoded as a bit mask
-+
-+Description:
-+
-+   A *<specifier>-map-pass-thru* property may be specified for a nexus node.
-+   This property specifies a mask that is applied to the incoming unit
-+   specifier being looked up in the table specified in the *<specifier>-map*
-+   property. Any matching bits in the incoming unit specifier are copied over
-+   to the outgoing specifier. If this property is not specified, the mask is
-+   assumed to be a mask with no bits set.
-+
-+#<specifier>-cells
-+^^^^^^^^^^^^^^^^^^
-+
-+Property: ``#<specifier>-cells``
-+
-+Value type: ``<u32>``
-+
-+Description:
-+
-+   The *#<specifier>-cells* property defines the number of cells required to
-+   encode a specifier for a domain.
-+
-+Specifier Mapping Example
-+~~~~~~~~~~~~~~~~~~~~~~~~~
-+
-+The following shows the representation of a fragment of a devicetree with
-+two GPIO controllers and a sample specifier map for describing the
-+GPIO routing of a few gpios on both of the controllers through a connector
-+on a board to a device. The expansion device node is one one side of the
-+connector node and the SoC with the two GPIO controllers is on the other
-+side of the connector.
-+
-+.. _example-specifier-mapping:
-+
-+.. code-block:: dts
-+
-+        soc {
-+                soc_gpio1: gpio-controller1 {
-+                        #gpio-cells = <2>;
-+                };
-+
-+                soc_gpio2: gpio-controller2 {
-+                        #gpio-cells = <2>;
-+                };
-+        };
-+
-+        connector: connector {
-+                #gpio-cells = <2>;
-+                gpio-map = <0 0 &soc_gpio1 1 0>,
-+                           <1 0 &soc_gpio2 4 0>,
-+                           <2 0 &soc_gpio1 3 0>,
-+                           <3 0 &soc_gpio2 2 0>;
-+                gpio-map-mask = <0xf 0x0>;
-+                gpio-map-pass-thru = <0x0 0x1>;
-+        };
-+
-+        expansion_device {
-+                reset-gpios = <&connector 2 GPIO_ACTIVE_LOW>;
-+        };
-+
-+
-+Each row in the gpio-map table consists of three parts: a child unit
-+specifier, which is mapped to a *gpio-controller*
-+node with a parent specifier.
-+
-+* For example, the first row of the specifier-map table specifies the
-+  mapping for GPIO 0 of the connector. The components of that row are shown
-+  here
-+
-+  | child specifier: ``0 0``
-+  | specifier parent: ``&soc_gpio1``
-+  | parent specifier: ``1 0``
-+
-+  * The child specifier is ``<0 0>``, which specifies GPIO 0 in the connector
-+    with a *flags* field of ``0``. This takes two 32-bit cells as specified
-+    by the *#gpio-cells* property of the connector node, which is the
-+    child specifier domian.
-+
-+  * The specifier parent is specified by a phandle which points to the
-+    specifier parent of the connector, the first GPIO controller in the SoC.
-+
-+  * The parent specifier is ``<1 0>``. The number of cells to
-+    represent the gpio specifier (two cells) is determined by the
-+    *#gpio-cells* property on the specifier parent, the soc_gpio1
-+    node.
-+
-+    * The value ``<1 0>`` is a value specified by the device binding for
-+      the GPIO controller. The value ``<1>`` specifies the
-+      GPIO pin number on the GPIO controller to which GPIO 0 on the connector
-+      is wired. The value ``<0>`` specifies the flags (active low,
-+      active high, etc.).
-+
-+In this example, the *gpio-map-mask* property has a value of ``<0xf 0>``.
-+This mask is applied to a child unit specifier before performing a lookup in
-+the *gpio-map* table. Similarly, the *gpio-map-pass-thru* property has a value
-+of ``<0x0 0x1>``. This mask is applied to a child unit specifier when mapping
-+it to the parent unit specifier. Any bits set in the mask are cleared out of
-+the parent unit specifier and copied over from the child unit specifier
-+to the parent unit specifier.
-+
-+To perform a lookup of the connector's specifier source number for GPIO 2
-+from the expansion device's reset-gpios property, the following steps would be
-+performed:
-+
-+*  The child specifier forms the value
-+   ``<2 GPIO_ACTIVE_LOW>``.
-+
-+   *  The specifier is encoding GPIO 2 with active low flags per the GPIO
-+      binding.
-+
-+*  The *gpio-map-mask* value ``<0xf 0x0>`` is applied, giving a
-+   result of ``<0x2 0>``.
-+
-+*  That result is looked up in the *gpio-map* table, which maps to
-+   the parent specifier ``<3 0>`` and &soc_gpio1 *phandle*.
-+
-+*  That *gpio-map-pass-thru* value ``<0x0 0x1>`` is applied to child specifier,
-+   forming ``<0 GPIO_ACTIVE_LOW>`` which is then ORed with the parent
-+   specifier ``<3 0>`` ANDed with the inverse of the pass-thru mask
-+   ``<0xffffffff 0xffffffe>`` resulting in ``<3 GPIO_ACTIVE_LOW>``.
-+
-+*  That specifier is combined with the mapped *phandle* &soc_gpio1 resulting
-+   in ``<&soc_gpio1 3 GPIO_ACTIVE_LOW>``.
+ static inline int of_parse_phandle_with_fixed_args(const struct device_node *np,
+ 	const char *list_name, int cells_count, int index,
+ 	struct of_phandle_args *out_args)
 -- 
 2.7.4
