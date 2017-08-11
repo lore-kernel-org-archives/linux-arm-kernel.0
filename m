@@ -1,56 +1,51 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Fri, 11 Aug 2017 16:39:57 +0530
-Subject: [PATCH 5/8] iommu/mediatek: Disable iommu clock when system
- suspend
-In-Reply-To: <1502445377-26936-6-git-send-email-yong.wu@mediatek.com>
-References: <1502445377-26936-1-git-send-email-yong.wu@mediatek.com>
- <1502445377-26936-6-git-send-email-yong.wu@mediatek.com>
-Message-ID: <b451cb47-505e-c300-42fd-9cb73c09ef0b@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 11 Aug 2017 12:29:23 +0100
+Subject: [PATCH 00/11] ARMv8.3 pointer authentication userspace support
+In-Reply-To: <20170725120630.GA8116@leverpostej>
+References: <1500480092-28480-1-git-send-email-mark.rutland@arm.com>
+ <20170721170509.GC1538@e103592.cambridge.arm.com>
+ <20170725120630.GA8116@leverpostej>
+Message-ID: <20170811112922.GE12985@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Youn,
+On Tue, Jul 25, 2017 at 01:06:43PM +0100, Mark Rutland wrote:
+> On Fri, Jul 21, 2017 at 06:05:09PM +0100, Dave Martin wrote:
+> > On Wed, Jul 19, 2017 at 05:01:21PM +0100, Mark Rutland wrote:
+> > > This series adds support for the ARMv8.3 pointer authentication extension.
+> 
+> > > Open questions
+> > > ==============
+> > > 
+> > > * Should keys be per-thread rather than per-process?
+> > > 
+> > >   My understanding is that glibc can't (currently) handle threads having
+> > >   different keys, but it might be that another libc would prefer per-thread
+> > 
+> > Can you elaborate?
+> > 
+> > It's not valid to do a function return from one thread to another.
+> 
+> Regardless of whether it's valid per the C spec or POSIX, some people
+> use {set,get}context and {set,long}jmp in this manner (IIRC, QEMU does
+> this), and my understanding is that similar tricks are in use in the
+> bowels of glibc.
+> 
+> Otherwise, my preference would be to have per-thread keys from day one.
 
+Having considered comments I've received elsewhere, I've reversed my
+position here. I think per-process keys are the more
+sensible default since:
 
-On Friday 11 August 2017 03:26 PM, Yong Wu wrote:
-> When system suspend, infra power domain may be off, and the iommu's
-> clock must be disabled when system off, or the iommu's bclk clock maybe
-> disabled after system resume.
->
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> ---
->   drivers/iommu/mtk_iommu.c | 4 +++-
->   1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-> index e81ed9a..b7c8e52 100644
-> --- a/drivers/iommu/mtk_iommu.c
-> +++ b/drivers/iommu/mtk_iommu.c
-> @@ -675,6 +675,7 @@ static int __maybe_unused mtk_iommu_suspend(struct device *dev)
->   	reg->ctrl_reg = readl_relaxed(base + REG_MMU_CTRL_REG);
->   	reg->int_control0 = readl_relaxed(base + REG_MMU_INT_CONTROL0);
->   	reg->int_main_control = readl_relaxed(base + REG_MMU_INT_MAIN_CONTROL);
-> +	clk_disable_unprepare(data->bclk);
->   	return 0;
->   }
->   
-> @@ -684,6 +685,7 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
->   	struct mtk_iommu_suspend_reg *reg = &data->reg;
->   	void __iomem *base = data->base;
->   
-> +	clk_prepare_enable(data->bclk);
-Please handle return value of clk_prepare_enable. It can fail
->   	writel_relaxed(reg->standard_axi_mode,
->   		       base + REG_MMU_STANDARD_AXI_MODE);
->   	writel_relaxed(reg->dcm_dis, base + REG_MMU_DCM_DIS);
-> @@ -699,7 +701,7 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
->   }
->   
->   static const struct dev_pm_ops mtk_iommu_pm_ops = {
-> -	SET_SYSTEM_SLEEP_PM_OPS(mtk_iommu_suspend, mtk_iommu_resume)
-> +	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_iommu_suspend, mtk_iommu_resume)
->   };
->   
->   static const struct of_device_id mtk_iommu_of_ids[] = {
-~arvind
+* This will allow us to protect function pointers in shared
+  datastructures such as vtables.
+
+* Tasks have their own stacks, and values leaked from one stack cannot
+  be used to spoof return addresses on another.
+
+* If an attacker can take control of one thread, they've already gained
+  code execution and/or primitives that can be used to attack the
+  process by other means.
+
+Thanks,
+Mark.
