@@ -1,197 +1,326 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 11 Aug 2017 15:06:17 +0200
-Subject: [PATCH v2 4/5] reset: zx2967: use the reset-simple driver
+Date: Fri, 11 Aug 2017 15:06:15 +0200
+Subject: [PATCH v2 2/5] reset: socfpga: use the reset-simple driver
 In-Reply-To: <20170811130618.3676-1-p.zabel@pengutronix.de>
 References: <20170811130618.3676-1-p.zabel@pengutronix.de>
-Message-ID: <20170811130618.3676-5-p.zabel@pengutronix.de>
+Message-ID: <20170811130618.3676-3-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reset-simple driver can be used without changes.
+Add reset line status readback, inverted status support, and socfpga
+device tree quirks to the simple reset driver, and use it to replace
+the socfpga driver.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
----
- MAINTAINERS                  |  1 -
- drivers/reset/Kconfig        | 10 +----
- drivers/reset/Makefile       |  1 -
- drivers/reset/reset-simple.c |  1 +
- drivers/reset/reset-zx2967.c | 99 --------------------------------------------
- 5 files changed, 3 insertions(+), 109 deletions(-)
- delete mode 100644 drivers/reset/reset-zx2967.c
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 57853844969bf..30af04516d8a0 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2061,7 +2061,6 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-zx/
- F:	drivers/clk/zte/
--F:	drivers/reset/reset-zx2967.c
- F:	drivers/soc/zte/
- F:	Documentation/devicetree/bindings/arm/zte.txt
- F:	Documentation/devicetree/bindings/clock/zx296702-clk.txt
+fixup! reset: socfpga: use the reset-simple driver
+---
+ drivers/reset/Kconfig         |  10 +--
+ drivers/reset/Makefile        |   1 -
+ drivers/reset/reset-simple.c  |  51 +++++++++++++-
+ drivers/reset/reset-simple.h  |   1 +
+ drivers/reset/reset-socfpga.c | 154 ------------------------------------------
+ 5 files changed, 53 insertions(+), 164 deletions(-)
+ delete mode 100644 drivers/reset/reset-socfpga.c
+
 diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index 29f4487c290fc..6dfea01023618 100644
+index f7ba01a71daee..78a8f6057985b 100644
 --- a/drivers/reset/Kconfig
 +++ b/drivers/reset/Kconfig
-@@ -70,14 +70,14 @@ config RESET_PISTACHIO
+@@ -70,19 +70,13 @@ config RESET_PISTACHIO
  
  config RESET_SIMPLE
  	bool "Simple Reset Controller Driver" if COMPILE_TEST
--	default ARCH_SOCFPGA || ARCH_STM32 || ARCH_SUNXI
-+	default ARCH_SOCFPGA || ARCH_STM32 || ARCH_SUNXI || ARCH_ZX
+-	default ARCH_SUNXI
++	default ARCH_SOCFPGA || ARCH_SUNXI
  	help
  	  This enables a simple reset controller driver for reset lines that
  	  that can be asserted and deasserted by toggling bits in a contiguous,
  	  exclusive register space.
  
- 	  Currently this driver supports Altera SoCFPGAs, the RCC reset
--	  controller in STM32 MCUs, and Allwinner SoCs.
-+	  controller in STM32 MCUs, Allwinner SoCs, and ZTE's zx2967 family.
- 
- config RESET_SUNXI
- 	bool "Allwinner SoCs Reset Driver" if COMPILE_TEST && !ARCH_SUNXI
-@@ -114,12 +114,6 @@ config RESET_UNIPHIER
- 	  Say Y if you want to control reset signals provided by System Control
- 	  block, Media I/O block, Peripheral Block.
- 
--config RESET_ZX2967
--	bool "ZTE ZX2967 Reset Driver"
--	depends on ARCH_ZX || COMPILE_TEST
--	help
--	  This enables the reset controller driver for ZTE's zx2967 family.
+-	  Currently this driver supports Allwinner SoCs.
 -
- config RESET_ZYNQ
- 	bool "ZYNQ Reset Driver" if COMPILE_TEST
- 	default ARCH_ZYNQ
+-config RESET_SOCFPGA
+-	bool "SoCFPGA Reset Driver" if COMPILE_TEST
+-	default ARCH_SOCFPGA
+-	help
+-	  This enables the reset controller driver for Altera SoCFPGAs.
++	  Currently this driver supports Altera SoCFPGAs and Allwinner SoCs.
+ 
+ config RESET_STM32
+ 	bool "STM32 Reset Driver" if COMPILE_TEST
 diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index e8c3a032f4780..3a70c254b5ea5 100644
+index ab4af99c3dfdc..25f5f722dec01 100644
 --- a/drivers/reset/Makefile
 +++ b/drivers/reset/Makefile
-@@ -16,6 +16,5 @@ obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
+@@ -12,7 +12,6 @@ obj-$(CONFIG_RESET_MESON) += reset-meson.o
+ obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+ obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
+ obj-$(CONFIG_RESET_SIMPLE) += reset-simple.o
+-obj-$(CONFIG_RESET_SOCFPGA) += reset-socfpga.o
+ obj-$(CONFIG_RESET_STM32) += reset-stm32.o
+ obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
  obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
- obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
- obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
--obj-$(CONFIG_RESET_ZX2967) += reset-zx2967.o
- obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
- 
 diff --git a/drivers/reset/reset-simple.c b/drivers/reset/reset-simple.c
-index 8166aafc42478..d2d6ac483d61d 100644
+index 08fc79d79e86d..e553d434ca362 100644
 --- a/drivers/reset/reset-simple.c
 +++ b/drivers/reset/reset-simple.c
-@@ -107,6 +107,7 @@ static const struct of_device_id reset_simple_dt_ids[] = {
- 	{ .compatible = "st,stm32-rcc", },
+@@ -68,25 +68,49 @@ static int reset_simple_deassert(struct reset_controller_dev *rcdev,
+ 	return reset_simple_set(rcdev, id, false);
+ }
+ 
++static int reset_simple_status(struct reset_controller_dev *rcdev,
++			       unsigned long id)
++{
++	struct reset_simple_data *data = to_reset_simple_data(rcdev);
++	int reg_width = sizeof(u32);
++	int bank = id / (reg_width * BITS_PER_BYTE);
++	int offset = id % (reg_width * BITS_PER_BYTE);
++	u32 reg;
++
++	reg = readl(data->membase + (bank * reg_width));
++
++	return !(reg & BIT(offset)) ^ !data->status_inverted;
++}
++
+ const struct reset_control_ops reset_simple_ops = {
+ 	.assert		= reset_simple_assert,
+ 	.deassert	= reset_simple_deassert,
++	.status		= reset_simple_status,
+ };
+ 
+ struct reset_simple_devdata {
+ 	bool inverted;
++	bool status_inverted;
++};
++
++static const struct reset_simple_devdata reset_simple_socfpga = {
++	.status_inverted = true,
+ };
+ 
+ static const struct reset_simple_devdata reset_simple_inverted = {
+ 	.inverted = true,
++	.status_inverted = true,
+ };
+ 
+ static const struct of_device_id reset_simple_dt_ids[] = {
++	{ .compatible = "altr,rst-mgr", .data = &reset_simple_socfpga },
  	{ .compatible = "allwinner,sun6i-a31-clock-reset",
  		.data = &reset_simple_inverted },
-+	{ .compatible = "zte,zx296718-reset", .data = &reset_simple_inverted },
  	{ /* sentinel */ },
  };
  
-diff --git a/drivers/reset/reset-zx2967.c b/drivers/reset/reset-zx2967.c
++#define SOCFPGA_NR_BANKS		8
++
+ static int reset_simple_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -113,8 +137,33 @@ static int reset_simple_probe(struct platform_device *pdev)
+ 	data->rcdev.ops = &reset_simple_ops;
+ 	data->rcdev.of_node = dev->of_node;
+ 
+-	if (devdata)
++	if (devdata == &reset_simple_socfpga) {
++		u32 modrst_offset;
++
++		/*
++		 * The binding was mainlined without the required property.
++		 * Do not continue, when we encounter an old DT.
++		 */
++		if (!of_find_property(dev->of_node, "#reset-cells", NULL)) {
++			dev_err(dev, "%pOF missing #reset-cells property\n",
++				dev->of_node);
++			return -EINVAL;
++		}
++
++		if (of_property_read_u32(dev->of_node, "altr,modrst-offset",
++					 &modrst_offset)) {
++			dev_warn(dev, "missing altr,modrst-offset property, assuming 0x10!\n");
++			modrst_offset = 0x10;
++		}
++
++		data->membase += modrst_offset;
++		data->rcdev.nr_resets = SOCFPGA_NR_BANKS * 32;
++	}
++
++	if (devdata) {
+ 		data->inverted = devdata->inverted;
++		data->status_inverted = devdata->status_inverted;
++	}
+ 
+ 	return devm_reset_controller_register(dev, &data->rcdev);
+ }
+diff --git a/drivers/reset/reset-simple.h b/drivers/reset/reset-simple.h
+index a26dc62b2f349..52dc28d4ffac3 100644
+--- a/drivers/reset/reset-simple.h
++++ b/drivers/reset/reset-simple.h
+@@ -25,6 +25,7 @@ struct reset_simple_data {
+ 	void __iomem			*membase;
+ 	struct reset_controller_dev	rcdev;
+ 	bool				inverted;
++	bool				status_inverted;
+ };
+ 
+ extern const struct reset_control_ops reset_simple_ops;
+diff --git a/drivers/reset/reset-socfpga.c b/drivers/reset/reset-socfpga.c
 deleted file mode 100644
-index 4f319f7753d4d..0000000000000
---- a/drivers/reset/reset-zx2967.c
+index 07224c0198920..0000000000000
+--- a/drivers/reset/reset-socfpga.c
 +++ /dev/null
-@@ -1,99 +0,0 @@
+@@ -1,154 +0,0 @@
 -/*
-- * ZTE's zx2967 family reset controller driver
+- * Socfpga Reset Controller Driver
 - *
-- * Copyright (C) 2017 ZTE Ltd.
+- * Copyright 2014 Steffen Trumtrar <s.trumtrar@pengutronix.de>
 - *
-- * Author: Baoyou Xie <baoyou.xie@linaro.org>
+- * based on
+- * Allwinner SoCs Reset Controller driver
 - *
-- * License terms: GNU General Public License (GPL) version 2
+- * Copyright 2013 Maxime Ripard
+- *
+- * Maxime Ripard <maxime.ripard@free-electrons.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
 - */
 -
--#include <linux/of_address.h>
+-#include <linux/err.h>
+-#include <linux/io.h>
+-#include <linux/init.h>
+-#include <linux/of.h>
 -#include <linux/platform_device.h>
 -#include <linux/reset-controller.h>
+-#include <linux/spinlock.h>
+-#include <linux/types.h>
 -
--struct zx2967_reset {
--	void __iomem			*reg_base;
+-#define BANK_INCREMENT		4
+-#define NR_BANKS		8
+-
+-struct socfpga_reset_data {
 -	spinlock_t			lock;
+-	void __iomem			*membase;
 -	struct reset_controller_dev	rcdev;
 -};
 -
--static int zx2967_reset_act(struct reset_controller_dev *rcdev,
--			    unsigned long id, bool assert)
+-static int socfpga_reset_assert(struct reset_controller_dev *rcdev,
+-				unsigned long id)
 -{
--	struct zx2967_reset *reset = NULL;
--	int bank = id / 32;
--	int offset = id % 32;
--	u32 reg;
+-	struct socfpga_reset_data *data = container_of(rcdev,
+-						     struct socfpga_reset_data,
+-						     rcdev);
+-	int bank = id / BITS_PER_LONG;
+-	int offset = id % BITS_PER_LONG;
 -	unsigned long flags;
+-	u32 reg;
 -
--	reset = container_of(rcdev, struct zx2967_reset, rcdev);
+-	spin_lock_irqsave(&data->lock, flags);
 -
--	spin_lock_irqsave(&reset->lock, flags);
--
--	reg = readl_relaxed(reset->reg_base + (bank * 4));
--	if (assert)
--		reg &= ~BIT(offset);
--	else
--		reg |= BIT(offset);
--	writel_relaxed(reg, reset->reg_base + (bank * 4));
--
--	spin_unlock_irqrestore(&reset->lock, flags);
+-	reg = readl(data->membase + (bank * BANK_INCREMENT));
+-	writel(reg | BIT(offset), data->membase + (bank * BANK_INCREMENT));
+-	spin_unlock_irqrestore(&data->lock, flags);
 -
 -	return 0;
 -}
 -
--static int zx2967_reset_assert(struct reset_controller_dev *rcdev,
--			       unsigned long id)
+-static int socfpga_reset_deassert(struct reset_controller_dev *rcdev,
+-				  unsigned long id)
 -{
--	return zx2967_reset_act(rcdev, id, true);
+-	struct socfpga_reset_data *data = container_of(rcdev,
+-						     struct socfpga_reset_data,
+-						     rcdev);
+-
+-	int bank = id / BITS_PER_LONG;
+-	int offset = id % BITS_PER_LONG;
+-	unsigned long flags;
+-	u32 reg;
+-
+-	spin_lock_irqsave(&data->lock, flags);
+-
+-	reg = readl(data->membase + (bank * BANK_INCREMENT));
+-	writel(reg & ~BIT(offset), data->membase + (bank * BANK_INCREMENT));
+-
+-	spin_unlock_irqrestore(&data->lock, flags);
+-
+-	return 0;
 -}
 -
--static int zx2967_reset_deassert(struct reset_controller_dev *rcdev,
--				 unsigned long id)
+-static int socfpga_reset_status(struct reset_controller_dev *rcdev,
+-				unsigned long id)
 -{
--	return zx2967_reset_act(rcdev, id, false);
+-	struct socfpga_reset_data *data = container_of(rcdev,
+-						struct socfpga_reset_data, rcdev);
+-	int bank = id / BITS_PER_LONG;
+-	int offset = id % BITS_PER_LONG;
+-	u32 reg;
+-
+-	reg = readl(data->membase + (bank * BANK_INCREMENT));
+-
+-	return !(reg & BIT(offset));
 -}
 -
--static const struct reset_control_ops zx2967_reset_ops = {
--	.assert		= zx2967_reset_assert,
--	.deassert	= zx2967_reset_deassert,
+-static const struct reset_control_ops socfpga_reset_ops = {
+-	.assert		= socfpga_reset_assert,
+-	.deassert	= socfpga_reset_deassert,
+-	.status		= socfpga_reset_status,
 -};
 -
--static int zx2967_reset_probe(struct platform_device *pdev)
+-static int socfpga_reset_probe(struct platform_device *pdev)
 -{
--	struct zx2967_reset *reset;
+-	struct socfpga_reset_data *data;
 -	struct resource *res;
+-	struct device *dev = &pdev->dev;
+-	struct device_node *np = dev->of_node;
+-	u32 modrst_offset;
 -
--	reset = devm_kzalloc(&pdev->dev, sizeof(*reset), GFP_KERNEL);
--	if (!reset)
+-	/*
+-	 * The binding was mainlined without the required property.
+-	 * Do not continue, when we encounter an old DT.
+-	 */
+-	if (!of_find_property(pdev->dev.of_node, "#reset-cells", NULL)) {
+-		dev_err(&pdev->dev, "%s missing #reset-cells property\n",
+-			pdev->dev.of_node->full_name);
+-		return -EINVAL;
+-	}
+-
+-	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+-	if (!data)
 -		return -ENOMEM;
 -
 -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	reset->reg_base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(reset->reg_base))
--		return PTR_ERR(reset->reg_base);
+-	data->membase = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(data->membase))
+-		return PTR_ERR(data->membase);
 -
--	spin_lock_init(&reset->lock);
+-	if (of_property_read_u32(np, "altr,modrst-offset", &modrst_offset)) {
+-		dev_warn(dev, "missing altr,modrst-offset property, assuming 0x10!\n");
+-		modrst_offset = 0x10;
+-	}
+-	data->membase += modrst_offset;
 -
--	reset->rcdev.owner = THIS_MODULE;
--	reset->rcdev.nr_resets = resource_size(res) * 8;
--	reset->rcdev.ops = &zx2967_reset_ops;
--	reset->rcdev.of_node = pdev->dev.of_node;
+-	spin_lock_init(&data->lock);
 -
--	return devm_reset_controller_register(&pdev->dev, &reset->rcdev);
+-	data->rcdev.owner = THIS_MODULE;
+-	data->rcdev.nr_resets = NR_BANKS * BITS_PER_LONG;
+-	data->rcdev.ops = &socfpga_reset_ops;
+-	data->rcdev.of_node = pdev->dev.of_node;
+-
+-	return devm_reset_controller_register(dev, &data->rcdev);
 -}
 -
--static const struct of_device_id zx2967_reset_dt_ids[] = {
--	 { .compatible = "zte,zx296718-reset", },
--	 {},
+-static const struct of_device_id socfpga_reset_dt_ids[] = {
+-	{ .compatible = "altr,rst-mgr", },
+-	{ /* sentinel */ },
 -};
 -
--static struct platform_driver zx2967_reset_driver = {
--	.probe	= zx2967_reset_probe,
+-static struct platform_driver socfpga_reset_driver = {
+-	.probe	= socfpga_reset_probe,
 -	.driver = {
--		.name		= "zx2967-reset",
--		.of_match_table	= zx2967_reset_dt_ids,
+-		.name		= "socfpga-reset",
+-		.of_match_table	= socfpga_reset_dt_ids,
 -	},
 -};
--builtin_platform_driver(zx2967_reset_driver);
+-builtin_platform_driver(socfpga_reset_driver);
 -- 
 2.11.0
