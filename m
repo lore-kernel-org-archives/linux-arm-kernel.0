@@ -1,40 +1,49 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Fri, 11 Aug 2017 17:22:41 +0200
-Subject: [v6 00/15] complete deferred page initialization
-In-Reply-To: <23e22449-89f0-507d-e92a-9ee947a7c363@oracle.com>
+From: pasha.tatashin@oracle.com (Pasha Tatashin)
+Date: Fri, 11 Aug 2017 11:24:55 -0400
+Subject: [v6 01/15] x86/mm: reserve only exiting low pages
+In-Reply-To: <20170811080706.GC30811@dhcp22.suse.cz>
 References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <20170811075826.GB30811@dhcp22.suse.cz>
- <23e22449-89f0-507d-e92a-9ee947a7c363@oracle.com>
-Message-ID: <20170811152240.GQ30811@dhcp22.suse.cz>
+ <1502138329-123460-2-git-send-email-pasha.tatashin@oracle.com>
+ <20170811080706.GC30811@dhcp22.suse.cz>
+Message-ID: <47ebf53b-ea8b-1822-a63a-3682ed2f4753@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 11-08-17 11:13:07, Pasha Tatashin wrote:
-> On 08/11/2017 03:58 AM, Michal Hocko wrote:
-> >[I am sorry I didn't get to your previous versions]
+>> Struct pages are initialized by going through __init_single_page(). Since
+>> the existing physical memory in memblock is represented in memblock.memory
+>> list, struct page for every page from this list goes through
+>> __init_single_page().
 > 
-> Thank you for reviewing this work. I will address your comments, and
-> send-out a new patches.
-> 
-> >>
-> >>In this work we do the following:
-> >>- Never read access struct page until it was initialized
-> >
-> >How is this enforced? What about pfn walkers? E.g. page_ext
-> >initialization code (page owner in particular)
-> 
-> This is hard to enforce 100%. But, because we have a patch in this series
-> that sets all memory that was allocated by memblock_virt_alloc_try_nid_raw()
-> to ones with debug options enabled, and because Linux has a good set of
-> asserts in place that check struct pages to be sane, especially the ones
-> that are enabled with this config: CONFIG_DEBUG_VM_PGFLAGS. I was able to
-> find many places in linux which accessed struct pages before
-> __init_single_page() is performed, and fix them. Most of these places happen
-> only when deferred struct page initialization code is enabled.
+> By a page _from_ this list you mean struct pages backing the physical
+> memory of the memblock lists?
 
-Yes, I am very well aware of how hard is this to guarantee. I was merely
-pointing out that the changelog should be more verbose about your
-testing and assumptions so that we can revalidate them.
--- 
-Michal Hocko
-SUSE Labs
+Correct: "for every page from this list...", for every page represented 
+by this list the struct page is initialized through __init_single_page()
+
+>> In this patchset we will stop zeroing struct page memory during allocation.
+>> Therefore, this bug must be fixed in order to avoid random assert failures
+>> caused by CONFIG_DEBUG_VM_PGFLAGS triggers.
+>>
+>> The fix is to reserve memory from the first existing PFN.
+> 
+> Hmm, I assume this is a result of some assert triggering, right? Which
+> one? Why don't we need the same treatment for other than x86 arch?
+
+Correct, the pgflags asserts were triggered when we were setting 
+reserved flags to struct page for PFN 0 in which was never initialized 
+through __init_single_page(). The reason they were triggered is because 
+we set all uninitialized memory to ones in one of the debug patches.
+
+>> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+>> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+>> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+>> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+> 
+> I guess that the review happened inhouse. I do not want to question its
+> value but it is rather strange to not hear the specific review comments
+> which might be useful in general and moreover even not include those
+> people on the CC list so they are aware of the follow up discussion.
+
+I will bring this up with my colleagues to how to handle this better in 
+the future. I will also CC the reviewers when I sent out the updated 
+patch series.
