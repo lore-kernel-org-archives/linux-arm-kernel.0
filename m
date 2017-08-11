@@ -1,42 +1,35 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 11 Aug 2017 17:57:24 +0200
-Subject: [PATCH v2 1/5] reset: add reset-simple to unify socfpga, stm32,
- sunxi, and zx2967
-In-Reply-To: <CAGb2v64bNTn5H1k-=rdTLPGYMfhTT8BuriaSAh9dNM__rLUi=Q@mail.gmail.com>
-References: <20170811130618.3676-1-p.zabel@pengutronix.de>
- <20170811130618.3676-2-p.zabel@pengutronix.de>
- <CAGb2v64bNTn5H1k-=rdTLPGYMfhTT8BuriaSAh9dNM__rLUi=Q@mail.gmail.com>
-Message-ID: <1502467044.2310.21.camel@pengutronix.de>
+From: pasha.tatashin@oracle.com (Pasha Tatashin)
+Date: Fri, 11 Aug 2017 11:58:46 -0400
+Subject: [v6 07/15] mm: defining memblock_virt_alloc_try_nid_raw
+In-Reply-To: <20170811123953.GI30811@dhcp22.suse.cz>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-8-git-send-email-pasha.tatashin@oracle.com>
+ <20170811123953.GI30811@dhcp22.suse.cz>
+Message-ID: <545b7230-2c09-d2f9-f26a-05ef395c36d4@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-08-11 at 23:51 +0800, Chen-Yu Tsai wrote:
-> On Fri, Aug 11, 2017 at 9:06 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> > +static int reset_simple_probe(struct platform_device *pdev)
-> > +{
-> > +???????struct device *dev = &pdev->dev;
-> > +???????const struct of_device_id *of_id =
-> > +???????????????of_match_device(of_match_ptr(reset_simple_dt_ids), dev);
-> > +???????const struct reset_simple_devdata *devdata = of_id->data;
+On 08/11/2017 08:39 AM, Michal Hocko wrote:
+> On Mon 07-08-17 16:38:41, Pavel Tatashin wrote:
+>> A new variant of memblock_virt_alloc_* allocations:
+>> memblock_virt_alloc_try_nid_raw()
+>>      - Does not zero the allocated memory
+>>      - Does not panic if request cannot be satisfied
 > 
-> Just use of_device_get_match_data().
-
-Will do that, thanks.
-
-> > +struct reset_simple_data {
-> > +???????spinlock_t??????????????????????lock;
-> > +???????void __iomem????????????????????*membase;
-> > +???????struct reset_controller_dev?????rcdev;
-> > +???????bool????????????????????????????inverted;
+> OK, this looks good but I would not introduce memblock_virt_alloc_raw
+> here because we do not have any users. Please move that to "mm: optimize
+> early system hash allocations" which actually uses the API. It would be
+> easier to review it that way.
 > 
-> You should document this option. "Inverted" by itself does not
-> say a whole lot, as there is no mention about what the normal
-> or non-inverted behavior is. Is the reset active low (assert
-> reset when bit is cleared)? Or active high (assert reset when
-> bit is set)?
+>> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+>> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+>> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+>> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+> 
+> other than that
+> Acked-by: Michal Hocko <mhocko@suse.com>
 
-You are right. Also, maybe I should rename this to
-"bool active_low;" to avoid confusion where it is used.
-
-regards
-Philipp
+Sure, I could do this, but as I understood from earlier Dave Miller's 
+comments, we should do one logical change at a time. Hence, introduce 
+API in one patch use it in another. So, this is how I tried to organize 
+this patch set. Is this assumption incorrect?
