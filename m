@@ -1,47 +1,80 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 11 Aug 2017 15:04:07 +0200
-Subject: [PATCH v2 1/2] devicetree: ARM: zynq: Add DT binding for eFuse
- controller
-Message-ID: <7e99803ff35cc540f8ce4fccc0940f1d730e8dc5.1502456643.git.michal.simek@xilinx.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Fri, 11 Aug 2017 15:04:49 +0200
+Subject: [v6 13/15] mm: stop zeroing memory during allocation in vmemmap
+In-Reply-To: <1502138329-123460-14-git-send-email-pasha.tatashin@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-14-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <20170811130449.GL30811@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT binding for eFuse controller available at Xilinx Zynq
-SoC.
+On Mon 07-08-17 16:38:47, Pavel Tatashin wrote:
+> Replace allocators in sprase-vmemmap to use the non-zeroing version. So,
+> we will get the performance improvement by zeroing the memory in parallel
+> when struct pages are zeroed.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
+First of all this should be probably merged with the previous patch. The
+I think vmemmap_alloc_block would be better to split up into
+__vmemmap_alloc_block which doesn't zero and vmemmap_alloc_block which
+does zero which would reduce the memset callsites and it would make it
+slightly more robust interface.
+ 
+> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+> Reviewed-by: Steven Sistare <steven.sistare@oracle.com>
+> Reviewed-by: Daniel Jordan <daniel.m.jordan@oracle.com>
+> Reviewed-by: Bob Picco <bob.picco@oracle.com>
+> ---
+>  mm/sparse-vmemmap.c | 6 +++---
+>  mm/sparse.c         | 6 +++---
+>  2 files changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/mm/sparse-vmemmap.c b/mm/sparse-vmemmap.c
+> index d40c721ab19f..3b646b5ce1b6 100644
+> --- a/mm/sparse-vmemmap.c
+> +++ b/mm/sparse-vmemmap.c
+> @@ -41,7 +41,7 @@ static void * __ref __earlyonly_bootmem_alloc(int node,
+>  				unsigned long align,
+>  				unsigned long goal)
+>  {
+> -	return memblock_virt_alloc_try_nid(size, align, goal,
+> +	return memblock_virt_alloc_try_nid_raw(size, align, goal,
+>  					    BOOTMEM_ALLOC_ACCESSIBLE, node);
+>  }
+>  
+> @@ -56,11 +56,11 @@ void * __meminit vmemmap_alloc_block(unsigned long size, int node)
+>  
+>  		if (node_state(node, N_HIGH_MEMORY))
+>  			page = alloc_pages_node(
+> -				node, GFP_KERNEL | __GFP_ZERO | __GFP_RETRY_MAYFAIL,
+> +				node, GFP_KERNEL | __GFP_RETRY_MAYFAIL,
+>  				get_order(size));
+>  		else
+>  			page = alloc_pages(
+> -				GFP_KERNEL | __GFP_ZERO | __GFP_RETRY_MAYFAIL,
+> +				GFP_KERNEL | __GFP_RETRY_MAYFAIL,
+>  				get_order(size));
+>  		if (page)
+>  			return page_address(page);
+> diff --git a/mm/sparse.c b/mm/sparse.c
+> index 7b4be3fd5cac..0e315766ad11 100644
+> --- a/mm/sparse.c
+> +++ b/mm/sparse.c
+> @@ -441,9 +441,9 @@ void __init sparse_mem_maps_populate_node(struct page **map_map,
+>  	}
+>  
+>  	size = PAGE_ALIGN(size);
+> -	map = memblock_virt_alloc_try_nid(size * map_count,
+> -					  PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
+> -					  BOOTMEM_ALLOC_ACCESSIBLE, nodeid);
+> +	map = memblock_virt_alloc_try_nid_raw(size * map_count,
+> +					      PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
+> +					      BOOTMEM_ALLOC_ACCESSIBLE, nodeid);
+>  	if (map) {
+>  		for (pnum = pnum_begin; pnum < pnum_end; pnum++) {
+>  			if (!present_section_nr(pnum))
+> -- 
+> 2.14.0
 
-Changes in v2:
-- Move doc to bindings/nvmem - suggested by Rob
-- Add Rob's ACK
-
- Documentation/devicetree/bindings/nvmem/zynq-efuse.txt | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/nvmem/zynq-efuse.txt
-
-diff --git a/Documentation/devicetree/bindings/nvmem/zynq-efuse.txt b/Documentation/devicetree/bindings/nvmem/zynq-efuse.txt
-new file mode 100644
-index 000000000000..39817e9750c3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/nvmem/zynq-efuse.txt
-@@ -0,0 +1,15 @@
-+Device tree bindings for Zynq's eFuse Controller
-+
-+The Zynq eFuse controller provides the access to the chip efuses which contain
-+information about device DNA, security settings and also device status.
-+
-+Required properties:
-+ compatible: Compatibility string. Must be "xlnx,zynq-efuse".
-+ reg: Specify the base and size of the EFUSE controller registers
-+      in the memory map. E.g.: reg = <0xf800d000 0x20>;
-+
-+Example:
-+efuse: efuse at f800d000 {
-+	compatible = "xlnx,zynq-efuse";
-+	reg = <0xf800d000 0x20>;
-+};
 -- 
-1.9.1
+Michal Hocko
+SUSE Labs
