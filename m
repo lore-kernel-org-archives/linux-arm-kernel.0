@@ -1,45 +1,59 @@
-From: pasha.tatashin@oracle.com (Pasha Tatashin)
-Date: Fri, 11 Aug 2017 11:39:41 -0400
-Subject: [v6 02/15] x86/mm: setting fields in deferred pages
-In-Reply-To: <20170811090214.GD30811@dhcp22.suse.cz>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-3-git-send-email-pasha.tatashin@oracle.com>
- <20170811090214.GD30811@dhcp22.suse.cz>
-Message-ID: <b0422e38-a6da-081a-71c5-82a36dd2a5bb@oracle.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Fri, 11 Aug 2017 08:42:32 -0700
+Subject: [PATCH v4 0/4] OF phandle nexus support + GPIO nexus
+Message-ID: <20170811154236.12891-1-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> AFAIU register_page_bootmem_info_node is only about struct pages backing
-> pgdat, usemap and memmap. Those should be in reserved memblocks and we
-> do not initialize those at later times, they are not relevant to the
-> deferred initialization as your changelog suggests so the ordering with
-> get_page_bootmem shouldn't matter. Or am I missing something here?
+This is a continutation of my phandle remapping/nexus node series
+from a while ago. I finally got around to writing the documentation
+in the spec for this, but it's really rough around the edges and
+could use some review/suggestions to get it into shape. Please
+review!
 
-The pages for pgdata, usemap, and memmap are part of reserved, and thus 
-getting initialized when free_all_bootmem() is called.
+This is one small chunk of work related to DT overlays for expansion
+boards. It would be good to have a way to expose #<list>-cells types of
+providers through a connector in a standard way. So we introduce a way
+to make "nexus" nodes for these types of properties to remap the consumer
+number space to the other side of the connector's number space. It's
+basically a copy of the interrupt nexus implementation, but without
+the address space matching design and interrupt-parent walking.
 
-So, we have something like this in mem_init()
+Changes since v3:
+ * Added devicetree spec patch
+ * Rebased to v4.13-rc1
 
-register_page_bootmem_info
-  register_page_bootmem_info_node
-   get_page_bootmem
-    .. setting fields here ..
-    such as: page->freelist = (void *)type;
+Changes since v2:
+ * Picked up Linus' ack on the gpio core patch
+ * Made const stack arrays static (Rob Herring)
+ * Used of_property_read_u32() instead of open coding (Rob Herring)
 
-free_all_bootmem()
-  free_low_memory_core_early()
-   for_each_reserved_mem_region()
-    reserve_bootmem_region()
-     init_reserved_page() <- Only if this is deferred reserved page
-      __init_single_pfn()
-       __init_single_page()
-           memset(0) <-- Loose the set fields here!
+Changes since v1:
+ * Addition of optional pass-thru parameter
+ * Reduction of strings passed to 1 instead of 3 (or 4 now)
+ * Updated gpio patch for the new function signature
+ * Updated test-case for new funciton signature and pass-thru parameter
+ * Updated kernel-doc to be correct and highlighted difference between this
+   API and of_parse_phandle_with_args()
 
-memblock does not know about deferred pages, and can be requested to 
-allocate physical pages anywhere. So, the reserved pages in memblock can 
-be both in non-deferred and deferred part of the memory.
+Stephen Boyd (3):
+  Document nexus nodes/specifier remapping
+  of: Support parsing phandle argument lists through a nexus node
+  of: unittest: Add phandle remapping test
+  gpio: Support gpio nexus dt bindings
 
-Without deferred pages enabled, by the time register_page_bootmem_info() 
-is called every page went through __init_single_page(), but with 
-deferred pages enabled, there is scenario where fields can be set before 
-pages go through __init_single_page(). This patch fixes it.
+Kernel:
+ drivers/gpio/gpiolib-of.c                   |   4 +-
+ drivers/of/base.c                           | 184 ++++++++++++++++++++++++++++
+ drivers/of/unittest-data/testcases.dts      |  11 ++
+ drivers/of/unittest-data/tests-phandle.dtsi |  25 ++++
+ drivers/of/unittest.c                       | 120 ++++++++++++++++++
+ include/linux/of.h                          |  12 ++
+ 6 files changed, 354 insertions(+), 2 deletions(-)
+
+Spec:
+ source/devicetree-basics.rst | 208 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 208 insertions(+)
+
+-- 
+2.7.4
