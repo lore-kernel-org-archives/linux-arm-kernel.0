@@ -1,26 +1,45 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 11 Aug 2017 22:13:09 +0800
-Subject: [linux-sunxi] Re: [PATCH] dt-bindings: clock: sunxi-ccu: Add
- compatibles for sun5i CCU driver
-In-Reply-To: <20170811025134.ee4v2tbol2pjcd4i@rob-hp-laptop>
-References: <20170808012540.16691-1-net147@gmail.com>
- <20170811025134.ee4v2tbol2pjcd4i@rob-hp-laptop>
-Message-ID: <CAGb2v661S=a0Bzp4yAoTHKb2YaDURmDczEGjMOEGwgEqXo5ddg@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 11 Aug 2017 16:17:37 +0200
+Subject: [PATCH 1/5] clocksource/drivers/arm_arch_timer: Fix mem frame loop
+ initialization
+In-Reply-To: <20170811141520.GA795@mai>
+References: <20170811141520.GA795@mai>
+Message-ID: <1502461061-28065-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 11, 2017 at 10:51 AM, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Aug 08, 2017 at 11:25:40AM +1000, Jonathan Liu wrote:
->> The bindings were not updated when the sun5i CCU driver was added in
->> commit 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver").
->>
->> Signed-off-by: Jonathan Liu <net147@gmail.com>
->> ---
->>  Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 3 +++
->>  1 file changed, 3 insertions(+)
->
-> Acked-by: Rob Herring <robh@kernel.org>
+From: Matthias Kaehlcke <mka@chromium.org>
 
-Applied for 4.14.
+The loop to find the best memory frame in arch_timer_mem_acpi_init()
+initializes the loop counter with itself ('i = i'), which is suspicious
+in the first place and pointed out by clang. The loop condition is
+'i < timer_count' and a prior for loop exits when 'i' reaches
+'timer_count', therefore the second loop is never executed.
 
-ChenYu
+Initialize the loop counter with 0 to iterate over all timers, which
+supposedly was the intention before the typo monster attacked.
+
+Fixes: c2743a36765d3 ("clocksource: arm_arch_timer: add GTDT support for memory-mapped timer")
+Signed-off-by: Matthias Kaehlcke <mka@chromium.org>
+Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/clocksource/arm_arch_timer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index aae87c4..72bbfcc 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -1440,7 +1440,7 @@ static int __init arch_timer_mem_acpi_init(int platform_timer_count)
+ 	 * While unlikely, it's theoretically possible that none of the frames
+ 	 * in a timer expose the combination of feature we want.
+ 	 */
+-	for (i = i; i < timer_count; i++) {
++	for (i = 0; i < timer_count; i++) {
+ 		timer = &timers[i];
+ 
+ 		frame = arch_timer_mem_find_best_frame(timer);
+-- 
+2.7.4
