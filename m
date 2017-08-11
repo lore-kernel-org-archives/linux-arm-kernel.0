@@ -1,30 +1,49 @@
 From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 11 Aug 2017 11:09:26 +0200
-Subject: [PATCH v2 2/6] edac: synopsys: Add platform specific structures
- for ddrc controller
-In-Reply-To: <6c72eae7c1fbfd2b96d5dc1c7feb251bdbe3e591.1502091561.git.michal.simek@xilinx.com>
-References: <91fd6532076e4c905b5a228d852bba4941c54a28.1502091561.git.michal.simek@xilinx.com>
- <6c72eae7c1fbfd2b96d5dc1c7feb251bdbe3e591.1502091561.git.michal.simek@xilinx.com>
-Message-ID: <20170811090926.GC9432@nazgul.tnic>
+Date: Fri, 11 Aug 2017 11:14:02 +0200
+Subject: [RESEND PATCH 4/4] EDAC: add support for reduced-width Armada-XP
+ SDRAM
+In-Reply-To: <20170807014641.4003-5-chris.packham@alliedtelesis.co.nz>
+References: <20170807014641.4003-1-chris.packham@alliedtelesis.co.nz>
+ <20170807014641.4003-5-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20170811091402.GD9432@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 09:39:24AM +0200, Michal Simek wrote:
-> From: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
+On Mon, Aug 07, 2017 at 01:46:41PM +1200, Chris Packham wrote:
+> Some integrated Armada XP SoCs use a reduced pin count so the width of
+> the SDRAM interface is smaller than the traditional discrete SoCs. This
+> means that the definition of "full" and "half" width is further reduced.
 > 
-> Adds platform specific structures, so that we can add
-> different IP support later using quirks.
-> 
-> Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 > ---
+>  drivers/edac/armada_xp_edac.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> Changes in v2:
+> diff --git a/drivers/edac/armada_xp_edac.c b/drivers/edac/armada_xp_edac.c
+> index 68e88b180928..d8edcaac87c0 100644
+> --- a/drivers/edac/armada_xp_edac.c
+> +++ b/drivers/edac/armada_xp_edac.c
+> @@ -350,6 +350,9 @@ static int armada_xp_mc_edac_probe(struct platform_device *pdev)
+>  	if (armada_xp_mc_edac_read_config(mci))
+>  		return -EINVAL;
+>  
+> +	if (of_property_read_bool(pdev->dev.of_node, "marvell,reduced-width"))
+> +		drvdata->width /= 2;
 
-Subject says "2/6" but I can't find 1/6 in my mbox. Nothing in spam
-folder either. What's up?
+If the compiler doesn't already convert it to a shift on ARM, you
+probably should do
 
-Are you using the --cover-letter option to git format-patch ?
+		>>= 1;
+
+here, just in case.
+
+With that you can add my
+
+Acked-by: Borislav Petkov <bp@suse.de>
+
+and route it through an ARM tree.
+
+Thx.
 
 -- 
 Regards/Gruss,
