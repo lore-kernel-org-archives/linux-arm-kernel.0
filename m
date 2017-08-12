@@ -1,37 +1,21 @@
-From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
-Date: Sat, 12 Aug 2017 12:13:12 +0100
-Subject: [PATCH v2 19/23] dt-bindings: adc: add description for rv1108
- saradc
-In-Reply-To: <20170810161800.m63tavdrawwkqejv@rob-hp-laptop>
-References: <1501662303-11687-1-git-send-email-andy.yan@rock-chips.com>
- <1501663953-12768-1-git-send-email-andy.yan@rock-chips.com>
- <20170810161800.m63tavdrawwkqejv@rob-hp-laptop>
-Message-ID: <20170812121312.14b31f02@archlinux>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 12 Aug 2017 19:44:45 +0800
+Subject: [linux-sunxi] [PATCH v3 01/11] ASoC: sun4i-i2s: Add clkdiv
+ offsets to quirks
+In-Reply-To: <20170812110059.5115-2-codekipper@gmail.com>
+References: <20170812110059.5115-1-codekipper@gmail.com>
+ <20170812110059.5115-2-codekipper@gmail.com>
+Message-ID: <CAGb2v66LA2=6nxzGpqrdd0SePz73VinXy2TDW8=GNK3VZa7Z_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 10 Aug 2017 11:18:00 -0500
-Rob Herring <robh@kernel.org> wrote:
+On Sat, Aug 12, 2017 at 7:00 PM,  <codekipper@gmail.com> wrote:
+> From: Marcus Cooper <codekipper@gmail.com>
+>
+> The BCLKDIV and MCLKDIV found on newer SoCs start from an offset of 1.
+> Add the functionality to adjust the division values according to the
+> needs to the device being used.
+>
+> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 
-> On Wed, Aug 02, 2017 at 04:52:33PM +0800, Andy Yan wrote:
-> > Add device tree bindings document for saradc on
-> > rockchip rv1108 soc.
-> > 
-> > Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-> > ---
-> > 
-> > Changes in v2: None
-> > 
-> >  Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt | 1 +
-> >  1 file changed, 1 insertion(+)  
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-Applied to the togreg branch of iio.git
-
-Thanks,
-
-Jonathan
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
