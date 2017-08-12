@@ -1,43 +1,101 @@
-From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
-Date: Sat, 12 Aug 2017 13:39:13 +0100
-Subject: [PATCH v3 09/13] dt-bindings: adc: add description for rv1108
- saradc
-In-Reply-To: <1502423180-31154-1-git-send-email-andy.yan@rock-chips.com>
-References: <1502422578-30611-1-git-send-email-andy.yan@rock-chips.com>
- <1502423180-31154-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <20170812133913.5311a274@archlinux>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Sat, 12 Aug 2017 20:49:31 +0800
+Subject: [PATCH v4 1/3] clk: sunxi-ng: div: Add support for fixed
+ post-divider
+In-Reply-To: <20170812124352.24148-2-icenowy@aosc.io>
+References: <20170812124352.24148-1-icenowy@aosc.io>
+ <20170812124352.24148-2-icenowy@aosc.io>
+Message-ID: <33a3c75432fab374f2ac5de468ec26ed@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 11 Aug 2017 11:46:20 +0800
-Andy Yan <andy.yan@rock-chips.com> wrote:
-
-> Add device tree bindings document for saradc on
-> rockchip rv1108 soc.
+? 2017-08-12 20:43?Icenowy Zheng ???
+> From: Priit Laes <plaes@plaes.org>
 > 
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-I've already applied.  This please drop it from the next version of the
-series.
+> SATA clock on sun4i/sun7i is of type (parent) / M / 6 where
+> 6 is fixed post-divider.
+> 
+> Signed-off-by: Priit Laes <plaes@plaes.org>
 
-Jonathan
+Oh sorry, it misses my SoB.
+
 > ---
+> It's based on the patch in v6 of the A10/A20 CCU patchset, but with
+> ccu_div_round_rate fixed.
 > 
-> Changes in v3: None
-> Changes in v2: None
+>  drivers/clk/sunxi-ng/ccu_div.c | 22 +++++++++++++++++++---
+>  drivers/clk/sunxi-ng/ccu_div.h |  3 ++-
+>  2 files changed, 21 insertions(+), 4 deletions(-)
 > 
->  Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt | 1 +
->  1 file changed, 1 insertion(+)
+> diff --git a/drivers/clk/sunxi-ng/ccu_div.c 
+> b/drivers/clk/sunxi-ng/ccu_div.c
+> index c0e5c10d0091..baa3cf96507b 100644
+> --- a/drivers/clk/sunxi-ng/ccu_div.c
+> +++ b/drivers/clk/sunxi-ng/ccu_div.c
+> @@ -21,10 +21,18 @@ static unsigned long ccu_div_round_rate(struct
+> ccu_mux_internal *mux,
+>  {
+>  	struct ccu_div *cd = data;
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
-> index e0a9b9d..c2c50b5 100644
-> --- a/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
-> +++ b/Documentation/devicetree/bindings/iio/adc/rockchip-saradc.txt
-> @@ -6,6 +6,7 @@ Required properties:
->     - "rockchip,rk3066-tsadc": for rk3036
->     - "rockchip,rk3328-saradc", "rockchip,rk3399-saradc": for rk3328
->     - "rockchip,rk3399-saradc": for rk3399
-> +   - "rockchip,rv1108-saradc", "rockchip,rk3399-saradc": for rv1108
->  
->  - reg: physical base address of the controller and length of memory mapped
->         region.
+> -	return divider_round_rate_parent(&cd->common.hw, parent,
+> +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> +		rate *= cd->fixed_post_div;
+> +
+> +	rate = divider_round_rate_parent(&cd->common.hw, parent,
+>  					 rate, parent_rate,
+>  					 cd->div.table, cd->div.width,
+>  					 cd->div.flags);
+> +
+> +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> +		rate /= cd->fixed_post_div;
+> +
+> +	return rate;
+>  }
+> 
+>  static void ccu_div_disable(struct clk_hw *hw)
+> @@ -62,8 +70,13 @@ static unsigned long ccu_div_recalc_rate(struct 
+> clk_hw *hw,
+>  	parent_rate = ccu_mux_helper_apply_prediv(&cd->common, &cd->mux, -1,
+>  						  parent_rate);
+> 
+> -	return divider_recalc_rate(hw, parent_rate, val, cd->div.table,
+> -				   cd->div.flags);
+> +	val = divider_recalc_rate(hw, parent_rate, val, cd->div.table,
+> +				  cd->div.flags);
+> +
+> +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> +		val /= cd->fixed_post_div;
+> +
+> +	return val;
+>  }
+> 
+>  static int ccu_div_determine_rate(struct clk_hw *hw,
+> @@ -86,6 +99,9 @@ static int ccu_div_set_rate(struct clk_hw *hw,
+> unsigned long rate,
+>  	parent_rate = ccu_mux_helper_apply_prediv(&cd->common, &cd->mux, -1,
+>  						  parent_rate);
+> 
+> +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
+> +		rate *= cd->fixed_post_div;
+> +
+>  	val = divider_get_val(rate, parent_rate, cd->div.table, 
+> cd->div.width,
+>  			      cd->div.flags);
+> 
+> diff --git a/drivers/clk/sunxi-ng/ccu_div.h 
+> b/drivers/clk/sunxi-ng/ccu_div.h
+> index 08d074451204..f3a5028dcd14 100644
+> --- a/drivers/clk/sunxi-ng/ccu_div.h
+> +++ b/drivers/clk/sunxi-ng/ccu_div.h
+> @@ -86,9 +86,10 @@ struct ccu_div_internal {
+>  struct ccu_div {
+>  	u32			enable;
+> 
+> -	struct ccu_div_internal		div;
+> +	struct ccu_div_internal	div;
+>  	struct ccu_mux_internal	mux;
+>  	struct ccu_common	common;
+> +	unsigned int		fixed_post_div;
+>  };
+> 
+>  #define SUNXI_CCU_DIV_TABLE_WITH_GATE(_struct, _name, _parent, _reg,	\
