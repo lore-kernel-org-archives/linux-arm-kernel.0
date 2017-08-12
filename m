@@ -1,91 +1,91 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sat, 12 Aug 2017 20:43:50 +0800
-Subject: [PATCH v4 1/3] clk: sunxi-ng: div: Add support for fixed post-divider
+Date: Sat, 12 Aug 2017 20:43:51 +0800
+Subject: [PATCH v4 2/3] clk: sunxi-ng: nkm: add support for fixed post-divider
 In-Reply-To: <20170812124352.24148-1-icenowy@aosc.io>
 References: <20170812124352.24148-1-icenowy@aosc.io>
-Message-ID: <20170812124352.24148-2-icenowy@aosc.io>
+Message-ID: <20170812124352.24148-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Priit Laes <plaes@plaes.org>
+SATA PLL on Allwinner R40 is of type (parent) * N * K / M / 6 where 6 is
+the fixed post-divider.
 
-SATA clock on sun4i/sun7i is of type (parent) / M / 6 where
-6 is fixed post-divider.
+Add post-divider support for NKM type clock.
 
-Signed-off-by: Priit Laes <plaes@plaes.org>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
-It's based on the patch in v6 of the A10/A20 CCU patchset, but with
-ccu_div_round_rate fixed.
+ drivers/clk/sunxi-ng/ccu_nkm.c | 22 +++++++++++++++++++---
+ drivers/clk/sunxi-ng/ccu_nkm.h |  2 ++
+ 2 files changed, 21 insertions(+), 3 deletions(-)
 
- drivers/clk/sunxi-ng/ccu_div.c | 22 +++++++++++++++++++---
- drivers/clk/sunxi-ng/ccu_div.h |  3 ++-
- 2 files changed, 21 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
-index c0e5c10d0091..baa3cf96507b 100644
---- a/drivers/clk/sunxi-ng/ccu_div.c
-+++ b/drivers/clk/sunxi-ng/ccu_div.c
-@@ -21,10 +21,18 @@ static unsigned long ccu_div_round_rate(struct ccu_mux_internal *mux,
+diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
+index 44b16dc8fea6..ce7f03737ad5 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkm.c
++++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+@@ -75,7 +75,7 @@ static unsigned long ccu_nkm_recalc_rate(struct clk_hw *hw,
+ 					unsigned long parent_rate)
  {
- 	struct ccu_div *cd = data;
+ 	struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
+-	unsigned long n, m, k;
++	unsigned long n, m, k, rate;
+ 	u32 reg;
  
--	return divider_round_rate_parent(&cd->common.hw, parent,
-+	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		rate *= cd->fixed_post_div;
+ 	reg = readl(nkm->common.base + nkm->common.reg);
+@@ -98,7 +98,12 @@ static unsigned long ccu_nkm_recalc_rate(struct clk_hw *hw,
+ 	if (!m)
+ 		m++;
+ 
+-	return parent_rate * n  * k / m;
++	rate = parent_rate * n  * k / m;
 +
-+	rate = divider_round_rate_parent(&cd->common.hw, parent,
- 					 rate, parent_rate,
- 					 cd->div.table, cd->div.width,
- 					 cd->div.flags);
-+
-+	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		rate /= cd->fixed_post_div;
++	if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
++		rate /= nkm->fixed_post_div;
 +
 +	return rate;
  }
  
- static void ccu_div_disable(struct clk_hw *hw)
-@@ -62,8 +70,13 @@ static unsigned long ccu_div_recalc_rate(struct clk_hw *hw,
- 	parent_rate = ccu_mux_helper_apply_prediv(&cd->common, &cd->mux, -1,
- 						  parent_rate);
+ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+@@ -117,9 +122,17 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+ 	_nkm.min_m = 1;
+ 	_nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
  
--	return divider_recalc_rate(hw, parent_rate, val, cd->div.table,
--				   cd->div.flags);
-+	val = divider_recalc_rate(hw, parent_rate, val, cd->div.table,
-+				  cd->div.flags);
++	if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
++		rate *= nkm->fixed_post_div;
 +
-+	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		val /= cd->fixed_post_div;
+ 	ccu_nkm_find_best(*parent_rate, rate, &_nkm);
+ 
+-	return *parent_rate * _nkm.n * _nkm.k / _nkm.m;
++	rate = *parent_rate * _nkm.n * _nkm.k / _nkm.m;
 +
-+	return val;
++	if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
++		rate /= nkm->fixed_post_div;
++
++	return rate;
  }
  
- static int ccu_div_determine_rate(struct clk_hw *hw,
-@@ -86,6 +99,9 @@ static int ccu_div_set_rate(struct clk_hw *hw, unsigned long rate,
- 	parent_rate = ccu_mux_helper_apply_prediv(&cd->common, &cd->mux, -1,
- 						  parent_rate);
+ static int ccu_nkm_determine_rate(struct clk_hw *hw,
+@@ -139,6 +152,9 @@ static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	unsigned long flags;
+ 	u32 reg;
  
-+	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
-+		rate *= cd->fixed_post_div;
++	if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
++		rate /= nkm->fixed_post_div;
 +
- 	val = divider_get_val(rate, parent_rate, cd->div.table, cd->div.width,
- 			      cd->div.flags);
- 
-diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
-index 08d074451204..f3a5028dcd14 100644
---- a/drivers/clk/sunxi-ng/ccu_div.h
-+++ b/drivers/clk/sunxi-ng/ccu_div.h
-@@ -86,9 +86,10 @@ struct ccu_div_internal {
- struct ccu_div {
- 	u32			enable;
- 
--	struct ccu_div_internal		div;
-+	struct ccu_div_internal	div;
+ 	_nkm.min_n = nkm->n.min ?: 1;
+ 	_nkm.max_n = nkm->n.max ?: 1 << nkm->n.width;
+ 	_nkm.min_k = nkm->k.min ?: 1;
+diff --git a/drivers/clk/sunxi-ng/ccu_nkm.h b/drivers/clk/sunxi-ng/ccu_nkm.h
+index 34580894f4d1..cc6efb70a102 100644
+--- a/drivers/clk/sunxi-ng/ccu_nkm.h
++++ b/drivers/clk/sunxi-ng/ccu_nkm.h
+@@ -34,6 +34,8 @@ struct ccu_nkm {
+ 	struct ccu_div_internal		m;
  	struct ccu_mux_internal	mux;
- 	struct ccu_common	common;
+ 
 +	unsigned int		fixed_post_div;
++
+ 	struct ccu_common	common;
  };
  
- #define SUNXI_CCU_DIV_TABLE_WITH_GATE(_struct, _name, _parent, _reg,	\
 -- 
 2.13.0
