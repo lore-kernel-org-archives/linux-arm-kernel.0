@@ -1,28 +1,24 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 12 Aug 2017 15:19:33 +0200 (CEST)
-Subject: [Bug] ARM: cpuidle: possible memleak
-Message-ID: <1980049531.494543.1502543973258@email.1und1.de>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 12 Aug 2017 15:38:54 +0200
+Subject: [PATCH v2 1/2] i2c: uniphier: add suspend / resume support
+In-Reply-To: <1501480387-15692-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1501480387-15692-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20170812133854.csmxs5d3x2xhkww2@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jul 31, 2017 at 02:53:06PM +0900, Masahiro Yamada wrote:
+> When resuming, set up registers that have been lost in the sleep state.
+> Also, add clock handling in the resume / suspend hooks.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-if i additionally enable kmemleak (on top of multi_v7_defconfig) on RPi 3 (4 cores) with 4.13-rc4, i get the following output from kmemleak:
+Applied to for-next, thanks!
 
-unreferenced object 0xede0dc00 (size 1024):
-  comm "swapper/0", pid 1, jiffies 4294937431 (age 744.510s)
-  hex dump (first 32 bytes):
-    94 9e 0b c1 00 00 00 00 00 00 00 00 00 00 00 00  ................
-    57 46 49 00 00 00 00 00 00 00 00 00 00 00 00 00  WFI.............
-  backtrace:
-    [<c1295f04>] arm_idle_init+0x44/0x1ac
-    [<c0301e6c>] do_one_initcall+0x3c/0x16c
-    [<c1200d70>] kernel_init_freeable+0x110/0x1d0
-    [<c0cb3624>] kernel_init+0x8/0x114
-    [<c0307a98>] ret_from_fork+0x14/0x3c
-    [<ffffffff>] 0xffffffff
-
-If i revert the last commit in cpuidle-arm d50a7d8acd78 ("ARM: cpuidle: Support asymmetric idle definition") then kmemleak stays calm.
-
-Best regards
-Stefan
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170812/6c34f475/attachment.sig>
