@@ -1,60 +1,83 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 12 Aug 2017 12:05:38 +0800
-Subject: [PATCH v3 08/10] clk: sunxi-ng: support R40 SoC
-In-Reply-To: <7e211ba8fd8ae0296f678294d09fcf0d@aosc.io>
-References: <20170527102308.1988-1-icenowy@aosc.io>
- <20170527102308.1988-9-icenowy@aosc.io>
- <20170529073428.f5os7g5e666v4xnp@wens.csie.org>
- <7e211ba8fd8ae0296f678294d09fcf0d@aosc.io>
-Message-ID: <CAGb2v64_aUYrU0gJyVMiTpJq83FhPUfo9rj_51d4X5mK0NSONQ@mail.gmail.com>
+Date: Sat, 12 Aug 2017 12:13:38 +0800
+Subject: [linux-sunxi] Re: [PATCH v6 1/6] clk: sunxi-ng: div: Add support
+ for fixed post-divider
+In-Reply-To: <d3ca32de91e857a8933fd570600cda17@aosc.io>
+References: <cover.ba2aaaa405a7ec685034e34926b8855fd6c9ab86.1500043741.git-series.plaes@plaes.org>
+ <946794e97ae2c36cd67c272099e8236a589efc28.1500043741.git-series.plaes@plaes.org>
+ <20170717085235.i7pwwql5dgmnf6kk@flea>
+ <d3ca32de91e857a8933fd570600cda17@aosc.io>
+Message-ID: <CAGb2v675Y3AAa747-3VqsPN64YOk11v5Gm3_yq5ZeJ=YPz596g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 12, 2017 at 12:04 PM,  <icenowy@aosc.io> wrote:
-> ? 2017-05-29 15:34?Chen-Yu Tsai ???
+On Sat, Aug 12, 2017 at 11:07 AM,  <icenowy@aosc.io> wrote:
+> ? 2017-07-17 16:52?Maxime Ripard ???
 >>
->> Hi,
->>
->> On Sat, May 27, 2017 at 06:23:06PM +0800, Icenowy Zheng wrote:
+>> On Fri, Jul 14, 2017 at 05:49:23PM +0300, Priit Laes wrote:
 >>>
->>> Allwinner R40 SoC have a clock controller module in the style of the
->>> SoCs beyond sun6i, however, it's more rich and complex.
+>>> SATA clock on sun4i/sun7i is of type (parent) / M / 6 where
+>>> 6 is fixed post-divider.
 >>>
->>> Add support for it.
->>>
->>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>>> Signed-off-by: Priit Laes <plaes@plaes.org>
 >>> ---
->>> Changes in v3:
->>> - Rebased on current linux-next.
->>> Changes in v2:
->>> - Fixes according to the SoC's user manual.
+>>>  drivers/clk/sunxi-ng/ccu_div.c | 15 +++++++++++++--
+>>>  drivers/clk/sunxi-ng/ccu_div.h |  3 ++-
+>>>  2 files changed, 15 insertions(+), 3 deletions(-)
 >>>
->>>  drivers/clk/sunxi-ng/Kconfig              |   10 +
->>>  drivers/clk/sunxi-ng/Makefile             |    1 +
->>>  drivers/clk/sunxi-ng/ccu-sun8i-r40.c      | 1153
->>> +++++++++++++++++++++++++++++
->>>  drivers/clk/sunxi-ng/ccu-sun8i-r40.h      |   68 ++
->>>  include/dt-bindings/clock/sun8i-r40-ccu.h |  191 +++++
->>>  include/dt-bindings/reset/sun8i-r40-ccu.h |  129 ++++
->>>  6 files changed, 1552 insertions(+)
->>>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-r40.c
->>>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-r40.h
->>>  create mode 100644 include/dt-bindings/clock/sun8i-r40-ccu.h
->>>  create mode 100644 include/dt-bindings/reset/sun8i-r40-ccu.h
+>>> diff --git a/drivers/clk/sunxi-ng/ccu_div.c
+>>> b/drivers/clk/sunxi-ng/ccu_div.c
+>>> index c0e5c10..744502a 100644
+>>> --- a/drivers/clk/sunxi-ng/ccu_div.c
+>>> +++ b/drivers/clk/sunxi-ng/ccu_div.c
+>>> @@ -21,6 +21,9 @@ static unsigned long ccu_div_round_rate(struct
+>>> ccu_mux_internal *mux,
+>>>  {
+>>>         struct ccu_div *cd = data;
 >>>
->> ...
->>>
->>> +static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_ddr1_clk, "pll-ddr1",
->>> +                                  "osc24M", 0x04c,
->>> +                                  8, 7,        /* N */
+>>> +       if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
+>>> +               rate *= cd->fixed_post_div;
+>>> +
+>>>         return divider_round_rate_parent(&cd->common.hw, parent,
+>>>                                          rate, parent_rate,
+>>>                                          cd->div.table, cd->div.width,
 >>
 >>
->> N has minimum and maximum limits.
+>>
+>> You still haven't addressed the biggest issue with this patch, see:
+>> https://patchwork.kernel.org/patch/9825565/
 >
 >
-> These constraints are never implemented in old SoCs.
+> I think he has already did the changes suggested in the review.
 
-Then we should implement them if we find that they are
-missing.
+Nope. Only half of it is fixed. First you "unapply" the post-divider,
+i.e. multiply the rate by the divider. Then you pass it to
+divider_round_rate_parent. You still have to reapply the divider
+to the result. This last part is missing. This means the clock
+rate returned by ccu_div_round_rate is going to be off.
+
+Instead the return statement should be
+
+    return divider_round_rate_parent(...) / cd->fixed_post_div
 
 ChenYu
+
+>
+> (P.S. during developing R40 CCU driver I found that pll-periph0-sata
+> also needs this patch, so I'm rechecking it)
+>
+>>
+>> Maxime
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+> --
+> You received this message because you are subscribed to the Google Groups
+> "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an
+> email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
