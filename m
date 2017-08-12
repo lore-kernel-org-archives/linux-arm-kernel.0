@@ -1,25 +1,20 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sat, 12 Aug 2017 16:44:11 +0200
-Subject: [PATCH v2 2/2] i2c: mediatek: Add i2c compatible for MediaTek
- MT7622
-In-Reply-To: <1502506672-7620-3-git-send-email-jun.gao@mediatek.com>
-References: <1502506672-7620-1-git-send-email-jun.gao@mediatek.com>
- <1502506672-7620-3-git-send-email-jun.gao@mediatek.com>
-Message-ID: <20170812144411.zqgbncsemzaolldv@ninjato>
+Date: Sat, 12 Aug 2017 16:46:52 +0200
+Subject: [PATCH  1/2] dt-bindings: i2c: Document r8a7743/5 support
+In-Reply-To: <1502191231-8682-1-git-send-email-biju.das@bp.renesas.com>
+References: <1502191231-8682-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <20170812144652.2lcfhur54pfbjihd@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Aug 08, 2017 at 12:20:31PM +0100, Biju Das wrote:
+> Document i2c Device Tree support for RZ/G1[ME]
+> (also known as r8aA774[35]) SoCs. They are compatible with
+> R-Car Gen2 SoC family.
+> 
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 
-> +static const struct i2c_adapter_quirks mt7622_i2c_quirks = {
-> +	.max_num_msgs = 255,
-> +	.max_write_len = 65535,
-> +	.max_read_len = 65535,
-> +	.max_comb_1st_msg_len = 65535,
-> +	.max_comb_2nd_msg_len = 65535,
-> +};
-
-That looks like no quirks? Then just leave the quirks pointer below
-empty.
+Applied to for-next, thanks!
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
@@ -27,4 +22,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170812/1a522185/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170812/a357e4c6/attachment-0001.sig>
