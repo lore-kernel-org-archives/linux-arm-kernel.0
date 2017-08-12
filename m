@@ -1,33 +1,51 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 12 Aug 2017 12:19:44 +0200
-Subject: [PATCH V2 2/2] pwm: bcm2835: Support for polarity setting via DT
-In-Reply-To: <1502533184-15765-1-git-send-email-stefan.wahren@i2se.com>
-References: <1502533184-15765-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1502533184-15765-3-git-send-email-stefan.wahren@i2se.com>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Sat, 12 Aug 2017 13:00:49 +0200
+Subject: [PATCH v3 01/11] ASoC: sun4i-i2s: Add clkdiv offsets to quirks
+In-Reply-To: <20170812110059.5115-1-codekipper@gmail.com>
+References: <20170812110059.5115-1-codekipper@gmail.com>
+Message-ID: <20170812110059.5115-2-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the third (optional) pwm cell to specify the
-polarity, which is needed by display backlights for example.
+From: Marcus Cooper <codekipper@gmail.com>
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-Reviewed-by: Eric Anholt <eric@anholt.net>
+The BCLKDIV and MCLKDIV found on newer SoCs start from an offset of 1.
+Add the functionality to adjust the division values according to the
+needs to the device being used.
+
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- drivers/pwm/pwm-bcm2835.c | 2 ++
- 1 file changed, 2 insertions(+)
+ sound/soc/sunxi/sun4i-i2s.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/pwm/pwm-bcm2835.c b/drivers/pwm/pwm-bcm2835.c
-index c5dbf16..db001cb 100644
---- a/drivers/pwm/pwm-bcm2835.c
-+++ b/drivers/pwm/pwm-bcm2835.c
-@@ -167,6 +167,8 @@ static int bcm2835_pwm_probe(struct platform_device *pdev)
- 	pc->chip.dev = &pdev->dev;
- 	pc->chip.ops = &bcm2835_pwm_ops;
- 	pc->chip.npwm = 2;
-+	pc->chip.of_xlate = of_pwm_xlate_with_flags;
-+	pc->chip.of_pwm_n_cells = 3;
+diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+index d7ee7a443e4e..9a35313c4f9b 100644
+--- a/sound/soc/sunxi/sun4i-i2s.c
++++ b/sound/soc/sunxi/sun4i-i2s.c
+@@ -94,9 +94,13 @@
+  * struct sun4i_i2s_quirks - Differences between SoC variants.
+  *
+  * @has_reset: SoC needs reset deasserted.
++ * @mclk_offset: Value by which mclkdiv needs to be adjusted.
++ * @bclk_offset: Value by which bclkdiv needs to be adjusted.
+  */
+ struct sun4i_i2s_quirks {
+ 	bool				has_reset;
++	unsigned int			mclk_offset;
++	unsigned int			bclk_offset;
+ };
  
- 	platform_set_drvdata(pdev, pc);
+ struct sun4i_i2s {
+@@ -237,6 +241,10 @@ static int sun4i_i2s_set_clk_rate(struct sun4i_i2s *i2s,
+ 	if (mclk_div < 0)
+ 		return -EINVAL;
  
++	/* Adjust the clock division values if needed */
++	bclk_div += i2s->variant->bclk_offset;
++	mclk_div += i2s->variant->mclk_offset;
++
+ 	regmap_write(i2s->regmap, SUN4I_I2S_CLK_DIV_REG,
+ 		     SUN4I_I2S_CLK_DIV_BCLK(bclk_div) |
+ 		     SUN4I_I2S_CLK_DIV_MCLK(mclk_div) |
 -- 
-2.7.4
+2.14.1
