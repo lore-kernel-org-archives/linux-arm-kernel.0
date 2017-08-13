@@ -1,34 +1,37 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun, 13 Aug 2017 08:21:41 +0200
-Subject: [PATCH 02/11] serial: owl: constify uart_ops structures
-In-Reply-To: <1502605310-4314-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1502605310-4314-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1502605310-4314-3-git-send-email-Julia.Lawall@lip6.fr>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sun, 13 Aug 2017 09:40:19 +0200
+Subject: [PATCH v4 2/9] mtd: nand: sharpsl.h: support partition parser
+ types
+In-Reply-To: <1498681836-3765-3-git-send-email-andrea.adami@gmail.com>
+References: <1498681836-3765-1-git-send-email-andrea.adami@gmail.com>
+ <1498681836-3765-3-git-send-email-andrea.adami@gmail.com>
+Message-ID: <20170813094019.2fced1d1@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These uart_ops structures are only stored in the ops field of a
-uart_port structure and this fields is const, so the uart_ops
-structures can also be const.
+Le Wed, 28 Jun 2017 22:30:29 +0200,
+Andrea Adami <andrea.adami@gmail.com> a ?crit :
 
-Done with the help of Coccinelle.
+Please add a commit message explaining why you're doing that.
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
+> ---
+>  include/linux/mtd/sharpsl.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/include/linux/mtd/sharpsl.h b/include/linux/mtd/sharpsl.h
+> index 65e91d0..c0e0be2 100644
+> --- a/include/linux/mtd/sharpsl.h
+> +++ b/include/linux/mtd/sharpsl.h
+> @@ -17,4 +17,5 @@ struct sharpsl_nand_platform_data {
+>  	const struct mtd_ooblayout_ops *ecc_layout;
+>  	struct mtd_partition	*partitions;
+>  	unsigned int		nr_partitions;
+> +	const char *const	*types;	/* names of parsers to use if any */
 
----
- drivers/tty/serial/owl-uart.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+types is not really descriptive here. How about 'part_parsers' or
+something clearly reflecting the purpose of this field.
 
-diff --git a/drivers/tty/serial/owl-uart.c b/drivers/tty/serial/owl-uart.c
-index 683b054..b9c85936 100644
---- a/drivers/tty/serial/owl-uart.c
-+++ b/drivers/tty/serial/owl-uart.c
-@@ -473,7 +473,7 @@ static void owl_uart_config_port(struct uart_port *port, int flags)
- 	}
- }
- 
--static struct uart_ops owl_uart_ops = {
-+static const struct uart_ops owl_uart_ops = {
- 	.set_mctrl = owl_uart_set_mctrl,
- 	.get_mctrl = owl_uart_get_mctrl,
- 	.tx_empty = owl_uart_tx_empty,
+BTW, try to avoid putting comments on the same line.
+
+>  };
