@@ -1,39 +1,215 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 13 Aug 2017 19:03:20 +0800
-Subject: [PATCH v5 09/11] ARM: dts: rk3228-evb: Enable the integrated PHY
- for gmac
-In-Reply-To: <1502373668-2767-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <201708131835.mxp4Bgpb%fengguang.wu@intel.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Sun, 13 Aug 2017 13:35:16 +0200
+Subject: [PATCH v2 2/6] edac: synopsys: Add platform specific structures
+ for ddrc controller
+In-Reply-To: <6c72eae7c1fbfd2b96d5dc1c7feb251bdbe3e591.1502091561.git.michal.simek@xilinx.com>
+References: <91fd6532076e4c905b5a228d852bba4941c54a28.1502091561.git.michal.simek@xilinx.com>
+ <6c72eae7c1fbfd2b96d5dc1c7feb251bdbe3e591.1502091561.git.michal.simek@xilinx.com>
+Message-ID: <20170813113516.GA22812@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Mon, Aug 07, 2017 at 09:39:24AM +0200, Michal Simek wrote:
+> From: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
+> 
+> Adds platform specific structures, so that we can add
 
-[auto build test ERROR on net/master]
-[also build test ERROR on v4.13-rc4 next-20170811]
-[cannot apply to net-next/master]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+"Add platform-specific structures, ..."
 
-url:    https://github.com/0day-ci/linux/commits/David-Wu/Add-the-integrated-PHY-support/20170813-163538
-config: arm-omap2plus_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+i.e., "Do this and do that" formulation. Fix that in the following
+patches too pls.
 
-All errors (new ones prefixed by >>):
+> different IP support later using quirks.
+> 
+> Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+> Changes in v2:
+> - Update commit message
+> - Update patch subject
+> - Update kernel-doc description for struct synps_platform_data
+> - Change synps_platform_data pointer names and update code
+> 
+>  drivers/edac/synopsys_edac.c | 70 ++++++++++++++++++++++++++++++++++++--------
+>  1 file changed, 58 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
+> index 0c9c59e2b5a3..293380f884fe 100644
+> --- a/drivers/edac/synopsys_edac.c
+> +++ b/drivers/edac/synopsys_edac.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/edac.h>
+>  #include <linux/module.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/of.h>
+>  
+>  #include "edac_module.h"
+>  
+> @@ -95,6 +96,9 @@
+>  #define SCRUB_MODE_MASK		0x7
+>  #define SCRUB_MODE_SECDED	0x4
+>  
+> +/* DDR ECC Quirks */
 
->> ERROR: Input tree has errors, aborting (use -f to force output)
+quirks?
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 30001 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170813/51d7c864/attachment-0001.gz>
+How is reporting ECC with an interrupt a quirk? Or whatever that define
+is...
+
+> +#define DDR_ECC_INTR_SUPPORT		BIT(0)
+> +
+>  /**
+>   * struct ecc_error_info - ECC error log information
+>   * @row:	Row number
+> @@ -130,6 +134,7 @@ struct synps_ecc_status {
+>   * @baseaddr:	Base address of the DDR controller
+>   * @message:	Buffer for framing the event specific info
+>   * @stat:	ECC status information
+> + * @p_data:	Pointer to platform data
+>   * @ce_cnt:	Correctable Error count
+>   * @ue_cnt:	Uncorrectable Error count
+>   */
+> @@ -137,11 +142,29 @@ struct synps_edac_priv {
+>  	void __iomem *baseaddr;
+>  	char message[SYNPS_EDAC_MSG_SIZE];
+>  	struct synps_ecc_status stat;
+> +	const struct synps_platform_data *p_data;
+>  	u32 ce_cnt;
+>  	u32 ue_cnt;
+>  };
+>  
+>  /**
+> + * struct synps_platform_data -  synps platform data structure
+> + * @edac_geterror_info:	function which returns the current ecc error info
+> + * @edac_get_mtype:	function which returns the memory type
+> + * @edac_get_dtype:	function which returns the DIMM type
+> + * @edac_get_eccstate:	function which returns the ecc enable/disable status
+> + * @quirks:		a bitfield of quirks
+> + */
+> +struct synps_platform_data {
+> +	int (*edac_geterror_info)(void __iomem *base,
+> +				  struct synps_ecc_status *p);
+> +	enum mem_type (*edac_get_mtype)(const void __iomem *base);
+> +	enum dev_type (*edac_get_dtype)(const void __iomem *base);
+> +	bool (*edac_get_eccstate)(void __iomem *base);
+> +	int quirks;
+
+You can just as well drop the "edac_" prefix too - those are
+driver-local things and not EDAC-core.
+
+> +};
+> +
+> +/**
+>   * synps_edac_geterror_info - Get the current ecc error info
+>   * @base:	Pointer to the base address of the ddr memory controller
+>   * @p:		Pointer to the synopsys ecc status structure
+> @@ -242,7 +265,8 @@ static void synps_edac_check(struct mem_ctl_info *mci)
+>  	struct synps_edac_priv *priv = mci->pvt_info;
+>  	int status;
+>  
+> -	status = synps_edac_geterror_info(priv->baseaddr, &priv->stat);
+> +	status = priv->p_data->edac_geterror_info(priv->baseaddr,
+> +						  &priv->stat);
+>  	if (status)
+>  		return;
+>  
+> @@ -372,10 +396,12 @@ static int synps_edac_init_csrows(struct mem_ctl_info *mci)
+>  		for (j = 0; j < csi->nr_channels; j++) {
+>  			dimm            = csi->channels[j]->dimm;
+>  			dimm->edac_mode = EDAC_FLAG_SECDED;
+> -			dimm->mtype     = synps_edac_get_mtype(priv->baseaddr);
+> +			dimm->mtype     = priv->p_data->edac_get_mtype(
+> +						priv->baseaddr);
+
+Always let it stick out, never break on the opening brace. checkpatch
+should catch that but it doesn't, for some reason.
+
+>  			dimm->nr_pages  = (size >> PAGE_SHIFT) / csi->nr_channels;
+>  			dimm->grain     = SYNPS_EDAC_ERR_GRAIN;
+> -			dimm->dtype     = synps_edac_get_dtype(priv->baseaddr);
+> +			dimm->dtype     = priv->p_data->edac_get_dtype(
+> +						priv->baseaddr);
+>  		}
+>  	}
+>  
+> @@ -423,6 +449,21 @@ static int synps_edac_mc_init(struct mem_ctl_info *mci,
+>  	return status;
+>  }
+>  
+> +static const struct synps_platform_data zynq_edac_def = {
+> +	.edac_geterror_info	= synps_edac_geterror_info,
+
+	.geterror_info	= synps_geterror_info,
+
+and so on looks perfectly fine to me.
+
+> +	.edac_get_mtype		= synps_edac_get_mtype,
+> +	.edac_get_dtype		= synps_edac_get_dtype,
+> +	.edac_get_eccstate	= synps_edac_get_eccstate,
+> +	.quirks			= 0,
+> +};
+> +
+> +static const struct of_device_id synps_edac_match[] = {
+> +	{ .compatible = "xlnx,zynq-ddrc-a05", .data = (void *)&zynq_edac_def },
+> +	{ /* end of table */ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, synps_edac_match);
+> +
+>  /**
+>   * synps_edac_mc_probe - Check controller and bind driver
+>   * @pdev:	Pointer to the platform_device struct
+> @@ -440,13 +481,22 @@ static int synps_edac_mc_probe(struct platform_device *pdev)
+>  	int rc;
+>  	struct resource *res;
+>  	void __iomem *baseaddr;
+> +	const struct of_device_id *match;
+> +	const struct synps_platform_data *p_data;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	baseaddr = devm_ioremap_resource(&pdev->dev, res);
+>  	if (IS_ERR(baseaddr))
+>  		return PTR_ERR(baseaddr);
+>  
+> -	if (!synps_edac_get_eccstate(baseaddr)) {
+> +	match = of_match_node(synps_edac_match, pdev->dev.of_node);
+> +	if (!match && !match->data) {
+> +		dev_err(&pdev->dev, "of_match_node() failed\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	p_data = (struct synps_platform_data *)match->data;
+> +	if (!(p_data->edac_get_eccstate(baseaddr))) {
+
+This patch does more than just adding platform-specific structures and
+the commit message is not talking about it.
+
+>  		edac_printk(KERN_INFO, EDAC_MC, "ECC not enabled\n");
+>  		return -ENXIO;
+>  	}
+> @@ -468,6 +518,8 @@ static int synps_edac_mc_probe(struct platform_device *pdev)
+>  
+>  	priv = mci->pvt_info;
+>  	priv->baseaddr = baseaddr;
+> +	priv->p_data = match->data;
+> +
+>  	rc = synps_edac_mc_init(mci, pdev);
+>  	if (rc) {
+>  		edac_printk(KERN_ERR, EDAC_MC,
+> @@ -486,7 +538,8 @@ static int synps_edac_mc_probe(struct platform_device *pdev)
+>  	 * Start capturing the correctable and uncorrectable errors. A write of
+>  	 * 0 starts the counters.
+>  	 */
+> -	writel(0x0, baseaddr + ECC_CTRL_OFST);
+> +	if (!(priv->p_data->quirks & DDR_ECC_INTR_SUPPORT))
+> +		writel(0x0, baseaddr + ECC_CTRL_OFST);
+
+Ditto.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
+--
