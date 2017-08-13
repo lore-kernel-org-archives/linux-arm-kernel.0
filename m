@@ -1,47 +1,40 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 13 Aug 2017 10:02:12 +0200
-Subject: [PATCH] mtd: nand: mtk: fix error return code in mtk_ecc_probe()
-In-Reply-To: <20170809163521.GA4941@embeddedgus>
-References: <20170809163521.GA4941@embeddedgus>
-Message-ID: <20170813100212.57ad0b65@bbrezillon>
+From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
+Date: Sun, 13 Aug 2017 18:00:41 +0900
+Subject: [PATCH v2 1/3] reset: uniphier: add audio systems reset control
+Message-ID: <20170813090043.3828-1-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Wed, 9 Aug 2017 11:35:21 -0500,
-"Gustavo A. R. Silva" <gustavo@embeddedor.com> a ?crit :
+Add reset lines for audio subsystem (AIO) and
+SoC internal audio codec (EVEA) on UniPhier LD11/LD20 SoCs.
 
-> platform_get_irq() returns an error code, but the mtk_ecc driver
-> ignores it and always returns -EINVAL. This is not correct and,
-> prevents -EPROBE_DEFER from being propagated properly.
-> 
-> Print and propagate the return value of platform_get_irq on failure.
-> 
-> This issue was detected with the help of Coccinelle.
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
+ drivers/reset/reset-uniphier.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Applied.
-
-Thanks,
-
-Boris
-
-> 
-> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
-> ---
->  drivers/mtd/nand/mtk_ecc.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/mtk_ecc.c b/drivers/mtd/nand/mtk_ecc.c
-> index 6c3a4aa..7f3b065 100644
-> --- a/drivers/mtd/nand/mtk_ecc.c
-> +++ b/drivers/mtd/nand/mtk_ecc.c
-> @@ -464,8 +464,8 @@ static int mtk_ecc_probe(struct platform_device *pdev)
->  
->  	irq = platform_get_irq(pdev, 0);
->  	if (irq < 0) {
-> -		dev_err(dev, "failed to get irq\n");
-> -		return -EINVAL;
-> +		dev_err(dev, "failed to get irq: %d\n", irq);
-> +		return irq;
->  	}
->  
->  	ret = dma_set_mask(dev, DMA_BIT_MASK(32));
+diff --git a/drivers/reset/reset-uniphier.c b/drivers/reset/reset-uniphier.c
+index 954b2c4e6ca7..90c52a96f775 100644
+--- a/drivers/reset/reset-uniphier.c
++++ b/drivers/reset/reset-uniphier.c
+@@ -93,6 +93,8 @@ static const struct uniphier_reset_data uniphier_ld11_sys_reset_data[] = {
+ 	UNIPHIER_RESETX(2, 0x200c, 0),		/* NAND */
+ 	UNIPHIER_RESETX(4, 0x200c, 2),		/* eMMC */
+ 	UNIPHIER_RESETX(8, 0x200c, 8),		/* STDMAC (HSC, MIO) */
++	UNIPHIER_RESETX(40, 0x2008, 0),		/* AIO */
++	UNIPHIER_RESETX(41, 0x2008, 1),		/* EVEA */
+ 	UNIPHIER_RESET_END,
+ };
+ 
+@@ -105,6 +107,8 @@ static const struct uniphier_reset_data uniphier_ld20_sys_reset_data[] = {
+ 	UNIPHIER_RESETX(17, 0x200c, 13),	/* USB30-PHY1 */
+ 	UNIPHIER_RESETX(18, 0x200c, 14),	/* USB30-PHY2 */
+ 	UNIPHIER_RESETX(19, 0x200c, 15),	/* USB30-PHY3 */
++	UNIPHIER_RESETX(40, 0x2008, 0),		/* AIO */
++	UNIPHIER_RESETX(41, 0x2008, 1),		/* EVEA */
+ 	UNIPHIER_RESET_END,
+ };
+ 
+-- 
+2.13.2
