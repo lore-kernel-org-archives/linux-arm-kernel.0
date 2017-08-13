@@ -1,40 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 13 Aug 2017 14:23:10 +0200
-Subject: [PATCH 1/4] ARM: dts: augment Ux500 to use DT cpufreq
-In-Reply-To: <20170811051515.GD3638@vireshk-i7>
-References: <20170810125221.25818-1-linus.walleij@linaro.org>
- <20170810125221.25818-2-linus.walleij@linaro.org>
- <20170811051515.GD3638@vireshk-i7>
-Message-ID: <CACRpkdZ-7yHA4Xz62K53_XM28pTNf1dNLV42Fo-Jzzx5Y7in8g@mail.gmail.com>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Sun, 13 Aug 2017 18:13:07 +0530
+Subject: [PATCH 0/6] drivers: make snd_pcm_hardware const
+Message-ID: <1502628193-3343-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 11, 2017 at 7:15 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+Make snd_pcm_hardware structures const.
 
-> For example, below will fail cpufreq on your board. You can try that
-> to make sure I am not dreaming.
->
-> - Compile cpufreq-dt as a module.
-> - Boot the board.
-> - Offline CPU0 (i.e. Keep only CPU1 online).
-> - Boom, cpufreq failed.
->
-> This will happen because the CPU1 doesn't have the operating-points
-> and other properties. We should have them in all the CPUs.
+Bhumika Goyal (6):
+  [media] usb: make snd_pcm_hardware const
+  [media] pci: make snd_pcm_hardware const
+  drm: bridge: dw-hdmi: make snd_pcm_hardware const
+  usb: gadget: make snd_pcm_hardware const
+  staging: bcm2835-audio:  make snd_pcm_hardware const
+  [media] tuners: make snd_pcm_hardware const
 
-I don't think that will be a problem because CPU0 cannot be
-taken offline on this system.
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi-ahb-audio.c       | 2 +-
+ drivers/media/pci/cobalt/cobalt-alsa-pcm.c                | 4 ++--
+ drivers/media/pci/cx18/cx18-alsa-pcm.c                    | 2 +-
+ drivers/media/pci/cx23885/cx23885-alsa.c                  | 2 +-
+ drivers/media/pci/cx25821/cx25821-alsa.c                  | 2 +-
+ drivers/media/pci/ivtv/ivtv-alsa-pcm.c                    | 2 +-
+ drivers/media/pci/saa7134/saa7134-alsa.c                  | 2 +-
+ drivers/media/tuners/tda18271-maps.c                      | 4 ++--
+ drivers/media/usb/cx231xx/cx231xx-audio.c                 | 2 +-
+ drivers/media/usb/em28xx/em28xx-audio.c                   | 2 +-
+ drivers/media/usb/go7007/snd-go7007.c                     | 2 +-
+ drivers/media/usb/tm6000/tm6000-alsa.c                    | 2 +-
+ drivers/media/usb/usbtv/usbtv-audio.c                     | 2 +-
+ drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c | 4 ++--
+ drivers/usb/gadget/function/u_audio.c                     | 2 +-
+ 15 files changed, 18 insertions(+), 18 deletions(-)
 
-arch/arm/mach-ux500/platsmp.c surely only contain code to take
-CPU1 online/offline.
-
-At sleep, the BIOS/ROM handles taking down/up CPU0 so from
-Linux' point of view that CPU is always online.
-
-But I will look a bit closer and check.
-
-This approach comes from the OMAP DT OPPs which also look like
-this (and this system is similar).
-
-Yours,
-Linus Walleij
+-- 
+1.9.1
