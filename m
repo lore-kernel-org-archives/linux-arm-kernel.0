@@ -1,9 +1,9 @@
 From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Sun, 13 Aug 2017 18:13:08 +0530
-Subject: [PATCH 1/6] [media] usb: make snd_pcm_hardware const
+Date: Sun, 13 Aug 2017 18:13:09 +0530
+Subject: [PATCH 2/6] [media] pci: make snd_pcm_hardware const
 In-Reply-To: <1502628193-3343-1-git-send-email-bhumirks@gmail.com>
 References: <1502628193-3343-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <1502628193-3343-2-git-send-email-bhumirks@gmail.com>
+Message-ID: <1502628193-3343-3-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,77 +12,100 @@ Done using Coccinelle.
 
 Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 ---
- drivers/media/usb/cx231xx/cx231xx-audio.c | 2 +-
- drivers/media/usb/em28xx/em28xx-audio.c   | 2 +-
- drivers/media/usb/go7007/snd-go7007.c     | 2 +-
- drivers/media/usb/tm6000/tm6000-alsa.c    | 2 +-
- drivers/media/usb/usbtv/usbtv-audio.c     | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/media/pci/cobalt/cobalt-alsa-pcm.c | 4 ++--
+ drivers/media/pci/cx18/cx18-alsa-pcm.c     | 2 +-
+ drivers/media/pci/cx23885/cx23885-alsa.c   | 2 +-
+ drivers/media/pci/cx25821/cx25821-alsa.c   | 2 +-
+ drivers/media/pci/ivtv/ivtv-alsa-pcm.c     | 2 +-
+ drivers/media/pci/saa7134/saa7134-alsa.c   | 2 +-
+ 6 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/media/usb/cx231xx/cx231xx-audio.c b/drivers/media/usb/cx231xx/cx231xx-audio.c
-index a050d12..06f10d7 100644
---- a/drivers/media/usb/cx231xx/cx231xx-audio.c
-+++ b/drivers/media/usb/cx231xx/cx231xx-audio.c
-@@ -403,7 +403,7 @@ static int snd_pcm_alloc_vmalloc_buffer(struct snd_pcm_substream *subs,
- 	return 0;
- }
+diff --git a/drivers/media/pci/cobalt/cobalt-alsa-pcm.c b/drivers/media/pci/cobalt/cobalt-alsa-pcm.c
+index 49013c6..b69b258 100644
+--- a/drivers/media/pci/cobalt/cobalt-alsa-pcm.c
++++ b/drivers/media/pci/cobalt/cobalt-alsa-pcm.c
+@@ -43,7 +43,7 @@
+ 			pr_info("cobalt-alsa-pcm %s: " fmt, __func__, ##arg); \
+ 	} while (0)
  
--static struct snd_pcm_hardware snd_cx231xx_hw_capture = {
-+static const struct snd_pcm_hardware snd_cx231xx_hw_capture = {
- 	.info = SNDRV_PCM_INFO_BLOCK_TRANSFER 	|
- 	    SNDRV_PCM_INFO_MMAP 		|
- 	    SNDRV_PCM_INFO_INTERLEAVED 		|
-diff --git a/drivers/media/usb/em28xx/em28xx-audio.c b/drivers/media/usb/em28xx/em28xx-audio.c
-index ffad7f1..261620a 100644
---- a/drivers/media/usb/em28xx/em28xx-audio.c
-+++ b/drivers/media/usb/em28xx/em28xx-audio.c
-@@ -216,7 +216,7 @@ static int snd_pcm_alloc_vmalloc_buffer(struct snd_pcm_substream *subs,
- 	return 0;
- }
- 
--static struct snd_pcm_hardware snd_em28xx_hw_capture = {
-+static const struct snd_pcm_hardware snd_em28xx_hw_capture = {
+-static struct snd_pcm_hardware snd_cobalt_hdmi_capture = {
++static const struct snd_pcm_hardware snd_cobalt_hdmi_capture = {
  	.info = SNDRV_PCM_INFO_BLOCK_TRANSFER |
  		SNDRV_PCM_INFO_MMAP           |
  		SNDRV_PCM_INFO_INTERLEAVED    |
-diff --git a/drivers/media/usb/go7007/snd-go7007.c b/drivers/media/usb/go7007/snd-go7007.c
-index 070871f..c618764 100644
---- a/drivers/media/usb/go7007/snd-go7007.c
-+++ b/drivers/media/usb/go7007/snd-go7007.c
-@@ -52,7 +52,7 @@ struct go7007_snd {
- 	int capturing;
+@@ -64,7 +64,7 @@
+ 	.periods_max = 4,
  };
  
--static struct snd_pcm_hardware go7007_snd_capture_hw = {
-+static const struct snd_pcm_hardware go7007_snd_capture_hw = {
- 	.info			= (SNDRV_PCM_INFO_MMAP |
- 					SNDRV_PCM_INFO_INTERLEAVED |
- 					SNDRV_PCM_INFO_BLOCK_TRANSFER |
-diff --git a/drivers/media/usb/tm6000/tm6000-alsa.c b/drivers/media/usb/tm6000/tm6000-alsa.c
-index 4223225..3717a68 100644
---- a/drivers/media/usb/tm6000/tm6000-alsa.c
-+++ b/drivers/media/usb/tm6000/tm6000-alsa.c
-@@ -143,7 +143,7 @@ static int dsp_buffer_alloc(struct snd_pcm_substream *substream, int size)
+-static struct snd_pcm_hardware snd_cobalt_playback = {
++static const struct snd_pcm_hardware snd_cobalt_playback = {
+ 	.info = SNDRV_PCM_INFO_BLOCK_TRANSFER |
+ 		SNDRV_PCM_INFO_MMAP           |
+ 		SNDRV_PCM_INFO_INTERLEAVED    |
+diff --git a/drivers/media/pci/cx18/cx18-alsa-pcm.c b/drivers/media/pci/cx18/cx18-alsa-pcm.c
+index f68ee57..aadd764 100644
+--- a/drivers/media/pci/cx18/cx18-alsa-pcm.c
++++ b/drivers/media/pci/cx18/cx18-alsa-pcm.c
+@@ -44,7 +44,7 @@
+ 				  __func__, ##arg); 			\
+ 	} while (0)
+ 
+-static struct snd_pcm_hardware snd_cx18_hw_capture = {
++static const struct snd_pcm_hardware snd_cx18_hw_capture = {
+ 	.info = SNDRV_PCM_INFO_BLOCK_TRANSFER |
+ 		SNDRV_PCM_INFO_MMAP           |
+ 		SNDRV_PCM_INFO_INTERLEAVED    |
+diff --git a/drivers/media/pci/cx23885/cx23885-alsa.c b/drivers/media/pci/cx23885/cx23885-alsa.c
+index c148f9a..d8c3637 100644
+--- a/drivers/media/pci/cx23885/cx23885-alsa.c
++++ b/drivers/media/pci/cx23885/cx23885-alsa.c
+@@ -293,7 +293,7 @@ static int dsp_buffer_free(struct cx23885_audio_dev *chip)
   */
  #define DEFAULT_FIFO_SIZE	4096
  
--static struct snd_pcm_hardware snd_tm6000_digital_hw = {
-+static const struct snd_pcm_hardware snd_tm6000_digital_hw = {
- 	.info = SNDRV_PCM_INFO_BATCH |
- 		SNDRV_PCM_INFO_MMAP |
+-static struct snd_pcm_hardware snd_cx23885_digital_hw = {
++static const struct snd_pcm_hardware snd_cx23885_digital_hw = {
+ 	.info = SNDRV_PCM_INFO_MMAP |
  		SNDRV_PCM_INFO_INTERLEAVED |
-diff --git a/drivers/media/usb/usbtv/usbtv-audio.c b/drivers/media/usb/usbtv/usbtv-audio.c
-index 9db31db..2c2ca77 100644
---- a/drivers/media/usb/usbtv/usbtv-audio.c
-+++ b/drivers/media/usb/usbtv/usbtv-audio.c
-@@ -43,7 +43,7 @@
+ 		SNDRV_PCM_INFO_BLOCK_TRANSFER |
+diff --git a/drivers/media/pci/cx25821/cx25821-alsa.c b/drivers/media/pci/cx25821/cx25821-alsa.c
+index 519b81c..2b34990 100644
+--- a/drivers/media/pci/cx25821/cx25821-alsa.c
++++ b/drivers/media/pci/cx25821/cx25821-alsa.c
+@@ -428,7 +428,7 @@ static int dsp_buffer_free(struct cx25821_audio_dev *chip)
+  * Digital hardware definition
+  */
+ #define DEFAULT_FIFO_SIZE	384
+-static struct snd_pcm_hardware snd_cx25821_digital_hw = {
++static const struct snd_pcm_hardware snd_cx25821_digital_hw = {
+ 	.info = SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+ 		SNDRV_PCM_INFO_BLOCK_TRANSFER | SNDRV_PCM_INFO_MMAP_VALID,
+ 	.formats = SNDRV_PCM_FMTBIT_S16_LE,
+diff --git a/drivers/media/pci/ivtv/ivtv-alsa-pcm.c b/drivers/media/pci/ivtv/ivtv-alsa-pcm.c
+index 417d03d..5326d86 100644
+--- a/drivers/media/pci/ivtv/ivtv-alsa-pcm.c
++++ b/drivers/media/pci/ivtv/ivtv-alsa-pcm.c
+@@ -41,7 +41,7 @@
+ 			pr_info("ivtv-alsa-pcm %s: " fmt, __func__, ##arg); \
+ 	} while (0)
  
- #include "usbtv.h"
+-static struct snd_pcm_hardware snd_ivtv_hw_capture = {
++static const struct snd_pcm_hardware snd_ivtv_hw_capture = {
+ 	.info = SNDRV_PCM_INFO_BLOCK_TRANSFER |
+ 		SNDRV_PCM_INFO_MMAP           |
+ 		SNDRV_PCM_INFO_INTERLEAVED    |
+diff --git a/drivers/media/pci/saa7134/saa7134-alsa.c b/drivers/media/pci/saa7134/saa7134-alsa.c
+index bf358ec..c59b69f 100644
+--- a/drivers/media/pci/saa7134/saa7134-alsa.c
++++ b/drivers/media/pci/saa7134/saa7134-alsa.c
+@@ -627,7 +627,7 @@ static int snd_card_saa7134_capture_prepare(struct snd_pcm_substream * substream
+  *    switching to 32kHz without any frequency translation
+  */
  
--static struct snd_pcm_hardware snd_usbtv_digital_hw = {
-+static const struct snd_pcm_hardware snd_usbtv_digital_hw = {
- 	.info = SNDRV_PCM_INFO_BATCH |
- 		SNDRV_PCM_INFO_MMAP |
- 		SNDRV_PCM_INFO_INTERLEAVED |
+-static struct snd_pcm_hardware snd_card_saa7134_capture =
++static const struct snd_pcm_hardware snd_card_saa7134_capture =
+ {
+ 	.info =                 (SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+ 				 SNDRV_PCM_INFO_BLOCK_TRANSFER |
 -- 
 1.9.1
