@@ -1,42 +1,34 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 13 Aug 2017 13:59:27 +0200
-Subject: [PATCH] arm64: dts: rockchip: remove num-slots property from
- rk3399-sapphire
-Message-ID: <20170813115927.2239-1-heiko@sntech.de>
+Date: Sun, 13 Aug 2017 14:13:01 +0200
+Subject: [PATCH v3 10/13] ARM: dts: rockchip: add saradc support for rv1108
+In-Reply-To: <1502423211-31216-1-git-send-email-andy.yan@rock-chips.com>
+References: <1502422578-30611-1-git-send-email-andy.yan@rock-chips.com>
+ <1502423211-31216-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <2309743.33rDFhBfGp@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When adding the rk3399 sapphire som, two more of the recently removed
-num-slots properties of dw-mmc nodes slipped in.
-Remove them again.
+Hi Andy,
 
-Fixes: 8164a84cca12 ("arm64: dts: rockchip: Add support for rk3399 sapphire SOM")
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-Already applied, posted for reference.
+Am Freitag, 11. August 2017, 11:46:51 CEST schrieb Andy Yan:
+> Add saradc device tree node for rv1108 soc
+> 
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> 
 
- arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi | 2 --
- 1 file changed, 2 deletions(-)
+> +	adc: adc at 1038c000 {
+> +		compatible = "rockchip,rv1108-saradc", "rockchip,rk3399-saradc";
+> +		reg = <0x1038c000 0x100>;
+> +		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
+> +		#io-channel-cells = <1>;
+> +		io-channel-ranges;
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi
-index be92a580732b..6c30bb02210d 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-sapphire.dtsi
-@@ -530,7 +530,6 @@
- 	max-frequency = <50000000>;
- 	mmc-pwrseq = <&sdio_pwrseq>;
- 	non-removable;
--	num-slots = <1>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk>;
- 	sd-uhs-sdr104;
-@@ -544,7 +543,6 @@
- 	clock-frequency = <150000000>;
- 	disable-wp;
- 	max-frequency = <150000000>;
--	num-slots = <1>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
- 	vqmmc-supply = <&vcc_sdio>;
--- 
-2.11.0
+What do you need the io-channel-ranges for?
+I.e. according to the documenation it is meant for when the adc is also
+a "bus node" and has children that should inherit channels from it.
+
+In all saradc uses so far we only have separate nodes referencing the
+adc controller (like adc-keys etc), so this does not look like it is needed?
+
+
+Heiko
