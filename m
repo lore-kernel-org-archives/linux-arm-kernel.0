@@ -1,101 +1,67 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Sun, 13 Aug 2017 10:50:40 +0800
-Subject: [PATCH v4 1/3] clk: sunxi-ng: div: Add support for fixed
- post-divider
-In-Reply-To: <20170812124352.24148-2-icenowy@aosc.io>
-References: <20170812124352.24148-1-icenowy@aosc.io>
- <20170812124352.24148-2-icenowy@aosc.io>
-Message-ID: <d47777b1acaae095020697fa7c2064ac@aosc.io>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Sun, 13 Aug 2017 11:50:40 +0800
+Subject: [Bug] ARM: cpuidle: possible memleak
+In-Reply-To: <1980049531.494543.1502543973258@email.1und1.de>
+References: <1980049531.494543.1502543973258@email.1und1.de>
+Message-ID: <20170813035040.GA13637@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-08-12 20:43?Icenowy Zheng ???
-> From: Priit Laes <plaes@plaes.org>
-> 
-> SATA clock on sun4i/sun7i is of type (parent) / M / 6 where
-> 6 is fixed post-divider.
-> 
-> Signed-off-by: Priit Laes <plaes@plaes.org>
+Hi Stefan,
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+On Sat, Aug 12, 2017 at 03:19:33PM +0200, Stefan Wahren wrote:
+> Hi,
+> 
+> if i additionally enable kmemleak (on top of multi_v7_defconfig) on RPi 3 (4 cores) with 4.13-rc4, i get the following output from kmemleak:
+> 
+> unreferenced object 0xede0dc00 (size 1024):
+>   comm "swapper/0", pid 1, jiffies 4294937431 (age 744.510s)
+>   hex dump (first 32 bytes):
+>     94 9e 0b c1 00 00 00 00 00 00 00 00 00 00 00 00  ................
+>     57 46 49 00 00 00 00 00 00 00 00 00 00 00 00 00  WFI.............
+>   backtrace:
+>     [<c1295f04>] arm_idle_init+0x44/0x1ac
+>     [<c0301e6c>] do_one_initcall+0x3c/0x16c
+>     [<c1200d70>] kernel_init_freeable+0x110/0x1d0
+>     [<c0cb3624>] kernel_init+0x8/0x114
+>     [<c0307a98>] ret_from_fork+0x14/0x3c
+>     [<ffffffff>] 0xffffffff
+> 
+> If i revert the last commit in cpuidle-arm d50a7d8acd78 ("ARM: cpuidle: Support asymmetric idle definition") then kmemleak stays calm.
 
-> ---
-> It's based on the patch in v6 of the A10/A20 CCU patchset, but with
-> ccu_div_round_rate fixed.
+I cannot reproduce the error at my side, I also tried to disable idle
+states but cannot trigger the failure. So first thing is to know the
+reason for registeration failure and finally introduce the memory
+leaking. Could you point out the dts you are using for idle states
+binding?
+
+Also reviewed a bit for the idle driver, it does have issue to handle
+failure case. I tweaked a bit for it, could you try it? Also would like
+to hear the comments from Daniel.
+
+diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+index 7080c38..80dc86f 100644
+--- a/drivers/cpuidle/cpuidle-arm.c
++++ b/drivers/cpuidle/cpuidle-arm.c
+@@ -152,11 +152,13 @@ static int __init arm_idle_init(void)
+ out_fail:
+        while (--cpu >= 0) {
+                dev = per_cpu(cpuidle_devices, cpu);
+-               cpuidle_unregister_device(dev);
+-               kfree(dev);
+-               drv = cpuidle_get_driver();
++               drv = cpuidle_get_cpu_driver(dev);
++
+                cpuidle_unregister_driver(drv);
+                kfree(drv);
++
++               cpuidle_unregister_device(dev);
++               kfree(dev);
+        }
+ 
+        return ret;
+
+
 > 
->  drivers/clk/sunxi-ng/ccu_div.c | 22 +++++++++++++++++++---
->  drivers/clk/sunxi-ng/ccu_div.h |  3 ++-
->  2 files changed, 21 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/clk/sunxi-ng/ccu_div.c 
-> b/drivers/clk/sunxi-ng/ccu_div.c
-> index c0e5c10d0091..baa3cf96507b 100644
-> --- a/drivers/clk/sunxi-ng/ccu_div.c
-> +++ b/drivers/clk/sunxi-ng/ccu_div.c
-> @@ -21,10 +21,18 @@ static unsigned long ccu_div_round_rate(struct
-> ccu_mux_internal *mux,
->  {
->  	struct ccu_div *cd = data;
-> 
-> -	return divider_round_rate_parent(&cd->common.hw, parent,
-> +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> +		rate *= cd->fixed_post_div;
-> +
-> +	rate = divider_round_rate_parent(&cd->common.hw, parent,
->  					 rate, parent_rate,
->  					 cd->div.table, cd->div.width,
->  					 cd->div.flags);
-> +
-> +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> +		rate /= cd->fixed_post_div;
-> +
-> +	return rate;
->  }
-> 
->  static void ccu_div_disable(struct clk_hw *hw)
-> @@ -62,8 +70,13 @@ static unsigned long ccu_div_recalc_rate(struct 
-> clk_hw *hw,
->  	parent_rate = ccu_mux_helper_apply_prediv(&cd->common, &cd->mux, -1,
->  						  parent_rate);
-> 
-> -	return divider_recalc_rate(hw, parent_rate, val, cd->div.table,
-> -				   cd->div.flags);
-> +	val = divider_recalc_rate(hw, parent_rate, val, cd->div.table,
-> +				  cd->div.flags);
-> +
-> +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> +		val /= cd->fixed_post_div;
-> +
-> +	return val;
->  }
-> 
->  static int ccu_div_determine_rate(struct clk_hw *hw,
-> @@ -86,6 +99,9 @@ static int ccu_div_set_rate(struct clk_hw *hw,
-> unsigned long rate,
->  	parent_rate = ccu_mux_helper_apply_prediv(&cd->common, &cd->mux, -1,
->  						  parent_rate);
-> 
-> +	if (cd->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> +		rate *= cd->fixed_post_div;
-> +
->  	val = divider_get_val(rate, parent_rate, cd->div.table, 
-> cd->div.width,
->  			      cd->div.flags);
-> 
-> diff --git a/drivers/clk/sunxi-ng/ccu_div.h 
-> b/drivers/clk/sunxi-ng/ccu_div.h
-> index 08d074451204..f3a5028dcd14 100644
-> --- a/drivers/clk/sunxi-ng/ccu_div.h
-> +++ b/drivers/clk/sunxi-ng/ccu_div.h
-> @@ -86,9 +86,10 @@ struct ccu_div_internal {
->  struct ccu_div {
->  	u32			enable;
-> 
-> -	struct ccu_div_internal		div;
-> +	struct ccu_div_internal	div;
->  	struct ccu_mux_internal	mux;
->  	struct ccu_common	common;
-> +	unsigned int		fixed_post_div;
->  };
-> 
->  #define SUNXI_CCU_DIV_TABLE_WITH_GATE(_struct, _name, _parent, _reg,	\
+> Best regards
+> Stefan
