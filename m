@@ -1,34 +1,21 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 13 Aug 2017 14:13:01 +0200
-Subject: [PATCH v3 10/13] ARM: dts: rockchip: add saradc support for rv1108
-In-Reply-To: <1502423211-31216-1-git-send-email-andy.yan@rock-chips.com>
+Date: Sun, 13 Aug 2017 14:14:59 +0200
+Subject: [PATCH v3 08/13] ARM: dts: rockchip: add watchdog dt node for
+ rv1108
+In-Reply-To: <1502423133-31097-1-git-send-email-andy.yan@rock-chips.com>
 References: <1502422578-30611-1-git-send-email-andy.yan@rock-chips.com>
- <1502423211-31216-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <2309743.33rDFhBfGp@phil>
+ <1502423133-31097-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <12628675.cIH0XWkdBn@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
-
-Am Freitag, 11. August 2017, 11:46:51 CEST schrieb Andy Yan:
-> Add saradc device tree node for rv1108 soc
+Am Freitag, 11. August 2017, 11:45:33 CEST schrieb Andy Yan:
+> Add watchdog device tree node for rv1108
 > 
 > Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-> 
 
-> +	adc: adc at 1038c000 {
-> +		compatible = "rockchip,rv1108-saradc", "rockchip,rk3399-saradc";
-> +		reg = <0x1038c000 0x100>;
-> +		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-> +		#io-channel-cells = <1>;
-> +		io-channel-ranges;
-
-What do you need the io-channel-ranges for?
-I.e. according to the documenation it is meant for when the adc is also
-a "bus node" and has children that should inherit channels from it.
-
-In all saradc uses so far we only have separate nodes referencing the
-adc controller (like adc-keys etc), so this does not look like it is needed?
+applied for 4.14
 
 
+Thanks
 Heiko
