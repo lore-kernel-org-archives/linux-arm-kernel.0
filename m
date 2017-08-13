@@ -1,57 +1,60 @@
-From: aik@ozlabs.ru (Alexey Kardashevskiy)
-Date: Mon, 14 Aug 2017 01:09:15 +1000
-Subject: SUN8I_EMAC driver wanted (for Orange Pi)
-Message-ID: <3792055e-d56f-e722-d9f8-519b46fd73dd@ozlabs.ru>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 13 Aug 2017 17:11:28 +0200
+Subject: [PATCH 0/4] DRM driver for Faraday TVE200
+Message-ID: <20170813151132.24736-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+I finally got my act together to clean up my patches and post
+this DRM driver.
 
-I have been using v4.8 with some driver I found somewhere. Ported to v4.13,
-it does not work anymore and I wonder if anyone has an idea where to get a
-working one from?
+It's an old hardware, but using all the new fancy CMA helpers
+and integrating really nicely I think. Most important: it
+JustWorks(TM) and i have a little penguin and interactive
+console on my D-Link DIR-685 router (!). Well that is not
+a serious usecase, but it kind of proves that it does all it
+should. Vblank interrupts work like a charm and all.
 
-It is for Orange Pi PC v1.3.
+It would not have been possible if I hadn't had Eric Anholts
+excellent PL11x driver to use as role model.
 
-Thanks!
+Daniel, Eric: please help me out with the next steps in your
+maintenance model, so I learn how to do this upstream work
+right with the DRM community.
 
-"Does not work" means:
+I posted the display driver separately since it is, well
+a separate business. I guess Thierry collects these drivers,
+else tell me.
 
-root at aikopi3:~# ls -l /sys/class/net/
-total 0
-lrwxrwxrwx 1 root root 0 Feb 12 04:32 eth0 ->
-../../devices/platform/soc/1c30000.ethernet/net/eth0
-lrwxrwxrwx 1 root root 0 Feb 12 04:32 lo -> ../../devices/virtual/net/lo
-root at aikopi3:~#
-root at aikopi3:~#
-root at aikopi3:~#
-root at aikopi3:~#
-root at aikopi3:~# ip addr
-1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group
-default qlen 1000
-    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
-    inet 127.0.0.1/8 scope host lo
-       valid_lft forever preferred_lft forever
-2: eth0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc pfifo_fast
-state DOWN group default qlen 1000
-    link/ether 02:20:76:db:bd:25 brd ff:ff:ff:ff:ff:ff
-root at aikopi3:~#
-root at aikopi3:~# dhclient -v eth0
-Internet Systems Consortium DHCP Client 4.3.3
-Copyright 2004-2015 Internet Systems Consortium.
-All rights reserved.
-For info, please visit https://www.isc.org/software/dhcp/
+Linus Walleij (4):
+  drm/tve200: Add DT bindings
+  drm/tve200: Add new driver for TVE200
+  ARM: dts: Add TVE200 to the Gemini SoC DTSI
+  ARM: dts: Add TVE/TVC and ILI9322 panel to DIR-685
 
-Listening on LPF/eth0/02:20:76:db:bd:25
-Sending on   LPF/eth0/02:20:76:db:bd:25
-Sending on   Socket/fallback
-DHCPREQUEST of 192.168.10.82 on eth0 to 255.255.255.255 port 67
-(xid=0x4eef31e4)
-DHCPREQUEST of 192.168.10.82 on eth0 to 255.255.255.255 port 67
-(xid=0x4eef31e4)
-^C
-
-
+ .../devicetree/bindings/display/faraday,tve200.txt |  41 +++
+ Documentation/gpu/index.rst                        |   1 +
+ Documentation/gpu/tve200.rst                       |   6 +
+ MAINTAINERS                                        |   6 +
+ arch/arm/boot/dts/gemini-dlink-dir-685.dts         |  77 ++++-
+ arch/arm/boot/dts/gemini.dtsi                      |  19 ++
+ drivers/gpu/drm/Kconfig                            |   2 +
+ drivers/gpu/drm/Makefile                           |   1 +
+ drivers/gpu/drm/tve200/Kconfig                     |  15 +
+ drivers/gpu/drm/tve200/Makefile                    |   5 +
+ drivers/gpu/drm/tve200/tve200_connector.c          | 126 ++++++++
+ drivers/gpu/drm/tve200/tve200_display.c            | 346 +++++++++++++++++++++
+ drivers/gpu/drm/tve200/tve200_drm.h                | 129 ++++++++
+ drivers/gpu/drm/tve200/tve200_drv.c                | 277 +++++++++++++++++
+ 14 files changed, 1050 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/display/faraday,tve200.txt
+ create mode 100644 Documentation/gpu/tve200.rst
+ create mode 100644 drivers/gpu/drm/tve200/Kconfig
+ create mode 100644 drivers/gpu/drm/tve200/Makefile
+ create mode 100644 drivers/gpu/drm/tve200/tve200_connector.c
+ create mode 100644 drivers/gpu/drm/tve200/tve200_display.c
+ create mode 100644 drivers/gpu/drm/tve200/tve200_drm.h
+ create mode 100644 drivers/gpu/drm/tve200/tve200_drv.c
 
 -- 
-Alexey
+2.13.4
