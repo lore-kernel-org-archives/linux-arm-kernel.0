@@ -1,36 +1,88 @@
 From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Sun, 13 Aug 2017 18:13:07 +0530
-Subject: [PATCH 0/6] drivers: make snd_pcm_hardware const
-Message-ID: <1502628193-3343-1-git-send-email-bhumirks@gmail.com>
+Date: Sun, 13 Aug 2017 18:13:08 +0530
+Subject: [PATCH 1/6] [media] usb: make snd_pcm_hardware const
+In-Reply-To: <1502628193-3343-1-git-send-email-bhumirks@gmail.com>
+References: <1502628193-3343-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <1502628193-3343-2-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make snd_pcm_hardware structures const.
+Make these const as they are only used during a copy operation.
+Done using Coccinelle.
 
-Bhumika Goyal (6):
-  [media] usb: make snd_pcm_hardware const
-  [media] pci: make snd_pcm_hardware const
-  drm: bridge: dw-hdmi: make snd_pcm_hardware const
-  usb: gadget: make snd_pcm_hardware const
-  staging: bcm2835-audio:  make snd_pcm_hardware const
-  [media] tuners: make snd_pcm_hardware const
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
+ drivers/media/usb/cx231xx/cx231xx-audio.c | 2 +-
+ drivers/media/usb/em28xx/em28xx-audio.c   | 2 +-
+ drivers/media/usb/go7007/snd-go7007.c     | 2 +-
+ drivers/media/usb/tm6000/tm6000-alsa.c    | 2 +-
+ drivers/media/usb/usbtv/usbtv-audio.c     | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
- drivers/gpu/drm/bridge/synopsys/dw-hdmi-ahb-audio.c       | 2 +-
- drivers/media/pci/cobalt/cobalt-alsa-pcm.c                | 4 ++--
- drivers/media/pci/cx18/cx18-alsa-pcm.c                    | 2 +-
- drivers/media/pci/cx23885/cx23885-alsa.c                  | 2 +-
- drivers/media/pci/cx25821/cx25821-alsa.c                  | 2 +-
- drivers/media/pci/ivtv/ivtv-alsa-pcm.c                    | 2 +-
- drivers/media/pci/saa7134/saa7134-alsa.c                  | 2 +-
- drivers/media/tuners/tda18271-maps.c                      | 4 ++--
- drivers/media/usb/cx231xx/cx231xx-audio.c                 | 2 +-
- drivers/media/usb/em28xx/em28xx-audio.c                   | 2 +-
- drivers/media/usb/go7007/snd-go7007.c                     | 2 +-
- drivers/media/usb/tm6000/tm6000-alsa.c                    | 2 +-
- drivers/media/usb/usbtv/usbtv-audio.c                     | 2 +-
- drivers/staging/vc04_services/bcm2835-audio/bcm2835-pcm.c | 4 ++--
- drivers/usb/gadget/function/u_audio.c                     | 2 +-
- 15 files changed, 18 insertions(+), 18 deletions(-)
-
+diff --git a/drivers/media/usb/cx231xx/cx231xx-audio.c b/drivers/media/usb/cx231xx/cx231xx-audio.c
+index a050d12..06f10d7 100644
+--- a/drivers/media/usb/cx231xx/cx231xx-audio.c
++++ b/drivers/media/usb/cx231xx/cx231xx-audio.c
+@@ -403,7 +403,7 @@ static int snd_pcm_alloc_vmalloc_buffer(struct snd_pcm_substream *subs,
+ 	return 0;
+ }
+ 
+-static struct snd_pcm_hardware snd_cx231xx_hw_capture = {
++static const struct snd_pcm_hardware snd_cx231xx_hw_capture = {
+ 	.info = SNDRV_PCM_INFO_BLOCK_TRANSFER 	|
+ 	    SNDRV_PCM_INFO_MMAP 		|
+ 	    SNDRV_PCM_INFO_INTERLEAVED 		|
+diff --git a/drivers/media/usb/em28xx/em28xx-audio.c b/drivers/media/usb/em28xx/em28xx-audio.c
+index ffad7f1..261620a 100644
+--- a/drivers/media/usb/em28xx/em28xx-audio.c
++++ b/drivers/media/usb/em28xx/em28xx-audio.c
+@@ -216,7 +216,7 @@ static int snd_pcm_alloc_vmalloc_buffer(struct snd_pcm_substream *subs,
+ 	return 0;
+ }
+ 
+-static struct snd_pcm_hardware snd_em28xx_hw_capture = {
++static const struct snd_pcm_hardware snd_em28xx_hw_capture = {
+ 	.info = SNDRV_PCM_INFO_BLOCK_TRANSFER |
+ 		SNDRV_PCM_INFO_MMAP           |
+ 		SNDRV_PCM_INFO_INTERLEAVED    |
+diff --git a/drivers/media/usb/go7007/snd-go7007.c b/drivers/media/usb/go7007/snd-go7007.c
+index 070871f..c618764 100644
+--- a/drivers/media/usb/go7007/snd-go7007.c
++++ b/drivers/media/usb/go7007/snd-go7007.c
+@@ -52,7 +52,7 @@ struct go7007_snd {
+ 	int capturing;
+ };
+ 
+-static struct snd_pcm_hardware go7007_snd_capture_hw = {
++static const struct snd_pcm_hardware go7007_snd_capture_hw = {
+ 	.info			= (SNDRV_PCM_INFO_MMAP |
+ 					SNDRV_PCM_INFO_INTERLEAVED |
+ 					SNDRV_PCM_INFO_BLOCK_TRANSFER |
+diff --git a/drivers/media/usb/tm6000/tm6000-alsa.c b/drivers/media/usb/tm6000/tm6000-alsa.c
+index 4223225..3717a68 100644
+--- a/drivers/media/usb/tm6000/tm6000-alsa.c
++++ b/drivers/media/usb/tm6000/tm6000-alsa.c
+@@ -143,7 +143,7 @@ static int dsp_buffer_alloc(struct snd_pcm_substream *substream, int size)
+  */
+ #define DEFAULT_FIFO_SIZE	4096
+ 
+-static struct snd_pcm_hardware snd_tm6000_digital_hw = {
++static const struct snd_pcm_hardware snd_tm6000_digital_hw = {
+ 	.info = SNDRV_PCM_INFO_BATCH |
+ 		SNDRV_PCM_INFO_MMAP |
+ 		SNDRV_PCM_INFO_INTERLEAVED |
+diff --git a/drivers/media/usb/usbtv/usbtv-audio.c b/drivers/media/usb/usbtv/usbtv-audio.c
+index 9db31db..2c2ca77 100644
+--- a/drivers/media/usb/usbtv/usbtv-audio.c
++++ b/drivers/media/usb/usbtv/usbtv-audio.c
+@@ -43,7 +43,7 @@
+ 
+ #include "usbtv.h"
+ 
+-static struct snd_pcm_hardware snd_usbtv_digital_hw = {
++static const struct snd_pcm_hardware snd_usbtv_digital_hw = {
+ 	.info = SNDRV_PCM_INFO_BATCH |
+ 		SNDRV_PCM_INFO_MMAP |
+ 		SNDRV_PCM_INFO_INTERLEAVED |
 -- 
 1.9.1
