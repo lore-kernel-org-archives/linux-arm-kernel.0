@@ -1,81 +1,25 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 13 Aug 2017 12:10:06 +0200 (CEST)
-Subject: [Bug] ARM: cpuidle: possible memleak
-In-Reply-To: <20170813035040.GA13637@leoy-linaro>
-References: <1980049531.494543.1502543973258@email.1und1.de>
- <20170813035040.GA13637@leoy-linaro>
-Message-ID: <37728512.316309.1502619006183@email.1und1.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 13 Aug 2017 12:54:50 +0200
+Subject: [PATCH v3 06/13] dt-bindings: pwm: add description for rv1108 pwm
+In-Reply-To: <1502423046-30988-1-git-send-email-andy.yan@rock-chips.com>
+References: <1502422578-30611-1-git-send-email-andy.yan@rock-chips.com>
+ <1502423046-30988-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <3776993.0yRkRa75EH@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo,
+Hi Andy,
 
-> Leo Yan <leo.yan@linaro.org> hat am 13. August 2017 um 05:50 geschrieben:
+Am Freitag, 11. August 2017, 11:44:06 CEST schrieb Andy Yan:
+> Add device tree bindings document for pwm on
+> rockchip rv1108 soc.
 > 
-> 
-> Hi Stefan,
-> 
-> On Sat, Aug 12, 2017 at 03:19:33PM +0200, Stefan Wahren wrote:
-> > Hi,
-> > 
-> > if i additionally enable kmemleak (on top of multi_v7_defconfig) on RPi 3 (4 cores) with 4.13-rc4, i get the following output from kmemleak:
-> > 
-> > unreferenced object 0xede0dc00 (size 1024):
-> >   comm "swapper/0", pid 1, jiffies 4294937431 (age 744.510s)
-> >   hex dump (first 32 bytes):
-> >     94 9e 0b c1 00 00 00 00 00 00 00 00 00 00 00 00  ................
-> >     57 46 49 00 00 00 00 00 00 00 00 00 00 00 00 00  WFI.............
-> >   backtrace:
-> >     [<c1295f04>] arm_idle_init+0x44/0x1ac
-> >     [<c0301e6c>] do_one_initcall+0x3c/0x16c
-> >     [<c1200d70>] kernel_init_freeable+0x110/0x1d0
-> >     [<c0cb3624>] kernel_init+0x8/0x114
-> >     [<c0307a98>] ret_from_fork+0x14/0x3c
-> >     [<ffffffff>] 0xffffffff
-> > 
-> > If i revert the last commit in cpuidle-arm d50a7d8acd78 ("ARM: cpuidle: Support asymmetric idle definition") then kmemleak stays calm.
-> 
-> I cannot reproduce the error at my side, I also tried to disable idle
-> states but cannot trigger the failure. So first thing is to know the
-> reason for registeration failure and finally introduce the memory
-> leaking. Could you point out the dts you are using for idle states
-> binding?
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
-thanks for you quick response. Sorry, i forgot to mention that arch/arm64/boot/dts/broadcom/bcm2837.dtsi doesn't contain any idle states. So the error path of dt_init_idle_driver() is expected. If i get it right, the clean up loop after out_fail only handles registered drivers (better label name or a comment would be helpful). So combined with your fix the following fixes the memleak for me (didn't test the clean up loop):
+I think you forgot to add Thierry (thierry.reding at gmail.com)
+who is the pwm maintainer, to your binding patch.
 
-diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-index 7080c38..827ab25 100644
---- a/drivers/cpuidle/cpuidle-arm.c
-+++ b/drivers/cpuidle/cpuidle-arm.c
-@@ -104,12 +104,14 @@ static int __init arm_idle_init(void)
- 		ret = dt_init_idle_driver(drv, arm_idle_state_match, 1);
- 		if (ret <= 0) {
- 			ret = ret ? : -ENODEV;
-+			kfree(drv);
- 			goto out_fail;
- 		}
- 
- 		ret = cpuidle_register_driver(drv);
- 		if (ret) {
- 			pr_err("Failed to register cpuidle driver\n");
-+			kfree(drv);
- 			goto out_fail;
- 		}
- 
-@@ -152,11 +154,13 @@ static int __init arm_idle_init(void)
- out_fail:
- 	while (--cpu >= 0) {
- 		dev = per_cpu(cpuidle_devices, cpu);
--		cpuidle_unregister_device(dev);
--		kfree(dev);
--		drv = cpuidle_get_driver();
-+		drv = cpuidle_get_cpu_driver(dev);
-+
- 		cpuidle_unregister_driver(drv);
- 		kfree(drv);
-+
-+		cpuidle_unregister_device(dev);
-+		kfree(dev);
- 	}
- 
- 	return ret;
+Especially, as normally he would take this binding patch.
+
+
+Heiko
