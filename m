@@ -1,69 +1,59 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 13 Aug 2017 17:11:29 +0200
-Subject: [PATCH 1/4] drm/tve200: Add DT bindings
+Date: Sun, 13 Aug 2017 17:11:31 +0200
+Subject: [PATCH 3/4] ARM: dts: Add TVE200 to the Gemini SoC DTSI
 In-Reply-To: <20170813151132.24736-1-linus.walleij@linaro.org>
 References: <20170813151132.24736-1-linus.walleij@linaro.org>
-Message-ID: <20170813151132.24736-2-linus.walleij@linaro.org>
+Message-ID: <20170813151132.24736-4-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds device tree bindings for the Faraday TVE200 IP block.
-This IP block is present in the Gemini ARM SoC and also in some
-Grain Media GMxxxx SoCs.
+The Faraday TVE200 is present in the Gemini SoC, sometimes
+under the name "TVC". Add it to the SoC DTSI file along with
+its resources.
 
-Cc: devicetree at vger.kernel.org
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- .../devicetree/bindings/display/faraday,tve200.txt | 41 ++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/faraday,tve200.txt
+DRM developers: I will merge this patch through the ARM SoC
+tree. It is only included in this series for completion.
+---
+ arch/arm/boot/dts/gemini.dtsi | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/faraday,tve200.txt b/Documentation/devicetree/bindings/display/faraday,tve200.txt
-new file mode 100644
-index 000000000000..95d588fbb2f2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/faraday,tve200.txt
-@@ -0,0 +1,41 @@
-+* Faraday TV Encoder TVE200
+diff --git a/arch/arm/boot/dts/gemini.dtsi b/arch/arm/boot/dts/gemini.dtsi
+index c68e8d430234..f4957545e558 100644
+--- a/arch/arm/boot/dts/gemini.dtsi
++++ b/arch/arm/boot/dts/gemini.dtsi
+@@ -141,6 +141,12 @@
+ 						groups = "idegrp";
+ 					};
+ 				};
++				tvc_default_pins: pinctrl-tvc {
++					mux {
++						function = "tvc";
++						groups = "tvcgrp";
++					};
++				};
+ 			};
+ 		};
+ 
+@@ -346,5 +352,18 @@
+ 			memcpy-bus-width = <32>;
+ 			#dma-cells = <2>;
+ 		};
 +
-+Required properties:
-+
-+- compatible: must be one of:
-+	"faraday,tve200"
-+	"cortina,gemini-tvc", "faraday,tve200"
-+
-+- reg: base address and size of the control registers block
-+
-+- interrupts: contains an interrupt specifier for the interrupt
-+	line from the TVE200
-+
-+- clock-names: should contain "PCLK" for the clock line clocking the
-+	silicon and "TVE" for the 27MHz clock to the video driver
-+
-+- clocks: contains phandle and clock specifier pairs for the entries
-+	in the clock-names property. See
-+	Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Optional properties:
-+
-+- resets: contains the reset line phandle for the block
-+
-+Required sub-nodes:
-+
-+- port: describes LCD panel signals, following the common binding
-+	for video transmitter interfaces; see
-+	Documentation/devicetree/bindings/media/video-interfaces.txt
-+
-+Example:
-+
-+tvc at 6a000000 {
-+	compatible = "faraday,tve200";
-+	reg = <0x6a000000 0x1000>;
-+	interrupts = <13 IRQ_TYPE_EDGE_RISING>;
-+	resets = <&syscon GEMINI_RESET_TVC>;
-+	clocks = <&syscon GEMINI_CLK_GATE_TVC>,
-+		 <&syscon GEMINI_CLK_TVC>;
-+	clock-names = "PCLK", "TVE";
-+};
++		tvc at 6a000000 {
++			compatible = "cortina,gemini-tvc", "faraday,tve200";
++			reg = <0x6a000000 0x1000>;
++			interrupts = <13 IRQ_TYPE_EDGE_RISING>;
++			resets = <&syscon GEMINI_RESET_TVC>;
++			clocks = <&syscon GEMINI_CLK_GATE_TVC>,
++				 <&syscon GEMINI_CLK_TVC>;
++			clock-names = "PCLK", "TVE";
++			pinctrl-names = "default";
++			pinctrl-0 = <&tvc_default_pins>;
++			status = "disabled";
++		};
+ 	};
+ };
 -- 
 2.13.4
