@@ -1,75 +1,90 @@
 From: bp@alien8.de (Borislav Petkov)
-Date: Sun, 13 Aug 2017 15:02:02 +0200
-Subject: [PATCH v2 4/6] edac: synopsys: Add ECC error injection support
-In-Reply-To: <738dd1ea12078f98e91d782b3266a41f7918f922.1502091561.git.michal.simek@xilinx.com>
+Date: Sun, 13 Aug 2017 15:08:36 +0200
+Subject: [PATCH v2 5/6] edac: synopsys: Update ECC error message info
+In-Reply-To: <b0fa5fc740ccbe8c13cec9886c6836df2e3042cd.1502091561.git.michal.simek@xilinx.com>
 References: <91fd6532076e4c905b5a228d852bba4941c54a28.1502091561.git.michal.simek@xilinx.com>
- <738dd1ea12078f98e91d782b3266a41f7918f922.1502091561.git.michal.simek@xilinx.com>
-Message-ID: <20170813130202.GA24994@nazgul.tnic>
+ <b0fa5fc740ccbe8c13cec9886c6836df2e3042cd.1502091561.git.michal.simek@xilinx.com>
+Message-ID: <20170813130836.GB24994@nazgul.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 09:39:26AM +0200, Michal Simek wrote:
-> @@ -181,6 +187,38 @@
->  #define MEM_TYPE_DDR4	0x10
->  #define MEM_TYPE_LPDDR4	0x10
+On Mon, Aug 07, 2017 at 09:39:27AM +0200, Michal Simek wrote:
+> From: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
+> 
+> This patch updates the ECC error message info
+> for zynqmp ddrc. added Block number and Bankgroup
+> in the message info.
+> 
+> Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+> Changes in v2:
+> - s/ecc/ECC/ in commit message
+> 
+>  drivers/edac/synopsys_edac.c | 27 +++++++++++++++++++++------
+>  1 file changed, 21 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/edac/synopsys_edac.c b/drivers/edac/synopsys_edac.c
+> index 4cd9e3d8161c..24490334a4f2 100644
+> --- a/drivers/edac/synopsys_edac.c
+> +++ b/drivers/edac/synopsys_edac.c
+> @@ -418,9 +418,17 @@ static void synps_edac_handle_error(struct mem_ctl_info *mci,
 >  
-> +/* DDRC Software control register */
-> +#define DDRC_SWCTL	0x320
-> +
-> +/* DDRC ECC CE & UE poison mask */
-> +#define ECC_CEPOISON_MASK	0x3
-> +#define ECC_UEPOISON_MASK	0x1
-> +
-> +/* DDRC Device config masks */
-> +#define DDRC_MSTR_DEV_CONFIG_MASK	0xC0000000
-> +#define DDRC_MSTR_DEV_CONFIG_SHIFT	30
-> +#define DDRC_MSTR_DEV_CONFIG_X4_MASK	0
-> +#define DDRC_MSTR_DEV_CONFIG_X8_MASK	1
-> +#define DDRC_MSTR_DEV_CONFIG_X16_MASK	0x10
-> +#define DDRC_MSTR_DEV_CONFIG_X32_MASK	0X11
+>  	if (p->ce_cnt) {
+>  		pinf = &p->ceinfo;
+> -		snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
+> -			 "DDR ECC error type :%s Row %d Bank %d Col %d ",
+> -			 "CE", pinf->row, pinf->bank, pinf->col);
+> +		if (priv->p_data->quirks == 0)
 
-Ox
+		if (!priv->...)
+
+> +			snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
+> +				 "DDR ECC error type :%s Row %d Bank %d Col %d ",
+> +				 "CE", pinf->row, pinf->bank, pinf->col);
+> +		else
+> +			snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
+> +				 "DDR ECC error type :%s Row %d Bank %d Col %d "
+> +				 "BankGroup Number %d Block Number %d",
+> +				 "CE", pinf->row, pinf->bank, pinf->col,
+> +				 pinf->bankgrpnr, pinf->blknr);
 
 > +
-> +/* DDR4 and DDR3 device Row,Column,Bank Mapping */
-> +#define DDR4_COL_SHIFT		3
-> +#define DDR4_BANKGRP_SHIFT	13
-> +#define DDR4_BANK_SHIFT		15
-> +#define DDR4_ROW_SHIFT		17
-> +#define DDR4_COL_MASK		0x3FF
-> +#define DDR4_BANKGRP_MASK	0x3
-> +#define DDR4_BANK_MASK		0x3
-> +#define DDR4_ROW_MASK		0x7FFF
-> +
-> +#define DDR3_COL_SHIFT		3
-> +#define DDR3_BANK_SHIFT		13
-> +#define DDR3_ROW_SHIFT		16
-> +#define DDR3_COL_MASK		0x3FF
-> +#define DDR3_BANK_MASK		0x7
-> +#define DDR3_ROW_MASK		0x3FFF
-> +
->  /**
->   * struct ecc_error_info - ECC error log information
->   * @row:	Row number
-> @@ -223,6 +261,7 @@ struct synps_ecc_status {
->   * @p_data:	Pointer to platform data
->   * @ce_cnt:	Correctable Error count
->   * @ue_cnt:	Uncorrectable Error count
-> + * @poison_addr: Data poison address
->   */
->  struct synps_edac_priv {
->  	void __iomem *baseaddr;
-> @@ -231,6 +270,7 @@ struct synps_edac_priv {
->  	const struct synps_platform_data *p_data;
->  	u32 ce_cnt;
->  	u32 ue_cnt;
-> +	ulong poison_addr;
+>  		edac_mc_handle_error(HW_EVENT_ERR_CORRECTED, mci,
+>  				     p->ce_cnt, 0, 0, 0, 0, 0, -1,
+>  				     priv->message, "");
+> @@ -428,9 +436,16 @@ static void synps_edac_handle_error(struct mem_ctl_info *mci,
+>  
+>  	if (p->ue_cnt) {
+>  		pinf = &p->ueinfo;
+> -		snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
+> -			 "DDR ECC error type :%s Row %d Bank %d Col %d ",
+> -			 "UE", pinf->row, pinf->bank, pinf->col);
+> +		if (priv->p_data->quirks == 0)
 
-unsigned long
+Ditto.
 
-Also, this error injection interface needs to go to debugfs and be
-behind CONFIG_EDAC_DEBUG. We don't want error injection capability
-present on production systems.
+> +			snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
+> +				 "DDR ECC error type :%s Row %d Bank %d Col %d ",
+> +				"UE", pinf->row, pinf->bank, pinf->col);
+> +		else
+> +			snprintf(priv->message, SYNPS_EDAC_MSG_SIZE,
+> +				 "DDR ECC error type :%s Row %d Bank %d Col %d "
+> +				 "BankGroup Number %d Block Number %d",
+> +				 "UE", pinf->row, pinf->bank, pinf->col,
+
+WARNING: quoted string split across lines
+#51: FILE: drivers/edac/synopsys_edac.c:428:
++                                "DDR ECC error type :%s Row %d Bank %d Col %d "
++                                "BankGroup Number %d Block Number %d",
+
+WARNING: quoted string split across lines
+#72: FILE: drivers/edac/synopsys_edac.c:446:
++                                "DDR ECC error type :%s Row %d Bank %d Col %d "
++                                "BankGroup Number %d Block Number %d",
+
+And above too. Put strings on a single line for easier grepping.
 
 -- 
 Regards/Gruss,
