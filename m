@@ -1,36 +1,59 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 13 Aug 2017 15:34:45 +0200
-Subject: [PATCH 2/3] mfd: tps65010: move header file out of I2C realm
-In-Reply-To: <20170523071819.4zpdef7ofzz3moil@dell>
+Date: Sun, 13 Aug 2017 15:37:00 +0200
+Subject: [PATCH 3/3] mfd: twl: move header file out of I2C realm
+In-Reply-To: <20170706070352.xdecvsnremwqed72@dell>
 References: <20170521220212.1404-1-wsa@the-dreams.de>
- <20170521220212.1404-3-wsa@the-dreams.de>
- <20170523071819.4zpdef7ofzz3moil@dell>
-Message-ID: <20170813133445.vqbfelwshvrififp@ninjato>
+ <20170521220212.1404-4-wsa@the-dreams.de>
+ <20170706064453.GH16144@ulmo.fritz.box>
+ <20170706070352.xdecvsnremwqed72@dell>
+Message-ID: <20170813133700.tv4ka7anvbzcplr7@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 23, 2017 at 08:18:19AM +0100, Lee Jones wrote:
-> On Mon, 22 May 2017, Wolfram Sang wrote:
+On Thu, Jul 06, 2017 at 08:03:52AM +0100, Lee Jones wrote:
+> On Thu, 06 Jul 2017, Thierry Reding wrote:
 > 
-> > include/linux/i2c is not for client devices. Move the header file to a
-> > more appropriate location.
+> > On Mon, May 22, 2017 at 12:02:10AM +0200, Wolfram Sang wrote:
+> > > include/linux/i2c is not for client devices. Move the header file to a
+> > > more appropriate location.
+> > > 
+> > > Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> > > ---
+> > >  arch/arm/mach-omap2/common.h            | 2 +-
+> > >  arch/arm/mach-omap2/omap_twl.c          | 2 +-
+> > >  drivers/gpio/gpio-twl4030.c             | 2 +-
+> > >  drivers/iio/adc/twl4030-madc.c          | 2 +-
+> > >  drivers/iio/adc/twl6030-gpadc.c         | 2 +-
+> > >  drivers/input/keyboard/twl4030_keypad.c | 2 +-
+> > >  drivers/input/misc/twl4030-pwrbutton.c  | 2 +-
+> > >  drivers/input/misc/twl4030-vibra.c      | 2 +-
+> > >  drivers/mfd/twl-core.c                  | 6 +++---
+> > >  drivers/mfd/twl4030-audio.c             | 2 +-
+> > >  drivers/mfd/twl4030-irq.c               | 2 +-
+> > >  drivers/mfd/twl4030-power.c             | 2 +-
+> > >  drivers/mfd/twl6030-irq.c               | 2 +-
+> > >  drivers/phy/phy-twl4030-usb.c           | 2 +-
+> > >  drivers/power/supply/twl4030_charger.c  | 2 +-
+> > >  drivers/pwm/pwm-twl-led.c               | 2 +-
+> > >  drivers/pwm/pwm-twl.c                   | 2 +-
+> > >  drivers/regulator/twl-regulator.c       | 2 +-
+> > >  drivers/regulator/twl6030-regulator.c   | 2 +-
+> > >  drivers/rtc/rtc-twl.c                   | 2 +-
+> > >  drivers/usb/phy/phy-twl6030-usb.c       | 2 +-
+> > >  drivers/video/backlight/pandora_bl.c    | 2 +-
+> > >  drivers/watchdog/twl4030_wdt.c          | 2 +-
+> > >  include/linux/{i2c => mfd}/twl.h        | 0
+> > >  sound/soc/codecs/twl4030.c              | 2 +-
+> > >  25 files changed, 26 insertions(+), 26 deletions(-)
+> > >  rename include/linux/{i2c => mfd}/twl.h (100%)
 > > 
-> > Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> > ---
-> >  arch/arm/mach-omap1/board-h2-mmc.c      | 2 +-
-> >  arch/arm/mach-omap1/board-h2.c          | 2 +-
-> >  arch/arm/mach-omap1/board-h3-mmc.c      | 2 +-
-> >  arch/arm/mach-omap1/board-h3.c          | 2 +-
-> >  arch/arm/mach-omap1/board-osk.c         | 2 +-
-> >  arch/arm/mach-s3c24xx/mach-osiris-dvs.c | 2 +-
-> >  arch/arm/mach-s3c24xx/mach-osiris.c     | 2 +-
+> > I didn't see this get applied yet, so just in case anyone was waiting
+> > for me (this is trivial, so I don't think there's a need):
 > 
-> >  drivers/mfd/tps65010.c                  | 2 +-
-> 
-> For my own reference:
->   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+> You're not the last. :)
 
-Same here: ok for 4.14 or something needed?
+Given the triviality of the change for non-MFD subsystems, can we apply
+this for 4.14?
 
 -------------- next part --------------
 A non-text attachment was scrubbed...
@@ -38,4 +61,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170813/cc212666/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170813/69b57bdd/attachment.sig>
