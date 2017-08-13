@@ -1,37 +1,47 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sun, 13 Aug 2017 09:40:19 +0200
-Subject: [PATCH v4 2/9] mtd: nand: sharpsl.h: support partition parser
- types
-In-Reply-To: <1498681836-3765-3-git-send-email-andrea.adami@gmail.com>
-References: <1498681836-3765-1-git-send-email-andrea.adami@gmail.com>
- <1498681836-3765-3-git-send-email-andrea.adami@gmail.com>
-Message-ID: <20170813094019.2fced1d1@bbrezillon>
+Date: Sun, 13 Aug 2017 10:02:12 +0200
+Subject: [PATCH] mtd: nand: mtk: fix error return code in mtk_ecc_probe()
+In-Reply-To: <20170809163521.GA4941@embeddedgus>
+References: <20170809163521.GA4941@embeddedgus>
+Message-ID: <20170813100212.57ad0b65@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Wed, 28 Jun 2017 22:30:29 +0200,
-Andrea Adami <andrea.adami@gmail.com> a ?crit :
+Le Wed, 9 Aug 2017 11:35:21 -0500,
+"Gustavo A. R. Silva" <gustavo@embeddedor.com> a ?crit :
 
-Please add a commit message explaining why you're doing that.
-
-> Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
-> ---
->  include/linux/mtd/sharpsl.h | 1 +
->  1 file changed, 1 insertion(+)
+> platform_get_irq() returns an error code, but the mtk_ecc driver
+> ignores it and always returns -EINVAL. This is not correct and,
+> prevents -EPROBE_DEFER from being propagated properly.
 > 
-> diff --git a/include/linux/mtd/sharpsl.h b/include/linux/mtd/sharpsl.h
-> index 65e91d0..c0e0be2 100644
-> --- a/include/linux/mtd/sharpsl.h
-> +++ b/include/linux/mtd/sharpsl.h
-> @@ -17,4 +17,5 @@ struct sharpsl_nand_platform_data {
->  	const struct mtd_ooblayout_ops *ecc_layout;
->  	struct mtd_partition	*partitions;
->  	unsigned int		nr_partitions;
-> +	const char *const	*types;	/* names of parsers to use if any */
+> Print and propagate the return value of platform_get_irq on failure.
+> 
+> This issue was detected with the help of Coccinelle.
 
-types is not really descriptive here. How about 'part_parsers' or
-something clearly reflecting the purpose of this field.
+Applied.
 
-BTW, try to avoid putting comments on the same line.
+Thanks,
 
->  };
+Boris
+
+> 
+> Signed-off-by: Gustavo A. R. Silva <gustavo@embeddedor.com>
+> ---
+>  drivers/mtd/nand/mtk_ecc.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/mtk_ecc.c b/drivers/mtd/nand/mtk_ecc.c
+> index 6c3a4aa..7f3b065 100644
+> --- a/drivers/mtd/nand/mtk_ecc.c
+> +++ b/drivers/mtd/nand/mtk_ecc.c
+> @@ -464,8 +464,8 @@ static int mtk_ecc_probe(struct platform_device *pdev)
+>  
+>  	irq = platform_get_irq(pdev, 0);
+>  	if (irq < 0) {
+> -		dev_err(dev, "failed to get irq\n");
+> -		return -EINVAL;
+> +		dev_err(dev, "failed to get irq: %d\n", irq);
+> +		return irq;
+>  	}
+>  
+>  	ret = dma_set_mask(dev, DMA_BIT_MASK(32));
