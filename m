@@ -1,32 +1,33 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 14 Aug 2017 13:40:11 +0200
-Subject: [v6 01/15] x86/mm: reserve only exiting low pages
-In-Reply-To: <47ebf53b-ea8b-1822-a63a-3682ed2f4753@oracle.com>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-2-git-send-email-pasha.tatashin@oracle.com>
- <20170811080706.GC30811@dhcp22.suse.cz>
- <47ebf53b-ea8b-1822-a63a-3682ed2f4753@oracle.com>
-Message-ID: <20170814114011.GG19063@dhcp22.suse.cz>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Mon, 14 Aug 2017 17:08:44 +0530
+Subject: [PATCH 05/11] ASoC: omap: make snd_soc_platform_driver const
+In-Reply-To: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
+References: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <1502710730-18912-6-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 11-08-17 11:24:55, Pasha Tatashin wrote:
-[...]
-> >>In this patchset we will stop zeroing struct page memory during allocation.
-> >>Therefore, this bug must be fixed in order to avoid random assert failures
-> >>caused by CONFIG_DEBUG_VM_PGFLAGS triggers.
-> >>
-> >>The fix is to reserve memory from the first existing PFN.
-> >
-> >Hmm, I assume this is a result of some assert triggering, right? Which
-> >one? Why don't we need the same treatment for other than x86 arch?
-> 
-> Correct, the pgflags asserts were triggered when we were setting reserved
-> flags to struct page for PFN 0 in which was never initialized through
-> __init_single_page(). The reason they were triggered is because we set all
-> uninitialized memory to ones in one of the debug patches.
+Make this const as it is only passed as the 2nd argument to the
+function devm_snd_soc_register_platform, which is of type const.
+Done using Coccinelle.
 
-And why don't we need the same treatment for other architectures?
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
+ sound/soc/omap/omap-pcm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/omap/omap-pcm.c b/sound/soc/omap/omap-pcm.c
+index 94e9ff7..1283473 100644
+--- a/sound/soc/omap/omap-pcm.c
++++ b/sound/soc/omap/omap-pcm.c
+@@ -243,7 +243,7 @@ static int omap_pcm_new(struct snd_soc_pcm_runtime *rtd)
+ 	return ret;
+ }
+ 
+-static struct snd_soc_platform_driver omap_soc_platform = {
++static const struct snd_soc_platform_driver omap_soc_platform = {
+ 	.ops		= &omap_pcm_ops,
+ 	.pcm_new	= omap_pcm_new,
+ 	.pcm_free	= omap_pcm_free_dma_buffers,
 -- 
-Michal Hocko
-SUSE Labs
+1.9.1
