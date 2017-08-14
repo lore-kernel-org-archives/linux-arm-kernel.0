@@ -1,42 +1,60 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 14 Aug 2017 21:47:13 +0200
-Subject: [PATCH v2 2/2] i2c: mediatek: Add i2c compatible for MediaTek
- MT7622
-In-Reply-To: <1502674616.930.74.camel@mhfsdcap03>
-References: <1502506672-7620-1-git-send-email-jun.gao@mediatek.com>
- <1502506672-7620-3-git-send-email-jun.gao@mediatek.com>
- <20170812144411.zqgbncsemzaolldv@ninjato>
- <1502674616.930.74.camel@mhfsdcap03>
-Message-ID: <20170814194713.c6ojqcbi2iluayau@ninjato>
+From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
+Date: Mon, 14 Aug 2017 21:56:08 +0200
+Subject: [PATCH 0/5] s5p-jpeg fixes
+In-Reply-To: <1502191352-11595-1-git-send-email-andrzej.p@samsung.com>
+References: <CGME20170808112254eucas1p20aacd5bb0737ff85ba4756724af189aa@eucas1p2.samsung.com>
+ <1502191352-11595-1-git-send-email-andrzej.p@samsung.com>
+Message-ID: <253fafa5-8403-b098-ccb3-d5cd3ccb1c23@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 09:36:56AM +0800, Jun Gao wrote:
-> On Sat, 2017-08-12 at 16:44 +0200, Wolfram Sang wrote:
-> > > +static const struct i2c_adapter_quirks mt7622_i2c_quirks = {
-> > > +	.max_num_msgs = 255,
-> > > +	.max_write_len = 65535,
-> > > +	.max_read_len = 65535,
-> > > +	.max_comb_1st_msg_len = 65535,
-> > > +	.max_comb_2nd_msg_len = 65535,
-> > > +};
-> > 
-> > That looks like no quirks? Then just leave the quirks pointer below
-> > empty.
-> > 
-> Compare to MT8173 i2c controller, MT7622 limits message numbers to 255.
+Hi Andrzej,
 
-I see. But you can safely drop all the length settings. The i2c core has
-this comment in quirk handling:
+Thanks for the patch set.
 
-/* Check if val is exceeding the quirk IFF quirk is non 0 */
+On 08/08/2017 01:22 PM, Andrzej Pietrasiewicz wrote:
+> Hi All,
+> 
+> This series contains a number of fixes to the s5p-jpeg driver.
+> 
+> There are two patches from Tony K Nadackal, which got lost long time ago.
+> 
+> @Thierry:
+> The patch changing the software reset routine you sent recently was
+> actually a resend of Tony's patch. I investigated the question why
+> this patch is needed. The encoder/decoder should be disabled as soon
+> as possible, in the interrupt service routine; please see the commit message.
+> I am resending Tony's patch again, with updated commit message.
+> Thank you for reminding about the patch in question!
+> 
+> There are also three patches from me, please see appropriate commit
+> messages.
+> 
+> Rebased onto Mauro's master.
+> 
+> Andrzej Pietrasiewicz (3):
+>   media: platform: s5p-jpeg: disable encoder/decoder in exynos4-like
+>     hardware after use
+>   media: platform: s5p-jpeg: fix number of components macro
+>   media: platform: s5p-jpeg: directly use parsed subsampling on 5433
+> 
+> Tony K Nadackal (2):
+>   media: platform: s5p-jpeg: Fix crash in jpeg isr due to multiple
+>     interrupts.
+>   media: platform: s5p-jpeg: Clear JPEG_CODEC_ON bits in sw reset
+>     function
+> 
+>  drivers/media/platform/s5p-jpeg/jpeg-core.c       | 8 +++++++-
+>  drivers/media/platform/s5p-jpeg/jpeg-core.h       | 1 +
+>  drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c | 9 ++++++++-
+>  drivers/media/platform/s5p-jpeg/jpeg-regs.h       | 2 +-
+>  4 files changed, 17 insertions(+), 3 deletions(-)
+> 
 
-IFF means "if and only if".
+For the whole series:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170814/80ee3163/attachment.sig>
+Reviewed-by: Jacek Anaszewski <jacek.anaszewski@gmail.com>
+
+-- 
+Best regards,
+Jacek Anaszewski
