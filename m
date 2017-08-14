@@ -1,173 +1,98 @@
 From: hjc@rock-chips.com (Sandy Huang)
-Date: Mon, 14 Aug 2017 11:59:49 +0800
-Subject: [PATCH 3/3] drm/rockchip: Add support for Rockchip Soc LVDS
-In-Reply-To: <20170811144435.mo6jk5mn2vsj3sz3@art_vandelay>
+Date: Mon, 14 Aug 2017 12:04:38 +0800
+Subject: [PATCH 1/3] dt-bindings: display: Add Document for Rockchip Soc
+ LVDS
+In-Reply-To: <1502465911.2310.18.camel@pengutronix.de>
 References: <1502272846-63941-1-git-send-email-hjc@rock-chips.com>
- <1502272861-64226-1-git-send-email-hjc@rock-chips.com>
- <20170809195812.vtndofimdiojb4cr@art_vandelay>
- <d24020c6-ef7f-6c7d-b655-99e56c8760d5@rock-chips.com>
- <20170810180519.ezndiczwpheac4ih@art_vandelay>
- <78abe787-c7f1-d8e4-3fcd-e08ea092be6f@rock-chips.com>
- <20170811144435.mo6jk5mn2vsj3sz3@art_vandelay>
-Message-ID: <1b115a5e-417e-5f35-806b-e9af9780e01a@rock-chips.com>
+ <1502272851-63997-1-git-send-email-hjc@rock-chips.com>
+ <1502465911.2310.18.camel@pengutronix.de>
+Message-ID: <7ebfa933-57ca-658a-84ef-6e47b0009209@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-? 2017/8/11 22:44, Sean Paul ??:
-> On Fri, Aug 11, 2017 at 10:15:16AM +0800, Sandy Huang wrote:
+? 2017/8/11 23:38, Philipp Zabel ??:
+> On Wed, 2017-08-09 at 18:00 +0800, Sandy Huang wrote:
+>> This patch add Document for Rockchip Soc RK3288 LVDS,
+>> This based on the patches from Mark yao and Heiko Stuebner.
 >>
+>>> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
+>>> Signed-off-by: Mark yao <mark.yao@rock-chips.com>
+>>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>> ---
+>>   .../bindings/display/rockchip/rockchip-lvds.txt    | 104 +++++++++++++++++++++
+>>   1 file changed, 104 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
 >>
->> ? 2017/8/11 2:05, Sean Paul ??:
->>> On Thu, Aug 10, 2017 at 05:35:52PM +0800, Sandy Huang wrote:
->>>> Hi Sean Paul,
->>>>       Thanks for your review.
->>>>
->>>> ? 2017/8/10 3:58, Sean Paul ??:
->>>>> On Wed, Aug 09, 2017 at 06:00:59PM +0800, Sandy Huang wrote:
->>>>>> This adds support for Rockchip soc lvds found on rk3288
->>>>>> Based on the patches from Mark yao and Heiko Stuebner
->>>>>>
->>>>>> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
->>>>>> Signed-off-by: Mark yao <mark.yao@rock-chips.com>
->>>>>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->>>>>> ---
->>>>>>     drivers/gpu/drm/rockchip/Kconfig         |   9 +
->>>>>>     drivers/gpu/drm/rockchip/Makefile        |   1 +
->>>>>>     drivers/gpu/drm/rockchip/rockchip_lvds.c | 734 +++++++++++++++++++++++++++++++
->>>>>>     drivers/gpu/drm/rockchip/rockchip_lvds.h | 112 +++++
->>>>>>     4 files changed, 856 insertions(+)
->>>>>>     create mode 100644 drivers/gpu/drm/rockchip/rockchip_lvds.c
->>>>>>     create mode 100644 drivers/gpu/drm/rockchip/rockchip_lvds.h
->>>>>>
->>>
->>> <snip />
->>>
->>>>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_lvds.c b/drivers/gpu/drm/rockchip/rockchip_lvds.c
->>>>>> new file mode 100644
->>>>>> index 0000000..a4ad3f0
->>>>>> --- /dev/null
->>>>>> +++ b/drivers/gpu/drm/rockchip/rockchip_lvds.c
->>>
->>> <snip />
->>>
->>>>>> +	lvds->drm_dev = drm_dev;
->>>>>> +	port = of_graph_get_port_by_id(dev->of_node, 1);
->>>>>> +	if (!port) {
->>>>>> +		dev_err(dev, "can't found port point, please init lvds panel port!\n");
->>>>>> +		return -EINVAL;
->>>>>> +	}
->>>>>> +
->>>>>> +	for_each_child_of_node(port, endpoint) {
->>>>>> +		remote = of_graph_get_remote_port_parent(endpoint);
->>>>>> +		if (!remote) {
->>>>>> +			dev_err(dev, "can't found panel node, please init!\n");
->>>>>> +			ret = -EINVAL;
->>>>>> +			goto err_put_port;
->>>>>> +		}
->>>>>> +		if (!of_device_is_available(remote)) {
->>>>>> +			of_node_put(remote);
->>>>>> +			remote = NULL;
->>>>>> +			continue;
->>>>>> +		}
->>>>>> +		break;
->>>>>> +	}
->>>>>> +	if (!remote) {
->>>>>> +		dev_err(dev, "can't found remote node, please init!\n");
->>>>>> +		ret = -EINVAL;
->>>>>> +		goto err_put_port;
->>>>>> +	}
->>>>>> +
->>>>>> +	lvds->panel = of_drm_find_panel(remote);
->>>>>> +	if (!lvds->panel)
->>>>>> +		lvds->bridge = of_drm_find_bridge(remote);
->>>>>
->>>>> drm_of_find_panel_or_bridge()
->>>>>
->>>>
->>>> because the lvds ports maybe connect to lvds-panel or connect to
->>>> rk1000(which is convert RGB to CVBS output), so i have to get the remote
->>>> port parent and check the status, and final get the active remote point.
->>>>
->>>
->>>
->>>
->>>> lvds_panel: lvds-panel {
->>>> 	status = "disabled";
->>>> 	ports {
->>>> 		panel_in_lvds: endpoint {
->>>> 			remote-endpoint = <&lvds_out_panel>;
->>>> 		};
->>>> 	};
->>>> };
->>>>
->>>> rk1000: rk1000 at 0xff000000 {
->>>> 	status = "okay";
->>>> 	ports {
->>>> 		rk1000_in_lvds: endpoint {
->>>> 			remote-endpoint = <&lvds_out_panel>;
->>>> 		};
->>>> 	};
->>>> };
->>>>
->>>> &lvds {
->>>> 	status = "okay";
->>>> 	ports {
->>>> 		lvds_out: port at 1 {
->>>> 			reg = <1>;
->>>> 			lvds_out_panel: endpoint at 0 {
->>>> 				reg = <0>;
->>>> 				remote-endpoint = <&panel_in_lvds>;
->>>> 			};
->>>> 			lvds_out_rk1000: endpoint at 1 {
->>>> 				reg = <1>;
->>>> 				remote-endpoint = <&rk1000_in_lvds>;
->>>> 			};
->>>> 		};
->>>>
->>>> 	};
->>>> };
->>>
->>> Hi Sandy,
->>> Forgive me, this is probably a stupid question. I don't see how this usecase is
->>> unique from the other users of drm_of_find_panel_or_bridge. Couldn't you change
->>> your devicetree bindings to conform to something drm_of_find_panel_or_bridge()
->>> can work with?
->>>
->>> Thank you,
->>>
->> Hi sean,
->>      Maybe i can use the following method to use
->> drm_of_find_panel_or_bridge() and no need to change my DT, but there is
->> another question:
->>      The LVDS output format(rockchip,output?rockchip,data-mapping etc.)
->> depend on different panel, so it should be put under remote panel point.
->> If use drm_of_find_panel_or_bridge?), this just return panel or bridge, so
->> i have to back to get remote panel point and get the output format.
+>> diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
+>> new file mode 100644
+>> index 0000000..bf934ba
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
+>> @@ -0,0 +1,104 @@
+>> +Rockchip RK3288 LVDS interface
+>> +================================
+>> +
+>> +Required properties:
+>> +- compatible: matching the soc type, one of
+>>> +	- "rockchip,rk3288-lvds";
+>> +
+>> +- reg: physical base address of the controller and length
+>>> +	of memory mapped region.
+>> +- clocks: must include clock specifiers corresponding to entries in the
+>>> +	clock-names property.
+>> +- clock-names: must contain "pclk_lvds"
+>> +
+>> +- avdd1v0-supply: regulator phandle for 1.0V analog power
+>> +- avdd1v8-supply: regulator phandle for 1.8V analog power
+>> +- avdd3v3-supply: regulator phandle for 3.3V analog power
+>> +
+>> +- rockchip,grf: phandle to the general register files syscon
+>> +
+>> +Optional properties
+>> +- pinctrl-names: must contain a "lcdc" entry.
+>> +- pinctrl-0: pin control group to be used for this controller.
+>> +
+>> +Required nodes:
+>> +
+>> +The lvds has two video ports as described by
+>>> +	Documentation/devicetree/bindings/media/video-interfaces.txt.
+>> +Their connections are modeled using the OF graph bindings specified in
+>>> +	Documentation/devicetree/bindings/graph.txt.
+>> +
+>> +- video port 0 for the VOP inputs
+>> +- video port 1 for either a panel or subsequent encoder
+>> +
+>> +the lvds panel described by
+>>> +	Documentation/devicetree/bindings/display/panel/simple-panel.txt
+>> +
+>> +- rockchip,data-mapping: should be "vesa" or "jeida",
+>>> +	This describes how the color bits are laid out in the
+>>> +	serialized LVDS signal.
+>> +- rockchip,data-width : should be <18> or <24>;
 > 
-> This should be easy since you can grab dev->of_node from panel or bridge once
-> it's found.
+> This can already be described by the panel itself, via the bus_format
+> property in the panel_desc for panel-simple, or via the existing panel
+> device tree property "data-mapping" in panel-lvds, which can be set to
+> "jeida-18", "jeida-24", or "vesa-24".
 > 
-ok, thanks.
->>
->> ret = drm_of_find_panel_or_bridge(dev->of_node, 1, 0, &lvds->panel,
->>                                    &lvds->bridge);
->> if (ret)
->>      ret = drm_of_find_panel_or_bridge(dev->of_node, 1, 1, &lvds->panel,
->>                                        &lvds->bridge);
+> The LVDS driver can then read the panel bus information from the
+> panel's connector->display_info.bus_formats.
 > 
-> Would be easier to read in a for loop.
-> 
-> Sean
->
-ok, thanks.
+Because the lvds maybe connected to panel or some cover chip just like 
+rgb2cvbs etc. , in this case, we no need to enable panel, so we have to 
+get this proterty at here.
 
->> if (ret) {
->>      DRM_DEV_ERROR(dev, "failed to find panel and bridge node\n");
->>      ret  = -EPROBE_DEFER;
->>      goto err_put_remote;
->> }
->> 	
->>
+> So if these properties are necessary at all, they at least should be
+> optional (overrides).
+>
+ok, i will set data-mapping to option.
+> regards
+> Philipp
+> 
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
 > 
