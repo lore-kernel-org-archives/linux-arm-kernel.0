@@ -1,32 +1,35 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon, 14 Aug 2017 17:50:47 +0800
-Subject: [PATCH v3 08/10] arm64: dts: hikey960: change bluetooth uart
- max-speed to 3mbps
-In-Reply-To: <20170814095049.27701-1-guodong.xu@linaro.org>
-References: <20170814095049.27701-1-guodong.xu@linaro.org>
-Message-ID: <20170814095049.27701-9-guodong.xu@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 14 Aug 2017 11:52:18 +0100
+Subject: [PATCH v5 2/6] ARM: smp_scu: add a helper for powering on a
+ specific CPU
+In-Reply-To: <20170728212138.12217-3-martin.blumenstingl@googlemail.com>
+References: <20170728212138.12217-1-martin.blumenstingl@googlemail.com>
+ <20170728212138.12217-3-martin.blumenstingl@googlemail.com>
+Message-ID: <20170814105218.GG20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update bluetooth UART max-speed to 3Mbps
+On Fri, Jul 28, 2017 at 11:21:34PM +0200, Martin Blumenstingl wrote:
+> +/*
+> + * Set the executing CPUs power mode to SCU_PM_NORMAL.
+> + *
+> + * This function must be called with preemption disabled, and as it
+> + * has the side effect of disabling coherency, caches must have been
+> + * flushed. Interrupts must also have been disabled.
 
-Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This comment looks rather misleading for several reasons:
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-index 7770ec7..fd4705c 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-@@ -230,7 +230,7 @@
- 	bluetooth {
- 		compatible = "ti,wl1837-st";
- 		enable-gpios = <&gpio15 6 GPIO_ACTIVE_HIGH>;
--		max-speed = <921600>;
-+		max-speed = <3000000>;
- 	};
- };
- 
+1. we're bringing another CPU to normal power mode, which means it's
+   coming _into_ coherency, not leaving coherency, so "side effect of
+   disabling coherency" is wrong.
+
+2. what has the state of the _local_ CPUs caches got to do with the
+   remote CPU when it isn't even powered up?
+
+Could you please reword this comment to be more accurate please - I
+think the paragraph can be removed.
+
 -- 
-2.10.2
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
