@@ -1,262 +1,257 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 14 Aug 2017 11:38:52 +0100
-Subject: [RFC PATCH 1/3] arm64: mm: Support Common Not Private translations
-In-Reply-To: <1502707134-10853-1-git-send-email-vladimir.murzin@arm.com>
-References: <1502707134-10853-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1502707134-10853-2-git-send-email-vladimir.murzin@arm.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Mon, 14 Aug 2017 16:16:04 +0530
+Subject: [PATCH v3] arm64: allwinner: a64: Add A64-OLinuXino initial support
+Message-ID: <1502707564-16703-1-git-send-email-jteki@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Common Not Private (CNP) is a feature of ARMv8.2 extension which
-allows translation table entries to be shared between different PEs in
-the same inner shareable domain, so the hardware can use this fact to
-optimise the caching of such entries in the TLB.
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-CNP occupies one bit in TTBRx_ELy and VTTBR_EL2, which advertises to
-the hardware that the translation table entries pointed to by this
-TTBR are the same as every PE in the same inner shareable domain for
-which the equivalent TTBR also has CNP bit set. In case CNP bit is set
-but TTBR does not point at the same translation table entries, then
-the system is mis-configured, so the results of translations are
-UNPREDICTABLE.
+OLimex A64-OLinuXino is an open-source hardware board
+using the Allwinner A64 SOC.
 
-This patch adds support for Common Not Private translations on
-different exceptions levels:
+OLimex A64-OLinuXino has
+- A64 Quad-core Cortex-A53 64bit
+- 1GB or 2GB RAM DDR3L @ 672Mhz
+- microSD slot and 4/8/16GB eMMC
+- Debug TTL UART
+- HDMI
+- LCD
+- IR receiver
+- 5V DC power supply
 
-(1) For EL0 there are a few cases we need to care of changes in
-    TTBR0_EL1:
-    - a switch to idmap
-    - software emulated PAN
-    in these cases we make sure that CNP is set for non-zero ASIDs
-    only.
-
-(2) For EL1 we postpone setting CNP till all cpus are up and rely on
-    cpufeature framework to 1) patch the code which is sensitive to
-    CNP and 2) update TTBR1_EL1 with CNP bit set. The only case where
-    TTBR1_EL1 can be reprogrammed is hibirnation, so the code there is
-    changed to save raw TTBR1_EL1 and blindly restore it on resume.
-
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- arch/arm64/Kconfig                   | 12 ++++++++++++
- arch/arm64/include/asm/asm-uaccess.h |  2 ++
- arch/arm64/include/asm/cpucaps.h     |  3 ++-
- arch/arm64/include/asm/cpufeature.h  |  6 ++++++
- arch/arm64/include/asm/memory.h      |  1 +
- arch/arm64/include/asm/mmu_context.h | 14 ++++++++++++++
- arch/arm64/include/asm/uaccess.h     | 10 ++++++++--
- arch/arm64/kernel/cpufeature.c       | 22 ++++++++++++++++++++++
- arch/arm64/kernel/hibernate.c        |  2 +-
- arch/arm64/mm/proc.S                 |  5 +++++
- 10 files changed, 73 insertions(+), 4 deletions(-)
+Changes for v3:
+- Droped i2c1, not found on schmatic
+- Updated vddfb-cpux regulator volt range 1.04 ~ 1.3 V
+- Removed poly-phased DCDC3 regulator node and added comment
+- Update DLDO4 regulator name as vcc-wifi-io
+- Moved uart0 below regulators
+Changes for v2:
+- Tested on board
+- Added AXP803 regulator
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index dfd9086..ce91a70 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -960,6 +960,18 @@ config ARM64_UAO
- 	  regular load/store instructions if the cpu does not implement the
- 	  feature.
- 
-+config ARM64_CNP
-+	bool "Enable support for Common Not Private (CNP) translations"
-+	default y
-+	help
-+	  Common Not Private (CNP) allows translation table entries to
-+	  be shared between different PEs in the same inner shareable
-+	  domain, so the hardware can use this fact to optimise the
-+	  caching of such entries in the TLB.
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../boot/dts/allwinner/sun50i-a64-olinuxino.dts    | 199 +++++++++++++++++++++
+ 2 files changed, 200 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index c997b5c..19c3fbd 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -1,5 +1,6 @@
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+new file mode 100644
+index 0000000..b86ac1a
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+@@ -0,0 +1,199 @@
++/*
++ * Copyright (C) 2017 Jagan Teki <jteki@openedev.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+	  Selecting this option allows the CNP feature to be detected
-+	  at runtime, and does not affect PEs that do not implement
-+	  this feature.
- endmenu
- 
- config ARM64_MODULE_CMODEL_LARGE
-diff --git a/arch/arm64/include/asm/asm-uaccess.h b/arch/arm64/include/asm/asm-uaccess.h
-index ecd9788..a3e452e 100644
---- a/arch/arm64/include/asm/asm-uaccess.h
-+++ b/arch/arm64/include/asm/asm-uaccess.h
-@@ -12,6 +12,8 @@
- #ifdef CONFIG_ARM64_SW_TTBR0_PAN
- 	.macro	__uaccess_ttbr0_disable, tmp1
- 	mrs	\tmp1, ttbr1_el1		// swapper_pg_dir
-+	bic	\tmp1, \tmp1, #TTBR_CNP_BIT	// unconditionally clear CNP bit to avoid alternatives
-+						// inside alternatives
- 	add	\tmp1, \tmp1, #SWAPPER_DIR_SIZE	// reserved_ttbr0 at the end of swapper_pg_dir
- 	msr	ttbr0_el1, \tmp1		// set reserved TTBR0_EL1
- 	isb
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 8d2272c..5ccb3f7 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -39,7 +39,8 @@
- #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	18
- #define ARM64_WORKAROUND_858921			19
- #define ARM64_WORKAROUND_CAVIUM_30115		20
-+#define ARM64_HAS_CNP				21
- 
--#define ARM64_NCAPS				21
-+#define ARM64_NCAPS				22
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 428ee1f..f7c75ac 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -262,6 +262,12 @@ static inline bool system_uses_ttbr0_pan(void)
- 		!cpus_have_const_cap(ARM64_HAS_PAN);
- }
- 
-+static inline bool system_supports_cnp(void)
-+{
-+	return IS_ENABLED(CONFIG_ARM64_CNP) &&
-+		cpus_have_const_cap(ARM64_HAS_CNP);
-+}
++/dts-v1/;
 +
- #endif /* __ASSEMBLY__ */
- 
- #endif
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index ef39dcb..14bd7e6 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -77,6 +77,7 @@
- #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
- #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
- #define TASK_SIZE_64		(UL(1) << VA_BITS)
-+#define TTBR_CNP_BIT		(UL(1) << 0)
- 
- #ifdef CONFIG_COMPAT
- #define TASK_SIZE_32		UL(0x100000000)
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 3257895a..c8adce2 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -135,6 +135,17 @@ static inline void cpu_replace_ttbr1(pgd_t *pgd)
- 
- 	phys_addr_t pgd_phys = virt_to_phys(pgd);
- 
-+	if (system_supports_cnp()) {
-+		/*
-+		 * cpu_replace_ttbr1() is used when there's a boot CPU up
-+		 * (i.e. cpufeture framework is not up yet) and latter only
-+		 * when we enable CNP via cpufeature's enable() callback.
-+		 */
-+		BUG_ON(pgd != swapper_pg_dir);
++#include "sun50i-a64.dtsi"
 +
-+		pgd_phys |= TTBR_CNP_BIT;
-+	}
++#include <dt-bindings/gpio/gpio.h>
 +
- 	replace_phys = (void *)__pa_symbol(idmap_cpu_replace_ttbr1);
- 
- 	cpu_install_idmap();
-@@ -178,6 +189,9 @@ static inline void update_saved_ttbr0(struct task_struct *tsk,
- 		BUG_ON(mm->pgd == swapper_pg_dir);
- 		task_thread_info(tsk)->ttbr0 =
- 			virt_to_phys(mm->pgd) | ASID(mm) << 48;
++/ {
++	model = "Olimex A64-Olinuxino";
++	compatible = "olimex,a64-olinuxino", "allwinner,sun50i-a64";
 +
-+		if (system_supports_cnp() && ASID(mm))
-+			task_thread_info(tsk)->ttbr0 |= TTBR_CNP_BIT;
- 	}
- }
- #else
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index fab46a0..f65a96c 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -104,8 +104,14 @@ static inline void __uaccess_ttbr0_disable(void)
- {
- 	unsigned long ttbr;
- 
--	/* reserved_ttbr0 placed at the end of swapper_pg_dir */
--	ttbr = read_sysreg(ttbr1_el1) + SWAPPER_DIR_SIZE;
-+	/*
-+	 * reserved_ttbr0 is placed at the end of swapper_pg_dir.
-+	 * When CNP is in use, TTBR1 may have the CNP bit set, but the
-+	 * reserved_ttbr should only be used without CNP.
-+	 */
-+	ttbr = read_sysreg(ttbr1_el1);
-+	ttbr &= ~TTBR_CNP_BIT;
-+	ttbr += SWAPPER_DIR_SIZE;
- 	write_sysreg(ttbr, ttbr0_el1);
- 	isb();
- }
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 9f9e0064..6beeaa2 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -101,6 +101,7 @@ EXPORT_SYMBOL(cpu_hwcap_keys);
- static bool __maybe_unused
- cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused);
- 
-+static int cpu_enable_cnp(void *__unused);;
- 
- /*
-  * NOTE: Any changes to the visibility of features should be kept in
-@@ -888,6 +889,19 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.min_field_value = 0,
- 		.matches = has_no_fpsimd,
- 	},
-+#ifdef CONFIG_ARM64_CNP
-+	{
-+		.desc = "Common not Private translations",
-+		.capability = ARM64_HAS_CNP,
-+		.def_scope = SCOPE_SYSTEM,
-+		.matches = has_cpuid_feature,
-+		.sys_reg = SYS_ID_AA64MMFR2_EL1,
-+		.sign = FTR_UNSIGNED,
-+		.field_pos = ID_AA64MMFR2_CNP_SHIFT,
-+		.min_field_value = 1,
-+		.enable = cpu_enable_cnp,
-+	},
-+#endif
- 	{},
- };
- 
-@@ -1198,6 +1212,14 @@ cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
- 	return (cpus_have_const_cap(ARM64_HAS_PAN) && !cpus_have_const_cap(ARM64_HAS_UAO));
- }
- 
-+#ifdef CONFIG_ARM64_CNP
-+static int cpu_enable_cnp(void *__unused)
-+{
-+	cpu_replace_ttbr1(swapper_pg_dir);
-+	return 0;
-+}
-+#endif /* CONFIG_ARM64_CNP */
++	aliases {
++		serial0 = &uart0;
++	};
 +
- /*
-  * We emulate only the following system register space.
-  * Op0 = 0x3, CRn = 0x0, Op1 = 0x0, CRm = [0, 4 - 7]
-diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-index a44e139..e864e3f 100644
---- a/arch/arm64/kernel/hibernate.c
-+++ b/arch/arm64/kernel/hibernate.c
-@@ -124,7 +124,7 @@ int arch_hibernation_header_save(void *addr, unsigned int max_size)
- 		return -EOVERFLOW;
- 
- 	arch_hdr_invariants(&hdr->invariants);
--	hdr->ttbr1_el1		= __pa_symbol(swapper_pg_dir);
-+	hdr->ttbr1_el1		= read_sysreg(ttbr1_el1);
- 	hdr->reenter_kernel	= _cpu_resume;
- 
- 	/* We can't use __hyp_get_vectors() because kvm may still be loaded */
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 877d42f..1c94030 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -141,6 +141,11 @@ ENTRY(cpu_do_switch_mm)
- 	pre_ttbr0_update_workaround x0, x2, x3
- 	mmid	x1, x1				// get mm->context.id
- 	bfi	x0, x1, #48, #16		// set the ASID
-+alternative_if ARM64_HAS_CNP
-+	cbz	x1, 1f
-+	orr	x0, x0, #TTBR_CNP_BIT
-+1:
-+alternative_else_nop_endif
- 	msr	ttbr0_el1, x0			// set TTBR0
- 	isb
- 	post_ttbr0_update_workaround
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	vmmc-supply = <&reg_dcdc1>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++	disable-wp;
++	bus-width = <4>;
++	status = "okay";
++};
++
++&r_rsb {
++	status = "okay";
++
++	axp803: pmic at 3a3 {
++		compatible = "x-powers,axp803";
++		reg = <0x3a3>;
++		interrupt-parent = <&r_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
++#include "axp803.dtsi"
++
++&reg_aldo1 {
++	regulator-always-on;
++	regulator-min-microvolt = <2800000>;
++	regulator-max-microvolt = <2800000>;
++	regulator-name = "vcc-pe";
++};
++
++&reg_aldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pl";
++};
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-pll-avcc";
++};
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-3v3";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1040000>;
++	regulator-max-microvolt = <1300000>;
++	regulator-name = "vddfb-cpux";
++};
++
++/* DCDC3 is polyphased with DCDC2 */
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1500000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vcc-ddr3";
++};
++
++&reg_dcdc6 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-sys";
++};
++
++&reg_dldo1 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-hdmi";
++};
++
++&reg_dldo2 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-mipi";
++};
++
++&reg_dldo3 {
++	regulator-min-microvolt = <2800000>;
++	regulator-max-microvolt = <2800000>;
++	regulator-name = "vcc-avdd-csi";
++};
++
++&reg_dldo4 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi-io";
++};
++
++&reg_eldo1 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "cpvdd";
++};
++
++&reg_eldo2 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "vcc-dvdd-csi";
++};
++
++&reg_fldo1 {
++	regulator-min-microvolt = <1200000>;
++	regulator-max-microvolt = <1200000>;
++	regulator-name = "vcc-1v2-hsic";
++};
++
++/*
++ * The A64 chip cannot work without this regulator off, although
++ * it seems to be only driving the AR100 core.
++ * Maybe we don't still know well about CPUs domain.
++ */
++&reg_fldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-cpus";
++};
++
++&reg_rtc_ldo {
++	regulator-name = "vcc-rtc";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
 -- 
-2.0.0
+2.7.4
