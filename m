@@ -1,91 +1,155 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 13:54:08 +0100
-Subject: [PATCH 27/30] efi/libstub: add 'max' parameter to efi_random_alloc()
+Date: Mon, 14 Aug 2017 13:53:58 +0100
+Subject: [PATCH 17/30] arm-soc: tegra: make sleep asm code runtime relocatable
 In-Reply-To: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
 References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170814125411.22604-28-ard.biesheuvel@linaro.org>
+Message-ID: <20170814125411.22604-18-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an upper limit to efi_random_alloc() so we can use it to randomly
-allocate the ARM kernel in lowmem.
+The PIE kernel build does not allow absolute references encoded in
+movw/movt instruction pairs, so use our mov_l macro instead (which
+will still use such a pair unless CONFIG_RELOCATABLE is defined)
 
-Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Also, avoid 32-bit absolute literals to refer to absolute symbols.
+Instead, use a 16 bit reference so that PIE linker cannot get
+confused whether the symbol reference is subject to relocation at
+runtime.
+
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/libstub/arm64-stub.c |  2 +-
- drivers/firmware/efi/libstub/efistub.h    |  3 ++-
- drivers/firmware/efi/libstub/random.c     | 10 ++++++----
- 3 files changed, 9 insertions(+), 6 deletions(-)
+ arch/arm/mach-tegra/sleep-tegra20.S | 22 ++++++++++++--------
+ arch/arm/mach-tegra/sleep-tegra30.S |  6 +++---
+ arch/arm/mach-tegra/sleep.S         |  4 ++--
+ 3 files changed, 18 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/firmware/efi/libstub/arm64-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
-index b4c2589d7c91..940766f90adb 100644
---- a/drivers/firmware/efi/libstub/arm64-stub.c
-+++ b/drivers/firmware/efi/libstub/arm64-stub.c
-@@ -94,7 +94,7 @@ efi_status_t handle_kernel_image(efi_system_table_t *sys_table_arg,
- 		*reserve_size = kernel_memsize + offset;
- 		status = efi_random_alloc(sys_table_arg, *reserve_size,
- 					  MIN_KIMG_ALIGN, reserve_addr,
--					  (u32)phys_seed);
-+					  (u32)phys_seed, ULONG_MAX);
+diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
+index 5c8e638ee51a..cab95de5c8f1 100644
+--- a/arch/arm/mach-tegra/sleep-tegra20.S
++++ b/arch/arm/mach-tegra/sleep-tegra20.S
+@@ -99,7 +99,7 @@ ENTRY(tegra20_cpu_shutdown)
+ 	cmp	r0, #0
+ 	reteq	lr			@ must not be called for CPU 0
+ 	mov32	r1, TEGRA_IRAM_RESET_BASE_VIRT
+-	ldr	r2, =__tegra20_cpu1_resettable_status_offset
++	ldrh	r2, 0f
+ 	mov	r12, #CPU_RESETTABLE
+ 	strb	r12, [r1, r2]
  
- 		*image_addr = *reserve_addr + offset;
- 	} else {
-diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
-index 83f268c05007..3a670a5f759f 100644
---- a/drivers/firmware/efi/libstub/efistub.h
-+++ b/drivers/firmware/efi/libstub/efistub.h
-@@ -60,7 +60,8 @@ efi_status_t efi_get_random_bytes(efi_system_table_t *sys_table,
+@@ -121,6 +121,7 @@ ENTRY(tegra20_cpu_shutdown)
+ 	beq	.
+ 	ret	lr
+ ENDPROC(tegra20_cpu_shutdown)
++0:	.short	__tegra20_cpu1_resettable_status_offset
+ #endif
  
- efi_status_t efi_random_alloc(efi_system_table_t *sys_table_arg,
- 			      unsigned long size, unsigned long align,
--			      unsigned long *addr, unsigned long random_seed);
-+			      unsigned long *addr, unsigned long random_seed,
-+			      unsigned long max);
+ #ifdef CONFIG_PM_SLEEP
+@@ -181,6 +182,9 @@ ENTRY(tegra_pen_unlock)
+ 	ret     lr
+ ENDPROC(tegra_pen_unlock)
  
- efi_status_t check_platform_features(efi_system_table_t *sys_table_arg);
- 
-diff --git a/drivers/firmware/efi/libstub/random.c b/drivers/firmware/efi/libstub/random.c
-index 7e72954d5860..85b80a4a85b3 100644
---- a/drivers/firmware/efi/libstub/random.c
-+++ b/drivers/firmware/efi/libstub/random.c
-@@ -42,7 +42,8 @@ efi_status_t efi_get_random_bytes(efi_system_table_t *sys_table_arg,
++.L__tegra20_cpu1_resettable_status_offset:
++	.short	__tegra20_cpu1_resettable_status_offset
++
+ /*
+  * tegra20_cpu_clear_resettable(void)
+  *
+@@ -189,7 +193,7 @@ ENDPROC(tegra_pen_unlock)
   */
- static unsigned long get_entry_num_slots(efi_memory_desc_t *md,
- 					 unsigned long size,
--					 unsigned long align_shift)
-+					 unsigned long align_shift,
-+					 unsigned long max)
- {
- 	unsigned long align = 1UL << align_shift;
- 	u64 first_slot, last_slot, region_end;
-@@ -50,7 +51,7 @@ static unsigned long get_entry_num_slots(efi_memory_desc_t *md,
- 	if (md->type != EFI_CONVENTIONAL_MEMORY)
- 		return 0;
+ ENTRY(tegra20_cpu_clear_resettable)
+ 	mov32	r1, TEGRA_IRAM_RESET_BASE_VIRT
+-	ldr	r2, =__tegra20_cpu1_resettable_status_offset
++	ldrh	r2, .L__tegra20_cpu1_resettable_status_offset
+ 	mov	r12, #CPU_NOT_RESETTABLE
+ 	strb	r12, [r1, r2]
+ 	ret	lr
+@@ -203,7 +207,7 @@ ENDPROC(tegra20_cpu_clear_resettable)
+  */
+ ENTRY(tegra20_cpu_set_resettable_soon)
+ 	mov32	r1, TEGRA_IRAM_RESET_BASE_VIRT
+-	ldr	r2, =__tegra20_cpu1_resettable_status_offset
++	ldrh	r2, .L__tegra20_cpu1_resettable_status_offset
+ 	mov	r12, #CPU_RESETTABLE_SOON
+ 	strb	r12, [r1, r2]
+ 	ret	lr
+@@ -217,7 +221,7 @@ ENDPROC(tegra20_cpu_set_resettable_soon)
+  */
+ ENTRY(tegra20_cpu_is_resettable_soon)
+ 	mov32	r1, TEGRA_IRAM_RESET_BASE_VIRT
+-	ldr	r2, =__tegra20_cpu1_resettable_status_offset
++	ldrh	r2, .L__tegra20_cpu1_resettable_status_offset
+ 	ldrb	r12, [r1, r2]
+ 	cmp	r12, #CPU_RESETTABLE_SOON
+ 	moveq	r0, #1
+@@ -238,11 +242,11 @@ ENTRY(tegra20_sleep_core_finish)
+ 	bl	tegra_disable_clean_inv_dcache
+ 	mov     r0, r4
  
--	region_end = min((u64)ULONG_MAX, md->phys_addr + md->num_pages*EFI_PAGE_SIZE - 1);
-+	region_end = min((u64)max, md->phys_addr + md->num_pages*EFI_PAGE_SIZE - 1);
+-	mov32	r3, tegra_shut_off_mmu
++	mov_l	r3, tegra_shut_off_mmu
+ 	add	r3, r3, r0
  
- 	first_slot = round_up(md->phys_addr, align);
- 	last_slot = round_down(region_end - size + 1, align);
-@@ -73,7 +74,8 @@ efi_status_t efi_random_alloc(efi_system_table_t *sys_table_arg,
- 			      unsigned long size,
- 			      unsigned long align,
- 			      unsigned long *addr,
--			      unsigned long random_seed)
-+			      unsigned long random_seed,
-+			      unsigned long max)
- {
- 	unsigned long map_size, desc_size, total_slots = 0, target_slot;
- 	unsigned long buff_size;
-@@ -101,7 +103,7 @@ efi_status_t efi_random_alloc(efi_system_table_t *sys_table_arg,
- 		efi_memory_desc_t *md = (void *)memory_map + map_offset;
- 		unsigned long slots;
+-	mov32	r0, tegra20_tear_down_core
+-	mov32	r1, tegra20_iram_start
++	mov_l	r0, tegra20_tear_down_core
++	mov_l	r1, tegra20_iram_start
+ 	sub	r0, r0, r1
+ 	mov32	r1, TEGRA_IRAM_LPx_RESUME_AREA
+ 	add	r0, r0, r1
+@@ -265,7 +269,7 @@ ENTRY(tegra20_sleep_cpu_secondary_finish)
+ 	bl	tegra_disable_clean_inv_dcache
  
--		slots = get_entry_num_slots(md, size, ilog2(align));
-+		slots = get_entry_num_slots(md, size, ilog2(align), max);
- 		MD_NUM_SLOTS(md) = slots;
- 		total_slots += slots;
- 	}
+ 	mov32	r0, TEGRA_IRAM_RESET_BASE_VIRT
+-	ldr	r4, =__tegra20_cpu1_resettable_status_offset
++	ldrh	r4, .L__tegra20_cpu1_resettable_status_offset
+ 	mov	r3, #CPU_RESETTABLE
+ 	strb	r3, [r0, r4]
+ 
+@@ -284,7 +288,7 @@ ENTRY(tegra20_sleep_cpu_secondary_finish)
+ 	bl	tegra_pen_lock
+ 
+ 	mov32	r0, TEGRA_IRAM_RESET_BASE_VIRT
+-	ldr	r4, =__tegra20_cpu1_resettable_status_offset
++	ldrh	r4, .L__tegra20_cpu1_resettable_status_offset
+ 	mov	r3, #CPU_NOT_RESETTABLE
+ 	strb	r3, [r0, r4]
+ 
+diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+index dd4a67dabd91..478b2ca3ef6e 100644
+--- a/arch/arm/mach-tegra/sleep-tegra30.S
++++ b/arch/arm/mach-tegra/sleep-tegra30.S
+@@ -261,11 +261,11 @@ ENTRY(tegra30_sleep_core_finish)
+ 	mov32	r6, TEGRA_FLOW_CTRL_BASE
+ 	mov32	r7, TEGRA_TMRUS_BASE
+ 
+-	mov32	r3, tegra_shut_off_mmu
++	mov_l	r3, tegra_shut_off_mmu
+ 	add	r3, r3, r0
+ 
+-	mov32	r0, tegra30_tear_down_core
+-	mov32	r1, tegra30_iram_start
++	mov_l	r0, tegra30_tear_down_core
++	mov_l	r1, tegra30_iram_start
+ 	sub	r0, r0, r1
+ 	mov32	r1, TEGRA_IRAM_LPx_RESUME_AREA
+ 	add	r0, r0, r1
+diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
+index 5e3496753df1..785df3edc767 100644
+--- a/arch/arm/mach-tegra/sleep.S
++++ b/arch/arm/mach-tegra/sleep.S
+@@ -101,11 +101,11 @@ ENTRY(tegra_sleep_cpu_finish)
+ 	bl	tegra_disable_clean_inv_dcache
+ 
+ 	mov	r0, r4
+-	mov32	r6, tegra_tear_down_cpu
++	mov_l	r6, tegra_tear_down_cpu
+ 	ldr	r1, [r6]
+ 	add	r1, r1, r0
+ 
+-	mov32	r3, tegra_shut_off_mmu
++	mov_l	r3, tegra_shut_off_mmu
+ 	add	r3, r3, r0
+ 	mov	r0, r1
+ 
 -- 
 2.11.0
