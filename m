@@ -1,45 +1,78 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 14 Aug 2017 20:40:42 +0200 (CEST)
-Subject: [PATCH] ARM: bcm2836: Send event when onlining other cores
-In-Reply-To: <1168905996.270506.1502730695418@email.1und1.de>
-References: <1502190295-53391-1-git-send-email-phil@raspberrypi.org>
- <1502190295-53391-2-git-send-email-phil@raspberrypi.org>
- <fdecf317-d20b-1a5d-046f-56ef40c55d82@gmail.com>
- <1168905996.270506.1502730695418@email.1und1.de>
-Message-ID: <399697756.271804.1502736043014@email.1und1.de>
+From: fkan@apm.com (Feng Kan)
+Date: Mon, 14 Aug 2017 11:41:58 -0700
+Subject: [PATCH v3 0/5] ACPI: DMA ranges management
+In-Reply-To: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
+References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
+Message-ID: <CAL85gmAd4aA7M7sEJC4yfb7UVghmb4ZE-XVdb8y0D=P_Ut2MOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-> Stefan Wahren <stefan.wahren@i2se.com> hat am 14. August 2017 um 19:11 geschrieben:
-> 
-> 
-> Hi Florian,
-> 
-> > Florian Fainelli <f.fainelli@gmail.com> hat am 14. August 2017 um 18:25 geschrieben:
-> > 
-> > 
-> > 
-> > 
-> > On 08/08/2017 04:04 AM, Phil Elwell wrote:
-> > > Secondary cores should enter a low-power idle state when waiting to
-> > > be started. The "wfe" instruction causes a core to wait until an event
-> > > or interrupt arrives before continuing to the next instruction, and
-> > > the "sev" instruction sends a wakeup event to the other cores.
-> > > 
-> > > Add an "sev" (and a memory barrier) to bcm2836_boot_secondary, the
-> > > function that wakes the waiting cores during booting. This is required
-> > > if the secondary cores are sitting in "wfe", and harmless if not.
-> > 
-> > Eric, should I just pick this up for the upcoming ARM SoC pull requests
-> > that I am preparing, or do you have more changes aside from the two tags
-> > I already merged?
-> 
-> this patch depends on series "ARM: bcm2836: Move SMP startup code to arch/arm".
-> 
-> I didn't had the time to test Phil's patch in all relevant cases. But i could at least prepare a branch with my changes with the acks.
-
-i prepared the branches bcm2835-dt-next-v2 and bcm2835-soc-next.
-
-Stefan
+On Thu, Aug 3, 2017 at 5:32 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> This patch series is v3 of a previous posting:
+>
+> v2->v3:
+>         - Fixed DMA masks computation
+>         - Fixed size computation overflow in acpi_dma_get_range()
+>
+> v1->v2:
+>         - Reworked acpi_dma_get_range() flow and logs
+>         - Added IORT named component address limits
+>         - Renamed acpi_dev_get_resources() helper function
+>         - Rebased against v4.13-rc3
+>
+> v2: http://lkml.kernel.org/r/20170731152323.32488-1-lorenzo.pieralisi at arm.com
+> v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
+>
+> -- Original cover letter --
+>
+> As reported in:
+>
+> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
+>
+> the bus connecting devices to an IOMMU bus can be smaller in size than
+> the IOMMU input address bits which results in devices DMA HW bugs in
+> particular related to IOVA allocation (ie chopping of higher address
+> bits owing to system bus HW capabilities mismatch with the IOMMU).
+>
+> Fortunately this problem can be solved through an already present but never
+> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
+> window for a specific bus in ACPI and therefore all upstream devices
+> connected to it.
+>
+> This small patch series enables _DMA parsing in ACPI core code and
+> use it in ACPI IORT code in order to detect DMA ranges for devices and
+> update their data structures to make them work with their related DMA
+> addressing restrictions.
+>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Feng Kan <fkan@apm.com>
+> Cc: Jon Masters <jcm@redhat.com>
+> Cc: Robert Moore <robert.moore@intel.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>
+> Lorenzo Pieralisi (5):
+>   ACPICA: resource_mgr: Allow _DMA method in walk resources
+>   ACPI: Make acpi_dev_get_resources() method agnostic
+>   ACPI: Introduce DMA ranges parsing
+>   ACPI: Make acpi_dma_configure() DMA regions aware
+>   ACPI/IORT: Add IORT named component memory address limits
+>
+>  drivers/acpi/acpica/rsxface.c |  7 ++--
+>  drivers/acpi/arm64/iort.c     | 57 ++++++++++++++++++++++++++-
+>  drivers/acpi/resource.c       | 82 +++++++++++++++++++++++++++++---------
+>  drivers/acpi/scan.c           | 91 +++++++++++++++++++++++++++++++++++++++----
+>  include/acpi/acnames.h        |  1 +
+>  include/acpi/acpi_bus.h       |  2 +
+>  include/linux/acpi.h          |  8 ++++
+>  include/linux/acpi_iort.h     |  5 ++-
+>  8 files changed, 219 insertions(+), 34 deletions(-)
+>
+> --
+> 2.10.0
+>
+Works on XGene.
+Tested-by: Feng Kan <fkan@apm.com>
