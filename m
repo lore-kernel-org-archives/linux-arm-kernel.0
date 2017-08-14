@@ -1,38 +1,20 @@
-From: pasha.tatashin@oracle.com (Pasha Tatashin)
-Date: Mon, 14 Aug 2017 10:01:52 -0400
-Subject: [v6 15/15] mm: debug for raw alloctor
-In-Reply-To: <20170814115000.GJ19063@dhcp22.suse.cz>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-16-git-send-email-pasha.tatashin@oracle.com>
- <20170811130831.GN30811@dhcp22.suse.cz>
- <87d84cad-f03a-88f0-7828-6d3bf7ac473c@oracle.com>
- <20170814115000.GJ19063@dhcp22.suse.cz>
-Message-ID: <b4eb28ad-2d58-fb23-2139-427df46c2773@oracle.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 14 Aug 2017 15:59:33 +0200
+Subject: [PATCH 6/8] gpio: zynq: Fix empty lines in driver
+In-Reply-To: <35852b459f0001981e0376c8fade8a498fd6e66e.1502103715.git.michal.simek@xilinx.com>
+References: <cover.1502103715.git.michal.simek@xilinx.com>
+ <35852b459f0001981e0376c8fade8a498fd6e66e.1502103715.git.michal.simek@xilinx.com>
+Message-ID: <CACRpkdZZ=XQZtEagX176rU+draPNmvUBRsxiUa3pV58ofS1m5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> However, now thinking about it, I will change it to CONFIG_MEMBLOCK_DEBUG,
->> and let users decide what other debugging configs need to be enabled, as
->> this is also OK.
-> 
-> Actually the more I think about it the more I am convinced that a kernel
-> boot parameter would be better because it doesn't need the kernel to be
-> recompiled and it is a single branch in not so hot path.
+On Mon, Aug 7, 2017 at 1:01 PM, Michal Simek <michal.simek@xilinx.com> wrote:
 
-The main reason I do not like kernel parameter is that automated test 
-suits for every platform would need to be updated to include this new 
-parameter in order to test it.
+> Remove one additional line and add two new. All are reported by checkpatch.
+>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-Yet, I think it is important at least initially to test it on every 
-platform unconditionally when certain debug configs are enabled.
+Patch applied.
 
-This patch series allows boot allocator to return uninitialized memory, 
-this behavior Linux never had before, but way too often firmware 
-explicitly zero all the memory before starting OS. Therefore, it would 
-be hard to debug issues that might be only seen during kinit type of 
-reboots.
-
-In the future, when memory sizes will increase so that this memset will 
-become unacceptable even on debug kernels, it can always be removed, but 
-at least at that time we will know that the code has been tested for 
-many years.
+Yours,
+Linus Walleij
