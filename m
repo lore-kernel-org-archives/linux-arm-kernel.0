@@ -1,67 +1,59 @@
-From: Chris.Paterson2@renesas.com (Chris Paterson)
-Date: Mon, 14 Aug 2017 15:15:17 +0000
-Subject: [PATCH ] mmc: renesas_sdhi: Add r8a7743/5 support
-In-Reply-To: <CAMuHMdVDqgbwKzxFoxajLLFHZC80NT5vrDLnpb9sFj+DL-1zDw@mail.gmail.com>
-References: <1502709581-26546-1-git-send-email-biju.das@bp.renesas.com>
- <CAMuHMdVDqgbwKzxFoxajLLFHZC80NT5vrDLnpb9sFj+DL-1zDw@mail.gmail.com>
-Message-ID: <TY1PR06MB070269842CD923E4DE4FE6EDB78C0@TY1PR06MB0702.apcprd06.prod.outlook.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 14 Aug 2017 17:15:37 +0200
+Subject: [PATCH v6 0/2] Add basic support for Mediatek MT2712 SoC
+In-Reply-To: <1501847977-4023-1-git-send-email-yt.shen@mediatek.com>
+References: <1501847977-4023-1-git-send-email-yt.shen@mediatek.com>
+Message-ID: <d40ece12-5148-af2a-fb83-00c56230e175@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> From: geert.uytterhoeven at gmail.com [mailto:geert.uytterhoeven at gmail.com]
-> On Behalf Of Geert Uytterhoeven
-> Sent: 14 August 2017 15:22
-> 
-> On Mon, Aug 14, 2017 at 1:19 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> > Add support for r8a7743/5 SoC.Renesas RZ/G1[ME] (R8A7743/5) SDHI is
-> > identical to the R-Car Gen2 family.
-> >
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > ---
-> > This patch is compiled and tested against mmc/next.
-> >
-> >  drivers/mmc/host/renesas_sdhi_sys_dmac.c | 2 ++
-> >  1 file changed, 2 insertions(+)
-> >
-> > diff --git a/drivers/mmc/host/renesas_sdhi_sys_dmac.c
-> > b/drivers/mmc/host/renesas_sdhi_sys_dmac.c
-> > index 718cb8a..f709f7f 100644
-> > --- a/drivers/mmc/host/renesas_sdhi_sys_dmac.c
-> > +++ b/drivers/mmc/host/renesas_sdhi_sys_dmac.c
-> > @@ -95,6 +95,8 @@
-> >         { .compatible = "renesas,sdhi-r7s72100", .data = &of_rz_compatible, },
-> >         { .compatible = "renesas,sdhi-r8a7778", .data =
-> &of_rcar_gen1_compatible, },
-> >         { .compatible = "renesas,sdhi-r8a7779", .data =
-> > &of_rcar_gen1_compatible, },
-> > +       { .compatible = "renesas,sdhi-r8a7743", .data =
-> &of_rcar_gen2_compatible, },
-> > +       { .compatible = "renesas,sdhi-r8a7745", .data =
-> > + &of_rcar_gen2_compatible, },
-> >         { .compatible = "renesas,sdhi-r8a7790", .data =
-> &of_rcar_gen2_compatible, },
-> >         { .compatible = "renesas,sdhi-r8a7791", .data =
-> &of_rcar_gen2_compatible, },
-> >         { .compatible = "renesas,sdhi-r8a7792", .data =
-> > &of_rcar_gen2_compatible, },
-> 
-> I guess we want generic R-Car Gen2/3 compatible values here, too?
 
-Yes, but I assume that should be a separate patch submitted instead of this one?
+On 08/04/2017 01:59 PM, YT Shen wrote:
+> MT2712 is a SoC based on 64bit ARMv8 architecture.
+> MT2712 share many HW IP with MT8173.  This patchset was tested on MT2712 evaluation board, and boot to shell ok.
+> 
+> This series contains document bindings, device tree including interrupt and uart.
+> 
 
-Kind regards, Chris
+pushed to v4.13-next/dts64
 
+Thanks
 
+> Changes compared to v5:
+> - remove the soc node
 > 
-> Gr{oetje,eeting}s,
+> Changes compared to v4:
+> - rebase to 4.13-rc1
+> - use two clocks (baud_clk & sys_clk) instead of one uart_clk to the correct bindings
 > 
->                         Geert
+> Changes compared to v3:
+> - use two uart clocks refer to the bindings
 > 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-
-> m68k.org
+> Changes compared to v2:
+> - remove alias from serial1 to serial5
+> - remove initrd-start and initrd-end
+> - change GIC_CPU_MASK_SIMPLE(6) to GIC_CPU_MASK_RAW(0x13)
+> - change gic-400 reg range
 > 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+> Changes compared to v1:
+> - change subject prefix for bindings
+> - change device tree license to SPDX tag.
+> - change bootargs parameter to DT usage.
+> - change intpol-controller to interrupt-controller
+> 
+> YT Shen (2):
+>    dt-bindings: arm: Add bindings for Mediatek MT2712 SoC Platform
+>    arm64: dts: Add Mediatek SoC MT2712 and evaluation board dts and
+>      Makefile
+> 
+>   Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
+>   .../interrupt-controller/mediatek,sysirq.txt       |   1 +
+>   .../devicetree/bindings/serial/mtk-uart.txt        |   1 +
+>   arch/arm64/boot/dts/mediatek/Makefile              |   1 +
+>   arch/arm64/boot/dts/mediatek/mt2712-evb.dts        |  32 ++++
+>   arch/arm64/boot/dts/mediatek/mt2712e.dtsi          | 171 +++++++++++++++++++++
+>   6 files changed, 210 insertions(+)
+>   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
+>   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+> 
