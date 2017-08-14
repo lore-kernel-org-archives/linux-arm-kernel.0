@@ -1,27 +1,73 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 14 Aug 2017 07:38:51 +0200
-Subject: [PATCH  1/2] ARM: dts: iwg20d-q7: Add RTC support
-In-Reply-To: <20170809090230.GM2705@verge.net.au>
-References: <1502197465-61546-1-git-send-email-biju.das@bp.renesas.com>
- <1502197465-61546-2-git-send-email-biju.das@bp.renesas.com>
- <20170809090230.GM2705@verge.net.au>
-Message-ID: <20170814053851.GE5654@verge.net.au>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 14 Aug 2017 07:42:47 +0100
+Subject: [PATCH 3/3] mfd: twl: move header file out of I2C realm
+In-Reply-To: <20170813133700.tv4ka7anvbzcplr7@ninjato>
+References: <20170521220212.1404-1-wsa@the-dreams.de>
+ <20170521220212.1404-4-wsa@the-dreams.de>
+ <20170706064453.GH16144@ulmo.fritz.box>
+ <20170706070352.xdecvsnremwqed72@dell>
+ <20170813133700.tv4ka7anvbzcplr7@ninjato>
+Message-ID: <20170814064247.qvggx4ito4vgjqvs@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 09, 2017 at 11:02:30AM +0200, Simon Horman wrote:
-> On Tue, Aug 08, 2017 at 02:04:24PM +0100, Biju Das wrote:
-> > Define the iWave RainboW-G20D-Qseven board dependent part of the
-> > RTC device node.
-> > 
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > ---
-> >  arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 18 ++++++++++++++++++
-> >  1 file changed, 18 insertions(+)
-> 
-> This has a compile-time dependency on
-> "[PATCH  2/2] ARM: dts: r8a7743: Add I2C DT support"
-> for the i2c2 node, right?
+On Sun, 13 Aug 2017, Wolfram Sang wrote:
 
-As I have now applied the above dependency I have
-also applied this patch for v4.14.
+> On Thu, Jul 06, 2017 at 08:03:52AM +0100, Lee Jones wrote:
+> > On Thu, 06 Jul 2017, Thierry Reding wrote:
+> > 
+> > > On Mon, May 22, 2017 at 12:02:10AM +0200, Wolfram Sang wrote:
+> > > > include/linux/i2c is not for client devices. Move the header file to a
+> > > > more appropriate location.
+> > > > 
+> > > > Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> > > > ---
+> > > >  arch/arm/mach-omap2/common.h            | 2 +-
+> > > >  arch/arm/mach-omap2/omap_twl.c          | 2 +-
+> > > >  drivers/gpio/gpio-twl4030.c             | 2 +-
+> > > >  drivers/iio/adc/twl4030-madc.c          | 2 +-
+> > > >  drivers/iio/adc/twl6030-gpadc.c         | 2 +-
+> > > >  drivers/input/keyboard/twl4030_keypad.c | 2 +-
+> > > >  drivers/input/misc/twl4030-pwrbutton.c  | 2 +-
+> > > >  drivers/input/misc/twl4030-vibra.c      | 2 +-
+> > > >  drivers/mfd/twl-core.c                  | 6 +++---
+> > > >  drivers/mfd/twl4030-audio.c             | 2 +-
+> > > >  drivers/mfd/twl4030-irq.c               | 2 +-
+> > > >  drivers/mfd/twl4030-power.c             | 2 +-
+> > > >  drivers/mfd/twl6030-irq.c               | 2 +-
+> > > >  drivers/phy/phy-twl4030-usb.c           | 2 +-
+> > > >  drivers/power/supply/twl4030_charger.c  | 2 +-
+> > > >  drivers/pwm/pwm-twl-led.c               | 2 +-
+> > > >  drivers/pwm/pwm-twl.c                   | 2 +-
+> > > >  drivers/regulator/twl-regulator.c       | 2 +-
+> > > >  drivers/regulator/twl6030-regulator.c   | 2 +-
+> > > >  drivers/rtc/rtc-twl.c                   | 2 +-
+> > > >  drivers/usb/phy/phy-twl6030-usb.c       | 2 +-
+> > > >  drivers/video/backlight/pandora_bl.c    | 2 +-
+> > > >  drivers/watchdog/twl4030_wdt.c          | 2 +-
+> > > >  include/linux/{i2c => mfd}/twl.h        | 0
+> > > >  sound/soc/codecs/twl4030.c              | 2 +-
+> > > >  25 files changed, 26 insertions(+), 26 deletions(-)
+> > > >  rename include/linux/{i2c => mfd}/twl.h (100%)
+> > > 
+> > > I didn't see this get applied yet, so just in case anyone was waiting
+> > > for me (this is trivial, so I don't think there's a need):
+> > 
+> > You're not the last. :)
+> 
+> Given the triviality of the change for non-MFD subsystems, can we apply
+> this for 4.14?
+
+I can't apply anything without Acks for *all* of the subsystems above.
+
+As you well know, it is the submitters responsibility to obtain them.
+
+My suggestion would be to collect the Acks you've received up until
+this point and identify which SS's are still lacking in change log
+section of a RESEND.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
