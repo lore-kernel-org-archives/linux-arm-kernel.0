@@ -1,84 +1,45 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 14 Aug 2017 14:37:51 -0400 (EDT)
-Subject: [PATCH 20/30] ARM: kernel: use PC relative symbol references in
- suspend/resume code
-In-Reply-To: <CAKv+Gu-k4vUHDz92dsy-d15aBh61-pcGDi3GbX9pmBCbY21SsQ@mail.gmail.com>
-References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
- <20170814125411.22604-21-ard.biesheuvel@linaro.org>
- <alpine.LFD.2.20.1708141158070.17016@knanqh.ubzr>
- <CAKv+Gu-k4vUHDz92dsy-d15aBh61-pcGDi3GbX9pmBCbY21SsQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.20.1708141434240.17016@knanqh.ubzr>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 14 Aug 2017 20:40:42 +0200 (CEST)
+Subject: [PATCH] ARM: bcm2836: Send event when onlining other cores
+In-Reply-To: <1168905996.270506.1502730695418@email.1und1.de>
+References: <1502190295-53391-1-git-send-email-phil@raspberrypi.org>
+ <1502190295-53391-2-git-send-email-phil@raspberrypi.org>
+ <fdecf317-d20b-1a5d-046f-56ef40c55d82@gmail.com>
+ <1168905996.270506.1502730695418@email.1und1.de>
+Message-ID: <399697756.271804.1502736043014@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 14 Aug 2017, Ard Biesheuvel wrote:
+Hi Eric,
 
-> On 14 August 2017 at 17:02, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Mon, 14 Aug 2017, Ard Biesheuvel wrote:
-> >
-> >> Replace some unnecessary absolute references with relative ones. Also,
-> >> to prepare for runtime relocation, which occurs with the caches on,
-> >> defer taking the absolute address of cpu_resume_after_mmu() until after
-> >> the MMU is enabled.
-> >>
-> >> Cc: Russell King <linux@armlinux.org.uk>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm/kernel/sleep.S | 11 +++++------
-> >>  1 file changed, 5 insertions(+), 6 deletions(-)
-> >>
-> >> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-> >> index 3026b119d3ff..9efd1c7d3552 100644
-> >> --- a/arch/arm/kernel/sleep.S
-> >> +++ b/arch/arm/kernel/sleep.S
-> >> @@ -60,18 +60,17 @@
-> >>  ENTRY(__cpu_suspend)
-> >>       stmfd   sp!, {r4 - r11, lr}
-> >>  #ifdef MULTI_CPU
-> >> -     ldr     r10, =processor
-> >> -     ldr     r4, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
-> >> +     ldr_l   r4, processor + CPU_SLEEP_SIZE  @ size of CPU sleep state
-> >>  #else
-> >> -     ldr     r4, =cpu_suspend_size
-> >> +     adr_l   r4, cpu_suspend_size
-> >>  #endif
-> >>       mov     r5, sp                  @ current virtual SP
-> >>       add     r4, r4, #12             @ Space for pgd, virt sp, phys resume fn
-> >>       sub     sp, sp, r4              @ allocate CPU state on stack
-> >> -     ldr     r3, =sleep_save_sp
-> >> +     adr_l   r3, sleep_save_sp
-> >>       stmfd   sp!, {r0, r1}           @ save suspend func arg and pointer
-> >>       ldr     r3, [r3, #SLEEP_SAVE_SP_VIRT]
-> >> -     ALT_SMP(ldr r0, =mpidr_hash)
-> >> +     ALT_SMP(adr_l r0, mpidr_hash)
-> >>       ALT_UP_B(1f)
-> >
-> > The above is dangerous. adr_l expands to more than one instruction which
-> > is not what ALT_SMP() was designed for. Here it might happen to work
-> > anyway because it is combined with ALT_UP_B() but with ALT_UP() it
-> > wouldn't. This is a mistake waiting to happen.
-> >
+> Stefan Wahren <stefan.wahren@i2se.com> hat am 14. August 2017 um 19:11 geschrieben:
 > 
-> OK. I will use the opencoded sequence instead in this case. I.e.,
 > 
-> -       ALT_SMP(ldr r0, =mpidr_hash)
-> +0:     ALT_SMP(adr r0, 2f)
->         ALT_UP_B(1f)
-> +       ldr     r1, [r0]
-> +       add     r0, r0, r1
+> Hi Florian,
 > 
-> and
+> > Florian Fainelli <f.fainelli@gmail.com> hat am 14. August 2017 um 18:25 geschrieben:
+> > 
+> > 
+> > 
+> > 
+> > On 08/08/2017 04:04 AM, Phil Elwell wrote:
+> > > Secondary cores should enter a low-power idle state when waiting to
+> > > be started. The "wfe" instruction causes a core to wait until an event
+> > > or interrupt arrives before continuing to the next instruction, and
+> > > the "sev" instruction sends a wakeup event to the other cores.
+> > > 
+> > > Add an "sev" (and a memory barrier) to bcm2836_boot_secondary, the
+> > > function that wakes the waiting cores during booting. This is required
+> > > if the secondary cores are sitting in "wfe", and harmless if not.
+> > 
+> > Eric, should I just pick this up for the upcoming ARM SoC pull requests
+> > that I am preparing, or do you have more changes aside from the two tags
+> > I already merged?
 > 
->  ENDPROC(__cpu_suspend)
-> +       .align  2
-> +2:     .long   mpidr_hash - .
->         .ltorg
+> this patch depends on series "ARM: bcm2836: Move SMP startup code to arch/arm".
 > 
+> I didn't had the time to test Phil's patch in all relevant cases. But i could at least prepare a branch with my changes with the acks.
 
-Yeah... I see no way around it.
+i prepared the branches bcm2835-dt-next-v2 and bcm2835-soc-next.
 
-And if you make this particular case into a commit of its own, then the 
-commit log may carry the above reasoning.
-
-
-Nicolas
+Stefan
