@@ -1,70 +1,59 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 13:54:09 +0100
-Subject: [PATCH 28/30] efi/libstub: check for vmalloc= command line argument
+Date: Mon, 14 Aug 2017 13:54:03 +0100
+Subject: [PATCH 22/30] ARM: kernel: refer to swapper_pg_dir via its symbol
 In-Reply-To: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
 References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170814125411.22604-29-ard.biesheuvel@linaro.org>
+Message-ID: <20170814125411.22604-23-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check for and record the presence of a vmalloc= argument on the
-kernel command line. We need this information on ARM systems when
-implementing KASLR, given that the size of the vmalloc region will
-affect the size of the lowmem region, therefore affecting the
-available randomization range as well.
+The location of swapper_pg_dir is relative to the kernel, not to
+PAGE_OFFSET or PHYS_OFFSET. So define the symbol relative to the
+start of the kernel image, and refer to it via its name.
 
-Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/firmware/efi/libstub/efi-stub-helper.c | 9 +++++++++
- drivers/firmware/efi/libstub/efistub.h         | 1 +
- 2 files changed, 10 insertions(+)
+ arch/arm/kernel/head.S | 13 ++++---------
+ 1 file changed, 4 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
-index b0184360efc6..f3e9d43030ac 100644
---- a/drivers/firmware/efi/libstub/efi-stub-helper.c
-+++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
-@@ -34,6 +34,7 @@ static unsigned long __chunk_size = EFI_READ_CHUNK_SIZE;
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 5d685e86148c..71bc0d037bc9 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -48,14 +48,6 @@
+ #define PMD_ORDER	2
+ #endif
  
- static int __section(.data) __nokaslr;
- static int __section(.data) __quiet;
-+static int __section(.data) __vmalloc_arg;
+-	.globl	swapper_pg_dir
+-	.equ	swapper_pg_dir, KERNEL_RAM_VADDR - PG_DIR_SIZE
+-
+-	.macro	pgtbl, rd, phys
+-	add	\rd, \phys, #TEXT_OFFSET
+-	sub	\rd, \rd, #PG_DIR_SIZE
+-	.endm
+-
+ /*
+  * Kernel startup entry point.
+  * ---------------------------
+@@ -77,6 +69,9 @@
+ 	.arm
  
- int __pure nokaslr(void)
- {
-@@ -43,6 +44,10 @@ int __pure is_quiet(void)
- {
- 	return __quiet;
- }
-+int __pure have_vmalloc(void)
-+{
-+	return __vmalloc_arg;
-+}
- 
- #define EFI_MMAP_NR_SLACK_SLOTS	8
- 
-@@ -433,6 +438,10 @@ efi_status_t efi_parse_options(char const *cmdline)
- 	if (str == cmdline || (str && str > cmdline && *(str - 1) == ' '))
- 		__quiet = 1;
- 
-+	str = strstr(cmdline, "vmalloc=");
-+	if (str == cmdline || (str && str > cmdline && *(str - 1) == ' '))
-+		__vmalloc_arg = 1;
+ 	__HEAD
++	.globl	swapper_pg_dir
++	.equ	swapper_pg_dir, . - PG_DIR_SIZE
 +
+ ENTRY(stext)
+  ARM_BE8(setend	be )			@ ensure we are in BE8 mode
+ 
+@@ -172,7 +167,7 @@ ENDPROC(stext)
+  *  r4 = physical page table address
+  */
+ __create_page_tables:
+-	pgtbl	r4, r8				@ page table address
++	adr_l	r4, swapper_pg_dir		@ page table address
+ 
  	/*
- 	 * If no EFI parameters were specified on the cmdline we've got
- 	 * nothing to do.
-diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
-index 3a670a5f759f..aaf2aeb785ea 100644
---- a/drivers/firmware/efi/libstub/efistub.h
-+++ b/drivers/firmware/efi/libstub/efistub.h
-@@ -26,6 +26,7 @@
- 
- extern int __pure nokaslr(void);
- extern int __pure is_quiet(void);
-+extern int __pure have_vmalloc(void);
- 
- #define pr_efi(sys_table, msg)		do {				\
- 	if (!is_quiet()) efi_printk(sys_table, "EFI stub: "msg);	\
+ 	 * Clear the swapper page table
 -- 
 2.11.0
