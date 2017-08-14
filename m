@@ -1,24 +1,24 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Aug 2017 13:33:17 -0700
-Subject: [PATCH] nokia n900: update dts with camera support
-In-Reply-To: <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
-References: <20170810204923.GA18442@amd>
- <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
-Message-ID: <20170814203317.GE8569@atomide.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 14 Aug 2017 23:43:23 +0300
+Subject: [PATCHv6 2/2] i2c: altera: Add Altera I2C Controller driver
+In-Reply-To: <1502728113-22547-2-git-send-email-thor.thayer@linux.intel.com>
+References: <1502728113-22547-1-git-send-email-thor.thayer@linux.intel.com>
+ <1502728113-22547-2-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <CAHp75VekTB2vLFpXsYhO0E5QacXe_ssCz9Bp-MpapJFCg4WJoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sakari Ailus <sakari.ailus@iki.fi> [170814 13:20]:
-> Hi Pavel,
-> 
-> Thanks for the patch.
-> 
-> I understand Tony already applied this one. I'd have a few comments below,
-> could you address them in another patch, please?
+On Mon, Aug 14, 2017 at 7:28 PM,  <thor.thayer@linux.intel.com> wrote:
+> From: Thor Thayer <thor.thayer@linux.intel.com>
+>
+> Add driver support for the Altera I2C Controller. The I2C
+> controller is soft IP for use in FPGAs.
 
-Oops sorry about that. It looked trivial enough for me.
-Yes an incremental patces to follow-up please.
+Hmm...
+Could you remind me if I reviewed this and gave a tag?
+If yes, where is the tag, since changelog doesn't clarify this.
 
-Regards,
 
-Tony
+-- 
+With Best Regards,
+Andy Shevchenko
