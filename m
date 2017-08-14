@@ -1,168 +1,115 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 14 Aug 2017 16:29:51 +0100
-Subject: [PATCH 02/30] ARM: assembler: introduce adr_l, ldr_l and str_l
- macros
-In-Reply-To: <20170814125411.22604-3-ard.biesheuvel@linaro.org>
-References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
- <20170814125411.22604-3-ard.biesheuvel@linaro.org>
-Message-ID: <20170814152950.GT6321@e103592.cambridge.arm.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Mon, 14 Aug 2017 18:21:29 +0300
+Subject: [PATCH v5 19/19] crypto: adapt api sample to use async. op wait
+In-Reply-To: <1502724094-23305-1-git-send-email-gilad@benyossef.com>
+References: <1502724094-23305-1-git-send-email-gilad@benyossef.com>
+Message-ID: <1502724094-23305-20-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 01:53:43PM +0100, Ard Biesheuvel wrote:
-> Like arm64, ARM supports position independent code sequences that
-> produce symbol references with a greater reach than the ordinary
-> adr/ldr instructions.
-> 
-> Currently, we use open coded instruction sequences involving literals
-> and arithmetic operations. Instead, we can use movw/movt pairs on v7
-> CPUs, circumventing the D-cache entirely. For older CPUs, we can emit
-> the literal into a subsection, allowing it to be emitted out of line
-> while retaining the ability to perform arithmetic on label offsets.
-> 
-> E.g., on pre-v7 CPUs, we can emit a PC-relative reference as follows:
-> 
->        ldr          <reg>, 222f
->   111: add          <reg>, <reg>, pc
->        .subsection  1
->   222: .long        <sym> - (111b + 8)
->        .previous
-> 
-> This is allowed by the assembler because, unlike ordinary sections,
-> subsections are combined into a single section into the object file,
-> and so the label references are not true cross-section references that
-> are visible as relocations. Note that we could even do something like
-> 
->        add          <reg>, pc, #(222f - 111f) & ~0xfff
->        ldr          <reg>, [<reg>, #(222f - 111f) & 0xfff]
->   111: add          <reg>, <reg>, pc
->        .subsection  1
->   222: .long        <sym> - (111b + 8)
->        .previous
+The code sample is waiting for an async. crypto op completion.
+Adapt sample to use the new generic infrastructure to do the same.
 
-This is reinventing ldr=
+This also fixes a possible data coruption bug created by the
+use of wait_for_completion_interruptible() without dealing
+correctly with an interrupt aborting the wait prior to the
+async op finishing.
 
-I seem to remember ldr= barfing on things that .long happily accepts
-though, was this the reason?
+Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+---
+ Documentation/crypto/api-samples.rst | 52 +++++++-----------------------------
+ 1 file changed, 10 insertions(+), 42 deletions(-)
 
-
-> if it turns out that the 4 KB range of the ldr instruction is insufficient
-> to reach the literal in the subsection, although this is currently not a
-> problem (of the 98 objects built from .S files in a multi_v7_defconfig
-> build, only 11 have .text sections that are over 1 KB, and the largest one
-> [entry-armv.o] is 3308 bytes)
-> 
-> Subsections have been available in binutils since 2004 at least, so
-> they should not cause any issues with older toolchains.
-
-(I also believe this to be an ancient feature, but I've not done the
-digging to prove it.)
-
-> So use the above to implement the macros mov_l, adr_l, adrm_l (using ldm
-> to load multiple literals at once), ldr_l and str_l, all of which will
-> use movw/movt pairs on v7 and later CPUs, and use PC-relative literals
-> otherwise.
-> 
-> Cc: Russell King <linux@armlinux.org.uk>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/include/asm/assembler.h | 71 ++++++++++++++++++++
->  1 file changed, 71 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> index ad301f107dd2..516ebaf4ff38 100644
-> --- a/arch/arm/include/asm/assembler.h
-> +++ b/arch/arm/include/asm/assembler.h
-> @@ -518,4 +518,75 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
->  #endif
->  	.endm
->  
-> +#ifdef CONFIG_THUMB2_KERNEL
-> +#define	ARM_PC_BIAS		4
-> +#else
-> +#define	ARM_PC_BIAS		8
-> +#endif
-> +
-> +	.macro		__adldst_l, op, reg, sym, tmp, c
-> +	.if		__LINUX_ARM_ARCH__ < 7
-> +	ldr\c		\tmp, 111f
-> +	.subsection	1
-> +	.align		2
-> +111:	.long		\sym - (222f + ARM_PC_BIAS)
-
-See above comment about ldr=.
-
-> +	.previous
-> +	.else
-> +	W(movw\c\())	\tmp, #:lower16:\sym - (222f + ARM_PC_BIAS)
-> +	W(movt\c\())	\tmp, #:upper16:\sym - (222f + ARM_PC_BIAS)
-
-Why W()?
-
-There are no narrow forms of these instructions anyway -- if there were
-then they couldn't accommodate a 16-bit immediate.
-
-> +	.endif
-> +222:
-> +	.ifc		\op, add
-> +	add\c		\reg, \tmp, pc
-> +	.elseif		CONFIG_THUMB2_KERNEL == 1
-> +	add		\tmp, \tmp, pc
-> +	\op\c		\reg, [\tmp]
-
-Shame 
-	\op\c		\reg, [pc, \tmp]
-doesn't work.
-
-But it doesn't, apparently.
-
-> +	.else
-> +	\op\c		\reg, [pc, \tmp]
-> +	.endif
-> +	.endm
-> +
-> +	/*
-> +	 * mov_l - move a constant value or [relocated] address into a register
-> +	 */
-> +	.macro		mov_l, dst:req, imm:req, cond
-> +	.if		__LINUX_ARM_ARCH__ < 7
-> +	ldr\cond	\dst, =\imm
-> +	.else
-> +	W(movw\cond\())	\dst, #:lower16:\imm
-> +	W(movt\cond\())	\dst, #:upper16:\imm
-> +	.endif
-> +	.endm
-> +
-> +	/*
-> +	 * adr_l - adr pseudo-op with unlimited range
-> +	 *
-> +	 * @dst: destination register
-> +	 * @sym: name of the symbol
-> +	 */
-> +	.macro		adr_l, dst:req, sym:req, cond
-> +	__adldst_l	add, \dst, \sym, \dst, \cond
-> +	.endm
-> +
-> +	/*
-> +	 * ldr_l - ldr <literal> pseudo-op with unlimited range
-> +	 *
-> +	 * @dst: destination register
-> +	 * @sym: name of the symbol
-> +	 */
-> +	.macro		ldr_l, dst:req, sym:req, cond
-> +	__adldst_l	ldr, \dst, \sym, \dst, \cond
-> +	.endm
-> +
-> +	/*
-> +	 * str_l - str <literal> pseudo-op with unlimited range
-> +	 *
-> +	 * @src: source register
-> +	 * @sym: name of the symbol
-> +	 * @tmp: mandatory scratch register
-> +	 */
-> +	.macro		str_l, src:req, sym:req, tmp:req, cond
-> +	__adldst_l	str, \src, \sym, \tmp, \cond
-> +	.endm
-
-Cheers
----Dave
+diff --git a/Documentation/crypto/api-samples.rst b/Documentation/crypto/api-samples.rst
+index 2531948..006827e 100644
+--- a/Documentation/crypto/api-samples.rst
++++ b/Documentation/crypto/api-samples.rst
+@@ -7,59 +7,27 @@ Code Example For Symmetric Key Cipher Operation
+ ::
+ 
+ 
+-    struct tcrypt_result {
+-        struct completion completion;
+-        int err;
+-    };
+-
+     /* tie all data structures together */
+     struct skcipher_def {
+         struct scatterlist sg;
+         struct crypto_skcipher *tfm;
+         struct skcipher_request *req;
+-        struct tcrypt_result result;
++        struct crypto_wait wait;
+     };
+ 
+-    /* Callback function */
+-    static void test_skcipher_cb(struct crypto_async_request *req, int error)
+-    {
+-        struct tcrypt_result *result = req->data;
+-
+-        if (error == -EINPROGRESS)
+-            return;
+-        result->err = error;
+-        complete(&result->completion);
+-        pr_info("Encryption finished successfully\n");
+-    }
+-
+     /* Perform cipher operation */
+     static unsigned int test_skcipher_encdec(struct skcipher_def *sk,
+                          int enc)
+     {
+-        int rc = 0;
++        int rc;
+ 
+         if (enc)
+-            rc = crypto_skcipher_encrypt(sk->req);
++            rc = crypto_wait_req(crypto_skcipher_encrypt(sk->req), &sk->wait);
+         else
+-            rc = crypto_skcipher_decrypt(sk->req);
+-
+-        switch (rc) {
+-        case 0:
+-            break;
+-        case -EINPROGRESS:
+-        case -EBUSY:
+-            rc = wait_for_completion_interruptible(
+-                &sk->result.completion);
+-            if (!rc && !sk->result.err) {
+-                reinit_completion(&sk->result.completion);
+-                break;
+-            }
+-        default:
+-            pr_info("skcipher encrypt returned with %d result %d\n",
+-                rc, sk->result.err);
+-            break;
+-        }
+-        init_completion(&sk->result.completion);
++            rc = crypto_wait_req(crypto_skcipher_decrypt(sk->req), &sk->wait);
++
++	if (rc)
++		pr_info("skcipher encrypt returned with result %d\n", rc);
+ 
+         return rc;
+     }
+@@ -89,8 +57,8 @@ Code Example For Symmetric Key Cipher Operation
+         }
+ 
+         skcipher_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+-                          test_skcipher_cb,
+-                          &sk.result);
++                          crypto_req_done,
++                          &sk.wait);
+ 
+         /* AES 256 with random key */
+         get_random_bytes(&key, 32);
+@@ -122,7 +90,7 @@ Code Example For Symmetric Key Cipher Operation
+         /* We encrypt one block */
+         sg_init_one(&sk.sg, scratchpad, 16);
+         skcipher_request_set_crypt(req, &sk.sg, &sk.sg, 16, ivdata);
+-        init_completion(&sk.result.completion);
++        crypto_init_wait(&sk.wait);
+ 
+         /* encrypt data */
+         ret = test_skcipher_encdec(&sk, 1);
+-- 
+2.1.4
