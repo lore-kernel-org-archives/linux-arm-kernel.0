@@ -1,21 +1,60 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 14 Aug 2017 17:48:31 +0800
-Subject: [linux-sunxi] [PATCH 4/4] drivers: soc: sunxi: add support for
- A64 and its SRAM C
-In-Reply-To: <20170809085627.32687-5-icenowy@aosc.io>
-References: <20170809085627.32687-1-icenowy@aosc.io>
- <20170809085627.32687-5-icenowy@aosc.io>
-Message-ID: <CAGb2v66RnXDbL7OJfOAgeXPJSFZwzgfGbnB108vX-+OO_0xiWQ@mail.gmail.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Mon, 14 Aug 2017 17:50:39 +0800
+Subject: [PATCH v3 00/10] arm64: dts: hi3660: add more device nodes
+Message-ID: <20170814095049.27701-1-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 9, 2017 at 4:56 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> Allwinner A64's display engine claims the SRAM C section to work.
->
-> Add support for the A64 SRAM controller and the SRAM C section of it.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+This patchset adds more device nodes for hi3660 and hikey960, including:
+ - cpu idle states
+ - L2 cache
+ - PMU
+ - OP-TEE
+ - reboot
+ - pstore
+ - DMA
+ - watchdog
 
-Looks good to me. Will apply all 4 once the dt bindings are acked.
+Patch 7 fixes an issue in mmc nodes, by adding 'reset'
+Patch 8 change bluetooth uart max-speed to 3Mbps
 
-ChenYu
+HiKey960 is one of 96boards. For details information about it, please
+refer to [1].
+
+===
+Major changes in v3:
+ - update commit message of patch 1, as suggested by Daniel Lezcano
+ - add patch 10 for watchdog bindings
+
+Major changes in v2:
+ - add patch 8 to change bluetooth uart max-speed to 3Mbps
+ - add patch 9 for DMA node.
+
+[1] https://github.com/96boards/documentation/tree/master/ConsumerEdition/HiKey960
+
+Guodong Xu (4):
+  arm64: dts: hikey960: Add support for syscon-reboot-mode
+  arm64: dts: hikey960: Add pstore support
+  arm64: dts: hi3660: Reset the mmc hosts
+  arm64: dts: hikey960: change bluetooth uart max-speed to 3mbps
+
+Leo Yan (3):
+  arm64: dts: hi3660: enable idle states
+  arm64: dts: hi3660: add L2 cache topology
+  arm64: dts: hi3660: enable watchdog
+
+Victor Chong (1):
+  arm64: dts: hikey960: Add optee node
+
+Wang Ruyi (1):
+  arm64: dts: hi3660: add bindings for DMA
+
+YiPing Xu (1):
+  arm64: dts: hi3660: add pmu dt node for hi3660
+
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  37 +++++-
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 130 ++++++++++++++++++++++
+ 2 files changed, 166 insertions(+), 1 deletion(-)
+
+-- 
+2.10.2
