@@ -1,58 +1,94 @@
-From: jun.gao@mediatek.com (Jun Gao)
-Date: Mon, 14 Aug 2017 18:05:39 +0800
-Subject: [PATCH 1/2] dt-bindings: i2c: Add MediaTek MT7622 i2c binding
-In-Reply-To: <3384d424-827a-0a4b-d1d6-7d361d8c8391@gmail.com>
-References: <1502264631-12572-1-git-send-email-jun.gao@mediatek.com>
- <1502264631-12572-2-git-send-email-jun.gao@mediatek.com>
- <3384d424-827a-0a4b-d1d6-7d361d8c8391@gmail.com>
-Message-ID: <1502705139.930.78.camel@mhfsdcap03>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Mon, 14 Aug 2017 10:53:18 +0100
+Subject: [PATCH v2] ARM: dts: r8a7743: add IIC cores to dtsi
+In-Reply-To: <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
+References: <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
+Message-ID: <1502704398-28378-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-08-14 at 11:36 +0200, Matthias Brugger wrote:
-> 
-> On 08/09/2017 09:43 AM, Jun Gao wrote:
-> > From: Jun Gao <jun.gao@mediatek.com>
-> > 
-> > Add MT7622 i2c binding to binding file. Compare to MT8173 i2c
-> > controller, MT7622 limit message size to 255, and not support
-> > 4GB DMA mode.
-> > 
-> > Signed-off-by: Jun Gao <jun.gao@mediatek.com>
-> > ---
-> >   Documentation/devicetree/bindings/i2c/i2c-mtk.txt | 11 ++++++-----
-> >   1 file changed, 6 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-> > index bd5a7be..ff9ac61 100644
-> > --- a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-> > +++ b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-> > @@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
-> >   
-> >   Required properties:
-> >     - compatible: value should be either of the following.
-> > -      "mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek mt2701
-> > -      "mediatek,mt6577-i2c": for i2c compatible with mt6577.
-> > -      "mediatek,mt6589-i2c": for i2c compatible with mt6589.
-> > -      "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for i2c compatible with mt7623.
-> > -      "mediatek,mt8173-i2c": for i2c compatible with mt8173.
-> > +	"mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek MT2701
-> > +	"mediatek,mt6577-i2c": for Mediatek MT6577
-> > +	"mediatek,mt6589-i2c": for Mediatek MT6589
-> > +	"mediatek,mt7622-i2c": for Mediatek MT7622
-> > +	"mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for Mediatek MT7623
-> > +	"mediatek,mt8173-i2c": for Mediatek MT8173
-> >     - reg: physical base address of the controller and dma base, length of memory
-> >       mapped region.
-> >     - interrupts: interrupt number to the cpu.
-> > 
-> 
-> In the next series, could you please make sure not to change the indentation.
-> 
-> Thanks a lot,
-> Matthias
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+---
+v1-->v2
+   Corrected the resets property for i2c6 device node.
 
-Please review [PATCH v2 1/2], I will not change the indentation any
-more. Thanks!
+This patch is compiled against renesas-devel tag renesas-devel-20170814-v4.13-rc5. 
 
-Jun
+ arch/arm/boot/dts/r8a7743.dtsi | 55 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
+
+diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+index ce80a26..480950f 100644
+--- a/arch/arm/boot/dts/r8a7743.dtsi
++++ b/arch/arm/boot/dts/r8a7743.dtsi
+@@ -25,6 +25,9 @@
+ 		i2c3 = &i2c3;
+ 		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
++		i2c6 = &i2c6;
++		i2c7 = &i2c7;
++		i2c8 = &i2c8;
+ 	};
+ 
+ 	cpus {
+@@ -411,6 +414,58 @@
+ 			status = "disabled";
+ 		};
+ 
++		i2c6: i2c at e60b0000 {
++			/* doesn't need pinmux */
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,iic-r8a7743",
++				     "renesas,rcar-gen2-iic",
++				     "renesas,rmobile-iic";
++			reg = <0 0xe60b0000 0 0x425>;
++			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 926>;
++			dmas = <&dmac0 0x77>, <&dmac0 0x78>,
++			       <&dmac1 0x77>, <&dmac1 0x78>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 926>;
++			status = "disabled";
++		};
++
++		i2c7: i2c at e6500000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,iic-r8a7743",
++				     "renesas,rcar-gen2-iic",
++				     "renesas,rmobile-iic";
++			reg = <0 0xe6500000 0 0x425>;
++			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 318>;
++			dmas = <&dmac0 0x61>, <&dmac0 0x62>,
++			       <&dmac1 0x61>, <&dmac1 0x62>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 318>;
++			status = "disabled";
++		};
++
++		i2c8: i2c at e6510000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,iic-r8a7743",
++				     "renesas,rcar-gen2-iic",
++				     "renesas,rmobile-iic";
++			reg = <0 0xe6510000 0 0x425>;
++			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 323>;
++			dmas = <&dmac0 0x65>, <&dmac0 0x66>,
++			       <&dmac1 0x65>, <&dmac1 0x66>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 323>;
++			status = "disabled";
++		};
++
+ 		scifa0: serial at e6c40000 {
+ 			compatible = "renesas,scifa-r8a7743",
+ 				     "renesas,rcar-gen2-scifa", "renesas,scifa";
+-- 
+1.9.1
