@@ -1,52 +1,77 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 14 Aug 2017 09:25:16 -0700
-Subject: [PATCH] ARM: bcm2836: Send event when onlining other cores
-In-Reply-To: <1502190295-53391-2-git-send-email-phil@raspberrypi.org>
-References: <1502190295-53391-1-git-send-email-phil@raspberrypi.org>
- <1502190295-53391-2-git-send-email-phil@raspberrypi.org>
-Message-ID: <fdecf317-d20b-1a5d-046f-56ef40c55d82@gmail.com>
+From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
+Date: Mon, 14 Aug 2017 11:28:32 -0500
+Subject: [PATCHv6 1/2] dt-bindings: i2c: Add Altera I2C Controller
+Message-ID: <1502728113-22547-1-git-send-email-thor.thayer@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Thor Thayer <thor.thayer@linux.intel.com>
 
+Add the documentation to support the Altera synthesizable
+logic I2C Controller in FPGA.
 
-On 08/08/2017 04:04 AM, Phil Elwell wrote:
-> Secondary cores should enter a low-power idle state when waiting to
-> be started. The "wfe" instruction causes a core to wait until an event
-> or interrupt arrives before continuing to the next instruction, and
-> the "sev" instruction sends a wakeup event to the other cores.
-> 
-> Add an "sev" (and a memory barrier) to bcm2836_boot_secondary, the
-> function that wakes the waiting cores during booting. This is required
-> if the secondary cores are sitting in "wfe", and harmless if not.
+Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+v2  Change the subject to identify dt-bindings
+    Add synthesizable logic to description.
+    Change compatible string to "altr,softip-i2c"
+    Make description of clock phandle singular since 1 clock.
+    Remove altr, from fifo-size
+    Specify fifo-size is in bytes.
+v3  Add version to compatible string "altr,softip-i2c-v1.0"
+    Add for use in FPGA in description.
+v4  No Change - Add Acked-by
+v5-6  No Change
+---
+ .../devicetree/bindings/i2c/i2c-altera.txt         | 39 ++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-altera.txt
 
-Eric, should I just pick this up for the upcoming ARM SoC pull requests
-that I am preparing, or do you have more changes aside from the two tags
-I already merged?
-
-Thanks!
-
-> 
-> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
-> ---
->  arch/arm/mach-bcm/platsmp.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/mach-bcm/platsmp.c b/arch/arm/mach-bcm/platsmp.c
-> index 3fa1a99..7811160 100644
-> --- a/arch/arm/mach-bcm/platsmp.c
-> +++ b/arch/arm/mach-bcm/platsmp.c
-> @@ -312,6 +312,9 @@ static int bcm2836_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  	writel(virt_to_phys(secondary_startup),
->  	       intc_base + LOCAL_MAILBOX3_SET0 + 16 * cpu);
->  
-> +	dsb(sy);
-> +	sev();
-> +
->  	iounmap(intc_base);
->  
->  	return 0;
-> 
-
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-altera.txt b/Documentation/devicetree/bindings/i2c/i2c-altera.txt
+new file mode 100644
+index 0000000..767664f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-altera.txt
+@@ -0,0 +1,39 @@
++* Altera I2C Controller
++* This is Altera's synthesizable logic block I2C Controller for use
++* in Altera's FPGAs.
++
++Required properties :
++ - compatible : should be "altr,softip-i2c-v1.0"
++ - reg        : Offset and length of the register set for the device
++ - interrupts : <IRQ> where IRQ is the interrupt number.
++ - clocks     : phandle to input clock.
++ - #address-cells = <1>;
++ - #size-cells = <0>;
++
++Recommended properties :
++ - clock-frequency : desired I2C bus clock frequency in Hz.
++
++Optional properties :
++ - fifo-size : Size of the RX and TX FIFOs in bytes.
++ - Child nodes conforming to i2c bus binding
++
++Example :
++
++	i2c at 100080000 {
++		compatible = "altr,softip-i2c-v1.0";
++		reg = <0x00000001 0x00080000 0x00000040>;
++		interrupt-parent = <&intc>;
++		interrupts = <0 43 4>;
++		clocks = <&clk_0>;
++		clock-frequency = <100000>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		fifo-size = <4>;
++
++		eeprom at 51 {
++			compatible = "atmel,24c32";
++			reg = <0x51>;
++			pagesize = <32>;
++		};
++	};
++
 -- 
-Florian
+2.7.4
