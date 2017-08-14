@@ -1,43 +1,84 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Aug 2017 10:17:48 -0700
-Subject: [PATCH v2 2/2] ARM: OMAP4+: PRM: fix of_irq_get() result checks
-In-Reply-To: <2dfd399c-2760-7d64-a43f-caefde03b39a@cogentembedded.com>
-References: <20170806151714.108596802@cogentembedded.com>
- <80dd8051-456b-2331-b847-0631d94f85b1@cogentembedded.com>
- <20170809220229.GI3934@atomide.com>
- <2dfd399c-2760-7d64-a43f-caefde03b39a@cogentembedded.com>
-Message-ID: <20170814171746.GY8569@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 14 Aug 2017 18:25:09 +0100
+Subject: [PATCH 14/14] arm64: add VMAP_STACK overflow detection
+In-Reply-To: <20170814153253.GA22747@arm.com>
+References: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
+ <1502130965-18710-15-git-send-email-mark.rutland@arm.com>
+ <20170814153253.GA22747@arm.com>
+Message-ID: <20170814172509.GD23428@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> [170814 04:44]:
-> On 08/10/2017 01:02 AM, Tony Lindgren wrote:
+On Mon, Aug 14, 2017 at 04:32:53PM +0100, Will Deacon wrote:
+> Just some minor comments on this (after taking ages to realise you were
+> using tpidr_el0 as a temporary rather than tpidr_el1 and getting totally
+> confused!).
 > 
-> > > > of_irq_get() may return 0 as well as a nagative error number on failure,
-> > > 
-> > >     Oops, forgot to kill comma...
-> > 
-> > I can fix that while applying.
-> 
->    Thanks!
-> 
-> > > > (and never on success), however omap44xx_prm_late_init() regards 0 as a
-> > > > valid IRQ -- fix this.
-> > > > 
-> > > > Fixes: a8f83aefcd5a ("ARM: OMAP4+: PRM: register interrupt information from DT")
-> > > > Fixes: c5b3955828ba ("ARM: OMAP4: Fix legacy code clean-up regression")
-> > > > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > > [...]
-> 
-> > Seems these both should be safe to apply into fixes-not-urgent for
-> > v4.14 merge window as we have not seen any issues with this? Or
-> 
->    Yes, probably.
-> 
-> > are there some known bugs related to this?
-> 
->    Dunno, I was just auditing the call sites of of_irq_get[_byname]()...
+> On Mon, Aug 07, 2017 at 07:36:05PM +0100, Mark Rutland wrote:
 
-OK thanks I'll apply both into omap-for-v4.14/fixes-not-urgent.
+> > +static inline bool on_overflow_stack(unsigned long sp)
+> > +{
+> > +	unsigned long low = (unsigned long)this_cpu_ptr(overflow_stack);
+> 
+> Can you use raw_cpu_ptr here, like you do for the irq stack?
 
-Tony
+Sure; done.
+
+> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> > index e5aa866..44a27c3 100644
+> > --- a/arch/arm64/kernel/entry.S
+> > +++ b/arch/arm64/kernel/entry.S
+> > @@ -72,6 +72,37 @@
+> >  	.macro kernel_ventry	label
+> >  	.align 7
+> >  	sub	sp, sp, #S_FRAME_SIZE
+> > +#ifdef CONFIG_VMAP_STACK
+> > +	add	sp, sp, x0			// sp' = sp + x0
+> > +	sub	x0, sp, x0			// x0' = sp' - x0 = (sp + x0) - x0 = sp
+> > +	tbnz	x0, #THREAD_SHIFT, 0f
+> > +	sub	x0, sp, x0			// sp' - x0' = (sp + x0) - sp = x0
+> > +	sub	sp, sp, x0			// sp' - x0 = (sp + x0) - x0 = sp
+> > +	b	\label
+> > +
+> > +	/* Stash the original SP value in tpidr_el0 */
+> > +0:	msr	tpidr_el0, x0
+> 
+> The comment here is a bit confusing, since the sp has already been
+> decremented for the frame, as mention in a later comment.
+
+True. I've updated the comment to say:
+
+	/*
+	 * Stash the SP (minus S_FRAME_SIZE) in tpidr_el0. We can recover the
+	 * original SP value later if we need it.
+	 */  
+
+[...]
+
+> > +	 * Store the original GPRs to the new stack. The orginial SP (minus
+> 
+> original
+
+Took me a moment to spot the second instance. Fixed now.
+
+[...]
+
+> > +	/* Time to die */
+> > +	bl	handle_bad_stack
+> > +	ASM_BUG()
+> 
+> Why not just a b without the ASM_BUG?
+
+We need the BL to ensure that the LR is valid for unwinding. That's
+necessary for the backtrace to identify the exception regs based on the
+LR falling into .entry.text.
+
+The ASM_BUG() ensures that the LR value definitely falls in .entry.text,
+and makes the backtrace resolve the symbol correctly regardless of
+what's next.
+
+I didn't add a comment for the other cases, so I hadn't bothered here.
+I'm happy to add those, so long as we're consistent.
+
+Thanks,
+Mark.
