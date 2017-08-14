@@ -1,50 +1,34 @@
 From: andrea.adami@gmail.com (Andrea Adami)
-Date: Mon, 14 Aug 2017 22:48:31 +0200
-Subject: [PATCH v5 0/9] mtd: sharpslpart partition parser
-Message-ID: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
+Date: Mon, 14 Aug 2017 22:48:33 +0200
+Subject: [PATCH v5 2/9] mtd: nand: sharpsl: Add partition parsers platform data
+In-Reply-To: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
+References: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
+Message-ID: <1502743720-28672-3-git-send-email-andrea.adami@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset introduces a simple partition parser for the Sharp SL
-Series PXA handhelds. More details in the commit text.
+With the introduction of sharpslpart partition parser we can now read the
+offsets from NAND: we specify the list of the parsers as platform data, with
+cmdlinepart and ofpart parsers first allowing to override the part. table
+written in NAND. This is done in the board files using this driver.
 
-I have set in cc the ARM PXA maintainers because this is the MTD part of
-a planned wider patchset cleaning the Zaurus board files. The MFD maintainers
-are also in cc (tmio.h change).
+Thus, we need to extend sharpsl_nand_platform_data to consider the partition
+parsers.
 
-Changelog:
-v1 firt version, initial import of 2.4 sources
-v2 refactor applying many suggested fixes
-v3 put the partition parser types in the platform data
-v4 refactor after ML review
-v5 fix commit messages and subject texts, remove global, fixes after v4 review
+Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
+---
+ include/linux/mtd/sharpsl.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-GPL sources: http://support.ezaurus.com/developer/source/source_dl.asp
-
-Andrea Adami (9):
-  mtd: sharpslpart: Add sharpslpart partition parser
-  mtd: nand: sharpsl: Add partition parsers platform data
-  mfd: tmio: Add partition parsers platform data
-  mtd: nand: sharpsl: Register partitions using the parsers
-  mtd: nand: tmio: Register partitions using the parsers
-  ARM: pxa/corgi: Remove hardcoded partitioning, use sharpslpart parser
-  ARM: pxa/tosa: Remove hardcoded partitioning, use sharpslpart parser
-  ARM: pxa/spitz: Remove hardcoded partitioning, use sharpslpart parser
-  ARM: pxa/poodle: Remove hardcoded partitioning, use sharpslpart parser
-
- arch/arm/mach-pxa/corgi.c         |  31 +---
- arch/arm/mach-pxa/poodle.c        |  28 +--
- arch/arm/mach-pxa/spitz.c         |  34 +---
- arch/arm/mach-pxa/tosa.c          |  28 +--
- drivers/mtd/nand/sharpsl.c        |   2 +-
- drivers/mtd/nand/tmio_nand.c      |   4 +-
- drivers/mtd/parsers/Kconfig       |   8 +
- drivers/mtd/parsers/Makefile      |   1 +
- drivers/mtd/parsers/sharpslpart.c | 376 ++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/tmio.h          |   1 +
- include/linux/mtd/sharpsl.h       |   1 +
- 11 files changed, 424 insertions(+), 90 deletions(-)
- create mode 100644 drivers/mtd/parsers/sharpslpart.c
-
+diff --git a/include/linux/mtd/sharpsl.h b/include/linux/mtd/sharpsl.h
+index 65e91d0..6381a7d 100644
+--- a/include/linux/mtd/sharpsl.h
++++ b/include/linux/mtd/sharpsl.h
+@@ -17,4 +17,5 @@ struct sharpsl_nand_platform_data {
+ 	const struct mtd_ooblayout_ops *ecc_layout;
+ 	struct mtd_partition	*partitions;
+ 	unsigned int		nr_partitions;
++	const char *const	*part_parsers;
+ };
 -- 
 2.7.4
