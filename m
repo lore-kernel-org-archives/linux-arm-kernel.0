@@ -1,143 +1,155 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 19:08:54 +0100
-Subject: [PATCH 00/30] implement KASLR for ARM
-In-Reply-To: <alpine.LFD.2.20.1708141333540.17016@knanqh.ubzr>
-References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
- <CAK8P3a1zJPsHphvoOitQbTaY-7rzFndGKatM2=aeUphkG+3T_A@mail.gmail.com>
- <CAKv+Gu_-O5ZW=SzXe=0nRExfYWjyMWoJ3eObaZiiftPVNojibw@mail.gmail.com>
- <CAK8P3a1rV5yXm0CSZOx0ZVUiLENe=gBtn-9XUdHQmC2mPRwXOA@mail.gmail.com>
- <alpine.LFD.2.20.1708141220540.17016@knanqh.ubzr>
- <CAKv+Gu_he5AFct0MzNcbZT-ynp_NRSkRpmNTpbfk1BuUS9+aGw@mail.gmail.com>
- <alpine.LFD.2.20.1708141333540.17016@knanqh.ubzr>
-Message-ID: <CAKv+Gu8ve0h1zgo6XVu+a0n49u+i2ONNv9hS-Dymvt366X=gbw@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 14 Aug 2017 19:15:03 +0100
+Subject: [PATCH v3 pci] PCI/MSI: pci-xgene-msi: Enable MSI support in
+ ACPI boot for X-Gene v1
+In-Reply-To: <1502496173-6017-1-git-send-email-kdinh@apm.com>
+References: <1502496173-6017-1-git-send-email-kdinh@apm.com>
+Message-ID: <20170814181503.GA3093@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 August 2017 at 19:01, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Mon, 14 Aug 2017, Ard Biesheuvel wrote:
->
->> On 14 August 2017 at 17:28, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->> > On Mon, 14 Aug 2017, Arnd Bergmann wrote:
->> >
->> >> On Mon, Aug 14, 2017 at 5:49 PM, Ard Biesheuvel
->> >> <ard.biesheuvel@linaro.org> wrote:
->> >> > On 14 August 2017 at 16:30, Arnd Bergmann <arnd@arndb.de> wrote:
->> >>
->> >>
->> >> >> Can you explain how the random seed is passed from the bootloader
->> >> >> to the kernel when we don't use EFI? Is this implemented at all? I see
->> >> >> that you add a seed to "/chosen/kaslr-seed" in the EFI stub when using
->> >> >> the EFI boot services, but I don't see where that value gets read again
->> >> >> when we relocate the kernel.
->> >>
->> >> > To allow other bootloaders to do the same, the kaslr metadata is
->> >> > exposed via a zImage header, containing the values of PAGE_OFFSET, the
->> >> > base of the vmalloc area and the randomization granularity. A
->> >> > bootloader can read these values, and taking the size of DRAM and the
->> >> > placement of initrd and DTB into account, it can choose a value for
->> >> > kaslr offset and write it back into the zImage header.
->> >> >
->> >> > This is a bit involved, but it is really difficult to make these
->> >> > things backward compatible, i.e., passing something in a register is
->> >> > not possible if that register was not mandated to be zero initially.
->> >> >
->> >> > Similarly, the decompressor passed the kaslr offset to the startup
->> >> > code in the core kernel. It does so by passing it in r3 and jumping 4
->> >> > bytes past the entry point. This way, we are backward compatible with
->> >> > configurations where the decompressor is not used, because in that
->> >> > case, you always jump to the first instruction, which zeroes r3.
->> >>
->> >> There are two ideas we discussed in the past (but never implemented
->> >> them obviously):
->> >>
->> >> - instead of reading the "kaslr-seed" in the decompressor, it could
->> >>   simply hash all of the DT blob to get the seed. This way the bootloader
->> >>   can put the random see anywhere it likes, and as an added bonus,
->> >>   we also get a little bit more random behavior on machines that have
->> >>   no entropy source at all but that do have things like a serial number or
->> >>   mac address in DT. Obviously those would be constant across boots
->> >>   but different between machines. The OS can also store a random
->> >>   seed during shutdown in a location that the bootloader uses to
->> >>   initialize /chosen/kaslr-seed or another property that we use to seed
->> >>   the kernel PRNG at boot time.
->> >>
->> >> - If we have a random number at boot but no way to pass it through
->> >>   the DT, I think we actually /can/ pass it through registers: the
->> >>   register state is undefined, so in the worst case using the XOR of
->> >>   all registers gives us the same number on each boot, but the
->> >>   if the loader is modified to store a random 32-bit number in any
->> >>   of the registers that don't pass other information, we can use that
->> >>   to calculate the kaslr-base.
->> >
->> > I really like the later. This way there is no hard protocol to define
->> > and follow. The bootloader may exploit any source of randomness it can
->> > find, including the RTC in addition to the serial number for example. So
->> > doing both on the kernel side might actually be the best approach,
->> > giving the boot environment all the flexibility it wants and being
->> > compatible with all of them.
->> >
->>
->> Finding a source of entropy is not trivial, but it is not the difficult part.
->>
->> So when we pass some random seed to the decompressor, what will it do
->> with it? In order to find a suitable KASLR offset, it needs to know
->> the size of DRAM, the placement of the DT and potentially an initrd,
->> and the size of the vmalloc region in order to decide where it can put
->> the kernel.
->>
->> In my implementation, the decompressor simply receives the offset from
->> the bootloader, and exposes the value of PAGE_OFFSET, the base of  the
->> vmalloc region and the kaslr granularity supported by the kernel. The
->> bootloader should already know the size of DRAM and where it loaded
->> the DT and initrd, so it can roll the dice in an informed manner.
->>
->> Note that my UEFI stub implementation essentially does the same, which
->> was trivial to implement because UEFI already keeps track of all
->> allocations in DRAM. Note that this version simply disables KASLR if
->> it encounters a vmalloc= command line argument, given that it affects
->> the size of the lowmem region. We could enhance that to actually parse
->> the value, but I kept it simple for now.
->
-> What I dislike about such an arrangement (and I've brought up this
-> argument forward in a different context before) is that you create a lot
-> of additional dependencies between the kernel and the boot environment.
-> The kernel is no longer self-sufficient and all this boot preparation
-> has to be duplicated in all boot environments from UEFI to U-Boot to
-> qemu. The fact that the bootloader now has to care about very Linux
-> internal concepts such as vmalloc_start makes it rather inelegant to me.
->
-> I'm even wondering if, design wise, the best solution wouldn't be for
-> the actual kernel to move itself during the boot process and reboot
-> itself without any external help. Not necessarily go as far as the full
-> kexec danse , but boot far enough to parse the DT, initialize the
-> bootmem allocator, then find a new location for itself, move it there,
-> do the relocs and restart the boot process.  For this to work well, you
-> would have to make a copy of the .data section so to reboot again with a
-> pristine version except for one flag indicating that the move has been
-> done.
->
-> Doing it this way gives you a full kernel environment to work from and
-> be completely self-sufficient with zero reliance on any boot
-> environment. This would even make it compatible with Image i.e. the
-> compressor-less kernel. And if the DT and/or initrd is in the way then
-> you could even go as far as moving them away if you wanted.
->
+On Fri, Aug 11, 2017 at 06:02:53PM -0600, Khuong Dinh wrote:
+> This patch makes pci-xgene-msi driver ACPI-aware and provides
+> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
+> 
+> Signed-off-by: Khuong Dinh <kdinh@apm.com>
+>         [Take over from Duc Dang]
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> v3:
+>  - Input X-Gene MSI base address for irq_domain_alloc_fwnode
+>  - Add a hook to enforce X-Gene MSI be probed prior acpi_bus_scan happens
+> v2:
+>  - Verify with BIOS version 3.06.25 and 3.07.09
+> v1:
+>  - Initial version
+> ---
+>  drivers/acpi/Makefile            |    2 +-
+>  drivers/acpi/acpi_msi.c          |   74 ++++++++++++++++++++++++++++++++++++++
+>  drivers/acpi/internal.h          |    1 +
+>  drivers/acpi/scan.c              |    1 +
+>  drivers/pci/host/pci-xgene-msi.c |   36 +++++++++++++++++--
+>  5 files changed, 110 insertions(+), 4 deletions(-)
+>  create mode 100644 drivers/acpi/acpi_msi.c
+> 
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index b1aacfc..c15f5cd 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -40,7 +40,7 @@ acpi-y				+= ec.o
+>  acpi-$(CONFIG_ACPI_DOCK)	+= dock.o
+>  acpi-y				+= pci_root.o pci_link.o pci_irq.o
+>  obj-$(CONFIG_ACPI_MCFG)		+= pci_mcfg.o
+> -acpi-y				+= acpi_lpss.o acpi_apd.o
+> +acpi-y				+= acpi_lpss.o acpi_apd.o acpi_msi.o
+>  acpi-y				+= acpi_platform.o
+>  acpi-y				+= acpi_pnp.o
+>  acpi-$(CONFIG_ARM_AMBA)	+= acpi_amba.o
+> diff --git a/drivers/acpi/acpi_msi.c b/drivers/acpi/acpi_msi.c
+> new file mode 100644
+> index 0000000..c2f8d26
+> --- /dev/null
+> +++ b/drivers/acpi/acpi_msi.c
+> @@ -0,0 +1,74 @@
+> +/*
+> + * Enforce MSI driver loaded by PCIe controller driver
+> + *
+> + * Copyright (c) 2017, MACOM Technology Solutions Corporation
+> + * Author: Khuong Dinh <kdinh@apm.com>
+> + *
+> + * This program is free software; you can redistribute  it and/or modify it
+> + * under  the terms of  the GNU General  Public License as published by the
+> + * Free Software Foundation;  either version 2 of the  License, or (at your
+> + * option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/acpi.h>
+> +#include "internal.h"
+> +
+> +static acpi_status acpi_create_msi_device(acpi_handle handle, u32 Level,
+> +					void *context, void **retval)
+> +{
+> +	struct acpi_device *device = NULL;
+> +	int type = ACPI_BUS_TYPE_DEVICE;
+> +	unsigned long long sta;
+> +	acpi_status status;
+> +	int ret = 0;
+> +
+> +	acpi_bus_get_device(handle, &device);
+> +	status = acpi_bus_get_status_handle(handle, &sta);
+> +	if (ACPI_FAILURE(status))
+> +		sta = 0;
+> +
+> +	device = kzalloc(sizeof(struct acpi_device), GFP_KERNEL);
+> +	if (!device)
+> +		return -ENOMEM;
+> +
+> +	acpi_init_device_object(device, handle, type, sta);
+> +	ret = acpi_device_add(device, NULL);
+> +	if (ret)
+> +		return ret;
+> +	device->parent = kzalloc(sizeof(struct acpi_device), GFP_KERNEL);
+> +	INIT_LIST_HEAD(&device->parent->physical_node_list);
+> +
+> +	acpi_device_add_finalize(device);
+> +
+> +	ret = device_attach(&device->dev);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	acpi_create_platform_device(device, NULL);
+> +	acpi_device_set_enumerated(device);
+> +
+> +	return ret;
+> +}
 
-Interestingly, this is essentially how I implemented it for arm64. It
-boots to the point where it can retrieve the kaslr-seed from the DT
-(and the 'nokaslr' command line argument), and either proceeds (if
-there is no seed or nokaslr is passed), or it returns to the startup
-code and remaps the kernel at a randomized offset.
+Can't this be implemented through acpi_bus_scan(handle) ?
 
-However, the configurations are very different. The arm64 kernel
-mappings are disjoint from the kernel's direct mapping, and the
-physical offset is under the control of the bootloader anyway. So when
-it returns to the startup code, it only updates the virtual mapping
-not the physical placement.
+(where handle is your MSI controller acpi_handle ?)
 
-> This would add some boot latency of course, but certainly in the
-> sub-second range. That is negligible for those systems where KASLR is
-> most relevant.
->
+[...]
 
-I will try to come up with something that makes it more self contained.
+>  static int xgene_msi_probe(struct platform_device *pdev)
+>  {
+>  	struct resource *res;
+> @@ -469,7 +487,18 @@ static int xgene_msi_probe(struct platform_device *pdev)
+>  		goto error;
+>  	}
+>  	xgene_msi->msi_addr = res->start;
+> -	xgene_msi->node = pdev->dev.of_node;
+> +
+> +	xgene_msi->fwnode = of_node_to_fwnode(pdev->dev.of_node);
+> +	if (!xgene_msi->fwnode) {
+> +		xgene_msi->fwnode =
+> +			irq_domain_alloc_fwnode((void *)xgene_msi->msi_addr);
+> +		if (!xgene_msi->fwnode) {
+> +			dev_err(&pdev->dev, "Failed to create fwnode\n");
+> +			rc = ENOMEM;
+> +			goto error;
+> +		}
+> +	}
+> +
+>  	xgene_msi->num_cpus = num_possible_cpus();
+>  
+>  	rc = xgene_msi_init_allocator(xgene_msi);
+> @@ -540,6 +569,7 @@ static int xgene_msi_probe(struct platform_device *pdev)
+>  	.driver = {
+>  		.name = "xgene-msi",
+>  		.of_match_table = xgene_msi_match_table,
+> +		.acpi_match_table = ACPI_PTR(xgene_msi_acpi_ids),
+>  	},
+>  	.probe = xgene_msi_probe,
+>  	.remove = xgene_msi_remove,
+
+AFAIK you still have not solved the link ordering problem, creating
+the platform device before scanning the PCI root bridge is not enough,
+because you are not guaranteed to probe the MSI driver first, there
+has to be way for registering your driver from the ACPI scan hook.
+
+Thanks,
+Lorenzo
