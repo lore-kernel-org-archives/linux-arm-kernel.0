@@ -1,40 +1,35 @@
-From: aik@ozlabs.ru (Alexey Kardashevskiy)
-Date: Mon, 14 Aug 2017 23:21:05 +1000
-Subject: SUN8I_EMAC driver wanted (for Orange Pi)
-In-Reply-To: <92615469-ba27-9c93-9915-872de3c42462@ozlabs.ru>
-References: <3792055e-d56f-e722-d9f8-519b46fd73dd@ozlabs.ru>
- <20170813154920.GA31401@lunn.ch>
- <92615469-ba27-9c93-9915-872de3c42462@ozlabs.ru>
-Message-ID: <76df0ea9-e875-c1bc-97ab-670e917ecfcb@ozlabs.ru>
+From: pasha.tatashin@oracle.com (Pasha Tatashin)
+Date: Mon, 14 Aug 2017 09:35:16 -0400
+Subject: [v6 04/15] mm: discard memblock data later
+In-Reply-To: <20170814113652.GF19063@dhcp22.suse.cz>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-5-git-send-email-pasha.tatashin@oracle.com>
+ <20170811093249.GE30811@dhcp22.suse.cz>
+ <6366171f-1a30-2faa-d776-01983fcb5a00@oracle.com>
+ <20170811160436.GS30811@dhcp22.suse.cz>
+ <a63eb223-455f-ae57-122f-7b2655e3de26@oracle.com>
+ <20170814113652.GF19063@dhcp22.suse.cz>
+Message-ID: <3c223cac-68f8-f810-38dd-4ff580048e63@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/08/17 10:54, Alexey Kardashevskiy wrote:
-> On 14/08/17 01:49, Andrew Lunn wrote:
->> On Mon, Aug 14, 2017 at 01:09:15AM +1000, Alexey Kardashevskiy wrote:
->>> Hi!
->>>
->>> I have been using v4.8 with some driver I found somewhere. Ported to v4.13,
->>> it does not work anymore and I wonder if anyone has an idea where to get a
->>> working one from?
->>
->> Hi Alexey
->>
->> A driver for this was added to Linux May 31st. Try 4.13-rcX enabling
->> DWMAC_SUN8I.
+>> OK, I will post it separately. No it does not depend on the rest, but the
+>> reset depends on this. So, I am not sure how to enforce that this comes
+>> before the rest.
 > 
-> Thanks, works nicely!
+> Andrew will take care of that. Just make it explicit that some of the
+> patch depends on an earlier work when reposting.
 
+Ok.
 
-Aaand it stopped with the only message in dmesg (I was trying to enable
-video on that pi but I removed DRM and everything and still seeing this):
+>> Yes, they said that the problem was bisected down to this patch. Do you know
+>> if there is a way to submit a patch to this test robot?
+> 
+> You can ask them for re testing with an updated patch by replying to
+> their report. ANyway I fail to see how the change could lead to this
+> patch.
 
-
-114 [    0.816334] dwmac-sun8i 1c30000.ethernet: MAC IRQ configuration
-information not found
-
-eth0 does not appear in the system, what am I missing now? Thanks!
-
-
--- 
-Alexey
+I have already done that. Anyway, I think it is unrelated. I have used 
+their scripts to test the patch alone, with number of elements in 
+memblock array reduced down to 4. Verified that my freeing code is 
+called, and never hit the problem that they reported.
