@@ -1,55 +1,36 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 14 Aug 2017 11:04:47 -0700
-Subject: [PATCH v2 16/18] hwmon: add support for sensors exported via ARM
- SCMI
-In-Reply-To: <c695dc09-fc28-518f-f287-bf74e0a2f87e@arm.com>
-References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
- <1501857104-11279-17-git-send-email-sudeep.holla@arm.com>
- <20170804193231.GA18153@roeck-us.net>
- <20e0a388-79a1-a7f1-57b4-fa5993eed9bf@arm.com>
- <c695dc09-fc28-518f-f287-bf74e0a2f87e@arm.com>
-Message-ID: <20170814180447.GA9577@roeck-us.net>
+From: leedom@chelsio.com (Casey Leedom)
+Date: Mon, 14 Aug 2017 18:07:51 +0000
+Subject: [PATCH v10 3/5] PCI: Disable Relaxed Ordering Attributes for AMD
+ A1100
+In-Reply-To: <20170814171937.GA52656@otc-nc-03>
+References: <1502725499-11276-1-git-send-email-dingtianhong@huawei.com>
+ <1502725499-11276-4-git-send-email-dingtianhong@huawei.com>,
+ <20170814171937.GA52656@otc-nc-03>
+Message-ID: <MWHPR12MB1600654CA840BC47AFC06127C88C0@MWHPR12MB1600.namprd12.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 04:09:18PM +0100, Sudeep Holla wrote:
-> Hi Guenter,
-> 
-> On 07/08/17 13:25, Sudeep Holla wrote:
-> > 
-> > 
-> > On 04/08/17 20:32, Guenter Roeck wrote:
-> >> On Fri, Aug 04, 2017 at 03:31:42PM +0100, Sudeep Holla wrote:
-> > 
-> > [...]
-> > 
-> >>> +	platform_set_drvdata(pdev, scmi_sensors);
-> >>> +
-> >>> +	hwdev = devm_hwmon_device_register_with_groups(dev, "scmi_sensors",
-> >>> +						       scmi_sensors,
-> >>> +						       scmi_sensors->groups);
-> >>
-> >> Can you rework this to use devm_hwmon_device_register_with_info(),
-> >> and if possible let it handle the thermal registration ? 
-> >>
-> > 
-> > Thanks for the pointers. I will check on the possibility and use it if
-> > possible.
-> > 
-> 
-> I had a look at devm_hwmon_device_register_with_info. It mostly deals
-> with constant structures where all the attributes are known at the boot
-> time. In case of SCMI, the firmware presents all the sensors and all the
-> information(type, scale, name/label, ...etc). Unless I create those
-> structures dynamically and typecast as const during probe, I can't get
-> it working. Are you OK with that ? If so, I can try making those changes.
-> 
+| From: Raj, Ashok <ashok.raj@intel.com>
+| Sent: Monday, August 14, 2017 10:19 AM
+| ?   
+| On Mon, Aug 14, 2017 at 11:44:57PM +0800, Ding Tianhong wrote:
+| > Casey reported that the AMD ARM A1100 SoC has a bug in its PCIe
+| > Root Port where Upstream Transaction Layer Packets with the Relaxed
+| > Ordering Attribute clear are allowed to bypass earlier TLPs with
+| > Relaxed Ordering set, it would cause Data Corruption, so we need
+| > to disable Relaxed Ordering Attribute when Upstream TLPs to the
+| > Root Port.
+| > 
+| > Signed-off-by: Casey Leedom <leedom@chelsio.com>
+| > Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+| > Acked-by: Alexander Duyck <alexander.h.duyck@intel.com>
+| > Acked-by: Ashok Raj <ashok.raj@intel.com>
+| 
+| I can't ack this patch :-).. must be someone from AMD. Please remove my
+| signature from this.
 
-Yes, please.
+  You can go ahead and leave my name on since I'm the person who found and diagnosed the problem (with help from others inside Chelsio).
 
-What operations exactly fail, though ? The idea was that the structures
-are not modified by the infrastructure code, not that they must be constant
-in the driver. Maybe some of the structure definitions are simply wrong. 
+  If anyone on the Linux PCI List knows anyone at AMD who'd be willing to respond it would be great, but as I noted earlier, I think that AMD has effectively abandoned the A1100 ("Seattle") ARM SoC, so I doubt if we'll get anyone from AMD to even comment now.
 
-Thanks,
-Guenter
+Casey
