@@ -1,70 +1,24 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Mon, 14 Aug 2017 14:26:08 +0000
-Subject: [PATCH 1/2] ARM: dts: iwg20d-q7: Add RTC support
-In-Reply-To: <CAMuHMdUU5fb6G7Wc9ZzfFhLxcUuZFakPdVGh3q_cfUzxZ1AarA@mail.gmail.com>
-References: <1502197465-61546-1-git-send-email-biju.das@bp.renesas.com>
- <1502197465-61546-2-git-send-email-biju.das@bp.renesas.com>
- <CAMuHMdUU5fb6G7Wc9ZzfFhLxcUuZFakPdVGh3q_cfUzxZ1AarA@mail.gmail.com>
-Message-ID: <KL1PR06MB1702571F2F9B75205A11280AB88C0@KL1PR06MB1702.apcprd06.prod.outlook.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 14 Aug 2017 16:26:32 +0200
+Subject: [PATCH 01/30] asm-generic: add .data.rel.ro sections to
+ __ro_after_init
+In-Reply-To: <20170814125411.22604-2-ard.biesheuvel@linaro.org>
+References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
+ <20170814125411.22604-2-ard.biesheuvel@linaro.org>
+Message-ID: <CAK8P3a3EArx1gEE=1WigMpBXHOKDkiBz+qudkyEKeO13jxxJ0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: geert.uytterhoeven at gmail.com [mailto:geert.uytterhoeven at gmail.com]
-> On Behalf Of Geert Uytterhoeven
-> Sent: 14 August 2017 15:12
-> To: Biju Das <biju.das@bp.renesas.com>
-> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
-> <mark.rutland@arm.com>; Simon Horman <horms@verge.net.au>; Magnus
-> Damm <magnus.damm@gmail.com>; Russell King <linux@armlinux.org.uk>;
-> Chris Paterson <Chris.Paterson2@renesas.com>; devicetree at vger.kernel.org;
-> Linux-Renesas <linux-renesas-soc@vger.kernel.org>; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2] ARM: dts: iwg20d-q7: Add RTC support
+On Mon, Aug 14, 2017 at 2:53 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> When running in PIC mode, the compiler will emit const structures
+> containing runtime relocatable quantities into .data.rel.ro.* sections,
+> so that the linker can be smart about placing them together in a segment
+> that is read-write initially, and is remapped read-only afterwards. This
+> is exactly what __ro_after_init aims to provide, so move these sections
+> together.
 >
-> On Tue, Aug 8, 2017 at 3:04 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> > Define the iWave RainboW-G20D-Qseven board dependent part of the RTC
-> > device node.
-> >
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
->
-> > @@ -54,3 +59,16 @@
-> >                 micrel,led-mode = <1>;
-> >         };
-> >  };
-> > +
-> > +&i2c2 {
-> > +       pinctrl-0 = <&i2c2_pins>;
-> > +       pinctrl-names = "default";
-> > +
-> > +       status = "okay";
-> > +       clock-frequency = <400000>;
-> > +
-> > +       rtc at 68 {
-> > +               compatible = "bq32000";
->
-> "ti,bq32000"
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Thanks. I will change this.
-
-> > +               reg = <0x68>;
-> > +       };
-> > +};
->
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-
-> m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
