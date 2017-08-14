@@ -1,47 +1,97 @@
-From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
-Date: Mon, 14 Aug 2017 11:01:28 +0200
-Subject: [PATCH v2 0/9] EDAC drivers for Armada XP L2 and DDR
-In-Reply-To: <20170802140505.GA2290@nazgul.tnic>
-References: <20170802123922.11498-1-jlu@pengutronix.de>
- <20170802140505.GA2290@nazgul.tnic>
-Message-ID: <1502701288.2922.6.camel@pengutronix.de>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Mon, 14 Aug 2017 14:39:28 +0530
+Subject: [linux-sunxi] [PATCH v2] arm64: allwinner: a64: Add A64-OLinuXino
+ initial support
+In-Reply-To: <CAGb2v64KJOuS=XfWu=tHyyYbTVjLJKVoTL2cQDyLby=CmnmLWw@mail.gmail.com>
+References: <1502560442-17715-1-git-send-email-jteki@openedev.com>
+ <CAGb2v66Scd69iBNxhvYbkqjt7K_5m+S4nYG633O3wYAW_3CyLQ@mail.gmail.com>
+ <CAD6G_RRMHMrm1wPGJCxQgmOuwhEqVK_zTZF1Fsv9az4tZ1uvBg@mail.gmail.com>
+ <CAGb2v64KJOuS=XfWu=tHyyYbTVjLJKVoTL2cQDyLby=CmnmLWw@mail.gmail.com>
+Message-ID: <CAD6G_RTi4MJ74yWsv3Zdg68mdSHBzszfkLmpz=rGdRVfOOQ2vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory and Borislav,
+On Mon, Aug 14, 2017 at 1:26 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Mon, Aug 14, 2017 at 3:34 PM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
+>> On Mon, Aug 14, 2017 at 12:38 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+>>> Hi,
+>>>
+>>> On Sun, Aug 13, 2017 at 1:54 AM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
+>>>> From: Jagan Teki <jagan@amarulasolutions.com>
+>>>>
+>>>> OLimex A64-OLinuXino is an open-source hardware board
+>>>> using the Allwinner A64 SOC.
+>>>>
+>>>> OLimex A64-OLinuXino has
+>>>> - A64 Quad-core Cortex-A53 64bit
+>>>> - 1GB or 2GB RAM DDR3L @ 672Mhz
+>>>> - microSD slot and 4/8/16GB eMMC
+>>>> - Debug TTL UART
+>>>> - HDMI
+>>>> - LCD
+>>>> - IR receiver
+>>>> - 5V DC power supply
+>>>
+>>> Have you tried out Ethernet?
+>>
+>> Not, tested yet. Will send separate patch.
+>
+> OK.
+>
+> [...]
+>
+>>>> +
+>>>> +&reg_aldo2 {
+>>>> +       regulator-always-on;
+>>>> +       regulator-min-microvolt = <3300000>;
+>>>> +       regulator-max-microvolt = <3300000>;
+>>>
+>>> Schematic says 1.8V?
+>>
+>> I saw ALD02 VCC-PL=3.3v on schematic.
+>
+> Ah. I see they changed it in a rev. B. Lets use 3.3V then.
+>
+>>>
+>>>> +       regulator-name = "vcc-pl";
+>>>> +};
+>>>> +
+>>>> +&reg_aldo3 {
+>>>> +       regulator-always-on;
+>>>> +       regulator-min-microvolt = <3000000>;
+>>>> +       regulator-max-microvolt = <3000000>;
+>>>> +       regulator-name = "vcc-pll-avcc";
+>>>> +};
+>>>> +
+>>>> +&reg_dcdc1 {
+>>>> +       regulator-always-on;
+>>>> +       regulator-min-microvolt = <3300000>;
+>>>> +       regulator-max-microvolt = <3300000>;
+>>>> +       regulator-name = "vcc-3v3";
+>>>> +};
+>>>> +
+>>>> +&reg_dcdc2 {
+>>>> +       regulator-always-on;
+>>>> +       regulator-min-microvolt = <1100000>;
+>>>> +       regulator-max-microvolt = <1100000>;
+>>>
+>>> The SoC has a wider range than a fixed voltage for the CPUs.
+>>
+>> So, max 1.1v can't enough CPUs? thought similar behavior with pine64?
+>
+> The recommended operating conditions says 1.04 ~ 1.3 V for CPUx,
+> while the typical voltage is 1.1V. The regulator constraints should
+> match the datasheet, especially for power rails that are involved in
+> DVFS.
 
-On Wed, 2017-08-02 at 16:05 +0200, Borislav Petkov wrote:
-> On Wed, Aug 02, 2017 at 02:39:13PM +0200, Jan Luebbe wrote:
-> > Chris Packham (2):
-> > ? ARM: l2x0: support parity-enable/disable on aurora
-> > ? ARM: l2x0: add marvell,ecc-enable property for aurora
-> > 
-> > Jan Luebbe (7):
-> > ? ARM: l2c: move cache-aurora-l2.h to asm/hardware
-> > ? ARM: aurora-l2: add prefix to MAX_RANGE_SIZE
-> > ? ARM: aurora-l2: add defines for parity and ECC registers
-> 
-> I'd need an ACK from an ARM maintainer for those if the whole series
-> is going to go through the EDAC tree.
+power rails from datasheet[1] shows 0.5v ~ 1.3v am I not looking
+updated details?
 
-Gregory, you've given Reviewed-by tags for some of these in version 1.?
+[1] http://files.pine64.org/doc/datasheet/pine64/AXP803_Datasheet_V1.0.pdf
 
-Would you be fine with acking them and merging the series through the
-EDAC tree?
-
-> > ? EDAC: Add missing debugfs_create_x32 wrapper
-> > ? EDAC: Add devres helpers for
-> > ????edac_mc_alloc/edac_mc_add_mc(_with_groups)
-> > ? EDAC: Add devres helpers for
-> > ????edac_device_alloc_ctl_info/edac_device_add_device
-> > ? EDAC: Add driver for the Marvell Armada XP SDRAM and L2 cache ECC
-> 
-> Alternatively, I can review those and they can go through an ARM
-> tree.
-> 
-> I'm fine with whatever ARM maintainers prefer.
-
-Thanks, if you have any review comments, please let me know.
-
-Regards,
-Jan
+thanks!
+-- 
+Jagan Teki
+Free Software Engineer | www.openedev.com
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
