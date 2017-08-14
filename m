@@ -1,70 +1,41 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 14 Aug 2017 07:42:47 +0100
-Subject: [PATCH 3/3] mfd: twl: move header file out of I2C realm
-In-Reply-To: <20170813133700.tv4ka7anvbzcplr7@ninjato>
+Date: Mon, 14 Aug 2017 07:43:55 +0100
+Subject: [PATCH 2/3] mfd: tps65010: move header file out of I2C realm
+In-Reply-To: <20170813133445.vqbfelwshvrififp@ninjato>
 References: <20170521220212.1404-1-wsa@the-dreams.de>
- <20170521220212.1404-4-wsa@the-dreams.de>
- <20170706064453.GH16144@ulmo.fritz.box>
- <20170706070352.xdecvsnremwqed72@dell>
- <20170813133700.tv4ka7anvbzcplr7@ninjato>
-Message-ID: <20170814064247.qvggx4ito4vgjqvs@dell>
+ <20170521220212.1404-3-wsa@the-dreams.de>
+ <20170523071819.4zpdef7ofzz3moil@dell>
+ <20170813133445.vqbfelwshvrififp@ninjato>
+Message-ID: <20170814064355.foiilzr5cmwk65hr@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sun, 13 Aug 2017, Wolfram Sang wrote:
 
-> On Thu, Jul 06, 2017 at 08:03:52AM +0100, Lee Jones wrote:
-> > On Thu, 06 Jul 2017, Thierry Reding wrote:
+> On Tue, May 23, 2017 at 08:18:19AM +0100, Lee Jones wrote:
+> > On Mon, 22 May 2017, Wolfram Sang wrote:
 > > 
-> > > On Mon, May 22, 2017 at 12:02:10AM +0200, Wolfram Sang wrote:
-> > > > include/linux/i2c is not for client devices. Move the header file to a
-> > > > more appropriate location.
-> > > > 
-> > > > Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> > > > ---
-> > > >  arch/arm/mach-omap2/common.h            | 2 +-
-> > > >  arch/arm/mach-omap2/omap_twl.c          | 2 +-
-> > > >  drivers/gpio/gpio-twl4030.c             | 2 +-
-> > > >  drivers/iio/adc/twl4030-madc.c          | 2 +-
-> > > >  drivers/iio/adc/twl6030-gpadc.c         | 2 +-
-> > > >  drivers/input/keyboard/twl4030_keypad.c | 2 +-
-> > > >  drivers/input/misc/twl4030-pwrbutton.c  | 2 +-
-> > > >  drivers/input/misc/twl4030-vibra.c      | 2 +-
-> > > >  drivers/mfd/twl-core.c                  | 6 +++---
-> > > >  drivers/mfd/twl4030-audio.c             | 2 +-
-> > > >  drivers/mfd/twl4030-irq.c               | 2 +-
-> > > >  drivers/mfd/twl4030-power.c             | 2 +-
-> > > >  drivers/mfd/twl6030-irq.c               | 2 +-
-> > > >  drivers/phy/phy-twl4030-usb.c           | 2 +-
-> > > >  drivers/power/supply/twl4030_charger.c  | 2 +-
-> > > >  drivers/pwm/pwm-twl-led.c               | 2 +-
-> > > >  drivers/pwm/pwm-twl.c                   | 2 +-
-> > > >  drivers/regulator/twl-regulator.c       | 2 +-
-> > > >  drivers/regulator/twl6030-regulator.c   | 2 +-
-> > > >  drivers/rtc/rtc-twl.c                   | 2 +-
-> > > >  drivers/usb/phy/phy-twl6030-usb.c       | 2 +-
-> > > >  drivers/video/backlight/pandora_bl.c    | 2 +-
-> > > >  drivers/watchdog/twl4030_wdt.c          | 2 +-
-> > > >  include/linux/{i2c => mfd}/twl.h        | 0
-> > > >  sound/soc/codecs/twl4030.c              | 2 +-
-> > > >  25 files changed, 26 insertions(+), 26 deletions(-)
-> > > >  rename include/linux/{i2c => mfd}/twl.h (100%)
+> > > include/linux/i2c is not for client devices. Move the header file to a
+> > > more appropriate location.
 > > > 
-> > > I didn't see this get applied yet, so just in case anyone was waiting
-> > > for me (this is trivial, so I don't think there's a need):
+> > > Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+> > > ---
+> > >  arch/arm/mach-omap1/board-h2-mmc.c      | 2 +-
+> > >  arch/arm/mach-omap1/board-h2.c          | 2 +-
+> > >  arch/arm/mach-omap1/board-h3-mmc.c      | 2 +-
+> > >  arch/arm/mach-omap1/board-h3.c          | 2 +-
+> > >  arch/arm/mach-omap1/board-osk.c         | 2 +-
+> > >  arch/arm/mach-s3c24xx/mach-osiris-dvs.c | 2 +-
+> > >  arch/arm/mach-s3c24xx/mach-osiris.c     | 2 +-
 > > 
-> > You're not the last. :)
+> > >  drivers/mfd/tps65010.c                  | 2 +-
+> > 
+> > For my own reference:
+> >   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 > 
-> Given the triviality of the change for non-MFD subsystems, can we apply
-> this for 4.14?
+> Same here: ok for 4.14 or something needed?
 
-I can't apply anything without Acks for *all* of the subsystems above.
-
-As you well know, it is the submitters responsibility to obtain them.
-
-My suggestion would be to collect the Acks you've received up until
-this point and identify which SS's are still lacking in change log
-section of a RESEND.
+Can this patch be applied on its own, or does it have dependencies?
 
 -- 
 Lee Jones
