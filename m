@@ -1,32 +1,42 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Mon, 14 Aug 2017 12:19:41 +0100
-Subject: [PATCH ] mmc: renesas_sdhi: Add r8a7743/5 support
-Message-ID: <1502709581-26546-1-git-send-email-biju.das@bp.renesas.com>
+From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
+Date: Mon, 14 Aug 2017 13:34:19 +0200
+Subject: [PATCH 3/3] arm64: dts: apq8096-db820c: always enable regulator LS
+ expansion
+In-Reply-To: <20170814113420.30866-1-srinivas.kandagatla@linaro.org>
+References: <20170814113420.30866-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20170814113420.30866-3-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for r8a7743/5 SoC.Renesas RZ/G1[ME] (R8A7743/5) SDHI
-is identical to the R-Car Gen2 family.
+From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+1.8v regulator on LS expansion should be left as always to comply
+with 96boards spec.
+
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
-This patch is compiled and tested against mmc/next.
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
- drivers/mmc/host/renesas_sdhi_sys_dmac.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/drivers/mmc/host/renesas_sdhi_sys_dmac.c b/drivers/mmc/host/renesas_sdhi_sys_dmac.c
-index 718cb8a..f709f7f 100644
---- a/drivers/mmc/host/renesas_sdhi_sys_dmac.c
-+++ b/drivers/mmc/host/renesas_sdhi_sys_dmac.c
-@@ -95,6 +95,8 @@
- 	{ .compatible = "renesas,sdhi-r7s72100", .data = &of_rz_compatible, },
- 	{ .compatible = "renesas,sdhi-r8a7778", .data = &of_rcar_gen1_compatible, },
- 	{ .compatible = "renesas,sdhi-r8a7779", .data = &of_rcar_gen1_compatible, },
-+	{ .compatible = "renesas,sdhi-r8a7743", .data = &of_rcar_gen2_compatible, },
-+	{ .compatible = "renesas,sdhi-r8a7745", .data = &of_rcar_gen2_compatible, },
- 	{ .compatible = "renesas,sdhi-r8a7790", .data = &of_rcar_gen2_compatible, },
- 	{ .compatible = "renesas,sdhi-r8a7791", .data = &of_rcar_gen2_compatible, },
- 	{ .compatible = "renesas,sdhi-r8a7792", .data = &of_rcar_gen2_compatible, },
+diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+index 18c61693529e..0c10bbe55317 100644
+--- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+@@ -189,9 +189,15 @@
+ 					regulator-min-microvolt = <1300000>;
+ 					regulator-max-microvolt = <1300000>;
+ 				};
++
++				/**
++				 * 1.8v required on LS expansion
++				 * for mezzanine boards
++				 */
+ 				s4 {
+ 					regulator-min-microvolt = <1800000>;
+ 					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
+ 				};
+ 				s5 {
+ 					regulator-min-microvolt = <2150000>;
 -- 
-1.9.1
+2.11.0
