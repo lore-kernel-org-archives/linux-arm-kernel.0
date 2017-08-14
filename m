@@ -1,93 +1,90 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 15:49:15 +0100
-Subject: [PATCH 17/30] arm-soc: tegra: make sleep asm code runtime
- relocatable
-In-Reply-To: <20170814144209.GR6321@e103592.cambridge.arm.com>
-References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
- <20170814125411.22604-18-ard.biesheuvel@linaro.org>
- <20170814144209.GR6321@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu8v7yKzxgmsjwBvPP=4riJ7QKj96vvQ2KMmBaHDmHXe7Q@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 14 Aug 2017 07:55:03 -0700
+Subject: [PATCH 01/11] watchdog: gemini/ftwdt010: rename DT bindings
+In-Reply-To: <20170812184318.10144-2-linus.walleij@linaro.org>
+References: <20170812184318.10144-1-linus.walleij@linaro.org>
+ <20170812184318.10144-2-linus.walleij@linaro.org>
+Message-ID: <20170814145503.GF14491@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 August 2017 at 15:42, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Mon, Aug 14, 2017 at 01:53:58PM +0100, Ard Biesheuvel wrote:
->> The PIE kernel build does not allow absolute references encoded in
->> movw/movt instruction pairs, so use our mov_l macro instead (which
->> will still use such a pair unless CONFIG_RELOCATABLE is defined)
->>
->> Also, avoid 32-bit absolute literals to refer to absolute symbols.
->> Instead, use a 16 bit reference so that PIE linker cannot get
->> confused whether the symbol reference is subject to relocation at
->> runtime.
->
-> This sounds like we're papering over something.
->
-> If the linker is "confused", that sounds like we are either abusing
-> it somehow, or the linker is broken.
->
+On Sat, Aug 12, 2017 at 08:43:08PM +0200, Linus Walleij wrote:
+> The device tree bindings are in two copies and also should be
+> consolidated into a single Faraday Technology FTWDT010
+> binding since we uncovered that this IP part is a standard
+> IP from Faraday.
+> 
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-There is some ambiguity in how SHN_ABS symbols are treated in shared
-libraries and PIE executables.
-
-https://sourceware.org/ml/binutils/2012-05/msg00019.html
-
-I haven't confirmed whether it actually causes problems in this
-particular case, but it is safer (and not entirely inappropriate) to
-use a 16-bit field for a quantity that can easily fit one.
+Will need Ack from Rob.
 
 
->
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm/mach-tegra/sleep-tegra20.S | 22 ++++++++++++--------
->>  arch/arm/mach-tegra/sleep-tegra30.S |  6 +++---
->>  arch/arm/mach-tegra/sleep.S         |  4 ++--
->>  3 files changed, 18 insertions(+), 14 deletions(-)
->>
->> diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
->> index 5c8e638ee51a..cab95de5c8f1 100644
->> --- a/arch/arm/mach-tegra/sleep-tegra20.S
->> +++ b/arch/arm/mach-tegra/sleep-tegra20.S
->> @@ -99,7 +99,7 @@ ENTRY(tegra20_cpu_shutdown)
->>       cmp     r0, #0
->>       reteq   lr                      @ must not be called for CPU 0
->>       mov32   r1, TEGRA_IRAM_RESET_BASE_VIRT
->> -     ldr     r2, =__tegra20_cpu1_resettable_status_offset
->> +     ldrh    r2, 0f
->>       mov     r12, #CPU_RESETTABLE
->>       strb    r12, [r1, r2]
->>
->> @@ -121,6 +121,7 @@ ENTRY(tegra20_cpu_shutdown)
->>       beq     .
->>       ret     lr
->>  ENDPROC(tegra20_cpu_shutdown)
->> +0:   .short  __tegra20_cpu1_resettable_status_offset
->>  #endif
->>
->>  #ifdef CONFIG_PM_SLEEP
->> @@ -181,6 +182,9 @@ ENTRY(tegra_pen_unlock)
->>       ret     lr
->>  ENDPROC(tegra_pen_unlock)
->>
->> +.L__tegra20_cpu1_resettable_status_offset:
->> +     .short  __tegra20_cpu1_resettable_status_offset
->> +
->>  /*
->>   * tegra20_cpu_clear_resettable(void)
->>   *
->> @@ -189,7 +193,7 @@ ENDPROC(tegra_pen_unlock)
->>   */
->>  ENTRY(tegra20_cpu_clear_resettable)
->>       mov32   r1, TEGRA_IRAM_RESET_BASE_VIRT
->
-> Can we simply port mov32 to mov_l?  Or do we hit a problem with
-> multiplatform kernels where mov_l may involve a literal pool entry
-> (and does it matter)?
->
-
-The only place where it matters is in code that lives in idmap.text,
-since the relative reference will point to the ID mapped alias of a
-section that is not covered by the ID ID map. I think we should be
-able to use mov_l everywhere else, and it should do the right thing
-for ordinary and PIE builds
+> ---
+>  .../bindings/watchdog/cortina,gemini-watchdog.txt       | 17 -----------------
+>  ...{cortina,gemin-watchdog.txt => faraday,ftwdt010.txt} | 11 ++++++++---
+>  2 files changed, 8 insertions(+), 20 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/watchdog/cortina,gemini-watchdog.txt
+>  rename Documentation/devicetree/bindings/watchdog/{cortina,gemin-watchdog.txt => faraday,ftwdt010.txt} (55%)
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/cortina,gemini-watchdog.txt b/Documentation/devicetree/bindings/watchdog/cortina,gemini-watchdog.txt
+> deleted file mode 100644
+> index bc4b865d178b..000000000000
+> --- a/Documentation/devicetree/bindings/watchdog/cortina,gemini-watchdog.txt
+> +++ /dev/null
+> @@ -1,17 +0,0 @@
+> -Cortina Systems Gemini SoC Watchdog
+> -
+> -Required properties:
+> -- compatible : must be "cortina,gemini-watchdog"
+> -- reg : shall contain base register location and length
+> -- interrupts : shall contain the interrupt for the watchdog
+> -
+> -Optional properties:
+> -- timeout-sec : the default watchdog timeout in seconds.
+> -
+> -Example:
+> -
+> -watchdog at 41000000 {
+> -	compatible = "cortina,gemini-watchdog";
+> -	reg = <0x41000000 0x1000>;
+> -	interrupts = <3 IRQ_TYPE_LEVEL_HIGH>;
+> -};
+> diff --git a/Documentation/devicetree/bindings/watchdog/cortina,gemin-watchdog.txt b/Documentation/devicetree/bindings/watchdog/faraday,ftwdt010.txt
+> similarity index 55%
+> rename from Documentation/devicetree/bindings/watchdog/cortina,gemin-watchdog.txt
+> rename to Documentation/devicetree/bindings/watchdog/faraday,ftwdt010.txt
+> index bc4b865d178b..9ecdb502e605 100644
+> --- a/Documentation/devicetree/bindings/watchdog/cortina,gemin-watchdog.txt
+> +++ b/Documentation/devicetree/bindings/watchdog/faraday,ftwdt010.txt
+> @@ -1,7 +1,12 @@
+> -Cortina Systems Gemini SoC Watchdog
+> +Faraday Technology FTWDT010 watchdog
+> +
+> +This is an IP part from Faraday Technology found in the Gemini
+> +SoCs and others.
+>  
+>  Required properties:
+> -- compatible : must be "cortina,gemini-watchdog"
+> +- compatible : must be one of
+> +  "faraday,ftwdt010"
+> +  "cortina,gemini-watchdog", "faraday,ftwdt010"
+>  - reg : shall contain base register location and length
+>  - interrupts : shall contain the interrupt for the watchdog
+>  
+> @@ -11,7 +16,7 @@ Optional properties:
+>  Example:
+>  
+>  watchdog at 41000000 {
+> -	compatible = "cortina,gemini-watchdog";
+> +	compatible = "faraday,ftwdt010";
+>  	reg = <0x41000000 0x1000>;
+>  	interrupts = <3 IRQ_TYPE_LEVEL_HIGH>;
+>  };
+> -- 
+> 2.13.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
