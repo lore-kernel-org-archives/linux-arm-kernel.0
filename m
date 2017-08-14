@@ -1,51 +1,58 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 14 Aug 2017 22:46:17 +0800
-Subject: [linux-sunxi] [PATCH v4 2/3] clk: sunxi-ng: nkm: add support for
- fixed post-divider
-In-Reply-To: <20170812124352.24148-3-icenowy@aosc.io>
-References: <20170812124352.24148-1-icenowy@aosc.io>
- <20170812124352.24148-3-icenowy@aosc.io>
-Message-ID: <CAGb2v65k6viZ2Y6nwQERAD9xYTjVGBmpnb9m17JkbJXJMpYteA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 14 Aug 2017 09:03:29 -0500
+Subject: [PATCH 1/3] dt: xilinx: zynqmp: Add bindings for PM firmware
+In-Reply-To: <5d2e3a5e-6060-ff13-a065-c4b6be37e4c9@xilinx.com>
+References: <cover.1501854302.git.michal.simek@xilinx.com>
+ <8c27b7eec6cc00d37dfe9b3998212ce9c9c27a31.1501854302.git.michal.simek@xilinx.com>
+ <20170810191056.ur5b3zdrcgmb6sim@rob-hp-laptop>
+ <4e5d9f8c-9e87-bdcd-388a-aab3c32415e8@xilinx.com>
+ <20170811135453.GU12347@toto>
+ <5d2e3a5e-6060-ff13-a065-c4b6be37e4c9@xilinx.com>
+Message-ID: <CABGGiszb1kr8ggo8Jv9jsvStK5DxpseuBy7z=_OK8pLN==h25Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 12, 2017 at 8:43 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> SATA PLL on Allwinner R40 is of type (parent) * N * K / M / 6 where 6 is
-> the fixed post-divider.
->
-> Add post-divider support for NKM type clock.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  drivers/clk/sunxi-ng/ccu_nkm.c | 22 +++++++++++++++++++---
->  drivers/clk/sunxi-ng/ccu_nkm.h |  2 ++
->  2 files changed, 21 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
-> index 44b16dc8fea6..ce7f03737ad5 100644
-> --- a/drivers/clk/sunxi-ng/ccu_nkm.c
-> +++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+On Mon, Aug 14, 2017 at 8:47 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+> On 11.8.2017 15:54, Edgar E. Iglesias wrote:
+>> On Fri, Aug 11, 2017 at 02:58:03PM +0200, Michal Simek wrote:
+>>> Hi Rob, +Edgar,
+>>>
+>>> On 10.8.2017 21:10, Rob Herring wrote:
+>>>> On Fri, Aug 04, 2017 at 03:45:30PM +0200, Michal Simek wrote:
+>>>>> From: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>>>>>
+>>>>> Document the DT bindings for the Zynq UltraScale+ PM Firmware.
 
 [...]
 
-> @@ -139,6 +152,9 @@ static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
->         unsigned long flags;
->         u32 reg;
+>>>>> + - method:        The method of calling the PM-API firmware layer.
+>>>>> +          Permitted values are:
+>>>>> +           - "smc" : To be used in configurations without a hypervisor
+>>>>> +           - "hvc" : To be used when hypervisor is present
+>>>>
+>>>> Do you really use both?
+>>>>
+>>>
+>>> SMCs definitely yes.
+>>>
+>>> Interface was designed in that way and I don't know if people are using
+>>> it or not.
+>>>
+>>> Not sure if Xen is blocking SMCs. I know we have discussed it but not
+>>> sure if this is enabled by default or only for certain configurations.
+>>> Also not sure if xen contains handler for hvc.
+>>> Edgar: Do you know?
+>>
+>> We have patches for Xen that implement a power-management mediator.
+>> That implementation handles PM calls over both SMC and HVC insns.
+>> Patches are on the Xen mailing list.
+>>
+>> Other hypervisors may work differently.
+>>
+>> I think we should support both but I don't have a strong opinion on it.
 >
-> +       if (nkm->common.features & CCU_FEATURE_FIXED_POSTDIV)
-> +               rate /= nkm->fixed_post_div;
+> Rob: Are you ok with having it there?
 
-This should be
+Yes.
 
-        rate *= nkm->fixed_post_div;
-
-Fixed and applied.
-
-ChenYu
-
-> +
->         _nkm.min_n = nkm->n.min ?: 1;
->         _nkm.max_n = nkm->n.max ?: 1 << nkm->n.width;
->         _nkm.min_k = nkm->k.min ?: 1;
-
-[...]
+Rob
