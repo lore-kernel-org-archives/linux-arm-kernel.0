@@ -1,45 +1,51 @@
 From: andy.yan@rock-chips.com (Andy Yan)
-Date: Mon, 14 Aug 2017 16:31:17 +0800
-Subject: [PATCH v4 0/8] Support more devices on rockchip rv1108
-Message-ID: <1502699477-8063-1-git-send-email-andy.yan@rock-chips.com>
+Date: Mon, 14 Aug 2017 16:34:22 +0800
+Subject: [PATCH v4 1/8] spi: rockchip: add compatible string for rv1108 spi
+In-Reply-To: <1502699477-8063-1-git-send-email-andy.yan@rock-chips.com>
+References: <1502699477-8063-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1502699662-8181-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The spi on rv1108 is the same as other rockchip based
+socs, add compatible string for it.
 
-This series try to support i2c/spi/pwm/saradc/pmic/watchdog
-on rockchip rv1108 soc.
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+Acked-by: Rob Herring <robh@kernel.org>
 
-The clk tree, pinctrl, i2c, watchdog and saradc dt-bindings has
-been applied. So there are not included in this version.
+---
 
-Changes in v4:
-- remove unnecessary property io-channel-ranges of saradc
-- order i2c devices by i2c address.
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
-Changes in v3:
-- make the compatible string be: "rockchip,rv1108-pwm", "rockchip,rk3288-pwm"
-  for rv1108
+ Documentation/devicetree/bindings/spi/spi-rockchip.txt | 1 +
+ drivers/spi/spi-rockchip.c                             | 1 +
+ 2 files changed, 2 insertions(+)
 
-Changes in v2:
-- add compatible string "rockchip,rv1108-pwm"
-- add compatible string "rockchip,rv1108-saradc"
-
-Andy Yan (8):
-  spi: rockchip: add compatible string for rv1108 spi
-  ARM: dts: rockchip: add spi dt node for rv1108
-  dt-bindings: pwm: add description for rv1108 pwm
-  ARM: dts: rockchip: add pwm dt node for rv1108
-  ARM: dts: rockchip: add saradc support for rv1108
-  ARM: dts: rockchip: add pwm backlight for rv1108 evb
-  ARM: dts: rockchip: add pmic rk805 dt node for rv1108 evb
-  ARM: dts: rockchip: add accelerometer bma250e dt node for rv1108 evb
-
- .../devicetree/bindings/pwm/pwm-rockchip.txt       |   3 +-
- .../devicetree/bindings/spi/spi-rockchip.txt       |   1 +
- arch/arm/boot/dts/rv1108-evb.dts                   | 158 +++++++++++++++++++
- arch/arm/boot/dts/rv1108.dtsi                      | 167 +++++++++++++++++++++
- drivers/spi/spi-rockchip.c                         |   1 +
- 5 files changed, 329 insertions(+), 1 deletion(-)
-
+diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+index 83da493..6e3ffac 100644
+--- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
++++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+@@ -6,6 +6,7 @@ and display controllers using the SPI communication interface.
+ Required Properties:
+ 
+ - compatible: should be one of the following.
++    "rockchip,rv1108-spi" for rv1108 SoCs.
+     "rockchip,rk3036-spi" for rk3036 SoCS.
+     "rockchip,rk3066-spi" for rk3066 SoCs.
+     "rockchip,rk3188-spi" for rk3188 SoCs.
+diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+index 0b4a52b..27b4db2 100644
+--- a/drivers/spi/spi-rockchip.c
++++ b/drivers/spi/spi-rockchip.c
+@@ -919,6 +919,7 @@ static const struct dev_pm_ops rockchip_spi_pm = {
+ };
+ 
+ static const struct of_device_id rockchip_spi_dt_match[] = {
++	{ .compatible = "rockchip,rv1108-spi", },
+ 	{ .compatible = "rockchip,rk3036-spi", },
+ 	{ .compatible = "rockchip,rk3066-spi", },
+ 	{ .compatible = "rockchip,rk3188-spi", },
 -- 
 2.7.4
