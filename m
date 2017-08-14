@@ -1,82 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 16:40:55 +0100
-Subject: [PATCH 02/30] ARM: assembler: introduce adr_l,
- ldr_l and str_l macros
-In-Reply-To: <20170814153213.GU6321@e103592.cambridge.arm.com>
-References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
- <20170814125411.22604-3-ard.biesheuvel@linaro.org>
- <20170814153213.GU6321@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu83nTRAqqT_AzQZubPVCt69tUdHy1oK7bPaYvHFmnihkw@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 14 Aug 2017 17:30:21 +0200
+Subject: [PATCH v3 0/4] add support of SCPSYS power domain for MediaTek
+ MT7622
+In-Reply-To: <CAPDyKFpDyhPc=T8SqWdh-mm4kOqFstHNMuRbL_qP04rynoLcsw@mail.gmail.com>
+References: <cover.1502090240.git.sean.wang@mediatek.com>
+ <CAPDyKFpDyhPc=T8SqWdh-mm4kOqFstHNMuRbL_qP04rynoLcsw@mail.gmail.com>
+Message-ID: <2a112b79-20a0-e09d-28a9-24b412d20874@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 August 2017 at 16:32, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Mon, Aug 14, 2017 at 01:53:43PM +0100, Ard Biesheuvel wrote:
->> Like arm64, ARM supports position independent code sequences that
->> produce symbol references with a greater reach than the ordinary
->> adr/ldr instructions.
->>
->> Currently, we use open coded instruction sequences involving literals
->> and arithmetic operations. Instead, we can use movw/movt pairs on v7
->> CPUs, circumventing the D-cache entirely. For older CPUs, we can emit
->> the literal into a subsection, allowing it to be emitted out of line
->> while retaining the ability to perform arithmetic on label offsets.
->>
->> E.g., on pre-v7 CPUs, we can emit a PC-relative reference as follows:
->>
->>        ldr          <reg>, 222f
->>   111: add          <reg>, <reg>, pc
->>        .subsection  1
->>   222: .long        <sym> - (111b + 8)
->>        .previous
->>
->> This is allowed by the assembler because, unlike ordinary sections,
->> subsections are combined into a single section into the object file,
->> and so the label references are not true cross-section references that
->> are visible as relocations. Note that we could even do something like
->>
->>        add          <reg>, pc, #(222f - 111f) & ~0xfff
->>        ldr          <reg>, [<reg>, #(222f - 111f) & 0xfff]
->>   111: add          <reg>, <reg>, pc
->>        .subsection  1
->>   222: .long        <sym> - (111b + 8)
->>        .previous
->>
->> if it turns out that the 4 KB range of the ldr instruction is insufficient
->> to reach the literal in the subsection, although this is currently not a
->> problem (of the 98 objects built from .S files in a multi_v7_defconfig
->> build, only 11 have .text sections that are over 1 KB, and the largest one
->> [entry-armv.o] is 3308 bytes)
->>
->> Subsections have been available in binutils since 2004 at least, so
->> they should not cause any issues with older toolchains.
->>
->> So use the above to implement the macros mov_l, adr_l, adrm_l (using ldm
->
-> I don't see adrm_l in this patch.
->
 
-Oops (2)
 
-Nico already mentioned that, and I failed to fix the commit log. I
-added it at some point, but it wasn't really useful
+On 08/08/2017 01:41 PM, Ulf Hansson wrote:
+> On 7 August 2017 at 09:24,  <sean.wang@mediatek.com> wrote:
+>> From: Sean Wang <sean.wang@mediatek.com>
+>>
+>> Changes since v2:
+>> - reduce code duplication of scpsys_probe across all SoCs
+>>
+>> Changes since v1:
+>> - rebase to Linux v4.13-rc1
+>>
+>> There are four power domains on MediaTek MT7622 SoC which are respectively
+>> ETHSYS for Ethernet including extra embedded switch, HIF0SYS for PCI-E and
+>> SATA, HIF1SYS for USB and WBSYS for WIFI and Bluetooth.
+>>
+>> Those functions could be selectively powered gated when the corresponding
+>> function is no longer to use in order to reach more minimal power
+>> dissipation through the patch series introduced here.
+>>
+>> Chen Zhong (1):
+>>    soc: mediatek: add header files required for MT7622 SCPSYS dt-binding
+>>
+>> Sean Wang (3):
+>>    dt-bindings: soc: update the binding document for SCPSYS on MediaTek
+>>      MT7622 SoC
+>>    soc: mediatek: reduce code duplication of scpsys_probe across all SoCs
+>>    soc: mediatek: add SCPSYS power domain driver for MediaTek MT7622 SoC
+>>
+>>   .../devicetree/bindings/soc/mediatek/scpsys.txt    |   3 +
+>>   drivers/soc/mediatek/mtk-scpsys.c                  | 247 ++++++++++++---------
+>>   include/dt-bindings/power/mt7622-power.h           |  22 ++
+>>   include/linux/soc/mediatek/infracfg.h              |   7 +
+>>   4 files changed, 179 insertions(+), 100 deletions(-)
+>>   create mode 100644 include/dt-bindings/power/mt7622-power.h
+>>
+>> --
+>> 2.7.4
+>>
+> 
+> Looks good to me! Feel free to add:
+> 
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> 
 
->> to load multiple literals at once), ldr_l and str_l, all of which will
->> use movw/movt pairs on v7 and later CPUs, and use PC-relative literals
->> otherwise.
->
-> Also...
->
-> By default, I'd assume that we should port _all_ uses of :upper16:/
-> :lower16: to use these.  Does this series consciously do that?  Are
-> there any exceptions?
->
+Pushed to v4.13-next/soc with the Reviewed-by.
 
-There aren't that many. Anything that refers to absolute symbols will
-break under CONFIG_RELOCATABLE and I haven't noticed any issues (I
-tested extensively with Thumb2)
-
-I don't mind open coded movw/movt for relative references in code that
-is tightly coupled to a platform that guarantees v7+ so I didn't do a
-full sweep. Also, I started with 50+ patches and tried to remove the
-ones that are mostly orthogonal to the KASLR stuff.
+Thanks!
