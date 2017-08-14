@@ -1,59 +1,115 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 14 Aug 2017 17:30:21 +0200
-Subject: [PATCH v3 0/4] add support of SCPSYS power domain for MediaTek
- MT7622
-In-Reply-To: <CAPDyKFpDyhPc=T8SqWdh-mm4kOqFstHNMuRbL_qP04rynoLcsw@mail.gmail.com>
-References: <cover.1502090240.git.sean.wang@mediatek.com>
- <CAPDyKFpDyhPc=T8SqWdh-mm4kOqFstHNMuRbL_qP04rynoLcsw@mail.gmail.com>
-Message-ID: <2a112b79-20a0-e09d-28a9-24b412d20874@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 14 Aug 2017 16:29:15 +0100
+Subject: [PATCH 17/30] arm-soc: tegra: make sleep asm code runtime
+ relocatable
+In-Reply-To: <CAKv+Gu8v7yKzxgmsjwBvPP=4riJ7QKj96vvQ2KMmBaHDmHXe7Q@mail.gmail.com>
+References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
+ <20170814125411.22604-18-ard.biesheuvel@linaro.org>
+ <20170814144209.GR6321@e103592.cambridge.arm.com>
+ <CAKv+Gu8v7yKzxgmsjwBvPP=4riJ7QKj96vvQ2KMmBaHDmHXe7Q@mail.gmail.com>
+Message-ID: <20170814152915.GS6321@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 08/08/2017 01:41 PM, Ulf Hansson wrote:
-> On 7 August 2017 at 09:24,  <sean.wang@mediatek.com> wrote:
->> From: Sean Wang <sean.wang@mediatek.com>
->>
->> Changes since v2:
->> - reduce code duplication of scpsys_probe across all SoCs
->>
->> Changes since v1:
->> - rebase to Linux v4.13-rc1
->>
->> There are four power domains on MediaTek MT7622 SoC which are respectively
->> ETHSYS for Ethernet including extra embedded switch, HIF0SYS for PCI-E and
->> SATA, HIF1SYS for USB and WBSYS for WIFI and Bluetooth.
->>
->> Those functions could be selectively powered gated when the corresponding
->> function is no longer to use in order to reach more minimal power
->> dissipation through the patch series introduced here.
->>
->> Chen Zhong (1):
->>    soc: mediatek: add header files required for MT7622 SCPSYS dt-binding
->>
->> Sean Wang (3):
->>    dt-bindings: soc: update the binding document for SCPSYS on MediaTek
->>      MT7622 SoC
->>    soc: mediatek: reduce code duplication of scpsys_probe across all SoCs
->>    soc: mediatek: add SCPSYS power domain driver for MediaTek MT7622 SoC
->>
->>   .../devicetree/bindings/soc/mediatek/scpsys.txt    |   3 +
->>   drivers/soc/mediatek/mtk-scpsys.c                  | 247 ++++++++++++---------
->>   include/dt-bindings/power/mt7622-power.h           |  22 ++
->>   include/linux/soc/mediatek/infracfg.h              |   7 +
->>   4 files changed, 179 insertions(+), 100 deletions(-)
->>   create mode 100644 include/dt-bindings/power/mt7622-power.h
->>
->> --
->> 2.7.4
->>
+On Mon, Aug 14, 2017 at 03:49:15PM +0100, Ard Biesheuvel wrote:
+> On 14 August 2017 at 15:42, Dave Martin <Dave.Martin@arm.com> wrote:
+> > On Mon, Aug 14, 2017 at 01:53:58PM +0100, Ard Biesheuvel wrote:
+> >> The PIE kernel build does not allow absolute references encoded in
+> >> movw/movt instruction pairs, so use our mov_l macro instead (which
+> >> will still use such a pair unless CONFIG_RELOCATABLE is defined)
+> >>
+> >> Also, avoid 32-bit absolute literals to refer to absolute symbols.
+> >> Instead, use a 16 bit reference so that PIE linker cannot get
+> >> confused whether the symbol reference is subject to relocation at
+> >> runtime.
+> >
+> > This sounds like we're papering over something.
+> >
+> > If the linker is "confused", that sounds like we are either abusing
+> > it somehow, or the linker is broken.
+> >
 > 
-> Looks good to me! Feel free to add:
+> There is some ambiguity in how SHN_ABS symbols are treated in shared
+> libraries and PIE executables.
 > 
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+> https://sourceware.org/ml/binutils/2012-05/msg00019.html
 > 
+> I haven't confirmed whether it actually causes problems in this
+> particular case, but it is safer (and not entirely inappropriate) to
+> use a 16-bit field for a quantity that can easily fit one.
 
-Pushed to v4.13-next/soc with the Reviewed-by.
+OK, so, fundamental linker design flaw that cannot be fixed for
+historical reasons.  Gotcha.
 
-Thanks!
+This "fix" feels like a bit of a hack, since it relies on the absence of
+a certain relocation type that could be added later (though it seems
+highly unlikely).
+
+
+Cleaner options would be to expose both symbols that are subtracted,
+rather than the result, or to do the subtraction at build time and
+generate a header that affected files include (though that's more
+invasive on the Makefile side).
+
+May be overkill though.
+
+> 
+> >
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  arch/arm/mach-tegra/sleep-tegra20.S | 22 ++++++++++++--------
+> >>  arch/arm/mach-tegra/sleep-tegra30.S |  6 +++---
+> >>  arch/arm/mach-tegra/sleep.S         |  4 ++--
+> >>  3 files changed, 18 insertions(+), 14 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
+> >> index 5c8e638ee51a..cab95de5c8f1 100644
+> >> --- a/arch/arm/mach-tegra/sleep-tegra20.S
+> >> +++ b/arch/arm/mach-tegra/sleep-tegra20.S
+> >> @@ -99,7 +99,7 @@ ENTRY(tegra20_cpu_shutdown)
+> >>       cmp     r0, #0
+> >>       reteq   lr                      @ must not be called for CPU 0
+> >>       mov32   r1, TEGRA_IRAM_RESET_BASE_VIRT
+> >> -     ldr     r2, =__tegra20_cpu1_resettable_status_offset
+> >> +     ldrh    r2, 0f
+> >>       mov     r12, #CPU_RESETTABLE
+> >>       strb    r12, [r1, r2]
+> >>
+> >> @@ -121,6 +121,7 @@ ENTRY(tegra20_cpu_shutdown)
+> >>       beq     .
+> >>       ret     lr
+> >>  ENDPROC(tegra20_cpu_shutdown)
+> >> +0:   .short  __tegra20_cpu1_resettable_status_offset
+> >>  #endif
+> >>
+> >>  #ifdef CONFIG_PM_SLEEP
+> >> @@ -181,6 +182,9 @@ ENTRY(tegra_pen_unlock)
+> >>       ret     lr
+> >>  ENDPROC(tegra_pen_unlock)
+> >>
+> >> +.L__tegra20_cpu1_resettable_status_offset:
+> >> +     .short  __tegra20_cpu1_resettable_status_offset
+> >> +
+> >>  /*
+> >>   * tegra20_cpu_clear_resettable(void)
+> >>   *
+> >> @@ -189,7 +193,7 @@ ENDPROC(tegra_pen_unlock)
+> >>   */
+> >>  ENTRY(tegra20_cpu_clear_resettable)
+> >>       mov32   r1, TEGRA_IRAM_RESET_BASE_VIRT
+> >
+> > Can we simply port mov32 to mov_l?  Or do we hit a problem with
+> > multiplatform kernels where mov_l may involve a literal pool entry
+> > (and does it matter)?
+> >
+> 
+> The only place where it matters is in code that lives in idmap.text,
+> since the relative reference will point to the ID mapped alias of a
+> section that is not covered by the ID ID map. I think we should be
+> able to use mov_l everywhere else, and it should do the right thing
+> for ordinary and PIE builds
+
+Fair enough.
+
+Cheers
+---Dave
