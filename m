@@ -1,80 +1,55 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Mon, 14 Aug 2017 13:01:33 +0200
-Subject: [PATCH v2 7/9] EDAC: Add devres helpers for
- edac_mc_alloc/edac_mc_add_mc(_with_groups)
-In-Reply-To: <20170802123922.11498-8-jlu@pengutronix.de>
-References: <20170802123922.11498-1-jlu@pengutronix.de>
- <20170802123922.11498-8-jlu@pengutronix.de>
-Message-ID: <20170814110133.cnxpt744yhmnsotc@pd.tnic>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 14 Aug 2017 13:17:21 +0200
+Subject: [PATCH] dt-bindings: watchdog: mediatek: add support for MediaTek
+ MT7623 and MT7622 SoC
+In-Reply-To: <1502418991.19230.1.camel@mtkswgap22>
+References: <b0058a0a9f948f17edf3c1a476665c715922ebc3.1501830388.git.sean.wang@mediatek.com>
+ <20170810174343.7pejhh7wxkcaf3zj@rob-hp-laptop>
+ <1502418991.19230.1.camel@mtkswgap22>
+Message-ID: <6f81355c-8071-1fc2-fe07-20dfef28e80e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 02, 2017 at 02:39:20PM +0200, Jan Luebbe wrote:
-> These helpers simplify error handling in the _probe functions and automate
-> deallocation in the _remove functions.
+
+
+On 08/11/2017 04:36 AM, Sean Wang wrote:
+> On Thu, 2017-08-10 at 12:43 -0500, Rob Herring wrote:
+>> On Fri, Aug 04, 2017 at 03:14:07PM +0800, sean.wang at mediatek.com wrote:
+>>> From: Sean Wang <sean.wang@mediatek.com>
+>>>
+>>> This updates dt-binding documentation for MediaTek MT7622 and
+>>> MT7623 SoC. For the both SoCs supported all rely on the fallback
+>>> binding of the case with "mediatek,mt6589-wdt".
+>>>
+>>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+>>> ---
+>>>   Documentation/devicetree/bindings/watchdog/mtk-wdt.txt | 2 ++
+>>>   1 file changed, 2 insertions(+)
+>>
+>> Acked-by: Rob Herring <robh@kernel.org>
 > 
-> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
-> ---
->  drivers/edac/edac_mc.c | 54 ++++++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/edac/edac_mc.h | 26 ++++++++++++++++++++++++
->  2 files changed, 80 insertions(+)
+> Hi, Rob
 > 
-> diff --git a/drivers/edac/edac_mc.c b/drivers/edac/edac_mc.c
-> index 480072139b7a..d3ee2b851329 100644
-> --- a/drivers/edac/edac_mc.c
-> +++ b/drivers/edac/edac_mc.c
-> @@ -517,6 +517,34 @@ void edac_mc_free(struct mem_ctl_info *mci)
->  }
->  EXPORT_SYMBOL_GPL(edac_mc_free);
->  
-> +/**
-> + * devm_edac_mc_free() - Internal helper to call edac_mc_free from a devres
-> + *	action.
-> + */
-> +static void devm_edac_mc_free(void *mci)
-> +{
-> +	edac_mc_free((struct mem_ctl_info *)mci);
-> +}
-> +
-> +struct mem_ctl_info *devm_edac_mc_alloc(struct device *dev,
-> +					unsigned int mc_num,
-> +					unsigned int n_layers,
-> +					struct edac_mc_layer *layers,
-> +					unsigned int sz_pvt)
-> +{
-> +	struct mem_ctl_info *mci;
-> +
-> +	mci = edac_mc_alloc(mc_num, n_layers, layers, sz_pvt);
-> +	if (!mci)
-> +		return mci;
-> +
-> +	if (devm_add_action_or_reset(dev, devm_edac_mc_free, mci))
-> +		return NULL;
-> +
-> +	return mci;
-> +}
-> +EXPORT_SYMBOL_GPL(devm_edac_mc_alloc);
+> thanks a lot
+> 
+> can the patch go through your tree?
+> 
 
-Ok, I see what you want to do here but I'm not excited.
+ From the MAINTAINERS file:
+WATCHDOG DEVICE DRIVERS
+M:      Wim Van Sebroeck <wim@iguana.be>
+R:      Guenter Roeck <linux@roeck-us.net>
+L:      linux-watchdog at vger.kernel.org
+W:      http://www.linux-watchdog.org/
+T:      git git://www.linux-watchdog.org/linux-watchdog.git
+S:      Maintained
+F:      Documentation/devicetree/bindings/watchdog/
+F:      Documentation/watchdog/
+F:      drivers/watchdog/
+F:      include/linux/watchdog.h
+F:      include/uapi/linux/watchdog.h
 
-Rather, what I've been telling other EDAC driver writers is to first
-probe the hardware as much as possible until they *know* they're all
-ready to init and only then call the EDAC core to allocate structures.
+The best will be to resend and add the email addresses/lists
 
-Because, with this lazy method, the pointless memory allocation
-and freeing would still happen if the late probing fails. But that
-allocation and freeing is completely pointless.
-
-So looking at armada_xp_mc_edac_probe(), for example, you should do
-edac_mc_alloc() *after* armada_xp_mc_edac_read_config() has succeeded.
-The same idea holds true for aurora_l2_edac_probe(): do all probing
-and gathering of info from the hardware first and then call EDAC core
-functions.
-
-Thanks.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+Regards,
+Matthias
