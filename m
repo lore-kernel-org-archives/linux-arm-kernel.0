@@ -1,193 +1,49 @@
 From: andy.yan@rock-chips.com (Andy Yan)
-Date: Mon, 14 Aug 2017 16:40:26 +0800
-Subject: [PATCH v4 4/8] ARM: dts: rockchip: add pwm dt node for rv1108
+Date: Mon, 14 Aug 2017 16:41:57 +0800
+Subject: [PATCH v4 5/8] ARM: dts: rockchip: add saradc support for rv1108
 In-Reply-To: <1502699477-8063-1-git-send-email-andy.yan@rock-chips.com>
 References: <1502699477-8063-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1502700026-8516-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1502700117-8668-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pwm device tree node for rv1108 soc
+Add saradc device tree node for rv1108 soc
 
 Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
 ---
 
-Changes in v4: None
+Changes in v4:
+- remove unnecessary property io-channel-ranges
+
 Changes in v3: None
 Changes in v2:
-- add compatible string "rockchip,rv1108-pwm"
+- add compatible string "rockchip,rv1108-saradc"
 
- arch/arm/boot/dts/rv1108.dtsi | 143 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 143 insertions(+)
+ arch/arm/boot/dts/rv1108.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
-index 4470679..75a0b1e 100644
+index 75a0b1e..064cec3 100644
 --- a/arch/arm/boot/dts/rv1108.dtsi
 +++ b/arch/arm/boot/dts/rv1108.dtsi
-@@ -213,6 +213,54 @@
+@@ -275,6 +275,17 @@
  		status = "disabled";
  	};
  
-+	pwm4: pwm at 10280000 {
-+		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
-+		reg = <0x10280000 0x10>;
-+		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm4_pin>;
-+		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
-+		clock-names = "pwm", "pclk";
++	adc: adc at 1038c000 {
++		compatible = "rockchip,rv1108-saradc", "rockchip,rk3399-saradc";
++		reg = <0x1038c000 0x100>;
++		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++		#io-channel-cells = <1>;
++		clock-frequency = <1000000>;
++		clocks = <&cru SCLK_SARADC>, <&cru PCLK_SARADC>;
++		clock-names = "saradc", "apb_pclk";
 +		status = "disabled";
 +	};
 +
-+	pwm5: pwm at 10280010 {
-+		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
-+		reg = <0x10280010 0x10>;
-+		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm5_pin>;
-+		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
-+		clock-names = "pwm", "pclk";
-+		status = "disabled";
-+	};
-+
-+	pwm6: pwm at 10280020 {
-+		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
-+		reg = <0x10280020 0x10>;
-+		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm6_pin>;
-+		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
-+		clock-names = "pwm", "pclk";
-+		status = "disabled";
-+	};
-+
-+	pwm7: pwm at 10280030 {
-+		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
-+		reg = <0x10280030 0x10>;
-+		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm7_pin>;
-+		clocks = <&cru SCLK_PWM>, <&cru PCLK_PWM>;
-+		clock-names = "pwm", "pclk";
-+		status = "disabled";
-+	};
-+
- 	grf: syscon at 10300000 {
- 		compatible = "rockchip,rv1108-grf", "syscon";
- 		reg = <0x10300000 0x1000>;
-@@ -241,6 +289,53 @@
- 		status = "disabled";
- 	};
- 
-+	pwm0: pwm at 20040000 {
-+		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
-+		reg = <0x20040000 0x10>;
-+		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm0_pin>;
-+		clocks = <&cru SCLK_PWM0_PMU>, <&cru PCLK_PWM0_PMU>;
-+		clock-names = "pwm", "pclk";
-+		status = "disabled";
-+	};
-+
-+	pwm1: pwm at 20040010 {
-+		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
-+		reg = <0x20040010 0x10>;
-+		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm1_pin>;
-+		clocks = <&cru SCLK_PWM0_PMU>, <&cru PCLK_PWM0_PMU>;
-+		clock-names = "pwm", "pclk";
-+		status = "disabled";
-+	};
-+
-+	pwm2: pwm at 20040020 {
-+		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
-+		reg = <0x20040020 0x10>;
-+		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm2_pin>;
-+		clocks = <&cru SCLK_PWM0_PMU>, <&cru PCLK_PWM0_PMU>;
-+		clock-names = "pwm", "pclk";
-+		status = "disabled";
-+	};
-+
-+	pwm3: pwm at 20040030 {
-+		compatible = "rockchip,rv1108-pwm", "rockchip,rk3288-pwm";
-+		reg = <0x20040030 0x10>;
-+		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
-+		#pwm-cells = <3>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm3_pin>;
-+		clocks = <&cru SCLK_PWM0_PMU>, <&cru PCLK_PWM0_PMU>;
-+		clock-names = "pwm", "pclk";
-+		status = "disabled";
-+	};
- 	pmugrf: syscon at 20060000 {
- 		compatible = "rockchip,rv1108-pmugrf", "syscon";
- 		reg = <0x20060000 0x1000>;
-@@ -475,6 +570,54 @@
- 			};
- 		};
- 
-+		pwm0 {
-+			pwm0_pin: pwm0-pin {
-+				rockchip,pins = <0 RK_PC5 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		pwm1 {
-+			pwm1_pin: pwm1-pin {
-+				rockchip,pins = <0 RK_PC4 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		pwm2 {
-+			pwm2_pin: pwm2-pin {
-+				rockchip,pins = <0 RK_PC6 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		pwm3 {
-+			pwm3_pin: pwm3-pin {
-+				rockchip,pins = <0 RK_PC0 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		pwm4 {
-+			pwm4_pin: pwm4-pin {
-+				rockchip,pins = <1 RK_PC1 RK_FUNC_3 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		pwm5 {
-+			pwm5_pin: pwm5-pin {
-+				rockchip,pins = <1 RK_PA7 RK_FUNC_2 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		pwm6 {
-+			pwm6_pin: pwm6-pin {
-+				rockchip,pins = <1 RK_PB0 RK_FUNC_2 &pcfg_pull_none>;
-+			};
-+		};
-+
-+		pwm7 {
-+			pwm7_pin: pwm7-pin {
-+				rockchip,pins = <1 RK_PB1 RK_FUNC_2 &pcfg_pull_none>;
-+			};
-+		};
-+
- 		sdmmc {
- 			sdmmc_clk: sdmmc-clk {
- 				rockchip,pins = <3 RK_PC4 RK_FUNC_1 &pcfg_pull_none_drv_4ma>;
+ 	i2c0: i2c at 20000000 {
+ 		compatible = "rockchip,rv1108-i2c";
+ 		reg = <0x20000000 0x1000>;
 -- 
 2.7.4
