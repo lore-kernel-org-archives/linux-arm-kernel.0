@@ -1,57 +1,33 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 14 Aug 2017 18:42:59 +0100
-Subject: [PATCH 10/14] arm64: assembler: allow adr_this_cpu to use the
- stack pointer
-In-Reply-To: <20170814171338.gvtn76awussgxctn@armageddon.cambridge.arm.com>
-References: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
- <1502130965-18710-11-git-send-email-mark.rutland@arm.com>
- <20170814171338.gvtn76awussgxctn@armageddon.cambridge.arm.com>
-Message-ID: <20170814174259.GA25890@leverpostej>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 14 Aug 2017 19:45:08 +0200
+Subject: [PATCH] arm64: dts: realtek: Clean up RTD1295 UART reg property
+In-Reply-To: <20170730111737.22888-1-afaerber@suse.de>
+References: <20170730111737.22888-1-afaerber@suse.de>
+Message-ID: <0c16bc3f-8e5d-3c35-a017-09000abd6e96@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 06:13:39PM +0100, Catalin Marinas wrote:
-> On Mon, Aug 07, 2017 at 07:36:01PM +0100, Mark Rutland wrote:
-
-> >  	.macro adr_this_cpu, dst, sym, tmp
-> > -	adr_l	\dst, \sym
-> > +	adrp	\tmp, \sym
-> > +	add	\dst, \tmp, #:lo12:\sym
-> >  	mrs	\tmp, tpidr_el1
-> >  	add	\dst, \dst, \tmp
-> >  	.endm
+Am 30.07.2017 um 13:17 schrieb Andreas F?rber:
+> The downstream RTD1195 and apparently RTD1295 trees have a modified 8250
+> serial driver that acknowledges its interrupts using the second reg area,
+> which is an irq mux.
 > 
-> Nitpick: it may be worth adding an #ifndef MODULE around these macros,
-> together with a comment, just in case. There are other macros in this
-> file like adr_l which are used in modules (crypto).
+> Drop these unused second reg entries for the UART nodes.
+> 
+> Fixes: 72a7786c0a0d ("ARM64: dts: Add Realtek RTD1295 and Zidoo X9S")
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  arch/arm64/boot/dts/realtek/rtd1295.dtsi | 9 +++------
+>  1 file changed, 3 insertions(+), 6 deletions(-)
 
-I've folded in the below, in keeping with the other MODULE fallbacks.
+Applied to v4.14/dt64:
 
-Thanks,
-Mark.
+https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-realtek.git/log/?h=v4.14/dt64
 
----->8----
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 4775af5..50c5592 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -230,13 +230,18 @@
-        .endm
- 
-        /*
--        * @dst: Result of per_cpu(sym, smp_processor_id())
-+        * @dst: Result of per_cpu(sym, smp_processor_id()), can be SP for
-+        *       non-module code
-         * @sym: The name of the per-cpu variable
-         * @tmp: scratch register
-         */
-        .macro adr_this_cpu, dst, sym, tmp
-+#ifndef MODULE
-        adrp    \tmp, \sym
-        add     \dst, \tmp, #:lo12:\sym
-+#else
-+       adr_l   \tmp, \sym
-+#endif
-        mrs     \tmp, tpidr_el1
-        add     \dst, \dst, \tmp
-        .endm
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
