@@ -1,47 +1,42 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Mon, 14 Aug 2017 17:08:42 +0530
-Subject: [PATCH 03/11] ASoC: fsl: make snd_soc_platform_driver const
-In-Reply-To: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
-References: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <1502710730-18912-4-git-send-email-bhumirks@gmail.com>
+From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
+Date: Mon, 14 Aug 2017 13:37:57 +0200
+Subject: [RESEND PATCH 3/3] arm64: dts: apq8096-db820c: never disable
+ regulator on LS expansion
+In-Reply-To: <20170814113757.31010-1-srinivas.kandagatla@linaro.org>
+References: <20170814113757.31010-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20170814113757.31010-3-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make these const as they are only passed as the 2nd argument to the function
-snd_soc_register_platform, which is of type const.
-Done using Coccinelle.
+From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+1.8v regulator on LS expansion should not be disabled anytime to comply
+with 96boards spec. So make this explicit with always-on flag.
+
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- sound/soc/fsl/imx-pcm-fiq.c | 2 +-
- sound/soc/fsl/mpc5200_dma.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/sound/soc/fsl/imx-pcm-fiq.c b/sound/soc/fsl/imx-pcm-fiq.c
-index 92410f7..3fcc7b5 100644
---- a/sound/soc/fsl/imx-pcm-fiq.c
-+++ b/sound/soc/fsl/imx-pcm-fiq.c
-@@ -341,7 +341,7 @@ static void imx_pcm_fiq_free(struct snd_pcm *pcm)
- 	imx_pcm_free(pcm);
- }
- 
--static struct snd_soc_platform_driver imx_soc_platform_fiq = {
-+static const struct snd_soc_platform_driver imx_soc_platform_fiq = {
- 	.ops		= &imx_pcm_ops,
- 	.pcm_new	= imx_pcm_fiq_new,
- 	.pcm_free	= imx_pcm_fiq_free,
-diff --git a/sound/soc/fsl/mpc5200_dma.c b/sound/soc/fsl/mpc5200_dma.c
-index 1f7e70b..cdd848c 100644
---- a/sound/soc/fsl/mpc5200_dma.c
-+++ b/sound/soc/fsl/mpc5200_dma.c
-@@ -356,7 +356,7 @@ static void psc_dma_free(struct snd_pcm *pcm)
- 	}
- }
- 
--static struct snd_soc_platform_driver mpc5200_audio_dma_platform = {
-+static const struct snd_soc_platform_driver mpc5200_audio_dma_platform = {
- 	.ops		= &psc_dma_ops,
- 	.pcm_new	= &psc_dma_new,
- 	.pcm_free	= &psc_dma_free,
+diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+index 18c61693529e..0c10bbe55317 100644
+--- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
++++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
+@@ -189,9 +189,15 @@
+ 					regulator-min-microvolt = <1300000>;
+ 					regulator-max-microvolt = <1300000>;
+ 				};
++
++				/**
++				 * 1.8v required on LS expansion
++				 * for mezzanine boards
++				 */
+ 				s4 {
+ 					regulator-min-microvolt = <1800000>;
+ 					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
+ 				};
+ 				s5 {
+ 					regulator-min-microvolt = <2150000>;
 -- 
-1.9.1
+2.11.0
