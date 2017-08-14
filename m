@@ -1,89 +1,82 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Mon, 14 Aug 2017 12:49:49 +0100
-Subject: [PATCH  3/3] ARM: dts: iwg20d-q7: Add SDHI1 support
-In-Reply-To: <1502711389-16040-1-git-send-email-biju.das@bp.renesas.com>
-References: <1502711389-16040-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <1502711389-16040-4-git-send-email-biju.das@bp.renesas.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 14 Aug 2017 14:11:29 +0200
+Subject: [PATCH] arm64: dts: r8a7795: Add OPPs table for cpu devices
+In-Reply-To: <1501853180-23939-1-git-send-email-horms+renesas@verge.net.au>
+References: <1501853180-23939-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVhRLLU=VW6xp2DtXXjjtxK_or0jRon0nbKJQiqqGfbwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the iWave RainboW-G20D-Qseven board dependent part of the
-SDHI1 device node.
+Hi Simon,
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
----
- arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 48 +++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+2017-08-04 15:26 GMT+02:00 Simon Horman <horms+renesas@verge.net.au>:
+> From: Dien Pham <dien.pham.ry@rvc.renesas.com>
+>
+> Current, OPP tables are defined temporary,
+> they are being evaluated and adjust in future.
+>
+> Based in part on work by Hien Dang.
+>
+> Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> [simon: consolidated sseveral patches into one]
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 309 +++++++++++++++++++++++++++++++
+>  1 file changed, 309 insertions(+)
+>
+> I am not aware of any build-time depdendencies of this patch.
+>
+> This patch has run-time depdnencies on:
+> * [PATCH] cpufreq: rcar: Add support for R8A7795 SoC
+> * [PATCH 0/4] r8a7795: Add Z and Z2 clock support
+>
+> I have provided an integration patch with this patch, those DTS changes,
+> and Renesas clock updates also depended on by the DTS changes. The result
+> is working CPUFreq for the r8a7795 (R-Car H3) ES1.0.
+>
+> https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/r8a7795-cpufreq
+>
+> A description of steps taken to lightly exercise the above can be found here:
+>
+> http://elinux.org/Tests:R-CAR-GEN3-CPUFreq
+>
+> If this work is acceptable I plan to follow up with patches to
+> enable CPUFreq on the r8a7796 (R-Car M3-W).
+>
+> This patch is based on renesas-arm64-dt-for-v4.14
+>
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> index a87ae76880ab..f34da4c9ea52 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
 
-diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-index b3a1efa..b5ac0ff 100644
---- a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-+++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-@@ -19,6 +19,29 @@
- 		serial0 = &scif0;
- 		ethernet0 = &avb;
- 	};
-+
-+	vcc_sdhi1: regulator-vcc-sdhi1 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "SDHI1 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpio = <&gpio1 16 GPIO_ACTIVE_LOW>;
-+	};
-+
-+	vccq_sdhi1: regulator-vccq-sdhi1 {
-+		compatible = "regulator-gpio";
-+
-+		regulator-name = "SDHI1 VccQ";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpios = <&gpio2 30 GPIO_ACTIVE_LOW>;
-+		gpios-states = <1>;
-+		states = <3300000 1
-+			  1800000 0>;
-+	};
- };
- 
- &pfc {
-@@ -36,6 +59,18 @@
- 		groups = "i2c2";
- 		function = "i2c2";
- 	};
-+
-+	sdhi1_pins: sd1 {
-+		groups = "sdhi1_data4", "sdhi1_ctrl";
-+		function = "sdhi1";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi1_pins_uhs: sd1_uhs {
-+		groups = "sdhi1_data4", "sdhi1_ctrl";
-+		function = "sdhi1";
-+		power-source = <1800>;
-+	};
- };
- 
- &scif0 {
-@@ -72,3 +107,16 @@
- 		reg = <0x68>;
- 	};
- };
-+
-+&sdhi1 {
-+	pinctrl-0 = <&sdhi1_pins>;
-+	pinctrl-1 = <&sdhi1_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
-+
-+	vmmc-supply = <&vcc_sdhi1>;
-+	vqmmc-supply = <&vccq_sdhi1>;
-+	cd-gpios = <&gpio6 14 GPIO_ACTIVE_LOW>;
-+	wp-gpios = <&gpio6 15 GPIO_ACTIVE_HIGH>;
-+	sd-uhs-sdr50;
-+	status = "okay";
-+};
--- 
-1.9.1
+> @@ -126,6 +152,289 @@
+>                 };
+>         };
+>
+> +       cluster0_opp_tb0: opp_table0 {
+> +               compatible = "operating-points-v2";
+> +               opp-shared;
+> +
+> +               opp at 500000000 {
+
+No complaints from "make W=1 dtbs" due to unit-address without reg property?
+
+=> "opp-500000000 { ... };"
+
+> +                       opp-hz = /bits/ 64 <500000000>;
+> +                       opp-microvolt = <830000>;
+> +                       clock-latency-ns = <300000>;
+> +               };
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
