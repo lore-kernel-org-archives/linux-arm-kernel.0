@@ -1,54 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Aug 2017 18:13:39 +0100
-Subject: [PATCH 10/14] arm64: assembler: allow adr_this_cpu to use the
- stack pointer
-In-Reply-To: <1502130965-18710-11-git-send-email-mark.rutland@arm.com>
-References: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
- <1502130965-18710-11-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170814171338.gvtn76awussgxctn@armageddon.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Aug 2017 10:17:48 -0700
+Subject: [PATCH v2 2/2] ARM: OMAP4+: PRM: fix of_irq_get() result checks
+In-Reply-To: <2dfd399c-2760-7d64-a43f-caefde03b39a@cogentembedded.com>
+References: <20170806151714.108596802@cogentembedded.com>
+ <80dd8051-456b-2331-b847-0631d94f85b1@cogentembedded.com>
+ <20170809220229.GI3934@atomide.com>
+ <2dfd399c-2760-7d64-a43f-caefde03b39a@cogentembedded.com>
+Message-ID: <20170814171746.GY8569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 07:36:01PM +0100, Mark Rutland wrote:
-> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+* Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> [170814 04:44]:
+> On 08/10/2017 01:02 AM, Tony Lindgren wrote:
 > 
-> Given that adr_this_cpu already requires a temp register in addition
-> to the destination register, tweak the instruction sequence so that sp
-> may be used as well.
+> > > > of_irq_get() may return 0 as well as a nagative error number on failure,
+> > > 
+> > >     Oops, forgot to kill comma...
+> > 
+> > I can fix that while applying.
 > 
-> This will simplify switching to per-cpu stacks in subsequent patches. While
-> this limits the range of adr_this_cpu, to +/-4GiB, we don't currently use
-> adr_this_cpu in modules, and this is not problematic for the main kernel image.
+>    Thanks!
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> [Mark: add more commit text]
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Laura Abbott <labbott@redhat.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/assembler.h | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> > > > (and never on success), however omap44xx_prm_late_init() regards 0 as a
+> > > > valid IRQ -- fix this.
+> > > > 
+> > > > Fixes: a8f83aefcd5a ("ARM: OMAP4+: PRM: register interrupt information from DT")
+> > > > Fixes: c5b3955828ba ("ARM: OMAP4: Fix legacy code clean-up regression")
+> > > > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > > [...]
 > 
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index 610a420..4775af5 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -235,7 +235,8 @@
->  	 * @tmp: scratch register
->  	 */
->  	.macro adr_this_cpu, dst, sym, tmp
-> -	adr_l	\dst, \sym
-> +	adrp	\tmp, \sym
-> +	add	\dst, \tmp, #:lo12:\sym
->  	mrs	\tmp, tpidr_el1
->  	add	\dst, \dst, \tmp
->  	.endm
+> > Seems these both should be safe to apply into fixes-not-urgent for
+> > v4.14 merge window as we have not seen any issues with this? Or
+> 
+>    Yes, probably.
+> 
+> > are there some known bugs related to this?
+> 
+>    Dunno, I was just auditing the call sites of of_irq_get[_byname]()...
 
-Nitpick: it may be worth adding an #ifndef MODULE around these macros,
-together with a comment, just in case. There are other macros in this
-file like adr_l which are used in modules (crypto).
+OK thanks I'll apply both into omap-for-v4.14/fixes-not-urgent.
 
--- 
-Catalin
+Tony
