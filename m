@@ -1,77 +1,185 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Aug 2017 11:34:45 +0100
-Subject: New assembler warnings with binutils 2.29
-In-Reply-To: <cab26e7e-a052-c78c-5ee7-fe11de1185bd@arm.com>
-References: <d101c48b-c47b-be60-4b40-de4f845e4965@redhat.com>
- <20170811092213.mdmzqtm2lp6ltlxt@armageddon.cambridge.arm.com>
- <CAKv+Gu8EQq+azTjMNDpE=TzEd_6b-VdQqUYbCc1=qGuYTU4Srg@mail.gmail.com>
- <20170814085901.evwj3rrxo74wcgak@armageddon.cambridge.arm.com>
- <cab26e7e-a052-c78c-5ee7-fe11de1185bd@arm.com>
-Message-ID: <20170814103444.nl6tl3y6wppyk32h@armageddon.cambridge.arm.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Mon, 14 Aug 2017 13:28:34 +0300
+Subject: [PATCH v2 1/4] mmc: sdhci: enable/disable the clock in
+ sdhci_pltfm_suspend/resume
+In-Reply-To: <1501724656-12435-2-git-send-email-yamada.masahiro@socionext.com>
+References: <1501724656-12435-1-git-send-email-yamada.masahiro@socionext.com>
+ <1501724656-12435-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <ec385fc0-a17e-7ee4-2414-be9de131ecdc@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 10:55:48AM +0100, Ramana Radhakrishnan wrote:
-> On Mon, Aug 14, 2017 at 09:59:02AM +0100, Catalin Marinas wrote:
-> > On Fri, Aug 11, 2017 at 10:26:06AM +0100, Ard Biesheuvel wrote:
-> > > On 11 August 2017 at 10:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > > On Thu, Aug 10, 2017 at 01:13:22PM -0700, Laura Abbott wrote:
-> > > >> Fedora rawhide recently upgraded to binutils 2.29 and this seems
-> > > >> to produce new warnings:
-> > > >>
-> > > >> ./arch/arm64/include/asm/assembler.h: Assembler messages:
-> > > >> ./arch/arm64/include/asm/assembler.h:125: Warning: ignoring attempt to redefine built-in register 'lr'
-> > > >>
-> > > >> This is
-> > > >>
-> > > >> /*
-> > > >>  * Register aliases.
-> > > >>  */
-> > > >> lr      .req    x30             // link register
-> > > >
-> > > > Strange, does gas now think 'lr' is a general purpose register (aliased
-> > > > to x30)? It never was and IIRC the toolchain people many years ago
-> > > > refused to add it, hence the alias above in the kernel. I wonder if they
-> > > > added 'fp' as well...
+On 03/08/17 04:44, Masahiro Yamada wrote:
+> This commit provides similar cleanups as commit 83eacdfa2529 ("mmc:
+> sdhci: disable the clock in sdhci_pltfm_unregister()") did for
+> unregister hooks.
 > 
-> I don't remember the reasons why it was refused in the past. Asking around I
-> can't seem to find anyone who remembers why either and it would be much
-> quicker to fix the problem in binutils than any of this archeology :)
-
-I don't have the old emails around either ;).
-
-> > > > We could remove the alias and replace all 'lr' instances with 'x30'
-> > > > throughout the kernel (no too many) or we add some #ifdef around the
-> > > > above based on the binutils version.
-> > > > This is annoying. Replacing lr with x30 achieves the opposite of the
-> > > intent of the binutils change. And using #ifdefs is inaccurate,
-> > > because you can't really test the binutils version only the GCC
-> > > version, and those are not tightly coupled.
-> > > > Can you .unreq it?
-> > 
-> > Not really, with an older binutils I get:
-> > 
-> > arch/arm64/include/asm/assembler.h:125: Error: unknown register alias 'lr'
-> > 
-> > I personally consider this a binutils bug. After 6+ years (probably not
-> > all public) of building the kernel just fine, all of a sudden certain
-> > strings became reserved in gas. Three options:
+> Some drivers duplicate code to handle pltfm_host->clk in their own
+> hooks.  The clock can be handled in sdhci_pltfm.c so that drivers
+> can reuse sdhci_pltfm_pmops.
 > 
-> IIRC the ABI states that LR is an alias for X30, FP is an alias for X29,
-> IP0 an alias for X16 and IP1 an alias for X17.
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-It's unfortunate that binutils never define them, so we ended up with
-.req in the kernel.
+I would like to see some Acks from other driver maintainers including ones
+that did not previously clk_disable_unprepare(pltfm_host->clk) in suspend
+but now do. e.g. sdhci-tegra
 
-> The warning is unfortunate - looking at the implementation of the
-> .req directive in gas it's something controlled in the aarch64 backend
-> and thus we could change gas to make LR (and friends) an internal alias thus
-> removing the warning.
+> ---
 > 
-> Any attempts to realias these to the correct meaning as per the AAPCS
-> continues to work from my limited testing of a prototype patch so far.
-
-This would be great. Thanks Ramana!
-
--- 
-Catalin
+> Changes in v2:
+>   - Fix build error reported by kbuild test robot
+> 
+>  drivers/mmc/host/sdhci-brcmstb.c | 37 +------------------------------------
+>  drivers/mmc/host/sdhci-pltfm.c   | 16 +++++++++++++++-
+>  drivers/mmc/host/sdhci-sirf.c    | 39 +--------------------------------------
+>  3 files changed, 17 insertions(+), 75 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-brcmstb.c b/drivers/mmc/host/sdhci-brcmstb.c
+> index e2f638338e8f..6d461fcdd663 100644
+> --- a/drivers/mmc/host/sdhci-brcmstb.c
+> +++ b/drivers/mmc/host/sdhci-brcmstb.c
+> @@ -21,41 +21,6 @@
+>  
+>  #include "sdhci-pltfm.h"
+>  
+> -#ifdef CONFIG_PM_SLEEP
+> -
+> -static int sdhci_brcmstb_suspend(struct device *dev)
+> -{
+> -	struct sdhci_host *host = dev_get_drvdata(dev);
+> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> -	int res;
+> -
+> -	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+> -		mmc_retune_needed(host->mmc);
+> -
+> -	res = sdhci_suspend_host(host);
+> -	if (res)
+> -		return res;
+> -	clk_disable_unprepare(pltfm_host->clk);
+> -	return res;
+> -}
+> -
+> -static int sdhci_brcmstb_resume(struct device *dev)
+> -{
+> -	struct sdhci_host *host = dev_get_drvdata(dev);
+> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> -	int err;
+> -
+> -	err = clk_prepare_enable(pltfm_host->clk);
+> -	if (err)
+> -		return err;
+> -	return sdhci_resume_host(host);
+> -}
+> -
+> -#endif /* CONFIG_PM_SLEEP */
+> -
+> -static SIMPLE_DEV_PM_OPS(sdhci_brcmstb_pmops, sdhci_brcmstb_suspend,
+> -			sdhci_brcmstb_resume);
+> -
+>  static const struct sdhci_ops sdhci_brcmstb_ops = {
+>  	.set_clock = sdhci_set_clock,
+>  	.set_bus_width = sdhci_set_bus_width,
+> @@ -131,7 +96,7 @@ MODULE_DEVICE_TABLE(of, sdhci_brcm_of_match);
+>  static struct platform_driver sdhci_brcmstb_driver = {
+>  	.driver		= {
+>  		.name	= "sdhci-brcmstb",
+> -		.pm	= &sdhci_brcmstb_pmops,
+> +		.pm	= &sdhci_pltfm_pmops,
+>  		.of_match_table = of_match_ptr(sdhci_brcm_of_match),
+>  	},
+>  	.probe		= sdhci_brcmstb_probe,
+> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+> index e090d8c42ddb..be9a79d62e22 100644
+> --- a/drivers/mmc/host/sdhci-pltfm.c
+> +++ b/drivers/mmc/host/sdhci-pltfm.c
+> @@ -212,16 +212,30 @@ EXPORT_SYMBOL_GPL(sdhci_pltfm_unregister);
+>  static int sdhci_pltfm_suspend(struct device *dev)
+>  {
+>  	struct sdhci_host *host = dev_get_drvdata(dev);
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	int ret;
+>  
+>  	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+>  		mmc_retune_needed(host->mmc);
+>  
+> -	return sdhci_suspend_host(host);
+> +	ret = sdhci_suspend_host(host);
+> +	if (ret)
+> +		return ret;
+> +
+> +	clk_disable_unprepare(pltfm_host->clk);
+> +
+> +	return 0;
+>  }
+>  
+>  static int sdhci_pltfm_resume(struct device *dev)
+>  {
+>  	struct sdhci_host *host = dev_get_drvdata(dev);
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(pltfm_host->clk);
+> +	if (ret)
+> +		return ret;
+>  
+>  	return sdhci_resume_host(host);
+>  }
+> diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
+> index c251c6c0a112..0c7aa89df4e2 100644
+> --- a/drivers/mmc/host/sdhci-sirf.c
+> +++ b/drivers/mmc/host/sdhci-sirf.c
+> @@ -230,43 +230,6 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
+>  	return ret;
+>  }
+>  
+> -#ifdef CONFIG_PM_SLEEP
+> -static int sdhci_sirf_suspend(struct device *dev)
+> -{
+> -	struct sdhci_host *host = dev_get_drvdata(dev);
+> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> -	int ret;
+> -
+> -	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+> -		mmc_retune_needed(host->mmc);
+> -
+> -	ret = sdhci_suspend_host(host);
+> -	if (ret)
+> -		return ret;
+> -
+> -	clk_disable(pltfm_host->clk);
+> -
+> -	return 0;
+> -}
+> -
+> -static int sdhci_sirf_resume(struct device *dev)
+> -{
+> -	struct sdhci_host *host = dev_get_drvdata(dev);
+> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> -	int ret;
+> -
+> -	ret = clk_enable(pltfm_host->clk);
+> -	if (ret) {
+> -		dev_dbg(dev, "Resume: Error enabling clock\n");
+> -		return ret;
+> -	}
+> -
+> -	return sdhci_resume_host(host);
+> -}
+> -#endif
+> -
+> -static SIMPLE_DEV_PM_OPS(sdhci_sirf_pm_ops, sdhci_sirf_suspend, sdhci_sirf_resume);
+> -
+>  static const struct of_device_id sdhci_sirf_of_match[] = {
+>  	{ .compatible = "sirf,prima2-sdhc" },
+>  	{ }
+> @@ -277,7 +240,7 @@ static struct platform_driver sdhci_sirf_driver = {
+>  	.driver		= {
+>  		.name	= "sdhci-sirf",
+>  		.of_match_table = sdhci_sirf_of_match,
+> -		.pm	= &sdhci_sirf_pm_ops,
+> +		.pm	= &sdhci_pltfm_pmops,
+>  	},
+>  	.probe		= sdhci_sirf_probe,
+>  	.remove		= sdhci_pltfm_unregister,
+> 
