@@ -1,61 +1,186 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Mon, 14 Aug 2017 21:04:26 +0800
-Subject: [PATCH v2 1/3] PCI: mediatek: Fix return value in case of error
-In-Reply-To: <1502715868-17651-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1502715868-17651-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1502715868-17651-2-git-send-email-honghui.zhang@mediatek.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 14 Aug 2017 13:54:10 +0100
+Subject: [PATCH 29/30] efi/libstub: arm: reserve bootloader supplied initrd in
+ memory map
+In-Reply-To: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
+References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170814125411.22604-30-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+Under KASLR, the EFI stub may allocate the kernel anywhere in the
+physical address space, which could be right on top of an initrd
+if it was supplied by the bootloader (i.e., GRUB) in /chosen rather
+than passed via the initrd= command line option. So allocate the
+pages explicitly, this ensures that the random memory allocation
+routine will disregard the region.
 
-In commit ae02a6dda285 ("PCI: mediatek: Add controller support for MT2712
-and MT7622"), the function 'mtk_pcie_init_irq_domain', the pattern used to
-check and return error is:
+Note that this means that we need to defer the handle_kernel_image()
+call.
 
-  if (!var) {
-    dev_err(...);
-    return PTR_ERR(var);
-  }
-
-The return value in such case is always 0, change it to return -ENODEV
-instead. And if error was returned from this function, the error should
-be returned to upper layer instead of -ENODEV.
-
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/pci/host/pcie-mediatek.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/firmware/efi/libstub/arm-stub.c | 51 ++++++++++++--------
+ drivers/firmware/efi/libstub/efistub.h  |  3 ++
+ drivers/firmware/efi/libstub/fdt.c      | 42 ++++++++++++++++
+ 3 files changed, 75 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
-index 44e7885..946c056 100644
---- a/drivers/pci/host/pcie-mediatek.c
-+++ b/drivers/pci/host/pcie-mediatek.c
-@@ -450,14 +450,14 @@ static int mtk_pcie_init_irq_domain(struct mtk_pcie_port *port,
- 	pcie_intc_node = of_get_next_child(node, NULL);
- 	if (!pcie_intc_node) {
- 		dev_err(dev, "no PCIe Intc node found\n");
--		return PTR_ERR(pcie_intc_node);
-+		return -ENODEV;
+diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+index 8181ac179d14..f5ef5ccd5f45 100644
+--- a/drivers/firmware/efi/libstub/arm-stub.c
++++ b/drivers/firmware/efi/libstub/arm-stub.c
+@@ -133,6 +133,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 	unsigned long reserve_size = 0;
+ 	enum efi_secureboot_mode secure_boot;
+ 	struct screen_info *si;
++	bool have_chosen_initrd;
+ 
+ 	/* Check if we were booted by the EFI firmware */
+ 	if (sys_table->hdr.signature != EFI_SYSTEM_TABLE_SIGNATURE)
+@@ -183,15 +184,6 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 
+ 	si = setup_graphics(sys_table);
+ 
+-	status = handle_kernel_image(sys_table, image_addr, &image_size,
+-				     &reserve_addr,
+-				     &reserve_size,
+-				     dram_base, image);
+-	if (status != EFI_SUCCESS) {
+-		pr_efi_err(sys_table, "Failed to relocate kernel\n");
+-		goto fail_free_cmdline;
+-	}
+-
+ 	secure_boot = efi_get_secureboot(sys_table);
+ 
+ 	/*
+@@ -209,7 +201,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 
+ 		if (status != EFI_SUCCESS) {
+ 			pr_efi_err(sys_table, "Failed to load device tree!\n");
+-			goto fail_free_image;
++			goto fail_free_cmdline;
+ 		}
  	}
  
- 	port->irq_domain = irq_domain_add_linear(pcie_intc_node, INTX_NUM,
- 						 &intx_domain_ops, port);
- 	if (!port->irq_domain) {
- 		dev_err(dev, "failed to get INTx IRQ domain\n");
--		return PTR_ERR(port->irq_domain);
-+		return -ENODEV;
+@@ -222,16 +214,33 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 			pr_efi(sys_table, "Using DTB from configuration table\n");
  	}
  
- 	return 0;
-@@ -502,7 +502,7 @@ static int mtk_pcie_setup_irq(struct mtk_pcie_port *port,
- 	err = mtk_pcie_init_irq_domain(port, node);
- 	if (err) {
- 		dev_err(dev, "failed to init PCIe legacy IRQ domain\n");
--		return -ENODEV;
-+		return err;
- 	}
+-	if (!fdt_addr)
++	if (!fdt_addr) {
+ 		pr_efi(sys_table, "Generating empty DTB\n");
++		have_chosen_initrd = false;
++	} else {
++		status = efi_reserve_dtb_initrd(sys_table, (void *)fdt_addr);
++		have_chosen_initrd = (status != EFI_NOT_FOUND);
++	}
  
- 	return 0;
+-	status = handle_cmdline_files(sys_table, image, cmdline_ptr, "initrd=",
+-				      efi_get_max_initrd_addr(dram_base,
+-							      *image_addr),
+-				      (unsigned long *)&initrd_addr,
+-				      (unsigned long *)&initrd_size);
+-	if (status != EFI_SUCCESS)
+-		pr_efi_err(sys_table, "Failed initrd from command line!\n");
++	status = handle_kernel_image(sys_table, image_addr, &image_size,
++				     &reserve_addr, &reserve_size,
++				     dram_base, image);
++	if (status != EFI_SUCCESS) {
++		pr_efi_err(sys_table, "Failed to relocate kernel\n");
++		goto fail_free_fdt;
++	}
++
++	if (!have_chosen_initrd) {
++		status = handle_cmdline_files(sys_table, image, cmdline_ptr,
++					      "initrd=",
++					      efi_get_max_initrd_addr(dram_base,
++								      *image_addr),
++					      (unsigned long *)&initrd_addr,
++					      (unsigned long *)&initrd_size);
++		if (status != EFI_SUCCESS)
++			pr_efi_err(sys_table,
++				   "Failed initrd from command line!\n");
++	}
+ 
+ 	efi_random_get_seed(sys_table);
+ 
+@@ -272,11 +281,11 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 	pr_efi_err(sys_table, "Failed to update FDT and exit boot services\n");
+ 
+ 	efi_free(sys_table, initrd_size, initrd_addr);
+-	efi_free(sys_table, fdt_size, fdt_addr);
+-
+-fail_free_image:
+ 	efi_free(sys_table, image_size, *image_addr);
+ 	efi_free(sys_table, reserve_size, reserve_addr);
++
++fail_free_fdt:
++	efi_free(sys_table, fdt_size, fdt_addr);
+ fail_free_cmdline:
+ 	free_screen_info(sys_table, si);
+ 	efi_free(sys_table, cmdline_size, (unsigned long)cmdline_ptr);
+diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
+index aaf2aeb785ea..35b514d7d962 100644
+--- a/drivers/firmware/efi/libstub/efistub.h
++++ b/drivers/firmware/efi/libstub/efistub.h
+@@ -68,4 +68,7 @@ efi_status_t check_platform_features(efi_system_table_t *sys_table_arg);
+ 
+ efi_status_t efi_random_get_seed(efi_system_table_t *sys_table_arg);
+ 
++efi_status_t efi_reserve_dtb_initrd(efi_system_table_t *sys_table_arg,
++				    const void *fdt);
++
+ #endif
+diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+index 8830fa601e45..54408c95e094 100644
+--- a/drivers/firmware/efi/libstub/fdt.c
++++ b/drivers/firmware/efi/libstub/fdt.c
+@@ -385,3 +385,45 @@ void *get_fdt(efi_system_table_t *sys_table, unsigned long *fdt_size)
+ 
+ 	return fdt;
+ }
++
++efi_status_t efi_reserve_dtb_initrd(efi_system_table_t *sys_table_arg,
++				    const void *fdt)
++{
++	int chosen, len;
++	const void *prop;
++	efi_physical_addr_t start, end;
++	unsigned long num_pages;
++	efi_status_t status;
++
++	chosen = fdt_path_offset(fdt, "/chosen");
++	if (chosen == -FDT_ERR_NOTFOUND)
++		return EFI_NOT_FOUND;
++
++	prop = fdt_getprop(fdt, chosen, "linux,initrd-start", &len);
++	if (!prop)
++		return EFI_NOT_FOUND;
++
++	start = (len == sizeof(fdt32_t)) ? fdt32_to_cpu(*(fdt32_t *)prop)
++					 : fdt64_to_cpu(*(fdt64_t *)prop);
++
++	prop = fdt_getprop(fdt, chosen, "linux,initrd-end", &len);
++	if (!prop)
++		return EFI_NOT_FOUND;
++
++	end = (len == sizeof(fdt32_t)) ? fdt32_to_cpu(*(fdt32_t *)prop)
++				       : fdt64_to_cpu(*(fdt64_t *)prop);
++
++	start = round_down(start, EFI_PAGE_SIZE);
++	num_pages = round_up(end - start, EFI_PAGE_SIZE) / EFI_PAGE_SIZE;
++
++	status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
++				EFI_LOADER_DATA, num_pages, &start);
++
++	if (status != EFI_SUCCESS)
++		pr_efi_err(sys_table_arg,
++			   "Failed to reserve initrd area found in /chosen\n");
++	else
++		pr_efi(sys_table_arg, "Using initrd found in /chosen\n");
++
++	return status;
++}
 -- 
-2.6.4
+2.11.0
