@@ -1,24 +1,50 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 14 Aug 2017 23:43:23 +0300
-Subject: [PATCHv6 2/2] i2c: altera: Add Altera I2C Controller driver
-In-Reply-To: <1502728113-22547-2-git-send-email-thor.thayer@linux.intel.com>
-References: <1502728113-22547-1-git-send-email-thor.thayer@linux.intel.com>
- <1502728113-22547-2-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <CAHp75VekTB2vLFpXsYhO0E5QacXe_ssCz9Bp-MpapJFCg4WJoA@mail.gmail.com>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Mon, 14 Aug 2017 22:48:31 +0200
+Subject: [PATCH v5 0/9] mtd: sharpslpart partition parser
+Message-ID: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 7:28 PM,  <thor.thayer@linux.intel.com> wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
->
-> Add driver support for the Altera I2C Controller. The I2C
-> controller is soft IP for use in FPGAs.
+This patchset introduces a simple partition parser for the Sharp SL
+Series PXA handhelds. More details in the commit text.
 
-Hmm...
-Could you remind me if I reviewed this and gave a tag?
-If yes, where is the tag, since changelog doesn't clarify this.
+I have set in cc the ARM PXA maintainers because this is the MTD part of
+a planned wider patchset cleaning the Zaurus board files. The MFD maintainers
+are also in cc (tmio.h change).
 
+Changelog:
+v1 firt version, initial import of 2.4 sources
+v2 refactor applying many suggested fixes
+v3 put the partition parser types in the platform data
+v4 refactor after ML review
+v5 fix commit messages and subject texts, remove global, fixes after v4 review
+
+GPL sources: http://support.ezaurus.com/developer/source/source_dl.asp
+
+Andrea Adami (9):
+  mtd: sharpslpart: Add sharpslpart partition parser
+  mtd: nand: sharpsl: Add partition parsers platform data
+  mfd: tmio: Add partition parsers platform data
+  mtd: nand: sharpsl: Register partitions using the parsers
+  mtd: nand: tmio: Register partitions using the parsers
+  ARM: pxa/corgi: Remove hardcoded partitioning, use sharpslpart parser
+  ARM: pxa/tosa: Remove hardcoded partitioning, use sharpslpart parser
+  ARM: pxa/spitz: Remove hardcoded partitioning, use sharpslpart parser
+  ARM: pxa/poodle: Remove hardcoded partitioning, use sharpslpart parser
+
+ arch/arm/mach-pxa/corgi.c         |  31 +---
+ arch/arm/mach-pxa/poodle.c        |  28 +--
+ arch/arm/mach-pxa/spitz.c         |  34 +---
+ arch/arm/mach-pxa/tosa.c          |  28 +--
+ drivers/mtd/nand/sharpsl.c        |   2 +-
+ drivers/mtd/nand/tmio_nand.c      |   4 +-
+ drivers/mtd/parsers/Kconfig       |   8 +
+ drivers/mtd/parsers/Makefile      |   1 +
+ drivers/mtd/parsers/sharpslpart.c | 376 ++++++++++++++++++++++++++++++++++++++
+ include/linux/mfd/tmio.h          |   1 +
+ include/linux/mtd/sharpsl.h       |   1 +
+ 11 files changed, 424 insertions(+), 90 deletions(-)
+ create mode 100644 drivers/mtd/parsers/sharpslpart.c
 
 -- 
-With Best Regards,
-Andy Shevchenko
+2.7.4
