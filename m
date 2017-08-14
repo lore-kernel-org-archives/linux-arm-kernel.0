@@ -1,59 +1,109 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 14 Aug 2017 17:15:37 +0200
-Subject: [PATCH v6 0/2] Add basic support for Mediatek MT2712 SoC
-In-Reply-To: <1501847977-4023-1-git-send-email-yt.shen@mediatek.com>
-References: <1501847977-4023-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <d40ece12-5148-af2a-fb83-00c56230e175@gmail.com>
+Date: Mon, 14 Aug 2017 17:18:34 +0200
+Subject: [PATCH v4 1/2] arm: dts: mt7623: Add SD-card and EMMC to
+ bananapi-r2
+In-Reply-To: <9fd98b55-8c71-f697-3a41-bb8b70b7dcf1@gmail.com>
+References: <1c83eae1944992f7c5a9af946e03bc2c4e62c874.1501819056.git.sean.wang@mediatek.com>
+ <1501841664.17551.2.camel@mtkswgap22>
+ <9fd98b55-8c71-f697-3a41-bb8b70b7dcf1@gmail.com>
+Message-ID: <f55920be-ff16-9f6f-a3b3-4e4bddda7b12@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 08/04/2017 01:59 PM, YT Shen wrote:
-> MT2712 is a SoC based on 64bit ARMv8 architecture.
-> MT2712 share many HW IP with MT8173.  This patchset was tested on MT2712 evaluation board, and boot to shell ok.
+On 08/04/2017 02:19 PM, Matthias Brugger wrote:
 > 
-> This series contains document bindings, device tree including interrupt and uart.
+> 
+> On 08/04/2017 12:14 PM, Sean Wang wrote:
+>> On Fri, 2017-08-04 at 11:59 +0800, sean.wang at mediatek.com wrote:
+>>> From: Sean Wang <sean.wang@mediatek.com>
+>>>
+>>> The bananapi-r2 board has an SD-card controller and built-in
+>>> EMMC storage so enables those devices in the devicetree. Also
+>>> cleanup nodes in alphabetical order in the patch.
+>>>
+>>
+>> Hi, Matthias
+>>
+>> could your help remove those words "Also cleanup nodes in alphabetical
+>> order in the patch." when merging, i was forgetting to do it.
+>>
+>> or prefer wanting me to resend it again?
+> 
+> Yes I can do that. No need to resend.
 > 
 
-pushed to v4.13-next/dts64
+Both patches pushed to v4.13-next/dts32 now
 
-Thanks
+Thanks a lot,
+Matthias
 
-> Changes compared to v5:
-> - remove the soc node
+> Regards,
+> Matthias
 > 
-> Changes compared to v4:
-> - rebase to 4.13-rc1
-> - use two clocks (baud_clk & sys_clk) instead of one uart_clk to the correct bindings
-> 
-> Changes compared to v3:
-> - use two uart clocks refer to the bindings
-> 
-> Changes compared to v2:
-> - remove alias from serial1 to serial5
-> - remove initrd-start and initrd-end
-> - change GIC_CPU_MASK_SIMPLE(6) to GIC_CPU_MASK_RAW(0x13)
-> - change gic-400 reg range
-> 
-> Changes compared to v1:
-> - change subject prefix for bindings
-> - change device tree license to SPDX tag.
-> - change bootargs parameter to DT usage.
-> - change intpol-controller to interrupt-controller
-> 
-> YT Shen (2):
->    dt-bindings: arm: Add bindings for Mediatek MT2712 SoC Platform
->    arm64: dts: Add Mediatek SoC MT2712 and evaluation board dts and
->      Makefile
-> 
->   Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
->   .../interrupt-controller/mediatek,sysirq.txt       |   1 +
->   .../devicetree/bindings/serial/mtk-uart.txt        |   1 +
->   arch/arm64/boot/dts/mediatek/Makefile              |   1 +
->   arch/arm64/boot/dts/mediatek/mt2712-evb.dts        |  32 ++++
->   arch/arm64/boot/dts/mediatek/mt2712e.dtsi          | 171 +++++++++++++++++++++
->   6 files changed, 210 insertions(+)
->   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712-evb.dts
->   create mode 100644 arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-> 
+>>
+>>     Sean
+>>
+>>> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+>>> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+>>> ---
+>>>   arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 37 +++++++++++++++++++++++++++
+>>>   1 file changed, 37 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts 
+>>> b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+>>> index 9f3e6dd..444ed93 100644
+>>> --- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+>>> +++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+>>> @@ -179,6 +179,32 @@
+>>>       status = "okay";
+>>>   };
+>>> +&mmc0 {
+>>> +    pinctrl-names = "default", "state_uhs";
+>>> +    pinctrl-0 = <&mmc0_pins_default>;
+>>> +    pinctrl-1 = <&mmc0_pins_uhs>;
+>>> +    status = "okay";
+>>> +    bus-width = <8>;
+>>> +    max-frequency = <50000000>;
+>>> +    cap-mmc-highspeed;
+>>> +    vmmc-supply = <&mt6323_vemc3v3_reg>;
+>>> +    vqmmc-supply = <&mt6323_vio18_reg>;
+>>> +    non-removable;
+>>> +};
+>>> +
+>>> +&mmc1 {
+>>> +    pinctrl-names = "default", "state_uhs";
+>>> +    pinctrl-0 = <&mmc1_pins_default>;
+>>> +    pinctrl-1 = <&mmc1_pins_uhs>;
+>>> +    status = "okay";
+>>> +    bus-width = <4>;
+>>> +    max-frequency = <50000000>;
+>>> +    cap-sd-highspeed;
+>>> +    cd-gpios = <&pio 261 0>;
+>>> +    vmmc-supply = <&mt6323_vmch_reg>;
+>>> +    vqmmc-supply = <&mt6323_vio18_reg>;
+>>> +};
+>>> +
+>>>   &pio {
+>>>       cir_pins_a:cir at 0 {
+>>>           pins_cir {
+>>> @@ -314,6 +340,17 @@
+>>>               bias-pull-down;
+>>>               drive-strength = <MTK_DRIVE_4mA>;
+>>>           };
+>>> +
+>>> +        pins_wp {
+>>> +            pinmux = <MT7623_PIN_29_EINT7_FUNC_MSDC1_WP>;
+>>> +            input-enable;
+>>> +            bias-pull-up;
+>>> +        };
+>>> +
+>>> +        pins_insert {
+>>> +            pinmux = <MT7623_PIN_261_MSDC1_INS_FUNC_GPIO261>;
+>>> +            bias-pull-up;
+>>> +        };
+>>>       };
+>>>       mmc1_pins_uhs: mmc1 {
+>>
+>>
