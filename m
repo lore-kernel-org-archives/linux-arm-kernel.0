@@ -1,52 +1,22 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 14 Aug 2017 15:28:30 +0800
-Subject: [PATCH 2/3] arm64: defconfig: Enable CONFIG_MFD_AXP20X_RSB
-In-Reply-To: <1502516443-4740-2-git-send-email-jteki@openedev.com>
-References: <1502516443-4740-1-git-send-email-jteki@openedev.com>
- <1502516443-4740-2-git-send-email-jteki@openedev.com>
-Message-ID: <CAGb2v64ur+Uze1jG2+-syPMf_mwsfNwHZnU3P3iOz13FMOhfVQ@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 14 Aug 2017 09:34:46 +0200
+Subject: [PATCH v2 3/3] reset: uniphier: add analog amplifiers reset
+ control
+In-Reply-To: <20170813090043.3828-3-suzuki.katsuhiro@socionext.com>
+References: <20170813090043.3828-1-suzuki.katsuhiro@socionext.com>
+ <20170813090043.3828-3-suzuki.katsuhiro@socionext.com>
+Message-ID: <1502696086.2287.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 12, 2017 at 1:40 PM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
->
-> X-Powers AXP series PMICs with RSB is need for sunxi a64
+On Sun, 2017-08-13 at 18:00 +0900, Katsuhiro Suzuki wrote:
+> Add a reset line for analog signal amplifier core (ADAMV) on
+> UniPhier LD11/LD20 SoCs.
+> 
+> Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 
-The proper vendor name is "Allwinner".
+Thank you, applied all three to the reset/next branch with Masahiro's
+acks.
 
-> so make it default in defconfig.
->
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-
-Applied with the following commit message:
-
-arm64: defconfig: Enable MFD_AXP20X_RSB
-
-The Allwinner A64 SoC is paired with the X-Powers AXP803 PMIC over the
-Reduced Serial Bus (RSB).
-
-Enable the driver for this PMIC.
-
-
-ChenYu
-
-> ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 33d2d62..a11fce7 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -313,6 +313,7 @@ CONFIG_MESON_GXBB_WATCHDOG=m
->  CONFIG_MESON_WATCHDOG=m
->  CONFIG_RENESAS_WDT=y
->  CONFIG_BCM2835_WDT=y
-> +CONFIG_MFD_AXP20X_RSB=y
->  CONFIG_MFD_CROS_EC=y
->  CONFIG_MFD_CROS_EC_I2C=y
->  CONFIG_MFD_CROS_EC_SPI=y
-> --
-> 2.7.4
->
+regards
+Philipp
