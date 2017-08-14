@@ -1,34 +1,52 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 Aug 2017 15:51:26 +0200
-Subject: [PATCH 05/10] ARM: dts: r8a7791: Use R-Car GPIO Gen2 fallback
- compat string
-In-Reply-To: <1502181568-12299-6-git-send-email-horms+renesas@verge.net.au>
-References: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
- <1502181568-12299-6-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVZ3-XKgjRJSaLXSa9e2-TxpGct6u_wDvPuCADCOu4i4g@mail.gmail.com>
+From: pasha.tatashin@oracle.com (Pasha Tatashin)
+Date: Mon, 14 Aug 2017 09:51:12 -0400
+Subject: [v6 05/15] mm: don't accessed uninitialized struct pages
+In-Reply-To: <20170814114755.GI19063@dhcp22.suse.cz>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-6-git-send-email-pasha.tatashin@oracle.com>
+ <20170811093746.GF30811@dhcp22.suse.cz>
+ <8444cb2b-b134-e9fc-a458-1ba7b22a8df1@oracle.com>
+ <20170814114755.GI19063@dhcp22.suse.cz>
+Message-ID: <e339a33c-d16b-91bd-5df0-18f5ec03d52b@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 8, 2017 at 10:39 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Use newly added R-Car GPIO Gen2 fallback compat string
-> in place of now deprecated non-generation specific
-> R-Car GPIO fallback compat string in the DT of the r8a7791 SoC.
->
-> This should have no run-time effect as the driver matches against
-> the per-SoC compat string before considering the fallback compat string.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> mem_init()
+>>   free_all_bootmem()
+>>    free_low_memory_core_early()
+>>     for_each_reserved_mem_region()
+>>      reserve_bootmem_region()
+>>       init_reserved_page() <- if this is deferred reserved page
+>>        __init_single_pfn()
+>>         __init_single_page()
+>>
+>> So, currently, we are using the value of page->flags to figure out if this
+>> page has been initialized while being part of deferred page, but this is not
+>> going to work for this project, as we do not zero the memory that is backing
+>> the struct pages, and size the value of page->flags can be anything.
+> 
+> True, this is the initialization part I've missed in one of the previous
+> patches already. Would it be possible to only iterate over !reserved
+> memory blocks instead? Now that we discard all the metadata later it
+> should be quite easy to do for_each_memblock_type, no?
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Michal,
 
-Gr{oetje,eeting}s,
+Clever suggestion to add a new iterator to go through unreserved 
+existing memory, I do not think there is this iterator available, so it 
+would need to be implemented, using similar approach to what I have done 
+with a call back.
 
-                        Geert
+However, there is a different reason, why I took this current approach.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Daniel Jordan is working on a ktask support:
+https://lkml.org/lkml/2017/7/14/666
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+He and I discussed on how to multi-thread struct pages initialization 
+within memory nodes using ktasks. Having this callback interface makes 
+that multi-threading quiet easy, improving the boot performance further, 
+with his prototype we saw x4-6 improvements (using 4-8 threads per 
+node). Reducing the total time it takes to initialize all struct pages 
+on machines with terabytes of memory to less than one second.
+
+Pasha
