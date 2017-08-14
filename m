@@ -1,36 +1,34 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 17:22:39 +0100
-Subject: [PATCH 02/30] ARM: assembler: introduce adr_l,
- ldr_l and str_l macros
-In-Reply-To: <alpine.LFD.2.20.1708141217150.17016@knanqh.ubzr>
-References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
- <20170814125411.22604-3-ard.biesheuvel@linaro.org>
- <20170814152950.GT6321@e103592.cambridge.arm.com>
- <CAKv+Gu87G93X36TdAEiMC46Uz_PqXEi_4LSftnUdkQ8HRCxWiA@mail.gmail.com>
- <20170814155002.GV6321@e103592.cambridge.arm.com>
- <alpine.LFD.2.20.1708141217150.17016@knanqh.ubzr>
-Message-ID: <CAKv+Gu_3gb4K_2=igLWMjtXuEcdhnqeoVgaW7Lvqx56AQU-VZg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 14 Aug 2017 09:22:20 -0700
+Subject: [PATCH 3/3] mfd: twl: move header file out of I2C realm
+In-Reply-To: <20170814084340.65morabelapfegph@ninjato>
+References: <20170521220212.1404-1-wsa@the-dreams.de>
+ <20170521220212.1404-4-wsa@the-dreams.de>
+ <20170706064453.GH16144@ulmo.fritz.box>
+ <20170706070352.xdecvsnremwqed72@dell>
+ <20170813133700.tv4ka7anvbzcplr7@ninjato>
+ <20170814064247.qvggx4ito4vgjqvs@dell>
+ <20170814084340.65morabelapfegph@ninjato>
+Message-ID: <20170814162219.GX8569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 August 2017 at 17:18, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Mon, 14 Aug 2017, Dave Martin wrote:
->
->> On Mon, Aug 14, 2017 at 04:38:02PM +0100, Ard Biesheuvel wrote:
->> > That's a trick, actually, which I failed to add a comment for.
->
-> Shame shame shame !
->
->> > We use .arm sections in the thumb2 kernel, and using these macros
->> > there would result in the wrong offset to be used. Adding the .w
->> > suffix forces an error in the assembler which even results in a fairly
->> > meaningful error message complaining about using .w in ARM code.
->>
->> Ewww... I think it'd be best to add a comment explaining that.
->
-> Absolutely!
->
+* Wolfram Sang <wsa@the-dreams.de> [170814 01:43]:
+> 
+> > > Given the triviality of the change for non-MFD subsystems, can we apply
+> > > this for 4.14?
+> > 
+> > I can't apply anything without Acks for *all* of the subsystems above.
+> 
+> Well, there are cases when you can. Those should be exceptions and well
+> justified, of course.
+> 
+> > My suggestion would be to collect the Acks you've received up until
+> > this point and identify which SS's are still lacking in change log
+> > section of a RESEND.
+> 
+> I agree, though, that I can try a second round to get the acks.
 
-Yeah, mea culpa.
+As long as it's been compile tested with omap2plus_defconfig:
 
-But if people have better ideas how to avoid this situation, I am all ears.
+Acked-by: Tony Lindgren <tony@atomide.com>
