@@ -1,79 +1,32 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 14 Aug 2017 15:42:10 +0100
-Subject: [PATCH 17/30] arm-soc: tegra: make sleep asm code runtime
- relocatable
-In-Reply-To: <20170814125411.22604-18-ard.biesheuvel@linaro.org>
-References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
- <20170814125411.22604-18-ard.biesheuvel@linaro.org>
-Message-ID: <20170814144209.GR6321@e103592.cambridge.arm.com>
+From: ramana.radhakrishnan@arm.com (Ramana Radhakrishnan)
+Date: Mon, 14 Aug 2017 15:45:10 +0100
+Subject: New assembler warnings with binutils 2.29
+In-Reply-To: <20170814103444.nl6tl3y6wppyk32h@armageddon.cambridge.arm.com>
+References: <d101c48b-c47b-be60-4b40-de4f845e4965@redhat.com>
+ <20170811092213.mdmzqtm2lp6ltlxt@armageddon.cambridge.arm.com>
+ <CAKv+Gu8EQq+azTjMNDpE=TzEd_6b-VdQqUYbCc1=qGuYTU4Srg@mail.gmail.com>
+ <20170814085901.evwj3rrxo74wcgak@armageddon.cambridge.arm.com>
+ <cab26e7e-a052-c78c-5ee7-fe11de1185bd@arm.com>
+ <20170814103444.nl6tl3y6wppyk32h@armageddon.cambridge.arm.com>
+Message-ID: <20170814144509.ktozfiaa2c3p46r2@armadillo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 01:53:58PM +0100, Ard Biesheuvel wrote:
-> The PIE kernel build does not allow absolute references encoded in
-> movw/movt instruction pairs, so use our mov_l macro instead (which
-> will still use such a pair unless CONFIG_RELOCATABLE is defined)
+On Mon, Aug 14, 2017 at 11:34:45AM +0100, Catalin Marinas wrote:
+> > 
+> > Any attempts to realias these to the correct meaning as per the AAPCS
+> > continues to work from my limited testing of a prototype patch so far.
 > 
-> Also, avoid 32-bit absolute literals to refer to absolute symbols.
-> Instead, use a 16 bit reference so that PIE linker cannot get
-> confused whether the symbol reference is subject to relocation at
-> runtime.
+> This would be great. Thanks Ramana!
 
-This sounds like we're papering over something.
+I've submitted the patch upstream and would appreciate any testing of kernel
+builds to double check that this fixes the issue at hand.
 
-If the linker is "confused", that sounds like we are either abusing
-it somehow, or the linker is broken.
+https://sourceware.org/ml/binutils/2017-08/msg00160.html
 
 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/mach-tegra/sleep-tegra20.S | 22 ++++++++++++--------
->  arch/arm/mach-tegra/sleep-tegra30.S |  6 +++---
->  arch/arm/mach-tegra/sleep.S         |  4 ++--
->  3 files changed, 18 insertions(+), 14 deletions(-)
+Ramana
+
 > 
-> diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
-> index 5c8e638ee51a..cab95de5c8f1 100644
-> --- a/arch/arm/mach-tegra/sleep-tegra20.S
-> +++ b/arch/arm/mach-tegra/sleep-tegra20.S
-> @@ -99,7 +99,7 @@ ENTRY(tegra20_cpu_shutdown)
->  	cmp	r0, #0
->  	reteq	lr			@ must not be called for CPU 0
->  	mov32	r1, TEGRA_IRAM_RESET_BASE_VIRT
-> -	ldr	r2, =__tegra20_cpu1_resettable_status_offset
-> +	ldrh	r2, 0f
->  	mov	r12, #CPU_RESETTABLE
->  	strb	r12, [r1, r2]
->  
-> @@ -121,6 +121,7 @@ ENTRY(tegra20_cpu_shutdown)
->  	beq	.
->  	ret	lr
->  ENDPROC(tegra20_cpu_shutdown)
-> +0:	.short	__tegra20_cpu1_resettable_status_offset
->  #endif
->  
->  #ifdef CONFIG_PM_SLEEP
-> @@ -181,6 +182,9 @@ ENTRY(tegra_pen_unlock)
->  	ret     lr
->  ENDPROC(tegra_pen_unlock)
->  
-> +.L__tegra20_cpu1_resettable_status_offset:
-> +	.short	__tegra20_cpu1_resettable_status_offset
-> +
->  /*
->   * tegra20_cpu_clear_resettable(void)
->   *
-> @@ -189,7 +193,7 @@ ENDPROC(tegra_pen_unlock)
->   */
->  ENTRY(tegra20_cpu_clear_resettable)
->  	mov32	r1, TEGRA_IRAM_RESET_BASE_VIRT
-
-Can we simply port mov32 to mov_l?  Or do we hit a problem with
-multiplatform kernels where mov_l may involve a literal pool entry
-(and does it matter)?
-
-
-[...]
-
-Cheers
----Dave
+> -- 
+> Catalin
