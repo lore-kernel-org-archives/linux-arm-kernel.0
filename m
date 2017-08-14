@@ -1,62 +1,131 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 14 Aug 2017 18:03:48 +0200
-Subject: [PATCH 00/30] implement KASLR for ARM
-In-Reply-To: <CAKv+Gu_-O5ZW=SzXe=0nRExfYWjyMWoJ3eObaZiiftPVNojibw@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 14 Aug 2017 16:50:02 +0100
+Subject: [PATCH 02/30] ARM: assembler: introduce adr_l, ldr_l and str_l
+ macros
+In-Reply-To: <CAKv+Gu87G93X36TdAEiMC46Uz_PqXEi_4LSftnUdkQ8HRCxWiA@mail.gmail.com>
 References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
- <CAK8P3a1zJPsHphvoOitQbTaY-7rzFndGKatM2=aeUphkG+3T_A@mail.gmail.com>
- <CAKv+Gu_-O5ZW=SzXe=0nRExfYWjyMWoJ3eObaZiiftPVNojibw@mail.gmail.com>
-Message-ID: <CAK8P3a1rV5yXm0CSZOx0ZVUiLENe=gBtn-9XUdHQmC2mPRwXOA@mail.gmail.com>
+ <20170814125411.22604-3-ard.biesheuvel@linaro.org>
+ <20170814152950.GT6321@e103592.cambridge.arm.com>
+ <CAKv+Gu87G93X36TdAEiMC46Uz_PqXEi_4LSftnUdkQ8HRCxWiA@mail.gmail.com>
+Message-ID: <20170814155002.GV6321@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 5:49 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 14 August 2017 at 16:30, Arnd Bergmann <arnd@arndb.de> wrote:
+On Mon, Aug 14, 2017 at 04:38:02PM +0100, Ard Biesheuvel wrote:
+> On 14 August 2017 at 16:29, Dave Martin <Dave.Martin@arm.com> wrote:
+> > On Mon, Aug 14, 2017 at 01:53:43PM +0100, Ard Biesheuvel wrote:
+> >> Like arm64, ARM supports position independent code sequences that
+> >> produce symbol references with a greater reach than the ordinary
+> >> adr/ldr instructions.
+> >>
+> >> Currently, we use open coded instruction sequences involving literals
+> >> and arithmetic operations. Instead, we can use movw/movt pairs on v7
+> >> CPUs, circumventing the D-cache entirely. For older CPUs, we can emit
+> >> the literal into a subsection, allowing it to be emitted out of line
+> >> while retaining the ability to perform arithmetic on label offsets.
+> >>
+> >> E.g., on pre-v7 CPUs, we can emit a PC-relative reference as follows:
+> >>
+> >>        ldr          <reg>, 222f
+> >>   111: add          <reg>, <reg>, pc
+> >>        .subsection  1
+> >>   222: .long        <sym> - (111b + 8)
+> >>        .previous
+> >>
+> >> This is allowed by the assembler because, unlike ordinary sections,
+> >> subsections are combined into a single section into the object file,
+> >> and so the label references are not true cross-section references that
+> >> are visible as relocations. Note that we could even do something like
+> >>
+> >>        add          <reg>, pc, #(222f - 111f) & ~0xfff
+> >>        ldr          <reg>, [<reg>, #(222f - 111f) & 0xfff]
+> >>   111: add          <reg>, <reg>, pc
+> >>        .subsection  1
+> >>   222: .long        <sym> - (111b + 8)
+> >>        .previous
+> >
+> > This is reinventing ldr=
+> >
+> > I seem to remember ldr= barfing on things that .long happily accepts
+> > though, was this the reason?
+> >
+> 
+> Yes. ldr = does not accept expressions involving symbols, only plain
+> symbols or expressions that evaluate to constants.
+> 
+> So something like
+> 
+> ldr <reg>, =<sym> - <label>
+> 
+> is rejected while the equivalent
+> 
+> ldr <reg>, 0f
+> 0: .long <sym> - <label>
+> 
+> does work.
 
+I wouldn't bother trying to rationalise gas' behaviour here.  I think
+it's an accident of implementation rather than there being some
+fundamental reason for it.
 
->> Can you explain how the random seed is passed from the bootloader
->> to the kernel when we don't use EFI? Is this implemented at all? I see
->> that you add a seed to "/chosen/kaslr-seed" in the EFI stub when using
->> the EFI boot services, but I don't see where that value gets read again
->> when we relocate the kernel.
+AFAICT gas could quite happily resolve ldr= in exactly the same way as
+.long and thus not have this problem.  But we can't rewrite history.
 
-> To allow other bootloaders to do the same, the kaslr metadata is
-> exposed via a zImage header, containing the values of PAGE_OFFSET, the
-> base of the vmalloc area and the randomization granularity. A
-> bootloader can read these values, and taking the size of DRAM and the
-> placement of initrd and DTB into account, it can choose a value for
-> kaslr offset and write it back into the zImage header.
->
-> This is a bit involved, but it is really difficult to make these
-> things backward compatible, i.e., passing something in a register is
-> not possible if that register was not mandated to be zero initially.
->
-> Similarly, the decompressor passed the kaslr offset to the startup
-> code in the core kernel. It does so by passing it in r3 and jumping 4
-> bytes past the entry point. This way, we are backward compatible with
-> configurations where the decompressor is not used, because in that
-> case, you always jump to the first instruction, which zeroes r3.
+[...]
 
-There are two ideas we discussed in the past (but never implemented
-them obviously):
+> >> +     .macro          __adldst_l, op, reg, sym, tmp, c
+> >> +     .if             __LINUX_ARM_ARCH__ < 7
+> >> +     ldr\c           \tmp, 111f
+> >> +     .subsection     1
+> >> +     .align          2
+> >> +111: .long           \sym - (222f + ARM_PC_BIAS)
+> >
+> > See above comment about ldr=.
+> >
+> >> +     .previous
+> >> +     .else
+> >> +     W(movw\c\())    \tmp, #:lower16:\sym - (222f + ARM_PC_BIAS)
+> >> +     W(movt\c\())    \tmp, #:upper16:\sym - (222f + ARM_PC_BIAS)
+> >
+> > Why W()?
+> >
+> > There are no narrow forms of these instructions anyway -- if there were
+> > then they couldn't accommodate a 16-bit immediate.
+> >
+> 
+> That's a trick, actually, which I failed to add a comment for.
+> 
+> We use .arm sections in the thumb2 kernel, and using these macros
+> there would result in the wrong offset to be used. Adding the .w
+> suffix forces an error in the assembler which even results in a fairly
+> meaningful error message complaining about using .w in ARM code.
 
-- instead of reading the "kaslr-seed" in the decompressor, it could
-  simply hash all of the DT blob to get the seed. This way the bootloader
-  can put the random see anywhere it likes, and as an added bonus,
-  we also get a little bit more random behavior on machines that have
-  no entropy source at all but that do have things like a serial number or
-  mac address in DT. Obviously those would be constant across boots
-  but different between machines. The OS can also store a random
-  seed during shutdown in a location that the bootloader uses to
-  initialize /chosen/kaslr-seed or another property that we use to seed
-  the kernel PRNG at boot time.
+Ewww... I think it'd be best to add a comment explaining that.
 
-- If we have a random number at boot but no way to pass it through
-  the DT, I think we actually /can/ pass it through registers: the
-  register state is undefined, so in the worst case using the XOR of
-  all registers gives us the same number on each boot, but the
-  if the loader is modified to store a random 32-bit number in any
-  of the registers that don't pass other information, we can use that
-  to calculate the kaslr-base.
+There's a fair change someone will trip over this at some point (or
+worse, "fix" the assembly errors).
 
-         Arnd
+> 
+> >> +     .endif
+> >> +222:
+> >> +     .ifc            \op, add
+> >> +     add\c           \reg, \tmp, pc
+> >> +     .elseif         CONFIG_THUMB2_KERNEL == 1
+> >> +     add             \tmp, \tmp, pc
+> >> +     \op\c           \reg, [\tmp]
+> >
+> > Shame
+> >         \op\c           \reg, [pc, \tmp]
+> > doesn't work.
+> >
+> > But it doesn't, apparently.
+> >
+> 
+> No, thumb2 does not allow that
+
+Meh.  Oh well.
+
+[...]
+
+Cheers
+---Dave
