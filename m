@@ -1,19 +1,19 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 14 Aug 2017 17:45:18 +0100
-Subject: Applied "spi: rockchip: add compatible string for rv1108 spi" to the
- spi tree
-In-Reply-To: <1501663563-12482-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <E1dhIUQ-0005k7-1c@finisterre>
+Date: Mon, 14 Aug 2017 17:43:22 +0100
+Subject: Applied "ASoC: sun4i-i2s: Add clkdiv offsets to quirks" to the asoc
+ tree
+In-Reply-To: <20170812110059.5115-2-codekipper@gmail.com>
+Message-ID: <E1dhISY-0005FW-Ry@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: rockchip: add compatible string for rv1108 spi
+   ASoC: sun4i-i2s: Add clkdiv offsets to quirks
 
-has been applied to the spi tree at
+has been applied to the asoc tree at
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -34,45 +34,50 @@ to this mail.
 Thanks,
 Mark
 
->From 6b860e69e873be247d19174ab6b24d0b5741bf8c Mon Sep 17 00:00:00 2001
-From: Andy Yan <andy.yan@rock-chips.com>
-Date: Mon, 14 Aug 2017 16:34:22 +0800
-Subject: [PATCH] spi: rockchip: add compatible string for rv1108 spi
+>From 0aef27cab880d9612331350c008aec00cbb3d247 Mon Sep 17 00:00:00 2001
+From: Marcus Cooper <codekipper@gmail.com>
+Date: Sat, 12 Aug 2017 13:00:49 +0200
+Subject: [PATCH] ASoC: sun4i-i2s: Add clkdiv offsets to quirks
 
-The spi on rv1108 is the same as other rockchip based
-socs, add compatible string for it.
+The BCLKDIV and MCLKDIV found on newer SoCs start from an offset of 1.
+Add the functionality to adjust the division values according to the
+needs to the device being used.
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- Documentation/devicetree/bindings/spi/spi-rockchip.txt | 1 +
- drivers/spi/spi-rockchip.c                             | 1 +
- 2 files changed, 2 insertions(+)
+ sound/soc/sunxi/sun4i-i2s.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-index 83da4931d832..6e3ffacbba32 100644
---- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-@@ -6,6 +6,7 @@ and display controllers using the SPI communication interface.
- Required Properties:
- 
- - compatible: should be one of the following.
-+    "rockchip,rv1108-spi" for rv1108 SoCs.
-     "rockchip,rk3036-spi" for rk3036 SoCS.
-     "rockchip,rk3066-spi" for rk3066 SoCs.
-     "rockchip,rk3188-spi" for rk3188 SoCs.
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 34f6440a5255..474033e2149e 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -914,6 +914,7 @@ static const struct dev_pm_ops rockchip_spi_pm = {
+diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+index d7ee7a443e4e..9a35313c4f9b 100644
+--- a/sound/soc/sunxi/sun4i-i2s.c
++++ b/sound/soc/sunxi/sun4i-i2s.c
+@@ -94,9 +94,13 @@
+  * struct sun4i_i2s_quirks - Differences between SoC variants.
+  *
+  * @has_reset: SoC needs reset deasserted.
++ * @mclk_offset: Value by which mclkdiv needs to be adjusted.
++ * @bclk_offset: Value by which bclkdiv needs to be adjusted.
+  */
+ struct sun4i_i2s_quirks {
+ 	bool				has_reset;
++	unsigned int			mclk_offset;
++	unsigned int			bclk_offset;
  };
  
- static const struct of_device_id rockchip_spi_dt_match[] = {
-+	{ .compatible = "rockchip,rv1108-spi", },
- 	{ .compatible = "rockchip,rk3036-spi", },
- 	{ .compatible = "rockchip,rk3066-spi", },
- 	{ .compatible = "rockchip,rk3188-spi", },
+ struct sun4i_i2s {
+@@ -237,6 +241,10 @@ static int sun4i_i2s_set_clk_rate(struct sun4i_i2s *i2s,
+ 	if (mclk_div < 0)
+ 		return -EINVAL;
+ 
++	/* Adjust the clock division values if needed */
++	bclk_div += i2s->variant->bclk_offset;
++	mclk_div += i2s->variant->mclk_offset;
++
+ 	regmap_write(i2s->regmap, SUN4I_I2S_CLK_DIV_REG,
+ 		     SUN4I_I2S_CLK_DIV_BCLK(bclk_div) |
+ 		     SUN4I_I2S_CLK_DIV_MCLK(mclk_div) |
 -- 
 2.13.2
