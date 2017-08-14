@@ -1,43 +1,63 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 14 Aug 2017 14:44:12 +0300
-Subject: [PATCH v2 2/2] ARM: OMAP4+: PRM: fix of_irq_get() result checks
-In-Reply-To: <20170809220229.GI3934@atomide.com>
-References: <20170806151714.108596802@cogentembedded.com>
- <80dd8051-456b-2331-b847-0631d94f85b1@cogentembedded.com>
- <20170809220229.GI3934@atomide.com>
-Message-ID: <2dfd399c-2760-7d64-a43f-caefde03b39a@cogentembedded.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Mon, 14 Aug 2017 13:47:55 +0200
+Subject: [v6 05/15] mm: don't accessed uninitialized struct pages
+In-Reply-To: <8444cb2b-b134-e9fc-a458-1ba7b22a8df1@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-6-git-send-email-pasha.tatashin@oracle.com>
+ <20170811093746.GF30811@dhcp22.suse.cz>
+ <8444cb2b-b134-e9fc-a458-1ba7b22a8df1@oracle.com>
+Message-ID: <20170814114755.GI19063@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/10/2017 01:02 AM, Tony Lindgren wrote:
-
->>> of_irq_get() may return 0 as well as a nagative error number on failure,
->>
->>     Oops, forgot to kill comma...
+On Fri 11-08-17 11:55:39, Pasha Tatashin wrote:
+> On 08/11/2017 05:37 AM, Michal Hocko wrote:
+> >On Mon 07-08-17 16:38:39, Pavel Tatashin wrote:
+> >>In deferred_init_memmap() where all deferred struct pages are initialized
+> >>we have a check like this:
+> >>
+> >>     if (page->flags) {
+> >>             VM_BUG_ON(page_zone(page) != zone);
+> >>             goto free_range;
+> >>     }
+> >>
+> >>This way we are checking if the current deferred page has already been
+> >>initialized. It works, because memory for struct pages has been zeroed, and
+> >>the only way flags are not zero if it went through __init_single_page()
+> >>before.  But, once we change the current behavior and won't zero the memory
+> >>in memblock allocator, we cannot trust anything inside "struct page"es
+> >>until they are initialized. This patch fixes this.
+> >>
+> >>This patch defines a new accessor memblock_get_reserved_pfn_range()
+> >>which returns successive ranges of reserved PFNs.  deferred_init_memmap()
+> >>calls it to determine if a PFN and its struct page has already been
+> >>initialized.
+> >
+> >Why don't we simply check the pfn against pgdat->first_deferred_pfn?
 > 
-> I can fix that while applying.
-
-    Thanks!
-
->>> (and never on success), however omap44xx_prm_late_init() regards 0 as a
->>> valid IRQ -- fix this.
->>>
->>> Fixes: a8f83aefcd5a ("ARM: OMAP4+: PRM: register interrupt information from DT")
->>> Fixes: c5b3955828ba ("ARM: OMAP4: Fix legacy code clean-up regression")
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->> [...]
-
-> Seems these both should be safe to apply into fixes-not-urgent for
-> v4.14 merge window as we have not seen any issues with this? Or
-
-    Yes, probably.
-
-> are there some known bugs related to this?
-
-    Dunno, I was just auditing the call sites of of_irq_get[_byname]()...
-
-> Regards,
+> Because we are initializing deferred pages, and all of them have pfn greater
+> than pgdat->first_deferred_pfn. However, some of deferred pages were already
+> initialized if they were reserved, in this path:
 > 
-> Tony
+> mem_init()
+>  free_all_bootmem()
+>   free_low_memory_core_early()
+>    for_each_reserved_mem_region()
+>     reserve_bootmem_region()
+>      init_reserved_page() <- if this is deferred reserved page
+>       __init_single_pfn()
+>        __init_single_page()
+> 
+> So, currently, we are using the value of page->flags to figure out if this
+> page has been initialized while being part of deferred page, but this is not
+> going to work for this project, as we do not zero the memory that is backing
+> the struct pages, and size the value of page->flags can be anything.
 
-MBR, Sergei
+True, this is the initialization part I've missed in one of the previous
+patches already. Would it be possible to only iterate over !reserved
+memory blocks instead? Now that we discard all the metadata later it
+should be quite easy to do for_each_memblock_type, no?
+
+-- 
+Michal Hocko
+SUSE Labs
