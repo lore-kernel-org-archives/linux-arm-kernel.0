@@ -1,29 +1,48 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 14 Aug 2017 18:09:16 +0800
-Subject: [PATCH] arm64: allwinner: a64: pine64: Use dcdc1 regulator for
- mmc0
-In-Reply-To: <1502516402-4661-1-git-send-email-jteki@openedev.com>
-References: <1502516402-4661-1-git-send-email-jteki@openedev.com>
-Message-ID: <CAGb2v67AJBdmx-aO2Th9x7n4GibtW+isrfEAZ+HBgnjbabzEUw@mail.gmail.com>
+From: guodong.xu@linaro.org (Guodong Xu)
+Date: Mon, 14 Aug 2017 17:50:49 +0800
+Subject: [PATCH v3 10/10] arm64: dts: hi3660: enable watchdog
+In-Reply-To: <20170814095049.27701-1-guodong.xu@linaro.org>
+References: <20170814095049.27701-1-guodong.xu@linaro.org>
+Message-ID: <20170814095049.27701-11-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Leo Yan <leo.yan@linaro.org>
 
-On Sat, Aug 12, 2017 at 1:40 PM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
->
-> Since current tree support AXP803 regulators, replace
-> fixed regulator with AXP803 dcdc1 regulator.
->
-> Tested on pine64.
->
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+This patch is to add watchdog binding for Hi3660 on Hikey960 board.
 
-There was a lot of (heated) discussion [1] around this change. Maxime
-stated he would merge a patch with this change but ended up picking
-a later version without it. I'll leave this to him when he gets back.
+Cc: Guodong Xu <guodong.xu@linaro.org>
+Cc: Zhong Kaihua <zhongkaihua@huawei.com>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-ChenYu
-
-[1] https://www.spinics.net/lists/arm-kernel/msg595419.html
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+index 545d435..b7a90d6 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+@@ -962,5 +962,21 @@
+ 				     &sdio_cfg_func>;
+ 			status = "disabled";
+ 		};
++
++		watchdog0: watchdog at e8a06000 {
++			compatible = "arm,sp805-wdt", "arm,primecell";
++			reg = <0x0 0xe8a06000 0x0 0x1000>;
++			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg_ctrl HI3660_OSC32K>;
++			clock-names = "apb_pclk";
++		};
++
++		watchdog1: watchdog at e8a07000 {
++			compatible = "arm,sp805-wdt", "arm,primecell";
++			reg = <0x0 0xe8a07000 0x0 0x1000>;
++			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg_ctrl HI3660_OSC32K>;
++			clock-names = "apb_pclk";
++		};
+ 	};
+ };
+-- 
+2.10.2
