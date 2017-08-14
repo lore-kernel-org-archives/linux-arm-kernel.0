@@ -1,48 +1,59 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 13:54:02 +0100
-Subject: [PATCH 21/30] ARM: mm: export default vmalloc base address
+Date: Mon, 14 Aug 2017 13:54:05 +0100
+Subject: [PATCH 24/30] ARM: decompressor: explicitly map decompressor binary
+ cacheable
 In-Reply-To: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
 References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170814125411.22604-22-ard.biesheuvel@linaro.org>
+Message-ID: <20170814125411.22604-25-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for the EFI stub to be able to decide over what range to
-randomize the load address of the kernel, expose the definition of
-the default vmalloc base address as VMALLOC_DEFAULT_BASE.
+When randomizing the kernel load address, there may be a large
+distance in memory between the decompressor binary and its payload
+and the destination area in memory. Ensure that the decompressor
+itself is mapped cacheable in this case, by tweaking the existing
+routine that takes care of this for XIP decompressors.
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/include/asm/pgtable.h | 1 +
- arch/arm/mm/mmu.c              | 3 +--
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/compressed/head.S | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 1c462381c225..a0d4a63a6516 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -45,6 +45,7 @@
- #define VMALLOC_OFFSET		(8*1024*1024)
- #define VMALLOC_START		(((unsigned long)high_memory + VMALLOC_OFFSET) & ~(VMALLOC_OFFSET-1))
- #define VMALLOC_END		0xff800000UL
-+#define VMALLOC_DEFAULT_BASE	(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET)
- 
- #define LIBRARY_TEXT_START	0x0c000000
- 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e46a6a446cdd..566f7e657931 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1128,8 +1128,7 @@ void __init debug_ll_io_init(void)
- }
- #endif
- 
--static void * __initdata vmalloc_min =
--	(void *)(VMALLOC_END - (240 << 20) - VMALLOC_OFFSET);
-+static void * __initdata vmalloc_min = (void *)VMALLOC_DEFAULT_BASE;
- 
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index 5884e8151376..583cc6899d98 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -706,20 +706,24 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
+ 		teq	r0, r2
+ 		bne	1b
  /*
-  * vmalloc=size forces the vmalloc area to be exactly 'size'
+- * If ever we are running from Flash, then we surely want the cache
+- * to be enabled also for our execution instance...  We map 2MB of it
+- * so there is no map overlap problem for up to 1 MB compressed kernel.
+- * If the execution is in RAM then we would only be duplicating the above.
++ * Make sure our entire executable image (including payload) is mapped
++ * cacheable, in case it is located outside the region we covered above.
++ * (This may be the case if running from flash or with randomization enabled)
++ * If the regions happen to overlap, we just duplicate some of the above.
+  */
+ 		orr	r1, r6, #0x04		@ ensure B is set for this
+ 		orr	r1, r1, #3 << 10
+ 		mov	r2, pc
++		adr_l	r9, _end
+ 		mov	r2, r2, lsr #20
++		mov	r9, r9, lsr #20
+ 		orr	r1, r1, r2, lsl #20
+ 		add	r0, r3, r2, lsl #2
+-		str	r1, [r0], #4
++		add	r9, r3, r9, lsl #2
++0:		str	r1, [r0], #4
+ 		add	r1, r1, #1048576
+-		str	r1, [r0]
++		cmp	r0, r9
++		bls	0b
+ 		mov	pc, lr
+ ENDPROC(__setup_mmu)
+ 
 -- 
 2.11.0
