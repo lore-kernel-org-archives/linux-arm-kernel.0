@@ -1,41 +1,47 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 14 Aug 2017 13:50:01 +0200
-Subject: [v6 15/15] mm: debug for raw alloctor
-In-Reply-To: <87d84cad-f03a-88f0-7828-6d3bf7ac473c@oracle.com>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-16-git-send-email-pasha.tatashin@oracle.com>
- <20170811130831.GN30811@dhcp22.suse.cz>
- <87d84cad-f03a-88f0-7828-6d3bf7ac473c@oracle.com>
-Message-ID: <20170814115000.GJ19063@dhcp22.suse.cz>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Mon, 14 Aug 2017 12:39:26 +0100
+Subject: [PATCH ] mmc: renesas_sdhi: Add r8a7743/5 support
+Message-ID: <1502710766-44361-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 11-08-17 12:18:24, Pasha Tatashin wrote:
-> >>When CONFIG_DEBUG_VM is enabled, this patch sets all the memory that is
-> >>returned by memblock_virt_alloc_try_nid_raw() to ones to ensure that no
-> >>places excpect zeroed memory.
-> >
-> >Please fold this into the patch which introduces
-> >memblock_virt_alloc_try_nid_raw.
-> 
-> OK
-> 
->  I am not sure CONFIG_DEBUG_VM is the
-> >best config because that tends to be enabled quite often. Maybe
-> >CONFIG_MEMBLOCK_DEBUG? Or even make it kernel command line parameter?
-> >
-> 
-> Initially, I did not want to make it CONFIG_MEMBLOCK_DEBUG because we really
-> benefit from this debugging code when VM debug is enabled, and especially
-> struct page debugging asserts which also depend on CONFIG_DEBUG_VM.
-> 
-> However, now thinking about it, I will change it to CONFIG_MEMBLOCK_DEBUG,
-> and let users decide what other debugging configs need to be enabled, as
-> this is also OK.
+Add support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5) SDHI
+is identical to the R-Car Gen2 family.
 
-Actually the more I think about it the more I am convinced that a kernel
-boot parameter would be better because it doesn't need the kernel to be
-recompiled and it is a single branch in not so hot path.
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+---
+This patch is compiled and tested againt linux next tag
+next-20170811. This patch depend on the driver change
+[PATCH ] mmc: renesas_sdhi: Add r8a7743/5 support
+https://patchwork.kernel.org/patch/9898611/
+
+
+ Documentation/devicetree/bindings/mmc/tmio_mmc.txt | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+index 4fd8b7a..0d507ec 100644
+--- a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
++++ b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+@@ -15,6 +15,8 @@ Required properties:
+ 		"renesas,sdhi-r7s72100" - SDHI IP on R7S72100 SoC
+ 		"renesas,sdhi-r8a73a4" - SDHI IP on R8A73A4 SoC
+ 		"renesas,sdhi-r8a7740" - SDHI IP on R8A7740 SoC
++		"renesas,sdhi-r8a7743" - SDHI IP on R8A7743 SoC
++		"renesas,sdhi-r8a7745" - SDHI IP on R8A7745 SoC
+ 		"renesas,sdhi-r8a7778" - SDHI IP on R8A7778 SoC
+ 		"renesas,sdhi-r8a7779" - SDHI IP on R8A7779 SoC
+ 		"renesas,sdhi-r8a7790" - SDHI IP on R8A7790 SoC
+@@ -34,8 +36,8 @@ Required properties:
+ 	  "core" and "cd". If the controller only has 1 clock, naming is not
+ 	  required.
+ 	  Below is the number clocks for each supported SoC:
+-	   1: SH73A0, R8A73A4, R8A7740, R8A7778, R8A7779, R8A7790
+-	      R8A7791, R8A7792, R8A7793, R8A7794, R8A7795, R8A7796
++	   1: SH73A0, R8A73A4, R8A7740, R8A7743, R8A7745, R8A7778, R8A7779,
++	      R8A7790, R8A7791, R8A7792, R8A7793, R8A7794, R8A7795, R8A7796
+ 	   2: R7S72100
+ 
+ Optional properties:
 -- 
-Michal Hocko
-SUSE Labs
+1.9.1
