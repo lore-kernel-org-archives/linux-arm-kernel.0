@@ -1,36 +1,144 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 14 Aug 2017 10:43:41 +0200
-Subject: [PATCH 3/3] mfd: twl: move header file out of I2C realm
-In-Reply-To: <20170814064247.qvggx4ito4vgjqvs@dell>
-References: <20170521220212.1404-1-wsa@the-dreams.de>
- <20170521220212.1404-4-wsa@the-dreams.de>
- <20170706064453.GH16144@ulmo.fritz.box>
- <20170706070352.xdecvsnremwqed72@dell>
- <20170813133700.tv4ka7anvbzcplr7@ninjato>
- <20170814064247.qvggx4ito4vgjqvs@dell>
-Message-ID: <20170814084340.65morabelapfegph@ninjato>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 14 Aug 2017 16:43:41 +0800
+Subject: [PATCH v4 7/8] ARM: dts: rockchip: add pmic rk805 dt node for rv1108
+ evb
+In-Reply-To: <1502699477-8063-1-git-send-email-andy.yan@rock-chips.com>
+References: <1502699477-8063-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1502700221-8792-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+RK805 is used as the voltage regulator on rv1108 evaluation
+board. Add device tree node for it.
 
-> > Given the triviality of the change for non-MFD subsystems, can we apply
-> > this for 4.14?
-> 
-> I can't apply anything without Acks for *all* of the subsystems above.
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+---
 
-Well, there are cases when you can. Those should be exceptions and well
-justified, of course.
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
-> My suggestion would be to collect the Acks you've received up until
-> this point and identify which SS's are still lacking in change log
-> section of a RESEND.
+ arch/arm/boot/dts/rv1108-evb.dts | 108 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 108 insertions(+)
 
-I agree, though, that I can try a second round to get the acks.
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170814/995d6d46/attachment-0001.sig>
+diff --git a/arch/arm/boot/dts/rv1108-evb.dts b/arch/arm/boot/dts/rv1108-evb.dts
+index 77ce707..a1bd95e 100644
+--- a/arch/arm/boot/dts/rv1108-evb.dts
++++ b/arch/arm/boot/dts/rv1108-evb.dts
+@@ -94,6 +94,114 @@
+ 			248 249 250 251 252 253 254 255>;
+ 		default-brightness-level = <200>;
+ 	};
++
++	vcc_sys: vsys-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "vsys";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-boot-on;
++	};
++};
++
++&i2c0 {
++	status = "okay";
++	i2c-scl-rising-time-ns = <275>;
++	i2c-scl-falling-time-ns = <16>;
++	clock-frequency = <400000>;
++
++	rk805: pmic at 18 {
++		compatible = "rockchip,rk805";
++		reg = <0x18>;
++		interrupt-parent = <&gpio0>;
++		interrupts = <RK_PB4 IRQ_TYPE_LEVEL_LOW>;
++		rockchip,system-power-controller;
++
++		vcc1-supply = <&vcc_sys>;
++		vcc2-supply = <&vcc_sys>;
++		vcc3-supply = <&vcc_sys>;
++		vcc4-supply = <&vcc_sys>;
++		vcc5-supply = <&vcc_sys>;
++		vcc6-supply = <&vcc_sys>;
++
++		regulators {
++			vdd_core: DCDC_REG1 {
++				regulator-name= "vdd_core";
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-state-enabled;
++					regulator-state-uv = <900000>;
++				};
++			};
++
++			vdd_cam: DCDC_REG2 {
++				regulator-name= "vdd_cam";
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <2000000>;
++				regulator-state-mem {
++					regulator-state-disabled;
++				};
++			};
++
++			vcc_ddr: DCDC_REG3 {
++				regulator-name= "vcc_ddr";
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-state-enabled;
++				};
++			};
++
++			vcc_io: DCDC_REG4 {
++				regulator-name= "vcc_io";
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-state-enabled;
++					regulator-state-uv = <3300000>;
++				};
++			};
++
++			vdd_10: LDO_REG1 {
++				regulator-name= "vdd_10";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-state-disabled;
++				};
++			};
++
++			vcc_18: LDO_REG2 {
++				regulator-name= "vcc_18";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-state-disabled;
++				};
++			};
++
++			vdd10_pmu: LDO_REG3 {
++				regulator-name= "vdd10_pmu";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-state-mem {
++					regulator-state-enabled;
++					regulator-state-uv = <1000000>;
++				};
++			};
++		};
++	};
+ };
+ 
+ &pwm0 {
+-- 
+2.7.4
