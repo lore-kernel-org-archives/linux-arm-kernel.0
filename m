@@ -1,33 +1,26 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 Aug 2017 15:59:16 +0200
-Subject: [PATCH v2 3/3] arm64: dts: r8a7795: Use R-Car SATA Gen3 fallback
- compat string
-In-Reply-To: <1502267203-12229-4-git-send-email-horms+renesas@verge.net.au>
-References: <1502267203-12229-1-git-send-email-horms+renesas@verge.net.au>
- <1502267203-12229-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdX26bRY-n+PENFqXQ-D7t9EfnVTEbYNESg1u4VR4i4yDg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 14 Aug 2017 16:00:37 +0200
+Subject: [PATCH 7/8] gpio: zynq: Fix warnings in the driver
+In-Reply-To: <58146421d2af970cedef5fd4b9e1b2d07bd13d6e.1502103715.git.michal.simek@xilinx.com>
+References: <cover.1502103715.git.michal.simek@xilinx.com>
+ <58146421d2af970cedef5fd4b9e1b2d07bd13d6e.1502103715.git.michal.simek@xilinx.com>
+Message-ID: <CACRpkdYFZNyu5GCfg-DrtfP1XwOutB0yzQMPXBix4mLC=shFfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 9, 2017 at 10:26 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Use newly added R-Car SATA Gen3 fallback compat string
-> in the DT of the r8a7795 SoC.
+On Mon, Aug 7, 2017 at 1:02 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+
+> From: Nava kishore Manne <nava.manne@xilinx.com>
 >
-> This should have no run-time effect as the driver matches against
-> the per-SoC compat string before the fallback compat string is considered.
+> This patch fixes the below warning
+>         -->Block comments should align the * on each line.
+>         -->suspect code indent for conditional statements.
+>         -->Prefer 'unsigned int' to bare use of 'unsigned'
 >
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Patch applied.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yours,
+Linus Walleij
