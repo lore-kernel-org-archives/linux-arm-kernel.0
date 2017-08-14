@@ -1,38 +1,45 @@
 From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon, 14 Aug 2017 17:50:46 +0800
-Subject: [PATCH v3 07/10] arm64: dts: hi3660: Reset the mmc hosts
+Date: Mon, 14 Aug 2017 17:50:48 +0800
+Subject: [PATCH v3 09/10] arm64: dts: hi3660: add bindings for DMA
 In-Reply-To: <20170814095049.27701-1-guodong.xu@linaro.org>
 References: <20170814095049.27701-1-guodong.xu@linaro.org>
-Message-ID: <20170814095049.27701-8-guodong.xu@linaro.org>
+Message-ID: <20170814095049.27701-10-guodong.xu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add reset-names = "reset" into mmc nodes.
+From: Wang Ruyi <wangruyi@huawei.com>
 
+Add bindings for DMA.
+
+Signed-off-by: Wang Ruyi <wangruyi@huawei.com>
 Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
 ---
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 5fd5686..41841f7 100644
+index 41841f7..545d435 100644
 --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
 +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -909,6 +909,7 @@
- 			clock-names = "ciu", "biu";
- 			clock-frequency = <3200000>;
- 			resets = <&crg_rst 0x94 18>;
-+			reset-names = "reset";
- 			cd-gpios = <&gpio25 3 0>;
- 			hisilicon,peripheral-syscon = <&sctrl>;
- 			pinctrl-names = "default";
-@@ -938,6 +939,7 @@
- 				 <&crg_ctrl HI3660_HCLK_GATE_SDIO0>;
- 			clock-names = "ciu", "biu";
- 			resets = <&crg_rst 0x94 20>;
-+			reset-names = "reset";
- 			card-detect-delay = <200>;
- 			supports-highspeed;
- 			keep-power-in-suspend;
+@@ -436,6 +436,19 @@
+ 			status = "disabled";
+ 		};
+ 
++		dma0: dma at fdf30000 {
++			compatible = "hisilicon,k3-dma-1.0";
++			reg = <0x0 0xfdf30000 0x0 0x1000>;
++			#dma-cells = <1>;
++			dma-channels = <16>;
++			dma-requests = <32>;
++			dma-min-chan = <1>;
++			interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&crg_ctrl HI3660_CLK_GATE_DMAC>;
++			dma-no-cci;
++			dma-type = "hi3660_dma";
++		};
++
+ 		rtc0: rtc at fff04000 {
+ 			compatible = "arm,pl031", "arm,primecell";
+ 			reg = <0x0 0Xfff04000 0x0 0x1000>;
 -- 
 2.10.2
