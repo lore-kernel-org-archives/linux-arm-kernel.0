@@ -1,58 +1,93 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 14 Aug 2017 09:03:29 -0500
-Subject: [PATCH 1/3] dt: xilinx: zynqmp: Add bindings for PM firmware
-In-Reply-To: <5d2e3a5e-6060-ff13-a065-c4b6be37e4c9@xilinx.com>
-References: <cover.1501854302.git.michal.simek@xilinx.com>
- <8c27b7eec6cc00d37dfe9b3998212ce9c9c27a31.1501854302.git.michal.simek@xilinx.com>
- <20170810191056.ur5b3zdrcgmb6sim@rob-hp-laptop>
- <4e5d9f8c-9e87-bdcd-388a-aab3c32415e8@xilinx.com>
- <20170811135453.GU12347@toto>
- <5d2e3a5e-6060-ff13-a065-c4b6be37e4c9@xilinx.com>
-Message-ID: <CABGGiszb1kr8ggo8Jv9jsvStK5DxpseuBy7z=_OK8pLN==h25Q@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 14 Aug 2017 15:49:15 +0100
+Subject: [PATCH 17/30] arm-soc: tegra: make sleep asm code runtime
+ relocatable
+In-Reply-To: <20170814144209.GR6321@e103592.cambridge.arm.com>
+References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
+ <20170814125411.22604-18-ard.biesheuvel@linaro.org>
+ <20170814144209.GR6321@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu8v7yKzxgmsjwBvPP=4riJ7QKj96vvQ2KMmBaHDmHXe7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 8:47 AM, Michal Simek <michal.simek@xilinx.com> wrote:
-> On 11.8.2017 15:54, Edgar E. Iglesias wrote:
->> On Fri, Aug 11, 2017 at 02:58:03PM +0200, Michal Simek wrote:
->>> Hi Rob, +Edgar,
->>>
->>> On 10.8.2017 21:10, Rob Herring wrote:
->>>> On Fri, Aug 04, 2017 at 03:45:30PM +0200, Michal Simek wrote:
->>>>> From: Soren Brinkmann <soren.brinkmann@xilinx.com>
->>>>>
->>>>> Document the DT bindings for the Zynq UltraScale+ PM Firmware.
-
-[...]
-
->>>>> + - method:        The method of calling the PM-API firmware layer.
->>>>> +          Permitted values are:
->>>>> +           - "smc" : To be used in configurations without a hypervisor
->>>>> +           - "hvc" : To be used when hypervisor is present
->>>>
->>>> Do you really use both?
->>>>
->>>
->>> SMCs definitely yes.
->>>
->>> Interface was designed in that way and I don't know if people are using
->>> it or not.
->>>
->>> Not sure if Xen is blocking SMCs. I know we have discussed it but not
->>> sure if this is enabled by default or only for certain configurations.
->>> Also not sure if xen contains handler for hvc.
->>> Edgar: Do you know?
+On 14 August 2017 at 15:42, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Mon, Aug 14, 2017 at 01:53:58PM +0100, Ard Biesheuvel wrote:
+>> The PIE kernel build does not allow absolute references encoded in
+>> movw/movt instruction pairs, so use our mov_l macro instead (which
+>> will still use such a pair unless CONFIG_RELOCATABLE is defined)
 >>
->> We have patches for Xen that implement a power-management mediator.
->> That implementation handles PM calls over both SMC and HVC insns.
->> Patches are on the Xen mailing list.
->>
->> Other hypervisors may work differently.
->>
->> I think we should support both but I don't have a strong opinion on it.
+>> Also, avoid 32-bit absolute literals to refer to absolute symbols.
+>> Instead, use a 16 bit reference so that PIE linker cannot get
+>> confused whether the symbol reference is subject to relocation at
+>> runtime.
 >
-> Rob: Are you ok with having it there?
+> This sounds like we're papering over something.
+>
+> If the linker is "confused", that sounds like we are either abusing
+> it somehow, or the linker is broken.
+>
 
-Yes.
+There is some ambiguity in how SHN_ABS symbols are treated in shared
+libraries and PIE executables.
 
-Rob
+https://sourceware.org/ml/binutils/2012-05/msg00019.html
+
+I haven't confirmed whether it actually causes problems in this
+particular case, but it is safer (and not entirely inappropriate) to
+use a 16-bit field for a quantity that can easily fit one.
+
+
+>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm/mach-tegra/sleep-tegra20.S | 22 ++++++++++++--------
+>>  arch/arm/mach-tegra/sleep-tegra30.S |  6 +++---
+>>  arch/arm/mach-tegra/sleep.S         |  4 ++--
+>>  3 files changed, 18 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
+>> index 5c8e638ee51a..cab95de5c8f1 100644
+>> --- a/arch/arm/mach-tegra/sleep-tegra20.S
+>> +++ b/arch/arm/mach-tegra/sleep-tegra20.S
+>> @@ -99,7 +99,7 @@ ENTRY(tegra20_cpu_shutdown)
+>>       cmp     r0, #0
+>>       reteq   lr                      @ must not be called for CPU 0
+>>       mov32   r1, TEGRA_IRAM_RESET_BASE_VIRT
+>> -     ldr     r2, =__tegra20_cpu1_resettable_status_offset
+>> +     ldrh    r2, 0f
+>>       mov     r12, #CPU_RESETTABLE
+>>       strb    r12, [r1, r2]
+>>
+>> @@ -121,6 +121,7 @@ ENTRY(tegra20_cpu_shutdown)
+>>       beq     .
+>>       ret     lr
+>>  ENDPROC(tegra20_cpu_shutdown)
+>> +0:   .short  __tegra20_cpu1_resettable_status_offset
+>>  #endif
+>>
+>>  #ifdef CONFIG_PM_SLEEP
+>> @@ -181,6 +182,9 @@ ENTRY(tegra_pen_unlock)
+>>       ret     lr
+>>  ENDPROC(tegra_pen_unlock)
+>>
+>> +.L__tegra20_cpu1_resettable_status_offset:
+>> +     .short  __tegra20_cpu1_resettable_status_offset
+>> +
+>>  /*
+>>   * tegra20_cpu_clear_resettable(void)
+>>   *
+>> @@ -189,7 +193,7 @@ ENDPROC(tegra_pen_unlock)
+>>   */
+>>  ENTRY(tegra20_cpu_clear_resettable)
+>>       mov32   r1, TEGRA_IRAM_RESET_BASE_VIRT
+>
+> Can we simply port mov32 to mov_l?  Or do we hit a problem with
+> multiplatform kernels where mov_l may involve a literal pool entry
+> (and does it matter)?
+>
+
+The only place where it matters is in code that lives in idmap.text,
+since the relative reference will point to the ID mapped alias of a
+section that is not covered by the ID ID map. I think we should be
+able to use mov_l everywhere else, and it should do the right thing
+for ordinary and PIE builds
