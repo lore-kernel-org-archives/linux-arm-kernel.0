@@ -1,49 +1,71 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 17:56:13 +0100
-Subject: [PATCH 02/30] ARM: assembler: introduce adr_l,
- ldr_l and str_l macros
-In-Reply-To: <20170814164227.GJ20805@n2100.armlinux.org.uk>
-References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
- <20170814125411.22604-3-ard.biesheuvel@linaro.org>
- <20170814152950.GT6321@e103592.cambridge.arm.com>
- <CAKv+Gu87G93X36TdAEiMC46Uz_PqXEi_4LSftnUdkQ8HRCxWiA@mail.gmail.com>
- <20170814155002.GV6321@e103592.cambridge.arm.com>
- <alpine.LFD.2.20.1708141217150.17016@knanqh.ubzr>
- <CAKv+Gu_3gb4K_2=igLWMjtXuEcdhnqeoVgaW7Lvqx56AQU-VZg@mail.gmail.com>
- <20170814164227.GJ20805@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu8SQMLM68W00UH_Vw+vwnTqSsM8v211KshuOEo06gkGww@mail.gmail.com>
+From: gary.hook@amd.com (Gary R Hook)
+Date: Mon, 14 Aug 2017 11:55:44 -0500
+Subject: [PATCH v5 02/19] crypto: ccp: use -EAGAIN for transient busy
+ indication
+In-Reply-To: <1502724094-23305-3-git-send-email-gilad@benyossef.com>
+References: <1502724094-23305-1-git-send-email-gilad@benyossef.com>
+ <1502724094-23305-3-git-send-email-gilad@benyossef.com>
+Message-ID: <28b9a7d4-d329-bb1e-d4eb-6530795eaa0b@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 August 2017 at 17:42, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Mon, Aug 14, 2017 at 05:22:39PM +0100, Ard Biesheuvel wrote:
->> On 14 August 2017 at 17:18, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->> > On Mon, 14 Aug 2017, Dave Martin wrote:
->> >
->> >> On Mon, Aug 14, 2017 at 04:38:02PM +0100, Ard Biesheuvel wrote:
->> >> > That's a trick, actually, which I failed to add a comment for.
->> >
->> > Shame shame shame !
->> >
->> >> > We use .arm sections in the thumb2 kernel, and using these macros
->> >> > there would result in the wrong offset to be used. Adding the .w
->> >> > suffix forces an error in the assembler which even results in a fairly
->> >> > meaningful error message complaining about using .w in ARM code.
->> >>
->> >> Ewww... I think it'd be best to add a comment explaining that.
->> >
->> > Absolutely!
->> >
->>
->> Yeah, mea culpa.
->>
->> But if people have better ideas how to avoid this situation, I am all ears.
+On 08/14/2017 10:21 AM, Gilad Ben-Yossef wrote:
+> Replace -EBUSY with -EAGAIN when reporting transient busy
+> indication in the absence of backlog.
 >
-> Have you tested building an ARMv7M kernel with your patches - ARMv7M is
-> Thumb only, so can't contain any ARM code.  If not, please try
-> mps2_defconfig.
->
+> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
 
-mps2_defconfig builds without error with these patches. I don't have
-the hardware so I can't boot it, unfortunately.
+Reviewed-by: Gary R Hook <gary.hook@amd.com>
+
+> ---
+>  drivers/crypto/ccp/ccp-crypto-main.c | 8 +++-----
+>  drivers/crypto/ccp/ccp-dev.c         | 7 +++++--
+>  2 files changed, 8 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/crypto/ccp/ccp-crypto-main.c b/drivers/crypto/ccp/ccp-crypto-main.c
+> index 35a9de7..403ff0a 100644
+> --- a/drivers/crypto/ccp/ccp-crypto-main.c
+> +++ b/drivers/crypto/ccp/ccp-crypto-main.c
+> @@ -222,9 +222,10 @@ static int ccp_crypto_enqueue_cmd(struct ccp_crypto_cmd *crypto_cmd)
+>
+>  	/* Check if the cmd can/should be queued */
+>  	if (req_queue.cmd_count >= CCP_CRYPTO_MAX_QLEN) {
+> -		ret = -EBUSY;
+> -		if (!(crypto_cmd->cmd->flags & CCP_CMD_MAY_BACKLOG))
+> +		if (!(crypto_cmd->cmd->flags & CCP_CMD_MAY_BACKLOG)) {
+> +			ret = -EAGAIN;
+>  			goto e_lock;
+> +		}
+>  	}
+>
+>  	/* Look for an entry with the same tfm.  If there is a cmd
+> @@ -243,9 +244,6 @@ static int ccp_crypto_enqueue_cmd(struct ccp_crypto_cmd *crypto_cmd)
+>  		ret = ccp_enqueue_cmd(crypto_cmd->cmd);
+>  		if (!ccp_crypto_success(ret))
+>  			goto e_lock;	/* Error, don't queue it */
+> -		if ((ret == -EBUSY) &&
+> -		    !(crypto_cmd->cmd->flags & CCP_CMD_MAY_BACKLOG))
+> -			goto e_lock;	/* Not backlogging, don't queue it */
+>  	}
+>
+>  	if (req_queue.cmd_count >= CCP_CRYPTO_MAX_QLEN) {
+> diff --git a/drivers/crypto/ccp/ccp-dev.c b/drivers/crypto/ccp/ccp-dev.c
+> index 4e029b1..3d637e3 100644
+> --- a/drivers/crypto/ccp/ccp-dev.c
+> +++ b/drivers/crypto/ccp/ccp-dev.c
+> @@ -292,9 +292,12 @@ int ccp_enqueue_cmd(struct ccp_cmd *cmd)
+>  	i = ccp->cmd_q_count;
+>
+>  	if (ccp->cmd_count >= MAX_CMD_QLEN) {
+> -		ret = -EBUSY;
+> -		if (cmd->flags & CCP_CMD_MAY_BACKLOG)
+> +		if (cmd->flags & CCP_CMD_MAY_BACKLOG) {
+> +			ret = -EBUSY;
+>  			list_add_tail(&cmd->entry, &ccp->backlog);
+> +		} else {
+> +			ret = -EAGAIN;
+> +		}
+>  	} else {
+>  		ret = -EINPROGRESS;
+>  		ccp->cmd_count++;
+>
