@@ -1,29 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 14 Aug 2017 15:57:56 +0200
-Subject: [PATCH 4/8] gpio: zynq: Provided workaround for GPIO
-In-Reply-To: <4f1f7ed79879d17e38ffda095d631d0f561c2818.1502103715.git.michal.simek@xilinx.com>
-References: <cover.1502103715.git.michal.simek@xilinx.com>
- <4f1f7ed79879d17e38ffda095d631d0f561c2818.1502103715.git.michal.simek@xilinx.com>
-Message-ID: <CACRpkdaM7TN8pg=E6ETJrZYfN8AC-CNY8CWJrWUrsX=EP+gnRg@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 14 Aug 2017 15:57:59 +0200
+Subject: [PATCH v2 1/3] ARM: dts: r8a7790: Use R-Car SATA Gen2 fallback
+ compat string
+In-Reply-To: <1502267203-12229-2-git-send-email-horms+renesas@verge.net.au>
+References: <1502267203-12229-1-git-send-email-horms+renesas@verge.net.au>
+ <1502267203-12229-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXYXU_ox_8d1jC+jgbwupzFWuxDtVSATWSyMxYVZz6kLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 7, 2017 at 1:01 PM, Michal Simek <michal.simek@xilinx.com> wrote:
-
-> From: Swapna Manupati <swapna.manupati@xilinx.com>
+On Wed, Aug 9, 2017 at 10:26 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Use newly added R-Car SATA Gen2 fallback compat string
+> in the DT of the r8a7790 SoC.
 >
-> This patch provides workaround in the gpio driver
-> for Zynq and ZynqMP Platforms by reading pin value
-> of EMIO banks through DATA register as it was unable
-> to read the value of it from DATA_RO register.
+> This should have no run-time effect as the driver matches against
+> the per-SoC compat string before the fallback compat string is considered.
 >
-> Signed-off-by: Swapna Manupati <swapnam@xilinx.com>
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Patch applied.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-(I hope my random application of patches does not screw things
-up, then I guess I need to back some out.)
+Gr{oetje,eeting}s,
 
-Yours,
-Linus Walleij
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
