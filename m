@@ -1,127 +1,129 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 13:53:57 +0100
-Subject: [PATCH 16/30] ARM: kernel: use relative phys-to-virt patch tables
+Date: Mon, 14 Aug 2017 13:53:59 +0100
+Subject: [PATCH 18/30] ARM: kernel: make vmlinux buildable as a PIE executable
 In-Reply-To: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
 References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170814125411.22604-17-ard.biesheuvel@linaro.org>
+Message-ID: <20170814125411.22604-19-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the contents of the __pv_table entries with relative references
-so that we don't have to relocate them at runtime when running the KASLR
-kernel. This ensures these quantities are invariant under runtime
-relocation, which makes any cache maintenance after runtime relocation
-unnecessary.
+Update the build flags and linker script to allow vmlinux to be build
+as a PIE  binary, which retains relocation information about absolute
+symbol references so that they can be fixed up at runtime. This will
+be used for implementing KASLR,
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/include/asm/memory.h |  6 +++---
- arch/arm/kernel/head.S        | 21 ++++++++++----------
- 2 files changed, 13 insertions(+), 14 deletions(-)
+ arch/arm/Kconfig                 |  4 ++++
+ arch/arm/Makefile                |  5 +++++
+ arch/arm/include/asm/assembler.h |  7 ++++++-
+ arch/arm/kernel/vmlinux.lds.S    |  9 +++++++++
+ include/linux/hidden.h           | 21 ++++++++++++++++++++
+ 5 files changed, 45 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 1f54e4e98c1e..47a984e3a244 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -195,7 +195,7 @@ extern const void *__pv_table_begin, *__pv_table_end;
- 	__asm__("@ __pv_stub\n"				\
- 	"1:	" instr "	%0, %1, %2\n"		\
- 	"	.pushsection .pv_table,\"a\"\n"		\
--	"	.long	1b\n"				\
-+	"	.long	1b - .\n"			\
- 	"	.popsection\n"				\
- 	: "=r" (to)					\
- 	: "r" (from), "I" (type))
-@@ -204,7 +204,7 @@ extern const void *__pv_table_begin, *__pv_table_end;
- 	__asm__ volatile("@ __pv_stub_mov\n"		\
- 	"1:	mov	%R0, %1\n"			\
- 	"	.pushsection .pv_table,\"a\"\n"		\
--	"	.long	1b\n"				\
-+	"	.long	1b - .\n"			\
- 	"	.popsection\n"				\
- 	: "=r" (t)					\
- 	: "I" (__PV_BITS_7_0))
-@@ -214,7 +214,7 @@ extern const void *__pv_table_begin, *__pv_table_end;
- 	"1:	adds	%Q0, %1, %2\n"			\
- 	"	adc	%R0, %R0, #0\n"			\
- 	"	.pushsection .pv_table,\"a\"\n"		\
--	"	.long	1b\n"				\
-+	"	.long	1b - .\n"			\
- 	"	.popsection\n"				\
- 	: "+r" (y)					\
- 	: "r" (x), "I" (__PV_BITS_31_24)		\
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 62c961849035..5d685e86148c 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -593,8 +593,7 @@ ENDPROC(__fixup_pv_table)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 61a0cb15067e..300add3b8023 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2085,6 +2085,10 @@ config DMI
+ 	  firmware need to be enabled. This would require the DMI subsystem
+ 	  to be enabled much earlier than we do on ARM, which is non-trivial.
  
- 	.text
- __fixup_a_pv_table:
--	mov_l	r6, __pv_offset
--	add	r6, r6, r3
-+	adr_l	r6, __pv_offset
- 	ldr	r0, [r6, #HIGH_OFFSET]	@ pv_offset high word
- 	ldr	r6, [r6, #LOW_OFFSET]	@ pv_offset low word
- 	mov	r6, r6, lsr #24
-@@ -612,22 +611,22 @@ __fixup_a_pv_table:
- 	orr	r6, r6, r7, lsl #12
- 	orr	r6, #0x4000
- 	b	2f
--1:	add     r7, r3
--	ldrh	ip, [r7, #2]
-+1:	add	r7, r4
-+	ldrh	ip, [r7, #-2]
- ARM_BE8(rev16	ip, ip)
- 	tst	ip, #0x4000
- 	and	ip, #0x8f00
- 	orrne	ip, r6	@ mask in offset bits 31-24
- 	orreq	ip, r0	@ mask in offset bits 7-0
- ARM_BE8(rev16	ip, ip)
--	strh	ip, [r7, #2]
-+	strh	ip, [r7, #-2]
- 	bne	2f
--	ldrh	ip, [r7]
-+	ldrh	ip, [r7, #-4]
- ARM_BE8(rev16	ip, ip)
- 	bic	ip, #0x20
- 	orr	ip, ip, r0, lsr #16
- ARM_BE8(rev16	ip, ip)
--	strh	ip, [r7]
-+	strh	ip, [r7, #-4]
- 2:	cmp	r4, r5
- 	ldrcc	r7, [r4], #4	@ use branch for delay slot
- 	bcc	1b
-@@ -639,7 +638,8 @@ ARM_BE8(rev16	ip, ip)
- 	moveq	r0, #0x400000	@ set bit 22, mov to mvn instruction
- #endif
- 	b	2f
--1:	ldr	ip, [r7, r3]
-+1:	ldr	ip, [r7, r4]!
-+	add	r4, r4, #4
- #ifdef CONFIG_CPU_ENDIAN_BE8
- 	@ in BE8, we load data in BE, but instructions still in LE
- 	bic	ip, ip, #0xff000000
-@@ -654,9 +654,9 @@ ARM_BE8(rev16	ip, ip)
- 	biceq	ip, ip, #0x400000	@ clear bit 22
- 	orreq	ip, ip, r0	@ mask in offset bits 7-0
- #endif
--	str	ip, [r7, r3]
-+	str	ip, [r7]
- 2:	cmp	r4, r5
--	ldrcc	r7, [r4], #4	@ use branch for delay slot
-+	ldrcc	r7, [r4]	@ use branch for delay slot
- 	bcc	1b
- 	ret	lr
- #endif
-@@ -664,7 +664,6 @@ ENDPROC(__fixup_a_pv_table)
++config RELOCATABLE
++	bool
++	select HAVE_ARCH_PREL32_RELOCATIONS
++
+ endmenu
  
- ENTRY(fixup_pv_table)
- 	stmfd	sp!, {r4 - r7, lr}
--	mov	r3, #0			@ no offset
- 	mov	r4, r0			@ r0 = table start
- 	add	r5, r0, r1		@ r1 = table size
- 	bl	__fixup_a_pv_table
+ menu "CPU Power Management"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 47d3a1ab08d2..88d9c33e24f5 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -52,6 +52,11 @@ AS		+= -EL
+ LD		+= -EL
+ endif
+ 
++ifeq ($(CONFIG_RELOCATABLE),y)
++KBUILD_CFLAGS	+= -include $(srctree)/include/linux/hidden.h -fpic
++LDFLAGS_vmlinux	+= -pie -shared -Bsymbolic
++endif
++
+ #
+ # The Scalar Replacement of Aggregates (SRA) optimization pass in GCC 4.9 and
+ # later may result in code being generated that handles signed short and signed
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 09b6b28f2595..b2254c1dc2de 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -550,7 +550,12 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+ 	 * mov_l - move a constant value or [relocated] address into a register
+ 	 */
+ 	.macro		mov_l, dst:req, imm:req, cond
+-	.if		__LINUX_ARM_ARCH__ < 7
++	.if		CONFIG_RELOCATABLE == 1
++	ldr_l		\dst, 333f, \cond
++	.section	".data.rel.ro.local", "aw", %progbits
++333:	.long		\imm
++	.previous
++	.elseif		__LINUX_ARM_ARCH__ < 7
+ 	ldr\cond	\dst, =\imm
+ 	.else
+ 	W(movw\cond\())	\dst, #:lower16:\imm
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index c83a7ba737d6..5853d4be2067 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -89,6 +89,9 @@ SECTIONS
+ #endif
+ 		*(.discard)
+ 		*(.discard.*)
++		*(.ARM.exidx.discard.text)
++		*(.interp .dynamic)
++		*(.dynsym .dynstr .hash)
+ 	}
+ 
+ 	. = PAGE_OFFSET + TEXT_OFFSET;
+@@ -209,6 +212,12 @@ SECTIONS
+ 		__smpalt_end = .;
+ 	}
+ #endif
++	.rel.dyn : ALIGN(8) {
++		__rel_begin = .;
++		*(.rel .rel.* .rel.dyn)
++	}
++	__rel_end = ADDR(.rel.dyn) + SIZEOF(.rel.dyn);
++
+ 	.init.pv_table : {
+ 		__pv_table_begin = .;
+ 		*(.pv_table)
+diff --git a/include/linux/hidden.h b/include/linux/hidden.h
+new file mode 100644
+index 000000000000..49b7823eed6e
+--- /dev/null
++++ b/include/linux/hidden.h
+@@ -0,0 +1,21 @@
++
++/*
++ * GCC assumes that we are building shared libraries or hosted binaries
++ * when the -fpic or -fpie switches are used. This results in all references
++ * to symbols with external linkage to be redirected via entries in the global
++ * offset table (GOT), which keeps .text pages clean and reduces the footprint
++ * of CoWed dirty pages to the GOT itself. It also allows symbol preemption,
++ * which is mandatory under ELF rules for shared libraries.
++ *
++ * For the kernel, we use PIC so that we can relocate the executable image at
++ * runtime. This does not involve CoW or symbol preemption, and we'd rather
++ * have relative references instead of absolute ones whenever possible.
++ * So set the default visibility to hidden: this informs the compiler that
++ * none of our symbols will ever be exported from a shared library, allowing
++ * it to use relative references where possible.
++ *
++ * Note that simply passing -fvisibility=hidden is not sufficient to achieve
++ * this: In that case, definitions will be marked hidden, but declarations
++ * will not, and we still end up with GOT entries unnecessarily.
++ */
++#pragma GCC visibility push(hidden)
 -- 
 2.11.0
