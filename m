@@ -1,41 +1,45 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 14 Aug 2017 17:46:58 +0800
-Subject: [linux-sunxi] [PATCH 3/4] drivers: soc: sunxi: add support for
- remapping func value to reg value
-In-Reply-To: <20170809085627.32687-4-icenowy@aosc.io>
-References: <20170809085627.32687-1-icenowy@aosc.io>
- <20170809085627.32687-4-icenowy@aosc.io>
-Message-ID: <CAGb2v64ryu76PcKZtaeC0g7C=02hy9os80X3wTyRkyNEFZ0QZA@mail.gmail.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 14 Aug 2017 16:44:11 +0800
+Subject: [PATCH v4 8/8] ARM: dts: rockchip: add accelerometer bma250e dt node
+ for rv1108 evb
+In-Reply-To: <1502699477-8063-1-git-send-email-andy.yan@rock-chips.com>
+References: <1502699477-8063-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1502700251-8852-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 9, 2017 at 4:56 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> On some Allwinner SoCs, sometimes the value needed to write into the
-> register to claim SRAM is not equal to the value specified in the
-> device tree.
->
-> We now defines 0 as "CPU" and 1 as "Device", however, for VE SRAM, the
-> register needs to be written 0x7FFFFFFF to claim it to VE, and for
-> Allwinner A64's SRAM C the needed register value to claim it to DE2 is
-> 0, and the value that enables CPU's access to the SRAM is 1.
+Add dt node of bosch accelerometer bma250e on rv1108 evb.
 
-The device tree binding defines 0 as "mapped to CPU" and 1 as "mapped
-to X device". This matches the value written to the configuration
-register for the SRAM blocks currently supported. However, the not yet
-supported VE SRAM block is claimed for the device by writing 0x7fffffff,
-which is vastly different from the other blocks. On the A64, SRAM C is
-claimed by the device by writing a 0, which is the opposite of the current
-design.
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
->
-> Add a value remapping in sunxi_sram_func structure, and let the
-> sunxi_sram_of_parse function set the remapped register value.
+---
 
-Add:
+Changes in v4:
+- order it by i2c address.
 
-This allows us to keep the convention currently used in the device tree
-binding.
+Changes in v3: None
+Changes in v2: None
 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+ arch/arm/boot/dts/rv1108-evb.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Some amendments to the commit message above. Code looks good.
+diff --git a/arch/arm/boot/dts/rv1108-evb.dts b/arch/arm/boot/dts/rv1108-evb.dts
+index a1bd95e..32fb09a 100644
+--- a/arch/arm/boot/dts/rv1108-evb.dts
++++ b/arch/arm/boot/dts/rv1108-evb.dts
+@@ -202,6 +202,13 @@
+ 			};
+ 		};
+ 	};
++
++	bma250: accelerometer at 19 {
++		compatible = "bosch,bma250e";
++		reg = <0x19>;
++		interrupt-parent = <&gpio0>;
++		interrupts = <RK_PB3 IRQ_TYPE_LEVEL_LOW>;
++	};
+ };
+ 
+ &pwm0 {
+-- 
+2.7.4
