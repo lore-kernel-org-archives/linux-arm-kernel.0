@@ -1,41 +1,21 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 14 Aug 2017 09:44:29 +0100
-Subject: [PATCH] ARM: mm: Remove dead code in mem_init()
-In-Reply-To: <1502700269-24384-1-git-send-email-vladimir.murzin@arm.com>
-References: <1502700269-24384-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1502700269-24384-3-git-send-email-vladimir.murzin@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 14 Aug 2017 17:48:31 +0800
+Subject: [linux-sunxi] [PATCH 4/4] drivers: soc: sunxi: add support for
+ A64 and its SRAM C
+In-Reply-To: <20170809085627.32687-5-icenowy@aosc.io>
+References: <20170809085627.32687-1-icenowy@aosc.io>
+ <20170809085627.32687-5-icenowy@aosc.io>
+Message-ID: <CAGb2v66RnXDbL7OJfOAgeXPJSFZwzgfGbnB108vX-+OO_0xiWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code in question checks memory constrains to set default policy for
-overcommit; however we support page size of 4K only thus condition is
-always evaluated to false. Remove that dead code.
+On Wed, Aug 9, 2017 at 4:56 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+> Allwinner A64's display engine claims the SRAM C section to work.
+>
+> Add support for the A64 SRAM controller and the SRAM C section of it.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/mm/init.c | 10 ----------
- 1 file changed, 10 deletions(-)
+Looks good to me. Will apply all 4 once the dt bindings are acked.
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index ad80548..81d4482 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -580,16 +580,6 @@ void __init mem_init(void)
- 	BUILD_BUG_ON(PKMAP_BASE + LAST_PKMAP * PAGE_SIZE > PAGE_OFFSET);
- 	BUG_ON(PKMAP_BASE + LAST_PKMAP * PAGE_SIZE	> PAGE_OFFSET);
- #endif
--
--	if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
--		extern int sysctl_overcommit_memory;
--		/*
--		 * On a machine this small we won't get
--		 * anywhere without overcommit, so turn
--		 * it on by default.
--		 */
--		sysctl_overcommit_memory = OVERCOMMIT_ALWAYS;
--	}
- }
- 
- #ifdef CONFIG_STRICT_KERNEL_RWX
--- 
-2.0.0
+ChenYu
