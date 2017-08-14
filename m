@@ -1,156 +1,153 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 14 Aug 2017 16:32:09 +0200
-Subject: [PATCH 2/2] ARM64: dts: marvell: enable USB host on Armada-8040-DB
-In-Reply-To: <20170809144437.26858-2-miquel.raynal@free-electrons.com> (Miquel
- Raynal's message of "Wed, 9 Aug 2017 16:44:37 +0200")
-References: <20170809140538.692b3e6d@windsurf>
- <20170809144437.26858-2-miquel.raynal@free-electrons.com>
-Message-ID: <87o9rikyom.fsf@free-electrons.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 14 Aug 2017 16:33:09 +0200
+Subject: [PATCH 2/8] gpio: zynq: Wakeup gpio controller when it is used as
+ IRQ controller
+In-Reply-To: <CACRpkdZE-Edr7fWZY5VQM1_65iw7MYGP-iDa2ExZsPxpM0rurQ@mail.gmail.com>
+References: <cover.1502103715.git.michal.simek@xilinx.com>
+ <72d3cd83bed792a23ab60cf9b6d51b618f5aa084.1502103715.git.michal.simek@xilinx.com>
+ <CACRpkdZE-Edr7fWZY5VQM1_65iw7MYGP-iDa2ExZsPxpM0rurQ@mail.gmail.com>
+Message-ID: <6da5fd79-fbc8-b613-954f-dcbe2ef8d6c5@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
- 
- On mer., ao?t 09 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+On 14.8.2017 15:53, Linus Walleij wrote:
+> On Mon, Aug 7, 2017 at 1:01 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+> 
+>> From: Borsodi Petr <Petr.Borsodi@i.cz>
+>>
+>> There is a problem with GPIO driver when used as IRQ controller.
+>> It is not working because the module is sleeping (clock is disabled).
+>> The patch enables clocks when IP is used as IRQ controller.
+>>
+>> Signed-off-by: Borsodi Petr <Petr.Borsodi@i.cz>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> 
+> I'm a bit worried about this patch.
+> 
+>> +static int zynq_gpio_irq_request_resources(struct irq_data *d)
+>> +{
+>> +       struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
+>> +       int ret;
+>> +
+>> +       if (!try_module_get(chip->gpiodev->owner))
+>> +               return -ENODEV;
+> 
+> You are poking around in gpiolib internals, I don't really like that.
+> I prefer that you use accessors and try to make the core deal with
+> this instead of fixing it up with a local hack in the driver.
+> 
+>> +       ret = pm_runtime_get_sync(chip->parent);
+>> +       if (ret < 0) {
+>> +               module_put(chip->gpiodev->owner);
+>> +               return ret;
+>> +       }
+> 
+> What you essentially do is disable runtime PM while IRQs are in
+> use, the patch commit log should say this.
+> 
+>> +       if (gpiochip_lock_as_irq(chip, d->hwirq)) {
+>> +               chip_err(chip, "unable to lock HW IRQ %lu for IRQ\n", d->hwirq);
+>> +               pm_runtime_put(chip->parent);
+>> +               module_put(chip->gpiodev->owner);
+>> +               return -EINVAL;
+>> +       }
+> 
+> This is essentially a separate patch that should be done orthogonally.
+> (I don't care super-much about that though.)
+> 
+>> +static void zynq_gpio_irq_release_resources(struct irq_data *d)
+>> +{
+>> +       struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
+>> +
+>> +       gpiochip_unlock_as_irq(chip, d->hwirq);
+>> +       pm_runtime_put(chip->parent);
+>> +       module_put(chip->gpiodev->owner);
+>> +}
+> (...)
+>> +       .irq_request_resources = zynq_gpio_irq_request_resources,
+>> +       .irq_release_resources = zynq_gpio_irq_release_resources,
+> 
+> Look at this from gpiolib.c:
+> 
+> static int gpiochip_irq_reqres(struct irq_data *d)
+> {
+>         struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
+> 
+>         if (!try_module_get(chip->gpiodev->owner))
+>                 return -ENODEV;
+> 
+>         if (gpiochip_lock_as_irq(chip, d->hwirq)) {
+>                 chip_err(chip,
+>                         "unable to lock HW IRQ %lu for IRQ\n",
+>                         d->hwirq);
+>                 module_put(chip->gpiodev->owner);
+>                 return -EINVAL;
+>         }
+>         return 0;
+> }
+> 
+> static void gpiochip_irq_relres(struct irq_data *d)
+> {
+>         struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
+> 
+>         gpiochip_unlock_as_irq(chip, d->hwirq);
+>         module_put(chip->gpiodev->owner);
+> }
+> 
+> If you add pm_runtime_get_sync()/put to this and export
+> the functions you have the same thing and you can just reuse this
+> code instead of copying it.
+> 
+> Arguably the above should indeed have that runtime PM code
+> (unless we know a better way to deal with IRQs).
+> 
+> So can we fix this in the core and reuse it from there?
 
-> From: Grzegorz Jaszczyk <jaz@semihalf.com>
->
-> Enable USB host on Armada-8040-DB by adding USB PHY nodes for the
-> following ports:
->   - host 0 and 1 of CPM
->   - host 0 of CPS
->
-> These PHY are enabled by lanes coming from regulators based on two
-> I2C expanders.
->
-> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
-> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
+I have checked 4.13-rc1 and none is doing anything with clock in these
+irq routines.
+It means it is a question if they have the same issue when device is
+sleeping or we do something wrong.
+It is not a problem to move these calls to core (patch is quite simple)
+but validate that if this is correct on others SoC.
+Do you know if we can validate this on different SoC?
 
-Applied on mvebu/dt64
+Nava: Can you please validate this again on ZynqMP?
 
 Thanks,
+Michal
 
-Gregory
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index 9568708a550b..a08a044fa4aa 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -1647,14 +1647,22 @@ static void gpiochip_irq_unmap(struct irq_domain
+*d, unsigned int irq)
+ static int gpiochip_irq_reqres(struct irq_data *d)
+ {
+        struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
++       int ret;
 
-> ---
->  arch/arm64/boot/dts/marvell/armada-8040-db.dts | 65 ++++++++++++++++++++++++++
->  1 file changed, 65 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-> index 1e8f7242ed6f..0d7b2ae46610 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-> @@ -44,6 +44,7 @@
->   * Device Tree file for Marvell Armada 8040 Development board platform
->   */
->  
-> +#include <dt-bindings/gpio/gpio.h>
->  #include "armada-8040.dtsi"
->  
->  / {
-> @@ -59,6 +60,48 @@
->  		device_type = "memory";
->  		reg = <0x0 0x0 0x0 0x80000000>;
->  	};
-> +
-> +	cpm_reg_usb3_0_vbus: cpm-usb3-0-vbus {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "cpm-usb3h0-vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		enable-active-high;
-> +		gpio = <&expander0 0 GPIO_ACTIVE_HIGH>;
-> +	};
-> +
-> +	cpm_reg_usb3_1_vbus: cpm-usb3-1-vbus {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "cpm-usb3h1-vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		enable-active-high;
-> +		gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
-> +	};
-> +
-> +	cpm_usb3_0_phy: cpm-usb3-0-phy {
-> +		compatible = "usb-nop-xceiv";
-> +		vcc-supply = <&cpm_reg_usb3_0_vbus>;
-> +	};
-> +
-> +	cpm_usb3_1_phy: cpm-usb3-1-phy {
-> +		compatible = "usb-nop-xceiv";
-> +		vcc-supply = <&cpm_reg_usb3_1_vbus>;
-> +	};
-> +
-> +	cps_reg_usb3_0_vbus: cps-usb3-0-vbus {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "cps-usb3h0-vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		enable-active-high;
-> +		gpio = <&expander1 0 GPIO_ACTIVE_HIGH>;
-> +	};
-> +
-> +	cps_usb3_0_phy: cps-usb3-0-phy {
-> +		compatible = "usb-nop-xceiv";
-> +		vcc-supply = <&cps_reg_usb3_0_vbus>;
-> +	};
->  };
->  
->  &i2c0 {
-> @@ -107,6 +150,25 @@
->  &cpm_i2c0 {
->  	status = "okay";
->  	clock-frequency = <100000>;
-> +
-> +	/* U31 */
-> +	expander0: pca9555 at 21 {
-> +		compatible = "nxp,pca9555";
-> +		pinctrl-names = "default";
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +		reg = <0x21>;
-> +	};
-> +
-> +	/* U25 */
-> +	expander1: pca9555 at 25 {
-> +		compatible = "nxp,pca9555";
-> +		pinctrl-names = "default";
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +		reg = <0x25>;
-> +	};
-> +
->  };
->  
->  /* CON4 on CP0 expansion */
-> @@ -116,11 +178,13 @@
->  
->  /* CON9 on CP0 expansion */
->  &cpm_usb3_0 {
-> +	usb-phy = <&cpm_usb3_0_phy>;
->  	status = "okay";
->  };
->  
->  /* CON10 on CP0 expansion */
->  &cpm_usb3_1 {
-> +	usb-phy = <&cpm_usb3_1_phy>;
->  	status = "okay";
->  };
->  
-> @@ -159,6 +223,7 @@
->  
->  /* CON9 on CP1 expansion */
->  &cps_usb3_0 {
-> +	usb-phy = <&cps_usb3_0_phy>;
->  	status = "okay";
->  };
->  
-> -- 
-> 2.11.0
->
+        if (!try_module_get(chip->gpiodev->owner))
+                return -ENODEV;
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
++       ret = pm_runtime_get_sync(chip->parent);
++       if (ret < 0) {
++               module_put(chip->gpiodev->owner);
++               return ret;
++       }
++
+        if (gpiochip_lock_as_irq(chip, d->hwirq)) {
+                chip_err(chip,
+                        "unable to lock HW IRQ %lu for IRQ\n",
+                        d->hwirq);
++               pm_runtime_put(chip->parent);
+                module_put(chip->gpiodev->owner);
+                return -EINVAL;
+        }
+@@ -1666,6 +1674,7 @@ static void gpiochip_irq_relres(struct irq_data *d)
+        struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
+
+        gpiochip_unlock_as_irq(chip, d->hwirq);
++       pm_runtime_put(chip->parent);
+        module_put(chip->gpiodev->owner);
+ }
