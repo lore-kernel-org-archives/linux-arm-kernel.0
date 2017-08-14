@@ -1,36 +1,58 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 14 Aug 2017 09:30:15 +0800
-Subject: [PATCH 00/10] Add support for Ixora V1.1 and Apalis Evaluation
- Board
-In-Reply-To: <cover.1502087184.git.maitysanchayan@gmail.com>
-References: <cover.1502087184.git.maitysanchayan@gmail.com>
-Message-ID: <20170814013014.GF31819@dragon>
+From: honghui.zhang@mediatek.com (honghui.zhang)
+Date: Mon, 14 Aug 2017 09:12:35 +0800
+Subject: [PATCH] PCI: mediatek: add msi support for mt2712 and mt7622
+In-Reply-To: <1502499441.31707.6.camel@mtkswgap22>
+References: <1502454469-29230-1-git-send-email-honghui.zhang@mediatek.com>
+ <1502499441.31707.6.camel@mtkswgap22>
+Message-ID: <1502673155.7754.1.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 12:52:32PM +0530, Sanchayan Maity wrote:
-> Hello,
+On Sat, 2017-08-12 at 08:57 +0800, Ryder Lee wrote:
+> Hi Honghui,
 > 
-> This patch series adds support for Toradex Ixora V1.1 and Apalis
-> Evaluation Board along with some cleanups.
+> On Fri, 2017-08-11 at 20:27 +0800, honghui.zhang at mediatek.com wrote:
+> ...
+> > +static void mtk_pcie_enable_msi(struct mtk_pcie_port *port)
+> > +{
+> > +	u32 val;
+> > +
+> > +	val = lower_32_bits((u64)(port->base + PCIE_MSI_VECTOR));
+> > +	writel(val, port->base + PCIE_IMSI_ADDR);
+> > +
+> > +	val = readl(port->base + PCIE_INT_MASK);
+> > +	val &= ~MSI_MASK;
+> > +	writel(val, port->base + PCIE_INT_MASK);
+> > +}
+> > +
+> >  static int mtk_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+> >  			     irq_hw_number_t hwirq)
+> >  {
+> > @@ -460,6 +574,18 @@ static int mtk_pcie_init_irq_domain(struct mtk_pcie_port *port,
+> >  		return PTR_ERR(port->irq_domain);
+> >  	}
+> >  
+> > +	/* Setup MSI */
+> > +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> > +		port->msi_domain = irq_domain_add_linear(node, MTK_MSI_IRQS_NUM,
+> > +							 &msi_domain_ops,
+> > +							 &mtk_pcie_msi_chip);
+> > +		if (!port->msi_domain) {
+> > +			dev_err(dev, "Failed to get a MSI IRQ domain\n");
+> > +			return PTR_ERR(port->msi_domain);
 > 
-> Patch series has been generated on top of shawn's for-next branch.
-> 
-> Regards,
-> Sanchayan.
-> 
-> Marcel Ziswiler (6):
->   ARM: dts: imx6q-apalis-ixora: combine aliases
->   ARM: dts: imx6qdl-apalis: imx6q-apalis-ixora: get rid of tegra legacy gen1_i2c comment
->   ARM: dts: imx6qdl-apalis: reword cam i2c comment
->   ARM: dts: imx6q-apalis-ixora: get rid of obsolete fusion comment
->   ARM: dts: imx6q-apalis-ixora: add camera i2c bus definition
->   ARM: dts: imx6qdl-apalis: imx6q-apalis-ixora: use i2c from dwc hdmi
-> 
-> Sanchayan Maity (4):
->   ARM: dts: imx6q-apalis-ixora: fix usdhc2 pinctrl property
->   ARM: dts: imx6qdl-apalis: split usdhc1 pinctrl to support 4- and 8-bit
->   ARM: dts: imx6: add support for Toradex Ixora V1.1 carrier board
->   ARM: dts: imx6q-apalis-eval: add support for Apalis Evaluation Board
+> Just return -ENOMEM. PTR_ERR(NULL) will cause a static checker warning.
 
-Applied all, thanks.
+I will fix this in the next version.
+
+Thanks.
+> 
+> > +		}
+> > +		mtk_pcie_enable_msi(port);
+> > +	}
+> > +
+> >  	return 0;
+> >  }
+> 
+> Ryder
+> 
