@@ -1,255 +1,353 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 13:54:04 +0100
-Subject: [PATCH 23/30] ARM: kernel: implement randomization of the kernel load
- address
+Date: Mon, 14 Aug 2017 13:53:56 +0100
+Subject: [PATCH 15/30] ARM: kernel: switch to relative exception tables
 In-Reply-To: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
 References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170814125411.22604-24-ard.biesheuvel@linaro.org>
+Message-ID: <20170814125411.22604-16-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implements randomization of the placement of the kernel image
-inside the lowmem region. It is intended to work together with the
-decompressor to place the kernel at an offset in physical memory
-that is a multiple of 2 MB, and to take the same offset into account
-when creating the virtual mapping.
-
-This uses runtime relocation of the kernel built as a PIE binary, to
-fix up all absolute symbol references to refer to their runtime virtual
-address. The physical-to-virtual mapping remains unchanged.
-
-In order to allow the decompressor to hand over to the core kernel
-without making assumptions that are not guaranteed to hold when
-invoking the core kernel directly using bootloaders that are not
-KASLR aware, the KASLR offset is expected to be placed in r3 when
-entering the kernel 4 bytes past the entry point, skipping the first
-instruction.
+To avoid having to relocate the contents of extable entries at
+runtime when running with KASLR enabled, wire up the existing
+support for emitting them as relative references. This ensures
+these quantities are invariant under runtime relocation.
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/Kconfig       |  15 +++
- arch/arm/kernel/head.S | 103 ++++++++++++++++++--
- 2 files changed, 109 insertions(+), 9 deletions(-)
+ arch/arm/include/asm/Kbuild           |  1 -
+ arch/arm/include/asm/assembler.h      |  6 +++---
+ arch/arm/include/asm/extable.h        | 20 ++++++++++++++++++
+ arch/arm/include/asm/futex.h          |  2 +-
+ arch/arm/include/asm/uaccess.h        |  8 +++----
+ arch/arm/include/asm/word-at-a-time.h |  2 +-
+ arch/arm/kernel/entry-armv.S          |  6 +++---
+ arch/arm/kernel/swp_emulate.c         |  4 ++--
+ arch/arm/lib/backtrace.S              |  8 +++----
+ arch/arm/lib/getuser.S                | 22 ++++++++++----------
+ arch/arm/lib/putuser.S                | 12 +++++------
+ arch/arm/mm/alignment.c               | 14 ++++++-------
+ arch/arm/mm/extable.c                 |  2 +-
+ arch/arm/nwfpe/entry.S                |  2 +-
+ scripts/sortextable.c                 |  2 +-
+ 15 files changed, 65 insertions(+), 46 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 300add3b8023..0d7b40f1061d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1825,6 +1825,21 @@ config XEN
- 	help
- 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
+diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+index 721ab5ecfb9b..f2d67fa34eb3 100644
+--- a/arch/arm/include/asm/Kbuild
++++ b/arch/arm/include/asm/Kbuild
+@@ -3,7 +3,6 @@ generic-y += current.h
+ generic-y += early_ioremap.h
+ generic-y += emergency-restart.h
+ generic-y += exec.h
+-generic-y += extable.h
+ generic-y += irq_regs.h
+ generic-y += kdebug.h
+ generic-y += local.h
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 3176bf7dcbd9..09b6b28f2595 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -247,7 +247,7 @@
+ 9999:	x;					\
+ 	.pushsection __ex_table,"a";		\
+ 	.align	3;				\
+-	.long	9999b,9001f;			\
++	.long	9999b - ., 9001f - .;		\
+ 	.popsection
  
-+config RANDOMIZE_BASE
-+	bool "Randomize the address of the kernel image"
-+	depends on MMU && AUTO_ZRELADDR
-+	depends on !XIP_KERNEL && !ZBOOT_ROM && !HAVE_TCM
-+	select RELOCATABLE
-+	help
-+	  Randomizes the virtual and physical address at which the kernel
-+	  image is loaded, as a security feature that deters exploit attempts
-+	  relying on knowledge of the location of kernel internals.
-+
-+	  This relies on the UEFI stub to invoke the EFI_RNG_PROTOCOL to
-+	  randomize the load address of the decompressed kernel in the
-+	  physical space. The same offset is applied to the virtual mapping
-+	  of the kernel in the virtual space by the kernel proper.
-+
- endmenu
+ #ifdef CONFIG_SMP
+@@ -383,7 +383,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
  
- menu "Boot options"
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 71bc0d037bc9..0795da990dde 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -48,6 +48,28 @@
- #define PMD_ORDER	2
+ 	.pushsection __ex_table,"a"
+ 	.align	3
+-	.long	9999b, \abort
++	.long	9999b - ., \abort - .
+ 	.popsection
+ 	.endm
+ 
+@@ -424,7 +424,7 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+ 
+ 	.pushsection __ex_table,"a"
+ 	.align	3
+-	.long	9999b, \abort
++	.long	9999b - ., \abort - .
+ 	.popsection
+ 	.endr
+ 	.endm
+diff --git a/arch/arm/include/asm/extable.h b/arch/arm/include/asm/extable.h
+new file mode 100644
+index 000000000000..3610cc116a86
+--- /dev/null
++++ b/arch/arm/include/asm/extable.h
+@@ -0,0 +1,20 @@
++#ifndef __ASM_EXTABLE_H
++#define __ASM_EXTABLE_H
++
++/*
++ * The exception table consists of pairs of relative offsets: the first
++ * is the relative offset to an instruction that is allowed to fault,
++ * and the second is the relative offset at which the program should
++ * continue. No registers are modified, so it is entirely up to the
++ * continuation code to figure out what to do.
++ */
++
++struct exception_table_entry
++{
++	int insn, fixup;
++};
++
++#define ARCH_HAS_RELATIVE_EXTABLE
++
++extern int fixup_exception(struct pt_regs *regs);
++#endif
+diff --git a/arch/arm/include/asm/futex.h b/arch/arm/include/asm/futex.h
+index 6795368ad023..31760d0ab76b 100644
+--- a/arch/arm/include/asm/futex.h
++++ b/arch/arm/include/asm/futex.h
+@@ -11,7 +11,7 @@
+ 	"3:\n"							\
+ 	"	.pushsection __ex_table,\"a\"\n"		\
+ 	"	.align	3\n"					\
+-	"	.long	1b, 4f, 2b, 4f\n"			\
++	"	.long	1b - ., 4f - ., 2b - ., 4f - .\n"	\
+ 	"	.popsection\n"					\
+ 	"	.pushsection .text.fixup,\"ax\"\n"		\
+ 	"	.align	2\n"					\
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 0bf2347495f1..62b9bb7d991a 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -295,7 +295,7 @@ do {									\
+ 	"	.popsection\n"					\
+ 	"	.pushsection __ex_table,\"a\"\n"		\
+ 	"	.align	3\n"					\
+-	"	.long	1b, 3b\n"				\
++	"	.long	1b - ., 3b - .\n"			\
+ 	"	.popsection"					\
+ 	: "+r" (err), "=&r" (x)					\
+ 	: "r" (addr), "i" (-EFAULT)				\
+@@ -385,7 +385,7 @@ do {									\
+ 	"	.popsection\n"					\
+ 	"	.pushsection __ex_table,\"a\"\n"		\
+ 	"	.align	3\n"					\
+-	"	.long	1b, 3b\n"				\
++	"	.long	1b - ., 3b - .\n"			\
+ 	"	.popsection"					\
+ 	: "+r" (err)						\
+ 	: "r" (x), "r" (__pu_addr), "i" (-EFAULT)		\
+@@ -435,8 +435,8 @@ do {									\
+ 	"	.popsection\n"					\
+ 	"	.pushsection __ex_table,\"a\"\n"		\
+ 	"	.align	3\n"					\
+-	"	.long	1b, 4b\n"				\
+-	"	.long	2b, 4b\n"				\
++	"	.long	1b - ., 4b - .\n"			\
++	"	.long	2b - ., 4b - .\n"			\
+ 	"	.popsection"					\
+ 	: "+r" (err), "+r" (__pu_addr)				\
+ 	: "r" (x), "i" (-EFAULT)				\
+diff --git a/arch/arm/include/asm/word-at-a-time.h b/arch/arm/include/asm/word-at-a-time.h
+index 5831dce4b51c..d433c686d9ca 100644
+--- a/arch/arm/include/asm/word-at-a-time.h
++++ b/arch/arm/include/asm/word-at-a-time.h
+@@ -86,7 +86,7 @@ static inline unsigned long load_unaligned_zeropad(const void *addr)
+ 	"	.popsection\n"
+ 	"	.pushsection __ex_table,\"a\"\n"
+ 	"	.align	3\n"
+-	"	.long	1b, 3b\n"
++	"	.long	1b - ., 3b - .\n"
+ 	"	.popsection"
+ 	: "=&r" (ret), "=&r" (offset)
+ 	: "r" (addr), "Qo" (*(unsigned long *)addr));
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index c731f0d2b2af..1c7c12123b18 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -570,10 +570,10 @@ ENDPROC(__und_usr)
+ 	ret	r9
+ 	.popsection
+ 	.pushsection __ex_table,"a"
+-	.long	1b, 4b
++	.long	1b - ., 4b - .
+ #if CONFIG_ARM_THUMB && __LINUX_ARM_ARCH__ >= 6 && CONFIG_CPU_V7
+-	.long	2b, 4b
+-	.long	3b, 4b
++	.long	2b - ., 4b - .
++	.long	3b - ., 4b - .
  #endif
+ 	.popsection
  
-+	.macro	get_kaslr_offset, reg
-+#ifdef CONFIG_RANDOMIZE_BASE
-+	ldr_l			\reg, __kaslr_offset
-+#else
-+	mov			\reg, #0
-+#endif
-+	.endm
-+
-+	.macro	add_kaslr_offset, reg, tmp
-+#ifdef CONFIG_RANDOMIZE_BASE
-+	get_kaslr_offset	\tmp
-+	add			\reg, \reg, \tmp
-+#endif
-+	.endm
-+
-+	.macro	sub_kaslr_offset, reg, tmp
-+#ifdef CONFIG_RANDOMIZE_BASE
-+	get_kaslr_offset	\tmp
-+	sub			\reg, \reg, \tmp
-+#endif
-+	.endm
-+
- /*
-  * Kernel startup entry point.
-  * ---------------------------
-@@ -73,6 +95,7 @@
- 	.equ	swapper_pg_dir, . - PG_DIR_SIZE
+diff --git a/arch/arm/kernel/swp_emulate.c b/arch/arm/kernel/swp_emulate.c
+index 3bda08bee674..a783e9c0b266 100644
+--- a/arch/arm/kernel/swp_emulate.c
++++ b/arch/arm/kernel/swp_emulate.c
+@@ -50,8 +50,8 @@
+ 	"	.previous\n"					\
+ 	"	.section	 __ex_table,\"a\"\n"		\
+ 	"	.align		3\n"				\
+-	"	.long		0b, 3b\n"			\
+-	"	.long		1b, 3b\n"			\
++	"	.long		0b - ., 3b - .\n"		\
++	"	.long		1b - ., 3b - .\n"		\
+ 	"	.previous"					\
+ 	: "=&r" (res), "+r" (data), "=&r" (temp)		\
+ 	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
+diff --git a/arch/arm/lib/backtrace.S b/arch/arm/lib/backtrace.S
+index 7d7952e5a3b1..84a8df7aa63c 100644
+--- a/arch/arm/lib/backtrace.S
++++ b/arch/arm/lib/backtrace.S
+@@ -107,10 +107,10 @@ ENDPROC(c_backtrace)
+ 		
+ 		.pushsection __ex_table,"a"
+ 		.align	3
+-		.long	1001b, 1006b
+-		.long	1002b, 1006b
+-		.long	1003b, 1006b
+-		.long	1004b, 1006b
++		.long	1001b - ., 1006b - .
++		.long	1002b - ., 1006b - .
++		.long	1003b - ., 1006b - .
++		.long	1004b - ., 1006b - .
+ 		.popsection
  
- ENTRY(stext)
-+	mov	r3, #0			@ normal entry point - clear r3
-  ARM_BE8(setend	be )			@ ensure we are in BE8 mode
+ .Lbad:		.asciz	"Backtrace aborted due to bad frame pointer <%p>\n"
+diff --git a/arch/arm/lib/getuser.S b/arch/arm/lib/getuser.S
+index df73914e81c8..d47b4776d308 100644
+--- a/arch/arm/lib/getuser.S
++++ b/arch/arm/lib/getuser.S
+@@ -133,17 +133,17 @@ ENDPROC(__get_user_bad)
+ ENDPROC(__get_user_bad8)
  
-  THUMB(	badr	r9, 1f		)	@ Kernel is always entered in ARM.
-@@ -80,6 +103,16 @@ ENTRY(stext)
-  THUMB(	.thumb			)	@ switch to Thumb now.
-  THUMB(1:			)
- 
-+#ifdef CONFIG_RANDOMIZE_BASE
-+	str_l	r3, __kaslr_offset, r9	@ offset in r3 if entered via kaslr ep
-+
-+	.section ".bss", "aw", %nobits
-+	.align	2
-+__kaslr_offset:
-+	.long	0			@ will be wiped before entering C code
-+	.previous
-+#endif
-+
- #ifdef CONFIG_ARM_VIRT_EXT
- 	bl	__hyp_stub_install
+ .pushsection __ex_table, "a"
+-	.long	1b, __get_user_bad
+-	.long	2b, __get_user_bad
+-	.long	3b, __get_user_bad
+-	.long	4b, __get_user_bad
+-	.long	5b, __get_user_bad8
+-	.long	6b, __get_user_bad8
++	.long	1b - ., __get_user_bad - .
++	.long	2b - ., __get_user_bad - .
++	.long	3b - ., __get_user_bad - .
++	.long	4b - ., __get_user_bad - .
++	.long	5b - ., __get_user_bad8 - .
++	.long	6b - ., __get_user_bad8 - .
+ #ifdef __ARMEB__
+-	.long   7b, __get_user_bad
+-	.long	8b, __get_user_bad8
+-	.long	9b, __get_user_bad8
+-	.long	10b, __get_user_bad8
+-	.long	11b, __get_user_bad8
++	.long   7b - ., __get_user_bad - .
++	.long	8b - ., __get_user_bad8 - .
++	.long	9b - ., __get_user_bad8 - .
++	.long	10b - ., __get_user_bad8 - .
++	.long	11b - ., __get_user_bad8 - .
  #endif
-@@ -103,6 +136,7 @@ ENTRY(stext)
- #ifndef CONFIG_XIP_KERNEL
- 	adr_l	r8, _text			@ __pa(_text)
- 	sub	r8, r8, #TEXT_OFFSET		@ PHYS_OFFSET
-+	sub_kaslr_offset r8, r12
- #else
- 	ldr	r8, =PLAT_PHYS_OFFSET		@ always constant in this case
- #endif
-@@ -139,8 +173,8 @@ ENTRY(stext)
- 	 * r0 will hold the CPU control register value, r1, r2, r4, and
- 	 * r9 will be preserved.  r5 will also be preserved if LPAE.
- 	 */
--	ldr	r13, =__mmap_switched		@ address to jump to after
--						@ mmu has been enabled
-+	adr_l	lr, __primary_switch		@ address to jump to after
-+	mov	r13, lr				@ mmu has been enabled
- 	badr	lr, 1f				@ return (PIC) address
- #ifdef CONFIG_ARM_LPAE
- 	mov	r5, #0				@ high TTBR0
-@@ -151,7 +185,8 @@ ENTRY(stext)
- 	ldr	r12, [r10, #PROCINFO_INITFUNC]
- 	add	r12, r12, r10
- 	ret	r12
--1:	b	__enable_mmu
-+1:	get_kaslr_offset r12			@ get before turning MMU on
-+	b	__enable_mmu
- ENDPROC(stext)
- 	.ltorg
+ .popsection
+diff --git a/arch/arm/lib/putuser.S b/arch/arm/lib/putuser.S
+index 38d660d3705f..6b854197ff48 100644
+--- a/arch/arm/lib/putuser.S
++++ b/arch/arm/lib/putuser.S
+@@ -89,10 +89,10 @@ __put_user_bad:
+ ENDPROC(__put_user_bad)
  
-@@ -230,9 +265,14 @@ __create_page_tables:
- 	/*
- 	 * Map our RAM from the start to the end of the kernel .bss section.
- 	 */
--	add	r0, r4, #PAGE_OFFSET >> (SECTION_SHIFT - PMD_ORDER)
--	ldr	r6, =(_end - 1)
--	orr	r3, r8, r7
-+	get_kaslr_offset r3
-+	add	r0, r3, #PAGE_OFFSET
-+	add	r0, r4, r0, lsr #(SECTION_SHIFT - PMD_ORDER)
-+	adr_l	r6, _end - 1
-+	sub	r6, r6, r8
-+	add	r6, r6, #PAGE_OFFSET
-+	add	r3, r3, r8
-+	orr	r3, r3, r7
- 	add	r6, r4, r6, lsr #(SECTION_SHIFT - PMD_ORDER)
- 1:	str	r3, [r0], #1 << PMD_ORDER
- 	add	r3, r3, #1 << SECTION_SHIFT
-@@ -376,7 +416,7 @@ ENTRY(secondary_startup)
- 	 * Use the page tables supplied from  __cpu_up.
- 	 */
- 	adr_l	r3, secondary_data
--	mov_l	r12, __secondary_switched
-+	adr_l	r12, __secondary_switch
- 	ldrd	r4, [r3, #0]			@ get secondary_data.pgdir
- ARM_BE8(eor	r4, r4, r5)			@ Swap r5 and r4 in BE:
- ARM_BE8(eor	r5, r4, r5)			@ it can be done in 3 steps
-@@ -414,6 +454,7 @@ ENDPROC(__secondary_switched)
-  *  r4  = TTBR pointer (low word)
-  *  r5  = TTBR pointer (high word if LPAE)
-  *  r9  = processor ID
-+ *  r12 = KASLR offset
-  *  r13 = *virtual* address to jump to upon completion
-  */
- __enable_mmu:
-@@ -451,6 +492,7 @@ ENDPROC(__enable_mmu)
-  *  r1  = machine ID
-  *  r2  = atags or dtb pointer
-  *  r9  = processor ID
-+ *  r12 = KASLR offset
-  *  r13 = *virtual* address to jump to upon completion
-  *
-  * other registers depend on the function called upon completion
-@@ -466,10 +508,52 @@ ENTRY(__turn_mmu_on)
- 	mov	r3, r3
- 	mov	r3, r13
- 	ret	r3
--__turn_mmu_on_end:
- ENDPROC(__turn_mmu_on)
--	.popsection
+ .pushsection __ex_table, "a"
+-	.long	1b, __put_user_bad
+-	.long	2b, __put_user_bad
+-	.long	3b, __put_user_bad
+-	.long	4b, __put_user_bad
+-	.long	5b, __put_user_bad
+-	.long	6b, __put_user_bad
++	.long	1b - ., __put_user_bad - .
++	.long	2b - ., __put_user_bad - .
++	.long	3b - ., __put_user_bad - .
++	.long	4b - ., __put_user_bad - .
++	.long	5b - ., __put_user_bad - .
++	.long	6b - ., __put_user_bad - .
+ .popsection
+diff --git a/arch/arm/mm/alignment.c b/arch/arm/mm/alignment.c
+index 2c96190e018b..2c74cb826b6a 100644
+--- a/arch/arm/mm/alignment.c
++++ b/arch/arm/mm/alignment.c
+@@ -209,7 +209,7 @@ union offset_union {
+ 	"	.popsection\n"				\
+ 	"	.pushsection __ex_table,\"a\"\n"	\
+ 	"	.align	3\n"				\
+-	"	.long	1b, 3b\n"			\
++	"	.long	1b - ., 3b - .\n"		\
+ 	"	.popsection\n"				\
+ 	: "=r" (err), "=&r" (val), "=r" (addr)		\
+ 	: "0" (err), "2" (addr))
+@@ -269,8 +269,8 @@ union offset_union {
+ 		"	.popsection\n"				\
+ 		"	.pushsection __ex_table,\"a\"\n"	\
+ 		"	.align	3\n"				\
+-		"	.long	1b, 4b\n"			\
+-		"	.long	2b, 4b\n"			\
++		"	.long	1b - ., 4b - .\n"		\
++		"	.long	2b - ., 4b - .\n"		\
+ 		"	.popsection\n"				\
+ 		: "=r" (err), "=&r" (v), "=&r" (a)		\
+ 		: "0" (err), "1" (v), "2" (a));			\
+@@ -309,10 +309,10 @@ union offset_union {
+ 		"	.popsection\n"				\
+ 		"	.pushsection __ex_table,\"a\"\n"	\
+ 		"	.align	3\n"				\
+-		"	.long	1b, 6b\n"			\
+-		"	.long	2b, 6b\n"			\
+-		"	.long	3b, 6b\n"			\
+-		"	.long	4b, 6b\n"			\
++		"	.long	1b - ., 6b - .\n"		\
++		"	.long	2b - ., 6b - .\n"		\
++		"	.long	3b - ., 6b - .\n"		\
++		"	.long	4b - ., 6b - .\n"		\
+ 		"	.popsection\n"				\
+ 		: "=r" (err), "=&r" (v), "=&r" (a)		\
+ 		: "0" (err), "1" (v), "2" (a));			\
+diff --git a/arch/arm/mm/extable.c b/arch/arm/mm/extable.c
+index f436f7439e46..6a8b85bf0cac 100644
+--- a/arch/arm/mm/extable.c
++++ b/arch/arm/mm/extable.c
+@@ -10,7 +10,7 @@ int fixup_exception(struct pt_regs *regs)
  
-+__primary_switch:
-+#ifdef CONFIG_RELOCATABLE
-+	adr_l	r7, _text			@ r7 := __pa(_text)
-+	sub	r7, r7, #TEXT_OFFSET		@ r7 := PHYS_OFFSET
-+
-+	adr_l	r5, __rel_begin
-+	adr_l	r6, __rel_end
-+	sub	r5, r5, r7
-+	sub	r6, r6, r7
-+
-+	add	r5, r5, #PAGE_OFFSET
-+	add	r6, r6, #PAGE_OFFSET
-+	add	r5, r5, r12
-+	add	r6, r6, r12
-+
-+	adr_l	r3, __stubs_start		@ __pa(__stubs_start)
-+	sub	r3, r3, r7			@ offset of __stubs_start
-+	add	r3, r3, #PAGE_OFFSET		@ __va(__stubs_start)
-+	sub	r3, r3, #0xffff1000		@ subtract VA of stubs section
-+
-+0:	cmp	r5, r6
-+	bge	1f
-+	ldm	r5!, {r7, r8}			@ load next relocation entry
-+	cmp	r8, #23				@ R_ARM_RELATIVE
-+	bne	0b
-+	cmp	r7, #0xff000000			@ vector page?
-+	addgt	r7, r7, r3			@ fix up VA offset
-+	ldr	r8, [r7, r12]
-+	add	r8, r8, r12
-+	str	r8, [r7, r12]
-+	b	0b
-+1:
-+#endif
-+	ldr	pc, =__mmap_switched
-+ENDPROC(__primary_switch)
-+
-+#ifdef CONFIG_SMP
-+__secondary_switch:
-+	ldr	pc, =__secondary_switched
-+ENDPROC(__secondary_switch)
-+#endif
-+	.ltorg
-+__turn_mmu_on_end:
-+	.popsection
+ 	fixup = search_exception_tables(instruction_pointer(regs));
+ 	if (fixup) {
+-		regs->ARM_pc = fixup->fixup;
++		regs->ARM_pc = (unsigned long)&fixup->fixup + fixup->fixup;
+ #ifdef CONFIG_THUMB2_KERNEL
+ 		/* Clear the IT state to avoid nasty surprises in the fixup */
+ 		regs->ARM_cpsr &= ~PSR_IT_MASK;
+diff --git a/arch/arm/nwfpe/entry.S b/arch/arm/nwfpe/entry.S
+index 39c20afad7ed..c4fe13b31705 100644
+--- a/arch/arm/nwfpe/entry.S
++++ b/arch/arm/nwfpe/entry.S
+@@ -121,5 +121,5 @@ next:
  
- #ifdef CONFIG_SMP_ON_UP
- 	__HEAD
-@@ -570,6 +654,7 @@ __fixup_pv_table:
- 	adr_l	r6, __pv_phys_pfn_offset
- 	adr_l	r7, __pv_offset			@ __pa(__pv_offset)
- 	mov_l	r3, __pv_offset			@ __va(__pv_offset)
-+	add_kaslr_offset r3, ip
- 	mvn	ip, #0
- 	subs	r3, r7, r3	@ PHYS_OFFSET - PAGE_OFFSET
- 	mov	r0, r8, lsr #PAGE_SHIFT	@ convert to PFN
+ 	.pushsection __ex_table,"a"
+ 	.align	3
+-	.long	.Lx1, .Lfix
++	.long	.Lx1 - ., .Lfix - .
+ 	.popsection
+diff --git a/scripts/sortextable.c b/scripts/sortextable.c
+index 365a907f98b3..56a4c6714da7 100644
+--- a/scripts/sortextable.c
++++ b/scripts/sortextable.c
+@@ -314,6 +314,7 @@ do_file(char const *const fname)
+ 		break;
+ 
+ 	case EM_S390:
++	case EM_ARM:
+ 	case EM_AARCH64:
+ 	case EM_PARISC:
+ 	case EM_PPC:
+@@ -322,7 +323,6 @@ do_file(char const *const fname)
+ 		break;
+ 	case EM_ARCOMPACT:
+ 	case EM_ARCV2:
+-	case EM_ARM:
+ 	case EM_MICROBLAZE:
+ 	case EM_MIPS:
+ 	case EM_XTENSA:
 -- 
 2.11.0
