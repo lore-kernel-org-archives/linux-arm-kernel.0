@@ -1,42 +1,32 @@
-From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Mon, 14 Aug 2017 13:37:57 +0200
-Subject: [RESEND PATCH 3/3] arm64: dts: apq8096-db820c: never disable
- regulator on LS expansion
-In-Reply-To: <20170814113757.31010-1-srinivas.kandagatla@linaro.org>
-References: <20170814113757.31010-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20170814113757.31010-3-srinivas.kandagatla@linaro.org>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Mon, 14 Aug 2017 13:40:11 +0200
+Subject: [v6 01/15] x86/mm: reserve only exiting low pages
+In-Reply-To: <47ebf53b-ea8b-1822-a63a-3682ed2f4753@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-2-git-send-email-pasha.tatashin@oracle.com>
+ <20170811080706.GC30811@dhcp22.suse.cz>
+ <47ebf53b-ea8b-1822-a63a-3682ed2f4753@oracle.com>
+Message-ID: <20170814114011.GG19063@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On Fri 11-08-17 11:24:55, Pasha Tatashin wrote:
+[...]
+> >>In this patchset we will stop zeroing struct page memory during allocation.
+> >>Therefore, this bug must be fixed in order to avoid random assert failures
+> >>caused by CONFIG_DEBUG_VM_PGFLAGS triggers.
+> >>
+> >>The fix is to reserve memory from the first existing PFN.
+> >
+> >Hmm, I assume this is a result of some assert triggering, right? Which
+> >one? Why don't we need the same treatment for other than x86 arch?
+> 
+> Correct, the pgflags asserts were triggered when we were setting reserved
+> flags to struct page for PFN 0 in which was never initialized through
+> __init_single_page(). The reason they were triggered is because we set all
+> uninitialized memory to ones in one of the debug patches.
 
-1.8v regulator on LS expansion should not be disabled anytime to comply
-with 96boards spec. So make this explicit with always-on flag.
-
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-index 18c61693529e..0c10bbe55317 100644
---- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-@@ -189,9 +189,15 @@
- 					regulator-min-microvolt = <1300000>;
- 					regulator-max-microvolt = <1300000>;
- 				};
-+
-+				/**
-+				 * 1.8v required on LS expansion
-+				 * for mezzanine boards
-+				 */
- 				s4 {
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
- 				};
- 				s5 {
- 					regulator-min-microvolt = <2150000>;
+And why don't we need the same treatment for other architectures?
 -- 
-2.11.0
+Michal Hocko
+SUSE Labs
