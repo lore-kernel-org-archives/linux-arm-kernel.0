@@ -1,9 +1,9 @@
 From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Mon, 14 Aug 2017 17:08:49 +0530
-Subject: [PATCH 10/11] ASoC: txx9: make snd_soc_platform_driver const
+Date: Mon, 14 Aug 2017 17:08:47 +0530
+Subject: [PATCH 08/11] ASoC: samsung: make snd_soc_platform_driver const
 In-Reply-To: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
 References: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <1502710730-18912-11-git-send-email-bhumirks@gmail.com>
+Message-ID: <1502710730-18912-9-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,21 +13,21 @@ Done using Coccinelle.
 
 Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 ---
- sound/soc/txx9/txx9aclc.c | 2 +-
+ sound/soc/samsung/idma.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/txx9/txx9aclc.c b/sound/soc/txx9/txx9aclc.c
-index 7912bf0..7df95df 100644
---- a/sound/soc/txx9/txx9aclc.c
-+++ b/sound/soc/txx9/txx9aclc.c
-@@ -403,7 +403,7 @@ static int txx9aclc_pcm_remove(struct snd_soc_platform *platform)
- 	return 0;
+diff --git a/sound/soc/samsung/idma.c b/sound/soc/samsung/idma.c
+index 3e40815..ee16e4c 100644
+--- a/sound/soc/samsung/idma.c
++++ b/sound/soc/samsung/idma.c
+@@ -399,7 +399,7 @@ void idma_reg_addr_init(void __iomem *regs, dma_addr_t addr)
  }
+ EXPORT_SYMBOL_GPL(idma_reg_addr_init);
  
--static struct snd_soc_platform_driver txx9aclc_soc_platform = {
-+static const struct snd_soc_platform_driver txx9aclc_soc_platform = {
- 	.probe		= txx9aclc_pcm_probe,
- 	.remove		= txx9aclc_pcm_remove,
- 	.ops		= &txx9aclc_pcm_ops,
+-static struct snd_soc_platform_driver asoc_idma_platform = {
++static const struct snd_soc_platform_driver asoc_idma_platform = {
+ 	.ops = &idma_ops,
+ 	.pcm_new = idma_new,
+ 	.pcm_free = idma_free,
 -- 
 1.9.1
