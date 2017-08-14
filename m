@@ -1,75 +1,53 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 14 Aug 2017 16:15:01 +0200
-Subject: [PATCH 3/8] gpio: zynq: Shift zynq_gpio_init() to subsys_initcall
- level
-In-Reply-To: <CACRpkdbUBe6z2C9U9THaaLq0JLuu=EsGAVQfaSY55tMUotKvvg@mail.gmail.com>
-References: <cover.1502103715.git.michal.simek@xilinx.com>
- <a05cc4f104097bef71ed381229aa8c746717ebce.1502103715.git.michal.simek@xilinx.com>
- <CACRpkdbUBe6z2C9U9THaaLq0JLuu=EsGAVQfaSY55tMUotKvvg@mail.gmail.com>
-Message-ID: <68cd52a7-ce87-a507-f02d-ccb99634b465@xilinx.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 14 Aug 2017 16:15:44 +0200
+Subject: [PATCH 2/2] ARM: dts: r8a7743: Add IIC cores to dtsi
+In-Reply-To: <TY1PR06MB0702EA22AFE7D8145BF623A6B7880@TY1PR06MB0702.apcprd06.prod.outlook.com>
+References: <1502196418-31341-1-git-send-email-biju.das@bp.renesas.com>
+ <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
+ <20170810080121.GE16647@verge.net.au>
+ <20170810112411.GA4380@katana>
+ <TY1PR06MB0702EA22AFE7D8145BF623A6B7880@TY1PR06MB0702.apcprd06.prod.outlook.com>
+Message-ID: <CAMuHMdXX0BRvWOc4iosiYNWuA4tP2BpLF5kndNrDL4FeKctgkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.8.2017 15:55, Linus Walleij wrote:
-> On Mon, Aug 7, 2017 at 1:01 PM, Michal Simek <michal.simek@xilinx.com> wrote:
-> 
->> From: Nava kishore Manne <nava.manne@xilinx.com>
+On Thu, Aug 10, 2017 at 3:49 PM, Chris Paterson
+<Chris.Paterson2@renesas.com> wrote:
+>> From: Wolfram Sang [mailto:wsa at the-dreams.de]
+>> Sent: 10 August 2017 12:24
 >>
->> In general situation on-SoC GPIO controller drivers should be probed
->> after pinctrl/pinmux controller driver, because on-SoC GPIOs utilize a
->> pin/pad as a resource provided and controlled by pinctrl subsystem.
 >>
->>   GPIO must come after pinctrl as gpios may need to mux pins....etc
+>> > > >+                i2c6: i2c at e60b0000 {
+>> > >
+>> > >    I'd use iic0 as the label.
+
+Sergei: I assume you meant "iic3"? ;-)
+
+>> >
+>> > I have no preference here other than that we try to be consistent in
+>> > DT for different R-Car SoCs. Wolfram, do you have an opinion on this?
 >>
->> Looking at Xilinx SoC series pinctrl drivers, zynq*_pinctrl_init()
->> functions are called at arch_initcall init levels,
->> so the change of initcall level for gpio-zynq driver from
->> postcore_initcall to subsys_initcall level is sufficient. Also note
->> that the most of GPIO controller drivers settled at subsys_initcall
->> level.
+>> Back then, for M2-W, I decided to go with the schematics/datasheets.
+>> And those mentioned i2c6 rather than iic0. For that reason, the comment
+>
+> The M2 schematics still use i2c6, and for consistency I'd vote to use the same with RZ/G1M.
+>
 >>
->> If pinctrl subsystem manages pads with GPIO functions, the change is
->> needed to avoid unwanted driver probe deferrals during kernel boot.
+>> "/* The memory map in the User's Manual maps the cores to bus numbers */"
 >>
->> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> 
-> Can't you just move it all the way to device_initcall and
-> simply use the standard module init macros?
-> builtin_platform_driver(), module_platform_driver()?
+>> exists in r8a7791.dtsi. Dunno the manual of this SoC here.
+>
+> The manual for r8a7743 uses the same terminology as the r8a7791 manuals.
 
-When I grep the kernel I see this
+The pinctrl section does, indeed.
 
-[linux](master)$ git grep "^core_initcall" drivers/gpio/ | wc -l
-1
-[linux](master)$ git grep "^postcore_initcall" drivers/gpio/ | wc -l
-12
-[linux](master)$ git grep "^arch_initcall" drivers/gpio/ | wc -l
-2
-[linux](master)$ git grep "^subsys_initcall" drivers/gpio/ | wc -l
-33
-[linux](master)$ git grep "^device_initcall" drivers/gpio/ | wc -l
-4
+Gr{oetje,eeting}s,
 
+                        Geert
 
-[linux](master)$ git grep "^core_initcall" drivers/pinctrl/ | wc -l
-6
-[linux](master)$ git grep "^postcore_initcall" drivers/pinctrl/ | wc -l
-7
-[linux](master)$ git grep "^arch_initcall" drivers/pinctrl/ | wc -l
-62
-[linux](master)$ git grep "^subsys_initcall" drivers/pinctrl/ | wc -l
-12
-[linux](master)$ git grep "^device_initcall" drivers/pinctrl/ | wc -l
-0
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Majority of gpio drivers are in subsys_initcall and pinctrl in
-arch_initcall. It doesn't mean that I have strong opinion about doing
-this change. I have also read internal tracking system and it is not
-fully clear if this is fixing any issue rather than removing on
-deferring probe message.
-
-Nava: Do you have any comment?
-
-Thanks,
-Michal
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
