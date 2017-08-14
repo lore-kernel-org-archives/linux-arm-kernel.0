@@ -1,66 +1,307 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 14 Aug 2017 17:38:43 -0500
-Subject: ARM: new DT warnings
-Message-ID: <20170814223843.oyezospd5knk62cl@rob-hp-laptop>
+From: kdinh@apm.com (Khuong Dinh)
+Date: Mon, 14 Aug 2017 16:10:46 -0700
+Subject: [PATCH v3 pci] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI
+ boot for X-Gene v1
+In-Reply-To: <141326ed-178b-d4dd-d45d-9c2ea57ca8b7@arm.com>
+References: <1502496173-6017-1-git-send-email-kdinh@apm.com>
+ <141326ed-178b-d4dd-d45d-9c2ea57ca8b7@arm.com>
+Message-ID: <CAAsHzqt++3Yck9ESo4mb35XLrvJRJxNQPsFZ7vfW25h-XGNhOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm working on some new dtc checks that check common binding phandle
-lookups and cell sizes.
+Hi Marc,
 
-These are the new warnings produced. I haven't checked them all, but I
-believe these are all actual errors from the ones I checked. This is a
-trimmed list removing duplicates that get repeated for each board.
+On Mon, Aug 14, 2017 at 1:21 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 12/08/17 01:02, Khuong Dinh wrote:
+>> This patch makes pci-xgene-msi driver ACPI-aware and provides
+>> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
+>>
+>> Signed-off-by: Khuong Dinh <kdinh@apm.com>
+>>         [Take over from Duc Dang]
+>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>
+> Given that the patch has changed very substantially, this Ack is no
+> longer valid.
 
-arch/arm/boot/dts/am335x-baltos-ir2110.dtb: Warning (provider_cells_property): Missing #phy-cells in provider /ocp/usb at 47400000/usb-phy at 47401300 for /ocp/usb at 47400000/usb at 47401000
-arch/arm/boot/dts/am335x-baltos-ir2110.dtb: Warning (provider_cells_property): Missing #phy-cells in provider /ocp/usb at 47400000/usb-phy at 47401b00 for /ocp/usb at 47400000/usb at 47401800
-arch/arm/boot/dts/am437x-cm-t43.dtb: Warning (interrupts_property): interrupts size is (8), expected multiple of 12 in /ocp at 44000000/mcasp at 48038000
-arch/arm/boot/dts/am437x-cm-t43.dtb: Warning (interrupts_property): interrupts size is (8), expected multiple of 12 in /ocp at 44000000/mcasp at 4803C000
-arch/arm/boot/dts/am437x-cm-t43.dtb: Warning (provider_cells_property): Missing #mbox-cells in provider /ocp at 44000000/mailbox at 480C8000/wkup_m3 for /ocp at 44000000/l4_wkup at 44c00000/scm at 210000/wkup_m3_ipc at 1324
-arch/arm/boot/dts/arm-realview-eb-11mp-bbrevd-ctrevb.dtb: Warning (interrupts_property): interrupts size is (8), expected multiple of 12 in /fpga/charlcd at 10008000
-arch/arm/boot/dts/at91-sama5d2_xplained.dtb: Warning (provider_cells_property): Missing phandles in /ahb/apb/flexcom at fc018000/i2c at 600:dmas
-arch/arm/boot/dts/at91-sama5d3_xplained.dtb: Warning (provider_cells_property): Missing phandles in /ahb/apb/i2c at f801c000:dmas
-arch/arm/boot/dts/at91-tse850-3.dtb: Warning (provider_cells_property): Missing phandles in /ahb/apb/serial at ffffee00:dmas
-arch/arm/boot/dts/bcm2835-rpi-a.dtb: Warning (provider_cells_property): Missing #phy-cells in provider /phy for /soc/usb at 7e980000
-arch/arm/boot/dts/dm8148-evm.dtb: Warning (provider_cells_property): Missing #phy-cells in provider /ocp/l4ls at 48000000/control at 140000/usb-phy at 1b00 for /ocp/usb at 47400000/usb at 47401800
-arch/arm/boot/dts/exynos5410-odroidxu.dtb: Warning (interrupts_property): Missing #interrupt-cells in interrupt-parent /soc/system-controller at 10040000
-arch/arm/boot/dts/imx25-eukrea-mbimxsd25-baseboard-cmo-qvga.dtb: Warning (gpio_cells_property): cd-gpios property size (8) too small for cell size 2 in /soc/aips at 53f00000/esdhc at 53fb4000
-arch/arm/boot/dts/imx50-evk.dtb: Warning (provider_cells_property): Missing #dma-cells in provider /soc/aips at 60000000/sdma at 63fb0000 for /soc/aips at 50000000/spba at 50000000/ssi at 50014000
-arch/arm/boot/dts/imx50-evk.dtb: Warning (provider_cells_property): Missing #dma-cells in provider /soc/aips at 60000000/sdma at 63fb0000 for /soc/aips at 60000000/ssi at 63fcc000
-arch/arm/boot/dts/imx53-tx53-x03x.dtb: Warning (interrupts_property): interrupts size is (4), expected multiple of 8 in /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0
-arch/arm/boot/dts/imx6ul-pico-hobbit.dtb: Warning (interrupts_property): interrupts size is (12), expected multiple of 8 in /soc/aips-bus at 02000000/ethernet at 020b4000/mdio/ethernet-phy at 1
-arch/arm/boot/dts/lpc3250-ea3250.dtb: Warning (gpio_cells_property): power-gpio property size (12) too small for cell size 3 in /ahb/apb/i2c at 400A0000/uda1380 at 18
-arch/arm/boot/dts/omap3-cm-t3517.dtb: Warning (provider_cells_property): Missing #phy-cells in provider /hsusb1_phy for /ocp at 68000000/usbhshost at 48064000/ehci at 48064800
-arch/arm/boot/dts/omap4-droid4-xt894.dtb: Warning (interrupts_property): interrupts size is (4), expected multiple of 12 in /ocp/elm at 48078000
-arch/arm/boot/dts/picoxcell-pc7302-pc3x2.dtb: Warning (interrupts_property): Missing interrupt-parent for /paxi/dmac at 40000
-arch/arm/boot/dts/picoxcell-pc7302-pc3x2.dtb: Warning (interrupts_property): Missing interrupt-parent for /paxi/dmac at 50000
-arch/arm/boot/dts/picoxcell-pc7302-pc3x2.dtb: Warning (interrupts_property): Missing interrupt-parent for /paxi/gem at 30000
-arch/arm/boot/dts/picoxcell-pc7302-pc3x2.dtb: Warning (interrupts_property): Missing interrupt-parent for /rwid-axi/axi2pico at c0000000
-arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dtb: Warning (provider_cells_property): Missing #phy-cells in provider /soc/dsi-phy at 4700200 for /soc/mdss_dsi at 4700000
-arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dtb: Warning (provider_cells_property): Missing #phy-cells in provider /soc/hdmi-phy at 4a00400 for /soc/hdmi-tx at 4a00000
-arch/arm/boot/dts/s5pv210-aquila.dtb: Warning (interrupts_property): Missing interrupt-parent for /soc/ohci at ec300000
-arch/arm/boot/dts/sama5d31ek.dtb: Warning (provider_cells_property): Missing phandles in /ahb/apb/serial at f0020000:dmas
-arch/arm/boot/dts/sama5d31ek.dtb: Warning (provider_cells_property): Missing phandles in /ahb/apb/spi at f0004000:dmas
-arch/arm/boot/dts/spear320-hmi.dtb: Warning (gpio_cells_property): Missing phandles in /ahb/apb/i2c at d0180000/stmpe811 at 41:irq-over-gpio
-arch/arm/boot/dts/spear600-evb.dtb: Warning (interrupts_property): Missing interrupt-parent for /ahb/apb/rtc at fc900000
-arch/arm/boot/dts/ste-nomadik-nhk15.dtb: Warning (interrupts_property): Missing interrupt-parent for /amba/clcd at 10120000
-arch/arm/boot/dts/stih407-b2120.dtb: Warning (gpio_cells_property): hdmi,hpd-gpio property size (8) too small for cell size 2 in /soc/sti-display-subsystem/sti-hdmi at 8d04000
-arch/arm/boot/dts/tango4-vantage-1172.dtb: Warning (interrupts_property): Missing #interrupt-cells in interrupt-parent /soc/interrupt-controller at 6e000
-arch/arm/boot/dts/tango4-vantage-1172.dtb: Warning (interrupts_property): Missing #interrupt-cells in interrupt-parent /soc/interrupt-controller at 6e000
-arch/arm/boot/dts/tango4-vantage-1172.dtb: Warning (interrupts_property): Missing #interrupt-cells in interrupt-parent /soc/interrupt-controller at 6e000
-arch/arm64/boot/dts/altera/socfpga_stratix10_socdk.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu
-arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dtb: Warning (provider_cells_property): Missing #phy-cells in provider /phy for /soc/usb at 7e980000
-arch/arm64/boot/dts/mediatek/mt8173-evb.dtb: Warning (provider_cells_property): Missing #cooling-cells in provider /cpus/cpu at 0 for /thermal-zones/cpu_thermal/cooling-maps/map at 0
-arch/arm64/boot/dts/mediatek/mt8173-evb.dtb: Warning (provider_cells_property): Missing #cooling-cells in provider /cpus/cpu at 100 for /thermal-zones/cpu_thermal/cooling-maps/map at 1
-arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dtb: Warning (provider_cells_property): Missing #power-domain-cells in provider /bpmp for /gpu at 17000000
+Yes, I'll remove it.
 
-The updated dtc is here[1]. Adding "DTC=path/to/dtc" will use external
-dtc in the kernel build.
+>> ---
+>> v3:
+>>  - Input X-Gene MSI base address for irq_domain_alloc_fwnode
+>>  - Add a hook to enforce X-Gene MSI be probed prior acpi_bus_scan happens
+>> v2:
+>>  - Verify with BIOS version 3.06.25 and 3.07.09
+>> v1:
+>>  - Initial version
+>> ---
+>>  drivers/acpi/Makefile            |    2 +-
+>>  drivers/acpi/acpi_msi.c          |   74 ++++++++++++++++++++++++++++++++++++++
+>>  drivers/acpi/internal.h          |    1 +
+>>  drivers/acpi/scan.c              |    1 +
+>>  drivers/pci/host/pci-xgene-msi.c |   36 +++++++++++++++++--
+>>  5 files changed, 110 insertions(+), 4 deletions(-)
+>>  create mode 100644 drivers/acpi/acpi_msi.c
+>>
+>> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+>> index b1aacfc..c15f5cd 100644
+>> --- a/drivers/acpi/Makefile
+>> +++ b/drivers/acpi/Makefile
+>> @@ -40,7 +40,7 @@ acpi-y                              += ec.o
+>>  acpi-$(CONFIG_ACPI_DOCK)     += dock.o
+>>  acpi-y                               += pci_root.o pci_link.o pci_irq.o
+>>  obj-$(CONFIG_ACPI_MCFG)              += pci_mcfg.o
+>> -acpi-y                               += acpi_lpss.o acpi_apd.o
+>> +acpi-y                               += acpi_lpss.o acpi_apd.o acpi_msi.o
+>>  acpi-y                               += acpi_platform.o
+>>  acpi-y                               += acpi_pnp.o
+>>  acpi-$(CONFIG_ARM_AMBA)      += acpi_amba.o
+>> diff --git a/drivers/acpi/acpi_msi.c b/drivers/acpi/acpi_msi.c
+>> new file mode 100644
+>> index 0000000..c2f8d26
+>> --- /dev/null
+>> +++ b/drivers/acpi/acpi_msi.c
+>> @@ -0,0 +1,74 @@
+>> +/*
+>> + * Enforce MSI driver loaded by PCIe controller driver
+>> + *
+>> + * Copyright (c) 2017, MACOM Technology Solutions Corporation
+>> + * Author: Khuong Dinh <kdinh@apm.com>
+>> + *
+>> + * This program is free software; you can redistribute  it and/or modify it
+>> + * under  the terms of  the GNU General  Public License as published by the
+>> + * Free Software Foundation;  either version 2 of the  License, or (at your
+>> + * option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/acpi.h>
+>> +#include "internal.h"
+>> +
+>> +static acpi_status acpi_create_msi_device(acpi_handle handle, u32 Level,
+>> +                                     void *context, void **retval)
+>> +{
+>> +     struct acpi_device *device = NULL;
+>> +     int type = ACPI_BUS_TYPE_DEVICE;
+>> +     unsigned long long sta;
+>> +     acpi_status status;
+>> +     int ret = 0;
+>> +
+>> +     acpi_bus_get_device(handle, &device);
+>> +     status = acpi_bus_get_status_handle(handle, &sta);
+>> +     if (ACPI_FAILURE(status))
+>> +             sta = 0;
+>> +
+>> +     device = kzalloc(sizeof(struct acpi_device), GFP_KERNEL);
+>> +     if (!device)
+>> +             return -ENOMEM;
+>> +
+>> +     acpi_init_device_object(device, handle, type, sta);
+>> +     ret = acpi_device_add(device, NULL);
+>> +     if (ret)
+>> +             return ret;
+>
+> Hello, memory leak.
 
-Once the changes are in dtc upstream, I plan to sync kernel's copy. For
-these, I don't plan to turn off by default (i.e. w/o W=1).
+I'll update the code to release the memory when the error happens.
 
-Thanks,
-Rob
+>> +     device->parent = kzalloc(sizeof(struct acpi_device), GFP_KERNEL);
+>> +     INIT_LIST_HEAD(&device->parent->physical_node_list);
+>> +
+>> +     acpi_device_add_finalize(device);
+>> +
+>> +     ret = device_attach(&device->dev);
+>> +     if (ret < 0)
+>> +             return ret;
+>
+> And another one.
 
-[1] https://github.com/robherring/dtc.git checks
+I'll update the code to release the memory when the error happens.
+
+>> +
+>> +     acpi_create_platform_device(device, NULL);
+>> +     acpi_device_set_enumerated(device);
+>> +
+>> +     return ret;
+>> +}
+>> +
+>> +static const struct acpi_device_id acpi_msi_device_ids[] = {
+>> +     {"APMC0D0E", 0},
+>
+> Isn't this an APM-specific thing? Is that supposed to be populated by
+> all MSI controller drivers? If so, this would better be served by a
+> separate linker section.
+
+The code is generic for MSI controller drivers.
+It will walk through the HID to get the MSI device and enforce it
+happens before acpi_bus_scan.
+This mechanism will help to avoid MSI driver from relying on ACPI
+device nodes ordering.
+For now, it just supports for APM X-Gene v1.
+
+>> +     { }
+>> +};
+>> +
+>> +int __init acpi_msi_init(void)
+>> +{
+>> +     acpi_status status;
+>> +     int ret = 0;
+>> +
+>> +     status = acpi_get_devices(acpi_msi_device_ids[0].id,
+>> +                     acpi_create_msi_device, NULL, NULL);
+>> +     if (ACPI_FAILURE(status))
+>> +             ret = -ENODEV;
+>> +
+>> +     return ret;
+>> +}
+>
+> Overall, this part should be a separate patch, and you should start by
+> explaining what it does exactly. Because so far, all I can see is that
+> it pre-populates random ACPI device structures, and that definitely seem
+> fishy to me.
+
+I'm still following Lorenzo's approach to resolve the general ACPI
+dependence issue.
+As soon as it's fine, I'll re-visit my prior suggestion to separate
+the original patch to enable ACPI support for PCIe MSI and the general
+ACPI dependence issue.
+The patch is to add a hook in drivers/acpi/scan.c to enforce MSI
+driver to be initialized and registered before acpi_bus_scan happens,
+so that MSI driver will not rely on ACPI device nodes ordering.
+It will walk through the HID to get the MSI device (e.g:
+acip_get_devices). When the device is found, the callback will be
+called and we will initialize MSI device by its handle, start to
+attach MSI device to a driver, create ACPI platform device for MSI
+APCI device node and marked it as visited.
+In result, it will happen on top of acpi_bus_scan.
+
+>> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
+>> index 58dd7ab..3da50d3 100644
+>> --- a/drivers/acpi/internal.h
+>> +++ b/drivers/acpi/internal.h
+>> @@ -80,6 +80,7 @@ int acpi_scan_add_handler_with_hotplug(struct acpi_scan_handler *handler,
+>>  void acpi_lpss_init(void);
+>>
+>>  void acpi_apd_init(void);
+>> +int acpi_msi_init(void);
+>>
+>>  acpi_status acpi_hotplug_schedule(struct acpi_device *adev, u32 src);
+>>  bool acpi_queue_hotplug_work(struct work_struct *work);
+>> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+>> index 3389729..8ec4d39 100644
+>> --- a/drivers/acpi/scan.c
+>> +++ b/drivers/acpi/scan.c
+>> @@ -2029,6 +2029,7 @@ int __init acpi_scan_init(void)
+>>       acpi_status status;
+>>       struct acpi_table_stao *stao_ptr;
+>>
+>> +     acpi_msi_init();
+>>       acpi_pci_root_init();
+>>       acpi_pci_link_init();
+>>       acpi_processor_init();
+>> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
+>> index f1b633b..b1768a1 100644
+>> --- a/drivers/pci/host/pci-xgene-msi.c
+>> +++ b/drivers/pci/host/pci-xgene-msi.c
+>> @@ -24,6 +24,7 @@
+>>  #include <linux/pci.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/of_pci.h>
+>> +#include <linux/acpi.h>
+>>
+>>  #define MSI_IR0                      0x000000
+>>  #define MSI_INT0             0x800000
+>> @@ -39,7 +40,7 @@ struct xgene_msi_group {
+>>  };
+>>
+>>  struct xgene_msi {
+>> -     struct device_node      *node;
+>> +     struct fwnode_handle    *fwnode;
+>>       struct irq_domain       *inner_domain;
+>>       struct irq_domain       *msi_domain;
+>>       u64                     msi_addr;
+>> @@ -249,6 +250,13 @@ static void xgene_irq_domain_free(struct irq_domain *domain,
+>>       .free   = xgene_irq_domain_free,
+>>  };
+>>
+>> +#ifdef CONFIG_ACPI
+>> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
+>> +{
+>> +     return xgene_msi_ctrl.fwnode;
+>> +}
+>> +#endif
+>> +
+>>  static int xgene_allocate_domains(struct xgene_msi *msi)
+>>  {
+>>       msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
+>> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+>>       if (!msi->inner_domain)
+>>               return -ENOMEM;
+>>
+>> -     msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
+>> +     msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
+>>                                                   &xgene_msi_domain_info,
+>>                                                   msi->inner_domain);
+>>
+>> @@ -265,6 +273,9 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+>>               return -ENOMEM;
+>>       }
+>>
+>> +#ifdef CONFIG_ACPI
+>> +     pci_msi_register_fwnode_provider(&xgene_msi_get_fwnode);
+>> +#endif
+>>       return 0;
+>>  }
+>>
+>> @@ -449,6 +460,13 @@ static int xgene_msi_hwirq_free(unsigned int cpu)
+>>       {},
+>>  };
+>>
+>> +#ifdef CONFIG_ACPI
+>> +static const struct acpi_device_id xgene_msi_acpi_ids[] = {
+>> +     {"APMC0D0E", 0},
+>> +     { },
+>> +};
+>> +#endif
+>> +
+>>  static int xgene_msi_probe(struct platform_device *pdev)
+>>  {
+>>       struct resource *res;
+>> @@ -469,7 +487,18 @@ static int xgene_msi_probe(struct platform_device *pdev)
+>>               goto error;
+>>       }
+>>       xgene_msi->msi_addr = res->start;
+>> -     xgene_msi->node = pdev->dev.of_node;
+>> +
+>> +     xgene_msi->fwnode = of_node_to_fwnode(pdev->dev.of_node);
+>> +     if (!xgene_msi->fwnode) {
+>> +             xgene_msi->fwnode =
+>> +                     irq_domain_alloc_fwnode((void *)xgene_msi->msi_addr);
+>> +             if (!xgene_msi->fwnode) {
+>> +                     dev_err(&pdev->dev, "Failed to create fwnode\n");
+>> +                     rc = ENOMEM;
+>> +                     goto error;
+>> +             }
+>> +     }
+>> +
+>>       xgene_msi->num_cpus = num_possible_cpus();
+>>
+>>       rc = xgene_msi_init_allocator(xgene_msi);
+>> @@ -540,6 +569,7 @@ static int xgene_msi_probe(struct platform_device *pdev)
+>>       .driver = {
+>>               .name = "xgene-msi",
+>>               .of_match_table = xgene_msi_match_table,
+>> +             .acpi_match_table = ACPI_PTR(xgene_msi_acpi_ids),
+>>       },
+>>       .probe = xgene_msi_probe,
+>>       .remove = xgene_msi_remove,
+>>
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
