@@ -1,54 +1,36 @@
-From: andrea.adami@gmail.com (Andrea Adami)
-Date: Mon, 14 Aug 2017 15:40:58 +0200
-Subject: [PATCH v4 2/9] mtd: nand: sharpsl.h: support partition parser
- types
-In-Reply-To: <20170813094019.2fced1d1@bbrezillon>
-References: <1498681836-3765-1-git-send-email-andrea.adami@gmail.com>
- <1498681836-3765-3-git-send-email-andrea.adami@gmail.com>
- <20170813094019.2fced1d1@bbrezillon>
-Message-ID: <CAAQYJAsYNUB5G4jw7-P2jFq3i0PdUejpvwA9XC-Wyv4nVDPVMA@mail.gmail.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Mon, 14 Aug 2017 15:42:43 +0200
+Subject: [v6 04/15] mm: discard memblock data later
+In-Reply-To: <aac7b5f1-5c5e-e716-af49-bc150449ddbc@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-5-git-send-email-pasha.tatashin@oracle.com>
+ <20170811093249.GE30811@dhcp22.suse.cz>
+ <42a04441-47ad-2fa0-ca3c-784c717213f7@oracle.com>
+ <20170814113445.GE19063@dhcp22.suse.cz>
+ <aac7b5f1-5c5e-e716-af49-bc150449ddbc@oracle.com>
+Message-ID: <20170814134243.GM19063@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 13, 2017 at 9:40 AM, Boris Brezillon
-<boris.brezillon@free-electrons.com> wrote:
-> Le Wed, 28 Jun 2017 22:30:29 +0200,
-> Andrea Adami <andrea.adami@gmail.com> a ?crit :
->
-> Please add a commit message explaining why you're doing that.
->
-Sure, I have added a short text.
+On Mon 14-08-17 09:39:17, Pasha Tatashin wrote:
+> >>#ifdef CONFIG_MEMBLOCK in page_alloc, or define memblock_discard() stubs in
+> >>nobootmem headfile.
+> >
+> >This is the standard way to do this. And it is usually preferred to
+> >proliferate ifdefs in the code.
+> 
+> Hi Michal,
+> 
+> As you suggested, I sent-out this patch separately. If you feel strongly,
+> that this should be updated to have stubs for platforms that do not
+> implement memblock, please send a reply to that e-mail, so those who do not
+> follow this tread will see it. Otherwise, I can leave it as is, page_alloc
+> file already has a number memblock related ifdefs all of which can be
+> cleaned out once every platform implements it (is it even achievable?)
 
->> Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
->> ---
->>  include/linux/mtd/sharpsl.h | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/include/linux/mtd/sharpsl.h b/include/linux/mtd/sharpsl.h
->> index 65e91d0..c0e0be2 100644
->> --- a/include/linux/mtd/sharpsl.h
->> +++ b/include/linux/mtd/sharpsl.h
->> @@ -17,4 +17,5 @@ struct sharpsl_nand_platform_data {
->>       const struct mtd_ooblayout_ops *ecc_layout;
->>       struct mtd_partition    *partitions;
->>       unsigned int            nr_partitions;
->> +     const char *const       *types; /* names of parsers to use if any */
->
-> types is not really descriptive here. How about 'part_parsers' or
-> something clearly reflecting the purpose of this field.
-
-I took this line somewhere from a pending mtd patch.
-I wasn't convinced of the name and   part_parsers   is better.
-
->
-> BTW, try to avoid putting comments on the same line.
-Yeah, we talked about these janitoring needs. Removed.
-
->
->>  };
->
-
-Please review v5 (coming soon).
-
-Thanks
-Andrea
+I do not think this needs a repost just for this. This was merely a
+JFYI, in case you would need to repost for other reasons then just
+update that as well. But nothing really earth shattering.
+-- 
+Michal Hocko
+SUSE Labs
