@@ -1,63 +1,71 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Aug 2017 12:59:59 +0100
-Subject: [PATCH 05/14] arm64: clean up THREAD_* definitions
-In-Reply-To: <1502130965-18710-6-git-send-email-mark.rutland@arm.com>
-References: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
- <1502130965-18710-6-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170814115958.dqg2xrobls4jcgx3@armageddon.cambridge.arm.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Mon, 14 Aug 2017 12:49:47 +0100
+Subject: [PATCH  1/3] ARM: dts: r8a7743: Add SDHI controllers
+In-Reply-To: <1502711389-16040-1-git-send-email-biju.das@bp.renesas.com>
+References: <1502711389-16040-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <1502711389-16040-2-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 07:35:56PM +0100, Mark Rutland wrote:
-> Currently we define THREAD_SIZE and THREAD_SIZE order separately, with
+Add the SDHI controllers to the r8a7743 device tree.
 
-s/THREAD_SIZE order/THREAD_SIZE_ORDER/
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+---
+ arch/arm/boot/dts/r8a7743.dtsi | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-> the latter dependent on particular CONFIG_ARM64_*K_PAGES definitions.
-> This is somewhat opaque, and will get in the way of future modifications
-> to THREAD_SIZE.
-> 
-> This patch cleans this up, defining both in terms of a common
-> THREAD_SHIFT, and using PAGE_SHIFT to calculate THREAD_SIZE_ORDER,
-> rather than using a number of definitions dependent on config symbols.
-> Subsequent patches will make use of this to alter the stack size used in
-> some configurations.
-> 
-> At the same time, these are moved into <asm/memory.h>, which will avoid
-> circular include issues in subsequent patches. To ensure that existing
-> code isn't adversely affected, <asm/thread_info.h> is updated to
-> transitively include these definitions.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Laura Abbott <labbott@redhat.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/memory.h      | 8 ++++++++
->  arch/arm64/include/asm/thread_info.h | 9 +--------
->  2 files changed, 9 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index 77d55dc..8ab4774 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -102,6 +102,14 @@
->  #define KASAN_SHADOW_SIZE	(0)
->  #endif
->  
-> +#define THREAD_SHIFT		14
-> +
-> +#if THREAD_SHIFT >= PAGE_SHIFT
-> +#define THREAD_SIZE_ORDER	(THREAD_SHIFT - PAGE_SHIFT)
-> +#endif
-> +
-> +#define THREAD_SIZE		(UL(1) << THREAD_SHIFT)
-
-I haven't tried the series to this patch but it seems to me that
-THREAD_SIZE_ORDER is undefined for a PAGE_SHIFT of 16. Without
-VMAP_STACKS, it may fail to build.
-
+diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+index ce80a26..3bd3ab5 100644
+--- a/arch/arm/boot/dts/r8a7743.dtsi
++++ b/arch/arm/boot/dts/r8a7743.dtsi
+@@ -754,6 +754,48 @@
+ 			max-frequency = <97500000>;
+ 			status = "disabled";
+ 		};
++
++		sdhi0: sd at ee100000 {
++			compatible = "renesas,sdhi-r8a7743";
++			reg = <0 0xee100000 0 0x328>;
++			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 314>;
++			dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
++			       <&dmac1 0xcd>, <&dmac1 0xce>;
++			dma-names = "tx", "rx", "tx", "rx";
++			max-frequency = <195000000>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 314>;
++			status = "disabled";
++		};
++
++		sdhi1: sd at ee140000 {
++			compatible = "renesas,sdhi-r8a7743";
++			reg = <0 0xee140000 0 0x100>;
++			interrupts = <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 312>;
++			dmas = <&dmac0 0xc1>, <&dmac0 0xc2>,
++			       <&dmac1 0xc1>, <&dmac1 0xc2>;
++			dma-names = "tx", "rx", "tx", "rx";
++			max-frequency = <97500000>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 312>;
++			status = "disabled";
++		};
++
++		sdhi2: sd at ee160000 {
++			compatible = "renesas,sdhi-r8a7743";
++			reg = <0 0xee160000 0 0x100>;
++			interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 311>;
++			dmas = <&dmac0 0xd3>, <&dmac0 0xd4>,
++			       <&dmac1 0xd3>, <&dmac1 0xd4>;
++			dma-names = "tx", "rx", "tx", "rx";
++			max-frequency = <97500000>;
++			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
++			resets = <&cpg 311>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	/* External root clock */
 -- 
-Catalin
+1.9.1
