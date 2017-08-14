@@ -1,85 +1,80 @@
-From: Chris.Paterson2@renesas.com (Chris Paterson)
-Date: Mon, 14 Aug 2017 15:23:50 +0000
-Subject: [PATCH ] mmc: renesas_sdhi: Add r8a7743/5 support
-In-Reply-To: <CAMuHMdWHMLi-yiVmzQCYRHSnJpuokBREo6QFF2z-zaviZVxFNA@mail.gmail.com>
-References: <1502709581-26546-1-git-send-email-biju.das@bp.renesas.com>
- <CAMuHMdVDqgbwKzxFoxajLLFHZC80NT5vrDLnpb9sFj+DL-1zDw@mail.gmail.com>
- <TY1PR06MB070269842CD923E4DE4FE6EDB78C0@TY1PR06MB0702.apcprd06.prod.outlook.com>
- <CAMuHMdWHMLi-yiVmzQCYRHSnJpuokBREo6QFF2z-zaviZVxFNA@mail.gmail.com>
-Message-ID: <TY1PR06MB0702B9EC39D190BC811CBD99B78C0@TY1PR06MB0702.apcprd06.prod.outlook.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Mon, 14 Aug 2017 18:21:27 +0300
+Subject: [PATCH v5 17/19] crypto: qce: move to generic async completion
+In-Reply-To: <1502724094-23305-1-git-send-email-gilad@benyossef.com>
+References: <1502724094-23305-1-git-send-email-gilad@benyossef.com>
+Message-ID: <1502724094-23305-18-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert,
+The qce driver starts several async crypto ops and  waits for their
+completions. Move it over to generic code doing the same.
 
-> From: geert.uytterhoeven at gmail.com [mailto:geert.uytterhoeven at gmail.com]
-> On Behalf Of Geert Uytterhoeven
-> 
-> Hi Chris,
-> 
-> On Mon, Aug 14, 2017 at 5:15 PM, Chris Paterson
-> <Chris.Paterson2@renesas.com> wrote:
-> >> From: geert.uytterhoeven at gmail.com
-> >> [mailto:geert.uytterhoeven at gmail.com]
-> >> On Behalf Of Geert Uytterhoeven
-> >> Sent: 14 August 2017 15:22
-> >>
-> >> On Mon, Aug 14, 2017 at 1:19 PM, Biju Das <biju.das@bp.renesas.com>
-> wrote:
-> >> > Add support for r8a7743/5 SoC.Renesas RZ/G1[ME] (R8A7743/5) SDHI is
-> >> > identical to the R-Car Gen2 family.
-> >> >
-> >> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> >> > ---
-> >> > This patch is compiled and tested against mmc/next.
-> >> >
-> >> >  drivers/mmc/host/renesas_sdhi_sys_dmac.c | 2 ++
-> >> >  1 file changed, 2 insertions(+)
-> >> >
-> >> > diff --git a/drivers/mmc/host/renesas_sdhi_sys_dmac.c
-> >> > b/drivers/mmc/host/renesas_sdhi_sys_dmac.c
-> >> > index 718cb8a..f709f7f 100644
-> >> > --- a/drivers/mmc/host/renesas_sdhi_sys_dmac.c
-> >> > +++ b/drivers/mmc/host/renesas_sdhi_sys_dmac.c
-> >> > @@ -95,6 +95,8 @@
-> >> >         { .compatible = "renesas,sdhi-r7s72100", .data = &of_rz_compatible,
-> },
-> >> >         { .compatible = "renesas,sdhi-r8a7778", .data =
-> >> &of_rcar_gen1_compatible, },
-> >> >         { .compatible = "renesas,sdhi-r8a7779", .data =
-> >> > &of_rcar_gen1_compatible, },
-> >> > +       { .compatible = "renesas,sdhi-r8a7743", .data =
-> >> &of_rcar_gen2_compatible, },
-> >> > +       { .compatible = "renesas,sdhi-r8a7745", .data =
-> >> > + &of_rcar_gen2_compatible, },
-> >> >         { .compatible = "renesas,sdhi-r8a7790", .data =
-> >> &of_rcar_gen2_compatible, },
-> >> >         { .compatible = "renesas,sdhi-r8a7791", .data =
-> >> &of_rcar_gen2_compatible, },
-> >> >         { .compatible = "renesas,sdhi-r8a7792", .data =
-> >> > &of_rcar_gen2_compatible, },
-> >>
-> >> I guess we want generic R-Car Gen2/3 compatible values here, too?
-> >
-> > Yes, but I assume that should be a separate patch submitted instead of this
-> one?
-> 
-> Indeed. That would avoid having to add the SoC-specific compatible values to
-> the driver for all RZ/G1 variants.
+Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+---
+ drivers/crypto/qce/sha.c | 30 ++++--------------------------
+ 1 file changed, 4 insertions(+), 26 deletions(-)
 
-Okay. I'll send a new patch.
-
-Kind regards, Chris
-
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-
-> m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
+diff --git a/drivers/crypto/qce/sha.c b/drivers/crypto/qce/sha.c
+index 47e114a..53227d7 100644
+--- a/drivers/crypto/qce/sha.c
++++ b/drivers/crypto/qce/sha.c
+@@ -349,28 +349,12 @@ static int qce_ahash_digest(struct ahash_request *req)
+ 	return qce->async_req_enqueue(tmpl->qce, &req->base);
+ }
+ 
+-struct qce_ahash_result {
+-	struct completion completion;
+-	int error;
+-};
+-
+-static void qce_digest_complete(struct crypto_async_request *req, int error)
+-{
+-	struct qce_ahash_result *result = req->data;
+-
+-	if (error == -EINPROGRESS)
+-		return;
+-
+-	result->error = error;
+-	complete(&result->completion);
+-}
+-
+ static int qce_ahash_hmac_setkey(struct crypto_ahash *tfm, const u8 *key,
+ 				 unsigned int keylen)
+ {
+ 	unsigned int digestsize = crypto_ahash_digestsize(tfm);
+ 	struct qce_sha_ctx *ctx = crypto_tfm_ctx(&tfm->base);
+-	struct qce_ahash_result result;
++	struct crypto_wait wait;
+ 	struct ahash_request *req;
+ 	struct scatterlist sg;
+ 	unsigned int blocksize;
+@@ -405,9 +389,9 @@ static int qce_ahash_hmac_setkey(struct crypto_ahash *tfm, const u8 *key,
+ 		goto err_free_ahash;
+ 	}
+ 
+-	init_completion(&result.completion);
++	crypto_init_wait(&wait);
+ 	ahash_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+-				   qce_digest_complete, &result);
++				   crypto_req_done, &wait);
+ 	crypto_ahash_clear_flags(ahash_tfm, ~0);
+ 
+ 	buf = kzalloc(keylen + QCE_MAX_ALIGN_SIZE, GFP_KERNEL);
+@@ -420,13 +404,7 @@ static int qce_ahash_hmac_setkey(struct crypto_ahash *tfm, const u8 *key,
+ 	sg_init_one(&sg, buf, keylen);
+ 	ahash_request_set_crypt(req, &sg, ctx->authkey, keylen);
+ 
+-	ret = crypto_ahash_digest(req);
+-	if (ret == -EINPROGRESS || ret == -EBUSY) {
+-		ret = wait_for_completion_interruptible(&result.completion);
+-		if (!ret)
+-			ret = result.error;
+-	}
+-
++	ret = crypto_wait_req(crypto_ahash_digest(req), &wait);
+ 	if (ret)
+ 		crypto_ahash_set_flags(tfm, CRYPTO_TFM_RES_BAD_KEY_LEN);
+ 
+-- 
+2.1.4
