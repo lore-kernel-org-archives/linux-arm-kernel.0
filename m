@@ -1,47 +1,63 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Mon, 14 Aug 2017 12:39:26 +0100
-Subject: [PATCH ] mmc: renesas_sdhi: Add r8a7743/5 support
-Message-ID: <1502710766-44361-1-git-send-email-biju.das@bp.renesas.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Aug 2017 12:59:59 +0100
+Subject: [PATCH 05/14] arm64: clean up THREAD_* definitions
+In-Reply-To: <1502130965-18710-6-git-send-email-mark.rutland@arm.com>
+References: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
+ <1502130965-18710-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170814115958.dqg2xrobls4jcgx3@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5) SDHI
-is identical to the R-Car Gen2 family.
+On Mon, Aug 07, 2017 at 07:35:56PM +0100, Mark Rutland wrote:
+> Currently we define THREAD_SIZE and THREAD_SIZE order separately, with
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
----
-This patch is compiled and tested againt linux next tag
-next-20170811. This patch depend on the driver change
-[PATCH ] mmc: renesas_sdhi: Add r8a7743/5 support
-https://patchwork.kernel.org/patch/9898611/
+s/THREAD_SIZE order/THREAD_SIZE_ORDER/
 
+> the latter dependent on particular CONFIG_ARM64_*K_PAGES definitions.
+> This is somewhat opaque, and will get in the way of future modifications
+> to THREAD_SIZE.
+> 
+> This patch cleans this up, defining both in terms of a common
+> THREAD_SHIFT, and using PAGE_SHIFT to calculate THREAD_SIZE_ORDER,
+> rather than using a number of definitions dependent on config symbols.
+> Subsequent patches will make use of this to alter the stack size used in
+> some configurations.
+> 
+> At the same time, these are moved into <asm/memory.h>, which will avoid
+> circular include issues in subsequent patches. To ensure that existing
+> code isn't adversely affected, <asm/thread_info.h> is updated to
+> transitively include these definitions.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Laura Abbott <labbott@redhat.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/memory.h      | 8 ++++++++
+>  arch/arm64/include/asm/thread_info.h | 9 +--------
+>  2 files changed, 9 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index 77d55dc..8ab4774 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -102,6 +102,14 @@
+>  #define KASAN_SHADOW_SIZE	(0)
+>  #endif
+>  
+> +#define THREAD_SHIFT		14
+> +
+> +#if THREAD_SHIFT >= PAGE_SHIFT
+> +#define THREAD_SIZE_ORDER	(THREAD_SHIFT - PAGE_SHIFT)
+> +#endif
+> +
+> +#define THREAD_SIZE		(UL(1) << THREAD_SHIFT)
 
- Documentation/devicetree/bindings/mmc/tmio_mmc.txt | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+I haven't tried the series to this patch but it seems to me that
+THREAD_SIZE_ORDER is undefined for a PAGE_SHIFT of 16. Without
+VMAP_STACKS, it may fail to build.
 
-diff --git a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-index 4fd8b7a..0d507ec 100644
---- a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-@@ -15,6 +15,8 @@ Required properties:
- 		"renesas,sdhi-r7s72100" - SDHI IP on R7S72100 SoC
- 		"renesas,sdhi-r8a73a4" - SDHI IP on R8A73A4 SoC
- 		"renesas,sdhi-r8a7740" - SDHI IP on R8A7740 SoC
-+		"renesas,sdhi-r8a7743" - SDHI IP on R8A7743 SoC
-+		"renesas,sdhi-r8a7745" - SDHI IP on R8A7745 SoC
- 		"renesas,sdhi-r8a7778" - SDHI IP on R8A7778 SoC
- 		"renesas,sdhi-r8a7779" - SDHI IP on R8A7779 SoC
- 		"renesas,sdhi-r8a7790" - SDHI IP on R8A7790 SoC
-@@ -34,8 +36,8 @@ Required properties:
- 	  "core" and "cd". If the controller only has 1 clock, naming is not
- 	  required.
- 	  Below is the number clocks for each supported SoC:
--	   1: SH73A0, R8A73A4, R8A7740, R8A7778, R8A7779, R8A7790
--	      R8A7791, R8A7792, R8A7793, R8A7794, R8A7795, R8A7796
-+	   1: SH73A0, R8A73A4, R8A7740, R8A7743, R8A7745, R8A7778, R8A7779,
-+	      R8A7790, R8A7791, R8A7792, R8A7793, R8A7794, R8A7795, R8A7796
- 	   2: R7S72100
- 
- Optional properties:
 -- 
-1.9.1
+Catalin
