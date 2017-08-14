@@ -1,94 +1,29 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Mon, 14 Aug 2017 10:53:18 +0100
-Subject: [PATCH v2] ARM: dts: r8a7743: add IIC cores to dtsi
-In-Reply-To: <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
-References: <12d923ba-184c-ef59-f27b-41a7592a5f93@cogentembedded.com>
-Message-ID: <1502704398-28378-1-git-send-email-biju.das@bp.renesas.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 14 Aug 2017 18:09:16 +0800
+Subject: [PATCH] arm64: allwinner: a64: pine64: Use dcdc1 regulator for
+ mmc0
+In-Reply-To: <1502516402-4661-1-git-send-email-jteki@openedev.com>
+References: <1502516402-4661-1-git-send-email-jteki@openedev.com>
+Message-ID: <CAGb2v67AJBdmx-aO2Th9x7n4GibtW+isrfEAZ+HBgnjbabzEUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
----
-v1-->v2
-   Corrected the resets property for i2c6 device node.
+Hi,
 
-This patch is compiled against renesas-devel tag renesas-devel-20170814-v4.13-rc5. 
+On Sat, Aug 12, 2017 at 1:40 PM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
+>
+> Since current tree support AXP803 regulators, replace
+> fixed regulator with AXP803 dcdc1 regulator.
+>
+> Tested on pine64.
+>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 
- arch/arm/boot/dts/r8a7743.dtsi | 55 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+There was a lot of (heated) discussion [1] around this change. Maxime
+stated he would merge a patch with this change but ended up picking
+a later version without it. I'll leave this to him when he gets back.
 
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index ce80a26..480950f 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -25,6 +25,9 @@
- 		i2c3 = &i2c3;
- 		i2c4 = &i2c4;
- 		i2c5 = &i2c5;
-+		i2c6 = &i2c6;
-+		i2c7 = &i2c7;
-+		i2c8 = &i2c8;
- 	};
- 
- 	cpus {
-@@ -411,6 +414,58 @@
- 			status = "disabled";
- 		};
- 
-+		i2c6: i2c at e60b0000 {
-+			/* doesn't need pinmux */
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,iic-r8a7743",
-+				     "renesas,rcar-gen2-iic",
-+				     "renesas,rmobile-iic";
-+			reg = <0 0xe60b0000 0 0x425>;
-+			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 926>;
-+			dmas = <&dmac0 0x77>, <&dmac0 0x78>,
-+			       <&dmac1 0x77>, <&dmac1 0x78>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 926>;
-+			status = "disabled";
-+		};
-+
-+		i2c7: i2c at e6500000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,iic-r8a7743",
-+				     "renesas,rcar-gen2-iic",
-+				     "renesas,rmobile-iic";
-+			reg = <0 0xe6500000 0 0x425>;
-+			interrupts = <GIC_SPI 174 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 318>;
-+			dmas = <&dmac0 0x61>, <&dmac0 0x62>,
-+			       <&dmac1 0x61>, <&dmac1 0x62>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 318>;
-+			status = "disabled";
-+		};
-+
-+		i2c8: i2c at e6510000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,iic-r8a7743",
-+				     "renesas,rcar-gen2-iic",
-+				     "renesas,rmobile-iic";
-+			reg = <0 0xe6510000 0 0x425>;
-+			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 323>;
-+			dmas = <&dmac0 0x65>, <&dmac0 0x66>,
-+			       <&dmac1 0x65>, <&dmac1 0x66>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 323>;
-+			status = "disabled";
-+		};
-+
- 		scifa0: serial at e6c40000 {
- 			compatible = "renesas,scifa-r8a7743",
- 				     "renesas,rcar-gen2-scifa", "renesas,scifa";
--- 
-1.9.1
+ChenYu
+
+[1] https://www.spinics.net/lists/arm-kernel/msg595419.html
