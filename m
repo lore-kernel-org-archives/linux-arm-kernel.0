@@ -1,47 +1,61 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 13:53:48 +0100
-Subject: [PATCH 07/30] ARM: head: use PC-relative insn sequence for __smp_alt
+Date: Mon, 14 Aug 2017 13:53:49 +0100
+Subject: [PATCH 08/30] ARM: sleep.S: use PC-relative insn sequence for
+ sleep_save_sp/mpidr_hash
 In-Reply-To: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
 References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170814125411.22604-8-ard.biesheuvel@linaro.org>
+Message-ID: <20170814125411.22604-9-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the open coded PC relative offset calculations with a pair
-of adr_l invocations. This ensures these quantities are invariant
-under runtime relocation.
+Replace the open coded PC relative offset calculations with adr_l and
+ldr_l invocations.
 
-Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/kernel/head.S | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+ arch/arm/kernel/sleep.S | 16 +++-------------
+ 1 file changed, 3 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index ec22f42fd8bb..db6b823f20a4 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -523,19 +523,11 @@ ARM_BE8(rev	r0, r0)			@ byteswap if big endian
- 	retne	lr
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index 0f6c1000582c..3026b119d3ff 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -137,9 +137,8 @@ ARM_BE8(setend be)			@ ensure we are in BE mode
+ 	mov	r1, #0
+ 	ALT_SMP(mrc p15, 0, r0, c0, c0, 5)
+ 	ALT_UP_B(1f)
+-	adr	r2, mpidr_hash_ptr
+-	ldr	r3, [r2]
+-	add	r2, r2, r3		@ r2 = struct mpidr_hash phys address
++	adr_l	r2, mpidr_hash		@ r2 = struct mpidr_hash phys address
++
+ 	/*
+ 	 * This ldmia relies on the memory layout of the mpidr_hash
+ 	 * struct mpidr_hash.
+@@ -147,10 +146,7 @@ ARM_BE8(setend be)			@ ensure we are in BE mode
+ 	ldmia	r2, { r3-r6 }	@ r3 = mpidr mask (r4,r5,r6) = l[0,1,2] shifts
+ 	compute_mpidr_hash	r1, r4, r5, r6, r0, r3
+ 1:
+-	adr	r0, _sleep_save_sp
+-	ldr	r2, [r0]
+-	add	r0, r0, r2
+-	ldr	r0, [r0, #SLEEP_SAVE_SP_PHYS]
++	ldr_l	r0, sleep_save_sp + SLEEP_SAVE_SP_PHYS
+ 	ldr	r0, [r0, r1, lsl #2]
  
- __fixup_smp_on_up:
--	adr	r0, 1f
--	ldmia	r0, {r3 - r5}
--	sub	r3, r0, r3
--	add	r4, r4, r3
--	add	r5, r5, r3
-+	adr_l	r4, __smpalt_begin
-+	adr_l	r5, __smpalt_end
- 	b	__do_fixup_smp_on_up
- ENDPROC(__fixup_smp)
+ 	@ load phys pgd, stack, resume fn
+@@ -164,12 +160,6 @@ ENDPROC(cpu_resume)
+ ENDPROC(cpu_resume_arm)
+ #endif
  
--	.align
--1:	.word	.
--	.word	__smpalt_begin
--	.word	__smpalt_end
+-	.align 2
+-_sleep_save_sp:
+-	.long	sleep_save_sp - .
+-mpidr_hash_ptr:
+-	.long	mpidr_hash - .			@ mpidr_hash struct offset
 -
- 	.pushsection .data
- 	.globl	smp_on_up
- smp_on_up:
+ 	.data
+ 	.type	sleep_save_sp, #object
+ ENTRY(sleep_save_sp)
 -- 
 2.11.0
