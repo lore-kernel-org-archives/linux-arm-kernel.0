@@ -1,55 +1,42 @@
-From: nicoleotsuka@gmail.com (Nicolin Chen)
-Date: Mon, 14 Aug 2017 12:16:50 -0700
-Subject: [PATCH 03/11] ASoC: fsl: make snd_soc_platform_driver const
-In-Reply-To: <1502710730-18912-4-git-send-email-bhumirks@gmail.com>
-References: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
- <1502710730-18912-4-git-send-email-bhumirks@gmail.com>
-Message-ID: <20170814191649.GA23972@Asurada-Nvidia>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 14 Aug 2017 21:47:13 +0200
+Subject: [PATCH v2 2/2] i2c: mediatek: Add i2c compatible for MediaTek
+ MT7622
+In-Reply-To: <1502674616.930.74.camel@mhfsdcap03>
+References: <1502506672-7620-1-git-send-email-jun.gao@mediatek.com>
+ <1502506672-7620-3-git-send-email-jun.gao@mediatek.com>
+ <20170812144411.zqgbncsemzaolldv@ninjato>
+ <1502674616.930.74.camel@mhfsdcap03>
+Message-ID: <20170814194713.c6ojqcbi2iluayau@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 05:08:42PM +0530, Bhumika Goyal wrote:
-> Make these const as they are only passed as the 2nd argument to the function
-> snd_soc_register_platform, which is of type const.
-> Done using Coccinelle.
-> 
-> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+On Mon, Aug 14, 2017 at 09:36:56AM +0800, Jun Gao wrote:
+> On Sat, 2017-08-12 at 16:44 +0200, Wolfram Sang wrote:
+> > > +static const struct i2c_adapter_quirks mt7622_i2c_quirks = {
+> > > +	.max_num_msgs = 255,
+> > > +	.max_write_len = 65535,
+> > > +	.max_read_len = 65535,
+> > > +	.max_comb_1st_msg_len = 65535,
+> > > +	.max_comb_2nd_msg_len = 65535,
+> > > +};
+> > 
+> > That looks like no quirks? Then just leave the quirks pointer below
+> > empty.
+> > 
+> Compare to MT8173 i2c controller, MT7622 limits message numbers to 255.
 
-Acked-by: Nicolin Chen <nicoleotsuka@gmail.com>
+I see. But you can safely drop all the length settings. The i2c core has
+this comment in quirk handling:
 
-Thanks
+/* Check if val is exceeding the quirk IFF quirk is non 0 */
 
-> ---
->  sound/soc/fsl/imx-pcm-fiq.c | 2 +-
->  sound/soc/fsl/mpc5200_dma.c | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/sound/soc/fsl/imx-pcm-fiq.c b/sound/soc/fsl/imx-pcm-fiq.c
-> index 92410f7..3fcc7b5 100644
-> --- a/sound/soc/fsl/imx-pcm-fiq.c
-> +++ b/sound/soc/fsl/imx-pcm-fiq.c
-> @@ -341,7 +341,7 @@ static void imx_pcm_fiq_free(struct snd_pcm *pcm)
->  	imx_pcm_free(pcm);
->  }
->  
-> -static struct snd_soc_platform_driver imx_soc_platform_fiq = {
-> +static const struct snd_soc_platform_driver imx_soc_platform_fiq = {
->  	.ops		= &imx_pcm_ops,
->  	.pcm_new	= imx_pcm_fiq_new,
->  	.pcm_free	= imx_pcm_fiq_free,
-> diff --git a/sound/soc/fsl/mpc5200_dma.c b/sound/soc/fsl/mpc5200_dma.c
-> index 1f7e70b..cdd848c 100644
-> --- a/sound/soc/fsl/mpc5200_dma.c
-> +++ b/sound/soc/fsl/mpc5200_dma.c
-> @@ -356,7 +356,7 @@ static void psc_dma_free(struct snd_pcm *pcm)
->  	}
->  }
->  
-> -static struct snd_soc_platform_driver mpc5200_audio_dma_platform = {
-> +static const struct snd_soc_platform_driver mpc5200_audio_dma_platform = {
->  	.ops		= &psc_dma_ops,
->  	.pcm_new	= &psc_dma_new,
->  	.pcm_free	= &psc_dma_free,
-> -- 
-> 1.9.1
-> 
+IFF means "if and only if".
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170814/80ee3163/attachment.sig>
