@@ -1,48 +1,185 @@
-From: guodong.xu@linaro.org (Guodong Xu)
-Date: Mon, 14 Aug 2017 17:50:49 +0800
-Subject: [PATCH v3 10/10] arm64: dts: hi3660: enable watchdog
-In-Reply-To: <20170814095049.27701-1-guodong.xu@linaro.org>
-References: <20170814095049.27701-1-guodong.xu@linaro.org>
-Message-ID: <20170814095049.27701-11-guodong.xu@linaro.org>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Mon, 14 Aug 2017 13:28:21 +0300
+Subject: [PATCH v2 1/4] mmc: sdhci: enable/disable the clock in
+ sdhci_pltfm_suspend/resume
+In-Reply-To: <1501724656-12435-2-git-send-email-yamada.masahiro@socionext.com>
+References: <1501724656-12435-1-git-send-email-yamada.masahiro@socionext.com>
+ <1501724656-12435-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1ff5bfa4-e7bf-3f52-de4d-fa34e87ffad7@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Leo Yan <leo.yan@linaro.org>
+On 03/08/17 04:44, Masahiro Yamada wrote:
+> This commit provides similar cleanups as commit 83eacdfa2529 ("mmc:
+> sdhci: disable the clock in sdhci_pltfm_unregister()") did for
+> unregister hooks.
+> 
+> Some drivers duplicate code to handle pltfm_host->clk in their own
+> hooks.  The clock can be handled in sdhci_pltfm.c so that drivers
+> can reuse sdhci_pltfm_pmops.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-This patch is to add watchdog binding for Hi3660 on Hikey960 board.
+I would like to some see Acks from other driver maintainers including ones
+that did not previously clk_disable_unprepare(pltfm_host->clk) in suspend
+but now do. e.g. sdhci-tegra
 
-Cc: Guodong Xu <guodong.xu@linaro.org>
-Cc: Zhong Kaihua <zhongkaihua@huawei.com>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 545d435..b7a90d6 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -962,5 +962,21 @@
- 				     &sdio_cfg_func>;
- 			status = "disabled";
- 		};
-+
-+		watchdog0: watchdog at e8a06000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xe8a06000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg_ctrl HI3660_OSC32K>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		watchdog1: watchdog at e8a07000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xe8a07000 0x0 0x1000>;
-+			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg_ctrl HI3660_OSC32K>;
-+			clock-names = "apb_pclk";
-+		};
- 	};
- };
--- 
-2.10.2
+> ---
+> 
+> Changes in v2:
+>   - Fix build error reported by kbuild test robot
+> 
+>  drivers/mmc/host/sdhci-brcmstb.c | 37 +------------------------------------
+>  drivers/mmc/host/sdhci-pltfm.c   | 16 +++++++++++++++-
+>  drivers/mmc/host/sdhci-sirf.c    | 39 +--------------------------------------
+>  3 files changed, 17 insertions(+), 75 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci-brcmstb.c b/drivers/mmc/host/sdhci-brcmstb.c
+> index e2f638338e8f..6d461fcdd663 100644
+> --- a/drivers/mmc/host/sdhci-brcmstb.c
+> +++ b/drivers/mmc/host/sdhci-brcmstb.c
+> @@ -21,41 +21,6 @@
+>  
+>  #include "sdhci-pltfm.h"
+>  
+> -#ifdef CONFIG_PM_SLEEP
+> -
+> -static int sdhci_brcmstb_suspend(struct device *dev)
+> -{
+> -	struct sdhci_host *host = dev_get_drvdata(dev);
+> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> -	int res;
+> -
+> -	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+> -		mmc_retune_needed(host->mmc);
+> -
+> -	res = sdhci_suspend_host(host);
+> -	if (res)
+> -		return res;
+> -	clk_disable_unprepare(pltfm_host->clk);
+> -	return res;
+> -}
+> -
+> -static int sdhci_brcmstb_resume(struct device *dev)
+> -{
+> -	struct sdhci_host *host = dev_get_drvdata(dev);
+> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> -	int err;
+> -
+> -	err = clk_prepare_enable(pltfm_host->clk);
+> -	if (err)
+> -		return err;
+> -	return sdhci_resume_host(host);
+> -}
+> -
+> -#endif /* CONFIG_PM_SLEEP */
+> -
+> -static SIMPLE_DEV_PM_OPS(sdhci_brcmstb_pmops, sdhci_brcmstb_suspend,
+> -			sdhci_brcmstb_resume);
+> -
+>  static const struct sdhci_ops sdhci_brcmstb_ops = {
+>  	.set_clock = sdhci_set_clock,
+>  	.set_bus_width = sdhci_set_bus_width,
+> @@ -131,7 +96,7 @@ MODULE_DEVICE_TABLE(of, sdhci_brcm_of_match);
+>  static struct platform_driver sdhci_brcmstb_driver = {
+>  	.driver		= {
+>  		.name	= "sdhci-brcmstb",
+> -		.pm	= &sdhci_brcmstb_pmops,
+> +		.pm	= &sdhci_pltfm_pmops,
+>  		.of_match_table = of_match_ptr(sdhci_brcm_of_match),
+>  	},
+>  	.probe		= sdhci_brcmstb_probe,
+> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
+> index e090d8c42ddb..be9a79d62e22 100644
+> --- a/drivers/mmc/host/sdhci-pltfm.c
+> +++ b/drivers/mmc/host/sdhci-pltfm.c
+> @@ -212,16 +212,30 @@ EXPORT_SYMBOL_GPL(sdhci_pltfm_unregister);
+>  static int sdhci_pltfm_suspend(struct device *dev)
+>  {
+>  	struct sdhci_host *host = dev_get_drvdata(dev);
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	int ret;
+>  
+>  	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+>  		mmc_retune_needed(host->mmc);
+>  
+> -	return sdhci_suspend_host(host);
+> +	ret = sdhci_suspend_host(host);
+> +	if (ret)
+> +		return ret;
+> +
+> +	clk_disable_unprepare(pltfm_host->clk);
+> +
+> +	return 0;
+>  }
+>  
+>  static int sdhci_pltfm_resume(struct device *dev)
+>  {
+>  	struct sdhci_host *host = dev_get_drvdata(dev);
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(pltfm_host->clk);
+> +	if (ret)
+> +		return ret;
+>  
+>  	return sdhci_resume_host(host);
+>  }
+> diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
+> index c251c6c0a112..0c7aa89df4e2 100644
+> --- a/drivers/mmc/host/sdhci-sirf.c
+> +++ b/drivers/mmc/host/sdhci-sirf.c
+> @@ -230,43 +230,6 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
+>  	return ret;
+>  }
+>  
+> -#ifdef CONFIG_PM_SLEEP
+> -static int sdhci_sirf_suspend(struct device *dev)
+> -{
+> -	struct sdhci_host *host = dev_get_drvdata(dev);
+> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> -	int ret;
+> -
+> -	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+> -		mmc_retune_needed(host->mmc);
+> -
+> -	ret = sdhci_suspend_host(host);
+> -	if (ret)
+> -		return ret;
+> -
+> -	clk_disable(pltfm_host->clk);
+> -
+> -	return 0;
+> -}
+> -
+> -static int sdhci_sirf_resume(struct device *dev)
+> -{
+> -	struct sdhci_host *host = dev_get_drvdata(dev);
+> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> -	int ret;
+> -
+> -	ret = clk_enable(pltfm_host->clk);
+> -	if (ret) {
+> -		dev_dbg(dev, "Resume: Error enabling clock\n");
+> -		return ret;
+> -	}
+> -
+> -	return sdhci_resume_host(host);
+> -}
+> -#endif
+> -
+> -static SIMPLE_DEV_PM_OPS(sdhci_sirf_pm_ops, sdhci_sirf_suspend, sdhci_sirf_resume);
+> -
+>  static const struct of_device_id sdhci_sirf_of_match[] = {
+>  	{ .compatible = "sirf,prima2-sdhc" },
+>  	{ }
+> @@ -277,7 +240,7 @@ static struct platform_driver sdhci_sirf_driver = {
+>  	.driver		= {
+>  		.name	= "sdhci-sirf",
+>  		.of_match_table = sdhci_sirf_of_match,
+> -		.pm	= &sdhci_sirf_pm_ops,
+> +		.pm	= &sdhci_pltfm_pmops,
+>  	},
+>  	.probe		= sdhci_sirf_probe,
+>  	.remove		= sdhci_pltfm_unregister,
+> 
