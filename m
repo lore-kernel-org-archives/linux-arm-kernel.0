@@ -1,42 +1,52 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Mon, 14 Aug 2017 13:34:19 +0200
-Subject: [PATCH 3/3] arm64: dts: apq8096-db820c: always enable regulator LS
- expansion
+Date: Mon, 14 Aug 2017 13:34:18 +0200
+Subject: [PATCH 2/3] arm64: dts: apq8096-db820c: Enable on board 3 pcie root
+ complex
 In-Reply-To: <20170814113420.30866-1-srinivas.kandagatla@linaro.org>
 References: <20170814113420.30866-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20170814113420.30866-3-srinivas.kandagatla@linaro.org>
+Message-ID: <20170814113420.30866-2-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-1.8v regulator on LS expansion should be left as always to comply
-with 96boards spec.
+This patch adds enables 3 instances of root complexes which are
+exposed on DB820c board. 3 Instances are terminted as below
+PCIE0 => QCA6174
+PCIE1 => MINI PCIE CARD
+PCIE2 => GBE ETHERNET
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-index 18c61693529e..0c10bbe55317 100644
+index 789f3e87321e..18c61693529e 100644
 --- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
 +++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-@@ -189,9 +189,15 @@
- 					regulator-min-microvolt = <1300000>;
- 					regulator-max-microvolt = <1300000>;
- 				};
+@@ -138,6 +138,22 @@
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&usb2_vbus_det_gpio>;
+ 		};
 +
-+				/**
-+				 * 1.8v required on LS expansion
-+				 * for mezzanine boards
-+				 */
- 				s4 {
- 					regulator-min-microvolt = <1800000>;
- 					regulator-max-microvolt = <1800000>;
-+					regulator-always-on;
- 				};
- 				s5 {
- 					regulator-min-microvolt = <2150000>;
++		agnoc at 0 {
++			qcom,pcie at 00600000 {
++				perst-gpio = <&msmgpio 35 GPIO_ACTIVE_LOW>;
++			};
++
++			qcom,pcie at 00608000 {
++				status = "okay";
++				perst-gpio = <&msmgpio 130 GPIO_ACTIVE_LOW>;
++			};
++
++			qcom,pcie at 00610000 {
++				status = "okay";
++				perst-gpio = <&msmgpio 114 GPIO_ACTIVE_LOW>;
++			};
++		};
+ 	};
+ 
+ 
 -- 
 2.11.0
