@@ -1,23 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 14 Aug 2017 15:58:42 +0200
-Subject: [PATCH 5/8] gpio: zynq: Fix kernel doc warnings
-In-Reply-To: <8659e6580b6738a973a161392ba7e03735837c15.1502103715.git.michal.simek@xilinx.com>
-References: <cover.1502103715.git.michal.simek@xilinx.com>
- <8659e6580b6738a973a161392ba7e03735837c15.1502103715.git.michal.simek@xilinx.com>
-Message-ID: <CACRpkdYHRJ7ODMWDgQB_yx5NQk31R7_4tMGJv9AqZhBX5tM79Q@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 14 Aug 2017 15:58:52 +0200
+Subject: [PATCH v2 2/3] ARM: dts: r8a7791: Use R-Car SATA Gen2 fallback
+ compat string
+In-Reply-To: <1502267203-12229-3-git-send-email-horms+renesas@verge.net.au>
+References: <1502267203-12229-1-git-send-email-horms+renesas@verge.net.au>
+ <1502267203-12229-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdW9tVnDevfDykFKsCAvOAwg_NhngEaA+-hgENZ-gbXSCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 7, 2017 at 1:01 PM, Michal Simek <michal.simek@xilinx.com> wrote:
-
-> From: Nava kishore Manne <nava.manne@xilinx.com>
+On Wed, Aug 9, 2017 at 10:26 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Use newly added R-Car SATA Gen2 fallback compat string
+> in the DT of the r8a7791 SoC.
 >
-> This patch fixes the kernel doc warnings in the driver.
+> This should have no run-time effect as the driver matches against
+> the per-SoC compat string before the fallback compat string is considered.
 >
-> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Patch applied.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Yours,
-Linus Walleij
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
