@@ -1,30 +1,26 @@
 From: kdinh@apm.com (Khuong Dinh)
-Date: Mon, 14 Aug 2017 16:10:46 -0700
+Date: Mon, 14 Aug 2017 16:17:35 -0700
 Subject: [PATCH v3 pci] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI
  boot for X-Gene v1
-In-Reply-To: <141326ed-178b-d4dd-d45d-9c2ea57ca8b7@arm.com>
+In-Reply-To: <20170814181503.GA3093@red-moon>
 References: <1502496173-6017-1-git-send-email-kdinh@apm.com>
- <141326ed-178b-d4dd-d45d-9c2ea57ca8b7@arm.com>
-Message-ID: <CAAsHzqt++3Yck9ESo4mb35XLrvJRJxNQPsFZ7vfW25h-XGNhOQ@mail.gmail.com>
+ <20170814181503.GA3093@red-moon>
+Message-ID: <CAAsHzqu6Mu99iDcJwFtK-h0kqgxw4cCk8xCEZX8BP+GEmCJR=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Lorenzo,
 
-On Mon, Aug 14, 2017 at 1:21 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 12/08/17 01:02, Khuong Dinh wrote:
+
+On Mon, Aug 14, 2017 at 11:15 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Fri, Aug 11, 2017 at 06:02:53PM -0600, Khuong Dinh wrote:
 >> This patch makes pci-xgene-msi driver ACPI-aware and provides
 >> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
 >>
 >> Signed-off-by: Khuong Dinh <kdinh@apm.com>
 >>         [Take over from Duc Dang]
 >> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->
-> Given that the patch has changed very substantially, this Ack is no
-> longer valid.
-
-Yes, I'll remove it.
-
 >> ---
 >> v3:
 >>  - Input X-Gene MSI base address for irq_domain_alloc_fwnode
@@ -103,11 +99,6 @@ Yes, I'll remove it.
 >> +     ret = acpi_device_add(device, NULL);
 >> +     if (ret)
 >> +             return ret;
->
-> Hello, memory leak.
-
-I'll update the code to release the memory when the error happens.
-
 >> +     device->parent = kzalloc(sizeof(struct acpi_device), GFP_KERNEL);
 >> +     INIT_LIST_HEAD(&device->parent->physical_node_list);
 >> +
@@ -116,157 +107,34 @@ I'll update the code to release the memory when the error happens.
 >> +     ret = device_attach(&device->dev);
 >> +     if (ret < 0)
 >> +             return ret;
->
-> And another one.
-
-I'll update the code to release the memory when the error happens.
-
 >> +
 >> +     acpi_create_platform_device(device, NULL);
 >> +     acpi_device_set_enumerated(device);
 >> +
 >> +     return ret;
 >> +}
->> +
->> +static const struct acpi_device_id acpi_msi_device_ids[] = {
->> +     {"APMC0D0E", 0},
 >
-> Isn't this an APM-specific thing? Is that supposed to be populated by
-> all MSI controller drivers? If so, this would better be served by a
-> separate linker section.
-
-The code is generic for MSI controller drivers.
-It will walk through the HID to get the MSI device and enforce it
-happens before acpi_bus_scan.
-This mechanism will help to avoid MSI driver from relying on ACPI
-device nodes ordering.
-For now, it just supports for APM X-Gene v1.
-
->> +     { }
->> +};
->> +
->> +int __init acpi_msi_init(void)
->> +{
->> +     acpi_status status;
->> +     int ret = 0;
->> +
->> +     status = acpi_get_devices(acpi_msi_device_ids[0].id,
->> +                     acpi_create_msi_device, NULL, NULL);
->> +     if (ACPI_FAILURE(status))
->> +             ret = -ENODEV;
->> +
->> +     return ret;
->> +}
+> Can't this be implemented through acpi_bus_scan(handle) ?
 >
-> Overall, this part should be a separate patch, and you should start by
-> explaining what it does exactly. Because so far, all I can see is that
-> it pre-populates random ACPI device structures, and that definitely seem
-> fishy to me.
+> (where handle is your MSI controller acpi_handle ?)
 
-I'm still following Lorenzo's approach to resolve the general ACPI
-dependence issue.
-As soon as it's fine, I'll re-visit my prior suggestion to separate
-the original patch to enable ACPI support for PCIe MSI and the general
-ACPI dependence issue.
-The patch is to add a hook in drivers/acpi/scan.c to enforce MSI
-driver to be initialized and registered before acpi_bus_scan happens,
-so that MSI driver will not rely on ACPI device nodes ordering.
-It will walk through the HID to get the MSI device (e.g:
-acip_get_devices). When the device is found, the callback will be
-called and we will initialize MSI device by its handle, start to
-attach MSI device to a driver, create ACPI platform device for MSI
-APCI device node and marked it as visited.
-In result, it will happen on top of acpi_bus_scan.
+I had an experiment to use acpi_bus_scan(handle) to register MSI
+driver, but it's not success as @handle for acpi_bus_scan is the root
+of the namespace scope to scan.
+The driver registration to ACPI platform happens with the following code path:
+acpi_bus_scan
+   acpi_bus_check_add
+   acpi_bus_attach
+      device_attach
+      acpi_default_enumeration
+         acpi_create_platform_device
+         acpi_device_set_enumerated
 
->> diff --git a/drivers/acpi/internal.h b/drivers/acpi/internal.h
->> index 58dd7ab..3da50d3 100644
->> --- a/drivers/acpi/internal.h
->> +++ b/drivers/acpi/internal.h
->> @@ -80,6 +80,7 @@ int acpi_scan_add_handler_with_hotplug(struct acpi_scan_handler *handler,
->>  void acpi_lpss_init(void);
->>
->>  void acpi_apd_init(void);
->> +int acpi_msi_init(void);
->>
->>  acpi_status acpi_hotplug_schedule(struct acpi_device *adev, u32 src);
->>  bool acpi_queue_hotplug_work(struct work_struct *work);
->> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
->> index 3389729..8ec4d39 100644
->> --- a/drivers/acpi/scan.c
->> +++ b/drivers/acpi/scan.c
->> @@ -2029,6 +2029,7 @@ int __init acpi_scan_init(void)
->>       acpi_status status;
->>       struct acpi_table_stao *stao_ptr;
->>
->> +     acpi_msi_init();
->>       acpi_pci_root_init();
->>       acpi_pci_link_init();
->>       acpi_processor_init();
->> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
->> index f1b633b..b1768a1 100644
->> --- a/drivers/pci/host/pci-xgene-msi.c
->> +++ b/drivers/pci/host/pci-xgene-msi.c
->> @@ -24,6 +24,7 @@
->>  #include <linux/pci.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/of_pci.h>
->> +#include <linux/acpi.h>
->>
->>  #define MSI_IR0                      0x000000
->>  #define MSI_INT0             0x800000
->> @@ -39,7 +40,7 @@ struct xgene_msi_group {
->>  };
->>
->>  struct xgene_msi {
->> -     struct device_node      *node;
->> +     struct fwnode_handle    *fwnode;
->>       struct irq_domain       *inner_domain;
->>       struct irq_domain       *msi_domain;
->>       u64                     msi_addr;
->> @@ -249,6 +250,13 @@ static void xgene_irq_domain_free(struct irq_domain *domain,
->>       .free   = xgene_irq_domain_free,
->>  };
->>
->> +#ifdef CONFIG_ACPI
->> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
->> +{
->> +     return xgene_msi_ctrl.fwnode;
->> +}
->> +#endif
->> +
->>  static int xgene_allocate_domains(struct xgene_msi *msi)
->>  {
->>       msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
->> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
->>       if (!msi->inner_domain)
->>               return -ENOMEM;
->>
->> -     msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
->> +     msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
->>                                                   &xgene_msi_domain_info,
->>                                                   msi->inner_domain);
->>
->> @@ -265,6 +273,9 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
->>               return -ENOMEM;
->>       }
->>
->> +#ifdef CONFIG_ACPI
->> +     pci_msi_register_fwnode_provider(&xgene_msi_get_fwnode);
->> +#endif
->>       return 0;
->>  }
->>
->> @@ -449,6 +460,13 @@ static int xgene_msi_hwirq_free(unsigned int cpu)
->>       {},
->>  };
->>
->> +#ifdef CONFIG_ACPI
->> +static const struct acpi_device_id xgene_msi_acpi_ids[] = {
->> +     {"APMC0D0E", 0},
->> +     { },
->> +};
->> +#endif
->> +
+acpi_bus_attach is recursively happened through ACPI nodes in order.
+
+
+> [...]
+>
 >>  static int xgene_msi_probe(struct platform_device *pdev)
 >>  {
 >>       struct resource *res;
@@ -298,10 +166,21 @@ In result, it will happen on top of acpi_bus_scan.
 >>       },
 >>       .probe = xgene_msi_probe,
 >>       .remove = xgene_msi_remove,
->>
 >
+> AFAIK you still have not solved the link ordering problem, creating
+> the platform device before scanning the PCI root bridge is not enough,
+> because you are not guaranteed to probe the MSI driver first, there
+> has to be way for registering your driver from the ACPI scan hook.
+
+With this implementation, I added a hook to enforce the MSI driver
+initialization and registration before acpi_bus_scan happens.
+It will walk through the HID to get the MSI device (e.g:
+acpi_get_devices). When the device is found, the callback will be
+called and we will initialize MSI device by its handle, start to
+attach MSI device to a driver, create ACPI platform device for MSI
+APCI device node and marked it as visited.
+In result, it will happen on top of acpi_bus_scan.
+
+
 > Thanks,
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
+> Lorenzo
