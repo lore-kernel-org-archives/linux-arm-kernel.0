@@ -1,61 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 14 Aug 2017 09:59:02 +0100
-Subject: New assembler warnings with binutils 2.29
-In-Reply-To: <CAKv+Gu8EQq+azTjMNDpE=TzEd_6b-VdQqUYbCc1=qGuYTU4Srg@mail.gmail.com>
-References: <d101c48b-c47b-be60-4b40-de4f845e4965@redhat.com>
- <20170811092213.mdmzqtm2lp6ltlxt@armageddon.cambridge.arm.com>
- <CAKv+Gu8EQq+azTjMNDpE=TzEd_6b-VdQqUYbCc1=qGuYTU4Srg@mail.gmail.com>
-Message-ID: <20170814085901.evwj3rrxo74wcgak@armageddon.cambridge.arm.com>
+From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
+Date: Mon, 14 Aug 2017 11:01:28 +0200
+Subject: [PATCH v2 0/9] EDAC drivers for Armada XP L2 and DDR
+In-Reply-To: <20170802140505.GA2290@nazgul.tnic>
+References: <20170802123922.11498-1-jlu@pengutronix.de>
+ <20170802140505.GA2290@nazgul.tnic>
+Message-ID: <1502701288.2922.6.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 11, 2017 at 10:26:06AM +0100, Ard Biesheuvel wrote:
-> On 11 August 2017 at 10:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > On Thu, Aug 10, 2017 at 01:13:22PM -0700, Laura Abbott wrote:
-> >> Fedora rawhide recently upgraded to binutils 2.29 and this seems
-> >> to produce new warnings:
-> >>
-> >> ./arch/arm64/include/asm/assembler.h: Assembler messages:
-> >> ./arch/arm64/include/asm/assembler.h:125: Warning: ignoring attempt to redefine built-in register 'lr'
-> >>
-> >> This is
-> >>
-> >> /*
-> >>  * Register aliases.
-> >>  */
-> >> lr      .req    x30             // link register
-> >
-> > Strange, does gas now think 'lr' is a general purpose register (aliased
-> > to x30)? It never was and IIRC the toolchain people many years ago
-> > refused to add it, hence the alias above in the kernel. I wonder if they
-> > added 'fp' as well...
-> >
-> > We could remove the alias and replace all 'lr' instances with 'x30'
-> > throughout the kernel (no too many) or we add some #ifdef around the
-> > above based on the binutils version.
+Hi Gregory and Borislav,
+
+On Wed, 2017-08-02 at 16:05 +0200, Borislav Petkov wrote:
+> On Wed, Aug 02, 2017 at 02:39:13PM +0200, Jan Luebbe wrote:
+> > Chris Packham (2):
+> > ? ARM: l2x0: support parity-enable/disable on aurora
+> > ? ARM: l2x0: add marvell,ecc-enable property for aurora
+> > 
+> > Jan Luebbe (7):
+> > ? ARM: l2c: move cache-aurora-l2.h to asm/hardware
+> > ? ARM: aurora-l2: add prefix to MAX_RANGE_SIZE
+> > ? ARM: aurora-l2: add defines for parity and ECC registers
 > 
-> This is annoying. Replacing lr with x30 achieves the opposite of the
-> intent of the binutils change. And using #ifdefs is inaccurate,
-> because you can't really test the binutils version only the GCC
-> version, and those are not tightly coupled.
+> I'd need an ACK from an ARM maintainer for those if the whole series
+> is going to go through the EDAC tree.
+
+Gregory, you've given Reviewed-by tags for some of these in version 1.?
+
+Would you be fine with acking them and merging the series through the
+EDAC tree?
+
+> > ? EDAC: Add missing debugfs_create_x32 wrapper
+> > ? EDAC: Add devres helpers for
+> > ????edac_mc_alloc/edac_mc_add_mc(_with_groups)
+> > ? EDAC: Add devres helpers for
+> > ????edac_device_alloc_ctl_info/edac_device_add_device
+> > ? EDAC: Add driver for the Marvell Armada XP SDRAM and L2 cache ECC
 > 
-> Can you .unreq it?
+> Alternatively, I can review those and they can go through an ARM
+> tree.
+> 
+> I'm fine with whatever ARM maintainers prefer.
 
-Not really, with an older binutils I get:
+Thanks, if you have any review comments, please let me know.
 
-arch/arm64/include/asm/assembler.h:125: Error: unknown register alias 'lr'
-
-I personally consider this a binutils bug. After 6+ years (probably not
-all public) of building the kernel just fine, all of a sudden certain
-strings became reserved in gas. Three options:
-
-a) binutils reverts the change
-b) we stop using lr etc. in Linux for good (since you can't tell which
-   gas supports them)
-c) we replace .req with #define in the kernel
-
-My preference is (a) but we can go for (c) as being more under our
-control.
-
--- 
-Catalin
+Regards,
+Jan
