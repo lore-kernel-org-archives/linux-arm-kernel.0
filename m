@@ -1,47 +1,75 @@
 From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Mon, 14 Aug 2017 17:08:39 +0530
-Subject: [PATCH 00/11] ASoC: make snd_soc_platform_driver const
-Message-ID: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
+Date: Mon, 14 Aug 2017 17:08:41 +0530
+Subject: [PATCH 02/11] ASoC: Intel: make snd_soc_platform_driver const
+In-Reply-To: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
+References: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <1502710730-18912-3-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make snd_soc_platform_driver const.
+Make these const as they are only passed as the 2nd argument to the
+function snd_soc_register_platform, which is of type const.
+Done using Coccinelle.
 
-Bhumika Goyal (11):
-  ASoC: codecs: make snd_soc_platform_driver const
-  ASoC: Intel: make snd_soc_platform_driver const
-  ASoC: fsl: make snd_soc_platform_driver const
-  ASoC: nuc900: make snd_soc_platform_driver const
-  ASoC: omap: make snd_soc_platform_driver const
-  ASoC: pxa: make snd_soc_platform_driver const
-  ASoC: qcom: make snd_soc_platform_driver const
-  ASoC: samsung: make snd_soc_platform_driver const
-  ASoC: sh: make snd_soc_platform_driver const
-  ASoC: txx9: make snd_soc_platform_driver const
-  ASoC: soc-utils: make snd_soc_platform_driver const
-
- sound/soc/codecs/cs47l24.c                   | 2 +-
- sound/soc/codecs/rt5514-spi.c                | 2 +-
- sound/soc/codecs/wm5102.c                    | 2 +-
- sound/soc/codecs/wm5110.c                    | 2 +-
- sound/soc/fsl/imx-pcm-fiq.c                  | 2 +-
- sound/soc/fsl/mpc5200_dma.c                  | 2 +-
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
  sound/soc/intel/atom/sst-mfld-platform-pcm.c | 2 +-
  sound/soc/intel/baytrail/sst-baytrail-pcm.c  | 2 +-
  sound/soc/intel/haswell/sst-haswell-pcm.c    | 2 +-
  sound/soc/intel/skylake/skl-pcm.c            | 2 +-
- sound/soc/nuc900/nuc900-pcm.c                | 2 +-
- sound/soc/omap/omap-pcm.c                    | 2 +-
- sound/soc/pxa/mmp-pcm.c                      | 2 +-
- sound/soc/pxa/pxa2xx-pcm.c                   | 2 +-
- sound/soc/qcom/lpass-platform.c              | 2 +-
- sound/soc/samsung/idma.c                     | 2 +-
- sound/soc/sh/dma-sh7760.c                    | 2 +-
- sound/soc/sh/fsi.c                           | 2 +-
- sound/soc/sh/rcar/core.c                     | 2 +-
- sound/soc/soc-utils.c                        | 2 +-
- sound/soc/txx9/txx9aclc.c                    | 2 +-
- 21 files changed, 21 insertions(+), 21 deletions(-)
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
+diff --git a/sound/soc/intel/atom/sst-mfld-platform-pcm.c b/sound/soc/intel/atom/sst-mfld-platform-pcm.c
+index 49c7b88..b272df5 100644
+--- a/sound/soc/intel/atom/sst-mfld-platform-pcm.c
++++ b/sound/soc/intel/atom/sst-mfld-platform-pcm.c
+@@ -705,7 +705,7 @@ static int sst_soc_probe(struct snd_soc_platform *platform)
+ 	return sst_dsp_init_v2_dpcm(platform);
+ }
+ 
+-static struct snd_soc_platform_driver sst_soc_platform_drv  = {
++static const struct snd_soc_platform_driver sst_soc_platform_drv  = {
+ 	.probe		= sst_soc_probe,
+ 	.ops		= &sst_platform_ops,
+ 	.compr_ops	= &sst_platform_compr_ops,
+diff --git a/sound/soc/intel/baytrail/sst-baytrail-pcm.c b/sound/soc/intel/baytrail/sst-baytrail-pcm.c
+index 4765ad4..84cb568 100644
+--- a/sound/soc/intel/baytrail/sst-baytrail-pcm.c
++++ b/sound/soc/intel/baytrail/sst-baytrail-pcm.c
+@@ -395,7 +395,7 @@ static int sst_byt_pcm_remove(struct snd_soc_platform *platform)
+ 	return 0;
+ }
+ 
+-static struct snd_soc_platform_driver byt_soc_platform = {
++static const struct snd_soc_platform_driver byt_soc_platform = {
+ 	.probe		= sst_byt_pcm_probe,
+ 	.remove		= sst_byt_pcm_remove,
+ 	.ops		= &sst_byt_pcm_ops,
+diff --git a/sound/soc/intel/haswell/sst-haswell-pcm.c b/sound/soc/intel/haswell/sst-haswell-pcm.c
+index 9e4094e..c044400 100644
+--- a/sound/soc/intel/haswell/sst-haswell-pcm.c
++++ b/sound/soc/intel/haswell/sst-haswell-pcm.c
+@@ -1135,7 +1135,7 @@ static int hsw_pcm_remove(struct snd_soc_platform *platform)
+ 	return 0;
+ }
+ 
+-static struct snd_soc_platform_driver hsw_soc_platform = {
++static const struct snd_soc_platform_driver hsw_soc_platform = {
+ 	.probe		= hsw_pcm_probe,
+ 	.remove		= hsw_pcm_remove,
+ 	.ops		= &hsw_pcm_ops,
+diff --git a/sound/soc/intel/skylake/skl-pcm.c b/sound/soc/intel/skylake/skl-pcm.c
+index debdaac..e98d825 100644
+--- a/sound/soc/intel/skylake/skl-pcm.c
++++ b/sound/soc/intel/skylake/skl-pcm.c
+@@ -1310,7 +1310,7 @@ static int skl_platform_soc_probe(struct snd_soc_platform *platform)
+ 
+ 	return 0;
+ }
+-static struct snd_soc_platform_driver skl_platform_drv  = {
++static const struct snd_soc_platform_driver skl_platform_drv  = {
+ 	.probe		= skl_platform_soc_probe,
+ 	.ops		= &skl_platform_ops,
+ 	.pcm_new	= skl_pcm_new,
 -- 
 1.9.1
