@@ -1,47 +1,71 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 14 Aug 2017 17:42:27 +0100
-Subject: [PATCH 02/30] ARM: assembler: introduce adr_l, ldr_l and str_l
- macros
-In-Reply-To: <CAKv+Gu_3gb4K_2=igLWMjtXuEcdhnqeoVgaW7Lvqx56AQU-VZg@mail.gmail.com>
-References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
- <20170814125411.22604-3-ard.biesheuvel@linaro.org>
- <20170814152950.GT6321@e103592.cambridge.arm.com>
- <CAKv+Gu87G93X36TdAEiMC46Uz_PqXEi_4LSftnUdkQ8HRCxWiA@mail.gmail.com>
- <20170814155002.GV6321@e103592.cambridge.arm.com>
- <alpine.LFD.2.20.1708141217150.17016@knanqh.ubzr>
- <CAKv+Gu_3gb4K_2=igLWMjtXuEcdhnqeoVgaW7Lvqx56AQU-VZg@mail.gmail.com>
-Message-ID: <20170814164227.GJ20805@n2100.armlinux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 14 Aug 2017 17:42:36 +0100
+Subject: Applied "ASoC: rockchip: Delete an error message for a failed memory
+ allocation in rockchip_i2s_probe()" to the asoc tree
+In-Reply-To: <20170225101834.28232-1-mihai.dumitru2201@stud.acs.upb.ro>
+Message-ID: <E1dhIRo-000569-KC@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 05:22:39PM +0100, Ard Biesheuvel wrote:
-> On 14 August 2017 at 17:18, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Mon, 14 Aug 2017, Dave Martin wrote:
-> >
-> >> On Mon, Aug 14, 2017 at 04:38:02PM +0100, Ard Biesheuvel wrote:
-> >> > That's a trick, actually, which I failed to add a comment for.
-> >
-> > Shame shame shame !
-> >
-> >> > We use .arm sections in the thumb2 kernel, and using these macros
-> >> > there would result in the wrong offset to be used. Adding the .w
-> >> > suffix forces an error in the assembler which even results in a fairly
-> >> > meaningful error message complaining about using .w in ARM code.
-> >>
-> >> Ewww... I think it'd be best to add a comment explaining that.
-> >
-> > Absolutely!
-> >
-> 
-> Yeah, mea culpa.
-> 
-> But if people have better ideas how to avoid this situation, I am all ears.
+The patch
 
-Have you tested building an ARMv7M kernel with your patches - ARMv7M is
-Thumb only, so can't contain any ARM code.  If not, please try
-mps2_defconfig.
+   ASoC: rockchip: Delete an error message for a failed memory allocation in rockchip_i2s_probe()
 
+has been applied to the asoc tree at
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From b48b2710913d583ff93c365413532e1a7cd60d84 Mon Sep 17 00:00:00 2001
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Thu, 10 Aug 2017 18:38:09 +0200
+Subject: [PATCH] ASoC: rockchip: Delete an error message for a failed memory
+ allocation in rockchip_i2s_probe()
+
+Omit an extra message for a memory allocation failure in this function.
+
+This issue was detected by using the Coccinelle software.
+
+Link: http://events.linuxfoundation.org/sites/events/files/slides/LCJ16-Refactor_Strings-WSang_0.pdf
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/rockchip/rockchip_i2s.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index 199338fdeda0..b6590467fd14 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -579,10 +579,8 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
+ 	int val;
+ 
+ 	i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
+-	if (!i2s) {
+-		dev_err(&pdev->dev, "Can't allocate rk_i2s_dev\n");
++	if (!i2s)
+ 		return -ENOMEM;
+-	}
+ 
+ 	i2s->dev = &pdev->dev;
+ 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.13.2
