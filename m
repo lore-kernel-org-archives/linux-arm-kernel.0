@@ -1,155 +1,255 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 13:53:58 +0100
-Subject: [PATCH 17/30] arm-soc: tegra: make sleep asm code runtime relocatable
+Date: Mon, 14 Aug 2017 13:54:04 +0100
+Subject: [PATCH 23/30] ARM: kernel: implement randomization of the kernel load
+ address
 In-Reply-To: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
 References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170814125411.22604-18-ard.biesheuvel@linaro.org>
+Message-ID: <20170814125411.22604-24-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PIE kernel build does not allow absolute references encoded in
-movw/movt instruction pairs, so use our mov_l macro instead (which
-will still use such a pair unless CONFIG_RELOCATABLE is defined)
+This implements randomization of the placement of the kernel image
+inside the lowmem region. It is intended to work together with the
+decompressor to place the kernel at an offset in physical memory
+that is a multiple of 2 MB, and to take the same offset into account
+when creating the virtual mapping.
 
-Also, avoid 32-bit absolute literals to refer to absolute symbols.
-Instead, use a 16 bit reference so that PIE linker cannot get
-confused whether the symbol reference is subject to relocation at
-runtime.
+This uses runtime relocation of the kernel built as a PIE binary, to
+fix up all absolute symbol references to refer to their runtime virtual
+address. The physical-to-virtual mapping remains unchanged.
 
+In order to allow the decompressor to hand over to the core kernel
+without making assumptions that are not guaranteed to hold when
+invoking the core kernel directly using bootloaders that are not
+KASLR aware, the KASLR offset is expected to be placed in r3 when
+entering the kernel 4 bytes past the entry point, skipping the first
+instruction.
+
+Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/mach-tegra/sleep-tegra20.S | 22 ++++++++++++--------
- arch/arm/mach-tegra/sleep-tegra30.S |  6 +++---
- arch/arm/mach-tegra/sleep.S         |  4 ++--
- 3 files changed, 18 insertions(+), 14 deletions(-)
+ arch/arm/Kconfig       |  15 +++
+ arch/arm/kernel/head.S | 103 ++++++++++++++++++--
+ 2 files changed, 109 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
-index 5c8e638ee51a..cab95de5c8f1 100644
---- a/arch/arm/mach-tegra/sleep-tegra20.S
-+++ b/arch/arm/mach-tegra/sleep-tegra20.S
-@@ -99,7 +99,7 @@ ENTRY(tegra20_cpu_shutdown)
- 	cmp	r0, #0
- 	reteq	lr			@ must not be called for CPU 0
- 	mov32	r1, TEGRA_IRAM_RESET_BASE_VIRT
--	ldr	r2, =__tegra20_cpu1_resettable_status_offset
-+	ldrh	r2, 0f
- 	mov	r12, #CPU_RESETTABLE
- 	strb	r12, [r1, r2]
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 300add3b8023..0d7b40f1061d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1825,6 +1825,21 @@ config XEN
+ 	help
+ 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
  
-@@ -121,6 +121,7 @@ ENTRY(tegra20_cpu_shutdown)
- 	beq	.
- 	ret	lr
- ENDPROC(tegra20_cpu_shutdown)
-+0:	.short	__tegra20_cpu1_resettable_status_offset
++config RANDOMIZE_BASE
++	bool "Randomize the address of the kernel image"
++	depends on MMU && AUTO_ZRELADDR
++	depends on !XIP_KERNEL && !ZBOOT_ROM && !HAVE_TCM
++	select RELOCATABLE
++	help
++	  Randomizes the virtual and physical address at which the kernel
++	  image is loaded, as a security feature that deters exploit attempts
++	  relying on knowledge of the location of kernel internals.
++
++	  This relies on the UEFI stub to invoke the EFI_RNG_PROTOCOL to
++	  randomize the load address of the decompressed kernel in the
++	  physical space. The same offset is applied to the virtual mapping
++	  of the kernel in the virtual space by the kernel proper.
++
+ endmenu
+ 
+ menu "Boot options"
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 71bc0d037bc9..0795da990dde 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -48,6 +48,28 @@
+ #define PMD_ORDER	2
  #endif
  
- #ifdef CONFIG_PM_SLEEP
-@@ -181,6 +182,9 @@ ENTRY(tegra_pen_unlock)
- 	ret     lr
- ENDPROC(tegra_pen_unlock)
- 
-+.L__tegra20_cpu1_resettable_status_offset:
-+	.short	__tegra20_cpu1_resettable_status_offset
++	.macro	get_kaslr_offset, reg
++#ifdef CONFIG_RANDOMIZE_BASE
++	ldr_l			\reg, __kaslr_offset
++#else
++	mov			\reg, #0
++#endif
++	.endm
++
++	.macro	add_kaslr_offset, reg, tmp
++#ifdef CONFIG_RANDOMIZE_BASE
++	get_kaslr_offset	\tmp
++	add			\reg, \reg, \tmp
++#endif
++	.endm
++
++	.macro	sub_kaslr_offset, reg, tmp
++#ifdef CONFIG_RANDOMIZE_BASE
++	get_kaslr_offset	\tmp
++	sub			\reg, \reg, \tmp
++#endif
++	.endm
 +
  /*
-  * tegra20_cpu_clear_resettable(void)
+  * Kernel startup entry point.
+  * ---------------------------
+@@ -73,6 +95,7 @@
+ 	.equ	swapper_pg_dir, . - PG_DIR_SIZE
+ 
+ ENTRY(stext)
++	mov	r3, #0			@ normal entry point - clear r3
+  ARM_BE8(setend	be )			@ ensure we are in BE8 mode
+ 
+  THUMB(	badr	r9, 1f		)	@ Kernel is always entered in ARM.
+@@ -80,6 +103,16 @@ ENTRY(stext)
+  THUMB(	.thumb			)	@ switch to Thumb now.
+  THUMB(1:			)
+ 
++#ifdef CONFIG_RANDOMIZE_BASE
++	str_l	r3, __kaslr_offset, r9	@ offset in r3 if entered via kaslr ep
++
++	.section ".bss", "aw", %nobits
++	.align	2
++__kaslr_offset:
++	.long	0			@ will be wiped before entering C code
++	.previous
++#endif
++
+ #ifdef CONFIG_ARM_VIRT_EXT
+ 	bl	__hyp_stub_install
+ #endif
+@@ -103,6 +136,7 @@ ENTRY(stext)
+ #ifndef CONFIG_XIP_KERNEL
+ 	adr_l	r8, _text			@ __pa(_text)
+ 	sub	r8, r8, #TEXT_OFFSET		@ PHYS_OFFSET
++	sub_kaslr_offset r8, r12
+ #else
+ 	ldr	r8, =PLAT_PHYS_OFFSET		@ always constant in this case
+ #endif
+@@ -139,8 +173,8 @@ ENTRY(stext)
+ 	 * r0 will hold the CPU control register value, r1, r2, r4, and
+ 	 * r9 will be preserved.  r5 will also be preserved if LPAE.
+ 	 */
+-	ldr	r13, =__mmap_switched		@ address to jump to after
+-						@ mmu has been enabled
++	adr_l	lr, __primary_switch		@ address to jump to after
++	mov	r13, lr				@ mmu has been enabled
+ 	badr	lr, 1f				@ return (PIC) address
+ #ifdef CONFIG_ARM_LPAE
+ 	mov	r5, #0				@ high TTBR0
+@@ -151,7 +185,8 @@ ENTRY(stext)
+ 	ldr	r12, [r10, #PROCINFO_INITFUNC]
+ 	add	r12, r12, r10
+ 	ret	r12
+-1:	b	__enable_mmu
++1:	get_kaslr_offset r12			@ get before turning MMU on
++	b	__enable_mmu
+ ENDPROC(stext)
+ 	.ltorg
+ 
+@@ -230,9 +265,14 @@ __create_page_tables:
+ 	/*
+ 	 * Map our RAM from the start to the end of the kernel .bss section.
+ 	 */
+-	add	r0, r4, #PAGE_OFFSET >> (SECTION_SHIFT - PMD_ORDER)
+-	ldr	r6, =(_end - 1)
+-	orr	r3, r8, r7
++	get_kaslr_offset r3
++	add	r0, r3, #PAGE_OFFSET
++	add	r0, r4, r0, lsr #(SECTION_SHIFT - PMD_ORDER)
++	adr_l	r6, _end - 1
++	sub	r6, r6, r8
++	add	r6, r6, #PAGE_OFFSET
++	add	r3, r3, r8
++	orr	r3, r3, r7
+ 	add	r6, r4, r6, lsr #(SECTION_SHIFT - PMD_ORDER)
+ 1:	str	r3, [r0], #1 << PMD_ORDER
+ 	add	r3, r3, #1 << SECTION_SHIFT
+@@ -376,7 +416,7 @@ ENTRY(secondary_startup)
+ 	 * Use the page tables supplied from  __cpu_up.
+ 	 */
+ 	adr_l	r3, secondary_data
+-	mov_l	r12, __secondary_switched
++	adr_l	r12, __secondary_switch
+ 	ldrd	r4, [r3, #0]			@ get secondary_data.pgdir
+ ARM_BE8(eor	r4, r4, r5)			@ Swap r5 and r4 in BE:
+ ARM_BE8(eor	r5, r4, r5)			@ it can be done in 3 steps
+@@ -414,6 +454,7 @@ ENDPROC(__secondary_switched)
+  *  r4  = TTBR pointer (low word)
+  *  r5  = TTBR pointer (high word if LPAE)
+  *  r9  = processor ID
++ *  r12 = KASLR offset
+  *  r13 = *virtual* address to jump to upon completion
+  */
+ __enable_mmu:
+@@ -451,6 +492,7 @@ ENDPROC(__enable_mmu)
+  *  r1  = machine ID
+  *  r2  = atags or dtb pointer
+  *  r9  = processor ID
++ *  r12 = KASLR offset
+  *  r13 = *virtual* address to jump to upon completion
   *
-@@ -189,7 +193,7 @@ ENDPROC(tegra_pen_unlock)
-  */
- ENTRY(tegra20_cpu_clear_resettable)
- 	mov32	r1, TEGRA_IRAM_RESET_BASE_VIRT
--	ldr	r2, =__tegra20_cpu1_resettable_status_offset
-+	ldrh	r2, .L__tegra20_cpu1_resettable_status_offset
- 	mov	r12, #CPU_NOT_RESETTABLE
- 	strb	r12, [r1, r2]
- 	ret	lr
-@@ -203,7 +207,7 @@ ENDPROC(tegra20_cpu_clear_resettable)
-  */
- ENTRY(tegra20_cpu_set_resettable_soon)
- 	mov32	r1, TEGRA_IRAM_RESET_BASE_VIRT
--	ldr	r2, =__tegra20_cpu1_resettable_status_offset
-+	ldrh	r2, .L__tegra20_cpu1_resettable_status_offset
- 	mov	r12, #CPU_RESETTABLE_SOON
- 	strb	r12, [r1, r2]
- 	ret	lr
-@@ -217,7 +221,7 @@ ENDPROC(tegra20_cpu_set_resettable_soon)
-  */
- ENTRY(tegra20_cpu_is_resettable_soon)
- 	mov32	r1, TEGRA_IRAM_RESET_BASE_VIRT
--	ldr	r2, =__tegra20_cpu1_resettable_status_offset
-+	ldrh	r2, .L__tegra20_cpu1_resettable_status_offset
- 	ldrb	r12, [r1, r2]
- 	cmp	r12, #CPU_RESETTABLE_SOON
- 	moveq	r0, #1
-@@ -238,11 +242,11 @@ ENTRY(tegra20_sleep_core_finish)
- 	bl	tegra_disable_clean_inv_dcache
- 	mov     r0, r4
+  * other registers depend on the function called upon completion
+@@ -466,10 +508,52 @@ ENTRY(__turn_mmu_on)
+ 	mov	r3, r3
+ 	mov	r3, r13
+ 	ret	r3
+-__turn_mmu_on_end:
+ ENDPROC(__turn_mmu_on)
+-	.popsection
  
--	mov32	r3, tegra_shut_off_mmu
-+	mov_l	r3, tegra_shut_off_mmu
- 	add	r3, r3, r0
++__primary_switch:
++#ifdef CONFIG_RELOCATABLE
++	adr_l	r7, _text			@ r7 := __pa(_text)
++	sub	r7, r7, #TEXT_OFFSET		@ r7 := PHYS_OFFSET
++
++	adr_l	r5, __rel_begin
++	adr_l	r6, __rel_end
++	sub	r5, r5, r7
++	sub	r6, r6, r7
++
++	add	r5, r5, #PAGE_OFFSET
++	add	r6, r6, #PAGE_OFFSET
++	add	r5, r5, r12
++	add	r6, r6, r12
++
++	adr_l	r3, __stubs_start		@ __pa(__stubs_start)
++	sub	r3, r3, r7			@ offset of __stubs_start
++	add	r3, r3, #PAGE_OFFSET		@ __va(__stubs_start)
++	sub	r3, r3, #0xffff1000		@ subtract VA of stubs section
++
++0:	cmp	r5, r6
++	bge	1f
++	ldm	r5!, {r7, r8}			@ load next relocation entry
++	cmp	r8, #23				@ R_ARM_RELATIVE
++	bne	0b
++	cmp	r7, #0xff000000			@ vector page?
++	addgt	r7, r7, r3			@ fix up VA offset
++	ldr	r8, [r7, r12]
++	add	r8, r8, r12
++	str	r8, [r7, r12]
++	b	0b
++1:
++#endif
++	ldr	pc, =__mmap_switched
++ENDPROC(__primary_switch)
++
++#ifdef CONFIG_SMP
++__secondary_switch:
++	ldr	pc, =__secondary_switched
++ENDPROC(__secondary_switch)
++#endif
++	.ltorg
++__turn_mmu_on_end:
++	.popsection
  
--	mov32	r0, tegra20_tear_down_core
--	mov32	r1, tegra20_iram_start
-+	mov_l	r0, tegra20_tear_down_core
-+	mov_l	r1, tegra20_iram_start
- 	sub	r0, r0, r1
- 	mov32	r1, TEGRA_IRAM_LPx_RESUME_AREA
- 	add	r0, r0, r1
-@@ -265,7 +269,7 @@ ENTRY(tegra20_sleep_cpu_secondary_finish)
- 	bl	tegra_disable_clean_inv_dcache
- 
- 	mov32	r0, TEGRA_IRAM_RESET_BASE_VIRT
--	ldr	r4, =__tegra20_cpu1_resettable_status_offset
-+	ldrh	r4, .L__tegra20_cpu1_resettable_status_offset
- 	mov	r3, #CPU_RESETTABLE
- 	strb	r3, [r0, r4]
- 
-@@ -284,7 +288,7 @@ ENTRY(tegra20_sleep_cpu_secondary_finish)
- 	bl	tegra_pen_lock
- 
- 	mov32	r0, TEGRA_IRAM_RESET_BASE_VIRT
--	ldr	r4, =__tegra20_cpu1_resettable_status_offset
-+	ldrh	r4, .L__tegra20_cpu1_resettable_status_offset
- 	mov	r3, #CPU_NOT_RESETTABLE
- 	strb	r3, [r0, r4]
- 
-diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
-index dd4a67dabd91..478b2ca3ef6e 100644
---- a/arch/arm/mach-tegra/sleep-tegra30.S
-+++ b/arch/arm/mach-tegra/sleep-tegra30.S
-@@ -261,11 +261,11 @@ ENTRY(tegra30_sleep_core_finish)
- 	mov32	r6, TEGRA_FLOW_CTRL_BASE
- 	mov32	r7, TEGRA_TMRUS_BASE
- 
--	mov32	r3, tegra_shut_off_mmu
-+	mov_l	r3, tegra_shut_off_mmu
- 	add	r3, r3, r0
- 
--	mov32	r0, tegra30_tear_down_core
--	mov32	r1, tegra30_iram_start
-+	mov_l	r0, tegra30_tear_down_core
-+	mov_l	r1, tegra30_iram_start
- 	sub	r0, r0, r1
- 	mov32	r1, TEGRA_IRAM_LPx_RESUME_AREA
- 	add	r0, r0, r1
-diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
-index 5e3496753df1..785df3edc767 100644
---- a/arch/arm/mach-tegra/sleep.S
-+++ b/arch/arm/mach-tegra/sleep.S
-@@ -101,11 +101,11 @@ ENTRY(tegra_sleep_cpu_finish)
- 	bl	tegra_disable_clean_inv_dcache
- 
- 	mov	r0, r4
--	mov32	r6, tegra_tear_down_cpu
-+	mov_l	r6, tegra_tear_down_cpu
- 	ldr	r1, [r6]
- 	add	r1, r1, r0
- 
--	mov32	r3, tegra_shut_off_mmu
-+	mov_l	r3, tegra_shut_off_mmu
- 	add	r3, r3, r0
- 	mov	r0, r1
- 
+ #ifdef CONFIG_SMP_ON_UP
+ 	__HEAD
+@@ -570,6 +654,7 @@ __fixup_pv_table:
+ 	adr_l	r6, __pv_phys_pfn_offset
+ 	adr_l	r7, __pv_offset			@ __pa(__pv_offset)
+ 	mov_l	r3, __pv_offset			@ __va(__pv_offset)
++	add_kaslr_offset r3, ip
+ 	mvn	ip, #0
+ 	subs	r3, r7, r3	@ PHYS_OFFSET - PAGE_OFFSET
+ 	mov	r0, r8, lsr #PAGE_SHIFT	@ convert to PFN
 -- 
 2.11.0
