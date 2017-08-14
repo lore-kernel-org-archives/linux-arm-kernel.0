@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 14 Aug 2017 17:42:36 +0100
-Subject: Applied "ASoC: rockchip: Delete an error message for a failed memory
- allocation in rockchip_i2s_probe()" to the asoc tree
-In-Reply-To: <20170225101834.28232-1-mihai.dumitru2201@stud.acs.upb.ro>
-Message-ID: <E1dhIRo-000569-KC@finisterre>
+Date: Mon, 14 Aug 2017 17:43:09 +0100
+Subject: Applied "ASoC: sun4i-i2s: Add regmap config to quirks" to the asoc
+ tree
+In-Reply-To: <20170729141753.20174-4-codekipper@gmail.com>
+Message-ID: <E1dhISL-0005EA-9q@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: rockchip: Delete an error message for a failed memory allocation in rockchip_i2s_probe()
+   ASoC: sun4i-i2s: Add regmap config to quirks
 
 has been applied to the asoc tree at
 
@@ -34,38 +34,64 @@ to this mail.
 Thanks,
 Mark
 
->From b48b2710913d583ff93c365413532e1a7cd60d84 Mon Sep 17 00:00:00 2001
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Thu, 10 Aug 2017 18:38:09 +0200
-Subject: [PATCH] ASoC: rockchip: Delete an error message for a failed memory
- allocation in rockchip_i2s_probe()
+>From cd1c63df5fa8196d8ed5138f1ecc22bbabf5f6df Mon Sep 17 00:00:00 2001
+From: Marcus Cooper <codekipper@gmail.com>
+Date: Sat, 12 Aug 2017 13:00:50 +0200
+Subject: [PATCH] ASoC: sun4i-i2s: Add regmap config to quirks
 
-Omit an extra message for a memory allocation failure in this function.
+The newer SoCs have a larger range than the original SoC that this
+driver was developed for. By adding the regmap config to the quirks
+then the driver can initialise the managed register map correctly.
 
-This issue was detected by using the Coccinelle software.
-
-Link: http://events.linuxfoundation.org/sites/events/files/slides/LCJ16-Refactor_Strings-WSang_0.pdf
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/rockchip/rockchip_i2s.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ sound/soc/sunxi/sun4i-i2s.c | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index 199338fdeda0..b6590467fd14 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -579,10 +579,8 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
- 	int val;
+diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+index 9a35313c4f9b..f6f3c409f25e 100644
+--- a/sound/soc/sunxi/sun4i-i2s.c
++++ b/sound/soc/sunxi/sun4i-i2s.c
+@@ -94,11 +94,13 @@
+  * struct sun4i_i2s_quirks - Differences between SoC variants.
+  *
+  * @has_reset: SoC needs reset deasserted.
++ * @sun4i_i2s_regmap: regmap config to use.
+  * @mclk_offset: Value by which mclkdiv needs to be adjusted.
+  * @bclk_offset: Value by which bclkdiv needs to be adjusted.
+  */
+ struct sun4i_i2s_quirks {
+ 	bool				has_reset;
++	const struct regmap_config	*sun4i_i2s_regmap;
+ 	unsigned int			mclk_offset;
+ 	unsigned int			bclk_offset;
+ };
+@@ -674,11 +676,13 @@ static int sun4i_i2s_runtime_suspend(struct device *dev)
+ }
  
- 	i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
--	if (!i2s) {
--		dev_err(&pdev->dev, "Can't allocate rk_i2s_dev\n");
-+	if (!i2s)
- 		return -ENOMEM;
--	}
+ static const struct sun4i_i2s_quirks sun4i_a10_i2s_quirks = {
+-	.has_reset	= false,
++	.has_reset		= false,
++	.sun4i_i2s_regmap	= &sun4i_i2s_regmap_config,
+ };
  
- 	i2s->dev = &pdev->dev;
+ static const struct sun4i_i2s_quirks sun6i_a31_i2s_quirks = {
+-	.has_reset	= true,
++	.has_reset		= true,
++	.sun4i_i2s_regmap	= &sun4i_i2s_regmap_config,
+ };
  
+ static int sun4i_i2s_probe(struct platform_device *pdev)
+@@ -717,7 +721,7 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	i2s->regmap = devm_regmap_init_mmio(&pdev->dev, regs,
+-					    &sun4i_i2s_regmap_config);
++					    i2s->variant->sun4i_i2s_regmap);
+ 	if (IS_ERR(i2s->regmap)) {
+ 		dev_err(&pdev->dev, "Regmap initialisation failed\n");
+ 		return PTR_ERR(i2s->regmap);
 -- 
 2.13.2
