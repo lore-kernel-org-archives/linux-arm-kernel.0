@@ -1,47 +1,109 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 14 Aug 2017 16:09:18 +0100
-Subject: [PATCH v2 16/18] hwmon: add support for sensors exported via ARM
- SCMI
-In-Reply-To: <20e0a388-79a1-a7f1-57b4-fa5993eed9bf@arm.com>
-References: <1501857104-11279-1-git-send-email-sudeep.holla@arm.com>
- <1501857104-11279-17-git-send-email-sudeep.holla@arm.com>
- <20170804193231.GA18153@roeck-us.net>
- <20e0a388-79a1-a7f1-57b4-fa5993eed9bf@arm.com>
-Message-ID: <c695dc09-fc28-518f-f287-bf74e0a2f87e@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 14 Aug 2017 08:09:20 -0700
+Subject: [PATCH 03/11] watchdog: ftwdt010: Make interrupt optional
+In-Reply-To: <20170812184318.10144-4-linus.walleij@linaro.org>
+References: <20170812184318.10144-1-linus.walleij@linaro.org>
+ <20170812184318.10144-4-linus.walleij@linaro.org>
+Message-ID: <20170814150920.GI14491@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+On Sat, Aug 12, 2017 at 08:43:10PM +0200, Linus Walleij wrote:
+> The Moxart does not appear to be using the interrupt from the
+> watchdog timer, maybe it's not even routed, so as to support
+> more architectures with this driver, make the interrupt
+> optional.
+> 
+> While we are at it: actually enable the use of the interrupt
+> if present by setting the right bit in the control register
+> and define the missing control register bits.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/watchdog/ftwdt010_wdt.c | 31 +++++++++++++++++++------------
+>  1 file changed, 19 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/watchdog/ftwdt010_wdt.c b/drivers/watchdog/ftwdt010_wdt.c
+> index 637ffd812f0b..ab38a3a89300 100644
+> --- a/drivers/watchdog/ftwdt010_wdt.c
+> +++ b/drivers/watchdog/ftwdt010_wdt.c
+> @@ -30,6 +30,8 @@
+>  #define WDRESTART_MAGIC		0x5AB9
+>  
+>  #define WDCR_CLOCK_5MHZ		BIT(4)
+> +#define WDCR_WDEXT		BIT(3)
+> +#define WDCR_WDINTR		BIT(2)
+>  #define WDCR_SYS_RST		BIT(1)
+>  #define WDCR_ENABLE		BIT(0)
+>  
+> @@ -39,6 +41,7 @@ struct ftwdt010_wdt {
+>  	struct watchdog_device	wdd;
+>  	struct device		*dev;
+>  	void __iomem		*base;
+> +	bool			has_irq;
+>  };
+>  
+>  static inline
+> @@ -50,14 +53,18 @@ struct ftwdt010_wdt *to_ftwdt010_wdt(struct watchdog_device *wdd)
+>  static int ftwdt010_wdt_start(struct watchdog_device *wdd)
+>  {
+>  	struct ftwdt010_wdt *gwdt = to_ftwdt010_wdt(wdd);
+> +	u32 enable;
+>  
+>  	writel(wdd->timeout * WDT_CLOCK, gwdt->base + FTWDT010_WDLOAD);
+>  	writel(WDRESTART_MAGIC, gwdt->base + FTWDT010_WDRESTART);
+>  	/* set clock before enabling */
+> -	writel(WDCR_CLOCK_5MHZ | WDCR_SYS_RST,
+> -			gwdt->base + FTWDT010_WDCR);
+> -	writel(WDCR_CLOCK_5MHZ | WDCR_SYS_RST | WDCR_ENABLE,
+> -			gwdt->base + FTWDT010_WDCR);
+> +	enable = WDCR_CLOCK_5MHZ | WDCR_SYS_RST;
+> +	writel(enable, gwdt->base + FTWDT010_WDCR);
+> +	enable |= WDCR_CLOCK_5MHZ;
 
-On 07/08/17 13:25, Sudeep Holla wrote:
-> 
-> 
-> On 04/08/17 20:32, Guenter Roeck wrote:
->> On Fri, Aug 04, 2017 at 03:31:42PM +0100, Sudeep Holla wrote:
-> 
-> [...]
-> 
->>> +	platform_set_drvdata(pdev, scmi_sensors);
->>> +
->>> +	hwdev = devm_hwmon_device_register_with_groups(dev, "scmi_sensors",
->>> +						       scmi_sensors,
->>> +						       scmi_sensors->groups);
->>
->> Can you rework this to use devm_hwmon_device_register_with_info(),
->> and if possible let it handle the thermal registration ? 
->>
-> 
-> Thanks for the pointers. I will check on the possibility and use it if
-> possible.
-> 
+This seems wrong/unnecessary. This bit is already set.
 
-I had a look at devm_hwmon_device_register_with_info. It mostly deals
-with constant structures where all the attributes are known at the boot
-time. In case of SCMI, the firmware presents all the sensors and all the
-information(type, scale, name/label, ...etc). Unless I create those
-structures dynamically and typecast as const during probe, I can't get
-it working. Are you OK with that ? If so, I can try making those changes.
-
--- 
-Regards,
-Sudeep
+> +	if (gwdt->has_irq)
+> +		enable |= WDCR_WDINTR;
+> +	enable |= WDCR_ENABLE;
+> +	writel(enable, gwdt->base + FTWDT010_WDCR);
+>  
+>  	return 0;
+>  }
+> @@ -133,10 +140,6 @@ static int ftwdt010_wdt_probe(struct platform_device *pdev)
+>  	if (IS_ERR(gwdt->base))
+>  		return PTR_ERR(gwdt->base);
+>  
+> -	irq = platform_get_irq(pdev, 0);
+> -	if (!irq)
+> -		return -EINVAL;
+> -
+>  	gwdt->dev = dev;
+>  	gwdt->wdd.info = &ftwdt010_wdt_info;
+>  	gwdt->wdd.ops = &ftwdt010_wdt_ops;
+> @@ -158,10 +161,14 @@ static int ftwdt010_wdt_probe(struct platform_device *pdev)
+>  		writel(reg, gwdt->base + FTWDT010_WDCR);
+>  	}
+>  
+> -	ret = devm_request_irq(dev, irq, ftwdt010_wdt_interrupt, 0,
+> -			       "watchdog bark", gwdt);
+> -	if (ret)
+> -		return ret;
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq) {
+> +		ret = devm_request_irq(dev, irq, ftwdt010_wdt_interrupt, 0,
+> +				       "watchdog bark", gwdt);
+> +		if (ret)
+> +			return ret;
+> +		gwdt->has_irq = true;
+> +	}
+>  
+>  	ret = devm_watchdog_register_device(dev, &gwdt->wdd);
+>  	if (ret) {
+> -- 
+> 2.13.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
