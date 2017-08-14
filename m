@@ -1,67 +1,44 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 14 Aug 2017 09:37:50 +0800
-Subject: [RESEND] arm64: dts: ls1088a: Added dcfg node in ls1088a dtsi
-In-Reply-To: <1502443177-15479-1-git-send-email-Ashish.Kumar@nxp.com>
-References: <1502443177-15479-1-git-send-email-Ashish.Kumar@nxp.com>
-Message-ID: <20170814013748.GG31819@dragon>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 14 Aug 2017 09:42:23 +0800
+Subject: [PATCH v3 10/13] ARM: dts: rockchip: add saradc support for rv1108
+In-Reply-To: <2309743.33rDFhBfGp@phil>
+References: <1502422578-30611-1-git-send-email-andy.yan@rock-chips.com>
+ <1502423211-31216-1-git-send-email-andy.yan@rock-chips.com>
+ <2309743.33rDFhBfGp@phil>
+Message-ID: <f920f312-3de2-74cd-d762-ac0d0c9729c8@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 11, 2017 at 02:49:36PM +0530, Ashish Kumar wrote:
-> Add debug configuration node(DCFG) in dtsi, helps guts driver to
-> print the following information in kernel boot log
-> 
-> [    0.526649] Machine: LS1088A RDB Board
-> [    0.530430] SoC family: QorIQ LS1088A
-> [    0.534115] SoC ID: svr:0x87030010, Revision: 1.0
-> 
-> Signed-off-by: Amrita Kumari <amrita.kumari@nxp.com>
-> Signed-off-by: Ashish Kumar <Ashish.Kumar@nxp.com>
+Hi Heiko:
 
-Why resend?
 
-> ---
->  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi |    6 ++++++
->  drivers/soc/fsl/guts.c                         |    1 +
+On 2017?08?13? 20:13, Heiko Stuebner wrote:
+> Hi Andy,
+>
+> Am Freitag, 11. August 2017, 11:46:51 CEST schrieb Andy Yan:
+>> Add saradc device tree node for rv1108 soc
+>>
+>> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+>>
+>> +	adc: adc at 1038c000 {
+>> +		compatible = "rockchip,rv1108-saradc", "rockchip,rk3399-saradc";
+>> +		reg = <0x1038c000 0x100>;
+>> +		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
+>> +		#io-channel-cells = <1>;
+>> +		io-channel-ranges;
+> What do you need the io-channel-ranges for?
+> I.e. according to the documenation it is meant for when the adc is also
+> a "bus node" and has children that should inherit channels from it.
+>
+> In all saradc uses so far we only have separate nodes referencing the
+> adc controller (like adc-keys etc), so this does not look like it is needed?
 
-Do not mix driver code with dts changes.  Instead, they should be
-separate patches going through different subsystem tree and maintainers.
-
-Send me dts patch only after driver counterpart lands on mainline.
-
-Shawn
-
->  2 files changed, 7 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> index c144d06..b5f2372 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> @@ -156,6 +156,12 @@
->  			clocks = <&sysclk>;
->  		};
->  
-> +		dcfg: dcfg at 1e00000 {
-> +			compatible = "fsl,ls1088a-dcfg", "syscon";
-> +			reg = <0x0 0x1e00000 0x0 0x10000>;
-> +			little-endian;
-> +		};
-> +
->  		tmu: tmu at 1f80000 {
->  			compatible = "fsl,qoriq-tmu";
->  			reg = <0x0 0x1f80000 0x0 0x10000>;
-> diff --git a/drivers/soc/fsl/guts.c b/drivers/soc/fsl/guts.c
-> index 6af7a11..d89a6a8 100644
-> --- a/drivers/soc/fsl/guts.c
-> +++ b/drivers/soc/fsl/guts.c
-> @@ -213,6 +213,7 @@ static int fsl_guts_remove(struct platform_device *dev)
->  	{ .compatible = "fsl,ls1021a-dcfg", },
->  	{ .compatible = "fsl,ls1043a-dcfg", },
->  	{ .compatible = "fsl,ls2080a-dcfg", },
-> +	{ .compatible = "fsl,ls1088a-dcfg", },
->  	{}
->  };
->  MODULE_DEVICE_TABLE(of, fsl_guts_of_match);
-> -- 
-> 1.7.6.GIT
-> 
+     Sorry, I just copied it from the downstream dts. After checked with 
+David, he suggested that we could remove it.
+>
+>
+> Heiko
+>
+>
+>
+>
