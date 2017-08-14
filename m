@@ -1,62 +1,43 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Mon, 14 Aug 2017 17:08:48 +0530
-Subject: [PATCH 09/11] ASoC: sh: make snd_soc_platform_driver const
-In-Reply-To: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
-References: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <1502710730-18912-10-git-send-email-bhumirks@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 14 Aug 2017 14:44:12 +0300
+Subject: [PATCH v2 2/2] ARM: OMAP4+: PRM: fix of_irq_get() result checks
+In-Reply-To: <20170809220229.GI3934@atomide.com>
+References: <20170806151714.108596802@cogentembedded.com>
+ <80dd8051-456b-2331-b847-0631d94f85b1@cogentembedded.com>
+ <20170809220229.GI3934@atomide.com>
+Message-ID: <2dfd399c-2760-7d64-a43f-caefde03b39a@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make these const as they are either passed as the 2nd argument to
-the function devm_snd_soc_register_platform or snd_soc_register_platform,
-and the arguments are of type const.
-Done using Coccinelle.
+On 08/10/2017 01:02 AM, Tony Lindgren wrote:
 
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
----
- sound/soc/sh/dma-sh7760.c | 2 +-
- sound/soc/sh/fsi.c        | 2 +-
- sound/soc/sh/rcar/core.c  | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+>>> of_irq_get() may return 0 as well as a nagative error number on failure,
+>>
+>>     Oops, forgot to kill comma...
+> 
+> I can fix that while applying.
 
-diff --git a/sound/soc/sh/dma-sh7760.c b/sound/soc/sh/dma-sh7760.c
-index 8fad444..81c7433 100644
---- a/sound/soc/sh/dma-sh7760.c
-+++ b/sound/soc/sh/dma-sh7760.c
-@@ -320,7 +320,7 @@ static int camelot_pcm_new(struct snd_soc_pcm_runtime *rtd)
- 	return 0;
- }
- 
--static struct snd_soc_platform_driver sh7760_soc_platform = {
-+static const struct snd_soc_platform_driver sh7760_soc_platform = {
- 	.ops		= &camelot_pcm_ops,
- 	.pcm_new	= camelot_pcm_new,
- };
-diff --git a/sound/soc/sh/fsi.c b/sound/soc/sh/fsi.c
-index 005b215..60bb23f 100644
---- a/sound/soc/sh/fsi.c
-+++ b/sound/soc/sh/fsi.c
-@@ -1818,7 +1818,7 @@ static int fsi_pcm_new(struct snd_soc_pcm_runtime *rtd)
- 	},
- };
- 
--static struct snd_soc_platform_driver fsi_soc_platform = {
-+static const struct snd_soc_platform_driver fsi_soc_platform = {
- 	.ops		= &fsi_pcm_ops,
- 	.pcm_new	= fsi_pcm_new,
- };
-diff --git a/sound/soc/sh/rcar/core.c b/sound/soc/sh/rcar/core.c
-index 650cc28..361afc0 100644
---- a/sound/soc/sh/rcar/core.c
-+++ b/sound/soc/sh/rcar/core.c
-@@ -1318,7 +1318,7 @@ static int rsnd_pcm_new(struct snd_soc_pcm_runtime *rtd)
- 		PREALLOC_BUFFER, PREALLOC_BUFFER_MAX);
- }
- 
--static struct snd_soc_platform_driver rsnd_soc_platform = {
-+static const struct snd_soc_platform_driver rsnd_soc_platform = {
- 	.ops		= &rsnd_pcm_ops,
- 	.pcm_new	= rsnd_pcm_new,
- };
--- 
-1.9.1
+    Thanks!
+
+>>> (and never on success), however omap44xx_prm_late_init() regards 0 as a
+>>> valid IRQ -- fix this.
+>>>
+>>> Fixes: a8f83aefcd5a ("ARM: OMAP4+: PRM: register interrupt information from DT")
+>>> Fixes: c5b3955828ba ("ARM: OMAP4: Fix legacy code clean-up regression")
+>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>> [...]
+
+> Seems these both should be safe to apply into fixes-not-urgent for
+> v4.14 merge window as we have not seen any issues with this? Or
+
+    Yes, probably.
+
+> are there some known bugs related to this?
+
+    Dunno, I was just auditing the call sites of of_irq_get[_byname]()...
+
+> Regards,
+> 
+> Tony
+
+MBR, Sergei
