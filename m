@@ -1,48 +1,118 @@
 From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Mon, 14 Aug 2017 23:44:57 +0800
-Subject: [PATCH v10 3/5] PCI: Disable Relaxed Ordering Attributes for AMD A1100
+Date: Mon, 14 Aug 2017 23:44:56 +0800
+Subject: [PATCH v10 2/5] PCI: Disable Relaxed Ordering for some Intel
+ processors
 In-Reply-To: <1502725499-11276-1-git-send-email-dingtianhong@huawei.com>
 References: <1502725499-11276-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1502725499-11276-4-git-send-email-dingtianhong@huawei.com>
+Message-ID: <1502725499-11276-3-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Casey reported that the AMD ARM A1100 SoC has a bug in its PCIe
-Root Port where Upstream Transaction Layer Packets with the Relaxed
-Ordering Attribute clear are allowed to bypass earlier TLPs with
-Relaxed Ordering set, it would cause Data Corruption, so we need
-to disable Relaxed Ordering Attribute when Upstream TLPs to the
-Root Port.
+According to the Intel spec section 3.9.1 said:
+
+    3.9.1 Optimizing PCIe Performance for Accesses Toward Coherent Memory
+          and Toward MMIO Regions (P2P)
+
+    In order to maximize performance for PCIe devices in the processors
+    listed in Table 3-6 below, the soft- ware should determine whether the
+    accesses are toward coherent memory (system memory) or toward MMIO
+    regions (P2P access to other devices). If the access is toward MMIO
+    region, then software can command HW to set the RO bit in the TLP
+    header, as this would allow hardware to achieve maximum throughput for
+    these types of accesses. For accesses toward coherent memory, software
+    can command HW to clear the RO bit in the TLP header (no RO), as this
+    would allow hardware to achieve maximum throughput for these types of
+    accesses.
+
+    Table 3-6. Intel Processor CPU RP Device IDs for Processors Optimizing
+               PCIe Performance
+
+    Processor                            CPU RP Device IDs
+
+    Intel Xeon processors based on       6F01H-6F0EH
+    Broadwell microarchitecture
+
+    Intel Xeon processors based on       2F01H-2F0EH
+    Haswell microarchitecture
+
+It means some Intel processors has performance issue when use the Relaxed
+Ordering Attribute, so disable Relaxed Ordering for these root port.
 
 Signed-off-by: Casey Leedom <leedom@chelsio.com>
 Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
 Acked-by: Alexander Duyck <alexander.h.duyck@intel.com>
 Acked-by: Ashok Raj <ashok.raj@intel.com>
 ---
- drivers/pci/quirks.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/pci/quirks.c | 62 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
 
 diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index 1272f7e..1407604 100644
+index 61b59bf..1272f7e 100644
 --- a/drivers/pci/quirks.c
 +++ b/drivers/pci/quirks.c
-@@ -4089,6 +4089,22 @@ static void quirk_relaxedordering_disable(struct pci_dev *dev)
- 			      quirk_relaxedordering_disable);
+@@ -4027,6 +4027,68 @@ static void quirk_relaxedordering_disable(struct pci_dev *dev)
+ }
  
  /*
-+ * The AMD ARM A1100 (AKA "SEATTLE") SoC has a bug in its PCIe Root Complex
-+ * where Upstream Transaction Layer Packets with the Relaxed Ordering
-+ * Attribute clear are allowed to bypass earlier TLPs with Relaxed Ordering
-+ * set.  This is a violation of the PCIe 3.0 Transaction Ordering Rules
-+ * outlined in Section 2.4.1 (PCI Express(r) Base Specification Revision 3.0
-+ * November 10, 2010).  As a result, on this platform we can't use Relaxed
-+ * Ordering for Upstream TLPs.
++ * Intel Xeon processors based on Broadwell/Haswell microarchitecture Root
++ * Complex has a Flow Control Credit issue which can cause performance
++ * problems with Upstream Transaction Layer Packets with Relaxed Ordering set.
 + */
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a00, PCI_CLASS_NOT_DEFINED, 8,
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f01, PCI_CLASS_NOT_DEFINED, 8,
 +			      quirk_relaxedordering_disable);
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a01, PCI_CLASS_NOT_DEFINED, 8,
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f02, PCI_CLASS_NOT_DEFINED, 8,
 +			      quirk_relaxedordering_disable);
-+DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a02, PCI_CLASS_NOT_DEFINED, 8,
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f03, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f04, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f05, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f06, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f07, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f08, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f09, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f0a, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f0b, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f0c, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f0d, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x6f0e, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x2f01, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x2f02, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x2f03, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x2f04, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x2f05, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x2f06, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x2f07, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x2f08, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x2f09, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x2f0a, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x2f0b, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x2f0c, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x2f0d, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_INTEL, 0x2f0e, PCI_CLASS_NOT_DEFINED, 8,
 +			      quirk_relaxedordering_disable);
 +
 +/*
