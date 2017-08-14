@@ -1,60 +1,147 @@
-From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
-Date: Mon, 14 Aug 2017 21:56:08 +0200
-Subject: [PATCH 0/5] s5p-jpeg fixes
-In-Reply-To: <1502191352-11595-1-git-send-email-andrzej.p@samsung.com>
-References: <CGME20170808112254eucas1p20aacd5bb0737ff85ba4756724af189aa@eucas1p2.samsung.com>
- <1502191352-11595-1-git-send-email-andrzej.p@samsung.com>
-Message-ID: <253fafa5-8403-b098-ccb3-d5cd3ccb1c23@gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 14 Aug 2017 15:08:08 -0500
+Subject: [PATCH 2/2] of: Restrict DMA configuration
+In-Reply-To: <82633e62b64e28dc18bc466319065b92faf2414f.1502468875.git.robin.murphy@arm.com>
+References: <0819179085df6c41c70e83a2c5c138b95c0386b3.1502468875.git.robin.murphy@arm.com>
+ <82633e62b64e28dc18bc466319065b92faf2414f.1502468875.git.robin.murphy@arm.com>
+Message-ID: <CAL_JsqKW7nhkCDu4eEDCgdC87b0MLH1UFO8LvaH22BcJMBsY7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrzej,
++linuxppc-dev
 
-Thanks for the patch set.
+On Fri, Aug 11, 2017 at 11:29 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+> Moving DMA configuration to happen later at driver probe time had the
+> unnoticed side-effect that we now perform DMA configuration for *every*
+> device represented in DT, rather than only those explicitly created by
+> the of_platform and PCI code.
+>
+> As Christoph points out, this is not really the best thing to do. Whilst
+> there may well be other DMA-capable buses that can benefit from having
+> their children automatically configured after the bridge has probed,
+> there are also plenty of others like USB, MDIO, etc. that definitely do
+> not support DMA and should not be indiscriminately processed.
+>
+> The good news is that DT already gives us the ammunition to do the right
+> thing - anything lacking a "dma-ranges" property should be considered
+> not to have a mapping of DMA address space from its children to its
+> parent, thus anything for which of_dma_get_range() does not succeed does
+> not need DMA configuration.
+>
+> The bad news is that strictly enforcing that would likely break just
+> about every FDT platform out there, since most authors have either not
+> considered the property at all or have mistakenly assumed that omitting
+> "dma-ranges" is equivalent to including the empty property. Thus we have
+> little choice but to special-case platform, AMBA and PCI devices so they
+> continue to receive configuration unconditionally as before. At least
+> anything new will have to get it right in future...
 
-On 08/08/2017 01:22 PM, Andrzej Pietrasiewicz wrote:
-> Hi All,
-> 
-> This series contains a number of fixes to the s5p-jpeg driver.
-> 
-> There are two patches from Tony K Nadackal, which got lost long time ago.
-> 
-> @Thierry:
-> The patch changing the software reset routine you sent recently was
-> actually a resend of Tony's patch. I investigated the question why
-> this patch is needed. The encoder/decoder should be disabled as soon
-> as possible, in the interrupt service routine; please see the commit message.
-> I am resending Tony's patch again, with updated commit message.
-> Thank you for reminding about the patch in question!
-> 
-> There are also three patches from me, please see appropriate commit
-> messages.
-> 
-> Rebased onto Mauro's master.
-> 
-> Andrzej Pietrasiewicz (3):
->   media: platform: s5p-jpeg: disable encoder/decoder in exynos4-like
->     hardware after use
->   media: platform: s5p-jpeg: fix number of components macro
->   media: platform: s5p-jpeg: directly use parsed subsampling on 5433
-> 
-> Tony K Nadackal (2):
->   media: platform: s5p-jpeg: Fix crash in jpeg isr due to multiple
->     interrupts.
->   media: platform: s5p-jpeg: Clear JPEG_CODEC_ON bits in sw reset
->     function
-> 
->  drivers/media/platform/s5p-jpeg/jpeg-core.c       | 8 +++++++-
->  drivers/media/platform/s5p-jpeg/jpeg-core.h       | 1 +
->  drivers/media/platform/s5p-jpeg/jpeg-hw-exynos4.c | 9 ++++++++-
->  drivers/media/platform/s5p-jpeg/jpeg-regs.h       | 2 +-
->  4 files changed, 17 insertions(+), 3 deletions(-)
-> 
+By "anything new", you mean new buses, not new platforms, right?
+What's a platform bus device today could be a different kernel bus
+type tomorrow with no DT change. So this isn't really enforceable.
 
-For the whole series:
+I don't completely agree that omitting dma-ranges is wrong and that
+new DTs have to have dma-ranges simply because there is much precedent
+of DTs with dma-ranges omitted (just go look at PPC). If a bus has no
+bus to cpu address translation nor size restrictions, then no
+dma-ranges should be allowed. Of course, DT standards can and do
+evolve and we could decide to be stricter here, but that hasn't
+happened. If it does, then we need to make that clear in the spec and
+enforce it.
 
-Reviewed-by: Jacek Anaszewski <jacek.anaszewski@gmail.com>
+Rob
 
--- 
-Best regards,
-Jacek Anaszewski
+
+>
+> Fixes: 09515ef5ddad ("of/acpi: Configure dma operations at probe time for platform/amba/pci bus devices")
+> Reported-by: Christoph Hellwig <hch@lst.de>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/of/device.c | 48 ++++++++++++++++++++++++++++++++----------------
+>  1 file changed, 32 insertions(+), 16 deletions(-)
+>
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index e0a28ea341fe..04c4c952dc57 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -9,6 +9,9 @@
+>  #include <linux/module.h>
+>  #include <linux/mod_devicetable.h>
+>  #include <linux/slab.h>
+> +#include <linux/pci.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/amba/bus.h>
+>
+>  #include <asm/errno.h>
+>  #include "of_private.h"
+> @@ -84,31 +87,28 @@ int of_device_add(struct platform_device *ofdev)
+>   */
+>  int of_dma_configure(struct device *dev, struct device_node *np)
+>  {
+> -       u64 dma_addr, paddr, size;
+> +       u64 dma_addr, paddr, size = 0;
+>         int ret;
+>         bool coherent;
+>         unsigned long offset;
+>         const struct iommu_ops *iommu;
+>         u64 mask;
+>
+> -       /*
+> -        * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
+> -        * setup the correct supported mask.
+> -        */
+> -       if (!dev->coherent_dma_mask)
+> -               dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> -
+> -       /*
+> -        * Set it to coherent_dma_mask by default if the architecture
+> -        * code has not set it.
+> -        */
+> -       if (!dev->dma_mask)
+> -               dev->dma_mask = &dev->coherent_dma_mask;
+> -
+>         ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+>         if (ret < 0) {
+> +               /*
+> +                * For legacy reasons, we have to assume some devices need
+> +                * DMA configuration regardless of whether "dma-ranges" is
+> +                * correctly specified or not.
+> +                */
+> +               if (!dev_is_pci(dev) &&
+> +#ifdef CONFIG_ARM_AMBA
+> +                   dev->bus != &amba_bustype &&
+> +#endif
+> +                   dev->bus != &platform_bus_type)
+> +                       return ret == -ENODEV ? 0 : ret;
+> +
+>                 dma_addr = offset = 0;
+> -               size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+>         } else {
+>                 offset = PFN_DOWN(paddr - dma_addr);
+>
+> @@ -129,6 +129,22 @@ int of_dma_configure(struct device *dev, struct device_node *np)
+>                 dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+>         }
+>
+> +       /*
+> +        * Set default coherent_dma_mask to 32 bit.  Drivers are expected to
+> +        * setup the correct supported mask.
+> +        */
+> +       if (!dev->coherent_dma_mask)
+> +               dev->coherent_dma_mask = DMA_BIT_MASK(32);
+> +       /*
+> +        * Set it to coherent_dma_mask by default if the architecture
+> +        * code has not set it.
+> +        */
+> +       if (!dev->dma_mask)
+> +               dev->dma_mask = &dev->coherent_dma_mask;
+> +
+> +       if (!size)
+> +               size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+> +
+>         dev->dma_pfn_offset = offset;
+>
+>         /*
+> --
+> 2.13.4.dirty
+>
