@@ -1,44 +1,52 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Mon, 14 Aug 2017 09:42:23 +0800
-Subject: [PATCH v3 10/13] ARM: dts: rockchip: add saradc support for rv1108
-In-Reply-To: <2309743.33rDFhBfGp@phil>
-References: <1502422578-30611-1-git-send-email-andy.yan@rock-chips.com>
- <1502423211-31216-1-git-send-email-andy.yan@rock-chips.com>
- <2309743.33rDFhBfGp@phil>
-Message-ID: <f920f312-3de2-74cd-d762-ac0d0c9729c8@rock-chips.com>
+From: hean.loong.ong@intel.com (Ong, Hean Loong)
+Date: Mon, 14 Aug 2017 02:27:15 +0000
+Subject: [PATCHv6 3/3] ARM:drm ivip Intel FPGA Video and Image
+ Processing Suite
+In-Reply-To: <b3505a39-9fa9-c993-15cb-d643a34f58a9@infradead.org>
+References: <1502434187-6407-1-git-send-email-hean.loong.ong@intel.com>
+ <1502434187-6407-4-git-send-email-hean.loong.ong@intel.com>
+ <b3505a39-9fa9-c993-15cb-d643a34f58a9@infradead.org>
+Message-ID: <1502677633.2192.0.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko:
-
-
-On 2017?08?13? 20:13, Heiko Stuebner wrote:
-> Hi Andy,
->
-> Am Freitag, 11. August 2017, 11:46:51 CEST schrieb Andy Yan:
->> Add saradc device tree node for rv1108 soc
->>
->> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
->>
->> +	adc: adc at 1038c000 {
->> +		compatible = "rockchip,rv1108-saradc", "rockchip,rk3399-saradc";
->> +		reg = <0x1038c000 0x100>;
->> +		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
->> +		#io-channel-cells = <1>;
->> +		io-channel-ranges;
-> What do you need the io-channel-ranges for?
-> I.e. according to the documenation it is meant for when the adc is also
-> a "bus node" and has children that should inherit channels from it.
->
-> In all saradc uses so far we only have separate nodes referencing the
-> adc controller (like adc-keys etc), so this does not look like it is needed?
-
-     Sorry, I just copied it from the downstream dts. After checked with 
-David, he suggested that we could remove it.
->
->
-> Heiko
->
->
->
->
+On Fri, 2017-08-11 at 08:21 -0700, Randy Dunlap wrote:
+> On 08/10/2017 11:49 PM, Hean-Loong, Ong wrote:
+> > 
+> > diff --git a/drivers/gpu/drm/ivip/Kconfig
+> > b/drivers/gpu/drm/ivip/Kconfig
+> > new file mode 100644
+> > index 0000000..398c9ab
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/ivip/Kconfig
+> > @@ -0,0 +1,14 @@
+> > +config DRM_IVIP
+> > +????????tristate "Intel FGPA Video and Image Processing"
+> > +????????depends on DRM && OF
+> > +????????select DRM_GEM_CMA_HELPER
+> > +????????select DRM_KMS_HELPER
+> > +????????select DRM_KMS_FB_HELPER
+> > +????????select DRM_KMS_CMA_HELPER
+> > +????????help
+> > +????????????Choose this option if you have a Intel FPGA Arria 10
+> > system
+> ??????????????????????????????????????????????an
+> 
+> > 
+> > +????????????and above with an Intel Display Port IP. This does not
+> > support
+> > +????????????legacy Intel FPGA Cyclone V display port. Currently
+> > only single
+> > +????????????frame buffer is supported. Note that ACPI and X_86
+> > architecture
+> > +????????????is not supported for Arria10.If M is selected the
+> > module will be
+> ????????????????????????????????????Arria10. If M is
+> 
+> > 
+> > +????????????called ivip.
+> All of the help text should be indented with one tab + 2 spaces
+> according to coding-style.rst.
+> 
+> 
+Noted.
