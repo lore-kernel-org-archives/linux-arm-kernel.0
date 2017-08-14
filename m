@@ -1,185 +1,281 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Mon, 14 Aug 2017 13:28:34 +0300
-Subject: [PATCH v2 1/4] mmc: sdhci: enable/disable the clock in
- sdhci_pltfm_suspend/resume
-In-Reply-To: <1501724656-12435-2-git-send-email-yamada.masahiro@socionext.com>
-References: <1501724656-12435-1-git-send-email-yamada.masahiro@socionext.com>
- <1501724656-12435-2-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <ec385fc0-a17e-7ee4-2414-be9de131ecdc@intel.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Mon, 14 Aug 2017 16:06:53 +0530
+Subject: [PATCH v6] arm64: allwinner: a64: Add initial NanoPi A64 support
+Message-ID: <1502707013-16422-1-git-send-email-jteki@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/08/17 04:44, Masahiro Yamada wrote:
-> This commit provides similar cleanups as commit 83eacdfa2529 ("mmc:
-> sdhci: disable the clock in sdhci_pltfm_unregister()") did for
-> unregister hooks.
-> 
-> Some drivers duplicate code to handle pltfm_host->clk in their own
-> hooks.  The clock can be handled in sdhci_pltfm.c so that drivers
-> can reuse sdhci_pltfm_pmops.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-I would like to see some Acks from other driver maintainers including ones
-that did not previously clk_disable_unprepare(pltfm_host->clk) in suspend
-but now do. e.g. sdhci-tegra
+NanoPi A64 is a new board of high performance with low cost
+designed by FriendlyElec., using the Allwinner A64 SOC.
 
-> ---
-> 
-> Changes in v2:
->   - Fix build error reported by kbuild test robot
-> 
->  drivers/mmc/host/sdhci-brcmstb.c | 37 +------------------------------------
->  drivers/mmc/host/sdhci-pltfm.c   | 16 +++++++++++++++-
->  drivers/mmc/host/sdhci-sirf.c    | 39 +--------------------------------------
->  3 files changed, 17 insertions(+), 75 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-brcmstb.c b/drivers/mmc/host/sdhci-brcmstb.c
-> index e2f638338e8f..6d461fcdd663 100644
-> --- a/drivers/mmc/host/sdhci-brcmstb.c
-> +++ b/drivers/mmc/host/sdhci-brcmstb.c
-> @@ -21,41 +21,6 @@
->  
->  #include "sdhci-pltfm.h"
->  
-> -#ifdef CONFIG_PM_SLEEP
-> -
-> -static int sdhci_brcmstb_suspend(struct device *dev)
-> -{
-> -	struct sdhci_host *host = dev_get_drvdata(dev);
-> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -	int res;
-> -
-> -	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
-> -		mmc_retune_needed(host->mmc);
-> -
-> -	res = sdhci_suspend_host(host);
-> -	if (res)
-> -		return res;
-> -	clk_disable_unprepare(pltfm_host->clk);
-> -	return res;
-> -}
-> -
-> -static int sdhci_brcmstb_resume(struct device *dev)
-> -{
-> -	struct sdhci_host *host = dev_get_drvdata(dev);
-> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -	int err;
-> -
-> -	err = clk_prepare_enable(pltfm_host->clk);
-> -	if (err)
-> -		return err;
-> -	return sdhci_resume_host(host);
-> -}
-> -
-> -#endif /* CONFIG_PM_SLEEP */
-> -
-> -static SIMPLE_DEV_PM_OPS(sdhci_brcmstb_pmops, sdhci_brcmstb_suspend,
-> -			sdhci_brcmstb_resume);
-> -
->  static const struct sdhci_ops sdhci_brcmstb_ops = {
->  	.set_clock = sdhci_set_clock,
->  	.set_bus_width = sdhci_set_bus_width,
-> @@ -131,7 +96,7 @@ MODULE_DEVICE_TABLE(of, sdhci_brcm_of_match);
->  static struct platform_driver sdhci_brcmstb_driver = {
->  	.driver		= {
->  		.name	= "sdhci-brcmstb",
-> -		.pm	= &sdhci_brcmstb_pmops,
-> +		.pm	= &sdhci_pltfm_pmops,
->  		.of_match_table = of_match_ptr(sdhci_brcm_of_match),
->  	},
->  	.probe		= sdhci_brcmstb_probe,
-> diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-> index e090d8c42ddb..be9a79d62e22 100644
-> --- a/drivers/mmc/host/sdhci-pltfm.c
-> +++ b/drivers/mmc/host/sdhci-pltfm.c
-> @@ -212,16 +212,30 @@ EXPORT_SYMBOL_GPL(sdhci_pltfm_unregister);
->  static int sdhci_pltfm_suspend(struct device *dev)
->  {
->  	struct sdhci_host *host = dev_get_drvdata(dev);
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	int ret;
->  
->  	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
->  		mmc_retune_needed(host->mmc);
->  
-> -	return sdhci_suspend_host(host);
-> +	ret = sdhci_suspend_host(host);
-> +	if (ret)
-> +		return ret;
-> +
-> +	clk_disable_unprepare(pltfm_host->clk);
-> +
-> +	return 0;
->  }
->  
->  static int sdhci_pltfm_resume(struct device *dev)
->  {
->  	struct sdhci_host *host = dev_get_drvdata(dev);
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	int ret;
-> +
-> +	ret = clk_prepare_enable(pltfm_host->clk);
-> +	if (ret)
-> +		return ret;
->  
->  	return sdhci_resume_host(host);
->  }
-> diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
-> index c251c6c0a112..0c7aa89df4e2 100644
-> --- a/drivers/mmc/host/sdhci-sirf.c
-> +++ b/drivers/mmc/host/sdhci-sirf.c
-> @@ -230,43 +230,6 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
->  	return ret;
->  }
->  
-> -#ifdef CONFIG_PM_SLEEP
-> -static int sdhci_sirf_suspend(struct device *dev)
-> -{
-> -	struct sdhci_host *host = dev_get_drvdata(dev);
-> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -	int ret;
-> -
-> -	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
-> -		mmc_retune_needed(host->mmc);
-> -
-> -	ret = sdhci_suspend_host(host);
-> -	if (ret)
-> -		return ret;
-> -
-> -	clk_disable(pltfm_host->clk);
-> -
-> -	return 0;
-> -}
-> -
-> -static int sdhci_sirf_resume(struct device *dev)
-> -{
-> -	struct sdhci_host *host = dev_get_drvdata(dev);
-> -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -	int ret;
-> -
-> -	ret = clk_enable(pltfm_host->clk);
-> -	if (ret) {
-> -		dev_dbg(dev, "Resume: Error enabling clock\n");
-> -		return ret;
-> -	}
-> -
-> -	return sdhci_resume_host(host);
-> -}
-> -#endif
-> -
-> -static SIMPLE_DEV_PM_OPS(sdhci_sirf_pm_ops, sdhci_sirf_suspend, sdhci_sirf_resume);
-> -
->  static const struct of_device_id sdhci_sirf_of_match[] = {
->  	{ .compatible = "sirf,prima2-sdhc" },
->  	{ }
-> @@ -277,7 +240,7 @@ static struct platform_driver sdhci_sirf_driver = {
->  	.driver		= {
->  		.name	= "sdhci-sirf",
->  		.of_match_table = sdhci_sirf_of_match,
-> -		.pm	= &sdhci_sirf_pm_ops,
-> +		.pm	= &sdhci_pltfm_pmops,
->  	},
->  	.probe		= sdhci_sirf_probe,
->  	.remove		= sdhci_pltfm_unregister,
-> 
+Nanopi A64 features
+- Allwinner A64, 64-bit Quad-core Cortex-A53 at 648MHz to 1.152GHz, DVFS
+- 1GB DDR3 RAM
+- MicroSD
+- Gigabit Ethernet (RTL8211E)
+- Wi-Fi 802.11b/g/n
+- IR receiver
+- Audio In/Out
+- Video In/Out
+- Serial Debug Port
+- microUSB 5V 2A DC power-supply
+
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v6:
+- Moved uart0 below regulators
+- Add comment for i2c1
+- Update vdd-cpux volt range 1.04 ~ 1.3 V
+- ehci0 detection https://paste.ubuntu.com/25311593/
+- Remove space before usbphy
+- Removed unused DLD02
+- Add comment for DLD01 regulator-name to vcc-dsi since
+  it's connected along with vcc-hdmi
+- Add regulator node for DLD04 for vcc-pg
+Changes for v5:
+- Add AXP803 PMIC regulator support.
+Changes for v4:
+- Rebased and droped wi-fi related nodes, since it require
+  other changes to taken care.
+Changes for v3:
+- Fix to use mmc1 for SDIO instead of mmc2
+- Replace buswidth by 4 instead of 8 mmc1
+- Drop cap-mmc-hw-reset for mmc1
+Changes for v2:
+- Added ohci0, ehci0, ohic1, ehci1, usbphy.
+- Tested on A64
+
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   | 209 +++++++++++++++++++++
+ 2 files changed, 210 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index 108f12c..c997b5c 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -1,4 +1,5 @@
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-sopine-baseboard.dtb
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+new file mode 100644
+index 0000000..c2bbc75
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
+@@ -0,0 +1,209 @@
++/*
++ * Copyright (C) 2017 Jagan Teki <jteki@openedev.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "sun50i-a64.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "FriendlyARM NanoPi A64";
++	compatible = "friendlyarm,nanopi-a64", "allwinner,sun50i-a64";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++/* i2c1 connected with gpio headers like pine64, bananapi */
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
++	status = "okay";
++};
++
++&i2c1_pins {
++	bias-pull-up;
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	vmmc-supply = <&reg_dcdc1>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++	disable-wp;
++	bus-width = <4>;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&r_rsb {
++	status = "okay";
++
++	axp803: pmic at 3a3 {
++		compatible = "x-powers,axp803";
++		reg = <0x3a3>;
++		interrupt-parent = <&r_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++	};
++};
++
++#include "axp803.dtsi"
++
++&reg_aldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pl";
++};
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-pll-avcc";
++};
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-3v";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1040000>;
++	regulator-max-microvolt = <1300000>;
++	regulator-name = "vdd-cpux";
++};
++
++/* DCDC3 is polyphased with DCDC2 */
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1500000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vcc-dram";
++};
++
++&reg_dcdc6 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-sys";
++};
++
++&reg_dldo1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	/* Same used for vcc-dsi */
++	regulator-name = "vcc-hdmi";
++};
++
++&reg_dldo4 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	/* Same used for vdd_wifi-io */
++	regulator-name = "vcc-pg";
++};
++
++&reg_eldo1 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "cpvdd";
++};
++
++&reg_fldo1 {
++	regulator-min-microvolt = <1200000>;
++	regulator-max-microvolt = <1200000>;
++	regulator-name = "vcc-1v2-hsic";
++};
++
++/*
++ * The A64 chip cannot work without this regulator off, although
++ * it seems to be only driving the AR100 core.
++ * Maybe we don't still know well about CPUs domain.
++ */
++&reg_fldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-cpus";
++};
++
++&reg_rtc_ldo {
++	regulator-name = "vcc-rtc";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	status = "okay";
++};
+-- 
+2.7.4
