@@ -1,53 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 14 Aug 2017 09:21:08 -0700
-Subject: [PATCH 2/3] mfd: tps65010: move header file out of I2C realm
-In-Reply-To: <20170814084412.dfbsqfwrgmy5bsu3@dell>
-References: <20170521220212.1404-1-wsa@the-dreams.de>
- <20170521220212.1404-3-wsa@the-dreams.de>
- <20170523071819.4zpdef7ofzz3moil@dell>
- <20170813133445.vqbfelwshvrififp@ninjato>
- <20170814064355.foiilzr5cmwk65hr@dell>
- <20170814084412.dfbsqfwrgmy5bsu3@dell>
-Message-ID: <20170814162108.GW8569@atomide.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 14 Aug 2017 17:22:39 +0100
+Subject: [PATCH 02/30] ARM: assembler: introduce adr_l,
+ ldr_l and str_l macros
+In-Reply-To: <alpine.LFD.2.20.1708141217150.17016@knanqh.ubzr>
+References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
+ <20170814125411.22604-3-ard.biesheuvel@linaro.org>
+ <20170814152950.GT6321@e103592.cambridge.arm.com>
+ <CAKv+Gu87G93X36TdAEiMC46Uz_PqXEi_4LSftnUdkQ8HRCxWiA@mail.gmail.com>
+ <20170814155002.GV6321@e103592.cambridge.arm.com>
+ <alpine.LFD.2.20.1708141217150.17016@knanqh.ubzr>
+Message-ID: <CAKv+Gu_3gb4K_2=igLWMjtXuEcdhnqeoVgaW7Lvqx56AQU-VZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lee Jones <lee.jones@linaro.org> [170814 01:44]:
-> On Mon, 14 Aug 2017, Lee Jones wrote:
-> 
-> > On Sun, 13 Aug 2017, Wolfram Sang wrote:
-> > 
-> > > On Tue, May 23, 2017 at 08:18:19AM +0100, Lee Jones wrote:
-> > > > On Mon, 22 May 2017, Wolfram Sang wrote:
-> > > > 
-> > > > > include/linux/i2c is not for client devices. Move the header file to a
-> > > > > more appropriate location.
-> > > > > 
-> > > > > Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> > > > > ---
-> > > > >  arch/arm/mach-omap1/board-h2-mmc.c      | 2 +-
-> > > > >  arch/arm/mach-omap1/board-h2.c          | 2 +-
-> > > > >  arch/arm/mach-omap1/board-h3-mmc.c      | 2 +-
-> > > > >  arch/arm/mach-omap1/board-h3.c          | 2 +-
-> > > > >  arch/arm/mach-omap1/board-osk.c         | 2 +-
-> > > > >  arch/arm/mach-s3c24xx/mach-osiris-dvs.c | 2 +-
-> > > > >  arch/arm/mach-s3c24xx/mach-osiris.c     | 2 +-
-> > > > 
-> > > > >  drivers/mfd/tps65010.c                  | 2 +-
-> > > > 
-> > > > For my own reference:
-> > > >   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-> > > 
-> > > Same here: ok for 4.14 or something needed?
-> > 
-> > Can this patch be applied on its own, or does it have dependencies?
-> 
-> Even if it doesn't, it still requires Acks.
+On 14 August 2017 at 17:18, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Mon, 14 Aug 2017, Dave Martin wrote:
+>
+>> On Mon, Aug 14, 2017 at 04:38:02PM +0100, Ard Biesheuvel wrote:
+>> > That's a trick, actually, which I failed to add a comment for.
+>
+> Shame shame shame !
+>
+>> > We use .arm sections in the thumb2 kernel, and using these macros
+>> > there would result in the wrong offset to be used. Adding the .w
+>> > suffix forces an error in the assembler which even results in a fairly
+>> > meaningful error message complaining about using .w in ARM code.
+>>
+>> Ewww... I think it'd be best to add a comment explaining that.
+>
+> Absolutely!
+>
 
-As long as this has been compile tested with omap1_defconfig:
+Yeah, mea culpa.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
-
-Regards,
-
-Tony
+But if people have better ideas how to avoid this situation, I am all ears.
