@@ -1,109 +1,67 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 14 Aug 2017 08:09:20 -0700
-Subject: [PATCH 03/11] watchdog: ftwdt010: Make interrupt optional
-In-Reply-To: <20170812184318.10144-4-linus.walleij@linaro.org>
-References: <20170812184318.10144-1-linus.walleij@linaro.org>
- <20170812184318.10144-4-linus.walleij@linaro.org>
-Message-ID: <20170814150920.GI14491@roeck-us.net>
+From: Chris.Paterson2@renesas.com (Chris Paterson)
+Date: Mon, 14 Aug 2017 15:15:17 +0000
+Subject: [PATCH ] mmc: renesas_sdhi: Add r8a7743/5 support
+In-Reply-To: <CAMuHMdVDqgbwKzxFoxajLLFHZC80NT5vrDLnpb9sFj+DL-1zDw@mail.gmail.com>
+References: <1502709581-26546-1-git-send-email-biju.das@bp.renesas.com>
+ <CAMuHMdVDqgbwKzxFoxajLLFHZC80NT5vrDLnpb9sFj+DL-1zDw@mail.gmail.com>
+Message-ID: <TY1PR06MB070269842CD923E4DE4FE6EDB78C0@TY1PR06MB0702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 12, 2017 at 08:43:10PM +0200, Linus Walleij wrote:
-> The Moxart does not appear to be using the interrupt from the
-> watchdog timer, maybe it's not even routed, so as to support
-> more architectures with this driver, make the interrupt
-> optional.
-> 
-> While we are at it: actually enable the use of the interrupt
-> if present by setting the right bit in the control register
-> and define the missing control register bits.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/watchdog/ftwdt010_wdt.c | 31 +++++++++++++++++++------------
->  1 file changed, 19 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/watchdog/ftwdt010_wdt.c b/drivers/watchdog/ftwdt010_wdt.c
-> index 637ffd812f0b..ab38a3a89300 100644
-> --- a/drivers/watchdog/ftwdt010_wdt.c
-> +++ b/drivers/watchdog/ftwdt010_wdt.c
-> @@ -30,6 +30,8 @@
->  #define WDRESTART_MAGIC		0x5AB9
->  
->  #define WDCR_CLOCK_5MHZ		BIT(4)
-> +#define WDCR_WDEXT		BIT(3)
-> +#define WDCR_WDINTR		BIT(2)
->  #define WDCR_SYS_RST		BIT(1)
->  #define WDCR_ENABLE		BIT(0)
->  
-> @@ -39,6 +41,7 @@ struct ftwdt010_wdt {
->  	struct watchdog_device	wdd;
->  	struct device		*dev;
->  	void __iomem		*base;
-> +	bool			has_irq;
->  };
->  
->  static inline
-> @@ -50,14 +53,18 @@ struct ftwdt010_wdt *to_ftwdt010_wdt(struct watchdog_device *wdd)
->  static int ftwdt010_wdt_start(struct watchdog_device *wdd)
->  {
->  	struct ftwdt010_wdt *gwdt = to_ftwdt010_wdt(wdd);
-> +	u32 enable;
->  
->  	writel(wdd->timeout * WDT_CLOCK, gwdt->base + FTWDT010_WDLOAD);
->  	writel(WDRESTART_MAGIC, gwdt->base + FTWDT010_WDRESTART);
->  	/* set clock before enabling */
-> -	writel(WDCR_CLOCK_5MHZ | WDCR_SYS_RST,
-> -			gwdt->base + FTWDT010_WDCR);
-> -	writel(WDCR_CLOCK_5MHZ | WDCR_SYS_RST | WDCR_ENABLE,
-> -			gwdt->base + FTWDT010_WDCR);
-> +	enable = WDCR_CLOCK_5MHZ | WDCR_SYS_RST;
-> +	writel(enable, gwdt->base + FTWDT010_WDCR);
-> +	enable |= WDCR_CLOCK_5MHZ;
 
-This seems wrong/unnecessary. This bit is already set.
+> From: geert.uytterhoeven at gmail.com [mailto:geert.uytterhoeven at gmail.com]
+> On Behalf Of Geert Uytterhoeven
+> Sent: 14 August 2017 15:22
+> 
+> On Mon, Aug 14, 2017 at 1:19 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+> > Add support for r8a7743/5 SoC.Renesas RZ/G1[ME] (R8A7743/5) SDHI is
+> > identical to the R-Car Gen2 family.
+> >
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > ---
+> > This patch is compiled and tested against mmc/next.
+> >
+> >  drivers/mmc/host/renesas_sdhi_sys_dmac.c | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> > diff --git a/drivers/mmc/host/renesas_sdhi_sys_dmac.c
+> > b/drivers/mmc/host/renesas_sdhi_sys_dmac.c
+> > index 718cb8a..f709f7f 100644
+> > --- a/drivers/mmc/host/renesas_sdhi_sys_dmac.c
+> > +++ b/drivers/mmc/host/renesas_sdhi_sys_dmac.c
+> > @@ -95,6 +95,8 @@
+> >         { .compatible = "renesas,sdhi-r7s72100", .data = &of_rz_compatible, },
+> >         { .compatible = "renesas,sdhi-r8a7778", .data =
+> &of_rcar_gen1_compatible, },
+> >         { .compatible = "renesas,sdhi-r8a7779", .data =
+> > &of_rcar_gen1_compatible, },
+> > +       { .compatible = "renesas,sdhi-r8a7743", .data =
+> &of_rcar_gen2_compatible, },
+> > +       { .compatible = "renesas,sdhi-r8a7745", .data =
+> > + &of_rcar_gen2_compatible, },
+> >         { .compatible = "renesas,sdhi-r8a7790", .data =
+> &of_rcar_gen2_compatible, },
+> >         { .compatible = "renesas,sdhi-r8a7791", .data =
+> &of_rcar_gen2_compatible, },
+> >         { .compatible = "renesas,sdhi-r8a7792", .data =
+> > &of_rcar_gen2_compatible, },
+> 
+> I guess we want generic R-Car Gen2/3 compatible values here, too?
 
-> +	if (gwdt->has_irq)
-> +		enable |= WDCR_WDINTR;
-> +	enable |= WDCR_ENABLE;
-> +	writel(enable, gwdt->base + FTWDT010_WDCR);
->  
->  	return 0;
->  }
-> @@ -133,10 +140,6 @@ static int ftwdt010_wdt_probe(struct platform_device *pdev)
->  	if (IS_ERR(gwdt->base))
->  		return PTR_ERR(gwdt->base);
->  
-> -	irq = platform_get_irq(pdev, 0);
-> -	if (!irq)
-> -		return -EINVAL;
-> -
->  	gwdt->dev = dev;
->  	gwdt->wdd.info = &ftwdt010_wdt_info;
->  	gwdt->wdd.ops = &ftwdt010_wdt_ops;
-> @@ -158,10 +161,14 @@ static int ftwdt010_wdt_probe(struct platform_device *pdev)
->  		writel(reg, gwdt->base + FTWDT010_WDCR);
->  	}
->  
-> -	ret = devm_request_irq(dev, irq, ftwdt010_wdt_interrupt, 0,
-> -			       "watchdog bark", gwdt);
-> -	if (ret)
-> -		return ret;
-> +	irq = platform_get_irq(pdev, 0);
-> +	if (irq) {
-> +		ret = devm_request_irq(dev, irq, ftwdt010_wdt_interrupt, 0,
-> +				       "watchdog bark", gwdt);
-> +		if (ret)
-> +			return ret;
-> +		gwdt->has_irq = true;
-> +	}
->  
->  	ret = devm_watchdog_register_device(dev, &gwdt->wdd);
->  	if (ret) {
-> -- 
-> 2.13.4
+Yes, but I assume that should be a separate patch submitted instead of this one?
+
+Kind regards, Chris
+
+
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
 > 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-
+> m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
