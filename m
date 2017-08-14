@@ -1,85 +1,224 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 14 Aug 2017 15:56:27 +0800
-Subject: [linux-sunxi] [PATCH v2] arm64: allwinner: a64: Add A64-OLinuXino
- initial support
-In-Reply-To: <CAD6G_RRMHMrm1wPGJCxQgmOuwhEqVK_zTZF1Fsv9az4tZ1uvBg@mail.gmail.com>
-References: <1502560442-17715-1-git-send-email-jteki@openedev.com>
- <CAGb2v66Scd69iBNxhvYbkqjt7K_5m+S4nYG633O3wYAW_3CyLQ@mail.gmail.com>
- <CAD6G_RRMHMrm1wPGJCxQgmOuwhEqVK_zTZF1Fsv9az4tZ1uvBg@mail.gmail.com>
-Message-ID: <CAGb2v64KJOuS=XfWu=tHyyYbTVjLJKVoTL2cQDyLby=CmnmLWw@mail.gmail.com>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Mon, 14 Aug 2017 15:55:12 +0800
+Subject: [PATCH V15 06/11] acpi: apei: handle SEA notification type for
+ ARMv8
+In-Reply-To: <1492556723-9189-7-git-send-email-tbaicar@codeaurora.org>
+References: <1492556723-9189-1-git-send-email-tbaicar@codeaurora.org>
+ <1492556723-9189-7-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <6a5ef607-ac92-a616-8e60-06c4e51bba04@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 3:34 PM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
-> On Mon, Aug 14, 2017 at 12:38 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->> Hi,
->>
->> On Sun, Aug 13, 2017 at 1:54 AM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
->>> From: Jagan Teki <jagan@amarulasolutions.com>
->>>
->>> OLimex A64-OLinuXino is an open-source hardware board
->>> using the Allwinner A64 SOC.
->>>
->>> OLimex A64-OLinuXino has
->>> - A64 Quad-core Cortex-A53 64bit
->>> - 1GB or 2GB RAM DDR3L @ 672Mhz
->>> - microSD slot and 4/8/16GB eMMC
->>> - Debug TTL UART
->>> - HDMI
->>> - LCD
->>> - IR receiver
->>> - 5V DC power supply
->>
->> Have you tried out Ethernet?
->
-> Not, tested yet. Will send separate patch.
+Hi Tyler,
 
-OK.
+On 2017/4/19 7:05, Tyler Baicar wrote:
+> ARM APEI extension proposal added SEA (Synchronous External Abort)
+> notification type for ARMv8.
+> Add a new GHES error source handling function for SEA. If an error
+> source's notification type is SEA, then this function can be registered
+> into the SEA exception handler. That way GHES will parse and report
+> SEA exceptions when they occur.
+> An SEA can interrupt code that had interrupts masked and is treated as
+> an NMI. To aid this the page of address space for mapping APEI buffers
+> while in_nmi() is always reserved, and ghes_ioremap_pfn_nmi() is
+> changed to use the helper methods to find the prot_t to map with in
+> the same way as ghes_ioremap_pfn_irq().
+> 
+> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> Reviewed-by: James Morse <james.morse@arm.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
 
-[...]
+> @@ -518,6 +520,17 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>  	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+>  		inf->name, esr, addr);
+>  
+> +	/*
+> +	 * Synchronous aborts may interrupt code which had interrupts masked.
+> +	 * Before calling out into the wider kernel tell the interested
+> +	 * subsystems.
+> +	 */
+> +	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
+> +		nmi_enter();
+> +		ghes_notify_sea();
+> +		nmi_exit();
+> +	}
+> +
+>  	info.si_signo = SIGBUS;
+>  	info.si_errno = 0;
+>  	info.si_code  = 0;
+For instruction abort, if there exists memory section in ghes, we will call memory_failure() in ghes_notify_sea()
+and reread the instruction from the disk. In this case, we don't have to send SIGBUS to the application.
+But memory_failure() is scheduled in a work queue, we don't what the result of memory_failure will be when ghes_notify_sea() returned.
+Do you have any idea about how to fix this, so we don't have to kill the application in the instruction abort case.
 
->>> +
->>> +&reg_aldo2 {
->>> +       regulator-always-on;
->>> +       regulator-min-microvolt = <3300000>;
->>> +       regulator-max-microvolt = <3300000>;
->>
->> Schematic says 1.8V?
->
-> I saw ALD02 VCC-PL=3.3v on schematic.
+Thanks,
+Wang Xiongfeng
 
-Ah. I see they changed it in a rev. B. Lets use 3.3V then.
 
->>
->>> +       regulator-name = "vcc-pl";
->>> +};
->>> +
->>> +&reg_aldo3 {
->>> +       regulator-always-on;
->>> +       regulator-min-microvolt = <3000000>;
->>> +       regulator-max-microvolt = <3000000>;
->>> +       regulator-name = "vcc-pll-avcc";
->>> +};
->>> +
->>> +&reg_dcdc1 {
->>> +       regulator-always-on;
->>> +       regulator-min-microvolt = <3300000>;
->>> +       regulator-max-microvolt = <3300000>;
->>> +       regulator-name = "vcc-3v3";
->>> +};
->>> +
->>> +&reg_dcdc2 {
->>> +       regulator-always-on;
->>> +       regulator-min-microvolt = <1100000>;
->>> +       regulator-max-microvolt = <1100000>;
->>
->> The SoC has a wider range than a fixed voltage for the CPUs.
->
-> So, max 1.1v can't enough CPUs? thought similar behavior with pine64?
-
-The recommended operating conditions says 1.04 ~ 1.3 V for CPUx,
-while the typical voltage is 1.1V. The regulator constraints should
-match the datasheet, especially for power rails that are involved in
-DVFS.
-
-ChenYu
+> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+> index b0140c8..de14d49 100644
+> --- a/drivers/acpi/apei/Kconfig
+> +++ b/drivers/acpi/apei/Kconfig
+> @@ -39,6 +39,21 @@ config ACPI_APEI_PCIEAER
+>  	  PCIe AER errors may be reported via APEI firmware first mode.
+>  	  Turn on this option to enable the corresponding support.
+>  
+> +config ACPI_APEI_SEA
+> +	bool "APEI Synchronous External Abort logging/recovering support"
+> +	depends on ARM64 && ACPI_APEI_GHES
+> +	default y
+> +	help
+> +	  This option should be enabled if the system supports
+> +	  firmware first handling of SEA (Synchronous External Abort).
+> +	  SEA happens with certain faults of data abort or instruction
+> +	  abort synchronous exceptions on ARMv8 systems. If a system
+> +	  supports firmware first handling of SEA, the platform analyzes
+> +	  and handles hardware error notifications from SEA, and it may then
+> +	  form a HW error record for the OS to parse and handle. This
+> +	  option allows the OS to look for such hardware error record, and
+> +	  take appropriate action.
+> +
+>  config ACPI_APEI_MEMORY_FAILURE
+>  	bool "APEI memory error recovering support"
+>  	depends on ACPI_APEI && MEMORY_FAILURE
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index dfb7dd2..2d387f8 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -115,11 +115,7 @@
+>   * Two virtual pages are used, one for IRQ/PROCESS context, the other for
+>   * NMI context (optionally).
+>   */
+> -#ifdef CONFIG_HAVE_ACPI_APEI_NMI
+>  #define GHES_IOREMAP_PAGES           2
+> -#else
+> -#define GHES_IOREMAP_PAGES           1
+> -#endif
+>  #define GHES_IOREMAP_IRQ_PAGE(base)	(base)
+>  #define GHES_IOREMAP_NMI_PAGE(base)	((base) + PAGE_SIZE)
+>  
+> @@ -158,10 +154,14 @@ static void ghes_ioremap_exit(void)
+>  static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
+>  {
+>  	unsigned long vaddr;
+> +	phys_addr_t paddr;
+> +	pgprot_t prot;
+>  
+>  	vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
+> -	ioremap_page_range(vaddr, vaddr + PAGE_SIZE,
+> -			   pfn << PAGE_SHIFT, PAGE_KERNEL);
+> +
+> +	paddr = pfn << PAGE_SHIFT;
+> +	prot = arch_apei_get_mem_attribute(paddr);
+> +	ioremap_page_range(vaddr, vaddr + PAGE_SIZE, paddr, prot);
+>  
+>  	return (void __iomem *)vaddr;
+>  }
+> @@ -771,6 +771,50 @@ static int ghes_notify_sci(struct notifier_block *this,
+>  	.notifier_call = ghes_notify_sci,
+>  };
+>  
+> +#ifdef CONFIG_ACPI_APEI_SEA
+> +static LIST_HEAD(ghes_sea);
+> +
+> +void ghes_notify_sea(void)
+> +{
+> +	struct ghes *ghes;
+> +
+> +	/*
+> +	 * synchronize_rcu() will wait for nmi_exit(), so no need to
+> +	 * rcu_read_lock().
+> +	 */
+> +	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
+> +		ghes_proc(ghes);
+> +	}
+> +}
+> +
+> +static void ghes_sea_add(struct ghes *ghes)
+> +{
+> +	mutex_lock(&ghes_list_mutex);
+> +	list_add_rcu(&ghes->list, &ghes_sea);
+> +	mutex_unlock(&ghes_list_mutex);
+> +}
+> +
+> +static void ghes_sea_remove(struct ghes *ghes)
+> +{
+> +	mutex_lock(&ghes_list_mutex);
+> +	list_del_rcu(&ghes->list);
+> +	mutex_unlock(&ghes_list_mutex);
+> +	synchronize_rcu();
+> +}
+> +#else /* CONFIG_ACPI_APEI_SEA */
+> +static inline void ghes_sea_add(struct ghes *ghes)
+> +{
+> +	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not supported\n",
+> +	       ghes->generic->header.source_id);
+> +}
+> +
+> +static inline void ghes_sea_remove(struct ghes *ghes)
+> +{
+> +	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not supported\n",
+> +	       ghes->generic->header.source_id);
+> +}
+> +#endif /* CONFIG_ACPI_APEI_SEA */
+> +
+>  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+>  /*
+>   * printk is not safe in NMI context.  So in NMI handler, we allocate
+> @@ -1016,6 +1060,14 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>  	case ACPI_HEST_NOTIFY_EXTERNAL:
+>  	case ACPI_HEST_NOTIFY_SCI:
+>  		break;
+> +	case ACPI_HEST_NOTIFY_SEA:
+> +		if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
+> +			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEA is not supported\n",
+> +				generic->header.source_id);
+> +			rc = -ENOTSUPP;
+> +			goto err;
+> +		}
+> +		break;
+>  	case ACPI_HEST_NOTIFY_NMI:
+>  		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
+>  			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
+> @@ -1081,6 +1133,9 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>  		list_add_rcu(&ghes->list, &ghes_sci);
+>  		mutex_unlock(&ghes_list_mutex);
+>  		break;
+> +	case ACPI_HEST_NOTIFY_SEA:
+> +		ghes_sea_add(ghes);
+> +		break;
+>  	case ACPI_HEST_NOTIFY_NMI:
+>  		ghes_nmi_add(ghes);
+>  		break;
+> @@ -1124,6 +1179,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
+>  		mutex_unlock(&ghes_list_mutex);
+>  		synchronize_rcu();
+>  		break;
+> +	case ACPI_HEST_NOTIFY_SEA:
+> +		ghes_sea_remove(ghes);
+> +		break;
+>  	case ACPI_HEST_NOTIFY_NMI:
+>  		ghes_nmi_remove(ghes);
+>  		break;
+> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+> index b89361a..ef0040893 100644
+> --- a/include/acpi/ghes.h
+> +++ b/include/acpi/ghes.h
+> @@ -1,3 +1,6 @@
+> +#ifndef GHES_H
+> +#define GHES_H
+> +
+>  #include <acpi/apei.h>
+>  #include <acpi/hed.h>
+>  
+> @@ -95,3 +98,7 @@ static inline void *acpi_hest_get_payload(struct acpi_hest_generic_data *gdata)
+>  
+>  	return gdata + 1;
+>  }
+> +
+> +void ghes_notify_sea(void);
+> +
+> +#endif /* GHES_H */
+> 
