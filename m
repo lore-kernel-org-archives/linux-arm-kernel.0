@@ -1,35 +1,29 @@
-From: pasha.tatashin@oracle.com (Pasha Tatashin)
-Date: Mon, 14 Aug 2017 09:35:16 -0400
-Subject: [v6 04/15] mm: discard memblock data later
-In-Reply-To: <20170814113652.GF19063@dhcp22.suse.cz>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-5-git-send-email-pasha.tatashin@oracle.com>
- <20170811093249.GE30811@dhcp22.suse.cz>
- <6366171f-1a30-2faa-d776-01983fcb5a00@oracle.com>
- <20170811160436.GS30811@dhcp22.suse.cz>
- <a63eb223-455f-ae57-122f-7b2655e3de26@oracle.com>
- <20170814113652.GF19063@dhcp22.suse.cz>
-Message-ID: <3c223cac-68f8-f810-38dd-4ff580048e63@oracle.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 14 Aug 2017 15:38:16 +0200
+Subject: device tree bindings for lp5523 leds on N950?
+Message-ID: <20170814133816.GA24493@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> OK, I will post it separately. No it does not depend on the rest, but the
->> reset depends on this. So, I am not sure how to enforce that this comes
->> before the rest.
-> 
-> Andrew will take care of that. Just make it explicit that some of the
-> patch depends on an earlier work when reposting.
+Hi!
 
-Ok.
+I'm (still) trying to debug "N950 not booting" situation. I'm stuck
+with black screen, so I thought it would be cool to use RGB led for
+debugging...
 
->> Yes, they said that the problem was bisected down to this patch. Do you know
->> if there is a way to submit a patch to this test robot?
-> 
-> You can ask them for re testing with an updated patch by replying to
-> their report. ANyway I fail to see how the change could lead to this
-> patch.
+Unfortunately, I don't see required dts bindings in the mainline.
 
-I have already done that. Anyway, I think it is unrelated. I have used 
-their scripts to test the patch alone, with number of elements in 
-memblock array reduced down to 4. Verified that my freeing code is 
-called, and never hit the problem that they reported.
+Does anyone have that working?
+
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170814/a5fdea4d/attachment.sig>
