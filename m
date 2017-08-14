@@ -1,71 +1,78 @@
-From: gary.hook@amd.com (Gary R Hook)
-Date: Mon, 14 Aug 2017 11:55:44 -0500
-Subject: [PATCH v5 02/19] crypto: ccp: use -EAGAIN for transient busy
- indication
-In-Reply-To: <1502724094-23305-3-git-send-email-gilad@benyossef.com>
-References: <1502724094-23305-1-git-send-email-gilad@benyossef.com>
- <1502724094-23305-3-git-send-email-gilad@benyossef.com>
-Message-ID: <28b9a7d4-d329-bb1e-d4eb-6530795eaa0b@amd.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 14 Aug 2017 17:45:18 +0100
+Subject: Applied "spi: rockchip: add compatible string for rv1108 spi" to the
+ spi tree
+In-Reply-To: <1501663563-12482-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <E1dhIUQ-0005k7-1c@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/14/2017 10:21 AM, Gilad Ben-Yossef wrote:
-> Replace -EBUSY with -EAGAIN when reporting transient busy
-> indication in the absence of backlog.
->
-> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+The patch
 
-Reviewed-by: Gary R Hook <gary.hook@amd.com>
+   spi: rockchip: add compatible string for rv1108 spi
 
-> ---
->  drivers/crypto/ccp/ccp-crypto-main.c | 8 +++-----
->  drivers/crypto/ccp/ccp-dev.c         | 7 +++++--
->  2 files changed, 8 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/crypto/ccp/ccp-crypto-main.c b/drivers/crypto/ccp/ccp-crypto-main.c
-> index 35a9de7..403ff0a 100644
-> --- a/drivers/crypto/ccp/ccp-crypto-main.c
-> +++ b/drivers/crypto/ccp/ccp-crypto-main.c
-> @@ -222,9 +222,10 @@ static int ccp_crypto_enqueue_cmd(struct ccp_crypto_cmd *crypto_cmd)
->
->  	/* Check if the cmd can/should be queued */
->  	if (req_queue.cmd_count >= CCP_CRYPTO_MAX_QLEN) {
-> -		ret = -EBUSY;
-> -		if (!(crypto_cmd->cmd->flags & CCP_CMD_MAY_BACKLOG))
-> +		if (!(crypto_cmd->cmd->flags & CCP_CMD_MAY_BACKLOG)) {
-> +			ret = -EAGAIN;
->  			goto e_lock;
-> +		}
->  	}
->
->  	/* Look for an entry with the same tfm.  If there is a cmd
-> @@ -243,9 +244,6 @@ static int ccp_crypto_enqueue_cmd(struct ccp_crypto_cmd *crypto_cmd)
->  		ret = ccp_enqueue_cmd(crypto_cmd->cmd);
->  		if (!ccp_crypto_success(ret))
->  			goto e_lock;	/* Error, don't queue it */
-> -		if ((ret == -EBUSY) &&
-> -		    !(crypto_cmd->cmd->flags & CCP_CMD_MAY_BACKLOG))
-> -			goto e_lock;	/* Not backlogging, don't queue it */
->  	}
->
->  	if (req_queue.cmd_count >= CCP_CRYPTO_MAX_QLEN) {
-> diff --git a/drivers/crypto/ccp/ccp-dev.c b/drivers/crypto/ccp/ccp-dev.c
-> index 4e029b1..3d637e3 100644
-> --- a/drivers/crypto/ccp/ccp-dev.c
-> +++ b/drivers/crypto/ccp/ccp-dev.c
-> @@ -292,9 +292,12 @@ int ccp_enqueue_cmd(struct ccp_cmd *cmd)
->  	i = ccp->cmd_q_count;
->
->  	if (ccp->cmd_count >= MAX_CMD_QLEN) {
-> -		ret = -EBUSY;
-> -		if (cmd->flags & CCP_CMD_MAY_BACKLOG)
-> +		if (cmd->flags & CCP_CMD_MAY_BACKLOG) {
-> +			ret = -EBUSY;
->  			list_add_tail(&cmd->entry, &ccp->backlog);
-> +		} else {
-> +			ret = -EAGAIN;
-> +		}
->  	} else {
->  		ret = -EINPROGRESS;
->  		ccp->cmd_count++;
->
+has been applied to the spi tree at
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 6b860e69e873be247d19174ab6b24d0b5741bf8c Mon Sep 17 00:00:00 2001
+From: Andy Yan <andy.yan@rock-chips.com>
+Date: Mon, 14 Aug 2017 16:34:22 +0800
+Subject: [PATCH] spi: rockchip: add compatible string for rv1108 spi
+
+The spi on rv1108 is the same as other rockchip based
+socs, add compatible string for it.
+
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ Documentation/devicetree/bindings/spi/spi-rockchip.txt | 1 +
+ drivers/spi/spi-rockchip.c                             | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+index 83da4931d832..6e3ffacbba32 100644
+--- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
++++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+@@ -6,6 +6,7 @@ and display controllers using the SPI communication interface.
+ Required Properties:
+ 
+ - compatible: should be one of the following.
++    "rockchip,rv1108-spi" for rv1108 SoCs.
+     "rockchip,rk3036-spi" for rk3036 SoCS.
+     "rockchip,rk3066-spi" for rk3066 SoCs.
+     "rockchip,rk3188-spi" for rk3188 SoCs.
+diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+index 34f6440a5255..474033e2149e 100644
+--- a/drivers/spi/spi-rockchip.c
++++ b/drivers/spi/spi-rockchip.c
+@@ -914,6 +914,7 @@ static const struct dev_pm_ops rockchip_spi_pm = {
+ };
+ 
+ static const struct of_device_id rockchip_spi_dt_match[] = {
++	{ .compatible = "rockchip,rv1108-spi", },
+ 	{ .compatible = "rockchip,rk3036-spi", },
+ 	{ .compatible = "rockchip,rk3066-spi", },
+ 	{ .compatible = "rockchip,rk3188-spi", },
+-- 
+2.13.2
