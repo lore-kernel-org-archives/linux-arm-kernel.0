@@ -1,88 +1,113 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 14 Aug 2017 16:31:29 +0200
-Subject: [PATCH v2] ARM64: dts: marvell: add NAND support on the CP110
-In-Reply-To: <20170804153232.10686-1-gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Fri, 4 Aug 2017 17:32:32 +0200")
-References: <20170804153232.10686-1-gregory.clement@free-electrons.com>
-Message-ID: <87wp66kypq.fsf@free-electrons.com>
+Date: Mon, 14 Aug 2017 16:31:51 +0200
+Subject: [PATCH 1/2] ARM64: dts: marvell: enable USB host on Armada-7040-DB
+In-Reply-To: <20170809144437.26858-1-miquel.raynal@free-electrons.com> (Miquel
+ Raynal's message of "Wed, 9 Aug 2017 16:44:36 +0200")
+References: <20170809140538.692b3e6d@windsurf>
+ <20170809144437.26858-1-miquel.raynal@free-electrons.com>
+Message-ID: <87shgukyp4.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Miquel,
  
- On ven., ao?t 04 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+ On mer., ao?t 09 2017, Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-> The NAND controller used in A7K/A8K is present on the CP110. It is
-> compatible with the pxa-nand driver.
+> From: Hanna Hawa <hannah@marvell.com>
 >
-> However, due to the limiation of the pins available this controller is
-> only usable on the CPM for A7K and on the CPS for A8K.
+> Add I2C expander and USB host PHY (host 0 and host 1) to enable
+> USB VBUS on USB ports of type A on Armada-7040-DB.
 >
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
 Applied on mvebu/dt64
 
+Thanks,
+
 Gregory
 
+> Signed-off-by: Hanna Hawa <hannah@marvell.com>
+> Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 > ---
->  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 15 +++++++++++++++
->  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 15 +++++++++++++++
->  2 files changed, 30 insertions(+)
+>  arch/arm64/boot/dts/marvell/armada-7040-db.dts | 39 ++++++++++++++++++++++++++
+>  1 file changed, 39 insertions(+)
 >
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> index 5586a732e1be..8b019a9f4f59 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> @@ -249,6 +249,21 @@
->  				status = "disabled";
->  			};
+> diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+> index 92c761c380d3..9c3bdf87e543 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+> @@ -44,6 +44,7 @@
+>   * Device Tree file for Marvell Armada 7040 Development board platform
+>   */
 >  
-> +			cpm_nand: nand at 720000 {
-> +				/*
-> +				 * Due to the limiation of the pin available
-> +				 * this controller is only usable on the CPM
-> +				 * for A7K and on the CPS for A8K.
-> +				 */
-> +				compatible = "marvell,armada370-nand";
-> +				reg = <0x720000 0x54>;
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				interrupts = <ICU_GRP_NSR 115 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&cpm_clk 1 2>;
-> +				status = "disabled";
-> +			};
-> +
->  			cpm_trng: trng at 760000 {
->  				compatible = "marvell,armada-8k-rng", "inside-secure,safexcel-eip76";
->  				reg = <0x760000 0x7d>;
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index 4be43f1f5aa2..7c1100133731 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -250,6 +250,21 @@
->  				status = "disabled";
->  			};
+> +#include <dt-bindings/gpio/gpio.h>
+>  #include "armada-7040.dtsi"
 >  
-> +			cps_nand: nand at 720000 {
-> +				/*
-> +				 * Due to the limiation of the pin available
-> +				 * this controller is only usable on the CPM
-> +				 * for A7K and on the CPS for A8K.
-> +				 */
-> +				compatible = "marvell,armada370-nand";
-> +				reg = <0x720000 0x54>;
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				interrupts = <ICU_GRP_NSR 115 IRQ_TYPE_LEVEL_HIGH>;
-> +				clocks = <&cps_clk 1 2>;
-> +				status = "disabled";
-> +			};
+>  / {
+> @@ -59,6 +60,34 @@
+>  		device_type = "memory";
+>  		reg = <0x0 0x0 0x0 0x80000000>;
+>  	};
 > +
->  			cps_trng: trng at 760000 {
->  				compatible = "marvell,armada-8k-rng", "inside-secure,safexcel-eip76";
->  				reg = <0x760000 0x7d>;
+> +	cpm_reg_usb3_0_vbus: cpm-usb3-0-vbus {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "usb3h0-vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		enable-active-high;
+> +		gpio = <&expander0 0 GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+> +	cpm_reg_usb3_1_vbus: cpm-usb3-1-vbus {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "usb3h1-vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		enable-active-high;
+> +		gpio = <&expander0 1 GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+> +	cpm_usb3_0_phy: cpm-usb3-0-phy {
+> +		compatible = "usb-nop-xceiv";
+> +		vcc-supply = <&cpm_reg_usb3_0_vbus>;
+> +	};
+> +
+> +	cpm_usb3_1_phy: cpm-usb3-1-phy {
+> +		compatible = "usb-nop-xceiv";
+> +		vcc-supply = <&cpm_reg_usb3_1_vbus>;
+> +	};
+>  };
+>  
+>  &i2c0 {
+> @@ -105,6 +134,14 @@
+>  &cpm_i2c0 {
+>  	status = "okay";
+>  	clock-frequency = <100000>;
+> +
+> +	expander0: pca9555 at 21 {
+> +		compatible = "nxp,pca9555";
+> +		pinctrl-names = "default";
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +		reg = <0x21>;
+> +	};
+>  };
+>  
+>  &cpm_spi1 {
+> @@ -140,10 +177,12 @@
+>  };
+>  
+>  &cpm_usb3_0 {
+> +	usb-phy = <&cpm_usb3_0_phy>;
+>  	status = "okay";
+>  };
+>  
+>  &cpm_usb3_1 {
+> +	usb-phy = <&cpm_usb3_1_phy>;
+>  	status = "okay";
+>  };
+>  
 > -- 
-> 2.13.2
+> 2.11.0
 >
 
 -- 
