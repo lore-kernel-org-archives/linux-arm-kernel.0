@@ -1,65 +1,54 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 14 Aug 2017 19:11:35 +0200 (CEST)
-Subject: [PATCH] ARM: bcm2836: Send event when onlining other cores
-In-Reply-To: <fdecf317-d20b-1a5d-046f-56ef40c55d82@gmail.com>
-References: <1502190295-53391-1-git-send-email-phil@raspberrypi.org>
- <1502190295-53391-2-git-send-email-phil@raspberrypi.org>
- <fdecf317-d20b-1a5d-046f-56ef40c55d82@gmail.com>
-Message-ID: <1168905996.270506.1502730695418@email.1und1.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 14 Aug 2017 18:13:39 +0100
+Subject: [PATCH 10/14] arm64: assembler: allow adr_this_cpu to use the
+ stack pointer
+In-Reply-To: <1502130965-18710-11-git-send-email-mark.rutland@arm.com>
+References: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
+ <1502130965-18710-11-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170814171338.gvtn76awussgxctn@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+On Mon, Aug 07, 2017 at 07:36:01PM +0100, Mark Rutland wrote:
+> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> 
+> Given that adr_this_cpu already requires a temp register in addition
+> to the destination register, tweak the instruction sequence so that sp
+> may be used as well.
+> 
+> This will simplify switching to per-cpu stacks in subsequent patches. While
+> this limits the range of adr_this_cpu, to +/-4GiB, we don't currently use
+> adr_this_cpu in modules, and this is not problematic for the main kernel image.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> [Mark: add more commit text]
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Laura Abbott <labbott@redhat.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/assembler.h | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> index 610a420..4775af5 100644
+> --- a/arch/arm64/include/asm/assembler.h
+> +++ b/arch/arm64/include/asm/assembler.h
+> @@ -235,7 +235,8 @@
+>  	 * @tmp: scratch register
+>  	 */
+>  	.macro adr_this_cpu, dst, sym, tmp
+> -	adr_l	\dst, \sym
+> +	adrp	\tmp, \sym
+> +	add	\dst, \tmp, #:lo12:\sym
+>  	mrs	\tmp, tpidr_el1
+>  	add	\dst, \dst, \tmp
+>  	.endm
 
-> Florian Fainelli <f.fainelli@gmail.com> hat am 14. August 2017 um 18:25 geschrieben:
-> 
-> 
-> 
-> 
-> On 08/08/2017 04:04 AM, Phil Elwell wrote:
-> > Secondary cores should enter a low-power idle state when waiting to
-> > be started. The "wfe" instruction causes a core to wait until an event
-> > or interrupt arrives before continuing to the next instruction, and
-> > the "sev" instruction sends a wakeup event to the other cores.
-> > 
-> > Add an "sev" (and a memory barrier) to bcm2836_boot_secondary, the
-> > function that wakes the waiting cores during booting. This is required
-> > if the secondary cores are sitting in "wfe", and harmless if not.
-> 
-> Eric, should I just pick this up for the upcoming ARM SoC pull requests
-> that I am preparing, or do you have more changes aside from the two tags
-> I already merged?
+Nitpick: it may be worth adding an #ifndef MODULE around these macros,
+together with a comment, just in case. There are other macros in this
+file like adr_l which are used in modules (crypto).
 
-this patch depends on series "ARM: bcm2836: Move SMP startup code to arch/arm".
-
-I didn't had the time to test Phil's patch in all relevant cases. But i could at least prepare a branch with my changes with the acks.
-
-Stefan
-
-> 
-> Thanks!
-> 
-> > 
-> > Signed-off-by: Phil Elwell <phil@raspberrypi.org>
-> > ---
-> >  arch/arm/mach-bcm/platsmp.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-bcm/platsmp.c b/arch/arm/mach-bcm/platsmp.c
-> > index 3fa1a99..7811160 100644
-> > --- a/arch/arm/mach-bcm/platsmp.c
-> > +++ b/arch/arm/mach-bcm/platsmp.c
-> > @@ -312,6 +312,9 @@ static int bcm2836_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> >  	writel(virt_to_phys(secondary_startup),
-> >  	       intc_base + LOCAL_MAILBOX3_SET0 + 16 * cpu);
-> >  
-> > +	dsb(sy);
-> > +	sev();
-> > +
-> >  	iounmap(intc_base);
-> >  
-> >  	return 0;
-> > 
-> 
-> -- 
-> Florian
+-- 
+Catalin
