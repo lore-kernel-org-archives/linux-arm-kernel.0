@@ -1,44 +1,33 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 14 Aug 2017 13:43:26 +0200
-Subject: [v6 02/15] x86/mm: setting fields in deferred pages
-In-Reply-To: <b0422e38-a6da-081a-71c5-82a36dd2a5bb@oracle.com>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-3-git-send-email-pasha.tatashin@oracle.com>
- <20170811090214.GD30811@dhcp22.suse.cz>
- <b0422e38-a6da-081a-71c5-82a36dd2a5bb@oracle.com>
-Message-ID: <20170814114326.GH19063@dhcp22.suse.cz>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Mon, 14 Aug 2017 17:08:43 +0530
+Subject: [PATCH 04/11] ASoC: nuc900: make snd_soc_platform_driver const
+In-Reply-To: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
+References: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <1502710730-18912-5-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 11-08-17 11:39:41, Pasha Tatashin wrote:
-> >AFAIU register_page_bootmem_info_node is only about struct pages backing
-> >pgdat, usemap and memmap. Those should be in reserved memblocks and we
-> >do not initialize those at later times, they are not relevant to the
-> >deferred initialization as your changelog suggests so the ordering with
-> >get_page_bootmem shouldn't matter. Or am I missing something here?
-> 
-> The pages for pgdata, usemap, and memmap are part of reserved, and thus
-> getting initialized when free_all_bootmem() is called.
-> 
-> So, we have something like this in mem_init()
-> 
-> register_page_bootmem_info
->  register_page_bootmem_info_node
->   get_page_bootmem
->    .. setting fields here ..
->    such as: page->freelist = (void *)type;
-> 
-> free_all_bootmem()
->  free_low_memory_core_early()
->   for_each_reserved_mem_region()
->    reserve_bootmem_region()
->     init_reserved_page() <- Only if this is deferred reserved page
->      __init_single_pfn()
->       __init_single_page()
->           memset(0) <-- Loose the set fields here!
+Make this const as it is only passed as the 2nd argument to the
+function devm_snd_soc_register_platform, which is of type const.
+Done using Coccinelle
 
-OK, I have missed that part. Please make it explicit in the changelog.
-It is quite easy to get lost in the deep call chains.
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
+ sound/soc/nuc900/nuc900-pcm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/nuc900/nuc900-pcm.c b/sound/soc/nuc900/nuc900-pcm.c
+index 2cca055..cd0486c 100644
+--- a/sound/soc/nuc900/nuc900-pcm.c
++++ b/sound/soc/nuc900/nuc900-pcm.c
+@@ -299,7 +299,7 @@ static int nuc900_dma_new(struct snd_soc_pcm_runtime *rtd)
+ 	return 0;
+ }
+ 
+-static struct snd_soc_platform_driver nuc900_soc_platform = {
++static const struct snd_soc_platform_driver nuc900_soc_platform = {
+ 	.ops		= &nuc900_dma_ops,
+ 	.pcm_new	= nuc900_dma_new,
+ };
 -- 
-Michal Hocko
-SUSE Labs
+1.9.1
