@@ -1,65 +1,36 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 13:54:01 +0100
-Subject: [PATCH 20/30] ARM: kernel: use PC relative symbol references in
- suspend/resume code
-In-Reply-To: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
-References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170814125411.22604-21-ard.biesheuvel@linaro.org>
+From: pasha.tatashin@oracle.com (Pasha Tatashin)
+Date: Mon, 14 Aug 2017 09:30:35 -0400
+Subject: [v6 01/15] x86/mm: reserve only exiting low pages
+In-Reply-To: <20170814114011.GG19063@dhcp22.suse.cz>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-2-git-send-email-pasha.tatashin@oracle.com>
+ <20170811080706.GC30811@dhcp22.suse.cz>
+ <47ebf53b-ea8b-1822-a63a-3682ed2f4753@oracle.com>
+ <20170814114011.GG19063@dhcp22.suse.cz>
+Message-ID: <8da779a0-ade4-e43e-3b14-2686e347f8ab@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace some unnecessary absolute references with relative ones. Also,
-to prepare for runtime relocation, which occurs with the caches on,
-defer taking the absolute address of cpu_resume_after_mmu() until after
-the MMU is enabled.
+>> Correct, the pgflags asserts were triggered when we were setting reserved
+>> flags to struct page for PFN 0 in which was never initialized through
+>> __init_single_page(). The reason they were triggered is because we set all
+>> uninitialized memory to ones in one of the debug patches.
+> 
+> And why don't we need the same treatment for other architectures?
+> 
 
-Cc: Russell King <linux@armlinux.org.uk>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/kernel/sleep.S | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+I have not seen similar issues on other architectures. At least this low 
+memory reserve is x86 specific for BIOS purposes:
 
-diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index 3026b119d3ff..9efd1c7d3552 100644
---- a/arch/arm/kernel/sleep.S
-+++ b/arch/arm/kernel/sleep.S
-@@ -60,18 +60,17 @@
- ENTRY(__cpu_suspend)
- 	stmfd	sp!, {r4 - r11, lr}
- #ifdef MULTI_CPU
--	ldr	r10, =processor
--	ldr	r4, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
-+	ldr_l	r4, processor + CPU_SLEEP_SIZE	@ size of CPU sleep state
- #else
--	ldr	r4, =cpu_suspend_size
-+	adr_l	r4, cpu_suspend_size
- #endif
- 	mov	r5, sp			@ current virtual SP
- 	add	r4, r4, #12		@ Space for pgd, virt sp, phys resume fn
- 	sub	sp, sp, r4		@ allocate CPU state on stack
--	ldr	r3, =sleep_save_sp
-+	adr_l	r3, sleep_save_sp
- 	stmfd	sp!, {r0, r1}		@ save suspend func arg and pointer
- 	ldr	r3, [r3, #SLEEP_SAVE_SP_VIRT]
--	ALT_SMP(ldr r0, =mpidr_hash)
-+	ALT_SMP(adr_l r0, mpidr_hash)
- 	ALT_UP_B(1f)
- 	/* This ldmia relies on the memory layout of the mpidr_hash struct */
- 	ldmia	r0, {r1, r6-r8}	@ r1 = mpidr mask (r6,r7,r8) = l[0,1,2] shifts
-@@ -100,13 +99,13 @@ ENDPROC(cpu_suspend_abort)
- 	.align	5
- 	.pushsection	.idmap.text,"ax"
- ENTRY(cpu_resume_mmu)
--	ldr	r3, =cpu_resume_after_mmu
- 	instr_sync
- 	mcr	p15, 0, r0, c1, c0, 0	@ turn on MMU, I-cache, etc
- 	mrc	p15, 0, r0, c0, c0, 0	@ read id reg
- 	instr_sync
- 	mov	r0, r0
- 	mov	r0, r0
-+	ldr	r3, =cpu_resume_after_mmu
- 	ret	r3			@ jump to virtual address
- ENDPROC(cpu_resume_mmu)
- 	.popsection
--- 
-2.11.0
+Documentation/admin-guide/kernel-parameters.txt
+3624	reservelow=	[X86]
+3625			Format: nn[K]
+3626			Set the amount of memory to reserve for BIOS at
+3627			the bottom of the address space.
+
+If there are similar cases with other architectures, they will be caught 
+by the last patch in this series, where all allocated memory is set to 
+ones, and page flags asserts will be triggered. I have boot-tested on 
+SPARC, ARM, and x86.
+
+Pasha
