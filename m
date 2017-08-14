@@ -1,28 +1,38 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 14 Aug 2017 16:03:45 +0200
-Subject: [PATCH 8/8] gpio: zynq: Fix driver function parameters alignment
-In-Reply-To: <CACRpkdbMRgR3=dNpKJMC+vm=DPK6ay9bjMATtKLmxapvAkrTjw@mail.gmail.com>
-References: <cover.1502103715.git.michal.simek@xilinx.com>
- <67e187a3dbc2ef8b6bacd1b173ae9e91c18aa429.1502103715.git.michal.simek@xilinx.com>
- <CACRpkdbMRgR3=dNpKJMC+vm=DPK6ay9bjMATtKLmxapvAkrTjw@mail.gmail.com>
-Message-ID: <7d741f71-2e7b-35b4-1c73-729896811b7e@xilinx.com>
+From: pasha.tatashin@oracle.com (Pasha Tatashin)
+Date: Mon, 14 Aug 2017 10:01:52 -0400
+Subject: [v6 15/15] mm: debug for raw alloctor
+In-Reply-To: <20170814115000.GJ19063@dhcp22.suse.cz>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-16-git-send-email-pasha.tatashin@oracle.com>
+ <20170811130831.GN30811@dhcp22.suse.cz>
+ <87d84cad-f03a-88f0-7828-6d3bf7ac473c@oracle.com>
+ <20170814115000.GJ19063@dhcp22.suse.cz>
+Message-ID: <b4eb28ad-2d58-fb23-2139-427df46c2773@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14.8.2017 16:01, Linus Walleij wrote:
-> On Mon, Aug 7, 2017 at 1:02 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> However, now thinking about it, I will change it to CONFIG_MEMBLOCK_DEBUG,
+>> and let users decide what other debugging configs need to be enabled, as
+>> this is also OK.
 > 
->> Fix function parameters alignment reported by checkpatch.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> 
-> Patch applied.
-> 
-> Now you just need to rebase and figure out the two patches
-> I had comments on.
+> Actually the more I think about it the more I am convinced that a kernel
+> boot parameter would be better because it doesn't need the kernel to be
+> recompiled and it is a single branch in not so hot path.
 
-Looking at that. That level one first and then the irq one.
-This came from 3rd party that's why it will require some time to look at it.
+The main reason I do not like kernel parameter is that automated test 
+suits for every platform would need to be updated to include this new 
+parameter in order to test it.
 
-Thanks,
-Michal
+Yet, I think it is important at least initially to test it on every 
+platform unconditionally when certain debug configs are enabled.
+
+This patch series allows boot allocator to return uninitialized memory, 
+this behavior Linux never had before, but way too often firmware 
+explicitly zero all the memory before starting OS. Therefore, it would 
+be hard to debug issues that might be only seen during kinit type of 
+reboots.
+
+In the future, when memory sizes will increase so that this memset will 
+become unacceptable even on debug kernels, it can always be removed, but 
+at least at that time we will know that the code has been tested for 
+many years.
