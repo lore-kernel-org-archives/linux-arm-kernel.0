@@ -1,92 +1,105 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 14 Aug 2017 23:58:57 +0200
-Subject: [PATCH v6 3/6] ARM: smp_scu: allow the platform code to read the SCU
- CPU status
+Date: Mon, 14 Aug 2017 23:58:59 +0200
+Subject: [PATCH v6 5/6] ARM: dts: meson8: add support for booting the
+ secondary CPU cores
 In-Reply-To: <20170814215900.1032-1-martin.blumenstingl@googlemail.com>
 References: <20170814215900.1032-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170814215900.1032-4-martin.blumenstingl@googlemail.com>
+Message-ID: <20170814215900.1032-6-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Amlogic Meson8 / Meson8m2 (both Cortex-A9) and Meson8b (Cortex-A5)
-the CPU hotplug code needs to wait until the SCU status of the CPU that
-is being taken offline is SCU_PM_POWEROFF.
-Provide a utility function (which can be invoked for example from
-.cpu_kill()) which allows reading the SCU status of a CPU.
+Booting the secondary CPU cores involves the following nodes/devices:
+- SCU (Snoop-Control-Unit, for which we already have a DT node)
+- a reset line for each CPU core, provided by the reset-controller
+  which is built into the clock-controller
+- the PMU (power management unit) which controls the power of the CPU
+  cores
+- a range in the SRAM specifically reserved for booting secondary CPU
+  cores
+- the "enable-method" which activates booting the secondary CPU cores
 
-While here, replace the magic number 0x3 with a preprocessor macro
-(SCU_CPU_STATUS_MASK) so we don't have to duplicate this magic number in
-the new function.
+This adds all required nodes and properties to boot the secondary CPU
+cores.
 
+Suggested-by: Carlo Caione <carlo@caione.org>
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- arch/arm/include/asm/smp_scu.h |  6 ++++++
- arch/arm/kernel/smp_scu.c      | 18 +++++++++++++++++-
- 2 files changed, 23 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/meson8.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/arch/arm/include/asm/smp_scu.h b/arch/arm/include/asm/smp_scu.h
-index 11e636f33ed9..992b34c4267f 100644
---- a/arch/arm/include/asm/smp_scu.h
-+++ b/arch/arm/include/asm/smp_scu.h
-@@ -27,6 +27,7 @@ static inline unsigned long scu_a9_get_base(void)
- unsigned int scu_get_core_count(void __iomem *);
- int scu_power_mode(void __iomem *, unsigned int);
- int scu_cpu_power_enable(void __iomem *, unsigned int);
-+int scu_get_cpu_power_mode(void __iomem *scu_base, unsigned int logical_cpu);
- #else
- static inline unsigned int scu_get_core_count(void __iomem *scu_base)
- {
-@@ -41,6 +42,11 @@ static inline int scu_cpu_power_enable(void __iomem *scu_base,
- {
- 	return -EINVAL;
- }
-+static inline int scu_get_cpu_power_mode(void __iomem *scu_base,
-+					 unsigned int logical_cpu)
-+{
-+	return -EINVAL;
-+}
- #endif
+diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
+index b98d44fde6b6..bf572fb45fe0 100644
+--- a/arch/arm/boot/dts/meson8.dtsi
++++ b/arch/arm/boot/dts/meson8.dtsi
+@@ -45,6 +45,7 @@
  
- #if defined(CONFIG_SMP) && defined(CONFIG_HAVE_ARM_SCU)
-diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-index 1d549c16b5fc..c6b33074c393 100644
---- a/arch/arm/kernel/smp_scu.c
-+++ b/arch/arm/kernel/smp_scu.c
-@@ -21,6 +21,7 @@
- #define SCU_STANDBY_ENABLE	(1 << 5)
- #define SCU_CONFIG		0x04
- #define SCU_CPU_STATUS		0x08
-+#define SCU_CPU_STATUS_MASK	GENMASK(1, 0)
- #define SCU_INVALIDATE		0x0c
- #define SCU_FPGA_REVISION	0x10
+ #include <dt-bindings/clock/meson8b-clkc.h>
+ #include <dt-bindings/gpio/meson8-gpio.h>
++#include <dt-bindings/reset/amlogic,meson8b-clkc-reset.h>
+ #include "meson.dtsi"
  
-@@ -82,7 +83,8 @@ static int scu_set_power_mode_internal(void __iomem *scu_base,
- 	if (mode > 3 || mode == 1 || cpu > 3)
- 		return -EINVAL;
+ / {
+@@ -60,6 +61,8 @@
+ 			compatible = "arm,cortex-a9";
+ 			next-level-cache = <&L2>;
+ 			reg = <0x200>;
++			enable-method = "amlogic,meson8-smp";
++			resets = <&clkc CLKC_RESET_CPU0_SOFT_RESET>;
+ 		};
  
--	val = readb_relaxed(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
-+	val = readb_relaxed(scu_base + SCU_CPU_STATUS + cpu);
-+	val &= ~SCU_CPU_STATUS_MASK;
- 	val |= mode;
- 	writeb_relaxed(val, scu_base + SCU_CPU_STATUS + cpu);
+ 		cpu at 201 {
+@@ -67,6 +70,8 @@
+ 			compatible = "arm,cortex-a9";
+ 			next-level-cache = <&L2>;
+ 			reg = <0x201>;
++			enable-method = "amlogic,meson8-smp";
++			resets = <&clkc CLKC_RESET_CPU1_SOFT_RESET>;
+ 		};
  
-@@ -109,3 +111,17 @@ int scu_cpu_power_enable(void __iomem *scu_base, unsigned int cpu)
- {
- 	return scu_set_power_mode_internal(scu_base, cpu, SCU_PM_NORMAL);
- }
+ 		cpu at 202 {
+@@ -74,6 +79,8 @@
+ 			compatible = "arm,cortex-a9";
+ 			next-level-cache = <&L2>;
+ 			reg = <0x202>;
++			enable-method = "amlogic,meson8-smp";
++			resets = <&clkc CLKC_RESET_CPU2_SOFT_RESET>;
+ 		};
+ 
+ 		cpu at 203 {
+@@ -81,6 +88,8 @@
+ 			compatible = "arm,cortex-a9";
+ 			next-level-cache = <&L2>;
+ 			reg = <0x203>;
++			enable-method = "amlogic,meson8-smp";
++			resets = <&clkc CLKC_RESET_CPU3_SOFT_RESET>;
+ 		};
+ 	};
+ 
+@@ -118,6 +127,11 @@
+ }; /* end of / */
+ 
+ &aobus {
++	pmu: pmu at e0 {
++		compatible = "amlogic,meson8-pmu", "syscon";
++		reg = <0xe0 0x8>;
++	};
 +
-+int scu_get_cpu_power_mode(void __iomem *scu_base, unsigned int logical_cpu)
-+{
-+	unsigned int val;
-+	int cpu = MPIDR_AFFINITY_LEVEL(cpu_logical_map(logical_cpu), 0);
+ 	pinctrl_aobus: pinctrl at 84 {
+ 		compatible = "amlogic,meson8-aobus-pinctrl";
+ 		reg = <0x84 0xc>;
+@@ -249,6 +263,13 @@
+ 	};
+ };
+ 
++&ahb_sram {
++	smp-sram at 1ff80 {
++		compatible = "amlogic,meson8-smp-sram";
++		reg = <0x1ff80 0x8>;
++	};
++};
 +
-+	if (cpu > 3)
-+		return -EINVAL;
-+
-+	val = readb_relaxed(scu_base + SCU_CPU_STATUS + cpu);
-+	val &= SCU_CPU_STATUS_MASK;
-+
-+	return val;
-+}
+ &ethmac {
+ 	clocks = <&clkc CLKID_ETH>;
+ 	clock-names = "stmmaceth";
 -- 
 2.14.1
