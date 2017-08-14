@@ -1,59 +1,70 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 13:54:05 +0100
-Subject: [PATCH 24/30] ARM: decompressor: explicitly map decompressor binary
- cacheable
+Date: Mon, 14 Aug 2017 13:54:09 +0100
+Subject: [PATCH 28/30] efi/libstub: check for vmalloc= command line argument
 In-Reply-To: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
 References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170814125411.22604-25-ard.biesheuvel@linaro.org>
+Message-ID: <20170814125411.22604-29-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When randomizing the kernel load address, there may be a large
-distance in memory between the decompressor binary and its payload
-and the destination area in memory. Ensure that the decompressor
-itself is mapped cacheable in this case, by tweaking the existing
-routine that takes care of this for XIP decompressors.
+Check for and record the presence of a vmalloc= argument on the
+kernel command line. We need this information on ARM systems when
+implementing KASLR, given that the size of the vmalloc region will
+affect the size of the lowmem region, therefore affecting the
+available randomization range as well.
 
-Cc: Russell King <linux@armlinux.org.uk>
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/boot/compressed/head.S | 16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+ drivers/firmware/efi/libstub/efi-stub-helper.c | 9 +++++++++
+ drivers/firmware/efi/libstub/efistub.h         | 1 +
+ 2 files changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 5884e8151376..583cc6899d98 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -706,20 +706,24 @@ __setup_mmu:	sub	r3, r4, #16384		@ Page directory size
- 		teq	r0, r2
- 		bne	1b
- /*
-- * If ever we are running from Flash, then we surely want the cache
-- * to be enabled also for our execution instance...  We map 2MB of it
-- * so there is no map overlap problem for up to 1 MB compressed kernel.
-- * If the execution is in RAM then we would only be duplicating the above.
-+ * Make sure our entire executable image (including payload) is mapped
-+ * cacheable, in case it is located outside the region we covered above.
-+ * (This may be the case if running from flash or with randomization enabled)
-+ * If the regions happen to overlap, we just duplicate some of the above.
-  */
- 		orr	r1, r6, #0x04		@ ensure B is set for this
- 		orr	r1, r1, #3 << 10
- 		mov	r2, pc
-+		adr_l	r9, _end
- 		mov	r2, r2, lsr #20
-+		mov	r9, r9, lsr #20
- 		orr	r1, r1, r2, lsl #20
- 		add	r0, r3, r2, lsl #2
--		str	r1, [r0], #4
-+		add	r9, r3, r9, lsl #2
-+0:		str	r1, [r0], #4
- 		add	r1, r1, #1048576
--		str	r1, [r0]
-+		cmp	r0, r9
-+		bls	0b
- 		mov	pc, lr
- ENDPROC(__setup_mmu)
+diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
+index b0184360efc6..f3e9d43030ac 100644
+--- a/drivers/firmware/efi/libstub/efi-stub-helper.c
++++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
+@@ -34,6 +34,7 @@ static unsigned long __chunk_size = EFI_READ_CHUNK_SIZE;
  
+ static int __section(.data) __nokaslr;
+ static int __section(.data) __quiet;
++static int __section(.data) __vmalloc_arg;
+ 
+ int __pure nokaslr(void)
+ {
+@@ -43,6 +44,10 @@ int __pure is_quiet(void)
+ {
+ 	return __quiet;
+ }
++int __pure have_vmalloc(void)
++{
++	return __vmalloc_arg;
++}
+ 
+ #define EFI_MMAP_NR_SLACK_SLOTS	8
+ 
+@@ -433,6 +438,10 @@ efi_status_t efi_parse_options(char const *cmdline)
+ 	if (str == cmdline || (str && str > cmdline && *(str - 1) == ' '))
+ 		__quiet = 1;
+ 
++	str = strstr(cmdline, "vmalloc=");
++	if (str == cmdline || (str && str > cmdline && *(str - 1) == ' '))
++		__vmalloc_arg = 1;
++
+ 	/*
+ 	 * If no EFI parameters were specified on the cmdline we've got
+ 	 * nothing to do.
+diff --git a/drivers/firmware/efi/libstub/efistub.h b/drivers/firmware/efi/libstub/efistub.h
+index 3a670a5f759f..aaf2aeb785ea 100644
+--- a/drivers/firmware/efi/libstub/efistub.h
++++ b/drivers/firmware/efi/libstub/efistub.h
+@@ -26,6 +26,7 @@
+ 
+ extern int __pure nokaslr(void);
+ extern int __pure is_quiet(void);
++extern int __pure have_vmalloc(void);
+ 
+ #define pr_efi(sys_table, msg)		do {				\
+ 	if (!is_quiet()) efi_printk(sys_table, "EFI stub: "msg);	\
 -- 
 2.11.0
