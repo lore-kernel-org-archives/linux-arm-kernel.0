@@ -1,11 +1,11 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 Aug 2017 15:49:22 +0200
-Subject: [PATCH 03/10] ARM: dts: r8a7743: Use R-Car GPIO Gen2 fallback
+Date: Mon, 14 Aug 2017 15:50:12 +0200
+Subject: [PATCH 04/10] ARM: dts: r8a7790: Use R-Car GPIO Gen2 fallback
  compat string
-In-Reply-To: <1502181568-12299-4-git-send-email-horms+renesas@verge.net.au>
+In-Reply-To: <1502181568-12299-5-git-send-email-horms+renesas@verge.net.au>
 References: <1502181568-12299-1-git-send-email-horms+renesas@verge.net.au>
- <1502181568-12299-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXM8H8cswSYodHJRA7TQkf9QaYo5pV=OMu9SkP44ZF_1g@mail.gmail.com>
+ <1502181568-12299-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVrC7MaXRQBLm5Ym96DFykZqqNjdGmO49Y6saLao2Xs-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,7 +13,7 @@ On Tue, Aug 8, 2017 at 10:39 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
 > Use newly added R-Car GPIO Gen2 fallback compat string
 > in place of now deprecated non-generation specific
-> R-Car GPIO fallback compat string in the DT of the r8a7743 SoC.
+> R-Car GPIO fallback compat string in the DT of the r8a7790 SoC.
 >
 > This should have no run-time effect as the driver matches against
 > the per-SoC compat string before considering the fallback compat string.
