@@ -1,82 +1,48 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 14 Aug 2017 14:11:29 +0200
-Subject: [PATCH] arm64: dts: r8a7795: Add OPPs table for cpu devices
-In-Reply-To: <1501853180-23939-1-git-send-email-horms+renesas@verge.net.au>
-References: <1501853180-23939-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVhRLLU=VW6xp2DtXXjjtxK_or0jRon0nbKJQiqqGfbwA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 14 Aug 2017 14:31:35 +0200
+Subject: [PATCH 00/11] watchdog: Consolidate FTWDT010 derivatives
+In-Reply-To: <CACPK8XetQJ_=CD4TPOmyigQZv2pRankWYew31Yf_ep4fai6X-g@mail.gmail.com>
+References: <20170812184318.10144-1-linus.walleij@linaro.org>
+ <CACPK8XetQJ_=CD4TPOmyigQZv2pRankWYew31Yf_ep4fai6X-g@mail.gmail.com>
+Message-ID: <CACRpkdbXsE9KM62Pu1y_AwCGfspkA=pwHkvJb5jXoZD09f6-mA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Mon, Aug 14, 2017 at 3:24 AM, Joel Stanley <joel@jms.id.au> wrote:
+> On Sun, Aug 13, 2017 at 4:13 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> The MOXA ART and Aspeed watchdogs are clearly based on the
+>> Faraday Technology FTWDT010 IP block.
+>
+> They have a similar register interface, but I'm told they are not the same IP.
 
-2017-08-04 15:26 GMT+02:00 Simon Horman <horms+renesas@verge.net.au>:
-> From: Dien Pham <dien.pham.ry@rvc.renesas.com>
->
-> Current, OPP tables are defined temporary,
-> they are being evaluated and adjust in future.
->
-> Based in part on work by Hien Dang.
->
-> Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> [simon: consolidated sseveral patches into one]
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 309 +++++++++++++++++++++++++++++++
->  1 file changed, 309 insertions(+)
->
-> I am not aware of any build-time depdendencies of this patch.
->
-> This patch has run-time depdnencies on:
-> * [PATCH] cpufreq: rcar: Add support for R8A7795 SoC
-> * [PATCH 0/4] r8a7795: Add Z and Z2 clock support
->
-> I have provided an integration patch with this patch, those DTS changes,
-> and Renesas clock updates also depended on by the DTS changes. The result
-> is working CPUFreq for the r8a7795 (R-Car H3) ES1.0.
->
-> https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/r8a7795-cpufreq
->
-> A description of steps taken to lightly exercise the above can be found here:
->
-> http://elinux.org/Tests:R-CAR-GEN3-CPUFreq
->
-> If this work is acceptable I plan to follow up with patches to
-> enable CPUFreq on the r8a7796 (R-Car M3-W).
->
-> This patch is based on renesas-arm64-dt-for-v4.14
->
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> index a87ae76880ab..f34da4c9ea52 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+They are too similar to not be related somehow.
 
-> @@ -126,6 +152,289 @@
->                 };
->         };
+I guess it is one of those Shanzhai-mindset things where IP VHDL
+or Verilog code is being copied around at silicon foundries in Asia
+and turn up in different chips "independently" of each other.
+
+It doesn't really matter if they "are" the same (as in: silicon vendor
+admits that they are), if it walks like a duck, act and talks like a duck,
+it is a duck. And we use the same driver.
+
+> We've got some patches on the list that add some extra registers to
+> the driver for the ast2500. If we decide to merge the drivers, that
+> support will need to be included.
+
+Hm I was not aware, need to read up on it.
+
+> Andrew was working on that, I'll let him follow up on the details.
 >
-> +       cluster0_opp_tb0: opp_table0 {
-> +               compatible = "operating-points-v2";
-> +               opp-shared;
-> +
-> +               opp at 500000000 {
+> The clock isn't called PCLK in the Aspeed documentation (similarly for
+> the timer, but I was too slow to speak up in that case).
 
-No complaints from "make W=1 dtbs" due to unit-address without reg property?
+"PCLK" is just short for "peripheral block", just like other such
+shorthands like "APB" (AMBA peripheral bridge clock). It's
+a generic term.
 
-=> "opp-500000000 { ... };"
+Preferrably it should use the name from the IP vendor, but when in
+conflict about names, it's too much trouble to use different names
+IMO so I think "PCLK" is just fine.
 
-> +                       opp-hz = /bits/ 64 <500000000>;
-> +                       opp-microvolt = <830000>;
-> +                       clock-latency-ns = <300000>;
-> +               };
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yours,
+Linus Walleij
