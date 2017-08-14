@@ -1,52 +1,64 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 13:53:45 +0100
-Subject: [PATCH 04/30] ARM: head-common.S: use PC-relative insn sequence for
- idmap creation
+Date: Mon, 14 Aug 2017 13:53:46 +0100
+Subject: [PATCH 05/30] ARM: head.S: use PC-relative insn sequence for
+ secondary_data
 In-Reply-To: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
 References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170814125411.22604-5-ard.biesheuvel@linaro.org>
+Message-ID: <20170814125411.22604-6-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the open coded PC relative offset calculations involving
-__turn_mmu_on and __turn_mmu_on_end with a pair of adr_l invocations.
-This ensures these quantities are invariant under runtime relocation.
+Replace the open coded PC relative offset calculations with adr_l
+and ldr_l invocations. This ensures these quantities are invariant
+under runtime relocation.
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/kernel/head.S | 12 ++----------
- 1 file changed, 2 insertions(+), 10 deletions(-)
+ arch/arm/kernel/head.S | 19 ++++---------------
+ 1 file changed, 4 insertions(+), 15 deletions(-)
 
 diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index 04286fd9e09c..0a98aec0e39d 100644
+index 0a98aec0e39d..6e9df3663a57 100644
 --- a/arch/arm/kernel/head.S
 +++ b/arch/arm/kernel/head.S
-@@ -227,11 +227,8 @@ __create_page_tables:
- 	 * Create identity mapping to cater for __enable_mmu.
- 	 * This identity mapping will be removed by paging_init().
+@@ -386,10 +386,8 @@ ENTRY(secondary_startup)
+ 	/*
+ 	 * Use the page tables supplied from  __cpu_up.
  	 */
--	adr	r0, __turn_mmu_on_loc
--	ldmia	r0, {r3, r5, r6}
--	sub	r0, r0, r3			@ virt->phys offset
--	add	r5, r5, r0			@ phys __turn_mmu_on
--	add	r6, r6, r0			@ phys __turn_mmu_on_end
-+	adr_l	r5, __turn_mmu_on		@ _pa(__turn_mmu_on)
-+	adr_l	r6, __turn_mmu_on_end		@ _pa(__turn_mmu_on_end)
- 	mov	r5, r5, lsr #SECTION_SHIFT
- 	mov	r6, r6, lsr #SECTION_SHIFT
+-	adr	r4, __secondary_data
+-	ldmia	r4, {r5, r7, r12}		@ address to jump to after
+-	sub	lr, r4, r5			@ mmu has been enabled
+-	add	r3, r7, lr
++	adr_l	r3, secondary_data
++	mov_l	r12, __secondary_switched
+ 	ldrd	r4, [r3, #0]			@ get secondary_data.pgdir
+ ARM_BE8(eor	r4, r4, r5)			@ Swap r5 and r4 in BE:
+ ARM_BE8(eor	r5, r4, r5)			@ it can be done in 3 steps
+@@ -404,22 +402,13 @@ ARM_BE8(eor	r4, r4, r5)			@ without using a temp reg.
+ ENDPROC(secondary_startup)
+ ENDPROC(secondary_startup_arm)
  
-@@ -354,11 +351,6 @@ __create_page_tables:
- 	ret	lr
- ENDPROC(__create_page_tables)
- 	.ltorg
+-	/*
+-	 * r6  = &secondary_data
+-	 */
+ ENTRY(__secondary_switched)
+-	ldr	sp, [r7, #12]			@ get secondary_data.stack
++	ldr_l	r7, secondary_data + 12		@ get secondary_data.stack
++	mov	sp, r7
+ 	mov	fp, #0
+ 	b	secondary_start_kernel
+ ENDPROC(__secondary_switched)
+ 
 -	.align
--__turn_mmu_on_loc:
+-
+-	.type	__secondary_data, %object
+-__secondary_data:
 -	.long	.
--	.long	__turn_mmu_on
--	.long	__turn_mmu_on_end
+-	.long	secondary_data
+-	.long	__secondary_switched
+ #endif /* defined(CONFIG_SMP) */
  
- #if defined(CONFIG_SMP)
- 	.text
+ 
 -- 
 2.11.0
