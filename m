@@ -1,34 +1,43 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 14 Aug 2017 15:22:07 +0800
-Subject: [PATCH 1/3] bus: kconfig: Enable SUNXI RSB for arm64
-In-Reply-To: <1502516443-4740-1-git-send-email-jteki@openedev.com>
-References: <1502516443-4740-1-git-send-email-jteki@openedev.com>
-Message-ID: <CAGb2v65zgxtLXPqvGFVAKwfbPJ8BauzmJNBTa=Gvw+JbAOFNTg@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 14 Aug 2017 09:26:43 +0200
+Subject: [PATCH v2 1/5] reset: add reset-simple to unify socfpga, stm32,
+ sunxi, and zx2967
+In-Reply-To: <0d8e5468-866a-eac8-d9ec-b23f47df8bf3@adaptrum.com>
+References: <20170811130618.3676-1-p.zabel@pengutronix.de>
+ <20170811130618.3676-2-p.zabel@pengutronix.de>
+ <0d8e5468-866a-eac8-d9ec-b23f47df8bf3@adaptrum.com>
+Message-ID: <1502695603.2287.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 12, 2017 at 1:40 PM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
-> From: Jagan Teki <jagan@amarulasolutions.com>
->
-> Sunxi arm64 doesn't have separate configs for
-> h5 and a64 so enable SUNXI_RSB bus for ARM64.
+On Fri, 2017-08-11 at 10:47 -0700, Alexandru Gagniuc wrote:
+> Hi Philipp,
+> 
+> On 08/11/2017 06:06 AM, Philipp Zabel wrote:
+> [snip]
+> 
+> > diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+> > index 52d5251660b9b..f7ba01a71daee 100644
+> > --- a/drivers/reset/Kconfig
+> > +++ b/drivers/reset/Kconfig
+> > @@ -68,6 +68,16 @@ config RESET_PISTACHIO
+> > ?	help
+> > ?	??This enables the reset driver for ImgTec Pistachio SoCs.
+> > 
+> > +config RESET_SIMPLE
+> > +	bool "Simple Reset Controller Driver" if COMPILE_TEST
+> 
+> Another question. Is there a reason this is depended on COMPILE_TEST
+> ?
 
-The commit message is missing a lot of details. It assumes the
-reader knows about the A64 SoC and that it uses the RSB bus to
-communicate with the PMIC.
+The idea is that if compile test is disabled, you are not presented
+with the option, but it is set to the correct value via the default
+mechanism. That way it is normally not possible to disable necessary
+reset controller drivers for enabled architectures, but the driver can
+still be built even on other architectures.
 
-Applied for 4.14 with the following commit message:
+It's a workaround for selecting the driver from the arch, which
+currently can't be done because of the encasing menuconfig.
 
-bus: sunxi-rsb: Enable by default for ARM64
-
-Allwinner's A64 SoC uses the "Reduced Serial Bus" to communicate with
-its companion PMIC.
-
-Since arm64 does not have separate defconfigs for each platform or
-processor family, enable this driver by default for ARM64 as well.
-Note that the Kconfig symbol already depends on ARCH_SUNXI.
-
-ChenYu
-
->
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+regards
+Philipp
