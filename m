@@ -1,47 +1,38 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Mon, 14 Aug 2017 17:08:45 +0530
-Subject: [PATCH 06/11] ASoC: pxa: make snd_soc_platform_driver const
-In-Reply-To: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
-References: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <1502710730-18912-7-git-send-email-bhumirks@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 14 Aug 2017 13:53:42 +0100
+Subject: [PATCH 01/30] asm-generic: add .data.rel.ro sections to
+ __ro_after_init
+In-Reply-To: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
+References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
+Message-ID: <20170814125411.22604-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make these const as they are only passed as the 2nd argument to the
-function devm_snd_soc_register_platform, which is of type const.
-Done using Coccinelle.
+When running in PIC mode, the compiler will emit const structures
+containing runtime relocatable quantities into .data.rel.ro.* sections,
+so that the linker can be smart about placing them together in a segment
+that is read-write initially, and is remapped read-only afterwards. This
+is exactly what __ro_after_init aims to provide, so move these sections
+together.
 
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- sound/soc/pxa/mmp-pcm.c    | 2 +-
- sound/soc/pxa/pxa2xx-pcm.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ include/asm-generic/vmlinux.lds.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/pxa/mmp-pcm.c b/sound/soc/pxa/mmp-pcm.c
-index 5b5f1a4..38d5999 100644
---- a/sound/soc/pxa/mmp-pcm.c
-+++ b/sound/soc/pxa/mmp-pcm.c
-@@ -211,7 +211,7 @@ static int mmp_pcm_new(struct snd_soc_pcm_runtime *rtd)
- 	return ret;
- }
+diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
+index da0be9a8d1de..d16537b0b102 100644
+--- a/include/asm-generic/vmlinux.lds.h
++++ b/include/asm-generic/vmlinux.lds.h
+@@ -261,7 +261,7 @@
+ #ifndef RO_AFTER_INIT_DATA
+ #define RO_AFTER_INIT_DATA						\
+ 	VMLINUX_SYMBOL(__start_ro_after_init) = .;			\
+-	*(.data..ro_after_init)						\
++	*(.data..ro_after_init .data.rel.ro.*)				\
+ 	VMLINUX_SYMBOL(__end_ro_after_init) = .;
+ #endif
  
--static struct snd_soc_platform_driver mmp_soc_platform = {
-+static const struct snd_soc_platform_driver mmp_soc_platform = {
- 	.ops		= &mmp_pcm_ops,
- 	.pcm_new	= mmp_pcm_new,
- 	.pcm_free	= mmp_pcm_free_dma_buffers,
-diff --git a/sound/soc/pxa/pxa2xx-pcm.c b/sound/soc/pxa/pxa2xx-pcm.c
-index b51d7a0..636895a 100644
---- a/sound/soc/pxa/pxa2xx-pcm.c
-+++ b/sound/soc/pxa/pxa2xx-pcm.c
-@@ -84,7 +84,7 @@ static int pxa2xx_soc_pcm_new(struct snd_soc_pcm_runtime *rtd)
- 	return ret;
- }
- 
--static struct snd_soc_platform_driver pxa2xx_soc_platform = {
-+static const struct snd_soc_platform_driver pxa2xx_soc_platform = {
- 	.ops		= &pxa2xx_pcm_ops,
- 	.pcm_new	= pxa2xx_soc_pcm_new,
- 	.pcm_free	= pxa2xx_pcm_free_dma_buffers,
 -- 
-1.9.1
+2.11.0
