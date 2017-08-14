@@ -1,36 +1,84 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 14 Aug 2017 11:22:41 -0700
-Subject: [PATCH] arm64: bcm2837 dts: enable bcm2708 frambuffer driver for
- the raspberry pi-3
-In-Reply-To: <534636301.409284.1502451058701@mail.yahoo.com>
-References: <534636301.409284.1502451058701.ref@mail.yahoo.com>
- <534636301.409284.1502451058701@mail.yahoo.com>
-Message-ID: <87378uf1qm.fsf@eliezer.anholt.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 14 Aug 2017 14:37:51 -0400 (EDT)
+Subject: [PATCH 20/30] ARM: kernel: use PC relative symbol references in
+ suspend/resume code
+In-Reply-To: <CAKv+Gu-k4vUHDz92dsy-d15aBh61-pcGDi3GbX9pmBCbY21SsQ@mail.gmail.com>
+References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
+ <20170814125411.22604-21-ard.biesheuvel@linaro.org>
+ <alpine.LFD.2.20.1708141158070.17016@knanqh.ubzr>
+ <CAKv+Gu-k4vUHDz92dsy-d15aBh61-pcGDi3GbX9pmBCbY21SsQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.20.1708141434240.17016@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VOTARY GITHUB <github.raspberrypi@votarytech.com> writes:
+On Mon, 14 Aug 2017, Ard Biesheuvel wrote:
 
-> From 3200cb6fd787390df1bccf1bb1f7a67ca04136fd Mon Sep 17 00:00:00 2001
-> From: VT-Github-Raspberrypi <github.raspberrypi@votarytech.com>
-> Date: Tue, 8 Aug 2017 16:57:15 +0530
-> Subject: [PATCH] arm64: bcm2837 dts: enable bcm2708 frambuffer driver for the
-> ?raspberry pi-3
->
-> This fb drivers to make rendering full boot up logs on the screen.
->
-> Fixed: https://github.com/raspberrypi/linux/issues/2156
+> On 14 August 2017 at 17:02, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Mon, 14 Aug 2017, Ard Biesheuvel wrote:
+> >
+> >> Replace some unnecessary absolute references with relative ones. Also,
+> >> to prepare for runtime relocation, which occurs with the caches on,
+> >> defer taking the absolute address of cpu_resume_after_mmu() until after
+> >> the MMU is enabled.
+> >>
+> >> Cc: Russell King <linux@armlinux.org.uk>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  arch/arm/kernel/sleep.S | 11 +++++------
+> >>  1 file changed, 5 insertions(+), 6 deletions(-)
+> >>
+> >> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+> >> index 3026b119d3ff..9efd1c7d3552 100644
+> >> --- a/arch/arm/kernel/sleep.S
+> >> +++ b/arch/arm/kernel/sleep.S
+> >> @@ -60,18 +60,17 @@
+> >>  ENTRY(__cpu_suspend)
+> >>       stmfd   sp!, {r4 - r11, lr}
+> >>  #ifdef MULTI_CPU
+> >> -     ldr     r10, =processor
+> >> -     ldr     r4, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
+> >> +     ldr_l   r4, processor + CPU_SLEEP_SIZE  @ size of CPU sleep state
+> >>  #else
+> >> -     ldr     r4, =cpu_suspend_size
+> >> +     adr_l   r4, cpu_suspend_size
+> >>  #endif
+> >>       mov     r5, sp                  @ current virtual SP
+> >>       add     r4, r4, #12             @ Space for pgd, virt sp, phys resume fn
+> >>       sub     sp, sp, r4              @ allocate CPU state on stack
+> >> -     ldr     r3, =sleep_save_sp
+> >> +     adr_l   r3, sleep_save_sp
+> >>       stmfd   sp!, {r0, r1}           @ save suspend func arg and pointer
+> >>       ldr     r3, [r3, #SLEEP_SAVE_SP_VIRT]
+> >> -     ALT_SMP(ldr r0, =mpidr_hash)
+> >> +     ALT_SMP(adr_l r0, mpidr_hash)
+> >>       ALT_UP_B(1f)
+> >
+> > The above is dangerous. adr_l expands to more than one instruction which
+> > is not what ALT_SMP() was designed for. Here it might happen to work
+> > anyway because it is combined with ALT_UP_B() but with ALT_UP() it
+> > wouldn't. This is a mistake waiting to happen.
+> >
+> 
+> OK. I will use the opencoded sequence instead in this case. I.e.,
+> 
+> -       ALT_SMP(ldr r0, =mpidr_hash)
+> +0:     ALT_SMP(adr r0, 2f)
+>         ALT_UP_B(1f)
+> +       ldr     r1, [r0]
+> +       add     r0, r0, r1
+> 
+> and
+> 
+>  ENDPROC(__cpu_suspend)
+> +       .align  2
+> +2:     .long   mpidr_hash - .
+>         .ltorg
+> 
 
-I don't think we should be adding DT nodes for the old, downstream-only
-fbdev driver to the upstream tree.  We have nodes already for the open
-source driver that directly programs the hardware, which will disable
-the firmware's closed-source modesetting interfaces used by bcm2708
-fbdev.  For early boot display, the proper solution is simplefb, not a
-custom fbdev driver.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170814/70c00878/attachment.sig>
+Yeah... I see no way around it.
+
+And if you make this particular case into a commit of its own, then the 
+commit log may carry the above reasoning.
+
+
+Nicolas
