@@ -1,150 +1,127 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 14 Aug 2017 13:53:55 +0100
-Subject: [PATCH 14/30] arm-soc: various: replace open coded VA->PA calculation
- of pen_release
+Date: Mon, 14 Aug 2017 13:53:57 +0100
+Subject: [PATCH 16/30] ARM: kernel: use relative phys-to-virt patch tables
 In-Reply-To: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
 References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170814125411.22604-15-ard.biesheuvel@linaro.org>
+Message-ID: <20170814125411.22604-17-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This replaces a few copies of the open coded calculations of the
-physical address of 'pen_release' in the secondary startup code
-of a couple of platforms. This ensures these quantities are invariant
-under runtime relocation.
+Replace the contents of the __pv_table entries with relative references
+so that we don't have to relocate them at runtime when running the KASLR
+kernel. This ensures these quantities are invariant under runtime
+relocation, which makes any cache maintenance after runtime relocation
+unnecessary.
 
 Cc: Russell King <linux@armlinux.org.uk>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/mach-prima2/headsmp.S    | 11 +++--------
- arch/arm/mach-spear/headsmp.S     | 11 +++--------
- arch/arm/mach-sti/headsmp.S       | 10 +++-------
- arch/arm/plat-versatile/headsmp.S |  9 +--------
- 4 files changed, 10 insertions(+), 31 deletions(-)
+ arch/arm/include/asm/memory.h |  6 +++---
+ arch/arm/kernel/head.S        | 21 ++++++++++----------
+ 2 files changed, 13 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-prima2/headsmp.S b/arch/arm/mach-prima2/headsmp.S
-index 209d9fc5c16c..070df700bb38 100644
---- a/arch/arm/mach-prima2/headsmp.S
-+++ b/arch/arm/mach-prima2/headsmp.S
-@@ -9,6 +9,8 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 1f54e4e98c1e..47a984e3a244 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -195,7 +195,7 @@ extern const void *__pv_table_begin, *__pv_table_end;
+ 	__asm__("@ __pv_stub\n"				\
+ 	"1:	" instr "	%0, %1, %2\n"		\
+ 	"	.pushsection .pv_table,\"a\"\n"		\
+-	"	.long	1b\n"				\
++	"	.long	1b - .\n"			\
+ 	"	.popsection\n"				\
+ 	: "=r" (to)					\
+ 	: "r" (from), "I" (type))
+@@ -204,7 +204,7 @@ extern const void *__pv_table_begin, *__pv_table_end;
+ 	__asm__ volatile("@ __pv_stub_mov\n"		\
+ 	"1:	mov	%R0, %1\n"			\
+ 	"	.pushsection .pv_table,\"a\"\n"		\
+-	"	.long	1b\n"				\
++	"	.long	1b - .\n"			\
+ 	"	.popsection\n"				\
+ 	: "=r" (t)					\
+ 	: "I" (__PV_BITS_7_0))
+@@ -214,7 +214,7 @@ extern const void *__pv_table_begin, *__pv_table_end;
+ 	"1:	adds	%Q0, %1, %2\n"			\
+ 	"	adc	%R0, %R0, #0\n"			\
+ 	"	.pushsection .pv_table,\"a\"\n"		\
+-	"	.long	1b\n"				\
++	"	.long	1b - .\n"			\
+ 	"	.popsection\n"				\
+ 	: "+r" (y)					\
+ 	: "r" (x), "I" (__PV_BITS_31_24)		\
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 62c961849035..5d685e86148c 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -593,8 +593,7 @@ ENDPROC(__fixup_pv_table)
  
-+#include <asm/assembler.h>
-+
- /*
-  * SIRFSOC specific entry point for secondary CPUs.  This provides
-  * a "holding pen" into which all secondary cores are held until we're
-@@ -17,10 +19,7 @@
- ENTRY(sirfsoc_secondary_startup)
-         mrc     p15, 0, r0, c0, c0, 5
-         and     r0, r0, #15
--        adr     r4, 1f
--        ldmia   r4, {r5, r6}
--        sub     r4, r4, r5
--        add     r6, r6, r4
-+        adr_l   r6, pen_release
- pen:    ldr     r7, [r6]
-         cmp     r7, r0
-         bne     pen
-@@ -31,7 +30,3 @@ pen:    ldr     r7, [r6]
-          */
-         b       secondary_startup
- ENDPROC(sirfsoc_secondary_startup)
--
--        .align
--1:      .long   .
--        .long   pen_release
-diff --git a/arch/arm/mach-spear/headsmp.S b/arch/arm/mach-spear/headsmp.S
-index c52192dc3d9f..4da01b103f33 100644
---- a/arch/arm/mach-spear/headsmp.S
-+++ b/arch/arm/mach-spear/headsmp.S
-@@ -13,6 +13,8 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
+ 	.text
+ __fixup_a_pv_table:
+-	mov_l	r6, __pv_offset
+-	add	r6, r6, r3
++	adr_l	r6, __pv_offset
+ 	ldr	r0, [r6, #HIGH_OFFSET]	@ pv_offset high word
+ 	ldr	r6, [r6, #LOW_OFFSET]	@ pv_offset low word
+ 	mov	r6, r6, lsr #24
+@@ -612,22 +611,22 @@ __fixup_a_pv_table:
+ 	orr	r6, r6, r7, lsl #12
+ 	orr	r6, #0x4000
+ 	b	2f
+-1:	add     r7, r3
+-	ldrh	ip, [r7, #2]
++1:	add	r7, r4
++	ldrh	ip, [r7, #-2]
+ ARM_BE8(rev16	ip, ip)
+ 	tst	ip, #0x4000
+ 	and	ip, #0x8f00
+ 	orrne	ip, r6	@ mask in offset bits 31-24
+ 	orreq	ip, r0	@ mask in offset bits 7-0
+ ARM_BE8(rev16	ip, ip)
+-	strh	ip, [r7, #2]
++	strh	ip, [r7, #-2]
+ 	bne	2f
+-	ldrh	ip, [r7]
++	ldrh	ip, [r7, #-4]
+ ARM_BE8(rev16	ip, ip)
+ 	bic	ip, #0x20
+ 	orr	ip, ip, r0, lsr #16
+ ARM_BE8(rev16	ip, ip)
+-	strh	ip, [r7]
++	strh	ip, [r7, #-4]
+ 2:	cmp	r4, r5
+ 	ldrcc	r7, [r4], #4	@ use branch for delay slot
+ 	bcc	1b
+@@ -639,7 +638,8 @@ ARM_BE8(rev16	ip, ip)
+ 	moveq	r0, #0x400000	@ set bit 22, mov to mvn instruction
+ #endif
+ 	b	2f
+-1:	ldr	ip, [r7, r3]
++1:	ldr	ip, [r7, r4]!
++	add	r4, r4, #4
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+ 	@ in BE8, we load data in BE, but instructions still in LE
+ 	bic	ip, ip, #0xff000000
+@@ -654,9 +654,9 @@ ARM_BE8(rev16	ip, ip)
+ 	biceq	ip, ip, #0x400000	@ clear bit 22
+ 	orreq	ip, ip, r0	@ mask in offset bits 7-0
+ #endif
+-	str	ip, [r7, r3]
++	str	ip, [r7]
+ 2:	cmp	r4, r5
+-	ldrcc	r7, [r4], #4	@ use branch for delay slot
++	ldrcc	r7, [r4]	@ use branch for delay slot
+ 	bcc	1b
+ 	ret	lr
+ #endif
+@@ -664,7 +664,6 @@ ENDPROC(__fixup_a_pv_table)
  
-+#include <asm/assembler.h>
-+
- 	__INIT
- 
- /*
-@@ -23,10 +25,7 @@
- ENTRY(spear13xx_secondary_startup)
- 	mrc	p15, 0, r0, c0, c0, 5
- 	and	r0, r0, #15
--	adr	r4, 1f
--	ldmia	r4, {r5, r6}
--	sub	r4, r4, r5
--	add	r6, r6, r4
-+	adr_l	r6, pen_release
- pen:	ldr	r7, [r6]
- 	cmp	r7, r0
- 	bne	pen
-@@ -40,8 +39,4 @@ pen:	ldr	r7, [r6]
- 	 * should now contain the SVC stack for this core
- 	 */
- 	b	secondary_startup
--
--	.align
--1:	.long	.
--	.long	pen_release
- ENDPROC(spear13xx_secondary_startup)
-diff --git a/arch/arm/mach-sti/headsmp.S b/arch/arm/mach-sti/headsmp.S
-index e0ad451700d5..cdf3442f397b 100644
---- a/arch/arm/mach-sti/headsmp.S
-+++ b/arch/arm/mach-sti/headsmp.S
-@@ -16,6 +16,8 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
- 
-+#include <asm/assembler.h>
-+
- /*
-  * ST specific entry point for secondary CPUs.  This provides
-  * a "holding pen" into which all secondary cores are held until we're
-@@ -24,10 +26,7 @@
- ENTRY(sti_secondary_startup)
- 	mrc	p15, 0, r0, c0, c0, 5
- 	and	r0, r0, #15
--	adr	r4, 1f
--	ldmia	r4, {r5, r6}
--	sub	r4, r4, r5
--	add	r6, r6, r4
-+	adr_l	r6, pen_release
- pen:	ldr	r7, [r6]
- 	cmp	r7, r0
- 	bne	pen
-@@ -38,6 +37,3 @@ pen:	ldr	r7, [r6]
- 	 */
- 	b	secondary_startup
- ENDPROC(sti_secondary_startup)
--
--1:	.long	.
--	.long	pen_release
-diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
-index 40f27e52de75..0f2a5eddac5a 100644
---- a/arch/arm/plat-versatile/headsmp.S
-+++ b/arch/arm/plat-versatile/headsmp.S
-@@ -21,10 +21,7 @@ ENTRY(versatile_secondary_startup)
-  ARM_BE8(setend	be)
- 	mrc	p15, 0, r0, c0, c0, 5
- 	bic	r0, #0xff000000
--	adr	r4, 1f
--	ldmia	r4, {r5, r6}
--	sub	r4, r4, r5
--	add	r6, r6, r4
-+	adr_l	r6, pen_release
- pen:	ldr	r7, [r6]
- 	cmp	r7, r0
- 	bne	pen
-@@ -34,8 +31,4 @@ pen:	ldr	r7, [r6]
- 	 * should now contain the SVC stack for this core
- 	 */
- 	b	secondary_startup
--
--	.align
--1:	.long	.
--	.long	pen_release
- ENDPROC(versatile_secondary_startup)
+ ENTRY(fixup_pv_table)
+ 	stmfd	sp!, {r4 - r7, lr}
+-	mov	r3, #0			@ no offset
+ 	mov	r4, r0			@ r0 = table start
+ 	add	r5, r0, r1		@ r1 = table size
+ 	bl	__fixup_a_pv_table
 -- 
 2.11.0
