@@ -1,91 +1,88 @@
 From: lori.hikichi@broadcom.com (Lori Hikichi)
-Date: Mon, 14 Aug 2017 12:00:39 -0700
-Subject: [PATCH v1 2/4] clk: iproc: Fix error in the pll post divider rate
- calculation
+Date: Mon, 14 Aug 2017 12:00:40 -0700
+Subject: [PATCH v1 3/4] clk: iproc: Allow plls to do minor rate changes
+ without reset
 In-Reply-To: <1502737241-2040-1-git-send-email-lori.hikichi@broadcom.com>
 References: <1502737241-2040-1-git-send-email-lori.hikichi@broadcom.com>
-Message-ID: <1502737241-2040-3-git-send-email-lori.hikichi@broadcom.com>
+Message-ID: <1502737241-2040-4-git-send-email-lori.hikichi@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pll post divider code was using DIV_ROUND_UP when determining the
-divider value best suited to produce the target frequency.
-Using DIV_ROUND_CLOSEST will give us better divider values when
-the division results in a small remainder.
-Also, change the post divider clock over to the determine_rate api
-instead of round_rate.
+From: Lori Hikichi <lhikichi@broadcom.com>
 
-Signed-off-by: Simran Rai <ssimran@broadcom.com>
+The iproc plls are capable of doing small rate changes without the
+need for a full reset and re-lock procedure.  This feature will
+allow for small tweaks to the PLL rate to occur smoothly.
+
 Signed-off-by: Lori Hikichi <lori.hikichi@broadcom.com>
 ---
- drivers/clk/bcm/clk-iproc-pll.c | 33 +++++++++++++++++----------------
- 1 file changed, 17 insertions(+), 16 deletions(-)
+ drivers/clk/bcm/clk-iproc-pll.c | 47 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
 
 diff --git a/drivers/clk/bcm/clk-iproc-pll.c b/drivers/clk/bcm/clk-iproc-pll.c
-index 9514ecf..7df010b 100644
+index 7df010b..ab10819 100644
 --- a/drivers/clk/bcm/clk-iproc-pll.c
 +++ b/drivers/clk/bcm/clk-iproc-pll.c
-@@ -602,25 +602,26 @@ static unsigned long iproc_clk_recalc_rate(struct clk_hw *hw,
- 	return clk->rate;
+@@ -285,6 +285,40 @@ static void __pll_bring_out_reset(struct iproc_pll *pll, unsigned int kp,
+ 	iproc_pll_write(pll, pll->control_base, reset->offset, val);
  }
  
--static long iproc_clk_round_rate(struct clk_hw *hw, unsigned long rate,
--		unsigned long *parent_rate)
-+static int iproc_clk_determine_rate(struct clk_hw *hw,
-+		struct clk_rate_request *req)
- {
--	unsigned int div;
-+	unsigned int bestdiv;
- 
--	if (rate == 0 || *parent_rate == 0)
-+	if (req->rate == 0)
- 		return -EINVAL;
-+	if (req->rate == req->best_parent_rate)
-+		return 0;
- 
--	if (rate == *parent_rate)
--		return *parent_rate;
-+	bestdiv = DIV_ROUND_CLOSEST(req->best_parent_rate, req->rate);
-+	if (bestdiv < 2)
-+		req->rate = req->best_parent_rate;
- 
--	div = DIV_ROUND_UP(*parent_rate, rate);
--	if (div < 2)
--		return *parent_rate;
-+	if (bestdiv > 256)
-+		bestdiv = 256;
- 
--	if (div > 256)
--		div = 256;
-+	req->rate = req->best_parent_rate / bestdiv;
- 
--	return *parent_rate / div;
-+	return 0;
- }
- 
- static int iproc_clk_set_rate(struct clk_hw *hw, unsigned long rate,
-@@ -635,10 +636,10 @@ static int iproc_clk_set_rate(struct clk_hw *hw, unsigned long rate,
- 	if (rate == 0 || parent_rate == 0)
- 		return -EINVAL;
- 
-+	div = DIV_ROUND_CLOSEST(parent_rate, rate);
- 	if (ctrl->flags & IPROC_CLK_MCLK_DIV_BY_2)
--		div = DIV_ROUND_UP(parent_rate, rate * 2);
--	else
--		div = DIV_ROUND_UP(parent_rate, rate);
-+		div /=  2;
++/*
++ * Determines if the change to be applied to the PLL is minor (just an update
++ * or the fractional divider). If so, then we can avoid going through a
++ * disruptive reset and lock sequence.
++ */
++static bool pll_fractional_change_only(struct iproc_pll *pll,
++				       struct iproc_pll_vco_param *vco)
++{
++	const struct iproc_pll_ctrl *ctrl = pll->ctrl;
++	u32 val;
++	u32 ndiv_int;
++	unsigned int pdiv;
 +
- 	if (div > 256)
- 		return -EINVAL;
++	/* PLL needs to be locked */
++	val = readl(pll->status_base + ctrl->status.offset);
++	if ((val & (1 << ctrl->status.shift)) == 0)
++		return false;
++
++	val = readl(pll->control_base + ctrl->ndiv_int.offset);
++	ndiv_int = (val >> ctrl->ndiv_int.shift) &
++		bit_mask(ctrl->ndiv_int.width);
++
++	if (ndiv_int != vco->ndiv_int)
++		return false;
++
++	val = readl(pll->control_base + ctrl->pdiv.offset);
++	pdiv = (val >> ctrl->pdiv.shift) & bit_mask(ctrl->pdiv.width);
++
++	if (pdiv != vco->pdiv)
++		return false;
++
++	return true;
++}
++
+ static int pll_set_rate(struct iproc_clk *clk, struct iproc_pll_vco_param *vco,
+ 			unsigned long parent_rate)
+ {
+@@ -333,6 +367,19 @@ static int pll_set_rate(struct iproc_clk *clk, struct iproc_pll_vco_param *vco,
+ 		return ret;
+ 	}
  
-@@ -662,7 +663,7 @@ static int iproc_clk_set_rate(struct clk_hw *hw, unsigned long rate,
- 	.enable = iproc_clk_enable,
- 	.disable = iproc_clk_disable,
- 	.recalc_rate = iproc_clk_recalc_rate,
--	.round_rate = iproc_clk_round_rate,
-+	.determine_rate = iproc_clk_determine_rate,
- 	.set_rate = iproc_clk_set_rate,
- };
++	if (pll_fractional_change_only(clk->pll, vco)) {
++		/* program fractional part of NDIV */
++		if (ctrl->flags & IPROC_CLK_PLL_HAS_NDIV_FRAC) {
++			val = readl(pll->control_base + ctrl->ndiv_frac.offset);
++			val &= ~(bit_mask(ctrl->ndiv_frac.width) <<
++				 ctrl->ndiv_frac.shift);
++			val |= vco->ndiv_frac << ctrl->ndiv_frac.shift;
++			iproc_pll_write(pll, pll->control_base,
++					ctrl->ndiv_frac.offset, val);
++			return 0;
++		}
++	}
++
+ 	/* put PLL in reset */
+ 	__pll_put_in_reset(pll);
  
 -- 
 1.9.1
