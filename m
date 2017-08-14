@@ -1,52 +1,28 @@
-From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Mon, 14 Aug 2017 13:34:18 +0200
-Subject: [PATCH 2/3] arm64: dts: apq8096-db820c: Enable on board 3 pcie root
- complex
-In-Reply-To: <20170814113420.30866-1-srinivas.kandagatla@linaro.org>
-References: <20170814113420.30866-1-srinivas.kandagatla@linaro.org>
-Message-ID: <20170814113420.30866-2-srinivas.kandagatla@linaro.org>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Mon, 14 Aug 2017 13:34:45 +0200
+Subject: [v6 04/15] mm: discard memblock data later
+In-Reply-To: <42a04441-47ad-2fa0-ca3c-784c717213f7@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-5-git-send-email-pasha.tatashin@oracle.com>
+ <20170811093249.GE30811@dhcp22.suse.cz>
+ <42a04441-47ad-2fa0-ca3c-784c717213f7@oracle.com>
+Message-ID: <20170814113445.GE19063@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On Fri 11-08-17 15:00:47, Pasha Tatashin wrote:
+> Hi Michal,
+> 
+> This suggestion won't work, because there are arches without memblock
+> support: tile, sh...
+> 
+> So, I would still need to have:
+> 
+> #ifdef CONFIG_MEMBLOCK in page_alloc, or define memblock_discard() stubs in
+> nobootmem headfile. 
 
-This patch adds enables 3 instances of root complexes which are
-exposed on DB820c board. 3 Instances are terminted as below
-PCIE0 => QCA6174
-PCIE1 => MINI PCIE CARD
-PCIE2 => GBE ETHERNET
-
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-index 789f3e87321e..18c61693529e 100644
---- a/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi
-@@ -138,6 +138,22 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&usb2_vbus_det_gpio>;
- 		};
-+
-+		agnoc at 0 {
-+			qcom,pcie at 00600000 {
-+				perst-gpio = <&msmgpio 35 GPIO_ACTIVE_LOW>;
-+			};
-+
-+			qcom,pcie at 00608000 {
-+				status = "okay";
-+				perst-gpio = <&msmgpio 130 GPIO_ACTIVE_LOW>;
-+			};
-+
-+			qcom,pcie at 00610000 {
-+				status = "okay";
-+				perst-gpio = <&msmgpio 114 GPIO_ACTIVE_LOW>;
-+			};
-+		};
- 	};
- 
- 
+This is the standard way to do this. And it is usually preferred to
+proliferate ifdefs in the code.
 -- 
-2.11.0
+Michal Hocko
+SUSE Labs
