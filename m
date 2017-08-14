@@ -1,20 +1,20 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 14 Aug 2017 14:39:48 +0200
-Subject: [PATCH 00/11] watchdog: Consolidate FTWDT010 derivatives
-In-Reply-To: <20170812184318.10144-1-linus.walleij@linaro.org>
-References: <20170812184318.10144-1-linus.walleij@linaro.org>
-Message-ID: <CACRpkdZPRSsx=M7gjhXBa0rQKOdGRNJj-062B08ZThvh1qAaBA@mail.gmail.com>
+Date: Mon, 14 Aug 2017 14:40:31 +0200
+Subject: [PATCH] ste_dma40: make stedma40_chan_cfg const
+In-Reply-To: <1502630584-6844-1-git-send-email-bhumirks@gmail.com>
+References: <1502630584-6844-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <CACRpkdbRtvE2+w1z1S=4d8gReomsMV1PjaB9Oux29tRGoP9nwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Aug 12, 2017 at 8:43 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Sun, Aug 13, 2017 at 3:23 PM, Bhumika Goyal <bhumirks@gmail.com> wrote:
 
-> The MOXA ART and Aspeed watchdogs are clearly based on the
-> Faraday Technology FTWDT010 IP block.
+> Make these const as they are only used during a copy operation.
+> Done using Coccinelle.
+>
+> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 
-Wim/Guenther: it is perfectly fine to just stop merging the series after
-the say top 3 or top 4 ones etc. The do not need to be applied on an
-all-or-nothing basis.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
