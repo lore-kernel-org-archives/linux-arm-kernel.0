@@ -1,43 +1,42 @@
 From: oza.oza@broadcom.com (Oza Pawandeep)
-Date: Tue, 15 Aug 2017 11:25:46 +0530
-Subject: [PATCH v2 2/3] Documentation/devicetree: Add PCIe hotplug property
+Date: Tue, 15 Aug 2017 11:25:47 +0530
+Subject: [PATCH v2 3/3] PCI: iproc: Implement optional property prsnt-gpios
 In-Reply-To: <1502776547-30542-1-git-send-email-oza.oza@broadcom.com>
 References: <1502776547-30542-1-git-send-email-oza.oza@broadcom.com>
-Message-ID: <1502776547-30542-3-git-send-email-oza.oza@broadcom.com>
+Message-ID: <1502776547-30542-4-git-send-email-oza.oza@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Host drivers have the requirement of implementing PCI hotplug
-based on the how their SOC supports PCI hotplug.
-
-Couple of properties have been added. the one to enable
-the hotplug feature itself, and the other caters to
-the PCI hotplug implementation with the use of gpios.
+Add description for optional device tree property
+'prsnt-gpios' for PCI hotplug feature.
 
 Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
 
-diff --git a/Documentation/devicetree/bindings/pci/pci.txt b/Documentation/devicetree/bindings/pci/pci.txt
-index 50f9e2c..0bf25a1 100644
---- a/Documentation/devicetree/bindings/pci/pci.txt
-+++ b/Documentation/devicetree/bindings/pci/pci.txt
-@@ -24,3 +24,18 @@ driver implementation may support the following properties:
-    unsupported link speed, for instance, trying to do training for
-    unsupported link speed, etc.  Must be '4' for gen4, '3' for gen3, '2'
-    for gen2, and '1' for gen1. Any other values are invalid.
+diff --git a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+index b8e48b4..0c5f631 100644
+--- a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
+@@ -72,6 +72,20 @@ Optional properties:
+ - brcm,pcie-msi-inten: Needs to be present for some older iProc platforms that
+ require the interrupt enable registers to be set explicitly to enable MSI
+ 
++Optional properties:
++- slot-pluggable: PCI hotplug feature is supported.
++- prsnt-gpios: Array of gpios, needs to be present if Hotplug is supported.
 +
-+- slot-pluggable:
-+   PCI hotplug feature is supported.
-+   PCI hotplug implementation is SOC/Board specific, and also it depends on
-+   how add-in card is designed (e.g. how many present pins are implemented).
-+   If the slot-pluggable property is present, the following propertey could
-+   become effective.
-+   - prsnt-gpios:
-+      Array of gpios, could be present if hotplug is supported.
-+      This property defines gpio based hotplug implementation.
-+      Example:
-+      If x8 card is connected, then it might be possible that all the
-+      3 present pins could go low, or at least one pin goes low.
-+      If x4 card is connected, then it might be possible that 2 present
-+      pins go low, or at least one pin goes low.
++Refer to the following binding documents for more detailed description on
++the use of 'slot-pluggable' and 'prsnt-gpios'.
++  Documentation/devicetree/bindings/pci/pci.txt
++
++Example:
++prsnt-gpios: <&pca9505 32 1>, <&pca9505 33 1>;
++This is x4 connector: monitoring max 2 present lines.
++prsnt-gpios: <&pca9505 32 1>, <&pca9505 33 1>, <&pca9505 34 1>;
++This is x8 connector: monitoring max 3 present lines.
++
+ Example:
+ 	pcie0: pcie at 18012000 {
+ 		compatible = "brcm,iproc-pcie";
 -- 
 1.9.1
