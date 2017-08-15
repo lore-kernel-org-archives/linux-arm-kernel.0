@@ -1,75 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Aug 2017 12:05:18 +0100
-Subject: [PATCH v4 4/6] perf: hisi: Add support for HiSilicon SoC HHA PMU
- driver
-In-Reply-To: <1500984642-204676-5-git-send-email-zhangshaokun@hisilicon.com>
-References: <1500984642-204676-1-git-send-email-zhangshaokun@hisilicon.com>
- <1500984642-204676-5-git-send-email-zhangshaokun@hisilicon.com>
-Message-ID: <20170815110518.GE6090@leverpostej>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Tue, 15 Aug 2017 11:54:20 +0100
+Subject: [PATCH 2/2] ARM: dts: iwg22d-sodimm: Add support for iWave
+ G22D-SODIMM board
+In-Reply-To: <1502794460-30213-1-git-send-email-biju.das@bp.renesas.com>
+References: <1502794460-30213-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <1502794460-30213-3-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 25, 2017 at 08:10:40PM +0800, Shaokun Zhang wrote:
-> +/* HHA register definition */
-> +#define HHA_INT_MASK		0x0804
-> +#define HHA_INT_STATUS		0x0808
-> +#define HHA_INT_CLEAR		0x080C
-> +#define HHA_PERF_CTRL		0x1E00
-> +#define HHA_EVENT_CTRL		0x1E04
-> +#define HHA_EVENT_TYPE0		0x1E80
-> +#define HHA_CNT0_LOWER		0x1F00
-> +
-> +/* HHA has 16-counters and supports 0x50 events */
+Add support for iWave RainboW-G22D-SODIMM board based on RZ/G1E.
 
-As with the L3C PMU, what exactly does this mean?
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+---
+ arch/arm/boot/dts/Makefile                  |  1 +
+ arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 29 +++++++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+)
+ create mode 100644 arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
 
-Does this mean event IDs 0-0x4f are valid?
-
-[...]
-
-> +static irqreturn_t hisi_hha_pmu_isr(int irq, void *dev_id)
-> +{
-> +	struct hisi_pmu *hha_pmu = dev_id;
-> +	struct perf_event *event;
-> +	unsigned long overflown;
-> +	u32 status;
-> +	int idx;
-> +
-> +	/* Read HHA_INT_STATUS register */
-> +	status = readl(hha_pmu->base + HHA_INT_STATUS);
-> +	if (!status)
-> +		return IRQ_NONE;
-> +	overflown = status;
-
-No need for the u32 temporary here.
-
-[....]
-
-> +static int hisi_hha_pmu_dev_probe(struct platform_device *pdev,
-> +				  struct hisi_pmu *hha_pmu)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	int ret;
-> +
-> +	ret = hisi_hha_pmu_init_data(pdev, hha_pmu);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* Pick one core to use for cpumask attributes */
-> +	cpumask_set_cpu(smp_processor_id(), &hha_pmu->cpus);
-> +
-
-Why does this not have the usual event migration callbacks, across CPUs
-in the same SCCL?
-
-> +	ret = hisi_hha_pmu_init_irq(hha_pmu, pdev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	hha_pmu->name = devm_kasprintf(dev, GFP_KERNEL, "hisi_hha%u_%u",
-> +				       hha_pmu->hha_uid, hha_pmu->sccl_id);
-
-As on the doc patch, this should be hierarchical.
-
-Thanks,
-Mark
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 4b17f35..51641d4 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -715,6 +715,7 @@ dtb-$(CONFIG_ARCH_RENESAS) += \
+ 	r8a7740-armadillo800eva.dtb \
+ 	r8a7743-iwg20d-q7.dtb \
+ 	r8a7743-sk-rzg1m.dtb \
++	r8a7745-iwg22d-sodimm.dtb \
+ 	r8a7745-sk-rzg1e.dtb \
+ 	r8a7778-bockw.dtb \
+ 	r8a7779-marzen.dtb \
+diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+new file mode 100644
+index 0000000..cbc19fe
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+@@ -0,0 +1,29 @@
++/*
++ * Device Tree Source for the iWave-RZG1E SODIMM carrier board
++ *
++ * Copyright (C) 2017 Renesas Electronics Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++#include "r8a7745-iwg22m.dtsi"
++
++/ {
++	model = "iWave Systems RainboW-G22D-SODIMM board based on RZ/G1E";
++	compatible = "iwave,g22d", "iwave,g22m", "renesas,r8a7745";
++
++	aliases {
++		serial0 = &scif4;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&scif4 {
++	status = "okay";
++};
+-- 
+1.9.1
