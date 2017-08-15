@@ -1,60 +1,81 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue, 15 Aug 2017 17:21:28 +0100
-Subject: [PATCH] ARM: debug-ll: Add support for r8a7745
-Message-ID: <1502814088-29767-1-git-send-email-fabrizio.castro@bp.renesas.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Tue, 15 Aug 2017 19:23:51 +0300
+Subject: [PATCH 1/2] media: ov7670: Add entity pads initialization
+In-Reply-To: <20170810090645.24344-2-wenyou.yang@microchip.com>
+References: <20170810090645.24344-1-wenyou.yang@microchip.com>
+ <20170810090645.24344-2-wenyou.yang@microchip.com>
+Message-ID: <20170815162351.ikd4n2zl2gj26m5r@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable low-level debugging support for RZ/G1E (r8a7745). RZ/G1E uses
-SCIF4 for the debug console.
+Hi Wenyou,
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
----
- arch/arm/Kconfig.debug | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+On Thu, Aug 10, 2017 at 05:06:44PM +0800, Wenyou Yang wrote:
+> Add the media entity pads initialization.
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 6dcea8e..be8916d 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -911,6 +911,13 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  via SCIF2 on Renesas R-Car E2 (R8A7794).
- 
-+	config DEBUG_RCAR_GEN2_SCIF4
-+		bool "Kernel low-level debugging messages via SCIF4 on R8A7745"
-+		depends on ARCH_R8A7745
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  via SCIF4 on Renesas RZ/G1E (R8A7745).
-+
- 	config DEBUG_RMOBILE_SCIFA0
- 		bool "Kernel low-level debugging messages via SCIFA0 on R8A73A4"
- 		depends on ARCH_R8A73A4
-@@ -1451,6 +1458,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN1_SCIF2
- 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF0
- 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF2
-+	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF4
- 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA0
- 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA1
- 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA4
-@@ -1568,6 +1576,7 @@ config DEBUG_UART_PHYS
- 	default 0xe6c40000 if DEBUG_RMOBILE_SCIFA0
- 	default 0xe6c50000 if DEBUG_RMOBILE_SCIFA1
- 	default 0xe6c80000 if DEBUG_RMOBILE_SCIFA4
-+	default 0xe6ee0000 if DEBUG_RCAR_GEN2_SCIF4
- 	default 0xe6e58000 if DEBUG_RCAR_GEN2_SCIF2
- 	default 0xe6e60000 if DEBUG_RCAR_GEN2_SCIF0
- 	default 0xe8008000 if DEBUG_R7S72100_SCIF2
-@@ -1604,6 +1613,7 @@ config DEBUG_UART_PHYS
- 		DEBUG_QCOM_UARTDM || DEBUG_R7S72100_SCIF2 || \
- 		DEBUG_RCAR_GEN1_SCIF0 || DEBUG_RCAR_GEN1_SCIF2 || \
- 		DEBUG_RCAR_GEN2_SCIF0 || DEBUG_RCAR_GEN2_SCIF2 || \
-+		DEBUG_RCAR_GEN2_SCIF4 || \
- 		DEBUG_RMOBILE_SCIFA0 || DEBUG_RMOBILE_SCIFA1 || \
- 		DEBUG_RMOBILE_SCIFA4 || DEBUG_S3C24XX_UART || \
- 		DEBUG_S3C64XX_UART || \
+The patch itself seems fine. However the driver is lacking support for
+get_fmt which I think would be necessary for the user space API to work
+properly. Without sub-device nodes it might not have been an issue with
+certain master drivers.
+
+Could you add that in v2, in a separate patch before this one, please?
+
+> ---
+> 
+>  drivers/media/i2c/ov7670.c | 13 ++++++++++++-
+>  1 file changed, 12 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/media/i2c/ov7670.c b/drivers/media/i2c/ov7670.c
+> index e88549f0e704..5c8460ee65c3 100644
+> --- a/drivers/media/i2c/ov7670.c
+> +++ b/drivers/media/i2c/ov7670.c
+> @@ -213,6 +213,7 @@ struct ov7670_devtype {
+>  struct ov7670_format_struct;  /* coming later */
+>  struct ov7670_info {
+>  	struct v4l2_subdev sd;
+> +	struct media_pad pad;
+>  	struct v4l2_ctrl_handler hdl;
+>  	struct {
+>  		/* gain cluster */
+> @@ -1688,14 +1689,23 @@ static int ov7670_probe(struct i2c_client *client,
+>  	v4l2_ctrl_auto_cluster(2, &info->auto_exposure,
+>  			       V4L2_EXPOSURE_MANUAL, false);
+>  	v4l2_ctrl_cluster(2, &info->saturation);
+> +
+> +	info->pad.flags = MEDIA_PAD_FL_SOURCE;
+> +	info->sd.entity.function = MEDIA_ENT_F_CAM_SENSOR;
+> +	ret = media_entity_pads_init(&info->sd.entity, 1, &info->pad);
+> +	if (ret < 0)
+> +		goto hdl_free;
+> +
+>  	v4l2_ctrl_handler_setup(&info->hdl);
+>  
+>  	ret = v4l2_async_register_subdev(&info->sd);
+>  	if (ret < 0)
+> -		goto hdl_free;
+> +		goto entity_cleanup;
+>  
+>  	return 0;
+>  
+> +entity_cleanup:
+> +	media_entity_cleanup(&info->sd.entity);
+>  hdl_free:
+>  	v4l2_ctrl_handler_free(&info->hdl);
+>  clk_disable:
+> @@ -1712,6 +1722,7 @@ static int ov7670_remove(struct i2c_client *client)
+>  	v4l2_device_unregister_subdev(sd);
+>  	v4l2_ctrl_handler_free(&info->hdl);
+>  	clk_disable_unprepare(info->clk);
+> +	media_entity_cleanup(&info->sd.entity);
+>  	return 0;
+>  }
+>  
+> -- 
+> 2.13.0
+> 
+
 -- 
-2.7.4
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
