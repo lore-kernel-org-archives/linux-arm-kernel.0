@@ -1,72 +1,58 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 15 Aug 2017 14:28:04 +0100
-Subject: [PATCH v11 0/3]add PCIe driver for Kirin PCIe
-In-Reply-To: <CAFGCpxy-Rn4aeRs6GwGu7kaXvk5ftQxSpho8D2kQ4OG5MgCA8w@mail.gmail.com>
-References: <20170619102349.50652-1-songxiaowei@hisilicon.com>
- <20170702233657.GA13507@bhelgaas-glaptop.roam.corp.google.com>
- <20170703104727.GB1573@arm.com>
- <CAFGCpxx+92PSs1VaryFOXau7CjBYEP4H6wT-o=bNMwkSznjQuw@mail.gmail.com>
- <595A4768.20404@hisilicon.com>
- <CAFGCpxy-Rn4aeRs6GwGu7kaXvk5ftQxSpho8D2kQ4OG5MgCA8w@mail.gmail.com>
-Message-ID: <5992F6E4.10505@hisilicon.com>
+Date: Tue, 15 Aug 2017 14:24:30 +0100
+Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.14
+Message-ID: <5992F60E.2060403@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guodong,
+Hi Arnd, Hi Olof, Hi Kevin,
 
-On 2017/7/4 3:03, Guodong Xu wrote:
-> On Mon, Jul 3, 2017 at 9:32 PM, Wei Xu <xuwei5@hisilicon.com> wrote:
->> Hi Guodong,
->>
->> On 2017/7/3 14:04, Guodong Xu wrote:
->>> Hi, Xu Wei
->>>
->>>
->>>
->>> On Mon, Jul 3, 2017 at 6:47 PM, Will Deacon <will.deacon@arm.com> wrote:
->>>> On Sun, Jul 02, 2017 at 06:36:57PM -0500, Bjorn Helgaas wrote:
->>>>> [+cc Catalin, Will, linux-arm-kernel]
->>>>>
->>>>> Applied patches 2 & 3 to pci/host-kirin for v4.13.
->>>>>
->>>>> I would like a MAINTAINERS update, too.  If you send me that, I'll
->>>>> squash it into the driver patch.
->>>>>
->>>>> Catalin, Will, how do you want to handle the
->>>>> arch/arm64/configs/defconfig change (patch 3)?  It's currently on my
->>>>> branch, but I'm happy to drop it if another route is better.
->>>>
->>>> defconfig updates usually go through arm-soc, via the relevant platform
->>>> maintainer, so it would be best to follow that route here too otherwise
->>>> you'll probably see conflicts in -next.
->>>>
->>>
->>> Is it ok for you to pick up the arch/arm64/configs/defconfig change (patch 3)?
->>
->> Since it is already 4.12-rc7, I will pick up it and queue for the v4.14.
->> Are you fine about that?
->> Thanks!
-> 
-> Sure.
+Please help to pull the following changes.
+Thanks!
 
-Applied the patch 3 into the hisilicon defconfig tree.
-
-BR,
+Best Regards,
 Wei
 
-> 
->>
->> Best Regards,
->> Wei
->>
->>>
->>> -Guodong
->>>
->>>> Will
->>>
->>> .
->>>
->>
-> 
-> .
-> 
+---
+
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-defconfig-for-4.14
+
+for you to fetch changes up to 4bd68d6038ffdcf5792fb7705bfd84caaaf39b2e:
+
+  arm64: defconfig: enable DMA driver for hi3660 (2017-08-14 16:14:16 +0100)
+
+----------------------------------------------------------------
+ARM64: hisilicon: defconfig updates for 4.14
+
+- Enable Kirin PCIe host, hi6421v530 mfd and regulator,
+  syscon reboot mode, serdev bus, OP-TEE and K3 DMA support
+  for hikey and hikey960
+
+- Enable pcie based sas controller support for hip08 SoC
+
+----------------------------------------------------------------
+Guodong Xu (3):
+      arm64: defconfig: enable support hi6421v530 PMIC
+      arm64: defconfig: enable CONFIG_SYSCON_REBOOT_MODE
+      arm64: defconfig: enable support for serial port connected device
+
+John Garry (1):
+      arm64: defconfig: enable SCSI_HISI_SAS_PCI
+
+Victor Chong (1):
+      arm64: defconfig: enable OP-TEE
+
+Wang Ruyi (1):
+      arm64: defconfig: enable DMA driver for hi3660
+
+Xiaowei Song (1):
+      arm64: defconfig: enable Kirin PCIe
+
+ arch/arm64/configs/defconfig | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
