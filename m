@@ -1,137 +1,88 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 15 Aug 2017 16:05:49 +0100
-Subject: [PATCH v4] acpi/iort: numa: Add numa node mapping for smmuv3
- devices
-In-Reply-To: <20170815150213.GD18024@rric.localdomain>
-References: <20170725050237.11033-1-ganapatrao.kulkarni@cavium.com>
- <20170815150213.GD18024@rric.localdomain>
-Message-ID: <20170815150549.GA1301@e107981-lin.cambridge.arm.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Tue, 15 Aug 2017 23:19:11 +0800
+Subject: [PATCH net] pci: fix oops when try to find Root Port for a PCI device
+Message-ID: <1502810351-8312-1-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 05:02:13PM +0200, Robert Richter wrote:
-> Lorenzo, Will,
-> 
-> On 25.07.17 10:32:37, Ganapatrao Kulkarni wrote:
-> > ARM IORT specification(rev. C) has added  provision to define proximity
-> > domain in SMMUv3 IORT table. Adding required code to parse Proximity
-> > domain and set numa_node of smmv3 platform devices.
-> > 
-> > Add code to parse proximity domain in SMMUv3 IORT table to
-> > set numa node mapping for smmuv3 devices.
-> > 
-> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> > ---
-> > 
-> > This patch has dependency on header file patch [1], which is
-> > already merged to linux-pm.
-> > 
-> > [1] https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git/commit/?h=linux-next&id=c944230064eb65e4fa018d86779b4fd200b1d7e7
-> > 
-> > v4:
-> >   - Fix compilation issue in !CONFIG_NUMA
-> > 
-> > v3:
-> >   - Addressed Lorenzo Pieralisi comment.
-> > 
-> > v2:
-> >   - Changed as per Lorenzo Pieralisi and Hanjun Guo suggestions.
-> > 
-> > v1:
-> >   - Initial patch
-> > 
-> >  drivers/acpi/arm64/iort.c | 33 +++++++++++++++++++++++++++++++--
-> >  1 file changed, 31 insertions(+), 2 deletions(-)
-> 
-> could this patch being scheduled for v4.14?
+Eric report a oops when booting the system after applying
+the commit a99b646afa8a ("PCI: Disable PCIe Relaxed..."):
 
-https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/commit/?h=for-next/core&id=5fe0ce3b9e514168427463d0c7a86dfa635da3d2
+[    4.241029] BUG: unable to handle kernel NULL pointer dereference at 0000000000000050
+[    4.247001] IP: pci_find_pcie_root_port+0x62/0x80
+[    4.253011] PGD 0
+[    4.253011] P4D 0
+[    4.253011]
+[    4.258013] Oops: 0000 [#1] SMP DEBUG_PAGEALLOC
+[    4.262015] Modules linked in:
+[    4.265005] CPU: 31 PID: 1 Comm: swapper/0 Not tainted 4.13.0-dbx-DEV #316
+[    4.271002] Hardware name: Intel RML,PCH/Iota_QC_19, BIOS 2.40.0 06/22/2016
+[    4.279002] task: ffffa2ee38cfa040 task.stack: ffffa51ec0004000
+[    4.285001] RIP: 0010:pci_find_pcie_root_port+0x62/0x80
+[    4.290012] RSP: 0000:ffffa51ec0007ab8 EFLAGS: 00010246
+[    4.295003] RAX: 0000000000000000 RBX: ffffa2ee36bae000 RCX: 0000000000000006
+[    4.303002] RDX: 000000000000081c RSI: ffffa2ee38cfa8c8 RDI: ffffa2ee36bae000
+[    4.310013] RBP: ffffa51ec0007b58 R08: 0000000000000001 R09: 0000000000000000
+[    4.317001] R10: 0000000000000000 R11: 0000000000000000 R12: ffffa51ec0007ad0
+[    4.324005] R13: ffffa2ee36bae098 R14: 0000000000000002 R15: ffffa2ee37204818
+[    4.331002] FS:  0000000000000000(0000) GS:ffffa2ee3fcc0000(0000) knlGS:0000000000000000
+[    4.339002] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[    4.345001] CR2: 0000000000000050 CR3: 000000401000f000 CR4: 00000000001406e0
+[    4.351002] Call Trace:
+[    4.354012]  ? pci_configure_device+0x19f/0x570
+[    4.359002]  ? pci_conf1_read+0xb8/0xf0
+[    4.363002]  ? raw_pci_read+0x23/0x40
+[    4.366011]  ? pci_read+0x2c/0x30
+[    4.370014]  ? pci_read_config_word+0x67/0x70
+[    4.374012]  pci_device_add+0x28/0x230
+[    4.378012]  ? pci_vpd_f0_read+0x50/0x80
+[    4.382014]  pci_scan_single_device+0x96/0xc0
+[    4.386012]  pci_scan_slot+0x79/0xf0
+[    4.389001]  pci_scan_child_bus+0x31/0x180
+[    4.394014]  acpi_pci_root_create+0x1c6/0x240
+[    4.398013]  pci_acpi_scan_root+0x15f/0x1b0
+[    4.402012]  acpi_pci_root_add+0x2e6/0x400
+[    4.406012]  ? acpi_evaluate_integer+0x37/0x60
+[    4.411002]  acpi_bus_attach+0xdf/0x200
+[    4.415002]  acpi_bus_attach+0x6a/0x200
+[    4.418014]  acpi_bus_attach+0x6a/0x200
+[    4.422013]  acpi_bus_scan+0x38/0x70
+[    4.426011]  acpi_scan_init+0x10c/0x271
+[    4.429001]  acpi_init+0x2fa/0x348
+[    4.433004]  ? acpi_sleep_proc_init+0x2d/0x2d
+[    4.437001]  do_one_initcall+0x43/0x169
+[    4.441001]  kernel_init_freeable+0x1d0/0x258
+[    4.445003]  ? rest_init+0xe0/0xe0
+[    4.449001]  kernel_init+0xe/0x150
 
-It is already :) (I CC'ed you on the PR)
+====================== cut here =============================
 
-Thanks,
-Lorenzo
+It looks like the pci_find_pcie_root_port() was trying to
+find the Root Port for the PCI device which is the Root
+Port already, it will return NULL and trigger the problem,
+so check the highest_pcie_bridge to fix thie problem.
 
-> 
-> Thanks,
-> 
-> -Robert
-> 
-> > 
-> > diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> > index a3215ee..c5c82c3 100644
-> > --- a/drivers/acpi/arm64/iort.c
-> > +++ b/drivers/acpi/arm64/iort.c
-> > @@ -908,6 +908,28 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
-> >  	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
-> >  }
-> >  
-> > +#if defined(CONFIG_ACPI_NUMA) && (ACPI_CA_VERSION >= 0x20170629)
-> > +/*
-> > + * set numa proximity domain for smmuv3 device
-> > + */
-> > +static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
-> > +		struct device *dev)
-> > +{
-> > +	struct acpi_iort_smmu_v3 *smmu;
-> > +
-> > +	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-> > +	if (smmu->flags & ACPI_IORT_SMMU_V3_PXM_VALID) {
-> > +		set_dev_node(dev, acpi_map_pxm_to_node(smmu->pxm));
-> > +		pr_info("SMMUV3[%llx] Mapped to Proximity domain %d\n",
-> > +			smmu->base_address,
-> > +			smmu->pxm);
-> > +	}
-> > +}
-> > +#else
-> > +static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
-> > +		struct device *dev) { }
-> > +#endif
-> > +
-> >  static int __init arm_smmu_count_resources(struct acpi_iort_node *node)
-> >  {
-> >  	struct acpi_iort_smmu *smmu;
-> > @@ -977,20 +999,24 @@ struct iort_iommu_config {
-> >  	int (*iommu_count_resources)(struct acpi_iort_node *node);
-> >  	void (*iommu_init_resources)(struct resource *res,
-> >  				     struct acpi_iort_node *node);
-> > +	void (*iommu_set_proximity)(struct acpi_iort_node *node,
-> > +				     struct device *dev);
-> >  };
-> >  
-> >  static const struct iort_iommu_config iort_arm_smmu_v3_cfg __initconst = {
-> >  	.name = "arm-smmu-v3",
-> >  	.iommu_is_coherent = arm_smmu_v3_is_coherent,
-> >  	.iommu_count_resources = arm_smmu_v3_count_resources,
-> > -	.iommu_init_resources = arm_smmu_v3_init_resources
-> > +	.iommu_init_resources = arm_smmu_v3_init_resources,
-> > +	.iommu_set_proximity = arm_smmu_v3_set_proximity
-> >  };
-> >  
-> >  static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
-> >  	.name = "arm-smmu",
-> >  	.iommu_is_coherent = arm_smmu_is_coherent,
-> >  	.iommu_count_resources = arm_smmu_count_resources,
-> > -	.iommu_init_resources = arm_smmu_init_resources
-> > +	.iommu_init_resources = arm_smmu_init_resources,
-> > +	.iommu_set_proximity = NULL
-> >  };
-> >  
-> >  static __init
-> > @@ -1028,6 +1054,9 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
-> >  	if (!pdev)
-> >  		return -ENOMEM;
-> >  
-> > +	if (ops->iommu_set_proximity)
-> > +		ops->iommu_set_proximity(node, &pdev->dev);
-> > +
-> >  	count = ops->iommu_count_resources(node);
-> >  
-> >  	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
-> > -- 
-> > 2.9.4
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Fixes: a99b646afa8a ("PCI: Disable PCIe Relaxed Ordering if unsupported")
+Reported-by: Eric Dumazet <eric.dumazet@gmail.com>
+Signed-off-by: Eric Dumazet <eric.dumazet@gmail.com>
+Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+---
+ drivers/pci/pci.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index af0cc34..7e2022f 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -522,7 +522,8 @@ struct pci_dev *pci_find_pcie_root_port(struct pci_dev *dev)
+ 		bridge = pci_upstream_bridge(bridge);
+ 	}
+ 
+-	if (pci_pcie_type(highest_pcie_bridge) != PCI_EXP_TYPE_ROOT_PORT)
++	if (highest_pcie_bridge &&
++	    pci_pcie_type(highest_pcie_bridge) != PCI_EXP_TYPE_ROOT_PORT)
+ 		return NULL;
+ 
+ 	return highest_pcie_bridge;
+-- 
+1.8.3.1
