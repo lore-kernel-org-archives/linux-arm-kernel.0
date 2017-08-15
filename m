@@ -1,43 +1,34 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 15 Aug 2017 18:37:19 +0100
-Subject: [PATCH 16/27] arm64/sve: Preserve SVE registers around
- kernel-mode NEON use
-In-Reply-To: <1502280338-23002-17-git-send-email-Dave.Martin@arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-17-git-send-email-Dave.Martin@arm.com>
-Message-ID: <CAKv+Gu_1LdHuSP1fAeiNNc9PbAw8MQBP2tYhWFJ+szv=nQjHvQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 Aug 2017 18:39:14 +0100
+Subject: [PATCHv2 00/14] arm64: VMAP_STACK support
+In-Reply-To: <fa283afb-b611-45da-a89a-12fafe987082@redhat.com>
+References: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
+ <fa283afb-b611-45da-a89a-12fafe987082@redhat.com>
+Message-ID: <20170815173913.GA27057@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 August 2017 at 13:05, Dave Martin <Dave.Martin@arm.com> wrote:
-> Kernel-mode NEON will corrupt the SVE vector registers, due to the
-> way they alias the FPSIMD vector registers in the hardware.
->
-> This patch ensures that any live SVE register content for the task
-> is saved by kernel_neon_begin().  The data will be restored in the
-> usual way on return to userspace.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/kernel/fpsimd.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 955c873..b7fb836 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -758,8 +758,10 @@ void kernel_neon_begin(void)
->         __this_cpu_write(kernel_neon_busy, true);
->
->         /* Save unsaved task fpsimd state, if any: */
-> -       if (current->mm && !test_and_set_thread_flag(TIF_FOREIGN_FPSTATE))
-> -               fpsimd_save_state(&current->thread.fpsimd_state);
-> +       if (current->mm) {
-> +               task_fpsimd_save();
-> +               set_thread_flag(TIF_FOREIGN_FPSTATE);
-> +       }
->
->         /* Invalidate any task state remaining in the fpsimd regs: */
->         __this_cpu_write(fpsimd_last_state, NULL);
+On Tue, Aug 15, 2017 at 10:18:20AM -0700, Laura Abbott wrote:
+> On 08/15/2017 05:50 AM, Mark Rutland wrote:
+> > Hi,
+> > 
+> > Ard and I have worked together to implement vmap stack support for
+> > arm64. This supersedes our earlier vmap stack RFCs [0,1]. The git author
+> > stats are a little misleading, as I've teased parts out into smaller
+> > patches for review.
+> > 
+> > The series is based on our stack dump rework [2,3], which can be found
+> > in the arm64/exception-stack branch [4] of my kernel.org repo. This
+> > series can be found in the arm64/vmap-stack branch [5] of the same repo.
 
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Tested-by: Laura Abbott <labbott@redhat.com>
+
+Thanks!
+
+> (I think I may be slightly late with this. Oh well.)
+
+On the chance that Catalin's happy to redo the pull, I've folded that
+Tested-by in, and pushed the series.
+
+Thanks,
+Mark.
