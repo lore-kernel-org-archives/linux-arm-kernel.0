@@ -1,34 +1,71 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 15 Aug 2017 13:59:46 +0200
-Subject: next-20170815 build: 2 failures 4 warnings (next-20170815)
-In-Reply-To: <20170815111612.esq73hxowbw2mehj@sirena.org.uk>
-References: <E1dhZPk-0002d9-9k@optimist>
- <20170815111612.esq73hxowbw2mehj@sirena.org.uk>
-Message-ID: <13442814.gWUDHvzIl2@aspire.rjw.lan>
+Date: Tue, 15 Aug 2017 14:25:58 +0200
+Subject: [PATCH 07/10] cpufreq: dt: Add support for some new Allwinner SoCs
+In-Reply-To: <CAGb2v640an6X75PTbNTnMqhnEREekX97uJZ4sFsfqTAgcDinQg@mail.gmail.com>
+References: <20170723102749.17323-1-icenowy@aosc.io>
+ <2436327.OLdY8skjMP@aspire.rjw.lan>
+ <CAGb2v640an6X75PTbNTnMqhnEREekX97uJZ4sFsfqTAgcDinQg@mail.gmail.com>
+Message-ID: <4537884.Ku45nQGoFt@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 15, 2017 1:16:12 PM CEST Mark Brown wrote:
+On Tuesday, August 15, 2017 7:42:19 AM CEST Chen-Yu Tsai wrote:
+> On Mon, Jul 24, 2017 at 7:46 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Monday, July 24, 2017 02:23:49 PM Viresh Kumar wrote:
+> >> On 23-07-17, 18:27, Icenowy Zheng wrote:
+> >> > Some new Allwinner SoCs get supported in the kernel after the
+> >> > compatibles are added to cpufreq-dt-platdev driver.
+> >> >
+> >> > Add their compatible strings in the cpufreq-dt-platdev driver.
+> >> >
+> >> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> >> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> >> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> >> > ---
+> >> >  drivers/cpufreq/cpufreq-dt-platdev.c | 6 ++++++
+> >> >  1 file changed, 6 insertions(+)
+> >> >
+> >> > diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+> >> > index 2eb40d46d357..c3851453e84a 100644
+> >> > --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+> >> > +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+> >> > @@ -24,7 +24,11 @@ static const struct of_device_id machines[] __initconst = {
+> >> >     { .compatible = "allwinner,sun8i-a23", },
+> >> >     { .compatible = "allwinner,sun8i-a33", },
+> >> >     { .compatible = "allwinner,sun8i-a83t", },
+> >> > +   { .compatible = "allwinner,sun8i-h2-plus", },
+> >> >     { .compatible = "allwinner,sun8i-h3", },
+> >> > +   { .compatible = "allwinner,sun8i-v3s", },
+> >> > +   { .compatible = "allwinner,sun50i-a64", },
+> >> > +   { .compatible = "allwinner,sun50i-h5", },
+> >> >
+> >> >     { .compatible = "apm,xgene-shadowcat", },
+> >> >
+> >> > @@ -43,6 +47,8 @@ static const struct of_device_id machines[] __initconst = {
+> >> >     { .compatible = "marvell,pxa250", },
+> >> >     { .compatible = "marvell,pxa270", },
+> >> >
+> >> > +   { .compatible = "nextthing,gr8", },
+> >> > +
+> >> >     { .compatible = "samsung,exynos3250", },
+> >> >     { .compatible = "samsung,exynos4210", },
+> >> >     { .compatible = "samsung,exynos4212", },
+> >>
+> >> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> >>
+> >>
+> >
+> > OK
+> >
+> > I'm assuming this will go in via arm-soc along with the rest of the series.
 > 
-> --xqegarazqzvkdxmo
-> Content-Type: text/plain; charset=us-ascii
-> Content-Disposition: inline
-> 
-> On Tue, Aug 15, 2017 at 11:49:36AM +0100, Build bot for Mark Brown wrote:
-> 
-> Today's -next fails to build on arm64 due to:
-> 
-> > 	arm64-allmodconfig
-> > 	arm64-defconfig
-> > ../drivers/acpi/spcr.c:168:1: error: expected expression before '<<' token
-> > ../drivers/acpi/spcr.c:198:1: error: expected expression before '>>' token
-> 
-> caused by f69ba1326ac33b (Merge branch 'acpi-spcr' into linux-next)
-> which has an unresolved conflict in it.
+> The rest of the series, except for the clk patches I've already taken,
+> doesn't seem to be going anywhere just yet. Is there a cpufreq or pm tree
+> this can be merged through?
 
-Yes, I broke this, sorry.
+You mean this particular patch or the whole series?
 
-Will fix it shortly.
+If the former, then yes, there is.
 
 Thanks,
 Rafael
