@@ -1,40 +1,89 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 15 Aug 2017 18:02:37 +0100
-Subject: [PATCHv2 02/14] fork: allow arch-override of VMAP stack alignment
-In-Reply-To: <20170815163955.GK6090@leverpostej>
-References: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
- <1502801449-29246-3-git-send-email-mark.rutland@arm.com>
- <CALCETrWAYvKTcgaQgEDC-ihhSuFAw9Phq-xF6FK5AMM6ag6j4A@mail.gmail.com>
- <20170815163036.GJ6090@leverpostej>
- <CALCETrWP-cufvhLJU2Q7BPAYw+HmyzJHVWPvmmCS+bq84Up1zQ@mail.gmail.com>
- <20170815163955.GK6090@leverpostej>
-Message-ID: <20170815170236.yvr3dlfpxcnx3y7u@armageddon.cambridge.arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 15 Aug 2017 12:03:31 -0500
+Subject: [PATCH net RESEND] PCI: fix oops when try to find Root Port for
+ a PCI device
+In-Reply-To: <1502810688-12420-1-git-send-email-dingtianhong@huawei.com>
+References: <1502810688-12420-1-git-send-email-dingtianhong@huawei.com>
+Message-ID: <20170815170331.GA4099@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 05:39:55PM +0100, Mark Rutland wrote:
-> On Tue, Aug 15, 2017 at 09:33:18AM -0700, Andy Lutomirski wrote:
-> > On Tue, Aug 15, 2017 at 9:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > > On Tue, Aug 15, 2017 at 09:09:36AM -0700, Andy Lutomirski wrote:
-> 
-> > >> This looks okay, but it might make sense to move that to a header file
-> > >> so THREAD_ALIGN is always available.
-> > >
-> > > I was a little worried about breaking things, since arches don't define
-> > > THREAD_SIZE in a consistent location.
-> > >
-> > > Looking again, it looks like those are all transitiviely included into
-> > > each arch's <asm/thread_info.h>, so I think I can move this into
-> > > <linux/thread_info.h>, which'll have to be added to kernel.fork.c's
-> > > includes.
-> > >
-> > > Are you happy with the below fixup?
-> > 
-> > LGTM.
-> 
-> Cool. I've folded that in and pushed the updated branch.
+On Tue, Aug 15, 2017 at 11:24:48PM +0800, Ding Tianhong wrote:
+> Eric report a oops when booting the system after applying
+> the commit a99b646afa8a ("PCI: Disable PCIe Relaxed..."):
+> ...
 
-I pulled the branch for 4.14. Thanks.
+> It looks like the pci_find_pcie_root_port() was trying to
+> find the Root Port for the PCI device which is the Root
+> Port already, it will return NULL and trigger the problem,
+> so check the highest_pcie_bridge to fix thie problem.
 
--- 
-Catalin
+The problem was actually with a Root Complex Integrated Endpoint that
+has no upstream PCIe device:
+
+  00:05.2 System peripheral: Intel Corporation Device 0e2a (rev 04)
+        Subsystem: Intel Corporation Device 0e2a
+        Control: I/O- Mem- BusMaster- SpecCycle- MemWINV- VGASnoop- ParErr- Stepping- SERR- FastB2B- DisINTx-
+        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
+        Capabilities: [40] Express (v2) Root Complex Integrated Endpoint, MSI 00
+                DevCap: MaxPayload 128 bytes, PhantFunc 0, Latency L0s <64ns, L1 <1us
+                        ExtTag- RBE- FLReset-
+                DevCtl: Report errors: Correctable- Non-Fatal- Fatal+ Unsupported+
+                        RlxdOrd+ ExtTag- PhantFunc- AuxPwr- NoSnoop+
+                        MaxPayload 128 bytes, MaxReadReq 128 bytes
+
+> Fixes: a99b646afa8a ("PCI: Disable PCIe Relaxed Ordering if unsupported")
+
+This also
+
+Fixes: c56d4450eb68 ("PCI: Turn off Request Attributes to avoid Chelsio T5 Completion erratum")
+
+which added pci_find_pcie_root_port().  Prior to this Relaxed Ordering
+series, we only used pci_find_pcie_root_port() in a Chelsio quirk that
+only applied to non-integrated endpoints, so we didn't trip over the
+bug.
+
+> Reported-by: Eric Dumazet <eric.dumazet@gmail.com>
+> Signed-off-by: Eric Dumazet <eric.dumazet@gmail.com>
+> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+> ---
+>  drivers/pci/pci.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index af0cc34..7e2022f 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -522,7 +522,8 @@ struct pci_dev *pci_find_pcie_root_port(struct pci_dev *dev)
+>  		bridge = pci_upstream_bridge(bridge);
+>  	}
+>  
+> -	if (pci_pcie_type(highest_pcie_bridge) != PCI_EXP_TYPE_ROOT_PORT)
+> +	if (highest_pcie_bridge &&
+> +	    pci_pcie_type(highest_pcie_bridge) != PCI_EXP_TYPE_ROOT_PORT)
+>  		return NULL;
+>  
+>  	return highest_pcie_bridge;
+> -- 
+
+I think structuring the fix as follows is a little more readable:
+
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index af0cc3456dc1..587cd7623ed8 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -522,10 +522,11 @@ struct pci_dev *pci_find_pcie_root_port(struct pci_dev *dev)
+ 		bridge = pci_upstream_bridge(bridge);
+ 	}
+ 
+-	if (pci_pcie_type(highest_pcie_bridge) != PCI_EXP_TYPE_ROOT_PORT)
+-		return NULL;
++	if (highest_pcie_bridge &&
++	    pci_pcie_type(highest_pcie_bridge) == PCI_EXP_TYPE_ROOT_PORT)
++		return highest_pcie_bridge;
+ 
+-	return highest_pcie_bridge;
++	return NULL;
+ }
+ EXPORT_SYMBOL(pci_find_pcie_root_port);
+ 
