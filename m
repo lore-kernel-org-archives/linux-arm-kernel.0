@@ -1,66 +1,44 @@
-From: sr@denx.de (Stefan Roese)
-Date: Tue, 15 Aug 2017 16:06:56 +0200
-Subject: [PATCH] irqchip/armada-370-xp: Enable MSI-X support
-In-Reply-To: <20170815160109.023842de@windsurf>
-References: <20170502072600.13380-1-sr@denx.de>
- <80f30724-20b6-b5a7-7218-93ff3fa23177@denx.de>
- <20170815160109.023842de@windsurf>
-Message-ID: <6a3e8bcc-19ef-cef1-180e-f4e194d5589b@denx.de>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 15 Aug 2017 15:14:25 +0100
+Subject: [RESEND PATCH] drm/hisilicon: Ensure LDI regs are properly configured.
+Message-ID: <1502806465-17772-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+This patch fixes the following soft lockup:
+  BUG: soft lockup - CPU#0 stuck for 23s! [weston:307]
 
-On 15.08.2017 16:01, Thomas Petazzoni wrote:
-> On Tue, 15 Aug 2017 15:31:31 +0200, Stefan Roese wrote:
-> 
->> On 02.05.2017 09:26, Stefan Roese wrote:
->>> Armada XP does not only support MSI, but also MSI-X. This patch sets
->>> the MSI_FLAG_PCI_MSIX flag in the interrupt controller driver which
->>> is the only change necessary to enable MSI-X support on this SoC. As
->>> the Linux PCI MSI-X infrastructure takes care of writing the data and
->>> address structures into the BAR specified by the MSI-X controller.
->>>
->>> Signed-off-by: Stefan Roese <sr@denx.de>
->>> Cc: Bjorn Helgaas <bhelgaas@google.com>
->>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>> Cc: Jason Cooper <jason@lakedaemon.net>
->>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>> ---
->>>    drivers/irqchip/irq-armada-370-xp.c | 2 +-
->>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
->>> index 33982cbd8a57..b17039ed8735 100644
->>> --- a/drivers/irqchip/irq-armada-370-xp.c
->>> +++ b/drivers/irqchip/irq-armada-370-xp.c
->>> @@ -124,7 +124,7 @@ static struct irq_chip armada_370_xp_msi_irq_chip = {
->>>    
->>>    static struct msi_domain_info armada_370_xp_msi_domain_info = {
->>>    	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
->>> -		   MSI_FLAG_MULTI_PCI_MSI),
->>> +		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
->>>    	.chip	= &armada_370_xp_msi_irq_chip,
->>>    };
->>>    
->>>    
->>
->> Its been a while since this patch has been submitted - without any
->> comments so far. What's the current status with it? Is it someones
->> queue for upstreaming?
-> 
-> Sorry for the lack of feedback, very good idea to ping me on this
-> topic. I don't have access to HW right now, so I can't give it a test.
-> However, I don't think I have MSI-X capable hardware, only MSI capable.
-> 
-> With which hardware did you test this? An off-the-shell PCIe card, or
-> some custom FPGA logic?
+On weston idle-timeout the IP is powered down and reset
+asserted. On weston resume we get a massive vblank
+IRQ storm due to the LDI registers having lost some state.
 
-I tested this code with some Altera / Intel FPGA using their PCI-Express
-IP core. It should be possible to test this with some MSI-X capable
-desktop PCIe cards as well on AXP boards equipped with PCIe slots,
-like the Marvell AXP development board (orange box).
+This state loss is caused by ade_crtc_atomic_begin() not
+calling ade_ldi_set_mode(). With this patch applied
+resuming from Weston idle-timeout works well.
 
-Thanks,
-Stefan
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Tested-by: John Stultz <john.stultz@linaro.org>
+Cc: stable at vger.kernel.org
+---
+ drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+index c96c228..72c6357 100644
+--- a/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
++++ b/drivers/gpu/drm/hisilicon/kirin/kirin_drm_ade.c
+@@ -519,9 +519,12 @@ static void ade_crtc_atomic_begin(struct drm_crtc *crtc,
+ {
+ 	struct ade_crtc *acrtc = to_ade_crtc(crtc);
+ 	struct ade_hw_ctx *ctx = acrtc->ctx;
++	struct drm_display_mode *mode = &crtc->state->mode;
++	struct drm_display_mode *adj_mode = &crtc->state->adjusted_mode;
+ 
+ 	if (!ctx->power_on)
+ 		(void)ade_power_up(ctx);
++	ade_ldi_set_mode(acrtc, mode, adj_mode);
+ }
+ 
+ static void ade_crtc_atomic_flush(struct drm_crtc *crtc,
+-- 
+2.7.4
