@@ -1,53 +1,81 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Aug 2017 12:19:11 +0100
-Subject: [PATCH 14/14] arm64: add VMAP_STACK overflow detection
-In-Reply-To: <20170815111031.xbga45isn5gumeni@armageddon.cambridge.arm.com>
-References: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
- <1502130965-18710-15-git-send-email-mark.rutland@arm.com>
- <20170815111031.xbga45isn5gumeni@armageddon.cambridge.arm.com>
-Message-ID: <20170815111910.GF6090@leverpostej>
+From: peda@axentia.se (Peter Rosin)
+Date: Tue, 15 Aug 2017 13:36:42 +0200
+Subject: [PATCH v2 2/3] usb: chipidea: Hook into mux framework to toggle
+ usb switch
+In-Reply-To: <150249037091.15411.10074988823155268663@sboyd-linaro>
+References: <20170714214005.14967-1-stephen.boyd@linaro.org>
+ <20170714214005.14967-3-stephen.boyd@linaro.org>
+ <7080030c-c9c2-657d-aad4-aef636438cb1@axentia.se>
+ <150215709134.18242.599725161375995991@sboyd-linaro>
+ <c5c411fe-2f5a-88cc-73e8-28ab61f5de04@axentia.se>
+ <150249037091.15411.10074988823155268663@sboyd-linaro>
+Message-ID: <8bbd90f2-a80f-1bf7-e5a8-400cebf6dc89@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 12:10:32PM +0100, Catalin Marinas wrote:
-> On Mon, Aug 07, 2017 at 07:36:05PM +0100, Mark Rutland wrote:
-> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> > index e5aa866..44a27c3 100644
-> > --- a/arch/arm64/kernel/entry.S
-> > +++ b/arch/arm64/kernel/entry.S
-> > @@ -72,6 +72,37 @@
-> >  	.macro kernel_ventry	label
-> >  	.align 7
-> >  	sub	sp, sp, #S_FRAME_SIZE
-> > +#ifdef CONFIG_VMAP_STACK
-> > +	add	sp, sp, x0			// sp' = sp + x0
-> > +	sub	x0, sp, x0			// x0' = sp' - x0 = (sp + x0) - x0 = sp
-> > +	tbnz	x0, #THREAD_SHIFT, 0f
-> > +	sub	x0, sp, x0			// sp' - x0' = (sp + x0) - sp = x0
-> > +	sub	sp, sp, x0			// sp' - x0 = (sp + x0) - x0 = sp
-> > +	b	\label
+On 2017-08-12 00:26, Stephen Boyd wrote:
+> Quoting Peter Rosin (2017-08-08 05:46:30)
+>> On 2017-08-08 03:51, Stephen Boyd wrote:
+>>
+>>>                      It looked like we paired the start/stop ops with
+>>> each other so that the mux is properly managed across these ops.
+>>
+>> Yes, it *looks* ok...
+>>
+>>>                                                                  My
+>>> testing hasn't shown a problem, but maybe there's some corner case
+>>> you're thinking of? I'll double check the code.
+>>
+>> ...but since I do not know the usb code, I can't tell. What I worry about
+>> is the usb core calling udc_id_switch_for_host or udc_id_switch_for_device
+>> more than once without any call to the other in between. Maybe that is a
+>> guarantee that the usb core makes? Or maybe it isn't? If e.g. there is a
+>> third mode (or if one is added in the future), then the calls to
+>> mux_control_select and mux_control_deselect would not be paired correctly.
+>> Ok, sure, a third mode probably doesn't exist and will probably not be
+>> added, but but but...
+>>
+>> Also, what happens if udc_id_switch_for_device fails? Is it certain that
+>> it will be called again before udc_id_switch_for_host is called, or is
+>> the failure simply logged? If the latter, you might have a call to
+>> mux_control_deselect without a preceding (and successful) call to
+>> mux_control_select. That's fatal.
 > 
-> Maybe a small comment before this hunk just to tell the user that it's
-> trying to test a bit in SP without corrupting a gpr. It's obvious once
-> you read it but not you see it for the first time ;).
+> The only thing that could fail right now is the mux selection, so we
+> wouldn't get into some sort of situation where that's locked in and
+> unchangeable. We do rollback the role if it fails to switch, so we also
+> wouldn't go into a half-way state of being in one role but not actually
+> switching all the way over to it.
+
+What do you roll back to if the initial setting of the role fails?
+Hopefully that causes a probe failure?
+
+Cheers,
+Peter
+
+>> I have similar worries for host_start/host_stop, but for that case
+>> host_stop is not allowed to fail, and it seems like a safe bet that
+>> host_stop will only be called if host_start succeeds. So, I'm not as
+>> worried there.
+>>
+>> In other words, the question is if the usb core is designed to allow
+>> this kind of "raw" resource administration in udc_id_switch_for_host and
+>> udc_id_switch_for_device, or if you need to keep a local record of the
+>> state so that you do not do double resource acquisition or attempt to
+>> free resources you don't have?
+>>
+>> I think I would feel better if the muxing for the device mode could
+>> be done in a start/stop pair of function just like the host mode is
+>> doing. Again, I don't know the usb code and don't know if such hooks
+>> exist or not?
+>>
 > 
-> > +
-> > +	/* Stash the original SP value in tpidr_el0 */
-> > +0:	msr	tpidr_el0, x0
-> 
-> And a comment here that on this path we no longer care about the user
-> tpidr_el0 as we are never returning there.
-
-Ok.
-
-I've updated comments in both cases.
-
-> Otherwise I'm fine with the series (I'm not a fan of the complexity it
-> adds but I don't have a better suggestion).
-
-Thanks!
-
-I'll send out a v2 shortly with the changes you requested.
-
-Thanks,
-Mark.
+> The host_start/host_stop functions are assigned to the same struct
+> ci_role_driver ops that udc_idc_switch_for_{device,host} are for the
+> gadget role. Really, these things are called from the same place by the
+> chipidea driver so not much is different between the two files I modify
+> to make the mux calls. Furthermore, we don't want to do this if we have
+> HNP or "true" OTG support so I've put it behind the ci_otg_is_fsm_mode()
+> check to make sure we don't do any muxing stuff based on fsm state
+> changes. It doesn't really make any sense here anyway because this
+> device I have doesn't support OTG, just role switching.
