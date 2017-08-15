@@ -1,196 +1,168 @@
-From: noralf@tronnes.org (=?UTF-8?Q?Noralf_Tr=c3=b8nnes?=)
-Date: Tue, 15 Aug 2017 23:49:56 +0200
-Subject: [PATCH 2/4] drm/tve200: Add new driver for TVE200
-In-Reply-To: <20170813151132.24736-3-linus.walleij@linaro.org>
-References: <20170813151132.24736-1-linus.walleij@linaro.org>
- <20170813151132.24736-3-linus.walleij@linaro.org>
-Message-ID: <e1004ea1-bd36-e3e4-c4e7-23d38a969e77@tronnes.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 16 Aug 2017 00:03:49 +0200
+Subject: [PATCH] nokia n900: update dts with camera support
+In-Reply-To: <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
+References: <20170810204923.GA18442@amd>
+ <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
+Message-ID: <20170815220349.GA15441@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
-Den 13.08.2017 17.11, skrev Linus Walleij:
-> This adds a new DRM driver for the Faraday Technology TVE200
-> block. This "TV Encoder" encodes a ITU-T BT.656 stream and can
-> be found in the StorLink SL3516 (later Cortina Systems CS3516)
-> as well as the Grain Media GM8180.
->
-> I do not have definitive word from anyone at Faraday that this
-> IP block is theirs, but it bears the hallmark of their 3-digit
-> version code (200) and is used in two SoCs from completely
-> different companies. (Grain Media was fully owned by Faraday
-> until it was transferred to NovoTek this january, and
-> Faraday did lots of work on the StorLink SoCs.)
->
-> The D-Link DIR-685 uses this in connection with the Ilitek
-> ILI9322 panel driver that supports BT.656 input, while the
-> GM8180 apparently has been used with the Cirrus Logic CS4954
-> digital video encoder. The oldest user seems to be
-> something called Techwall 2835.
->
-> This driver is heavily inspired by Eric Anholt's PL111
-> driver and therefore I have mentioned all the ancestor authors
-> in the header file.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
+> I understand Tony already applied this one. I'd have a few comments below,
+> could you address them in another patch, please?
 
-[...]
+Yes.
 
-> diff --git a/drivers/gpu/drm/tve200/tve200_drv.c b/drivers/gpu/drm/tve200/tve200_drv.c
+> > +	rear_camera: camera at 0 {
+> > +		compatible = "linux,camera";
+> > +
+> > +		module {
+> > +			model = "TCM8341MD";
+> > +			sensor = <&cam1>;
+> > +		};
+> > +	};
+> 
+> There's no reference to rear_camera. I understand that this represents the
+> camera module but as we don't have any documented way to describe camera
+> modules (nor we have really discussed the matter), this should be removed
+> for now.
+> 
+> Perhaps later on, but I be it'd look quite different.
 
-[...]
+Ok, this is easy.
 
-> +static struct drm_driver tve200_drm_driver = {
-> +	.driver_features =
-> +		DRIVER_MODESET | DRIVER_GEM | DRIVER_PRIME | DRIVER_ATOMIC,
-> +	.lastclose = tve200_lastclose,
-> +	.ioctls = NULL,
-> +	.fops = &drm_fops,
-> +	.name = "tve200",
-> +	.desc = DRIVER_DESC,
-> +	.date = "20170703",
-> +	.major = 1,
-> +	.minor = 0,
-> +	.patchlevel = 0,
-> +	.dumb_create = drm_gem_cma_dumb_create,
-> +	.dumb_destroy = drm_gem_dumb_destroy,
-> +	.dumb_map_offset = drm_gem_cma_dumb_map_offset,
+> > +				bus-type = <3>; /* CCP2 */
+> > +				clock-lanes = <1>;
+> > +				data-lanes = <0>;
+> > +				lane-polarity = <0 0>;
+> > +				clock-inv = <0>;
+> > +				/* Select strobe = <1> for back camera, <0> for front camera */
+> > +				strobe = <1>;
+> > +				crc = <0>;
+> 
+> crc is not a documented binding in video-interfaces.txt. Same for
+> clock-inv. clock-inv is used by v4l2-fwnode.c already. Describing both in
+> video-interfaces.txt would certainly make sense though, as well as adding
+> support for crc in CCP2 to V4L2 fwnode.
+> 
+> Could you submit patches for that? I can do that as well but it'll probably
+> take some days at least.
 
-The dumb_destroy and dumb_map_offset callbacks have defaults now that
-fits the cma helper drivers so you don't need to set them. And
-drm_gem_cma_dumb_map_offset() is gone as soon as I get and ack on the
-remaining cleanup patches.
+Ok, no longer that easy. But see below, something like that?
 
-Noralf.
+Could you suggest better documentation lines? I'm afraid Rob will not
+like "not inverted" vs. "inverted"... would "camera sensor protects
+image data of each frame with crc" be suitable?
 
-> +	.gem_free_object = drm_gem_cma_free_object,
-> +	.gem_vm_ops = &drm_gem_cma_vm_ops,
-> +
-> +	.enable_vblank = tve200_enable_vblank,
-> +	.disable_vblank = tve200_disable_vblank,
-> +
-> +	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
-> +	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
-> +	.gem_prime_import = drm_gem_prime_import,
-> +	.gem_prime_import_sg_table = drm_gem_cma_prime_import_sg_table,
-> +	.gem_prime_export = drm_gem_prime_export,
-> +	.gem_prime_get_sg_table	= drm_gem_cma_prime_get_sg_table,
-> +};
-> +
-> +static int tve200_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct tve200_drm_dev_private *priv;
-> +	struct drm_device *drm;
-> +	struct resource *res;
-> +	int irq;
-> +	int ret;
-> +
-> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	drm = drm_dev_alloc(&tve200_drm_driver, dev);
-> +	if (IS_ERR(drm))
-> +		return PTR_ERR(drm);
-> +	platform_set_drvdata(pdev, drm);
-> +	priv->drm = drm;
-> +	drm->dev_private = priv;
-> +
-> +	/* Clock the silicon so we can access the registers */
-> +	priv->pclk = devm_clk_get(dev, "PCLK");
-> +	if (IS_ERR(priv->pclk)) {
-> +		dev_err(dev, "unable to get PCLK\n");
-> +		ret = PTR_ERR(priv->pclk);
-> +		goto dev_unref;
-> +	}
-> +	ret = clk_prepare_enable(priv->pclk);
-> +	if (ret) {
-> +		dev_err(dev, "failed to enable PCLK\n");
-> +		goto dev_unref;
-> +	}
-> +
-> +	/* This clock is for the pixels (27MHz) */
-> +	priv->clk = devm_clk_get(dev, "TVE");
-> +	if (IS_ERR(priv->clk)) {
-> +		dev_err(dev, "unable to get TVE clock\n");
-> +		ret = PTR_ERR(priv->clk);
-> +		goto clk_disable;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	priv->regs = devm_ioremap_resource(dev, res);
-> +	if (!priv->regs) {
-> +		dev_err(dev, "%s failed mmio\n", __func__);
-> +		ret = -EINVAL;
-> +		goto dev_unref;
-> +	}
-> +
-> +	irq = platform_get_irq(pdev, 0);
-> +	if (!irq) {
-> +		ret = -EINVAL;
-> +		goto dev_unref;
-> +	}
-> +
-> +	/* turn off interrupts before requesting the irq */
-> +	writel(0, priv->regs + TVE200_INT_EN);
-> +
-> +	ret = devm_request_irq(dev, irq, tve200_irq, 0, "tve200", priv);
-> +	if (ret) {
-> +		dev_err(dev, "failed to request irq %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = tve200_modeset_init(drm);
-> +	if (ret)
-> +		goto dev_unref;
-> +
-> +	ret = drm_dev_register(drm, 0);
-> +	if (ret < 0)
-> +		goto dev_unref;
-> +
-> +	return 0;
-> +
-> +clk_disable:
-> +	clk_disable_unprepare(priv->pclk);
-> +dev_unref:
-> +	drm_dev_unref(drm);
-> +	return ret;
-> +}
-> +
-> +static int tve200_remove(struct platform_device *pdev)
-> +{
-> +	struct drm_device *drm = platform_get_drvdata(pdev);
-> +	struct tve200_drm_dev_private *priv = drm->dev_private;
-> +
-> +	drm_dev_unregister(drm);
-> +	if (priv->fbdev)
-> +		drm_fbdev_cma_fini(priv->fbdev);
-> +	drm_mode_config_cleanup(drm);
-> +	clk_disable_unprepare(priv->pclk);
-> +	drm_dev_unref(drm);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id tve200_of_match[] = {
-> +	{
-> +		.compatible = "faraday,tve200",
-> +	},
-> +	{},
-> +};
-> +
-> +static struct platform_driver tve200_driver = {
-> +	.driver = {
-> +		.name           = "tve200",
-> +		.of_match_table = of_match_ptr(tve200_of_match),
-> +	},
-> +	.probe = tve200_probe,
-> +	.remove = tve200_remove,
-> +};
-> +module_platform_driver(tve200_driver);
-> +
-> +MODULE_DESCRIPTION(DRIVER_DESC);
-> +MODULE_AUTHOR("Linus Walleij <linus.walleij@linaro.org>");
-> +MODULE_LICENSE("GPL");
+Best regards,
+
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+									Pavel
+
+diff --git a/Documentation/devicetree/bindings/media/video-interfaces.txt b/Documentation/devicetree/bindings/media/video-interfaces.txt
+index 852041a..aade681 100644
+--- a/Documentation/devicetree/bindings/media/video-interfaces.txt
++++ b/Documentation/devicetree/bindings/media/video-interfaces.txt
+@@ -119,6 +119,8 @@ Optional endpoint properties
+   as 0 (normal). This property is valid for serial busses only.
+ - strobe: Whether the clock signal is used as clock (0) or strobe (1). Used
+   with CCP2, for instance.
++- clock-inv: polarity of clock/strobe signal. 0 - not inverted, 1 - inverted
++- crc: crc is in use
+ 
+ Example
+ -------
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+index b1be53d..0c1ef5c 100644
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -144,15 +144,6 @@
+ 		io-channel-names = "temp", "bsi", "vbat";
+ 	};
+ 
+-	rear_camera: camera at 0 {
+-		compatible = "linux,camera";
+-
+-		module {
+-			model = "TCM8341MD";
+-			sensor = <&cam1>;
+-		};
+-	};
+-
+ 	pwm9: dmtimer-pwm {
+ 		compatible = "ti,omap-dmtimer-pwm";
+ 		#pwm-cells = <3>;
+@@ -192,7 +183,7 @@
+ 				clock-inv = <0>;
+ 				/* Select strobe = <1> for back camera, <0> for front camera */
+ 				strobe = <1>;
+-				crc = <0>;
++				crc = <1>;
+ 			};
+ 		};
+ 	};
+diff --git a/drivers/media/platform/omap3isp/isp.c b/drivers/media/platform/omap3isp/isp.c
+index 6cb1f04..3e17d72 100644
+--- a/drivers/media/platform/omap3isp/isp.c
++++ b/drivers/media/platform/omap3isp/isp.c
+@@ -2098,12 +2098,12 @@ static int isp_fwnode_parse(struct device *dev, struct fwnode_handle *fwnode,
+ 
+ 			buscfg->bus.ccp2.strobe_clk_pol =
+ 				vep.bus.mipi_csi1.clock_inv;
++			buscfg->bus.ccp2.crc =
++				vep.bus.mipi_csi1.crc;
+ 			buscfg->bus.ccp2.phy_layer = vep.bus.mipi_csi1.strobe;
+ 			buscfg->bus.ccp2.ccp2_mode =
+ 				vep.bus_type == V4L2_MBUS_CCP2;
+ 			buscfg->bus.ccp2.vp_clk_pol = 1;
+-
+-			buscfg->bus.ccp2.crc = 1;
+ 		} else {
+ 			buscfg->bus.csi2.lanecfg.clk.pos =
+ 				vep.bus.mipi_csi2.clock_lane;
+diff --git a/drivers/media/v4l2-core/v4l2-fwnode.c b/drivers/media/v4l2-core/v4l2-fwnode.c
+index 5cd2687..ce1af2d 100644
+--- a/drivers/media/v4l2-core/v4l2-fwnode.c
++++ b/drivers/media/v4l2-core/v4l2-fwnode.c
+@@ -170,6 +170,9 @@ v4l2_fwnode_endpoint_parse_csi1_bus(struct fwnode_handle *fwnode,
+ 	if (!fwnode_property_read_u32(fwnode, "clock-lanes", &v))
+ 		bus->clock_lane = v;
+ 
++	if (!fwnode_property_read_u32(fwnode, "crc", &v))
++		bus->crc = v;
++
+ 	if (bus_type == V4L2_FWNODE_BUS_TYPE_CCP2)
+ 		vep->bus_type = V4L2_MBUS_CCP2;
+ 	else
+diff --git a/include/media/v4l2-fwnode.h b/include/media/v4l2-fwnode.h
+index cb34dcb..eb820dc 100644
+--- a/include/media/v4l2-fwnode.h
++++ b/include/media/v4l2-fwnode.h
+@@ -66,11 +66,13 @@ struct v4l2_fwnode_bus_parallel {
+  *		   index (1)
+  * @data_lane: the number of the data lane
+  * @clock_lane: the number of the clock lane
++ * @crc: crc is in use
+  */
+ struct v4l2_fwnode_bus_mipi_csi1 {
+ 	bool clock_inv;
+ 	bool strobe;
+ 	bool lane_polarity[2];
++	bool crc;
+ 	unsigned char data_lane;
+ 	unsigned char clock_lane;
+ };
+									
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170816/b4598985/attachment.sig>
