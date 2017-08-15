@@ -1,19 +1,18 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Tue, 15 Aug 2017 20:38:25 +0800
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 15 Aug 2017 20:39:41 +0800
 Subject: [PATCH 07/10] cpufreq: dt: Add support for some new Allwinner SoCs
 In-Reply-To: <4537884.Ku45nQGoFt@aspire.rjw.lan>
 References: <20170723102749.17323-1-icenowy@aosc.io>
  <2436327.OLdY8skjMP@aspire.rjw.lan>
  <CAGb2v640an6X75PTbNTnMqhnEREekX97uJZ4sFsfqTAgcDinQg@mail.gmail.com>
  <4537884.Ku45nQGoFt@aspire.rjw.lan>
-Message-ID: <cd9133086c3e527fff7003a441862412@aosc.io>
+Message-ID: <CAGb2v67zenaLQaK+df_oN1BebH_7LhTOtSr6dGyaLPN-k3fZow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-08-15 20:25?Rafael J. Wysocki ???
+On Tue, Aug 15, 2017 at 8:25 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
 > On Tuesday, August 15, 2017 7:42:19 AM CEST Chen-Yu Tsai wrote:
->> On Mon, Jul 24, 2017 at 7:46 PM, Rafael J. Wysocki <rjw@rjwysocki.net> 
->> wrote:
+>> On Mon, Jul 24, 2017 at 7:46 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
 >> > On Monday, July 24, 2017 02:23:49 PM Viresh Kumar wrote:
 >> >> On 23-07-17, 18:27, Icenowy Zheng wrote:
 >> >> > Some new Allwinner SoCs get supported in the kernel after the
@@ -61,27 +60,18 @@ List-Id: linux-arm-kernel.lists.infradead.org
 >> > OK
 >> >
 >> > I'm assuming this will go in via arm-soc along with the rest of the series.
->> 
+>>
 >> The rest of the series, except for the clk patches I've already taken,
->> doesn't seem to be going anywhere just yet. Is there a cpufreq or pm 
->> tree
+>> doesn't seem to be going anywhere just yet. Is there a cpufreq or pm tree
 >> this can be merged through?
-> 
+>
 > You mean this particular patch or the whole series?
-> 
+>
 > If the former, then yes, there is.
 
-I think he means the particular patch.
+Just this patch. As I mentioned the rest of the series still needs some
+work, and likely won't make it in this cycle. If you could take this
+through the tree it would normally go through, avoiding any conflicts,
+that'd be great.
 
-Other patches in this series still need some review, however, this patch
-is standalone and can be taken independently.
-
-> 
-> Thanks,
-> Rafael
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ChenYu
