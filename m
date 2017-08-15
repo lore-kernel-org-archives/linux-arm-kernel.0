@@ -1,48 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Aug 2017 17:36:19 +0200
-Subject: [PATCH] soc: imx: gpcv2: fix regulator deferred probe
-In-Reply-To: <20170814053510.GI31819@dragon>
-References: <20170802195129.20442-1-stefan@agner.ch>
- <20170805031321.GP31819@dragon>
- <4546b5193b819ad78a9663baa41be836@agner.ch> <20170814053510.GI31819@dragon>
-Message-ID: <CAK8P3a2UkeX3FGrkPGB=S0HFyvTzR=XcW=dNpg5jj=+kSeSXiQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 15 Aug 2017 17:43:37 +0200
+Subject: [PATCH v2 1/3] ARM: dts: r8a7790: Use R-Car SATA Gen2 fallback
+ compat string
+In-Reply-To: <CAMuHMdXYXU_ox_8d1jC+jgbwupzFWuxDtVSATWSyMxYVZz6kLA@mail.gmail.com>
+References: <1502267203-12229-1-git-send-email-horms+renesas@verge.net.au>
+ <1502267203-12229-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXYXU_ox_8d1jC+jgbwupzFWuxDtVSATWSyMxYVZz6kLA@mail.gmail.com>
+Message-ID: <20170815154336.GA26748@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 7:35 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Sun, Aug 13, 2017 at 10:12:13PM -0700, Stefan Agner wrote:
->> Hi Shawn,
->>
->> On 2017-08-04 20:13, Shawn Guo wrote:
->> > On Wed, Aug 02, 2017 at 12:51:29PM -0700, Stefan Agner wrote:
->> >> If a regulator requests a deferred probe, the power domain gets
->> >> initialized twice. This leads to a list double add (without
->> >> list debugging the kernel hangs due to the double add later):
->> >>
->> >>   WARNING: CPU: 0 PID: 19 at lib/list_debug.c:31 __list_add_valid+0xbc/0xc4
->> >>   list_add double add: new=c1229754, prev=c12383b4, next=c1229754.
->> >>
->> >> Initialize the power domain after we get the regulator. Also do
->> >> not print an error in case the regulator defers probing.
->> >>
->> >> Cc: Fabio Estevam <fabio.estevam@nxp.com>
->> >> Cc: Andrey Smirnov <andrew.smirnov@gmail.com>
->> >> Cc: linux-arm-kernel at lists.infradead.org
->> >> Cc: linux-kernel at vger.kernel.org
->> >> Fixes: 03aa12629fc4 ("soc: imx: Add GPCv2 power gating driver")
->> >> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> >
->> > Applied, thanks.
->>
->> As of 4.13-rc5 this did not make it upstream yet, I guess still on its
->> way?
->
-> Yes, Stefan. It's on the way to arm-soc [1], but not yet responded.
->
-> Shawn
->
-> [1] https://www.spinics.net/lists/arm-kernel/msg598634.html
+On Mon, Aug 14, 2017 at 03:57:59PM +0200, Geert Uytterhoeven wrote:
+> On Wed, Aug 9, 2017 at 10:26 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Use newly added R-Car SATA Gen2 fallback compat string
+> > in the DT of the r8a7790 SoC.
+> >
+> > This should have no run-time effect as the driver matches against
+> > the per-SoC compat string before the fallback compat string is considered.
+> >
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Merged into arm-soc now with Shawn's pull request.
-
-      Arnd
+Thanks. I have applied this and the other two patches in this series
+with your Acks.
