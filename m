@@ -1,81 +1,31 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Tue, 15 Aug 2017 19:23:51 +0300
-Subject: [PATCH 1/2] media: ov7670: Add entity pads initialization
-In-Reply-To: <20170810090645.24344-2-wenyou.yang@microchip.com>
-References: <20170810090645.24344-1-wenyou.yang@microchip.com>
- <20170810090645.24344-2-wenyou.yang@microchip.com>
-Message-ID: <20170815162351.ikd4n2zl2gj26m5r@valkosipuli.retiisi.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 15 Aug 2017 09:27:27 -0700
+Subject: [GIT PULL] debug_ll update for omaps for v4.14
+Message-ID: <pull-1502814426-118174>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wenyou,
+From: "Tony Lindgren" <tony@atomide.com>
 
-On Thu, Aug 10, 2017 at 05:06:44PM +0800, Wenyou Yang wrote:
-> Add the media entity pads initialization.
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
-The patch itself seems fine. However the driver is lacking support for
-get_fmt which I think would be necessary for the user space API to work
-properly. Without sub-device nodes it might not have been an issue with
-certain master drivers.
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 
-Could you add that in v2, in a separate patch before this one, please?
+are available in the git repository at:
 
-> ---
-> 
->  drivers/media/i2c/ov7670.c | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/media/i2c/ov7670.c b/drivers/media/i2c/ov7670.c
-> index e88549f0e704..5c8460ee65c3 100644
-> --- a/drivers/media/i2c/ov7670.c
-> +++ b/drivers/media/i2c/ov7670.c
-> @@ -213,6 +213,7 @@ struct ov7670_devtype {
->  struct ov7670_format_struct;  /* coming later */
->  struct ov7670_info {
->  	struct v4l2_subdev sd;
-> +	struct media_pad pad;
->  	struct v4l2_ctrl_handler hdl;
->  	struct {
->  		/* gain cluster */
-> @@ -1688,14 +1689,23 @@ static int ov7670_probe(struct i2c_client *client,
->  	v4l2_ctrl_auto_cluster(2, &info->auto_exposure,
->  			       V4L2_EXPOSURE_MANUAL, false);
->  	v4l2_ctrl_cluster(2, &info->saturation);
-> +
-> +	info->pad.flags = MEDIA_PAD_FL_SOURCE;
-> +	info->sd.entity.function = MEDIA_ENT_F_CAM_SENSOR;
-> +	ret = media_entity_pads_init(&info->sd.entity, 1, &info->pad);
-> +	if (ret < 0)
-> +		goto hdl_free;
-> +
->  	v4l2_ctrl_handler_setup(&info->hdl);
->  
->  	ret = v4l2_async_register_subdev(&info->sd);
->  	if (ret < 0)
-> -		goto hdl_free;
-> +		goto entity_cleanup;
->  
->  	return 0;
->  
-> +entity_cleanup:
-> +	media_entity_cleanup(&info->sd.entity);
->  hdl_free:
->  	v4l2_ctrl_handler_free(&info->hdl);
->  clk_disable:
-> @@ -1712,6 +1722,7 @@ static int ov7670_remove(struct i2c_client *client)
->  	v4l2_device_unregister_subdev(sd);
->  	v4l2_ctrl_handler_free(&info->hdl);
->  	clk_disable_unprepare(info->clk);
-> +	media_entity_cleanup(&info->sd.entity);
->  	return 0;
->  }
->  
-> -- 
-> 2.13.0
-> 
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap omap-for-v4.14/debug-ll
 
--- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+for you to fetch changes up to 51ef70037ebc2f63739c518ef357b364a802b648:
+
+  ARM: debug: Use generic 8250 debug_ll for am3517 and am335x (2017-07-17 00:53:42 -0700)
+
+----------------------------------------------------------------
+Tony Lindgren (4):
+      ARM: debug: Use generic 8250 debug_ll for omap2 and omap3/4/5 common uarts
+      ARM: debug: Use generic 8250 debug_ll for omap3/4/5
+      ARM: debug: Use generic 8250 debug_ll for ti81xx
+      ARM: debug: Use generic 8250 debug_ll for am3517 and am335x
+
+ arch/arm/Kconfig.debug             |  44 +++++++++++----
+ arch/arm/include/debug/omap2plus.S | 108 -------------------------------------
+ 2 files changed, 33 insertions(+), 119 deletions(-)
