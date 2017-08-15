@@ -1,32 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 15 Aug 2017 15:00:35 +0100
-Subject: [PATCHv2 00/14] arm64: VMAP_STACK support
-In-Reply-To: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
-References: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170815140035.GA18351@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 15 Aug 2017 16:01:09 +0200
+Subject: [PATCH] irqchip/armada-370-xp: Enable MSI-X support
+In-Reply-To: <80f30724-20b6-b5a7-7218-93ff3fa23177@denx.de>
+References: <20170502072600.13380-1-sr@denx.de>
+ <80f30724-20b6-b5a7-7218-93ff3fa23177@denx.de>
+Message-ID: <20170815160109.023842de@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 01:50:35PM +0100, Mark Rutland wrote:
-> Ard and I have worked together to implement vmap stack support for
-> arm64. This supersedes our earlier vmap stack RFCs [0,1]. The git author
-> stats are a little misleading, as I've teased parts out into smaller
-> patches for review.
+Hello,
+
+On Tue, 15 Aug 2017 15:31:31 +0200, Stefan Roese wrote:
+
+> On 02.05.2017 09:26, Stefan Roese wrote:
+> > Armada XP does not only support MSI, but also MSI-X. This patch sets
+> > the MSI_FLAG_PCI_MSIX flag in the interrupt controller driver which
+> > is the only change necessary to enable MSI-X support on this SoC. As
+> > the Linux PCI MSI-X infrastructure takes care of writing the data and
+> > address structures into the BAR specified by the MSI-X controller.
+> > 
+> > Signed-off-by: Stefan Roese <sr@denx.de>
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> > Cc: Jason Cooper <jason@lakedaemon.net>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > ---
+> >   drivers/irqchip/irq-armada-370-xp.c | 2 +-
+> >   1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+> > index 33982cbd8a57..b17039ed8735 100644
+> > --- a/drivers/irqchip/irq-armada-370-xp.c
+> > +++ b/drivers/irqchip/irq-armada-370-xp.c
+> > @@ -124,7 +124,7 @@ static struct irq_chip armada_370_xp_msi_irq_chip = {
+> >   
+> >   static struct msi_domain_info armada_370_xp_msi_domain_info = {
+> >   	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+> > -		   MSI_FLAG_MULTI_PCI_MSI),
+> > +		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
+> >   	.chip	= &armada_370_xp_msi_irq_chip,
+> >   };
+> >   
+> >   
 > 
-> The series is based on our stack dump rework [2,3], which can be found
-> in the arm64/exception-stack branch [4] of my kernel.org repo. This
-> series can be found in the arm64/vmap-stack branch [5] of the same repo.
-> 
-> Since v1 [6]:
-> * Fix typos
-> * Update comments in entry assembly
-> * Dump exception context (and stacks) before regs
-> * Define safe adr_this_cpu for modules
+> Its been a while since this patch has been submitted - without any
+> comments so far. What's the current status with it? Is it someones
+> queue for upstreaming?
 
-Thanks:
+Sorry for the lack of feedback, very good idea to ping me on this
+topic. I don't have access to HW right now, so I can't give it a test.
+However, I don't think I have MSI-X capable hardware, only MSI capable.
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
+With which hardware did you test this? An off-the-shell PCIe card, or
+some custom FPGA logic?
 
-for the series.
+Best regards,
 
-Will
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
