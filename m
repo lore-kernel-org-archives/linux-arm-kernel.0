@@ -1,146 +1,59 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Tue, 15 Aug 2017 18:10:14 +0200
-Subject: [PATCH v4] acpi/iort: numa: Add numa node mapping for smmuv3
- devices
-In-Reply-To: <20170815150549.GA1301@e107981-lin.cambridge.arm.com>
-References: <20170725050237.11033-1-ganapatrao.kulkarni@cavium.com>
- <20170815150213.GD18024@rric.localdomain>
- <20170815150549.GA1301@e107981-lin.cambridge.arm.com>
-Message-ID: <20170815161014.GS31351@rric.localdomain>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 15 Aug 2017 09:20:00 -0700
+Subject: [PATCH 0/8] MIPS: BCM63XX: add and use clkdev lookup support
+In-Reply-To: <20170802093429.12572-1-jonas.gorski@gmail.com>
+References: <20170802093429.12572-1-jonas.gorski@gmail.com>
+Message-ID: <b180fcb8-0282-3bad-aad0-4f1faaea73b0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.08.17 16:05:49, Lorenzo Pieralisi wrote:
-> On Tue, Aug 15, 2017 at 05:02:13PM +0200, Robert Richter wrote:
-> > Lorenzo, Will,
-> > 
-> > On 25.07.17 10:32:37, Ganapatrao Kulkarni wrote:
-> > > ARM IORT specification(rev. C) has added  provision to define proximity
-> > > domain in SMMUv3 IORT table. Adding required code to parse Proximity
-> > > domain and set numa_node of smmv3 platform devices.
-> > > 
-> > > Add code to parse proximity domain in SMMUv3 IORT table to
-> > > set numa node mapping for smmuv3 devices.
-> > > 
-> > > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> > > ---
-> > > 
-> > > This patch has dependency on header file patch [1], which is
-> > > already merged to linux-pm.
-> > > 
-> > > [1] https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git/commit/?h=linux-next&id=c944230064eb65e4fa018d86779b4fd200b1d7e7
-> > > 
-> > > v4:
-> > >   - Fix compilation issue in !CONFIG_NUMA
-> > > 
-> > > v3:
-> > >   - Addressed Lorenzo Pieralisi comment.
-> > > 
-> > > v2:
-> > >   - Changed as per Lorenzo Pieralisi and Hanjun Guo suggestions.
-> > > 
-> > > v1:
-> > >   - Initial patch
-> > > 
-> > >  drivers/acpi/arm64/iort.c | 33 +++++++++++++++++++++++++++++++--
-> > >  1 file changed, 31 insertions(+), 2 deletions(-)
-> > 
-> > could this patch being scheduled for v4.14?
+
+
+On 08/02/2017 02:34 AM, Jonas Gorski wrote:
+> This patchset adds and uses clckdev lookup support to name input clocks
+> in various drivers more closely to their functions, or simplify their
+> usage.
 > 
-> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/commit/?h=for-next/core&id=5fe0ce3b9e514168427463d0c7a86dfa635da3d2
+> Since most of these patches touch arch/mips, it probably makes most
+> sense to go through the MIPS tree.
 > 
-> It is already :) (I CC'ed you on the PR)
+> The HSSPI driver was already updated previously to support a "pll"
+> input with ff18e1ef04e2 ("spi/bcm63xx-hsspi: allow providing clock rate
+> through a second clock"), so there is no need to touch it.
+> 
+> This patch series is part of an effort to modernize BCM63XX and clean up
+> its drivers to eventually make them usable with BMIPS and device tree.
 
-Ah, right. I missed that.
+For this entire series:
 
-Thanks,
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 
--Robert
+Thanks!
 
 > 
-> Thanks,
-> Lorenzo
+> Jonas Gorski (8):
+>   MIPS: BCM63XX: add clkdev lookup support
+>   MIPS: BCM63XX: provide periph clock as refclk for uart
+>   tty/bcm63xx_uart: use refclk for the expected clock name
+>   tty/bcm63xx_uart: allow naming clock in device tree
+>   MIPS: BCM63XX: provide enet clocks as "enet" to the ethernet devices
+>   bcm63xx_enet: just use "enet" as the clock name
+>   MIPS: BCM63XX: move the HSSPI PLL HZ into its own clock
+>   MIPS: BMIPS: name the refclk clock for uart
 > 
-> > 
-> > Thanks,
-> > 
-> > -Robert
-> > 
-> > > 
-> > > diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> > > index a3215ee..c5c82c3 100644
-> > > --- a/drivers/acpi/arm64/iort.c
-> > > +++ b/drivers/acpi/arm64/iort.c
-> > > @@ -908,6 +908,28 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
-> > >  	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
-> > >  }
-> > >  
-> > > +#if defined(CONFIG_ACPI_NUMA) && (ACPI_CA_VERSION >= 0x20170629)
-> > > +/*
-> > > + * set numa proximity domain for smmuv3 device
-> > > + */
-> > > +static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
-> > > +		struct device *dev)
-> > > +{
-> > > +	struct acpi_iort_smmu_v3 *smmu;
-> > > +
-> > > +	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-> > > +	if (smmu->flags & ACPI_IORT_SMMU_V3_PXM_VALID) {
-> > > +		set_dev_node(dev, acpi_map_pxm_to_node(smmu->pxm));
-> > > +		pr_info("SMMUV3[%llx] Mapped to Proximity domain %d\n",
-> > > +			smmu->base_address,
-> > > +			smmu->pxm);
-> > > +	}
-> > > +}
-> > > +#else
-> > > +static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
-> > > +		struct device *dev) { }
-> > > +#endif
-> > > +
-> > >  static int __init arm_smmu_count_resources(struct acpi_iort_node *node)
-> > >  {
-> > >  	struct acpi_iort_smmu *smmu;
-> > > @@ -977,20 +999,24 @@ struct iort_iommu_config {
-> > >  	int (*iommu_count_resources)(struct acpi_iort_node *node);
-> > >  	void (*iommu_init_resources)(struct resource *res,
-> > >  				     struct acpi_iort_node *node);
-> > > +	void (*iommu_set_proximity)(struct acpi_iort_node *node,
-> > > +				     struct device *dev);
-> > >  };
-> > >  
-> > >  static const struct iort_iommu_config iort_arm_smmu_v3_cfg __initconst = {
-> > >  	.name = "arm-smmu-v3",
-> > >  	.iommu_is_coherent = arm_smmu_v3_is_coherent,
-> > >  	.iommu_count_resources = arm_smmu_v3_count_resources,
-> > > -	.iommu_init_resources = arm_smmu_v3_init_resources
-> > > +	.iommu_init_resources = arm_smmu_v3_init_resources,
-> > > +	.iommu_set_proximity = arm_smmu_v3_set_proximity
-> > >  };
-> > >  
-> > >  static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
-> > >  	.name = "arm-smmu",
-> > >  	.iommu_is_coherent = arm_smmu_is_coherent,
-> > >  	.iommu_count_resources = arm_smmu_count_resources,
-> > > -	.iommu_init_resources = arm_smmu_init_resources
-> > > +	.iommu_init_resources = arm_smmu_init_resources,
-> > > +	.iommu_set_proximity = NULL
-> > >  };
-> > >  
-> > >  static __init
-> > > @@ -1028,6 +1054,9 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
-> > >  	if (!pdev)
-> > >  		return -ENOMEM;
-> > >  
-> > > +	if (ops->iommu_set_proximity)
-> > > +		ops->iommu_set_proximity(node, &pdev->dev);
-> > > +
-> > >  	count = ops->iommu_count_resources(node);
-> > >  
-> > >  	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
-> > > -- 
-> > > 2.9.4
-> > > 
-> > > --
-> > > To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> > > the body of a message to majordomo at vger.kernel.org
-> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>  .../bindings/serial/brcm,bcm6345-uart.txt          |   6 +
+>  arch/mips/Kconfig                                  |   1 +
+>  arch/mips/bcm63xx/clk.c                            | 181 ++++++++++++++++-----
+>  arch/mips/boot/dts/brcm/bcm3368.dtsi               |   2 +
+>  arch/mips/boot/dts/brcm/bcm63268.dtsi              |   2 +
+>  arch/mips/boot/dts/brcm/bcm6328.dtsi               |   2 +
+>  arch/mips/boot/dts/brcm/bcm6358.dtsi               |   2 +
+>  arch/mips/boot/dts/brcm/bcm6362.dtsi               |   2 +
+>  arch/mips/boot/dts/brcm/bcm6368.dtsi               |   2 +
+>  drivers/net/ethernet/broadcom/bcm63xx_enet.c       |   5 +-
+>  drivers/tty/serial/bcm63xx_uart.c                  |   6 +-
+>  11 files changed, 168 insertions(+), 43 deletions(-)
+> 
+
+-- 
+Florian
