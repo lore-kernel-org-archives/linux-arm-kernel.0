@@ -1,21 +1,66 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 14 Aug 2017 22:15:12 -0700 (PDT)
-Subject: [PATCH v11 0/5] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-In-Reply-To: <1502767407-6812-1-git-send-email-dingtianhong@huawei.com>
-References: <1502767407-6812-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <20170814.221512.1430356980828045690.davem@davemloft.net>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 15 Aug 2017 13:42:19 +0800
+Subject: [PATCH 07/10] cpufreq: dt: Add support for some new Allwinner SoCs
+In-Reply-To: <2436327.OLdY8skjMP@aspire.rjw.lan>
+References: <20170723102749.17323-1-icenowy@aosc.io>
+ <20170723102749.17323-8-icenowy@aosc.io>
+ <20170724085349.GT352@vireshk-i7> <2436327.OLdY8skjMP@aspire.rjw.lan>
+Message-ID: <CAGb2v640an6X75PTbNTnMqhnEREekX97uJZ4sFsfqTAgcDinQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ding Tianhong <dingtianhong@huawei.com>
-Date: Tue, 15 Aug 2017 11:23:22 +0800
+On Mon, Jul 24, 2017 at 7:46 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Monday, July 24, 2017 02:23:49 PM Viresh Kumar wrote:
+>> On 23-07-17, 18:27, Icenowy Zheng wrote:
+>> > Some new Allwinner SoCs get supported in the kernel after the
+>> > compatibles are added to cpufreq-dt-platdev driver.
+>> >
+>> > Add their compatible strings in the cpufreq-dt-platdev driver.
+>> >
+>> > Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
+>> > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> > ---
+>> >  drivers/cpufreq/cpufreq-dt-platdev.c | 6 ++++++
+>> >  1 file changed, 6 insertions(+)
+>> >
+>> > diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+>> > index 2eb40d46d357..c3851453e84a 100644
+>> > --- a/drivers/cpufreq/cpufreq-dt-platdev.c
+>> > +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+>> > @@ -24,7 +24,11 @@ static const struct of_device_id machines[] __initconst = {
+>> >     { .compatible = "allwinner,sun8i-a23", },
+>> >     { .compatible = "allwinner,sun8i-a33", },
+>> >     { .compatible = "allwinner,sun8i-a83t", },
+>> > +   { .compatible = "allwinner,sun8i-h2-plus", },
+>> >     { .compatible = "allwinner,sun8i-h3", },
+>> > +   { .compatible = "allwinner,sun8i-v3s", },
+>> > +   { .compatible = "allwinner,sun50i-a64", },
+>> > +   { .compatible = "allwinner,sun50i-h5", },
+>> >
+>> >     { .compatible = "apm,xgene-shadowcat", },
+>> >
+>> > @@ -43,6 +47,8 @@ static const struct of_device_id machines[] __initconst = {
+>> >     { .compatible = "marvell,pxa250", },
+>> >     { .compatible = "marvell,pxa270", },
+>> >
+>> > +   { .compatible = "nextthing,gr8", },
+>> > +
+>> >     { .compatible = "samsung,exynos3250", },
+>> >     { .compatible = "samsung,exynos4210", },
+>> >     { .compatible = "samsung,exynos4212", },
+>>
+>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>
+>>
+>
+> OK
+>
+> I'm assuming this will go in via arm-soc along with the rest of the series.
 
-> Some devices have problems with Transaction Layer Packets with the Relaxed
-> Ordering Attribute set.  This patch set adds a new PCIe Device Flag,
-> PCI_DEV_FLAGS_NO_RELAXED_ORDERING, a set of PCI Quirks to catch some known
-> devices with Relaxed Ordering issues, and a use of this new flag by the
-> cxgb4 driver to avoid using Relaxed Ordering with problematic Root Complex
-> Ports.
- ...
+The rest of the series, except for the clk patches I've already taken,
+doesn't seem to be going anywhere just yet. Is there a cpufreq or pm tree
+this can be merged through?
 
-Series applied, thanks.
+Thanks
+ChenYu
