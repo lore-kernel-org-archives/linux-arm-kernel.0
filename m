@@ -1,41 +1,62 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 15 Aug 2017 19:06:45 +0300
-Subject: [PATCH 1/3] ARM: dts: r8a7745: add PFC support
-In-Reply-To: <20170815160049.GC26748@verge.net.au>
-References: <20170415202036.987901107@cogentembedded.com>
- <CAMuHMdUPda7Mjo_P8p1V5a20XOAYM6GFf8Jqf0KLUuO7zAODeA@mail.gmail.com>
- <TY1PR06MB07025D9CE628A3D4CED37AA9B78D0@TY1PR06MB0702.apcprd06.prod.outlook.com>
- <b3bcd091-4f96-c37a-54ec-c8ee5b0fd916@cogentembedded.com>
- <20170815160049.GC26748@verge.net.au>
-Message-ID: <6e68e4d5-aa95-4b88-abdc-1a78dcbdc22f@cogentembedded.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Tue, 15 Aug 2017 09:09:36 -0700
+Subject: [PATCHv2 02/14] fork: allow arch-override of VMAP stack alignment
+In-Reply-To: <1502801449-29246-3-git-send-email-mark.rutland@arm.com>
+References: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
+ <1502801449-29246-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <CALCETrWAYvKTcgaQgEDC-ihhSuFAw9Phq-xF6FK5AMM6ag6j4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/15/2017 07:00 PM, Simon Horman wrote:
+On Tue, Aug 15, 2017 at 5:50 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> In some cases, an architecture might wish its stacks to be aligned to a
+> boundary larger than THREAD_SIZE. For example, using an alignment of
+> double THREAD_SIZE can allow for stack overflows smaller than
+> THREAD_SIZE to be detected by checking a single bit of the stack
+> pointer.
+>
+> This patch allows architectures to override the alignment of VMAP'd
+> stacks, by defining THREAD_ALIGN. Where not defined, this defaults to
+> THREAD_SIZE, as is the case today.
 
->>>>> Define the generic R8A7745 part of the PFC device node.
->>>>>
->>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>>
->>>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>>
->>> It looks like the dependencies for this patch are met now [1].
->>>
->>> Are you happy to accept this patch? (and presumably the others in the series for the sk-rzg1e board).
->>>
->>> We plan to add GPIO support for r8a7745, but need this patch in place first.
->>>
->>>
->>> [1] https://patchwork.kernel.org/patch/9705249/
->>
->>     Actually, R8A774x PFC support has hit the Linus' tree in the meanwhile.
->> Simon, please merge the .dts patches.
->>
->>> Kind regards, Chris
-> 
-> Thanks, I have applied the series for v4.14.
+This looks okay, but it might make sense to move that to a header file
+so THREAD_ALIGN is always available.
 
-    TY! High time, otherwise we may end up with R8A7743 PFC patches merged and 
-R8A7745 PFC patches not merged...
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Andy Lutomirski <luto@amacapital.net>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Laura Abbott <labbott@redhat.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  kernel/fork.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/kernel/fork.c b/kernel/fork.c
+> index 17921b0..696d692 100644
+> --- a/kernel/fork.c
+> +++ b/kernel/fork.c
+> @@ -217,7 +217,10 @@ static unsigned long *alloc_thread_stack_node(struct task_struct *tsk, int node)
+>                 return s->addr;
+>         }
+>
+> -       stack = __vmalloc_node_range(THREAD_SIZE, THREAD_SIZE,
+> +#ifndef THREAD_ALIGN
+> +#define THREAD_ALIGN   THREAD_SIZE
+> +#endif
+> +       stack = __vmalloc_node_range(THREAD_SIZE, THREAD_ALIGN,
+>                                      VMALLOC_START, VMALLOC_END,
+>                                      THREADINFO_GFP,
+>                                      PAGE_KERNEL,
+> --
+> 1.9.1
+>
 
-MBR, Sergei
+
+
+-- 
+Andy Lutomirski
+AMA Capital Management, LLC
