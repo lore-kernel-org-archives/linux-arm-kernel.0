@@ -1,77 +1,127 @@
-From: u@pkh.me (=?utf-8?B?Q2zDqW1lbnQgQsWTc2No?=)
-Date: Tue, 15 Aug 2017 17:01:39 +0200
-Subject: [PATCH 2/2] arm64: dts: hi6220: add acpu_sctrl
-In-Reply-To: <5992F7FB.9080709@hisilicon.com>
-References: <1492478242-16146-1-git-send-email-zhangfei.gao@linaro.org>
- <1492478242-16146-2-git-send-email-zhangfei.gao@linaro.org>
- <5992F7FB.9080709@hisilicon.com>
-Message-ID: <20170815150138.GL22218@golem.pkh.me>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Tue, 15 Aug 2017 17:02:13 +0200
+Subject: [PATCH v4] acpi/iort: numa: Add numa node mapping for smmuv3
+ devices
+In-Reply-To: <20170725050237.11033-1-ganapatrao.kulkarni@cavium.com>
+References: <20170725050237.11033-1-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20170815150213.GD18024@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 02:32:43PM +0100, Wei Xu wrote:
-> Hi Zhangfei,
+Lorenzo, Will,
+
+On 25.07.17 10:32:37, Ganapatrao Kulkarni wrote:
+> ARM IORT specification(rev. C) has added  provision to define proximity
+> domain in SMMUv3 IORT table. Adding required code to parse Proximity
+> domain and set numa_node of smmv3 platform devices.
 > 
-> On 2017/4/18 2:17, Zhangfei Gao wrote:
-> > Add acpu_sctrl clock node
-> > 
-> > Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> > Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
-> > ---
-> >  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> > index 470461d..710cc34 100644
-> > --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> > @@ -262,6 +262,12 @@
-> >  			#clock-cells = <1>;
-> >  		};
-> >  
-> > +		acpu_sctrl: acpu_sctrl at f7032000 {
+> Add code to parse proximity domain in SMMUv3 IORT table to
+> set numa node mapping for smmuv3 devices.
+> 
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> ---
+> 
+> This patch has dependency on header file patch [1], which is
+> already merged to linux-pm.
+> 
+> [1] https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git/commit/?h=linux-next&id=c944230064eb65e4fa018d86779b4fd200b1d7e7
+> 
+> v4:
+>   - Fix compilation issue in !CONFIG_NUMA
+> 
+> v3:
+>   - Addressed Lorenzo Pieralisi comment.
+> 
+> v2:
+>   - Changed as per Lorenzo Pieralisi and Hanjun Guo suggestions.
+> 
+> v1:
+>   - Initial patch
+> 
+>  drivers/acpi/arm64/iort.c | 33 +++++++++++++++++++++++++++++++--
+>  1 file changed, 31 insertions(+), 2 deletions(-)
 
-I think the unit address is incorrect here (this value has been copied
-from the pm controller while it should match the 1st one the reg).
+could this patch being scheduled for v4.14?
 
-> > +			compatible = "hisilicon,hi6220-acpu-sctrl", "syscon";
-> > +			reg = <0x0 0xf6504000 0x0 0x1000>;
-> > +			#clock-cells = <1>;
-> > +		};
-> > +
-> >  		medianoc_ade: medianoc_ade at f4520000 {
-> >  			compatible = "syscon";
-> >  			reg = <0x0 0xf4520000 0x0 0x4000>;
-> > 
+Thanks,
 
-Also I'm sorry I'm going to ask stupid questions:
-
-- why 's' in "sctrl" while all the other node controllers declared around
-  seems to use "ctrl"?
-
-- is it possible to have access to the specs where those addresses can be
-  found? The only public doc I could find is the "Hi6220V100 Multi-Mode
-  Application Processor" one where this information doesn't seem present.
-
-- is there any work pending adding the pmu counters node (interrupt
-  GCI_SPI 99) ? AFAIK the ACPU controller added here can be used to enable
-  the counters.
+-Robert
 
 > 
-> Thanks!
-> Applied to the hisilicon dt tree since the driver part is in the mainline now.
+> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> index a3215ee..c5c82c3 100644
+> --- a/drivers/acpi/arm64/iort.c
+> +++ b/drivers/acpi/arm64/iort.c
+> @@ -908,6 +908,28 @@ static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
+>  	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
+>  }
+>  
+> +#if defined(CONFIG_ACPI_NUMA) && (ACPI_CA_VERSION >= 0x20170629)
+> +/*
+> + * set numa proximity domain for smmuv3 device
+> + */
+> +static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
+> +		struct device *dev)
+> +{
+> +	struct acpi_iort_smmu_v3 *smmu;
+> +
+> +	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
+> +	if (smmu->flags & ACPI_IORT_SMMU_V3_PXM_VALID) {
+> +		set_dev_node(dev, acpi_map_pxm_to_node(smmu->pxm));
+> +		pr_info("SMMUV3[%llx] Mapped to Proximity domain %d\n",
+> +			smmu->base_address,
+> +			smmu->pxm);
+> +	}
+> +}
+> +#else
+> +static void  __init arm_smmu_v3_set_proximity(struct acpi_iort_node *node,
+> +		struct device *dev) { }
+> +#endif
+> +
+>  static int __init arm_smmu_count_resources(struct acpi_iort_node *node)
+>  {
+>  	struct acpi_iort_smmu *smmu;
+> @@ -977,20 +999,24 @@ struct iort_iommu_config {
+>  	int (*iommu_count_resources)(struct acpi_iort_node *node);
+>  	void (*iommu_init_resources)(struct resource *res,
+>  				     struct acpi_iort_node *node);
+> +	void (*iommu_set_proximity)(struct acpi_iort_node *node,
+> +				     struct device *dev);
+>  };
+>  
+>  static const struct iort_iommu_config iort_arm_smmu_v3_cfg __initconst = {
+>  	.name = "arm-smmu-v3",
+>  	.iommu_is_coherent = arm_smmu_v3_is_coherent,
+>  	.iommu_count_resources = arm_smmu_v3_count_resources,
+> -	.iommu_init_resources = arm_smmu_v3_init_resources
+> +	.iommu_init_resources = arm_smmu_v3_init_resources,
+> +	.iommu_set_proximity = arm_smmu_v3_set_proximity
+>  };
+>  
+>  static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
+>  	.name = "arm-smmu",
+>  	.iommu_is_coherent = arm_smmu_is_coherent,
+>  	.iommu_count_resources = arm_smmu_count_resources,
+> -	.iommu_init_resources = arm_smmu_init_resources
+> +	.iommu_init_resources = arm_smmu_init_resources,
+> +	.iommu_set_proximity = NULL
+>  };
+>  
+>  static __init
+> @@ -1028,6 +1054,9 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
+>  	if (!pdev)
+>  		return -ENOMEM;
+>  
+> +	if (ops->iommu_set_proximity)
+> +		ops->iommu_set_proximity(node, &pdev->dev);
+> +
+>  	count = ops->iommu_count_resources(node);
+>  
+>  	r = kcalloc(count, sizeof(*r), GFP_KERNEL);
+> -- 
+> 2.9.4
 > 
-
-Is this refering to https://github.com/hisilicon/linux-hisi/commits/next/dt64 ?
-
-[...]
-
--- 
-Cl?ment B.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170815/a60c3354/attachment.sig>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
