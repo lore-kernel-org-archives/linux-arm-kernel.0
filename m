@@ -1,62 +1,17 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 15 Aug 2017 09:09:36 -0700
-Subject: [PATCHv2 02/14] fork: allow arch-override of VMAP stack alignment
-In-Reply-To: <1502801449-29246-3-git-send-email-mark.rutland@arm.com>
-References: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
- <1502801449-29246-3-git-send-email-mark.rutland@arm.com>
-Message-ID: <CALCETrWAYvKTcgaQgEDC-ihhSuFAw9Phq-xF6FK5AMM6ag6j4A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Aug 2017 18:10:07 +0200
+Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.14
+In-Reply-To: <5992F60E.2060403@hisilicon.com>
+References: <5992F60E.2060403@hisilicon.com>
+Message-ID: <CAK8P3a2LFRLEU+4M3K_4ihGzP4hfKyKVsGsQPF7bmr0c5Y=W0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 5:50 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> In some cases, an architecture might wish its stacks to be aligned to a
-> boundary larger than THREAD_SIZE. For example, using an alignment of
-> double THREAD_SIZE can allow for stack overflows smaller than
-> THREAD_SIZE to be detected by checking a single bit of the stack
-> pointer.
+On Tue, Aug 15, 2017 at 3:24 PM, Wei Xu <xuwei5@hisilicon.com> wrote:
+> Hi Arnd, Hi Olof, Hi Kevin,
 >
-> This patch allows architectures to override the alignment of VMAP'd
-> stacks, by defining THREAD_ALIGN. Where not defined, this defaults to
-> THREAD_SIZE, as is the case today.
+> Please help to pull the following changes.
 
-This looks okay, but it might make sense to move that to a header file
-so THREAD_ALIGN is always available.
+Pulled into next/arm64, thanks!
 
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Andy Lutomirski <luto@amacapital.net>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Laura Abbott <labbott@redhat.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  kernel/fork.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/kernel/fork.c b/kernel/fork.c
-> index 17921b0..696d692 100644
-> --- a/kernel/fork.c
-> +++ b/kernel/fork.c
-> @@ -217,7 +217,10 @@ static unsigned long *alloc_thread_stack_node(struct task_struct *tsk, int node)
->                 return s->addr;
->         }
->
-> -       stack = __vmalloc_node_range(THREAD_SIZE, THREAD_SIZE,
-> +#ifndef THREAD_ALIGN
-> +#define THREAD_ALIGN   THREAD_SIZE
-> +#endif
-> +       stack = __vmalloc_node_range(THREAD_SIZE, THREAD_ALIGN,
->                                      VMALLOC_START, VMALLOC_END,
->                                      THREADINFO_GFP,
->                                      PAGE_KERNEL,
-> --
-> 1.9.1
->
-
-
-
--- 
-Andy Lutomirski
-AMA Capital Management, LLC
+     Arnd
