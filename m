@@ -1,16 +1,23 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 15 Aug 2017 18:05:01 +0200
-Subject: [PATCH] arm64: dts: renesas: r8a7795: correct whitespace of
- companion property
-In-Reply-To: <1502177952-27983-1-git-send-email-horms+renesas@verge.net.au>
-References: <1502177952-27983-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20170815160501.GD26748@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Aug 2017 18:05:31 +0200
+Subject: [PATCH] arm64: defconfig: add recently added crypto drivers as
+ modules
+In-Reply-To: <20170716195152.11285-1-ard.biesheuvel@linaro.org>
+References: <20170716195152.11285-1-ard.biesheuvel@linaro.org>
+Message-ID: <CAK8P3a2NRFLM38za5KCR_WD5EFRqBqsU56SyAJzrxGmOGv6vvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 09:39:12AM +0200, Simon Horman wrote:
-> Fixes: 4dad6dcdae7b ("arm64: dts: renesas: r8a7795: add usb2.0 host ch3 device nodes")
-> Fixes: 1c422b4c501e ("arm64: dts: renesas: r8a7795: Add usb companion property in EHCI")
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Sun, Jul 16, 2017 at 9:51 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> Add the arm64 crypto drivers that have been added over the past
+> couple of kernel releases to its defconfig as modules.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/configs/defconfig | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 
-I have applied this change for v4.14.
+Applied to next/arm64, thanks!
+
+     Arnd
