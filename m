@@ -1,69 +1,55 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 15 Aug 2017 14:36:05 +0100
-Subject: [PATCH v3 00/10] arm64: dts: hi3660: add more device nodes
-In-Reply-To: <20170814095049.27701-1-guodong.xu@linaro.org>
-References: <20170814095049.27701-1-guodong.xu@linaro.org>
-Message-ID: <5992F8C5.1030109@hisilicon.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 15 Aug 2017 14:38:41 +0100
+Subject: [PATCH 01/11] arm64: numa: Remove the unused parent_node() macro
+In-Reply-To: <0e088b13-12eb-3bf6-696d-9fdd79e96670@cn.fujitsu.com>
+References: <1501076076-1974-1-git-send-email-douly.fnst@cn.fujitsu.com>
+ <1501076076-1974-2-git-send-email-douly.fnst@cn.fujitsu.com>
+ <20170804133017.GD15287@arm.com>
+ <0e088b13-12eb-3bf6-696d-9fdd79e96670@cn.fujitsu.com>
+Message-ID: <20170815133840.f5ykdecovzhiydbh@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guodong,
+On Fri, Aug 04, 2017 at 11:28:36PM +0800, Dou Liyang wrote:
+> Hi will,
+> 
+> At 08/04/2017 09:30 PM, Will Deacon wrote:
+> > On Wed, Jul 26, 2017 at 09:34:26PM +0800, Dou Liyang wrote:
+> > > Commit a7be6e5a7f8d ("mm: drop useless local parameters of
+> > > __register_one_node()") removes the last user of parent_node().
+> > > 
+> > > The parent_node() macro in ARM64 platform is unnecessary.
+> > > 
+> > > Remove it for cleanup.
+> > > 
+> > > Reported-by: Michael Ellerman <mpe@ellerman.id.au>
+> > > Signed-off-by: Dou Liyang <douly.fnst@cn.fujitsu.com>
+> > > Cc: Michael Ellerman <mpe@ellerman.id.au>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > Cc: linux-arm-kernel at lists.infradead.org
+> > > ---
+> > >  arch/arm64/include/asm/numa.h | 3 ---
+> > >  1 file changed, 3 deletions(-)
+> > > 
+> > > diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
+> > > index bf466d1..ef7b238 100644
+> > > --- a/arch/arm64/include/asm/numa.h
+> > > +++ b/arch/arm64/include/asm/numa.h
+> > > @@ -7,9 +7,6 @@
+> > > 
+> > >  #define NR_NODE_MEMBLKS		(MAX_NUMNODES * 2)
+> > > 
+> > > -/* currently, arm64 implements flat NUMA topology */
+> > > -#define parent_node(node)	(node)
+> > > -
+> > 
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> > 
+> > Where you intending for this to go via the arm64 tree?
+> 
+> I intend for this to go to upstream tree. shall we?
 
-On 2017/8/14 10:50, Guodong Xu wrote:
-> This patchset adds more device nodes for hi3660 and hikey960, including:
->  - cpu idle states
->  - L2 cache
->  - PMU
->  - OP-TEE
->  - reboot
->  - pstore
->  - DMA
->  - watchdog
-> 
-> Patch 7 fixes an issue in mmc nodes, by adding 'reset'
-> Patch 8 change bluetooth uart max-speed to 3Mbps
-> 
-> HiKey960 is one of 96boards. For details information about it, please
-> refer to [1].
-> 
-> ===
-> Major changes in v3:
->  - update commit message of patch 1, as suggested by Daniel Lezcano
->  - add patch 10 for watchdog bindings
-> 
-> Major changes in v2:
->  - add patch 8 to change bluetooth uart max-speed to 3Mbps
->  - add patch 9 for DMA node.
-> 
-> [1] https://github.com/96boards/documentation/tree/master/ConsumerEdition/HiKey960
-> 
-> Guodong Xu (4):
->   arm64: dts: hikey960: Add support for syscon-reboot-mode
->   arm64: dts: hikey960: Add pstore support
->   arm64: dts: hi3660: Reset the mmc hosts
->   arm64: dts: hikey960: change bluetooth uart max-speed to 3mbps
-> 
-> Leo Yan (3):
->   arm64: dts: hi3660: enable idle states
->   arm64: dts: hi3660: add L2 cache topology
->   arm64: dts: hi3660: enable watchdog
-> 
-> Victor Chong (1):
->   arm64: dts: hikey960: Add optee node
-> 
-> Wang Ruyi (1):
->   arm64: dts: hi3660: add bindings for DMA
-> 
-> YiPing Xu (1):
->   arm64: dts: hi3660: add pmu dt node for hi3660
-> 
->  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  37 +++++-
->  arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 130 ++++++++++++++++++++++
->  2 files changed, 166 insertions(+), 1 deletion(-)
-> 
+Queued for 4.14. Thanks.
 
-Thanks!
-Series applied to the hisilicon dt tree.
-
-Best Regards,
-Wei
+-- 
+Catalin
