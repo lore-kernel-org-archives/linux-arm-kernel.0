@@ -1,66 +1,74 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 14 Aug 2017 18:19:50 -0700
-Subject: [PATCH 4.12 59/65] pinctrl: samsung: Remove bogus irq_[un]mask from
- resource management
-In-Reply-To: <20170815011942.395714306@linuxfoundation.org>
-References: <20170815011942.395714306@linuxfoundation.org>
-Message-ID: <20170815011944.741233665@linuxfoundation.org>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Tue, 15 Aug 2017 09:40:27 +0800
+Subject: [PATCH v10 3/5] PCI: Disable Relaxed Ordering Attributes for AMD
+ A1100
+In-Reply-To: <20170814171937.GA52656@otc-nc-03>
+References: <1502725499-11276-1-git-send-email-dingtianhong@huawei.com>
+ <1502725499-11276-4-git-send-email-dingtianhong@huawei.com>
+ <20170814171937.GA52656@otc-nc-03>
+Message-ID: <f918dd35-a317-d745-974c-bd271136bf41@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.12-stable review patch.  If anyone has any objections, please let me know.
 
-------------------
 
-From: Thomas Gleixner <tglx@linutronix.de>
+On 2017/8/15 1:19, Raj, Ashok wrote:
+> On Mon, Aug 14, 2017 at 11:44:57PM +0800, Ding Tianhong wrote:
+>> Casey reported that the AMD ARM A1100 SoC has a bug in its PCIe
+>> Root Port where Upstream Transaction Layer Packets with the Relaxed
+>> Ordering Attribute clear are allowed to bypass earlier TLPs with
+>> Relaxed Ordering set, it would cause Data Corruption, so we need
+>> to disable Relaxed Ordering Attribute when Upstream TLPs to the
+>> Root Port.
+>>
+>> Signed-off-by: Casey Leedom <leedom@chelsio.com>
+>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>> Acked-by: Alexander Duyck <alexander.h.duyck@intel.com>
+>> Acked-by: Ashok Raj <ashok.raj@intel.com>
+> 
+> I can't ack this patch :-).. must be someone from AMD. Please remove my
+> signature from this.
+> 
 
-commit 3fa53ec2ed885b0aec3f0472e3b4a8a6f1cd748c upstream.
+Sorry for funny mistake :)  I will fix it.
 
-The irq chip callbacks irq_request/release_resources() have absolutely no
-business with masking and unmasking the irq.
+Ding
 
-The core code unmasks the interrupt after complete setup and masks it
-before invoking irq_release_resources().
-
-The unmask is actually harmful as it happens before the interrupt is
-completely initialized in __setup_irq().
-
-Remove it.
-
-Fixes: f6a8249f9e55 ("pinctrl: exynos: Lock GPIOs as interrupts when used as EINTs")
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: Krzysztof Kozlowski <krzk@kernel.org>
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: linux-gpio at vger.kernel.org
-Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- drivers/pinctrl/samsung/pinctrl-exynos.c |    4 ----
- 1 file changed, 4 deletions(-)
-
---- a/drivers/pinctrl/samsung/pinctrl-exynos.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -205,8 +205,6 @@ static int exynos_irq_request_resources(
- 
- 	spin_unlock_irqrestore(&bank->slock, flags);
- 
--	exynos_irq_unmask(irqd);
--
- 	return 0;
- }
- 
-@@ -226,8 +224,6 @@ static void exynos_irq_release_resources
- 	shift = irqd->hwirq * bank_type->fld_width[PINCFG_TYPE_FUNC];
- 	mask = (1 << bank_type->fld_width[PINCFG_TYPE_FUNC]) - 1;
- 
--	exynos_irq_mask(irqd);
--
- 	spin_lock_irqsave(&bank->slock, flags);
- 
- 	con = readl(bank->eint_base + reg_con);
+>> ---
+>>  drivers/pci/quirks.c | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>>
+>> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+>> index 1272f7e..1407604 100644
+>> --- a/drivers/pci/quirks.c
+>> +++ b/drivers/pci/quirks.c
+>> @@ -4089,6 +4089,22 @@ static void quirk_relaxedordering_disable(struct pci_dev *dev)
+>>  			      quirk_relaxedordering_disable);
+>>  
+>>  /*
+>> + * The AMD ARM A1100 (AKA "SEATTLE") SoC has a bug in its PCIe Root Complex
+>> + * where Upstream Transaction Layer Packets with the Relaxed Ordering
+>> + * Attribute clear are allowed to bypass earlier TLPs with Relaxed Ordering
+>> + * set.  This is a violation of the PCIe 3.0 Transaction Ordering Rules
+>> + * outlined in Section 2.4.1 (PCI Express(r) Base Specification Revision 3.0
+>> + * November 10, 2010).  As a result, on this platform we can't use Relaxed
+>> + * Ordering for Upstream TLPs.
+>> + */
+>> +DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a00, PCI_CLASS_NOT_DEFINED, 8,
+>> +			      quirk_relaxedordering_disable);
+>> +DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a01, PCI_CLASS_NOT_DEFINED, 8,
+>> +			      quirk_relaxedordering_disable);
+>> +DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a02, PCI_CLASS_NOT_DEFINED, 8,
+>> +			      quirk_relaxedordering_disable);
+>> +
+>> +/*
+>>   * Per PCIe r3.0, sec 2.2.9, "Completion headers must supply the same
+>>   * values for the Attribute as were supplied in the header of the
+>>   * corresponding Request, except as explicitly allowed when IDO is used."
+>> -- 
+>> 1.8.3.1
+>>
+>>
+> 
+> .
+> 
