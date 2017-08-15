@@ -1,116 +1,76 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Tue, 15 Aug 2017 19:36:39 +0300
-Subject: [PATCH 2/2] media: ov7670: Add the s_power operation
-In-Reply-To: <20170810090645.24344-3-wenyou.yang@microchip.com>
-References: <20170810090645.24344-1-wenyou.yang@microchip.com>
- <20170810090645.24344-3-wenyou.yang@microchip.com>
-Message-ID: <20170815163638.77rda4pbkzqsyxwj@valkosipuli.retiisi.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 15 Aug 2017 17:37:55 +0100
+Subject: [PATCH 23/27] arm64/sve: KVM: Hide SVE from CPU features exposed
+ to guests
+In-Reply-To: <1502280338-23002-24-git-send-email-Dave.Martin@arm.com>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-24-git-send-email-Dave.Martin@arm.com>
+Message-ID: <39b6ee07-1258-e733-3495-38b0d31ab800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wenyou,
-
-On Thu, Aug 10, 2017 at 05:06:45PM +0800, Wenyou Yang wrote:
-> Add the s_power operation which is responsible for manipulating the
-> power dowm mode through the PWDN pin and the reset operation through
-> the RESET pin.
+On 09/08/17 13:05, Dave Martin wrote:
+> KVM guests cannot currently use SVE, because SVE is always
+> configured to trap to EL2.
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
+> However, a guest that sees SVE reported as present in
+> ID_AA64PFR0_EL1 may legitimately expect that SVE works and try to
+> use it.  Instead of working, the guest will receive an injected
+> undef exception, which may cause the guest to oops or go into a
+> spin.
+> 
+> To avoid misleading the guest into believing that SVE will work,
+> this patch masks out the SVE field from ID_AA64PFR0_EL1 when a
+> guest attempts to read this register.  No support is explicitly
+> added for ID_AA64ZFR0_EL1 either, so that is still emulated as
+> reading as zero, which is consistent with SVE not being
+> implemented.
+> 
+> This is a temporary measure, and will be removed in a later series
+> when full KVM support for SVE is implemented.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > ---
+>  arch/arm64/kvm/sys_regs.c | 14 +++++++++++++-
+>  1 file changed, 13 insertions(+), 1 deletion(-)
 > 
->  drivers/media/i2c/ov7670.c | 30 +++++++++++++++++++++++++++---
->  1 file changed, 27 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/media/i2c/ov7670.c b/drivers/media/i2c/ov7670.c
-> index 5c8460ee65c3..5ed79ccfaf91 100644
-> --- a/drivers/media/i2c/ov7670.c
-> +++ b/drivers/media/i2c/ov7670.c
-> @@ -1506,6 +1506,22 @@ static int ov7670_s_register(struct v4l2_subdev *sd, const struct v4l2_dbg_regis
->  }
->  #endif
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 6583dd7..9e8c54e 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -897,8 +897,20 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
+>  {
+>  	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
+>  			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
+> +	u64 val = raz ? 0 : read_sanitised_ftr_reg(id);
 >  
-> +static int ov7670_s_power(struct v4l2_subdev *sd, int on)
-> +{
-> +	struct ov7670_info *info = to_state(sd);
+> -	return raz ? 0 : read_sanitised_ftr_reg(id);
+> +	if (id == SYS_ID_AA64PFR0_EL1) {
+> +		static bool printed;
 > +
-> +	if (info->pwdn_gpio)
-> +		gpiod_direction_output(info->pwdn_gpio, !on);
+> +		if ((val & (0xfUL << ID_AA64PFR0_SVE_SHIFT)) && !printed) {
+> +			kvm_info("SVE unsupported for guests, suppressing\n");
+> +			printed = true;
+> +		}
 
-gpiod_direction_output() can cope with NULL gpio_desc.
+Ideally, this should be a vcpu_unimpl_once(). But:
+- it doesn't exist
+- vcpu_unimpl looks hopelessly x86 specific
 
-> +	if (on && info->resetb_gpio) {
-> +		gpiod_set_value(info->resetb_gpio, 1);
-> +		usleep_range(500, 1000);
-> +		gpiod_set_value(info->resetb_gpio, 0);
-> +		usleep_range(3000, 5000);
+How about turning it into a pr_err_once() instead?
+
+> +
+> +		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
 > +	}
 > +
-> +	return 0;
-> +}
-> +
->  /* ----------------------------------------------------------------------- */
->  
->  static const struct v4l2_subdev_core_ops ov7670_core_ops = {
-> @@ -1515,6 +1531,7 @@ static const struct v4l2_subdev_core_ops ov7670_core_ops = {
->  	.g_register = ov7670_g_register,
->  	.s_register = ov7670_s_register,
->  #endif
-> +	.s_power = ov7670_s_power,
->  };
->  
->  static const struct v4l2_subdev_video_ops ov7670_video_ops = {
-> @@ -1568,8 +1585,6 @@ static int ov7670_init_gpio(struct i2c_client *client, struct ov7670_info *info)
->  		return PTR_ERR(info->resetb_gpio);
->  	}
->  
-> -	usleep_range(3000, 5000);
-> -
->  	return 0;
+> +	return val;
 >  }
 >  
-> @@ -1630,13 +1645,19 @@ static int ov7670_probe(struct i2c_client *client,
->  		goto clk_disable;
->  	}
->  
-> +	ret = ov7670_init_gpio(client, info);
+>  /* cpufeature ID register access trap handlers */
+> 
 
-ov7670_init_gpio() is already called a few lines above this. Was this
-intended?
+Thanks,
 
-> +	if (ret)
-> +		goto clk_disable;
-> +
-> +	ov7670_s_power(sd, 1);
-> +
->  	/* Make sure it's an ov7670 */
->  	ret = ov7670_detect(sd);
->  	if (ret) {
->  		v4l_dbg(1, debug, client,
->  			"chip found @ 0x%x (%s) is not an ov7670 chip.\n",
->  			client->addr << 1, client->adapter->name);
-> -		goto clk_disable;
-> +		goto power_off;
->  	}
->  	v4l_info(client, "chip found @ 0x%02x (%s)\n",
->  			client->addr << 1, client->adapter->name);
-> @@ -1708,6 +1729,8 @@ static int ov7670_probe(struct i2c_client *client,
->  	media_entity_cleanup(&info->sd.entity);
->  hdl_free:
->  	v4l2_ctrl_handler_free(&info->hdl);
-> +power_off:
-> +	ov7670_s_power(sd, 0);
->  clk_disable:
->  	clk_disable_unprepare(info->clk);
->  	return ret;
-> @@ -1723,6 +1746,7 @@ static int ov7670_remove(struct i2c_client *client)
->  	v4l2_ctrl_handler_free(&info->hdl);
->  	clk_disable_unprepare(info->clk);
->  	media_entity_cleanup(&info->sd.entity);
-> +	ov7670_s_power(sd, 0);
->  	return 0;
->  }
->  
-
+	M.
 -- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+Jazz is not dead. It just smells funny...
