@@ -1,46 +1,74 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 15 Aug 2017 14:19:39 +0100
-Subject: [PATCH] arm64: defconfig: add recently added crypto drivers as
- modules
-In-Reply-To: <20170716195152.11285-1-ard.biesheuvel@linaro.org>
-References: <20170716195152.11285-1-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu9Omd52Av460EJO_4+BVgRmwqdF3Z2QS_PvAzJdomf=Lg@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Tue, 15 Aug 2017 14:19:53 +0100
+Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.14
+Message-ID: <5992F4F9.6090301@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 July 2017 at 20:51, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Add the arm64 crypto drivers that have been added over the past
-> couple of kernel releases to its defconfig as modules.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/configs/defconfig | 9 +++++++++
->  1 file changed, 9 insertions(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 6c7d147eed54..3028bc0796ea 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -562,8 +562,17 @@ CONFIG_SECURITY=y
->  CONFIG_CRYPTO_ECHAINIV=y
->  CONFIG_CRYPTO_ANSI_CPRNG=y
->  CONFIG_ARM64_CRYPTO=y
-> +CONFIG_CRYPTO_SHA256_ARM64=m
-> +CONFIG_CRYPTO_SHA512_ARM64=m
->  CONFIG_CRYPTO_SHA1_ARM64_CE=y
->  CONFIG_CRYPTO_SHA2_ARM64_CE=y
->  CONFIG_CRYPTO_GHASH_ARM64_CE=y
-> +CONFIG_CRYPTO_CRCT10DIF_ARM64_CE=m
-> +CONFIG_CRYPTO_CRC32_ARM64_CE=m
-> +CONFIG_CRYPTO_AES_ARM64=m
-> +CONFIG_CRYPTO_AES_ARM64_CE=m
->  CONFIG_CRYPTO_AES_ARM64_CE_CCM=y
->  CONFIG_CRYPTO_AES_ARM64_CE_BLK=y
-> +CONFIG_CRYPTO_AES_ARM64_NEON_BLK=m
-> +CONFIG_CRYPTO_CHACHA20_NEON=m
-> +CONFIG_CRYPTO_AES_ARM64_BS=m
-> --
-> 2.11.0
->
+Hi Arnd, Hi Olof, Hi Kevin,
 
-Ping?
+Please help to pull the following changes.
+Thanks!
+
+Best Regards,
+Wei
+
+---
+
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+are available in the git repository at:
+
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.14
+
+for you to fetch changes up to a0a450ead7309e4852ae1e442790c710e829b0d8:
+
+  arm64: dts: hi3660: enable watchdog (2017-08-14 15:42:38 +0100)
+
+----------------------------------------------------------------
+ARM64: DT: Hisilicon SoC DT updates for 4.14
+
+- Add PCIe node for hip07
+- Add acpu_sctrl node and refine the usb tx fifo size for hi6220
+- Add cpu idle states, L2 cache, PMU, OP-TEE, reboot, pstore,
+  k3-dma and watchdog nodes for hi3660 and hikey960
+- Update mmc and bluetooth nodes for hi3660 and hikey960
+
+----------------------------------------------------------------
+Guodong Xu (4):
+      arm64: dts: hikey960: Add support for syscon-reboot-mode
+      arm64: dts: hikey960: Add pstore support
+      arm64: dts: hi3660: Reset the mmc hosts
+      arm64: dts: hikey960: change bluetooth uart max-speed to 3mbps
+
+Leo Yan (3):
+      arm64: dts: hi3660: enable idle states
+      arm64: dts: hi3660: add L2 cache topology
+      arm64: dts: hi3660: enable watchdog
+
+Shawn Guo (1):
+      arm64: dts: hi6220: improve g-tx-fifo-size setting for usb device
+
+Victor Chong (1):
+      arm64: dts: hikey960: Add optee node
+
+Wang Ruyi (1):
+      arm64: dts: hi3660: add bindings for DMA
+
+YiPing Xu (1):
+      arm64: dts: hi3660: add pmu dt node for hi3660
+
+Zhangfei Gao (1):
+      arm64: dts: hi6220: add acpu_sctrl
+
+Zhou Wang (1):
+      arm64: dts: hisi: add PCIe host controller node for hip07 SoC
+
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  37 +++++-
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 130 ++++++++++++++++++++++
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi         |   9 +-
+ arch/arm64/boot/dts/hisilicon/hip07-d05.dts       |   4 +
+ arch/arm64/boot/dts/hisilicon/hip07.dtsi          |  22 ++++
+ 5 files changed, 200 insertions(+), 2 deletions(-)
