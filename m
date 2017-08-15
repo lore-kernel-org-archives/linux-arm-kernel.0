@@ -1,65 +1,49 @@
 From: weiyi.lu@mediatek.com (weiyi.lu at mediatek.com)
-Date: Tue, 15 Aug 2017 14:42:41 +0800
-Subject: [PATCH v1 0/9] Mediatek MT2712 clock and scpsys support
-Message-ID: <1502779370-30150-1-git-send-email-weiyi.lu@mediatek.com>
+Date: Tue, 15 Aug 2017 14:42:48 +0800
+Subject: [PATCH v1 7/9] soc: mediatek: add dependent clock jpgdec/audio for
+ scpsys
+In-Reply-To: <1502779370-30150-1-git-send-email-weiyi.lu@mediatek.com>
+References: <1502779370-30150-1-git-send-email-weiyi.lu@mediatek.com>
+Message-ID: <1502779370-30150-8-git-send-email-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set is composed of clock control (PATCH 1-4) and scpsys control (PATCH 5-9)
+From: Weiyi Lu <weiyi.lu@mediatek.com>
 
-Weiyi Lu (9):
-[PATCH v1 1/9] dt-bindings: ARM: Mediatek: Document bindings for MT2712
-[PATCH v1 2/9] clk: mediatek: Add dt-bindings for MT2712 clocks
-[PATCH v1 3/9] clk: mediatek: Add MT2712 clock support
-[PATCH v1 4/9] arm: dts: mt2712: Add clock controller device nodes
-[PATCH v1 5/9] dt-bindings: soc: add MT2712 power dt-bindings
-[PATCH v1 6/9] soc: mediatek: add bus protection extend API
-[PATCH v1 7/9] soc: mediatek: add dependent clock jpgdec/audio for
-[PATCH v1 8/9] soc: mediatek: add MT2712 scpsys support
-[PATCH v1 9/9] arm: dts: Add power controller device node of MT2712
+There are dependent clock jpgdec/audio in scpsys on MT2712,
+and will exist three dependent clocks on MT2712 VDEC.
 
- .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |    1 +
- .../bindings/arm/mediatek/mediatek,bdpsys.txt      |    1 +
- .../bindings/arm/mediatek/mediatek,imgsys.txt      |    1 +
- .../bindings/arm/mediatek/mediatek,infracfg.txt    |    1 +
- .../bindings/arm/mediatek/mediatek,jpgdecsys.txt   |   22 +
- .../bindings/arm/mediatek/mediatek,mcucfg.txt      |   22 +
- .../bindings/arm/mediatek/mediatek,mfgcfg.txt      |   22 +
- .../bindings/arm/mediatek/mediatek,mmsys.txt       |    1 +
- .../bindings/arm/mediatek/mediatek,pericfg.txt     |    1 +
- .../bindings/arm/mediatek/mediatek,topckgen.txt    |    1 +
- .../bindings/arm/mediatek/mediatek,vdecsys.txt     |    1 +
- .../bindings/arm/mediatek/mediatek,vencsys.txt     |    1 +
- .../devicetree/bindings/soc/mediatek/scpsys.txt    |    3 +
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi          |  130 ++
- drivers/clk/mediatek/Kconfig                       |   50 +
- drivers/clk/mediatek/Makefile                      |    8 +
- drivers/clk/mediatek/clk-mt2712-bdp.c              |  102 ++
- drivers/clk/mediatek/clk-mt2712-img.c              |   80 ++
- drivers/clk/mediatek/clk-mt2712-jpgdec.c           |   76 ++
- drivers/clk/mediatek/clk-mt2712-mfg.c              |   75 ++
- drivers/clk/mediatek/clk-mt2712-mm.c               |  170 +++
- drivers/clk/mediatek/clk-mt2712-vdec.c             |   94 ++
- drivers/clk/mediatek/clk-mt2712-venc.c             |   77 ++
- drivers/clk/mediatek/clk-mt2712.c                  | 1400 ++++++++++++++++++++
- drivers/clk/mediatek/clk-mtk.h                     |    2 +
- drivers/clk/mediatek/clk-pll.c                     |   13 +-
- drivers/soc/mediatek/mtk-infracfg.c                |   90 +-
- drivers/soc/mediatek/mtk-scpsys.c                  |  160 ++-
- include/dt-bindings/clock/mt2712-clk.h             |  428 ++++++
- include/dt-bindings/power/mt2712-power.h           |   26 +
- include/linux/soc/mediatek/infracfg.h              |   14 +-
- 31 files changed, 3057 insertions(+), 16 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,jpgdecsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt
- create mode 100644 drivers/clk/mediatek/clk-mt2712-bdp.c
- create mode 100644 drivers/clk/mediatek/clk-mt2712-img.c
- create mode 100644 drivers/clk/mediatek/clk-mt2712-jpgdec.c
- create mode 100644 drivers/clk/mediatek/clk-mt2712-mfg.c
- create mode 100644 drivers/clk/mediatek/clk-mt2712-mm.c
- create mode 100644 drivers/clk/mediatek/clk-mt2712-vdec.c
- create mode 100644 drivers/clk/mediatek/clk-mt2712-venc.c
- create mode 100644 drivers/clk/mediatek/clk-mt2712.c
- create mode 100644 include/dt-bindings/clock/mt2712-clk.h
- create mode 100644 include/dt-bindings/power/mt2712-power.h
+Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
+---
+ drivers/soc/mediatek/mtk-scpsys.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index b181ef2..590e82d 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -73,6 +73,8 @@ enum clk_id {
+ 	CLK_VENC_LT,
+ 	CLK_ETHIF,
+ 	CLK_VDEC,
++	CLK_JPGDEC,
++	CLK_AUDIO,
+ 	CLK_MAX,
+ };
+ 
+@@ -84,10 +86,12 @@ enum clk_id {
+ 	"venc_lt",
+ 	"ethif",
+ 	"vdec",
++	"jpgdec",
++	"audio",
+ 	NULL,
+ };
+ 
+-#define MAX_CLKS	2
++#define MAX_CLKS	3
+ 
+ struct bus_prot_ext {
+ 	u32 set_ofs;
+-- 
+1.9.1
