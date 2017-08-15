@@ -1,21 +1,18 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Tue, 15 Aug 2017 17:10:07 +0200
-Subject: [PATCH 0/5] constify snd_soc_dai_ops structures
-Message-ID: <1502809812-13891-1-git-send-email-Julia.Lawall@lip6.fr>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Aug 2017 17:38:36 +0200
+Subject: [GIT PULL] ARM: at91: DT for 4.13 #2
+In-Reply-To: <20170721225832.vwufkhxyy6clnprg@piout.net>
+References: <20170721225832.vwufkhxyy6clnprg@piout.net>
+Message-ID: <CAK8P3a0KydsBNmdri-D7NMEZ=7FZ8eSog9ZwAuj3+gR+42ZbrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These snd_soc_dai_ops structures are only stored in the ops field of
-a snd_soc_dai_driver structure, which is const.  Thus, the
-snd_soc_dai_ops structures can be const too.
+On Sat, Jul 22, 2017 at 12:58 AM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> Arnd, Olof,
+>
+> Two DT patches for 4.13, fixing NAND flash support on sama5d2.
 
-Done with the help of Coccinelle.
+Pulled into fixes, thanks for your reminder.
 
----
-
- sound/soc/blackfin/bf6xx-i2s.c    |    2 +-
- sound/soc/codecs/es8316.c         |    2 +-
- sound/soc/codecs/zx_aud96p22.c    |    2 +-
- sound/soc/rockchip/rockchip_pdm.c |    2 +-
- sound/soc/spear/spdif_in.c        |    2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+        Arnd
