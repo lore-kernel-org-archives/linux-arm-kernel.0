@@ -1,59 +1,60 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 15 Aug 2017 09:20:00 -0700
-Subject: [PATCH 0/8] MIPS: BCM63XX: add and use clkdev lookup support
-In-Reply-To: <20170802093429.12572-1-jonas.gorski@gmail.com>
-References: <20170802093429.12572-1-jonas.gorski@gmail.com>
-Message-ID: <b180fcb8-0282-3bad-aad0-4f1faaea73b0@gmail.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Tue, 15 Aug 2017 17:21:28 +0100
+Subject: [PATCH] ARM: debug-ll: Add support for r8a7745
+Message-ID: <1502814088-29767-1-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Enable low-level debugging support for RZ/G1E (r8a7745). RZ/G1E uses
+SCIF4 for the debug console.
 
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+---
+ arch/arm/Kconfig.debug | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-On 08/02/2017 02:34 AM, Jonas Gorski wrote:
-> This patchset adds and uses clckdev lookup support to name input clocks
-> in various drivers more closely to their functions, or simplify their
-> usage.
-> 
-> Since most of these patches touch arch/mips, it probably makes most
-> sense to go through the MIPS tree.
-> 
-> The HSSPI driver was already updated previously to support a "pll"
-> input with ff18e1ef04e2 ("spi/bcm63xx-hsspi: allow providing clock rate
-> through a second clock"), so there is no need to touch it.
-> 
-> This patch series is part of an effort to modernize BCM63XX and clean up
-> its drivers to eventually make them usable with BMIPS and device tree.
-
-For this entire series:
-
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
-
-Thanks!
-
-> 
-> Jonas Gorski (8):
->   MIPS: BCM63XX: add clkdev lookup support
->   MIPS: BCM63XX: provide periph clock as refclk for uart
->   tty/bcm63xx_uart: use refclk for the expected clock name
->   tty/bcm63xx_uart: allow naming clock in device tree
->   MIPS: BCM63XX: provide enet clocks as "enet" to the ethernet devices
->   bcm63xx_enet: just use "enet" as the clock name
->   MIPS: BCM63XX: move the HSSPI PLL HZ into its own clock
->   MIPS: BMIPS: name the refclk clock for uart
-> 
->  .../bindings/serial/brcm,bcm6345-uart.txt          |   6 +
->  arch/mips/Kconfig                                  |   1 +
->  arch/mips/bcm63xx/clk.c                            | 181 ++++++++++++++++-----
->  arch/mips/boot/dts/brcm/bcm3368.dtsi               |   2 +
->  arch/mips/boot/dts/brcm/bcm63268.dtsi              |   2 +
->  arch/mips/boot/dts/brcm/bcm6328.dtsi               |   2 +
->  arch/mips/boot/dts/brcm/bcm6358.dtsi               |   2 +
->  arch/mips/boot/dts/brcm/bcm6362.dtsi               |   2 +
->  arch/mips/boot/dts/brcm/bcm6368.dtsi               |   2 +
->  drivers/net/ethernet/broadcom/bcm63xx_enet.c       |   5 +-
->  drivers/tty/serial/bcm63xx_uart.c                  |   6 +-
->  11 files changed, 168 insertions(+), 43 deletions(-)
-> 
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 6dcea8e..be8916d 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -911,6 +911,13 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  via SCIF2 on Renesas R-Car E2 (R8A7794).
+ 
++	config DEBUG_RCAR_GEN2_SCIF4
++		bool "Kernel low-level debugging messages via SCIF4 on R8A7745"
++		depends on ARCH_R8A7745
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  via SCIF4 on Renesas RZ/G1E (R8A7745).
++
+ 	config DEBUG_RMOBILE_SCIFA0
+ 		bool "Kernel low-level debugging messages via SCIFA0 on R8A73A4"
+ 		depends on ARCH_R8A73A4
+@@ -1451,6 +1458,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN1_SCIF2
+ 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF0
+ 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF2
++	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF4
+ 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA0
+ 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA1
+ 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA4
+@@ -1568,6 +1576,7 @@ config DEBUG_UART_PHYS
+ 	default 0xe6c40000 if DEBUG_RMOBILE_SCIFA0
+ 	default 0xe6c50000 if DEBUG_RMOBILE_SCIFA1
+ 	default 0xe6c80000 if DEBUG_RMOBILE_SCIFA4
++	default 0xe6ee0000 if DEBUG_RCAR_GEN2_SCIF4
+ 	default 0xe6e58000 if DEBUG_RCAR_GEN2_SCIF2
+ 	default 0xe6e60000 if DEBUG_RCAR_GEN2_SCIF0
+ 	default 0xe8008000 if DEBUG_R7S72100_SCIF2
+@@ -1604,6 +1613,7 @@ config DEBUG_UART_PHYS
+ 		DEBUG_QCOM_UARTDM || DEBUG_R7S72100_SCIF2 || \
+ 		DEBUG_RCAR_GEN1_SCIF0 || DEBUG_RCAR_GEN1_SCIF2 || \
+ 		DEBUG_RCAR_GEN2_SCIF0 || DEBUG_RCAR_GEN2_SCIF2 || \
++		DEBUG_RCAR_GEN2_SCIF4 || \
+ 		DEBUG_RMOBILE_SCIFA0 || DEBUG_RMOBILE_SCIFA1 || \
+ 		DEBUG_RMOBILE_SCIFA4 || DEBUG_S3C24XX_UART || \
+ 		DEBUG_S3C64XX_UART || \
 -- 
-Florian
+2.7.4
