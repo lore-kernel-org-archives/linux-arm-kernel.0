@@ -1,38 +1,43 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Tue, 15 Aug 2017 11:54:18 +0100
-Subject: [PATCH  0/2] ARM: dts: Add iWave RZ/G1E board support
-Message-ID: <1502794460-30213-1-git-send-email-biju.das@bp.renesas.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 15 Aug 2017 12:10:32 +0100
+Subject: [PATCH 14/14] arm64: add VMAP_STACK overflow detection
+In-Reply-To: <1502130965-18710-15-git-send-email-mark.rutland@arm.com>
+References: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
+ <1502130965-18710-15-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170815111031.xbga45isn5gumeni@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Aug 07, 2017 at 07:36:05PM +0100, Mark Rutland wrote:
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index e5aa866..44a27c3 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -72,6 +72,37 @@
+>  	.macro kernel_ventry	label
+>  	.align 7
+>  	sub	sp, sp, #S_FRAME_SIZE
+> +#ifdef CONFIG_VMAP_STACK
+> +	add	sp, sp, x0			// sp' = sp + x0
+> +	sub	x0, sp, x0			// x0' = sp' - x0 = (sp + x0) - x0 = sp
+> +	tbnz	x0, #THREAD_SHIFT, 0f
+> +	sub	x0, sp, x0			// sp' - x0' = (sp + x0) - sp = x0
+> +	sub	sp, sp, x0			// sp' - x0 = (sp + x0) - x0 = sp
+> +	b	\label
 
-This series aims to add iWave RZ/G1E (R8A7745) based RainboW-G22M-SM SODIMM 
-SoM and RainboW-G22D board support. 
+Maybe a small comment before this hunk just to tell the user that it's
+trying to test a bit in SP without corrupting a gpr. It's obvious once
+you read it but not you see it for the first time ;).
 
-This series has been tested against linux-next tag next-20170815 as well as
-renesas-dev tag 20170814-v4.13-rc5
+> +
+> +	/* Stash the original SP value in tpidr_el0 */
+> +0:	msr	tpidr_el0, x0
 
-This patch has documentation dependency on below patches
+And a comment here that on this path we no longer care about the user
+tpidr_el0 as we are never returning there.
 
-[repost,1/2] ARM: shmobile: document iW-RainboW-G22M-SM SODIMM System on Module
-https://patchwork.kernel.org/patch/9890389/
-[repost, 2/2] ARM: shmobile: document iW-RainboW-G22D SODIMM SOM Development Platform
-https://patchwork.kernel.org/patch/9890391/
-
-
-Regards,
-
-Biju Das (2):
-  ARM: dts: iwg22m: Add iWave RZG1E SODIMM SOM
-  ARM: dts: iwg22d-sodimm: Add support for iWave G22D-SODIMM board
-
- arch/arm/boot/dts/Makefile                  |  1 +
- arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 29 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/r8a7745-iwg22m.dtsi       | 24 ++++++++++++++++++++++++
- 3 files changed, 54 insertions(+)
- create mode 100644 arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
- create mode 100644 arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+Otherwise I'm fine with the series (I'm not a fan of the complexity it
+adds but I don't have a better suggestion).
 
 -- 
-1.9.1
+Catalin
