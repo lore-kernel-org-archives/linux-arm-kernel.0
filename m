@@ -1,36 +1,40 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue, 15 Aug 2017 17:53:27 +0100
-Subject: [PATCH] dt-bindings: mmc: sh_mmcif: Document r8a7745 DT bindings
-Message-ID: <1502816007-30186-1-git-send-email-fabrizio.castro@bp.renesas.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 15 Aug 2017 18:02:37 +0100
+Subject: [PATCHv2 02/14] fork: allow arch-override of VMAP stack alignment
+In-Reply-To: <20170815163955.GK6090@leverpostej>
+References: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
+ <1502801449-29246-3-git-send-email-mark.rutland@arm.com>
+ <CALCETrWAYvKTcgaQgEDC-ihhSuFAw9Phq-xF6FK5AMM6ag6j4A@mail.gmail.com>
+ <20170815163036.GJ6090@leverpostej>
+ <CALCETrWP-cufvhLJU2Q7BPAYw+HmyzJHVWPvmmCS+bq84Up1zQ@mail.gmail.com>
+ <20170815163955.GK6090@leverpostej>
+Message-ID: <20170815170236.yvr3dlfpxcnx3y7u@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
----
- Documentation/devicetree/bindings/mmc/renesas,mmcif.txt | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+On Tue, Aug 15, 2017 at 05:39:55PM +0100, Mark Rutland wrote:
+> On Tue, Aug 15, 2017 at 09:33:18AM -0700, Andy Lutomirski wrote:
+> > On Tue, Aug 15, 2017 at 9:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > > On Tue, Aug 15, 2017 at 09:09:36AM -0700, Andy Lutomirski wrote:
+> 
+> > >> This looks okay, but it might make sense to move that to a header file
+> > >> so THREAD_ALIGN is always available.
+> > >
+> > > I was a little worried about breaking things, since arches don't define
+> > > THREAD_SIZE in a consistent location.
+> > >
+> > > Looking again, it looks like those are all transitiviely included into
+> > > each arch's <asm/thread_info.h>, so I think I can move this into
+> > > <linux/thread_info.h>, which'll have to be added to kernel.fork.c's
+> > > includes.
+> > >
+> > > Are you happy with the below fixup?
+> > 
+> > LGTM.
+> 
+> Cool. I've folded that in and pushed the updated branch.
 
-diff --git a/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt b/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt
-index 703e18c..5ff1e12 100644
---- a/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt
-+++ b/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt
-@@ -12,6 +12,7 @@ Required properties:
- 	- "renesas,mmcif-r8a73a4" for the MMCIF found in r8a73a4 SoCs
- 	- "renesas,mmcif-r8a7740" for the MMCIF found in r8a7740 SoCs
- 	- "renesas,mmcif-r8a7743" for the MMCIF found in r8a7743 SoCs
-+	- "renesas,mmcif-r8a7745" for the MMCIF found in r8a7745 SoCs
- 	- "renesas,mmcif-r8a7778" for the MMCIF found in r8a7778 SoCs
- 	- "renesas,mmcif-r8a7790" for the MMCIF found in r8a7790 SoCs
- 	- "renesas,mmcif-r8a7791" for the MMCIF found in r8a7791 SoCs
-@@ -22,7 +23,7 @@ Required properties:
- - interrupts: Some SoCs have only 1 shared interrupt, while others have either
-   2 or 3 individual interrupts (error, int, card detect). Below is the number
-   of interrupts for each SoC:
--    1: r8a73a4, r8a7743, r8a7778, r8a7790, r8a7791, r8a7793, r8a7794
-+    1: r8a73a4, r8a7743, r8a7745, r8a7778, r8a7790, r8a7791, r8a7793, r8a7794
-     2: r8a7740, sh73a0
-     3: r7s72100
- 
+I pulled the branch for 4.14. Thanks.
+
 -- 
-2.7.4
+Catalin
