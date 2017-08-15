@@ -1,76 +1,89 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 15 Aug 2017 23:25:53 +0800
-Subject: [arm-platforms:irq/fixes-4.13 3/12] include/linux/cpumask.h:24:29:
- warning: 'mask' may be used uninitialized in this function
-Message-ID: <201708152345.tWBYGR0b%fengguang.wu@intel.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Tue, 15 Aug 2017 23:24:48 +0800
+Subject: [PATCH net RESEND] PCI: fix oops when try to find Root Port for a PCI
+ device
+Message-ID: <1502810688-12420-1-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/fixes-4.13
-head:   7636e759fb20cb932b867b58a9d1a706d0155372
-commit: 2090e3e6320fab84046c2d2abf86a18b876bf0a9 [3/12] irqchip/gic: Report that effective affinity is a single target
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 2090e3e6320fab84046c2d2abf86a18b876bf0a9
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Eric report a oops when booting the system after applying
+the commit a99b646afa8a ("PCI: Disable PCIe Relaxed..."):
 
-Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
-http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
+[    4.241029] BUG: unable to handle kernel NULL pointer dereference at 0000000000000050
+[    4.247001] IP: pci_find_pcie_root_port+0x62/0x80
+[    4.253011] PGD 0
+[    4.253011] P4D 0
+[    4.253011]
+[    4.258013] Oops: 0000 [#1] SMP DEBUG_PAGEALLOC
+[    4.262015] Modules linked in:
+[    4.265005] CPU: 31 PID: 1 Comm: swapper/0 Not tainted 4.13.0-dbx-DEV #316
+[    4.271002] Hardware name: Intel RML,PCH/Iota_QC_19, BIOS 2.40.0 06/22/2016
+[    4.279002] task: ffffa2ee38cfa040 task.stack: ffffa51ec0004000
+[    4.285001] RIP: 0010:pci_find_pcie_root_port+0x62/0x80
+[    4.290012] RSP: 0000:ffffa51ec0007ab8 EFLAGS: 00010246
+[    4.295003] RAX: 0000000000000000 RBX: ffffa2ee36bae000 RCX: 0000000000000006
+[    4.303002] RDX: 000000000000081c RSI: ffffa2ee38cfa8c8 RDI: ffffa2ee36bae000
+[    4.310013] RBP: ffffa51ec0007b58 R08: 0000000000000001 R09: 0000000000000000
+[    4.317001] R10: 0000000000000000 R11: 0000000000000000 R12: ffffa51ec0007ad0
+[    4.324005] R13: ffffa2ee36bae098 R14: 0000000000000002 R15: ffffa2ee37204818
+[    4.331002] FS:  0000000000000000(0000) GS:ffffa2ee3fcc0000(0000) knlGS:0000000000000000
+[    4.339002] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+[    4.345001] CR2: 0000000000000050 CR3: 000000401000f000 CR4: 00000000001406e0
+[    4.351002] Call Trace:
+[    4.354012]  ? pci_configure_device+0x19f/0x570
+[    4.359002]  ? pci_conf1_read+0xb8/0xf0
+[    4.363002]  ? raw_pci_read+0x23/0x40
+[    4.366011]  ? pci_read+0x2c/0x30
+[    4.370014]  ? pci_read_config_word+0x67/0x70
+[    4.374012]  pci_device_add+0x28/0x230
+[    4.378012]  ? pci_vpd_f0_read+0x50/0x80
+[    4.382014]  pci_scan_single_device+0x96/0xc0
+[    4.386012]  pci_scan_slot+0x79/0xf0
+[    4.389001]  pci_scan_child_bus+0x31/0x180
+[    4.394014]  acpi_pci_root_create+0x1c6/0x240
+[    4.398013]  pci_acpi_scan_root+0x15f/0x1b0
+[    4.402012]  acpi_pci_root_add+0x2e6/0x400
+[    4.406012]  ? acpi_evaluate_integer+0x37/0x60
+[    4.411002]  acpi_bus_attach+0xdf/0x200
+[    4.415002]  acpi_bus_attach+0x6a/0x200
+[    4.418014]  acpi_bus_attach+0x6a/0x200
+[    4.422013]  acpi_bus_scan+0x38/0x70
+[    4.426011]  acpi_scan_init+0x10c/0x271
+[    4.429001]  acpi_init+0x2fa/0x348
+[    4.433004]  ? acpi_sleep_proc_init+0x2d/0x2d
+[    4.437001]  do_one_initcall+0x43/0x169
+[    4.441001]  kernel_init_freeable+0x1d0/0x258
+[    4.445003]  ? rest_init+0xe0/0xe0
+[    4.449001]  kernel_init+0xe/0x150
 
-All warnings (new ones prefixed by >>):
+====================== cut here =============================
 
-   In file included from include/linux/smp.h:12:0,
-                    from include/linux/irq.h:12,
-                    from kernel/irq/proc.c:9:
-   kernel/irq/proc.c: In function 'show_irq_affinity':
->> include/linux/cpumask.h:24:29: warning: 'mask' may be used uninitialized in this function [-Wmaybe-uninitialized]
-    #define cpumask_bits(maskp) ((maskp)->bits)
-                                ^
-   kernel/irq/proc.c:50:24: note: 'mask' was declared here
-     const struct cpumask *mask;
-                           ^~~~
---
-   In file included from include/linux/smp.h:12:0,
-                    from include/linux/irq.h:12,
-                    from kernel//irq/proc.c:9:
-   kernel//irq/proc.c: In function 'show_irq_affinity':
->> include/linux/cpumask.h:24:29: warning: 'mask' may be used uninitialized in this function [-Wmaybe-uninitialized]
-    #define cpumask_bits(maskp) ((maskp)->bits)
-                                ^
-   kernel//irq/proc.c:50:24: note: 'mask' was declared here
-     const struct cpumask *mask;
-                           ^~~~
+It looks like the pci_find_pcie_root_port() was trying to
+find the Root Port for the PCI device which is the Root
+Port already, it will return NULL and trigger the problem,
+so check the highest_pcie_bridge to fix thie problem.
 
-vim +/mask +24 include/linux/cpumask.h
-
-^1da177e Linus Torvalds 2005-04-16  16  
-ae7a47e7 Rusty Russell  2008-12-30  17  /**
-6ba2ef7b Rusty Russell  2009-09-24  18   * cpumask_bits - get the bits in a cpumask
-6ba2ef7b Rusty Russell  2009-09-24  19   * @maskp: the struct cpumask *
-ae7a47e7 Rusty Russell  2008-12-30  20   *
-6ba2ef7b Rusty Russell  2009-09-24  21   * You should only assume nr_cpu_ids bits of this mask are valid.  This is
-6ba2ef7b Rusty Russell  2009-09-24  22   * a macro so it's const-correct.
-ae7a47e7 Rusty Russell  2008-12-30  23   */
-6ba2ef7b Rusty Russell  2009-09-24 @24  #define cpumask_bits(maskp) ((maskp)->bits)
-7ea931c9 Paul Jackson   2008-04-28  25  
-
-:::::: The code at line 24 was first introduced by commit
-:::::: 6ba2ef7baac23a5d9bb85e28b882d16b439a2293 cpumask: Move deprecated functions to end of header.
-
-:::::: TO: Rusty Russell <rusty@rustcorp.com.au>
-:::::: CC: Rusty Russell <rusty@rustcorp.com.au>
-
+Fixes: a99b646afa8a ("PCI: Disable PCIe Relaxed Ordering if unsupported")
+Reported-by: Eric Dumazet <eric.dumazet@gmail.com>
+Signed-off-by: Eric Dumazet <eric.dumazet@gmail.com>
+Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 63456 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170815/8cda43dc/attachment-0001.gz>
+ drivers/pci/pci.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index af0cc34..7e2022f 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -522,7 +522,8 @@ struct pci_dev *pci_find_pcie_root_port(struct pci_dev *dev)
+ 		bridge = pci_upstream_bridge(bridge);
+ 	}
+ 
+-	if (pci_pcie_type(highest_pcie_bridge) != PCI_EXP_TYPE_ROOT_PORT)
++	if (highest_pcie_bridge &&
++	    pci_pcie_type(highest_pcie_bridge) != PCI_EXP_TYPE_ROOT_PORT)
+ 		return NULL;
+ 
+ 	return highest_pcie_bridge;
+-- 
+1.8.3.1
