@@ -1,136 +1,75 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 15 Aug 2017 11:51:53 +0100
-Subject: [PATCH v3 pci] PCI/MSI: pci-xgene-msi: Enable MSI support in
- ACPI boot for X-Gene v1
-In-Reply-To: <CAAsHzqu6Mu99iDcJwFtK-h0kqgxw4cCk8xCEZX8BP+GEmCJR=A@mail.gmail.com>
-References: <1502496173-6017-1-git-send-email-kdinh@apm.com>
- <20170814181503.GA3093@red-moon>
- <CAAsHzqu6Mu99iDcJwFtK-h0kqgxw4cCk8xCEZX8BP+GEmCJR=A@mail.gmail.com>
-Message-ID: <20170815105153.GA27248@red-moon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 Aug 2017 12:05:18 +0100
+Subject: [PATCH v4 4/6] perf: hisi: Add support for HiSilicon SoC HHA PMU
+ driver
+In-Reply-To: <1500984642-204676-5-git-send-email-zhangshaokun@hisilicon.com>
+References: <1500984642-204676-1-git-send-email-zhangshaokun@hisilicon.com>
+ <1500984642-204676-5-git-send-email-zhangshaokun@hisilicon.com>
+Message-ID: <20170815110518.GE6090@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 04:17:35PM -0700, Khuong Dinh wrote:
+On Tue, Jul 25, 2017 at 08:10:40PM +0800, Shaokun Zhang wrote:
+> +/* HHA register definition */
+> +#define HHA_INT_MASK		0x0804
+> +#define HHA_INT_STATUS		0x0808
+> +#define HHA_INT_CLEAR		0x080C
+> +#define HHA_PERF_CTRL		0x1E00
+> +#define HHA_EVENT_CTRL		0x1E04
+> +#define HHA_EVENT_TYPE0		0x1E80
+> +#define HHA_CNT0_LOWER		0x1F00
+> +
+> +/* HHA has 16-counters and supports 0x50 events */
+
+As with the L3C PMU, what exactly does this mean?
+
+Does this mean event IDs 0-0x4f are valid?
 
 [...]
 
-> >> +static acpi_status acpi_create_msi_device(acpi_handle handle, u32 Level,
-> >> +                                     void *context, void **retval)
-> >> +{
-> >> +     struct acpi_device *device = NULL;
-> >> +     int type = ACPI_BUS_TYPE_DEVICE;
-> >> +     unsigned long long sta;
-> >> +     acpi_status status;
-> >> +     int ret = 0;
-> >> +
-> >> +     acpi_bus_get_device(handle, &device);
-> >> +     status = acpi_bus_get_status_handle(handle, &sta);
-> >> +     if (ACPI_FAILURE(status))
-> >> +             sta = 0;
-> >> +
-> >> +     device = kzalloc(sizeof(struct acpi_device), GFP_KERNEL);
-> >> +     if (!device)
-> >> +             return -ENOMEM;
-> >> +
-> >> +     acpi_init_device_object(device, handle, type, sta);
-> >> +     ret = acpi_device_add(device, NULL);
-> >> +     if (ret)
-> >> +             return ret;
-> >> +     device->parent = kzalloc(sizeof(struct acpi_device), GFP_KERNEL);
-> >> +     INIT_LIST_HEAD(&device->parent->physical_node_list);
-> >> +
-> >> +     acpi_device_add_finalize(device);
-> >> +
-> >> +     ret = device_attach(&device->dev);
-> >> +     if (ret < 0)
-> >> +             return ret;
-> >> +
-> >> +     acpi_create_platform_device(device, NULL);
-> >> +     acpi_device_set_enumerated(device);
-> >> +
-> >> +     return ret;
-> >> +}
-> >
-> > Can't this be implemented through acpi_bus_scan(handle) ?
-> >
-> > (where handle is your MSI controller acpi_handle ?)
-> 
-> I had an experiment to use acpi_bus_scan(handle) to register MSI
-> driver, but it's not success as @handle for acpi_bus_scan is the root
-> of the namespace scope to scan.
-> The driver registration to ACPI platform happens with the following code path:
-> acpi_bus_scan
->    acpi_bus_check_add
->    acpi_bus_attach
->       device_attach
->       acpi_default_enumeration
->          acpi_create_platform_device
->          acpi_device_set_enumerated
-> 
-> acpi_bus_attach is recursively happened through ACPI nodes in order.
+> +static irqreturn_t hisi_hha_pmu_isr(int irq, void *dev_id)
+> +{
+> +	struct hisi_pmu *hha_pmu = dev_id;
+> +	struct perf_event *event;
+> +	unsigned long overflown;
+> +	u32 status;
+> +	int idx;
+> +
+> +	/* Read HHA_INT_STATUS register */
+> +	status = readl(hha_pmu->base + HHA_INT_STATUS);
+> +	if (!status)
+> +		return IRQ_NONE;
+> +	overflown = status;
 
-What I was saying is to call acpi_bus_scan() on the MSI controller
-handle (as start_object - see acpi_walk_namespace()).
+No need for the u32 temporary here.
 
-> > [...]
-> >
-> >>  static int xgene_msi_probe(struct platform_device *pdev)
-> >>  {
-> >>       struct resource *res;
-> >> @@ -469,7 +487,18 @@ static int xgene_msi_probe(struct platform_device *pdev)
-> >>               goto error;
-> >>       }
-> >>       xgene_msi->msi_addr = res->start;
-> >> -     xgene_msi->node = pdev->dev.of_node;
-> >> +
-> >> +     xgene_msi->fwnode = of_node_to_fwnode(pdev->dev.of_node);
-> >> +     if (!xgene_msi->fwnode) {
-> >> +             xgene_msi->fwnode =
-> >> +                     irq_domain_alloc_fwnode((void *)xgene_msi->msi_addr);
-> >> +             if (!xgene_msi->fwnode) {
-> >> +                     dev_err(&pdev->dev, "Failed to create fwnode\n");
-> >> +                     rc = ENOMEM;
-> >> +                     goto error;
-> >> +             }
-> >> +     }
-> >> +
-> >>       xgene_msi->num_cpus = num_possible_cpus();
-> >>
-> >>       rc = xgene_msi_init_allocator(xgene_msi);
-> >> @@ -540,6 +569,7 @@ static int xgene_msi_probe(struct platform_device *pdev)
-> >>       .driver = {
-> >>               .name = "xgene-msi",
-> >>               .of_match_table = xgene_msi_match_table,
-> >> +             .acpi_match_table = ACPI_PTR(xgene_msi_acpi_ids),
-> >>       },
-> >>       .probe = xgene_msi_probe,
-> >>       .remove = xgene_msi_remove,
-> >
-> > AFAIK you still have not solved the link ordering problem, creating
-> > the platform device before scanning the PCI root bridge is not enough,
-> > because you are not guaranteed to probe the MSI driver first, there
-> > has to be way for registering your driver from the ACPI scan hook.
-> 
-> With this implementation, I added a hook to enforce the MSI driver
-> initialization and registration before acpi_bus_scan happens.
+[....]
 
-I do not know if I am mistaken but all I see is still:
+> +static int hisi_hha_pmu_dev_probe(struct platform_device *pdev,
+> +				  struct hisi_pmu *hha_pmu)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	int ret;
+> +
+> +	ret = hisi_hha_pmu_init_data(pdev, hha_pmu);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Pick one core to use for cpumask attributes */
+> +	cpumask_set_cpu(smp_processor_id(), &hha_pmu->cpus);
+> +
 
-subsys_initcall(xgene_pcie_msi_init);
+Why does this not have the usual event migration callbacks, across CPUs
+in the same SCCL?
 
-which is not guaranteed to be called before the PCI host bridge
-is scanned. You have to have a way to _probe_ the MSI driver before
-the PCI host bridge is scanned, which is different.
+> +	ret = hisi_hha_pmu_init_irq(hha_pmu, pdev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	hha_pmu->name = devm_kasprintf(dev, GFP_KERNEL, "hisi_hha%u_%u",
+> +				       hha_pmu->hha_uid, hha_pmu->sccl_id);
 
-> It will walk through the HID to get the MSI device (e.g:
-> acpi_get_devices). When the device is found, the callback will be
-> called and we will initialize MSI device by its handle, start to
-> attach MSI device to a driver, create ACPI platform device for MSI
-> APCI device node and marked it as visited.
-
-But if the MSI driver is still not registered the whole concept still
-does not work. You are not guaranteed ordering between initcalls at
-the same level.
+As on the doc patch, this should be hierarchical.
 
 Thanks,
-Lorenzo
+Mark
