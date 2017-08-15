@@ -1,36 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Aug 2017 17:39:55 +0100
-Subject: [PATCHv2 02/14] fork: allow arch-override of VMAP stack alignment
-In-Reply-To: <CALCETrWP-cufvhLJU2Q7BPAYw+HmyzJHVWPvmmCS+bq84Up1zQ@mail.gmail.com>
-References: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
- <1502801449-29246-3-git-send-email-mark.rutland@arm.com>
- <CALCETrWAYvKTcgaQgEDC-ihhSuFAw9Phq-xF6FK5AMM6ag6j4A@mail.gmail.com>
- <20170815163036.GJ6090@leverpostej>
- <CALCETrWP-cufvhLJU2Q7BPAYw+HmyzJHVWPvmmCS+bq84Up1zQ@mail.gmail.com>
-Message-ID: <20170815163955.GK6090@leverpostej>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 15 Aug 2017 09:52:23 -0700
+Subject: [GIT PULL 1/4] soc changes for omaps for v4.14
+Message-ID: <pull-1502815785-702769>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 09:33:18AM -0700, Andy Lutomirski wrote:
-> On Tue, Aug 15, 2017 at 9:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Tue, Aug 15, 2017 at 09:09:36AM -0700, Andy Lutomirski wrote:
+From: "Tony Lindgren" <tony@atomide.com>
 
-> >> This looks okay, but it might make sense to move that to a header file
-> >> so THREAD_ALIGN is always available.
-> >
-> > I was a little worried about breaking things, since arches don't define
-> > THREAD_SIZE in a consistent location.
-> >
-> > Looking again, it looks like those are all transitiviely included into
-> > each arch's <asm/thread_info.h>, so I think I can move this into
-> > <linux/thread_info.h>, which'll have to be added to kernel.fork.c's
-> > includes.
-> >
-> > Are you happy with the below fixup?
-> 
-> LGTM.
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
-Cool. I've folded that in and pushed the updated branch.
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 
-Thanks,
-Mark.
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.14/soc-signed
+
+for you to fetch changes up to 3af6ccc3d1b167c14fd195341092073820361de1:
+
+  ARM: OMAP: dra7: powerdomain data: Register SoC specific powerdomains (2017-08-14 10:33:29 -0700)
+
+----------------------------------------------------------------
+SoC updates for omaps for v4.14. Most of the chages are to add
+support for new dra762 SoC. The other changes are are for legacy
+DMA code removal, and MMC quirk and iodelay config for dra7.
+
+----------------------------------------------------------------
+Kishon Vijay Abraham I (1):
+      ARM: OMAP2+: Select PINCTRL_TI_IODELAY for SOC_DRA7XX
+
+Lokesh Vutla (5):
+      ARM: OMAP2+: board-generic: add support for dra762 family
+      ARM: dra762: Add support for device identification
+      ARM: dra7: hwmod: Register dra76x specific hwmod
+      ARM: dra762: Enable SMP for dra762
+      ARM: OMAP: dra7: powerdomain data: Register SoC specific powerdomains
+
+Sekhar Nori (1):
+      ARM: OMAP2+: Add pdata-quirks for MMC/SD on DRA74x EVM
+
+Tony Lindgren (1):
+      ARM: OMAP2+: Remove unused legacy code for DMA
+
+ .../devicetree/bindings/arm/omap/omap.txt          |   3 +
+ arch/arm/mach-omap2/Kconfig                        |   1 +
+ arch/arm/mach-omap2/board-generic.c                |   1 +
+ arch/arm/mach-omap2/dma.c                          | 148 +--------------------
+ arch/arm/mach-omap2/id.c                           |   9 ++
+ arch/arm/mach-omap2/omap-smp.c                     |   4 +-
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  11 +-
+ arch/arm/mach-omap2/pdata-quirks.c                 |  31 +++++
+ arch/arm/mach-omap2/powerdomains7xx_data.c         |  33 ++++-
+ arch/arm/mach-omap2/soc.h                          |   5 +
+ include/linux/platform_data/hsmmc-omap.h           |   3 +
+ 11 files changed, 101 insertions(+), 148 deletions(-)
