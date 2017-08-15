@@ -1,89 +1,49 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 15 Aug 2017 12:03:31 -0500
-Subject: [PATCH net RESEND] PCI: fix oops when try to find Root Port for
- a PCI device
-In-Reply-To: <1502810688-12420-1-git-send-email-dingtianhong@huawei.com>
-References: <1502810688-12420-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <20170815170331.GA4099@bhelgaas-glaptop.roam.corp.google.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 15 Aug 2017 18:11:27 +0100
+Subject: [PATCH 05/27] arm64: fpsimd: Simplify uses of {set,
+ clear}_ti_thread_flag()
+In-Reply-To: <1502280338-23002-6-git-send-email-Dave.Martin@arm.com>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-6-git-send-email-Dave.Martin@arm.com>
+Message-ID: <CAKv+Gu8DsJTeX8=yWNd6vAaFQqBbQdcjyCBgiFhLAq9JiyEGRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 11:24:48PM +0800, Ding Tianhong wrote:
-> Eric report a oops when booting the system after applying
-> the commit a99b646afa8a ("PCI: Disable PCIe Relaxed..."):
-> ...
+On 9 August 2017 at 13:05, Dave Martin <Dave.Martin@arm.com> wrote:
+> The existing FPSIMD context switch code contains a couple of
+> instances of {set,clear}_ti_thread(task_thread_info(task)).  Since
+> there are thread flag manipulators that operate directly on
+> task_struct, this verbosity isn't strictly needed.
+>
+> For consistency, this patch simplifies the affected calls.  This
+> should have no impact on behaviour.
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-> It looks like the pci_find_pcie_root_port() was trying to
-> find the Root Port for the PCI device which is the Root
-> Port already, it will return NULL and trigger the problem,
-> so check the highest_pcie_bridge to fix thie problem.
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-The problem was actually with a Root Complex Integrated Endpoint that
-has no upstream PCIe device:
-
-  00:05.2 System peripheral: Intel Corporation Device 0e2a (rev 04)
-        Subsystem: Intel Corporation Device 0e2a
-        Control: I/O- Mem- BusMaster- SpecCycle- MemWINV- VGASnoop- ParErr- Stepping- SERR- FastB2B- DisINTx-
-        Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
-        Capabilities: [40] Express (v2) Root Complex Integrated Endpoint, MSI 00
-                DevCap: MaxPayload 128 bytes, PhantFunc 0, Latency L0s <64ns, L1 <1us
-                        ExtTag- RBE- FLReset-
-                DevCtl: Report errors: Correctable- Non-Fatal- Fatal+ Unsupported+
-                        RlxdOrd+ ExtTag- PhantFunc- AuxPwr- NoSnoop+
-                        MaxPayload 128 bytes, MaxReadReq 128 bytes
-
-> Fixes: a99b646afa8a ("PCI: Disable PCIe Relaxed Ordering if unsupported")
-
-This also
-
-Fixes: c56d4450eb68 ("PCI: Turn off Request Attributes to avoid Chelsio T5 Completion erratum")
-
-which added pci_find_pcie_root_port().  Prior to this Relaxed Ordering
-series, we only used pci_find_pcie_root_port() in a Chelsio quirk that
-only applied to non-integrated endpoints, so we didn't trip over the
-bug.
-
-> Reported-by: Eric Dumazet <eric.dumazet@gmail.com>
-> Signed-off-by: Eric Dumazet <eric.dumazet@gmail.com>
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
 > ---
->  drivers/pci/pci.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index af0cc34..7e2022f 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -522,7 +522,8 @@ struct pci_dev *pci_find_pcie_root_port(struct pci_dev *dev)
->  		bridge = pci_upstream_bridge(bridge);
->  	}
->  
-> -	if (pci_pcie_type(highest_pcie_bridge) != PCI_EXP_TYPE_ROOT_PORT)
-> +	if (highest_pcie_bridge &&
-> +	    pci_pcie_type(highest_pcie_bridge) != PCI_EXP_TYPE_ROOT_PORT)
->  		return NULL;
->  
->  	return highest_pcie_bridge;
-> -- 
-
-I think structuring the fix as follows is a little more readable:
-
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index af0cc3456dc1..587cd7623ed8 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -522,10 +522,11 @@ struct pci_dev *pci_find_pcie_root_port(struct pci_dev *dev)
- 		bridge = pci_upstream_bridge(bridge);
- 	}
- 
--	if (pci_pcie_type(highest_pcie_bridge) != PCI_EXP_TYPE_ROOT_PORT)
--		return NULL;
-+	if (highest_pcie_bridge &&
-+	    pci_pcie_type(highest_pcie_bridge) == PCI_EXP_TYPE_ROOT_PORT)
-+		return highest_pcie_bridge;
- 
--	return highest_pcie_bridge;
-+	return NULL;
- }
- EXPORT_SYMBOL(pci_find_pcie_root_port);
- 
+>  arch/arm64/kernel/fpsimd.c | 6 ++----
+>  1 file changed, 2 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 138fcfa..9c1f268e 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -159,11 +159,9 @@ void fpsimd_thread_switch(struct task_struct *next)
+>
+>                 if (__this_cpu_read(fpsimd_last_state) == st
+>                     && st->cpu == smp_processor_id())
+> -                       clear_ti_thread_flag(task_thread_info(next),
+> -                                            TIF_FOREIGN_FPSTATE);
+> +                       clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
+>                 else
+> -                       set_ti_thread_flag(task_thread_info(next),
+> -                                          TIF_FOREIGN_FPSTATE);
+> +                       set_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
+>         }
+>  }
+>
+> --
+> 2.1.4
+>
