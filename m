@@ -1,89 +1,116 @@
-From: luto@amacapital.net (Andy Lutomirski)
-Date: Tue, 15 Aug 2017 09:33:18 -0700
-Subject: [PATCHv2 02/14] fork: allow arch-override of VMAP stack alignment
-In-Reply-To: <20170815163036.GJ6090@leverpostej>
-References: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
- <1502801449-29246-3-git-send-email-mark.rutland@arm.com>
- <CALCETrWAYvKTcgaQgEDC-ihhSuFAw9Phq-xF6FK5AMM6ag6j4A@mail.gmail.com>
- <20170815163036.GJ6090@leverpostej>
-Message-ID: <CALCETrWP-cufvhLJU2Q7BPAYw+HmyzJHVWPvmmCS+bq84Up1zQ@mail.gmail.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Tue, 15 Aug 2017 19:36:39 +0300
+Subject: [PATCH 2/2] media: ov7670: Add the s_power operation
+In-Reply-To: <20170810090645.24344-3-wenyou.yang@microchip.com>
+References: <20170810090645.24344-1-wenyou.yang@microchip.com>
+ <20170810090645.24344-3-wenyou.yang@microchip.com>
+Message-ID: <20170815163638.77rda4pbkzqsyxwj@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 9:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Aug 15, 2017 at 09:09:36AM -0700, Andy Lutomirski wrote:
->> On Tue, Aug 15, 2017 at 5:50 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > In some cases, an architecture might wish its stacks to be aligned to a
->> > boundary larger than THREAD_SIZE. For example, using an alignment of
->> > double THREAD_SIZE can allow for stack overflows smaller than
->> > THREAD_SIZE to be detected by checking a single bit of the stack
->> > pointer.
->> >
->> > This patch allows architectures to override the alignment of VMAP'd
->> > stacks, by defining THREAD_ALIGN. Where not defined, this defaults to
->> > THREAD_SIZE, as is the case today.
->>
->> This looks okay, but it might make sense to move that to a header file
->> so THREAD_ALIGN is always available.
->
-> I was a little worried about breaking things, since arches don't define
-> THREAD_SIZE in a consistent location.
->
-> Looking again, it looks like those are all transitiviely included into
-> each arch's <asm/thread_info.h>, so I think I can move this into
-> <linux/thread_info.h>, which'll have to be added to kernel.fork.c's
-> includes.
->
-> Are you happy with the below fixup?
+Hi Wenyou,
 
-LGTM.
-
->
-> Thanks,
-> Mark.
->
-> ---->8----
-> diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
-> index 250a276..905d769 100644
-> --- a/include/linux/thread_info.h
-> +++ b/include/linux/thread_info.h
-> @@ -38,6 +38,10 @@ enum {
->
->  #ifdef __KERNEL__
->
-> +#ifndef THREAD_ALIGN
-> +#define THREAD_ALIGN   THREAD_SIZE
-> +#endif
+On Thu, Aug 10, 2017 at 05:06:45PM +0800, Wenyou Yang wrote:
+> Add the s_power operation which is responsible for manipulating the
+> power dowm mode through the PWDN pin and the reset operation through
+> the RESET pin.
+> 
+> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
+> ---
+> 
+>  drivers/media/i2c/ov7670.c | 30 +++++++++++++++++++++++++++---
+>  1 file changed, 27 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/media/i2c/ov7670.c b/drivers/media/i2c/ov7670.c
+> index 5c8460ee65c3..5ed79ccfaf91 100644
+> --- a/drivers/media/i2c/ov7670.c
+> +++ b/drivers/media/i2c/ov7670.c
+> @@ -1506,6 +1506,22 @@ static int ov7670_s_register(struct v4l2_subdev *sd, const struct v4l2_dbg_regis
+>  }
+>  #endif
+>  
+> +static int ov7670_s_power(struct v4l2_subdev *sd, int on)
+> +{
+> +	struct ov7670_info *info = to_state(sd);
 > +
->  #ifdef CONFIG_DEBUG_STACK_USAGE
->  # define THREADINFO_GFP                (GFP_KERNEL_ACCOUNT | __GFP_NOTRACK | \
->                                  __GFP_ZERO)
-> diff --git a/kernel/fork.c b/kernel/fork.c
-> index 696d692..f12882a 100644
-> --- a/kernel/fork.c
-> +++ b/kernel/fork.c
-> @@ -88,6 +88,7 @@
->  #include <linux/sysctl.h>
->  #include <linux/kcov.h>
->  #include <linux/livepatch.h>
-> +#include <linux/thread_info.h>
->
->  #include <asm/pgtable.h>
->  #include <asm/pgalloc.h>
-> @@ -217,9 +218,6 @@ static unsigned long *alloc_thread_stack_node(struct task_struct *tsk, int node)
->                 return s->addr;
->         }
->
-> -#ifndef THREAD_ALIGN
-> -#define THREAD_ALIGN   THREAD_SIZE
-> -#endif
->         stack = __vmalloc_node_range(THREAD_SIZE, THREAD_ALIGN,
->                                      VMALLOC_START, VMALLOC_END,
->                                      THREADINFO_GFP,
->
+> +	if (info->pwdn_gpio)
+> +		gpiod_direction_output(info->pwdn_gpio, !on);
 
+gpiod_direction_output() can cope with NULL gpio_desc.
 
+> +	if (on && info->resetb_gpio) {
+> +		gpiod_set_value(info->resetb_gpio, 1);
+> +		usleep_range(500, 1000);
+> +		gpiod_set_value(info->resetb_gpio, 0);
+> +		usleep_range(3000, 5000);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  /* ----------------------------------------------------------------------- */
+>  
+>  static const struct v4l2_subdev_core_ops ov7670_core_ops = {
+> @@ -1515,6 +1531,7 @@ static const struct v4l2_subdev_core_ops ov7670_core_ops = {
+>  	.g_register = ov7670_g_register,
+>  	.s_register = ov7670_s_register,
+>  #endif
+> +	.s_power = ov7670_s_power,
+>  };
+>  
+>  static const struct v4l2_subdev_video_ops ov7670_video_ops = {
+> @@ -1568,8 +1585,6 @@ static int ov7670_init_gpio(struct i2c_client *client, struct ov7670_info *info)
+>  		return PTR_ERR(info->resetb_gpio);
+>  	}
+>  
+> -	usleep_range(3000, 5000);
+> -
+>  	return 0;
+>  }
+>  
+> @@ -1630,13 +1645,19 @@ static int ov7670_probe(struct i2c_client *client,
+>  		goto clk_disable;
+>  	}
+>  
+> +	ret = ov7670_init_gpio(client, info);
+
+ov7670_init_gpio() is already called a few lines above this. Was this
+intended?
+
+> +	if (ret)
+> +		goto clk_disable;
+> +
+> +	ov7670_s_power(sd, 1);
+> +
+>  	/* Make sure it's an ov7670 */
+>  	ret = ov7670_detect(sd);
+>  	if (ret) {
+>  		v4l_dbg(1, debug, client,
+>  			"chip found @ 0x%x (%s) is not an ov7670 chip.\n",
+>  			client->addr << 1, client->adapter->name);
+> -		goto clk_disable;
+> +		goto power_off;
+>  	}
+>  	v4l_info(client, "chip found @ 0x%02x (%s)\n",
+>  			client->addr << 1, client->adapter->name);
+> @@ -1708,6 +1729,8 @@ static int ov7670_probe(struct i2c_client *client,
+>  	media_entity_cleanup(&info->sd.entity);
+>  hdl_free:
+>  	v4l2_ctrl_handler_free(&info->hdl);
+> +power_off:
+> +	ov7670_s_power(sd, 0);
+>  clk_disable:
+>  	clk_disable_unprepare(info->clk);
+>  	return ret;
+> @@ -1723,6 +1746,7 @@ static int ov7670_remove(struct i2c_client *client)
+>  	v4l2_ctrl_handler_free(&info->hdl);
+>  	clk_disable_unprepare(info->clk);
+>  	media_entity_cleanup(&info->sd.entity);
+> +	ov7670_s_power(sd, 0);
+>  	return 0;
+>  }
+>  
 
 -- 
-Andy Lutomirski
-AMA Capital Management, LLC
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
