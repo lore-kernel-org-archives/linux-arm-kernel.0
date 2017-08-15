@@ -1,61 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 15 Aug 2017 14:55:51 +0100
-Subject: [PATCH] irqchip/armada-370-xp: Enable MSI-X support
-In-Reply-To: <20170815134255.GB31762@io.lakedaemon.net>
-References: <20170502072600.13380-1-sr@denx.de>
- <80f30724-20b6-b5a7-7218-93ff3fa23177@denx.de>
- <20170815134255.GB31762@io.lakedaemon.net>
-Message-ID: <9d7c9cd5-468b-1fe6-e50b-9b968b157b8b@arm.com>
+From: eric.dumazet@gmail.com (Eric Dumazet)
+Date: Tue, 15 Aug 2017 06:58:54 -0700
+Subject: [PATCH v11 0/5] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+In-Reply-To: <20170814.221512.1430356980828045690.davem@davemloft.net>
+References: <1502767407-6812-1-git-send-email-dingtianhong@huawei.com>
+ <20170814.221512.1430356980828045690.davem@davemloft.net>
+Message-ID: <1502805534.4936.73.camel@edumazet-glaptop3.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/08/17 14:42, Jason Cooper wrote:
-> + Marc ;-)
-
-Thanks Jason.
-
+On Mon, 2017-08-14 at 22:15 -0700, David Miller wrote:
+> From: Ding Tianhong <dingtianhong@huawei.com>
+> Date: Tue, 15 Aug 2017 11:23:22 +0800
 > 
-> On Tue, Aug 15, 2017 at 03:31:31PM +0200, Stefan Roese wrote:
->> On 02.05.2017 09:26, Stefan Roese wrote:
->>> Armada XP does not only support MSI, but also MSI-X. This patch sets
->>> the MSI_FLAG_PCI_MSIX flag in the interrupt controller driver which
->>> is the only change necessary to enable MSI-X support on this SoC. As
->>> the Linux PCI MSI-X infrastructure takes care of writing the data and
->>> address structures into the BAR specified by the MSI-X controller.
->>>
->>> Signed-off-by: Stefan Roese <sr@denx.de>
->>> Cc: Bjorn Helgaas <bhelgaas@google.com>
->>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>> Cc: Jason Cooper <jason@lakedaemon.net>
->>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>> ---
->>>  drivers/irqchip/irq-armada-370-xp.c | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
->>> index 33982cbd8a57..b17039ed8735 100644
->>> --- a/drivers/irqchip/irq-armada-370-xp.c
->>> +++ b/drivers/irqchip/irq-armada-370-xp.c
->>> @@ -124,7 +124,7 @@ static struct irq_chip armada_370_xp_msi_irq_chip = {
->>>  static struct msi_domain_info armada_370_xp_msi_domain_info = {
->>>  	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
->>> -		   MSI_FLAG_MULTI_PCI_MSI),
->>> +		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
->>>  	.chip	= &armada_370_xp_msi_irq_chip,
->>>  };
->>>
->>
->> Its been a while since this patch has been submitted - without any
->> comments so far. What's the current status with it? Is it someones
->> queue for upstreaming?
+> > Some devices have problems with Transaction Layer Packets with the Relaxed
+> > Ordering Attribute set.  This patch set adds a new PCIe Device Flag,
+> > PCI_DEV_FLAGS_NO_RELAXED_ORDERING, a set of PCI Quirks to catch some known
+> > devices with Relaxed Ordering issues, and a use of this new flag by the
+> > cxgb4 driver to avoid using Relaxed Ordering with problematic Root Complex
+> > Ports.
+>  ...
 > 
-> I'd like to see an Ack from Thomas P, as he's intimately familiar with
-> both the platforms and the PCI support.
-Same here. If Thomas P is OK with it, I'll queue it.
+> Series applied, thanks.
 
-Thanks,
+I got a NULL deref in pci_find_pcie_root_port()
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Was it expected ?
+
+This local hack seems to fix the issue.
+
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index af0cc3456dc1b48b1325c06c5edd2ca8cc22a640..cfd8eb5a3d0ba8347d44952ffab28d9c761044d3 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -522,7 +522,7 @@ struct pci_dev *pci_find_pcie_root_port(struct pci_dev *dev)
+                bridge = pci_upstream_bridge(bridge);
+        }
+ 
+-       if (pci_pcie_type(highest_pcie_bridge) != PCI_EXP_TYPE_ROOT_PORT)
++       if (highest_pcie_bridge && pci_pcie_type(highest_pcie_bridge) != PCI_EXP_TYPE_ROOT_PORT)
+                return NULL;
+ 
+        return highest_pcie_bridge;
