@@ -1,89 +1,140 @@
 From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Tue, 15 Aug 2017 11:23:27 +0800
-Subject: [PATCH v11 5/5] net/cxgb4vf: Use new
- PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
+Date: Tue, 15 Aug 2017 11:23:23 +0800
+Subject: [PATCH v11 1/5] PCI: Disable PCIe Relaxed Ordering if unsupported
 In-Reply-To: <1502767407-6812-1-git-send-email-dingtianhong@huawei.com>
 References: <1502767407-6812-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1502767407-6812-6-git-send-email-dingtianhong@huawei.com>
+Message-ID: <1502767407-6812-2-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Casey Leedom <leedom@chelsio.com>
+When bit4 is set in the PCIe Device Control register, it indicates
+whether the device is permitted to use relaxed ordering.
+On some platforms using relaxed ordering can have performance issues or
+due to erratum can cause data-corruption. In such cases devices must avoid
+using relaxed ordering.
 
-cxgb4vf Ethernet driver now queries PCIe configuration space to
-determine if it can send TLPs to it with the Relaxed Ordering
-Attribute set, just like the pf did.
+The patch adds a new flag PCI_DEV_FLAGS_NO_RELAXED_ORDERING to indicate that
+Relaxed Ordering (RO) attribute should not be used for Transaction Layer
+Packets (TLP) targeted towards these affected root complexes.
+
+This patch checks if there is any node in the hierarchy that indicates that
+using relaxed ordering is not safe. In such cases the patch turns off the
+relaxed ordering by clearing the capability for this device.
 
 Signed-off-by: Casey Leedom <leedom@chelsio.com>
 Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-Reviewed-by: Casey Leedom <leedom@chelsio.com>
+Acked-by: Ashok Raj <ashok.raj@intel.com>
+Acked-by: Alexander Duyck <alexander.h.duyck@intel.com>
+Acked-by: Casey Leedom <leedom@chelsio.com>
 ---
- drivers/net/ethernet/chelsio/cxgb4vf/adapter.h      |  1 +
- drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c | 18 ++++++++++++++++++
- drivers/net/ethernet/chelsio/cxgb4vf/sge.c          |  3 +++
- 3 files changed, 22 insertions(+)
+ drivers/pci/probe.c  | 43 +++++++++++++++++++++++++++++++++++++++++++
+ drivers/pci/quirks.c | 11 +++++++++++
+ include/linux/pci.h  |  3 +++
+ 3 files changed, 57 insertions(+)
 
-diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h b/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h
-index 109bc63..08c6ddb 100644
---- a/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h
-+++ b/drivers/net/ethernet/chelsio/cxgb4vf/adapter.h
-@@ -408,6 +408,7 @@ enum { /* adapter flags */
- 	USING_MSI          = (1UL << 1),
- 	USING_MSIX         = (1UL << 2),
- 	QUEUES_BOUND       = (1UL << 3),
-+	ROOT_NO_RELAXED_ORDERING = (1UL << 4),
- };
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index c31310d..779e646 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1762,6 +1762,48 @@ static void pci_configure_extended_tags(struct pci_dev *dev)
+ 					 PCI_EXP_DEVCTL_EXT_TAG);
+ }
+ 
++/**
++ * pcie_relaxed_ordering_enabled - Probe for PCIe relaxed ordering enable
++ * @dev: PCI device to query
++ *
++ * Returns true if the device has enabled relaxed ordering attribute.
++ */
++bool pcie_relaxed_ordering_enabled(struct pci_dev *dev)
++{
++	u16 v;
++
++	pcie_capability_read_word(dev, PCI_EXP_DEVCTL, &v);
++
++	return !!(v & PCI_EXP_DEVCTL_RELAX_EN);
++}
++EXPORT_SYMBOL(pcie_relaxed_ordering_enabled);
++
++static void pci_configure_relaxed_ordering(struct pci_dev *dev)
++{
++	struct pci_dev *root;
++
++	/* PCI_EXP_DEVICE_RELAX_EN is RsvdP in VFs */
++	if (dev->is_virtfn)
++		return;
++
++	if (!pcie_relaxed_ordering_enabled(dev))
++		return;
++
++	/*
++	 * For now, we only deal with Relaxed Ordering issues with Root
++	 * Ports. Peer-to-Peer DMA is another can of worms.
++	 */
++	root = pci_find_pcie_root_port(dev);
++	if (!root)
++		return;
++
++	if (root->dev_flags & PCI_DEV_FLAGS_NO_RELAXED_ORDERING) {
++		pcie_capability_clear_word(dev, PCI_EXP_DEVCTL,
++					   PCI_EXP_DEVCTL_RELAX_EN);
++		dev_info(&dev->dev, "Disable Relaxed Ordering because the Root Port didn't support it\n");
++	}
++}
++
+ static void pci_configure_device(struct pci_dev *dev)
+ {
+ 	struct hotplug_params hpp;
+@@ -1769,6 +1811,7 @@ static void pci_configure_device(struct pci_dev *dev)
+ 
+ 	pci_configure_mps(dev);
+ 	pci_configure_extended_tags(dev);
++	pci_configure_relaxed_ordering(dev);
+ 
+ 	memset(&hpp, 0, sizeof(hpp));
+ 	ret = pci_get_hp_params(dev, &hpp);
+diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+index 6967c6b..61b59bf 100644
+--- a/drivers/pci/quirks.c
++++ b/drivers/pci/quirks.c
+@@ -4016,6 +4016,17 @@ static void quirk_tw686x_class(struct pci_dev *pdev)
+ 			      quirk_tw686x_class);
  
  /*
-diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c b/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c
-index ac7a150..2b85b87 100644
---- a/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4vf/cxgb4vf_main.c
-@@ -2888,6 +2888,24 @@ static int cxgb4vf_pci_probe(struct pci_dev *pdev,
++ * Some devices have problems with Transaction Layer Packets with the Relaxed
++ * Ordering Attribute set.  Such devices should mark themselves and other
++ * Device Drivers should check before sending TLPs with RO set.
++ */
++static void quirk_relaxedordering_disable(struct pci_dev *dev)
++{
++	dev->dev_flags |= PCI_DEV_FLAGS_NO_RELAXED_ORDERING;
++	dev_info(&dev->dev, "Disable Relaxed Ordering Attributes to avoid PCIe Completion erratum\n");
++}
++
++/*
+  * Per PCIe r3.0, sec 2.2.9, "Completion headers must supply the same
+  * values for the Attribute as were supplied in the header of the
+  * corresponding Request, except as explicitly allowed when IDO is used."
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 4869e66..29606fb 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -188,6 +188,8 @@ enum pci_dev_flags {
+ 	 * the direct_complete optimization.
  	 */
- 	adapter->name = pci_name(pdev);
- 	adapter->msg_enable = DFLT_MSG_ENABLE;
-+
-+	/* If possible, we use PCIe Relaxed Ordering Attribute to deliver
-+	 * Ingress Packet Data to Free List Buffers in order to allow for
-+	 * chipset performance optimizations between the Root Complex and
-+	 * Memory Controllers.  (Messages to the associated Ingress Queue
-+	 * notifying new Packet Placement in the Free Lists Buffers will be
-+	 * send without the Relaxed Ordering Attribute thus guaranteeing that
-+	 * all preceding PCIe Transaction Layer Packets will be processed
-+	 * first.)  But some Root Complexes have various issues with Upstream
-+	 * Transaction Layer Packets with the Relaxed Ordering Attribute set.
-+	 * The PCIe devices which under the Root Complexes will be cleared the
-+	 * Relaxed Ordering bit in the configuration space, So we check our
-+	 * PCIe configuration space to see if it's flagged with advice against
-+	 * using Relaxed Ordering.
-+	 */
-+	if (!pcie_relaxed_ordering_enabled(pdev))
-+		adapter->flags |= ROOT_NO_RELAXED_ORDERING;
-+
- 	err = adap_init0(adapter);
- 	if (err)
- 		goto err_unmap_bar;
-diff --git a/drivers/net/ethernet/chelsio/cxgb4vf/sge.c b/drivers/net/ethernet/chelsio/cxgb4vf/sge.c
-index e37dde2..05498e7 100644
---- a/drivers/net/ethernet/chelsio/cxgb4vf/sge.c
-+++ b/drivers/net/ethernet/chelsio/cxgb4vf/sge.c
-@@ -2205,6 +2205,7 @@ int t4vf_sge_alloc_rxq(struct adapter *adapter, struct sge_rspq *rspq,
- 	struct port_info *pi = netdev_priv(dev);
- 	struct fw_iq_cmd cmd, rpl;
- 	int ret, iqandst, flsz = 0;
-+	int relaxed = !(adapter->flags & ROOT_NO_RELAXED_ORDERING);
+ 	PCI_DEV_FLAGS_NEEDS_RESUME = (__force pci_dev_flags_t) (1 << 11),
++	/* Don't use Relaxed Ordering for TLPs directed@this device */
++	PCI_DEV_FLAGS_NO_RELAXED_ORDERING = (__force pci_dev_flags_t) (1 << 12),
+ };
  
- 	/*
- 	 * If we're using MSI interrupts and we're not initializing the
-@@ -2300,6 +2301,8 @@ int t4vf_sge_alloc_rxq(struct adapter *adapter, struct sge_rspq *rspq,
- 			cpu_to_be32(
- 				FW_IQ_CMD_FL0HOSTFCMODE_V(SGE_HOSTFCMODE_NONE) |
- 				FW_IQ_CMD_FL0PACKEN_F |
-+				FW_IQ_CMD_FL0FETCHRO_V(relaxed) |
-+				FW_IQ_CMD_FL0DATARO_V(relaxed) |
- 				FW_IQ_CMD_FL0PADEN_F);
+ enum pci_irq_reroute_variant {
+@@ -1125,6 +1127,7 @@ int pci_add_ext_cap_save_buffer(struct pci_dev *dev,
+ void pci_pme_wakeup_bus(struct pci_bus *bus);
+ void pci_d3cold_enable(struct pci_dev *dev);
+ void pci_d3cold_disable(struct pci_dev *dev);
++bool pcie_relaxed_ordering_enabled(struct pci_dev *dev);
  
- 		/* In T6, for egress queue type FL there is internal overhead
+ /* PCI Virtual Channel */
+ int pci_save_vc_state(struct pci_dev *dev);
 -- 
 1.8.3.1
