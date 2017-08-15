@@ -1,88 +1,53 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 15 Aug 2017 08:41:51 +0530
-Subject: [PATCH] ARM: dts: am57xx-beagle-x15: Add support for rev C
-In-Reply-To: <20170814175820.12065-1-robertcnelson@gmail.com>
-References: <20170814175820.12065-1-robertcnelson@gmail.com>
-Message-ID: <bf2a5868-4c0b-58a1-350e-cba7dcfb5166@ti.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Tue, 15 Aug 2017 11:23:25 +0800
+Subject: [PATCH v11 3/5] PCI: Disable Relaxed Ordering Attributes for AMD A1100
+In-Reply-To: <1502767407-6812-1-git-send-email-dingtianhong@huawei.com>
+References: <1502767407-6812-1-git-send-email-dingtianhong@huawei.com>
+Message-ID: <1502767407-6812-4-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Casey reported that the AMD ARM A1100 SoC has a bug in its PCIe
+Root Port where Upstream Transaction Layer Packets with the Relaxed
+Ordering Attribute clear are allowed to bypass earlier TLPs with
+Relaxed Ordering set, it would cause Data Corruption, so we need
+to disable Relaxed Ordering Attribute when Upstream TLPs to the
+Root Port.
 
+Reported-and-suggested-by: Casey Leedom <leedom@chelsio.com>
+Signed-off-by: Casey Leedom <leedom@chelsio.com>
+Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+Acked-by: Casey Leedom <leedom@chelsio.com>
+---
+ drivers/pci/quirks.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-On Monday 14 August 2017 11:28 PM, Robert Nelson wrote:
-> Latest update to the BeagleBoard-X15 platform (revision C). This board contains
-> a silicon update (Rev 2.0), which includes a fix for the 2nd ethernet phy when
-> running at 1000 Mbps speeds.
-> 
-> This board can be indentified by the [C.00] after [BBRDX15_] in the at24 eeprom:
-> [BBRDX15_C.001731PX150249]
-> 
-> Rev C is now in full production and boards are available for end users.
-> 
-> https://beagleboard.org/x15
-> https://github.com/beagleboard/beagleboard-x15/
-> 
-> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
-> CC: Tony Lindgren <tony@atomide.com>
-> CC: Nishanth Menon <nm@ti.com>
-> CC: Jason Kridner <jkridner@beagleboard.org>
-> CC: Drew Fustini <drew@beagleboard.org>
-> ---
->  arch/arm/boot/dts/Makefile                   |  1 +
->  arch/arm/boot/dts/am57xx-beagle-x15-revc.dts | 24 ++++++++++++++++++++++++
->  2 files changed, 25 insertions(+)
->  create mode 100644 arch/arm/boot/dts/am57xx-beagle-x15-revc.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index c293e841eea3..d3a4fe7eb6f7 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -651,6 +651,7 @@ dtb-$(CONFIG_SOC_OMAP5) += \
->  dtb-$(CONFIG_SOC_DRA7XX) += \
->  	am57xx-beagle-x15.dtb \
->  	am57xx-beagle-x15-revb1.dtb \
-> +	am57xx-beagle-x15-revc.dtb \
->  	am57xx-cl-som-am57x.dtb \
->  	am57xx-sbc-am57x.dtb \
->  	am572x-idk.dtb \
-> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-revc.dts b/arch/arm/boot/dts/am57xx-beagle-x15-revc.dts
-> new file mode 100644
-> index 000000000000..742eeb96b8aa
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/am57xx-beagle-x15-revc.dts
-> @@ -0,0 +1,24 @@
-> +/*
-> + * Copyright (C) 2014-2016 Texas Instruments Incorporated - http://www.ti.com/
-						^^2017 :)
-
-Rest of the patch looks good to me.
-
-Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
-
-Thanks and regards,
-Lokesh
-
-
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include "am57xx-beagle-x15-common.dtsi"
-> +
-> +/ {
-> +	model = "TI AM5728 BeagleBoard-X15 rev C";
-> +};
-> +
-> +&tpd12s015 {
-> +	gpios = <&gpio7 10 GPIO_ACTIVE_HIGH>,	/* gpio7_10, CT CP HPD */
-> +		<&gpio2 30 GPIO_ACTIVE_HIGH>,	/* gpio2_30, LS OE */
-> +		<&gpio7 12 GPIO_ACTIVE_HIGH>;	/* gpio7_12/sp1_cs2, HPD */
-> +};
-> +
-> +&mmc1 {
-> +	vmmc-supply = <&vdd_3v3>;
-> +	vqmmc-supply = <&ldo1_reg>;
-> +};
-> 
+diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+index 1272f7e..1407604 100644
+--- a/drivers/pci/quirks.c
++++ b/drivers/pci/quirks.c
+@@ -4089,6 +4089,22 @@ static void quirk_relaxedordering_disable(struct pci_dev *dev)
+ 			      quirk_relaxedordering_disable);
+ 
+ /*
++ * The AMD ARM A1100 (AKA "SEATTLE") SoC has a bug in its PCIe Root Complex
++ * where Upstream Transaction Layer Packets with the Relaxed Ordering
++ * Attribute clear are allowed to bypass earlier TLPs with Relaxed Ordering
++ * set.  This is a violation of the PCIe 3.0 Transaction Ordering Rules
++ * outlined in Section 2.4.1 (PCI Express(r) Base Specification Revision 3.0
++ * November 10, 2010).  As a result, on this platform we can't use Relaxed
++ * Ordering for Upstream TLPs.
++ */
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a00, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a01, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a02, PCI_CLASS_NOT_DEFINED, 8,
++			      quirk_relaxedordering_disable);
++
++/*
+  * Per PCIe r3.0, sec 2.2.9, "Completion headers must supply the same
+  * values for the Attribute as were supplied in the header of the
+  * corresponding Request, except as explicitly allowed when IDO is used."
+-- 
+1.8.3.1
