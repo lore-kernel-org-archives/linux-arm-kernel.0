@@ -1,43 +1,32 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Tue, 15 Aug 2017 06:58:54 -0700
-Subject: [PATCH v11 0/5] Add new PCI_DEV_FLAGS_NO_RELAXED_ORDERING flag
-In-Reply-To: <20170814.221512.1430356980828045690.davem@davemloft.net>
-References: <1502767407-6812-1-git-send-email-dingtianhong@huawei.com>
- <20170814.221512.1430356980828045690.davem@davemloft.net>
-Message-ID: <1502805534.4936.73.camel@edumazet-glaptop3.roam.corp.google.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 15 Aug 2017 15:00:35 +0100
+Subject: [PATCHv2 00/14] arm64: VMAP_STACK support
+In-Reply-To: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
+References: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170815140035.GA18351@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-08-14 at 22:15 -0700, David Miller wrote:
-> From: Ding Tianhong <dingtianhong@huawei.com>
-> Date: Tue, 15 Aug 2017 11:23:22 +0800
+On Tue, Aug 15, 2017 at 01:50:35PM +0100, Mark Rutland wrote:
+> Ard and I have worked together to implement vmap stack support for
+> arm64. This supersedes our earlier vmap stack RFCs [0,1]. The git author
+> stats are a little misleading, as I've teased parts out into smaller
+> patches for review.
 > 
-> > Some devices have problems with Transaction Layer Packets with the Relaxed
-> > Ordering Attribute set.  This patch set adds a new PCIe Device Flag,
-> > PCI_DEV_FLAGS_NO_RELAXED_ORDERING, a set of PCI Quirks to catch some known
-> > devices with Relaxed Ordering issues, and a use of this new flag by the
-> > cxgb4 driver to avoid using Relaxed Ordering with problematic Root Complex
-> > Ports.
->  ...
+> The series is based on our stack dump rework [2,3], which can be found
+> in the arm64/exception-stack branch [4] of my kernel.org repo. This
+> series can be found in the arm64/vmap-stack branch [5] of the same repo.
 > 
-> Series applied, thanks.
+> Since v1 [6]:
+> * Fix typos
+> * Update comments in entry assembly
+> * Dump exception context (and stacks) before regs
+> * Define safe adr_this_cpu for modules
 
-I got a NULL deref in pci_find_pcie_root_port()
+Thanks:
 
-Was it expected ?
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-This local hack seems to fix the issue.
+for the series.
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index af0cc3456dc1b48b1325c06c5edd2ca8cc22a640..cfd8eb5a3d0ba8347d44952ffab28d9c761044d3 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -522,7 +522,7 @@ struct pci_dev *pci_find_pcie_root_port(struct pci_dev *dev)
-                bridge = pci_upstream_bridge(bridge);
-        }
- 
--       if (pci_pcie_type(highest_pcie_bridge) != PCI_EXP_TYPE_ROOT_PORT)
-+       if (highest_pcie_bridge && pci_pcie_type(highest_pcie_bridge) != PCI_EXP_TYPE_ROOT_PORT)
-                return NULL;
- 
-        return highest_pcie_bridge;
+Will
