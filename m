@@ -1,43 +1,87 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 15 Aug 2017 12:10:32 +0100
-Subject: [PATCH 14/14] arm64: add VMAP_STACK overflow detection
-In-Reply-To: <1502130965-18710-15-git-send-email-mark.rutland@arm.com>
-References: <1502130965-18710-1-git-send-email-mark.rutland@arm.com>
- <1502130965-18710-15-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170815111031.xbga45isn5gumeni@armageddon.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 15 Aug 2017 13:16:06 +0200
+Subject: [patch v3 1/3] drivers: jtag: Add JTAG core driver
+In-Reply-To: <1502791207-26951-2-git-send-email-oleksandrs@mellanox.com>
+References: <1502791207-26951-1-git-send-email-oleksandrs@mellanox.com>
+ <1502791207-26951-2-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <CAK8P3a3DutrfhGrd9MnDFbzhfvnZXSyrV2RbTgrFGgpbAs=H0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 07:36:05PM +0100, Mark Rutland wrote:
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index e5aa866..44a27c3 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -72,6 +72,37 @@
->  	.macro kernel_ventry	label
->  	.align 7
->  	sub	sp, sp, #S_FRAME_SIZE
-> +#ifdef CONFIG_VMAP_STACK
-> +	add	sp, sp, x0			// sp' = sp + x0
-> +	sub	x0, sp, x0			// x0' = sp' - x0 = (sp + x0) - x0 = sp
-> +	tbnz	x0, #THREAD_SHIFT, 0f
-> +	sub	x0, sp, x0			// sp' - x0' = (sp + x0) - sp = x0
-> +	sub	sp, sp, x0			// sp' - x0 = (sp + x0) - x0 = sp
-> +	b	\label
+On Tue, Aug 15, 2017 at 12:00 PM, Oleksandr Shamray
+<oleksandrs@mellanox.com> wrote:
 
-Maybe a small comment before this hunk just to tell the user that it's
-trying to test a bit in SP without corrupting a gpr. It's obvious once
-you read it but not you see it for the first time ;).
-
+> +       case JTAG_IOCXFER:
+> +               if (copy_from_user(&xfer, varg, sizeof(struct jtag_xfer)))
+> +                       return -EFAULT;
 > +
-> +	/* Stash the original SP value in tpidr_el0 */
-> +0:	msr	tpidr_el0, x0
+> +               if (xfer.length >= JTAG_MAX_XFER_DATA_LEN)
+> +                       return -EFAULT;
+> +
+> +               user_tdio_data = xfer.tdio;
+> +               xfer.tdio = jtag_copy_from_user((void __user *)user_tdio_data,
+> +                                               xfer.length);
+> +               if (!xfer.tdio)
+> +                       return -ENOMEM;
 
-And a comment here that on this path we no longer care about the user
-tpidr_el0 as we are never returning there.
+This is not safe for 32-bit processes on 64-bit kernels, since the
+structure layout differs for the pointer member. It's better to always
+use either rework the structure to avoid the pointer, or to use a
+__u64 member to store it, and then use u64_to_user_ptr()
+to convert it in the kernel.
 
-Otherwise I'm fine with the series (I'm not a fan of the complexity it
-adds but I don't have a better suggestion).
+> +       case JTAG_GIOCSTATUS:
+> +               if (jtag->ops->status_get)
+> +                       err = jtag->ops->status_get(jtag,
+> +                                               (enum jtag_endstate *)&value);
 
--- 
-Catalin
+This pointer cast is also not safe, as an enum might have a different
+size than the 'value' variable that is not an enum. I think you need to
+change the argument type for the callback, or maybe use another
+intermediate.
+
+> +static int jtag_open(struct inode *inode, struct file *file)
+> +{
+> +       struct jtag *jtag = container_of(inode->i_cdev, struct jtag, cdev);
+> +
+> +       spin_lock(&jtag->lock);
+> +
+> +       if (jtag->is_open) {
+> +               dev_info(NULL, "jtag already opened\n");
+> +               spin_unlock(&jtag->lock);
+> +               return -EBUSY;
+> +       }
+> +
+> +       jtag->is_open = true;
+> +       file->private_data = jtag;
+> +       spin_unlock(&jtag->lock);
+> +       return 0;
+> +}
+
+Does the 'is_open' flag protect you from something that doesn't
+also happen after a 'dup()' call on the file descriptor?
+
+> + * @mode: access mode
+> + * @type: transfer type
+> + * @direction: xfer direction
+> + * @length: xfer bits len
+> + * @tdio : xfer data array
+> + * @endir: xfer end state
+> + *
+> + * Structure represents interface to Aspeed JTAG device for jtag sdr xfer
+> + * execution.
+> + */
+> +struct jtag_xfer {
+> +       __u8    mode;
+> +       __u8    type;
+> +       __u8    direction;
+> +       __u32   length;
+> +       __u8    *tdio;
+> +       __u8    endstate;
+> +};
+
+As mentioned above, the pointer in here makes it incompatible. Also,
+you should reorder the members to avoid the implied padding.
+Moving the 'endstate' before 'length' is sufficient.
+
+        Arnd
