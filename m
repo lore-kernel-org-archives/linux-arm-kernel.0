@@ -1,74 +1,72 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 15 Aug 2017 14:19:53 +0100
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.14
-Message-ID: <5992F4F9.6090301@hisilicon.com>
+Date: Tue, 15 Aug 2017 14:28:04 +0100
+Subject: [PATCH v11 0/3]add PCIe driver for Kirin PCIe
+In-Reply-To: <CAFGCpxy-Rn4aeRs6GwGu7kaXvk5ftQxSpho8D2kQ4OG5MgCA8w@mail.gmail.com>
+References: <20170619102349.50652-1-songxiaowei@hisilicon.com>
+ <20170702233657.GA13507@bhelgaas-glaptop.roam.corp.google.com>
+ <20170703104727.GB1573@arm.com>
+ <CAFGCpxx+92PSs1VaryFOXau7CjBYEP4H6wT-o=bNMwkSznjQuw@mail.gmail.com>
+ <595A4768.20404@hisilicon.com>
+ <CAFGCpxy-Rn4aeRs6GwGu7kaXvk5ftQxSpho8D2kQ4OG5MgCA8w@mail.gmail.com>
+Message-ID: <5992F6E4.10505@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+Hi Guodong,
 
-Please help to pull the following changes.
-Thanks!
+On 2017/7/4 3:03, Guodong Xu wrote:
+> On Mon, Jul 3, 2017 at 9:32 PM, Wei Xu <xuwei5@hisilicon.com> wrote:
+>> Hi Guodong,
+>>
+>> On 2017/7/3 14:04, Guodong Xu wrote:
+>>> Hi, Xu Wei
+>>>
+>>>
+>>>
+>>> On Mon, Jul 3, 2017 at 6:47 PM, Will Deacon <will.deacon@arm.com> wrote:
+>>>> On Sun, Jul 02, 2017 at 06:36:57PM -0500, Bjorn Helgaas wrote:
+>>>>> [+cc Catalin, Will, linux-arm-kernel]
+>>>>>
+>>>>> Applied patches 2 & 3 to pci/host-kirin for v4.13.
+>>>>>
+>>>>> I would like a MAINTAINERS update, too.  If you send me that, I'll
+>>>>> squash it into the driver patch.
+>>>>>
+>>>>> Catalin, Will, how do you want to handle the
+>>>>> arch/arm64/configs/defconfig change (patch 3)?  It's currently on my
+>>>>> branch, but I'm happy to drop it if another route is better.
+>>>>
+>>>> defconfig updates usually go through arm-soc, via the relevant platform
+>>>> maintainer, so it would be best to follow that route here too otherwise
+>>>> you'll probably see conflicts in -next.
+>>>>
+>>>
+>>> Is it ok for you to pick up the arch/arm64/configs/defconfig change (patch 3)?
+>>
+>> Since it is already 4.12-rc7, I will pick up it and queue for the v4.14.
+>> Are you fine about that?
+>> Thanks!
+> 
+> Sure.
 
-Best Regards,
+Applied the patch 3 into the hisilicon defconfig tree.
+
+BR,
 Wei
 
----
-
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
-
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.14
-
-for you to fetch changes up to a0a450ead7309e4852ae1e442790c710e829b0d8:
-
-  arm64: dts: hi3660: enable watchdog (2017-08-14 15:42:38 +0100)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.14
-
-- Add PCIe node for hip07
-- Add acpu_sctrl node and refine the usb tx fifo size for hi6220
-- Add cpu idle states, L2 cache, PMU, OP-TEE, reboot, pstore,
-  k3-dma and watchdog nodes for hi3660 and hikey960
-- Update mmc and bluetooth nodes for hi3660 and hikey960
-
-----------------------------------------------------------------
-Guodong Xu (4):
-      arm64: dts: hikey960: Add support for syscon-reboot-mode
-      arm64: dts: hikey960: Add pstore support
-      arm64: dts: hi3660: Reset the mmc hosts
-      arm64: dts: hikey960: change bluetooth uart max-speed to 3mbps
-
-Leo Yan (3):
-      arm64: dts: hi3660: enable idle states
-      arm64: dts: hi3660: add L2 cache topology
-      arm64: dts: hi3660: enable watchdog
-
-Shawn Guo (1):
-      arm64: dts: hi6220: improve g-tx-fifo-size setting for usb device
-
-Victor Chong (1):
-      arm64: dts: hikey960: Add optee node
-
-Wang Ruyi (1):
-      arm64: dts: hi3660: add bindings for DMA
-
-YiPing Xu (1):
-      arm64: dts: hi3660: add pmu dt node for hi3660
-
-Zhangfei Gao (1):
-      arm64: dts: hi6220: add acpu_sctrl
-
-Zhou Wang (1):
-      arm64: dts: hisi: add PCIe host controller node for hip07 SoC
-
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  37 +++++-
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 130 ++++++++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi         |   9 +-
- arch/arm64/boot/dts/hisilicon/hip07-d05.dts       |   4 +
- arch/arm64/boot/dts/hisilicon/hip07.dtsi          |  22 ++++
- 5 files changed, 200 insertions(+), 2 deletions(-)
+> 
+>>
+>> Best Regards,
+>> Wei
+>>
+>>>
+>>> -Guodong
+>>>
+>>>> Will
+>>>
+>>> .
+>>>
+>>
+> 
+> .
+> 
