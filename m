@@ -1,43 +1,63 @@
-From: jan.glauber@caviumnetworks.com (Jan Glauber)
-Date: Tue, 15 Aug 2017 11:13:38 +0200
-Subject: [PATCH v8 1/3] perf: cavium: Support memory controller PMU
- counters
-In-Reply-To: <20170808132509.GJ13355@arm.com>
-References: <20170726163049.GG28875@nazgul.tnic>
- <20170726173353.GB21705@kroah.com>
- <1a2eedea-040d-c746-eaf0-1d8085b3f2bf@gmail.com>
- <20170726200802.GA17722@kroah.com>
- <b27cda60-8bf8-47a1-15b5-bf8b3a83fc45@gmail.com>
- <20170727051157.GA4525@nazgul.tnic> <20170727090856.GB15784@hc>
- <20170727131515.GC28548@nazgul.tnic>
- <20170728231233.GA29240@kroah.com> <20170808132509.GJ13355@arm.com>
-Message-ID: <20170815091338.GA3317@hc>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Tue, 15 Aug 2017 11:33:07 +0200
+Subject: [v6 05/15] mm: don't accessed uninitialized struct pages
+In-Reply-To: <1502138329-123460-6-git-send-email-pasha.tatashin@oracle.com>
+References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
+ <1502138329-123460-6-git-send-email-pasha.tatashin@oracle.com>
+Message-ID: <20170815093306.GC29067@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 02:25:10PM +0100, Will Deacon wrote:
-> On Fri, Jul 28, 2017 at 04:12:33PM -0700, Greg KH wrote:
-> > On Thu, Jul 27, 2017 at 03:15:15PM +0200, Borislav Petkov wrote:
-> > > On Thu, Jul 27, 2017 at 11:08:56AM +0200, Jan Glauber wrote:
-> > > > OK. As fixing the firmware will take quite some time I'll go for the memory
-> > > > controller driver that starts EDAC / PMU depending on their CONFIG_.
-> > > > 
-> > > > What would be the proper location for the multiplexer?
-> > > > drivers/soc/cavium or drivers/misc?
-> > > 
-> > > Uff, no idea. Greg? You're the special drivers guy. :-)
-> > 
-> > Start out in misc/ and let's see the code to determine if it should be
-> > moved elsewhere.
+[CC Mel - the original patch was
+http://lkml.kernel.org/r/1502138329-123460-6-git-send-email-pasha.tatashin at oracle.com]
+
+On Mon 07-08-17 16:38:39, Pavel Tatashin wrote:
+> In deferred_init_memmap() where all deferred struct pages are initialized
+> we have a check like this:
 > 
-> Jan, are you ok making this change, or are you waiting for anything else
-> from us? (Mark and I are just going through the pending PMU patches and
-> we're not clear on the status of this one).
+>     if (page->flags) {
+>             VM_BUG_ON(page_zone(page) != zone);
+>             goto free_range;
+>     }
+> 
+> This way we are checking if the current deferred page has already been
+> initialized. It works, because memory for struct pages has been zeroed, and
+> the only way flags are not zero if it went through __init_single_page()
+> before.  But, once we change the current behavior and won't zero the memory
+> in memblock allocator, we cannot trust anything inside "struct page"es
+> until they are initialized. This patch fixes this.
+> 
+> This patch defines a new accessor memblock_get_reserved_pfn_range()
+> which returns successive ranges of reserved PFNs.  deferred_init_memmap()
+> calls it to determine if a PFN and its struct page has already been
+> initialized.
 
-Hi Will,
-it's my turn but I was on vacation. It was not completely trivial (well,
-to me) to get the multiplexing working with modules but I'll look at it
-again this week.
+Maybe I am missing something but how can we see reserved ranges here
+when for_each_mem_pfn_range iterates over memblock.memory?
 
-Cheers,
-Jan
+The loop is rather complex but I am wondering whether the page->flags
+check is needed at all. We shouldn't have duplicated memblocks covering
+the same pfn ranges so we cannot initialize the same range multiple
+times, right? Reserved ranges are excluded altogether so how exactly can
+we see an initialized struct page? In other words, why this simply
+doesn't work?
+---
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 90e331e4c077..987a340a5bed 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -1524,11 +1524,6 @@ static int __init deferred_init_memmap(void *data)
+ 				cond_resched();
+ 			}
+ 
+-			if (page->flags) {
+-				VM_BUG_ON(page_zone(page) != zone);
+-				goto free_range;
+-			}
+-
+ 			__init_single_page(page, pfn, zid, nid);
+ 			if (!free_base_page) {
+ 				free_base_page = page;
+-- 
+Michal Hocko
+SUSE Labs
