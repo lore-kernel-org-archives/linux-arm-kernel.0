@@ -1,21 +1,63 @@
-From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Tue, 15 Aug 2017 09:05:55 +0300
-Subject: [PATCH 05/11] ASoC: omap: make snd_soc_platform_driver const
-In-Reply-To: <1502710730-18912-6-git-send-email-bhumirks@gmail.com>
-References: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
- <1502710730-18912-6-git-send-email-bhumirks@gmail.com>
-Message-ID: <20170815060555.GA3824@bitmer.com>
+From: wenyou.yang@microchip.com (Wenyou Yang)
+Date: Tue, 15 Aug 2017 14:24:20 +0800
+Subject: [PATCH] ARM: dts: at91: sama5d2_xplained: Add charger node
+Message-ID: <20170815062420.21644-1-wenyou.yang@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 05:08:44PM +0530, Bhumika Goyal wrote:
-> Make this const as it is only passed as the 2nd argument to the
-> function devm_snd_soc_register_platform, which is of type const.
-> Done using Coccinelle.
-> 
-> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
-> ---
->  sound/soc/omap/omap-pcm.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
+From: Wenyou Yang <wenyou.yang@atmel.com>
+
+Add the charger device node as a sub-device of act8945a mfd, move
+the charger's properties in the node, and replace the
+"active-semi,irq_gpios" with the "interrupts" property to denote
+the act8945a charger's irq.
+
+Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
+---
+
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 23 +++++++++++++++--------
+ 1 file changed, 15 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index 2e2c3d1a1fa2..2a0f5f41260f 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -160,14 +160,6 @@
+ 					compatible = "active-semi,act8945a";
+ 					reg = <0x5b>;
+ 					active-semi,vsel-high;
+-					active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
+-					active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
+-					active-semi,irq_gpios = <&pioA 45 GPIO_ACTIVE_LOW>;
+-					active-semi,input-voltage-threshold-microvolt = <6600>;
+-					active-semi,precondition-timeout = <40>;
+-					active-semi,total-timeout = <3>;
+-					pinctrl-names = "default";
+-					pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
+ 					status = "okay";
+ 
+ 					regulators {
+@@ -220,6 +212,21 @@
+ 							regulator-always-on;
+ 						};
+ 					};
++
++					charger {
++						compatible = "active-semi,act8945a-charger";
++						pinctrl-names = "default";
++						pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
++						interrupt-parent = <&pioA>;
++						interrupts = <45 GPIO_ACTIVE_LOW>;
++
++						active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
++						active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
++						active-semi,input-voltage-threshold-microvolt = <6600>;
++						active-semi,precondition-timeout = <40>;
++						active-semi,total-timeout = <3>;
++						status = "okay";
++					};
+ 				};
+ 			};
+ 
+-- 
+2.13.0
