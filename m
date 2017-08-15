@@ -1,14 +1,14 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 14 Aug 2017 18:18:25 -0700
-Subject: [PATCH 3.18 16/16] pinctrl: samsung: Remove bogus irq_[un]mask from
+Date: Mon, 14 Aug 2017 18:18:40 -0700
+Subject: [PATCH 4.4 23/23] pinctrl: samsung: Remove bogus irq_[un]mask from
  resource management
-In-Reply-To: <20170815011733.115636913@linuxfoundation.org>
-References: <20170815011733.115636913@linuxfoundation.org>
-Message-ID: <20170815011734.047026450@linuxfoundation.org>
+In-Reply-To: <20170815011754.234902525@linuxfoundation.org>
+References: <20170815011754.234902525@linuxfoundation.org>
+Message-ID: <20170815011755.159468535@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.18-stable review patch.  If anyone has any objections, please let me know.
+4.4-stable review patch.  If anyone has any objections, please let me know.
 
 ------------------
 
@@ -46,7 +46,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 --- a/drivers/pinctrl/samsung/pinctrl-exynos.c
 +++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -200,8 +200,6 @@ static int exynos_irq_request_resources(
+@@ -194,8 +194,6 @@ static int exynos_irq_request_resources(
  
  	spin_unlock_irqrestore(&bank->slock, flags);
  
@@ -55,7 +55,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
  	return 0;
  }
  
-@@ -222,8 +220,6 @@ static void exynos_irq_release_resources
+@@ -216,8 +214,6 @@ static void exynos_irq_release_resources
  	shift = irqd->hwirq * bank_type->fld_width[PINCFG_TYPE_FUNC];
  	mask = (1 << bank_type->fld_width[PINCFG_TYPE_FUNC]) - 1;
  
