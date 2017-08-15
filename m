@@ -1,58 +1,49 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 15 Aug 2017 14:24:30 +0100
-Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.14
-Message-ID: <5992F60E.2060403@hisilicon.com>
+From: sr@denx.de (Stefan Roese)
+Date: Tue, 15 Aug 2017 15:31:31 +0200
+Subject: [PATCH] irqchip/armada-370-xp: Enable MSI-X support
+In-Reply-To: <20170502072600.13380-1-sr@denx.de>
+References: <20170502072600.13380-1-sr@denx.de>
+Message-ID: <80f30724-20b6-b5a7-7218-93ff3fa23177@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+Hi!
 
-Please help to pull the following changes.
-Thanks!
+On 02.05.2017 09:26, Stefan Roese wrote:
+> Armada XP does not only support MSI, but also MSI-X. This patch sets
+> the MSI_FLAG_PCI_MSIX flag in the interrupt controller driver which
+> is the only change necessary to enable MSI-X support on this SoC. As
+> the Linux PCI MSI-X infrastructure takes care of writing the data and
+> address structures into the BAR specified by the MSI-X controller.
+> 
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> ---
+>   drivers/irqchip/irq-armada-370-xp.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+> index 33982cbd8a57..b17039ed8735 100644
+> --- a/drivers/irqchip/irq-armada-370-xp.c
+> +++ b/drivers/irqchip/irq-armada-370-xp.c
+> @@ -124,7 +124,7 @@ static struct irq_chip armada_370_xp_msi_irq_chip = {
+>   
+>   static struct msi_domain_info armada_370_xp_msi_domain_info = {
+>   	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+> -		   MSI_FLAG_MULTI_PCI_MSI),
+> +		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
+>   	.chip	= &armada_370_xp_msi_irq_chip,
+>   };
+>   
+> 
 
-Best Regards,
-Wei
+Its been a while since this patch has been submitted - without any
+comments so far. What's the current status with it? Is it someones
+queue for upstreaming?
 
----
-
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
-
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-defconfig-for-4.14
-
-for you to fetch changes up to 4bd68d6038ffdcf5792fb7705bfd84caaaf39b2e:
-
-  arm64: defconfig: enable DMA driver for hi3660 (2017-08-14 16:14:16 +0100)
-
-----------------------------------------------------------------
-ARM64: hisilicon: defconfig updates for 4.14
-
-- Enable Kirin PCIe host, hi6421v530 mfd and regulator,
-  syscon reboot mode, serdev bus, OP-TEE and K3 DMA support
-  for hikey and hikey960
-
-- Enable pcie based sas controller support for hip08 SoC
-
-----------------------------------------------------------------
-Guodong Xu (3):
-      arm64: defconfig: enable support hi6421v530 PMIC
-      arm64: defconfig: enable CONFIG_SYSCON_REBOOT_MODE
-      arm64: defconfig: enable support for serial port connected device
-
-John Garry (1):
-      arm64: defconfig: enable SCSI_HISI_SAS_PCI
-
-Victor Chong (1):
-      arm64: defconfig: enable OP-TEE
-
-Wang Ruyi (1):
-      arm64: defconfig: enable DMA driver for hi3660
-
-Xiaowei Song (1):
-      arm64: defconfig: enable Kirin PCIe
-
- arch/arm64/configs/defconfig | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Thanks,
+Stefan
