@@ -1,37 +1,36 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 15 Aug 2017 09:52:24 -0700
-Subject: [GIT PULL 2/4] defconfig changes for omaps for v4.14
+Date: Tue, 15 Aug 2017 09:52:25 -0700
+Subject: [GIT PULL 3/4] non-urgent dts fixes for omaps for v4.14
 In-Reply-To: <pull-1502815785-702769>
 References: <pull-1502815785-702769>
-Message-ID: <pull-1502815785-702769-2>
+Message-ID: <pull-1502815785-702769-3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Tony Lindgren" <tony@atomide.com>
 
-The following changes since commit 9b51f04424e17051a89ab32d892ca66b2a104825:
+The following changes since commit ff570a01b1bd15cf8a87c9ea774fc9c52ea07f15:
 
-  Merge branch 'parisc-4.13-2' of git://git.kernel.org/pub/scm/linux/kernel/git/deller/parisc-linux (2017-07-05 17:41:31 -0700)
+  ARM: dts: dra71-evm: mdio: Fix impedance values (2017-07-05 00:54:52 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.14/defconfig-signed
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.14/fixes-not-urgent-dt-signed
 
-for you to fetch changes up to 6a60a2aca111fd71c5229dbcb3de8ecf0e0e9a12:
+for you to fetch changes up to 83f51f06d132c5430b4ac5065ce3594fc4c99aaa:
 
-  ARM: omap2plus_defconfig: Enable LP87565 (2017-08-14 10:33:49 -0700)
-
-----------------------------------------------------------------
-Defconfig updates for omaps for v4.14 to enable DP83867
-phy driver on dra72x and dra71x evm, and LP87565 that is
-on dra76-evm.
+  ARM: dts: dra72-evm-revc: workaround incorrect DP83867 RX_CTRL pin strap (2017-08-10 10:32:17 -0700)
 
 ----------------------------------------------------------------
-Lokesh Vutla (1):
-      ARM: omap2plus_defconfig: Enable LP87565
+Two non-urgent dts fixes for dra7 Ethernet quirk. These are sent
+separately from the rest of the dts changes to avoid merge conflicts
+as these depend on earlier fixes sent during v4.13-rc cycle.
 
-Sekhar Nori (1):
-      ARM: omap2plus_defconfig: enable DP83867 phy driver
+----------------------------------------------------------------
+Sekhar Nori (2):
+      ARM: dts: dra71-evm: workaround incorrect DP83867 RX_CTRL pin strap
+      ARM: dts: dra72-evm-revc: workaround incorrect DP83867 RX_CTRL pin strap
 
- arch/arm/configs/omap2plus_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/dra71-evm.dts      | 2 ++
+ arch/arm/boot/dts/dra72-evm-revc.dts | 2 ++
+ 2 files changed, 4 insertions(+)
