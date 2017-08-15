@@ -1,229 +1,232 @@
 From: weiyi.lu@mediatek.com (weiyi.lu at mediatek.com)
-Date: Tue, 15 Aug 2017 14:42:42 +0800
-Subject: [PATCH v1 1/9] dt-bindings: ARM: Mediatek: Document bindings for
- MT2712
+Date: Tue, 15 Aug 2017 14:42:47 +0800
+Subject: [PATCH v1 6/9] soc: mediatek: add bus protection extend API
 In-Reply-To: <1502779370-30150-1-git-send-email-weiyi.lu@mediatek.com>
 References: <1502779370-30150-1-git-send-email-weiyi.lu@mediatek.com>
-Message-ID: <1502779370-30150-2-git-send-email-weiyi.lu@mediatek.com>
+Message-ID: <1502779370-30150-7-git-send-email-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Weiyi Lu <weiyi.lu@mediatek.com>
 
-This patch adds the binding documentation for apmixedsys, bdpsys,
-imgsys, imgsys, infracfg, mcucfg, mfgcfg, mmsys, pericfg, topckgen,
-vdecsys and vencsys for Mediatek MT2712.
+MT2712 add "set/clear" bus control register to each control register set
+instead of providing only one "enable" control register, we could avoid
+the read-modify-write racing by using extend API with such new design.
+Also there exists the second bus control register set, we could not access
+this setting via original API rather than the extend API.
+By improving the mtk-infracfg bus protection implementation to
+support set/clear bus protection control method and second
+register set while power on/off scpsys.
 
 Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
 ---
- .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |  1 +
- .../bindings/arm/mediatek/mediatek,bdpsys.txt      |  1 +
- .../bindings/arm/mediatek/mediatek,imgsys.txt      |  1 +
- .../bindings/arm/mediatek/mediatek,infracfg.txt    |  1 +
- .../bindings/arm/mediatek/mediatek,jpgdecsys.txt   | 22 ++++++++++++++++++++++
- .../bindings/arm/mediatek/mediatek,mcucfg.txt      | 22 ++++++++++++++++++++++
- .../bindings/arm/mediatek/mediatek,mfgcfg.txt      | 22 ++++++++++++++++++++++
- .../bindings/arm/mediatek/mediatek,mmsys.txt       |  1 +
- .../bindings/arm/mediatek/mediatek,pericfg.txt     |  1 +
- .../bindings/arm/mediatek/mediatek,topckgen.txt    |  1 +
- .../bindings/arm/mediatek/mediatek,vdecsys.txt     |  1 +
- .../bindings/arm/mediatek/mediatek,vencsys.txt     |  1 +
- 12 files changed, 75 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,jpgdecsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt
+ drivers/soc/mediatek/mtk-infracfg.c   | 90 +++++++++++++++++++++++++++++++++--
+ drivers/soc/mediatek/mtk-scpsys.c     | 36 ++++++++++++--
+ include/linux/soc/mediatek/infracfg.h | 14 +++++-
+ 3 files changed, 132 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-index cd977db..19fc116 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,apmixedsys.txt
-@@ -7,6 +7,7 @@ Required Properties:
+diff --git a/drivers/soc/mediatek/mtk-infracfg.c b/drivers/soc/mediatek/mtk-infracfg.c
+index dba3055..63898e4 100644
+--- a/drivers/soc/mediatek/mtk-infracfg.c
++++ b/drivers/soc/mediatek/mtk-infracfg.c
+@@ -17,9 +17,6 @@
+ #include <linux/soc/mediatek/infracfg.h>
+ #include <asm/processor.h>
  
- - compatible: Should be one of:
- 	- "mediatek,mt2701-apmixedsys"
-+	- "mediatek,mt2712-apmixedsys", "syscon"
- 	- "mediatek,mt6797-apmixedsys"
- 	- "mediatek,mt8135-apmixedsys"
- 	- "mediatek,mt8173-apmixedsys"
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
-index 4137196..4010e37 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
-@@ -7,6 +7,7 @@ Required Properties:
+-#define INFRA_TOPAXI_PROTECTEN		0x0220
+-#define INFRA_TOPAXI_PROTECTSTA1	0x0228
+-
+ /**
+  * mtk_infracfg_set_bus_protection - enable bus protection
+  * @regmap: The infracfg regmap
+@@ -89,3 +86,90 @@ int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask)
  
- - compatible: Should be:
- 	- "mediatek,mt2701-bdpsys", "syscon"
-+	- "mediatek,mt2712-bdpsys", "syscon"
- - #clock-cells: Must be 1
+ 	return 0;
+ }
++
++/**
++ * mtk_infracfg_set_bus_protection_ext - enable bus protection
++ * @regmap: The infracfg regmap
++ * @mask: The mask containing the protection bits to be enabled.
++ * @reg_set: The register used to enable protection bits.
++ * @reg_sta: The register used to check the protection bits are enabled.
++ * @reg_en: The register used to enable protection bits when there doesn't
++ *          exist reg_set.
++ *
++ * This function enables the bus protection bits for disabled power
++ * domains so that the system does not hang when some unit accesses the
++ * bus while in power down.
++ */
++int mtk_infracfg_set_bus_protection_ext(struct regmap *infracfg, u32 mask,
++		u32 reg_set, u32 reg_sta, u32 reg_en)
++{
++	unsigned long expired;
++	u32 val;
++	int ret;
++
++	if (reg_set)
++		regmap_write(infracfg, reg_set, mask);
++	else
++		regmap_update_bits(infracfg, reg_en, mask, mask);
++
++	expired = jiffies + HZ;
++
++	while (1) {
++		ret = regmap_read(infracfg, reg_sta, &val);
++		if (ret)
++			return ret;
++
++		if ((val & mask) == mask)
++			break;
++
++		cpu_relax();
++		if (time_after(jiffies, expired))
++			return -EIO;
++	}
++
++	return 0;
++}
++
++/**
++ * mtk_infracfg_clear_bus_protection_ext - disable bus protection
++ * @regmap: The infracfg regmap
++ * @mask: The mask containing the protection bits to be disabled.
++ * @reg_clr: The register used to disable protection bits.
++ * @reg_sta: The register used to check the protection bits are disabled.
++ * @reg_en: The register used to disable protection bits when there doesn't
++ *          exist reg_clr.
++ *
++ * This function disables the bus protection bits previously enabled with
++ * mtk_infracfg_set_bus_protection.
++ */
++
++int mtk_infracfg_clear_bus_protection_ext(struct regmap *infracfg, u32 mask,
++		u32 reg_clr, u32 reg_sta, u32 reg_en)
++{
++	unsigned long expired;
++	int ret;
++
++	if (reg_clr)
++		regmap_write(infracfg, reg_clr, mask);
++	else
++		regmap_update_bits(infracfg, reg_en, mask, 0);
++
++	expired = jiffies + HZ;
++
++	while (1) {
++		u32 val;
++
++		ret = regmap_read(infracfg, reg_sta, &val);
++		if (ret)
++			return ret;
++
++		if (!(val & mask))
++			break;
++
++		cpu_relax();
++		if (time_after(jiffies, expired))
++			return -EIO;
++	}
++
++	return 0;
++}
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index ceb2cc4..b181ef2 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -89,6 +89,13 @@ enum clk_id {
  
- The bdpsys controller uses the common clk binding from
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-index 047b11a..868bd51 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
-@@ -7,6 +7,7 @@ Required Properties:
+ #define MAX_CLKS	2
  
- - compatible: Should be one of:
- 	- "mediatek,mt2701-imgsys", "syscon"
-+	- "mediatek,mt2712-imgsys", "syscon"
- 	- "mediatek,mt6797-imgsys", "syscon"
- 	- "mediatek,mt8173-imgsys", "syscon"
- - #clock-cells: Must be 1
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-index 58d58e2..a3430cd 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,infracfg.txt
-@@ -8,6 +8,7 @@ Required Properties:
- 
- - compatible: Should be one of:
- 	- "mediatek,mt2701-infracfg", "syscon"
-+	- "mediatek,mt2712-infracfg", "syscon"
- 	- "mediatek,mt6797-infracfg", "syscon"
- 	- "mediatek,mt8135-infracfg", "syscon"
- 	- "mediatek,mt8173-infracfg", "syscon"
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,jpgdecsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,jpgdecsys.txt
-new file mode 100644
-index 0000000..2df799c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,jpgdecsys.txt
-@@ -0,0 +1,22 @@
-+Mediatek jpgdecsys controller
-+============================
-+
-+The Mediatek jpgdecsys controller provides various clocks to the system.
-+
-+Required Properties:
-+
-+- compatible: Should be:
-+	- "mediatek,mt2712-jpgdecsys", "syscon"
-+- #clock-cells: Must be 1
-+
-+The jpgdecsys controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-+
-+Example:
-+
-+jpgdecsys: syscon at 19000000 {
-+	compatible = "mediatek,mt2712-jpgdecsys", "syscon";
-+	reg = <0 0x19000000 0 0x1000>;
-+	#clock-cells = <1>;
++struct bus_prot_ext {
++	u32 set_ofs;
++	u32 clr_ofs;
++	u32 en_ofs;
++	u32 sta_ofs;
 +};
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt
-new file mode 100644
-index 0000000..b8fb03f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt
-@@ -0,0 +1,22 @@
-+Mediatek mcucfg controller
-+============================
 +
-+The Mediatek mcucfg controller provides various clocks to the system.
-+
-+Required Properties:
-+
-+- compatible: Should be one of:
-+	- "mediatek,mt2712-mcucfg", "syscon"
-+- #clock-cells: Must be 1
-+
-+The mcucfg controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-+
-+Example:
-+
-+mcucfg: syscon at 10220000 {
-+	compatible = "mediatek,mt2712-mcucfg", "syscon";
-+	reg = <0 0x10220000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt
-new file mode 100644
-index 0000000..859e67b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt
-@@ -0,0 +1,22 @@
-+Mediatek mfgcfg controller
-+============================
-+
-+The Mediatek mfgcfg controller provides various clocks to the system.
-+
-+Required Properties:
-+
-+- compatible: Should be one of:
-+	- "mediatek,mt2712-mfgcfg", "syscon"
-+- #clock-cells: Must be 1
-+
-+The mfgcfg controller uses the common clk binding from
-+Documentation/devicetree/bindings/clock/clock-bindings.txt
-+The available clocks are defined in dt-bindings/clock/mt*-clk.h.
-+
-+Example:
-+
-+mfgcfg: syscon at 13000000 {
-+	compatible = "mediatek,mt2712-mfgcfg", "syscon";
-+	reg = <0 0x13000000 0 0x1000>;
-+	#clock-cells = <1>;
-+};
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-index 70529e0..4eb8bbe 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-@@ -7,6 +7,7 @@ Required Properties:
+ struct scp_domain_data {
+ 	const char *name;
+ 	u32 sta_mask;
+@@ -96,6 +103,7 @@ struct scp_domain_data {
+ 	u32 sram_pdn_bits;
+ 	u32 sram_pdn_ack_bits;
+ 	u32 bus_prot_mask;
++	struct bus_prot_ext bp_ext;
+ 	enum clk_id clk_id[MAX_CLKS];
+ 	bool active_wakeup;
+ };
+@@ -228,8 +236,18 @@ static int scpsys_power_on(struct generic_pm_domain *genpd)
+ 	}
  
- - compatible: Should be one of:
- 	- "mediatek,mt2701-mmsys", "syscon"
-+	- "mediatek,mt2712-mmsys", "syscon"
- 	- "mediatek,mt6797-mmsys", "syscon"
- 	- "mediatek,mt8173-mmsys", "syscon"
- - #clock-cells: Must be 1
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
-index e494366..d9f092e 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,pericfg.txt
-@@ -8,6 +8,7 @@ Required Properties:
+ 	if (scpd->data->bus_prot_mask) {
+-		ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
+-				scpd->data->bus_prot_mask);
++		if (((scpd->data->bp_ext.set_ofs && scpd->data->bp_ext.clr_ofs)
++			|| scpd->data->bp_ext.en_ofs)
++			&& scpd->data->bp_ext.sta_ofs)
++			ret = mtk_infracfg_clear_bus_protection_ext(
++					scp->infracfg,
++					scpd->data->bus_prot_mask,
++					scpd->data->bp_ext.clr_ofs,
++					scpd->data->bp_ext.sta_ofs,
++					scpd->data->bp_ext.en_ofs);
++		else
++			ret = mtk_infracfg_clear_bus_protection(scp->infracfg,
++					scpd->data->bus_prot_mask);
+ 		if (ret)
+ 			goto err_pwr_ack;
+ 	}
+@@ -263,8 +281,18 @@ static int scpsys_power_off(struct generic_pm_domain *genpd)
+ 	int i;
  
- - compatible: Should be one of:
- 	- "mediatek,mt2701-pericfg", "syscon"
-+	- "mediatek,mt2712-pericfg", "syscon"
- 	- "mediatek,mt8135-pericfg", "syscon"
- 	- "mediatek,mt8173-pericfg", "syscon"
- - #clock-cells: Must be 1
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-index ec93ecb..2024fc9 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,topckgen.txt
-@@ -7,6 +7,7 @@ Required Properties:
+ 	if (scpd->data->bus_prot_mask) {
+-		ret = mtk_infracfg_set_bus_protection(scp->infracfg,
+-				scpd->data->bus_prot_mask);
++		if (((scpd->data->bp_ext.set_ofs && scpd->data->bp_ext.clr_ofs)
++			|| scpd->data->bp_ext.en_ofs)
++			&& scpd->data->bp_ext.sta_ofs)
++			ret = mtk_infracfg_set_bus_protection_ext(
++					scp->infracfg,
++					scpd->data->bus_prot_mask,
++					scpd->data->bp_ext.set_ofs,
++					scpd->data->bp_ext.sta_ofs,
++					scpd->data->bp_ext.en_ofs);
++		else
++			ret = mtk_infracfg_set_bus_protection(scp->infracfg,
++					scpd->data->bus_prot_mask);
+ 		if (ret)
+ 			goto out;
+ 	}
+diff --git a/include/linux/soc/mediatek/infracfg.h b/include/linux/soc/mediatek/infracfg.h
+index a5714e9..d3fbb45 100644
+--- a/include/linux/soc/mediatek/infracfg.h
++++ b/include/linux/soc/mediatek/infracfg.h
+@@ -1,6 +1,15 @@
+ #ifndef __SOC_MEDIATEK_INFRACFG_H
+ #define __SOC_MEDIATEK_INFRACFG_H
  
- - compatible: Should be one of:
- 	- "mediatek,mt2701-topckgen"
-+	- "mediatek,mt2712-topckgen", "syscon"
- 	- "mediatek,mt6797-topckgen"
- 	- "mediatek,mt8135-topckgen"
- 	- "mediatek,mt8173-topckgen"
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-index d150104..ea40d05 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
-@@ -7,6 +7,7 @@ Required Properties:
++#define INFRA_TOPAXI_PROTECTEN		0x0220
++#define INFRA_TOPAXI_PROTECTSTA1	0x0228
++#define INFRA_TOPAXI_PROTECTEN1		0x0250
++#define INFRA_TOPAXI_PROTECTSTA3	0x0258
++#define INFRA_TOPAXI_PROTECTEN_SET	0x0260
++#define INFRA_TOPAXI_PROTECTEN_CLR	0x0264
++#define INFRA_TOPAXI_PROTECTEN1_SET	0x0270
++#define INFRA_TOPAXI_PROTECTEN1_CLR	0x0274
++
+ #define MT8173_TOP_AXI_PROT_EN_MCI_M2		BIT(0)
+ #define MT8173_TOP_AXI_PROT_EN_MM_M0		BIT(1)
+ #define MT8173_TOP_AXI_PROT_EN_MM_M1		BIT(2)
+@@ -22,5 +31,8 @@
  
- - compatible: Should be one of:
- 	- "mediatek,mt2701-vdecsys", "syscon"
-+	- "mediatek,mt2712-vdecsys", "syscon"
- 	- "mediatek,mt6797-vdecsys", "syscon"
- 	- "mediatek,mt8173-vdecsys", "syscon"
- - #clock-cells: Must be 1
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
-index 8a93be6..8515453 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
-@@ -6,6 +6,7 @@ The Mediatek vencsys controller provides various clocks to the system.
- Required Properties:
- 
- - compatible: Should be one of:
-+	- "mediatek,mt2712-vencsys", "syscon"
- 	- "mediatek,mt6797-vencsys", "syscon"
- 	- "mediatek,mt8173-vencsys", "syscon"
- - #clock-cells: Must be 1
+ int mtk_infracfg_set_bus_protection(struct regmap *infracfg, u32 mask);
+ int mtk_infracfg_clear_bus_protection(struct regmap *infracfg, u32 mask);
+-
++int mtk_infracfg_set_bus_protection_ext(struct regmap *infracfg, u32 mask,
++		u32 reg_set, u32 reg_sta, u32 reg_en);
++int mtk_infracfg_clear_bus_protection_ext(struct regmap *infracfg, u32 mask,
++		u32 reg_clr, u32 reg_sta, u32 reg_en);
+ #endif /* __SOC_MEDIATEK_INFRACFG_H */
 -- 
 1.9.1
