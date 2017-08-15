@@ -1,182 +1,469 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Aug 2017 13:50:47 +0100
-Subject: [PATCHv2 12/14] arm64: add basic VMAP_STACK support
-In-Reply-To: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
-References: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1502801449-29246-13-git-send-email-mark.rutland@arm.com>
+Date: Tue, 15 Aug 2017 14:02:12 +0100
+Subject: [PATCH v4 5/6] perf: hisi: Add support for HiSilicon SoC DDRC
+ PMU driver
+In-Reply-To: <1500984642-204676-6-git-send-email-zhangshaokun@hisilicon.com>
+References: <1500984642-204676-1-git-send-email-zhangshaokun@hisilicon.com>
+ <1500984642-204676-6-git-send-email-zhangshaokun@hisilicon.com>
+Message-ID: <20170815130211.GG6090@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables arm64 to be built with vmap'd task and IRQ stacks.
+On Tue, Jul 25, 2017 at 08:10:41PM +0800, Shaokun Zhang wrote:
+> This patch adds support for DDRC PMU driver in HiSilicon SoC chip, Each
+> DDRC has own control, counter and interrupt registers and is an separate
+> PMU. For each DDRC PMU, it has 8-fixed-purpose counters which have been
+> mapped to 8-events by hardware, it assumes that counter index is equal
+> to event code (0 - 7) in DDRC PMU driver. Interrupt is supported to
+> handle counter (32-bits) overflow.
+> 
+> Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> Signed-off-by: Anurup M <anurup.m@huawei.com>
+> ---
+>  drivers/perf/hisilicon/Makefile               |   2 +-
+>  drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c | 420 ++++++++++++++++++++++++++
+>  2 files changed, 421 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c
 
-As vmap'd stacks are mapped at page granularity, stacks must be a multiple of
-PAGE_SIZE. This means that a 64K page kernel must use stacks of at least 64K in
-size.
+My comments for the HHA PMU driver all apply here, too.
 
-To minimize the increase in Image size, IRQ stacks are dynamically allocated at
-boot time, rather than embedding the boot CPU's IRQ stack in the kernel image.
+Thanks,
+Mark.
 
-This patch was co-authored by Ard Biesheuvel and Mark Rutland.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Laura Abbott <labbott@redhat.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/Kconfig              |  1 +
- arch/arm64/include/asm/efi.h    |  7 ++++++-
- arch/arm64/include/asm/memory.h | 23 ++++++++++++++++++++++-
- arch/arm64/kernel/irq.c         | 30 ++++++++++++++++++++++++++++--
- arch/arm64/kernel/vmlinux.lds.S |  2 +-
- 5 files changed, 58 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index dfd9086..d66f9db 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -75,6 +75,7 @@ config ARM64
- 	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
-+	select HAVE_ARCH_VMAP_STACK
- 	select HAVE_ARM_SMCCC
- 	select HAVE_EBPF_JIT
- 	select HAVE_C_RECORDMCOUNT
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index 0e8cc3b..2b1e5de 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -49,7 +49,12 @@
-  */
- #define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
- 
--#define EFI_KIMG_ALIGN	SEGMENT_ALIGN
-+/*
-+ * In some configurations (e.g. VMAP_STACK && 64K pages), stacks built into the
-+ * kernel need greater alignment than we require the segments to be padded to.
-+ */
-+#define EFI_KIMG_ALIGN	\
-+	(SEGMENT_ALIGN > THREAD_ALIGN ? SEGMENT_ALIGN : THREAD_ALIGN)
- 
- /* on arm64, the FDT may be located anywhere in system RAM */
- static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 7fa6ad4..c5cd2c5 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -102,7 +102,17 @@
- #define KASAN_SHADOW_SIZE	(0)
- #endif
- 
--#define THREAD_SHIFT		14
-+#define MIN_THREAD_SHIFT	14
-+
-+/*
-+ * VMAP'd stacks are allocated at page granularity, so we must ensure that such
-+ * stacks are a multiple of page size.
-+ */
-+#if defined(CONFIG_VMAP_STACK) && (MIN_THREAD_SHIFT < PAGE_SHIFT)
-+#define THREAD_SHIFT		PAGE_SHIFT
-+#else
-+#define THREAD_SHIFT		MIN_THREAD_SHIFT
-+#endif
- 
- #if THREAD_SHIFT >= PAGE_SHIFT
- #define THREAD_SIZE_ORDER	(THREAD_SHIFT - PAGE_SHIFT)
-@@ -110,6 +120,17 @@
- 
- #define THREAD_SIZE		(UL(1) << THREAD_SHIFT)
- 
-+/*
-+ * By aligning VMAP'd stacks to 2 * THREAD_SIZE, we can detect overflow by
-+ * checking sp & (1 << THREAD_SHIFT), which we can do cheaply in the entry
-+ * assembly.
-+ */
-+#ifdef CONFIG_VMAP_STACK
-+#define THREAD_ALIGN		(2 * THREAD_SIZE)
-+#else
-+#define THREAD_ALIGN		THREAD_SIZE
-+#endif
-+
- #define IRQ_STACK_SIZE		THREAD_SIZE
- 
- /*
-diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-index 5141282..713561e 100644
---- a/arch/arm64/kernel/irq.c
-+++ b/arch/arm64/kernel/irq.c
-@@ -23,15 +23,15 @@
- 
- #include <linux/kernel_stat.h>
- #include <linux/irq.h>
-+#include <linux/memory.h>
- #include <linux/smp.h>
- #include <linux/init.h>
- #include <linux/irqchip.h>
- #include <linux/seq_file.h>
-+#include <linux/vmalloc.h>
- 
- unsigned long irq_err_count;
- 
--/* irq stack only needs to be 16 byte aligned - not IRQ_STACK_SIZE aligned. */
--DEFINE_PER_CPU(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack) __aligned(16);
- DEFINE_PER_CPU(unsigned long *, irq_stack_ptr);
- 
- int arch_show_interrupts(struct seq_file *p, int prec)
-@@ -51,6 +51,31 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
- 	handle_arch_irq = handle_irq;
- }
- 
-+#ifdef CONFIG_VMAP_STACK
-+static void init_irq_stacks(void)
-+{
-+	int cpu;
-+	unsigned long *p;
-+
-+	for_each_possible_cpu(cpu) {
-+		/*
-+		* To ensure that VMAP'd stack overflow detection works
-+		* correctly, the IRQ stacks need to have the same
-+		* alignment as other stacks.
-+		*/
-+		p = __vmalloc_node_range(IRQ_STACK_SIZE, THREAD_ALIGN,
-+					 VMALLOC_START, VMALLOC_END,
-+					 THREADINFO_GFP, PAGE_KERNEL,
-+					 0, cpu_to_node(cpu),
-+					 __builtin_return_address(0));
-+
-+		per_cpu(irq_stack_ptr, cpu) = p;
-+	}
-+}
-+#else
-+/* irq stack only needs to be 16 byte aligned - not IRQ_STACK_SIZE aligned. */
-+DEFINE_PER_CPU_ALIGNED(unsigned long [IRQ_STACK_SIZE/sizeof(long)], irq_stack);
-+
- static void init_irq_stacks(void)
- {
- 	int cpu;
-@@ -58,6 +83,7 @@ static void init_irq_stacks(void)
- 	for_each_possible_cpu(cpu)
- 		per_cpu(irq_stack_ptr, cpu) = per_cpu(irq_stack, cpu);
- }
-+#endif
- 
- void __init init_IRQ(void)
- {
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 7156538..fe56c26 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -176,7 +176,7 @@ SECTIONS
- 
- 	_data = .;
- 	_sdata = .;
--	RW_DATA_SECTION(L1_CACHE_BYTES, PAGE_SIZE, THREAD_SIZE)
-+	RW_DATA_SECTION(L1_CACHE_BYTES, PAGE_SIZE, THREAD_ALIGN)
- 
- 	/*
- 	 * Data written with the MMU off but read with the MMU on requires
--- 
-1.9.1
+> diff --git a/drivers/perf/hisilicon/Makefile b/drivers/perf/hisilicon/Makefile
+> index a72afe8..2621d51 100644
+> --- a/drivers/perf/hisilicon/Makefile
+> +++ b/drivers/perf/hisilicon/Makefile
+> @@ -1 +1 @@
+> -obj-$(CONFIG_HISI_PMU) += hisi_uncore_pmu.o hisi_uncore_l3c_pmu.o hisi_uncore_hha_pmu.o
+> +obj-$(CONFIG_HISI_PMU) += hisi_uncore_pmu.o hisi_uncore_l3c_pmu.o hisi_uncore_hha_pmu.o hisi_uncore_ddrc_pmu.o
+> diff --git a/drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c b/drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c
+> new file mode 100644
+> index 0000000..e178a09
+> --- /dev/null
+> +++ b/drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c
+> @@ -0,0 +1,420 @@
+> +/*
+> + * HiSilicon SoC DDRC uncore Hardware event counters support
+> + *
+> + * Copyright (C) 2017 Hisilicon Limited
+> + * Author: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> + *         Anurup M <anurup.m@huawei.com>
+> + *
+> + * This code is based on the uncore PMUs like arm-cci and arm-ccn.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#include <linux/acpi.h>
+> +#include <linux/bug.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/list.h>
+> +#include <linux/platform_device.h>
+> +#include "hisi_uncore_pmu.h"
+> +
+> +/* DDRC register definition */
+> +#define DDRC_PERF_CTRL		0x010
+> +#define DDRC_FLUX_WR		0x380
+> +#define DDRC_FLUX_RD		0x384
+> +#define DDRC_FLUX_WCMD          0x388
+> +#define DDRC_FLUX_RCMD          0x38c
+> +#define DDRC_PRE_CMD            0x3c0
+> +#define DDRC_ACT_CMD            0x3c4
+> +#define DDRC_BNK_CHG            0x3c8
+> +#define DDRC_RNK_CHG            0x3cc
+> +#define DDRC_EVENT_CTRL         0x6C0
+> +#define DDRC_INT_MASK		0x6c8
+> +#define DDRC_INT_STATUS		0x6cc
+> +#define DDRC_INT_CLEAR		0x6d0
+> +
+> +/* DDRC supports 8-events and counter is fixed-purpose */
+> +#define DDRC_NR_COUNTERS	0x8
+> +#define DDRC_NR_EVENTS		DDRC_NR_COUNTERS
+> +
+> +#define DDRC_PERF_CTRL_EN	0x2
+> +
+> +/*
+> + * For DDRC PMU, there are eight-events and every event has been mapped
+> + * to fixed-purpose counters which register offset is not consistent.
+> + * Therefore there is no write event type and we assume that event
+> + * code (0 to 7) is equal to counter index in PMU driver.
+> + */
+> +#define GET_DDRC_EVENTID(hwc)	(hwc->config_base & 0x7)
+> +
+> +static const u32 ddrc_reg_off[] = {
+> +	DDRC_FLUX_WR, DDRC_FLUX_RD, DDRC_FLUX_WCMD, DDRC_FLUX_RCMD,
+> +	DDRC_PRE_CMD, DDRC_ACT_CMD, DDRC_BNK_CHG, DDRC_RNK_CHG
+> +};
+> +
+> +/*
+> + * Select the counter register offset using the counter index.
+> + * In DDRC there are no programmable counter, the count
+> + * is readed form the statistics counter register itself.
+> + */
+> +static u32 get_counter_reg_off(int cntr_idx)
+> +{
+> +	return ddrc_reg_off[cntr_idx];
+> +}
+> +
+> +static u64 hisi_ddrc_pmu_read_counter(struct hisi_pmu *ddrc_pmu,
+> +				      struct hw_perf_event *hwc)
+> +{
+> +	/* Use event code as counter index */
+> +	u32 idx = GET_DDRC_EVENTID(hwc);
+> +	u32 reg;
+> +
+> +	if (!hisi_uncore_pmu_counter_valid(ddrc_pmu, idx)) {
+> +		dev_err(ddrc_pmu->dev, "Unsupported event index:%d!\n", idx);
+> +		return 0;
+> +	}
+> +
+> +	reg = get_counter_reg_off(idx);
+> +
+> +	return readl(ddrc_pmu->base + reg);
+> +}
+> +
+> +static void hisi_ddrc_pmu_write_counter(struct hisi_pmu *ddrc_pmu,
+> +					struct hw_perf_event *hwc, u64 val)
+> +{
+> +	u32 idx = GET_DDRC_EVENTID(hwc);
+> +	u32 reg;
+> +
+> +	if (!hisi_uncore_pmu_counter_valid(ddrc_pmu, idx)) {
+> +		dev_err(ddrc_pmu->dev, "Unsupported event index:%d!\n", idx);
+> +		return;
+> +	}
+> +
+> +	reg = get_counter_reg_off(idx);
+> +	writel((u32)val, ddrc_pmu->base + reg);
+> +}
+> +
+> +static void hisi_ddrc_pmu_start_counters(struct hisi_pmu *ddrc_pmu)
+> +{
+> +	u32 val;
+> +
+> +	/* Set perf_enable in DDRC_PERF_CTRL to start event counting */
+> +	val = readl(ddrc_pmu->base + DDRC_PERF_CTRL);
+> +	val |= DDRC_PERF_CTRL_EN;
+> +	writel(val, ddrc_pmu->base + DDRC_PERF_CTRL);
+> +}
+> +
+> +static void hisi_ddrc_pmu_stop_counters(struct hisi_pmu *ddrc_pmu)
+> +{
+> +	u32 val;
+> +
+> +	/* Clear perf_enable in DDRC_PERF_CTRL to stop event counting */
+> +	val = readl(ddrc_pmu->base + DDRC_PERF_CTRL);
+> +	val &= ~DDRC_PERF_CTRL_EN;
+> +	writel(val, ddrc_pmu->base + DDRC_PERF_CTRL);
+> +}
+> +
+> +static void hisi_ddrc_pmu_enable_counter(struct hisi_pmu *ddrc_pmu,
+> +					 struct hw_perf_event *hwc)
+> +{
+> +	u32 val;
+> +
+> +	/* Set counter index(event code) in DDRC_EVENT_CTRL register */
+> +	val = readl(ddrc_pmu->base + DDRC_EVENT_CTRL);
+> +	val |= (1 << GET_DDRC_EVENTID(hwc));
+> +	writel(val, ddrc_pmu->base + DDRC_EVENT_CTRL);
+> +}
+> +
+> +static void hisi_ddrc_pmu_disable_counter(struct hisi_pmu *ddrc_pmu,
+> +					  struct hw_perf_event *hwc)
+> +{
+> +	u32 val;
+> +
+> +	/* Clear counter index(event code) in DDRC_EVENT_CTRL register */
+> +	val = readl(ddrc_pmu->base + DDRC_EVENT_CTRL);
+> +	val &= ~(1 << GET_DDRC_EVENTID(hwc));
+> +	writel(val, ddrc_pmu->base + DDRC_EVENT_CTRL);
+> +}
+> +
+> +static int hisi_ddrc_pmu_get_event_idx(struct perf_event *event)
+> +{
+> +	struct hisi_pmu *ddrc_pmu = to_hisi_pmu(event->pmu);
+> +	unsigned long *used_mask = ddrc_pmu->pmu_events.used_mask;
+> +	struct hw_perf_event *hwc = &event->hw;
+> +	/* For DDRC PMU, we use event code as counter index */
+> +	int idx = GET_DDRC_EVENTID(hwc);
+> +
+> +	if (test_bit(idx, used_mask))
+> +		return -EAGAIN;
+> +
+> +	set_bit(idx, used_mask);
+> +
+> +	return idx;
+> +}
+> +
+> +static void hisi_ddrc_pmu_enable_counter_int(struct hisi_pmu *ddrc_pmu,
+> +					     struct hw_perf_event *hwc)
+> +{
+> +	u32 val;
+> +
+> +	/* Write 0 to enable interrupt */
+> +	val = readl(ddrc_pmu->base + DDRC_INT_MASK);
+> +	val &= ~(1 << GET_DDRC_EVENTID(hwc));
+> +	writel(val, ddrc_pmu->base + DDRC_INT_MASK);
+> +}
+> +
+> +static void hisi_ddrc_pmu_disable_counter_int(struct hisi_pmu *ddrc_pmu,
+> +					      struct hw_perf_event *hwc)
+> +{
+> +	u32 val;
+> +
+> +	/* Write 1 to mask interrupt */
+> +	val = readl(ddrc_pmu->base + DDRC_INT_MASK);
+> +	val |= (1 << GET_DDRC_EVENTID(hwc));
+> +	writel(val, ddrc_pmu->base + DDRC_INT_MASK);
+> +}
+> +
+> +static irqreturn_t hisi_ddrc_pmu_isr(int irq, void *dev_id)
+> +{
+> +	struct hisi_pmu *ddrc_pmu = dev_id;
+> +	struct perf_event *event;
+> +	unsigned long overflown;
+> +	u32 status;
+> +	int idx;
+> +
+> +	/* Read the DDRC_INT_STATUS register */
+> +	status = readl(ddrc_pmu->base + DDRC_INT_STATUS);
+> +	if (!status)
+> +		return IRQ_NONE;
+> +	overflown = status;
+> +
+> +	/*
+> +	 * Find the counter index which overflowed if the bit was set
+> +	 * and handle it
+> +	 */
+> +	for_each_set_bit(idx, &overflown, DDRC_NR_COUNTERS) {
+> +		/* Write 1 to clear the IRQ status flag */
+> +		writel((1 << idx), ddrc_pmu->base + DDRC_INT_CLEAR);
+> +
+> +		/* Get the corresponding event struct */
+> +		event = ddrc_pmu->pmu_events.hw_events[idx];
+> +		if (!event)
+> +			continue;
+> +
+> +		hisi_uncore_pmu_event_update(event);
+> +		hisi_uncore_pmu_set_event_period(event);
+> +	}
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static int hisi_ddrc_pmu_init_irq(struct hisi_pmu *ddrc_pmu,
+> +				  struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	int irq, ret;
+> +
+> +	/* Read and init IRQ */
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq < 0) {
+> +		dev_err(dev, "irq init: fail map DDRC overflow interrupt\n");
+> +		return irq;
+> +	}
+> +
+> +	ret = devm_request_irq(dev, irq, hisi_ddrc_pmu_isr,
+> +			       IRQF_NOBALANCING | IRQF_NO_THREAD,
+> +			       dev_name(dev), ddrc_pmu);
+> +	if (ret < 0) {
+> +		dev_err(dev, "Fail to request IRQ:%d ret:%d\n", irq, ret);
+> +		return ret;
+> +	}
+> +
+> +	/* Overflow interrupt also should use the same CPU */
+> +	WARN_ON(irq_set_affinity(irq, &ddrc_pmu->cpus));
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct acpi_device_id hisi_ddrc_pmu_acpi_match[] = {
+> +	{ "HISI0233", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(acpi, hisi_ddrc_pmu_acpi_match);
+> +
+> +static int hisi_ddrc_pmu_init_data(struct platform_device *pdev,
+> +				   struct hisi_pmu *ddrc_pmu)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct resource *res;
+> +
+> +	/* Get the DDRC Channel ID */
+> +	if (device_property_read_u32(dev, "hisilicon,ch-id",
+> +				     &ddrc_pmu->ddrc_chn_id)) {
+> +		dev_err(dev, "Can not read ddrc ch-id!\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Get the DDRC SCCL ID */
+> +	if (device_property_read_u32(dev, "hisilicon,scl-id",
+> +				     &ddrc_pmu->sccl_id)) {
+> +		dev_err(dev, "Can not read ddrc sccl-id!\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	ddrc_pmu->base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(ddrc_pmu->base)) {
+> +		dev_err(dev, "ioremap failed for ddrc_pmu resource\n");
+> +		return PTR_ERR(ddrc_pmu->base);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static struct attribute *hisi_ddrc_pmu_format_attr[] = {
+> +	HISI_PMU_FORMAT_ATTR(event, "config:0-4"),
+> +	NULL,
+> +};
+> +
+> +static const struct attribute_group hisi_ddrc_pmu_format_group = {
+> +	.name = "format",
+> +	.attrs = hisi_ddrc_pmu_format_attr,
+> +};
+> +
+> +static struct attribute *hisi_ddrc_pmu_events_attr[] = {
+> +	HISI_PMU_EVENT_ATTR(flux_wr,		0x00),
+> +	HISI_PMU_EVENT_ATTR(flux_rd,		0x01),
+> +	HISI_PMU_EVENT_ATTR(flux_wcmd,		0x02),
+> +	HISI_PMU_EVENT_ATTR(flux_rcmd,		0x03),
+> +	HISI_PMU_EVENT_ATTR(pre_cmd,		0x04),
+> +	HISI_PMU_EVENT_ATTR(act_cmd,		0x05),
+> +	HISI_PMU_EVENT_ATTR(rnk_chg,		0x06),
+> +	HISI_PMU_EVENT_ATTR(rw_chg,		0x07),
+> +	NULL,
+> +};
+> +
+> +static const struct attribute_group hisi_ddrc_pmu_events_group = {
+> +	.name = "events",
+> +	.attrs = hisi_ddrc_pmu_events_attr,
+> +};
+> +
+> +static DEVICE_ATTR(cpumask, 0444, hisi_cpumask_sysfs_show, NULL);
+> +
+> +static struct attribute *hisi_ddrc_pmu_cpumask_attrs[] = {
+> +	&dev_attr_cpumask.attr,
+> +	NULL,
+> +};
+> +
+> +static const struct attribute_group hisi_ddrc_pmu_cpumask_attr_group = {
+> +	.attrs = hisi_ddrc_pmu_cpumask_attrs,
+> +};
+> +
+> +static const struct attribute_group *hisi_ddrc_pmu_attr_groups[] = {
+> +	&hisi_ddrc_pmu_format_group,
+> +	&hisi_ddrc_pmu_events_group,
+> +	&hisi_ddrc_pmu_cpumask_attr_group,
+> +	NULL,
+> +};
+> +
+> +static const struct hisi_uncore_ops hisi_uncore_ddrc_ops = {
+> +	.get_event_idx		= hisi_ddrc_pmu_get_event_idx,
+> +	.start_counters		= hisi_ddrc_pmu_start_counters,
+> +	.stop_counters		= hisi_ddrc_pmu_stop_counters,
+> +	.enable_counter		= hisi_ddrc_pmu_enable_counter,
+> +	.disable_counter	= hisi_ddrc_pmu_disable_counter,
+> +	.enable_counter_int	= hisi_ddrc_pmu_enable_counter_int,
+> +	.disable_counter_int	= hisi_ddrc_pmu_disable_counter_int,
+> +	.write_counter		= hisi_ddrc_pmu_write_counter,
+> +	.read_counter		= hisi_ddrc_pmu_read_counter,
+> +};
+> +
+> +static int hisi_ddrc_pmu_dev_probe(struct platform_device *pdev,
+> +				   struct hisi_pmu *ddrc_pmu)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	int ret;
+> +
+> +	ret = hisi_ddrc_pmu_init_data(pdev, ddrc_pmu);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Pick one core to use for cpumask attributes */
+> +	cpumask_set_cpu(smp_processor_id(), &ddrc_pmu->cpus);
+> +
+> +	ret = hisi_ddrc_pmu_init_irq(ddrc_pmu, pdev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ddrc_pmu->name = devm_kasprintf(dev, GFP_KERNEL, "hisi_ddrc%u_%u",
+> +					ddrc_pmu->ddrc_chn_id,
+> +					ddrc_pmu->sccl_id);
+> +	ddrc_pmu->num_events = DDRC_NR_EVENTS;
+> +	ddrc_pmu->num_counters = DDRC_NR_COUNTERS;
+> +	ddrc_pmu->counter_bits = 32;
+> +	ddrc_pmu->ops = &hisi_uncore_ddrc_ops;
+> +	ddrc_pmu->dev = dev;
+> +
+> +	return 0;
+> +}
+> +
+> +static int hisi_ddrc_pmu_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct hisi_pmu *ddrc_pmu;
+> +	int ret;
+> +
+> +	ddrc_pmu = hisi_pmu_alloc(dev, DDRC_NR_COUNTERS);
+> +	if (!ddrc_pmu)
+> +		return -ENOMEM;
+> +
+> +	platform_set_drvdata(pdev, ddrc_pmu);
+> +
+> +	ret = hisi_ddrc_pmu_dev_probe(pdev, ddrc_pmu);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ddrc_pmu->pmu = (struct pmu) {
+> +		.name		= ddrc_pmu->name,
+> +		.task_ctx_nr	= perf_invalid_context,
+> +		.event_init	= hisi_uncore_pmu_event_init,
+> +		.pmu_enable	= hisi_uncore_pmu_enable,
+> +		.pmu_disable	= hisi_uncore_pmu_disable,
+> +		.add		= hisi_uncore_pmu_add,
+> +		.del		= hisi_uncore_pmu_del,
+> +		.start		= hisi_uncore_pmu_start,
+> +		.stop		= hisi_uncore_pmu_stop,
+> +		.read		= hisi_uncore_pmu_read,
+> +		.attr_groups	= hisi_ddrc_pmu_attr_groups,
+> +	};
+> +
+> +	ret = perf_pmu_register(&ddrc_pmu->pmu, ddrc_pmu->name, -1);
+> +	if (ret)
+> +		dev_err(ddrc_pmu->dev, "ddrc_pmu register failed!\n");
+> +
+> +	return ret;
+> +}
+> +
+> +static int hisi_ddrc_pmu_remove(struct platform_device *pdev)
+> +{
+> +	struct hisi_pmu *ddrc_pmu = platform_get_drvdata(pdev);
+> +
+> +	perf_pmu_unregister(&ddrc_pmu->pmu);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct platform_driver hisi_ddrc_pmu_driver = {
+> +	.driver = {
+> +		.name = "hisi_ddrc_pmu",
+> +		.acpi_match_table = ACPI_PTR(hisi_ddrc_pmu_acpi_match),
+> +	},
+> +	.probe = hisi_ddrc_pmu_probe,
+> +	.remove = hisi_ddrc_pmu_remove,
+> +};
+> +module_platform_driver(hisi_ddrc_pmu_driver);
+> +
+> +MODULE_DESCRIPTION("HiSilicon SoC DDRC uncore PMU driver");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR("Shaokun Zhang <zhangshaokun@hisilicon.com>");
+> +MODULE_AUTHOR("Anurup M <anurup.m@huawei.com>");
+> -- 
+> 1.9.1
+> 
