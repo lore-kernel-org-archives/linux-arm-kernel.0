@@ -1,83 +1,110 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Aug 2017 10:50:06 +0100
-Subject: [PATCH v4 1/6] Documentation: perf: hisi: Documentation for
- HiSilicon SoC PMU driver
-In-Reply-To: <1500984642-204676-2-git-send-email-zhangshaokun@hisilicon.com>
-References: <1500984642-204676-1-git-send-email-zhangshaokun@hisilicon.com>
- <1500984642-204676-2-git-send-email-zhangshaokun@hisilicon.com>
-Message-ID: <20170815095005.GB6090@leverpostej>
+From: oleksandrs@mellanox.com (Oleksandr Shamray)
+Date: Tue, 15 Aug 2017 13:00:04 +0300
+Subject: [patch v3 0/3] JTAG driver introduction
+Message-ID: <1502791207-26951-1-git-send-email-oleksandrs@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When a need raise up to use JTAG interface for system's devices
+programming or CPU debugging, it could be done from the external
+JTAG master controller.
 
-On Tue, Jul 25, 2017 at 08:10:37PM +0800, Shaokun Zhang wrote:
-> This patch adds documentation for the uncore PMUs on HiSilicon SoC.
-> 
-> Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
-> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
-> Signed-off-by: Anurup M <anurup.m@huawei.com>
-> ---
->  Documentation/perf/hisi-pmu.txt | 52 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
->  create mode 100644 Documentation/perf/hisi-pmu.txt
-> 
-> diff --git a/Documentation/perf/hisi-pmu.txt b/Documentation/perf/hisi-pmu.txt
-> new file mode 100644
-> index 0000000..f45a03d
-> --- /dev/null
-> +++ b/Documentation/perf/hisi-pmu.txt
-> @@ -0,0 +1,52 @@
-> +HiSilicon SoC uncore Performance Monitoring Unit (PMU)
-> +======================================================
-> +The HiSilicon SoC chip comprehends various independent system device PMUs
+For such purpose, usually the user layer
+application implements jtag protocol or using a proprietary
+connection to vendor hardware.
+This method is slow and not generic.
+ 
+We propose to implement general JTAG interface and infrastructure
+to communicate with user layer application. In such way, we can
+have the standard JTAG interface core part and separation from
+specific HW implementation.
+This allow new capability to debug the CPU or program system's 
+device via BMC without additional devices nor cost. 
 
-Nit: s/comprehends/comprises/ would be easier to read.
+This patch purpose is to add JTAG master core infrastructure by 
+defining new JTAG class and provide generic JTAG interface
+to allow hardware specific drivers to connect this interface.
+This will enable all JTAG drivers to use the common interface
+part and will have separate for hardware implementation.
 
-> +such as L3 cache (L3C), Hydra Home Agent (HHA) and DDRC. These PMUs are
-> +independent and have hardware logic to gather statistics and performance
-> +information.
-> +
-> +HiSilicon SoC encapsulates multiple CPU and IO dies. Each CPU cluster
+The JTAG (Joint Test Action Group) core driver provides minimal generic
+JTAG interface, which can be used by hardware specific JTAG master
+controllers. By providing common interface for the JTAG controllers,
+user space device programing is hardware independent.
+ 
+Modern SoC which in use for embedded system' equipped with
+internal JTAG master interface.
+This interface is used for programming and debugging system's
+hardware components, like CPLD, FPGA, CPU, voltage and
+industrial controllers.
+Firmware for such devices can be upgraded through JTAG interface during
+Runtime. The JTAG standard support for multiple devices programming,
+is in case their lines are daisy-chained together.
 
-Nit: The Hisilicon SoC
+For example, systems which equipped with host CPU, BMC SoC or/and 
+number of programmable devices are capable to connect a pin and
+select system components dynamically for programming and debugging,
+This is using by the BMC which is equipped with internal SoC master
+controller.
+For example:
 
-> +(CCL) is made up of 4 cpu cores sharing one L3 cache; Each CPU die is
+BMC JTAG master --> pin selected to CPLDs chain for programming (filed
+upgrade, production) 
+BMC JTAG master --> pin selected to voltage monitors for programming 
+(field upgrade, production) 
+BMC JTAG master --> pin selected to host CPU (on-site debugging 
+and developers debugging)
 
-Nit: s/Each/each/
+For example, we can have application in user space which using calls
+to JTAG driver executes CPLD programming directly from SVF file
+ 
+The JTAG standard (IEEE 1149.1) defines the next connector pins:
+- TDI (Test Data In);
+- TDO (Test Data Out);
+- TCK (Test Clock);
+- TMS (Test Mode Select);
+- TRST (Test Reset) (Optional);
 
-> +called Super CPU cluster (SCCL) and is made up of 6 CCLs. Each SCCL has
-> +two HHAs (0 - 1) and four DDRCs (0 - 3), respectively.
-> +
-> +HiSilicon SoC uncore PMU driver
-> +---------------------------------------
-> +Each device PMU has separate registers for event counting, control and
-> +interrupt, and the PMU driver shall register perf PMU drivers like L3C,
-> +HHA and DDRC etc. The available events and configuration options shall
-> +be described in the sysfs, see /sys/devices/hisi_* 
+The SoC equipped with JTAG master controller, performs
+device programming on command or vector level. For example
+a file in a standard SVF (Serial Vector Format) that contains
+boundary scan vectors, can be used by sending each vector
+to the JTAG interface and the JTAG controller will execute
+the programming.
 
-What exactly its exposed under /sys/devices/hisi_* ?
+Initial version provides the system calls set for:
+- SIR (Scan Instruction Register, IEEE 1149.1 Data Register scan);
+- SDR (Scan Data Register, IEEE 1149.1 Instruction Register scan);
+- RUNTEST (Forces the IEEE 1149.1 bus to a run state for a specified
+  number of clocks.
 
-> or /sys/bus/
-> +event_source/devices/hisi_*.
+SoC which are not equipped with JTAG master interface, can be built
+on top of JTAG core driver infrastructure, by applying bit-banging of
+TDI, TDO, TCK and TMS pins within the hardware specific driver.
 
-Please don't wrap paths; keep this on one line.
+Oleksandr Shamray (3):
+  drivers: jtag: Add JTAG core driver
+  drivers: jtag: Add Aspeed SoC 24xx and 25xx families JTAG master
+    driver
+  doccumentation: jtag: Add bindings for Aspeed SoC 24xx and 25xx
+    families     JTAG master driver
 
-> +The "perf list" command shall list the available events from sysfs.
-> +
-> +Each L3C, HHA and DDRC in one SCCL are registered as an separate PMU with perf.
-> +The PMU name will appear in event listing as hisi_module <index-id>_<sccl-id>.
-> +where "index-id" is the index of module and "sccl-id" is the identifier of
-> +the SCCL.
-> +e.g. hisi_l3c0_1/rd_hit_cpipe is READ_HIT_CPIPE event of L3C index #0 and SCCL
-> +ID #1.
-> +e.g. hisi_hha0_1/rx_operations is RX_OPERATIONS event of HHA index #0 and SCCL
-> +ID #1.
-
-It would make more sense for this to be hierarichal, e.g. hisi_sccl{X}_l3c{Y}.
-
-Other than the above nits, this documentation is very useful. Thanks for
-putting this together.
-
-Thanks,
-Mark.
+ .../devicetree/bindings/jtag/aspeed-jtag.txt       |   19 +
+ Documentation/ioctl/ioctl-number.txt               |    2 +
+ MAINTAINERS                                        |    8 +
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    1 +
+ drivers/jtag/Kconfig                               |   29 +
+ drivers/jtag/Makefile                              |    2 +
+ drivers/jtag/jtag-aspeed.c                         |  774 ++++++++++++++++++++
+ drivers/jtag/jtag.c                                |  313 ++++++++
+ include/linux/jtag.h                               |   46 ++
+ include/uapi/linux/jtag.h                          |  113 +++
+ 11 files changed, 1309 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+ create mode 100644 drivers/jtag/Kconfig
+ create mode 100644 drivers/jtag/Makefile
+ create mode 100644 drivers/jtag/jtag-aspeed.c
+ create mode 100644 drivers/jtag/jtag.c
+ create mode 100644 include/linux/jtag.h
+ create mode 100644 include/uapi/linux/jtag.h
