@@ -1,45 +1,55 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Tue, 15 Aug 2017 14:32:43 +0100
-Subject: [PATCH 2/2] arm64: dts: hi6220: add acpu_sctrl
-In-Reply-To: <1492478242-16146-2-git-send-email-zhangfei.gao@linaro.org>
-References: <1492478242-16146-1-git-send-email-zhangfei.gao@linaro.org>
- <1492478242-16146-2-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <5992F7FB.9080709@hisilicon.com>
+Date: Tue, 15 Aug 2017 14:33:46 +0100
+Subject: [PATCH v2 0/6] arm64: defconfig: enable configs for HiKey960
+In-Reply-To: <20170810023728.19621-1-guodong.xu@linaro.org>
+References: <20170810023728.19621-1-guodong.xu@linaro.org>
+Message-ID: <5992F83A.6050407@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhangfei,
+Hi Guodong,
 
-On 2017/4/18 2:17, Zhangfei Gao wrote:
-> Add acpu_sctrl clock node
+On 2017/8/10 3:37, Guodong Xu wrote:
+> This patchset enables config items in arm64/defconfig for HiKey960. All
+> of them correspond to real functions on HiKey960.
 > 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
-> ---
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
+> Including:
+>  - Kirin PCIe
+>  - PMIC support, hi6421v530
+>  - syscon reboot mode
+>  - serdev bus
+>  - OP-TEE
+>  - K3 DMA
 > 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> index 470461d..710cc34 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-> @@ -262,6 +262,12 @@
->  			#clock-cells = <1>;
->  		};
->  
-> +		acpu_sctrl: acpu_sctrl at f7032000 {
-> +			compatible = "hisilicon,hi6220-acpu-sctrl", "syscon";
-> +			reg = <0x0 0xf6504000 0x0 0x1000>;
-> +			#clock-cells = <1>;
-> +		};
-> +
->  		medianoc_ade: medianoc_ade at f4520000 {
->  			compatible = "syscon";
->  			reg = <0x0 0xf4520000 0x0 0x4000>;
+> HiKey960 is one of 96boards. For details information about it, please
+> refer to [1].
+> 
+> [1] https://github.com/96boards/documentation/tree/master/ConsumerEdition/HiKey960
+> 
+> ===
+> Major changes in v2:
+>  - Add patch 6 to enable K3 DMA
+> 
+> Guodong Xu (3):
+>   arm64: defconfig: enable support hi6421v530 PMIC
+>   arm64: defconfig: enable CONFIG_SYSCON_REBOOT_MODE
+>   arm64: defconfig: enable support for serial port connected device
+> 
+> Victor Chong (1):
+>   arm64: defconfig: enable OP-TEE
+> 
+> Wang Ruyi (1):
+>   arm64: defconfig: enable DMA driver for hi3660
+> 
+> Xiaowei Song (1):
+>   arm64: defconfig: enable Kirin PCIe
+> 
+>  arch/arm64/configs/defconfig | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 > 
 
 Thanks!
-Applied to the hisilicon dt tree since the driver part is in the mainline now.
+Series applied to the hisilicon defconfig tree.
 
-Best Regards,
+BR,
 Wei
