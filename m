@@ -1,63 +1,43 @@
-From: wenyou.yang@microchip.com (Wenyou Yang)
-Date: Tue, 15 Aug 2017 14:24:20 +0800
-Subject: [PATCH] ARM: dts: at91: sama5d2_xplained: Add charger node
-Message-ID: <20170815062420.21644-1-wenyou.yang@microchip.com>
+From: rafal@milecki.pl (=?UTF-8?Q?Rafa=C5=82_Mi=C5=82ecki?=)
+Date: Tue, 15 Aug 2017 08:42:11 +0200
+Subject: [PATCH v4 2/4] thermal: add brcmstb AVS TMON driver
+In-Reply-To: <1502777298.2591.1.camel@intel.com>
+References: <20170809220257.4234-1-code@mmayer.net>
+ <20170809220257.4234-3-code@mmayer.net> <1502777298.2591.1.camel@intel.com>
+Message-ID: <95da51df3cadbb05f721f2e5b8d59f8d@milecki.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wenyou Yang <wenyou.yang@atmel.com>
+On 2017-08-15 08:08, Zhang Rui wrote:
+>> diff --git a/drivers/thermal/broadcom/Kconfig
+>> b/drivers/thermal/broadcom/Kconfig
+>> index 42c098e..c106a15 100644
+>> --- a/drivers/thermal/broadcom/Kconfig
+>> +++ b/drivers/thermal/broadcom/Kconfig
+>> @@ -6,6 +6,13 @@ config BCM2835_THERMAL
+>> ?	help
+>> ?	??Support for thermal sensors on Broadcom bcm2835 SoCs.
+>> ?
+>> +config BRCMSTB_THERMAL
+>> +	tristate "Broadcom STB AVS TMON thermal driver"
+>> +	depends on ARCH_BRCMSTB || COMPILE_TEST
+>> +	help
+>> +	??Enable this driver if you have a Broadcom STB SoC and
+>> would like
+>> +	??thermal framework support.
+>> +
+> 
+> I don't understand why I got the following checkpatch warning
+> 
+> WARNING: please write a paragraph that describes the config symbol
+> fully
+> #73: FILE: drivers/thermal/broadcom/Kconfig:9:
+> +config BRCMSTB_THERMAL
+> 
+> I didn't see this for other Kconfig changes.
 
-Add the charger device node as a sub-device of act8945a mfd, move
-the charger's properties in the node, and replace the
-"active-semi,irq_gpios" with the "interrupts" property to denote
-the act8945a charger's irq.
+It's because your help message is only 2 lines long (instead of 3).
 
-Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
----
-
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 23 +++++++++++++++--------
- 1 file changed, 15 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-index 2e2c3d1a1fa2..2a0f5f41260f 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -160,14 +160,6 @@
- 					compatible = "active-semi,act8945a";
- 					reg = <0x5b>;
- 					active-semi,vsel-high;
--					active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
--					active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
--					active-semi,irq_gpios = <&pioA 45 GPIO_ACTIVE_LOW>;
--					active-semi,input-voltage-threshold-microvolt = <6600>;
--					active-semi,precondition-timeout = <40>;
--					active-semi,total-timeout = <3>;
--					pinctrl-names = "default";
--					pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
- 					status = "okay";
- 
- 					regulators {
-@@ -220,6 +212,21 @@
- 							regulator-always-on;
- 						};
- 					};
-+
-+					charger {
-+						compatible = "active-semi,act8945a-charger";
-+						pinctrl-names = "default";
-+						pinctrl-0 = <&pinctrl_charger_chglev &pinctrl_charger_lbo &pinctrl_charger_irq>;
-+						interrupt-parent = <&pioA>;
-+						interrupts = <45 GPIO_ACTIVE_LOW>;
-+
-+						active-semi,chglev-gpios = <&pioA 12 GPIO_ACTIVE_HIGH>;
-+						active-semi,lbo-gpios = <&pioA 72 GPIO_ACTIVE_LOW>;
-+						active-semi,input-voltage-threshold-microvolt = <6600>;
-+						active-semi,precondition-timeout = <40>;
-+						active-semi,total-timeout = <3>;
-+						status = "okay";
-+					};
- 				};
- 			};
- 
--- 
-2.13.0
+Some (many?) maintainers aren't pedantic about that, a common sense 
+should
+be applied ;)
