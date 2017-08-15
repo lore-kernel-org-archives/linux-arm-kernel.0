@@ -1,25 +1,18 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 15 Aug 2017 18:01:32 +0200
-Subject: [GIT PULL] Renesas ARM64 Based SoC Defconfig Updates for v4.14
-In-Reply-To: <cover.1501509815.git.horms+renesas@verge.net.au>
-References: <cover.1501509815.git.horms+renesas@verge.net.au>
-Message-ID: <CAK8P3a2VnommvfALpR+q8Dh8sa421oF3z45ZH4W8s1qVjFo8zw@mail.gmail.com>
+Date: Tue, 15 Aug 2017 18:03:32 +0200
+Subject: [PATCH v2] arm64: defconfig: enable CONFIG_UNIPHIER_WATCHDOG
+In-Reply-To: <1500359890-30358-1-git-send-email-hayashibara.keiji@socionext.com>
+References: <1500359890-30358-1-git-send-email-hayashibara.keiji@socionext.com>
+Message-ID: <CAK8P3a3rESS81M98sqM26Yxgu5A7RoFg3ua1XEicm=LH9UUuJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 5:02 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-
-> ----------------------------------------------------------------
-> Renesas ARM64 Based SoC Defconfig Updates for v4.14
+On Tue, Jul 18, 2017 at 8:38 AM, Keiji Hayashibara
+<hayashibara.keiji@socionext.com> wrote:
+> Enable the watchdog driver for UniPhier SoC
 >
-> * compile ak4613 and renesas sound as modules
->
->   This is intended to reduce the size of a kernel image compiled
->   using the defconfig. This is timely as it brings the kernel image
->   back below the size that can be booted in my environment, a limit
->   it crept over in v4.13-rc1.
+> Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
 
-Good idea, thanks! Pulled into next/arm64.
+Applied to next/arm64, thanks!
 
-       Arnd
+      Arnd
