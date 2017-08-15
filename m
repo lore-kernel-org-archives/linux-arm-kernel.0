@@ -1,74 +1,120 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Tue, 15 Aug 2017 09:40:27 +0800
-Subject: [PATCH v10 3/5] PCI: Disable Relaxed Ordering Attributes for AMD
- A1100
-In-Reply-To: <20170814171937.GA52656@otc-nc-03>
-References: <1502725499-11276-1-git-send-email-dingtianhong@huawei.com>
- <1502725499-11276-4-git-send-email-dingtianhong@huawei.com>
- <20170814171937.GA52656@otc-nc-03>
-Message-ID: <f918dd35-a317-d745-974c-bd271136bf41@huawei.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 14 Aug 2017 18:49:59 -0700
+Subject: [1/2] watchdog: of_xilinx_wdt: Add support for reading freq via
+ CCF
+In-Reply-To: <d081ea43fc2b3b75cae2e19716920e1bb6c81328.1502105061.git.michal.simek@xilinx.com>
+References: <d081ea43fc2b3b75cae2e19716920e1bb6c81328.1502105061.git.michal.simek@xilinx.com>
+Message-ID: <20170815014959.GA31850@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2017/8/15 1:19, Raj, Ashok wrote:
-> On Mon, Aug 14, 2017 at 11:44:57PM +0800, Ding Tianhong wrote:
->> Casey reported that the AMD ARM A1100 SoC has a bug in its PCIe
->> Root Port where Upstream Transaction Layer Packets with the Relaxed
->> Ordering Attribute clear are allowed to bypass earlier TLPs with
->> Relaxed Ordering set, it would cause Data Corruption, so we need
->> to disable Relaxed Ordering Attribute when Upstream TLPs to the
->> Root Port.
->>
->> Signed-off-by: Casey Leedom <leedom@chelsio.com>
->> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->> Acked-by: Alexander Duyck <alexander.h.duyck@intel.com>
->> Acked-by: Ashok Raj <ashok.raj@intel.com>
+On Mon, Aug 07, 2017 at 01:24:22PM +0200, Michal Simek wrote:
+> From: Maulik Jodhani <maulik.jodhani@xilinx.com>
 > 
-> I can't ack this patch :-).. must be someone from AMD. Please remove my
-> signature from this.
+> Improve CLK handling in the code to read freq via CCF.
+> Also disable CLK asap and add clk handling code to start and stop.
 > 
+> Signed-off-by: Maulik Jodhani <maulik.jodhani@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-Sorry for funny mistake :)  I will fix it.
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-Ding
-
->> ---
->>  drivers/pci/quirks.c | 16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
->>
->> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
->> index 1272f7e..1407604 100644
->> --- a/drivers/pci/quirks.c
->> +++ b/drivers/pci/quirks.c
->> @@ -4089,6 +4089,22 @@ static void quirk_relaxedordering_disable(struct pci_dev *dev)
->>  			      quirk_relaxedordering_disable);
->>  
->>  /*
->> + * The AMD ARM A1100 (AKA "SEATTLE") SoC has a bug in its PCIe Root Complex
->> + * where Upstream Transaction Layer Packets with the Relaxed Ordering
->> + * Attribute clear are allowed to bypass earlier TLPs with Relaxed Ordering
->> + * set.  This is a violation of the PCIe 3.0 Transaction Ordering Rules
->> + * outlined in Section 2.4.1 (PCI Express(r) Base Specification Revision 3.0
->> + * November 10, 2010).  As a result, on this platform we can't use Relaxed
->> + * Ordering for Upstream TLPs.
->> + */
->> +DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a00, PCI_CLASS_NOT_DEFINED, 8,
->> +			      quirk_relaxedordering_disable);
->> +DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a01, PCI_CLASS_NOT_DEFINED, 8,
->> +			      quirk_relaxedordering_disable);
->> +DECLARE_PCI_FIXUP_CLASS_EARLY(PCI_VENDOR_ID_AMD, 0x1a02, PCI_CLASS_NOT_DEFINED, 8,
->> +			      quirk_relaxedordering_disable);
->> +
->> +/*
->>   * Per PCIe r3.0, sec 2.2.9, "Completion headers must supply the same
->>   * values for the Attribute as were supplied in the header of the
->>   * corresponding Request, except as explicitly allowed when IDO is used."
->> -- 
->> 1.8.3.1
->>
->>
+> ---
 > 
-> .
+>  drivers/watchdog/of_xilinx_wdt.c | 45 ++++++++++++++++++++++++++++------------
+>  1 file changed, 32 insertions(+), 13 deletions(-)
 > 
+> diff --git a/drivers/watchdog/of_xilinx_wdt.c b/drivers/watchdog/of_xilinx_wdt.c
+> index fae7fe929ea3..41edeb93a327 100644
+> --- a/drivers/watchdog/of_xilinx_wdt.c
+> +++ b/drivers/watchdog/of_xilinx_wdt.c
+> @@ -51,9 +51,16 @@ struct xwdt_device {
+>  
+>  static int xilinx_wdt_start(struct watchdog_device *wdd)
+>  {
+> +	int ret;
+>  	u32 control_status_reg;
+>  	struct xwdt_device *xdev = watchdog_get_drvdata(wdd);
+>  
+> +	ret = clk_enable(xdev->clk);
+> +	if (ret) {
+> +		dev_err(wdd->parent, "Failed to enable clock\n");
+> +		return ret;
+> +	}
+> +
+>  	spin_lock(&xdev->spinlock);
+>  
+>  	/* Clean previous status and enable the watchdog timer */
+> @@ -85,6 +92,9 @@ static int xilinx_wdt_stop(struct watchdog_device *wdd)
+>  	iowrite32(0, xdev->base + XWT_TWCSR1_OFFSET);
+>  
+>  	spin_unlock(&xdev->spinlock);
+> +
+> +	clk_disable(xdev->clk);
+> +
+>  	pr_info("Stopped!\n");
+>  
+>  	return 0;
+> @@ -167,11 +177,6 @@ static int xwdt_probe(struct platform_device *pdev)
+>  	if (IS_ERR(xdev->base))
+>  		return PTR_ERR(xdev->base);
+>  
+> -	rc = of_property_read_u32(pdev->dev.of_node, "clock-frequency", &pfreq);
+> -	if (rc)
+> -		dev_warn(&pdev->dev,
+> -			 "The watchdog clock frequency cannot be obtained\n");
+> -
+>  	rc = of_property_read_u32(pdev->dev.of_node, "xlnx,wdt-interval",
+>  				  &xdev->wdt_interval);
+>  	if (rc)
+> @@ -186,6 +191,26 @@ static int xwdt_probe(struct platform_device *pdev)
+>  
+>  	watchdog_set_nowayout(xilinx_wdt_wdd, enable_once);
+>  
+> +	xdev->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(xdev->clk)) {
+> +		if (PTR_ERR(xdev->clk) != -ENOENT)
+> +			return PTR_ERR(xdev->clk);
+> +
+> +		/*
+> +		 * Clock framework support is optional, continue on
+> +		 * anyways if we don't find a matching clock.
+> +		 */
+> +		xdev->clk = NULL;
+> +
+> +		rc = of_property_read_u32(pdev->dev.of_node, "clock-frequency",
+> +					  &pfreq);
+> +		if (rc)
+> +			dev_warn(&pdev->dev,
+> +				 "The watchdog clock freq cannot be obtained\n");
+> +	} else {
+> +		pfreq = clk_get_rate(xdev->clk);
+> +	}
+> +
+>  	/*
+>  	 * Twice of the 2^wdt_interval / freq  because the first wdt overflow is
+>  	 * ignored (interrupt), reset is only generated at second wdt overflow
+> @@ -197,14 +222,6 @@ static int xwdt_probe(struct platform_device *pdev)
+>  	spin_lock_init(&xdev->spinlock);
+>  	watchdog_set_drvdata(xilinx_wdt_wdd, xdev);
+>  
+> -	xdev->clk = devm_clk_get(&pdev->dev, NULL);
+> -	if (IS_ERR(xdev->clk)) {
+> -		if (PTR_ERR(xdev->clk) == -ENOENT)
+> -			xdev->clk = NULL;
+> -		else
+> -			return PTR_ERR(xdev->clk);
+> -	}
+> -
+>  	rc = clk_prepare_enable(xdev->clk);
+>  	if (rc) {
+>  		dev_err(&pdev->dev, "unable to enable clock\n");
+> @@ -223,6 +240,8 @@ static int xwdt_probe(struct platform_device *pdev)
+>  		goto err_clk_disable;
+>  	}
+>  
+> +	clk_disable(xdev->clk);
+> +
+>  	dev_info(&pdev->dev, "Xilinx Watchdog Timer at %p with timeout %ds\n",
+>  		 xdev->base, xilinx_wdt_wdd->timeout);
+>  
