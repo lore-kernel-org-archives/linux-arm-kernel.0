@@ -1,130 +1,81 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 15 Aug 2017 13:50:38 +0100
-Subject: [PATCHv2 03/14] arm64: kernel: remove {THREAD,IRQ_STACK}_START_SP
+Date: Tue, 15 Aug 2017 13:50:40 +0100
+Subject: [PATCHv2 05/14] arm64: clean up THREAD_* definitions
 In-Reply-To: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
 References: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1502801449-29246-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1502801449-29246-6-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Currently we define THREAD_SIZE and THREAD_SIZE_ORDER separately, with
+the latter dependent on particular CONFIG_ARM64_*K_PAGES definitions.
+This is somewhat opaque, and will get in the way of future modifications
+to THREAD_SIZE.
 
-For historical reasons, we leave the top 16 bytes of our task and IRQ
-stacks unused, a practice used to ensure that the SP can always be
-masked to find the base of the current stack (historically, where
-thread_info could be found).
+This patch cleans this up, defining both in terms of a common
+THREAD_SHIFT, and using PAGE_SHIFT to calculate THREAD_SIZE_ORDER,
+rather than using a number of definitions dependent on config symbols.
+Subsequent patches will make use of this to alter the stack size used in
+some configurations.
 
-However, this is not necessary, as:
+At the same time, these are moved into <asm/memory.h>, which will avoid
+circular include issues in subsequent patches. To ensure that existing
+code isn't adversely affected, <asm/thread_info.h> is updated to
+transitively include these definitions.
 
-* When an exception is taken from a task stack, we decrement the SP by
-  S_FRAME_SIZE and stash the exception registers before we compare the
-  SP against the task stack. In such cases, the SP must be at least
-  S_FRAME_SIZE below the limit, and can be safely masked to determine
-  whether the task stack is in use.
-
-* When transitioning to an IRQ stack, we'll place a dummy frame onto the
-  IRQ stack before enabling asynchronous exceptions, or executing code
-  we expect to trigger faults. Thus, if an exception is taken from the
-  IRQ stack, the SP must be at least 16 bytes below the limit.
-
-* We no longer mask the SP to find the thread_info, which is now found
-  via sp_el0. Note that historically, the offset was critical to ensure
-  that cpu_switch_to() found the correct stack for new threads that
-  hadn't yet executed ret_from_fork().
-
-Given that, this initial offset serves no purpose, and can be removed.
-This brings us in-line with other architectures (e.g. x86) which do not
-rely on this masking.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-[Mark: rebase, kill THREAD_START_SP, commit msg additions]
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: James Morse <james.morse@arm.com>
 Cc: Laura Abbott <labbott@redhat.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/irq.h         | 5 ++---
- arch/arm64/include/asm/processor.h   | 2 +-
- arch/arm64/include/asm/thread_info.h | 1 -
- arch/arm64/kernel/entry.S            | 2 +-
- arch/arm64/kernel/smp.c              | 2 +-
- 5 files changed, 5 insertions(+), 7 deletions(-)
+ arch/arm64/include/asm/memory.h      | 8 ++++++++
+ arch/arm64/include/asm/thread_info.h | 9 +--------
+ 2 files changed, 9 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-index 8ba89c4..1ebe202 100644
---- a/arch/arm64/include/asm/irq.h
-+++ b/arch/arm64/include/asm/irq.h
-@@ -2,7 +2,6 @@
- #define __ASM_IRQ_H
- 
- #define IRQ_STACK_SIZE			THREAD_SIZE
--#define IRQ_STACK_START_SP		THREAD_START_SP
- 
- #ifndef __ASSEMBLER__
- 
-@@ -26,9 +25,9 @@ static inline int nr_legacy_irqs(void)
- static inline bool on_irq_stack(unsigned long sp)
- {
- 	unsigned long low = (unsigned long)raw_cpu_ptr(irq_stack);
--	unsigned long high = low + IRQ_STACK_START_SP;
-+	unsigned long high = low + IRQ_STACK_SIZE;
- 
--	return (low <= sp && sp <= high);
-+	return (low <= sp && sp < high);
- }
- 
- static inline bool on_task_stack(struct task_struct *tsk, unsigned long sp)
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 64c9e78..6687dd2 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -159,7 +159,7 @@ extern struct task_struct *cpu_switch_to(struct task_struct *prev,
- 					 struct task_struct *next);
- 
- #define task_pt_regs(p) \
--	((struct pt_regs *)(THREAD_START_SP + task_stack_page(p)) - 1)
-+	((struct pt_regs *)(THREAD_SIZE + task_stack_page(p)) - 1)
- 
- #define KSTK_EIP(tsk)	((unsigned long)task_pt_regs(tsk)->pc)
- #define KSTK_ESP(tsk)	user_stack_pointer(task_pt_regs(tsk))
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index 46c3b93..b29ab0e 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -30,7 +30,6 @@
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 77d55dc..8ab4774 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -102,6 +102,14 @@
+ #define KASAN_SHADOW_SIZE	(0)
  #endif
  
- #define THREAD_SIZE		16384
--#define THREAD_START_SP		(THREAD_SIZE - 16)
++#define THREAD_SHIFT		14
++
++#if THREAD_SHIFT >= PAGE_SHIFT
++#define THREAD_SIZE_ORDER	(THREAD_SHIFT - PAGE_SHIFT)
++#endif
++
++#define THREAD_SIZE		(UL(1) << THREAD_SHIFT)
++
+ /*
+  * Memory types available.
+  */
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index b29ab0e..aa04b73 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -23,18 +23,11 @@
  
+ #include <linux/compiler.h>
+ 
+-#ifdef CONFIG_ARM64_4K_PAGES
+-#define THREAD_SIZE_ORDER	2
+-#elif defined(CONFIG_ARM64_16K_PAGES)
+-#define THREAD_SIZE_ORDER	0
+-#endif
+-
+-#define THREAD_SIZE		16384
+-
  #ifndef __ASSEMBLY__
  
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 612a077..f31c7b2 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -272,7 +272,7 @@ alternative_else_nop_endif
- 	cbnz	x25, 9998f
+ struct task_struct;
  
- 	adr_this_cpu x25, irq_stack, x26
--	mov	x26, #IRQ_STACK_START_SP
-+	mov	x26, #IRQ_STACK_SIZE
- 	add	x26, x25, x26
- 
- 	/* switch to the irq stack */
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index dc66e6e..f13ddb24 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -154,7 +154,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
- 	 * page tables.
- 	 */
- 	secondary_data.task = idle;
--	secondary_data.stack = task_stack_page(idle) + THREAD_START_SP;
-+	secondary_data.stack = task_stack_page(idle) + THREAD_SIZE;
- 	update_cpu_boot_status(CPU_MMU_OFF);
- 	__flush_dcache_area(&secondary_data, sizeof(secondary_data));
++#include <asm/memory.h>
+ #include <asm/stack_pointer.h>
+ #include <asm/types.h>
  
 -- 
 1.9.1
