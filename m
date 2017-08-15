@@ -1,25 +1,54 @@
-From: ckeepax@opensource.cirrus.com (Charles Keepax)
-Date: Tue, 15 Aug 2017 09:11:43 +0100
-Subject: [PATCH 01/11] ASoC: codecs: make snd_soc_platform_driver const
-In-Reply-To: <1502710730-18912-2-git-send-email-bhumirks@gmail.com>
-References: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
- <1502710730-18912-2-git-send-email-bhumirks@gmail.com>
-Message-ID: <20170815081143.cpkronjaqjo5ike5@localhost.localdomain>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 15 Aug 2017 10:16:29 +0200
+Subject: [PATCH v5 04/19] crypto: marvell/cesa: remove redundant backlog
+ checks on EBUSY
+In-Reply-To: <1502724094-23305-5-git-send-email-gilad@benyossef.com>
+References: <1502724094-23305-1-git-send-email-gilad@benyossef.com>
+ <1502724094-23305-5-git-send-email-gilad@benyossef.com>
+Message-ID: <20170815101629.7d323845@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 05:08:40PM +0530, Bhumika Goyal wrote:
-> Make these const as they are either passed as the 2nd argument to the
-> function devm_snd_soc_register_platform or snd_soc_register_platform,
-> and the arguments are of type const.
-> Done using Coccinelle.
+Le Mon, 14 Aug 2017 18:21:14 +0300,
+Gilad Ben-Yossef <gilad@benyossef.com> a ?crit :
+
+> Now that -EBUSY return code only indicates backlog queueing
+> we can safely remove the now redundant check for the
+> CRYPTO_TFM_REQ_MAY_BACKLOG flag when -EBUSY is returned.
 > 
-> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+> Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
 > ---
-
-For the Wolfson bits:
-
-Acked-by: Charles Keepax <ckeepax@opensource.cirrus.com>
-
-Thanks,
-Charles
+>  drivers/crypto/marvell/cesa.c | 3 +--
+>  drivers/crypto/marvell/cesa.h | 2 +-
+>  2 files changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/crypto/marvell/cesa.c b/drivers/crypto/marvell/cesa.c
+> index 6e7a5c7..269737f 100644
+> --- a/drivers/crypto/marvell/cesa.c
+> +++ b/drivers/crypto/marvell/cesa.c
+> @@ -183,8 +183,7 @@ int mv_cesa_queue_req(struct crypto_async_request *req,
+>  	spin_lock_bh(&engine->lock);
+>  	ret = crypto_enqueue_request(&engine->queue, req);
+>  	if ((mv_cesa_req_get_type(creq) == CESA_DMA_REQ) &&
+> -	    (ret == -EINPROGRESS ||
+> -	    (ret == -EBUSY && req->flags & CRYPTO_TFM_REQ_MAY_BACKLOG)))
+> +	    (ret == -EINPROGRESS || ret == -EBUSY)
+>  		mv_cesa_tdma_chain(engine, creq);
+>  	spin_unlock_bh(&engine->lock);
+>  
+> diff --git a/drivers/crypto/marvell/cesa.h b/drivers/crypto/marvell/cesa.h
+> index b7872f6..63c8457 100644
+> --- a/drivers/crypto/marvell/cesa.h
+> +++ b/drivers/crypto/marvell/cesa.h
+> @@ -763,7 +763,7 @@ static inline int mv_cesa_req_needs_cleanup(struct crypto_async_request *req,
+>  	 * the backlog and will be processed later. There's no need to
+>  	 * clean it up.
+>  	 */
+> -	if (ret == -EBUSY && req->flags & CRYPTO_TFM_REQ_MAY_BACKLOG)
+> +	if (ret == -EBUSY)
+>  		return false;
+>  
+>  	/* Request wasn't queued, we need to clean it up */
