@@ -1,57 +1,49 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 15 Aug 2017 11:04:01 -0700
-Subject: [PATCH] ARM: bcm2836: Send event when onlining other cores
-In-Reply-To: <399697756.271804.1502736043014@email.1und1.de>
-References: <1502190295-53391-1-git-send-email-phil@raspberrypi.org>
- <1502190295-53391-2-git-send-email-phil@raspberrypi.org>
- <fdecf317-d20b-1a5d-046f-56ef40c55d82@gmail.com>
- <1168905996.270506.1502730695418@email.1und1.de>
- <399697756.271804.1502736043014@email.1und1.de>
-Message-ID: <878tikhfn2.fsf@eliezer.anholt.net>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 15 Aug 2017 11:15:26 -0700
+Subject: [PATCHv2 00/14] arm64: VMAP_STACK support
+In-Reply-To: <20170815174411.dyo6b2ktmu3wjegj@armageddon.cambridge.arm.com>
+References: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
+ <fa283afb-b611-45da-a89a-12fafe987082@redhat.com>
+ <20170815173913.GA27057@leverpostej>
+ <20170815174411.dyo6b2ktmu3wjegj@armageddon.cambridge.arm.com>
+Message-ID: <CAGXu5jJNL6SViAbCcCAYzc+SwAq+74iH_jf9erTdY+hhjE=Ssg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
-
-> Hi Eric,
+On Tue, Aug 15, 2017 at 10:44 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+> On Tue, Aug 15, 2017 at 06:39:14PM +0100, Mark Rutland wrote:
+>> On Tue, Aug 15, 2017 at 10:18:20AM -0700, Laura Abbott wrote:
+>> > On 08/15/2017 05:50 AM, Mark Rutland wrote:
+>> > > Hi,
+>> > >
+>> > > Ard and I have worked together to implement vmap stack support for
+>> > > arm64. This supersedes our earlier vmap stack RFCs [0,1]. The git author
+>> > > stats are a little misleading, as I've teased parts out into smaller
+>> > > patches for review.
+>> > >
+>> > > The series is based on our stack dump rework [2,3], which can be found
+>> > > in the arm64/exception-stack branch [4] of my kernel.org repo. This
+>> > > series can be found in the arm64/vmap-stack branch [5] of the same repo.
+>>
+>> > Tested-by: Laura Abbott <labbott@redhat.com>
+>>
+>> Thanks!
+>>
+>> > (I think I may be slightly late with this. Oh well.)
+>>
+>> On the chance that Catalin's happy to redo the pull, I've folded that
+>> Tested-by in, and pushed the series.
 >
->> Stefan Wahren <stefan.wahren@i2se.com> hat am 14. August 2017 um 19:11 geschrieben:
->> 
->> 
->> Hi Florian,
->> 
->> > Florian Fainelli <f.fainelli@gmail.com> hat am 14. August 2017 um 18:25 geschrieben:
->> > 
->> > 
->> > 
->> > 
->> > On 08/08/2017 04:04 AM, Phil Elwell wrote:
->> > > Secondary cores should enter a low-power idle state when waiting to
->> > > be started. The "wfe" instruction causes a core to wait until an event
->> > > or interrupt arrives before continuing to the next instruction, and
->> > > the "sev" instruction sends a wakeup event to the other cores.
->> > > 
->> > > Add an "sev" (and a memory barrier) to bcm2836_boot_secondary, the
->> > > function that wakes the waiting cores during booting. This is required
->> > > if the secondary cores are sitting in "wfe", and harmless if not.
->> > 
->> > Eric, should I just pick this up for the upcoming ARM SoC pull requests
->> > that I am preparing, or do you have more changes aside from the two tags
->> > I already merged?
->> 
->> this patch depends on series "ARM: bcm2836: Move SMP startup code to arch/arm".
->> 
->> I didn't had the time to test Phil's patch in all relevant cases. But i could at least prepare a branch with my changes with the acks.
->
-> i prepared the branches bcm2835-dt-next-v2 and bcm2835-soc-next.
+> Pulled again as I haven't pushed it out yet (not until tomorrow, I'm
+> running some tests overnight).
 
-bcm2835-soc-next on its own breaks boot for me on the Pi2, so I had to
-merge in the DT branch first.  I've rebased to do that, pulled in this
-patch (and the clk one), and sent PRs for -dt and -soc.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170815/79544c84/attachment.sig>
+So awesome! Thanks everyone for the work, review, and testing. :)
+
+I'll get the LKDTM tests for VMAP_STACK pushed to Greg.
+
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
