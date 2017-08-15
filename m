@@ -1,36 +1,37 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 15 Aug 2017 11:36:32 +0200
-Subject: [v6 15/15] mm: debug for raw alloctor
-In-Reply-To: <b4eb28ad-2d58-fb23-2139-427df46c2773@oracle.com>
-References: <1502138329-123460-1-git-send-email-pasha.tatashin@oracle.com>
- <1502138329-123460-16-git-send-email-pasha.tatashin@oracle.com>
- <20170811130831.GN30811@dhcp22.suse.cz>
- <87d84cad-f03a-88f0-7828-6d3bf7ac473c@oracle.com>
- <20170814115000.GJ19063@dhcp22.suse.cz>
- <b4eb28ad-2d58-fb23-2139-427df46c2773@oracle.com>
-Message-ID: <20170815093631.GD29067@dhcp22.suse.cz>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Tue, 15 Aug 2017 12:48:41 +0300
+Subject: [PATCH v2 4/5] usb: gadget: udc: Replace the deprecated extcon API
+In-Reply-To: <1501748448-26821-5-git-send-email-cw00.choi@samsung.com>
+References: <1501748448-26821-1-git-send-email-cw00.choi@samsung.com>
+ <CGME20170803082050epcas1p2491eedf2f26510f55cd15ce777356fce@epcas1p2.samsung.com>
+ <1501748448-26821-5-git-send-email-cw00.choi@samsung.com>
+Message-ID: <87mv716u12.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 14-08-17 10:01:52, Pasha Tatashin wrote:
-> >>However, now thinking about it, I will change it to CONFIG_MEMBLOCK_DEBUG,
-> >>and let users decide what other debugging configs need to be enabled, as
-> >>this is also OK.
-> >
-> >Actually the more I think about it the more I am convinced that a kernel
-> >boot parameter would be better because it doesn't need the kernel to be
-> >recompiled and it is a single branch in not so hot path.
-> 
-> The main reason I do not like kernel parameter is that automated test suits
-> for every platform would need to be updated to include this new parameter in
-> order to test it.
 
-How does this differ from the enabling a config option and building a
-separate kernel?
+Hi,
 
-My primary point of the kernel option was to have something available to
-debug without recompiling the kernel which is more tedious than simply
-adding one option to the kernel command line.
+Chanwoo Choi <cw00.choi@samsung.com> writes:
+> This patch replaces the deprecated extcon API as following:
+> - extcon_get_cable_state_() -> extcon_get_state()
+>
+> Cc: Felipe Balbi <balbi@kernel.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Raviteja Garimella <raviteja.garimella@broadcom.com>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+Do you want to take these through your tree or mine? In case you want
+them in your tree:
+
+Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+
 -- 
-Michal Hocko
-SUSE Labs
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170815/b4a37b53/attachment.sig>
