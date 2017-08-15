@@ -1,31 +1,77 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 15 Aug 2017 09:27:27 -0700
-Subject: [GIT PULL] debug_ll update for omaps for v4.14
-Message-ID: <pull-1502814426-118174>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 15 Aug 2017 17:30:36 +0100
+Subject: [PATCHv2 02/14] fork: allow arch-override of VMAP stack alignment
+In-Reply-To: <CALCETrWAYvKTcgaQgEDC-ihhSuFAw9Phq-xF6FK5AMM6ag6j4A@mail.gmail.com>
+References: <1502801449-29246-1-git-send-email-mark.rutland@arm.com>
+ <1502801449-29246-3-git-send-email-mark.rutland@arm.com>
+ <CALCETrWAYvKTcgaQgEDC-ihhSuFAw9Phq-xF6FK5AMM6ag6j4A@mail.gmail.com>
+Message-ID: <20170815163036.GJ6090@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+On Tue, Aug 15, 2017 at 09:09:36AM -0700, Andy Lutomirski wrote:
+> On Tue, Aug 15, 2017 at 5:50 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > In some cases, an architecture might wish its stacks to be aligned to a
+> > boundary larger than THREAD_SIZE. For example, using an alignment of
+> > double THREAD_SIZE can allow for stack overflows smaller than
+> > THREAD_SIZE to be detected by checking a single bit of the stack
+> > pointer.
+> >
+> > This patch allows architectures to override the alignment of VMAP'd
+> > stacks, by defining THREAD_ALIGN. Where not defined, this defaults to
+> > THREAD_SIZE, as is the case today.
+> 
+> This looks okay, but it might make sense to move that to a header file
+> so THREAD_ALIGN is always available.
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+I was a little worried about breaking things, since arches don't define
+THREAD_SIZE in a consistent location.
 
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+Looking again, it looks like those are all transitiviely included into
+each arch's <asm/thread_info.h>, so I think I can move this into
+<linux/thread_info.h>, which'll have to be added to kernel.fork.c's
+includes.
 
-are available in the git repository at:
+Are you happy with the below fixup?
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap omap-for-v4.14/debug-ll
+Thanks,
+Mark.
 
-for you to fetch changes up to 51ef70037ebc2f63739c518ef357b364a802b648:
-
-  ARM: debug: Use generic 8250 debug_ll for am3517 and am335x (2017-07-17 00:53:42 -0700)
-
-----------------------------------------------------------------
-Tony Lindgren (4):
-      ARM: debug: Use generic 8250 debug_ll for omap2 and omap3/4/5 common uarts
-      ARM: debug: Use generic 8250 debug_ll for omap3/4/5
-      ARM: debug: Use generic 8250 debug_ll for ti81xx
-      ARM: debug: Use generic 8250 debug_ll for am3517 and am335x
-
- arch/arm/Kconfig.debug             |  44 +++++++++++----
- arch/arm/include/debug/omap2plus.S | 108 -------------------------------------
- 2 files changed, 33 insertions(+), 119 deletions(-)
+---->8----
+diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
+index 250a276..905d769 100644
+--- a/include/linux/thread_info.h
++++ b/include/linux/thread_info.h
+@@ -38,6 +38,10 @@ enum {
+ 
+ #ifdef __KERNEL__
+ 
++#ifndef THREAD_ALIGN
++#define THREAD_ALIGN   THREAD_SIZE
++#endif
++
+ #ifdef CONFIG_DEBUG_STACK_USAGE
+ # define THREADINFO_GFP                (GFP_KERNEL_ACCOUNT | __GFP_NOTRACK | \
+                                 __GFP_ZERO)
+diff --git a/kernel/fork.c b/kernel/fork.c
+index 696d692..f12882a 100644
+--- a/kernel/fork.c
++++ b/kernel/fork.c
+@@ -88,6 +88,7 @@
+ #include <linux/sysctl.h>
+ #include <linux/kcov.h>
+ #include <linux/livepatch.h>
++#include <linux/thread_info.h>
+ 
+ #include <asm/pgtable.h>
+ #include <asm/pgalloc.h>
+@@ -217,9 +218,6 @@ static unsigned long *alloc_thread_stack_node(struct task_struct *tsk, int node)
+                return s->addr;
+        }
+ 
+-#ifndef THREAD_ALIGN
+-#define THREAD_ALIGN   THREAD_SIZE
+-#endif
+        stack = __vmalloc_node_range(THREAD_SIZE, THREAD_ALIGN,
+                                     VMALLOC_START, VMALLOC_END,
+                                     THREADINFO_GFP,
