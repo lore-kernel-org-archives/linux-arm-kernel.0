@@ -1,43 +1,88 @@
-From: yangbo.lu@nxp.com (Y.b. Lu)
-Date: Tue, 15 Aug 2017 02:53:21 +0000
-Subject: [PATCH] ARM: multi_v7_defconfig: make eSDHC driver built-in
-In-Reply-To: <1502176674-30522-1-git-send-email-yangbo.lu@nxp.com>
-References: <1502176674-30522-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <DB6PR0401MB2536D5E3E91CF7943EEA4FD0F88D0@DB6PR0401MB2536.eurprd04.prod.outlook.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 15 Aug 2017 08:41:51 +0530
+Subject: [PATCH] ARM: dts: am57xx-beagle-x15: Add support for rev C
+In-Reply-To: <20170814175820.12065-1-robertcnelson@gmail.com>
+References: <20170814175820.12065-1-robertcnelson@gmail.com>
+Message-ID: <bf2a5868-4c0b-58a1-350e-cba7dcfb5166@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any comments?
-Thanks a lot:)
 
-> -----Original Message-----
-> From: Yangbo Lu [mailto:yangbo.lu at nxp.com]
-> Sent: Tuesday, August 08, 2017 3:18 PM
-> To: linux-arm-kernel at lists.infradead.org; Russell King
-> Cc: Xiaobo Xie; Y.b. Lu
-> Subject: [PATCH] ARM: multi_v7_defconfig: make eSDHC driver built-in
+
+On Monday 14 August 2017 11:28 PM, Robert Nelson wrote:
+> Latest update to the BeagleBoard-X15 platform (revision C). This board contains
+> a silicon update (Rev 2.0), which includes a fix for the 2nd ethernet phy when
+> running at 1000 Mbps speeds.
 > 
-> Sometimes root file system is deployed on SD card. It's proper to always
-> build eSDHC driver into kernel.
+> This board can be indentified by the [C.00] after [BBRDX15_] in the at24 eeprom:
+> [BBRDX15_C.001731PX150249]
 > 
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> Rev C is now in full production and boards are available for end users.
+> 
+> https://beagleboard.org/x15
+> https://github.com/beagleboard/beagleboard-x15/
+> 
+> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+> CC: Tony Lindgren <tony@atomide.com>
+> CC: Nishanth Menon <nm@ti.com>
+> CC: Jason Kridner <jkridner@beagleboard.org>
+> CC: Drew Fustini <drew@beagleboard.org>
 > ---
->  arch/arm/configs/multi_v7_defconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/boot/dts/Makefile                   |  1 +
+>  arch/arm/boot/dts/am57xx-beagle-x15-revc.dts | 24 ++++++++++++++++++++++++
+>  2 files changed, 25 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/am57xx-beagle-x15-revc.dts
 > 
-> diff --git a/arch/arm/configs/multi_v7_defconfig
-> b/arch/arm/configs/multi_v7_defconfig
-> index 4d19c1b..d407468 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -711,7 +711,7 @@ CONFIG_MMC_SDHCI=y
->  CONFIG_MMC_SDHCI_PLTFM=y
->  CONFIG_MMC_SDHCI_OF_ARASAN=y
->  CONFIG_MMC_SDHCI_OF_AT91=y
-> -CONFIG_MMC_SDHCI_OF_ESDHC=m
-> +CONFIG_MMC_SDHCI_OF_ESDHC=y
->  CONFIG_MMC_SDHCI_ESDHC_IMX=y
->  CONFIG_MMC_SDHCI_DOVE=y
->  CONFIG_MMC_SDHCI_TEGRA=y
-> --
-> 2.1.0.27.g96db324
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index c293e841eea3..d3a4fe7eb6f7 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -651,6 +651,7 @@ dtb-$(CONFIG_SOC_OMAP5) += \
+>  dtb-$(CONFIG_SOC_DRA7XX) += \
+>  	am57xx-beagle-x15.dtb \
+>  	am57xx-beagle-x15-revb1.dtb \
+> +	am57xx-beagle-x15-revc.dtb \
+>  	am57xx-cl-som-am57x.dtb \
+>  	am57xx-sbc-am57x.dtb \
+>  	am572x-idk.dtb \
+> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-revc.dts b/arch/arm/boot/dts/am57xx-beagle-x15-revc.dts
+> new file mode 100644
+> index 000000000000..742eeb96b8aa
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am57xx-beagle-x15-revc.dts
+> @@ -0,0 +1,24 @@
+> +/*
+> + * Copyright (C) 2014-2016 Texas Instruments Incorporated - http://www.ti.com/
+						^^2017 :)
+
+Rest of the patch looks good to me.
+
+Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
+
+Thanks and regards,
+Lokesh
+
+
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include "am57xx-beagle-x15-common.dtsi"
+> +
+> +/ {
+> +	model = "TI AM5728 BeagleBoard-X15 rev C";
+> +};
+> +
+> +&tpd12s015 {
+> +	gpios = <&gpio7 10 GPIO_ACTIVE_HIGH>,	/* gpio7_10, CT CP HPD */
+> +		<&gpio2 30 GPIO_ACTIVE_HIGH>,	/* gpio2_30, LS OE */
+> +		<&gpio7 12 GPIO_ACTIVE_HIGH>;	/* gpio7_12/sp1_cs2, HPD */
+> +};
+> +
+> +&mmc1 {
+> +	vmmc-supply = <&vdd_3v3>;
+> +	vqmmc-supply = <&ldo1_reg>;
+> +};
+> 
