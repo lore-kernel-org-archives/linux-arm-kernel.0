@@ -1,35 +1,64 @@
 From: scott.branden@broadcom.com (Scott Branden)
-Date: Tue, 15 Aug 2017 10:25:58 -0700
-Subject: [PATCH 1/6] ARM: dts: cygnus: Fix incorrect UART2 register base
+Date: Tue, 15 Aug 2017 10:25:59 -0700
+Subject: [PATCH 2/6] ARM: dts: cygnus: place v3d in proper address ordered
+ location
 In-Reply-To: <1502817964-8221-1-git-send-email-scott.branden@broadcom.com>
 References: <1502817964-8221-1-git-send-email-scott.branden@broadcom.com>
-Message-ID: <1502817964-8221-2-git-send-email-scott.branden@broadcom.com>
+Message-ID: <1502817964-8221-3-git-send-email-scott.branden@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ray Jui <ray.jui@broadcom.com>
+Move v3d devicetree node to proper address ordered location in Cygnus
+dtsi.
 
-Fix incorrect Cygnus UART2 register base.
-
-Fixes: 0f0b21a83ad2 ("ARM: dts: Move all Cygnus peripherals into axi bus")
-Signed-off-by: Ray Jui <ray.jui@broadcom.com>
 Signed-off-by: Scott Branden <scott.branden@broadcom.com>
 ---
- arch/arm/boot/dts/bcm-cygnus.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/bcm-cygnus.dtsi | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
 
 diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index bf8c838..e4d07f4 100644
+index e4d07f4..2077fee 100644
 --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
 +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -324,7 +324,7 @@
+@@ -366,6 +366,19 @@
+ 			brcm,nand-has-wp;
+ 		};
  
- 		uart2: serial at 18022000 {
- 			compatible = "snps,dw-apb-uart";
--			reg = <0x18020000 0x100>;
-+			reg = <0x18022000 0x100>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
- 			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
++		v3d: v3d at 180a2000 {
++			compatible = "brcm,cygnus-v3d";
++			reg = <0x180a2000 0x1000>;
++			clocks = <&mipipll BCM_CYGNUS_MIPIPLL_CH2_V3D>;
++			clock-names = "v3d_clk";
++			interrupts = <GIC_SPI 182 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		vc4: gpu {
++			compatible = "brcm,cygnus-vc4";
++		};
++
+ 		gpio_asiu: gpio at 180a5000 {
+ 			compatible = "brcm,cygnus-asiu-gpio";
+ 			reg = <0x180a5000 0x668>;
+@@ -444,19 +457,6 @@
+ 			status = "disabled";
+ 		};
+ 
+-		v3d: v3d at 180a2000 {
+-			compatible = "brcm,cygnus-v3d";
+-			reg = <0x180a2000 0x1000>;
+-			clocks = <&mipipll BCM_CYGNUS_MIPIPLL_CH2_V3D>;
+-			clock-names = "v3d_clk";
+-			interrupts = <GIC_SPI 182 IRQ_TYPE_LEVEL_HIGH>;
+-			status = "disabled";
+-		};
+-
+-		vc4: gpu {
+-			compatible = "brcm,cygnus-vc4";
+-		};
+-
+ 		adc: adc at 180a6000 {
+ 			compatible = "brcm,iproc-static-adc";
+ 			#io-channel-cells = <1>;
 -- 
 2.5.0
