@@ -1,68 +1,174 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 16 Aug 2017 18:48:01 +0100
-Subject: [PATCH 15/27] arm64/sve: Probe SVE capabilities and usable vector
- lengths
-In-Reply-To: <1502280338-23002-16-git-send-email-Dave.Martin@arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-16-git-send-email-Dave.Martin@arm.com>
-Message-ID: <07268b07-c5f4-38d6-257d-5864cb6752c1@arm.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Wed, 16 Aug 2017 10:49:37 -0700
+Subject: [RFC PATCH 1/3] PCI: rockchip: Add support for pcie wake irq
+In-Reply-To: <20170816075224.31734-2-jeffy.chen@rock-chips.com>
+References: <20170816075224.31734-1-jeffy.chen@rock-chips.com>
+ <20170816075224.31734-2-jeffy.chen@rock-chips.com>
+Message-ID: <20170816174936.GB99323@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/17 13:05, Dave Martin wrote:
-> [This sender failed our fraud detection checks and may not be who they appear to be. Learn about spoofing at http://aka.ms/LearnAboutSpoofing]
->
-> This patch uses the cpufeatures framework to determine common SVE
-> capabilities and vector lengths, and configures the runtime SVE
-> support code appropriately.
->
-> ZCR_ELx is not really a feature register, but it is convenient to
-> use it as a template for recording the maximum vector length
-> supported by a CPU, using the LEN field.  This field is similar to
-> a feature field in that it is a contiguous bitfield for which we
-> want to determine the minimum system-wide value.  This patch adds
-> ZCR as a pseudo-register in cpuinfo/cpufeatures, with appropriate
-> custom code to populate it.  Finding the minimum supported value of
-> the LEN field is left to the cpufeatures framework in the usual
-> way.
->
-> The meaning of ID_AA64ZFR0_EL1 is not architecturally defined yet,
-> so for now we just require it to be zero.
->
-> Note that much of this code is dormant and SVE still won't be used
-> yet, since system_supports_sve() remains hardwired to false.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Hi,
 
-Dave,
-
-The cpufeature bits look good to me, with one minor comment.
-
-
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index bce95de..955c873 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-
-...
-
-> +void __init sve_setup(void)
+On Wed, Aug 16, 2017 at 03:52:22PM +0800, Jeffy Chen wrote:
+> Add support for PCIE_WAKE pin in rockchip pcie driver.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+> 
+>  drivers/pci/host/pcie-rockchip.c | 58 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 58 insertions(+)
+> 
+> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
+> index 7bb9870f6d8c..f969a6d3cd85 100644
+> --- a/drivers/pci/host/pcie-rockchip.c
+> +++ b/drivers/pci/host/pcie-rockchip.c
+> @@ -38,6 +38,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/reset.h>
+>  #include <linux/regmap.h>
+> +#include <linux/suspend.h>
+>  
+>  /*
+>   * The upper 16 bits of PCIE_CLIENT_CONFIG are a write mask for the lower 16
+> @@ -226,6 +227,8 @@ struct rockchip_pcie {
+>  	struct	regulator *vpcie1v8; /* 1.8V power supply */
+>  	struct	regulator *vpcie0v9; /* 0.9V power supply */
+>  	struct	gpio_desc *ep_gpio;
+> +	int	wake_irq;
+> +	bool	wake_by_pcie;
+>  	u32	lanes;
+>  	u8	root_bus_nr;
+>  	int	link_gen;
+> @@ -853,6 +856,20 @@ static void rockchip_pcie_legacy_int_handler(struct irq_desc *desc)
+>  	chained_irq_exit(chip, desc);
+>  }
+>  
+> +static irqreturn_t rockchip_pcie_wake_irq_handler(int irq, void *arg)
 > +{
-> +       u64 zcr;
-> +       unsigned int max_vl;
+> +	struct rockchip_pcie *rockchip = arg;
 > +
-> +       if (!system_supports_sve())
-> +               return;
+> +	rockchip->wake_by_pcie = true;
 > +
-> +       /*
-> +        * The architecture mandates 128-bit vectors be supported, and
-> +        * the code assumes elsewhere that sve_vq_map is non-empty:
-> +        */
-> +       BUG_ON(!test_bit(vq_to_bit(1), sve_vq_map));
+> +	disable_irq_nosync(rockchip->wake_irq);
+> +	disable_irq_wake(rockchip->wake_irq);
 > +
-> +       sve_vq_map_finalised = true;
+> +	pm_wakeup_event(rockchip->dev, 0);
+> +	pm_system_wakeup();
+> +
+> +	return IRQ_HANDLED;
+> +}
+>  
+>  /**
+>   * rockchip_pcie_parse_dt - Parse Device Tree
+> @@ -868,6 +885,7 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
+>  	struct resource *regs;
+>  	int irq;
+>  	int err;
+> +	bool wakeup = 0;
 
-We have something local in cpufeature.c, sys_caps_initialised. May be we could
-reuse it here ? With or without that change, FWIW.
+'0' should be 'false'.
 
-Acked-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>  
+>  	regs = platform_get_resource_byname(pdev,
+>  					    IORESOURCE_MEM,
+> @@ -1018,6 +1036,21 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
+>  		return err;
+>  	}
+>  
+> +	rockchip->wake_irq = platform_get_irq_byname(pdev, "wake");
+> +	if (rockchip->wake_irq >= 0) {
+> +		err = devm_request_irq(dev, rockchip->wake_irq,
+> +				       rockchip_pcie_wake_irq_handler,
+> +				       0, "pcie-wake", rockchip);
+> +		if (err) {
+> +			dev_err(dev, "failed to request PCIe wake IRQ\n");
+> +			return err;
+> +		}
+> +
+> +		disable_irq(rockchip->wake_irq);
+
+If you're worried about keeping this disabled at first, you can just use
+this nifty trick (since this isn't a shared interrupt) -- call this
+before requesting the IRQ:
+
+	irq_set_status_flags(rockchip->wake_irq, IRQ_NOAUTOEN);
+
+You could also consider using dev_pm_set_dedicated_wake_irq() to handle
+this -- but beware, it still might not quite handle level-triggered
+interrupt properly. I'm pretty sure Tony Lindgren would be happy to get
+testing or patches for that though :) He already sent me something a
+while back but I didn't have time to test it out.
+
+> +		wakeup = device_property_read_bool(dev, "wakeup-source");
+> +	}
+> +	device_init_wakeup(dev, wakeup);
+
+Shouldn't you call 'device_init_wakeup(dev, false)' on remove()?
+
+> +
+>  	rockchip->vpcie3v3 = devm_regulator_get_optional(dev, "vpcie3v3");
+>  	if (IS_ERR(rockchip->vpcie3v3)) {
+>  		if (PTR_ERR(rockchip->vpcie3v3) == -EPROBE_DEFER)
+> @@ -1270,6 +1303,30 @@ static int rockchip_pcie_wait_l2(struct rockchip_pcie *rockchip)
+>  	return 0;
+>  }
+>  
+> +static int __maybe_unused rockchip_pcie_suspend(struct device *dev)
+
+Why do this in suspend() instead of suspend_noirq()? You shouldn't
+really need a separate method here.
+
+Note that this should be a level-triggered interrupt which remains
+asserted, so there should be no chance of "missing" it if you don't
+enable it in time.
+
+And on a related note: if you try the dedicated wake irq approach, this
+will only occur just before the noirq phase anyway, since
+device_wakeup_arm_wake_irqs() is called in dpm_suspend_noirq().
+
+> +{
+> +	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
+> +
+> +	rockchip->wake_by_pcie = false;
+> +
+> +	if (device_may_wakeup(dev)) {
+> +		enable_irq_wake(rockchip->wake_irq);
+> +		enable_irq(rockchip->wake_irq);
+> +	}
+> +	return 0;
+> +}
+> +
+> +static int __maybe_unused rockchip_pcie_resume(struct device *dev)
+> +{
+> +	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
+> +
+> +	if (device_may_wakeup(dev) && !rockchip->wake_by_pcie) {
+
+The use of 'wake_by_pcie' is racy; an interrupt could be in flight (but
+not completed), and so it could set 'wake_by_pcie' just after you're
+reading this. Then, you'll get a double-disable.
+
+I believe the safe way to handle this would be to use an atomic
+test-and-set / test-and-clear approach (either atomic_cmpxchg(), or use
+a spinlock).
+
+> +		disable_irq(rockchip->wake_irq);
+> +		disable_irq_wake(rockchip->wake_irq);
+> +	}
+> +	return 0;
+> +}
+> +
+>  static int __maybe_unused rockchip_pcie_suspend_noirq(struct device *dev)
+>  {
+>  	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
+> @@ -1548,6 +1605,7 @@ static int rockchip_pcie_remove(struct platform_device *pdev)
+>  }
+>  
+>  static const struct dev_pm_ops rockchip_pcie_pm_ops = {
+> +	SET_SYSTEM_SLEEP_PM_OPS(rockchip_pcie_suspend, rockchip_pcie_resume)
+>  	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(rockchip_pcie_suspend_noirq,
+>  				      rockchip_pcie_resume_noirq)
+>  };
+
+Brian
