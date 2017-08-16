@@ -1,111 +1,36 @@
-From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Wed, 16 Aug 2017 12:40:48 +0530
-Subject: [PATCH v5 4/4] perf vendor events arm64: Add ThunderX2 implementation
- defined pmu core events
-In-Reply-To: <20170816071048.26087-1-ganapatrao.kulkarni@cavium.com>
-References: <20170816071048.26087-1-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20170816071048.26087-5-ganapatrao.kulkarni@cavium.com>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Wed, 16 Aug 2017 15:26:35 +0800
+Subject: [PATCH v2] arm64: dts: hi6220: add acpu_sctrl
+Message-ID: <1502868395-11481-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is not a full event list, but a short list of useful events.
+Add acpu_sctrl clock node
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
 ---
- tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
- .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
- 2 files changed, 77 insertions(+)
- create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
- create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+Update name to acpu_sctrl at f6504000
 
-diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-new file mode 100644
-index 0000000..7167086
---- /dev/null
-+++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-@@ -0,0 +1,15 @@
-+# Format:
-+#	MIDR,Version,JSON/file/pathname,Type
-+#
-+# where
-+#	MIDR	Processor version
-+#		Variant[23:20] and Revision [3:0] should be zero.
-+#	Version could be used to track version of of JSON file
-+#		but currently unused.
-+#	JSON/file/pathname is the path to JSON file, relative
-+#		to tools/perf/pmu-events/arch/arm64/.
-+#	Type is core, uncore etc
-+#
-+#
-+#Family-model,Version,Filename,EventType
-+0x00000000420f5160,v1,thunderx2,core
-diff --git a/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
-new file mode 100644
-index 0000000..2db45c4
---- /dev/null
-+++ b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
-@@ -0,0 +1,62 @@
-+[
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache access, read",
-+        "EventCode": "0x40",
-+        "EventName": "l1d_cache_rd",
-+        "BriefDescription": "L1D cache read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache access, write ",
-+        "EventCode": "0x41",
-+        "EventName": "l1d_cache_wr",
-+        "BriefDescription": "L1D cache write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache refill, read",
-+        "EventCode": "0x42",
-+        "EventName": "l1d_cache_refill_rd",
-+        "BriefDescription": "L1D cache refill read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache refill, write",
-+        "EventCode": "0x43",
-+        "EventName": "l1d_cache_refill_wr",
-+        "BriefDescription": "L1D refill write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data TLB refill, read",
-+        "EventCode": "0x4C",
-+        "EventName": "l1d_tlb_refill_rd",
-+        "BriefDescription": "L1D tlb refill read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data TLB refill, write",
-+        "EventCode": "0x4D",
-+        "EventName": "l1d_tlb_refill_wr",
-+        "BriefDescription": "L1D tlb refill write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
-+        "EventCode": "0x4E",
-+        "EventName": "l1d_tlb_rd",
-+        "BriefDescription": "L1D tlb read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
-+        "EventCode": "0x4F",
-+        "EventName": "l1d_tlb_wr",
-+        "BriefDescription": "L1D tlb write",
-+    },
-+    {
-+        "PublicDescription": "Bus access read",
-+        "EventCode": "0x60",
-+        "EventName": "bus_access_rd",
-+        "BriefDescription": "Bus access read",
-+   },
-+   {
-+        "PublicDescription": "Bus access write",
-+        "EventCode": "0x61",
-+        "EventName": "bus_access_wr",
-+        "BriefDescription": "Bus access write",
-+   }
-+]
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+index eacbe0d..f8012d5 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+@@ -262,6 +262,12 @@
+ 			#clock-cells = <1>;
+ 		};
+ 
++		acpu_sctrl: acpu_sctrl at f6504000 {
++			compatible = "hisilicon,hi6220-acpu-sctrl", "syscon";
++			reg = <0x0 0xf6504000 0x0 0x1000>;
++			#clock-cells = <1>;
++		};
++
+ 		medianoc_ade: medianoc_ade at f4520000 {
+ 			compatible = "syscon";
+ 			reg = <0x0 0xf4520000 0x0 0x4000>;
 -- 
-2.9.4
+2.7.4
