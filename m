@@ -1,90 +1,78 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 16 Aug 2017 09:27:29 +0100
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.14
-In-Reply-To: <5992F4F9.6090301@hisilicon.com>
-References: <5992F4F9.6090301@hisilicon.com>
-Message-ID: <599401F1.4040304@hisilicon.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Wed, 16 Aug 2017 16:33:38 +0800
+Subject: [RFC PATCH 3/3] arm64: dts: rockchip: Handle pcie wake in pcie
+ driver for Gru
+In-Reply-To: <20170816075224.31734-4-jeffy.chen@rock-chips.com>
+References: <20170816075224.31734-1-jeffy.chen@rock-chips.com>
+ <20170816075224.31734-4-jeffy.chen@rock-chips.com>
+Message-ID: <3bd2600e-6e5d-6179-6b9b-6989e1f65b7d@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+Hi Jeffy,
 
-Please ignore this pull request because of the incorrect unit address
-of the acpu_sctrl clock node.
-
-I will send v2.
-Sorry for the noise.
-Thanks!
-
-Best Regards,
-Wei
-
-On 2017/8/15 14:19, Wei Xu wrote:
-> Hi Arnd, Hi Olof, Hi Kevin,
+On 2017/8/16 15:52, Jeffy Chen wrote:
+> Currently we are handling pcie wake irq in mrvl wifi driver.
+> Move it to rockchip pcie driver for Gru boards.
 > 
-> Please help to pull the following changes.
-> Thanks!
-> 
-> Best Regards,
-> Wei
-> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 > ---
 > 
-> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+>   arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 17 +++++++++++------
+>   1 file changed, 11 insertions(+), 6 deletions(-)
 > 
->   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.14
-> 
-> for you to fetch changes up to a0a450ead7309e4852ae1e442790c710e829b0d8:
-> 
->   arm64: dts: hi3660: enable watchdog (2017-08-14 15:42:38 +0100)
-> 
-> ----------------------------------------------------------------
-> ARM64: DT: Hisilicon SoC DT updates for 4.14
-> 
-> - Add PCIe node for hip07
-> - Add acpu_sctrl node and refine the usb tx fifo size for hi6220
-> - Add cpu idle states, L2 cache, PMU, OP-TEE, reboot, pstore,
->   k3-dma and watchdog nodes for hi3660 and hikey960
-> - Update mmc and bluetooth nodes for hi3660 and hikey960
-> 
-> ----------------------------------------------------------------
-> Guodong Xu (4):
->       arm64: dts: hikey960: Add support for syscon-reboot-mode
->       arm64: dts: hikey960: Add pstore support
->       arm64: dts: hi3660: Reset the mmc hosts
->       arm64: dts: hikey960: change bluetooth uart max-speed to 3mbps
-> 
-> Leo Yan (3):
->       arm64: dts: hi3660: enable idle states
->       arm64: dts: hi3660: add L2 cache topology
->       arm64: dts: hi3660: enable watchdog
-> 
-> Shawn Guo (1):
->       arm64: dts: hi6220: improve g-tx-fifo-size setting for usb device
-> 
-> Victor Chong (1):
->       arm64: dts: hikey960: Add optee node
-> 
-> Wang Ruyi (1):
->       arm64: dts: hi3660: add bindings for DMA
-> 
-> YiPing Xu (1):
->       arm64: dts: hi3660: add pmu dt node for hi3660
-> 
-> Zhangfei Gao (1):
->       arm64: dts: hi6220: add acpu_sctrl
-> 
-> Zhou Wang (1):
->       arm64: dts: hisi: add PCIe host controller node for hip07 SoC
-> 
->  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  37 +++++-
->  arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 130 ++++++++++++++++++++++
->  arch/arm64/boot/dts/hisilicon/hi6220.dtsi         |   9 +-
->  arch/arm64/boot/dts/hisilicon/hip07-d05.dts       |   4 +
->  arch/arm64/boot/dts/hisilicon/hip07.dtsi          |  22 ++++
->  5 files changed, 200 insertions(+), 2 deletions(-)
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> index d48e98b62d09..7a5e1517a496 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> @@ -712,11 +712,21 @@ ap_i2c_audio: &i2c8 {
+>   
+>   	ep-gpios = <&gpio2 27 GPIO_ACTIVE_HIGH>;
+>   	pinctrl-names = "default";
+> -	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wifi_perst_l>;
+> +	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wlan_host_wake_l>, <&wifi_perst_l>;
+> +
+> +	interrupts-extended = <&gic GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH 0>,
+> +			      <&gic GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH 0>,
+> +			      <&gic GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH 0>,
+> +			      <&gpio0 8 IRQ_TYPE_LEVEL_LOW>;
+> +	interrupt-names = "sys", "legacy", "client", "wake";
+> +	/delete-property/ interrupts;
+> +
+
+Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+says "Nodes that describe devices which generate interrupts must contain
+an "interrupts" property, an "interrupts-extended" property, or both. If
+both are present, the latter should take precedence;"
+
+But it doesn't seem real as drivers/of/irq.c actually says "Try the
+new-style interrupts-extended first"
+
+Anyway, it seems you could safely add interrupts-extended and don't need
+to delete "interrupts".
+
+>   	vpcie3v3-supply = <&pp3300_wifi_bt>;
+>   	vpcie1v8-supply = <&wlan_pd_n>; /* HACK: see &wlan_pd_n */
+>   	vpcie0v9-supply = <&pp900_pcie>;
+>   
+> +	wakeup-source;
+> +
+
+I also have a question for this one but will inline that in the patch 1
+
+>   	pci_rootport: pcie at 0,0 {
+>   		reg = <0x83000000 0x0 0x00000000 0x0 0x00000000>;
+>   		#address-cells = <3>;
+> @@ -727,11 +737,6 @@ ap_i2c_audio: &i2c8 {
+>   			compatible = "pci1b4b,2b42";
+>   			reg = <0x83010000 0x0 0x00000000 0x0 0x00100000
+>   			       0x83010000 0x0 0x00100000 0x0 0x00100000>;
+> -			interrupt-parent = <&gpio0>;
+> -			interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
+> -			pinctrl-names = "default";
+> -			pinctrl-0 = <&wlan_host_wake_l>;
+> -			wakeup-source;
+>   		};
+>   	};
+>   };
 > 
