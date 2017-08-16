@@ -1,79 +1,113 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Wed, 16 Aug 2017 09:22:48 -0500
-Subject: [PATCH] ARM: dts: am57xx-beagle-x15: Add support for rev C
-In-Reply-To: <bf2a5868-4c0b-58a1-350e-cba7dcfb5166@ti.com>
-References: <20170814175820.12065-1-robertcnelson@gmail.com>
- <bf2a5868-4c0b-58a1-350e-cba7dcfb5166@ti.com>
-Message-ID: <CAOCHtYi=JxMirp03DMny+HFo3g9nsPO--VuNK7N-YtctNhj2dg@mail.gmail.com>
+From: oleksandrs@mellanox.com (Oleksandr Shamray)
+Date: Wed, 16 Aug 2017 14:24:16 +0000
+Subject: [patch v3 1/3] drivers: jtag: Add JTAG core driver
+In-Reply-To: <CAK8P3a3DutrfhGrd9MnDFbzhfvnZXSyrV2RbTgrFGgpbAs=H0w@mail.gmail.com>
+References: <1502791207-26951-1-git-send-email-oleksandrs@mellanox.com>
+ <1502791207-26951-2-git-send-email-oleksandrs@mellanox.com>
+ <CAK8P3a3DutrfhGrd9MnDFbzhfvnZXSyrV2RbTgrFGgpbAs=H0w@mail.gmail.com>
+Message-ID: <AM4PR0501MB2194CBCC82F7EB67FE73304AB1820@AM4PR0501MB2194.eurprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 10:11 PM, Lokesh Vutla <lokeshvutla@ti.com> wrote:
->
->
-> On Monday 14 August 2017 11:28 PM, Robert Nelson wrote:
->> Latest update to the BeagleBoard-X15 platform (revision C). This board contains
->> a silicon update (Rev 2.0), which includes a fix for the 2nd ethernet phy when
->> running at 1000 Mbps speeds.
->>
->> This board can be indentified by the [C.00] after [BBRDX15_] in the at24 eeprom:
->> [BBRDX15_C.001731PX150249]
->>
->> Rev C is now in full production and boards are available for end users.
->>
->> https://beagleboard.org/x15
->> https://github.com/beagleboard/beagleboard-x15/
->>
->> Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
->> CC: Tony Lindgren <tony@atomide.com>
->> CC: Nishanth Menon <nm@ti.com>
->> CC: Jason Kridner <jkridner@beagleboard.org>
->> CC: Drew Fustini <drew@beagleboard.org>
->> ---
->>  arch/arm/boot/dts/Makefile                   |  1 +
->>  arch/arm/boot/dts/am57xx-beagle-x15-revc.dts | 24 ++++++++++++++++++++++++
->>  2 files changed, 25 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/am57xx-beagle-x15-revc.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index c293e841eea3..d3a4fe7eb6f7 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -651,6 +651,7 @@ dtb-$(CONFIG_SOC_OMAP5) += \
->>  dtb-$(CONFIG_SOC_DRA7XX) += \
->>       am57xx-beagle-x15.dtb \
->>       am57xx-beagle-x15-revb1.dtb \
->> +     am57xx-beagle-x15-revc.dtb \
->>       am57xx-cl-som-am57x.dtb \
->>       am57xx-sbc-am57x.dtb \
->>       am572x-idk.dtb \
->> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-revc.dts b/arch/arm/boot/dts/am57xx-beagle-x15-revc.dts
->> new file mode 100644
->> index 000000000000..742eeb96b8aa
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/am57xx-beagle-x15-revc.dts
->> @@ -0,0 +1,24 @@
->> +/*
->> + * Copyright (C) 2014-2016 Texas Instruments Incorporated - http://www.ti.com/
->                                                 ^^2017 :)
->
-> Rest of the patch looks good to me.
->
-> Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
->
-> Thanks and regards,
-> Lokesh
+> -----Original Message-----
+> From: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] On
+> Behalf Of Arnd Bergmann
+> Sent: Tuesday, August 15, 2017 2:16 PM
+> To: Oleksandr Shamray <oleksandrs@mellanox.com>
+> Cc: gregkh <gregkh@linuxfoundation.org>; Linux Kernel Mailing List <linux-
+> kernel at vger.kernel.org>; Linux ARM <linux-arm-kernel@lists.infradead.org>;
+> devicetree at vger.kernel.org; OpenBMC Maillist <openbmc@lists.ozlabs.org>;
+> Joel Stanley <joel@jms.id.au>; Ji?? P?rko <jiri@resnulli.us>; Tobias Klauser
+> <tklauser@distanz.ch>; linux-serial at vger.kernel.org; mec at shout.net;
+> vadimp at maellanox.com; system-sw-low-level <system-sw-low-
+> level at mellanox.com>; Rob Herring <robh+dt@kernel.org>; openocd-devel-
+> owner at lists.sourceforge.net; Jiri Pirko <jiri@mellanox.com>
+> Subject: Re: [patch v3 1/3] drivers: jtag: Add JTAG core driver
+> 
+> On Tue, Aug 15, 2017 at 12:00 PM, Oleksandr Shamray
+> <oleksandrs@mellanox.com> wrote:
+> 
+> > +       case JTAG_IOCXFER:
+> > +               if (copy_from_user(&xfer, varg, sizeof(struct jtag_xfer)))
+> > +                       return -EFAULT;
+> > +
+> > +               if (xfer.length >= JTAG_MAX_XFER_DATA_LEN)
+> > +                       return -EFAULT;
+> > +
+> > +               user_tdio_data = xfer.tdio;
+> > +               xfer.tdio = jtag_copy_from_user((void __user *)user_tdio_data,
+> > +                                               xfer.length);
+> > +               if (!xfer.tdio)
+> > +                       return -ENOMEM;
+> 
+> This is not safe for 32-bit processes on 64-bit kernels, since the structure layout
+> differs for the pointer member. It's better to always use either rework the
+> structure to avoid the pointer, or to use a
+> __u64 member to store it, and then use u64_to_user_ptr() to convert it in the
+> kernel.
 
-and this is going to conflict with:
+Thanks,  I think using __u64 instead of  pointer will be a good solution.
 
-[v2,04/10] ARM: dts: am57xx-beagle-x15: Add pinmux configuration for MMC
+> 
+> > +       case JTAG_GIOCSTATUS:
+> > +               if (jtag->ops->status_get)
+> > +                       err = jtag->ops->status_get(jtag,
+> > +                                               (enum jtag_endstate
+> > + *)&value);
+> 
+> This pointer cast is also not safe, as an enum might have a different size than
+> the 'value' variable that is not an enum. I think you need to change the
+> argument type for the callback, or maybe use another intermediate.
+> 
+> > +static int jtag_open(struct inode *inode, struct file *file) {
+> > +       struct jtag *jtag = container_of(inode->i_cdev, struct jtag,
+> > +cdev);
+> > +
+> > +       spin_lock(&jtag->lock);
+> > +
+> > +       if (jtag->is_open) {
+> > +               dev_info(NULL, "jtag already opened\n");
+> > +               spin_unlock(&jtag->lock);
+> > +               return -EBUSY;
+> > +       }
+> > +
+> > +       jtag->is_open = true;
+> > +       file->private_data = jtag;
+> > +       spin_unlock(&jtag->lock);
+> > +       return 0;
+> > +}
+> 
+> Does the 'is_open' flag protect you from something that doesn't also happen
+> after a 'dup()' call on the file descriptor?
 
-https://patchwork.kernel.org/patch/9903875/
+is_open flag protects from the opening file more than one time.
 
-i'll wait for Tony to pick up Kishon's before i re-submit..
+> 
+> > + * @mode: access mode
+> > + * @type: transfer type
+> > + * @direction: xfer direction
+> > + * @length: xfer bits len
+> > + * @tdio : xfer data array
+> > + * @endir: xfer end state
+> > + *
+> > + * Structure represents interface to Aspeed JTAG device for jtag sdr
+> > +xfer
+> > + * execution.
+> > + */
+> > +struct jtag_xfer {
+> > +       __u8    mode;
+> > +       __u8    type;
+> > +       __u8    direction;
+> > +       __u32   length;
+> > +       __u8    *tdio;
+> > +       __u8    endstate;
+> > +};
+> 
+> As mentioned above, the pointer in here makes it incompatible. Also, you
+> should reorder the members to avoid the implied padding.
+> Moving the 'endstate' before 'length' is sufficient.
+> 
 
-Regards,
+Thank. I will do it.
 
--- 
-Robert Nelson
-https://rcn-ee.com/
+>         Arnd
