@@ -1,64 +1,74 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 16 Aug 2017 12:01:01 +0900
-Subject: [GIT PULL] arm64: dts: uniphier: UniPhier DT updates (64bit) for v4.14
-Message-ID: <CAK7LNARP=6+63Cnjy-U57-0_Ue-5FamM-9SdBtfxkfmqHesxjQ@mail.gmail.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Wed, 16 Aug 2017 11:02:41 +0800
+Subject: [PATCH 2/2] arm64: dts: hi6220: add acpu_sctrl
+In-Reply-To: <20170815150138.GL22218@golem.pkh.me>
+References: <1492478242-16146-1-git-send-email-zhangfei.gao@linaro.org>
+ <1492478242-16146-2-git-send-email-zhangfei.gao@linaro.org>
+ <5992F7FB.9080709@hisilicon.com> <20170815150138.GL22218@golem.pkh.me>
+Message-ID: <a3efeae1-834b-55f5-f5b5-cbe588b6fa8b@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
-
-Here are UniPhier DT (64bit) updates for the v4.14 merge window.
-Please pull!
 
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
-
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-dt64-v4.14
-
-for you to fetch changes up to e5aefb380eafe176de066ddde1d354a167a9d474:
-
-  arm64: dts: uniphier: add Denali NAND controller nodes (2017-08-13
-08:43:27 +0900)
-
-----------------------------------------------------------------
-UniPhier ARM64 SoC DT updates for v4.14
-
-- add nodes for NAND, Watchdog
-- replace /include/ with #include
-- use #include <arm/...> instead of symlinks
-
-----------------------------------------------------------------
-Keiji Hayashibara (1):
-      arm64: dts: uniphier: add watchdog node for LD11 and LD20
-
-Masahiro Yamada (3):
-      arm64: dts: uniphier: use #include instead of /include/
-      arm64: dts: uniphier: use cross-arch include instead of symlinks
-      arm64: dts: uniphier: add Denali NAND controller nodes
-
- .../boot/dts/socionext/uniphier-ld11-global.dts  |  6 +++++-
- .../boot/dts/socionext/uniphier-ld11-ref.dts     |  6 +++---
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 17 ++++++++++++++++-
- .../boot/dts/socionext/uniphier-ld20-global.dts  |  6 +++++-
- .../boot/dts/socionext/uniphier-ld20-ref.dts     |  6 +++---
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 17 ++++++++++++++++-
- .../boot/dts/socionext/uniphier-pinctrl.dtsi     |  2 +-
- .../dts/socionext/uniphier-ref-daughter.dtsi     |  2 +-
- .../dts/socionext/uniphier-support-card.dtsi     |  2 +-
- 9 files changed, 51 insertions(+), 13 deletions(-)
- mode change 120000 => 100644
-arch/arm64/boot/dts/socionext/uniphier-pinctrl.dtsi
- mode change 120000 => 100644
-arch/arm64/boot/dts/socionext/uniphier-ref-daughter.dtsi
- mode change 120000 => 100644
-arch/arm64/boot/dts/socionext/uniphier-support-card.dtsi
-
-
--- 
-Best Regards
-Masahiro Yamada
+On 2017?08?15? 23:01, Cl?ment B?sch wrote:
+> On Tue, Aug 15, 2017 at 02:32:43PM +0100, Wei Xu wrote:
+>> Hi Zhangfei,
+>>
+>> On 2017/4/18 2:17, Zhangfei Gao wrote:
+>>> Add acpu_sctrl clock node
+>>>
+>>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>>> Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
+>>> ---
+>>>   arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 6 ++++++
+>>>   1 file changed, 6 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+>>> index 470461d..710cc34 100644
+>>> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+>>> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+>>> @@ -262,6 +262,12 @@
+>>>   			#clock-cells = <1>;
+>>>   		};
+>>>   
+>>> +		acpu_sctrl: acpu_sctrl at f7032000 {
+> I think the unit address is incorrect here (this value has been copied
+> from the pm controller while it should match the 1st one the reg).
+oops,
+Yes, you are right, will update.
+>>> +			compatible = "hisilicon,hi6220-acpu-sctrl", "syscon";
+>>> +			reg = <0x0 0xf6504000 0x0 0x1000>;
+>>> +			#clock-cells = <1>;
+>>> +		};
+>>> +
+>>>   		medianoc_ade: medianoc_ade at f4520000 {
+>>>   			compatible = "syscon";
+>>>   			reg = <0x0 0xf4520000 0x0 0x4000>;
+>>>
+> Also I'm sorry I'm going to ask stupid questions:
+>
+> - why 's' in "sctrl" while all the other node controllers declared around
+>    seems to use "ctrl"?
+Just from hisilicon convention, sctrl means system control.
+acpu_ctrl seems better, more match spec.
+However clk part using this name already been merged, so will keep use this.
+>
+> - is it possible to have access to the specs where those addresses can be
+>    found? The only public doc I could find is the "Hi6220V100 Multi-Mode
+>    Application Processor" one where this information doesn't seem present.
+https://github.com/96boards/documentation/tree/master/ConsumerEdition/HiKey/HardwareDocs
+Looks only this part.
+>
+> - is there any work pending adding the pmu counters node (interrupt
+>    GCI_SPI 99) ? AFAIK the ACPU controller added here can be used to enable
+>    the counters.
+This patch is part of enabling core-sight, not touching pmu.
+>> Thanks!
+>> Applied to the hisilicon dt tree since the driver part is in the mainline now.
+>>
+> Is this refering to https://github.com/hisilicon/linux-hisi/commits/next/dt64 ?
+Yes.
+>
+> [...]
+>
