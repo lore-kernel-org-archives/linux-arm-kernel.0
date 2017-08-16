@@ -1,30 +1,50 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 16 Aug 2017 14:08:10 +0800
-Subject: [PATCH v2 1/4] usb: mtu3: add generic compatible string
-Message-ID: <670f9ce1ecaec5859006b6f02b45cfc72c3cca2c.1502854628.git.chunfeng.yun@mediatek.com>
+From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
+Date: Wed, 16 Aug 2017 12:40:44 +0530
+Subject: [PATCH v5 0/4] Add support for ThunderX2 pmu events using json files
+Message-ID: <20170816071048.26087-1-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mtu3 driver is a generic driver for MediaTek usb3 DRD IP, add
-a generic compatible to avoid confusion when support new SoCs but
-use a compatible with specific SoC's name "mt8173".
+Extending json/jevent framework for parsing arm64 event files.
+Adding jevents for ThunderX2 implementation defined PMU events.
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/usb/mtu3/mtu3_plat.c |    1 +
- 1 file changed, 1 insertion(+)
+v5:
+   - Addressed comments from Arnaldo.
+   - Rebased to 4.13-rc5
 
-diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
-index 0d3ebb3..088e3e6 100644
---- a/drivers/usb/mtu3/mtu3_plat.c
-+++ b/drivers/usb/mtu3/mtu3_plat.c
-@@ -500,6 +500,7 @@ static int __maybe_unused mtu3_resume(struct device *dev)
- 
- static const struct of_device_id mtu3_of_match[] = {
- 	{.compatible = "mediatek,mt8173-mtu3",},
-+	{.compatible = "mediatek,mtu3",},
- 	{},
- };
- 
+v4:
+   - Rebased to 4.13-rc1
+
+v3:
+   - Addressed comments from Will Deacon and Jayachandran C.
+   - Rebased to 4.12-rc1
+
+v2:
+   - Updated as per Mark Rutland's suggestions.
+   - Added provision for get_cpuid_str to get cpu id string
+     from associated cpus of pmu core device.
+
+v1: Initial patchset.
+
+Ganapatrao Kulkarni (4):
+  perf utils: passing pmu as a parameter to function get_cpuid_str
+  perf tools arm64: Add support for get_cpuid_str function.
+  perf utils: Add helper function is_pmu_core to detect PMU CORE devices
+  perf vendor events arm64: Add ThunderX2 implementation defined pmu
+    core events
+
+ tools/perf/arch/arm64/util/Build                   |  1 +
+ tools/perf/arch/arm64/util/header.c                | 61 +++++++++++++++++++++
+ tools/perf/arch/powerpc/util/header.c              |  2 +-
+ tools/perf/arch/x86/util/header.c                  |  2 +-
+ tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
+ .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+ tools/perf/util/header.h                           |  3 +-
+ tools/perf/util/pmu.c                              | 53 +++++++++++++++---
+ 8 files changed, 188 insertions(+), 11 deletions(-)
+ create mode 100644 tools/perf/arch/arm64/util/header.c
+ create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+ create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+
 -- 
-1.7.9.5
+2.9.4
