@@ -1,34 +1,33 @@
 From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Wed, 16 Aug 2017 22:29:23 +0530
-Subject: [PATCH 0/7] ASoC: make snd_soc_ops const
-Message-ID: <1502902770-3758-1-git-send-email-bhumirks@gmail.com>
+Date: Wed, 16 Aug 2017 22:29:24 +0530
+Subject: [PATCH 1/7] ASoC: aux1x: make snd_soc_ops const
+In-Reply-To: <1502902770-3758-1-git-send-email-bhumirks@gmail.com>
+References: <1502902770-3758-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <1502902770-3758-2-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make these const. Done using Coccinelle.
+Make this const as it is only stored in the ops field of a
+snd_soc_dai_link structure, which is const.
+Done using Coccinelle.
 
-Bhumika Goyal (7):
-  ASoC: aux1x: make snd_soc_ops const
-  ASoC: cirrus: make snd_soc_ops const
-  ASoC: generic: make snd_soc_ops const
-  ASoC: pxa: make snd_soc_ops const
-  ASoC: rockchip: make snd_soc_ops const
-  ASoC: samsung: make snd_soc_ops const
-  ASoC: sh: make snd_soc_ops const
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
+ sound/soc/au1x/db1200.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- sound/soc/au1x/db1200.c                  | 2 +-
- sound/soc/cirrus/edb93xx.c               | 2 +-
- sound/soc/cirrus/snappercl15.c           | 2 +-
- sound/soc/generic/audio-graph-card.c     | 2 +-
- sound/soc/generic/audio-graph-scu-card.c | 2 +-
- sound/soc/pxa/raumfeld.c                 | 2 +-
- sound/soc/rockchip/rk3288_hdmi_analog.c  | 2 +-
- sound/soc/samsung/jive_wm8750.c          | 2 +-
- sound/soc/samsung/s3c24xx_simtec.c       | 2 +-
- sound/soc/samsung/s3c24xx_uda134x.c      | 2 +-
- sound/soc/samsung/smdk_spdif.c           | 2 +-
- sound/soc/sh/migor.c                     | 2 +-
- 12 files changed, 12 insertions(+), 12 deletions(-)
-
+diff --git a/sound/soc/au1x/db1200.c b/sound/soc/au1x/db1200.c
+index 5c73061..301e1fc 100644
+--- a/sound/soc/au1x/db1200.c
++++ b/sound/soc/au1x/db1200.c
+@@ -99,7 +99,7 @@ static int db1200_i2s_startup(struct snd_pcm_substream *substream)
+ 	return 0;
+ }
+ 
+-static struct snd_soc_ops db1200_i2s_wm8731_ops = {
++static const struct snd_soc_ops db1200_i2s_wm8731_ops = {
+ 	.startup	= db1200_i2s_startup,
+ };
+ 
 -- 
 1.9.1
