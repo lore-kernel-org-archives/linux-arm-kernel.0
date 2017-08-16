@@ -1,57 +1,84 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 16 Aug 2017 17:11:33 +0200
-Subject: [PATCH v3 1/5] reset: add reset-simple to unify socfpga, stm32,
- sunxi, and zx2967
-In-Reply-To: <d6b20df2-12f7-68b1-f7de-0c7f205eba13@suse.de>
-References: <20170816094701.30678-1-p.zabel@pengutronix.de>
- <20170816094701.30678-2-p.zabel@pengutronix.de>
- <51db563d-d6e1-18f1-01c1-3fdcf8269773@arm.com>
- <d6b20df2-12f7-68b1-f7de-0c7f205eba13@suse.de>
-Message-ID: <1502896293.7596.7.camel@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 16 Aug 2017 16:12:03 +0100
+Subject: [PATCH] irqchip/gic-v3-its: handle queue wrapping in
+ its_wait_for_range_completion()
+In-Reply-To: <1502888682-12148-1-git-send-email-yangyingliang@huawei.com>
+References: <1502888682-12148-1-git-send-email-yangyingliang@huawei.com>
+Message-ID: <ce21378f-c7ad-9a7a-563d-982b1170df93@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-08-16 at 14:12 +0200, Andreas F?rber wrote:
-> Hi Andre,
+Hi Yang,
+
+On 16/08/17 14:04, Yang Yingliang wrote:
+> If the to_idx wrap to 0, (rd_idx >= to_idx) will be true,
+> but the command is not completed.
 > 
-> Am 16.08.2017 um 13:30 schrieb Andre Przywara:
-> > On 16/08/17 10:46, Philipp Zabel wrote:
-> > > +/**
-> > > + * struct reset_simple_devdata - simple reset controller properties
-> > > + * @active_low: if true, bits are cleared to assert the reset. Otherwise, bits
-> > > + *??????????????are set to assert the reset.
-> > > + */
-> > > +struct reset_simple_devdata {
-> > > > > > +	bool active_low;
-> > > +};
-> > > +
-> > > +static const struct reset_simple_devdata reset_simple_active_low = {
-> > > > > > +	.active_low = true,
-> > > +};
-> > > +
-> > > +static const struct of_device_id reset_simple_dt_ids[] = {
-> > > > > > +	{ .compatible = "allwinner,sun6i-a31-clock-reset",
-> > > +		.data = &reset_simple_active_low },
-> > 
-> > Can we have a additional generic compatible string here? New users of
-> > this driver then wouldn't need to explicitly enter their name into the
-> > driver, but could just use the generic name as a fallback. This would
-> > enable the driver without any Linux code change just by adding a DT node.
-> > 
-> > 	compatible = "nexell,s5p6818-reset", "simple-reset";
-> > 
-> > Whenever we need a quirk (now or in the future), we can add the specific
-> > name into this structure along with the required workarounds.
+> When to_idx is smaller than from_idx, it means the queue
+> is wrapped. For handling this case, add ITS_CMD_QUEUE_SZ
+> to to_idx and rd_idx to.
 > 
-> Same question about binding here. However the way it is done today, we
-> would also need some optional active-low property then or two different
-> compatible strings, as this is currently controlled via the DT matches.
+> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 6893287..8e47515 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -446,13 +446,18 @@ static void its_wait_for_range_completion(struct its_node *its,
+>  					  struct its_cmd_block *to)
+>  {
+>  	u64 rd_idx, from_idx, to_idx;
+> +	u32 wrap_offset = 0;
+>  	u32 count = 1000000;	/* 1s! */
+>  
+>  	from_idx = its_cmd_ptr_to_offset(its, from);
+>  	to_idx = its_cmd_ptr_to_offset(its, to);
+> +	if (to_idx < from_idx) {
+> +		wrap_offset = ITS_CMD_QUEUE_SZ;
+> +		to_idx += ITS_CMD_QUEUE_SZ;
+> +	}
+>  
+>  	while (1) {
+> -		rd_idx = readl_relaxed(its->base + GITS_CREADR);
+> +		rd_idx = readl_relaxed(its->base + GITS_CREADR) + wrap_offset;
+>  		if (rd_idx >= to_idx || rd_idx < from_idx)
+>  			break;
+>  
+> 
 
-I'd like to decouple this from the issue at hand, which is de-
-duplicating simple reset code without device tree changes.
+I think you've spotted a real issue, but the way you solve it hurts my 
+brain. I'd rather have something that makes the cases explicit. Does the 
+following work for you?
 
-I'll make a separate suggestion for a simple binding on top of this
-series.
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 22e228500357..374977681384 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -453,7 +453,13 @@ static void its_wait_for_range_completion(struct its_node *its,
+ 
+ 	while (1) {
+ 		rd_idx = readl_relaxed(its->base + GITS_CREADR);
+-		if (rd_idx >= to_idx || rd_idx < from_idx)
++
++		/* Direct case */
++		if (from_idx < to_idx && rd_idx >= to_idx)
++			break;
++
++		/* Wrapped case */
++		if (from_idx >= to_idx && rd_idx >= to_idx && rd_idx < from_idx)
+ 			break;
+ 
+ 		count--;
 
-regards
-Philipp
+Secondary question: have you seen this breaking in practice? The worse
+case seems that we exit early, and potentially fail to detect a hung
+ITS. But that should never happen, right?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
