@@ -1,40 +1,24 @@
-From: kever.yang@rock-chips.com (Kever Yang)
-Date: Wed, 16 Aug 2017 10:51:09 +0800
-Subject: [PATCH] arm64: dts: rk3399: init vop clock rates
-Message-ID: <1502851869-1736-1-git-send-email-kever.yang@rock-chips.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 16 Aug 2017 11:50:43 +0900
+Subject: [PATCH 5/6] ARM: dts: uniphier: add Denali NAND controller node
+In-Reply-To: <1502297011-30201-5-git-send-email-yamada.masahiro@socionext.com>
+References: <1502297011-30201-1-git-send-email-yamada.masahiro@socionext.com>
+ <1502297011-30201-5-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNAQVQeh0=kpALRVos42vacLNcgmUbEPRngMYroMq8P71cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to init vop aclk and hclk incase the U-Boot does not do
-the initialize.
+2017-08-10 1:43 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Add NAND controller node to LD4, Pro4, sLD8, Pro5, and PXs2.
+> Set up pinctrl to enable 2 chip select lines except Pro4.  The CS1
+> for Pro4 is multiplexed with other peripherals such as UART2, so
+> I did not enable it.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 
-Signed-off-by: Kever Yang <kever.yang@rock-chips.com>
----
+With some compatibles fixed, applied to linux-uniphier.
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 0b3acc9..a592c24 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1480,6 +1480,8 @@
- 		interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH 0>;
- 		clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>;
- 		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
-+		assigned-clocks = <&cru ACLK_VOP1>, <&cru HCLK_VOP1>;
-+		assigned-clock-rates = <400000000>, <100000000>;
- 		iommus = <&vopl_mmu>;
- 		power-domains = <&power RK3399_PD_VOPL>;
- 		resets = <&cru SRST_A_VOP1>, <&cru SRST_H_VOP1>, <&cru SRST_D_VOP1>;
-@@ -1525,6 +1527,8 @@
- 		interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH 0>;
- 		clocks = <&cru ACLK_VOP0>, <&cru DCLK_VOP0>, <&cru HCLK_VOP0>;
- 		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
-+		assigned-clocks = <&cru ACLK_VOP0>, <&cru HCLK_VOP0>;
-+		assigned-clock-rates = <400000000>, <100000000>;
- 		iommus = <&vopb_mmu>;
- 		power-domains = <&power RK3399_PD_VOPB>;
- 		resets = <&cru SRST_A_VOP0>, <&cru SRST_H_VOP0>, <&cru SRST_D_VOP0>;
 -- 
-1.9.1
+Best Regards
+Masahiro Yamada
