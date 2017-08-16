@@ -1,32 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Aug 2017 22:55:09 +0200
-Subject: [GIT PULL 2/5] ARM: dts: exynos: Updates for v4.14
-In-Reply-To: <20170724190856.19055-2-krzk@kernel.org>
-References: <20170724190856.19055-1-krzk@kernel.org>
- <20170724190856.19055-2-krzk@kernel.org>
-Message-ID: <CAK8P3a1TyCS1VW8ibQR1NBBSsv+BxXFznRkMpZMe2nU_vY2z_A@mail.gmail.com>
+From: alex.g@adaptrum.com (Alexandru Gagniuc)
+Date: Wed, 16 Aug 2017 13:55:32 -0700
+Subject: [PATCH v3 3/5] reset: stm32: use the reset-simple driver
+In-Reply-To: <338608e8-9e83-fc0f-8d8a-18a336e94860@suse.de>
+References: <20170816094701.30678-1-p.zabel@pengutronix.de>
+ <20170816094701.30678-4-p.zabel@pengutronix.de>
+ <edbdf06c-fb1e-63f1-d6b2-17193c86385a@adaptrum.com>
+ <338608e8-9e83-fc0f-8d8a-18a336e94860@suse.de>
+Message-ID: <d46ad9ea-4bf5-5ceb-cfc8-0c1efa48bb02@adaptrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 9:08 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->
-> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
->
->   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.14
->
-> for you to fetch changes up to 9d2770b8e49a1726310e706ae23b52c83b33a986:
->
->   ARM: dts: exynos: Remove num-slots from exynos platforms (2017-07-18 07:14:22 +0200)
->
-> ----------------------------------------------------------------
-> Samsung DTS ARM changes for v4.13
->
-> Remove deprecated and unneeded properties from Exynos boards.
 
-Pulled into next/dt, thanks!
 
-       Arnd
+On 08/16/2017 01:52 PM, Andreas F?rber wrote:
+> Am 16.08.2017 um 22:50 schrieb Alexandru Gagniuc:
+>> On 08/16/2017 02:46 AM, Philipp Zabel wrote:
+>>> The reset-simple driver can be used without changes.
+>>>
+>>> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+>>
+>> Reviewed-by: Alexandru Gagniuc <alex.g@adaptrum.com>
+>>
+>>> ---
+>>>  drivers/reset/Kconfig        |  11 ++---
+>>>  drivers/reset/Makefile       |   1 -
+>>>  drivers/reset/reset-simple.c |   1 +
+>>>  drivers/reset/reset-stm32.c  | 108
+>>> -------------------------------------------
+>>>  4 files changed, 4 insertions(+), 117 deletions(-)
+>>>  delete mode 100644 drivers/reset/reset-stm32.c
+>>>
+>>> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+>>> index 78a8f6057985b..29f4487c290fc 100644
+>>> --- a/drivers/reset/Kconfig
+>>> +++ b/drivers/reset/Kconfig
+>>> @@ -70,19 +70,14 @@ config RESET_PISTACHIO
+>>>
+>>>  config RESET_SIMPLE
+>>>      bool "Simple Reset Controller Driver" if COMPILE_TEST
+>>> -    default ARCH_SOCFPGA || ARCH_SUNXI
+>>> +    default ARCH_SOCFPGA || ARCH_STM32 || ARCH_SUNXI
+>>
+>> If this series gets respun, could you please look into removing the
+>> ARCH_ dependency here?
+>
+> Why?
+
+Because the driver has to keep track of all its users, which is a 
+layering violation.
+
+> It's not a dependency, just the default. Doing it here decouples it
+> from having to do Kconfig changes in the arm-soc tree as well.
+
+Doing it here allows this list to grow without bounds.
+
+> Regards,
+> Andreas
+>
