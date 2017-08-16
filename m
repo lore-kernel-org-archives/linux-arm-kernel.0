@@ -1,138 +1,39 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 16 Aug 2017 14:05:58 +0200
-Subject: [PATCH 3/3] soc: xilinx: zynqmp: Add firmware interface
-In-Reply-To: <247a5660-6c53-ccc3-7b9f-bfd2a11f6f54@xilinx.com>
-References: <cover.1501854302.git.michal.simek@xilinx.com>
- <98038734d73c604dee6ac0d34740d5bc2034e87d.1501854302.git.michal.simek@xilinx.com>
- <CAK8P3a1UhKAhYx2fCoWGm7HMka+8XrzFCxEphYNdyNS7yYR8cA@mail.gmail.com>
- <247a5660-6c53-ccc3-7b9f-bfd2a11f6f54@xilinx.com>
-Message-ID: <1074f025-404e-f6a1-cc69-4f9ea7b366a7@xilinx.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Wed, 16 Aug 2017 14:09:21 +0200
+Subject: [PATCH 3/5] reset: Add Realtek RTD1295 driver
+In-Reply-To: <1502876699.7596.3.camel@pengutronix.de>
+References: <20170816003847.6208-1-afaerber@suse.de>
+ <20170816003847.6208-4-afaerber@suse.de>
+ <1502876699.7596.3.camel@pengutronix.de>
+Message-ID: <47359100-edf7-5aa4-a3ee-1250c8a84c5e@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.8.2017 13:51, Michal Simek wrote:
-> On 14.8.2017 17:06, Arnd Bergmann wrote:
->> On Fri, Aug 4, 2017 at 3:45 PM, Michal Simek <michal.simek@xilinx.com> wrote:
->>> +static noinline int do_fw_call_smc(u64 arg0, u64 arg1, u64 arg2,
->>> +                                  u32 *ret_payload)
->>> +{
->>> +       struct arm_smccc_res res;
->>> +
->>> +       arm_smccc_smc(arg0, arg1, arg2, 0, 0, 0, 0, 0, &res);
->>> +
->>> +       if (ret_payload) {
->>> +               ret_payload[0] = (u32)res.a0;
->>> +               ret_payload[1] = (u32)(res.a0 >> 32);
->>> +               ret_payload[2] = (u32)res.a1;
->>> +               ret_payload[3] = (u32)(res.a1 >> 32);
->>> +               ret_payload[4] = (u32)res.a2;
->>> +       }
->>> +
->>> +       return zynqmp_pm_ret_code((enum pm_ret_status)res.a0);
->>> +}
->>
->> It looks like you forgot to add the cpu_to_le32/le32_to_cpu conversions
->> here to make this work on big-endian kernels.
-> 
-> We have discussed support for big endian kernels in past and discussion
-> end up with that there is no customer for this. It means I can change
-> this but none will use this.
-> 
-> 
->>
->>> +
->>> +static u32 pm_api_version;
->>> +
->>> +/**
->>> + * zynqmp_pm_get_api_version - Get version number of PMU PM firmware
->>> + * @version:   Returned version value
->>> + *
->>> + * Return:     Returns status, either success or error+reason
->>> + */
->>> +int zynqmp_pm_get_api_version(u32 *version)
->>> +{
->>> +       u32 ret_payload[PAYLOAD_ARG_CNT];
->>> +
->>> +       if (!version)
->>> +               return zynqmp_pm_ret_code(XST_PM_CONFLICT);
->>> +
->>> +       /* Check is PM API version already verified */
->>> +       if (pm_api_version > 0) {
->>> +               *version = pm_api_version;
->>> +               return XST_PM_SUCCESS;
->>> +       }
->>> +       invoke_pm_fn(GET_API_VERSION, 0, 0, 0, 0, ret_payload);
->>> +       *version = ret_payload[1];
->>> +
->>> +       return zynqmp_pm_ret_code((enum pm_ret_status)ret_payload[0]);
->>> +}
->>> +EXPORT_SYMBOL_GPL(zynqmp_pm_get_api_version);
->>
->> How is this supposed to be used? API version number interfaces
->> are generally problematic, as you don't have that interface any
->> more if you change the version.
-> 
-> This function is called from power management driver to find out a
-> version of PMUFW. It is not a problem to save version in the driver and
-> provide another function to access it instead of asking firmware again.
-> Or also remove this completely because it is more for power management
-> then for communication. And this patch is just about communication.
-> 
-> 
->>
->> Normally this should be based on the "compatible" string
->> in DT to find our what you are talking to, in combination with
->> a list of features that you can query to find out if something
->> is available that you can't just try out by calling.
-> 
-> How can you find out what you are talking to without asking for version?
-> 
-> It should be probably be based on some sort of list of services and
-> based on that enabled features.
-> 
-> Anyway I don't need this function to be in this interface driver that's
-> why I will remove this part in v2.
-> 
->>> diff --git a/include/linux/soc/xilinx/zynqmp/firmware.h b/include/linux/soc/xilinx/zynqmp/firmware.h
->>> new file mode 100644
->>> index 000000000000..5beb5988e3de
->>> --- /dev/null
->>> +++ b/include/linux/soc/xilinx/zynqmp/firmware.h
->>> @@ -0,0 +1,246 @@
->>> +
->>> +#ifndef __SOC_ZYNQMP_FIRMWARE_H__
->>> +#define __SOC_ZYNQMP_FIRMWARE_H__
->>> +
->>> +#define ZYNQMP_PM_VERSION_MAJOR        0
->>> +#define ZYNQMP_PM_VERSION_MINOR        3
->>
->> Again, having the version number hardcoded in a global constant
->> seems pointless. If you expect to have to support different incompatible
->> versions in the future, name the header file firmware-0-3.h and
->> prefix the constants with the current version.
-> 
-> Will remove.
-> 
->>
->>> +/*
->>> + * Internal functions
->>> + */
->>> +int invoke_pm_fn(u32 pm_api_id, u32 arg0, u32 arg1, u32 arg2, u32 arg3,
->>> +                u32 *ret_payload);
->>> +int zynqmp_pm_ret_code(u32 ret_status);
->>> +
->>> +/* Miscellaneous API functions */
->>> +int zynqmp_pm_get_api_version(u32 *version);
-> 
-> This will go out too.
-> 
->>> +int zynqmp_pm_get_chipid(u32 *idcode, u32 *version);
->>
->> The "internal" functions probably shouldn't be declared in a global
->> header file.
+Hi Philipp,
 
-Sorry got your comment now - will mark that internal functions as static
-to get them out of this header.
+Am 16.08.2017 um 11:44 schrieb Philipp Zabel:
+> On Wed, 2017-08-16 at 02:38 +0200, Andreas F?rber wrote:
+>> Add a per-register reset controller driver. This deals with the fact
+>> that not all registers are adjoined.
+> 
+> the way you handle the non-contiguous reset registers, this looks like
+> a candidate to join the recently discussed reset-simple driver [1].
+> Could you check if that would fit?
 
-Thanks,
-Michal
+Thanks, I appreciate the idea, and it looks like you already have the
+active-low logic in place.
+
+Are you okay with keeping the first three as separate nodes, or would
+you rather want one node to cover the first three registers, plus two
+separate ones for the non-contiguous cases? Or is the simple driver
+supposed to cover gaps, too? Then we could go with just two nodes. (I
+found it weird to have reset and then reset4, so I went with separate
+ones as seen downstream.)
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
