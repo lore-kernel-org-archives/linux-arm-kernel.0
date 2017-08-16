@@ -1,38 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Aug 2017 23:31:50 +0200
-Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.14
-In-Reply-To: <CAK7LNAQpsNrrrL2T8J1QYjA+9cmj8UO3JdTCZ7_WLGfdWC4G7w@mail.gmail.com>
-References: <CAK7LNAQpsNrrrL2T8J1QYjA+9cmj8UO3JdTCZ7_WLGfdWC4G7w@mail.gmail.com>
-Message-ID: <CAK8P3a1qY1UCVcFmmJ4Df=27xZqeEh91XZdW1udMSUNcb-ZeyA@mail.gmail.com>
+Date: Wed, 16 Aug 2017 23:33:00 +0200
+Subject: [GIT PULL] Qualcomm Device Tree updates for 4.14
+In-Reply-To: <1502896623-6905-1-git-send-email-andy.gross@linaro.org>
+References: <1502896623-6905-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <CAK8P3a1YLnTk1g2M=5jSzmBGx7wS4Nw8morxAUX0P5vm7u7Cvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 16, 2017 at 5:00 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-
+On Wed, Aug 16, 2017 at 5:17 PM, Andy Gross <andy.gross@linaro.org> wrote:
 > ----------------------------------------------------------------
-> UniPhier ARM SoC DT updates for v4.14
+> Qualcomm Device Tree Changes for v4.14
 >
-> - complete migrating to SPDX License Identifier
-> - remove support for old SoC
-> - add nodes for NAND, Audio pinctrl
-> - replace /include/ with #include
+> * Fixup XO, timer nodes, and pinctrl on IPQ4019
+> * Add IPQ4019 RNG and wifi blocks
+> * Update MSM8974 coresight node
+> * Add IPQ8074 bindings
 >
-> ----------------------------------------------------------------
-> Katsuhiro Suzuki (1):
->       ARM: dts: uniphier: add audio out pin-mux node
->
-> Masahiro Yamada (4):
->       ARM: dts: uniphier: use SPDX-License-Identifier (2nd)
->       ARM: dts: uniphier: remove sLD3 SoC support
->       ARM: dts: uniphier use #include instead of /include/
->       ARM: dts: uniphier: add Denali NAND controller node
 
-Pulled into next/dt, but please clarify one question:
-
-How likely is it that there are still users of the sLD3 SoC on
-mainline kernels? The commit just states that it is too hard
-to maintain, but the more important question is whether anyone
-cares about it breaking.
+Pulled into next/dt, thanks!
 
       Arnd
