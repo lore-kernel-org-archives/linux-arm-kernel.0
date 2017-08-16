@@ -1,45 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Aug 2017 23:00:12 +0200
-Subject: [PATCH] ARM: dts: stm32: use right compatible for stm32f469
-In-Reply-To: <1501172847-31323-1-git-send-email-alexandre.torgue@st.com>
-References: <1501172847-31323-1-git-send-email-alexandre.torgue@st.com>
-Message-ID: <CAK8P3a17b3viT=TduBXzV5LCpNO5-=vopq6u_nX7syHzyGsvAw@mail.gmail.com>
+From: alex.g@adaptrum.com (Alexandru Gagniuc)
+Date: Wed, 16 Aug 2017 14:00:59 -0700
+Subject: [PATCH v3 5/5] reset: simple: read back to make sure changes are
+ applied
+In-Reply-To: <20170816094701.30678-6-p.zabel@pengutronix.de>
+References: <20170816094701.30678-1-p.zabel@pengutronix.de>
+ <20170816094701.30678-6-p.zabel@pengutronix.de>
+Message-ID: <561b4eb5-98be-f844-57cb-b5ce5962258f@adaptrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 27, 2017 at 6:27 PM, Alexandre Torgue
-<alexandre.torgue@st.com> wrote:
-> Currently, same stm32f429-pinctrl driver is used for stm32f429 and
-> stm32f469. As pin map is different between those 2 MCUs,
-> a stm32f469-pinctrl driver has been recently added.
-> This patch
->  -allows to use stm32f469-pinctrl driver for stm32f469 boards
->  -reworks stm32 devicetree files to fit with stm32f429 / stm32f469
+
+
+On 08/16/2017 02:47 AM, Philipp Zabel wrote:
+> Read back the register after setting or clearing a reset bit to make
+> sure that the changes are applied to the reset controller hardware.
+
+> Theoretically, this avoids the write to stay stuck in a store buffer
+
+Is there hardware where this has been observed to happen, or is this 
+purely theoretical? It would be nice to have a "this is needed on 
+hardware XYZ because ABC, and doesn't affect other hardware" comment in 
+the source.
+
+> during the delay of an assert-delay-deassert sequence, and makes sure
+> that the reset really is asserted for the specified duration.
 >
-> In the same time it fixes an issue when only MACH_STM32F469 flag is
-> selected in menuconfig.
->
-> Fixes: d28bcd53fa90 ("ARM: stm32: Introduce MACH_STM32F469 flag")
-> Reported-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 > ---
+>  drivers/reset/reset-simple.c | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
 >
-> Hi Arnd, Kevin and Olof,
+> diff --git a/drivers/reset/reset-simple.c b/drivers/reset/reset-simple.c
+> index 13e7d5559acc9..d98a7e7d802d1 100644
+> --- a/drivers/reset/reset-simple.c
+> +++ b/drivers/reset/reset-simple.c
+> @@ -39,17 +39,20 @@ static int reset_simple_set(struct reset_controller_dev *rcdev,
+>  	int reg_width = sizeof(u32);
+>  	int bank = id / (reg_width * BITS_PER_BYTE);
+>  	int offset = id % (reg_width * BITS_PER_BYTE);
+> +	void __iomem *addr = data->membase + (bank * reg_width);
+>  	unsigned long flags;
+>  	u32 reg;
 >
-> I send this series in 4.13-rcx cycle to fix d28bcd53fa90
-> ("ARM: stm32: Introduce MACH_STM32F469 flag").
-> This patch could look "huge" to fix the issue but I prefer to send
-> a clean patch now that send a quick fix first and a DT rework in 4.14
-> cycle.
-> Let me know, if tou disagree with that.
+>  	spin_lock_irqsave(&data->lock, flags);
+>
+> -	reg = readl(data->membase + (bank * reg_width));
+> +	reg = readl(addr);
+>  	if (assert ^ data->active_low)
+>  		reg |= BIT(offset);
+>  	else
+>  		reg &= ~BIT(offset);
+> -	writel(reg, data->membase + (bank * reg_width));
+> +	writel(reg, addr);
+> +	/* Read back to make sure the write doesn't linger in a store buffer */
+> +	readl(addr);
 
-Unfortunately I did not have this one on my radar for the 4.13 fixes,
-as the subject looked rather innocent. My feeling is that we could have
-done it earlier, but by now it's a bit late, and I'd rather have a quick
-fix to merge for 4.13.
+You're not using the returned value to check that the reset was actually 
+set. This seems a very arbitrary readback workaround, which gives no 
+indication if it actually succeeded or not.
 
-Doing this without merge conflicts unfortunately means that you have
-to send two pull requests, with the 4.14 one based on the quick fix
-for 4.13.
+Also the set() is now asymmetrical to clear(). In cases when releasing 
+reset on a HW block that is about to have IO performed on it, one would 
+want to make sure the reset is actually deasserted before doing any IO.
 
-        Arnd
+Alex
+
+>
+>  	spin_unlock_irqrestore(&data->lock, flags);
+>
+>
