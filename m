@@ -1,13 +1,13 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 16 Aug 2017 12:00:52 +0900
-Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.14
-Message-ID: <CAK7LNAQpsNrrrL2T8J1QYjA+9cmj8UO3JdTCZ7_WLGfdWC4G7w@mail.gmail.com>
+Date: Wed, 16 Aug 2017 12:01:01 +0900
+Subject: [GIT PULL] arm64: dts: uniphier: UniPhier DT updates (64bit) for v4.14
+Message-ID: <CAK7LNARP=6+63Cnjy-U57-0_Ue-5FamM-9SdBtfxkfmqHesxjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof,
 
-Here are UniPhier DT (32bit) updates for the v4.14 merge window.
+Here are UniPhier DT (64bit) updates for the v4.14 merge window.
 Please pull!
 
 
@@ -18,56 +18,45 @@ The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-dt-v4.14
+tags/uniphier-dt64-v4.14
 
-for you to fetch changes up to 69f9cdc63319e5ccc210b30d1cec1dfda7096b04:
+for you to fetch changes up to e5aefb380eafe176de066ddde1d354a167a9d474:
 
-  ARM: dts: uniphier: add Denali NAND controller node (2017-08-16
-01:47:01 +0900)
+  arm64: dts: uniphier: add Denali NAND controller nodes (2017-08-13
+08:43:27 +0900)
 
 ----------------------------------------------------------------
-UniPhier ARM SoC DT updates for v4.14
+UniPhier ARM64 SoC DT updates for v4.14
 
-- complete migrating to SPDX License Identifier
-- remove support for old SoC
-- add nodes for NAND, Audio pinctrl
+- add nodes for NAND, Watchdog
 - replace /include/ with #include
+- use #include <arm/...> instead of symlinks
 
 ----------------------------------------------------------------
-Katsuhiro Suzuki (1):
-      ARM: dts: uniphier: add audio out pin-mux node
+Keiji Hayashibara (1):
+      arm64: dts: uniphier: add watchdog node for LD11 and LD20
 
-Masahiro Yamada (4):
-      ARM: dts: uniphier: use SPDX-License-Identifier (2nd)
-      ARM: dts: uniphier: remove sLD3 SoC support
-      ARM: dts: uniphier use #include instead of /include/
-      ARM: dts: uniphier: add Denali NAND controller node
+Masahiro Yamada (3):
+      arm64: dts: uniphier: use #include instead of /include/
+      arm64: dts: uniphier: use cross-arch include instead of symlinks
+      arm64: dts: uniphier: add Denali NAND controller nodes
 
- arch/arm/boot/dts/Makefile                 |   1 -
- arch/arm/boot/dts/uniphier-ld4-ref.dts     |  10 +-
- arch/arm/boot/dts/uniphier-ld4.dtsi        |  13 +-
- arch/arm/boot/dts/uniphier-ld6b-ref.dts    |  10 +-
- arch/arm/boot/dts/uniphier-ld6b.dtsi       |   2 +-
- arch/arm/boot/dts/uniphier-pinctrl.dtsi    |  43 +---
- arch/arm/boot/dts/uniphier-pro4-ace.dts    |   2 +-
- arch/arm/boot/dts/uniphier-pro4-ref.dts    |  10 +-
- arch/arm/boot/dts/uniphier-pro4-sanji.dts  |   2 +-
- arch/arm/boot/dts/uniphier-pro4.dtsi       |  13 +-
- arch/arm/boot/dts/uniphier-pro5.dtsi       |  51 ++---
- arch/arm/boot/dts/uniphier-pxs2-gentil.dts |   2 +-
- arch/arm/boot/dts/uniphier-pxs2-vodka.dts  |   2 +-
- arch/arm/boot/dts/uniphier-pxs2.dtsi       |  13 +-
- arch/arm/boot/dts/uniphier-sld3-ref.dts    |  75 -------
- arch/arm/boot/dts/uniphier-sld3.dtsi       | 260 ----------------------
- arch/arm/boot/dts/uniphier-sld8-ref.dts    |  10 +-
- arch/arm/boot/dts/uniphier-sld8.dtsi       |  13 +-
- 18 files changed, 100 insertions(+), 432 deletions(-)
- delete mode 100644 arch/arm/boot/dts/uniphier-sld3-ref.dts
- delete mode 100644 arch/arm/boot/dts/uniphier-sld3.dtsi
-
-
-
-
+ .../boot/dts/socionext/uniphier-ld11-global.dts  |  6 +++++-
+ .../boot/dts/socionext/uniphier-ld11-ref.dts     |  6 +++---
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 17 ++++++++++++++++-
+ .../boot/dts/socionext/uniphier-ld20-global.dts  |  6 +++++-
+ .../boot/dts/socionext/uniphier-ld20-ref.dts     |  6 +++---
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 17 ++++++++++++++++-
+ .../boot/dts/socionext/uniphier-pinctrl.dtsi     |  2 +-
+ .../dts/socionext/uniphier-ref-daughter.dtsi     |  2 +-
+ .../dts/socionext/uniphier-support-card.dtsi     |  2 +-
+ 9 files changed, 51 insertions(+), 13 deletions(-)
+ mode change 120000 => 100644
+arch/arm64/boot/dts/socionext/uniphier-pinctrl.dtsi
+ mode change 120000 => 100644
+arch/arm64/boot/dts/socionext/uniphier-ref-daughter.dtsi
+ mode change 120000 => 100644
+arch/arm64/boot/dts/socionext/uniphier-support-card.dtsi
 
 
 -- 
