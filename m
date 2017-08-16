@@ -1,98 +1,91 @@
 From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Wed, 16 Aug 2017 12:40:46 +0530
-Subject: [PATCH v5 2/4] perf tools arm64: Add support for get_cpuid_str
- function.
+Date: Wed, 16 Aug 2017 12:40:47 +0530
+Subject: [PATCH v5 3/4] perf utils: Add helper function is_pmu_core to detect
+ PMU CORE devices
 In-Reply-To: <20170816071048.26087-1-ganapatrao.kulkarni@cavium.com>
 References: <20170816071048.26087-1-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20170816071048.26087-3-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20170816071048.26087-4-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-function get_cpuid_str returns MIDR string of the first online
-cpu from the range of cpus associated with the pmu core device.
+On some platforms, PMU core devices sysfs name is not cpu.
+Adding function is_pmu_core to detect as core device using
+core device specific hints in sysfs.
 
+For arm64 platforms, all core devices have file "cpus" in sysfs.
+
+Tested-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
 Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 ---
- tools/perf/arch/arm64/util/Build    |  1 +
- tools/perf/arch/arm64/util/header.c | 61 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 62 insertions(+)
- create mode 100644 tools/perf/arch/arm64/util/header.c
+ tools/perf/util/pmu.c | 44 ++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 40 insertions(+), 4 deletions(-)
 
-diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
-index cef6fb3..b1ab72d 100644
---- a/tools/perf/arch/arm64/util/Build
-+++ b/tools/perf/arch/arm64/util/Build
-@@ -1,3 +1,4 @@
-+libperf-y += header.o
- libperf-$(CONFIG_DWARF)     += dwarf-regs.o
- libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
+diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
+index aefdbd1..0057d1c 100644
+--- a/tools/perf/util/pmu.c
++++ b/tools/perf/util/pmu.c
+@@ -506,6 +506,39 @@ static struct cpu_map *pmu_cpumask(const char *name)
+ }
  
-diff --git a/tools/perf/arch/arm64/util/header.c b/tools/perf/arch/arm64/util/header.c
-new file mode 100644
-index 0000000..713ef17
---- /dev/null
-+++ b/tools/perf/arch/arm64/util/header.c
-@@ -0,0 +1,61 @@
-+#include <stdio.h>
-+#include <stdlib.h>
-+#include <api/fs/fs.h>
-+#include "header.h"
-+
-+#define MIDR "/regs/identification/midr_el1"
-+#define MIDR_SIZE 128
-+
-+char *get_cpuid_str(struct perf_pmu *pmu)
+ /*
++ *  PMU CORE devices have different name other than cpu in sysfs on some
++ *  platforms. looking for possible sysfs files to identify as core device.
++ */
++static int is_pmu_core(const char *name)
 +{
-+	char *buf = NULL;
-+	char *temp = NULL;
++	struct stat st;
 +	char path[PATH_MAX];
 +	const char *sysfs = sysfs__mountpoint();
-+	int cpu;
-+	unsigned long long midr = 0;
-+	struct cpu_map *cpus;
-+	FILE *file;
++	const char **template;
++	const char *templates[] = {
++		 "%s/bus/event_source/devices/%s/cpus",
++		 NULL
++	};
 +
-+	if (!sysfs || !pmu->cpus)
-+		return NULL;
++	if (!sysfs)
++		return 0;
 +
-+	buf = malloc(MIDR_SIZE);
-+	if (!buf)
-+		return NULL;
++	/* Look for cpu sysfs */
++	snprintf(path, PATH_MAX, "%s/bus/event_source/devices/cpu", sysfs);
++	if ((stat(path, &st) == 0) &&
++			(strncmp(name, "cpu", strlen("cpu")) == 0))
++		return 1;
 +
-+	/* read midr from list of cpus mapped to this pmu */
-+	cpus = cpu_map__get(pmu->cpus);
-+	for (cpu = 0; cpu < cpus->nr; cpu++) {
-+		scnprintf(path, PATH_MAX, "%s/devices/system/cpu/cpu%d"MIDR,
-+				sysfs, cpus->map[cpu]);
-+
-+		file = fopen(path, "r");
-+		if (!file) {
-+			pr_err("fopen failed for file %s\n", path);
-+			continue;
-+		}
-+
-+		temp = fgets(buf, MIDR_SIZE, file);
-+		if (!temp)
-+			continue;
-+		fclose(file);
-+
-+		/* Ignore/clear Variant[23:20] and
-+		 * Revision[3:0] of MIDR
-+		 */
-+		midr = strtoll(buf, NULL, 16);
-+		midr &= (~(0xf << 20 | 0xf));
-+		scnprintf(buf, MIDR_SIZE, "0x%016llx", midr);
-+		/* got midr break loop */
-+		break;
++	for (template = templates; *template; template++) {
++		snprintf(path, PATH_MAX, *template, sysfs, name);
++		if (stat(path, &st) == 0)
++			return 1;
 +	}
 +
-+	if (!midr) {
-+		free(buf);
-+		buf = NULL;
-+	}
-+
-+	cpu_map__put(cpus);
-+	return buf;
++	return 0;
 +}
++
++/*
+  * Return the CPU id as a raw string.
+  *
+  * Each architecture should provide a more precise id string that
+@@ -558,15 +591,18 @@ static void pmu_add_cpu_aliases(struct list_head *head, const char *name,
+ 	 */
+ 	i = 0;
+ 	while (1) {
+-		const char *pname;
+ 
+ 		pe = &map->table[i++];
+ 		if (!pe->name)
+ 			break;
+ 
+-		pname = pe->pmu ? pe->pmu : "cpu";
+-		if (strncmp(pname, name, strlen(pname)))
+-			continue;
++		if (!is_pmu_core(name)) {
++			/* check for uncore devices */
++			if (pe->pmu == NULL)
++				continue;
++			if (strncmp(pe->pmu, name, strlen(pe->pmu)))
++				continue;
++		}
+ 
+ 		/* need type casts to override 'const' */
+ 		__perf_pmu__new_alias(head, NULL, (char *)pe->name,
 -- 
 2.9.4
