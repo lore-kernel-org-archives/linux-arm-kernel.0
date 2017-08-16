@@ -1,33 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Aug 2017 21:51:20 +0200
-Subject: [GIT PULL 1/5] ARM: s3c24xx: Early stuff for v4.14
-In-Reply-To: <20170724190856.19055-1-krzk@kernel.org>
-References: <20170724190856.19055-1-krzk@kernel.org>
-Message-ID: <CAK8P3a1JEfJ95bmAnR6bLUtw9Eyt++4+SxPoNi_Pj5wVk2crCQ@mail.gmail.com>
+From: rkrcmar@redhat.com (=?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?=)
+Date: Wed, 16 Aug 2017 21:40:36 +0200
+Subject: [PATCH RFC 1/2] KVM: remove unused __KVM_HAVE_ARCH_VM_ALLOC
+In-Reply-To: <20170816194037.9460-1-rkrcmar@redhat.com>
+References: <20170816194037.9460-1-rkrcmar@redhat.com>
+Message-ID: <20170816194037.9460-2-rkrcmar@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 24, 2017 at 9:08 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->
-> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
->
->   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.14
->
-> for you to fetch changes up to f991ce429a420dbb42b3e4b5a47490c84390d7e1:
->
->   ARM: s3c24xx: make H1940BT depend on RFKILL (2017-07-20 20:26:24 +0200)
->
-> ----------------------------------------------------------------
-> Samsung mach/soc changes for v4.14
->
-> Only for S3C24xx platform:
-> 1. Cleanup from non-existent CONFIG entries.
-> 2. Fix unmet NET dependency when H1940 bluetooth chip is selected..
+Moving it to generic code will allow us to extend it with ease.
 
-Pulled into next/soc, thanks!
+Reviewed-by: David Hildenbrand <david@redhat.com>
+Signed-off-by: Radim Kr?m?? <rkrcmar@redhat.com>
+---
+ include/linux/kvm_host.h | 12 ------------
+ virt/kvm/kvm_main.c      | 16 +++++++++++++---
+ 2 files changed, 13 insertions(+), 15 deletions(-)
 
-        Arnd
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index 6882538eda32..c8df733eed41 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -803,18 +803,6 @@ int kvm_arch_vcpu_runnable(struct kvm_vcpu *vcpu);
+ bool kvm_arch_vcpu_in_kernel(struct kvm_vcpu *vcpu);
+ int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu);
+ 
+-#ifndef __KVM_HAVE_ARCH_VM_ALLOC
+-static inline struct kvm *kvm_arch_alloc_vm(void)
+-{
+-	return kzalloc(sizeof(struct kvm), GFP_KERNEL);
+-}
+-
+-static inline void kvm_arch_free_vm(struct kvm *kvm)
+-{
+-	kfree(kvm);
+-}
+-#endif
+-
+ #ifdef __KVM_HAVE_ARCH_NONCOHERENT_DMA
+ void kvm_arch_register_noncoherent_dma(struct kvm *kvm);
+ void kvm_arch_unregister_noncoherent_dma(struct kvm *kvm);
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index e17c40d986f3..2eac2c62795f 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -640,10 +640,20 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
+ 	return 0;
+ }
+ 
++static inline struct kvm *kvm_alloc_vm(void)
++{
++	return kzalloc(sizeof(struct kvm), GFP_KERNEL);
++}
++
++static inline void kvm_free_vm(struct kvm *kvm)
++{
++	kfree(kvm);
++}
++
+ static struct kvm *kvm_create_vm(unsigned long type)
+ {
+ 	int r, i;
+-	struct kvm *kvm = kvm_arch_alloc_vm();
++	struct kvm *kvm = kvm_alloc_vm();
+ 
+ 	if (!kvm)
+ 		return ERR_PTR(-ENOMEM);
+@@ -720,7 +730,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
+ 		kfree(kvm_get_bus(kvm, i));
+ 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++)
+ 		kvm_free_memslots(kvm, __kvm_memslots(kvm, i));
+-	kvm_arch_free_vm(kvm);
++	kvm_free_vm(kvm);
+ 	mmdrop(current->mm);
+ 	return ERR_PTR(r);
+ }
+@@ -771,7 +781,7 @@ static void kvm_destroy_vm(struct kvm *kvm)
+ 		kvm_free_memslots(kvm, __kvm_memslots(kvm, i));
+ 	cleanup_srcu_struct(&kvm->irq_srcu);
+ 	cleanup_srcu_struct(&kvm->srcu);
+-	kvm_arch_free_vm(kvm);
++	kvm_free_vm(kvm);
+ 	preempt_notifier_dec();
+ 	hardware_disable_all();
+ 	mmdrop(mm);
+-- 
+2.13.3
