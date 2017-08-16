@@ -1,23 +1,32 @@
 From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Wed, 16 Aug 2017 22:45:07 +0530
-Subject: [PATCH 0/2] ASoC: make snd_soc_dai_driver and
- snd_soc_component_driver const
-Message-ID: <1502903709-7411-1-git-send-email-bhumirks@gmail.com>
+Date: Wed, 16 Aug 2017 22:45:08 +0530
+Subject: [PATCH 1/2] ASoC: bcm: make snd_soc_dai_driver const
+In-Reply-To: <1502903709-7411-1-git-send-email-bhumirks@gmail.com>
+References: <1502903709-7411-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <1502903709-7411-2-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make these const.
+Make this const as it is only used during a copy operation.
+Done using Coccinelle.
 
-Bhumika Goyal (2):
-  ASoC: bcm: make snd_soc_dai_driver const
-  ASoC: codecs: make snd_soc_dai_driver and snd_soc_component_driver
-    const
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
+ sound/soc/bcm/cygnus-ssp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- sound/soc/bcm/cygnus-ssp.c    | 2 +-
- sound/soc/codecs/hdmi-codec.c | 2 +-
- sound/soc/codecs/lm4857.c     | 2 +-
- sound/soc/codecs/max9768.c    | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
-
+diff --git a/sound/soc/bcm/cygnus-ssp.c b/sound/soc/bcm/cygnus-ssp.c
+index 1a57a4e..15c438f 100644
+--- a/sound/soc/bcm/cygnus-ssp.c
++++ b/sound/soc/bcm/cygnus-ssp.c
+@@ -1165,7 +1165,7 @@ static int cygnus_ssp_resume(struct snd_soc_dai *cpu_dai)
+ 	INIT_CPU_DAI(2),
+ };
+ 
+-static struct snd_soc_dai_driver cygnus_spdif_dai_info = {
++static const struct snd_soc_dai_driver cygnus_spdif_dai_info = {
+ 	.name = "cygnus-spdif",
+ 	.playback = {
+ 		.channels_min = 2,
 -- 
 1.9.1
