@@ -1,42 +1,30 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Wed, 16 Aug 2017 08:19:06 +0200
-Subject: [PATCH 2/2] dmaengine: at_xdmac: Handle return value of
- clk_prepare_enable.
-In-Reply-To: <3c5d3448f8d00995698e2dd905ba0d11a645b35f.1502091778.git.arvind.yadav.cs@gmail.com>
-References: <878f9486ee507c227cb8835417c520b489c768c8.1502091778.git.arvind.yadav.cs@gmail.com>
- <3c5d3448f8d00995698e2dd905ba0d11a645b35f.1502091778.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20170816061906.c3q52ummmungnweo@rfolt0960.corp.atmel.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 16 Aug 2017 14:08:10 +0800
+Subject: [PATCH v2 1/4] usb: mtu3: add generic compatible string
+Message-ID: <670f9ce1ecaec5859006b6f02b45cfc72c3cca2c.1502854628.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 01:15:19PM +0530, Arvind Yadav wrote:
-> clk_prepare_enable() can fail here and we must check its return value.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+The mtu3 driver is a generic driver for MediaTek usb3 DRD IP, add
+a generic compatible to avoid confusion when support new SoCs but
+use a compatible with specific SoC's name "mt8173".
 
-Thanks
-> ---
->  drivers/dma/at_xdmac.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-> index 6a3cf97..c00e392 100644
-> --- a/drivers/dma/at_xdmac.c
-> +++ b/drivers/dma/at_xdmac.c
-> @@ -1883,8 +1883,11 @@ static int atmel_xdmac_resume(struct device *dev)
->  	struct at_xdmac_chan	*atchan;
->  	struct dma_chan		*chan, *_chan;
->  	int			i;
-> +	int ret;
->  
-> -	clk_prepare_enable(atxdmac->clk);
-> +	ret = clk_prepare_enable(atxdmac->clk);
-> +	if (ret)
-> +		return ret;
->  
->  	/* Clear pending interrupts. */
->  	for (i = 0; i < atxdmac->dma.chancnt; i++) {
-> -- 
-> 1.9.1
-> 
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/usb/mtu3/mtu3_plat.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
+index 0d3ebb3..088e3e6 100644
+--- a/drivers/usb/mtu3/mtu3_plat.c
++++ b/drivers/usb/mtu3/mtu3_plat.c
+@@ -500,6 +500,7 @@ static int __maybe_unused mtu3_resume(struct device *dev)
+ 
+ static const struct of_device_id mtu3_of_match[] = {
+ 	{.compatible = "mediatek,mt8173-mtu3",},
++	{.compatible = "mediatek,mtu3",},
+ 	{},
+ };
+ 
+-- 
+1.7.9.5
