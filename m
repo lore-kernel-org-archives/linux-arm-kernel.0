@@ -1,77 +1,140 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 16 Aug 2017 12:35:19 +0100
-Subject: [PATCH 21/27] arm64/sve: KVM: Prevent guests from using SVE
-In-Reply-To: <3cb51836-9677-5eb5-cc07-361eee674806@arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-22-git-send-email-Dave.Martin@arm.com>
- <0f5b14a8-4d04-61e4-05e8-92cd55c8bee9@arm.com>
- <20170816105013.GZ6321@e103592.cambridge.arm.com>
- <3cb51836-9677-5eb5-cc07-361eee674806@arm.com>
-Message-ID: <20170816113519.GE6321@e103592.cambridge.arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 16 Aug 2017 13:51:23 +0200
+Subject: [PATCH 3/3] soc: xilinx: zynqmp: Add firmware interface
+In-Reply-To: <CAK8P3a1UhKAhYx2fCoWGm7HMka+8XrzFCxEphYNdyNS7yYR8cA@mail.gmail.com>
+References: <cover.1501854302.git.michal.simek@xilinx.com>
+ <98038734d73c604dee6ac0d34740d5bc2034e87d.1501854302.git.michal.simek@xilinx.com>
+ <CAK8P3a1UhKAhYx2fCoWGm7HMka+8XrzFCxEphYNdyNS7yYR8cA@mail.gmail.com>
+Message-ID: <247a5660-6c53-ccc3-7b9f-bfd2a11f6f54@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 16, 2017 at 12:20:41PM +0100, Marc Zyngier wrote:
-> On 16/08/17 11:50, Dave Martin wrote:
-> > On Tue, Aug 15, 2017 at 05:33:15PM +0100, Marc Zyngier wrote:
-> >> On 09/08/17 13:05, Dave Martin wrote:
-> >>> Until KVM has full SVE support, guests must not be allowed to
-> >>> execute SVE instructions.
-> >>>
-> >>> This patch enables the necessary traps, and also ensures that the
-> >>> traps are disabled again on exit from the guest so that the host
-> >>> can still use SVE if it wants to.
-> >>>
-> >>> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> >>> ---
-> >>>  arch/arm64/include/asm/kvm_arm.h | 3 ++-
-> >>>  arch/arm64/kvm/hyp/switch.c      | 6 +++---
-> >>>  2 files changed, 5 insertions(+), 4 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> >>> index dbf0537..8a19651 100644
-> >>> --- a/arch/arm64/include/asm/kvm_arm.h
-> >>> +++ b/arch/arm64/include/asm/kvm_arm.h
-> >>> @@ -186,7 +186,7 @@
-> >>>  #define CPTR_EL2_TTA	(1 << 20)
-> >>>  #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
-> >>>  #define CPTR_EL2_TZ	(1 << 8)
-> >>> -#define CPTR_EL2_DEFAULT	0x000033ff
-> >>> +#define CPTR_EL2_DEFAULT	(0x000033ff & ~CPTR_EL2_TZ)
-> >>
-> >> I must say I'm not overly fond of this construct. I'd rather introduce a
-> >> RES1 field that matches the v8.2 description, instead of this ugly
-> >> constant and something that clears it.
-> > 
-> > Sorry, I don't get your meaning here.  v8.2 neither immediately predates
-> > or postdates SVE.  
+On 14.8.2017 17:06, Arnd Bergmann wrote:
+> On Fri, Aug 4, 2017 at 3:45 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> +static noinline int do_fw_call_smc(u64 arg0, u64 arg1, u64 arg2,
+>> +                                  u32 *ret_payload)
+>> +{
+>> +       struct arm_smccc_res res;
+>> +
+>> +       arm_smccc_smc(arg0, arg1, arg2, 0, 0, 0, 0, 0, &res);
+>> +
+>> +       if (ret_payload) {
+>> +               ret_payload[0] = (u32)res.a0;
+>> +               ret_payload[1] = (u32)(res.a0 >> 32);
+>> +               ret_payload[2] = (u32)res.a1;
+>> +               ret_payload[3] = (u32)(res.a1 >> 32);
+>> +               ret_payload[4] = (u32)res.a2;
+>> +       }
+>> +
+>> +       return zynqmp_pm_ret_code((enum pm_ret_status)res.a0);
+>> +}
 > 
-> The ARMv8 ARM (DDI406B_a, D7.2.19) says otherwise. This bit is only
-> defined as having a possibility of being 0 on an v8.2 implementation if
-> SVE is implemented.
+> It looks like you forgot to add the cpu_to_le32/le32_to_cpu conversions
+> here to make this work on big-endian kernels.
 
-Right.  I was confused by the v8.2 reference, since if this weren't true
-for v8.0 of the architecture, we couldn't simply change a compile time
-constant here.  In fact, there's a compatible retroactive change to all
-arch versions >= v8.0.
+We have discussed support for big endian kernels in past and discussion
+end up with that there is no customer for this. It means I can change
+this but none will use this.
 
-> > What are you propsing?
+
 > 
-> What I'm proposing is:
+>> +
+>> +static u32 pm_api_version;
+>> +
+>> +/**
+>> + * zynqmp_pm_get_api_version - Get version number of PMU PM firmware
+>> + * @version:   Returned version value
+>> + *
+>> + * Return:     Returns status, either success or error+reason
+>> + */
+>> +int zynqmp_pm_get_api_version(u32 *version)
+>> +{
+>> +       u32 ret_payload[PAYLOAD_ARG_CNT];
+>> +
+>> +       if (!version)
+>> +               return zynqmp_pm_ret_code(XST_PM_CONFLICT);
+>> +
+>> +       /* Check is PM API version already verified */
+>> +       if (pm_api_version > 0) {
+>> +               *version = pm_api_version;
+>> +               return XST_PM_SUCCESS;
+>> +       }
+>> +       invoke_pm_fn(GET_API_VERSION, 0, 0, 0, 0, ret_payload);
+>> +       *version = ret_payload[1];
+>> +
+>> +       return zynqmp_pm_ret_code((enum pm_ret_status)ret_payload[0]);
+>> +}
+>> +EXPORT_SYMBOL_GPL(zynqmp_pm_get_api_version);
 > 
-> #define CPTR_EL2_RES1		0x32ff
-> #define CPTR_EL2_DEFAULT	CPTR_EL2_RES1
+> How is this supposed to be used? API version number interfaces
+> are generally problematic, as you don't have that interface any
+> more if you change the version.
+
+This function is called from power management driver to find out a
+version of PMUFW. It is not a problem to save version in the driver and
+provide another function to access it instead of asking firmware again.
+Or also remove this completely because it is more for power management
+then for communication. And this patch is just about communication.
+
+
 > 
-> and none of that pointless constant clearing.
+> Normally this should be based on the "compatible" string
+> in DT to find our what you are talking to, in combination with
+> a list of features that you can query to find out if something
+> is available that you can't just try out by calling.
+
+How can you find out what you are talking to without asking for version?
+
+It should be probably be based on some sort of list of services and
+based on that enabled features.
+
+Anyway I don't need this function to be in this interface driver that's
+why I will remove this part in v2.
+
+>> diff --git a/include/linux/soc/xilinx/zynqmp/firmware.h b/include/linux/soc/xilinx/zynqmp/firmware.h
+>> new file mode 100644
+>> index 000000000000..5beb5988e3de
+>> --- /dev/null
+>> +++ b/include/linux/soc/xilinx/zynqmp/firmware.h
+>> @@ -0,0 +1,246 @@
+>> +
+>> +#ifndef __SOC_ZYNQMP_FIRMWARE_H__
+>> +#define __SOC_ZYNQMP_FIRMWARE_H__
+>> +
+>> +#define ZYNQMP_PM_VERSION_MAJOR        0
+>> +#define ZYNQMP_PM_VERSION_MINOR        3
 > 
-> > I guess we could just write 0x000032ff now that the only meaning the
-> > architecture can ever assign to bit 8 is known.
-> Exactly.
+> Again, having the version number hardcoded in a global constant
+> seems pointless. If you expect to have to support different incompatible
+> versions in the future, name the header file firmware-0-3.h and
+> prefix the constants with the current version.
 
-OK, good -- I'll change that.
+Will remove.
 
-I was trying to avoid magic numberness, but it's a bit futile when
-talking about RESx bits.
+> 
+>> +/*
+>> + * Internal functions
+>> + */
+>> +int invoke_pm_fn(u32 pm_api_id, u32 arg0, u32 arg1, u32 arg2, u32 arg3,
+>> +                u32 *ret_payload);
+>> +int zynqmp_pm_ret_code(u32 ret_status);
+>> +
+>> +/* Miscellaneous API functions */
+>> +int zynqmp_pm_get_api_version(u32 *version);
 
-Cheers
----Dave
+This will go out too.
+
+>> +int zynqmp_pm_get_chipid(u32 *idcode, u32 *version);
+> 
+> The "internal" functions probably shouldn't be declared in a global
+> header file.
+
+Ok. This function will be called by nvmem driver which provides an
+option to expose chip id to kernel and user space.
+
+I can call this function just once internally and then expose another
+function which will simply just provide access to that static variable.
+Please let me know what you prefer.
+
+Thanks,
+Michal
