@@ -1,77 +1,72 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 16 Aug 2017 22:49:09 +0530
-Subject: [PATCH 16/18] rpmsg: glink: Use the intents passed by remote
-In-Reply-To: <1502903951-5403-1-git-send-email-sricharan@codeaurora.org>
-References: <1502903951-5403-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1502903951-5403-17-git-send-email-sricharan@codeaurora.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Wed, 16 Aug 2017 18:53:07 +0100
+Subject: [PATCH 24/27] arm64/sve: Detect SVE and activate runtime support
+In-Reply-To: <1502280338-23002-25-git-send-email-Dave.Martin@arm.com>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-25-git-send-email-Dave.Martin@arm.com>
+Message-ID: <3389809f-52e9-5830-304b-21ce56fbcde2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While sending data, use the remote intent id buffer
-of suitable size that was passed by remote previously.
+On 09/08/17 13:05, Dave Martin wrote:
+> [This sender failed our fraud detection checks and may not be who they appear to be. Learn about spoofing at http://aka.ms/LearnAboutSpoofing]
+>
+> This patch enables detection of hardware SVE support via the
+> cpufeatures framework, and reports its presence to the kernel and
+> userspace via the new ARM64_SVE cpucap and HWCAP_SVE hwcap
+> respectively.
+>
+> Userspace can also detect SVE using ID_AA64PFR0_EL1, using the
+> cpufeatures MRS emulation.
+>
+> When running on hardware that supports SVE, this enables runtime
+> kernel support for SVE, and allows user tasks to execute SVE
+> instructions and make of the of the SVE-specific user/kernel
+> interface extensions implemented by this series.
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
----
- drivers/rpmsg/qcom_glink_native.c | 35 +++++++++++++++++++++++++++++++++--
- 1 file changed, 33 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/rpmsg/qcom_glink_native.c b/drivers/rpmsg/qcom_glink_native.c
-index 738303e..7b43adc 100644
---- a/drivers/rpmsg/qcom_glink_native.c
-+++ b/drivers/rpmsg/qcom_glink_native.c
-@@ -1103,19 +1103,50 @@ static int __qcom_glink_send(struct glink_channel *channel,
- 			     void *data, int len, bool wait)
- {
- 	struct qcom_glink *glink = channel->glink;
-+	struct glink_core_rx_intent *intent = NULL;
-+	struct glink_core_rx_intent *tmp;
-+	int iid = 0;
- 	struct {
- 		struct glink_msg msg;
- 		__le32 chunk_size;
- 		__le32 left_size;
- 	} __packed req;
-+	int ret;
-+	unsigned long flags;
-+
-+	if (!glink->intentless) {
-+		if (!intent) {
-+			spin_lock_irqsave(&channel->intent_lock, flags);
-+			idr_for_each_entry(&channel->riids, tmp, iid) {
-+				if (tmp->size >= len && !tmp->in_use) {
-+					tmp->in_use = true;
-+					intent = tmp;
-+					break;
-+				}
-+			}
-+			spin_unlock_irqrestore(&channel->intent_lock, flags);
-+
-+			/* We found an available intent */
-+			if (!intent)
-+				return -EBUSY;
-+		}
-+
-+		iid = intent->id;
-+	}
- 
- 	req.msg.cmd = cpu_to_le16(RPM_CMD_TX_DATA);
- 	req.msg.param1 = cpu_to_le16(channel->lcid);
--	req.msg.param2 = cpu_to_le32(channel->rcid);
-+	req.msg.param2 = cpu_to_le32(iid);
- 	req.chunk_size = cpu_to_le32(len);
- 	req.left_size = cpu_to_le32(0);
- 
--	return qcom_glink_tx(glink, &req, sizeof(req), data, len, wait);
-+	ret = qcom_glink_tx(glink, &req, sizeof(req), data, len, wait);
-+
-+	/* Mark intent available if we failed */
-+	if (ret)
-+		intent->in_use = false;
-+
-+	return ret;
- }
- 
- static int qcom_glink_send(struct rpmsg_endpoint *ept, void *data, int len)
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> ---
+>  arch/arm64/include/asm/cpucaps.h    |  3 ++-
+>  arch/arm64/include/asm/cpufeature.h |  3 ++-
+>  arch/arm64/include/uapi/asm/hwcap.h |  1 +
+>  arch/arm64/kernel/cpufeature.c      | 16 ++++++++++++++++
+>  arch/arm64/kernel/cpuinfo.c         |  1 +
+>  5 files changed, 22 insertions(+), 2 deletions(-)
+>
+
+...
+
+>
+> @@ -944,6 +957,9 @@ static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
+>         HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_JSCVT_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_JSCVT),
+>         HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_FCMA_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_FCMA),
+>         HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_LRCPC_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_LRCPC),
+> +#ifdef CONFIG_ARM64_SVE
+> +       HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_SVE_SHIFT, FTR_UNSIGNED, ID_AA64PFR0_SVE, CAP_HWCAP, HWCAP_SVE),
+> +#endif
+>         {},
+>  };
+>
+> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> index 0e087d7..943aad0 100644
+> --- a/arch/arm64/kernel/cpuinfo.c
+> +++ b/arch/arm64/kernel/cpuinfo.c
+> @@ -69,6 +69,7 @@ static const char *const hwcap_str[] = {
+>         "jscvt",
+>         "fcma",
+>         "lrcpc",
+> +       "sve",
+>         NULL
+>  };
+>
+
+
+Dave,
+
+Could you please update the Documentation for the exposed CPU feature
+registers to include the SVE field ? Rest looks good to me. With that
+change,
+
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
