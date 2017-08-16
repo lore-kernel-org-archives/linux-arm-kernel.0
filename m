@@ -1,42 +1,199 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 16 Aug 2017 13:47:54 -0700
-Subject: [GIT PULL 2/4] defconfig changes for omaps for v4.14
-In-Reply-To: <CAK8P3a2CaT4KxGHJRkyuu+0i_NGN876E7X8YZ+dm8-27PG5ffQ@mail.gmail.com>
-References: <-2831898822533480273@unknownmsgid>
- <CAK8P3a2CaT4KxGHJRkyuu+0i_NGN876E7X8YZ+dm8-27PG5ffQ@mail.gmail.com>
-Message-ID: <20170816204754.GK8569@atomide.com>
+From: alex.g@adaptrum.com (Alexandru Gagniuc)
+Date: Wed, 16 Aug 2017 13:50:06 -0700
+Subject: [PATCH v3 3/5] reset: stm32: use the reset-simple driver
+In-Reply-To: <20170816094701.30678-4-p.zabel@pengutronix.de>
+References: <20170816094701.30678-1-p.zabel@pengutronix.de>
+ <20170816094701.30678-4-p.zabel@pengutronix.de>
+Message-ID: <edbdf06c-fb1e-63f1-d6b2-17193c86385a@adaptrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [170816 13:45]:
-> On Tue, Aug 15, 2017 at 6:52 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > From: "Tony Lindgren" <tony@atomide.com>
-> >
-> > The following changes since commit 9b51f04424e17051a89ab32d892ca66b2a104825:
-> >
-> >   Merge branch 'parisc-4.13-2' of git://git.kernel.org/pub/scm/linux/kernel/git/deller/parisc-linux (2017-07-05 17:41:31 -0700)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.14/defconfig-signed
-> >
-> > for you to fetch changes up to 6a60a2aca111fd71c5229dbcb3de8ecf0e0e9a12:
-> >
-> >   ARM: omap2plus_defconfig: Enable LP87565 (2017-08-14 10:33:49 -0700)
-> >
-> > ----------------------------------------------------------------
-> > Defconfig updates for omaps for v4.14 to enable DP83867
-> > phy driver on dra72x and dra71x evm, and LP87565 that is
-> > on dra76-evm.
-> 
-> Pulled into next/defconfig, thanks!
-> 
-> Should we enable those drivers on multi_v7_defconfig as well?
 
-Yeah, I actually started a series enabling options for
-multi_v7_defconfig from omap2plus_defconfig before I went
-offline :) Will continue on that at some point.
 
-Regards,
+On 08/16/2017 02:46 AM, Philipp Zabel wrote:
+> The reset-simple driver can be used without changes.
+>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-Tony
+Reviewed-by: Alexandru Gagniuc <alex.g@adaptrum.com>
+
+> ---
+>  drivers/reset/Kconfig        |  11 ++---
+>  drivers/reset/Makefile       |   1 -
+>  drivers/reset/reset-simple.c |   1 +
+>  drivers/reset/reset-stm32.c  | 108 -------------------------------------------
+>  4 files changed, 4 insertions(+), 117 deletions(-)
+>  delete mode 100644 drivers/reset/reset-stm32.c
+>
+> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+> index 78a8f6057985b..29f4487c290fc 100644
+> --- a/drivers/reset/Kconfig
+> +++ b/drivers/reset/Kconfig
+> @@ -70,19 +70,14 @@ config RESET_PISTACHIO
+>
+>  config RESET_SIMPLE
+>  	bool "Simple Reset Controller Driver" if COMPILE_TEST
+> -	default ARCH_SOCFPGA || ARCH_SUNXI
+> +	default ARCH_SOCFPGA || ARCH_STM32 || ARCH_SUNXI
+
+If this series gets respun, could you please look into removing the 
+ARCH_ dependency here?
+
+Alex
+
+>  	help
+>  	  This enables a simple reset controller driver for reset lines that
+>  	  that can be asserted and deasserted by toggling bits in a contiguous,
+>  	  exclusive register space.
+>
+> -	  Currently this driver supports Altera SoCFPGAs and Allwinner SoCs.
+> -
+> -config RESET_STM32
+> -	bool "STM32 Reset Driver" if COMPILE_TEST
+> -	default ARCH_STM32
+> -	help
+> -	  This enables the RCC reset controller driver for STM32 MCUs.
+> +	  Currently this driver supports Altera SoCFPGAs, the RCC reset
+> +	  controller in STM32 MCUs, and Allwinner SoCs.
+>
+>  config RESET_SUNXI
+>  	bool "Allwinner SoCs Reset Driver" if COMPILE_TEST && !ARCH_SUNXI
+> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+> index 25f5f722dec01..e8c3a032f4780 100644
+> --- a/drivers/reset/Makefile
+> +++ b/drivers/reset/Makefile
+> @@ -12,7 +12,6 @@ obj-$(CONFIG_RESET_MESON) += reset-meson.o
+>  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+>  obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
+>  obj-$(CONFIG_RESET_SIMPLE) += reset-simple.o
+> -obj-$(CONFIG_RESET_STM32) += reset-stm32.o
+>  obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
+>  obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
+>  obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
+> diff --git a/drivers/reset/reset-simple.c b/drivers/reset/reset-simple.c
+> index 84b08ce4def01..e54a29b8b532d 100644
+> --- a/drivers/reset/reset-simple.c
+> +++ b/drivers/reset/reset-simple.c
+> @@ -120,6 +120,7 @@ static const struct reset_simple_devdata reset_simple_active_low = {
+>
+>  static const struct of_device_id reset_simple_dt_ids[] = {
+>  	{ .compatible = "altr,rst-mgr", .data = &reset_simple_socfpga },
+> +	{ .compatible = "st,stm32-rcc", },
+>  	{ .compatible = "allwinner,sun6i-a31-clock-reset",
+>  		.data = &reset_simple_active_low },
+>  	{ /* sentinel */ },
+> diff --git a/drivers/reset/reset-stm32.c b/drivers/reset/reset-stm32.c
+> deleted file mode 100644
+> index 3a7c8527e66af..0000000000000
+> --- a/drivers/reset/reset-stm32.c
+> +++ /dev/null
+> @@ -1,108 +0,0 @@
+> -/*
+> - * Copyright (C) Maxime Coquelin 2015
+> - * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> - * License terms:  GNU General Public License (GPL), version 2
+> - *
+> - * Heavily based on sunxi driver from Maxime Ripard.
+> - */
+> -
+> -#include <linux/err.h>
+> -#include <linux/io.h>
+> -#include <linux/of.h>
+> -#include <linux/of_address.h>
+> -#include <linux/platform_device.h>
+> -#include <linux/reset-controller.h>
+> -#include <linux/slab.h>
+> -#include <linux/spinlock.h>
+> -#include <linux/types.h>
+> -
+> -struct stm32_reset_data {
+> -	spinlock_t			lock;
+> -	void __iomem			*membase;
+> -	struct reset_controller_dev	rcdev;
+> -};
+> -
+> -static int stm32_reset_assert(struct reset_controller_dev *rcdev,
+> -			      unsigned long id)
+> -{
+> -	struct stm32_reset_data *data = container_of(rcdev,
+> -						     struct stm32_reset_data,
+> -						     rcdev);
+> -	int bank = id / BITS_PER_LONG;
+> -	int offset = id % BITS_PER_LONG;
+> -	unsigned long flags;
+> -	u32 reg;
+> -
+> -	spin_lock_irqsave(&data->lock, flags);
+> -
+> -	reg = readl(data->membase + (bank * 4));
+> -	writel(reg | BIT(offset), data->membase + (bank * 4));
+> -
+> -	spin_unlock_irqrestore(&data->lock, flags);
+> -
+> -	return 0;
+> -}
+> -
+> -static int stm32_reset_deassert(struct reset_controller_dev *rcdev,
+> -				unsigned long id)
+> -{
+> -	struct stm32_reset_data *data = container_of(rcdev,
+> -						     struct stm32_reset_data,
+> -						     rcdev);
+> -	int bank = id / BITS_PER_LONG;
+> -	int offset = id % BITS_PER_LONG;
+> -	unsigned long flags;
+> -	u32 reg;
+> -
+> -	spin_lock_irqsave(&data->lock, flags);
+> -
+> -	reg = readl(data->membase + (bank * 4));
+> -	writel(reg & ~BIT(offset), data->membase + (bank * 4));
+> -
+> -	spin_unlock_irqrestore(&data->lock, flags);
+> -
+> -	return 0;
+> -}
+> -
+> -static const struct reset_control_ops stm32_reset_ops = {
+> -	.assert		= stm32_reset_assert,
+> -	.deassert	= stm32_reset_deassert,
+> -};
+> -
+> -static const struct of_device_id stm32_reset_dt_ids[] = {
+> -	 { .compatible = "st,stm32-rcc", },
+> -	 { /* sentinel */ },
+> -};
+> -
+> -static int stm32_reset_probe(struct platform_device *pdev)
+> -{
+> -	struct stm32_reset_data *data;
+> -	struct resource *res;
+> -
+> -	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> -	if (!data)
+> -		return -ENOMEM;
+> -
+> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	data->membase = devm_ioremap_resource(&pdev->dev, res);
+> -	if (IS_ERR(data->membase))
+> -		return PTR_ERR(data->membase);
+> -
+> -	spin_lock_init(&data->lock);
+> -
+> -	data->rcdev.owner = THIS_MODULE;
+> -	data->rcdev.nr_resets = resource_size(res) * 8;
+> -	data->rcdev.ops = &stm32_reset_ops;
+> -	data->rcdev.of_node = pdev->dev.of_node;
+> -
+> -	return devm_reset_controller_register(&pdev->dev, &data->rcdev);
+> -}
+> -
+> -static struct platform_driver stm32_reset_driver = {
+> -	.probe	= stm32_reset_probe,
+> -	.driver = {
+> -		.name		= "stm32-rcc-reset",
+> -		.of_match_table	= stm32_reset_dt_ids,
+> -	},
+> -};
+> -builtin_platform_driver(stm32_reset_driver);
+>
