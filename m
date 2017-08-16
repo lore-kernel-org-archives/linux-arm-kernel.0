@@ -1,52 +1,36 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Wed, 16 Aug 2017 22:52:43 +0200
-Subject: [PATCH v3 3/5] reset: stm32: use the reset-simple driver
-In-Reply-To: <edbdf06c-fb1e-63f1-d6b2-17193c86385a@adaptrum.com>
-References: <20170816094701.30678-1-p.zabel@pengutronix.de>
- <20170816094701.30678-4-p.zabel@pengutronix.de>
- <edbdf06c-fb1e-63f1-d6b2-17193c86385a@adaptrum.com>
-Message-ID: <338608e8-9e83-fc0f-8d8a-18a336e94860@suse.de>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Wed, 16 Aug 2017 22:53:32 +0200
+Subject: [PATCH] nokia n900: update dts with camera support
+In-Reply-To: <20170815220349.GA15441@amd>
+References: <20170810204923.GA18442@amd>
+ <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
+ <20170815220349.GA15441@amd>
+Message-ID: <20170816205332.rqcuenvuxfs5jvuw@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 16.08.2017 um 22:50 schrieb Alexandru Gagniuc:
-> On 08/16/2017 02:46 AM, Philipp Zabel wrote:
->> The reset-simple driver can be used without changes.
->>
->> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> 
-> Reviewed-by: Alexandru Gagniuc <alex.g@adaptrum.com>
-> 
->> ---
->>  drivers/reset/Kconfig        |  11 ++---
->>  drivers/reset/Makefile       |   1 -
->>  drivers/reset/reset-simple.c |   1 +
->>  drivers/reset/reset-stm32.c  | 108
->> -------------------------------------------
->>  4 files changed, 4 insertions(+), 117 deletions(-)
->>  delete mode 100644 drivers/reset/reset-stm32.c
->>
->> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
->> index 78a8f6057985b..29f4487c290fc 100644
->> --- a/drivers/reset/Kconfig
->> +++ b/drivers/reset/Kconfig
->> @@ -70,19 +70,14 @@ config RESET_PISTACHIO
->>
->>  config RESET_SIMPLE
->>      bool "Simple Reset Controller Driver" if COMPILE_TEST
->> -    default ARCH_SOCFPGA || ARCH_SUNXI
->> +    default ARCH_SOCFPGA || ARCH_STM32 || ARCH_SUNXI
-> 
-> If this series gets respun, could you please look into removing the
-> ARCH_ dependency here?
+Hi,
 
-Why? It's not a dependency, just the default. Doing it here decouples it
-from having to do Kconfig changes in the arm-soc tree as well.
+On Wed, Aug 16, 2017 at 12:03:49AM +0200, Pavel Machek wrote:
+> diff --git a/Documentation/devicetree/bindings/media/video-interfaces.txt b/Documentation/devicetree/bindings/media/video-interfaces.txt
+> index 852041a..aade681 100644
+> --- a/Documentation/devicetree/bindings/media/video-interfaces.txt
+> +++ b/Documentation/devicetree/bindings/media/video-interfaces.txt
+> @@ -119,6 +119,8 @@ Optional endpoint properties
+>    as 0 (normal). This property is valid for serial busses only.
+>  - strobe: Whether the clock signal is used as clock (0) or strobe (1). Used
+>    with CCP2, for instance.
+> +- clock-inv: polarity of clock/strobe signal. 0 - not inverted, 1 - inverted
+> +- crc: crc is in use
 
-Regards,
-Andreas
+booleans in DT are not done with <0> and <1>, but as properties without
+values. True = property exists, False = property does not exist.
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170816/5d8992fb/attachment.sig>
