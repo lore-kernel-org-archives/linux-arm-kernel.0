@@ -1,36 +1,51 @@
-From: david.wu@rock-chips.com (David.Wu)
-Date: Wed, 16 Aug 2017 18:49:41 +0800
-Subject: [PATCH v3 0/7] Add rk3328 pwm support
-In-Reply-To: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
-References: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <89a895fd-d905-6a5b-c697-8e43ecc55e73@rock-chips.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 16 Aug 2017 11:50:14 +0100
+Subject: [PATCH 21/27] arm64/sve: KVM: Prevent guests from using SVE
+In-Reply-To: <0f5b14a8-4d04-61e4-05e8-92cd55c8bee9@arm.com>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-22-git-send-email-Dave.Martin@arm.com>
+ <0f5b14a8-4d04-61e4-05e8-92cd55c8bee9@arm.com>
+Message-ID: <20170816105013.GZ6321@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On Tue, Aug 15, 2017 at 05:33:15PM +0100, Marc Zyngier wrote:
+> On 09/08/17 13:05, Dave Martin wrote:
+> > Until KVM has full SVE support, guests must not be allowed to
+> > execute SVE instructions.
+> > 
+> > This patch enables the necessary traps, and also ensures that the
+> > traps are disabled again on exit from the guest so that the host
+> > can still use SVE if it wants to.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > ---
+> >  arch/arm64/include/asm/kvm_arm.h | 3 ++-
+> >  arch/arm64/kvm/hyp/switch.c      | 6 +++---
+> >  2 files changed, 5 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> > index dbf0537..8a19651 100644
+> > --- a/arch/arm64/include/asm/kvm_arm.h
+> > +++ b/arch/arm64/include/asm/kvm_arm.h
+> > @@ -186,7 +186,7 @@
+> >  #define CPTR_EL2_TTA	(1 << 20)
+> >  #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
+> >  #define CPTR_EL2_TZ	(1 << 8)
+> > -#define CPTR_EL2_DEFAULT	0x000033ff
+> > +#define CPTR_EL2_DEFAULT	(0x000033ff & ~CPTR_EL2_TZ)
+> 
+> I must say I'm not overly fond of this construct. I'd rather introduce a
+> RES1 field that matches the v8.2 description, instead of this ugly
+> constant and something that clears it.
 
-For the PWM patches, whether we let the first patch land in, that is PWM 
-APB and function clocks are different in rk3328 and rv1108 SOCs. If the 
-first patch was merged before 4.14, it will guarantee that the PWM is 
-working, and the lock function you might review it later.
+Sorry, I don't get your meaning here.  v8.2 neither immediately predates
+or postdates SVE.  What are you propsing?
 
-? 2017/8/8 23:38, David Wu ??:
-> There are two features of rk3328 pwm module.
->   - PWM APB and function clocks are different.
->   - Add pwm atomic hardware update
-> 
-> David Wu (7):
->    pwm: rockchip: Add APB and function both clocks support
->    pwm: rockchip: Remove the judge from return value of pwm_config
->    pwm: rockchip: Use pwm_apply instead of the pwm_enable
->    pwm: rockchip: Move the configuration of polarity from
->      rockchip_pwm_set_enable() to rockchip_pwm_config()
->    pwm: rockchip: Use same pwm ops for each IP
->    pwm: rockchip: Add rk3328 pwm support
->    arm64: dts: rockchip: Add pwm nodes for rk3328
-> 
->   .../devicetree/bindings/pwm/pwm-rockchip.txt       |   8 +-
->   arch/arm64/boot/dts/rockchip/rk3328.dtsi           |  45 ++++
->   drivers/pwm/pwm-rockchip.c                         | 281 +++++++++++----------
->   3 files changed, 199 insertions(+), 135 deletions(-)
-> 
+I guess we could just write 0x000032ff now that the only meaning the
+architecture can ever assign to bit 8 is known.
+
+[...]
+
+Cheers
+---Dave
