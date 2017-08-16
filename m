@@ -1,49 +1,46 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Wed, 16 Aug 2017 16:35:24 +0800
-Subject: [RFC PATCH 2/3] dt-bindings: PCI: rockchip: Add support for pcie
- wake irq
-In-Reply-To: <20170816075224.31734-3-jeffy.chen@rock-chips.com>
-References: <20170816075224.31734-1-jeffy.chen@rock-chips.com>
- <20170816075224.31734-3-jeffy.chen@rock-chips.com>
-Message-ID: <35487e90-74f2-3a66-70d3-d0780b0b6e26@rock-chips.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 16 Aug 2017 09:41:22 +0100
+Subject: [PATCH v2] arm64: dts: hi6220: add acpu_sctrl
+In-Reply-To: <1502868395-11481-1-git-send-email-zhangfei.gao@linaro.org>
+References: <1502868395-11481-1-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <59940532.7010700@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffy
+Hi Zhangfei,
 
-On 2017/8/16 15:52, Jeffy Chen wrote:
-> Add an optional interrupt for PCIE_WAKE pin.
+On 2017/8/16 8:26, Zhangfei Gao wrote:
+> Add acpu_sctrl clock node
 > 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
 > ---
+> Update name to acpu_sctrl at f6504000
 > 
->   Documentation/devicetree/bindings/pci/rockchip-pcie.txt | 11 +++++++----
->   1 file changed, 7 insertions(+), 4 deletions(-)
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/rockchip-pcie.txt b/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
-> index 1453a734c2f5..6ef9903567db 100644
-> --- a/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
-> @@ -22,10 +22,13 @@ Required properties:
->   - phys: From PHY bindings: Phandle for the Generic PHY for PCIe.
->   - phy-names:  MUST be "pcie-phy".
->   - interrupts: Three interrupt entries must be specified.
-> -- interrupt-names: Must include the following names
-> -	- "sys"
-> -	- "legacy"
-> -	- "client"
-> +- interrupt-names: Include the following names
-> +	Required:
-> +		- "sys"
-> +		- "legacy"
-> +		- "client"
-> +	Optional:
-> +		- "wake"
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index eacbe0d..f8012d5 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -262,6 +262,12 @@
+>  			#clock-cells = <1>;
+>  		};
+>  
+> +		acpu_sctrl: acpu_sctrl at f6504000 {
+> +			compatible = "hisilicon,hi6220-acpu-sctrl", "syscon";
+> +			reg = <0x0 0xf6504000 0x0 0x1000>;
+> +			#clock-cells = <1>;
+> +		};
+> +
+>  		medianoc_ade: medianoc_ade at f4520000 {
+>  			compatible = "syscon";
+>  			reg = <0x0 0xf4520000 0x0 0x4000>;
+> 
 
-It would be better to introduce interrupts-extended and show a example
-here. :)
+Thanks!
+Dropped the v1 and applied v2 to the hisilicon dt tree.
 
->   - resets: Must contain seven entries for each entry in reset-names.
->   	   See ../reset/reset.txt for details.
->   - reset-names: Must include the following names
-> 
+Best Regards,
+Wei
