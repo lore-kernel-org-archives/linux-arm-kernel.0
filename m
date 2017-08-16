@@ -1,67 +1,51 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Wed, 16 Aug 2017 12:25:41 -0700
-Subject: [PATCH 2/2] arm64: compat: Add CONFIG_KUSER_HELPERS
-In-Reply-To: <20170815133839.GE12294@arm.com>
-References: <20170804183151.78804-1-salyzyn@android.com>
- <20170815133839.GE12294@arm.com>
-Message-ID: <34ad3ba0-9397-1799-1688-bc647e1e92b2@android.com>
+From: anjiandi@codeaurora.org (Jiandi An)
+Date: Wed, 16 Aug 2017 14:30:37 -0500
+Subject: [PATCH 2/3] [v3] pinctrl: qcom: disable GPIO groups with no pins
+In-Reply-To: <66bfbee6-245d-fddb-f6cb-a2c3c06ffc9b@codeaurora.org>
+References: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
+ <1501179565-26466-3-git-send-email-timur@codeaurora.org>
+ <CACRpkdZj+tnMcEpic6PrQS-qMJDodmc_uFJVudxc=USCTXpyKg@mail.gmail.com>
+ <d0b16753-b202-5756-1cba-1cd083af52ed@codeaurora.org>
+ <7c278367-bf3b-6a26-e31f-ee696cb5534e@codeaurora.org>
+ <66bfbee6-245d-fddb-f6cb-a2c3c06ffc9b@codeaurora.org>
+Message-ID: <417198b9-ded1-bd98-e489-3a2925505984@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Started working on rebasing the entire set based on your comments, and 
-to retest with a larger set of changes I have in my private branch. I 
-had four queries regarding the requested changes that may affect the 
-outcome; all in this patch.
 
-On 08/15/2017 06:38 AM, Will Deacon wrote:
->> +
->> +	  Say N here only if you are absolutely certain that you do not need
->> +	  these helpers; otherwise, the safe option is to say Y.
-> I think we should default this to 'N' for arm64.
-This would introduce engineering churn on defconfig updates to the 
-subset of the 8000 Android devices that are arm64 based. We have yet to 
-find a means to actually turn off the KUSER helpers yet and abandon the 
-large number of armv7 and earlier applications. For non Android use, I 
-agree whole heartedly, but can not bring myself to do so. It is there by 
-default, and we are offering a means to turn it off for those that want 
-the security.
 
-So I am pushing back ...
+On 08/16/2017 01:32 PM, Timur Tabi wrote:
+> On 08/16/2017 01:10 PM, Jiandi An wrote:
+>>
+>> Technically the same check added in msm_gpio_irq_mask() and
+>> msm_gpio_irq_unmask() should be added in msm_gpio_irq_ack(),
+>> msm_gpio_irq_set_type(), and msm_gpio_irq_set_wake() if it's
+>> registered with irq domain.
 >
->> diff --git a/arch/arm64/kernel/sigreturn32.S b/arch/arm64/kernel/sigreturn32.S
->> new file mode 100644
->> index 000000000000..6ecda4d84cd5
->> --- /dev/null
->> +++ b/arch/arm64/kernel/sigreturn32.S
-> Why do we need a new file for these?
+> I assume that if the GPIO is never unmasked, then msm_gpio_irq_ack()
+> will never be called.
+>
+> msm_gpio_irq_set_type() and msm_gpio_irq_set_wake() might be called, so
+> I can add checks for those functions.  I'm hoping that won't be
+> necessary, however.  The GPIO and IRQ code is too entangled for me to
+> figure out whether unclaimed GPIOs can still have their interrupts
+> programmed.
+>
 
-Less ifdefs, more arm64-obj-$(CONFIG_KUSER_HELPERS) and (for a future 
-patch) arm64-obj-$(CONFIG_VDSO32-y).
+That is why the suggestion is instead of patching in each of the op
+function of registered irq_chip for the unavailable gpio that won't
+have use for all that anyways, simply don't register irq for the
+unavailable gpio.  What's the use of registering  irq if you know
+the gpio is unavailable and not going to use any of the irq_chip
+functions.  It's unnecessarily adding an irq_desc in the list.
 
-It is also confusing that sigreturn32 and kuser32 could be switched off 
-separately, and in this specific case, using an ifdef, having all 
-kuser32 stuff wiped from the file and yet it remains to hold _unrelated_ 
-sigreturn32 content.
+Technically machine_kexec_mask_interrupts() is not blindly disable
+all IRQs.  If you don't register irq, it won't be in the irq_desc
+list.
 
->> +
->> +	/*
->> +	 * ARM Code
->> +	 */
->> +	// mov	r7, #__NR_compat_sigreturn
->> +	.byte	__NR_compat_sigreturn, 0x70, 0xa0, 0xe3
->> +	// svc	#__NR_compat_sigreturn
->> +	.byte	__NR_compat_sigreturn, 0x00, 0x00, 0xef
-> If there is a good reason to have this in a new file, why reformat the stuff
-> at the same time? This looks like more churn.
-checkpatch.pl did not like the new file, so I wrapped the comments to 
-proceed the .byte's to suppress a large amount of 80-character limit 
-warnings. No good deed goes unpunished.
-> I have a feeling that there's a nice concise patch set in this lot that's
-> trying to get out ;)
-
-In answer to the above three, could split out into a separate patch, the 
-splitting of sigreturn32 and kuser32, would that feel better and more 
-concise?
-> Will
-
--- Mark
+-- 
+Jiandi An
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux Foundation Collaborative Project.
