@@ -1,7 +1,7 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 16 Aug 2017 22:47:57 +0530
+Date: Wed, 16 Aug 2017 22:48:53 +0530
 Subject: [PATCH 00/18] rpmsg: glink: Add glink smem based transport
-Message-ID: <1502903895-5298-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1502903951-5403-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
