@@ -1,75 +1,28 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 16 Aug 2017 11:54:38 +0100
-Subject: [PATCH 23/27] arm64/sve: KVM: Hide SVE from CPU features exposed
- to guests
-In-Reply-To: <39b6ee07-1258-e733-3495-38b0d31ab800@arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-24-git-send-email-Dave.Martin@arm.com>
- <39b6ee07-1258-e733-3495-38b0d31ab800@arm.com>
-Message-ID: <20170816105438.GA6321@e103592.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 16 Aug 2017 11:59:54 +0100
+Subject: [PATCH 2/9] ASoC: cygnus: Update bindings for audio clock changes
+In-Reply-To: <d7e7144b-26c7-b96a-663d-03744bb60c36@broadcom.com>
+References: <1502748417-26417-1-git-send-email-lori.hikichi@broadcom.com>
+ <1502748417-26417-3-git-send-email-lori.hikichi@broadcom.com>
+ <20170815171424.whcy4mftex6sgzgj@sirena.org.uk>
+ <d7e7144b-26c7-b96a-663d-03744bb60c36@broadcom.com>
+Message-ID: <20170816105954.ve434zeeqinweo5a@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 05:37:55PM +0100, Marc Zyngier wrote:
-> On 09/08/17 13:05, Dave Martin wrote:
-> > KVM guests cannot currently use SVE, because SVE is always
-> > configured to trap to EL2.
-> > 
-> > However, a guest that sees SVE reported as present in
-> > ID_AA64PFR0_EL1 may legitimately expect that SVE works and try to
-> > use it.  Instead of working, the guest will receive an injected
-> > undef exception, which may cause the guest to oops or go into a
-> > spin.
-> > 
-> > To avoid misleading the guest into believing that SVE will work,
-> > this patch masks out the SVE field from ID_AA64PFR0_EL1 when a
-> > guest attempts to read this register.  No support is explicitly
-> > added for ID_AA64ZFR0_EL1 either, so that is still emulated as
-> > reading as zero, which is consistent with SVE not being
-> > implemented.
-> > 
-> > This is a temporary measure, and will be removed in a later series
-> > when full KVM support for SVE is implemented.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > ---
-> >  arch/arm64/kvm/sys_regs.c | 14 +++++++++++++-
-> >  1 file changed, 13 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> > index 6583dd7..9e8c54e 100644
-> > --- a/arch/arm64/kvm/sys_regs.c
-> > +++ b/arch/arm64/kvm/sys_regs.c
-> > @@ -897,8 +897,20 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
-> >  {
-> >  	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
-> >  			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
-> > +	u64 val = raz ? 0 : read_sanitised_ftr_reg(id);
-> >  
-> > -	return raz ? 0 : read_sanitised_ftr_reg(id);
-> > +	if (id == SYS_ID_AA64PFR0_EL1) {
-> > +		static bool printed;
-> > +
-> > +		if ((val & (0xfUL << ID_AA64PFR0_SVE_SHIFT)) && !printed) {
-> > +			kvm_info("SVE unsupported for guests, suppressing\n");
-> > +			printed = true;
-> > +		}
-> 
-> Ideally, this should be a vcpu_unimpl_once(). But:
-> - it doesn't exist
-> - vcpu_unimpl looks hopelessly x86 specific
+On Tue, Aug 15, 2017 at 12:29:44PM -0700, Lori Hikichi wrote:
 
-Yeah, I looked for an appropriate function and didn't find one ... and
-writing one just for this seemed overkill.
+> I have put the mux assignment in DT because the assignment is a
+> static property and did not need run time programmability from the
+> machine driver.
 
-> How about turning it into a pr_err_once() instead?
-
-Can do, though should it be an err?
-
-No error has occurred here, rather I want people who discover that their
-guest mysteriously doesn't see SVE gets a clue about why.
-
-[...]
-
-Cheers
----Dave
+Why is this a static property, what prevents something wanting to change
+things at runtime?  You might be running with simpler setups now but
+perhaps you'll run into a more complex use case later?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170816/98363145/attachment.sig>
