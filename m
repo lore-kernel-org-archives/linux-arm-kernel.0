@@ -1,69 +1,52 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 16 Aug 2017 10:20:52 +0530
-Subject: [PATCH v2 4/5] mtd: spi-nor: cadence-quadspi: Add support to enable
- loop-back clock circuit
+Date: Wed, 16 Aug 2017 10:20:53 +0530
+Subject: [PATCH v2 5/5] mtd: spi-nor: cadence-quadspi: Add runtime PM support
 In-Reply-To: <20170816045053.15492-1-vigneshr@ti.com>
 References: <20170816045053.15492-1-vigneshr@ti.com>
-Message-ID: <20170816045053.15492-5-vigneshr@ti.com>
+Message-ID: <20170816045053.15492-6-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cadence QSPI IP has a adapted loop-back circuit which can be enabled by
-setting BYPASS field to 0 in READCAPTURE register. It enables use of
-QSPI return clock to latch the data rather than the internal QSPI
-reference clock. For high speed operations, adapted loop-back circuit
-using QSPI return clock helps to increase data valid window.
-
-Based on DT parameter cdns,rclk-en enable adapted loop-back circuit
-for boards which do have QSPI return clock provided.
-This patch also modifies cqspi_readdata_capture() function's bypass
-parameter to bool to match how its used in the function.
+Add pm_runtime* calls to cadence-quadspi driver. This is required to
+switch on QSPI power domain on TI 66AK2G SoC during probe.
 
 Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
-
-v2:
-Split doc update to separate patch
-
- drivers/mtd/spi-nor/cadence-quadspi.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/mtd/spi-nor/cadence-quadspi.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/drivers/mtd/spi-nor/cadence-quadspi.c b/drivers/mtd/spi-nor/cadence-quadspi.c
-index bb0cb02a6938..c11ced529ddd 100644
+index c11ced529ddd..4fd6fb9c83b3 100644
 --- a/drivers/mtd/spi-nor/cadence-quadspi.c
 +++ b/drivers/mtd/spi-nor/cadence-quadspi.c
-@@ -78,6 +78,7 @@ struct cqspi_st {
- 	bool			is_decoded_cs;
- 	u32			fifo_depth;
- 	u32			fifo_width;
-+	bool			rclk_en;
- 	u32			trigger_address;
- 	u32			wr_delay;
- 	struct cqspi_flash_pdata f_pdata[CQSPI_MAX_CHIPSELECT];
-@@ -788,7 +789,7 @@ static void cqspi_config_baudrate_div(struct cqspi_st *cqspi)
- }
- 
- static void cqspi_readdata_capture(struct cqspi_st *cqspi,
--				   const unsigned int bypass,
-+				   const bool bypass,
- 				   const unsigned int delay)
- {
- 	void __iomem *reg_base = cqspi->iobase;
-@@ -852,7 +853,8 @@ static void cqspi_configure(struct spi_nor *nor)
- 		cqspi->sclk = sclk;
- 		cqspi_config_baudrate_div(cqspi);
- 		cqspi_delay(nor);
--		cqspi_readdata_capture(cqspi, 1, f_pdata->read_delay);
-+		cqspi_readdata_capture(cqspi, !cqspi->rclk_en,
-+				       f_pdata->read_delay);
- 	}
- 
- 	if (switch_cs || switch_ck)
-@@ -1049,6 +1051,8 @@ static int cqspi_of_get_pdata(struct platform_device *pdev)
+@@ -31,6 +31,7 @@
+ #include <linux/of_device.h>
+ #include <linux/of.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
+ #include <linux/sched.h>
+ #include <linux/spi/spi.h>
+ #include <linux/timer.h>
+@@ -1224,6 +1225,13 @@ static int cqspi_probe(struct platform_device *pdev)
  		return -ENXIO;
  	}
  
-+	cqspi->rclk_en = of_property_read_bool(np, "cdns,rclk-en");
++	pm_runtime_enable(&pdev->dev);
++	ret = pm_runtime_get_sync(&pdev->dev);
++	if (ret < 0) {
++		pm_runtime_put_noidle(&pdev->dev);
++		return ret;
++	}
++
+ 	ret = clk_prepare_enable(cqspi->clk);
+ 	if (ret) {
+ 		dev_err(dev, "Cannot enable QSPI clock.\n");
+@@ -1275,6 +1283,9 @@ static int cqspi_remove(struct platform_device *pdev)
+ 
+ 	clk_disable_unprepare(cqspi->clk);
+ 
++	pm_runtime_put_sync(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
 +
  	return 0;
  }
