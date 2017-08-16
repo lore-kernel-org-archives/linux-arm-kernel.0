@@ -1,72 +1,67 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 16 Aug 2017 18:53:07 +0100
-Subject: [PATCH 24/27] arm64/sve: Detect SVE and activate runtime support
-In-Reply-To: <1502280338-23002-25-git-send-email-Dave.Martin@arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-25-git-send-email-Dave.Martin@arm.com>
-Message-ID: <3389809f-52e9-5830-304b-21ce56fbcde2@arm.com>
+From: anjiandi@codeaurora.org (Jiandi An)
+Date: Wed, 16 Aug 2017 13:10:12 -0500
+Subject: [PATCH 2/3] [v3] pinctrl: qcom: disable GPIO groups with no pins
+In-Reply-To: <d0b16753-b202-5756-1cba-1cd083af52ed@codeaurora.org>
+References: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
+ <1501179565-26466-3-git-send-email-timur@codeaurora.org>
+ <CACRpkdZj+tnMcEpic6PrQS-qMJDodmc_uFJVudxc=USCTXpyKg@mail.gmail.com>
+ <d0b16753-b202-5756-1cba-1cd083af52ed@codeaurora.org>
+Message-ID: <7c278367-bf3b-6a26-e31f-ee696cb5534e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/08/17 13:05, Dave Martin wrote:
-> [This sender failed our fraud detection checks and may not be who they appear to be. Learn about spoofing at http://aka.ms/LearnAboutSpoofing]
->
-> This patch enables detection of hardware SVE support via the
-> cpufeatures framework, and reports its presence to the kernel and
-> userspace via the new ARM64_SVE cpucap and HWCAP_SVE hwcap
-> respectively.
->
-> Userspace can also detect SVE using ID_AA64PFR0_EL1, using the
-> cpufeatures MRS emulation.
->
-> When running on hardware that supports SVE, this enables runtime
-> kernel support for SVE, and allows user tasks to execute SVE
-> instructions and make of the of the SVE-specific user/kernel
-> interface extensions implemented by this series.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+During a kexec shutdown, machine_kexec_mask_interrupts() will attempt
+to disable all IRQs that are registered.  If gpio is not available,
+don't register IRQs and it won't be in the irq_desc list it walks through.
+
+If gpio is unavailable, perhaps a more correct fix that covers more is 
+to not calling gpiochip_irqchip_add() to register msm_gpio_irq_chip in 
+msm_gpio_init().
+
+When registering interrupt for msm_qpio_irq_chip the following are 
+registered, not just irq_mask and irq_unmask.
+
+static struct irq_chip msm_gpio_irq_chip = {
+	.name           = "msmgpio",
+	.irq_mask       = msm_gpio_irq_mask,
+	.irq_unmask     = msm_gpio_irq_unmask,
+	.irq_ack        = msm_gpio_irq_ack,
+	.irq_set_type   = msm_gpio_irq_set_type,
+	.irq_set_wake   = msm_gpio_irq_set_wake,
+};
+
+Technically the same check added in msm_gpio_irq_mask() and 
+msm_gpio_irq_unmask() should be added in msm_gpio_irq_ack(), 
+msm_gpio_irq_set_type(), and msm_gpio_irq_set_wake() if it's registered 
+with irq domain.
+
+To cover more bases, the more correct way is to not register interrupt 
+with irq domain at all if gpio is unavailable.
 
 
-> ---
->  arch/arm64/include/asm/cpucaps.h    |  3 ++-
->  arch/arm64/include/asm/cpufeature.h |  3 ++-
->  arch/arm64/include/uapi/asm/hwcap.h |  1 +
->  arch/arm64/kernel/cpufeature.c      | 16 ++++++++++++++++
->  arch/arm64/kernel/cpuinfo.c         |  1 +
->  5 files changed, 22 insertions(+), 2 deletions(-)
+On 08/09/2017 02:02 PM, Timur Tabi wrote:
+> On 07/31/2017 08:36 AM, Linus Walleij wrote:
+>>> To support sparse GPIO maps, pinctrl-msm client drivers can specify
+>>> that a given GPIO has a pin count of zero.  These GPIOs will be
+>>> considered "hidden".  Any attempt to claim the GPIO will fail, and they
+>>> will not be listed in debugfs.
+>>>
+>>> During a kexec shutdown, machine_kexec_mask_interrupts() will attempt
+>>> to disable all IRQs, even those that aren't enabled.  This includes
+>>> GPIOs that are unavailable (npins == 0), so add a check to the irq mask
+>>> and unmask functions.
+>>>
+>>> Signed-off-by: Timur Tabi<timur@codeaurora.org>
+>
+>> I'm waiting for Bj?rn's review of the two remaining patches.
+>
+> Bj?rn, do you have time to review these patches?  I'm hoping to get them
+> into 4.14.
 >
 
-...
-
->
-> @@ -944,6 +957,9 @@ static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
->         HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_JSCVT_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_JSCVT),
->         HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_FCMA_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_FCMA),
->         HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_LRCPC_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_LRCPC),
-> +#ifdef CONFIG_ARM64_SVE
-> +       HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_SVE_SHIFT, FTR_UNSIGNED, ID_AA64PFR0_SVE, CAP_HWCAP, HWCAP_SVE),
-> +#endif
->         {},
->  };
->
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index 0e087d7..943aad0 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -69,6 +69,7 @@ static const char *const hwcap_str[] = {
->         "jscvt",
->         "fcma",
->         "lrcpc",
-> +       "sve",
->         NULL
->  };
->
-
-
-Dave,
-
-Could you please update the Documentation for the exposed CPU feature
-registers to include the SVE field ? Rest looks good to me. With that
-change,
-
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+-- 
+Jiandi An
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux Foundation Collaborative Project.
