@@ -1,58 +1,57 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 15 Aug 2017 17:26:02 -0700 (PDT)
-Subject: [PATCH net RESEND] PCI: fix oops when try to find Root Port
- for a PCI device
-In-Reply-To: <20170815170331.GA4099@bhelgaas-glaptop.roam.corp.google.com>
-References: <1502810688-12420-1-git-send-email-dingtianhong@huawei.com>
- <20170815170331.GA4099@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170815.172602.828619829770973735.davem@davemloft.net>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Wed, 16 Aug 2017 02:38:47 +0200
+Subject: [PATCH 5/5] arm64: dts: realtek: Adopt RTD1295 reset constants
+In-Reply-To: <20170816003847.6208-1-afaerber@suse.de>
+References: <20170816003847.6208-1-afaerber@suse.de>
+Message-ID: <20170816003847.6208-6-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bjorn Helgaas <helgaas@kernel.org>
-Date: Tue, 15 Aug 2017 12:03:31 -0500
+Replace reset controller indices with constants.
 
-> On Tue, Aug 15, 2017 at 11:24:48PM +0800, Ding Tianhong wrote:
->> Eric report a oops when booting the system after applying
->> the commit a99b646afa8a ("PCI: Disable PCIe Relaxed..."):
->> ...
-> 
->> It looks like the pci_find_pcie_root_port() was trying to
->> find the Root Port for the PCI device which is the Root
->> Port already, it will return NULL and trigger the problem,
->> so check the highest_pcie_bridge to fix thie problem.
-> 
-> The problem was actually with a Root Complex Integrated Endpoint that
-> has no upstream PCIe device:
-> 
->   00:05.2 System peripheral: Intel Corporation Device 0e2a (rev 04)
->         Subsystem: Intel Corporation Device 0e2a
->         Control: I/O- Mem- BusMaster- SpecCycle- MemWINV- VGASnoop- ParErr- Stepping- SERR- FastB2B- DisINTx-
->         Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
->         Capabilities: [40] Express (v2) Root Complex Integrated Endpoint, MSI 00
->                 DevCap: MaxPayload 128 bytes, PhantFunc 0, Latency L0s <64ns, L1 <1us
->                         ExtTag- RBE- FLReset-
->                 DevCtl: Report errors: Correctable- Non-Fatal- Fatal+ Unsupported+
->                         RlxdOrd+ ExtTag- PhantFunc- AuxPwr- NoSnoop+
->                         MaxPayload 128 bytes, MaxReadReq 128 bytes
-> 
->> Fixes: a99b646afa8a ("PCI: Disable PCIe Relaxed Ordering if unsupported")
-> 
-> This also
-> 
-> Fixes: c56d4450eb68 ("PCI: Turn off Request Attributes to avoid Chelsio T5 Completion erratum")
-> 
-> which added pci_find_pcie_root_port().  Prior to this Relaxed Ordering
-> series, we only used pci_find_pcie_root_port() in a Chelsio quirk that
-> only applied to non-integrated endpoints, so we didn't trip over the
-> bug.
- ...
-> I think structuring the fix as follows is a little more readable:
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index af0cc3456dc1..587cd7623ed8 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ arch/arm64/boot/dts/realtek/rtd1295.dtsi | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-I've integrated all of this feedback and the other Fixes: tag and applied it
-to 'net', thanks.
+diff --git a/arch/arm64/boot/dts/realtek/rtd1295.dtsi b/arch/arm64/boot/dts/realtek/rtd1295.dtsi
+index e777200d84b9..2d2d84b573e3 100644
+--- a/arch/arm64/boot/dts/realtek/rtd1295.dtsi
++++ b/arch/arm64/boot/dts/realtek/rtd1295.dtsi
+@@ -7,6 +7,7 @@
+  */
+ 
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/reset/realtek,rtd1295.h>
+ 
+ / {
+ 	compatible = "realtek,rtd1295";
+@@ -123,7 +124,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clock-frequency = <27000000>;
+-			resets = <&iso_reset 8>;
++			resets = <&iso_reset RTD1295_ISO_RSTN_UR0>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -133,7 +134,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clock-frequency = <432000000>;
+-			resets = <&reset2 28>;
++			resets = <&reset2 RTD1295_RSTN_UR1>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -143,7 +144,7 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clock-frequency = <432000000>;
+-			resets = <&reset2 27>;
++			resets = <&reset2 RTD1295_RSTN_UR2>;
+ 			status = "disabled";
+ 		};
+ 
+-- 
+2.12.3
