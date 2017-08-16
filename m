@@ -1,57 +1,47 @@
-From: chris.paterson2@renesas.com (Chris Paterson)
-Date: Wed, 16 Aug 2017 10:16:30 +0100
-Subject: [PATCH v2] ARM: dts: iwg20d-q7: Add RTC support
-Message-ID: <1502874990-12006-1-git-send-email-chris.paterson2@renesas.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 16 Aug 2017 10:18:22 +0100
+Subject: [PATCH] ARM: hisi: Fix typo in comment
+In-Reply-To: <20170807093322.26050-1-yunzhi.li@deephi.tech>
+References: <20170807093322.26050-1-yunzhi.li@deephi.tech>
+Message-ID: <59940DDE.1000906@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+Hi Yunzhi,
 
-Define the iWave RainboW-G20D-Qseven board dependent part of the
-RTC device node.
+On 2017/8/7 10:33, Yunzhi Li wrote:
+> Fix the rc vs. pc typo. There is no a register named rc, I felt
+> confused when I read this assembler command in comment.
+>
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-[chris: corrected bq32000 compatible string]
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
----
-v1 -> v2
-Added ti to bq32000 compatible string - Thanks Geert
+Thanks!
+Yes, it is a typo.
+And 0xe51ff004 is the machine code to do the jump.
+I will change the commit msg as below and pick up it:
 
- arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+The machine code "0xe51ff004" means "ldr pc, [pc, #-4]".
+This patch fixed the comment typo to avoid any confusion.
 
-diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-index 081af01..2c81ea7 100644
---- a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-+++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-@@ -31,6 +31,11 @@
- 		groups = "avb_mdio", "avb_gmii";
- 		function = "avb";
- 	};
-+
-+	i2c2_pins: i2c2 {
-+		groups = "i2c2";
-+		function = "i2c2";
-+	};
- };
- 
- &scif0 {
-@@ -54,3 +59,16 @@
- 		micrel,led-mode = <1>;
- 	};
- };
-+
-+&i2c2 {
-+	pinctrl-0 = <&i2c2_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	rtc at 68 {
-+		compatible = "ti,bq32000";
-+		reg = <0x68>;
-+	};
-+};
--- 
-1.9.1
+Best Regards,
+Wei
+
+> Signed-off-by: Yunzhi Li <yunzhi.li@deephi.tech>
+> ---
+> 
+>  arch/arm/mach-hisi/platsmp.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-hisi/platsmp.c b/arch/arm/mach-hisi/platsmp.c
+> index 91bb02dec20f..da5689ababf7 100644
+> --- a/arch/arm/mach-hisi/platsmp.c
+> +++ b/arch/arm/mach-hisi/platsmp.c
+> @@ -109,7 +109,7 @@ static void hix5hd2_set_scu_boot_addr(phys_addr_t start_addr, phys_addr_t jump_a
+>  
+>  	virt = ioremap(start_addr, PAGE_SIZE);
+>  
+> -	writel_relaxed(0xe51ff004, virt);	/* ldr pc, [rc, #-4] */
+> +	writel_relaxed(0xe51ff004, virt);	/* ldr pc, [pc, #-4] */
+>  	writel_relaxed(jump_addr, virt + 4);	/* pc jump phy address */
+>  	iounmap(virt);
+>  }
+> 
