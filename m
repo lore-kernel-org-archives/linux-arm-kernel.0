@@ -1,41 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Aug 2017 23:28:24 +0200
-Subject: [GIT PULL 4/4] device tree changes for omaps for v4.14
-In-Reply-To: <5246773866334625482@unknownmsgid>
-References: <5246773866334625482@unknownmsgid>
-Message-ID: <CAK8P3a1EuWq4pS_JTEcrKbQKZLpUncLE5d226Z-xnyauLTWcqA@mail.gmail.com>
+Date: Wed, 16 Aug 2017 23:31:50 +0200
+Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.14
+In-Reply-To: <CAK7LNAQpsNrrrL2T8J1QYjA+9cmj8UO3JdTCZ7_WLGfdWC4G7w@mail.gmail.com>
+References: <CAK7LNAQpsNrrrL2T8J1QYjA+9cmj8UO3JdTCZ7_WLGfdWC4G7w@mail.gmail.com>
+Message-ID: <CAK8P3a1qY1UCVcFmmJ4Df=27xZqeEh91XZdW1udMSUNcb-ZeyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 6:52 PM, Tony Lindgren <tony@atomide.com> wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
+On Wed, Aug 16, 2017 at 5:00 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+
 > ----------------------------------------------------------------
-> Device tree changes for omaps for v4.14 merge window:
+> UniPhier ARM SoC DT updates for v4.14
 >
-> - A series of changes for dra7 and am572 to use generic
->   MMC vqmmc regulator
+> - complete migrating to SPDX License Identifier
+> - remove support for old SoC
+> - add nodes for NAND, Audio pinctrl
+> - replace /include/ with #include
 >
-> - Clean-up tps65217 internal interrupts to define them
->   only in tps65217.dtsi
+> ----------------------------------------------------------------
+> Katsuhiro Suzuki (1):
+>       ARM: dts: uniphier: add audio out pin-mux node
 >
-> - Add dra7 iodelay pinctrl driver configuration
->
-> - Add buzzer support for am437x-gp-evm
->
-> - Disable HDMI CEC internal pull-ups as it seems that
->   all boards have an external pull for these
->
-> - Remove unnecessary interrupt-parent for omap3
->
-> - Configure droid 4 vaudio regulator initial mode and
->   add vibrator
->
-> - Enable NAND dma prefetch for am335x-evm, am437x and dra7
->
-> - Add pcie1 dt node for EP mode for am57x and dra7
->
-> - Add support for new dra76x SoCs and dra76x-evm
+> Masahiro Yamada (4):
+>       ARM: dts: uniphier: use SPDX-License-Identifier (2nd)
+>       ARM: dts: uniphier: remove sLD3 SoC support
+>       ARM: dts: uniphier use #include instead of /include/
+>       ARM: dts: uniphier: add Denali NAND controller node
 
-Pulled into next/dt, thanks!
+Pulled into next/dt, but please clarify one question:
 
-    Arnd
+How likely is it that there are still users of the sLD3 SoC on
+mainline kernels? The commit just states that it is too hard
+to maintain, but the more important question is whether anyone
+cares about it breaking.
+
+      Arnd
