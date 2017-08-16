@@ -1,5 +1,5 @@
 From: anjiandi@codeaurora.org (Jiandi An)
-Date: Wed, 16 Aug 2017 14:30:37 -0500
+Date: Wed, 16 Aug 2017 14:31:54 -0500
 Subject: [PATCH 2/3] [v3] pinctrl: qcom: disable GPIO groups with no pins
 In-Reply-To: <66bfbee6-245d-fddb-f6cb-a2c3c06ffc9b@codeaurora.org>
 References: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
@@ -8,7 +8,7 @@ References: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
  <d0b16753-b202-5756-1cba-1cd083af52ed@codeaurora.org>
  <7c278367-bf3b-6a26-e31f-ee696cb5534e@codeaurora.org>
  <66bfbee6-245d-fddb-f6cb-a2c3c06ffc9b@codeaurora.org>
-Message-ID: <417198b9-ded1-bd98-e489-3a2925505984@codeaurora.org>
+Message-ID: <b99e9fc2-2531-20d6-6b25-830f7583e2bc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
