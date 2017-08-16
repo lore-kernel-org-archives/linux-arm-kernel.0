@@ -1,79 +1,41 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 16 Aug 2017 15:45:21 -0500
-Subject: [PATCH 1/3] dt-bindings: mfd: d1w: iproc: Documentation for d1w
- driver
-In-Reply-To: <1502905525-5646-2-git-send-email-scott.branden@broadcom.com>
-References: <1502905525-5646-1-git-send-email-scott.branden@broadcom.com>
- <1502905525-5646-2-git-send-email-scott.branden@broadcom.com>
-Message-ID: <CABGGiswK7UofmFea4FcNi_fTG+hzhu707Z8Lni7DNRoMtsx0FQ@mail.gmail.com>
+From: alex.g@adaptrum.com (Alexandru Gagniuc)
+Date: Wed, 16 Aug 2017 13:46:07 -0700
+Subject: [PATCH v3 2/5] reset: socfpga: use the reset-simple driver
+In-Reply-To: <20170816094701.30678-3-p.zabel@pengutronix.de>
+References: <20170816094701.30678-1-p.zabel@pengutronix.de>
+ <20170816094701.30678-3-p.zabel@pengutronix.de>
+Message-ID: <900b3dad-7340-6ad9-d996-d2f0e389bd58@adaptrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 16, 2017 at 12:45 PM, Scott Branden
-<scott.branden@broadcom.com> wrote:
-> From: Shreesha Rajashekar <shreesha@broadcom.com>
+Hi Phillip,
+
+On 08/16/2017 02:46 AM, Philipp Zabel wrote:
+[snip]
+> @@ -118,8 +151,23 @@ static int reset_simple_probe(struct platform_device *pdev)
+>  	data->rcdev.ops = &reset_simple_ops;
+>  	data->rcdev.of_node = dev->of_node;
 >
-> Adding document for IPROC d1w driver.
->
-> Signed-off-by: Shreesha Rajashekar <shreesha@broadcom.com>
-> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
-> ---
->  .../devicetree/bindings/mfd/brcm,iproc-d1w.txt     | 27 ++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/brcm,iproc-d1w.txt
-
-How is this an MFD? Should be bindings/w1/...
-
->
-> diff --git a/Documentation/devicetree/bindings/mfd/brcm,iproc-d1w.txt b/Documentation/devicetree/bindings/mfd/brcm,iproc-d1w.txt
-> new file mode 100644
-> index 0000000..2bb99c1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/brcm,iproc-d1w.txt
-> @@ -0,0 +1,27 @@
-> +* Broadcom Dallas One wire (D1W) bus master controller
+> -	if (devdata)
+> +	if (devdata) {
+> +		u32 reg_offset = devdata->reg_offset;
 > +
-> +Required properties:
-> +- compatible : should be "brcm,iproc-d1w"
-> +- reg : Address and length of the register set for the device
-> +- interrupts : IRQ number of D1W controller
-> +
-> +Optional properties:
-> +- clocks : phandle of clock that supplies the module (required if platform
-> +               clock bindings use device tree)
-> +- clock-names : name for the clock
-> +- clock-frequency : D1W divisor clock rate
+> +		if (reg_offset &&
+> +		    of_property_read_u32(dev->of_node, "altr,modrst-offset",
+> +					 &reg_offset)) {
+> +			dev_warn(dev,
+> +				 "missing altr,modrst-offset property, assuming 0x%x!\n",
+> +				 reg_offset);
+> +		}
 
-This should be bus-frequency. We messed up on I2C.
+I would not make reading dt properties dependent on the presence of 
+devdata. That breaks being able to configure the reset controller from 
+dt. I would either just read the "altr,modrst-offset" property, or read 
+it when
 
-> +- reset-recover-delay : Delay while reset D1W in milliseconds.
+	of_device_is_compatible(dev->of_node, "altr,rst-mgr"));
 
-Is this a standard 1-wire bus operation? I'm guessing so, but if not
-needs a vendor prefix.
+Ideally, we could have a more generic "reg-offset" binding for new reset 
+controllers, but that is beyond the scope of this patch.
 
-Also, needs unit suffix as defined in property-units.txt.
-
-> +
-> +Example:
-> +
-> +- From bcm-cygnus.dtsi:
-> +iproc_d1w: d1w at 180ab000 {
-
-Should be a generic name. So far in bindings/w1/ we have 3 different
-ones in 3 bindings. Lets go with "onewire".
-
-> +       compatible = "brcm,iproc_d1w";
-
-Doesn't match the doc.
-
-> +       reg = <0x180ab000 0x0f>;
-> +       interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
-> +       clocks = <&axi81_clk>;
-> +       clock-names = "iproc_d1w_clk";
-> +       clock-frequency = <100000000>;
-> +       reset-recover-delay = <1>;
-> +};
-> +
-> --
-> 2.5.0
->
+Alex
