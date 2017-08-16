@@ -1,41 +1,43 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 16 Aug 2017 10:20:51 +0530
-Subject: [PATCH v2 3/5] mtd: spi-nor: cadence-quadspi: Add new binding to
- enable loop-back circuit
-In-Reply-To: <20170816045053.15492-1-vigneshr@ti.com>
-References: <20170816045053.15492-1-vigneshr@ti.com>
-Message-ID: <20170816045053.15492-4-vigneshr@ti.com>
+From: hjc@rock-chips.com (Sandy Huang)
+Date: Wed, 16 Aug 2017 14:06:55 +0800
+Subject: [PATCH v5 3/3] drm/rockchip: Add support for Rockchip Soc LVDS
+In-Reply-To: <3e6822fa-58f6-9207-32b1-340e330bf758@phytec.de>
+References: <1502768955-176510-1-git-send-email-hjc@rock-chips.com>
+ <1502768969-176681-1-git-send-email-hjc@rock-chips.com>
+ <3e6822fa-58f6-9207-32b1-340e330bf758@phytec.de>
+Message-ID: <64900a7a-25d1-2822-1fc1-0b5fe4b08752@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cadence QSPI IP has a adapted loop-back circuit which can be enabled by
-setting BYPASS field to 0 in READCAPTURE register. It enables use of
-QSPI return clock to latch the data rather than the internal QSPI
-reference clock. For high speed operations, adapted loop-back circuit
-using QSPI return clock helps to increase data valid window.
 
-Add DT parameter cdns,rclk-en to help enable adapted loop-back circuit
-for boards which do have QSPI return clock provided. Update binding
-documentation for the same.
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- Documentation/devicetree/bindings/mtd/cadence-quadspi.txt | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
-index 7dbe3bd9ac56..bb2075df9b38 100644
---- a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
-+++ b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
-@@ -16,6 +16,9 @@ Required properties:
- 
- Optional properties:
- - cdns,is-decoded-cs : Flag to indicate whether decoder is used or not.
-+- cdns,rclk-en : Flag to indicate that QSPI return clock is used to latch
-+  the read data rather than the QSPI clock. Make sure that QSPI return
-+  clock is populated on the board before using this property.
- 
- Optional subnodes:
- Subnodes of the Cadence Quad SPI controller are spi slave nodes with additional
--- 
-2.14.1
+? 2017/8/15 17:08, Wadim Egorov ??:
+> 
+> 
+> Am 15.08.2017 um 05:49 schrieb Sandy Huang:
+>> This adds support for Rockchip soc lvds found on rk3288
+>> Based on the patches from Mark yao and Heiko Stuebner
+>>
+>> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
+>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>> ---
+>>   drivers/gpu/drm/rockchip/Kconfig            |   9 +
+>>   drivers/gpu/drm/rockchip/Makefile           |   1 +
+>>   drivers/gpu/drm/rockchip/rockchip_drm_drv.c |   2 +
+>>   drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   1 +
+>>   drivers/gpu/drm/rockchip/rockchip_lvds.c    | 599 ++++++++++++++++++++++++++++
+>>   drivers/gpu/drm/rockchip/rockchip_lvds.h    | 109 +++++
+>>   6 files changed, 721 insertions(+)
+>>   create mode 100644 drivers/gpu/drm/rockchip/rockchip_lvds.c
+>>   create mode 100644 drivers/gpu/drm/rockchip/rockchip_lvds.h
+>>
+> I have tested this with an ETM0700G0DH6 7.0" LCD panel on the
+> phyCORE-RK3288.
+> 
+> Tested-by: Wadim Egorov <w.egorov@phytec.de>
+> 
+> 
+> 
+Hi Wadim Egorov,
+     Thanks for your test.
