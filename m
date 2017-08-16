@@ -1,33 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Aug 2017 21:33:56 +0200
-Subject: [PATCH] soc: Convert to using %pOF instead of full_name
-In-Reply-To: <CAL_JsqLYz9ACd-YAtU0gEHkY8A++cCeBTW9jvUyc5OheEq4scQ@mail.gmail.com>
-References: <20170718214339.7774-49-robh@kernel.org>
- <CAL_JsqLYz9ACd-YAtU0gEHkY8A++cCeBTW9jvUyc5OheEq4scQ@mail.gmail.com>
-Message-ID: <CAK8P3a3eEV8KWb-cCovRH0LQQ+88yJ7R9se1sjd06K_TyPzKjQ@mail.gmail.com>
+Date: Wed, 16 Aug 2017 21:38:19 +0200
+Subject: [PATCH] memory: Convert to using %pOF instead of full_name
+In-Reply-To: <CAL_JsqKLCWVY09RHgU71oc+QMa_bWg+t_yhb60iKFShFT41YPw@mail.gmail.com>
+References: <20170718214339.7774-34-robh@kernel.org>
+ <20170719054702.x6h2fkz6vplzyqg2@piout.net>
+ <CAL_JsqKLCWVY09RHgU71oc+QMa_bWg+t_yhb60iKFShFT41YPw@mail.gmail.com>
+Message-ID: <CAK8P3a1hr=x31+6U=xcM8W_6xhjjFPfP3-yk5C5tsK-KRMiP4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 10, 2017 at 12:09 AM, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Jul 18, 2017 at 4:43 PM, Rob Herring <robh@kernel.org> wrote:
->> Now that we have a custom printf format specifier, convert users of
->> full_name to use %pOF instead. This is preparation to remove storing
->> of the full path string for each node.
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> Cc: Scott Wood <oss@buserror.net>
->> Cc: Qiang Zhao <qiang.zhao@nxp.com>
->> Cc: Matthias Brugger <matthias.bgg@gmail.com>
->> Cc: Simon Horman <horms@verge.net.au>
->> Cc: Magnus Damm <magnus.damm@gmail.com>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> Cc: Krzysztof Kozlowski <krzk@kernel.org>
->> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-
-> Arnd, Olof,
+On Thu, Aug 10, 2017 at 12:22 AM, Rob Herring <robh@kernel.org> wrote:
+> On Wed, Jul 19, 2017 at 12:47 AM, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+>> On 18/07/2017 at 16:43:14 -0500, Rob Herring wrote:
+>>> Now that we have a custom printf format specifier, convert users of
+>>> full_name to use %pOF instead. This is preparation to remove storing
+>>> of the full path string for each node.
+>>>
+>>> Signed-off-by: Rob Herring <robh@kernel.org>
+>>> Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+>>> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>> Cc: Roger Quadros <rogerq@ti.com>
+>>> Cc: Tony Lindgren <tony@atomide.com>
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: linux-omap at vger.kernel.org
+>> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 >
-> Can you please apply this one.
+> This can go through subsystem tree. Who normally takes drivers/memory/
+> changes? arm-soc?
 
-Applied to next/drivers with the various Acks, thanks!
+I applied it to next/drivers in arm-soc with the two acks now. For some
+reason the whitespace change in omap-gpmc.c did not apply though,
+so I ended up hand-editing the patch to take that out.
 
       Arnd
