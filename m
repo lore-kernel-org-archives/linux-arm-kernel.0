@@ -1,20 +1,16 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Aug 2017 22:40:57 +0200
-Subject: [GIT PULL] ARM: mvebu: soc for v4.14 (#1)
-In-Reply-To: <8760duiexx.fsf@free-electrons.com>
-References: <8760duiexx.fsf@free-electrons.com>
-Message-ID: <CAK8P3a1CkiLy_aAbi8Qb7um0ATvK2p9Hn+jeRbJLbmKSWmPY1Q@mail.gmail.com>
+Date: Wed, 16 Aug 2017 22:42:14 +0200
+Subject: [GIT PULL] Gemini changes for v4.14
+In-Reply-To: <CACRpkdZ6D=VdS6wHjF3AuNkvp7xty8t+OAQgwAAyW7ko_4mjrw@mail.gmail.com>
+References: <CACRpkdZ6D=VdS6wHjF3AuNkvp7xty8t+OAQgwAAyW7ko_4mjrw@mail.gmail.com>
+Message-ID: <CAK8P3a145=B9mKEGt9_RgzuZ9xJqUC-w71fugCpiN+UX_tg0sA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 11, 2017 at 12:20 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-
-> mvebu soc for 4.14 (part 1)
+On Sat, Aug 5, 2017 at 11:56 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> Hi ARM SoC folks,
 >
-> Enabling ARM_GLOBAL_TIMER in mvebu_v7_defconfig for Armada 38x
->
+> please pull these (simple) changes into the ARM SoC tree
+> for v4.14. Details in the signed tag.
 
 Pulled into next/soc, thanks!
-
-       Arnd
