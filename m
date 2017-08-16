@@ -1,50 +1,35 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Tue, 15 Aug 2017 23:28:26 -0500
-Subject: [PATCH] ARM: dts: qcom-apq8064: Fix dsi and hdmi phy cells
-Message-ID: <1502857706-18379-1-git-send-email-andy.gross@linaro.org>
+From: vigneshr@ti.com (Vignesh R)
+Date: Wed, 16 Aug 2017 10:20:49 +0530
+Subject: [PATCH v2 1/5] mtd: spi-nor: cadence-quadspi: Add TI 66AK2G SoC
+ specific compatible
+In-Reply-To: <20170816045053.15492-1-vigneshr@ti.com>
+References: <20170816045053.15492-1-vigneshr@ti.com>
+Message-ID: <20170816045053.15492-2-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the necessary #phy-cells property to the DSI and HDMI
-phys.
+Update binding documentation to add a new compatible for TI 66AK2G SoC,
+to handle TI SoC specific quirks in the driver.
 
-Signed-off-by: Andy Gross <andy.gross@linaro.org>
+Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
- arch/arm/boot/dts/qcom-apq8064.dtsi | 4 +++-
+ Documentation/devicetree/bindings/mtd/cadence-quadspi.txt | 4 +++-
  1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index f3db185..d08f3db 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -906,11 +906,11 @@
- 				usb_hs1_phy: phy {
- 					compatible = "qcom,usb-hs-phy-apq8064",
- 						     "qcom,usb-hs-phy";
--					#phy-cells = <0>;
- 					clocks = <&sleep_clk>, <&cxo_board>;
- 					clock-names = "sleep", "ref";
- 					resets = <&usb1 0>;
- 					reset-names = "por";
-+					#phy-cells = <0>;
- 				};
- 			};
- 		};
-@@ -1263,6 +1263,7 @@
- 		dsi0_phy: dsi-phy at 4700200 {
- 			compatible = "qcom,dsi-phy-28nm-8960";
- 			#clock-cells = <1>;
-+			#phy-cells = <0>;
+diff --git a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
+index f248056da24c..7dbe3bd9ac56 100644
+--- a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
++++ b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
+@@ -1,7 +1,9 @@
+ * Cadence Quad SPI controller
  
- 			reg = <0x04700200 0x100>,
- 				<0x04700300 0x200>,
-@@ -1417,6 +1418,7 @@
- 
- 			clocks = <&mmcc HDMI_S_AHB_CLK>;
- 			clock-names = "slave_iface_clk";
-+			#phy-cells = <0>;
- 		};
- 
- 		mdp: mdp at 5100000 {
+ Required properties:
+-- compatible : Should be "cdns,qspi-nor".
++- compatible : should be one of the following:
++	Generic default - "cdns,qspi-nor".
++	For TI 66AK2G SoC - "ti,k2g-qspi", "cdns,qspi-nor".
+ - reg : Contains two entries, each of which is a tuple consisting of a
+ 	physical address and length. The first entry is the address and
+ 	length of the controller register set. The second entry is the
 -- 
-2.7.4
+2.14.1
