@@ -1,73 +1,94 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 16 Aug 2017 17:46:17 +0100
-Subject: [PATCH v3 1/5] reset: add reset-simple to unify socfpga, stm32,
- sunxi, and zx2967
-In-Reply-To: <706d596c-a444-dcc9-a210-02d3564f3e83@suse.de>
-References: <20170816094701.30678-1-p.zabel@pengutronix.de>
- <20170816094701.30678-2-p.zabel@pengutronix.de>
- <51db563d-d6e1-18f1-01c1-3fdcf8269773@arm.com>
- <d6b20df2-12f7-68b1-f7de-0c7f205eba13@suse.de>
- <1502896293.7596.7.camel@pengutronix.de>
- <706d596c-a444-dcc9-a210-02d3564f3e83@suse.de>
-Message-ID: <ac9d55ae-46f4-6f5c-d2d2-146e4af85250@arm.com>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Wed, 16 Aug 2017 11:50:53 -0500
+Subject: [PATCH v2] ARM: dts: am57xx-beagle-x15: Add support for rev C
+Message-ID: <20170816165053.19450-1-robertcnelson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Latest update to the BeagleBoard-X15 platform (revision C). This board contains
+a silicon update (Rev 2.0), which includes a fix for the 2nd ethernet phy when
+running at 1000 Mbps speeds.
 
-On 16/08/17 17:41, Andreas F?rber wrote:
-> Am 16.08.2017 um 17:11 schrieb Philipp Zabel:
->> On Wed, 2017-08-16 at 14:12 +0200, Andreas F?rber wrote:
->>> Am 16.08.2017 um 13:30 schrieb Andre Przywara:
->>>> On 16/08/17 10:46, Philipp Zabel wrote:
->>>>> +/**
->>>>> + * struct reset_simple_devdata - simple reset controller properties
->>>>> + * @active_low: if true, bits are cleared to assert the reset. Otherwise, bits
->>>>> + *              are set to assert the reset.
->>>>> + */
->>>>> +struct reset_simple_devdata {
->>>>>>>> +	bool active_low;
->>>>> +};
->>>>> +
->>>>> +static const struct reset_simple_devdata reset_simple_active_low = {
->>>>>>>> +	.active_low = true,
->>>>> +};
->>>>> +
->>>>> +static const struct of_device_id reset_simple_dt_ids[] = {
->>>>>>>> +	{ .compatible = "allwinner,sun6i-a31-clock-reset",
->>>>> +		.data = &reset_simple_active_low },
->>>>
->>>> Can we have a additional generic compatible string here? New users of
->>>> this driver then wouldn't need to explicitly enter their name into the
->>>> driver, but could just use the generic name as a fallback. This would
->>>> enable the driver without any Linux code change just by adding a DT node.
->>>>
->>>> 	compatible = "nexell,s5p6818-reset", "simple-reset";
->>>>
->>>> Whenever we need a quirk (now or in the future), we can add the specific
->>>> name into this structure along with the required workarounds.
->>>
->>> Same question about binding here. However the way it is done today, we
->>> would also need some optional active-low property then or two different
->>> compatible strings, as this is currently controlled via the DT matches.
->>
->> I'd like to decouple this from the issue at hand, which is de-
->> duplicating simple reset code without device tree changes.
->>
->> I'll make a separate suggestion for a simple binding on top of this
->> series.
-> 
-> Okay, I'll continue using my own driver then, until it's clear how
-> exactly I'm supposed to piggy-back on this new driver.
+This board can be indentified by the [C.00] after [BBRDX15_] in the at24 eeprom:
+[BBRDX15_C.001731PX150249]
 
-It's not very nice, but if you can't wait, what about using:
+Rev C is now in full production and boards are available for end users.
 
-	compatible = "your_vendor,your-reset",
-		     "allwinner,sun6i-a31-clock-reset";
+https://beagleboard.org/x15
+https://github.com/beagleboard/beagleboard-x15/
 
-for now, then later adding the new generic compatible string at the end,
-once we agreed on the naming?
-That should give you support for all ranges of kernels.
+Signed-off-by: Robert Nelson <robertcnelson@gmail.com>
+CC: Tony Lindgren <tony@atomide.com>
+CC: Nishanth Menon <nm@ti.com>
+CC: Lokesh Vutla <lokeshvutla@ti.com>
+CC: Kishon Vijay Abraham I <kishon@ti.com>
+CC: Jason Kridner <jkridner@beagleboard.org>
+CC: Drew Fustini <drew@beagleboard.org>
+---
+v2: Rework based on Kishon's [PATCH v2 00/10] ARM: dts: Add iodelay data for MMC
+---
+---
+ arch/arm/boot/dts/Makefile                   |  1 +
+ arch/arm/boot/dts/am57xx-beagle-x15-revc.dts | 39 ++++++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
+ create mode 100644 arch/arm/boot/dts/am57xx-beagle-x15-revc.dts
 
-Cheers,
-Andre.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 570e107bf702..d51c0def01de 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -656,6 +656,7 @@ dtb-$(CONFIG_SOC_OMAP5) += \
+ dtb-$(CONFIG_SOC_DRA7XX) += \
+ 	am57xx-beagle-x15.dtb \
+ 	am57xx-beagle-x15-revb1.dtb \
++	am57xx-beagle-x15-revc.dtb \
+ 	am57xx-cl-som-am57x.dtb \
+ 	am57xx-sbc-am57x.dtb \
+ 	am572x-idk.dtb \
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15-revc.dts b/arch/arm/boot/dts/am57xx-beagle-x15-revc.dts
+new file mode 100644
+index 000000000000..17c41da3b55f
+--- /dev/null
++++ b/arch/arm/boot/dts/am57xx-beagle-x15-revc.dts
+@@ -0,0 +1,39 @@
++/*
++ * Copyright (C) 2014-2017 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include "am57xx-beagle-x15-common.dtsi"
++
++/ {
++	model = "TI AM5728 BeagleBoard-X15 rev C";
++};
++
++&tpd12s015 {
++	gpios = <&gpio7 10 GPIO_ACTIVE_HIGH>,	/* gpio7_10, CT CP HPD */
++		<&gpio2 30 GPIO_ACTIVE_HIGH>,	/* gpio2_30, LS OE */
++		<&gpio7 12 GPIO_ACTIVE_HIGH>;	/* gpio7_12/sp1_cs2, HPD */
++};
++
++&mmc1 {
++	pinctrl-names = "default", "hs", "sdr12", "sdr25", "sdr50", "ddr50", "sdr104";
++	pinctrl-0 = <&mmc1_pins_default>;
++	pinctrl-1 = <&mmc1_pins_hs>;
++	pinctrl-2 = <&mmc1_pins_sdr12>;
++	pinctrl-3 = <&mmc1_pins_sdr25>;
++	pinctrl-4 = <&mmc1_pins_sdr50>;
++	pinctrl-5 = <&mmc1_pins_ddr50 &mmc1_iodelay_ddr_rev20_conf>;
++	pinctrl-6 = <&mmc1_pins_sdr104 &mmc1_iodelay_sdr104_rev20_conf>;
++	vmmc-supply = <&vdd_3v3>;
++	vqmmc-supply = <&ldo1_reg>;
++};
++
++&mmc2 {
++	pinctrl-names = "default", "hs", "ddr_1_8v";
++	pinctrl-0 = <&mmc2_pins_default>;
++	pinctrl-1 = <&mmc2_pins_hs>;
++	pinctrl-2 = <&mmc2_pins_ddr_rev20>;
++};
+-- 
+2.14.1
