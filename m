@@ -1,125 +1,125 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 16 Aug 2017 17:18:16 +0100
-Subject: [PATCH v2 1/2] perf/aux: Make aux_{head,
- wakeup} ring_buffer members long
-Message-ID: <1502900297-21839-1-git-send-email-will.deacon@arm.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Wed, 16 Aug 2017 09:27:31 -0700
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170816125617.GY7017@linux.vnet.ibm.com>
+References: <20170728182053.000072aa@huawei.com>
+ <20170728190349.GM3730@linux.vnet.ibm.com>
+ <20170731120847.00003d5c@huawei.com>
+ <20170731150411.GA3730@linux.vnet.ibm.com>
+ <20170731162757.000058ba@huawei.com>
+ <20170801184646.GE3730@linux.vnet.ibm.com>
+ <20170802172555.0000468a@huawei.com>
+ <20170815154743.GK7017@linux.vnet.ibm.com>
+ <87wp63smwn.fsf@concordia.ellerman.id.au>
+ <20170816125617.GY7017@linux.vnet.ibm.com>
+Message-ID: <20170816162731.GA22978@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aux_head and aux_wakeup members of struct ring_buffer are defined
-using the local_t type, despite the fact that they are only accessed via
-the perf_aux_output_* functions, which cannot race with each other for a
-given ring buffer.
+On Wed, Aug 16, 2017 at 05:56:17AM -0700, Paul E. McKenney wrote:
+> On Wed, Aug 16, 2017 at 10:43:52PM +1000, Michael Ellerman wrote:
+> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> writes:
+> > ...
+> > >
+> > > commit 33103e7b1f89ef432dfe3337d2a6932cdf5c1312
+> > > Author: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> > > Date:   Mon Aug 14 08:54:39 2017 -0700
+> > >
+> > >     EXP: Trace tick return from tick_nohz_stop_sched_tick
+> > >     
+> > >     Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
+> > >
+> > > diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
+> > > index c7a899c5ce64..7358a5073dfb 100644
+> > > --- a/kernel/time/tick-sched.c
+> > > +++ b/kernel/time/tick-sched.c
+> > > @@ -817,6 +817,7 @@ static ktime_t tick_nohz_stop_sched_tick(struct tick_sched *ts,
+> > >  	 * (not only the tick).
+> > >  	 */
+> > >  	ts->sleep_length = ktime_sub(dev->next_event, now);
+> > > +	trace_printk("tick_nohz_stop_sched_tick: %lld\n", (tick - ktime_get()) / 1000);
+> > >  	return tick;
+> > >  }
+> > 
+> > Should I be seeing negative values? A small sample:
+> 
+> Maybe due to hypervisor preemption delays, but I confess that I am
+> surprised to see them this large.  1,602,250,019 microseconds is something
+> like a half hour, which could result in stall warnings all by itself.
+> 
+> >           <idle>-0     [015] d...  1602.039695: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250019
+> >           <idle>-0     [009] d...  1602.039701: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250025
+> >           <idle>-0     [007] d...  1602.039702: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250025
+> >           <idle>-0     [048] d...  1602.039703: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: 9973
+> >           <idle>-0     [006] d...  1602.039704: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250027
+> >           <idle>-0     [001] d...  1602.039730: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250053
+> >           <idle>-0     [008] d...  1602.039732: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250055
+> >           <idle>-0     [006] d...  1602.049695: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602260018
+> >           <idle>-0     [009] d...  1602.049695: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602260018
+> >           <idle>-0     [001] d...  1602.049695: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602260018
+> > 
+> > 
+> > I have a full trace, I'll send it to you off-list.
+> 
+> I will take a look!
 
-This patch changes the type of the members to long, so we can avoid
-using the local_* API where it isn't needed.
+And from your ps output, PID 9 is rcu_sched, which is the RCU grace-period
+kthread that stalled.  This kthread was starved, based on this from your
+dmesg:
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- kernel/events/internal.h    |  4 ++--
- kernel/events/ring_buffer.c | 31 ++++++++++++++-----------------
- 2 files changed, 16 insertions(+), 19 deletions(-)
+[ 1602.067008] rcu_sched kthread starved for 2603 jiffies! g7275 c7274 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1
 
-diff --git a/kernel/events/internal.h b/kernel/events/internal.h
-index 486fd78eb8d5..2941b868353c 100644
---- a/kernel/events/internal.h
-+++ b/kernel/events/internal.h
-@@ -38,9 +38,9 @@ struct ring_buffer {
- 	struct user_struct		*mmap_user;
- 
- 	/* AUX area */
--	local_t				aux_head;
-+	long				aux_head;
- 	local_t				aux_nest;
--	local_t				aux_wakeup;
-+	long				aux_wakeup;
- 	unsigned long			aux_pgoff;
- 	int				aux_nr_pages;
- 	int				aux_overwrite;
-diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
-index 14a240ff439d..87c28faca8e4 100644
---- a/kernel/events/ring_buffer.c
-+++ b/kernel/events/ring_buffer.c
-@@ -367,7 +367,7 @@ void *perf_aux_output_begin(struct perf_output_handle *handle,
- 	if (WARN_ON_ONCE(local_xchg(&rb->aux_nest, 1)))
- 		goto err_put;
- 
--	aux_head = local_read(&rb->aux_head);
-+	aux_head = rb->aux_head;
- 
- 	handle->rb = rb;
- 	handle->event = event;
-@@ -382,7 +382,7 @@ void *perf_aux_output_begin(struct perf_output_handle *handle,
- 	 */
- 	if (!rb->aux_overwrite) {
- 		aux_tail = ACCESS_ONCE(rb->user_page->aux_tail);
--		handle->wakeup = local_read(&rb->aux_wakeup) + rb->aux_watermark;
-+		handle->wakeup = rb->aux_wakeup + rb->aux_watermark;
- 		if (aux_head - aux_tail < perf_aux_size(rb))
- 			handle->size = CIRC_SPACE(aux_head, aux_tail, perf_aux_size(rb));
- 
-@@ -434,12 +434,12 @@ void perf_aux_output_end(struct perf_output_handle *handle, unsigned long size)
- 		handle->aux_flags |= PERF_AUX_FLAG_OVERWRITE;
- 
- 		aux_head = handle->head;
--		local_set(&rb->aux_head, aux_head);
-+		rb->aux_head = aux_head;
- 	} else {
- 		handle->aux_flags &= ~PERF_AUX_FLAG_OVERWRITE;
- 
--		aux_head = local_read(&rb->aux_head);
--		local_add(size, &rb->aux_head);
-+		aux_head = rb->aux_head;
-+		rb->aux_head += size;
- 	}
- 
- 	if (size || handle->aux_flags) {
-@@ -451,11 +451,10 @@ void perf_aux_output_end(struct perf_output_handle *handle, unsigned long size)
- 		                     handle->aux_flags);
- 	}
- 
--	aux_head = rb->user_page->aux_head = local_read(&rb->aux_head);
--
--	if (aux_head - local_read(&rb->aux_wakeup) >= rb->aux_watermark) {
-+	rb->user_page->aux_head = rb->aux_head;
-+	if (rb->aux_head - rb->aux_wakeup >= rb->aux_watermark) {
- 		wakeup = true;
--		local_add(rb->aux_watermark, &rb->aux_wakeup);
-+		rb->aux_wakeup += rb->aux_watermark;
- 	}
- 
- 	if (wakeup) {
-@@ -480,22 +479,20 @@ EXPORT_SYMBOL_GPL(perf_aux_output_end);
- int perf_aux_output_skip(struct perf_output_handle *handle, unsigned long size)
- {
- 	struct ring_buffer *rb = handle->rb;
--	unsigned long aux_head;
- 
- 	if (size > handle->size)
- 		return -ENOSPC;
- 
--	local_add(size, &rb->aux_head);
-+	rb->aux_head += size;
- 
--	aux_head = rb->user_page->aux_head = local_read(&rb->aux_head);
--	if (aux_head - local_read(&rb->aux_wakeup) >= rb->aux_watermark) {
-+	rb->user_page->aux_head = rb->aux_head;
-+	if (rb->aux_head - rb->aux_wakeup >= rb->aux_watermark) {
- 		perf_output_wakeup(handle);
--		local_add(rb->aux_watermark, &rb->aux_wakeup);
--		handle->wakeup = local_read(&rb->aux_wakeup) +
--				 rb->aux_watermark;
-+		rb->aux_wakeup += rb->aux_watermark;
-+		handle->wakeup = rb->aux_wakeup + rb->aux_watermark;
- 	}
- 
--	handle->head = aux_head;
-+	handle->head = rb->aux_head;
- 	handle->size -= size;
- 
- 	return 0;
--- 
-2.1.4
+The RCU_GP_WAIT_FQS says that this kthread is periodically scanning for
+idle-CPU and offline-CPU quiescent states, which means that its waits
+will be accompanied by short timeouts.  The "starved for 2603 jiffies"
+says that it has not run for one good long time.  The ->state is its
+task_struct ->state field.
+
+The immediately preceding dmesg line is as follows:
+
+[ 1602.063851]  (detected by 53, t=2603 jiffies, g=7275, c=7274, q=608)
+
+In other words, the rcu_sched grace-period kthread has been starved
+for the entire duration of the current grace period, as shown by the
+t=2603.
+
+Lets turn now to the trace output, looking for the last bit of the
+rcu_sched task's activity:
+
+       rcu_sched-9     [054] d...  1576.030096: timer_start: timer=c0000007fae1bc20 function=process_timeout expires=4295094922 [timeout=1] cpu=54 idx=0 flags=
+    ksoftirqd/53-276   [053] ..s.  1576.030097: rcu_invoke_callback: rcu_sched rhp=c000000fcf8c4eb0 func=__d_free
+       rcu_sched-9     [054] d...  1576.030097: rcu_utilization: Start context switch
+    ksoftirqd/53-276   [053] ..s.  1576.030098: rcu_invoke_callback: rcu_sched rhp=c000000fcff74ee0 func=proc_i_callback
+       rcu_sched-9     [054] d...  1576.030098: rcu_grace_period: rcu_sched 7275 cpuqs
+       rcu_sched-9     [054] d...  1576.030099: rcu_utilization: End context switch
+
+So this task set up a timer ("timer_start:") for one jiffy ("[timeout=1]",
+but what is with "expires=4295094922"?)  and blocked ("rcu_utilization:
+Start context switch" and "rcu_utilization: End context switch"),
+recording its CPU's quiescent state in the process ("rcu_grace_period:
+rcu_sched 7275 cpuqs").
+
+Of course, the timer will have expired in the context of some other task,
+but a search for "c0000007fae1bc20" (see the "timer=" in the first trace
+line above) shows nothing (to be painfully accurate, the search wraps back
+to earlier uses of this timer by rcu_sched).  So the timer never did fire.
+
+The next question is "what did CPU 054 do next?"  We find it entering idle:
+
+          <idle>-0     [054] d...  1576.030167: tick_stop: success=1 dependency=NONE
+          <idle>-0     [054] d...  1576.030167: hrtimer_cancel: hrtimer=c000000fff88c680
+          <idle>-0     [054] d...  1576.030168: hrtimer_start: hrtimer=c000000fff88c680 function=tick_sched_timer expires=1610710000000 softexpires=1610710000000
+          <idle>-0     [054] d...  1576.030170: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: 34469831
+          <idle>-0     [054] d...  1576.030171: rcu_dyntick: Start 140000000000000 0
+
+So we have an hrtimer set for 1610710000000, whatever time that might
+happen to map to.  And that is the last we hear from CPU 054, so it
+apparently maps to something a bit too far into the future.  Let's
+assume that this value is nanoseconds since boot, in which case we have
+1,610.710000000 seconds, which is eight seconds after the stall-warning
+message.  And -way- longer than the one-jiffy timeout requested!
+
+Thomas, John, am I misinterpreting the timer trace event messages?
+
+							Thanx, Paul
