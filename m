@@ -1,65 +1,70 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Wed, 16 Aug 2017 18:41:25 +0200
-Subject: [PATCH v3 1/5] reset: add reset-simple to unify socfpga, stm32,
- sunxi, and zx2967
-In-Reply-To: <1502896293.7596.7.camel@pengutronix.de>
-References: <20170816094701.30678-1-p.zabel@pengutronix.de>
- <20170816094701.30678-2-p.zabel@pengutronix.de>
- <51db563d-d6e1-18f1-01c1-3fdcf8269773@arm.com>
- <d6b20df2-12f7-68b1-f7de-0c7f205eba13@suse.de>
- <1502896293.7596.7.camel@pengutronix.de>
-Message-ID: <706d596c-a444-dcc9-a210-02d3564f3e83@suse.de>
+From: briannorris@chromium.org (Brian Norris)
+Date: Wed, 16 Aug 2017 09:43:44 -0700
+Subject: [RFC PATCH 3/3] arm64: dts: rockchip: Handle pcie wake in pcie
+ driver for Gru
+In-Reply-To: <3bd2600e-6e5d-6179-6b9b-6989e1f65b7d@rock-chips.com>
+References: <20170816075224.31734-1-jeffy.chen@rock-chips.com>
+ <20170816075224.31734-4-jeffy.chen@rock-chips.com>
+ <3bd2600e-6e5d-6179-6b9b-6989e1f65b7d@rock-chips.com>
+Message-ID: <20170816164343.GA99323@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 16.08.2017 um 17:11 schrieb Philipp Zabel:
-> On Wed, 2017-08-16 at 14:12 +0200, Andreas F?rber wrote:
->> Am 16.08.2017 um 13:30 schrieb Andre Przywara:
->>> On 16/08/17 10:46, Philipp Zabel wrote:
->>>> +/**
->>>> + * struct reset_simple_devdata - simple reset controller properties
->>>> + * @active_low: if true, bits are cleared to assert the reset. Otherwise, bits
->>>> + *              are set to assert the reset.
->>>> + */
->>>> +struct reset_simple_devdata {
->>>>>>> +	bool active_low;
->>>> +};
->>>> +
->>>> +static const struct reset_simple_devdata reset_simple_active_low = {
->>>>>>> +	.active_low = true,
->>>> +};
->>>> +
->>>> +static const struct of_device_id reset_simple_dt_ids[] = {
->>>>>>> +	{ .compatible = "allwinner,sun6i-a31-clock-reset",
->>>> +		.data = &reset_simple_active_low },
->>>
->>> Can we have a additional generic compatible string here? New users of
->>> this driver then wouldn't need to explicitly enter their name into the
->>> driver, but could just use the generic name as a fallback. This would
->>> enable the driver without any Linux code change just by adding a DT node.
->>>
->>> 	compatible = "nexell,s5p6818-reset", "simple-reset";
->>>
->>> Whenever we need a quirk (now or in the future), we can add the specific
->>> name into this structure along with the required workarounds.
->>
->> Same question about binding here. However the way it is done today, we
->> would also need some optional active-low property then or two different
->> compatible strings, as this is currently controlled via the DT matches.
+Hi Shawn,
+
+On Wed, Aug 16, 2017 at 04:33:38PM +0800, Shawn Lin wrote:
+> On 2017/8/16 15:52, Jeffy Chen wrote:
+> >Currently we are handling pcie wake irq in mrvl wifi driver.
+> >Move it to rockchip pcie driver for Gru boards.
+> >
+> >Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> >---
+> >
+> >  arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 17 +++++++++++------
+> >  1 file changed, 11 insertions(+), 6 deletions(-)
+> >
+> >diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> >index d48e98b62d09..7a5e1517a496 100644
+> >--- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> >+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> >@@ -712,11 +712,21 @@ ap_i2c_audio: &i2c8 {
+> >  	ep-gpios = <&gpio2 27 GPIO_ACTIVE_HIGH>;
+> >  	pinctrl-names = "default";
+> >-	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wifi_perst_l>;
+> >+	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wlan_host_wake_l>, <&wifi_perst_l>;
+> >+
+> >+	interrupts-extended = <&gic GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH 0>,
+> >+			      <&gic GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH 0>,
+> >+			      <&gic GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH 0>,
+> >+			      <&gpio0 8 IRQ_TYPE_LEVEL_LOW>;
+> >+	interrupt-names = "sys", "legacy", "client", "wake";
+> >+	/delete-property/ interrupts;
+> >+
 > 
-> I'd like to decouple this from the issue at hand, which is de-
-> duplicating simple reset code without device tree changes.
-> 
-> I'll make a separate suggestion for a simple binding on top of this
-> series.
+> Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
+> says "Nodes that describe devices which generate interrupts must contain
+> an "interrupts" property, an "interrupts-extended" property, or both. If
+> both are present, the latter should take precedence;"
 
-Okay, I'll continue using my own driver then, until it's clear how
-exactly I'm supposed to piggy-back on this new driver.
+I added that language, and as the text notes, it's just for
+compatibility in case some software doesn't understand the 'extended'
+property. It's occasionally useful, but not extremely often. (In my case
+at that time: we actually had the DTB stuck in the bootloader, and so
+would support various combinations of old/new DTBs/kernels which may or
+may not understand 'interrupts-extended'.)
 
-Cheers,
-Andreas
+> But it doesn't seem real as drivers/of/irq.c actually says "Try the
+> new-style interrupts-extended first"
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+How is that not real? That follows exactly what the binding says; "the
+latter" (i.e., the new-style interrupts-extended) is taking precedence.
+
+> Anyway, it seems you could safely add interrupts-extended and don't need
+> to delete "interrupts".
+
+You could do this, yes. Unless you really need the compatibility (and
+are prepared for such a system to ignore the "wake" interrupt in that
+case), I'm not sure the value in that though, as it would just make
+things more confusing.
+
+Brian
