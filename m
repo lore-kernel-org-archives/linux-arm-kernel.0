@@ -1,69 +1,42 @@
 From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Wed, 16 Aug 2017 08:17:42 +0200
-Subject: [PATCH 1/2] dmaengine: at_xdmac: Fix compilation warning.
-In-Reply-To: <878f9486ee507c227cb8835417c520b489c768c8.1502091778.git.arvind.yadav.cs@gmail.com>
+Date: Wed, 16 Aug 2017 08:19:06 +0200
+Subject: [PATCH 2/2] dmaengine: at_xdmac: Handle return value of
+ clk_prepare_enable.
+In-Reply-To: <3c5d3448f8d00995698e2dd905ba0d11a645b35f.1502091778.git.arvind.yadav.cs@gmail.com>
 References: <878f9486ee507c227cb8835417c520b489c768c8.1502091778.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20170816061742.g6a4chvlx3qlbdm6@rfolt0960.corp.atmel.com>
+ <3c5d3448f8d00995698e2dd905ba0d11a645b35f.1502091778.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20170816061906.c3q52ummmungnweo@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 01:15:18PM +0530, Arvind Yadav wrote:
-> Replace '%d' by '%zu' to fix the compilation warning:-
->    "format ?%d? expects argument of type ?int?,but argument has type ?size_t? [-Wformat=]"
+On Mon, Aug 07, 2017 at 01:15:19PM +0530, Arvind Yadav wrote:
+> clk_prepare_enable() can fail here and we must check its return value.
 > 
 > Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 
 Thanks
 > ---
->  drivers/dma/at_xdmac.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+>  drivers/dma/at_xdmac.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
 > diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-> index 7d4e0bc..6a3cf97 100644
+> index 6a3cf97..c00e392 100644
 > --- a/drivers/dma/at_xdmac.c
 > +++ b/drivers/dma/at_xdmac.c
-> @@ -875,7 +875,7 @@ static inline u32 at_xdmac_align_width(struct dma_chan *chan, dma_addr_t addr)
->  	dwidth = at_xdmac_align_width(chan, src | dst | chunk->size);
->  	if (chunk->size >= (AT_XDMAC_MBR_UBC_UBLEN_MAX << dwidth)) {
->  		dev_dbg(chan2dev(chan),
-> -			"%s: chunk too big (%d, max size %lu)...\n",
-> +			"%s: chunk too big (%zu, max size %lu)...\n",
->  			__func__, chunk->size,
->  			AT_XDMAC_MBR_UBC_UBLEN_MAX << dwidth);
->  		return NULL;
-> @@ -956,7 +956,7 @@ static inline u32 at_xdmac_align_width(struct dma_chan *chan, dma_addr_t addr)
->  	if ((xt->numf > 1) && (xt->frame_size > 1))
->  		return NULL;
+> @@ -1883,8 +1883,11 @@ static int atmel_xdmac_resume(struct device *dev)
+>  	struct at_xdmac_chan	*atchan;
+>  	struct dma_chan		*chan, *_chan;
+>  	int			i;
+> +	int ret;
 >  
-> -	dev_dbg(chan2dev(chan), "%s: src=%pad, dest=%pad, numf=%d, frame_size=%d, flags=0x%lx\n",
-> +	dev_dbg(chan2dev(chan), "%s: src=%pad, dest=%pad, numf=%zu, frame_size=%zu, flags=0x%lx\n",
->  		__func__, &xt->src_start, &xt->dst_start,	xt->numf,
->  		xt->frame_size, flags);
+> -	clk_prepare_enable(atxdmac->clk);
+> +	ret = clk_prepare_enable(atxdmac->clk);
+> +	if (ret)
+> +		return ret;
 >  
-> @@ -990,7 +990,7 @@ static inline u32 at_xdmac_align_width(struct dma_chan *chan, dma_addr_t addr)
->  			dst_skip = chunk->size + dst_icg;
->  
->  			dev_dbg(chan2dev(chan),
-> -				"%s: chunk size=%d, src icg=%d, dst icg=%d\n",
-> +				"%s: chunk size=%zu, src icg=%zu, dst icg=%zu\n",
->  				__func__, chunk->size, src_icg, dst_icg);
->  
->  			desc = at_xdmac_interleaved_queue_desc(chan, atchan,
-> @@ -1207,7 +1207,7 @@ static struct at_xdmac_desc *at_xdmac_memset_create_desc(struct dma_chan *chan,
->  	struct at_xdmac_chan	*atchan = to_at_xdmac_chan(chan);
->  	struct at_xdmac_desc	*desc;
->  
-> -	dev_dbg(chan2dev(chan), "%s: dest=%pad, len=%d, pattern=0x%x, flags=0x%lx\n",
-> +	dev_dbg(chan2dev(chan), "%s: dest=%pad, len=%zu, pattern=0x%x, flags=0x%lx\n",
->  		__func__, &dest, len, value, flags);
->  
->  	if (unlikely(!len))
+>  	/* Clear pending interrupts. */
+>  	for (i = 0; i < atxdmac->dma.chancnt; i++) {
 > -- 
 > 1.9.1
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
