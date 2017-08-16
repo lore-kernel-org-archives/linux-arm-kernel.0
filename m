@@ -1,73 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 16 Aug 2017 12:21:01 +0100
-Subject: Applied "spi: rockchip: configure CTRLR1 according to size and data
- frame" to the spi tree
-In-Reply-To: <1502849522-10073-1-git-send-email-huibin.hong@rock-chips.com>
-Message-ID: <E1dhwNh-0003iD-VL@finisterre>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 16 Aug 2017 12:22:34 +0100
+Subject: [PATCH 23/27] arm64/sve: KVM: Hide SVE from CPU features exposed
+ to guests
+In-Reply-To: <63ca85dc-24fe-ca82-c83b-e3235766c86c@arm.com>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-24-git-send-email-Dave.Martin@arm.com>
+ <39b6ee07-1258-e733-3495-38b0d31ab800@arm.com>
+ <20170816105438.GA6321@e103592.cambridge.arm.com>
+ <63ca85dc-24fe-ca82-c83b-e3235766c86c@arm.com>
+Message-ID: <20170816112234.GD6321@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Wed, Aug 16, 2017 at 12:10:53PM +0100, Marc Zyngier wrote:
+> On 16/08/17 11:54, Dave Martin wrote:
+> > On Tue, Aug 15, 2017 at 05:37:55PM +0100, Marc Zyngier wrote:
+> >> On 09/08/17 13:05, Dave Martin wrote:
 
-   spi: rockchip: configure CTRLR1 according to size and data frame
+[...]
 
-has been applied to the spi tree at
+> >>> +	if (id == SYS_ID_AA64PFR0_EL1) {
+> >>> +		static bool printed;
+> >>> +
+> >>> +		if ((val & (0xfUL << ID_AA64PFR0_SVE_SHIFT)) && !printed) {
+> >>> +			kvm_info("SVE unsupported for guests, suppressing\n");
+> >>> +			printed = true;
+> >>> +		}
+> >>
+> >> Ideally, this should be a vcpu_unimpl_once(). But:
+> >> - it doesn't exist
+> >> - vcpu_unimpl looks hopelessly x86 specific
+> > 
+> > Yeah, I looked for an appropriate function and didn't find one ... and
+> > writing one just for this seemed overkill.
+> > 
+> >> How about turning it into a pr_err_once() instead?
+> > 
+> > Can do, though should it be an err?
+> > 
+> > No error has occurred here, rather I want people who discover that their
+> > guest mysteriously doesn't see SVE gets a clue about why.
+> An "err" is a good way to make it appear on the console. If you want to
+> make it noticed, that's the way.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+OK, I was concerned that overuse of err might be frowned upon.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+If this is the preferred way to signal such things, I'm happy to that.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 04b37d2d02c0a5ae2f4e59326ef6deaff18e0456 Mon Sep 17 00:00:00 2001
-From: Huibin Hong <huibin.hong@rock-chips.com>
-Date: Wed, 16 Aug 2017 10:12:02 +0800
-Subject: [PATCH] spi: rockchip: configure CTRLR1 according to size and data
- frame
-
-CTRLR1 is number of data frames, when rx only.
-When data frame is 8 bit, CTRLR1 is len-1.
-When data frame is 16 bit, CTRLR1 is (len/2)-1.
-
-Signed-off-by: Huibin Hong <huibin.hong@rock-chips.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi-rockchip.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 474033e2149e..fdcf3076681b 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -568,7 +568,13 @@ static void rockchip_spi_config(struct rockchip_spi *rs)
- 
- 	writel_relaxed(cr0, rs->regs + ROCKCHIP_SPI_CTRLR0);
- 
--	writel_relaxed(rs->len - 1, rs->regs + ROCKCHIP_SPI_CTRLR1);
-+	if (rs->n_bytes == 1)
-+		writel_relaxed(rs->len - 1, rs->regs + ROCKCHIP_SPI_CTRLR1);
-+	else if (rs->n_bytes == 2)
-+		writel_relaxed((rs->len / 2) - 1, rs->regs + ROCKCHIP_SPI_CTRLR1);
-+	else
-+		writel_relaxed((rs->len * 2) - 1, rs->regs + ROCKCHIP_SPI_CTRLR1);
-+
- 	writel_relaxed(rs->fifo_len / 2 - 1, rs->regs + ROCKCHIP_SPI_TXFTLR);
- 	writel_relaxed(rs->fifo_len / 2 - 1, rs->regs + ROCKCHIP_SPI_RXFTLR);
- 
--- 
-2.13.2
+Cheers
+---Dave
