@@ -1,60 +1,57 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Wed, 16 Aug 2017 22:43:52 +1000
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170815154743.GK7017@linux.vnet.ibm.com>
-References: <20170728084411.00001ddb@huawei.com>
- <20170728142403.0000122b@huawei.com>
- <20170728165529.GF3730@linux.vnet.ibm.com>
- <20170728182053.000072aa@huawei.com>
- <20170728190349.GM3730@linux.vnet.ibm.com>
- <20170731120847.00003d5c@huawei.com>
- <20170731150411.GA3730@linux.vnet.ibm.com>
- <20170731162757.000058ba@huawei.com>
- <20170801184646.GE3730@linux.vnet.ibm.com>
- <20170802172555.0000468a@huawei.com>
- <20170815154743.GK7017@linux.vnet.ibm.com>
-Message-ID: <87wp63smwn.fsf@concordia.ellerman.id.au>
+From: Eugeniy.Paltsev@synopsys.com (Eugeniy Paltsev)
+Date: Wed, 16 Aug 2017 12:52:01 +0000
+Subject: [PATCH v3 3/5] reset: stm32: use the reset-simple driver
+In-Reply-To: <20170816094701.30678-4-p.zabel@pengutronix.de>
+References: <20170816094701.30678-1-p.zabel@pengutronix.de>
+ <20170816094701.30678-4-p.zabel@pengutronix.de>
+Message-ID: <1502887920.2586.35.camel@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> writes:
-...
->
-> commit 33103e7b1f89ef432dfe3337d2a6932cdf5c1312
-> Author: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> Date:   Mon Aug 14 08:54:39 2017 -0700
->
->     EXP: Trace tick return from tick_nohz_stop_sched_tick
->     
->     Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
->
-> diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-> index c7a899c5ce64..7358a5073dfb 100644
-> --- a/kernel/time/tick-sched.c
-> +++ b/kernel/time/tick-sched.c
-> @@ -817,6 +817,7 @@ static ktime_t tick_nohz_stop_sched_tick(struct tick_sched *ts,
->  	 * (not only the tick).
->  	 */
->  	ts->sleep_length = ktime_sub(dev->next_event, now);
-> +	trace_printk("tick_nohz_stop_sched_tick: %lld\n", (tick - ktime_get()) / 1000);
->  	return tick;
->  }
+Hi Philipp,
 
-Should I be seeing negative values? A small sample:
+On Wed, 2017-08-16 at 11:46 +0200, Philipp Zabel wrote:
+> The reset-simple driver can be used without changes.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> [snip]
+> 
+> --- a/drivers/reset/reset-simple.c
+> +++ b/drivers/reset/reset-simple.c
+> @@ -120,6 +120,7 @@ static const struct reset_simple_devdata
+> reset_simple_active_low = {
+> ?
+> ?static const struct of_device_id reset_simple_dt_ids[] = {
+> ?	{ .compatible = "altr,rst-mgr", .data =
+> &reset_simple_socfpga },
+> +	{ .compatible = "st,stm32-rcc", },
+> ?	{ .compatible = "allwinner,sun6i-a31-clock-reset",
+> ?		.data = &reset_simple_active_low },
+> ?	{ /* sentinel */ },
 
-          <idle>-0     [015] d...  1602.039695: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250019
-          <idle>-0     [009] d...  1602.039701: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250025
-          <idle>-0     [007] d...  1602.039702: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250025
-          <idle>-0     [048] d...  1602.039703: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: 9973
-          <idle>-0     [006] d...  1602.039704: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250027
-          <idle>-0     [001] d...  1602.039730: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250053
-          <idle>-0     [008] d...  1602.039732: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250055
-          <idle>-0     [006] d...  1602.049695: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602260018
-          <idle>-0     [009] d...  1602.049695: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602260018
-          <idle>-0     [001] d...  1602.049695: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602260018
+What about adding generic compatible strings for future use?
+I mean next:
 
+--------------------->8---------------------
 
-I have a full trace, I'll send it to you off-list.
+static const struct of_device_id reset_simple_dt_ids[] = {
+	{ .compatible = "reset-simple-active-low",
+		.data = &reset_simple_active_low },
+	{ .compatible = "reset-simple-active-high",
+		.data = &reset_simple_active_high },
+	/* ... */
+	{ /* sentinel */ },
+};
 
-cheers
+static const struct reset_simple_devdata reset_simple_active_high = {
+	.active_low = false,
+};
+
+static const struct reset_simple_devdata reset_simple_active_low = {
+	.active_low = true,
+};
+
+--------------------->8---------------------
+
+-- 
+?Eugeniy Paltsev
