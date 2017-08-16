@@ -1,47 +1,51 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 16 Aug 2017 10:18:22 +0100
-Subject: [PATCH] ARM: hisi: Fix typo in comment
-In-Reply-To: <20170807093322.26050-1-yunzhi.li@deephi.tech>
-References: <20170807093322.26050-1-yunzhi.li@deephi.tech>
-Message-ID: <59940DDE.1000906@hisilicon.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Wed, 16 Aug 2017 17:24:32 +0800
+Subject: [PATCH] arm64: dts: rockchip: Assign mic irq to correct device for Gru
+Message-ID: <20170816092432.23991-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yunzhi,
+Currently we are assigning mic irq to rt5514 i2c driver, which is wrong.
+Assign it to rt5514 spi driver instead.
 
-On 2017/8/7 10:33, Yunzhi Li wrote:
-> Fix the rc vs. pc typo. There is no a register named rc, I felt
-> confused when I read this assembler command in comment.
->
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
-Thanks!
-Yes, it is a typo.
-And 0xe51ff004 is the machine code to do the jump.
-I will change the commit msg as below and pick up it:
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-The machine code "0xe51ff004" means "ldr pc, [pc, #-4]".
-This patch fixed the comment typo to avoid any confusion.
-
-Best Regards,
-Wei
-
-> Signed-off-by: Yunzhi Li <yunzhi.li@deephi.tech>
-> ---
-> 
->  arch/arm/mach-hisi/platsmp.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-hisi/platsmp.c b/arch/arm/mach-hisi/platsmp.c
-> index 91bb02dec20f..da5689ababf7 100644
-> --- a/arch/arm/mach-hisi/platsmp.c
-> +++ b/arch/arm/mach-hisi/platsmp.c
-> @@ -109,7 +109,7 @@ static void hix5hd2_set_scu_boot_addr(phys_addr_t start_addr, phys_addr_t jump_a
->  
->  	virt = ioremap(start_addr, PAGE_SIZE);
->  
-> -	writel_relaxed(0xe51ff004, virt);	/* ldr pc, [rc, #-4] */
-> +	writel_relaxed(0xe51ff004, virt);	/* ldr pc, [pc, #-4] */
->  	writel_relaxed(jump_addr, virt + 4);	/* pc jump phy address */
->  	iounmap(virt);
->  }
-> 
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+index d48e98b62d09..d7723a77ae03 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+@@ -612,12 +612,8 @@ ap_i2c_mic: &i2c1 {
+ 	headsetcodec: rt5514 at 57 {
+ 		compatible = "realtek,rt5514";
+ 		reg = <0x57>;
+-		interrupt-parent = <&gpio1>;
+-		interrupts = <13 IRQ_TYPE_LEVEL_HIGH>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&mic_int>;
++
+ 		realtek,dmic-init-delay = <20>;
+-		wakeup-source;
+ 	};
+ };
+ 
+@@ -826,9 +822,13 @@ ap_i2c_audio: &i2c8 {
+ 	wacky_spi_audio: spi2 at 0 {
+ 		compatible = "realtek,rt5514";
+ 		reg = <0>;
+-
++		interrupt-parent = <&gpio1>;
++		interrupts = <13 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&mic_int>;
+ 		/* May run faster once verified. */
+ 		spi-max-frequency = <10000000>;
++		wakeup-source;
+ 	};
+ };
+ 
+-- 
+2.11.0
