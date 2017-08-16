@@ -1,70 +1,46 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 16 Aug 2017 14:03:57 +0100
-Subject: [PATCH v3 3/5] reset: stm32: use the reset-simple driver
-In-Reply-To: <1502887920.2586.35.camel@synopsys.com>
-References: <20170816094701.30678-1-p.zabel@pengutronix.de>
- <20170816094701.30678-4-p.zabel@pengutronix.de>
- <1502887920.2586.35.camel@synopsys.com>
-Message-ID: <eed2f3aa-be3b-76fd-41cb-f1f88ff36cdc@arm.com>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Wed, 16 Aug 2017 21:04:42 +0800
+Subject: [PATCH] irqchip/gic-v3-its: handle queue wrapping in
+ its_wait_for_range_completion()
+Message-ID: <1502888682-12148-1-git-send-email-yangyingliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+If the to_idx wrap to 0, (rd_idx >= to_idx) will be true,
+but the command is not completed.
 
-On 16/08/17 13:52, Eugeniy Paltsev wrote:
-> Hi Philipp,
-> 
-> On Wed, 2017-08-16 at 11:46 +0200, Philipp Zabel wrote:
->> The reset-simple driver can be used without changes.
->>
->> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
->> [snip]
->>
->> --- a/drivers/reset/reset-simple.c
->> +++ b/drivers/reset/reset-simple.c
->> @@ -120,6 +120,7 @@ static const struct reset_simple_devdata
->> reset_simple_active_low = {
->>  
->>  static const struct of_device_id reset_simple_dt_ids[] = {
->>  	{ .compatible = "altr,rst-mgr", .data =
->> &reset_simple_socfpga },
->> +	{ .compatible = "st,stm32-rcc", },
->>  	{ .compatible = "allwinner,sun6i-a31-clock-reset",
->>  		.data = &reset_simple_active_low },
->>  	{ /* sentinel */ },
-> 
-> What about adding generic compatible strings for future use?
+When to_idx is smaller than from_idx, it means the queue
+is wrapped. For handling this case, add ITS_CMD_QUEUE_SZ
+to to_idx and rd_idx to.
 
-Exactly ;-) (see my previous email)
-But we still need the pre-existing strings in here, of course.
+Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-> I mean next:
-> 
-> --------------------->8---------------------
-> 
-> static const struct of_device_id reset_simple_dt_ids[] = {
-> 	{ .compatible = "reset-simple-active-low",
-> 		.data = &reset_simple_active_low },
-> 	{ .compatible = "reset-simple-active-high",
-> 		.data = &reset_simple_active_high },
-
-Either that or maybe even better define a "simple-reset" string and add
-standard properties like "active-low".
-
-Cheers,
-Andre.
-
-> 	/* ... */
-> 	{ /* sentinel */ },
-> };
-> 
-> static const struct reset_simple_devdata reset_simple_active_high = {
-> 	.active_low = false,
-> };
-> 
-> static const struct reset_simple_devdata reset_simple_active_low = {
-> 	.active_low = true,
-> };
-> 
-> --------------------->8---------------------
-> 
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 6893287..8e47515 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -446,13 +446,18 @@ static void its_wait_for_range_completion(struct its_node *its,
+ 					  struct its_cmd_block *to)
+ {
+ 	u64 rd_idx, from_idx, to_idx;
++	u32 wrap_offset = 0;
+ 	u32 count = 1000000;	/* 1s! */
+ 
+ 	from_idx = its_cmd_ptr_to_offset(its, from);
+ 	to_idx = its_cmd_ptr_to_offset(its, to);
++	if (to_idx < from_idx) {
++		wrap_offset = ITS_CMD_QUEUE_SZ;
++		to_idx += ITS_CMD_QUEUE_SZ;
++	}
+ 
+ 	while (1) {
+-		rd_idx = readl_relaxed(its->base + GITS_CREADR);
++		rd_idx = readl_relaxed(its->base + GITS_CREADR) + wrap_offset;
+ 		if (rd_idx >= to_idx || rd_idx < from_idx)
+ 			break;
+ 
+-- 
+2.5.0
