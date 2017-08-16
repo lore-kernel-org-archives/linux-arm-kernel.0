@@ -1,54 +1,32 @@
-From: rkrcmar@redhat.com (=?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?=)
-Date: Wed, 16 Aug 2017 21:40:35 +0200
-Subject: [PATCH RFC 0/2] KVM: use RCU to allow dynamic kvm->vcpus array
-Message-ID: <20170816194037.9460-1-rkrcmar@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Aug 2017 21:50:12 +0200
+Subject: [GIT PULL] Qualcomm Driver updates for 4.14
+In-Reply-To: <1502896644-6993-1-git-send-email-andy.gross@linaro.org>
+References: <1502896644-6993-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <CAK8P3a0YFnOe2JMUHcAWbkRKTM97E6RHnNzQ-aospurHi=px6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The goal is to increase KVM_MAX_VCPUS without worrying about memory
-impact of many small guests.
+On Wed, Aug 16, 2017 at 5:17 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+>
+>   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.14
+>
+> for you to fetch changes up to 445c2410a449ae29c0ec0bb9cee8f38078c4a2f1:
+>
+>   soc: qcom: mdt_loader: Use request_firmware_into_buf() (2017-08-08 17:41:23 -0500)
+>
+> ----------------------------------------------------------------
+> Qualcomm ARM Based Driver Updates for v4.14
+>
+> * Minor fixes for SMSM and WCNSS_CTRL
+> * Move Qcom SoC drivers to submenu
+> * Fix mdt_loader to use request_firmware_into_buf()
 
-This is a second out of three major "dynamic" options:
- 1) size vcpu array at VM creation time
- 2) resize vcpu array when new VCPUs are created
- 3) use a lockless list/tree for VCPUs
+Pulled into next/drivers, thanks!
 
-The disadvantage of (1) is its requirement on userspace changes and
-limited flexibility because userspace must provide the maximal count on
-start.  The main advantage is that kvm->vcpus will work like it does
-now.  It has been posted as "[PATCH 0/4] KVM: add KVM_CREATE_VM2 to
-allow dynamic kvm->vcpus array",
-http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1377285.html
-
-The main problem of (2), this series, is that we cannot extend the array
-in place and therefore require some kind of protection when moving it.
-RCU seems best, but it makes the code slower and harder to deal with.
-The main advantage is that we do not need userspace changes.
-
-The third option wasn't explored yet.  It would solve the ugly
-kvm_for_each_vcpu() of (2), but kvm_get_vcpu() would become linear.
-(We could mitigate it by having list of vcpu arrays and A lockless
- sequentially growing "tree" would be logarithmic and not that much more
- complicated to implement.)
-
-Which option do you think is the best?
-
-Thanks.
-
-Radim Kr?m?? (2):
-  KVM: remove unused __KVM_HAVE_ARCH_VM_ALLOC
-  KVM: RCU protected dynamic vcpus array
-
- arch/mips/kvm/mips.c       |  8 +++--
- arch/powerpc/kvm/powerpc.c |  6 ++--
- arch/s390/kvm/kvm-s390.c   | 27 ++++++++++++-----
- arch/x86/kvm/hyperv.c      |  3 +-
- arch/x86/kvm/vmx.c         |  3 +-
- arch/x86/kvm/x86.c         |  5 ++--
- include/linux/kvm_host.h   | 73 +++++++++++++++++++++++++++++-----------------
- virt/kvm/arm/arm.c         | 10 +++----
- virt/kvm/kvm_main.c        | 72 +++++++++++++++++++++++++++++++++++++--------
- 9 files changed, 144 insertions(+), 63 deletions(-)
-
--- 
-2.13.3
+        Arnd
