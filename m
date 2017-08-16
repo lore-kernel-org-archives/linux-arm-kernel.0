@@ -1,59 +1,41 @@
-From: alex.g@adaptrum.com (Alexandru Gagniuc)
-Date: Wed, 16 Aug 2017 13:55:32 -0700
-Subject: [PATCH v3 3/5] reset: stm32: use the reset-simple driver
-In-Reply-To: <338608e8-9e83-fc0f-8d8a-18a336e94860@suse.de>
-References: <20170816094701.30678-1-p.zabel@pengutronix.de>
- <20170816094701.30678-4-p.zabel@pengutronix.de>
- <edbdf06c-fb1e-63f1-d6b2-17193c86385a@adaptrum.com>
- <338608e8-9e83-fc0f-8d8a-18a336e94860@suse.de>
-Message-ID: <d46ad9ea-4bf5-5ceb-cfc8-0c1efa48bb02@adaptrum.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 16 Aug 2017 22:59:15 +0200
+Subject: [PATCH] nokia n900: update dts with camera support
+In-Reply-To: <20170816205332.rqcuenvuxfs5jvuw@earth>
+References: <20170810204923.GA18442@amd>
+ <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
+ <20170815220349.GA15441@amd>
+ <20170816205332.rqcuenvuxfs5jvuw@earth>
+Message-ID: <20170816205915.GA5386@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> Hi,
+> 
+> On Wed, Aug 16, 2017 at 12:03:49AM +0200, Pavel Machek wrote:
+> > diff --git a/Documentation/devicetree/bindings/media/video-interfaces.txt b/Documentation/devicetree/bindings/media/video-interfaces.txt
+> > index 852041a..aade681 100644
+> > --- a/Documentation/devicetree/bindings/media/video-interfaces.txt
+> > +++ b/Documentation/devicetree/bindings/media/video-interfaces.txt
+> > @@ -119,6 +119,8 @@ Optional endpoint properties
+> >    as 0 (normal). This property is valid for serial busses only.
+> >  - strobe: Whether the clock signal is used as clock (0) or strobe (1). Used
+> >    with CCP2, for instance.
+> > +- clock-inv: polarity of clock/strobe signal. 0 - not inverted, 1 - inverted
+> > +- crc: crc is in use
+> 
+> booleans in DT are not done with <0> and <1>, but as properties without
+> values. True = property exists, False = property does not exist.
 
+Well, strobe property above already uses = <0>/<1> format, as do
+others.
 
-On 08/16/2017 01:52 PM, Andreas F?rber wrote:
-> Am 16.08.2017 um 22:50 schrieb Alexandru Gagniuc:
->> On 08/16/2017 02:46 AM, Philipp Zabel wrote:
->>> The reset-simple driver can be used without changes.
->>>
->>> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
->>
->> Reviewed-by: Alexandru Gagniuc <alex.g@adaptrum.com>
->>
->>> ---
->>>  drivers/reset/Kconfig        |  11 ++---
->>>  drivers/reset/Makefile       |   1 -
->>>  drivers/reset/reset-simple.c |   1 +
->>>  drivers/reset/reset-stm32.c  | 108
->>> -------------------------------------------
->>>  4 files changed, 4 insertions(+), 117 deletions(-)
->>>  delete mode 100644 drivers/reset/reset-stm32.c
->>>
->>> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
->>> index 78a8f6057985b..29f4487c290fc 100644
->>> --- a/drivers/reset/Kconfig
->>> +++ b/drivers/reset/Kconfig
->>> @@ -70,19 +70,14 @@ config RESET_PISTACHIO
->>>
->>>  config RESET_SIMPLE
->>>      bool "Simple Reset Controller Driver" if COMPILE_TEST
->>> -    default ARCH_SOCFPGA || ARCH_SUNXI
->>> +    default ARCH_SOCFPGA || ARCH_STM32 || ARCH_SUNXI
->>
->> If this series gets respun, could you please look into removing the
->> ARCH_ dependency here?
->
-> Why?
+Problem with "false = property does not exist" is that you don't know
+if it is "someone forgot to define it" or "someone made a typo" or
+"dts is too old to know about this property" or "the property indeed
+should be false"...
+									Pavel
 
-Because the driver has to keep track of all its users, which is a 
-layering violation.
-
-> It's not a dependency, just the default. Doing it here decouples it
-> from having to do Kconfig changes in the arm-soc tree as well.
-
-Doing it here allows this list to grow without bounds.
-
-> Regards,
-> Andreas
->
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
