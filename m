@@ -1,41 +1,21 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 16 Aug 2017 22:59:15 +0200
-Subject: [PATCH] nokia n900: update dts with camera support
-In-Reply-To: <20170816205332.rqcuenvuxfs5jvuw@earth>
-References: <20170810204923.GA18442@amd>
- <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
- <20170815220349.GA15441@amd>
- <20170816205332.rqcuenvuxfs5jvuw@earth>
-Message-ID: <20170816205915.GA5386@atrey.karlin.mff.cuni.cz>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 16 Aug 2017 13:59:52 -0700 (PDT)
+Subject: [PATCH net RESEND] PCI: fix oops when try to find Root Port
+ for a PCI device
+In-Reply-To: <20170816200237.GE28977@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170815170331.GA4099@bhelgaas-glaptop.roam.corp.google.com>
+ <20170816193303.GA14147@ulmo>
+ <20170816200237.GE28977@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170816.135952.1915098012719012810.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi,
-> 
-> On Wed, Aug 16, 2017 at 12:03:49AM +0200, Pavel Machek wrote:
-> > diff --git a/Documentation/devicetree/bindings/media/video-interfaces.txt b/Documentation/devicetree/bindings/media/video-interfaces.txt
-> > index 852041a..aade681 100644
-> > --- a/Documentation/devicetree/bindings/media/video-interfaces.txt
-> > +++ b/Documentation/devicetree/bindings/media/video-interfaces.txt
-> > @@ -119,6 +119,8 @@ Optional endpoint properties
-> >    as 0 (normal). This property is valid for serial busses only.
-> >  - strobe: Whether the clock signal is used as clock (0) or strobe (1). Used
-> >    with CCP2, for instance.
-> > +- clock-inv: polarity of clock/strobe signal. 0 - not inverted, 1 - inverted
-> > +- crc: crc is in use
-> 
-> booleans in DT are not done with <0> and <1>, but as properties without
-> values. True = property exists, False = property does not exist.
+From: Bjorn Helgaas <helgaas@kernel.org>
+Date: Wed, 16 Aug 2017 15:02:37 -0500
 
-Well, strobe property above already uses = <0>/<1> format, as do
-others.
+> Your fix looks right to me.
 
-Problem with "false = property does not exist" is that you don't know
-if it is "someone forgot to define it" or "someone made a typo" or
-"dts is too old to know about this property" or "the property indeed
-should be false"...
-									Pavel
+Someone please submit this fix formally because this change is now in
+Linus's tree.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Thank you.
