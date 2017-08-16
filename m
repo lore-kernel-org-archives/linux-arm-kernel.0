@@ -1,125 +1,65 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Wed, 16 Aug 2017 09:27:31 -0700
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170816125617.GY7017@linux.vnet.ibm.com>
-References: <20170728182053.000072aa@huawei.com>
- <20170728190349.GM3730@linux.vnet.ibm.com>
- <20170731120847.00003d5c@huawei.com>
- <20170731150411.GA3730@linux.vnet.ibm.com>
- <20170731162757.000058ba@huawei.com>
- <20170801184646.GE3730@linux.vnet.ibm.com>
- <20170802172555.0000468a@huawei.com>
- <20170815154743.GK7017@linux.vnet.ibm.com>
- <87wp63smwn.fsf@concordia.ellerman.id.au>
- <20170816125617.GY7017@linux.vnet.ibm.com>
-Message-ID: <20170816162731.GA22978@linux.vnet.ibm.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Wed, 16 Aug 2017 18:41:25 +0200
+Subject: [PATCH v3 1/5] reset: add reset-simple to unify socfpga, stm32,
+ sunxi, and zx2967
+In-Reply-To: <1502896293.7596.7.camel@pengutronix.de>
+References: <20170816094701.30678-1-p.zabel@pengutronix.de>
+ <20170816094701.30678-2-p.zabel@pengutronix.de>
+ <51db563d-d6e1-18f1-01c1-3fdcf8269773@arm.com>
+ <d6b20df2-12f7-68b1-f7de-0c7f205eba13@suse.de>
+ <1502896293.7596.7.camel@pengutronix.de>
+Message-ID: <706d596c-a444-dcc9-a210-02d3564f3e83@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 16, 2017 at 05:56:17AM -0700, Paul E. McKenney wrote:
-> On Wed, Aug 16, 2017 at 10:43:52PM +1000, Michael Ellerman wrote:
-> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> writes:
-> > ...
-> > >
-> > > commit 33103e7b1f89ef432dfe3337d2a6932cdf5c1312
-> > > Author: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> > > Date:   Mon Aug 14 08:54:39 2017 -0700
-> > >
-> > >     EXP: Trace tick return from tick_nohz_stop_sched_tick
-> > >     
-> > >     Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
-> > >
-> > > diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-> > > index c7a899c5ce64..7358a5073dfb 100644
-> > > --- a/kernel/time/tick-sched.c
-> > > +++ b/kernel/time/tick-sched.c
-> > > @@ -817,6 +817,7 @@ static ktime_t tick_nohz_stop_sched_tick(struct tick_sched *ts,
-> > >  	 * (not only the tick).
-> > >  	 */
-> > >  	ts->sleep_length = ktime_sub(dev->next_event, now);
-> > > +	trace_printk("tick_nohz_stop_sched_tick: %lld\n", (tick - ktime_get()) / 1000);
-> > >  	return tick;
-> > >  }
-> > 
-> > Should I be seeing negative values? A small sample:
+Am 16.08.2017 um 17:11 schrieb Philipp Zabel:
+> On Wed, 2017-08-16 at 14:12 +0200, Andreas F?rber wrote:
+>> Am 16.08.2017 um 13:30 schrieb Andre Przywara:
+>>> On 16/08/17 10:46, Philipp Zabel wrote:
+>>>> +/**
+>>>> + * struct reset_simple_devdata - simple reset controller properties
+>>>> + * @active_low: if true, bits are cleared to assert the reset. Otherwise, bits
+>>>> + *              are set to assert the reset.
+>>>> + */
+>>>> +struct reset_simple_devdata {
+>>>>>>> +	bool active_low;
+>>>> +};
+>>>> +
+>>>> +static const struct reset_simple_devdata reset_simple_active_low = {
+>>>>>>> +	.active_low = true,
+>>>> +};
+>>>> +
+>>>> +static const struct of_device_id reset_simple_dt_ids[] = {
+>>>>>>> +	{ .compatible = "allwinner,sun6i-a31-clock-reset",
+>>>> +		.data = &reset_simple_active_low },
+>>>
+>>> Can we have a additional generic compatible string here? New users of
+>>> this driver then wouldn't need to explicitly enter their name into the
+>>> driver, but could just use the generic name as a fallback. This would
+>>> enable the driver without any Linux code change just by adding a DT node.
+>>>
+>>> 	compatible = "nexell,s5p6818-reset", "simple-reset";
+>>>
+>>> Whenever we need a quirk (now or in the future), we can add the specific
+>>> name into this structure along with the required workarounds.
+>>
+>> Same question about binding here. However the way it is done today, we
+>> would also need some optional active-low property then or two different
+>> compatible strings, as this is currently controlled via the DT matches.
 > 
-> Maybe due to hypervisor preemption delays, but I confess that I am
-> surprised to see them this large.  1,602,250,019 microseconds is something
-> like a half hour, which could result in stall warnings all by itself.
+> I'd like to decouple this from the issue at hand, which is de-
+> duplicating simple reset code without device tree changes.
 > 
-> >           <idle>-0     [015] d...  1602.039695: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250019
-> >           <idle>-0     [009] d...  1602.039701: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250025
-> >           <idle>-0     [007] d...  1602.039702: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250025
-> >           <idle>-0     [048] d...  1602.039703: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: 9973
-> >           <idle>-0     [006] d...  1602.039704: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250027
-> >           <idle>-0     [001] d...  1602.039730: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250053
-> >           <idle>-0     [008] d...  1602.039732: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602250055
-> >           <idle>-0     [006] d...  1602.049695: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602260018
-> >           <idle>-0     [009] d...  1602.049695: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602260018
-> >           <idle>-0     [001] d...  1602.049695: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: -1602260018
-> > 
-> > 
-> > I have a full trace, I'll send it to you off-list.
-> 
-> I will take a look!
+> I'll make a separate suggestion for a simple binding on top of this
+> series.
 
-And from your ps output, PID 9 is rcu_sched, which is the RCU grace-period
-kthread that stalled.  This kthread was starved, based on this from your
-dmesg:
+Okay, I'll continue using my own driver then, until it's clear how
+exactly I'm supposed to piggy-back on this new driver.
 
-[ 1602.067008] rcu_sched kthread starved for 2603 jiffies! g7275 c7274 f0x0 RCU_GP_WAIT_FQS(3) ->state=0x1
+Cheers,
+Andreas
 
-The RCU_GP_WAIT_FQS says that this kthread is periodically scanning for
-idle-CPU and offline-CPU quiescent states, which means that its waits
-will be accompanied by short timeouts.  The "starved for 2603 jiffies"
-says that it has not run for one good long time.  The ->state is its
-task_struct ->state field.
-
-The immediately preceding dmesg line is as follows:
-
-[ 1602.063851]  (detected by 53, t=2603 jiffies, g=7275, c=7274, q=608)
-
-In other words, the rcu_sched grace-period kthread has been starved
-for the entire duration of the current grace period, as shown by the
-t=2603.
-
-Lets turn now to the trace output, looking for the last bit of the
-rcu_sched task's activity:
-
-       rcu_sched-9     [054] d...  1576.030096: timer_start: timer=c0000007fae1bc20 function=process_timeout expires=4295094922 [timeout=1] cpu=54 idx=0 flags=
-    ksoftirqd/53-276   [053] ..s.  1576.030097: rcu_invoke_callback: rcu_sched rhp=c000000fcf8c4eb0 func=__d_free
-       rcu_sched-9     [054] d...  1576.030097: rcu_utilization: Start context switch
-    ksoftirqd/53-276   [053] ..s.  1576.030098: rcu_invoke_callback: rcu_sched rhp=c000000fcff74ee0 func=proc_i_callback
-       rcu_sched-9     [054] d...  1576.030098: rcu_grace_period: rcu_sched 7275 cpuqs
-       rcu_sched-9     [054] d...  1576.030099: rcu_utilization: End context switch
-
-So this task set up a timer ("timer_start:") for one jiffy ("[timeout=1]",
-but what is with "expires=4295094922"?)  and blocked ("rcu_utilization:
-Start context switch" and "rcu_utilization: End context switch"),
-recording its CPU's quiescent state in the process ("rcu_grace_period:
-rcu_sched 7275 cpuqs").
-
-Of course, the timer will have expired in the context of some other task,
-but a search for "c0000007fae1bc20" (see the "timer=" in the first trace
-line above) shows nothing (to be painfully accurate, the search wraps back
-to earlier uses of this timer by rcu_sched).  So the timer never did fire.
-
-The next question is "what did CPU 054 do next?"  We find it entering idle:
-
-          <idle>-0     [054] d...  1576.030167: tick_stop: success=1 dependency=NONE
-          <idle>-0     [054] d...  1576.030167: hrtimer_cancel: hrtimer=c000000fff88c680
-          <idle>-0     [054] d...  1576.030168: hrtimer_start: hrtimer=c000000fff88c680 function=tick_sched_timer expires=1610710000000 softexpires=1610710000000
-          <idle>-0     [054] d...  1576.030170: __tick_nohz_idle_enter: tick_nohz_stop_sched_tick: 34469831
-          <idle>-0     [054] d...  1576.030171: rcu_dyntick: Start 140000000000000 0
-
-So we have an hrtimer set for 1610710000000, whatever time that might
-happen to map to.  And that is the last we hear from CPU 054, so it
-apparently maps to something a bit too far into the future.  Let's
-assume that this value is nanoseconds since boot, in which case we have
-1,610.710000000 seconds, which is eight seconds after the stall-warning
-message.  And -way- longer than the one-jiffy timeout requested!
-
-Thomas, John, am I misinterpreting the timer trace event messages?
-
-							Thanx, Paul
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
