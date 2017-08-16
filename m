@@ -1,33 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Aug 2017 17:22:18 +0200
-Subject: [PATCH] bus: Convert to using %pOF instead of full_name
-In-Reply-To: <20170719062200.aixn34tcmxy3h6dl@flea>
-References: <20170718214339.7774-11-robh@kernel.org>
- <20170719062200.aixn34tcmxy3h6dl@flea>
-Message-ID: <CAK8P3a3FtaPn-MnE+1e29cr_vwUaQWBoUv6=x6+AZ04HcncX_Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 16 Aug 2017 08:23:44 -0700
+Subject: [PATCH] ARM: dts: am57xx-beagle-x15: Add support for rev C
+In-Reply-To: <CAOCHtYi=JxMirp03DMny+HFo3g9nsPO--VuNK7N-YtctNhj2dg@mail.gmail.com>
+References: <20170814175820.12065-1-robertcnelson@gmail.com>
+ <bf2a5868-4c0b-58a1-350e-cba7dcfb5166@ti.com>
+ <CAOCHtYi=JxMirp03DMny+HFo3g9nsPO--VuNK7N-YtctNhj2dg@mail.gmail.com>
+Message-ID: <20170816152343.GG8569@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 19, 2017 at 8:22 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Jul 18, 2017 at 04:42:51PM -0500, Rob Herring wrote:
->> Now that we have a custom printf format specifier, convert users of
->> full_name to use %pOF instead. This is preparation to remove storing
->> of the full path string for each node.
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
->> Cc: Chen-Yu Tsai <wens@csie.org>
->> Cc: linux-arm-kernel at lists.infradead.org
->> ---
->>  drivers/bus/arm-cci.c   | 12 ++++++------
->>  drivers/bus/imx-weim.c  |  8 ++++----
->>  drivers/bus/sunxi-rsb.c | 22 +++++++++++-----------
->
-> for sunxi-rsb:
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->
+* Robert Nelson <robertcnelson@gmail.com> [170816 07:23]:
+> and this is going to conflict with:
+> 
+> [v2,04/10] ARM: dts: am57xx-beagle-x15: Add pinmux configuration for MMC
+> 
+> https://patchwork.kernel.org/patch/9903875/
+> 
+> i'll wait for Tony to pick up Kishon's before i re-submit..
 
-Applied to next/drivers, thanks!
+OK Kishon's patches are now all applied and merged into
+my for-next branch I just pushed out. Can you please
+update and test against that and repost?
 
-       Arnd
+The commit to use as base is commit 271df663be9e ("Merge branch
+'omap-for-v4.14/dt-v3' into for-next") as that has -rc4 merged
+in that has commit c5b3955828ba ("ARM: OMAP4: Fix legacy code
+clean-up regression") while omap-for-v4.14/dt-v3 is missing that
+for testing.
+
+Regards,
+
+Tony
