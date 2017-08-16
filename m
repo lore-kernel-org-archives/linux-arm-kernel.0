@@ -1,41 +1,63 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 16 Aug 2017 10:58:56 +0100
-Subject: [GIT PULL] arm: hisi: non-urgent fixes for v4.14
-Message-ID: <59941760.3030708@hisilicon.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Wed, 16 Aug 2017 11:20:10 +0100
+Subject: [PATCH v2] ARM: debug-ll: Add support for r8a7745
+Message-ID: <1502878810-17011-1-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+Enable low-level debugging support for RZ/G1E (r8a7745). RZ/G1E uses
+SCIF4 for the debug console.
 
-Please help to pull the following fixes.
-Thanks!
-
-Best Regards,
-Wei
-
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
 ---
+Changes in v2:
+  - Keep the list sorted by physical address
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+ arch/arm/Kconfig.debug | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-fixes-for-4.14
-
-for you to fetch changes up to d2057bbb79aad0e0f20112edd7b6599f06101e64:
-
-  ARM: hisi: Fix typo in comment (2017-08-16 10:40:46 +0100)
-
-----------------------------------------------------------------
-ARM: hisi fixes for 4.14
-
-- Fix the comment typo of the machine code "0xe51ff004"
-  to avoid confusion.
-
-----------------------------------------------------------------
-Yunzhi Li (1):
-      ARM: hisi: Fix typo in comment
-
- arch/arm/mach-hisi/platsmp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 6dcea8e..31bf312 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -911,6 +911,13 @@ choice
+ 		  Say Y here if you want kernel low-level debugging support
+ 		  via SCIF2 on Renesas R-Car E2 (R8A7794).
+ 
++	config DEBUG_RCAR_GEN2_SCIF4
++		bool "Kernel low-level debugging messages via SCIF4 on R8A7745"
++		depends on ARCH_R8A7745
++		help
++		  Say Y here if you want kernel low-level debugging support
++		  via SCIF4 on Renesas RZ/G1E (R8A7745).
++
+ 	config DEBUG_RMOBILE_SCIFA0
+ 		bool "Kernel low-level debugging messages via SCIFA0 on R8A73A4"
+ 		depends on ARCH_R8A73A4
+@@ -1451,6 +1458,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN1_SCIF2
+ 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF0
+ 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF2
++	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF4
+ 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA0
+ 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA1
+ 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA4
+@@ -1570,6 +1578,7 @@ config DEBUG_UART_PHYS
+ 	default 0xe6c80000 if DEBUG_RMOBILE_SCIFA4
+ 	default 0xe6e58000 if DEBUG_RCAR_GEN2_SCIF2
+ 	default 0xe6e60000 if DEBUG_RCAR_GEN2_SCIF0
++	default 0xe6ee0000 if DEBUG_RCAR_GEN2_SCIF4
+ 	default 0xe8008000 if DEBUG_R7S72100_SCIF2
+ 	default 0xf0000be0 if ARCH_EBSA110
+ 	default 0xf1012000 if DEBUG_MVEBU_UART0_ALTERNATE
+@@ -1604,6 +1613,7 @@ config DEBUG_UART_PHYS
+ 		DEBUG_QCOM_UARTDM || DEBUG_R7S72100_SCIF2 || \
+ 		DEBUG_RCAR_GEN1_SCIF0 || DEBUG_RCAR_GEN1_SCIF2 || \
+ 		DEBUG_RCAR_GEN2_SCIF0 || DEBUG_RCAR_GEN2_SCIF2 || \
++		DEBUG_RCAR_GEN2_SCIF4 || \
+ 		DEBUG_RMOBILE_SCIFA0 || DEBUG_RMOBILE_SCIFA1 || \
+ 		DEBUG_RMOBILE_SCIFA4 || DEBUG_S3C24XX_UART || \
+ 		DEBUG_S3C64XX_UART || \
+-- 
+2.7.4
