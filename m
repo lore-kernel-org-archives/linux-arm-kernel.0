@@ -1,58 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Aug 2017 12:22:47 +0100
-Subject: [PATCH 21/27] arm64/sve: KVM: Prevent guests from using SVE
-In-Reply-To: <3cb51836-9677-5eb5-cc07-361eee674806@arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-22-git-send-email-Dave.Martin@arm.com>
- <0f5b14a8-4d04-61e4-05e8-92cd55c8bee9@arm.com>
- <20170816105013.GZ6321@e103592.cambridge.arm.com>
- <3cb51836-9677-5eb5-cc07-361eee674806@arm.com>
-Message-ID: <98593c20-12f6-c738-cd92-c94804941b36@arm.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Wed, 16 Aug 2017 12:12:16 +0100
+Subject: [PATCH ] gpio: rcar: Add r8a7745 (RZ/G1E) support
+Message-ID: <1502881936-39357-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/08/17 12:20, Marc Zyngier wrote:
-> On 16/08/17 11:50, Dave Martin wrote:
->> On Tue, Aug 15, 2017 at 05:33:15PM +0100, Marc Zyngier wrote:
->>> On 09/08/17 13:05, Dave Martin wrote:
->>>> Until KVM has full SVE support, guests must not be allowed to
->>>> execute SVE instructions.
->>>>
->>>> This patch enables the necessary traps, and also ensures that the
->>>> traps are disabled again on exit from the guest so that the host
->>>> can still use SVE if it wants to.
->>>>
->>>> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
->>>> ---
->>>>  arch/arm64/include/asm/kvm_arm.h | 3 ++-
->>>>  arch/arm64/kvm/hyp/switch.c      | 6 +++---
->>>>  2 files changed, 5 insertions(+), 4 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
->>>> index dbf0537..8a19651 100644
->>>> --- a/arch/arm64/include/asm/kvm_arm.h
->>>> +++ b/arch/arm64/include/asm/kvm_arm.h
->>>> @@ -186,7 +186,7 @@
->>>>  #define CPTR_EL2_TTA	(1 << 20)
->>>>  #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
->>>>  #define CPTR_EL2_TZ	(1 << 8)
->>>> -#define CPTR_EL2_DEFAULT	0x000033ff
->>>> +#define CPTR_EL2_DEFAULT	(0x000033ff & ~CPTR_EL2_TZ)
->>>
->>> I must say I'm not overly fond of this construct. I'd rather introduce a
->>> RES1 field that matches the v8.2 description, instead of this ugly
->>> constant and something that clears it.
->>
->> Sorry, I don't get your meaning here.  v8.2 neither immediately predates
->> or postdates SVE.  
-> 
-> The ARMv8 ARM (DDI406B_a, D7.2.19) says otherwise. This bit is only
+Renesas RZ/G1E (R8A7745) SoC GPIO blocks are identical to the R-Car Gen2
+family. Add support for its GPIO controllers.
 
-Of course, the days of the ARMv7 ARM are still haunting me. This should
-read DDI487B_a.
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+---
+This patch is tested against linux-next tag next-20170816 as well as gpio-devel.
 
-Apologies for the confusion.
+ Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-	M.
+diff --git a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+index 48634b0..51c86f6 100644
+--- a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
++++ b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+@@ -4,6 +4,7 @@ Required Properties:
+ 
+   - compatible: should contain one or more of the following:
+     - "renesas,gpio-r8a7743": for R8A7743 (RZ/G1M) compatible GPIO controller.
++    - "renesas,gpio-r8a7745": for R8A7745 (RZ/G1E) compatible GPIO controller.
+     - "renesas,gpio-r8a7778": for R8A7778 (R-Mobile M1) compatible GPIO controller.
+     - "renesas,gpio-r8a7779": for R8A7779 (R-Car H1) compatible GPIO controller.
+     - "renesas,gpio-r8a7790": for R8A7790 (R-Car H2) compatible GPIO controller.
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
