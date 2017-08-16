@@ -1,32 +1,28 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Aug 2017 23:43:18 +0200
-Subject: [GIT PULL 3/3] Allwinner dts64 changes for 4.14
-In-Reply-To: <20170807034307.5gw5ircl6eexsbfq@wens.csie.org>
-References: <20170807031910.66qj742m3egmdex5@wens.csie.org>
- <20170807034307.5gw5ircl6eexsbfq@wens.csie.org>
-Message-ID: <CAK8P3a0CQCSKwD6mAitby5BGArqpx7vAFH_80gcy+n85g7=JbA@mail.gmail.com>
+Date: Wed, 16 Aug 2017 23:46:26 +0200
+Subject: [GIT PULL] arm64: dts: juno: Updates for v4.14
+In-Reply-To: <d33155aa-9925-1a65-ac82-d7cb5e7edd53@arm.com>
+References: <d33155aa-9925-1a65-ac82-d7cb5e7edd53@arm.com>
+Message-ID: <CAK8P3a3KX0iDGpWH-CYpwiuz1a2n07MdYC6zkZ0HUch0_xWm2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 7, 2017 at 5:43 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> Hi Arnd, Olof,
+On Mon, Aug 14, 2017 at 6:20 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> ----------------------------------------------------------------
+> ARMv8 Vexpress/Juno DT updates for v4.14
 >
-> We still have a couple of dts64 patches in our tree that are not
-> included in this pull request. These add missing aliases for the
-> Ethernet controllers we enabled in 4.13-rc1. So we are aiming to
-> rework them as fixes for 4.13. Otherwise this is just a fairly
-> routine set of patches enabling the PMIC.
+> 1. Replaces old coresight ATB programmable replicator compatible with
+>    new and more generic one
+>
+> 2. Replaces incorrect usage of underscores for device node names in the
+>    device tree with hyphen
 
-Ok.
+Pulled into next/dt64.
 
-> Allwinner arm64 DT changes for 4.14
->
-> The usual improvement patches:
->
->   - R_INTC interrupt controller enabled for the A64 SoC
->
->   - AXP803 PMIC added and enabled on the Pine64 and SoPine boards
+Regarding the change of the compatible string for the replicator, can you
+confirm that nothing ever used the old string?
 
-Pulled into next/dt64, thanks!
+In doubt, it might be better to keep both strings present for
+backward-compatibility.
 
        Arnd
