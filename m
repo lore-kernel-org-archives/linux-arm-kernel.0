@@ -1,7 +1,7 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Wed, 16 Aug 2017 10:17:03 -0500
-Subject: [GIT PULL] Qualcomm Device Tree updates for 4.14
-Message-ID: <1502896623-6905-1-git-send-email-andy.gross@linaro.org>
+Date: Wed, 16 Aug 2017 10:17:10 -0500
+Subject: [GIT PULL] Qualcomm ARM64 DT updates for 4.14
+Message-ID: <1502896630-6948-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,35 +11,59 @@ The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-dts-for-4.14
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.14
 
-for you to fetch changes up to 0d363594c5287390310fa91be28d0efccb334779:
+for you to fetch changes up to 6a6729f384365db9443a867bf8cf22255b3da582:
 
-  ARM: dts: qcom: add and enable both wifi blocks on the IPQ4019 (2017-08-08 14:53:12 -0500)
-
-----------------------------------------------------------------
-Qualcomm Device Tree Changes for v4.14
-
-* Fixup XO, timer nodes, and pinctrl on IPQ4019
-* Add IPQ4019 RNG and wifi blocks
-* Update MSM8974 coresight node
-* Add IPQ8074 bindings
+  arm64: dts: qcom: msm8916: Add IOMMU support (2017-08-16 10:09:03 -0500)
 
 ----------------------------------------------------------------
-Christian Lamparter (2):
-      ARM: dts: qcom: add pseudo random number generator on the IPQ4019
-      ARM: dts: qcom: add and enable both wifi blocks on the IPQ4019
+Qualcomm ARM64 Updates for v4.14
+
+* Force USB host mode on APQ8016
+* Update coresight nodes on MSM8916
+* Add MSM8996 support for USB, PCIE phy, RPM/GLink, and modem SMP2P
+* Add db820c PM8994 regulator node
+* Add PMI8994 gpios
+* Add assorted MSM8916 nodes including GPU, IOMMU, Venus, and CEC clock.
+
+----------------------------------------------------------------
+Bjorn Andersson (3):
+      arm64: dts: qcom: Add RPM glink nodes to msm8996
+      arm64: dts: msm8996: Add modem smp2p nodes
+      arm64: dts: qcom: msm8996: Specify smd-edge for ADSP
+
+Hans Verkuil (1):
+      arm64: dts: qcom: add cec clock for apq8016 board
+
+Rajendra Nayak (1):
+      arm64: dts: qcom: db820c: Add pm8994 regulator node
+
+Rob Clark (2):
+      arm64: dts: qcom: msm8916: Add gpu support
+      arm64: dts: qcom: msm8916: Add IOMMU support
+
+Stanimir Varbanov (1):
+      arm64: dts: qcom: msm8916: Add Venus video codec support
+
+Stephen Boyd (1):
+      arm64: dts: qcom: Force host mode for USB on apq8016-sbc
 
 Suzuki K. Poulose (1):
-      ARM: dts: qcom-msm8974: dts: Update coresight replicator
+      arm64: dts: qcom-msm8916: dts: Update coresight replicator
 
-Varadarajan Narayanan (3):
-      dt-bindings: qcom: Add IPQ8074 bindings
-      ARM: dts: ipq4019: Fix pinctrl node name
-      ARM: dts: ipq4019: Move xo and timer nodes to SoC dtsi
+Vivek Gautam (5):
+      arm64: dts: pmi8994: Add device node for pmi8994 gpios
+      arm64: dts: msm8996: Add device node for qcom qusb2 phy
+      arm64: dts: msm8996: Add device node for qcom qmp-phy for usb
+      arm64: dts: msm8996: Add device node for qcom qmp-phy for pcie
+      arm64: dts: msm8996: Add device node for qcom,dwc3
 
- Documentation/devicetree/bindings/arm/qcom.txt |   2 +
- arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi  |  29 +++----
- arch/arm/boot/dts/qcom-ipq4019.dtsi            | 109 ++++++++++++++++++++++++-
- arch/arm/boot/dts/qcom-msm8974.dtsi            |   2 +-
- 4 files changed, 122 insertions(+), 20 deletions(-)
+ .../arm64/boot/dts/qcom/apq8016-sbc-pmic-pins.dtsi |   1 +
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi          |  17 +-
+ .../boot/dts/qcom/apq8096-db820c-pmic-pins.dtsi    |  24 ++
+ arch/arm64/boot/dts/qcom/apq8096-db820c.dtsi       | 198 +++++++++++++
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              | 120 +++++++-
+ arch/arm64/boot/dts/qcom/msm8996.dtsi              | 314 +++++++++++++++++++++
+ arch/arm64/boot/dts/qcom/pmi8994.dtsi              |  17 ++
+ 7 files changed, 680 insertions(+), 11 deletions(-)
