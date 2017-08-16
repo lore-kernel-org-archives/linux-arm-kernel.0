@@ -1,74 +1,144 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 16 Aug 2017 09:45:16 +0100
-Subject: [GIT PULL v2] arm64: dts: hisilicon dts updates for v4.14
-Message-ID: <5994061C.4080605@hisilicon.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Wed, 16 Aug 2017 17:00:10 +0800
+Subject: [RFC PATCH 1/3] PCI: rockchip: Add support for pcie wake irq
+In-Reply-To: <20170816075224.31734-2-jeffy.chen@rock-chips.com>
+References: <20170816075224.31734-1-jeffy.chen@rock-chips.com>
+ <20170816075224.31734-2-jeffy.chen@rock-chips.com>
+Message-ID: <5440b476-f811-c478-c19a-9ee08005de6b@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof, Hi Kevin,
+Hi Jeffy,
 
-Please help to pull the following changes.
-Thanks!
+On 2017/8/16 15:52, Jeffy Chen wrote:
+> Add support for PCIE_WAKE pin in rockchip pcie driver.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+> 
+>   drivers/pci/host/pcie-rockchip.c | 58 ++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 58 insertions(+)
+> 
+> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
+> index 7bb9870f6d8c..f969a6d3cd85 100644
+> --- a/drivers/pci/host/pcie-rockchip.c
+> +++ b/drivers/pci/host/pcie-rockchip.c
+> @@ -38,6 +38,7 @@
+>   #include <linux/platform_device.h>
+>   #include <linux/reset.h>
+>   #include <linux/regmap.h>
+> +#include <linux/suspend.h>
+>   
+>   /*
+>    * The upper 16 bits of PCIE_CLIENT_CONFIG are a write mask for the lower 16
+> @@ -226,6 +227,8 @@ struct rockchip_pcie {
+>   	struct	regulator *vpcie1v8; /* 1.8V power supply */
+>   	struct	regulator *vpcie0v9; /* 0.9V power supply */
+>   	struct	gpio_desc *ep_gpio;
+> +	int	wake_irq;
+> +	bool	wake_by_pcie;
+>   	u32	lanes;
+>   	u8	root_bus_nr;
+>   	int	link_gen;
+> @@ -853,6 +856,20 @@ static void rockchip_pcie_legacy_int_handler(struct irq_desc *desc)
+>   	chained_irq_exit(chip, desc);
+>   }
+>   
+> +static irqreturn_t rockchip_pcie_wake_irq_handler(int irq, void *arg)
+> +{
+> +	struct rockchip_pcie *rockchip = arg;
+> +
+> +	rockchip->wake_by_pcie = true;
+> +
+> +	disable_irq_nosync(rockchip->wake_irq);
+> +	disable_irq_wake(rockchip->wake_irq);
+> +
+> +	pm_wakeup_event(rockchip->dev, 0);
+> +	pm_system_wakeup();
+> +
+> +	return IRQ_HANDLED;
+> +}
+>   
+>   /**
+>    * rockchip_pcie_parse_dt - Parse Device Tree
+> @@ -868,6 +885,7 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
+>   	struct resource *regs;
+>   	int irq;
+>   	int err;
+> +	bool wakeup = 0;
+>   
+>   	regs = platform_get_resource_byname(pdev,
+>   					    IORESOURCE_MEM,
+> @@ -1018,6 +1036,21 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
+>   		return err;
+>   	}
+>   
+> +	rockchip->wake_irq = platform_get_irq_byname(pdev, "wake");
+> +	if (rockchip->wake_irq >= 0) {
+> +		err = devm_request_irq(dev, rockchip->wake_irq,
+> +				       rockchip_pcie_wake_irq_handler,
+> +				       0, "pcie-wake", rockchip);
+> +		if (err) {
+> +			dev_err(dev, "failed to request PCIe wake IRQ\n");
+> +			return err;
 
-Best Regards,
-Wei
+This is optional, so I'm not sure if we should prevent the driver to
+probe?
 
----
+> +		}
+> +
+> +		disable_irq(rockchip->wake_irq);
+> +		wakeup = device_property_read_bool(dev, "wakeup-source");
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+The purpose we add this, is for ep to wakeup the system, so why not
+always treate it as a wakeup source.
 
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+> +	}
+> +	device_init_wakeup(dev, wakeup);
+> +
+>   	rockchip->vpcie3v3 = devm_regulator_get_optional(dev, "vpcie3v3");
+>   	if (IS_ERR(rockchip->vpcie3v3)) {
+>   		if (PTR_ERR(rockchip->vpcie3v3) == -EPROBE_DEFER)
+> @@ -1270,6 +1303,30 @@ static int rockchip_pcie_wait_l2(struct rockchip_pcie *rockchip)
+>   	return 0;
+>   }
+>   
+> +static int __maybe_unused rockchip_pcie_suspend(struct device *dev)
+> +{
+> +	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
+> +
+> +	rockchip->wake_by_pcie = false;
+> +
+> +	if (device_may_wakeup(dev)) {
+> +		enable_irq_wake(rockchip->wake_irq);
+> +		enable_irq(rockchip->wake_irq);
+> +	}
+> +	return 0;
+> +}
+> +
+> +static int __maybe_unused rockchip_pcie_resume(struct device *dev)
+> +{
+> +	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
+> +
+> +	if (device_may_wakeup(dev) && !rockchip->wake_by_pcie) {
 
-are available in the git repository at:
+I don't get this that why we need to check wake_by_pcie here?
 
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.14-v2
-
-for you to fetch changes up to 487f00d4b95e086f89d65f7024b71d81628f1551:
-
-  arm64: dts: hi3660: enable watchdog (2017-08-16 09:32:12 +0100)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.14
-
-- Add PCIe node for hip07
-- Add acpu_sctrl node and refine the usb tx fifo size for hi6220
-- Add cpu idle states, L2 cache, PMU, OP-TEE, reboot, pstore,
-  k3-dma and watchdog nodes for hi3660 and hikey960
-- Update mmc and bluetooth nodes for hi3660 and hikey960
-
-----------------------------------------------------------------
-Guodong Xu (4):
-      arm64: dts: hikey960: Add support for syscon-reboot-mode
-      arm64: dts: hikey960: Add pstore support
-      arm64: dts: hi3660: Reset the mmc hosts
-      arm64: dts: hikey960: change bluetooth uart max-speed to 3mbps
-
-Leo Yan (3):
-      arm64: dts: hi3660: enable idle states
-      arm64: dts: hi3660: add L2 cache topology
-      arm64: dts: hi3660: enable watchdog
-
-Shawn Guo (1):
-      arm64: dts: hi6220: improve g-tx-fifo-size setting for usb device
-
-Victor Chong (1):
-      arm64: dts: hikey960: Add optee node
-
-Wang Ruyi (1):
-      arm64: dts: hi3660: add bindings for DMA
-
-YiPing Xu (1):
-      arm64: dts: hi3660: add pmu dt node for hi3660
-
-Zhangfei Gao (1):
-      arm64: dts: hi6220: add acpu_sctrl
-
-Zhou Wang (1):
-      arm64: dts: hisi: add PCIe host controller node for hip07 SoC
-
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  37 +++++-
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 130 ++++++++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi         |   9 +-
- arch/arm64/boot/dts/hisilicon/hip07-d05.dts       |   4 +
- arch/arm64/boot/dts/hisilicon/hip07.dtsi          |  22 ++++
- 5 files changed, 200 insertions(+), 2 deletions(-)
+> +		disable_irq(rockchip->wake_irq);
+> +		disable_irq_wake(rockchip->wake_irq);
+> +	}
+> +	return 0;
+> +}
+> +
+>   static int __maybe_unused rockchip_pcie_suspend_noirq(struct device *dev)
+>   {
+>   	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
+> @@ -1548,6 +1605,7 @@ static int rockchip_pcie_remove(struct platform_device *pdev)
+>   }
+>   
+>   static const struct dev_pm_ops rockchip_pcie_pm_ops = {
+> +	SET_SYSTEM_SLEEP_PM_OPS(rockchip_pcie_suspend, rockchip_pcie_resume)
+>   	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(rockchip_pcie_suspend_noirq,
+>   				      rockchip_pcie_resume_noirq)
+>   };
+> 
