@@ -1,22 +1,68 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 16 Aug 2017 11:51:28 +0900
-Subject: [PATCH 6/6] arm64: dts: uniphier: add Denali NAND controller nodes
-In-Reply-To: <1502297011-30201-6-git-send-email-yamada.masahiro@socionext.com>
-References: <1502297011-30201-1-git-send-email-yamada.masahiro@socionext.com>
- <1502297011-30201-6-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNARhJLakL82swMNCmEYS7ayetNA+VWtyOOvXxPZdaGu+xQ@mail.gmail.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Wed, 16 Aug 2017 11:08:54 +0800
+Subject: [PATCH v3 2/2] i2c: mediatek: Add i2c compatible for MediaTek
+ MT7622
+In-Reply-To: <1502802495-5064-3-git-send-email-jun.gao@mediatek.com>
+References: <1502802495-5064-1-git-send-email-jun.gao@mediatek.com>
+ <1502802495-5064-3-git-send-email-jun.gao@mediatek.com>
+Message-ID: <1502852934.19230.45.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-08-10 1:43 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Add NAND controller node to LD11 and LD20.  Neither of them supports
-> the CS1 line, so pinctrl is set up for a single CS line.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+On Tue, 2017-08-15 at 21:08 +0800, Jun Gao wrote:
+> From: Jun Gao <jun.gao@mediatek.com>
+> 
+> Add i2c compatible for MT7622. Compare to MT8173 i2c controller,
+> MT7622 limits message numbers to 255, and does not support 4GB
+> DMA mode.
+> 
+> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
+
+you seemed missing a Reviewed-by tag from Joe.C
+
+http://lists.infradead.org/pipermail/linux-mediatek/2017-August/009975.html
+
+
 > ---
-
-Applied to linux-uniphier.
-
--- 
-Best Regards
-Masahiro Yamada
+>  drivers/i2c/busses/i2c-mt65xx.c | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
+> index 9bedf0b..09d288c 100644
+> --- a/drivers/i2c/busses/i2c-mt65xx.c
+> +++ b/drivers/i2c/busses/i2c-mt65xx.c
+> @@ -172,6 +172,10 @@ struct mtk_i2c {
+>  	.max_comb_2nd_msg_len = 31,
+>  };
+>  
+> +static const struct i2c_adapter_quirks mt7622_i2c_quirks = {
+> +	.max_num_msgs = 255,
+> +};
+> +
+>  static const struct mtk_i2c_compatible mt6577_compat = {
+>  	.quirks = &mt6577_i2c_quirks,
+>  	.pmic_i2c = 0,
+> @@ -190,6 +194,15 @@ struct mtk_i2c {
+>  	.support_33bits = 0,
+>  };
+>  
+> +static const struct mtk_i2c_compatible mt7622_compat = {
+> +	.quirks = &mt7622_i2c_quirks,
+> +	.pmic_i2c = 0,
+> +	.dcm = 1,
+> +	.auto_restart = 1,
+> +	.aux_len_reg = 1,
+> +	.support_33bits = 0,
+> +};
+> +
+>  static const struct mtk_i2c_compatible mt8173_compat = {
+>  	.pmic_i2c = 0,
+>  	.dcm = 1,
+> @@ -201,6 +214,7 @@ struct mtk_i2c {
+>  static const struct of_device_id mtk_i2c_of_match[] = {
+>  	{ .compatible = "mediatek,mt6577-i2c", .data = &mt6577_compat },
+>  	{ .compatible = "mediatek,mt6589-i2c", .data = &mt6589_compat },
+> +	{ .compatible = "mediatek,mt7622-i2c", .data = &mt7622_compat },
+>  	{ .compatible = "mediatek,mt8173-i2c", .data = &mt8173_compat },
+>  	{}
+>  };
