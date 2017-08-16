@@ -1,25 +1,30 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Aug 2017 22:37:37 +0200
-Subject: [GIT PULL] debug_ll update for omaps for v4.14
-In-Reply-To: <-8673996423090876694@unknownmsgid>
-References: <-8673996423090876694@unknownmsgid>
-Message-ID: <CAK8P3a1buU3Yg2dtmSQvxi4H1CUN++P5wdvHXVwkXa=ChNun+w@mail.gmail.com>
+Date: Wed, 16 Aug 2017 22:39:45 +0200
+Subject: [PATCH] MAINTAINERS: update ARM/ZTE entry
+In-Reply-To: <1502678694-8874-1-git-send-email-shawnguo@kernel.org>
+References: <1502678694-8874-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <CAK8P3a3V1d=h7JV=0J_EW0CZ=YONxtZWbJLcqUhKMkq=AJQZBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 6:27 PM, Tony Lindgren <tony@atomide.com> wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
+On Mon, Aug 14, 2017 at 4:44 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> Update ARM/ZTE entry to include all those ZTE ZX platform drivers and
+> files that do not have a separate MAINTAINERS entry.
 >
-> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+> Since I have been contributing a lot for ZTE ZX SoCs support and
+> collecting platform patches for a few cycles, add myself as one
+> maintainer for the platform.
 >
->   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+> Cc: Jun Nie <jun.nie@linaro.org>
+> Cc: Baoyou Xie <baoyou.xie@linaro.org>
+> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+> ---
+> Hi Arnd, Olof,
 >
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap omap-for-v4.14/debug-ll
+> Can you please apply the patch directly to arm-soc if you are fine with
+> it.  Or if you would like a pull request for this, please let me know.
 
-This is not the tag you wanted to send. I pulled
-"omap-for-v4.14/debug-ll-signed" instead
-and verified that the contents are the same.
+Applied to next/soc. You did not specify whether you wanted this in 4.13,
+which would have been fine with me, but I guessed it's not urgent.
 
-       Arnd
+     Arnd
