@@ -1,46 +1,74 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 16 Aug 2017 19:14:58 +0530
-Subject: [PATCH v2 00/10] ARM: dts: Add iodelay data for MMC
-Message-ID: <20170816134508.8887-1-kishon@ti.com>
+Date: Wed, 16 Aug 2017 19:15:01 +0530
+Subject: [PATCH v2 03/10] ARM: dts: dra7-evm: Add pinmux configuration for MMC
+In-Reply-To: <20170816134508.8887-1-kishon@ti.com>
+References: <20170816134508.8887-1-kishon@ti.com>
+Message-ID: <20170816134508.8887-4-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series only adds data and it won't be used until
-the next series which adds UHS support to omap_hsmmc/sdhci driver.
+Include dra74x-mmc-iodelay.dtsi which has pinmux and IODelay
+configuration values for the various MMC modes for dra74 SoC
+and use it in the pinctrl properties of MMC devicetree
+nodes present in dra7-evm.
 
-Changes from v1:
-*) Add missing Signed-off-by in a couple of patches
-*) Fixed Author of "Move common MMC/SD properties to common file" patch.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/dra7-evm.dts | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
 
-Kishon Vijay Abraham I (7):
-  ARM: dts: dra7-evm: Add pinmux configuration for MMC
-  ARM: dts: am57xx-beagle-x15: Add pinmux configuration for MMC
-  ARM: dts: am571x-idk: Add pinmux configuration for MMC
-  ARM: dts: am572x-idk: Add pinmux configuration for MMC
-  ARM: dts: dra72-evm: Add pinmux configuration for MMC
-  ARM: dts: dra72-evm-revc: Add pinmux configuration for MMC
-  ARM: dts: dra71-evm: Add pinmux configuration for MMC
-
-Sekhar Nori (3):
-  ARM: dts: dra72x: Create a common file with MMC/SD IOdelay data
-  ARM: dts: dra74x: Create a common file with MMC/SD IOdelay data
-  ARM: dts: am57xx-idk: Move common MMC/SD properties to common file
-
- arch/arm/boot/dts/am571x-idk.dts                |  26 +-
- arch/arm/boot/dts/am572x-idk.dts                |  27 +-
- arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi |  29 +-
- arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts   |  15 +
- arch/arm/boot/dts/am57xx-beagle-x15.dts         |  11 +
- arch/arm/boot/dts/am57xx-idk-common.dtsi        |   8 +
- arch/arm/boot/dts/dra7-evm.dts                  |  22 +-
- arch/arm/boot/dts/dra71-evm.dts                 |  14 +
- arch/arm/boot/dts/dra72-evm-revc.dts            |  14 +
- arch/arm/boot/dts/dra72-evm.dts                 |  14 +
- arch/arm/boot/dts/dra72x-mmc-iodelay.dtsi       | 350 +++++++++++++
- arch/arm/boot/dts/dra74x-mmc-iodelay.dtsi       | 647 ++++++++++++++++++++++++
- 12 files changed, 1130 insertions(+), 47 deletions(-)
- create mode 100644 arch/arm/boot/dts/dra72x-mmc-iodelay.dtsi
- create mode 100644 arch/arm/boot/dts/dra74x-mmc-iodelay.dtsi
-
+diff --git a/arch/arm/boot/dts/dra7-evm.dts b/arch/arm/boot/dts/dra7-evm.dts
+index 5e3f9ba861f0..aa426dabb6c3 100644
+--- a/arch/arm/boot/dts/dra7-evm.dts
++++ b/arch/arm/boot/dts/dra7-evm.dts
+@@ -9,6 +9,7 @@
+ 
+ #include "dra74x.dtsi"
+ #include "dra7-evm-common.dtsi"
++#include "dra74x-mmc-iodelay.dtsi"
+ 
+ / {
+ 	model = "TI DRA742";
+@@ -326,8 +327,6 @@
+ 
+ &mmc1 {
+ 	status = "okay";
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc1_pins_default>;
+ 	vmmc-supply = <&evm_3v3_sd>;
+ 	vqmmc-supply = <&ldo1_reg>;
+ 	bus-width = <4>;
+@@ -336,14 +335,29 @@
+ 	 * is always hardwired.
+ 	 */
+ 	cd-gpios = <&gpio6 27 GPIO_ACTIVE_LOW>;
++	pinctrl-names = "default", "hs", "sdr12", "sdr25", "sdr50", "ddr50-rev11", "sdr104-rev11", "ddr50", "sdr104";
++	pinctrl-0 = <&mmc1_pins_default>;
++	pinctrl-1 = <&mmc1_pins_hs>;
++	pinctrl-2 = <&mmc1_pins_sdr12>;
++	pinctrl-3 = <&mmc1_pins_sdr25>;
++	pinctrl-4 = <&mmc1_pins_sdr50>;
++	pinctrl-5 = <&mmc1_pins_ddr50 &mmc1_iodelay_ddr_rev11_conf>;
++	pinctrl-6 = <&mmc1_pins_sdr104 &mmc1_iodelay_sdr104_rev11_conf>;
++	pinctrl-7 = <&mmc1_pins_ddr50 &mmc1_iodelay_ddr_rev20_conf>;
++	pinctrl-8 = <&mmc1_pins_sdr104 &mmc1_iodelay_sdr104_rev20_conf>;
+ };
+ 
+ &mmc2 {
+ 	status = "okay";
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc2_pins_default>;
+ 	vmmc-supply = <&evm_1v8_sw>;
+ 	bus-width = <8>;
++	pinctrl-names = "default", "hs", "ddr_1_8v-rev11", "ddr_1_8v", "hs200_1_8v-rev11", "hs200_1_8v";
++	pinctrl-0 = <&mmc2_pins_default>;
++	pinctrl-1 = <&mmc2_pins_hs>;
++	pinctrl-2 = <&mmc2_pins_ddr_1_8v_rev11 &mmc2_iodelay_ddr_1_8v_rev11_conf>;
++	pinctrl-3 = <&mmc2_pins_ddr_rev20>;
++	pinctrl-4 = <&mmc2_pins_hs200 &mmc2_iodelay_hs200_rev11_conf>;
++	pinctrl-5 = <&mmc2_pins_hs200 &mmc2_iodelay_hs200_rev20_conf>;
+ };
+ 
+ &cpu0 {
 -- 
 2.11.0
