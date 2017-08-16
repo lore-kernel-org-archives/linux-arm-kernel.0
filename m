@@ -1,28 +1,22 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 16 Aug 2017 14:55:03 -0500
-Subject: [PATCH 2/3] [v3] pinctrl: qcom: disable GPIO groups with no pins
-In-Reply-To: <b99e9fc2-2531-20d6-6b25-830f7583e2bc@codeaurora.org>
-References: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
- <1501179565-26466-3-git-send-email-timur@codeaurora.org>
- <CACRpkdZj+tnMcEpic6PrQS-qMJDodmc_uFJVudxc=USCTXpyKg@mail.gmail.com>
- <d0b16753-b202-5756-1cba-1cd083af52ed@codeaurora.org>
- <7c278367-bf3b-6a26-e31f-ee696cb5534e@codeaurora.org>
- <66bfbee6-245d-fddb-f6cb-a2c3c06ffc9b@codeaurora.org>
- <b99e9fc2-2531-20d6-6b25-830f7583e2bc@codeaurora.org>
-Message-ID: <4b1ac1f5-f302-6a02-798a-814b4b3a9b79@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Aug 2017 21:55:36 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Drivers Updates for v4.14
+In-Reply-To: <cover.1501511923.git.horms+renesas@verge.net.au>
+References: <cover.1501511923.git.horms+renesas@verge.net.au>
+Message-ID: <CAK8P3a1YxZcs59bdw=EJGKGcRWmHKiaEdR18BWEgOFWAH-FwLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/16/2017 02:31 PM, Jiandi An wrote:
-> That is why the suggestion is instead of patching in each of the op
-> function of registered irq_chip for the unavailable gpio that won't
-> have use for all that anyways, simply don't register irq for the
-> unavailable gpio
+On Mon, Jul 31, 2017 at 5:04 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> ----------------------------------------------------------------
+> Renesas ARM Based SoC Drivers Updates for v4.14
+>
+> Add R-Car D3 (r8a77995) support to the Renesas-specific SoC drivers
+> - SoC identification
+> - System controller
+> - Reset controller
 
-Ah, it looks like maybe I can update gpio_chip.irq_valid_mask after 
-calling gpiochip_add_data().  I'll try it.
+Pulled into next/drivers, thanks!
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+       Arnd
