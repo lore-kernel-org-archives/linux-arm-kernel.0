@@ -1,66 +1,23 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 16 Aug 2017 16:17:28 +0100
-Subject: [PATCH v3 1/5] reset: add reset-simple to unify socfpga, stm32,
- sunxi, and zx2967
-In-Reply-To: <1502896293.7596.7.camel@pengutronix.de>
-References: <20170816094701.30678-1-p.zabel@pengutronix.de>
- <20170816094701.30678-2-p.zabel@pengutronix.de>
- <51db563d-d6e1-18f1-01c1-3fdcf8269773@arm.com>
- <d6b20df2-12f7-68b1-f7de-0c7f205eba13@suse.de>
- <1502896293.7596.7.camel@pengutronix.de>
-Message-ID: <5eeb7eb1-b8d5-ad6c-b2ab-37770f4029c9@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 16 Aug 2017 17:20:48 +0200
+Subject: [PATCH] firmware: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-21-robh@kernel.org>
+References: <20170718214339.7774-21-robh@kernel.org>
+Message-ID: <CAK8P3a0o7roVft-C6op3CU3_yMgphQPEJTsx0cdeB4+S76dkew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jul 18, 2017 at 11:43 PM, Rob Herring <robh@kernel.org> wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
+>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
 
-On 16/08/17 16:11, Philipp Zabel wrote:
-> On Wed, 2017-08-16 at 14:12 +0200, Andreas F?rber wrote:
->> Hi Andre,
->>
->> Am 16.08.2017 um 13:30 schrieb Andre Przywara:
->>> On 16/08/17 10:46, Philipp Zabel wrote:
->>>> +/**
->>>> + * struct reset_simple_devdata - simple reset controller properties
->>>> + * @active_low: if true, bits are cleared to assert the reset. Otherwise, bits
->>>> + *              are set to assert the reset.
->>>> + */
->>>> +struct reset_simple_devdata {
->>>>>>> +	bool active_low;
->>>> +};
->>>> +
->>>> +static const struct reset_simple_devdata reset_simple_active_low = {
->>>>>>> +	.active_low = true,
->>>> +};
->>>> +
->>>> +static const struct of_device_id reset_simple_dt_ids[] = {
->>>>>>> +	{ .compatible = "allwinner,sun6i-a31-clock-reset",
->>>> +		.data = &reset_simple_active_low },
->>>
->>> Can we have a additional generic compatible string here? New users of
->>> this driver then wouldn't need to explicitly enter their name into the
->>> driver, but could just use the generic name as a fallback. This would
->>> enable the driver without any Linux code change just by adding a DT node.
->>>
->>> 	compatible = "nexell,s5p6818-reset", "simple-reset";
->>>
->>> Whenever we need a quirk (now or in the future), we can add the specific
->>> name into this structure along with the required workarounds.
->>
->> Same question about binding here. However the way it is done today, we
->> would also need some optional active-low property then or two different
->> compatible strings, as this is currently controlled via the DT matches.
-> 
-> I'd like to decouple this from the issue at hand, which is de-
-> duplicating simple reset code without device tree changes.
+Applied to next/drivers with Sudeep's ack, thanks.
 
-Agreed, this is an orthogonal issue, actually being enabled by this series.
-
-> I'll make a separate suggestion for a simple binding on top of this
-> series.
-
-Thanks! Happy to review it.
-I actually have a user at hand already ...
-
-Cheers,
-Andre.
+      Arnd
