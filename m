@@ -1,153 +1,80 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Wed, 16 Aug 2017 15:28:35 -0700
-Subject: [PATCH v2 3/3] arm64: compat: Add CONFIG_KUSER_HELPERS
-Message-ID: <20170816222857.119247-1-salyzyn@android.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Wed, 16 Aug 2017 15:33:00 -0700
+Subject: [PATCH] ARM: dts: TI: Enable __symbols__ in dtb files for some
+ platforms
+In-Reply-To: <1502920751-11121-1-git-send-email-trini@konsulko.com>
+References: <1502920751-11121-1-git-send-email-trini@konsulko.com>
+Message-ID: <5994C81C.609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Brodsky <kevin.brodsky@arm.com>
+On 08/16/17 14:59, Tom Rini wrote:
+> Build the dtb file for these platfroms with __symbol__ information
+> included.  This will reduce the size of the dtb (and resident memory
 
-Make it possible to disable the kuser helpers by adding a KUSER_HELPERS
-config option (enabled by default). When disabled, all kuser
-helpers-related code is removed from the kernel and no mapping is done
-at the fixed high address (0xffff0000); any attempt to use a kuser
-helper from a 32-bit process will result in a segfault.
+typo: reduce the size should be increase the size
 
-Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
-Signed-off-by: Mark Salyzyn <salyzyn@android.com>
 
-v2:
-- split off assembler changes to a new previous patch in series to reduce churn
-- modify slightly the feature documentation to reduce its reach
-- modify slightly the feature documentation to rationalize the yes default.
-- There are more ifdefs as a result of the rebase.
----
- arch/arm64/Kconfig         | 30 ++++++++++++++++++++++++++++++
- arch/arm64/kernel/Makefile |  2 +-
- arch/arm64/kernel/vdso.c   | 10 ++++++++++
- 3 files changed, 41 insertions(+), 1 deletion(-)
+> usage) in exchange for allowing more types of overlays to be applied to
+> the dtb file prior to passing it to Linux and additional functionality
+> within the kernel when OF_OVERLAY is enabled.
+> 
+> Cc: Jason Kridner <jkridner@beagleboard.org>
+> Cc: Drew Fustini <drew@beagleboard.org>
+> Cc: Robert Nelson <robertcnelson@gmail.com>
+> Cc: Lokesh Vutla <lokeshvutla@ti.com>
+> Cc: Frank Rowand <frowand.list@gmail.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Tom Rini <trini@konsulko.com>
+> ---
+> This patch takes the path that Rob encouraged in my previous patch of
+> enabling __symbols__ in some platforms now (that can use it) and see if
+> a critical mass evolves that pushes towards -@ being default for all
+> dtbs.  I would suggest that the dra76 series be respun to include a hunk
+> like this at least as well, and if there's another Beagle X15 patch,
+> that too.  Russell, per some of our conversations, something like would
+> also be needed as part of using overlays to solve some of the problems
+> with Hummingboard, etc.
+> ---
+>  arch/arm/boot/dts/Makefile | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 4b17f35dc9a7..6f98422ca00e 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -1063,3 +1063,17 @@ dtb-$(CONFIG_OF_ALL_DTBS) := $(patsubst $(dtstree)/%.dts,%.dtb, $(wildcard $(dts
+>  
+>  always		:= $(dtb-y)
+>  clean-files	:= *.dtb
+> +
+> +# enable creation of __symbols__ node
+> +DTC_FLAGS_am335x-bone += -@
+> +DTC_FLAGS_am335x-boneblack += -@
+> +DTC_FLAGS_am335x-boneblack-wireless += -@
+> +DTC_FLAGS_am335x-boneblue += -@
+> +DTC_FLAGS_am335x-bonegreen += -@
+> +DTC_FLAGS_am335x-bonegreen-wireless += -@
+> +DTC_FLAGS_am57xx-beagle-x15 += -@
+> +DTC_FLAGS_am57xx-beagle-x15-revb1 += -@
+> +DTC_FLAGS_dra7-evm += -@
+> +DTC_FLAGS_dra72-evm += -@
+> +DTC_FLAGS_dra72-evm-revc += -@
+> +DTC_FLAGS_dra71-evm += -@
+> 
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index dfd908630631..407f74e7a64a 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1100,6 +1100,36 @@ config COMPAT
- 
- 	  If you want to execute 32-bit userspace applications, say Y.
- 
-+config KUSER_HELPERS
-+	bool "Enable the kuser helpers page in 32-bit processes"
-+	depends on COMPAT
-+	default y
-+	help
-+	  Warning: disabling this option may break 32-bit applications.
-+
-+	  Provide kuser helpers in a special purpose fixed-address page. The
-+	  kernel provides helper code to userspace in read-only form at a fixed
-+	  location to allow userspace to be independent of the CPU type fitted
-+	  to the system. This permits 32-bit binaries to be run on ARMv6 through
-+	  to ARMv8 without modification.
-+
-+	  See Documentation/arm/kernel_user_helpers.txt for details.
-+
-+	  However, the fixed-address nature of these helpers can be used by ROP
-+	  (return-orientated programming) authors when creating exploits.
-+
-+	  If all of the 32-bit binaries and libraries that run on your platform
-+	  are built specifically for your platform, and make no use of these
-+	  helpers, then you can turn this option off to hinder such exploits.
-+	  However, in that case, if a binary or library relying on those helpers
-+	  is run, it will receive a SIGSEGV signal, which will terminate the
-+	  program. Typically, binaries compiled for ARMv7 or later do not use
-+	  the kuser helpers.
-+
-+	  Say N here only if you are absolutely certain that you do not need
-+	  these helpers; otherwise, the safe option is to say Y (the default
-+	  for now)
-+
- config SYSVIPC_COMPAT
- 	def_bool y
- 	depends on COMPAT && SYSVIPC
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 59e1b2b002e5..12f9d1e3a027 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -30,7 +30,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
- arm64-obj-$(CONFIG_COMPAT)		+= sys32.o signal32.o	\
- 					   sys_compat.o entry32.o
- arm64-obj-$(CONFIG_COMPAT)		+= sigreturn32.o
--arm64-obj-$(CONFIG_COMPAT)		+= kuser32.o
-+arm64-obj-$(CONFIG_KUSER_HELPERS)	+= kuser32.o
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
- arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 3777f232c18e..c2a483afd7bc 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -62,18 +62,22 @@ static const struct vm_special_mapping compat_vdso_spec[] = {
- 		.name	= "[sigpage]",
- 		.pages	= &vectors_page[0],
- 	},
-+#ifdef CONFIG_KUSER_HELPERS
- 	{
- 		.name	= "[kuserhelpers]",
- 		.pages	= &vectors_page[1],
- 	},
-+#endif
- };
- static struct page *vectors_page[ARRAY_SIZE(compat_vdso_spec)] __ro_after_init;
- 
- static int __init alloc_vectors_page(void)
- {
-+#ifdef CONFIG_KUSER_HELPERS
- 	extern char __kuser_helper_start[], __kuser_helper_end[];
- 	size_t kuser_sz = __kuser_helper_end - __kuser_helper_start;
- 	unsigned long kuser_vpage;
-+#endif
- 
- 	extern char __aarch32_sigret_code_start[], __aarch32_sigret_code_end[];
- 	size_t sigret_sz =
-@@ -84,22 +88,26 @@ static int __init alloc_vectors_page(void)
- 	if (!sigret_vpage)
- 		return -ENOMEM;
- 
-+#ifdef CONFIG_KUSER_HELPERS
- 	kuser_vpage = get_zeroed_page(GFP_ATOMIC);
- 	if (!kuser_vpage) {
- 		free_page(sigret_vpage);
- 		return -ENOMEM;
- 	}
-+#endif
- 
- 	/* sigreturn code */
- 	memcpy((void *)sigret_vpage, __aarch32_sigret_code_start, sigret_sz);
- 	flush_icache_range(sigret_vpage, sigret_vpage + PAGE_SIZE);
- 	vectors_page[0] = virt_to_page(sigret_vpage);
- 
-+#ifdef CONFIG_KUSER_HELPERS
- 	/* kuser helpers */
- 	memcpy((void *)kuser_vpage + 0x1000 - kuser_sz, __kuser_helper_start,
- 		kuser_sz);
- 	flush_icache_range(kuser_vpage, kuser_vpage + PAGE_SIZE);
- 	vectors_page[1] = virt_to_page(kuser_vpage);
-+#endif
- 
- 	return 0;
- }
-@@ -128,11 +136,13 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
- 
- 	current->mm->context.vdso = (void *)addr;
- 
-+#ifdef CONFIG_KUSER_HELPERS
- 	/* Map the kuser helpers at the ABI-defined high address. */
- 	ret = _install_special_mapping(mm, AARCH32_KUSER_HELPERS_BASE,
- 				       PAGE_SIZE,
- 				       VM_READ|VM_EXEC|VM_MAYREAD|VM_MAYEXEC,
- 				       &compat_vdso_spec[1]);
-+#endif
- out:
- 	up_write(&mm->mmap_sem);
- 
--- 
-2.14.1.480.gb18f417b89-goog
+I would prefer that instead of "-@", a configurable value be used.
+
+The current form of the patch imposes the extra overhead even
+for those who do not want to use any overlay.
+
+Using a kernel CONFIG_ value for the "configurable value" is not
+desired because it adds a kernel configuration dependency to what
+is contained in a dtb.  I do not know if we can find another
+better way to make this configurable.  AMaybe Rob's suggestion
+of a shell variable used in the make command.
