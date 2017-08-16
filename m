@@ -1,36 +1,28 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Wed, 16 Aug 2017 15:26:35 +0800
-Subject: [PATCH v2] arm64: dts: hi6220: add acpu_sctrl
-Message-ID: <1502868395-11481-1-git-send-email-zhangfei.gao@linaro.org>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Wed, 16 Aug 2017 15:52:21 +0800
+Subject: [RFC PATCH 0/3] PCI: rockchip: Move PCIE_WAKE handling into rockchip
+ pcie driver
+Message-ID: <20170816075224.31734-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add acpu_sctrl clock node
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-Signed-off-by: Li Pengcheng <lipengcheng8@huawei.com>
----
-Update name to acpu_sctrl at f6504000
+Currently we are handling pcie wake in mrvl wifi driver. But Brian
+suggests to move it into rockchip pcie driver.
 
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Tested on my chromebook bob(with cros 4.4 kernel and mrvl wifi).
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index eacbe0d..f8012d5 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -262,6 +262,12 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		acpu_sctrl: acpu_sctrl at f6504000 {
-+			compatible = "hisilicon,hi6220-acpu-sctrl", "syscon";
-+			reg = <0x0 0xf6504000 0x0 0x1000>;
-+			#clock-cells = <1>;
-+		};
-+
- 		medianoc_ade: medianoc_ade at f4520000 {
- 			compatible = "syscon";
- 			reg = <0x0 0xf4520000 0x0 0x4000>;
+
+
+Jeffy Chen (3):
+  PCI: rockchip: Add support for pcie wake irq
+  dt-bindings: PCI: rockchip: Add support for pcie wake irq
+  arm64: dts: rockchip: Handle pcie wake in pcie driver for Gru
+
+ .../devicetree/bindings/pci/rockchip-pcie.txt      | 11 ++--
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       | 17 ++++---
+ drivers/pci/host/pcie-rockchip.c                   | 58 ++++++++++++++++++++++
+ 3 files changed, 76 insertions(+), 10 deletions(-)
+
 -- 
-2.7.4
+2.11.0
