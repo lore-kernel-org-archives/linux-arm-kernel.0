@@ -1,63 +1,155 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Wed, 16 Aug 2017 11:20:10 +0100
-Subject: [PATCH v2] ARM: debug-ll: Add support for r8a7745
-Message-ID: <1502878810-17011-1-git-send-email-fabrizio.castro@bp.renesas.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 16 Aug 2017 11:22:33 +0100
+Subject: Questions about PMU counters
+In-Reply-To: <20170716100537.GA15094@golem.pkh.me>
+References: <20170716100537.GA15094@golem.pkh.me>
+Message-ID: <3bf77de4-e064-1117-8073-f785b060544a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable low-level debugging support for RZ/G1E (r8a7745). RZ/G1E uses
-SCIF4 for the debug console.
+On 16/07/17 11:05, Cl?ment B?sch wrote:
+> Hi,
+> 
+> I have a few questions about the PMU counters I couldn't get anywhere
+> else. Hopefully this is the right place.
+> 
+> 
+> 1. Device-Tree: pmu vs arm-pmu
+> ==============================
+> 
+> Documentation/devicetree/bindings/arm/pmu.txt is documenting "pmu" as
+> identifier, but both "arm-pmu" and "pmu" seems to be used interchangeably
+> in the codebase in both arch/{arm,arm64}.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
----
-Changes in v2:
-  - Keep the list sorted by physical address
+The node *name* is essentially just some unique namespace identifier; in
+most cases it doesn't really matter at all, although DT guidelines are
+that it should represent the general type of device (see "Node Names" in
+http://www.devicetree.org/specifications-pdf). The "compatible" string
+is what actually identifies the hardware, and what drivers care about.
 
- arch/arm/Kconfig.debug | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+> While most of the codebase seems to use "pmu", drivers/perf/arm_pmu.c is
+> also checking for the exact "arm-pmu" string.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 6dcea8e..31bf312 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -911,6 +911,13 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  via SCIF2 on Renesas R-Car E2 (R8A7794).
- 
-+	config DEBUG_RCAR_GEN2_SCIF4
-+		bool "Kernel low-level debugging messages via SCIF4 on R8A7745"
-+		depends on ARCH_R8A7745
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  via SCIF4 on Renesas RZ/G1E (R8A7745).
-+
- 	config DEBUG_RMOBILE_SCIFA0
- 		bool "Kernel low-level debugging messages via SCIFA0 on R8A73A4"
- 		depends on ARCH_R8A73A4
-@@ -1451,6 +1458,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN1_SCIF2
- 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF0
- 	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF2
-+	default "debug/renesas-scif.S" if DEBUG_RCAR_GEN2_SCIF4
- 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA0
- 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA1
- 	default "debug/renesas-scif.S" if DEBUG_RMOBILE_SCIFA4
-@@ -1570,6 +1578,7 @@ config DEBUG_UART_PHYS
- 	default 0xe6c80000 if DEBUG_RMOBILE_SCIFA4
- 	default 0xe6e58000 if DEBUG_RCAR_GEN2_SCIF2
- 	default 0xe6e60000 if DEBUG_RCAR_GEN2_SCIF0
-+	default 0xe6ee0000 if DEBUG_RCAR_GEN2_SCIF4
- 	default 0xe8008000 if DEBUG_R7S72100_SCIF2
- 	default 0xf0000be0 if ARCH_EBSA110
- 	default 0xf1012000 if DEBUG_MVEBU_UART0_ALTERNATE
-@@ -1604,6 +1613,7 @@ config DEBUG_UART_PHYS
- 		DEBUG_QCOM_UARTDM || DEBUG_R7S72100_SCIF2 || \
- 		DEBUG_RCAR_GEN1_SCIF0 || DEBUG_RCAR_GEN1_SCIF2 || \
- 		DEBUG_RCAR_GEN2_SCIF0 || DEBUG_RCAR_GEN2_SCIF2 || \
-+		DEBUG_RCAR_GEN2_SCIF4 || \
- 		DEBUG_RMOBILE_SCIFA0 || DEBUG_RMOBILE_SCIFA1 || \
- 		DEBUG_RMOBILE_SCIFA4 || DEBUG_S3C24XX_UART || \
- 		DEBUG_S3C64XX_UART || \
--- 
-2.7.4
+I don't see that - AFAICS that string only appears as the name it
+registers interrupts with.
+
+> Q: what is the difference between the two?
+
+One is prefixed with "arm-" ;)
+
+Note that "pmu" is also used for Power Management Units in some cases,
+so sometimes it's an explicit disambiguation.
+
+> 2. Userspace access
+> ===================
+> 
+> An RFC patch was sent a few years ago to allows userspace access to the
+> PMU counters: https://patchwork.kernel.org/patch/5217341/
+> 
+> AFAICT, this was not mainlined as a module or the suggested sysfs control.
+> I tried to contact the author of this patch but got no answer.
+> 
+> The perf API may be considered good enough for end users, but some
+> projects have their own benchmarking framework which they want
+> cross-platform, with as little overhead as possible (FFmpeg is one of
+> them).
+> 
+> Currently, the only workaround seems to use this lost module, which
+> "recently" got arm64 support: https://github.com/zhiyisun/enable_arm_pmu/
+> I confirm it's working on various boards I tested, but it's still not
+> ideal (typically, it's breaking badly if perf is used at the same time).
+> 
+> Q: did anything come out of this, is there any plan, or is there a
+> decision to not doing this?
+
+Say you do give userspace direct access to the PMU; now run two or more
+programs at once that believe they can use the counters for their own
+"minimal-overhead" profiling. Have fun interpreting those results...
+
+And that's not even getting into the implications of scheduling across
+different CPUs, CPUidle, etc. where the PMU state is completely beyond
+userspace's control. In general, the plan to provide userspace with
+something which might happen to just about work in a few corner cases,
+but is meaningless, misleading or downright broken in all others, is to
+never do so.
+> 3. ACPU controller for the Hikey
+> ================================
+> 
+> This question is specific to the Hikey (hisilicon/hi6220-hikey.dts).
+> 
+> While I was able to get PMU counters access through enable_arm_pmu with
+> most of my boards, it made no difference for the Hikey. So I was under the
+> impression that the board needs a special treatment to enable these PMU
+> counters.
+> 
+> Anyway, according the specifications, there is an ACPU interrupt
+> ACPU_PMUIRQ_intr=131 (so SPI 99) "combined interrupt of the eight core
+> CoreSight interrupts of the two clusters of the ACPU)."
+> 
+> Just in case, I naively attempted:
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> index 470461ddd427..98fb2c775540 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
+> @@ -171,6 +171,11 @@
+>                 CLUSTER1_L2: l2-cache1 {
+>                         compatible = "cache";
+>                 };
+> +
+> +               pmu {
+> +                       compatible = "arm,armv8-pmuv3";
+> +                       interrupts = <GCI_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
+> +               };
+>         };
+>  
+>         cpu_opp_table: cpu_opp_table {
+> 
+> But it didn't make any difference.
+> 
+> Q: any idea where I can find more information on this? I couldn't get any help
+>    from 96boards.
+> 
+> 
+> 4. Quick questions
+> ==================
+> 
+> Q: Where can I find the "interrupt" parser of the device-tree? (I'm trying
+>    to verify I understand correctly how exactly is handled 1, 2 and 3
+>    parameters forms).
+
+The interrupt cells are interpreted by relevant interrupt controller
+driver, not generically - their meanings are defined by whichever DT
+binding applies to the appropriate interrupt parent.
+
+> Q: rpi3 seems to have perf counters in 32-bit but not in 64-bit. I don't
+>    understand why: they seem to both share the same device-tree. Oh, and
+>    that bcm2837 doesn't seem to even have pmu declared, so I'm confused.
+> 
+> Q: Why "v3" in "armv8-pmuv3"?
+
+Because it's version 3 of the PMU architecture (which is the baseline
+for version 8 of the CPU architecture).
+
+Robin.
+
+> 
+> Q: I watched an old talk about device trees, and one of the main issue seemed
+>    to be the impossibility to keep API/ABI compatibility forever. What came out
+>    of this wrt the process of defining how to write device trees?
+> 
+> 
+> Note: as you probably guessed, I'm completely new to all this stuff, so if you
+> can answer at least one of these questions, this will probably help me a lot
+> finding my way in the forest.
+> 
+> 
+> Thanks,
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
