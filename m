@@ -1,32 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Aug 2017 23:19:57 +0200
-Subject: [GIT PULL] Gemini DTS updates for v4.14 take one
-In-Reply-To: <CACRpkdZYn1OXayC8ZdPeGJZ_ShQ5drRqVv5WBj3mdevqsHbCcw@mail.gmail.com>
-References: <CACRpkdZYn1OXayC8ZdPeGJZ_ShQ5drRqVv5WBj3mdevqsHbCcw@mail.gmail.com>
-Message-ID: <CAK8P3a0bWMx5NomSo54F5gRjXxVRHAMDAjj1e9ikmWgWqjzj8Q@mail.gmail.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Thu, 17 Aug 2017 00:23:44 +0300
+Subject: [PATCH] nokia n900: update dts with camera support
+In-Reply-To: <20170816205915.GA5386@atrey.karlin.mff.cuni.cz>
+References: <20170810204923.GA18442@amd>
+ <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
+ <20170815220349.GA15441@amd>
+ <20170816205332.rqcuenvuxfs5jvuw@earth>
+ <20170816205915.GA5386@atrey.karlin.mff.cuni.cz>
+Message-ID: <20170816212343.hfd4azb4dq2qrlkc@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 8, 2017 at 2:25 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> Hi ARM SoC guys,
->
-> this is the first set of DTS patches for Gemini for v4.14.
->
-> - Moves to using macros (patch submitted to be applied on
->   top of v4.13-rc1 but it was missed, whatever)
->
-> - New DTS for the D-Link DIR-685
+On Wed, Aug 16, 2017 at 10:59:15PM +0200, Pavel Machek wrote:
+> > Hi,
+> > 
+> > On Wed, Aug 16, 2017 at 12:03:49AM +0200, Pavel Machek wrote:
+> > > diff --git a/Documentation/devicetree/bindings/media/video-interfaces.txt b/Documentation/devicetree/bindings/media/video-interfaces.txt
+> > > index 852041a..aade681 100644
+> > > --- a/Documentation/devicetree/bindings/media/video-interfaces.txt
+> > > +++ b/Documentation/devicetree/bindings/media/video-interfaces.txt
+> > > @@ -119,6 +119,8 @@ Optional endpoint properties
+> > >    as 0 (normal). This property is valid for serial busses only.
+> > >  - strobe: Whether the clock signal is used as clock (0) or strobe (1). Used
+> > >    with CCP2, for instance.
+> > > +- clock-inv: polarity of clock/strobe signal. 0 - not inverted, 1 - inverted
+> > > +- crc: crc is in use
+> > 
+> > booleans in DT are not done with <0> and <1>, but as properties without
+> > values. True = property exists, False = property does not exist.
 
-Nice one! I had to look up what this actually is, apparently you can still
-buy them new after all those years.
+Now that you mention it, I remember that now.
 
-> - Modify all device trees to include proper pin control.
->
-> This is infrastructure for any future extensions of the platform
-> so it is all nice to have in place.
->
-> Please pull it in on some appropriate branch!
+> 
+> Well, strobe property above already uses = <0>/<1> format, as do
+> others.
+> 
+> Problem with "false = property does not exist" is that you don't know
+> if it is "someone forgot to define it" or "someone made a typo" or
+> "dts is too old to know about this property" or "the property indeed
+> should be false"...
 
-Pulled into next/dt, thanks!
+As this is an established practice, I think we should follow it for bool
+properties.
 
-       Arnd
+We could change the existing ones, too, and leave some extra checks in
+place to handle old dtbs.
+
+-- 
+Regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
