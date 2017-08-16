@@ -1,144 +1,110 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Wed, 16 Aug 2017 17:00:10 +0800
-Subject: [RFC PATCH 1/3] PCI: rockchip: Add support for pcie wake irq
-In-Reply-To: <20170816075224.31734-2-jeffy.chen@rock-chips.com>
-References: <20170816075224.31734-1-jeffy.chen@rock-chips.com>
- <20170816075224.31734-2-jeffy.chen@rock-chips.com>
-Message-ID: <5440b476-f811-c478-c19a-9ee08005de6b@rock-chips.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Wed, 16 Aug 2017 11:12:54 +0200
+Subject: [PATCH 2/3] ARM: sun8i: sunxi-h3-h5: add phy-is-integrated
+ property to internal PHY
+In-Reply-To: <302496B2-46F1-456D-A9A0-8257B5582695@gmail.com>
+References: <20170810085129.20463-1-clabbe.montjoie@gmail.com>
+ <20170810085129.20463-3-clabbe.montjoie@gmail.com>
+ <CAGb2v64dBZgN6-8kHnnN1qiEXHnbXw_FM9WxGHPU0h-tZDbspA@mail.gmail.com>
+ <20170811080543.GA25147@Red>
+ <CAGb2v66wCRe8nFucJa5nAT1GhO75LmCyfNWQQbwxzh085Zwk+w@mail.gmail.com>
+ <20170811081920.GB25147@Red>
+ <CAGb2v66SGAKnFoHNqWR+DqS-mY3KA853NmKpdHqf8huOkisLKg@mail.gmail.com>
+ <20170811132526.GD25147@Red>
+ <302496B2-46F1-456D-A9A0-8257B5582695@gmail.com>
+Message-ID: <20170816091254.GB5732@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffy,
-
-On 2017/8/16 15:52, Jeffy Chen wrote:
-> Add support for PCIE_WAKE pin in rockchip pcie driver.
+On Fri, Aug 11, 2017 at 08:03:29AM -0700, Florian Fainelli wrote:
+> On August 11, 2017 6:25:26 AM PDT, Corentin Labbe <clabbe.montjoie@gmail.com> wrote:
+> >On Fri, Aug 11, 2017 at 04:22:11PM +0800, Chen-Yu Tsai wrote:
+> >> On Fri, Aug 11, 2017 at 4:19 PM, Corentin Labbe
+> >> <clabbe.montjoie@gmail.com> wrote:
+> >> > On Fri, Aug 11, 2017 at 04:11:13PM +0800, Chen-Yu Tsai wrote:
+> >> >> On Fri, Aug 11, 2017 at 4:05 PM, Corentin Labbe
+> >> >> <clabbe.montjoie@gmail.com> wrote:
+> >> >> > On Fri, Aug 11, 2017 at 10:42:51AM +0800, Chen-Yu Tsai wrote:
+> >> >> >> Hi,
+> >> >> >>
+> >> >> >> On Thu, Aug 10, 2017 at 4:51 PM, Corentin Labbe
+> >> >> >> <clabbe.montjoie@gmail.com> wrote:
+> >> >> >> > This patch add the new phy-is-integrated property to the
+> >internal PHY
+> >> >> >> > node.
+> >> >> >> >
+> >> >> >> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> >> >> >> > ---
+> >> >> >> >  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 1 +
+> >> >> >> >  1 file changed, 1 insertion(+)
+> >> >> >> >
+> >> >> >> > diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> >b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> >> >> >> > index 4b599b5d26f6..54fc24e4c569 100644
+> >> >> >> > --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> >> >> >> > +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> >> >> >> > @@ -425,6 +425,7 @@
+> >> >> >> >                                         reg = <1>;
+> >> >> >> >                                         clocks = <&ccu
+> >CLK_BUS_EPHY>;
+> >> >> >> >                                         resets = <&ccu
+> >RST_BUS_EPHY>;
+> >> >> >> > +                                       phy-is-integrated;
+> >> >> >>
+> >> >> >> You also need to "delete" this property at the board level for
+> >> >> >> any board that has the external PHY at address <1>. Otherwise
+> >> >> >> they will stop working. This is due to the internal and
+> >external
+> >> >> >> PHYs having the same path and node name in the device tree, so
+> >> >> >> they are effectively the same node.
+> >> >> >>
+> >> >> >> ChenYu
+> >> >> >>
+> >> >> >
+> >> >> > They have not the same name, ext_rgmii_phy vs int_mii_phy.
+> >> >>
+> >> >> That is just the label. The label plays no part in device tree
+> >merging. The path
+> >> >>
+> >> >>     /soc/ethernet at 1c30000/mdio/ethernet-phy at 1
+> >> >>
+> >> >> is the same. You can look under
+> >> >>
+> >> >>     /proc/device-tree/soc/ethernet at 1c30000/mdio
+> >> >>
+> >> >> on the OrangePI Plus 2E or any other H3 board that uses an
+> >> >> external PHY at address 1.
+> >> >>
+> >> >> ChenYu
+> >> >
+> >> > Since we get the phy node by phy-handle and not by path, I think
+> >all should be good.
+> >> 
+> >> You are not getting me. The fact that the two seemingly separate
+> >> nodes are merged together means, whatever properties you put in
+> >> the internal PHY node, also affect the external PHY node. Once
+> >> compiled, they are the SAME node.
+> >
+> >Hello Rob, florian, mark
+> >
+> >Adding a delete property on all external ethernet-phy at 1 is a bit
+> >overkill, and I dont like the idea that nodes are merged.
 > 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> ---
+> This is not exactly up to you that's just how DTC works.
 > 
->   drivers/pci/host/pcie-rockchip.c | 58 ++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 58 insertions(+)
+> >What do you think about other possible solutions:
+> >- Using integrated-phy at 1 for the integrated PHY node name
 > 
-> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-> index 7bb9870f6d8c..f969a6d3cd85 100644
-> --- a/drivers/pci/host/pcie-rockchip.c
-> +++ b/drivers/pci/host/pcie-rockchip.c
-> @@ -38,6 +38,7 @@
->   #include <linux/platform_device.h>
->   #include <linux/reset.h>
->   #include <linux/regmap.h>
-> +#include <linux/suspend.h>
->   
->   /*
->    * The upper 16 bits of PCIE_CLIENT_CONFIG are a write mask for the lower 16
-> @@ -226,6 +227,8 @@ struct rockchip_pcie {
->   	struct	regulator *vpcie1v8; /* 1.8V power supply */
->   	struct	regulator *vpcie0v9; /* 0.9V power supply */
->   	struct	gpio_desc *ep_gpio;
-> +	int	wake_irq;
-> +	bool	wake_by_pcie;
->   	u32	lanes;
->   	u8	root_bus_nr;
->   	int	link_gen;
-> @@ -853,6 +856,20 @@ static void rockchip_pcie_legacy_int_handler(struct irq_desc *desc)
->   	chained_irq_exit(chip, desc);
->   }
->   
-> +static irqreturn_t rockchip_pcie_wake_irq_handler(int irq, void *arg)
-> +{
-> +	struct rockchip_pcie *rockchip = arg;
-> +
-> +	rockchip->wake_by_pcie = true;
-> +
-> +	disable_irq_nosync(rockchip->wake_irq);
-> +	disable_irq_wake(rockchip->wake_irq);
-> +
-> +	pm_wakeup_event(rockchip->dev, 0);
-> +	pm_system_wakeup();
-> +
-> +	return IRQ_HANDLED;
-> +}
->   
->   /**
->    * rockchip_pcie_parse_dt - Parse Device Tree
-> @@ -868,6 +885,7 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
->   	struct resource *regs;
->   	int irq;
->   	int err;
-> +	bool wakeup = 0;
->   
->   	regs = platform_get_resource_byname(pdev,
->   					    IORESOURCE_MEM,
-> @@ -1018,6 +1036,21 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
->   		return err;
->   	}
->   
-> +	rockchip->wake_irq = platform_get_irq_byname(pdev, "wake");
-> +	if (rockchip->wake_irq >= 0) {
-> +		err = devm_request_irq(dev, rockchip->wake_irq,
-> +				       rockchip_pcie_wake_irq_handler,
-> +				       0, "pcie-wake", rockchip);
-> +		if (err) {
-> +			dev_err(dev, "failed to request PCIe wake IRQ\n");
-> +			return err;
-
-This is optional, so I'm not sure if we should prevent the driver to
-probe?
-
-> +		}
-> +
-> +		disable_irq(rockchip->wake_irq);
-> +		wakeup = device_property_read_bool(dev, "wakeup-source");
-
-The purpose we add this, is for ep to wakeup the system, so why not
-always treate it as a wakeup source.
-
-> +	}
-> +	device_init_wakeup(dev, wakeup);
-> +
->   	rockchip->vpcie3v3 = devm_regulator_get_optional(dev, "vpcie3v3");
->   	if (IS_ERR(rockchip->vpcie3v3)) {
->   		if (PTR_ERR(rockchip->vpcie3v3) == -EPROBE_DEFER)
-> @@ -1270,6 +1303,30 @@ static int rockchip_pcie_wait_l2(struct rockchip_pcie *rockchip)
->   	return 0;
->   }
->   
-> +static int __maybe_unused rockchip_pcie_suspend(struct device *dev)
-> +{
-> +	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
-> +
-> +	rockchip->wake_by_pcie = false;
-> +
-> +	if (device_may_wakeup(dev)) {
-> +		enable_irq_wake(rockchip->wake_irq);
-> +		enable_irq(rockchip->wake_irq);
-> +	}
-> +	return 0;
-> +}
-> +
-> +static int __maybe_unused rockchip_pcie_resume(struct device *dev)
-> +{
-> +	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
-> +
-> +	if (device_may_wakeup(dev) && !rockchip->wake_by_pcie) {
-
-I don't get this that why we need to check wake_by_pcie here?
-
-> +		disable_irq(rockchip->wake_irq);
-> +		disable_irq_wake(rockchip->wake_irq);
-> +	}
-> +	return 0;
-> +}
-> +
->   static int __maybe_unused rockchip_pcie_suspend_noirq(struct device *dev)
->   {
->   	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
-> @@ -1548,6 +1605,7 @@ static int rockchip_pcie_remove(struct platform_device *pdev)
->   }
->   
->   static const struct dev_pm_ops rockchip_pcie_pm_ops = {
-> +	SET_SYSTEM_SLEEP_PM_OPS(rockchip_pcie_suspend, rockchip_pcie_resume)
->   	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(rockchip_pcie_suspend_noirq,
->   				      rockchip_pcie_resume_noirq)
->   };
+> That might be okay although you are using now a seemingly non-standard unit name.
 > 
+> >- Using a fake address like 31 (see patch below)
+> 
+> You could also drop the address part in the unit name although we'd probably get a DTC warning for that.
+> 
+> I suspect both of your solutions and what I mentioned above will be producing DTC warnings to some extent... Rob what do you think?
+> 
+
+I think I found an easier solution, putting phy-is-integrated on board DT nodes only.
+I will send an updated serie.
+
+Regards
