@@ -1,34 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Aug 2017 23:05:07 +0200
-Subject: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v4.14
-In-Reply-To: <cover.1501512759.git.horms+renesas@verge.net.au>
-References: <cover.1501512759.git.horms+renesas@verge.net.au>
-Message-ID: <CAK8P3a3oa_0sEy=mQgBDS3mXw8kTGYbQ2z64PMGB7HTs1HBLCg@mail.gmail.com>
+Date: Wed, 16 Aug 2017 23:06:35 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.14
+In-Reply-To: <cover.1501514100.git.horms+renesas@verge.net.au>
+References: <cover.1501514100.git.horms+renesas@verge.net.au>
+Message-ID: <CAK8P3a1GwoJ6hB7m+s+ADn6qg0YVoNXkBoVp4JLH3QJY70QK2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 31, 2017 at 5:04 PM, Simon Horman
+On Mon, Jul 31, 2017 at 5:19 PM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
-> Renesas ARM Based SoC DT Bindings Updates for v4.14
+> Renesas ARM Based SoC DT Updates for v4.14
 >
-> * Document R-Car D3 (r8a77995) SoC and Draak board
+> Changes of note:
 >
-> * Document reserved SRAM for the SMP jump stub on R-Car Gen2 and RZ/G1 SoCs
+> * Add pin controller support to the RZ/G1M (r8a7743) SoC and
+>   RZ/A1 (r7s72100) SoCs now that the driver is available in v4.13-rc1.
 >
->   Geert Uytterhoeven says, "+Renesas R-Car Gen2 and RZ/G1 SoCs need a small
->   piece of SRAM for the jump stub +for secondary CPU bringup and CPU
->   hotplug.  +This memory is reserved by adding a child node to a
->   "mmio-sram" node..."
+> * Add GPIO support to the RZ/G1M (r8a7743) SoC now that the driver
+>   is availabe in v4.13-rc1.
 >
-> * Add a VSP channel index to DU vsps
+> * Enable MMCIF0 and Ethernet AVB support on the RZ/G1M (r8a7743) SoC and
+>   the iWave-RZG1M-20M Qseven SOM. This depends on newly added pin
+>   controller support noted above.
 >
->   Laurent Pinchart says, "multiple LIF instances in the VSP. The current DT
->   bindings don't support specifying that kind of SoC integration scheme.
->   Extend them with a VSP channel index."
+> * Use R-Car Gen 2 fallback binding for vin nodes
 >
-> * Add R-Car M3-W (r8a7796) HDMI TX DT bindings
+>   This makes binding use consistent across R-Car Gen 2 SoCs.
+>   It does not have any run-time effect
 >
->   This is compatible with existing R-Car H3 (r8a7795) support
+> * Use SMP jump stub SRAM region from DT on R-Car Gen 2 SoCs
+>
+>   Geert Uytterhoeven says, "The R-Car Gen2 platform code for CPU core
+>   bringup needs to copy a jump stub to on-SoC SRAM.  Currently it uses a
+>   hardcoded address pointing to ICRAM1."
+>
+> * Add Inter Connect RAM to R-Car Gen 2 and RZ/G1 SoCs
+>
+>   Geert Uytterhoeven says, "R-Car Gen2 and RZ/G1 SoCs contain two or three
+>   blocks of SRAM, which can be used for several purposes.  One such purpose
+>   is holding a jump stub for CPU core bringup."
+> * Use generic compatible string for I2C EEPROM for RZ/A1 (r7s72100) SoC
+>   and koelsch board.
+>
+>   This is part of a tree-wide cleanup by Javier Martinez Canillas
 
 Pulled into next/dt, thanks!
 
