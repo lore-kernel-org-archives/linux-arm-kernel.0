@@ -1,44 +1,67 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 16 Aug 2017 10:12:57 +0200
-Subject: [PATCH] ARM: debug-ll: Add support for r8a7745
-In-Reply-To: <1502814088-29767-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1502814088-29767-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdXoYF28SrRKKc3=fvt9avoiKdthZzN-V7nGotB1gkt0ng@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 16 Aug 2017 10:16:55 +0200
+Subject: [PATCH 3/4] mfd: db8500-prcmu: Get rid of cpufreq dependency
+In-Reply-To: <20170814070740.eezm4wiilb25w7ze@dell>
+References: <20170810125221.25818-1-linus.walleij@linaro.org>
+ <20170810125221.25818-4-linus.walleij@linaro.org>
+ <20170814070740.eezm4wiilb25w7ze@dell>
+Message-ID: <CACRpkdZ=H0NNFcyXvZk2qqRSLqkSHwnUkyfx5EFtKVnPPgRCPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabrizio,
-
-On Tue, Aug 15, 2017 at 6:21 PM, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
-> Enable low-level debugging support for RZ/G1E (r8a7745). RZ/G1E uses
-> SCIF4 for the debug console.
+On Mon, Aug 14, 2017 at 9:07 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 10 Aug 2017, Linus Walleij wrote:
 >
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+>> The ARMSS clock, also known as the operating point of the
+>> CPU, should not cross-depend on cpufreq like this. Move
+>> the code to use just frequencies and remove the false
+>> frequency (1GHz) and put in the actual frequency provided
+>> by the ARMSS clock (998400000 Hz) as part of the process.
+>>
+>> After this and the related cpufreq patch, the DB8500 will
+>> simply use the standard DT cpufreq driver to change the
+>> operating points through the common clock framework using
+>> the ARMSS clock.
+>>
+>> Cc: Lee Jones <lee.jones@linaro.org>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
+>>  drivers/mfd/db8500-prcmu.c | 59 +++++++++++++---------------------------------
+>>  1 file changed, 17 insertions(+), 42 deletions(-)
+>
+> Make sure this passes checkpatch.pl.
 
-> @@ -1568,6 +1576,7 @@ config DEBUG_UART_PHYS
->         default 0xe6c40000 if DEBUG_RMOBILE_SCIFA0
->         default 0xe6c50000 if DEBUG_RMOBILE_SCIFA1
->         default 0xe6c80000 if DEBUG_RMOBILE_SCIFA4
-> +       default 0xe6ee0000 if DEBUG_RCAR_GEN2_SCIF4
+Sure thing :)
+$ scripts/checkpatch.pl
+cpufreq/0003-mfd-db8500-prcmu-Get-rid-of-cpufreq-dependency.patch
+total: 0 errors, 0 warnings, 112 lines checked
 
-Please keep the list sorted by physical address.
+cpufreq/0003-mfd-db8500-prcmu-Get-rid-of-cpufreq-dependency.patch has
+no obvious style problems and is ready for submission.
 
->         default 0xe6e58000 if DEBUG_RCAR_GEN2_SCIF2
->         default 0xe6e60000 if DEBUG_RCAR_GEN2_SCIF0
->         default 0xe8008000 if DEBUG_R7S72100_SCIF2
+>> +     int i;
+>>
+>>       /* Find the corresponding arm opp from the cpufreq table. */
+>> -     cpufreq_for_each_entry(pos, db8500_cpufreq_table)
+>> -             if (pos->frequency == rate)
+>> +     for (i = 0; i < ARRAY_SIZE(armss_freqs); i++) {
+>> +             freq = armss_freqs[i];
+>> +             if (rate == freq)
+>>                       break;
+>> +     }
+>
+> Why don't you just call round_armss_rate()?
 
-Gr{oetje,eeting}s,
+It's because I need the index of the located frequency (i), and the other
+function due to being called from the clock framework has to have
+that simple signature.
 
-                        Geert
+> Once fixed please apply my:
+>
+> For my own reference:
+>   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+OK thanks!
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yours,
+Linus Walleij
