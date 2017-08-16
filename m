@@ -1,33 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Aug 2017 16:39:49 +0100
-Subject: [PATCHv2 0/3] arm64 xilinx zynqmp firmware interface
-In-Reply-To: <cover.1502886277.git.michal.simek@xilinx.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 16 Aug 2017 16:45:28 +0100
+Subject: [PATCHv2 1/3] dt: xilinx: zynqmp: Add bindings for PM firmware
+In-Reply-To: <2935be9896d54020720919e7dab7c2f86bdc83a3.1502886277.git.michal.simek@xilinx.com>
 References: <cover.1502886277.git.michal.simek@xilinx.com>
-Message-ID: <43deeed7-32c8-7914-5f44-862ebbe14a3b@arm.com>
+ <2935be9896d54020720919e7dab7c2f86bdc83a3.1502886277.git.michal.simek@xilinx.com>
+Message-ID: <2c2ffced-bc32-1eb4-aabe-ad6386076267@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+
+
 On 16/08/17 13:24, Michal Simek wrote:
-> Hi,
+> From: Soren Brinkmann <soren.brinkmann@xilinx.com>
 > 
-> xilinx is using this interface for very long time and we can't merge our
-> driver changes to Linux because of missing communication layer with
-> firmware. This interface was developed before scpi and scmi was
-> available. In connection to power management scpi and scmi are missing
-> pieces which we already use. There is a separate discussion how to
-> extend scmi to support all our use cases.
+> Document the DT bindings for the Zynq UltraScale+ PM Firmware.
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+> 
+> Changes in v2:
+> - Move to bindings/firmware and also add it to firmware node
+>   Reported-by Rob
+> 
+>  .../bindings/firmware/xlnx,zynqmp-pm.txt           | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/firmware/xlnx,zynqmp-pm.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/firmware/xlnx,zynqmp-pm.txt b/Documentation/devicetree/bindings/firmware/xlnx,zynqmp-pm.txt
+> new file mode 100644
+> index 000000000000..7de0c82758b3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/firmware/xlnx,zynqmp-pm.txt
+> @@ -0,0 +1,22 @@
+> +Xilinx Zynq MPSoC Firmware Device Tree Bindings
+> +
+> +The zynqmp-pm node describes the interface to platform firmware.
+> +
+> +Required properties:
+> + - compatible:	Must contain:  "xlnx,zynqmp-pm"
+> + - method:	The method of calling the PM-API firmware layer.
+> +		Permitted values are:
+> +		 - "smc" : To be used in configurations without a hypervisor
+> +		 - "hvc" : To be used when hypervisor is present
+> + - interrupts:	Interrupt specifier
 
-So maybe we should wait and see where this discussion is going before we
-merge yet another firmware interface?
+What exactly is this interrupt ? I see it's not SGI, so if it's SPI,
+where does this originate from ? How is that dealt ?
 
-> This simply patch is not adding any power management features but only
-> adding minimum functionality which are needed for drivers.
-
-I don't get it. 600 lines of firmware interface that isn't used by
-anything? Or is it? Needed by which driver?
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Sudeep
