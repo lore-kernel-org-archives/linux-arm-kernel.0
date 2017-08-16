@@ -1,35 +1,33 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 16 Aug 2017 10:20:49 +0530
-Subject: [PATCH v2 1/5] mtd: spi-nor: cadence-quadspi: Add TI 66AK2G SoC
- specific compatible
-In-Reply-To: <20170816045053.15492-1-vigneshr@ti.com>
-References: <20170816045053.15492-1-vigneshr@ti.com>
-Message-ID: <20170816045053.15492-2-vigneshr@ti.com>
+Date: Wed, 16 Aug 2017 10:20:48 +0530
+Subject: [PATCH v2 0/5] K2G: Add QSPI support
+Message-ID: <20170816045053.15492-1-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update binding documentation to add a new compatible for TI 66AK2G SoC,
-to handle TI SoC specific quirks in the driver.
+This series adds support for Cadence QSPI IP present in TI's 66AK2G SoC.
+The patches enhance the existing cadence-quadspi driver to support
+loopback clock circuit, pm_runtime support and tweaks for 66AK2G SoC.
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- Documentation/devicetree/bindings/mtd/cadence-quadspi.txt | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
-index f248056da24c..7dbe3bd9ac56 100644
---- a/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
-+++ b/Documentation/devicetree/bindings/mtd/cadence-quadspi.txt
-@@ -1,7 +1,9 @@
- * Cadence Quad SPI controller
- 
- Required properties:
--- compatible : Should be "cdns,qspi-nor".
-+- compatible : should be one of the following:
-+	Generic default - "cdns,qspi-nor".
-+	For TI 66AK2G SoC - "ti,k2g-qspi", "cdns,qspi-nor".
- - reg : Contains two entries, each of which is a tuple consisting of a
- 	physical address and length. The first entry is the address and
- 	length of the controller register set. The second entry is the
+Changes in v2:
+* Drop DT patches. Will be sent as separate series as requested by
+ maintainer.
+* Split binding docs into separate patches.
+* Address comments by Rob Herring.
+
+Vignesh R (5):
+  mtd: spi-nor: cadence-quadspi: Add TI 66AK2G SoC specific compatible
+  mtd: spi-nor: cadence-quadspi: add a delay in write sequence
+  mtd: spi-nor: cadence-quadspi: Add new binding to enable loop-back
+    circuit
+  mtd: spi-nor: cadence-quadspi: Add support to enable loop-back clock
+    circuit
+  mtd: spi-nor: cadence-quadspi: Add runtime PM support
+
+ .../devicetree/bindings/mtd/cadence-quadspi.txt    |  7 +++-
+ drivers/mtd/spi-nor/cadence-quadspi.c              | 46 ++++++++++++++++++++--
+ 2 files changed, 49 insertions(+), 4 deletions(-)
+
 -- 
 2.14.1
