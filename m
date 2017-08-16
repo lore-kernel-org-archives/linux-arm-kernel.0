@@ -1,156 +1,90 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 16 Aug 2017 10:19:13 +0200
-Subject: [PATCH 2/3 v2] mfd: db8500-prcmu: Get rid of cpufreq dependency
-In-Reply-To: <20170816081914.30471-1-linus.walleij@linaro.org>
-References: <20170816081914.30471-1-linus.walleij@linaro.org>
-Message-ID: <20170816081914.30471-2-linus.walleij@linaro.org>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Wed, 16 Aug 2017 09:27:29 +0100
+Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.14
+In-Reply-To: <5992F4F9.6090301@hisilicon.com>
+References: <5992F4F9.6090301@hisilicon.com>
+Message-ID: <599401F1.4040304@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARMSS clock, also known as the operating point of the
-CPU, should not cross-depend on cpufreq like this. Move
-the code to use just frequencies and remove the false
-frequency (1GHz) and put in the actual frequency provided
-by the ARMSS clock (998400000 Hz) as part of the process.
+Hi Arnd, Hi Olof, Hi Kevin,
 
-After this and the related cpufreq patch, the DB8500 will
-simply use the standard DT cpufreq driver to change the
-operating points through the common clock framework using
-the ARMSS clock.
+Please ignore this pull request because of the incorrect unit address
+of the acpu_sctrl clock node.
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1-v2:
-- Added Lee's ACK.
+I will send v2.
+Sorry for the noise.
+Thanks!
 
-Please apply this to the cpufreq tree. This MFD driver is very
-seldom touched to it shouldn't create any conflicts.
----
- drivers/mfd/db8500-prcmu.c | 60 ++++++++++++++--------------------------------
- 1 file changed, 18 insertions(+), 42 deletions(-)
+Best Regards,
+Wei
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 5c739ac752e8..cc6dc5dd20d2 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -33,7 +33,6 @@
- #include <linux/mfd/abx500/ab8500.h>
- #include <linux/regulator/db8500-prcmu.h>
- #include <linux/regulator/machine.h>
--#include <linux/cpufreq.h>
- #include <linux/platform_data/ux500_wdt.h>
- #include <linux/platform_data/db8500_thermal.h>
- #include "dbx500-prcmu-regs.h"
-@@ -1692,32 +1691,23 @@ static long round_clock_rate(u8 clock, unsigned long rate)
- 	return rounded_rate;
- }
- 
--/* CPU FREQ table, may be changed due to if MAX_OPP is supported. */
--static struct cpufreq_frequency_table db8500_cpufreq_table[] = {
--	{ .frequency = 200000, .driver_data = ARM_EXTCLK,},
--	{ .frequency = 400000, .driver_data = ARM_50_OPP,},
--	{ .frequency = 800000, .driver_data = ARM_100_OPP,},
--	{ .frequency = CPUFREQ_TABLE_END,}, /* To be used for MAX_OPP. */
--	{ .frequency = CPUFREQ_TABLE_END,},
--};
-+static const unsigned long armss_freqs[] = { 200000000, 400000000,
-+					     800000000, 998400000 };
- 
- static long round_armss_rate(unsigned long rate)
- {
--	struct cpufreq_frequency_table *pos;
--	long freq = 0;
--
--	/* cpufreq table frequencies is in KHz. */
--	rate = rate / 1000;
-+	unsigned long freq = 0;
-+	int i;
- 
- 	/* Find the corresponding arm opp from the cpufreq table. */
--	cpufreq_for_each_entry(pos, db8500_cpufreq_table) {
--		freq = pos->frequency;
--		if (freq == rate)
-+	for (i = 0; i < ARRAY_SIZE(armss_freqs); i++) {
-+		freq = armss_freqs[i];
-+		if (rate <= freq)
- 			break;
- 	}
- 
- 	/* Return the last valid value, even if a match was not found. */
--	return freq * 1000;
-+	return freq;
- }
- 
- #define MIN_PLL_VCO_RATE 600000000ULL
-@@ -1854,21 +1844,23 @@ static void set_clock_rate(u8 clock, unsigned long rate)
- 
- static int set_armss_rate(unsigned long rate)
- {
--	struct cpufreq_frequency_table *pos;
--
--	/* cpufreq table frequencies is in KHz. */
--	rate = rate / 1000;
-+	unsigned long freq;
-+	u8 opps[] = { ARM_EXTCLK, ARM_50_OPP, ARM_100_OPP, ARM_MAX_OPP };
-+	int i;
- 
- 	/* Find the corresponding arm opp from the cpufreq table. */
--	cpufreq_for_each_entry(pos, db8500_cpufreq_table)
--		if (pos->frequency == rate)
-+	for (i = 0; i < ARRAY_SIZE(armss_freqs); i++) {
-+		freq = armss_freqs[i];
-+		if (rate == freq)
- 			break;
-+	}
- 
--	if (pos->frequency != rate)
-+	if (rate != freq)
- 		return -EINVAL;
- 
- 	/* Set the new arm opp. */
--	return db8500_prcmu_set_arm_opp(pos->driver_data);
-+	pr_debug("SET ARM OPP 0x%02x\n", opps[i]);
-+	return db8500_prcmu_set_arm_opp(opps[i]);
- }
- 
- static int set_plldsi_rate(unsigned long rate)
-@@ -3049,12 +3041,6 @@ static const struct mfd_cell db8500_prcmu_devs[] = {
- 		.pdata_size = sizeof(db8500_regulators),
- 	},
- 	{
--		.name = "cpufreq-ux500",
--		.of_compatible = "stericsson,cpufreq-ux500",
--		.platform_data = &db8500_cpufreq_table,
--		.pdata_size = sizeof(db8500_cpufreq_table),
--	},
--	{
- 		.name = "cpuidle-dbx500",
- 		.of_compatible = "stericsson,cpuidle-dbx500",
- 	},
-@@ -3067,14 +3053,6 @@ static const struct mfd_cell db8500_prcmu_devs[] = {
- 	},
- };
- 
--static void db8500_prcmu_update_cpufreq(void)
--{
--	if (prcmu_has_arm_maxopp()) {
--		db8500_cpufreq_table[3].frequency = 1000000;
--		db8500_cpufreq_table[3].driver_data = ARM_MAX_OPP;
--	}
--}
--
- static int db8500_prcmu_register_ab8500(struct device *parent)
- {
- 	struct device_node *np;
-@@ -3160,8 +3138,6 @@ static int db8500_prcmu_probe(struct platform_device *pdev)
- 
- 	prcmu_config_esram0_deep_sleep(ESRAM0_DEEP_SLEEP_STATE_RET);
- 
--	db8500_prcmu_update_cpufreq();
--
- 	err = mfd_add_devices(&pdev->dev, 0, common_prcmu_devs,
- 			      ARRAY_SIZE(common_prcmu_devs), NULL, 0, db8500_irq_domain);
- 	if (err) {
--- 
-2.13.5
+On 2017/8/15 14:19, Wei Xu wrote:
+> Hi Arnd, Hi Olof, Hi Kevin,
+> 
+> Please help to pull the following changes.
+> Thanks!
+> 
+> Best Regards,
+> Wei
+> 
+> ---
+> 
+> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+> 
+>   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.14
+> 
+> for you to fetch changes up to a0a450ead7309e4852ae1e442790c710e829b0d8:
+> 
+>   arm64: dts: hi3660: enable watchdog (2017-08-14 15:42:38 +0100)
+> 
+> ----------------------------------------------------------------
+> ARM64: DT: Hisilicon SoC DT updates for 4.14
+> 
+> - Add PCIe node for hip07
+> - Add acpu_sctrl node and refine the usb tx fifo size for hi6220
+> - Add cpu idle states, L2 cache, PMU, OP-TEE, reboot, pstore,
+>   k3-dma and watchdog nodes for hi3660 and hikey960
+> - Update mmc and bluetooth nodes for hi3660 and hikey960
+> 
+> ----------------------------------------------------------------
+> Guodong Xu (4):
+>       arm64: dts: hikey960: Add support for syscon-reboot-mode
+>       arm64: dts: hikey960: Add pstore support
+>       arm64: dts: hi3660: Reset the mmc hosts
+>       arm64: dts: hikey960: change bluetooth uart max-speed to 3mbps
+> 
+> Leo Yan (3):
+>       arm64: dts: hi3660: enable idle states
+>       arm64: dts: hi3660: add L2 cache topology
+>       arm64: dts: hi3660: enable watchdog
+> 
+> Shawn Guo (1):
+>       arm64: dts: hi6220: improve g-tx-fifo-size setting for usb device
+> 
+> Victor Chong (1):
+>       arm64: dts: hikey960: Add optee node
+> 
+> Wang Ruyi (1):
+>       arm64: dts: hi3660: add bindings for DMA
+> 
+> YiPing Xu (1):
+>       arm64: dts: hi3660: add pmu dt node for hi3660
+> 
+> Zhangfei Gao (1):
+>       arm64: dts: hi6220: add acpu_sctrl
+> 
+> Zhou Wang (1):
+>       arm64: dts: hisi: add PCIe host controller node for hip07 SoC
+> 
+>  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  37 +++++-
+>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 130 ++++++++++++++++++++++
+>  arch/arm64/boot/dts/hisilicon/hi6220.dtsi         |   9 +-
+>  arch/arm64/boot/dts/hisilicon/hip07-d05.dts       |   4 +
+>  arch/arm64/boot/dts/hisilicon/hip07.dtsi          |  22 ++++
+>  5 files changed, 200 insertions(+), 2 deletions(-)
+> 
