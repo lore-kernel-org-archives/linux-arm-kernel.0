@@ -1,30 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 16 Aug 2017 23:04:03 +0200
-Subject: [GIT PULL] STM32 defconfig changes for v4.14 #1
-In-Reply-To: <5a0f6e72-bb00-7945-af7a-a3b380372597@st.com>
-References: <5a0f6e72-bb00-7945-af7a-a3b380372597@st.com>
-Message-ID: <CAK8P3a0NLkgsFydaO6f1NXm-4T=+zdUXWLuEkVim=tOmJnsctA@mail.gmail.com>
+Date: Wed, 16 Aug 2017 23:19:57 +0200
+Subject: [GIT PULL] Gemini DTS updates for v4.14 take one
+In-Reply-To: <CACRpkdZYn1OXayC8ZdPeGJZ_ShQ5drRqVv5WBj3mdevqsHbCcw@mail.gmail.com>
+References: <CACRpkdZYn1OXayC8ZdPeGJZ_ShQ5drRqVv5WBj3mdevqsHbCcw@mail.gmail.com>
+Message-ID: <CAK8P3a0bWMx5NomSo54F5gRjXxVRHAMDAjj1e9ikmWgWqjzj8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 28, 2017 at 3:57 PM, Alexandre Torgue
-<alexandre.torgue@st.com> wrote:
-> ----------------------------------------------------------------
-> STM32 DT updates for v4.14, round 1
+On Tue, Aug 8, 2017 at 2:25 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> Hi ARM SoC guys,
 >
-> Highlights:
-> ----------
->  -Add DMA support on STM32F746
->  -Add DMA support on STM32H743
->  -Add DAC support on STM32H743
->  -Add DAC support on STM32F429
->  -Add ADC support on STM32H743
->  -Enable ADC on stm32h743i-eval board
->  -Add CEC support on STM32F7xx MCUs
->  -Enable CEC on stm32f769-disco board
->  -Remove rdinit from stm32f4 boards
+> this is the first set of DTS patches for Gemini for v4.14.
 >
+> - Moves to using macros (patch submitted to be applied on
+>   top of v4.13-rc1 but it was missed, whatever)
+>
+> - New DTS for the D-Link DIR-685
 
-Pulled into next/dt, sorry for the delay.
+Nice one! I had to look up what this actually is, apparently you can still
+buy them new after all those years.
 
-      Arnd
+> - Modify all device trees to include proper pin control.
+>
+> This is infrastructure for any future extensions of the platform
+> so it is all nice to have in place.
+>
+> Please pull it in on some appropriate branch!
+
+Pulled into next/dt, thanks!
+
+       Arnd
