@@ -1,69 +1,187 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 16 Aug 2017 11:46:56 +0200
-Subject: [PATCH v3 0/5] Unify simple reset drivers
-Message-ID: <20170816094701.30678-1-p.zabel@pengutronix.de>
+Date: Wed, 16 Aug 2017 11:46:59 +0200
+Subject: [PATCH v3 3/5] reset: stm32: use the reset-simple driver
+In-Reply-To: <20170816094701.30678-1-p.zabel@pengutronix.de>
+References: <20170816094701.30678-1-p.zabel@pengutronix.de>
+Message-ID: <20170816094701.30678-4-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The reset-simple driver can be used without changes.
 
-This series introduces common reset ops for simple reset controllers.
-"Simple" in this context means that they allow to directly control reset
-lines by setting and clearing bits in a single register or in a contiguous
-register range that is exclusive to the reset controller.
-
-Parts of the sunxi driver and the socfpga, stm32, and zx2967 drivers are
-merged into a single reset-simple driver.
-The sunxi driver is kept around to register the early reset controllers,
-but it reuses the exported reset_simple_ops.
-
-The first patch depends on [1] or commit 726cc791c9b9 ("reset: sunxi: fix
-number of reset lines") in linux-next. On linux-next, the second patch will
-trivially conflict with commit 7799167b7a14 ("regulator: Convert to using
-%pOF instead of full_name").
-
-Changes since v2 [2]:
- - Use of_device_get_match_data instead of of_match_device,
-   add kerneldoc comment for struct reset_simple_devdata and struct
-   reset_simple_data, suggested by Chen-Yu.
- - Add reg_offset and nr_reset override to struct reset_simple_devdata,
-   instead of special casing socfpga, always check "altr,modrst-offset"
-   device tree property if a default reg_offset is set, based on
-   Alexandru's advice.
- - Rename "*inverted" properties to "*active_low".
-
-[1] https://patchwork.kernel.org/patch/9895433/
-[2] https://patchwork.kernel.org/patch/9895833/
-    https://patchwork.kernel.org/patch/9895819/
-    https://patchwork.kernel.org/patch/9895831/
-    https://patchwork.kernel.org/patch/9895815/
-    https://patchwork.kernel.org/patch/9895841/
-
-regards
-Philipp
-
-Philipp Zabel (5):
-  reset: add reset-simple to unify socfpga, stm32, sunxi, and zx2967
-  reset: socfpga: use the reset-simple driver
-  reset: stm32: use the reset-simple driver
-  reset: zx2967: use the reset-simple driver
-  reset: simple: read back to make sure changes are applied
-
- MAINTAINERS                   |   1 -
- drivers/reset/Kconfig         |  24 ++----
- drivers/reset/Makefile        |   4 +-
- drivers/reset/reset-simple.c  | 188 ++++++++++++++++++++++++++++++++++++++++++
- drivers/reset/reset-simple.h  |  45 ++++++++++
- drivers/reset/reset-socfpga.c | 154 ----------------------------------
- drivers/reset/reset-stm32.c   | 108 ------------------------
- drivers/reset/reset-sunxi.c   | 104 ++---------------------
- drivers/reset/reset-zx2967.c  |  99 ----------------------
- 9 files changed, 249 insertions(+), 478 deletions(-)
- create mode 100644 drivers/reset/reset-simple.c
- create mode 100644 drivers/reset/reset-simple.h
- delete mode 100644 drivers/reset/reset-socfpga.c
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ drivers/reset/Kconfig        |  11 ++---
+ drivers/reset/Makefile       |   1 -
+ drivers/reset/reset-simple.c |   1 +
+ drivers/reset/reset-stm32.c  | 108 -------------------------------------------
+ 4 files changed, 4 insertions(+), 117 deletions(-)
  delete mode 100644 drivers/reset/reset-stm32.c
- delete mode 100644 drivers/reset/reset-zx2967.c
 
+diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+index 78a8f6057985b..29f4487c290fc 100644
+--- a/drivers/reset/Kconfig
++++ b/drivers/reset/Kconfig
+@@ -70,19 +70,14 @@ config RESET_PISTACHIO
+ 
+ config RESET_SIMPLE
+ 	bool "Simple Reset Controller Driver" if COMPILE_TEST
+-	default ARCH_SOCFPGA || ARCH_SUNXI
++	default ARCH_SOCFPGA || ARCH_STM32 || ARCH_SUNXI
+ 	help
+ 	  This enables a simple reset controller driver for reset lines that
+ 	  that can be asserted and deasserted by toggling bits in a contiguous,
+ 	  exclusive register space.
+ 
+-	  Currently this driver supports Altera SoCFPGAs and Allwinner SoCs.
+-
+-config RESET_STM32
+-	bool "STM32 Reset Driver" if COMPILE_TEST
+-	default ARCH_STM32
+-	help
+-	  This enables the RCC reset controller driver for STM32 MCUs.
++	  Currently this driver supports Altera SoCFPGAs, the RCC reset
++	  controller in STM32 MCUs, and Allwinner SoCs.
+ 
+ config RESET_SUNXI
+ 	bool "Allwinner SoCs Reset Driver" if COMPILE_TEST && !ARCH_SUNXI
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 25f5f722dec01..e8c3a032f4780 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -12,7 +12,6 @@ obj-$(CONFIG_RESET_MESON) += reset-meson.o
+ obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+ obj-$(CONFIG_RESET_PISTACHIO) += reset-pistachio.o
+ obj-$(CONFIG_RESET_SIMPLE) += reset-simple.o
+-obj-$(CONFIG_RESET_STM32) += reset-stm32.o
+ obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
+ obj-$(CONFIG_RESET_TI_SCI) += reset-ti-sci.o
+ obj-$(CONFIG_RESET_TI_SYSCON) += reset-ti-syscon.o
+diff --git a/drivers/reset/reset-simple.c b/drivers/reset/reset-simple.c
+index 84b08ce4def01..e54a29b8b532d 100644
+--- a/drivers/reset/reset-simple.c
++++ b/drivers/reset/reset-simple.c
+@@ -120,6 +120,7 @@ static const struct reset_simple_devdata reset_simple_active_low = {
+ 
+ static const struct of_device_id reset_simple_dt_ids[] = {
+ 	{ .compatible = "altr,rst-mgr", .data = &reset_simple_socfpga },
++	{ .compatible = "st,stm32-rcc", },
+ 	{ .compatible = "allwinner,sun6i-a31-clock-reset",
+ 		.data = &reset_simple_active_low },
+ 	{ /* sentinel */ },
+diff --git a/drivers/reset/reset-stm32.c b/drivers/reset/reset-stm32.c
+deleted file mode 100644
+index 3a7c8527e66af..0000000000000
+--- a/drivers/reset/reset-stm32.c
++++ /dev/null
+@@ -1,108 +0,0 @@
+-/*
+- * Copyright (C) Maxime Coquelin 2015
+- * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+- * License terms:  GNU General Public License (GPL), version 2
+- *
+- * Heavily based on sunxi driver from Maxime Ripard.
+- */
+-
+-#include <linux/err.h>
+-#include <linux/io.h>
+-#include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/platform_device.h>
+-#include <linux/reset-controller.h>
+-#include <linux/slab.h>
+-#include <linux/spinlock.h>
+-#include <linux/types.h>
+-
+-struct stm32_reset_data {
+-	spinlock_t			lock;
+-	void __iomem			*membase;
+-	struct reset_controller_dev	rcdev;
+-};
+-
+-static int stm32_reset_assert(struct reset_controller_dev *rcdev,
+-			      unsigned long id)
+-{
+-	struct stm32_reset_data *data = container_of(rcdev,
+-						     struct stm32_reset_data,
+-						     rcdev);
+-	int bank = id / BITS_PER_LONG;
+-	int offset = id % BITS_PER_LONG;
+-	unsigned long flags;
+-	u32 reg;
+-
+-	spin_lock_irqsave(&data->lock, flags);
+-
+-	reg = readl(data->membase + (bank * 4));
+-	writel(reg | BIT(offset), data->membase + (bank * 4));
+-
+-	spin_unlock_irqrestore(&data->lock, flags);
+-
+-	return 0;
+-}
+-
+-static int stm32_reset_deassert(struct reset_controller_dev *rcdev,
+-				unsigned long id)
+-{
+-	struct stm32_reset_data *data = container_of(rcdev,
+-						     struct stm32_reset_data,
+-						     rcdev);
+-	int bank = id / BITS_PER_LONG;
+-	int offset = id % BITS_PER_LONG;
+-	unsigned long flags;
+-	u32 reg;
+-
+-	spin_lock_irqsave(&data->lock, flags);
+-
+-	reg = readl(data->membase + (bank * 4));
+-	writel(reg & ~BIT(offset), data->membase + (bank * 4));
+-
+-	spin_unlock_irqrestore(&data->lock, flags);
+-
+-	return 0;
+-}
+-
+-static const struct reset_control_ops stm32_reset_ops = {
+-	.assert		= stm32_reset_assert,
+-	.deassert	= stm32_reset_deassert,
+-};
+-
+-static const struct of_device_id stm32_reset_dt_ids[] = {
+-	 { .compatible = "st,stm32-rcc", },
+-	 { /* sentinel */ },
+-};
+-
+-static int stm32_reset_probe(struct platform_device *pdev)
+-{
+-	struct stm32_reset_data *data;
+-	struct resource *res;
+-
+-	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+-	if (!data)
+-		return -ENOMEM;
+-
+-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	data->membase = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(data->membase))
+-		return PTR_ERR(data->membase);
+-
+-	spin_lock_init(&data->lock);
+-
+-	data->rcdev.owner = THIS_MODULE;
+-	data->rcdev.nr_resets = resource_size(res) * 8;
+-	data->rcdev.ops = &stm32_reset_ops;
+-	data->rcdev.of_node = pdev->dev.of_node;
+-
+-	return devm_reset_controller_register(&pdev->dev, &data->rcdev);
+-}
+-
+-static struct platform_driver stm32_reset_driver = {
+-	.probe	= stm32_reset_probe,
+-	.driver = {
+-		.name		= "stm32-rcc-reset",
+-		.of_match_table	= stm32_reset_dt_ids,
+-	},
+-};
+-builtin_platform_driver(stm32_reset_driver);
 -- 
 2.11.0
