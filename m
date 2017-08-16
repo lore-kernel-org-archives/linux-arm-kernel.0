@@ -1,66 +1,73 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 16 Aug 2017 12:20:41 +0100
-Subject: [PATCH 21/27] arm64/sve: KVM: Prevent guests from using SVE
-In-Reply-To: <20170816105013.GZ6321@e103592.cambridge.arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-22-git-send-email-Dave.Martin@arm.com>
- <0f5b14a8-4d04-61e4-05e8-92cd55c8bee9@arm.com>
- <20170816105013.GZ6321@e103592.cambridge.arm.com>
-Message-ID: <3cb51836-9677-5eb5-cc07-361eee674806@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 16 Aug 2017 12:21:01 +0100
+Subject: Applied "spi: rockchip: configure CTRLR1 according to size and data
+ frame" to the spi tree
+In-Reply-To: <1502849522-10073-1-git-send-email-huibin.hong@rock-chips.com>
+Message-ID: <E1dhwNh-0003iD-VL@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/08/17 11:50, Dave Martin wrote:
-> On Tue, Aug 15, 2017 at 05:33:15PM +0100, Marc Zyngier wrote:
->> On 09/08/17 13:05, Dave Martin wrote:
->>> Until KVM has full SVE support, guests must not be allowed to
->>> execute SVE instructions.
->>>
->>> This patch enables the necessary traps, and also ensures that the
->>> traps are disabled again on exit from the guest so that the host
->>> can still use SVE if it wants to.
->>>
->>> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
->>> ---
->>>  arch/arm64/include/asm/kvm_arm.h | 3 ++-
->>>  arch/arm64/kvm/hyp/switch.c      | 6 +++---
->>>  2 files changed, 5 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
->>> index dbf0537..8a19651 100644
->>> --- a/arch/arm64/include/asm/kvm_arm.h
->>> +++ b/arch/arm64/include/asm/kvm_arm.h
->>> @@ -186,7 +186,7 @@
->>>  #define CPTR_EL2_TTA	(1 << 20)
->>>  #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
->>>  #define CPTR_EL2_TZ	(1 << 8)
->>> -#define CPTR_EL2_DEFAULT	0x000033ff
->>> +#define CPTR_EL2_DEFAULT	(0x000033ff & ~CPTR_EL2_TZ)
->>
->> I must say I'm not overly fond of this construct. I'd rather introduce a
->> RES1 field that matches the v8.2 description, instead of this ugly
->> constant and something that clears it.
-> 
-> Sorry, I don't get your meaning here.  v8.2 neither immediately predates
-> or postdates SVE.  
+The patch
 
-The ARMv8 ARM (DDI406B_a, D7.2.19) says otherwise. This bit is only
-defined as having a possibility of being 0 on an v8.2 implementation if
-SVE is implemented.
+   spi: rockchip: configure CTRLR1 according to size and data frame
 
-> What are you propsing?
+has been applied to the spi tree at
 
-What I'm proposing is:
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
-#define CPTR_EL2_RES1		0x32ff
-#define CPTR_EL2_DEFAULT	CPTR_EL2_RES1
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-and none of that pointless constant clearing.
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-> I guess we could just write 0x000032ff now that the only meaning the
-> architecture can ever assign to bit 8 is known.
-Exactly.
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-	M.
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 04b37d2d02c0a5ae2f4e59326ef6deaff18e0456 Mon Sep 17 00:00:00 2001
+From: Huibin Hong <huibin.hong@rock-chips.com>
+Date: Wed, 16 Aug 2017 10:12:02 +0800
+Subject: [PATCH] spi: rockchip: configure CTRLR1 according to size and data
+ frame
+
+CTRLR1 is number of data frames, when rx only.
+When data frame is 8 bit, CTRLR1 is len-1.
+When data frame is 16 bit, CTRLR1 is (len/2)-1.
+
+Signed-off-by: Huibin Hong <huibin.hong@rock-chips.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-rockchip.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+index 474033e2149e..fdcf3076681b 100644
+--- a/drivers/spi/spi-rockchip.c
++++ b/drivers/spi/spi-rockchip.c
+@@ -568,7 +568,13 @@ static void rockchip_spi_config(struct rockchip_spi *rs)
+ 
+ 	writel_relaxed(cr0, rs->regs + ROCKCHIP_SPI_CTRLR0);
+ 
+-	writel_relaxed(rs->len - 1, rs->regs + ROCKCHIP_SPI_CTRLR1);
++	if (rs->n_bytes == 1)
++		writel_relaxed(rs->len - 1, rs->regs + ROCKCHIP_SPI_CTRLR1);
++	else if (rs->n_bytes == 2)
++		writel_relaxed((rs->len / 2) - 1, rs->regs + ROCKCHIP_SPI_CTRLR1);
++	else
++		writel_relaxed((rs->len * 2) - 1, rs->regs + ROCKCHIP_SPI_CTRLR1);
++
+ 	writel_relaxed(rs->fifo_len / 2 - 1, rs->regs + ROCKCHIP_SPI_TXFTLR);
+ 	writel_relaxed(rs->fifo_len / 2 - 1, rs->regs + ROCKCHIP_SPI_RXFTLR);
+ 
 -- 
-Jazz is not dead. It just smells funny...
+2.13.2
