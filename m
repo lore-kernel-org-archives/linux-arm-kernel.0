@@ -1,29 +1,82 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Thu, 17 Aug 2017 11:16:59 +0200
-Subject: [PATCH RFC 0/2] KVM: use RCU to allow dynamic kvm->vcpus array
-In-Reply-To: <20170817093612.024cc4bc.cohuck@redhat.com>
-References: <20170816194037.9460-1-rkrcmar@redhat.com>
- <b77b151f-e51d-3657-66e9-6fbc83887b18@suse.de>
- <20170817093612.024cc4bc.cohuck@redhat.com>
-Message-ID: <b69bc1e0-9d7b-5412-ba56-a5261d539a5b@redhat.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 17 Aug 2017 10:19:54 +0100
+Subject: [PATCH v3 3/5] reset: stm32: use the reset-simple driver
+In-Reply-To: <d46ad9ea-4bf5-5ceb-cfc8-0c1efa48bb02@adaptrum.com>
+References: <20170816094701.30678-1-p.zabel@pengutronix.de>
+ <20170816094701.30678-4-p.zabel@pengutronix.de>
+ <edbdf06c-fb1e-63f1-d6b2-17193c86385a@adaptrum.com>
+ <338608e8-9e83-fc0f-8d8a-18a336e94860@suse.de>
+ <d46ad9ea-4bf5-5ceb-cfc8-0c1efa48bb02@adaptrum.com>
+Message-ID: <74144e84-cd37-511a-9702-ceb590f37bf0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/08/2017 09:36, Cornelia Huck wrote:
->> What if we just sent a "vcpu move" request to all vcpus with the new 
->> pointer after it moved? That way the vcpu thread itself would be 
->> responsible for the migration to the new memory region. Only if all 
->> vcpus successfully moved, keep rolling (and allow foreign get_vcpu again).
->>
->> That way we should be basically lock-less and scale well. For additional 
->> icing, feel free to increase the vcpu array x2 every time it grows to 
->> not run into the slow path too often.
+Hi,
+
+On 16/08/17 21:55, Alexandru Gagniuc wrote:
 > 
-> I'd prefer the rcu approach: This is a mechanism already understood
-> well, no need to come up with a new one that will likely have its own
-> share of problems.
+> 
+> On 08/16/2017 01:52 PM, Andreas F?rber wrote:
+>> Am 16.08.2017 um 22:50 schrieb Alexandru Gagniuc:
+>>> On 08/16/2017 02:46 AM, Philipp Zabel wrote:
+>>>> The reset-simple driver can be used without changes.
+>>>>
+>>>> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+>>>
+>>> Reviewed-by: Alexandru Gagniuc <alex.g@adaptrum.com>
+>>>
+>>>> ---
+>>>>  drivers/reset/Kconfig        |  11 ++---
+>>>>  drivers/reset/Makefile       |   1 -
+>>>>  drivers/reset/reset-simple.c |   1 +
+>>>>  drivers/reset/reset-stm32.c  | 108
+>>>> -------------------------------------------
+>>>>  4 files changed, 4 insertions(+), 117 deletions(-)
+>>>>  delete mode 100644 drivers/reset/reset-stm32.c
+>>>>
+>>>> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+>>>> index 78a8f6057985b..29f4487c290fc 100644
+>>>> --- a/drivers/reset/Kconfig
+>>>> +++ b/drivers/reset/Kconfig
+>>>> @@ -70,19 +70,14 @@ config RESET_PISTACHIO
+>>>>
+>>>>  config RESET_SIMPLE
+>>>>      bool "Simple Reset Controller Driver" if COMPILE_TEST
+>>>> -    default ARCH_SOCFPGA || ARCH_SUNXI
+>>>> +    default ARCH_SOCFPGA || ARCH_STM32 || ARCH_SUNXI
+>>>
+>>> If this series gets respun, could you please look into removing the
+>>> ARCH_ dependency here?
+>>
+>> Why?
+> 
+> Because the driver has to keep track of all its users, which is a
+> layering violation.
 
-What Alex is proposing _is_ RCU, except with a homegrown
-synchronize_rcu.  Using kvm->srcu seems to be the best of both worlds.
+"keep track of all its users": not necessarily, this is mostly for
+convenience reasons to get automatic coverage for those SoCs without
+changing various defconfigs - or distribution .configs, for that matter.
+Especially the latter may prove to be nasty and introduce regressions.
 
-Paolo
+But I see that this list may grow big and this is a bit beyond the scope
+of the otherwise neat "default ARCH_xxx" trick.
+
+So given the generic nature of this driver, can't we make this simply:
+"default ARM || ARM64"
+That would enable it everywhere automatically, but people can still
+disable this if they know what they do.
+
+Alternatively for ARM64 this is actually a candidate for the (one and
+only) defconfig.
+
+Cheers,
+Andre.
+
+>> It's not a dependency, just the default. Doing it here decouples it
+>> from having to do Kconfig changes in the arm-soc tree as well.
+> 
+> Doing it here allows this list to grow without bounds.
+> 
+>> Regards,
+>> Andreas
+>>
