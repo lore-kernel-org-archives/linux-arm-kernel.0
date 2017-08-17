@@ -1,30 +1,49 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Thu, 17 Aug 2017 11:32:59 +0200
-Subject: [PATCH 0/7] Add support for USB OTG on STM32F7xx
-Message-ID: <1502962386-6683-1-git-send-email-amelie.delaunay@st.com>
+Date: Thu, 17 Aug 2017 11:33:06 +0200
+Subject: [PATCH 7/7] ARM: dts: stm32: Enable USB FS on stm32f746-disco
+In-Reply-To: <1502962386-6683-1-git-send-email-amelie.delaunay@st.com>
+References: <1502962386-6683-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1502962386-6683-8-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The STM32F7xx MCU family embeds two DWC2 USB OTG cores. One core is USB
-OTG FS and the other is USB OTG HS. The USB FS core only works with its
-internal phy whilst the USB HS core can work in HS with external ULPI phy
-or in FS/LS with the on-chip FS phy.
+This patch enables USB FS on stm32f746-disco (Host mode) with 5V VBUS
+enable.
 
-Amelie Delaunay (7):
-  dt-bindings: usb: Document the STM32F7xx DWC2 USB OTG HS core binding
-  usb: dwc2: add support for STM32F7xx USB OTG HS
-  ARM: dts: stm32: Add USB HS support for STM32F746 MCU
-  ARM: dts: stm32: Enable USB HS on stm32746g-eval
-  ARM: dts: stm32: Enable USB HS on stm32f746-disco
-  ARM: dts: stm32: Add USB FS support for STM32F746 MCU
-  ARM: dts: stm32: Enable USB FS on stm32f746-disco
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+---
+ arch/arm/boot/dts/stm32f746-disco.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
- Documentation/devicetree/bindings/usb/dwc2.txt |  2 +
- arch/arm/boot/dts/stm32746g-eval.dts           | 16 ++++++
- arch/arm/boot/dts/stm32f746-disco.dts          | 30 ++++++++++
- arch/arm/boot/dts/stm32f746.dtsi               | 80 ++++++++++++++++++++++++++
- drivers/usb/dwc2/params.c                      | 11 ++++
- 5 files changed, 139 insertions(+)
-
+diff --git a/arch/arm/boot/dts/stm32f746-disco.dts b/arch/arm/boot/dts/stm32f746-disco.dts
+index 0d38e9a..c683040 100644
+--- a/arch/arm/boot/dts/stm32f746-disco.dts
++++ b/arch/arm/boot/dts/stm32f746-disco.dts
+@@ -67,6 +67,14 @@
+ 		clocks = <&rcc 0 STM32F7_AHB1_CLOCK(OTGHSULPI)>;
+ 		clock-names = "main_clk";
+ 	};
++
++	/* This turns on vbus for otg fs for host mode (dwc2) */
++	vcc5v_otg_fs: vcc5v-otg-fs-regulator {
++		compatible = "regulator-fixed";
++		gpio = <&gpiod 5 0>;
++		regulator-name = "vcc5_host1";
++		regulator-always-on;
++	};
+ };
+ 
+ &clk_hse {
+@@ -87,3 +95,10 @@
+ 	pinctrl-names = "default";
+ 	status = "okay";
+ };
++
++&usbotg_fs {
++	dr_mode = "host";
++	pinctrl-0 = <&usbotg_fs_pins_a>;
++	pinctrl-names = "default";
++	status = "okay";
++};
 -- 
 2.7.4
