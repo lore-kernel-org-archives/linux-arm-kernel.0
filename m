@@ -1,61 +1,130 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 17 Aug 2017 20:40:16 +0800
-Subject: [PATCH net] PCI: fix the return value for the
- pci_find_pcie_root_port()
-In-Reply-To: <20170817105156.GA18789@ulmo>
-References: <1502936730-7368-1-git-send-email-dingtianhong@huawei.com>
- <20170817105156.GA18789@ulmo>
-Message-ID: <ea83e7a8-39a4-5b94-1148-5bf4ae4ed214@huawei.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Thu, 17 Aug 2017 14:56:28 +0200
+Subject: [PATCH 05/13] arm: dma-mapping: Use sychronized interface of the
+ IOMMU-API
+In-Reply-To: <1502974596-23835-1-git-send-email-joro@8bytes.org>
+References: <1502974596-23835-1-git-send-email-joro@8bytes.org>
+Message-ID: <1502974596-23835-6-git-send-email-joro@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Joerg Roedel <jroedel@suse.de>
 
+The map and unmap functions of the IOMMU-API changed their
+semantics: They do no longer guarantee that the hardware
+TLBs are synchronized with the page-table updates they made.
 
-On 2017/8/17 18:51, Thierry Reding wrote:
-> On Thu, Aug 17, 2017 at 10:25:30AM +0800, Ding Tianhong wrote:
->> The pci_find_pcie_root_port() would return NULL if the given
->> dev is already a Root Port, it looks like unfriendly to the
->> PCIe Root Port device, Thierry and Bjorn suggest to let this
->> function return the given dev under this circumstances.
->>
->> Fixes: 0e405232871d6 ("PCI: fix oops when try to find Root Port for a PCI device")
->> Suggested-by: Thierry Reding <thierry.reding@gmail.com>
->> Suggested-by: Bjorn Helgaas <helgaas@kernel.org>
->> Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
->> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->> ---
->>  drivers/pci/pci.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
->> index 7e2022f..352bb53 100644
->> --- a/drivers/pci/pci.c
->> +++ b/drivers/pci/pci.c
->> @@ -514,7 +514,7 @@ struct resource *pci_find_resource(struct pci_dev *dev, struct resource *res)
->>   */
->>  struct pci_dev *pci_find_pcie_root_port(struct pci_dev *dev)
->>  {
->> -	struct pci_dev *bridge, *highest_pcie_bridge = NULL;
->> +	struct pci_dev *bridge, *highest_pcie_bridge = dev;
->>  
->>  	bridge = pci_upstream_bridge(dev);
->>  	while (bridge && pci_is_pcie(bridge)) {
-> 
-> I think this should actually be this change on top of a revert of commit
-> 0e405232871d6 ("PCI: fix oops when try to find Root Port for a PCI
-> device"). After the above change, the previous fix will have a redundant
-> check because highest_pcie_bridge will never be NULL.
-> 
-> Let me send out that version to clarify what I mean.
-> 
+To make conversion easier, new synchronized functions have
+been introduced which give these guarantees again until the
+code is converted to use the new TLB-flush interface of the
+IOMMU-API, which allows certain optimizations.
 
-Hi Thierry:
+But for now, just convert this code to use the synchronized
+functions so that it will behave as before.
 
-The patch ("PCI: fix oops when try to find Root Port for a PCI device")
-has been merge to the linus mainline tree before you found this deficiencies....
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Cc: Sricharan R <sricharan@codeaurora.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Joerg Roedel <jroedel@suse.de>
+---
+ arch/arm/mm/dma-mapping.c | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
 
-Regards
-Tianhong
-
-> Thierry
-> 
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index fcf1473..fae2398 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1444,7 +1444,7 @@ __iommu_create_mapping(struct device *dev, struct page **pages, size_t size,
+ 				break;
+ 
+ 		len = (j - i) << PAGE_SHIFT;
+-		ret = iommu_map(mapping->domain, iova, phys, len,
++		ret = iommu_map_sync(mapping->domain, iova, phys, len,
+ 				__dma_info_to_prot(DMA_BIDIRECTIONAL, attrs));
+ 		if (ret < 0)
+ 			goto fail;
+@@ -1453,7 +1453,7 @@ __iommu_create_mapping(struct device *dev, struct page **pages, size_t size,
+ 	}
+ 	return dma_addr;
+ fail:
+-	iommu_unmap(mapping->domain, dma_addr, iova-dma_addr);
++	iommu_unmap_sync(mapping->domain, dma_addr, iova-dma_addr);
+ 	__free_iova(mapping, dma_addr, size);
+ 	return ARM_MAPPING_ERROR;
+ }
+@@ -1469,7 +1469,7 @@ static int __iommu_remove_mapping(struct device *dev, dma_addr_t iova, size_t si
+ 	size = PAGE_ALIGN((iova & ~PAGE_MASK) + size);
+ 	iova &= PAGE_MASK;
+ 
+-	iommu_unmap(mapping->domain, iova, size);
++	iommu_unmap_sync(mapping->domain, iova, size);
+ 	__free_iova(mapping, iova, size);
+ 	return 0;
+ }
+@@ -1730,7 +1730,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+ 
+ 		prot = __dma_info_to_prot(dir, attrs);
+ 
+-		ret = iommu_map(mapping->domain, iova, phys, len, prot);
++		ret = iommu_map_sync(mapping->domain, iova, phys, len, prot);
+ 		if (ret < 0)
+ 			goto fail;
+ 		count += len >> PAGE_SHIFT;
+@@ -1740,7 +1740,7 @@ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+ 
+ 	return 0;
+ fail:
+-	iommu_unmap(mapping->domain, iova_base, count * PAGE_SIZE);
++	iommu_unmap_sync(mapping->domain, iova_base, count * PAGE_SIZE);
+ 	__free_iova(mapping, iova_base, size);
+ 	return ret;
+ }
+@@ -1938,7 +1938,8 @@ static dma_addr_t arm_coherent_iommu_map_page(struct device *dev, struct page *p
+ 
+ 	prot = __dma_info_to_prot(dir, attrs);
+ 
+-	ret = iommu_map(mapping->domain, dma_addr, page_to_phys(page), len, prot);
++	ret = iommu_map_sync(mapping->domain, dma_addr, page_to_phys(page),
++			     len, prot);
+ 	if (ret < 0)
+ 		goto fail;
+ 
+@@ -1988,7 +1989,7 @@ static void arm_coherent_iommu_unmap_page(struct device *dev, dma_addr_t handle,
+ 	if (!iova)
+ 		return;
+ 
+-	iommu_unmap(mapping->domain, iova, len);
++	iommu_unmap_sync(mapping->domain, iova, len);
+ 	__free_iova(mapping, iova, len);
+ }
+ 
+@@ -2016,7 +2017,7 @@ static void arm_iommu_unmap_page(struct device *dev, dma_addr_t handle,
+ 	if ((attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
+ 		__dma_page_dev_to_cpu(page, offset, size, dir);
+ 
+-	iommu_unmap(mapping->domain, iova, len);
++	iommu_unmap_sync(mapping->domain, iova, len);
+ 	__free_iova(mapping, iova, len);
+ }
+ 
+@@ -2044,7 +2045,7 @@ static dma_addr_t arm_iommu_map_resource(struct device *dev,
+ 
+ 	prot = __dma_info_to_prot(dir, attrs) | IOMMU_MMIO;
+ 
+-	ret = iommu_map(mapping->domain, dma_addr, addr, len, prot);
++	ret = iommu_map_sync(mapping->domain, dma_addr, addr, len, prot);
+ 	if (ret < 0)
+ 		goto fail;
+ 
+@@ -2073,7 +2074,7 @@ static void arm_iommu_unmap_resource(struct device *dev, dma_addr_t dma_handle,
+ 	if (!iova)
+ 		return;
+ 
+-	iommu_unmap(mapping->domain, iova, len);
++	iommu_unmap_sync(mapping->domain, iova, len);
+ 	__free_iova(mapping, iova, len);
+ }
+ 
+-- 
+2.7.4
