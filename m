@@ -1,14 +1,15 @@
 From: william.wu@rock-chips.com (William Wu)
-Date: Thu, 17 Aug 2017 15:35:40 +0800
-Subject: [PATCH 0/2] Add usb3 ctrl node on RK3328 SoCs and enable usb3 host on
- RK3328 evb
-Message-ID: <1502955342-21985-1-git-send-email-william.wu@rock-chips.com>
+Date: Thu, 17 Aug 2017 15:54:48 +0800
+Subject: [PATCH v2 0/2] Add usb3 ctrl node on RK3328 SoCs and enable usb3 host
+ on RK3328 evb
+Message-ID: <1502956490-23087-1-git-send-email-william.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This series add support for usb3 controller on RK3328 SoCs.
 This series don't include usb3 phy patches, and I will try
 to submit usb3 phy patches individually later.
+
 Tested on RK3328 evaluation board.
 
 William Wu (2):
