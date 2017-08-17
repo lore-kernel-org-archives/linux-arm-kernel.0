@@ -1,55 +1,54 @@
-From: danilokrummrich@dk-develop.de (Danilo Krummrich)
-Date: Thu, 17 Aug 2017 12:51:33 +0200
-Subject: [PATCH] serio: PS2 gpio bit banging driver for the serio bus
-In-Reply-To: <20170817090908.GP20805@n2100.armlinux.org.uk>
-References: <20170731222452.22887-1-danilokrummrich@dk-develop.de>
- <CACRpkdYz_+soss4Rb9zMiP4eZZtXqjW_Xy7hH=wm1x2m_R9R3A@mail.gmail.com>
- <20170807182207.348762301bf3d7f8509b1bf7@dk-develop.de>
- <8e5e73575b3a70e0e60931698687471d@dk-develop.de>
- <CACRpkda=bYacXmv8SoQu3wPoZW9v+j8myZnme=QpofD=Y-gYTg@mail.gmail.com>
- <20170817090908.GP20805@n2100.armlinux.org.uk>
-Message-ID: <d9966e58f98ed5820154d9a979ca19f2@dk-develop.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 17 Aug 2017 12:51:56 +0200
+Subject: [PATCH net] PCI: fix the return value for the
+ pci_find_pcie_root_port()
+In-Reply-To: <1502936730-7368-1-git-send-email-dingtianhong@huawei.com>
+References: <1502936730-7368-1-git-send-email-dingtianhong@huawei.com>
+Message-ID: <20170817105156.GA18789@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-08-17 11:09, Russell King - ARM Linux wrote:
-> On Fri, Aug 11, 2017 at 11:16:20AM +0200, Linus Walleij wrote:
->> writel() should be guaranteeing that the values hit the hardware, 
->> wmb() is
->> spelled out "write memory barrier" I don't see what you're after here.
+On Thu, Aug 17, 2017 at 10:25:30AM +0800, Ding Tianhong wrote:
+> The pci_find_pcie_root_port() would return NULL if the given
+> dev is already a Root Port, it looks like unfriendly to the
+> PCIe Root Port device, Thierry and Bjorn suggest to let this
+> function return the given dev under this circumstances.
 > 
-> Incorrect.  writel() has a barrier which ensures that data written to
-> memory (eg, dma coherent memory) is visible to the hardware prior to
-> the write hitting the hardware.
+> Fixes: 0e405232871d6 ("PCI: fix oops when try to find Root Port for a PCI device")
+> Suggested-by: Thierry Reding <thierry.reding@gmail.com>
+> Suggested-by: Bjorn Helgaas <helgaas@kernel.org>
+> Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
+> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+> ---
+>  drivers/pci/pci.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> There is no barrier to ensure that the write hits the hardware in a
-> timely manner - the write can be buffered by the buses, which will
-> delay it before it hits its destination.
-> 
-> PCI particularly buffers MMIO writes, and the requirement there has
-> always been that if you need the write to hit the hardware in a timely
-> fashion, you must perform a read-back to force the bus to deliver the
-> write (since a read is not allowed to overlap a write.)
-> 
-> The solution is never to use barrier() - barrier() is a _compiler_
-> barrier and does nothing for posted writes on hardware buses.
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index 7e2022f..352bb53 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -514,7 +514,7 @@ struct resource *pci_find_resource(struct pci_dev *dev, struct resource *res)
+>   */
+>  struct pci_dev *pci_find_pcie_root_port(struct pci_dev *dev)
+>  {
+> -	struct pci_dev *bridge, *highest_pcie_bridge = NULL;
+> +	struct pci_dev *bridge, *highest_pcie_bridge = dev;
+>  
+>  	bridge = pci_upstream_bridge(dev);
+>  	while (bridge && pci_is_pcie(bridge)) {
 
-Thanks for clarification. I thought I just need a wmb() to make sure 
-writel()
-can not be reordered with another store operation. I wasn't aware that 
-writel()
-is defined to guarantee this on every arch.
+I think this should actually be this change on top of a revert of commit
+0e405232871d6 ("PCI: fix oops when try to find Root Port for a PCI
+device"). After the above change, the previous fix will have a redundant
+check because highest_pcie_bridge will never be NULL.
 
-That having the correct execution order is not enough on some buses 
-because
-of buffering is really something to be aware of, thanks again for 
-pointing
-this out.
+Let me send out that version to clarify what I mean.
 
-So for the scenario I was concerned about I would expect the irqchip 
-driver
-guarantees the write actually hits the the hardware (if necessary read 
-it
-back) before the function (disable_irq_nosync()) returns, is that 
-correct?
-Though, having the need should be very unlikely.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170817/f8503237/attachment.sig>
