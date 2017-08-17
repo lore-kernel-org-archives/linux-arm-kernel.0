@@ -1,41 +1,44 @@
-From: bgoswami@codeaurora.org (Banajit Goswami)
-Date: Thu, 17 Aug 2017 00:59:29 -0700
-Subject: [PATCH 07/11] ASoC: qcom: make snd_soc_platform_driver const
-In-Reply-To: <1502710730-18912-8-git-send-email-bhumirks@gmail.com>
-References: <1502710730-18912-1-git-send-email-bhumirks@gmail.com>
- <1502710730-18912-8-git-send-email-bhumirks@gmail.com>
-Message-ID: <20170817075929.GA11689@codeaurora.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 17 Aug 2017 09:56:18 +0200
+Subject: [PATCH 1/3] ARM: dts: r8a7745: add PFC support
+In-Reply-To: <521e62cc-46d4-b067-59b2-cc085fd88e84@cogentembedded.com>
+References: <20170415202036.987901107@cogentembedded.com>
+ <CAMuHMdUPda7Mjo_P8p1V5a20XOAYM6GFf8Jqf0KLUuO7zAODeA@mail.gmail.com>
+ <TY1PR06MB07025D9CE628A3D4CED37AA9B78D0@TY1PR06MB0702.apcprd06.prod.outlook.com>
+ <b3bcd091-4f96-c37a-54ec-c8ee5b0fd916@cogentembedded.com>
+ <20170815160049.GC26748@verge.net.au>
+ <521e62cc-46d4-b067-59b2-cc085fd88e84@cogentembedded.com>
+Message-ID: <20170817075618.GB26170@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 04:38:46AM -0700, Bhumika Goyal wrote:
-> Make this const as it is only passed as the 2nd argument to the
-> function devm_snd_soc_register_platform, which is of type const.
-> Done using Coccinelle.
+On Wed, Aug 16, 2017 at 02:00:37PM +0300, Sergei Shtylyov wrote:
+> On 08/15/2017 07:00 PM, Simon Horman wrote:
 > 
-> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+> >>>>>Define the generic R8A7745 part of the PFC device node.
+> >>>>>
+> >>>>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>>>
+> >>>>Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >>>
+> >>>It looks like the dependencies for this patch are met now [1].
+> >>>
+> >>>Are you happy to accept this patch? (and presumably the others in the series for the sk-rzg1e board).
+> >>>
+> >>>We plan to add GPIO support for r8a7745, but need this patch in place first.
+> >>>
+> >>>
+> >>>[1] https://patchwork.kernel.org/patch/9705249/
+> >>
+> >>    Actually, R8A774x PFC support has hit the Linus' tree in the meanwhile.
+> >>Simon, please merge the .dts patches.
+> >>
+> >>>Kind regards, Chris
+> >
+> >Thanks, I have applied the series for v4.14.
+> 
+>    Are you going to finally push the devel branch? I'm not seeing changes
+> since the Monday tags.
 
-Acked-by: Banajit Goswami <bgoswami@codeaurora.org>
-
-> ---
->  sound/soc/qcom/lpass-platform.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/sound/soc/qcom/lpass-platform.c
-> b/sound/soc/qcom/lpass-platform.c
-> index 7aabf08..fb3576a 100644
-> --- a/sound/soc/qcom/lpass-platform.c
-> +++ b/sound/soc/qcom/lpass-platform.c
-> @@ -557,7 +557,7 @@ static void lpass_platform_pcm_free(struct snd_pcm
-> *pcm)
->  	}
->  }
->  
-> -static struct snd_soc_platform_driver lpass_platform_driver = {
-> +static const struct snd_soc_platform_driver lpass_platform_driver = {
->  	.pcm_new	= lpass_platform_pcm_new,
->  	.pcm_free	= lpass_platform_pcm_free,
->  	.ops		= &lpass_platform_pcm_ops,
-> -- 
-> 1.9.1
-> 
+Sorry, about the delay.
+I have (finally) pushed Tuesday's tags.
