@@ -1,102 +1,47 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 17 Aug 2017 17:46:44 +0100
-Subject: [PATCH 11/27] arm64/sve: Core task context handling
-In-Reply-To: <20170817164233.GJ6321@e103592.cambridge.arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-12-git-send-email-Dave.Martin@arm.com>
- <CAKv+Gu-Rei0LP9q77+KHtD4JqM-6j4XvQjG7oCLrjHx2M5DA7g@mail.gmail.com>
- <20170817164233.GJ6321@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu-dgsOcW032P2Zk36Rk4C-FUuJuWSkWox_-wPX+NHY2sA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 17 Aug 2017 10:10:28 -0500
+Subject: [PATCH v4 06/12] net: stmmac: dwmac-rk: Add internal phy support
+In-Reply-To: <1502280661-2308-1-git-send-email-david.wu@rock-chips.com>
+References: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
+ <1502280661-2308-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <20170817151028.ewrgdk7qqd3nqzhe@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 August 2017 at 17:42, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Tue, Aug 15, 2017 at 06:31:05PM +0100, Ard Biesheuvel wrote:
->> Hi Dave,
->>
->> On 9 August 2017 at 13:05, Dave Martin <Dave.Martin@arm.com> wrote:
->> > This patch adds the core support for switching and managing the SVE
->> > architectural state of user tasks.
->
-> [...]
->
->> > +static u64 sve_cpacr_trap_on(u64 cpacr)
->> > +{
->> > +       return cpacr & ~(u64)CPACR_EL1_ZEN_EL0EN;
->> > +}
->> > +
->> > +static u64 sve_cpacr_trap_off(u64 cpacr)
->> > +{
->> > +       return cpacr | CPACR_EL1_ZEN_EL0EN;
->> > +}
->> > +
->> > +static void change_cpacr(u64 old, u64 new)
->> > +{
->> > +       if (old != new)
->> > +               write_sysreg(new, CPACR_EL1);
->> > +}
->
-> [...]
->
->> > +static void task_fpsimd_load(void)
->> > +{
->> > +       if (system_supports_sve() && test_thread_flag(TIF_SVE)) {
->> > +               unsigned int vl = current->thread.sve_vl;
->> > +
->> > +               BUG_ON(!sve_vl_valid(vl));
->> > +               sve_load_state(sve_pffr(current),
->> > +                              &current->thread.fpsimd_state.fpsr,
->> > +                              sve_vq_from_vl(vl) - 1);
->> > +       } else
->> > +               fpsimd_load_state(&current->thread.fpsimd_state);
->> > +
->>
->> Please use braces consistently on all branches of an if ()
->>
->> > +       if (system_supports_sve()) {
->> > +               u64 cpacr = read_sysreg(CPACR_EL1);
->> > +               u64 new_cpacr;
->> > +
->> > +               /* Toggle SVE trapping for userspace if needed */
->> > +               if (test_thread_flag(TIF_SVE))
->> > +                       new_cpacr = sve_cpacr_trap_off(cpacr);
->> > +               else
->> > +                       new_cpacr = sve_cpacr_trap_on(cpacr);
->> > +
->> > +               change_cpacr(cpacr, new_cpacr);
->>
->> I understand you want to avoid setting CPACR to the same value, but
->> this does look a bit clunky IMO. Wouldn't it be much better to have a
->> generic accessor with a mask and a value that encapsulates this?
->
-> For this I now have:
->
-> static void change_cpacr(u64 val, u64 mask)
-> {
->         u64 cpacr = read_sysreg(CPACR_EL1);
->         u64 new = (cpacr & ~mask) | val;
->
->         if (new != cpacr)
->                 write_sysreg(new, CPACR_EL1);
-> }
->
-> static void sve_cpacr_trap_on(void)
-> {
->         change_cpacr(0, CPACR_EL1_ZEN_EL0EN);
-> }
->
-> static void sve_cpacr_trap_off(void)
-> {
->         change_cpacr(CPACR_EL1_ZEN_EL0EN, CPACR_EL1_ZEN_EL0EN);
-> }
->
->
-> This is stilla little verbose, but fairly clean.  Possibly this was the
-> sort of thing you meant by a generic accessor.
->
-> What do you think?
->
+On Wed, Aug 09, 2017 at 08:11:01PM +0800, David Wu wrote:
+> To make internal phy work, need to configure the phy_clock,
+> phy cru_reset and related registers.
+> 
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> ---
+> change in v4:
+>  - PHY is internal or not base on the phy-is-internal property via phy node.
+> 
+>  .../devicetree/bindings/net/rockchip-dwmac.txt     |  4 +-
+>  drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c     | 88 ++++++++++++++++++++++
+>  2 files changed, 91 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+> index 8f42755..4f51305 100644
+> --- a/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+> +++ b/Documentation/devicetree/bindings/net/rockchip-dwmac.txt
+> @@ -25,7 +25,8 @@ Required properties:
+>   - clock-names: One name for each entry in the clocks property.
+>   - phy-mode: See ethernet.txt file in the same directory.
+>   - pinctrl-names: Names corresponding to the numbered pinctrl states.
+> - - pinctrl-0: pin-control mode. can be <&rgmii_pins> or <&rmii_pins>.
+> + - pinctrl-0: pin-control mode. can be <&rgmii_pins>, <&rmii_pins> or led pins
+> +   for internal phy mode.
+>   - clock_in_out: For RGMII, it must be "input", means main clock(125MHz)
+>     is not sourced from SoC's PLL, but input from PHY; For RMII, "input" means
+>     PHY provides the reference clock(50MHz), "output" means GMAC provides the
+> @@ -40,6 +41,7 @@ Optional properties:
+>   - tx_delay: Delay value for TXD timing. Range value is 0~0x7F, 0x30 as default.
+>   - rx_delay: Delay value for RXD timing. Range value is 0~0x7F, 0x10 as default.
+>   - phy-supply: phandle to a regulator if the PHY needs one
+> + - clocks: <&cru MAC_PHY>: Clock selector for internal macphy
 
-In my opinion, this does look a lot better. Having mask/val pairs like
-this is a fairly common pattern, so it should be quite obvious to most
-readers what is going on.
+I assume this is required if internal phy is used. 'clocks' is already 
+documented above, so this needs to be documented with it.
+
+Rob
