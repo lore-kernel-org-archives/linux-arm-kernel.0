@@ -1,126 +1,80 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Aug 2017 10:11:02 -0500
-Subject: [PATCH 1/2] drm/bridge/sii8620: add external connector handle
-In-Reply-To: <9232b812-7aef-c614-b122-612e19743df4@samsung.com>
-References: <1502371530-32260-1-git-send-email-m.purski@samsung.com>
- <6478480.TjcUCueU5y@avalon>
- <5ce6bd99-c50e-84c2-f21f-eb611cac94c2@samsung.com>
- <CGME20170811094031epcas5p4ca089af7dba2f3fafed757c1fb40c798@epcas5p4.samsung.com>
- <2097016.rlxulirhWA@avalon>
- <9232b812-7aef-c614-b122-612e19743df4@samsung.com>
-Message-ID: <20170817151102.wmjelokfkzd2lk4i@rob-hp-laptop>
+Date: Thu, 17 Aug 2017 10:10:20 -0500
+Subject: [PATCH v2 4/4] dt-bindings: phy-mt65xx-usb: supports PCIe, SATA
+ and rename file
+In-Reply-To: <b2d4141dd3c0dc33d60a727561014d91c5f70176.1502256365.git.chunfeng.yun@mediatek.com>
+References: <d58705436a2563b87a67609a472db3c3d84b36f5.1502256365.git.chunfeng.yun@mediatek.com>
+ <b2d4141dd3c0dc33d60a727561014d91c5f70176.1502256365.git.chunfeng.yun@mediatek.com>
+Message-ID: <20170817151020.d2gyvdhbpicybwe4@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 11, 2017 at 02:49:35PM +0200, Marek Szyprowski wrote:
-> Hi Laurent,
-> 
-> On 2017-08-11 11:40, Laurent Pinchart wrote:
-> > Hi Marek,
-> > 
-> > On Friday 11 Aug 2017 08:39:31 Marek Szyprowski wrote:
-> > > On 2017-08-10 15:39, Laurent Pinchart wrote:
-> > > > On Thursday 10 Aug 2017 15:25:29 Maciej Purski wrote:
-> > > > > The driver should be switched on if an external connector is plugged and
-> > > > > switched off if it is unplugged. Extcon is optional. If it is not found,
-> > > > > the driver stays in "always-on" mode.
-> > > > > 
-> > > > > Signed-off-by: Maciej Purski <m.purski@samsung.com>
-> > > > > ---
-> > > > > 
-> > > > >    .../bindings/display/bridge/sil-sii8620.txt        |  4 ++
-> > > > >    drivers/gpu/drm/bridge/sil-sii8620.c               | 83 ++++++++++++++-
-> > > > >    2 files changed, 85 insertions(+), 2 deletions(-)
-> > > > > 
-> > > > > diff --git
-> > > > > a/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt
-> > > > > b/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt index
-> > > > > 9409d9c..1f230bf 100644
-> > > > > --- a/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt
-> > > > > +++ b/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt
-> > > > > @@ -10,6 +10,9 @@ Required properties:
-> > > > >    	- clocks, clock-names: specification and name of "xtal" clock
-> > > > >    	- video interfaces: Device node can contain video interface port
-> > > > >    			    node for HDMI encoder according to [1].
-> > > > > 
-> > > > > +Optional properties:
-> > > > > +	- extcon: phandle to external connector for MHL cable changes
-> > > > > +		  detection
-> > > > The sii8620 DT node should model its connection to the MHL connector using
-> > > > OF graph, connecting a port to the MHL connector DT node through
-> > > > endpoints. I believe the extcon property should then be added to the MHL
-> > > > connector DT node, not the bridge.
-> > > I don't get this. Generic extcon bindings doesn't define connector DT
-> > > node, so I don't see how could we use endpoint DT approach here. Could you
-> > > give the example?
-> > Sure, here you are.
-> > 
-> > &hsi2c_7 {
-> > 	...
-> > 
-> >          sii8620 at 39 {
-> >                  reg = <0x39>;
-> >                  compatible = "sil,sii8620";
-> >                  cvcc10-supply = <&ldo36_reg>;
-> >                  iovcc18-supply = <&ldo34_reg>;
-> >                  interrupt-parent = <&gpf0>;
-> >                  interrupts = <2 IRQ_TYPE_LEVEL_HIGH>;
-> >                  reset-gpios = <&gpv7 0 GPIO_ACTIVE_LOW>;
-> >                  clocks = <&pmu_system_controller 0>;
-> >                  clock-names = "xtal";
-> > 
-> > 		ports {
-> > 			#address-cells = <1>;
-> > 			#size-cells = <0>;
-> > 
-> > 	                port at 0 {
-> > 				reg = <0>;
-> >          	                mhl_to_hdmi: endpoint {
-> >                  	                remote-endpoint = <&hdmi_to_mhl>;
-> > 	                        };
-> >          	        };
-> > 	                port at 1 {
-> > 				reg = <1>;
-> >          	                mhl_bridge_out: endpoint {
-> >                  	                remote-endpoint = <&mhl_connector_in>;
-> > 	                        };
-> >          	        };
-> > 		};
-> >          };
-> > };
-> > 
-> > / {
-> > 	mhl-connector {
-> > 		compatible = "mhl-connector";
-> > 		extcon = <&muic>;
-> > 
-> > 	        port {
-> >          	        mhl_connector_in: endpoint {
-> >                  	        remote-endpoint = <&mhl_bridge_out>;
-> > 	                };
-> >          	};
-> > 	};
-> > };
-> > 
-> > Note that there's currently no DT binding for MHL connectors. One needs to be
-> > developed, the HDMI connector DT binding can be used as a source of
-> > inspiration.
-> 
-> Ah, I see. I wasn't aware that display subsystem has bindings even for the
-> connectors.
-> Other types of connectors already used together with extcon in device tree
-> (like usb
-> and chargers) don't have dedicated bindings.
+On Wed, Aug 09, 2017 at 01:29:49PM +0800, Chunfeng Yun wrote:
+> add support for PCIe and SATA, also add some new compatibles.
 
-I NAK any extcon binding additions because it is poorly designed, so 
-don't use extcon. It is full of Linuxisms and needs work. USB 
-connectors need to be described like what we have for display related 
-connectors especially since they are merging.
+s/add/Add/
 
 > 
-> Do we need to add hdmi-connectors to all existing boards that have HDMI
-> module?
+> due to phy-mt65xx-usb.txt holds the bindings for all mediatek SoCs
 
-Ideally, yes.
+s/due/Due/
 
-Rob
+> with T-PHY controller, change the name to phy-mtk-tphy.txt to
+> reflect that.
+> 
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  .../phy/{phy-mt65xx-usb.txt => phy-mtk-tphy.txt}        | 17 ++++++++++++-----
+>  1 file changed, 12 insertions(+), 5 deletions(-)
+>  rename Documentation/devicetree/bindings/phy/{phy-mt65xx-usb.txt => phy-mtk-tphy.txt} (88%)
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
+> similarity index 88%
+> rename from Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> rename to Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
+> index 0acc5a9..faf1808 100644
+> --- a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> +++ b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
+> @@ -1,13 +1,18 @@
+> -mt65xx USB3.0 PHY binding
+> +MediaTek T-PHY binding
+>  --------------------------
+>  
+> -This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
+> +T-phy controller supports physical layer functionality for a number of
+> +controllers on MediaTek SoCs, such as, USB2.0, USB3.0, PCIe, and SATA.
+>  
+>  Required properties (controller (parent) node):
+>   - compatible	: should be one of
+> -		  "mediatek,mt2701-u3phy"
+> -		  "mediatek,mt2712-u3phy"
+> -		  "mediatek,mt8173-u3phy"
+> +		  "mediatek,generic-tphy-v1"
+> +		  "mediatek,generic-tphy-v2"
+> +		  "mediatek,mt2701-u3phy" (deprecated)
+> +		  "mediatek,mt2712-u3phy" (deprecated)
+
+SoC specific compatibles should not be deprecated.
+
+> +		  "mediatek,mt8173-u3phy";
+> +		  make use of "mediatek,generic-tphy-v1" on mt2701 instead and
+> +		  "mediatek,generic-tphy-v2" on mt2712 instead.
+>   - clocks	: (deprecated, use port's clocks instead) a list of phandle +
+>  		  clock-specifier pairs, one for each entry in clock-names
+>   - clock-names	: (deprecated, use port's one instead) must contain
+> @@ -35,6 +40,8 @@ Required properties (port (child) node):
+>  		  cell after port phandle is phy type from:
+>  			- PHY_TYPE_USB2
+>  			- PHY_TYPE_USB3
+> +			- PHY_TYPE_PCIE
+> +			- PHY_TYPE_SATA
+>  
+>  Example:
+>  
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
