@@ -1,51 +1,33 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 17 Aug 2017 08:29:42 -0600
-Subject: [GIT PULL] arm64: dts: juno: Updates for v4.14
-In-Reply-To: <9419e74d-1d1d-b8fa-75c5-5afd0d1b1072@arm.com>
-References: <d33155aa-9925-1a65-ac82-d7cb5e7edd53@arm.com>
- <CAK8P3a3KX0iDGpWH-CYpwiuz1a2n07MdYC6zkZ0HUch0_xWm2g@mail.gmail.com>
- <9419e74d-1d1d-b8fa-75c5-5afd0d1b1072@arm.com>
-Message-ID: <CANLsYkye1BioUutdCLAi=9-SnHY-yOzyO_b5fyor_PtXoe+Thg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 17 Aug 2017 15:36:50 +0100
+Subject: [PATCH 0/5] arm-smmu: performance optimization
+In-Reply-To: <1498484330-10840-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1498484330-10840-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <20170817143650.GB30338@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 August 2017 at 03:14, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> (+Suzuki,Mathieu)
->
-> Hi Arnd,
->
-> On 16/08/17 22:46, Arnd Bergmann wrote:
->> On Mon, Aug 14, 2017 at 6:20 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>> ----------------------------------------------------------------
->>> ARMv8 Vexpress/Juno DT updates for v4.14
->>>
->>> 1. Replaces old coresight ATB programmable replicator compatible with
->>>    new and more generic one
->>>
->>> 2. Replaces incorrect usage of underscores for device node names in the
->>>    device tree with hyphen
->>
->> Pulled into next/dt64.
->>
->> Regarding the change of the compatible string for the replicator, can you
->> confirm that nothing ever used the old string?
->>
->> In doubt, it might be better to keep both strings present for
->> backward-compatibility.
->>
->
-> I think Rob agreed to remove the old binding on the basis that it was
-> never used. That's my understanding as per the thread[1]
->
-> Suzuki/Mathieu,
->
-> Please shout if my understand on this is wrong.
->
+Thunder, Nate, Robin,
 
-You are correct.
+On Mon, Jun 26, 2017 at 09:38:45PM +0800, Zhen Lei wrote:
+> I described the optimization more detail in patch 1 and 2, and patch 3-5 are
+> the implementation on arm-smmu/arm-smmu-v3 of patch 2.
+> 
+> Patch 1 is v2. In v1, I directly replaced writel with writel_relaxed in
+> queue_inc_prod. But Robin figured that it may lead SMMU consume stale
+> memory contents. I thought more than 3 whole days and got this one.
+> 
+> This patchset is based on Robin Murphy's [PATCH v2 0/8] io-pgtable lock removal.
 
-> --
-> Regards,
-> Sudeep
->
-> [1] http://marc.info/?l=devicetree&m=149727844025618&w=2
+For the time being, I think we should focus on the new TLB flushing
+interface posted by Joerg:
+
+http://lkml.kernel.org/r/1502974596-23835-1-git-send-email-joro at 8bytes.org
+
+which looks like it can give us most of the benefits of this series. Once
+we've got that, we can see what's left in the way of performance and focus
+on the cmdq batching separately (because I'm still not convinced about it).
+
+Thanks,
+
+Will
