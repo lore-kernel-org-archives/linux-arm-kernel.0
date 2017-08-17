@@ -1,49 +1,56 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Thu, 17 Aug 2017 17:18:01 +0200
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Add
- CONFIG_FW_LOADER_USER_HELPER_FALLBACK
-In-Reply-To: <CAOMZO5DF8qfdraG8V1_ZuS393hqoU+fd1=Chiw7sTiK_gKaZVA@mail.gmail.com>
-References: <20170817140424.4614-1-gary.bisson@boundarydevices.com>
- <CAOMZO5DF8qfdraG8V1_ZuS393hqoU+fd1=Chiw7sTiK_gKaZVA@mail.gmail.com>
-Message-ID: <CAAMH-ytcK8HJzrc_DtDKg6cO3fQQ0xBzQXMLRJfs65kWgsiwxg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 17 Aug 2017 10:22:24 -0500
+Subject: [PATCHv6 1/3] ARM:dt-bindings Intel FPGA Video and Image
+ Processing Suite
+In-Reply-To: <1502434187-6407-2-git-send-email-hean.loong.ong@intel.com>
+References: <1502434187-6407-1-git-send-email-hean.loong.ong@intel.com>
+ <1502434187-6407-2-git-send-email-hean.loong.ong@intel.com>
+Message-ID: <20170817152147.d4bqny5wmrexh3bu@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Fri, Aug 11, 2017 at 02:49:45PM +0800, Hean-Loong, Ong wrote:
+> From: Ong Hean Loong <hean.loong.ong@intel.com>
 
-On Thu, Aug 17, 2017 at 5:11 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> Hi Gary,
->
-> On Thu, Aug 17, 2017 at 11:04 AM, Gary Bisson
-> <gary.bisson@boundarydevices.com> wrote:
->> Allows to load firmware files which aren't built inside the kernel.
->>
->> Especially useful for CODA firmware (vpu_fw_imx6q.bin) which is usually
->> located in the rootfs.
->>
->> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
->> ---
->> Hi Shawn,
->>
->> I'm not sure if this patch is acceptable since I've noticed that no
->> configuration currently has that option enabled (why?).
->>
->> As mentioned in the commit, I had to enable that in order to have CODA
->> load the VPU firmware properly.
->>
->> Another option would be to make the CODA driver a module...
->
-> Yes, that's what we have currently:
->
-> commit a5a56f07c2726cc801efccd23f8df29af04d6d19
-> Author: Fabio Estevam <fabio.estevam@nxp.com>
-> Date:   Fri Jul 7 12:06:45 2017 -0300
->
->     ARM: imx_v6_v7_defconfig: Select the coda driver as module
+"dt-bindings: display: ..." for the subject. With that,
 
-Ok good, I tested on v4.13-rc5, that's why I had the problem.
+Acked-by: Rob Herring <robh@kernel.org>
 
-I'll make sure to check Shawn's tree next time.
+> 
+> Device tree binding for Intel FPGA Video and Image
+> Processing Suite. The binding involved would be generated
+> from the Altera (Intel) Qsys system. The bindings would
+> set the max width, max height, buts per pixel and memory
+> port width. The device tree binding only supports the Intel
+> Arria10 devkit and its variants. Vendor name retained as
+> altr.
+> 
+> Signed-off-by: Ong, Hean Loong <hean.loong.ong@intel.com>
+> ---
+> V6:
+> Fix comments for description
 
-Regards,
-Gary
+A completely useless version history. You should describe the diff 
+between versions.
+
+> 
+> V5:
+> *Fix comments on description
+> *remove bindings for bits per symbol as it has only one value which is 8
+> 
+> V4:
+> *Fix comments on description
+> 
+> V3:
+> *Fix comments on description
+> 
+> V2:
+> *Fix comments on description
+> 
+> V1:
+> *Fix comments on description
+> ---
+> ---
+>  .../devicetree/bindings/display/altr,vip-fb2.txt   | 42 ++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/altr,vip-fb2.txt
