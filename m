@@ -1,73 +1,127 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 17 Aug 2017 11:28:54 -0700
-Subject: [GIT PULL] device tree changes for omaps for v4.14, part2
-Message-ID: <pull-1502992271-779834>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 17 Aug 2017 11:37:43 -0700
+Subject: [GIT PULL 1/6] Broadcom soc changes for 4.14
+In-Reply-To: <20170817183748.1450-1-f.fainelli@gmail.com>
+References: <20170817183748.1450-1-f.fainelli@gmail.com>
+Message-ID: <20170817183748.1450-2-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
-The following changes since commit d510d12f26f49905d53ab550fcb40e848a01a60e:
-
-  ARM: dts: nokia n900: update dts with camera support (2017-08-14 11:34:25 -0700)
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.14/dt-v3-pt2-signed
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.14/soc
 
-for you to fetch changes up to b7ace5ed8867ca54503727988adec6b20af54eeb:
+for you to fetch changes up to e831871597aaa1f650b83f96b61858907c203b76:
 
-  ARM: dts: omap3: logicpd-torpedo-37xx-devkit: Fix MMC1 cd-gpio (2017-08-17 09:23:13 -0700)
-
-----------------------------------------------------------------
-Second set of device tree changes for omaps for v4.14 merge window.
-These got delayed a bit because the iodelay changes had to be
-reworked for a missing Signed-off-by. And the beagleboard-x15
-wants to use iodelay too for mmc:
-
-- A series of changes to add dra7 iodelay data used for mmc
-
-- Add support for new beagleBoard-x15 revision c
-
-- Fix logicpd-torpedo-37xx-devkit mmc card detect direction
+  Merge tag 'bcm2835-soc-next-2017-08-15' into soc/next (2017-08-16 18:14:49 -0700)
 
 ----------------------------------------------------------------
-Adam Ford (1):
-      ARM: dts: omap3: logicpd-torpedo-37xx-devkit: Fix MMC1 cd-gpio
+This pull request contains Broadcom ARM-based SoC/Kconfig changes for 4.14,
+please pull the following:
 
-Kishon Vijay Abraham I (7):
-      ARM: dts: dra7-evm: Add pinmux configuration for MMC
-      ARM: dts: am57xx-beagle-x15: Add pinmux configuration for MMC
-      ARM: dts: am571x-idk: Add pinmux configuration for MMC
-      ARM: dts: am572x-idk: Add pinmux configuration for MMC
-      ARM: dts: dra72-evm: Add pinmux configuration for MMC
-      ARM: dts: dra72-evm-revc: Add pinmux configuration for MMC
-      ARM: dts: dra71-evm: Add pinmux configuration for MMC
+- Stefan moves the BCM2836 SMP bring-up code from the irqchip driver down to
+  where it belongs under arch/arm/mach-bcm/. This requires us to merge parts
+  of the devicetree/next branch because we depend on Eric's change that relocates
+  the bcm2836/37 Device Tree files as well as the "enable-method" being correctly
+  set in the Device Tree source files.
 
-Robert Nelson (1):
-      ARM: dts: am57xx-beagle-x15: Add support for rev C
+- Danilo removes the fixed clocks introduced earlier when we did not have a
+  CPRMAN clock provider and in the process removes the init_machine callback
+  since we no longer need it.
 
-Sekhar Nori (3):
-      ARM: dts: dra72x: Create a common file with MMC/SD IOdelay data
-      ARM: dts: dra74x: Create a common file with MMC/SD IOdelay data
-      ARM: dts: am57xx-idk: Move common MMC/SD properties to common file
+- Phil provides a fix for the SMP bring-up code to have a "sev" (and corresponding
+  barrier) instruction in order to wake-up secondary cores. Future Rasperry Pi
+  firmware(s) will depend on this.
 
- arch/arm/boot/dts/Makefile                        |   1 +
- arch/arm/boot/dts/am571x-idk.dts                  |  26 +-
- arch/arm/boot/dts/am572x-idk.dts                  |  27 +-
- arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi   |  29 +-
- arch/arm/boot/dts/am57xx-beagle-x15-revb1.dts     |  15 +
- arch/arm/boot/dts/am57xx-beagle-x15-revc.dts      |  39 ++
- arch/arm/boot/dts/am57xx-beagle-x15.dts           |  11 +
- arch/arm/boot/dts/am57xx-idk-common.dtsi          |   8 +
- arch/arm/boot/dts/dra7-evm.dts                    |  22 +-
- arch/arm/boot/dts/dra71-evm.dts                   |  14 +
- arch/arm/boot/dts/dra72-evm-revc.dts              |  14 +
- arch/arm/boot/dts/dra72-evm.dts                   |  14 +
- arch/arm/boot/dts/dra72x-mmc-iodelay.dtsi         | 350 ++++++++++++
- arch/arm/boot/dts/dra74x-mmc-iodelay.dtsi         | 647 ++++++++++++++++++++++
- arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dts |   2 +-
- 15 files changed, 1171 insertions(+), 48 deletions(-)
- create mode 100644 arch/arm/boot/dts/am57xx-beagle-x15-revc.dts
- create mode 100644 arch/arm/boot/dts/dra72x-mmc-iodelay.dtsi
- create mode 100644 arch/arm/boot/dts/dra74x-mmc-iodelay.dtsi
+----------------------------------------------------------------
+Danilo Krummrich (1):
+      clk: bcm2835: remove remains from stub clk driver
+
+Eric Anholt (2):
+      ARM: dts: bcm283x: Move the BCM2837 DT contents from arm64 to arm.
+      Merge tag 'bcm2835-dt-next-2017-08-15' into HEAD
+
+Florian Fainelli (3):
+      ARM: dts: BCM53573: Add Broadcom BCM947189ACDBMR board support
+      Merge tag 'bcm2835-dt-next-2017-08-07' into devicetree/next
+      Merge tag 'bcm2835-soc-next-2017-08-15' into soc/next
+
+Jon Mason (3):
+      ARM: dts: NSP: Add dma-coherent to relevant DT entries
+      ARM: dts: NSP: Rearrage USB entries
+      ARM: dts: NSP: Add USB3 and USB3 PHY to NSP
+
+Phil Elwell (1):
+      ARM: bcm2836: Send event when onlining other cores
+
+Rafa? Mi?ecki (2):
+      ARM: dts: BCM5301X: Specify USB ports for each controller
+      ARM: dts: BCM5301X: Specify USB ports for USB LEDs of few devices
+
+Stefan Wahren (6):
+      ARM: bcm283x: Define UART pinmuxing on board level
+      dt-bindings: bcm: Add Raspberry Pi Zero W
+      ARM: dts: bcm2835: Add Raspberry Pi Zero W
+      dt-bindings: arm: add SMP enable-method for BCM2836
+      ARM: dts: bcm283x: Add 32-bit enable method for SMP
+      irqchip: bcm2836: Move SMP startup code to arch/arm
+
+ .../devicetree/bindings/arm/bcm/brcm,bcm2835.txt   |   4 +
+ Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
+ arch/arm/boot/dts/Makefile                         |   6 +-
+ arch/arm/boot/dts/bcm-nsp.dtsi                     |  59 ++++++---
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts           |   6 +
+ arch/arm/boot/dts/bcm2835-rpi-a.dts                |   6 +
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts           |   6 +
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts           |   6 +
+ arch/arm/boot/dts/bcm2835-rpi-b.dts                |   6 +
+ arch/arm/boot/dts/bcm2835-rpi-zero-w.dts           | 139 +++++++++++++++++++++
+ arch/arm/boot/dts/bcm2835-rpi-zero.dts             |   6 +
+ arch/arm/boot/dts/bcm2835-rpi.dtsi                 |   2 +-
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts              |   6 +
+ arch/arm/boot/dts/bcm2836.dtsi                     |   1 +
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts              |  52 +++++++-
+ .../dts/broadcom => arm/boot/dts}/bcm2837.dtsi     |   1 +
+ arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  |   4 +
+ arch/arm/boot/dts/bcm4708-netgear-r6250.dts        |   3 +
+ arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      |   6 +
+ arch/arm/boot/dts/bcm47081-tplink-archer-c5-v2.dts |   4 +
+ arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts  |   5 +
+ arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts      |   3 +
+ arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts      |   3 +
+ arch/arm/boot/dts/bcm5301x.dtsi                    |  34 +++++
+ arch/arm/boot/dts/bcm947189acdbmr.dts              |  97 ++++++++++++++
+ arch/arm/boot/dts/bcm958522er.dts                  |   8 ++
+ arch/arm/boot/dts/bcm958525er.dts                  |   8 ++
+ arch/arm/boot/dts/bcm958525xmc.dts                 |   8 ++
+ arch/arm/boot/dts/bcm958622hr.dts                  |   8 ++
+ arch/arm/boot/dts/bcm958623hr.dts                  |   8 ++
+ arch/arm/boot/dts/bcm958625hr.dts                  |   8 ++
+ arch/arm/boot/dts/bcm958625k.dts                   |   8 ++
+ arch/arm/mach-bcm/Makefile                         |   5 +
+ arch/arm/mach-bcm/board_bcm2835.c                  |   7 --
+ arch/arm/mach-bcm/platsmp.c                        |  38 ++++++
+ arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi      |   1 -
+ arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts   |  42 +------
+ .../boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi    |   1 -
+ .../boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi    |   1 -
+ arch/arm64/boot/dts/broadcom/bcm283x.dtsi          |   1 -
+ drivers/clk/bcm/clk-bcm2835-aux.c                  |   1 -
+ drivers/clk/bcm/clk-bcm2835.c                      |  30 -----
+ drivers/irqchip/irq-bcm2836.c                      |  79 +-----------
+ include/linux/clk/bcm2835.h                        |  24 ----
+ include/linux/irqchip/irq-bcm2836.h                |  70 +++++++++++
+ 45 files changed, 620 insertions(+), 202 deletions(-)
+ create mode 100644 arch/arm/boot/dts/bcm2835-rpi-zero-w.dts
+ rename arch/{arm64/boot/dts/broadcom => arm/boot/dts}/bcm2837.dtsi (96%)
+ create mode 100644 arch/arm/boot/dts/bcm947189acdbmr.dts
+ delete mode 120000 arch/arm64/boot/dts/broadcom/bcm2835-rpi.dtsi
+ delete mode 120000 arch/arm64/boot/dts/broadcom/bcm283x-rpi-smsc9514.dtsi
+ delete mode 120000 arch/arm64/boot/dts/broadcom/bcm283x-rpi-usb-host.dtsi
+ delete mode 120000 arch/arm64/boot/dts/broadcom/bcm283x.dtsi
+ delete mode 100644 include/linux/clk/bcm2835.h
+ create mode 100644 include/linux/irqchip/irq-bcm2836.h
