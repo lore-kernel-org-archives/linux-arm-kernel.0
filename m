@@ -1,80 +1,76 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Aug 2017 10:10:20 -0500
-Subject: [PATCH v2 4/4] dt-bindings: phy-mt65xx-usb: supports PCIe, SATA
- and rename file
-In-Reply-To: <b2d4141dd3c0dc33d60a727561014d91c5f70176.1502256365.git.chunfeng.yun@mediatek.com>
-References: <d58705436a2563b87a67609a472db3c3d84b36f5.1502256365.git.chunfeng.yun@mediatek.com>
- <b2d4141dd3c0dc33d60a727561014d91c5f70176.1502256365.git.chunfeng.yun@mediatek.com>
-Message-ID: <20170817151020.d2gyvdhbpicybwe4@rob-hp-laptop>
+From: rkrcmar@redhat.com (Radim =?utf-8?B?S3LEjW3DocWZ?=)
+Date: Thu, 17 Aug 2017 18:50:44 +0200
+Subject: [PATCH RFC 2/2] KVM: RCU protected dynamic vcpus array
+In-Reply-To: <7cb42373-355c-7cb3-2979-9529aef0641c@redhat.com>
+References: <20170816194037.9460-1-rkrcmar@redhat.com>
+ <20170816194037.9460-3-rkrcmar@redhat.com>
+ <7cb42373-355c-7cb3-2979-9529aef0641c@redhat.com>
+Message-ID: <20170817165044.GF2566@flask>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 09, 2017 at 01:29:49PM +0800, Chunfeng Yun wrote:
-> add support for PCIe and SATA, also add some new compatibles.
-
-s/add/Add/
-
+2017-08-17 13:14+0200, David Hildenbrand:
+> >  	atomic_set(&kvm->online_vcpus, 0);
+> >  	mutex_unlock(&kvm->lock);
+> > diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+> > index c8df733eed41..eb9fb5b493ac 100644
+> > --- a/include/linux/kvm_host.h
+> > +++ b/include/linux/kvm_host.h
+> > @@ -386,12 +386,17 @@ struct kvm_memslots {
+> >  	int used_slots;
+> >  };
+> >  
+> > +struct kvm_vcpus {
+> > +	u32 online;
+> > +	struct kvm_vcpu *array[];
 > 
-> due to phy-mt65xx-usb.txt holds the bindings for all mediatek SoCs
-
-s/due/Due/
-
-> with T-PHY controller, change the name to phy-mtk-tphy.txt to
-> reflect that.
+> On option could be to simply chunk it:
 > 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  .../phy/{phy-mt65xx-usb.txt => phy-mtk-tphy.txt}        | 17 ++++++++++++-----
->  1 file changed, 12 insertions(+), 5 deletions(-)
->  rename Documentation/devicetree/bindings/phy/{phy-mt65xx-usb.txt => phy-mtk-tphy.txt} (88%)
-> 
-> diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
-> similarity index 88%
-> rename from Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
-> rename to Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
-> index 0acc5a9..faf1808 100644
-> --- a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
-> +++ b/Documentation/devicetree/bindings/phy/phy-mtk-tphy.txt
-> @@ -1,13 +1,18 @@
-> -mt65xx USB3.0 PHY binding
-> +MediaTek T-PHY binding
->  --------------------------
->  
-> -This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
-> +T-phy controller supports physical layer functionality for a number of
-> +controllers on MediaTek SoCs, such as, USB2.0, USB3.0, PCIe, and SATA.
->  
->  Required properties (controller (parent) node):
->   - compatible	: should be one of
-> -		  "mediatek,mt2701-u3phy"
-> -		  "mediatek,mt2712-u3phy"
-> -		  "mediatek,mt8173-u3phy"
-> +		  "mediatek,generic-tphy-v1"
-> +		  "mediatek,generic-tphy-v2"
-> +		  "mediatek,mt2701-u3phy" (deprecated)
-> +		  "mediatek,mt2712-u3phy" (deprecated)
+> +struct kvm_vcpus {
+> +       struct kvm_vcpu vcpus[32];
 
-SoC specific compatibles should not be deprecated.
+I'm thinking of 128/256.
 
-> +		  "mediatek,mt8173-u3phy";
-> +		  make use of "mediatek,generic-tphy-v1" on mt2701 instead and
-> +		  "mediatek,generic-tphy-v2" on mt2712 instead.
->   - clocks	: (deprecated, use port's clocks instead) a list of phandle +
->  		  clock-specifier pairs, one for each entry in clock-names
->   - clock-names	: (deprecated, use port's one instead) must contain
-> @@ -35,6 +40,8 @@ Required properties (port (child) node):
->  		  cell after port phandle is phy type from:
->  			- PHY_TYPE_USB2
->  			- PHY_TYPE_USB3
-> +			- PHY_TYPE_PCIE
-> +			- PHY_TYPE_SATA
->  
->  Example:
->  
-> -- 
-> 1.9.1
+> +};
+> +
+>  /*
+>   * Note:
+>   * memslots are not sorted by id anymore, please use id_to_memslot()
+> @@ -391,7 +395,7 @@ struct kvm {
+>         struct mutex slots_lock;
+>         struct mm_struct *mm; /* userspace tied to this vm */
+>         struct kvm_memslots __rcu *memslots[KVM_ADDRESS_SPACE_NUM];
+> -       struct kvm_vcpu *vcpus[KVM_MAX_VCPUS];
+> +       struct kvm_vcpus vcpus[(KVM_MAX_VCPUS + 31) / 32];
+>         /*
+>          * created_vcpus is protected by kvm->lock, and is incremented
+> @@ -483,12 +487,14 @@ static inline struct kvm_io_bus
+> *kvm_get_bus(struct kvm *kvm, enum kvm_bus idx)
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 1. make nobody access kvm->vcpus directly (factor out)
+> 2. allocate next chunk if necessary when creating a VCPU and store
+> pointer using WRITE_ONCE
+> 3. use READ_ONCE to test for availability of the current chunk
+
+We can also use kvm->online_vcpus exactly like we did now.
+
+> kvm_for_each_vcpu just has to use READ_ONCE to access/test for the right
+> chunk. Pointers never get invalid. No RCU needed. Sleeping in the loop
+> is possible.
+
+I like this better than SRCU because it keeps the internal code mostly
+intact, even though it is compromise solution with a tunable.
+(SRCU gives us more protection than we need.)
+
+It is very similar to (3).  Chunks will usually take memory and have
+slower access to the first chunk than an extendable list would, but is
+faster from the third chunk, which is a reasonable deal.
+
+We are just postponing the problem until a higher number of VCPUs, but
+then we can extend it into more levels using the same principle and I
+think it will still get a better trade-offs than SRCU.
+
+I'd do this for v2,
+
+thanks.
