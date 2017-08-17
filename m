@@ -1,38 +1,44 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 16 Aug 2017 21:15:27 -0700
-Subject: [GIT PULL] Amlogic driver updates for v4.14
-Message-ID: <7hinhmakyo.fsf@baylibre.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Thu, 17 Aug 2017 12:44:08 +0800
+Subject: [PATCH v3 0/9] ASoC: rockchip: Parse dai links from dts
+Message-ID: <20170817044417.22069-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+Currently we are using a fixed list of dai links in the driver.
+This serial of patches would let the driver parse dai links from
+dts, so that we can make some of them optional for future boards.
 
-are available in the git repository at:
+Tested on my chromebook bob(with cros 4.4 kernel), it still works
+after disabled rt5514 codecs in the dts.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-drivers
 
-for you to fetch changes up to a9daaba2965e8b132424514e184fc40ee6f9e00c:
+Changes in v3:
+Use compatible to match audio codecs
+        -- Suggested-by Matthias Kaehlcke <mka@chromium.org>
 
-  soc: Add Amlogic SoC Information driver (2017-07-28 09:25:07 -0700)
+Changes in v2:
+Let rockchip,codec-names be a required property, because we plan to
+add more supported codecs to the fixed dai link list in the driver.
 
-----------------------------------------------------------------
-Amlogic driver updates for v4.14
-- add SoC info driver
+Jeffy Chen (9):
+  ASoC: rt5514: Switch to snd_soc_register_codec
+  ASoC: rockchip: Remove obsolete dmic-delay
+  ASoC: rockchip: Use codec of_node and dai_name for rt5514 dsp
+  arm64: dts: rockchip: Add rt5514 dsp for Gru
+  arm64: dts: rockchip: Update rt5514 devices' compatible for Gru
+  ASoC: rockchip: Parse dai links from dts
+  ASoC: rockchip: Add support for DP codec
+  ASoC: rockchip: Add support for DMIC codec
+  dt-bindings: ASoC: rockchip: Update description of rockchip,codec
 
-----------------------------------------------------------------
-Neil Armstrong (2):
-      dt-bindings: arm: amlogic: Add SoC information bindings
-      soc: Add Amlogic SoC Information driver
+ .../bindings/sound/rockchip,rk3399-gru-sound.txt   |   9 +-
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       |   7 +-
+ sound/soc/codecs/rt5514-spi.c                      |  19 +-
+ sound/soc/rockchip/Kconfig                         |   2 +
+ sound/soc/rockchip/rk3399_gru_sound.c              | 263 ++++++++++++++-------
+ 5 files changed, 196 insertions(+), 104 deletions(-)
 
- Documentation/devicetree/bindings/arm/amlogic.txt |  29 +++++++++++++++
- drivers/soc/Kconfig                               |   1 +
- drivers/soc/Makefile                              |   1 +
- drivers/soc/amlogic/Kconfig                       |  12 +++++++
- drivers/soc/amlogic/Makefile                      |   1 +
- drivers/soc/amlogic/meson-gx-socinfo.c            | 177 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 6 files changed, 221 insertions(+)
- create mode 100644 drivers/soc/amlogic/Kconfig
- create mode 100644 drivers/soc/amlogic/Makefile
- create mode 100644 drivers/soc/amlogic/meson-gx-socinfo.c
+-- 
+2.11.0
