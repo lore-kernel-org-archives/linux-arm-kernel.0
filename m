@@ -1,57 +1,447 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Thu, 17 Aug 2017 13:20:25 +0200
-Subject: [RFC 4/4] arm64: dts: realtek: Update RTD1295 UART nodes with clocks
+Date: Thu, 17 Aug 2017 13:20:24 +0200
+Subject: [RFC 3/4] clk: Add Realtek RTD1295
 In-Reply-To: <20170817112026.24062-1-afaerber@suse.de>
 References: <20170817112026.24062-1-afaerber@suse.de>
-Message-ID: <20170817112026.24062-5-afaerber@suse.de>
+Message-ID: <20170817112026.24062-4-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace clock-frequency with a reference to the respective clock gates.
+Add two clock controller drivers for RTD1295.
+
+Clock names are taken from vendor DT and clk_summary where possible.
+Clock rate calculations are guesses derived from Android register values and
+resulting rates in clk_summary.
+Clock gate parents are mostly unknown - osc27M is chosen for UART baudrate.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm64/boot/dts/realtek/rtd1295.dtsi | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/clk/Kconfig       |   7 +
+ drivers/clk/Makefile      |   1 +
+ drivers/clk/clk-rtd1295.c | 385 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 393 insertions(+)
+ create mode 100644 drivers/clk/clk-rtd1295.c
 
-diff --git a/arch/arm64/boot/dts/realtek/rtd1295.dtsi b/arch/arm64/boot/dts/realtek/rtd1295.dtsi
-index 078a11506876..503e2d5fc334 100644
---- a/arch/arm64/boot/dts/realtek/rtd1295.dtsi
-+++ b/arch/arm64/boot/dts/realtek/rtd1295.dtsi
-@@ -6,6 +6,7 @@
-  * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-  */
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index a874b72612d0..8e4534912f51 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -209,6 +209,13 @@ config COMMON_CLK_OXNAS
+ 	---help---
+ 	  Support for the OXNAS SoC Family clocks.
  
++config CLK_RTD129X
++	bool "Clock driver for the Realtek RTD129x SoC family"
++	default ARCH_REALTEK && ARM64
++	depends on (ARCH_REALTEK && ARM64) || COMPILE_TEST
++	---help---
++	  Support for the Realtek RTD1295 SoC.
++
+ config COMMON_CLK_VC5
+ 	tristate "Clock driver for IDT VersaClock 5,6 devices"
+ 	depends on I2C
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index cd376b3fb47a..466965452d4f 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -37,6 +37,7 @@ obj-$(CONFIG_COMMON_CLK_PALMAS)		+= clk-palmas.o
+ obj-$(CONFIG_COMMON_CLK_PWM)		+= clk-pwm.o
+ obj-$(CONFIG_CLK_QORIQ)			+= clk-qoriq.o
+ obj-$(CONFIG_COMMON_CLK_RK808)		+= clk-rk808.o
++obj-$(CONFIG_CLK_RTD129X)		+= clk-rtd1295.o
+ obj-$(CONFIG_COMMON_CLK_HI655X)		+= clk-hi655x.o
+ obj-$(CONFIG_COMMON_CLK_S2MPS11)	+= clk-s2mps11.o
+ obj-$(CONFIG_COMMON_CLK_SCPI)           += clk-scpi.o
+diff --git a/drivers/clk/clk-rtd1295.c b/drivers/clk/clk-rtd1295.c
+new file mode 100644
+index 000000000000..a20e71460dac
+--- /dev/null
++++ b/drivers/clk/clk-rtd1295.c
+@@ -0,0 +1,385 @@
++/*
++ * Realtek RTD1295
++ *
++ * Copyright (c) 2017 Andreas F?rber
++ *
++ * SPDX-License-Identifier: GPL-2.0+
++ */
++
 +#include <dt-bindings/clock/realtek,rtd1295.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/reset/realtek,rtd1295.h>
- 
-@@ -152,7 +153,7 @@
- 			reg = <0x98007800 0x400>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clock-frequency = <27000000>;
-+			clocks = <&iso_clkc RTD1295_ISO_CLK_EN_MISC_UR0>;
- 			interrupt-parent = <&iso_irq_mux>;
- 			interrupts = <2>;
- 			resets = <&iso_reset RTD1295_ISO_RSTN_UR0>;
-@@ -172,7 +173,7 @@
- 			reg = <0x9801b200 0x100>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clock-frequency = <432000000>;
-+			clocks = <&clkc RTD1295_CLK_EN_UR1>;
- 			interrupt-parent = <&irq_mux>;
- 			interrupts = <3>, <5>;
- 			resets = <&reset2 RTD1295_RSTN_UR1>;
-@@ -184,7 +185,7 @@
- 			reg = <0x9801b400 0x100>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clock-frequency = <432000000>;
-+			clocks = <&clkc RTD1295_CLK_EN_UR2>;
- 			interrupt-parent = <&irq_mux>;
- 			interrupts = <8>, <13>;
- 			resets = <&reset2 RTD1295_RSTN_UR2>;
++#include <linux/clk.h>
++#include <linux/clk-provider.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++
++struct rtd_pll_clk {
++	struct clk_hw hw;
++	void __iomem *base;
++	bool gpu;
++};
++
++#define to_pll_clk(_hw) container_of(_hw, struct rtd_pll_clk, hw)
++
++static unsigned long rtd_scpu_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct rtd_pll_clk *pll = to_pll_clk(hw);
++	u32 reg1, reg2, reg3, reg4;
++	unsigned f1, f2, f3, f4, f5;
++	unsigned long rate, frac;
++
++	reg1 = readl(pll->base + 0x4);
++	reg2 = readl(pll->base - (0x500 - 0x30));
++	reg3 = readl(pll->base + 0x0);
++	reg4 = readl(pll->base + 0x1c);
++	f1 = (reg1 >> 11) & 0xff;
++	f2 = (reg1 >> 0) & 0x7ff;
++	f3 = (reg2 >> 7) & 0x3;
++	f4 = (reg3 >> 0) & 0x1;
++	f5 = (reg4 >> 20) & 0x1;
++
++	rate = parent_rate * (f1 + 3) / f3;
++	frac = parent_rate / 2048 * f2 / BIT(f4);
++	rate += frac;
++
++	pr_info("%s 0x%08x n=%u f=%u 0x%08x x=%u 0x%08x y=%u 0x%08x z=%u rate=%lu\n",
++		__clk_get_name(hw->clk),
++		reg1, f1, f2,
++		reg2, f3,
++		reg3, f4,
++		reg4, f5, rate);
++	return rate;
++}
++
++static const struct clk_ops rtd_scpu_ops = {
++	.recalc_rate = rtd_scpu_recalc_rate,
++};
++
++static struct clk *rtd_scpu(void __iomem *base, const char *name, struct clk *parent)
++{
++	struct rtd_pll_clk *pll;
++	struct clk_init_data init;
++	struct clk *clk;
++	const char *parents[1];
++
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
++
++	if (parent)
++		parents[0] = __clk_get_name(parent);
++	init.name = name;
++	init.ops = &rtd_scpu_ops;
++	init.parent_names = parent ? parents : NULL;
++	init.num_parents = parent ? 1 : 0;
++	init.flags = CLK_IGNORE_UNUSED;
++
++	pll->hw.init = &init;
++	pll->base = base;
++
++	clk = clk_register(NULL, &pll->hw);
++	if (IS_ERR(clk)) {
++		pr_err("%s: error registering clk", name);
++		kfree(pll);
++	}
++	return clk;
++}
++
++static unsigned long rtd_nf_ssc_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct rtd_pll_clk *pll = to_pll_clk(hw);
++	u32 reg1, reg2, reg3;
++	unsigned f1, f2, f3, f4;
++	unsigned long rate, frac;
++
++	reg1 = readl(pll->base + 0x4);
++	reg2 = readl(pll->base + 0x0);
++	reg3 = readl(pll->base + 0x1c);
++	f1 = (reg1 >> 11) & 0xff;
++	f2 = (reg1 >> 0) & 0x7ff;
++	f3 = (reg2 >> 0) & 0xf;
++	f4 = (reg3 >> 20) & 0x1;
++
++	rate = parent_rate * (f1 + 3);
++	if (pll->gpu) {
++		rate /= 2;
++	}
++	frac = parent_rate * 4 * f2 / BIT(f3);
++	if (pll->gpu) {
++		frac /= 2;
++	}
++	rate += frac;
++
++	pr_info("%s 0x%08x n=%u f=%u 0x%08x d=%u 0x%08x x=%u rate=%lu\n", __clk_get_name(hw->clk),
++		reg1, f1, f2,
++		reg2, f3,
++		reg3, f4, rate);
++	return rate;
++}
++
++static const struct clk_ops rtd_nf_ssc_ops = {
++	.recalc_rate = rtd_nf_ssc_recalc_rate,
++};
++
++static struct clk *rtd_nf_ssc(void __iomem *base, const char *name, struct clk *parent)
++{
++	struct rtd_pll_clk *pll;
++	struct clk_init_data init;
++	struct clk *clk;
++	const char *parents[1];
++
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
++
++	if (parent)
++		parents[0] = __clk_get_name(parent);
++	init.name = name;
++	init.ops = &rtd_nf_ssc_ops;
++	init.parent_names = parent ? parents : NULL;
++	init.num_parents = parent ? 1 : 0;
++	init.flags = CLK_IGNORE_UNUSED;
++
++	pll->hw.init = &init;
++	pll->base = base;
++	pll->gpu = (strcmp(name, "pll_gpu") == 0);
++
++	clk = clk_register(NULL, &pll->hw);
++	if (IS_ERR(clk)) {
++		pr_err("%s: error registering clk", name);
++		kfree(pll);
++	}
++	return clk;
++}
++
++static unsigned long rtd_mno_ctrl_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
++{
++	struct rtd_pll_clk *pll = to_pll_clk(hw);
++	u32 reg1, reg2;
++	unsigned f1, f2, f3;
++	unsigned long rate;
++
++	reg1 = readl(pll->base + 0x0);
++	reg2 = readl(pll->base + 0x4);
++	f1 = (reg1 >> 4) & 0xff;
++	f2 = (reg1 >> 12) & 0x3;
++	f3 = (reg1 >> 17) & 0x3;
++
++	rate = parent_rate * (f1 + 2) / (f2 +1) / (f3 + 1);
++
++	pr_info("%s 0x%08x m=%u n=%u o=%u 0x%08x rate=%lu\n", __clk_get_name(hw->clk),
++		reg1, f1, f2, f3,
++		reg2, rate);
++	return rate;
++}
++
++static const struct clk_ops rtd_mno_ctrl_ops = {
++	.recalc_rate = rtd_mno_ctrl_recalc_rate,
++};
++
++static struct clk *rtd_mno_ctrl(void __iomem *base, const char *name, struct clk *parent)
++{
++	struct rtd_pll_clk *pll;
++	struct clk_init_data init;
++	struct clk *clk;
++	const char *parents[1];
++
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
++
++	if (parent)
++		parents[0] = __clk_get_name(parent);
++	init.name = name;
++	init.ops = &rtd_mno_ctrl_ops;
++	init.parent_names = parent ? parents : NULL;
++	init.num_parents = parent ? 1 : 0;
++	init.flags = CLK_IGNORE_UNUSED;
++
++	pll->hw.init = &init;
++	pll->base = base;
++
++	clk = clk_register(NULL, &pll->hw);
++	if (IS_ERR(clk)) {
++		pr_err("%s: error registering clk", name);
++		kfree(pll);
++	}
++	return clk;
++}
++
++static const char * const rtd1295_gates1[32] = {
++	[ 0] = "clk_en_misc",
++	[ 1] = "clk_en_pcie0",
++	[ 2] = "clk_en_sata_0",
++	[ 3] = "clk_en_gspi",
++	[ 4] = "clk_en_usb",
++	[ 5] = "clk_en_pcr",
++	[ 6] = "clk_en_iso_misc",
++	[ 7] = "clk_en_sata_alive_0",
++	[ 8] = "clk_en_hdmi",
++	[ 9] = "clk_en_etn",
++	[10] = "clk_en_aio",
++	/* "*clk_en_gpu", */
++	/* "*clk_en_ve1", */
++	/* "*clk_en_ve2", */
++	[14] = "clk_en_tve",
++	/* "*clk_en_vo", */
++	[16] = "clk_en_lvds",
++	[17] = "clk_en_se",
++	[18] = "clk_en_dcu",
++	[19] = "clk_en_cp",
++	[20] = "clk_en_md",
++	[21] = "clk_en_tp",
++	[22] = "clk_en_rsa",
++	[23] = "clk_en_nf",
++	[24] = "clk_en_emmc",
++	[25] = "clk_en_cr",
++	[26] = "clk_en_sdio_ip",
++	[27] = "clk_en_mipi",
++	[28] = "clk_en_emmc_ip",
++	/* "*clk_en_ve3", */
++	[30] = "clk_en_sdio",
++	[31] = "clk_en_sd_ip",
++};
++
++static const char * const rtd1295_gates2[32] = {
++	[ 0] = "clk_en_nat",
++	[ 1] = "clk_en_misc_i2c_5",
++	/* "*clk_en_scpu", */
++	[ 3] = "clk_en_jpeg",
++	/* "*clk_en_apu", */
++	[ 5] = "clk_en_pcie1",
++	[ 6] = "clk_en_misc_sc",
++	[ 7] = "clk_en_cbus_tx",
++	/* "*rvd", */
++	/* "*rvd", */
++	[10] = "clk_en_misc_rtc",
++	/* "*rvd", */
++	/* "*rvd", */
++	[13] = "clk_en_misc_i2c_4",
++	[14] = "clk_en_misc_i2c_3",
++	[15] = "clk_en_misc_i2c_2",
++	[16] = "clk_en_misc_i2c_1",
++	[17] = "clk_en_aio_au_codec",
++	[18] = "clk_en_aio_mod",
++	[19] = "clk_en_aio_da",
++	[20] = "clk_en_aio_hdmi",
++	[21] = "clk_en_aio_spdif",
++	[22] = "clk_en_aio_i2s",
++	[23] = "clk_en_aio_mclk",
++	[24] = "clk_en_hdmirx",
++	[25] = "clk_en_sata_1",
++	[26] = "clk_en_sata_alive_1",
++	[27] = "clk_en_ur2",
++	[28] = "clk_en_ur1",
++	[29] = "clk_en_fan",
++	[30] = "clk_en_dcphy_0",
++	[31] = "clk_en_dcphy_1",
++};
++
++static struct clk *clks[16 + 2 * 32] = {};
++
++static struct clk_onecell_data rtd_clks = {
++	.clks = clks,
++	.clk_num = ARRAY_SIZE(clks),
++};
++
++static void __init rtd1295_clk_init(struct device_node *node)
++{
++	void __iomem *base;
++	struct clk *osc;
++	int i;
++	static const char *clk_sys_parents[2] = { "pll_bus", "pll_bus_div2" };
++	static const char *clk_ve_parents[4] = { "clk_sysh", "pll_ve1", "pll_ve2", "pll_ve2" };
++
++	base = of_iomap(node, 0);
++
++	osc = of_clk_get(node, 0);
++
++	clks[RTD1295_CLK_PLL_SCPU] = rtd_scpu(base + 0x500, "pll_scpu", osc);
++	clks[RTD1295_CLK_PLL_BUS] = rtd_nf_ssc(base + 0x520, "pll_bus", osc);
++	clks[RTD1295_CLK_PLL_BUS_DIV2] = clk_register_fixed_factor(NULL, "pll_bus_div2", "pll_bus", 0, 1, 2);
++	clks[RTD1295_CLK_SYS] = clk_register_mux(NULL, "clk_sys", clk_sys_parents, 2, 0, base + 0x30, 0, 1, CLK_MUX_READ_ONLY, NULL);
++	clks[RTD1295_CLK_PLL_BUS_H] = rtd_nf_ssc(base + 0x540, "pll_bus_h", osc);
++	clks[RTD1295_CLK_SYSH] = clk_register_fixed_factor(NULL, "clk_sysh", "pll_bus_h", 0, 1, 1);
++	clks[RTD1295_CLK_PLL_DDSA] = rtd_nf_ssc(base + 0x560, "pll_ddsa", osc);
++	clks[RTD1295_CLK_PLL_DDSB] = rtd_nf_ssc(base + 0x580, "pll_ddsb", osc);
++	clks[RTD1295_CLK_PLL_VODMA] = rtd_mno_ctrl(base + 0x260, "pll_vodma", osc);
++	clk_register_fixed_factor(NULL, "clk_vodma", "pll_vodma", 0, 1, 1);
++	clks[RTD1295_CLK_EN_VO] = clk_register_gate(NULL, "clk_en_vo", "clk_vodma", CLK_IGNORE_UNUSED, base + 0xc, 15, 0, NULL);
++	clks[RTD1295_CLK_PLL_VE1] = rtd_mno_ctrl(base + 0x114, "pll_ve1", osc);
++	clks[RTD1295_CLK_PLL_VE2] = rtd_mno_ctrl(base + 0x1d0, "pll_ve2", osc);
++	clk_register_mux(NULL, "clk_ve1", clk_ve_parents, 4, 0, base + 0x4c, 0, 2, CLK_MUX_READ_ONLY, NULL);
++	clks[RTD1295_CLK_EN_VE1] = clk_register_gate(NULL, "clk_en_ve1", "clk_ve1", CLK_IGNORE_UNUSED, base + 0xc, 12, 0, NULL);
++	clk_register_mux(NULL, "clk_ve2", clk_ve_parents, 4, 0, base + 0x4c, 2, 2, CLK_MUX_READ_ONLY, NULL);
++	clks[RTD1295_CLK_EN_VE2] = clk_register_gate(NULL, "clk_en_ve2", "clk_ve2", CLK_IGNORE_UNUSED, base + 0xc, 13, 0, NULL);
++	clk_register_mux(NULL, "clk_ve3", clk_ve_parents, 4, 0, base + 0x4c, 4, 2, CLK_MUX_READ_ONLY, NULL);
++	clks[RTD1295_CLK_EN_VE3] = clk_register_gate(NULL, "clk_en_ve3", "clk_ve3", CLK_IGNORE_UNUSED, base + 0xc, 29, 0, NULL);
++	clks[RTD1295_CLK_PLL_GPU] = rtd_nf_ssc(base + 0x5a0, "pll_gpu", osc);
++	clk_register_fixed_factor(NULL, "clk_gpu", "pll_gpu", 0, 1, 1);
++	clks[RTD1295_CLK_EN_GPU] = clk_register_gate(NULL, "clk_en_gpu", "clk_gpu", CLK_IGNORE_UNUSED, base + 0xc, 11, 0, NULL);
++	clks[RTD1295_CLK_PLL_ACPU] = rtd_nf_ssc(base + 0x5c0, "pll_acpu", osc);
++
++	for (i = 0; i < ARRAY_SIZE(rtd1295_gates1); i++) {
++		if (!rtd1295_gates1[i])
++			continue;
++		clks[RTD1295_CLK_EN_BASE + i] = clk_register_gate(NULL, rtd1295_gates1[i], NULL, CLK_IGNORE_UNUSED, base + 0xc, i, 0, NULL);
++	}
++
++	for (i = 0; i < ARRAY_SIZE(rtd1295_gates2); i++) {
++		if (!rtd1295_gates2[i])
++			continue;
++		clks[RTD1295_CLK_EN_BASE2 + i] = clk_register_gate(NULL, rtd1295_gates2[i], __clk_get_name(osc), CLK_IGNORE_UNUSED, base + 0x10, i, 0, NULL);
++	}
++
++	clk_put(osc);
++
++	of_clk_add_provider(node, of_clk_src_onecell_get, &rtd_clks);
++}
++CLK_OF_DECLARE(rtd1295, "realtek,rtd1295-clk", rtd1295_clk_init);
++
++static const char * const rtd1295_iso_gates[13] = {
++	/* "*unused", */
++	/* "*rvd", */
++	[ 2] = "clk_en_misc_cec0",
++	[ 3] = "clk_en_cbusrx_sys",
++	[ 4] = "clk_en_cbustx_sys",
++	[ 5] = "clk_en_cbus_sys",
++	[ 6] = "clk_en_cbus_osc",
++	[ 7] = "clk_en_misc_ir",
++	[ 8] = "clk_en_misc_ur0",
++	[ 9] = "clk_en_i2c0",
++	[10] = "clk_en_i2c1",
++	[11] = "clk_en_etn_250m",
++	[12] = "clk_en_etn_sys",
++};
++
++static struct clk *iso_clks[13] = {};
++
++static struct clk_onecell_data rtd_iso_clks = {
++	.clks = iso_clks,
++	.clk_num = ARRAY_SIZE(iso_clks),
++};
++
++static void __init rtd1295_iso_clk_init(struct device_node *node)
++{
++	void __iomem *base;
++	struct clk *osc;
++	int i;
++
++	base = of_iomap(node, 0);
++
++	osc = of_clk_get(node, 0);
++
++	for (i = 0; i < ARRAY_SIZE(rtd1295_iso_gates); i++) {
++		if (!rtd1295_iso_gates[i])
++			continue;
++		iso_clks[i] = clk_register_gate(NULL, rtd1295_iso_gates[i], __clk_get_name(osc), CLK_IGNORE_UNUSED, base + 0x8c, i, 0, NULL);
++	}
++
++	clk_put(osc);
++
++	of_clk_add_provider(node, of_clk_src_onecell_get, &rtd_iso_clks);
++}
++CLK_OF_DECLARE(rtd1295_iso, "realtek,rtd1295-iso-clk", rtd1295_iso_clk_init);
 -- 
 2.12.3
