@@ -1,7 +1,7 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 16 Aug 2017 21:14:34 -0700
-Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.14
-Message-ID: <7hmv6yal05.fsf@baylibre.com>
+Date: Wed, 16 Aug 2017 21:15:27 -0700
+Subject: [GIT PULL] Amlogic driver updates for v4.14
+Message-ID: <7hinhmakyo.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,41 +11,28 @@ The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-drivers
 
-for you to fetch changes up to f72d6f6037b7b07927f78e159e4949b8e0263258:
+for you to fetch changes up to a9daaba2965e8b132424514e184fc40ee6f9e00c:
 
-  ARM64: dts: meson-gx: use stable UART bindings with correct gate clock (2017-08-08 14:48:56 -0700)
-
-----------------------------------------------------------------
-Amlogic 64-bit DT updates for v4.14
-- add GPIO line names to a few boards
-- MMC regulator settle time updates
-- misc cleanups/fixups
+  soc: Add Amlogic SoC Information driver (2017-07-28 09:25:07 -0700)
 
 ----------------------------------------------------------------
-Helmut Klein (1):
-      ARM64: dts: meson-gx: use stable UART bindings with correct gate clock
+Amlogic driver updates for v4.14
+- add SoC info driver
 
-Jerome Brunet (1):
-      ARM64: dts: meson-gxbb: p20x: add card regulator settle times
+----------------------------------------------------------------
+Neil Armstrong (2):
+      dt-bindings: arm: amlogic: Add SoC information bindings
+      soc: Add Amlogic SoC Information driver
 
-Kevin Hilman (1):
-      dt-bindings: amlogic: add unstable statement
-
-Martin Blumenstingl (1):
-      ARM64: dts: meson-gx: consistently use the GIC_SPI and IRQ type macros
-
-Neil Armstrong (3):
-      ARM64: dts: meson-gx: Add SoC info register
-      ARM64: dts: meson-gxl-khadas-vim: Add GPIO lines names
-      ARM64: dts: meson-gxbb-nanopi-k2: Add GPIO lines names
-
- Documentation/devicetree/bindings/arm/amlogic.txt          | 12 ++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi                  | 26 +++++++++++++++-----------
- arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts       | 58 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi           |  3 +++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                | 25 +++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts | 56 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                 | 25 +++++++++++++++++++++++++
- 7 files changed, 194 insertions(+), 11 deletions(-)
+ Documentation/devicetree/bindings/arm/amlogic.txt |  29 +++++++++++++++
+ drivers/soc/Kconfig                               |   1 +
+ drivers/soc/Makefile                              |   1 +
+ drivers/soc/amlogic/Kconfig                       |  12 +++++++
+ drivers/soc/amlogic/Makefile                      |   1 +
+ drivers/soc/amlogic/meson-gx-socinfo.c            | 177 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 221 insertions(+)
+ create mode 100644 drivers/soc/amlogic/Kconfig
+ create mode 100644 drivers/soc/amlogic/Makefile
+ create mode 100644 drivers/soc/amlogic/meson-gx-socinfo.c
