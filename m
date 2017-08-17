@@ -1,19 +1,41 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Aug 2017 17:20:57 -0500
-Subject: [PATCH v3 1/2] remoteproc: dt: Provide bindings for iMX6SX/7D
- Remote Processor Controller driver
-In-Reply-To: <20170817071526.5930-2-o.rempel@pengutronix.de>
-References: <20170817071526.5930-1-o.rempel@pengutronix.de>
- <20170817071526.5930-2-o.rempel@pengutronix.de>
-Message-ID: <20170817222057.r7ysd72byn4o7kg3@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Aug 2017 16:01:19 -0700
+Subject: [PATCH 0/3] omap5 cpu off mode support
+Message-ID: <20170817230122.30655-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 09:15:25AM +0200, Oleksij Rempel wrote:
-> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
-> ---
->  .../devicetree/bindings/remoteproc/imx-rproc.txt   | 33 ++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
+Hi all,
 
-Acked-by: Rob Herring <robh@kernel.org>
+Here are few patches to enable omap5 cpu off mode similar to
+what we do for omap4. This seems to save about 0.2W power on
+omap5-uevm while idle compared to retention idle.
+
+Note that this won't work for dra7 as it does not support
+deeper idle modes.
+
+Regards,
+
+Tony
+
+clone of "next-bak-2017-07-17-20170717-001945"
+
+Santosh Shilimkar (1):
+  ARM: OMAP5: Add cpuidle assembly code
+
+Tony Lindgren (2):
+  ARM: OMAP2+: Separate dra7 cpuidle from omap5
+  ARM: OMAP5: Enable CPU off idle states
+
+ arch/arm/mach-omap2/common.h                |  11 +++
+ arch/arm/mach-omap2/cpuidle44xx.c           |  56 ++++++++++++
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c   |   8 +-
+ arch/arm/mach-omap2/omap-secure.h           |   6 ++
+ arch/arm/mach-omap2/omap-wakeupgen.c        |   5 +-
+ arch/arm/mach-omap2/pm44xx.c                |   2 +-
+ arch/arm/mach-omap2/powerdomains54xx_data.c |  10 +-
+ arch/arm/mach-omap2/sleep44xx.S             | 137 ++++++++++++++++++++++++++++
+ 8 files changed, 226 insertions(+), 9 deletions(-)
+
+-- 
+2.14.1
