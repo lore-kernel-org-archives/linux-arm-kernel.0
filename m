@@ -1,46 +1,40 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Thu, 17 Aug 2017 15:12:58 +1000
-Subject: [PATCH net RESEND] PCI: fix oops when try to find Root Port for a
- PCI device
-In-Reply-To: <20170816193303.GA14147@ulmo>
-References: <1502810688-12420-1-git-send-email-dingtianhong@huawei.com>
- <20170815170331.GA4099@bhelgaas-glaptop.roam.corp.google.com>
- <20170816193303.GA14147@ulmo>
-Message-ID: <87fucqsrol.fsf@concordia.ellerman.id.au>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 17 Aug 2017 08:10:33 +0200
+Subject: [PATCHv2 0/3] arm64 xilinx zynqmp firmware interface
+In-Reply-To: <43deeed7-32c8-7914-5f44-862ebbe14a3b@arm.com>
+References: <cover.1502886277.git.michal.simek@xilinx.com>
+ <43deeed7-32c8-7914-5f44-862ebbe14a3b@arm.com>
+Message-ID: <89e5469b-650e-64c7-1754-797b35bac523@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry Reding <thierry.reding@gmail.com> writes:
-...
->
-> In case of Tegra, dev actually points to the root port. Now if I read
-> the above code correctly, highest_pcie_bridge will still be NULL in that
-> case, which in turn will return NULL from pci_find_pcie_root_port(). But
-> shouldn't it really return dev?
->
-> The patch that I used to fix the issue is this:
->
-> --->8---
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 2c712dcfd37d..dd56c1c05614 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -514,7 +514,7 @@ EXPORT_SYMBOL(pci_find_resource);
->   */
->  struct pci_dev *pci_find_pcie_root_port(struct pci_dev *dev)
->  {
-> -       struct pci_dev *bridge, *highest_pcie_bridge = NULL;
-> +       struct pci_dev *bridge, *highest_pcie_bridge = dev;
->  
->         bridge = pci_upstream_bridge(dev);
->         while (bridge && pci_is_pcie(bridge)) {
-> --->8---
->
-> That works correctly if this function ends up being called on the PCIe
-> root port, though perhaps that's not what this function is supposed to
-> do. It's somewhat unclear from the kerneldoc what the function should
-> be doing when called on a root port device itself.
+On 16.8.2017 17:39, Marc Zyngier wrote:
+> On 16/08/17 13:24, Michal Simek wrote:
+>> Hi,
+>>
+>> xilinx is using this interface for very long time and we can't merge our
+>> driver changes to Linux because of missing communication layer with
+>> firmware. This interface was developed before scpi and scmi was
+>> available. In connection to power management scpi and scmi are missing
+>> pieces which we already use. There is a separate discussion how to
+>> extend scmi to support all our use cases.
+> 
+> So maybe we should wait and see where this discussion is going before we
+> merge yet another firmware interface?
 
-That also works for me on powerpc (oops reported up thread).
+It will take a lot of time when this discussion ends and I can't see any
+benefit to hold all
 
-cheers
+
+>> This simply patch is not adding any power management features but only
+>> adding minimum functionality which are needed for drivers.
+> 
+> I don't get it. 600 lines of firmware interface that isn't used by
+> anything? Or is it? Needed by which driver?
+
+I can send that drivers for review. pinctrl, fpga manager, nvmem driver,
+clock, serdes phy and reset drivers.
+But this driver need to come first because they depend on this.
+
+Thanks,
+Michal
