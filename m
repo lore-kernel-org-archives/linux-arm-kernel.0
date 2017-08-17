@@ -1,29 +1,25 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 17 Aug 2017 17:00:21 +0800
-Subject: [PATCH RESEND] lib/mpi: fix build with clang
-In-Reply-To: <20170807173120.15463-1-stefan@agner.ch>
-References: <20170807173120.15463-1-stefan@agner.ch>
-Message-ID: <20170817090021.GC25646@gondor.apana.org.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Aug 2017 11:01:05 +0200
+Subject: [GIT PULL] Fourth Round of Renesas ARM Based SoC Fixes for v4.13
+In-Reply-To: <cover.1502959921.git.horms+renesas@verge.net.au>
+References: <cover.1502959921.git.horms+renesas@verge.net.au>
+Message-ID: <CAK8P3a0F5xKg1A3Oi-DzsZic0YK_UWMKxdO6Ka2EweAxq229=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 10:31:20AM -0700, Stefan Agner wrote:
-> Use just @ to denote comments which works with gcc and clang.
-> Otherwise clang reports an escape sequence error:
->   error: invalid % escape in inline assembly string
-> 
-> Use %0-%3 as operand references, this avoids:
->   error: invalid operand in inline asm: 'umull ${1:r}, ${0:r}, ${2:r}, ${3:r}'
-> 
-> Also remove superfluous casts on output operands to avoid warnings
-> such as:
->   warning: invalid use of a cast in an inline asm context requiring an l-value
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+On Thu, Aug 17, 2017 at 10:56 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
+>
+> Please consider these fourth round of Renesas ARM based SoC fixes for v4.13.
+>
+> This pull request is based on the second round of
+> such requests, tagged as renesas-fixes2-for-v4.13,
+> which I you have already pulled.
+>
+> It is not based on the third round of fixes as they
+> are not related to arm64 DT and have a different base.
 
-Patch applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Pulled into the fixes branch, thanks!
+
+       Arnd
