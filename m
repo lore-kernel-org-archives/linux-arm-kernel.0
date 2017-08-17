@@ -1,46 +1,78 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 17 Aug 2017 03:23:40 -0400
-Subject: [PATCH v2 1/8] ARM: implement get_tls syscall
+Date: Thu, 17 Aug 2017 03:23:46 -0400
+Subject: [PATCH v2 7/8] binfmt_elf: don't attempt to load FDPIC binaries
 In-Reply-To: <20170817072347.19990-1-nicolas.pitre@linaro.org>
 References: <20170817072347.19990-1-nicolas.pitre@linaro.org>
-Message-ID: <20170817072347.19990-2-nicolas.pitre@linaro.org>
+Message-ID: <20170817072347.19990-8-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When there is no dedicated register to hold the tp value and no MMU
-to provide a fixed address kuser helper entry point, all that is
-left as fallback is a syscall.
+On platforms where both ELF and ELF-FDPIC variants are available, the
+regular ELF loader will happily identify FDPIC binaries as proper ELF
+and load them without the necessary FDPIC fixups, resulting in an
+immediate user space crash. Let's prevent binflt_elf from loading those
+binaries so binfmt_elf_fdpic has a chance to pick them up. For those
+architectures that don't define elf_check_fdpic(), a default version
+returning false is provided.
 
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/include/uapi/asm/unistd.h | 1 +
- arch/arm/kernel/traps.c            | 3 +++
- 2 files changed, 4 insertions(+)
+ fs/binfmt_elf.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/uapi/asm/unistd.h b/arch/arm/include/uapi/asm/unistd.h
-index 28bd456494..575b25fc29 100644
---- a/arch/arm/include/uapi/asm/unistd.h
-+++ b/arch/arm/include/uapi/asm/unistd.h
-@@ -35,5 +35,6 @@
- #define __ARM_NR_usr26			(__ARM_NR_BASE+3)
- #define __ARM_NR_usr32			(__ARM_NR_BASE+4)
- #define __ARM_NR_set_tls		(__ARM_NR_BASE+5)
-+#define __ARM_NR_get_tls		(__ARM_NR_BASE+6)
+diff --git a/fs/binfmt_elf.c b/fs/binfmt_elf.c
+index 879ff9c7ff..84d64afaea 100644
+--- a/fs/binfmt_elf.c
++++ b/fs/binfmt_elf.c
+@@ -51,6 +51,11 @@
+ #define user_siginfo_t siginfo_t
+ #endif
  
- #endif /* _UAPI__ASM_ARM_UNISTD_H */
-diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-index 948c648fea..43c0560f7b 100644
---- a/arch/arm/kernel/traps.c
-+++ b/arch/arm/kernel/traps.c
-@@ -647,6 +647,9 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
- 		set_tls(regs->ARM_r0);
- 		return 0;
- 
-+	case NR(get_tls):
-+		return current_thread_info()->tp_value[0];
++/* That's for binfmt_elf_fdpic to deal with */
++#ifndef elf_check_fdpic
++#define elf_check_fdpic(ex) false
++#endif
 +
- 	default:
- 		/* Calls 9f00xx..9f07ff are defined to return -ENOSYS
- 		   if not implemented, rather than raising SIGILL.  This
+ static int load_elf_binary(struct linux_binprm *bprm);
+ static unsigned long elf_map(struct file *, unsigned long, struct elf_phdr *,
+ 				int, int, unsigned long);
+@@ -541,7 +546,8 @@ static unsigned long load_elf_interp(struct elfhdr *interp_elf_ex,
+ 	if (interp_elf_ex->e_type != ET_EXEC &&
+ 	    interp_elf_ex->e_type != ET_DYN)
+ 		goto out;
+-	if (!elf_check_arch(interp_elf_ex))
++	if (!elf_check_arch(interp_elf_ex) ||
++	    elf_check_fdpic(interp_elf_ex))
+ 		goto out;
+ 	if (!interpreter->f_op->mmap)
+ 		goto out;
+@@ -718,6 +724,8 @@ static int load_elf_binary(struct linux_binprm *bprm)
+ 		goto out;
+ 	if (!elf_check_arch(&loc->elf_ex))
+ 		goto out;
++	if (elf_check_fdpic(&loc->elf_ex))
++		goto out;
+ 	if (!bprm->file->f_op->mmap)
+ 		goto out;
+ 
+@@ -817,7 +825,8 @@ static int load_elf_binary(struct linux_binprm *bprm)
+ 		if (memcmp(loc->interp_elf_ex.e_ident, ELFMAG, SELFMAG) != 0)
+ 			goto out_free_dentry;
+ 		/* Verify the interpreter has a valid arch */
+-		if (!elf_check_arch(&loc->interp_elf_ex))
++		if (!elf_check_arch(&loc->interp_elf_ex) ||
++		    elf_check_fdpic(&loc->interp_elf_ex))
+ 			goto out_free_dentry;
+ 
+ 		/* Load the interpreter program headers */
+@@ -1189,6 +1198,8 @@ static int load_elf_library(struct file *file)
+ 	if (elf_ex.e_type != ET_EXEC || elf_ex.e_phnum > 2 ||
+ 	    !elf_check_arch(&elf_ex) || !file->f_op->mmap)
+ 		goto out;
++	if (elf_check_fdpic(&elf_ex))
++		goto out;
+ 
+ 	/* Now read in all of the header information */
+ 
 -- 
 2.9.5
