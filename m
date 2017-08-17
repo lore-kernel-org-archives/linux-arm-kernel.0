@@ -1,98 +1,36 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Thu, 17 Aug 2017 16:57:37 +0800
-Subject: [PATCH] pinctrl: mediatek: update PCIe pinmux data
-Message-ID: <7e51745301c377eb8527bdf6171eaf26fc53b0b4.1502959698.git.ryder.lee@mediatek.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Aug 2017 10:58:18 +0200
+Subject: [GIT PULL 1/3] ARM: Keystone DTS for 4.14
+In-Reply-To: <1502929842-8156-1-git-send-email-ssantosh@kernel.org>
+References: <1502929842-8156-1-git-send-email-ssantosh@kernel.org>
+Message-ID: <CAK8P3a3P=ncdJo-weht5fdoKeNBH-k2xvf4s-uQaS+fMhNBarg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update pinmux data so that PCIe function can work normally.
+On Thu, Aug 17, 2017 at 2:30 AM, Santosh Shilimkar <ssantosh@kernel.org> wrote:
+> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+>
+>   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.14
+>
+> for you to fetch changes up to 6794d3771c319bd67f95575f11846a0fe86105c5:
+>
+>   ARM: dts: keystone-k2g-ice: Add and enable DSP CMA memory pool (2017-08-12 10:58:11 -0700)
+>
+> ----------------------------------------------------------------
+> ARM: Keystone DTS for 4.14
+>
+> Contents:
+> - ti-sci power domain, clock and reset controller support
+> - DSP nodes for k2h/k2l/k2e evms
+> - DSP CMA memory pools for k2h/k2l/k2e/keg evms
+> - MMC/hsmmc suport for k2g
+> - eDMA support for k2g
+> - DCAN support for k2g
 
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
----
- drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h | 24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+Pulled into next/dt, thanks!
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h
-index f906420..bdbb491 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h
-@@ -223,11 +223,11 @@
- 		MTK_EINT_FUNCTION(0, 0),
- 		MTK_FUNCTION(0, "GPIO22"),
- 		MTK_FUNCTION(1, "UCTS0"),
-+		MTK_FUNCTION(2, "PCIE0_PERST_N"),
- 		MTK_FUNCTION(3, "KCOL3"),
- 		MTK_FUNCTION(4, "CONN_DSP_JDO"),
- 		MTK_FUNCTION(5, "EXT_FRAME_SYNC"),
--		MTK_FUNCTION(7, "DBG_MON_A[30]"),
--		MTK_FUNCTION(10, "PCIE0_PERST_N")
-+		MTK_FUNCTION(7, "DBG_MON_A[30]")
- 	),
- 	MTK_PIN(
- 		PINCTRL_PIN(23, "EINT1"),
-@@ -235,11 +235,11 @@
- 		MTK_EINT_FUNCTION(0, 1),
- 		MTK_FUNCTION(0, "GPIO23"),
- 		MTK_FUNCTION(1, "URTS0"),
-+		MTK_FUNCTION(2, "PCIE1_PERST_N"),
- 		MTK_FUNCTION(3, "KCOL2"),
- 		MTK_FUNCTION(4, "CONN_MCU_TDO"),
- 		MTK_FUNCTION(5, "EXT_FRAME_SYNC"),
--		MTK_FUNCTION(7, "DBG_MON_A[29]"),
--		MTK_FUNCTION(10, "PCIE1_PERST_N")
-+		MTK_FUNCTION(7, "DBG_MON_A[29]")
- 	),
- 	MTK_PIN(
- 		PINCTRL_PIN(24, "EINT2"),
-@@ -247,10 +247,10 @@
- 		MTK_EINT_FUNCTION(0, 2),
- 		MTK_FUNCTION(0, "GPIO24"),
- 		MTK_FUNCTION(1, "UCTS1"),
-+		MTK_FUNCTION(2, "PCIE2_PERST_N"),
- 		MTK_FUNCTION(3, "KCOL1"),
- 		MTK_FUNCTION(4, "CONN_MCU_DBGACK_N"),
--		MTK_FUNCTION(7, "DBG_MON_A[28]"),
--		MTK_FUNCTION(10, "PCIE2_PERST_N")
-+		MTK_FUNCTION(7, "DBG_MON_A[28]")
- 	),
- 	MTK_PIN(
- 		PINCTRL_PIN(25, "EINT3"),
-@@ -308,8 +308,8 @@
- 		MTK_FUNCTION(3, "KROW0"),
- 		MTK_FUNCTION(4, "CONN_MCU_TMS"),
- 		MTK_FUNCTION(5, "CONN_MCU_AICE_JMSC"),
--		MTK_FUNCTION(7, "DBG_MON_A[23]"),
--		MTK_FUNCTION(14, "PCIE2_PERST_N")
-+		MTK_FUNCTION(6, "PCIE2_PERST_N"),
-+		MTK_FUNCTION(7, "DBG_MON_A[23]")
- 	),
- 	MTK_PIN(
- 		PINCTRL_PIN(30, "I2S5_LRCK"),
-@@ -1787,10 +1787,10 @@
- 		MTK_FUNCTION(0, "GPIO208"),
- 		MTK_FUNCTION(1, "AUD_EXT_CK1"),
- 		MTK_FUNCTION(2, "PWM0"),
-+		MTK_FUNCTION(3, "PCIE0_PERST_N"),
- 		MTK_FUNCTION(4, "ANT_SEL5"),
- 		MTK_FUNCTION(5, "DISP_PWM"),
--		MTK_FUNCTION(7, "DBG_MON_A[31]"),
--		MTK_FUNCTION(11, "PCIE0_PERST_N")
-+		MTK_FUNCTION(7, "DBG_MON_A[31]")
- 	),
- 	MTK_PIN(
- 		PINCTRL_PIN(209, "AUD_EXT_CK2"),
-@@ -1798,10 +1798,10 @@
- 		MTK_EINT_FUNCTION(0, 121),
- 		MTK_FUNCTION(0, "GPIO209"),
- 		MTK_FUNCTION(1, "AUD_EXT_CK2"),
-+		MTK_FUNCTION(3, "PCIE1_PERST_N"),
- 		MTK_FUNCTION(2, "MSDC1_WP"),
- 		MTK_FUNCTION(5, "PWM1"),
--		MTK_FUNCTION(7, "DBG_MON_A[32]"),
--		MTK_FUNCTION(11, "PCIE1_PERST_N")
-+		MTK_FUNCTION(7, "DBG_MON_A[32]")
- 	),
- 	MTK_PIN(
- 		PINCTRL_PIN(210, "AUD_CLOCK"),
--- 
-1.9.1
+       Arnd
