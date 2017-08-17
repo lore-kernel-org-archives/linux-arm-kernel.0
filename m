@@ -1,61 +1,61 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 17 Aug 2017 13:06:14 +0200
-Subject: [PATCH] PCI: Allow PCI express root ports to find themselves
-In-Reply-To: <1502936730-7368-1-git-send-email-dingtianhong@huawei.com>
-References: <1502936730-7368-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <20170817110614.11454-1-thierry.reding@gmail.com>
+From: david@redhat.com (David Hildenbrand)
+Date: Thu, 17 Aug 2017 13:14:27 +0200
+Subject: [PATCH RFC 2/2] KVM: RCU protected dynamic vcpus array
+In-Reply-To: <20170816194037.9460-3-rkrcmar@redhat.com>
+References: <20170816194037.9460-1-rkrcmar@redhat.com>
+ <20170816194037.9460-3-rkrcmar@redhat.com>
+Message-ID: <7cb42373-355c-7cb3-2979-9529aef0641c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
 
-If the pci_find_pcie_root_port() function is called on a root port
-itself, return the root port rather than NULL.
+>  	atomic_set(&kvm->online_vcpus, 0);
+>  	mutex_unlock(&kvm->lock);
+> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+> index c8df733eed41..eb9fb5b493ac 100644
+> --- a/include/linux/kvm_host.h
+> +++ b/include/linux/kvm_host.h
+> @@ -386,12 +386,17 @@ struct kvm_memslots {
+>  	int used_slots;
+>  };
+>  
+> +struct kvm_vcpus {
+> +	u32 online;
+> +	struct kvm_vcpu *array[];
 
-This effectively reverts commit 0e405232871d6 ("PCI: fix oops when
-try to find Root Port for a PCI device") which added an extra check
-that would now be redundant.
+On option could be to simply chunk it:
 
-Fixes: a99b646afa8a ("PCI: Disable PCIe Relaxed Ordering if unsupported")
-Fixes: c56d4450eb68 ("PCI: Turn off Request Attributes to avoid Chelsio T5 Completion erratum")
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
-This applies on top of and was tested on next-20170817.
++struct kvm_vcpus {
++       struct kvm_vcpu vcpus[32];
++};
++
+ /*
+  * Note:
+  * memslots are not sorted by id anymore, please use id_to_memslot()
+@@ -391,7 +395,7 @@ struct kvm {
+        struct mutex slots_lock;
+        struct mm_struct *mm; /* userspace tied to this vm */
+        struct kvm_memslots __rcu *memslots[KVM_ADDRESS_SPACE_NUM];
+-       struct kvm_vcpu *vcpus[KVM_MAX_VCPUS];
++       struct kvm_vcpus vcpus[(KVM_MAX_VCPUS + 31) / 32];
 
-Michael, it'd be great if you could test this one again to clarify
-whether or not the fix that's already in Linus' tree is still needed, or
-whether it's indeed obsoleted by this patch.
+        /*
+         * created_vcpus is protected by kvm->lock, and is incremented
+@@ -483,12 +487,14 @@ static inline struct kvm_io_bus
+*kvm_get_bus(struct kvm *kvm, enum kvm_bus idx)
 
- drivers/pci/pci.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index b05c587e335a..dd56c1c05614 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -514,7 +514,7 @@ EXPORT_SYMBOL(pci_find_resource);
-  */
- struct pci_dev *pci_find_pcie_root_port(struct pci_dev *dev)
- {
--	struct pci_dev *bridge, *highest_pcie_bridge = NULL;
-+	struct pci_dev *bridge, *highest_pcie_bridge = dev;
- 
- 	bridge = pci_upstream_bridge(dev);
- 	while (bridge && pci_is_pcie(bridge)) {
-@@ -522,11 +522,10 @@ struct pci_dev *pci_find_pcie_root_port(struct pci_dev *dev)
- 		bridge = pci_upstream_bridge(bridge);
- 	}
- 
--	if (highest_pcie_bridge &&
--	    pci_pcie_type(highest_pcie_bridge) == PCI_EXP_TYPE_ROOT_PORT)
--		return highest_pcie_bridge;
-+	if (pci_pcie_type(highest_pcie_bridge) != PCI_EXP_TYPE_ROOT_PORT)
-+		return NULL;
- 
--	return NULL;
-+	return highest_pcie_bridge;
- }
- EXPORT_SYMBOL(pci_find_pcie_root_port);
- 
+1. make nobody access kvm->vcpus directly (factor out)
+2. allocate next chunk if necessary when creating a VCPU and store
+pointer using WRITE_ONCE
+3. use READ_ONCE to test for availability of the current chunk
+
+kvm_for_each_vcpu just has to use READ_ONCE to access/test for the right
+chunk. Pointers never get invalid. No RCU needed. Sleeping in the loop
+is possible.
+
 -- 
-2.13.3
+
+Thanks,
+
+David
