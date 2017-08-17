@@ -1,59 +1,47 @@
-From: danilokrummrich@dk-develop.de (Danilo Krummrich)
-Date: Thu, 17 Aug 2017 16:14:23 +0200
-Subject: [PATCH] serio: PS2 gpio bit banging driver for the serio bus
-In-Reply-To: <20170817130103.GR20805@n2100.armlinux.org.uk>
-References: <20170731222452.22887-1-danilokrummrich@dk-develop.de>
- <CACRpkdYz_+soss4Rb9zMiP4eZZtXqjW_Xy7hH=wm1x2m_R9R3A@mail.gmail.com>
- <20170807182207.348762301bf3d7f8509b1bf7@dk-develop.de>
- <8e5e73575b3a70e0e60931698687471d@dk-develop.de>
- <CACRpkda=bYacXmv8SoQu3wPoZW9v+j8myZnme=QpofD=Y-gYTg@mail.gmail.com>
- <20170817090908.GP20805@n2100.armlinux.org.uk>
- <d9966e58f98ed5820154d9a979ca19f2@dk-develop.de>
- <20170817130103.GR20805@n2100.armlinux.org.uk>
-Message-ID: <52be16427347cefff9238902146df110@dk-develop.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 17 Aug 2017 16:22:11 +0200
+Subject: [PATCH 1/3] sound: ASoC: tegra: Remove SoC-specific Kconfig
+ depends and selects
+In-Reply-To: <20170731102309.GE26667@ulmo>
+References: <20170730112220.15525-1-contact@paulk.fr>
+ <20170731102309.GE26667@ulmo>
+Message-ID: <20170817142211.GH6854@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-08-17 15:01, Russell King - ARM Linux wrote:
-> On Thu, Aug 17, 2017 at 12:51:33PM +0200, Danilo Krummrich wrote:
->> That having the correct execution order is not enough on some buses 
->> because
->> of buffering is really something to be aware of, thanks again for 
->> pointing
->> this out.
+On Mon, Jul 31, 2017 at 12:23:09PM +0200, Thierry Reding wrote:
+> On Sun, Jul 30, 2017 at 01:22:18PM +0200, Paul Kocialkowski wrote:
+> > This removes the SoC-specific dependencies on the platform drivers,
+> > as well as SoC-specific selections of platform drivers for the
+> > machine drivers. The rationale behind this change is that the
+> > dependencies are not actual build dependencies but run-time ones.
+> > 
+> > The previously listed SoCs were also incomplete: for instance, tegra124
+> > uses the tegra30 platform drivers, which could not be built without
+> > ARCH_TEGRA_3x_SOC set.
+> > 
+> > Descriptions of the tristates are also added to allow these options
+> > to be set via defconfig/menuconfig.
+> > 
+> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> > ---
+> >  sound/soc/tegra/Kconfig | 42 ++++++++++++++----------------------------
+> >  1 file changed, 14 insertions(+), 28 deletions(-)
 > 
-> PCI guarantees the order of writes to a device, but there are 
-> situations
-> on SoCs where you can't rely on that - for instance, if the writes go
-> over different buses to different devices (eg, write to a peripheral
-> vs write to an interrupt controller.)
-> 
-> Even then, with interrupts delivered by message (eg, MSI) there's
-> issues.
-> 
->> So for the scenario I was concerned about I would expect the irqchip 
->> driver
->> guarantees the write actually hits the the hardware (if necessary read 
->> it
->> back) before the function (disable_irq_nosync()) returns, is that 
->> correct?
->> Though, having the need should be very unlikely.
-> 
-> Well, disable_irq_nosync() doesn't guarantee that the interrupt handler
-> isn't running - a CPU may have just received the interrupt and is just
-> entering the interrupt handler when disable_irq_nosync() returns.  The
-> hint is the "nosync" - there's no synchronisation.  If you need to
-> guarantee that the interrupt handler is not running, disable_irq() does
-> that.  By implication, however, disable_irq() can not be called from
-> within the same interrupt handler for the interrupt that is being
-> disabled.
-> 
-Thanks again, I'm aware of that. As in my case the code could be called 
-from
-atomic context disable_irq() is not an option.
+> Acked-by: Thierry Reding <treding@nvidia.com>
 
-My main point is if it can be assumed that after disable_irq_nosync() 
-returns
-it is guaranteed, by convention, that the hardware was hit. But I really 
-would
-think so.
+Hi Mark,
+
+do you want to pick this up, or would you rather provide an Acked-by so
+that I can take it through the Tegra tree along with the defconfig
+changes? I can provide a branch with this patch in case we ever need it
+for conflict resolution.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170817/28bf0be1/attachment.sig>
