@@ -1,14 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 Aug 2017 18:13:08 +0100
-Subject: Applied "ASoC: generic: make snd_soc_ops const" to the asoc tree
-In-Reply-To: <1502902770-3758-4-git-send-email-bhumirks@gmail.com>
-Message-ID: <E1diOM0-0008OR-Bl@debutante>
+Date: Thu, 17 Aug 2017 18:12:58 +0100
+Subject: Applied "ASoC: sh: make snd_soc_ops const" to the asoc tree
+In-Reply-To: <1502902770-3758-8-git-send-email-bhumirks@gmail.com>
+Message-ID: <E1diOLq-0008Kf-J9@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: generic: make snd_soc_ops const
+   ASoC: sh: make snd_soc_ops const
 
 has been applied to the asoc tree at
 
@@ -33,47 +33,33 @@ to this mail.
 Thanks,
 Mark
 
->From e23d834876390d6b8d4d35057e9ecd899a44193a Mon Sep 17 00:00:00 2001
+>From a46d0592d164c017342d2d86e5d123735ec046ae Mon Sep 17 00:00:00 2001
 From: Bhumika Goyal <bhumirks@gmail.com>
-Date: Wed, 16 Aug 2017 22:29:26 +0530
-Subject: [PATCH] ASoC: generic: make snd_soc_ops const
+Date: Wed, 16 Aug 2017 22:29:30 +0530
+Subject: [PATCH] ASoC: sh: make snd_soc_ops const
 
-Make these const as they are only stored in the ops field of a
+Make this const as it is only stored in the ops field of a
 snd_soc_dai_link structure, which is const.
 Done using Coccinelle.
 
 Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/generic/audio-graph-card.c     | 2 +-
- sound/soc/generic/audio-graph-scu-card.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ sound/soc/sh/migor.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/generic/audio-graph-card.c b/sound/soc/generic/audio-graph-card.c
-index 105ec3a6e30d..d3497a3e14ca 100644
---- a/sound/soc/generic/audio-graph-card.c
-+++ b/sound/soc/generic/audio-graph-card.c
-@@ -95,7 +95,7 @@ static void asoc_graph_card_shutdown(struct snd_pcm_substream *substream)
- 	asoc_simple_card_clk_disable(&dai_props->codec_dai);
+diff --git a/sound/soc/sh/migor.c b/sound/soc/sh/migor.c
+index 672bcd4c252b..ecb057ff9fbb 100644
+--- a/sound/soc/sh/migor.c
++++ b/sound/soc/sh/migor.c
+@@ -98,7 +98,7 @@ static int migor_hw_free(struct snd_pcm_substream *substream)
+ 	return 0;
  }
  
--static struct snd_soc_ops asoc_graph_card_ops = {
-+static const struct snd_soc_ops asoc_graph_card_ops = {
- 	.startup = asoc_graph_card_startup,
- 	.shutdown = asoc_graph_card_shutdown,
- };
-diff --git a/sound/soc/generic/audio-graph-scu-card.c b/sound/soc/generic/audio-graph-scu-card.c
-index dcd2df37bc3b..3da9acd6844e 100644
---- a/sound/soc/generic/audio-graph-scu-card.c
-+++ b/sound/soc/generic/audio-graph-scu-card.c
-@@ -56,7 +56,7 @@ static void asoc_graph_card_shutdown(struct snd_pcm_substream *substream)
- 	asoc_simple_card_clk_disable(dai_props);
- }
- 
--static struct snd_soc_ops asoc_graph_card_ops = {
-+static const struct snd_soc_ops asoc_graph_card_ops = {
- 	.startup = asoc_graph_card_startup,
- 	.shutdown = asoc_graph_card_shutdown,
+-static struct snd_soc_ops migor_dai_ops = {
++static const struct snd_soc_ops migor_dai_ops = {
+ 	.hw_params = migor_hw_params,
+ 	.hw_free = migor_hw_free,
  };
 -- 
 2.13.3
