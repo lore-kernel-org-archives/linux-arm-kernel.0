@@ -1,15 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 Aug 2017 18:12:52 +0100
-Subject: Applied "ASoC: codecs: make snd_soc_dai_driver and
- snd_soc_component_driver const" to the asoc tree
-In-Reply-To: <1502903709-7411-3-git-send-email-bhumirks@gmail.com>
-Message-ID: <E1diOLk-0008IC-Go@debutante>
+Date: Thu, 17 Aug 2017 18:13:15 +0100
+Subject: Applied "ASoC: aux1x: make snd_soc_ops const" to the asoc tree
+In-Reply-To: <1502902770-3758-2-git-send-email-bhumirks@gmail.com>
+Message-ID: <E1diOM7-0008Qv-6W@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: codecs: make snd_soc_dai_driver and snd_soc_component_driver const
+   ASoC: aux1x: make snd_soc_ops const
 
 has been applied to the asoc tree at
 
@@ -34,63 +33,33 @@ to this mail.
 Thanks,
 Mark
 
->From 6e37f933ed1ade3201dd609d103c0ef79c0ef6b0 Mon Sep 17 00:00:00 2001
+>From 052fba77f57b9f243ad3a45a21c809bddcd03627 Mon Sep 17 00:00:00 2001
 From: Bhumika Goyal <bhumirks@gmail.com>
-Date: Wed, 16 Aug 2017 22:45:09 +0530
-Subject: [PATCH] ASoC: codecs: make snd_soc_dai_driver and
- snd_soc_component_driver const
+Date: Wed, 16 Aug 2017 22:29:24 +0530
+Subject: [PATCH] ASoC: aux1x: make snd_soc_ops const
 
-Make these two structure variables const as they are either used in a
-copy operation or passed to devm_snd_soc_register_component having the
-corresponding argument as const.
+Make this const as it is only stored in the ops field of a
+snd_soc_dai_link structure, which is const.
 Done using Coccinelle.
 
 Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/codecs/hdmi-codec.c | 2 +-
- sound/soc/codecs/lm4857.c     | 2 +-
- sound/soc/codecs/max9768.c    | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ sound/soc/au1x/db1200.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/codecs/hdmi-codec.c b/sound/soc/codecs/hdmi-codec.c
-index f288404f0a61..d73d2c1ed823 100644
---- a/sound/soc/codecs/hdmi-codec.c
-+++ b/sound/soc/codecs/hdmi-codec.c
-@@ -692,7 +692,7 @@ static int hdmi_codec_pcm_new(struct snd_soc_pcm_runtime *rtd,
- 	return snd_ctl_add(rtd->card->snd_card, kctl);
- }
- 
--static struct snd_soc_dai_driver hdmi_i2s_dai = {
-+static const struct snd_soc_dai_driver hdmi_i2s_dai = {
- 	.name = "i2s-hifi",
- 	.id = DAI_ID_I2S,
- 	.playback = {
-diff --git a/sound/soc/codecs/lm4857.c b/sound/soc/codecs/lm4857.c
-index 558de1053f73..1e964079642a 100644
---- a/sound/soc/codecs/lm4857.c
-+++ b/sound/soc/codecs/lm4857.c
-@@ -100,7 +100,7 @@ static const struct snd_soc_dapm_route lm4857_routes[] = {
- 	{ "EP", "Earpiece", "Mode" },
- };
- 
--static struct snd_soc_component_driver lm4857_component_driver = {
-+static const struct snd_soc_component_driver lm4857_component_driver = {
- 	.controls = lm4857_controls,
- 	.num_controls = ARRAY_SIZE(lm4857_controls),
- 	.dapm_widgets = lm4857_dapm_widgets,
-diff --git a/sound/soc/codecs/max9768.c b/sound/soc/codecs/max9768.c
-index 5b82e26cd5d1..7017c0389e73 100644
---- a/sound/soc/codecs/max9768.c
-+++ b/sound/soc/codecs/max9768.c
-@@ -151,7 +151,7 @@ static int max9768_probe(struct snd_soc_component *component)
+diff --git a/sound/soc/au1x/db1200.c b/sound/soc/au1x/db1200.c
+index 5c73061d912a..301e1fc9a377 100644
+--- a/sound/soc/au1x/db1200.c
++++ b/sound/soc/au1x/db1200.c
+@@ -99,7 +99,7 @@ static int db1200_i2s_startup(struct snd_pcm_substream *substream)
  	return 0;
  }
  
--static struct snd_soc_component_driver max9768_component_driver = {
-+static const struct snd_soc_component_driver max9768_component_driver = {
- 	.probe = max9768_probe,
- 	.controls = max9768_volume,
- 	.num_controls = ARRAY_SIZE(max9768_volume),
+-static struct snd_soc_ops db1200_i2s_wm8731_ops = {
++static const struct snd_soc_ops db1200_i2s_wm8731_ops = {
+ 	.startup	= db1200_i2s_startup,
+ };
+ 
 -- 
 2.13.3
