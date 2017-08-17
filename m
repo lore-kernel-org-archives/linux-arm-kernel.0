@@ -1,218 +1,143 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 17 Aug 2017 09:15:34 +0530
-Subject: [PATCH v2 03/16] dmaengine: bcm-sba-raid: Common flags for
- sba_request state and fence
-In-Reply-To: <1501583880-32072-4-git-send-email-anup.patel@broadcom.com>
-References: <1501583880-32072-1-git-send-email-anup.patel@broadcom.com>
- <1501583880-32072-4-git-send-email-anup.patel@broadcom.com>
-Message-ID: <20170817034534.GY3053@localhost>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Thu, 17 Aug 2017 09:15:46 +0530
+Subject: [PATCH v4] vfio: platform: reset: Add Broadcom FlexRM reset module
+In-Reply-To: <20170810132338.406b06ce@w520.home>
+References: <1501652310-3638-1-git-send-email-anup.patel@broadcom.com>
+ <1501652310-3638-2-git-send-email-anup.patel@broadcom.com>
+ <20170810132338.406b06ce@w520.home>
+Message-ID: <CAALAos_FWj5Usfmp46NdPXJFKExuG2N3HqUd8b_EPoejRk7_7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 01, 2017 at 04:07:47PM +0530, Anup Patel wrote:
-> This patch merges sba_request state and fence into common
-> sba_request flags. Also, in-future we can extend sba_request
-> flags as required.
+On Fri, Aug 11, 2017 at 12:53 AM, Alex Williamson
+<alex.williamson@redhat.com> wrote:
+> On Wed,  2 Aug 2017 11:08:30 +0530
+> Anup Patel <anup.patel@broadcom.com> wrote:
+>
+>> This patch adds Broadcom FlexRM low-level reset for
+>> VFIO platform.
+>>
+>> It will do the following:
+>> 1. Disable/Deactivate each FlexRM ring
+>> 2. Flush each FlexRM ring
+>>
+>> The cleanup sequence for FlexRM rings is adapted from
+>> Broadcom FlexRM mailbox driver.
+>>
+>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>> Reviewed-by: Oza Oza <oza.oza@broadcom.com>
+>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>> Reviewed-by: Eric Auger <eric.auger@redhat.com>
+>> ---
+>>  drivers/vfio/platform/reset/Kconfig                |   8 ++
+>>  drivers/vfio/platform/reset/Makefile               |   1 +
+>>  .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 100 +++++++++++++++++++++
+>>  3 files changed, 109 insertions(+)
+>>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+>>
+>> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
+>> index 70cccc5..8833805 100644
+>> --- a/drivers/vfio/platform/reset/Kconfig
+>> +++ b/drivers/vfio/platform/reset/Kconfig
+>> @@ -13,3 +13,11 @@ config VFIO_PLATFORM_AMDXGBE_RESET
+>>         Enables the VFIO platform driver to handle reset for AMD XGBE
+>>
+>>         If you don't know what to do here, say N.
+>> +
+>> +config VFIO_PLATFORM_BCMFLEXRM_RESET
+>> +     tristate "VFIO support for Broadcom FlexRM reset"
+>> +     depends on VFIO_PLATFORM && (ARCH_BCM_IPROC || COMPILE_TEST)
+>> +     help
+>> +       Enables the VFIO platform driver to handle reset for Broadcom FlexRM
+>> +
+>> +       If you don't know what to do here, say N.
+>> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
+>> index 93f4e23..8d9874b 100644
+>> --- a/drivers/vfio/platform/reset/Makefile
+>> +++ b/drivers/vfio/platform/reset/Makefile
+>> @@ -5,3 +5,4 @@ ccflags-y += -Idrivers/vfio/platform
+>>
+>>  obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
+>>  obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
+>> +obj-$(CONFIG_VFIO_PLATFORM_BCMFLEXRM_RESET) += vfio_platform_bcmflexrm.o
+>> diff --git a/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+>> new file mode 100644
+>> index 0000000..104c3c1
+>> --- /dev/null
+>> +++ b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+>> @@ -0,0 +1,100 @@
+>> +/*
+>> + * Copyright (C) 2017 Broadcom
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +/*
+>> + * This driver provides reset support for Broadcom FlexRM ring manager
+>> + * to VFIO platform.
+>> + */
+>> +
+>> +#include <linux/delay.h>
+>> +#include <linux/init.h>
+>> +#include <linux/io.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +
+>> +#include "vfio_platform_private.h"
+>> +
+>> +/* FlexRM configuration */
+>> +#define RING_REGS_SIZE                                       0x10000
+>> +#define RING_VER_MAGIC                                       0x76303031
+>> +
+>> +/* Per-Ring register offsets */
+>> +#define RING_VER                                     0x000
+>> +#define RING_CONTROL                                 0x034
+>> +#define RING_FLUSH_DONE                                      0x038
+>> +
+>> +/* Register RING_CONTROL fields */
+>> +#define CONTROL_FLUSH_SHIFT                          5
+>> +
+>> +/* Register RING_FLUSH_DONE fields */
+>> +#define FLUSH_DONE_MASK                                      0x1
+>> +
+>> +static int vfio_platform_bcmflexrm_shutdown(void __iomem *ring)
+>> +{
+>> +     unsigned int timeout;
+>> +
+>> +     /* Disable/inactivate ring */
+>> +     writel_relaxed(0x0, ring + RING_CONTROL);
+>> +
+>> +     /* Flush ring with timeout of 1s */
+>> +     timeout = 1000;
+>> +     writel_relaxed(BIT(CONTROL_FLUSH_SHIFT), ring + RING_CONTROL);
+>> +     do {
+>> +             if (readl_relaxed(ring + RING_FLUSH_DONE) & FLUSH_DONE_MASK)
+>> +                     break;
+>> +             mdelay(1);
+>> +     } while (timeout--);
+>> +
+>> +     if (!timeout) {
+>> +             pr_warn("VFIO FlexRM shutdown timeout\n");
+>> +             return -ETIMEDOUT;
+>> +     }
+>
+>
+> This doesn't work, timeout is ~0 here.
 
-and it also changes the flag values to bits, which I have no idea why that
-was done, care to explain that please...
+Sure, I will use "--timeout" instead of "timeout--" which will
+fix the issue.
 
-> 
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> ---
->  drivers/dma/bcm-sba-raid.c | 66 ++++++++++++++++++++++++++--------------------
->  1 file changed, 38 insertions(+), 28 deletions(-)
-> 
-> diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
-> index f81d5ac..6fa3df1 100644
-> --- a/drivers/dma/bcm-sba-raid.c
-> +++ b/drivers/dma/bcm-sba-raid.c
-> @@ -91,22 +91,23 @@
->  
->  /* ===== Driver data structures ===== */
->  
-> -enum sba_request_state {
-> -	SBA_REQUEST_STATE_FREE = 1,
-> -	SBA_REQUEST_STATE_ALLOCED = 2,
-> -	SBA_REQUEST_STATE_PENDING = 3,
-> -	SBA_REQUEST_STATE_ACTIVE = 4,
-> -	SBA_REQUEST_STATE_RECEIVED = 5,
-> -	SBA_REQUEST_STATE_COMPLETED = 6,
-> -	SBA_REQUEST_STATE_ABORTED = 7,
-> +enum sba_request_flags {
-> +	SBA_REQUEST_STATE_FREE		= 0x001,
-> +	SBA_REQUEST_STATE_ALLOCED	= 0x002,
-> +	SBA_REQUEST_STATE_PENDING	= 0x004,
-> +	SBA_REQUEST_STATE_ACTIVE	= 0x008,
-> +	SBA_REQUEST_STATE_RECEIVED	= 0x010,
-> +	SBA_REQUEST_STATE_COMPLETED	= 0x020,
-> +	SBA_REQUEST_STATE_ABORTED	= 0x040,
-> +	SBA_REQUEST_STATE_MASK		= 0x0ff,
-> +	SBA_REQUEST_FENCE		= 0x100,
->  };
->  
->  struct sba_request {
->  	/* Global state */
->  	struct list_head node;
->  	struct sba_device *sba;
-> -	enum sba_request_state state;
-> -	bool fence;
-> +	u32 flags;
->  	/* Chained requests management */
->  	struct sba_request *first;
->  	struct list_head next;
-> @@ -217,8 +218,7 @@ static struct sba_request *sba_alloc_request(struct sba_device *sba)
->  	if (!req)
->  		return NULL;
->  
-> -	req->state = SBA_REQUEST_STATE_ALLOCED;
-> -	req->fence = false;
-> +	req->flags = SBA_REQUEST_STATE_ALLOCED;
->  	req->first = req;
->  	INIT_LIST_HEAD(&req->next);
->  	req->next_count = 1;
-> @@ -234,7 +234,8 @@ static void _sba_pending_request(struct sba_device *sba,
->  				 struct sba_request *req)
->  {
->  	lockdep_assert_held(&sba->reqs_lock);
-> -	req->state = SBA_REQUEST_STATE_PENDING;
-> +	req->flags &= ~SBA_REQUEST_STATE_MASK;
-> +	req->flags |= SBA_REQUEST_STATE_PENDING;
->  	list_move_tail(&req->node, &sba->reqs_pending_list);
->  	if (list_empty(&sba->reqs_active_list))
->  		sba->reqs_fence = false;
-> @@ -249,9 +250,10 @@ static bool _sba_active_request(struct sba_device *sba,
->  		sba->reqs_fence = false;
->  	if (sba->reqs_fence)
->  		return false;
-> -	req->state = SBA_REQUEST_STATE_ACTIVE;
-> +	req->flags &= ~SBA_REQUEST_STATE_MASK;
-> +	req->flags |= SBA_REQUEST_STATE_ACTIVE;
->  	list_move_tail(&req->node, &sba->reqs_active_list);
-> -	if (req->fence)
-> +	if (req->flags & SBA_REQUEST_FENCE)
->  		sba->reqs_fence = true;
->  	return true;
->  }
-> @@ -261,7 +263,8 @@ static void _sba_abort_request(struct sba_device *sba,
->  			       struct sba_request *req)
->  {
->  	lockdep_assert_held(&sba->reqs_lock);
-> -	req->state = SBA_REQUEST_STATE_ABORTED;
-> +	req->flags &= ~SBA_REQUEST_STATE_MASK;
-> +	req->flags |= SBA_REQUEST_STATE_ABORTED;
->  	list_move_tail(&req->node, &sba->reqs_aborted_list);
->  	if (list_empty(&sba->reqs_active_list))
->  		sba->reqs_fence = false;
-> @@ -272,7 +275,8 @@ static void _sba_free_request(struct sba_device *sba,
->  			      struct sba_request *req)
->  {
->  	lockdep_assert_held(&sba->reqs_lock);
-> -	req->state = SBA_REQUEST_STATE_FREE;
-> +	req->flags &= ~SBA_REQUEST_STATE_MASK;
-> +	req->flags |= SBA_REQUEST_STATE_FREE;
->  	list_move_tail(&req->node, &sba->reqs_free_list);
->  	if (list_empty(&sba->reqs_active_list))
->  		sba->reqs_fence = false;
-> @@ -285,7 +289,8 @@ static void sba_received_request(struct sba_request *req)
->  	struct sba_device *sba = req->sba;
->  
->  	spin_lock_irqsave(&sba->reqs_lock, flags);
-> -	req->state = SBA_REQUEST_STATE_RECEIVED;
-> +	req->flags &= ~SBA_REQUEST_STATE_MASK;
-> +	req->flags |= SBA_REQUEST_STATE_RECEIVED;
->  	list_move_tail(&req->node, &sba->reqs_received_list);
->  	spin_unlock_irqrestore(&sba->reqs_lock, flags);
->  }
-> @@ -298,10 +303,12 @@ static void sba_complete_chained_requests(struct sba_request *req)
->  
->  	spin_lock_irqsave(&sba->reqs_lock, flags);
->  
-> -	req->state = SBA_REQUEST_STATE_COMPLETED;
-> +	req->flags &= ~SBA_REQUEST_STATE_MASK;
-> +	req->flags |= SBA_REQUEST_STATE_COMPLETED;
->  	list_move_tail(&req->node, &sba->reqs_completed_list);
->  	list_for_each_entry(nreq, &req->next, next) {
-> -		nreq->state = SBA_REQUEST_STATE_COMPLETED;
-> +		nreq->flags &= ~SBA_REQUEST_STATE_MASK;
-> +		nreq->flags |= SBA_REQUEST_STATE_COMPLETED;
->  		list_move_tail(&nreq->node, &sba->reqs_completed_list);
->  	}
->  	if (list_empty(&sba->reqs_active_list))
-> @@ -576,7 +583,7 @@ sba_prep_dma_interrupt(struct dma_chan *dchan, unsigned long flags)
->  	 * Force fence so that no requests are submitted
->  	 * until DMA callback for this request is invoked.
->  	 */
-> -	req->fence = true;
-> +	req->flags |= SBA_REQUEST_FENCE;
->  
->  	/* Fillup request message */
->  	sba_fillup_interrupt_msg(req, req->cmds, &req->msg);
-> @@ -659,7 +666,8 @@ sba_prep_dma_memcpy_req(struct sba_device *sba,
->  	req = sba_alloc_request(sba);
->  	if (!req)
->  		return NULL;
-> -	req->fence = (flags & DMA_PREP_FENCE) ? true : false;
-> +	if (flags & DMA_PREP_FENCE)
-> +		req->flags |= SBA_REQUEST_FENCE;
->  
->  	/* Fillup request message */
->  	sba_fillup_memcpy_msg(req, req->cmds, &req->msg,
-> @@ -796,7 +804,8 @@ sba_prep_dma_xor_req(struct sba_device *sba,
->  	req = sba_alloc_request(sba);
->  	if (!req)
->  		return NULL;
-> -	req->fence = (flags & DMA_PREP_FENCE) ? true : false;
-> +	if (flags & DMA_PREP_FENCE)
-> +		req->flags |= SBA_REQUEST_FENCE;
->  
->  	/* Fillup request message */
->  	sba_fillup_xor_msg(req, req->cmds, &req->msg,
-> @@ -1005,7 +1014,8 @@ sba_prep_dma_pq_req(struct sba_device *sba, dma_addr_t off,
->  	req = sba_alloc_request(sba);
->  	if (!req)
->  		return NULL;
-> -	req->fence = (flags & DMA_PREP_FENCE) ? true : false;
-> +	if (flags & DMA_PREP_FENCE)
-> +		req->flags |= SBA_REQUEST_FENCE;
->  
->  	/* Fillup request messages */
->  	sba_fillup_pq_msg(req, dmaf_continue(flags),
-> @@ -1258,7 +1268,8 @@ sba_prep_dma_pq_single_req(struct sba_device *sba, dma_addr_t off,
->  	req = sba_alloc_request(sba);
->  	if (!req)
->  		return NULL;
-> -	req->fence = (flags & DMA_PREP_FENCE) ? true : false;
-> +	if (flags & DMA_PREP_FENCE)
-> +		req->flags |= SBA_REQUEST_FENCE;
->  
->  	/* Fillup request messages */
->  	sba_fillup_pq_single_msg(req,  dmaf_continue(flags),
-> @@ -1425,7 +1436,7 @@ static void sba_receive_message(struct mbox_client *cl, void *msg)
->  	req = req->first;
->  
->  	/* Update request */
-> -	if (req->state == SBA_REQUEST_STATE_RECEIVED)
-> +	if (req->flags & SBA_REQUEST_STATE_RECEIVED)
->  		sba_dma_tx_actions(req);
->  	else
->  		sba_free_chained_requests(req);
-> @@ -1488,11 +1499,10 @@ static int sba_prealloc_channel_resources(struct sba_device *sba)
->  		req = &sba->reqs[i];
->  		INIT_LIST_HEAD(&req->node);
->  		req->sba = sba;
-> -		req->state = SBA_REQUEST_STATE_FREE;
-> +		req->flags = SBA_REQUEST_STATE_FREE;
->  		INIT_LIST_HEAD(&req->next);
->  		req->next_count = 1;
->  		atomic_set(&req->next_pending_count, 0);
-> -		req->fence = false;
->  		req->resp = sba->resp_base + p;
->  		req->resp_dma = sba->resp_dma_base + p;
->  		p += sba->hw_resp_size;
-> -- 
-> 2.7.4
-> 
+Thanks for pointing.
 
--- 
-~Vinod
+Regards,
+Anup
