@@ -1,44 +1,30 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 17 Aug 2017 11:01:12 +0200
-Subject: [PATCH  2/2] ARM: shmobile: Enable BQ32000 rtc in
- shmobile_defconfig
-In-Reply-To: <20170809090421.GN2705@verge.net.au>
-References: <1502197465-61546-1-git-send-email-biju.das@bp.renesas.com>
- <1502197465-61546-3-git-send-email-biju.das@bp.renesas.com>
- <20170809090421.GN2705@verge.net.au>
-Message-ID: <20170817090112.GE27693@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Aug 2017 11:03:02 +0200
+Subject: [GIT PULL 3/3] ARM: SOC: Keystone soc driver update for 4.14
+In-Reply-To: <1502929842-8156-3-git-send-email-ssantosh@kernel.org>
+References: <1502929842-8156-1-git-send-email-ssantosh@kernel.org>
+ <1502929842-8156-3-git-send-email-ssantosh@kernel.org>
+Message-ID: <CAK8P3a2gj0nkdSmHYv=D+UWY1M48bacY4Cxy8T-Vu2cUqe2_Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 09, 2017 at 11:04:21AM +0200, Simon Horman wrote:
-> On Tue, Aug 08, 2017 at 02:04:25PM +0100, Biju Das wrote:
-> > The iWave RZ/G1M Q7 SOM supports RTC (TI BQ32000).
-> > To increase hardware support enable the driver in the
-> > shmobile_defconfig multiplatform configuration.
-> > 
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> 
-> Thanks, applied for v4.14.
+On Thu, Aug 17, 2017 at 2:30 AM, Santosh Shilimkar <ssantosh@kernel.org> wrote:
+> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+>
+>   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_soc_drivers_4.14
+>
+> for you to fetch changes up to a1934ff175ff25f57dae8b5107a2351d15729c3a:
+>
+>   soc: ti: ti_sci_pm_domains: Populate name for genpd (2017-07-28 09:51:34 -0700)
+>
+> ----------------------------------------------------------------
+> soc: Keystone ti-sci driver genpd fix for 4.14
 
-Please consider posting a similar patch for multi_v7_defconfig.
+>From the patch description I would have guessed that we want this in 4.13,
+can you clarify?
 
-> > ---
-> >  arch/arm/configs/shmobile_defconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-> > index 18886c5..7b4fc01 100644
-> > --- a/arch/arm/configs/shmobile_defconfig
-> > +++ b/arch/arm/configs/shmobile_defconfig
-> > @@ -193,6 +193,7 @@ CONFIG_LEDS_CLASS=y
-> >  CONFIG_LEDS_GPIO=y
-> >  CONFIG_RTC_CLASS=y
-> >  CONFIG_RTC_DRV_RS5C372=y
-> > +CONFIG_RTC_DRV_BQ32K=y
-> >  CONFIG_RTC_DRV_S35390A=y
-> >  CONFIG_RTC_DRV_RX8581=y
-> >  CONFIG_RTC_DRV_DA9063=y
-> > -- 
-> > 1.9.1
-> > 
-> 
+     Arnd
