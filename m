@@ -1,66 +1,70 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Thu, 17 Aug 2017 09:20:40 +0300
-Subject: [PATCH] nokia n900: update dts with camera support
-In-Reply-To: <20170817000845.agkcuvqaheejm33j@earth>
-References: <20170810204923.GA18442@amd>
- <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
- <20170815220349.GA15441@amd> <20170816205332.rqcuenvuxfs5jvuw@earth>
- <20170816205915.GA5386@atrey.karlin.mff.cuni.cz>
- <20170816212343.hfd4azb4dq2qrlkc@valkosipuli.retiisi.org.uk>
- <20170817000845.agkcuvqaheejm33j@earth>
-Message-ID: <2e7561f4-a160-9009-baa6-e056aa8f3887@iki.fi>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 17 Aug 2017 08:26:34 +0200
+Subject: [PATCHv2 1/3] dt: xilinx: zynqmp: Add bindings for PM firmware
+In-Reply-To: <20170816160046.GB12389@leverpostej>
+References: <cover.1502886277.git.michal.simek@xilinx.com>
+ <2935be9896d54020720919e7dab7c2f86bdc83a3.1502886277.git.michal.simek@xilinx.com>
+ <20170816160046.GB12389@leverpostej>
+Message-ID: <04d8618e-4f39-9caf-95cb-60af35dba662@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian Reichel wrote:
-> Hi,
-> 
-> On Thu, Aug 17, 2017 at 12:23:44AM +0300, Sakari Ailus wrote:
->> On Wed, Aug 16, 2017 at 10:59:15PM +0200, Pavel Machek wrote:
->>>> On Wed, Aug 16, 2017 at 12:03:49AM +0200, Pavel Machek wrote:
->>>>> diff --git a/Documentation/devicetree/bindings/media/video-interfaces.txt b/Documentation/devicetree/bindings/media/video-interfaces.txt
->>>>> index 852041a..aade681 100644
->>>>> --- a/Documentation/devicetree/bindings/media/video-interfaces.txt
->>>>> +++ b/Documentation/devicetree/bindings/media/video-interfaces.txt
->>>>> @@ -119,6 +119,8 @@ Optional endpoint properties
->>>>>    as 0 (normal). This property is valid for serial busses only.
->>>>>  - strobe: Whether the clock signal is used as clock (0) or strobe (1). Used
->>>>>    with CCP2, for instance.
->>>>> +- clock-inv: polarity of clock/strobe signal. 0 - not inverted, 1 - inverted
->>>>> +- crc: crc is in use
->>>>
->>>> booleans in DT are not done with <0> and <1>, but as properties without
->>>> values. True = property exists, False = property does not exist.
+On 16.8.2017 18:00, Mark Rutland wrote:
+> On Wed, Aug 16, 2017 at 02:24:56PM +0200, Michal Simek wrote:
+>> From: Soren Brinkmann <soren.brinkmann@xilinx.com>
 >>
->> Now that you mention it, I remember that now.
+>> Document the DT bindings for the Zynq UltraScale+ PM Firmware.
 >>
->>> Well, strobe property above already uses = <0>/<1> format, as do
->>> others.
+>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> ---
 >>
->>> Problem with "false = property does not exist" is that you don't know
->>> if it is "someone forgot to define it" or "someone made a typo" or
->>> "dts is too old to know about this property" or "the property indeed
->>> should be false"...
+>> Changes in v2:
+>> - Move to bindings/firmware and also add it to firmware node
+>>   Reported-by Rob
 >>
->> As this is an established practice, I think we should follow it for bool
->> properties.
+>>  .../bindings/firmware/xlnx,zynqmp-pm.txt           | 22 ++++++++++++++++++++++
+>>  1 file changed, 22 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/firmware/xlnx,zynqmp-pm.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/firmware/xlnx,zynqmp-pm.txt b/Documentation/devicetree/bindings/firmware/xlnx,zynqmp-pm.txt
+>> new file mode 100644
+>> index 000000000000..7de0c82758b3
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/firmware/xlnx,zynqmp-pm.txt
+>> @@ -0,0 +1,22 @@
+>> +Xilinx Zynq MPSoC Firmware Device Tree Bindings
+>> +
+>> +The zynqmp-pm node describes the interface to platform firmware.
 > 
-> Yes it's common practice, there is also device_property_read_bool()
-> to get the value.
-> 
->> We could change the existing ones, too, and leave some extra checks in
->> place to handle old dtbs.
-> 
-> The following should be downward compatible:
-> 
-> var = read_bool();
-> if (var && !read_int())
->     var = false;
-> 
-> Btw. DT people should be CC'd for DT binding additions/changes.
+> Is there any documentation for this? I appreciate that the answer
+> might be "no".
 
-Pavel: could you also add linux-media as well for the next version, please?
+We have pm documentation somewhere but not sure if this firmware
+interface is the part of it. Let me ask around and see what I can find out.
 
--- 
-Sakari Ailus
-sakari.ailus at iki.fi
+> 
+>> +Required properties:
+>> + - compatible:	Must contain:  "xlnx,zynqmp-pm"
+>> + - method:	The method of calling the PM-API firmware layer.
+>> +		Permitted values are:
+>> +		 - "smc" : To be used in configurations without a hypervisor
+>> +		 - "hvc" : To be used when hypervisor is present
+>> + - interrupts:	Interrupt specifier
+> 
+> For what, exactly?
+> 
+> Is this an interrupt for FW to signal the OS somehow?
+> 
+> If so, is it an SGI?
+
+This is SPI. There is a dedicated hardware on the chip for communication
+with APU.
+
+https://www.xilinx.com/support/documentation/user_guides/ug1085-zynq-ultrascale-trm.pdf
+page 275
+
+Anyway I don't need this for this driver that's why I will remove it.
+
+Thanks,
+Michal
