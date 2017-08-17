@@ -1,27 +1,34 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 17 Aug 2017 15:02:43 +0200
-Subject: [PATCH ] gpio: rcar: Add r8a7745 (RZ/G1E) support
-In-Reply-To: <1502881936-39357-1-git-send-email-biju.das@bp.renesas.com>
-References: <1502881936-39357-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <CAMuHMdVxwMZQ9JpRHaM++ezL-iLR938ZJPxTxYfFU7Pb-BXpOQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 17 Aug 2017 21:14:16 +0800
+Subject: [PATCH] MAINTAINERS: update ARM/ZTE entry
+In-Reply-To: <CAK8P3a3V1d=h7JV=0J_EW0CZ=YONxtZWbJLcqUhKMkq=AJQZBg@mail.gmail.com>
+References: <1502678694-8874-1-git-send-email-shawnguo@kernel.org>
+ <CAK8P3a3V1d=h7JV=0J_EW0CZ=YONxtZWbJLcqUhKMkq=AJQZBg@mail.gmail.com>
+Message-ID: <20170817131415.GC7608@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 16, 2017 at 1:12 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> Renesas RZ/G1E (R8A7745) SoC GPIO blocks are identical to the R-Car Gen2
-> family. Add support for its GPIO controllers.
->
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+On Wed, Aug 16, 2017 at 10:39:45PM +0200, Arnd Bergmann wrote:
+> On Mon, Aug 14, 2017 at 4:44 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > Update ARM/ZTE entry to include all those ZTE ZX platform drivers and
+> > files that do not have a separate MAINTAINERS entry.
+> >
+> > Since I have been contributing a lot for ZTE ZX SoCs support and
+> > collecting platform patches for a few cycles, add myself as one
+> > maintainer for the platform.
+> >
+> > Cc: Jun Nie <jun.nie@linaro.org>
+> > Cc: Baoyou Xie <baoyou.xie@linaro.org>
+> > Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+> > ---
+> > Hi Arnd, Olof,
+> >
+> > Can you please apply the patch directly to arm-soc if you are fine with
+> > it.  Or if you would like a pull request for this, please let me know.
+> 
+> Applied to next/soc. You did not specify whether you wanted this in 4.13,
+> which would have been fine with me, but I guessed it's not urgent.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Yes, my intention is just for -next.  Thanks, Arnd.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Shawn
