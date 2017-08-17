@@ -1,103 +1,35 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Thu, 17 Aug 2017 17:26:28 +0800
-Subject: [PATCH] pinctrl: mediatek: update PCIe pinmux data
-In-Reply-To: <7e51745301c377eb8527bdf6171eaf26fc53b0b4.1502959698.git.ryder.lee@mediatek.com>
-References: <7e51745301c377eb8527bdf6171eaf26fc53b0b4.1502959698.git.ryder.lee@mediatek.com>
-Message-ID: <1502961988.29938.3.camel@mtkswgap22>
+From: cohuck@redhat.com (Cornelia Huck)
+Date: Thu, 17 Aug 2017 11:28:29 +0200
+Subject: [PATCH RFC 0/2] KVM: use RCU to allow dynamic kvm->vcpus array
+In-Reply-To: <b69bc1e0-9d7b-5412-ba56-a5261d539a5b@redhat.com>
+References: <20170816194037.9460-1-rkrcmar@redhat.com>
+ <b77b151f-e51d-3657-66e9-6fbc83887b18@suse.de>
+ <20170817093612.024cc4bc.cohuck@redhat.com>
+ <b69bc1e0-9d7b-5412-ba56-a5261d539a5b@redhat.com>
+Message-ID: <20170817112829.7795820a.cohuck@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Thu, 17 Aug 2017 11:16:59 +0200
+Paolo Bonzini <pbonzini@redhat.com> wrote:
 
-Please ignore this wrong patch. Sorry for the inconvenience.
+> On 17/08/2017 09:36, Cornelia Huck wrote:
+> >> What if we just sent a "vcpu move" request to all vcpus with the new 
+> >> pointer after it moved? That way the vcpu thread itself would be 
+> >> responsible for the migration to the new memory region. Only if all 
+> >> vcpus successfully moved, keep rolling (and allow foreign get_vcpu again).
+> >>
+> >> That way we should be basically lock-less and scale well. For additional 
+> >> icing, feel free to increase the vcpu array x2 every time it grows to 
+> >> not run into the slow path too often.  
+> > 
+> > I'd prefer the rcu approach: This is a mechanism already understood
+> > well, no need to come up with a new one that will likely have its own
+> > share of problems.  
+> 
+> What Alex is proposing _is_ RCU, except with a homegrown
+> synchronize_rcu.  Using kvm->srcu seems to be the best of both worlds.
 
-On Thu, 2017-08-17 at 16:57 +0800, Ryder Lee wrote:
-> Update pinmux data so that PCIe function can work normally.
-> 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h | 24 ++++++++++++------------
->  1 file changed, 12 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h b/drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h
-> index f906420..bdbb491 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-mt2701.h
-> @@ -223,11 +223,11 @@
->  		MTK_EINT_FUNCTION(0, 0),
->  		MTK_FUNCTION(0, "GPIO22"),
->  		MTK_FUNCTION(1, "UCTS0"),
-> +		MTK_FUNCTION(2, "PCIE0_PERST_N"),
->  		MTK_FUNCTION(3, "KCOL3"),
->  		MTK_FUNCTION(4, "CONN_DSP_JDO"),
->  		MTK_FUNCTION(5, "EXT_FRAME_SYNC"),
-> -		MTK_FUNCTION(7, "DBG_MON_A[30]"),
-> -		MTK_FUNCTION(10, "PCIE0_PERST_N")
-> +		MTK_FUNCTION(7, "DBG_MON_A[30]")
->  	),
->  	MTK_PIN(
->  		PINCTRL_PIN(23, "EINT1"),
-> @@ -235,11 +235,11 @@
->  		MTK_EINT_FUNCTION(0, 1),
->  		MTK_FUNCTION(0, "GPIO23"),
->  		MTK_FUNCTION(1, "URTS0"),
-> +		MTK_FUNCTION(2, "PCIE1_PERST_N"),
->  		MTK_FUNCTION(3, "KCOL2"),
->  		MTK_FUNCTION(4, "CONN_MCU_TDO"),
->  		MTK_FUNCTION(5, "EXT_FRAME_SYNC"),
-> -		MTK_FUNCTION(7, "DBG_MON_A[29]"),
-> -		MTK_FUNCTION(10, "PCIE1_PERST_N")
-> +		MTK_FUNCTION(7, "DBG_MON_A[29]")
->  	),
->  	MTK_PIN(
->  		PINCTRL_PIN(24, "EINT2"),
-> @@ -247,10 +247,10 @@
->  		MTK_EINT_FUNCTION(0, 2),
->  		MTK_FUNCTION(0, "GPIO24"),
->  		MTK_FUNCTION(1, "UCTS1"),
-> +		MTK_FUNCTION(2, "PCIE2_PERST_N"),
->  		MTK_FUNCTION(3, "KCOL1"),
->  		MTK_FUNCTION(4, "CONN_MCU_DBGACK_N"),
-> -		MTK_FUNCTION(7, "DBG_MON_A[28]"),
-> -		MTK_FUNCTION(10, "PCIE2_PERST_N")
-> +		MTK_FUNCTION(7, "DBG_MON_A[28]")
->  	),
->  	MTK_PIN(
->  		PINCTRL_PIN(25, "EINT3"),
-> @@ -308,8 +308,8 @@
->  		MTK_FUNCTION(3, "KROW0"),
->  		MTK_FUNCTION(4, "CONN_MCU_TMS"),
->  		MTK_FUNCTION(5, "CONN_MCU_AICE_JMSC"),
-> -		MTK_FUNCTION(7, "DBG_MON_A[23]"),
-> -		MTK_FUNCTION(14, "PCIE2_PERST_N")
-> +		MTK_FUNCTION(6, "PCIE2_PERST_N"),
-> +		MTK_FUNCTION(7, "DBG_MON_A[23]")
->  	),
->  	MTK_PIN(
->  		PINCTRL_PIN(30, "I2S5_LRCK"),
-> @@ -1787,10 +1787,10 @@
->  		MTK_FUNCTION(0, "GPIO208"),
->  		MTK_FUNCTION(1, "AUD_EXT_CK1"),
->  		MTK_FUNCTION(2, "PWM0"),
-> +		MTK_FUNCTION(3, "PCIE0_PERST_N"),
->  		MTK_FUNCTION(4, "ANT_SEL5"),
->  		MTK_FUNCTION(5, "DISP_PWM"),
-> -		MTK_FUNCTION(7, "DBG_MON_A[31]"),
-> -		MTK_FUNCTION(11, "PCIE0_PERST_N")
-> +		MTK_FUNCTION(7, "DBG_MON_A[31]")
->  	),
->  	MTK_PIN(
->  		PINCTRL_PIN(209, "AUD_EXT_CK2"),
-> @@ -1798,10 +1798,10 @@
->  		MTK_EINT_FUNCTION(0, 121),
->  		MTK_FUNCTION(0, "GPIO209"),
->  		MTK_FUNCTION(1, "AUD_EXT_CK2"),
-> +		MTK_FUNCTION(3, "PCIE1_PERST_N"),
->  		MTK_FUNCTION(2, "MSDC1_WP"),
->  		MTK_FUNCTION(5, "PWM1"),
-> -		MTK_FUNCTION(7, "DBG_MON_A[32]"),
-> -		MTK_FUNCTION(11, "PCIE1_PERST_N")
-> +		MTK_FUNCTION(7, "DBG_MON_A[32]")
->  	),
->  	MTK_PIN(
->  		PINCTRL_PIN(210, "AUD_CLOCK"),
+I'm worried a bit about the 'homegrown' part, though.
+
+I also may be misunderstanding what Alex means with "vcpu move"...
