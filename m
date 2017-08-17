@@ -1,64 +1,68 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Wed, 16 Aug 2017 16:50:58 -0700
-Subject: [PATCH v2 1/3] ASoC: rockchip: Parse dai links from dts
-In-Reply-To: <5994CD58.7030406@rock-chips.com>
-References: <1502340898-28403-1-git-send-email-jeffy.chen@rock-chips.com>
- <1502340898-28403-2-git-send-email-jeffy.chen@rock-chips.com>
- <20170816215909.GC109008@google.com>
- <5994CD58.7030406@rock-chips.com>
-Message-ID: <20170816235058.GA173745@google.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 17 Aug 2017 02:08:45 +0200
+Subject: [PATCH] nokia n900: update dts with camera support
+In-Reply-To: <20170816212343.hfd4azb4dq2qrlkc@valkosipuli.retiisi.org.uk>
+References: <20170810204923.GA18442@amd>
+ <20170814201950.sbtyuksn3ntuigyp@valkosipuli.retiisi.org.uk>
+ <20170815220349.GA15441@amd>
+ <20170816205332.rqcuenvuxfs5jvuw@earth>
+ <20170816205915.GA5386@atrey.karlin.mff.cuni.cz>
+ <20170816212343.hfd4azb4dq2qrlkc@valkosipuli.retiisi.org.uk>
+Message-ID: <20170817000845.agkcuvqaheejm33j@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El Thu, Aug 17, 2017 at 06:55:20AM +0800 jeffy ha dit:
+Hi,
 
-> hi matthias,
+On Thu, Aug 17, 2017 at 12:23:44AM +0300, Sakari Ailus wrote:
+> On Wed, Aug 16, 2017 at 10:59:15PM +0200, Pavel Machek wrote:
+> > > On Wed, Aug 16, 2017 at 12:03:49AM +0200, Pavel Machek wrote:
+> > > > diff --git a/Documentation/devicetree/bindings/media/video-interfaces.txt b/Documentation/devicetree/bindings/media/video-interfaces.txt
+> > > > index 852041a..aade681 100644
+> > > > --- a/Documentation/devicetree/bindings/media/video-interfaces.txt
+> > > > +++ b/Documentation/devicetree/bindings/media/video-interfaces.txt
+> > > > @@ -119,6 +119,8 @@ Optional endpoint properties
+> > > >    as 0 (normal). This property is valid for serial busses only.
+> > > >  - strobe: Whether the clock signal is used as clock (0) or strobe (1). Used
+> > > >    with CCP2, for instance.
+> > > > +- clock-inv: polarity of clock/strobe signal. 0 - not inverted, 1 - inverted
+> > > > +- crc: crc is in use
+> > > 
+> > > booleans in DT are not done with <0> and <1>, but as properties without
+> > > values. True = property exists, False = property does not exist.
 > 
-> thanks for your suggestion.
+> Now that you mention it, I remember that now.
 > 
-> On 08/17/2017 05:59 AM, Matthias Kaehlcke wrote:
-> >El Thu, Aug 10, 2017 at 12:54:56PM +0800 Jeffy Chen ha dit:
-> >
-> >>>Refactor rockchip_sound_probe, parse dai links from dts instead of
-> >>>hard coding them.
-> >Mark doesn't seem to be overly convinced that 'rockchip,codec-names'
-> >is a good idea (https://lkml.org/lkml/2017/8/10/511).
-> >
-> >How about using something like this instead:
-> >
-> >static const char *dailink_compat[] = {
-> >	[DAILINK_MAX98357A] = "maxim,max98357a",
-> >	[DAILINK_RT5514] = "realtek,rt5514",
-> >	[DAILINK_DA7219] = "dlg,da7219",
-> >};
-> i've thought about this too, but i'm working on converting rt5514
-> dsp(spi) from codec name matching to of_node, and it would have the
-> same compatible with rt5514(i2c)
+> > Well, strobe property above already uses = <0>/<1> format, as do
+> > others.
+>
+> > Problem with "false = property does not exist" is that you don't know
+> > if it is "someone forgot to define it" or "someone made a typo" or
+> > "dts is too old to know about this property" or "the property indeed
+> > should be false"...
+>
+> As this is an established practice, I think we should follow it for bool
+> properties.
 
-Bummer!
+Yes it's common practice, there is also device_property_read_bool()
+to get the value.
 
-I wonder if a relatively inoffensive DT hack would be an appropriate
-solution in this case, since the conflicting compatible string is a
-somewhat special case and this change only affects the DT and the
-driver/glue of a specific device (family).
+> We could change the existing ones, too, and leave some extra checks in
+> place to handle old dtbs.
 
-The hack would consist in adding an additional 'compatible' entry to
-the DT entry of the codec, which is ignored by the rt5514 driver, and
-only used by the sound glue to identify it:
+The following should be downward compatible:
 
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-@@ -671,7 +671,7 @@ ap_i2c_mic: &i2c1 {
-        i2c-scl-rising-time-ns = <300>;
- 
-        headsetcodec: rt5514 at 57 {
--               compatible = "realtek,rt5514";
-+               compatible = "realtek,rt5514", "realtek,rt5514-i2c";
+var = read_bool();
+if (var && !read_int())
+    var = false;
 
+Btw. DT people should be CC'd for DT binding additions/changes.
 
-And then use "realtek,rt5514-i2c" in dailink_compat.
-
-Mark, would you prefer a hack like this over the list of codec names
-or do you have any other suggestions?
-
-Matthias
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170817/a2106f21/attachment.sig>
