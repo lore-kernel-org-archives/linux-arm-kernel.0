@@ -1,47 +1,45 @@
-From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Thu, 17 Aug 2017 11:33:01 +0200
-Subject: [PATCH 2/7] usb: dwc2: add support for STM32F7xx USB OTG HS
-In-Reply-To: <1502962386-6683-1-git-send-email-amelie.delaunay@st.com>
-References: <1502962386-6683-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1502962386-6683-3-git-send-email-amelie.delaunay@st.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 17 Aug 2017 11:47:33 +0200
+Subject: [PATCH 0/4] arm64: dts: renesas: Add Support for R-Car D3 and
+ Draak
+In-Reply-To: <20170727151622.GG16143@verge.net.au>
+References: <1500555277-22921-1-git-send-email-geert+renesas@glider.be>
+ <20170727151622.GG16143@verge.net.au>
+Message-ID: <CAMuHMdXLVXaN+X0yKuO+xdZGi3MwM4vSP1uTLuS9SKFKg_UBDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the dwc2_set_params function for STM32F7xx USB OTG HS.
+Hi Simon,
 
-Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
----
- drivers/usb/dwc2/params.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+On Thu, Jul 27, 2017 at 5:16 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Jul 20, 2017 at 02:54:33PM +0200, Geert Uytterhoeven wrote:
+>> This patch series adds minimal support for the R-Car D3 SoC and the
+>> Draak development board, allowing to boot from a ramdisk using a serial
+>> console.
+>>
+>>   - The first two patches add DT sources for R-Car D3 and Draak.
+>>     Due to the use of hardcoded constants, they have no further (build)
+>>     dependencies (obviously there is a runtime dependency).
+>>   - The last two patches replace the hardcoded constants by symbols from
+>>     DT binding headers, and thus depend on those headers.  Hence it
+>>     should be postponed to v4.15.
 
-diff --git a/drivers/usb/dwc2/params.c b/drivers/usb/dwc2/params.c
-index a3ffe97..015d23e 100644
---- a/drivers/usb/dwc2/params.c
-+++ b/drivers/usb/dwc2/params.c
-@@ -136,6 +136,15 @@ static void dwc2_set_stm32f4x9_fsotg_params(struct dwc2_hsotg *hsotg)
- 	p->activate_stm_fs_transceiver = true;
- }
- 
-+static void dwc2_set_stm32f7xx_hsotg_params(struct dwc2_hsotg *hsotg)
-+{
-+	struct dwc2_core_params *p = &hsotg->params;
-+
-+	p->host_rx_fifo_size = 622;
-+	p->host_nperio_tx_fifo_size = 128;
-+	p->host_perio_tx_fifo_size = 256;
-+}
-+
- const struct of_device_id dwc2_of_match_table[] = {
- 	{ .compatible = "brcm,bcm2835-usb", .data = dwc2_set_bcm_params },
- 	{ .compatible = "hisilicon,hi6220-usb", .data = dwc2_set_his_params  },
-@@ -154,6 +163,8 @@ const struct of_device_id dwc2_of_match_table[] = {
- 	{ .compatible = "st,stm32f4x9-fsotg",
- 	  .data = dwc2_set_stm32f4x9_fsotg_params },
- 	{ .compatible = "st,stm32f4x9-hsotg" },
-+	{ .compatible = "st,stm32f7xx-hsotg",
-+	  .data = dwc2_set_stm32f7xx_hsotg_params },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, dwc2_of_match_table);
--- 
-2.7.4
+> So I have applied the first two patches for v4.14.
+
+Thank you!
+
+> Please repost the remaining two after v4.13-rc6 at which time I should
+> be able to queue them up for v4.15.
+
+You mean after v4.14-rc1? Else you still won't have them in renesas-devel.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
