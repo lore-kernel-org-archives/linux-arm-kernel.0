@@ -1,39 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 17 Aug 2017 11:51:43 +0200
-Subject: [PATCH 0/4] arm64: dts: renesas: Add Support for R-Car D3 and
- Draak
-In-Reply-To: <CAMuHMdXLVXaN+X0yKuO+xdZGi3MwM4vSP1uTLuS9SKFKg_UBDA@mail.gmail.com>
-References: <1500555277-22921-1-git-send-email-geert+renesas@glider.be>
- <20170727151622.GG16143@verge.net.au>
- <CAMuHMdXLVXaN+X0yKuO+xdZGi3MwM4vSP1uTLuS9SKFKg_UBDA@mail.gmail.com>
-Message-ID: <20170817095142.GC25223@verge.net.au>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 17 Aug 2017 11:44:47 +0200
+Subject: [PATCH RFC 0/2] KVM: use RCU to allow dynamic kvm->vcpus array
+In-Reply-To: <20170817112829.7795820a.cohuck@redhat.com>
+References: <20170816194037.9460-1-rkrcmar@redhat.com>
+ <b77b151f-e51d-3657-66e9-6fbc83887b18@suse.de>
+ <20170817093612.024cc4bc.cohuck@redhat.com>
+ <b69bc1e0-9d7b-5412-ba56-a5261d539a5b@redhat.com>
+ <20170817112829.7795820a.cohuck@redhat.com>
+Message-ID: <69d47131-2405-b2be-60d7-e40fbd17592a@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 11:47:33AM +0200, Geert Uytterhoeven wrote:
-> Hi Simon,
+On 17/08/2017 11:28, Cornelia Huck wrote:
+> On Thu, 17 Aug 2017 11:16:59 +0200
+> Paolo Bonzini <pbonzini@redhat.com> wrote:
 > 
-> On Thu, Jul 27, 2017 at 5:16 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Jul 20, 2017 at 02:54:33PM +0200, Geert Uytterhoeven wrote:
-> >> This patch series adds minimal support for the R-Car D3 SoC and the
-> >> Draak development board, allowing to boot from a ramdisk using a serial
-> >> console.
-> >>
-> >>   - The first two patches add DT sources for R-Car D3 and Draak.
-> >>     Due to the use of hardcoded constants, they have no further (build)
-> >>     dependencies (obviously there is a runtime dependency).
-> >>   - The last two patches replace the hardcoded constants by symbols from
-> >>     DT binding headers, and thus depend on those headers.  Hence it
-> >>     should be postponed to v4.15.
+>> On 17/08/2017 09:36, Cornelia Huck wrote:
+>>>> What if we just sent a "vcpu move" request to all vcpus with the new 
+>>>> pointer after it moved? That way the vcpu thread itself would be 
+>>>> responsible for the migration to the new memory region. Only if all 
+>>>> vcpus successfully moved, keep rolling (and allow foreign get_vcpu again).
+>>>>
+>>>> That way we should be basically lock-less and scale well. For additional 
+>>>> icing, feel free to increase the vcpu array x2 every time it grows to 
+>>>> not run into the slow path too often.  
+>>>
+>>> I'd prefer the rcu approach: This is a mechanism already understood
+>>> well, no need to come up with a new one that will likely have its own
+>>> share of problems.  
+>>
+>> What Alex is proposing _is_ RCU, except with a homegrown
+>> synchronize_rcu.  Using kvm->srcu seems to be the best of both worlds.
 > 
-> > So I have applied the first two patches for v4.14.
-> 
-> Thank you!
-> 
-> > Please repost the remaining two after v4.13-rc6 at which time I should
-> > be able to queue them up for v4.15.
-> 
-> You mean after v4.14-rc1? Else you still won't have them in renesas-devel.
+> I'm worried a bit about the 'homegrown' part, though.
 
-I was thinking I could merge a stable branch in after v4.13-rc6.
-But waiting for v4.14-rc1 is simpler for me.
+I agree, that's why I'm suggesting SRCU instead.  But it's a trick that
+has its uses.  For example, if you were only doing reads from a work
+queue, flush_work_queue could be used as the "homegrown
+synchronize_rcu".  In KVM you might use kvm_make_all_cpus_request, I guess.
+
+> I also may be misunderstanding what Alex means with "vcpu move"...
+
+My interpretation was "resizing the array" (so it moves in memory).
+
+Paolo
