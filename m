@@ -1,48 +1,31 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Thu, 17 Aug 2017 21:54:09 +0300
-Subject: [PATCH 2/6] arm64: tegra: Add host1x on Tegra186
+Date: Thu, 17 Aug 2017 21:54:08 +0300
+Subject: [PATCH 1/6] arm64: tegra: Add #power-domain-cells for BPMP
 In-Reply-To: <20170817185413.6324-1-mperttunen@nvidia.com>
 References: <20170817185413.6324-1-mperttunen@nvidia.com>
-Message-ID: <20170817185413.6324-3-mperttunen@nvidia.com>
+Message-ID: <20170817185413.6324-2-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the node for Host1x on the Tegra186, without any subdevices
-for now.
+Add #power-domain-cells for the BPMP node on Tegra186 so that the power
+domain provider may be used.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
- arch/arm64/boot/dts/nvidia/tegra186.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm64/boot/dts/nvidia/tegra186.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-index a964d246c0e9..3556f89ddf1d 100644
+index 0b0552c9f7dd..a964d246c0e9 100644
 --- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
 +++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
-@@ -355,6 +355,24 @@
- 		nvidia,bpmp = <&bpmp>;
- 	};
+@@ -443,6 +443,7 @@
+ 		shmem = <&cpu_bpmp_tx &cpu_bpmp_rx>;
+ 		#clock-cells = <1>;
+ 		#reset-cells = <1>;
++		#power-domain-cells = <1>;
  
-+	host1x at 13e00000 {
-+		compatible = "nvidia,tegra186-host1x", "simple-bus";
-+		reg = <0x0 0x13e00000 0x0 0x10000>,
-+		      <0x0 0x13e10000 0x0 0x10000>;
-+		reg-names = "hypervisor", "vm";
-+		interrupts = <GIC_SPI 265 IRQ_TYPE_LEVEL_HIGH>,
-+		             <GIC_SPI 263 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&bpmp TEGRA186_CLK_HOST1X>;
-+		clock-names = "host1x";
-+		resets = <&bpmp TEGRA186_RESET_HOST1X>;
-+		reset-names = "host1x";
-+
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+
-+		ranges = <0x0 0x15000000 0x0 0x15000000 0x0 0x01000000>;
-+	};
-+
- 	gpu at 17000000 {
- 		compatible = "nvidia,gp10b";
- 		reg = <0x0 0x17000000 0x0 0x1000000>,
+ 		bpmp_i2c: i2c {
+ 			compatible = "nvidia,tegra186-bpmp-i2c";
 -- 
 2.14.1
