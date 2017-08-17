@@ -1,7 +1,7 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 16 Aug 2017 21:13:27 -0700
-Subject: [GIT PULL] Amlogic 32-bit DT updates for v4.14
-Message-ID: <7hr2waal20.fsf@baylibre.com>
+Date: Wed, 16 Aug 2017 21:14:34 -0700
+Subject: [GIT PULL] Amlogic 64-bit DT updates for v4.14
+Message-ID: <7hmv6yal05.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,30 +11,41 @@ The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-dt64
 
-for you to fetch changes up to ec9b59162fd8317933e362f347a7ed6da7d85618:
+for you to fetch changes up to f72d6f6037b7b07927f78e159e4949b8e0263258:
 
-  ARM: dts: meson6: use stable UART bindings (2017-08-08 14:49:12 -0700)
-
-----------------------------------------------------------------
-Amlogic 32-bit DT changes for v4.14
-- update clock controler for use as reset controller
-- misc. updates/fixups/improvements
+  ARM64: dts: meson-gx: use stable UART bindings with correct gate clock (2017-08-08 14:48:56 -0700)
 
 ----------------------------------------------------------------
-Martin Blumenstingl (5):
-      ARM: dts: move the pwm_ab and pwm_cd nodes to meson.dtsi
-      ARM: dts: meson8: add the PWM controller nodes
-      ARM: dts: meson8b: use the existing wdt node to override the compatible
-      ARM: dts: meson: add a node which describes the SRAM
-      ARM: dts: meson: mark the clock controller also as reset controller
+Amlogic 64-bit DT updates for v4.14
+- add GPIO line names to a few boards
+- MMC regulator settle time updates
+- misc cleanups/fixups
 
-Neil Armstrong (1):
-      ARM: dts: meson6: use stable UART bindings
+----------------------------------------------------------------
+Helmut Klein (1):
+      ARM64: dts: meson-gx: use stable UART bindings with correct gate clock
 
- arch/arm/boot/dts/meson.dtsi   | 30 ++++++++++++++++++++++++++----
- arch/arm/boot/dts/meson6.dtsi  | 28 ++++++++++++++++++++++++++++
- arch/arm/boot/dts/meson8.dtsi  | 16 ++++++++++++++++
- arch/arm/boot/dts/meson8b.dtsi | 33 +++++++++++++--------------------
- 4 files changed, 83 insertions(+), 24 deletions(-)
+Jerome Brunet (1):
+      ARM64: dts: meson-gxbb: p20x: add card regulator settle times
+
+Kevin Hilman (1):
+      dt-bindings: amlogic: add unstable statement
+
+Martin Blumenstingl (1):
+      ARM64: dts: meson-gx: consistently use the GIC_SPI and IRQ type macros
+
+Neil Armstrong (3):
+      ARM64: dts: meson-gx: Add SoC info register
+      ARM64: dts: meson-gxl-khadas-vim: Add GPIO lines names
+      ARM64: dts: meson-gxbb-nanopi-k2: Add GPIO lines names
+
+ Documentation/devicetree/bindings/arm/amlogic.txt          | 12 ++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi                  | 26 +++++++++++++++-----------
+ arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts       | 58 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi           |  3 +++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                | 25 +++++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts | 56 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                 | 25 +++++++++++++++++++++++++
+ 7 files changed, 194 insertions(+), 11 deletions(-)
