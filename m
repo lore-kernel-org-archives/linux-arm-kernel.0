@@ -1,31 +1,42 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Aug 2017 10:09:48 -0500
-Subject: [PATCH v2 06/11] Docs: dt: add devicetree binding for describing
- arm64 SDEI firmware
-In-Reply-To: <20170808164616.25949-7-james.morse@arm.com>
-References: <20170808164616.25949-1-james.morse@arm.com>
- <20170808164616.25949-7-james.morse@arm.com>
-Message-ID: <20170817150948.x4ebg54ak7pzfley@rob-hp-laptop>
+Date: Thu, 17 Aug 2017 10:10:25 -0500
+Subject: [PATCH v4 05/12] Documentation: net: phy: Add phy-is-internal
+ binding
+In-Reply-To: <1bff1793-fe46-f263-fbf5-ef65ffbc5dc9@rock-chips.com>
+References: <1502280475-736-1-git-send-email-david.wu@rock-chips.com>
+ <1502280630-2254-1-git-send-email-david.wu@rock-chips.com>
+ <778B0470-8ABD-46AD-A63D-F0CF4911C800@gmail.com>
+ <20170810002041.GA10776@lunn.ch>
+ <1bff1793-fe46-f263-fbf5-ef65ffbc5dc9@rock-chips.com>
+Message-ID: <20170817151025.sdbusesfq7spy4fm@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 05:46:11PM +0100, James Morse wrote:
-> The Software Delegated Exception Interface (SDEI) is an ARM standard
-> for registering callbacks from the platform firmware into the OS.
-> This is typically used to implement RAS notifications, or from an
-> IRQ that has been promoted to a firmware-assisted NMI.
+On Thu, Aug 10, 2017 at 06:57:40PM +0800, David.Wu wrote:
+> Hi Andrew, Florian
 > 
-> Add a new devicetree binding to describe the SDE firmware interface.
+> ? 2017/8/10 8:20, Andrew Lunn ??:
+> > Hi Florian, David.
+> > 
+> > I'm happy with the property name. But i think the text needs more
+> > description. We deal with Ethernet switches with integrated PHYs. Yet
+> > for us, this property is unneeded.
+> > 
+> > Seeing this property means some bit of software needs to ensure the
+> > internal PHY should be used, when given the choice between an internal
+> > and external PHY. So i would say something like:
+> > 
+> >      If set, indicates that the PHY is integrated into the same
+> >      physical package as the Ethernet MAC. If needed, muxers should be
+> >      configured to ensure the (internal) PHY is used. The absence of this
+> >      property indicates the muxers should be configured so that the
+> >      external PHY is used.
 > 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
-> Changes since v1:
-> * Added bound IRQ description for binding,
-> * Reference SMC-CC, not 'AAPCS like'
-> * Move sdei node under firmware node (and the file path)
-> 
->  .../devicetree/bindings/arm/firmware/sdei.txt      | 42 ++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/firmware/sdei.txt
+> Are we supposed to replace the words "internal" with "integrated" here?
+> So we have three kinds of PHY, they are intenal, external and integrated
+> PHYs.
 
-Acked-by: Rob Herring <robh@kernel.org>
+And you can have both a XAUI/serdes phy and the ethernet phy. It should 
+be clear this is for the latter.
+
+Rob
