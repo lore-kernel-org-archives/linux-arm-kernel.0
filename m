@@ -1,71 +1,57 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Thu, 17 Aug 2017 16:16:06 +0900
-Subject: [PATCH -tip 3/4] arm64: Cleanup in_exception_text() and move it in
- asm/sections.h
-In-Reply-To: <150295395797.14424.968407208436624832.stgit@devbox>
-References: <150295395797.14424.968407208436624832.stgit@devbox>
-Message-ID: <150295415599.14424.2567748523337189088.stgit@devbox>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Thu, 17 Aug 2017 09:15:25 +0200
+Subject: [PATCH v3 1/2] remoteproc: dt: Provide bindings for iMX6SX/7D Remote
+ Processor Controller driver
+In-Reply-To: <20170817071526.5930-1-o.rempel@pengutronix.de>
+References: <20170817071526.5930-1-o.rempel@pengutronix.de>
+Message-ID: <20170817071526.5930-2-o.rempel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cleanup in_exception_text() using memory_contains() and
-move it in asm/sections.h from asm/trap.h because
-section symbols and memory_contains() are defined in
-asm/sections.h.
-
-Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 ---
- arch/arm64/include/asm/sections.h |   16 ++++++++++++++++
- arch/arm64/include/asm/traps.h    |   16 ----------------
- 2 files changed, 16 insertions(+), 16 deletions(-)
+ .../devicetree/bindings/remoteproc/imx-rproc.txt   | 33 ++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
 
-diff --git a/arch/arm64/include/asm/sections.h b/arch/arm64/include/asm/sections.h
-index 941267caa39c..abaa8ac79eaf 100644
---- a/arch/arm64/include/asm/sections.h
-+++ b/arch/arm64/include/asm/sections.h
-@@ -29,4 +29,20 @@ extern char __inittext_begin[], __inittext_end[];
- extern char __irqentry_text_start[], __irqentry_text_end[];
- extern char __mmuoff_data_start[], __mmuoff_data_end[];
- 
-+/**
-+ * in_exception_text - check if an address is in exception_text or
-+ *			irqentry_text
-+ * @addr: virtual address to be checked
-+ *
-+ * Returns: true if the address specified by @addr is in the exception_text or
-+ * irqentry_text, false otherwise.
-+ */
-+static inline bool in_exception_text(unsigned long addr)
-+{
-+	return memory_contains(__exception_text_start, __exception_text_end,
-+			       (void *)addr, 0) ||
-+		memory_contains(__irqentry_text_start, __irqentry_text_end,
-+				(void *)addr, 0);
-+}
+diff --git a/Documentation/devicetree/bindings/remoteproc/imx-rproc.txt b/Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
+new file mode 100644
+index 000000000000..fbcefd965dc4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
+@@ -0,0 +1,33 @@
++NXP iMX6SX/iMX7D Co-Processor Bindings
++----------------------------------------
 +
- #endif /* __ASM_SECTIONS_H */
-diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
-index 47a9066f7c86..c3734c3e8115 100644
---- a/arch/arm64/include/asm/traps.h
-+++ b/arch/arm64/include/asm/traps.h
-@@ -37,20 +37,4 @@ void unregister_undef_hook(struct undef_hook *hook);
- 
- void arm64_notify_segfault(struct pt_regs *regs, unsigned long addr);
- 
--static inline int __in_irqentry_text(unsigned long ptr)
--{
--	return ptr >= (unsigned long)&__irqentry_text_start &&
--	       ptr < (unsigned long)&__irqentry_text_end;
--}
--
--static inline int in_exception_text(unsigned long ptr)
--{
--	int in;
--
--	in = ptr >= (unsigned long)&__exception_text_start &&
--	     ptr < (unsigned long)&__exception_text_end;
--
--	return in ? : __in_irqentry_text(ptr);
--}
--
- #endif
++This binding provides support for ARM Cortex M4 Co-processor found on some
++NXP iMX SoCs.
++
++Required properties:
++- compatible		Should be one of:
++				"fsl,imx7d-cm4"
++				"fsl,imx6sx-cm4"
++- clocks		Clock for co-processor (See: ../clock/clock-bindings.txt)
++- syscon		Phandle to syscon block which provide access to
++			System Reset Controller
++
++Optional properties:
++- memory-region		list of phandels to the reserved memory regions.
++			(See: ../reserved-memory/reserved-memory.txt)
++
++Example:
++	m4_reserved_sysmem1: cm4 at 80000000 {
++		reg = <0x80000000 0x80000>;
++	};
++
++	m4_reserved_sysmem2: cm4 at 81000000 {
++		reg = <0x81000000 0x80000>;
++	};
++
++	imx7d-cm4 {
++		compatible	= "fsl,imx7d-cm4";
++		memory-region	= <&m4_reserved_sysmem1>, <&m4_reserved_sysmem2>;
++		syscon		= <&src>;
++		clocks		= <&clks IMX7D_ARM_M4_ROOT_CLK>;
++	};
+-- 
+2.11.0
