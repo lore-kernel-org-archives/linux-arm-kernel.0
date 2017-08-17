@@ -1,122 +1,152 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 17 Aug 2017 12:18:49 +0100
-Subject: [PATCHv2 0/3] arm64 xilinx zynqmp firmware interface
-In-Reply-To: <07473fe2-d159-a016-2f65-735b1231beb8@xilinx.com>
-References: <cover.1502886277.git.michal.simek@xilinx.com>
- <43deeed7-32c8-7914-5f44-862ebbe14a3b@arm.com>
- <89e5469b-650e-64c7-1754-797b35bac523@xilinx.com>
- <a1970cb5-1cf1-d38a-3de3-c782c23fc8ac@arm.com>
- <0560c79f-e461-6010-0628-e99ce0a1f8c6@xilinx.com>
- <45e58860-cb8c-75f2-60bf-140aa3704169@arm.com>
- <07473fe2-d159-a016-2f65-735b1231beb8@xilinx.com>
-Message-ID: <8123bd03-2822-d2c3-e07f-cc99238d3cbe@arm.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Thu, 17 Aug 2017 13:20:22 +0200
+Subject: [RFC 1/4] dt-bindings: clock: Add Realtek RTD1295
+In-Reply-To: <20170817112026.24062-1-afaerber@suse.de>
+References: <20170817112026.24062-1-afaerber@suse.de>
+Message-ID: <20170817112026.24062-2-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Naming inspired from Zidoo X9S Device Tree and clk_summary.
 
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ .../devicetree/bindings/clock/realtek,rtd129x.txt  | 20 +++++
+ include/dt-bindings/clock/realtek,rtd1295.h        | 99 ++++++++++++++++++++++
+ 2 files changed, 119 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/realtek,rtd129x.txt
+ create mode 100644 include/dt-bindings/clock/realtek,rtd1295.h
 
-On 17/08/17 11:32, Michal Simek wrote:
-> On 17.8.2017 11:12, Sudeep Holla wrote:
->> 
->> 
->> On 17/08/17 09:42, Michal Simek wrote:
->>> On 17.8.2017 09:52, Marc Zyngier wrote:
->>>> On 17/08/17 07:10, Michal Simek wrote:
->>>>> On 16.8.2017 17:39, Marc Zyngier wrote:
->>>>>> On 16/08/17 13:24, Michal Simek wrote:
->>>>>>> Hi,
->>>>>>> 
->>>>>>> xilinx is using this interface for very long time and we
->>>>>>> can't merge our driver changes to Linux because of
->>>>>>> missing communication layer with firmware. This interface
->>>>>>> was developed before scpi and scmi was available. In
->>>>>>> connection to power management scpi and scmi are missing 
->>>>>>> pieces which we already use. There is a separate
->>>>>>> discussion how to extend scmi to support all our use
->>>>>>> cases.
->>>>>> 
->>>>>> So maybe we should wait and see where this discussion is
->>>>>> going before we merge yet another firmware interface?
->>>>> 
->>>>> It will take a lot of time when this discussion ends and I
->>>>> can't see any benefit to hold all
->>>> 
->>>> Well, so far, the benefit of this series is exactly nil, as the
->>>> code it brings is *unused*. It is impossible to review in
->>>> isolation.
->>>> 
->>> 
->>> Ok. I will add others drivers to this series that's not a
->>> problem.
->>> 
->>>> In the meantime, you can continue finding out how *not* to have
->>>> to merge this code, and instead focus on using the
->>>> infrastructure we already have, or at least influence the
->>>> infrastructure that is being designed. It will be much better
->>>> than dumping yet another slab of "I'm so different" code that
->>>> is going to ultimately bitrot.
->>> 
->>> I am happy to look the better proposed way. SCPI is ancient and
->>> SCMI is replacement and not merged yet. We already had a call
->>> with arm and Sudeep was on it too where outcome from that was
->>> that we can't use that because it doesn't support what we need to
->>> support now.
->>> 
->> 
->> OK, none of the specifics were discussed in the meeting to conclude
->> that SCMI can't be used. My takeaway from the meeting was Xilinx
->> has this interface for long and being deployed in various systems.
->> I would like to get into specifics before discarding SCMI as
->> unusable. What bothers me more is that why was that not raised
->> during the specification review which was quite a long period IMO ?
->> I tend to think Xilinx never bothered to look/review the
->> specification as this f/w interface was already there.
-> 
-> Xilinx is using this interface from Aug 2015. I am not aware about
-> any invitation to spec review. And not sure who was there from
-> xilinx.
-> 
-
-Sure, I can understand and that's not a problem but Xilinx was involved.
-
->> 
->> However I still can't see why this was posted once we started
->> pushing out SCMI patches especially given that this f/w interface
->> was there for long and no attempts were made in past to upstream
->> this.
-> 
-> The reason is simple which is upstream our code which depends on
-> this communication layer. I don't think there is quick path to move
-> to different interface than this one.
-> 
-
-Do you mean "smc" when you refer communication layer ? If so, that's
-fine. You can use "smc" as transport with SCMI if you want,
-specification doesn't prevent that.
-
->> 
->> Also I am not dismissing the series yet, but if I find that SCMI
->> can be used(after getting specifics from this series myself), I
->> will at-least argue against the "SCMI can't be used" argument.
-> 
-> This is not my argument that we can't use SCMI. This is what was my 
-> understanding from that meeting we had. And definitely there is no
-> quick path for us to switch to SCMI and breaks all current existing
-> customers.
-> 
-
-I understand the latter and I mentioned the same earlier, but I disagree
-with the former. That meeting was mostly introduction(and informal IMO)
-and didn't involve anything at the technical level.
-
-> And this interface is just in the same position as current SCPI. It 
-> means you have SCPI already merged and you are adding new one. SCMI 
-> could be maybe also just SCPIv2.
-
-Agreed, but it was posted as soon as the specification is out and so is
-the SCMI. I am not arguing it as a point, but just mentioning that this
-post was simply bad timing :)
-
+diff --git a/Documentation/devicetree/bindings/clock/realtek,rtd129x.txt b/Documentation/devicetree/bindings/clock/realtek,rtd129x.txt
+new file mode 100644
+index 000000000000..b55da39faf58
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/realtek,rtd129x.txt
+@@ -0,0 +1,20 @@
++Realtek RTD129x clock controllers
++=================================
++
++Requires properties:
++- compatible   :  Should be one of the following:
++                  - "realtek,rtd1295-clk"
++                  - "realtek,rtd1295-iso-clk"
++- reg          :  Specifies physical base address and size
++- clocks       :  Specifies the oscillator node
++- #clock-cells :  Shall be 1
++
++
++Example:
++
++	clock-controller at 98000000 {
++		compatible = "realtek,rtd1295-clk";
++		reg = <0x98000000 0x1000>;
++		clocks = <&osc27M>;
++		#clock-cells = <1>;
++	};
+diff --git a/include/dt-bindings/clock/realtek,rtd1295.h b/include/dt-bindings/clock/realtek,rtd1295.h
+new file mode 100644
+index 000000000000..278148bff2ac
+--- /dev/null
++++ b/include/dt-bindings/clock/realtek,rtd1295.h
+@@ -0,0 +1,99 @@
++/*
++ * Copyright (c) 2017 Andreas F?rber
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ */
++#ifndef DT_BINDINGS_CLOCK_RTD1295_H
++#define DT_BINDINGS_CLOCK_RTD1295_H
++
++#define RTD1295_CLK_PLL_SCPU		0
++#define RTD1295_CLK_PLL_BUS		1
++#define RTD1295_CLK_PLL_BUS_DIV2	2
++#define RTD1295_CLK_SYS			3
++#define RTD1295_CLK_PLL_BUS_H		4
++#define RTD1295_CLK_SYSH		5
++#define RTD1295_CLK_PLL_DDSA		6
++#define RTD1295_CLK_PLL_DDSB		7
++#define RTD1295_CLK_PLL_VODMA		8
++#define RTD1295_CLK_PLL_VE1		9
++#define RTD1295_CLK_PLL_VE2		10
++#define RTD1295_CLK_PLL_GPU		14
++#define RTD1295_CLK_PLL_ACPU		15
++
++#define RTD1295_CLK_EN_BASE		16
++#define RTD1295_CLK_EN_MISC		(RTD1295_CLK_EN_BASE + 0)
++#define RTD1295_CLK_EN_PCIE0		(RTD1295_CLK_EN_BASE + 1)
++#define RTD1295_CLK_EN_SATA_0		(RTD1295_CLK_EN_BASE + 2)
++#define RTD1295_CLK_EN_GSPI		(RTD1295_CLK_EN_BASE + 3)
++#define RTD1295_CLK_EN_USB		(RTD1295_CLK_EN_BASE + 4)
++#define RTD1295_CLK_EN_PCR		(RTD1295_CLK_EN_BASE + 5)
++#define RTD1295_CLK_EN_ISO_MISC		(RTD1295_CLK_EN_BASE + 6)
++#define RTD1295_CLK_EN_SATA_ALIVE_0	(RTD1295_CLK_EN_BASE + 7)
++#define RTD1295_CLK_EN_HDMI		(RTD1295_CLK_EN_BASE + 8)
++#define RTD1295_CLK_EN_ETN		(RTD1295_CLK_EN_BASE + 9)
++#define RTD1295_CLK_EN_AIO		(RTD1295_CLK_EN_BASE + 10)
++#define RTD1295_CLK_EN_GPU		(RTD1295_CLK_EN_BASE + 11)
++#define RTD1295_CLK_EN_VE1		(RTD1295_CLK_EN_BASE + 12)
++#define RTD1295_CLK_EN_VE2		(RTD1295_CLK_EN_BASE + 13)
++#define RTD1295_CLK_EN_TVE		(RTD1295_CLK_EN_BASE + 14)
++#define RTD1295_CLK_EN_VO		(RTD1295_CLK_EN_BASE + 15)
++#define RTD1295_CLK_EN_LVDS		(RTD1295_CLK_EN_BASE + 16)
++#define RTD1295_CLK_EN_SE		(RTD1295_CLK_EN_BASE + 17)
++#define RTD1295_CLK_EN_DCU		(RTD1295_CLK_EN_BASE + 18)
++#define RTD1295_CLK_EN_CP		(RTD1295_CLK_EN_BASE + 19)
++#define RTD1295_CLK_EN_MD		(RTD1295_CLK_EN_BASE + 20)
++#define RTD1295_CLK_EN_TP		(RTD1295_CLK_EN_BASE + 21)
++#define RTD1295_CLK_EN_RSA		(RTD1295_CLK_EN_BASE + 22)
++#define RTD1295_CLK_EN_NF		(RTD1295_CLK_EN_BASE + 23)
++#define RTD1295_CLK_EN_EMMC		(RTD1295_CLK_EN_BASE + 24)
++#define RTD1295_CLK_EN_CR		(RTD1295_CLK_EN_BASE + 25)
++#define RTD1295_CLK_EN_SDIO_IP		(RTD1295_CLK_EN_BASE + 26)
++#define RTD1295_CLK_EN_MIPI		(RTD1295_CLK_EN_BASE + 27)
++#define RTD1295_CLK_EN_EMMC_IP		(RTD1295_CLK_EN_BASE + 28)
++#define RTD1295_CLK_EN_VE3		(RTD1295_CLK_EN_BASE + 29)
++#define RTD1295_CLK_EN_SDIO		(RTD1295_CLK_EN_BASE + 30)
++#define RTD1295_CLK_EN_SD_IP		(RTD1295_CLK_EN_BASE + 31)
++
++#define RTD1295_CLK_EN_BASE2		(RTD1295_CLK_EN_BASE + 32)
++#define RTD1295_CLK_EN_NAT		(RTD1295_CLK_EN_BASE2 + 0)
++#define RTD1295_CLK_EN_MISC_I2C_5	(RTD1295_CLK_EN_BASE2 + 1)
++#define RTD1295_CLK_EN_SCPU		(RTD1295_CLK_EN_BASE2 + 2)
++#define RTD1295_CLK_EN_JPEG		(RTD1295_CLK_EN_BASE2 + 3)
++#define RTD1295_CLK_EN_APU		(RTD1295_CLK_EN_BASE2 + 4)
++#define RTD1295_CLK_EN_PCIE1		(RTD1295_CLK_EN_BASE2 + 5)
++#define RTD1295_CLK_EN_MISC_SC		(RTD1295_CLK_EN_BASE2 + 6)
++#define RTD1295_CLK_EN_CBUS_TX		(RTD1295_CLK_EN_BASE2 + 7)
++#define RTD1295_CLK_EN_MISC_RTC		(RTD1295_CLK_EN_BASE2 + 10)
++#define RTD1295_CLK_EN_MISC_I2C_4	(RTD1295_CLK_EN_BASE2 + 13)
++#define RTD1295_CLK_EN_MISC_I2C_3	(RTD1295_CLK_EN_BASE2 + 14)
++#define RTD1295_CLK_EN_MISC_I2C_2	(RTD1295_CLK_EN_BASE2 + 15)
++#define RTD1295_CLK_EN_MISC_I2C_1	(RTD1295_CLK_EN_BASE2 + 16)
++#define RTD1295_CLK_EN_AIO_AU_CODEC	(RTD1295_CLK_EN_BASE2 + 17)
++#define RTD1295_CLK_EN_AIO_MOD		(RTD1295_CLK_EN_BASE2 + 18)
++#define RTD1295_CLK_EN_AIO_DA		(RTD1295_CLK_EN_BASE2 + 19)
++#define RTD1295_CLK_EN_AIO_HDMI		(RTD1295_CLK_EN_BASE2 + 20)
++#define RTD1295_CLK_EN_AIO_SPDIF	(RTD1295_CLK_EN_BASE2 + 21)
++#define RTD1295_CLK_EN_AIO_I2S		(RTD1295_CLK_EN_BASE2 + 22)
++#define RTD1295_CLK_EN_AIO_MCLK		(RTD1295_CLK_EN_BASE2 + 23)
++#define RTD1295_CLK_EN_HDMIRX		(RTD1295_CLK_EN_BASE2 + 24)
++#define RTD1295_CLK_EN_SATA_1		(RTD1295_CLK_EN_BASE2 + 25)
++#define RTD1295_CLK_EN_SATA_ALIVE_1	(RTD1295_CLK_EN_BASE2 + 26)
++#define RTD1295_CLK_EN_UR2		(RTD1295_CLK_EN_BASE2 + 27)
++#define RTD1295_CLK_EN_UR1		(RTD1295_CLK_EN_BASE2 + 28)
++#define RTD1295_CLK_EN_FAN		(RTD1295_CLK_EN_BASE2 + 29)
++#define RTD1295_CLK_EN_DCPHY_0		(RTD1295_CLK_EN_BASE2 + 30)
++#define RTD1295_CLK_EN_DCPHY_1		(RTD1295_CLK_EN_BASE2 + 31)
++
++#define RTD1295_ISO_CLK_EN_MISC_CEC0	2
++#define RTD1295_ISO_CLK_EN_CBUSRX_SYS	3
++#define RTD1295_ISO_CLK_EN_CBUSTX_SYS	4
++#define RTD1295_ISO_CLK_EN_CBUS_SYS	5
++#define RTD1295_ISO_CLK_EN_CBUS_OSC	6
++#define RTD1295_ISO_CLK_EN_MISC_IR	7
++#define RTD1295_ISO_CLK_EN_MISC_UR0	8
++#define RTD1295_ISO_CLK_EN_I2C_0	9
++#define RTD1295_ISO_CLK_EN_I2C_1	10
++#define RTD1295_ISO_CLK_EN_ETN_250M	11
++#define RTD1295_ISO_CLK_EN_ETN_SYS	12
++
++#endif
 -- 
-Regards,
-Sudeep
+2.12.3
