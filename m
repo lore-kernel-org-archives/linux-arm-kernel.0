@@ -1,33 +1,37 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 18 Aug 2017 01:05:53 +0800
-Subject: [PATCH 1/8] dt-bindings: phy: sun4i-usb-phy: Add property
- descriptions for H3
-In-Reply-To: <20170810170855.txcvwjfb4kzx4q66@rob-hp-laptop>
-References: <20170803081411.22389-1-wens@csie.org>
- <20170803081411.22389-2-wens@csie.org>
- <20170810170855.txcvwjfb4kzx4q66@rob-hp-laptop>
-Message-ID: <CAGb2v65mKdQC40ASsmeWqCxnDWV4mmf9QFo5-t7spX9RRJBdbg@mail.gmail.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Thu, 17 Aug 2017 10:06:57 -0700
+Subject: [GIT PULL 3/3] ARM: SOC: Keystone soc driver update for 4.14
+In-Reply-To: <CAK8P3a2gj0nkdSmHYv=D+UWY1M48bacY4Cxy8T-Vu2cUqe2_Jw@mail.gmail.com>
+References: <1502929842-8156-1-git-send-email-ssantosh@kernel.org>
+ <1502929842-8156-3-git-send-email-ssantosh@kernel.org>
+ <CAK8P3a2gj0nkdSmHYv=D+UWY1M48bacY4Cxy8T-Vu2cUqe2_Jw@mail.gmail.com>
+Message-ID: <627dec90-71a7-be6c-d2bc-855e5bf552ae@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 11, 2017 at 1:08 AM, Rob Herring <robh@kernel.org> wrote:
-> On Thu, Aug 03, 2017 at 04:14:04PM +0800, Chen-Yu Tsai wrote:
->> The Allwinner H3 SoC has 4 USB PHYs, so it needs four sets of pmu
->> regions, clocks, resets, and optional vbus properties. These were
->> not described when the H3 compatible string was added.
+On 8/17/2017 2:03 AM, Arnd Bergmann wrote:
+> On Thu, Aug 17, 2017 at 2:30 AM, Santosh Shilimkar <ssantosh@kernel.org> wrote:
+>> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 >>
->> Fixes: 626a630e003c ("phy-sun4i-usb: Add support for the host usb-phys
->>                     found on the H3 SoC")
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 8 ++++++--
->>  1 file changed, 6 insertions(+), 2 deletions(-)
->
-> Acked-by: Rob Herring <robh@kernel.org>
+>>    Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_soc_drivers_4.14
+>>
+>> for you to fetch changes up to a1934ff175ff25f57dae8b5107a2351d15729c3a:
+>>
+>>    soc: ti: ti_sci_pm_domains: Populate name for genpd (2017-07-28 09:51:34 -0700)
+>>
+>> ----------------------------------------------------------------
+>> soc: Keystone ti-sci driver genpd fix for 4.14
+> 
+>  From the patch description I would have guessed that we want this in 4.13,
+> can you clarify?
+> 
+I was in two minds as well but no one complained it has must have
+fix so I just queued it for 4.14. If you can cherry pick that to 4.13,
+that will be great.
 
-Kishon, are the dt binding and driver parts of this series OK for
-4.14? I'd like to get an answer from you to be able to merge the
-device tree parts.
-
-Thanks
-ChenYu
+Regards,
+Santosh
