@@ -1,37 +1,55 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 17 Aug 2017 13:44:44 +0300
-Subject: [PATCH 4/7] ARM: dts: stm32: Enable USB HS on stm32746g-eval
-In-Reply-To: <1502962386-6683-5-git-send-email-amelie.delaunay@st.com>
-References: <1502962386-6683-1-git-send-email-amelie.delaunay@st.com>
- <1502962386-6683-5-git-send-email-amelie.delaunay@st.com>
-Message-ID: <824d41f2-bea9-c1b6-4c3e-1ae146286d89@cogentembedded.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 17 Aug 2017 11:46:12 +0100
+Subject: [PATCH 15/27] arm64/sve: Probe SVE capabilities and usable vector
+ lengths
+In-Reply-To: <20170817100424.GI6321@e103592.cambridge.arm.com>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-16-git-send-email-Dave.Martin@arm.com>
+ <07268b07-c5f4-38d6-257d-5864cb6752c1@arm.com>
+ <20170817100424.GI6321@e103592.cambridge.arm.com>
+Message-ID: <5cd3b5c8-acea-044e-c503-a7e8ad0180f8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On 17/08/17 11:04, Dave Martin wrote:
+> On Wed, Aug 16, 2017 at 06:48:01PM +0100, Suzuki K Poulose wrote:
+>> On 09/08/17 13:05, Dave Martin wrote:
+>>> [This sender failed our fraud detection checks and may not be who they appear to be. Learn about spoofing at http://aka.ms/LearnAboutSpoofing]
+>
+> Any idea what this is ^ ?  I don't know if this is caused by me or you,
+> but I only seem to see it on subthreads you've replied to.
+>
 
-On 8/17/2017 12:33 PM, Amelie Delaunay wrote:
+Dave,
 
-> This patch enables USB HS on stm32746g-eval (Host mode).
-> 
-> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
-> ---
->   arch/arm/boot/dts/stm32746g-eval.dts | 16 ++++++++++++++++
->   1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/stm32746g-eval.dts b/arch/arm/boot/dts/stm32746g-eval.dts
-> index 69a9579..944501d 100644
-> --- a/arch/arm/boot/dts/stm32746g-eval.dts
-> +++ b/arch/arm/boot/dts/stm32746g-eval.dts
-> @@ -83,6 +83,13 @@
->   			gpios = <&gpioc 13 0>;
->   		};
->   	};
-> +
-> +	usbotg_hs_phy: usbphy {
+Sorry about that, should have trimmed that. It looks like the mail server is unhappy
+about email received via kvmarm list and I don't know why.
 
-    Name it "usb-phy" please, tpo be m,ore in line with the DT spec.
+>>
+>>> +void __init sve_setup(void)
+>>> +{
+>>> +       u64 zcr;
+>>> +       unsigned int max_vl;
+>>> +
+>>> +       if (!system_supports_sve())
+>>> +               return;
+>>> +
+>>> +       /*
+>>> +        * The architecture mandates 128-bit vectors be supported, and
+>>> +        * the code assumes elsewhere that sve_vq_map is non-empty:
+>>> +        */
+>>> +       BUG_ON(!test_bit(vq_to_bit(1), sve_vq_map));
+>>> +
+>>> +       sve_vq_map_finalised = true;
+>>
+>> We have something local in cpufeature.c, sys_caps_initialised. May be we could
+>> reuse it here ? With or without that change, FWIW.
+>
+> I'll take a look at that.  Inventing that here seemed a little ugly, and
+> this is all driven from the cpufreatures code anyway now which ensures a
+> certain ordering.
+>
+> If I can reuse sys_caps_initialised for this, I will -- seems pointless
+> to reinvent it.
 
-[...]
-
-MBR, Sergei
+Suzuki
