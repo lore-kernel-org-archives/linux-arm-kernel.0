@@ -1,94 +1,87 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 17 Aug 2017 12:32:25 +0200
-Subject: [PATCHv2 0/3] arm64 xilinx zynqmp firmware interface
-In-Reply-To: <45e58860-cb8c-75f2-60bf-140aa3704169@arm.com>
-References: <cover.1502886277.git.michal.simek@xilinx.com>
- <43deeed7-32c8-7914-5f44-862ebbe14a3b@arm.com>
- <89e5469b-650e-64c7-1754-797b35bac523@xilinx.com>
- <a1970cb5-1cf1-d38a-3de3-c782c23fc8ac@arm.com>
- <0560c79f-e461-6010-0628-e99ce0a1f8c6@xilinx.com>
- <45e58860-cb8c-75f2-60bf-140aa3704169@arm.com>
-Message-ID: <07473fe2-d159-a016-2f65-735b1231beb8@xilinx.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Thu, 17 Aug 2017 18:37:46 +0800
+Subject: [PATCH] PM / AVS: rockchip-io: add io selectors and supplies for
+ rv1108
+Message-ID: <1502966266-15215-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.8.2017 11:12, Sudeep Holla wrote:
-> 
-> 
-> On 17/08/17 09:42, Michal Simek wrote:
->> On 17.8.2017 09:52, Marc Zyngier wrote:
->>> On 17/08/17 07:10, Michal Simek wrote:
->>>> On 16.8.2017 17:39, Marc Zyngier wrote:
->>>>> On 16/08/17 13:24, Michal Simek wrote:
->>>>>> Hi,
->>>>>>
->>>>>> xilinx is using this interface for very long time and we can't merge our
->>>>>> driver changes to Linux because of missing communication layer with
->>>>>> firmware. This interface was developed before scpi and scmi was
->>>>>> available. In connection to power management scpi and scmi are missing
->>>>>> pieces which we already use. There is a separate discussion how to
->>>>>> extend scmi to support all our use cases.
->>>>>
->>>>> So maybe we should wait and see where this discussion is going before we
->>>>> merge yet another firmware interface?
->>>>
->>>> It will take a lot of time when this discussion ends and I can't see any
->>>> benefit to hold all
->>>
->>> Well, so far, the benefit of this series is exactly nil, as the code it
->>> brings is *unused*. It is impossible to review in isolation.
->>>
->>
->> Ok. I will add others drivers to this series that's not a problem.
->>
->>> In the meantime, you can continue finding out how *not* to have to merge
->>> this code, and instead focus on using the infrastructure we already
->>> have, or at least influence the infrastructure that is being designed.
->>> It will be much better than dumping yet another slab of "I'm so
->>> different" code that is going to ultimately bitrot.
->>
->> I am happy to look the better proposed way. SCPI is ancient and SCMI is
->> replacement and not merged yet. We already had a call with arm and
->> Sudeep was on it too where outcome from that was that we can't use that
->> because it doesn't support what we need to support now.
->>
-> 
-> OK, none of the specifics were discussed in the meeting to conclude that
-> SCMI can't be used. My takeaway from the meeting was Xilinx has this
-> interface for long and being deployed in various systems. I would like
-> to get into specifics before discarding SCMI as unusable. What bothers
-> me more is that why was that not raised during the specification review
-> which was quite a long period IMO ? I tend to think Xilinx never
-> bothered to look/review the specification as this f/w interface was
-> already there.
+This adds the necessary data for handling io voltage domains on the rv1108.
 
-Xilinx is using this interface from Aug 2015. I am not aware about any
-invitation to spec review. And not sure who was there from xilinx.
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+---
+ .../bindings/power/rockchip-io-domain.txt          |  2 ++
+ drivers/power/avs/rockchip-io-domain.c             | 38 ++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
 
-> 
-> However I still can't see why this was posted once we started pushing
-> out SCMI patches especially given that this f/w interface was there for
-> long and no attempts were made in past to upstream this.
-
-The reason is simple which is upstream our code which depends on this
-communication layer. I don't think there is quick path to move to
-different interface than this one.
-
-> 
-> Also I am not dismissing the series yet, but if I find that SCMI can be
-> used(after getting specifics from this series myself), I will at-least
-> argue against the "SCMI can't be used" argument.
-
-This is not my argument that we can't use SCMI. This is what was my
-understanding from that meeting we had. And definitely there is no quick
-path for us to switch to SCMI and breaks all current existing customers.
-
-And this interface is just in the same position as current SCPI. It
-means you have SCPI already merged and you are adding new one. SCMI
-could be maybe also just SCPIv2.
-And when it is merged you are going to move all targets to this new
-interface. The same is for us but instead of scpi it is this interface
-we use and test.
-
-Thanks,
-Michal
+diff --git a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+index 43c21fb..d9d96fd 100644
+--- a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
++++ b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+@@ -31,6 +31,8 @@ SoC is on the same page.
+ 
+ Required properties:
+ - compatible: should be one of:
++  - "rockchip,rv1108-io-voltage-domain" for rv1108
++  - "rockchip,rv1108-pmu-io-voltage-domain" for rv1108 pmu-domains
+   - "rockchip,rk3188-io-voltage-domain" for rk3188
+   - "rockchip,rk3228-io-voltage-domain" for rk3228
+   - "rockchip,rk3288-io-voltage-domain" for rk3288
+diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
+index 031a343..a55205eb 100644
+--- a/drivers/power/avs/rockchip-io-domain.c
++++ b/drivers/power/avs/rockchip-io-domain.c
+@@ -227,6 +227,36 @@ static void rk3399_pmu_iodomain_init(struct rockchip_iodomain *iod)
+ 		dev_warn(iod->dev, "couldn't update pmu io iodomain ctrl\n");
+ }
+ 
++static const struct rockchip_iodomain_soc_data soc_data_rv1108 = {
++	.grf_offset = 0x404,
++	.supply_names = {
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		"vccio1",
++		"vccio2",
++		"vccio3",
++		"vccio5",
++		"vccio6",
++	},
++
++};
++
++static const struct rockchip_iodomain_soc_data soc_data_rv1108_pmu = {
++	.grf_offset = 0x104,
++	.supply_names = {
++		"pmu",
++	},
++};
++
+ /*
+  * On the rk3188 the io-domains are handled by a shared register with the
+  * lower 8 bits being still being continuing drive-strength settings.
+@@ -351,6 +381,14 @@ static void rk3399_pmu_iodomain_init(struct rockchip_iodomain *iod)
+ 
+ static const struct of_device_id rockchip_iodomain_match[] = {
+ 	{
++		.compatible = "rockchip,rv1108-io-voltage-domain",
++		.data = (void *)&soc_data_rv1108
++	},
++	{
++		.compatible = "rockchip,rv1108-pmu-io-voltage-domain",
++		.data = (void *)&soc_data_rv1108_pmu
++	},
++	{
+ 		.compatible = "rockchip,rk3188-io-voltage-domain",
+ 		.data = (void *)&soc_data_rk3188
+ 	},
+-- 
+1.9.1
