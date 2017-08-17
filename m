@@ -1,28 +1,32 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 17 Aug 2017 13:32:11 +0200
-Subject: [PATCH] arm64: defconfig: Enable Renesas R8A77995 SoC
-Message-ID: <1502969531-15248-1-git-send-email-geert+renesas@glider.be>
+From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
+Date: Thu, 17 Aug 2017 14:55:04 +0300
+Subject: [PATCH] staging: fsl-mc: be consistent when checking strcmp() returns
+Message-ID: <20170817115504.4308-1-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable support for the Renesas R-Car D3 SoC.
+From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Throughout the driver we use == 0 / != 0 to check strcmp() returns except
+this place, so fix it.
+
+Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/staging/fsl-mc/bus/dprc-driver.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index b0cc318abea8fae7..ccca96ff8a19bf89 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -50,6 +50,7 @@ CONFIG_ARCH_SEATTLE=y
- CONFIG_ARCH_RENESAS=y
- CONFIG_ARCH_R8A7795=y
- CONFIG_ARCH_R8A7796=y
-+CONFIG_ARCH_R8A77995=y
- CONFIG_ARCH_STRATIX10=y
- CONFIG_ARCH_TEGRA=y
- CONFIG_ARCH_SPRD=y
+diff --git a/drivers/staging/fsl-mc/bus/dprc-driver.c b/drivers/staging/fsl-mc/bus/dprc-driver.c
+index 485abad..06df528 100644
+--- a/drivers/staging/fsl-mc/bus/dprc-driver.c
++++ b/drivers/staging/fsl-mc/bus/dprc-driver.c
+@@ -29,7 +29,7 @@ static bool fsl_mc_device_match(struct fsl_mc_device *mc_dev,
+ 				struct fsl_mc_obj_desc *obj_desc)
+ {
+ 	return mc_dev->obj_desc.id == obj_desc->id &&
+-	       !strcmp(mc_dev->obj_desc.type, obj_desc->type);
++	       strcmp(mc_dev->obj_desc.type, obj_desc->type) == 0;
+ 
+ }
+ 
 -- 
-2.7.4
+2.9.4
