@@ -1,29 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 17 Aug 2017 15:01:30 +0200
-Subject: [PATCH v2] ARM: debug-ll: Add support for r8a7745
-In-Reply-To: <1502878810-17011-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1502878810-17011-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAMuHMdW_XMQGYrKcEmax59ADBD+zNMkNbqZQAPGOAkB0Ja5MJw@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Aug 2017 14:01:03 +0100
+Subject: [PATCH] serio: PS2 gpio bit banging driver for the serio bus
+In-Reply-To: <d9966e58f98ed5820154d9a979ca19f2@dk-develop.de>
+References: <20170731222452.22887-1-danilokrummrich@dk-develop.de>
+ <CACRpkdYz_+soss4Rb9zMiP4eZZtXqjW_Xy7hH=wm1x2m_R9R3A@mail.gmail.com>
+ <20170807182207.348762301bf3d7f8509b1bf7@dk-develop.de>
+ <8e5e73575b3a70e0e60931698687471d@dk-develop.de>
+ <CACRpkda=bYacXmv8SoQu3wPoZW9v+j8myZnme=QpofD=Y-gYTg@mail.gmail.com>
+ <20170817090908.GP20805@n2100.armlinux.org.uk>
+ <d9966e58f98ed5820154d9a979ca19f2@dk-develop.de>
+Message-ID: <20170817130103.GR20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 16, 2017 at 12:20 PM, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
-> Enable low-level debugging support for RZ/G1E (r8a7745). RZ/G1E uses
-> SCIF4 for the debug console.
->
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+On Thu, Aug 17, 2017 at 12:51:33PM +0200, Danilo Krummrich wrote:
+> That having the correct execution order is not enough on some buses because
+> of buffering is really something to be aware of, thanks again for pointing
+> this out.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+PCI guarantees the order of writes to a device, but there are situations
+on SoCs where you can't rely on that - for instance, if the writes go
+over different buses to different devices (eg, write to a peripheral
+vs write to an interrupt controller.)
 
-Gr{oetje,eeting}s,
+Even then, with interrupts delivered by message (eg, MSI) there's
+issues.
 
-                        Geert
+> So for the scenario I was concerned about I would expect the irqchip driver
+> guarantees the write actually hits the the hardware (if necessary read it
+> back) before the function (disable_irq_nosync()) returns, is that correct?
+> Though, having the need should be very unlikely.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Well, disable_irq_nosync() doesn't guarantee that the interrupt handler
+isn't running - a CPU may have just received the interrupt and is just
+entering the interrupt handler when disable_irq_nosync() returns.  The
+hint is the "nosync" - there's no synchronisation.  If you need to
+guarantee that the interrupt handler is not running, disable_irq() does
+that.  By implication, however, disable_irq() can not be called from
+within the same interrupt handler for the interrupt that is being
+disabled.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
