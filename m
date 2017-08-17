@@ -1,83 +1,75 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 17 Aug 2017 11:04:24 +0100
-Subject: [PATCH 15/27] arm64/sve: Probe SVE capabilities and usable
- vector lengths
-In-Reply-To: <07268b07-c5f4-38d6-257d-5864cb6752c1@arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-16-git-send-email-Dave.Martin@arm.com>
- <07268b07-c5f4-38d6-257d-5864cb6752c1@arm.com>
-Message-ID: <20170817100424.GI6321@e103592.cambridge.arm.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Thu, 17 Aug 2017 12:11:39 +0200
+Subject: [RFC 2/3] arm64: dts: realtek: Add irq mux to RTD1295
+In-Reply-To: <20170817101140.32000-1-afaerber@suse.de>
+References: <20170817101140.32000-1-afaerber@suse.de>
+Message-ID: <20170817101140.32000-3-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 16, 2017 at 06:48:01PM +0100, Suzuki K Poulose wrote:
-> On 09/08/17 13:05, Dave Martin wrote:
-> >[This sender failed our fraud detection checks and may not be who they appear to be. Learn about spoofing at http://aka.ms/LearnAboutSpoofing]
+Update UART nodes with interrupts.
 
-Any idea what this is ^ ?  I don't know if this is caused by me or you,
-but I only seem to see it on subthreads you've replied to.
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ arch/arm64/boot/dts/realtek/rtd1295.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-> >This patch uses the cpufeatures framework to determine common SVE
-> >capabilities and vector lengths, and configures the runtime SVE
-> >support code appropriately.
-> >
-> >ZCR_ELx is not really a feature register, but it is convenient to
-> >use it as a template for recording the maximum vector length
-> >supported by a CPU, using the LEN field.  This field is similar to
-> >a feature field in that it is a contiguous bitfield for which we
-> >want to determine the minimum system-wide value.  This patch adds
-> >ZCR as a pseudo-register in cpuinfo/cpufeatures, with appropriate
-> >custom code to populate it.  Finding the minimum supported value of
-> >the LEN field is left to the cpufeatures framework in the usual
-> >way.
-> >
-> >The meaning of ID_AA64ZFR0_EL1 is not architecturally defined yet,
-> >so for now we just require it to be zero.
-> >
-> >Note that much of this code is dormant and SVE still won't be used
-> >yet, since system_supports_sve() remains hardwired to false.
-> >
-> >Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> 
-> Dave,
-> 
-> The cpufeature bits look good to me, with one minor comment.
-> 
-> 
-> >diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> >index bce95de..955c873 100644
-> >--- a/arch/arm64/kernel/fpsimd.c
-> >+++ b/arch/arm64/kernel/fpsimd.c
-> 
-> ...
-> 
-> >+void __init sve_setup(void)
-> >+{
-> >+       u64 zcr;
-> >+       unsigned int max_vl;
-> >+
-> >+       if (!system_supports_sve())
-> >+               return;
-> >+
-> >+       /*
-> >+        * The architecture mandates 128-bit vectors be supported, and
-> >+        * the code assumes elsewhere that sve_vq_map is non-empty:
-> >+        */
-> >+       BUG_ON(!test_bit(vq_to_bit(1), sve_vq_map));
-> >+
-> >+       sve_vq_map_finalised = true;
-> 
-> We have something local in cpufeature.c, sys_caps_initialised. May be we could
-> reuse it here ? With or without that change, FWIW.
-
-I'll take a look at that.  Inventing that here seemed a little ugly, and
-this is all driven from the cpufreatures code anyway now which ensures a
-certain ordering.
-
-If I can reuse sys_caps_initialised for this, I will -- seems pointless
-to reinvent it.
-
-> Acked-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-Thanks
----Dave
+diff --git a/arch/arm64/boot/dts/realtek/rtd1295.dtsi b/arch/arm64/boot/dts/realtek/rtd1295.dtsi
+index 2d2d84b573e3..77063e984db9 100644
+--- a/arch/arm64/boot/dts/realtek/rtd1295.dtsi
++++ b/arch/arm64/boot/dts/realtek/rtd1295.dtsi
+@@ -112,6 +112,14 @@
+ 			#reset-cells = <1>;
+ 		};
+ 
++		iso_irq_mux: interrupt-controller at 98007000 {
++			compatible = "realtek,rtd1295-iso-irq-mux";
++			reg = <0x98007000 0x100>;
++			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-controller;
++			#interrupt-cells = <1>;
++		};
++
+ 		iso_reset: reset-controller at 98007088 {
+ 			compatible = "realtek,rtd1295-reset";
+ 			reg = <0x98007088 0x4>;
+@@ -124,16 +132,28 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clock-frequency = <27000000>;
++			interrupt-parent = <&iso_irq_mux>;
++			interrupts = <2>;
+ 			resets = <&iso_reset RTD1295_ISO_RSTN_UR0>;
+ 			status = "disabled";
+ 		};
+ 
++		irq_mux: interrupt-controller at 9801b000 {
++			compatible = "realtek,rtd1295-irq-mux";
++			reg = <0x9801b000 0x100>;
++			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-controller;
++			#interrupt-cells = <1>;
++		};
++
+ 		uart1: serial at 9801b200 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x9801b200 0x100>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clock-frequency = <432000000>;
++			interrupt-parent = <&irq_mux>;
++			interrupts = <3>, <5>;
+ 			resets = <&reset2 RTD1295_RSTN_UR1>;
+ 			status = "disabled";
+ 		};
+@@ -144,6 +164,8 @@
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clock-frequency = <432000000>;
++			interrupt-parent = <&irq_mux>;
++			interrupts = <8>, <13>;
+ 			resets = <&reset2 RTD1295_RSTN_UR2>;
+ 			status = "disabled";
+ 		};
+-- 
+2.12.3
