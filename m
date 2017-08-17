@@ -1,45 +1,57 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Thu, 17 Aug 2017 18:31:42 +0100
-Subject: [PATCH 1/2] ARM: dts: r8a7745: Add MMC interface support
+Date: Thu, 17 Aug 2017 18:31:43 +0100
+Subject: [PATCH 2/2] ARM: dtsi: iwg22m: Add eMMC support
 In-Reply-To: <1502991103-2325-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1502991103-2325-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1502991103-2325-2-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1502991103-2325-3-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MMC interface support for r8a7745 SoC.
+Add eMMC support for iW-RainboW-G22M-SM.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 ---
- arch/arm/boot/dts/r8a7745.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/r8a7745-iwg22m.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index aff90df..e17289f 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -508,6 +508,22 @@
- 			#size-cells = <0>;
- 			status = "disabled";
- 		};
-+
-+		mmcif0: mmc at ee200000 {
-+			compatible = "renesas,mmcif-r8a7745",
-+				     "renesas,sh-mmcif";
-+			reg = <0 0xee200000 0 0x80>;
-+			interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 315>;
-+			dmas = <&dmac0 0xd1>, <&dmac0 0xd2>,
-+			       <&dmac1 0xd1>, <&dmac1 0xd2>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 315>;
-+			reg-io-width = <4>;
-+			max-frequency = <97500000>;
-+			status = "disabled";
-+		};
+diff --git a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+index 9dbd854..afb1148 100644
+--- a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
++++ b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
+@@ -17,8 +17,34 @@
+ 		device_type = "memory";
+ 		reg = <0 0x40000000 0 0x20000000>;
  	};
++
++	reg_3p3v: 3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++	};
+ };
  
- 	/* External root clock */
+ &extal_clk {
+ 	clock-frequency = <20000000>;
+ };
++
++&pfc {
++	mmcif0_pins: mmc {
++		groups = "mmc_data8", "mmc_ctrl";
++		function = "mmc";
++	};
++};
++
++&mmcif0 {
++	pinctrl-0 = <&mmcif0_pins>;
++	pinctrl-names = "default";
++
++	vmmc-supply = <&reg_3p3v>;
++	bus-width = <8>;
++	non-removable;
++	status = "okay";
++};
 -- 
 2.7.4
