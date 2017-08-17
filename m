@@ -1,76 +1,54 @@
-From: william.wu@rock-chips.com (William Wu)
-Date: Thu, 17 Aug 2017 15:35:41 +0800
-Subject: [PATCH 1/2] arm64: dts: rockchip: add usb3 controller node for RK3328
- SoCs
-In-Reply-To: <1502955342-21985-1-git-send-email-william.wu@rock-chips.com>
-References: <1502955342-21985-1-git-send-email-william.wu@rock-chips.com>
-Message-ID: <1502955342-21985-2-git-send-email-william.wu@rock-chips.com>
+From: david@redhat.com (David Hildenbrand)
+Date: Thu, 17 Aug 2017 09:29:51 +0200
+Subject: [PATCH RFC 0/2] KVM: use RCU to allow dynamic kvm->vcpus array
+In-Reply-To: <20170816194037.9460-1-rkrcmar@redhat.com>
+References: <20170816194037.9460-1-rkrcmar@redhat.com>
+Message-ID: <db11c343-d5f7-97cd-47df-ed801bad5947@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RK3328 has one USB 3.0 OTG controller which uses DWC_USB3
-core's general architecture. It can act as static xHCI host
-controller, static device controller, USB 3.0/2.0 OTG basing
-on ID of USB3.0 PHY.
+On 16.08.2017 21:40, Radim Kr?m?? wrote:
+> The goal is to increase KVM_MAX_VCPUS without worrying about memory
+> impact of many small guests.
+> 
+> This is a second out of three major "dynamic" options:
+>  1) size vcpu array at VM creation time
+>  2) resize vcpu array when new VCPUs are created
+>  3) use a lockless list/tree for VCPUs
+> 
+> The disadvantage of (1) is its requirement on userspace changes and
+> limited flexibility because userspace must provide the maximal count on
+> start.  The main advantage is that kvm->vcpus will work like it does
+> now.  It has been posted as "[PATCH 0/4] KVM: add KVM_CREATE_VM2 to
+> allow dynamic kvm->vcpus array",
+> http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1377285.html
+> 
+> The main problem of (2), this series, is that we cannot extend the array
+> in place and therefore require some kind of protection when moving it.
+> RCU seems best, but it makes the code slower and harder to deal with.
+> The main advantage is that we do not need userspace changes.
+> 
+> The third option wasn't explored yet.  It would solve the ugly
+> kvm_for_each_vcpu() of (2), but kvm_get_vcpu() would become linear.
+> (We could mitigate it by having list of vcpu arrays and A lockless
+>  sequentially growing "tree" would be logarithmic and not that much more
+>  complicated to implement.)
 
-Signed-off-by: William Wu <william.wu@rock-chips.com>
----
- .../devicetree/bindings/usb/rockchip,dwc3.txt      |  4 +++-
- arch/arm64/boot/dts/rockchip/rk3328.dtsi           | 27 ++++++++++++++++++++++
- 2 files changed, 30 insertions(+), 1 deletion(-)
+That sounds interesting but also too complicated.
 
-diff --git a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
-index 0536a93..d6b2e47 100644
---- a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
-+++ b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
-@@ -1,7 +1,9 @@
- Rockchip SuperSpeed DWC3 USB SoC controller
- 
- Required properties:
--- compatible:	should contain "rockchip,rk3399-dwc3" for rk3399 SoC
-+- compatible:	should be one of the following:
-+  - "rockchip,rk3399-dwc3": for rk3399 SoC
-+  - "rockchip,rk3328-dwc3", "rockchip,rk3399-dwc3": for rk3328 SoC
- - clocks:	A list of phandle + clock-specifier pairs for the
- 		clocks listed in clock-names
- - clock-names:	Should contain the following:
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-index e6da0ce..4b4953b 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
-@@ -655,6 +655,33 @@
- 		status = "disabled";
- 	};
- 
-+	usbdrd3: usb at ff600000 {
-+		compatible = "rockchip,rk3328-dwc3", "rockchip,rk3399-dwc3";
-+		clocks = <&cru SCLK_USB3OTG_REF>, <&cru SCLK_USB3OTG_SUSPEND>,
-+			 <&cru ACLK_USB3OTG>;
-+		clock-names = "ref_clk", "suspend_clk",
-+			      "bus_clk";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+		status = "disabled";
-+
-+		usbdrd_dwc3: dwc3 at ff600000 {
-+			compatible = "snps,dwc3";
-+			reg = <0x0 0xff600000 0x0 0x100000>;
-+			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
-+			dr_mode = "otg";
-+			phy_type = "utmi_wide";
-+			snps,dis_enblslpm_quirk;
-+			snps,dis-u2-freeclk-exists-quirk;
-+			snps,dis_u2_susphy_quirk;
-+			snps,dis_u3_susphy_quirk;
-+			snps,dis-del-phy-power-chg-quirk;
-+			snps,tx-ipgap-linecheck-dis-quirk;
-+			status = "disabled";
-+		};
-+	};
-+
- 	gic: interrupt-controller at ff811000 {
- 		compatible = "arm,gic-400";
- 		#interrupt-cells = <3>;
+> 
+> Which option do you think is the best?
+
+I actually think the RCU variant doesn't look bad at all. Execution time
+should be ok.
+
+As Alex said, doubling the size every time we run out of space could be
+done.
+
+I clearly favor a solution that doesn't require user space changes.
+
 -- 
-2.0.0
+
+Thanks,
+
+David
