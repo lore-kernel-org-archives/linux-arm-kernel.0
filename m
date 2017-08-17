@@ -1,36 +1,31 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 16 Aug 2017 18:11:53 -0700
-Subject: [GIT PULL 1/2] bcm2835-dt-next-2017-08-15
-In-Reply-To: <20170815180325.12809-1-eric@anholt.net>
-References: <20170815180325.12809-1-eric@anholt.net>
-Message-ID: <0385a287-7cdc-296e-2595-2fe03372f7e6@gmail.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 17 Aug 2017 09:14:06 +0800
+Subject: [PATCH net RESEND] PCI: fix oops when try to find Root Port for a
+ PCI device
+In-Reply-To: <20170816.135952.1915098012719012810.davem@davemloft.net>
+References: <20170815170331.GA4099@bhelgaas-glaptop.roam.corp.google.com>
+ <20170816193303.GA14147@ulmo>
+ <20170816200237.GE28977@bhelgaas-glaptop.roam.corp.google.com>
+ <20170816.135952.1915098012719012810.davem@davemloft.net>
+Message-ID: <fe758f12-9f9c-3878-ccb8-ebf232098888@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 08/15/2017 11:03 AM, Eric Anholt wrote:
-> The following changes since commit ad41eacc11046fe6a199cffb6663bcd9c90df2f8:
+On 2017/8/17 4:59, David Miller wrote:
+> From: Bjorn Helgaas <helgaas@kernel.org>
+> Date: Wed, 16 Aug 2017 15:02:37 -0500
 > 
->   Merge tag 'bcm2835-dt-next-2017-08-07' into devicetree/next (2017-08-07 10:45:35 -0700)
+>> Your fix looks right to me.
 > 
-> are available in the git repository at:
+> Someone please submit this fix formally because this change is now in
+> Linus's tree.
 > 
->   git://github.com/anholt/linux tags/bcm2835-dt-next-2017-08-15
-> 
-> for you to fetch changes up to f29c256853b7412961d3ee80ca525bd2530573db:
-> 
->   ARM: dts: bcm283x: Add 32-bit enable method for SMP (2017-08-14 20:09:44 +0200)
-> 
-> ----------------------------------------------------------------
-> This pull request brings in a new SMP enable-method compat string,
-> which is needed to move the 32-bit SMP boot code out of the irqchip.
-> 
-> ----------------------------------------------------------------
-> Stefan Wahren (2):
->       dt-bindings: arm: add SMP enable-method for BCM2836
->       ARM: dts: bcm283x: Add 32-bit enable method for SMP
 
-Merged, thanks Eric!
--- 
-Florian
+I will send it.
+
+> Thank you.
+> 
+> .
+> 
