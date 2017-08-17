@@ -1,57 +1,49 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Thu, 17 Aug 2017 18:31:43 +0100
-Subject: [PATCH 2/2] ARM: dtsi: iwg22m: Add eMMC support
-In-Reply-To: <1502991103-2325-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1502991103-2325-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1502991103-2325-3-git-send-email-fabrizio.castro@bp.renesas.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Aug 2017 10:50:49 -0700
+Subject: [GIT PULL] non-urgent fixes for omaps for v4.14
+Message-ID: <pull-1502992204-718163>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add eMMC support for iW-RainboW-G22M-SM.
+From: "Tony Lindgren" <tony@atomide.com>
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
----
- arch/arm/boot/dts/r8a7745-iwg22m.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+The following changes since commit ff570a01b1bd15cf8a87c9ea774fc9c52ea07f15:
 
-diff --git a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
-index 9dbd854..afb1148 100644
---- a/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
-+++ b/arch/arm/boot/dts/r8a7745-iwg22m.dtsi
-@@ -17,8 +17,34 @@
- 		device_type = "memory";
- 		reg = <0 0x40000000 0 0x20000000>;
- 	};
-+
-+	reg_3p3v: 3p3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3P3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
- };
- 
- &extal_clk {
- 	clock-frequency = <20000000>;
- };
-+
-+&pfc {
-+	mmcif0_pins: mmc {
-+		groups = "mmc_data8", "mmc_ctrl";
-+		function = "mmc";
-+	};
-+};
-+
-+&mmcif0 {
-+	pinctrl-0 = <&mmcif0_pins>;
-+	pinctrl-names = "default";
-+
-+	vmmc-supply = <&reg_3p3v>;
-+	bus-width = <8>;
-+	non-removable;
-+	status = "okay";
-+};
--- 
-2.7.4
+  ARM: dts: dra71-evm: mdio: Fix impedance values (2017-07-05 00:54:52 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.14/fixes-not-urgent-v2-signed
+
+for you to fetch changes up to 879dce79531ea82f78d662c4651be07761c6e41a:
+
+  ARM: OMAP4+: PRM: fix of_irq_get() result checks (2017-08-15 08:53:28 -0700)
+
+----------------------------------------------------------------
+Non-urgent fixes for omaps for v4.14 merge window. These all
+can wait for the merge window as we have not seemed to hit
+any of these so far:
+
+- Fix error handling in omap_ocp2scp_probe affecting runtime
+  PM error path
+
+- Drop broken RPM status update for omap_device
+
+- Two fixes for of_irq_get() usage that can return 0
+
+----------------------------------------------------------------
+Johan Hovold (1):
+      ARM: OMAP2+: omap_device: drop broken RPM status update from suspend_noirq
+
+Kishon Vijay Abraham I (1):
+      bus: omap-ocp2scp: Fix error handling in omap_ocp2scp_probe
+
+Sergei Shtylyov (2):
+      ARM: OMAP3+: PRM: fix of_irq_get() result check
+      ARM: OMAP4+: PRM: fix of_irq_get() result checks
+
+ arch/arm/mach-omap2/omap_device.c | 10 ----------
+ arch/arm/mach-omap2/prm3xxx.c     |  2 +-
+ arch/arm/mach-omap2/prm44xx.c     |  4 ++--
+ drivers/bus/omap-ocp2scp.c        |  9 +++++++--
+ 4 files changed, 10 insertions(+), 15 deletions(-)
