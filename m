@@ -1,25 +1,41 @@
 From: william.wu@rock-chips.com (William Wu)
-Date: Thu, 17 Aug 2017 15:54:48 +0800
-Subject: [PATCH v2 0/2] Add usb3 ctrl node on RK3328 SoCs and enable usb3 host
- on RK3328 evb
-Message-ID: <1502956490-23087-1-git-send-email-william.wu@rock-chips.com>
+Date: Thu, 17 Aug 2017 15:54:50 +0800
+Subject: [PATCH v2 2/2] arm64: dts: rockchip: enable usb3 for RK3328
+ evaluation board
+In-Reply-To: <1502956490-23087-1-git-send-email-william.wu@rock-chips.com>
+References: <1502956490-23087-1-git-send-email-william.wu@rock-chips.com>
+Message-ID: <1502956490-23087-3-git-send-email-william.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series add support for usb3 controller on RK3328 SoCs.
-This series don't include usb3 phy patches, and I will try
-to submit usb3 phy patches individually later.
+Rockchip's RK3328 evaluation board has one USB 3.0 OTG controller,
+we enable it and set it act as static xHCI host controller to
+support USB 3.0 HOST on RK3328 evaluation board.
 
-Tested on RK3328 evaluation board.
+Signed-off-by: William Wu <william.wu@rock-chips.com>
+---
+Changes in v2:
+- None
 
-William Wu (2):
-  arm64: dts: rockchip: add usb3 controller node for RK3328 SoCs
-  arm64: dts: rockchip: enable usb3 for RK3328 evaluation board
+ arch/arm64/boot/dts/rockchip/rk3328-evb.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
- .../devicetree/bindings/usb/rockchip,dwc3.txt      |  4 +++-
- arch/arm64/boot/dts/rockchip/rk3328-evb.dts        |  9 ++++++++
- arch/arm64/boot/dts/rockchip/rk3328.dtsi           | 27 ++++++++++++++++++++++
- 3 files changed, 39 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
+index e7db0dc..fedea73 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
+@@ -83,3 +83,12 @@
+ &usb_host0_ohci {
+ 	status = "okay";
+ };
++
++&usbdrd3 {
++	status = "okay";
++};
++
++&usbdrd_dwc3 {
++	dr_mode = "host";
++	status = "okay";
++};
 -- 
 2.0.0
