@@ -1,14 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 Aug 2017 18:13:02 +0100
-Subject: Applied "ASoC: samsung: make snd_soc_ops const" to the asoc tree
-In-Reply-To: <1502902770-3758-7-git-send-email-bhumirks@gmail.com>
-Message-ID: <E1diOLu-0008Lv-8p@debutante>
+Date: Thu, 17 Aug 2017 18:13:08 +0100
+Subject: Applied "ASoC: generic: make snd_soc_ops const" to the asoc tree
+In-Reply-To: <1502902770-3758-4-git-send-email-bhumirks@gmail.com>
+Message-ID: <E1diOM0-0008OR-Bl@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: samsung: make snd_soc_ops const
+   ASoC: generic: make snd_soc_ops const
 
 has been applied to the asoc tree at
 
@@ -33,76 +33,47 @@ to this mail.
 Thanks,
 Mark
 
->From 2af236391f5a167630ebca0eced832afcc4634e0 Mon Sep 17 00:00:00 2001
+>From e23d834876390d6b8d4d35057e9ecd899a44193a Mon Sep 17 00:00:00 2001
 From: Bhumika Goyal <bhumirks@gmail.com>
-Date: Wed, 16 Aug 2017 22:29:29 +0530
-Subject: [PATCH] ASoC: samsung: make snd_soc_ops const
+Date: Wed, 16 Aug 2017 22:29:26 +0530
+Subject: [PATCH] ASoC: generic: make snd_soc_ops const
 
 Make these const as they are only stored in the ops field of a
 snd_soc_dai_link structure, which is const.
 Done using Coccinelle.
 
 Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/samsung/jive_wm8750.c     | 2 +-
- sound/soc/samsung/s3c24xx_simtec.c  | 2 +-
- sound/soc/samsung/s3c24xx_uda134x.c | 2 +-
- sound/soc/samsung/smdk_spdif.c      | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+ sound/soc/generic/audio-graph-card.c     | 2 +-
+ sound/soc/generic/audio-graph-scu-card.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/sound/soc/samsung/jive_wm8750.c b/sound/soc/samsung/jive_wm8750.c
-index 7fcb51faa2a0..529b10dc532b 100644
---- a/sound/soc/samsung/jive_wm8750.c
-+++ b/sound/soc/samsung/jive_wm8750.c
-@@ -79,7 +79,7 @@ static int jive_hw_params(struct snd_pcm_substream *substream,
- 	return 0;
+diff --git a/sound/soc/generic/audio-graph-card.c b/sound/soc/generic/audio-graph-card.c
+index 105ec3a6e30d..d3497a3e14ca 100644
+--- a/sound/soc/generic/audio-graph-card.c
++++ b/sound/soc/generic/audio-graph-card.c
+@@ -95,7 +95,7 @@ static void asoc_graph_card_shutdown(struct snd_pcm_substream *substream)
+ 	asoc_simple_card_clk_disable(&dai_props->codec_dai);
  }
  
--static struct snd_soc_ops jive_ops = {
-+static const struct snd_soc_ops jive_ops = {
- 	.hw_params	= jive_hw_params,
+-static struct snd_soc_ops asoc_graph_card_ops = {
++static const struct snd_soc_ops asoc_graph_card_ops = {
+ 	.startup = asoc_graph_card_startup,
+ 	.shutdown = asoc_graph_card_shutdown,
  };
- 
-diff --git a/sound/soc/samsung/s3c24xx_simtec.c b/sound/soc/samsung/s3c24xx_simtec.c
-index dcc008d1e1ab..6de63f3e37d5 100644
---- a/sound/soc/samsung/s3c24xx_simtec.c
-+++ b/sound/soc/samsung/s3c24xx_simtec.c
-@@ -211,7 +211,7 @@ static int simtec_call_startup(struct s3c24xx_audio_simtec_pdata *pd)
- 	return 0;
+diff --git a/sound/soc/generic/audio-graph-scu-card.c b/sound/soc/generic/audio-graph-scu-card.c
+index dcd2df37bc3b..3da9acd6844e 100644
+--- a/sound/soc/generic/audio-graph-scu-card.c
++++ b/sound/soc/generic/audio-graph-scu-card.c
+@@ -56,7 +56,7 @@ static void asoc_graph_card_shutdown(struct snd_pcm_substream *substream)
+ 	asoc_simple_card_clk_disable(dai_props);
  }
  
--static struct snd_soc_ops simtec_snd_ops = {
-+static const struct snd_soc_ops simtec_snd_ops = {
- 	.hw_params	= simtec_hw_params,
+-static struct snd_soc_ops asoc_graph_card_ops = {
++static const struct snd_soc_ops asoc_graph_card_ops = {
+ 	.startup = asoc_graph_card_startup,
+ 	.shutdown = asoc_graph_card_shutdown,
  };
- 
-diff --git a/sound/soc/samsung/s3c24xx_uda134x.c b/sound/soc/samsung/s3c24xx_uda134x.c
-index 55538e333cc8..c65c89d4aaa6 100644
---- a/sound/soc/samsung/s3c24xx_uda134x.c
-+++ b/sound/soc/samsung/s3c24xx_uda134x.c
-@@ -199,7 +199,7 @@ static int s3c24xx_uda134x_hw_params(struct snd_pcm_substream *substream,
- 	return 0;
- }
- 
--static struct snd_soc_ops s3c24xx_uda134x_ops = {
-+static const struct snd_soc_ops s3c24xx_uda134x_ops = {
- 	.startup = s3c24xx_uda134x_startup,
- 	.shutdown = s3c24xx_uda134x_shutdown,
- 	.hw_params = s3c24xx_uda134x_hw_params,
-diff --git a/sound/soc/samsung/smdk_spdif.c b/sound/soc/samsung/smdk_spdif.c
-index a2f2363fe1c2..7fc7cc6d1530 100644
---- a/sound/soc/samsung/smdk_spdif.c
-+++ b/sound/soc/samsung/smdk_spdif.c
-@@ -144,7 +144,7 @@ static int smdk_hw_params(struct snd_pcm_substream *substream,
- 	return ret;
- }
- 
--static struct snd_soc_ops smdk_spdif_ops = {
-+static const struct snd_soc_ops smdk_spdif_ops = {
- 	.hw_params = smdk_hw_params,
- };
- 
 -- 
 2.13.3
