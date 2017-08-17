@@ -1,28 +1,82 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Aug 2017 17:00:56 -0500
-Subject: [PATCH v2 3/5] mtd: spi-nor: cadence-quadspi: Add new binding to
- enable loop-back circuit
-In-Reply-To: <20170816045053.15492-4-vigneshr@ti.com>
-References: <20170816045053.15492-1-vigneshr@ti.com>
- <20170816045053.15492-4-vigneshr@ti.com>
-Message-ID: <20170817220056.q572ix5kzjawf2gf@rob-hp-laptop>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 17 Aug 2017 15:05:19 -0700
+Subject: [RFC PATCH] ARM: decompressor: implement autonomous KASLR offset
+ calculation
+In-Reply-To: <CAKv+Gu-g+0E=b1G+0mfZOHP0iEsD14VMCtJy0fXnbhwoOc-8oA@mail.gmail.com>
+References: <20170815201544.8479-1-ard.biesheuvel@linaro.org>
+ <CAGXu5jJprvbsa2o_Tazw3XNO1QQQw2d_XcDfzZhkDcXR9BfFew@mail.gmail.com>
+ <CAKv+Gu-g+0E=b1G+0mfZOHP0iEsD14VMCtJy0fXnbhwoOc-8oA@mail.gmail.com>
+Message-ID: <CAGXu5jLOKPB1FYrO_HeFZAkmo+0zoagAL=nR1SPBX01pPg7MAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 16, 2017 at 10:20:51AM +0530, Vignesh R wrote:
-> Cadence QSPI IP has a adapted loop-back circuit which can be enabled by
-> setting BYPASS field to 0 in READCAPTURE register. It enables use of
-> QSPI return clock to latch the data rather than the internal QSPI
-> reference clock. For high speed operations, adapted loop-back circuit
-> using QSPI return clock helps to increase data valid window.
-> 
-> Add DT parameter cdns,rclk-en to help enable adapted loop-back circuit
-> for boards which do have QSPI return clock provided. Update binding
-> documentation for the same.
-> 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
->  Documentation/devicetree/bindings/mtd/cadence-quadspi.txt | 3 +++
->  1 file changed, 3 insertions(+)
+On Thu, Aug 17, 2017 at 12:22 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 15 August 2017 at 21:29, Kees Cook <keescook@chromium.org> wrote:
+>> On Tue, Aug 15, 2017 at 1:15 PM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>> This enables KASLR for environments that are not KASLR-aware, or only
+>>> to a limited extent. The decompressor collects information about the
+>>> placement of the zImage, DTB and initrd, and parses the /memory DT
+>>> node and the /memreserve/s and /reserved-memory node, and combines this
+>>> information to select a suitable KASLR offset, and proceeds to decompress
+>>> the kernel at this offset in physical memory. It then invoked the kernel
+>>> proper while passing on this information, so that it can be taken into
+>>> account to create the virtual mapping.
+>>>
+>>> This code shuffles some registers together to create a poor man's seed,
+>>> which will be superseded by the value of /chosen/kaslr-seed if present.
+>>>
+> [...]
+>>
+>> Without kaslr-seed, perhaps also include build-time entropy (as I did
+>> in x86's decompressor with build_str):
+>>
+>> static unsigned long get_boot_seed(void)
+>> {
+>>         unsigned long hash = 0;
+>>
+>>         hash = rotate_xor(hash, build_str, sizeof(build_str));
+>>         hash = rotate_xor(hash, boot_params, sizeof(*boot_params));
+>>
+>>         return hash;
+>> }
+>>
+>
+> Shouldn't we use something with better diffusion than rotate and xor?
+> If we can afford to decompress ~10 MB worth of vmlinux, I'm sure we
+> can afford to crc() the device tree blob.
 
-Acked-by: Rob Herring <robh@kernel.org>
+The final kaslr_get_random_long() (in arch/x86/lib/kaslr.c) uses a
+circular multiply. That could be done earlier, I suppose, but I wasn't
+too concerned given common the availability of RDRAND on x86 has
+become.
+
+>> You're effectively starting with hash == r3. This could be further
+>> enhanced with a __latent_entropy string when that plugin is enabled:
+>>
+>> static u8 compile_time_entropy[32] __latent_entropy;
+>>
+>> ...
+>>
+>> seed = rotate_xor(seed, compile_time_entropy, sizeof(compile_time_entropy));
+>>
+>> And toss in the fdt too? (I have no idea if this is the correct way to
+>> do this....)
+>>
+>> seed = rotate_xor(seed, fdt, fdt_totalsize(fdt));
+>>
+>
+> As mentioned by several people, this is a nice way to add
+> /chosen/kaslr-seed to the mix if it is there, and still have some
+> pseudo=entropy otherwise, especially given the fact (as Daniel figured
+> out) that Android puts device serials and some boot timing related
+> variables on the kernel command line.
+
+Cool, yeah.
+
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
