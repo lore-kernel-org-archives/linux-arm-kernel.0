@@ -1,56 +1,93 @@
 From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Thu, 17 Aug 2017 16:12:48 +0900
-Subject: [PATCH -tip 0/4] Add section address checking helper
-Message-ID: <150295395797.14424.968407208436624832.stgit@devbox>
+Date: Thu, 17 Aug 2017 16:13:55 +0900
+Subject: [PATCH -tip 1/4] x86: Add in_entry_text() helper function
+In-Reply-To: <150295395797.14424.968407208436624832.stgit@devbox>
+References: <150295395797.14424.968407208436624832.stgit@devbox>
+Message-ID: <150295402564.14424.15300433101224423177.stgit@devbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add in_entry_text() helper function to cleanup
+entry/irqentry section checking code in kprobes and
+unwind_frame.
 
-This series adds some address checking helpers in sections.h
-so that each one doesn't need to implement it individually.
-This series contains basically cleanup patches. Each patch
-replaces some checking code with helper function but changes
-no behavior.
-
- - [1/4]: x86: add in_entry_text() helper to cleanup kprobes
-	  and unwind_frame code.
- - [2/4]: arm: move in_exception_text() to asm/sections.h and
-	  cleanup using memory_contains().
- - [3/4]: arm64: move in_exception_text() to asm/sections.h and
-	  cleanup using memory_contains().
- - [4/4]: add in_init_text() and in_core_text() and use it in
-	  kernel/extable.c and kernel/kallsyms.c, also this
-	  cleanup core_kernel_data using memory_contains().
-
-By the way, I found core_kernel_text() and is_kernel_text()
-has different behavior, is_kernel_text() checks arch dependent
-text area and in_gate_area_no_mm(), but core_kernel_text()
-doesn't. (and core_kernel_text() checks inittext section
-while booting up)
-Can we ignore this difference or better to merge it?
-
-Thank you,
+Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
 ---
+ arch/x86/include/asm/sections.h |   15 +++++++++++++++
+ arch/x86/kernel/kprobes/opt.c   |    5 +----
+ arch/x86/kernel/unwind_frame.c  |   15 +--------------
+ 3 files changed, 17 insertions(+), 18 deletions(-)
 
-Masami Hiramatsu (4):
-      x86: Add in_entry_text() helper function
-      arm: Cleanup in_exception_text() and move it in asm/sections.h
-      arm64: Cleanup in_exception_text() and move it in asm/sections.h
-      extable: kallsyms: Add in_init_text() and in_core_text() helper
-
-
- arch/arm/include/asm/sections.h   |   17 +++++++++++++++++
- arch/arm/include/asm/traps.h      |   22 +---------------------
- arch/arm64/include/asm/sections.h |   16 ++++++++++++++++
- arch/arm64/include/asm/traps.h    |   16 ----------------
- arch/x86/include/asm/sections.h   |   15 +++++++++++++++
- arch/x86/kernel/kprobes/opt.c     |    5 +----
- arch/x86/kernel/unwind_frame.c    |   15 +--------------
- include/asm-generic/sections.h    |   24 ++++++++++++++++++++++++
- kernel/extable.c                  |   18 ++++--------------
- kernel/kallsyms.c                 |   14 +++-----------
- 10 files changed, 82 insertions(+), 80 deletions(-)
-
---
-Masami Hiramatsu (Linaro)
+diff --git a/arch/x86/include/asm/sections.h b/arch/x86/include/asm/sections.h
+index 2f75f30cb2f6..bb72ea0f4367 100644
+--- a/arch/x86/include/asm/sections.h
++++ b/arch/x86/include/asm/sections.h
+@@ -11,4 +11,19 @@ extern struct exception_table_entry __stop___ex_table[];
+ extern char __end_rodata_hpage_align[];
+ #endif
+ 
++/**
++ * in_entry_text - check if an address is in entry_text or irqentry_text
++ * @addr: virtual address to be checked
++ *
++ * Returns: true if the address specified by @addr is in the entry_text or
++ * irqentry_text, false otherwise.
++ */
++static inline bool in_entry_text(unsigned long addr)
++{
++	return memory_contains(__entry_text_start, __entry_text_end,
++			       (void *)addr, 0) ||
++		memory_contains(__irqentry_text_start, __irqentry_text_end,
++				(void *)addr, 0);
++}
++
+ #endif	/* _ASM_X86_SECTIONS_H */
+diff --git a/arch/x86/kernel/kprobes/opt.c b/arch/x86/kernel/kprobes/opt.c
+index 4f98aad38237..74c5ad55ba6a 100644
+--- a/arch/x86/kernel/kprobes/opt.c
++++ b/arch/x86/kernel/kprobes/opt.c
+@@ -254,10 +254,7 @@ static int can_optimize(unsigned long paddr)
+ 	 * Do not optimize in the entry code due to the unstable
+ 	 * stack handling and registers setup.
+ 	 */
+-	if (((paddr >= (unsigned long)__entry_text_start) &&
+-	     (paddr <  (unsigned long)__entry_text_end)) ||
+-	    ((paddr >= (unsigned long)__irqentry_text_start) &&
+-	     (paddr <  (unsigned long)__irqentry_text_end)))
++	if (in_entry_text(paddr))
+ 		return 0;
+ 
+ 	/* Check there is enough space for a relative jump. */
+diff --git a/arch/x86/kernel/unwind_frame.c b/arch/x86/kernel/unwind_frame.c
+index d145a0b1f529..508cef8904f4 100644
+--- a/arch/x86/kernel/unwind_frame.c
++++ b/arch/x86/kernel/unwind_frame.c
+@@ -77,19 +77,6 @@ static size_t regs_size(struct pt_regs *regs)
+ 	return sizeof(*regs);
+ }
+ 
+-static bool in_entry_code(unsigned long ip)
+-{
+-	char *addr = (char *)ip;
+-
+-	if (addr >= __entry_text_start && addr < __entry_text_end)
+-		return true;
+-
+-	if (addr >= __irqentry_text_start && addr < __irqentry_text_end)
+-		return true;
+-
+-	return false;
+-}
+-
+ static inline unsigned long *last_frame(struct unwind_state *state)
+ {
+ 	return (unsigned long *)task_pt_regs(state->task) - 2;
+@@ -321,7 +308,7 @@ bool unwind_next_frame(struct unwind_state *state)
+ 	 * Don't warn if the unwinder got lost due to an interrupt in entry
+ 	 * code or in the C handler before the first frame pointer got set up:
+ 	 */
+-	if (state->got_irq && in_entry_code(state->ip))
++	if (state->got_irq && in_entry_text(state->ip))
+ 		goto the_end;
+ 	if (state->regs &&
+ 	    state->regs->sp >= (unsigned long)last_aligned_frame(state) &&
