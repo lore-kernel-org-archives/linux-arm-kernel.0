@@ -1,38 +1,28 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Aug 2017 16:04:45 -0500
-Subject: [PATCH v1 1/9] dt-bindings: ARM: Mediatek: Document bindings for
- MT2712
-In-Reply-To: <1502779370-30150-2-git-send-email-weiyi.lu@mediatek.com>
-References: <1502779370-30150-1-git-send-email-weiyi.lu@mediatek.com>
- <1502779370-30150-2-git-send-email-weiyi.lu@mediatek.com>
-Message-ID: <20170817210445.y34gpxbqixt6qswr@rob-hp-laptop>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 17 Aug 2017 14:06:30 -0700
+Subject: [PATCH] usb: dwc3: of-simple: remove include of clk-provider.h
+In-Reply-To: <1502634071-2266-1-git-send-email-shawnguo@kernel.org>
+References: <1502634071-2266-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <20170817210630.GH2146@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 02:42:42PM +0800, weiyi.lu at mediatek.com wrote:
-> From: Weiyi Lu <weiyi.lu@mediatek.com>
+On 08/13, Shawn Guo wrote:
+> From: Shawn Guo <shawn.guo@linaro.org>
 > 
-> This patch adds the binding documentation for apmixedsys, bdpsys,
-> imgsys, imgsys, infracfg, mcucfg, mfgcfg, mmsys, pericfg, topckgen,
-> vdecsys and vencsys for Mediatek MT2712.
+> The header clk-provider.h is there for clock drivers (providers) to
+> include, not client drivers (consumers).  That said,
+> of_clk_get_parent_count() is a helper function for clock providers, not
+> a clk API for consumers.
 > 
-> Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
+> Let's replace of_clk_get_parent_count() with of_count_phandle_with_args()
+> call, so that we can remove the include of clk-provider.h.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
->  .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |  1 +
->  .../bindings/arm/mediatek/mediatek,bdpsys.txt      |  1 +
->  .../bindings/arm/mediatek/mediatek,imgsys.txt      |  1 +
->  .../bindings/arm/mediatek/mediatek,infracfg.txt    |  1 +
->  .../bindings/arm/mediatek/mediatek,jpgdecsys.txt   | 22 ++++++++++++++++++++++
->  .../bindings/arm/mediatek/mediatek,mcucfg.txt      | 22 ++++++++++++++++++++++
->  .../bindings/arm/mediatek/mediatek,mfgcfg.txt      | 22 ++++++++++++++++++++++
->  .../bindings/arm/mediatek/mediatek,mmsys.txt       |  1 +
->  .../bindings/arm/mediatek/mediatek,pericfg.txt     |  1 +
->  .../bindings/arm/mediatek/mediatek,topckgen.txt    |  1 +
->  .../bindings/arm/mediatek/mediatek,vdecsys.txt     |  1 +
->  .../bindings/arm/mediatek/mediatek,vencsys.txt     |  1 +
->  12 files changed, 75 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,jpgdecsys.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mcucfg.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mfgcfg.txt
 
-Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
