@@ -1,68 +1,235 @@
-From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
-Date: Thu, 17 Aug 2017 10:52:38 +0800
-Subject: [PATCH] arm64: dts: ls1088a: Add USB support
-Message-ID: <1502938358-23522-1-git-send-email-yinbo.zhu@nxp.com>
+From: zhangshaokun@hisilicon.com (Zhangshaokun)
+Date: Thu, 17 Aug 2017 11:31:08 +0800
+Subject: [PATCH v4 3/6] perf: hisi: Add support for HiSilicon SoC L3C PMU
+ driver
+In-Reply-To: <20170815104143.GD6090@leverpostej>
+References: <1500984642-204676-1-git-send-email-zhangshaokun@hisilicon.com>
+ <1500984642-204676-4-git-send-email-zhangshaokun@hisilicon.com>
+ <20170815104143.GD6090@leverpostej>
+Message-ID: <e95de281-aa17-131e-8597-32335d43243d@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+Hi Mark,
 
-Fix the issue that usb is not detected on ls1088ardb
+On 2017/8/15 18:41, Mark Rutland wrote:
+> On Tue, Jul 25, 2017 at 08:10:39PM +0800, Shaokun Zhang wrote:
+>> This patch adds support for L3C PMU driver in HiSilicon SoC chip, Each
+>> L3C has own control, counter and interrupt registers and is an separate
+>> PMU. For each L3C PMU, it has 8-programable counters and supports 0x60
+>> events, event code is 8-bits and every counter is free-running.
+>> Interrupt is supported to handle counter (48-bits) overflow.
+> 
+> [...]
+> 
+>> +/* L3C register definition */
+>> +#define L3C_PERF_CTRL		0x0408
+>> +#define L3C_INT_MASK		0x0800
+>> +#define L3C_INT_STATUS		0x0808
+>> +#define L3C_INT_CLEAR		0x080c
+>> +#define L3C_EVENT_CTRL	        0x1c00
+>> +#define L3C_EVENT_TYPE0		0x1d00
+>> +#define L3C_CNTR0_LOWER		0x1e00
+> 
+> Why does this have a _LOWER suffix?
+> 
+> How big is this regsiter? is it part of a pair of registers?
+> 
 
-Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
-Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |  8 ++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    | 18 ++++++++++++++++++
- 2 files changed, 26 insertions(+)
+Each counter is 48-bits, for counter0, the register offset of the lower
+32-bits is 0x1e00 and the higher 16-bits is in 0x1e04 (while the upper
+16-bits is reserved for 0x1e04, RAZ and WI), other counters are the same.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-index e9276a5..949cd67 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-@@ -145,6 +145,14 @@
- 	status = "okay";
- };
- 
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
-+
- &esdhc {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index 3a3be87..0dbff29 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -458,6 +458,24 @@
- 			status = "disabled";
- 		};
- 
-+		usb0: usb3 at 3100000 {
-+			compatible = "snps,dwc3";
-+			reg = <0x0 0x3100000 0x0 0x10000>;
-+			interrupts = <0 80 0x4>; /* Level high type */
-+			dr_mode = "host";
-+			configure-gfladj;
-+			snps,dis_rxdet_inp3_quirk;
-+		};
-+
-+		usb1: usb3 at 3110000 {
-+			compatible = "snps,dwc3";
-+			reg = <0x0 0x3110000 0x0 0x10000>;
-+			interrupts = <0 81 0x4>; /* Level high type */
-+			dr_mode = "host";
-+			configure-gfladj;
-+			snps,dis_rxdet_inp3_quirk;
-+		};
-+
- 		sata: sata at 3200000 {
- 			compatible = "fsl,ls1088a-ahci";
- 			reg = <0x0 0x3200000 0x0 0x10000>,
--- 
-2.1.0.27.g96db324
+>> +
+>> +/* L3C has 8-counters and supports 0x60 events */
+>> +#define L3C_NR_COUNTERS		0x8
+>> +#define L3C_NR_EVENTS		0x60
+> 
+> What exactly is meant by "supports 0x60 events"?
+> 
+> e.g. does tha mean event IDs 0-0x5f are valid?
+> 
+
+It is event IDs, my apologies to describe it vaguely.
+
+>> +static irqreturn_t hisi_l3c_pmu_isr(int irq, void *dev_id)
+>> +{
+>> +	struct hisi_pmu *l3c_pmu = dev_id;
+>> +	struct perf_event *event;
+>> +	unsigned long overflown;
+>> +	u32 status;
+>> +	int idx;
+>> +
+>> +	/* Read L3C_INT_STATUS register */
+>> +	status = readl(l3c_pmu->base + L3C_INT_STATUS);
+>> +	if (!status)
+>> +		return IRQ_NONE;
+>> +	overflown = status;
+> 
+> You don't need the temporary u32 value here; you can assign directly to
+> an unsigned lnog and do all the manipulation on that.
+> 
+
+Ok.
+
+> [...]
+> 
+>> +/* Check if the CPU belongs to the SCCL and CCL of PMU */
+>> +static bool hisi_l3c_is_cpu_in_ccl(struct hisi_pmu *l3c_pmu)
+>> +{
+>> +	u32 ccl_id, sccl_id;
+>> +
+>> +	hisi_read_sccl_and_ccl_id(&sccl_id, &ccl_id);
+>> +
+>> +	if (sccl_id != l3c_pmu->sccl_id)
+>> +		return false;
+>> +
+>> +	if (ccl_id != l3c_pmu->ccl_id)
+>> +		return false;
+>> +
+>> +	/* Return true if matched */
+>> +	return true;
+>> +}
+> 
+> The conditionals would be simpler as:
+> 
+> 	return (sccl_id == l3c_pmu->sccl_id &&
+> 	        ccl_id == l3c_pmu->ccl_id);
+> 
+
+Ok.
+
+>> +
+>> +static int hisi_l3c_pmu_online_cpu(unsigned int cpu, struct hlist_node *node)
+>> +{
+>> +	struct hisi_pmu *l3c_pmu;
+>> +
+>> +	l3c_pmu = hlist_entry_safe(node, struct hisi_pmu, node);
+>> +
+>> +	/* Proceed only when CPU belongs to the same SCCL and CCL */
+>> +	if (!hisi_l3c_is_cpu_in_ccl(l3c_pmu))
+>> +		return 0;
+> 
+> Surely you have a mask of CPUs that you can check instead? You'll need
+> that for the offline path.
+> 
+
+Ok, Shall create the cpumask and update it during CPU hotplug callback.
+
+> [...]
+> 
+>> +static int hisi_l3c_pmu_offline_cpu(unsigned int cpu, struct hlist_node *node)
+>> +{
+>> +	struct hisi_pmu *l3c_pmu;
+>> +	cpumask_t ccl_online_cpus;
+>> +	unsigned int target;
+>> +
+>> +	l3c_pmu = hlist_entry_safe(node, struct hisi_pmu, node);
+>> +
+>> +	/* Proceed only when CPU belongs to the same SCCL and CCL */
+>> +	if (!hisi_l3c_is_cpu_in_ccl(l3c_pmu))
+>> +		return 0;
+> 
+> Again, surely you can check a pre-computed mask?
+> 
+
+Ok.
+
+>> +
+>> +	/* Proceed if this CPU is used for event counting */
+>> +	if (!cpumask_test_cpu(cpu, &l3c_pmu->cpus))
+>> +		return 0;
+> 
+> You need to set up the CPU state regardless of whether there are active
+> events currently. Otherwise the cpumask can be stale, pointing at an
+> offline CPU, leaving the PMU unusable.
+>
+
+Ok. Shall update the cpumask and also hisi_pmu::init cpu to hold the next
+online CPU
+
+>> +
+>> +	/* Give up ownership of CCL */
+>> +	cpumask_test_and_clear_cpu(cpu, &l3c_pmu->cpus);
+>> +
+>> +	/* Any other CPU for this CCL which is still online */
+>> +	cpumask_and(&ccl_online_cpus, cpu_coregroup_mask(cpu),
+>> +		    cpu_online_mask);
+> 
+> What is cpu_coregroup_mask? I do not think you can rely on that
+> happening to align with the physical CCL mask.
+> 
+
+The cpu_coregroup_mask return the CPU cores within the cluster. So we used this.
+
+> Instead, please:
+> 
+> * Keep track of which CPU(s) this PMU can be used from, with a cpumask.
+>   Either initialise that at probe time, or add CPUs to that in the
+>   hotplug callback.
+> 
+> * Use only that mask to determine which CPU to move the PMU context to.
+> 
+> * Use an int to hold the current CPU; there's no need to use a mask to
+>   hold what shoule be a single CPU ID.
+> 
+
+Shall modify as suggested.
+
+> [...]
+> 
+>> +	/* Get the L3C SCCL ID */
+>> +	if (device_property_read_u32(dev, "hisilicon,scl-id",
+>> +				     &l3c_pmu->sccl_id)) {
+>> +		dev_err(dev, "Can not read l3c sccl-id!\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	/* Get the L3C CPU cluster(CCL) ID */
+>> +	if (device_property_read_u32(dev, "hisilicon,ccl-id",
+>> +				     &l3c_pmu->ccl_id)) {
+>> +		dev_err(dev, "Can not read l3c ccl-id!\n");
+>> +		return -EINVAL;
+>> +	}
+> 
+> Previously, you expect that these happen to match particular bits of the
+> MPIDR, which vary for multi-threaded cores. Please document this.
+> 
+
+Ok.
+
+>> +static int hisi_l3c_pmu_dev_probe(struct platform_device *pdev,
+>> +				  struct hisi_pmu *l3c_pmu)
+>> +{
+>> +	struct device *dev = &pdev->dev;
+>> +	int ret;
+>> +
+>> +	ret = hisi_l3c_pmu_init_data(pdev, l3c_pmu);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	ret = hisi_l3c_pmu_init_irq(l3c_pmu, pdev);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	l3c_pmu->name = devm_kasprintf(dev, GFP_KERNEL, "hisi_l3c%u_%u",
+>> +				       l3c_pmu->l3c_tag_id, l3c_pmu->sccl_id);
+> 
+> As mentioned on the documentation patch, it would be nicer for the name
+> to be hierarchical, i.e. placing the SCCL ID first.
+> 
+
+Surely.
+
+Thanks.
+Shaokun
+
+> Thanks,
+> Mark.
+> _______________________________________________
+> linuxarm mailing list
+> linuxarm at huawei.com
+> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+> 
+> .
+> 
