@@ -1,23 +1,24 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 17 Aug 2017 16:46:08 +0800
-Subject: [RFC PATCH 00/10] crypto: caam - add DPAA2 (DPSECI) driver
-In-Reply-To: <20170810174253.20951-1-horia.geanta@nxp.com>
-References: <20170810174253.20951-1-horia.geanta@nxp.com>
-Message-ID: <20170817084607.GA25429@gondor.apana.org.au>
+From: william.wu@rock-chips.com (William Wu)
+Date: Thu, 17 Aug 2017 15:35:40 +0800
+Subject: [PATCH 0/2] Add usb3 ctrl node on RK3328 SoCs and enable usb3 host on
+ RK3328 evb
+Message-ID: <1502955342-21985-1-git-send-email-william.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 10, 2017 at 08:42:43PM +0300, Horia Geant? wrote:
->
-> Patches 5-9 are the core of the patch set, adding the driver.
-> For symmetric encryption the legacy ablkcipher interface is used; the
-> plan is to convert to skcipher all CAAM frontends at once at a certain
-> point in time.
+This series add support for usb3 controller on RK3328 SoCs.
+This series don't include usb3 phy patches, and I will try
+to submit usb3 phy patches individually later.
+Tested on RK3328 evaluation board.
 
-I'm fine with these patches.
+William Wu (2):
+  arm64: dts: rockchip: add usb3 controller node for RK3328 SoCs
+  arm64: dts: rockchip: enable usb3 for RK3328 evaluation board
 
-Cheers,
+ .../devicetree/bindings/usb/rockchip,dwc3.txt      |  4 +++-
+ arch/arm64/boot/dts/rockchip/rk3328-evb.dts        |  9 ++++++++
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi           | 27 ++++++++++++++++++++++
+ 3 files changed, 39 insertions(+), 1 deletion(-)
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.0.0
