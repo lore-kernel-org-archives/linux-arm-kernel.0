@@ -1,45 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 17 Aug 2017 11:47:33 +0200
-Subject: [PATCH 0/4] arm64: dts: renesas: Add Support for R-Car D3 and
- Draak
-In-Reply-To: <20170727151622.GG16143@verge.net.au>
-References: <1500555277-22921-1-git-send-email-geert+renesas@glider.be>
- <20170727151622.GG16143@verge.net.au>
-Message-ID: <CAMuHMdXLVXaN+X0yKuO+xdZGi3MwM4vSP1uTLuS9SKFKg_UBDA@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 17 Aug 2017 11:49:22 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Defconfig Updates
+ for v4.14
+Message-ID: <cover.1502960320.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Olof, Hi Kevin, Hi Arnd,
 
-On Thu, Jul 27, 2017 at 5:16 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Jul 20, 2017 at 02:54:33PM +0200, Geert Uytterhoeven wrote:
->> This patch series adds minimal support for the R-Car D3 SoC and the
->> Draak development board, allowing to boot from a ramdisk using a serial
->> console.
->>
->>   - The first two patches add DT sources for R-Car D3 and Draak.
->>     Due to the use of hardcoded constants, they have no further (build)
->>     dependencies (obviously there is a runtime dependency).
->>   - The last two patches replace the hardcoded constants by symbols from
->>     DT binding headers, and thus depend on those headers.  Hence it
->>     should be postponed to v4.15.
+Please consider these second round of Renesas ARM based SoC defconfig updates for v4.14.
 
-> So I have applied the first two patches for v4.14.
+This pull request is based on the previous round of
+such requests, tagged as renesas-defconfig-for-v4.14,
+which you have already pulled.
 
-Thank you!
 
-> Please repost the remaining two after v4.13-rc6 at which time I should
-> be able to queue them up for v4.15.
+The following changes since commit 52078ca712cd933844721aaa700b3bd85234841f:
 
-You mean after v4.14-rc1? Else you still won't have them in renesas-devel.
+  ARM: multi_v7_defconfig: Enable DMA for Renesas serial ports (2017-07-27 16:06:23 +0200)
 
-Gr{oetje,eeting}s,
+are available in the git repository at:
 
-                        Geert
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig2-for-v4.14
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+for you to fetch changes up to 0736aad1290d61bc3668f20253e1e1997ad8b3c1:
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+  ARM: shmobile: Enable BQ32000 rtc in shmobile_defconfig (2017-08-09 11:03:26 +0200)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Defconfig Updates for v4.14
+
+* Enable BQ32000 rtc in shmobile_defconfig
+
+  Biju Das says "The iWave RZ/G1M Q7 SOM supports RTC (TI BQ32000).  To
+  increase hardware support enable the driver in the shmobile_defconfig
+  multiplatform configuration."
+
+----------------------------------------------------------------
+Biju Das (1):
+      ARM: shmobile: Enable BQ32000 rtc in shmobile_defconfig
+
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
