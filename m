@@ -1,34 +1,33 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 17 Aug 2017 21:14:16 +0800
-Subject: [PATCH] MAINTAINERS: update ARM/ZTE entry
-In-Reply-To: <CAK8P3a3V1d=h7JV=0J_EW0CZ=YONxtZWbJLcqUhKMkq=AJQZBg@mail.gmail.com>
-References: <1502678694-8874-1-git-send-email-shawnguo@kernel.org>
- <CAK8P3a3V1d=h7JV=0J_EW0CZ=YONxtZWbJLcqUhKMkq=AJQZBg@mail.gmail.com>
-Message-ID: <20170817131415.GC7608@dragon>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Thu, 17 Aug 2017 14:09:05 +0100
+Subject: [PATCH ] ARM: multi_v7_defconfig: Enable BQ32000 RTC driver
+Message-ID: <1502975345-4209-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 16, 2017 at 10:39:45PM +0200, Arnd Bergmann wrote:
-> On Mon, Aug 14, 2017 at 4:44 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> > Update ARM/ZTE entry to include all those ZTE ZX platform drivers and
-> > files that do not have a separate MAINTAINERS entry.
-> >
-> > Since I have been contributing a lot for ZTE ZX SoCs support and
-> > collecting platform patches for a few cycles, add myself as one
-> > maintainer for the platform.
-> >
-> > Cc: Jun Nie <jun.nie@linaro.org>
-> > Cc: Baoyou Xie <baoyou.xie@linaro.org>
-> > Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-> > ---
-> > Hi Arnd, Olof,
-> >
-> > Can you please apply the patch directly to arm-soc if you are fine with
-> > it.  Or if you would like a pull request for this, please let me know.
-> 
-> Applied to next/soc. You did not specify whether you wanted this in 4.13,
-> which would have been fine with me, but I guessed it's not urgent.
+The iWave RZ/G1M Q7 SOM supports RTC (TI BQ32000).
+To increase hardware support enable the driver in the
+multi_v7_defconfig multiplatform configuration.
 
-Yes, my intention is just for -next.  Thanks, Arnd.
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+---
+This patch is tested against linux-next tag next-20170817 as well as 
+renesas-dev tag renesas-devel-20170815-v4.13-rc5 .
 
-Shawn
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 18e1f80..02dc373 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -766,6 +766,7 @@ CONFIG_RTC_DRV_MAX8997=m
+ CONFIG_RTC_DRV_MAX77686=y
+ CONFIG_RTC_DRV_RK808=m
+ CONFIG_RTC_DRV_RS5C372=m
++CONFIG_RTC_DRV_BQ32K=y
+ CONFIG_RTC_DRV_PALMAS=y
+ CONFIG_RTC_DRV_ST_LPC=y
+ CONFIG_RTC_DRV_TWL4030=y
+-- 
+1.9.1
