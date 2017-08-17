@@ -1,64 +1,57 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Thu, 17 Aug 2017 13:20:23 +0200
-Subject: [RFC 2/4] arm64: dts: realtek: Add clock nodes for RTD1295
+Date: Thu, 17 Aug 2017 13:20:25 +0200
+Subject: [RFC 4/4] arm64: dts: realtek: Update RTD1295 UART nodes with clocks
 In-Reply-To: <20170817112026.24062-1-afaerber@suse.de>
 References: <20170817112026.24062-1-afaerber@suse.de>
-Message-ID: <20170817112026.24062-3-afaerber@suse.de>
+Message-ID: <20170817112026.24062-5-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 27 MHz oscillator and two clock controller nodes.
+Replace clock-frequency with a reference to the respective clock gates.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm64/boot/dts/realtek/rtd1295.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm64/boot/dts/realtek/rtd1295.dtsi | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/realtek/rtd1295.dtsi b/arch/arm64/boot/dts/realtek/rtd1295.dtsi
-index 77063e984db9..078a11506876 100644
+index 078a11506876..503e2d5fc334 100644
 --- a/arch/arm64/boot/dts/realtek/rtd1295.dtsi
 +++ b/arch/arm64/boot/dts/realtek/rtd1295.dtsi
-@@ -81,6 +81,13 @@
- 			(GIC_CPU_MASK_RAW(0xf) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
+@@ -6,6 +6,7 @@
+  * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+  */
  
-+	osc27M: osc {
-+		compatible = "fixed-clock";
-+		clock-frequency = <27000000>;
-+		#clock-cells = <0>;
-+		clock-output-names = "osc27M";
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -88,6 +95,13 @@
- 		/* Exclude up to 2 GiB of RAM */
- 		ranges = <0x80000000 0x80000000 0x80000000>;
++#include <dt-bindings/clock/realtek,rtd1295.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/reset/realtek,rtd1295.h>
  
-+		clkc: clock-controller at 98000000 {
-+			compatible = "realtek,rtd1295-clk";
-+			reg = <0x98000000 0x1000>;
-+			clocks = <&osc27M>;
-+			#clock-cells = <1>;
-+		};
-+
- 		reset1: reset-controller at 98000000 {
- 			compatible = "realtek,rtd1295-reset";
- 			reg = <0x98000000 0x4>;
-@@ -112,6 +126,13 @@
- 			#reset-cells = <1>;
- 		};
- 
-+		iso_clkc: clock-controller at 98007000 {
-+			compatible = "realtek,rtd1295-iso-clk";
-+			reg = <0x98007000 0x100>;
-+			clocks = <&osc27M>;
-+			#clock-cells = <1>;
-+		};
-+
- 		iso_irq_mux: interrupt-controller at 98007000 {
- 			compatible = "realtek,rtd1295-iso-irq-mux";
- 			reg = <0x98007000 0x100>;
+@@ -152,7 +153,7 @@
+ 			reg = <0x98007800 0x400>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clock-frequency = <27000000>;
++			clocks = <&iso_clkc RTD1295_ISO_CLK_EN_MISC_UR0>;
+ 			interrupt-parent = <&iso_irq_mux>;
+ 			interrupts = <2>;
+ 			resets = <&iso_reset RTD1295_ISO_RSTN_UR0>;
+@@ -172,7 +173,7 @@
+ 			reg = <0x9801b200 0x100>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clock-frequency = <432000000>;
++			clocks = <&clkc RTD1295_CLK_EN_UR1>;
+ 			interrupt-parent = <&irq_mux>;
+ 			interrupts = <3>, <5>;
+ 			resets = <&reset2 RTD1295_RSTN_UR1>;
+@@ -184,7 +185,7 @@
+ 			reg = <0x9801b400 0x100>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clock-frequency = <432000000>;
++			clocks = <&clkc RTD1295_CLK_EN_UR2>;
+ 			interrupt-parent = <&irq_mux>;
+ 			interrupts = <8>, <13>;
+ 			resets = <&reset2 RTD1295_RSTN_UR2>;
 -- 
 2.12.3
