@@ -1,14 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 Aug 2017 18:13:11 +0100
-Subject: Applied "ASoC: cirrus: make snd_soc_ops const" to the asoc tree
-In-Reply-To: <1502902770-3758-3-git-send-email-bhumirks@gmail.com>
-Message-ID: <E1diOM3-0008Pg-Bn@debutante>
+Date: Thu, 17 Aug 2017 18:12:55 +0100
+Subject: Applied "ASoC: bcm: make snd_soc_dai_driver const" to the asoc tree
+In-Reply-To: <1502903709-7411-2-git-send-email-bhumirks@gmail.com>
+Message-ID: <E1diOLn-0008JO-HS@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: cirrus: make snd_soc_ops const
+   ASoC: bcm: make snd_soc_dai_driver const
 
 has been applied to the asoc tree at
 
@@ -33,47 +33,32 @@ to this mail.
 Thanks,
 Mark
 
->From 7f8159acecb3bb58c0d782813dc605ebef63b317 Mon Sep 17 00:00:00 2001
+>From cc6e25631ddd4f3295fc79568f2145c437849e63 Mon Sep 17 00:00:00 2001
 From: Bhumika Goyal <bhumirks@gmail.com>
-Date: Wed, 16 Aug 2017 22:29:25 +0530
-Subject: [PATCH] ASoC: cirrus: make snd_soc_ops const
+Date: Wed, 16 Aug 2017 22:45:08 +0530
+Subject: [PATCH] ASoC: bcm: make snd_soc_dai_driver const
 
-Make these const as they are only stored in the ops field of a
-snd_soc_dai_link structure, which is const.
+Make this const as it is only used during a copy operation.
 Done using Coccinelle.
 
 Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/cirrus/edb93xx.c     | 2 +-
- sound/soc/cirrus/snappercl15.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ sound/soc/bcm/cygnus-ssp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/cirrus/edb93xx.c b/sound/soc/cirrus/edb93xx.c
-index 85962657aabe..c53bd6f2c2d7 100644
---- a/sound/soc/cirrus/edb93xx.c
-+++ b/sound/soc/cirrus/edb93xx.c
-@@ -56,7 +56,7 @@ static int edb93xx_hw_params(struct snd_pcm_substream *substream,
- 				      SND_SOC_CLOCK_OUT);
- }
- 
--static struct snd_soc_ops edb93xx_ops = {
-+static const struct snd_soc_ops edb93xx_ops = {
- 	.hw_params	= edb93xx_hw_params,
+diff --git a/sound/soc/bcm/cygnus-ssp.c b/sound/soc/bcm/cygnus-ssp.c
+index e710bb0c5637..cdd5e82439dd 100644
+--- a/sound/soc/bcm/cygnus-ssp.c
++++ b/sound/soc/bcm/cygnus-ssp.c
+@@ -1288,7 +1288,7 @@ static const struct snd_soc_dai_driver cygnus_ssp_dai_info[] = {
+ 	INIT_CPU_DAI(2),
  };
  
-diff --git a/sound/soc/cirrus/snappercl15.c b/sound/soc/cirrus/snappercl15.c
-index 98089df08df6..2334ec19e7eb 100644
---- a/sound/soc/cirrus/snappercl15.c
-+++ b/sound/soc/cirrus/snappercl15.c
-@@ -45,7 +45,7 @@ static int snappercl15_hw_params(struct snd_pcm_substream *substream,
- 	return 0;
- }
- 
--static struct snd_soc_ops snappercl15_ops = {
-+static const struct snd_soc_ops snappercl15_ops = {
- 	.hw_params	= snappercl15_hw_params,
- };
- 
+-static struct snd_soc_dai_driver cygnus_spdif_dai_info = {
++static const struct snd_soc_dai_driver cygnus_spdif_dai_info = {
+ 	.name = "cygnus-spdif",
+ 	.playback = {
+ 		.channels_min = 2,
 -- 
 2.13.3
