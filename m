@@ -1,58 +1,56 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Aug 2017 16:11:04 -0500
-Subject: [PATCH v2 2/3] dt-bindings: Document STM32 CRYP bindings
-In-Reply-To: <1502781584-18468-3-git-send-email-fabien.dessenne@st.com>
-References: <1502781584-18468-1-git-send-email-fabien.dessenne@st.com>
- <1502781584-18468-3-git-send-email-fabien.dessenne@st.com>
-Message-ID: <20170817211104.qiixtzbetrssp4k2@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 17 Aug 2017 23:11:45 +0200
+Subject: [PATCH 3/3] soc: xilinx: zynqmp: Add firmware interface
+In-Reply-To: <5a53e449-b269-89da-9b69-e560132502fc@xilinx.com>
+References: <cover.1501854302.git.michal.simek@xilinx.com>
+ <98038734d73c604dee6ac0d34740d5bc2034e87d.1501854302.git.michal.simek@xilinx.com>
+ <CAK8P3a1UhKAhYx2fCoWGm7HMka+8XrzFCxEphYNdyNS7yYR8cA@mail.gmail.com>
+ <247a5660-6c53-ccc3-7b9f-bfd2a11f6f54@xilinx.com>
+ <CAK8P3a3TsnYRWnurAduChLVc5q41vax_S0mpK5sQPUo5reM5bw@mail.gmail.com>
+ <d55c3064-3db8-dad9-ac0a-8adad53465ff@xilinx.com>
+ <3809b6a0-1cb9-37af-a524-8bc1986268ec@xilinx.com>
+ <CAK8P3a2h27MSyUhTdU07m8dyGj92o2E5h0dviQ+mp7AtTYhM_A@mail.gmail.com>
+ <5a53e449-b269-89da-9b69-e560132502fc@xilinx.com>
+Message-ID: <CAK8P3a0+tMHHYtVsq77LdcH+3Sdse38md=Bn3Sjkg0LzKyTn9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 09:19:43AM +0200, Fabien Dessenne wrote:
-> Document device tree bindings for the STM32 CRYP.
-> 
-> Signed-off-by: Fabien Dessenne <fabien.dessenne@st.com>
-> ---
->  .../devicetree/bindings/crypto/st,stm32-cryp.txt     | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/crypto/st,stm32-cryp.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/crypto/st,stm32-cryp.txt b/Documentation/devicetree/bindings/crypto/st,stm32-cryp.txt
-> new file mode 100644
-> index 0000000..7c6d599
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/crypto/st,stm32-cryp.txt
-> @@ -0,0 +1,20 @@
-> +* STMicroelectronics STM32 CRYP
-> +
-> +Required properties:
-> +- compatible: Should be "st,stm32f756-cryp".
-> +- reg: The address and length of the peripheral registers space
-> +- clocks: The input clock of the CRYP instance
-> +- interrupts: The CRYP interrupt
-> +
-> +Optional properties:
-> +- resets: The input reset of the CRYP instance
-> +
-> +Example:
-> +cryp1: cryp at 50060000 {
+On Thu, Aug 17, 2017 at 12:48 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+> On 16.8.2017 17:05, Arnd Bergmann wrote:
+>> On Wed, Aug 16, 2017 at 4:34 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+>>
+>> Looks good, just make sure you also check with sparse (make C=1)
+>> to ensure you have the right __le64/__le32 types everywhere.
+>
+> Are you aware about any doc where it is written that data should be
+> passed as little endian?
 
-crypto at ..
+Looking at http://infocenter.arm.com/help/topic/com.arm.doc.den0028b/ARM_DEN0028B_SMC_Calling_Convention.pdf
+now, I think that the structure above is endian-neutral as the arguments
+get passed in registers rather than memory.
 
-> +	compatible = "st,stm32f756-cryp";
-> +	reg = <0x50060000 0x400>;
-> +	interrupts = <79>;
-> +	clocks = <&rcc 0 STM32F7_AHB2_CLOCK(CRYP)>;
-> +	resets = <&rcc STM32F7_AHB2_RESET(CRYP)>;
-> +	status = "disabled";
+However, if you pass pointers to data structures in memory, those
+data structures would have to be defined with __le32/__le64 types.
 
-Don't show status in examples.
+> I was playing with it a little bit and this means that these 2(3 with
+> hvc) needs to be changed.
+>
+> asmlinkage void __arm_smccc_smc(__le64 a0, __le64 a1, __le64 a2,
+>  __le64 a3,__le64 a4, __le64 a5, __le64 a6, __le64 a7,
+> struct arm_smccc_res *res, struct arm_smccc_quirk *quirk);
+>
+>  struct arm_smccc_res {
+> -       unsigned long a0;
+> -       unsigned long a1;
+> -       unsigned long a2;
+> -       unsigned long a3;
+> +       __le64 a0;
+> +       __le64 a1;
+> +       __le64 a2;
+> +       __le64 a3;
+>  };
 
-Otherwise,
+This is clearly wrong on 32-bit machines, I think this is intentionally
+defined as 'unsigned long' to have register sized arguments.
 
-Acked-by: Rob Herring <robh@kernel.org>
-
-> +};
-> -- 
-> 2.7.4
-> 
+       Arnd
