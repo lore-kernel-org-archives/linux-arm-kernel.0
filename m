@@ -1,46 +1,104 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Thu, 17 Aug 2017 09:04:14 +0200
-Subject: [PATCH RFC 0/2] KVM: use RCU to allow dynamic kvm->vcpus array
-In-Reply-To: <20170816194037.9460-1-rkrcmar@redhat.com>
-References: <20170816194037.9460-1-rkrcmar@redhat.com>
-Message-ID: <b77b151f-e51d-3657-66e9-6fbc83887b18@suse.de>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 17 Aug 2017 10:08:22 +0300
+Subject: [PATCH v2 1/2] usb: dwc3: keystone: Add PM_RUNTIME Support to
+ DWC3 Keystone USB driver
+In-Reply-To: <20170816215408.13076-2-fcooper@ti.com>
+References: <20170816215408.13076-1-fcooper@ti.com>
+ <20170816215408.13076-2-fcooper@ti.com>
+Message-ID: <6c96175e-3624-0921-8e2f-00378a270b59@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+?
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
 
-
-On 16.08.17 21:40, Radim Kr?m??  wrote:
-> The goal is to increase KVM_MAX_VCPUS without worrying about memory
-> impact of many small guests.
+On 17/08/17 00:54, Franklin S Cooper Jr wrote:
+> For 66AK2Gx there is a requirement to use PM Runtime to properly manage
+> clocks and the power domains. Therefore, add PM runtime support. Remove
+> legacy clock api's calls since other users of this driver worked without
+> these clock apis calls.
 > 
-> This is a second out of three major "dynamic" options:
->   1) size vcpu array at VM creation time
->   2) resize vcpu array when new VCPUs are created
->   3) use a lockless list/tree for VCPUs
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+
+Acked-by: Roger Quadros <rogerq@ti.com>
+
+> ---
+>  drivers/usb/dwc3/dwc3-keystone.c | 22 ++++++++++------------
+>  1 file changed, 10 insertions(+), 12 deletions(-)
 > 
-> The disadvantage of (1) is its requirement on userspace changes and
-> limited flexibility because userspace must provide the maximal count on
-> start.  The main advantage is that kvm->vcpus will work like it does
-> now.  It has been posted as "[PATCH 0/4] KVM: add KVM_CREATE_VM2 to
-> allow dynamic kvm->vcpus array",
-> http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1377285.html
+> diff --git a/drivers/usb/dwc3/dwc3-keystone.c b/drivers/usb/dwc3/dwc3-keystone.c
+> index 12ee23f..d2ed952 100644
+> --- a/drivers/usb/dwc3/dwc3-keystone.c
+> +++ b/drivers/usb/dwc3/dwc3-keystone.c
+> @@ -15,7 +15,6 @@
+>   * GNU General Public License for more details.
+>   */
+>  
+> -#include <linux/clk.h>
+>  #include <linux/module.h>
+>  #include <linux/kernel.h>
+>  #include <linux/interrupt.h>
+> @@ -23,6 +22,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/io.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/pm_runtime.h>
+>  
+>  /* USBSS register offsets */
+>  #define USBSS_REVISION		0x0000
+> @@ -41,7 +41,6 @@
+>  
+>  struct dwc3_keystone {
+>  	struct device			*dev;
+> -	struct clk			*clk;
+>  	void __iomem			*usbss;
+>  };
+>  
+> @@ -106,17 +105,13 @@ static int kdwc3_probe(struct platform_device *pdev)
+>  	if (IS_ERR(kdwc->usbss))
+>  		return PTR_ERR(kdwc->usbss);
+>  
+> -	kdwc->clk = devm_clk_get(kdwc->dev, "usb");
+> -	if (IS_ERR(kdwc->clk)) {
+> -		dev_err(kdwc->dev, "unable to get usb clock\n");
+> -		return PTR_ERR(kdwc->clk);
+> -	}
+> +	pm_runtime_enable(kdwc->dev);
+>  
+> -	error = clk_prepare_enable(kdwc->clk);
+> +	error = pm_runtime_get_sync(kdwc->dev);
+>  	if (error < 0) {
+> -		dev_err(kdwc->dev, "unable to enable usb clock, error %d\n",
+> +		dev_err(kdwc->dev, "pm_runtime_get_sync failed, error %d\n",
+>  			error);
+> -		return error;
+> +		goto err_irq;
+>  	}
+>  
+>  	irq = platform_get_irq(pdev, 0);
+> @@ -147,7 +142,8 @@ static int kdwc3_probe(struct platform_device *pdev)
+>  err_core:
+>  	kdwc3_disable_irqs(kdwc);
+>  err_irq:
+> -	clk_disable_unprepare(kdwc->clk);
+> +	pm_runtime_put_sync(kdwc->dev);
+> +	pm_runtime_disable(kdwc->dev);
+>  
+>  	return error;
+>  }
+> @@ -167,7 +163,9 @@ static int kdwc3_remove(struct platform_device *pdev)
+>  
+>  	kdwc3_disable_irqs(kdwc);
+>  	device_for_each_child(&pdev->dev, NULL, kdwc3_remove_core);
+> -	clk_disable_unprepare(kdwc->clk);
+> +	pm_runtime_put_sync(kdwc->dev);
+> +	pm_runtime_disable(kdwc->dev);
+> +
+>  	platform_set_drvdata(pdev, NULL);
+>  
+>  	return 0;
 > 
-> The main problem of (2), this series, is that we cannot extend the array
-> in place and therefore require some kind of protection when moving it.
-> RCU seems best, but it makes the code slower and harder to deal with.
-> The main advantage is that we do not need userspace changes.
 
-Creating/Destroying vcpus is not something I consider a fast path, so 
-why should we optimize for it? The case that needs to be fast is execution.
-
-What if we just sent a "vcpu move" request to all vcpus with the new 
-pointer after it moved? That way the vcpu thread itself would be 
-responsible for the migration to the new memory region. Only if all 
-vcpus successfully moved, keep rolling (and allow foreign get_vcpu again).
-
-That way we should be basically lock-less and scale well. For additional 
-icing, feel free to increase the vcpu array x2 every time it grows to 
-not run into the slow path too often.
-
-
-Alex
+-- 
+cheers,
+-roger
