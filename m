@@ -1,153 +1,61 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Thu, 17 Aug 2017 15:49:26 +0800
-Subject: [PATCH] ARM: sun8i: a33: add dts for Q8 tablets with different
- resolution
-Message-ID: <20170817074926.3410-1-icenowy@aosc.io>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 Aug 2017 08:52:27 +0100
+Subject: [PATCHv2 0/3] arm64 xilinx zynqmp firmware interface
+In-Reply-To: <89e5469b-650e-64c7-1754-797b35bac523@xilinx.com>
+References: <cover.1502886277.git.michal.simek@xilinx.com>
+ <43deeed7-32c8-7914-5f44-862ebbe14a3b@arm.com>
+ <89e5469b-650e-64c7-1754-797b35bac523@xilinx.com>
+Message-ID: <a1970cb5-1cf1-d38a-3de3-c782c23fc8ac@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Q8 tablets with Allwinner A33 SoC now come with two kind of LCD, either
-800x480 or 1024x600.
+On 17/08/17 07:10, Michal Simek wrote:
+> On 16.8.2017 17:39, Marc Zyngier wrote:
+>> On 16/08/17 13:24, Michal Simek wrote:
+>>> Hi,
+>>>
+>>> xilinx is using this interface for very long time and we can't merge our
+>>> driver changes to Linux because of missing communication layer with
+>>> firmware. This interface was developed before scpi and scmi was
+>>> available. In connection to power management scpi and scmi are missing
+>>> pieces which we already use. There is a separate discussion how to
+>>> extend scmi to support all our use cases.
+>>
+>> So maybe we should wait and see where this discussion is going before we
+>> merge yet another firmware interface?
+> 
+> It will take a lot of time when this discussion ends and I can't see any
+> benefit to hold all
 
-In order for sun4i-drm to be able to choose correct LCD configuration,
-two different device trees should be present, one for a resolution.
+Well, so far, the benefit of this series is exactly nil, as the code it
+brings is *unused*. It is impossible to review in isolation.
 
-Add stub device trees for two resolutions.
+In the meantime, you can continue finding out how *not* to have to merge
+this code, and instead focus on using the infrastructure we already
+have, or at least influence the infrastructure that is being designed.
+It will be much better than dumping yet another slab of "I'm so
+different" code that is going to ultimately bitrot.
 
-As the sun4i-drm driver still has some problems to support the LCDs, the
-real LCD device nodes are not added to the device tree files.
+> 
+> 
+>>> This simply patch is not adding any power management features but only
+>>> adding minimum functionality which are needed for drivers.
+>>
+>> I don't get it. 600 lines of firmware interface that isn't used by
+>> anything? Or is it? Needed by which driver?
+> 
+> I can send that drivers for review. pinctrl, fpga manager, nvmem driver,
+> clock, serdes phy and reset drivers.
+> But this driver need to come first because they depend on this.
+My take is: no users, no use.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- arch/arm/boot/dts/Makefile                         |  2 +
- arch/arm/boot/dts/sun8i-a33-q8-tablet-1024x600.dts | 49 ++++++++++++++++++++++
- arch/arm/boot/dts/sun8i-a33-q8-tablet-800x480.dts  | 49 ++++++++++++++++++++++
- 3 files changed, 100 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-a33-q8-tablet-1024x600.dts
- create mode 100644 arch/arm/boot/dts/sun8i-a33-q8-tablet-800x480.dts
+And if you need to hack all these drivers to hook into your specific
+firmware interface, I feel that you're doing it wrong. We have common
+APIs for device drivers. If these APIs are not good enough, we extend
+them. But designing drivers for a given firmware interface?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 570e107bf702..eeb9d9591cf0 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -908,6 +908,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a33-ippo-q8h-v1.2.dtb \
- 	sun8i-a33-olinuxino.dtb \
- 	sun8i-a33-q8-tablet.dtb \
-+	sun8i-a33-q8-tablet-800x480.dtb \
-+	sun8i-a33-q8-tablet-1024x600.dtb \
- 	sun8i-a33-sinlinx-sina33.dtb \
- 	sun8i-a83t-allwinner-h8homlet-v2.dtb \
- 	sun8i-a83t-cubietruck-plus.dtb \
-diff --git a/arch/arm/boot/dts/sun8i-a33-q8-tablet-1024x600.dts b/arch/arm/boot/dts/sun8i-a33-q8-tablet-1024x600.dts
-new file mode 100644
-index 000000000000..6f8ebd6c90ee
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-a33-q8-tablet-1024x600.dts
-@@ -0,0 +1,49 @@
-+/*
-+ * Copyright 2017 Icenowy Zheng <icenowy@aosc.io>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "sun8i-a33-q8-tablet.dts"
-+
-+/ {
-+	model = "Q8 A33 Tablet with 1024x600 LCD";
-+	compatible = "allwinner,q8-a33-1024x600", "allwinner,q8-a33",
-+		     "allwinner,sun8i-a33";
-+};
-diff --git a/arch/arm/boot/dts/sun8i-a33-q8-tablet-800x480.dts b/arch/arm/boot/dts/sun8i-a33-q8-tablet-800x480.dts
-new file mode 100644
-index 000000000000..ad84b94dee53
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-a33-q8-tablet-800x480.dts
-@@ -0,0 +1,49 @@
-+/*
-+ * Copyright 2017 Icenowy Zheng <icenowy@aosc.io>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "sun8i-a33-q8-tablet.dts"
-+
-+/ {
-+	model = "Q8 A33 Tablet with 800x480 LCD";
-+	compatible = "allwinner,q8-a33-800x480", "allwinner,q8-a33",
-+		     "allwinner,sun8i-a33";
-+};
+Thanks,
+
+	M.
 -- 
-2.13.0
+Jazz is not dead. It just smells funny...
