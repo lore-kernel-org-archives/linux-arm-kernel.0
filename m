@@ -1,80 +1,237 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Thu, 17 Aug 2017 10:42:54 +0200
-Subject: [PATCHv2 0/3] arm64 xilinx zynqmp firmware interface
-In-Reply-To: <a1970cb5-1cf1-d38a-3de3-c782c23fc8ac@arm.com>
-References: <cover.1502886277.git.michal.simek@xilinx.com>
- <43deeed7-32c8-7914-5f44-862ebbe14a3b@arm.com>
- <89e5469b-650e-64c7-1754-797b35bac523@xilinx.com>
- <a1970cb5-1cf1-d38a-3de3-c782c23fc8ac@arm.com>
-Message-ID: <0560c79f-e461-6010-0628-e99ce0a1f8c6@xilinx.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 17 Aug 2017 09:45:51 +0100
+Subject: [PATCH 02/27] arm64: KVM: Hide unsupported AArch64 CPU features
+ from guests
+In-Reply-To: <20170816203112.GF6321@e103592.cambridge.arm.com>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-3-git-send-email-Dave.Martin@arm.com>
+ <9397d41c-f6f2-af7e-913e-a09f85ecc6bb@arm.com>
+ <20170816203112.GF6321@e103592.cambridge.arm.com>
+Message-ID: <fcaa83e4-8917-a713-ae57-81a39be057d2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.8.2017 09:52, Marc Zyngier wrote:
-> On 17/08/17 07:10, Michal Simek wrote:
->> On 16.8.2017 17:39, Marc Zyngier wrote:
->>> On 16/08/17 13:24, Michal Simek wrote:
->>>> Hi,
->>>>
->>>> xilinx is using this interface for very long time and we can't merge our
->>>> driver changes to Linux because of missing communication layer with
->>>> firmware. This interface was developed before scpi and scmi was
->>>> available. In connection to power management scpi and scmi are missing
->>>> pieces which we already use. There is a separate discussion how to
->>>> extend scmi to support all our use cases.
+On 16/08/17 21:32, Dave Martin wrote:
+> On Wed, Aug 16, 2017 at 12:10:38PM +0100, Marc Zyngier wrote:
+>> On 09/08/17 13:05, Dave Martin wrote:
+>>> Currently, a guest kernel sees the true CPU feature registers
+>>> (ID_*_EL1) when it reads them using MRS instructions.  This means
+>>> that the guest will observe features that are present in the
+>>> hardware but the host doesn't understand or doesn't provide support
+>>> for.  A guest may legimitately try to use such a feature as per the
+>>> architecture, but use of the feature may trap instead of working
+>>> normally, triggering undef injection into the guest.
 >>>
->>> So maybe we should wait and see where this discussion is going before we
->>> merge yet another firmware interface?
->>
->> It will take a lot of time when this discussion ends and I can't see any
->> benefit to hold all
-> 
-> Well, so far, the benefit of this series is exactly nil, as the code it
-> brings is *unused*. It is impossible to review in isolation.
-> 
-
-Ok. I will add others drivers to this series that's not a problem.
-
-> In the meantime, you can continue finding out how *not* to have to merge
-> this code, and instead focus on using the infrastructure we already
-> have, or at least influence the infrastructure that is being designed.
-> It will be much better than dumping yet another slab of "I'm so
-> different" code that is going to ultimately bitrot.
-
-I am happy to look the better proposed way. SCPI is ancient and SCMI is
-replacement and not merged yet. We already had a call with arm and
-Sudeep was on it too where outcome from that was that we can't use that
-because it doesn't support what we need to support now.
-
-This code is compatible with current ARM SMC calling convention which
-allocate range for vendors.
-
-0xC2000000-0xC200FFFF SMC64: SiP Service Calls
-
-Provides interfaces to SoC implementation-specific services on this
-platform, for example secure platform initialization, configuration
-, and some power control services.
-
-> 
->>
->>
->>>> This simply patch is not adding any power management features but only
->>>> adding minimum functionality which are needed for drivers.
+>>> This is not a problem for the host, but the guest may go wrong when
+>>> running on newer hardware than the host knows about.
 >>>
->>> I don't get it. 600 lines of firmware interface that isn't used by
->>> anything? Or is it? Needed by which driver?
->>
->> I can send that drivers for review. pinctrl, fpga manager, nvmem driver,
->> clock, serdes phy and reset drivers.
->> But this driver need to come first because they depend on this.
-> My take is: no users, no use.
+>>> This patch hides from guest VMs any AArch64-specific CPU features
+>>> that the host doesn't support, by exposing to the guest the
+>>> sanitised versions of the registers computed by the cpufeatures
+>>> framework, instead of the true hardware registers.  To achieve
+>>> this, HCR_EL2.TID3 is now set for AArch64 guests, and emulation
+>>> code is added to KVM to report the sanitised versions of the
+>>> affected registers in response to MRS and register reads from
+>>> userspace.
+>>>
+>>> The affected registers are removed from invariant_sys_regs[] (since
+>>> the invariant_sys_regs handling is no longer quite correct for
+>>> them) and added to sys_reg_desgs[], with appropriate access(),
+>>> get_user() and set_user() methods.  No runtime vcpu storage is
+>>> allocated for the registers: instead, they are read on demand from
+>>> the cpufeatures framework.  This may need modification in the
+>>> future if there is a need for userspace to customise the features
+>>> visible to the guest.
+>>>
+>>> Attempts by userspace to write the registers are handled similarly
+>>> to the current invariant_sys_regs handling: writes are permitted,
+>>> but only if they don't attempt to change the value.  This is
+>>> sufficient to support VM snapshot/restore from userspace.
+>>>
+>>> Because of the additional registers, restoring a VM on an older
+>>> kernel may not work unless userspace knows how to handle the extra
+>>> VM registers exposed to the KVM user ABI by this patch.
+>>>
+>>> Under the principle of least damage, this patch makes no attempt to
+>>> handle any of the other registers currently in
+>>> invariant_sys_regs[], or to emulate registers for AArch32: however,
+>>> these could be handled in a similar way in future, as necessary.
+>>>
+>>> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+>>> ---
+>>>  arch/arm64/kvm/hyp/switch.c |   6 ++
+>>>  arch/arm64/kvm/sys_regs.c   | 224 +++++++++++++++++++++++++++++++++++---------
+>>>  2 files changed, 185 insertions(+), 45 deletions(-)
+>>>
 > 
-> And if you need to hack all these drivers to hook into your specific
-> firmware interface, I feel that you're doing it wrong. We have common
-> APIs for device drivers. If these APIs are not good enough, we extend
-> them. But designing drivers for a given firmware interface?
+> [...]
+> 
+>>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>>> index 2e070d3..6583dd7 100644
+>>> --- a/arch/arm64/kvm/sys_regs.c
+>>> +++ b/arch/arm64/kvm/sys_regs.c
+>>> @@ -892,6 +892,135 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
+>>>  	return true;
+>>>  }
+>>>  
+>>> +/* Read a sanitised cpufeature ID register by sys_reg_desc */
+>>> +static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
+>>> +{
+>>> +	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
+>>> +			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
+>>> +
+>>> +	return raz ? 0 : read_sanitised_ftr_reg(id);
+>>> +}
+>>> +
+>>> +/* cpufeature ID register access trap handlers */
+>>> +
+>>> +static bool __access_id_reg(struct kvm_vcpu *vcpu,
+>>> +			    struct sys_reg_params *p,
+>>> +			    const struct sys_reg_desc const *r,
+>>> +			    bool raz)
+>>> +{
+>>> +	if (p->is_write) {
+>>> +		kvm_inject_undefined(vcpu);
+>>> +		return false;
+>>> +	}
+>>
+>> I don't think this is supposed to happen (should have UNDEF-ed at EL1).
+>> You can call write_to_read_only() in that case, which will spit out a
+>> warning and inject the exception.
+> 
+> I'll check this -- sounds about right.
+> 
+> If is should never happen, should I just delete that code or BUG()?  I
+> notice a BUG_ON() for a similar situation in access_vm_reg() for example.
+> 
+> Or do we not quite trust hardware not to get this wrong?
+> (It feels like the kind of thing that could slip through validation
+> and/or would be considered not worth a respin, but it seems wrong to
+> work around a theoretical hardware bug before it's confirmed to exist,
+> unless we think for some reason that it's really likely.)
 
-Let me send that users of this.
+That's the way we handle this for the rest of the accessors. We used to
+have a BUG_ON(), but it is pretty silly to kill the whole system for
+such a small deviation from the architecture. And maybe it is useless,
+but it doesn't hurt either.
+
+>>> +
+>>> +	p->regval = read_id_reg(r, raz);
+>>> +	return true;
+>>> +}
+> 
+> [...]
+> 
+>>> @@ -944,6 +1073,32 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>>>  	{ SYS_DESC(SYS_DBGVCR32_EL2), NULL, reset_val, DBGVCR32_EL2, 0 },
+>>>  
+>>>  	{ SYS_DESC(SYS_MPIDR_EL1), NULL, reset_mpidr, MPIDR_EL1 },
+>>> +
+>>> +	/*
+>>> +	 * All non-RAZ feature registers listed here must also be
+>>> +	 * present in arm64_ftr_regs[].
+>>> +	 */
+>>> +
+>>> +	/* AArch64 mappings of the AArch32 ID registers */
+>>> +	/* ID_AFR0_EL1 not exposed to guests for now */
+>>> +	ID(PFR0),	ID(PFR1),	ID(DFR0),	_ID_RAZ(1,3),
+>>> +	ID(MMFR0),	ID(MMFR1),	ID(MMFR2),	ID(MMFR3),
+>>> +	ID(ISAR0),	ID(ISAR1),	ID(ISAR2),	ID(ISAR3),
+>>> +	ID(ISAR4),	ID(ISAR5),	ID(MMFR4),	_ID_RAZ(2,7),
+>>> +	_ID(MVFR0),	_ID(MVFR1),	_ID(MVFR2),	_ID_RAZ(3,3),
+>>> +	_ID_RAZ(3,4),	_ID_RAZ(3,5),	_ID_RAZ(3,6),	_ID_RAZ(3,7),
+>>
+>> #bikeshed:
+>>
+>> OK, this is giving me a headache. Too many variants with similar names.
+>> ID and _ID
+>> I'm also slightly perplexed with the amalgamation of RAZ because the
+>> register is not defined yet in the architecture, and RAZ because we
+>> don't expose it (like ID_AFR0_EL1). Yes, there is a number of comments
+> 
+> This "raz" overloading already seems present in other places, such as the
+> cpufeatures code.  (Which is not necessarily a good reason for adding
+> more of it...)
+> 
+>> to document that, but the code should aim to be be self-documenting. How
+>> about IDRAZ() for those we want to "hide", and IDRSV for encodings that
+>> are not allocated yet? It would look like this:
+>>
+>> 	IDREG(ID_PFR0),		IDREG(ID_PFR1),		IDREG(ID_DFR0),
+>> 	IDRAZ(ID_AFR0),		IDREG(ID_MMFR0),	IDREG(ID_MMFR1),
+>> 	IDREG(ID_MMFR2),	IDREG(ID_MMFR3),	IDREG(ID_ISAR0),
+>> 	IDREG(ID_ISAR1),	IDREG(ID_ISAR2),	IDREG(ID_ISAR3),
+>> 	IDREG(ID_ISAR4),	IDREG(ID_ISAR5),	IDREG(ID_MMFR4),
+>> 	IDRSV(2,7),		IDREG(MVFR0),		IDREG(MVFR1),
+>> 	IDREG(MVFR2),		IDRSV(3,3),		IDRSV(3,4),	
+>> 	IDRSV(3,5),		IDRSV(3,6),		IDRSV(3,7),
+>>
+>> Yes, only 3 a line. Lines are cheap. And yes, they also have similar
+>> names, but I said #bikeshed.
+> 
+> So, point taken, but the main reason for making this a table was to make
+> it easy to see by eye how the entries map to the encoding while hacking
+> this up, which helped me to make sure no entries were missed or in the
+> wrong place etc.
+> 
+> With 3 entries per line that visual map is lost, and with 2 entries per
+> line it's debatable whether it's worth having multiple entries per line
+> at all.
+
+Let's be clear. I don't care at all about the number of entries per
+line. I can widen my editor to 200 columns if I need to. If you think 4
+is the way, keep it to 4.
+
+My point is about the readability of both the macros and the
+identifiers, and your initial proposal did seem to lack on both counts.
+
+> So now that the table exists maybe we should just have one entry per
+> line like everything else -- it really depends on which option you think
+> is best for ongoing maintenance.
+> 
+> 
+> Having one per line allows much less cryptic names, allowing the
+> temptingly short but ambiguous "RAZ" to be avoided:
+> 
+> 	ID_SANITISED(ID_ISAR5),
+> 	ID_RAZ_FOR_GUEST(ID_AFR0),
+> 	ID_UNALLOCATED(crm, op2)
+> 
+> With a whole line and different lengths, it's easier to pick out
+> the different cases by eye, so they don't all look like IDRXX (and are a
+> more tasteful colour perhaps).
+> 
+> Blank lines and/or comments can split the list into sensible blocks for
+> readability if needed.
+> 
+> If you're happy with naming along those broad lines then I'm happy to
+> see what it looks like.
+
+Sure. If you're happy with that, so am I.
+
+>>> +
+>>> +	/* AArch64 ID registers */
+>>> +	ID(AA64PFR0),	ID(AA64PFR1),	_ID_RAZ(4,2),	_ID_RAZ(4,3),
+>>> +	_ID_RAZ(4,4),	_ID_RAZ(4,5),	_ID_RAZ(4,6),	_ID_RAZ(4,7),
+>>> +	ID(AA64DFR0),	ID(AA64DFR1),	_ID_RAZ(5,2),	_ID_RAZ(5,3),
+>>> +	/* ID_AA64AFR0_EL1 and ID_AA64AFR0_EL1 not exposed to guests for now */
+> 
+> There are no sysreg definitions for IA_AA64AFR{0,1}_EL1 yet.
+> 
+> If we want to macroise those rather than just commenting, I guess
+> they'll need adding in sysreg.h.  I'd prefer not to imply these are
+> "unallocated" or similar when the architecture does define them.
+> 
+> Can I take it there's no problem with zombie entries in sysreg.h so long
+> as they're at least referenced somewhere?  (Arguably they wouldn't be
+> zombies then, but hopefully you see what I mean.)
+
+That'd be the right thing to do. The register exists, and KVM handles it
+by returning 0 when a guest reads it. So I'd argue that it *must* be
+defined in sysreg.h, and given its full visibility in that table.
 
 Thanks,
-Michal
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
