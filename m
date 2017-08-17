@@ -1,89 +1,94 @@
-From: ssantosh@kernel.org (Santosh Shilimkar)
-Date: Wed, 16 Aug 2017 17:30:40 -0700
-Subject: [GIT PULL 1/3] ARM: Keystone DTS for 4.14
-Message-ID: <1502929842-8156-1-git-send-email-ssantosh@kernel.org>
+From: trini@konsulko.com (Tom Rini)
+Date: Wed, 16 Aug 2017 20:33:55 -0400
+Subject: [PATCH] ARM: dts: TI: Enable __symbols__ in dtb files for some
+ platforms
+In-Reply-To: <5994CDD1.9050708@gmail.com>
+References: <1502920751-11121-1-git-send-email-trini@konsulko.com>
+ <5994C81C.609@gmail.com> <5994CDD1.9050708@gmail.com>
+Message-ID: <20170817003355.GR20467@bill-the-cat>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+On Wed, Aug 16, 2017 at 03:57:21PM -0700, Frank Rowand wrote:
+> On 08/16/17 15:33, Frank Rowand wrote:
+> > On 08/16/17 14:59, Tom Rini wrote:
+> >> Build the dtb file for these platfroms with __symbol__ information
+> >> included.  This will reduce the size of the dtb (and resident memory
+> > 
+> > typo: reduce the size should be increase the size
+> > 
+> > 
+> >> usage) in exchange for allowing more types of overlays to be applied to
+> >> the dtb file prior to passing it to Linux and additional functionality
+> >> within the kernel when OF_OVERLAY is enabled.
+> >>
+> >> Cc: Jason Kridner <jkridner@beagleboard.org>
+> >> Cc: Drew Fustini <drew@beagleboard.org>
+> >> Cc: Robert Nelson <robertcnelson@gmail.com>
+> >> Cc: Lokesh Vutla <lokeshvutla@ti.com>
+> >> Cc: Frank Rowand <frowand.list@gmail.com>
+> >> Cc: Rob Herring <robh+dt@kernel.org>
+> >> Cc: Mark Rutland <mark.rutland@arm.com>
+> >> Cc: Russell King <linux@armlinux.org.uk>
+> >> Cc: devicetree at vger.kernel.org
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> Cc: linux-kernel at vger.kernel.org
+> >> Signed-off-by: Tom Rini <trini@konsulko.com>
+> >> ---
+> >> This patch takes the path that Rob encouraged in my previous patch of
+> >> enabling __symbols__ in some platforms now (that can use it) and see if
+> >> a critical mass evolves that pushes towards -@ being default for all
+> >> dtbs.  I would suggest that the dra76 series be respun to include a hunk
+> >> like this at least as well, and if there's another Beagle X15 patch,
+> >> that too.  Russell, per some of our conversations, something like would
+> >> also be needed as part of using overlays to solve some of the problems
+> >> with Hummingboard, etc.
+> >> ---
+> >>  arch/arm/boot/dts/Makefile | 14 ++++++++++++++
+> >>  1 file changed, 14 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> >> index 4b17f35dc9a7..6f98422ca00e 100644
+> >> --- a/arch/arm/boot/dts/Makefile
+> >> +++ b/arch/arm/boot/dts/Makefile
+> >> @@ -1063,3 +1063,17 @@ dtb-$(CONFIG_OF_ALL_DTBS) := $(patsubst $(dtstree)/%.dts,%.dtb, $(wildcard $(dts
+> >>  
+> >>  always		:= $(dtb-y)
+> >>  clean-files	:= *.dtb
+> >> +
+> >> +# enable creation of __symbols__ node
+> >> +DTC_FLAGS_am335x-bone += -@
+> >> +DTC_FLAGS_am335x-boneblack += -@
+> >> +DTC_FLAGS_am335x-boneblack-wireless += -@
+> >> +DTC_FLAGS_am335x-boneblue += -@
+> >> +DTC_FLAGS_am335x-bonegreen += -@
+> >> +DTC_FLAGS_am335x-bonegreen-wireless += -@
+> >> +DTC_FLAGS_am57xx-beagle-x15 += -@
+> >> +DTC_FLAGS_am57xx-beagle-x15-revb1 += -@
+> >> +DTC_FLAGS_dra7-evm += -@
+> >> +DTC_FLAGS_dra72-evm += -@
+> >> +DTC_FLAGS_dra72-evm-revc += -@
+> >> +DTC_FLAGS_dra71-evm += -@
+> >>
+> > 
+> > I would prefer that instead of "-@", a configurable value be used.
+> 
+> I stated that poorly.  It was intended conceptually, not literally.
+> 
+> One possible concrete implementation would be to use something other
+> than DTC_FLAGS, for example DTC_FLAGS_EXTRA, then have the build
+> system choose whether to fold DTC_FLAGS_EXTRA into DTC_FLAGS, based
+> on some sort of configurable value.
 
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+So you would have to pass in a flag, and then set a CONFIG option for
+"please use this flag I just explicitly set" ?
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_dts_for_4.14
-
-for you to fetch changes up to 6794d3771c319bd67f95575f11846a0fe86105c5:
-
-  ARM: dts: keystone-k2g-ice: Add and enable DSP CMA memory pool (2017-08-12 10:58:11 -0700)
-
-----------------------------------------------------------------
-ARM: Keystone DTS for 4.14
-
-Contents:
-- ti-sci power domain, clock and reset controller support
-- DSP nodes for k2h/k2l/k2e evms
-- DSP CMA memory pools for k2h/k2l/k2e/keg evms
-- MMC/hsmmc suport for k2g
-- eDMA support for k2g
-- DCAN support for k2g
-
-----------------------------------------------------------------
-Andrew F. Davis (2):
-      ARM: dts: keystone-k2g: Add TI SCI reset-controller node
-      ARM: dts: keystone-k2g-evm: Add and enable DSP CMA memory pool
-
-Dave Gerlach (2):
-      dt-bindings: Drop k2g genpd device ID macros
-      ARM: dts: keystone-k2g: Add ti-sci power domain node
-
-Franklin S Cooper Jr (1):
-      dt-bindings: net: c_can: Update binding for clock and power-domains property
-
-Keerthy (1):
-      ARM: dts: keystone-k2g: Add gpio nodes
-
-Lokesh Vutla (5):
-      dt-bindings: ti,edma: Add 66AK2G specific information
-      dt-bindings: ti,omap-hsmmc: Add 66AK2G mmc controller
-      ARM: dts: keystone-k2g: add MMC0 and MMC1 nodes
-      ARM: dts: keystone-k2g-evm: Enable MMC0 and MMC1
-      ARM: dts: k2g: Add DCAN nodes
-
-Nishanth Menon (1):
-      ARM: dts: keystone-k2g: Add PMMC node to support TI-SCI protocol
-
-Peter Ujfalusi (1):
-      ARM: dts: keystone-k2g: Add eDMA nodes
-
-Sam Nelson (3):
-      ARM: dts: keystone-k2hk-evm: Add and enable common DSP CMA memory pool
-      ARM: dts: keystone-k2l-evm: Add and enable common DSP CMA memory pool
-      ARM: dts: keystone-k2e-evm: Add and enable DSP CMA memory pool
-
-Suman Anna (5):
-      ARM: dts: keystone-k2hk: Add DSP nodes
-      ARM: dts: keystone-k2l: Add DSP nodes
-      ARM: dts: keystone-k2e: Add DSP node
-      ARM: dts: keystone-k2g: Add DSP node
-      ARM: dts: keystone-k2g-ice: Add and enable DSP CMA memory pool
-
-Tero Kristo (1):
-      ARM: dts: keystone-k2g: Add ti-sci clock provider node
-
- Documentation/devicetree/bindings/dma/ti-edma.txt  |  95 +++++++++-
- .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |  52 ++++--
- .../devicetree/bindings/net/can/c_can.txt          |  13 +-
- .../devicetree/bindings/soc/ti/sci-pm-domain.txt   |   5 +-
- arch/arm/boot/dts/keystone-k2e-evm.dts             |  18 ++
- arch/arm/boot/dts/keystone-k2e.dtsi                |  20 ++
- arch/arm/boot/dts/keystone-k2g-evm.dts             |  71 +++++++
- arch/arm/boot/dts/keystone-k2g-ice.dts             |  18 ++
- arch/arm/boot/dts/keystone-k2g.dtsi                | 204 +++++++++++++++++++++
- arch/arm/boot/dts/keystone-k2hk-evm.dts            |  53 ++++++
- arch/arm/boot/dts/keystone-k2hk.dtsi               | 139 ++++++++++++++
- arch/arm/boot/dts/keystone-k2l-evm.dts             |  33 ++++
- arch/arm/boot/dts/keystone-k2l.dtsi                |  71 +++++++
- include/dt-bindings/genpd/k2g.h                    |  90 ---------
- 14 files changed, 769 insertions(+), 113 deletions(-)
- delete mode 100644 include/dt-bindings/genpd/k2g.h
+-- 
+Tom
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170816/50c12a0c/attachment.sig>
