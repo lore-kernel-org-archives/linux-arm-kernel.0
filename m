@@ -1,45 +1,59 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 17 Aug 2017 22:12:45 +0800
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Add
- CONFIG_FW_LOADER_USER_HELPER_FALLBACK
-In-Reply-To: <20170817140424.4614-1-gary.bisson@boundarydevices.com>
-References: <20170817140424.4614-1-gary.bisson@boundarydevices.com>
-Message-ID: <20170817141243.GG7608@dragon>
+From: danilokrummrich@dk-develop.de (Danilo Krummrich)
+Date: Thu, 17 Aug 2017 16:14:23 +0200
+Subject: [PATCH] serio: PS2 gpio bit banging driver for the serio bus
+In-Reply-To: <20170817130103.GR20805@n2100.armlinux.org.uk>
+References: <20170731222452.22887-1-danilokrummrich@dk-develop.de>
+ <CACRpkdYz_+soss4Rb9zMiP4eZZtXqjW_Xy7hH=wm1x2m_R9R3A@mail.gmail.com>
+ <20170807182207.348762301bf3d7f8509b1bf7@dk-develop.de>
+ <8e5e73575b3a70e0e60931698687471d@dk-develop.de>
+ <CACRpkda=bYacXmv8SoQu3wPoZW9v+j8myZnme=QpofD=Y-gYTg@mail.gmail.com>
+ <20170817090908.GP20805@n2100.armlinux.org.uk>
+ <d9966e58f98ed5820154d9a979ca19f2@dk-develop.de>
+ <20170817130103.GR20805@n2100.armlinux.org.uk>
+Message-ID: <52be16427347cefff9238902146df110@dk-develop.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 04:04:24PM +0200, Gary Bisson wrote:
-> Allows to load firmware files which aren't built inside the kernel.
+On 2017-08-17 15:01, Russell King - ARM Linux wrote:
+> On Thu, Aug 17, 2017 at 12:51:33PM +0200, Danilo Krummrich wrote:
+>> That having the correct execution order is not enough on some buses 
+>> because
+>> of buffering is really something to be aware of, thanks again for 
+>> pointing
+>> this out.
 > 
-> Especially useful for CODA firmware (vpu_fw_imx6q.bin) which is usually
-> located in the rootfs.
+> PCI guarantees the order of writes to a device, but there are 
+> situations
+> on SoCs where you can't rely on that - for instance, if the writes go
+> over different buses to different devices (eg, write to a peripheral
+> vs write to an interrupt controller.)
 > 
-> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
-> ---
-> Hi Shawn,
+> Even then, with interrupts delivered by message (eg, MSI) there's
+> issues.
 > 
-> I'm not sure if this patch is acceptable since I've noticed that no
-> configuration currently has that option enabled (why?).
+>> So for the scenario I was concerned about I would expect the irqchip 
+>> driver
+>> guarantees the write actually hits the the hardware (if necessary read 
+>> it
+>> back) before the function (disable_irq_nosync()) returns, is that 
+>> correct?
+>> Though, having the need should be very unlikely.
 > 
-> As mentioned in the commit, I had to enable that in order to have CODA
-> load the VPU firmware properly.
+> Well, disable_irq_nosync() doesn't guarantee that the interrupt handler
+> isn't running - a CPU may have just received the interrupt and is just
+> entering the interrupt handler when disable_irq_nosync() returns.  The
+> hint is the "nosync" - there's no synchronisation.  If you need to
+> guarantee that the interrupt handler is not running, disable_irq() does
+> that.  By implication, however, disable_irq() can not be called from
+> within the same interrupt handler for the interrupt that is being
+> disabled.
 > 
-> Another option would be to make the CODA driver a module...
-> 
-> Let me know your thoughts.
+Thanks again, I'm aware of that. As in my case the code could be called 
+from
+atomic context disable_irq() is not an option.
 
-@Philipp, do you have any comments on this?
-
->From reading of the option help text, I feel the option is not
-recommended?
-
-config FW_LOADER_USER_HELPER_FALLBACK
-
-This option enables / disables the invocation of user-helper
-(e.g. udev) for loading firmware files as a fallback after the
-direct file loading in kernel fails.  The user-mode helper is
-no longer required unless you have a special firmware file that
-resides in a non-standard path. Moreover, the udev support has
-been deprecated upstream.
-
-Shawn
+My main point is if it can be assumed that after disable_irq_nosync() 
+returns
+it is guaranteed, by convention, that the hardware was hit. But I really 
+would
+think so.
