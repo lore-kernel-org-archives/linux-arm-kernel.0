@@ -1,29 +1,60 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Thu, 17 Aug 2017 15:04:47 +0300
-Subject: [PATCH v2 1/2] usb: dwc3: keystone: Add PM_RUNTIME Support to
- DWC3 Keystone USB driver
-In-Reply-To: <20170816215408.13076-2-fcooper@ti.com>
-References: <20170816215408.13076-1-fcooper@ti.com>
- <20170816215408.13076-2-fcooper@ti.com>
-Message-ID: <87r2waqu1s.fsf@linux.intel.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Thu, 17 Aug 2017 20:04:30 +0800
+Subject: [RFC PATCH v2 2/3] dt-bindings: PCI: rockchip: Add support for pcie
+ wake irq
+In-Reply-To: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
+References: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
+Message-ID: <20170817120431.12398-3-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add an optional interrupt for PCIE_WAKE pin.
 
-Hi,
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
-Franklin S Cooper Jr <fcooper@ti.com> writes:
-> For 66AK2Gx there is a requirement to use PM Runtime to properly manage
-> clocks and the power domains. Therefore, add PM runtime support. Remove
-> legacy clock api's calls since other users of this driver worked without
-> these clock apis calls.
->
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> ---
+Changes in v2: None
 
-I already have the previous version of this in my tree. Seems like the
-only difference was on binding document, right? Do I need to change
-anything in my 'next' and/or 'testing/next' branches?
+ .../devicetree/bindings/pci/rockchip-pcie.txt        | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/pci/rockchip-pcie.txt b/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
+index 1453a734c2f5..edd779f842fa 100644
+--- a/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/rockchip-pcie.txt
+@@ -22,10 +22,13 @@ Required properties:
+ - phys: From PHY bindings: Phandle for the Generic PHY for PCIe.
+ - phy-names:  MUST be "pcie-phy".
+ - interrupts: Three interrupt entries must be specified.
+-- interrupt-names: Must include the following names
+-	- "sys"
+-	- "legacy"
+-	- "client"
++- interrupt-names: Include the following names
++	Required:
++		- "sys"
++		- "legacy"
++		- "client"
++	Optional:
++		- "wake"
+ - resets: Must contain seven entries for each entry in reset-names.
+ 	   See ../reset/reset.txt for details.
+ - reset-names: Must include the following names
+@@ -76,10 +79,11 @@ pcie0: pcie at f8000000 {
+ 	clock-names = "aclk", "aclk-perf",
+ 		      "hclk", "pm";
+ 	bus-range = <0x0 0x1>;
+-	interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH 0>,
+-		     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH 0>,
+-		     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH 0>;
+-	interrupt-names = "sys", "legacy", "client";
++	interrupts-extended = <&gic GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH 0>,
++			      <&gic GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH 0>,
++			      <&gic GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH 0>,
++			      <&gpio0 8 IRQ_TYPE_LEVEL_LOW>;
++	interrupt-names = "sys", "legacy", "client", "wake";
+ 	assigned-clocks = <&cru SCLK_PCIEPHY_REF>;
+ 	assigned-clock-parents = <&cru SCLK_PCIEPHY_REF100M>;
+ 	assigned-clock-rates = <100000000>;
 -- 
-balbi
+2.11.0
