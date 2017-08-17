@@ -1,123 +1,118 @@
-From: hoeun.ryu@gmail.com (Hoeun Ryu)
-Date: Thu, 17 Aug 2017 11:24:27 +0900
-Subject: [PATCHv3] arm64:kexec: have own crash_smp_send_stop() for crash dump
- for nonpanic cores
-Message-ID: <1502936722-549-1-git-send-email-hoeun.ryu@gmail.com>
+From: zhangshaokun@hisilicon.com (Zhangshaokun)
+Date: Thu, 17 Aug 2017 10:30:23 +0800
+Subject: [PATCH v4 1/6] Documentation: perf: hisi: Documentation for
+ HiSilicon SoC PMU driver
+In-Reply-To: <20170815095005.GB6090@leverpostej>
+References: <1500984642-204676-1-git-send-email-zhangshaokun@hisilicon.com>
+ <1500984642-204676-2-git-send-email-zhangshaokun@hisilicon.com>
+ <20170815095005.GB6090@leverpostej>
+Message-ID: <bc9920c7-bea4-6f45-7cde-477e0fe21078@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Commit 0ee5941 : (x86/panic: replace smp_send_stop() with kdump friendly
-version in panic path) introduced crash_smp_send_stop() which is a weak
-function and can be overridden by architecture codes to fix the side effect
-caused by commit f06e515 : (kernel/panic.c: add "crash_kexec_post_
-notifiers" option).
+Hi Mark,
 
- ARM64 architecture uses the weak version function and the problem is that
-the weak function simply calls smp_send_stop() which makes other CPUs
-offline and takes away the chance to save crash information for nonpanic
-CPUs in machine_crash_shutdown() when crash_kexec_post_notifiers kernel
-option is enabled.
+Thanks for your comments.
 
- Calling smp_send_crash_stop() in machine_crash_shutdown() is useless
-because all nonpanic CPUs are already offline by smp_send_stop() in this
-case and smp_send_crash_stop() only works against online CPUs.
+On 2017/8/15 17:50, Mark Rutland wrote:
+> Hi,
+> 
+> On Tue, Jul 25, 2017 at 08:10:37PM +0800, Shaokun Zhang wrote:
+>> This patch adds documentation for the uncore PMUs on HiSilicon SoC.
+>>
+>> Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+>> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+>> Signed-off-by: Anurup M <anurup.m@huawei.com>
+>> ---
+>>  Documentation/perf/hisi-pmu.txt | 52 +++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 52 insertions(+)
+>>  create mode 100644 Documentation/perf/hisi-pmu.txt
+>>
+>> diff --git a/Documentation/perf/hisi-pmu.txt b/Documentation/perf/hisi-pmu.txt
+>> new file mode 100644
+>> index 0000000..f45a03d
+>> --- /dev/null
+>> +++ b/Documentation/perf/hisi-pmu.txt
+>> @@ -0,0 +1,52 @@
+>> +HiSilicon SoC uncore Performance Monitoring Unit (PMU)
+>> +======================================================
+>> +The HiSilicon SoC chip comprehends various independent system device PMUs
+> 
+> Nit: s/comprehends/comprises/ would be easier to read.
+> 
 
- The result is that secondary CPUs registers are not saved by
-crash_save_cpu() and the vmcore file misreports these CPUs as being
-offline.
+Ok.
 
- crash_smp_send_stop() is implemented to fix this problem by replacing the
-existing smp_send_crash_stop() and adding a check for multiple calling to
-the function. The function (strong symbol version) saves crash information
-for nonpanic CPUs and machine_crash_shutdown() tries to save crash
-information for nonpanic CPUs only when crash_kexec_post_notifiers kernel
-option is disabled.
+>> +such as L3 cache (L3C), Hydra Home Agent (HHA) and DDRC. These PMUs are
+>> +independent and have hardware logic to gather statistics and performance
+>> +information.
+>> +
+>> +HiSilicon SoC encapsulates multiple CPU and IO dies. Each CPU cluster
+> 
+> Nit: The Hisilicon SoC
+> 
 
-* crash_kexec_post_notifiers : false
+Ok.
 
-  panic()
-    __crash_kexec()
-      machine_crash_shutdown()
-        crash_smp_send_stop()    <= save crash dump for nonpanic cores
+>> +(CCL) is made up of 4 cpu cores sharing one L3 cache; Each CPU die is
+> 
+> Nit: s/Each/each/
+> 
 
-* crash_kexec_post_notifiers : true
+Ok.
 
-  panic()
-    crash_smp_send_stop()        <= save crash dump for nonpanic cores
-    __crash_kexec()
-      machine_crash_shutdown()
-        crash_smp_send_stop()    <= just return.
+>> +called Super CPU cluster (SCCL) and is made up of 6 CCLs. Each SCCL has
+>> +two HHAs (0 - 1) and four DDRCs (0 - 3), respectively.
+>> +
+>> +HiSilicon SoC uncore PMU driver
+>> +---------------------------------------
+>> +Each device PMU has separate registers for event counting, control and
+>> +interrupt, and the PMU driver shall register perf PMU drivers like L3C,
+>> +HHA and DDRC etc. The available events and configuration options shall
+>> +be described in the sysfs, see /sys/devices/hisi_* 
+> 
+> What exactly its exposed under /sys/devices/hisi_* ?
+> 
 
-Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
-Reviewed-by: James Morse <james.morse@arm.com>
-Tested-by: James Morse <james.morse@arm.com>
----
- v3:
-   - fix typos in the commit log.
-   - modify commit log about the result of this problem.
-   - add Tested-by/Reviewed-by: James Morse.
- v2:
-   - replace the existing smp_send_crash_stop() with crash_smp_send_stop()
-     and adding called-twice logic to it.
-   - modify the commit message.
+Apologies that i shall list /sys/devices/hisi_sccl{X}_<l3c{Y}/hha{Y}/ddrc{Y}>/ and
+will change it in next version.
 
- arch/arm64/include/asm/smp.h      |  2 +-
- arch/arm64/kernel/machine_kexec.c |  2 +-
- arch/arm64/kernel/smp.c           | 12 +++++++++++-
- 3 files changed, 13 insertions(+), 3 deletions(-)
+>> or /sys/bus/
+>> +event_source/devices/hisi_*.
+> 
+> Please don't wrap paths; keep this on one line.
+> 
 
-diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-index 55f08c5..f82b447 100644
---- a/arch/arm64/include/asm/smp.h
-+++ b/arch/arm64/include/asm/smp.h
-@@ -148,7 +148,7 @@ static inline void cpu_panic_kernel(void)
-  */
- bool cpus_are_stuck_in_kernel(void);
- 
--extern void smp_send_crash_stop(void);
-+extern void crash_smp_send_stop(void);
- extern bool smp_crash_stop_failed(void);
- 
- #endif /* ifndef __ASSEMBLY__ */
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index 481f54a..11121f6 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -252,7 +252,7 @@ void machine_crash_shutdown(struct pt_regs *regs)
- 	local_irq_disable();
- 
- 	/* shutdown non-crashing cpus */
--	smp_send_crash_stop();
-+	crash_smp_send_stop();
- 
- 	/* for crashing cpu */
- 	crash_save_cpu(regs, smp_processor_id());
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index dc66e6e..73d8f5e 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -977,11 +977,21 @@ void smp_send_stop(void)
- }
- 
- #ifdef CONFIG_KEXEC_CORE
--void smp_send_crash_stop(void)
-+void crash_smp_send_stop(void)
- {
-+	static int cpus_stopped;
- 	cpumask_t mask;
- 	unsigned long timeout;
- 
-+	/*
-+	 * This function can be called twice in panic path, but obviously
-+	 * we execute this only once.
-+	 */
-+	if (cpus_stopped)
-+		return;
-+
-+	cpus_stopped = 1;
-+
- 	if (num_online_cpus() == 1)
- 		return;
- 
--- 
-2.7.4
+Ok.
+
+>> +The "perf list" command shall list the available events from sysfs.
+>> +
+>> +Each L3C, HHA and DDRC in one SCCL are registered as an separate PMU with perf.
+>> +The PMU name will appear in event listing as hisi_module <index-id>_<sccl-id>.
+>> +where "index-id" is the index of module and "sccl-id" is the identifier of
+>> +the SCCL.
+>> +e.g. hisi_l3c0_1/rd_hit_cpipe is READ_HIT_CPIPE event of L3C index #0 and SCCL
+>> +ID #1.
+>> +e.g. hisi_hha0_1/rx_operations is RX_OPERATIONS event of HHA index #0 and SCCL
+>> +ID #1.
+> 
+> It would make more sense for this to be hierarichal, e.g. hisi_sccl{X}_l3c{Y}.
+> 
+
+Surely, it is nicer.
+
+Thanks.
+Shaokun
+
+> Other than the above nits, this documentation is very useful. Thanks for
+> putting this together.
+> 
+> Thanks,
+> Mark.
+> _______________________________________________
+> linuxarm mailing list
+> linuxarm at huawei.com
+> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+> 
+> .
+> 
