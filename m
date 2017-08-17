@@ -1,42 +1,60 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Thu, 17 Aug 2017 21:54:11 +0300
-Subject: [PATCH 4/6] dt-bindings: host1x: Fix and add Tegra186 information
+Date: Thu, 17 Aug 2017 21:54:13 +0300
+Subject: [PATCH 6/6] drm/tegra: Add Tegra186 support for VIC
 In-Reply-To: <20170817185413.6324-1-mperttunen@nvidia.com>
 References: <20170817185413.6324-1-mperttunen@nvidia.com>
-Message-ID: <20170817185413.6324-5-mperttunen@nvidia.com>
+Message-ID: <20170817185413.6324-7-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add note that address/size-cells should be 2 on 64-bit systems,
-and add Tegra186-specific register range properties.
+Add Tegra186 support for VIC - no changes are required except for new
+firmware and compatibility string.
 
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
- .../devicetree/bindings/display/tegra/nvidia,tegra20-host1x.txt  | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/tegra/drm.c |  1 +
+ drivers/gpu/drm/tegra/vic.c | 10 ++++++++++
+ 2 files changed, 11 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/tegra/nvidia,tegra20-host1x.txt b/Documentation/devicetree/bindings/display/tegra/nvidia,tegra20-host1x.txt
-index 74e1e8add5a1..b3e785b47100 100644
---- a/Documentation/devicetree/bindings/display/tegra/nvidia,tegra20-host1x.txt
-+++ b/Documentation/devicetree/bindings/display/tegra/nvidia,tegra20-host1x.txt
-@@ -3,11 +3,16 @@ NVIDIA Tegra host1x
- Required properties:
- - compatible: "nvidia,tegra<chip>-host1x"
- - reg: Physical base address and length of the controller's registers.
-+  For pre-Tegra186, one entry describing the whole register area.
-+  For Tegra186, one entry for each entry in reg-names:
-+    "vm" - VM region assigned to Linux
-+    "hypervisor" - Hypervisor region (only if Linux acts as hypervisor)
- - interrupts: The interrupt outputs from the controller.
- - #address-cells: The number of cells used to represent physical base addresses
--  in the host1x address space. Should be 1.
-+  in the host1x address space. Should be 1 for 32-bit and 2 for 64-bit systems.
- - #size-cells: The number of cells used to represent the size of an address
--  range in the host1x address space. Should be 1.
-+  range in the host1x address space. Should be 1 for 32-bit and 2 for 64-bit
-+  systems.
- - ranges: The mapping of the host1x address space to the CPU address space.
- - clocks: Must contain one entry, for the module clock.
-   See ../clocks/clock-bindings.txt for details.
+diff --git a/drivers/gpu/drm/tegra/drm.c b/drivers/gpu/drm/tegra/drm.c
+index 3ba659a5940d..e3331a2bc082 100644
+--- a/drivers/gpu/drm/tegra/drm.c
++++ b/drivers/gpu/drm/tegra/drm.c
+@@ -1281,6 +1281,7 @@ static const struct of_device_id host1x_drm_subdevs[] = {
+ 	{ .compatible = "nvidia,tegra210-sor", },
+ 	{ .compatible = "nvidia,tegra210-sor1", },
+ 	{ .compatible = "nvidia,tegra210-vic", },
++	{ .compatible = "nvidia,tegra186-vic", },
+ 	{ /* sentinel */ }
+ };
+ 
+diff --git a/drivers/gpu/drm/tegra/vic.c b/drivers/gpu/drm/tegra/vic.c
+index 2448229fa653..6697a21a250d 100644
+--- a/drivers/gpu/drm/tegra/vic.c
++++ b/drivers/gpu/drm/tegra/vic.c
+@@ -270,9 +270,16 @@ static const struct vic_config vic_t210_config = {
+ 	.firmware = NVIDIA_TEGRA_210_VIC_FIRMWARE,
+ };
+ 
++#define NVIDIA_TEGRA_186_VIC_FIRMWARE "nvidia/tegra186/vic04_ucode.bin"
++
++static const struct vic_config vic_t186_config = {
++	.firmware = NVIDIA_TEGRA_186_VIC_FIRMWARE,
++};
++
+ static const struct of_device_id vic_match[] = {
+ 	{ .compatible = "nvidia,tegra124-vic", .data = &vic_t124_config },
+ 	{ .compatible = "nvidia,tegra210-vic", .data = &vic_t210_config },
++	{ .compatible = "nvidia,tegra186-vic", .data = &vic_t186_config },
+ 	{ },
+ };
+ 
+@@ -405,3 +412,6 @@ MODULE_FIRMWARE(NVIDIA_TEGRA_124_VIC_FIRMWARE);
+ #if IS_ENABLED(CONFIG_ARCH_TEGRA_210_SOC)
+ MODULE_FIRMWARE(NVIDIA_TEGRA_210_VIC_FIRMWARE);
+ #endif
++#if IS_ENABLED(CONFIG_ARCH_TEGRA_186_SOC)
++MODULE_FIRMWARE(NVIDIA_TEGRA_186_VIC_FIRMWARE);
++#endif
 -- 
 2.14.1
