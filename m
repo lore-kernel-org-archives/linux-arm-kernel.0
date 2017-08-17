@@ -1,129 +1,37 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 18 Aug 2017 02:37:13 +0300
-Subject: [PATCH 1/2] drm/bridge/sii8620: add external connector handle
-In-Reply-To: <20170817151102.wmjelokfkzd2lk4i@rob-hp-laptop>
-References: <1502371530-32260-1-git-send-email-m.purski@samsung.com>
- <9232b812-7aef-c614-b122-612e19743df4@samsung.com>
- <20170817151102.wmjelokfkzd2lk4i@rob-hp-laptop>
-Message-ID: <3769720.Fa99sOQPuX@avalon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 17 Aug 2017 16:42:19 -0700
+Subject: [PATCH 1/3] ARM: OMAP2+: Separate dra7 cpuidle from omap5
+In-Reply-To: <20170817230122.30655-2-tony@atomide.com>
+References: <20170817230122.30655-1-tony@atomide.com>
+ <20170817230122.30655-2-tony@atomide.com>
+Message-ID: <20170817234218.GC6008@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+* Tony Lindgren <tony@atomide.com> [170817 16:01]:
+> As omap5 supports deeper idle states compared to dra7, let's
+> separate dra7 from omap5 in preparation for adding more support
+> for omap5.
 
-On Thursday 17 Aug 2017 10:11:02 Rob Herring wrote:
-> On Fri, Aug 11, 2017 at 02:49:35PM +0200, Marek Szyprowski wrote:
-> > On 2017-08-11 11:40, Laurent Pinchart wrote:
-> >> On Friday 11 Aug 2017 08:39:31 Marek Szyprowski wrote:
-> >>> On 2017-08-10 15:39, Laurent Pinchart wrote:
-> >>>> On Thursday 10 Aug 2017 15:25:29 Maciej Purski wrote:
-> >>>>> The driver should be switched on if an external connector is
-> >>>>> plugged and switched off if it is unplugged. Extcon is optional.
-> >>>>> If it is not found, the driver stays in "always-on" mode.
-> >>>>> 
-> >>>>> Signed-off-by: Maciej Purski <m.purski@samsung.com>
-> >>>>> ---
-> >>>>> 
-> >>>>> .../bindings/display/bridge/sil-sii8620.txt        |  4 ++
-> >>>>> drivers/gpu/drm/bridge/sil-sii8620.c               | 83 ++++++++++++-
-> >>>>> 2 files changed, 85 insertions(+), 2 deletions(-)
-> >>>>> 
-> >>>>> diff --git
-> >>>>> a/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt
-> >>>>> b/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt
-> >>>>> index
-> >>>>> 9409d9c..1f230bf 100644
-> >>>>> --- a/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt
-> >>>>> +++ b/Documentation/devicetree/bindings/display/bridge/sil-sii8620.txt 
-> >>>>> @@ -10,6 +10,9 @@ Required properties:
-> >>>>>    	- clocks, clock-names: specification and name of "xtal" clock
-> >>>>>    	- video interfaces: Device node can contain video interface
-> >>>>>    	  port node for HDMI encoder according to [1].
-> >>>>> 
-> >>>>> +Optional properties:
-> >>>>> +	- extcon: phandle to external connector for MHL cable changes
-> >>>>> +		  detection
-> >>>> 
-> >>>> The sii8620 DT node should model its connection to the MHL connector
-> >>>> using OF graph, connecting a port to the MHL connector DT node through
-> >>>> endpoints. I believe the extcon property should then be added to the
-> >>>> MHL connector DT node, not the bridge.
-> >>> 
-> >>> I don't get this. Generic extcon bindings doesn't define connector DT
-> >>> node, so I don't see how could we use endpoint DT approach here. Could
-> >>> you give the example?
-> >> 
-> >> Sure, here you are.
-> >> 
-> >> &hsi2c_7 {
-> >> 	...
-> >>          sii8620 at 39 {
-> >>                  reg = <0x39>;
-> >>                  compatible = "sil,sii8620";
-> >>                  cvcc10-supply = <&ldo36_reg>;
-> >>                  iovcc18-supply = <&ldo34_reg>;
-> >>                  interrupt-parent = <&gpf0>;
-> >>                  interrupts = <2 IRQ_TYPE_LEVEL_HIGH>;
-> >>                  reset-gpios = <&gpv7 0 GPIO_ACTIVE_LOW>;
-> >>                  clocks = <&pmu_system_controller 0>;
-> >>                  clock-names = "xtal";
-> >> 		
-> >> 		ports {
-> >> 			#address-cells = <1>;
-> >> 			#size-cells = <0>;
-> >> 			
-> >> 	                port at 0 {
-> >> 				reg = <0>;
-> >>          	                mhl_to_hdmi: endpoint {
-> >>                  	                remote-endpoint = <&hdmi_to_mhl>;
-> >> 	                        };
-> >>          	        };
-> >> 	                port at 1 {
-> >> 				reg = <1>;
-> >>          	                mhl_bridge_out: endpoint {
-> >>                  	                remote-endpoint = <&mhl_connector_in>;
-> >> 	                        };
-> >>          	        };
-> >> 		};
-> >>          };
-> >> };
-> >> 
-> >> / {
-> >> 	mhl-connector {
-> >> 		compatible = "mhl-connector";
-> >> 		extcon = <&muic>;
-> >> 		
-> >> 	        port {
-> >>          	        mhl_connector_in: endpoint {
-> >>                  	        remote-endpoint = <&mhl_bridge_out>;
-> >> 	                };
-> >>          	};
-> >> 	};
-> >> };
-> >> 
-> >> Note that there's currently no DT binding for MHL connectors. One needs
-> >> to be developed, the HDMI connector DT binding can be used as a source
-> >> of inspiration.
-> > 
-> > Ah, I see. I wasn't aware that display subsystem has bindings even for the
-> > connectors. Other types of connectors already used together with extcon in
-> > device tree (like usb and chargers) don't have dedicated bindings.
-> 
-> I NAK any extcon binding additions because it is poorly designed, so
-> don't use extcon. It is full of Linuxisms and needs work. USB
-> connectors need to be described like what we have for display related
-> connectors especially since they are merging.
-> 
-> > Do we need to add hdmi-connectors to all existing boards that have HDMI
-> > module?
-> 
-> Ideally, yes.
+Oops, sorry this first patch can be ignored. I forgot we already
+separated out things for dra7 when we added omap5 cpu
+retention mode support earlir. So there's nothing left
+to move away for dra7.
 
-I agree. In practice "details" such as backward compatibility need to be taken 
-into account, but it's a good practice to update the mainline device tree 
-sources to the recommended bindings.
+> @@ -303,6 +342,9 @@ int __init omap4_idle_init(void)
+>  	if (soc_is_omap54xx()) {
+>  		state_ptr = &omap5_idle_data[0];
+>  		idle_driver = &omap5_idle_driver;
+> +	} else if (soc_is_dra7xx()) {
+> +		state_ptr = &dra7_idle_data[0];
+> +		idle_driver = &dra7_idle_driver;
+>  	} else {
+>  		state_ptr = &omap4_idle_data[0];
+>  		idle_driver = &omap4_idle_driver;
 
--- 
+And then this part now wrongly enables things for dra7 while
+it can't be done.
+
 Regards,
 
-Laurent Pinchart
+Tony
