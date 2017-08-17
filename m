@@ -1,35 +1,48 @@
-From: cohuck@redhat.com (Cornelia Huck)
-Date: Thu, 17 Aug 2017 11:28:29 +0200
-Subject: [PATCH RFC 0/2] KVM: use RCU to allow dynamic kvm->vcpus array
-In-Reply-To: <b69bc1e0-9d7b-5412-ba56-a5261d539a5b@redhat.com>
-References: <20170816194037.9460-1-rkrcmar@redhat.com>
- <b77b151f-e51d-3657-66e9-6fbc83887b18@suse.de>
- <20170817093612.024cc4bc.cohuck@redhat.com>
- <b69bc1e0-9d7b-5412-ba56-a5261d539a5b@redhat.com>
-Message-ID: <20170817112829.7795820a.cohuck@redhat.com>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Thu, 17 Aug 2017 11:33:04 +0200
+Subject: [PATCH 5/7] ARM: dts: stm32: Enable USB HS on stm32f746-disco
+In-Reply-To: <1502962386-6683-1-git-send-email-amelie.delaunay@st.com>
+References: <1502962386-6683-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1502962386-6683-6-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Aug 2017 11:16:59 +0200
-Paolo Bonzini <pbonzini@redhat.com> wrote:
+This patch enables USB HS on stm32f746-disco (Host mode).
 
-> On 17/08/2017 09:36, Cornelia Huck wrote:
-> >> What if we just sent a "vcpu move" request to all vcpus with the new 
-> >> pointer after it moved? That way the vcpu thread itself would be 
-> >> responsible for the migration to the new memory region. Only if all 
-> >> vcpus successfully moved, keep rolling (and allow foreign get_vcpu again).
-> >>
-> >> That way we should be basically lock-less and scale well. For additional 
-> >> icing, feel free to increase the vcpu array x2 every time it grows to 
-> >> not run into the slow path too often.  
-> > 
-> > I'd prefer the rcu approach: This is a mechanism already understood
-> > well, no need to come up with a new one that will likely have its own
-> > share of problems.  
-> 
-> What Alex is proposing _is_ RCU, except with a homegrown
-> synchronize_rcu.  Using kvm->srcu seems to be the best of both worlds.
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+---
+ arch/arm/boot/dts/stm32f746-disco.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-I'm worried a bit about the 'homegrown' part, though.
-
-I also may be misunderstanding what Alex means with "vcpu move"...
+diff --git a/arch/arm/boot/dts/stm32f746-disco.dts b/arch/arm/boot/dts/stm32f746-disco.dts
+index 18f6560..0d38e9a 100644
+--- a/arch/arm/boot/dts/stm32f746-disco.dts
++++ b/arch/arm/boot/dts/stm32f746-disco.dts
+@@ -61,6 +61,12 @@
+ 		serial0 = &usart1;
+ 	};
+ 
++	usbotg_hs_phy: usbphy {
++		#phy-cells = <0>;
++		compatible = "usb-nop-xceiv";
++		clocks = <&rcc 0 STM32F7_AHB1_CLOCK(OTGHSULPI)>;
++		clock-names = "main_clk";
++	};
+ };
+ 
+ &clk_hse {
+@@ -72,3 +78,12 @@
+ 	pinctrl-names = "default";
+ 	status = "okay";
+ };
++
++&usbotg_hs {
++	dr_mode = "host";
++	phys = <&usbotg_hs_phy>;
++	phy-names = "usb2-phy";
++	pinctrl-0 = <&usbotg_hs_pins_b>;
++	pinctrl-names = "default";
++	status = "okay";
++};
+-- 
+2.7.4
