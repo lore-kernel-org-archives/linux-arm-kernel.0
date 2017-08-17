@@ -1,24 +1,19 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Aug 2017 17:20:02 -0500
-Subject: [PATCH v3 9/9] dt-bindings: ASoC: rockchip: Update description
- of rockchip,codec
-In-Reply-To: <20170817044417.22069-10-jeffy.chen@rock-chips.com>
-References: <20170817044417.22069-1-jeffy.chen@rock-chips.com>
- <20170817044417.22069-10-jeffy.chen@rock-chips.com>
-Message-ID: <20170817222002.h3ezuvmafbdb2iy4@rob-hp-laptop>
+Date: Thu, 17 Aug 2017 17:20:57 -0500
+Subject: [PATCH v3 1/2] remoteproc: dt: Provide bindings for iMX6SX/7D
+ Remote Processor Controller driver
+In-Reply-To: <20170817071526.5930-2-o.rempel@pengutronix.de>
+References: <20170817071526.5930-1-o.rempel@pengutronix.de>
+ <20170817071526.5930-2-o.rempel@pengutronix.de>
+Message-ID: <20170817222057.r7ysd72byn4o7kg3@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 12:44:17PM +0800, Jeffy Chen wrote:
-> Update description for newly added optional audio codecs.
-> 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+On Thu, Aug 17, 2017 at 09:15:25AM +0200, Oleksij Rempel wrote:
+> Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
 > ---
-> 
-> Changes in v3: None
-> Changes in v2: None
-> 
->  Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  .../devicetree/bindings/remoteproc/imx-rproc.txt   | 33 ++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/remoteproc/imx-rproc.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
