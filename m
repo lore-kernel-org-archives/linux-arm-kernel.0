@@ -1,24 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Aug 2017 17:18:55 -0500
-Subject: [PATCH v2 2/2] dt-bindings: usb: keystone-usb: Update bindings
- pm and clocks properties
-In-Reply-To: <20170816215408.13076-3-fcooper@ti.com>
-References: <20170816215408.13076-1-fcooper@ti.com>
- <20170816215408.13076-3-fcooper@ti.com>
-Message-ID: <20170817221855.7tcgsx4onukbooyu@rob-hp-laptop>
+Date: Thu, 17 Aug 2017 17:20:02 -0500
+Subject: [PATCH v3 9/9] dt-bindings: ASoC: rockchip: Update description
+ of rockchip,codec
+In-Reply-To: <20170817044417.22069-10-jeffy.chen@rock-chips.com>
+References: <20170817044417.22069-1-jeffy.chen@rock-chips.com>
+ <20170817044417.22069-10-jeffy.chen@rock-chips.com>
+Message-ID: <20170817222002.h3ezuvmafbdb2iy4@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 16, 2017 at 04:54:08PM -0500, Franklin S Cooper Jr wrote:
-> Update various properties to properly indicate their requirement depending
-> on the SoC.
+On Thu, Aug 17, 2017 at 12:44:17PM +0800, Jeffy Chen wrote:
+> Update description for newly added optional audio codecs.
 > 
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 > ---
-> Version 2:
-> Clarify clock requirements in binding document
 > 
->  Documentation/devicetree/bindings/usb/keystone-usb.txt | 17 +++++++++++++++--
->  1 file changed, 15 insertions(+), 2 deletions(-)
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
