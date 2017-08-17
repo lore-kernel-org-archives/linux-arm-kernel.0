@@ -1,46 +1,62 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 17 Aug 2017 14:01:03 +0100
-Subject: [PATCH] serio: PS2 gpio bit banging driver for the serio bus
-In-Reply-To: <d9966e58f98ed5820154d9a979ca19f2@dk-develop.de>
-References: <20170731222452.22887-1-danilokrummrich@dk-develop.de>
- <CACRpkdYz_+soss4Rb9zMiP4eZZtXqjW_Xy7hH=wm1x2m_R9R3A@mail.gmail.com>
- <20170807182207.348762301bf3d7f8509b1bf7@dk-develop.de>
- <8e5e73575b3a70e0e60931698687471d@dk-develop.de>
- <CACRpkda=bYacXmv8SoQu3wPoZW9v+j8myZnme=QpofD=Y-gYTg@mail.gmail.com>
- <20170817090908.GP20805@n2100.armlinux.org.uk>
- <d9966e58f98ed5820154d9a979ca19f2@dk-develop.de>
-Message-ID: <20170817130103.GR20805@n2100.armlinux.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 17 Aug 2017 15:04:08 +0200
+Subject: [PATCH] mtd: physmap_of: Retire Gemini pad control
+In-Reply-To: <20170808190510.11496-1-linus.walleij@linaro.org>
+References: <20170808190510.11496-1-linus.walleij@linaro.org>
+Message-ID: <20170817150408.79d16349@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 12:51:33PM +0200, Danilo Krummrich wrote:
-> That having the correct execution order is not enough on some buses because
-> of buffering is really something to be aware of, thanks again for pointing
-> this out.
+Le Tue,  8 Aug 2017 21:05:10 +0200,
+Linus Walleij <linus.walleij@linaro.org> a ?crit :
 
-PCI guarantees the order of writes to a device, but there are situations
-on SoCs where you can't rely on that - for instance, if the writes go
-over different buses to different devices (eg, write to a peripheral
-vs write to an interrupt controller.)
+> I wrote a proper pin control driver for the Gemini. Retire this
+> SoC-specific pad control and rely on the pin controller to manage
+> this.
+> 
 
-Even then, with interrupts delivered by message (eg, MSI) there's
-issues.
+Applied to l2-mtd/master.
 
-> So for the scenario I was concerned about I would expect the irqchip driver
-> guarantees the write actually hits the the hardware (if necessary read it
-> back) before the function (disable_irq_nosync()) returns, is that correct?
-> Though, having the need should be very unlikely.
+Thanks,
 
-Well, disable_irq_nosync() doesn't guarantee that the interrupt handler
-isn't running - a CPU may have just received the interrupt and is just
-entering the interrupt handler when disable_irq_nosync() returns.  The
-hint is the "nosync" - there's no synchronisation.  If you need to
-guarantee that the interrupt handler is not running, disable_irq() does
-that.  By implication, however, disable_irq() can not be called from
-within the same interrupt handler for the interrupt that is being
-disabled.
+Boris
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/mtd/maps/physmap_of_gemini.c | 16 ----------------
+>  1 file changed, 16 deletions(-)
+> 
+> diff --git a/drivers/mtd/maps/physmap_of_gemini.c b/drivers/mtd/maps/physmap_of_gemini.c
+> index 05b286b5289f..4ed1a6bb4d3c 100644
+> --- a/drivers/mtd/maps/physmap_of_gemini.c
+> +++ b/drivers/mtd/maps/physmap_of_gemini.c
+> @@ -43,13 +43,6 @@
+>  
+>  #define FLASH_PARALLEL_HIGH_PIN_CNT	(1 << 20)	/* else low pin cnt */
+>  
+> -/* Miscellaneous Control Register */
+> -#define GLOBAL_MISC_CTRL		0x30
+> -#define FLASH_PADS_MASK			0x07
+> -#define NAND_PADS_DISABLE		BIT(2)
+> -#define PFLASH_PADS_DISABLE		BIT(1)
+> -#define SFLASH_PADS_DISABLE		BIT(0)
+> -
+>  static const struct of_device_id syscon_match[] = {
+>  	{ .compatible = "cortina,gemini-syscon" },
+>  	{ },
+> @@ -102,15 +95,6 @@ int of_flash_probe_gemini(struct platform_device *pdev,
+>  				 map->bankwidth * 8);
+>  	}
+>  
+> -	/* Activate parallel (NOR flash) mode */
+> -	ret = regmap_update_bits(rmap, GLOBAL_MISC_CTRL,
+> -				 FLASH_PADS_MASK,
+> -				 SFLASH_PADS_DISABLE | NAND_PADS_DISABLE);
+> -	if (ret) {
+> -		dev_err(dev, "unable to set up physmap pads\n");
+> -		return -ENODEV;
+> -	}
+> -
+>  	dev_info(&pdev->dev, "initialized Gemini-specific physmap control\n");
+>  
+>  	return 0;
