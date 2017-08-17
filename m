@@ -1,37 +1,88 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 17 Aug 2017 13:29:14 +0200
-Subject: [PATCH] arm64: dts: r8a7795-es1: Drop extra zero from usb unit address
-Message-ID: <1502969354-14968-1-git-send-email-geert+renesas@glider.be>
+From: dja@axtens.net (Daniel Axtens)
+Date: Thu, 17 Aug 2017 21:30:27 +1000
+Subject: [PATCH v2 0/1] Split VGA default nomination out from VGA arbiter
+Message-ID: <20170817113028.16853-1-dja@axtens.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With W=1:
+This is approach 3, version 2, of my patch series to sort out Xorg
+autoconfiguration for the Hibmc card beind a Hisilicon bridge on
+arm64.
 
-    arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/usb at ee0400000 simple-bus unit address format error, expected "ee040000"
-    arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/usb at ee0400000 simple-bus unit address format error, expected "ee040000"
+Approach 1 was a simple quirk for the card+bridge to mark it as
+default. This higlighted the fact that the default card was picked by
+the arbiter, which assumed legacy resources. The lack of legacy
+resources leads to quirks in ppc and concerns in arm land, so a more
+generic approach was desired.
+Link: https://www.spinics.net/lists/linux-pci/msg62865.html
 
-Fixes: 291e0c4994d0813f ("arm64: dts: r8a7795: Add support for R-Car H3 ES2.0")
-Fixes: 171f2ef82284f61b ("arm64: dts: r8a7795: Add USB3.0 host device nodes")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-The second fixes tag is for the original r8a7795.dtsi, before
-r8a7795-es1.dtsi was split off.
----
- arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Approach 2 allowed platforms to opt in to a class enable hook that
+added a card as default if there was no default. This:
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-index aaa5e67a963ea9ff..655dd30639c55027 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-@@ -11,7 +11,7 @@
- #include "r8a7795.dtsi"
- 
- &soc {
--	xhci1: usb at ee0400000 {
-+	xhci1: usb at ee040000 {
- 		compatible = "renesas,xhci-r8a7795", "renesas,rcar-gen3-xhci";
- 		reg = <0 0xee040000 0 0xc00>;
- 		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+ - was possibly racy as ACPI PCI init and vgaarb are both subsys
+   initcalls.
+
+ - didn't check to see if a card had a driver.
+
+ - meant that platforms for which the vga arbiter didn't make sense
+   still needed it.
+
+Links: https://www.spinics.net/lists/linux-pci/msg63092.html
+       https://www.spinics.net/lists/linux-pci/msg63083.html
+
+This is approach 3. It pulls the default handling out of the arbiter,
+into its own file and behind its own Kconfig option. It adds the extra
+detection as a late initcall and an enable hook that only operates
+after the initcall, so it's not racy. It checks for drivers. It means
+people can turn off the vga arbiter. It works sensibly for modules
+too.
+
+v1: https://www.spinics.net/lists/linux-pci/msg63581.html
+
+Changes in v2:
+
+Drop all the powerpc patches.
+
+Including just the new handler doesn't change behaviour on powerpc.
+
+This is because - as Bjorn pointed out on v1 - I had not fully
+understood how fixup_vga worked. fixup_vga is quite aggressive: if
+there is no default, and it finds a VGA card, it will mark that card
+as default. Later on, if it finds a card with decoding enabled, it
+will update the default.
+
+This means that if there is any vga card in the system at all, a
+default will be marked. This all happens at the FIXUP_CLASS_FINAL
+stage, so if there is a vga card, a default will be marked before the
+late_initcall that kicks off this new discovery process. This will
+completely prevent my code from firing.
+
+Once this is merged I will discuss with the ppc folks if they want to
+move to this approach or if ppc should continue to be very optimistic
+about the cards it marks as default.
+
+Regards,
+Daniel
+
+
+Daniel Axtens (1):
+  Split VGA default device handler out of VGA arbiter
+
+ arch/ia64/pci/fixup.c            |   2 +-
+ arch/powerpc/kernel/pci-common.c |   2 +-
+ arch/x86/pci/fixup.c             |   2 +-
+ arch/x86/video/fbdev.c           |   2 +-
+ drivers/gpu/vga/Kconfig          |  12 +++
+ drivers/gpu/vga/Makefile         |   1 +
+ drivers/gpu/vga/vga_default.c    | 159 +++++++++++++++++++++++++++++++++++++++
+ drivers/gpu/vga/vga_switcheroo.c |   2 +-
+ drivers/gpu/vga/vgaarb.c         |  41 +---------
+ drivers/pci/pci-sysfs.c          |   2 +-
+ include/linux/vga_default.h      |  44 +++++++++++
+ include/linux/vgaarb.h           |  14 ----
+ 12 files changed, 225 insertions(+), 58 deletions(-)
+ create mode 100644 drivers/gpu/vga/vga_default.c
+ create mode 100644 include/linux/vga_default.h
+
 -- 
-2.7.4
+2.11.0
