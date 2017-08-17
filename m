@@ -1,53 +1,96 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Thu, 17 Aug 2017 22:07:56 +0300
-Subject: [PATCH 1/3] sound: ASoC: tegra: Remove SoC-specific Kconfig
- depends and selects
-In-Reply-To: <20170817142639.ixe7pfzpfhwbhz5q@sirena.org.uk>
-References: <20170730112220.15525-1-contact@paulk.fr>
- <20170731102309.GE26667@ulmo> <20170817142211.GH6854@ulmo>
- <20170817142639.ixe7pfzpfhwbhz5q@sirena.org.uk>
-Message-ID: <1502996876.1287.2.camel@paulk.fr>
+From: agraf@suse.de (Alexander Graf)
+Date: Thu, 17 Aug 2017 21:17:24 +0200
+Subject: [PATCH RFC 0/2] KVM: use RCU to allow dynamic kvm->vcpus array
+In-Reply-To: <20170817145411.GE2566@flask>
+References: <20170816194037.9460-1-rkrcmar@redhat.com>
+ <b77b151f-e51d-3657-66e9-6fbc83887b18@suse.de> <20170817145411.GE2566@flask>
+Message-ID: <edb9403f-3a94-605d-5f06-9bc81ca4d2c3@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le jeudi 17 ao?t 2017 ? 15:26 +0100, Mark Brown a ?crit :
-> On Thu, Aug 17, 2017 at 04:22:11PM +0200, Thierry Reding wrote:
+
+
+On 17.08.17 16:54, Radim Kr?m?? wrote:
+> 2017-08-17 09:04+0200, Alexander Graf:
+>> On 16.08.17 21:40, Radim Kr?m??  wrote:
+>>> The goal is to increase KVM_MAX_VCPUS without worrying about memory
+>>> impact of many small guests.
+>>>
+>>> This is a second out of three major "dynamic" options:
+>>>    1) size vcpu array at VM creation time
+>>>    2) resize vcpu array when new VCPUs are created
+>>>    3) use a lockless list/tree for VCPUs
+>>>
+>>> The disadvantage of (1) is its requirement on userspace changes and
+>>> limited flexibility because userspace must provide the maximal count on
+>>> start.  The main advantage is that kvm->vcpus will work like it does
+>>> now.  It has been posted as "[PATCH 0/4] KVM: add KVM_CREATE_VM2 to
+>>> allow dynamic kvm->vcpus array",
+>>> http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1377285.html
+>>>
+>>> The main problem of (2), this series, is that we cannot extend the array
+>>> in place and therefore require some kind of protection when moving it.
+>>> RCU seems best, but it makes the code slower and harder to deal with.
+>>> The main advantage is that we do not need userspace changes.
+>>
+>> Creating/Destroying vcpus is not something I consider a fast path, so why
+>> should we optimize for it? The case that needs to be fast is execution.
 > 
-> > do you want to pick this up, or would you rather provide an Acked-by 
-> > so
-> > that I can take it through the Tegra tree along with the defconfig
-> > changes? I can provide a branch with this patch in case we ever need
-> > it
-> > for conflict resolution.
+> Right, the creation is not important.  I was concerned about the use of
+> lock() and unlock() needed for every access -- both in performance and
+> code, because the common case where hotplug doesn't happen and all VCPUs
+> are created upfront doesn't even need any runtime protection.
 > 
-> I don't know what this patch is, sorry.  I think I probably deleted
-> the
-> mail since the subject line indicates it's not for me.
+>> What if we just sent a "vcpu move" request to all vcpus with the new pointer
+>> after it moved? That way the vcpu thread itself would be responsible for the
+>> migration to the new memory region. Only if all vcpus successfully moved,
+>> keep rolling (and allow foreign get_vcpu again).
 > 
-> Please submit patches using subject lines reflecting the style for the
-> subsystem.  This makes it easier for people to identify relevant
-> patches.  Look at what existing commits in the area you're changing
-> are
-> doing and make sure your subject lines visually resemble what they're
-> doing.
+> I'm not sure if I understood this.  You propose to cache kvm->vcpus in
+> vcpu->vcpus and do an extensions of this,
+> 
+>    int vcpu_create(...) {
+>      if (resize_needed(kvm->vcpus)) {
+>        old_vcpus = kvm->vcpus
+>        kvm->vcpus = make_bigger(kvm->vcpus)
 
-I have just sent out another version with a subject line that matches
-what others have been doing (mainly, dropping the "sound:" prefix).
+if (kvm->vcpus != old_vcpus) :)
 
-Cheers,
+>        kvm_make_all_cpus_request(kvm, KVM_REQ_UPDATE_VCPUS)
 
--- 
-Paul Kocialkowski,
+IIRC you'd need some manual bookkeeping to ensure that all users have 
+switched to the new array. Or set the KVM_REQUEST_WAIT flag :).
 
-developer of free digital technology and hardware support.
+>        free(old_vcpus)
+>      }
+>      vcpu->vcpus = kvm->vcpus
+>    }
+> 
+> with added extra locking, (S)RCU, on accesses that do not come from
+> VCPUs (irqfd and VM ioctl)?
 
-Website: https://www.paulk.fr/
-Coding blog: https://code.paulk.fr/
-Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170817/cf074c60/attachment.sig>
+Well, in an ideal world we wouldn't have any users to vcpu structs 
+outside of the vcpus obviously. Every time we do, we should either 
+reconsider whether the design is smart and if we think it is, protect 
+them accordingly. Maybe even hard code separate request mechanisms for 
+the few cases where it's reasonable?
+
+> 
+>> That way we should be basically lock-less and scale well. For additional
+>> icing, feel free to increase the vcpu array x2 every time it grows to not
+>> run into the slow path too often.
+> 
+> Yeah, I skipped the growing as it was not necessary for the
+> illustration.
+
+Sure.
+
+I'm also not fully advocating my solution here, but wanted to make sure 
+we have it on the radar. I *think* this option has the least runtime 
+overhead and best readability score, as it sticks to the same frameworks 
+we already have and use throughout the code base ;).
+
+That said, I'd love to get proven wrong.
+
+
+Alex
