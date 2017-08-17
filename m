@@ -1,78 +1,52 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 17 Aug 2017 03:23:46 -0400
-Subject: [PATCH v2 7/8] binfmt_elf: don't attempt to load FDPIC binaries
+Date: Thu, 17 Aug 2017 03:23:41 -0400
+Subject: [PATCH v2 2/8] arm_elf_read_implies_exec(): remove unused argument
 In-Reply-To: <20170817072347.19990-1-nicolas.pitre@linaro.org>
 References: <20170817072347.19990-1-nicolas.pitre@linaro.org>
-Message-ID: <20170817072347.19990-8-nicolas.pitre@linaro.org>
+Message-ID: <20170817072347.19990-3-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On platforms where both ELF and ELF-FDPIC variants are available, the
-regular ELF loader will happily identify FDPIC binaries as proper ELF
-and load them without the necessary FDPIC fixups, resulting in an
-immediate user space crash. Let's prevent binflt_elf from loading those
-binaries so binfmt_elf_fdpic has a chance to pick them up. For those
-architectures that don't define elf_check_fdpic(), a default version
-returning false is provided.
+The first argument to elf_read_implies_exec() is either the actual
+header structure or a pointer to that structure whether one looks
+at fs/binfmt_elf.c or fs/binfmt_elf_fdpic.c. This ought to be fixed
+of course, but in the mean time let's sidestep the issue by removing
+that first argument from arm_elf_read_implies_exec() as it is unused
+anyway.
 
 Signed-off-by: Nicolas Pitre <nico@linaro.org>
 ---
- fs/binfmt_elf.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/elf.h | 4 ++--
+ arch/arm/kernel/elf.c      | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/fs/binfmt_elf.c b/fs/binfmt_elf.c
-index 879ff9c7ff..84d64afaea 100644
---- a/fs/binfmt_elf.c
-+++ b/fs/binfmt_elf.c
-@@ -51,6 +51,11 @@
- #define user_siginfo_t siginfo_t
- #endif
+diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+index f13ae153fb..e2786acf82 100644
+--- a/arch/arm/include/asm/elf.h
++++ b/arch/arm/include/asm/elf.h
+@@ -102,8 +102,8 @@ extern int elf_check_arch(const struct elf32_hdr *);
  
-+/* That's for binfmt_elf_fdpic to deal with */
-+#ifndef elf_check_fdpic
-+#define elf_check_fdpic(ex) false
-+#endif
-+
- static int load_elf_binary(struct linux_binprm *bprm);
- static unsigned long elf_map(struct file *, unsigned long, struct elf_phdr *,
- 				int, int, unsigned long);
-@@ -541,7 +546,8 @@ static unsigned long load_elf_interp(struct elfhdr *interp_elf_ex,
- 	if (interp_elf_ex->e_type != ET_EXEC &&
- 	    interp_elf_ex->e_type != ET_DYN)
- 		goto out;
--	if (!elf_check_arch(interp_elf_ex))
-+	if (!elf_check_arch(interp_elf_ex) ||
-+	    elf_check_fdpic(interp_elf_ex))
- 		goto out;
- 	if (!interpreter->f_op->mmap)
- 		goto out;
-@@ -718,6 +724,8 @@ static int load_elf_binary(struct linux_binprm *bprm)
- 		goto out;
- 	if (!elf_check_arch(&loc->elf_ex))
- 		goto out;
-+	if (elf_check_fdpic(&loc->elf_ex))
-+		goto out;
- 	if (!bprm->file->f_op->mmap)
- 		goto out;
+ #define vmcore_elf64_check_arch(x) (0)
  
-@@ -817,7 +825,8 @@ static int load_elf_binary(struct linux_binprm *bprm)
- 		if (memcmp(loc->interp_elf_ex.e_ident, ELFMAG, SELFMAG) != 0)
- 			goto out_free_dentry;
- 		/* Verify the interpreter has a valid arch */
--		if (!elf_check_arch(&loc->interp_elf_ex))
-+		if (!elf_check_arch(&loc->interp_elf_ex) ||
-+		    elf_check_fdpic(&loc->interp_elf_ex))
- 			goto out_free_dentry;
+-extern int arm_elf_read_implies_exec(const struct elf32_hdr *, int);
+-#define elf_read_implies_exec(ex,stk) arm_elf_read_implies_exec(&(ex), stk)
++extern int arm_elf_read_implies_exec(int);
++#define elf_read_implies_exec(ex,stk) arm_elf_read_implies_exec(stk)
  
- 		/* Load the interpreter program headers */
-@@ -1189,6 +1198,8 @@ static int load_elf_library(struct file *file)
- 	if (elf_ex.e_type != ET_EXEC || elf_ex.e_phnum > 2 ||
- 	    !elf_check_arch(&elf_ex) || !file->f_op->mmap)
- 		goto out;
-+	if (elf_check_fdpic(&elf_ex))
-+		goto out;
- 
- 	/* Now read in all of the header information */
- 
+ struct task_struct;
+ int dump_task_regs(struct task_struct *t, elf_gregset_t *elfregs);
+diff --git a/arch/arm/kernel/elf.c b/arch/arm/kernel/elf.c
+index d0d1e83150..52fb98358d 100644
+--- a/arch/arm/kernel/elf.c
++++ b/arch/arm/kernel/elf.c
+@@ -80,7 +80,7 @@ EXPORT_SYMBOL(elf_set_personality);
+  *  - the binary requires an executable stack
+  *  - we're running on a CPU which doesn't support NX.
+  */
+-int arm_elf_read_implies_exec(const struct elf32_hdr *x, int executable_stack)
++int arm_elf_read_implies_exec(int executable_stack)
+ {
+ 	if (executable_stack != EXSTACK_DISABLE_X)
+ 		return 1;
 -- 
 2.9.5
