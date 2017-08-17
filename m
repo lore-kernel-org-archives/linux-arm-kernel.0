@@ -1,135 +1,37 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 17 Aug 2017 17:08:19 +0800
-Subject: [linux-sunxi] Re: [PATCH] ARM: sun8i: a83t: Add device tree for
- Sinovoip Bananapi BPI-M3
-In-Reply-To: <0dbfd9d8f83ac53c1538e86c4e02883e@aosc.io>
-References: <20170817034048.11601-1-wens@csie.org>
- <0dbfd9d8f83ac53c1538e86c4e02883e@aosc.io>
-Message-ID: <CAGb2v64WqSR+xp2Qrrx5hWhHCi9yZwoOackzRXx1VRah=8O4-A@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 17 Aug 2017 10:09:08 +0100
+Subject: [PATCH] serio: PS2 gpio bit banging driver for the serio bus
+In-Reply-To: <CACRpkda=bYacXmv8SoQu3wPoZW9v+j8myZnme=QpofD=Y-gYTg@mail.gmail.com>
+References: <20170731222452.22887-1-danilokrummrich@dk-develop.de>
+ <CACRpkdYz_+soss4Rb9zMiP4eZZtXqjW_Xy7hH=wm1x2m_R9R3A@mail.gmail.com>
+ <20170807182207.348762301bf3d7f8509b1bf7@dk-develop.de>
+ <8e5e73575b3a70e0e60931698687471d@dk-develop.de>
+ <CACRpkda=bYacXmv8SoQu3wPoZW9v+j8myZnme=QpofD=Y-gYTg@mail.gmail.com>
+Message-ID: <20170817090908.GP20805@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 1:11 PM,  <icenowy@aosc.io> wrote:
-> ? 2017-08-17 11:40?Chen-Yu Tsai ???
->>
->> The BPI-M3 is an Allwinner A83T based SBC in the Bananapi/Bpi family.
->> It is roughly the same form factor as the BPI-M1+, with roughly the
->> same peripherals and connectors:
->>
->>   - 2GB LPDDR3 DRAM
->>   - 8GB eMMC
->>   - Micro-SD card slot
->>   - HDMI output
->>   - Headset (stereo + mic) jack
->>   - Onboard mic
->>   - Gigabit Ethernet with RTL8211E transceiver
->>   - Ampak AP6212 WiFi + BT
->>   - USB OTG connector
->>   - USB-to-SATA bridge connected through a USB 2.0 hub
->>   - Consumer IR receiver
->>   - MIPI DSI LCD panel connector
->>   - Camera interface (parallel and MIPI CSI) connector
->>   - 3 LEDs (Red, Green, Blue), of which 2 are controllable (GB)
->>   - Raspberry Pi 2 compatible GPIO header
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>
->> Note that the file name follows the convention of most of the other
->> bananapi boards, that is the vendor "sinovoip" is not included in
->> the name. This deviates from what is already in U-boot.
->>
->> This applies on top of my A83t USB patches.
->>
->> ---
->>  arch/arm/boot/dts/Makefile                   |   1 +
->>  arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 148
->> +++++++++++++++++++++++++++
->>  2 files changed, 149 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index e0d77ab79f5f..791fecc0774a 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -903,6 +903,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
->>         sun8i-a33-q8-tablet.dtb \
->>         sun8i-a33-sinlinx-sina33.dtb \
->>         sun8i-a83t-allwinner-h8homlet-v2.dtb \
->> +       sun8i-a83t-bananapi-m3.dtb \
->>         sun8i-a83t-cubietruck-plus.dtb \
->>         sun8i-h2-plus-orangepi-zero.dtb \
->>         sun8i-h3-bananapi-m2-plus.dtb \
->> diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
->> b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
->> new file mode 100644
->> index 000000000000..2bafd7e99ef7
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
->> @@ -0,0 +1,148 @@
->> +/*
->> + * Copyright 2017 Chen-Yu Tsai
->> + *
->> + * Chen-Yu Tsai <wens@csie.org>
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
->> + *
->> + *  a) This file is free software; you can redistribute it and/or
->> + *     modify it under the terms of the GNU General Public License as
->> + *     published by the Free Software Foundation; either version 2 of the
->> + *     License, or (at your option) any later version.
->> + *
->> + *     This file is distributed in the hope that it will be useful,
->> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + *     GNU General Public License for more details.
->> + *
->> + * Or, alternatively,
->> + *
->> + *  b) Permission is hereby granted, free of charge, to any person
->> + *     obtaining a copy of this software and associated documentation
->> + *     files (the "Software"), to deal in the Software without
->> + *     restriction, including without limitation the rights to use,
->> + *     copy, modify, merge, publish, distribute, sublicense, and/or
->> + *     sell copies of the Software, and to permit persons to whom the
->> + *     Software is furnished to do so, subject to the following
->> + *     conditions:
->> + *
->> + *     The above copyright notice and this permission notice shall be
->> + *     included in all copies or substantial portions of the Software.
->> + *
->> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
->> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
->> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
->> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
->> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
->> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
->> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
->> + *     OTHER DEALINGS IN THE SOFTWARE.
->> + */
->> +
->> +/dts-v1/;
->> +#include "sun8i-a83t.dtsi"
->> +#include "sunxi-common-regulators.dtsi"
->> +
->> +#include <dt-bindings/gpio/gpio.h>
->> +
->> +/ {
->> +       model = "Banana Pi BPI-M3";
->> +       compatible = "sinovoip,bpi-m3", "allwinner,sun8i-a83t";
->
->
-> Should we continue to use sinovoip,bpi-mx-xxx or use bananapi,mx-xxx
-> instead?
+On Fri, Aug 11, 2017 at 11:16:20AM +0200, Linus Walleij wrote:
+> writel() should be guaranteeing that the values hit the hardware, wmb() is
+> spelled out "write memory barrier" I don't see what you're after here.
 
-The vendor listed for "bananapi" is "BIPAI KEJI LIMITED", which you and
-I know is probably the Chinese pronunciation of "BPi Technologies".
-However I can't seem to find any trademark registrations.
+Incorrect.  writel() has a barrier which ensures that data written to
+memory (eg, dma coherent memory) is visible to the hardware prior to
+the write hitting the hardware.
 
-The dispute around the Banana Pi brand was confusing. I'd hate to see
-it again. I'll make some inquiries about this first.
+There is no barrier to ensure that the write hits the hardware in a
+timely manner - the write can be buffered by the buses, which will
+delay it before it hits its destination.
 
-ChenYu
+PCI particularly buffers MMIO writes, and the requirement there has
+always been that if you need the write to hit the hardware in a timely
+fashion, you must perform a read-back to force the bus to deliver the
+write (since a read is not allowed to overlap a write.)
+
+The solution is never to use barrier() - barrier() is a _compiler_
+barrier and does nothing for posted writes on hardware buses.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
