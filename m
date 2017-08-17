@@ -1,30 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 17 Aug 2017 11:03:02 +0200
-Subject: [GIT PULL 3/3] ARM: SOC: Keystone soc driver update for 4.14
-In-Reply-To: <1502929842-8156-3-git-send-email-ssantosh@kernel.org>
-References: <1502929842-8156-1-git-send-email-ssantosh@kernel.org>
- <1502929842-8156-3-git-send-email-ssantosh@kernel.org>
-Message-ID: <CAK8P3a2gj0nkdSmHYv=D+UWY1M48bacY4Cxy8T-Vu2cUqe2_Jw@mail.gmail.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Thu, 17 Aug 2017 09:04:03 +0000
+Subject: [PATCH  2/2] ARM: shmobile: Enable BQ32000 rtc in
+ shmobile_defconfig
+In-Reply-To: <20170817090112.GE27693@verge.net.au>
+References: <1502197465-61546-1-git-send-email-biju.das@bp.renesas.com>
+ <1502197465-61546-3-git-send-email-biju.das@bp.renesas.com>
+ <20170809090421.GN2705@verge.net.au> <20170817090112.GE27693@verge.net.au>
+Message-ID: <SG2PR06MB17113348ACF043CD7453CACEB8830@SG2PR06MB1711.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 2:30 AM, Santosh Shilimkar <ssantosh@kernel.org> wrote:
-> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
->
->   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_soc_drivers_4.14
->
-> for you to fetch changes up to a1934ff175ff25f57dae8b5107a2351d15729c3a:
->
->   soc: ti: ti_sci_pm_domains: Populate name for genpd (2017-07-28 09:51:34 -0700)
->
-> ----------------------------------------------------------------
-> soc: Keystone ti-sci driver genpd fix for 4.14
 
->From the patch description I would have guessed that we want this in 4.13,
-can you clarify?
+> -----Original Message-----
+> From: Simon Horman [mailto:horms at verge.net.au]
+> Sent: 17 August 2017 10:01
+> To: Biju Das <biju.das@bp.renesas.com>
+> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
+> <mark.rutland@arm.com>; Magnus Damm <magnus.damm@gmail.com>;
+> Russell King <linux@armlinux.org.uk>; Chris Paterson
+> <Chris.Paterson2@renesas.com>; devicetree at vger.kernel.org; linux-renesas-
+> soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH 2/2] ARM: shmobile: Enable BQ32000 rtc in
+> shmobile_defconfig
+>
+> On Wed, Aug 09, 2017 at 11:04:21AM +0200, Simon Horman wrote:
+> > On Tue, Aug 08, 2017 at 02:04:25PM +0100, Biju Das wrote:
+> > > The iWave RZ/G1M Q7 SOM supports RTC (TI BQ32000).
+> > > To increase hardware support enable the driver in the
+> > > shmobile_defconfig multiplatform configuration.
+> > >
+> > > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> >
+> > Thanks, applied for v4.14.
+>
+> Please consider posting a similar patch for multi_v7_defconfig.
 
-     Arnd
+Thanks , I will do this.
+
+
+Regards,
+Biju
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
