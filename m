@@ -1,69 +1,46 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Aug 2017 10:10:52 -0500
-Subject: [PATCH v3 1/3] dt-bindings: Document the hi3660 thermal sensor
- bindings
-In-Reply-To: <1502353935-92924-2-git-send-email-kevin.wangtao@hisilicon.com>
-References: <1498102923-68481-1-git-send-email-kevin.wangtao@hisilicon.com>
- <1502353935-92924-1-git-send-email-kevin.wangtao@hisilicon.com>
- <1502353935-92924-2-git-send-email-kevin.wangtao@hisilicon.com>
-Message-ID: <20170817141517.izhteflvfwtoovqv@rob-hp-laptop>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 17 Aug 2017 12:11:04 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Add
+ CONFIG_FW_LOADER_USER_HELPER_FALLBACK
+In-Reply-To: <20170817140424.4614-1-gary.bisson@boundarydevices.com>
+References: <20170817140424.4614-1-gary.bisson@boundarydevices.com>
+Message-ID: <CAOMZO5DF8qfdraG8V1_ZuS393hqoU+fd1=Chiw7sTiK_gKaZVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 10, 2017 at 04:32:13PM +0800, Tao Wang wrote:
-> From: Tao Wang <kevin.wangtao@linaro.org>
-> 
-> This adds documentation of device tree bindings for the
-> thermal sensor controller of hi3660 SoC.
-> 
-> Signed-off-by: Tao Wang <kevin.wangtao@linaro.org>
+Hi Gary,
+
+On Thu, Aug 17, 2017 at 11:04 AM, Gary Bisson
+<gary.bisson@boundarydevices.com> wrote:
+> Allows to load firmware files which aren't built inside the kernel.
+>
+> Especially useful for CODA firmware (vpu_fw_imx6q.bin) which is usually
+> located in the rootfs.
+>
+> Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
 > ---
->  .../devicetree/bindings/thermal/hisi-tsensor.txt   | 23 ++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt b/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
-> new file mode 100644
-> index 0000000..2ab0eb9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
-> @@ -0,0 +1,23 @@
-> +* Temperature Sensor on hisilicon SoC
-> +
-> +** Required properties :
-> +
-> +- compatible: "hisilicon,thermal-tsensor".
+> Hi Shawn,
+>
+> I'm not sure if this patch is acceptable since I've noticed that no
+> configuration currently has that option enabled (why?).
+>
+> As mentioned in the commit, I had to enable that in order to have CODA
+> load the VPU firmware properly.
+>
+> Another option would be to make the CODA driver a module...
 
-Needs an SoC specific compatible.
+Yes, that's what we have currently:
 
-> +- reg: physical base address of thermal sensor and length of memory mapped
-> +  region.
-> +- offset: reg offset of each sensor.
+commit a5a56f07c2726cc801efccd23f8df29af04d6d19
+Author: Fabio Estevam <fabio.estevam@nxp.com>
+Date:   Fri Jul 7 12:06:45 2017 -0300
 
-Should be implied by the compatible.
+    ARM: imx_v6_v7_defconfig: Select the coda driver as module
 
-> +- coefficients:	An array of integers (one signed cell) containing
-> +		coefficients to turn adc value to temperture.
+    The coda driver may be probed prior to the rootfs being available, leading
+    to firmware loading failure.
 
-Needs a vendor prefix.
+    To avoid such problem, select the coda driver as module.
 
-> +- hisi,adc-range: adc value range, minimum value is followed by maximum value.
-> +- #thermal-sensor-cells: Should be 1. See ./thermal.txt for a description.
-> +
-> +Example :
-> +
-> +tsensor: tsensor at FFF3000 {
-> +	compatible = "hisilicon,tsensor";
-> +	reg = <0x0 0xfff30000 0x0 0x1000>;
-> +	offset = <0x1c 0x5c 0x9c>;
-> +	coefficients = <165000 (-40000)>;
-> +	hisi,adc-range = <0x74 0x39A>;
-> +	#thermal-sensor-cells = <1>;
-> +};
-> -- 
-> 2.8.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+    Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+    Signed-off-by: Shawn Guo <shawnguo@kernel.org>
