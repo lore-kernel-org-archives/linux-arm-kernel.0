@@ -1,76 +1,94 @@
-From: david@redhat.com (David Hildenbrand)
-Date: Thu, 17 Aug 2017 12:31:25 +0200
-Subject: [PATCH RFC 0/2] KVM: use RCU to allow dynamic kvm->vcpus array
-In-Reply-To: <20bd04bf-9d0d-ac95-212e-88530184fbf2@redhat.com>
-References: <20170816194037.9460-1-rkrcmar@redhat.com>
- <b77b151f-e51d-3657-66e9-6fbc83887b18@suse.de>
- <20170817093612.024cc4bc.cohuck@redhat.com>
- <b69bc1e0-9d7b-5412-ba56-a5261d539a5b@redhat.com>
- <20170817112829.7795820a.cohuck@redhat.com>
- <69d47131-2405-b2be-60d7-e40fbd17592a@redhat.com>
- <6609138c-6a29-5106-39a8-3219ce47f01a@redhat.com>
- <b240630b-e991-5c1e-a2c7-8def744f275e@redhat.com>
- <6b2816ca-d8c0-0819-efdb-c30fd3d1a0e9@redhat.com>
- <20bd04bf-9d0d-ac95-212e-88530184fbf2@redhat.com>
-Message-ID: <2d5b9eaa-0996-94b3-4823-3d2ba8018611@redhat.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 17 Aug 2017 12:32:25 +0200
+Subject: [PATCHv2 0/3] arm64 xilinx zynqmp firmware interface
+In-Reply-To: <45e58860-cb8c-75f2-60bf-140aa3704169@arm.com>
+References: <cover.1502886277.git.michal.simek@xilinx.com>
+ <43deeed7-32c8-7914-5f44-862ebbe14a3b@arm.com>
+ <89e5469b-650e-64c7-1754-797b35bac523@xilinx.com>
+ <a1970cb5-1cf1-d38a-3de3-c782c23fc8ac@arm.com>
+ <0560c79f-e461-6010-0628-e99ce0a1f8c6@xilinx.com>
+ <45e58860-cb8c-75f2-60bf-140aa3704169@arm.com>
+Message-ID: <07473fe2-d159-a016-2f65-735b1231beb8@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.08.2017 12:23, Paolo Bonzini wrote:
-> On 17/08/2017 12:20, David Hildenbrand wrote:
->> On 17.08.2017 12:18, Paolo Bonzini wrote:
->>> On 17/08/2017 11:55, David Hildenbrand wrote:
->>>> On 17.08.2017 11:44, Paolo Bonzini wrote:
->>>>> On 17/08/2017 11:28, Cornelia Huck wrote:
->>>>>> On Thu, 17 Aug 2017 11:16:59 +0200
->>>>>> Paolo Bonzini <pbonzini@redhat.com> wrote:
+On 17.8.2017 11:12, Sudeep Holla wrote:
+> 
+> 
+> On 17/08/17 09:42, Michal Simek wrote:
+>> On 17.8.2017 09:52, Marc Zyngier wrote:
+>>> On 17/08/17 07:10, Michal Simek wrote:
+>>>> On 16.8.2017 17:39, Marc Zyngier wrote:
+>>>>> On 16/08/17 13:24, Michal Simek wrote:
+>>>>>> Hi,
 >>>>>>
->>>>>>> On 17/08/2017 09:36, Cornelia Huck wrote:
->>>>>>>>> What if we just sent a "vcpu move" request to all vcpus with the new 
->>>>>>>>> pointer after it moved? That way the vcpu thread itself would be 
->>>>>>>>> responsible for the migration to the new memory region. Only if all 
->>>>>>>>> vcpus successfully moved, keep rolling (and allow foreign get_vcpu again).
->>>>>>>>>
->>>>>>>>> That way we should be basically lock-less and scale well. For additional 
->>>>>>>>> icing, feel free to increase the vcpu array x2 every time it grows to 
->>>>>>>>> not run into the slow path too often.  
->>>>>>>>
->>>>>>>> I'd prefer the rcu approach: This is a mechanism already understood
->>>>>>>> well, no need to come up with a new one that will likely have its own
->>>>>>>> share of problems.  
->>>>>>>
->>>>>>> What Alex is proposing _is_ RCU, except with a homegrown
->>>>>>> synchronize_rcu.  Using kvm->srcu seems to be the best of both worlds.
->>>>>>
->>>>>> I'm worried a bit about the 'homegrown' part, though.
+>>>>>> xilinx is using this interface for very long time and we can't merge our
+>>>>>> driver changes to Linux because of missing communication layer with
+>>>>>> firmware. This interface was developed before scpi and scmi was
+>>>>>> available. In connection to power management scpi and scmi are missing
+>>>>>> pieces which we already use. There is a separate discussion how to
+>>>>>> extend scmi to support all our use cases.
 >>>>>
->>>>> I agree, that's why I'm suggesting SRCU instead.  But it's a trick that
->>>>> has its uses.  For example, if you were only doing reads from a work
->>>>> queue, flush_work_queue could be used as the "homegrown
->>>>> synchronize_rcu".  In KVM you might use kvm_make_all_cpus_request, I guess.
->>>>>
->>>>>> I also may be misunderstanding what Alex means with "vcpu move"...
->>>>>
->>>>> My interpretation was "resizing the array" (so it moves in memory).
+>>>>> So maybe we should wait and see where this discussion is going before we
+>>>>> merge yet another firmware interface?
 >>>>
->>>> Unpopular opinion: Let's keep it simple first (straight rcu) and
->>>> optimize later on.
+>>>> It will take a lot of time when this discussion ends and I can't see any
+>>>> benefit to hold all
 >>>
->>> RCU vs. SRCU is about correctness, not optimization...
+>>> Well, so far, the benefit of this series is exactly nil, as the code it
+>>> brings is *unused*. It is impossible to review in isolation.
+>>>
 >>
->> Guess I am still missing the point why RCU cannot be used here.
+>> Ok. I will add others drivers to this series that's not a problem.
+>>
+>>> In the meantime, you can continue finding out how *not* to have to merge
+>>> this code, and instead focus on using the infrastructure we already
+>>> have, or at least influence the infrastructure that is being designed.
+>>> It will be much better than dumping yet another slab of "I'm so
+>>> different" code that is going to ultimately bitrot.
+>>
+>> I am happy to look the better proposed way. SCPI is ancient and SCMI is
+>> replacement and not merged yet. We already had a call with arm and
+>> Sudeep was on it too where outcome from that was that we can't use that
+>> because it doesn't support what we need to support now.
+>>
 > 
-> Because the body of kvm_foreach_vcpu might sleep.
+> OK, none of the specifics were discussed in the meeting to conclude that
+> SCMI can't be used. My takeaway from the meeting was Xilinx has this
+> interface for long and being deployed in various systems. I would like
+> to get into specifics before discarding SCMI as unusable. What bothers
+> me more is that why was that not raised during the specification review
+> which was quite a long period IMO ? I tend to think Xilinx never
+> bothered to look/review the specification as this f/w interface was
+> already there.
+
+Xilinx is using this interface from Aug 2015. I am not aware about any
+invitation to spec review. And not sure who was there from xilinx.
+
 > 
+> However I still can't see why this was posted once we started pushing
+> out SCMI patches especially given that this f/w interface was there for
+> long and no attempts were made in past to upstream this.
 
-Thanks, now I get it, then of course srcu is the right thing to do.
+The reason is simple which is upstream our code which depends on this
+communication layer. I don't think there is quick path to move to
+different interface than this one.
 
-> Paolo
 > 
+> Also I am not dismissing the series yet, but if I find that SCMI can be
+> used(after getting specifics from this series myself), I will at-least
+> argue against the "SCMI can't be used" argument.
 
+This is not my argument that we can't use SCMI. This is what was my
+understanding from that meeting we had. And definitely there is no quick
+path for us to switch to SCMI and breaks all current existing customers.
 
--- 
+And this interface is just in the same position as current SCPI. It
+means you have SCPI already merged and you are adding new one. SCMI
+could be maybe also just SCPIv2.
+And when it is merged you are going to move all targets to this new
+interface. The same is for us but instead of scpi it is this interface
+we use and test.
 
 Thanks,
-
-David
+Michal
