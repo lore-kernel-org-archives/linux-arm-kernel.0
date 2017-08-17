@@ -1,70 +1,58 @@
-From: trini@konsulko.com (Tom Rini)
-Date: Wed, 16 Aug 2017 20:35:02 -0400
-Subject: [PATCH] dts: Make it easier to enable __symbols__ generation in dtb
- files
-Message-ID: <1502930102-8648-1-git-send-email-trini@konsulko.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 16 Aug 2017 18:10:42 -0700
+Subject: [PATCH 2/3] w1: d1w: Provide callback for ds1wm read/write
+In-Reply-To: <1502905525-5646-3-git-send-email-scott.branden@broadcom.com>
+References: <1502905525-5646-1-git-send-email-scott.branden@broadcom.com>
+ <1502905525-5646-3-git-send-email-scott.branden@broadcom.com>
+Message-ID: <992bd68a-d63a-fead-e7ea-b613263bb3c6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces the variabe DTC_EXTRA_FLAGS to allow for additional
-flags to be passed to dtc.  While this can have many uses (such as
-easier testing of new warning flags) the use case I wish to spell out
-here is passing of -@ to enable __symbols__ to be included in the
-resulting dtb and thus 'stacked' overlays to be able to be used.
 
-When passing in -@ this will increase the size of the dtb (and resident
-memory usage) in exchange for allowing more types of overlays to be
-applied to the dtb file prior to passing it to Linux and additional
-functionality within the kernel when OF_OVERLAY is enabled and in tools
-outside of the kernel.
 
-Cc: Jason Kridner <jkridner@beagleboard.org>
-Cc: Drew Fustini <drew@beagleboard.org>
-Cc: Robert Nelson <robertcnelson@gmail.com>
-Cc: Lokesh Vutla <lokeshvutla@ti.com>
-Cc: Frank Rowand <frowand.list@gmail.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
-Cc: Michal Marek <mmarek@suse.com>
-CC: linux-kbuild at vger.kernel.org
-Cc: devicetree at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Tom Rini <trini@konsulko.com>
----
-This would be v3 of my attempt to enable __symbols__ more widely (v2,
-for people not on the CC, enabled it always, but for some boards).
+On 08/16/2017 10:45 AM, Scott Branden wrote:
+> From: Shreesha Rajashekar <shreesha@broadcom.com>
+> 
+> DS1WM core registers are accessed by reading from and writing to a group of
+> registers in iproc SOC's.
+> 
+> By default the read and write function uses
+> __raw_readb() and __raw_writeb(), which wouldnt work for iproc.
+> hence modifying to provide callbacks for read and write functions.
 
-To be clear, this version of the patch is more flexible in that it
-allows for arbitrary flags to be passed to dtc, which can have other
-uses.  But, I'm still spelling out -@ being the motivation behind this
-for clarity.  Both Frank and Rob were uncomfortable with v2, and Frank
-suggested this approach to make it easier for users  / distributions /
-etc to opt-in to this functionality.  For clarity, Frank was suggesting
-(at least at first) perhaps also a tie-in CONFIG option, which I have
-not done here as I feel that's adding extra hurdles to something that
-must already be opt-in.  Given that today many of the immediate uses are
-for "pre-boot" application of overlays (SoM + carrier + add-ons or EVM +
-LCD for example), I believe this is an acceptable trade-off to make
-currently.
----
- scripts/Makefile.lib | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+It's only obvious once you look at patch 3, and that's because you use
+MFD, might be worth adding to this commit message here.
 
-diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-index 58c05e5d9870..04434ffe3370 100644
---- a/scripts/Makefile.lib
-+++ b/scripts/Makefile.lib
-@@ -293,7 +293,7 @@ DTC_FLAGS += -Wnode_name_chars_strict \
- 	-Wproperty_name_chars_strict
- endif
- 
--DTC_FLAGS += $(DTC_FLAGS_$(basetarget))
-+DTC_FLAGS += $(DTC_FLAGS_$(basetarget)) $(DTC_EXTRA_FLAGS)
- 
- # Generate an assembly file to wrap the output of the device tree compiler
- quiet_cmd_dt_S_dtb= DTB     $@
+> 
+> Signed-off-by: Shreesha Rajashekar <shreesha@broadcom.com>
+> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+> ---
+>  drivers/w1/masters/ds1wm.c | 18 ++++++++++++++++--
+>  include/linux/mfd/ds1wm.h  |  2 ++
+>  2 files changed, 18 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/w1/masters/ds1wm.c b/drivers/w1/masters/ds1wm.c
+> index fd2e9da..9fadc39 100644
+> --- a/drivers/w1/masters/ds1wm.c
+> +++ b/drivers/w1/masters/ds1wm.c
+> @@ -115,12 +115,26 @@ struct ds1wm_data {
+>  static inline void ds1wm_write_register(struct ds1wm_data *ds1wm_data, u32 reg,
+>  					u8 val)
+>  {
+> -	__raw_writeb(val, ds1wm_data->map + (reg << ds1wm_data->bus_shift));
+> +	struct device *dev = &ds1wm_data->pdev->dev;
+> +	struct ds1wm_driver_data *pdata = dev_get_platdata(dev);
+> +
+> +	if (pdata->write)
+> +		pdata->write(ds1wm_data->map, reg, val);
+
+Should not this be pdata && pdata->write otherwise are not you just
+causing a NULL pointer dereference for any driver other than the
+Broadcom iProc d1w?
+
+Also, you may not have any bus shift, but it sounds like this should
+either be clarified in a header file that the platform data I/O accessor
+is responsible for shifting, or that the shift should be applied here
+(and because you set it to 0, nothing happens).
 -- 
-1.9.1
+Florian
