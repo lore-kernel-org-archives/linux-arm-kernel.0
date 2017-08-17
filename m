@@ -1,56 +1,34 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Thu, 17 Aug 2017 20:04:31 +0800
-Subject: [RFC PATCH v2 3/3] arm64: dts: rockchip: Handle pcie wake in pcie
- driver for Gru
-In-Reply-To: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
-References: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
-Message-ID: <20170817120431.12398-4-jeffy.chen@rock-chips.com>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Thu, 17 Aug 2017 07:28:49 -0500
+Subject: [PATCH v2 1/2] usb: dwc3: keystone: Add PM_RUNTIME Support to
+ DWC3 Keystone USB driver
+In-Reply-To: <87r2waqu1s.fsf@linux.intel.com>
+References: <20170816215408.13076-1-fcooper@ti.com>
+ <20170816215408.13076-2-fcooper@ti.com> <87r2waqu1s.fsf@linux.intel.com>
+Message-ID: <926be30f-3a97-ab81-876f-610bdd57775d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we are handling pcie wake irq in mrvl wifi driver.
-Move it to rockchip pcie driver for Gru boards.
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
 
-Changes in v2: None
+On 08/17/2017 07:04 AM, Felipe Balbi wrote:
+> 
+> Hi,
+> 
+> Franklin S Cooper Jr <fcooper@ti.com> writes:
+>> For 66AK2Gx there is a requirement to use PM Runtime to properly manage
+>> clocks and the power domains. Therefore, add PM runtime support. Remove
+>> legacy clock api's calls since other users of this driver worked without
+>> these clock apis calls.
+>>
+>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+>> ---
+> 
+> I already have the previous version of this in my tree. Seems like the
+> only difference was on binding document, right? Do I need to change
+> anything in my 'next' and/or 'testing/next' branches?
 
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+Correct the binding document is the only difference. Both of your
+branches looks good.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-index d48e98b62d09..42158512e979 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-@@ -712,7 +712,15 @@ ap_i2c_audio: &i2c8 {
- 
- 	ep-gpios = <&gpio2 27 GPIO_ACTIVE_HIGH>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wifi_perst_l>;
-+	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wlan_host_wake_l>, <&wifi_perst_l>;
-+
-+	interrupts-extended = <&gic GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH 0>,
-+			      <&gic GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH 0>,
-+			      <&gic GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH 0>,
-+			      <&gpio0 8 IRQ_TYPE_LEVEL_LOW>;
-+	interrupt-names = "sys", "legacy", "client", "wake";
-+	/delete-property/ interrupts;
-+
- 	vpcie3v3-supply = <&pp3300_wifi_bt>;
- 	vpcie1v8-supply = <&wlan_pd_n>; /* HACK: see &wlan_pd_n */
- 	vpcie0v9-supply = <&pp900_pcie>;
-@@ -727,11 +735,6 @@ ap_i2c_audio: &i2c8 {
- 			compatible = "pci1b4b,2b42";
- 			reg = <0x83010000 0x0 0x00000000 0x0 0x00100000
- 			       0x83010000 0x0 0x00100000 0x0 0x00100000>;
--			interrupt-parent = <&gpio0>;
--			interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&wlan_host_wake_l>;
--			wakeup-source;
- 		};
- 	};
- };
--- 
-2.11.0
+> 
