@@ -1,143 +1,137 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Thu, 17 Aug 2017 09:15:46 +0530
-Subject: [PATCH v4] vfio: platform: reset: Add Broadcom FlexRM reset module
-In-Reply-To: <20170810132338.406b06ce@w520.home>
-References: <1501652310-3638-1-git-send-email-anup.patel@broadcom.com>
- <1501652310-3638-2-git-send-email-anup.patel@broadcom.com>
- <20170810132338.406b06ce@w520.home>
-Message-ID: <CAALAos_FWj5Usfmp46NdPXJFKExuG2N3HqUd8b_EPoejRk7_7Q@mail.gmail.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Thu, 17 Aug 2017 04:56:22 +0100
+Subject: [PATCH v4 1/6] Documentation: perf: hisi: Documentation for
+ HiSilicon SoC PMU driver
+In-Reply-To: <bc9920c7-bea4-6f45-7cde-477e0fe21078@hisilicon.com>
+References: <1500984642-204676-1-git-send-email-zhangshaokun@hisilicon.com>
+ <1500984642-204676-2-git-send-email-zhangshaokun@hisilicon.com>
+ <20170815095005.GB6090@leverpostej>
+ <bc9920c7-bea4-6f45-7cde-477e0fe21078@hisilicon.com>
+Message-ID: <20170817045622.00000669@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 11, 2017 at 12:53 AM, Alex Williamson
-<alex.williamson@redhat.com> wrote:
-> On Wed,  2 Aug 2017 11:08:30 +0530
-> Anup Patel <anup.patel@broadcom.com> wrote:
->
->> This patch adds Broadcom FlexRM low-level reset for
->> VFIO platform.
->>
->> It will do the following:
->> 1. Disable/Deactivate each FlexRM ring
->> 2. Flush each FlexRM ring
->>
->> The cleanup sequence for FlexRM rings is adapted from
->> Broadcom FlexRM mailbox driver.
->>
->> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->> Reviewed-by: Oza Oza <oza.oza@broadcom.com>
->> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->> Reviewed-by: Eric Auger <eric.auger@redhat.com>
->> ---
->>  drivers/vfio/platform/reset/Kconfig                |   8 ++
->>  drivers/vfio/platform/reset/Makefile               |   1 +
->>  .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 100 +++++++++++++++++++++
->>  3 files changed, 109 insertions(+)
->>  create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
->>
->> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
->> index 70cccc5..8833805 100644
->> --- a/drivers/vfio/platform/reset/Kconfig
->> +++ b/drivers/vfio/platform/reset/Kconfig
->> @@ -13,3 +13,11 @@ config VFIO_PLATFORM_AMDXGBE_RESET
->>         Enables the VFIO platform driver to handle reset for AMD XGBE
->>
->>         If you don't know what to do here, say N.
->> +
->> +config VFIO_PLATFORM_BCMFLEXRM_RESET
->> +     tristate "VFIO support for Broadcom FlexRM reset"
->> +     depends on VFIO_PLATFORM && (ARCH_BCM_IPROC || COMPILE_TEST)
->> +     help
->> +       Enables the VFIO platform driver to handle reset for Broadcom FlexRM
->> +
->> +       If you don't know what to do here, say N.
->> diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
->> index 93f4e23..8d9874b 100644
->> --- a/drivers/vfio/platform/reset/Makefile
->> +++ b/drivers/vfio/platform/reset/Makefile
->> @@ -5,3 +5,4 @@ ccflags-y += -Idrivers/vfio/platform
->>
->>  obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
->>  obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
->> +obj-$(CONFIG_VFIO_PLATFORM_BCMFLEXRM_RESET) += vfio_platform_bcmflexrm.o
->> diff --git a/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
->> new file mode 100644
->> index 0000000..104c3c1
->> --- /dev/null
->> +++ b/drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
->> @@ -0,0 +1,100 @@
->> +/*
->> + * Copyright (C) 2017 Broadcom
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +/*
->> + * This driver provides reset support for Broadcom FlexRM ring manager
->> + * to VFIO platform.
->> + */
->> +
->> +#include <linux/delay.h>
->> +#include <linux/init.h>
->> +#include <linux/io.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +
->> +#include "vfio_platform_private.h"
->> +
->> +/* FlexRM configuration */
->> +#define RING_REGS_SIZE                                       0x10000
->> +#define RING_VER_MAGIC                                       0x76303031
->> +
->> +/* Per-Ring register offsets */
->> +#define RING_VER                                     0x000
->> +#define RING_CONTROL                                 0x034
->> +#define RING_FLUSH_DONE                                      0x038
->> +
->> +/* Register RING_CONTROL fields */
->> +#define CONTROL_FLUSH_SHIFT                          5
->> +
->> +/* Register RING_FLUSH_DONE fields */
->> +#define FLUSH_DONE_MASK                                      0x1
->> +
->> +static int vfio_platform_bcmflexrm_shutdown(void __iomem *ring)
->> +{
->> +     unsigned int timeout;
->> +
->> +     /* Disable/inactivate ring */
->> +     writel_relaxed(0x0, ring + RING_CONTROL);
->> +
->> +     /* Flush ring with timeout of 1s */
->> +     timeout = 1000;
->> +     writel_relaxed(BIT(CONTROL_FLUSH_SHIFT), ring + RING_CONTROL);
->> +     do {
->> +             if (readl_relaxed(ring + RING_FLUSH_DONE) & FLUSH_DONE_MASK)
->> +                     break;
->> +             mdelay(1);
->> +     } while (timeout--);
->> +
->> +     if (!timeout) {
->> +             pr_warn("VFIO FlexRM shutdown timeout\n");
->> +             return -ETIMEDOUT;
->> +     }
->
->
-> This doesn't work, timeout is ~0 here.
+On Thu, 17 Aug 2017 10:30:23 +0800
+Zhangshaokun <zhangshaokun@hisilicon.com> wrote:
 
-Sure, I will use "--timeout" instead of "timeout--" which will
-fix the issue.
+> Hi Mark,
+> 
+> Thanks for your comments.
+> 
+> On 2017/8/15 17:50, Mark Rutland wrote:
+> > Hi,
+> > 
+> > On Tue, Jul 25, 2017 at 08:10:37PM +0800, Shaokun Zhang wrote:  
+> >> This patch adds documentation for the uncore PMUs on HiSilicon SoC.
+> >>
+> >> Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+> >> Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> >> Signed-off-by: Anurup M <anurup.m@huawei.com>
+> >> ---
+> >>  Documentation/perf/hisi-pmu.txt | 52 +++++++++++++++++++++++++++++++++++++++++
+> >>  1 file changed, 52 insertions(+)
+> >>  create mode 100644 Documentation/perf/hisi-pmu.txt
+> >>
+> >> diff --git a/Documentation/perf/hisi-pmu.txt b/Documentation/perf/hisi-pmu.txt
+> >> new file mode 100644
+> >> index 0000000..f45a03d
+> >> --- /dev/null
+> >> +++ b/Documentation/perf/hisi-pmu.txt
+> >> @@ -0,0 +1,52 @@
+> >> +HiSilicon SoC uncore Performance Monitoring Unit (PMU)
+> >> +======================================================
+> >> +The HiSilicon SoC chip comprehends various independent system device PMUs  
+> > 
+> > Nit: s/comprehends/comprises/ would be easier to read.
+> >   
+> 
+> Ok.
 
-Thanks for pointing.
+s/comprises/includes/ would perhaps be even better.  There are a few other
+things in the SoC beyond independent system device PMUs :)
 
-Regards,
-Anup
+(good spot though - I completely missed comprehends when doing the internal
+review!)
+
+> 
+> >> +such as L3 cache (L3C), Hydra Home Agent (HHA) and DDRC. These PMUs are
+> >> +independent and have hardware logic to gather statistics and performance
+> >> +information.
+> >> +
+> >> +HiSilicon SoC encapsulates multiple CPU and IO dies. Each CPU cluster  
+> > 
+> > Nit: The Hisilicon SoC
+> >   
+> 
+> Ok.
+
+I disagree. It is odd but the company name is HiSilicon with the capital S.
+
+> 
+> >> +(CCL) is made up of 4 cpu cores sharing one L3 cache; Each CPU die is  
+> > 
+> > Nit: s/Each/each/
+> >   
+> 
+> Ok.
+> 
+> >> +called Super CPU cluster (SCCL) and is made up of 6 CCLs. Each SCCL has
+> >> +two HHAs (0 - 1) and four DDRCs (0 - 3), respectively.
+> >> +
+> >> +HiSilicon SoC uncore PMU driver
+> >> +---------------------------------------
+> >> +Each device PMU has separate registers for event counting, control and
+> >> +interrupt, and the PMU driver shall register perf PMU drivers like L3C,
+> >> +HHA and DDRC etc. The available events and configuration options shall
+> >> +be described in the sysfs, see /sys/devices/hisi_*   
+> > 
+> > What exactly its exposed under /sys/devices/hisi_* ?
+> >   
+> 
+> Apologies that i shall list /sys/devices/hisi_sccl{X}_<l3c{Y}/hha{Y}/ddrc{Y}>/ and
+> will change it in next version.
+> 
+> >> or /sys/bus/
+> >> +event_source/devices/hisi_*.  
+> > 
+> > Please don't wrap paths; keep this on one line.
+> >   
+> 
+> Ok.
+> 
+> >> +The "perf list" command shall list the available events from sysfs.
+> >> +
+> >> +Each L3C, HHA and DDRC in one SCCL are registered as an separate PMU with perf.
+> >> +The PMU name will appear in event listing as hisi_module <index-id>_<sccl-id>.
+> >> +where "index-id" is the index of module and "sccl-id" is the identifier of
+> >> +the SCCL.
+> >> +e.g. hisi_l3c0_1/rd_hit_cpipe is READ_HIT_CPIPE event of L3C index #0 and SCCL
+> >> +ID #1.
+> >> +e.g. hisi_hha0_1/rx_operations is RX_OPERATIONS event of HHA index #0 and SCCL
+> >> +ID #1.  
+> > 
+> > It would make more sense for this to be hierarichal, e.g. hisi_sccl{X}_l3c{Y}.
+> >   
+> 
+> Surely, it is nicer.
+> 
+> Thanks.
+> Shaokun
+> 
+> > Other than the above nits, this documentation is very useful. Thanks for
+> > putting this together.
+> > 
+> > Thanks,
+> > Mark.
+> > _______________________________________________
+> > linuxarm mailing list
+> > linuxarm at huawei.com
+> > http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
+> > 
+> > .
+> >   
+> 
+> _______________________________________________
+> linuxarm mailing list
+> linuxarm at huawei.com
+> http://rnd-openeuler.huawei.com/mailman/listinfo/linuxarm
