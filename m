@@ -1,94 +1,70 @@
 From: trini@konsulko.com (Tom Rini)
-Date: Wed, 16 Aug 2017 20:33:55 -0400
-Subject: [PATCH] ARM: dts: TI: Enable __symbols__ in dtb files for some
- platforms
-In-Reply-To: <5994CDD1.9050708@gmail.com>
-References: <1502920751-11121-1-git-send-email-trini@konsulko.com>
- <5994C81C.609@gmail.com> <5994CDD1.9050708@gmail.com>
-Message-ID: <20170817003355.GR20467@bill-the-cat>
+Date: Wed, 16 Aug 2017 20:35:02 -0400
+Subject: [PATCH] dts: Make it easier to enable __symbols__ generation in dtb
+ files
+Message-ID: <1502930102-8648-1-git-send-email-trini@konsulko.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 16, 2017 at 03:57:21PM -0700, Frank Rowand wrote:
-> On 08/16/17 15:33, Frank Rowand wrote:
-> > On 08/16/17 14:59, Tom Rini wrote:
-> >> Build the dtb file for these platfroms with __symbol__ information
-> >> included.  This will reduce the size of the dtb (and resident memory
-> > 
-> > typo: reduce the size should be increase the size
-> > 
-> > 
-> >> usage) in exchange for allowing more types of overlays to be applied to
-> >> the dtb file prior to passing it to Linux and additional functionality
-> >> within the kernel when OF_OVERLAY is enabled.
-> >>
-> >> Cc: Jason Kridner <jkridner@beagleboard.org>
-> >> Cc: Drew Fustini <drew@beagleboard.org>
-> >> Cc: Robert Nelson <robertcnelson@gmail.com>
-> >> Cc: Lokesh Vutla <lokeshvutla@ti.com>
-> >> Cc: Frank Rowand <frowand.list@gmail.com>
-> >> Cc: Rob Herring <robh+dt@kernel.org>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Cc: Russell King <linux@armlinux.org.uk>
-> >> Cc: devicetree at vger.kernel.org
-> >> Cc: linux-arm-kernel at lists.infradead.org
-> >> Cc: linux-kernel at vger.kernel.org
-> >> Signed-off-by: Tom Rini <trini@konsulko.com>
-> >> ---
-> >> This patch takes the path that Rob encouraged in my previous patch of
-> >> enabling __symbols__ in some platforms now (that can use it) and see if
-> >> a critical mass evolves that pushes towards -@ being default for all
-> >> dtbs.  I would suggest that the dra76 series be respun to include a hunk
-> >> like this at least as well, and if there's another Beagle X15 patch,
-> >> that too.  Russell, per some of our conversations, something like would
-> >> also be needed as part of using overlays to solve some of the problems
-> >> with Hummingboard, etc.
-> >> ---
-> >>  arch/arm/boot/dts/Makefile | 14 ++++++++++++++
-> >>  1 file changed, 14 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> >> index 4b17f35dc9a7..6f98422ca00e 100644
-> >> --- a/arch/arm/boot/dts/Makefile
-> >> +++ b/arch/arm/boot/dts/Makefile
-> >> @@ -1063,3 +1063,17 @@ dtb-$(CONFIG_OF_ALL_DTBS) := $(patsubst $(dtstree)/%.dts,%.dtb, $(wildcard $(dts
-> >>  
-> >>  always		:= $(dtb-y)
-> >>  clean-files	:= *.dtb
-> >> +
-> >> +# enable creation of __symbols__ node
-> >> +DTC_FLAGS_am335x-bone += -@
-> >> +DTC_FLAGS_am335x-boneblack += -@
-> >> +DTC_FLAGS_am335x-boneblack-wireless += -@
-> >> +DTC_FLAGS_am335x-boneblue += -@
-> >> +DTC_FLAGS_am335x-bonegreen += -@
-> >> +DTC_FLAGS_am335x-bonegreen-wireless += -@
-> >> +DTC_FLAGS_am57xx-beagle-x15 += -@
-> >> +DTC_FLAGS_am57xx-beagle-x15-revb1 += -@
-> >> +DTC_FLAGS_dra7-evm += -@
-> >> +DTC_FLAGS_dra72-evm += -@
-> >> +DTC_FLAGS_dra72-evm-revc += -@
-> >> +DTC_FLAGS_dra71-evm += -@
-> >>
-> > 
-> > I would prefer that instead of "-@", a configurable value be used.
-> 
-> I stated that poorly.  It was intended conceptually, not literally.
-> 
-> One possible concrete implementation would be to use something other
-> than DTC_FLAGS, for example DTC_FLAGS_EXTRA, then have the build
-> system choose whether to fold DTC_FLAGS_EXTRA into DTC_FLAGS, based
-> on some sort of configurable value.
+This introduces the variabe DTC_EXTRA_FLAGS to allow for additional
+flags to be passed to dtc.  While this can have many uses (such as
+easier testing of new warning flags) the use case I wish to spell out
+here is passing of -@ to enable __symbols__ to be included in the
+resulting dtb and thus 'stacked' overlays to be able to be used.
 
-So you would have to pass in a flag, and then set a CONFIG option for
-"please use this flag I just explicitly set" ?
+When passing in -@ this will increase the size of the dtb (and resident
+memory usage) in exchange for allowing more types of overlays to be
+applied to the dtb file prior to passing it to Linux and additional
+functionality within the kernel when OF_OVERLAY is enabled and in tools
+outside of the kernel.
 
+Cc: Jason Kridner <jkridner@beagleboard.org>
+Cc: Drew Fustini <drew@beagleboard.org>
+Cc: Robert Nelson <robertcnelson@gmail.com>
+Cc: Lokesh Vutla <lokeshvutla@ti.com>
+Cc: Frank Rowand <frowand.list@gmail.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Michal Marek <mmarek@suse.com>
+CC: linux-kbuild at vger.kernel.org
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Tom Rini <trini@konsulko.com>
+---
+This would be v3 of my attempt to enable __symbols__ more widely (v2,
+for people not on the CC, enabled it always, but for some boards).
+
+To be clear, this version of the patch is more flexible in that it
+allows for arbitrary flags to be passed to dtc, which can have other
+uses.  But, I'm still spelling out -@ being the motivation behind this
+for clarity.  Both Frank and Rob were uncomfortable with v2, and Frank
+suggested this approach to make it easier for users  / distributions /
+etc to opt-in to this functionality.  For clarity, Frank was suggesting
+(at least at first) perhaps also a tie-in CONFIG option, which I have
+not done here as I feel that's adding extra hurdles to something that
+must already be opt-in.  Given that today many of the immediate uses are
+for "pre-boot" application of overlays (SoM + carrier + add-ons or EVM +
+LCD for example), I believe this is an acceptable trade-off to make
+currently.
+---
+ scripts/Makefile.lib | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index 58c05e5d9870..04434ffe3370 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -293,7 +293,7 @@ DTC_FLAGS += -Wnode_name_chars_strict \
+ 	-Wproperty_name_chars_strict
+ endif
+ 
+-DTC_FLAGS += $(DTC_FLAGS_$(basetarget))
++DTC_FLAGS += $(DTC_FLAGS_$(basetarget)) $(DTC_EXTRA_FLAGS)
+ 
+ # Generate an assembly file to wrap the output of the device tree compiler
+ quiet_cmd_dt_S_dtb= DTB     $@
 -- 
-Tom
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170816/50c12a0c/attachment.sig>
+1.9.1
