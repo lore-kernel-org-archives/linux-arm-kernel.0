@@ -1,60 +1,45 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 17 Aug 2017 14:56:32 +0200
-Subject: [PATCH 09/13] drm/rockchip: Use sychronized interface of the IOMMU-API
-In-Reply-To: <1502974596-23835-1-git-send-email-joro@8bytes.org>
-References: <1502974596-23835-1-git-send-email-joro@8bytes.org>
-Message-ID: <1502974596-23835-10-git-send-email-joro@8bytes.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 17 Aug 2017 14:01:39 +0100
+Subject: [RFC PATCH 4/4] ACPI: IORT: Add SMMUv3 MSI support
+In-Reply-To: <de1b88e0-57d5-b73b-bc49-3c28070df6b1@linaro.org>
+References: <1502276017-63108-1-git-send-email-guohanjun@huawei.com>
+ <1502276017-63108-5-git-send-email-guohanjun@huawei.com>
+ <20170811093348.GC26039@red-moon>
+ <CAGHbJ3AgEvbpsPdeqJ+bFWa5hBMqxBX6g1eC4HiUvHarJf8H+g@mail.gmail.com>
+ <20170815171525.GB13707@e107981-lin.cambridge.arm.com>
+ <de1b88e0-57d5-b73b-bc49-3c28070df6b1@linaro.org>
+Message-ID: <20170817130139.GA17795@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joerg Roedel <jroedel@suse.de>
+On Thu, Aug 17, 2017 at 03:49:37PM +0800, Hanjun Guo wrote:
 
-The map and unmap functions of the IOMMU-API changed their
-semantics: They do no longer guarantee that the hardware
-TLBs are synchronized with the page-table updates they made.
+[...]
 
-To make conversion easier, new synchronized functions have
-been introduced which give these guarantees again until the
-code is converted to use the new TLB-flush interface of the
-IOMMU-API, which allows certain optimizations.
+> >  /**
+> >   * iort_get_platform_device_domain() - Find MSI domain related to a
+> >   * platform device
+> >@@ -1159,6 +1207,8 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
+> >  	/* Configure DMA for the page table walker */
+> >  	acpi_dma_configure(&pdev->dev, attr);
+> >+	iort_set_device_domain(&pdev->dev, node);
+> 
+> This is fine to me, but I think we still need to retrieve
+> the output ID as the request id for ITS, which means we
+> need to do that in iort_pmsi_get_dev_id(), right?
 
-But for now, just convert this code to use the synchronized
-functions so that it will behave as before.
+Yes, probably we can add code there like:
 
-Cc: Mark Yao <mark.yao@rock-chips.com>
-Cc: David Airlie <airlied@linux.ie>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: dri-devel at lists.freedesktop.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-rockchip at lists.infradead.org
-Signed-off-by: Joerg Roedel <jroedel@suse.de>
----
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ret = iort_get_id_mapping_index(&index);
+if (!ret)
+	iort_node_get_id(node, &id, index);
+	...
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-index b74ac71..6d28224 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-@@ -41,8 +41,8 @@ static int rockchip_gem_iommu_map(struct rockchip_gem_object *rk_obj)
- 
- 	rk_obj->dma_addr = rk_obj->mm.start;
- 
--	ret = iommu_map_sg(private->domain, rk_obj->dma_addr, rk_obj->sgt->sgl,
--			   rk_obj->sgt->nents, prot);
-+	ret = iommu_map_sg_sync(private->domain, rk_obj->dma_addr,
-+				rk_obj->sgt->sgl, rk_obj->sgt->nents, prot);
- 	if (ret < rk_obj->base.size) {
- 		DRM_ERROR("failed to map buffer: size=%zd request_size=%zd\n",
- 			  ret, rk_obj->base.size);
-@@ -67,7 +67,7 @@ static int rockchip_gem_iommu_unmap(struct rockchip_gem_object *rk_obj)
- 	struct drm_device *drm = rk_obj->base.dev;
- 	struct rockchip_drm_private *private = drm->dev_private;
- 
--	iommu_unmap(private->domain, rk_obj->dma_addr, rk_obj->size);
-+	iommu_unmap_sync(private->domain, rk_obj->dma_addr, rk_obj->size);
- 
- 	mutex_lock(&private->mm_lock);
- 
--- 
-2.7.4
+This requires updating iort_node_get_id() to allow single mappings
+for SMMU/PMCG as you flagged up before.
+
+I will think a bit more to see if there is a cleaner way to reshuffle
+the mapping API.
+
+Thanks,
+Lorenzo
