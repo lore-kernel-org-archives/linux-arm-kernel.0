@@ -1,62 +1,27 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 17 Aug 2017 15:04:08 +0200
-Subject: [PATCH] mtd: physmap_of: Retire Gemini pad control
-In-Reply-To: <20170808190510.11496-1-linus.walleij@linaro.org>
-References: <20170808190510.11496-1-linus.walleij@linaro.org>
-Message-ID: <20170817150408.79d16349@bbrezillon>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 17 Aug 2017 15:02:43 +0200
+Subject: [PATCH ] gpio: rcar: Add r8a7745 (RZ/G1E) support
+In-Reply-To: <1502881936-39357-1-git-send-email-biju.das@bp.renesas.com>
+References: <1502881936-39357-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <CAMuHMdVxwMZQ9JpRHaM++ezL-iLR938ZJPxTxYfFU7Pb-BXpOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Tue,  8 Aug 2017 21:05:10 +0200,
-Linus Walleij <linus.walleij@linaro.org> a ?crit :
+On Wed, Aug 16, 2017 at 1:12 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+> Renesas RZ/G1E (R8A7745) SoC GPIO blocks are identical to the R-Car Gen2
+> family. Add support for its GPIO controllers.
+>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 
-> I wrote a proper pin control driver for the Gemini. Retire this
-> SoC-specific pad control and rely on the pin controller to manage
-> this.
-> 
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Applied to l2-mtd/master.
+Gr{oetje,eeting}s,
 
-Thanks,
+                        Geert
 
-Boris
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/mtd/maps/physmap_of_gemini.c | 16 ----------------
->  1 file changed, 16 deletions(-)
-> 
-> diff --git a/drivers/mtd/maps/physmap_of_gemini.c b/drivers/mtd/maps/physmap_of_gemini.c
-> index 05b286b5289f..4ed1a6bb4d3c 100644
-> --- a/drivers/mtd/maps/physmap_of_gemini.c
-> +++ b/drivers/mtd/maps/physmap_of_gemini.c
-> @@ -43,13 +43,6 @@
->  
->  #define FLASH_PARALLEL_HIGH_PIN_CNT	(1 << 20)	/* else low pin cnt */
->  
-> -/* Miscellaneous Control Register */
-> -#define GLOBAL_MISC_CTRL		0x30
-> -#define FLASH_PADS_MASK			0x07
-> -#define NAND_PADS_DISABLE		BIT(2)
-> -#define PFLASH_PADS_DISABLE		BIT(1)
-> -#define SFLASH_PADS_DISABLE		BIT(0)
-> -
->  static const struct of_device_id syscon_match[] = {
->  	{ .compatible = "cortina,gemini-syscon" },
->  	{ },
-> @@ -102,15 +95,6 @@ int of_flash_probe_gemini(struct platform_device *pdev,
->  				 map->bankwidth * 8);
->  	}
->  
-> -	/* Activate parallel (NOR flash) mode */
-> -	ret = regmap_update_bits(rmap, GLOBAL_MISC_CTRL,
-> -				 FLASH_PADS_MASK,
-> -				 SFLASH_PADS_DISABLE | NAND_PADS_DISABLE);
-> -	if (ret) {
-> -		dev_err(dev, "unable to set up physmap pads\n");
-> -		return -ENODEV;
-> -	}
-> -
->  	dev_info(&pdev->dev, "initialized Gemini-specific physmap control\n");
->  
->  	return 0;
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
