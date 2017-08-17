@@ -1,46 +1,29 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 17 Aug 2017 10:14:40 +0100
-Subject: [GIT PULL] arm64: dts: juno: Updates for v4.14
-In-Reply-To: <CAK8P3a3KX0iDGpWH-CYpwiuz1a2n07MdYC6zkZ0HUch0_xWm2g@mail.gmail.com>
-References: <d33155aa-9925-1a65-ac82-d7cb5e7edd53@arm.com>
- <CAK8P3a3KX0iDGpWH-CYpwiuz1a2n07MdYC6zkZ0HUch0_xWm2g@mail.gmail.com>
-Message-ID: <9419e74d-1d1d-b8fa-75c5-5afd0d1b1072@arm.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 17 Aug 2017 11:16:59 +0200
+Subject: [PATCH RFC 0/2] KVM: use RCU to allow dynamic kvm->vcpus array
+In-Reply-To: <20170817093612.024cc4bc.cohuck@redhat.com>
+References: <20170816194037.9460-1-rkrcmar@redhat.com>
+ <b77b151f-e51d-3657-66e9-6fbc83887b18@suse.de>
+ <20170817093612.024cc4bc.cohuck@redhat.com>
+Message-ID: <b69bc1e0-9d7b-5412-ba56-a5261d539a5b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+Suzuki,Mathieu)
-
-Hi Arnd,
-
-On 16/08/17 22:46, Arnd Bergmann wrote:
-> On Mon, Aug 14, 2017 at 6:20 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> ----------------------------------------------------------------
->> ARMv8 Vexpress/Juno DT updates for v4.14
+On 17/08/2017 09:36, Cornelia Huck wrote:
+>> What if we just sent a "vcpu move" request to all vcpus with the new 
+>> pointer after it moved? That way the vcpu thread itself would be 
+>> responsible for the migration to the new memory region. Only if all 
+>> vcpus successfully moved, keep rolling (and allow foreign get_vcpu again).
 >>
->> 1. Replaces old coresight ATB programmable replicator compatible with
->>    new and more generic one
->>
->> 2. Replaces incorrect usage of underscores for device node names in the
->>    device tree with hyphen
+>> That way we should be basically lock-less and scale well. For additional 
+>> icing, feel free to increase the vcpu array x2 every time it grows to 
+>> not run into the slow path too often.
 > 
-> Pulled into next/dt64.
-> 
-> Regarding the change of the compatible string for the replicator, can you
-> confirm that nothing ever used the old string?
-> 
-> In doubt, it might be better to keep both strings present for
-> backward-compatibility.
-> 
+> I'd prefer the rcu approach: This is a mechanism already understood
+> well, no need to come up with a new one that will likely have its own
+> share of problems.
 
-I think Rob agreed to remove the old binding on the basis that it was
-never used. That's my understanding as per the thread[1]
+What Alex is proposing _is_ RCU, except with a homegrown
+synchronize_rcu.  Using kvm->srcu seems to be the best of both worlds.
 
-Suzuki/Mathieu,
-
-Please shout if my understand on this is wrong.
-
--- 
-Regards,
-Sudeep
-
-[1] http://marc.info/?l=devicetree&m=149727844025618&w=2
+Paolo
