@@ -1,38 +1,76 @@
 From: william.wu@rock-chips.com (William Wu)
-Date: Thu, 17 Aug 2017 15:35:42 +0800
-Subject: [PATCH 2/2] arm64: dts: rockchip: enable usb3 for RK3328 evaluation
- board
+Date: Thu, 17 Aug 2017 15:35:41 +0800
+Subject: [PATCH 1/2] arm64: dts: rockchip: add usb3 controller node for RK3328
+ SoCs
 In-Reply-To: <1502955342-21985-1-git-send-email-william.wu@rock-chips.com>
 References: <1502955342-21985-1-git-send-email-william.wu@rock-chips.com>
-Message-ID: <1502955342-21985-3-git-send-email-william.wu@rock-chips.com>
+Message-ID: <1502955342-21985-2-git-send-email-william.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rockchip's RK3328 evaluation board has one USB 3.0 OTG controller,
-we enable it and set it act as static xHCI host controller to
-support USB 3.0 HOST on RK3328 evaluation board.
+RK3328 has one USB 3.0 OTG controller which uses DWC_USB3
+core's general architecture. It can act as static xHCI host
+controller, static device controller, USB 3.0/2.0 OTG basing
+on ID of USB3.0 PHY.
 
 Signed-off-by: William Wu <william.wu@rock-chips.com>
 ---
- arch/arm64/boot/dts/rockchip/rk3328-evb.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ .../devicetree/bindings/usb/rockchip,dwc3.txt      |  4 +++-
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi           | 27 ++++++++++++++++++++++
+ 2 files changed, 30 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-index e7db0dc..fedea73 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-@@ -83,3 +83,12 @@
- &usb_host0_ohci {
- 	status = "okay";
- };
+diff --git a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
+index 0536a93..d6b2e47 100644
+--- a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
++++ b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
+@@ -1,7 +1,9 @@
+ Rockchip SuperSpeed DWC3 USB SoC controller
+ 
+ Required properties:
+-- compatible:	should contain "rockchip,rk3399-dwc3" for rk3399 SoC
++- compatible:	should be one of the following:
++  - "rockchip,rk3399-dwc3": for rk3399 SoC
++  - "rockchip,rk3328-dwc3", "rockchip,rk3399-dwc3": for rk3328 SoC
+ - clocks:	A list of phandle + clock-specifier pairs for the
+ 		clocks listed in clock-names
+ - clock-names:	Should contain the following:
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+index e6da0ce..4b4953b 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+@@ -655,6 +655,33 @@
+ 		status = "disabled";
+ 	};
+ 
++	usbdrd3: usb at ff600000 {
++		compatible = "rockchip,rk3328-dwc3", "rockchip,rk3399-dwc3";
++		clocks = <&cru SCLK_USB3OTG_REF>, <&cru SCLK_USB3OTG_SUSPEND>,
++			 <&cru ACLK_USB3OTG>;
++		clock-names = "ref_clk", "suspend_clk",
++			      "bus_clk";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		status = "disabled";
 +
-+&usbdrd3 {
-+	status = "okay";
-+};
++		usbdrd_dwc3: dwc3 at ff600000 {
++			compatible = "snps,dwc3";
++			reg = <0x0 0xff600000 0x0 0x100000>;
++			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
++			dr_mode = "otg";
++			phy_type = "utmi_wide";
++			snps,dis_enblslpm_quirk;
++			snps,dis-u2-freeclk-exists-quirk;
++			snps,dis_u2_susphy_quirk;
++			snps,dis_u3_susphy_quirk;
++			snps,dis-del-phy-power-chg-quirk;
++			snps,tx-ipgap-linecheck-dis-quirk;
++			status = "disabled";
++		};
++	};
 +
-+&usbdrd_dwc3 {
-+	dr_mode = "host";
-+	status = "okay";
-+};
+ 	gic: interrupt-controller at ff811000 {
+ 		compatible = "arm,gic-400";
+ 		#interrupt-cells = <3>;
 -- 
 2.0.0
