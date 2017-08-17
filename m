@@ -1,48 +1,33 @@
 From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Thu, 17 Aug 2017 11:33:04 +0200
-Subject: [PATCH 5/7] ARM: dts: stm32: Enable USB HS on stm32f746-disco
+Date: Thu, 17 Aug 2017 11:33:00 +0200
+Subject: [PATCH 1/7] dt-bindings: usb: Document the STM32F7xx DWC2 USB OTG HS
+ core binding
 In-Reply-To: <1502962386-6683-1-git-send-email-amelie.delaunay@st.com>
 References: <1502962386-6683-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <1502962386-6683-6-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1502962386-6683-2-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables USB HS on stm32f746-disco (Host mode).
+This patch adds binding documentation for DWC2 controller in HS mode found
+on STMicroelectronics STM32F7xx SoC.
 
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 ---
- arch/arm/boot/dts/stm32f746-disco.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ Documentation/devicetree/bindings/usb/dwc2.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32f746-disco.dts b/arch/arm/boot/dts/stm32f746-disco.dts
-index 18f6560..0d38e9a 100644
---- a/arch/arm/boot/dts/stm32f746-disco.dts
-+++ b/arch/arm/boot/dts/stm32f746-disco.dts
-@@ -61,6 +61,12 @@
- 		serial0 = &usart1;
- 	};
- 
-+	usbotg_hs_phy: usbphy {
-+		#phy-cells = <0>;
-+		compatible = "usb-nop-xceiv";
-+		clocks = <&rcc 0 STM32F7_AHB1_CLOCK(OTGHSULPI)>;
-+		clock-names = "main_clk";
-+	};
- };
- 
- &clk_hse {
-@@ -72,3 +78,12 @@
- 	pinctrl-names = "default";
- 	status = "okay";
- };
-+
-+&usbotg_hs {
-+	dr_mode = "host";
-+	phys = <&usbotg_hs_phy>;
-+	phy-names = "usb2-phy";
-+	pinctrl-0 = <&usbotg_hs_pins_b>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
+diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
+index fcf199b..e64d903 100644
+--- a/Documentation/devicetree/bindings/usb/dwc2.txt
++++ b/Documentation/devicetree/bindings/usb/dwc2.txt
+@@ -19,6 +19,8 @@ Required properties:
+   configured in FS mode;
+   - "st,stm32f4x9-hsotg": The DWC2 USB HS controller instance in STM32F4x9 SoCs
+   configured in HS mode;
++  - "st,stm32f7xx-hsotg": The DWC2 USB HS controller instance in STM32F7xx SoCs
++    configured in HS mode;
+ - reg : Should contain 1 register range (address and length)
+ - interrupts : Should contain 1 interrupt
+ - clocks: clock provider specifier
 -- 
 2.7.4
