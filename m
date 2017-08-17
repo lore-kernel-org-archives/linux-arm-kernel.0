@@ -1,80 +1,38 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 17 Aug 2017 11:00:29 +0100
-Subject: [PATCH 24/27] arm64/sve: Detect SVE and activate runtime support
-In-Reply-To: <3389809f-52e9-5830-304b-21ce56fbcde2@arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-25-git-send-email-Dave.Martin@arm.com>
- <3389809f-52e9-5830-304b-21ce56fbcde2@arm.com>
-Message-ID: <20170817100028.GH6321@e103592.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 17 Aug 2017 11:02:06 +0100
+Subject: [PATCH 3/3] mfd: d1w: iproc: Add d1w driver
+In-Reply-To: <1502905525-5646-4-git-send-email-scott.branden@broadcom.com>
+References: <1502905525-5646-1-git-send-email-scott.branden@broadcom.com>
+ <1502905525-5646-4-git-send-email-scott.branden@broadcom.com>
+Message-ID: <20170817100206.tqb5kluje6nr27ob@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 16, 2017 at 06:53:07PM +0100, Suzuki K Poulose wrote:
-> On 09/08/17 13:05, Dave Martin wrote:
-> >[This sender failed our fraud detection checks and may not be who they appear to be. Learn about spoofing at http://aka.ms/LearnAboutSpoofing]
-> >
-> >This patch enables detection of hardware SVE support via the
-> >cpufeatures framework, and reports its presence to the kernel and
-> >userspace via the new ARM64_SVE cpucap and HWCAP_SVE hwcap
-> >respectively.
-> >
-> >Userspace can also detect SVE using ID_AA64PFR0_EL1, using the
-> >cpufeatures MRS emulation.
-> >
-> >When running on hardware that supports SVE, this enables runtime
-> >kernel support for SVE, and allows user tasks to execute SVE
-> >instructions and make of the of the SVE-specific user/kernel
-> >interface extensions implemented by this series.
-> >
-> >Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> 
-> 
-> >---
-> > arch/arm64/include/asm/cpucaps.h    |  3 ++-
-> > arch/arm64/include/asm/cpufeature.h |  3 ++-
-> > arch/arm64/include/uapi/asm/hwcap.h |  1 +
-> > arch/arm64/kernel/cpufeature.c      | 16 ++++++++++++++++
-> > arch/arm64/kernel/cpuinfo.c         |  1 +
-> > 5 files changed, 22 insertions(+), 2 deletions(-)
-> >
-> 
-> ...
-> 
-> >
-> >@@ -944,6 +957,9 @@ static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
-> >        HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_JSCVT_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_JSCVT),
-> >        HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_FCMA_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_FCMA),
-> >        HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_LRCPC_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_LRCPC),
-> >+#ifdef CONFIG_ARM64_SVE
-> >+       HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_SVE_SHIFT, FTR_UNSIGNED, ID_AA64PFR0_SVE, CAP_HWCAP, HWCAP_SVE),
-> >+#endif
-> >        {},
-> > };
-> >
-> >diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> >index 0e087d7..943aad0 100644
-> >--- a/arch/arm64/kernel/cpuinfo.c
-> >+++ b/arch/arm64/kernel/cpuinfo.c
-> >@@ -69,6 +69,7 @@ static const char *const hwcap_str[] = {
-> >        "jscvt",
-> >        "fcma",
-> >        "lrcpc",
-> >+       "sve",
-> >        NULL
-> > };
-> >
-> 
-> 
-> Dave,
-> 
-> Could you please update the Documentation for the exposed CPU feature
-> registers to include the SVE field ? Rest looks good to me. With that
-> change,
+On Wed, 16 Aug 2017, Scott Branden wrote:
 
-Oops, yes, I'll update that.  Rutland's hwcaps documentation will also
-need an update.
+> From: Shreesha Rajashekar <shreesha@broadcom.com>
+> 
+> d1w bus master controller is added as a mfd node.
 
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Why?
 
-Thanks for the review
----Dave
+> ds1wm driver is hooked to this node through the mfd framework.
+
+Why?
+
+What makes this an MFD device?
+
+> Signed-off-by: Shreesha Rajashekar <shreesha@broadcom.com>
+> Signed-off-by: Scott Branden <scott.branden@broadcom.com>
+> ---
+>  drivers/mfd/Kconfig         |  11 +++
+>  drivers/mfd/Makefile        |   1 +
+>  drivers/mfd/bcm-iproc-d1w.c | 202 ++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 214 insertions(+)
+>  create mode 100644 drivers/mfd/bcm-iproc-d1w.c
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
