@@ -1,70 +1,82 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 17 Aug 2017 15:30:12 +0200
-Subject: [PATCH net] PCI: fix the return value for the
- pci_find_pcie_root_port()
-In-Reply-To: <ea83e7a8-39a4-5b94-1148-5bf4ae4ed214@huawei.com>
-References: <1502936730-7368-1-git-send-email-dingtianhong@huawei.com>
- <20170817105156.GA18789@ulmo>
- <ea83e7a8-39a4-5b94-1148-5bf4ae4ed214@huawei.com>
-Message-ID: <20170817133012.GC6854@ulmo>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 17 Aug 2017 15:31:22 +0200
+Subject: [GIT PULL] arm: mediatek: dts32 updates for v4.14
+Message-ID: <c357cfa5-8464-8b94-caeb-4b48c2f42659@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 08:40:16PM +0800, Ding Tianhong wrote:
-> 
-> 
-> On 2017/8/17 18:51, Thierry Reding wrote:
-> > On Thu, Aug 17, 2017 at 10:25:30AM +0800, Ding Tianhong wrote:
-> >> The pci_find_pcie_root_port() would return NULL if the given
-> >> dev is already a Root Port, it looks like unfriendly to the
-> >> PCIe Root Port device, Thierry and Bjorn suggest to let this
-> >> function return the given dev under this circumstances.
-> >>
-> >> Fixes: 0e405232871d6 ("PCI: fix oops when try to find Root Port for a PCI device")
-> >> Suggested-by: Thierry Reding <thierry.reding@gmail.com>
-> >> Suggested-by: Bjorn Helgaas <helgaas@kernel.org>
-> >> Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
-> >> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> >> ---
-> >>  drivers/pci/pci.c | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> >> index 7e2022f..352bb53 100644
-> >> --- a/drivers/pci/pci.c
-> >> +++ b/drivers/pci/pci.c
-> >> @@ -514,7 +514,7 @@ struct resource *pci_find_resource(struct pci_dev *dev, struct resource *res)
-> >>   */
-> >>  struct pci_dev *pci_find_pcie_root_port(struct pci_dev *dev)
-> >>  {
-> >> -	struct pci_dev *bridge, *highest_pcie_bridge = NULL;
-> >> +	struct pci_dev *bridge, *highest_pcie_bridge = dev;
-> >>  
-> >>  	bridge = pci_upstream_bridge(dev);
-> >>  	while (bridge && pci_is_pcie(bridge)) {
-> > 
-> > I think this should actually be this change on top of a revert of commit
-> > 0e405232871d6 ("PCI: fix oops when try to find Root Port for a PCI
-> > device"). After the above change, the previous fix will have a redundant
-> > check because highest_pcie_bridge will never be NULL.
-> > 
-> > Let me send out that version to clarify what I mean.
-> > 
-> 
-> Hi Thierry:
-> 
-> The patch ("PCI: fix oops when try to find Root Port for a PCI device")
-> has been merge to the linus mainline tree before you found this deficiencies....
+Hi Olof and Arnd,
 
-I understand that. I'm just saying that there's no point keeping that
-change around because it no longer makes sense after we initialize the
-highest_pcie_bridge variable to dev.
+for v4.14 please take the following pull request into account.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170817/46f7dea2/attachment-0001.sig>
+Thanks,
+Matthias
+
+---
+
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+
+   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+are available in the git repository at:
+
+   https://github.com/mbgg/linux-mediatek.git tags/v4.13-next-dts32
+
+for you to fetch changes up to dfff569aaf8886dcc97b145a15f2213b4a4599e6:
+
+   arm: dts: mt7623: cleanup binding file (2017-08-14 17:17:02 +0200)
+
+----------------------------------------------------------------
+- mt7623: add mt7623n and mt7623a plattform
+- add mt7623 based reference boards
+- mt7623: add usb3, ethernet, cpufreq,
+- Add banana-pi board
+- add mt6323 pmic
+- mt2701: add larb-id property to smi larb
+
+----------------------------------------------------------------
+Chunfeng Yun (1):
+       arm: dts: mt2701: Add usb3 device nodes
+
+Honghui Zhang (1):
+       arm: dts: mediatek: add larbid property for larb
+
+John Crispin (4):
+       arm: dts: mt7623: add mt6323.dtsi file
+       arm: dts: mt7623: cleanup the mt7623n rfb uart nodes
+       arm: dts: mt7623: enable the usb device on the mt7623n rfb
+       arm: dts: mt7623: enable the nand device on the mt7623n nand rfb
+
+Matthias Brugger (1):
+       arm: dts: mt7623: fix mmc interrupt assignment
+
+Ryder Lee (1):
+       arm: dts: mt7623: cleanup binding file
+
+Sean Wang (9):
+       dt-bindings: net: mediatek: update documentation for reset signals
+       arm: dts: mt7623: fixup binding violation missing reset in ethernet node
+       dt-bindings: arm: mediatek: update for MT7623n SoC and relevant boards
+       dt-bindings: arm: mediatek: add bindings for mediatek MT7623a SoC Platform
+       arm: dts: mt7623: rename mt7623-evb.dts to arch/arm/boot/dts/mt7623n-rfb.dtsi
+       arm: dts: mt7623: add support for Bananapi R2 (BPI-R2) board
+       arm: dts: mt7623: add clock-frequency to CPU nodes
+       arm: dts: mt2701: Add ethernet device node
+       arm: dts: mt7623: Add SD-card and EMMC to bananapi-r2
+
+  Documentation/devicetree/bindings/arm/mediatek.txt |  14 +-
+  .../devicetree/bindings/net/mediatek-net.txt       |   6 +-
+  arch/arm/boot/dts/Makefile                         |   3 +-
+  arch/arm/boot/dts/mt2701.dtsi                      | 106 +++++
+  arch/arm/boot/dts/mt6323.dtsi                      | 241 ++++++++++
+  arch/arm/boot/dts/mt7623-evb.dts                   |  33 --
+  arch/arm/boot/dts/mt7623.dtsi                      | 211 +++++++--
+  arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts      | 487 +++++++++++++++++++++
+  arch/arm/boot/dts/mt7623n-rfb-nand.dts             | 111 +++++
+  arch/arm/boot/dts/mt7623n-rfb.dtsi                 |  92 ++++
+  10 files changed, 1218 insertions(+), 86 deletions(-)
+  create mode 100644 arch/arm/boot/dts/mt6323.dtsi
+  delete mode 100644 arch/arm/boot/dts/mt7623-evb.dts
+  create mode 100644 arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
+  create mode 100644 arch/arm/boot/dts/mt7623n-rfb-nand.dts
+  create mode 100644 arch/arm/boot/dts/mt7623n-rfb.dtsi
