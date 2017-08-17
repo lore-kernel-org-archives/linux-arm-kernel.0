@@ -1,36 +1,61 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Thu, 17 Aug 2017 15:31:48 +0300
-Subject: [PATCH v2 1/2] usb: dwc3: keystone: Add PM_RUNTIME Support to
- DWC3 Keystone USB driver
-In-Reply-To: <926be30f-3a97-ab81-876f-610bdd57775d@ti.com>
-References: <20170816215408.13076-1-fcooper@ti.com>
- <20170816215408.13076-2-fcooper@ti.com> <87r2waqu1s.fsf@linux.intel.com>
- <926be30f-3a97-ab81-876f-610bdd57775d@ti.com>
-Message-ID: <87o9reqssr.fsf@linux.intel.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 17 Aug 2017 20:40:16 +0800
+Subject: [PATCH net] PCI: fix the return value for the
+ pci_find_pcie_root_port()
+In-Reply-To: <20170817105156.GA18789@ulmo>
+References: <1502936730-7368-1-git-send-email-dingtianhong@huawei.com>
+ <20170817105156.GA18789@ulmo>
+Message-ID: <ea83e7a8-39a4-5b94-1148-5bf4ae4ed214@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi,
 
-Franklin S Cooper Jr <fcooper@ti.com> writes:
->> Franklin S Cooper Jr <fcooper@ti.com> writes:
->>> For 66AK2Gx there is a requirement to use PM Runtime to properly manage
->>> clocks and the power domains. Therefore, add PM runtime support. Remove
->>> legacy clock api's calls since other users of this driver worked without
->>> these clock apis calls.
->>>
->>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
->>> ---
->> 
->> I already have the previous version of this in my tree. Seems like the
->> only difference was on binding document, right? Do I need to change
->> anything in my 'next' and/or 'testing/next' branches?
->
-> Correct the binding document is the only difference. Both of your
-> branches looks good.
+On 2017/8/17 18:51, Thierry Reding wrote:
+> On Thu, Aug 17, 2017 at 10:25:30AM +0800, Ding Tianhong wrote:
+>> The pci_find_pcie_root_port() would return NULL if the given
+>> dev is already a Root Port, it looks like unfriendly to the
+>> PCIe Root Port device, Thierry and Bjorn suggest to let this
+>> function return the given dev under this circumstances.
+>>
+>> Fixes: 0e405232871d6 ("PCI: fix oops when try to find Root Port for a PCI device")
+>> Suggested-by: Thierry Reding <thierry.reding@gmail.com>
+>> Suggested-by: Bjorn Helgaas <helgaas@kernel.org>
+>> Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
+>> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+>> ---
+>>  drivers/pci/pci.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+>> index 7e2022f..352bb53 100644
+>> --- a/drivers/pci/pci.c
+>> +++ b/drivers/pci/pci.c
+>> @@ -514,7 +514,7 @@ struct resource *pci_find_resource(struct pci_dev *dev, struct resource *res)
+>>   */
+>>  struct pci_dev *pci_find_pcie_root_port(struct pci_dev *dev)
+>>  {
+>> -	struct pci_dev *bridge, *highest_pcie_bridge = NULL;
+>> +	struct pci_dev *bridge, *highest_pcie_bridge = dev;
+>>  
+>>  	bridge = pci_upstream_bridge(dev);
+>>  	while (bridge && pci_is_pcie(bridge)) {
+> 
+> I think this should actually be this change on top of a revert of commit
+> 0e405232871d6 ("PCI: fix oops when try to find Root Port for a PCI
+> device"). After the above change, the previous fix will have a redundant
+> check because highest_pcie_bridge will never be NULL.
+> 
+> Let me send out that version to clarify what I mean.
+> 
 
-cool, thanks :-)
+Hi Thierry:
 
--- 
-balbi
+The patch ("PCI: fix oops when try to find Root Port for a PCI device")
+has been merge to the linus mainline tree before you found this deficiencies....
+
+Regards
+Tianhong
+
+> Thierry
+> 
