@@ -1,29 +1,31 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 17 Aug 2017 10:09:30 -0500
-Subject: [PATCH v5 5/6] dt-bindings: Document devicetree binding for ARM
- DSU PMU
-In-Reply-To: <1502192246-5623-6-git-send-email-suzuki.poulose@arm.com>
-References: <1502192246-5623-1-git-send-email-suzuki.poulose@arm.com>
- <1502192246-5623-6-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20170817150930.upau4hatd5fowl7a@rob-hp-laptop>
+Date: Thu, 17 Aug 2017 10:09:48 -0500
+Subject: [PATCH v2 06/11] Docs: dt: add devicetree binding for describing
+ arm64 SDEI firmware
+In-Reply-To: <20170808164616.25949-7-james.morse@arm.com>
+References: <20170808164616.25949-1-james.morse@arm.com>
+ <20170808164616.25949-7-james.morse@arm.com>
+Message-ID: <20170817150948.x4ebg54ak7pzfley@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 12:37:25PM +0100, Suzuki K Poulose wrote:
-> This patch documents the devicetree bindings for ARM DSU PMU.
+On Tue, Aug 08, 2017 at 05:46:11PM +0100, James Morse wrote:
+> The Software Delegated Exception Interface (SDEI) is an ARM standard
+> for registering callbacks from the platform firmware into the OS.
+> This is typically used to implement RAS notifications, or from an
+> IRQ that has been promoted to a firmware-assisted NMI.
 > 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: devicetree at vger.kernel.org
-> Cc: frowand.list at gmail.com
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Add a new devicetree binding to describe the SDE firmware interface.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
 > ---
-> Changes since V3:
->  - Fixed node name in the example, suggested by Rob
-> ---
->  .../devicetree/bindings/arm/arm-dsu-pmu.txt        | 27 ++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/arm-dsu-pmu.txt
+> Changes since v1:
+> * Added bound IRQ description for binding,
+> * Reference SMC-CC, not 'AAPCS like'
+> * Move sdei node under firmware node (and the file path)
+> 
+>  .../devicetree/bindings/arm/firmware/sdei.txt      | 42 ++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/firmware/sdei.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
