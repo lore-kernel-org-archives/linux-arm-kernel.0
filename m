@@ -1,14 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 17 Aug 2017 18:12:55 +0100
-Subject: Applied "ASoC: bcm: make snd_soc_dai_driver const" to the asoc tree
-In-Reply-To: <1502903709-7411-2-git-send-email-bhumirks@gmail.com>
-Message-ID: <E1diOLn-0008JO-HS@debutante>
+Date: Thu, 17 Aug 2017 18:13:05 +0100
+Subject: Applied "ASoC: rockchip: make snd_soc_ops const" to the asoc tree
+In-Reply-To: <1502902770-3758-6-git-send-email-bhumirks@gmail.com>
+Message-ID: <E1diOLx-0008NC-8r@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: bcm: make snd_soc_dai_driver const
+   ASoC: rockchip: make snd_soc_ops const
 
 has been applied to the asoc tree at
 
@@ -33,32 +33,33 @@ to this mail.
 Thanks,
 Mark
 
->From cc6e25631ddd4f3295fc79568f2145c437849e63 Mon Sep 17 00:00:00 2001
+>From c12a4a40b4fdaefa6c2578e86d277410e1a9cea1 Mon Sep 17 00:00:00 2001
 From: Bhumika Goyal <bhumirks@gmail.com>
-Date: Wed, 16 Aug 2017 22:45:08 +0530
-Subject: [PATCH] ASoC: bcm: make snd_soc_dai_driver const
+Date: Wed, 16 Aug 2017 22:29:28 +0530
+Subject: [PATCH] ASoC: rockchip: make snd_soc_ops const
 
-Make this const as it is only used during a copy operation.
-Done using Coccinelle.
+Make this const as it is only stored in the ops field of a
+snd_soc_dai_link structure, which is const.
+Done using Coccinelle
 
 Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/bcm/cygnus-ssp.c | 2 +-
+ sound/soc/rockchip/rk3288_hdmi_analog.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/soc/bcm/cygnus-ssp.c b/sound/soc/bcm/cygnus-ssp.c
-index e710bb0c5637..cdd5e82439dd 100644
---- a/sound/soc/bcm/cygnus-ssp.c
-+++ b/sound/soc/bcm/cygnus-ssp.c
-@@ -1288,7 +1288,7 @@ static const struct snd_soc_dai_driver cygnus_ssp_dai_info[] = {
- 	INIT_CPU_DAI(2),
+diff --git a/sound/soc/rockchip/rk3288_hdmi_analog.c b/sound/soc/rockchip/rk3288_hdmi_analog.c
+index dbc53e48c52c..42227b0f66ac 100644
+--- a/sound/soc/rockchip/rk3288_hdmi_analog.c
++++ b/sound/soc/rockchip/rk3288_hdmi_analog.c
+@@ -147,7 +147,7 @@ static int rk_init(struct snd_soc_pcm_runtime *runtime)
+ 	return 0;
+ }
+ 
+-static struct snd_soc_ops rk_ops = {
++static const struct snd_soc_ops rk_ops = {
+ 	.hw_params = rk_hw_params,
  };
  
--static struct snd_soc_dai_driver cygnus_spdif_dai_info = {
-+static const struct snd_soc_dai_driver cygnus_spdif_dai_info = {
- 	.name = "cygnus-spdif",
- 	.playback = {
- 		.channels_min = 2,
 -- 
 2.13.3
