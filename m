@@ -1,41 +1,133 @@
 From: hjc@rock-chips.com (Sandy Huang)
-Date: Fri, 18 Aug 2017 16:09:39 +0800
-Subject: [PATCH v6 0/3] Add support Rockchip Soc LVDS
-Message-ID: <1503043780-22605-1-git-send-email-hjc@rock-chips.com>
+Date: Fri, 18 Aug 2017 16:09:49 +0800
+Subject: [PATCH v6 1/3] dt-bindings: display: Add Document for Rockchip Soc
+ LVDS
+In-Reply-To: <1503043780-22605-1-git-send-email-hjc@rock-chips.com>
+References: <1503043780-22605-1-git-send-email-hjc@rock-chips.com>
+Message-ID: <1503043792-22746-1-git-send-email-hjc@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patches add support Rockchip RK3288 LVDS support, based on patches from
-Mark yao[0] and Heiko Stuebner[1].
+This patch add Document for Rockchip Soc RK3288 LVDS,
+This based on the patches from Mark yao and Heiko Stuebner.
 
-[0]: https://github.com/RockchipOpensourceCommunity/popmetal-kernel-3.14
-[1]: http://lists.infradead.org/pipermail/linux-rockchip/2015-April/002830.html
-
+Signed-off-by: Sandy Huang <hjc@rock-chips.com>
+Signed-off-by: Mark yao <mark.yao@rock-chips.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
 Changes:
-- Update rockchip_lvds_encoder_helper_funcs to atomic API
-- Add bridge function for RGB/LVDS convert to other output type
-- Fix some unreasonable define
-- Adapter to the latest rockchip DRM driver framework
-- Add pinctrl for RGB output type
-- Reseved some define for rockchip next Soc
+    - use data-mapping instead of rockchip,data-mapping and rockchip,data-width
+    - move rockchip,output to lvds node
 
-Sandy Huang (3):
-  dt-bindings: display: Add Document for Rockchip Soc LVDS
-  ARM: dts: Add LVDS info for rk3288
-  drm/rockchip: Add support for Rockchip Soc LVDS
-
- .../bindings/display/rockchip/rockchip-lvds.txt    | 100 ++++
- arch/arm/boot/dts/rk3288.dtsi                      |  52 ++
- drivers/gpu/drm/rockchip/Kconfig                   |   9 +
- drivers/gpu/drm/rockchip/Makefile                  |   1 +
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c        |   2 +
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h        |   1 +
- drivers/gpu/drm/rockchip/rockchip_lvds.c           | 582 +++++++++++++++++++++
- drivers/gpu/drm/rockchip/rockchip_lvds.h           | 114 ++++
- 8 files changed, 861 insertions(+)
+ .../bindings/display/rockchip/rockchip-lvds.txt    | 100 +++++++++++++++++++++
+ 1 file changed, 100 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
- create mode 100644 drivers/gpu/drm/rockchip/rockchip_lvds.c
- create mode 100644 drivers/gpu/drm/rockchip/rockchip_lvds.h
 
+diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
+new file mode 100644
+index 0000000..a33821b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
+@@ -0,0 +1,100 @@
++Rockchip RK3288 LVDS interface
++================================
++
++Required properties:
++- compatible: matching the soc type, one of
++	- "rockchip,rk3288-lvds";
++
++- reg: physical base address of the controller and length
++	of memory mapped region.
++- clocks: must include clock specifiers corresponding to entries in the
++	clock-names property.
++- clock-names: must contain "pclk_lvds"
++
++- avdd1v0-supply: regulator phandle for 1.0V analog power
++- avdd1v8-supply: regulator phandle for 1.8V analog power
++- avdd3v3-supply: regulator phandle for 3.3V analog power
++
++- rockchip,grf: phandle to the general register files syscon
++- rockchip,output: "rgb", "lvds" or "duallvds", This describes the output face.
++
++Optional properties:
++- pinctrl-names: must contain a "lcdc" entry.
++- pinctrl-0: pin control group to be used for this controller.
++
++Required nodes:
++
++The lvds has two video ports as described by
++	Documentation/devicetree/bindings/media/video-interfaces.txt.
++Their connections are modeled using the OF graph bindings specified in
++	Documentation/devicetree/bindings/graph.txt.
++
++- video port 0 for the VOP inputs
++- video port 1 for either a panel or subsequent encoder
++
++the lvds panel described by
++	Documentation/devicetree/bindings/display/panel/simple-panel.txt
++
++Panel required properties:
++- ports for remote LVDS output
++
++Panel optional properties:
++- data-mapping: should be "vesa-24","jeida-24" or "jeida-18".
++This describes decribed by:
++	Documentation/devicetree/bindings/display/panel/panel-lvds.txt
++
++Example:
++
++lvds_panel: lvds-panel {
++	status = "okay";
++	compatible = "auo,b101ean01";
++	enable-gpios = <&gpio7 21 GPIO_ACTIVE_HIGH>;
++	data-mapping = "jeida-24";
++
++	ports {
++		panel_in_lvds: endpoint {
++			remote-endpoint = <&lvds_out_panel>;
++		};
++	};
++};
++
++For Rockchip RK3288:
++
++	lvds: lvds at ff96c000 {
++		compatible = "rockchip,rk3288-lvds";
++		rockchip,grf = <&grf>;
++		reg = <0xff96c000 0x4000>;
++		clocks = <&cru PCLK_LVDS_PHY>;
++		clock-names = "pclk_lvds";
++		pinctrl-names = "lcdc";
++		pinctrl-0 = <&lcdc_ctl>;
++		avdd1v0-supply = <&vdd10_lcd>;
++		avdd1v8-supply = <&vcc18_lcd>;
++		avdd3v3-supply = <&vcca_33>;
++		rockchip,output = "rgb";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			lvds_in: port at 0 {
++				reg = <0>;
++
++				lvds_in_vopb: endpoint at 0 {
++					reg = <0>;
++					remote-endpoint = <&vopb_out_lvds>;
++				};
++				lvds_in_vopl: endpoint at 1 {
++					reg = <1>;
++					remote-endpoint = <&vopl_out_lvds>;
++				};
++			};
++
++			lvds_out: port at 1 {
++				reg = <1>;
++
++				lvds_out_panel: endpoint {
++					remote-endpoint = <&panel_in_lvds>;
++				};
++			};
++		};
++	};
 -- 
 2.7.4
