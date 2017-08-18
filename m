@@ -1,10 +1,10 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 18 Aug 2017 17:43:44 +0200
+Date: Fri, 18 Aug 2017 17:44:14 +0200
 Subject: [PATCH v3 5/7] pwm: rockchip: Use same pwm ops for each IP
 In-Reply-To: <1502206888-24302-1-git-send-email-david.wu@rock-chips.com>
 References: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
  <1502206888-24302-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <20170818154344.GF18307@ulmo>
+Message-ID: <20170818154414.GG18307@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,4 +28,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170818/323ecfc9/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170818/84c163ca/attachment.sig>
