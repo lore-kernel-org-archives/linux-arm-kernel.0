@@ -1,18 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 19 Aug 2017 00:07:25 +0200
-Subject: [GIT PULL] Qualcomm ARM64 Defconfig updates for 4.14
-In-Reply-To: <1503090105-1569-1-git-send-email-andy.gross@linaro.org>
-References: <1503090105-1569-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <CAK8P3a0TS+nOqPKiTvs7KeJ7bJg39=vTTVpouYhAYM5zBRQrEw@mail.gmail.com>
+Date: Sat, 19 Aug 2017 00:08:53 +0200
+Subject: [GIT PULL] non-urgent fixes for omaps for v4.14
+In-Reply-To: <-7291673037985203159@unknownmsgid>
+References: <-7291673037985203159@unknownmsgid>
+Message-ID: <CAK8P3a0WDkzUwLz2ZUQdGrOX0oW+gvGgF3zyktum==OqvCmUpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 11:01 PM, Andy Gross <andy.gross@linaro.org> wrote:
-> ----------------------------------------------------------------
-> Qualcomm ARM64 Based defconfig Updates for v4.14
+On Thu, Aug 17, 2017 at 7:50 PM, Tony Lindgren <tony@atomide.com> wrote:
+> Non-urgent fixes for omaps for v4.14 merge window. These all
+> can wait for the merge window as we have not seemed to hit
+> any of these so far:
 >
-> * Enable Qualcomm IPQ8074 clocks and pinctrl
+> - Fix error handling in omap_ocp2scp_probe affecting runtime
+>   PM error path
+>
+> - Drop broken RPM status update for omap_device
+>
+> - Two fixes for of_irq_get() usage that can return 0
 
-Pulled into next/arm64,thanks!
+Pulled into next/cleanup, thanks!
 
        Arnd
