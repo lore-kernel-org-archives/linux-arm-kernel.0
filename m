@@ -1,55 +1,63 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 18 Aug 2017 14:21:14 +0200
-Subject: [PATCH v3 0/4] net: stmmac: Detect PHY location with phy-is-integrated
-Message-ID: <20170818122118.4925-1-clabbe.montjoie@gmail.com>
+Date: Fri, 18 Aug 2017 14:21:15 +0200
+Subject: [PATCH v3 1/4] ARM: dts: sunxi: h3/h5: represent the mdio switch used
+ by sun8i-h3-emac
+In-Reply-To: <20170818122118.4925-1-clabbe.montjoie@gmail.com>
+References: <20170818122118.4925-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170818122118.4925-2-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
+Since dwmac-sun8i could use either an integrated PHY or an external PHY
+(which could be at same MDIO address), we need to represent this selection
+by a MDIO switch.
 
-The current way to find if the PHY is internal is to compare DT phy-mode
-and emac_variant/internal_phy.
-But it will negate a possible future SoC where an external PHY use the
-same phy mode than the integrated one.
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi | 28 +++++++++++++++++++++++-----
+ 1 file changed, 23 insertions(+), 5 deletions(-)
 
-This patchs series adds a new way to find if the PHY is integrated, via
-the phy-is-integrated DT property.
-
-Since it exists both integrated and external ethernet-phy at 1, they are merged in
-the final DTB and so share all properties.
-For avoiding this, and better represent the reality, we use a MDIO mux.
-
-Note that sun8i-v3s-emac have also an integrated PHY, but since it lacks
-any external PHY support, it is not necessary to add MDIO mux to it.
-
-The first patch should go via the sunxi tree.
-Note that this serie will need backporting the patch
-"Documentation: net: phy: Add phy-is-integrated binding" which is in net-next
-
-Thanks
-Regards
-
-Changes since v2:
-- Add a MDIO mux for creating distinction between integrated and external MDIO.
-- phy-is-integrated is not set in dtsi.
-
-Changes since v1:
-- Dropped phy-is-integrated documentation patch since another same patch was already merged
-- Moved phy-is-integrated from SoC dtsi to final board DT.
-
-Corentin Labbe (4):
-  ARM: dts: sunxi: h3/h5: represent the mdio switch used by
-    sun8i-h3-emac
-  net: stmmac: dwmac-sun8i: choose internal PHY via phy-is-integrated
-  net: stmmac: register parent MDIO node for sun8i-h3-emac
-  dt-bindings: net: dwmac-sun8i: update documentation about integrated
-    PHY
-
- .../devicetree/bindings/net/dwmac-sun8i.txt        | 112 +++++++++++++++++++--
- arch/arm/boot/dts/sunxi-h3-h5.dtsi                 |  28 +++++-
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c  |  16 +--
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  12 ++-
- 4 files changed, 146 insertions(+), 22 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+index 4b599b5d26f6..74fdfcc9dfd3 100644
+--- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
++++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+@@ -417,14 +417,32 @@
+ 			#size-cells = <0>;
+ 			status = "disabled";
+ 
+-			mdio: mdio {
++			mdio_parent: mdio {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+-				int_mii_phy: ethernet-phy at 1 {
+-					compatible = "ethernet-phy-ieee802.3-c22";
++			};
++			mdio-mux {
++				compatible = "allwinner,sun8i-h3-mdio-switch";
++				mdio-parent-bus = <&mdio_parent>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				internal_mdio: mdio at 1 {
+ 					reg = <1>;
+-					clocks = <&ccu CLK_BUS_EPHY>;
+-					resets = <&ccu RST_BUS_EPHY>;
++					#address-cells = <1>;
++					#size-cells = <0>;
++					int_mii_phy: ethernet-phy at 1 {
++						compatible = "ethernet-phy-ieee802.3-c22";
++						reg = <1>;
++						clocks = <&ccu CLK_BUS_EPHY>;
++						resets = <&ccu RST_BUS_EPHY>;
++						phy-is-integrated;
++					};
++				};
++				mdio: mdio at 0 {
++					reg = <0>;
++					#address-cells = <1>;
++					#size-cells = <0>;
+ 				};
+ 			};
+ 		};
 -- 
 2.13.0
