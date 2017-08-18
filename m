@@ -1,61 +1,49 @@
 From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Fri, 18 Aug 2017 22:11:55 +0800
-Subject: [PATCH v5 5/7] arm64: kvm: route synchronous external abort
- exceptions to el2
+Date: Fri, 18 Aug 2017 22:11:54 +0800
+Subject: [PATCH v5 4/7] support user space to query RAS extension feature
 In-Reply-To: <1503065517-7920-1-git-send-email-gengdongjiu@huawei.com>
 References: <1503065517-7920-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <1503065517-7920-6-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1503065517-7920-5-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv8.2 adds a new bit HCR_EL2.TEA which controls to
-route synchronous external aborts to EL2, and add a
-trap control bit HCR_EL2.TERR which will control to
-trap all Non-secure EL1&0 error record accesses to EL2.
-
-This patch will enable the two bits for the guest OS.
-when an synchronous abort is generated in the guest OS,
-it will trap to EL3 firmware, firmware will be according
-to the HCR_EL2.TEA to decide to jump to hypervisor or host
-OS. In the guest OS, RAS error record access will trap to
-EL2.
+In armv8.2 RAS extension, it adds virtual SError exception
+syndrome registeri(VSESR_EL2), user space will specify that
+value. so user space will check whether CPU feature has RAS
+extension. if has, it will specify the virtual SError syndrome
+value. Otherwise, it will not set. This patch adds this support
 
 Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 ---
- arch/arm64/include/asm/kvm_arm.h     | 2 ++
- arch/arm64/include/asm/kvm_emulate.h | 7 +++++++
- 2 files changed, 9 insertions(+)
+ arch/arm64/kvm/reset.c   | 3 +++
+ include/uapi/linux/kvm.h | 1 +
+ 2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 61d694c2eae5..1188272003c4 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -23,6 +23,8 @@
- #include <asm/types.h>
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index 3256b9228e75..b7313ee028e9 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	case KVM_CAP_ARM_PMU_V3:
+ 		r = kvm_arm_support_pmu_v3();
+ 		break;
++	case KVM_CAP_ARM_RAS_EXTENSION:
++		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
++		break;
+ 	case KVM_CAP_SET_GUEST_DEBUG:
+ 	case KVM_CAP_VCPU_ATTRIBUTES:
+ 		r = 1;
+diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+index 6cd63c18708a..5a2a338cae57 100644
+--- a/include/uapi/linux/kvm.h
++++ b/include/uapi/linux/kvm.h
+@@ -929,6 +929,7 @@ struct kvm_ppc_resize_hpt {
+ #define KVM_CAP_PPC_SMT_POSSIBLE 147
+ #define KVM_CAP_HYPERV_SYNIC2 148
+ #define KVM_CAP_HYPERV_VP_INDEX 149
++#define KVM_CAP_ARM_RAS_EXTENSION 150
  
- /* Hyp Configuration Register (HCR) bits */
-+#define HCR_TEA		(UL(1) << 37)
-+#define HCR_TERR	(UL(1) << 36)
- #define HCR_E2H		(UL(1) << 34)
- #define HCR_ID		(UL(1) << 33)
- #define HCR_CD		(UL(1) << 32)
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index fe39e6841326..47983db27de2 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -47,6 +47,13 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
- 	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
- 	if (is_kernel_in_hyp_mode())
- 		vcpu->arch.hcr_el2 |= HCR_E2H;
-+	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
-+		/* route synchronous external abort exceptions to EL2 */
-+		vcpu->arch.hcr_el2 |= HCR_TEA;
-+		/* trap error record accesses */
-+		vcpu->arch.hcr_el2 |= HCR_TERR;
-+	}
-+
- 	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
- 		vcpu->arch.hcr_el2 &= ~HCR_RW;
- }
+ #ifdef KVM_CAP_IRQ_ROUTING
+ 
 -- 
 2.14.0
