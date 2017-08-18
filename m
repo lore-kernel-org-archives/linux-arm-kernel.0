@@ -1,19 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 19 Aug 2017 00:01:20 +0200
-Subject: [GIT PULL 1/3] ZTE SoC updates for 4.14
-In-Reply-To: <1503043549-13232-1-git-send-email-shawnguo@kernel.org>
-References: <1503043549-13232-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <CAK8P3a1X4yM+-4rnXr+HNbgmMLxW2+nH82eaVm-O+f743EWtKg@mail.gmail.com>
+Date: Sat, 19 Aug 2017 00:06:15 +0200
+Subject: [GIT PULL] Reset controller changes for v4.14
+In-Reply-To: <1503051046.7730.7.camel@pengutronix.de>
+References: <1503051046.7730.7.camel@pengutronix.de>
+Message-ID: <CAK8P3a1eOMim4tP2OFLrEDf+1-L4gy0W5hjbfzT1SAqX5DxrtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 10:05 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+On Fri, Aug 18, 2017 at 12:10 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Dear arm-soc maintainers,
+>
+> please consider merging this tag for v4.14. It contains a new HSDKv1
+> reset driver, updates and fixes for the uniphier driver, a reset array
+> API to handle a number of resets together, and removes the Gemini reset
+> driver, which is replaced by a combined clock/reset driver in
+> drivers/clk.
 
-> ----------------------------------------------------------------
-> ZTE SoC updates for 4.14:
->  - Select PINCTRL for ZTE platform, so that pinctrl driver for ZX296718
->    can be enabled.
+Pulled into next/drivers, thanks!
 
-Pulled into next/arm64, thanks!
-
-        Arnd
+      Arnd
