@@ -1,53 +1,112 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 Aug 2017 14:29:35 +0100
-Subject: [PATCH v2] irqchip/armada-370-xp: Enable MSI-X support
-In-Reply-To: <20170818125926.32029-1-sr@denx.de>
-References: <20170818125926.32029-1-sr@denx.de>
-Message-ID: <3362ef1b-17ec-992a-0347-263327f59591@arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 18 Aug 2017 09:33:11 -0400
+Subject: [PATCH V10 1/3] PCI: introduce pci_bus_wait_crs() function
+In-Reply-To: <20170818030009.GK28977@bhelgaas-glaptop.roam.corp.google.com>
+References: <1502470596-4112-1-git-send-email-okaya@codeaurora.org>
+ <20170818030009.GK28977@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <255545a4-0481-e77a-63ad-260d02a43131@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/08/17 13:59, Stefan Roese wrote:
-> Armada XP does not only support MSI, but also MSI-X. This patch sets
-> the MSI_FLAG_PCI_MSIX flag in the interrupt controller driver which
-> is the only change necessary to enable MSI-X support on this SoC. As
-> the Linux PCI MSI-X infrastructure takes care of writing the data and
-> address structures into the BAR specified by the MSI-X controller.
+On 8/17/2017 11:00 PM, Bjorn Helgaas wrote:
+> On Fri, Aug 11, 2017 at 12:56:34PM -0400, Sinan Kaya wrote:
+>> Kernel is hiding Configuration Request Retry Status (CRS) inside
+>> pci_bus_read_dev_vendor_id() function. We are looking to add support for
+>> Function Level Reset (FLR) where vendor id read returns ~0.
+>>
+>> Move CRS handling into its own function so that it can be called from other
+>> places as well.
 > 
-> Signed-off-by: Stefan Roese <sr@denx.de>
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
-> v2:
-> - Added Reviewed-by tag from Thomas
-> - Added usual irqchip maintainers
-> 
->  drivers/irqchip/irq-armada-370-xp.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-> index 33982cbd8a57..b17039ed8735 100644
-> --- a/drivers/irqchip/irq-armada-370-xp.c
-> +++ b/drivers/irqchip/irq-armada-370-xp.c
-> @@ -124,7 +124,7 @@ static struct irq_chip armada_370_xp_msi_irq_chip = {
->  
->  static struct msi_domain_info armada_370_xp_msi_domain_info = {
->  	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
-> -		   MSI_FLAG_MULTI_PCI_MSI),
-> +		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
->  	.chip	= &armada_370_xp_msi_irq_chip,
->  };
->  
+> I think this is a much better idea than what I proposed.  I still have
+> a few questions proposals.  I'll post a v11 to show what I'm thinking.
 > 
 
-Queued for 4.14.
+Sure, let me know. I can test it.
 
-Thanks,
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>  drivers/pci/pci.h   |  2 ++
+>>  drivers/pci/probe.c | 44 ++++++++++++++++++++++++++++++--------------
+>>  2 files changed, 32 insertions(+), 14 deletions(-)
+>>
 
-	M.
+>>  		msleep(delay);
+>>  		delay *= 2;
+>>  		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
+>> @@ -1858,6 +1846,34 @@ bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
+>>  			       PCI_FUNC(devfn));
+>>  			return false;
+> 
+> While staring at this, I think I found a pre-existing bug in
+> pci_bus_read_dev_vendor_id().  It looks like this:
+> 
+>   while ((*l & 0xffff) == 0x0001) {
+>     pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l);
+>     if (delay > crs_timeout)
+>       return false;
+>   }
+> 
+> The problem is that the config read may have *succeeded* that last
+> time before we time out.  I think the correct sequence is:
+> 
+>   - check for timeout
+>   - read PCI_VENDOR_ID
+>   - check for CRS
+> 
+
+Yeah, it makes sense.
+
+>>  		}
+>> +	} while ((*l & 0xffff) == 0x0001);
+>> +
+>> +	return true;
+>> +}
+>> +EXPORT_SYMBOL(pci_bus_wait_crs);
+> 
+> I don't think we need EXPORT_SYMBOL here, do we?
+
+copy/paste mistake. 
+
+> 
+>> +bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
+>> +				int crs_timeout)
+>> +{
+>> +	if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
+>> +		return false;
+>> +
+>> +	/* some broken boards return 0 or ~0 if a slot is empty: */
+>> +	if (*l == 0xffffffff || *l == 0x00000000 ||
+>> +	    *l == 0x0000ffff || *l == 0xffff0000)
+>> +		return false;
+>> +
+>> +	/*
+>> +	 * Configuration Request Retry Status.  Some root ports return the
+>> +	 * actual device ID instead of the synthetic ID (0xFFFF) required
+>> +	 * by the PCIe spec.  Ignore the device ID and only check for
+>> +	 * (vendor id == 1).
+>> +	 */
+>> +	if ((*l & 0xffff) == 0x0001) {
+>> +		if (!crs_timeout)
+>> +			return false;
+> 
+> One thing I don't like is that every caller of pci_bus_wait_crs() has
+> to know about the 0x0001 value.
+
+Another helper function? I was trying to poll for CRS completion only
+if we know that we are observing CRS.
+
+> 
+>> +		return pci_bus_wait_crs(bus, devfn, l, crs_timeout);
+>>  	}
+>>  
+>>  	return true;
+>> -- 
+>> 1.9.1
+>>
+> 
+
+
 -- 
-Jazz is not dead. It just smells funny...
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
