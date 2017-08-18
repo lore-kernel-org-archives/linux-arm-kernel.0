@@ -1,29 +1,51 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Fri, 18 Aug 2017 16:32:38 +0800
-Subject: [RFC PATCH v2 1/3] PCI: rockchip: Add support for pcie wake irq
-In-Reply-To: <5e3accf1-6f84-861f-f647-628322bb7841@rock-chips.com>
-References: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
- <20170817120431.12398-2-jeffy.chen@rock-chips.com>
- <5e3accf1-6f84-861f-f647-628322bb7841@rock-chips.com>
-Message-ID: <5996A626.5040303@rock-chips.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 18 Aug 2017 10:20:06 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Bindings Updates
+ for v4.14
+Message-ID: <cover.1502961902.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Olof, Hi Kevin, Hi Arnd,
 
-On 08/18/2017 03:23 PM, Shawn Lin wrote:
->>
->> @@ -1524,6 +1532,9 @@ static int rockchip_pcie_remove(struct
->> platform_device *pdev)
->>       struct device *dev = &pdev->dev;
->>       struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
->> +    dev_pm_clear_wake_irq(dev);
->> +    device_init_wakeup(dev, false);
->> +
->
-> Looks good overall but I think we need this on the
-> error handling path of rockchip_pcie_probe as well?
+Please consider these second round of Renesas ARM based SoC DT bindings updates for v4.14.
 
-hmm, right, will fix it, thanks.
+This pull request is based on the previous round of
+such requests, tagged as renesas-dt-bindings-for-v4.14,
+which I have already sent a pull-request for.
 
-and i also notice some other missing error handling, will fix them too:)
+
+The following changes since commit 100acb0bd90be67b3fc625cff91c7617b791743d:
+
+  ARM: shmobile: Document Renesas Draak board DT bindings (2017-07-27 17:10:48 +0200)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-bindings2-for-v4.14
+
+for you to fetch changes up to 304ce59242e11e715bfdc86577771502df99f7cd:
+
+  dt-bindings: apmu: Document r8a7743 support (2017-08-17 10:32:24 +0200)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC DT Bindings Updates for v4.14
+
+* Add RZ/G1M (r8a7743) binding to apmu driver
+
+  This allows SMP to be supported on the RZ/G1M SoC
+
+* Add bindings for iW-RainboW-G22D-SODIMM RZ/G1E SODIMM development kit
+
+  This is in preparation for adding DTS to support this hardware
+
+----------------------------------------------------------------
+Biju Das (1):
+      dt-bindings: apmu: Document r8a7743 support
+
+Fabrizio Castro (2):
+      ARM: shmobile: document iW-RainboW-G22M-SM SODIMM System on Module
+      ARM: shmobile: document iW-RainboW-G22D SODIMM SOM Development Platform
+
+ Documentation/devicetree/bindings/arm/shmobile.txt       | 4 ++++
+ Documentation/devicetree/bindings/power/renesas,apmu.txt | 3 ++-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
