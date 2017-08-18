@@ -1,47 +1,55 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Aug 2017 18:25:57 +0100
-Subject: [PATCH v2 0/5] Rework the pte handling for hardware AF/DBM
-Message-ID: <20170818172602.7624-1-catalin.marinas@arm.com>
+Date: Fri, 18 Aug 2017 18:25:59 +0100
+Subject: [PATCH v2 2/5] kvm: arm64: Convert kvm_set_s2pte_readonly() from
+ inline asm to cmpxchg()
+In-Reply-To: <20170818172602.7624-1-catalin.marinas@arm.com>
+References: <20170818172602.7624-1-catalin.marinas@arm.com>
+Message-ID: <20170818172602.7624-3-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+To take advantage of the LSE atomic instructions and also make the code
+cleaner, convert the kvm_set_s2pte_readonly() function to use the more
+generic cmpxchg().
 
-That's the second version of the pte accessors reworking series (first
-version at [1]).
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/kvm_mmu.h | 21 +++++++++------------
+ 1 file changed, 9 insertions(+), 12 deletions(-)
 
-Changes since v1:
-
-- READ_ONCE moved out of the cmpxchg loops since cmpxchg already returns
-  the old value (probably more efficient with LSE atomics)
-
-- The first patch from the first series has been merged upstream (cc
-  stable)
-
-- Kconfig entry kept just to disable the hardware feature but the code
-  paths all assume hardware AF/DBM
-
-- PAGE_COPY(_EXEC) removed as they just duplicate PAGE_READONLY(_EXEC)
-
-I kept the review-by tags in place as the logic is unchanged but feel
-free to look at the patches again.
-
-Thanks.
-
-[1] http://lkml.kernel.org/r/20170725135308.18173-1-catalin.marinas at arm.com
-
-Catalin Marinas (5):
-  arm64: Convert pte handling from inline asm to using (cmp)xchg
-  kvm: arm64: Convert kvm_set_s2pte_readonly() from inline asm to
-    cmpxchg()
-  arm64: Move PTE_RDONLY bit handling out of set_pte_at()
-  arm64: Ignore hardware dirty bit updates in ptep_set_wrprotect()
-  arm64: Remove the !CONFIG_ARM64_HW_AFDBM alternative code paths
-
- arch/arm64/include/asm/kvm_mmu.h      |  21 +++----
- arch/arm64/include/asm/pgtable-prot.h |  18 +++---
- arch/arm64/include/asm/pgtable.h      | 103 ++++++++++++++--------------------
- arch/arm64/kernel/hibernate.c         |   4 +-
- arch/arm64/kvm/hyp/s2-setup.c         |   2 +-
- arch/arm64/mm/fault.c                 |  30 ++++------
- 6 files changed, 72 insertions(+), 106 deletions(-)
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index a89cc22abadc..672c8684d5c2 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -175,18 +175,15 @@ static inline pmd_t kvm_s2pmd_mkwrite(pmd_t pmd)
+ 
+ static inline void kvm_set_s2pte_readonly(pte_t *pte)
+ {
+-	pteval_t pteval;
+-	unsigned long tmp;
+-
+-	asm volatile("//	kvm_set_s2pte_readonly\n"
+-	"	prfm	pstl1strm, %2\n"
+-	"1:	ldxr	%0, %2\n"
+-	"	and	%0, %0, %3		// clear PTE_S2_RDWR\n"
+-	"	orr	%0, %0, %4		// set PTE_S2_RDONLY\n"
+-	"	stxr	%w1, %0, %2\n"
+-	"	cbnz	%w1, 1b\n"
+-	: "=&r" (pteval), "=&r" (tmp), "+Q" (pte_val(*pte))
+-	: "L" (~PTE_S2_RDWR), "L" (PTE_S2_RDONLY));
++	pteval_t old_pteval, pteval;
++
++	pteval = READ_ONCE(pte_val(*pte));
++	do {
++		old_pteval = pteval;
++		pteval &= ~PTE_S2_RDWR;
++		pteval |= PTE_S2_RDONLY;
++		pteval = cmpxchg_relaxed(&pte_val(*pte), old_pteval, pteval);
++	} while (pteval != old_pteval);
+ }
+ 
+ static inline bool kvm_s2pte_readonly(pte_t *pte)
