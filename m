@@ -1,126 +1,40 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 18 Aug 2017 15:35:05 -0500
-Subject: [RESEND PATCH 1/1] arm64: dts: Add Variscite DART-SD410
- Evaluation board dts
-In-Reply-To: <014701d31418$8e419670$aac4c350$@variscite.com>
-References: <014701d31418$8e419670$aac4c350$@variscite.com>
-Message-ID: <20170818203505.GB4042@hector.attlocal.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Aug 2017 22:41:07 +0200
+Subject: [GIT PULL] arm: mediatek: dts32 updates for v4.14
+In-Reply-To: <9434dcb8-d38d-ff3a-a6ce-2b27d3a74cef@gmail.com>
+References: <9434dcb8-d38d-ff3a-a6ce-2b27d3a74cef@gmail.com>
+Message-ID: <CAK8P3a0HnyJq4LUQyv8zn5vKcybyY3avam8s=6UFcMSeqXVQbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 13, 2017 at 12:42:59PM +0300, Leonid Segal wrote:
-> Add initial device tree support for Variscite DART-SD410 Evalueation board.
-> This board is also known as VAR-SD410CustomBoard.
-> 
-> Signed-off-by: Leonid Segal <leonid.s@variscite.com>
-> ---
+On Thu, Aug 17, 2017 at 3:37 PM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+>
+> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+>
+>   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+>
+> are available in the git repository at:
+>
+>   https://github.com/mbgg/linux-mediatek.git tags/v4.13-next-dts64
+>
+> for you to fetch changes up to bdf2cbb2b3160122f7ff16445fdb73267fffd583:
+>
+>   arm64: dts: Add Mediatek SoC MT2712 and evaluation board dts and Makefile
+> (2017-08-17 15:33:45 +0200)
+>
+> ----------------------------------------------------------------
+> - add SoC mt7622 and its reference board
+> - cleanup of dts bindings
+> - mt6797: add watchdog and delete unused clock
+> - add support for SoC mt2701 and it's eval board
 
-A few comments, mainly about your documentation on the Variscite
-website.  Specifically the schematics.  Please tell your hardware
-people to be consistent in your naming conventions for pins.
+Nice to see mt7622 support already getting merged, at least it seems this
+is getting there before the chip ends up in consumer devices, normally
+it's the other way round ;-)
 
-MPP_GPIO/PM_GPIO appear to be interchangeable.  And it's usually
-best to split out the PMIC pins from the non-pmic.  That's my 2
-cents at least.
+Could you let me know what mt2712 is? I can't find anything about this
+chip, not even which business unit made it, and I'd like to have a brief
+description for most newly added hardware in my own pull requests.
 
-
->  arch/arm64/boot/dts/qcom/Makefile                  |   1 +
->  .../boot/dts/qcom/apq8016-var-dart-pmic-pins.dtsi  |  53 +++
->  .../boot/dts/qcom/apq8016-var-dart-soc-pins.dtsi   |  88 ++++
->  arch/arm64/boot/dts/qcom/apq8016-var-dart.dts      |  21 +
->  arch/arm64/boot/dts/qcom/apq8016-var-dart.dtsi     | 525
-
-<snip>
-
-> +			pins = "gpio32";
-> +		};
-> +		pinconf {
-> +			pins = "gpio32";
-> +			drive-strength = <2>;
-> +			bias-disable;
-> +		};
-> +	};
-> +
-> +	msm_key_volp_n_default: msm_key_volp_n_default {
-
-Schematics show this to be a Home button.  If so this needs to be
-updated to reflect that.
-
-> +		pinmux {
-> +			function = "gpio";
-> +			pins = "gpio107";
-> +		};
-> +		pinconf {
-> +			pins = "gpio107";
-> +			drive-strength = <8>;
-> +			input-enable;
-> +			bias-pull-up;
-> +		};
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/qcom/apq8016-var-dart.dts
-
-<snip>
-
-> +/dts-v1/;
-> +
-> +#include "apq8016-var-dart.dtsi"
-> +
-> +/ {
-> +	model = "Variscite LTD. VAR-DART410";
-> +	compatible = "qcom,apq8016-dart", "qcom,apq8016", "qcom,dart";
-
-qcom isnt making this board.  Please use something like "variscite,dart",
-"qcom,apq8016"
-
-> +};
-> diff --git a/arch/arm64/boot/dts/qcom/apq8016-var-dart.dtsi
-> b/arch/arm64/boot/dts/qcom/apq8016-var-dart.dtsi
-> new file mode 100644
-> index 000000000000..f214d0b101a4
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/qcom/apq8016-var-dart.dtsi
-
-<snip>
-> +
-> +		usb at 78d9000 {
-> +			extcon = <&usb_id>, <&usb_id>;
-> +			status = "okay";
-> +		};
-> +
-> +		ehci at 78d9000 {
-> +			status = "okay";
-
-Can you try removing the echi and using the chipidea instead.  Take a
-look at the current db410c in -next.  Try it out and see if that works
-for you.  If it does, modify your nodes to match up.
-
-> +		};
-> +
-> +		phy at 78d9000 {
-> +			v1p8-supply = <&pm8916_l7>;
-> +			v3p3-supply = <&pm8916_l13>;
-> +			vddcx-supply = <&pm8916_s1>;
-> +			extcon = <&usb_id>, <&usb_id>;
-> +			dr_mode = "otg";
-> +			status = "okay";
-> +			switch-gpio = <&pm8916_gpios 4 GPIO_ACTIVE_HIGH>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&usb_sw_sel_pm>;
-
-Same here, I think some things changed here.  Need to update.
-switch-gpio went away.
-
-> +		};
-> +
-> +		lpass at 07708000 {
-> +			status = "okay";
-> +		};
-> +
-
-<snip>
-
-
-Regards,
-
-Andy Gross
+        Arnd
