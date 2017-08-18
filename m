@@ -1,44 +1,33 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 18 Aug 2017 16:48:06 +0200
-Subject: [GIT PULL 5/5] ARM: tegra: Default configuration updates for v4.14-rc1
-In-Reply-To: <20170818144806.14252-1-thierry.reding@gmail.com>
-References: <20170818144806.14252-1-thierry.reding@gmail.com>
-Message-ID: <20170818144806.14252-5-thierry.reding@gmail.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Fri, 18 Aug 2017 22:48:08 +0800
+Subject: [PATCH] arm64: dts: rockchip: Fix wrong rt5514 dmic delay property
+ for Gru
+Message-ID: <20170818144808.27869-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+According to rt5514 dt-binding, it should be "realtek,dmic-init-delay-ms".
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+Fixes: 48f4d9796d99 (arm64: dts: rockchip: add Gru/Kevin DTS)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+---
 
-are available in the git repository at:
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.14-arm-defconfig
-
-for you to fetch changes up to f6982786df61513c3614c91d492f3c1b21da6128:
-
-  ARM: defconfig: tegra: Enable ChipIdea UDC driver (2017-08-17 16:29:53 +0200)
-
-----------------------------------------------------------------
-ARM: tegra: Default configuration updates for v4.14-rc1
-
-Enables the ChipIdea UDC driver and selects some symbols that were
-previously being selected by other drivers but will no longer be in
-v4.14.
-
-----------------------------------------------------------------
-Dmitry Osipenko (1):
-      ARM: defconfig: tegra: Enable ChipIdea UDC driver
-
-Paul Kocialkowski (2):
-      ARM: tegra: Add Tegra I2S interfaces to defconfig
-      ARM: configs: Add Tegra I2S interfaces to multi_v7_defconfig
-
-Thierry Reding (1):
-      ARM: tegra: Update default configuration for v4.13-rc1
-
- arch/arm/configs/multi_v7_defconfig |  2 ++
- arch/arm/configs/tegra_defconfig    | 12 +++++++-----
- 2 files changed, 9 insertions(+), 5 deletions(-)
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+index c489c78b2b5b..5f2e1415b7ab 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+@@ -617,7 +617,7 @@ ap_i2c_mic: &i2c1 {
+ 		interrupts = <13 IRQ_TYPE_LEVEL_HIGH>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&mic_int>;
+-		realtek,dmic-init-delay = <20>;
++		realtek,dmic-init-delay-ms = <20>;
+ 		wakeup-source;
+ 	};
+ };
+-- 
+2.11.0
