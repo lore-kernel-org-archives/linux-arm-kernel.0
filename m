@@ -1,64 +1,52 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 18 Aug 2017 11:24:27 +0200
-Subject: [PATCH v2 0/6] net: stmmac: Detect PHY location with
- phy-is-integrated
-In-Reply-To: <20170817075149.16178-1-clabbe.montjoie@gmail.com>
-References: <20170817075149.16178-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170818092427.GA7425@Red>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 18 Aug 2017 11:44:02 +0200
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.14 (#2)
+Message-ID: <87mv6xky71.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 09:51:43AM +0200, Corentin Labbe wrote:
-> Hello
-> 
-> The current way to find if the phy is internal is to compare DT phy-mode
-> and emac_variant/internal_phy.
-> But it will negate a possible future SoC where an external PHY use the
-> same phy mode than the integrated one.
-> 
-> This patchs series adds a new way to find if the PHY is integrated, via
-> the phy-is-integrated DT property.
-> 
-> Since it exists both integrated and external ethernet-phy at 1, they are merged in
-> the final DTB and so share all properties.
-> For avoiding this, the phy-is-integrated is added only to board DT.
-> 
-> The first five patchs should go via the sunxi tree.
-> the last one should go via the net tree.
-> Note that this serie will need backporting the patch
-> "Documentation: net: phy: Add phy-is-integrated binding" which is in net-next
-> 
-> Thanks
-> Regards
-> 
-> Changes since v1:
-> - Dropped phy-is-integrated documentation patch since another same patch was already merged
-> - Moved phy-is-integrated from SoC dtsi to final board DT.
-> 
-> Corentin Labbe (6):
->   ARM: sun8i: orangepipc: Set phy-is-integrated to the internal phy node
->   ARM: sun8i: beelink-x2: Set phy-is-integrated to the internal phy node
->   ARM: sun8i: nanopi-neo: Set phy-is-integrated to the internal phy node
->   ARM: sun8i: orangepi-2: Set phy-is-integrated to the internal phy node
->   ARM: sun8i: orangepi-one: Set phy-is-integrated to the internal phy
->     node
->   net: stmmac: dwmac-sun8i: choose internal PHY via phy-is-integrated
-> 
->  arch/arm/boot/dts/sun8i-h3-beelink-x2.dts         |  4 ++++
->  arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts         |  4 ++++
->  arch/arm/boot/dts/sun8i-h3-orangepi-2.dts         |  4 ++++
->  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts       |  4 ++++
->  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts        |  4 ++++
->  drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 16 ++++++++--------
->  6 files changed, 28 insertions(+), 8 deletions(-)
-> 
-> -- 
-> 2.13.0
-> 
+Hi,
 
-Hello
+Here is the second pull request for dt64 for mvebu for v4.14.
 
-Self NACK, the comment from Rob on previous series is pertinent.
-I will send a v3 which use a mdio-mux for solving all problems.
+Gregory
 
-Regards
+The following changes since commit 249112cef2f323354be61a27be1d6e94507f7587:
+
+  arm64: dts: marvell: re-order RTC nodes in Marvell CP110 description (2017-08-02 16:07:38 +0200)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.14-2
+
+for you to fetch changes up to 0ea62502a5146cfe98696a152894ebb9afbee9d4:
+
+  ARM64: dts: marvell: enable USB host on Armada-8040-DB (2017-08-14 16:30:43 +0200)
+
+----------------------------------------------------------------
+mvebu dt64 for 4.14 (part 2)
+
+- Enable uSD on ESPRESSObin (Armada 37xx based board)
+- Add NAND support on Armada 7K/8K SoCs
+- Enable USB host on Armada-7040-DB and Armada-8040-DB boards
+
+----------------------------------------------------------------
+Gregory CLEMENT (2):
+      arm64: dts: marvell: Fully re-order nodes in Marvell CP110 dtsi files
+      ARM64: dts: marvell: add NAND support on the CP110
+
+Grzegorz Jaszczyk (1):
+      ARM64: dts: marvell: enable USB host on Armada-8040-DB
+
+Hanna Hawa (1):
+      ARM64: dts: marvell: enable USB host on Armada-7040-DB
+
+Marcin Wojtas (1):
+      ARM64: dts: marvell: armada-37xx: Enable uSD on ESPRESSObin
+
+ .../boot/dts/marvell/armada-3720-espressobin.dts   | 25 +++++++++
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 39 +++++++++++++
+ arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 65 ++++++++++++++++++++++
+ .../boot/dts/marvell/armada-cp110-master.dtsi      | 33 ++++++++---
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 33 ++++++++---
+ 5 files changed, 177 insertions(+), 18 deletions(-)
