@@ -1,72 +1,64 @@
-From: sr@denx.de (Stefan Roese)
-Date: Fri, 18 Aug 2017 12:18:28 +0200
-Subject: [PATCH] irqchip/armada-370-xp: Enable MSI-X support
-In-Reply-To: <6a3e8bcc-19ef-cef1-180e-f4e194d5589b@denx.de>
-References: <20170502072600.13380-1-sr@denx.de>
- <80f30724-20b6-b5a7-7218-93ff3fa23177@denx.de>
- <20170815160109.023842de@windsurf>
- <6a3e8bcc-19ef-cef1-180e-f4e194d5589b@denx.de>
-Message-ID: <0b8b249b-255a-6354-69cd-58f44fa7874d@denx.de>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Fri, 18 Aug 2017 10:25:47 +0000
+Subject: [PATCH ] ARM: multi_v7_defconfig: Enable BQ32000 RTC driver
+In-Reply-To: <20170818080621.GI9175@verge.net.au>
+References: <1502975345-4209-1-git-send-email-biju.das@bp.renesas.com>
+ <20170818080621.GI9175@verge.net.au>
+Message-ID: <KL1PR06MB17029FA6365BDD6C1C38C42DB8800@KL1PR06MB1702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
 
-On 15.08.2017 16:06, Stefan Roese wrote:
-> On 15.08.2017 16:01, Thomas Petazzoni wrote:
->> On Tue, 15 Aug 2017 15:31:31 +0200, Stefan Roese wrote:
->>
->>> On 02.05.2017 09:26, Stefan Roese wrote:
->>>> Armada XP does not only support MSI, but also MSI-X. This patch sets
->>>> the MSI_FLAG_PCI_MSIX flag in the interrupt controller driver which
->>>> is the only change necessary to enable MSI-X support on this SoC. As
->>>> the Linux PCI MSI-X infrastructure takes care of writing the data and
->>>> address structures into the BAR specified by the MSI-X controller.
->>>>
->>>> Signed-off-by: Stefan Roese <sr@denx.de>
->>>> Cc: Bjorn Helgaas <bhelgaas@google.com>
->>>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->>>> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
->>>> Cc: Jason Cooper <jason@lakedaemon.net>
->>>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>>> ---
->>>>    drivers/irqchip/irq-armada-370-xp.c | 2 +-
->>>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/irqchip/irq-armada-370-xp.c 
->>>> b/drivers/irqchip/irq-armada-370-xp.c
->>>> index 33982cbd8a57..b17039ed8735 100644
->>>> --- a/drivers/irqchip/irq-armada-370-xp.c
->>>> +++ b/drivers/irqchip/irq-armada-370-xp.c
->>>> @@ -124,7 +124,7 @@ static struct irq_chip 
->>>> armada_370_xp_msi_irq_chip = {
->>>>    static struct msi_domain_info armada_370_xp_msi_domain_info = {
->>>>        .flags    = (MSI_FLAG_USE_DEF_DOM_OPS | 
->>>> MSI_FLAG_USE_DEF_CHIP_OPS |
->>>> -           MSI_FLAG_MULTI_PCI_MSI),
->>>> +           MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
->>>>        .chip    = &armada_370_xp_msi_irq_chip,
->>>>    };
->>>
->>> Its been a while since this patch has been submitted - without any
->>> comments so far. What's the current status with it? Is it someones
->>> queue for upstreaming?
->>
->> Sorry for the lack of feedback, very good idea to ping me on this
->> topic. I don't have access to HW right now, so I can't give it a test.
->> However, I don't think I have MSI-X capable hardware, only MSI capable.
->>
->> With which hardware did you test this? An off-the-shell PCIe card, or
->> some custom FPGA logic?
-> 
-> I tested this code with some Altera / Intel FPGA using their PCI-Express
-> IP core. It should be possible to test this with some MSI-X capable
-> desktop PCIe cards as well on AXP boards equipped with PCIe slots,
-> like the Marvell AXP development board (orange box).
 
-So what do you think about this patch? Can I get your Acked-by /
-Reviewed-by, or do you have some objections? Or do plan to first do
-some tests yourself?
+> -----Original Message-----
+> From: Simon Horman [mailto:horms at verge.net.au]
+> Sent: 18 August 2017 09:06
+> To: Biju Das <biju.das@bp.renesas.com>
+> Cc: Russell King <linux@armlinux.org.uk>; Magnus Damm
+> <magnus.damm@gmail.com>; Fabrizio Castro
+> <fabrizio.castro@bp.renesas.com>; Chris Paterson
+> <Chris.Paterson2@renesas.com>; linux-renesas-soc at vger.kernel.org; linux-
+> arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH ] ARM: multi_v7_defconfig: Enable BQ32000 RTC driver
+>
+> On Thu, Aug 17, 2017 at 02:09:05PM +0100, Biju Das wrote:
+> > The iWave RZ/G1M Q7 SOM supports RTC (TI BQ32000).
+> > To increase hardware support enable the driver in the
+> > multi_v7_defconfig multiplatform configuration.
+> >
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > ---
+> > This patch is tested against linux-next tag next-20170817 as well as
+> > renesas-dev tag renesas-devel-20170815-v4.13-rc5 .
+> >
+> >  arch/arm/configs/multi_v7_defconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/arch/arm/configs/multi_v7_defconfig
+> > b/arch/arm/configs/multi_v7_defconfig
+> > index 18e1f80..02dc373 100644
+> > --- a/arch/arm/configs/multi_v7_defconfig
+> > +++ b/arch/arm/configs/multi_v7_defconfig
+> > @@ -766,6 +766,7 @@ CONFIG_RTC_DRV_MAX8997=m
+> > CONFIG_RTC_DRV_MAX77686=y  CONFIG_RTC_DRV_RK808=m
+> > CONFIG_RTC_DRV_RS5C372=m
+> > +CONFIG_RTC_DRV_BQ32K=y
+>
+> My assumption is that multi_v7_defconfig produces a very large kernel image
+> and that we should try to avoid making it larger by using modules where
+> possible. Is it practical to enable this option as a module (m) rather than a built-
+> in (y)?
 
-Thanks,
-Stefan
+I have tested this as module and it works. OK I will send v2.
+
+
+> >  CONFIG_RTC_DRV_PALMAS=y
+> >  CONFIG_RTC_DRV_ST_LPC=y
+> >  CONFIG_RTC_DRV_TWL4030=y
+> > --
+> > 1.9.1
+> >
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
