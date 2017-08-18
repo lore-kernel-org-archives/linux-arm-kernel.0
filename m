@@ -1,27 +1,39 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 18 Aug 2017 11:18:24 +0200
-Subject: [PATCH] arm64: dts: rockchip: disable tx ipgap linecheck for
- rk3399 dwc3
-In-Reply-To: <1502958272-1384-1-git-send-email-william.wu@rock-chips.com>
-References: <1502958272-1384-1-git-send-email-william.wu@rock-chips.com>
-Message-ID: <4718044.sxV3Y2WdLf@phil>
+From: fabien.dessenne@st.com (Fabien Dessenne)
+Date: Fri, 18 Aug 2017 11:19:03 +0200
+Subject: [PATCH v3 0/3] STM32 CRYP crypto driver
+Message-ID: <1503047946-27799-1-git-send-email-fabien.dessenne@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 17. August 2017, 16:24:32 CEST schrieb William Wu:
-> RK3399 USB DWC3 controller has a issue that FS/LS devices not
-> recognized if inserted through USB 3.0 HUB. It's because that
-> the inter-packet delay between the SSPLIT token to SETUP token
-> is about 566ns, more then the USB spec requirement.
-> 
-> This patch adds a quirk "snps,dis-tx-ipgap-linecheck-quirk" to
-> disable the u2mac linestate check to decrease the SSPLIT token
-> to SETUP token inter-packet delay from 566ns to 466ns.
-> 
-> Signed-off-by: William Wu <william.wu@rock-chips.com>
+This set of patches adds a new crypto driver for STMicroelectronics stm32 HW.
+This drivers uses the crypto API and provides with HW-enabled AEAD and block
+cipher algorithms.
+It makes use of the crypto engine which is upgraded in order to support AEAD
+requests.
 
-applied for 4.14
+This driver was successfully tested with tcrypt / testmgr.
 
+Changes since v3:
+- update dt-bindings with Rob Herring remarks
 
-Thanks
-Heiko
+Changes since v2:
+- update dt-bindings (interrupts description)
+- rebase on STM32 crypto patches (L. Debieve : update CRC32 + add HASH)
+
+Fabien Dessenne (3):
+  crypto: engine - permit to enqueue aead_request
+  dt-bindings: Document STM32 CRYP bindings
+  crypto: stm32 - Support for STM32 CRYP crypto module
+
+ .../devicetree/bindings/crypto/st,stm32-cryp.txt   |   19 +
+ crypto/crypto_engine.c                             |  101 +
+ drivers/crypto/stm32/Kconfig                       |    9 +
+ drivers/crypto/stm32/Makefile                      |    3 +-
+ drivers/crypto/stm32/stm32-cryp.c                  | 1962 ++++++++++++++++++++
+ include/crypto/engine.h                            |   16 +
+ 6 files changed, 2109 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/crypto/st,stm32-cryp.txt
+ create mode 100644 drivers/crypto/stm32/stm32-cryp.c
+
+-- 
+2.7.4
