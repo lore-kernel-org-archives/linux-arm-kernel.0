@@ -1,40 +1,73 @@
-From: lionel.debieve@st.com (Lionel Debieve)
-Date: Fri, 18 Aug 2017 15:54:01 +0200
-Subject: [PATCH 1/1] crypto: stm32/hash - Remove uninitialized symbol
-Message-ID: <1503064441-19964-1-git-send-email-lionel.debieve@st.com>
+From: gengdongjiu@huawei.com (Dongjiu Geng)
+Date: Fri, 18 Aug 2017 22:23:45 +0800
+Subject: [PATCH v11 4/6] target-arm: kvm64: detect guest RAS EXTENSION feature
+In-Reply-To: <1503066227-18251-1-git-send-email-gengdongjiu@huawei.com>
+References: <1503066227-18251-1-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1503066227-18251-5-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove err symbol as this is not used in the thread context
-and the variable is not initialized.
+check if kvm supports guest RAS EXTENSION. if so, set
+corresponding feature bit for vcpu.
 
-Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 ---
- drivers/crypto/stm32/stm32-hash.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ linux-headers/linux/kvm.h | 1 +
+ target/arm/cpu.h          | 3 +++
+ target/arm/kvm64.c        | 8 ++++++++
+ 3 files changed, 12 insertions(+)
 
-diff --git a/drivers/crypto/stm32/stm32-hash.c b/drivers/crypto/stm32/stm32-hash.c
-index b585ce5..b34ee85 100644
---- a/drivers/crypto/stm32/stm32-hash.c
-+++ b/drivers/crypto/stm32/stm32-hash.c
-@@ -1067,7 +1067,6 @@ static int stm32_hash_cra_sha256_init(struct crypto_tfm *tfm)
- static irqreturn_t stm32_hash_irq_thread(int irq, void *dev_id)
- {
- 	struct stm32_hash_dev *hdev = dev_id;
--	int err;
+diff --git a/linux-headers/linux/kvm.h b/linux-headers/linux/kvm.h
+index 7971a4f..2aa176e 100644
+--- a/linux-headers/linux/kvm.h
++++ b/linux-headers/linux/kvm.h
+@@ -929,6 +929,7 @@ struct kvm_ppc_resize_hpt {
+ #define KVM_CAP_PPC_SMT_POSSIBLE 147
+ #define KVM_CAP_HYPERV_SYNIC2 148
+ #define KVM_CAP_HYPERV_VP_INDEX 149
++#define KVM_CAP_ARM_RAS_EXTENSION 150
  
- 	if (HASH_FLAGS_CPU & hdev->flags) {
- 		if (HASH_FLAGS_OUTPUT_READY & hdev->flags) {
-@@ -1084,8 +1083,8 @@ static irqreturn_t stm32_hash_irq_thread(int irq, void *dev_id)
- 	return IRQ_HANDLED;
+ #ifdef KVM_CAP_IRQ_ROUTING
  
- finish:
--	/*Finish current request */
--	stm32_hash_finish_req(hdev->req, err);
-+	/* Finish current request */
-+	stm32_hash_finish_req(hdev->req, 0);
+diff --git a/target/arm/cpu.h b/target/arm/cpu.h
+index b39d64a..6b0961b 100644
+--- a/target/arm/cpu.h
++++ b/target/arm/cpu.h
+@@ -611,6 +611,8 @@ struct ARMCPU {
  
- 	return IRQ_HANDLED;
- }
+     /* CPU has memory protection unit */
+     bool has_mpu;
++    /* CPU has ras extension unit */
++    bool has_ras_extension;
+     /* PMSAv7 MPU number of supported regions */
+     uint32_t pmsav7_dregion;
+ 
+@@ -1229,6 +1231,7 @@ enum arm_features {
+     ARM_FEATURE_THUMB_DSP, /* DSP insns supported in the Thumb encodings */
+     ARM_FEATURE_PMU, /* has PMU support */
+     ARM_FEATURE_VBAR, /* has cp15 VBAR */
++    ARM_FEATURE_RAS_EXTENSION, /*has RAS extension support */
+ };
+ 
+ static inline int arm_feature(CPUARMState *env, int feature)
+diff --git a/target/arm/kvm64.c b/target/arm/kvm64.c
+index a16abc8..0781367 100644
+--- a/target/arm/kvm64.c
++++ b/target/arm/kvm64.c
+@@ -518,6 +518,14 @@ int kvm_arch_init_vcpu(CPUState *cs)
+         unset_feature(&env->features, ARM_FEATURE_PMU);
+     }
+ 
++    if (kvm_check_extension(cs->kvm_state, KVM_CAP_ARM_RAS_EXTENSION)) {
++        cpu->has_ras_extension = true;
++        set_feature(&env->features, ARM_FEATURE_RAS_EXTENSION);
++    } else {
++        cpu->has_ras_extension = false;
++        unset_feature(&env->features, ARM_FEATURE_RAS_EXTENSION);
++    }
++
+     /* Do KVM_ARM_VCPU_INIT ioctl */
+     ret = kvm_arm_vcpu_init(cs);
+     if (ret) {
 -- 
-2.7.4
+1.8.3.1
