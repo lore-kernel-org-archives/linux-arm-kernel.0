@@ -1,21 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Aug 2017 23:02:11 +0200
-Subject: [GIT PULL 2/3] ZTE device tree updates for 4.14
-In-Reply-To: <1503043549-13232-2-git-send-email-shawnguo@kernel.org>
-References: <1503043549-13232-1-git-send-email-shawnguo@kernel.org>
- <1503043549-13232-2-git-send-email-shawnguo@kernel.org>
-Message-ID: <CAK8P3a1wU-N_DqY90-QcpPtAp1aFaaEjngYHhK=eBSzkHN69bA@mail.gmail.com>
+Date: Fri, 18 Aug 2017 23:04:05 +0200
+Subject: [GIT PULL 4/5] ARM: tegra: Device tree changes for v4.14-rc1
+In-Reply-To: <20170818144806.14252-4-thierry.reding@gmail.com>
+References: <20170818144806.14252-1-thierry.reding@gmail.com>
+ <20170818144806.14252-4-thierry.reding@gmail.com>
+Message-ID: <CAK8P3a2Fc-QAfnxLm9OOk4mygJF6yctVze2698cW9wPqWP-dqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 10:05 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
-> ----------------------------------------------------------------
-> ZTE device tree updates for 4.14:
->  - A clean up patch from Shawn Lin to remove the deprecated dwmmc
->    property 'num-slots'.
+On Fri, Aug 18, 2017 at 4:48 PM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> ARM: tegra: Device tree changes for v4.14-rc1
 >
+> One fix for Tegra124 to hook the host1x device up with the SMMU.
+>
+> The remainder of this enables USB device mode on a couple of boards
+> where the port is currently unused.
 
 Pulled into next/dt, thanks!
 
-      Arnd
+         Arnd
