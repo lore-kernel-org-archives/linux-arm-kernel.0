@@ -1,194 +1,67 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Aug 2017 18:25:58 +0100
-Subject: [PATCH v2 1/5] arm64: Convert pte handling from inline asm to using
- (cmp)xchg
+Date: Fri, 18 Aug 2017 18:26:01 +0100
+Subject: [PATCH v2 4/5] arm64: Ignore hardware dirty bit updates in
+ ptep_set_wrprotect()
 In-Reply-To: <20170818172602.7624-1-catalin.marinas@arm.com>
 References: <20170818172602.7624-1-catalin.marinas@arm.com>
-Message-ID: <20170818172602.7624-2-catalin.marinas@arm.com>
+Message-ID: <20170818172602.7624-5-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the support for hardware updates of the access and dirty states,
-the following pte handling functions had to be implemented using
-exclusives: __ptep_test_and_clear_young(), ptep_get_and_clear(),
-ptep_set_wrprotect() and ptep_set_access_flags(). To take advantage of
-the LSE atomic instructions and also make the code cleaner, convert
-these pte functions to use the more generic cmpxchg()/xchg().
+ptep_set_wrprotect() is only called on CoW mappings which are private
+(!VM_SHARED) with the pte either read-only (!PTE_WRITE && PTE_RDONLY) or
+writable and software-dirty (PTE_WRITE && !PTE_RDONLY && PTE_DIRTY).
+There is no race with the hardware update of the dirty state: clearing
+of PTE_RDONLY when PTE_WRITE (a.k.a. PTE_DBM) is set. This patch removes
+the code setting the software PTE_DIRTY bit in ptep_set_wrprotect() as
+superfluous. A VM_WARN_ONCE is introduced in case the above logic is
+wrong or the core mm code changes its use of ptep_set_wrprotect().
 
 Cc: Will Deacon <will.deacon@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Steve Capper <steve.capper@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/pgtable.h | 71 +++++++++++++++++++---------------------
- arch/arm64/mm/fault.c            | 24 +++++++-------
- 2 files changed, 44 insertions(+), 51 deletions(-)
+ arch/arm64/include/asm/pgtable.h | 21 +++++++++++++--------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 6eae342ced6b..9127688ae775 100644
+index a04bfb869a80..0117cbcd62d4 100644
 --- a/arch/arm64/include/asm/pgtable.h
 +++ b/arch/arm64/include/asm/pgtable.h
-@@ -39,6 +39,7 @@
+@@ -634,23 +634,28 @@ static inline pmd_t pmdp_huge_get_and_clear(struct mm_struct *mm,
+ #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
  
- #ifndef __ASSEMBLY__
- 
-+#include <asm/cmpxchg.h>
- #include <asm/fixmap.h>
- #include <linux/mmdebug.h>
- 
-@@ -173,6 +174,11 @@ static inline pte_t pte_clear_rdonly(pte_t pte)
- 	return clear_pte_bit(pte, __pgprot(PTE_RDONLY));
- }
- 
-+static inline pte_t pte_set_rdonly(pte_t pte)
-+{
-+	return set_pte_bit(pte, __pgprot(PTE_RDONLY));
-+}
-+
- static inline pte_t pte_mkpresent(pte_t pte)
- {
- 	return set_pte_bit(pte, __pgprot(PTE_VALID));
-@@ -593,20 +599,17 @@ static inline int pmdp_set_access_flags(struct vm_area_struct *vma,
- #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
- static inline int __ptep_test_and_clear_young(pte_t *ptep)
- {
--	pteval_t pteval;
--	unsigned int tmp, res;
-+	pte_t old_pte, pte;
- 
--	asm volatile("//	__ptep_test_and_clear_young\n"
--	"	prfm	pstl1strm, %2\n"
--	"1:	ldxr	%0, %2\n"
--	"	ubfx	%w3, %w0, %5, #1	// extract PTE_AF (young)\n"
--	"	and	%0, %0, %4		// clear PTE_AF\n"
--	"	stxr	%w1, %0, %2\n"
--	"	cbnz	%w1, 1b\n"
--	: "=&r" (pteval), "=&r" (tmp), "+Q" (pte_val(*ptep)), "=&r" (res)
--	: "L" (~PTE_AF), "I" (ilog2(PTE_AF)));
-+	pte = READ_ONCE(*ptep);
-+	do {
-+		old_pte = pte;
-+		pte = pte_mkold(pte);
-+		pte_val(pte) = cmpxchg_relaxed(&pte_val(*ptep),
-+					       pte_val(old_pte), pte_val(pte));
-+	} while (pte_val(pte) != pte_val(old_pte));
- 
--	return res;
-+	return pte_young(pte);
- }
- 
- static inline int ptep_test_and_clear_young(struct vm_area_struct *vma,
-@@ -630,17 +633,7 @@ static inline int pmdp_test_and_clear_young(struct vm_area_struct *vma,
- static inline pte_t ptep_get_and_clear(struct mm_struct *mm,
- 				       unsigned long address, pte_t *ptep)
- {
--	pteval_t old_pteval;
--	unsigned int tmp;
--
--	asm volatile("//	ptep_get_and_clear\n"
--	"	prfm	pstl1strm, %2\n"
--	"1:	ldxr	%0, %2\n"
--	"	stxr	%w1, xzr, %2\n"
--	"	cbnz	%w1, 1b\n"
--	: "=&r" (old_pteval), "=&r" (tmp), "+Q" (pte_val(*ptep)));
--
--	return __pte(old_pteval);
-+	return __pte(xchg_relaxed(&pte_val(*ptep), 0));
- }
- 
- #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-@@ -659,21 +652,23 @@ static inline pmd_t pmdp_huge_get_and_clear(struct mm_struct *mm,
+ /*
+- * ptep_set_wrprotect - mark read-only while trasferring potential hardware
+- * dirty status (PTE_DBM && !PTE_RDONLY) to the software PTE_DIRTY bit.
++ * ptep_set_wrprotect - mark read-only while preserving the hardware update of
++ * the Access Flag.
+  */
  #define __HAVE_ARCH_PTEP_SET_WRPROTECT
  static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long address, pte_t *ptep)
  {
--	pteval_t pteval;
--	unsigned long tmp;
--
--	asm volatile("//	ptep_set_wrprotect\n"
--	"	prfm	pstl1strm, %2\n"
--	"1:	ldxr	%0, %2\n"
--	"	tst	%0, %4			// check for hw dirty (!PTE_RDONLY)\n"
--	"	csel	%1, %3, xzr, eq		// set PTE_DIRTY|PTE_RDONLY if dirty\n"
--	"	orr	%0, %0, %1		// if !dirty, PTE_RDONLY is already set\n"
--	"	and	%0, %0, %5		// clear PTE_WRITE/PTE_DBM\n"
--	"	stxr	%w1, %0, %2\n"
--	"	cbnz	%w1, 1b\n"
--	: "=&r" (pteval), "=&r" (tmp), "+Q" (pte_val(*ptep))
--	: "r" (PTE_DIRTY|PTE_RDONLY), "L" (PTE_RDONLY), "L" (~PTE_WRITE)
--	: "cc");
-+	pte_t old_pte, pte;
-+
-+	pte = READ_ONCE(*ptep);
-+	do {
-+		old_pte = pte;
-+		/*
-+		 * If hardware-dirty (PTE_WRITE/DBM bit set and PTE_RDONLY
-+		 * clear), set the PTE_DIRTY and PTE_RDONLY bits.
-+		 */
-+		if (pte_hw_dirty(pte)) {
-+			pte = pte_mkdirty(pte);
-+			pte = pte_set_rdonly(pte);
-+		}
-+		pte = pte_wrprotect(pte);
-+		pte_val(pte) = cmpxchg_relaxed(&pte_val(*ptep),
-+					       pte_val(old_pte), pte_val(pte));
-+	} while (pte_val(pte) != pte_val(old_pte));
- }
+ 	pte_t old_pte, pte;
  
- #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 2509e4fe6992..9b861986548e 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -34,6 +34,7 @@
- #include <linux/hugetlb.h>
- 
- #include <asm/bug.h>
-+#include <asm/cmpxchg.h>
- #include <asm/cpufeature.h>
- #include <asm/exception.h>
- #include <asm/debug-monitors.h>
-@@ -154,8 +155,7 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
- 			  unsigned long address, pte_t *ptep,
- 			  pte_t entry, int dirty)
- {
--	pteval_t old_pteval;
--	unsigned int tmp;
-+	pteval_t old_pteval, pteval;
- 
- 	if (pte_same(*ptep, entry))
- 		return 0;
-@@ -165,7 +165,7 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
- 
- 	/* set PTE_RDONLY if actual read-only or clean PTE */
- 	if (!pte_write(entry) || !pte_sw_dirty(entry))
--		pte_val(entry) |= PTE_RDONLY;
-+		entry = pte_set_rdonly(entry);
- 
- 	/*
- 	 * Setting the flags must be done atomically to avoid racing with the
-@@ -174,16 +174,14 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
- 	 * (calculated as: a & b == ~(~a | ~b)).
- 	 */
- 	pte_val(entry) ^= PTE_RDONLY;
--	asm volatile("//	ptep_set_access_flags\n"
--	"	prfm	pstl1strm, %2\n"
--	"1:	ldxr	%0, %2\n"
--	"	eor	%0, %0, %3		// negate PTE_RDONLY in *ptep\n"
--	"	orr	%0, %0, %4		// set flags\n"
--	"	eor	%0, %0, %3		// negate final PTE_RDONLY\n"
--	"	stxr	%w1, %0, %2\n"
--	"	cbnz	%w1, 1b\n"
--	: "=&r" (old_pteval), "=&r" (tmp), "+Q" (pte_val(*ptep))
--	: "L" (PTE_RDONLY), "r" (pte_val(entry)));
-+	pteval = READ_ONCE(pte_val(*ptep));
-+	do {
-+		old_pteval = pteval;
-+		pteval ^= PTE_RDONLY;
-+		pteval |= pte_val(entry);
-+		pteval ^= PTE_RDONLY;
-+		pteval = cmpxchg_relaxed(&pte_val(*ptep), old_pteval, pteval);
-+	} while (pteval != old_pteval);
- 
- 	flush_tlb_fix_spurious_fault(vma, address);
- 	return 1;
++	/*
++	 * ptep_set_wrprotect() is only called on CoW mappings which are
++	 * private (!VM_SHARED) with the pte either read-only (!PTE_WRITE &&
++	 * PTE_RDONLY) or writable and software-dirty (PTE_WRITE &&
++	 * !PTE_RDONLY && PTE_DIRTY); see is_cow_mapping() and
++	 * protection_map[]. There is no race with the hardware update of the
++	 * dirty state: clearing of PTE_RDONLY when PTE_WRITE (a.k.a. PTE_DBM)
++	 * is set.
++	 */
++	VM_WARN_ONCE(pte_write(*ptep) && !pte_dirty(*ptep),
++		     "%s: potential race with hardware DBM", __func__);
+ 	pte = READ_ONCE(*ptep);
+ 	do {
+ 		old_pte = pte;
+-		/*
+-		 * If hardware-dirty (PTE_WRITE/DBM bit set and PTE_RDONLY
+-		 * clear), set the PTE_DIRTY bit.
+-		 */
+-		if (pte_hw_dirty(pte))
+-			pte = pte_mkdirty(pte);
+ 		pte = pte_wrprotect(pte);
+ 		pte_val(pte) = cmpxchg_relaxed(&pte_val(*ptep),
+ 					       pte_val(old_pte), pte_val(pte));
