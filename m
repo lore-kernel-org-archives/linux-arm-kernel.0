@@ -1,33 +1,109 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Fri, 18 Aug 2017 09:41:54 +0800
-Subject: [PATCH v3 2/9] ASoC: rockchip: Remove obsolete dmic-delay
-In-Reply-To: <20170817171152.abf3ngr6nr22jfif@sirena.org.uk>
-References: <20170817044417.22069-1-jeffy.chen@rock-chips.com>
- <20170817044417.22069-3-jeffy.chen@rock-chips.com>
- <20170817171152.abf3ngr6nr22jfif@sirena.org.uk>
-Message-ID: <599645E2.4020402@rock-chips.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 18 Aug 2017 09:51:55 +0800
+Subject: [PATCH] ARM: dts: imx7d-pico: Add Wifi support
+In-Reply-To: <1502994320-27614-1-git-send-email-vanessa.maegima@nxp.com>
+References: <1502994320-27614-1-git-send-email-vanessa.maegima@nxp.com>
+Message-ID: <20170818015154.GI7608@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Thu, Aug 17, 2017 at 03:25:20PM -0300, Vanessa Maegima wrote:
+> imx7d-pico has an ap6212 wifi chip connected to usdhc2 port.
+> 
+> Add support for the usdhc2 port and to the WL_REG_ON regulator
+> so Wifi can be functional on this board.
+> 
+> Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
+> ---
+>  arch/arm/boot/dts/imx7d-pico.dts | 40 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx7d-pico.dts b/arch/arm/boot/dts/imx7d-pico.dts
+> index e78c2c9..db9f345 100644
+> --- a/arch/arm/boot/dts/imx7d-pico.dts
+> +++ b/arch/arm/boot/dts/imx7d-pico.dts
+> @@ -52,6 +52,17 @@
+>  		reg = <0x80000000 0x80000000>;
+>  	};
+>  
+> +	reg_ap6212: regulator-ap6212 {
+> +			compatible = "regulator-fixed";
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_reg_ap6212>;
+> +			regulator-name = "AP6212";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			gpio = <&gpio4 16 GPIO_ACTIVE_HIGH>;
+> +			enable-active-high;
 
-thanks for your reply
+Bad indentation.
 
-On 08/18/2017 01:11 AM, Mark Brown wrote:
-> On Thu, Aug 17, 2017 at 12:44:10PM +0800, Jeffy Chen wrote:
->
->> This property is no longer used.
->
->> -Optional properties:
->> -- dmic-wakeup-delay-ms : specify delay time (ms) for DMIC ready.
->> -  If this option is specified, which means it's required dmic need
->> -  delay for DMIC to ready so that rt5514 can avoid recording before
->> -  DMIC send valid data
->
-> Why would nobody ever want to use this in future?
->
+> +	};
+> +
+>  	reg_2p5v: regulator-2p5v {
+>  		compatible = "regulator-fixed";
+>  		regulator-name = "2P5V";
+> @@ -271,6 +282,17 @@
+>  	status = "okay";
+>  };
+>  
+> +&usdhc2 { /* Wifi SDIO */
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc2>;
+> +	no-1-8-v;
+> +	non-removable;
+> +	keep-power-in-suspend;
+> +	wakeup-source;
+> +	vmmc-supply = <&reg_ap6212>;
+> +	status = "okay";
+> +};
+> +
+>  &usdhc3 {
+>  	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+>  	pinctrl-0 = <&pinctrl_usdhc3>;
+> @@ -326,6 +348,13 @@
+>  		>;
+>  	};
+>  
+> +	pinctrl_reg_ap6212: regap6212grp {
+> +		fsl,pins = <
+> +			MX7D_PAD_ECSPI1_SCLK__GPIO4_IO16	0x59
+> +			MX7D_PAD_ECSPI1_SS0__GPIO4_IO19		0x59 /* WL_HOST_WAKE */
 
-hmmm, check again, rt5514 fixed this issue in there driver instead in:
-a5461fd6c8f7 ASoC: rt5514: Add the DMIC initial delay to wait it ready.
+I only see gpio4_16 is used in regulator-ap6212.  Why do we need to set
+up GPIO4_IO19 here?
 
-so we don't need this...
+Shawn
+
+> +		>;
+> +	};
+> +
+>  	pinctrl_sai1: sai1grp {
+>  		fsl,pins = <
+>  			MX7D_PAD_ENET1_RX_CLK__SAI1_TX_BCLK	0x1f
+> @@ -348,6 +377,17 @@
+>  		>;
+>  	};
+>  
+> +	pinctrl_usdhc2: usdhc2grp {
+> +			fsl,pins = <
+> +				MX7D_PAD_SD2_CMD__SD2_CMD	0x59
+> +				MX7D_PAD_SD2_CLK__SD2_CLK	0x19
+> +				MX7D_PAD_SD2_DATA0__SD2_DATA0	0x59
+> +				MX7D_PAD_SD2_DATA1__SD2_DATA1	0x59
+> +				MX7D_PAD_SD2_DATA2__SD2_DATA2	0x59
+> +				MX7D_PAD_SD2_DATA3__SD2_DATA3	0x59
+> +			>;
+> +	};
+> +
+>  	pinctrl_usdhc3: usdhc3grp {
+>  		fsl,pins = <
+>  			MX7D_PAD_SD3_CMD__SD3_CMD		0x59
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
