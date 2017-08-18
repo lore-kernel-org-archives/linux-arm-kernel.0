@@ -1,43 +1,53 @@
-From: sr@denx.de (Stefan Roese)
-Date: Fri, 18 Aug 2017 14:59:26 +0200
-Subject: [PATCH v2] irqchip/armada-370-xp: Enable MSI-X support
-Message-ID: <20170818125926.32029-1-sr@denx.de>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 18 Aug 2017 21:02:25 +0800
+Subject: [PATCH] arm64: dts: ls1088a: Add USB support
+In-Reply-To: <1503044085-5024-1-git-send-email-yinbo.zhu@nxp.com>
+References: <1503044085-5024-1-git-send-email-yinbo.zhu@nxp.com>
+Message-ID: <20170818130224.GN7608@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Armada XP does not only support MSI, but also MSI-X. This patch sets
-the MSI_FLAG_PCI_MSIX flag in the interrupt controller driver which
-is the only change necessary to enable MSI-X support on this SoC. As
-the Linux PCI MSI-X infrastructure takes care of writing the data and
-address structures into the BAR specified by the MSI-X controller.
+On Fri, Aug 18, 2017 at 04:14:45PM +0800, yinbo.zhu at nxp.com wrote:
+> From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+> 
+> Fix the issue that usb is not detected on ls1088ardb
+> 
+> Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
+> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
 
-Signed-off-by: Stefan Roese <sr@denx.de>
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
-v2:
-- Added Reviewed-by tag from Thomas
-- Added usual irqchip maintainers
+You are sending an updated patch.  Please have the version number in
+subject prefix ...
 
- drivers/irqchip/irq-armada-370-xp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> ---
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 33982cbd8a57..b17039ed8735 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -124,7 +124,7 @@ static struct irq_chip armada_370_xp_msi_irq_chip = {
- 
- static struct msi_domain_info armada_370_xp_msi_domain_info = {
- 	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
--		   MSI_FLAG_MULTI_PCI_MSI),
-+		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
- 	.chip	= &armada_370_xp_msi_irq_chip,
- };
- 
--- 
-2.12.2
+... and a change history here.  There are a lot of good examples on the
+list.  Please have a check.
+
+>  arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |  8 ++++++++
+>  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    | 20 ++++++++++++++++++++
+>  2 files changed, 28 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+> index 213abb7..6c3c3bc 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+> @@ -118,6 +118,14 @@
+>  	status = "okay";
+>  };
+>  
+> +&usb0 {
+> +	status = "okay";
+> +};
+> +
+> +&usb1 {
+> +	status = "okay";
+> +};
+> +
+>  &esdhc {
+>  	status = "okay";
+>  };
+
+I had already put this on previous version - please sort these labelled
+nodes alphabetically.  That said, &usb should go after &sata.
+
+Shawn
