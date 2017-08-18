@@ -1,39 +1,41 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Aug 2017 10:20:05 +0200
-Subject: [PATCH 1/3] ARM: shmobile: document iW-RainboW-G22M-SM SODIMM System
- on Module
+Date: Fri, 18 Aug 2017 10:20:07 +0200
+Subject: [PATCH 3/3] dt-bindings: apmu: Document r8a7743 support
 In-Reply-To: <cover.1502961902.git.horms+renesas@verge.net.au>
 References: <cover.1502961902.git.horms+renesas@verge.net.au>
-Message-ID: <9933924781c2b27dfd8c43c1c12abb450b33094b.1502961902.git.horms+renesas@verge.net.au>
+Message-ID: <304ce59242e11e715bfdc86577771502df99f7cd.1502961902.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+From: Biju Das <biju.das@bp.renesas.com>
 
-Document the iW-RainboW-G22M-SM SODIMM System on Module device tree
-bindings. It is just a placeholder for the time being, the actual
-implementation is not available yet.
+Document APMU and SMP enable method for RZ/G1M
+(also known as r8a7743) SoC.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
-Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- Documentation/devicetree/bindings/arm/shmobile.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/power/renesas,apmu.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 275cda1469b8..64e7f63826c3 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -68,6 +68,8 @@ Boards:
-     compatible = "renesas,h3ulcb", "renesas,r8a7795";
-   - Henninger
-     compatible = "renesas,henninger", "renesas,r8a7791"
-+  - iWave Systems RZ/G1E SODIMM System On Module (iW-RainboW-G22M-SM)
-+    compatible = "iwave,g22m", "renesas,r8a7745"
-   - iWave Systems RZ/G1M Qseven Development Platform (iW-RainboW-G20D-Qseven)
-     compatible = "iwave,g20d", "iwave,g20m", "renesas,r8a7743"
-   - iWave Systems RZ/G1M Qseven System On Module (iW-RainboW-G20M-Qseven)
+diff --git a/Documentation/devicetree/bindings/power/renesas,apmu.txt b/Documentation/devicetree/bindings/power/renesas,apmu.txt
+index 84404c9edff7..af21502e939c 100644
+--- a/Documentation/devicetree/bindings/power/renesas,apmu.txt
++++ b/Documentation/devicetree/bindings/power/renesas,apmu.txt
+@@ -1,12 +1,13 @@
+ DT bindings for the Renesas Advanced Power Management Unit
+ 
+-Renesas R-Car line of SoCs utilize one or more APMU hardware units
++Renesas R-Car and RZ/G1 SoCs utilize one or more APMU hardware units
+ for CPU core power domain control including SMP boot and CPU Hotplug.
+ 
+ Required properties:
+ 
+ - compatible: Should be "renesas,<soctype>-apmu", "renesas,apmu" as fallback.
+ 	      Examples with soctypes are:
++		- "renesas,r8a7743-apmu" (RZ/G1M)
+ 		- "renesas,r8a7790-apmu" (R-Car H2)
+ 		- "renesas,r8a7791-apmu" (R-Car M2-W)
+ 		- "renesas,r8a7792-apmu" (R-Car V2H)
 -- 
 2.1.4
