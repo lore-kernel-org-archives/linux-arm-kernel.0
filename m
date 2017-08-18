@@ -1,79 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Fri, 18 Aug 2017 10:19:34 +0200
-Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates for
- v4.14
-Message-ID: <cover.1502961153.git.horms+renesas@verge.net.au>
+Subject: [PATCH 4/9] arm64: dts: r8a7796: add usb2_phy device nodes
+In-Reply-To: <cover.1502961153.git.horms+renesas@verge.net.au>
+References: <cover.1502961153.git.horms+renesas@verge.net.au>
+Message-ID: <bf68012373546fe4e9078ae294f5886f497fb0e3.1502961153.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 
-Please consider these second round of Renesas ARM64 based SoC DT updates for v4.14.
+Signed-off-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-arm64-dt-for-v4.14,
-which I have already sent a pull-request for.
-
-
-The following changes since commit 4725f2b8805718a65dcbce8668710f145df797a8:
-
-  arm64: dts: renesas: r8a7795: add hsusb ch3 device node (2017-07-27 17:19:05 +0200)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt2-for-v4.14
-
-for you to fetch changes up to 1fa0b494f6b17f8094b1b380f7cc1cb89f4878dc:
-
-  arm64: dts: r8a77995: add pfc device node (2017-08-17 11:03:44 +0200)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM64 Based SoC DT Updates for v4.14
-
-* Add PFC device node to R-Car D3 (r8a77995)
-
-  This is a step towards enabling devices that use multiplexed pins
-  - including ethernet - on boards that use the r8a7796 SoC.
-
-* Add USB nodes to R-Car M3-W (r8a7796)
-
-  This is a step towards enabling USB devices on boards that
-  use the r8a7796 SoC.
-
-* Use newly added Gen-3 fallback compat string
-
-  This is consistent with ongoing efforts to use per-generation
-  fallback strings where appropriate across devices found
-  on R-Car SoCs. The aim of the effort being to strike a balance
-  between the limited information available about the compatibility
-  of devices found on different SoCs and the desire to ease enabling
-  devices on new SoCs.
-
-  This has no run-time effect due to the presence of a per-SoC
-  compat string.
-
-* Cleanup whitespace and extra LVDS port label
-
-  Minor cleanups, no run-time effect.
-
-----------------------------------------------------------------
-Laurent Pinchart (1):
-      arm64: dts: salvator-common: Remove extra LVDS port label
-
-Simon Horman (2):
-      arm64: dts: r8a7795: Use R-Car SATA Gen3 fallback compat string
-      arm64: dts: r8a7795: correct whitespace of companion property
-
-Yoshihiro Shimoda (6):
-      arm64: dts: r8a7796: add usb2_phy device nodes
-      arm64: dts: r8a7796: add USB2.0 Host (EHCI/OHCI) device nodes
-      arm64: dts: r8a7796: Add USB3.0 host device node
-      arm64: dts: r8a7796: Add USB-DMAC device nodes
-      arm64: dts: r8a7796: Add HSUSB device node
-      arm64: dts: r8a77995: add pfc device node
-
- arch/arm64/boot/dts/renesas/r8a7795.dtsi         |  11 ++-
- arch/arm64/boot/dts/renesas/r8a7796.dtsi         | 113 +++++++++++++++++++++--
- arch/arm64/boot/dts/renesas/r8a77995.dtsi        |   5 +
- arch/arm64/boot/dts/renesas/salvator-common.dtsi |   4 -
- 4 files changed, 116 insertions(+), 17 deletions(-)
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index ef1120f4e561..efaf941837ac 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -1240,7 +1240,15 @@
+ 		};
+ 
+ 		usb2_phy0: usb-phy at ee080200 {
+-			/* placeholder */
++			compatible = "renesas,usb2-phy-r8a7796",
++				     "renesas,rcar-gen3-usb2-phy";
++			reg = <0 0xee080200 0 0x700>;
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 703>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			resets = <&cpg 703>;
++			#phy-cells = <0>;
++			status = "disabled";
+ 		};
+ 
+ 		ohci1: usb at ee0a0000 {
+@@ -1252,7 +1260,14 @@
+ 		};
+ 
+ 		usb2_phy1: usb-phy at ee0a0200 {
+-			/* placeholder */
++			compatible = "renesas,usb2-phy-r8a7796",
++				     "renesas,rcar-gen3-usb2-phy";
++			reg = <0 0xee0a0200 0 0x700>;
++			clocks = <&cpg CPG_MOD 702>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			resets = <&cpg 702>;
++			#phy-cells = <0>;
++			status = "disabled";
+ 		};
+ 
+ 		sdhi0: sd at ee100000 {
+-- 
+2.1.4
