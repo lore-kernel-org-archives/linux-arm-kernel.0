@@ -1,9 +1,7 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 18 Aug 2017 16:05:48 +0800
-Subject: [GIT PULL 2/3] ZTE device tree updates for 4.14
-In-Reply-To: <1503043549-13232-1-git-send-email-shawnguo@kernel.org>
-References: <1503043549-13232-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <1503043549-13232-2-git-send-email-shawnguo@kernel.org>
+Date: Fri, 18 Aug 2017 16:05:47 +0800
+Subject: [GIT PULL 1/3] ZTE SoC updates for 4.14
+Message-ID: <1503043549-13232-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,20 +11,20 @@ The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/zte-dt-4.14
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/zte-soc-4.14
 
-for you to fetch changes up to 8cb46bd224a0ecfc759b685d4bb0538d8e7d51a7:
+for you to fetch changes up to 03d95c264a0277418e21cbb9043c12bf0604be05:
 
-  ARM: dts: zte: remove num-slots from zx296702-ad1 (2017-07-16 09:18:18 +0800)
-
-----------------------------------------------------------------
-ZTE device tree updates for 4.14:
- - A clean up patch from Shawn Lin to remove the deprecated dwmmc
-   property 'num-slots'.
+  arm64: select PINCTRL for ZTE platform (2017-08-14 09:50:24 +0800)
 
 ----------------------------------------------------------------
-Shawn Lin (1):
-      ARM: dts: zte: remove num-slots from zx296702-ad1
+ZTE SoC updates for 4.14:
+ - Select PINCTRL for ZTE platform, so that pinctrl driver for ZX296718
+   can be enabled.
 
- arch/arm/boot/dts/zx296702-ad1.dts | 2 --
- 1 file changed, 2 deletions(-)
+----------------------------------------------------------------
+Shawn Guo (1):
+      arm64: select PINCTRL for ZTE platform
+
+ arch/arm64/Kconfig.platforms | 1 +
+ 1 file changed, 1 insertion(+)
