@@ -1,26 +1,32 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 18 Aug 2017 10:07:17 -0700
-Subject: [RFC PATCH v2 1/3] PCI: rockchip: Add support for pcie wake irq
-In-Reply-To: <20170818170107.GA119461@google.com>
-References: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
- <20170817120431.12398-2-jeffy.chen@rock-chips.com>
- <20170818170107.GA119461@google.com>
-Message-ID: <20170818170716.GB119461@google.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Fri, 18 Aug 2017 17:58:08 +0100
+Subject: [PATCH ] ARM: dts: iwg20d-q7: Add chosen node
+Message-ID: <1503075488-44304-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 10:01:07AM -0700, Brian Norris wrote:
-> + Tony
-> 
-> On Thu, Aug 17, 2017 at 08:04:29PM +0800, Jeffy Chen wrote:
-> > Add support for PCIE_WAKE pin in rockchip pcie driver.
-> > 
-> > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> > ---
-> > 
-> > Changes in v2:
-> > Use dev_pm_set_dedicated_wake_irq
-> >         -- Suggested by Brian Norris <briannorris@chromium.com>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+---
+This patch tested against renesas-dev tag renesas-devel-20170815-v4.13-rc5
 
-Oops, I forgot you sent a v3. Same questions/comments apply there
-though.
+ arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
+index 081af01..305a6a1 100644
+--- a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
++++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
+@@ -19,6 +19,11 @@
+ 		serial0 = &scif0;
+ 		ethernet0 = &avb;
+ 	};
++
++	chosen {
++		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
++		stdout-path = "serial0:115200n8";
++	};
+ };
+ 
+ &pfc {
+-- 
+1.9.1
