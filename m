@@ -1,27 +1,100 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 18 Aug 2017 09:46:43 +0100
-Subject: for-next/core ACPI boot issue
-In-Reply-To: <f485ae4c-579c-d84b-d138-fbd6b6a87cda@riken.jp>
-References: <6813810f-4222-56e0-6285-5cb7cb65303c@riken.jp>
- <20170817173331.GA19028@red-moon>
- <f485ae4c-579c-d84b-d138-fbd6b6a87cda@riken.jp>
-Message-ID: <20170818084643.GB24764@e107981-lin.cambridge.arm.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 18 Aug 2017 11:11:33 +0200
+Subject: [PATCH v2 0/5] ARM: dts: rcar-gen2: Convert to new CPG/MSSR bindings
+Message-ID: <1503047498-29078-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 04:36:28AM +0900, Itaru Kitayama wrote:
-> Lorenzo,
-> I'm afraid not. I was trying to see if the HEAD of for-next/core boot
-> with acpi=force. Given VMAP'ed stack support may be intrusive to the
-> kernel, I specifically mentioned it as it sits at the top of the patch
-> stack then. I'm on a RevA3 CPU at this moment.
-> 
-> Itaru
+	Hi Simon, Magnus,
 
-Hi Itaru,
+Currently Renesas R-Car Gen2 SoCs use the common clk-rcar-gen2,
+clk-mstp, and clk-div6 drivers, which depend on most clocks being
+described in DT.  Especially the module (MSTP) clocks are cumbersome and
+error prone, due to 3 arrays (clocks, clock-indices, and
+clock-output-names) to be kept in sync. In addition, the clk-mstp driver
+cannot be extended easily to also support module resets, which are
+provided by the same hardware module.
 
-I am afraid it is a bit vague for me to be able to help, if you can
-bisect the issue down to a given commit that would be helpful.
+Hence when developing support for R-Car Gen3 SoCs, another approach was
+chosen, which led to the CPG/MSSR driver core, and SoC-specific
+subdrivers (initially for R-Car Gen3, but later also for RZ/G1).
 
-Thanks,
-Lorenzo
+This series converts the various R-Car Gen2 DTSes to migrate to the new
+CPG/MSSR drivers that were added in v4.13-rc1.
+
+Note that module reset descriptions will be added later.
+
+Changes compared to v1:
+  - Rebased.
+
+Dependencies:
+  - renesas-devel-20170818-v4.13-rc5.
+
+Known issues:
+  - The CPG/MSSR driver is initialized later than the old clk-rcar-gen2
+    driver, causing changes of initialization order for other drivers.
+
+    Currently the PHY subsystem does not support probe deferral
+
+	+irq: no irq domain found for /interrupt-controller at e61c0000 !
+
+	-Micrel KSZ8041RNLI ee700000.ethernet-ffffffff:01: attached PHY driver [Micrel KSZ8041RNLI] (mii_bus:phy_addr=ee700000.ethernet-ffffffff:01, irq=182)
+	+Micrel KSZ8041RNLI ee700000.ethernet-ffffffff:01: attached PHY driver [Micrel KSZ8041RNLI] (mii_bus:phy_addr=ee700000.ethernet-ffffffff:01, irq=-1)
+
+    leading to the Ethernet PHY falling back to polling instead of using an
+    interrupt.  This can be remedied by "of_mdio: Fix broken PHY IRQ in
+    case of probe deferral" (https://patchwork.kernel.org/patch/9734175/),
+    which is still pending approval.
+
+    Fortunately the impact of this is limited to a small delay in the
+    detection of cable (un)plugging.
+    Note that when using the PHY interrupt, cable unplugging is reported
+    instantaneous, but plugging takes ca. 1.5-1.8 seconds.  Hence when
+    using polling with the standard interval of 1 second, the link comes up
+    in about the same time.
+
+For your convenience, this series is also available in the
+topic/rcar2-cpg-mssr-dt-v2 branch of my renesas-drivers git repository at
+git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
+
+This has been tested on r8a7790/lager, r8a7791/koelsch, r8a7792/blanche,
+r8a7793/gose, and r8a7794/alt.  /sys/kernel/debug/clk/clk_summary has
+been compared before and after the conversion.
+
+Thanks for applying!
+
+Geert Uytterhoeven (5):
+  ARM: dts: r8a7790: Convert to new CPG/MSSR bindings
+  ARM: dts: r8a7791: Convert to new CPG/MSSR bindings
+  ARM: dts: r8a7792: Convert to new CPG/MSSR bindings
+  ARM: dts: r8a7793: Convert to new CPG/MSSR bindings
+  ARM: dts: r8a7794: Convert to new CPG/MSSR bindings
+
+ arch/arm/boot/dts/r8a7790-lager.dts   |   7 +-
+ arch/arm/boot/dts/r8a7790.dtsi        | 557 ++++++----------------------------
+ arch/arm/boot/dts/r8a7791-koelsch.dts |   4 +-
+ arch/arm/boot/dts/r8a7791-porter.dts  |   4 +-
+ arch/arm/boot/dts/r8a7791.dtsi        | 557 +++++++---------------------------
+ arch/arm/boot/dts/r8a7792-blanche.dts |   3 +-
+ arch/arm/boot/dts/r8a7792-wheat.dts   |   3 +-
+ arch/arm/boot/dts/r8a7792.dtsi        | 333 ++++----------------
+ arch/arm/boot/dts/r8a7793-gose.dts    |   4 +-
+ arch/arm/boot/dts/r8a7793.dtsi        | 459 +++++-----------------------
+ arch/arm/boot/dts/r8a7794-alt.dts     |   3 +-
+ arch/arm/boot/dts/r8a7794-silk.dts    |   3 +-
+ arch/arm/boot/dts/r8a7794.dtsi        | 528 +++++---------------------------
+ 13 files changed, 430 insertions(+), 2035 deletions(-)
+
+-- 
+2.7.4
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
