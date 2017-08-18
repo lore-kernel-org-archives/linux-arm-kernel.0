@@ -1,46 +1,63 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Fri, 18 Aug 2017 21:36:57 +0530
-Subject: [PATCH 1/2] i2c: busses: make i2c_algorithm const
-In-Reply-To: <1503072418-6887-1-git-send-email-bhumirks@gmail.com>
-References: <1503072418-6887-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <1503072418-6887-2-git-send-email-bhumirks@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 18 Aug 2017 17:14:14 +0100
+Subject: [PATCH] bootwrapper: SVE: Enable SVE for EL2 and below
+Message-ID: <1503072854-6794-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make these const as they are only stored in the algo field of
-i2c_adapter structure, which is const.
+By default, SVE will trap to EL3.  We also want to make sure that
+lower ELs have access to the full SVE vector length before dropping
+down.
 
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+This patch programs CPTR_EL3 and ZCR_EL3 appropriately to enable
+SVE for lower exception levels and make sure that they can use the
+full vector length provided by the hardware.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- drivers/i2c/busses/i2c-pnx.c  | 2 +-
- drivers/i2c/busses/i2c-puv3.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ boot.S   | 13 +++++++++++++
+ common.S |  5 +++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/drivers/i2c/busses/i2c-pnx.c b/drivers/i2c/busses/i2c-pnx.c
-index fd5f9d2..42d6b3a 100644
---- a/drivers/i2c/busses/i2c-pnx.c
-+++ b/drivers/i2c/busses/i2c-pnx.c
-@@ -590,7 +590,7 @@ static u32 i2c_pnx_func(struct i2c_adapter *adapter)
- 	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
- }
+diff --git a/boot.S b/boot.S
+index c65590c..c789705 100644
+--- a/boot.S
++++ b/boot.S
+@@ -28,6 +28,19 @@ _start:
  
--static struct i2c_algorithm pnx_algorithm = {
-+static const struct i2c_algorithm pnx_algorithm = {
- 	.master_xfer = i2c_pnx_xfer,
- 	.functionality = i2c_pnx_func,
- };
-diff --git a/drivers/i2c/busses/i2c-puv3.c b/drivers/i2c/busses/i2c-puv3.c
-index 0c8b157..287088b 100644
---- a/drivers/i2c/busses/i2c-puv3.c
-+++ b/drivers/i2c/busses/i2c-puv3.c
-@@ -175,7 +175,7 @@ static u32 puv3_i2c_func(struct i2c_adapter *adapter)
- 	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
- }
+ 	msr	cptr_el3, xzr			// Disable copro. traps to EL3
  
--static struct i2c_algorithm puv3_i2c_algorithm = {
-+static const struct i2c_algorithm puv3_i2c_algorithm = {
- 	.master_xfer	= puv3_i2c_xfer,
- 	.functionality	= puv3_i2c_func,
- };
++	mrs	x0, id_aa64pfr0_el1
++	ubfx	x0, x0, #32, #4			// SVE present?
++	cbz	x0, 1f				// Skip SVE init if not
++
++	mrs	x0, cptr_el3
++	orr	x0, x0, #CPTR_EL3_EZ		// enable SVE
++	msr	cptr_el3, x0
++	isb
++
++	mov	x0, #ZCR_EL3_LEN_MASK		// SVE: Enable full vector len
++	msr	ZCR_EL3, x0			// for EL2.
++
++1:
+ 	ldr	x0, =CNTFRQ
+ 	msr	cntfrq_el0, x0
+ 
+diff --git a/common.S b/common.S
+index 7ddfad0..37643e1 100644
+--- a/common.S
++++ b/common.S
+@@ -23,6 +23,11 @@
+ #define SPSR_F		(1 << 6)	/* FIQ masked */
+ #define SPSR_EL2H	(9 << 0)	/* EL2 Handler mode */
+ 
++#define CPTR_EL3_EZ	(1 << 8)
++
++#define ZCR_EL3		s3_6_c1_c2_0
++#define ZCR_EL3_LEN_MASK	0x1ff
++
+ #define SPSR_KERNEL	(SPSR_A | SPSR_D | SPSR_I | SPSR_F | SPSR_EL2H)
+ 
+ 	/*
 -- 
-1.9.1
+2.1.4
