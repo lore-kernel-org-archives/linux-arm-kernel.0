@@ -1,57 +1,70 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri, 18 Aug 2017 16:28:41 +0800
-Subject: [PATCH v3 4/4] arm64: dts: rockchip: Handle pcie wake in pcie driver
- for Gru
-In-Reply-To: <20170818082841.22335-1-jeffy.chen@rock-chips.com>
-References: <20170818082841.22335-1-jeffy.chen@rock-chips.com>
-Message-ID: <20170818082841.22335-5-jeffy.chen@rock-chips.com>
+From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
+Date: Fri, 18 Aug 2017 16:14:45 +0800
+Subject: [PATCH] arm64: dts: ls1088a: Add USB support
+Message-ID: <1503044085-5024-1-git-send-email-yinbo.zhu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we are handling pcie wake irq in mrvl wifi driver.
-Move it to rockchip pcie driver for Gru boards.
+From: "yinbo.zhu" <yinbo.zhu@nxp.com>
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Fix the issue that usb is not detected on ls1088ardb
+
+Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
+Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
 ---
+ arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |  8 ++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    | 20 ++++++++++++++++++++
+ 2 files changed, 28 insertions(+)
 
-Changes in v3: None
-Changes in v2: None
-
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-index d48e98b62d09..42158512e979 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-@@ -712,7 +712,15 @@ ap_i2c_audio: &i2c8 {
- 
- 	ep-gpios = <&gpio2 27 GPIO_ACTIVE_HIGH>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wifi_perst_l>;
-+	pinctrl-0 = <&pcie_clkreqn_cpm>, <&wlan_host_wake_l>, <&wifi_perst_l>;
-+
-+	interrupts-extended = <&gic GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH 0>,
-+			      <&gic GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH 0>,
-+			      <&gic GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH 0>,
-+			      <&gpio0 8 IRQ_TYPE_LEVEL_LOW>;
-+	interrupt-names = "sys", "legacy", "client", "wake";
-+	/delete-property/ interrupts;
-+
- 	vpcie3v3-supply = <&pp3300_wifi_bt>;
- 	vpcie1v8-supply = <&wlan_pd_n>; /* HACK: see &wlan_pd_n */
- 	vpcie0v9-supply = <&pp900_pcie>;
-@@ -727,11 +735,6 @@ ap_i2c_audio: &i2c8 {
- 			compatible = "pci1b4b,2b42";
- 			reg = <0x83010000 0x0 0x00000000 0x0 0x00100000
- 			       0x83010000 0x0 0x00100000 0x0 0x00100000>;
--			interrupt-parent = <&gpio0>;
--			interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&wlan_host_wake_l>;
--			wakeup-source;
- 		};
- 	};
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+index 213abb7..6c3c3bc 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+@@ -118,6 +118,14 @@
+ 	status = "okay";
  };
+ 
++&usb0 {
++	status = "okay";
++};
++
++&usb1 {
++	status = "okay";
++};
++
+ &esdhc {
+ 	status = "okay";
+ };
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+index c144d06..c23fede 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+@@ -359,6 +359,26 @@
+ 			status = "disabled";
+ 		};
+ 
++		usb0: usb3 at 3100000 {
++			compatible = "snps,dwc3";
++			reg = <0x0 0x3100000 0x0 0x10000>;
++			interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
++			dr_mode = "host";
++			snps,quirk-frame-length-adjustment = <0x20>;
++			snps,dis_rxdet_inp3_quirk;
++			status = "disabled";
++		};
++
++		usb1: usb3 at 3110000 {
++			compatible = "snps,dwc3";
++			reg = <0x0 0x3110000 0x0 0x10000>;
++			interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
++			dr_mode = "host";
++			snps,quirk-frame-length-adjustment = <0x20>;
++			snps,dis_rxdet_inp3_quirk;
++			status = "disabled";
++		};
++
+ 		sata: sata at 3200000 {
+ 			compatible = "fsl,ls1088a-ahci";
+ 			reg = <0x0 0x3200000 0x0 0x10000>,
 -- 
-2.11.0
+2.1.0.27.g96db324
