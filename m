@@ -1,56 +1,64 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 18 Aug 2017 16:57:01 +0100
-Subject: [PATCH] arm64: fpsimd: Prevent registers leaking across exec
-Message-ID: <1503071821-13845-1-git-send-email-Dave.Martin@arm.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Fri, 18 Aug 2017 08:57:09 -0700
+Subject: [PATCH v2 3/3] vfio/pci: Don't probe devices that can't be reset
+In-Reply-To: <20170818081251.2bbffe56@w520.home>
+References: <1502957663-5527-1-git-send-email-jglauber@cavium.com>
+ <1502957663-5527-4-git-send-email-jglauber@cavium.com>
+ <20170817070017.1e9c9456@w520.home> <20170818134231.GA3464@hc>
+ <20170818081251.2bbffe56@w520.home>
+Message-ID: <d7492153-ec84-eb87-13ac-eb3fc9116114@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some tricky dependencies between the different stages of
-flushing the FPSIMD register state during exec, and these can race
-with context switch in ways that can cause the old task's regs to
-leak across.  In particular, a context switch during the memset() can
-cause some of the task's old FPSIMD registers to reappear.
+On 08/18/2017 07:12 AM, Alex Williamson wrote:
+> On Fri, 18 Aug 2017 15:42:31 +0200
+> Jan Glauber <jan.glauber@caviumnetworks.com> wrote:
+> 
+>> On Thu, Aug 17, 2017 at 07:00:17AM -0600, Alex Williamson wrote:
+>>> On Thu, 17 Aug 2017 10:14:23 +0200
+>>> Jan Glauber <jglauber@cavium.com> wrote:
+>>>    
+>>>> If a PCI device supports neither function-level reset, nor slot
+>>>> or bus reset then refuse to probe it. A line is printed to inform
+>>>> the user.
+>>>
+>>> But that's not what this does, this requires that the device is on a
+>>> reset-able bus.  This is a massive regression.  With this we could no
+>>> longer assign devices on the root complex or any device which doesn't
+>>> return from bus reset and currently makes use of the NO_BUS_RESET flag
+>>> and works happily otherwise.  Full NAK.  Thanks,
+>>
+>> Looks like I missed the slot reset check. So how about this:
+>>
+>> if (pci_probe_reset_slot(pdev->slot) && pci_probe_reset_bus(pdev->bus)) {
+>> 	dev_warn(...);
+>> 	return -ENODEV;
+>> }
+>>
+>> Or am I still missing something here?
+> 
+> We don't require that a device is on a reset-able bus/slot, so any
+> attempt to impose that requirement means that there are devices that
+> might work perfectly fine that are now excluded from assignment.  The
+> entire premise is unacceptable.  Thanks,
 
-Disabling preemption for this small window would be no big deal for
-performance: preemption is already disabled for similar scenarios
-like updating the FPSIMD registers in sigreturn.
 
-So, instead of rearranging things in ways that might swap existing
-subtle bugs for new ones, this patch just disables preemption
-around the FPSIMD state flushing so that races of this type can't
-occur here.  This brings fpsimd_flush_thread() into line with other
-code paths.
+You previously rejected the idea to silently ignore bus reset requests 
+on buses that do not support it.
 
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: stable at vger.kernel.org
-Fixes: 674c242c9323 ("arm64: flush FP/SIMD state correctly after execve()")
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
+So this leaves us with two options:
 
-NOTE TO MAINTAINERS: This is a fix, applicable to *v4.13* and stable.
+1) Do nothing, and crash the kernel on systems with bad combinations of 
+PCIe target devices and cn88xx when vfio_pci is used.
 
-The kernel-mode NEON rework already queued for v4.14 turns this into a
-local_bh_disable() as a side effect, so does not strictly need this
-patch.  When merging, the queued v4.14 changes should be retained.
+2) Do something else.
 
- arch/arm64/kernel/fpsimd.c | 2 ++
- 1 file changed, 2 insertions(+)
+We are trying to figure out what that something else should be.  The 
+general concept we are working on is that if vfio_pci wants to reset a 
+device, *and* bus reset is the only option available, *and* cn88xx, then 
+make vfio_pci fail.
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 06da8ea..c7b4995 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -161,9 +161,11 @@ void fpsimd_flush_thread(void)
- {
- 	if (!system_supports_fpsimd())
- 		return;
-+	preempt_disable();
- 	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
- 	fpsimd_flush_task_state(current);
- 	set_thread_flag(TIF_FOREIGN_FPSTATE);
-+	preempt_enable();
- }
- 
- /*
--- 
-2.1.4
+What is your opinion of doing that (assuming it is properly implemented)?
+
+Thanks,
+David Daney
