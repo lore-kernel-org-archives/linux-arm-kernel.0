@@ -1,28 +1,40 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 18 Aug 2017 14:21:07 +0800
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 18 Aug 2017 14:23:34 +0800
 Subject: [linux-sunxi] [PATCH 2/4] drivers: soc: sunxi: fix error
  processing on base address when claiming
-In-Reply-To: <20170809085627.32687-3-icenowy@aosc.io>
+In-Reply-To: <CAGb2v67F6xUOE9sJsBgpOn2kRoG2S-aoWrtTsjON64o2pzeXjA@mail.gmail.com>
 References: <20170809085627.32687-1-icenowy@aosc.io>
  <20170809085627.32687-3-icenowy@aosc.io>
-Message-ID: <CAGb2v67F6xUOE9sJsBgpOn2kRoG2S-aoWrtTsjON64o2pzeXjA@mail.gmail.com>
+ <CAGb2v67F6xUOE9sJsBgpOn2kRoG2S-aoWrtTsjON64o2pzeXjA@mail.gmail.com>
+Message-ID: <94408FC0-D7F8-4050-936E-F350029DAB9F@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Wed, Aug 9, 2017 at 4:56 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
-> When claiming SRAM, if the base is set to an error, it means that the
-> SRAM controller has been probed, but failed to remap the controller
-> memory zone. If the base is zero, thus the SRAM controller should be not
-> probed at all, and it should return -EPROBE_DEFER. However, currently we
-> returned -EPROBE_DEFER in the former situation, and ignored the latter
-> situation (which will lead to the kernel to panic).
+
+? 2017?8?18? GMT+08:00 ??2:21:07, Chen-Yu Tsai <wens@csie.org> ??:
+>Hi,
 >
-> Fix the behavior on abnormal base address processing when claiming.
+>On Wed, Aug 9, 2017 at 4:56 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>> When claiming SRAM, if the base is set to an error, it means that the
+>> SRAM controller has been probed, but failed to remap the controller
+>> memory zone. If the base is zero, thus the SRAM controller should be
+>not
+>> probed at all, and it should return -EPROBE_DEFER. However, currently
+>we
+>> returned -EPROBE_DEFER in the former situation, and ignored the
+>latter
+>> situation (which will lead to the kernel to panic).
+>>
+>> Fix the behavior on abnormal base address processing when claiming.
+>
+>Could you describe how you actually ran into this? The failure seems
+>unlikely for a properly written device tree.
 
-Could you describe how you actually ran into this? The failure seems
-unlikely for a properly written device tree.
+In fact it's possible, as the probe defering used to be broken.
 
-Thanks
-ChenYu
+On the A64 situation, the SRAM is referenced by the DE2 CCU driver, which will be probed very early -- before SRAM is probed, and the problem happens.
+
+>
+>Thanks
+>ChenYu
