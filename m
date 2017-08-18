@@ -1,51 +1,63 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Aug 2017 23:33:49 +0200
-Subject: [GIT PULL 2/5] soc/tegra: Changes for v4.14-rc1
-In-Reply-To: <20170818144806.14252-2-thierry.reding@gmail.com>
-References: <20170818144806.14252-1-thierry.reding@gmail.com>
- <20170818144806.14252-2-thierry.reding@gmail.com>
-Message-ID: <CAK8P3a1ditcQq_3TdkXQ3VAqcog5CUGsJQvqm9KJoJCi41zOoA@mail.gmail.com>
+Date: Fri, 18 Aug 2017 23:58:24 +0200
+Subject: [GIT PULL 6/6] Broadcom drivers changes for 4.14
+In-Reply-To: <20170817183748.1450-7-f.fainelli@gmail.com>
+References: <20170817183748.1450-1-f.fainelli@gmail.com>
+ <20170817183748.1450-7-f.fainelli@gmail.com>
+Message-ID: <CAK8P3a1id0Wd7XdH+9MsgaK-UCNmYE5ks1p4bzont-T03v5tEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 4:48 PM, Thierry Reding
-<thierry.reding@gmail.com> wrote:
-> Hi ARM SoC maintainers,
->
+On Thu, Aug 17, 2017 at 8:37 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
 > The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 >
 >   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 >
 > are available in the git repository at:
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.14-soc
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.14/drivers
 >
-> for you to fetch changes up to 27a0342ac162bf2ba30c288cfb7b72eabed38d8b:
+> for you to fetch changes up to 7f95522be533c27a918fe388ae5d733344660ef2:
 >
->   soc/tegra: Register SoC device (2017-08-17 16:43:13 +0200)
+>   soc bcm: brcmstb: Add support for S2/S3/S5 suspend states (MIPS) (2017-07-28 16:57:03 -0700)
 >
 > ----------------------------------------------------------------
-> soc/tegra: Changes for v4.14-rc1
+> This pull request contains Broadcom ARM/ARM64 SoC drivers changes for 4.14,
+> please pull the following:
 >
-> Contains a fix for unbalanced reference counting of device tree nodes in
-> the PMC-based generic power domains code.
+> - Markus adds support for the Broadcom STB DDR PHY frontend which supports
+>   dynamic firmware loading and offers the ability to respond with DRAM refresh
+>   rates. He also adds a proper documentation binding document for that peripheral
 >
-> A second change moves the SoC device registration code from its old
-> location in arch/arm/mach-tegra to drivers/soc/tegra so that it can be
-> shared between 32-bit and 64-bit ARM Tegra SoCs.
 
-Ok. I noticed this part in the changelog:
+I had not seen this driver before, but now I looked at it and have two small
+comments:
 
-    Move this code from arch/arm/mach-tegra and make it common among 32-bit
-    and 64-bit Tegra SoCs. This is slightly complicated by the fact that on
-    32-bit Tegra, the SoC device is used as the parent for all devices that
-    are instantiated from device tree.
+- I'd rather see this added to drivers/memory than drivers/soc. The distinction
+  is not always clear, but I think that's where most of the DDR memory interface
+  drivers are at the moment.
 
-Have you considered whether we can change the behavior on arm32?
-Usually nothing cares about the hierarchy in sysfs, though there is of
-course a theoretical risk of something breaking.
+- In a function called __write_firmware, I stumbled over this small
+  hunk and similar functions elsewhere in the driver:
 
-I pulled your branch into next/drivers, if you decide to change the
-arm32 behavior, just send a patch on top. Thanks,
++       /* Now copy it. */
++       if (is_big_endian) {
++               for (i = 0; i < size; i++)
++                       writel_relaxed(be32_to_cpu(fw[i]), mem + i);
++       } else {
++               for (i = 0; i < size; i++)
++                       writel_relaxed(fw[i], mem + i);
++       }
 
-     Arnd
+This looks wrong to me, as the behavior is different between
+little-endian and big-endian kernels: the former will byteswap
+big-endian fw images but not little-endian images, while the
+latter will byte-swap both.
+
+What is the expected behavior here?
+
+Both of my points should be easy to address, so I haven't
+pulled the branch yet, but expect that it will make it into 4.14
+without problems.
+
+       Arnd
