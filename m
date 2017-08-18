@@ -1,38 +1,52 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri, 18 Aug 2017 11:11:47 +0800
-Subject: [PATCH v4 9/9] dt-bindings: ASoC: rockchip: Update description of
- rockchip, codec
-In-Reply-To: <20170818031147.16810-1-jeffy.chen@rock-chips.com>
-References: <20170818031147.16810-1-jeffy.chen@rock-chips.com>
-Message-ID: <20170818031147.16810-10-jeffy.chen@rock-chips.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Fri, 18 Aug 2017 11:19:00 +0800
+Subject: [PATCH 0/5] arm-smmu: performance optimization
+In-Reply-To: <20170817143650.GB30338@arm.com>
+References: <1498484330-10840-1-git-send-email-thunder.leizhen@huawei.com>
+ <20170817143650.GB30338@arm.com>
+Message-ID: <59965CA4.10907@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update description for newly added optional audio codecs.
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
 
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+On 2017/8/17 22:36, Will Deacon wrote:
+> Thunder, Nate, Robin,
+> 
+> On Mon, Jun 26, 2017 at 09:38:45PM +0800, Zhen Lei wrote:
+>> I described the optimization more detail in patch 1 and 2, and patch 3-5 are
+>> the implementation on arm-smmu/arm-smmu-v3 of patch 2.
+>>
+>> Patch 1 is v2. In v1, I directly replaced writel with writel_relaxed in
+>> queue_inc_prod. But Robin figured that it may lead SMMU consume stale
+>> memory contents. I thought more than 3 whole days and got this one.
+>>
+>> This patchset is based on Robin Murphy's [PATCH v2 0/8] io-pgtable lock removal.
+> 
+> For the time being, I think we should focus on the new TLB flushing
+> interface posted by Joerg:
+> 
+> http://lkml.kernel.org/r/1502974596-23835-1-git-send-email-joro at 8bytes.org
+> 
+> which looks like it can give us most of the benefits of this series. Once
+> we've got that, we can see what's left in the way of performance and focus
+> on the cmdq batching separately (because I'm still not convinced about it).
+OK, this is a good news.
 
- Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+But I have a review comment(sorry, I have not subscribed it yet, so can not directly reply it):
+I don't think we should add tlb sync for map operation
+1. at init time, all tlbs will be invalidated
+2. when we try to map a new range, there are no related ptes bufferd in tlb, because of above 1 and below 3
+3. when we unmap the above range, make sure all related ptes bufferd in tlb to be invalidated before unmap finished
 
-diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-index f19b6c830a34..f54b4e91e97c 100644
---- a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-+++ b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-@@ -4,7 +4,7 @@ Required properties:
- - compatible: "rockchip,rk3399-gru-sound"
- - rockchip,cpu: The phandle of the Rockchip I2S controller that's
-   connected to the codecs
--- rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
-+- rockchip,codec: The phandle of the audio codecs
- 
- Example:
- 
+> 
+> Thanks,
+> 
+> Will
+> 
+> .
+> 
+
 -- 
-2.11.0
+Thanks!
+BestRegards
