@@ -1,54 +1,73 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 Aug 2017 13:46:54 +0100
-Subject: [PATCH] irqchip/armada-370-xp: Enable MSI-X support
-In-Reply-To: <20170818141226.77e5719d@windsurf>
-References: <20170502072600.13380-1-sr@denx.de>
- <80f30724-20b6-b5a7-7218-93ff3fa23177@denx.de>
- <20170815160109.023842de@windsurf>
- <6a3e8bcc-19ef-cef1-180e-f4e194d5589b@denx.de>
- <0b8b249b-255a-6354-69cd-58f44fa7874d@denx.de>
- <20170818141226.77e5719d@windsurf>
-Message-ID: <0178be88-608e-5189-5cf8-00b3bcf40e54@arm.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Fri, 18 Aug 2017 13:48:56 +0100
+Subject: [PATCH v6 4/9] arm64: hugetlb: Add break-before-make logic for
+ contiguous entries
+In-Reply-To: <20170818104327.a5yep2p3ntjbffug@armageddon.cambridge.arm.com>
+ (Catalin Marinas's message of "Fri, 18 Aug 2017 11:43:28 +0100")
+References: <20170810170906.30772-1-punit.agrawal@arm.com>
+ <20170810170906.30772-5-punit.agrawal@arm.com>
+ <20170817180311.uwrz64g3bkwfdkrn@armageddon.cambridge.arm.com>
+ <87shgpnp6p.fsf@e105922-lin.cambridge.arm.com>
+ <20170818104327.a5yep2p3ntjbffug@armageddon.cambridge.arm.com>
+Message-ID: <87o9rdnirr.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/08/17 13:12, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Fri, 18 Aug 2017 12:18:28 +0200, Stefan Roese wrote:
-> 
-> 
->>>>> Its been a while since this patch has been submitted - without any
->>>>> comments so far. What's the current status with it? Is it someones
->>>>> queue for upstreaming?  
->>>>
->>>> Sorry for the lack of feedback, very good idea to ping me on this
->>>> topic. I don't have access to HW right now, so I can't give it a test.
->>>> However, I don't think I have MSI-X capable hardware, only MSI capable.
->>>>
->>>> With which hardware did you test this? An off-the-shell PCIe card, or
->>>> some custom FPGA logic?  
->>>
->>> I tested this code with some Altera / Intel FPGA using their PCI-Express
->>> IP core. It should be possible to test this with some MSI-X capable
->>> desktop PCIe cards as well on AXP boards equipped with PCIe slots,
->>> like the Marvell AXP development board (orange box).  
->>
->> So what do you think about this patch? Can I get your Acked-by /
->> Reviewed-by, or do you have some objections? Or do plan to first do
->> some tests yourself?
-> 
-> I thought about testing it myself, but since I don't have any MSI-X
-> capable device, I'm not sure it would bring a lot.
-> 
-> Therefore:
-> 
-> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Thanks.
+Catalin Marinas <catalin.marinas@arm.com> writes:
 
-Stefan: Can you resend this patch (cc'ing the usual irqchip
-maintainers)? I'll queue it for 4.14.
+> On Fri, Aug 18, 2017 at 11:30:22AM +0100, Punit Agrawal wrote:
+>> Catalin Marinas <catalin.marinas@arm.com> writes:
+>> 
+>> > On Thu, Aug 10, 2017 at 06:09:01PM +0100, Punit Agrawal wrote:
+>> >> --- a/arch/arm64/mm/hugetlbpage.c
+>> >> +++ b/arch/arm64/mm/hugetlbpage.c
+>> >> @@ -68,6 +68,62 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
+>> >>  	return CONT_PTES;
+>> >>  }
+>> >>  
+>> >> +/*
+>> >> + * Changing some bits of contiguous entries requires us to follow a
+>> >> + * Break-Before-Make approach, breaking the whole contiguous set
+>> >> + * before we can change any entries. See ARM DDI 0487A.k_iss10775,
+>> >> + * "Misprogramming of the Contiguous bit", page D4-1762.
+>> >> + *
+>> >> + * This helper performs the break step.
+>> >> + */
+>> >> +static pte_t get_clear_flush(struct mm_struct *mm,
+>> >> +			     unsigned long addr,
+>> >> +			     pte_t *ptep,
+>> >> +			     unsigned long pgsize,
+>> >> +			     unsigned long ncontig)
+>> >> +{
+>> >> +	unsigned long i, saddr = addr;
+>> >> +	struct vm_area_struct vma = { .vm_mm = mm };
+>> >> +	pte_t orig_pte = huge_ptep_get(ptep);
+>> >> +
+>> >> +	/*
+>> >> +	 * If we already have a faulting entry then we don't need
+>> >> +	 * to break before make (there won't be a tlb entry cached).
+>> >> +	 */
+>> >> +	if (!pte_present(orig_pte))
+>> >> +		return orig_pte;
+>> >
+>> > I first thought we could relax this check to pte_valid() as we don't
+>> > care about the PROT_NONE case for hardware page table updates. However,
+>> > I realised that we call this where we expect the pte to be entirely
+>> > cleared but we simply skip it if !present (e.g. swap entry). Is this
+>> > correct?
+>> 
+>> I've checked back and come to the conclusion that get_clear_flush() will
+>> not get called with swap entries.
+>> 
+>> In the case of huge_ptep_get_and_clear() below, the callers
+>> (__unmap_hugepage_range() and hugetlb_change_protection()) check for
+>> swap entries before calling. Similarly 
+>> 
+>> I'll relax the check to pte_valid().
+>
+> Thanks for checking but I would still keep the semantics of the generic
+> huge_ptep_get_and_clear() where the entry is always zeroed. It shouldn't
+> have any performance impact since this function won't be called for swap
+> entries, but just in case anyone changes the core code later on.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Makes sense. I'll drop the check and unconditionally clear the entries.
