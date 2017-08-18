@@ -1,38 +1,53 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 18 Aug 2017 17:46:34 +0200
-Subject: [PATCH v4 3/8] dt-bindings: pwm: add description for rv1108 pwm
-In-Reply-To: <1502699868-8315-1-git-send-email-andy.yan@rock-chips.com>
-References: <1502699477-8063-1-git-send-email-andy.yan@rock-chips.com>
- <1502699868-8315-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <20170818154634.GI18307@ulmo>
+From: martyn.welch@collabora.co.uk (Martyn Welch)
+Date: Fri, 18 Aug 2017 16:53:47 +0100
+Subject: [PATCH v6 1/2] dt-bindings: misc: achc: Add device tree binding for
+ GE ACHC
+In-Reply-To: <1503071628-11899-1-git-send-email-martyn.welch@collabora.co.uk>
+References: <1503071628-11899-1-git-send-email-martyn.welch@collabora.co.uk>
+Message-ID: <1503071628-11899-2-git-send-email-martyn.welch@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 04:37:48PM +0800, Andy Yan wrote:
-> Add device tree bindings document for pwm on
-> rockchip rv1108 soc.
-> 
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
-> 
-> ---
-> 
-> Changes in v4: None
-> Changes in v3:
-> - make the compatible string be: "rockchip,rv1108-pwm", "rockchip,rk3288-pwm"
->   for rv1108
-> 
-> Changes in v2: None
-> 
->  Documentation/devicetree/bindings/pwm/pwm-rockchip.txt | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+Add Device Tree binding document for GE Healthcare USB Management
+Controller (ACHC).
 
-Applied to for-4.14/drivers, thanks.
+Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
+---
+ Documentation/devicetree/bindings/misc/ge-achc.txt | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/misc/ge-achc.txt
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170818/29bf427c/attachment.sig>
+diff --git a/Documentation/devicetree/bindings/misc/ge-achc.txt b/Documentation/devicetree/bindings/misc/ge-achc.txt
+new file mode 100644
+index 0000000..77df94d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/misc/ge-achc.txt
+@@ -0,0 +1,26 @@
++* GE Healthcare USB Management Controller
++
++A device which handles data aquisition from compatible USB based peripherals.
++SPI is used for device management.
++
++Note: This device does not expose the peripherals as USB devices.
++
++Required properties:
++
++- compatible : Should be "ge,achc"
++
++Required SPI properties:
++
++- reg : Should be address of the device chip select within
++  the controller.
++
++- spi-max-frequency : Maximum SPI clocking speed of device in Hz, should be
++  1MHz for the GE ACHC.
++
++Example:
++
++spidev0: spi at 0 {
++	compatible = "ge,achc";
++	reg = <0>;
++	spi-max-frequency = <1000000>;
++};
+-- 
+1.8.3.1
