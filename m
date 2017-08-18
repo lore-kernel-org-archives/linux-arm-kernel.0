@@ -1,73 +1,29 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 18 Aug 2017 10:24:23 +0530
-Subject: [PATCH v2 01/16] dmaengine: bcm-sba-raid: Minor improvments in
- comments
-In-Reply-To: <20170817034441.GX3053@localhost>
+Date: Fri, 18 Aug 2017 10:26:54 +0530
+Subject: [PATCH v2 03/16] dmaengine: bcm-sba-raid: Common flags for
+ sba_request state and fence
+In-Reply-To: <20170817034534.GY3053@localhost>
 References: <1501583880-32072-1-git-send-email-anup.patel@broadcom.com>
- <1501583880-32072-2-git-send-email-anup.patel@broadcom.com>
- <20170817034441.GX3053@localhost>
-Message-ID: <CAALAos8D1K0omRQbpAYA4paA3-wds-g-+TARhwi7VEc-ajWo_g@mail.gmail.com>
+ <1501583880-32072-4-git-send-email-anup.patel@broadcom.com>
+ <20170817034534.GY3053@localhost>
+Message-ID: <CAALAos8HhiGO3XHDS3ia5G51TmYWGeY9aSzCBDoWKSqr195Meg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 9:14 AM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Tue, Aug 01, 2017 at 04:07:45PM +0530, Anup Patel wrote:
->> Make section comments consistent across the Broadcom SBA RAID driver
->> by avoiding " SBA " in some of the comments.
+On Thu, Aug 17, 2017 at 9:15 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Tue, Aug 01, 2017 at 04:07:47PM +0530, Anup Patel wrote:
+>> This patch merges sba_request state and fence into common
+>> sba_request flags. Also, in-future we can extend sba_request
+>> flags as required.
 >
-> and you add more comments..
+> and it also changes the flag values to bits, which I have no idea why that
+> was done, care to explain that please...
 
-OK, I will add this to commit description.
+I thought its better to have separate bit each sba_request state so
+that when a sba_request is accidentally in two states then we can
+debug better.
 
->
->>
->> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->> ---
->>  drivers/dma/bcm-sba-raid.c | 9 ++++++---
->>  1 file changed, 6 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
->> index e41bbc7..76999b7 100644
->> --- a/drivers/dma/bcm-sba-raid.c
->> +++ b/drivers/dma/bcm-sba-raid.c
->> @@ -48,7 +48,8 @@
->>
->>  #include "dmaengine.h"
->>
->> -/* SBA command related defines */
->> +/* ====== Driver macros and defines ===== */
->> +
->>  #define SBA_TYPE_SHIFT                                       48
->>  #define SBA_TYPE_MASK                                        GENMASK(1, 0)
->>  #define SBA_TYPE_A                                   0x0
->> @@ -88,6 +89,8 @@
->>  #define to_sba_device(dchan)         \
->>       container_of(dchan, struct sba_device, dma_chan)
->>
->> +/* ===== Driver data structures ===== */
->
-> like this!!
->
->> +
->>  enum sba_request_state {
->>       SBA_REQUEST_STATE_FREE = 1,
->>       SBA_REQUEST_STATE_ALLOCED = 2,
->> @@ -164,7 +167,7 @@ struct sba_device {
->>       int reqs_free_count;
->>  };
->>
->> -/* ====== SBA command helper routines ===== */
->> +/* ====== Command helper routines ===== */
->>
->>  static inline u64 __pure sba_cmd_enc(u64 cmd, u32 val, u32 shift, u32 mask)
->>  {
->> @@ -196,7 +199,7 @@ static inline u32 __pure sba_cmd_pq_c_mdata(u32 d, u32 b1, u32 b0)
->>              ((d & SBA_C_MDATA_DNUM_MASK) << SBA_C_MDATA_DNUM_SHIFT);
->>  }
->>
->> -/* ====== Channel resource management routines ===== */
->> +/* ====== General helper routines ===== */
->>
+I will restore state values.
 
 Regards,
 Anup
