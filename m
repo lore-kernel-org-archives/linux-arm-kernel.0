@@ -1,58 +1,23 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Fri, 18 Aug 2017 16:32:24 -0500
-Subject: [PATCH v11 4/4] PCI: Warn periodically while waiting for device to
- become ready
-In-Reply-To: <20170818212310.15145.21732.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170818212310.15145.21732.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170818213224.15145.34617.stgit@bhelgaas-glaptop.roam.corp.google.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Aug 2017 23:35:08 +0200
+Subject: [GIT PULL 1/5] firmare: Changes for v4.14-rc1
+In-Reply-To: <20170818144806.14252-1-thierry.reding@gmail.com>
+References: <20170818144806.14252-1-thierry.reding@gmail.com>
+Message-ID: <CAK8P3a1VU4M2VoMAP_0QLNEBCVtrRsyfamajADBJafh-uCF_wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sinan Kaya <okaya@codeaurora.org>
+On Fri, Aug 18, 2017 at 4:48 PM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+>
+> ----------------------------------------------------------------
+> firmare: Changes for v4.14-rc1
+>
+> This contains a single bug fix that can lead to a crash in some rare
+> situations. Since this has never been reported to happen with the level
+> of support that exists upstream, this isn't considered critical.
+>
 
-Add a print statement in pci_bus_wait_crs() so that user observes the
-progress of device polling instead of silently waiting for timeout to be
-reached.
+Pulled into next/drivers, thanks!
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-[bhelgaas: check for timeout first so we don't print "waiting, giving up",
-always print time we've slept (not the actual timeout, print a "ready"
-message if we've printed a "waiting" message]
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
----
- drivers/pci/probe.c |   15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 342a86640c6b..99799cc1de22 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1844,16 +1844,25 @@ bool pci_bus_wait_crs(struct pci_bus *bus, int devfn, u32 *l, int timeout)
- 		delay *= 2;
- 
- 		if (delay > timeout) {
--			printk(KERN_WARNING "pci %04x:%02x:%02x.%d: not responding\n",
--			       pci_domain_nr(bus), bus->number, PCI_SLOT(devfn),
--			       PCI_FUNC(devfn));
-+			pr_warn("pci %04x:%02x:%02x.%d: not ready after %dms; giving up\n",
-+				pci_domain_nr(bus), bus->number,
-+				PCI_SLOT(devfn), PCI_FUNC(devfn), delay - 1);
- 			return false;
- 		}
- 
-+		if (delay >= 1000)
-+			pr_info("pci %04x:%02x:%02x.%d: not ready after %dms; waiting\n",
-+				pci_domain_nr(bus), bus->number,
-+				PCI_SLOT(devfn), PCI_FUNC(devfn), delay - 1);
-+
- 		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
- 			return false;
- 	}
- 
-+	if (delay >= 1000)
-+		pr_info("pci %04x:%02x:%02x.%d: ready after %dms\n",
-+			pci_domain_nr(bus), bus->number,
-+			PCI_SLOT(devfn), PCI_FUNC(devfn), delay - 1);
- 	return true;
- }
- 
+        Arnd
