@@ -1,162 +1,55 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Fri, 18 Aug 2017 14:17:01 +0200
-Subject: [PATCH v2] arm64: dts: rockchip: Add basic DVFS support for RK3368
-Message-ID: <20170818121701.12668-1-romain.perier@collabora.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 18 Aug 2017 14:21:14 +0200
+Subject: [PATCH v3 0/4] net: stmmac: Detect PHY location with phy-is-integrated
+Message-ID: <20170818122118.4925-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds and enable the operating points that have been tested and are
-currently supported by the SoC. This also adds clocks for ARMCLKL and
-ARMCLKB.
+Hello
 
-Signed-off-by: Romain Perier <romain.perier@collabora.com>
----
+The current way to find if the PHY is internal is to compare DT phy-mode
+and emac_variant/internal_phy.
+But it will negate a possible future SoC where an external PHY use the
+same phy mode than the integrated one.
 
-Changes in v2:
-- Switched to binding v2 for operating-points
-- Improved commit message
-- Rebased onto linux-next
+This patchs series adds a new way to find if the PHY is integrated, via
+the phy-is-integrated DT property.
 
- arch/arm64/boot/dts/rockchip/rk3368.dtsi | 75 +++++++++++++++++++++++++++++++-
- 1 file changed, 73 insertions(+), 2 deletions(-)
+Since it exists both integrated and external ethernet-phy at 1, they are merged in
+the final DTB and so share all properties.
+For avoiding this, and better represent the reality, we use a MDIO mux.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-index b6f234f10585..7f42a9111062 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-@@ -113,7 +113,8 @@
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
--
-+			clocks = <&cru ARMCLKL>;
-+			operating-points-v2 = <&cluster0_opp>;
- 			#cooling-cells = <2>; /* min followed by max */
- 		};
- 
-@@ -122,6 +123,8 @@
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
-+			clocks = <&cru ARMCLKL>;
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		cpu_l2: cpu at 2 {
-@@ -129,6 +132,8 @@
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
-+			clocks = <&cru ARMCLKL>;
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		cpu_l3: cpu at 3 {
-@@ -136,6 +141,8 @@
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
-+			clocks = <&cru ARMCLKL>;
-+			operating-points-v2 = <&cluster0_opp>;
- 		};
- 
- 		cpu_b0: cpu at 100 {
-@@ -143,7 +150,8 @@
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x0 0x100>;
- 			enable-method = "psci";
--
-+			clocks = <&cru ARMCLKB>;
-+			operating-points-v2 = <&cluster1_opp>;
- 			#cooling-cells = <2>; /* min followed by max */
- 		};
- 
-@@ -152,6 +160,8 @@
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x0 0x101>;
- 			enable-method = "psci";
-+			clocks = <&cru ARMCLKB>;
-+			operating-points-v2 = <&cluster1_opp>;
- 		};
- 
- 		cpu_b2: cpu at 102 {
-@@ -159,6 +169,8 @@
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x0 0x102>;
- 			enable-method = "psci";
-+			clocks = <&cru ARMCLKB>;
-+			operating-points-v2 = <&cluster1_opp>;
- 		};
- 
- 		cpu_b3: cpu at 103 {
-@@ -166,9 +178,68 @@
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0x0 0x103>;
- 			enable-method = "psci";
-+			clocks = <&cru ARMCLKB>;
-+			operating-points-v2 = <&cluster1_opp>;
- 		};
- 	};
- 
-+	cluster0_opp: opp-table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp00 {
-+			opp-hz = /bits/ 64 <312000000>;
-+			opp-microvolt = <950000>;
-+			clock-latency-ns = <40000>;
-+		};
-+		opp01 {
-+			opp-hz = /bits/ 64 <408000000>;
-+			opp-microvolt = <950000>;
-+		};
-+		opp02 {
-+			opp-hz = /bits/ 64 <600000000>;
-+			opp-microvolt = <950000>;
-+		};
-+		opp03 {
-+			opp-hz = /bits/ 64 <816000000>;
-+			opp-microvolt = <1025000>;
-+		};
-+		opp04 {
-+			opp-hz = /bits/ 64 <1008000000>;
-+			opp-microvolt = <1125000>;
-+		};
-+	};
-+
-+	cluster1_opp: opp-table1 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp00 {
-+			opp-hz = /bits/ 64 <312000000>;
-+			opp-microvolt = <950000>;
-+			clock-latency-ns = <40000>;
-+		};
-+		opp01 {
-+			opp-hz = /bits/ 64 <408000000>;
-+			opp-microvolt = <950000>;
-+		};
-+		opp02 {
-+			opp-hz = /bits/ 64 <600000000>;
-+			opp-microvolt = <950000>;
-+		};
-+		opp03 {
-+			opp-hz = /bits/ 64 <816000000>;
-+			opp-microvolt = <975000>;
-+		};
-+		opp04 {
-+			opp-hz = /bits/ 64 <1008000000>;
-+			opp-microvolt = <1050000>;
-+		};
-+	};
-+
-+
-+
-+
- 	amba {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
+Note that sun8i-v3s-emac have also an integrated PHY, but since it lacks
+any external PHY support, it is not necessary to add MDIO mux to it.
+
+The first patch should go via the sunxi tree.
+Note that this serie will need backporting the patch
+"Documentation: net: phy: Add phy-is-integrated binding" which is in net-next
+
+Thanks
+Regards
+
+Changes since v2:
+- Add a MDIO mux for creating distinction between integrated and external MDIO.
+- phy-is-integrated is not set in dtsi.
+
+Changes since v1:
+- Dropped phy-is-integrated documentation patch since another same patch was already merged
+- Moved phy-is-integrated from SoC dtsi to final board DT.
+
+Corentin Labbe (4):
+  ARM: dts: sunxi: h3/h5: represent the mdio switch used by
+    sun8i-h3-emac
+  net: stmmac: dwmac-sun8i: choose internal PHY via phy-is-integrated
+  net: stmmac: register parent MDIO node for sun8i-h3-emac
+  dt-bindings: net: dwmac-sun8i: update documentation about integrated
+    PHY
+
+ .../devicetree/bindings/net/dwmac-sun8i.txt        | 112 +++++++++++++++++++--
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                 |  28 +++++-
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c  |  16 +--
+ .../net/ethernet/stmicro/stmmac/stmmac_platform.c  |  12 ++-
+ 4 files changed, 146 insertions(+), 22 deletions(-)
+
 -- 
-2.11.0
+2.13.0
