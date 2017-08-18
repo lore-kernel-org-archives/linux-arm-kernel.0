@@ -1,30 +1,26 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 18 Aug 2017 17:31:35 +0200
-Subject: [PATCH v3 1/7] pwm: rockchip: Add APB and function both clocks
- support
-In-Reply-To: <1502206715-24174-2-git-send-email-david.wu@rock-chips.com>
+Date: Fri, 18 Aug 2017 17:32:55 +0200
+Subject: [PATCH v3 2/7] pwm: rockchip: Remove the judge from return value
+ of pwm_config
+In-Reply-To: <1502206715-24174-3-git-send-email-david.wu@rock-chips.com>
 References: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
- <1502206715-24174-2-git-send-email-david.wu@rock-chips.com>
-Message-ID: <20170818153135.GB18307@ulmo>
+ <1502206715-24174-3-git-send-email-david.wu@rock-chips.com>
+Message-ID: <20170818153255.GC18307@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 11:38:29PM +0800, David Wu wrote:
-> New PWM module provides two individual clocks for APB clock
-> and function clock.
+On Tue, Aug 08, 2017 at 11:38:30PM +0800, David Wu wrote:
+> It seems the rockchip_pwm_config always returns the result 0,
+> so remove the judge.
 > 
 > Signed-off-by: David Wu <david.wu@rock-chips.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > ---
-> changes in v3:
->  - clk_get with NULL argument again if it was error, when clk_get with "pwm" argument.
->  - To get clk count, use of_count_phandle_with_args instead of of_property_count_strings.
-> 
->  .../devicetree/bindings/pwm/pwm-rockchip.txt       |  8 ++-
->  drivers/pwm/pwm-rockchip.c                         | 58 ++++++++++++++++++----
->  2 files changed, 56 insertions(+), 10 deletions(-)
+>  drivers/pwm/pwm-rockchip.c | 12 ++----------
+>  1 file changed, 2 insertions(+), 10 deletions(-)
 
-Applied to for-4.14/drivers, thanks.
+I don't understand what the "judge" is supposed to be, but I've applied
+this to for-4.14/drivers anyway. Thanks.
 
 Thierry
 -------------- next part --------------
@@ -33,4 +29,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170818/7c900f50/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170818/416eac75/attachment-0001.sig>
