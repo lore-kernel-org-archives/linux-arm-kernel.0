@@ -1,45 +1,72 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 18 Aug 2017 18:12:20 +0800
-Subject: [GIT PULL] Allwinner fixes for 4.13 round 2
-In-Reply-To: <CAK8P3a3Hokuu6GDj8HQ9-XEBvErcZsJcF6mwGVHo2nUR7SxawA@mail.gmail.com>
-References: <20170818040447.ddz27hm3c2eashjr@wens.csie.org>
- <CAK8P3a3Hokuu6GDj8HQ9-XEBvErcZsJcF6mwGVHo2nUR7SxawA@mail.gmail.com>
-Message-ID: <CAGb2v67ceJheg1n_U29DmGe7iZ76W=qLdukZJchD=xyvUsenkQ@mail.gmail.com>
+From: sr@denx.de (Stefan Roese)
+Date: Fri, 18 Aug 2017 12:18:28 +0200
+Subject: [PATCH] irqchip/armada-370-xp: Enable MSI-X support
+In-Reply-To: <6a3e8bcc-19ef-cef1-180e-f4e194d5589b@denx.de>
+References: <20170502072600.13380-1-sr@denx.de>
+ <80f30724-20b6-b5a7-7218-93ff3fa23177@denx.de>
+ <20170815160109.023842de@windsurf>
+ <6a3e8bcc-19ef-cef1-180e-f4e194d5589b@denx.de>
+Message-ID: <0b8b249b-255a-6354-69cd-58f44fa7874d@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 5:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Fri, Aug 18, 2017 at 6:04 AM, Chen-Yu Tsai <wens@csie.org> wrote:
->> Hi Arnd, Olof,
+Hi Thomas,
+
+On 15.08.2017 16:06, Stefan Roese wrote:
+> On 15.08.2017 16:01, Thomas Petazzoni wrote:
+>> On Tue, 15 Aug 2017 15:31:31 +0200, Stefan Roese wrote:
 >>
->> This is the second batch of fixes for 4.13. This is based on the first
->> batch of fixes that was already merged.
->
-> Pulled into fixes, thanks!
->
->> We still have some device tree binding changes for the H3 EMAC and
->> integrated Ethernet PHY we need to sort out for 4.13. If it is not
->> done by next week, I will send out revert patches for the driver,
->> device tree binding, and device tree changes. Or is this cutting
->> it too close and we should just revert them now?
->
-> I need more information about the specific change to answer that.
+>>> On 02.05.2017 09:26, Stefan Roese wrote:
+>>>> Armada XP does not only support MSI, but also MSI-X. This patch sets
+>>>> the MSI_FLAG_PCI_MSIX flag in the interrupt controller driver which
+>>>> is the only change necessary to enable MSI-X support on this SoC. As
+>>>> the Linux PCI MSI-X infrastructure takes care of writing the data and
+>>>> address structures into the BAR specified by the MSI-X controller.
+>>>>
+>>>> Signed-off-by: Stefan Roese <sr@denx.de>
+>>>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>>>> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>>>> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>>> Cc: Jason Cooper <jason@lakedaemon.net>
+>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>>> ---
+>>>>    drivers/irqchip/irq-armada-370-xp.c | 2 +-
+>>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/irqchip/irq-armada-370-xp.c 
+>>>> b/drivers/irqchip/irq-armada-370-xp.c
+>>>> index 33982cbd8a57..b17039ed8735 100644
+>>>> --- a/drivers/irqchip/irq-armada-370-xp.c
+>>>> +++ b/drivers/irqchip/irq-armada-370-xp.c
+>>>> @@ -124,7 +124,7 @@ static struct irq_chip 
+>>>> armada_370_xp_msi_irq_chip = {
+>>>>    static struct msi_domain_info armada_370_xp_msi_domain_info = {
+>>>>        .flags    = (MSI_FLAG_USE_DEF_DOM_OPS | 
+>>>> MSI_FLAG_USE_DEF_CHIP_OPS |
+>>>> -           MSI_FLAG_MULTI_PCI_MSI),
+>>>> +           MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
+>>>>        .chip    = &armada_370_xp_msi_irq_chip,
+>>>>    };
+>>>
+>>> Its been a while since this patch has been submitted - without any
+>>> comments so far. What's the current status with it? Is it someones
+>>> queue for upstreaming?
+>>
+>> Sorry for the lack of feedback, very good idea to ping me on this
+>> topic. I don't have access to HW right now, so I can't give it a test.
+>> However, I don't think I have MSI-X capable hardware, only MSI capable.
+>>
+>> With which hardware did you test this? An off-the-shell PCIe card, or
+>> some custom FPGA logic?
+> 
+> I tested this code with some Altera / Intel FPGA using their PCI-Express
+> IP core. It should be possible to test this with some MSI-X capable
+> desktop PCIe cards as well on AXP boards equipped with PCIe slots,
+> like the Marvell AXP development board (orange box).
 
-The hardware in question has an integrated PHY in the SoC, but can
-also choose to use an external PHY. The changes would address two
-issues: a) how to differentiate internal vs external PHY in the
-device tree, and b) avoiding confusion when both are present and
-assigned the same address (there is a mux in the hardware).
+So what do you think about this patch? Can I get your Acked-by /
+Reviewed-by, or do you have some objections? Or do plan to first do
+some tests yourself?
 
-> Can you point me to the patches in question?
-
-Here's v2 (which is not final):
-
-    https://www.spinics.net/lists/arm-kernel/msg601325.html
-
-Rob also chimed in on related patches:
-
-    https://www.spinics.net/lists/arm-kernel/msg601482.html
-    https://www.spinics.net/lists/devicetree/msg190976.html
-
-ChenYu
+Thanks,
+Stefan
