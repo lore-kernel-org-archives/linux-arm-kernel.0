@@ -1,77 +1,59 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 17 Aug 2017 22:31:52 -0700
-Subject: [PATCH v4 0/4] Add Broadcom STB USB phy driver
-In-Reply-To: <1500646226-10659-1-git-send-email-alcooperx@gmail.com>
-References: <1500646226-10659-1-git-send-email-alcooperx@gmail.com>
-Message-ID: <42033e0e-00c1-dcd5-dc9e-66fff071118c@gmail.com>
+Date: Thu, 17 Aug 2017 22:34:11 -0700
+Subject: [PATCH v4 0/3] Add support for Broadcom iProc mailbox controller
+In-Reply-To: <75e8060f-7e9e-8e7c-2eee-a5c9321f3d3f@broadcom.com>
+References: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
+ <75e8060f-7e9e-8e7c-2eee-a5c9321f3d3f@broadcom.com>
+Message-ID: <e0b8a198-a734-e412-e364-0897f094b78d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 07/21/2017 07:10 AM, Al Cooper wrote:
-> Add a new USB Phy driver for Broadcom STB SoCs. This driver
-> supports Broadcom STB ARM SoCs. This driver in
-> combination with the Broadcom STB ohci, ehci and xhci
-> drivers will enable USB1.1, USB2.0 and USB3.0 support.
-> This Phy driver also supports the Broadcom BDC gadget
-> driver.
+On 02/16/2017 12:08 PM, Jonathan Richardson wrote:
+> Pinging maintainer. Jassi, have you had a chance to look at this yet? Thanks.
 
-Kishon can we get some timely feedback on this please? Thanks
+Jassi did provide some feedback, should we expect a v5 at some point? Thanks
 
 > 
-> Changes since v3:
-> - Removed MIPS support because there is such a small
->   amount of code that is common to both ARM and MIPS.
->   I'll create a separate MIPS driver in the future.
-> - Have the Kconfig selection for this driver also select
->   "CONFIG_SOC_BRCMSTB" which contains needed functions.
-> - Change device tree properties to use "brcm,has_xhci" and
->   "brcm,has_eohci" to determine if the phy contains
->   a xhci phy, and e/ohci phy or both.
-> - Change the phy xlate routine to return an error instead
->   of NULL for a requested phy that doesn't exist.
-> - Moved some probe functionality into it's own funtion to
->   simplify the many "if (has_xhci)" statements.
-> 
-> Changes since v2:
-> - Fix kbuild errors by changing Kconfig so the driver
->   only builds for ARCH_BRCMSTB || BMIPS_GENERIC systems
-> 
-> Changes since v1:
-> - Rebased to next
-> - Add Kconfig entry to build the driver
-> - Commented all delays
-> - Split out sysfs functionality in separate patch
-> - Removed parsing of old obselete device tree properties
-> - Changed device property "device" to "dr_mode" using
->   standard values "host" and "peripheral" along with new
->   values "drd" and "typec-pd"
-> - Add ability to handle the standard PHY_TYPE_USB2 and
->   PHY_TYPE_USB3 arguments passed in by phy consumers.
-> - Moved phy_provider_register() to end of probe routine
-> 
-> Al Cooper (4):
->   soc: brcmstb: Add Product ID and Family ID helper functions
->   dt-bindings: Add Broadcom STB USB PHY binding document
->   phy: usb: phy-brcm-usb: Add Broadcom STB USB phy driver
->   phy: usb: phy-brcm-usb: Add ability to force DRD mode to host or
->     device
-> 
->  .../bindings/phy/brcm,brcmstb-usb-phy.txt          |   43 +
->  MAINTAINERS                                        |    7 +
->  drivers/phy/broadcom/Kconfig                       |   13 +
->  drivers/phy/broadcom/Makefile                      |    3 +
->  drivers/phy/broadcom/phy-brcm-usb-init.c           | 1034 ++++++++++++++++++++
->  drivers/phy/broadcom/phy-brcm-usb-init.h           |   50 +
->  drivers/phy/broadcom/phy-brcm-usb.c                |  460 +++++++++
->  drivers/soc/bcm/brcmstb/common.c                   |   12 +
->  include/linux/soc/brcmstb/brcmstb.h                |   10 +
->  9 files changed, 1632 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/brcm,brcmstb-usb-phy.txt
->  create mode 100644 drivers/phy/broadcom/phy-brcm-usb-init.c
->  create mode 100644 drivers/phy/broadcom/phy-brcm-usb-init.h
->  create mode 100644 drivers/phy/broadcom/phy-brcm-usb.c
+> On 17-01-26 12:37 PM, Jonathan Richardson wrote:
+>> This patch set contains mailbox support for Broadcom iProc based SoC's. The
+>> mailbox controller handles all communication with a Cortex-M0 MCU processor that
+>> provides support for power, clock, and reset management. The mailbox controller
+>> for Cygnus is enabled in DT.
+>>
+>> Changes from v3:
+>>  - DT changes merged into one commit.
+>>
+>> Changes from v2:
+>>  - Fixed binding to remove leading 0 (Rob's comment). Also added more detail as
+>>    suggested by Jassi.
+>>  - Added changelog to dt binding and enable dts commits.
+>>  - Changed year in copyright in bcm_iproc_mailbox.h.
+>>  - Changes to bcm-cygnus.dtsi were prematurely merged into the mainline after
+>>    Rob acked the DT changes but Jassi suggested changes to the mailbox driver.
+>>    The result was that the mailbox controller node and changes to the crmu gpio
+>>    driver to enable interrupt handling were incorrectly added to the dtsi. A
+>>    commit is included in this patchset to revert those changes. Enabling
+>>    interrupt handling in the the crmu gpio driver will be introduced when the
+>>    interrupt controller driver is added to provide mailbox interrupt support.
+>>
+>> Jonathan Richardson (3):
+>>   dt-bindings: Document Broadcom iProc mailbox controller driver
+>>   mailbox: Add iProc mailbox controller driver
+>>   ARM: dts: Enable Broadcom iProc mailbox controller
+>>
+>>  .../bindings/mailbox/brcm,iproc-mailbox.txt        |  18 ++
+>>  arch/arm/boot/dts/bcm-cygnus.dtsi                  |   8 +-
+>>  drivers/mailbox/Kconfig                            |  10 ++
+>>  drivers/mailbox/Makefile                           |   2 +
+>>  drivers/mailbox/bcm-iproc-mailbox.c                | 199 +++++++++++++++++++++
+>>  include/linux/mailbox/bcm_iproc_mailbox.h          |  32 ++++
+>>  6 files changed, 262 insertions(+), 7 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-mailbox.txt
+>>  create mode 100644 drivers/mailbox/bcm-iproc-mailbox.c
+>>  create mode 100644 include/linux/mailbox/bcm_iproc_mailbox.h
+>>
 > 
 
 -- 
