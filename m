@@ -1,89 +1,45 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 18 Aug 2017 12:10:46 +0200
-Subject: [GIT PULL] Reset controller changes for v4.14
-Message-ID: <1503051046.7730.7.camel@pengutronix.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 18 Aug 2017 18:12:20 +0800
+Subject: [GIT PULL] Allwinner fixes for 4.13 round 2
+In-Reply-To: <CAK8P3a3Hokuu6GDj8HQ9-XEBvErcZsJcF6mwGVHo2nUR7SxawA@mail.gmail.com>
+References: <20170818040447.ddz27hm3c2eashjr@wens.csie.org>
+ <CAK8P3a3Hokuu6GDj8HQ9-XEBvErcZsJcF6mwGVHo2nUR7SxawA@mail.gmail.com>
+Message-ID: <CAGb2v67ceJheg1n_U29DmGe7iZ76W=qLdukZJchD=xyvUsenkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear arm-soc maintainers,
+On Fri, Aug 18, 2017 at 5:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Fri, Aug 18, 2017 at 6:04 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+>> Hi Arnd, Olof,
+>>
+>> This is the second batch of fixes for 4.13. This is based on the first
+>> batch of fixes that was already merged.
+>
+> Pulled into fixes, thanks!
+>
+>> We still have some device tree binding changes for the H3 EMAC and
+>> integrated Ethernet PHY we need to sort out for 4.13. If it is not
+>> done by next week, I will send out revert patches for the driver,
+>> device tree binding, and device tree changes. Or is this cutting
+>> it too close and we should just revert them now?
+>
+> I need more information about the specific change to answer that.
 
-please consider merging this tag for v4.14. It contains a new HSDKv1
-reset driver, updates and fixes for the uniphier driver, a reset array
-API to handle a number of resets together, and removes the Gemini reset
-driver, which is replaced by a combined clock/reset driver in
-drivers/clk.
+The hardware in question has an integrated PHY in the SoC, but can
+also choose to use an external PHY. The changes would address two
+issues: a) how to differentiate internal vs external PHY in the
+device tree, and b) avoiding confusion when both are present and
+assigned the same address (there is a mux in the hardware).
 
-regards
-Philipp
+> Can you point me to the patches in question?
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+Here's v2 (which is not final):
 
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+    https://www.spinics.net/lists/arm-kernel/msg601325.html
 
-are available in the git repository at:
+Rob also chimed in on related patches:
 
-  git://git.pengutronix.de/git/pza/linux tags/reset-for-4.14
+    https://www.spinics.net/lists/arm-kernel/msg601482.html
+    https://www.spinics.net/lists/devicetree/msg190976.html
 
-for you to fetch changes up to ac0c735ac3dd6697055299cac01617527aa6a695:
-
-  reset: uniphier: add analog amplifiers reset control (2017-08-14 09:29:47 +0200)
-
-----------------------------------------------------------------
-Reset controller changes for v4.14
-
-- constify zx2967 reset_ops
-- add a convenience API to manage an array of resets
-- let deassert report success and let assert report success for shared resets
-  if the reset controller driver does not implement (de)assert.
-- add HSDKv1 reset driver
-- remove Gemini reset controller, the driver is made obsolete
-  by a combined clock/reset driver in drivers/clk
-- fix the total number of reset lines in the sunxi driver
-- various uniphier updates and fixes:
-  - remove sLD3 SoC support
-  - simplify system reset register and bit definitions
-  - add audio systems, video input subsystem, and analog amplifiers reset
-    controls
-
-----------------------------------------------------------------
-Arvind Yadav (1):
-      reset: zx2967: constify zx2967_reset_ops.
-
-Eugeniy Paltsev (1):
-      ARC: reset: introduce HSDKv1 reset driver
-
-Katsuhiro Suzuki (3):
-      reset: uniphier: add audio systems reset control
-      reset: uniphier: add video input subsystem reset control
-      reset: uniphier: add analog amplifiers reset control
-
-Linus Walleij (1):
-      Revert "reset: Add a Gemini reset controller"
-
-Masahiro Yamada (2):
-      reset: uniphier: remove sLD3 SoC support
-      reset: uniphier: do not use per-SoC macro for system reset block
-
-Philipp Zabel (2):
-      reset: make (de)assert report success for self-deasserting reset drivers
-      reset: sunxi: fix number of reset lines
-
-Vivek Gautam (1):
-      reset: Add APIs to manage array of resets
-
- .../devicetree/bindings/reset/uniphier-reset.txt   |  27 ++-
- MAINTAINERS                                        |   7 +
- drivers/reset/Kconfig                              |   9 +-
- drivers/reset/Makefile                             |   2 +-
- drivers/reset/core.c                               | 238 ++++++++++++++++++++-
- drivers/reset/reset-gemini.c                       | 110 ----------
- drivers/reset/reset-hsdk-v1.c                      | 137 ++++++++++++
- drivers/reset/reset-sunxi.c                        |   4 +-
- drivers/reset/reset-uniphier.c                     | 117 +++++-----
- drivers/reset/reset-zx2967.c                       |   2 +-
- include/dt-bindings/reset/snps,hsdk-v1-reset.h     |  17 ++
- include/linux/reset.h                              |  68 ++++++
- 12 files changed, 547 insertions(+), 191 deletions(-)
- delete mode 100644 drivers/reset/reset-gemini.c
- create mode 100644 drivers/reset/reset-hsdk-v1.c
- create mode 100644 include/dt-bindings/reset/snps,hsdk-v1-reset.h
+ChenYu
