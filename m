@@ -1,26 +1,56 @@
-From: martyn.welch@collabora.co.uk (Martyn Welch)
-Date: Fri, 18 Aug 2017 16:53:46 +0100
-Subject: [PATCH v6 0/2] Add device tree and associated documentation for GE
- Healthcare PPD
-Message-ID: <1503071628-11899-1-git-send-email-martyn.welch@collabora.co.uk>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 18 Aug 2017 16:57:01 +0100
+Subject: [PATCH] arm64: fpsimd: Prevent registers leaking across exec
+Message-ID: <1503071821-13845-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds the device tree for the GE Healthcare PPD and binding
-documentation for the ge-achc, as used by the PPD device tree.
+There are some tricky dependencies between the different stages of
+flushing the FPSIMD register state during exec, and these can race
+with context switch in ways that can cause the old task's regs to
+leak across.  In particular, a context switch during the memset() can
+cause some of the task's old FPSIMD registers to reappear.
 
-Fabien Lahoudere (1):
-  ARM: dts: imx53: Add GE Healthcare PPD
+Disabling preemption for this small window would be no big deal for
+performance: preemption is already disabled for similar scenarios
+like updating the FPSIMD registers in sigreturn.
 
-Martyn Welch (1):
-  dt-bindings: misc: achc: Add device tree binding for GE ACHC
+So, instead of rearranging things in ways that might swap existing
+subtle bugs for new ones, this patch just disables preemption
+around the FPSIMD state flushing so that races of this type can't
+occur here.  This brings fpsimd_flush_thread() into line with other
+code paths.
 
- Documentation/devicetree/bindings/misc/ge-achc.txt |   26 +
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/imx53-ppd.dts                    | 1042 ++++++++++++++++++++
- 3 files changed, 1069 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/misc/ge-achc.txt
- create mode 100644 arch/arm/boot/dts/imx53-ppd.dts
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: stable at vger.kernel.org
+Fixes: 674c242c9323 ("arm64: flush FP/SIMD state correctly after execve()")
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
 
+NOTE TO MAINTAINERS: This is a fix, applicable to *v4.13* and stable.
+
+The kernel-mode NEON rework already queued for v4.14 turns this into a
+local_bh_disable() as a side effect, so does not strictly need this
+patch.  When merging, the queued v4.14 changes should be retained.
+
+ arch/arm64/kernel/fpsimd.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 06da8ea..c7b4995 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -161,9 +161,11 @@ void fpsimd_flush_thread(void)
+ {
+ 	if (!system_supports_fpsimd())
+ 		return;
++	preempt_disable();
+ 	memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
+ 	fpsimd_flush_task_state(current);
+ 	set_thread_flag(TIF_FOREIGN_FPSTATE);
++	preempt_enable();
+ }
+ 
+ /*
 -- 
-1.8.3.1
+2.1.4
