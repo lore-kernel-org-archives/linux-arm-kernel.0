@@ -1,21 +1,18 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 19 Aug 2017 00:06:15 +0200
-Subject: [GIT PULL] Reset controller changes for v4.14
-In-Reply-To: <1503051046.7730.7.camel@pengutronix.de>
-References: <1503051046.7730.7.camel@pengutronix.de>
-Message-ID: <CAK8P3a1eOMim4tP2OFLrEDf+1-L4gy0W5hjbfzT1SAqX5DxrtQ@mail.gmail.com>
+Date: Sat, 19 Aug 2017 00:07:25 +0200
+Subject: [GIT PULL] Qualcomm ARM64 Defconfig updates for 4.14
+In-Reply-To: <1503090105-1569-1-git-send-email-andy.gross@linaro.org>
+References: <1503090105-1569-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <CAK8P3a0TS+nOqPKiTvs7KeJ7bJg39=vTTVpouYhAYM5zBRQrEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 12:10 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> Dear arm-soc maintainers,
+On Fri, Aug 18, 2017 at 11:01 PM, Andy Gross <andy.gross@linaro.org> wrote:
+> ----------------------------------------------------------------
+> Qualcomm ARM64 Based defconfig Updates for v4.14
 >
-> please consider merging this tag for v4.14. It contains a new HSDKv1
-> reset driver, updates and fixes for the uniphier driver, a reset array
-> API to handle a number of resets together, and removes the Gemini reset
-> driver, which is replaced by a combined clock/reset driver in
-> drivers/clk.
+> * Enable Qualcomm IPQ8074 clocks and pinctrl
 
-Pulled into next/drivers, thanks!
+Pulled into next/arm64,thanks!
 
-      Arnd
+       Arnd
