@@ -1,70 +1,29 @@
-From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
-Date: Fri, 18 Aug 2017 16:14:45 +0800
-Subject: [PATCH] arm64: dts: ls1088a: Add USB support
-Message-ID: <1503044085-5024-1-git-send-email-yinbo.zhu@nxp.com>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Fri, 18 Aug 2017 16:32:38 +0800
+Subject: [RFC PATCH v2 1/3] PCI: rockchip: Add support for pcie wake irq
+In-Reply-To: <5e3accf1-6f84-861f-f647-628322bb7841@rock-chips.com>
+References: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
+ <20170817120431.12398-2-jeffy.chen@rock-chips.com>
+ <5e3accf1-6f84-861f-f647-628322bb7841@rock-chips.com>
+Message-ID: <5996A626.5040303@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+Hi Shawn,
 
-Fix the issue that usb is not detected on ls1088ardb
+On 08/18/2017 03:23 PM, Shawn Lin wrote:
+>>
+>> @@ -1524,6 +1532,9 @@ static int rockchip_pcie_remove(struct
+>> platform_device *pdev)
+>>       struct device *dev = &pdev->dev;
+>>       struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
+>> +    dev_pm_clear_wake_irq(dev);
+>> +    device_init_wakeup(dev, false);
+>> +
+>
+> Looks good overall but I think we need this on the
+> error handling path of rockchip_pcie_probe as well?
 
-Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
-Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |  8 ++++++++
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    | 20 ++++++++++++++++++++
- 2 files changed, 28 insertions(+)
+hmm, right, will fix it, thanks.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-index 213abb7..6c3c3bc 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-@@ -118,6 +118,14 @@
- 	status = "okay";
- };
- 
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
-+
- &esdhc {
- 	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index c144d06..c23fede 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -359,6 +359,26 @@
- 			status = "disabled";
- 		};
- 
-+		usb0: usb3 at 3100000 {
-+			compatible = "snps,dwc3";
-+			reg = <0x0 0x3100000 0x0 0x10000>;
-+			interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
-+			dr_mode = "host";
-+			snps,quirk-frame-length-adjustment = <0x20>;
-+			snps,dis_rxdet_inp3_quirk;
-+			status = "disabled";
-+		};
-+
-+		usb1: usb3 at 3110000 {
-+			compatible = "snps,dwc3";
-+			reg = <0x0 0x3110000 0x0 0x10000>;
-+			interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
-+			dr_mode = "host";
-+			snps,quirk-frame-length-adjustment = <0x20>;
-+			snps,dis_rxdet_inp3_quirk;
-+			status = "disabled";
-+		};
-+
- 		sata: sata at 3200000 {
- 			compatible = "fsl,ls1088a-ahci";
- 			reg = <0x0 0x3200000 0x0 0x10000>,
--- 
-2.1.0.27.g96db324
+and i also notice some other missing error handling, will fix them too:)
