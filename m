@@ -1,34 +1,21 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 18 Aug 2017 16:02:04 -0500
-Subject: [GIT PULL] Qualcomm ARM64 DT updates for 4.14 Part 2
-Message-ID: <1503090124-1658-1-git-send-email-andy.gross@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Aug 2017 23:02:11 +0200
+Subject: [GIT PULL 2/3] ZTE device tree updates for 4.14
+In-Reply-To: <1503043549-13232-2-git-send-email-shawnguo@kernel.org>
+References: <1503043549-13232-1-git-send-email-shawnguo@kernel.org>
+ <1503043549-13232-2-git-send-email-shawnguo@kernel.org>
+Message-ID: <CAK8P3a1wU-N_DqY90-QcpPtAp1aFaaEjngYHhK=eBSzkHN69bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 6a6729f384365db9443a867bf8cf22255b3da582:
+On Fri, Aug 18, 2017 at 10:05 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+> ----------------------------------------------------------------
+> ZTE device tree updates for 4.14:
+>  - A clean up patch from Shawn Lin to remove the deprecated dwmmc
+>    property 'num-slots'.
+>
 
-  arm64: dts: qcom: msm8916: Add IOMMU support (2017-08-16 10:09:03 -0500)
+Pulled into next/dt, thanks!
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.14-2
-
-for you to fetch changes up to 41dac73e243d42b89fd10dfd331824d4a39099ac:
-
-  arm64: dts: Add ipq8074 SoC and HK01 board support (2017-08-18 14:47:25 -0500)
-
-----------------------------------------------------------------
-Qualcomm ARM64 Updates for v4.14 Part 2
-
-* Add IPQ8074 SoC and HK01 board support
-
-----------------------------------------------------------------
-Varadarajan Narayanan (1):
-      arm64: dts: Add ipq8074 SoC and HK01 board support
-
- arch/arm64/boot/dts/qcom/Makefile         |   1 +
- arch/arm64/boot/dts/qcom/ipq8074-hk01.dts |  52 ++++++++
- arch/arm64/boot/dts/qcom/ipq8074.dtsi     | 194 ++++++++++++++++++++++++++++++
- 3 files changed, 247 insertions(+)
- create mode 100644 arch/arm64/boot/dts/qcom/ipq8074-hk01.dts
- create mode 100644 arch/arm64/boot/dts/qcom/ipq8074.dtsi
+      Arnd
