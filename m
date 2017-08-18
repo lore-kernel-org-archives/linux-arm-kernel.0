@@ -1,46 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Aug 2017 11:28:52 -0700
-Subject: [RFC PATCH v2 1/3] PCI: rockchip: Add support for pcie wake irq
-In-Reply-To: <59972817.4030907@rock-chips.com>
-References: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
- <20170817120431.12398-2-jeffy.chen@rock-chips.com>
- <20170818170107.GA119461@google.com>
- <59972817.4030907@rock-chips.com>
-Message-ID: <20170818182850.GG6008@atomide.com>
+From: klaus.goger@theobroma-systems.com (Klaus Goger)
+Date: Fri, 18 Aug 2017 21:34:43 +0200
+Subject: [PATCH v2 3/5] dt-bindings: add rk3399-q7 SoM
+In-Reply-To: <20170818193445.47542-1-klaus.goger@theobroma-systems.com>
+References: <20170818193445.47542-1-klaus.goger@theobroma-systems.com>
+Message-ID: <20170818193445.47542-4-klaus.goger@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* jeffy <jeffy.chen@rock-chips.com> [170818 11:05]:
-> On 08/19/2017 01:01 AM, Brian Norris wrote:
-> > BTW, in another context, Tony suggested we might need to fix up the IRQ flags
-> > like this:
-> > 
-> > int dev_pm_set_dedicated_wake_irq(struct device *dev, int irq)
-> > {
-> > ...
-> >          err = request_threaded_irq(irq, NULL, handle_threaded_wake_irq,
-> > -                                  IRQF_ONESHOT, dev_name(dev), wirq);
-> > +                                  IRQF_ONESHOT | irq_get_trigger_type(irq), dev_name(dev), wirq);
-> > 
-> > But IIUC, that's not actually necessary, because __setup_irq()
-> > automatically configures the trigger type if the driver didn't request
-> > one explicitly.
-> 
-> actually this would not work...irq_get_trigger_type would return zero due to
-> a bug which we have a patch for it already:
-> 
-> 9908207 New          [tip:irq/urgent] genirq: Restore trigger settings in
-> irq_modify_status()
+RK3399-Q7 is a Qseven compatible system-on-module by Theobroma Systems.
 
-Thanks for that information. So it seems we can leave out the
-irq_get_trigger_type() here then? Might be worth checking
-that it really does get populated though :)
+This adds the module and the EVK baseboard "Haikou"
 
-> BTW, using dev_name for the name of this wake irq seems not very
-> convenient...maybe add a ":wake" suffix?
+Signed-off-by: Klaus Goger <klaus.goger@theobroma-systems.com>
+---
 
-Good idea, will take a look.
+Changes in v2: None
 
-Regards,
+ Documentation/devicetree/bindings/arm/rockchip.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Tony
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index 88d95323d301..c343fb5f6d7b 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -177,6 +177,10 @@ Rockchip platforms device tree bindings
+     Required root node properties:
+       - compatible = "rockchip,rk3399-sapphire-excavator", "rockchip,rk3399";
+ 
++- Theobroma Systems RK3399-Q7 Haikou Baseboard:
++    Required root node properties:
++      - compatible = "tsd,rk3399-q7-haikou", "rockchip,rk3399";
++
+ - Tronsmart Orion R68 Meta
+     Required root node properties:
+       - compatible = "tronsmart,orion-r68-meta", "rockchip,rk3368";
+-- 
+2.11.0
