@@ -1,98 +1,94 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 18 Aug 2017 17:06:46 +0530
-Subject: [PATCH v2 11/16] dmaengine: bcm-sba-raid: Peek mbox when we have
- no free requests
-In-Reply-To: <20170817064008.GB3053@localhost>
-References: <1501583880-32072-1-git-send-email-anup.patel@broadcom.com>
- <1501583880-32072-12-git-send-email-anup.patel@broadcom.com>
- <20170817064008.GB3053@localhost>
-Message-ID: <CAALAos9Wzk3LF9hOn+Wc_7ieyeXgq2M=Zk11rsrr38fZs25g2w@mail.gmail.com>
+From: vanessa.maegima@nxp.com (Vanessa Maegima)
+Date: Fri, 18 Aug 2017 08:37:01 -0300
+Subject: [PATCH v2] ARM: dts: imx7d-pico: Add Wifi support
+Message-ID: <1503056221-29183-1-git-send-email-vanessa.maegima@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 12:10 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Tue, Aug 01, 2017 at 04:07:55PM +0530, Anup Patel wrote:
->> When setting up RAID array on several NVMe disks we observed that
->> sba_alloc_request() start failing (due to no free requests left)
->> and RAID array setup becomes very slow.
->>
->> To improve performance, we do mbox channel peek when we have
->> no free requests. This improves performance of RAID array setup
->> because mbox requests that were completed but not processed by
->> mbox completion worker will be processed immediately by mbox
->> channel peek.
->>
->> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
->> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->> ---
->>  drivers/dma/bcm-sba-raid.c | 25 ++++++++++++++++++++-----
->>  1 file changed, 20 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
->> index f14ed0a..399250e 100644
->> --- a/drivers/dma/bcm-sba-raid.c
->> +++ b/drivers/dma/bcm-sba-raid.c
->> @@ -200,6 +200,14 @@ static inline u32 __pure sba_cmd_pq_c_mdata(u32 d, u32 b1, u32 b0)
->>
->>  /* ====== General helper routines ===== */
->>
->> +static void sba_peek_mchans(struct sba_device *sba)
->> +{
->> +     int mchan_idx;
->> +
->> +     for (mchan_idx = 0; mchan_idx < sba->mchans_count; mchan_idx++)
->> +             mbox_client_peek_data(sba->mchans[mchan_idx]);
->> +}
->> +
->>  static struct sba_request *sba_alloc_request(struct sba_device *sba)
->>  {
->>       unsigned long flags;
->> @@ -211,8 +219,17 @@ static struct sba_request *sba_alloc_request(struct sba_device *sba)
->>       if (req)
->>               list_move_tail(&req->node, &sba->reqs_alloc_list);
->>       spin_unlock_irqrestore(&sba->reqs_lock, flags);
->> -     if (!req)
->> +
->> +     if (!req) {
->> +             /*
->> +              * We have no more free requests so, we peek
->> +              * mailbox channels hoping few active requests
->> +              * would have completed which will create more
->> +              * room for new requests.
->> +              */
->> +             sba_peek_mchans(sba);
->>               return NULL;
->> +     }
->>
->>       req->flags = SBA_REQUEST_STATE_ALLOCED;
->>       req->first = req;
->> @@ -560,17 +577,15 @@ static enum dma_status sba_tx_status(struct dma_chan *dchan,
->>                                    dma_cookie_t cookie,
->>                                    struct dma_tx_state *txstate)
->>  {
->> -     int mchan_idx;
->>       enum dma_status ret;
->>       struct sba_device *sba = to_sba_device(dchan);
->>
->> -     for (mchan_idx = 0; mchan_idx < sba->mchans_count; mchan_idx++)
->> -             mbox_client_peek_data(sba->mchans[mchan_idx]);
->> -
->>       ret = dma_cookie_status(dchan, cookie, txstate);
->>       if (ret == DMA_COMPLETE)
->>               return ret;
->>
->> +     sba_peek_mchans(sba);
->
-> why do you want to do this while checking status..?
+imx7d-pico has an ap6212 wifi chip connected to usdhc2 port.
 
-The dma_tx_state is only updated via sba_receive_message()
-which in-turn is called by mailbox framework upon completion
-of a request.
+Add support for the usdhc2 port and to the WL_REG_ON regulator
+so Wifi can be functional on this board.
 
-Placing the sba_peek_mchans() here helps polling based
-DMA client by not waiting for IRQ worker to schedule and
-process the completions.
+Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
+---
+Changes since v1:
+- Fix bad identation.
+- Remove unused pin MX7D_PAD_ECSPI1_SS0__GPIO4_IO19.
 
-Regards,
-Anup
+ arch/arm/boot/dts/imx7d-pico.dts | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx7d-pico.dts b/arch/arm/boot/dts/imx7d-pico.dts
+index e78c2c9..bddbf7c 100644
+--- a/arch/arm/boot/dts/imx7d-pico.dts
++++ b/arch/arm/boot/dts/imx7d-pico.dts
+@@ -52,6 +52,17 @@
+ 		reg = <0x80000000 0x80000000>;
+ 	};
+ 
++	reg_ap6212: regulator-ap6212 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_ap6212>;
++		regulator-name = "AP6212";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio4 16 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
+ 	reg_2p5v: regulator-2p5v {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "2P5V";
+@@ -271,6 +282,17 @@
+ 	status = "okay";
+ };
+ 
++&usdhc2 { /* Wifi SDIO */
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	no-1-8-v;
++	non-removable;
++	keep-power-in-suspend;
++	wakeup-source;
++	vmmc-supply = <&reg_ap6212>;
++	status = "okay";
++};
++
+ &usdhc3 {
+ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_usdhc3>;
+@@ -326,6 +348,12 @@
+ 		>;
+ 	};
+ 
++	pinctrl_reg_ap6212: regap6212grp {
++		fsl,pins = <
++			MX7D_PAD_ECSPI1_SCLK__GPIO4_IO16	0x59
++		>;
++	};
++
+ 	pinctrl_sai1: sai1grp {
+ 		fsl,pins = <
+ 			MX7D_PAD_ENET1_RX_CLK__SAI1_TX_BCLK	0x1f
+@@ -348,6 +376,17 @@
+ 		>;
+ 	};
+ 
++	pinctrl_usdhc2: usdhc2grp {
++			fsl,pins = <
++				MX7D_PAD_SD2_CMD__SD2_CMD	0x59
++				MX7D_PAD_SD2_CLK__SD2_CLK	0x19
++				MX7D_PAD_SD2_DATA0__SD2_DATA0	0x59
++				MX7D_PAD_SD2_DATA1__SD2_DATA1	0x59
++				MX7D_PAD_SD2_DATA2__SD2_DATA2	0x59
++				MX7D_PAD_SD2_DATA3__SD2_DATA3	0x59
++			>;
++	};
++
+ 	pinctrl_usdhc3: usdhc3grp {
+ 		fsl,pins = <
+ 			MX7D_PAD_SD3_CMD__SD3_CMD		0x59
+-- 
+2.7.4
