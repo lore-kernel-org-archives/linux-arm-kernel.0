@@ -1,37 +1,40 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 18 Aug 2017 14:53:47 +0100
-Subject: [PATCH] arm64: neon/efi: Make EFI fpsimd save/restore variables static
-Message-ID: <1503064427-4352-1-git-send-email-Dave.Martin@arm.com>
+From: lionel.debieve@st.com (Lionel Debieve)
+Date: Fri, 18 Aug 2017 15:54:01 +0200
+Subject: [PATCH 1/1] crypto: stm32/hash - Remove uninitialized symbol
+Message-ID: <1503064441-19964-1-git-send-email-lionel.debieve@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The percpu variables efi_fpsimd_state and efi_fpsimd_state_used,
-used by the FPSIMD save/restore routines for EFI calls, are
-unintentionally global.
+Remove err symbol as this is not used in the thread context
+and the variable is not initialized.
 
-There's no reason for anything outside fpsimd.c to touch these, so
-this patch makes them static (as they should have been in the first
-place).
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
 ---
- arch/arm64/kernel/fpsimd.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/crypto/stm32/stm32-hash.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 138fcfa..ceb0ff0 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -320,8 +320,8 @@ void kernel_neon_end(void)
+diff --git a/drivers/crypto/stm32/stm32-hash.c b/drivers/crypto/stm32/stm32-hash.c
+index b585ce5..b34ee85 100644
+--- a/drivers/crypto/stm32/stm32-hash.c
++++ b/drivers/crypto/stm32/stm32-hash.c
+@@ -1067,7 +1067,6 @@ static int stm32_hash_cra_sha256_init(struct crypto_tfm *tfm)
+ static irqreturn_t stm32_hash_irq_thread(int irq, void *dev_id)
+ {
+ 	struct stm32_hash_dev *hdev = dev_id;
+-	int err;
+ 
+ 	if (HASH_FLAGS_CPU & hdev->flags) {
+ 		if (HASH_FLAGS_OUTPUT_READY & hdev->flags) {
+@@ -1084,8 +1083,8 @@ static irqreturn_t stm32_hash_irq_thread(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ 
+ finish:
+-	/*Finish current request */
+-	stm32_hash_finish_req(hdev->req, err);
++	/* Finish current request */
++	stm32_hash_finish_req(hdev->req, 0);
+ 
+ 	return IRQ_HANDLED;
  }
- EXPORT_SYMBOL(kernel_neon_end);
- 
--DEFINE_PER_CPU(struct fpsimd_state, efi_fpsimd_state);
--DEFINE_PER_CPU(bool, efi_fpsimd_state_used);
-+static DEFINE_PER_CPU(struct fpsimd_state, efi_fpsimd_state);
-+static DEFINE_PER_CPU(bool, efi_fpsimd_state_used);
- 
- /*
-  * EFI runtime services support functions
 -- 
-2.1.4
+2.7.4
