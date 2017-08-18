@@ -1,176 +1,194 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Aug 2017 18:26:00 +0100
-Subject: [PATCH v2 3/5] arm64: Move PTE_RDONLY bit handling out of set_pte_at()
+Date: Fri, 18 Aug 2017 18:25:58 +0100
+Subject: [PATCH v2 1/5] arm64: Convert pte handling from inline asm to using
+ (cmp)xchg
 In-Reply-To: <20170818172602.7624-1-catalin.marinas@arm.com>
 References: <20170818172602.7624-1-catalin.marinas@arm.com>
-Message-ID: <20170818172602.7624-4-catalin.marinas@arm.com>
+Message-ID: <20170818172602.7624-2-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently PTE_RDONLY is treated as a hardware only bit and not handled
-by the pte_mkwrite(), pte_wrprotect() or the user PAGE_* definitions.
-The set_pte_at() function is responsible for setting this bit based on
-the write permission or dirty state. This patch moves the PTE_RDONLY
-handling out of set_pte_at into the pte_mkwrite()/pte_wrprotect()
-functions. The PAGE_* definitions to need to be updated to explicitly
-include PTE_RDONLY when !PTE_WRITE.
-
-The patch also removes the redundant PAGE_COPY(_EXEC) definitions as
-they are identical to the corresponding PAGE_READONLY(_EXEC).
+With the support for hardware updates of the access and dirty states,
+the following pte handling functions had to be implemented using
+exclusives: __ptep_test_and_clear_young(), ptep_get_and_clear(),
+ptep_set_wrprotect() and ptep_set_access_flags(). To take advantage of
+the LSE atomic instructions and also make the code cleaner, convert
+these pte functions to use the more generic cmpxchg()/xchg().
 
 Cc: Will Deacon <will.deacon@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Steve Capper <steve.capper@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/pgtable-prot.h | 18 ++++++++----------
- arch/arm64/include/asm/pgtable.h      | 34 ++++++++++------------------------
- arch/arm64/kernel/hibernate.c         |  4 ++--
- arch/arm64/mm/fault.c                 |  6 +-----
- 4 files changed, 21 insertions(+), 41 deletions(-)
+ arch/arm64/include/asm/pgtable.h | 71 +++++++++++++++++++---------------------
+ arch/arm64/mm/fault.c            | 24 +++++++-------
+ 2 files changed, 44 insertions(+), 51 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-index 2142c7726e76..0a5635fb0ef9 100644
---- a/arch/arm64/include/asm/pgtable-prot.h
-+++ b/arch/arm64/include/asm/pgtable-prot.h
-@@ -63,23 +63,21 @@
- #define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
- #define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
- 
--#define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_PXN | PTE_UXN)
-+#define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_RDONLY | PTE_PXN | PTE_UXN)
- #define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
- #define PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
--#define PAGE_COPY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
--#define PAGE_COPY_EXEC		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
--#define PAGE_READONLY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
--#define PAGE_READONLY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
--#define PAGE_EXECONLY		__pgprot(_PAGE_DEFAULT | PTE_NG | PTE_PXN)
-+#define PAGE_READONLY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_RDONLY | PTE_NG | PTE_PXN | PTE_UXN)
-+#define PAGE_READONLY_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_RDONLY | PTE_NG | PTE_PXN)
-+#define PAGE_EXECONLY		__pgprot(_PAGE_DEFAULT | PTE_RDONLY | PTE_NG | PTE_PXN)
- 
- #define __P000  PAGE_NONE
- #define __P001  PAGE_READONLY
--#define __P010  PAGE_COPY
--#define __P011  PAGE_COPY
-+#define __P010  PAGE_READONLY
-+#define __P011  PAGE_READONLY
- #define __P100  PAGE_EXECONLY
- #define __P101  PAGE_READONLY_EXEC
--#define __P110  PAGE_COPY_EXEC
--#define __P111  PAGE_COPY_EXEC
-+#define __P110  PAGE_READONLY_EXEC
-+#define __P111  PAGE_READONLY_EXEC
- 
- #define __S000  PAGE_NONE
- #define __S001  PAGE_READONLY
 diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 9127688ae775..a04bfb869a80 100644
+index 6eae342ced6b..9127688ae775 100644
 --- a/arch/arm64/include/asm/pgtable.h
 +++ b/arch/arm64/include/asm/pgtable.h
-@@ -125,12 +125,16 @@ static inline pte_t set_pte_bit(pte_t pte, pgprot_t prot)
+@@ -39,6 +39,7 @@
  
- static inline pte_t pte_wrprotect(pte_t pte)
- {
--	return clear_pte_bit(pte, __pgprot(PTE_WRITE));
-+	pte = clear_pte_bit(pte, __pgprot(PTE_WRITE));
-+	pte = set_pte_bit(pte, __pgprot(PTE_RDONLY));
-+	return pte;
+ #ifndef __ASSEMBLY__
+ 
++#include <asm/cmpxchg.h>
+ #include <asm/fixmap.h>
+ #include <linux/mmdebug.h>
+ 
+@@ -173,6 +174,11 @@ static inline pte_t pte_clear_rdonly(pte_t pte)
+ 	return clear_pte_bit(pte, __pgprot(PTE_RDONLY));
  }
  
- static inline pte_t pte_mkwrite(pte_t pte)
- {
--	return set_pte_bit(pte, __pgprot(PTE_WRITE));
-+	pte = set_pte_bit(pte, __pgprot(PTE_WRITE));
-+	pte = clear_pte_bit(pte, __pgprot(PTE_RDONLY));
-+	return pte;
- }
- 
- static inline pte_t pte_mkclean(pte_t pte)
-@@ -169,16 +173,6 @@ static inline pte_t pte_mknoncont(pte_t pte)
- 	return clear_pte_bit(pte, __pgprot(PTE_CONT));
- }
- 
--static inline pte_t pte_clear_rdonly(pte_t pte)
--{
--	return clear_pte_bit(pte, __pgprot(PTE_RDONLY));
--}
--
--static inline pte_t pte_set_rdonly(pte_t pte)
--{
--	return set_pte_bit(pte, __pgprot(PTE_RDONLY));
--}
--
++static inline pte_t pte_set_rdonly(pte_t pte)
++{
++	return set_pte_bit(pte, __pgprot(PTE_RDONLY));
++}
++
  static inline pte_t pte_mkpresent(pte_t pte)
  {
  	return set_pte_bit(pte, __pgprot(PTE_VALID));
-@@ -226,14 +220,8 @@ extern void __sync_icache_dcache(pte_t pteval, unsigned long addr);
- static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
- 			      pte_t *ptep, pte_t pte)
+@@ -593,20 +599,17 @@ static inline int pmdp_set_access_flags(struct vm_area_struct *vma,
+ #define __HAVE_ARCH_PTEP_TEST_AND_CLEAR_YOUNG
+ static inline int __ptep_test_and_clear_young(pte_t *ptep)
  {
--	if (pte_present(pte)) {
--		if (pte_sw_dirty(pte) && pte_write(pte))
--			pte_val(pte) &= ~PTE_RDONLY;
--		else
--			pte_val(pte) |= PTE_RDONLY;
--		if (pte_user_exec(pte) && !pte_special(pte))
--			__sync_icache_dcache(pte, addr);
--	}
-+	if (pte_present(pte) && pte_user_exec(pte) && !pte_special(pte))
-+		__sync_icache_dcache(pte, addr);
+-	pteval_t pteval;
+-	unsigned int tmp, res;
++	pte_t old_pte, pte;
  
- 	/*
- 	 * If the existing pte is valid, check for potential race with
-@@ -659,12 +647,10 @@ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addres
- 		old_pte = pte;
- 		/*
- 		 * If hardware-dirty (PTE_WRITE/DBM bit set and PTE_RDONLY
--		 * clear), set the PTE_DIRTY and PTE_RDONLY bits.
-+		 * clear), set the PTE_DIRTY bit.
- 		 */
--		if (pte_hw_dirty(pte)) {
-+		if (pte_hw_dirty(pte))
- 			pte = pte_mkdirty(pte);
--			pte = pte_set_rdonly(pte);
--		}
- 		pte = pte_wrprotect(pte);
- 		pte_val(pte) = cmpxchg_relaxed(&pte_val(*ptep),
- 					       pte_val(old_pte), pte_val(pte));
-diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-index a44e13942d30..095d3c170f5d 100644
---- a/arch/arm64/kernel/hibernate.c
-+++ b/arch/arm64/kernel/hibernate.c
-@@ -330,7 +330,7 @@ static void _copy_pte(pte_t *dst_pte, pte_t *src_pte, unsigned long addr)
- 		 * read only (code, rodata). Clear the RDONLY bit from
- 		 * the temporary mappings we use during restore.
- 		 */
--		set_pte(dst_pte, pte_clear_rdonly(pte));
-+		set_pte(dst_pte, pte_mkwrite(pte));
- 	} else if (debug_pagealloc_enabled() && !pte_none(pte)) {
- 		/*
- 		 * debug_pagealloc will removed the PTE_VALID bit if
-@@ -343,7 +343,7 @@ static void _copy_pte(pte_t *dst_pte, pte_t *src_pte, unsigned long addr)
- 		 */
- 		BUG_ON(!pfn_valid(pte_pfn(pte)));
+-	asm volatile("//	__ptep_test_and_clear_young\n"
+-	"	prfm	pstl1strm, %2\n"
+-	"1:	ldxr	%0, %2\n"
+-	"	ubfx	%w3, %w0, %5, #1	// extract PTE_AF (young)\n"
+-	"	and	%0, %0, %4		// clear PTE_AF\n"
+-	"	stxr	%w1, %0, %2\n"
+-	"	cbnz	%w1, 1b\n"
+-	: "=&r" (pteval), "=&r" (tmp), "+Q" (pte_val(*ptep)), "=&r" (res)
+-	: "L" (~PTE_AF), "I" (ilog2(PTE_AF)));
++	pte = READ_ONCE(*ptep);
++	do {
++		old_pte = pte;
++		pte = pte_mkold(pte);
++		pte_val(pte) = cmpxchg_relaxed(&pte_val(*ptep),
++					       pte_val(old_pte), pte_val(pte));
++	} while (pte_val(pte) != pte_val(old_pte));
  
--		set_pte(dst_pte, pte_mkpresent(pte_clear_rdonly(pte)));
-+		set_pte(dst_pte, pte_mkpresent(pte_mkwrite(pte)));
- 	}
+-	return res;
++	return pte_young(pte);
  }
  
+ static inline int ptep_test_and_clear_young(struct vm_area_struct *vma,
+@@ -630,17 +633,7 @@ static inline int pmdp_test_and_clear_young(struct vm_area_struct *vma,
+ static inline pte_t ptep_get_and_clear(struct mm_struct *mm,
+ 				       unsigned long address, pte_t *ptep)
+ {
+-	pteval_t old_pteval;
+-	unsigned int tmp;
+-
+-	asm volatile("//	ptep_get_and_clear\n"
+-	"	prfm	pstl1strm, %2\n"
+-	"1:	ldxr	%0, %2\n"
+-	"	stxr	%w1, xzr, %2\n"
+-	"	cbnz	%w1, 1b\n"
+-	: "=&r" (old_pteval), "=&r" (tmp), "+Q" (pte_val(*ptep)));
+-
+-	return __pte(old_pteval);
++	return __pte(xchg_relaxed(&pte_val(*ptep), 0));
+ }
+ 
+ #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+@@ -659,21 +652,23 @@ static inline pmd_t pmdp_huge_get_and_clear(struct mm_struct *mm,
+ #define __HAVE_ARCH_PTEP_SET_WRPROTECT
+ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long address, pte_t *ptep)
+ {
+-	pteval_t pteval;
+-	unsigned long tmp;
+-
+-	asm volatile("//	ptep_set_wrprotect\n"
+-	"	prfm	pstl1strm, %2\n"
+-	"1:	ldxr	%0, %2\n"
+-	"	tst	%0, %4			// check for hw dirty (!PTE_RDONLY)\n"
+-	"	csel	%1, %3, xzr, eq		// set PTE_DIRTY|PTE_RDONLY if dirty\n"
+-	"	orr	%0, %0, %1		// if !dirty, PTE_RDONLY is already set\n"
+-	"	and	%0, %0, %5		// clear PTE_WRITE/PTE_DBM\n"
+-	"	stxr	%w1, %0, %2\n"
+-	"	cbnz	%w1, 1b\n"
+-	: "=&r" (pteval), "=&r" (tmp), "+Q" (pte_val(*ptep))
+-	: "r" (PTE_DIRTY|PTE_RDONLY), "L" (PTE_RDONLY), "L" (~PTE_WRITE)
+-	: "cc");
++	pte_t old_pte, pte;
++
++	pte = READ_ONCE(*ptep);
++	do {
++		old_pte = pte;
++		/*
++		 * If hardware-dirty (PTE_WRITE/DBM bit set and PTE_RDONLY
++		 * clear), set the PTE_DIRTY and PTE_RDONLY bits.
++		 */
++		if (pte_hw_dirty(pte)) {
++			pte = pte_mkdirty(pte);
++			pte = pte_set_rdonly(pte);
++		}
++		pte = pte_wrprotect(pte);
++		pte_val(pte) = cmpxchg_relaxed(&pte_val(*ptep),
++					       pte_val(old_pte), pte_val(pte));
++	} while (pte_val(pte) != pte_val(old_pte));
+ }
+ 
+ #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 9b861986548e..c3eebb4afd6c 100644
+index 2509e4fe6992..9b861986548e 100644
 --- a/arch/arm64/mm/fault.c
 +++ b/arch/arm64/mm/fault.c
-@@ -161,11 +161,7 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
- 		return 0;
+@@ -34,6 +34,7 @@
+ #include <linux/hugetlb.h>
  
- 	/* only preserve the access flags and write permission */
--	pte_val(entry) &= PTE_AF | PTE_WRITE | PTE_DIRTY;
--
--	/* set PTE_RDONLY if actual read-only or clean PTE */
--	if (!pte_write(entry) || !pte_sw_dirty(entry))
--		entry = pte_set_rdonly(entry);
-+	pte_val(entry) &= PTE_RDONLY | PTE_AF | PTE_WRITE | PTE_DIRTY;
+ #include <asm/bug.h>
++#include <asm/cmpxchg.h>
+ #include <asm/cpufeature.h>
+ #include <asm/exception.h>
+ #include <asm/debug-monitors.h>
+@@ -154,8 +155,7 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
+ 			  unsigned long address, pte_t *ptep,
+ 			  pte_t entry, int dirty)
+ {
+-	pteval_t old_pteval;
+-	unsigned int tmp;
++	pteval_t old_pteval, pteval;
+ 
+ 	if (pte_same(*ptep, entry))
+ 		return 0;
+@@ -165,7 +165,7 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
+ 
+ 	/* set PTE_RDONLY if actual read-only or clean PTE */
+ 	if (!pte_write(entry) || !pte_sw_dirty(entry))
+-		pte_val(entry) |= PTE_RDONLY;
++		entry = pte_set_rdonly(entry);
  
  	/*
  	 * Setting the flags must be done atomically to avoid racing with the
+@@ -174,16 +174,14 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
+ 	 * (calculated as: a & b == ~(~a | ~b)).
+ 	 */
+ 	pte_val(entry) ^= PTE_RDONLY;
+-	asm volatile("//	ptep_set_access_flags\n"
+-	"	prfm	pstl1strm, %2\n"
+-	"1:	ldxr	%0, %2\n"
+-	"	eor	%0, %0, %3		// negate PTE_RDONLY in *ptep\n"
+-	"	orr	%0, %0, %4		// set flags\n"
+-	"	eor	%0, %0, %3		// negate final PTE_RDONLY\n"
+-	"	stxr	%w1, %0, %2\n"
+-	"	cbnz	%w1, 1b\n"
+-	: "=&r" (old_pteval), "=&r" (tmp), "+Q" (pte_val(*ptep))
+-	: "L" (PTE_RDONLY), "r" (pte_val(entry)));
++	pteval = READ_ONCE(pte_val(*ptep));
++	do {
++		old_pteval = pteval;
++		pteval ^= PTE_RDONLY;
++		pteval |= pte_val(entry);
++		pteval ^= PTE_RDONLY;
++		pteval = cmpxchg_relaxed(&pte_val(*ptep), old_pteval, pteval);
++	} while (pteval != old_pteval);
+ 
+ 	flush_tlb_fix_spurious_fault(vma, address);
+ 	return 1;
