@@ -1,61 +1,26 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Aug 2017 16:54:35 +0100
-Subject: [PATCH 6/6] arm64: Remove the CONFIG_ARM64_HW_AFDBM option
-In-Reply-To: <20170817133154.GB29194@arm.com>
-References: <20170725135308.18173-1-catalin.marinas@arm.com>
- <20170725135308.18173-7-catalin.marinas@arm.com>
- <20170817133154.GB29194@arm.com>
-Message-ID: <20170818155435.mvkwu6n5sdclzx3e@armageddon.cambridge.arm.com>
+From: martyn.welch@collabora.co.uk (Martyn Welch)
+Date: Fri, 18 Aug 2017 16:53:46 +0100
+Subject: [PATCH v6 0/2] Add device tree and associated documentation for GE
+ Healthcare PPD
+Message-ID: <1503071628-11899-1-git-send-email-martyn.welch@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 02:31:54PM +0100, Will Deacon wrote:
-> On Tue, Jul 25, 2017 at 02:53:08PM +0100, Catalin Marinas wrote:
-> > Since the pte handling for hardware AF/DBM works even when the hardware
-> > feature is not present, make the implementation permanent and remove the
-> > Kconfig option.
-> > 
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > ---
-> >  arch/arm64/Kconfig               | 17 -----------------
-> >  arch/arm64/include/asm/pgtable.h |  9 +--------
-> >  arch/arm64/kvm/hyp/s2-setup.c    |  2 +-
-> >  arch/arm64/mm/fault.c            |  2 --
-> >  arch/arm64/mm/proc.S             |  3 +--
-> >  5 files changed, 3 insertions(+), 30 deletions(-)
-> 
-> Largely in favour of this, but I'd prefer to keep the option so that
-> we can build kernels where the enabling:
-> 
-> > diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> > index 877d42fb0df6..ba82f8bf3cf1 100644
-> > --- a/arch/arm64/mm/proc.S
-> > +++ b/arch/arm64/mm/proc.S
-> > @@ -234,7 +234,7 @@ ENTRY(__cpu_setup)
-> >  	 */
-> >  	mrs	x9, ID_AA64MMFR0_EL1
-> >  	bfi	x10, x9, #32, #3
-> > -#ifdef CONFIG_ARM64_HW_AFDBM
-> > +
-> >  	/*
-> >  	 * Hardware update of the Access and Dirty bits.
-> >  	 */
-> > @@ -246,7 +246,6 @@ ENTRY(__cpu_setup)
-> >  	orr	x10, x10, #TCR_HD		// hardware Dirty flag update
-> >  1:	orr	x10, x10, #TCR_HA		// hardware Access flag update
-> >  2:
-> > -#endif	/* CONFIG_ARM64_HW_AFDBM */
-> >  	msr	tcr_el1, x10
-> >  	ret					// return to head.S
-> >  ENDPROC(__cpu_setup)
-> 
-> is still configurable. That might help for debugging suspected races in
-> this area.
+This series adds the device tree for the GE Healthcare PPD and binding
+documentation for the ge-achc, as used by the PPD device tree.
 
-Makes sense. Fixed it locally.
+Fabien Lahoudere (1):
+  ARM: dts: imx53: Add GE Healthcare PPD
+
+Martyn Welch (1):
+  dt-bindings: misc: achc: Add device tree binding for GE ACHC
+
+ Documentation/devicetree/bindings/misc/ge-achc.txt |   26 +
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/imx53-ppd.dts                    | 1042 ++++++++++++++++++++
+ 3 files changed, 1069 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/misc/ge-achc.txt
+ create mode 100644 arch/arm/boot/dts/imx53-ppd.dts
 
 -- 
-Catalin
+1.8.3.1
