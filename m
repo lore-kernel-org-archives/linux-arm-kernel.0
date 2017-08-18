@@ -1,163 +1,56 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 18 Aug 2017 14:21:18 +0200
-Subject: [PATCH v3 4/4] dt-bindings: net: dwmac-sun8i: update documentation
- about integrated PHY
-In-Reply-To: <20170818122118.4925-1-clabbe.montjoie@gmail.com>
-References: <20170818122118.4925-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170818122118.4925-5-clabbe.montjoie@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 18 Aug 2017 14:42:03 +0200
+Subject: [PATCH 4/4] phy: tegra: use of_device_get_match_data()
+In-Reply-To: <1502270280-13792-4-git-send-email-chunfeng.yun@mediatek.com>
+References: <1502270280-13792-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1502270280-13792-4-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <20170818124203.GA4556@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add documentation about the MDIO switch used on sun8i-h3-emac
-for integrated PHY.
+On Wed, Aug 09, 2017 at 05:18:00PM +0800, Chunfeng Yun wrote:
+> reduce the boilerplate code to get the specific data
+> 
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  drivers/phy/tegra/xusb.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
----
- .../devicetree/bindings/net/dwmac-sun8i.txt        | 112 +++++++++++++++++++--
- 1 file changed, 105 insertions(+), 7 deletions(-)
+You're not reducing by much here. =)
 
-diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-index 725f3b187886..631084122532 100644
---- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-+++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
-@@ -39,7 +39,7 @@ Optional properties for the following compatibles:
- - allwinner,leds-active-low: EPHY LEDs are active low
- 
- Required child node of emac:
--- mdio bus node: should be named mdio
-+- mdio bus node: should be named mdio (or mdio_parent in case of H3)
- 
- Required properties of the mdio node:
- - #address-cells: shall be 1
-@@ -48,14 +48,21 @@ Required properties of the mdio node:
- The device node referenced by "phy" or "phy-handle" should be a child node
- of the mdio node. See phy.txt for the generic PHY bindings.
- 
--Required properties of the phy node with the following compatibles:
-+Required mdio-mux nodes for the following compatibles:
-+  - "allwinner,sun8i-h3-emac",
-+- a mdio-mux node with compatible = "allwinner,sun8i-h3-mdio-switch"
-+  - mdio-parent-bus: The parent bus is "mdio_parent"
-+  - two child mdio, one for the integrated mdio, one for the external mdio
-+
-+Required properties of the integrated phy node with the following compatibles:
-   - "allwinner,sun8i-h3-emac",
-   - "allwinner,sun8i-v3s-emac":
- - clocks: a phandle to the reference clock for the EPHY
- - resets: a phandle to the reset control for the EPHY
-+- phy-is-integrated
-+- Should be a child of the integrated mdio
- 
--Example:
--
-+Example with integrated PHY:
- emac: ethernet at 1c0b000 {
- 	compatible = "allwinner,sun8i-h3-emac";
- 	syscon = <&syscon>;
-@@ -75,10 +82,101 @@ emac: ethernet at 1c0b000 {
- 	mdio: mdio {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		int_mii_phy: ethernet-phy at 1 {
-+	};
-+	mdio-mux {
-+		compatible = "allwinner,sun8i-h3-mdio-switch";
-+		mdio-parent-bus = <&mdio>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		int_mdio: mdio at 1 {
-+			reg = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			int_mii_phy: ethernet-phy at 1 {
-+				reg = <1>;
-+				clocks = <&ccu CLK_BUS_EPHY>;
-+				resets = <&ccu RST_BUS_EPHY>;
-+				phy-is-integrated
-+			};
-+		};
-+		ext_mdio: mdio at 0 {
-+			reg = <0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+};
-+
-+Example with external PHY:
-+emac: ethernet at 1c0b000 {
-+	compatible = "allwinner,sun8i-h3-emac";
-+	syscon = <&syscon>;
-+	reg = <0x01c0b000 0x104>;
-+	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+	interrupt-names = "macirq";
-+	resets = <&ccu RST_BUS_EMAC>;
-+	reset-names = "stmmaceth";
-+	clocks = <&ccu CLK_BUS_EMAC>;
-+	clock-names = "stmmaceth";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	phy-handle = <&ext_rgmii_phy>;
-+	phy-mode = "rgmii";
-+	allwinner,leds-active-low;
-+	mdio: mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+	mdio-mux {
-+		compatible = "allwinner,sun8i-h3-mdio-switch";
-+		mdio-parent-bus = <&mdio>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		int_mdio: mdio at 1 {
-+			reg = <1>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			int_mii_phy: ethernet-phy at 1 {
-+				reg = <1>;
-+				clocks = <&ccu CLK_BUS_EPHY>;
-+				resets = <&ccu RST_BUS_EPHY>;
-+				phy-is-integrated
-+			};
-+		};
-+		ext_mdio: mdio at 0 {
-+			reg = <0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			ext_rgmii_phy: ethernet-phy at 1 {
-+				reg = <1>;
-+			};
-+		};
-+};
-+
-+Example with SoC without integrated PHY
-+
-+emac: ethernet at 1c0b000 {
-+	compatible = "allwinner,sun8i-a83t-emac";
-+	syscon = <&syscon>;
-+	reg = <0x01c0b000 0x104>;
-+	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+	interrupt-names = "macirq";
-+	resets = <&ccu RST_BUS_EMAC>;
-+	reset-names = "stmmaceth";
-+	clocks = <&ccu CLK_BUS_EMAC>;
-+	clock-names = "stmmaceth";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	phy-handle = <&ext_rgmii_phy>;
-+	phy-mode = "rgmii";
-+	mdio: mdio {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		ext_rgmii_phy: ethernet-phy at 1 {
- 			reg = <1>;
--			clocks = <&ccu CLK_BUS_EPHY>;
--			resets = <&ccu RST_BUS_EPHY>;
- 		};
- 	};
- };
--- 
-2.13.0
+> diff --git a/drivers/phy/tegra/xusb.c b/drivers/phy/tegra/xusb.c
+> index 3cbcb25..25cdfb1 100644
+> --- a/drivers/phy/tegra/xusb.c
+> +++ b/drivers/phy/tegra/xusb.c
+> @@ -848,7 +848,6 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
+>  	struct device_node *np = of_node_get(pdev->dev.of_node);
+>  	const struct tegra_xusb_padctl_soc *soc;
+>  	struct tegra_xusb_padctl *padctl;
+> -	const struct of_device_id *match;
+>  	struct resource *res;
+>  	int err;
+>  
+> @@ -861,8 +860,9 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
+>  
+>  	of_node_put(np);
+>  
+> -	match = of_match_node(tegra_xusb_padctl_of_match, pdev->dev.of_node);
+> -	soc = match->data;
+> +	soc = of_device_get_match_data(&pdev->dev);
+> +	if (!soc)
+> +		return -EINVAL;
+
+This is never going to happen. There will always be a match, otherwise
+this function would never be called.
+
+Also, if you omit these last two lines, then you actually do reduce the
+boilerplate.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170818/a7a7029c/attachment.sig>
