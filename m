@@ -1,57 +1,47 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 18 Aug 2017 09:56:52 +0200
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Add
- CONFIG_FW_LOADER_USER_HELPER_FALLBACK
-In-Reply-To: <20170817141243.GG7608@dragon>
-References: <20170817140424.4614-1-gary.bisson@boundarydevices.com>
- <20170817141243.GG7608@dragon>
-Message-ID: <1503043012.7730.5.camel@pengutronix.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 18 Aug 2017 10:02:16 +0200
+Subject: [PATCH] arm64: dts: r8a7795-es1: Drop extra zero from usb unit
+ address
+In-Reply-To: <1502969354-14968-1-git-send-email-geert+renesas@glider.be>
+References: <1502969354-14968-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170818080215.GG9175@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Thu, Aug 17, 2017 at 01:29:14PM +0200, Geert Uytterhoeven wrote:
+> With W=1:
+> 
+>     arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/usb at ee0400000 simple-bus unit address format error, expected "ee040000"
+>     arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/usb at ee0400000 simple-bus unit address format error, expected "ee040000"
+> 
+> Fixes: 291e0c4994d0813f ("arm64: dts: r8a7795: Add support for R-Car H3 ES2.0")
+> Fixes: 171f2ef82284f61b ("arm64: dts: r8a7795: Add USB3.0 host device nodes")
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> The second fixes tag is for the original r8a7795.dtsi, before
+> r8a7795-es1.dtsi was split off.
 
-On Thu, 2017-08-17 at 22:12 +0800, Shawn Guo wrote:
-> On Thu, Aug 17, 2017 at 04:04:24PM +0200, Gary Bisson wrote:
-> > Allows to load firmware files which aren't built inside the kernel.
-> > 
-> > Especially useful for CODA firmware (vpu_fw_imx6q.bin) which is
-> > usually
-> > located in the rootfs.
-> > 
-> > Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
-> > ---
-> > Hi Shawn,
-> > 
-> > I'm not sure if this patch is acceptable since I've noticed that no
-> > configuration currently has that option enabled (why?).
-> > 
-> > As mentioned in the commit, I had to enable that in order to have
-> > CODA
-> > load the VPU firmware properly.
-> > 
-> > Another option would be to make the CODA driver a module...
-> > 
-> > Let me know your thoughts.
-> 
-> @Philipp, do you have any comments on this?
-> 
-> From reading of the option help text, I feel the option is not
-> recommended?
-> 
-> config FW_LOADER_USER_HELPER_FALLBACK
-> 
-> This option enables / disables the invocation of user-helper
-> (e.g. udev) for loading firmware files as a fallback after the
-> direct file loading in kernel fails.??The user-mode helper is
-> no longer required unless you have a special firmware file that
-> resides in a non-standard path. Moreover, the udev support has
-> been deprecated upstream.
-> 
-> Shawn
+Do you want this treated as a fix for v4.13 or v4.14, or a regular patch
+for v4.15? It looks like the problem has been present in some form since
+v4.12.
 
-Building coda as a module should work fine, so I'd say this is not
-necessary.
-
-regards
-Philipp
+> ---
+>  arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+> index aaa5e67a963ea9ff..655dd30639c55027 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+> @@ -11,7 +11,7 @@
+>  #include "r8a7795.dtsi"
+>  
+>  &soc {
+> -	xhci1: usb at ee0400000 {
+> +	xhci1: usb at ee040000 {
+>  		compatible = "renesas,xhci-r8a7795", "renesas,rcar-gen3-xhci";
+>  		reg = <0 0xee040000 0 0xc00>;
+>  		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+> -- 
+> 2.7.4
+> 
