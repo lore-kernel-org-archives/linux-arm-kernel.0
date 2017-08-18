@@ -1,30 +1,123 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 18 Aug 2017 09:55:48 +0800
-Subject: [GIT PULL] i.MX fixes for 4.13, round 3
-Message-ID: <20170818015546.GJ7608@dragon>
+From: hoeun.ryu@gmail.com (Hoeun Ryu)
+Date: Fri, 18 Aug 2017 11:19:45 +0900
+Subject: [PATCHv3] arm:kexec: have own crash_smp_send_stop() for crash
+ dump for nonpanic cores
+In-Reply-To: <1502155416-5735-1-git-send-email-hoeun.ryu@gmail.com>
+References: <1502155416-5735-1-git-send-email-hoeun.ryu@gmail.com>
+Message-ID: <1503022785.28554.101.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 8317562097acec4c9e9750eb91115687931bca35:
+Hello, All.
 
-  ARM: dts: i.MX25: add ranges to tscadc (2017-08-05 13:22:32 +0800)
+Would you please review this patch ?
+I haven't had any respond to this patch.
 
-are available in the git repository at:
+Thank you.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.13-3
-
-for you to fetch changes up to c40bc54fdf2d52a80f66b365f1eac9d43b32e107:
-
-  ARM: dts: imx6qdl-nitrogen6_som2: fix PCIe reset (2017-08-18 09:40:40 +0800)
-
-----------------------------------------------------------------
-i.MX fixes for 4.13, round 3:
- - Fix PCIe reset GPIO of imx6qdl-nitrogen6_som2 board, which was
-   a bad copy from nitrogen6_max device tree.
-
-----------------------------------------------------------------
-Gary Bisson (1):
-      ARM: dts: imx6qdl-nitrogen6_som2: fix PCIe reset
-
- arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On Tue, 2017-08-08 at 10:22 +0900, Hoeun Ryu wrote:
+> ?Commit 0ee5941 : (x86/panic: replace smp_send_stop() with kdump friendly
+> version in panic path) introduced crash_smp_send_stop() which is a weak
+> function and can be overriden by architecture codes to fix the side effect
+> caused by commit f06e515 : (kernel/panic.c: add "crash_kexec_post_
+> notifiers" option).
+> 
+> ?ARM architecture uses the weak version function and the problem is that
+> the weak function simply calls smp_send_stop() which makes other CPUs
+> offline and takes away the chance to save crash information for nonpanic
+> CPUs in machine_crash_shutdown() when crash_kexec_post_notifiers kernel
+> option is enabled.
+> 
+> ?Calling smp_call_function(machine_crash_nonpanic_core, NULL, false) in
+> the function is useless because all nonpanic CPUs are already offline by
+> smp_send_stop() in this case and smp_call_function() only works against
+> online CPUs.
+> 
+> ?The result is that /proc/vmcore is not available with the error messages;
+> "Warning: Zero PT_NOTE entries found", "Kdump: vmcore not initialized".
+> 
+> ?crash_smp_send_stop() is implemented for ARM architecture to fix this
+> problem and the function (strong symbol version) saves crash information
+> for nonpanic CPUs using smp_call_function() and machine_crash_shutdown()
+> tries to save crash information for nonpanic CPUs only when
+> crash_kexec_post_notifiers kernel option is disabled.
+> 
+> ?We might be able to implement the function like arm64 or x86 using a
+> dedicated IPI (let's say IPI_CPU_CRASH_STOP), but we cannot implement this
+> function like that because of the lack of IPI slots. Please see the commit
+> e7273ff4 : (ARM: 8488/1: Make IPI_CPU_BACKTRACE a "non-secure" SGI)
+> 
+> Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
+> ---
+> ?v3:
+> ???- remove 'WARN_ON(num_online_cpus() > 1)' in machine_crash_shutdown().
+> ?????it's a false check for the case when crash_kexec_post_notifiers
+> ?????kernel option is disabled.
+> ?v2:
+> ???- calling crash_smp_send_stop() in machine_crash_shutdown() for the case
+> ?????when crash_kexec_post_notifiers kernel option is disabled.
+> ???- fix commit messages for it.
+> 
+> ?arch/arm/kernel/machine_kexec.c | 40 +++++++++++++++++++++++++++++-----------
+> ?1 file changed, 29 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+> index fe1419e..82ef7c7 100644
+> --- a/arch/arm/kernel/machine_kexec.c
+> +++ b/arch/arm/kernel/machine_kexec.c
+> @@ -94,6 +94,34 @@ void machine_crash_nonpanic_core(void *unused)
+> ?		cpu_relax();
+> ?}
+> ?
+> +void crash_smp_send_stop(void)
+> +{
+> +	static int cpus_stopped;
+> +	unsigned long msecs;
+> +
+> +	/*
+> +	?* This function can be called twice in panic path, but obviously
+> +	?* we execute this only once.
+> +	?*/
+> +	if (cpus_stopped)
+> +		return;
+> +
+> +	cpus_stopped = 1;
+> +
+> +	if (num_online_cpus() == 1)
+> +		return;
+> +
+> +	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
+> +	smp_call_function(machine_crash_nonpanic_core, NULL, false);
+> +	msecs = 1000; /* Wait at most a second for the other cpus to stop */
+> +	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
+> +		mdelay(1);
+> +		msecs--;
+> +	}
+> +	if (atomic_read(&waiting_for_crash_ipi) > 0)
+> +		pr_warn("Non-crashing CPUs did not react to IPI\n");
+> +}
+> +
+> ?static void machine_kexec_mask_interrupts(void)
+> ?{
+> ?	unsigned int i;
+> @@ -119,19 +147,9 @@ static void machine_kexec_mask_interrupts(void)
+> ?
+> ?void machine_crash_shutdown(struct pt_regs *regs)
+> ?{
+> -	unsigned long msecs;
+> -
+> ?	local_irq_disable();
+> ?
+> -	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
+> -	smp_call_function(machine_crash_nonpanic_core, NULL, false);
+> -	msecs = 1000; /* Wait at most a second for the other cpus to stop */
+> -	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
+> -		mdelay(1);
+> -		msecs--;
+> -	}
+> -	if (atomic_read(&waiting_for_crash_ipi) > 0)
+> -		pr_warn("Non-crashing CPUs did not react to IPI\n");
+> +	crash_smp_send_stop();
+> ?
+> ?	crash_save_cpu(regs, smp_processor_id());
+> ?	machine_kexec_mask_interrupts();
