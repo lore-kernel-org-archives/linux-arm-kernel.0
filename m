@@ -1,112 +1,65 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 18 Aug 2017 09:33:11 -0400
-Subject: [PATCH V10 1/3] PCI: introduce pci_bus_wait_crs() function
-In-Reply-To: <20170818030009.GK28977@bhelgaas-glaptop.roam.corp.google.com>
-References: <1502470596-4112-1-git-send-email-okaya@codeaurora.org>
- <20170818030009.GK28977@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <255545a4-0481-e77a-63ad-260d02a43131@codeaurora.org>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Fri, 18 Aug 2017 15:42:31 +0200
+Subject: [PATCH v2 3/3] vfio/pci: Don't probe devices that can't be reset
+In-Reply-To: <20170817070017.1e9c9456@w520.home>
+References: <1502957663-5527-1-git-send-email-jglauber@cavium.com>
+ <1502957663-5527-4-git-send-email-jglauber@cavium.com>
+ <20170817070017.1e9c9456@w520.home>
+Message-ID: <20170818134231.GA3464@hc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/17/2017 11:00 PM, Bjorn Helgaas wrote:
-> On Fri, Aug 11, 2017 at 12:56:34PM -0400, Sinan Kaya wrote:
->> Kernel is hiding Configuration Request Retry Status (CRS) inside
->> pci_bus_read_dev_vendor_id() function. We are looking to add support for
->> Function Level Reset (FLR) where vendor id read returns ~0.
->>
->> Move CRS handling into its own function so that it can be called from other
->> places as well.
+On Thu, Aug 17, 2017 at 07:00:17AM -0600, Alex Williamson wrote:
+> On Thu, 17 Aug 2017 10:14:23 +0200
+> Jan Glauber <jglauber@cavium.com> wrote:
 > 
-> I think this is a much better idea than what I proposed.  I still have
-> a few questions proposals.  I'll post a v11 to show what I'm thinking.
+> > If a PCI device supports neither function-level reset, nor slot
+> > or bus reset then refuse to probe it. A line is printed to inform
+> > the user.
 > 
+> But that's not what this does, this requires that the device is on a
+> reset-able bus.  This is a massive regression.  With this we could no
+> longer assign devices on the root complex or any device which doesn't
+> return from bus reset and currently makes use of the NO_BUS_RESET flag
+> and works happily otherwise.  Full NAK.  Thanks,
 
-Sure, let me know. I can test it.
+Looks like I missed the slot reset check. So how about this:
 
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>  drivers/pci/pci.h   |  2 ++
->>  drivers/pci/probe.c | 44 ++++++++++++++++++++++++++++++--------------
->>  2 files changed, 32 insertions(+), 14 deletions(-)
->>
+if (pci_probe_reset_slot(pdev->slot) && pci_probe_reset_bus(pdev->bus)) {
+	dev_warn(...);
+	return -ENODEV;
+}
 
->>  		msleep(delay);
->>  		delay *= 2;
->>  		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
->> @@ -1858,6 +1846,34 @@ bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
->>  			       PCI_FUNC(devfn));
->>  			return false;
-> 
-> While staring at this, I think I found a pre-existing bug in
-> pci_bus_read_dev_vendor_id().  It looks like this:
-> 
->   while ((*l & 0xffff) == 0x0001) {
->     pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l);
->     if (delay > crs_timeout)
->       return false;
->   }
-> 
-> The problem is that the config read may have *succeeded* that last
-> time before we time out.  I think the correct sequence is:
-> 
->   - check for timeout
->   - read PCI_VENDOR_ID
->   - check for CRS
-> 
+Or am I still missing something here?
 
-Yeah, it makes sense.
+thanks,
+Jan
 
->>  		}
->> +	} while ((*l & 0xffff) == 0x0001);
->> +
->> +	return true;
->> +}
->> +EXPORT_SYMBOL(pci_bus_wait_crs);
-> 
-> I don't think we need EXPORT_SYMBOL here, do we?
-
-copy/paste mistake. 
-
-> 
->> +bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
->> +				int crs_timeout)
->> +{
->> +	if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
->> +		return false;
->> +
->> +	/* some broken boards return 0 or ~0 if a slot is empty: */
->> +	if (*l == 0xffffffff || *l == 0x00000000 ||
->> +	    *l == 0x0000ffff || *l == 0xffff0000)
->> +		return false;
->> +
->> +	/*
->> +	 * Configuration Request Retry Status.  Some root ports return the
->> +	 * actual device ID instead of the synthetic ID (0xFFFF) required
->> +	 * by the PCIe spec.  Ignore the device ID and only check for
->> +	 * (vendor id == 1).
->> +	 */
->> +	if ((*l & 0xffff) == 0x0001) {
->> +		if (!crs_timeout)
->> +			return false;
-> 
-> One thing I don't like is that every caller of pci_bus_wait_crs() has
-> to know about the 0x0001 value.
-
-Another helper function? I was trying to poll for CRS completion only
-if we know that we are observing CRS.
-
-> 
->> +		return pci_bus_wait_crs(bus, devfn, l, crs_timeout);
->>  	}
->>  
->>  	return true;
->> -- 
->> 1.9.1
->>
-> 
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> Alex
+>  
+> > Without this change starting qemu with a vfio-pci device can lead to
+> > a kernel panic on some Cavium cn8xxx systems, depending on the used
+> > device.
+> > 
+> > Signed-off-by: Jan Glauber <jglauber@cavium.com>
+> > ---
+> >  drivers/vfio/pci/vfio_pci.c | 6 ++++++
+> >  1 file changed, 6 insertions(+)
+> > 
+> > diff --git a/drivers/vfio/pci/vfio_pci.c b/drivers/vfio/pci/vfio_pci.c
+> > index 063c1ce..029ba13 100644
+> > --- a/drivers/vfio/pci/vfio_pci.c
+> > +++ b/drivers/vfio/pci/vfio_pci.c
+> > @@ -1196,6 +1196,12 @@ static int vfio_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+> >  	if (pdev->hdr_type != PCI_HEADER_TYPE_NORMAL)
+> >  		return -EINVAL;
+> >  
+> > +	ret = pci_probe_reset_bus(pdev->bus);
+> > +	if (ret) {
+> > +		dev_warn(&pdev->dev, "Refusing to probe because reset is not possible.\n");
+> > +		return ret;
+> > +	}
+> > +
+> >  	group = vfio_iommu_group_get(&pdev->dev);
+> >  	if (!group)
+> >  		return -EINVAL;
