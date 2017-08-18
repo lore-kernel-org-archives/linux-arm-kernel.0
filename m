@@ -1,47 +1,35 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Aug 2017 10:19:50 +0200
-Subject: [PATCH 5/9] ARM: dts: koelsch: Add CEC clock for HDMI transmitter
-In-Reply-To: <cover.1502962873.git.horms+renesas@verge.net.au>
-References: <cover.1502962873.git.horms+renesas@verge.net.au>
-Message-ID: <02a5ab18d366223893d634b0992f6434300bee32.1502962873.git.horms+renesas@verge.net.au>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Fri, 18 Aug 2017 16:28:37 +0800
+Subject: [PATCH v3 0/4] PCI: rockchip: Move PCIE_WAKE handling into rockchip
+ pcie driver
+Message-ID: <20170818082841.22335-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hans Verkuil <hans.verkuil@cisco.com>
 
-The adv7511 on the Koelsch board has a 12 MHz fixed clock
-for the CEC block. Specify this in the dts to enable CEC support.
+Currently we are handling pcie wake in mrvl wifi driver. But Brian
+suggests to move it into rockchip pcie driver.
 
-Signed-off-by: Hans Verkuil <hans.verkuil@cisco.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791-koelsch.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Tested on my chromebook bob(with cros 4.4 kernel and mrvl wifi).
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index dc8ed02de707..0ce0b278e1cb 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -642,11 +642,19 @@
- 		};
- 	};
- 
-+	cec_clock: cec-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <12000000>;
-+	};
-+
- 	hdmi at 39 {
- 		compatible = "adi,adv7511w";
- 		reg = <0x39>;
- 		interrupt-parent = <&gpio3>;
- 		interrupts = <29 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&cec_clock>;
-+		clock-names = "cec";
- 
- 		adi,input-depth = <8>;
- 		adi,input-colorspace = "rgb";
+
+Changes in v3:
+Fix error handling
+
+Changes in v2:
+Use dev_pm_set_dedicated_wake_irq
+        -- Suggested by Brian Norris <briannorris@chromium.com>
+
+Jeffy Chen (4):
+  PCI: rockchip: Fix error handlings
+  PCI: rockchip: Add support for pcie wake irq
+  dt-bindings: PCI: rockchip: Add support for pcie wake irq
+  arm64: dts: rockchip: Handle pcie wake in pcie driver for Gru
+
+ .../devicetree/bindings/pci/rockchip-pcie.txt      |  20 ++--
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       |  15 ++-
+ drivers/pci/host/pcie-rockchip.c                   | 122 +++++++++++++--------
+ 3 files changed, 96 insertions(+), 61 deletions(-)
+
 -- 
-2.1.4
+2.11.0
