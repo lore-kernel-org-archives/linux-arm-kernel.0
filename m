@@ -1,78 +1,111 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 18 Aug 2017 18:42:30 +0100
-Subject: [PATCH] arm64: kaslr: ignore modulo offset when validating virtual
- displacement
-Message-ID: <20170818174230.30435-1-ard.biesheuvel@linaro.org>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Sat, 19 Aug 2017 01:47:03 +0800
+Subject: [RFC PATCH v2 1/3] PCI: rockchip: Add support for pcie wake irq
+In-Reply-To: <20170818170107.GA119461@google.com>
+References: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
+ <20170817120431.12398-2-jeffy.chen@rock-chips.com>
+ <20170818170107.GA119461@google.com>
+Message-ID: <59972817.4030907@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the KASLR setup routine, we ensure that the early virtual mapping
-of the kernel image does not cover more than a single table entry at
-the level above the swapper block level, so that the assembler routines
-involved in setting up this mapping can remain simple.
+Hi Brian,
 
-In this calculation we add the proposed KASLR offset to the values of
-the _text and _end markers, and reject it if they would end up falling
-in different swapper table sized windows.
+On 08/19/2017 01:01 AM, Brian Norris wrote:
+> Did you test that this works out correctly as a level-triggered
+> interrupt? IIUC, the dummy handler won't mask the interrupt, so it might
+> keep firing. See:
+>
+> static irqreturn_t handle_threaded_wake_irq(int irq, void *_wirq)
+> {
+>          struct wake_irq *wirq = _wirq;
+>          int res;
+>
+>          /* Maybe abort suspend? */
+>          if (irqd_is_wakeup_set(irq_get_irq_data(irq))) {
+>                  pm_wakeup_event(wirq->dev, 0);
+>
+>                  return IRQ_HANDLED; <--- We can return here, with the trigger still asserted
+>          }
+> ...
+>
+> This could cause some kind of an IRQ storm, including a lockup or
+> significant slowdown, I think.
 
-However, when taking the addresses of _text and _end, the modulo offset
-(the physical displacement modulo 2 MB) is already accounted for, and
-so adding it again results in incorrect results. So disregard the modulo
-offset from the calculation.
+hmmm, right, but as i replied at cros partner issue, this irq handle 
+might not be called actually...
 
-Fixes: 08cdac619c81 ("arm64: relocatable: deal with physically misaligned ...")
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
+in my test on cros 4.4 kernel, it would break by irq_may_run(returning 
+false):
+static bool irq_may_run(struct irq_desc *desc)
+{
+...
+         /*
+          * If the interrupt is an armed wakeup source, mark it pending
+          * and suspended, disable it and notify the pm core about the
+          * event.
+          */
+         if (irq_pm_check_wakeup(desc))
+                 return false;
 
-This still leaves the 16K pages issue, but I think this solves the problem
-encountered by Mark.
 
- arch/arm64/kernel/head.S  |  1 -
- arch/arm64/kernel/kaslr.c | 12 +++++++++---
- 2 files changed, 9 insertions(+), 4 deletions(-)
+bool irq_pm_check_wakeup(struct irq_desc *desc)
+{
+         if (irqd_is_wakeup_armed(&desc->irq_data)) {
+                 irqd_clear(&desc->irq_data, IRQD_WAKEUP_ARMED);
+                 desc->istate |= IRQS_SUSPENDED | IRQS_PENDING;
+                 desc->depth++;
+                 irq_disable(desc); <--- disabled here
+                 pm_system_irq_wakeup(irq_desc_get_irq(desc));
+                 return true;
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index d3015172c136..7434ec0c7a27 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -354,7 +354,6 @@ __primary_switched:
- 	tst	x23, ~(MIN_KIMG_ALIGN - 1)	// already running randomized?
- 	b.ne	0f
- 	mov	x0, x21				// pass FDT address in x0
--	mov	x1, x23				// pass modulo offset in x1
- 	bl	kaslr_early_init		// parse FDT for KASLR options
- 	cbz	x0, 0f				// KASLR disabled? just proceed
- 	orr	x23, x23, x0			// record KASLR offset
-diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
-index a9710efb8c01..1d95c204186b 100644
---- a/arch/arm64/kernel/kaslr.c
-+++ b/arch/arm64/kernel/kaslr.c
-@@ -75,7 +75,7 @@ extern void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size,
-  * containing function pointers) to be reinitialized, and zero-initialized
-  * .bss variables will be reset to 0.
-  */
--u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
-+u64 __init kaslr_early_init(u64 dt_phys)
- {
- 	void *fdt;
- 	u64 seed, offset, mask, module_range;
-@@ -133,9 +133,15 @@ u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
- 	 * boundary (for 4KB/16KB/64KB granule kernels, respectively). If this
- 	 * happens, increase the KASLR offset by the size of the kernel image
- 	 * rounded up by SWAPPER_BLOCK_SIZE.
-+	 *
-+	 * NOTE: The references to _text and _end below will already take the
-+	 *       modulo offset (the physical displacement modulo 2 MB) into
-+	 *       account, given that the physical placement is controlled by
-+	 *       the loader, and will not change as a result of the virtual
-+	 *       mapping we choose.
- 	 */
--	if ((((u64)_text + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT) !=
--	    (((u64)_end + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT)) {
-+	if ((((u64)_text + offset) >> SWAPPER_TABLE_SHIFT) !=
-+	    (((u64)_end + offset) >> SWAPPER_TABLE_SHIFT)) {
- 		u64 kimg_sz = _end - _text;
- 		offset = (offset + round_up(kimg_sz, SWAPPER_BLOCK_SIZE))
- 				& mask;
--- 
-2.11.0
+
+
+and for irqd_is_wakeup_armed:
+
+static bool suspend_device_irq(struct irq_desc *desc)
+{
+...
+         if (irqd_is_wakeup_set(&desc->irq_data)) {
+                 irqd_set(&desc->irq_data, IRQD_WAKEUP_ARMED); <-- set 
+irqd_is_wakeup_armed here
+
+
+void dpm_noirq_begin(void)
+{
+         cpuidle_pause();
+         device_wakeup_arm_wake_irqs();
+         suspend_device_irqs();
+
+
+so unless we get an irq between device_wakeup_arm_wake_irqs and 
+suspend_device_irq, the irq_pm_check_wakeup would not let us get to 
+handle_threaded_wake_irq...
+
+
+>
+> BTW, in another context, Tony suggested we might need to fix up the IRQ flags
+> like this:
+>
+> int dev_pm_set_dedicated_wake_irq(struct device *dev, int irq)
+> {
+> ...
+>          err = request_threaded_irq(irq, NULL, handle_threaded_wake_irq,
+> -                                  IRQF_ONESHOT, dev_name(dev), wirq);
+> +                                  IRQF_ONESHOT | irq_get_trigger_type(irq), dev_name(dev), wirq);
+>
+> But IIUC, that's not actually necessary, because __setup_irq()
+> automatically configures the trigger type if the driver didn't request
+> one explicitly.
+
+actually this would not work...irq_get_trigger_type would return zero 
+due to a bug which we have a patch for it already:
+
+9908207 New          [tip:irq/urgent] genirq: Restore trigger settings 
+in irq_modify_status()
+
+
+BTW, using dev_name for the name of this wake irq seems not very 
+convenient...maybe add a ":wake" suffix?
+>
+> Brian
