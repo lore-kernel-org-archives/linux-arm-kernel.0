@@ -1,33 +1,26 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Fri, 18 Aug 2017 09:17:07 -0700
-Subject: [GIT PULL 3/3] ARM: SOC: Keystone soc driver update for 4.14
-In-Reply-To: <CAK8P3a0aKvXM8sb6Koty9Q77QcTjPGYGEq5f=jsDLasUUNuG+Q@mail.gmail.com>
-References: <1502929842-8156-1-git-send-email-ssantosh@kernel.org>
- <1502929842-8156-3-git-send-email-ssantosh@kernel.org>
- <CAK8P3a2gj0nkdSmHYv=D+UWY1M48bacY4Cxy8T-Vu2cUqe2_Jw@mail.gmail.com>
- <627dec90-71a7-be6c-d2bc-855e5bf552ae@oracle.com>
- <CAK8P3a0aKvXM8sb6Koty9Q77QcTjPGYGEq5f=jsDLasUUNuG+Q@mail.gmail.com>
-Message-ID: <0f01bbdd-4542-1a49-2c27-5fe34b8ab34c@oracle.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Fri, 18 Aug 2017 09:28:31 -0700
+Subject: [PATCH v3 2/7] pwm: rockchip: Remove the judge from return value
+ of pwm_config
+In-Reply-To: <20170818153255.GC18307@ulmo>
+References: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
+ <1502206715-24174-3-git-send-email-david.wu@rock-chips.com>
+ <20170818153255.GC18307@ulmo>
+Message-ID: <20170818162830.GA115593@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/18/2017 3:00 AM, Arnd Bergmann wrote:
-> On Thu, Aug 17, 2017 at 7:06 PM, Santosh Shilimkar
-> <santosh.shilimkar@oracle.com> wrote:
->> On 8/17/2017 2:03 AM, Arnd Bergmann wrote:
->>>
->>> On Thu, Aug 17, 2017 at 2:30 AM, Santosh Shilimkar <ssantosh@kernel.org>
->>> wrote:
-[..]
+On Fri, Aug 18, 2017 at 05:32:55PM +0200, Thierry Reding wrote:
+> I don't understand what the "judge" is supposed to be, but I've applied
+> this to for-4.14/drivers anyway. Thanks.
 
->>>   From the patch description I would have guessed that we want this in
->>> 4.13,
->>> can you clarify?
->>>
->> I was in two minds as well but no one complained it has must have
->> fix so I just queued it for 4.14. If you can cherry pick that to 4.13,
->> that will be great.
-> 
-> Cherry-picked into fixes now, thanks for the clarification.
-> 
-Thanks Arnd !!
+Probably just an artifact of non-native English.
+
+Judging by context, David probably meant more like "Remove the check for
+the return value". I believe I've seen other non-native English speakers
+use "judge" in a way similar to "check" or "test" in the context of
+comparisons and error checking. (A search through my mailbox for "judge"
+confirms this.)
+
+Regards,
+Brian
