@@ -1,47 +1,46 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 18 Aug 2017 10:19:47 +0200
-Subject: [PATCH 2/9] ARM: dts: r8a7745: add PFC support
-In-Reply-To: <cover.1502962873.git.horms+renesas@verge.net.au>
-References: <cover.1502962873.git.horms+renesas@verge.net.au>
-Message-ID: <95b94ed9abb58d2f5372a980a0af037e76c0beaf.1502962873.git.horms+renesas@verge.net.au>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 18 Aug 2017 09:39:22 +0100
+Subject: [PATCH 0/5] arm-smmu: performance optimization
+In-Reply-To: <59965CA4.10907@huawei.com>
+References: <1498484330-10840-1-git-send-email-thunder.leizhen@huawei.com>
+ <20170817143650.GB30338@arm.com> <59965CA4.10907@huawei.com>
+Message-ID: <20170818083922.GA2333@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On Fri, Aug 18, 2017 at 11:19:00AM +0800, Leizhen (ThunderTown) wrote:
+> 
+> 
+> On 2017/8/17 22:36, Will Deacon wrote:
+> > Thunder, Nate, Robin,
+> > 
+> > On Mon, Jun 26, 2017 at 09:38:45PM +0800, Zhen Lei wrote:
+> >> I described the optimization more detail in patch 1 and 2, and patch 3-5 are
+> >> the implementation on arm-smmu/arm-smmu-v3 of patch 2.
+> >>
+> >> Patch 1 is v2. In v1, I directly replaced writel with writel_relaxed in
+> >> queue_inc_prod. But Robin figured that it may lead SMMU consume stale
+> >> memory contents. I thought more than 3 whole days and got this one.
+> >>
+> >> This patchset is based on Robin Murphy's [PATCH v2 0/8] io-pgtable lock removal.
+> > 
+> > For the time being, I think we should focus on the new TLB flushing
+> > interface posted by Joerg:
+> > 
+> > http://lkml.kernel.org/r/1502974596-23835-1-git-send-email-joro at 8bytes.org
+> > 
+> > which looks like it can give us most of the benefits of this series. Once
+> > we've got that, we can see what's left in the way of performance and focus
+> > on the cmdq batching separately (because I'm still not convinced about it).
+> OK, this is a good news.
+> 
+> But I have a review comment(sorry, I have not subscribed it yet, so can not directly reply it):
+> I don't think we should add tlb sync for map operation
+> 1. at init time, all tlbs will be invalidated
+> 2. when we try to map a new range, there are no related ptes bufferd in tlb, because of above 1 and below 3
+> 3. when we unmap the above range, make sure all related ptes bufferd in tlb to be invalidated before unmap finished
 
-Define the generic R8A7745 part of the PFC device node.
+Yup, you're completely correct and I raised that with Joerg, who is looking
+into a way to avoid it.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7745.dtsi | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index 354534cdc588..aff90dfb8b32 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -1,7 +1,7 @@
- /*
-  * Device Tree Source for the r8a7745 SoC
-  *
-- * Copyright (C) 2016 Cogent Embedded Inc.
-+ * Copyright (C) 2016-2017 Cogent Embedded Inc.
-  *
-  * This file is licensed under the terms of the GNU General Public License
-  * version 2. This program is licensed "as is" without any warranty of any
-@@ -123,6 +123,11 @@
- 			#power-domain-cells = <1>;
- 		};
- 
-+		pfc: pin-controller at e6060000 {
-+			compatible = "renesas,pfc-r8a7745";
-+			reg = <0 0xe6060000 0 0x11c>;
-+		};
-+
- 		dmac0: dma-controller at e6700000 {
- 			compatible = "renesas,dmac-r8a7745",
- 				     "renesas,rcar-dmac";
--- 
-2.1.4
+Will
