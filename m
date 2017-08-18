@@ -1,228 +1,114 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 18 Aug 2017 11:30:22 +0100
-Subject: [PATCH v6 4/9] arm64: hugetlb: Add break-before-make logic for
- contiguous entries
-In-Reply-To: <20170817180311.uwrz64g3bkwfdkrn@armageddon.cambridge.arm.com>
- (Catalin Marinas's message of "Thu, 17 Aug 2017 19:03:11 +0100")
-References: <20170810170906.30772-1-punit.agrawal@arm.com>
- <20170810170906.30772-5-punit.agrawal@arm.com>
- <20170817180311.uwrz64g3bkwfdkrn@armageddon.cambridge.arm.com>
-Message-ID: <87shgpnp6p.fsf@e105922-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Aug 2017 12:36:31 +0200
+Subject: [GIT PULL] ARM: SoC fixes for 4.13
+Message-ID: <CAK8P3a1sFafctSh6-=9dmD8yFXx8uAhRZs8oFPy2GPJSjGzoTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas <catalin.marinas@arm.com> writes:
+The following changes since commit aae4e7a8bc44722fe70d58920a36916b1043195e:
 
-> On Thu, Aug 10, 2017 at 06:09:01PM +0100, Punit Agrawal wrote:
->> --- a/arch/arm64/mm/hugetlbpage.c
->> +++ b/arch/arm64/mm/hugetlbpage.c
->> @@ -68,6 +68,62 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
->>  	return CONT_PTES;
->>  }
->>  
->> +/*
->> + * Changing some bits of contiguous entries requires us to follow a
->> + * Break-Before-Make approach, breaking the whole contiguous set
->> + * before we can change any entries. See ARM DDI 0487A.k_iss10775,
->> + * "Misprogramming of the Contiguous bit", page D4-1762.
->> + *
->> + * This helper performs the break step.
->> + */
->> +static pte_t get_clear_flush(struct mm_struct *mm,
->> +			     unsigned long addr,
->> +			     pte_t *ptep,
->> +			     unsigned long pgsize,
->> +			     unsigned long ncontig)
->> +{
->> +	unsigned long i, saddr = addr;
->> +	struct vm_area_struct vma = { .vm_mm = mm };
->> +	pte_t orig_pte = huge_ptep_get(ptep);
->> +
->> +	/*
->> +	 * If we already have a faulting entry then we don't need
->> +	 * to break before make (there won't be a tlb entry cached).
->> +	 */
->> +	if (!pte_present(orig_pte))
->> +		return orig_pte;
->
-> I first thought we could relax this check to pte_valid() as we don't
-> care about the PROT_NONE case for hardware page table updates. However,
-> I realised that we call this where we expect the pte to be entirely
-> cleared but we simply skip it if !present (e.g. swap entry). Is this
-> correct?
+  Linux 4.13-rc4 (2017-08-06 18:44:49 -0700)
 
-I've checked back and come to the conclusion that get_clear_flush() will
-not get called with swap entries.
+are available in the git repository at:
 
-In the case of huge_ptep_get_and_clear() below, the callers
-(__unmap_hugepage_range() and hugetlb_change_protection()) check for
-swap entries before calling. Similarly 
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+tags/armsoc-fixes
 
-I'll relax the check to pte_valid().
+for you to fetch changes up to 4dd6a9973b8aaffac4bf37c5bb70e8eae5a7afb4:
 
->
->> +
->> +	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++) {
->> +		pte_t pte = ptep_get_and_clear(mm, addr, ptep);
->> +
->> +		/*
->> +		 * If HW_AFDBM is enabled, then the HW could turn on
->> +		 * the dirty bit for any page in the set, so check
->> +		 * them all.  All hugetlb entries are already young.
->> +		 */
->> +		if (IS_ENABLED(CONFIG_ARM64_HW_AFDBM) && pte_dirty(pte))
->> +			orig_pte = pte_mkdirty(orig_pte);
->> +	}
->> +
->> +	flush_tlb_range(&vma, saddr, addr);
->> +	return orig_pte;
->> +}
->
-> It would be better if you do something like
->
-> 	bool valid = pte_valid(org_pte);
-> 	...
-> 	if (valid)
-> 		flush_tlb_range(...);
+  soc: ti: ti_sci_pm_domains: Populate name for genpd (2017-08-18
+11:59:53 +0200)
 
-With the above change of pte_present() to pte_valid() this isn't needed
-anymore.
+----------------------------------------------------------------
+ARM: SoC fixes for 4.13
 
->
->> +
->> +static void clear_flush(struct mm_struct *mm,
->> +			     unsigned long addr,
->> +			     pte_t *ptep,
->> +			     unsigned long pgsize,
->> +			     unsigned long ncontig)
->> +{
->> +	unsigned long i, saddr = addr;
->> +	struct vm_area_struct vma = { .vm_mm = mm };
->> +
->> +	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++)
->> +		pte_clear(mm, addr, ptep);
->> +
->> +	flush_tlb_range(&vma, saddr, addr);
->> +}
->> +
->>  void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
->>  			    pte_t *ptep, pte_t pte)
->>  {
->> @@ -93,6 +149,8 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
->>  	dpfn = pgsize >> PAGE_SHIFT;
->>  	hugeprot = pte_pgprot(pte);
->>  
->> +	clear_flush(mm, addr, ptep, pgsize, ncontig);
->> +
->>  	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
->>  		pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
->>  			 pte_val(pfn_pte(pfn, hugeprot)));
->> @@ -194,7 +252,7 @@ pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
->>  pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
->>  			      unsigned long addr, pte_t *ptep)
->>  {
->> -	int ncontig, i;
->> +	int ncontig;
->>  	size_t pgsize;
->>  	pte_t orig_pte = huge_ptep_get(ptep);
->>  
->> @@ -202,17 +260,8 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
->>  		return ptep_get_and_clear(mm, addr, ptep);
->>  
->>  	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
->> -	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++) {
->> -		/*
->> -		 * If HW_AFDBM is enabled, then the HW could
->> -		 * turn on the dirty bit for any of the page
->> -		 * in the set, so check them all.
->> -		 */
->> -		if (pte_dirty(ptep_get_and_clear(mm, addr, ptep)))
->> -			orig_pte = pte_mkdirty(orig_pte);
->> -	}
->>  
->> -	return orig_pte;
->> +	return get_clear_flush(mm, addr, ptep, pgsize, ncontig);
->>  }
->
-> E.g. here you don't always clear the pte if a swap entry.
->
->>  
->>  int huge_ptep_set_access_flags(struct vm_area_struct *vma,
->> @@ -222,6 +271,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
->>  	int ncontig, i, changed = 0;
->>  	size_t pgsize = 0;
->>  	unsigned long pfn = pte_pfn(pte), dpfn;
->> +	pte_t orig_pte;
->>  	pgprot_t hugeprot;
->>  
->>  	if (!pte_cont(pte))
->> @@ -229,12 +279,18 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
->>  
->>  	ncontig = find_num_contig(vma->vm_mm, addr, ptep, &pgsize);
->>  	dpfn = pgsize >> PAGE_SHIFT;
->> -	hugeprot = pte_pgprot(pte);
->>  
->> -	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
->> -		changed |= ptep_set_access_flags(vma, addr, ptep,
->> -				pfn_pte(pfn, hugeprot), dirty);
->> -	}
->> +	orig_pte = get_clear_flush(vma->vm_mm, addr, ptep, pgsize, ncontig);
->> +	if (!pte_same(orig_pte, pte))
->> +		changed = 1;
->> +
->> +	/* Make sure we don't lose the dirty state */
->> +	if (pte_dirty(orig_pte))
->> +		pte = pte_mkdirty(pte);
->> +
->> +	hugeprot = pte_pgprot(pte);
->> +	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
->> +		set_pte_at(vma->vm_mm, addr, ptep, pfn_pte(pfn, hugeprot));
->>  
->>  	return changed;
->>  }
->> @@ -244,6 +300,9 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
->>  {
->>  	int ncontig, i;
->>  	size_t pgsize;
->> +	pte_t pte = pte_wrprotect(huge_ptep_get(ptep)), orig_pte;
->
-> I'm not particularly fond of too many function calls in the variable
-> initialisation part. I would rather keep pte_wrprotect further down
-> where you also make it "dirty".
->
->> +	unsigned long pfn = pte_pfn(pte), dpfn;
->> +	pgprot_t hugeprot;
->>  
->>  	if (!pte_cont(*ptep)) {
->>  		ptep_set_wrprotect(mm, addr, ptep);
->> @@ -251,14 +310,21 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
->>  	}
->>  
->>  	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
->> -	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize)
->> -		ptep_set_wrprotect(mm, addr, ptep);
->> +	dpfn = pgsize >> PAGE_SHIFT;
->> +
->> +	orig_pte = get_clear_flush(mm, addr, ptep, pgsize, ncontig);
->
-> Can you not use just set pte here instead of deriving it from *ptep
-> early on?
->
-> 	pte = get_clear_flush(mm, addr, ptep, pgsize, ncontig);
-> 	pte = pte_wrprotect(pte);
->
+A small number of bugfixes, nothing serious this time.
+Here is a full list.
 
-I've simplified this locally now.
+4.13 regression fix:
 
-I'll run through a few tests and post a new version.
+- imx7d-sdb pinctrl support regressed in 4.13 due to an incomplete patch
 
-Thanks for review.
-Punit
+DT fixes for recently added devices:
 
->> +	if (pte_dirty(orig_pte))
->> +		pte = pte_mkdirty(pte);
->> +
->> +	hugeprot = pte_pgprot(pte);
->> +	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
->> +		set_pte_at(mm, addr, ptep, pfn_pte(pfn, hugeprot));
->>  }
+- badly copied DT entries on imx6qdl-nitrogen6_som broke PCI reset
+
+- sama5d2 memory controller had the wrong ID and registers
+
+- imx7 power domains did not work correctly with deferred probing
+  (driver added in 4.12)
+
+- Allwinner H5 pinctrl (added in 4.12) did not work right with GPIO
+  interrupts
+
+Fixes for older bugs that just got noticed:
+
+- i.MX25 ADC support (added in 4.6) apparently never worked right due
+  to a missing 'ranges' property in DT.
+
+- Renesas Salvador Audio support (added in v4.5) was broken for device
+  repeated bind/unbind due to a naming conflict.
+
+- Various allwinner boards are missing an 'ethernet' alias in DT,
+  leading to unstable device naming.
+
+Preventive bugfix:
+
+- TI Keystone needs a fix to prevent a NULL pointer dereference with
+  an upcoming PM change.
+
+----------------------------------------------------------------
+Arnd Bergmann (6):
+      Merge tag 'imx-fixes-4.13' of
+git://git.kernel.org/.../shawnguo/linux into fixes
+      Merge tag 'imx-fixes-4.13-2' of
+git://git.kernel.org/.../shawnguo/linux into fixes
+      Merge tag 'at91-ab-4.13-dt-fixes' of
+git://git.kernel.org/.../abelloni/linux into fixes
+      Merge tag 'renesas-fixes4-for-v4.13' of
+https://git.kernel.org/.../horms/renesas into fixes
+      Merge tag 'sunxi-fixes-for-4.13-2' of
+https://git.kernel.org/.../sunxi/linux into fixes
+      Merge tag 'imx-fixes-4.13-3' of
+git://git.kernel.org/.../shawnguo/linux into fixes
+
+Dave Gerlach (1):
+      soc: ti: ti_sci_pm_domains: Populate name for genpd
+
+Fabio Estevam (1):
+      ARM: dts: imx7d-sdb: Put pinctrl_spi4 in the correct location
+
+Gary Bisson (1):
+      ARM: dts: imx6qdl-nitrogen6_som2: fix PCIe reset
+
+Icenowy Zheng (4):
+      arm64: allwinner: a64: bananapi-m64: add missing ethernet0 alias
+      arm64: allwinner: a64: pine64: add missing ethernet0 alias
+      arm64: allwinner: a64: sopine: add missing ethernet0 alias
+      arm64: allwinner: h5: fix pinctrl IRQs
+
+Kuninori Morimoto (1):
+      arm64: renesas: salvator-common: avoid audio_clkout naming conflict
+
+Ludovic Desroches (2):
+      ARM: dts: at91: sama5d2: use sama5d2 compatible string for SMC
+      ARM: dts: at91: sama5d2: fix EBI/NAND controllers declaration
+
+Martin Kaiser (1):
+      ARM: dts: i.MX25: add ranges to tscadc
+
+Stefan Agner (1):
+      soc: imx: gpcv2: fix regulator deferred probe
+
+ arch/arm/boot/dts/imx25.dtsi                             |  1 +
+ arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi            |  4 ++--
+ arch/arm/boot/dts/imx7d-sdb.dts                          | 16 ++++++++--------
+ arch/arm/boot/dts/sama5d2.dtsi                           | 12 ++++++------
+ .../arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts |  1 +
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts      |  1 +
+ .../boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts   |  1 +
+ arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi             |  3 +++
+ arch/arm64/boot/dts/renesas/salvator-common.dtsi         |  2 +-
+ drivers/soc/imx/gpcv2.c                                  | 15 ++++++++-------
+ drivers/soc/ti/ti_sci_pm_domains.c                       |  2 ++
+ 11 files changed, 34 insertions(+), 24 deletions(-)
