@@ -1,46 +1,27 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 18 Aug 2017 09:39:22 +0100
-Subject: [PATCH 0/5] arm-smmu: performance optimization
-In-Reply-To: <59965CA4.10907@huawei.com>
-References: <1498484330-10840-1-git-send-email-thunder.leizhen@huawei.com>
- <20170817143650.GB30338@arm.com> <59965CA4.10907@huawei.com>
-Message-ID: <20170818083922.GA2333@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 18 Aug 2017 09:46:43 +0100
+Subject: for-next/core ACPI boot issue
+In-Reply-To: <f485ae4c-579c-d84b-d138-fbd6b6a87cda@riken.jp>
+References: <6813810f-4222-56e0-6285-5cb7cb65303c@riken.jp>
+ <20170817173331.GA19028@red-moon>
+ <f485ae4c-579c-d84b-d138-fbd6b6a87cda@riken.jp>
+Message-ID: <20170818084643.GB24764@e107981-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 11:19:00AM +0800, Leizhen (ThunderTown) wrote:
+On Fri, Aug 18, 2017 at 04:36:28AM +0900, Itaru Kitayama wrote:
+> Lorenzo,
+> I'm afraid not. I was trying to see if the HEAD of for-next/core boot
+> with acpi=force. Given VMAP'ed stack support may be intrusive to the
+> kernel, I specifically mentioned it as it sits at the top of the patch
+> stack then. I'm on a RevA3 CPU at this moment.
 > 
-> 
-> On 2017/8/17 22:36, Will Deacon wrote:
-> > Thunder, Nate, Robin,
-> > 
-> > On Mon, Jun 26, 2017 at 09:38:45PM +0800, Zhen Lei wrote:
-> >> I described the optimization more detail in patch 1 and 2, and patch 3-5 are
-> >> the implementation on arm-smmu/arm-smmu-v3 of patch 2.
-> >>
-> >> Patch 1 is v2. In v1, I directly replaced writel with writel_relaxed in
-> >> queue_inc_prod. But Robin figured that it may lead SMMU consume stale
-> >> memory contents. I thought more than 3 whole days and got this one.
-> >>
-> >> This patchset is based on Robin Murphy's [PATCH v2 0/8] io-pgtable lock removal.
-> > 
-> > For the time being, I think we should focus on the new TLB flushing
-> > interface posted by Joerg:
-> > 
-> > http://lkml.kernel.org/r/1502974596-23835-1-git-send-email-joro at 8bytes.org
-> > 
-> > which looks like it can give us most of the benefits of this series. Once
-> > we've got that, we can see what's left in the way of performance and focus
-> > on the cmdq batching separately (because I'm still not convinced about it).
-> OK, this is a good news.
-> 
-> But I have a review comment(sorry, I have not subscribed it yet, so can not directly reply it):
-> I don't think we should add tlb sync for map operation
-> 1. at init time, all tlbs will be invalidated
-> 2. when we try to map a new range, there are no related ptes bufferd in tlb, because of above 1 and below 3
-> 3. when we unmap the above range, make sure all related ptes bufferd in tlb to be invalidated before unmap finished
+> Itaru
 
-Yup, you're completely correct and I raised that with Joerg, who is looking
-into a way to avoid it.
+Hi Itaru,
 
-Will
+I am afraid it is a bit vague for me to be able to help, if you can
+bisect the issue down to a given commit that would be helpful.
+
+Thanks,
+Lorenzo
