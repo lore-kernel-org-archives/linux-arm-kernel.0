@@ -1,56 +1,93 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 18 Aug 2017 14:42:03 +0200
-Subject: [PATCH 4/4] phy: tegra: use of_device_get_match_data()
-In-Reply-To: <1502270280-13792-4-git-send-email-chunfeng.yun@mediatek.com>
-References: <1502270280-13792-1-git-send-email-chunfeng.yun@mediatek.com>
- <1502270280-13792-4-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <20170818124203.GA4556@ulmo>
+From: vanessa.maegima@nxp.com (Vanessa Maegima)
+Date: Fri, 18 Aug 2017 09:43:38 -0300
+Subject: [PATCH v3] ARM: dts: imx7d-pico: Add Wifi support
+Message-ID: <1503060218-1975-1-git-send-email-vanessa.maegima@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 09, 2017 at 05:18:00PM +0800, Chunfeng Yun wrote:
-> reduce the boilerplate code to get the specific data
-> 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  drivers/phy/tegra/xusb.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+imx7d-pico has an ap6212 wifi chip connected to usdhc2 port.
 
-You're not reducing by much here. =)
+Add support for the usdhc2 port and to the WL_REG_ON regulator
+so Wifi can be functional on this board.
 
-> diff --git a/drivers/phy/tegra/xusb.c b/drivers/phy/tegra/xusb.c
-> index 3cbcb25..25cdfb1 100644
-> --- a/drivers/phy/tegra/xusb.c
-> +++ b/drivers/phy/tegra/xusb.c
-> @@ -848,7 +848,6 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
->  	struct device_node *np = of_node_get(pdev->dev.of_node);
->  	const struct tegra_xusb_padctl_soc *soc;
->  	struct tegra_xusb_padctl *padctl;
-> -	const struct of_device_id *match;
->  	struct resource *res;
->  	int err;
->  
-> @@ -861,8 +860,9 @@ static int tegra_xusb_padctl_probe(struct platform_device *pdev)
->  
->  	of_node_put(np);
->  
-> -	match = of_match_node(tegra_xusb_padctl_of_match, pdev->dev.of_node);
-> -	soc = match->data;
-> +	soc = of_device_get_match_data(&pdev->dev);
-> +	if (!soc)
-> +		return -EINVAL;
+Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
+---
+Change since v2:
+- Fix bad identation.
 
-This is never going to happen. There will always be a match, otherwise
-this function would never be called.
+ arch/arm/boot/dts/imx7d-pico.dts | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-Also, if you omit these last two lines, then you actually do reduce the
-boilerplate.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170818/a7a7029c/attachment.sig>
+diff --git a/arch/arm/boot/dts/imx7d-pico.dts b/arch/arm/boot/dts/imx7d-pico.dts
+index e78c2c9..bea0095 100644
+--- a/arch/arm/boot/dts/imx7d-pico.dts
++++ b/arch/arm/boot/dts/imx7d-pico.dts
+@@ -52,6 +52,17 @@
+ 		reg = <0x80000000 0x80000000>;
+ 	};
+ 
++	reg_ap6212: regulator-ap6212 {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_reg_ap6212>;
++		regulator-name = "AP6212";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio4 16 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
+ 	reg_2p5v: regulator-2p5v {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "2P5V";
+@@ -271,6 +282,17 @@
+ 	status = "okay";
+ };
+ 
++&usdhc2 { /* Wifi SDIO */
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	no-1-8-v;
++	non-removable;
++	keep-power-in-suspend;
++	wakeup-source;
++	vmmc-supply = <&reg_ap6212>;
++	status = "okay";
++};
++
+ &usdhc3 {
+ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_usdhc3>;
+@@ -326,6 +348,12 @@
+ 		>;
+ 	};
+ 
++	pinctrl_reg_ap6212: regap6212grp {
++		fsl,pins = <
++			MX7D_PAD_ECSPI1_SCLK__GPIO4_IO16	0x59
++		>;
++	};
++
+ 	pinctrl_sai1: sai1grp {
+ 		fsl,pins = <
+ 			MX7D_PAD_ENET1_RX_CLK__SAI1_TX_BCLK	0x1f
+@@ -348,6 +376,17 @@
+ 		>;
+ 	};
+ 
++	pinctrl_usdhc2: usdhc2grp {
++		fsl,pins = <
++			MX7D_PAD_SD2_CMD__SD2_CMD		0x59
++			MX7D_PAD_SD2_CLK__SD2_CLK		0x19
++			MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
++			MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
++			MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
++			MX7D_PAD_SD2_DATA3__SD2_DATA3		0x59
++		>;
++	};
++
+ 	pinctrl_usdhc3: usdhc3grp {
+ 		fsl,pins = <
+ 			MX7D_PAD_SD3_CMD__SD3_CMD		0x59
+-- 
+2.7.4
