@@ -1,93 +1,54 @@
-From: vanessa.maegima@nxp.com (Vanessa Maegima)
-Date: Fri, 18 Aug 2017 09:43:38 -0300
-Subject: [PATCH v3] ARM: dts: imx7d-pico: Add Wifi support
-Message-ID: <1503060218-1975-1-git-send-email-vanessa.maegima@nxp.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 18 Aug 2017 13:46:54 +0100
+Subject: [PATCH] irqchip/armada-370-xp: Enable MSI-X support
+In-Reply-To: <20170818141226.77e5719d@windsurf>
+References: <20170502072600.13380-1-sr@denx.de>
+ <80f30724-20b6-b5a7-7218-93ff3fa23177@denx.de>
+ <20170815160109.023842de@windsurf>
+ <6a3e8bcc-19ef-cef1-180e-f4e194d5589b@denx.de>
+ <0b8b249b-255a-6354-69cd-58f44fa7874d@denx.de>
+ <20170818141226.77e5719d@windsurf>
+Message-ID: <0178be88-608e-5189-5cf8-00b3bcf40e54@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-imx7d-pico has an ap6212 wifi chip connected to usdhc2 port.
+On 18/08/17 13:12, Thomas Petazzoni wrote:
+> Hello,
+> 
+> On Fri, 18 Aug 2017 12:18:28 +0200, Stefan Roese wrote:
+> 
+> 
+>>>>> Its been a while since this patch has been submitted - without any
+>>>>> comments so far. What's the current status with it? Is it someones
+>>>>> queue for upstreaming?  
+>>>>
+>>>> Sorry for the lack of feedback, very good idea to ping me on this
+>>>> topic. I don't have access to HW right now, so I can't give it a test.
+>>>> However, I don't think I have MSI-X capable hardware, only MSI capable.
+>>>>
+>>>> With which hardware did you test this? An off-the-shell PCIe card, or
+>>>> some custom FPGA logic?  
+>>>
+>>> I tested this code with some Altera / Intel FPGA using their PCI-Express
+>>> IP core. It should be possible to test this with some MSI-X capable
+>>> desktop PCIe cards as well on AXP boards equipped with PCIe slots,
+>>> like the Marvell AXP development board (orange box).  
+>>
+>> So what do you think about this patch? Can I get your Acked-by /
+>> Reviewed-by, or do you have some objections? Or do plan to first do
+>> some tests yourself?
+> 
+> I thought about testing it myself, but since I don't have any MSI-X
+> capable device, I'm not sure it would bring a lot.
+> 
+> Therefore:
+> 
+> Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Thanks.
 
-Add support for the usdhc2 port and to the WL_REG_ON regulator
-so Wifi can be functional on this board.
+Stefan: Can you resend this patch (cc'ing the usual irqchip
+maintainers)? I'll queue it for 4.14.
 
-Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
----
-Change since v2:
-- Fix bad identation.
-
- arch/arm/boot/dts/imx7d-pico.dts | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx7d-pico.dts b/arch/arm/boot/dts/imx7d-pico.dts
-index e78c2c9..bea0095 100644
---- a/arch/arm/boot/dts/imx7d-pico.dts
-+++ b/arch/arm/boot/dts/imx7d-pico.dts
-@@ -52,6 +52,17 @@
- 		reg = <0x80000000 0x80000000>;
- 	};
- 
-+	reg_ap6212: regulator-ap6212 {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_reg_ap6212>;
-+		regulator-name = "AP6212";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio4 16 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
- 	reg_2p5v: regulator-2p5v {
- 		compatible = "regulator-fixed";
- 		regulator-name = "2P5V";
-@@ -271,6 +282,17 @@
- 	status = "okay";
- };
- 
-+&usdhc2 { /* Wifi SDIO */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2>;
-+	no-1-8-v;
-+	non-removable;
-+	keep-power-in-suspend;
-+	wakeup-source;
-+	vmmc-supply = <&reg_ap6212>;
-+	status = "okay";
-+};
-+
- &usdhc3 {
- 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
- 	pinctrl-0 = <&pinctrl_usdhc3>;
-@@ -326,6 +348,12 @@
- 		>;
- 	};
- 
-+	pinctrl_reg_ap6212: regap6212grp {
-+		fsl,pins = <
-+			MX7D_PAD_ECSPI1_SCLK__GPIO4_IO16	0x59
-+		>;
-+	};
-+
- 	pinctrl_sai1: sai1grp {
- 		fsl,pins = <
- 			MX7D_PAD_ENET1_RX_CLK__SAI1_TX_BCLK	0x1f
-@@ -348,6 +376,17 @@
- 		>;
- 	};
- 
-+	pinctrl_usdhc2: usdhc2grp {
-+		fsl,pins = <
-+			MX7D_PAD_SD2_CMD__SD2_CMD		0x59
-+			MX7D_PAD_SD2_CLK__SD2_CLK		0x19
-+			MX7D_PAD_SD2_DATA0__SD2_DATA0		0x59
-+			MX7D_PAD_SD2_DATA1__SD2_DATA1		0x59
-+			MX7D_PAD_SD2_DATA2__SD2_DATA2		0x59
-+			MX7D_PAD_SD2_DATA3__SD2_DATA3		0x59
-+		>;
-+	};
-+
- 	pinctrl_usdhc3: usdhc3grp {
- 		fsl,pins = <
- 			MX7D_PAD_SD3_CMD__SD3_CMD		0x59
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
