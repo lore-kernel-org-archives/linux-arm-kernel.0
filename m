@@ -1,105 +1,103 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 18 Aug 2017 11:14:16 -0700
-Subject: [RFC PATCH v2 1/3] PCI: rockchip: Add support for pcie wake irq
-In-Reply-To: <20170818170107.GA119461@google.com>
-References: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
- <20170817120431.12398-2-jeffy.chen@rock-chips.com>
- <20170818170107.GA119461@google.com>
-Message-ID: <20170818181416.GF6008@atomide.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 18 Aug 2017 11:24:28 -0700
+Subject: [PATCH v3] irqchip/tango: Don't use incorrect irq_mask_ack
+ callback
+In-Reply-To: <ee3119ec-75e9-376d-f1f1-630a9a17c660@arm.com>
+References: <20170719190734.18566-1-opendmb@gmail.com>
+ <20170719190734.18566-3-opendmb@gmail.com>
+ <7a51555f-8191-9ebd-1f30-7c20f6db9d3f@sigmadesigns.com>
+ <8d29fec9-35b8-c33b-3091-3e9a51c99ed7@gmail.com>
+ <dddc01e3-b4f0-1f94-db6a-e3d4b31e6f4d@sigmadesigns.com>
+ <yw1xfudkodvv.fsf@mansr.com>
+ <6f0092f7-692f-4a15-1d95-40f4e59c8585@sigmadesigns.com>
+ <yw1xbmo8odan.fsf@mansr.com> <3b858e14-0da1-d4aa-eb84-f136ece8c2a6@gmail.com>
+ <yw1x4ltzm2ok.fsf@mansr.com> <48734beb-0e6b-3a8f-ebf4-b1cec63322e5@gmail.com>
+ <fb868111-bcff-9a12-70db-a820d3bbffd0@sigmadesigns.com>
+ <ee3119ec-75e9-376d-f1f1-630a9a17c660@arm.com>
+Message-ID: <dc85dbbe-3f2f-8630-3acd-9b11183383c7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Brian Norris <briannorris@chromium.org> [170818 10:01]:
-> + Tony
+On 08/07/2017 05:56 AM, Marc Zyngier wrote:
+> On 28/07/17 15:06, Marc Gonzalez wrote:
+>> On 27/07/2017 20:17, Florian Fainelli wrote:
+>>
+>>> On 07/26/2017 12:13 PM, M?ns Rullg?rd wrote:
+>>>
+>>>> Florian Fainelli writes:
+>>>>
+>>>>> On 07/25/2017 06:29 AM, M?ns Rullg?rd wrote:
+>>>>>
+>>>>>> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+>>>>>>
+>>>>>>> On 25/07/2017 15:16, M?ns Rullg?rd wrote:
+>>>>>>>
+>>>>>>>> What happened to the patch adding the proper combined function?
+>>>>>>>
+>>>>>>> It appears you're not CCed on v2.
+>>>>>>>
+>>>>>>> https://patchwork.kernel.org/patch/9859799/
+>>>>>>>
+>>>>>>> Doug wrote:
+>>>>>>>> Yes, you understand correctly.  The irq_mask_ack method is entirely
+>>>>>>>> optional and I assume that is why this issue went undetected for so
+>>>>>>>> long; however, it is slightly more efficient to combine the functions
+>>>>>>>> (even if the ack is unnecessary) which is why I chose to do so for my
+>>>>>>>> changes to the irqchip-brcmstb-l2 driver where I first discovered this
+>>>>>>>> issue.  How much value the improved efficiency has is certainly
+>>>>>>>> debatable, but interrupt handling is one area where people might care
+>>>>>>>> about such a small difference.  As the irqchip-tango driver maintainer
+>>>>>>>> you are welcome to decide whether or not the irq_mask_ack method makes
+>>>>>>>> sense to you.
+>>>>>>>
+>>>>>>> My preference goes to leaving the irq_mask_ack callback undefined,
+>>>>>>> and let the irqchip framework use irq_mask and irq_ack instead.
+>>>>>>
+>>>>>> Why would you prefer the less efficient way?
+>>>>>>
+>>>>>
+>>>>> Same question here, that does not really make sense to me.
+>>>>>
+>>>>> The whole point of this patch series is to have a set of efficient and
+>>>>> bugfree (or nearly) helper functions that drivers can rely on, are you
+>>>>> saying that somehow using irq_mask_and_ack is exposing a bug in the
+>>>>> tango irqchip driver and using the separate functions does not expose
+>>>>> this bug?
+>>>>
+>>>> There is currently a bug in that the function used doesn't do what its
+>>>> name implies which can't be good.  Using the separate mask and ack
+>>>> functions obviously works, but combining them saves a lock/unlock
+>>>> sequence.  The correct combined function has already been written, so I
+>>>> see no reason not to use it.
+>>>
+>>> Marc/Mason, are you intending to get this patch accepted in order to
+>>> provide a quick bugfix targeting earlier kernels with the tango irqchip
+>>> driver or is this how you think the correct fix for the tango irqchip
+>>> driver is as opposed to using Doug's fix?
+>>
+>> Hello Florian,
+>>
+>> I am extremely grateful for you and Doug bringing the defect to
+>> my attention, as it was indeed causing an issue which I had not
+>> found the time to investigate.
+>>
+>> The reason I proposed an alternate patch is that
+>> 1) Doug didn't seem to mind, 2) simpler code leads to fewer bugs
+>> and less maintenance IME, and 3) I didn't see many drivers using
+>> the irq_mask_ack() callback (9 out of 86) with a few misusing it,
+>> by defining irq_mask = irq_mask_ack.
+>>
+>> As you point out, my patch might be slightly easier to backport
+>> than Doug's (TBH, I hadn't considered that aspect until you
+>> mentioned it).
+>>
+>> Has anyone ever quantified the performance improvement of
+>> mask_ack over mask + ack?
 > 
-> On Thu, Aug 17, 2017 at 08:04:29PM +0800, Jeffy Chen wrote:
-> > Add support for PCIE_WAKE pin in rockchip pcie driver.
-> > 
-> > Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-> > ---
-> > 
-> > Changes in v2:
-> > Use dev_pm_set_dedicated_wake_irq
-> >         -- Suggested by Brian Norris <briannorris@chromium.com>
-> > 
-> >  drivers/pci/host/pcie-rockchip.c | 13 ++++++++++++-
-> >  1 file changed, 12 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-> > index 7bb9870f6d8c..c2b973c738fe 100644
-> > --- a/drivers/pci/host/pcie-rockchip.c
-> > +++ b/drivers/pci/host/pcie-rockchip.c
-> > @@ -36,6 +36,7 @@
-> >  #include <linux/pci_ids.h>
-> >  #include <linux/phy/phy.h>
-> >  #include <linux/platform_device.h>
-> > +#include <linux/pm_wakeirq.h>
-> >  #include <linux/reset.h>
-> >  #include <linux/regmap.h>
-> >  
-> > @@ -853,7 +854,6 @@ static void rockchip_pcie_legacy_int_handler(struct irq_desc *desc)
-> >  	chained_irq_exit(chip, desc);
-> >  }
-> >  
-> > -
-> >  /**
-> >   * rockchip_pcie_parse_dt - Parse Device Tree
-> >   * @rockchip: PCIe port information
-> > @@ -1018,6 +1018,14 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
-> >  		return err;
-> >  	}
-> >  
-> > +	device_init_wakeup(dev, true);
-> > +	irq = platform_get_irq_byname(pdev, "wake");
-> > +	if (irq >= 0) {
-> > +		err = dev_pm_set_dedicated_wake_irq(dev, irq);
-> 
-> Did you test that this works out correctly as a level-triggered
-> interrupt? IIUC, the dummy handler won't mask the interrupt, so it might
-> keep firing. See:
-> 
-> static irqreturn_t handle_threaded_wake_irq(int irq, void *_wirq)
-> {
->         struct wake_irq *wirq = _wirq;
->         int res;
-> 
->         /* Maybe abort suspend? */
->         if (irqd_is_wakeup_set(irq_get_irq_data(irq))) {
->                 pm_wakeup_event(wirq->dev, 0);
->         
->                 return IRQ_HANDLED; <--- We can return here, with the trigger still asserted
->         }
-> ...
-> 
-> This could cause some kind of an IRQ storm, including a lockup or
-> significant slowdown, I think.
+> Aren't you the one who is in position of measuring this effect on the
+> actual HW that uses this?
 
-Hmm yeah that should be checked. The test cases I have are all
-edge interrupts where there is no status whatsoever after the
-wake-up event except which irq fired.
-
-To me it seems that the wakeirq consumer driver should be able
-to clear the level wakeirq in it's runtime_resume, or even better,
-maybe all it takes is just let the consumer driver's irq handler
-clear the level wakeirq when it runs after runtime_resume.
-
-> BTW, in another context, Tony suggested we might need to fix up the IRQ flags
-> like this:
-> 
-> int dev_pm_set_dedicated_wake_irq(struct device *dev, int irq)
-> {
-> ...
->         err = request_threaded_irq(irq, NULL, handle_threaded_wake_irq,
-> -                                  IRQF_ONESHOT, dev_name(dev), wirq);
-> +                                  IRQF_ONESHOT | irq_get_trigger_type(irq), dev_name(dev), wirq);
-> 
-> But IIUC, that's not actually necessary, because __setup_irq()
-> automatically configures the trigger type if the driver didn't request
-> one explicitly.
-
-OK so we should make sure that the triggering is parsed
-properly when passed in from device tree.
-
-Regards,
-
-Tony
+What do we do with this patch series to move forward? Can we get Doug's
+changes queued up for 4.14?
+-- 
+Florian
