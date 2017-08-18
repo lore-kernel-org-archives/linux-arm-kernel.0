@@ -1,33 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Aug 2017 23:08:07 +0200
-Subject: [GIT PULL] Qualcomm ARM64 DT updates for 4.14 Part 2
-In-Reply-To: <1503090124-1658-1-git-send-email-andy.gross@linaro.org>
-References: <1503090124-1658-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <CAK8P3a3NhhFW_-7k3P6UUOG06EVhwwx503SPV9GJ1xf+Doh+bQ@mail.gmail.com>
+Date: Fri, 18 Aug 2017 23:12:00 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for
+ v4.14
+In-Reply-To: <cover.1502962873.git.horms+renesas@verge.net.au>
+References: <cover.1502962873.git.horms+renesas@verge.net.au>
+Message-ID: <CAK8P3a3-5zdQ1h8jaO04eOv8qXtRMeJ7HDveZP89tf8qtnnmzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 11:02 PM, Andy Gross <andy.gross@linaro.org> wrote:
-> The following changes since commit 6a6729f384365db9443a867bf8cf22255b3da582:
+On Fri, Aug 18, 2017 at 10:19 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Second Round of Renesas ARM Based SoC DT Updates for v4.14
 >
->   arm64: dts: qcom: msm8916: Add IOMMU support (2017-08-16 10:09:03 -0500)
+> * Use newly added Gen-3 fallback compat string
 >
-> are available in the git repository at:
+>   This is consistent with ongoing efforts to use per-generation
+>   fallback strings where appropriate across devices found
+>   on R-Car SoCs. The aim of the effort being to strike a balance
+>   between the limited information available about the compatibility
+>   of devices found on different SoCs and the desire to ease enabling
+>   devices on new SoCs.
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.14-2
+>   This has no run-time effect due to the presence of a per-SoC
+>   compat string.
 >
-> for you to fetch changes up to 41dac73e243d42b89fd10dfd331824d4a39099ac:
+> * Enable second CPU core on RZ/G1M (r8a7743)
 >
->   arm64: dts: Add ipq8074 SoC and HK01 board support (2017-08-18 14:47:25 -0500)
+>   The RZ/G1M has two CA15 cores running at up to 1.5GHz
 >
-> ----------------------------------------------------------------
-> Qualcomm ARM64 Updates for v4.14 Part 2
+> * Enable frequency scaling on RZ/G1M (r8a7743)
 >
-> * Add IPQ8074 SoC and HK01 board support
+> * Add six I2C cores to RZ/G1M (r8a7743) SoC DT
+>
+>   This is a step towards enabling these cores on boards that use this SoC
+>
+> * Add CEC clock for HDMI transmitter to R-Car M2-W (r8a7791) Koelsch
+>
+>   Hans Verkuil says "The adv7511 on the Koelsch board has a 12 MHz fixed
+>   clock for the CEC block. Specify this in the dts to enable CEC support."
+>
+> * Add PFC support to RZ/G1E (r8a7745) SoC and add Ethernet and SCIF2
+>   pins to SK-RZG1E board.
+>
+>   This allows the kernel to control multiplexed pins for Ethernet
+>   and SCIF2 rather than relying on setup inherited at boot.
 
-Looks like everyone is updating their Wifi chips to 64-bit now, just merged
-support for Mediatek mtk7622 as well.
-
-Pulled into next/dt64, thanks!
+Pulled into next/dt, thanks!
 
         Arnd
