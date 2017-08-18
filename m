@@ -1,33 +1,21 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 18 Aug 2017 16:14:52 -0700 (PDT)
-Subject: [PATCH] PCI: Allow PCI express root ports to find themselves
-In-Reply-To: <20170817110614.11454-1-thierry.reding@gmail.com>
-References: <1502936730-7368-1-git-send-email-dingtianhong@huawei.com>
- <20170817110614.11454-1-thierry.reding@gmail.com>
-Message-ID: <20170818.161452.1186139926380057795.davem@davemloft.net>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 19 Aug 2017 01:17:26 +0200
+Subject: [PATCH] arm64: dts: rockchip: Assign mic irq to correct device
+ for Gru
+In-Reply-To: <20170816092432.23991-1-jeffy.chen@rock-chips.com>
+References: <20170816092432.23991-1-jeffy.chen@rock-chips.com>
+Message-ID: <1737976.DtYLZJGtdQ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <thierry.reding@gmail.com>
-Date: Thu, 17 Aug 2017 13:06:14 +0200
+Am Mittwoch, 16. August 2017, 17:24:32 CEST schrieb Jeffy Chen:
+> Currently we are assigning mic irq to rt5514 i2c driver, which is wrong.
+> Assign it to rt5514 spi driver instead.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
-> From: Thierry Reding <treding@nvidia.com>
-> 
-> If the pci_find_pcie_root_port() function is called on a root port
-> itself, return the root port rather than NULL.
-> 
-> This effectively reverts commit 0e405232871d6 ("PCI: fix oops when
-> try to find Root Port for a PCI device") which added an extra check
-> that would now be redundant.
-> 
-> Fixes: a99b646afa8a ("PCI: Disable PCIe Relaxed Ordering if unsupported")
-> Fixes: c56d4450eb68 ("PCI: Turn off Request Attributes to avoid Chelsio T5 Completion erratum")
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> This applies on top of and was tested on next-20170817.
-> 
-> Michael, it'd be great if you could test this one again to clarify
-> whether or not the fix that's already in Linus' tree is still needed, or
-> whether it's indeed obsoleted by this patch.
+applied for 4.14
 
-Applied, thanks everyone.
+
+Thanks
+Heiko
