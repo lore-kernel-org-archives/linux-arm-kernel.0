@@ -1,309 +1,248 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Fri, 18 Aug 2017 19:21:05 +0200
-Subject: [RFC 3/3] irqchip: Add Realtek RTD1295 mux driver
-In-Reply-To: <da3b236f-08ec-837a-de18-4c22b30ce5ca@arm.com>
-References: <20170817101140.32000-1-afaerber@suse.de>
- <20170817101140.32000-4-afaerber@suse.de>
- <da3b236f-08ec-837a-de18-4c22b30ce5ca@arm.com>
-Message-ID: <d7b03533-0442-4df9-7829-5e81f3ed6f34@suse.de>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Fri, 18 Aug 2017 17:18:24 +0000
+Subject: =?gb2312?B?tPC4tDogW1BBVENIIHYxMSAxLzZdIEFDUEk6IGFkZCBBUEVJL0hFU1QvQ1BF?=
+ =?gb2312?Q?R_structures_and_macros?=
+In-Reply-To: <1503066227-18251-2-git-send-email-gengdongjiu@huawei.com>
+References: <1503066227-18251-1-git-send-email-gengdongjiu@huawei.com>
+ <1503066227-18251-2-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <0184EA26B2509940AA629AE1405DD7F201591861@DGGEMA503-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Loop Laszlo
 
-Am 18.08.2017 um 12:53 schrieb Marc Zyngier:
-> On 17/08/17 11:11, Andreas F?rber wrote:
->> This irq mux driver is derived from the RTD1295 vendor DT and assumes a linear
->> mapping between intr_en and intr_status registers. Code for RTD119x indicates
->> this may not always be the case (i2c_3).
->>
->> The register initialization was copied from QNAP's mach-rtk119x/rtk_irq_mux.c
->> as a boot fix, without full insights into what exactly this is changing (TODO).
->>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  drivers/irqchip/Makefile          |   1 +
->>  drivers/irqchip/irq-rtd119x-mux.c | 201 ++++++++++++++++++++++++++++++++++++++
->>  2 files changed, 202 insertions(+)
->>  create mode 100644 drivers/irqchip/irq-rtd119x-mux.c
->>
->> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
->> index e88d856cc09c..46202a0b7d96 100644
->> --- a/drivers/irqchip/Makefile
->> +++ b/drivers/irqchip/Makefile
->> @@ -78,3 +78,4 @@ obj-$(CONFIG_EZNPS_GIC)			+= irq-eznps.o
->>  obj-$(CONFIG_ARCH_ASPEED)		+= irq-aspeed-vic.o irq-aspeed-i2c-ic.o
->>  obj-$(CONFIG_STM32_EXTI) 		+= irq-stm32-exti.o
->>  obj-$(CONFIG_QCOM_IRQ_COMBINER)		+= qcom-irq-combiner.o
->> +obj-$(CONFIG_ARCH_REALTEK)		+= irq-rtd119x-mux.o
-
-Should this get its own config option? It would get shared by ARM64 and
-future potential ARM, so no strict need for composite expressions, and
-there's examples of both ways above.
-
-BTW I was surprised that the Makefile does not seem to have a consistent
-order, leading to potential conflicts when adding things in the bottom.
-Have you guys thought about enforcing alphabetical order by either
-config option or file name?
-
->> diff --git a/drivers/irqchip/irq-rtd119x-mux.c b/drivers/irqchip/irq-rtd119x-mux.c
->> new file mode 100644
->> index 000000000000..c6c1ba126bf3
->> --- /dev/null
->> +++ b/drivers/irqchip/irq-rtd119x-mux.c
->> @@ -0,0 +1,201 @@
->> +/*
->> + * Realtek RTD129x IRQ mux
->> + *
->> + * Copyright (c) 2017 Andreas F?rber
->> + *
->> + * SPDX-License-Identifier: GPL-2.0+
->> + */
->> +
->> +#include <linux/io.h>
->> +#include <linux/irqchip.h>
->> +#include <linux/irqchip/chained_irq.h>
->> +#include <linux/irqdomain.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_irq.h>
->> +#include <linux/slab.h>
->> +
->> +struct rtd119x_irq_mux_info {
->> +	unsigned intr_status;
->> +	unsigned intr_en;
+> -----????-----
+> ???: gengdongjiu
+> ????: 2017?8?18? 22:24
+> ???: mst at redhat.com; imammedo at redhat.com; Zhaoshenglong <zhaoshenglong@huawei.com>; peter.maydell at linaro.org;
+> pbonzini at redhat.com; qemu-devel at nongnu.org; qemu-arm at nongnu.org; kvm at vger.kernel.org; edk2-devel at lists.01.org;
+> christoffer.dall at linaro.org; marc.zyngier at arm.com; will.deacon at arm.com; james.morse at arm.com; tbaicar at codeaurora.org;
+> ard.biesheuvel at linaro.org; mingo at kernel.org; bp at suse.de; Shiju Jose <shiju.jose@huawei.com>; zjzhang at codeaurora.org;
+> linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu; linux-kernel at vger.kernel.org; linux-acpi at vger.kernel.org;
+> devel at acpica.org; John Garry <john.garry@huawei.com>; Jonathan Cameron <jonathan.cameron@huawei.com>; Shameerali Kolothum
+> Thodi <shameerali.kolothum.thodi@huawei.com>; huangdaode <huangdaode@hisilicon.com>; Wangzhou (B) <wangzhou1@hisilicon.com>
+> ??: Huangshaoyu <huangshaoyu@huawei.com>; Wuquanming <wuquanming@huawei.com>; Linuxarm <linuxarm@huawei.com>;
+> gengdongjiu <gengdongjiu@huawei.com>; Zhengqiang (turing) <zhengqiang10@huawei.com>
+> ??: [PATCH v11 1/6] ACPI: add APEI/HEST/CPER structures and macros
 > 
-> nit: these would be better named with a "_offset" suffix, in order to
-> better distinguish them from the structure below.
-
-True, renamed. See also discussion in the bottom.
-
->> +};
->> +
->> +struct rtd119x_irq_mux_data {
->> +	void __iomem *intr_status;
->> +	void __iomem *intr_en;
->> +	int irq;
->> +	struct irq_domain *domain;
->> +	spinlock_t lock;
->> +};
->> +
->> +static void rtd119x_mux_irq_handle(struct irq_desc *desc)
->> +{
->> +	struct rtd119x_irq_mux_data *data = irq_desc_get_handler_data(desc);
->> +	struct irq_chip *chip = irq_desc_get_chip(desc);
->> +	u32 intr_en, intr_status, status;
->> +	int ret;
->> +
->> +	chained_irq_enter(chip, desc);
->> +
->> +	spin_lock(&data->lock);
->> +	intr_en     = readl(data->intr_en);
->> +	intr_status = readl(data->intr_status);
+> (1) Add related APEI/HEST table structures and  macros, these
+>     definition refer to ACPI 6.1 and UEFI 2.6 spec.
+> (2) Add generic error status block and CPER memory section
+>     definition, user space only handle memory section errors.
 > 
-> All the readl/writel should be turned into their _relaxed versions.
-
-Hmm, so I use readl/writel by default. The old downstream code was using
-__raw_readl/__raw_writel, but my initial code appeared to work, so I
-left it that way.
-
-Can you explain why _relaxed, so that I can properly choose next time?
-I see the difference is __iormb(), but when do I need that? Thanks.
-
->> +	spin_unlock(&data->lock);
->> +
->> +	status = intr_status & intr_en;
->> +	if (status != 0) {
->> +		unsigned irq = __ffs(status);
->> +		ret = generic_handle_irq(irq_find_mapping(data->domain, irq));
->> +		if (ret == 0) {
->> +			spin_lock(&data->lock);
->> +			intr_status = readl(data->intr_status);
->> +			intr_status |= BIT(irq - 1);
->> +			writel(intr_status, data->intr_status);
->> +			spin_unlock(&data->lock);
->> +		}
->> +	}
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> ---
+>  include/hw/acpi/acpi-defs.h | 193 ++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 193 insertions(+)
 > 
-> And what if status is 0? We keep the lock held forever?
-
-Which lock? Locking is only done for consistently reading en and status,
-and for the read-modify-write of status. Both look balanced to me, and
-no hangs have been observed in testing.
-
-__ffs: "Undefined if no bit exists, so code should check against 0 first."
-
-If status is 0 then there's no pending enabled interrupt and thus
-nothing to do.
-
-The downstream code modified all drivers (e.g., 8250 serial) to
-acknowledge their interrupts inside the drivers, and instead it had code
-that complained and cleared them here.
-I wanted to keep the irqchip abstraction, so I am always acknowledging
-the interrupt if generic_handle_irq does not run into an error - I
-understood that this is not the same as actually having been
-successfully handled, but I did not see a better way for how to do this
-in generic code.
-(I am facing a similar mux situation with FM4, so input appreciated on
-whether these are right hooks to use - for FM4 I got stuck trying to
-adopt the hierarchical API and resorted to the simpler approach here.)
-
-Would you rather have realtek,intr_en and realtek,intr_status properties
-in the relevant device nodes and drivers and acknowledge the interrupts
-from their respective interrupt handlers and then ignore it here?
-
->> +
->> +	chained_irq_exit(chip, desc);
->> +}
->> +
->> +static void rtd119x_mux_mask_irq(struct irq_data *data)
->> +{
->> +	struct rtd119x_irq_mux_data *mux_data = irq_data_get_irq_chip_data(data);
->> +	u32 intr_status;
->> +
->> +	intr_status = readl(mux_data->intr_status);
->> +	intr_status |= BIT(data->hwirq);
->> +	writel(intr_status, mux_data->intr_status);
+> diff --git a/include/hw/acpi/acpi-defs.h b/include/hw/acpi/acpi-defs.h index 72be675..3b4bad7 100644
+> --- a/include/hw/acpi/acpi-defs.h
+> +++ b/include/hw/acpi/acpi-defs.h
+> @@ -297,6 +297,44 @@ typedef struct AcpiMultipleApicTable AcpiMultipleApicTable;
+>  #define ACPI_APIC_GENERIC_TRANSLATOR    15
+>  #define ACPI_APIC_RESERVED              16   /* 16 and greater are reserved */
 > 
-> So you need a lock in the chained handler, but you don't need one here?
-> It doesn't feel right.
-
-Good point. I had started without locks; should add them here and below.
-
->> +}
->> +
->> +static void rtd119x_mux_unmask_irq(struct irq_data *data)
->> +{
->> +	struct rtd119x_irq_mux_data *mux_data = irq_data_get_irq_chip_data(data);
->> +	u32 intr_en;
->> +
->> +	intr_en = readl(mux_data->intr_en);
->> +	intr_en |= BIT(data->hwirq);
->> +	writel(intr_en, mux_data->intr_en);
+> +/* UEFI Spec 2.6, "N.2.5 Memory Error Section */
+> +#define UEFI_CPER_MEM_VALID_ERROR_STATUS     0x0001
+> +#define UEFI_CPER_MEM_VALID_PA               0x0002
+> +#define UEFI_CPER_MEM_VALID_PA_MASK          0x0004
+> +#define UEFI_CPER_MEM_VALID_NODE             0x0008
+> +#define UEFI_CPER_MEM_VALID_CARD             0x0010
+> +#define UEFI_CPER_MEM_VALID_MODULE           0x0020
+> +#define UEFI_CPER_MEM_VALID_BANK             0x0040
+> +#define UEFI_CPER_MEM_VALID_DEVICE           0x0080
+> +#define UEFI_CPER_MEM_VALID_ROW              0x0100
+> +#define UEFI_CPER_MEM_VALID_COLUMN           0x0200
+> +#define UEFI_CPER_MEM_VALID_BIT_POSITION     0x0400
+> +#define UEFI_CPER_MEM_VALID_REQUESTOR        0x0800
+> +#define UEFI_CPER_MEM_VALID_RESPONDER        0x1000
+> +#define UEFI_CPER_MEM_VALID_TARGET           0x2000
+> +#define UEFI_CPER_MEM_VALID_ERROR_TYPE       0x4000
+> +#define UEFI_CPER_MEM_VALID_RANK_NUMBER      0x8000
+> +#define UEFI_CPER_MEM_VALID_CARD_HANDLE      0x10000
+> +#define UEFI_CPER_MEM_VALID_MODULE_HANDLE    0x20000
+> +#define UEFI_CPER_MEM_ERROR_TYPE_MULTI_ECC   3
+> +
+> +/* From the ACPI 6.1 spec, "18.3.2.9 Hardware Error Notification" */
+> +
+> +enum AcpiHestNotifyType {
+> +    ACPI_HEST_NOTIFY_POLLED = 0,
+> +    ACPI_HEST_NOTIFY_EXTERNAL = 1,
+> +    ACPI_HEST_NOTIFY_LOCAL = 2,
+> +    ACPI_HEST_NOTIFY_SCI = 3,
+> +    ACPI_HEST_NOTIFY_NMI = 4,
+> +    ACPI_HEST_NOTIFY_CMCI = 5,  /* ACPI 5.0 */
+> +    ACPI_HEST_NOTIFY_MCE = 6,   /* ACPI 5.0 */
+> +    ACPI_HEST_NOTIFY_GPIO = 7,  /* ACPI 6.0 */
+> +    ACPI_HEST_NOTIFY_SEA = 8,   /* ACPI 6.1 */
+> +    ACPI_HEST_NOTIFY_SEI = 9,   /* ACPI 6.1 */
+> +    ACPI_HEST_NOTIFY_GSIV = 10, /* ACPI 6.1 */
+> +    ACPI_HEST_NOTIFY_RESERVED = 11  /* 11 and greater are reserved */
+> +};
+> +
+>  /*
+>   * MADT sub-structures (Follow MULTIPLE_APIC_DESCRIPTION_TABLE)
+>   */
+> @@ -474,6 +512,161 @@ struct AcpiSystemResourceAffinityTable {  } QEMU_PACKED;  typedef struct AcpiSystemResourceAffinityTable
+> AcpiSystemResourceAffinityTable;
 > 
-> Same thing here.
-> 
->> +}
->> +
->> +static int rtd119x_mux_set_affinity(struct irq_data *d,
->> +			const struct cpumask *mask_val, bool force)
->> +{
->> +	struct rtd119x_irq_mux_data *mux_data = irq_data_get_irq_chip_data(d);
->> +	struct irq_chip *chip = irq_get_chip(mux_data->irq);
->> +	struct irq_data *data = irq_get_irq_data(mux_data->irq);
->> +
->> +	if (chip && chip->irq_set_affinity)
->> +		return chip->irq_set_affinity(data, mask_val, force);
-> 
-> I'm always worried when I see this. It means that all of the interrupts
-> on the secondary chip move in one go, without the core code noticing.
-
-You mean it affects all 32 mux'ed IRQs as a side effect here? True.
-
-> One of these days, we'll have to address it.
-
-Note that currently I have only a single core up on RTD1295, so affinity
-is not really tested. (They use a custom "rtk-spin-table" implementation
-that I have no source code or documentation for, and I haven't made
-guesses yet, nor do I think that would be acceptable in mainline arm64.)
-
-This hook appears to be optional, so we could just drop it for now, or
-always return -EINVAL if preferred over forwarding to the GIC?
-
->> +
->> +	return -EINVAL;
->> +}
->> +
->> +static struct irq_chip rtd119x_mux_irq_chip = {
->> +	.name			= "rtd119x-mux",
->> +	.irq_mask		= rtd119x_mux_mask_irq,
->> +	.irq_unmask		= rtd119x_mux_unmask_irq,
->> +	.irq_set_affinity	= rtd119x_mux_set_affinity,
->> +};
->> +
->> +static int rtd119x_mux_irq_domain_xlate(struct irq_domain *d,
->> +		struct device_node *controller,
->> +		const u32 *intspec, unsigned int intsize,
->> +		unsigned long *out_hwirq,
->> +		unsigned int *out_type)
->> +{
->> +	if (irq_domain_get_of_node(d) != controller)
->> +		return -EINVAL;
->> +
->> +	if (intsize < 1)
->> +		return -EINVAL;
->> +
->> +	*out_hwirq = intspec[0];
->> +	*out_type = 0;
->> +
->> +	return 0;
->> +}
-> 
-> Please use irq_domain_xlate_onecell() instead.
-
-Thanks for the pointer, done.
-
->> +
->> +static int rtd119x_mux_irq_domain_map(struct irq_domain *d,
->> +		unsigned int irq, irq_hw_number_t hw)
->> +{
->> +	struct rtd119x_irq_mux_data *data = d->host_data;
->> +
->> +	irq_set_chip_and_handler(irq, &rtd119x_mux_irq_chip, handle_level_irq);
->> +	irq_set_chip_data(irq, data);
->> +	irq_set_probe(irq);
->> +
->> +	return 0;
->> +}
->> +
->> +static struct irq_domain_ops rtd119x_mux_irq_domain_ops = {
->> +	.xlate	= rtd119x_mux_irq_domain_xlate,
->> +	.map	= rtd119x_mux_irq_domain_map,
->> +};
-[...]
->> +static const struct rtd119x_irq_mux_info rtd1295_iso_irq_mux_info = {
->> +	.intr_status	= 0x0,
->> +	.intr_en	= 0x40,
->> +};
->> +
->> +static int __init rtd1295_iso_irq_mux_init(struct device_node *node,
->> +					   struct device_node *parent)
->> +{
->> +	return rtd119x_irq_mux_init(node, parent, &rtd1295_iso_irq_mux_info);
->> +}
->> +IRQCHIP_DECLARE(rtd1295_iso_mux, "realtek,rtd1295-iso-irq-mux", rtd1295_iso_irq_mux_init);
->> +
->> +static const struct rtd119x_irq_mux_info rtd1295_irq_mux_info = {
->> +	.intr_status	= 0xc,
->> +	.intr_en	= 0x80,
->> +};
->> +
->> +static int __init rtd1295_irq_mux_init(struct device_node *node,
->> +				       struct device_node *parent)
->> +{
->> +	return rtd119x_irq_mux_init(node, parent, &rtd1295_irq_mux_info);
->> +}
->> +IRQCHIP_DECLARE(rtd1295_mux, "realtek,rtd1295-irq-mux", rtd1295_irq_mux_init);
-
-This was a quick hack to cover both instances. I am not yet sure how to
-best model the case of e.g. en bit 28 corresponding to status bit 23 in
-the struct. An index array of all 32 bits with special value for absent,
-to iteratively or the bits instead of masking them?
-
-We might use of_match_node() to get the info pointer in one generic init
-function instead of having per-compatible init functions down here, but
-then we'd have the compatibles duplicated (compared to platform_driver
-reusing the same of_device_id array).
-
-For the bit twiddling we could use of_device_is_compatible() and avoid
-this info struct altogether. That would allow to implement more complex
-logic - doesn't rule out using this struct for the offsets of course.
-
-Preferences?
-
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+> +/* Hardware Error Notification, from the ACPI 6.1
+> + * spec, "18.3.2.9 Hardware Error Notification"
+> + */
+> +struct AcpiHestNotify {
+> +    uint8_t type;
+> +    uint8_t length;
+> +    uint16_t config_write_enable;
+> +    uint32_t poll_interval;
+> +    uint32_t vector;
+> +    uint32_t polling_threshold_value;
+> +    uint32_t polling_threshold_window;
+> +    uint32_t error_threshold_value;
+> +    uint32_t error_threshold_window;
+> +} QEMU_PACKED;
+> +typedef struct AcpiHestNotify AcpiHestNotify;
+> +
+> +/* From ACPI 6.1, sections "18.3.2.1 IA-32 Architecture Machine
+> + * Check Exception" through "18.3.2.8 Generic Hardware Error Source version 2".
+> + */
+> +enum AcpiHestSourceType {
+> +    ACPI_HEST_SOURCE_IA32_CHECK = 0,
+> +    ACPI_HEST_SOURCE_IA32_CORRECTED_CHECK = 1,
+> +    ACPI_HEST_SOURCE_IA32_NMI = 2,
+> +    ACPI_HEST_SOURCE_AER_ROOT_PORT = 6,
+> +    ACPI_HEST_SOURCE_AER_ENDPOINT = 7,
+> +    ACPI_HEST_SOURCE_AER_BRIDGE = 8,
+> +    ACPI_HEST_SOURCE_GENERIC_ERROR = 9,
+> +    ACPI_HEST_SOURCE_GENERIC_ERROR_V2 = 10,
+> +    ACPI_HEST_SOURCE_RESERVED = 11    /* 11 and greater are reserved */
+> +};
+> +
+> +/* Block status bitmasks from ACPI 6.1, "18.3.2.7.1 Generic Error Data" */
+> +#define ACPI_GEBS_UNCORRECTABLE             (1)
+> +#define ACPI_GEBS_CORRECTABLE               (1 << 1)
+> +#define ACPI_GEBS_MULTIPLE_UNCORRECTABLE    (1 << 2)
+> +#define ACPI_GEBS_MULTIPLE_CORRECTABLE      (1 << 3)
+> +/* 10 bits, error data entry count */
+> +#define ACPI_GEBS_ERROR_ENTRY_COUNT         (0x3FF << 4)
+> +
+> +/* Generic Hardware Error Source Structure, refer to ACPI 6.1
+> + * "18.3.2.7 Generic Hardware Error Source". in this struct the
+> + * "type" field has to be ACPI_HEST_SOURCE_GENERIC_ERROR  */
+> +
+> +struct AcpiGenericHardwareErrorSource {
+> +    uint16_t type;
+> +    uint16_t source_id;
+> +    uint16_t related_source_id;
+> +    uint8_t flags;
+> +    uint8_t enabled;
+> +    uint32_t number_of_records;
+> +    uint32_t max_sections_per_record;
+> +    uint32_t max_raw_data_length;
+> +    struct AcpiGenericAddress error_status_address;
+> +    struct AcpiHestNotify notify;
+> +    uint32_t error_status_block_length; } QEMU_PACKED; typedef struct
+> +AcpiGenericHardwareErrorSource AcpiGenericHardwareErrorSource;
+> +
+> +/* Generic Hardware Error Source, version 2, ACPI 6.1, "18.3.2.8
+> +Generic
+> + * Hardware Error Source version 2", in this struct the "type" field
+> +has to
+> + * be ACPI_HEST_SOURCE_GENERIC_ERROR_V2  */ struct
+> +AcpiGenericHardwareErrorSourceV2 {
+> +    uint16_t type;
+> +    uint16_t source_id;
+> +    uint16_t related_source_id;
+> +    uint8_t flags;
+> +    uint8_t enabled;
+> +    uint32_t number_of_records;
+> +    uint32_t max_sections_per_record;
+> +    uint32_t max_raw_data_length;
+> +    struct AcpiGenericAddress error_status_address;
+> +    struct AcpiHestNotify notify;
+> +    uint32_t error_status_block_length;
+> +    struct AcpiGenericAddress read_ack_register;
+> +    uint64_t read_ack_preserve;
+> +    uint64_t read_ack_write;
+> +} QEMU_PACKED;
+> +typedef struct AcpiGenericHardwareErrorSourceV2
+> +            AcpiGenericHardwareErrorSourceV2;
+> +
+> +/* Generic Error Status block, from ACPI 6.1,
+> + * "18.3.2.7.1 Generic Error Data"
+> + */
+> +struct AcpiGenericErrorStatus {
+> +    /* It is a bitmask composed of ACPI_GEBS_xxx macros */
+> +    uint32_t block_status;
+> +    uint32_t raw_data_offset;
+> +    uint32_t raw_data_length;
+> +    uint32_t data_length;
+> +    uint32_t error_severity;
+> +} QEMU_PACKED;
+> +typedef struct AcpiGenericErrorStatus AcpiGenericErrorStatus;
+> +
+> +enum AcpiGenericErrorSeverity {
+> +    ACPI_CPER_SEV_RECOVERABLE,
+> +    ACPI_CPER_SEV_FATAL,
+> +    ACPI_CPER_SEV_CORRECTED,
+> +    ACPI_CPER_SEV_NONE,
+> +};
+> +
+> +/* Generic Error Data entry, revision number is 0x0300,
+> + * ACPI 6.1, "18.3.2.7.1 Generic Error Data"
+> + */
+> +struct AcpiGenericErrorData {
+> +    uint8_t section_type_le[16];
+> +    /* The "error_severity" fields that they take their
+> +     * values from AcpiGenericErrorSeverity
+> +     */
+> +    uint32_t error_severity;
+> +    uint16_t revision;
+> +    uint8_t validation_bits;
+> +    uint8_t flags;
+> +    uint32_t error_data_length;
+> +    uint8_t fru_id[16];
+> +    uint8_t fru_text[20];
+> +    uint64_t time_stamp;
+> +} QEMU_PACKED;
+> +typedef struct AcpiGenericErrorData AcpiGenericErrorData;
+> +
+> +/* From UEFI 2.6, "N.2.5 Memory Error Section" */ struct
+> +UefiCperSecMemErr {
+> +    uint64_t    validation_bits;
+> +    uint64_t    error_status;
+> +    uint64_t    physical_addr;
+> +    uint64_t    physical_addr_mask;
+> +    uint16_t    node;
+> +    uint16_t    card;
+> +    uint16_t    module;
+> +    uint16_t    bank;
+> +    uint16_t    device;
+> +    uint16_t    row;
+> +    uint16_t    column;
+> +    uint16_t    bit_pos;
+> +    uint64_t    requestor_id;
+> +    uint64_t    responder_id;
+> +    uint64_t    target_id;
+> +    uint8_t     error_type;
+> +    uint8_t     reserved;
+> +    uint16_t    rank;
+> +    uint16_t    mem_array_handle;   /* card handle in UEFI 2.4 */
+> +    uint16_t    mem_dev_handle;     /* module handle in UEFI 2.4 */
+> +} QEMU_PACKED;
+> +typedef struct UefiCperSecMemErr UefiCperSecMemErr;
+> +
+> +/*
+> + * HEST Description Table
+> + */
+> +struct AcpiHardwareErrorSourceTable {
+> +    ACPI_TABLE_HEADER_DEF                    /* ACPI common table header */
+> +    uint32_t           error_source_count;
+> +} QEMU_PACKED;
+> +typedef struct AcpiHardwareErrorSourceTable
+> +AcpiHardwareErrorSourceTable;
+> +
+>  #define ACPI_SRAT_PROCESSOR_APIC     0
+>  #define ACPI_SRAT_MEMORY             1
+>  #define ACPI_SRAT_PROCESSOR_x2APIC   2
+> --
+> 1.8.3.1
