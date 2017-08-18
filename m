@@ -1,31 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Aug 2017 23:01:26 +0200
-Subject: [GIT PULL 1/3] i.MX device tree updates for 4.14
-In-Reply-To: <1503042820-13043-1-git-send-email-shawnguo@kernel.org>
-References: <1503042820-13043-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <CAK8P3a1DO8GjyYocOEBaXMpGHo8bZVACGJqrDsUphxLX0obFZg@mail.gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Fri, 18 Aug 2017 16:01:45 -0500
+Subject: [GIT PULL] Qualcomm ARM64 Defconfig updates for 4.14
+Message-ID: <1503090105-1569-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 9:53 AM, Shawn Guo <shawnguo@kernel.org> wrote:
->
-> ----------------------------------------------------------------
-> i.MX device tree updates for 4.14:
->  - A series from Andrew Lunn updating imx6-rdu2 board to enable
->    on-board Marvell switch support.
->  - A series from Jagan Teki updating imx6ul-isiot and imx6ul-geam to
->    enable audio card and FEC support.
->  - Add support for Toradex Ixora V1.1 and Apalis Evaluation Board
->    along with some cleanups.
->  - Enable DRM display support for imx6ul-evk and imx7d-sdb board.
->  - Add i.MX53 based Beckhoff CX9020 board support.
->  - Add GPMI NAND and APBH DMA devices for i.MX7 and enables NAND support
->    for imx7-colibri board.
->  - Enables the ADV7180 analog video decoder sensor connected to the
->    IMX6 IPU on various Gateworks Ventana boards.
->  - Minor updates on misc boards and some random cleanups.
->
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
-Pulled into next/dt, thanks!
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 
-        Arnd
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-defconfig-for-4.14
+
+for you to fetch changes up to dc6159fd04624f5953f833f36428e9c118f4f022:
+
+  arm64: defconfig: Enable QCOM IPQ8074 clock and pinctrl (2017-08-18 15:48:50 -0500)
+
+----------------------------------------------------------------
+Qualcomm ARM64 Based defconfig Updates for v4.14
+
+* Enable Qualcomm IPQ8074 clocks and pinctrl
+
+----------------------------------------------------------------
+Abhishek Sahu (1):
+      arm64: defconfig: Enable QCOM IPQ8074 clock and pinctrl
+
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
