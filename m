@@ -1,72 +1,92 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 18 Aug 2017 17:27:08 -0500
-Subject: [PATCH 3/3] ARM: OMAP5: Enable CPU off idle states
-In-Reply-To: <20170818152600.GE6008@atomide.com>
-References: <20170817230122.30655-1-tony@atomide.com>
- <20170817230122.30655-4-tony@atomide.com>
- <c31a90c4-8dbe-926a-831c-5fac92ebae80@ti.com>
- <20170818152600.GE6008@atomide.com>
-Message-ID: <77854a91-80f0-3622-93a2-2eefe1e8b1aa@ti.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 18 Aug 2017 15:35:33 -0700
+Subject: [GIT PULL 6/6] Broadcom drivers changes for 4.14
+In-Reply-To: <CAK8P3a1id0Wd7XdH+9MsgaK-UCNmYE5ks1p4bzont-T03v5tEA@mail.gmail.com>
+References: <20170817183748.1450-1-f.fainelli@gmail.com>
+ <20170817183748.1450-7-f.fainelli@gmail.com>
+ <CAK8P3a1id0Wd7XdH+9MsgaK-UCNmYE5ks1p4bzont-T03v5tEA@mail.gmail.com>
+Message-ID: <124419b2-4f45-d282-2aea-c8e0c3a819c5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/18/2017 10:26 AM, Tony Lindgren wrote:
-> * Nishanth Menon <nm@ti.com> [170817 18:30]:
->> On 08/17/2017 06:01 PM, Tony Lindgren wrote:
->>> With the idle code in place needed for supporting off mode for cpus,
->>> let's enable it. This seems to save about 0.2W of power compared to
->>> CPU retention states based on quick measurement on omap5-uevm.
+On 08/18/2017 02:58 PM, Arnd Bergmann wrote:
+> On Thu, Aug 17, 2017 at 8:37 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 >>
->> That makes sense since the Silicon you probably have is pre-production
->> silicon.
-> 
-> It seems to be es2.0, the measurement was just based on a glance
-> of the power supply after rmmod of ehci-omap and ohci-platform
-> modules.
-
-yeah -> ES2.0 did have two stages prior to being approved for production.
-
-> 
->> unfortunately, you have been looking at some preproduction code which was
->> being developed prior to the silicon going into production (also the reason
->> why I have'nt upstreamed those changes).
-> 
-> Oh I did not know that, I was just looking at the old
-> ti-linux-3-8-y-kernel that the igepv5 kernel tree is
-> based on.
-> 
-
-unfortunately so.
-
->> unfortunately, I have to NAK this patch.
+>>   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 >>
->> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=9f5dc91b691cf296c49aedf0a671fd659a70f737
->> as per Technical Reference Manual SWPU282AF?May 2012?Revised August 2016,
->> PM_MPU_PWRSTCTRL can only support: ON INA, RET. (CSWR only).
+>> are available in the git repository at:
 >>
->> Same applies to CPUs as well. which was the reason in the first place for me
->> to send the patch upstream.
+>>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.14/drivers
+>>
+>> for you to fetch changes up to 7f95522be533c27a918fe388ae5d733344660ef2:
+>>
+>>   soc bcm: brcmstb: Add support for S2/S3/S5 suspend states (MIPS) (2017-07-28 16:57:03 -0700)
+>>
+>> ----------------------------------------------------------------
+>> This pull request contains Broadcom ARM/ARM64 SoC drivers changes for 4.14,
+>> please pull the following:
+>>
+>> - Markus adds support for the Broadcom STB DDR PHY frontend which supports
+>>   dynamic firmware loading and offers the ability to respond with DRAM refresh
+>>   rates. He also adds a proper documentation binding document for that peripheral
+>>
 > 
-> OK, is there some hardware errata issued on that?
+> I had not seen this driver before, but now I looked at it and have two small
+> comments:
+> 
+> - I'd rather see this added to drivers/memory than drivers/soc. The distinction
+>   is not always clear, but I think that's where most of the DDR memory interface
+>   drivers are at the moment.
 
-To my knowledge, errata is only when TRM is not updated (feature that 
-is supposed to work, but does'nt). TRM's version history indicates 
-descope. At least to my information all production customers should 
-have been informed about this as well.
+This driver does not control the SoC's memory interface though it does
+talk to the frontend processor built into the DDR controller to first
+load its firmware and then query it to get the DDR refresh rates. If you
+feel like drivers/memory/broadcom/ is more appropriate I suppose we
+could relocate the driver there.
 
 > 
-> I also noticed these patches won't work when booted with LPAE
-> enabled kernel for some reason.
+> - In a function called __write_firmware, I stumbled over this small
+>   hunk and similar functions elsewhere in the driver:
 > 
+> +       /* Now copy it. */
+> +       if (is_big_endian) {
+> +               for (i = 0; i < size; i++)
+> +                       writel_relaxed(be32_to_cpu(fw[i]), mem + i);
+> +       } else {
+> +               for (i = 0; i < size; i++)
+> +                       writel_relaxed(fw[i], mem + i);
+> +       }
+> 
+> This looks wrong to me, as the behavior is different between
+> little-endian and big-endian kernels: the former will byteswap
+> big-endian fw images but not little-endian images, while the
+> latter will byte-swap both.
+> 
+> What is the expected behavior here?
 
-Obviously, I dont think I am interested in chasing any further down 
-this road. SoC descope is a severe decision that has been taken after 
-a lot of internal and  customer considerations. there is no point in 
-trying to enable a descoped feature when even if it worked on 10 
-boards means nothing from a production device perspective, and there 
-are devices out there in production with OMAP5.
+So the is_big_endian flag actually refers to the endianess of the DPFE
+CPU/firmware image here, so if I read this code correctly, we have the
+following happening
+
+LE kernel + BE DPFE: swapping from BE to LE during file read but not I/O
+write (KO because resulting DPFE image is LE)
+LE kernel + LE DPFE: no-swapping (OK)
+
+BE kernel + BE DPFE: swapping to LE during I/O write not file read (KO,
+because resulting DPFE image is LE)
+BE kernel + LE DPFE: swapping to LE during I/O write not file read (OK)
+
+Markus, does that sound like what is happening?
+
+> 
+> Both of my points should be easy to address, so I haven't
+> pulled the branch yet, but expect that it will make it into 4.14
+> without problems.
+> 
+>        Arnd
+> 
 
 
 -- 
-Regards,
-Nishanth Menon
+Florian
