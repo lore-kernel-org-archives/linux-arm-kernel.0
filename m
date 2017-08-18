@@ -1,281 +1,51 @@
 From: klaus.goger@theobroma-systems.com (Klaus Goger)
-Date: Fri, 18 Aug 2017 21:34:45 +0200
-Subject: [PATCH v2 5/5] arm64: dts: add Haikou baseboard with RK3399-Q7 SoM
-In-Reply-To: <20170818193445.47542-1-klaus.goger@theobroma-systems.com>
-References: <20170818193445.47542-1-klaus.goger@theobroma-systems.com>
-Message-ID: <20170818193445.47542-6-klaus.goger@theobroma-systems.com>
+Date: Fri, 18 Aug 2017 21:34:40 +0200
+Subject: [PATCH v2 0/5] arm64: dts: add RK3399-Q7
+Message-ID: <20170818193445.47542-1-klaus.goger@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Haikou is a Qseven and ?Qseven baseboard featuring PCIe, USB3 and a
-video connector for MIPI-DSI/CSI and eDP adapter.
+Adds the devicetree for the Qseven module RK3399-Q7 and it's EVK baseboard.
+See https://www.theobroma-systems.com/rk3399-q7/ for more information
+about the module
 
-This dts is for usage with the RK3399-Q7 SoM Puma.
+As it uses fan535555 instead of syr82x that has slightly different
+voltage settings we also overwrite the cpu_b cluster opp settings
+from rk3399-opp.dtsi
 
-Signed-off-by: Klaus Goger <klaus.goger@theobroma-systems.com>
+This series also includes additional devicetree bindings to satisfy
+checkpatch.
 
----
+Two issues that have been observed with current linux-next:
+ *  PCIe is not working due iommu_get_domain_for_dev always returning null.
+ *  SD-Card detect only works if used as cd-gpio.
+
 
 Changes in v2:
-? split baseboard parts in it's own dts
+? split dts in a SoM dtsi and a dts for the baseboard
 - use dashes in phandles
+- use /delete-node/ before redefining opp-table1
+- add comment why opp-table1 is redefined
 - use generic node names
-  -- suggested by Heiko St?bner <heiko@sntech.de>
+- remove deprecated regulator-compatible property
+- add vqmmc property to sdmmc
 
-- add vmmc property to sdmmc
-- use pcie_clkreqn_cpm instead of pcie_clkreqn
-  -- suggested by Shawn Lin <shawn.lin@rock-chips.com>
+Klaus Goger (5):
+  dt-bindings: add vendor prefix for Theobroma Systems
+  dt-bindings: add amc6821, isl1208 trivial bindings
+  dt-bindings: add rk3399-q7 SoM
+  arm64: dts: add RK3399-Q7 (Puma) SoM
+  arm64: dts: add Haikou baseboard with RK3399-Q7 SoM
 
+ Documentation/devicetree/bindings/arm/rockchip.txt |   4 +
+ .../devicetree/bindings/trivial-devices.txt        |   2 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
  arch/arm64/boot/dts/rockchip/Makefile              |   1 +
- .../arm64/boot/dts/rockchip/rk3399-puma-haikou.dts | 228 +++++++++++++++++++++
- 2 files changed, 229 insertions(+)
+ .../arm64/boot/dts/rockchip/rk3399-puma-haikou.dts | 228 +++++++++
+ arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi      | 546 +++++++++++++++++++++
+ 6 files changed, 782 insertions(+)
  create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-puma.dtsi
 
-diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-index d0ad366bbd12..b9d472cc21ed 100644
---- a/arch/arm64/boot/dts/rockchip/Makefile
-+++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -7,6 +7,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-r88.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-evb.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-firefly.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-gru-kevin.dtb
-+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-puma-haikou.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-sapphire-excavator.dtb
- 
- always		:= $(dtb-y)
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts b/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts
-new file mode 100644
-index 000000000000..25405fa7f68a
---- /dev/null
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts
-@@ -0,0 +1,228 @@
-+/*
-+ * Copyright (c) 2017 Theobroma Systems Design und Consulting GmbH
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "rk3399-puma.dtsi"
-+
-+/ {
-+	model = "Theobroma Systems RK3399-Q7 SoM";
-+	compatible = "tsd,rk3399-puma-haikou", "rockchip,rk3399";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		pinctrl-0 = <&led_pin_module>, <&led_sd_haikou>;
-+
-+		sd-card-led {
-+			label = "sd_card_led";
-+			gpios = <&gpio1 RK_PA2 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "mmc0";
-+		};
-+	};
-+
-+	dc_12v: dc-12v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "dc_12v";
-+		regulator-always-on;
-+		regulator-boot-on;
-+		regulator-min-microvolt = <12000000>;
-+		regulator-max-microvolt = <12000000>;
-+	};
-+
-+	vcc3v3_baseboard: vcc3v3-baseboard {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3_baseboard";
-+		regulator-always-on;
-+		regulator-boot-on;
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		vin-supply = <&dc_12v>;
-+	};
-+
-+	vcc5v0_otg: vcc5v0-otg-regulator {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio0 RK_PA2 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&otg_vbus_drv>;
-+		regulator-name = "vcc5v0_otg";
-+		regulator-always-on;
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+};
-+
-+&i2c3 {
-+	i2c-scl-rising-time-ns = <450>;
-+	i2c-scl-falling-time-ns = <15>;
-+	status = "okay";
-+};
-+
-+&i2c4 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+};
-+
-+&i2c6 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+};
-+
-+&i2s0 {
-+	status = "okay";
-+	rockchip,playback-channels = <8>;
-+	rockchip,capture-channels = <8>;
-+	#sound-dai-cells = <0>;
-+	status = "okay";
-+};
-+
-+&pcie_phy {
-+	status = "okay";
-+};
-+
-+&pcie0 {
-+	ep-gpios = <&gpio4 RK_PC6 GPIO_ACTIVE_LOW>;
-+	num-lanes = <4>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pcie_clkreqn_cpm>;
-+	status = "okay";
-+};
-+
-+&pinctrl {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&haikou_pin_hog>;
-+
-+	hog {
-+		haikou_pin_hog: haikou-pin-hog {
-+			rockchip,pins =
-+			  /* LID_BTN */
-+			  <RK_GPIO0 RK_PA4 RK_FUNC_GPIO &pcfg_pull_up>,
-+			  /* BATLOW# */
-+			  <RK_GPIO0 RK_PB2 RK_FUNC_GPIO &pcfg_pull_up>,
-+			  /* SLP_BTN# */
-+			  <RK_GPIO0 RK_PB3 RK_FUNC_GPIO &pcfg_pull_up>,
-+			  /* BIOS_DISABLE# */
-+			  <RK_GPIO0 RK_PB1 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+
-+	leds {
-+		led_sd_haikou: led-sd-gpio {
-+			rockchip,pins =
-+			  <RK_GPIO1 RK_PA2 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	usb2 {
-+		otg_vbus_drv: otg-vbus-drv {
-+			rockchip,pins =
-+			  <RK_GPIO0 RK_PA2 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+};
-+
-+&pwm0 {
-+	status = "okay";
-+};
-+
-+&sdmmc {
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	cd-gpios = <&gpio0 RK_PA7 GPIO_ACTIVE_LOW>;
-+	disable-wp;
-+	max-frequency = <150000000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
-+	vmmc-supply = <&vcc3v3_baseboard>;
-+	status = "okay";
-+};
-+
-+&spi5 {
-+	status = "okay";
-+};
-+
-+&u2phy0 {
-+	status = "okay";
-+};
-+
-+&usbdrd3_0 {
-+	status = "okay";
-+};
-+
-+&usbdrd_dwc3_0 {
-+	status = "okay";
-+	dr_mode = "otg";
-+};
-+
-+&u2phy0_host {
-+	phy-supply = <&vcc5v0_otg>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_xfer &uart0_cts &uart0_rts>;
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&usb_host0_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host0_ohci {
-+	status = "okay";
-+};
 -- 
 2.11.0
