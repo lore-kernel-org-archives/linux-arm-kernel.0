@@ -1,60 +1,78 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 18 Aug 2017 19:41:16 +0200
-Subject: [PATCH] video: fbdev: constify copied structures
-In-Reply-To: <1501664679-10356-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <CGME20170802093008epcas2p48a98827ec2c27fbd6f6de8913d47c02b@epcas2p4.samsung.com>
- <1501664679-10356-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <7127868.v7Fj1TocLv@amdc3058>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 18 Aug 2017 18:42:30 +0100
+Subject: [PATCH] arm64: kaslr: ignore modulo offset when validating virtual
+ displacement
+Message-ID: <20170818174230.30435-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In the KASLR setup routine, we ensure that the early virtual mapping
+of the kernel image does not cover more than a single table entry at
+the level above the swapper block level, so that the assembler routines
+involved in setting up this mapping can remain simple.
 
-Hi,
+In this calculation we add the proposed KASLR offset to the values of
+the _text and _end markers, and reject it if they would end up falling
+in different swapper table sized windows.
 
-On Wednesday, August 02, 2017 11:04:39 AM Julia Lawall wrote:
-> Make const some structures that are only copied into other structures.
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+However, when taking the addresses of _text and _end, the modulo offset
+(the physical displacement modulo 2 MB) is already accounted for, and
+so adding it again results in incorrect results. So disregard the modulo
+offset from the calculation.
 
-fb_fix_screeninfo and fb_var_screeninfo structures were already
-const-ified by commit 40445365a43f ("video: xilinxfb: constify
-fb_fix_screeninfo and fb_var_screeninfo structures") in my -next
-tree (git://github.com/bzolnier/linux.git fbdev-for-next) so
-I just applied xilinx_fb_default_pdata part (patch included below
-for reference).
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-
-From: Julia Lawall <Julia.Lawall@lip6.fr>
-Subject: [PATCH] video: fbdev: xilinxfb: constify copied structure
-
-Make const xilinx_fb_default_pdata structure that is only copied into
-other structure.
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: Soren Brinkmann <soren.brinkmann@xilinx.com>,
-[b.zolnierkie: split from a bigger patch]
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Fixes: 08cdac619c81 ("arm64: relocatable: deal with physically misaligned ...")
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/video/fbdev/xilinxfb.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Index: b/drivers/video/fbdev/xilinxfb.c
-===================================================================
---- a/drivers/video/fbdev/xilinxfb.c	2017-08-18 19:34:11.383004874 +0200
-+++ b/drivers/video/fbdev/xilinxfb.c	2017-08-18 19:34:35.383005478 +0200
-@@ -100,7 +100,7 @@ struct xilinxfb_platform_data {
- /*
-  * Default xilinxfb configuration
+This still leaves the 16K pages issue, but I think this solves the problem
+encountered by Mark.
+
+ arch/arm64/kernel/head.S  |  1 -
+ arch/arm64/kernel/kaslr.c | 12 +++++++++---
+ 2 files changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index d3015172c136..7434ec0c7a27 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -354,7 +354,6 @@ __primary_switched:
+ 	tst	x23, ~(MIN_KIMG_ALIGN - 1)	// already running randomized?
+ 	b.ne	0f
+ 	mov	x0, x21				// pass FDT address in x0
+-	mov	x1, x23				// pass modulo offset in x1
+ 	bl	kaslr_early_init		// parse FDT for KASLR options
+ 	cbz	x0, 0f				// KASLR disabled? just proceed
+ 	orr	x23, x23, x0			// record KASLR offset
+diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+index a9710efb8c01..1d95c204186b 100644
+--- a/arch/arm64/kernel/kaslr.c
++++ b/arch/arm64/kernel/kaslr.c
+@@ -75,7 +75,7 @@ extern void *__init __fixmap_remap_fdt(phys_addr_t dt_phys, int *size,
+  * containing function pointers) to be reinitialized, and zero-initialized
+  * .bss variables will be reset to 0.
   */
--static struct xilinxfb_platform_data xilinx_fb_default_pdata = {
-+static const struct xilinxfb_platform_data xilinx_fb_default_pdata = {
- 	.xres = 640,
- 	.yres = 480,
- 	.xvirt = 1024,
+-u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
++u64 __init kaslr_early_init(u64 dt_phys)
+ {
+ 	void *fdt;
+ 	u64 seed, offset, mask, module_range;
+@@ -133,9 +133,15 @@ u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
+ 	 * boundary (for 4KB/16KB/64KB granule kernels, respectively). If this
+ 	 * happens, increase the KASLR offset by the size of the kernel image
+ 	 * rounded up by SWAPPER_BLOCK_SIZE.
++	 *
++	 * NOTE: The references to _text and _end below will already take the
++	 *       modulo offset (the physical displacement modulo 2 MB) into
++	 *       account, given that the physical placement is controlled by
++	 *       the loader, and will not change as a result of the virtual
++	 *       mapping we choose.
+ 	 */
+-	if ((((u64)_text + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT) !=
+-	    (((u64)_end + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT)) {
++	if ((((u64)_text + offset) >> SWAPPER_TABLE_SHIFT) !=
++	    (((u64)_end + offset) >> SWAPPER_TABLE_SHIFT)) {
+ 		u64 kimg_sz = _end - _text;
+ 		offset = (offset + round_up(kimg_sz, SWAPPER_BLOCK_SIZE))
+ 				& mask;
+-- 
+2.11.0
