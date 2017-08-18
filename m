@@ -1,38 +1,51 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Fri, 18 Aug 2017 12:12:38 +0100
-Subject: [PATCH v2] ARM: multi_v7_defconfig: Enable BQ32000 RTC driver
-In-Reply-To: <20170818080621.GI9175@verge.net.au>
-References: <20170818080621.GI9175@verge.net.au>
-Message-ID: <1503054758-6713-1-git-send-email-biju.das@bp.renesas.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 18 Aug 2017 13:30:47 +0200
+Subject: [GIT PULL] Allwinner fixes for 4.13 round 2
+In-Reply-To: <CAGb2v67ceJheg1n_U29DmGe7iZ76W=qLdukZJchD=xyvUsenkQ@mail.gmail.com>
+References: <20170818040447.ddz27hm3c2eashjr@wens.csie.org>
+ <CAK8P3a3Hokuu6GDj8HQ9-XEBvErcZsJcF6mwGVHo2nUR7SxawA@mail.gmail.com>
+ <CAGb2v67ceJheg1n_U29DmGe7iZ76W=qLdukZJchD=xyvUsenkQ@mail.gmail.com>
+Message-ID: <CAK8P3a3LCe2bRc=WsvteS_xYMtLOqPOtjhLX_FHheD2++2SFRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The iWave RZ/G1M Q7 SOM supports RTC (TI BQ32000).
-To increase hardware support enable the driver in the
-multi_v7_defconfig multiplatform configuration.
+On Fri, Aug 18, 2017 at 12:12 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Fri, Aug 18, 2017 at 5:58 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Fri, Aug 18, 2017 at 6:04 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+>>> Hi Arnd, Olof,
+>>>
+>>> This is the second batch of fixes for 4.13. This is based on the first
+>>> batch of fixes that was already merged.
+>>
+>> Pulled into fixes, thanks!
+>>
+>>> We still have some device tree binding changes for the H3 EMAC and
+>>> integrated Ethernet PHY we need to sort out for 4.13. If it is not
+>>> done by next week, I will send out revert patches for the driver,
+>>> device tree binding, and device tree changes. Or is this cutting
+>>> it too close and we should just revert them now?
+>>
+>> I need more information about the specific change to answer that.
+>
+> The hardware in question has an integrated PHY in the SoC, but can
+> also choose to use an external PHY. The changes would address two
+> issues: a) how to differentiate internal vs external PHY in the
+> device tree, and b) avoiding confusion when both are present and
+> assigned the same address (there is a mux in the hardware).
+>
+>> Can you point me to the patches in question?
+>
+> Here's v2 (which is not final):
+>
+>     https://www.spinics.net/lists/arm-kernel/msg601325.html
+>
+> Rob also chimed in on related patches:
+>
+>     https://www.spinics.net/lists/arm-kernel/msg601482.html
+>     https://www.spinics.net/lists/devicetree/msg190976.html
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
----
-v1->v2
-    Changed the enable option as module.
+Ok, it sounds like you are closing in on the final solution now,
+If we get agreement on the fixes by next week, that should be
+fine.
 
-This patch is tested against linux-next tag next-20170817 as well as 
-renesas-dev tag renesas-devel-20170815-v4.13-rc5 .
-
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 18e1f80..1ca9c91 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -766,6 +766,7 @@ CONFIG_RTC_DRV_MAX8997=m
- CONFIG_RTC_DRV_MAX77686=y
- CONFIG_RTC_DRV_RK808=m
- CONFIG_RTC_DRV_RS5C372=m
-+CONFIG_RTC_DRV_BQ32K=m
- CONFIG_RTC_DRV_PALMAS=y
- CONFIG_RTC_DRV_ST_LPC=y
- CONFIG_RTC_DRV_TWL4030=y
--- 
-1.9.1
+       Arnd
