@@ -1,52 +1,66 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 18 Aug 2017 14:12:26 +0200
-Subject: [PATCH] irqchip/armada-370-xp: Enable MSI-X support
-In-Reply-To: <0b8b249b-255a-6354-69cd-58f44fa7874d@denx.de>
-References: <20170502072600.13380-1-sr@denx.de>
- <80f30724-20b6-b5a7-7218-93ff3fa23177@denx.de>
- <20170815160109.023842de@windsurf>
- <6a3e8bcc-19ef-cef1-180e-f4e194d5589b@denx.de>
- <0b8b249b-255a-6354-69cd-58f44fa7874d@denx.de>
-Message-ID: <20170818141226.77e5719d@windsurf>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 18 Aug 2017 14:14:55 +0200
+Subject: [PATCH 3/3] soc: xilinx: zynqmp: Add firmware interface
+In-Reply-To: <CAK8P3a0+tMHHYtVsq77LdcH+3Sdse38md=Bn3Sjkg0LzKyTn9w@mail.gmail.com>
+References: <cover.1501854302.git.michal.simek@xilinx.com>
+ <98038734d73c604dee6ac0d34740d5bc2034e87d.1501854302.git.michal.simek@xilinx.com>
+ <CAK8P3a1UhKAhYx2fCoWGm7HMka+8XrzFCxEphYNdyNS7yYR8cA@mail.gmail.com>
+ <247a5660-6c53-ccc3-7b9f-bfd2a11f6f54@xilinx.com>
+ <CAK8P3a3TsnYRWnurAduChLVc5q41vax_S0mpK5sQPUo5reM5bw@mail.gmail.com>
+ <d55c3064-3db8-dad9-ac0a-8adad53465ff@xilinx.com>
+ <3809b6a0-1cb9-37af-a524-8bc1986268ec@xilinx.com>
+ <CAK8P3a2h27MSyUhTdU07m8dyGj92o2E5h0dviQ+mp7AtTYhM_A@mail.gmail.com>
+ <5a53e449-b269-89da-9b69-e560132502fc@xilinx.com>
+ <CAK8P3a0+tMHHYtVsq77LdcH+3Sdse38md=Bn3Sjkg0LzKyTn9w@mail.gmail.com>
+Message-ID: <bd650766-cb2b-2bd6-e7ec-d1b045fe6cf5@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, 18 Aug 2017 12:18:28 +0200, Stefan Roese wrote:
-
-
-> >>> Its been a while since this patch has been submitted - without any
-> >>> comments so far. What's the current status with it? Is it someones
-> >>> queue for upstreaming?  
-> >>
-> >> Sorry for the lack of feedback, very good idea to ping me on this
-> >> topic. I don't have access to HW right now, so I can't give it a test.
-> >> However, I don't think I have MSI-X capable hardware, only MSI capable.
-> >>
-> >> With which hardware did you test this? An off-the-shell PCIe card, or
-> >> some custom FPGA logic?  
-> > 
-> > I tested this code with some Altera / Intel FPGA using their PCI-Express
-> > IP core. It should be possible to test this with some MSI-X capable
-> > desktop PCIe cards as well on AXP boards equipped with PCIe slots,
-> > like the Marvell AXP development board (orange box).  
+On 17.8.2017 23:11, Arnd Bergmann wrote:
+> On Thu, Aug 17, 2017 at 12:48 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+>> On 16.8.2017 17:05, Arnd Bergmann wrote:
+>>> On Wed, Aug 16, 2017 at 4:34 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+>>>
+>>> Looks good, just make sure you also check with sparse (make C=1)
+>>> to ensure you have the right __le64/__le32 types everywhere.
+>>
+>> Are you aware about any doc where it is written that data should be
+>> passed as little endian?
 > 
-> So what do you think about this patch? Can I get your Acked-by /
-> Reviewed-by, or do you have some objections? Or do plan to first do
-> some tests yourself?
+> Looking at http://infocenter.arm.com/help/topic/com.arm.doc.den0028b/ARM_DEN0028B_SMC_Calling_Convention.pdf
+> now, I think that the structure above is endian-neutral as the arguments
+> get passed in registers rather than memory.
+> 
+> However, if you pass pointers to data structures in memory, those
+> data structures would have to be defined with __le32/__le64 types.
 
-I thought about testing it myself, but since I don't have any MSI-X
-capable device, I'm not sure it would bring a lot.
+ok.
 
-Therefore:
+> 
+>> I was playing with it a little bit and this means that these 2(3 with
+>> hvc) needs to be changed.
+>>
+>> asmlinkage void __arm_smccc_smc(__le64 a0, __le64 a1, __le64 a2,
+>>  __le64 a3,__le64 a4, __le64 a5, __le64 a6, __le64 a7,
+>> struct arm_smccc_res *res, struct arm_smccc_quirk *quirk);
+>>
+>>  struct arm_smccc_res {
+>> -       unsigned long a0;
+>> -       unsigned long a1;
+>> -       unsigned long a2;
+>> -       unsigned long a3;
+>> +       __le64 a0;
+>> +       __le64 a1;
+>> +       __le64 a2;
+>> +       __le64 a3;
+>>  };
+> 
+> This is clearly wrong on 32-bit machines, I think this is intentionally
+> defined as 'unsigned long' to have register sized arguments.
 
-Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Yep, I know.
 
-Best regards,
+Let me integrate that changes which Marc wanted and will send next version.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks,
+Michal
