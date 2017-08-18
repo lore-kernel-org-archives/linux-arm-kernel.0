@@ -1,64 +1,34 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Fri, 18 Aug 2017 09:51:04 +0530
-Subject: [PATCH] ARM: dts: qcom-apq8064: Fix dsi and hdmi phy cells
-In-Reply-To: <1502857706-18379-1-git-send-email-andy.gross@linaro.org>
-References: <1502857706-18379-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <ae7f9349-9600-5798-2485-bffa54458b34@codeaurora.org>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Fri, 18 Aug 2017 14:32:36 +1000
+Subject: [PATCH] PCI: Allow PCI express root ports to find themselves
+In-Reply-To: <20170817110614.11454-1-thierry.reding@gmail.com>
+References: <1502936730-7368-1-git-send-email-dingtianhong@huawei.com>
+ <20170817110614.11454-1-thierry.reding@gmail.com>
+Message-ID: <87bmndqyvv.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Thierry Reding <thierry.reding@gmail.com> writes:
 
-
-On 08/16/2017 09:58 AM, Andy Gross wrote:
-> This patch adds the necessary #phy-cells property to the DSI and HDMI
-> phys.
-The DSI and HDMI drivers don't use the common PHY framework, so we end up
-being okay without #phy-cells. But we do follow the PHY DT bindings, so it's
-necessary in that sense.
-
-Reviewed-by: Archit Taneja <architt@codeaurora.org>
-
-> 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> From: Thierry Reding <treding@nvidia.com>
+>
+> If the pci_find_pcie_root_port() function is called on a root port
+> itself, return the root port rather than NULL.
+>
+> This effectively reverts commit 0e405232871d6 ("PCI: fix oops when
+> try to find Root Port for a PCI device") which added an extra check
+> that would now be redundant.
+>
+> Fixes: a99b646afa8a ("PCI: Disable PCIe Relaxed Ordering if unsupported")
+> Fixes: c56d4450eb68 ("PCI: Turn off Request Attributes to avoid Chelsio T5 Completion erratum")
+> Signed-off-by: Thierry Reding <treding@nvidia.com>
 > ---
->   arch/arm/boot/dts/qcom-apq8064.dtsi | 4 +++-
->   1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> index f3db185..d08f3db 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-> @@ -906,11 +906,11 @@
->   				usb_hs1_phy: phy {
->   					compatible = "qcom,usb-hs-phy-apq8064",
->   						     "qcom,usb-hs-phy";
-> -					#phy-cells = <0>;
->   					clocks = <&sleep_clk>, <&cxo_board>;
->   					clock-names = "sleep", "ref";
->   					resets = <&usb1 0>;
->   					reset-names = "por";
-> +					#phy-cells = <0>;
->   				};
->   			};
->   		};
-> @@ -1263,6 +1263,7 @@
->   		dsi0_phy: dsi-phy at 4700200 {
->   			compatible = "qcom,dsi-phy-28nm-8960";
->   			#clock-cells = <1>;
-> +			#phy-cells = <0>;
->   
->   			reg = <0x04700200 0x100>,
->   				<0x04700300 0x200>,
-> @@ -1417,6 +1418,7 @@
->   
->   			clocks = <&mmcc HDMI_S_AHB_CLK>;
->   			clock-names = "slave_iface_clk";
-> +			#phy-cells = <0>;
->   		};
->   
->   		mdp: mdp at 5100000 {
-> 
+> This applies on top of and was tested on next-20170817.
+>
+> Michael, it'd be great if you could test this one again to clarify
+> whether or not the fix that's already in Linus' tree is still needed, or
+> whether it's indeed obsoleted by this patch.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+This works fine for me, applied on top of Linus' tree (d33a2a914319).
+
+cheers
