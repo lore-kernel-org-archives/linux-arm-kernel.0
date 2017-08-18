@@ -1,84 +1,52 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 18 Aug 2017 13:09:21 +0100
-Subject: [PATCH 04/27] arm64: Port deprecated instruction emulation to new
- sysctl interface
-In-Reply-To: <1502280338-23002-5-git-send-email-Dave.Martin@arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-5-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87mv6xhyby.fsf@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 18 Aug 2017 14:12:26 +0200
+Subject: [PATCH] irqchip/armada-370-xp: Enable MSI-X support
+In-Reply-To: <0b8b249b-255a-6354-69cd-58f44fa7874d@denx.de>
+References: <20170502072600.13380-1-sr@denx.de>
+ <80f30724-20b6-b5a7-7218-93ff3fa23177@denx.de>
+ <20170815160109.023842de@windsurf>
+ <6a3e8bcc-19ef-cef1-180e-f4e194d5589b@denx.de>
+ <0b8b249b-255a-6354-69cd-58f44fa7874d@denx.de>
+Message-ID: <20170818141226.77e5719d@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
 
-Dave Martin <Dave.Martin@arm.com> writes:
-
-> Currently, armv8_deprected.c takes charge of the "abi" sysctl
-> directory, which makes life difficult for other code that wants to
-> register sysctls in the same directory.
->
-> There is a "new" [1] sysctl registration interface that removes the
-> need to define ctl_tables for parent directories explicitly, which
-> is ideal here.
->
-> This patch ports register_insn_emulation_sysctl() over to the
-> register_sysctl() interface and removes the redundant ctl_table for
-> "abi".
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-
->
-> [1] fea478d4101a (sysctl: Add register_sysctl for normal sysctl
-> users)
-> The commit message notes an intent to port users of the
-> pre-existing interfaces over to register_sysctl(), though the
-> number of users of the new interface currently appears negligible.
-> ---
->  arch/arm64/kernel/armv8_deprecated.c | 15 +++------------
->  1 file changed, 3 insertions(+), 12 deletions(-)
->
-> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-> index f0e6d71..e15eb2d 100644
-> --- a/arch/arm64/kernel/armv8_deprecated.c
-> +++ b/arch/arm64/kernel/armv8_deprecated.c
-> @@ -228,15 +228,7 @@ static int emulation_proc_handler(struct ctl_table *table, int write,
->  	return ret;
->  }
->
-> -static struct ctl_table ctl_abi[] = {
-> -	{
-> -		.procname = "abi",
-> -		.mode = 0555,
-> -	},
-> -	{ }
-> -};
-> -
-> -static void __init register_insn_emulation_sysctl(struct ctl_table *table)
-> +static void __init register_insn_emulation_sysctl(void)
->  {
->  	unsigned long flags;
->  	int i = 0;
-> @@ -262,8 +254,7 @@ static void __init register_insn_emulation_sysctl(struct ctl_table *table)
->  	}
->  	raw_spin_unlock_irqrestore(&insn_emulation_lock, flags);
->
-> -	table->child = insns_sysctl;
-> -	register_sysctl_table(table);
-> +	register_sysctl("abi", insns_sysctl);
->  }
->
->  /*
-> @@ -644,7 +635,7 @@ static int __init armv8_deprecated_init(void)
->  	cpuhp_setup_state_nocalls(CPUHP_AP_ARM64_ISNDEP_STARTING,
->  				  "arm64/isndep:starting",
->  				  run_all_insn_set_hw_mode, NULL);
-> -	register_insn_emulation_sysctl(ctl_abi);
-> +	register_insn_emulation_sysctl();
->
->  	return 0;
->  }
+On Fri, 18 Aug 2017 12:18:28 +0200, Stefan Roese wrote:
 
 
---
-Alex Benn?e
+> >>> Its been a while since this patch has been submitted - without any
+> >>> comments so far. What's the current status with it? Is it someones
+> >>> queue for upstreaming?  
+> >>
+> >> Sorry for the lack of feedback, very good idea to ping me on this
+> >> topic. I don't have access to HW right now, so I can't give it a test.
+> >> However, I don't think I have MSI-X capable hardware, only MSI capable.
+> >>
+> >> With which hardware did you test this? An off-the-shell PCIe card, or
+> >> some custom FPGA logic?  
+> > 
+> > I tested this code with some Altera / Intel FPGA using their PCI-Express
+> > IP core. It should be possible to test this with some MSI-X capable
+> > desktop PCIe cards as well on AXP boards equipped with PCIe slots,
+> > like the Marvell AXP development board (orange box).  
+> 
+> So what do you think about this patch? Can I get your Acked-by /
+> Reviewed-by, or do you have some objections? Or do plan to first do
+> some tests yourself?
+
+I thought about testing it myself, but since I don't have any MSI-X
+capable device, I'm not sure it would bring a lot.
+
+Therefore:
+
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
