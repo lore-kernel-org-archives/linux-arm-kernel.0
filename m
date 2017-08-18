@@ -1,20 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Aug 2017 23:20:47 +0200
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.14 (#2)
-In-Reply-To: <87mv6xky71.fsf@free-electrons.com>
-References: <87mv6xky71.fsf@free-electrons.com>
-Message-ID: <CAK8P3a0_JS+86Cb64HRVepCVT2G7W-rUT09Eyq4qTXetO3U-wA@mail.gmail.com>
+Date: Fri, 18 Aug 2017 23:24:41 +0200
+Subject: [GIT PULL] arm: mediatek: soc updates for v4.14
+In-Reply-To: <9f782ba3-4c03-10a9-07c5-b2b682f81846@gmail.com>
+References: <9f782ba3-4c03-10a9-07c5-b2b682f81846@gmail.com>
+Message-ID: <CAK8P3a1ca44WqucCY0vTSpiKKnM7kHpAkRi29TdN9XN9FZCLgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 11:44 AM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> mvebu dt64 for 4.14 (part 2)
->
-> - Enable uSD on ESPRESSObin (Armada 37xx based board)
-> - Add NAND support on Armada 7K/8K SoCs
-> - Enable USB host on Armada-7040-DB and Armada-8040-DB boards
+On Thu, Aug 17, 2017 at 3:27 PM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+> ----------------------------------------------------------------
+> - add mt7623a smp support
+> - scpsys: reduce code duplication
+> - scpsys: add mt7622 support
+> - pmic wrapper: make of_device_ids constant
 
-Pulled into next/dt64, thanks!
+Pulled into next/soc, thanks!
 
-     Arnd
+        Arnd
