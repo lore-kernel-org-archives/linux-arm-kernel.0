@@ -1,59 +1,64 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 18 Aug 2017 12:04:47 +0800
-Subject: [GIT PULL] Allwinner fixes for 4.13 round 2
-Message-ID: <20170818040447.ddz27hm3c2eashjr@wens.csie.org>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Fri, 18 Aug 2017 09:51:04 +0530
+Subject: [PATCH] ARM: dts: qcom-apq8064: Fix dsi and hdmi phy cells
+In-Reply-To: <1502857706-18379-1-git-send-email-andy.gross@linaro.org>
+References: <1502857706-18379-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <ae7f9349-9600-5798-2485-bffa54458b34@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
-
-This is the second batch of fixes for 4.13. This is based on the first
-batch of fixes that was already merged.
-
-We still have some device tree binding changes for the H3 EMAC and
-integrated Ethernet PHY we need to sort out for 4.13. If it is not
-done by next week, I will send out revert patches for the driver,
-device tree binding, and device tree changes. Or is this cutting
-it too close and we should just revert them now?
 
 
-Thanks
-ChenYu
+On 08/16/2017 09:58 AM, Andy Gross wrote:
+> This patch adds the necessary #phy-cells property to the DSI and HDMI
+> phys.
+The DSI and HDMI drivers don't use the common PHY framework, so we end up
+being okay without #phy-cells. But we do follow the PHY DT bindings, so it's
+necessary in that sense.
 
-The following changes since commit c50f9fb6c535edf4731eecb53d91ebc297e82e5b:
+Reviewed-by: Archit Taneja <architt@codeaurora.org>
 
-  ARM: dts: sun8i: a83t: Switch to CCU device tree binding macros (2017-07-27 21:18:48 +0800)
+> 
+> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> ---
+>   arch/arm/boot/dts/qcom-apq8064.dtsi | 4 +++-
+>   1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> index f3db185..d08f3db 100644
+> --- a/arch/arm/boot/dts/qcom-apq8064.dtsi
+> +++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+> @@ -906,11 +906,11 @@
+>   				usb_hs1_phy: phy {
+>   					compatible = "qcom,usb-hs-phy-apq8064",
+>   						     "qcom,usb-hs-phy";
+> -					#phy-cells = <0>;
+>   					clocks = <&sleep_clk>, <&cxo_board>;
+>   					clock-names = "sleep", "ref";
+>   					resets = <&usb1 0>;
+>   					reset-names = "por";
+> +					#phy-cells = <0>;
+>   				};
+>   			};
+>   		};
+> @@ -1263,6 +1263,7 @@
+>   		dsi0_phy: dsi-phy at 4700200 {
+>   			compatible = "qcom,dsi-phy-28nm-8960";
+>   			#clock-cells = <1>;
+> +			#phy-cells = <0>;
+>   
+>   			reg = <0x04700200 0x100>,
+>   				<0x04700300 0x200>,
+> @@ -1417,6 +1418,7 @@
+>   
+>   			clocks = <&mmcc HDMI_S_AHB_CLK>;
+>   			clock-names = "slave_iface_clk";
+> +			#phy-cells = <0>;
+>   		};
+>   
+>   		mdp: mdp at 5100000 {
+> 
 
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git sunxi-fixes-for-4.13-2
-
-for you to fetch changes up to d86e63e1f0b7868c55c8d4a54854b85e2bac690b:
-
-  arm64: allwinner: h5: fix pinctrl IRQs (2017-08-14 14:18:21 +0800)
-
-----------------------------------------------------------------
-Allwinner fixes for 4.13, round 2
-
-Three fixes adding a missing alias for the Ethernet controller on A64
-boards. One adding a missing interrupt for the pin controller.
-
-----------------------------------------------------------------
-Icenowy Zheng (4):
-      arm64: allwinner: a64: bananapi-m64: add missing ethernet0 alias
-      arm64: allwinner: a64: pine64: add missing ethernet0 alias
-      arm64: allwinner: a64: sopine: add missing ethernet0 alias
-      arm64: allwinner: h5: fix pinctrl IRQs
-
- arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts     | 1 +
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts           | 1 +
- arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts | 1 +
- arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi                  | 3 +++
- 4 files changed, 6 insertions(+)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170818/13d1cd9e/attachment.sig>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
