@@ -1,47 +1,75 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 18 Aug 2017 14:29:35 +0800
-Subject: [linux-sunxi] [PATCH 2/4] drivers: soc: sunxi: fix error
- processing on base address when claiming
-In-Reply-To: <94408FC0-D7F8-4050-936E-F350029DAB9F@aosc.io>
-References: <20170809085627.32687-1-icenowy@aosc.io>
- <20170809085627.32687-3-icenowy@aosc.io>
- <CAGb2v67F6xUOE9sJsBgpOn2kRoG2S-aoWrtTsjON64o2pzeXjA@mail.gmail.com>
- <94408FC0-D7F8-4050-936E-F350029DAB9F@aosc.io>
-Message-ID: <CAGb2v67Mxq+y6mEKQ10y+vod5mxT=0Kz8dMPKC46By2-LO3EAg@mail.gmail.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Fri, 18 Aug 2017 15:23:39 +0800
+Subject: [RFC PATCH v2 1/3] PCI: rockchip: Add support for pcie wake irq
+In-Reply-To: <20170817120431.12398-2-jeffy.chen@rock-chips.com>
+References: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
+ <20170817120431.12398-2-jeffy.chen@rock-chips.com>
+Message-ID: <5e3accf1-6f84-861f-f647-628322bb7841@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 2:23 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->
->
-> ? 2017?8?18? GMT+08:00 ??2:21:07, Chen-Yu Tsai <wens@csie.org> ??:
->>Hi,
->>
->>On Wed, Aug 9, 2017 at 4:56 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->>> When claiming SRAM, if the base is set to an error, it means that the
->>> SRAM controller has been probed, but failed to remap the controller
->>> memory zone. If the base is zero, thus the SRAM controller should be
->>not
->>> probed at all, and it should return -EPROBE_DEFER. However, currently
->>we
->>> returned -EPROBE_DEFER in the former situation, and ignored the
->>latter
->>> situation (which will lead to the kernel to panic).
->>>
->>> Fix the behavior on abnormal base address processing when claiming.
->>
->>Could you describe how you actually ran into this? The failure seems
->>unlikely for a properly written device tree.
->
-> In fact it's possible, as the probe defering used to be broken.
->
-> On the A64 situation, the SRAM is referenced by the DE2 CCU driver, which
-> will be probed very early -- before SRAM is probed, and the problem happens.
+Hi Jeffy
 
-OK. I see it's because the DE block's address if before almost everything
-else. I was wondering why we never ran into this before.
+On 2017/8/17 20:04, Jeffy Chen wrote:
+> Add support for PCIE_WAKE pin in rockchip pcie driver.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+> 
+> Changes in v2:
+> Use dev_pm_set_dedicated_wake_irq
+>          -- Suggested by Brian Norris <briannorris@chromium.com>
+> 
+>   drivers/pci/host/pcie-rockchip.c | 13 ++++++++++++-
+>   1 file changed, 12 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
+> index 7bb9870f6d8c..c2b973c738fe 100644
+> --- a/drivers/pci/host/pcie-rockchip.c
+> +++ b/drivers/pci/host/pcie-rockchip.c
+> @@ -36,6 +36,7 @@
+>   #include <linux/pci_ids.h>
+>   #include <linux/phy/phy.h>
+>   #include <linux/platform_device.h>
+> +#include <linux/pm_wakeirq.h>
+>   #include <linux/reset.h>
+>   #include <linux/regmap.h>
+>   
+> @@ -853,7 +854,6 @@ static void rockchip_pcie_legacy_int_handler(struct irq_desc *desc)
+>   	chained_irq_exit(chip, desc);
+>   }
+>   
+> -
+>   /**
+>    * rockchip_pcie_parse_dt - Parse Device Tree
+>    * @rockchip: PCIe port information
+> @@ -1018,6 +1018,14 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
+>   		return err;
+>   	}
+>   
+> +	device_init_wakeup(dev, true);
+> +	irq = platform_get_irq_byname(pdev, "wake");
+> +	if (irq >= 0) {
+> +		err = dev_pm_set_dedicated_wake_irq(dev, irq);
+> +		if (err)
+> +			dev_err(dev, "failed to setup PCIe wake IRQ\n");
+> +	}
+> +
+>   	rockchip->vpcie3v3 = devm_regulator_get_optional(dev, "vpcie3v3");
+>   	if (IS_ERR(rockchip->vpcie3v3)) {
+>   		if (PTR_ERR(rockchip->vpcie3v3) == -EPROBE_DEFER)
+> @@ -1524,6 +1532,9 @@ static int rockchip_pcie_remove(struct platform_device *pdev)
+>   	struct device *dev = &pdev->dev;
+>   	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
+>   
+> +	dev_pm_clear_wake_irq(dev);
+> +	device_init_wakeup(dev, false);
+> +
 
-Given there are no actual users in the kernel that could trigger this,
-I'll queue this for 4.14 instead.
+Looks good overall but I think we need this on the
+error handling path of rockchip_pcie_probe as well?
 
-ChenYu
+>   	pci_stop_root_bus(rockchip->root_bus);
+>   	pci_remove_root_bus(rockchip->root_bus);
+>   	pci_unmap_iospace(rockchip->io);
+> 
