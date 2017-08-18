@@ -1,104 +1,41 @@
 From: hjc@rock-chips.com (Sandy Huang)
-Date: Fri, 18 Aug 2017 16:09:55 +0800
-Subject: [PATCH v6 2/3] ARM: dts: Add LVDS info for rk3288
-In-Reply-To: <1503043780-22605-1-git-send-email-hjc@rock-chips.com>
-References: <1503043780-22605-1-git-send-email-hjc@rock-chips.com>
-Message-ID: <1503043795-22805-1-git-send-email-hjc@rock-chips.com>
+Date: Fri, 18 Aug 2017 16:09:39 +0800
+Subject: [PATCH v6 0/3] Add support Rockchip Soc LVDS
+Message-ID: <1503043780-22605-1-git-send-email-hjc@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add LVDS info in rk3288.dtsi for LVDS driver
-This based on the patches from Mark yao and Heiko Stuebner.
+This patches add support Rockchip RK3288 LVDS support, based on patches from
+Mark yao[0] and Heiko Stuebner[1].
 
-Signed-off-by: Sandy Huang <hjc@rock-chips.com>
-Signed-off-by: Mark yao <mark.yao@rock-chips.com>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3288.dtsi | 52 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+[0]: https://github.com/RockchipOpensourceCommunity/popmetal-kernel-3.14
+[1]: http://lists.infradead.org/pipermail/linux-rockchip/2015-April/002830.html
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 2484f11..c2e33b8 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -983,6 +983,11 @@
- 				reg = <2>;
- 				remote-endpoint = <&mipi_in_vopb>;
- 			};
-+
-+			vopb_out_lvds: endpoint at 3 {
-+				reg = <3>;
-+				remote-endpoint = <&lvds_in_vopb>;
-+			};
- 		};
- 	};
- 
-@@ -1026,6 +1031,11 @@
- 				reg = <2>;
- 				remote-endpoint = <&mipi_in_vopl>;
- 			};
-+
-+			vopl_out_lvds: endpoint at 3 {
-+				reg = <3>;
-+				remote-endpoint = <&lvds_in_vopl>;
-+			};
- 		};
- 	};
- 
-@@ -1099,6 +1109,39 @@
- 		};
- 	};
- 
-+	lvds: lvds at ff96c000 {
-+		compatible = "rockchip,rk3288-lvds";
-+		reg = <0xff96c000 0x4000>;
-+		clocks = <&cru PCLK_LVDS_PHY>;
-+		clock-names = "pclk_lvds";
-+		pinctrl-names = "lcdc";
-+		pinctrl-0 = <&lcdc_ctl>;
-+		power-domains = <&power RK3288_PD_VIO>;
-+		rockchip,grf = <&grf>;
-+		status = "disabled";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			lvds_in: port at 0 {
-+				reg = <0>;
-+
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				lvds_in_vopb: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vopb_out_lvds>;
-+				};
-+				lvds_in_vopl: endpoint at 1 {
-+					reg = <1>;
-+					remote-endpoint = <&vopl_out_lvds>;
-+				};
-+			};
-+		};
-+	};
-+
- 	hdmi: hdmi at ff980000 {
- 		compatible = "rockchip,rk3288-dw-hdmi";
- 		reg = <0xff980000 0x20000>;
-@@ -1823,5 +1866,14 @@
- 				rockchip,pins = <RK_GPIO6 11 RK_FUNC_1 &pcfg_pull_none>;
- 			};
- 		};
-+
-+		lcdc {
-+			lcdc_ctl: lcdc-ctl {
-+				rockchip,pins = <1 24 RK_FUNC_1 &pcfg_pull_none>,
-+						<1 25 RK_FUNC_1 &pcfg_pull_none>,
-+						<1 26 RK_FUNC_1 &pcfg_pull_none>,
-+						<1 27 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
- 	};
- };
+Changes:
+- Update rockchip_lvds_encoder_helper_funcs to atomic API
+- Add bridge function for RGB/LVDS convert to other output type
+- Fix some unreasonable define
+- Adapter to the latest rockchip DRM driver framework
+- Add pinctrl for RGB output type
+- Reseved some define for rockchip next Soc
+
+Sandy Huang (3):
+  dt-bindings: display: Add Document for Rockchip Soc LVDS
+  ARM: dts: Add LVDS info for rk3288
+  drm/rockchip: Add support for Rockchip Soc LVDS
+
+ .../bindings/display/rockchip/rockchip-lvds.txt    | 100 ++++
+ arch/arm/boot/dts/rk3288.dtsi                      |  52 ++
+ drivers/gpu/drm/rockchip/Kconfig                   |   9 +
+ drivers/gpu/drm/rockchip/Makefile                  |   1 +
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c        |   2 +
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h        |   1 +
+ drivers/gpu/drm/rockchip/rockchip_lvds.c           | 582 +++++++++++++++++++++
+ drivers/gpu/drm/rockchip/rockchip_lvds.h           | 114 ++++
+ 8 files changed, 861 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
+ create mode 100644 drivers/gpu/drm/rockchip/rockchip_lvds.c
+ create mode 100644 drivers/gpu/drm/rockchip/rockchip_lvds.h
+
 -- 
 2.7.4
