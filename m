@@ -1,34 +1,73 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Fri, 18 Aug 2017 14:32:36 +1000
-Subject: [PATCH] PCI: Allow PCI express root ports to find themselves
-In-Reply-To: <20170817110614.11454-1-thierry.reding@gmail.com>
-References: <1502936730-7368-1-git-send-email-dingtianhong@huawei.com>
- <20170817110614.11454-1-thierry.reding@gmail.com>
-Message-ID: <87bmndqyvv.fsf@concordia.ellerman.id.au>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Fri, 18 Aug 2017 10:24:23 +0530
+Subject: [PATCH v2 01/16] dmaengine: bcm-sba-raid: Minor improvments in
+ comments
+In-Reply-To: <20170817034441.GX3053@localhost>
+References: <1501583880-32072-1-git-send-email-anup.patel@broadcom.com>
+ <1501583880-32072-2-git-send-email-anup.patel@broadcom.com>
+ <20170817034441.GX3053@localhost>
+Message-ID: <CAALAos8D1K0omRQbpAYA4paA3-wds-g-+TARhwi7VEc-ajWo_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thierry Reding <thierry.reding@gmail.com> writes:
+On Thu, Aug 17, 2017 at 9:14 AM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Tue, Aug 01, 2017 at 04:07:45PM +0530, Anup Patel wrote:
+>> Make section comments consistent across the Broadcom SBA RAID driver
+>> by avoiding " SBA " in some of the comments.
+>
+> and you add more comments..
 
-> From: Thierry Reding <treding@nvidia.com>
->
-> If the pci_find_pcie_root_port() function is called on a root port
-> itself, return the root port rather than NULL.
->
-> This effectively reverts commit 0e405232871d6 ("PCI: fix oops when
-> try to find Root Port for a PCI device") which added an extra check
-> that would now be redundant.
->
-> Fixes: a99b646afa8a ("PCI: Disable PCIe Relaxed Ordering if unsupported")
-> Fixes: c56d4450eb68 ("PCI: Turn off Request Attributes to avoid Chelsio T5 Completion erratum")
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
-> This applies on top of and was tested on next-20170817.
->
-> Michael, it'd be great if you could test this one again to clarify
-> whether or not the fix that's already in Linus' tree is still needed, or
-> whether it's indeed obsoleted by this patch.
+OK, I will add this to commit description.
 
-This works fine for me, applied on top of Linus' tree (d33a2a914319).
+>
+>>
+>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>> ---
+>>  drivers/dma/bcm-sba-raid.c | 9 ++++++---
+>>  1 file changed, 6 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
+>> index e41bbc7..76999b7 100644
+>> --- a/drivers/dma/bcm-sba-raid.c
+>> +++ b/drivers/dma/bcm-sba-raid.c
+>> @@ -48,7 +48,8 @@
+>>
+>>  #include "dmaengine.h"
+>>
+>> -/* SBA command related defines */
+>> +/* ====== Driver macros and defines ===== */
+>> +
+>>  #define SBA_TYPE_SHIFT                                       48
+>>  #define SBA_TYPE_MASK                                        GENMASK(1, 0)
+>>  #define SBA_TYPE_A                                   0x0
+>> @@ -88,6 +89,8 @@
+>>  #define to_sba_device(dchan)         \
+>>       container_of(dchan, struct sba_device, dma_chan)
+>>
+>> +/* ===== Driver data structures ===== */
+>
+> like this!!
+>
+>> +
+>>  enum sba_request_state {
+>>       SBA_REQUEST_STATE_FREE = 1,
+>>       SBA_REQUEST_STATE_ALLOCED = 2,
+>> @@ -164,7 +167,7 @@ struct sba_device {
+>>       int reqs_free_count;
+>>  };
+>>
+>> -/* ====== SBA command helper routines ===== */
+>> +/* ====== Command helper routines ===== */
+>>
+>>  static inline u64 __pure sba_cmd_enc(u64 cmd, u32 val, u32 shift, u32 mask)
+>>  {
+>> @@ -196,7 +199,7 @@ static inline u32 __pure sba_cmd_pq_c_mdata(u32 d, u32 b1, u32 b0)
+>>              ((d & SBA_C_MDATA_DNUM_MASK) << SBA_C_MDATA_DNUM_SHIFT);
+>>  }
+>>
+>> -/* ====== Channel resource management routines ===== */
+>> +/* ====== General helper routines ===== */
+>>
 
-cheers
+Regards,
+Anup
