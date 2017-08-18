@@ -1,32 +1,39 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 18 Aug 2017 09:30:22 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-nitrogen6_som2: fix PCIe reset
-In-Reply-To: <20170817150236.GA8358@kroah.com>
-References: <20170817135010.3042-1-gary.bisson@boundarydevices.com>
- <20170817150236.GA8358@kroah.com>
-Message-ID: <20170818013020.GH7608@dragon>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 17 Aug 2017 20:38:44 -0500
+Subject: [PATCH 2/3] ARM: OMAP5: Add cpuidle assembly code
+In-Reply-To: <20170817230122.30655-3-tony@atomide.com>
+References: <20170817230122.30655-1-tony@atomide.com>
+ <20170817230122.30655-3-tony@atomide.com>
+Message-ID: <97a05a99-3fc5-7fb8-f6d0-708c5d0ddcdc@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 08:02:36AM -0700, Greg KH wrote:
-> On Thu, Aug 17, 2017 at 03:50:10PM +0200, Gary Bisson wrote:
-> > Previous value was a bad copy of nitrogen6_max device tree.
-> > 
-> > Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
-> > ---
-> >  arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
+On 08/17/2017 06:01 PM, Tony Lindgren wrote:
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 > 
-> <formletter>
+> In order to support CPU off modes during idle like omap4 already
+> does, we need to add the assembly code needed for restoring the
+> CPU state from off mode.
 > 
-> This is not the correct way to submit patches for inclusion in the
-> stable kernel tree.  Please read:
->     https://www.kernel.org/doc/html/latest/process/stable-kernel-rules.html
-> for how to do this properly.
+> The code is a combination of the following earlier patches done
+> by Santosh Shilimkar <santosh.shilimkar@oracle.com> in TI Linux
+> kernel tree:
 > 
-> </formletter>
+> 881603c3f97f ("ARM: OMAP5: PM: Add CPU power off mode support")
+> 411533444365 ("ARM: OMAP5: PM: Add MPU Open Switch Retention support")
+> 3f9ea63594c3 ("ARM: OMAP5: PM: Add L2 memory power down support")
 
-I didn't realized that Gary wants to get this into stable.  I will add
-Fixes and stable tags to the patch.  Thanks, Greg.
+Ref: 
+https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=9f5dc91b691cf296c49aedf0a671fd659a70f737 
+and the fact that OSWR and OFF both have been descoped in production 
+silicon, is again the reason why TI has not posted these preproduction 
+experimentation patches upstream.
 
-Shawn
+NAK once again. Sorry.
+
+PS: deleting Santosh's old TI ID which should unfortunately be 
+bouncing now.
+
+-- 
+Regards,
+Nishanth Menon
