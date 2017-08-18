@@ -1,22 +1,57 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 18 Aug 2017 09:55:50 +0200
-Subject: [PATCH v2] ARM: debug-ll: Add support for r8a7745
-In-Reply-To: <CAMuHMdW_XMQGYrKcEmax59ADBD+zNMkNbqZQAPGOAkB0Ja5MJw@mail.gmail.com>
-References: <1502878810-17011-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <CAMuHMdW_XMQGYrKcEmax59ADBD+zNMkNbqZQAPGOAkB0Ja5MJw@mail.gmail.com>
-Message-ID: <20170818075549.GD9175@verge.net.au>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 18 Aug 2017 09:56:52 +0200
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Add
+ CONFIG_FW_LOADER_USER_HELPER_FALLBACK
+In-Reply-To: <20170817141243.GG7608@dragon>
+References: <20170817140424.4614-1-gary.bisson@boundarydevices.com>
+ <20170817141243.GG7608@dragon>
+Message-ID: <1503043012.7730.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 03:01:30PM +0200, Geert Uytterhoeven wrote:
-> On Wed, Aug 16, 2017 at 12:20 PM, Fabrizio Castro
-> <fabrizio.castro@bp.renesas.com> wrote:
-> > Enable low-level debugging support for RZ/G1E (r8a7745). RZ/G1E uses
-> > SCIF4 for the debug console.
-> >
-> > Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
-> 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Shawn,
 
-Thanks, applied for v4.15.
+On Thu, 2017-08-17 at 22:12 +0800, Shawn Guo wrote:
+> On Thu, Aug 17, 2017 at 04:04:24PM +0200, Gary Bisson wrote:
+> > Allows to load firmware files which aren't built inside the kernel.
+> > 
+> > Especially useful for CODA firmware (vpu_fw_imx6q.bin) which is
+> > usually
+> > located in the rootfs.
+> > 
+> > Signed-off-by: Gary Bisson <gary.bisson@boundarydevices.com>
+> > ---
+> > Hi Shawn,
+> > 
+> > I'm not sure if this patch is acceptable since I've noticed that no
+> > configuration currently has that option enabled (why?).
+> > 
+> > As mentioned in the commit, I had to enable that in order to have
+> > CODA
+> > load the VPU firmware properly.
+> > 
+> > Another option would be to make the CODA driver a module...
+> > 
+> > Let me know your thoughts.
+> 
+> @Philipp, do you have any comments on this?
+> 
+> From reading of the option help text, I feel the option is not
+> recommended?
+> 
+> config FW_LOADER_USER_HELPER_FALLBACK
+> 
+> This option enables / disables the invocation of user-helper
+> (e.g. udev) for loading firmware files as a fallback after the
+> direct file loading in kernel fails.??The user-mode helper is
+> no longer required unless you have a special firmware file that
+> resides in a non-standard path. Moreover, the udev support has
+> been deprecated upstream.
+> 
+> Shawn
+
+Building coda as a module should work fine, so I'd say this is not
+necessary.
+
+regards
+Philipp
