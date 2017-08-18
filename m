@@ -1,52 +1,32 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 18 Aug 2017 11:44:02 +0200
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.14 (#2)
-Message-ID: <87mv6xky71.fsf@free-electrons.com>
+From: romain.perier@collabora.com (Romain Perier)
+Date: Fri, 18 Aug 2017 11:40:30 +0200
+Subject: [PATCH] arm64: dts: rockchip: Add basic DVFS support for RK3368
+In-Reply-To: <10444104.mndukromaz@phil>
+References: <20170818075053.8779-1-romain.perier@collabora.com>
+ <10444104.mndukromaz@phil>
+Message-ID: <f283f9de-e9ce-e2b9-645f-b5f0566ebccf@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-Here is the second pull request for dt64 for mvebu for v4.14.
 
-Gregory
+Le 18/08/2017 ? 10:20, Heiko Stuebner a ?crit :
+> Am Freitag, 18. August 2017, 09:50:53 CEST schrieb Romain Perier:
+>> This adds and enable the operating points that have been tested and are
+>> currently supported by the SoC.
+>>
+>> Signed-off-by: Romain Perier <romain.perier@collabora.com>
+>> ---
+>>
+>> Note: RK3288 is using operating-points binding v1, while RK3399 is using
+>> binding v2. I can send another iteration for switching to binding v2,
+>> if required.
+> Yes please use v2 for _new_ operating points :-) .
+>
+> One more thing down below.
 
-The following changes since commit 249112cef2f323354be61a27be1d6e94507f7587:
+Ack, will do.
 
-  arm64: dts: marvell: re-order RTC nodes in Marvell CP110 description (2017-08-02 16:07:38 +0200)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.14-2
-
-for you to fetch changes up to 0ea62502a5146cfe98696a152894ebb9afbee9d4:
-
-  ARM64: dts: marvell: enable USB host on Armada-8040-DB (2017-08-14 16:30:43 +0200)
-
-----------------------------------------------------------------
-mvebu dt64 for 4.14 (part 2)
-
-- Enable uSD on ESPRESSObin (Armada 37xx based board)
-- Add NAND support on Armada 7K/8K SoCs
-- Enable USB host on Armada-7040-DB and Armada-8040-DB boards
-
-----------------------------------------------------------------
-Gregory CLEMENT (2):
-      arm64: dts: marvell: Fully re-order nodes in Marvell CP110 dtsi files
-      ARM64: dts: marvell: add NAND support on the CP110
-
-Grzegorz Jaszczyk (1):
-      ARM64: dts: marvell: enable USB host on Armada-8040-DB
-
-Hanna Hawa (1):
-      ARM64: dts: marvell: enable USB host on Armada-7040-DB
-
-Marcin Wojtas (1):
-      ARM64: dts: marvell: armada-37xx: Enable uSD on ESPRESSObin
-
- .../boot/dts/marvell/armada-3720-espressobin.dts   | 25 +++++++++
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 39 +++++++++++++
- arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 65 ++++++++++++++++++++++
- .../boot/dts/marvell/armada-cp110-master.dtsi      | 33 ++++++++---
- .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 33 ++++++++---
- 5 files changed, 177 insertions(+), 18 deletions(-)
+Thanks,
+Romain
