@@ -1,43 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Aug 2017 23:15:01 +0200
-Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates for
- v4.14
-In-Reply-To: <cover.1502961153.git.horms+renesas@verge.net.au>
-References: <cover.1502961153.git.horms+renesas@verge.net.au>
-Message-ID: <CAK8P3a0Er5WQMF5+1G_oDHzd2Qp56sCrbY6kkBD_sBeMiwz_yw@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 18 Aug 2017 23:14:48 +0200
+Subject: [PATCH v2 4/5] arm64: dts: add RK3399-Q7 (Puma) SoM
+In-Reply-To: <20170818193445.47542-5-klaus.goger@theobroma-systems.com>
+References: <20170818193445.47542-1-klaus.goger@theobroma-systems.com>
+ <20170818193445.47542-5-klaus.goger@theobroma-systems.com>
+Message-ID: <2629491.nQPY0c5PWU@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 10:19 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Second Round of Renesas ARM64 Based SoC DT Updates for v4.14
->
-> * Add PFC device node to R-Car D3 (r8a77995)
->
->   This is a step towards enabling devices that use multiplexed pins
->   - including ethernet - on boards that use the r8a7796 SoC.
->
-> * Add USB nodes to R-Car M3-W (r8a7796)
->
->   This is a step towards enabling USB devices on boards that
->   use the r8a7796 SoC.
->
-> * Use newly added Gen-3 fallback compat string
->
->   This is consistent with ongoing efforts to use per-generation
->   fallback strings where appropriate across devices found
->   on R-Car SoCs. The aim of the effort being to strike a balance
->   between the limited information available about the compatibility
->   of devices found on different SoCs and the desire to ease enabling
->   devices on new SoCs.
->
->   This has no run-time effect due to the presence of a per-SoC
->   compat string.
->
-> * Cleanup whitespace and extra LVDS port label
->
->   Minor cleanups, no run-time effect.
+Am Freitag, 18. August 2017, 21:34:44 CEST schrieb Klaus Goger:
+> The RK3399-Q7 SoM is a Qseven-compatible (70mm x 70mm, MXM-230
+> connector) system-on-module from Theobroma Systems, featuring the
+> Rockchip RK3399.
+> 
+> It provides the following feature set:
+>  * up to 4GB DDR3
+>  * on-module SPI-NOR flash
+>  * on-module eMMC (with 8-bit 1.8V interface)
+>  * SD card (on a baseboad) via edge connector
+>  * Gigabit Ethernet with on-module Micrel KSZ9031 GbE PHY
+>  * HDMI/eDP/2x MIPI-DSI
+>  * 2x MIPI-CSI
+>  * USB
+>    - 1x USB 3.0 dual-role (direct connection)
+>    - 2x USB 3.0 host + 1x USB 2.0 (on-module USB 3.0 hub)
+>  * on-module STM32 Cortex-M0 companion controller, implementing:
+>    - low-power RTC functionality (ISL1208 emulation)
+>    - fan controller (AMC6821 emulation)
+>    - USB<->CAN bridge controller
+> 
+> Signed-off-by: Klaus Goger <klaus.goger@theobroma-systems.com>
+> ---
+> 
+> Changes in v2:
+> ? split SoM parts into it's own dtsi
+> - use dashes in phandles
 
-Pulled into next/dt64, thanks!
+as I was stumbling over this comment and checked the patch for it,
+dashes in node-names, underscores in phandles (phandles are the
+references defined in front of nodes and used later).
 
-        Arnd
+The patch itself is doing things correctly, so it's only a wording issue here :-)
+
+Otherwise looks good, just need Rob looking at the bindings things.
+I'll probably find some properties to move around when applying
+(to conform to sorting expectations)
+
+
+Heiko
