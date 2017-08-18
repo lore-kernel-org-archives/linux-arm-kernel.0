@@ -1,33 +1,54 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Fri, 18 Aug 2017 22:48:08 +0800
-Subject: [PATCH] arm64: dts: rockchip: Fix wrong rt5514 dmic delay property
- for Gru
-Message-ID: <20170818144808.27869-1-jeffy.chen@rock-chips.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 18 Aug 2017 16:02:38 +0200
+Subject: [PATCH v3 0/3] Add support for the otm8009a dsi panel
+In-Reply-To: <1500297593-30633-1-git-send-email-philippe.cornu@st.com>
+References: <1500297593-30633-1-git-send-email-philippe.cornu@st.com>
+Message-ID: <20170818140238.GB28143@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to rt5514 dt-binding, it should be "realtek,dmic-init-delay-ms".
+On Mon, Jul 17, 2017 at 03:19:50PM +0200, Philippe CORNU wrote:
+> Version 3:
+> - panel-orisetech-otm8009a.c: Remove a FIXME (Andrzej Hajda)
+> - panel/Makefile & Kconfig: Alphabetical order (Andrzej Hajda)
+> 
+> Version 2:
+> - panel-orisetech-otm8009a.c: Add Manufacturer Command Set defines,
+>   add new macro for handling address shifting, improve reset
+>   sequence, use more mipi dcs helpers (Andrzej Hajda)
+> - dt-bindings/display/panel/orisetech,otm8009a.txt: Fix reset gpio
+>   active level in the example (Andrzej Hajda), Add an "Optional
+>   Properties" section (Rob Herring).
+> 
+> Version 1:
+> - Initial commit
+> 
+> The purpose of this patch is to add support for the Orise Tech
+> otm8009a 3.97" 480x800 TFT LCD panel (MIPI-DSI video mode).
+> This LCD panel is used in several STM32 boards.
+> 
+> Philippe CORNU (3):
+>   dt-bindings: Add vendor prefix for Orise Technology
+>   dt-bindings: display: panel: Add support for Orise Tech otm8009a dsi
+>     panel
+>   drm/panel: Add support for otm8009a panel driver
+> 
+>  .../bindings/display/panel/orisetech,otm8009a.txt  |  21 +
+>  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+>  drivers/gpu/drm/panel/Kconfig                      |   9 +
+>  drivers/gpu/drm/panel/Makefile                     |   1 +
+>  drivers/gpu/drm/panel/panel-orisetech-otm8009a.c   | 491 +++++++++++++++++++++
+>  5 files changed, 523 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
+>  create mode 100755 drivers/gpu/drm/panel/panel-orisetech-otm8009a.c
 
-Fixes: 48f4d9796d99 (arm64: dts: rockchip: add Gru/Kevin DTS)
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Series applied to drm-misc-next, thanks.
 
----
-
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-index c489c78b2b5b..5f2e1415b7ab 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-@@ -617,7 +617,7 @@ ap_i2c_mic: &i2c1 {
- 		interrupts = <13 IRQ_TYPE_LEVEL_HIGH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&mic_int>;
--		realtek,dmic-init-delay = <20>;
-+		realtek,dmic-init-delay-ms = <20>;
- 		wakeup-source;
- 	};
- };
--- 
-2.11.0
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170818/7ba4cffb/attachment.sig>
