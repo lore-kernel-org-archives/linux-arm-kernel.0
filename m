@@ -1,114 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 18 Aug 2017 12:36:31 +0200
-Subject: [GIT PULL] ARM: SoC fixes for 4.13
-Message-ID: <CAK8P3a1sFafctSh6-=9dmD8yFXx8uAhRZs8oFPy2GPJSjGzoTA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 18 Aug 2017 11:43:28 +0100
+Subject: [PATCH v6 4/9] arm64: hugetlb: Add break-before-make logic for
+ contiguous entries
+In-Reply-To: <87shgpnp6p.fsf@e105922-lin.cambridge.arm.com>
+References: <20170810170906.30772-1-punit.agrawal@arm.com>
+ <20170810170906.30772-5-punit.agrawal@arm.com>
+ <20170817180311.uwrz64g3bkwfdkrn@armageddon.cambridge.arm.com>
+ <87shgpnp6p.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20170818104327.a5yep2p3ntjbffug@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit aae4e7a8bc44722fe70d58920a36916b1043195e:
+On Fri, Aug 18, 2017 at 11:30:22AM +0100, Punit Agrawal wrote:
+> Catalin Marinas <catalin.marinas@arm.com> writes:
+> 
+> > On Thu, Aug 10, 2017 at 06:09:01PM +0100, Punit Agrawal wrote:
+> >> --- a/arch/arm64/mm/hugetlbpage.c
+> >> +++ b/arch/arm64/mm/hugetlbpage.c
+> >> @@ -68,6 +68,62 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
+> >>  	return CONT_PTES;
+> >>  }
+> >>  
+> >> +/*
+> >> + * Changing some bits of contiguous entries requires us to follow a
+> >> + * Break-Before-Make approach, breaking the whole contiguous set
+> >> + * before we can change any entries. See ARM DDI 0487A.k_iss10775,
+> >> + * "Misprogramming of the Contiguous bit", page D4-1762.
+> >> + *
+> >> + * This helper performs the break step.
+> >> + */
+> >> +static pte_t get_clear_flush(struct mm_struct *mm,
+> >> +			     unsigned long addr,
+> >> +			     pte_t *ptep,
+> >> +			     unsigned long pgsize,
+> >> +			     unsigned long ncontig)
+> >> +{
+> >> +	unsigned long i, saddr = addr;
+> >> +	struct vm_area_struct vma = { .vm_mm = mm };
+> >> +	pte_t orig_pte = huge_ptep_get(ptep);
+> >> +
+> >> +	/*
+> >> +	 * If we already have a faulting entry then we don't need
+> >> +	 * to break before make (there won't be a tlb entry cached).
+> >> +	 */
+> >> +	if (!pte_present(orig_pte))
+> >> +		return orig_pte;
+> >
+> > I first thought we could relax this check to pte_valid() as we don't
+> > care about the PROT_NONE case for hardware page table updates. However,
+> > I realised that we call this where we expect the pte to be entirely
+> > cleared but we simply skip it if !present (e.g. swap entry). Is this
+> > correct?
+> 
+> I've checked back and come to the conclusion that get_clear_flush() will
+> not get called with swap entries.
+> 
+> In the case of huge_ptep_get_and_clear() below, the callers
+> (__unmap_hugepage_range() and hugetlb_change_protection()) check for
+> swap entries before calling. Similarly 
+> 
+> I'll relax the check to pte_valid().
 
-  Linux 4.13-rc4 (2017-08-06 18:44:49 -0700)
+Thanks for checking but I would still keep the semantics of the generic
+huge_ptep_get_and_clear() where the entry is always zeroed. It shouldn't
+have any performance impact since this function won't be called for swap
+entries, but just in case anyone changes the core code later on.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
-tags/armsoc-fixes
-
-for you to fetch changes up to 4dd6a9973b8aaffac4bf37c5bb70e8eae5a7afb4:
-
-  soc: ti: ti_sci_pm_domains: Populate name for genpd (2017-08-18
-11:59:53 +0200)
-
-----------------------------------------------------------------
-ARM: SoC fixes for 4.13
-
-A small number of bugfixes, nothing serious this time.
-Here is a full list.
-
-4.13 regression fix:
-
-- imx7d-sdb pinctrl support regressed in 4.13 due to an incomplete patch
-
-DT fixes for recently added devices:
-
-- badly copied DT entries on imx6qdl-nitrogen6_som broke PCI reset
-
-- sama5d2 memory controller had the wrong ID and registers
-
-- imx7 power domains did not work correctly with deferred probing
-  (driver added in 4.12)
-
-- Allwinner H5 pinctrl (added in 4.12) did not work right with GPIO
-  interrupts
-
-Fixes for older bugs that just got noticed:
-
-- i.MX25 ADC support (added in 4.6) apparently never worked right due
-  to a missing 'ranges' property in DT.
-
-- Renesas Salvador Audio support (added in v4.5) was broken for device
-  repeated bind/unbind due to a naming conflict.
-
-- Various allwinner boards are missing an 'ethernet' alias in DT,
-  leading to unstable device naming.
-
-Preventive bugfix:
-
-- TI Keystone needs a fix to prevent a NULL pointer dereference with
-  an upcoming PM change.
-
-----------------------------------------------------------------
-Arnd Bergmann (6):
-      Merge tag 'imx-fixes-4.13' of
-git://git.kernel.org/.../shawnguo/linux into fixes
-      Merge tag 'imx-fixes-4.13-2' of
-git://git.kernel.org/.../shawnguo/linux into fixes
-      Merge tag 'at91-ab-4.13-dt-fixes' of
-git://git.kernel.org/.../abelloni/linux into fixes
-      Merge tag 'renesas-fixes4-for-v4.13' of
-https://git.kernel.org/.../horms/renesas into fixes
-      Merge tag 'sunxi-fixes-for-4.13-2' of
-https://git.kernel.org/.../sunxi/linux into fixes
-      Merge tag 'imx-fixes-4.13-3' of
-git://git.kernel.org/.../shawnguo/linux into fixes
-
-Dave Gerlach (1):
-      soc: ti: ti_sci_pm_domains: Populate name for genpd
-
-Fabio Estevam (1):
-      ARM: dts: imx7d-sdb: Put pinctrl_spi4 in the correct location
-
-Gary Bisson (1):
-      ARM: dts: imx6qdl-nitrogen6_som2: fix PCIe reset
-
-Icenowy Zheng (4):
-      arm64: allwinner: a64: bananapi-m64: add missing ethernet0 alias
-      arm64: allwinner: a64: pine64: add missing ethernet0 alias
-      arm64: allwinner: a64: sopine: add missing ethernet0 alias
-      arm64: allwinner: h5: fix pinctrl IRQs
-
-Kuninori Morimoto (1):
-      arm64: renesas: salvator-common: avoid audio_clkout naming conflict
-
-Ludovic Desroches (2):
-      ARM: dts: at91: sama5d2: use sama5d2 compatible string for SMC
-      ARM: dts: at91: sama5d2: fix EBI/NAND controllers declaration
-
-Martin Kaiser (1):
-      ARM: dts: i.MX25: add ranges to tscadc
-
-Stefan Agner (1):
-      soc: imx: gpcv2: fix regulator deferred probe
-
- arch/arm/boot/dts/imx25.dtsi                             |  1 +
- arch/arm/boot/dts/imx6qdl-nitrogen6_som2.dtsi            |  4 ++--
- arch/arm/boot/dts/imx7d-sdb.dts                          | 16 ++++++++--------
- arch/arm/boot/dts/sama5d2.dtsi                           | 12 ++++++------
- .../arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts |  1 +
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts      |  1 +
- .../boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts   |  1 +
- arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi             |  3 +++
- arch/arm64/boot/dts/renesas/salvator-common.dtsi         |  2 +-
- drivers/soc/imx/gpcv2.c                                  | 15 ++++++++-------
- drivers/soc/ti/ti_sci_pm_domains.c                       |  2 ++
- 11 files changed, 34 insertions(+), 24 deletions(-)
+-- 
+Catalin
