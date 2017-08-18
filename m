@@ -1,86 +1,34 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Fri, 18 Aug 2017 22:41:44 +0800
-Subject: [PATCH v3 2/9] ASoC: rockchip: Remove obsolete dmic-delay
-In-Reply-To: <20170818115223.pyfqji5jkplt6isx@sirena.org.uk>
-References: <20170817044417.22069-1-jeffy.chen@rock-chips.com>
- <20170817044417.22069-3-jeffy.chen@rock-chips.com>
- <20170817171152.abf3ngr6nr22jfif@sirena.org.uk>
- <599645E2.4020402@rock-chips.com>
- <20170818115223.pyfqji5jkplt6isx@sirena.org.uk>
-Message-ID: <5996FCA8.9090909@rock-chips.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 18 Aug 2017 16:48:02 +0200
+Subject: [GIT PULL 1/5] firmare: Changes for v4.14-rc1
+Message-ID: <20170818144806.14252-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi ARM SoC maintainers,
 
-On 08/18/2017 07:52 PM, Mark Brown wrote:
-> On Fri, Aug 18, 2017 at 09:41:54AM +0800, jeffy wrote:
->> On 08/18/2017 01:11 AM, Mark Brown wrote:
->>> On Thu, Aug 17, 2017 at 12:44:10PM +0800, Jeffy Chen wrote:
->
->>>> -Optional properties:
->>>> -- dmic-wakeup-delay-ms : specify delay time (ms) for DMIC ready.
->>>> -  If this option is specified, which means it's required dmic need
->>>> -  delay for DMIC to ready so that rt5514 can avoid recording before
->>>> -  DMIC send valid data
->
->>> Why would nobody ever want to use this in future?
->
->> hmmm, check again, rt5514 fixed this issue in there driver instead in:
->> a5461fd6c8f7 ASoC: rt5514: Add the DMIC initial delay to wait it ready.
->
->> so we don't need this...
->
-> You don't need it on your board for new DTs but why is it not possible
-> that another board might need it?
->
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
-this property is added in:
-3a6f9dce6116 ASoC: rk3399_gru_sound: fix recording pop at first attempt
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 
-to fix pop noise by performing a delay after set dmic clk.
+are available in the git repository at:
 
-the binding said "dmic-wakeup-delay-ms", but actually driver parses 
-"dmic-delay":
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.14-firmware
 
-+       /* Set DMIC delay */
-+       ret = device_property_read_u32(&pdev->dev, "dmic-delay",
-+                                       &rt5514_dmic_delay);
+for you to fetch changes up to 122954edfdf5888dbd532acf2b945af15660da66:
 
-@@ -123,6 +125,9 @@ static int rockchip_sound_rt5514_hw_params(struct 
-snd_pcm_subst
-ream *substream,
-                 return ret;
-         }
+  firmware: tegra: set drvdata earlier (2017-08-17 13:08:08 +0200)
 
-+       /* Wait for DMIC stable */
-+       msleep(rt5514_dmic_delay); <-- perform a delay after set dmic clk
-+
-         return 0;
-  }
+----------------------------------------------------------------
+firmare: Changes for v4.14-rc1
 
-then realtek guys fixed this issue in the rt5514 codec driver:
-a5461fd6c8f7 ASoC: rt5514: Add the DMIC initial delay to wait it ready.
+This contains a single bug fix that can lead to a crash in some rare
+situations. Since this has never been reported to happen with the level
+of support that exists upstream, this isn't considered critical.
 
-+       device_property_read_u32(dev, "realtek,dmic-init-delay-ms",
-+               &rt5514->pdata.dmic_init_delay);
+----------------------------------------------------------------
+Timo Alho (1):
+      firmware: tegra: set drvdata earlier
 
-@@ -452,6 +452,9 @@ static int rt5514_set_dmic_clk(struct 
-snd_soc_dapm_widget *w,
-                         RT5514_CLK_DMIC_OUT_SEL_MASK,
-                         idx << RT5514_CLK_DMIC_OUT_SEL_SFT);
-
-+       if (rt5514->pdata.dmic_init_delay)
-+               msleep(rt5514->pdata.dmic_init_delay); <-- perform a 
-delay after set dmic clk
-
-
-so we don't need to deal with it in every boards' drivers which using 
-rt5514 codec, and we are using this new property now:
-ag dmic arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-620:            realtek,dmic-init-delay = <20>;   <---- oops, seems 
-missing "-ms"@the end, guess due to realtek patch ends up differently 
-on upstream. will send a patch to fix it later.
-
-
-anyway, i think it's ok to remove that out-dated property in our driver :)
+ drivers/firmware/tegra/bpmp.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
