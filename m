@@ -1,54 +1,61 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 18 Aug 2017 16:02:38 +0200
-Subject: [PATCH v3 0/3] Add support for the otm8009a dsi panel
-In-Reply-To: <1500297593-30633-1-git-send-email-philippe.cornu@st.com>
-References: <1500297593-30633-1-git-send-email-philippe.cornu@st.com>
-Message-ID: <20170818140238.GB28143@ulmo>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 18 Aug 2017 16:04:34 +0100
+Subject: [PATCH] arm64: kaslr: Adjust the offset to avoid Image across
+ alignment boundary
+Message-ID: <20170818150435.35224-1-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 17, 2017 at 03:19:50PM +0200, Philippe CORNU wrote:
-> Version 3:
-> - panel-orisetech-otm8009a.c: Remove a FIXME (Andrzej Hajda)
-> - panel/Makefile & Kconfig: Alphabetical order (Andrzej Hajda)
-> 
-> Version 2:
-> - panel-orisetech-otm8009a.c: Add Manufacturer Command Set defines,
->   add new macro for handling address shifting, improve reset
->   sequence, use more mipi dcs helpers (Andrzej Hajda)
-> - dt-bindings/display/panel/orisetech,otm8009a.txt: Fix reset gpio
->   active level in the example (Andrzej Hajda), Add an "Optional
->   Properties" section (Rob Herring).
-> 
-> Version 1:
-> - Initial commit
-> 
-> The purpose of this patch is to add support for the Orise Tech
-> otm8009a 3.97" 480x800 TFT LCD panel (MIPI-DSI video mode).
-> This LCD panel is used in several STM32 boards.
-> 
-> Philippe CORNU (3):
->   dt-bindings: Add vendor prefix for Orise Technology
->   dt-bindings: display: panel: Add support for Orise Tech otm8009a dsi
->     panel
->   drm/panel: Add support for otm8009a panel driver
-> 
->  .../bindings/display/panel/orisetech,otm8009a.txt  |  21 +
->  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
->  drivers/gpu/drm/panel/Kconfig                      |   9 +
->  drivers/gpu/drm/panel/Makefile                     |   1 +
->  drivers/gpu/drm/panel/panel-orisetech-otm8009a.c   | 491 +++++++++++++++++++++
->  5 files changed, 523 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/orisetech,otm8009a.txt
->  create mode 100755 drivers/gpu/drm/panel/panel-orisetech-otm8009a.c
+With 16KB pages and a kernel Image larger than 16MB, the current
+kaslr_early_init() logic for avoiding mappings across swapper table
+boundaries fails since increasing the offset by kimg_sz just moves the
+problem to the next boundary.
 
-Series applied to drm-misc-next, thanks.
+This patch decreases the offset by the boundary overflow amount, with
+slight risk of reduced entropy as the kernel is more likely to be found
+at kimg_sz below a swapper table boundary.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170818/7ba4cffb/attachment.sig>
+Trying-to-fix: afd0e5a87670 ("arm64: kaslr: Fix up the kernel image alignment")
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Neeraj Upadhyay <neeraju@codeaurora.org>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+
+While preparing this email, I noticed that the kernel eventually failed
+to boot, though after a lot more reboot iterations. Mark Rutland also
+managed to make the KASLR kernel fail to boot with 64K pages which
+wouldn't be explained by this patch.
+
+So, any suggestions are welcome. My testing method, qemu starting a
+guest in a loop with virtio-rng-pci.
+
+Thanks.
+
+ arch/arm64/kernel/kaslr.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+index a9710efb8c01..e8cdc02f66ae 100644
+--- a/arch/arm64/kernel/kaslr.c
++++ b/arch/arm64/kernel/kaslr.c
+@@ -131,13 +131,14 @@ u64 __init kaslr_early_init(u64 dt_phys, u64 modulo_offset)
+ 	/*
+ 	 * The kernel Image should not extend across a 1GB/32MB/512MB alignment
+ 	 * boundary (for 4KB/16KB/64KB granule kernels, respectively). If this
+-	 * happens, increase the KASLR offset by the size of the kernel image
+-	 * rounded up by SWAPPER_BLOCK_SIZE.
++	 * happens, decrease the KASLR offset by the boundary overflow rounded
++	 * up to SWAPPER_BLOCK_SIZE.
+ 	 */
+ 	if ((((u64)_text + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT) !=
+ 	    (((u64)_end + offset + modulo_offset) >> SWAPPER_TABLE_SHIFT)) {
+-		u64 kimg_sz = _end - _text;
+-		offset = (offset + round_up(kimg_sz, SWAPPER_BLOCK_SIZE))
++		u64 adjust = ((u64)_end + offset + modulo_offset) &
++			((1 << SWAPPER_TABLE_SHIFT) - 1);
++		offset = (offset - round_up(adjust, SWAPPER_BLOCK_SIZE))
+ 				& mask;
+ 	}
+ 
