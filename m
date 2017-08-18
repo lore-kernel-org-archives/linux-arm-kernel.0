@@ -1,39 +1,33 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 17 Aug 2017 20:38:44 -0500
-Subject: [PATCH 2/3] ARM: OMAP5: Add cpuidle assembly code
-In-Reply-To: <20170817230122.30655-3-tony@atomide.com>
-References: <20170817230122.30655-1-tony@atomide.com>
- <20170817230122.30655-3-tony@atomide.com>
-Message-ID: <97a05a99-3fc5-7fb8-f6d0-708c5d0ddcdc@ti.com>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Fri, 18 Aug 2017 09:41:54 +0800
+Subject: [PATCH v3 2/9] ASoC: rockchip: Remove obsolete dmic-delay
+In-Reply-To: <20170817171152.abf3ngr6nr22jfif@sirena.org.uk>
+References: <20170817044417.22069-1-jeffy.chen@rock-chips.com>
+ <20170817044417.22069-3-jeffy.chen@rock-chips.com>
+ <20170817171152.abf3ngr6nr22jfif@sirena.org.uk>
+Message-ID: <599645E2.4020402@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2017 06:01 PM, Tony Lindgren wrote:
-> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> 
-> In order to support CPU off modes during idle like omap4 already
-> does, we need to add the assembly code needed for restoring the
-> CPU state from off mode.
-> 
-> The code is a combination of the following earlier patches done
-> by Santosh Shilimkar <santosh.shilimkar@oracle.com> in TI Linux
-> kernel tree:
-> 
-> 881603c3f97f ("ARM: OMAP5: PM: Add CPU power off mode support")
-> 411533444365 ("ARM: OMAP5: PM: Add MPU Open Switch Retention support")
-> 3f9ea63594c3 ("ARM: OMAP5: PM: Add L2 memory power down support")
+Hi Mark,
 
-Ref: 
-https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=9f5dc91b691cf296c49aedf0a671fd659a70f737 
-and the fact that OSWR and OFF both have been descoped in production 
-silicon, is again the reason why TI has not posted these preproduction 
-experimentation patches upstream.
+thanks for your reply
 
-NAK once again. Sorry.
+On 08/18/2017 01:11 AM, Mark Brown wrote:
+> On Thu, Aug 17, 2017 at 12:44:10PM +0800, Jeffy Chen wrote:
+>
+>> This property is no longer used.
+>
+>> -Optional properties:
+>> -- dmic-wakeup-delay-ms : specify delay time (ms) for DMIC ready.
+>> -  If this option is specified, which means it's required dmic need
+>> -  delay for DMIC to ready so that rt5514 can avoid recording before
+>> -  DMIC send valid data
+>
+> Why would nobody ever want to use this in future?
+>
 
-PS: deleting Santosh's old TI ID which should unfortunately be 
-bouncing now.
+hmmm, check again, rt5514 fixed this issue in there driver instead in:
+a5461fd6c8f7 ASoC: rt5514: Add the DMIC initial delay to wait it ready.
 
--- 
-Regards,
-Nishanth Menon
+so we don't need this...
