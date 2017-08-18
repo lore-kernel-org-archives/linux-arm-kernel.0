@@ -1,111 +1,64 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 18 Aug 2017 10:01:08 -0700
-Subject: [RFC PATCH v2 1/3] PCI: rockchip: Add support for pcie wake irq
-In-Reply-To: <20170817120431.12398-2-jeffy.chen@rock-chips.com>
-References: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
- <20170817120431.12398-2-jeffy.chen@rock-chips.com>
-Message-ID: <20170818170107.GA119461@google.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 19 Aug 2017 01:05:21 +0800
+Subject: [PATCH v3 3/4] net: stmmac: register parent MDIO node for
+ sun8i-h3-emac
+In-Reply-To: <20170818122118.4925-4-clabbe.montjoie@gmail.com>
+References: <20170818122118.4925-1-clabbe.montjoie@gmail.com>
+ <20170818122118.4925-4-clabbe.montjoie@gmail.com>
+Message-ID: <CAGb2v66KcZkiDDHryMmVzm4WroXePPy3V44SLpVdoO3ZEjgC=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Tony
-
-On Thu, Aug 17, 2017 at 08:04:29PM +0800, Jeffy Chen wrote:
-> Add support for PCIE_WAKE pin in rockchip pcie driver.
-> 
-> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+On Fri, Aug 18, 2017 at 8:21 PM, Corentin Labbe
+<clabbe.montjoie@gmail.com> wrote:
+> In case of a MDIO switch, the registered MDIO node should be
+> the parent of the PHY. Otherwise of_phy_connect will fail.
+>
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 > ---
-> 
-> Changes in v2:
-> Use dev_pm_set_dedicated_wake_irq
->         -- Suggested by Brian Norris <briannorris@chromium.com>
-> 
->  drivers/pci/host/pcie-rockchip.c | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-> index 7bb9870f6d8c..c2b973c738fe 100644
-> --- a/drivers/pci/host/pcie-rockchip.c
-> +++ b/drivers/pci/host/pcie-rockchip.c
-> @@ -36,6 +36,7 @@
->  #include <linux/pci_ids.h>
->  #include <linux/phy/phy.h>
->  #include <linux/platform_device.h>
-> +#include <linux/pm_wakeirq.h>
->  #include <linux/reset.h>
->  #include <linux/regmap.h>
->  
-> @@ -853,7 +854,6 @@ static void rockchip_pcie_legacy_int_handler(struct irq_desc *desc)
->  	chained_irq_exit(chip, desc);
->  }
->  
-> -
->  /**
->   * rockchip_pcie_parse_dt - Parse Device Tree
->   * @rockchip: PCIe port information
-> @@ -1018,6 +1018,14 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
->  		return err;
->  	}
->  
-> +	device_init_wakeup(dev, true);
-> +	irq = platform_get_irq_byname(pdev, "wake");
-> +	if (irq >= 0) {
-> +		err = dev_pm_set_dedicated_wake_irq(dev, irq);
+>  drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c | 12 ++++++++++--
+>  1 file changed, 10 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> index a366b3747eeb..ca3cc99d8960 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+> @@ -312,10 +312,12 @@ static int stmmac_dt_phy(struct plat_stmmacenet_data *plat,
+>         static const struct of_device_id need_mdio_ids[] = {
+>                 { .compatible = "snps,dwc-qos-ethernet-4.10" },
+>                 { .compatible = "allwinner,sun8i-a83t-emac" },
+> -               { .compatible = "allwinner,sun8i-h3-emac" },
+>                 { .compatible = "allwinner,sun8i-v3s-emac" },
+>                 { .compatible = "allwinner,sun50i-a64-emac" },
+>         };
+> +       static const struct of_device_id need_mdio_mux_ids[] = {
+> +               { .compatible = "allwinner,sun8i-h3-emac" },
+> +       };
+>
+>         /* If phy-handle property is passed from DT, use it as the PHY */
+>         plat->phy_node = of_parse_phandle(np, "phy-handle", 0);
+> @@ -332,7 +334,13 @@ static int stmmac_dt_phy(struct plat_stmmacenet_data *plat,
+>                 mdio = false;
+>         }
+>
+> -       if (of_match_node(need_mdio_ids, np)) {
+> +       /*
+> +        * In case of a MDIO switch/mux, the registered MDIO node should be
+> +        * the parent of the PHY. Otherwise of_phy_connect will fail.
+> +        */
+> +       if (of_match_node(need_mdio_mux_ids, np)) {
+> +                plat->mdio_node =  of_get_parent(plat->phy_node);
 
-Did you test that this works out correctly as a level-triggered
-interrupt? IIUC, the dummy handler won't mask the interrupt, so it might
-keep firing. See:
+Extra space before of_get_parent.
 
-static irqreturn_t handle_threaded_wake_irq(int irq, void *_wirq)
-{
-        struct wake_irq *wirq = _wirq;
-        int res;
+Also this is going to fail horribly if a fixed link is used.
 
-        /* Maybe abort suspend? */
-        if (irqd_is_wakeup_set(irq_get_irq_data(irq))) {
-                pm_wakeup_event(wirq->dev, 0);
-        
-                return IRQ_HANDLED; <--- We can return here, with the trigger still asserted
-        }
-...
+ChenYu
 
-This could cause some kind of an IRQ storm, including a lockup or
-significant slowdown, I think.
-
-BTW, in another context, Tony suggested we might need to fix up the IRQ flags
-like this:
-
-int dev_pm_set_dedicated_wake_irq(struct device *dev, int irq)
-{
-...
-        err = request_threaded_irq(irq, NULL, handle_threaded_wake_irq,
--                                  IRQF_ONESHOT, dev_name(dev), wirq);
-+                                  IRQF_ONESHOT | irq_get_trigger_type(irq), dev_name(dev), wirq);
-
-But IIUC, that's not actually necessary, because __setup_irq()
-automatically configures the trigger type if the driver didn't request
-one explicitly.
-
-Brian
-
-> +		if (err)
-> +			dev_err(dev, "failed to setup PCIe wake IRQ\n");
-> +	}
-> +
->  	rockchip->vpcie3v3 = devm_regulator_get_optional(dev, "vpcie3v3");
->  	if (IS_ERR(rockchip->vpcie3v3)) {
->  		if (PTR_ERR(rockchip->vpcie3v3) == -EPROBE_DEFER)
-> @@ -1524,6 +1532,9 @@ static int rockchip_pcie_remove(struct platform_device *pdev)
->  	struct device *dev = &pdev->dev;
->  	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
->  
-> +	dev_pm_clear_wake_irq(dev);
-> +	device_init_wakeup(dev, false);
-> +
->  	pci_stop_root_bus(rockchip->root_bus);
->  	pci_remove_root_bus(rockchip->root_bus);
->  	pci_unmap_iospace(rockchip->io);
-> -- 
-> 2.11.0
-> 
-> 
+> +       } else if (of_match_node(need_mdio_ids, np)) {
+>                 plat->mdio_node = of_get_child_by_name(np, "mdio");
+>         } else {
+>                 /**
+> --
+> 2.13.0
+>
