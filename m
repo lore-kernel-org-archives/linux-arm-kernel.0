@@ -1,65 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 18 Aug 2017 12:20:16 +0100
-Subject: [PATCH v6 5/9] arm64: hugetlb: Handle swap entries in
- huge_pte_offset() for contiguous hugepages
-In-Reply-To: <20170810170906.30772-6-punit.agrawal@arm.com>
-References: <20170810170906.30772-1-punit.agrawal@arm.com>
- <20170810170906.30772-6-punit.agrawal@arm.com>
-Message-ID: <20170818112015.2cvkb7y3gkozz5ip@armageddon.cambridge.arm.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Fri, 18 Aug 2017 12:12:38 +0100
+Subject: [PATCH v2] ARM: multi_v7_defconfig: Enable BQ32000 RTC driver
+In-Reply-To: <20170818080621.GI9175@verge.net.au>
+References: <20170818080621.GI9175@verge.net.au>
+Message-ID: <1503054758-6713-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 10, 2017 at 06:09:02PM +0100, Punit Agrawal wrote:
-> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-> index d3a6713048a2..09e79785c019 100644
-> --- a/arch/arm64/mm/hugetlbpage.c
-> +++ b/arch/arm64/mm/hugetlbpage.c
-> @@ -210,6 +210,7 @@ pte_t *huge_pte_offset(struct mm_struct *mm,
->  	pgd_t *pgd;
->  	pud_t *pud;
->  	pmd_t *pmd;
-> +	pte_t *pte;
->  
->  	pgd = pgd_offset(mm, addr);
->  	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
-> @@ -217,19 +218,29 @@ pte_t *huge_pte_offset(struct mm_struct *mm,
->  		return NULL;
->  
->  	pud = pud_offset(pgd, addr);
-> -	if (pud_none(*pud))
-> +	if (pud_none(*pud) && sz != PUD_SIZE)
->  		return NULL;
->  	/* swap or huge page */
->  	if (!pud_present(*pud) || pud_huge(*pud))
->  		return (pte_t *)pud;
->  	/* table; check the next level */
+The iWave RZ/G1M Q7 SOM supports RTC (TI BQ32000).
+To increase hardware support enable the driver in the
+multi_v7_defconfig multiplatform configuration.
 
-So if sz == PUD_SIZE and we have pud_none(*pud) == true, it returns the
-pud. Isn't this different from what you proposed for the generic
-huge_pte_offset()? [1]
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+---
+v1->v2
+    Changed the enable option as module.
 
->  
-> +	if (sz == CONT_PMD_SIZE)
-> +		addr &= CONT_PMD_MASK;
-> +
->  	pmd = pmd_offset(pud, addr);
-> -	if (pmd_none(*pmd))
-> +	if (pmd_none(*pmd) &&
-> +	    !(sz == PMD_SIZE || sz == CONT_PMD_SIZE))
->  		return NULL;
+This patch is tested against linux-next tag next-20170817 as well as 
+renesas-dev tag renesas-devel-20170815-v4.13-rc5 .
 
-Again, if sz == PMD_SIZE, you no longer return NULL. The generic
-proposal in [1] looks like:
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-	if (pmd_none(*pmd))
-		return NULL;
-
-and that's even when sz == PMD_SIZE.
-
-Anyway, I think we need to push for [1] again to be accepted before we
-go ahead with these changes.
-
-[1] http://lkml.kernel.org/r/20170725154114.24131-2-punit.agrawal at arm.com
-
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 18e1f80..1ca9c91 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -766,6 +766,7 @@ CONFIG_RTC_DRV_MAX8997=m
+ CONFIG_RTC_DRV_MAX77686=y
+ CONFIG_RTC_DRV_RK808=m
+ CONFIG_RTC_DRV_RS5C372=m
++CONFIG_RTC_DRV_BQ32K=m
+ CONFIG_RTC_DRV_PALMAS=y
+ CONFIG_RTC_DRV_ST_LPC=y
+ CONFIG_RTC_DRV_TWL4030=y
 -- 
-Catalin
+1.9.1
