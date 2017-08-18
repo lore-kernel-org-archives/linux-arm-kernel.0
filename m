@@ -1,53 +1,64 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 18 Aug 2017 11:24:14 +0200
-Subject: [PATCH v2 1/2] arm64: dts: rockchip: add usb3 controller node for
- RK3328 SoCs
-In-Reply-To: <1502956490-23087-2-git-send-email-william.wu@rock-chips.com>
-References: <1502956490-23087-1-git-send-email-william.wu@rock-chips.com>
- <1502956490-23087-2-git-send-email-william.wu@rock-chips.com>
-Message-ID: <7917076.Ei9Henru6l@phil>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 18 Aug 2017 11:24:27 +0200
+Subject: [PATCH v2 0/6] net: stmmac: Detect PHY location with
+ phy-is-integrated
+In-Reply-To: <20170817075149.16178-1-clabbe.montjoie@gmail.com>
+References: <20170817075149.16178-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170818092427.GA7425@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi William,
-
-Am Donnerstag, 17. August 2017, 15:54:49 CEST schrieb William Wu:
-> RK3328 has one USB 3.0 OTG controller which uses DWC_USB3
-> core's general architecture. It can act as static xHCI host
-> controller, static device controller, USB 3.0/2.0 OTG basing
-> on ID of USB3.0 PHY.
+On Thu, Aug 17, 2017 at 09:51:43AM +0200, Corentin Labbe wrote:
+> Hello
 > 
-> Signed-off-by: William Wu <william.wu@rock-chips.com>
-> ---
-> Changes in v2:
-> - Modify the dwc3 quirk "snps,tx-ipgap-linecheck-dis-quirk" to
->   "snps,dis-tx-ipgap-linecheck-quirk"
+> The current way to find if the phy is internal is to compare DT phy-mode
+> and emac_variant/internal_phy.
+> But it will negate a possible future SoC where an external PHY use the
+> same phy mode than the integrated one.
 > 
->  .../devicetree/bindings/usb/rockchip,dwc3.txt      |  4 +++-
->  arch/arm64/boot/dts/rockchip/rk3328.dtsi           | 27 ++++++++++++++++++++++
->  2 files changed, 30 insertions(+), 1 deletion(-)
+> This patchs series adds a new way to find if the PHY is integrated, via
+> the phy-is-integrated DT property.
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
-> index 0536a93..d6b2e47 100644
-> --- a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
-> +++ b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
-> @@ -1,7 +1,9 @@
->  Rockchip SuperSpeed DWC3 USB SoC controller
->  
->  Required properties:
-> -- compatible:	should contain "rockchip,rk3399-dwc3" for rk3399 SoC
-> +- compatible:	should be one of the following:
-> +  - "rockchip,rk3399-dwc3": for rk3399 SoC
-> +  - "rockchip,rk3328-dwc3", "rockchip,rk3399-dwc3": for rk3328 SoC
->  - clocks:	A list of phandle + clock-specifier pairs for the
->  		clocks listed in clock-names
->  - clock-names:	Should contain the following:
+> Since it exists both integrated and external ethernet-phy at 1, they are merged in
+> the final DTB and so share all properties.
+> For avoiding this, the phy-is-integrated is added only to board DT.
+> 
+> The first five patchs should go via the sunxi tree.
+> the last one should go via the net tree.
+> Note that this serie will need backporting the patch
+> "Documentation: net: phy: Add phy-is-integrated binding" which is in net-next
+> 
+> Thanks
+> Regards
+> 
+> Changes since v1:
+> - Dropped phy-is-integrated documentation patch since another same patch was already merged
+> - Moved phy-is-integrated from SoC dtsi to final board DT.
+> 
+> Corentin Labbe (6):
+>   ARM: sun8i: orangepipc: Set phy-is-integrated to the internal phy node
+>   ARM: sun8i: beelink-x2: Set phy-is-integrated to the internal phy node
+>   ARM: sun8i: nanopi-neo: Set phy-is-integrated to the internal phy node
+>   ARM: sun8i: orangepi-2: Set phy-is-integrated to the internal phy node
+>   ARM: sun8i: orangepi-one: Set phy-is-integrated to the internal phy
+>     node
+>   net: stmmac: dwmac-sun8i: choose internal PHY via phy-is-integrated
+> 
+>  arch/arm/boot/dts/sun8i-h3-beelink-x2.dts         |  4 ++++
+>  arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts         |  4 ++++
+>  arch/arm/boot/dts/sun8i-h3-orangepi-2.dts         |  4 ++++
+>  arch/arm/boot/dts/sun8i-h3-orangepi-one.dts       |  4 ++++
+>  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts        |  4 ++++
+>  drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 16 ++++++++--------
+>  6 files changed, 28 insertions(+), 8 deletions(-)
+> 
+> -- 
+> 2.13.0
+> 
 
-This probably shouldn't be part of the patch adding the dts node, but
-instead should be a separate patch and should either go through some
-usb tree or at least get an Ack from usb maintainers (Felipe Balbi and/or
-Greg Kroah Hartman), so you should definitly include them into your
-recipient list.
+Hello
 
+Self NACK, the comment from Rob on previous series is pertinent.
+I will send a v3 which use a mdio-mux for solving all problems.
 
-Heiko
+Regards
