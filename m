@@ -1,62 +1,99 @@
 From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Fri, 18 Aug 2017 22:11:52 +0800
-Subject: [PATCH v5 2/7] KVM: arm64: Save ESR_EL2 on guest SError
+Date: Fri, 18 Aug 2017 22:11:56 +0800
+Subject: [PATCH v5 6/7] KVM: arm64: Allow get exception information from
+ userspace
 In-Reply-To: <1503065517-7920-1-git-send-email-gengdongjiu@huawei.com>
 References: <1503065517-7920-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <1503065517-7920-3-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1503065517-7920-7-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+when userspace gets SIGBUS signal, it does not know whether
+this is a synchronous external abort or SError, so needs
+to get the exception syndrome. so this patch allows userspace
+can get this values. For syndrome, only give userspace
+syndrome EC and ISS.
 
-When we exit a guest due to an SError the vcpu fault info isn't updated
-with the ESR. Today this is only done for traps.
+Now we move the synchronous external abort injection logic to
+userspace, when userspace injects the SEA exception to guest
+OS, it needs to specify the far_el1 value, so this patch give
+the exception virtual address to user space.
 
-The v8.2 RAS Extensions define ISS values for SError. Update the vcpu's
-fault_info with the ESR on SError so that handle_exit() can determine
-if this was a RAS SError and decode its severity.
-
-Signed-off-by: James Morse <james.morse@arm.com>
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+Signed-off-by: Quanming Wu <wuquanming@huawei.com>
 ---
- arch/arm64/kvm/hyp/switch.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+ arch/arm64/include/uapi/asm/kvm.h |  5 +++++
+ arch/arm64/kvm/guest.c            | 35 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 945e79c641c4..c6f17c7675ad 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -226,13 +226,20 @@ static bool __hyp_text __translate_far_to_hpfar(u64 far, u64 *hpfar)
- 	return true;
- }
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 9f3ca24bbcc6..514261f682b8 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -181,6 +181,11 @@ struct kvm_arch_memory_slot {
+ #define KVM_REG_ARM64_SYSREG_OP2_MASK	0x0000000000000007
+ #define KVM_REG_ARM64_SYSREG_OP2_SHIFT	0
  
-+static void __hyp_text __populate_fault_info_esr(struct kvm_vcpu *vcpu)
++/* AArch64 fault registers */
++#define KVM_REG_ARM64_FAULT		(0x0014 << KVM_REG_ARM_COPROC_SHIFT)
++#define KVM_REG_ARM64_FAULT_ESR_EC_ISS	(0)
++#define KVM_REG_ARM64_FAULT_FAR		(1)
++
+ #define ARM64_SYS_REG_SHIFT_MASK(x,n) \
+ 	(((x) << KVM_REG_ARM64_SYSREG_ ## n ## _SHIFT) & \
+ 	KVM_REG_ARM64_SYSREG_ ## n ## _MASK)
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 5c7f657dd207..cb383c310f18 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -128,6 +128,38 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ out:
+ 	return err;
+ }
++static int get_fault_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
 +{
-+	vcpu->arch.fault.esr_el2 = read_sysreg_el2(esr);
++	void __user *uaddr = (void __user *)(unsigned long)reg->addr;
++	u32 ec, value;
++	u32 id = reg->id & ~(KVM_REG_ARCH_MASK |
++			KVM_REG_SIZE_MASK | KVM_REG_ARM64_FAULT);
++
++	switch (id) {
++	case KVM_REG_ARM64_FAULT_ESR_EC_ISS:
++		/* The user space needs to know the fault exception
++		 * class field
++		 */
++		ec = kvm_vcpu_get_hsr(vcpu) & ESR_ELx_EC_MASK;
++		value = ec | (kvm_vcpu_get_hsr(vcpu) & ESR_ELx_ISS_MASK);
++
++		if (copy_to_user(uaddr, &value, KVM_REG_SIZE(reg->id)) != 0)
++			return -EFAULT;
++		break;
++	case KVM_REG_ARM64_FAULT_FAR:
++		/* when user space injects synchronized abort, it needs
++		 * to inject the fault address.
++		 */
++		if (copy_to_user(uaddr, &(vcpu->arch.fault.far_el2),
++				KVM_REG_SIZE(reg->id)) != 0)
++			return -EFAULT;
++		break;
++	default:
++		return -ENOENT;
++	}
++	return 0;
 +}
 +
- static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+ 
+ int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
  {
--	u64 esr = read_sysreg_el2(esr);
--	u8 ec = ESR_ELx_EC(esr);
-+	u8 ec;
-+	u64 esr;
- 	u64 hpfar, far;
+@@ -243,6 +275,9 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
+ 		return get_core_reg(vcpu, reg);
  
--	vcpu->arch.fault.esr_el2 = esr;
-+	__populate_fault_info_esr(vcpu);
-+	esr = vcpu->arch.fault.esr_el2;
-+	ec = ESR_ELx_EC(esr);
++	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM64_FAULT)
++		return get_fault_reg(vcpu, reg);
++
+ 	if (is_timer_reg(reg->id))
+ 		return get_timer_reg(vcpu, reg);
  
- 	if (ec != ESR_ELx_EC_DABT_LOW && ec != ESR_ELx_EC_IABT_LOW)
- 		return true;
-@@ -321,6 +328,8 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 	 */
- 	if (exit_code == ARM_EXCEPTION_TRAP && !__populate_fault_info(vcpu))
- 		goto again;
-+	else if (ARM_EXCEPTION_CODE(exit_code) == ARM_EXCEPTION_EL1_SERROR)
-+		__populate_fault_info_esr(vcpu);
- 
- 	if (static_branch_unlikely(&vgic_v2_cpuif_trap) &&
- 	    exit_code == ARM_EXCEPTION_TRAP) {
 -- 
 2.14.0
