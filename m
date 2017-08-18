@@ -1,32 +1,43 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 18 Aug 2017 20:54:20 +0800
-Subject: [PATCH v2 0/3] Add ZTE zx-irdec remote control driver
-In-Reply-To: <1501420993-21977-1-git-send-email-shawnguo@kernel.org>
-References: <1501420993-21977-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <20170818125418.GM7608@dragon>
+From: sr@denx.de (Stefan Roese)
+Date: Fri, 18 Aug 2017 14:59:26 +0200
+Subject: [PATCH v2] irqchip/armada-370-xp: Enable MSI-X support
+Message-ID: <20170818125926.32029-1-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 30, 2017 at 09:23:10PM +0800, Shawn Guo wrote:
-> From: Shawn Guo <shawn.guo@linaro.org>
-> 
-> The series adds dt-bindings and remote control driver for IRDEC block
-> found on ZTE ZX family SoCs.
-> 
-> Changes for v2:
->  - Add one patch to move generic NEC scancode composing and protocol
->    type detection code from ir_nec_decode() into an inline shared
->    function, which can be reused by zx-irdec driver.
-> 
-> Shawn Guo (3):
->   rc: ir-nec-decoder: move scancode composing code into a shared
->     function
->   dt-bindings: add bindings document for zx-irdec
->   rc: add zx-irdec remote control driver
+Armada XP does not only support MSI, but also MSI-X. This patch sets
+the MSI_FLAG_PCI_MSIX flag in the interrupt controller driver which
+is the only change necessary to enable MSI-X support on this SoC. As
+the Linux PCI MSI-X infrastructure takes care of writing the data and
+address structures into the BAR specified by the MSI-X controller.
 
-Hi Sean,
+Signed-off-by: Stefan Roese <sr@denx.de>
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+v2:
+- Added Reviewed-by tag from Thomas
+- Added usual irqchip maintainers
 
-We are getting close to 4.14 merge window.  Can we get this into -next
-for a bit exposure, if you are fine with the patches?
+ drivers/irqchip/irq-armada-370-xp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Shawn
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index 33982cbd8a57..b17039ed8735 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -124,7 +124,7 @@ static struct irq_chip armada_370_xp_msi_irq_chip = {
+ 
+ static struct msi_domain_info armada_370_xp_msi_domain_info = {
+ 	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+-		   MSI_FLAG_MULTI_PCI_MSI),
++		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
+ 	.chip	= &armada_370_xp_msi_irq_chip,
+ };
+ 
+-- 
+2.12.2
