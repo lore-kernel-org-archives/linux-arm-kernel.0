@@ -1,19 +1,22 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Sat, 19 Aug 2017 00:42:59 +0200
-Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.14
-In-Reply-To: <20170818151947.GB7900@arm.com>
-References: <20170818151947.GB7900@arm.com>
-Message-ID: <20170818224258.GN16908@8bytes.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 19 Aug 2017 00:51:20 +0200
+Subject: [PATCH v4 4/8] ARM: dts: rockchip: add pwm dt node for rv1108
+In-Reply-To: <1502700026-8516-1-git-send-email-andy.yan@rock-chips.com>
+References: <1502699477-8063-1-git-send-email-andy.yan@rock-chips.com>
+ <1502700026-8516-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <7232722.hES1xTI2s5@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 04:19:48PM +0100, Will Deacon wrote:
-> The following changes since commit aae4e7a8bc44722fe70d58920a36916b1043195e:
+Am Montag, 14. August 2017, 16:40:26 CEST schrieb Andy Yan:
+> Add pwm device tree node for rv1108 soc
 > 
->   Linux 4.13-rc4 (2017-08-06 18:44:49 -0700)
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
 
-Pulled, thanks Will.
+applied for 4.14, after properly sorting properties
+and adding a missing newline.
+
+
+Thanks
+Heiko
