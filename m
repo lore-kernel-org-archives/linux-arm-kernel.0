@@ -1,47 +1,135 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 18 Aug 2017 10:31:51 +0530
-Subject: [PATCH v2 10/16] dmaengine: bcm-sba-raid: Alloc resources before
- registering DMA device
-In-Reply-To: <20170817063812.GA3053@localhost>
+Date: Fri, 18 Aug 2017 10:33:54 +0530
+Subject: [PATCH v2 15/16] dmaengine: bcm-sba-raid: Add debugfs support
+In-Reply-To: <20170817080142.GC3053@localhost>
 References: <1501583880-32072-1-git-send-email-anup.patel@broadcom.com>
- <1501583880-32072-11-git-send-email-anup.patel@broadcom.com>
- <20170817063812.GA3053@localhost>
-Message-ID: <CAALAos-i22Mm5R1U-GGHPBZE74nKkHH-z_v4y48oD8nHZ6uscA@mail.gmail.com>
+ <1501583880-32072-16-git-send-email-anup.patel@broadcom.com>
+ <20170817080142.GC3053@localhost>
+Message-ID: <CAALAos_SXTMms8XmhEC28gxx4qvvr0z3wqQ=o_-BohMpcXwQTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 12:08 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Tue, Aug 01, 2017 at 04:07:54PM +0530, Anup Patel wrote:
->> We should allocate DMA channel resources before registering the
->> DMA device in sba_probe() because we can get DMA request soon
->> after registering the DMA device. If DMA channel resources are
->> not allocated before first DMA request then SBA-RAID driver will
->> crash.
+On Thu, Aug 17, 2017 at 1:31 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Tue, Aug 01, 2017 at 04:07:59PM +0530, Anup Patel wrote:
+>> This patch adds debugfs support to report stats via debugfs
+>> which in-turn will help debug hang or error situations.
 >>
 >> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 >> ---
->>  drivers/dma/bcm-sba-raid.c | 30 +++++++++++++++---------------
->>  1 file changed, 15 insertions(+), 15 deletions(-)
+>>  drivers/dma/bcm-sba-raid.c | 82 +++++++++++++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 81 insertions(+), 1 deletion(-)
 >>
 >> diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
->> index f6616da..f14ed0a 100644
+>> index f0a0e80..f9d110c 100644
 >> --- a/drivers/dma/bcm-sba-raid.c
 >> +++ b/drivers/dma/bcm-sba-raid.c
->> @@ -1478,13 +1478,13 @@ static int sba_prealloc_channel_resources(struct sba_device *sba)
->>       int i, j, ret = 0;
->>       struct sba_request *req = NULL;
+>> @@ -36,6 +36,7 @@
+>>   */
 >>
->> -     sba->resp_base = dma_alloc_coherent(sba->dma_dev.dev,
->> +     sba->resp_base = dma_alloc_coherent(sba->mbox_dev,
+>>  #include <linux/bitops.h>
+>> +#include <linux/debugfs.h>
+>>  #include <linux/dma-mapping.h>
+>>  #include <linux/dmaengine.h>
+>>  #include <linux/list.h>
+>> @@ -162,6 +163,9 @@ struct sba_device {
+>>       struct list_head reqs_completed_list;
+>>       struct list_head reqs_aborted_list;
+>>       struct list_head reqs_free_list;
+>> +     /* DebugFS directory entries */
+>> +     struct dentry *root;
+>> +     struct dentry *stats;
+>>  };
+>>
+>>  /* ====== Command helper routines ===== */
+>> @@ -486,6 +490,45 @@ static void sba_process_received_request(struct sba_device *sba,
+>>       }
+>>  }
+>>
+>> +static void sba_write_stats_in_seqfile(struct sba_device *sba,
+>> +                                    struct seq_file *file)
+>> +{
+>> +     unsigned long flags;
+>> +     struct sba_request *req;
+>> +     u32 free_count = 0, alloced_count = 0, pending_count = 0;
+>> +     u32 active_count = 0, aborted_count = 0, completed_count = 0;
+>> +
+>> +     spin_lock_irqsave(&sba->reqs_lock, flags);
+>> +
+>> +     list_for_each_entry(req, &sba->reqs_free_list, node)
+>> +             free_count++;
+>> +
+>> +     list_for_each_entry(req, &sba->reqs_alloc_list, node)
+>> +             alloced_count++;
+>> +
+>> +     list_for_each_entry(req, &sba->reqs_pending_list, node)
+>> +             pending_count++;
+>> +
+>> +     list_for_each_entry(req, &sba->reqs_active_list, node)
+>> +             active_count++;
+>> +
+>> +     list_for_each_entry(req, &sba->reqs_aborted_list, node)
+>> +             aborted_count++;
+>> +
+>> +     list_for_each_entry(req, &sba->reqs_completed_list, node)
+>> +             completed_count++;
+>> +
+>> +     spin_unlock_irqrestore(&sba->reqs_lock, flags);
+>> +
+>> +     seq_printf(file, "maximum requests   = %d\n", sba->max_req);
+>> +     seq_printf(file, "free requests      = %d\n", free_count);
+>> +     seq_printf(file, "alloced requests   = %d\n", alloced_count);
+>> +     seq_printf(file, "pending requests   = %d\n", pending_count);
+>> +     seq_printf(file, "active requests    = %d\n", active_count);
+>> +     seq_printf(file, "aborted requests   = %d\n", aborted_count);
+>> +     seq_printf(file, "completed requests = %d\n", completed_count);
+>> +}
+>> +
+>>  /* ====== DMAENGINE callbacks ===== */
+>>
+>>  static void sba_free_chan_resources(struct dma_chan *dchan)
+>> @@ -1451,6 +1494,19 @@ static void sba_receive_message(struct mbox_client *cl, void *msg)
+>>       sba_process_received_request(sba, req);
+>>  }
+>>
+>> +/* ====== Debugfs callbacks ====== */
+>> +
+>> +static int sba_debugfs_stats_show(struct seq_file *file, void *offset)
+>> +{
+>> +     struct platform_device *pdev = to_platform_device(file->private);
+>> +     struct sba_device *sba = platform_get_drvdata(pdev);
+>> +
+>> +     /* Write stats in file */
+>> +     sba_write_stats_in_seqfile(sba, file);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>>  /* ====== Platform driver routines ===== */
+>>
+>>  static int sba_prealloc_channel_resources(struct sba_device *sba)
+>> @@ -1721,10 +1777,30 @@ static int sba_probe(struct platform_device *pdev)
+>>       if (ret)
+>>               goto fail_free_mchans;
+>>
+>> +     /* Check availability of debugfs */
+>> +     if (!debugfs_initialized())
+>> +             goto skip_debugfs;
+>> +
+>> +     /* Create debugfs root entry */
+>> +     sba->root = debugfs_create_dir(dev_name(sba->dev), NULL);
+>> +     if (IS_ERR_OR_NULL(sba->root)) {
+>> +             ret = PTR_ERR_OR_ZERO(sba->root);
+>> +             goto fail_free_resources;
 >
-> how does this qualify as move before registering, you seem to be using
-> different device now
+> why fail, debugfs should be an optional thingy, why would you want to fail here?
 
-The sba->dma_dev.dev is assigned in sba_async_register().
+Yes, we are handling the case when debugfs is not available
+and skipping debugfs gracefully.
 
-Now, if we are calling sba_async_register() after
-sba_prealloc_channel_resources() then we cannot
-use sba->dma_dev.dev in sba_prealloc_channel_resources()
+If debugfs is available then failure of debugfs_create_dir()
+should be reported.
 
 Regards,
 Anup
