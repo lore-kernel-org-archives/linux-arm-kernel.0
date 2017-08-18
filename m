@@ -1,90 +1,86 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 18 Aug 2017 15:22:18 +0100
-Subject: [PATCH RFC 0/2] KVM: use RCU to allow dynamic kvm->vcpus array
-In-Reply-To: <20170818141028.GG2566@flask>
-References: <20170816194037.9460-1-rkrcmar@redhat.com>
- <b77b151f-e51d-3657-66e9-6fbc83887b18@suse.de> <20170817145411.GE2566@flask>
- <edb9403f-3a94-605d-5f06-9bc81ca4d2c3@suse.de> <20170818141028.GG2566@flask>
-Message-ID: <5186b185-9db8-304d-25b9-20957fb9c545@arm.com>
+From: jeffy.chen@rock-chips.com (jeffy)
+Date: Fri, 18 Aug 2017 22:41:44 +0800
+Subject: [PATCH v3 2/9] ASoC: rockchip: Remove obsolete dmic-delay
+In-Reply-To: <20170818115223.pyfqji5jkplt6isx@sirena.org.uk>
+References: <20170817044417.22069-1-jeffy.chen@rock-chips.com>
+ <20170817044417.22069-3-jeffy.chen@rock-chips.com>
+ <20170817171152.abf3ngr6nr22jfif@sirena.org.uk>
+ <599645E2.4020402@rock-chips.com>
+ <20170818115223.pyfqji5jkplt6isx@sirena.org.uk>
+Message-ID: <5996FCA8.9090909@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/08/17 15:10, Radim Kr?m?? wrote:
-> 2017-08-17 21:17+0200, Alexander Graf:
->> On 17.08.17 16:54, Radim Kr?m?? wrote:
->>> 2017-08-17 09:04+0200, Alexander Graf:
->>>> What if we just sent a "vcpu move" request to all vcpus with the new pointer
->>>> after it moved? That way the vcpu thread itself would be responsible for the
->>>> migration to the new memory region. Only if all vcpus successfully moved,
->>>> keep rolling (and allow foreign get_vcpu again).
->>>
->>> I'm not sure if I understood this.  You propose to cache kvm->vcpus in
->>> vcpu->vcpus and do an extensions of this,
->>>
->>>    int vcpu_create(...) {
->>>      if (resize_needed(kvm->vcpus)) {
->>>        old_vcpus = kvm->vcpus
->>>        kvm->vcpus = make_bigger(kvm->vcpus)
->>
->> if (kvm->vcpus != old_vcpus) :)
->>
->>>        kvm_make_all_cpus_request(kvm, KVM_REQ_UPDATE_VCPUS)
->>
->> IIRC you'd need some manual bookkeeping to ensure that all users have
->> switched to the new array. Or set the KVM_REQUEST_WAIT flag :).
-> 
-> Absolutely.  I was thinking about synchronous execution, which might
-> need extra work to expedite halted VCPUs.  Letting the last user free it
-> is plausible and would need more protection against races.
-> 
->>>        free(old_vcpus)
->>>      }
->>>      vcpu->vcpus = kvm->vcpus
->>>    }
->>>
->>> with added extra locking, (S)RCU, on accesses that do not come from
->>> VCPUs (irqfd and VM ioctl)?
->>
->> Well, in an ideal world we wouldn't have any users to vcpu structs outside
->> of the vcpus obviously. Every time we do, we should either reconsider
->> whether the design is smart and if we think it is, protect them accordingly.
-> 
-> And there would be no linear access to all VCPUs. :)
-> 
-> The main user of kvm->vcpus is kvm_for_each_vcpu(), which is well suited
-> for a list, so we can change the design of kvm_for_each_vcpu() to use a
-> list head in struct kvm_vcpu with head/tail in struct kvm.
-> (The list is trivial to make lockless as we only append.)
-> 
-> This would allow more flexibility with the remaining uses.
-> 
->> Maybe even hard code separate request mechanisms for the few cases where
->> it's reasonable?
-> 
-> All non-kvm_for_each_vcpu() seem to need accesss outside of VCPU scope.
-> 
-> We have few awkward accesses that can be handled keeping track of kvm
-> state and all remaining uses need some kind of "int -> struct kvm_vcpu"
-> mapping, where the integer is arbitrary.
-> 
-> All users of kvm_get_vcpu_by_id() need a vcpu_id mapping, but hijack
-> kvm->vcpus for O(1) access if lucky, with fallback to
-> kvm_for_each_vcpu().  Adding a vcpu_id mapping seems reasonable.
-> 
-> s390 __floating_irq_kick() and x86 kvm_irq_delivery_to_apic() are
-> keeping a bitmap for kvm->vcpus indices.  They want compact indices,
-> which cannot be provided by vcpu_id mapping.
-> 
-> I think that MIPS and ARM use the index in kvm->vcpus for userspace
-> communication, which looks dangerous as userspace shouldn't know the
-> position.  Not much we can do because of that.
-I think (at least for the ARM side) that we could switch whatever use we
-have of the index to a vcpu_id. The worse offender (as far as I can
-remember) is when injecting an interrupt, and that could be creatively
-re-purposed to describe an affinity value in a backward compatible way.
+Hi Mark,
 
-Probably.
+On 08/18/2017 07:52 PM, Mark Brown wrote:
+> On Fri, Aug 18, 2017 at 09:41:54AM +0800, jeffy wrote:
+>> On 08/18/2017 01:11 AM, Mark Brown wrote:
+>>> On Thu, Aug 17, 2017 at 12:44:10PM +0800, Jeffy Chen wrote:
+>
+>>>> -Optional properties:
+>>>> -- dmic-wakeup-delay-ms : specify delay time (ms) for DMIC ready.
+>>>> -  If this option is specified, which means it's required dmic need
+>>>> -  delay for DMIC to ready so that rt5514 can avoid recording before
+>>>> -  DMIC send valid data
+>
+>>> Why would nobody ever want to use this in future?
+>
+>> hmmm, check again, rt5514 fixed this issue in there driver instead in:
+>> a5461fd6c8f7 ASoC: rt5514: Add the DMIC initial delay to wait it ready.
+>
+>> so we don't need this...
+>
+> You don't need it on your board for new DTs but why is it not possible
+> that another board might need it?
+>
 
-	N,
--- 
-Jazz is not dead. It just smells funny...
+this property is added in:
+3a6f9dce6116 ASoC: rk3399_gru_sound: fix recording pop at first attempt
+
+to fix pop noise by performing a delay after set dmic clk.
+
+the binding said "dmic-wakeup-delay-ms", but actually driver parses 
+"dmic-delay":
+
++       /* Set DMIC delay */
++       ret = device_property_read_u32(&pdev->dev, "dmic-delay",
++                                       &rt5514_dmic_delay);
+
+@@ -123,6 +125,9 @@ static int rockchip_sound_rt5514_hw_params(struct 
+snd_pcm_subst
+ream *substream,
+                 return ret;
+         }
+
++       /* Wait for DMIC stable */
++       msleep(rt5514_dmic_delay); <-- perform a delay after set dmic clk
++
+         return 0;
+  }
+
+then realtek guys fixed this issue in the rt5514 codec driver:
+a5461fd6c8f7 ASoC: rt5514: Add the DMIC initial delay to wait it ready.
+
++       device_property_read_u32(dev, "realtek,dmic-init-delay-ms",
++               &rt5514->pdata.dmic_init_delay);
+
+@@ -452,6 +452,9 @@ static int rt5514_set_dmic_clk(struct 
+snd_soc_dapm_widget *w,
+                         RT5514_CLK_DMIC_OUT_SEL_MASK,
+                         idx << RT5514_CLK_DMIC_OUT_SEL_SFT);
+
++       if (rt5514->pdata.dmic_init_delay)
++               msleep(rt5514->pdata.dmic_init_delay); <-- perform a 
+delay after set dmic clk
+
+
+so we don't need to deal with it in every boards' drivers which using 
+rt5514 codec, and we are using this new property now:
+ag dmic arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+620:            realtek,dmic-init-delay = <20>;   <---- oops, seems 
+missing "-ms"@the end, guess due to realtek patch ends up differently 
+on upstream. will send a patch to fix it later.
+
+
+anyway, i think it's ok to remove that out-dated property in our driver :)
