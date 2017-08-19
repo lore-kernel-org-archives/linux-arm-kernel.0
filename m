@@ -1,159 +1,104 @@
-From: illusionist.neo@gmail.com (Shubham Bansal)
-Date: Sun, 20 Aug 2017 03:16:02 +0530
-Subject: [PATCH net-next v3] arm: eBPF JIT compiler
-In-Reply-To: <CAHgaXd+hccuUYXfTs6gMbvxBctrypofc2FJ10q3QAc0jGsgeyQ@mail.gmail.com>
-References: <1503134429-29063-1-git-send-email-illusionist.neo@gmail.com>
- <c2f4c796-0cb0-7eca-6cab-fed6b25020d5@fb.com>
- <CAHgaXdJnHxu4gJ8ZVFmrmaXyZL1oFkTbz2K___xKLQedTLmBQg@mail.gmail.com>
- <9d77730f-c6a8-b337-599e-5919207a7e0a@fb.com>
- <CAHgaXd+hccuUYXfTs6gMbvxBctrypofc2FJ10q3QAc0jGsgeyQ@mail.gmail.com>
-Message-ID: <CAHgaXdJDOseZk0=4uCGeCx44kgnvHf1gnh7CX2c6dTzXb8Rk+g@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 19 Aug 2017 16:07:01 -0700
+Subject: [GIT PULL 6/6] Broadcom drivers changes for 4.14
+In-Reply-To: <CAK8P3a0RDuMAdACCepTj_zr4NkocM5vSVGEayjGPbyTuQ7TwBQ@mail.gmail.com>
+References: <20170817183748.1450-1-f.fainelli@gmail.com>
+ <20170817183748.1450-7-f.fainelli@gmail.com>
+ <CAK8P3a1id0Wd7XdH+9MsgaK-UCNmYE5ks1p4bzont-T03v5tEA@mail.gmail.com>
+ <124419b2-4f45-d282-2aea-c8e0c3a819c5@gmail.com>
+ <CAK8P3a0RDuMAdACCepTj_zr4NkocM5vSVGEayjGPbyTuQ7TwBQ@mail.gmail.com>
+Message-ID: <5722f17c-194b-3e13-b702-c51683abfba0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Qemu is giving me different numbers different time.
-Another stats.
-
-With bpf_jit_enable set
-
-test_pkt_access:PASS:ipv4 271 nsec
-test_pkt_access:PASS:ipv6 297 nsec
-test_xdp:PASS:ipv4 961517 nsec     <--- Here is the difference.
-test_xdp:PASS:ipv6 615855 nsec     <--- Here is the difference.
-test_l4lb:PASS:ipv4 3049 nsec
-test_l4lb:PASS:ipv6 3906 nsec
-test_tcp_estats:PASS: 0 nsec
-test_bpf_obj_id:PASS:get-fd-by-notexist-prog-id 0 nsec
-test_bpf_obj_id:PASS:get-fd-by-notexist-map-id 0 nsec
-test_bpf_obj_id:PASS:get-prog-info(fd) 0 nsec
-test_bpf_obj_id:PASS:get-map-info(fd) 0 nsec
-test_bpf_obj_id:PASS:get-prog-info(fd) 0 nsec
-test_bpf_obj_id:PASS:get-map-info(fd) 0 nsec
-test_bpf_obj_id:PASS:get-prog-fd(next_id) 0 nsec
-test_bpf_obj_id:PASS:get-prog-info(next_id->fd) 0 nsec
-test_bpf_obj_id:PASS:get-prog-fd(next_id) 0 nsec
-test_bpf_obj_id:PASS:get-prog-info(next_id->fd) 0 nsec
-test_bpf_obj_id:PASS:check total prog id found by get_next_id 0 nsec
-test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-test_bpf_obj_id:PASS:check get-map-info(next_id->fd) 0 nsec
-test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-test_bpf_obj_id:PASS:check get-map-info(next_id->fd) 0 nsec
-test_bpf_obj_id:PASS:check total map id found by get_next_id 0 nsec
-test_pkt_md_access:PASS: 30459 nsec    <--- Here is the difference.
-Summary: 30 PASSED, 0 FAILED
 
 
-On Sun, Aug 20, 2017 at 2:58 AM, Shubham Bansal
-<illusionist.neo@gmail.com> wrote:
-> Here are numbers.
->
-> Without any JIT enabled
->
-> test_pkt_access:PASS:ipv4 1823 nsec
-> test_pkt_access:PASS:ipv6 1743 nsec
-> test_xdp:PASS:ipv4 769022 nsec
-> test_xdp:PASS:ipv6 15408 nsec
-> test_l4lb:PASS:ipv4 12441 nsec
-> test_l4lb:PASS:ipv6 18131 nsec
-> test_tcp_estats:PASS: 0 nsec
-> test_bpf_obj_id:PASS:get-fd-by-notexist-prog-id 0 nsec
-> test_bpf_obj_id:PASS:get-fd-by-notexist-map-id 0 nsec
-> test_bpf_obj_id:PASS:get-prog-info(fd) 0 nsec
-> test_bpf_obj_id:PASS:get-map-info(fd) 0 nsec
-> test_bpf_obj_id:PASS:get-prog-info(fd) 0 nsec
-> test_bpf_obj_id:PASS:get-map-info(fd) 0 nsec
-> test_bpf_obj_id:PASS:get-prog-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-prog-info(next_id->fd) 0 nsec
-> test_bpf_obj_id:PASS:get-prog-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-prog-info(next_id->fd) 0 nsec
-> test_bpf_obj_id:PASS:check total prog id found by get_next_id 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:check get-map-info(next_id->fd) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:check get-map-info(next_id->fd) 0 nsec
-> test_bpf_obj_id:PASS:check total map id found by get_next_id 0 nsec
-> test_pkt_md_access:PASS: 5816 nsec
-> Summary: 30 PASSED, 0 FAILED
->
-> With only bpf_jit_enable
->
-> test_pkt_access:PASS:ipv4 263 nsec
-> test_pkt_access:PASS:ipv6 337 nsec
-> test_xdp:PASS:ipv4 1377212 nsec
-> test_xdp:PASS:ipv6 1290381 nsec
-> test_l4lb:PASS:ipv4 2689 nsec
-> test_l4lb:PASS:ipv6 3804 nsec
-> test_tcp_estats:PASS: 0 nsec
-> test_bpf_obj_id:PASS:get-fd-by-notexist-prog-id 0 nsec
-> test_bpf_obj_id:PASS:get-fd-by-notexist-map-id 0 nsec
-> test_bpf_obj_id:PASS:get-prog-info(fd) 0 nsec
-> test_bpf_obj_id:PASS:get-map-info(fd) 0 nsec
-> test_bpf_obj_id:PASS:get-prog-info(fd) 0 nsec
-> test_bpf_obj_id:PASS:get-map-info(fd) 0 nsec
-> test_bpf_obj_id:PASS:get-prog-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-prog-info(next_id->fd) 0 nsec
-> test_bpf_obj_id:PASS:get-prog-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-prog-info(next_id->fd) 0 nsec
-> test_bpf_obj_id:PASS:check total prog id found by get_next_id 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:check get-map-info(next_id->fd) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:check get-map-info(next_id->fd) 0 nsec
-> test_bpf_obj_id:PASS:check total map id found by get_next_id 0 nsec
-> test_pkt_md_access:PASS: 41609 nsec
-> Summary: 30 PASSED, 0 FAILED
->
->
-> With bpf_jit_enable and bpf_jit_harden set
->
-> test_pkt_access:PASS:ipv4 416 nsec
-> test_pkt_access:PASS:ipv6 509 nsec
-> test_xdp:PASS:ipv4 1512428 nsec
-> test_xdp:PASS:ipv6 962318 nsec
-> test_l4lb:PASS:ipv4 4135 nsec
-> test_l4lb:PASS:ipv6 5497 nsec
-> test_tcp_estats:PASS: 0 nsec
-> test_bpf_obj_id:PASS:get-fd-by-notexist-prog-id 0 nsec
-> test_bpf_obj_id:PASS:get-fd-by-notexist-map-id 0 nsec
-> test_bpf_obj_id:PASS:get-prog-info(fd) 0 nsec
-> test_bpf_obj_id:PASS:get-map-info(fd) 0 nsec
-> test_bpf_obj_id:PASS:get-prog-info(fd) 0 nsec
-> test_bpf_obj_id:PASS:get-map-info(fd) 0 nsec
-> test_bpf_obj_id:PASS:get-prog-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-prog-info(next_id->fd) 0 nsec
-> test_bpf_obj_id:PASS:get-prog-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-prog-info(next_id->fd) 0 nsec
-> test_bpf_obj_id:PASS:check total prog id found by get_next_id 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:check get-map-info(next_id->fd) 0 nsec
-> test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
-> test_bpf_obj_id:PASS:check get-map-info(next_id->fd) 0 nsec
-> test_bpf_obj_id:PASS:check total map id found by get_next_id 0 nsec
-> test_pkt_md_access:PASS: 24774 nsec
-> Summary: 30 PASSED, 0 FAILED
->
-> -Shubham
+On 08/19/2017 01:34 PM, Arnd Bergmann wrote:
+> On Sat, Aug 19, 2017 at 12:35 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> On 08/18/2017 02:58 PM, Arnd Bergmann wrote:
+>>> On Thu, Aug 17, 2017 at 8:37 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>>>> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+>>>>
+>>>>   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.14/drivers
+>>>>
+>>>> for you to fetch changes up to 7f95522be533c27a918fe388ae5d733344660ef2:
+>>>>
+>>>>   soc bcm: brcmstb: Add support for S2/S3/S5 suspend states (MIPS) (2017-07-28 16:57:03 -0700)
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> This pull request contains Broadcom ARM/ARM64 SoC drivers changes for 4.14,
+>>>> please pull the following:
+>>>>
+>>>> - Markus adds support for the Broadcom STB DDR PHY frontend which supports
+>>>>   dynamic firmware loading and offers the ability to respond with DRAM refresh
+>>>>   rates. He also adds a proper documentation binding document for that peripheral
+>>>>
+>>>
+>>> I had not seen this driver before, but now I looked at it and have two small
+>>> comments:
+>>>
+>>> - I'd rather see this added to drivers/memory than drivers/soc. The distinction
+>>>   is not always clear, but I think that's where most of the DDR memory interface
+>>>   drivers are at the moment.
+>>
+>> This driver does not control the SoC's memory interface though it does
+>> talk to the frontend processor built into the DDR controller to first
+>> load its firmware and then query it to get the DDR refresh rates. If you
+>> feel like drivers/memory/broadcom/ is more appropriate I suppose we
+>> could relocate the driver there.
+> 
+> Yes, I still think it makes sense to put it there, although it's not the only
+> possible choice. drivers/memory is a very broad category that groups
+> all kinds of things that are related to memory interfaces.
+
+Alright, we'll move it there.
+
+> 
+>>> - In a function called __write_firmware, I stumbled over this small
+>>>   hunk and similar functions elsewhere in the driver:
+>>>
+>>> +       /* Now copy it. */
+>>> +       if (is_big_endian) {
+>>> +               for (i = 0; i < size; i++)
+>>> +                       writel_relaxed(be32_to_cpu(fw[i]), mem + i);
+>>> +       } else {
+>>> +               for (i = 0; i < size; i++)
+>>> +                       writel_relaxed(fw[i], mem + i);
+>>> +       }
+>>>
+>>> This looks wrong to me, as the behavior is different between
+>>> little-endian and big-endian kernels: the former will byteswap
+>>> big-endian fw images but not little-endian images, while the
+>>> latter will byte-swap both.
+>>>
+>>> What is the expected behavior here?
+>>
+>> So the is_big_endian flag actually refers to the endianess of the DPFE
+>> CPU/firmware image here, so if I read this code correctly, we have the
+>> following happening
+>>
+>> LE kernel + BE DPFE: swapping from BE to LE during file read but not I/O
+>> write (KO because resulting DPFE image is LE)
+>> LE kernel + LE DPFE: no-swapping (OK)
+>>
+>> BE kernel + BE DPFE: swapping to LE during I/O write not file read (KO,
+>> because resulting DPFE image is LE)
+>> BE kernel + LE DPFE: swapping to LE during I/O write not file read (OK)
+>>
+>> Markus, does that sound like what is happening?
+> 
+> I suspect it would be better to never swap while copying the image from
+> memory to I/O and always use memcpy_toio there, which performs
+> a byte stream copy. The information you then need really is not what
+> the endianess of the DPFE CPU is, but rather if it was stored as
+> byte-reversed in the file.
+
+I think you are right, it does not look like we need to swap and since
+we are actually already checking the endianess of the file it should be
+a lot simpler, we'll fix that too. Thanks!
+-- 
+Florian
