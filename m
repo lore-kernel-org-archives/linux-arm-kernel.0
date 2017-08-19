@@ -1,39 +1,48 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat, 19 Aug 2017 09:26:03 +0200
-Subject: [PATCH v5 3/9] mfd: tmio: Add partition parsers platform data
-In-Reply-To: <20170815065835.jcuweb377lqioddc@dell>
-References: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
- <1502743720-28672-4-git-send-email-andrea.adami@gmail.com>
- <20170815065835.jcuweb377lqioddc@dell>
-Message-ID: <20170819092603.1c919b4b@bbrezillon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 19 Aug 2017 15:56:59 +0800
+Subject: [GIT PULL 1/4] Allwinner arm64 defconfig changes for 4.14, round 2
+Message-ID: <20170819075659.w2tndblqwhesniuv@wens.csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Arnd, Olof,
 
-Le Tue, 15 Aug 2017 07:58:35 +0100,
-Lee Jones <lee.jones@linaro.org> a ?crit :
+This is the second round of pull requests for Allwinner changes for 4.14.
+There were no arm64 defconfig changes in round 1.
 
-> On Mon, 14 Aug 2017, Andrea Adami wrote:
-> 
-> > With the introduction of sharpslpart partition parser we can now read the
-> > offsets from NAND: we specify the list of the parsers as platform data, with
-> > cmdlinepart and ofpart parsers first allowing to override the part. table
-> > written in NAND. This is done in the board files using this driver.
-> > 
-> > Thus, we need to extend tmio_nand_data to consider the partition parsers.
-> > 
-> > Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
-> > ---
-> >  include/linux/mfd/tmio.h | 1 +
-> >  1 file changed, 1 insertion(+)  
-> 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> 
+Please have a look.
 
-I'm about to apply patches 1 to 5 of this series to the nand/next
-branch. Do you want me to create an immutable branch with this patch?
+Thanks!
+ChenYu
 
-Regards,
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
-Boris
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-config64-for-4.14
+
+for you to fetch changes up to 908d10b02b80a81c5dd1cee88165db2a30e23d45:
+
+  arm64: defconfig: Enable REGULATOR_AXP20X (2017-08-14 15:26:09 +0800)
+
+----------------------------------------------------------------
+Allwinner arm64 defconfig changes for 4.14
+
+Enable X-Powers AXP series PMIC mfd and regulator support by default.
+
+----------------------------------------------------------------
+Jagan Teki (2):
+      arm64: defconfig: Enable MFD_AXP20X_RSB
+      arm64: defconfig: Enable REGULATOR_AXP20X
+
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170819/302341d8/attachment.sig>
