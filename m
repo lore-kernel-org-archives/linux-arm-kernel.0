@@ -1,63 +1,63 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 19 Aug 2017 11:58:00 +0100
-Subject: [PATCH] arm64: fpsimd: Prevent registers leaking across exec
-In-Reply-To: <1503071821-13845-1-git-send-email-Dave.Martin@arm.com>
-References: <1503071821-13845-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <CAKv+Gu8w0Mr61LZ57fLxCuHqakfYMt1tvMfbbTdNAeaOYoVTYg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 19 Aug 2017 12:10:48 +0100
+Subject: [PATCH v3 2/8] irqchip/gic-v3-its: Initialize MSIs with
+ subsys_initcalls
+In-Reply-To: <20170808122259.6299-3-rrichter@cavium.com> (Robert Richter's
+ message of "Tue, 8 Aug 2017 14:22:52 +0200")
+References: <20170808122259.6299-1-rrichter@cavium.com>
+ <20170808122259.6299-3-rrichter@cavium.com>
+Message-ID: <86wp5zx16v.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 August 2017 at 16:57, Dave Martin <Dave.Martin@arm.com> wrote:
-> There are some tricky dependencies between the different stages of
-> flushing the FPSIMD register state during exec, and these can race
-> with context switch in ways that can cause the old task's regs to
-> leak across.  In particular, a context switch during the memset() can
-> cause some of the task's old FPSIMD registers to reappear.
+On Tue, Aug 08 2017 at  2:22:52 pm BST, Robert Richter <rrichter@cavium.com> wrote:
+> This allows us to use kernel core functionality (e.g. cma) for ITS
+> initialization. MSIs must be up before the device_initcalls (pci and
+> platform device probe) and after arch_initcalls (dma init), so
+> subsys_initcall is fine.
 >
-> Disabling preemption for this small window would be no big deal for
-> performance: preemption is already disabled for similar scenarios
-> like updating the FPSIMD registers in sigreturn.
->
-> So, instead of rearranging things in ways that might swap existing
-> subtle bugs for new ones, this patch just disables preemption
-> around the FPSIMD state flushing so that races of this type can't
-> occur here.  This brings fpsimd_flush_thread() into line with other
-> code paths.
->
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: stable at vger.kernel.org
-> Fixes: 674c242c9323 ("arm64: flush FP/SIMD state correctly after execve()")
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
 > ---
+>  drivers/irqchip/irq-gic-v3-its-pci-msi.c      | 2 +-
+>  drivers/irqchip/irq-gic-v3-its-platform-msi.c | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 >
-> NOTE TO MAINTAINERS: This is a fix, applicable to *v4.13* and stable.
->
-> The kernel-mode NEON rework already queued for v4.14 turns this into a
-> local_bh_disable() as a side effect, so does not strictly need this
-> patch.  When merging, the queued v4.14 changes should be retained.
->
->  arch/arm64/kernel/fpsimd.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 06da8ea..c7b4995 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -161,9 +161,11 @@ void fpsimd_flush_thread(void)
->  {
->         if (!system_supports_fpsimd())
->                 return;
-> +       preempt_disable();
->         memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
->         fpsimd_flush_task_state(current);
->         set_thread_flag(TIF_FOREIGN_FPSTATE);
-> +       preempt_enable();
+> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> index 77931214d954..5940fdf0036e 100644
+> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> @@ -193,4 +193,4 @@ static int __init its_pci_msi_init(void)
+>  
+>  	return 0;
 >  }
->
->  /*
-> --
-> 2.1.4
->
+> -early_initcall(its_pci_msi_init);
+> +subsys_initcall(its_pci_msi_init);
+> diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+> index 249240d9a425..6ebc871ac63f 100644
+> --- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+> +++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+> @@ -166,4 +166,4 @@ static int __init its_pmsi_init(void)
+>  	its_pmsi_acpi_init();
+>  	return 0;
+>  }
+> -early_initcall(its_pmsi_init);
+> +subsys_initcall(its_pmsi_init);
+
+You've missed the fsl-mc stuff in staging, which has the same behaviour,
+except that it is a postcore_initcall.
+
+More importantly, what guarantees do we have that this doesn't break
+anything else? Sure, the ITS itself will work fine, but what about the
+subsystems that depend on it? Just on the PCI side, I can see a bunch of
+initcalls that are much earlier than subsys, and that says nothing of
+other subsystems (such as the above fsl stuff).
+
+I'm not saying that this is wrong, but I'd like some evidence that
+you've done the required due diligence, ensuring this will not cause any
+regression.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
