@@ -1,81 +1,66 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sat, 19 Aug 2017 16:15:48 -0500
-Subject: [PATCH 1/4] PCI:xilinx-nwl: Enable Root DMA
-In-Reply-To: <1502190739-13474-2-git-send-email-vjonnal@xilinx.com>
+Date: Sat, 19 Aug 2017 16:18:03 -0500
+Subject: [PATCH 2/4] PCI:xilinx-nwl: Correcting Styling checks
+In-Reply-To: <1502190739-13474-3-git-send-email-vjonnal@xilinx.com>
 References: <1502190739-13474-1-git-send-email-vjonnal@xilinx.com>
- <1502190739-13474-2-git-send-email-vjonnal@xilinx.com>
-Message-ID: <20170819211548.GU28977@bhelgaas-glaptop.roam.corp.google.com>
+ <1502190739-13474-3-git-send-email-vjonnal@xilinx.com>
+Message-ID: <20170819211803.GV28977@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 04:42:16PM +0530, Ravi Shankar Jonnalagadda wrote:
+On Tue, Aug 08, 2017 at 04:42:17PM +0530, Ravi Shankar Jonnalagadda wrote:
 
-Please update the subject line to match previous changes to this file,
-e.g. (note spacing),
+s/PCI:xilinx-nwl: Correcting Styling checks/PCI: xilinx-nwl: Clean up whitespace/
 
-  PCI: xilinx-nwl: Enable Root DMA
+> Correcting Style checks thrown by checkpatch scripts
 
-> Enabling Root DMA interrupts
-
-s/Enabling/Enable/  (also in code comments)
-
-> Adding Root DMA translations to bridge for Register Access
-
-s/Adding/Add/
+s/Correcting Style checks thrown/Correct whitespace errors reported/
 
 > Signed-off-by: Ravi Shankar Jonnalagadda <vjonnal@xilinx.com>
 
-This should have an ack from Michal, but as far as I'm concerned:
-
 Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-Since the bulk of this series is in drivers/dma, I assume Dan or Vinod
-will take care of it.
-
 > ---
->  drivers/pci/host/pcie-xilinx-nwl.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
+>  drivers/pci/host/pcie-xilinx-nwl.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 > 
 > diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-> index eec641a..5766582 100644
+> index 5766582..3c62e3d 100644
 > --- a/drivers/pci/host/pcie-xilinx-nwl.c
 > +++ b/drivers/pci/host/pcie-xilinx-nwl.c
-> @@ -39,6 +39,11 @@
->  #define E_ECAM_CONTROL			0x00000228
->  #define E_ECAM_BASE_LO			0x00000230
->  #define E_ECAM_BASE_HI			0x00000234
-> +#define E_DREG_CTRL			0x00000288
-> +#define E_DREG_BASE_LO			0x00000290
+> @@ -506,15 +506,15 @@ static int nwl_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+>  
+>  	for (i = 0; i < nr_irqs; i++) {
+>  		irq_domain_set_info(domain, virq + i, bit + i, &nwl_irq_chip,
+> -				domain->host_data, handle_simple_irq,
+> -				NULL, NULL);
+> +				    domain->host_data, handle_simple_irq,
+> +				    NULL, NULL);
+>  	}
+>  	mutex_unlock(&msi->lock);
+>  	return 0;
+>  }
+>  
+>  static void nwl_irq_domain_free(struct irq_domain *domain, unsigned int virq,
+> -					unsigned int nr_irqs)
+> +				unsigned int nr_irqs)
+>  {
+>  	struct irq_data *data = irq_domain_get_irq_data(domain, virq);
+>  	struct nwl_pcie *pcie = irq_data_get_irq_chip_data(data);
+> @@ -767,7 +767,6 @@ static int nwl_pcie_bridge_init(struct nwl_pcie *pcie)
+>  	/* Enable all misc interrupts */
+>  	nwl_bridge_writel(pcie, MSGF_MISC_SR_MASKALL, MSGF_MISC_MASK);
+>  
+> -
+>  	/* Disable all legacy interrupts */
+>  	nwl_bridge_writel(pcie, (u32)~MSGF_LEG_SR_MASKALL, MSGF_LEG_MASK);
+>  
+> @@ -932,4 +931,5 @@ static struct platform_driver nwl_pcie_driver = {
+>  	},
+>  	.probe = nwl_pcie_probe,
+>  };
 > +
-> +#define DREG_DMA_EN			BIT(0)
-> +#define DREG_DMA_BASE_LO		0xFD0F0000
->  
->  /* Ingress - address translations */
->  #define I_MSII_CAPABILITIES		0x00000300
-> @@ -57,6 +62,10 @@
->  #define MSGF_MSI_STATUS_HI		0x00000444
->  #define MSGF_MSI_MASK_LO		0x00000448
->  #define MSGF_MSI_MASK_HI		0x0000044C
-> +/* Root DMA Interrupt register */
-> +#define MSGF_DMA_MASK			0x00000464
-> +
-> +#define MSGF_INTR_EN			BIT(0)
->  
->  /* Msg filter mask bits */
->  #define CFG_ENABLE_PM_MSG_FWD		BIT(1)
-> @@ -766,6 +775,12 @@ static int nwl_pcie_bridge_init(struct nwl_pcie *pcie)
->  	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, MSGF_LEG_STATUS) &
->  			  MSGF_LEG_SR_MASKALL, MSGF_LEG_STATUS);
->  
-> +	/* Enabling DREG translations */
-> +	nwl_bridge_writel(pcie, DREG_DMA_EN, E_DREG_CTRL);
-> +	nwl_bridge_writel(pcie, DREG_DMA_BASE_LO, E_DREG_BASE_LO);
-> +	/* Enabling Root DMA interrupts */
-> +	nwl_bridge_writel(pcie, MSGF_INTR_EN, MSGF_DMA_MASK);
-> +
->  	/* Enable all legacy interrupts */
->  	nwl_bridge_writel(pcie, MSGF_LEG_SR_MASKALL, MSGF_LEG_MASK);
->  
+>  builtin_platform_driver(nwl_pcie_driver);
 > -- 
 > 2.1.1
 > 
