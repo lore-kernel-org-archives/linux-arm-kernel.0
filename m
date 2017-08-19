@@ -1,67 +1,85 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 19 Aug 2017 10:41:23 +0800
-Subject: [PATCH 0/8] ARM: sun8i: a83t: Add USB host support
-In-Reply-To: <20170803081411.22389-1-wens@csie.org>
-References: <20170803081411.22389-1-wens@csie.org>
-Message-ID: <CAGb2v65p=6bd3eX+=OJCZdM3pVwgmNVRFRbLiB0uYg839vFozA@mail.gmail.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Fri, 18 Aug 2017 21:55:53 -0600
+Subject: [PATCH v2 3/3] vfio/pci: Don't probe devices that can't be reset
+In-Reply-To: <d7492153-ec84-eb87-13ac-eb3fc9116114@caviumnetworks.com>
+References: <1502957663-5527-1-git-send-email-jglauber@cavium.com>
+ <1502957663-5527-4-git-send-email-jglauber@cavium.com>
+ <20170817070017.1e9c9456@w520.home> <20170818134231.GA3464@hc>
+ <20170818081251.2bbffe56@w520.home>
+ <d7492153-ec84-eb87-13ac-eb3fc9116114@caviumnetworks.com>
+Message-ID: <20170818215553.3396d509@ul30vt.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 3, 2017 at 4:14 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> Hi everyone,
->
-> This series enables USB host support for the Allwinner A83T SoC.
-> The A83T's USB OTG PHY uses different controls. The USB 2.0 host
-> PHYs are the same as previous chips. And the HSIC part is actually
-> used on some boards.
->
-> The external bits needed for proper USB OTG support is not there
-> yet, namely the regulators and power supplies for VBUS sensing and
-> control. This will be enabled later on. However the OTG controller
-> is the same as the one found in previous chips. This has been tested
-> under U-boot.
->
-> Patch 1 adds some properties that were missing for the H3. The H3
-> has 4 USB host controllers, so there are also 4 USB host PHYs. The
-> properies for the last one were missing.
->
-> Patch 2 adds a compatible string for the A83T USB PHY block.
->
-> Patch 3 adds support for a secondary clock for the HSIC PHY. The
-> HSIC block takes a 480MHz clock and a 12MHz clock. All known chips
-> only have at most 1 HSIC capable host/PHY.
->
-> Patch 4 adds support for the A83T's USB PHYs. The difference is
-> mainly how the OTG PHY (PHY0) is configured.
->
-> Patch 5 adds the device nodes for the USB PHY and hosts.
->
-> Patch 6 adds the device node for the USB OTG controller.
->
-> Patch 7 enables the USB hosts and peripherals on the Cubietruck Plus.
->
-> Patch 8 enables the USB hosts and peripherals on the H8Homlet v2.
->
-> The first four patches would go through linux-phy, while I will
-> take the other four through the sunxi tree. For those who want
-> to test this, the series is based on my previous "ARM: sun8i: a83t:
-> Add support for MMC controllers v3" and "mfd: axp20x: Add basic
-> support for AXP813 v2" series.
->
->
-> Regards
-> ChenYu
->
-> Chen-Yu Tsai (8):
->   dt-bindings: phy: sun4i-usb-phy: Add property descriptions for H3
->   dt-bindings: phy: sun4i-usb-phy: Add compatible string for A83T
->   phy: sun4i-usb: Support secondary clock for HSIC PHY
->   phy: sun4i-usb: Support A83T USB PHYs
->   ARM: sun8i: a83t: Add USB PHY and host device nodes
->   ARM: sun8i: a83t: Add device node for USB OTG controller
->   ARM: sun8i: a83t: cubietruck-plus: Enable onboard USB peripherals
->   ARM: sun8i: a83t: h8homlet-v2: Enable USB ports
+On Fri, 18 Aug 2017 08:57:09 -0700
+David Daney <ddaney@caviumnetworks.com> wrote:
 
-Applied the device tree patches.
+> On 08/18/2017 07:12 AM, Alex Williamson wrote:
+> > On Fri, 18 Aug 2017 15:42:31 +0200
+> > Jan Glauber <jan.glauber@caviumnetworks.com> wrote:
+> >   
+> >> On Thu, Aug 17, 2017 at 07:00:17AM -0600, Alex Williamson wrote:  
+> >>> On Thu, 17 Aug 2017 10:14:23 +0200
+> >>> Jan Glauber <jglauber@cavium.com> wrote:
+> >>>      
+> >>>> If a PCI device supports neither function-level reset, nor slot
+> >>>> or bus reset then refuse to probe it. A line is printed to inform
+> >>>> the user.  
+> >>>
+> >>> But that's not what this does, this requires that the device is on a
+> >>> reset-able bus.  This is a massive regression.  With this we could no
+> >>> longer assign devices on the root complex or any device which doesn't
+> >>> return from bus reset and currently makes use of the NO_BUS_RESET flag
+> >>> and works happily otherwise.  Full NAK.  Thanks,  
+> >>
+> >> Looks like I missed the slot reset check. So how about this:
+> >>
+> >> if (pci_probe_reset_slot(pdev->slot) && pci_probe_reset_bus(pdev->bus)) {
+> >> 	dev_warn(...);
+> >> 	return -ENODEV;
+> >> }
+> >>
+> >> Or am I still missing something here?  
+> > 
+> > We don't require that a device is on a reset-able bus/slot, so any
+> > attempt to impose that requirement means that there are devices that
+> > might work perfectly fine that are now excluded from assignment.  The
+> > entire premise is unacceptable.  Thanks,  
+> 
+> 
+> You previously rejected the idea to silently ignore bus reset requests 
+> on buses that do not support it.
+> 
+> So this leaves us with two options:
+> 
+> 1) Do nothing, and crash the kernel on systems with bad combinations of 
+> PCIe target devices and cn88xx when vfio_pci is used.
+> 
+> 2) Do something else.
+> 
+> We are trying to figure out what that something else should be.  The 
+> general concept we are working on is that if vfio_pci wants to reset a 
+> device, *and* bus reset is the only option available, *and* cn88xx, then 
+> make vfio_pci fail.
 
-ChenYu
+But that's not what these attempts do, they say if we can't do a bus or
+slot reset, fail the device probe.  The comment is trying to suggest
+they do something else, am I misinterpreting the actual code change?
+There are plenty of devices out there that don't care if bus reset
+doesn't work, they support FLR or PM reset or device specific reset or
+just deal without a reset.  We can't suddenly say this new thing is a
+requirement and sorry if you were happily using device assignment
+before, but there's a slim chance you're on this platform that falls
+over if we attempt to do a secondary bus reset.
+
+> What is your opinion of doing that (assuming it is properly implemented)?
+
+It seems like these attempts are trying to completely turn off vfio-pci
+on cn88xx, do you just want it unsupported on these platforms?  Should
+we blacklist anything where dev->bus->self is this root port?
+Otherwise, what's wrong with returning an error if a bus reset fails,
+because we should *never* silently ignore the request and pretend that
+it worked, perhaps even dev_warn()'ing that the platform doesn't
+support bus resets?  Thanks,
+
+Alex
