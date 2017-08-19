@@ -1,28 +1,30 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 19 Aug 2017 16:17:23 +0800
-Subject: [PATCH v3 07/10] dt-bindings: add compatible string for Allwinner
- R40 CCU
-In-Reply-To: <CAGb2v65174+qJTyReMH7ov0NWvp+f6YC3+ovPVZghw9tsokmZw@mail.gmail.com>
-References: <20170527102308.1988-1-icenowy@aosc.io>
- <20170527102308.1988-8-icenowy@aosc.io>
- <CAGb2v65174+qJTyReMH7ov0NWvp+f6YC3+ovPVZghw9tsokmZw@mail.gmail.com>
-Message-ID: <CAGb2v65CdqK1JZWwQAby5VRaLYMFYPttLcwb9XaRJ6_PMrPEjQ@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sat, 19 Aug 2017 10:22:37 +0200
+Subject: [PATCH v5 5/9] mtd: nand: tmio: Register partitions using the
+ parsers
+In-Reply-To: <1502743720-28672-6-git-send-email-andrea.adami@gmail.com>
+References: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
+ <1502743720-28672-6-git-send-email-andrea.adami@gmail.com>
+Message-ID: <20170819082236.GA1460@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 28, 2017 at 11:09 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Sat, May 27, 2017 at 6:23 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
->> Allwinner R40 has a clock controlling unit like the ones on other
->> Allwinner SoCs after sun6i, and can also use a CCU-based driver.
->>
->> Add a compatible string for it.
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> Acked-by: Rob Herring <robh@kernel.org>
->
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+On Mon, Aug 14, 2017 at 10:48:36PM +0200, Andrea Adami wrote:
+> With the introduction of sharpslpart partition parser we can now read the
+> offsets from NAND: we specify the list of the parsers as platform data, with
+> cmdlinepart and ofpart parsers first allowing to override the part. table
+> written in NAND. This is done in the board files using this driver.
+> 
+> Use now these parsers.
+> 
+> Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
 
-Fixed the conflict and applied for 4.14. Next time please include this when you
-send the driver patches.
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-ChenYu
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170819/4bcb8406/attachment-0001.sig>
