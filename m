@@ -1,57 +1,64 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 19 Aug 2017 15:59:15 +0800
-Subject: [GIT PULL 2/4] Allwinner driver changes for 4.14, round 2
-Message-ID: <20170819075915.4uae73yviij4lkig@wens.csie.org>
+Date: Sat, 19 Aug 2017 16:06:39 +0800
+Subject: [GIT PULL 3/4] Allwinner dts changes for 4.14, round 2
+Message-ID: <20170819080639.y2umtabkspdft7if@wens.csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof,
 
-Here are some Allwinner driver changes for 4.14.
-There were no driver changes in round 1.
+Here's the second batch of Allwinner device tree changes for 4.14.
+This is based on the previous pull request that is already in arm-soc.
 
-Thanks!
+I might send a late pull request for a single new board next week.
+The board dts was posted only 2 days ago, so I'd like to wait a few
+more days for feedback.
+
+Thanks
 ChenYu
 
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+The following changes since commit 581ae76e96c6ab3bf942da7c4822ce9fa2074a01:
+
+  ARM: dts: sun8i: a83t: h8homlet: Enable micro-SD card and onboard eMMC (2017-08-05 22:06:58 +0800)
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-drivers-for-4.14
+  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt-for-4.14-2
 
-for you to fetch changes up to 5e4fb6429761ebe8f5acb5a761fa57d02a91ac6f:
+for you to fetch changes up to 75ce73fdadf6944d6948f45b34cbfd7aa01190cc:
 
-  drivers: soc: sunxi: add support for A64 and its SRAM C (2017-08-18 14:30:21 +0800)
-
-----------------------------------------------------------------
-Allwinner driver changes for 4.14
-
-Usual driver changes:
-
-  - SUNXI_RSB bus driver enabled by default for ARM64
-
-  - Support for SRAM controller and SRAM C block on the A64 added
+  ARM: sun8i: a83t: h8homlet-v2: Enable USB ports (2017-08-19 00:25:25 +0800)
 
 ----------------------------------------------------------------
-Icenowy Zheng (4):
-      dt-bindings: add binding for Allwinner A64 SRAM controller and SRAM C
-      drivers: soc: sunxi: fix error processing on base address when claiming
-      drivers: soc: sunxi: add support for remapping func value to reg value
-      drivers: soc: sunxi: add support for A64 and its SRAM C
+Allwinner device tree changes for 4.14, round 2
 
-Jagan Teki (1):
-      bus: sunxi-rsb: Enable by default for ARM64
+The usual improvements:
 
- .../devicetree/bindings/sram/sunxi-sram.txt        |  9 +++-
- drivers/bus/Kconfig                                |  2 +-
- drivers/soc/sunxi/sunxi_sram.c                     | 57 ++++++++++++++++++----
- 3 files changed, 56 insertions(+), 12 deletions(-)
+  - AXP813/AXP818 PMIC (mfd and codec) enabled for Allwinner A83T boards
+
+  - USB enabled for Allwinner A83T boards
+
+----------------------------------------------------------------
+Chen-Yu Tsai (9):
+      ARM: sun8i: a83t: Add device node and pinmux setting for RSB controller
+      ARM: sun8i: a83t: cubietruck-plus: Enable PMIC part of AXP818 PMIC
+      ARM: sun8i: a83t: cubietruck-plus: Enable AC100 combo chip in AXP818 PMIC
+      ARM: sun8i: a83t: h8homlet-v2: Enable PMIC part of AXP818 PMIC
+      ARM: sun8i: a83t: h8homlet-v2: Enable AC100 combo chip in AXP818 PMIC
+      ARM: sun8i: a83t: Add USB PHY and host device nodes
+      ARM: sun8i: a83t: Add device node for USB OTG controller
+      ARM: sun8i: a83t: cubietruck-plus: Enable onboard USB peripherals
+      ARM: sun8i: a83t: h8homlet-v2: Enable USB ports
+
+ .../boot/dts/sun8i-a83t-allwinner-h8homlet-v2.dts  | 64 ++++++++++++++
+ arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts   | 84 ++++++++++++++++--
+ arch/arm/boot/dts/sun8i-a83t.dtsi                  | 99 ++++++++++++++++++++++
+ 3 files changed, 242 insertions(+), 5 deletions(-)
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170819/660f9a84/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170819/2c20dba3/attachment.sig>
