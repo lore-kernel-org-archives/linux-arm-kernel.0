@@ -1,77 +1,210 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Sun, 20 Aug 2017 02:03:30 +0800
-Subject: [PATCH v2 2/2] serial: 8250: of: Add new port type for MediaTek BTIF
- controller on MT7622/23 SoC
-In-Reply-To: <cover.1503165144.git.sean.wang@mediatek.com>
-References: <cover.1503165144.git.sean.wang@mediatek.com>
-Message-ID: <c2696f6a17ca5914098ad1da394834f8b4b30141.1503165144.git.sean.wang@mediatek.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Sat, 19 Aug 2017 20:33:49 +0200
+Subject: [PATCH v3 4/4] dt-bindings: net: dwmac-sun8i: update
+ documentation about integrated PHY
+In-Reply-To: <CAGb2v67tHYh3hcC58kw_8cGHpMm56Swfy67OUq7vxBqmr6ERfw@mail.gmail.com>
+References: <20170818122118.4925-1-clabbe.montjoie@gmail.com>
+ <20170818122118.4925-5-clabbe.montjoie@gmail.com>
+ <CAGb2v67tHYh3hcC58kw_8cGHpMm56Swfy67OUq7vxBqmr6ERfw@mail.gmail.com>
+Message-ID: <20170819183349.GA13266@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On Sat, Aug 19, 2017 at 12:57:07AM +0800, Chen-Yu Tsai wrote:
+> On Fri, Aug 18, 2017 at 8:21 PM, Corentin Labbe
+> <clabbe.montjoie@gmail.com> wrote:
+> > This patch add documentation about the MDIO switch used on sun8i-h3-emac
+> > for integrated PHY.
+> >
+> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > ---
+> >  .../devicetree/bindings/net/dwmac-sun8i.txt        | 112 +++++++++++++++++++--
+> >  1 file changed, 105 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+> > index 725f3b187886..631084122532 100644
+> > --- a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+> > +++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+> > @@ -39,7 +39,7 @@ Optional properties for the following compatibles:
+> >  - allwinner,leds-active-low: EPHY LEDs are active low
+> >
+> >  Required child node of emac:
+> > -- mdio bus node: should be named mdio
+> > +- mdio bus node: should be named mdio (or mdio_parent in case of H3)
+> 
+> The node would still be named "mdio". You are confusing the node name
+> with the label. But you don't really need the mdio node for the H3.
+> You could say here that it is not needed for the H3. See below.
+> 
+> >
+> >  Required properties of the mdio node:
+> >  - #address-cells: shall be 1
+> > @@ -48,14 +48,21 @@ Required properties of the mdio node:
+> >  The device node referenced by "phy" or "phy-handle" should be a child node
+> >  of the mdio node. See phy.txt for the generic PHY bindings.
+> >
+> > -Required properties of the phy node with the following compatibles:
+> > +Required mdio-mux nodes for the following compatibles:
+> 
+> The following compatibles require an mdio-mux node:
+> 
+> > +  - "allwinner,sun8i-h3-emac",
+> 
+> Drop the comma. It's already a list.
+> 
+> > +- a mdio-mux node with compatible = "allwinner,sun8i-h3-mdio-switch"
+> 
+> Required properties for the mdio-mux node:
+>   - compatible: "allwinner,sun8i-h3-mdio-switch"
+> 
+> > +  - mdio-parent-bus: The parent bus is "mdio_parent"
+> 
+> This is optional in the mdio-mux binding. Since you have the mdio-mux under
+> the EMAC node, it should be obvious that it is connected to the EMAC. The
+> parent phandle is more useful for muxes that are separate from the controller,
+> such as an external GPIO-controlled mux. So you could just drop it.
+> 
+> > +  - two child mdio, one for the integrated mdio, one for the external mdio
+> > +
+> > +Required properties of the integrated phy node with the following compatibles:
+> 
+> The following compatibles require a PHY node representing the integrated
+> PHY, under the integrated MDIO bus node if an mdio-mux node is used:
+> 
+> >    - "allwinner,sun8i-h3-emac",
+> >    - "allwinner,sun8i-v3s-emac":
+> 
+> Required properties of the integrated PHY node:
+> 
+> >  - clocks: a phandle to the reference clock for the EPHY
+> >  - resets: a phandle to the reset control for the EPHY
+> > +- phy-is-integrated
+> > +- Should be a child of the integrated mdio
+> >
+> > -Example:
+> > -
+> > +Example with integrated PHY:
+> >  emac: ethernet at 1c0b000 {
+> >         compatible = "allwinner,sun8i-h3-emac";
+> >         syscon = <&syscon>;
+> > @@ -75,10 +82,101 @@ emac: ethernet at 1c0b000 {
+> >         mdio: mdio {
+> >                 #address-cells = <1>;
+> >                 #size-cells = <0>;
+> > -               int_mii_phy: ethernet-phy at 1 {
+> > +       };
+> > +       mdio-mux {
+> 
+> Drop the mdio node as mentioned above. And also have spaces between
+> blocks to be consistent in styling. It's also easier to read.
+> 
+> > +               compatible = "allwinner,sun8i-h3-mdio-switch";
+> > +               mdio-parent-bus = <&mdio>;
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
+> > +
+> > +               int_mdio: mdio at 1 {
+> > +                       reg = <1>;
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <0>;
+> > +                       int_mii_phy: ethernet-phy at 1 {
+> > +                               reg = <1>;
+> > +                               clocks = <&ccu CLK_BUS_EPHY>;
+> > +                               resets = <&ccu RST_BUS_EPHY>;
+> > +                               phy-is-integrated
+> > +                       };
+> > +               };
+> > +               ext_mdio: mdio at 0 {
+> > +                       reg = <0>;
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <0>;
+> > +               };
+> > +};
+> > +
+> > +Example with external PHY:
+> > +emac: ethernet at 1c0b000 {
+> > +       compatible = "allwinner,sun8i-h3-emac";
+> > +       syscon = <&syscon>;
+> > +       reg = <0x01c0b000 0x104>;
+> > +       interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+> > +       interrupt-names = "macirq";
+> > +       resets = <&ccu RST_BUS_EMAC>;
+> > +       reset-names = "stmmaceth";
+> > +       clocks = <&ccu CLK_BUS_EMAC>;
+> > +       clock-names = "stmmaceth";
+> > +       #address-cells = <1>;
+> > +       #size-cells = <0>;
+> > +
+> > +       phy-handle = <&ext_rgmii_phy>;
+> > +       phy-mode = "rgmii";
+> > +       allwinner,leds-active-low;
+> 
+> You don't need this when using the external PHY.
+> 
+> Regards
+> ChenYu
+> 
+> > +       mdio: mdio {
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
+> > +       };
+> > +       mdio-mux {
+> > +               compatible = "allwinner,sun8i-h3-mdio-switch";
+> > +               mdio-parent-bus = <&mdio>;
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
+> > +
+> > +               int_mdio: mdio at 1 {
+> > +                       reg = <1>;
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <0>;
+> > +                       int_mii_phy: ethernet-phy at 1 {
+> > +                               reg = <1>;
+> > +                               clocks = <&ccu CLK_BUS_EPHY>;
+> > +                               resets = <&ccu RST_BUS_EPHY>;
+> > +                               phy-is-integrated
+> > +                       };
+> > +               };
+> > +               ext_mdio: mdio at 0 {
+> > +                       reg = <0>;
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <0>;
+> > +                       ext_rgmii_phy: ethernet-phy at 1 {
+> > +                               reg = <1>;
+> > +                       };
+> > +               };
+> > +};
+> > +
+> > +Example with SoC without integrated PHY
+> > +
+> > +emac: ethernet at 1c0b000 {
+> > +       compatible = "allwinner,sun8i-a83t-emac";
+> > +       syscon = <&syscon>;
+> > +       reg = <0x01c0b000 0x104>;
+> > +       interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
+> > +       interrupt-names = "macirq";
+> > +       resets = <&ccu RST_BUS_EMAC>;
+> > +       reset-names = "stmmaceth";
+> > +       clocks = <&ccu CLK_BUS_EMAC>;
+> > +       clock-names = "stmmaceth";
+> > +       #address-cells = <1>;
+> > +       #size-cells = <0>;
+> > +
+> > +       phy-handle = <&ext_rgmii_phy>;
+> > +       phy-mode = "rgmii";
+> > +       mdio: mdio {
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
+> > +               ext_rgmii_phy: ethernet-phy at 1 {
+> >                         reg = <1>;
+> > -                       clocks = <&ccu CLK_BUS_EPHY>;
+> > -                       resets = <&ccu RST_BUS_EPHY>;
+> >                 };
+> >         };
+> >  };
+> > --
+> > 2.13.0
+> >
 
-MediaTek BTIF controller is the serial interface similar to UART but it
-works only as the digital device which is mainly used to communicate with
-the connectivity module called CONNSYS inside the SoC which could be mostly
-found on those MediaTek SoCs with Bluetooth feature such as MT7622 and
-MT7623 SoCs.
-
-And the controller is made as being compatible with the 8250 register
-layout with extra registers such as DMA enablement so it tends to be
-integrated with reusing 8250 OF driver. However, DMA mode is not being
-supported yet in the current driver.
-
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Suggested-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
----
- drivers/tty/serial/8250/8250_of.c   | 2 ++
- drivers/tty/serial/8250/8250_port.c | 8 ++++++++
- include/uapi/linux/serial_core.h    | 3 +++
- 3 files changed, 13 insertions(+)
-
-diff --git a/drivers/tty/serial/8250/8250_of.c b/drivers/tty/serial/8250/8250_of.c
-index 6c5a8ca..47d4772 100644
---- a/drivers/tty/serial/8250/8250_of.c
-+++ b/drivers/tty/serial/8250/8250_of.c
-@@ -300,6 +300,8 @@ static const struct of_device_id of_platform_serial_table[] = {
- 		.data = (void *)PORT_ALTR_16550_F64, },
- 	{ .compatible = "altr,16550-FIFO128",
- 		.data = (void *)PORT_ALTR_16550_F128, },
-+	{ .compatible = "mediatek,mt7623-btif",
-+		.data = (void *)PORT_MTK_BTIF, },
- 	{ .compatible = "mrvl,mmp-uart",
- 		.data = (void *)PORT_XSCALE, },
- 	{ .compatible = "ti,da830-uart", .data = (void *)PORT_DA830, },
-diff --git a/drivers/tty/serial/8250/8250_port.c b/drivers/tty/serial/8250/8250_port.c
-index 25aae66..053bb38 100644
---- a/drivers/tty/serial/8250/8250_port.c
-+++ b/drivers/tty/serial/8250/8250_port.c
-@@ -289,6 +289,14 @@ static const struct serial8250_config uart_config[] = {
- 		.rxtrig_bytes	= {1, 4, 8, 14},
- 		.flags		= UART_CAP_FIFO | UART_CAP_AFE,
- 	},
-+	[PORT_MTK_BTIF] = {
-+		.name		= "MediaTek BTIF",
-+		.fifo_size	= 16,
-+		.tx_loadsz	= 16,
-+		.fcr		= UART_FCR_ENABLE_FIFO |
-+				  UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT,
-+		.flags		= UART_CAP_FIFO,
-+	},
- };
- 
- /* Uart divisor latch read */
-diff --git a/include/uapi/linux/serial_core.h b/include/uapi/linux/serial_core.h
-index 38bea32..cfc07a5 100644
---- a/include/uapi/linux/serial_core.h
-+++ b/include/uapi/linux/serial_core.h
-@@ -272,4 +272,7 @@
- /* MPS2 UART */
- #define PORT_MPS2UART	116
- 
-+/* MediaTek BTIF */
-+#define PORT_MTK_BTIF	117
-+
- #endif /* _UAPILINUX_SERIAL_CORE_H */
--- 
-2.7.4
+Thanks I will fix all in next version.
+Regards
