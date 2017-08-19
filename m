@@ -1,66 +1,118 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sat, 19 Aug 2017 16:18:03 -0500
-Subject: [PATCH 2/4] PCI:xilinx-nwl: Correcting Styling checks
-In-Reply-To: <1502190739-13474-3-git-send-email-vjonnal@xilinx.com>
-References: <1502190739-13474-1-git-send-email-vjonnal@xilinx.com>
- <1502190739-13474-3-git-send-email-vjonnal@xilinx.com>
-Message-ID: <20170819211803.GV28977@bhelgaas-glaptop.roam.corp.google.com>
+From: illusionist.neo@gmail.com (Shubham Bansal)
+Date: Sun, 20 Aug 2017 02:58:37 +0530
+Subject: [PATCH net-next v3] arm: eBPF JIT compiler
+In-Reply-To: <9d77730f-c6a8-b337-599e-5919207a7e0a@fb.com>
+References: <1503134429-29063-1-git-send-email-illusionist.neo@gmail.com>
+ <c2f4c796-0cb0-7eca-6cab-fed6b25020d5@fb.com>
+ <CAHgaXdJnHxu4gJ8ZVFmrmaXyZL1oFkTbz2K___xKLQedTLmBQg@mail.gmail.com>
+ <9d77730f-c6a8-b337-599e-5919207a7e0a@fb.com>
+Message-ID: <CAHgaXd+hccuUYXfTs6gMbvxBctrypofc2FJ10q3QAc0jGsgeyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 04:42:17PM +0530, Ravi Shankar Jonnalagadda wrote:
+Here are numbers.
 
-s/PCI:xilinx-nwl: Correcting Styling checks/PCI: xilinx-nwl: Clean up whitespace/
+Without any JIT enabled
 
-> Correcting Style checks thrown by checkpatch scripts
+test_pkt_access:PASS:ipv4 1823 nsec
+test_pkt_access:PASS:ipv6 1743 nsec
+test_xdp:PASS:ipv4 769022 nsec
+test_xdp:PASS:ipv6 15408 nsec
+test_l4lb:PASS:ipv4 12441 nsec
+test_l4lb:PASS:ipv6 18131 nsec
+test_tcp_estats:PASS: 0 nsec
+test_bpf_obj_id:PASS:get-fd-by-notexist-prog-id 0 nsec
+test_bpf_obj_id:PASS:get-fd-by-notexist-map-id 0 nsec
+test_bpf_obj_id:PASS:get-prog-info(fd) 0 nsec
+test_bpf_obj_id:PASS:get-map-info(fd) 0 nsec
+test_bpf_obj_id:PASS:get-prog-info(fd) 0 nsec
+test_bpf_obj_id:PASS:get-map-info(fd) 0 nsec
+test_bpf_obj_id:PASS:get-prog-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-prog-info(next_id->fd) 0 nsec
+test_bpf_obj_id:PASS:get-prog-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-prog-info(next_id->fd) 0 nsec
+test_bpf_obj_id:PASS:check total prog id found by get_next_id 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:check get-map-info(next_id->fd) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:check get-map-info(next_id->fd) 0 nsec
+test_bpf_obj_id:PASS:check total map id found by get_next_id 0 nsec
+test_pkt_md_access:PASS: 5816 nsec
+Summary: 30 PASSED, 0 FAILED
 
-s/Correcting Style checks thrown/Correct whitespace errors reported/
+With only bpf_jit_enable
 
-> Signed-off-by: Ravi Shankar Jonnalagadda <vjonnal@xilinx.com>
+test_pkt_access:PASS:ipv4 263 nsec
+test_pkt_access:PASS:ipv6 337 nsec
+test_xdp:PASS:ipv4 1377212 nsec
+test_xdp:PASS:ipv6 1290381 nsec
+test_l4lb:PASS:ipv4 2689 nsec
+test_l4lb:PASS:ipv6 3804 nsec
+test_tcp_estats:PASS: 0 nsec
+test_bpf_obj_id:PASS:get-fd-by-notexist-prog-id 0 nsec
+test_bpf_obj_id:PASS:get-fd-by-notexist-map-id 0 nsec
+test_bpf_obj_id:PASS:get-prog-info(fd) 0 nsec
+test_bpf_obj_id:PASS:get-map-info(fd) 0 nsec
+test_bpf_obj_id:PASS:get-prog-info(fd) 0 nsec
+test_bpf_obj_id:PASS:get-map-info(fd) 0 nsec
+test_bpf_obj_id:PASS:get-prog-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-prog-info(next_id->fd) 0 nsec
+test_bpf_obj_id:PASS:get-prog-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-prog-info(next_id->fd) 0 nsec
+test_bpf_obj_id:PASS:check total prog id found by get_next_id 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:check get-map-info(next_id->fd) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:check get-map-info(next_id->fd) 0 nsec
+test_bpf_obj_id:PASS:check total map id found by get_next_id 0 nsec
+test_pkt_md_access:PASS: 41609 nsec
+Summary: 30 PASSED, 0 FAILED
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-> ---
->  drivers/pci/host/pcie-xilinx-nwl.c | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-> index 5766582..3c62e3d 100644
-> --- a/drivers/pci/host/pcie-xilinx-nwl.c
-> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
-> @@ -506,15 +506,15 @@ static int nwl_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
->  
->  	for (i = 0; i < nr_irqs; i++) {
->  		irq_domain_set_info(domain, virq + i, bit + i, &nwl_irq_chip,
-> -				domain->host_data, handle_simple_irq,
-> -				NULL, NULL);
-> +				    domain->host_data, handle_simple_irq,
-> +				    NULL, NULL);
->  	}
->  	mutex_unlock(&msi->lock);
->  	return 0;
->  }
->  
->  static void nwl_irq_domain_free(struct irq_domain *domain, unsigned int virq,
-> -					unsigned int nr_irqs)
-> +				unsigned int nr_irqs)
->  {
->  	struct irq_data *data = irq_domain_get_irq_data(domain, virq);
->  	struct nwl_pcie *pcie = irq_data_get_irq_chip_data(data);
-> @@ -767,7 +767,6 @@ static int nwl_pcie_bridge_init(struct nwl_pcie *pcie)
->  	/* Enable all misc interrupts */
->  	nwl_bridge_writel(pcie, MSGF_MISC_SR_MASKALL, MSGF_MISC_MASK);
->  
-> -
->  	/* Disable all legacy interrupts */
->  	nwl_bridge_writel(pcie, (u32)~MSGF_LEG_SR_MASKALL, MSGF_LEG_MASK);
->  
-> @@ -932,4 +931,5 @@ static struct platform_driver nwl_pcie_driver = {
->  	},
->  	.probe = nwl_pcie_probe,
->  };
-> +
->  builtin_platform_driver(nwl_pcie_driver);
-> -- 
-> 2.1.1
-> 
+With bpf_jit_enable and bpf_jit_harden set
+
+test_pkt_access:PASS:ipv4 416 nsec
+test_pkt_access:PASS:ipv6 509 nsec
+test_xdp:PASS:ipv4 1512428 nsec
+test_xdp:PASS:ipv6 962318 nsec
+test_l4lb:PASS:ipv4 4135 nsec
+test_l4lb:PASS:ipv6 5497 nsec
+test_tcp_estats:PASS: 0 nsec
+test_bpf_obj_id:PASS:get-fd-by-notexist-prog-id 0 nsec
+test_bpf_obj_id:PASS:get-fd-by-notexist-map-id 0 nsec
+test_bpf_obj_id:PASS:get-prog-info(fd) 0 nsec
+test_bpf_obj_id:PASS:get-map-info(fd) 0 nsec
+test_bpf_obj_id:PASS:get-prog-info(fd) 0 nsec
+test_bpf_obj_id:PASS:get-map-info(fd) 0 nsec
+test_bpf_obj_id:PASS:get-prog-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-prog-info(next_id->fd) 0 nsec
+test_bpf_obj_id:PASS:get-prog-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-prog-info(next_id->fd) 0 nsec
+test_bpf_obj_id:PASS:check total prog id found by get_next_id 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:check get-map-info(next_id->fd) 0 nsec
+test_bpf_obj_id:PASS:get-map-fd(next_id) 0 nsec
+test_bpf_obj_id:PASS:check get-map-info(next_id->fd) 0 nsec
+test_bpf_obj_id:PASS:check total map id found by get_next_id 0 nsec
+test_pkt_md_access:PASS: 24774 nsec
+Summary: 30 PASSED, 0 FAILED
+
+-Shubham
