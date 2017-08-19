@@ -1,46 +1,63 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat, 19 Aug 2017 11:21:24 +0200
-Subject: [PATCH v5 3/9] mfd: tmio: Add partition parsers platform data
-In-Reply-To: <20170819092603.1c919b4b@bbrezillon>
-References: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
- <1502743720-28672-4-git-send-email-andrea.adami@gmail.com>
- <20170815065835.jcuweb377lqioddc@dell>
- <20170819092603.1c919b4b@bbrezillon>
-Message-ID: <20170819112124.59854507@bbrezillon>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 19 Aug 2017 11:58:00 +0100
+Subject: [PATCH] arm64: fpsimd: Prevent registers leaking across exec
+In-Reply-To: <1503071821-13845-1-git-send-email-Dave.Martin@arm.com>
+References: <1503071821-13845-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <CAKv+Gu8w0Mr61LZ57fLxCuHqakfYMt1tvMfbbTdNAeaOYoVTYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le Sat, 19 Aug 2017 09:26:03 +0200,
-Boris Brezillon <boris.brezillon@free-electrons.com> a ?crit :
+On 18 August 2017 at 16:57, Dave Martin <Dave.Martin@arm.com> wrote:
+> There are some tricky dependencies between the different stages of
+> flushing the FPSIMD register state during exec, and these can race
+> with context switch in ways that can cause the old task's regs to
+> leak across.  In particular, a context switch during the memset() can
+> cause some of the task's old FPSIMD registers to reappear.
+>
+> Disabling preemption for this small window would be no big deal for
+> performance: preemption is already disabled for similar scenarios
+> like updating the FPSIMD registers in sigreturn.
+>
+> So, instead of rearranging things in ways that might swap existing
+> subtle bugs for new ones, this patch just disables preemption
+> around the FPSIMD state flushing so that races of this type can't
+> occur here.  This brings fpsimd_flush_thread() into line with other
+> code paths.
+>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: stable at vger.kernel.org
+> Fixes: 674c242c9323 ("arm64: flush FP/SIMD state correctly after execve()")
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-> Hi Lee,
-> 
-> Le Tue, 15 Aug 2017 07:58:35 +0100,
-> Lee Jones <lee.jones@linaro.org> a ?crit :
-> 
-> > On Mon, 14 Aug 2017, Andrea Adami wrote:
-> >   
-> > > With the introduction of sharpslpart partition parser we can now read the
-> > > offsets from NAND: we specify the list of the parsers as platform data, with
-> > > cmdlinepart and ofpart parsers first allowing to override the part. table
-> > > written in NAND. This is done in the board files using this driver.
-> > > 
-> > > Thus, we need to extend tmio_nand_data to consider the partition parsers.
-> > > 
-> > > Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
-> > > ---
-> > >  include/linux/mfd/tmio.h | 1 +
-> > >  1 file changed, 1 insertion(+)    
-> > 
-> > Acked-by: Lee Jones <lee.jones@linaro.org>
-> >   
-> 
-> I'm about to apply patches 1 to 5 of this series to the nand/next
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-I meant patches 2 to 5, patch 1 still requires a few adjustments.
-
-> branch. Do you want me to create an immutable branch with this patch?
-> 
-> Regards,
-> 
-> Boris
+> ---
+>
+> NOTE TO MAINTAINERS: This is a fix, applicable to *v4.13* and stable.
+>
+> The kernel-mode NEON rework already queued for v4.14 turns this into a
+> local_bh_disable() as a side effect, so does not strictly need this
+> patch.  When merging, the queued v4.14 changes should be retained.
+>
+>  arch/arm64/kernel/fpsimd.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 06da8ea..c7b4995 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -161,9 +161,11 @@ void fpsimd_flush_thread(void)
+>  {
+>         if (!system_supports_fpsimd())
+>                 return;
+> +       preempt_disable();
+>         memset(&current->thread.fpsimd_state, 0, sizeof(struct fpsimd_state));
+>         fpsimd_flush_task_state(current);
+>         set_thread_flag(TIF_FOREIGN_FPSTATE);
+> +       preempt_enable();
+>  }
+>
+>  /*
+> --
+> 2.1.4
+>
