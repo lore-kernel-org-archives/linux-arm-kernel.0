@@ -1,48 +1,67 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 19 Aug 2017 10:34:34 +0800
-Subject: [PATCH 1/8] dt-bindings: phy: sun4i-usb-phy: Add property
- descriptions for H3
-In-Reply-To: <7a1889e0-6733-3f7d-4b34-b08e8bf3e2b5@ti.com>
+Date: Sat, 19 Aug 2017 10:41:23 +0800
+Subject: [PATCH 0/8] ARM: sun8i: a83t: Add USB host support
+In-Reply-To: <20170803081411.22389-1-wens@csie.org>
 References: <20170803081411.22389-1-wens@csie.org>
- <20170803081411.22389-2-wens@csie.org>
- <20170810170855.txcvwjfb4kzx4q66@rob-hp-laptop>
- <CAGb2v65mKdQC40ASsmeWqCxnDWV4mmf9QFo5-t7spX9RRJBdbg@mail.gmail.com>
- <7a1889e0-6733-3f7d-4b34-b08e8bf3e2b5@ti.com>
-Message-ID: <CAGb2v67cMzvmZGMFptkak-M1AT0FNFSX7p-1xqsczMAnO8UFHA@mail.gmail.com>
+Message-ID: <CAGb2v65p=6bd3eX+=OJCZdM3pVwgmNVRFRbLiB0uYg839vFozA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 6:53 PM, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi,
+On Thu, Aug 3, 2017 at 4:14 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> Hi everyone,
 >
-> On Thursday 17 August 2017 10:35 PM, Chen-Yu Tsai wrote:
->> On Fri, Aug 11, 2017 at 1:08 AM, Rob Herring <robh@kernel.org> wrote:
->>> On Thu, Aug 03, 2017 at 04:14:04PM +0800, Chen-Yu Tsai wrote:
->>>> The Allwinner H3 SoC has 4 USB PHYs, so it needs four sets of pmu
->>>> regions, clocks, resets, and optional vbus properties. These were
->>>> not described when the H3 compatible string was added.
->>>>
->>>> Fixes: 626a630e003c ("phy-sun4i-usb: Add support for the host usb-phys
->>>>                     found on the H3 SoC")
->>>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>>> ---
->>>>  Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt | 8 ++++++--
->>>>  1 file changed, 6 insertions(+), 2 deletions(-)
->>>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>
->> Kishon, are the dt binding and driver parts of this series OK for
->> 4.14? I'd like to get an answer from you to be able to merge the
->> device tree parts.
+> This series enables USB host support for the Allwinner A83T SoC.
+> The A83T's USB OTG PHY uses different controls. The USB 2.0 host
+> PHYs are the same as previous chips. And the HSIC part is actually
+> used on some boards.
 >
-> Yes. I merged the phy driver patches to phy tree. I'm not able to merge the
-> dt-bindings patch due to conflicts. Can you resend the dt-binding patch based
-> on linux-phy next or let me know if I'm missing any dependent patch.
+> The external bits needed for proper USB OTG support is not there
+> yet, namely the regulators and power supplies for VBUS sensing and
+> control. This will be enabled later on. However the OTG controller
+> is the same as the one found in previous chips. This has been tested
+> under U-boot.
+>
+> Patch 1 adds some properties that were missing for the H3. The H3
+> has 4 USB host controllers, so there are also 4 USB host PHYs. The
+> properies for the last one were missing.
+>
+> Patch 2 adds a compatible string for the A83T USB PHY block.
+>
+> Patch 3 adds support for a secondary clock for the HSIC PHY. The
+> HSIC block takes a 480MHz clock and a 12MHz clock. All known chips
+> only have at most 1 HSIC capable host/PHY.
+>
+> Patch 4 adds support for the A83T's USB PHYs. The difference is
+> mainly how the OTG PHY (PHY0) is configured.
+>
+> Patch 5 adds the device nodes for the USB PHY and hosts.
+>
+> Patch 6 adds the device node for the USB OTG controller.
+>
+> Patch 7 enables the USB hosts and peripherals on the Cubietruck Plus.
+>
+> Patch 8 enables the USB hosts and peripherals on the H8Homlet v2.
+>
+> The first four patches would go through linux-phy, while I will
+> take the other four through the sunxi tree. For those who want
+> to test this, the series is based on my previous "ARM: sun8i: a83t:
+> Add support for MMC controllers v3" and "mfd: axp20x: Add basic
+> support for AXP813 v2" series.
+>
+>
+> Regards
+> ChenYu
+>
+> Chen-Yu Tsai (8):
+>   dt-bindings: phy: sun4i-usb-phy: Add property descriptions for H3
+>   dt-bindings: phy: sun4i-usb-phy: Add compatible string for A83T
+>   phy: sun4i-usb: Support secondary clock for HSIC PHY
+>   phy: sun4i-usb: Support A83T USB PHYs
+>   ARM: sun8i: a83t: Add USB PHY and host device nodes
+>   ARM: sun8i: a83t: Add device node for USB OTG controller
+>   ARM: sun8i: a83t: cubietruck-plus: Enable onboard USB peripherals
+>   ARM: sun8i: a83t: h8homlet-v2: Enable USB ports
 
-That's weird. I just applied both patches on top of linux-phy/next and
-there were no conflicts or issues. Note that there are two dt binding
-patches, patches 1 and 2 in this series. Patch 1 has to be applied before
-patch 2
+Applied the device tree patches.
 
-Thanks
 ChenYu
