@@ -1,63 +1,28 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 19 Aug 2017 16:09:13 +0800
-Subject: [GIT PULL 4/4] Allwinner dts64 changes for 4.14, round 2
-Message-ID: <20170819080913.mcaoh7u4uk3rfc2t@wens.csie.org>
+Date: Sat, 19 Aug 2017 16:17:23 +0800
+Subject: [PATCH v3 07/10] dt-bindings: add compatible string for Allwinner
+ R40 CCU
+In-Reply-To: <CAGb2v65174+qJTyReMH7ov0NWvp+f6YC3+ovPVZghw9tsokmZw@mail.gmail.com>
+References: <20170527102308.1988-1-icenowy@aosc.io>
+ <20170527102308.1988-8-icenowy@aosc.io>
+ <CAGb2v65174+qJTyReMH7ov0NWvp+f6YC3+ovPVZghw9tsokmZw@mail.gmail.com>
+Message-ID: <CAGb2v65CdqK1JZWwQAby5VRaLYMFYPttLcwb9XaRJ6_PMrPEjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On Sun, May 28, 2017 at 11:09 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Sat, May 27, 2017 at 6:23 PM, Icenowy Zheng <icenowy@aosc.io> wrote:
+>> Allwinner R40 has a clock controlling unit like the ones on other
+>> Allwinner SoCs after sun6i, and can also use a CCU-based driver.
+>>
+>> Add a compatible string for it.
+>>
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>
+> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-Here's the second batch of Allwinner arm64 device tree changes for 4.14.
-This is based on the previous pull request that is already in arm-soc.
+Fixed the conflict and applied for 4.14. Next time please include this when you
+send the driver patches.
 
-Thanks
 ChenYu
-
-
-The following changes since commit 78c3cbc80fec105d12a0f9aabe628090ae9c1749:
-
-  arm64: allwinner: a64: add AXP803 PMIC support to SoPine and the baseboard (2017-07-24 09:56:00 +0200)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git tags/sunxi-dt64-for-4.14-2
-
-for you to fetch changes up to 4969efb28b4301b09aba621f30cf81c582c018a8:
-
-  arm64: allwinner: a64: Add A64-OLinuXino initial support (2017-08-15 12:07:11 +0800)
-
-----------------------------------------------------------------
-Allwinner arm64 device tree changes for 4.14, round 2
-
-The usual improvement patches:
-
-  - PMIC, USB and WiFi enabled for Bananapi M64
-
-  - New board added: NanoPi A64
-
-  - New board added: Olimex A64-OLinuXino
-
-----------------------------------------------------------------
-Icenowy Zheng (3):
-      arm64: allwinner: a64: enable USB host controller for BPi M64
-      arm64: allwinner: a64: enable AXP803 for Banana Pi M64
-      arm64: allwinner: a64: add proper support for the Wi-Fi on BPi M64
-
-Jagan Teki (2):
-      arm64: allwinner: a64: Add initial NanoPi A64 support
-      arm64: allwinner: a64: Add A64-OLinuXino initial support
-
- arch/arm64/boot/dts/allwinner/Makefile             |   2 +
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 144 +++++++++++++-
- .../boot/dts/allwinner/sun50i-a64-nanopi-a64.dts   | 207 +++++++++++++++++++++
- .../boot/dts/allwinner/sun50i-a64-olinuxino.dts    | 199 ++++++++++++++++++++
- 4 files changed, 544 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-nanopi-a64.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170819/065f429b/attachment.sig>
