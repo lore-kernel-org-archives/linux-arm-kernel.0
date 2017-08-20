@@ -1,61 +1,40 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Sun, 20 Aug 2017 14:02:47 +0800
-Subject: [PATCH] ARM: sun8i: a83t: Add device tree for Sinovoip Bananapi
- BPI-M3
-In-Reply-To: <201708200827.WQojuopU%fengguang.wu@intel.com>
-References: <201708200827.WQojuopU%fengguang.wu@intel.com>
-Message-ID: <f14d6c43ddcf403775dfb6efe25e7196@aosc.io>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Sun, 20 Aug 2017 08:57:57 +0200
+Subject: [PATCH v3 3/4] net: stmmac: register parent MDIO node for
+ sun8i-h3-emac
+In-Reply-To: <20170819203836.GA21567@lunn.ch>
+References: <20170818122118.4925-1-clabbe.montjoie@gmail.com>
+ <20170818122118.4925-4-clabbe.montjoie@gmail.com>
+ <CAGb2v66KcZkiDDHryMmVzm4WroXePPy3V44SLpVdoO3ZEjgC=g@mail.gmail.com>
+ <20170819185025.GB13266@Red> <20170819203836.GA21567@lunn.ch>
+Message-ID: <20170820065757.GA6081@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-08-20 08:59?kbuild test robot ???
-> Hi Chen-Yu,
+On Sat, Aug 19, 2017 at 10:38:36PM +0200, Andrew Lunn wrote:
+> On Sat, Aug 19, 2017 at 08:50:25PM +0200, Corentin Labbe wrote:
+> > On Sat, Aug 19, 2017 at 01:05:21AM +0800, Chen-Yu Tsai wrote:
+> > > On Fri, Aug 18, 2017 at 8:21 PM, Corentin Labbe
+> > > <clabbe.montjoie@gmail.com> wrote:
+> > > > In case of a MDIO switch, the registered MDIO node should be
+> > > > the parent of the PHY. Otherwise of_phy_connect will fail.
 > 
-> [auto build test ERROR on robh/for-next]
-> [also build test ERROR on v4.13-rc5 next-20170817]
-> [if your patch is applied to the wrong git tree, please drop us a note
-> to help improve the system]
+> Hi Corentin
+> 
+> Sorry, I missed this patch series. Looking at patchwork...
 
-In fact this tree shouldn't be applied on robh's tree, but the arm-soc 
-tree
-or its downstream, sunxi tree.
+That's my fault, I forgot to set you in recipient like in last send.
 
 > 
-> url:
-> https://github.com/0day-ci/linux/commits/Chen-Yu-Tsai/ARM-sun8i-a83t-Add-device-tree-for-Sinovoip-Bananapi-BPI-M3/20170820-055904
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git 
-> for-next
-> config: arm-at91_dt_defconfig (attached as .config)
-> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         wget
-> https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross
-> -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm
+> Can you represent the MDIO mux using 
 > 
-> All errors (new ones prefixed by >>):
+> Documentation/devicetree/bindings/net/mdio-mux-mmioreg.txt
 > 
->>> Error: arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts:64.1-7 Label or 
->>> path ehci0 not found
->>> Error: arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts:71.1-6 Label or 
->>> path mmc0 not found
->>> Error: arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts:81.1-6 Label or 
->>> path mmc2 not found
->>> Error: arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts:91.1-7 Label or 
->>> path r_rsb not found
->>> Error: arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts:145.1-8 Label or 
->>> path usbphy not found
->    FATAL ERROR: Syntax error parsing input tree
+> It would be better if you could reuse existing infrastructure than
+> invent something new.
 > 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology 
-> Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel 
-> Corporation
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+I think we cannot use mdio-mux-mmioreg since the register for doing the switch is in middle of the "System Control" and shared with other functions.
+This is why we use a sycon/regmap for selecting the MDIO.
+
+Regards
