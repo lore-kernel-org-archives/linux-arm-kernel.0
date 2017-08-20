@@ -1,242 +1,159 @@
-From: slash.tmp@free.fr (Mason)
-Date: Sun, 20 Aug 2017 19:22:00 +0200
-Subject: [PATCH v6] irqchip: Add support for tango interrupt router
-In-Reply-To: <ee9e4a52-9b21-d57f-1ae8-c7297d4386a6@arm.com>
-References: <657580dd-0cfe-e377-e425-0deabf6d20c3@free.fr>
- <20170606175219.34ef62b9@free-electrons.com>
- <d8a4d8ad-a9f3-07eb-9e2a-a4bbec01961e@free.fr>
- <dfb86360-2247-65bb-602b-5c21029709fd@free.fr>
- <c0bd235a-9035-2002-31eb-e68710b076fd@free.fr>
- <24f34220-a017-f4e0-b72e-d1fdb014c0e1@free.fr>
- <9f384711-eef0-5117-b89c-9d2dc16e5ae5@free.fr>
- <afcc2b79-61ff-b54d-eac1-ea7f3ee6b6b2@free.fr>
- <e4a201b1-64e7-32a1-9cad-e632eeb156f6@free.fr>
- <473118cd-20dc-3534-d0d8-88799e3d2c3b@free.fr>
- <eea0ba7d-15d2-fb20-7c23-b2d3c4a7cfa7@free.fr>
- <ee9e4a52-9b21-d57f-1ae8-c7297d4386a6@arm.com>
-Message-ID: <21670cea-beaf-8a41-84fb-f3c892527b0e@free.fr>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Sun, 20 Aug 2017 11:35:14 -0700
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170820230040.706b62ac@roar.ozlabs.ibm.com>
+References: <20170731150411.GA3730@linux.vnet.ibm.com>
+ <20170731162757.000058ba@huawei.com>
+ <20170801184646.GE3730@linux.vnet.ibm.com>
+ <20170802172555.0000468a@huawei.com>
+ <20170815154743.GK7017@linux.vnet.ibm.com>
+ <87wp63smwn.fsf@concordia.ellerman.id.au>
+ <20170816125617.GY7017@linux.vnet.ibm.com>
+ <20170816162731.GA22978@linux.vnet.ibm.com>
+ <20170820144553.2ab2727b@ppc64le>
+ <20170820230040.706b62ac@roar.ozlabs.ibm.com>
+Message-ID: <20170820183514.GM11320@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2017 14:47, Marc Zyngier wrote:
-
-> On 01/08/17 17:56, Mason wrote:
->
->> +/*
->> + * This controller maps IRQ_MAX input lines to SPI_MAX output lines.
->> + * The output lines are routed to GIC SPI 0 to 23.
->> + * This driver muxes LEVEL_HIGH IRQs onto output line 0,
->> + * and gives every EDGE_RISING IRQ a dedicated output line.
->> + */
->> +#define IRQ_MAX		128
->> +#define SPI_MAX		24
->> +#define LEVEL_SPI	0
->> +#define IRQ_ENABLE	BIT(31)
->> +#define STATUS		0x420
->> +
->> +struct tango_intc {
->> +	void __iomem *base;
->> +	struct irq_domain *dom;
->> +	u8 spi_to_tango_irq[SPI_MAX];
->> +	u8 tango_irq_to_spi[IRQ_MAX];
->> +	DECLARE_BITMAP(enabled_level, IRQ_MAX);
->> +	DECLARE_BITMAP(enabled_edge, IRQ_MAX);
->> +	spinlock_t lock;
->> +};
->> +
->> +static struct tango_intc *tango_intc;
->> +
->> +static void tango_level_isr(struct irq_desc *desc)
->> +{
->> +	uint pos, virq;
->> +	struct irq_chip *chip = irq_desc_get_chip(desc);
->> +	struct tango_intc *intc = irq_desc_get_handler_data(desc);
->> +	DECLARE_BITMAP(status, IRQ_MAX);
->> +
->> +	chained_irq_enter(chip, desc);
->> +
->> +	spin_lock(&intc->lock);
->> +	memcpy_fromio(status, intc->base + STATUS, IRQ_MAX / BITS_PER_BYTE);
+On Sun, Aug 20, 2017 at 11:00:40PM +1000, Nicholas Piggin wrote:
+> On Sun, 20 Aug 2017 14:45:53 +1000
+> Nicholas Piggin <npiggin@gmail.com> wrote:
 > 
-> No. Please don't. Nothing guarantees that your bus can deal with those.
-> We have readl_relaxed, which is what should be used.
-
-Is that because readl_relaxed() handles endianness, while
-memcpy_fromio() does not?
-
-How do I fill a DECLARE_BITMAP using readl_relaxed() ?
-
-> Also, you do know which inputs are level, right? So why do you need to
-> read the whole register array all the time?
-
-AFAIR, interrupts are scattered all over the map, so there's
-at least one interrupt per word. I'll double-check.
-
-
->> +	bitmap_and(status, status, intc->enabled_level, IRQ_MAX);
->> +	spin_unlock(&intc->lock);
->> +
->> +	for_each_set_bit(pos, status, IRQ_MAX) {
->> +		virq = irq_find_mapping(intc->dom, pos);
->> +		generic_handle_irq(virq);
+> > On Wed, 16 Aug 2017 09:27:31 -0700
+> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+> > > On Wed, Aug 16, 2017 at 05:56:17AM -0700, Paul E. McKenney wrote:
+> > > 
+> > > Thomas, John, am I misinterpreting the timer trace event messages?  
+> > 
+> > So I did some digging, and what you find is that rcu_sched seems to do a
+> > simple scheudle_timeout(1) and just goes out to lunch for many seconds.
+> > The process_timeout timer never fires (when it finally does wake after
+> > one of these events, it usually removes the timer with del_timer_sync).
+> > 
+> > So this patch seems to fix it. Testing, comments welcome.
 > 
-> Please check for virq==0, just in case you get a spurious interrupt.
-
-AFAICT, generic_handle_irq() would handle virq==0
-gracefully(?)
-
-
->> +static void tango_edge_isr(struct irq_desc *desc)
->> +{
->> +	uint virq;
->> +	struct irq_data *data = irq_desc_get_irq_data(desc);
->> +	struct irq_chip *chip = irq_desc_get_chip(desc);
->> +	struct tango_intc *intc = irq_desc_get_handler_data(desc);
->> +	int tango_irq = intc->spi_to_tango_irq[data->hwirq - 32];
->> +
->> +	chained_irq_enter(chip, desc);
->> +	virq = irq_find_mapping(intc->dom, tango_irq);
->> +	generic_handle_irq(virq);
->> +	chained_irq_exit(chip, desc);
+> Okay this had a problem of trying to forward the timer from a timer
+> callback function.
 > 
-> If you have a 1:1 mapping between an edge input and its output, why do
-> you with a chained interrupt handler? This should be a hierarchical
-> setup for these 23 interrupts.
+> This was my other approach which also fixes the RCU warnings, but it's
+> a little more complex. I reworked it a bit so the mod_timer fast path
+> hopefully doesn't have much more overhead (actually by reading jiffies
+> only when needed, it probably saves a load).
 
-I don't understand what you are suggesting.
+Giving this one a whirl!
 
-I should not call chained_irq_enter/chained_irq_exit
-in tango_edge_isr()?
+							Thanx, Paul
 
-
->> +static int tango_set_type(struct irq_data *data, uint flow_type)
->> +{
->> +	return 0;
+> Thanks,
+> Nick
 > 
-> What does this mean? Either you can do a set-type (and you do it), or
-> you cannot, and you fail. At least you check that what you're asked to
-> do matches the configuration.
-
-IIRC, __irq_set_trigger() barfed when I did it differently.
-
-(FWIW, this HW block only routes interrupt signals, it doesn't
-latch anything.)
-
-
->> +static int tango_alloc(struct irq_domain *dom, uint virq, uint n, void *arg)
->> +{
->> +	int spi;
->> +	struct irq_fwspec *fwspec = arg;
->> +	struct tango_intc *intc = dom->host_data;
->> +	u32 hwirq = fwspec->param[0], trigger = fwspec->param[1];
->> +
->> +	if (trigger & IRQ_TYPE_EDGE_FALLING || trigger & IRQ_TYPE_LEVEL_LOW)
->> +		return -EINVAL;
->> +
->> +	if (trigger & IRQ_TYPE_LEVEL_HIGH)
->> +		intc->tango_irq_to_spi[hwirq] = LEVEL_SPI;
->> +
->> +	if (trigger & IRQ_TYPE_EDGE_RISING) {
->> +		for (spi = 1; spi < SPI_MAX; ++spi) {
->> +			if (intc->spi_to_tango_irq[spi] == 0) {
->> +				intc->tango_irq_to_spi[hwirq] = spi;
->> +				intc->spi_to_tango_irq[spi] = hwirq;
->> +				break;
->> +			}
->> +		}
->> +		if (spi == SPI_MAX)
->> +			return -ENOSPC;
->> +	}
+> --
+> [PATCH] timers: Fix excessive granularity of new timers after a nohz idle
 > 
-> What's wrong with having a bitmap allocation, just like on other drivers?
-
-I don't understand what you are suggesting.
-
-The mapping is set up at run-time, I need to record it
-somewhere.
-
-
->> +static int __init tango_irq_init(struct device_node *node, struct device_node *parent)
->> +{
->> +	int spi, virq;
->> +	struct tango_intc *intc;
->> +
->> +	intc = kzalloc(sizeof(*intc), GFP_KERNEL);
->> +	if (!intc)
->> +		panic("%s: Failed to kalloc\n", node->name);
->> +
->> +	virq = map_irq(parent, LEVEL_SPI, IRQ_TYPE_LEVEL_HIGH);
->> +	if (!virq)
->> +		panic("%s: Failed to map IRQ %d\n", node->name, LEVEL_SPI);
->> +
->> +	irq_set_chained_handler_and_data(virq, tango_level_isr, intc);
->> +
->> +	for (spi = 1; spi < SPI_MAX; ++spi) {
->> +		virq = map_irq(parent, spi, IRQ_TYPE_EDGE_RISING);
->> +		if (!virq)
->> +			panic("%s: Failed to map IRQ %d\n", node->name, spi);
->> +
->> +		irq_set_chained_handler_and_data(virq, tango_edge_isr, intc);
->> +	}
+> When a timer base is idle, it is forwarded when a new timer is added to
+> ensure that granularity does not become excessive. When not idle, the
+> timer tick is expected to increment the base.
 > 
-> Calling panic? For a secondary interrupt controller? Don't. We call
-> panic when we know for sure that the system is in such a state that
-> we're better off killing it altogether than keeping it running (to avoid
-> corruption, for example). panic is not a substitute for proper error
-> handling.
-
-I handled the setup like irq-tango.c did.
-
-What is the point in bringing up a system where
-interrupts do not work? Nothing will work.
-
-
->> +	tango_intc = intc;
->> +	register_syscore_ops(&tango_syscore_ops);
->> +
->> +	spin_lock_init(&intc->lock);
->> +	intc->base = of_iomap(node, 0);
->> +	intc->dom = irq_domain_add_linear(node, IRQ_MAX, &dom_ops, intc);
->> +	if (!intc->base || !intc->dom)
->> +		panic("%s: Failed to setup IRQ controller\n", node->name);
->> +
->> +	return 0;
->> +}
->> +IRQCHIP_DECLARE(tango_intc, "sigma,smp8759-intc", tango_irq_init);
+> However there is a window after a timer is restarted from nohz, when it
+> is marked not-idle, and before the timer tick on this CPU, where a timer
+> may be added on an ancient base that does not get forwarded (beacause
+> the timer appears not-idle).
 > 
-> Overall, this edge business feels wrong. If you want to mux a single
-> output for all level interrupts, fine by me. But edge interrupts that
-> have a 1:1 mapping with the underlying SPI must be represented as a
-> hierarchy.
-
-I don't understand what you mean by "feels wrong".
-
-There are 128 inputs, and only 24 outputs.
-Therefore, I must map some inputs to the same output.
-Thomas explained that edge interrupts *cannot* be shared.
-So edge interrupts must receive a dedicated output line.
-Did I write anything wrong so far?
-
-Therefore, I figured that I must
-A) map every edge interrupt to a different output
-B) map at least some level interrupts to the same output
-
-Are you saying that I could do things differently?
-
-Do you mean I should have defined two separate domains,
-one for level interrupts, one for edge interrupts?
-
-For level interrupts:
-irq_domain_add_linear(node, IRQ_MAX, &dom_ops, intc);
-
-For edge interrupts:
-irq_domain_add_hierarchy(...)
-
-Eventually, irq_domain_create_hierarchy() calls
-irq_domain_create_linear() anyway.
-
-So maybe you are suggesting a single hierarchical
-domain. I will test tomorrow. What differences will
-it make? Better performance?
-
-Regards.
+> This results in excessive granularity. So much so that a 1 jiffy timeout
+> has blown out to 10s of seconds and triggered the RCU stall warning
+> detector.
+> 
+> Fix this by keeping track of whether the timer has been idle since it was
+> last run or forwarded, and allow forwarding in the case that is true (even
+> if it is not currently idle).
+> 
+> Also add a comment noting a case where we could get an unexpectedly
+> large granularity for a timer. I debugged this problem by adding
+> warnings for such cases, but it seems we can't add them in general due
+> to this corner case.
+> 
+> Signed-off-by: Nicholas Piggin <npiggin@gmail.com>
+> ---
+>  kernel/time/timer.c | 32 +++++++++++++++++++++++++++-----
+>  1 file changed, 27 insertions(+), 5 deletions(-)
+> 
+> diff --git a/kernel/time/timer.c b/kernel/time/timer.c
+> index 8f5d1bf18854..ee7b8b688b48 100644
+> --- a/kernel/time/timer.c
+> +++ b/kernel/time/timer.c
+> @@ -203,6 +203,7 @@ struct timer_base {
+>  	bool			migration_enabled;
+>  	bool			nohz_active;
+>  	bool			is_idle;
+> +	bool			was_idle;
+>  	DECLARE_BITMAP(pending_map, WHEEL_SIZE);
+>  	struct hlist_head	vectors[WHEEL_SIZE];
+>  } ____cacheline_aligned;
+> @@ -856,13 +857,19 @@ get_target_base(struct timer_base *base, unsigned tflags)
+> 
+>  static inline void forward_timer_base(struct timer_base *base)
+>  {
+> -	unsigned long jnow = READ_ONCE(jiffies);
+> +	unsigned long jnow;
+> 
+>  	/*
+> -	 * We only forward the base when it's idle and we have a delta between
+> -	 * base clock and jiffies.
+> +	 * We only forward the base when we are idle or have just come out
+> +	 * of idle (was_idle logic), and have a delta between base clock
+> +	 * and jiffies. In the common case, run_timers will take care of it.
+>  	 */
+> -	if (!base->is_idle || (long) (jnow - base->clk) < 2)
+> +	if (likely(!base->was_idle))
+> +		return;
+> +
+> +	jnow = READ_ONCE(jiffies);
+> +	base->was_idle = base->is_idle;
+> +	if ((long)(jnow - base->clk) < 2)
+>  		return;
+> 
+>  	/*
+> @@ -938,6 +945,13 @@ __mod_timer(struct timer_list *timer, unsigned long expires, bool pending_only)
+>  	 * same array bucket then just return:
+>  	 */
+>  	if (timer_pending(timer)) {
+> +		/*
+> +		 * The downside of this optimization is that it can result in
+> +		 * larger granularity than you would get from adding a new
+> +		 * timer with this expiry. Would a timer flag for networking
+> +		 * be appropriate, then we can try to keep expiry of general
+> +		 * timers within ~1/8th of their interval?
+> +		 */
+>  		if (timer->expires == expires)
+>  			return 1;
+> 
+> @@ -1499,8 +1513,10 @@ u64 get_next_timer_interrupt(unsigned long basej, u64 basem)
+>  		/*
+>  		 * If we expect to sleep more than a tick, mark the base idle:
+>  		 */
+> -		if ((expires - basem) > TICK_NSEC)
+> +		if ((expires - basem) > TICK_NSEC) {
+> +			base->was_idle = true;
+>  			base->is_idle = true;
+> +		}
+>  	}
+>  	raw_spin_unlock(&base->lock);
+> 
+> @@ -1587,6 +1603,12 @@ static inline void __run_timers(struct timer_base *base)
+>  	struct hlist_head heads[LVL_DEPTH];
+>  	int levels;
+> 
+> +	/*
+> +	 * was_idle must be cleared before running timers so that any timer
+> +	 * functions that call mod_timer will not try to forward the base.
+> +	 */
+> +	base->was_idle = false;
+> +
+>  	if (!time_after_eq(jiffies, base->clk))
+>  		return;
+> 
+> -- 
+> 2.13.3
+> 
