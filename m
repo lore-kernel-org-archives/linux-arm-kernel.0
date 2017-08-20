@@ -1,7 +1,7 @@
 From: dolinux.peng@gmail.com (Peng Donglin)
-Date: Sun, 20 Aug 2017 13:22:00 +0800
-Subject: [PATCH 02/12] ASoC: mediatek: Remove unnecessary function call
-Message-ID: <1503206520-15031-1-git-send-email-dolinux.peng@gmail.com>
+Date: Sun, 20 Aug 2017 13:25:46 +0800
+Subject: [PATCH 06/12] ASoC: rockchip: Remove unnecessary function call
+Message-ID: <1503206746-15555-1-git-send-email-dolinux.peng@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,42 +13,30 @@ operation,so i think that the former copy operation can be removed.
 
 Signed-off-by: Peng Donglin <dolinux.peng@gmail.com>
 ---
- sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c | 1 -
- sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c | 1 -
- sound/soc/mediatek/mt8173/mt8173-rt5650.c        | 1 -
- 3 files changed, 3 deletions(-)
+ sound/soc/rockchip/rk3288_hdmi_analog.c | 2 --
+ sound/soc/rockchip/rk3399_gru_sound.c   | 1 -
+ 2 files changed, 3 deletions(-)
 
-diff --git a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c
-index 5e383eb..99c1521 100644
---- a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c
-+++ b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5514.c
-@@ -222,7 +222,6 @@ static int mt8173_rt5650_rt5514_dev_probe(struct platform_device *pdev)
- 		mt8173_rt5650_rt5514_codecs[1].of_node;
- 
- 	card->dev = &pdev->dev;
--	platform_set_drvdata(pdev, card);
- 
- 	ret = devm_snd_soc_register_card(&pdev->dev, card);
- 	if (ret)
-diff --git a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c
-index fed1f15..42de84c 100644
---- a/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c
-+++ b/sound/soc/mediatek/mt8173/mt8173-rt5650-rt5676.c
-@@ -279,7 +279,6 @@ static int mt8173_rt5650_rt5676_dev_probe(struct platform_device *pdev)
+diff --git a/sound/soc/rockchip/rk3288_hdmi_analog.c b/sound/soc/rockchip/rk3288_hdmi_analog.c
+index dbc53e4..37ef162 100644
+--- a/sound/soc/rockchip/rk3288_hdmi_analog.c
++++ b/sound/soc/rockchip/rk3288_hdmi_analog.c
+@@ -272,8 +272,6 @@ static int snd_rk_mc_probe(struct platform_device *pdev)
+ 		return ret;
  	}
  
- 	card->dev = &pdev->dev;
 -	platform_set_drvdata(pdev, card);
+-
+ 	return ret;
+ }
  
- 	ret = devm_snd_soc_register_card(&pdev->dev, card);
- 	if (ret)
-diff --git a/sound/soc/mediatek/mt8173/mt8173-rt5650.c b/sound/soc/mediatek/mt8173/mt8173-rt5650.c
-index a784708..e69c141 100644
---- a/sound/soc/mediatek/mt8173/mt8173-rt5650.c
-+++ b/sound/soc/mediatek/mt8173/mt8173-rt5650.c
-@@ -311,7 +311,6 @@ static int mt8173_rt5650_dev_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
+diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
+index 3475c61..70c0908 100644
+--- a/sound/soc/rockchip/rk3399_gru_sound.c
++++ b/sound/soc/rockchip/rk3399_gru_sound.c
+@@ -362,7 +362,6 @@ static int rockchip_sound_probe(struct platform_device *pdev)
+ 	rockchip_dailinks[DAILINK_RT5514_DSP].platform_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
+ 
  	card->dev = &pdev->dev;
 -	platform_set_drvdata(pdev, card);
  
