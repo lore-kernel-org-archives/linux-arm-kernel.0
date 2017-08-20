@@ -1,64 +1,33 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Sun, 20 Aug 2017 13:29:57 +0800
-Subject: [PATCH 2/2] ARM: sunxi: add support for R40 SoC
-In-Reply-To: <20170820052957.34597-1-icenowy@aosc.io>
-References: <20170820052957.34597-1-icenowy@aosc.io>
-Message-ID: <20170820052957.34597-2-icenowy@aosc.io>
+From: dolinux.peng@gmail.com (Peng Donglin)
+Date: Sun, 20 Aug 2017 13:55:13 +0800
+Subject: [PATCH 10/12] ASoC: sun4i-codec: Remove unnecessary function call
+Message-ID: <1503208513-4015-1-git-send-email-dolinux.peng@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner R40 is a new SoC, with Quad Core Cortex-A7 and peripherals
-like A20.
+First of all,the address of pdev->dev is assigned to card->dev in
+create_card,then the function platform_set_drvdata copies the value
+the variable card to pdev->dev.driver_data, but when calling
+snd_soc_register_card,the function dev_set_drvdata(card->dev, card)
+will also do the same copy operation,so i think that the former copy
+operation can be removed.
 
-Add support for it.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Peng Donglin <dolinux.peng@gmail.com>
 ---
- Documentation/arm/sunxi/README                  | 6 ++++++
- Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
- arch/arm/mach-sunxi/sunxi.c                     | 1 +
- 3 files changed, 8 insertions(+)
+ sound/soc/sunxi/sun4i-codec.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
-index d7b1f016bd62..4fa836782e46 100644
---- a/Documentation/arm/sunxi/README
-+++ b/Documentation/arm/sunxi/README
-@@ -75,6 +75,12 @@ SunXi family
-         + Datasheet
-           http://linux-sunxi.org/File:Allwinner_V3s_Datasheet_V1.0.pdf
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index 1500699..82beeae 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -1655,7 +1655,6 @@ static int sun4i_codec_probe(struct platform_device *pdev)
+ 		goto err_unregister_codec;
+ 	}
  
-+      - Allwinner R40 (sun8i)
-+        + Datasheet
-+          https://github.com/tinalinux/docs/raw/r40-v1.y/R40_Datasheet_V1.0.pdf
-+        + User Manual
-+          https://github.com/tinalinux/docs/raw/r40-v1.y/Allwinner_R40_User_Manual_V1.0.pdf
-+
-     * Quad ARM Cortex-A15, Quad ARM Cortex-A7 based SoCs
-       - Allwinner A80
-         + Datasheet
-diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-index f35c6ada5a65..e4beec3d9ad3 100644
---- a/Documentation/devicetree/bindings/arm/sunxi.txt
-+++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-@@ -14,6 +14,7 @@ using one of the following compatible strings:
-   allwinner,sun8i-a83t
-   allwinner,sun8i-h2-plus
-   allwinner,sun8i-h3
-+  allwinner-sun8i-r40
-   allwinner,sun8i-v3s
-   allwinner,sun9i-a80
-   allwinner,sun50i-a64
-diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-index 7ab353fb25f2..311e6c4fc4f4 100644
---- a/arch/arm/mach-sunxi/sunxi.c
-+++ b/arch/arm/mach-sunxi/sunxi.c
-@@ -66,6 +66,7 @@ static const char * const sun8i_board_dt_compat[] = {
- 	"allwinner,sun8i-h2-plus",
- 	"allwinner,sun8i-h3",
- 	"allwinner,sun8i-v3s",
-+	"allwinner,sun8i-r40",
- 	NULL,
- };
+-	platform_set_drvdata(pdev, card);
+ 	snd_soc_card_set_drvdata(card, scodec);
  
+ 	ret = snd_soc_register_card(card);
 -- 
-2.13.0
+1.9.1
