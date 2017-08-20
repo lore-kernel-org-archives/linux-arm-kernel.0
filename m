@@ -1,33 +1,101 @@
-From: ast@fb.com (Alexei Starovoitov)
-Date: Sat, 19 Aug 2017 19:11:51 -0700
-Subject: [PATCH net-next v3] arm: eBPF JIT compiler
-In-Reply-To: <CAHgaXdJDOseZk0=4uCGeCx44kgnvHf1gnh7CX2c6dTzXb8Rk+g@mail.gmail.com>
-References: <1503134429-29063-1-git-send-email-illusionist.neo@gmail.com>
- <c2f4c796-0cb0-7eca-6cab-fed6b25020d5@fb.com>
- <CAHgaXdJnHxu4gJ8ZVFmrmaXyZL1oFkTbz2K___xKLQedTLmBQg@mail.gmail.com>
- <9d77730f-c6a8-b337-599e-5919207a7e0a@fb.com>
- <CAHgaXd+hccuUYXfTs6gMbvxBctrypofc2FJ10q3QAc0jGsgeyQ@mail.gmail.com>
- <CAHgaXdJDOseZk0=4uCGeCx44kgnvHf1gnh7CX2c6dTzXb8Rk+g@mail.gmail.com>
-Message-ID: <b63fae4b-cb74-1928-b210-80914f3c8995@fb.com>
+From: npiggin@gmail.com (Nicholas Piggin)
+Date: Sun, 20 Aug 2017 14:45:53 +1000
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170816162731.GA22978@linux.vnet.ibm.com>
+References: <20170728182053.000072aa@huawei.com>
+ <20170728190349.GM3730@linux.vnet.ibm.com>
+ <20170731120847.00003d5c@huawei.com>
+ <20170731150411.GA3730@linux.vnet.ibm.com>
+ <20170731162757.000058ba@huawei.com>
+ <20170801184646.GE3730@linux.vnet.ibm.com>
+ <20170802172555.0000468a@huawei.com>
+ <20170815154743.GK7017@linux.vnet.ibm.com>
+ <87wp63smwn.fsf@concordia.ellerman.id.au>
+ <20170816125617.GY7017@linux.vnet.ibm.com>
+ <20170816162731.GA22978@linux.vnet.ibm.com>
+Message-ID: <20170820144553.2ab2727b@ppc64le>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/19/17 2:46 PM, Shubham Bansal wrote:
-> test_pkt_access:PASS:ipv4 271 nsec
-> test_pkt_access:PASS:ipv6 297 nsec
-> test_xdp:PASS:ipv4 961517 nsec     <--- Here is the difference.
-> test_xdp:PASS:ipv6 615855 nsec     <--- Here is the difference.
+On Wed, 16 Aug 2017 09:27:31 -0700
+"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+> On Wed, Aug 16, 2017 at 05:56:17AM -0700, Paul E. McKenney wrote:
+> 
+> Thomas, John, am I misinterpreting the timer trace event messages?
 
-yes. this is expected. These two numbers are single run
-on cold cache, so there will be run-to-run variation.
+So I did some digging, and what you find is that rcu_sched seems to do a
+simple scheudle_timeout(1) and just goes out to lunch for many seconds.
+The process_timeout timer never fires (when it finally does wake after
+one of these events, it usually removes the timer with del_timer_sync).
 
-> test_l4lb:PASS:ipv4 3049 nsec
-> test_l4lb:PASS:ipv6 3906 nsec
+So this patch seems to fix it. Testing, comments welcome.
 
-These two and the first two were the ones I was interested in,
-since they do many iterations over the same set and
-the best to compare code gen changes.
-The delta % is actually better than I expected judging by test_bpf
-micro-benchmarks, so the results are very encouraging.
+Thanks,
+Nick
 
-Thanks!
+[PATCH] timers: Fix excessive granularity of new timers after a nohz idle
+
+When a timer base is idle, it is forwarded when a new timer is added to
+ensure that granularity does not become excessive. When not idle, the
+timer tick is expected to increment the base.
+
+However there is a window after a timer is restarted from nohz, when it
+is marked not-idle, and before the timer tick on this CPU, where a timer
+may be added on an ancient base that does not get forwarded (beacause
+the timer appears not-idle).
+
+This results in excessive granularity. So much so that a 1 jiffy timeout
+has blown out to 10s of seconds and triggered the RCU stall warning
+detector.
+
+Fix this by always forwarding the base when adding a new timer if it is
+more than 1 jiffy behind. Another approach I looked at first was to note
+if the base was idle but not yet run or forwarded, however this just
+seemed to add more branches and complexity when it seems we can just
+cover it with this test.
+
+Also add a comment noting a case where we could get an unexpectedly
+large granularity for a timer. I debugged this problem by adding
+warnings for such cases, but it seems we can't add them in general due
+to this corner case.
+
+Signed-off-by: Nicholas Piggin <npiggin@gmail.com>
+---
+ kernel/time/timer.c | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/kernel/time/timer.c b/kernel/time/timer.c
+index 8f5d1bf18854..8f69b3105b8f 100644
+--- a/kernel/time/timer.c
++++ b/kernel/time/timer.c
+@@ -859,10 +859,10 @@ static inline void forward_timer_base(struct timer_base *base)
+ 	unsigned long jnow = READ_ONCE(jiffies);
+ 
+ 	/*
+-	 * We only forward the base when it's idle and we have a delta between
+-	 * base clock and jiffies.
++	 * We only forward the base when we have a delta between base clock
++	 * and jiffies. In the common case, run_timers will take care of it.
+ 	 */
+-	if (!base->is_idle || (long) (jnow - base->clk) < 2)
++	if ((long) (jnow - base->clk) < 2)
+ 		return;
+ 
+ 	/*
+@@ -938,6 +938,13 @@ __mod_timer(struct timer_list *timer, unsigned long expires, bool pending_only)
+ 	 * same array bucket then just return:
+ 	 */
+ 	if (timer_pending(timer)) {
++		/*
++		 * The downside of this optimization is that it can result in
++		 * larger granularity than you would get from adding a new
++		 * timer with this expiry. Would a timer flag for networking
++		 * be appropriate, then we can try to keep expiry of general
++		 * timers within ~1/8th of their interval?
++		 */
+ 		if (timer->expires == expires)
+ 			return 1;
+ 
+-- 
+2.13.3
