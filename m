@@ -1,31 +1,41 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sun, 20 Aug 2017 12:08:20 -0700
-Subject: [PATCH v2 1/1] Split VGA default device handler out of VGA arbiter
-In-Reply-To: <20170819154753.GQ28977@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170817113028.16853-1-dja@axtens.net>
- <20170817113028.16853-2-dja@axtens.net>
- <20170819154753.GQ28977@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <1503256100.12059.13.camel@kernel.crashing.org>
+From: sean@mess.org (Sean Young)
+Date: Sun, 20 Aug 2017 21:09:48 +0100
+Subject: [PATCH v2 0/3] Add ZTE zx-irdec remote control driver
+In-Reply-To: <20170818125418.GM7608@dragon>
+References: <1501420993-21977-1-git-send-email-shawnguo@kernel.org>
+ <20170818125418.GM7608@dragon>
+Message-ID: <20170820200947.pvyj7fqlorfq56l5@gofer.mess.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2017-08-19 at 10:47 -0500, Bjorn Helgaas wrote:
-> So if ARM64 doesn't have these PCI legacy resources, does that mean an
-> ARM64 host bridge cannot generate these legacy addresses on PCI?  That
-> is, there's no host bridge window that maps to those PCI addresses?
-> That seems like a curious restriction on host bridges, but I guess it
-> would be possible.
+On Fri, Aug 18, 2017 at 08:54:20PM +0800, Shawn Guo wrote:
+> On Sun, Jul 30, 2017 at 09:23:10PM +0800, Shawn Guo wrote:
+> > From: Shawn Guo <shawn.guo@linaro.org>
+> > 
+> > The series adds dt-bindings and remote control driver for IRDEC block
+> > found on ZTE ZX family SoCs.
+> > 
+> > Changes for v2:
+> >  - Add one patch to move generic NEC scancode composing and protocol
+> >    type detection code from ir_nec_decode() into an inline shared
+> >    function, which can be reused by zx-irdec driver.
+> > 
+> > Shawn Guo (3):
+> >   rc: ir-nec-decoder: move scancode composing code into a shared
+> >     function
+> >   dt-bindings: add bindings document for zx-irdec
+> >   rc: add zx-irdec remote control driver
+> 
+> Hi Sean,
+> 
+> We are getting close to 4.14 merge window.  Can we get this into -next
+> for a bit exposure, if you are fine with the patches?
 
-It's rather common. For example on POWER8:
+The rc pull requests have been merged into the media_tree, so they should
+now get exposure in linux-next.
 
- - There is no IO space at all
+https://git.linuxtv.org/media_tree.git/
 
- - We configure the 32-bit MMIO window to be around 3..4G (to avoid
-overlapping with DMA space below it).
+Thanks,
 
-So we effectively have no path to the legacy areas, and that hasn't
-been a problem so far.
-
-Cheers,
-Ben.
- 
+Sean
