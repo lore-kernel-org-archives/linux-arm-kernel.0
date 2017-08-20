@@ -1,159 +1,105 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Sun, 20 Aug 2017 11:35:14 -0700
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170820230040.706b62ac@roar.ozlabs.ibm.com>
-References: <20170731150411.GA3730@linux.vnet.ibm.com>
- <20170731162757.000058ba@huawei.com>
- <20170801184646.GE3730@linux.vnet.ibm.com>
- <20170802172555.0000468a@huawei.com>
- <20170815154743.GK7017@linux.vnet.ibm.com>
- <87wp63smwn.fsf@concordia.ellerman.id.au>
- <20170816125617.GY7017@linux.vnet.ibm.com>
- <20170816162731.GA22978@linux.vnet.ibm.com>
- <20170820144553.2ab2727b@ppc64le>
- <20170820230040.706b62ac@roar.ozlabs.ibm.com>
-Message-ID: <20170820183514.GM11320@linux.vnet.ibm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 20 Aug 2017 19:43:05 +0100
+Subject: [PATCH] arm64: kaslr: ignore modulo offset when validating
+ virtual displacement
+In-Reply-To: <20170820122653.vicqcqqdgqai6ywz@armageddon.cambridge.arm.com>
+References: <20170818174230.30435-1-ard.biesheuvel@linaro.org>
+ <20170820122653.vicqcqqdgqai6ywz@armageddon.cambridge.arm.com>
+Message-ID: <CAKv+Gu84Y-LWvhnzqK5KbjSGa75MpQPcwX6LiC0kpuyFXrP+9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 20, 2017 at 11:00:40PM +1000, Nicholas Piggin wrote:
-> On Sun, 20 Aug 2017 14:45:53 +1000
-> Nicholas Piggin <npiggin@gmail.com> wrote:
-> 
-> > On Wed, 16 Aug 2017 09:27:31 -0700
-> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> > > On Wed, Aug 16, 2017 at 05:56:17AM -0700, Paul E. McKenney wrote:
-> > > 
-> > > Thomas, John, am I misinterpreting the timer trace event messages?  
-> > 
-> > So I did some digging, and what you find is that rcu_sched seems to do a
-> > simple scheudle_timeout(1) and just goes out to lunch for many seconds.
-> > The process_timeout timer never fires (when it finally does wake after
-> > one of these events, it usually removes the timer with del_timer_sync).
-> > 
-> > So this patch seems to fix it. Testing, comments welcome.
-> 
-> Okay this had a problem of trying to forward the timer from a timer
-> callback function.
-> 
-> This was my other approach which also fixes the RCU warnings, but it's
-> a little more complex. I reworked it a bit so the mod_timer fast path
-> hopefully doesn't have much more overhead (actually by reading jiffies
-> only when needed, it probably saves a load).
-
-Giving this one a whirl!
-
-							Thanx, Paul
-
-> Thanks,
-> Nick
-> 
-> --
-> [PATCH] timers: Fix excessive granularity of new timers after a nohz idle
-> 
-> When a timer base is idle, it is forwarded when a new timer is added to
-> ensure that granularity does not become excessive. When not idle, the
-> timer tick is expected to increment the base.
-> 
-> However there is a window after a timer is restarted from nohz, when it
-> is marked not-idle, and before the timer tick on this CPU, where a timer
-> may be added on an ancient base that does not get forwarded (beacause
-> the timer appears not-idle).
-> 
-> This results in excessive granularity. So much so that a 1 jiffy timeout
-> has blown out to 10s of seconds and triggered the RCU stall warning
-> detector.
-> 
-> Fix this by keeping track of whether the timer has been idle since it was
-> last run or forwarded, and allow forwarding in the case that is true (even
-> if it is not currently idle).
-> 
-> Also add a comment noting a case where we could get an unexpectedly
-> large granularity for a timer. I debugged this problem by adding
-> warnings for such cases, but it seems we can't add them in general due
-> to this corner case.
-> 
-> Signed-off-by: Nicholas Piggin <npiggin@gmail.com>
+On 20 August 2017 at 13:26, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Fri, Aug 18, 2017 at 06:42:30PM +0100, Ard Biesheuvel wrote:
+>> In the KASLR setup routine, we ensure that the early virtual mapping
+>> of the kernel image does not cover more than a single table entry at
+>> the level above the swapper block level, so that the assembler routines
+>> involved in setting up this mapping can remain simple.
+>>
+>> In this calculation we add the proposed KASLR offset to the values of
+>> the _text and _end markers, and reject it if they would end up falling
+>> in different swapper table sized windows.
+>>
+>> However, when taking the addresses of _text and _end, the modulo offset
+>> (the physical displacement modulo 2 MB) is already accounted for, and
+>> so adding it again results in incorrect results. So disregard the modulo
+>> offset from the calculation.
+>>
+>> Fixes: 08cdac619c81 ("arm64: relocatable: deal with physically misaligned ...")
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>
+>> This still leaves the 16K pages issue, but I think this solves the problem
+>> encountered by Mark.
+>
+> Thanks. It indeed seems to solve this aspect, at least in my tests but
+> I'll let Mark confirm with his known to fail seeds. For this patch:
+>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> Tested-by: Catalin Marinas <catalin.marinas@arm.com>
+>
+> For the 16K pages, we still need my patch on top of yours, slightly
+> changed to drop module_offset (see below). With both these patches, my
+> continuous reboot seems to be fine but I'll let it running overnight.
+>
+> ------8<-----------------------
+> From fead5f2937b3af7e1054c1de74b7e5fe5964ac02 Mon Sep 17 00:00:00 2001
+> From: Catalin Marinas <catalin.marinas@arm.com>
+> Date: Fri, 18 Aug 2017 15:39:24 +0100
+> Subject: [PATCH] arm64: kaslr: Adjust the offset to avoid Image across
+>  alignment boundary
+>
+> With 16KB pages and a kernel Image larger than 16MB, the current
+> kaslr_early_init() logic for avoiding mappings across swapper table
+> boundaries fails since increasing the offset by kimg_sz just moves the
+> problem to the next boundary.
+>
+> This patch decreases the offset by the boundary overflow amount, with
+> slight risk of reduced entropy as the kernel is more likely to be found
+> at kimg_sz below a swapper table boundary.
+>
+> Fixes: afd0e5a87670 ("arm64: kaslr: Fix up the kernel image alignment")
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Neeraj Upadhyay <neeraju@codeaurora.org>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 > ---
->  kernel/time/timer.c | 32 +++++++++++++++++++++++++++-----
->  1 file changed, 27 insertions(+), 5 deletions(-)
-> 
-> diff --git a/kernel/time/timer.c b/kernel/time/timer.c
-> index 8f5d1bf18854..ee7b8b688b48 100644
-> --- a/kernel/time/timer.c
-> +++ b/kernel/time/timer.c
-> @@ -203,6 +203,7 @@ struct timer_base {
->  	bool			migration_enabled;
->  	bool			nohz_active;
->  	bool			is_idle;
-> +	bool			was_idle;
->  	DECLARE_BITMAP(pending_map, WHEEL_SIZE);
->  	struct hlist_head	vectors[WHEEL_SIZE];
->  } ____cacheline_aligned;
-> @@ -856,13 +857,19 @@ get_target_base(struct timer_base *base, unsigned tflags)
-> 
->  static inline void forward_timer_base(struct timer_base *base)
->  {
-> -	unsigned long jnow = READ_ONCE(jiffies);
-> +	unsigned long jnow;
-> 
->  	/*
-> -	 * We only forward the base when it's idle and we have a delta between
-> -	 * base clock and jiffies.
-> +	 * We only forward the base when we are idle or have just come out
-> +	 * of idle (was_idle logic), and have a delta between base clock
-> +	 * and jiffies. In the common case, run_timers will take care of it.
->  	 */
-> -	if (!base->is_idle || (long) (jnow - base->clk) < 2)
-> +	if (likely(!base->was_idle))
-> +		return;
-> +
-> +	jnow = READ_ONCE(jiffies);
-> +	base->was_idle = base->is_idle;
-> +	if ((long)(jnow - base->clk) < 2)
->  		return;
-> 
->  	/*
-> @@ -938,6 +945,13 @@ __mod_timer(struct timer_list *timer, unsigned long expires, bool pending_only)
->  	 * same array bucket then just return:
->  	 */
->  	if (timer_pending(timer)) {
-> +		/*
-> +		 * The downside of this optimization is that it can result in
-> +		 * larger granularity than you would get from adding a new
-> +		 * timer with this expiry. Would a timer flag for networking
-> +		 * be appropriate, then we can try to keep expiry of general
-> +		 * timers within ~1/8th of their interval?
-> +		 */
->  		if (timer->expires == expires)
->  			return 1;
-> 
-> @@ -1499,8 +1513,10 @@ u64 get_next_timer_interrupt(unsigned long basej, u64 basem)
->  		/*
->  		 * If we expect to sleep more than a tick, mark the base idle:
->  		 */
-> -		if ((expires - basem) > TICK_NSEC)
-> +		if ((expires - basem) > TICK_NSEC) {
-> +			base->was_idle = true;
->  			base->is_idle = true;
-> +		}
->  	}
->  	raw_spin_unlock(&base->lock);
-> 
-> @@ -1587,6 +1603,12 @@ static inline void __run_timers(struct timer_base *base)
->  	struct hlist_head heads[LVL_DEPTH];
->  	int levels;
-> 
-> +	/*
-> +	 * was_idle must be cleared before running timers so that any timer
-> +	 * functions that call mod_timer will not try to forward the base.
-> +	 */
-> +	base->was_idle = false;
-> +
->  	if (!time_after_eq(jiffies, base->clk))
->  		return;
-> 
-> -- 
-> 2.13.3
-> 
+>  arch/arm64/kernel/kaslr.c | 9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+> index 1d95c204186b..b5fceb7efff5 100644
+> --- a/arch/arm64/kernel/kaslr.c
+> +++ b/arch/arm64/kernel/kaslr.c
+> @@ -131,8 +131,8 @@ u64 __init kaslr_early_init(u64 dt_phys)
+>         /*
+>          * The kernel Image should not extend across a 1GB/32MB/512MB alignment
+>          * boundary (for 4KB/16KB/64KB granule kernels, respectively). If this
+> -        * happens, increase the KASLR offset by the size of the kernel image
+> -        * rounded up by SWAPPER_BLOCK_SIZE.
+> +        * happens, decrease the KASLR offset by the boundary overflow rounded
+> +        * up to SWAPPER_BLOCK_SIZE.
+>          *
+>          * NOTE: The references to _text and _end below will already take the
+>          *       modulo offset (the physical displacement modulo 2 MB) into
+> @@ -142,8 +142,9 @@ u64 __init kaslr_early_init(u64 dt_phys)
+>          */
+>         if ((((u64)_text + offset) >> SWAPPER_TABLE_SHIFT) !=
+>             (((u64)_end + offset) >> SWAPPER_TABLE_SHIFT)) {
+> -               u64 kimg_sz = _end - _text;
+> -               offset = (offset + round_up(kimg_sz, SWAPPER_BLOCK_SIZE))
+> +               u64 adjust = ((u64)_end + offset) &
+> +                       ((1 << SWAPPER_TABLE_SHIFT) - 1);
+> +               offset = (offset - round_up(adjust, SWAPPER_BLOCK_SIZE))
+>                                 & mask;
+>         }
+>
+
+At this point, _text is in the range [PAGE_OFFSET .. PAGE_OFFSET +
+2MB), so we can simply round up offset instead, I think.
+
+offset = round_up(offset, 1 << SWAPPER_TABLE_SHIFT);
+
+That way we add rather than subtract but this should not be a problem
+(we don't randomize over the entire VMALLOC region anyway)
