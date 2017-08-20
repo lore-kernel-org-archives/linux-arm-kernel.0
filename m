@@ -1,82 +1,87 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sun, 20 Aug 2017 13:20:47 +0300
-Subject: [PATCH 1/2] arm64: introduce separated bits for mm_context_t flags
+Date: Sun, 20 Aug 2017 13:20:48 +0300
+Subject: [PATCH 2/2] arm64: cleanup {COMPAT_,}SET_PERSONALITY() macro
 In-Reply-To: <20170820102048.7537-1-ynorov@caviumnetworks.com>
 References: <20170820102048.7537-1-ynorov@caviumnetworks.com>
-Message-ID: <20170820102048.7537-2-ynorov@caviumnetworks.com>
+Message-ID: <20170820102048.7537-3-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently mm->context.flags field uses thread_info flags which is not
-the best idea for many reasons. For example, mm_context_t doesn't need
-most of thread_info flags. And it would be difficult to add new mm-related
-flag if needed because it may easily interfere with TIF ones.
+There is some work that should be done after setting the personality.
+Currently it's done in the macro, which is not the best idea.
 
-To deal with it, the new MMCF_AARCH32 flag is introduced for
-mm_context_t->flags, where MMCF prefix stands for mm_context_t flags.
-Also, mm_context_t flag doesn't require atomicity and ordering of the
-access, so using set/clear_bit() is replaced with simple masks.
+In this patch new arch_setup_new_exec() routine is introduced, and all
+setup code is moved there, as suggested by Catalin:
+https://lkml.org/lkml/2017/8/4/494
 
-RFC: https://lkml.org/lkml/2017/7/31/454
-v1:
- - changed the MMCF_AARCH32 bit number from 0x1 to 0x0 and added comment
 v2:
- - using set/clear_bit() is replaced with simple masks.
+ - don't move clearing READ_IMPLIES_EXEC flag from SET_PERSONALITY()
 
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+CC: Pratyush Anand <panand@redhat.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/elf.h       | 4 ++--
- arch/arm64/include/asm/mmu.h       | 2 ++
- arch/arm64/kernel/probes/uprobes.c | 2 +-
- 3 files changed, 5 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/elf.h         | 7 +++++--
+ arch/arm64/include/asm/thread_info.h | 3 +++
+ arch/arm64/kernel/process.c          | 8 ++++++++
+ 3 files changed, 16 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 3288c2b36731..517b9ff0456c 100644
+index 517b9ff0456c..9c4434b8a9a8 100644
 --- a/arch/arm64/include/asm/elf.h
 +++ b/arch/arm64/include/asm/elf.h
-@@ -139,7 +139,7 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+@@ -137,9 +137,13 @@ typedef struct user_fpsimd_state elf_fpregset_t;
+  */
+ #define ELF_PLAT_INIT(_r, load_addr)	(_r)->regs[0] = 0
  
++/*
++ * Don't modify this macro unless you add new personality.
++ * All personality-related setup should be done at proper place.
++ * If not sure, consider the arch_setup_new_exec() function.
++ */
  #define SET_PERSONALITY(ex)						\
  ({									\
--	clear_bit(TIF_32BIT, &current->mm->context.flags);		\
-+	current->mm->context.flags = 0;					\
+-	current->mm->context.flags = 0;					\
  	clear_thread_flag(TIF_32BIT);					\
  	current->personality &= ~READ_IMPLIES_EXEC;			\
  })
-@@ -195,7 +195,7 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
+@@ -195,7 +199,6 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
   */
  #define COMPAT_SET_PERSONALITY(ex)					\
  ({									\
--	set_bit(TIF_32BIT, &current->mm->context.flags);		\
-+	current->mm->context.flags = MMCF_AARCH32;			\
+-	current->mm->context.flags = MMCF_AARCH32;			\
  	set_thread_flag(TIF_32BIT);					\
   })
  #define COMPAT_ARCH_DLINFO
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 5468c834b072..e4c474c6501e 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -16,6 +16,8 @@
- #ifndef __ASM_MMU_H
- #define __ASM_MMU_H
+diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+index 46c3b93cf865..c823d2f12b4c 100644
+--- a/arch/arm64/include/asm/thread_info.h
++++ b/arch/arm64/include/asm/thread_info.h
+@@ -68,6 +68,9 @@ struct thread_info {
+ #define thread_saved_fp(tsk)	\
+ 	((unsigned long)(tsk->thread.cpu_context.fp))
  
-+#define MMCF_AARCH32	0x1	/* MM hosts AArch32 executables */
++void arch_setup_new_exec(void);
++#define arch_setup_new_exec     arch_setup_new_exec
 +
- typedef struct {
- 	atomic64_t	id;
- 	void		*vdso;
-diff --git a/arch/arm64/kernel/probes/uprobes.c b/arch/arm64/kernel/probes/uprobes.c
-index 26c998534dca..636ca0119c0e 100644
---- a/arch/arm64/kernel/probes/uprobes.c
-+++ b/arch/arm64/kernel/probes/uprobes.c
-@@ -40,7 +40,7 @@ int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
- 	probe_opcode_t insn;
+ #endif
  
- 	/* TODO: Currently we do not support AARCH32 instruction probing */
--	if (test_bit(TIF_32BIT, &mm->context.flags))
-+	if (mm->context.flags & MMCF_AARCH32)
- 		return -ENOTSUPP;
- 	else if (!IS_ALIGNED(addr, AARCH64_INSN_SIZE))
- 		return -EINVAL;
+ /*
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index 659ae8094ed5..e99012c4803a 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -417,3 +417,11 @@ unsigned long arch_randomize_brk(struct mm_struct *mm)
+ 	else
+ 		return randomize_page(mm->brk, SZ_1G);
+ }
++
++/*
++ * Called immediately after a successful exec.
++ */
++void arch_setup_new_exec(void)
++{
++	current->mm->context.flags = is_compat_task() ? MMCF_AARCH32 : 0;
++}
 -- 
 2.11.0
