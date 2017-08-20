@@ -1,104 +1,44 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 19 Aug 2017 16:07:01 -0700
-Subject: [GIT PULL 6/6] Broadcom drivers changes for 4.14
-In-Reply-To: <CAK8P3a0RDuMAdACCepTj_zr4NkocM5vSVGEayjGPbyTuQ7TwBQ@mail.gmail.com>
-References: <20170817183748.1450-1-f.fainelli@gmail.com>
- <20170817183748.1450-7-f.fainelli@gmail.com>
- <CAK8P3a1id0Wd7XdH+9MsgaK-UCNmYE5ks1p4bzont-T03v5tEA@mail.gmail.com>
- <124419b2-4f45-d282-2aea-c8e0c3a819c5@gmail.com>
- <CAK8P3a0RDuMAdACCepTj_zr4NkocM5vSVGEayjGPbyTuQ7TwBQ@mail.gmail.com>
-Message-ID: <5722f17c-194b-3e13-b702-c51683abfba0@gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 20 Aug 2017 08:59:16 +0800
+Subject: [PATCH] ARM: sun8i: a83t: Add device tree for Sinovoip Bananapi
+ BPI-M3
+In-Reply-To: <20170817034048.11601-1-wens@csie.org>
+Message-ID: <201708200827.WQojuopU%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Chen-Yu,
 
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.13-rc5 next-20170817]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-On 08/19/2017 01:34 PM, Arnd Bergmann wrote:
-> On Sat, Aug 19, 2017 at 12:35 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> On 08/18/2017 02:58 PM, Arnd Bergmann wrote:
->>> On Thu, Aug 17, 2017 at 8:37 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>>> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
->>>>
->>>>   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.14/drivers
->>>>
->>>> for you to fetch changes up to 7f95522be533c27a918fe388ae5d733344660ef2:
->>>>
->>>>   soc bcm: brcmstb: Add support for S2/S3/S5 suspend states (MIPS) (2017-07-28 16:57:03 -0700)
->>>>
->>>> ----------------------------------------------------------------
->>>> This pull request contains Broadcom ARM/ARM64 SoC drivers changes for 4.14,
->>>> please pull the following:
->>>>
->>>> - Markus adds support for the Broadcom STB DDR PHY frontend which supports
->>>>   dynamic firmware loading and offers the ability to respond with DRAM refresh
->>>>   rates. He also adds a proper documentation binding document for that peripheral
->>>>
->>>
->>> I had not seen this driver before, but now I looked at it and have two small
->>> comments:
->>>
->>> - I'd rather see this added to drivers/memory than drivers/soc. The distinction
->>>   is not always clear, but I think that's where most of the DDR memory interface
->>>   drivers are at the moment.
->>
->> This driver does not control the SoC's memory interface though it does
->> talk to the frontend processor built into the DDR controller to first
->> load its firmware and then query it to get the DDR refresh rates. If you
->> feel like drivers/memory/broadcom/ is more appropriate I suppose we
->> could relocate the driver there.
-> 
-> Yes, I still think it makes sense to put it there, although it's not the only
-> possible choice. drivers/memory is a very broad category that groups
-> all kinds of things that are related to memory interfaces.
+url:    https://github.com/0day-ci/linux/commits/Chen-Yu-Tsai/ARM-sun8i-a83t-Add-device-tree-for-Sinovoip-Bananapi-BPI-M3/20170820-055904
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Alright, we'll move it there.
+All errors (new ones prefixed by >>):
 
-> 
->>> - In a function called __write_firmware, I stumbled over this small
->>>   hunk and similar functions elsewhere in the driver:
->>>
->>> +       /* Now copy it. */
->>> +       if (is_big_endian) {
->>> +               for (i = 0; i < size; i++)
->>> +                       writel_relaxed(be32_to_cpu(fw[i]), mem + i);
->>> +       } else {
->>> +               for (i = 0; i < size; i++)
->>> +                       writel_relaxed(fw[i], mem + i);
->>> +       }
->>>
->>> This looks wrong to me, as the behavior is different between
->>> little-endian and big-endian kernels: the former will byteswap
->>> big-endian fw images but not little-endian images, while the
->>> latter will byte-swap both.
->>>
->>> What is the expected behavior here?
->>
->> So the is_big_endian flag actually refers to the endianess of the DPFE
->> CPU/firmware image here, so if I read this code correctly, we have the
->> following happening
->>
->> LE kernel + BE DPFE: swapping from BE to LE during file read but not I/O
->> write (KO because resulting DPFE image is LE)
->> LE kernel + LE DPFE: no-swapping (OK)
->>
->> BE kernel + BE DPFE: swapping to LE during I/O write not file read (KO,
->> because resulting DPFE image is LE)
->> BE kernel + LE DPFE: swapping to LE during I/O write not file read (OK)
->>
->> Markus, does that sound like what is happening?
-> 
-> I suspect it would be better to never swap while copying the image from
-> memory to I/O and always use memcpy_toio there, which performs
-> a byte stream copy. The information you then need really is not what
-> the endianess of the DPFE CPU is, but rather if it was stored as
-> byte-reversed in the file.
+>> Error: arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts:64.1-7 Label or path ehci0 not found
+>> Error: arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts:71.1-6 Label or path mmc0 not found
+>> Error: arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts:81.1-6 Label or path mmc2 not found
+>> Error: arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts:91.1-7 Label or path r_rsb not found
+>> Error: arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts:145.1-8 Label or path usbphy not found
+   FATAL ERROR: Syntax error parsing input tree
 
-I think you are right, it does not look like we need to swap and since
-we are actually already checking the endianess of the file it should be
-a lot simpler, we'll fix that too. Thanks!
--- 
-Florian
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 23091 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170820/1bad2dca/attachment-0001.gz>
