@@ -1,164 +1,156 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 20 Aug 2017 10:32:19 +0200
-Subject: [RFC 2/3] rtc: Add Realtek RTD1295
-In-Reply-To: <20170820013632.18375-3-afaerber@suse.de>
-References: <20170820013632.18375-1-afaerber@suse.de>
- <20170820013632.18375-3-afaerber@suse.de>
-Message-ID: <20170820083219.siez3rl2hbjgjgk5@piout.net>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Sun, 20 Aug 2017 17:46:00 +0800
+Subject: [PATCH 2/4] arm: dts: mt7623: update pio, usb and crypto nodes
+In-Reply-To: <9c4a8be621ac76594fad303d5d49ed32bd530605.1503222289.git.ryder.lee@mediatek.com>
+References: <9c4a8be621ac76594fad303d5d49ed32bd530605.1503222289.git.ryder.lee@mediatek.com>
+Message-ID: <51f8e8bc439dbb09dc1cd4ae0a518cc0993e6db0.1503222289.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch updates pio, usb and crypto nodes to make them be
+consistent with the binding documents.
 
-On 20/08/2017 at 03:36:30 +0200, Andreas F?rber wrote:
-> +static int rtd119x_rtc_read_time(struct device *dev, struct rtc_time *tm)
-> +{
-> +	struct rtd119x_rtc *data = dev_get_drvdata(dev);
-> +	time64_t t;
-> +	u32 day;
-> +
-> +	day = readl_relaxed(data->base + RTD_RTCDATE_LOW);
-> +	day |= readl_relaxed(data->base + RTD_RTCDATE_HIGH) << 8;
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ arch/arm/boot/dts/mt7623.dtsi | 52 ++++++++++++++++++++++---------------------
+ 1 file changed, 27 insertions(+), 25 deletions(-)
 
-Is RTD_RTCDATE_HIGH latched when RTD_RTCDATE_LOW is read? If this is not
-the case, you probably want to handle a possible update between both
-readl_relaxed.
-
-> +	t = mktime64(data->base_year, 1, 1, 0, 0, 0);
-> +	t += day * 24 * 60 * 60;
-> +	rtc_time64_to_tm(t, tm);
-> +	tm->tm_sec  = readl_relaxed(data->base + RTD_RTCSEC) >> 1;
-> +	tm->tm_min  = readl_relaxed(data->base + RTD_RTCMIN);
-> +	tm->tm_hour = readl_relaxed(data->base + RTD_RTCHR);
-> +
-> +	return rtc_valid_tm(tm);
-> +}
-> +
-> +static int rtd119x_rtc_set_time(struct device *dev, struct rtc_time *tm)
-> +{
-> +	struct rtd119x_rtc *data = dev_get_drvdata(dev);
-> +	time64_t time_base, new_time, time_delta;
-> +	unsigned long day;
-> +
-> +	if (tm->tm_year < data->base_year)
-> +		return -EINVAL;
-> +
-> +	time_base = mktime64(data->base_year, 1, 1, 0, 0, 0);
-> +	new_time = rtc_tm_to_time64(tm);
-> +	time_delta = new_time - time_base;
-> +	day = time_delta / (24 * 60 * 60);
-> +	if (day > 0x7fff)
-> +		return -EINVAL;
-> +
-> +	rtd119x_rtc_set_enabled(dev, false);
-> +
-> +	writel_relaxed(tm->tm_sec,  data->base + RTD_RTCSEC);
-> +	writel_relaxed(tm->tm_min,  data->base + RTD_RTCMIN);
-> +	writel_relaxed(tm->tm_hour, data->base + RTD_RTCHR);
-> +	writel_relaxed(day & 0xff, data->base + RTD_RTCDATE_LOW);
-> +	writel_relaxed((day >> 8) & 0x7f, data->base + RTD_RTCDATE_HIGH);
-> +
-> +	rtd119x_rtc_set_enabled(dev, true);
-> +
-> +	return 0;
-> +}
-> +
-> +static int rtd119x_rtc_open(struct device *dev)
-> +{
-> +	struct rtd119x_rtc *data = dev_get_drvdata(dev);
-> +	u32 val;
-> +	int ret;
-> +
-> +	ret = clk_prepare_enable(data->clk);
-> +	if (ret)
-> +		return ret;
-> +
-> +	val = readl_relaxed(data->base + RTD_RTCACR);
-> +	dev_info(dev, "rtcacr = 0x%08x\n", val);
-> +	if (!(val & BIT(7))) {
-> +	}
-
-I don't see the point of reading that register, and not doing anything
-with it.
-
-> +
-> +	rtd119x_rtc_set_enabled(dev, true);
-> +
-
-This is certainly not what you want. The RTC device is usually not
-opened so enabling the RTC when open and disabling it when closed will
-not work on most systems. This is probably true for the clock too. i.e
-what you do here should be done in probe.
-
-> +	return 0;
-> +}
-> +
-> +static void rtd119x_rtc_release(struct device *dev)
-> +{
-> +	struct rtd119x_rtc *data = dev_get_drvdata(dev);
-> +
-> +	rtd119x_rtc_set_enabled(dev, false);
-> +
-> +	clk_disable_unprepare(data->clk);
-> +}
-> +
-> +static const struct rtc_class_ops rtd119x_rtc_ops = {
-> +	.open		= rtd119x_rtc_open,
-> +	.release	= rtd119x_rtc_release,
-> +	.read_time	= rtd119x_rtc_read_time,
-> +	.set_time	= rtd119x_rtc_set_time,
-> +};
-> +
-> +static const struct of_device_id rtd119x_rtc_dt_ids[] = {
-> +	 { .compatible = "realtek,rtd1295-rtc" },
-> +	 { }
-> +};
-> +
-> +static int rtd119x_rtc_probe(struct platform_device *pdev)
-> +{
-> +	struct rtd119x_rtc *data;
-> +	struct resource *res;
-> +
-> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> +	if (!data)
-> +		return -ENOMEM;
-> +
-> +	platform_set_drvdata(pdev, data);
-> +	data->base_year = 2014;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	data->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(data->base))
-> +		return PTR_ERR(data->base);
-> +
-> +	data->clk = of_clk_get(pdev->dev.of_node, 0);
-> +	if (IS_ERR(data->clk))
-> +		return PTR_ERR(data->clk);
-> +
-> +	data->rtcdev = devm_rtc_device_register(&pdev->dev, "rtc",
-> +				&rtd119x_rtc_ops, THIS_MODULE);
-> +	if (IS_ERR(data->rtcdev)) {
-> +		dev_err(&pdev->dev, "failed to register rtc device");
-> +		clk_put(data->clk);
-> +		return PTR_ERR(data->rtcdev);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver rtd119x_rtc_driver = {
-> +	.probe = rtd119x_rtc_probe,
-> +	.driver = {
-> +		.name = "rtd1295-rtc",
-> +		.of_match_table	= rtd119x_rtc_dt_ids,
-> +	},
-> +};
-> +builtin_platform_driver(rtd119x_rtc_driver);
-> -- 
-> 2.12.3
-> 
-
+diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+index 381843e..9ec3767 100644
+--- a/arch/arm/boot/dts/mt7623.dtsi
++++ b/arch/arm/boot/dts/mt7623.dtsi
+@@ -226,21 +226,6 @@
+ 		#reset-cells = <1>;
+ 	};
+ 
+-	pio: pinctrl at 10005000 {
+-		compatible = "mediatek,mt7623-pinctrl",
+-			     "mediatek,mt2701-pinctrl";
+-		reg = <0 0x1000b000 0 0x1000>;
+-		mediatek,pctl-regmap = <&syscfg_pctl_a>;
+-		pins-are-numbered;
+-		gpio-controller;
+-		#gpio-cells = <2>;
+-		interrupt-controller;
+-		interrupt-parent = <&gic>;
+-		#interrupt-cells = <2>;
+-		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
+-	};
+-
+ 	syscfg_pctl_a: syscfg at 10005000 {
+ 		compatible = "mediatek,mt7623-pctl-a-syscfg", "syscon";
+ 		reg = <0 0x10005000 0 0x1000>;
+@@ -274,6 +259,20 @@
+ 		clock-names = "system-clk", "rtc-clk";
+ 	};
+ 
++	pio: pinctrl at 1000b000 {
++		compatible = "mediatek,mt7623-pinctrl";
++		reg = <0 0x1000b000 0 0x1000>;
++		mediatek,pctl-regmap = <&syscfg_pctl_a>;
++		pins-are-numbered;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		interrupt-parent = <&gic>;
++		#interrupt-cells = <2>;
++		interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
+ 	pwrap: pwrap at 1000d000 {
+ 		compatible = "mediatek,mt7623-pwrap",
+ 			     "mediatek,mt2701-pwrap";
+@@ -680,7 +679,7 @@
+ 		interrupts = <GIC_SPI 196 IRQ_TYPE_LEVEL_LOW>;
+ 		clocks = <&hifsys CLK_HIFSYS_USB0PHY>,
+ 			 <&topckgen CLK_TOP_ETHIF_SEL>;
+-		clock-names = "sys_ck", "free_ck";
++		clock-names = "sys_ck", "ref_ck";
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_HIF>;
+ 		phys = <&u2port0 PHY_TYPE_USB2>, <&u3port0 PHY_TYPE_USB3>;
+ 		status = "disabled";
+@@ -690,8 +689,6 @@
+ 		compatible = "mediatek,mt7623-u3phy",
+ 			     "mediatek,mt2701-u3phy";
+ 		reg = <0 0x1a1c4000 0 0x0700>;
+-		clocks = <&clk26m>;
+-		clock-names = "u3phya_ref";
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+ 		ranges;
+@@ -699,12 +696,16 @@
+ 
+ 		u2port0: usb-phy at 1a1c4800 {
+ 			reg = <0 0x1a1c4800 0 0x0100>;
++			clocks = <&topckgen CLK_TOP_USB_PHY48M>;
++			clock-names = "ref";
+ 			#phy-cells = <1>;
+ 			status = "okay";
+ 		};
+ 
+ 		u3port0: usb-phy at 1a1c4900 {
+ 			reg = <0 0x1a1c4900 0 0x0700>;
++			clocks = <&clk26m>;
++			clock-names = "ref";
+ 			#phy-cells = <1>;
+ 			status = "okay";
+ 		};
+@@ -719,7 +720,7 @@
+ 		interrupts = <GIC_SPI 197 IRQ_TYPE_LEVEL_LOW>;
+ 		clocks = <&hifsys CLK_HIFSYS_USB1PHY>,
+ 			 <&topckgen CLK_TOP_ETHIF_SEL>;
+-		clock-names = "sys_ck", "free_ck";
++		clock-names = "sys_ck", "ref_ck";
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_HIF>;
+ 		phys = <&u2port1 PHY_TYPE_USB2>, <&u3port1 PHY_TYPE_USB3>;
+ 		status = "disabled";
+@@ -729,8 +730,6 @@
+ 		compatible = "mediatek,mt7623-u3phy",
+ 			     "mediatek,mt2701-u3phy";
+ 		reg = <0 0x1a244000 0 0x0700>;
+-		clocks = <&clk26m>;
+-		clock-names = "u3phya_ref";
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+ 		ranges;
+@@ -738,12 +737,16 @@
+ 
+ 		u2port1: usb-phy at 1a244800 {
+ 			reg = <0 0x1a244800 0 0x0100>;
++			clocks = <&topckgen CLK_TOP_USB_PHY48M>;
++			clock-names = "ref";
+ 			#phy-cells = <1>;
+ 			status = "okay";
+ 		};
+ 
+ 		u3port1: usb-phy at 1a244900 {
+ 			reg = <0 0x1a244900 0 0x0700>;
++			clocks = <&clk26m>;
++			clock-names = "ref";
+ 			#phy-cells = <1>;
+ 			status = "okay";
+ 		};
+@@ -784,16 +787,15 @@
+ 	};
+ 
+ 	crypto: crypto at 1b240000 {
+-		compatible = "mediatek,mt7623-crypto";
++		compatible = "mediatek,eip97-crypto";
+ 		reg = <0 0x1b240000 0 0x20000>;
+ 		interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_LOW>,
+ 			     <GIC_SPI 83 IRQ_TYPE_LEVEL_LOW>,
+ 			     <GIC_SPI 84 IRQ_TYPE_LEVEL_LOW>,
+ 			     <GIC_SPI 91 IRQ_TYPE_LEVEL_LOW>,
+ 			     <GIC_SPI 97 IRQ_TYPE_LEVEL_LOW>;
+-		clocks = <&topckgen CLK_TOP_ETHIF_SEL>,
+-			 <&ethsys CLK_ETHSYS_CRYPTO>;
+-		clock-names = "ethif","cryp";
++		clocks = <&ethsys CLK_ETHSYS_CRYPTO>;
++		clock-names = "cryp";
+ 		power-domains = <&scpsys MT2701_POWER_DOMAIN_ETH>;
+ 		status = "disabled";
+ 	};
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
