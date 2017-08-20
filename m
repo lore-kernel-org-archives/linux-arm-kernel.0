@@ -1,41 +1,85 @@
-From: sean@mess.org (Sean Young)
-Date: Sun, 20 Aug 2017 21:09:48 +0100
-Subject: [PATCH v2 0/3] Add ZTE zx-irdec remote control driver
-In-Reply-To: <20170818125418.GM7608@dragon>
-References: <1501420993-21977-1-git-send-email-shawnguo@kernel.org>
- <20170818125418.GM7608@dragon>
-Message-ID: <20170820200947.pvyj7fqlorfq56l5@gofer.mess.org>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Mon, 21 Aug 2017 01:49:39 +0530
+Subject: Odroid XU4 usb 3.0 clk summary.
+Message-ID: <CANAwSgTq75gH2k2Mxxs5BfEckpNkOhfBk3j+KwZS3JrqgBiK3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 08:54:20PM +0800, Shawn Guo wrote:
-> On Sun, Jul 30, 2017 at 09:23:10PM +0800, Shawn Guo wrote:
-> > From: Shawn Guo <shawn.guo@linaro.org>
-> > 
-> > The series adds dt-bindings and remote control driver for IRDEC block
-> > found on ZTE ZX family SoCs.
-> > 
-> > Changes for v2:
-> >  - Add one patch to move generic NEC scancode composing and protocol
-> >    type detection code from ir_nec_decode() into an inline shared
-> >    function, which can be reused by zx-irdec driver.
-> > 
-> > Shawn Guo (3):
-> >   rc: ir-nec-decoder: move scancode composing code into a shared
-> >     function
-> >   dt-bindings: add bindings document for zx-irdec
-> >   rc: add zx-irdec remote control driver
-> 
-> Hi Sean,
-> 
-> We are getting close to 4.14 merge window.  Can we get this into -next
-> for a bit exposure, if you are fine with the patches?
+Hi All,
 
-The rc pull requests have been merged into the media_tree, so they should
-now get exposure in linux-next.
+I have some issue on performance on USB 3.0 on Odroid XU4.
+some inconsistency on heavy read/write issue on hdd / ssd.
+with intermediated failure in hub reset, with no kernel panic.
 
-https://git.linuxtv.org/media_tree.git/
+Jul 31 00:04:52 odroid kernel: usb 4-1.1: reset SuperSpeed USB device
+number 3 using xhci-hcd
+Jul 31 00:04:53 odroid kernel: usb 4-1.1: reset SuperSpeed USB device
+number 3 using xhci-hcd
+Jul 31 00:04:55 odroid kernel: usb 4-1.1: reset SuperSpeed USB device
+number 3 using xhci-hcd
 
-Thanks,
+So I just wonder if this could be related to usb 3.0 clk.
+So the cross check check the ck_summary of HK 3.10.x and mainline 4.13.x
 
-Sean
+ck_summary HK 3.10.x         https://pastebin.com/qGGHj1t6
+
+    mout_usbdrd300              3           3            24000000
+       dout_usbdrd300           2           2            24000000
+          sclk_usbdrd300        1           1            24000000
+       dout_usbphy300           2           2            24000000
+          sclk_usbphy300        1           1            24000000
+    mout_usbdrd301              3           3            24000000
+       dout_usbdrd301           2           2            24000000
+          sclk_usbdrd301        1           1            24000000
+       dout_usbphy301           2           2            24000000
+          sclk_usbphy301        1           1            24000000
+
+clk_summary mainline 4.13.x          https://pastebin.com/i7ij29Sm
+
+    mout_usbd300                          1            1    24000000
+       0 0
+       dout_usbd300                       0            0    24000000
+       0 0
+          sclk_usbd300                    0            0    24000000
+       0 0
+       dout_usbphy300                     1            1    24000000
+       0 0
+          sclk_usbphy300                  4            4    24000000
+       0 0
+    mout_usbd301                          1            1    24000000
+       0 0
+       dout_usbd301                       0            0    24000000
+       0 0
+          sclk_usbd301                    0            0    24000000
+       0 0
+       dout_usbphy301                     1            1    24000000
+       0 0
+          sclk_usbphy301                  3            3    24000000
+       0 0
+
+So their seem to be some difference in the clk count on usb 3.0.
+could this be related to the above behavior.
+
+Form the schematic of Odroid XU4 it seem to have USB_CLK to control usb.
+usb clk to but could not find any link in the exynos5420 clk code.
+
+Odroid XU4 has USB HUB GL852G-OHG  controller.
+possible datasheet of hub controller
+http://minipcsale.ru/images/Minix-Neo-X8-h/GL852G.pdf
+
+How can we control the vbus power of the usb 3.0 ports ?
+
+XUSB30OVERCUR_U2/ETC5_0
+XUSB30OVERCUR_U3/ETC5_1
+XUSB30VBUSCTRL_U2/ETC5_2
+XUSB30VBUSCTRL_U3/ETC5_3
+
+I have also tried to setup vbu/vbus-boost via dts but no success.
+
+I have also tried to enable power-domain fsys for usb device
+but it's say unsupported setting.
+
+If you could share some inputs it would be useful in debug and enhance the code.
+
+Best Regards
+-Anand
