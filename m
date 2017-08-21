@@ -1,242 +1,91 @@
 From: rkrcmar@redhat.com (=?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?=)
-Date: Mon, 21 Aug 2017 22:35:28 +0200
-Subject: [PATCH RFC v3 7/9] KVM: add kvm_free_vcpus and kvm_arch_free_vcpus
+Date: Mon, 21 Aug 2017 22:35:25 +0200
+Subject: [PATCH RFC v3 4/9] KVM: arm/arm64: use locking helpers in
+ kvm_vgic_create()
 In-Reply-To: <20170821203530.9266-1-rkrcmar@redhat.com>
 References: <20170821203530.9266-1-rkrcmar@redhat.com>
-Message-ID: <20170821203530.9266-8-rkrcmar@redhat.com>
+Message-ID: <20170821203530.9266-5-rkrcmar@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generalize clearing of kvm->vcpus.  This should not be needed at all as
-all accesses to VCPUs in the destruction path are bugs, but maybe helps
-to catch them.  The call path crosses arch/common code way too much, so
-extra untangling patch is welcome.  Doing the clearing later seems be
-ok.
+No new VCPUs can be created because we are holding the kvm->lock.
+This means that if we successfuly lock all VCPUs, we'll be unlocking the
+same set and there is no need to do extra bookkeeping.
 
-I don't see a reason for the locking the mutex, so there definitely is
-a room for improvements.
-
-Suggested-by: Cornelia Huck <cohuck@redhat.com>
 Signed-off-by: Radim Kr?m?? <rkrcmar@redhat.com>
 ---
- arch/mips/kvm/mips.c       | 13 ++-----------
- arch/powerpc/kvm/powerpc.c | 17 +++++++++--------
- arch/s390/kvm/kvm-s390.c   |  9 +--------
- arch/x86/kvm/x86.c         |  9 +--------
- include/linux/kvm_host.h   |  2 ++
- virt/kvm/arm/arm.c         | 17 +++++++++--------
- virt/kvm/kvm_main.c        | 17 +++++++++++++++++
- 7 files changed, 41 insertions(+), 43 deletions(-)
+ virt/kvm/arm/vgic/vgic-init.c       | 24 +++++++++---------------
+ virt/kvm/arm/vgic/vgic-kvm-device.c |  6 +++++-
+ 2 files changed, 14 insertions(+), 16 deletions(-)
 
-diff --git a/arch/mips/kvm/mips.c b/arch/mips/kvm/mips.c
-index bce2a6431430..770c40b9df37 100644
---- a/arch/mips/kvm/mips.c
-+++ b/arch/mips/kvm/mips.c
-@@ -160,7 +160,7 @@ int kvm_arch_create_vcpu_debugfs(struct kvm_vcpu *vcpu)
- 	return 0;
- }
- 
--void kvm_mips_free_vcpus(struct kvm *kvm)
-+void kvm_arch_free_vcpus(struct kvm *kvm)
- {
- 	unsigned int i;
- 	struct kvm_vcpu *vcpu;
-@@ -168,15 +168,6 @@ void kvm_mips_free_vcpus(struct kvm *kvm)
- 	kvm_for_each_vcpu(i, vcpu, kvm) {
- 		kvm_arch_vcpu_free(vcpu);
- 	}
--
--	mutex_lock(&kvm->lock);
--
--	for (i = 0; i < atomic_read(&kvm->online_vcpus); i++)
--		kvm->vcpus[i] = NULL;
--
--	atomic_set(&kvm->online_vcpus, 0);
--
--	mutex_unlock(&kvm->lock);
- }
- 
- static void kvm_mips_free_gpa_pt(struct kvm *kvm)
-@@ -188,7 +179,7 @@ static void kvm_mips_free_gpa_pt(struct kvm *kvm)
- 
- void kvm_arch_destroy_vm(struct kvm *kvm)
- {
--	kvm_mips_free_vcpus(kvm);
-+	kvm_free_vcpus(kvm);
- 	kvm_mips_free_gpa_pt(kvm);
- }
- 
-diff --git a/arch/powerpc/kvm/powerpc.c b/arch/powerpc/kvm/powerpc.c
-index 3480faaf1ef8..1c563545473c 100644
---- a/arch/powerpc/kvm/powerpc.c
-+++ b/arch/powerpc/kvm/powerpc.c
-@@ -456,11 +456,17 @@ int kvm_arch_create_vcpu_debugfs(struct kvm_vcpu *vcpu)
- 	return 0;
- }
- 
--void kvm_arch_destroy_vm(struct kvm *kvm)
-+void kvm_arch_free_vcpus(struct kvm *kvm)
- {
--	unsigned int i;
-+	int i;
- 	struct kvm_vcpu *vcpu;
- 
-+	kvm_for_each_vcpu(i, vcpu, kvm)
-+		kvm_arch_vcpu_free(vcpu);
-+}
-+
-+void kvm_arch_destroy_vm(struct kvm *kvm)
-+{
- #ifdef CONFIG_KVM_XICS
- 	/*
- 	 * We call kick_all_cpus_sync() to ensure that all
-@@ -471,14 +477,9 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
- 		kick_all_cpus_sync();
- #endif
- 
--	kvm_for_each_vcpu(i, vcpu, kvm)
--		kvm_arch_vcpu_free(vcpu);
-+	kvm_free_vcpus(kvm);
- 
- 	mutex_lock(&kvm->lock);
--	for (i = 0; i < atomic_read(&kvm->online_vcpus); i++)
--		kvm->vcpus[i] = NULL;
--
--	atomic_set(&kvm->online_vcpus, 0);
- 
- 	kvmppc_core_destroy_vm(kvm);
- 
-diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
-index 1534778a3c66..bb6278d45a25 100644
---- a/arch/s390/kvm/kvm-s390.c
-+++ b/arch/s390/kvm/kvm-s390.c
-@@ -1941,20 +1941,13 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
- 	kmem_cache_free(kvm_vcpu_cache, vcpu);
- }
- 
--static void kvm_free_vcpus(struct kvm *kvm)
-+void kvm_arch_free_vcpus(struct kvm *kvm)
- {
- 	unsigned int i;
- 	struct kvm_vcpu *vcpu;
- 
- 	kvm_for_each_vcpu(i, vcpu, kvm)
- 		kvm_arch_vcpu_destroy(vcpu);
--
--	mutex_lock(&kvm->lock);
--	for (i = 0; i < atomic_read(&kvm->online_vcpus); i++)
--		kvm->vcpus[i] = NULL;
--
--	atomic_set(&kvm->online_vcpus, 0);
--	mutex_unlock(&kvm->lock);
- }
- 
- void kvm_arch_destroy_vm(struct kvm *kvm)
-diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
-index e10eda86bc7b..d021746f1fdf 100644
---- a/arch/x86/kvm/x86.c
-+++ b/arch/x86/kvm/x86.c
-@@ -8077,7 +8077,7 @@ static void kvm_unload_vcpu_mmu(struct kvm_vcpu *vcpu)
- 	vcpu_put(vcpu);
- }
- 
--static void kvm_free_vcpus(struct kvm *kvm)
-+void kvm_arch_free_vcpus(struct kvm *kvm)
- {
- 	unsigned int i;
- 	struct kvm_vcpu *vcpu;
-@@ -8091,13 +8091,6 @@ static void kvm_free_vcpus(struct kvm *kvm)
- 	}
- 	kvm_for_each_vcpu(i, vcpu, kvm)
- 		kvm_arch_vcpu_free(vcpu);
--
--	mutex_lock(&kvm->lock);
--	for (i = 0; i < atomic_read(&kvm->online_vcpus); i++)
--		kvm->vcpus[i] = NULL;
--
--	atomic_set(&kvm->online_vcpus, 0);
--	mutex_unlock(&kvm->lock);
- }
- 
- void kvm_arch_sync_events(struct kvm *kvm)
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index cfb3c0efdd51..a8b9aa563834 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -874,6 +874,8 @@ static inline bool kvm_arch_intc_initialized(struct kvm *kvm)
- int kvm_arch_init_vm(struct kvm *kvm, unsigned long type);
- void kvm_arch_destroy_vm(struct kvm *kvm);
- void kvm_arch_sync_events(struct kvm *kvm);
-+void kvm_free_vcpus(struct kvm *kvm);
-+void kvm_arch_free_vcpus(struct kvm *kvm);
- 
- int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu);
- void kvm_vcpu_kick(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index b9f68e4add71..d63aa1107fdb 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -166,6 +166,14 @@ int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
- 	return VM_FAULT_SIGBUS;
- }
- 
-+void kvm_arch_free_vcpus(struct kvm *kvm)
-+{
-+	int i;
-+	struct kvm_vcpu *vcpu;
-+
-+	for_each_online_vcpu(i, vcpu, kvm)
-+		kvm_arch_vcpu_free(vcpu);
-+}
- 
- /**
-  * kvm_arch_destroy_vm - destroy the VM data structure
-@@ -173,17 +181,10 @@ int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 5801261f3add..feb766f74c34 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -119,7 +119,7 @@ void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
   */
- void kvm_arch_destroy_vm(struct kvm *kvm)
+ int kvm_vgic_create(struct kvm *kvm, u32 type)
  {
--	int i;
--
- 	free_percpu(kvm->arch.last_vcpu_ran);
- 	kvm->arch.last_vcpu_ran = NULL;
+-	int i, vcpu_lock_idx = -1, ret;
++	int i, ret;
+ 	struct kvm_vcpu *vcpu;
  
--	for (i = 0; i < KVM_MAX_VCPUS; ++i) {
--		if (kvm->vcpus[i]) {
--			kvm_arch_vcpu_free(kvm->vcpus[i]);
--			kvm->vcpus[i] = NULL;
--		}
+ 	if (irqchip_in_kernel(kvm))
+@@ -140,18 +140,14 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
+ 	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
+ 	 * that no other VCPUs are run while we create the vgic.
+ 	 */
+-	ret = -EBUSY;
+-	kvm_for_each_vcpu(i, vcpu, kvm) {
+-		if (!mutex_trylock(&vcpu->mutex))
+-			goto out_unlock;
+-		vcpu_lock_idx = i;
 -	}
-+	kvm_free_vcpus(kvm);
++	if (!lock_all_vcpus(kvm))
++		return -EBUSY;
  
- 	kvm_vgic_destroy(kvm);
- }
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 33a15e176927..0d2d8b0c785c 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -750,6 +750,23 @@ static void kvm_destroy_devices(struct kvm *kvm)
- 	}
+-	kvm_for_each_vcpu(i, vcpu, kvm) {
+-		if (vcpu->arch.has_run_once)
++	kvm_for_each_vcpu(i, vcpu, kvm)
++		if (vcpu->arch.has_run_once) {
++			ret = -EBUSY;
+ 			goto out_unlock;
+-	}
+-	ret = 0;
++		}
+ 
+ 	if (type == KVM_DEV_TYPE_ARM_VGIC_V2)
+ 		kvm->arch.max_vcpus = VGIC_V2_MAX_CPUS;
+@@ -176,11 +172,9 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
+ 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+ 	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
+ 
++	ret = 0;
+ out_unlock:
+-	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
+-		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
+-		mutex_unlock(&vcpu->mutex);
+-	}
++	unlock_all_vcpus(kvm);
+ 	return ret;
  }
  
-+void kvm_free_vcpus(struct kvm *kvm)
-+{
-+	int i;
-+
-+	kvm_arch_free_vcpus(kvm);
-+
-+	mutex_lock(&kvm->lock);
-+
-+	i = atomic_read(&kvm->online_vcpus);
-+	atomic_set(&kvm->online_vcpus, 0);
-+
-+	while (i--)
-+		kvm->vcpus[i] = NULL;
-+
-+	mutex_unlock(&kvm->lock);
-+}
-+
- static void kvm_destroy_vm(struct kvm *kvm)
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index 10ae6f394b71..c5124737c7fc 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -270,7 +270,11 @@ static void unlock_vcpus(struct kvm *kvm, int vcpu_lock_idx)
+ 
+ void unlock_all_vcpus(struct kvm *kvm)
  {
- 	int i;
+-	unlock_vcpus(kvm, atomic_read(&kvm->online_vcpus) - 1);
++	int i;
++	struct kvm_vcpu *tmp_vcpu;
++
++	kvm_for_each_vcpu(i, tmp_vcpu, kvm)
++		mutex_unlock(&tmp_vcpu->mutex);
+ }
+ 
+ /* Returns true if all vcpus were locked, false otherwise */
 -- 
 2.13.3
