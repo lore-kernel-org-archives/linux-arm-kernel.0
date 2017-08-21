@@ -1,81 +1,95 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 21 Aug 2017 10:21:00 +0200
-Subject: [PATCH v3 5/5] reset: simple: read back to make sure changes
- are applied
-In-Reply-To: <561b4eb5-98be-f844-57cb-b5ce5962258f@adaptrum.com>
-References: <20170816094701.30678-1-p.zabel@pengutronix.de>
- <20170816094701.30678-6-p.zabel@pengutronix.de>
- <561b4eb5-98be-f844-57cb-b5ce5962258f@adaptrum.com>
-Message-ID: <1503303660.8125.4.camel@pengutronix.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 21 Aug 2017 10:25:27 +0200
+Subject: [PATCH 0/2] extend PWM framework to support PWM dead-times
+In-Reply-To: <1494332153-14534-1-git-send-email-claudiu.beznea@microchip.com>
+References: <1494332153-14534-1-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <20170821082527.GQ18996@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandru,
-
-On Wed, 2017-08-16 at 14:00 -0700, Alexandru Gagniuc wrote:
+On Tue, May 09, 2017 at 03:15:51PM +0300, Claudiu Beznea wrote:
+> Hi all,
 > 
-> On 08/16/2017 02:47 AM, Philipp Zabel wrote:
-> > Read back the register after setting or clearing a reset bit to make
-> > sure that the changes are applied to the reset controller hardware.
-> > Theoretically, this avoids the write to stay stuck in a store buffer
+> Please give feedback on these patches which extends the PWM
+> framework in order to support multiple PWM signal types.
+> Since I didn't receive any inputs on RFC series I'm resending it as
+> normal patch series.
 > 
-> Is there hardware where this has been observed to happen, or is this?
-> purely theoretical? It would be nice to have a "this is needed on?
-> hardware XYZ because ABC, and doesn't affect other hardware" comment in?
-> the source.
-
-This is purely theoretical, at least in the context of reset
-controllers. I'm happy to drop this patch for now.
-
-> > during the delay of an assert-delay-deassert sequence, and makes sure
-> > that the reset really is asserted for the specified duration.
-> > 
-> > > > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > ---
-> > ?drivers/reset/reset-simple.c | 7 +++++--
-> > ?1 file changed, 5 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/reset/reset-simple.c b/drivers/reset/reset-simple.c
-> > index 13e7d5559acc9..d98a7e7d802d1 100644
-> > --- a/drivers/reset/reset-simple.c
-> > +++ b/drivers/reset/reset-simple.c
-> > @@ -39,17 +39,20 @@ static int reset_simple_set(struct reset_controller_dev *rcdev,
-> > > > ?	int reg_width = sizeof(u32);
-> > > > ?	int bank = id / (reg_width * BITS_PER_BYTE);
-> > > > ?	int offset = id % (reg_width * BITS_PER_BYTE);
-> > > > +	void __iomem *addr = data->membase + (bank * reg_width);
-> > > > ?	unsigned long flags;
-> > > > ?	u32 reg;
-> > 
-> > > > ?	spin_lock_irqsave(&data->lock, flags);
-> > 
-> > > > -	reg = readl(data->membase + (bank * reg_width));
-> > > > +	reg = readl(addr);
-> > > > ?	if (assert ^ data->active_low)
-> > > > ?		reg |= BIT(offset);
-> > > > ?	else
-> > > > ?		reg &= ~BIT(offset);
-> > > > -	writel(reg, data->membase + (bank * reg_width));
-> > > > +	writel(reg, addr);
-> > > > +	/* Read back to make sure the write doesn't linger in a store buffer */
-> > > > +	readl(addr);
+> The current patch series add the following PWM signal types:
+> - PWM complementary signals
+> - PWM push-pull signal
 > 
-> You're not using the returned value to check that the reset was actually?
-> set. This seems a very arbitrary readback workaround, which gives no?
-> indication if it actually succeeded or not.
+> Definition of PWM complementary mode:
+> For a PWM controllers with more than one outputs per PWM channel,
+> e.g. with 2 outputs per PWM channels, the PWM complementary signals
+> have opposite levels, same duration and same starting times,
+> as in the following diagram:
+> 
+>         __    __    __    __
+> PWMH __|  |__|  |__|  |__|  |__
+>      __    __    __    __    __
+> PWML   |__|  |__|  |__|  |__|
+>        <--T-->
+> Where T is the signal period.
+> 
+> Definition of PWM push-pull mode:
+> For PWM controllers with more than one outputs per PWM channel,
+> e.g. with 2 outputs per PWM channel, the PWM push-pull signals
+> have same levels, same duration and are delayed until the begining
+> of the next period, as in the following diagram:
+> 
+>         __          __
+> PWMH __|  |________|  |________
+>               __          __
+> PWML ________|  |________|  |__
+>        <--T-->
+> 
+> Where T is the signal period.
+> 
+> These output signals could be configured by setting PWM mode
+> (a new input in sysfs has been added in order to support this
+> operation).
+> 
+> root at sama5d2-xplained:/sys/devices/platform/ahb/ahb:apb/f802c000.pwm/pwm/pwmchip0/pwm2# ls -l
+> -r--r--r--    1 root     root          4096 Feb  9 10:54 capture
+> -rw-r--r--    1 root     root          4096 Feb  9 10:54 duty_cycle
+> -rw-r--r--    1 root     root          4096 Feb  9 10:54 enable
+> -rw-r--r--    1 root     root          4096 Feb  9 10:54 mode
+> -rw-r--r--    1 root     root          4096 Feb  9 10:54 period
+> -rw-r--r--    1 root     root          4096 Feb  9 10:55 polarity
+> drwxr-xr-x    2 root     root             0 Feb  9 10:54 power
+> -rw-r--r--    1 root     root          4096 Feb  9 10:54 uevent
+> 
+> The PWM push-pull mode could be usefull in applications like
+> half bridge converters.
 
-True. For those reset controllers that support status readback, this
-would be a better check.
+Sorry for taking an absurdly long time to get back to you on this.
 
-> Also the set() is now asymmetrical to clear(). In cases when releasing?
-> reset on a HW block that is about to have IO performed on it, one would?
-> want to make sure the reset is actually deasserted before doing any IO.
+One problem I see with this is that the PWM framework is built on the
+assumption that we have a single output per PWM channel. This becomes
+important when you start adding features such as this because now the
+users have no way of determining whether or not the PWM they retrieve
+will actually be able to do what they want.
 
-Thanks for this observation, the reset_simple_set function name is
-ambiguous. I'll rename it to reset_simple_update.
-The function is called both for assert and deassert operations, and
-whether the bit is set or cleared depends on both the assert parameter
-and the active_low flag.
+For example, let's say you have a half bridge converter driver in the
+kernel and it does a pwm_get() to obtain a PWM to use. There's nothing
+preventing it from using a simple one-output PWM and there's no way to
+check that we're actually doing something wrong.
 
-regards
-Philipp
+I think any in-kernel API would have to be more fully-featured,
+otherwise we're bound to run into problems. At the very least I think
+we'd have to expose some sort of capabilities list.
+
+A possibly simpler approach might be to restrict this to the driver that
+you need this for. It looks like you will be mainly using this via sysfs
+and in that case you might be able to just extend what information is
+exposed in sysfs for the particular PWM you're dealing with.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/7b2791ef/attachment.sig>
