@@ -1,59 +1,62 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 21 Aug 2017 16:23:21 +0200
-Subject: [PATCH v3 3/4] net: stmmac: register parent MDIO node for
- sun8i-h3-emac
-In-Reply-To: <20170821133104.qvrhvwin2rdg4aqo@flea.lan>
-References: <20170818122118.4925-1-clabbe.montjoie@gmail.com>
- <20170818122118.4925-4-clabbe.montjoie@gmail.com>
- <CAGb2v66KcZkiDDHryMmVzm4WroXePPy3V44SLpVdoO3ZEjgC=g@mail.gmail.com>
- <20170819185025.GB13266@Red> <20170819203836.GA21567@lunn.ch>
- <20170820065757.GA6081@Red> <20170820142545.GB24150@lunn.ch>
- <CAGb2v67hQXSoCKP7qW+KRUYX+0djQ1Z23cQ67Lyg6G7ozGyfGQ@mail.gmail.com>
- <20170821132015.GB1703@lunn.ch>
- <20170821133104.qvrhvwin2rdg4aqo@flea.lan>
-Message-ID: <20170821142321.GE1703@lunn.ch>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 21 Aug 2017 15:26:28 +0100
+Subject: [PATCH 06/27] arm64/sve: System register and exception syndrome
+ definitions
+In-Reply-To: <8760dh5cbl.fsf@linaro.org>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-7-git-send-email-Dave.Martin@arm.com>
+ <87a82t5kos.fsf@linaro.org> <8760dh5cbl.fsf@linaro.org>
+Message-ID: <20170821142627.GQ6321@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> All muxes are mostly always represented the same way afaik, or do you
-> want to simply introduce a new compatible / property?
+On Mon, Aug 21, 2017 at 01:34:38PM +0100, Alex Benn?e wrote:
+> 
+> Alex Benn?e <alex.bennee@linaro.org> writes:
+> 
+> > Dave Martin <Dave.Martin@arm.com> writes:
 
-+      	  mdio-mux {
-+		compatible = "allwinner,sun8i-h3-mdio-switch";
-+		mdio-parent-bus = <&mdio_parent>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		internal_mdio: mdio at 1 {
-			reg = <1>;
--			clocks = <&ccu CLK_BUS_EPHY>;
--			resets = <&ccu RST_BUS_EPHY>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			int_mii_phy: ethernet-phy at 1 {
-+				compatible = "ethernet-phy-ieee802.3-c22";
-+				reg = <1>;
-+				clocks = <&ccu CLK_BUS_EPHY>;
-+				resets = <&ccu RST_BUS_EPHY>;
-+				phy-is-integrated;
-+			};
-+		};
-+		mdio: mdio at 0 {
-+			reg = <0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 		};
- 		
-Hi Maxim
+[...]
 
-Anybody who knows the MDIO-mux code/binding, knows that it is a run
-time mux. You swap the mux per MDIO transaction. You can access all
-the PHY and switches on the mux'ed MDIO bus.
+> OK no I'm working directly from the unpacked ZIP file with the rest of
+> the details I think this should be:
+> 
+>   #define SYS_ZCR_EL2			sys_reg(3, 5, 1, 2, 0)
+> 
+> e.g. op1 = 101 / 5
 
-However here, it is effectively a boot-time MUX. You cannot change it
-on the fly. What happens when somebody has a phandle to a PHY on the
-internal and a phandle to a phy on the external? Does the driver at
-least return -EINVAL, or -EBUSY? Is there a representation which
-eliminates this possibility?
+No, that's the encoding for ZCR_EL12.  Where did you get this from?
 
-   Andrew
+(This encoding follows the general pattern of the v8.1 Virtualization
+Host Extensions.)
+
+[...]
+
+> >> +#define ZCR_ELx_LEN_SHIFT	0
+> >> +#define ZCR_ELx_LEN_SIZE	9
+> >> +#define ZCR_ELx_LEN_MASK	0x1ff
+> >> +
+> 
+> LEN should be 0/4/0xf
+> 
+> LEN, bits [3:0]
+> 
+> Constrains the scalable vector register length for EL1 and EL0 to
+> (LEN+1)x128 bits.
+
+The SVE supplement is not very explicit about the meaning of bits [8:4],
+but they are reserved to extend the LEN field in the future, in case
+that's ever needed for future architecture revisions.  I've aimed for
+Linux to cope with this.
+
+Basically bits [8:4] are read-as-zero, write-ignore today, but in
+the future some or all of them may be LEN field bits.
+
+In particular, this means that writing all bits [8:0] with 1 will
+configure the largest supported vector length, even on future
+architecture versions that may have a larger LEN field.
+
+It didn't seem useful to distinguish the two classes of bits here.
+
+Cheers
+---Dave
