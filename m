@@ -1,67 +1,56 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 21 Aug 2017 09:47:50 +0200
-Subject: [PATCH v3 3/6] pwm: mediatek: fix clock control issue
-In-Reply-To: <1498802721-32455-4-git-send-email-zhi.mao@mediatek.com>
-References: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
- <1498802721-32455-4-git-send-email-zhi.mao@mediatek.com>
-Message-ID: <20170821074750.GM18996@ulmo>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 21 Aug 2017 08:49:36 +0100
+Subject: [PATCH 1/1] Revert "mfd: da9061: Fix to remove BBAT_CONT
+ register from chip model"
+In-Reply-To: <20170815083804.26073-1-lee.jones@linaro.org>
+References: <20170815083804.26073-1-lee.jones@linaro.org>
+Message-ID: <20170821074936.ae2sw2ncvoaxsq3w@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 02:05:18PM +0800, Zhi Mao wrote:
-> 1. prepare top/main clk in mtk_pwm_probe() function,
->    it will increase power consumption
->    and in original code these clocks is only prepeare but never enabled.
-> 2. pwm clock should be enabled before setting pwm registers
->    in function: mtk_pwm_config().
-> 3. delete "pwm_disable" in function:mtk_pwm_remove(),
->    as framework should disable all the pwms, before remove them.
+On Tue, 15 Aug 2017, Lee Jones wrote:
+
+> This patch was applied to the MFD twice, causing unwanted behavour.
 > 
-> Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
+> This reverts commit b77eb79acca3203883e8d8dbc7f2b842def1bff8.
+> 
+> Fixes: b77eb79acca3 ("mfd: da9061: Fix to remove BBAT_CONT register from chip model")
+> Reported-by: Steve Twiss <stwiss.opensource@diasemi.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  drivers/pwm/pwm-mediatek.c |   69 ++++++++++++++++++++++++++++++--------------
->  1 file changed, 47 insertions(+), 22 deletions(-)
+>  drivers/mfd/da9062-core.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
 
-I think the commit description could be better. Try to avoid enumerating
-changes like you did. Not only is it tedious to read, but this kind of
-enumeration is often a sign that you can split the commit up into
-multiple logical changes.
+Steve, It would be good to obtain a {Reviewed|Acked}-by from you
+before applying.
 
-Especially the change described in 3) is not related to the clock. It's
-also not a quite correct description, because there is no code in the
-framework that disables PWMs on chip removal. Users should've disabled
-the PWMs that they were using.
+> diff --git a/drivers/mfd/da9062-core.c b/drivers/mfd/da9062-core.c
+> index fbe0f245ce8e..fe1811523e4a 100644
+> --- a/drivers/mfd/da9062-core.c
+> +++ b/drivers/mfd/da9062-core.c
+> @@ -645,6 +645,9 @@ static const struct regmap_range da9062_aa_readable_ranges[] = {
+>  		.range_min = DA9062AA_VLDO1_B,
+>  		.range_max = DA9062AA_VLDO4_B,
+>  	}, {
+> +		.range_min = DA9062AA_BBAT_CONT,
+> +		.range_max = DA9062AA_BBAT_CONT,
+> +	}, {
+>  		.range_min = DA9062AA_INTERFACE,
+>  		.range_max = DA9062AA_CONFIG_E,
+>  	}, {
+> @@ -721,6 +724,9 @@ static const struct regmap_range da9062_aa_writeable_ranges[] = {
+>  		.range_min = DA9062AA_VLDO1_B,
+>  		.range_max = DA9062AA_VLDO4_B,
+>  	}, {
+> +		.range_min = DA9062AA_BBAT_CONT,
+> +		.range_max = DA9062AA_BBAT_CONT,
+> +	}, {
+>  		.range_min = DA9062AA_GP_ID_0,
+>  		.range_max = DA9062AA_GP_ID_19,
+>  	},
 
-The framework could probably warn about misuse, though.
-
-That said, I've left the change as-is, and changed the commit message to
-this:
-
---- >8 ---
-pwm: mediatek: Fix clock control issue
-
-In order to save some power, do not prepare the top and main clocks
-during mtk_pwm_probe(). Instead, prepare the clocks only when necessary
-and also make sure to enable the clocks to match the semantics of the
-common clock framework.
-
-While at it, don't explicitly disable all PWM channels in ->remove()
-because all users should have done that already.
-
-Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
-Acked-by: John Crispin <john@phrozen.org>
-Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
---- 8< ---
-
-Try to keep this in mind for future patch submissions.
-
-Applied to for-4.14/drivers, thanks.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/1a5ffacc/attachment.sig>
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
