@@ -1,56 +1,167 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 21 Aug 2017 11:05:42 +0100
-Subject: [PATCH] arm64: kaslr: ignore modulo offset when validating
- virtual displacement
-In-Reply-To: <CAKv+Gu84Y-LWvhnzqK5KbjSGa75MpQPcwX6LiC0kpuyFXrP+9w@mail.gmail.com>
-References: <20170818174230.30435-1-ard.biesheuvel@linaro.org>
- <20170820122653.vicqcqqdgqai6ywz@armageddon.cambridge.arm.com>
- <CAKv+Gu84Y-LWvhnzqK5KbjSGa75MpQPcwX6LiC0kpuyFXrP+9w@mail.gmail.com>
-Message-ID: <20170821100541.4wiztipdu2ccofn4@armageddon.cambridge.arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 21 Aug 2017 12:10:34 +0200
+Subject: [PATCH v2] arm64: dts: rockchip: Add basic DVFS support for RK3368
+In-Reply-To: <20170818121701.12668-1-romain.perier@collabora.com>
+References: <20170818121701.12668-1-romain.perier@collabora.com>
+Message-ID: <71592497.yCJ5sVJQSp@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 20, 2017 at 07:43:05PM +0100, Ard Biesheuvel wrote:
-> On 20 August 2017 at 13:26, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
-> > index 1d95c204186b..b5fceb7efff5 100644
-> > --- a/arch/arm64/kernel/kaslr.c
-> > +++ b/arch/arm64/kernel/kaslr.c
-> > @@ -131,8 +131,8 @@ u64 __init kaslr_early_init(u64 dt_phys)
-> >         /*
-> >          * The kernel Image should not extend across a 1GB/32MB/512MB alignment
-> >          * boundary (for 4KB/16KB/64KB granule kernels, respectively). If this
-> > -        * happens, increase the KASLR offset by the size of the kernel image
-> > -        * rounded up by SWAPPER_BLOCK_SIZE.
-> > +        * happens, decrease the KASLR offset by the boundary overflow rounded
-> > +        * up to SWAPPER_BLOCK_SIZE.
-> >          *
-> >          * NOTE: The references to _text and _end below will already take the
-> >          *       modulo offset (the physical displacement modulo 2 MB) into
-> > @@ -142,8 +142,9 @@ u64 __init kaslr_early_init(u64 dt_phys)
-> >          */
-> >         if ((((u64)_text + offset) >> SWAPPER_TABLE_SHIFT) !=
-> >             (((u64)_end + offset) >> SWAPPER_TABLE_SHIFT)) {
-> > -               u64 kimg_sz = _end - _text;
-> > -               offset = (offset + round_up(kimg_sz, SWAPPER_BLOCK_SIZE))
-> > +               u64 adjust = ((u64)_end + offset) &
-> > +                       ((1 << SWAPPER_TABLE_SHIFT) - 1);
-> > +               offset = (offset - round_up(adjust, SWAPPER_BLOCK_SIZE))
-> >                                 & mask;
-> >         }
-> >
+Am Freitag, 18. August 2017, 14:17:01 CEST schrieb Romain Perier:
+> This adds and enable the operating points that have been tested and are
+> currently supported by the SoC. This also adds clocks for ARMCLKL and
+> ARMCLKB.
 > 
-> At this point, _text is in the range [PAGE_OFFSET .. PAGE_OFFSET +
-> 2MB), so we can simply round up offset instead, I think.
+> Signed-off-by: Romain Perier <romain.perier@collabora.com>
+> ---
 > 
-> offset = round_up(offset, 1 << SWAPPER_TABLE_SHIFT);
+> Changes in v2:
+> - Switched to binding v2 for operating-points
+> - Improved commit message
+> - Rebased onto linux-next
 > 
-> That way we add rather than subtract but this should not be a problem
-> (we don't randomize over the entire VMALLOC region anyway)
+>  arch/arm64/boot/dts/rockchip/rk3368.dtsi | 75 +++++++++++++++++++++++++++++++-
+>  1 file changed, 73 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> index b6f234f10585..7f42a9111062 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> @@ -113,7 +113,8 @@
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x0>;
+>  			enable-method = "psci";
+> -
+> +			clocks = <&cru ARMCLKL>;
+> +			operating-points-v2 = <&cluster0_opp>;
+>  			#cooling-cells = <2>; /* min followed by max */
+>  		};
+>  
+> @@ -122,6 +123,8 @@
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x1>;
+>  			enable-method = "psci";
+> +			clocks = <&cru ARMCLKL>;
+> +			operating-points-v2 = <&cluster0_opp>;
+>  		};
+>  
+>  		cpu_l2: cpu at 2 {
+> @@ -129,6 +132,8 @@
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x2>;
+>  			enable-method = "psci";
+> +			clocks = <&cru ARMCLKL>;
+> +			operating-points-v2 = <&cluster0_opp>;
+>  		};
+>  
+>  		cpu_l3: cpu at 3 {
+> @@ -136,6 +141,8 @@
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x3>;
+>  			enable-method = "psci";
+> +			clocks = <&cru ARMCLKL>;
+> +			operating-points-v2 = <&cluster0_opp>;
+>  		};
+>  
+>  		cpu_b0: cpu at 100 {
+> @@ -143,7 +150,8 @@
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x100>;
+>  			enable-method = "psci";
+> -
+> +			clocks = <&cru ARMCLKB>;
+> +			operating-points-v2 = <&cluster1_opp>;
+>  			#cooling-cells = <2>; /* min followed by max */
+>  		};
+>  
+> @@ -152,6 +160,8 @@
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x101>;
+>  			enable-method = "psci";
+> +			clocks = <&cru ARMCLKB>;
+> +			operating-points-v2 = <&cluster1_opp>;
+>  		};
+>  
+>  		cpu_b2: cpu at 102 {
+> @@ -159,6 +169,8 @@
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x102>;
+>  			enable-method = "psci";
+> +			clocks = <&cru ARMCLKB>;
+> +			operating-points-v2 = <&cluster1_opp>;
+>  		};
+>  
+>  		cpu_b3: cpu at 103 {
+> @@ -166,9 +178,68 @@
+>  			compatible = "arm,cortex-a53", "arm,armv8";
+>  			reg = <0x0 0x103>;
+>  			enable-method = "psci";
+> +			clocks = <&cru ARMCLKB>;
+> +			operating-points-v2 = <&cluster1_opp>;
+>  		};
+>  	};
+>  
+> +	cluster0_opp: opp-table0 {
+> +		compatible = "operating-points-v2";
+> +		opp-shared;
+> +
+> +		opp00 {
+> +			opp-hz = /bits/ 64 <312000000>;
+> +			opp-microvolt = <950000>;
+> +			clock-latency-ns = <40000>;
+> +		};
+> +		opp01 {
+> +			opp-hz = /bits/ 64 <408000000>;
+> +			opp-microvolt = <950000>;
+> +		};
+> +		opp02 {
+> +			opp-hz = /bits/ 64 <600000000>;
+> +			opp-microvolt = <950000>;
+> +		};
+> +		opp03 {
+> +			opp-hz = /bits/ 64 <816000000>;
+> +			opp-microvolt = <1025000>;
+> +		};
+> +		opp04 {
+> +			opp-hz = /bits/ 64 <1008000000>;
+> +			opp-microvolt = <1125000>;
+> +		};
+> +	};
+> +
+> +	cluster1_opp: opp-table1 {
+> +		compatible = "operating-points-v2";
+> +		opp-shared;
+> +
+> +		opp00 {
+> +			opp-hz = /bits/ 64 <312000000>;
+> +			opp-microvolt = <950000>;
+> +			clock-latency-ns = <40000>;
+> +		};
+> +		opp01 {
+> +			opp-hz = /bits/ 64 <408000000>;
+> +			opp-microvolt = <950000>;
+> +		};
+> +		opp02 {
+> +			opp-hz = /bits/ 64 <600000000>;
+> +			opp-microvolt = <950000>;
+> +		};
+> +		opp03 {
+> +			opp-hz = /bits/ 64 <816000000>;
+> +			opp-microvolt = <975000>;
+> +		};
+> +		opp04 {
+> +			opp-hz = /bits/ 64 <1008000000>;
+> +			opp-microvolt = <1050000>;
+> +		};
+> +	};
+> +
+> +
+> +
+> +
 
-This would work as well, with a similar loss of randomness (I don't
-think it matters whether _text or _end is more aligned with
-1 << SWAPPER_TABLE_SHIFT).
+please don't insert multiple empty lines in future patches.
 
--- 
-Catalin
+I've removed the excess blank lines and applied it for 4.14
+
+
+Heiko
