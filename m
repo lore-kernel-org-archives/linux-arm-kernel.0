@@ -1,98 +1,84 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Mon, 21 Aug 2017 19:29:30 +0530
-Subject: [PATCH] ARM: mmp: make matrix_keymap_data const
-Message-ID: <1503323970-31939-1-git-send-email-bhumirks@gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 21 Aug 2017 10:02:55 -0400
+Subject: [PATCH v11 1/4] PCI: Don't ignore valid response before CRS
+ timeout
+In-Reply-To: <20170818213203.15145.36487.stgit@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170818212310.15145.21732.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20170818213203.15145.36487.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <f7127748-24cd-37bd-544a-8cba6bf5906d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make these const as they are only stored in the matrix_keymap_data field
-of a pxa27x_keypad_platform_data structure, which is const.
-Done using Coccinelle:
+On 8/18/2017 5:32 PM, Bjorn Helgaas wrote:
+> While waiting for a device to become ready (i.e., to return a non-CRS
+> completion to a read of its Vendor ID), if we got a valid response to the
+> very last read before timing out, we printed a warning and gave up on the
+> device even though it was actually ready.
+> 
+> For a typical 60s timeout, we wait about 65s (it's not exact because of the
+> exponential backoff), but we treated devices that became ready between 33s
+> and 65s as though they failed.
+> 
+> Move the Device ID read later so we check whether the device is ready
+> immediately, before checking for a timeout.
+> 
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> ---
+>  drivers/pci/probe.c |    7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index c31310db0404..08ea844ac4ba 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -1849,15 +1849,16 @@ bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
+>  
+>  		msleep(delay);
+>  		delay *= 2;
+> -		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
+> -			return false;
+> -		/* Card hasn't responded in 60 seconds?  Must be stuck. */
+> +
 
-@match disable optional_qualifier@
-identifier s;
-@@
-static struct matrix_keymap_data s = {...};
+There is still a problem here. We'll wait some time above and return without checking if
+we actually found the card or not.
 
-@ref@
-position p;
-identifier match.s;
-@@
-s at p
+>  		if (delay > crs_timeout) {
+>  			printk(KERN_WARNING "pci %04x:%02x:%02x.%d: not responding\n",
+>  			       pci_domain_nr(bus), bus->number, PCI_SLOT(devfn),
+>  			       PCI_FUNC(devfn));
+>  			return false;
+>  		}
+> +
+> +		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
+> +			return false;
+>  	}
+>  
+>  	return true;
+> 
+> 
 
-@good1@
-identifier y;
-position ref.p;
-identifier match.s;
-@@
-struct matrix_keypad_platform_data y = {...,.keymap_data=&s at p,...};
+Here is another shot at it. Sorry, I don't have a diff syntax. I made up the function
+by copy paste.
 
-@good2@
-struct matrix_keypad_platform_data y;
-identifier match.s;
-position ref.p;
-@@
-y.keymap_data = &s at p
-
-@good3@
-identifier y;
-position ref.p;
-identifier match.s;
-@@
-struct pxa27x_keypad_platform_data y =
-{...,.matrix_keymap_data=&s at p,...};
-
-@good4@
-struct pxa27x_keypad_platform_data y;
-identifier match.s;
-position ref.p;
-@@
-y.matrix_keymap_data = &s at p
-
-@bad depends on  !good1 && !good2 && !good3 && !good4@
-position ref.p;
-identifier match.s;
-@@
-s at p
-
-@depends on forall !bad disable optional_qualifier@
-identifier match.s;
-@@
-static
-+ const
-struct matrix_keymap_data s;
-
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
----
- arch/arm/mach-mmp/aspenite.c  | 2 +-
- arch/arm/mach-mmp/teton_bga.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-index 5db0edf..a285951 100644
---- a/arch/arm/mach-mmp/aspenite.c
-+++ b/arch/arm/mach-mmp/aspenite.c
-@@ -219,7 +219,7 @@ struct pxa168fb_mach_info aspenite_lcd_info = {
- 	KEY(4, 7, KEY_ESC),	/* SW 9 */
- };
+	while ((*l & 0xffff) == 0x0001) {
+		if (!crs_timeout)
+			return false;
  
--static struct matrix_keymap_data aspenite_matrix_keymap_data = {
-+static const struct matrix_keymap_data aspenite_matrix_keymap_data = {
- 	.keymap			= aspenite_matrix_key_map,
- 	.keymap_size		= ARRAY_SIZE(aspenite_matrix_key_map),
- };
-diff --git a/arch/arm/mach-mmp/teton_bga.c b/arch/arm/mach-mmp/teton_bga.c
-index cf038eb..d16010d 100644
---- a/arch/arm/mach-mmp/teton_bga.c
-+++ b/arch/arm/mach-mmp/teton_bga.c
-@@ -61,7 +61,7 @@
- 	KEY(1, 7, KEY_RIGHT),
- };
- 
--static struct matrix_keymap_data teton_bga_matrix_keymap_data = {
-+static const struct matrix_keymap_data teton_bga_matrix_keymap_data = {
- 	.keymap			= teton_bga_matrix_key_map,
- 	.keymap_size		= ARRAY_SIZE(teton_bga_matrix_key_map),
- };
+		/* Card hasn't responded in 60 seconds?  Must be stuck. */
+		if (delay > crs_timeout) {
+			printk(KERN_WARNING "pci %04x:%02x:%02x.%d: not responding\n",
+			       pci_domain_nr(bus), bus->number, PCI_SLOT(devfn),
+			       PCI_FUNC(devfn));
+			return false;
+		} 
+		msleep(delay);
+		delay *= 2;
+		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
+			return false; 
+	}
+
 -- 
-1.9.1
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
