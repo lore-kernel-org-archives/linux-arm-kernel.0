@@ -1,29 +1,50 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 21 Aug 2017 09:35:16 +0200
-Subject: [PATCH v3  2/6] pwm: mediatek: fix pwm source clock selection
-In-Reply-To: <1498802721-32455-3-git-send-email-zhi.mao@mediatek.com>
-References: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
- <1498802721-32455-3-git-send-email-zhi.mao@mediatek.com>
-Message-ID: <20170821073516.GL18996@ulmo>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 21 Aug 2017 13:11:29 +0530
+Subject: [PATCH 2/5] mmc: sdhci: Add quirk to indicate MMC_RSP_136 has CRC
+In-Reply-To: <20170821074132.4622-1-kishon@ti.com>
+References: <20170821074132.4622-1-kishon@ti.com>
+Message-ID: <20170821074132.4622-3-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 02:05:17PM +0800, Zhi Mao wrote:
-> In original code, the pwm output frequency is not correct
-> when set bit<3>=1 to PWMCON register.
-> 
-> Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
-> ---
->  drivers/pwm/pwm-mediatek.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+TI's implementation of sdhci controller used in DRA7 SoC's has
+CRC in responses with length 136 bits. Add quirk to indicate
+the controller has CRC in MMC_RSP_136. If this quirk is
+set sdhci library shouldn't shift the response present in
+SDHCI_RESPONSE register.
 
-Applied to for-4.14/drivers, thanks.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/mmc/host/sdhci.c | 3 +++
+ drivers/mmc/host/sdhci.h | 2 ++
+ 2 files changed, 5 insertions(+)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/085d50f4/attachment.sig>
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index ba639b7851cb..9c8d7428df3c 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1182,6 +1182,9 @@ static void sdhci_read_rsp_136(struct sdhci_host *host, struct mmc_command *cmd)
+ 		cmd->resp[i] = sdhci_readl(host, reg);
+ 	}
+ 
++	if (host->quirks2 & SDHCI_QUIRK2_RSP_136_HAS_CRC)
++		return;
++
+ 	/* CRC is stripped so we need to do some shifting */
+ 	for (i = 0; i < 4; i++) {
+ 		cmd->resp[i] <<= 8;
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index 399edc681623..54bc444c317f 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -435,6 +435,8 @@ struct sdhci_host {
+ #define SDHCI_QUIRK2_ACMD23_BROKEN			(1<<14)
+ /* Broken Clock divider zero in controller */
+ #define SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN		(1<<15)
++/* Controller has CRC in 136 bit Command Response */
++#define SDHCI_QUIRK2_RSP_136_HAS_CRC			(1<<16)
+ 
+ 	int irq;		/* Device IRQ */
+ 	void __iomem *ioaddr;	/* Mapped address */
+-- 
+2.11.0
