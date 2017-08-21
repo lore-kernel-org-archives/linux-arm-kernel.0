@@ -1,75 +1,70 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 21 Aug 2017 16:32:26 -0400
-Subject: [PATCH v11 2/4] PCI: Factor out pci_bus_wait_crs()
-In-Reply-To: <20170821202338.GD28977@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170818212310.15145.21732.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20170818213210.15145.15340.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <9cb3006d-31d0-e57a-fd3e-c32914e8ba42@codeaurora.org>
- <20170821191806.GC28977@bhelgaas-glaptop.roam.corp.google.com>
- <eca38319-9e78-1a9c-b275-43944fd0a63d@codeaurora.org>
- <20170821202338.GD28977@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <967910e7-e64d-2fa4-10b8-ca0400d7ed2f@codeaurora.org>
+From: rkrcmar@redhat.com (=?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?=)
+Date: Mon, 21 Aug 2017 22:35:21 +0200
+Subject: [PATCH RFC v3 0/9] KVM: allow dynamic kvm->vcpus array
+Message-ID: <20170821203530.9266-1-rkrcmar@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/21/2017 4:23 PM, Bjorn Helgaas wrote:
-> On Mon, Aug 21, 2017 at 03:37:06PM -0400, Sinan Kaya wrote:
->> On 8/21/2017 3:18 PM, Bjorn Helgaas wrote:
->> ...
->> if (pci_bus_crs_pending(id))
->> 	return pci_bus_wait_crs(dev->bus, dev->devfn, &id, 60000);
->>
->>> I think that makes sense.  We'd want to check for CRS SV being
->>> enabled, e.g., maybe read PCI_EXP_RTCTL_CRSSVE back in
->>> pci_enable_crs() and cache it somewhere.  Maybe a crs_sv_enabled bit
->>> in the root port's pci_dev, and check it with something like what
->>> pcie_root_rcb_set() does?
->>>
->>
->> You can observe CRS under the following conditions
->>
->> 1. root port <-> endpoint 
->> 2. bridge <-> endpoint 
->> 3. root port<->bridge
->>
->> I was relying on the fact that we are reading 0x001 as an indication that
->> this device detected CRS. Maybe, this is too indirect.
->>
->> If we also want to capture the capability, I think the right thing is to
->> check the parent capability.
->>
->> bool pci_bus_crs_vis_supported(struct pci_dev *bridge)
->> {
->> 	if (device type(bridge) == root port)
->> 		return read(root_crs_register_reg);
->>
->> 	if (device type(bridge) == switch)
->> 		return read(switch_crs_register);
-> 
-> I don't understand this part.  AFAIK, CRS SV is only a feature of root
-> ports.  The capability and enable bits are in the Root Capabilities
-> and Root Control registers.
-> 
+The only common part with v2 is [v3 5/9].
 
-No question about it.
+The crucial part of this series is adding a separate mechanism for
+kvm_for_each_vcpu() [v3 8/9] and with that change, I think that the
+dynamic array [v3 9/9] would be nicer if protected by RCU, like in v2:
+The protection can be nicely hidden in kvm_get_vcpu().  I just had the
+split done before implementing [v3 8/9] and presented it for
+consideration.
 
-> It's certainly true that a device below a switch can respond with a
-> CRS completion, but the switch is not the requester, and my
-> understanding is that it would not take any action on the completion
-> other than passing it upstream.
-> 
+Smoke tested on x86 only.
 
-I saw some bridge references in the spec for CRS. I was going to do
-some research for it. You answered my question. I was curious how this
-would impact the behavior.
 
-"Bridge Configuration Retry Enable ? When Set, this bit enables PCI Express
-to PCI/PCI-X bridges to return Configuration Request Retry Status (CRS) in
-response to Configuration Requests that target devices below the bridge. 
-Refer to the PCI Express to PCI/PCI-X Bridge Specification, Revision 1.0 for
-further details."
+Radim Kr?m?? (9):
+  KVM: s390: optimize detection of started vcpus
+  KVM: arm/arm64: fix vcpu self-detection in vgic_v3_dispatch_sgi()
+  KVM: remember position in kvm->vcpus array
+  KVM: arm/arm64: use locking helpers in kvm_vgic_create()
+  KVM: remove unused __KVM_HAVE_ARCH_VM_ALLOC
+  KVM: rework kvm_vcpu_on_spin loop
+  KVM: add kvm_free_vcpus and kvm_arch_free_vcpus
+  KVM: implement kvm_for_each_vcpu with a list
+  KVM: split kvm->vcpus into chunks
+
+ arch/mips/kvm/mips.c                |  19 ++----
+ arch/powerpc/kvm/book3s_32_mmu.c    |   3 +-
+ arch/powerpc/kvm/book3s_64_mmu.c    |   3 +-
+ arch/powerpc/kvm/book3s_hv.c        |   7 +-
+ arch/powerpc/kvm/book3s_pr.c        |   5 +-
+ arch/powerpc/kvm/book3s_xics.c      |   2 +-
+ arch/powerpc/kvm/book3s_xics.h      |   3 +-
+ arch/powerpc/kvm/book3s_xive.c      |  18 +++---
+ arch/powerpc/kvm/book3s_xive.h      |   3 +-
+ arch/powerpc/kvm/e500_emulate.c     |   3 +-
+ arch/powerpc/kvm/powerpc.c          |  16 ++---
+ arch/s390/include/asm/kvm_host.h    |   1 +
+ arch/s390/kvm/interrupt.c           |   3 +-
+ arch/s390/kvm/kvm-s390.c            |  77 ++++++++--------------
+ arch/s390/kvm/kvm-s390.h            |   6 +-
+ arch/s390/kvm/sigp.c                |   3 +-
+ arch/x86/kvm/hyperv.c               |   3 +-
+ arch/x86/kvm/i8254.c                |   3 +-
+ arch/x86/kvm/i8259.c                |   7 +-
+ arch/x86/kvm/ioapic.c               |   3 +-
+ arch/x86/kvm/irq_comm.c             |  10 +--
+ arch/x86/kvm/lapic.c                |   5 +-
+ arch/x86/kvm/svm.c                  |   3 +-
+ arch/x86/kvm/vmx.c                  |   5 +-
+ arch/x86/kvm/x86.c                  |  34 ++++------
+ include/linux/kvm_host.h            |  81 ++++++++++++-----------
+ virt/kvm/arm/arch_timer.c           |  10 ++-
+ virt/kvm/arm/arm.c                  |  25 ++++----
+ virt/kvm/arm/pmu.c                  |   3 +-
+ virt/kvm/arm/psci.c                 |   7 +-
+ virt/kvm/arm/vgic/vgic-init.c       |  31 ++++-----
+ virt/kvm/arm/vgic/vgic-kvm-device.c |  30 +++++----
+ virt/kvm/arm/vgic/vgic-mmio-v2.c    |   5 +-
+ virt/kvm/arm/vgic/vgic-mmio-v3.c    |  22 ++++---
+ virt/kvm/arm/vgic/vgic.c            |   3 +-
+ virt/kvm/kvm_main.c                 | 124 +++++++++++++++++++++++-------------
+ 36 files changed, 278 insertions(+), 308 deletions(-)
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.13.3
