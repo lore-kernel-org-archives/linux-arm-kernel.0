@@ -1,47 +1,243 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 21 Aug 2017 16:07:00 +0200
-Subject: [PATCH 1/3] media: atmel-isc: Not support RBG format from sensor.
-In-Reply-To: <20170817071614.12767-2-wenyou.yang@microchip.com>
-References: <20170817071614.12767-1-wenyou.yang@microchip.com>
- <20170817071614.12767-2-wenyou.yang@microchip.com>
-Message-ID: <61cb51fa-8d05-6707-00cc-429c761fa6f5@xs4all.nl>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Mon, 21 Aug 2017 17:04:57 +0300
+Subject: [PATCH v6 11/19] fscrypt: move to generic async completion
+In-Reply-To: <1503324309-13673-1-git-send-email-gilad@benyossef.com>
+References: <1503324309-13673-1-git-send-email-gilad@benyossef.com>
+Message-ID: <1503324309-13673-12-git-send-email-gilad@benyossef.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2017 09:16 AM, Wenyou Yang wrote:
-> The 12-bit parallel interface supports the Raw Bayer, YCbCr,
-> Monochrome and JPEG Compressed pixel formats from the external
-> sensor, not support RBG pixel format.
-> 
-> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
-> ---
-> 
->  drivers/media/platform/atmel/atmel-isc.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
-> index d4df3d4ccd85..535bb03783fe 100644
-> --- a/drivers/media/platform/atmel/atmel-isc.c
-> +++ b/drivers/media/platform/atmel/atmel-isc.c
-> @@ -1478,6 +1478,11 @@ static int isc_formats_init(struct isc_device *isc)
->  	while (!v4l2_subdev_call(subdev, pad, enum_mbus_code,
->  	       NULL, &mbus_code)) {
->  		mbus_code.index++;
-> +
-> +		/* Not support the RGB pixel formats from sensor */
-> +		if ((mbus_code.code & 0xf000) == 0x1000)
-> +			continue;
+fscrypt starts several async. crypto ops and waiting for them to
+complete. Move it over to generic code doing the same.
 
-Am I missing something? Here you skip any RGB mediabus formats, but in patch 3/3
-you add RGB mediabus formats. But this patch prevents those new formats from being
-selected, right?
+Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
+---
+ fs/crypto/crypto.c          | 28 ++++------------------------
+ fs/crypto/fname.c           | 36 ++++++------------------------------
+ fs/crypto/fscrypt_private.h | 10 ----------
+ fs/crypto/keyinfo.c         | 21 +++------------------
+ 4 files changed, 13 insertions(+), 82 deletions(-)
 
-Regards,
-
-	Hans
-
-> +
->  		fmt = find_format_by_code(mbus_code.code, &i);
->  		if (!fmt)
->  			continue;
-> 
+diff --git a/fs/crypto/crypto.c b/fs/crypto/crypto.c
+index c7835df..80a3cad 100644
+--- a/fs/crypto/crypto.c
++++ b/fs/crypto/crypto.c
+@@ -126,21 +126,6 @@ struct fscrypt_ctx *fscrypt_get_ctx(const struct inode *inode, gfp_t gfp_flags)
+ }
+ EXPORT_SYMBOL(fscrypt_get_ctx);
+ 
+-/**
+- * page_crypt_complete() - completion callback for page crypto
+- * @req: The asynchronous cipher request context
+- * @res: The result of the cipher operation
+- */
+-static void page_crypt_complete(struct crypto_async_request *req, int res)
+-{
+-	struct fscrypt_completion_result *ecr = req->data;
+-
+-	if (res == -EINPROGRESS)
+-		return;
+-	ecr->res = res;
+-	complete(&ecr->completion);
+-}
+-
+ int fscrypt_do_page_crypto(const struct inode *inode, fscrypt_direction_t rw,
+ 			   u64 lblk_num, struct page *src_page,
+ 			   struct page *dest_page, unsigned int len,
+@@ -151,7 +136,7 @@ int fscrypt_do_page_crypto(const struct inode *inode, fscrypt_direction_t rw,
+ 		u8 padding[FS_IV_SIZE - sizeof(__le64)];
+ 	} iv;
+ 	struct skcipher_request *req = NULL;
+-	DECLARE_FS_COMPLETION_RESULT(ecr);
++	DECLARE_CRYPTO_WAIT(wait);
+ 	struct scatterlist dst, src;
+ 	struct fscrypt_info *ci = inode->i_crypt_info;
+ 	struct crypto_skcipher *tfm = ci->ci_ctfm;
+@@ -179,7 +164,7 @@ int fscrypt_do_page_crypto(const struct inode *inode, fscrypt_direction_t rw,
+ 
+ 	skcipher_request_set_callback(
+ 		req, CRYPTO_TFM_REQ_MAY_BACKLOG | CRYPTO_TFM_REQ_MAY_SLEEP,
+-		page_crypt_complete, &ecr);
++		crypto_req_done, &wait);
+ 
+ 	sg_init_table(&dst, 1);
+ 	sg_set_page(&dst, dest_page, len, offs);
+@@ -187,14 +172,9 @@ int fscrypt_do_page_crypto(const struct inode *inode, fscrypt_direction_t rw,
+ 	sg_set_page(&src, src_page, len, offs);
+ 	skcipher_request_set_crypt(req, &src, &dst, len, &iv);
+ 	if (rw == FS_DECRYPT)
+-		res = crypto_skcipher_decrypt(req);
++		res = crypto_wait_req(crypto_skcipher_decrypt(req), &wait);
+ 	else
+-		res = crypto_skcipher_encrypt(req);
+-	if (res == -EINPROGRESS || res == -EBUSY) {
+-		BUG_ON(req->base.data != &ecr);
+-		wait_for_completion(&ecr.completion);
+-		res = ecr.res;
+-	}
++		res = crypto_wait_req(crypto_skcipher_encrypt(req), &wait);
+ 	skcipher_request_free(req);
+ 	if (res) {
+ 		printk_ratelimited(KERN_ERR
+diff --git a/fs/crypto/fname.c b/fs/crypto/fname.c
+index ad9f814..a80a0d3 100644
+--- a/fs/crypto/fname.c
++++ b/fs/crypto/fname.c
+@@ -15,21 +15,6 @@
+ #include "fscrypt_private.h"
+ 
+ /**
+- * fname_crypt_complete() - completion callback for filename crypto
+- * @req: The asynchronous cipher request context
+- * @res: The result of the cipher operation
+- */
+-static void fname_crypt_complete(struct crypto_async_request *req, int res)
+-{
+-	struct fscrypt_completion_result *ecr = req->data;
+-
+-	if (res == -EINPROGRESS)
+-		return;
+-	ecr->res = res;
+-	complete(&ecr->completion);
+-}
+-
+-/**
+  * fname_encrypt() - encrypt a filename
+  *
+  * The caller must have allocated sufficient memory for the @oname string.
+@@ -40,7 +25,7 @@ static int fname_encrypt(struct inode *inode,
+ 			const struct qstr *iname, struct fscrypt_str *oname)
+ {
+ 	struct skcipher_request *req = NULL;
+-	DECLARE_FS_COMPLETION_RESULT(ecr);
++	DECLARE_CRYPTO_WAIT(wait);
+ 	struct fscrypt_info *ci = inode->i_crypt_info;
+ 	struct crypto_skcipher *tfm = ci->ci_ctfm;
+ 	int res = 0;
+@@ -76,17 +61,12 @@ static int fname_encrypt(struct inode *inode,
+ 	}
+ 	skcipher_request_set_callback(req,
+ 			CRYPTO_TFM_REQ_MAY_BACKLOG | CRYPTO_TFM_REQ_MAY_SLEEP,
+-			fname_crypt_complete, &ecr);
++			crypto_req_done, &wait);
+ 	sg_init_one(&sg, oname->name, cryptlen);
+ 	skcipher_request_set_crypt(req, &sg, &sg, cryptlen, iv);
+ 
+ 	/* Do the encryption */
+-	res = crypto_skcipher_encrypt(req);
+-	if (res == -EINPROGRESS || res == -EBUSY) {
+-		/* Request is being completed asynchronously; wait for it */
+-		wait_for_completion(&ecr.completion);
+-		res = ecr.res;
+-	}
++	res = crypto_wait_req(crypto_skcipher_encrypt(req), &wait);
+ 	skcipher_request_free(req);
+ 	if (res < 0) {
+ 		printk_ratelimited(KERN_ERR
+@@ -110,7 +90,7 @@ static int fname_decrypt(struct inode *inode,
+ 				struct fscrypt_str *oname)
+ {
+ 	struct skcipher_request *req = NULL;
+-	DECLARE_FS_COMPLETION_RESULT(ecr);
++	DECLARE_CRYPTO_WAIT(wait);
+ 	struct scatterlist src_sg, dst_sg;
+ 	struct fscrypt_info *ci = inode->i_crypt_info;
+ 	struct crypto_skcipher *tfm = ci->ci_ctfm;
+@@ -131,7 +111,7 @@ static int fname_decrypt(struct inode *inode,
+ 	}
+ 	skcipher_request_set_callback(req,
+ 		CRYPTO_TFM_REQ_MAY_BACKLOG | CRYPTO_TFM_REQ_MAY_SLEEP,
+-		fname_crypt_complete, &ecr);
++		crypto_req_done, &wait);
+ 
+ 	/* Initialize IV */
+ 	memset(iv, 0, FS_CRYPTO_BLOCK_SIZE);
+@@ -140,11 +120,7 @@ static int fname_decrypt(struct inode *inode,
+ 	sg_init_one(&src_sg, iname->name, iname->len);
+ 	sg_init_one(&dst_sg, oname->name, oname->len);
+ 	skcipher_request_set_crypt(req, &src_sg, &dst_sg, iname->len, iv);
+-	res = crypto_skcipher_decrypt(req);
+-	if (res == -EINPROGRESS || res == -EBUSY) {
+-		wait_for_completion(&ecr.completion);
+-		res = ecr.res;
+-	}
++	res = crypto_wait_req(crypto_skcipher_decrypt(req), &wait);
+ 	skcipher_request_free(req);
+ 	if (res < 0) {
+ 		printk_ratelimited(KERN_ERR
+diff --git a/fs/crypto/fscrypt_private.h b/fs/crypto/fscrypt_private.h
+index a1d5021..c0f1881 100644
+--- a/fs/crypto/fscrypt_private.h
++++ b/fs/crypto/fscrypt_private.h
+@@ -69,16 +69,6 @@ typedef enum {
+ #define FS_CTX_REQUIRES_FREE_ENCRYPT_FL		0x00000001
+ #define FS_CTX_HAS_BOUNCE_BUFFER_FL		0x00000002
+ 
+-struct fscrypt_completion_result {
+-	struct completion completion;
+-	int res;
+-};
+-
+-#define DECLARE_FS_COMPLETION_RESULT(ecr) \
+-	struct fscrypt_completion_result ecr = { \
+-		COMPLETION_INITIALIZER_ONSTACK((ecr).completion), 0 }
+-
+-
+ /* crypto.c */
+ extern int fscrypt_initialize(unsigned int cop_flags);
+ extern struct workqueue_struct *fscrypt_read_workqueue;
+diff --git a/fs/crypto/keyinfo.c b/fs/crypto/keyinfo.c
+index 018c588..3c84cac 100644
+--- a/fs/crypto/keyinfo.c
++++ b/fs/crypto/keyinfo.c
+@@ -17,17 +17,6 @@
+ 
+ static struct crypto_shash *essiv_hash_tfm;
+ 
+-static void derive_crypt_complete(struct crypto_async_request *req, int rc)
+-{
+-	struct fscrypt_completion_result *ecr = req->data;
+-
+-	if (rc == -EINPROGRESS)
+-		return;
+-
+-	ecr->res = rc;
+-	complete(&ecr->completion);
+-}
+-
+ /**
+  * derive_key_aes() - Derive a key using AES-128-ECB
+  * @deriving_key: Encryption key used for derivation.
+@@ -42,7 +31,7 @@ static int derive_key_aes(u8 deriving_key[FS_AES_128_ECB_KEY_SIZE],
+ {
+ 	int res = 0;
+ 	struct skcipher_request *req = NULL;
+-	DECLARE_FS_COMPLETION_RESULT(ecr);
++	DECLARE_CRYPTO_WAIT(wait);
+ 	struct scatterlist src_sg, dst_sg;
+ 	struct crypto_skcipher *tfm = crypto_alloc_skcipher("ecb(aes)", 0, 0);
+ 
+@@ -59,7 +48,7 @@ static int derive_key_aes(u8 deriving_key[FS_AES_128_ECB_KEY_SIZE],
+ 	}
+ 	skcipher_request_set_callback(req,
+ 			CRYPTO_TFM_REQ_MAY_BACKLOG | CRYPTO_TFM_REQ_MAY_SLEEP,
+-			derive_crypt_complete, &ecr);
++			crypto_req_done, &wait);
+ 	res = crypto_skcipher_setkey(tfm, deriving_key,
+ 					FS_AES_128_ECB_KEY_SIZE);
+ 	if (res < 0)
+@@ -69,11 +58,7 @@ static int derive_key_aes(u8 deriving_key[FS_AES_128_ECB_KEY_SIZE],
+ 	sg_init_one(&dst_sg, derived_raw_key, source_key->size);
+ 	skcipher_request_set_crypt(req, &src_sg, &dst_sg, source_key->size,
+ 				   NULL);
+-	res = crypto_skcipher_encrypt(req);
+-	if (res == -EINPROGRESS || res == -EBUSY) {
+-		wait_for_completion(&ecr.completion);
+-		res = ecr.res;
+-	}
++	res = crypto_wait_req(crypto_skcipher_encrypt(req), &wait);
+ out:
+ 	skcipher_request_free(req);
+ 	crypto_free_skcipher(tfm);
+-- 
+2.1.4
