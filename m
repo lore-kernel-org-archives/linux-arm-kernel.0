@@ -1,17 +1,61 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 21 Aug 2017 22:03:56 +0530
-Subject: [PATCH 1/2] dmaengine: at_xdmac: Fix compilation warning.
-In-Reply-To: <878f9486ee507c227cb8835417c520b489c768c8.1502091778.git.arvind.yadav.cs@gmail.com>
-References: <878f9486ee507c227cb8835417c520b489c768c8.1502091778.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20170821163355.GS3053@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Aug 2017 17:35:53 +0100
+Subject: [PATCHv3] arm64:kexec: have own crash_smp_send_stop() for crash
+ dump for nonpanic cores
+In-Reply-To: <1502936722-549-1-git-send-email-hoeun.ryu@gmail.com>
+References: <1502936722-549-1-git-send-email-hoeun.ryu@gmail.com>
+Message-ID: <20170821163552.pom6iqlaezvtdmie@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 07, 2017 at 01:15:18PM +0530, Arvind Yadav wrote:
-> Replace '%d' by '%zu' to fix the compilation warning:-
->    "format ?%d? expects argument of type ?int?,but argument has type ?size_t? [-Wformat=]"
+On Thu, Aug 17, 2017 at 11:24:27AM +0900, Hoeun Ryu wrote:
+>  Commit 0ee5941 : (x86/panic: replace smp_send_stop() with kdump friendly
+> version in panic path) introduced crash_smp_send_stop() which is a weak
+> function and can be overridden by architecture codes to fix the side effect
+> caused by commit f06e515 : (kernel/panic.c: add "crash_kexec_post_
+> notifiers" option).
+> 
+>  ARM64 architecture uses the weak version function and the problem is that
+> the weak function simply calls smp_send_stop() which makes other CPUs
+> offline and takes away the chance to save crash information for nonpanic
+> CPUs in machine_crash_shutdown() when crash_kexec_post_notifiers kernel
+> option is enabled.
+> 
+>  Calling smp_send_crash_stop() in machine_crash_shutdown() is useless
+> because all nonpanic CPUs are already offline by smp_send_stop() in this
+> case and smp_send_crash_stop() only works against online CPUs.
+> 
+>  The result is that secondary CPUs registers are not saved by
+> crash_save_cpu() and the vmcore file misreports these CPUs as being
+> offline.
+> 
+>  crash_smp_send_stop() is implemented to fix this problem by replacing the
+> existing smp_send_crash_stop() and adding a check for multiple calling to
+> the function. The function (strong symbol version) saves crash information
+> for nonpanic CPUs and machine_crash_shutdown() tries to save crash
+> information for nonpanic CPUs only when crash_kexec_post_notifiers kernel
+> option is disabled.
+> 
+> * crash_kexec_post_notifiers : false
+> 
+>   panic()
+>     __crash_kexec()
+>       machine_crash_shutdown()
+>         crash_smp_send_stop()    <= save crash dump for nonpanic cores
+> 
+> * crash_kexec_post_notifiers : true
+> 
+>   panic()
+>     crash_smp_send_stop()        <= save crash dump for nonpanic cores
+>     __crash_kexec()
+>       machine_crash_shutdown()
+>         crash_smp_send_stop()    <= just return.
+> 
+> Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
+> Reviewed-by: James Morse <james.morse@arm.com>
+> Tested-by: James Morse <james.morse@arm.com>
 
-Applied both, thanks
+Queued for 4.14. Thanks.
 
 -- 
-~Vinod
+Catalin
