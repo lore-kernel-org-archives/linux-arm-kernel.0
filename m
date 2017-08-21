@@ -1,47 +1,34 @@
-From: jun.gao@mediatek.com (Jun Gao)
-Date: Mon, 21 Aug 2017 11:36:52 +0800
-Subject: [PATCH v4 1/3] dt-bindings: i2c: modify information formats
-In-Reply-To: <1503286614-17670-1-git-send-email-jun.gao@mediatek.com>
-References: <1503286614-17670-1-git-send-email-jun.gao@mediatek.com>
-Message-ID: <1503286614-17670-2-git-send-email-jun.gao@mediatek.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 21 Aug 2017 07:28:21 +0200
+Subject: [PATCH V2 0/2] pwm: bcm2835: Support for polarity setting via DT
+In-Reply-To: <1502533184-15765-1-git-send-email-stefan.wahren@i2se.com>
+References: <1502533184-15765-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20170821052821.GA18996@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jun Gao <jun.gao@mediatek.com>
+On Sat, Aug 12, 2017 at 12:19:42PM +0200, Stefan Wahren wrote:
+> This patch series adds support for the third (optional) pwm cell to specify the
+> polarity.
+> 
+> Changes in V2:
+> * add ack and review tags
+> 
+> Stefan Wahren (2):
+>   dt-bindings: pwm-bcm2835: Increase pwm-cells
+>   pwm: bcm2835: Support for polarity setting via DT
+> 
+>  Documentation/devicetree/bindings/pwm/pwm-bcm2835.txt | 4 ++--
+>  drivers/pwm/pwm-bcm2835.c                             | 2 ++
+>  2 files changed, 4 insertions(+), 2 deletions(-)
 
-Use common name MediaTek and modify the compatible information
-formats of all SoCs to the same.
+Both patches applied to for-4.14/drivers, thanks.
 
-Signed-off-by: Jun Gao <jun.gao@mediatek.com>
----
- Documentation/devicetree/bindings/i2c/i2c-mtk.txt | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-index bd5a7be..9c86424 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
-@@ -1,14 +1,14 @@
--* Mediatek's I2C controller
-+* MediaTek's I2C controller
- 
--The Mediatek's I2C controller is used to interface with I2C devices.
-+The MediaTek's I2C controller is used to interface with I2C devices.
- 
- Required properties:
-   - compatible: value should be either of the following.
--      "mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for Mediatek mt2701
--      "mediatek,mt6577-i2c": for i2c compatible with mt6577.
--      "mediatek,mt6589-i2c": for i2c compatible with mt6589.
--      "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for i2c compatible with mt7623.
--      "mediatek,mt8173-i2c": for i2c compatible with mt8173.
-+      "mediatek,mt2701-i2c", "mediatek,mt6577-i2c": for MediaTek MT2701
-+      "mediatek,mt6577-i2c": for MediaTek MT6577
-+      "mediatek,mt6589-i2c": for MediaTek MT6589
-+      "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for MediaTek MT7623
-+      "mediatek,mt8173-i2c": for MediaTek MT8173
-   - reg: physical base address of the controller and dma base, length of memory
-     mapped region.
-   - interrupts: interrupt number to the cpu.
--- 
-1.8.1.1
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/d3f57336/attachment.sig>
