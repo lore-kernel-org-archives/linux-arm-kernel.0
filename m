@@ -1,60 +1,39 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Mon, 21 Aug 2017 16:39:28 +0800
-Subject: [PATCH 3/3] ARM: dts: rockchip: enable usb for rv1108-evb
-In-Reply-To: <1503304768-14520-1-git-send-email-frank.wang@rock-chips.com>
-References: <1503304768-14520-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1503304768-14520-4-git-send-email-frank.wang@rock-chips.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 21 Aug 2017 10:40:53 +0200
+Subject: [PATCH] ARM: sun8i: a33: add dts for Q8 tablets with different
+ resolution
+In-Reply-To: <20170817074926.3410-1-icenowy@aosc.io>
+References: <20170817074926.3410-1-icenowy@aosc.io>
+Message-ID: <20170821084053.s4qmhlvgsmckmqgh@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rockchip's rv1108-evb board has one usb otg controller and one usb
-host controller, each usb controller connect with one usb-phy port
-through UTMI+ interface. This patch enables them to support usb on
-rv1108-evb board.
+On Thu, Aug 17, 2017 at 03:49:26PM +0800, Icenowy Zheng wrote:
+> Q8 tablets with Allwinner A33 SoC now come with two kind of LCD, either
+> 800x480 or 1024x600.
+> 
+> In order for sun4i-drm to be able to choose correct LCD configuration,
+> two different device trees should be present, one for a resolution.
+> 
+> Add stub device trees for two resolutions.
+> 
+> As the sun4i-drm driver still has some problems to support the LCDs, the
+> real LCD device nodes are not added to the device tree files.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
----
- arch/arm/boot/dts/rv1108-evb.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+This should be an overlay, ideally applied by the bootloader.
 
-diff --git a/arch/arm/boot/dts/rv1108-evb.dts b/arch/arm/boot/dts/rv1108-evb.dts
-index 010763f..5a48e79 100644
---- a/arch/arm/boot/dts/rv1108-evb.dts
-+++ b/arch/arm/boot/dts/rv1108-evb.dts
-@@ -103,6 +103,18 @@
- 	status = "okay";
- };
- 
-+&u2phy {
-+	status = "okay";
-+
-+	u2phy_otg: otg-port {
-+		status = "okay";
-+	};
-+
-+	u2phy_host: host-port {
-+		status = "okay";
-+	};
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-@@ -114,3 +126,15 @@
- &uart2 {
- 	status = "okay";
- };
-+
-+&usb_host_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host_ohci {
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	status = "okay";
-+};
+Maxime
+
 -- 
-2.0.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/b83ee581/attachment.sig>
