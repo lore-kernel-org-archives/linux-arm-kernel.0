@@ -1,97 +1,89 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Mon, 21 Aug 2017 17:04:55 +0300
-Subject: [PATCH v6 09/19] crypto: move gcm to generic async completion
-In-Reply-To: <1503324309-13673-1-git-send-email-gilad@benyossef.com>
-References: <1503324309-13673-1-git-send-email-gilad@benyossef.com>
-Message-ID: <1503324309-13673-10-git-send-email-gilad@benyossef.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Mon, 21 Aug 2017 15:36:37 +0100
+Subject: [PATCH 06/27] arm64/sve: System register and exception syndrome
+ definitions
+In-Reply-To: <20170821135654.GP6321@e103592.cambridge.arm.com>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-7-git-send-email-Dave.Martin@arm.com>
+ <87a82t5kos.fsf@linaro.org> <20170821135654.GP6321@e103592.cambridge.arm.com>
+Message-ID: <87378l56oa.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcm is starting an async. crypto op and waiting for it complete.
-Move it over to generic code doing the same.
 
-Signed-off-by: Gilad Ben-Yossef <gilad@benyossef.com>
----
- crypto/gcm.c | 32 ++++++--------------------------
- 1 file changed, 6 insertions(+), 26 deletions(-)
+Dave Martin <Dave.Martin@arm.com> writes:
 
-diff --git a/crypto/gcm.c b/crypto/gcm.c
-index 3841b5e..fb923a5 100644
---- a/crypto/gcm.c
-+++ b/crypto/gcm.c
-@@ -16,7 +16,6 @@
- #include <crypto/scatterwalk.h>
- #include <crypto/hash.h>
- #include "internal.h"
--#include <linux/completion.h>
- #include <linux/err.h>
- #include <linux/init.h>
- #include <linux/kernel.h>
-@@ -78,11 +77,6 @@ struct crypto_gcm_req_priv_ctx {
- 	} u;
- };
- 
--struct crypto_gcm_setkey_result {
--	int err;
--	struct completion completion;
--};
--
- static struct {
- 	u8 buf[16];
- 	struct scatterlist sg;
-@@ -98,17 +92,6 @@ static inline struct crypto_gcm_req_priv_ctx *crypto_gcm_reqctx(
- 	return (void *)PTR_ALIGN((u8 *)aead_request_ctx(req), align + 1);
- }
- 
--static void crypto_gcm_setkey_done(struct crypto_async_request *req, int err)
--{
--	struct crypto_gcm_setkey_result *result = req->data;
--
--	if (err == -EINPROGRESS)
--		return;
--
--	result->err = err;
--	complete(&result->completion);
--}
--
- static int crypto_gcm_setkey(struct crypto_aead *aead, const u8 *key,
- 			     unsigned int keylen)
- {
-@@ -119,7 +102,7 @@ static int crypto_gcm_setkey(struct crypto_aead *aead, const u8 *key,
- 		be128 hash;
- 		u8 iv[16];
- 
--		struct crypto_gcm_setkey_result result;
-+		struct crypto_wait wait;
- 
- 		struct scatterlist sg[1];
- 		struct skcipher_request req;
-@@ -140,21 +123,18 @@ static int crypto_gcm_setkey(struct crypto_aead *aead, const u8 *key,
- 	if (!data)
- 		return -ENOMEM;
- 
--	init_completion(&data->result.completion);
-+	crypto_init_wait(&data->wait);
- 	sg_init_one(data->sg, &data->hash, sizeof(data->hash));
- 	skcipher_request_set_tfm(&data->req, ctr);
- 	skcipher_request_set_callback(&data->req, CRYPTO_TFM_REQ_MAY_SLEEP |
- 						  CRYPTO_TFM_REQ_MAY_BACKLOG,
--				      crypto_gcm_setkey_done,
--				      &data->result);
-+				      crypto_req_done,
-+				      &data->wait);
- 	skcipher_request_set_crypt(&data->req, data->sg, data->sg,
- 				   sizeof(data->hash), data->iv);
- 
--	err = crypto_skcipher_encrypt(&data->req);
--	if (err == -EINPROGRESS || err == -EBUSY) {
--		wait_for_completion(&data->result.completion);
--		err = data->result.err;
--	}
-+	err = crypto_wait_req(crypto_skcipher_encrypt(&data->req),
-+							&data->wait);
- 
- 	if (err)
- 		goto out;
--- 
-2.1.4
+> On Mon, Aug 21, 2017 at 10:33:55AM +0100, Alex Benn?e wrote:
+>>
+>> Dave Martin <Dave.Martin@arm.com> writes:
+>>
+>> > The SVE architecture adds some system registers, ID register fields
+>> > and a dedicated ESR exception class.
+>> >
+>> > This patch adds the appropriate definitions that will be needed by
+>> > the kernel.
+>> >
+>> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+>> > ---
+>> >  arch/arm64/include/asm/esr.h     |  3 ++-
+>> >  arch/arm64/include/asm/kvm_arm.h |  1 +
+>> >  arch/arm64/include/asm/sysreg.h  | 16 ++++++++++++++++
+>> >  arch/arm64/kernel/traps.c        |  1 +
+>> >  4 files changed, 20 insertions(+), 1 deletion(-)
+>
+> [...]
+>
+>> > diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+>> > index 248339e..2d259e8 100644
+>> > --- a/arch/arm64/include/asm/sysreg.h
+>> > +++ b/arch/arm64/include/asm/sysreg.h
+>
+> [...]
+>
+>> > +#define SYS_ZCR_EL1			sys_reg(3, 0, 1, 2, 0)
+>> > +
+>>
+>> I'll have to take these on trust. They are mentioned in both the ARM ARM
+>> and the SVE supplement but I can't see any actual definitions of them.
+>
+> [I note from subsequent replies you've now found this in the
+> accompanying HTML]
+>
+> [...]
+>
+>> > +#define CPACR_EL1_ZEN_EL1EN	(1 << 16)
+>> > +#define CPACR_EL1_ZEN_EL0EN	(1 << 17)
+>> > +#define CPACR_EL1_ZEN		(CPACR_EL1_ZEN_EL1EN |
+>> > CPACR_EL1_ZEN_EL0EN)
+>>
+>> This is a little weird as it is a 2 bit field in which 00 and 11 are not
+>> simply the sum of their bits. If the code wrote CPACR_EL1_ZEN_EL0EN |
+>> CPACR_EL1_ZEN_EL1EN to the CPACR_EL1 you wouldn't get the expected behaviour.
+>
+> This seemed natural-ish if you believe that disabling at EL1 implies
+> disabling at EL0.  This is consistent with the way the traps at EL2/3
+> work, and lack of this property would be a sort of privilege inversion.
+>
+> The meanings of the bits are not orthogonal, but it's still useful to be
+> able to twiddle EL0EN by itself when EL1EN is set (since we wan't to
+> control access for EL0 but leave EL1 access enabled).
+>
+> Maybe comments would be sufficient:
+>
+> #define CPACR_EL1_ZEN_EL1EN ... /* enable EL1 access */
+> #define CPACR_EL1_ZEN_EL0EN ... /* enable EL0 access, if EL1EN is also
+> set */
+
+Certainly it would help. I'll see as I go through the rest of the code
+but it looks like a potential bear trap we should at least mitigate.
+
+>
+> I'm not sure how to make the names both reasonably terse and self-
+> escribing, but I'm open to ideas.
+
+Sorry no decent ideas. Naming things is hard as they say.
+
+BTW see the follow-up mail for the other things I found....
+
+--
+Alex Benn?e
