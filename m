@@ -1,45 +1,53 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Mon, 21 Aug 2017 18:51:53 -0500
-Subject: [PATCH 0/5] Enable DRA7 processor MMU DT nodes 
-Message-ID: <20170821235158.4968-1-s-anna@ti.com>
+Date: Mon, 21 Aug 2017 18:51:57 -0500
+Subject: [PATCH 4/5] ARM: dts: am572x-idk: Enable relevant IPU and DSP MMU
+ nodes
+In-Reply-To: <20170821235158.4968-1-s-anna@ti.com>
+References: <20170821235158.4968-1-s-anna@ti.com>
+Message-ID: <20170821235158.4968-5-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+The MMU nodes for the remote processors IPU1, IPU2, DSP1 and
+DSP2 have all been enabled. All these nodes are relevant and
+valid for the AM572x IDK board.
 
-The following series enables the DSP and IPU MMUs on various
-TI DRA7xx/AM57xx boards. This is part 2 of the patches for
-enabling the MMUs on DRA7 SoCs (OMAP4 and OMAP5 are already
-supported on mainline).
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ arch/arm/boot/dts/am572x-idk.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-Patches are baselined on your for-next branch with HEAD of
-a70cb93b6c2f ("Merge branch 'omap-for-v4.14/dt-v3' into for-next").
-
-I have tested the patches on current TI DRA7xx/AM57xx boards (DRA7,
-DRA72, DRA71, DRA76 EVMs, AM571x & AM572x IDKs and AM57xx BeagleBoard-X15)
-as well as the OMAP4 Panda and OMAP5 uEVM. The boards can boot fine
-with just these patches, but requires the hwmod patches to be able
-to use them (otherwise get the failures from _od_fail_runtime_{resume/suspend}
-functions). There are no consumer devices for these yet, and they
-just probe but are not clocked/enabled by default, so the current
-System suspend is not affected.
-
-regards
-Suman
-
-Suman Anna (5):
-  ARM: dts: dra7-evm-common: Enable relevant IPU and DSP MMU nodes
-  ARM: dts: dra72-evm-common: Enable relevant IPU and DSP MMU nodes
-  ARM: dts: beagle-x15-common: Enable relevant IPU and DSP MMU nodes
-  ARM: dts: am572x-idk: Enable relevant IPU and DSP MMU nodes
-  ARM: dts: am571x-idk: Enable relevant IPU and DSP MMU nodes
-
- arch/arm/boot/dts/am571x-idk.dts                | 16 ++++++++++++++++
- arch/arm/boot/dts/am572x-idk.dts                | 24 ++++++++++++++++++++++++
- arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi | 24 ++++++++++++++++++++++++
- arch/arm/boot/dts/dra7-evm-common.dtsi          | 24 ++++++++++++++++++++++++
- arch/arm/boot/dts/dra72-evm-common.dtsi         | 16 ++++++++++++++++
- 5 files changed, 104 insertions(+)
-
+diff --git a/arch/arm/boot/dts/am572x-idk.dts b/arch/arm/boot/dts/am572x-idk.dts
+index a578fe97ba3b..0f3be0de82b7 100644
+--- a/arch/arm/boot/dts/am572x-idk.dts
++++ b/arch/arm/boot/dts/am572x-idk.dts
+@@ -127,3 +127,27 @@
+ 		status = "okay";
+ 	};
+ };
++
++&mmu0_dsp1 {
++	status = "okay";
++};
++
++&mmu1_dsp1 {
++	status = "okay";
++};
++
++&mmu0_dsp2 {
++	status = "okay";
++};
++
++&mmu1_dsp2 {
++	status = "okay";
++};
++
++&mmu_ipu1 {
++	status = "okay";
++};
++
++&mmu_ipu2 {
++	status = "okay";
++};
 -- 
 2.13.1
