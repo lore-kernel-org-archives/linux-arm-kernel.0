@@ -1,22 +1,21 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 21 Aug 2017 15:21:22 +0530
-Subject: [PATCH v2 3/3] dt-bindings: i2c: i2c-davinci: Update binding for
- 66AK2Gx pwr dm property
-In-Reply-To: <20170816221715.15027-4-fcooper@ti.com>
-References: <20170816221715.15027-1-fcooper@ti.com>
- <20170816221715.15027-4-fcooper@ti.com>
-Message-ID: <9688ea55-74ac-32da-ff49-7e1cfbd3025e@ti.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 21 Aug 2017 11:52:57 +0200
+Subject: [PATCH v4 8/8] ARM: dts: rockchip: add accelerometer bma250e dt
+ node for rv1108 evb
+In-Reply-To: <1502700251-8852-1-git-send-email-andy.yan@rock-chips.com>
+References: <1502699477-8063-1-git-send-email-andy.yan@rock-chips.com>
+ <1502700251-8852-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1682225.9zDcqiPKQS@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 17 August 2017 03:47 AM, Franklin S Cooper Jr wrote:
-> Add pm-domains property which is required for 66AK2Gx. Also document 66AK2G
-> unique clocks property usage.
+Am Montag, 14. August 2017, 16:44:11 CEST schrieb Andy Yan:
+> Add dt node of bosch accelerometer bma250e on rv1108 evb.
 > 
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
-Acked-by: Sekhar Nori <nsekhar@ti.com>
+applied for 4.14
 
-Thanks,
-Sekhar
+
+Thanks
+Heiko
