@@ -1,155 +1,206 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 21 Aug 2017 10:05:11 +0200
-Subject: [PATCH v3 6/6] pwm: mediatek: add MT2712/MT7622 support
-In-Reply-To: <1498802721-32455-7-git-send-email-zhi.mao@mediatek.com>
-References: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
- <1498802721-32455-7-git-send-email-zhi.mao@mediatek.com>
-Message-ID: <20170821080511.GP18996@ulmo>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 21 Aug 2017 10:05:03 +0200
+Subject: [PATCH v9 5/5] clk: samsung: exynos-audss: Add support for runtime PM
+In-Reply-To: <1503302703-13801-1-git-send-email-m.szyprowski@samsung.com>
+References: <1503302703-13801-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170821080540eucas1p2e07bb23e15027aca9563316a5fbf1597@eucas1p2.samsung.com>
+Message-ID: <1503302703-13801-6-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 02:05:21PM +0800, Zhi Mao wrote:
-> 1. support multiple chip(MT2712, MT7622, MT7623)
-> 2. add mtk_pwm_com_reg for match the registers of MT2712 pwm8
->    the register offset address of pwm8 for MT2712 is not fixed 0x40
->    and they are not the same as pwm0~6.
-> 
-> Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
-> ---
->  drivers/pwm/pwm-mediatek.c |   55 +++++++++++++++++++++++++++++++++++---------
->  1 file changed, 44 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-> index 1d78ab1..2c9ce24 100644
-> --- a/drivers/pwm/pwm-mediatek.c
-> +++ b/drivers/pwm/pwm-mediatek.c
-> @@ -16,6 +16,7 @@
->  #include <linux/module.h>
->  #include <linux/clk.h>
->  #include <linux/of.h>
-> +#include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <linux/pwm.h>
->  #include <linux/slab.h>
-> @@ -40,11 +41,19 @@ enum {
->  	MTK_CLK_PWM3,
->  	MTK_CLK_PWM4,
->  	MTK_CLK_PWM5,
-> +	MTK_CLK_PWM6,
-> +	MTK_CLK_PWM7,
-> +	MTK_CLK_PWM8,
->  	MTK_CLK_MAX,
->  };
->  
-> -static const char * const mtk_pwm_clk_name[] = {
-> -	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5"
-> +static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
-> +	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4",
-> +	"pwm5", "pwm6", "pwm7", "pwm8"
+This patch adds support for runtime PM to Exynos Audio SubSystem driver to
+enable full support for audio power domain on Exynos5 SoCs. The main change
+is moving register saving and restoring code from system sleep PM ops to
+runtime PM ops and implementing system sleep PM ops with generic
+pm_runtime_force_suspend/resume helpers. Runtime PM of the Exynos AudSS
+device is managed from clock core depending on the preparation status
+of the provided clocks.
 
-You're wrapping these lines at arbitrary boundaries. Make sure to use
-all of the 80 columns at your disposal.
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ .../devicetree/bindings/clock/clk-exynos-audss.txt |  6 +++
+ drivers/clk/samsung/clk-exynos-audss.c             | 51 ++++++++++++++--------
+ 2 files changed, 40 insertions(+), 17 deletions(-)
 
-> +};
-> +
-> +struct mtk_com_pwm_data {
-
-What does the _com stand for in the above?
-
-> +	unsigned int pwm_nums;
->  };
-
-Maybe name this num_pwms for consistency with other drivers?
-
->  
->  /**
-> @@ -57,6 +66,11 @@ struct mtk_pwm_chip {
->  	struct pwm_chip chip;
->  	void __iomem *regs;
->  	struct clk *clks[MTK_CLK_MAX];
-> +	const struct mtk_com_pwm_data *data;
-> +};
-> +
-> +static const unsigned long mtk_pwm_com_reg[] = {
-
-There's another of these _com that I don't understand what it means.
-Also since these are all fairly small offsets, these can simply be
-unsigned int.
-
-> +	0x0010, 0x0050, 0x0090, 0x00d0, 0x0110, 0x0150, 0x0190, 0x0220
->  };
->  
->  static inline struct mtk_pwm_chip *to_mtk_pwm_chip(struct pwm_chip *chip)
-> @@ -103,14 +117,14 @@ static void mtk_pwm_clk_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->  static inline u32 mtk_pwm_readl(struct mtk_pwm_chip *chip, unsigned int num,
->  				unsigned int offset)
->  {
-> -	return readl(chip->regs + 0x10 + (num * 0x40) + offset);
-> +	return readl(chip->regs + mtk_pwm_com_reg[num] + offset);
->  }
->  
->  static inline void mtk_pwm_writel(struct mtk_pwm_chip *chip,
->  				  unsigned int num, unsigned int offset,
->  				  u32 value)
->  {
-> -	writel(value, chip->regs + 0x10 + (num * 0x40) + offset);
-> +	writel(value, chip->regs + mtk_pwm_com_reg[num] + offset);
->  }
->  
->  static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> @@ -194,23 +208,28 @@ static int mtk_pwm_probe(struct platform_device *pdev)
->  	if (!pc)
->  		return -ENOMEM;
->  
-> +	pc->data = of_device_get_match_data(&pdev->dev);
-> +
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	pc->regs = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(pc->regs))
->  		return PTR_ERR(pc->regs);
->  
-> -	for (i = 0; i < MTK_CLK_MAX; i++) {
-> +	for (i = 0; i < pc->data->pwm_nums + 2; i++) {
->  		pc->clks[i] = devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
-> -		if (IS_ERR(pc->clks[i]))
-> +		if (IS_ERR(pc->clks[i])) {
-> +			dev_err(&pdev->dev, "[PWM] clock: %s fail: %ld\n",
-> +				mtk_pwm_clk_name[i], PTR_ERR(pc->clks[i]));
-
-Why include the "[PWM] " prefix in the above message?
-
->  			return PTR_ERR(pc->clks[i]);
-> +		}
->  	}
->  
-> -	platform_set_drvdata(pdev, pc);
-> -
->  	pc->chip.dev = &pdev->dev;
->  	pc->chip.ops = &mtk_pwm_ops;
->  	pc->chip.base = -1;
-> -	pc->chip.npwm = 5;
-> +	pc->chip.npwm = pc->data->pwm_nums;
-> +
-> +	platform_set_drvdata(pdev, pc);
-
-No need to move the location of the platform_set_drvdata() call. It's
-needless churn.
-
->  static const struct of_device_id mtk_pwm_of_match[] = {
-> -	{ .compatible = "mediatek,mt7623-pwm" },
-> -	{ }
-> +	{.compatible = "mediatek,mt2712-pwm", .data = &mt2712_pwm_data},
-> +	{.compatible = "mediatek,mt7622-pwm", .data = &mt7622_pwm_data},
-> +	{.compatible = "mediatek,mt7623-pwm", .data = &mt7623_pwm_data},
-> +	{},
-
-Spaces after { and before }, please.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/72c1f9de/attachment.sig>
+diff --git a/Documentation/devicetree/bindings/clock/clk-exynos-audss.txt b/Documentation/devicetree/bindings/clock/clk-exynos-audss.txt
+index 0c3d6015868d..f3635d5aeba4 100644
+--- a/Documentation/devicetree/bindings/clock/clk-exynos-audss.txt
++++ b/Documentation/devicetree/bindings/clock/clk-exynos-audss.txt
+@@ -33,6 +33,12 @@ Required Properties:
+ - clock-names: Aliases for the above clocks. They should be "pll_ref",
+   "pll_in", "cdclk", "sclk_audio", and "sclk_pcm_in" respectively.
+ 
++Optional Properties:
++
++  - power-domains: a phandle to respective power domain node as described by
++    generic PM domain bindings (see power/power_domain.txt for more
++    information).
++
+ The following is the list of clocks generated by the controller. Each clock is
+ assigned an identifier and client nodes use this identifier to specify the
+ clock which they consume. Some of the clocks are available only on a particular
+diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
+index 6be52fb46ff3..ab494c104ce6 100644
+--- a/drivers/clk/samsung/clk-exynos-audss.c
++++ b/drivers/clk/samsung/clk-exynos-audss.c
+@@ -18,6 +18,7 @@
+ #include <linux/syscore_ops.h>
+ #include <linux/module.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
+ 
+ #include <dt-bindings/clock/exynos-audss-clk.h>
+ 
+@@ -36,14 +37,13 @@
+ #define ASS_CLK_DIV 0x4
+ #define ASS_CLK_GATE 0x8
+ 
+-#ifdef CONFIG_PM_SLEEP
+ static unsigned long reg_save[][2] = {
+ 	{ ASS_CLK_SRC,  0 },
+ 	{ ASS_CLK_DIV,  0 },
+ 	{ ASS_CLK_GATE, 0 },
+ };
+ 
+-static int exynos_audss_clk_suspend(struct device *dev)
++static int __maybe_unused exynos_audss_clk_suspend(struct device *dev)
+ {
+ 	int i;
+ 
+@@ -53,7 +53,7 @@ static int exynos_audss_clk_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int exynos_audss_clk_resume(struct device *dev)
++static int __maybe_unused exynos_audss_clk_resume(struct device *dev)
+ {
+ 	int i;
+ 
+@@ -62,7 +62,6 @@ static int exynos_audss_clk_resume(struct device *dev)
+ 
+ 	return 0;
+ }
+-#endif /* CONFIG_PM_SLEEP */
+ 
+ struct exynos_audss_clk_drvdata {
+ 	unsigned int has_adma_clk:1;
+@@ -179,7 +178,18 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+ 			}
+ 		}
+ 	}
+-	clk_table[EXYNOS_MOUT_AUDSS] = clk_hw_register_mux(NULL, "mout_audss",
++
++	/*
++	 * Enable runtime PM here to allow the clock core using runtime PM
++	 * for the registered clocks. Additionally, we increase the runtime
++	 * PM usage count before registering the clocks, to prevent the
++	 * clock core from runtime suspending the device.
++	 */
++	pm_runtime_get_noresume(dev);
++	pm_runtime_set_active(dev);
++	pm_runtime_enable(dev);
++
++	clk_table[EXYNOS_MOUT_AUDSS] = clk_hw_register_mux(dev, "mout_audss",
+ 				mout_audss_p, ARRAY_SIZE(mout_audss_p),
+ 				CLK_SET_RATE_NO_REPARENT,
+ 				reg_base + ASS_CLK_SRC, 0, 1, 0, &lock);
+@@ -190,48 +200,48 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+ 		mout_i2s_p[1] = __clk_get_name(cdclk);
+ 	if (!IS_ERR(sclk_audio))
+ 		mout_i2s_p[2] = __clk_get_name(sclk_audio);
+-	clk_table[EXYNOS_MOUT_I2S] = clk_hw_register_mux(NULL, "mout_i2s",
++	clk_table[EXYNOS_MOUT_I2S] = clk_hw_register_mux(dev, "mout_i2s",
+ 				mout_i2s_p, ARRAY_SIZE(mout_i2s_p),
+ 				CLK_SET_RATE_NO_REPARENT,
+ 				reg_base + ASS_CLK_SRC, 2, 2, 0, &lock);
+ 
+-	clk_table[EXYNOS_DOUT_SRP] = clk_hw_register_divider(NULL, "dout_srp",
++	clk_table[EXYNOS_DOUT_SRP] = clk_hw_register_divider(dev, "dout_srp",
+ 				"mout_audss", 0, reg_base + ASS_CLK_DIV, 0, 4,
+ 				0, &lock);
+ 
+-	clk_table[EXYNOS_DOUT_AUD_BUS] = clk_hw_register_divider(NULL,
++	clk_table[EXYNOS_DOUT_AUD_BUS] = clk_hw_register_divider(dev,
+ 				"dout_aud_bus", "dout_srp", 0,
+ 				reg_base + ASS_CLK_DIV, 4, 4, 0, &lock);
+ 
+-	clk_table[EXYNOS_DOUT_I2S] = clk_hw_register_divider(NULL, "dout_i2s",
++	clk_table[EXYNOS_DOUT_I2S] = clk_hw_register_divider(dev, "dout_i2s",
+ 				"mout_i2s", 0, reg_base + ASS_CLK_DIV, 8, 4, 0,
+ 				&lock);
+ 
+-	clk_table[EXYNOS_SRP_CLK] = clk_hw_register_gate(NULL, "srp_clk",
++	clk_table[EXYNOS_SRP_CLK] = clk_hw_register_gate(dev, "srp_clk",
+ 				"dout_srp", CLK_SET_RATE_PARENT,
+ 				reg_base + ASS_CLK_GATE, 0, 0, &lock);
+ 
+-	clk_table[EXYNOS_I2S_BUS] = clk_hw_register_gate(NULL, "i2s_bus",
++	clk_table[EXYNOS_I2S_BUS] = clk_hw_register_gate(dev, "i2s_bus",
+ 				"dout_aud_bus", CLK_SET_RATE_PARENT,
+ 				reg_base + ASS_CLK_GATE, 2, 0, &lock);
+ 
+-	clk_table[EXYNOS_SCLK_I2S] = clk_hw_register_gate(NULL, "sclk_i2s",
++	clk_table[EXYNOS_SCLK_I2S] = clk_hw_register_gate(dev, "sclk_i2s",
+ 				"dout_i2s", CLK_SET_RATE_PARENT,
+ 				reg_base + ASS_CLK_GATE, 3, 0, &lock);
+ 
+-	clk_table[EXYNOS_PCM_BUS] = clk_hw_register_gate(NULL, "pcm_bus",
++	clk_table[EXYNOS_PCM_BUS] = clk_hw_register_gate(dev, "pcm_bus",
+ 				 "sclk_pcm", CLK_SET_RATE_PARENT,
+ 				reg_base + ASS_CLK_GATE, 4, 0, &lock);
+ 
+ 	sclk_pcm_in = devm_clk_get(dev, "sclk_pcm_in");
+ 	if (!IS_ERR(sclk_pcm_in))
+ 		sclk_pcm_p = __clk_get_name(sclk_pcm_in);
+-	clk_table[EXYNOS_SCLK_PCM] = clk_hw_register_gate(NULL, "sclk_pcm",
++	clk_table[EXYNOS_SCLK_PCM] = clk_hw_register_gate(dev, "sclk_pcm",
+ 				sclk_pcm_p, CLK_SET_RATE_PARENT,
+ 				reg_base + ASS_CLK_GATE, 5, 0, &lock);
+ 
+ 	if (variant->has_adma_clk) {
+-		clk_table[EXYNOS_ADMA] = clk_hw_register_gate(NULL, "adma",
++		clk_table[EXYNOS_ADMA] = clk_hw_register_gate(dev, "adma",
+ 				"dout_srp", CLK_SET_RATE_PARENT,
+ 				reg_base + ASS_CLK_GATE, 9, 0, &lock);
+ 	}
+@@ -251,10 +261,14 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
+ 		goto unregister;
+ 	}
+ 
++	pm_runtime_put_sync(dev);
++
+ 	return 0;
+ 
+ unregister:
+ 	exynos_audss_clk_teardown();
++	pm_runtime_put_sync(dev);
++	pm_runtime_disable(dev);
+ 
+ 	if (!IS_ERR(epll))
+ 		clk_disable_unprepare(epll);
+@@ -267,6 +281,7 @@ static int exynos_audss_clk_remove(struct platform_device *pdev)
+ 	of_clk_del_provider(pdev->dev.of_node);
+ 
+ 	exynos_audss_clk_teardown();
++	pm_runtime_disable(&pdev->dev);
+ 
+ 	if (!IS_ERR(epll))
+ 		clk_disable_unprepare(epll);
+@@ -275,8 +290,10 @@ static int exynos_audss_clk_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct dev_pm_ops exynos_audss_clk_pm_ops = {
+-	SET_LATE_SYSTEM_SLEEP_PM_OPS(exynos_audss_clk_suspend,
+-				     exynos_audss_clk_resume)
++	SET_RUNTIME_PM_OPS(exynos_audss_clk_suspend, exynos_audss_clk_resume,
++			   NULL)
++	SET_LATE_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
++				     pm_runtime_force_resume)
+ };
+ 
+ static struct platform_driver exynos_audss_clk_driver = {
+-- 
+1.9.1
