@@ -1,69 +1,62 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 21 Aug 2017 13:11:28 +0530
-Subject: [PATCH 1/5] mmc: sdhci: Tidy reading 136-bit responses
-In-Reply-To: <20170821074132.4622-1-kishon@ti.com>
-References: <20170821074132.4622-1-kishon@ti.com>
-Message-ID: <20170821074132.4622-2-kishon@ti.com>
+Date: Mon, 21 Aug 2017 13:11:27 +0530
+Subject: [PATCH 0/5] mmc: Add OMAP SDHCI driver
+Message-ID: <20170821074132.4622-1-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Adrian Hunter <adrian.hunter@intel.com>
+This is the first step in deprecating omap_hsmmc driver completely
+and moving to sdhci-omap driver which uses the sdhci library.
 
-Read each register only once and move the code to a separate function so
-that it is not jammed against the 80 column margin.
+This series adds a new SDHCI quirk to indicate MMC_RSP_136 has CRC (since
+sdhci in OMAP has CRC)
 
-Signed-off-by: Adrian Hunter <adrian.hunter@intel.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- drivers/mmc/host/sdhci.c | 28 ++++++++++++++++++----------
- 1 file changed, 18 insertions(+), 10 deletions(-)
+Apart from the quirk, sdhci-omap has it's own callbacks
+to set_clock (clock divider programming is different from generic sdhci)
+, set_power, set_bus_width, set_bus_mode and platform_send_init_74_clocks.
+These callback functions are implemented based on omap_hsmmc driver.
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index a1ad2ddadca1..ba639b7851cb 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1173,24 +1173,32 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
- }
- EXPORT_SYMBOL_GPL(sdhci_send_command);
- 
-+static void sdhci_read_rsp_136(struct sdhci_host *host, struct mmc_command *cmd)
-+{
-+	int i, reg;
-+
-+	for (i = 0; i < 4; i++) {
-+		reg = SDHCI_RESPONSE + (3 - i) * 4;
-+		cmd->resp[i] = sdhci_readl(host, reg);
-+	}
-+
-+	/* CRC is stripped so we need to do some shifting */
-+	for (i = 0; i < 4; i++) {
-+		cmd->resp[i] <<= 8;
-+		if (i != 3)
-+			cmd->resp[i] |= cmd->resp[i + 1] >> 24;
-+	}
-+}
-+
- static void sdhci_finish_command(struct sdhci_host *host)
- {
- 	struct mmc_command *cmd = host->cmd;
--	int i;
- 
- 	host->cmd = NULL;
- 
- 	if (cmd->flags & MMC_RSP_PRESENT) {
- 		if (cmd->flags & MMC_RSP_136) {
--			/* CRC is stripped so we need to do some shifting. */
--			for (i = 0;i < 4;i++) {
--				cmd->resp[i] = sdhci_readl(host,
--					SDHCI_RESPONSE + (3-i)*4) << 8;
--				if (i != 3)
--					cmd->resp[i] |=
--						sdhci_readb(host,
--						SDHCI_RESPONSE + (3-i)*4-1);
--			}
-+			sdhci_read_rsp_136(host, cmd);
- 		} else {
- 			cmd->resp[0] = sdhci_readl(host, SDHCI_RESPONSE);
- 		}
+The sdhci-omap driver supports only the high speed mode and UHS/HS200
+mode will be added in a later series.
+
+It has been tested only in boards having DRA7 SoCs like dra7-evm, dra72-evm,
+am571x-idk, am572x-idk, am57xx-evm. (Tested only eMMC and SD.
+SDIO support will be added later). The plan is to fully convert DRA7
+SoC to use SDHCI driver and then convert other legacy platforms to use
+SDHCI.
+
+Next Steps:
+*) Add UHS support to sdhci-omap
+*) Add SDIO support
+*) Add support for older TI platforms
+
+Changes from v1:
+*) Remove the quirks and instead use sdhci_omap specific callbacks for
+   set_power, set_busmode etc.
+*) Add a patch from Adrian to tidy reading 136-bit responses
+
+I've also pushed the entire series along with dependent dt patches @
+https://github.com/kishon/linux-wip.git sdhci_omap_v1 (in case someone
+wants to test)
+
+Adrian Hunter (1):
+  mmc: sdhci: Tidy reading 136-bit responses
+
+Kishon Vijay Abraham I (4):
+  mmc: sdhci: Add quirk to indicate MMC_RSP_136 has CRC
+  dt-bindings: ti-omap-hsmmc: Document new compatible for sdhci omap
+  mmc: sdhci-omap: Add OMAP SDHCI driver
+  MAINTAINERS: Add TI OMAP SDHCI Maintainer
+
+ .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   1 +
+ MAINTAINERS                                        |   6 +
+ drivers/mmc/host/Kconfig                           |  12 +
+ drivers/mmc/host/Makefile                          |   1 +
+ drivers/mmc/host/sdhci-omap.c                      | 629 +++++++++++++++++++++
+ drivers/mmc/host/sdhci.c                           |  31 +-
+ drivers/mmc/host/sdhci.h                           |   2 +
+ 7 files changed, 672 insertions(+), 10 deletions(-)
+ create mode 100644 drivers/mmc/host/sdhci-omap.c
+
 -- 
 2.11.0
