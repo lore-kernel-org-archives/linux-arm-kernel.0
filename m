@@ -1,58 +1,54 @@
-From: gabriel.fernandez@st.com (gabriel.fernandez at st.com)
-Date: Mon, 21 Aug 2017 13:59:01 +0200
-Subject: [RESEND PATCH v8 2/3] clk: gate: expose clk_gate_ops::is_enabled
-In-Reply-To: <1503316742-22145-1-git-send-email-gabriel.fernandez@st.com>
-References: <1503316742-22145-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <1503316742-22145-3-git-send-email-gabriel.fernandez@st.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 21 Aug 2017 14:04:01 +0200
+Subject: [RESEND PATCH v5 11/16] arm64: zynqmp: Add generic compatible
+ string for I2C EEPROM
+In-Reply-To: <CABxcv=mOtPDU4RStdrF1EFci65N8sMB1MG4oKZiTXqUTe7GWHA@mail.gmail.com>
+References: <20170615185418.13980-1-javier@dowhile0.org>
+ <20170615185418.13980-12-javier@dowhile0.org>
+ <e64ce8be-599a-5fc5-3194-92aac574173c@xilinx.com>
+ <CABxcv=mOtPDU4RStdrF1EFci65N8sMB1MG4oKZiTXqUTe7GWHA@mail.gmail.com>
+Message-ID: <ae7ec977-4ec8-7dcf-8bc6-27cb8c6bf48d@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@st.com>
+On 21.8.2017 13:27, Javier Martinez Canillas wrote:
+> [snip]
+> 
+>>>
+>>> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+>>> index ef1b9e573af0..53907b7a7fd9 100644
+>>> --- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+>>> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+>>> @@ -55,7 +55,7 @@
+>>>       status = "okay";
+>>>       clock-frequency = <400000>;
+>>>       eeprom at 54 {
+>>> -             compatible = "at,24c64";
+>>> +             compatible = "atmel,24c64";
+>>>               reg = <0x54>;
+>>>       };
+>>>  };
+>>> @@ -64,7 +64,7 @@
+>>>       status = "okay";
+>>>       clock-frequency = <400000>;
+>>>       eeprom at 55 {
+>>> -             compatible = "at,24c64";
+>>> +             compatible = "atmel,24c64";
+>>>               reg = <0x55>;
+>>>       };
+>>>  };
+>>>
+>>
+>> Acked-by: Michal Simek <michal.simek@xilinx.com>
+>>
+> 
+> Any reasons why this patch was never picked? It was acked two months ago.
 
-This patch exposes clk_gate_ops::is_enabled as functions
-that can be directly called and assigned in places like this so
-we don't need wrapper functions that do nothing besides forward
-the call.
+Normally when you send series then it should be applied as the whole
+series not just one piece of that.
 
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/clk-gate.c       | 3 ++-
- include/linux/clk-provider.h | 1 +
- 2 files changed, 3 insertions(+), 1 deletion(-)
+Anyway I see that changes are applied and this one is missing that's why
+I will add to zynqmp/dt branch and going to send pull request today.
 
-diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-index 4e0c054a..dd82485 100644
---- a/drivers/clk/clk-gate.c
-+++ b/drivers/clk/clk-gate.c
-@@ -86,7 +86,7 @@ static void clk_gate_disable(struct clk_hw *hw)
- 	clk_gate_endisable(hw, 0);
- }
- 
--static int clk_gate_is_enabled(struct clk_hw *hw)
-+int clk_gate_is_enabled(struct clk_hw *hw)
- {
- 	u32 reg;
- 	struct clk_gate *gate = to_clk_gate(hw);
-@@ -101,6 +101,7 @@ static int clk_gate_is_enabled(struct clk_hw *hw)
- 
- 	return reg ? 1 : 0;
- }
-+EXPORT_SYMBOL_GPL(clk_gate_is_enabled);
- 
- const struct clk_ops clk_gate_ops = {
- 	.enable = clk_gate_enable,
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index c59c625..e9587ab 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -343,6 +343,7 @@ struct clk_hw *clk_hw_register_gate(struct device *dev, const char *name,
- 		u8 clk_gate_flags, spinlock_t *lock);
- void clk_unregister_gate(struct clk *clk);
- void clk_hw_unregister_gate(struct clk_hw *hw);
-+int clk_gate_is_enabled(struct clk_hw *hw);
- 
- struct clk_div_table {
- 	unsigned int	val;
--- 
-1.9.1
+Thanks,
+Michal
