@@ -1,84 +1,71 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 21 Aug 2017 18:02:52 +0200
-Subject: [PATCH v2 07/16] mmc: meson-gx: rework clk_set function
+Date: Mon, 21 Aug 2017 18:02:50 +0200
+Subject: [PATCH v2 05/16] mmc: meson-gx: cfg init overwrite values
 In-Reply-To: <20170821160301.21899-1-jbrunet@baylibre.com>
 References: <20170821160301.21899-1-jbrunet@baylibre.com>
-Message-ID: <20170821160301.21899-8-jbrunet@baylibre.com>
+Message-ID: <20170821160301.21899-6-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clean-up clk_set function to prepare the next changes (DDR and clk-stop)
+cfg init function overwrite values set in the clk init function
+Remove the cfg pokes from the clk init. Actually, trying to use
+the CLK_AUTO, like initially tried in clk_init, would break
+the card initialization
+
+BEWARE not to poke the cfg register while the divider value in clk
+register is 0. It crashes the SoC.
 
 Reviewed-by: Kevin Hilman <khilman@baylibre.com>
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/mmc/host/meson-gx-mmc.c | 30 +++++++++---------------------
- 1 file changed, 9 insertions(+), 21 deletions(-)
+ drivers/mmc/host/meson-gx-mmc.c | 14 ++++----------
+ 1 file changed, 4 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index 18fff28025d8..8f9ba5190c18 100644
+index a399fbd415f4..61668891b4fc 100644
 --- a/drivers/mmc/host/meson-gx-mmc.c
 +++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -139,7 +139,7 @@ struct meson_host {
- 	struct clk *core_clk;
- 	struct clk_mux mux;
- 	struct clk *mux_clk;
--	unsigned long current_clock;
-+	unsigned long req_rate;
+@@ -337,7 +337,7 @@ static int meson_mmc_clk_init(struct meson_host *host)
+ 	int i, ret = 0;
+ 	const char *mux_parent_names[MUX_CLK_NUM_PARENTS];
+ 	const char *clk_div_parents[1];
+-	u32 clk_reg, cfg;
++	u32 clk_reg;
  
- 	struct clk_divider cfg_div;
- 	struct clk *cfg_div_clk;
-@@ -275,29 +275,18 @@ static int meson_mmc_clk_set(struct meson_host *host, unsigned long clk_rate)
- 	int ret;
- 	u32 cfg;
+ 	/* get the mux parents */
+ 	for (i = 0; i < MUX_CLK_NUM_PARENTS; i++) {
+@@ -403,12 +403,6 @@ static int meson_mmc_clk_init(struct meson_host *host)
+ 	clk_reg &= ~CLK_ALWAYS_ON;
+ 	writel(clk_reg, host->regs + SD_EMMC_CLOCK);
  
--	if (clk_rate) {
--		if (WARN_ON(clk_rate > mmc->f_max))
--			clk_rate = mmc->f_max;
--		else if (WARN_ON(clk_rate < mmc->f_min))
--			clk_rate = mmc->f_min;
--	}
+-	/* Ensure clock starts in "auto" mode, not "always on" */
+-	cfg = readl(host->regs + SD_EMMC_CFG);
+-	cfg &= ~CFG_CLK_ALWAYS_ON;
+-	cfg |= CFG_AUTO_CLK;
+-	writel(cfg, host->regs + SD_EMMC_CFG);
 -
--	if (clk_rate == host->current_clock)
-+	/* Same request - bail-out */
-+	if (host->req_rate == clk_rate)
- 		return 0;
- 
- 	/* stop clock */
- 	cfg = readl(host->regs + SD_EMMC_CFG);
--	if (!(cfg & CFG_STOP_CLOCK)) {
--		cfg |= CFG_STOP_CLOCK;
--		writel(cfg, host->regs + SD_EMMC_CFG);
--	}
--
--	dev_dbg(host->dev, "change clock rate %u -> %lu\n",
--		mmc->actual_clock, clk_rate);
-+	cfg |= CFG_STOP_CLOCK;
-+	writel(cfg, host->regs + SD_EMMC_CFG);
-+	host->req_rate = 0;
- 
- 	if (!clk_rate) {
- 		mmc->actual_clock = 0;
--		host->current_clock = 0;
- 		/* return with clock being stopped */
- 		return 0;
- 	}
-@@ -309,13 +298,12 @@ static int meson_mmc_clk_set(struct meson_host *host, unsigned long clk_rate)
+ 	ret = clk_prepare_enable(host->cfg_div_clk);
+ 	if (ret)
  		return ret;
- 	}
+@@ -958,6 +952,9 @@ static int meson_mmc_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto err_core_clk;
  
-+	host->req_rate = clk_rate;
- 	mmc->actual_clock = clk_get_rate(host->cfg_div_clk);
--	host->current_clock = clk_rate;
++	/* set config to sane default */
++	meson_mmc_cfg_init(host);
++
+ 	/* Stop execution */
+ 	writel(0, host->regs + SD_EMMC_START);
  
-+	dev_dbg(host->dev, "clk rate: %u Hz\n", mmc->actual_clock);
- 	if (clk_rate != mmc->actual_clock)
--		dev_dbg(host->dev,
--			"divider requested rate %lu != actual rate %u\n",
--			clk_rate, mmc->actual_clock);
-+		dev_dbg(host->dev, "requested rate was %lu\n", clk_rate);
+@@ -966,9 +963,6 @@ static int meson_mmc_probe(struct platform_device *pdev)
+ 	writel(IRQ_EN_MASK, host->regs + SD_EMMC_STATUS);
+ 	writel(IRQ_EN_MASK, host->regs + SD_EMMC_IRQ_EN);
  
- 	/* (re)start clock */
- 	cfg = readl(host->regs + SD_EMMC_CFG);
+-	/* set config to sane default */
+-	meson_mmc_cfg_init(host);
+-
+ 	ret = devm_request_threaded_irq(&pdev->dev, irq, meson_mmc_irq,
+ 					meson_mmc_irq_thread, IRQF_SHARED,
+ 					NULL, host);
 -- 
 2.9.5
