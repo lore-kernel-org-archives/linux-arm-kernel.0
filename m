@@ -1,39 +1,43 @@
-From: frank.wang@rock-chips.com (Frank Wang)
-Date: Mon, 21 Aug 2017 16:39:26 +0800
-Subject: [PATCH 1/3] dt-bindings: update dt-binding for rv1108 SoCs
-In-Reply-To: <1503304768-14520-1-git-send-email-frank.wang@rock-chips.com>
-References: <1503304768-14520-1-git-send-email-frank.wang@rock-chips.com>
-Message-ID: <1503304768-14520-2-git-send-email-frank.wang@rock-chips.com>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Mon, 21 Aug 2017 16:44:30 +0800
+Subject: [PATCH] ARM: sun8i: a33: add dts for Q8 tablets with different
+ resolution
+In-Reply-To: <20170821084053.s4qmhlvgsmckmqgh@flea.lan>
+References: <20170817074926.3410-1-icenowy@aosc.io>
+ <20170821084053.s4qmhlvgsmckmqgh@flea.lan>
+Message-ID: <4a0a72b4679db296a8e48512c41a2ce5@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the compatible of GRF and USBGRF for RV1108 SoCs.
+? 2017-08-21 16:40?Maxime Ripard ???
+> On Thu, Aug 17, 2017 at 03:49:26PM +0800, Icenowy Zheng wrote:
+>> Q8 tablets with Allwinner A33 SoC now come with two kind of LCD, 
+>> either
+>> 800x480 or 1024x600.
+>> 
+>> In order for sun4i-drm to be able to choose correct LCD configuration,
+>> two different device trees should be present, one for a resolution.
+>> 
+>> Add stub device trees for two resolutions.
+>> 
+>> As the sun4i-drm driver still has some problems to support the LCDs, 
+>> the
+>> real LCD device nodes are not added to the device tree files.
+>> 
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> 
+> This should be an overlay, ideally applied by the bootloader.
 
-Signed-off-by: Frank Wang <frank.wang@rock-chips.com>
----
- Documentation/devicetree/bindings/soc/rockchip/grf.txt | 3 +++
- 1 file changed, 3 insertions(+)
+I think this is not suitable for overlay.
 
-diff --git a/Documentation/devicetree/bindings/soc/rockchip/grf.txt b/Documentation/devicetree/bindings/soc/rockchip/grf.txt
-index cc9f05d..7dc5ce8 100644
---- a/Documentation/devicetree/bindings/soc/rockchip/grf.txt
-+++ b/Documentation/devicetree/bindings/soc/rockchip/grf.txt
-@@ -21,6 +21,7 @@ Required Properties:
-    - "rockchip,rk3328-grf", "syscon": for rk3328
-    - "rockchip,rk3368-grf", "syscon": for rk3368
-    - "rockchip,rk3399-grf", "syscon": for rk3399
-+   - "rockchip,rv1108-grf", "syscon": for rv1108
- - compatible: PMUGRF should be one of the following:
-    - "rockchip,rk3368-pmugrf", "syscon": for rk3368
-    - "rockchip,rk3399-pmugrf", "syscon": for rk3399
-@@ -28,6 +29,8 @@ Required Properties:
-    - "rockchip,rk3288-sgrf", "syscon": for rk3288
- - compatible: USB2PHYGRF should be one of the followings
-    - "rockchip,rk3328-usb2phy-grf", "syscon": for rk3328
-+- compatible: USBGRF should be one of the following
-+   - "rockchip,rv1108-usbgrf", "syscon": for rv1108
- - reg: physical base address of the controller and length of memory mapped
-   region.
- 
--- 
-2.0.0
+The two kind of Q8 tablets are not compatible at all, and they
+should both have a suitable device tree. The old DT without
+resolution is only kept for backward compatibility.
+
+> 
+> Maxime
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
