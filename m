@@ -1,123 +1,118 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Mon, 21 Aug 2017 11:18:33 +0100
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170821160605.5b1cc019@roar.ozlabs.ibm.com>
-References: <20170731162757.000058ba@huawei.com>
- <20170801184646.GE3730@linux.vnet.ibm.com>
- <20170802172555.0000468a@huawei.com>
- <20170815154743.GK7017@linux.vnet.ibm.com>
- <87wp63smwn.fsf@concordia.ellerman.id.au>
- <20170816125617.GY7017@linux.vnet.ibm.com>
- <20170816162731.GA22978@linux.vnet.ibm.com>
- <20170820144553.2ab2727b@ppc64le>
- <20170820230040.706b62ac@roar.ozlabs.ibm.com>
- <20170820183514.GM11320@linux.vnet.ibm.com>
- <20170820211429.GA27111@linux.vnet.ibm.com>
- <20170821105258.191d04b1@roar.ozlabs.ibm.com>
- <20170821160605.5b1cc019@roar.ozlabs.ibm.com>
-Message-ID: <20170821111833.00006753@huawei.com>
+From: hugues.fruchet@st.com (Hugues FRUCHET)
+Date: Mon, 21 Aug 2017 10:20:25 +0000
+Subject: [PATCH v1 4/5] [media] stm32-dcmi: set default format at open()
+In-Reply-To: <a5a158b3-b502-d220-52bb-8138328c1773@xs4all.nl>
+References: <1501236302-18097-1-git-send-email-hugues.fruchet@st.com>
+ <1501236302-18097-5-git-send-email-hugues.fruchet@st.com>
+ <a5a158b3-b502-d220-52bb-8138328c1773@xs4all.nl>
+Message-ID: <47cc9905-27d8-abec-2e28-f97a073249c9@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Aug 2017 16:06:05 +1000
-Nicholas Piggin <npiggin@gmail.com> wrote:
 
-> On Mon, 21 Aug 2017 10:52:58 +1000
-> Nicholas Piggin <npiggin@gmail.com> wrote:
+
+On 08/04/2017 02:00 PM, Hans Verkuil wrote:
+> On 28/07/17 12:05, Hugues Fruchet wrote:
+>> Ensure that we start with default pixel format and resolution
+>> when opening a new instance.
 > 
-> > On Sun, 20 Aug 2017 14:14:29 -0700
-> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> >   
-> > > On Sun, Aug 20, 2017 at 11:35:14AM -0700, Paul E. McKenney wrote:    
-> > > > On Sun, Aug 20, 2017 at 11:00:40PM +1000, Nicholas Piggin wrote:      
-> > > > > On Sun, 20 Aug 2017 14:45:53 +1000
-> > > > > Nicholas Piggin <npiggin@gmail.com> wrote:
-> > > > >       
-> > > > > > On Wed, 16 Aug 2017 09:27:31 -0700
-> > > > > > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:      
-> > > > > > > On Wed, Aug 16, 2017 at 05:56:17AM -0700, Paul E. McKenney wrote:
-> > > > > > > 
-> > > > > > > Thomas, John, am I misinterpreting the timer trace event messages?        
-> > > > > > 
-> > > > > > So I did some digging, and what you find is that rcu_sched seems to do a
-> > > > > > simple scheudle_timeout(1) and just goes out to lunch for many seconds.
-> > > > > > The process_timeout timer never fires (when it finally does wake after
-> > > > > > one of these events, it usually removes the timer with del_timer_sync).
-> > > > > > 
-> > > > > > So this patch seems to fix it. Testing, comments welcome.      
-> > > > > 
-> > > > > Okay this had a problem of trying to forward the timer from a timer
-> > > > > callback function.
-> > > > > 
-> > > > > This was my other approach which also fixes the RCU warnings, but it's
-> > > > > a little more complex. I reworked it a bit so the mod_timer fast path
-> > > > > hopefully doesn't have much more overhead (actually by reading jiffies
-> > > > > only when needed, it probably saves a load).      
-> > > > 
-> > > > Giving this one a whirl!      
-> > > 
-> > > No joy here, but then again there are other reasons to believe that I
-> > > am seeing a different bug than Dave and Jonathan are.
-> > > 
-> > > OK, not -entirely- without joy -- 10 of 14 runs were error-free, which
-> > > is a good improvement over 0 of 84 for your earlier patch.  ;-)  But
-> > > not statistically different from what I see without either patch.
-> > > 
-> > > But no statistical difference compared to without patch, and I still
-> > > see the "rcu_sched kthread starved" messages.  For whatever it is worth,
-> > > by the way, I also see this: "hrtimer: interrupt took 5712368 ns".
-> > > Hmmm...  I am also seeing that without any of your patches.  Might
-> > > be hypervisor preemption, I guess.    
-> > 
-> > Okay it makes the warnings go away for me, but I'm just booting then
-> > leaving the system idle. You're doing some CPU hotplug activity?  
+> Why? The format is persistent in V4L2 and (re)opening the video device
+> shouldn't change the format.
 > 
-> Okay found a bug in the patch (it was not forwarding properly before
-> adding the first timer after an idle) and a few other concerns.
+> Suppose you use v4l2-ctl to set up a format. E.g. v4l2-ctl -v width=320,height-240.
+> Now run v4l2-ctl -V to get the format and with this code it would suddenly be
+> back to the default!
 > 
-> There's still a problem of a timer function doing a mod timer from
-> within expire_timers. It can't forward the base, which might currently
-> be quite a way behind. I *think* after we close these gaps and get
-> timely wakeups for timers on there, it should not get too far behind
-> for standard timers.
+> You set up the default format in the dcmi_graph_notify_complete, but after that
+> it is only changed if userspace explicitly requests it.
 > 
-> Deferrable is a different story. Firstly it has no idle tracking so we
-> never forward it. Even if we wanted to, we can't do it reliably because
-> it could contain timers way behind the base. They are "deferrable", so
-> you get what you pay for, but this still means there's a window where
-> you can add a deferrable timer and get a far later expiry than you
-> asked for despite the CPU never going idle after you added it.
+> Regards,
 > 
-> All these problems would seem to go away if mod_timer just queued up
-> the timer to a single list on the base then pushed them into the
-> wheel during your wheel processing softirq... Although maybe you end
-> up with excessive passes over big queue of timers. Anyway that
-> wouldn't be suitable for 4.13 even if it could work.
+> 	Hans
 > 
-> I'll send out an updated minimal fix after some more testing...
 
-Hi All,
+Thanks Hans, I didn't catch this before, thanks for explanation.
 
-I'm back in the office with hardware access on our D05 64 core ARM64
-boards.
-
-I think we still have by far the quickest test cases for this so
-feel free to ping me anything you want tested quickly (we were
-looking at an average of less than 10 minutes to trigger
-with machine idling).
-
-Nick, I'm currently running your previous version and we are over an
-hour so even without any instances of the issue so it looks like a
-considerable improvement.  I'll see if I can line a couple of boards
-up for an overnight run if you have your updated version out by then.
-
-Be great to finally put this one to bed.
-
-Thanks,
-
-Jonathan
-
+>>
+>> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
+>> ---
+>>   drivers/media/platform/stm32/stm32-dcmi.c | 49 ++++++++++++++++++-------------
+>>   1 file changed, 28 insertions(+), 21 deletions(-)
+>>
+>> diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
+>> index 4733d1f..2be56b6 100644
+>> --- a/drivers/media/platform/stm32/stm32-dcmi.c
+>> +++ b/drivers/media/platform/stm32/stm32-dcmi.c
+>> @@ -890,6 +890,28 @@ static int dcmi_enum_frameintervals(struct file *file, void *fh,
+>>   	return 0;
+>>   }
+>>   
+>> +static int dcmi_set_default_fmt(struct stm32_dcmi *dcmi)
+>> +{
+>> +	struct v4l2_format f = {
+>> +		.type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
+>> +		.fmt.pix = {
+>> +			.width		= CIF_WIDTH,
+>> +			.height		= CIF_HEIGHT,
+>> +			.field		= V4L2_FIELD_NONE,
+>> +			.pixelformat	= dcmi->sd_formats[0]->fourcc,
+>> +		},
+>> +	};
+>> +	int ret;
+>> +
+>> +	ret = dcmi_try_fmt(dcmi, &f, NULL);
+>> +	if (ret)
+>> +		return ret;
+>> +	dcmi->sd_format = dcmi->sd_formats[0];
+>> +	dcmi->fmt = f;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>   static const struct of_device_id stm32_dcmi_of_match[] = {
+>>   	{ .compatible = "st,stm32-dcmi"},
+>>   	{ /* end node */ },
+>> @@ -916,7 +938,13 @@ static int dcmi_open(struct file *file)
+>>   	if (ret < 0 && ret != -ENOIOCTLCMD)
+>>   		goto fh_rel;
+>>   
+>> +	ret = dcmi_set_default_fmt(dcmi);
+>> +	if (ret)
+>> +		goto power_off;
+>> +
+>>   	ret = dcmi_set_fmt(dcmi, &dcmi->fmt);
+>> +
+>> +power_off:
+>>   	if (ret)
+>>   		v4l2_subdev_call(sd, core, s_power, 0);
+>>   fh_rel:
+>> @@ -991,27 +1019,6 @@ static int dcmi_release(struct file *file)
+>>   	.read		= vb2_fop_read,
+>>   };
+>>   
+>> -static int dcmi_set_default_fmt(struct stm32_dcmi *dcmi)
+>> -{
+>> -	struct v4l2_format f = {
+>> -		.type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
+>> -		.fmt.pix = {
+>> -			.width		= CIF_WIDTH,
+>> -			.height		= CIF_HEIGHT,
+>> -			.field		= V4L2_FIELD_NONE,
+>> -			.pixelformat	= dcmi->sd_formats[0]->fourcc,
+>> -		},
+>> -	};
+>> -	int ret;
+>> -
+>> -	ret = dcmi_try_fmt(dcmi, &f, NULL);
+>> -	if (ret)
+>> -		return ret;
+>> -	dcmi->sd_format = dcmi->sd_formats[0];
+>> -	dcmi->fmt = f;
+>> -	return 0;
+>> -}
+>> -
+>>   static const struct dcmi_format dcmi_formats[] = {
+>>   	{
+>>   		.fourcc = V4L2_PIX_FMT_RGB565,
+>>
 > 
-> Thanks,
-> Nick
