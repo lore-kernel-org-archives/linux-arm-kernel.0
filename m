@@ -1,77 +1,98 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 21 Aug 2017 14:56:54 +0100
-Subject: [PATCH 06/27] arm64/sve: System register and exception syndrome
- definitions
-In-Reply-To: <87a82t5kos.fsf@linaro.org>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-7-git-send-email-Dave.Martin@arm.com>
- <87a82t5kos.fsf@linaro.org>
-Message-ID: <20170821135654.GP6321@e103592.cambridge.arm.com>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Mon, 21 Aug 2017 19:29:30 +0530
+Subject: [PATCH] ARM: mmp: make matrix_keymap_data const
+Message-ID: <1503323970-31939-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 21, 2017 at 10:33:55AM +0100, Alex Benn?e wrote:
-> 
-> Dave Martin <Dave.Martin@arm.com> writes:
-> 
-> > The SVE architecture adds some system registers, ID register fields
-> > and a dedicated ESR exception class.
-> >
-> > This patch adds the appropriate definitions that will be needed by
-> > the kernel.
-> >
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > ---
-> >  arch/arm64/include/asm/esr.h     |  3 ++-
-> >  arch/arm64/include/asm/kvm_arm.h |  1 +
-> >  arch/arm64/include/asm/sysreg.h  | 16 ++++++++++++++++
-> >  arch/arm64/kernel/traps.c        |  1 +
-> >  4 files changed, 20 insertions(+), 1 deletion(-)
+Make these const as they are only stored in the matrix_keymap_data field
+of a pxa27x_keypad_platform_data structure, which is const.
+Done using Coccinelle:
 
-[...]
+@match disable optional_qualifier@
+identifier s;
+@@
+static struct matrix_keymap_data s = {...};
 
-> > diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> > index 248339e..2d259e8 100644
-> > --- a/arch/arm64/include/asm/sysreg.h
-> > +++ b/arch/arm64/include/asm/sysreg.h
+@ref@
+position p;
+identifier match.s;
+@@
+s at p
 
-[...]
+@good1@
+identifier y;
+position ref.p;
+identifier match.s;
+@@
+struct matrix_keypad_platform_data y = {...,.keymap_data=&s at p,...};
 
-> > +#define SYS_ZCR_EL1			sys_reg(3, 0, 1, 2, 0)
-> > +
-> 
-> I'll have to take these on trust. They are mentioned in both the ARM ARM
-> and the SVE supplement but I can't see any actual definitions of them.
+@good2@
+struct matrix_keypad_platform_data y;
+identifier match.s;
+position ref.p;
+@@
+y.keymap_data = &s at p
 
-[I note from subsequent replies you've now found this in the
-accompanying HTML]
+@good3@
+identifier y;
+position ref.p;
+identifier match.s;
+@@
+struct pxa27x_keypad_platform_data y =
+{...,.matrix_keymap_data=&s at p,...};
 
-[...]
+@good4@
+struct pxa27x_keypad_platform_data y;
+identifier match.s;
+position ref.p;
+@@
+y.matrix_keymap_data = &s at p
 
-> > +#define CPACR_EL1_ZEN_EL1EN	(1 << 16)
-> > +#define CPACR_EL1_ZEN_EL0EN	(1 << 17)
-> > +#define CPACR_EL1_ZEN		(CPACR_EL1_ZEN_EL1EN |
-> > CPACR_EL1_ZEN_EL0EN)
-> 
-> This is a little weird as it is a 2 bit field in which 00 and 11 are not
-> simply the sum of their bits. If the code wrote CPACR_EL1_ZEN_EL0EN |
-> CPACR_EL1_ZEN_EL1EN to the CPACR_EL1 you wouldn't get the expected behaviour.
+@bad depends on  !good1 && !good2 && !good3 && !good4@
+position ref.p;
+identifier match.s;
+@@
+s at p
 
-This seemed natural-ish if you believe that disabling at EL1 implies
-disabling at EL0.  This is consistent with the way the traps at EL2/3
-work, and lack of this property would be a sort of privilege inversion.
+@depends on forall !bad disable optional_qualifier@
+identifier match.s;
+@@
+static
++ const
+struct matrix_keymap_data s;
 
-The meanings of the bits are not orthogonal, but it's still useful to be
-able to twiddle EL0EN by itself when EL1EN is set (since we wan't to
-control access for EL0 but leave EL1 access enabled).
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
+ arch/arm/mach-mmp/aspenite.c  | 2 +-
+ arch/arm/mach-mmp/teton_bga.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Maybe comments would be sufficient:
-
-#define CPACR_EL1_ZEN_EL1EN ... /* enable EL1 access */
-#define CPACR_EL1_ZEN_EL0EN ... /* enable EL0 access, if EL1EN is also set */
-
-I'm not sure how to make the names both reasonably terse and self-
-escribing, but I'm open to ideas.
-
-Cheers
----Dave
+diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
+index 5db0edf..a285951 100644
+--- a/arch/arm/mach-mmp/aspenite.c
++++ b/arch/arm/mach-mmp/aspenite.c
+@@ -219,7 +219,7 @@ struct pxa168fb_mach_info aspenite_lcd_info = {
+ 	KEY(4, 7, KEY_ESC),	/* SW 9 */
+ };
+ 
+-static struct matrix_keymap_data aspenite_matrix_keymap_data = {
++static const struct matrix_keymap_data aspenite_matrix_keymap_data = {
+ 	.keymap			= aspenite_matrix_key_map,
+ 	.keymap_size		= ARRAY_SIZE(aspenite_matrix_key_map),
+ };
+diff --git a/arch/arm/mach-mmp/teton_bga.c b/arch/arm/mach-mmp/teton_bga.c
+index cf038eb..d16010d 100644
+--- a/arch/arm/mach-mmp/teton_bga.c
++++ b/arch/arm/mach-mmp/teton_bga.c
+@@ -61,7 +61,7 @@
+ 	KEY(1, 7, KEY_RIGHT),
+ };
+ 
+-static struct matrix_keymap_data teton_bga_matrix_keymap_data = {
++static const struct matrix_keymap_data teton_bga_matrix_keymap_data = {
+ 	.keymap			= teton_bga_matrix_key_map,
+ 	.keymap_size		= ARRAY_SIZE(teton_bga_matrix_key_map),
+ };
+-- 
+1.9.1
