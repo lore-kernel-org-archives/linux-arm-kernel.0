@@ -1,22 +1,69 @@
-From: illusionist.neo@gmail.com (Shubham Bansal)
-Date: Mon, 21 Aug 2017 03:46:05 +0530
-Subject: [PATCH net-next v3] arm: eBPF JIT compiler
-In-Reply-To: <599A0961.3010300@iogearbox.net>
-References: <1503134429-29063-1-git-send-email-illusionist.neo@gmail.com>
- <599A0961.3010300@iogearbox.net>
-Message-ID: <CAHgaXdKFtv9GUWJZBpTkbq807a+=rJRJ+fk3rKqPW1Jhjert3A@mail.gmail.com>
+From: npiggin@gmail.com (Nicholas Piggin)
+Date: Mon, 21 Aug 2017 10:52:58 +1000
+Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
+ else seeing this?
+In-Reply-To: <20170820211429.GA27111@linux.vnet.ibm.com>
+References: <20170731162757.000058ba@huawei.com>
+ <20170801184646.GE3730@linux.vnet.ibm.com>
+ <20170802172555.0000468a@huawei.com>
+ <20170815154743.GK7017@linux.vnet.ibm.com>
+ <87wp63smwn.fsf@concordia.ellerman.id.au>
+ <20170816125617.GY7017@linux.vnet.ibm.com>
+ <20170816162731.GA22978@linux.vnet.ibm.com>
+ <20170820144553.2ab2727b@ppc64le>
+ <20170820230040.706b62ac@roar.ozlabs.ibm.com>
+ <20170820183514.GM11320@linux.vnet.ibm.com>
+ <20170820211429.GA27111@linux.vnet.ibm.com>
+Message-ID: <20170821105258.191d04b1@roar.ozlabs.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> With the below #ifdef __LITTLE_ENDIAN spanning the entire
-> bpf_int_jit_compile(), a user can then enable and compile
-> eBPF JIT for big endian, even set the bpf_jit_enable to 1
-> to turn it on, but it won't JIT anything, which is contrary
-> to the expectation.
->
-> This should rather be a hard dependency in the Kconfig, if
-> I got it correctly, expressed as e.g.
->
->         select HAVE_EBPF_JIT if !CPU_ENDIAN_BE32
+On Sun, 20 Aug 2017 14:14:29 -0700
+"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
 
-Will do it. That's a good catch. Thanks Daniel.
+> On Sun, Aug 20, 2017 at 11:35:14AM -0700, Paul E. McKenney wrote:
+> > On Sun, Aug 20, 2017 at 11:00:40PM +1000, Nicholas Piggin wrote:  
+> > > On Sun, 20 Aug 2017 14:45:53 +1000
+> > > Nicholas Piggin <npiggin@gmail.com> wrote:
+> > >   
+> > > > On Wed, 16 Aug 2017 09:27:31 -0700
+> > > > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:  
+> > > > > On Wed, Aug 16, 2017 at 05:56:17AM -0700, Paul E. McKenney wrote:
+> > > > > 
+> > > > > Thomas, John, am I misinterpreting the timer trace event messages?    
+> > > > 
+> > > > So I did some digging, and what you find is that rcu_sched seems to do a
+> > > > simple scheudle_timeout(1) and just goes out to lunch for many seconds.
+> > > > The process_timeout timer never fires (when it finally does wake after
+> > > > one of these events, it usually removes the timer with del_timer_sync).
+> > > > 
+> > > > So this patch seems to fix it. Testing, comments welcome.  
+> > > 
+> > > Okay this had a problem of trying to forward the timer from a timer
+> > > callback function.
+> > > 
+> > > This was my other approach which also fixes the RCU warnings, but it's
+> > > a little more complex. I reworked it a bit so the mod_timer fast path
+> > > hopefully doesn't have much more overhead (actually by reading jiffies
+> > > only when needed, it probably saves a load).  
+> > 
+> > Giving this one a whirl!  
+> 
+> No joy here, but then again there are other reasons to believe that I
+> am seeing a different bug than Dave and Jonathan are.
+> 
+> OK, not -entirely- without joy -- 10 of 14 runs were error-free, which
+> is a good improvement over 0 of 84 for your earlier patch.  ;-)  But
+> not statistically different from what I see without either patch.
+> 
+> But no statistical difference compared to without patch, and I still
+> see the "rcu_sched kthread starved" messages.  For whatever it is worth,
+> by the way, I also see this: "hrtimer: interrupt took 5712368 ns".
+> Hmmm...  I am also seeing that without any of your patches.  Might
+> be hypervisor preemption, I guess.
+
+Okay it makes the warnings go away for me, but I'm just booting then
+leaving the system idle. You're doing some CPU hotplug activity?
+
+Thanks,
+Nick
