@@ -1,84 +1,42 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 21 Aug 2017 10:02:55 -0400
-Subject: [PATCH v11 1/4] PCI: Don't ignore valid response before CRS
- timeout
-In-Reply-To: <20170818213203.15145.36487.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170818212310.15145.21732.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20170818213203.15145.36487.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <f7127748-24cd-37bd-544a-8cba6bf5906d@codeaurora.org>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 21 Aug 2017 16:04:14 +0200
+Subject: [PATCH 1/2] video: fbdev: Fix multiple style issues in xilinxfb
+In-Reply-To: <b07b143769ed5dccf44e9de4cb0d5c6203b3eca0.1502179820.git.michal.simek@xilinx.com>
+References: <CGME20170808081042epcas4p3b6787c3895bec41cb37aa4ae868adb45@epcas4p3.samsung.com>
+ <b07b143769ed5dccf44e9de4cb0d5c6203b3eca0.1502179820.git.michal.simek@xilinx.com>
+Message-ID: <2014067.suSortcy05@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/18/2017 5:32 PM, Bjorn Helgaas wrote:
-> While waiting for a device to become ready (i.e., to return a non-CRS
-> completion to a read of its Vendor ID), if we got a valid response to the
-> very last read before timing out, we printed a warning and gave up on the
-> device even though it was actually ready.
+On Tuesday, August 08, 2017 10:10:25 AM Michal Simek wrote:
+> From: Hyun Kwon <hyun.kwon@xilinx.com>
 > 
-> For a typical 60s timeout, we wait about 65s (it's not exact because of the
-> exponential backoff), but we treated devices that became ready between 33s
-> and 65s as though they failed.
+> All reported by from checkpatch
+> ./scripts/checkpatch.pl --max-line-length 120 -strict -f
+> drivers/video/fbdev/xilinxfb.c
 > 
-> Move the Device ID read later so we check whether the device is ready
-> immediately, before checking for a timeout.
+> WARNING: Block comments should align the * on each line
+> WARNING: Block comments use a trailing */ on a separate line
+> WARNING: Block comments use * on subsequent lines
+> WARNING: please, no space before tabs
+> WARNING: Prefer 'unsigned int' to bare use of 'unsigned'
+> WARNING: braces {} are not necessary for single statement blocks
+> WARNING: Missing a blank line after declarations
+> WARNING: struct of_device_id should normally be const
+> CHECK: Please don't use multiple blank lines
+> CHECK: Blank lines aren't necessary after an open brace '{'
+> CHECK: Alignment should match open parenthesis
+> CHECK: 'Endianess' may be misspelled - perhaps 'Endianness'?
+> CHECK: spaces preferred around that '*' (ctx:VxV)
+> ERROR: that open brace { should be on the previous line
 > 
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> ---
->  drivers/pci/probe.c |    7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index c31310db0404..08ea844ac4ba 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1849,15 +1849,16 @@ bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
->  
->  		msleep(delay);
->  		delay *= 2;
-> -		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
-> -			return false;
-> -		/* Card hasn't responded in 60 seconds?  Must be stuck. */
-> +
+> Signed-off-by: Hyun Kwon <hyun.kwon@xilinx.com>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 
-There is still a problem here. We'll wait some time above and return without checking if
-we actually found the card or not.
-
->  		if (delay > crs_timeout) {
->  			printk(KERN_WARNING "pci %04x:%02x:%02x.%d: not responding\n",
->  			       pci_domain_nr(bus), bus->number, PCI_SLOT(devfn),
->  			       PCI_FUNC(devfn));
->  			return false;
->  		}
-> +
-> +		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
-> +			return false;
->  	}
->  
->  	return true;
-> 
-> 
-
-Here is another shot at it. Sorry, I don't have a diff syntax. I made up the function
-by copy paste.
-
-	while ((*l & 0xffff) == 0x0001) {
-		if (!crs_timeout)
-			return false;
+Patch queued for 4.14, thanks.
  
-		/* Card hasn't responded in 60 seconds?  Must be stuck. */
-		if (delay > crs_timeout) {
-			printk(KERN_WARNING "pci %04x:%02x:%02x.%d: not responding\n",
-			       pci_domain_nr(bus), bus->number, PCI_SLOT(devfn),
-			       PCI_FUNC(devfn));
-			return false;
-		} 
-		msleep(delay);
-		delay *= 2;
-		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
-			return false; 
-	}
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
