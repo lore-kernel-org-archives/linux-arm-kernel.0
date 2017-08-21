@@ -1,83 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 21 Aug 2017 20:29:07 +0100
-Subject: [PATCH 3/3] dt-bindings: designware: add binding for Designware PCIe
- in ECAM mode
-In-Reply-To: <20170821192907.8695-1-ard.biesheuvel@linaro.org>
-References: <20170821192907.8695-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170821192907.8695-4-ard.biesheuvel@linaro.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 21 Aug 2017 15:37:06 -0400
+Subject: [PATCH v11 2/4] PCI: Factor out pci_bus_wait_crs()
+In-Reply-To: <20170821191806.GC28977@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170818212310.15145.21732.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20170818213210.15145.15340.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <9cb3006d-31d0-e57a-fd3e-c32914e8ba42@codeaurora.org>
+ <20170821191806.GC28977@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <eca38319-9e78-1a9c-b275-43944fd0a63d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the binding for firmware-configured instances of the Synopsys
-Designware PCIe controller in RC mode.
+On 8/21/2017 3:18 PM, Bjorn Helgaas wrote:
+>> pci_bus_read_dev_vendor_id()
+>> {
+>> 	...
+>> 	if (pci_bus_crs_visibility_supported())
+>> 		return pci_bus_wait_crs(dev->bus, dev->devfn, &id, 60000);
+>>
+>> 	return true
+>> }
+>>
+>> Similar pattern for pci_flr_wait().
 
-Cc: Rob Herring <robh@kernel.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- Documentation/devicetree/bindings/pci/designware-pcie-ecam.txt | 56 ++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+Sorry for the poor choice of function name. 
 
-diff --git a/Documentation/devicetree/bindings/pci/designware-pcie-ecam.txt b/Documentation/devicetree/bindings/pci/designware-pcie-ecam.txt
-new file mode 100644
-index 000000000000..b8127b19c220
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/designware-pcie-ecam.txt
-@@ -0,0 +1,56 @@
-+* Synopsys Designware PCIe root complex in ECAM mode
-+
-+In some cases, firmware may already have configured the Synopsys Designware
-+PCIe controller in RC mode with static ATU window mappings that cover all
-+config, MMIO and I/O spaces in a [mostly] ECAM compatible fashion.
-+In this case, there is no need for the OS to perform any low level setup
-+of clocks or device registers, nor is there any reason for the driver to
-+reconfigure ATU windows for config and/or IO space accesses at runtime.
-+
-+Such hardware configurations should be described as "pci-host-ecam-generic"
-+if they are truly ECAM compatible. Configurations that require no low-level
-+setup by the OS nor any ATU window reconfiguration at runtime, but do
-+require special handling for type 0 config TLPs may instead be described as
-+"snps,dw-pcie-ecam".
-+
-+Required properties:
-+- compatible: should contain "snps,dw-pcie-ecam".
-+
-+Please refer to the binding document of "pci-host-ecam-generic" in the
-+file host-generic-pci.txt for a description of the remaining required
-+and optional properties.
-+
-+
-+* MSI support for Synopsys Designware PCIe root complex in ECAM mode
-+
-+Platforms that elect to perform all configuration of the RC in firmware
-+and use the "pci-host-ecam-generic" or "snps,dw-pcie-ecam" binding to
-+describe it to the OS may include a separate description of the embedded
-+MSI controller in case no MSI support is available in the core interrupt
-+controller.
-+
-+Required properties:
-+- compatible:      should contain "snps,dw-pcie-msi".
-+- reg:             a single region describing the device registers.
-+- interrupts:      interrupt specifier for the interrupt that is asserted when
-+                   an MSI is received by the RC.
-+- msi-controller:  empty property identifying this device as an MSI controller.
-+
-+Example for an implementation that routes all legacy INTx interrupts via SPI
-+#188 and all MSI interrupts via SPI #190:
-+
-+  pcie at 20000000 {
-+    compatible = "snps,dw-pcie-ecam";
-+    device_type = "pci";
-+    msi-parent = <&msi0>;
-+    interrupt-map-mask = <0x0 0x0 0x0 0x0>;
-+    interrupt-map = <0x0 0x0 0x0 0x0 &gic GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
-+    ...
-+  };
-+
-+  msi0: msi at 10000000 {
-+    compatible = "snps,dw-pcie-msi";
-+    reg = <0x0 0x10000000 0x0 0x10000>;
-+    interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
-+    msi-controller;
-+  };
+I was thinking of something like this.
+
+bool pci_bus_crs_pending(u32 l)
+{
+	return (l & 0xFFFF) == 0x0001
+}
+
+if (pci_bus_crs_pending(id))
+	return pci_bus_wait_crs(dev->bus, dev->devfn, &id, 60000);
+
+> I think that makes sense.  We'd want to check for CRS SV being
+> enabled, e.g., maybe read PCI_EXP_RTCTL_CRSSVE back in
+> pci_enable_crs() and cache it somewhere.  Maybe a crs_sv_enabled bit
+> in the root port's pci_dev, and check it with something like what
+> pcie_root_rcb_set() does?
+> 
+
+You can observe CRS under the following conditions
+
+1. root port <-> endpoint 
+2. bridge <-> endpoint 
+3. root port<->bridge
+
+I was relying on the fact that we are reading 0x001 as an indication that
+this device detected CRS. Maybe, this is too indirect.
+
+If we also want to capture the capability, I think the right thing is to
+check the parent capability.
+
+bool pci_bus_crs_vis_supported(struct pci_dev *bridge)
+{
+	if (device type(bridge) == root port)
+		return read(root_crs_register_reg);
+
+	if (device type(bridge) == switch)
+		return read(switch_crs_register);
+
+	return false;
+}
+
+bool pci_bus_crs_pending(struct pci_dev *dev, u32 l)
+{
+	if !pci_bus_crs_vis_supported(dev->parent)
+		return false;
+
+	return (l & 0xFFFF) == 0x0001;
+}
+
+I'll prototype this. Let me know if you have concerns.
+
 -- 
-2.11.0
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
