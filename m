@@ -1,43 +1,33 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 21 Aug 2017 11:06:13 +0200
-Subject: [PATCH v2 0/4] ARM: dts: rcar-gen2: Stop grouping clocks under a
- "clocks" subnode
-In-Reply-To: <1503047817-29439-1-git-send-email-geert+renesas@glider.be>
-References: <1503047817-29439-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170821090613.GF14174@verge.net.au>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 21 Aug 2017 14:39:56 +0530
+Subject: [PATCH v2 2/3] i2c: davinci: Add PM Runtime Support
+In-Reply-To: <20170817162427.izbfsa7xatjxb2aw@ninjato>
+References: <20170816221715.15027-1-fcooper@ti.com>
+ <20170816221715.15027-3-fcooper@ti.com>
+ <20170817162427.izbfsa7xatjxb2aw@ninjato>
+Message-ID: <3996b44e-68cd-0a19-c685-64f6345cdf88@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 11:16:53AM +0200, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus,
-> 
-> The current practice is to not group clocks under a "clocks" subnode,
-> but just put them together with the other on-SoC devices.
-> 
-> Hence this patch series implements this for the various R-Car Gen2
-> DTSes that still need this (r8a7792.dtsi is OK).
-> 
-> Changes compared to v1:
->   - Rebased.
-> 
-> Dependencies:
->   - renesas-devel-20170818-v4.13-rc5,
->   - Patch series "[PATCH v2 0/5] ARM: dts: rcar-gen2: Convert to new
->     CPG/MSSR bindings".
-> 
-> For your convenience, this series is also available in the
-> topic/rcar2-cpg-mssr-dt-v2 branch of my renesas-drivers git repository at
-> git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
-> 
-> Thanks for applying!
-> 
-> Geert Uytterhoeven (4):
->   ARM: dts: r8a7790: Stop grouping clocks under a "clocks" subnode
->   ARM: dts: r8a7791: Stop grouping clocks under a "clocks" subnode
->   ARM: dts: r8a7793: Stop grouping clocks under a "clocks" subnode
->   ARM: dts: r8a7794: Stop grouping clocks under a "clocks" subnode
+Hi Wolfram,
 
-Thanks. r8a779[034] patches applied for v4.15.
+On Thursday 17 August 2017 09:54 PM, Wolfram Sang wrote:
+> On Wed, Aug 16, 2017 at 05:17:14PM -0500, Franklin S Cooper Jr wrote:
+>> 66AK2G has I2C instances that are not apart of the ALWAYS_ON power domain
+>> like other Keystone 2 SoCs and OMAPL138. Therefore, pm_runtime
+>> is required to insure the power domain used by the specific I2C instance is
+>> properly turned on along with its functional clock.
+>>
+>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> 
+> I'd need a review from the driver maintainers here. Which are Sekhar
+> Nori and Kevin Hilman(?) according to MAINTAINERS. Is that still
+> correct?
 
-The r8a7791 patch did not apply cleanly for some reason.
-Could you rebase and repost once I have pushed today's devel branch?
+I just finished the review (sent the comments). Thanks for the reminder!
+
+Also, tested the patches using i2cdetect and suspend/resume on OMAP-L138
+LCDK board.
+
+Regards,
+Sekhar
