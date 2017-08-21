@@ -1,79 +1,38 @@
-From: kevin.wangtao@hisilicon.com (Wangtao (Kevin, Kirin))
-Date: Mon, 21 Aug 2017 10:17:48 +0800
-Subject: [PATCH v3 1/3] dt-bindings: Document the hi3660 thermal sensor
- bindings
-In-Reply-To: <20170817141517.izhteflvfwtoovqv@rob-hp-laptop>
-References: <1498102923-68481-1-git-send-email-kevin.wangtao@hisilicon.com>
- <1502353935-92924-1-git-send-email-kevin.wangtao@hisilicon.com>
- <1502353935-92924-2-git-send-email-kevin.wangtao@hisilicon.com>
- <20170817141517.izhteflvfwtoovqv@rob-hp-laptop>
-Message-ID: <e313015d-11d5-91b8-aa64-37e9410cb882@hisilicon.com>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Mon, 21 Aug 2017 10:30:26 +0800
+Subject: [PATCH v1 1/3] clk: rockchip: add rv1108 ACLK_GAMC and PCLK_GMAC ID
+In-Reply-To: <1503282628-23542-1-git-send-email-zhangqing@rock-chips.com>
+References: <1503282628-23542-1-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1503282628-23542-2-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch exports gmac aclk and pclk for dts reference.
 
+Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
+---
+ include/dt-bindings/clock/rv1108-cru.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-? 2017/8/17 23:10, Rob Herring ??:
-> On Thu, Aug 10, 2017 at 04:32:13PM +0800, Tao Wang wrote:
->> From: Tao Wang <kevin.wangtao@linaro.org>
->>
->> This adds documentation of device tree bindings for the
->> thermal sensor controller of hi3660 SoC.
->>
->> Signed-off-by: Tao Wang <kevin.wangtao@linaro.org>
->> ---
->>   .../devicetree/bindings/thermal/hisi-tsensor.txt   | 23 ++++++++++++++++++++++
->>   1 file changed, 23 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
->>
->> diff --git a/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt b/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
->> new file mode 100644
->> index 0000000..2ab0eb9
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
->> @@ -0,0 +1,23 @@
->> +* Temperature Sensor on hisilicon SoC
->> +
->> +** Required properties :
->> +
->> +- compatible: "hisilicon,thermal-tsensor".
-> 
-> Needs an SoC specific compatible.
-OK
-> 
->> +- reg: physical base address of thermal sensor and length of memory mapped
->> +  region.
->> +- offset: reg offset of each sensor.
-> 
-> Should be implied by the compatible.
-Do you mean that the reg offset should not in dts?
-> 
->> +- coefficients:	An array of integers (one signed cell) containing
->> +		coefficients to turn adc value to temperture.
-> 
-> Needs a vendor prefix.
-OK
-> 
->> +- hisi,adc-range: adc value range, minimum value is followed by maximum value.
->> +- #thermal-sensor-cells: Should be 1. See ./thermal.txt for a description.
->> +
->> +Example :
->> +
->> +tsensor: tsensor at FFF3000 {
->> +	compatible = "hisilicon,tsensor";
->> +	reg = <0x0 0xfff30000 0x0 0x1000>;
->> +	offset = <0x1c 0x5c 0x9c>;
->> +	coefficients = <165000 (-40000)>;
->> +	hisi,adc-range = <0x74 0x39A>;
->> +	#thermal-sensor-cells = <1>;
->> +};
->> -- 
->> 2.8.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> .
-> 
+diff --git a/include/dt-bindings/clock/rv1108-cru.h b/include/dt-bindings/clock/rv1108-cru.h
+index f269d833e41a..2239ae2a19b9 100644
+--- a/include/dt-bindings/clock/rv1108-cru.h
++++ b/include/dt-bindings/clock/rv1108-cru.h
+@@ -110,6 +110,7 @@
+ #define ACLK_CIF2			207
+ #define ACLK_CIF3			208
+ #define ACLK_PERI			209
++#define ACLK_GMAC			210
+ 
+ /* pclk gates */
+ #define PCLK_GPIO1			256
+@@ -141,6 +142,7 @@
+ #define PCLK_EFUSE0			282
+ #define PCLK_EFUSE1			283
+ #define PCLK_WDT			284
++#define PCLK_GMAC			285
+ 
+ /* hclk gates */
+ #define HCLK_I2S0_8CH			320
+-- 
+1.9.1
