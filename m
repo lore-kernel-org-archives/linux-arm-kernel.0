@@ -1,45 +1,22 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Mon, 21 Aug 2017 09:47:36 +0000
-Subject: [PATCH ] mmc: renesas_sdhi: Add r8a7743/5 support
-In-Reply-To: <20170821082523.GA2418@katana>
-References: <1502710766-44361-1-git-send-email-biju.das@bp.renesas.com>
- <20170821082523.GA2418@katana>
-Message-ID: <KL1PR06MB1702E32A5BF249BC5D5FB767B8870@KL1PR06MB1702.apcprd06.prod.outlook.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 21 Aug 2017 11:48:13 +0200
+Subject: [PATCH v4 7/8] ARM: dts: rockchip: add pmic rk805 dt node for
+ rv1108 evb
+In-Reply-To: <1502700221-8792-1-git-send-email-andy.yan@rock-chips.com>
+References: <1502699477-8063-1-git-send-email-andy.yan@rock-chips.com>
+ <1502700221-8792-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <2749560.3r9KG54GLu@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Montag, 14. August 2017, 16:43:41 CEST schrieb Andy Yan:
+> RK805 is used as the voltage regulator on rv1108 evaluation
+> board. Add device tree node for it.
+> 
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+
+applied for 4.14
 
 
-> -----Original Message-----
-> From: Wolfram Sang [mailto:wsa at the-dreams.de]
-> Sent: 21 August 2017 09:25
-> To: Biju Das <biju.das@bp.renesas.com>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>; Rob Herring <robh+dt@kernel.org>;
-> Mark Rutland <mark.rutland@arm.com>; Simon Horman
-> <horms@verge.net.au>; Magnus Damm <magnus.damm@gmail.com>; Chris
-> Paterson <Chris.Paterson2@renesas.com>; Wolfram Sang
-> <wsa+renesas@sang-engineering.com>; devicetree at vger.kernel.org; linux-
-> renesas-soc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> mmc at vger.kernel.org
-> Subject: Re: [PATCH ] mmc: renesas_sdhi: Add r8a7743/5 support
->
->
-> >    Below is the number clocks for each supported SoC:
-> > -   1: SH73A0, R8A73A4, R8A7740, R8A7778, R8A7779, R8A7790
-> > -      R8A7791, R8A7792, R8A7793, R8A7794, R8A7795, R8A7796
-> > +   1: SH73A0, R8A73A4, R8A7740, R8A7743, R8A7745, R8A7778,
-> R8A7779,
-> > +      R8A7790, R8A7791, R8A7792, R8A7793, R8A7794, R8A7795,
-> R8A7796
-> >     2: R7S72100
->
-> Hmm, maybe we should convert this to only listing SoCs with two clocks?
-> That will be easier to maintaine since the majority seems to have one.
-
-Ok. I will send v2 with the suggested  changes.
-
-
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+Thanks
+Heiko
