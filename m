@@ -1,46 +1,36 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 21 Aug 2017 13:27:53 +0200
-Subject: [RESEND PATCH v5 11/16] arm64: zynqmp: Add generic compatible
- string for I2C EEPROM
-In-Reply-To: <e64ce8be-599a-5fc5-3194-92aac574173c@xilinx.com>
-References: <20170615185418.13980-1-javier@dowhile0.org>
- <20170615185418.13980-12-javier@dowhile0.org>
- <e64ce8be-599a-5fc5-3194-92aac574173c@xilinx.com>
-Message-ID: <CABxcv=mOtPDU4RStdrF1EFci65N8sMB1MG4oKZiTXqUTe7GWHA@mail.gmail.com>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Mon, 21 Aug 2017 19:29:00 +0800
+Subject: [PATCH v3 2/7] pwm: rockchip: Remove the judge from return value
+ of pwm_config
+In-Reply-To: <20170818162830.GA115593@google.com>
+References: <1502206715-24174-1-git-send-email-david.wu@rock-chips.com>
+ <1502206715-24174-3-git-send-email-david.wu@rock-chips.com>
+ <20170818153255.GC18307@ulmo> <20170818162830.GA115593@google.com>
+Message-ID: <1f3bda8e-3130-efeb-92f4-f6c57944b1f3@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[snip]
+Hi Thierry,
 
->>
->> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
->> index ef1b9e573af0..53907b7a7fd9 100644
->> --- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
->> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
->> @@ -55,7 +55,7 @@
->>       status = "okay";
->>       clock-frequency = <400000>;
->>       eeprom at 54 {
->> -             compatible = "at,24c64";
->> +             compatible = "atmel,24c64";
->>               reg = <0x54>;
->>       };
->>  };
->> @@ -64,7 +64,7 @@
->>       status = "okay";
->>       clock-frequency = <400000>;
->>       eeprom at 55 {
->> -             compatible = "at,24c64";
->> +             compatible = "atmel,24c64";
->>               reg = <0x55>;
->>       };
->>  };
->>
->
-> Acked-by: Michal Simek <michal.simek@xilinx.com>
->
+? 2017/8/19 0:28, Brian Norris ??:
+> On Fri, Aug 18, 2017 at 05:32:55PM +0200, Thierry Reding wrote:
+>> I don't understand what the "judge" is supposed to be, but I've applied
+>> this to for-4.14/drivers anyway. Thanks.
+> 
+> Probably just an artifact of non-native English.
+> 
+> Judging by context, David probably meant more like "Remove the check for
+> the return value". I believe I've seen other non-native English speakers
+> use "judge" in a way similar to "check" or "test" in the context of
+> comparisons and error checking. (A search through my mailbox for "judge"
+> confirms this.)
+> 
 
-Any reasons why this patch was never picked? It was acked two months ago.
+Yeap, as Brain said, the "Remove the check for the return value "will be 
+better, the "judge" looks like a grammatical error here now.
 
-Best regards,
-Javier
+> Regards,
+> Brian
+> 
+> 
+> 
