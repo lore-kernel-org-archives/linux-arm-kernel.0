@@ -1,43 +1,31 @@
-From: sugar.zhang@rock-chips.com (Sugar Zhang)
-Date: Mon, 21 Aug 2017 16:25:07 +0800
-Subject: [PATCH v2 2/2] ASoC: rockchip: separate pinctrl pins from each other
-In-Reply-To: <1503303907-57630-1-git-send-email-sugar.zhang@rock-chips.com>
-References: <1503303907-57630-1-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <1503303907-57630-3-git-send-email-sugar.zhang@rock-chips.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 21 Aug 2017 10:28:42 +0200
+Subject: [PATCH  2/3] ARM: dts: iwg20m: Enable SDHI0 controller
+In-Reply-To: <1502711389-16040-3-git-send-email-biju.das@bp.renesas.com>
+References: <1502711389-16040-1-git-send-email-biju.das@bp.renesas.com>
+ <1502711389-16040-3-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <20170821082842.GB2418@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pdm sdi0~3 pins are optional, for example, if 4ch required,
-only sdi0~1 need to be enabled.
+> +
+> +&sdhi0 {
+> +	pinctrl-0 = <&sdhi0_pins>;
+> +	pinctrl-names = "default";
+> +
+> +	vmmc-supply = <&reg_3p3v>;
+> +	vqmmc-supply = <&reg_3p3v>;
+> +	cd-gpios = <&gpio7 11 GPIO_ACTIVE_LOW>;
+> +	status = "okay";
+> +};
 
-Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
----
+Just to make sure: No 1.8V and UHS support (SDR50/104)? Or is this to be
+tested and added later?
 
-Changes in v2: None
-
- Documentation/devicetree/bindings/sound/rockchip,pdm.txt | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/sound/rockchip,pdm.txt b/Documentation/devicetree/bindings/sound/rockchip,pdm.txt
-index 921729d..2ad66f6 100644
---- a/Documentation/devicetree/bindings/sound/rockchip,pdm.txt
-+++ b/Documentation/devicetree/bindings/sound/rockchip,pdm.txt
-@@ -29,11 +29,14 @@ pdm: pdm at ff040000 {
- 	dma-names = "rx";
- 	pinctrl-names = "default", "sleep";
- 	pinctrl-0 = <&pdmm0_clk
--		     &pdmm0_fsync
- 		     &pdmm0_sdi0
- 		     &pdmm0_sdi1
- 		     &pdmm0_sdi2
- 		     &pdmm0_sdi3>;
--	pinctrl-1 = <&pdmm0_sleep>;
-+	pinctrl-1 = <&pdmm0_clk_sleep
-+		     &pdmm0_sdi0_sleep
-+		     &pdmm0_sdi1_sleep
-+		     &pdmm0_sdi2_sleep
-+		     &pdmm0_sdi3_sleep>;
- 	status = "disabled";
- };
--- 
-2.7.4
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/a3fbe45c/attachment.sig>
