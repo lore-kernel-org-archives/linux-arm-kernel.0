@@ -1,66 +1,133 @@
 From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 21 Aug 2017 19:00:15 +0800
-Subject: [PATCH v2 2/8] iommu/mediatek: Move MTK_M4U_TO_LARB/PORT into
- mtk_iommu.c
+Date: Mon, 21 Aug 2017 19:00:18 +0800
+Subject: [PATCH v2 5/8] iommu/mediatek: Move pgtable allocation into
+ domain_alloc
 In-Reply-To: <1503313221-26453-1-git-send-email-yong.wu@mediatek.com>
 References: <1503313221-26453-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <1503313221-26453-3-git-send-email-yong.wu@mediatek.com>
+Message-ID: <1503313221-26453-6-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The definition of MTK_M4U_TO_LARB and MTK_M4U_TO_PORT are shared by
-all the gen2 M4U HWs. Thus, Move them out from mt8173-larb-port.h,
-and put them into the c file.
+After adding the global list for M4U HW, We get a chance to
+move the pagetable allocation into the mtk_iommu_domain_alloc.
+Let the domain_alloc do the right thing.
 
-Suggested-by: Honghui Zhang <honghui.zhang@mediatek.com>
+This patch is for fixing this problem[1].
+[1]: https://patchwork.codeaurora.org/patch/53987/
+
 Signed-off-by: Yong Wu <yong.wu@mediatek.com>
 ---
-This patch only moves the position of the MACRO MTK_M4U_TO_LARB/PORT.
----
- drivers/iommu/mtk_iommu.c                     | 8 +++++++-
- include/dt-bindings/memory/mt8173-larb-port.h | 4 ----
- 2 files changed, 7 insertions(+), 5 deletions(-)
+ drivers/iommu/mtk_iommu.c | 52 ++++++++++++++++++++---------------------------
+ 1 file changed, 22 insertions(+), 30 deletions(-)
 
 diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-index 91c6d36..4db6c8f 100644
+index 1503dfa..a82196c 100644
 --- a/drivers/iommu/mtk_iommu.c
 +++ b/drivers/iommu/mtk_iommu.c
-@@ -31,7 +31,6 @@
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- #include <asm/barrier.h>
--#include <dt-bindings/memory/mt8173-larb-port.h>
- #include <soc/mediatek/smi.h>
+@@ -262,9 +262,9 @@ static void mtk_iommu_config(struct mtk_iommu_data *data,
+ 	}
+ }
  
- #include "mtk_iommu.h"
-@@ -93,6 +92,13 @@
+-static int mtk_iommu_domain_finalise(struct mtk_iommu_data *data)
++static int mtk_iommu_domain_finalise(struct mtk_iommu_domain *dom)
+ {
+-	struct mtk_iommu_domain *dom = data->m4u_dom;
++	struct mtk_iommu_data *data = mtk_iommu_get_m4u_data();
  
- #define MTK_PROTECT_PA_ALIGN			128
+ 	spin_lock_init(&dom->pgtlock);
  
-+/*
-+ * Get the local arbiter ID and the portid within the larb arbiter
-+ * from mtk_m4u_id which is defined by MTK_M4U_ID.
-+ */
-+#define MTK_M4U_TO_LARB(id)		(((id) >> 5) & 0x7)
-+#define MTK_M4U_TO_PORT(id)		((id) & 0x1f)
+@@ -290,9 +290,6 @@ static int mtk_iommu_domain_finalise(struct mtk_iommu_data *data)
+ 
+ 	/* Update our support page sizes bitmap */
+ 	dom->domain.pgsize_bitmap = dom->cfg.pgsize_bitmap;
+-
+-	writel(data->m4u_dom->cfg.arm_v7s_cfg.ttbr[0],
+-	       data->base + REG_MMU_PT_BASE_ADDR);
+ 	return 0;
+ }
+ 
+@@ -307,20 +304,30 @@ static struct iommu_domain *mtk_iommu_domain_alloc(unsigned type)
+ 	if (!dom)
+ 		return NULL;
+ 
+-	if (iommu_get_dma_cookie(&dom->domain)) {
+-		kfree(dom);
+-		return NULL;
+-	}
++	if (iommu_get_dma_cookie(&dom->domain))
++		goto  free_dom;
 +
- struct mtk_iommu_domain {
- 	spinlock_t			pgtlock; /* lock for page table */
++	if (mtk_iommu_domain_finalise(dom))
++		goto  put_dma_cookie;
  
-diff --git a/include/dt-bindings/memory/mt8173-larb-port.h b/include/dt-bindings/memory/mt8173-larb-port.h
-index 5fef5d1..111b4b0 100644
---- a/include/dt-bindings/memory/mt8173-larb-port.h
-+++ b/include/dt-bindings/memory/mt8173-larb-port.h
-@@ -15,10 +15,6 @@
- #define __DTS_IOMMU_PORT_MT8173_H
+ 	dom->domain.geometry.aperture_start = 0;
+ 	dom->domain.geometry.aperture_end = DMA_BIT_MASK(32);
+ 	dom->domain.geometry.force_aperture = true;
  
- #define MTK_M4U_ID(larb, port)		(((larb) << 5) | (port))
--/* Local arbiter ID */
--#define MTK_M4U_TO_LARB(id)		(((id) >> 5) & 0x7)
--/* PortID within the local arbiter */
--#define MTK_M4U_TO_PORT(id)		((id) & 0x1f)
+ 	return &dom->domain;
++
++put_dma_cookie:
++	iommu_put_dma_cookie(&dom->domain);
++free_dom:
++	kfree(dom);
++	return NULL;
+ }
  
- #define M4U_LARB0_ID			0
- #define M4U_LARB1_ID			1
+ static void mtk_iommu_domain_free(struct iommu_domain *domain)
+ {
++	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
++
++	free_io_pgtable_ops(dom->iop);
+ 	iommu_put_dma_cookie(domain);
+ 	kfree(to_mtk_domain(domain));
+ }
+@@ -329,33 +336,19 @@ static int mtk_iommu_attach_device(struct iommu_domain *domain,
+ 				   struct device *dev)
+ {
+ 	struct mtk_iommu_domain *dom = to_mtk_domain(domain);
+-	struct mtk_iommu_data *curdata = dev->iommu_fwspec->iommu_priv;
+-	struct mtk_iommu_data *data = mtk_iommu_get_m4u_data();
+-	int ret;
++	struct mtk_iommu_data *data = dev->iommu_fwspec->iommu_priv;
+ 
+-	if (!data || !curdata)
++	if (!data)
+ 		return -ENODEV;
+ 
++	/* Update the pgtable base address register of the M4U HW */
+ 	if (!data->m4u_dom) {
+ 		data->m4u_dom = dom;
+-		ret = mtk_iommu_domain_finalise(data);
+-		if (ret) {
+-			data->m4u_dom = NULL;
+-			return ret;
+-		}
+-	}
+-
+-	/*
+-	 * Update the pgtable base address register of another M4U HW with the
+-	 * existed pgtable if there are more than one M4U HW.
+-	 */
+-	if (!curdata->m4u_dom) {
+-		curdata->m4u_dom = data->m4u_dom;
+-		writel(data->m4u_dom->cfg.arm_v7s_cfg.ttbr[0],
+-		       curdata->base + REG_MMU_PT_BASE_ADDR);
++		writel(dom->cfg.arm_v7s_cfg.ttbr[0],
++		       data->base + REG_MMU_PT_BASE_ADDR);
+ 	}
+ 
+-	mtk_iommu_config(curdata, dev, true);
++	mtk_iommu_config(data, dev, true);
+ 	return 0;
+ }
+ 
+@@ -664,7 +657,6 @@ static int mtk_iommu_remove(struct platform_device *pdev)
+ 	if (iommu_present(&platform_bus_type))
+ 		bus_set_iommu(&platform_bus_type, NULL);
+ 
+-	free_io_pgtable_ops(data->m4u_dom->iop);
+ 	clk_disable_unprepare(data->bclk);
+ 	devm_free_irq(&pdev->dev, data->irq, data);
+ 	component_master_del(&pdev->dev, &mtk_iommu_com_ops);
 -- 
 1.9.1
