@@ -1,39 +1,27 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 21 Aug 2017 11:41:49 +0100
-Subject: [PATCH v2 0/5] Rework the pte handling for hardware AF/DBM
-In-Reply-To: <20170818172936.GA10043@arm.com>
-References: <20170818172602.7624-1-catalin.marinas@arm.com>
- <20170818172936.GA10043@arm.com>
-Message-ID: <20170821104148.25zlf2unja7xonbf@armageddon.cambridge.arm.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 21 Aug 2017 12:49:07 +0200
+Subject: [PATCH] rtc: zynqmp: Disable the build as a module
+In-Reply-To: <20170821084641.p432yvwciwj6irdk@piout.net>
+References: <9881f4ae2afb2cd671715bcd1fcb9035688c40c9.1500464394.git.michal.simek@xilinx.com>
+ <20170821084641.p432yvwciwj6irdk@piout.net>
+Message-ID: <dd3127ef-8061-c357-8f55-5f661e8eda3a@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 06:29:36PM +0100, Will Deacon wrote:
-> On Fri, Aug 18, 2017 at 06:25:57PM +0100, Catalin Marinas wrote:
-> > That's the second version of the pte accessors reworking series (first
-> > version at [1]).
-> > 
-> > Changes since v1:
-> > 
-> > - READ_ONCE moved out of the cmpxchg loops since cmpxchg already returns
-> >   the old value (probably more efficient with LSE atomics)
-> > 
-> > - The first patch from the first series has been merged upstream (cc
-> >   stable)
-> > 
-> > - Kconfig entry kept just to disable the hardware feature but the code
-> >   paths all assume hardware AF/DBM
-> > 
-> > - PAGE_COPY(_EXEC) removed as they just duplicate PAGE_READONLY(_EXEC)
-> > 
-> > I kept the review-by tags in place as the logic is unchanged but feel
-> > free to look at the patches again.
+On 21.8.2017 10:46, Alexandre Belloni wrote:
+> Hi,
 > 
-> Thanks, this looks good to me now:
-> 
-> Reviewed-by: Will Deacon <will.deacon@arm.com>
+> As discussed, I will not apply that patch and instead will push for:
+> https://patchwork.kernel.org/patch/9911471/
 
-Thanks. I merged them into for-next/core.
+no problem with this.
 
--- 
-Catalin
+M
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/8a0977ed/attachment.sig>
