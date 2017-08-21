@@ -1,83 +1,59 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 21 Aug 2017 11:34:05 +0200
-Subject: [PATCH 2/2] ARM: sunxi: add support for R40 SoC
-In-Reply-To: <20170820052957.34597-2-icenowy@aosc.io>
-References: <20170820052957.34597-1-icenowy@aosc.io>
- <20170820052957.34597-2-icenowy@aosc.io>
-Message-ID: <20170821093405.n4bum7j6nswnv6wr@flea.lan>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Mon, 21 Aug 2017 11:34:15 +0200
+Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
+In-Reply-To: <6e8e19f1-8d0f-183b-e02f-1ec8c4dd57b3@ti.com>
+References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
+ <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
+ <20170722065133.GT3053@localhost>
+ <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
+ <20170726052930.GF3053@localhost>
+ <f2908e38-dc4d-3886-4058-52a7ad845415@st.com>
+ <20170731123157.GJ3053@localhost>
+ <e3a76a50-4160-d111-cce9-132b46b66c33@st.com>
+ <20170802045522.GU3053@localhost>
+ <7d2091fe-a2e5-78bb-b63d-9cb66bdb7e84@ti.com>
+ <7bcad698-fa1a-3dc2-e918-4400639ca6d7@st.com>
+ <47ceba83-1097-072e-bed6-d1964bce7a25@ti.com>
+ <0e16a519-3d60-f683-5517-12a520e0e521@st.com>
+ <f0db566e-5613-8914-e070-915c8c4d9b9f@ti.com>
+ <71b7ef2a-d745-d16b-4538-567c856cce9a@st.com>
+ <401305f0-15d8-1996-60d6-69c13cbacc06@ti.com>
+ <58bf2f7c-faf1-d1e9-3c87-d7964d1ba3d4@st.com>
+ <6e8e19f1-8d0f-183b-e02f-1ec8c4dd57b3@ti.com>
+Message-ID: <f7ddd927-5db3-e1b1-b7f1-94050b508298@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Sun, Aug 20, 2017 at 01:29:57PM +0800, Icenowy Zheng wrote:
-> Allwinner R40 is a new SoC, with Quad Core Cortex-A7 and peripherals
-> like A20.
+
+On 08/04/2017 04:21 PM, Peter Ujfalusi wrote:
+> On 08/04/2017 03:50 PM, Pierre Yves MORDRET wrote:
+>> Our DMAMUX can manage up to 255 request lines (only 128 is eventually assigned
+>> though) onto 16 events: 8 events mapped on 1 DMA and the 8 others onto the
+>> second DMA. Request line numbering is fixed (a peripheral DMA request is
+>> assigned to one MUX input) and but can be routed randomly onto the any 16
+>> channels. We use chanID to mux input on event.
+>> chanID given by dma_get_any_slave_channe is enough in our case.
 > 
-> Add support for it.
+> I would think that if you have in the router node:
+> dma-masters = <&dma1>, <&dma2>;
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> ---
->  Documentation/arm/sunxi/README                  | 6 ++++++
->  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
->  arch/arm/mach-sunxi/sunxi.c                     | 1 +
->  3 files changed, 8 insertions(+)
+> and request a DMA via the router:
+> dmas = <&dma_router req_in param1 param2>;
 > 
-> diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
-> index d7b1f016bd62..4fa836782e46 100644
-> --- a/Documentation/arm/sunxi/README
-> +++ b/Documentation/arm/sunxi/README
-> @@ -75,6 +75,12 @@ SunXi family
->          + Datasheet
->            http://linux-sunxi.org/File:Allwinner_V3s_Datasheet_V1.0.pdf
->  
-> +      - Allwinner R40 (sun8i)
-> +        + Datasheet
-> +          https://github.com/tinalinux/docs/raw/r40-v1.y/R40_Datasheet_V1.0.pdf
-> +        + User Manual
-> +          https://github.com/tinalinux/docs/raw/r40-v1.y/Allwinner_R40_User_Manual_V1.0.pdf
-> +
+> then the router driver would decide which dma-master it is going to assign the
+> given request line and craft the dma-spec based on this decision. This
+> requires no callback to the router from the DMA master driver at all.
+> 
+> The idea of the dma event router is to be transparent for the DMA clients
+> (peripherals needing DMA channel) and for the DMA drivers as well. Neither
+> should know that the events are muxed as it does not really matter for them.
+>
 
-Please sort it by alphabetical order.
+OK. I will redesign my driver to take into account this idea.
 
->      * Quad ARM Cortex-A15, Quad ARM Cortex-A7 based SoCs
->        - Allwinner A80
->          + Datasheet
-> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-> index f35c6ada5a65..e4beec3d9ad3 100644
-> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-> @@ -14,6 +14,7 @@ using one of the following compatible strings:
->    allwinner,sun8i-a83t
->    allwinner,sun8i-h2-plus
->    allwinner,sun8i-h3
-> +  allwinner-sun8i-r40
->    allwinner,sun8i-v3s
->    allwinner,sun9i-a80
->    allwinner,sun50i-a64
-> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
-> index 7ab353fb25f2..311e6c4fc4f4 100644
-> --- a/arch/arm/mach-sunxi/sunxi.c
-> +++ b/arch/arm/mach-sunxi/sunxi.c
-> @@ -66,6 +66,7 @@ static const char * const sun8i_board_dt_compat[] = {
->  	"allwinner,sun8i-h2-plus",
->  	"allwinner,sun8i-h3",
->  	"allwinner,sun8i-v3s",
-> +	"allwinner,sun8i-r40",
+I believe I should get rid of my custom API in DMA for channelID as well. Please
+confirm. Not very clear for me whether I can keep it or not.
 
-And same thing here.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/7ef9e5aa/attachment.sig>
+Regards
+PY
