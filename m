@@ -1,107 +1,96 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Mon, 21 Aug 2017 12:13:11 +0000
-Subject: [PATCH v2] mmc: renesas_sdhi: Add r8a7743/5 support
-In-Reply-To: <CAMuHMdWUxxp75u1VSLY3WnObmhSMDvP3skr9Uf3rV4Bf-ixy_w@mail.gmail.com>
-References: <1502710766-44361-1-git-send-email-biju.das@bp.renesas.com>
- <1503311897-18807-1-git-send-email-biju.das@bp.renesas.com>
- <CAMuHMdWUxxp75u1VSLY3WnObmhSMDvP3skr9Uf3rV4Bf-ixy_w@mail.gmail.com>
-Message-ID: <KL1PR06MB1702B56392DC90F9B02FB956B8870@KL1PR06MB1702.apcprd06.prod.outlook.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 21 Aug 2017 14:14:54 +0200
+Subject: [GIT PULL] ARM64: Xilinx ZynqMP DT fixes for v4.14
+Message-ID: <36ea049b-a57f-78e5-440f-ab6cdf1df1f7@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+please pull these patches to your tree.
+
+Thanks,
+Michal
+
+> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+> 
+>   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-dt-for-4.14
+> 
+> for you to fetch changes up to 0bb6f25a6ee5ff0826d2e620cbb78b1579c3d2ee:
+> 
+>   arm64: zynqmp: Add generic compatible string for I2C EEPROM (2017-08-21 14:07:37 +0200)
+> 
+> ----------------------------------------------------------------
+> arm: Xilinx ZynqMP DT fixes for v4.14
+> 
+> - Fix DTC warnings
+> - Add idle states, OP, cci-400, RTC, pcie prefetchable memory
+>   fpd/lpd dmas, clocks for ep108
+> - Enable can1
+> - Fix smmu IRQ, aliases, uart compatible string
+> - Use generic compatible string for i2c eeprom
+> 
+> ----------------------------------------------------------------
+> Alistair Francis (1):
+>       arm64: zynqmp: Use C pre-processor for includes
+> 
+> Bharat Kumar Gogada (1):
+>       arm64: zynqmp: Adding prefetchable memory space to pcie node
+> 
+> Edgar E. Iglesias (1):
+>       arm64: zynqmp: Correct IRQ nr for the SMMU
+> 
+> Javier Martinez Canillas (1):
+>       arm64: zynqmp: Add generic compatible string for I2C EEPROM
+> 
+> Michal Simek (9):
+>       arm64: zynqmp: Remove leading 0s from mtd table for spi flashes
+>       arm64: zynqmp: Move nodes which have no reg property out of bus
+>       arm64: zynqmp: Add references to cpu nodes
+>       arm64: zynqmp: Add dcc console for zynqmp
+>       arm64: zynqmp: Add CCI-400 node
+>       arm64: zynqmp: Add support for RTC
+>       arm64: zynqmp: Add new uartps compatible string
+>       arm64: zynqmp: Add fpd/lpd dmas
+>       arm64: zynqmp: Add missing mmc aliases in ep108
+> 
+> Naga Sureshkumar Relli (2):
+>       arm64: zynqmp: Set status disabled in dtsi
+>       arm64: zynqmp: Enable can1 for ep108
+> 
+> Rob Herring (1):
+>       arm64: dts: xilinx: fix PCI bus dtc warnings
+> 
+> Shubhrajyoti Datta (1):
+>       arm64: zynqmp: Add operating points
+> 
+> Stefan Krsmanovic (1):
+>       arm64: zynqmp: Add idle state for ZynqMP
+> 
+> VNSL Durga (1):
+>       arm64: zynqmp: Added clocks to DT for ep108
+> 
+>  arch/arm64/boot/dts/xilinx/zynqmp-ep108-clk.dtsi |  50 +++++++++++++++++++++++++++-
+>  arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts      |  18 +++++++----
+>  arch/arm64/boot/dts/xilinx/zynqmp.dtsi           | 277 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++----------
+>  3 files changed, 321 insertions(+), 24 deletions(-)
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
 
 
-> -----Original Message-----
-> From: devicetree-owner at vger.kernel.org [mailto:devicetree-
-> owner at vger.kernel.org] On Behalf Of Geert Uytterhoeven
-> Sent: 21 August 2017 12:30
-> To: Biju Das <biju.das@bp.renesas.com>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>; Rob Herring <robh+dt@kernel.org>;
-> Mark Rutland <mark.rutland@arm.com>; Wolfram Sang <wsa@the-
-> dreams.de>; Simon Horman <horms@verge.net.au>; Magnus Damm
-> <magnus.damm@gmail.com>; Chris Paterson
-> <Chris.Paterson2@renesas.com>; devicetree at vger.kernel.org; Linux-Renesas
-> <linux-renesas-soc@vger.kernel.org>; linux-arm-kernel at lists.infradead.org;
-> Linux MMC List <linux-mmc@vger.kernel.org>
-> Subject: Re: [PATCH v2] mmc: renesas_sdhi: Add r8a7743/5 support
->
-> Hi Biju,
->
-> On Mon, Aug 21, 2017 at 12:38 PM, Biju Das <biju.das@bp.renesas.com>
-> wrote:
-> > Add support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5) SDHI is
-> > identical to the R-Car Gen2 family.
-> >
-> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > ---
-> > v1->v2
-> >     -Modified the listing SoC's description related to SoC
-> >      with 1 Clock and 2 Clocks
-> >
-> > This patch is compiled and tested against linux next tag
-> > next-20170817.
-> >
-> >  Documentation/devicetree/bindings/mmc/tmio_mmc.txt | 9 +++++----
-> >  1 file changed, 5 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-> > b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-> > index 4fd8b7a..1e3106e 100644
-> > --- a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-> > +++ b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-> > @@ -15,6 +15,8 @@ Required properties:
-> >                 "renesas,sdhi-r7s72100" - SDHI IP on R7S72100 SoC
-> >                 "renesas,sdhi-r8a73a4" - SDHI IP on R8A73A4 SoC
-> >                 "renesas,sdhi-r8a7740" - SDHI IP on R8A7740 SoC
-> > +               "renesas,sdhi-r8a7743" - SDHI IP on R8A7743 SoC
-> > +               "renesas,sdhi-r8a7745" - SDHI IP on R8A7745 SoC
-> >                 "renesas,sdhi-r8a7778" - SDHI IP on R8A7778 SoC
-> >                 "renesas,sdhi-r8a7779" - SDHI IP on R8A7779 SoC
-> >                 "renesas,sdhi-r8a7790" - SDHI IP on R8A7790 SoC @@
-> > -33,10 +35,9 @@ Required properties:
-> >           If 2 clocks are specified by the hardware, you must name them as
-> >           "core" and "cd". If the controller only has 1 clock, naming is not
-> >           required.
-> > -         Below is the number clocks for each supported SoC:
-> > -          1: SH73A0, R8A73A4, R8A7740, R8A7778, R8A7779, R8A7790
-> > -             R8A7791, R8A7792, R8A7793, R8A7794, R8A7795, R8A7796
-> > -          2: R7S72100
-> > +         Most supported SoCs only have 1 clock. Devices which have
-> > + more
->
-> That is actually mentioned in the paragraph above:
->
-> - clocks: Most controllers only have 1 clock source per channel. However, on
->           some variations of this controller, the internal card detection
->           logic that exists in this controller is sectioned off to be run by a
->           separate second clock source to allow the main core clock to be turned
->           off to save power.
->
-> so I suggest just integrating the (short) list in that paragraph.
->
-> > +         than 1 clock are listed below:
-> > +         2: R7S72100"
->
-> Bogus trailing double quote.
-
-Thanks. I will send v3 with above changes.
-
-> Gr{oetje,eeting}s,
->
->                         Geert
->
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-
-> m68k.org
->
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in the body
-> of a message to majordomo at vger.kernel.org More majordomo info at
-> http://vger.kernel.org/majordomo-info.html
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/51ffcab6/attachment.sig>
