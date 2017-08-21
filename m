@@ -1,66 +1,51 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 21 Aug 2017 15:05:55 +0200
-Subject: [GIT PULL] ARM: Xilinx Zynq SoC patches for v4.14
-Message-ID: <8d0c07a6-27e9-e14a-560f-3fc89327f8cd@monstr.eu>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 21 Aug 2017 15:15:58 +0200
+Subject: [GIT PULL] ARM: at91: drivers fixes for 4.13
+Message-ID: <20170821131558.56i2o4o677y6kjzu@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Arnd, Olof,
 
-please apply these two patches to your tree.
+A very late pull request for a few fixes I'm carrying in my tree for a
+while.
+It would be great if you could send that to Linus for 4.13.
 
-Thanks,
-Michal
+The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
+  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 
- The following changes since commit
-5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+are available in the git repository at:
 
-   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.13-drivers-fixes
 
- are available in the git repository at:
+for you to fetch changes up to 3fb3b3c4b68e33bb4acf42361b6a0db96115de35:
 
-   https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.14
+  memory: atmel-ebi: Fix smc cycle xlate converter (2017-07-26 22:37:54 +0200)
 
- for you to fetch changes up to b04d4c876b1b7f25cff35b7c26c5b9f518f612b2:
+----------------------------------------------------------------
+Driver fixes for 4.13:
 
-   ARM: zynq: Add support for Zynq-7000S devices (2017-08-21 14:22:50 +0200)
+ - Multiple EBI/SMC timing setting/calculation fixes
 
- ----------------------------------------------------------------
- arm: Xilinx Zynq patches for v4.14
+----------------------------------------------------------------
+Alexander Dahl (3):
+      memory: atmel-ebi: Fix smc timing return value evaluation
+      memory: atmel-ebi: Allow t_DF timings of zero ns
+      memory: atmel-ebi: Fix smc cycle xlate converter
 
- - Add support for 7000s devices
-
- ----------------------------------------------------------------
- Michal Simek (2):
-       devicetree: ARM: zynq: Add DT binding for eFuse controller
-       ARM: zynq: Add support for Zynq-7000S devices
-
-  Documentation/devicetree/bindings/nvmem/zynq-efuse.txt | 15
-+++++++++++++++
-  arch/arm/boot/dts/zynq-7000.dtsi                       |  5 +++++
-  arch/arm/mach-zynq/Makefile                            |  2 +-
-  arch/arm/mach-zynq/common.c                            |  1 +
-  arch/arm/mach-zynq/common.h                            |  3 +++
-  arch/arm/mach-zynq/efuse.c                             | 75
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-  arch/arm/mach-zynq/platsmp.c                           |  3 +++
-  7 files changed, 103 insertions(+), 1 deletion(-)
-  create mode 100644 Documentation/devicetree/bindings/nvmem/zynq-efuse.txt
-  create mode 100644 arch/arm/mach-zynq/efuse.c
+ drivers/memory/atmel-ebi.c | 10 ++++++----
+ drivers/mfd/atmel-smc.c    |  2 +-
+ 2 files changed, 7 insertions(+), 5 deletions(-)
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
-
-
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/a8594170/attachment-0001.sig>
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/4ea794f6/attachment.sig>
