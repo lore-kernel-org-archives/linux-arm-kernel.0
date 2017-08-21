@@ -1,45 +1,29 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 21 Aug 2017 08:24:33 +0100
-Subject: [PATCH v3 0/9] Add STM32 LPTimer: PWM, trigger and counter
-In-Reply-To: <1499445068-7037-1-git-send-email-fabrice.gasnier@st.com>
-References: <1499445068-7037-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170821072433.fvtezmsnrkuhnx6w@dell>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Aug 2017 09:25:00 +0200
+Subject: [GIT PULL 1/4] Allwinner arm64 defconfig changes for 4.14, round 2
+In-Reply-To: <20170819075659.w2tndblqwhesniuv@wens.csie.org>
+References: <20170819075659.w2tndblqwhesniuv@wens.csie.org>
+Message-ID: <CAK8P3a2D0oC0fmN=x2UYdDP34JciM6ZJXB6MiLw+krX4c0bAdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 07 Jul 2017, Fabrice Gasnier wrote:
+On Sat, Aug 19, 2017 at 9:56 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> ----------------------------------------------------------------
+> Allwinner arm64 defconfig changes for 4.14
+>
+> Enable X-Powers AXP series PMIC mfd and regulator support by default.
+>
+> ----------------------------------------------------------------
+> Jagan Teki (2):
+>       arm64: defconfig: Enable MFD_AXP20X_RSB
+>       arm64: defconfig: Enable REGULATOR_AXP20X
 
-> This series adds support for Low-Power Timer that can be found on
-> some STM32 devices.
-> 
-> STM32 LPTimer (LPTIM) is a 16-bit timer that provides several
-> functionalities. This series adds support for following features:
-> - PWM output (with programmable prescaler, configurable polarity)
-> - Trigger source for STM32 ADC or DAC (LPTIM_OUT)
-> - Quadrature encoder and counter
-> 
-> The MFD core is used to manage common resources (clock, register map)
-> and to detect encoder feature. "stm32_lptimer" structure is provided
-> to its sub-nodes to share those information:
-> - PWM driver is used to implement single PWM channel
-> - IIO trigger
-> - IIO quadrature encoder and counter
-> 
-> ---
-> Changes in v3:
-> - I sent this v3 with various changes, but still need to discuss ABI
->   for counter driver (no change on this in v3).
-> - Remarks for Rob on dt-bindings
-> - Add validate_device in Trigger driver
-> - Update PWM driver after Thierry's comments
-> - Additional patch for STM32 ADC trigger
+Applied to next/arm64.
 
-Looks like you have everything you need.
+Just as a general comment, I think there is no point in splitting up
+patches like this one in two. Just group defconfig in a combined
+patch where it makes sense. The same goes e.g. for DT patches
+when you apply the same change to multiple files, it can be a single
+patch.
 
-Please apply all the Acks you've collected and [RESEND].
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+    Arnd
