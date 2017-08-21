@@ -1,56 +1,26 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 21 Aug 2017 14:18:06 -0500
-Subject: [PATCH v11 2/4] PCI: Factor out pci_bus_wait_crs()
-In-Reply-To: <9cb3006d-31d0-e57a-fd3e-c32914e8ba42@codeaurora.org>
-References: <20170818212310.15145.21732.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20170818213210.15145.15340.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <9cb3006d-31d0-e57a-fd3e-c32914e8ba42@codeaurora.org>
-Message-ID: <20170821191806.GC28977@bhelgaas-glaptop.roam.corp.google.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 21 Aug 2017 14:21:38 -0500
+Subject: [PATCH 1/4 v2] drm/tve200: Add DT bindings
+In-Reply-To: <20170820100557.24991-1-linus.walleij@linaro.org>
+References: <20170820100557.24991-1-linus.walleij@linaro.org>
+Message-ID: <CAL_JsqKeVT5ODav+Mca0oHb0euJVUgU5UGgvsYXyPZj_DPqFsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 21, 2017 at 09:53:56AM -0400, Sinan Kaya wrote:
-> On 8/18/2017 5:32 PM, Bjorn Helgaas wrote:
-> > +	if ((*l & 0xffff) != 0x0001)
-> > +		return true;	/* not a CRS completion */
-> >  
-> 
-> This version certainly looks cleaner. However, it breaks pci_flr_wait().
-> 
-> If some root port doesn't support CRS and returns 0xFFFFFFFF, pci_bus_wait_crs()
-> function returns true. pci_flr_wait() prematurely bails out from here.
-> 
-> 
-> pci_flr_wait()
-> {
-> 
-> +	ret = pci_bus_wait_crs(dev->bus, dev->devfn, &id, 60000);
-> +	if (ret)
-> +		return;
-> 
-> }
-> 
-> We can change the return code to false above but then we break pci_bus_read_dev_vendor_id()
-> function. 
-> 
-> That's why, I was interested in creating a pci_bus_crs_visibility_supported() helper
-> function that would check for the magic 0x0001 value and return true. Otherwise, false. 
-> 
-> pci_bus_read_dev_vendor_id() would do this
-> 
-> pci_bus_read_dev_vendor_id()
-> {
-> 	...
-> 	if (pci_bus_crs_visibility_supported())
-> 		return pci_bus_wait_crs(dev->bus, dev->devfn, &id, 60000);
-> 
-> 	return true
-> }
-> 
-> Similar pattern for pci_flr_wait().
+On Sun, Aug 20, 2017 at 5:05 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> This adds device tree bindings for the Faraday TVE200 IP block.
+> This IP block is present in the Gemini ARM SoC and also in some
+> Grain Media GMxxxx SoCs.
+>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Fix display port bindings: list required endpoint.
+> - Fix the example to include an endpoint.
+> ---
+>  .../devicetree/bindings/display/faraday,tve200.txt | 54 ++++++++++++++++++++++
+>  1 file changed, 54 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/faraday,tve200.txt
 
-I think that makes sense.  We'd want to check for CRS SV being
-enabled, e.g., maybe read PCI_EXP_RTCTL_CRSSVE back in
-pci_enable_crs() and cache it somewhere.  Maybe a crs_sv_enabled bit
-in the root port's pci_dev, and check it with something like what
-pcie_root_rcb_set() does?
+Acked-by: Rob Herring <robh@kernel.org>
