@@ -1,30 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 21 Aug 2017 11:39:15 +0100
-Subject: [PATCH 29/30] efi/libstub: arm: reserve bootloader supplied
- initrd in memory map
-In-Reply-To: <20170821103708.GD3028@leverpostej>
-References: <20170814125411.22604-1-ard.biesheuvel@linaro.org>
- <20170814125411.22604-30-ard.biesheuvel@linaro.org>
- <20170821103708.GD3028@leverpostej>
-Message-ID: <CAKv+Gu-=U_f16vcz5GxgQ1FxiWTcGjXhjVau5y0CKgUOJzJrcA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 21 Aug 2017 11:41:49 +0100
+Subject: [PATCH v2 0/5] Rework the pte handling for hardware AF/DBM
+In-Reply-To: <20170818172936.GA10043@arm.com>
+References: <20170818172602.7624-1-catalin.marinas@arm.com>
+ <20170818172936.GA10043@arm.com>
+Message-ID: <20170821104148.25zlf2unja7xonbf@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 August 2017 at 11:37, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Aug 14, 2017 at 01:54:10PM +0100, Ard Biesheuvel wrote:
->> Under KASLR, the EFI stub may allocate the kernel anywhere in the
->> physical address space, which could be right on top of an initrd
->> if it was supplied by the bootloader (i.e., GRUB) in /chosen rather
->> than passed via the initrd= command line option. So allocate the
->> pages explicitly, this ensures that the random memory allocation
->> routine will disregard the region.
->
-> I'm a little confused. Shouldn't the bootloader have allocated that
-> memory, leaving it reserved?
->
-> If it hasn't, then that region could be allcoated by anything else at
-> any time (e.g. by the code which loads the kernel, or some EFI timer
-> callback), so that sounds like a bootloader bug that we can't fix.
->
+On Fri, Aug 18, 2017 at 06:29:36PM +0100, Will Deacon wrote:
+> On Fri, Aug 18, 2017 at 06:25:57PM +0100, Catalin Marinas wrote:
+> > That's the second version of the pte accessors reworking series (first
+> > version at [1]).
+> > 
+> > Changes since v1:
+> > 
+> > - READ_ONCE moved out of the cmpxchg loops since cmpxchg already returns
+> >   the old value (probably more efficient with LSE atomics)
+> > 
+> > - The first patch from the first series has been merged upstream (cc
+> >   stable)
+> > 
+> > - Kconfig entry kept just to disable the hardware feature but the code
+> >   paths all assume hardware AF/DBM
+> > 
+> > - PAGE_COPY(_EXEC) removed as they just duplicate PAGE_READONLY(_EXEC)
+> > 
+> > I kept the review-by tags in place as the logic is unchanged but feel
+> > free to look at the patches again.
+> 
+> Thanks, this looks good to me now:
+> 
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-Yeah, thinko on my part. Thanks for spotting that.
+Thanks. I merged them into for-next/core.
+
+-- 
+Catalin
