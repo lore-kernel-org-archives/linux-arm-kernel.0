@@ -1,44 +1,41 @@
 From: william.wu@rock-chips.com (William Wu)
-Date: Mon, 21 Aug 2017 21:36:06 +0800
-Subject: [PATCH v3 3/3] arm64: dts: rockchip: enable usb3 for RK3328
- evaluation board
+Date: Mon, 21 Aug 2017 21:36:04 +0800
+Subject: [PATCH v3 1/3] dt-bindings: usb: add DT binding for RK3328 dwc3
+ controller
 In-Reply-To: <1503322566-31489-1-git-send-email-william.wu@rock-chips.com>
 References: <1503322566-31489-1-git-send-email-william.wu@rock-chips.com>
-Message-ID: <1503322566-31489-4-git-send-email-william.wu@rock-chips.com>
+Message-ID: <1503322566-31489-2-git-send-email-william.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rockchip's RK3328 evaluation board has one USB 3.0 OTG controller,
-we enable it and set it act as static xHCI host controller to
-support USB 3.0 HOST on RK3328 evaluation board.
+Adds the device tree bindings description for RK3328 and
+compatible USB DWC3 controller.
 
 Signed-off-by: William Wu <william.wu@rock-chips.com>
 ---
 Changes in v3:
-- None
+- Add this for separate usb dt-bindings patch.
 
 Changes in v2:
 - None
 
- arch/arm64/boot/dts/rockchip/rk3328-evb.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ Documentation/devicetree/bindings/usb/rockchip,dwc3.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-index 86605ae..68e1b424 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-@@ -219,3 +219,12 @@
- &usb_host0_ohci {
- 	status = "okay";
- };
-+
-+&usbdrd3 {
-+	status = "okay";
-+};
-+
-+&usbdrd_dwc3 {
-+	dr_mode = "host";
-+	status = "okay";
-+};
+diff --git a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
+index 0536a93..d6b2e47 100644
+--- a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
++++ b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
+@@ -1,7 +1,9 @@
+ Rockchip SuperSpeed DWC3 USB SoC controller
+ 
+ Required properties:
+-- compatible:	should contain "rockchip,rk3399-dwc3" for rk3399 SoC
++- compatible:	should be one of the following:
++  - "rockchip,rk3399-dwc3": for rk3399 SoC
++  - "rockchip,rk3328-dwc3", "rockchip,rk3399-dwc3": for rk3328 SoC
+ - clocks:	A list of phandle + clock-specifier pairs for the
+ 		clocks listed in clock-names
+ - clock-names:	Should contain the following:
 -- 
 2.0.0
