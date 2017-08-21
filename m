@@ -1,43 +1,25 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 21 Aug 2017 16:10:17 +0800
-Subject: [PATCH v3 3/4] net: stmmac: register parent MDIO node for
- sun8i-h3-emac
-In-Reply-To: <20170820142545.GB24150@lunn.ch>
-References: <20170818122118.4925-1-clabbe.montjoie@gmail.com>
- <20170818122118.4925-4-clabbe.montjoie@gmail.com>
- <CAGb2v66KcZkiDDHryMmVzm4WroXePPy3V44SLpVdoO3ZEjgC=g@mail.gmail.com>
- <20170819185025.GB13266@Red> <20170819203836.GA21567@lunn.ch>
- <20170820065757.GA6081@Red> <20170820142545.GB24150@lunn.ch>
-Message-ID: <CAGb2v67hQXSoCKP7qW+KRUYX+0djQ1Z23cQ67Lyg6G7ozGyfGQ@mail.gmail.com>
+From: zhangqing@rock-chips.com (Elaine Zhang)
+Date: Mon, 21 Aug 2017 16:16:03 +0800
+Subject: [PATCH v2 0/4] clk: rockchip: rv1108: support mac clk
+Message-ID: <1503303367-17915-1-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Aug 20, 2017 at 10:25 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->> I think we cannot use mdio-mux-mmioreg since the register for doing
->> the switch is in middle of the "System Control" and shared with
->> other functions.  This is why we use a sycon/regmap for selecting
->> the MDIO.
->
-> You could add a mdio-mux-regmap.c.
->
-> However, it probably need restructuring of the stmmac mdio code, to
-> make the mdio bus usable as a separate driver. You need stmmac mdio
-> to probe first, then mdio-mux-remap should probe, and then lastly
-> stmmmac mac driver.
->
-> With stmmac mdio and stmmac mac being in one driver, there is no time
-> in the middle to allow the mux driver to probe.
->
-> It is some effort, but a nice cleanup and generalization.
+change in V2:
+[PATCH v2 1/4] : NONE
+[PATCH v2 2/4] : NONE
+[PATCH v2 3/4] : NONE
+[PATCH v2 4/4] : fix up the clk_mac mux regs description error
 
-I'm not sure mdio-mux is the right thing here.
+Elaine Zhang (4):
+  clk: rockchip: add rv1108 ACLK_GAMC and PCLK_GMAC ID
+  clk: rockchip: rv1108: add ACLK_GMAC and PCLK_GMAC clk id
+  clk: rockchip: rv1108: rename macphy to mac
+  clk: rockchip: rv1108: fix up the clk_mac sel register description
 
-Looking at mdio-mux, it seems to provide a way to access multiplexed
-MDIO buses. It says nothing about the MAC<->PHY connection.
+ drivers/clk/rockchip/clk-rv1108.c      | 14 ++++++++------
+ include/dt-bindings/clock/rv1108-cru.h |  8 +++++---
+ 2 files changed, 13 insertions(+), 9 deletions(-)
 
-With our hardware, and likely Rockchip's as well, the muxed connections
-include the MDIO and MII connections, which are muxed at the same time.
-It's likely to cause some confusion or even bugs if we implement it as
-a separate driver.
-
-ChenYu
+-- 
+1.9.1
