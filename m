@@ -1,75 +1,161 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 21 Aug 2017 14:33:42 +0200
-Subject: [PATCH] mmc: sunxi: Fix clock rate passed to
- sunxi_mmc_clk_set_phase
-In-Reply-To: <20170810032954.9104-1-wens@csie.org>
-References: <20170810032954.9104-1-wens@csie.org>
-Message-ID: <CAPDyKFqqhGXzmXSVZuie++VcNJGs_9etV16MhLtMAoyB5oCQ4A@mail.gmail.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Mon, 21 Aug 2017 13:34:38 +0100
+Subject: [PATCH 06/27] arm64/sve: System register and exception syndrome
+ definitions
+In-Reply-To: <87a82t5kos.fsf@linaro.org>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-7-git-send-email-Dave.Martin@arm.com>
+ <87a82t5kos.fsf@linaro.org>
+Message-ID: <8760dh5cbl.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 August 2017 at 05:29, Chen-Yu Tsai <wens@csie.org> wrote:
-> sunxi_mmc_clk_set_phase expects the actual card clock rate to be passed
-> to it. When the internal divider code was reworked in commit 9a639c6073d3
-> ("mmc: sunxi: Support MMC DDR52 transfer mode with new timing mode"),
-> this requirement was missed, and the module clock rate was passed in
-> instead. This broke 8 bit DDR MMC on old controllers, as the module
-> clock rate is double the card clock rate, for which we have no valid
-> delay settings.
->
-> Fix this by applying the internal divider to the clock rate right after
-> we configure it in hardware.
->
-> Fixes: 9a639c6073d3 ("mmc: sunxi: Support MMC DDR52 transfer mode with
->                       new timing mode")
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Thanks, applied for next!
+Alex Benn?e <alex.bennee@linaro.org> writes:
 
-Kind regards
-Uffe
+> Dave Martin <Dave.Martin@arm.com> writes:
+>
+>> The SVE architecture adds some system registers, ID register fields
+>> and a dedicated ESR exception class.
+>>
+>> This patch adds the appropriate definitions that will be needed by
+>> the kernel.
+>>
+>> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+>> ---
+>>  arch/arm64/include/asm/esr.h     |  3 ++-
+>>  arch/arm64/include/asm/kvm_arm.h |  1 +
+>>  arch/arm64/include/asm/sysreg.h  | 16 ++++++++++++++++
+>>  arch/arm64/kernel/traps.c        |  1 +
+>>  4 files changed, 20 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+>> index 8cabd57..813629e 100644
+>> --- a/arch/arm64/include/asm/esr.h
+>> +++ b/arch/arm64/include/asm/esr.h
+>> @@ -43,7 +43,8 @@
+>>  #define ESR_ELx_EC_HVC64	(0x16)
+>>  #define ESR_ELx_EC_SMC64	(0x17)
+>>  #define ESR_ELx_EC_SYS64	(0x18)
+>> -/* Unallocated EC: 0x19 - 0x1E */
+>> +#define ESR_ELx_EC_SVE		(0x19)
+>> +/* Unallocated EC: 0x1A - 0x1E */
+>>  #define ESR_ELx_EC_IMP_DEF	(0x1f)
+>>  #define ESR_ELx_EC_IABT_LOW	(0x20)
+>>  #define ESR_ELx_EC_IABT_CUR	(0x21)
+>> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+>> index 61d694c..dbf0537 100644
+>> --- a/arch/arm64/include/asm/kvm_arm.h
+>> +++ b/arch/arm64/include/asm/kvm_arm.h
+>> @@ -185,6 +185,7 @@
+>>  #define CPTR_EL2_TCPAC	(1 << 31)
+>>  #define CPTR_EL2_TTA	(1 << 20)
+>>  #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
+>> +#define CPTR_EL2_TZ	(1 << 8)
+>>  #define CPTR_EL2_DEFAULT	0x000033ff
+>>
+>>  /* Hyp Debug Configuration Register bits */
+>> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+>> index 248339e..2d259e8 100644
+>> --- a/arch/arm64/include/asm/sysreg.h
+>> +++ b/arch/arm64/include/asm/sysreg.h
+>> @@ -145,6 +145,7 @@
+>>
+>>  #define SYS_ID_AA64PFR0_EL1		sys_reg(3, 0, 0, 4, 0)
+>>  #define SYS_ID_AA64PFR1_EL1		sys_reg(3, 0, 0, 4, 1)
+>> +#define SYS_ID_AA64ZFR0_EL1		sys_reg(3, 0, 0, 4, 4)
+>>
+>>  #define SYS_ID_AA64DFR0_EL1		sys_reg(3, 0, 0, 5, 0)
+>>  #define SYS_ID_AA64DFR1_EL1		sys_reg(3, 0, 0, 5, 1)
+>> @@ -160,6 +161,8 @@
+>>  #define SYS_ACTLR_EL1			sys_reg(3, 0, 1, 0, 1)
+>>  #define SYS_CPACR_EL1			sys_reg(3, 0, 1, 0, 2)
+>>
+>> +#define SYS_ZCR_EL1			sys_reg(3, 0, 1, 2, 0)
+>> +
+>
+> I'll have to take these on trust. They are mentioned in both the ARM ARM
+> and the SVE supplement but I can't see any actual definitions of them.
+>
+>>  #define SYS_TTBR0_EL1			sys_reg(3, 0, 2, 0, 0)
+>>  #define SYS_TTBR1_EL1			sys_reg(3, 0, 2, 0, 1)
+>>  #define SYS_TCR_EL1			sys_reg(3, 0, 2, 0, 2)
+>> @@ -250,6 +253,8 @@
+>>
+>>  #define SYS_PMCCFILTR_EL0		sys_reg (3, 3, 14, 15, 7)
+>>
+>> +#define SYS_ZCR_EL2			sys_reg(3, 4, 1, 2, 0)
+>> +
 
-> ---
+OK no I'm working directly from the unpacked ZIP file with the rest of
+the details I think this should be:
+
+  #define SYS_ZCR_EL2			sys_reg(3, 5, 1, 2, 0)
+
+e.g. op1 = 101 / 5
+
+>>  #define SYS_DACR32_EL2			sys_reg(3, 4, 3, 0, 0)
+>>  #define SYS_IFSR32_EL2			sys_reg(3, 4, 5, 0, 1)
+>>  #define SYS_FPEXC32_EL2			sys_reg(3, 4, 5, 3, 0)
+>> @@ -331,6 +336,7 @@
+>>  #define ID_AA64ISAR1_JSCVT_SHIFT	12
+>>
+>>  /* id_aa64pfr0 */
+>> +#define ID_AA64PFR0_SVE_SHIFT		32
+>>  #define ID_AA64PFR0_GIC_SHIFT		24
+>>  #define ID_AA64PFR0_ASIMD_SHIFT		20
+>>  #define ID_AA64PFR0_FP_SHIFT		16
+>> @@ -339,6 +345,7 @@
+>>  #define ID_AA64PFR0_EL1_SHIFT		4
+>>  #define ID_AA64PFR0_EL0_SHIFT		0
+>>
+>> +#define ID_AA64PFR0_SVE			0x1
+>>  #define ID_AA64PFR0_FP_NI		0xf
+>>  #define ID_AA64PFR0_FP_SUPPORTED	0x0
+>>  #define ID_AA64PFR0_ASIMD_NI		0xf
+>> @@ -440,6 +447,15 @@
+>>  #endif
+>>
+>>
+>> +#define ZCR_ELx_LEN_SHIFT	0
+>> +#define ZCR_ELx_LEN_SIZE	9
+>> +#define ZCR_ELx_LEN_MASK	0x1ff
+>> +
+
+LEN should be 0/4/0xf
+
+LEN, bits [3:0]
+
+Constrains the scalable vector register length for EL1 and EL0 to (LEN+1)x128 bits.
+
+
+>> +#define CPACR_EL1_ZEN_EL1EN	(1 << 16)
+>> +#define CPACR_EL1_ZEN_EL0EN	(1 << 17)
+>> +#define CPACR_EL1_ZEN		(CPACR_EL1_ZEN_EL1EN |
+>> CPACR_EL1_ZEN_EL0EN)
 >
-> Sorry for all the regressions the A83T MMC series has caused.
-> I only caught this while testing some other patches on the H3.
-> I really hope this is the last one.
+> This is a little weird as it is a 2 bit field in which 00 and 11 are not
+> simply the sum of their bits. If the code wrote CPACR_EL1_ZEN_EL0EN |
+> CPACR_EL1_ZEN_EL1EN to the CPACR_EL1 you wouldn't get the expected behaviour.
 >
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 6c7eb859ace1..da5f46a14497 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -821,6 +821,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->         rval |= div - 1;
->         mmc_writel(host, REG_CLKCR, rval);
->
-> +       /* update card clock rate to account for internal divider */
-> +       rate /= div;
-> +
->         if (host->use_new_timings) {
->                 /* Don't touch the delay bits */
->                 rval = mmc_readl(host, REG_SD_NTSR);
-> @@ -828,6 +831,7 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->                 mmc_writel(host, REG_SD_NTSR, rval);
->         }
->
-> +       /* sunxi_mmc_clk_set_phase expects the actual card clock rate */
->         ret = sunxi_mmc_clk_set_phase(host, ios, rate);
->         if (ret)
->                 return ret;
-> @@ -849,7 +853,7 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->                 return ret;
->
->         /* And we just enabled our clock back */
-> -       mmc->actual_clock = rate / div;
-> +       mmc->actual_clock = rate;
->
->         return 0;
->  }
-> --
-> 2.13.3
->
+>> +
+>> +
+>>  /* Safe value for MPIDR_EL1: Bit31:RES1, Bit30:U:0, Bit24:MT:0 */
+>>  #define SYS_MPIDR_SAFE_VAL		(1UL << 31)
+>>
+>> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+>> index 0f047e9..8964795 100644
+>> --- a/arch/arm64/kernel/traps.c
+>> +++ b/arch/arm64/kernel/traps.c
+>> @@ -621,6 +621,7 @@ static const char *esr_class_str[] = {
+>>  	[ESR_ELx_EC_HVC64]		= "HVC (AArch64)",
+>>  	[ESR_ELx_EC_SMC64]		= "SMC (AArch64)",
+>>  	[ESR_ELx_EC_SYS64]		= "MSR/MRS (AArch64)",
+>> +	[ESR_ELx_EC_SVE]		= "SVE",
+>>  	[ESR_ELx_EC_IMP_DEF]		= "EL3 IMP DEF",
+>>  	[ESR_ELx_EC_IABT_LOW]		= "IABT (lower EL)",
+>>  	[ESR_ELx_EC_IABT_CUR]		= "IABT (current EL)",
+
+
+--
+Alex Benn?e
