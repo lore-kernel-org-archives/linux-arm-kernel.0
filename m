@@ -1,76 +1,60 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 21 Aug 2017 13:30:02 +0200
-Subject: [PATCH v2] mmc: renesas_sdhi: Add r8a7743/5 support
-In-Reply-To: <1503311897-18807-1-git-send-email-biju.das@bp.renesas.com>
-References: <1502710766-44361-1-git-send-email-biju.das@bp.renesas.com>
- <1503311897-18807-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <CAMuHMdWUxxp75u1VSLY3WnObmhSMDvP3skr9Uf3rV4Bf-ixy_w@mail.gmail.com>
+From: oleksandrs@mellanox.com (Oleksandr Shamray)
+Date: Mon, 21 Aug 2017 14:31:09 +0300
+Subject: [patch v5 3/3] doccumentation: jtag: Add bindings for Aspeed SoC 24xx
+ and 25xx families JTAG master driver
+In-Reply-To: <1503315069-29465-1-git-send-email-oleksandrs@mellanox.com>
+References: <1503315069-29465-1-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <1503315069-29465-4-git-send-email-oleksandrs@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Biju,
+It has been tested on Mellanox system with BMC equipped with
+Aspeed 2520 SoC for programming CPLD devices.
 
-On Mon, Aug 21, 2017 at 12:38 PM, Biju Das <biju.das@bp.renesas.com> wrote:
-> Add support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5) SDHI
-> is identical to the R-Car Gen2 family.
->
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> ---
-> v1->v2
->     -Modified the listing SoC's description related to SoC
->      with 1 Clock and 2 Clocks
->
-> This patch is compiled and tested against linux next tag
-> next-20170817.
->
->  Documentation/devicetree/bindings/mmc/tmio_mmc.txt | 9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-> index 4fd8b7a..1e3106e 100644
-> --- a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-> @@ -15,6 +15,8 @@ Required properties:
->                 "renesas,sdhi-r7s72100" - SDHI IP on R7S72100 SoC
->                 "renesas,sdhi-r8a73a4" - SDHI IP on R8A73A4 SoC
->                 "renesas,sdhi-r8a7740" - SDHI IP on R8A7740 SoC
-> +               "renesas,sdhi-r8a7743" - SDHI IP on R8A7743 SoC
-> +               "renesas,sdhi-r8a7745" - SDHI IP on R8A7745 SoC
->                 "renesas,sdhi-r8a7778" - SDHI IP on R8A7778 SoC
->                 "renesas,sdhi-r8a7779" - SDHI IP on R8A7779 SoC
->                 "renesas,sdhi-r8a7790" - SDHI IP on R8A7790 SoC
-> @@ -33,10 +35,9 @@ Required properties:
->           If 2 clocks are specified by the hardware, you must name them as
->           "core" and "cd". If the controller only has 1 clock, naming is not
->           required.
-> -         Below is the number clocks for each supported SoC:
-> -          1: SH73A0, R8A73A4, R8A7740, R8A7778, R8A7779, R8A7790
-> -             R8A7791, R8A7792, R8A7793, R8A7794, R8A7795, R8A7796
-> -          2: R7S72100
-> +         Most supported SoCs only have 1 clock. Devices which have more
+Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
+Signed-off-by: Jiri Pirko <jiri@mellanox.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+v4->v5
 
-That is actually mentioned in the paragraph above:
+V3->v4
+Comments pointed by Rob Herring <robh@kernel.org>
+- delete unnecessary "status" and "reg-shift" descriptions in
+  bndings file
 
-- clocks: Most controllers only have 1 clock source per channel. However, on
-          some variations of this controller, the internal card detection
-          logic that exists in this controller is sectioned off to be run by a
-          separate second clock source to allow the main core clock to be turned
-          off to save power.
+v2->v3
+Comments pointed by Rob Herring <robh@kernel.org>
+- split Aspeed jtag driver and binding to sepatrate patches
+- delete unnecessary "status" and "reg-shift" descriptions in
+  bndings file
+---
+ .../devicetree/bindings/jtag/aspeed-jtag.txt       |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
 
-so I suggest just integrating the (short) list in that paragraph.
-
-> +         than 1 clock are listed below:
-> +         2: R7S72100"
-
-Bogus trailing double quote.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+new file mode 100644
+index 0000000..f4ded49
+--- /dev/null
++++ b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
+@@ -0,0 +1,18 @@
++Aspeed JTAG driver for ast2400 and ast2500 SoC
++
++Required properties:
++- compatible:		Should be one of
++      - "aspeed,aspeed2400-jtag"
++      - "aspeed,aspeed2500-jtag"
++- reg			contains the offset and length of the JTAG memory
++			region
++- clocks		root clock of bus, should reference the APB clock
++- interrupts		should contain JTAG controller interrupt
++
++Example:
++jtag: jtag at 1e6e4000 {
++	compatible = "aspeed,aspeed2500-jtag";
++	reg = <0x1e6e4000 0x1c>;
++	clocks = <&clk_apb>;
++	interrupts = <43>;
++};
+-- 
+1.7.1
