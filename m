@@ -1,54 +1,116 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 21 Aug 2017 14:04:01 +0200
-Subject: [RESEND PATCH v5 11/16] arm64: zynqmp: Add generic compatible
- string for I2C EEPROM
-In-Reply-To: <CABxcv=mOtPDU4RStdrF1EFci65N8sMB1MG4oKZiTXqUTe7GWHA@mail.gmail.com>
-References: <20170615185418.13980-1-javier@dowhile0.org>
- <20170615185418.13980-12-javier@dowhile0.org>
- <e64ce8be-599a-5fc5-3194-92aac574173c@xilinx.com>
- <CABxcv=mOtPDU4RStdrF1EFci65N8sMB1MG4oKZiTXqUTe7GWHA@mail.gmail.com>
-Message-ID: <ae7ec977-4ec8-7dcf-8bc6-27cb8c6bf48d@xilinx.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 21 Aug 2017 14:05:46 +0200
+Subject: [PATCH 08/14] mmc: meson-gx: rework clock init function
+In-Reply-To: <7h4ltjoyep.fsf@baylibre.com>
+References: <20170804174353.16486-1-jbrunet@baylibre.com>
+ <20170804174353.16486-9-jbrunet@baylibre.com> <7h4ltjoyep.fsf@baylibre.com>
+Message-ID: <1503317146.7032.3.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.8.2017 13:27, Javier Martinez Canillas wrote:
-> [snip]
+On Mon, 2017-08-07 at 14:34 -0700, Kevin Hilman wrote:
+> Jerome Brunet <jbrunet@baylibre.com> writes:
 > 
->>>
->>> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
->>> index ef1b9e573af0..53907b7a7fd9 100644
->>> --- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
->>> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
->>> @@ -55,7 +55,7 @@
->>>       status = "okay";
->>>       clock-frequency = <400000>;
->>>       eeprom at 54 {
->>> -             compatible = "at,24c64";
->>> +             compatible = "atmel,24c64";
->>>               reg = <0x54>;
->>>       };
->>>  };
->>> @@ -64,7 +64,7 @@
->>>       status = "okay";
->>>       clock-frequency = <400000>;
->>>       eeprom at 55 {
->>> -             compatible = "at,24c64";
->>> +             compatible = "atmel,24c64";
->>>               reg = <0x55>;
->>>       };
->>>  };
->>>
->>
->> Acked-by: Michal Simek <michal.simek@xilinx.com>
->>
+> > Perform basic initialisation of the clk register before providing it to
+> > the CCF.
+> > 
+> > Thanks to devm, carrying the clock structure around after init is not
+> > necessary. Rework the function to remove these from the controller host
+> > data.
+> > 
+> > Finally, set initial mmc clock rate before enabling it, simplifying the
+> > exit condition.
+> > 
+> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> > ---
+> > ?drivers/mmc/host/meson-gx-mmc.c | 101 +++++++++++++++++++----------------
+> > -----
+> > ?1 file changed, 49 insertions(+), 52 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-
+> > mmc.c
+> > index 8f9ba5190c18..4cc7d6530536 100644
+> > --- a/drivers/mmc/host/meson-gx-mmc.c
+> > +++ b/drivers/mmc/host/meson-gx-mmc.c
+> > @@ -42,10 +42,7 @@
+> > ?
+> > ?#define SD_EMMC_CLOCK 0x0
+> > ?#define???CLK_DIV_MASK GENMASK(5, 0)
+> > -#define???CLK_DIV_MAX 63
+> > ?#define???CLK_SRC_MASK GENMASK(7, 6)
+> > -#define???CLK_SRC_XTAL 0???/* external crystal */
+> > -#define???CLK_SRC_PLL 1????/* FCLK_DIV2 */
+> > ?#define???CLK_CORE_PHASE_MASK GENMASK(9, 8)
+> > ?#define???CLK_TX_PHASE_MASK GENMASK(11, 10)
+> > ?#define???CLK_RX_PHASE_MASK GENMASK(13, 12)
+> > @@ -137,13 +134,9 @@ struct meson_host {
+> > ?	spinlock_t lock;
+> > ?	void __iomem *regs;
+> > ?	struct clk *core_clk;
+> > -	struct clk_mux mux;
+> > -	struct clk *mux_clk;
+> > +	struct clk *signal_clk;
+> > ?	unsigned long req_rate;
+> > ?
+> > -	struct clk_divider cfg_div;
+> > -	struct clk *cfg_div_clk;
+> > -
+> > ?	unsigned int bounce_buf_size;
+> > ?	void *bounce_buf;
+> > ?	dma_addr_t bounce_dma_addr;
+> > @@ -291,7 +284,7 @@ static int meson_mmc_clk_set(struct meson_host *host,
+> > unsigned long clk_rate)
+> > ?		return 0;
+> > ?	}
+> > ?
+> > -	ret = clk_set_rate(host->cfg_div_clk, clk_rate);
+> > +	ret = clk_set_rate(host->signal_clk, clk_rate);
 > 
-> Any reasons why this patch was never picked? It was acked two months ago.
+> minor nit: where does the name "signal" come from???I called this
+> "div_clk" because it's the output of the divider right before the
+> sd/emmc IP block. 
 
-Normally when you send series then it should be applied as the whole
-series not just one piece of that.
+Actually, no before but inside.
 
-Anyway I see that changes are applied and this one is missing that's why
-I will add to zynqmp/dt branch and going to send pull request today.
+> Admittedly, that's not a great name either, and I'm
+> not too picky about the naming, just curious...
 
-Thanks,
-Michal
+Well, I thought div_clk was not great name too ... since the clock is actually
+the one used for the mmc signal (as opposed to the clock gate named "core") I
+thought it was ok.
+
+In the v2, I added the handling of clock phase through CCF. With this change,
+div_clk does not make sense anymore.
+
+According to the datasheet, It should be named "core_clk" (it is the clock
+coming out of the CORE_PHASE setting), unfortunately we already used this name
+for the clock gate ... changing it would mean changing the clock names in the
+bindings as well, which would probably be very confusing.
+
+In the v2, I named it mmc_clk ... probably not great either :( If you have
+another idea, I'm happy to sed it.
+
+> 
+> Looking at the diagram we have since I initially wrote the driver, this
+> is more commonly referred to as device_clk.
+> 
+> Anyways, if you're going to rename...
+> 
+> [...]
+> 
+> > ?static void meson_mmc_set_tuning_params(struct mmc_host *mmc)
+> > @@ -987,7 +984,7 @@ static int meson_mmc_probe(struct platform_device *pdev)
+> > ?	dma_free_coherent(host->dev, host->bounce_buf_size,
+> > ?			??host->bounce_buf, host->bounce_dma_addr);
+> > ?err_div_clk:
+> 
+> ... probably should rename this too.
+
+Indeed !
+
+> 
+> Otherwise,
+> 
+> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+> 
+> Kevin
