@@ -1,46 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 21 Aug 2017 07:21:32 -0700
-Subject: [PATCH 3/5] dt-bindings: ti-omap-hsmmc: Document new compatible
- for sdhci omap
-In-Reply-To: <20170821074132.4622-4-kishon@ti.com>
-References: <20170821074132.4622-1-kishon@ti.com>
- <20170821074132.4622-4-kishon@ti.com>
-Message-ID: <20170821142132.GH6008@atomide.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 21 Aug 2017 16:23:21 +0200
+Subject: [PATCH v3 3/4] net: stmmac: register parent MDIO node for
+ sun8i-h3-emac
+In-Reply-To: <20170821133104.qvrhvwin2rdg4aqo@flea.lan>
+References: <20170818122118.4925-1-clabbe.montjoie@gmail.com>
+ <20170818122118.4925-4-clabbe.montjoie@gmail.com>
+ <CAGb2v66KcZkiDDHryMmVzm4WroXePPy3V44SLpVdoO3ZEjgC=g@mail.gmail.com>
+ <20170819185025.GB13266@Red> <20170819203836.GA21567@lunn.ch>
+ <20170820065757.GA6081@Red> <20170820142545.GB24150@lunn.ch>
+ <CAGb2v67hQXSoCKP7qW+KRUYX+0djQ1Z23cQ67Lyg6G7ozGyfGQ@mail.gmail.com>
+ <20170821132015.GB1703@lunn.ch>
+ <20170821133104.qvrhvwin2rdg4aqo@flea.lan>
+Message-ID: <20170821142321.GE1703@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [170821 00:42]:
-> Document the new compatible string "ti,dra7-sdhci" to be used for
-> MMC controllers in DRA7 and DRA72 SoCs.
+> All muxes are mostly always represented the same way afaik, or do you
+> want to simply introduce a new compatible / property?
 
-I suggest that you add a new one sdhci-omap.txt instead.
-We are not currently parsing the all the hsmmc properties for
-sdhci.
++      	  mdio-mux {
++		compatible = "allwinner,sun8i-h3-mdio-switch";
++		mdio-parent-bus = <&mdio_parent>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		internal_mdio: mdio at 1 {
+			reg = <1>;
+-			clocks = <&ccu CLK_BUS_EPHY>;
+-			resets = <&ccu RST_BUS_EPHY>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			int_mii_phy: ethernet-phy at 1 {
++				compatible = "ethernet-phy-ieee802.3-c22";
++				reg = <1>;
++				clocks = <&ccu CLK_BUS_EPHY>;
++				resets = <&ccu RST_BUS_EPHY>;
++				phy-is-integrated;
++			};
++		};
++		mdio: mdio at 0 {
++			reg = <0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 		
+Hi Maxim
 
-Then eventually when they are fully compatible, we can just
-change ti-omap-hsmmc.txt to point to the sdhci-omap.txt.
+Anybody who knows the MDIO-mux code/binding, knows that it is a run
+time mux. You swap the mux per MDIO transaction. You can access all
+the PHY and switches on the mux'ed MDIO bus.
 
-Regards,
+However here, it is effectively a boot-time MUX. You cannot change it
+on the fly. What happens when somebody has a phandle to a PHY on the
+internal and a phandle to a phy on the external? Does the driver at
+least return -EINVAL, or -EBUSY? Is there a representation which
+eliminates this possibility?
 
-Tony
-
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> index 0e026c151c1c..db80fdfd05d7 100644
-> --- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> @@ -13,6 +13,7 @@ Required properties:
->   Should be "ti,omap3-pre-es3-hsmmc" for OMAP3 controllers pre ES3.0
->   Should be "ti,omap4-hsmmc", for OMAP4 controllers
->   Should be "ti,am33xx-hsmmc", for AM335x controllers
-> + Should be "ti,dra7-sdhci" for DRA7 and DRA72 controllers
->  - ti,hwmods: Must be "mmc<n>", n is controller instance starting 1
->  
->  Optional properties:
-> -- 
-> 2.11.0
-> 
+   Andrew
