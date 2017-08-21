@@ -1,92 +1,54 @@
-From: borntraeger@de.ibm.com (Christian Borntraeger)
-Date: Mon, 21 Aug 2017 15:48:57 +0200
-Subject: [PATCH RFC 1/2] KVM: remove unused __KVM_HAVE_ARCH_VM_ALLOC
-In-Reply-To: <20170816194037.9460-2-rkrcmar@redhat.com>
-References: <20170816194037.9460-1-rkrcmar@redhat.com>
- <20170816194037.9460-2-rkrcmar@redhat.com>
-Message-ID: <b73c394a-cd08-1f70-aaf5-5387d5a9adce@de.ibm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 21 Aug 2017 09:53:56 -0400
+Subject: [PATCH v11 2/4] PCI: Factor out pci_bus_wait_crs()
+In-Reply-To: <20170818213210.15145.15340.stgit@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170818212310.15145.21732.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20170818213210.15145.15340.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <9cb3006d-31d0-e57a-fd3e-c32914e8ba42@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Christian Borntraeger <borntraeger@de.ibm.com>
+On 8/18/2017 5:32 PM, Bjorn Helgaas wrote:
+> +	if ((*l & 0xffff) != 0x0001)
+> +		return true;	/* not a CRS completion */
+>  
 
-Since we removed ia64 from KVM we no longer need an _arch_ variant.
+This version certainly looks cleaner. However, it breaks pci_flr_wait().
 
-On 08/16/2017 09:40 PM, Radim Kr?m?? wrote:
-> Moving it to generic code will allow us to extend it with ease.
-> 
-> Reviewed-by: David Hildenbrand <david@redhat.com>
-> Signed-off-by: Radim Kr?m?? <rkrcmar@redhat.com>
-> ---
->  include/linux/kvm_host.h | 12 ------------
->  virt/kvm/kvm_main.c      | 16 +++++++++++++---
->  2 files changed, 13 insertions(+), 15 deletions(-)
-> 
-> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-> index 6882538eda32..c8df733eed41 100644
-> --- a/include/linux/kvm_host.h
-> +++ b/include/linux/kvm_host.h
-> @@ -803,18 +803,6 @@ int kvm_arch_vcpu_runnable(struct kvm_vcpu *vcpu);
->  bool kvm_arch_vcpu_in_kernel(struct kvm_vcpu *vcpu);
->  int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu);
-> 
-> -#ifndef __KVM_HAVE_ARCH_VM_ALLOC
-> -static inline struct kvm *kvm_arch_alloc_vm(void)
-> -{
-> -	return kzalloc(sizeof(struct kvm), GFP_KERNEL);
-> -}
-> -
-> -static inline void kvm_arch_free_vm(struct kvm *kvm)
-> -{
-> -	kfree(kvm);
-> -}
-> -#endif
-> -
->  #ifdef __KVM_HAVE_ARCH_NONCOHERENT_DMA
->  void kvm_arch_register_noncoherent_dma(struct kvm *kvm);
->  void kvm_arch_unregister_noncoherent_dma(struct kvm *kvm);
-> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> index e17c40d986f3..2eac2c62795f 100644
-> --- a/virt/kvm/kvm_main.c
-> +++ b/virt/kvm/kvm_main.c
-> @@ -640,10 +640,20 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
->  	return 0;
->  }
-> 
-> +static inline struct kvm *kvm_alloc_vm(void)
-> +{
-> +	return kzalloc(sizeof(struct kvm), GFP_KERNEL);
-> +}
-> +
-> +static inline void kvm_free_vm(struct kvm *kvm)
-> +{
-> +	kfree(kvm);
-> +}
-> +
->  static struct kvm *kvm_create_vm(unsigned long type)
->  {
->  	int r, i;
-> -	struct kvm *kvm = kvm_arch_alloc_vm();
-> +	struct kvm *kvm = kvm_alloc_vm();
-> 
->  	if (!kvm)
->  		return ERR_PTR(-ENOMEM);
-> @@ -720,7 +730,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
->  		kfree(kvm_get_bus(kvm, i));
->  	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++)
->  		kvm_free_memslots(kvm, __kvm_memslots(kvm, i));
-> -	kvm_arch_free_vm(kvm);
-> +	kvm_free_vm(kvm);
->  	mmdrop(current->mm);
->  	return ERR_PTR(r);
->  }
-> @@ -771,7 +781,7 @@ static void kvm_destroy_vm(struct kvm *kvm)
->  		kvm_free_memslots(kvm, __kvm_memslots(kvm, i));
->  	cleanup_srcu_struct(&kvm->irq_srcu);
->  	cleanup_srcu_struct(&kvm->srcu);
-> -	kvm_arch_free_vm(kvm);
-> +	kvm_free_vm(kvm);
->  	preempt_notifier_dec();
->  	hardware_disable_all();
->  	mmdrop(mm);
-> 
+If some root port doesn't support CRS and returns 0xFFFFFFFF, pci_bus_wait_crs()
+function returns true. pci_flr_wait() prematurely bails out from here.
+
+
+pci_flr_wait()
+{
+
++	ret = pci_bus_wait_crs(dev->bus, dev->devfn, &id, 60000);
++	if (ret)
++		return;
+
+}
+
+We can change the return code to false above but then we break pci_bus_read_dev_vendor_id()
+function. 
+
+That's why, I was interested in creating a pci_bus_crs_visibility_supported() helper
+function that would check for the magic 0x0001 value and return true. Otherwise, false. 
+
+pci_bus_read_dev_vendor_id() would do this
+
+pci_bus_read_dev_vendor_id()
+{
+	...
+	if (pci_bus_crs_visibility_supported())
+		return pci_bus_wait_crs(dev->bus, dev->devfn, &id, 60000);
+
+	return true
+}
+
+Similar pattern for pci_flr_wait().
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
