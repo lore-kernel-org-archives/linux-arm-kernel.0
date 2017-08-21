@@ -1,122 +1,182 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Mon, 21 Aug 2017 18:48:17 -0500
-Subject: [PATCH 7/8] ARM: DRA7: hwmod_data: Add data for IPUs
+Date: Mon, 21 Aug 2017 18:48:12 -0500
+Subject: [PATCH 2/8] ARM: DRA7: hwmod data: Add MMU data for DSPs
 In-Reply-To: <20170821234818.4755-1-s-anna@ti.com>
 References: <20170821234818.4755-1-s-anna@ti.com>
-Message-ID: <20170821234818.4755-8-s-anna@ti.com>
+Message-ID: <20170821234818.4755-3-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DRA7xx family of SoCs usually have two IPU remote processor
-subsystems. These subsystems are very similar to the respective
-processor subsystems on OMAP4/OMAP5 in terms of clock and reset
-integration. The relevant hwmod classes and data structures are
-added for IPU1 and IPU2 remoteproc devices that's present on
-almost all DRA7xx/AM57xx SoCs.
+Add the data structures for representing the MMUs within the DSP
+processor subsystems present in DRA7xx/AM57xx SoCs. The DRA7xx
+family of SoCs usually have one or two DSPs. The DRA74x/DRA76x
+family has two DSPs, while DRA72x/DRA71x has only a single DSP.
+Each DSP subsystem has two MMUs, one for the processor core and
+the other for the internal EDMA block. The hwmod data for the
+second DSP is only added for DRA74x/DRA76x family of SoCs.
 
-Do note that these hwmod data structures do not have a .modulemode
-field as the devices are managed together with their corresponding
-MMUs. Each of the processor subsystem and its MMU are present within
-the same clock domain and requires the domain be clocked and enabled
-until the last entity is disabled. The module is disabled properly
-during the omap_device_idle processing of the MMU hwmod while
-disabling the MMU.
+Both these MMUs share a common reset line, the MMU on the EDMA
+port is expected to be mirror-programmed alongside the primary
+MMU. The reset data is added to both the MMUs to allow the
+omap_hwmod layer to skip the enabling and idling of these devices,
+as that would require the reset be released, which is outside
+the scope of the hwmod core code. The other PRCM data fields are
+also skipped for both the second MMUs, this will be handled as
+part of the primary MMU enabling sequence. The pdata quirks will
+also not be added for the second MMU as the OMAP IOMMU driver
+releases the reset once and is expected to program both the MMUs
+together.
 
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 66 +++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 109 ++++++++++++++++++++++++++++++
+ 1 file changed, 109 insertions(+)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 63ad0d3217dc..e65a02855633 100644
+index bf55802448ac..63ad0d3217dc 100644
 --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
 +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1201,6 +1201,54 @@ static struct omap_hwmod dra7xx_i2c5_hwmod = {
+@@ -1821,6 +1821,77 @@ static struct omap_hwmod_class dra7xx_mmu_hwmod_class = {
+ 	.sysc = &dra7xx_mmu_sysc,
  };
  
- /*
-+ * 'ipu' class
-+ * image processor unit
-+ */
-+
-+static struct omap_hwmod_class dra7xx_ipu_hwmod_class = {
-+	.name	= "ipu",
++/* DSP MMUs */
++static struct omap_hwmod_rst_info dra7xx_mmu_dsp_resets[] = {
++	{ .name = "mmu_cache", .rst_shift = 1 },
 +};
 +
-+static struct omap_hwmod_rst_info dra7xx_ipu_resets[] = {
-+	{ .name = "cpu0", .rst_shift = 0 },
-+	{ .name = "cpu1", .rst_shift = 1 },
-+};
-+
-+/* ipu1 processor */
-+static struct omap_hwmod dra7xx_ipu1_hwmod = {
-+	.name		= "ipu1",
-+	.class		= &dra7xx_ipu_hwmod_class,
-+	.clkdm_name	= "ipu1_clkdm",
-+	.rst_lines	= dra7xx_ipu_resets,
-+	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_ipu_resets),
-+	.main_clk	= "ipu1_gfclk_mux",
++/* mmu0 - dsp1 */
++static struct omap_hwmod dra7xx_mmu0_dsp1_hwmod = {
++	.name		= "mmu0_dsp1",
++	.class		= &dra7xx_mmu_hwmod_class,
++	.clkdm_name	= "dsp1_clkdm",
++	.rst_lines	= dra7xx_mmu_dsp_resets,
++	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_mmu_dsp_resets),
++	.main_clk	= "dpll_dsp_m2_ck",
 +	.prcm = {
 +		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_IPU1_IPU1_CLKCTRL_OFFSET,
-+			.rstctrl_offs = DRA7XX_RM_IPU1_RSTCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_IPU1_IPU1_CONTEXT_OFFSET,
++			.clkctrl_offs = DRA7XX_CM_DSP1_DSP1_CLKCTRL_OFFSET,
++			.rstctrl_offs = DRA7XX_RM_DSP1_RSTCTRL_OFFSET,
++			.context_offs = DRA7XX_RM_DSP1_DSP1_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_HWCTRL,
 +		},
 +	},
 +};
 +
-+/* ipu2 processor */
-+static struct omap_hwmod dra7xx_ipu2_hwmod = {
-+	.name		= "ipu2",
-+	.class		= &dra7xx_ipu_hwmod_class,
-+	.clkdm_name	= "ipu2_clkdm",
-+	.rst_lines	= dra7xx_ipu_resets,
-+	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_ipu_resets),
-+	.main_clk	= "dpll_core_h22x2_ck",
++/* mmu1 - dsp1 */
++static struct omap_hwmod dra7xx_mmu1_dsp1_hwmod = {
++	.name		= "mmu1_dsp1",
++	.class		= &dra7xx_mmu_hwmod_class,
++	.clkdm_name	= "dsp1_clkdm",
++	.rst_lines	= dra7xx_mmu_dsp_resets,
++	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_mmu_dsp_resets),
++	.main_clk	= "dpll_dsp_m2_ck",
 +	.prcm = {
 +		.omap4 = {
-+			.clkctrl_offs = DRA7XX_CM_IPU2_IPU2_CLKCTRL_OFFSET,
-+			.rstctrl_offs = DRA7XX_RM_IPU2_RSTCTRL_OFFSET,
-+			.context_offs = DRA7XX_RM_IPU2_IPU2_CONTEXT_OFFSET,
++			.rstctrl_offs = DRA7XX_RM_DSP1_RSTCTRL_OFFSET,
 +		},
 +	},
 +};
 +
-+/*
-  * 'mailbox' class
-  *
-  */
-@@ -3492,6 +3540,22 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per1__i2c5 = {
++/* mmu0 - dsp2 */
++static struct omap_hwmod dra7xx_mmu0_dsp2_hwmod = {
++	.name		= "mmu0_dsp2",
++	.class		= &dra7xx_mmu_hwmod_class,
++	.clkdm_name	= "dsp2_clkdm",
++	.rst_lines	= dra7xx_mmu_dsp_resets,
++	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_mmu_dsp_resets),
++	.main_clk	= "dpll_dsp_m2_ck",
++	.prcm = {
++		.omap4 = {
++			.clkctrl_offs = DRA7XX_CM_DSP2_DSP2_CLKCTRL_OFFSET,
++			.rstctrl_offs = DRA7XX_RM_DSP2_RSTCTRL_OFFSET,
++			.context_offs = DRA7XX_RM_DSP2_DSP2_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_HWCTRL,
++		},
++	},
++};
++
++/* mmu1 - dsp2 */
++static struct omap_hwmod dra7xx_mmu1_dsp2_hwmod = {
++	.name		= "mmu1_dsp2",
++	.class		= &dra7xx_mmu_hwmod_class,
++	.clkdm_name	= "dsp2_clkdm",
++	.rst_lines	= dra7xx_mmu_dsp_resets,
++	.rst_lines_cnt	= ARRAY_SIZE(dra7xx_mmu_dsp_resets),
++	.main_clk	= "dpll_dsp_m2_ck",
++	.prcm = {
++		.omap4 = {
++			.rstctrl_offs = DRA7XX_RM_DSP2_RSTCTRL_OFFSET,
++		},
++	},
++};
++
+ /* IPU MMUs */
+ static struct omap_hwmod_rst_info dra7xx_mmu_ipu_resets[] = {
+ 	{ .name = "mmu_cache", .rst_shift = 2 },
+@@ -2964,6 +3035,38 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__l4_cfg = {
  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
  };
  
-+/* ipu1 -> l3_main_1 */
-+static struct omap_hwmod_ocp_if dra7xx_ipu1__l3_main_1 = {
-+	.master		= &dra7xx_ipu1_hwmod,
-+	.slave		= &dra7xx_l3_main_1_hwmod,
++/* l3_main_1 -> mmu0_dsp1 */
++static struct omap_hwmod_ocp_if dra7xx_l3_main_1__mmu0_dsp1 = {
++	.master		= &dra7xx_l3_main_1_hwmod,
++	.slave		= &dra7xx_mmu0_dsp1_hwmod,
 +	.clk		= "l3_iclk_div",
 +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 +};
 +
-+/* ipu2 -> l3_main_1 */
-+static struct omap_hwmod_ocp_if dra7xx_ipu2__l3_main_1 = {
-+	.master		= &dra7xx_ipu2_hwmod,
-+	.slave		= &dra7xx_l3_main_1_hwmod,
++/* l3_main_1 -> mmu1_dsp1 */
++static struct omap_hwmod_ocp_if dra7xx_l3_main_1__mmu1_dsp1 = {
++	.master		= &dra7xx_l3_main_1_hwmod,
++	.slave		= &dra7xx_mmu1_dsp1_hwmod,
 +	.clk		= "l3_iclk_div",
 +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
 +};
 +
- /* l4_cfg -> mailbox1 */
- static struct omap_hwmod_ocp_if dra7xx_l4_cfg__mailbox1 = {
- 	.master		= &dra7xx_l4_cfg_hwmod,
-@@ -4171,6 +4235,8 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l4_per1__i2c3,
- 	&dra7xx_l4_per1__i2c4,
- 	&dra7xx_l4_per1__i2c5,
-+	&dra7xx_ipu1__l3_main_1,
-+	&dra7xx_ipu2__l3_main_1,
- 	&dra7xx_l4_cfg__mailbox1,
- 	&dra7xx_l4_per3__mailbox2,
- 	&dra7xx_l4_per3__mailbox3,
++/* l3_main_1 -> mmu0_dsp2 */
++static struct omap_hwmod_ocp_if dra7xx_l3_main_1__mmu0_dsp2 = {
++	.master		= &dra7xx_l3_main_1_hwmod,
++	.slave		= &dra7xx_mmu0_dsp2_hwmod,
++	.clk		= "l3_iclk_div",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
++/* l3_main_1 -> mmu1_dsp2 */
++static struct omap_hwmod_ocp_if dra7xx_l3_main_1__mmu1_dsp2 = {
++	.master		= &dra7xx_l3_main_1_hwmod,
++	.slave		= &dra7xx_mmu1_dsp2_hwmod,
++	.clk		= "l3_iclk_div",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ /* l3_main_1 -> mmu_ipu1 */
+ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__mmu_ipu1 = {
+ 	.master		= &dra7xx_l3_main_1_hwmod,
+@@ -4089,6 +4192,8 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+ 	&dra7xx_l4_per1__mmc2,
+ 	&dra7xx_l4_per1__mmc3,
+ 	&dra7xx_l4_per1__mmc4,
++	&dra7xx_l3_main_1__mmu0_dsp1,
++	&dra7xx_l3_main_1__mmu1_dsp1,
+ 	&dra7xx_l3_main_1__mmu_ipu1,
+ 	&dra7xx_l3_main_1__mmu_ipu2,
+ 	&dra7xx_l4_cfg__mpu,
+@@ -4153,11 +4258,15 @@ static struct omap_hwmod_ocp_if *dra7xx_gp_hwmod_ocp_ifs[] __initdata = {
+ /* SoC variant specific hwmod links */
+ static struct omap_hwmod_ocp_if *dra76x_hwmod_ocp_ifs[] __initdata = {
+ 	&dra7xx_l4_per3__usb_otg_ss4,
++	&dra7xx_l3_main_1__mmu0_dsp2,
++	&dra7xx_l3_main_1__mmu1_dsp2,
+ 	NULL,
+ };
+ 
+ static struct omap_hwmod_ocp_if *dra74x_hwmod_ocp_ifs[] __initdata = {
+ 	&dra7xx_l4_per3__usb_otg_ss4,
++	&dra7xx_l3_main_1__mmu0_dsp2,
++	&dra7xx_l3_main_1__mmu1_dsp2,
+ 	NULL,
+ };
+ 
 -- 
 2.13.1
