@@ -1,71 +1,50 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 21 Aug 2017 18:02:50 +0200
-Subject: [PATCH v2 05/16] mmc: meson-gx: cfg init overwrite values
+Date: Mon, 21 Aug 2017 18:02:49 +0200
+Subject: [PATCH v2 04/16] mmc: meson-gx: use _irqsave variant of spinlock
 In-Reply-To: <20170821160301.21899-1-jbrunet@baylibre.com>
 References: <20170821160301.21899-1-jbrunet@baylibre.com>
-Message-ID: <20170821160301.21899-6-jbrunet@baylibre.com>
+Message-ID: <20170821160301.21899-5-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cfg init function overwrite values set in the clk init function
-Remove the cfg pokes from the clk init. Actually, trying to use
-the CLK_AUTO, like initially tried in clk_init, would break
-the card initialization
+spinlock used in interrupt handler should use the _irqsave variant
 
-BEWARE not to poke the cfg register while the divider value in clk
-register is 0. It crashes the SoC.
-
+Fixes: 51c5d8447bd7 ("MMC: meson: initial support for GX platforms")
 Reviewed-by: Kevin Hilman <khilman@baylibre.com>
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/mmc/host/meson-gx-mmc.c | 14 ++++----------
- 1 file changed, 4 insertions(+), 10 deletions(-)
+ drivers/mmc/host/meson-gx-mmc.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index a399fbd415f4..61668891b4fc 100644
+index 8a74a048db88..a399fbd415f4 100644
 --- a/drivers/mmc/host/meson-gx-mmc.c
 +++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -337,7 +337,7 @@ static int meson_mmc_clk_init(struct meson_host *host)
- 	int i, ret = 0;
- 	const char *mux_parent_names[MUX_CLK_NUM_PARENTS];
- 	const char *clk_div_parents[1];
--	u32 clk_reg, cfg;
-+	u32 clk_reg;
+@@ -727,6 +727,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
+ 	struct mmc_command *cmd;
+ 	struct mmc_data *data;
+ 	u32 irq_en, status, raw_status;
++	unsigned long flag;
+ 	irqreturn_t ret = IRQ_HANDLED;
  
- 	/* get the mux parents */
- 	for (i = 0; i < MUX_CLK_NUM_PARENTS; i++) {
-@@ -403,12 +403,6 @@ static int meson_mmc_clk_init(struct meson_host *host)
- 	clk_reg &= ~CLK_ALWAYS_ON;
- 	writel(clk_reg, host->regs + SD_EMMC_CLOCK);
+ 	if (WARN_ON(!host))
+@@ -739,7 +740,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
  
--	/* Ensure clock starts in "auto" mode, not "always on" */
--	cfg = readl(host->regs + SD_EMMC_CFG);
--	cfg &= ~CFG_CLK_ALWAYS_ON;
--	cfg |= CFG_AUTO_CLK;
--	writel(cfg, host->regs + SD_EMMC_CFG);
--
- 	ret = clk_prepare_enable(host->cfg_div_clk);
- 	if (ret)
- 		return ret;
-@@ -958,6 +952,9 @@ static int meson_mmc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_core_clk;
+ 	data = cmd->data;
  
-+	/* set config to sane default */
-+	meson_mmc_cfg_init(host);
-+
- 	/* Stop execution */
- 	writel(0, host->regs + SD_EMMC_START);
+-	spin_lock(&host->lock);
++	spin_lock_irqsave(&host->lock, flag);
+ 	irq_en = readl(host->regs + SD_EMMC_IRQ_EN);
+ 	raw_status = readl(host->regs + SD_EMMC_STATUS);
+ 	status = raw_status & irq_en;
+@@ -806,7 +807,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
+ 	if (ret == IRQ_HANDLED)
+ 		meson_mmc_request_done(host->mmc, cmd->mrq);
  
-@@ -966,9 +963,6 @@ static int meson_mmc_probe(struct platform_device *pdev)
- 	writel(IRQ_EN_MASK, host->regs + SD_EMMC_STATUS);
- 	writel(IRQ_EN_MASK, host->regs + SD_EMMC_IRQ_EN);
+-	spin_unlock(&host->lock);
++	spin_unlock_irqrestore(&host->lock, flag);
+ 	return ret;
+ }
  
--	/* set config to sane default */
--	meson_mmc_cfg_init(host);
--
- 	ret = devm_request_threaded_irq(&pdev->dev, irq, meson_mmc_irq,
- 					meson_mmc_irq_thread, IRQF_SHARED,
- 					NULL, host);
 -- 
 2.9.5
