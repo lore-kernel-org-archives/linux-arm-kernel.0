@@ -1,116 +1,71 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 21 Aug 2017 14:05:46 +0200
-Subject: [PATCH 08/14] mmc: meson-gx: rework clock init function
-In-Reply-To: <7h4ltjoyep.fsf@baylibre.com>
-References: <20170804174353.16486-1-jbrunet@baylibre.com>
- <20170804174353.16486-9-jbrunet@baylibre.com> <7h4ltjoyep.fsf@baylibre.com>
-Message-ID: <1503317146.7032.3.camel@baylibre.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 21 Aug 2017 14:01:17 +0200
+Subject: [GIT PULL] ARM: Xilinx Zynq DT fixes for v4.14
+Message-ID: <d3b9ce62-6899-8629-d267-2f08d435281d@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-08-07 at 14:34 -0700, Kevin Hilman wrote:
-> Jerome Brunet <jbrunet@baylibre.com> writes:
-> 
-> > Perform basic initialisation of the clk register before providing it to
-> > the CCF.
-> > 
-> > Thanks to devm, carrying the clock structure around after init is not
-> > necessary. Rework the function to remove these from the controller host
-> > data.
-> > 
-> > Finally, set initial mmc clock rate before enabling it, simplifying the
-> > exit condition.
-> > 
-> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> > ---
-> > ?drivers/mmc/host/meson-gx-mmc.c | 101 +++++++++++++++++++----------------
-> > -----
-> > ?1 file changed, 49 insertions(+), 52 deletions(-)
-> > 
-> > diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-
-> > mmc.c
-> > index 8f9ba5190c18..4cc7d6530536 100644
-> > --- a/drivers/mmc/host/meson-gx-mmc.c
-> > +++ b/drivers/mmc/host/meson-gx-mmc.c
-> > @@ -42,10 +42,7 @@
-> > ?
-> > ?#define SD_EMMC_CLOCK 0x0
-> > ?#define???CLK_DIV_MASK GENMASK(5, 0)
-> > -#define???CLK_DIV_MAX 63
-> > ?#define???CLK_SRC_MASK GENMASK(7, 6)
-> > -#define???CLK_SRC_XTAL 0???/* external crystal */
-> > -#define???CLK_SRC_PLL 1????/* FCLK_DIV2 */
-> > ?#define???CLK_CORE_PHASE_MASK GENMASK(9, 8)
-> > ?#define???CLK_TX_PHASE_MASK GENMASK(11, 10)
-> > ?#define???CLK_RX_PHASE_MASK GENMASK(13, 12)
-> > @@ -137,13 +134,9 @@ struct meson_host {
-> > ?	spinlock_t lock;
-> > ?	void __iomem *regs;
-> > ?	struct clk *core_clk;
-> > -	struct clk_mux mux;
-> > -	struct clk *mux_clk;
-> > +	struct clk *signal_clk;
-> > ?	unsigned long req_rate;
-> > ?
-> > -	struct clk_divider cfg_div;
-> > -	struct clk *cfg_div_clk;
-> > -
-> > ?	unsigned int bounce_buf_size;
-> > ?	void *bounce_buf;
-> > ?	dma_addr_t bounce_dma_addr;
-> > @@ -291,7 +284,7 @@ static int meson_mmc_clk_set(struct meson_host *host,
-> > unsigned long clk_rate)
-> > ?		return 0;
-> > ?	}
-> > ?
-> > -	ret = clk_set_rate(host->cfg_div_clk, clk_rate);
-> > +	ret = clk_set_rate(host->signal_clk, clk_rate);
-> 
-> minor nit: where does the name "signal" come from???I called this
-> "div_clk" because it's the output of the divider right before the
-> sd/emmc IP block. 
+Hi,
 
-Actually, no before but inside.
+please pull these patches to your tree.
 
-> Admittedly, that's not a great name either, and I'm
-> not too picky about the naming, just curious...
+Thanks,
+Michal
 
-Well, I thought div_clk was not great name too ... since the clock is actually
-the one used for the mmc signal (as opposed to the clock gate named "core") I
-thought it was ok.
 
-In the v2, I added the handling of clock phase through CCF. With this change,
-div_clk does not make sense anymore.
+ The following changes since commit
+5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
-According to the datasheet, It should be named "core_clk" (it is the clock
-coming out of the CORE_PHASE setting), unfortunately we already used this name
-for the clock gate ... changing it would mean changing the clock names in the
-bindings as well, which would probably be very confusing.
+   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
 
-In the v2, I named it mmc_clk ... probably not great either :( If you have
-another idea, I'm happy to sed it.
+ are available in the git repository at:
 
-> 
-> Looking at the diagram we have since I initially wrote the driver, this
-> is more commonly referred to as device_clk.
-> 
-> Anyways, if you're going to rename...
-> 
-> [...]
-> 
-> > ?static void meson_mmc_set_tuning_params(struct mmc_host *mmc)
-> > @@ -987,7 +984,7 @@ static int meson_mmc_probe(struct platform_device *pdev)
-> > ?	dma_free_coherent(host->dev, host->bounce_buf_size,
-> > ?			??host->bounce_buf, host->bounce_dma_addr);
-> > ?err_div_clk:
-> 
-> ... probably should rename this too.
+   https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-4.14
 
-Indeed !
+ for you to fetch changes up to 21ad06cc9e6399f64447ab316d92142bff7a17dd:
 
-> 
-> Otherwise,
-> 
-> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-> 
-> Kevin
+   arm: zynq: Remove earlycon from bootargs (2017-08-21 13:54:42 +0200)
+
+ ----------------------------------------------------------------
+ arm: Xilinx Zynq DT fixes for v4.14
+
+ - Remove earlycon
+ - Use C pre-processor
+ - Add fpga full region
+ - Add ethernet-phy as device-type
+ - Add adv7511 nodes to zc70x
+
+----------------------------------------------------------------
+ Christian Kohn (1):
+       arm: zynq: Add adv7511 on i2c bus for zc70x
+
+ Michal Simek (3):
+       arm: zynq: Label whole PL part as fpga_full region
+       arm: zynq: Use C pre-processor for includes in dts
+       arm: zynq: Remove earlycon from bootargs
+
+ Sai Pavan Boddu (1):
+       arm: zynq: Add device-type property for zynq ethernet phy nodes
+
+  arch/arm/boot/dts/zynq-7000.dtsi      |  8 ++++++++
+  arch/arm/boot/dts/zynq-parallella.dts |  3 ++-
+  arch/arm/boot/dts/zynq-zc702.dts      | 20 ++++++++++++++++++--
+  arch/arm/boot/dts/zynq-zc706.dts      | 20 ++++++++++++++++++--
+  arch/arm/boot/dts/zynq-zed.dts        |  5 +++--
+  arch/arm/boot/dts/zynq-zybo.dts       |  5 +++--
+  6 files changed, 52 insertions(+), 9 deletions(-)
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/b5d8a356/attachment-0001.sig>
