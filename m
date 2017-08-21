@@ -1,142 +1,83 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Mon, 21 Aug 2017 10:33:55 +0100
-Subject: [PATCH 06/27] arm64/sve: System register and exception syndrome
- definitions
-In-Reply-To: <1502280338-23002-7-git-send-email-Dave.Martin@arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-7-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87a82t5kos.fsf@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 21 Aug 2017 11:34:05 +0200
+Subject: [PATCH 2/2] ARM: sunxi: add support for R40 SoC
+In-Reply-To: <20170820052957.34597-2-icenowy@aosc.io>
+References: <20170820052957.34597-1-icenowy@aosc.io>
+ <20170820052957.34597-2-icenowy@aosc.io>
+Message-ID: <20170821093405.n4bum7j6nswnv6wr@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-Dave Martin <Dave.Martin@arm.com> writes:
-
-> The SVE architecture adds some system registers, ID register fields
-> and a dedicated ESR exception class.
->
-> This patch adds the appropriate definitions that will be needed by
-> the kernel.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+On Sun, Aug 20, 2017 at 01:29:57PM +0800, Icenowy Zheng wrote:
+> Allwinner R40 is a new SoC, with Quad Core Cortex-A7 and peripherals
+> like A20.
+> 
+> Add support for it.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 > ---
->  arch/arm64/include/asm/esr.h     |  3 ++-
->  arch/arm64/include/asm/kvm_arm.h |  1 +
->  arch/arm64/include/asm/sysreg.h  | 16 ++++++++++++++++
->  arch/arm64/kernel/traps.c        |  1 +
->  4 files changed, 20 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-> index 8cabd57..813629e 100644
-> --- a/arch/arm64/include/asm/esr.h
-> +++ b/arch/arm64/include/asm/esr.h
-> @@ -43,7 +43,8 @@
->  #define ESR_ELx_EC_HVC64	(0x16)
->  #define ESR_ELx_EC_SMC64	(0x17)
->  #define ESR_ELx_EC_SYS64	(0x18)
-> -/* Unallocated EC: 0x19 - 0x1E */
-> +#define ESR_ELx_EC_SVE		(0x19)
-> +/* Unallocated EC: 0x1A - 0x1E */
->  #define ESR_ELx_EC_IMP_DEF	(0x1f)
->  #define ESR_ELx_EC_IABT_LOW	(0x20)
->  #define ESR_ELx_EC_IABT_CUR	(0x21)
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index 61d694c..dbf0537 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -185,6 +185,7 @@
->  #define CPTR_EL2_TCPAC	(1 << 31)
->  #define CPTR_EL2_TTA	(1 << 20)
->  #define CPTR_EL2_TFP	(1 << CPTR_EL2_TFP_SHIFT)
-> +#define CPTR_EL2_TZ	(1 << 8)
->  #define CPTR_EL2_DEFAULT	0x000033ff
->
->  /* Hyp Debug Configuration Register bits */
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 248339e..2d259e8 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -145,6 +145,7 @@
->
->  #define SYS_ID_AA64PFR0_EL1		sys_reg(3, 0, 0, 4, 0)
->  #define SYS_ID_AA64PFR1_EL1		sys_reg(3, 0, 0, 4, 1)
-> +#define SYS_ID_AA64ZFR0_EL1		sys_reg(3, 0, 0, 4, 4)
->
->  #define SYS_ID_AA64DFR0_EL1		sys_reg(3, 0, 0, 5, 0)
->  #define SYS_ID_AA64DFR1_EL1		sys_reg(3, 0, 0, 5, 1)
-> @@ -160,6 +161,8 @@
->  #define SYS_ACTLR_EL1			sys_reg(3, 0, 1, 0, 1)
->  #define SYS_CPACR_EL1			sys_reg(3, 0, 1, 0, 2)
->
-> +#define SYS_ZCR_EL1			sys_reg(3, 0, 1, 2, 0)
+>  Documentation/arm/sunxi/README                  | 6 ++++++
+>  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+>  arch/arm/mach-sunxi/sunxi.c                     | 1 +
+>  3 files changed, 8 insertions(+)
+> 
+> diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+> index d7b1f016bd62..4fa836782e46 100644
+> --- a/Documentation/arm/sunxi/README
+> +++ b/Documentation/arm/sunxi/README
+> @@ -75,6 +75,12 @@ SunXi family
+>          + Datasheet
+>            http://linux-sunxi.org/File:Allwinner_V3s_Datasheet_V1.0.pdf
+>  
+> +      - Allwinner R40 (sun8i)
+> +        + Datasheet
+> +          https://github.com/tinalinux/docs/raw/r40-v1.y/R40_Datasheet_V1.0.pdf
+> +        + User Manual
+> +          https://github.com/tinalinux/docs/raw/r40-v1.y/Allwinner_R40_User_Manual_V1.0.pdf
 > +
 
-I'll have to take these on trust. They are mentioned in both the ARM ARM
-and the SVE supplement but I can't see any actual definitions of them.
+Please sort it by alphabetical order.
 
->  #define SYS_TTBR0_EL1			sys_reg(3, 0, 2, 0, 0)
->  #define SYS_TTBR1_EL1			sys_reg(3, 0, 2, 0, 1)
->  #define SYS_TCR_EL1			sys_reg(3, 0, 2, 0, 2)
-> @@ -250,6 +253,8 @@
->
->  #define SYS_PMCCFILTR_EL0		sys_reg (3, 3, 14, 15, 7)
->
-> +#define SYS_ZCR_EL2			sys_reg(3, 4, 1, 2, 0)
-> +
->  #define SYS_DACR32_EL2			sys_reg(3, 4, 3, 0, 0)
->  #define SYS_IFSR32_EL2			sys_reg(3, 4, 5, 0, 1)
->  #define SYS_FPEXC32_EL2			sys_reg(3, 4, 5, 3, 0)
-> @@ -331,6 +336,7 @@
->  #define ID_AA64ISAR1_JSCVT_SHIFT	12
->
->  /* id_aa64pfr0 */
-> +#define ID_AA64PFR0_SVE_SHIFT		32
->  #define ID_AA64PFR0_GIC_SHIFT		24
->  #define ID_AA64PFR0_ASIMD_SHIFT		20
->  #define ID_AA64PFR0_FP_SHIFT		16
-> @@ -339,6 +345,7 @@
->  #define ID_AA64PFR0_EL1_SHIFT		4
->  #define ID_AA64PFR0_EL0_SHIFT		0
->
-> +#define ID_AA64PFR0_SVE			0x1
->  #define ID_AA64PFR0_FP_NI		0xf
->  #define ID_AA64PFR0_FP_SUPPORTED	0x0
->  #define ID_AA64PFR0_ASIMD_NI		0xf
-> @@ -440,6 +447,15 @@
->  #endif
->
->
-> +#define ZCR_ELx_LEN_SHIFT	0
-> +#define ZCR_ELx_LEN_SIZE	9
-> +#define ZCR_ELx_LEN_MASK	0x1ff
-> +
-> +#define CPACR_EL1_ZEN_EL1EN	(1 << 16)
-> +#define CPACR_EL1_ZEN_EL0EN	(1 << 17)
-> +#define CPACR_EL1_ZEN		(CPACR_EL1_ZEN_EL1EN |
-> CPACR_EL1_ZEN_EL0EN)
+>      * Quad ARM Cortex-A15, Quad ARM Cortex-A7 based SoCs
+>        - Allwinner A80
+>          + Datasheet
+> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+> index f35c6ada5a65..e4beec3d9ad3 100644
+> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
+> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+> @@ -14,6 +14,7 @@ using one of the following compatible strings:
+>    allwinner,sun8i-a83t
+>    allwinner,sun8i-h2-plus
+>    allwinner,sun8i-h3
+> +  allwinner-sun8i-r40
+>    allwinner,sun8i-v3s
+>    allwinner,sun9i-a80
+>    allwinner,sun50i-a64
+> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+> index 7ab353fb25f2..311e6c4fc4f4 100644
+> --- a/arch/arm/mach-sunxi/sunxi.c
+> +++ b/arch/arm/mach-sunxi/sunxi.c
+> @@ -66,6 +66,7 @@ static const char * const sun8i_board_dt_compat[] = {
+>  	"allwinner,sun8i-h2-plus",
+>  	"allwinner,sun8i-h3",
+>  	"allwinner,sun8i-v3s",
+> +	"allwinner,sun8i-r40",
 
-This is a little weird as it is a 2 bit field in which 00 and 11 are not
-simply the sum of their bits. If the code wrote CPACR_EL1_ZEN_EL0EN |
-CPACR_EL1_ZEN_EL1EN to the CPACR_EL1 you wouldn't get the expected behaviour.
+And same thing here.
 
-> +
-> +
->  /* Safe value for MPIDR_EL1: Bit31:RES1, Bit30:U:0, Bit24:MT:0 */
->  #define SYS_MPIDR_SAFE_VAL		(1UL << 31)
->
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index 0f047e9..8964795 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -621,6 +621,7 @@ static const char *esr_class_str[] = {
->  	[ESR_ELx_EC_HVC64]		= "HVC (AArch64)",
->  	[ESR_ELx_EC_SMC64]		= "SMC (AArch64)",
->  	[ESR_ELx_EC_SYS64]		= "MSR/MRS (AArch64)",
-> +	[ESR_ELx_EC_SVE]		= "SVE",
->  	[ESR_ELx_EC_IMP_DEF]		= "EL3 IMP DEF",
->  	[ESR_ELx_EC_IABT_LOW]		= "IABT (lower EL)",
->  	[ESR_ELx_EC_IABT_CUR]		= "IABT (current EL)",
+Thanks!
+Maxime
 
-
---
-Alex Benn?e
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/7ef9e5aa/attachment.sig>
