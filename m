@@ -1,71 +1,107 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 21 Aug 2017 14:01:17 +0200
-Subject: [GIT PULL] ARM: Xilinx Zynq DT fixes for v4.14
-Message-ID: <d3b9ce62-6899-8629-d267-2f08d435281d@monstr.eu>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Mon, 21 Aug 2017 12:13:11 +0000
+Subject: [PATCH v2] mmc: renesas_sdhi: Add r8a7743/5 support
+In-Reply-To: <CAMuHMdWUxxp75u1VSLY3WnObmhSMDvP3skr9Uf3rV4Bf-ixy_w@mail.gmail.com>
+References: <1502710766-44361-1-git-send-email-biju.das@bp.renesas.com>
+ <1503311897-18807-1-git-send-email-biju.das@bp.renesas.com>
+ <CAMuHMdWUxxp75u1VSLY3WnObmhSMDvP3skr9Uf3rV4Bf-ixy_w@mail.gmail.com>
+Message-ID: <KL1PR06MB1702B56392DC90F9B02FB956B8870@KL1PR06MB1702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-please pull these patches to your tree.
-
-Thanks,
-Michal
 
 
- The following changes since commit
-5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+> -----Original Message-----
+> From: devicetree-owner at vger.kernel.org [mailto:devicetree-
+> owner at vger.kernel.org] On Behalf Of Geert Uytterhoeven
+> Sent: 21 August 2017 12:30
+> To: Biju Das <biju.das@bp.renesas.com>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>; Rob Herring <robh+dt@kernel.org>;
+> Mark Rutland <mark.rutland@arm.com>; Wolfram Sang <wsa@the-
+> dreams.de>; Simon Horman <horms@verge.net.au>; Magnus Damm
+> <magnus.damm@gmail.com>; Chris Paterson
+> <Chris.Paterson2@renesas.com>; devicetree at vger.kernel.org; Linux-Renesas
+> <linux-renesas-soc@vger.kernel.org>; linux-arm-kernel at lists.infradead.org;
+> Linux MMC List <linux-mmc@vger.kernel.org>
+> Subject: Re: [PATCH v2] mmc: renesas_sdhi: Add r8a7743/5 support
+>
+> Hi Biju,
+>
+> On Mon, Aug 21, 2017 at 12:38 PM, Biju Das <biju.das@bp.renesas.com>
+> wrote:
+> > Add support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5) SDHI is
+> > identical to the R-Car Gen2 family.
+> >
+> > Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > ---
+> > v1->v2
+> >     -Modified the listing SoC's description related to SoC
+> >      with 1 Clock and 2 Clocks
+> >
+> > This patch is compiled and tested against linux next tag
+> > next-20170817.
+> >
+> >  Documentation/devicetree/bindings/mmc/tmio_mmc.txt | 9 +++++----
+> >  1 file changed, 5 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+> > b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+> > index 4fd8b7a..1e3106e 100644
+> > --- a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+> > +++ b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+> > @@ -15,6 +15,8 @@ Required properties:
+> >                 "renesas,sdhi-r7s72100" - SDHI IP on R7S72100 SoC
+> >                 "renesas,sdhi-r8a73a4" - SDHI IP on R8A73A4 SoC
+> >                 "renesas,sdhi-r8a7740" - SDHI IP on R8A7740 SoC
+> > +               "renesas,sdhi-r8a7743" - SDHI IP on R8A7743 SoC
+> > +               "renesas,sdhi-r8a7745" - SDHI IP on R8A7745 SoC
+> >                 "renesas,sdhi-r8a7778" - SDHI IP on R8A7778 SoC
+> >                 "renesas,sdhi-r8a7779" - SDHI IP on R8A7779 SoC
+> >                 "renesas,sdhi-r8a7790" - SDHI IP on R8A7790 SoC @@
+> > -33,10 +35,9 @@ Required properties:
+> >           If 2 clocks are specified by the hardware, you must name them as
+> >           "core" and "cd". If the controller only has 1 clock, naming is not
+> >           required.
+> > -         Below is the number clocks for each supported SoC:
+> > -          1: SH73A0, R8A73A4, R8A7740, R8A7778, R8A7779, R8A7790
+> > -             R8A7791, R8A7792, R8A7793, R8A7794, R8A7795, R8A7796
+> > -          2: R7S72100
+> > +         Most supported SoCs only have 1 clock. Devices which have
+> > + more
+>
+> That is actually mentioned in the paragraph above:
+>
+> - clocks: Most controllers only have 1 clock source per channel. However, on
+>           some variations of this controller, the internal card detection
+>           logic that exists in this controller is sectioned off to be run by a
+>           separate second clock source to allow the main core clock to be turned
+>           off to save power.
+>
+> so I suggest just integrating the (short) list in that paragraph.
+>
+> > +         than 1 clock are listed below:
+> > +         2: R7S72100"
+>
+> Bogus trailing double quote.
 
-   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+Thanks. I will send v3 with above changes.
 
- are available in the git repository at:
-
-   https://github.com/Xilinx/linux-xlnx.git tags/zynq-dt-for-4.14
-
- for you to fetch changes up to 21ad06cc9e6399f64447ab316d92142bff7a17dd:
-
-   arm: zynq: Remove earlycon from bootargs (2017-08-21 13:54:42 +0200)
-
- ----------------------------------------------------------------
- arm: Xilinx Zynq DT fixes for v4.14
-
- - Remove earlycon
- - Use C pre-processor
- - Add fpga full region
- - Add ethernet-phy as device-type
- - Add adv7511 nodes to zc70x
-
-----------------------------------------------------------------
- Christian Kohn (1):
-       arm: zynq: Add adv7511 on i2c bus for zc70x
-
- Michal Simek (3):
-       arm: zynq: Label whole PL part as fpga_full region
-       arm: zynq: Use C pre-processor for includes in dts
-       arm: zynq: Remove earlycon from bootargs
-
- Sai Pavan Boddu (1):
-       arm: zynq: Add device-type property for zynq ethernet phy nodes
-
-  arch/arm/boot/dts/zynq-7000.dtsi      |  8 ++++++++
-  arch/arm/boot/dts/zynq-parallella.dts |  3 ++-
-  arch/arm/boot/dts/zynq-zc702.dts      | 20 ++++++++++++++++++--
-  arch/arm/boot/dts/zynq-zc706.dts      | 20 ++++++++++++++++++--
-  arch/arm/boot/dts/zynq-zed.dts        |  5 +++--
-  arch/arm/boot/dts/zynq-zybo.dts       |  5 +++--
-  6 files changed, 52 insertions(+), 9 deletions(-)
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Xilinx Microblaze
-Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
-U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-
+> m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in the body
+> of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/b5d8a356/attachment-0001.sig>
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
