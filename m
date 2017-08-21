@@ -1,84 +1,198 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 21 Aug 2017 14:42:03 +0100
-Subject: [PATCH 1/2] arm64: mm: abort uaccess retries upon fatal signal
-In-Reply-To: <20170711145849.GE13977@arm.com>
-References: <1499782763-31418-1-git-send-email-mark.rutland@arm.com>
- <1499782763-31418-2-git-send-email-mark.rutland@arm.com>
- <20170711145849.GE13977@arm.com>
-Message-ID: <20170821134202.GA5418@leverpostej>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 21 Aug 2017 09:44:09 -0400
+Subject: [PATCH V10 2/3] PCI: handle CRS returned by device after FLR
+In-Reply-To: <20170818210134.GO28977@bhelgaas-glaptop.roam.corp.google.com>
+References: <1502470596-4112-1-git-send-email-okaya@codeaurora.org>
+ <1502470596-4112-2-git-send-email-okaya@codeaurora.org>
+ <20170818210134.GO28977@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <4da26c10-3426-e752-4a59-25bb59cde8cd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 11, 2017 at 03:58:49PM +0100, Will Deacon wrote:
-> On Tue, Jul 11, 2017 at 03:19:22PM +0100, Mark Rutland wrote:
-> > When there's a fatal signal pending, arm64's do_page_fault()
-> > implementation returns 0. The intent is that we'll return to the
-> > faulting userspace instruction, delivering the signal on the way.
-> > 
-> > However, if we take a fatal signal during fixing up a uaccess, this
-> > results in a return to the faulting kernel instruction, which will be
-> > instantly retried, resulting in the same fault being taken forever. As
-> > the task never reaches userspace, the signal is not delivered, and the
-> > task is left unkillable. While the task is stuck in this state, it can
-> > inhibit the forward progress of the system.
-> > 
-> > To avoid this, we must ensure that when a fatal signal is pending, we
-> > apply any necessary fixup for a faulting kernel instruction. Thus we
-> > will return to an error path, and it is up to that code to make forward
-> > progress towards delivering the fatal signal.
-> > 
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Reviewed-by: Steve Capper <steve.capper@arm.com>
-> > Tested-by: Steve Capper <steve.capper@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: James Morse <james.morse@arm.com>
-> > Cc: Laura Abbott <labbott@redhat.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: stable at vger.kernel.org
-> > ---
-> >  arch/arm64/mm/fault.c | 5 ++++-
-> >  1 file changed, 4 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> > index 37b95df..3952d5e 100644
-> > --- a/arch/arm64/mm/fault.c
-> > +++ b/arch/arm64/mm/fault.c
-> > @@ -397,8 +397,11 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
-> >  	 * signal first. We do not need to release the mmap_sem because it
-> >  	 * would already be released in __lock_page_or_retry in mm/filemap.c.
-> >  	 */
-> > -	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current))
-> > +	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current)) {
-> > +		if (!user_mode(regs))
-> > +			goto no_context;
-> >  		return 0;
-> > +	}
+Hi Bjorn,
+
+On 8/18/2017 5:01 PM, Bjorn Helgaas wrote:
+> On Fri, Aug 11, 2017 at 12:56:35PM -0400, Sinan Kaya wrote:
+>> Sporadic reset issues have been observed with Intel 750 NVMe drive while
+>> assigning the physical function to the guest machine. The sequence of
+>> events observed is as follows:
+>>
+>> - perform a Function Level Reset (FLR)
+>> - sleep up to 1000ms total
+>> - read ~0 from PCI_COMMAND
+>> - warn that the device didn't return from FLR
+>> - touch the device before it's ready
+>> - drop register read and writes performing register settings restore
+>> - incomplete reset operation and partial register restoration
+>> - second time device probe fails in the guest machine as HW is left in
+>> limbo.
 > 
-> This will need rebasing at -rc1 (take a look at current HEAD).
+> Pardon me while I think out loud for a while.  It's taking me a while
+> to untangle my confusion about how CRS works.
 > 
-> Also, I think it introduces a weird corner case where we take a page fault
-> when writing the signal frame to the user stack to deliver a SIGSEGV. If
-> we end up with VM_FAULT_RETRY and somebody has sent a SIGKILL to the task,
-> then we'll fail setup_sigframe and force an un-handleable SIGSEGV instead
-> of SIGKILL.
+
+no problem,
+
+> Prior to this patch, you saw the "Failed to return from FLR" warning.
+> That means we did this:
 > 
-> The end result (task is killed) is the same, but the fatal signal is wrong.
+>      0ms  assert FLR
+>    100ms  read PCI_COMMAND, get ~0 (i == 0)
+>    200ms  read PCI_COMMAND, get ~0 (i == 1)
+>    ...
+>   1000ms  read PCI_COMMAND, get ~0 (i == 9)
+> 
+> If we did not get completions for those config reads, the root port
+> would complete the read as a failed transaction and probably
+> synthesize ~0 data.  
 
-That doesn't seem to be the case, testing on v4.13-rc5.
+That's correct. This root port returns ~0 when destination is unreachable.
 
-I used sigaltstack() to use the userfaultfd region as signal stack,
-registerd a SIGSEGV handler, and dereferenced NULL. The task locks up,
-but when killed with a SIGINT or SIGKILL, the exit status reflects that
-signal, rather than the SIGSEGV.
+> But if that were the case, this patch would make
+> no difference: it reads PCI_VENDOR_ID instead of PCI_COMMAND the first
+> time around, that would also be a failed transaction, and we wouldn't
+> interpret it as a CRS status, so the sequence would be exactly the
+> above except the first read would be of PCI_VENDOR_ID, not
+> PCI_COMMAND.
+> 
+> Since this patch *does* make a difference, CRS Software Visibility
+> must be supported and enabled, and we must have gotten completions
+> with CRS status for the PCI_COMMAND reads.  
 
-If I move the SIGINT handler onto the userfaultfd-monitored stack, then
-delivering SIGINT hangs, but can be killed with SIGKILL, and the exit
-status reflects that SIGKILL.
+That's right, CRS visibility is supported and enabled. Root port returns
+0xFFFF0001 when vendor ID is read as per the spec.
 
-As you say, it does look like we'd try to set up a deferred SIGSEGV for
-the failed signal delivery.
+> Per the completion
+> handling rules in sec 2.3.2, the root complex should transparently
+> retry the read (since we're not reading PCI_VENDOR_ID, CRS Software
+> Visibility doesn't apply, so this is invisible to software).  But the
+> root complex *is* allowed to limit the number of retries and if the
+> limit is reached, complete the request as a failed transaction.
 
-I haven't yet figured out exactly how that works; I'll keep digging.
+This version of the root port doesn't support retry mechanism. This is a
+TO-DO for the hardware team. This root port returns ~0 for all accesses
+other than vendor id. This means we waited 1 seconds and the device
+was not accessible. Command register was not reachable at the end of
+1 seconds.
 
-Thanks,
-Mark.
+> 
+> That must be what happened before this patch.  If that's the case, we
+> should see an error logged from the failed transaction.  We should be
+> able to verify this if we collected "lspci -vv" output for the system
+> before and after the FLR.
+> 
+
+See above.
+
+> If CRS SV is not present (or not enabled), the PCI_VENDOR_ID read will
+> still get a CRS completion, but the root port will retry it instead of
+> returning the 0x0001 ID.  When we hit the retry limit, the root port
+> will synthesize ~0 data to complete the read.
+
+This is what is missing from the HW. I'm trying to get this corrected
+to be complete.
+
+> 
+> That means we won't call pci_bus_wait_crs() at all, and we'll fall
+> back to the original PCI_COMMAND reads.  That path will only wait
+> 1000ms, just like the original code before this patch.  So I *think*
+> that if you disable CRS SV on this system (or if you put the device in
+> a system that doesn't support CRS SV), you'll probably see the same
+> "failed to return from FLR" warning.
+> 
+> You could easily test this by using setpci to turn off
+> PCI_EXP_RTCTL_CRSSVE in the root port leading to the NVMe device
+> before the FLR.
+> 
+> I think the implication is that we need to generalize
+> pci_bus_wait_crs() to be more of a "wait for device ready" interface
+> that can use CRS SV (if supported and enabled) or something like the
+> PCI_COMMAND loop (if no CRS SV).  It should use the same timeout
+> either way, since CRS SV is a property of the root port, not of the
+> device we're waiting for.
+
+I saw your comment about timeout. I was trying not to change the behavior
+for systems that do not support CRS visibility. we can certainly increase
+the timeout if you think it is better.
+
+I saw your V11, I'll review them in a minute.
+
+> 
+> It's "interesting" that the PCI core error handling code doesn't look
+> at the Master Abort bit at all, even though it's pretty fundamental to
+> conventional PCI error reporting.  I suspect Master Abort gets set
+> whenever a root port synthesizes ~0 data, but (with the exception of
+> some arch code) we never look at it and never clear it.
+> 
+>> An endpoint is allowed to issue Configuration Request Retry Status (CRS)
+>> following a FLR request to indicate that it is not ready to accept new
+>> requests. CRS is defined in PCIe r3.1, sec 2.3.1. Request Handling Rules
+>> and CRS usage in FLR context is mentioned in PCIe r3.1, sec 6.6.2.
+>> Function-Level Reset.
+>>
+>> A CRS indication will only be given if the address to be read is vendor ID
+>> register. pci_bus_read_dev_vendor_id() knows how to deal with CRS returned
+>> 0xFFFF0001 value and will continue polling until a value other than
+>> 0xFFFF0001 is returned within a given timeout.
+>>
+>> Try to discover device presence via CRS first. If device is not found, fall
+>> through to old behavior.
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>  drivers/pci/pci.c | 23 +++++++++++++++++++++--
+>>  1 file changed, 21 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+>> index af0cc34..c853551 100644
+>> --- a/drivers/pci/pci.c
+>> +++ b/drivers/pci/pci.c
+>> @@ -3821,17 +3821,36 @@ static void pci_flr_wait(struct pci_dev *dev)
+>>  {
+>>  	int i = 0;
+>>  	u32 id;
+>> +	bool ret;
+>> +
+>> +	/*
+>> +	 * Don't touch the HW before waiting 100ms. HW has to finish
+>> +	 * within 100ms according to PCI Express Base Specification
+>> +	 * Revision 3.1 Section 6.6.2: Function-Level Reset (FLR).
+>> +	 */
+>> +	msleep(100);
+>> +
+>> +	if (pci_bus_read_config_dword(dev->bus, dev->devfn, PCI_VENDOR_ID,
+>> +				      &id))
+>> +		return;
+>> +
+>> +	/* See if we can find a device via CRS first. */
+>> +	if ((id & 0xffff) == 0x0001) {
+>> +		ret = pci_bus_wait_crs(dev->bus, dev->devfn, &id, 60000);
+>> +		if (ret)
+>> +			return;
+>> +	}
+>>  
+>>  	do {
+>>  		msleep(100);
+>>  		pci_read_config_dword(dev, PCI_COMMAND, &id);
+>> -	} while (i++ < 10 && id == ~0);
+>> +	} while (i++ < 9 && id == ~0);
+>>  
+>>  	if (id == ~0)
+>>  		dev_warn(&dev->dev, "Failed to return from FLR\n");
+>>  	else if (i > 1)
+>>  		dev_info(&dev->dev, "Required additional %dms to return from FLR\n",
+>> -			 (i - 1) * 100);
+>> +			 i * 100);
+>>  }
+>>  
+>>  /**
+>> -- 
+>> 1.9.1
+>>
+> 
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
