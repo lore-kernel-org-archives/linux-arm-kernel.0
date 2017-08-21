@@ -1,45 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 21 Aug 2017 12:53:00 +0100
-Subject: [PATCH v2] irqchip: uniphier-aidet: add UniPhier AIDET irqchip
- driver
-In-Reply-To: <CAK7LNAS_bTsweGB-WqbSoh8myTET9KW-7oN0FLZTmAf_K317aw@mail.gmail.com>
-References: <1503309663-2742-1-git-send-email-yamada.masahiro@socionext.com>
- <e3b865f5-a779-f176-67ef-9ffac25019d4@arm.com>
- <CAK7LNAS_bTsweGB-WqbSoh8myTET9KW-7oN0FLZTmAf_K317aw@mail.gmail.com>
-Message-ID: <44a166ec-019e-8f84-5469-b095eb4d26fe@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 21 Aug 2017 13:54:57 +0200
+Subject: [PATCH 03/14] mmc: meson-gx: clean up some constants
+In-Reply-To: <7ha83bozoz.fsf@baylibre.com>
+References: <20170804174353.16486-1-jbrunet@baylibre.com>
+ <20170804174353.16486-4-jbrunet@baylibre.com> <7ha83bozoz.fsf@baylibre.com>
+Message-ID: <1503316497.7032.1.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/08/17 11:54, Masahiro Yamada wrote:
-
->>> +     /* parent is GIC */
->>> +     parent_fwspec.fwnode = domain->parent->fwnode;
->>> +     parent_fwspec.param_count = 3;
->>> +     parent_fwspec.param[0] = 0;             /* SPI */
->>> +     parent_fwspec.param[1] = hwirq;
->>> +     parent_fwspec.param[2] = IRQ_TYPE_LEVEL_HIGH;   /* properly set later */
->>
->> Why defer it to later? You already have the right information in "type",
->> so you might as well provide it immediately.
+On Mon, 2017-08-07 at 14:06 -0700, Kevin Hilman wrote:
+> Jerome Brunet <jbrunet@baylibre.com> writes:
 > 
+> > Remove useless clock rate defines. These should not be defined but
 > 
-> Because .irq_set_type() will set it up
-> before the IRQ is really in use.
+> To be more precise, they're also unused, so maybe s/useless/unused/ ?
 > 
+> > equested from the clock framework.
 > 
-> If we look gic_irq_domain_alloc() implementation,
-> it does not care "type".
+> s/equested/requested/
 > 
-> gic_set_type() will manipulate hardware registers.
 
-But that's out of the scope of this driver. Whatever the GIC driver does
-(or doesn't), you should pass it the right information.
+Thx Kevin !
 
-> Having said that, it shouldn't hurt to set type here.
-Exactly.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> > Also correct typo on the DELAY register
+> > 
+> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> 
+> Otherwise,
+> 
+> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+> 
+> > ---
+> > ?drivers/mmc/host/meson-gx-mmc.c | 4 +---
+> > ?1 file changed, 1 insertion(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-
+> > mmc.c
+> > index d480a8052a06..8a74a048db88 100644
+> > --- a/drivers/mmc/host/meson-gx-mmc.c
+> > +++ b/drivers/mmc/host/meson-gx-mmc.c
+> > @@ -45,9 +45,7 @@
+> > ?#define???CLK_DIV_MAX 63
+> > ?#define???CLK_SRC_MASK GENMASK(7, 6)
+> > ?#define???CLK_SRC_XTAL 0???/* external crystal */
+> > -#define???CLK_SRC_XTAL_RATE 24000000
+> > ?#define???CLK_SRC_PLL 1????/* FCLK_DIV2 */
+> > -#define???CLK_SRC_PLL_RATE 1000000000
+> > ?#define???CLK_CORE_PHASE_MASK GENMASK(9, 8)
+> > ?#define???CLK_TX_PHASE_MASK GENMASK(11, 10)
+> > ?#define???CLK_RX_PHASE_MASK GENMASK(13, 12)
+> > @@ -57,7 +55,7 @@
+> > ?#define???CLK_PHASE_270 3
+> > ?#define???CLK_ALWAYS_ON BIT(24)
+> > ?
+> > -#define SD_EMMC_DElAY 0x4
+> > +#define SD_EMMC_DELAY 0x4
+> > ?#define SD_EMMC_ADJUST 0x8
+> > ?#define SD_EMMC_CALOUT 0x10
+> > ?#define SD_EMMC_START 0x40
