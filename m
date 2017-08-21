@@ -1,27 +1,23 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 21 Aug 2017 10:25:23 +0200
-Subject: [PATCH ] mmc: renesas_sdhi: Add r8a7743/5 support
-In-Reply-To: <1502710766-44361-1-git-send-email-biju.das@bp.renesas.com>
-References: <1502710766-44361-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <20170821082523.GA2418@katana>
+From: sugar.zhang@rock-chips.com (Sugar Zhang)
+Date: Mon, 21 Aug 2017 16:25:05 +0800
+Subject: [PATCH v2 0/2] Patches to add support pdm controller for rk3328
+Message-ID: <1503303907-57630-1-git-send-email-sugar.zhang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+These patches to add support pdm for rk3328 socs.
 
->  	  Below is the number clocks for each supported SoC:
-> -	   1: SH73A0, R8A73A4, R8A7740, R8A7778, R8A7779, R8A7790
-> -	      R8A7791, R8A7792, R8A7793, R8A7794, R8A7795, R8A7796
-> +	   1: SH73A0, R8A73A4, R8A7740, R8A7743, R8A7745, R8A7778, R8A7779,
-> +	      R8A7790, R8A7791, R8A7792, R8A7793, R8A7794, R8A7795, R8A7796
->  	   2: R7S72100
+Changes in v2:
+- separate pinctrl pins
+  remove unused fsync clk, it's debug pins
 
-Hmm, maybe we should convert this to only listing SoCs with two clocks?
-That will be easier to maintaine since the majority seems to have one.
+Sugar Zhang (2):
+  arm64: dts: rockchip: add rk3328 pdm node
+  ASoC: rockchip: separate pinctrl pins from each other
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/024ba7bd/attachment.sig>
+ .../devicetree/bindings/sound/rockchip,pdm.txt     |  7 +-
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi           | 77 ++++++++++++++++++++++
+ 2 files changed, 82 insertions(+), 2 deletions(-)
+
+-- 
+2.7.4
