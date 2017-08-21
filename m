@@ -1,30 +1,27 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 21 Aug 2017 09:31:49 +0200
-Subject: [PATCH v3 1/6] pwm: kconfig: modify mediatek information
-In-Reply-To: <1498802721-32455-2-git-send-email-zhi.mao@mediatek.com>
-References: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
- <1498802721-32455-2-git-send-email-zhi.mao@mediatek.com>
-Message-ID: <20170821073149.GK18996@ulmo>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 21 Aug 2017 09:32:35 +0200
+Subject: [GIT PULL 3/4] Allwinner dts changes for 4.14, round 2
+In-Reply-To: <20170819080639.y2umtabkspdft7if@wens.csie.org>
+References: <20170819080639.y2umtabkspdft7if@wens.csie.org>
+Message-ID: <CAK8P3a1jNXc4OqYVFSY7R5AnL13LTx2qSU2UbDuGK+Us6vKAUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 30, 2017 at 02:05:16PM +0800, Zhi Mao wrote:
-> modify mediatek information
-> 
-> Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
-> ---
->  drivers/pwm/Kconfig |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Sat, Aug 19, 2017 at 10:06 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> Hi Arnd, Olof,
+>
+> Here's the second batch of Allwinner device tree changes for 4.14.
+> This is based on the previous pull request that is already in arm-soc.
+>
+> I might send a late pull request for a single new board next week.
+> The board dts was posted only 2 days ago, so I'd like to wait a few
+> more days for feedback.
 
-Applied to for-4.14/drivers, with a slightly modified subject and commit
-message.
+Sounds good. As with the defconfig changes, I think this series could
+have been grouped into fewer patches where things fit together naturally.
+The important part is that the changelog makes sense with the (larger)
+patch, and your changelog texts are generally very good here.
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/f3479853/attachment.sig>
+Pulled into next/dt, thanks!
+
+        Arnd
