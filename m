@@ -1,43 +1,68 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Mon, 21 Aug 2017 15:49:41 +0300
-Subject: [PATCH v5 05/19] crypto: introduce crypto wait for async op
-In-Reply-To: <20170815032303.000042b2@huawei.com>
-References: <1502724094-23305-1-git-send-email-gilad@benyossef.com>
- <1502724094-23305-6-git-send-email-gilad@benyossef.com>
- <20170815032303.000042b2@huawei.com>
-Message-ID: <CAOtvUMfJaG-Uomc1EnD1+HySz+X8SUaRUm1SEx4DusquWfOF0w@mail.gmail.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Mon, 21 Aug 2017 14:58:37 +0200
+Subject: [RESEND PATCH v5 11/16] arm64: zynqmp: Add generic compatible
+ string for I2C EEPROM
+In-Reply-To: <ae7ec977-4ec8-7dcf-8bc6-27cb8c6bf48d@xilinx.com>
+References: <20170615185418.13980-1-javier@dowhile0.org>
+ <20170615185418.13980-12-javier@dowhile0.org>
+ <e64ce8be-599a-5fc5-3194-92aac574173c@xilinx.com>
+ <CABxcv=mOtPDU4RStdrF1EFci65N8sMB1MG4oKZiTXqUTe7GWHA@mail.gmail.com>
+ <ae7ec977-4ec8-7dcf-8bc6-27cb8c6bf48d@xilinx.com>
+Message-ID: <CABxcv=k+3bi0XbuUDEu4nFvFhCHxjZMg1+oEnrBhH5gow4HaNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 15, 2017 at 5:23 AM, Jonathan Cameron
-<Jonathan.Cameron@huawei.com> wrote:
-> On Mon, 14 Aug 2017 18:21:15 +0300
-> Gilad Ben-Yossef <gilad@benyossef.com> wrote:
->
->> Invoking a possibly async. crypto op and waiting for completion
->> while correctly handling backlog processing is a common task
->> in the crypto API implementation and outside users of it.
+Hello Michal,
+
+On Mon, Aug 21, 2017 at 2:04 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+> On 21.8.2017 13:27, Javier Martinez Canillas wrote:
+>> [snip]
 >>
->> This patch adds a generic implementation for doing so in
->> preparation for using it across the board instead of hand
->> rolled versions.
-
->
-> Trivial observation.  Shouldn't have this bonus blank line inserted here.
->
->>  #endif       /* _LINUX_CRYPTO_H */
+>>>>
+>>>> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+>>>> index ef1b9e573af0..53907b7a7fd9 100644
+>>>> --- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+>>>> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+>>>> @@ -55,7 +55,7 @@
+>>>>       status = "okay";
+>>>>       clock-frequency = <400000>;
+>>>>       eeprom at 54 {
+>>>> -             compatible = "at,24c64";
+>>>> +             compatible = "atmel,24c64";
+>>>>               reg = <0x54>;
+>>>>       };
+>>>>  };
+>>>> @@ -64,7 +64,7 @@
+>>>>       status = "okay";
+>>>>       clock-frequency = <400000>;
+>>>>       eeprom at 55 {
+>>>> -             compatible = "at,24c64";
+>>>> +             compatible = "atmel,24c64";
+>>>>               reg = <0x55>;
+>>>>       };
+>>>>  };
+>>>>
+>>>
+>>> Acked-by: Michal Simek <michal.simek@xilinx.com>
+>>>
 >>
+>> Any reasons why this patch was never picked? It was acked two months ago.
+>
+> Normally when you send series then it should be applied as the whole
+> series not just one piece of that.
 >
 
-Indeed. Will be fixed.
+Right, I mentioned in the cover letter that the patches could be
+applied independently. Sorry for the confusion.
 
-Thanks,
-Gilad
+> Anyway I see that changes are applied and this one is missing that's why
+> I will add to zynqmp/dt branch and going to send pull request today.
+>
 
--- 
-Gilad Ben-Yossef
-Chief Coffee Drinker
+Great, thanks a lot for your help.
 
-"If you take a class in large-scale robotics, can you end up in a
-situation where the homework eats your dog?"
- -- Jean-Baptiste Queru
+> Thanks,
+> Michal
+
+Best regards,
+Javier
