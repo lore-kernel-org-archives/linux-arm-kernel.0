@@ -1,22 +1,34 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 21 Aug 2017 11:48:13 +0200
-Subject: [PATCH v4 7/8] ARM: dts: rockchip: add pmic rk805 dt node for
- rv1108 evb
-In-Reply-To: <1502700221-8792-1-git-send-email-andy.yan@rock-chips.com>
-References: <1502699477-8063-1-git-send-email-andy.yan@rock-chips.com>
- <1502700221-8792-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <2749560.3r9KG54GLu@phil>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 21 Aug 2017 11:48:16 +0200
+Subject: [PATCH] arm64: allwinner: a64: pine64: Use dcdc1 regulator for
+ mmc0
+In-Reply-To: <1502516402-4661-1-git-send-email-jteki@openedev.com>
+References: <1502516402-4661-1-git-send-email-jteki@openedev.com>
+Message-ID: <20170821094816.wqygjbchdlguezlo@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 14. August 2017, 16:43:41 CEST schrieb Andy Yan:
-> RK805 is used as the voltage regulator on rv1108 evaluation
-> board. Add device tree node for it.
+On Sat, Aug 12, 2017 at 11:10:02AM +0530, Jagan Teki wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
 > 
-> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> Since current tree support AXP803 regulators, replace
+> fixed regulator with AXP803 dcdc1 regulator.
+> 
+> Tested on pine64.
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 
-applied for 4.14
+Applied, thanks!
+Maxime
 
-
-Thanks
-Heiko
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/c75ab151/attachment.sig>
