@@ -1,118 +1,49 @@
-From: hugues.fruchet@st.com (Hugues FRUCHET)
-Date: Mon, 21 Aug 2017 10:20:25 +0000
-Subject: [PATCH v1 4/5] [media] stm32-dcmi: set default format at open()
-In-Reply-To: <a5a158b3-b502-d220-52bb-8138328c1773@xs4all.nl>
-References: <1501236302-18097-1-git-send-email-hugues.fruchet@st.com>
- <1501236302-18097-5-git-send-email-hugues.fruchet@st.com>
- <a5a158b3-b502-d220-52bb-8138328c1773@xs4all.nl>
-Message-ID: <47cc9905-27d8-abec-2e28-f97a073249c9@st.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 21 Aug 2017 13:21:24 +0300
+Subject: [PATCH v8 00/20] ILP32 for ARM64
+In-Reply-To: <20170808133411.opuh7pz3kmlhkhzy@armageddon.cambridge.arm.com>
+References: <20170619155003.13218-1-ynorov@caviumnetworks.com>
+ <20170629161036.ftedtbp2gdmyzloo@e104818-lin.cambridge.arm.com>
+ <20170706215902.qtmbsidwvqlr7o56@yury-thinkpad>
+ <20170707171135.h54fe4ea7xuxnrqt@armageddon.cambridge.arm.com>
+ <20170724112624.7ie6na7uszmsc5te@yury-thinkpad>
+ <20170808133411.opuh7pz3kmlhkhzy@armageddon.cambridge.arm.com>
+Message-ID: <20170821102124.xcqnzdzhs73gzbcf@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Aug 08, 2017 at 02:34:11PM +0100, Catalin Marinas wrote:
+> On Mon, Jul 24, 2017 at 02:26:24PM +0300, Yury Norov wrote:
+> > This is the 4.12 and linux-next - based kernel patches:
+> > https://github.com/norov/linux/tree/ilp32-4.12
+> > https://github.com/norov/linux/tree/ilp32-20170724
+> 
+> I published the 4.12 branch here:
+> 
+> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=staging/ilp32-4.12
+> 
+> (or git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git staging/ilp32-4.12)
+> 
+> There are two patches on top, one to fix SET_PERSONALITY and the other
+> to make ILP32 default y since you'd expect people using this branch to
+> need such option enabled.
+> 
+> I'll publish a 4.13-based branch when the corresponding kernel version
+> is released.
 
+Hi Catalin,
 
-On 08/04/2017 02:00 PM, Hans Verkuil wrote:
-> On 28/07/17 12:05, Hugues Fruchet wrote:
->> Ensure that we start with default pixel format and resolution
->> when opening a new instance.
-> 
-> Why? The format is persistent in V4L2 and (re)opening the video device
-> shouldn't change the format.
-> 
-> Suppose you use v4l2-ctl to set up a format. E.g. v4l2-ctl -v width=320,height-240.
-> Now run v4l2-ctl -V to get the format and with this code it would suddenly be
-> back to the default!
-> 
-> You set up the default format in the dcmi_graph_notify_complete, but after that
-> it is only changed if userspace explicitly requests it.
-> 
-> Regards,
-> 
-> 	Hans
-> 
+This is the rc-6 based ilp32 series:
+https://github.com/norov/linux/tree/ilp32-4.13-rc6
 
-Thanks Hans, I didn't catch this before, thanks for explanation.
+It includes latest version of SET_PERSONALITY() rework:
+https://www.spinics.net/lists/arm-kernel/msg602005.html
 
->>
->> Signed-off-by: Hugues Fruchet <hugues.fruchet@st.com>
->> ---
->>   drivers/media/platform/stm32/stm32-dcmi.c | 49 ++++++++++++++++++-------------
->>   1 file changed, 28 insertions(+), 21 deletions(-)
->>
->> diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
->> index 4733d1f..2be56b6 100644
->> --- a/drivers/media/platform/stm32/stm32-dcmi.c
->> +++ b/drivers/media/platform/stm32/stm32-dcmi.c
->> @@ -890,6 +890,28 @@ static int dcmi_enum_frameintervals(struct file *file, void *fh,
->>   	return 0;
->>   }
->>   
->> +static int dcmi_set_default_fmt(struct stm32_dcmi *dcmi)
->> +{
->> +	struct v4l2_format f = {
->> +		.type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
->> +		.fmt.pix = {
->> +			.width		= CIF_WIDTH,
->> +			.height		= CIF_HEIGHT,
->> +			.field		= V4L2_FIELD_NONE,
->> +			.pixelformat	= dcmi->sd_formats[0]->fourcc,
->> +		},
->> +	};
->> +	int ret;
->> +
->> +	ret = dcmi_try_fmt(dcmi, &f, NULL);
->> +	if (ret)
->> +		return ret;
->> +	dcmi->sd_format = dcmi->sd_formats[0];
->> +	dcmi->fmt = f;
->> +
->> +	return 0;
->> +}
->> +
->>   static const struct of_device_id stm32_dcmi_of_match[] = {
->>   	{ .compatible = "st,stm32-dcmi"},
->>   	{ /* end node */ },
->> @@ -916,7 +938,13 @@ static int dcmi_open(struct file *file)
->>   	if (ret < 0 && ret != -ENOIOCTLCMD)
->>   		goto fh_rel;
->>   
->> +	ret = dcmi_set_default_fmt(dcmi);
->> +	if (ret)
->> +		goto power_off;
->> +
->>   	ret = dcmi_set_fmt(dcmi, &dcmi->fmt);
->> +
->> +power_off:
->>   	if (ret)
->>   		v4l2_subdev_call(sd, core, s_power, 0);
->>   fh_rel:
->> @@ -991,27 +1019,6 @@ static int dcmi_release(struct file *file)
->>   	.read		= vb2_fop_read,
->>   };
->>   
->> -static int dcmi_set_default_fmt(struct stm32_dcmi *dcmi)
->> -{
->> -	struct v4l2_format f = {
->> -		.type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
->> -		.fmt.pix = {
->> -			.width		= CIF_WIDTH,
->> -			.height		= CIF_HEIGHT,
->> -			.field		= V4L2_FIELD_NONE,
->> -			.pixelformat	= dcmi->sd_formats[0]->fourcc,
->> -		},
->> -	};
->> -	int ret;
->> -
->> -	ret = dcmi_try_fmt(dcmi, &f, NULL);
->> -	if (ret)
->> -		return ret;
->> -	dcmi->sd_format = dcmi->sd_formats[0];
->> -	dcmi->fmt = f;
->> -	return 0;
->> -}
->> -
->>   static const struct dcmi_format dcmi_formats[] = {
->>   	{
->>   		.fourcc = V4L2_PIX_FMT_RGB565,
->>
-> 
+All patches prior to 3fc85ee96eb8 ("arm64: ilp32: add documentation on
+the ILP32 ABI for ARM64") are looking not ilp32-specific and may be
+applied independently.
+
+It also includes your patch "arm64: ilp32: Make the Kconfig option
+default y" on the top of series.
+
+Yury
