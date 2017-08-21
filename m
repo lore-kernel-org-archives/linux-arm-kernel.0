@@ -1,56 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 21 Aug 2017 08:49:36 +0100
-Subject: [PATCH 1/1] Revert "mfd: da9061: Fix to remove BBAT_CONT
- register from chip model"
-In-Reply-To: <20170815083804.26073-1-lee.jones@linaro.org>
-References: <20170815083804.26073-1-lee.jones@linaro.org>
-Message-ID: <20170821074936.ae2sw2ncvoaxsq3w@dell>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 21 Aug 2017 09:51:24 +0200
+Subject: [PATCH v3 4/6] pwm: bindings: add MT2712/MT7622 information
+In-Reply-To: <1498802721-32455-5-git-send-email-zhi.mao@mediatek.com>
+References: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
+ <1498802721-32455-5-git-send-email-zhi.mao@mediatek.com>
+Message-ID: <20170821075124.GN18996@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 15 Aug 2017, Lee Jones wrote:
+On Fri, Jun 30, 2017 at 02:05:19PM +0800, Zhi Mao wrote:
+> add MT2712/MT7622 pwm information
 
-> This patch was applied to the MFD twice, causing unwanted behavour.
-> 
-> This reverts commit b77eb79acca3203883e8d8dbc7f2b842def1bff8.
-> 
-> Fixes: b77eb79acca3 ("mfd: da9061: Fix to remove BBAT_CONT register from chip model")
-> Reported-by: Steve Twiss <stwiss.opensource@diasemi.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mfd/da9062-core.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+Please avoid duplicating the subject in the description. You're not
+adding any meaningful information. I've changed the commit to this:
 
-Steve, It would be good to obtain a {Reviewed|Acked}-by from you
-before applying.
+--- >8 ---
+dt-bindings: pwm: Add MT2712/MT7622 information
 
-> diff --git a/drivers/mfd/da9062-core.c b/drivers/mfd/da9062-core.c
-> index fbe0f245ce8e..fe1811523e4a 100644
-> --- a/drivers/mfd/da9062-core.c
-> +++ b/drivers/mfd/da9062-core.c
-> @@ -645,6 +645,9 @@ static const struct regmap_range da9062_aa_readable_ranges[] = {
->  		.range_min = DA9062AA_VLDO1_B,
->  		.range_max = DA9062AA_VLDO4_B,
->  	}, {
-> +		.range_min = DA9062AA_BBAT_CONT,
-> +		.range_max = DA9062AA_BBAT_CONT,
-> +	}, {
->  		.range_min = DA9062AA_INTERFACE,
->  		.range_max = DA9062AA_CONFIG_E,
->  	}, {
-> @@ -721,6 +724,9 @@ static const struct regmap_range da9062_aa_writeable_ranges[] = {
->  		.range_min = DA9062AA_VLDO1_B,
->  		.range_max = DA9062AA_VLDO4_B,
->  	}, {
-> +		.range_min = DA9062AA_BBAT_CONT,
-> +		.range_max = DA9062AA_BBAT_CONT,
-> +	}, {
->  		.range_min = DA9062AA_GP_ID_0,
->  		.range_max = DA9062AA_GP_ID_19,
->  	},
+Enhance the MediaTek PWM binding with details about the IP found in the
+MT2712 and MT7622 SoCs.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
+Acked-by: John Crispin <john@phrozen.org>
+Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
+--- 8< ---
+
+Applied to for-4.14/drivers, thanks.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/73927736/attachment.sig>
