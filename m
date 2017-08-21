@@ -1,53 +1,90 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Mon, 21 Aug 2017 11:38:17 +0100
-Subject: [PATCH v2] mmc: renesas_sdhi: Add r8a7743/5 support
-In-Reply-To: <1502710766-44361-1-git-send-email-biju.das@bp.renesas.com>
-References: <1502710766-44361-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <1503311897-18807-1-git-send-email-biju.das@bp.renesas.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Mon, 21 Aug 2017 18:58:33 +0800
+Subject: [PATCH v2] PM / AVS: rockchip-io: add io selectors and supplies for
+ RV1108
+Message-ID: <1503313113-31056-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5) SDHI
-is identical to the R-Car Gen2 family.
+This adds the necessary data for handling io voltage domains on the RV1108.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Signed-off-by: David Wu <david.wu@rock-chips.com>
 ---
-v1->v2
-    -Modified the listing SoC's description related to SoC
-     with 1 Clock and 2 Clocks
+change in v2:
+ - Alphabetic order for the binding string
 
-This patch is compiled and tested against linux next tag
-next-20170817.
+ .../bindings/power/rockchip-io-domain.txt          |  2 ++
+ drivers/power/avs/rockchip-io-domain.c             | 38 ++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
 
- Documentation/devicetree/bindings/mmc/tmio_mmc.txt | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-index 4fd8b7a..1e3106e 100644
---- a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-@@ -15,6 +15,8 @@ Required properties:
- 		"renesas,sdhi-r7s72100" - SDHI IP on R7S72100 SoC
- 		"renesas,sdhi-r8a73a4" - SDHI IP on R8A73A4 SoC
- 		"renesas,sdhi-r8a7740" - SDHI IP on R8A7740 SoC
-+		"renesas,sdhi-r8a7743" - SDHI IP on R8A7743 SoC
-+		"renesas,sdhi-r8a7745" - SDHI IP on R8A7745 SoC
- 		"renesas,sdhi-r8a7778" - SDHI IP on R8A7778 SoC
- 		"renesas,sdhi-r8a7779" - SDHI IP on R8A7779 SoC
- 		"renesas,sdhi-r8a7790" - SDHI IP on R8A7790 SoC
-@@ -33,10 +35,9 @@ Required properties:
- 	  If 2 clocks are specified by the hardware, you must name them as
- 	  "core" and "cd". If the controller only has 1 clock, naming is not
- 	  required.
--	  Below is the number clocks for each supported SoC:
--	   1: SH73A0, R8A73A4, R8A7740, R8A7778, R8A7779, R8A7790
--	      R8A7791, R8A7792, R8A7793, R8A7794, R8A7795, R8A7796
--	   2: R7S72100
-+	  Most supported SoCs only have 1 clock. Devices which have more
-+	  than 1 clock are listed below:
-+	  2: R7S72100"
+diff --git a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+index 43c21fb..4a4766e 100644
+--- a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
++++ b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+@@ -39,6 +39,8 @@ Required properties:
+   - "rockchip,rk3368-pmu-io-voltage-domain" for rk3368 pmu-domains
+   - "rockchip,rk3399-io-voltage-domain" for rk3399
+   - "rockchip,rk3399-pmu-io-voltage-domain" for rk3399 pmu-domains
++  - "rockchip,rv1108-io-voltage-domain" for rv1108
++  - "rockchip,rv1108-pmu-io-voltage-domain" for rv1108 pmu-domains
  
- Optional properties:
- - toshiba,mmc-wrprotect-disable: write-protect detection is unavailable
+ Deprecated properties:
+ - rockchip,grf: phandle to the syscon managing the "general register files"
+diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
+index 031a343..75f63e3 100644
+--- a/drivers/power/avs/rockchip-io-domain.c
++++ b/drivers/power/avs/rockchip-io-domain.c
+@@ -349,6 +349,36 @@ static void rk3399_pmu_iodomain_init(struct rockchip_iodomain *iod)
+ 	.init = rk3399_pmu_iodomain_init,
+ };
+ 
++static const struct rockchip_iodomain_soc_data soc_data_rv1108 = {
++	.grf_offset = 0x404,
++	.supply_names = {
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		NULL,
++		"vccio1",
++		"vccio2",
++		"vccio3",
++		"vccio5",
++		"vccio6",
++	},
++
++};
++
++static const struct rockchip_iodomain_soc_data soc_data_rv1108_pmu = {
++	.grf_offset = 0x104,
++	.supply_names = {
++		"pmu",
++	},
++};
++
+ static const struct of_device_id rockchip_iodomain_match[] = {
+ 	{
+ 		.compatible = "rockchip,rk3188-io-voltage-domain",
+@@ -382,6 +412,14 @@ static void rk3399_pmu_iodomain_init(struct rockchip_iodomain *iod)
+ 		.compatible = "rockchip,rk3399-pmu-io-voltage-domain",
+ 		.data = (void *)&soc_data_rk3399_pmu
+ 	},
++	{
++		.compatible = "rockchip,rv1108-io-voltage-domain",
++		.data = (void *)&soc_data_rv1108
++	},
++	{
++		.compatible = "rockchip,rv1108-pmu-io-voltage-domain",
++		.data = (void *)&soc_data_rv1108_pmu
++	},
+ 	{ /* sentinel */ },
+ };
+ MODULE_DEVICE_TABLE(of, rockchip_iodomain_match);
 -- 
 1.9.1
