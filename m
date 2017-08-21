@@ -1,40 +1,43 @@
-From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Mon, 21 Aug 2017 13:47:43 +0100
-Subject: [PATCH] regulator: fan53555: fix I2C device ids
-Message-ID: <20170821124743.52924-1-guillaume.tucker@collabora.com>
+From: gilad@benyossef.com (Gilad Ben-Yossef)
+Date: Mon, 21 Aug 2017 15:49:41 +0300
+Subject: [PATCH v5 05/19] crypto: introduce crypto wait for async op
+In-Reply-To: <20170815032303.000042b2@huawei.com>
+References: <1502724094-23305-1-git-send-email-gilad@benyossef.com>
+ <1502724094-23305-6-git-send-email-gilad@benyossef.com>
+ <20170815032303.000042b2@huawei.com>
+Message-ID: <CAOtvUMfJaG-Uomc1EnD1+HySz+X8SUaRUm1SEx4DusquWfOF0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device tree nodes all correctly describe the regulators as
-syr827 or syr828, but the I2C device id is currently set to the
-wildcard value of syr82x in the driver.  This causes udev to fail
-to match the driver module with the modalias data from sysfs.
+On Tue, Aug 15, 2017 at 5:23 AM, Jonathan Cameron
+<Jonathan.Cameron@huawei.com> wrote:
+> On Mon, 14 Aug 2017 18:21:15 +0300
+> Gilad Ben-Yossef <gilad@benyossef.com> wrote:
+>
+>> Invoking a possibly async. crypto op and waiting for completion
+>> while correctly handling backlog processing is a common task
+>> in the crypto API implementation and outside users of it.
+>>
+>> This patch adds a generic implementation for doing so in
+>> preparation for using it across the board instead of hand
+>> rolled versions.
 
-Fix this by replacing the I2C device ids with ones that match the
-device tree descriptions, with syr827 and syr828.  Tested on
-Firefly rk3288 board.  The syr82x id was not used anywhere.
+>
+> Trivial observation.  Shouldn't have this bonus blank line inserted here.
+>
+>>  #endif       /* _LINUX_CRYPTO_H */
+>>
+>
 
-Fixes: e80c47bd738b (regulator: fan53555: Export I2C module alias information)
-Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
----
- drivers/regulator/fan53555.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Indeed. Will be fixed.
 
-diff --git a/drivers/regulator/fan53555.c b/drivers/regulator/fan53555.c
-index 60f431831582..ca29d49fdadd 100644
---- a/drivers/regulator/fan53555.c
-+++ b/drivers/regulator/fan53555.c
-@@ -476,7 +476,10 @@ static const struct i2c_device_id fan53555_id[] = {
- 		.name = "fan53555",
- 		.driver_data = FAN53555_VENDOR_FAIRCHILD
- 	}, {
--		.name = "syr82x",
-+		.name = "syr827",
-+		.driver_data = FAN53555_VENDOR_SILERGY
-+	}, {
-+		.name = "syr828",
- 		.driver_data = FAN53555_VENDOR_SILERGY
- 	},
- 	{ },
+Thanks,
+Gilad
+
 -- 
-2.11.0
+Gilad Ben-Yossef
+Chief Coffee Drinker
+
+"If you take a class in large-scale robotics, can you end up in a
+situation where the homework eats your dog?"
+ -- Jean-Baptiste Queru
