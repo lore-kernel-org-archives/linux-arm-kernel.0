@@ -1,115 +1,43 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 21 Aug 2017 10:05:02 +0200
-Subject: [PATCH v9 4/5] clk: samsung: exynos-audss: Use local variable for
- controller's device
-In-Reply-To: <1503302703-13801-1-git-send-email-m.szyprowski@samsung.com>
-References: <1503302703-13801-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170821080540eucas1p25bd0c482fdb581bca68bc875bdfedc87@eucas1p2.samsung.com>
-Message-ID: <1503302703-13801-5-git-send-email-m.szyprowski@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 21 Aug 2017 16:10:17 +0800
+Subject: [PATCH v3 3/4] net: stmmac: register parent MDIO node for
+ sun8i-h3-emac
+In-Reply-To: <20170820142545.GB24150@lunn.ch>
+References: <20170818122118.4925-1-clabbe.montjoie@gmail.com>
+ <20170818122118.4925-4-clabbe.montjoie@gmail.com>
+ <CAGb2v66KcZkiDDHryMmVzm4WroXePPy3V44SLpVdoO3ZEjgC=g@mail.gmail.com>
+ <20170819185025.GB13266@Red> <20170819203836.GA21567@lunn.ch>
+ <20170820065757.GA6081@Red> <20170820142545.GB24150@lunn.ch>
+Message-ID: <CAGb2v67hQXSoCKP7qW+KRUYX+0djQ1Z23cQ67Lyg6G7ozGyfGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Store pointer to the controller's device in local variable to avoid
-extracting it from platform device in each call. This will also simplify
-code in the future, when runtime PM support is added.
+On Sun, Aug 20, 2017 at 10:25 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> I think we cannot use mdio-mux-mmioreg since the register for doing
+>> the switch is in middle of the "System Control" and shared with
+>> other functions.  This is why we use a sycon/regmap for selecting
+>> the MDIO.
+>
+> You could add a mdio-mux-regmap.c.
+>
+> However, it probably need restructuring of the stmmac mdio code, to
+> make the mdio bus usable as a separate driver. You need stmmac mdio
+> to probe first, then mdio-mux-remap should probe, and then lastly
+> stmmmac mac driver.
+>
+> With stmmac mdio and stmmac mac being in one driver, there is no time
+> in the middle to allow the mux driver to probe.
+>
+> It is some effort, but a nice cleanup and generalization.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
----
- drivers/clk/samsung/clk-exynos-audss.c | 25 +++++++++++++------------
- 1 file changed, 13 insertions(+), 12 deletions(-)
+I'm not sure mdio-mux is the right thing here.
 
-diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
-index 1fab56f396d4..6be52fb46ff3 100644
---- a/drivers/clk/samsung/clk-exynos-audss.c
-+++ b/drivers/clk/samsung/clk-exynos-audss.c
-@@ -135,6 +135,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
- 	const struct exynos_audss_clk_drvdata *variant;
- 	struct clk_hw **clk_table;
- 	struct resource *res;
-+	struct device *dev = &pdev->dev;
- 	int i, ret = 0;
- 
- 	variant = of_device_get_match_data(&pdev->dev);
-@@ -142,15 +143,15 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	reg_base = devm_ioremap_resource(&pdev->dev, res);
-+	reg_base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(reg_base)) {
--		dev_err(&pdev->dev, "failed to map audss registers\n");
-+		dev_err(dev, "failed to map audss registers\n");
- 		return PTR_ERR(reg_base);
- 	}
- 
- 	epll = ERR_PTR(-ENODEV);
- 
--	clk_data = devm_kzalloc(&pdev->dev,
-+	clk_data = devm_kzalloc(dev,
- 				sizeof(*clk_data) +
- 				sizeof(*clk_data->hws) * EXYNOS_AUDSS_MAX_CLKS,
- 				GFP_KERNEL);
-@@ -160,8 +161,8 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
- 	clk_data->num = variant->num_clks;
- 	clk_table = clk_data->hws;
- 
--	pll_ref = devm_clk_get(&pdev->dev, "pll_ref");
--	pll_in = devm_clk_get(&pdev->dev, "pll_in");
-+	pll_ref = devm_clk_get(dev, "pll_ref");
-+	pll_in = devm_clk_get(dev, "pll_in");
- 	if (!IS_ERR(pll_ref))
- 		mout_audss_p[0] = __clk_get_name(pll_ref);
- 	if (!IS_ERR(pll_in)) {
-@@ -172,7 +173,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
- 
- 			ret = clk_prepare_enable(epll);
- 			if (ret) {
--				dev_err(&pdev->dev,
-+				dev_err(dev,
- 					"failed to prepare the epll clock\n");
- 				return ret;
- 			}
-@@ -183,8 +184,8 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
- 				CLK_SET_RATE_NO_REPARENT,
- 				reg_base + ASS_CLK_SRC, 0, 1, 0, &lock);
- 
--	cdclk = devm_clk_get(&pdev->dev, "cdclk");
--	sclk_audio = devm_clk_get(&pdev->dev, "sclk_audio");
-+	cdclk = devm_clk_get(dev, "cdclk");
-+	sclk_audio = devm_clk_get(dev, "sclk_audio");
- 	if (!IS_ERR(cdclk))
- 		mout_i2s_p[1] = __clk_get_name(cdclk);
- 	if (!IS_ERR(sclk_audio))
-@@ -222,7 +223,7 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
- 				 "sclk_pcm", CLK_SET_RATE_PARENT,
- 				reg_base + ASS_CLK_GATE, 4, 0, &lock);
- 
--	sclk_pcm_in = devm_clk_get(&pdev->dev, "sclk_pcm_in");
-+	sclk_pcm_in = devm_clk_get(dev, "sclk_pcm_in");
- 	if (!IS_ERR(sclk_pcm_in))
- 		sclk_pcm_p = __clk_get_name(sclk_pcm_in);
- 	clk_table[EXYNOS_SCLK_PCM] = clk_hw_register_gate(NULL, "sclk_pcm",
-@@ -237,16 +238,16 @@ static int exynos_audss_clk_probe(struct platform_device *pdev)
- 
- 	for (i = 0; i < clk_data->num; i++) {
- 		if (IS_ERR(clk_table[i])) {
--			dev_err(&pdev->dev, "failed to register clock %d\n", i);
-+			dev_err(dev, "failed to register clock %d\n", i);
- 			ret = PTR_ERR(clk_table[i]);
- 			goto unregister;
- 		}
- 	}
- 
--	ret = of_clk_add_hw_provider(pdev->dev.of_node, of_clk_hw_onecell_get,
-+	ret = of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
- 				     clk_data);
- 	if (ret) {
--		dev_err(&pdev->dev, "failed to add clock provider\n");
-+		dev_err(dev, "failed to add clock provider\n");
- 		goto unregister;
- 	}
- 
--- 
-1.9.1
+Looking at mdio-mux, it seems to provide a way to access multiplexed
+MDIO buses. It says nothing about the MAC<->PHY connection.
+
+With our hardware, and likely Rockchip's as well, the muxed connections
+include the MDIO and MII connections, which are muxed at the same time.
+It's likely to cause some confusion or even bugs if we implement it as
+a separate driver.
+
+ChenYu
