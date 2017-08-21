@@ -1,158 +1,43 @@
-From: zhi.mao@mediatek.com (Zhi Mao)
-Date: Mon, 21 Aug 2017 17:05:37 +0800
-Subject: [PATCH v3 6/6] pwm: mediatek: add MT2712/MT7622 support
-In-Reply-To: <20170821080511.GP18996@ulmo>
-References: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
- <1498802721-32455-7-git-send-email-zhi.mao@mediatek.com>
- <20170821080511.GP18996@ulmo>
-Message-ID: <1503306337.23444.2.camel@mhfsdcap03>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 21 Aug 2017 11:06:13 +0200
+Subject: [PATCH v2 0/4] ARM: dts: rcar-gen2: Stop grouping clocks under a
+ "clocks" subnode
+In-Reply-To: <1503047817-29439-1-git-send-email-geert+renesas@glider.be>
+References: <1503047817-29439-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170821090613.GF14174@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
+On Fri, Aug 18, 2017 at 11:16:53AM +0200, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
+> 
+> The current practice is to not group clocks under a "clocks" subnode,
+> but just put them together with the other on-SoC devices.
+> 
+> Hence this patch series implements this for the various R-Car Gen2
+> DTSes that still need this (r8a7792.dtsi is OK).
+> 
+> Changes compared to v1:
+>   - Rebased.
+> 
+> Dependencies:
+>   - renesas-devel-20170818-v4.13-rc5,
+>   - Patch series "[PATCH v2 0/5] ARM: dts: rcar-gen2: Convert to new
+>     CPG/MSSR bindings".
+> 
+> For your convenience, this series is also available in the
+> topic/rcar2-cpg-mssr-dt-v2 branch of my renesas-drivers git repository at
+> git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers.git.
+> 
+> Thanks for applying!
+> 
+> Geert Uytterhoeven (4):
+>   ARM: dts: r8a7790: Stop grouping clocks under a "clocks" subnode
+>   ARM: dts: r8a7791: Stop grouping clocks under a "clocks" subnode
+>   ARM: dts: r8a7793: Stop grouping clocks under a "clocks" subnode
+>   ARM: dts: r8a7794: Stop grouping clocks under a "clocks" subnode
 
-Thanks for your review  code.
-I will modify the code as you comment in the next release.
+Thanks. r8a779[034] patches applied for v4.15.
 
-Regards
-Zhi
-
-On Mon, 2017-08-21 at 10:05 +0200, Thierry Reding wrote:
-> On Fri, Jun 30, 2017 at 02:05:21PM +0800, Zhi Mao wrote:
-> > 1. support multiple chip(MT2712, MT7622, MT7623)
-> > 2. add mtk_pwm_com_reg for match the registers of MT2712 pwm8
-> >    the register offset address of pwm8 for MT2712 is not fixed 0x40
-> >    and they are not the same as pwm0~6.
-> > 
-> > Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
-> > ---
-> >  drivers/pwm/pwm-mediatek.c |   55 +++++++++++++++++++++++++++++++++++---------
-> >  1 file changed, 44 insertions(+), 11 deletions(-)
-> > 
-> > diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-> > index 1d78ab1..2c9ce24 100644
-> > --- a/drivers/pwm/pwm-mediatek.c
-> > +++ b/drivers/pwm/pwm-mediatek.c
-> > @@ -16,6 +16,7 @@
-> >  #include <linux/module.h>
-> >  #include <linux/clk.h>
-> >  #include <linux/of.h>
-> > +#include <linux/of_device.h>
-> >  #include <linux/platform_device.h>
-> >  #include <linux/pwm.h>
-> >  #include <linux/slab.h>
-> > @@ -40,11 +41,19 @@ enum {
-> >  	MTK_CLK_PWM3,
-> >  	MTK_CLK_PWM4,
-> >  	MTK_CLK_PWM5,
-> > +	MTK_CLK_PWM6,
-> > +	MTK_CLK_PWM7,
-> > +	MTK_CLK_PWM8,
-> >  	MTK_CLK_MAX,
-> >  };
-> >  
-> > -static const char * const mtk_pwm_clk_name[] = {
-> > -	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5"
-> > +static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
-> > +	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4",
-> > +	"pwm5", "pwm6", "pwm7", "pwm8"
-> 
-> You're wrapping these lines at arbitrary boundaries. Make sure to use
-> all of the 80 columns at your disposal.
-> 
-> > +};
-> > +
-> > +struct mtk_com_pwm_data {
-> 
-> What does the _com stand for in the above?
-> 
-> > +	unsigned int pwm_nums;
-> >  };
-> 
-> Maybe name this num_pwms for consistency with other drivers?
-> 
-> >  
-> >  /**
-> > @@ -57,6 +66,11 @@ struct mtk_pwm_chip {
-> >  	struct pwm_chip chip;
-> >  	void __iomem *regs;
-> >  	struct clk *clks[MTK_CLK_MAX];
-> > +	const struct mtk_com_pwm_data *data;
-> > +};
-> > +
-> > +static const unsigned long mtk_pwm_com_reg[] = {
-> 
-> There's another of these _com that I don't understand what it means.
-> Also since these are all fairly small offsets, these can simply be
-> unsigned int.
-> 
-> > +	0x0010, 0x0050, 0x0090, 0x00d0, 0x0110, 0x0150, 0x0190, 0x0220
-> >  };
-> >  
-> >  static inline struct mtk_pwm_chip *to_mtk_pwm_chip(struct pwm_chip *chip)
-> > @@ -103,14 +117,14 @@ static void mtk_pwm_clk_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-> >  static inline u32 mtk_pwm_readl(struct mtk_pwm_chip *chip, unsigned int num,
-> >  				unsigned int offset)
-> >  {
-> > -	return readl(chip->regs + 0x10 + (num * 0x40) + offset);
-> > +	return readl(chip->regs + mtk_pwm_com_reg[num] + offset);
-> >  }
-> >  
-> >  static inline void mtk_pwm_writel(struct mtk_pwm_chip *chip,
-> >  				  unsigned int num, unsigned int offset,
-> >  				  u32 value)
-> >  {
-> > -	writel(value, chip->regs + 0x10 + (num * 0x40) + offset);
-> > +	writel(value, chip->regs + mtk_pwm_com_reg[num] + offset);
-> >  }
-> >  
-> >  static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> > @@ -194,23 +208,28 @@ static int mtk_pwm_probe(struct platform_device *pdev)
-> >  	if (!pc)
-> >  		return -ENOMEM;
-> >  
-> > +	pc->data = of_device_get_match_data(&pdev->dev);
-> > +
-> >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >  	pc->regs = devm_ioremap_resource(&pdev->dev, res);
-> >  	if (IS_ERR(pc->regs))
-> >  		return PTR_ERR(pc->regs);
-> >  
-> > -	for (i = 0; i < MTK_CLK_MAX; i++) {
-> > +	for (i = 0; i < pc->data->pwm_nums + 2; i++) {
-> >  		pc->clks[i] = devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
-> > -		if (IS_ERR(pc->clks[i]))
-> > +		if (IS_ERR(pc->clks[i])) {
-> > +			dev_err(&pdev->dev, "[PWM] clock: %s fail: %ld\n",
-> > +				mtk_pwm_clk_name[i], PTR_ERR(pc->clks[i]));
-> 
-> Why include the "[PWM] " prefix in the above message?
-> 
-> >  			return PTR_ERR(pc->clks[i]);
-> > +		}
-> >  	}
-> >  
-> > -	platform_set_drvdata(pdev, pc);
-> > -
-> >  	pc->chip.dev = &pdev->dev;
-> >  	pc->chip.ops = &mtk_pwm_ops;
-> >  	pc->chip.base = -1;
-> > -	pc->chip.npwm = 5;
-> > +	pc->chip.npwm = pc->data->pwm_nums;
-> > +
-> > +	platform_set_drvdata(pdev, pc);
-> 
-> No need to move the location of the platform_set_drvdata() call. It's
-> needless churn.
-> 
-> >  static const struct of_device_id mtk_pwm_of_match[] = {
-> > -	{ .compatible = "mediatek,mt7623-pwm" },
-> > -	{ }
-> > +	{.compatible = "mediatek,mt2712-pwm", .data = &mt2712_pwm_data},
-> > +	{.compatible = "mediatek,mt7622-pwm", .data = &mt7622_pwm_data},
-> > +	{.compatible = "mediatek,mt7623-pwm", .data = &mt7623_pwm_data},
-> > +	{},
-> 
-> Spaces after { and before }, please.
-> 
-> Thierry
+The r8a7791 patch did not apply cleanly for some reason.
+Could you rebase and repost once I have pushed today's devel branch?
