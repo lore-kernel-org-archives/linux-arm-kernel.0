@@ -1,49 +1,22 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 21 Aug 2017 13:21:24 +0300
-Subject: [PATCH v8 00/20] ILP32 for ARM64
-In-Reply-To: <20170808133411.opuh7pz3kmlhkhzy@armageddon.cambridge.arm.com>
-References: <20170619155003.13218-1-ynorov@caviumnetworks.com>
- <20170629161036.ftedtbp2gdmyzloo@e104818-lin.cambridge.arm.com>
- <20170706215902.qtmbsidwvqlr7o56@yury-thinkpad>
- <20170707171135.h54fe4ea7xuxnrqt@armageddon.cambridge.arm.com>
- <20170724112624.7ie6na7uszmsc5te@yury-thinkpad>
- <20170808133411.opuh7pz3kmlhkhzy@armageddon.cambridge.arm.com>
-Message-ID: <20170821102124.xcqnzdzhs73gzbcf@yury-thinkpad>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Mon, 21 Aug 2017 18:22:31 +0800
+Subject: [PATCH v2 1/4] clk: rockchip: add rv1108 ACLK_GAMC and PCLK_GMAC
+ ID
+In-Reply-To: <1503303367-17915-2-git-send-email-zhangqing@rock-chips.com>
+References: <1503303367-17915-1-git-send-email-zhangqing@rock-chips.com>
+ <1503303367-17915-2-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <f51160d5-32cc-a63c-3877-76ea91fb6e8b@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 02:34:11PM +0100, Catalin Marinas wrote:
-> On Mon, Jul 24, 2017 at 02:26:24PM +0300, Yury Norov wrote:
-> > This is the 4.12 and linux-next - based kernel patches:
-> > https://github.com/norov/linux/tree/ilp32-4.12
-> > https://github.com/norov/linux/tree/ilp32-20170724
+Hi Elaine,
+
+? 2017/8/21 16:16, Elaine Zhang ??:
+> This patch exports gmac aclk and pclk for dts reference.
 > 
-> I published the 4.12 branch here:
-> 
-> https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=staging/ilp32-4.12
-> 
-> (or git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git staging/ilp32-4.12)
-> 
-> There are two patches on top, one to fix SET_PERSONALITY and the other
-> to make ILP32 default y since you'd expect people using this branch to
-> need such option enabled.
-> 
-> I'll publish a 4.13-based branch when the corresponding kernel version
-> is released.
+> Signed-off-by: Elaine Zhang<zhangqing@rock-chips.com>
+> ---
+>   include/dt-bindings/clock/rv1108-cru.h | 2 ++
+>   1 file changed, 2 insertions(+)
 
-Hi Catalin,
-
-This is the rc-6 based ilp32 series:
-https://github.com/norov/linux/tree/ilp32-4.13-rc6
-
-It includes latest version of SET_PERSONALITY() rework:
-https://www.spinics.net/lists/arm-kernel/msg602005.html
-
-All patches prior to 3fc85ee96eb8 ("arm64: ilp32: add documentation on
-the ILP32 ABI for ARM64") are looking not ilp32-specific and may be
-applied independently.
-
-It also includes your patch "arm64: ilp32: Make the Kconfig option
-default y" on the top of series.
-
-Yury
+Acked-by: David Wu <david.wu@rock-chips.com>
