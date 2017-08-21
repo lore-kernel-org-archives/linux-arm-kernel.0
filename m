@@ -1,62 +1,175 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 21 Aug 2017 18:02:59 +0200
-Subject: [PATCH v2 14/16] mmc: meson-gx: implement voltage switch callback
+Date: Mon, 21 Aug 2017 18:02:56 +0200
+Subject: [PATCH v2 11/16] mmc: meson-gx: simplify interrupt handler
 In-Reply-To: <20170821160301.21899-1-jbrunet@baylibre.com>
 References: <20170821160301.21899-1-jbrunet@baylibre.com>
-Message-ID: <20170821160301.21899-15-jbrunet@baylibre.com>
+Message-ID: <20170821160301.21899-12-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement voltage switch callback (shamelessly copied from sunxi mmc
-driver). This allow, with the appropriate tuning function, to use
-SD ultra high speed modes.
+No functional change, just improve interrupt handler readability
 
 Reviewed-by: Kevin Hilman <khilman@baylibre.com>
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/mmc/host/meson-gx-mmc.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ drivers/mmc/host/meson-gx-mmc.c | 93 +++++++++++++++++------------------------
+ 1 file changed, 39 insertions(+), 54 deletions(-)
 
 diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index df1ac96bd0db..3167f561e1a6 100644
+index c37e31dc709e..5203a9f76fe3 100644
 --- a/drivers/mmc/host/meson-gx-mmc.c
 +++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -1050,6 +1050,28 @@ static int meson_mmc_card_busy(struct mmc_host *mmc)
- 	return !(FIELD_GET(STATUS_DATI, regval) & 0xf);
- }
+@@ -78,16 +78,22 @@
+ #define   STATUS_BUSY BIT(31)
  
-+static int meson_mmc_voltage_switch(struct mmc_host *mmc, struct mmc_ios *ios)
-+{
-+	/* vqmmc regulator is available */
-+	if (!IS_ERR(mmc->supply.vqmmc)) {
-+		/*
-+		 * The usual amlogic setup uses a GPIO to switch from one
-+		 * regulator to the other. While the voltage ramp up is
-+		 * pretty fast, care must be taken when switching from 3.3v
-+		 * to 1.8v. Please make sure the regulator framework is aware
-+		 * of your own regulator constraints
-+		 */
-+		return mmc_regulator_set_vqmmc(mmc, ios);
-+
-+	}
-+
-+	/* no vqmmc regulator, assume fixed regulator at 3/3.3V */
-+	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330)
-+		return 0;
-+
-+	return -EINVAL;
-+}
-+
- static const struct mmc_host_ops meson_mmc_ops = {
- 	.request	= meson_mmc_request,
- 	.set_ios	= meson_mmc_set_ios,
-@@ -1058,6 +1080,7 @@ static const struct mmc_host_ops meson_mmc_ops = {
- 	.post_req	= meson_mmc_post_req,
- 	.execute_tuning = meson_mmc_execute_tuning,
- 	.card_busy	= meson_mmc_card_busy,
-+	.start_signal_voltage_switch = meson_mmc_voltage_switch,
- };
+ #define SD_EMMC_IRQ_EN 0x4c
+-#define   IRQ_EN_MASK GENMASK(13, 0)
+ #define   IRQ_RXD_ERR_MASK GENMASK(7, 0)
+ #define   IRQ_TXD_ERR BIT(8)
+ #define   IRQ_DESC_ERR BIT(9)
+ #define   IRQ_RESP_ERR BIT(10)
++#define   IRQ_CRC_ERR \
++	(IRQ_RXD_ERR_MASK | IRQ_TXD_ERR | IRQ_DESC_ERR | IRQ_RESP_ERR)
+ #define   IRQ_RESP_TIMEOUT BIT(11)
+ #define   IRQ_DESC_TIMEOUT BIT(12)
++#define   IRQ_TIMEOUTS \
++	(IRQ_RESP_TIMEOUT | IRQ_DESC_TIMEOUT)
+ #define   IRQ_END_OF_CHAIN BIT(13)
+ #define   IRQ_RESP_STATUS BIT(14)
+ #define   IRQ_SDIO BIT(15)
++#define   IRQ_EN_MASK \
++	(IRQ_CRC_ERR | IRQ_TIMEOUTS | IRQ_END_OF_CHAIN | IRQ_RESP_STATUS |\
++	 IRQ_SDIO)
  
- static int meson_mmc_probe(struct platform_device *pdev)
+ #define SD_EMMC_CMD_CFG 0x50
+ #define SD_EMMC_CMD_ARG 0x54
+@@ -761,57 +767,40 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
+ 	struct mmc_data *data;
+ 	u32 irq_en, status, raw_status;
+ 	unsigned long flag;
+-	irqreturn_t ret = IRQ_HANDLED;
++	irqreturn_t ret = IRQ_NONE;
+ 
+-	if (WARN_ON(!host))
++	if (WARN_ON(!host) || WARN_ON(!host->cmd))
+ 		return IRQ_NONE;
+ 
+-	cmd = host->cmd;
+-
+-	if (WARN_ON(!cmd))
+-		return IRQ_NONE;
++	spin_lock_irqsave(&host->lock, flag);
+ 
++	cmd = host->cmd;
+ 	data = cmd->data;
+-
+-	spin_lock_irqsave(&host->lock, flag);
+ 	irq_en = readl(host->regs + SD_EMMC_IRQ_EN);
+ 	raw_status = readl(host->regs + SD_EMMC_STATUS);
+ 	status = raw_status & irq_en;
+ 
+-	if (!status) {
+-		dev_warn(host->dev, "Spurious IRQ! status=0x%08x, irq_en=0x%08x\n",
+-			 raw_status, irq_en);
+-		ret = IRQ_NONE;
+-		goto out;
+-	}
+-
+-	meson_mmc_read_resp(host->mmc, cmd);
+-
+ 	cmd->error = 0;
+-	if (status & IRQ_RXD_ERR_MASK) {
+-		dev_dbg(host->dev, "Unhandled IRQ: RXD error\n");
+-		cmd->error = -EILSEQ;
+-	}
+-	if (status & IRQ_TXD_ERR) {
+-		dev_dbg(host->dev, "Unhandled IRQ: TXD error\n");
+-		cmd->error = -EILSEQ;
+-	}
+-	if (status & IRQ_DESC_ERR)
+-		dev_dbg(host->dev, "Unhandled IRQ: Descriptor error\n");
+-	if (status & IRQ_RESP_ERR) {
+-		dev_dbg(host->dev, "Unhandled IRQ: Response error\n");
++	if (status & IRQ_CRC_ERR) {
++		dev_dbg(host->dev, "CRC Error - status 0x%08x\n", status);
+ 		cmd->error = -EILSEQ;
++		ret = IRQ_HANDLED;
++		goto out;
+ 	}
+-	if (status & IRQ_RESP_TIMEOUT) {
+-		dev_dbg(host->dev, "Unhandled IRQ: Response timeout\n");
++
++	if (status & IRQ_TIMEOUTS) {
++		dev_dbg(host->dev, "Timeout - status 0x%08x\n", status);
+ 		cmd->error = -ETIMEDOUT;
++		ret = IRQ_HANDLED;
++		goto out;
+ 	}
+-	if (status & IRQ_DESC_TIMEOUT) {
+-		dev_dbg(host->dev, "Unhandled IRQ: Descriptor timeout\n");
+-		cmd->error = -ETIMEDOUT;
++
++	meson_mmc_read_resp(host->mmc, cmd);
++
++	if (status & IRQ_SDIO) {
++		dev_dbg(host->dev, "IRQ: SDIO TODO.\n");
++		ret = IRQ_HANDLED;
+ 	}
+-	if (status & IRQ_SDIO)
+-		dev_dbg(host->dev, "Unhandled IRQ: SDIO.\n");
+ 
+ 	if (status & (IRQ_END_OF_CHAIN | IRQ_RESP_STATUS)) {
+ 		if (data && !cmd->error)
+@@ -819,26 +808,20 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
+ 		if (meson_mmc_bounce_buf_read(data) ||
+ 		    meson_mmc_get_next_command(cmd))
+ 			ret = IRQ_WAKE_THREAD;
+-	} else {
+-		dev_warn(host->dev, "Unknown IRQ! status=0x%04x: MMC CMD%u arg=0x%08x flags=0x%08x stop=%d\n",
+-			 status, cmd->opcode, cmd->arg,
+-			 cmd->flags, cmd->mrq->stop ? 1 : 0);
+-		if (cmd->data) {
+-			struct mmc_data *data = cmd->data;
+-
+-			dev_warn(host->dev, "\tblksz %u blocks %u flags 0x%08x (%s%s)",
+-				 data->blksz, data->blocks, data->flags,
+-				 data->flags & MMC_DATA_WRITE ? "write" : "",
+-				 data->flags & MMC_DATA_READ ? "read" : "");
+-		}
++		else
++			ret = IRQ_HANDLED;
+ 	}
+ 
+ out:
+-	/* ack all (enabled) interrupts */
+-	writel(status, host->regs + SD_EMMC_STATUS);
++	/* ack all enabled interrupts */
++	writel(irq_en, host->regs + SD_EMMC_STATUS);
+ 
+ 	if (ret == IRQ_HANDLED)
+ 		meson_mmc_request_done(host->mmc, cmd->mrq);
++	else if (ret == IRQ_NONE)
++		dev_warn(host->dev,
++			 "Unexpected IRQ! status=0x%08x, irq_en=0x%08x\n",
++			 raw_status, irq_en);
+ 
+ 	spin_unlock_irqrestore(&host->lock, flag);
+ 	return ret;
+@@ -1018,10 +1001,12 @@ static int meson_mmc_probe(struct platform_device *pdev)
+ 	/* Stop execution */
+ 	writel(0, host->regs + SD_EMMC_START);
+ 
+-	/* clear, ack, enable all interrupts */
++	/* clear, ack and enable interrupts */
+ 	writel(0, host->regs + SD_EMMC_IRQ_EN);
+-	writel(IRQ_EN_MASK, host->regs + SD_EMMC_STATUS);
+-	writel(IRQ_EN_MASK, host->regs + SD_EMMC_IRQ_EN);
++	writel(IRQ_CRC_ERR | IRQ_TIMEOUTS | IRQ_END_OF_CHAIN,
++	       host->regs + SD_EMMC_STATUS);
++	writel(IRQ_CRC_ERR | IRQ_TIMEOUTS | IRQ_END_OF_CHAIN,
++	       host->regs + SD_EMMC_IRQ_EN);
+ 
+ 	ret = devm_request_threaded_irq(&pdev->dev, irq, meson_mmc_irq,
+ 					meson_mmc_irq_thread, IRQF_SHARED,
 -- 
 2.9.5
