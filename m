@@ -1,30 +1,36 @@
 From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Mon, 21 Aug 2017 16:16:05 +0800
-Subject: [PATCH v2 2/4] clk: rockchip: rv1108: add ACLK_GMAC and PCLK_GMAC clk
- id
+Date: Mon, 21 Aug 2017 16:16:07 +0800
+Subject: [PATCH v2 4/4] clk: rockchip: rv1108: fix up the clk_mac sel register
+ description
 In-Reply-To: <1503303367-17915-1-git-send-email-zhangqing@rock-chips.com>
 References: <1503303367-17915-1-git-send-email-zhangqing@rock-chips.com>
-Message-ID: <1503303367-17915-3-git-send-email-zhangqing@rock-chips.com>
+Message-ID: <1503303367-17915-5-git-send-email-zhangqing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+cru_sel24_con[8]
+rmii_extclk_sel
+clock source select control register
+1'b0: from internal PLL
+1'b1: from external IO
+
 Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
 ---
- drivers/clk/rockchip/clk-rv1108.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/clk/rockchip/clk-rv1108.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/clk/rockchip/clk-rv1108.c b/drivers/clk/rockchip/clk-rv1108.c
-index d1065dd9f442..0e441ec21e90 100644
+index 658da17c9d99..4d87828df4f7 100644
 --- a/drivers/clk/rockchip/clk-rv1108.c
 +++ b/drivers/clk/rockchip/clk-rv1108.c
-@@ -763,6 +763,8 @@ enum rv1108_plls {
- 	GATE(SCLK_MACPHY_RX, "sclk_macphy_rx", "sclk_macphy", 0, RV1108_CLKGATE_CON(4), 8, GFLAGS),
- 	GATE(SCLK_MAC_REF, "sclk_mac_ref", "sclk_macphy", 0, RV1108_CLKGATE_CON(4), 6, GFLAGS),
- 	GATE(SCLK_MAC_REFOUT, "sclk_mac_refout", "sclk_macphy", 0, RV1108_CLKGATE_CON(4), 7, GFLAGS),
-+	GATE(ACLK_GMAC, "aclk_gmac", "aclk_periph", 0, RV1108_CLKGATE_CON(15), 4, GFLAGS),
-+	GATE(PCLK_GMAC, "pclk_gmac", "pclk_periph", 0, RV1108_CLKGATE_CON(15), 5, GFLAGS),
- 
- 	MMC(SCLK_SDMMC_DRV,    "sdmmc_drv",    "sclk_sdmmc", RV1108_SDMMC_CON0, 1),
- 	MMC(SCLK_SDMMC_SAMPLE, "sdmmc_sample", "sclk_sdmmc", RV1108_SDMMC_CON1, 1),
+@@ -140,7 +140,7 @@ enum rv1108_plls {
+ PNAME(mux_uart0_p)		= { "uart0_src", "uart0_frac", "xin24m" };
+ PNAME(mux_uart1_p)		= { "uart1_src", "uart1_frac", "xin24m" };
+ PNAME(mux_uart2_p)		= { "uart2_src", "uart2_frac", "xin24m" };
+-PNAME(mux_sclk_mac_p)	= { "ext_gmac", "sclk_mac_pre" };
++PNAME(mux_sclk_mac_p)	= { "sclk_mac_pre", "ext_gmac" };
+ PNAME(mux_i2s0_pre_p)		= { "i2s0_src", "i2s0_frac", "ext_i2s", "xin12m" };
+ PNAME(mux_i2s_out_p)		= { "i2s0_pre", "xin12m" };
+ PNAME(mux_i2s1_p)		= { "i2s1_src", "i2s1_frac", "dummy", "xin12m" };
 -- 
 1.9.1
