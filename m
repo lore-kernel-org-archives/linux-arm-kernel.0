@@ -1,127 +1,154 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 21 Aug 2017 15:01:23 +0200
-Subject: [PATCH v2 2/6] clk: renesas: rcar-gen3: Add Z2 clock divider support
+Date: Mon, 21 Aug 2017 15:01:22 +0200
+Subject: [PATCH v2 1/6] clk: renesas: rcar-gen3: Add Z clock divider support
 In-Reply-To: <1503320487-13591-1-git-send-email-horms+renesas@verge.net.au>
 References: <1503320487-13591-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1503320487-13591-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1503320487-13591-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-This patch adds Z2 clock divider support for R-Car Gen3 SoC.
+This patch adds Z clock divider support for R-Car Gen3 SoC.
 
 Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-[simon: add recalc_rate() helper; use bitops macros]
+[simon: divide parent by 2; use bitops macros]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
 v1 [Simon Horman]
-* Provide __cpg_z_clk_recalc_rate() helper
-* Use GENMASK
+* Divide parent clock by 2 to give correct rate
+* Use GENMASK, FIELD_{GET,PREP}
+* Correct whitespace
+* Arrange local variables in reverse christmas tree order
 
 v0 [Takeshi Kihara]
 ---
- drivers/clk/renesas/rcar-gen3-cpg.c | 76 ++++++++++++++++++++++++++++++++++---
- drivers/clk/renesas/rcar-gen3-cpg.h |  1 +
- 2 files changed, 72 insertions(+), 5 deletions(-)
+ drivers/clk/renesas/rcar-gen3-cpg.c | 138 ++++++++++++++++++++++++++++++++++++
+ drivers/clk/renesas/rcar-gen3-cpg.h |   1 +
+ 2 files changed, 139 insertions(+)
 
 diff --git a/drivers/clk/renesas/rcar-gen3-cpg.c b/drivers/clk/renesas/rcar-gen3-cpg.c
-index f688b5f44961..8f44cbf895fb 100644
+index 951105816547..f688b5f44961 100644
 --- a/drivers/clk/renesas/rcar-gen3-cpg.c
 +++ b/drivers/clk/renesas/rcar-gen3-cpg.c
-@@ -30,7 +30,7 @@
+@@ -13,6 +13,7 @@
+  */
+ 
+ #include <linux/bug.h>
++#include <linux/bitfield.h>
+ #include <linux/clk.h>
+ #include <linux/clk-provider.h>
+ #include <linux/device.h>
+@@ -29,6 +30,139 @@
  #define CPG_PLL2CR		0x002c
  #define CPG_PLL4CR		0x01f4
  
--/* Z Clock
-+/* Z Clock & Z2 Clock
-  *
-  * Traits of this clock:
-  * prepare - clk_prepare only ensures that parents are prepared
-@@ -42,6 +42,7 @@
- #define CPG_FRQCRB_KICK			BIT(31)
- #define CPG_FRQCRC			0x000000e0
- #define CPG_FRQCRC_ZFC_MASK		GENMASK(12, 8)
-+#define CPG_FRQCRC_Z2FC_MASK		GENMASK(4, 0)
- 
- struct cpg_z_clk {
- 	struct clk_hw hw;
-@@ -51,14 +52,13 @@ struct cpg_z_clk {
- 
- #define to_z_clk(_hw)	container_of(_hw, struct cpg_z_clk, hw)
- 
--static unsigned long cpg_z_clk_recalc_rate(struct clk_hw *hw,
--					   unsigned long parent_rate)
-+static unsigned long __cpg_z_clk_recalc_rate(unsigned long parent_rate,
-+					     unsigned int val)
- {
--	struct cpg_z_clk *zclk = to_z_clk(hw);
- 	unsigned long rate;
- 	unsigned int mult;
- 
--	mult = 32 - FIELD_GET(CPG_FRQCRC_ZFC_MASK, clk_readl(zclk->reg));
-+	mult = 32 - val;
- 	/* There is a PLL post-divider of 1/2,
- 	 * thus the doubling of the divisor below.
- 	 */
-@@ -69,6 +69,26 @@ static unsigned long cpg_z_clk_recalc_rate(struct clk_hw *hw,
- 	return rate;
- }
- 
++/* Z Clock
++ *
++ * Traits of this clock:
++ * prepare - clk_prepare only ensures that parents are prepared
++ * enable - clk_enable only ensures that parents are enabled
++ * rate - rate is adjustable.  clk->rate = (parent->rate * mult / 32 ) / 2
++ * parent - fixed parent.  No clk_set_parent support
++ */
++#define CPG_FRQCRB			0x00000004
++#define CPG_FRQCRB_KICK			BIT(31)
++#define CPG_FRQCRC			0x000000e0
++#define CPG_FRQCRC_ZFC_MASK		GENMASK(12, 8)
++
++struct cpg_z_clk {
++	struct clk_hw hw;
++	void __iomem *reg;
++	void __iomem *kick_reg;
++};
++
++#define to_z_clk(_hw)	container_of(_hw, struct cpg_z_clk, hw)
++
 +static unsigned long cpg_z_clk_recalc_rate(struct clk_hw *hw,
 +					   unsigned long parent_rate)
 +{
 +	struct cpg_z_clk *zclk = to_z_clk(hw);
-+	unsigned int val;
++	unsigned long rate;
++	unsigned int mult;
 +
-+	val = FIELD_GET(CPG_FRQCRC_ZFC_MASK, clk_readl(zclk->reg));
-+	return __cpg_z_clk_recalc_rate(parent_rate, val);
++	mult = 32 - FIELD_GET(CPG_FRQCRC_ZFC_MASK, clk_readl(zclk->reg));
++	/* There is a PLL post-divider of 1/2,
++	 * thus the doubling of the divisor below.
++	 */
++	rate = div_u64((u64)parent_rate * mult + 16, 32 * 2);
++	/* Round to closest value at 100MHz unit */
++	rate = 100000000 * DIV_ROUND_CLOSEST(rate, 100000000);
++
++	return rate;
 +}
 +
-+static unsigned long cpg_z2_clk_recalc_rate(struct clk_hw *hw,
-+					   unsigned long parent_rate)
++static long cpg_z_clk_round_rate(struct clk_hw *hw, unsigned long rate,
++				 unsigned long *parent_rate)
 +{
-+	struct cpg_z_clk *zclk = to_z_clk(hw);
-+	unsigned int val;
++	unsigned long prate = *parent_rate;
++	unsigned int mult;
 +
-+	val = FIELD_GET(CPG_FRQCRC_Z2FC_MASK, clk_readl(zclk->reg));
-+	return __cpg_z_clk_recalc_rate(parent_rate, val);
++	if (!prate)
++		prate = 1;
++
++	mult = div_u64((u64)rate * 32 + prate/2, prate);
++	mult = clamp(mult, 1U, 32U);
++
++	return *parent_rate / 32 * mult;
 +}
 +
- static long cpg_z_clk_round_rate(struct clk_hw *hw, unsigned long rate,
- 				 unsigned long *parent_rate)
- {
-@@ -129,12 +149,25 @@ static int cpg_z_clk_set_rate(struct clk_hw *hw, unsigned long rate,
- 	return -ETIMEDOUT;
- }
- 
-+static int cpg_z2_clk_set_rate(struct clk_hw *hw, unsigned long rate,
++static int cpg_z_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 +			      unsigned long parent_rate)
 +{
-+	pr_info("Do not support Z2 clock changing\n");
-+	return 0;
++	struct cpg_z_clk *zclk = to_z_clk(hw);
++	unsigned int mult;
++	unsigned int i;
++	u32 val, kick;
++
++	mult = div_u64((u64)rate * 32 + parent_rate/2, parent_rate);
++	mult = clamp(mult, 1U, 32U);
++
++	if (clk_readl(zclk->kick_reg) & CPG_FRQCRB_KICK)
++		return -EBUSY;
++
++	val = clk_readl(zclk->reg) & ~CPG_FRQCRC_ZFC_MASK;
++	val |= FIELD_PREP(CPG_FRQCRC_ZFC_MASK, 32 - mult);
++	clk_writel(val, zclk->reg);
++
++	/*
++	 * Set KICK bit in FRQCRB to update hardware setting and wait for
++	 * clock change completion.
++	 */
++	kick = clk_readl(zclk->kick_reg);
++	kick |= CPG_FRQCRB_KICK;
++	clk_writel(kick, zclk->kick_reg);
++
++	/*
++	 * Note: There is no HW information about the worst case latency.
++	 *
++	 * Using experimental measurements, it seems that no more than
++	 * ~10 iterations are needed, independently of the CPU rate.
++	 * Since this value might be dependent of external xtal rate, pll1
++	 * rate or even the other emulation clocks rate, use 1000 as a
++	 * "super" safe value.
++	 */
++	for (i = 1000; i; i--) {
++		if (!(clk_readl(zclk->kick_reg) & CPG_FRQCRB_KICK))
++			return 0;
++
++		cpu_relax();
++	}
++
++	return -ETIMEDOUT;
 +}
 +
- static const struct clk_ops cpg_z_clk_ops = {
- 	.recalc_rate = cpg_z_clk_recalc_rate,
- 	.round_rate = cpg_z_clk_round_rate,
- 	.set_rate = cpg_z_clk_set_rate,
- };
- 
-+static const struct clk_ops cpg_z2_clk_ops = {
-+	.recalc_rate = cpg_z2_clk_recalc_rate,
++static const struct clk_ops cpg_z_clk_ops = {
++	.recalc_rate = cpg_z_clk_recalc_rate,
 +	.round_rate = cpg_z_clk_round_rate,
-+	.set_rate = cpg_z2_clk_set_rate,
++	.set_rate = cpg_z_clk_set_rate,
 +};
 +
- static struct clk * __init cpg_z_clk_register(const char *name,
- 					      const char *parent_name,
- 					      void __iomem *reg)
-@@ -164,6 +197,35 @@ static struct clk * __init cpg_z_clk_register(const char *name,
- 	return clk;
- }
- 
-+static struct clk * __init cpg_z2_clk_register(const char *name,
++static struct clk * __init cpg_z_clk_register(const char *name,
 +					      const char *parent_name,
 +					      void __iomem *reg)
 +{
@@ -134,7 +161,7 @@ index f688b5f44961..8f44cbf895fb 100644
 +		return ERR_PTR(-ENOMEM);
 +
 +	init.name = name;
-+	init.ops = &cpg_z2_clk_ops;
++	init.ops = &cpg_z_clk_ops;
 +	init.flags = 0;
 +	init.parent_names = &parent_name;
 +	init.num_parents = 1;
@@ -149,30 +176,29 @@ index f688b5f44961..8f44cbf895fb 100644
 +
 +	return clk;
 +}
-+
+ 
  /*
   * SDn Clock
-  */
-@@ -511,6 +573,10 @@ struct clk * __init rcar_gen3_cpg_clk_register(struct device *dev,
- 		return cpg_z_clk_register(core->name, __clk_get_name(parent),
- 					  base);
+@@ -373,6 +507,10 @@ struct clk * __init rcar_gen3_cpg_clk_register(struct device *dev,
+ 		mult = 1;
+ 		break;
  
-+	case CLK_TYPE_GEN3_Z2:
-+		return cpg_z2_clk_register(core->name, __clk_get_name(parent),
-+					   base);
++	case CLK_TYPE_GEN3_Z:
++		return cpg_z_clk_register(core->name, __clk_get_name(parent),
++					  base);
 +
  	default:
  		return ERR_PTR(-EINVAL);
  	}
 diff --git a/drivers/clk/renesas/rcar-gen3-cpg.h b/drivers/clk/renesas/rcar-gen3-cpg.h
-index 89da28f6f71b..c03fd498c96b 100644
+index d756ef8b78eb..89da28f6f71b 100644
 --- a/drivers/clk/renesas/rcar-gen3-cpg.h
 +++ b/drivers/clk/renesas/rcar-gen3-cpg.h
-@@ -22,6 +22,7 @@ enum rcar_gen3_clk_types {
+@@ -21,6 +21,7 @@ enum rcar_gen3_clk_types {
+ 	CLK_TYPE_GEN3_SD,
  	CLK_TYPE_GEN3_R,
  	CLK_TYPE_GEN3_PE,
- 	CLK_TYPE_GEN3_Z,
-+	CLK_TYPE_GEN3_Z2,
++	CLK_TYPE_GEN3_Z,
  };
  
  #define DEF_GEN3_SD(_name, _id, _parent, _offset)	\
