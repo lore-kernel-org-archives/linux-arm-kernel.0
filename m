@@ -1,97 +1,29 @@
-From: npiggin@gmail.com (Nicholas Piggin)
-Date: Mon, 21 Aug 2017 16:06:05 +1000
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170821105258.191d04b1@roar.ozlabs.ibm.com>
-References: <20170731162757.000058ba@huawei.com>
- <20170801184646.GE3730@linux.vnet.ibm.com>
- <20170802172555.0000468a@huawei.com>
- <20170815154743.GK7017@linux.vnet.ibm.com>
- <87wp63smwn.fsf@concordia.ellerman.id.au>
- <20170816125617.GY7017@linux.vnet.ibm.com>
- <20170816162731.GA22978@linux.vnet.ibm.com>
- <20170820144553.2ab2727b@ppc64le>
- <20170820230040.706b62ac@roar.ozlabs.ibm.com>
- <20170820183514.GM11320@linux.vnet.ibm.com>
- <20170820211429.GA27111@linux.vnet.ibm.com>
- <20170821105258.191d04b1@roar.ozlabs.ibm.com>
-Message-ID: <20170821160605.5b1cc019@roar.ozlabs.ibm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 21 Aug 2017 08:12:34 +0200
+Subject: [PATCH 1/4] pwm: pwm-tiecap: Add TI 66AK2G SoC specific compatible
+In-Reply-To: <20170807114943.22612-2-vigneshr@ti.com>
+References: <20170807114943.22612-1-vigneshr@ti.com>
+ <20170807114943.22612-2-vigneshr@ti.com>
+Message-ID: <20170821061234.GF18996@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Aug 2017 10:52:58 +1000
-Nicholas Piggin <npiggin@gmail.com> wrote:
-
-> On Sun, 20 Aug 2017 14:14:29 -0700
-> "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+On Mon, Aug 07, 2017 at 05:19:40PM +0530, Vignesh R wrote:
+> Add a new compatible string "ti,k2g-ecap" to support PWM ECAP IP of
+> TI 66AK2G SoC.
 > 
-> > On Sun, Aug 20, 2017 at 11:35:14AM -0700, Paul E. McKenney wrote:  
-> > > On Sun, Aug 20, 2017 at 11:00:40PM +1000, Nicholas Piggin wrote:    
-> > > > On Sun, 20 Aug 2017 14:45:53 +1000
-> > > > Nicholas Piggin <npiggin@gmail.com> wrote:
-> > > >     
-> > > > > On Wed, 16 Aug 2017 09:27:31 -0700
-> > > > > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:    
-> > > > > > On Wed, Aug 16, 2017 at 05:56:17AM -0700, Paul E. McKenney wrote:
-> > > > > > 
-> > > > > > Thomas, John, am I misinterpreting the timer trace event messages?      
-> > > > > 
-> > > > > So I did some digging, and what you find is that rcu_sched seems to do a
-> > > > > simple scheudle_timeout(1) and just goes out to lunch for many seconds.
-> > > > > The process_timeout timer never fires (when it finally does wake after
-> > > > > one of these events, it usually removes the timer with del_timer_sync).
-> > > > > 
-> > > > > So this patch seems to fix it. Testing, comments welcome.    
-> > > > 
-> > > > Okay this had a problem of trying to forward the timer from a timer
-> > > > callback function.
-> > > > 
-> > > > This was my other approach which also fixes the RCU warnings, but it's
-> > > > a little more complex. I reworked it a bit so the mod_timer fast path
-> > > > hopefully doesn't have much more overhead (actually by reading jiffies
-> > > > only when needed, it probably saves a load).    
-> > > 
-> > > Giving this one a whirl!    
-> > 
-> > No joy here, but then again there are other reasons to believe that I
-> > am seeing a different bug than Dave and Jonathan are.
-> > 
-> > OK, not -entirely- without joy -- 10 of 14 runs were error-free, which
-> > is a good improvement over 0 of 84 for your earlier patch.  ;-)  But
-> > not statistically different from what I see without either patch.
-> > 
-> > But no statistical difference compared to without patch, and I still
-> > see the "rcu_sched kthread starved" messages.  For whatever it is worth,
-> > by the way, I also see this: "hrtimer: interrupt took 5712368 ns".
-> > Hmmm...  I am also seeing that without any of your patches.  Might
-> > be hypervisor preemption, I guess.  
-> 
-> Okay it makes the warnings go away for me, but I'm just booting then
-> leaving the system idle. You're doing some CPU hotplug activity?
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>  Documentation/devicetree/bindings/pwm/pwm-tiecap.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-Okay found a bug in the patch (it was not forwarding properly before
-adding the first timer after an idle) and a few other concerns.
+Applied to for-4.14/drivers, thanks.
 
-There's still a problem of a timer function doing a mod timer from
-within expire_timers. It can't forward the base, which might currently
-be quite a way behind. I *think* after we close these gaps and get
-timely wakeups for timers on there, it should not get too far behind
-for standard timers.
-
-Deferrable is a different story. Firstly it has no idle tracking so we
-never forward it. Even if we wanted to, we can't do it reliably because
-it could contain timers way behind the base. They are "deferrable", so
-you get what you pay for, but this still means there's a window where
-you can add a deferrable timer and get a far later expiry than you
-asked for despite the CPU never going idle after you added it.
-
-All these problems would seem to go away if mod_timer just queued up
-the timer to a single list on the base then pushed them into the
-wheel during your wheel processing softirq... Although maybe you end
-up with excessive passes over big queue of timers. Anyway that
-wouldn't be suitable for 4.13 even if it could work.
-
-I'll send out an updated minimal fix after some more testing...
-
-Thanks,
-Nick
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/29b876ec/attachment.sig>
