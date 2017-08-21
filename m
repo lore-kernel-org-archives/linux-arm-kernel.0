@@ -1,80 +1,60 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 21 Aug 2017 15:37:06 -0400
-Subject: [PATCH v11 2/4] PCI: Factor out pci_bus_wait_crs()
-In-Reply-To: <20170821191806.GC28977@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170818212310.15145.21732.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20170818213210.15145.15340.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <9cb3006d-31d0-e57a-fd3e-c32914e8ba42@codeaurora.org>
- <20170821191806.GC28977@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <eca38319-9e78-1a9c-b275-43944fd0a63d@codeaurora.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 21 Aug 2017 22:13:39 +0200
+Subject: [PATCH v5 0/9] mtd: sharpslpart partition parser
+In-Reply-To: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
+References: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
+Message-ID: <20170821221339.70cfcfb7@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/21/2017 3:18 PM, Bjorn Helgaas wrote:
->> pci_bus_read_dev_vendor_id()
->> {
->> 	...
->> 	if (pci_bus_crs_visibility_supported())
->> 		return pci_bus_wait_crs(dev->bus, dev->devfn, &id, 60000);
->>
->> 	return true
->> }
->>
->> Similar pattern for pci_flr_wait().
+Le Mon, 14 Aug 2017 22:48:31 +0200,
+Andrea Adami <andrea.adami@gmail.com> a ?crit :
 
-Sorry for the poor choice of function name. 
-
-I was thinking of something like this.
-
-bool pci_bus_crs_pending(u32 l)
-{
-	return (l & 0xFFFF) == 0x0001
-}
-
-if (pci_bus_crs_pending(id))
-	return pci_bus_wait_crs(dev->bus, dev->devfn, &id, 60000);
-
-> I think that makes sense.  We'd want to check for CRS SV being
-> enabled, e.g., maybe read PCI_EXP_RTCTL_CRSSVE back in
-> pci_enable_crs() and cache it somewhere.  Maybe a crs_sv_enabled bit
-> in the root port's pci_dev, and check it with something like what
-> pcie_root_rcb_set() does?
+> This patchset introduces a simple partition parser for the Sharp SL
+> Series PXA handhelds. More details in the commit text.
 > 
+> I have set in cc the ARM PXA maintainers because this is the MTD part of
+> a planned wider patchset cleaning the Zaurus board files. The MFD maintainers
+> are also in cc (tmio.h change).
+> 
+> Changelog:
+> v1 firt version, initial import of 2.4 sources
+> v2 refactor applying many suggested fixes
+> v3 put the partition parser types in the platform data
+> v4 refactor after ML review
+> v5 fix commit messages and subject texts, remove global, fixes after v4 review
+> 
+> GPL sources: http://support.ezaurus.com/developer/source/source_dl.asp
+> 
+> Andrea Adami (9):
+>   mtd: sharpslpart: Add sharpslpart partition parser
+>   mtd: nand: sharpsl: Add partition parsers platform data
+>   mfd: tmio: Add partition parsers platform data
+>   mtd: nand: sharpsl: Register partitions using the parsers
+>   mtd: nand: tmio: Register partitions using the parsers
 
-You can observe CRS under the following conditions
+Applied patches 2, to 5 to nand/next.
 
-1. root port <-> endpoint 
-2. bridge <-> endpoint 
-3. root port<->bridge
+Thanks,
 
-I was relying on the fact that we are reading 0x001 as an indication that
-this device detected CRS. Maybe, this is too indirect.
+Boris
 
-If we also want to capture the capability, I think the right thing is to
-check the parent capability.
-
-bool pci_bus_crs_vis_supported(struct pci_dev *bridge)
-{
-	if (device type(bridge) == root port)
-		return read(root_crs_register_reg);
-
-	if (device type(bridge) == switch)
-		return read(switch_crs_register);
-
-	return false;
-}
-
-bool pci_bus_crs_pending(struct pci_dev *dev, u32 l)
-{
-	if !pci_bus_crs_vis_supported(dev->parent)
-		return false;
-
-	return (l & 0xFFFF) == 0x0001;
-}
-
-I'll prototype this. Let me know if you have concerns.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>   ARM: pxa/corgi: Remove hardcoded partitioning, use sharpslpart parser
+>   ARM: pxa/tosa: Remove hardcoded partitioning, use sharpslpart parser
+>   ARM: pxa/spitz: Remove hardcoded partitioning, use sharpslpart parser
+>   ARM: pxa/poodle: Remove hardcoded partitioning, use sharpslpart parser
+> 
+>  arch/arm/mach-pxa/corgi.c         |  31 +---
+>  arch/arm/mach-pxa/poodle.c        |  28 +--
+>  arch/arm/mach-pxa/spitz.c         |  34 +---
+>  arch/arm/mach-pxa/tosa.c          |  28 +--
+>  drivers/mtd/nand/sharpsl.c        |   2 +-
+>  drivers/mtd/nand/tmio_nand.c      |   4 +-
+>  drivers/mtd/parsers/Kconfig       |   8 +
+>  drivers/mtd/parsers/Makefile      |   1 +
+>  drivers/mtd/parsers/sharpslpart.c | 376 ++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/tmio.h          |   1 +
+>  include/linux/mtd/sharpsl.h       |   1 +
+>  11 files changed, 424 insertions(+), 90 deletions(-)
+>  create mode 100644 drivers/mtd/parsers/sharpslpart.c
+> 
