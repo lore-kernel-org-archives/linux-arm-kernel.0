@@ -1,91 +1,123 @@
 From: rkrcmar@redhat.com (=?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?=)
-Date: Mon, 21 Aug 2017 22:35:25 +0200
-Subject: [PATCH RFC v3 4/9] KVM: arm/arm64: use locking helpers in
- kvm_vgic_create()
+Date: Mon, 21 Aug 2017 22:35:22 +0200
+Subject: [PATCH RFC v3 1/9] KVM: s390: optimize detection of started vcpus
 In-Reply-To: <20170821203530.9266-1-rkrcmar@redhat.com>
 References: <20170821203530.9266-1-rkrcmar@redhat.com>
-Message-ID: <20170821203530.9266-5-rkrcmar@redhat.com>
+Message-ID: <20170821203530.9266-2-rkrcmar@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No new VCPUs can be created because we are holding the kvm->lock.
-This means that if we successfuly lock all VCPUs, we'll be unlocking the
-same set and there is no need to do extra bookkeeping.
+We can add a variable instead of scanning all online VCPUs to know how
+many are started.  We can't trivially tell which VCPU is the last one,
+though.
 
+Suggested-by: Cornelia Huck <cohuck@redhat.com>
 Signed-off-by: Radim Kr?m?? <rkrcmar@redhat.com>
 ---
- virt/kvm/arm/vgic/vgic-init.c       | 24 +++++++++---------------
- virt/kvm/arm/vgic/vgic-kvm-device.c |  6 +++++-
- 2 files changed, 14 insertions(+), 16 deletions(-)
+ arch/s390/include/asm/kvm_host.h |  1 +
+ arch/s390/kvm/kvm-s390.c         | 39 +++++++++++++++------------------------
+ 2 files changed, 16 insertions(+), 24 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 5801261f3add..feb766f74c34 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -119,7 +119,7 @@ void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
-  */
- int kvm_vgic_create(struct kvm *kvm, u32 type)
+diff --git a/arch/s390/include/asm/kvm_host.h b/arch/s390/include/asm/kvm_host.h
+index a409d5991934..be0d0bdf585b 100644
+--- a/arch/s390/include/asm/kvm_host.h
++++ b/arch/s390/include/asm/kvm_host.h
+@@ -735,6 +735,7 @@ struct kvm_arch{
+ 	struct mutex ipte_mutex;
+ 	struct ratelimit_state sthyi_limit;
+ 	spinlock_t start_stop_lock;
++	unsigned started_vcpus;
+ 	struct sie_page2 *sie_page2;
+ 	struct kvm_s390_cpu_model model;
+ 	struct kvm_s390_crypto crypto;
+diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
+index 9f23a9e81a91..1534778a3c66 100644
+--- a/arch/s390/kvm/kvm-s390.c
++++ b/arch/s390/kvm/kvm-s390.c
+@@ -3414,25 +3414,17 @@ static void __enable_ibs_on_vcpu(struct kvm_vcpu *vcpu)
+ 
+ void kvm_s390_vcpu_start(struct kvm_vcpu *vcpu)
  {
--	int i, vcpu_lock_idx = -1, ret;
-+	int i, ret;
- 	struct kvm_vcpu *vcpu;
+-	int i, online_vcpus, started_vcpus = 0;
+-
+ 	if (!is_vcpu_stopped(vcpu))
+ 		return;
  
- 	if (irqchip_in_kernel(kvm))
-@@ -140,18 +140,14 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
- 	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
- 	 * that no other VCPUs are run while we create the vgic.
- 	 */
--	ret = -EBUSY;
--	kvm_for_each_vcpu(i, vcpu, kvm) {
--		if (!mutex_trylock(&vcpu->mutex))
--			goto out_unlock;
--		vcpu_lock_idx = i;
+ 	trace_kvm_s390_vcpu_start_stop(vcpu->vcpu_id, 1);
+ 	/* Only one cpu at a time may enter/leave the STOPPED state. */
+ 	spin_lock(&vcpu->kvm->arch.start_stop_lock);
+-	online_vcpus = atomic_read(&vcpu->kvm->online_vcpus);
+ 
+-	for (i = 0; i < online_vcpus; i++) {
+-		if (!is_vcpu_stopped(vcpu->kvm->vcpus[i]))
+-			started_vcpus++;
 -	}
-+	if (!lock_all_vcpus(kvm))
-+		return -EBUSY;
+-
+-	if (started_vcpus == 0) {
++	if (vcpu->kvm->arch.started_vcpus == 0) {
+ 		/* we're the only active VCPU -> speed it up */
+ 		__enable_ibs_on_vcpu(vcpu);
+-	} else if (started_vcpus == 1) {
++	} else if (vcpu->kvm->arch.started_vcpus == 1) {
+ 		/*
+ 		 * As we are starting a second VCPU, we have to disable
+ 		 * the IBS facility on all VCPUs to remove potentially
+@@ -3441,6 +3433,8 @@ void kvm_s390_vcpu_start(struct kvm_vcpu *vcpu)
+ 		__disable_ibs_on_all_vcpus(vcpu->kvm);
+ 	}
  
--	kvm_for_each_vcpu(i, vcpu, kvm) {
--		if (vcpu->arch.has_run_once)
-+	kvm_for_each_vcpu(i, vcpu, kvm)
-+		if (vcpu->arch.has_run_once) {
-+			ret = -EBUSY;
- 			goto out_unlock;
--	}
--	ret = 0;
-+		}
- 
- 	if (type == KVM_DEV_TYPE_ARM_VGIC_V2)
- 		kvm->arch.max_vcpus = VGIC_V2_MAX_CPUS;
-@@ -176,11 +172,9 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
- 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
- 	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
- 
-+	ret = 0;
- out_unlock:
--	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
--		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
--		mutex_unlock(&vcpu->mutex);
--	}
-+	unlock_all_vcpus(kvm);
- 	return ret;
- }
- 
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index 10ae6f394b71..c5124737c7fc 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -270,7 +270,11 @@ static void unlock_vcpus(struct kvm *kvm, int vcpu_lock_idx)
- 
- void unlock_all_vcpus(struct kvm *kvm)
- {
--	unlock_vcpus(kvm, atomic_read(&kvm->online_vcpus) - 1);
-+	int i;
-+	struct kvm_vcpu *tmp_vcpu;
++	vcpu->kvm->arch.started_vcpus++;
 +
-+	kvm_for_each_vcpu(i, tmp_vcpu, kvm)
-+		mutex_unlock(&tmp_vcpu->mutex);
- }
+ 	atomic_andnot(CPUSTAT_STOPPED, &vcpu->arch.sie_block->cpuflags);
+ 	/*
+ 	 * Another VCPU might have used IBS while we were offline.
+@@ -3453,16 +3447,12 @@ void kvm_s390_vcpu_start(struct kvm_vcpu *vcpu)
  
- /* Returns true if all vcpus were locked, false otherwise */
+ void kvm_s390_vcpu_stop(struct kvm_vcpu *vcpu)
+ {
+-	int i, online_vcpus, started_vcpus = 0;
+-	struct kvm_vcpu *started_vcpu = NULL;
+-
+ 	if (is_vcpu_stopped(vcpu))
+ 		return;
+ 
+ 	trace_kvm_s390_vcpu_start_stop(vcpu->vcpu_id, 0);
+ 	/* Only one cpu at a time may enter/leave the STOPPED state. */
+ 	spin_lock(&vcpu->kvm->arch.start_stop_lock);
+-	online_vcpus = atomic_read(&vcpu->kvm->online_vcpus);
+ 
+ 	/* SIGP STOP and SIGP STOP AND STORE STATUS has been fully processed */
+ 	kvm_s390_clear_stop_irq(vcpu);
+@@ -3470,19 +3460,20 @@ void kvm_s390_vcpu_stop(struct kvm_vcpu *vcpu)
+ 	atomic_or(CPUSTAT_STOPPED, &vcpu->arch.sie_block->cpuflags);
+ 	__disable_ibs_on_vcpu(vcpu);
+ 
+-	for (i = 0; i < online_vcpus; i++) {
+-		if (!is_vcpu_stopped(vcpu->kvm->vcpus[i])) {
+-			started_vcpus++;
+-			started_vcpu = vcpu->kvm->vcpus[i];
+-		}
+-	}
++	vcpu->kvm->arch.started_vcpus--;
++
++	if (vcpu->kvm->arch.started_vcpus == 1) {
++		struct kvm_vcpu *started_vcpu;
+ 
+-	if (started_vcpus == 1) {
+ 		/*
+-		 * As we only have one VCPU left, we want to enable the
+-		 * IBS facility for that VCPU to speed it up.
++		 * As we only have one VCPU left, we want to enable the IBS
++		 * facility for that VCPU to speed it up.
+ 		 */
+-		__enable_ibs_on_vcpu(started_vcpu);
++		kvm_for_each_vcpu(i, started_vcpu, vcpu->kvm)
++			if (!is_vcpu_stopped(started_vcpu)) {
++				__enable_ibs_on_vcpu(started_vcpu);
++				break;
++			}
+ 	}
+ 
+ 	spin_unlock(&vcpu->kvm->arch.start_stop_lock);
 -- 
 2.13.3
