@@ -1,48 +1,30 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 21 Aug 2017 08:27:03 +0100
-Subject: [PATCH v5 3/9] mfd: tmio: Add partition parsers platform data
-In-Reply-To: <20170819092603.1c919b4b@bbrezillon>
-References: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
- <1502743720-28672-4-git-send-email-andrea.adami@gmail.com>
- <20170815065835.jcuweb377lqioddc@dell>
- <20170819092603.1c919b4b@bbrezillon>
-Message-ID: <20170821072703.nmzarvksj6l7omrg@dell>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 21 Aug 2017 09:31:49 +0200
+Subject: [PATCH v3 1/6] pwm: kconfig: modify mediatek information
+In-Reply-To: <1498802721-32455-2-git-send-email-zhi.mao@mediatek.com>
+References: <1498802721-32455-1-git-send-email-zhi.mao@mediatek.com>
+ <1498802721-32455-2-git-send-email-zhi.mao@mediatek.com>
+Message-ID: <20170821073149.GK18996@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 19 Aug 2017, Boris Brezillon wrote:
-
-> Hi Lee,
+On Fri, Jun 30, 2017 at 02:05:16PM +0800, Zhi Mao wrote:
+> modify mediatek information
 > 
-> Le Tue, 15 Aug 2017 07:58:35 +0100,
-> Lee Jones <lee.jones@linaro.org> a ?crit :
-> 
-> > On Mon, 14 Aug 2017, Andrea Adami wrote:
-> > 
-> > > With the introduction of sharpslpart partition parser we can now read the
-> > > offsets from NAND: we specify the list of the parsers as platform data, with
-> > > cmdlinepart and ofpart parsers first allowing to override the part. table
-> > > written in NAND. This is done in the board files using this driver.
-> > > 
-> > > Thus, we need to extend tmio_nand_data to consider the partition parsers.
-> > > 
-> > > Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
-> > > ---
-> > >  include/linux/mfd/tmio.h | 1 +
-> > >  1 file changed, 1 insertion(+)  
-> > 
-> > Acked-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> 
-> I'm about to apply patches 1 to 5 of this series to the nand/next
-> branch. Do you want me to create an immutable branch with this patch?
+> Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
+> ---
+>  drivers/pwm/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-No, not for a single line change.  Git should figure that out.
+Applied to for-4.14/drivers, with a slightly modified subject and commit
+message.
 
-Thanks for asking though.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/f3479853/attachment.sig>
