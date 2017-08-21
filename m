@@ -1,78 +1,48 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 21 Aug 2017 19:54:43 +0900
-Subject: [PATCH v2] irqchip: uniphier-aidet: add UniPhier AIDET irqchip
- driver
-In-Reply-To: <e3b865f5-a779-f176-67ef-9ffac25019d4@arm.com>
-References: <1503309663-2742-1-git-send-email-yamada.masahiro@socionext.com>
- <e3b865f5-a779-f176-67ef-9ffac25019d4@arm.com>
-Message-ID: <CAK7LNAS_bTsweGB-WqbSoh8myTET9KW-7oN0FLZTmAf_K317aw@mail.gmail.com>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Mon, 21 Aug 2017 19:15:18 +0800
+Subject: [PATCH v2 1/4] clk: rockchip: add rv1108 ACLK_GAMC and PCLK_GMAC
+ ID
+In-Reply-To: <19279521.prAVXYBsZ9@phil>
+References: <1503303367-17915-1-git-send-email-zhangqing@rock-chips.com>
+ <1503303367-17915-2-git-send-email-zhangqing@rock-chips.com>
+ <f51160d5-32cc-a63c-3877-76ea91fb6e8b@rock-chips.com>
+ <19279521.prAVXYBsZ9@phil>
+Message-ID: <4765221b-e122-b67d-cec2-dffbeeadc379@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Heiko,
 
+? 2017/8/21 18:32, Heiko Stuebner ??:
+> Hi David,
+> 
+> Am Montag, 21. August 2017, 18:22:31 CEST schrieb David.Wu:
+>> Hi Elaine,
+>>
+>> ? 2017/8/21 16:16, Elaine Zhang ??:
+>>> This patch exports gmac aclk and pclk for dts reference.
+>>>
+>>> Signed-off-by: Elaine Zhang<zhangqing@rock-chips.com>
+>>> ---
+>>>    include/dt-bindings/clock/rv1108-cru.h | 2 ++
+>>>    1 file changed, 2 insertions(+)
+>>
+>> Acked-by: David Wu <david.wu@rock-chips.com>
+> 
+> Acked-by is mainly meant for cross-maintainer stuff (changes
+> for one subsystem going through a different tree etc).
+> 
+> If you want to show that the change is correct and you have reviewed
+> the patch, please use "Reviewed-by".
+> 
 
-2017-08-21 19:25 GMT+09:00 Marc Zyngier <marc.zyngier@arm.com>:
-> On 21/08/17 11:01, Masahiro Yamada wrote:
->> +static struct irq_chip uniphier_aidet_irq_chip = {
->> +     .name = "AIDET",
->> +     .irq_mask = irq_chip_mask_parent,
->> +     .irq_unmask = irq_chip_unmask_parent,
->> +     .irq_eoi = irq_chip_eoi_parent,
->> +     .irq_set_type = uniphier_aidet_irq_set_type,
->
-> Is this irqchip only used in a uniprocessor system? If not, how is the
-> interrupt affinity managed without a irq_set_affinity callback?
+Yeap, my intent is that the patches are correct. And change the tag here.?
+So for the series:
 
-I missed that.
-I will set irq_chip_set_affinity_parent.
+Reviewed-by: David Wu <david.wu@rock-chips.com>
 
-
-
-
->> +     /* parent is GIC */
->> +     parent_fwspec.fwnode = domain->parent->fwnode;
->> +     parent_fwspec.param_count = 3;
->> +     parent_fwspec.param[0] = 0;             /* SPI */
->> +     parent_fwspec.param[1] = hwirq;
->> +     parent_fwspec.param[2] = IRQ_TYPE_LEVEL_HIGH;   /* properly set later */
->
-> Why defer it to later? You already have the right information in "type",
-> so you might as well provide it immediately.
-
-
-Because .irq_set_type() will set it up
-before the IRQ is really in use.
-
-
-If we look gic_irq_domain_alloc() implementation,
-it does not care "type".
-
-gic_set_type() will manipulate hardware registers.
-
-
-Having said that, it shouldn't hurt to set type here.
-
-
-
->> +
->> +     priv->domain = irq_domain_add_hierarchy(parent_domain, 0,
->> +                                             UNIPHIER_AIDET_NR_IRQS,
->> +                                             dev->of_node,
->> +                                             &uniphier_aidet_domain_ops,
->> +                                             priv);
->
-> Nit: please use irq_domain_create_hierarchy. This does the exact same
-> thing, but is consistent with the use of fwnode instead of mixing
-> of_node and fwnode in this code.
->
-
-I will do so.
-
-
-Thanks.
-
-
--- 
-Best Regards
-Masahiro Yamada
+> 
+> Heiko
+> 
+> 
+> 
