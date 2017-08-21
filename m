@@ -1,31 +1,50 @@
-From: nikita.yoush@cogentembedded.com (Nikita Yushchenko)
-Date: Mon, 21 Aug 2017 18:58:19 +0300
-Subject: [PATCH] clk: imx51: propagate rate across ipu_di*_sel
-In-Reply-To: <20170821155412.GA24652@amethyst.visucore.com>
-References: <20170818163058.22252-1-l.stach@pengutronix.de>
- <CAOMZO5BoZNQrmDMXE0CDxLS-v7xVu4z87Ezdma1X1QCV56rPtQ@mail.gmail.com>
- <20170821155412.GA24652@amethyst.visucore.com>
-Message-ID: <4d5dbc0a-56b0-52a3-482d-2b3348c9c53b@cogentembedded.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Mon, 21 Aug 2017 18:00:53 +0200
+Subject: [PATCH] MAINTAINERS: Add SoC drivers to AT91 entry
+In-Reply-To: <20170812215345.10011-1-alexandre.belloni@free-electrons.com>
+References: <20170812215345.10011-1-alexandre.belloni@free-electrons.com>
+Message-ID: <fa4e7ad7-4441-0752-a676-4bd0a185cb81@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I'm trying to, but getting a non-clock-related problem on the i.mx51 babbage board
-> with current kernel preventing the display from coming up at all:
+On 12/08/2017 at 23:53, Alexandre Belloni wrote:
+> We (the AT91/Atmel SoC maintainers) are not seeing patches for several
+> drivers present only on our SoCs. Add more patterns to match at91 and atmel
+> drivers.
 > 
->     [    0.824712] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
->     [    0.831411] [drm] No driver support for vblank timestamp query.
->     [    0.837632] imx-drm display-subsystem: bound imx-ipuv3-crtc.0 (ops ipu_crtc_ops)
->     [    0.845214] imx-drm display-subsystem: bound imx-ipuv3-crtc.1 (ops ipu_crtc_ops)
->     [    0.852720] imx-drm display-subsystem: failed to bind display at di0 (ops imx_pd_ops): -19
->     [    0.860994] imx-drm display-subsystem: master bind failed: -19
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-I believe this should be fixed by
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-commit 799ee2970485dc206c3bf347d6e6827c04d5e4f9
-Author: Philipp Zabel <p.zabel@pengutronix.de>
-Date:   Mon Jun 12 17:54:29 2017 +0200
+> ---
+>  MAINTAINERS | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 205d3977ac46..6ba83a50a926 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1158,6 +1158,8 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  W:	http://www.linux4sam.org
+>  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
+>  S:	Supported
+> +N:	at91
+> +N:	atmel
+>  F:	arch/arm/mach-at91/
+>  F:	include/soc/at91/
+>  F:	arch/arm/boot/dts/at91*.dts
+> @@ -1166,6 +1168,9 @@ F:	arch/arm/boot/dts/sama*.dts
+>  F:	arch/arm/boot/dts/sama*.dtsi
+>  F:	arch/arm/include/debug/at91.S
+>  F:	drivers/memory/atmel*
+> +F:	drivers/watchdog/sama5d4_wdt.c
+> +X:	drivers/input/touchscreen/atmel_mxt_ts.c
+> +X:	drivers/net/wireless/atmel/
+>  
+>  ARM/ATMEL AT91 Clock Support
+>  M:	Boris Brezillon <boris.brezillon@free-electrons.com>
+> 
 
-  drm/imx: parallel-display: Accept drm_of_find_panel_or_bridge failure
 
-
-Nikita
+-- 
+Nicolas Ferre
