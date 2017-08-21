@@ -1,33 +1,66 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 21 Aug 2017 15:01:27 +0200
-Subject: [PATCH v2 6/6] clk: renesas: r8a7796: Add Z2 clock
-In-Reply-To: <1503320487-13591-1-git-send-email-horms+renesas@verge.net.au>
-References: <1503320487-13591-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1503320487-13591-7-git-send-email-horms+renesas@verge.net.au>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 21 Aug 2017 15:05:55 +0200
+Subject: [GIT PULL] ARM: Xilinx Zynq SoC patches for v4.14
+Message-ID: <8d0c07a6-27e9-e14a-560f-3fc89327f8cd@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Hi,
 
-This patch adds Z2 clock for R8A7796 SoC.
+please apply these two patches to your tree.
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/clk/renesas/r8a7796-cpg-mssr.c | 1 +
- 1 file changed, 1 insertion(+)
+Thanks,
+Michal
 
-diff --git a/drivers/clk/renesas/r8a7796-cpg-mssr.c b/drivers/clk/renesas/r8a7796-cpg-mssr.c
-index e8d5e75afc65..48731741b59e 100644
---- a/drivers/clk/renesas/r8a7796-cpg-mssr.c
-+++ b/drivers/clk/renesas/r8a7796-cpg-mssr.c
-@@ -75,6 +75,7 @@ static const struct cpg_core_clk r8a7796_core_clks[] __initconst = {
- 
- 	/* Core Clock Outputs */
- 	DEF_BASE("z",           R8A7796_CLK_Z,     CLK_TYPE_GEN3_Z, CLK_PLL0),
-+	DEF_BASE("z2",          R8A7796_CLK_Z2,    CLK_TYPE_GEN3_Z2, CLK_PLL2),
- 	DEF_FIXED("ztr",        R8A7796_CLK_ZTR,   CLK_PLL1_DIV2,  6, 1),
- 	DEF_FIXED("ztrd2",      R8A7796_CLK_ZTRD2, CLK_PLL1_DIV2, 12, 1),
- 	DEF_FIXED("zt",         R8A7796_CLK_ZT,    CLK_PLL1_DIV2,  4, 1),
+
+ The following changes since commit
+5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+
+   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+
+ are available in the git repository at:
+
+   https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.14
+
+ for you to fetch changes up to b04d4c876b1b7f25cff35b7c26c5b9f518f612b2:
+
+   ARM: zynq: Add support for Zynq-7000S devices (2017-08-21 14:22:50 +0200)
+
+ ----------------------------------------------------------------
+ arm: Xilinx Zynq patches for v4.14
+
+ - Add support for 7000s devices
+
+ ----------------------------------------------------------------
+ Michal Simek (2):
+       devicetree: ARM: zynq: Add DT binding for eFuse controller
+       ARM: zynq: Add support for Zynq-7000S devices
+
+  Documentation/devicetree/bindings/nvmem/zynq-efuse.txt | 15
++++++++++++++++
+  arch/arm/boot/dts/zynq-7000.dtsi                       |  5 +++++
+  arch/arm/mach-zynq/Makefile                            |  2 +-
+  arch/arm/mach-zynq/common.c                            |  1 +
+  arch/arm/mach-zynq/common.h                            |  3 +++
+  arch/arm/mach-zynq/efuse.c                             | 75
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  arch/arm/mach-zynq/platsmp.c                           |  3 +++
+  7 files changed, 103 insertions(+), 1 deletion(-)
+  create mode 100644 Documentation/devicetree/bindings/nvmem/zynq-efuse.txt
+  create mode 100644 arch/arm/mach-zynq/efuse.c
+
 -- 
-2.1.4
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/a8594170/attachment-0001.sig>
