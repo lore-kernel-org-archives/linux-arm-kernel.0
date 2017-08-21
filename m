@@ -1,69 +1,79 @@
-From: npiggin@gmail.com (Nicholas Piggin)
-Date: Mon, 21 Aug 2017 10:52:58 +1000
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170820211429.GA27111@linux.vnet.ibm.com>
-References: <20170731162757.000058ba@huawei.com>
- <20170801184646.GE3730@linux.vnet.ibm.com>
- <20170802172555.0000468a@huawei.com>
- <20170815154743.GK7017@linux.vnet.ibm.com>
- <87wp63smwn.fsf@concordia.ellerman.id.au>
- <20170816125617.GY7017@linux.vnet.ibm.com>
- <20170816162731.GA22978@linux.vnet.ibm.com>
- <20170820144553.2ab2727b@ppc64le>
- <20170820230040.706b62ac@roar.ozlabs.ibm.com>
- <20170820183514.GM11320@linux.vnet.ibm.com>
- <20170820211429.GA27111@linux.vnet.ibm.com>
-Message-ID: <20170821105258.191d04b1@roar.ozlabs.ibm.com>
+From: kevin.wangtao@hisilicon.com (Wangtao (Kevin, Kirin))
+Date: Mon, 21 Aug 2017 10:17:48 +0800
+Subject: [PATCH v3 1/3] dt-bindings: Document the hi3660 thermal sensor
+ bindings
+In-Reply-To: <20170817141517.izhteflvfwtoovqv@rob-hp-laptop>
+References: <1498102923-68481-1-git-send-email-kevin.wangtao@hisilicon.com>
+ <1502353935-92924-1-git-send-email-kevin.wangtao@hisilicon.com>
+ <1502353935-92924-2-git-send-email-kevin.wangtao@hisilicon.com>
+ <20170817141517.izhteflvfwtoovqv@rob-hp-laptop>
+Message-ID: <e313015d-11d5-91b8-aa64-37e9410cb882@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 20 Aug 2017 14:14:29 -0700
-"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
 
-> On Sun, Aug 20, 2017 at 11:35:14AM -0700, Paul E. McKenney wrote:
-> > On Sun, Aug 20, 2017 at 11:00:40PM +1000, Nicholas Piggin wrote:  
-> > > On Sun, 20 Aug 2017 14:45:53 +1000
-> > > Nicholas Piggin <npiggin@gmail.com> wrote:
-> > >   
-> > > > On Wed, 16 Aug 2017 09:27:31 -0700
-> > > > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:  
-> > > > > On Wed, Aug 16, 2017 at 05:56:17AM -0700, Paul E. McKenney wrote:
-> > > > > 
-> > > > > Thomas, John, am I misinterpreting the timer trace event messages?    
-> > > > 
-> > > > So I did some digging, and what you find is that rcu_sched seems to do a
-> > > > simple scheudle_timeout(1) and just goes out to lunch for many seconds.
-> > > > The process_timeout timer never fires (when it finally does wake after
-> > > > one of these events, it usually removes the timer with del_timer_sync).
-> > > > 
-> > > > So this patch seems to fix it. Testing, comments welcome.  
-> > > 
-> > > Okay this had a problem of trying to forward the timer from a timer
-> > > callback function.
-> > > 
-> > > This was my other approach which also fixes the RCU warnings, but it's
-> > > a little more complex. I reworked it a bit so the mod_timer fast path
-> > > hopefully doesn't have much more overhead (actually by reading jiffies
-> > > only when needed, it probably saves a load).  
-> > 
-> > Giving this one a whirl!  
-> 
-> No joy here, but then again there are other reasons to believe that I
-> am seeing a different bug than Dave and Jonathan are.
-> 
-> OK, not -entirely- without joy -- 10 of 14 runs were error-free, which
-> is a good improvement over 0 of 84 for your earlier patch.  ;-)  But
-> not statistically different from what I see without either patch.
-> 
-> But no statistical difference compared to without patch, and I still
-> see the "rcu_sched kthread starved" messages.  For whatever it is worth,
-> by the way, I also see this: "hrtimer: interrupt took 5712368 ns".
-> Hmmm...  I am also seeing that without any of your patches.  Might
-> be hypervisor preemption, I guess.
 
-Okay it makes the warnings go away for me, but I'm just booting then
-leaving the system idle. You're doing some CPU hotplug activity?
-
-Thanks,
-Nick
+? 2017/8/17 23:10, Rob Herring ??:
+> On Thu, Aug 10, 2017 at 04:32:13PM +0800, Tao Wang wrote:
+>> From: Tao Wang <kevin.wangtao@linaro.org>
+>>
+>> This adds documentation of device tree bindings for the
+>> thermal sensor controller of hi3660 SoC.
+>>
+>> Signed-off-by: Tao Wang <kevin.wangtao@linaro.org>
+>> ---
+>>   .../devicetree/bindings/thermal/hisi-tsensor.txt   | 23 ++++++++++++++++++++++
+>>   1 file changed, 23 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt b/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
+>> new file mode 100644
+>> index 0000000..2ab0eb9
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/thermal/hisi-tsensor.txt
+>> @@ -0,0 +1,23 @@
+>> +* Temperature Sensor on hisilicon SoC
+>> +
+>> +** Required properties :
+>> +
+>> +- compatible: "hisilicon,thermal-tsensor".
+> 
+> Needs an SoC specific compatible.
+OK
+> 
+>> +- reg: physical base address of thermal sensor and length of memory mapped
+>> +  region.
+>> +- offset: reg offset of each sensor.
+> 
+> Should be implied by the compatible.
+Do you mean that the reg offset should not in dts?
+> 
+>> +- coefficients:	An array of integers (one signed cell) containing
+>> +		coefficients to turn adc value to temperture.
+> 
+> Needs a vendor prefix.
+OK
+> 
+>> +- hisi,adc-range: adc value range, minimum value is followed by maximum value.
+>> +- #thermal-sensor-cells: Should be 1. See ./thermal.txt for a description.
+>> +
+>> +Example :
+>> +
+>> +tsensor: tsensor at FFF3000 {
+>> +	compatible = "hisilicon,tsensor";
+>> +	reg = <0x0 0xfff30000 0x0 0x1000>;
+>> +	offset = <0x1c 0x5c 0x9c>;
+>> +	coefficients = <165000 (-40000)>;
+>> +	hisi,adc-range = <0x74 0x39A>;
+>> +	#thermal-sensor-cells = <1>;
+>> +};
+>> -- 
+>> 2.8.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> .
+> 
