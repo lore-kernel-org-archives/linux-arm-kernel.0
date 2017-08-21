@@ -1,36 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 21 Aug 2017 09:21:05 +0200
-Subject: [PATCH v2] soc: ti: knav: Add a NULL pointer check for kdev in
- knav_pool_create
-In-Reply-To: <2f826631-68d2-6a7e-a656-9c8e67ee8337@oracle.com>
-References: <1501475496-10267-1-git-send-email-j-keerthy@ti.com>
- <2f826631-68d2-6a7e-a656-9c8e67ee8337@oracle.com>
-Message-ID: <CAK8P3a2Jg7Sor57jQ2Q2cOozAP1G=o3=ZR2qFDsP_dFRSKy9bg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 21 Aug 2017 08:24:33 +0100
+Subject: [PATCH v3 0/9] Add STM32 LPTimer: PWM, trigger and counter
+In-Reply-To: <1499445068-7037-1-git-send-email-fabrice.gasnier@st.com>
+References: <1499445068-7037-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170821072433.fvtezmsnrkuhnx6w@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 21, 2017 at 7:44 AM, santosh.shilimkar at oracle.com
-<santosh.shilimkar@oracle.com> wrote:
-> Hi Arnd,
->
-> On 7/30/17 9:31 PM, Keerthy wrote:
->>
->> knav_pool_create is an exported function. In the event of a call
->> before knav_queue_probe, we encounter a NULL pointer dereference
->> in the following line. Hence return -EPROBE_DEFER to the caller till
->> the kdev pointer is non-NULL.
->>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> ---
->>
->> Changes in v2:
->>
->>    * Fixed returning an int to returning pointer.
->
-> FWIW, Acked-by: Santosh Shilimkar <santosh.shilimkar@oracle.com>
->
-> Can you please also apply this fix in your fixes branch ?
+On Fri, 07 Jul 2017, Fabrice Gasnier wrote:
 
-Applied now, thanks!
+> This series adds support for Low-Power Timer that can be found on
+> some STM32 devices.
+> 
+> STM32 LPTimer (LPTIM) is a 16-bit timer that provides several
+> functionalities. This series adds support for following features:
+> - PWM output (with programmable prescaler, configurable polarity)
+> - Trigger source for STM32 ADC or DAC (LPTIM_OUT)
+> - Quadrature encoder and counter
+> 
+> The MFD core is used to manage common resources (clock, register map)
+> and to detect encoder feature. "stm32_lptimer" structure is provided
+> to its sub-nodes to share those information:
+> - PWM driver is used to implement single PWM channel
+> - IIO trigger
+> - IIO quadrature encoder and counter
+> 
+> ---
+> Changes in v3:
+> - I sent this v3 with various changes, but still need to discuss ABI
+>   for counter driver (no change on this in v3).
+> - Remarks for Rob on dt-bindings
+> - Add validate_device in Trigger driver
+> - Update PWM driver after Thierry's comments
+> - Additional patch for STM32 ADC trigger
 
-      Arnd
+Looks like you have everything you need.
+
+Please apply all the Acks you've collected and [RESEND].
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
