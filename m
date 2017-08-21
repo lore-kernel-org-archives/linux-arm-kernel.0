@@ -1,78 +1,39 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 21 Aug 2017 18:06:29 +0200
-Subject: [PATCH v2 1/9] ARM64: dts: meson-gx: Use correct mmc clock source 0
+Date: Mon, 21 Aug 2017 18:06:32 +0200
+Subject: [PATCH v2 4/9] ARM64: dts: meson-gxbb: nanopi-k2: add card regulator
+ settle times
 In-Reply-To: <20170821160637.22456-1-jbrunet@baylibre.com>
 References: <20170821160637.22456-1-jbrunet@baylibre.com>
-Message-ID: <20170821160637.22456-2-jbrunet@baylibre.com>
+Message-ID: <20170821160637.22456-5-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the clock source 0 is properly described in the CCF, use it
-instead of assuming the default value (xtal)
+Changing the card voltage on the nanopi-k2 is not instantaneous,
+especially when switching from 3.3v to 1.8v.
 
+It take at least 3ms for the regulator to go from 3.3v to 1.8v. Add
+margin to that to make sure we don't upset the sdcard during the voltage
+switch
+
+Fixes: 9bc7ffb08daf ("arm64: dts: amlogic: Add NanoPi K2")
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 6 +++---
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 6 +++---
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 17d3efdf1469..9a1e478f80d5 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -652,21 +652,21 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
+index e4c6b2fd52ee..de4ed28d78bc 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nanopi-k2.dts
+@@ -107,6 +107,9 @@
  
- &sd_emmc_a {
- 	clocks = <&clkc CLKID_SD_EMMC_A>,
--		 <&xtal>,
-+		 <&clkc CLKID_SD_EMMC_A_CLK0>,
- 		 <&clkc CLKID_FCLK_DIV2>;
- 	clock-names = "core", "clkin0", "clkin1";
- };
+ 		states = <3300000 0>,
+ 		         <1800000 1>;
++
++		regulator-settling-time-up-us = <100>;
++		regulator-settling-time-down-us = <5000>;
+ 	};
  
- &sd_emmc_b {
- 	clocks = <&clkc CLKID_SD_EMMC_B>,
--		 <&xtal>,
-+		 <&clkc CLKID_SD_EMMC_B_CLK0>,
- 		 <&clkc CLKID_FCLK_DIV2>;
- 	clock-names = "core", "clkin0", "clkin1";
- };
- 
- &sd_emmc_c {
- 	clocks = <&clkc CLKID_SD_EMMC_C>,
--		 <&xtal>,
-+		 <&clkc CLKID_SD_EMMC_C_CLK0>,
- 		 <&clkc CLKID_FCLK_DIV2>;
- 	clock-names = "core", "clkin0", "clkin1";
- };
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index 8d4f3160a0ee..071eca074a91 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -593,21 +593,21 @@
- 
- &sd_emmc_a {
- 	clocks = <&clkc CLKID_SD_EMMC_A>,
--		 <&xtal>,
-+		 <&clkc CLKID_SD_EMMC_A_CLK0>,
- 		 <&clkc CLKID_FCLK_DIV2>;
- 	clock-names = "core", "clkin0", "clkin1";
- };
- 
- &sd_emmc_b {
- 	clocks = <&clkc CLKID_SD_EMMC_B>,
--		 <&xtal>,
-+		 <&clkc CLKID_SD_EMMC_B_CLK0>,
- 		 <&clkc CLKID_FCLK_DIV2>;
-        clock-names = "core", "clkin0", "clkin1";
- };
- 
- &sd_emmc_c {
- 	clocks = <&clkc CLKID_SD_EMMC_C>,
--		 <&xtal>,
-+		 <&clkc CLKID_SD_EMMC_C_CLK0>,
- 		 <&clkc CLKID_FCLK_DIV2>;
- 	clock-names = "core", "clkin0", "clkin1";
- };
+ 	wifi_32k: wifi-32k {
 -- 
 2.9.5
