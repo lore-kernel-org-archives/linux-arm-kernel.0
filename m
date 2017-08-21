@@ -1,46 +1,33 @@
 From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Tue, 22 Aug 2017 00:06:17 +0200
-Subject: [PATCH v2] mt7601u: check memory allocation failure
-Message-ID: <20170821220617.21513-1-christophe.jaillet@wanadoo.fr>
+Date: Tue, 22 Aug 2017 00:08:54 +0200
+Subject: [PATCH] mt7601u: check memory allocation failure
+In-Reply-To: <20170821144136.477bf655@cakuba.netronome.com>
+References: <20170821205956.20859-1-christophe.jaillet@wanadoo.fr>
+ <20170821143430.635e4b92@cakuba.netronome.com>
+ <20170821144136.477bf655@cakuba.netronome.com>
+Message-ID: <f8db0e55-8480-ea91-e54a-1c83e7ff64a9@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check memory allocation failure and return -ENOMEM in such a case, as
-already done a few lines below.
+Le 21/08/2017 ? 23:41, Jakub Kicinski a ?crit?:
+> On Mon, 21 Aug 2017 14:34:30 -0700, Jakub Kicinski wrote:
+>> On Mon, 21 Aug 2017 22:59:56 +0200, Christophe JAILLET wrote:
+>>> Check memory allocation failure and return -ENOMEM in such a case, as
+>>> already done a few lines below
+>>>
+>>> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+>> Acked-by: Jakub Kicinski <kubakici@wp.pl>
+> Wait, I take that back.  This code is a bit weird.  We would return an
+> error, then mt7601u_dma_init() will call mt7601u_free_tx_queue() which
+> doesn't check for tx_q == NULL condition.
+>
+> Looks like mt7601u_free_tx() has to check for dev->tx_q == NULL and
+> return early if that's the case.  Or mt7601u_alloc_tx() should really
+> clean things up on it's own on failure.  Ugh.
+>
+You are right. Thanks for the review.
 
-As 'dev->tx_q' can be NULL, we also need to check for that in
-'mt7601u_free_tx()', and return early.
+I've sent a v2 which updates 'mt7601u_free_tx()'.
+Doing so sounds more in line with the spirit of this code.
 
-Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
----
-v2: avoid another NULL pointer dereference in 'mt7601u_free_tx()' if the
-allocation had failed.
----
- drivers/net/wireless/mediatek/mt7601u/dma.c | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/drivers/net/wireless/mediatek/mt7601u/dma.c b/drivers/net/wireless/mediatek/mt7601u/dma.c
-index 660267b359e4..7f3e3983b781 100644
---- a/drivers/net/wireless/mediatek/mt7601u/dma.c
-+++ b/drivers/net/wireless/mediatek/mt7601u/dma.c
-@@ -457,6 +457,9 @@ static void mt7601u_free_tx(struct mt7601u_dev *dev)
- {
- 	int i;
- 
-+	if (!dev->tx_q)
-+		return;
-+
- 	for (i = 0; i < __MT_EP_OUT_MAX; i++)
- 		mt7601u_free_tx_queue(&dev->tx_q[i]);
- }
-@@ -484,6 +487,8 @@ static int mt7601u_alloc_tx(struct mt7601u_dev *dev)
- 
- 	dev->tx_q = devm_kcalloc(dev->dev, __MT_EP_OUT_MAX,
- 				 sizeof(*dev->tx_q), GFP_KERNEL);
-+	if (!dev->tx_q)
-+		return -ENOMEM;
- 
- 	for (i = 0; i < __MT_EP_OUT_MAX; i++)
- 		if (mt7601u_alloc_tx_queue(dev, &dev->tx_q[i]))
--- 
-2.11.0
+CJ
