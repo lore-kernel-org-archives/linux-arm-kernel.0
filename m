@@ -1,24 +1,30 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 21 Aug 2017 13:55:04 -0700 (PDT)
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <20170822001928.74f01322@roar.ozlabs.ibm.com>
-References: <20170821160605.5b1cc019@roar.ozlabs.ibm.com>
- <20170821111833.00006753@huawei.com>
- <20170822001928.74f01322@roar.ozlabs.ibm.com>
-Message-ID: <20170821.135504.1392954698746959868.davem@davemloft.net>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Mon, 21 Aug 2017 22:59:56 +0200
+Subject: [PATCH] mt7601u: check memory allocation failure
+Message-ID: <20170821205956.20859-1-christophe.jaillet@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicholas Piggin <npiggin@gmail.com>
-Date: Tue, 22 Aug 2017 00:19:28 +1000
+Check memory allocation failure and return -ENOMEM in such a case, as
+already done a few lines below
 
-> Thanks here's an updated version with a couple more bugs fixed. If
-> you could try testing, that would be much appreciated.
+Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+---
+ drivers/net/wireless/mediatek/mt7601u/dma.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-I'm not getting RCU stalls on sparc64 any longer with this patch.
-
-I'm really happy you guys were able to figure out what was going
-wrong. :-)
-
-Feel free to add my Tested-by:
+diff --git a/drivers/net/wireless/mediatek/mt7601u/dma.c b/drivers/net/wireless/mediatek/mt7601u/dma.c
+index 660267b359e4..fa0173579d32 100644
+--- a/drivers/net/wireless/mediatek/mt7601u/dma.c
++++ b/drivers/net/wireless/mediatek/mt7601u/dma.c
+@@ -484,6 +484,8 @@ static int mt7601u_alloc_tx(struct mt7601u_dev *dev)
+ 
+ 	dev->tx_q = devm_kcalloc(dev->dev, __MT_EP_OUT_MAX,
+ 				 sizeof(*dev->tx_q), GFP_KERNEL);
++	if (!dev->tx_q)
++		return -ENOMEM;
+ 
+ 	for (i = 0; i < __MT_EP_OUT_MAX; i++)
+ 		if (mt7601u_alloc_tx_queue(dev, &dev->tx_q[i]))
+-- 
+2.11.0
