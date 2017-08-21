@@ -1,54 +1,77 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 21 Aug 2017 09:53:56 -0400
-Subject: [PATCH v11 2/4] PCI: Factor out pci_bus_wait_crs()
-In-Reply-To: <20170818213210.15145.15340.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170818212310.15145.21732.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20170818213210.15145.15340.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <9cb3006d-31d0-e57a-fd3e-c32914e8ba42@codeaurora.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 21 Aug 2017 14:56:54 +0100
+Subject: [PATCH 06/27] arm64/sve: System register and exception syndrome
+ definitions
+In-Reply-To: <87a82t5kos.fsf@linaro.org>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-7-git-send-email-Dave.Martin@arm.com>
+ <87a82t5kos.fsf@linaro.org>
+Message-ID: <20170821135654.GP6321@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/18/2017 5:32 PM, Bjorn Helgaas wrote:
-> +	if ((*l & 0xffff) != 0x0001)
-> +		return true;	/* not a CRS completion */
->  
+On Mon, Aug 21, 2017 at 10:33:55AM +0100, Alex Benn?e wrote:
+> 
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > The SVE architecture adds some system registers, ID register fields
+> > and a dedicated ESR exception class.
+> >
+> > This patch adds the appropriate definitions that will be needed by
+> > the kernel.
+> >
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > ---
+> >  arch/arm64/include/asm/esr.h     |  3 ++-
+> >  arch/arm64/include/asm/kvm_arm.h |  1 +
+> >  arch/arm64/include/asm/sysreg.h  | 16 ++++++++++++++++
+> >  arch/arm64/kernel/traps.c        |  1 +
+> >  4 files changed, 20 insertions(+), 1 deletion(-)
 
-This version certainly looks cleaner. However, it breaks pci_flr_wait().
+[...]
 
-If some root port doesn't support CRS and returns 0xFFFFFFFF, pci_bus_wait_crs()
-function returns true. pci_flr_wait() prematurely bails out from here.
+> > diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> > index 248339e..2d259e8 100644
+> > --- a/arch/arm64/include/asm/sysreg.h
+> > +++ b/arch/arm64/include/asm/sysreg.h
 
+[...]
 
-pci_flr_wait()
-{
+> > +#define SYS_ZCR_EL1			sys_reg(3, 0, 1, 2, 0)
+> > +
+> 
+> I'll have to take these on trust. They are mentioned in both the ARM ARM
+> and the SVE supplement but I can't see any actual definitions of them.
 
-+	ret = pci_bus_wait_crs(dev->bus, dev->devfn, &id, 60000);
-+	if (ret)
-+		return;
+[I note from subsequent replies you've now found this in the
+accompanying HTML]
 
-}
+[...]
 
-We can change the return code to false above but then we break pci_bus_read_dev_vendor_id()
-function. 
+> > +#define CPACR_EL1_ZEN_EL1EN	(1 << 16)
+> > +#define CPACR_EL1_ZEN_EL0EN	(1 << 17)
+> > +#define CPACR_EL1_ZEN		(CPACR_EL1_ZEN_EL1EN |
+> > CPACR_EL1_ZEN_EL0EN)
+> 
+> This is a little weird as it is a 2 bit field in which 00 and 11 are not
+> simply the sum of their bits. If the code wrote CPACR_EL1_ZEN_EL0EN |
+> CPACR_EL1_ZEN_EL1EN to the CPACR_EL1 you wouldn't get the expected behaviour.
 
-That's why, I was interested in creating a pci_bus_crs_visibility_supported() helper
-function that would check for the magic 0x0001 value and return true. Otherwise, false. 
+This seemed natural-ish if you believe that disabling at EL1 implies
+disabling at EL0.  This is consistent with the way the traps at EL2/3
+work, and lack of this property would be a sort of privilege inversion.
 
-pci_bus_read_dev_vendor_id() would do this
+The meanings of the bits are not orthogonal, but it's still useful to be
+able to twiddle EL0EN by itself when EL1EN is set (since we wan't to
+control access for EL0 but leave EL1 access enabled).
 
-pci_bus_read_dev_vendor_id()
-{
-	...
-	if (pci_bus_crs_visibility_supported())
-		return pci_bus_wait_crs(dev->bus, dev->devfn, &id, 60000);
+Maybe comments would be sufficient:
 
-	return true
-}
+#define CPACR_EL1_ZEN_EL1EN ... /* enable EL1 access */
+#define CPACR_EL1_ZEN_EL0EN ... /* enable EL0 access, if EL1EN is also set */
 
-Similar pattern for pci_flr_wait().
+I'm not sure how to make the names both reasonably terse and self-
+escribing, but I'm open to ideas.
 
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Cheers
+---Dave
