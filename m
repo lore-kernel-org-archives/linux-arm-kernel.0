@@ -1,103 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 21 Aug 2017 10:30:05 +0200
-Subject: [linux-sunxi] [PATCH 07/13] ARM: sun8i: h3: add display engine
- pipeline barebone
-In-Reply-To: <fcbff773f61061bbc0f1d6ffef2a7c35@aosc.io>
-References: <20170801131304.7741-1-icenowy@aosc.io>
- <20170801131304.7741-8-icenowy@aosc.io>
- <1773537.vAqre0jhCE@jernej-laptop>
- <fcbff773f61061bbc0f1d6ffef2a7c35@aosc.io>
-Message-ID: <20170821083005.4ujfk5g3kqgqofwl@flea.lan>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 21 Aug 2017 09:30:24 +0100
+Subject: [PATCH v3 6/8] irqchip/gic-v3-its: Initialize its nodes later
+In-Reply-To: <20170808122259.6299-7-rrichter@cavium.com>
+References: <20170808122259.6299-1-rrichter@cavium.com>
+ <20170808122259.6299-7-rrichter@cavium.com>
+Message-ID: <02849da3-f4a9-562d-ee2c-e08a563c3908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 02, 2017 at 01:07:55PM +0800, icenowy at aosc.io wrote:
-> ? 2017-08-02 12:47?Jernej ?krabec ???
-> > Hi Icenowy,
-> > 
-> > Dne torek, 01. avgust 2017 ob 15:12:58 CEST je Icenowy Zheng napisal(a):
-> > > As we have already the support for the DE2 on Allwinner H3, add the
-> > > display engine pipeline device tree nodes to its DTSI file.
-> > > 
-> > > The H5 pipeline has some differences and will be enabled later.
-> > > 
-> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > > ---
-> > >  arch/arm/boot/dts/sun8i-h3.dtsi | 170
-> > > ++++++++++++++++++++++++++++++++++++++++ 1 file changed, 170
-> > > insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi
-> > > b/arch/arm/boot/dts/sun8i-h3.dtsi index b36f9f423c39..75ad7b65a7fc
-> > > 100644
-> > > --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> > > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> > > @@ -41,6 +41,8 @@
-> > >   */
-> > > 
-> > >  #include "sunxi-h3-h5.dtsi"
-> > > +#include <dt-bindings/clock/sun8i-de2.h>
-> > > +#include <dt-bindings/reset/sun8i-de2.h>
-> > > 
-> > >  / {
-> > >  	cpus {
-> > > @@ -72,6 +74,174 @@
-> > >  		};
-> > >  	};
-> > > 
-> > > +	de: display-engine {
-> > > +		compatible = "allwinner,sun8i-h3-display-engine";
-> > > +		allwinner,pipelines = <&mixer0>,
-> > > +				      <&mixer1>;
-> > > +		status = "disabled";
-> > > +	};
-> > > +
-> > > +	soc {
-> > > +		display_clocks: clock at 1000000 {
-> > > +			compatible = "allwinner,sun8i-a83t-de2-clk";
-> > > +			reg = <0x01000000 0x100000>;
-> > > +			clocks = <&ccu CLK_BUS_DE>,
-> > > +				 <&ccu CLK_DE>;
-> > > +			clock-names = "bus",
-> > > +				      "mod";
-> > > +			resets = <&ccu RST_BUS_DE>;
-> > > +			#clock-cells = <1>;
-> > > +			#reset-cells = <1>;
-> > > +			assigned-clocks = <&ccu CLK_DE>;
-> > > +			assigned-clock-parents = <&ccu CLK_PLL_DE>;
-> > > +			assigned-clock-rates = <432000000>;
-> > > +		};
-> > 
-> > I believe Maxime ask you to use clk_set_rate() in the past:
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/512909.html
++Lorenzo
+
+On 08/08/17 13:22, Robert Richter wrote:
+> Use an initcall to initialize its. This allows us to use the device
+> framework during initialization that is up at this point. We use
+> subsys_initcall() here since we need the arch to be initialized
+> first. It is before pci and platform device probe where devices are
+> bound to msi interrupts.
 > 
-> Yes, but I think the frequency is still part of our configuration,
-> not forced by the hardware.
+> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c   | 3 ++-
+>  drivers/irqchip/irq-gic-v3.c       | 5 -----
+>  include/linux/irqchip/arm-gic-v3.h | 1 -
+>  3 files changed, 2 insertions(+), 7 deletions(-)
 > 
-> If we set it in the driver, why don't we set it to 300MHz?
-> 
-> (In fact for pipelines without TVE we can really use 300MHz for
-> CLK_DE, and if we do not want 4K we can even use lower frequency)
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 5e2d4f2876d8..488f811d5978 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1994,7 +1994,7 @@ int __init its_probe(struct fwnode_handle *handle, struct rdists *rdists,
+>  	return 0;
+>  }
+>  
+> -int __init its_init(void)
+> +static int __init its_init(void)
+>  {
+>  	struct its_node *its, *tmp;
+>  	int err = 0, err2;
+> @@ -2036,3 +2036,4 @@ int __init its_init(void)
+>  
+>  	return 0;
+>  }
+> +subsys_initcall(its_init);
 
-You should ask yourself another question. Do you absolutely need that
-rate and parent to operate properly?
+*ding*!
 
-If the answer is yes, the DT is not what you're looking for, it
-provides no guarantee on the changes to the clock rate and parenthood,
-and doesn't allow you to act upon those changes either.
+I'm sorry, but that's a total NAK. We're trading hard to maintain
+hardcoded dependencies for even more difficult to deal with, link-order
+driven dependencies.  That's exactly what Lorenzo and I have been
+fighting against in the XGene ACPI case, and I'm not going to introduce
+more of this.
 
-If you want to make it work, you need to have some code to do that.
+We need to break the dependency between the HW and the associated MSI
+domains, not making it tighter. Let the HW be probed at some time, and
+the MSI domains lazily created as needed once the end-points are probed.
 
-Maxime
+I'm also pretty worried that (as mentioned in my reply to patch #2) that
+this "make it happen later" games with the initcalls are breaking stuff
+(see how platform devices are instantiated on the back of an
+arch_initcall_sync). As far as I can tell, non-PCI MSI is dead after
+patch #2.
 
+I think there is a number of things to fix in the core code before we
+can start playing that kind of tricks. The major issue I see is that MSI
+domains are expected to be available way too early, at device discovery
+time rather than at driver probe time. This has a cascading effect which
+we should solve first.
+
+I'll try to prototype something...
+
+Thanks,
+
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170821/cda8cd81/attachment.sig>
+Jazz is not dead. It just smells funny...
