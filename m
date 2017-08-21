@@ -1,33 +1,52 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 21 Aug 2017 18:02:46 +0200
-Subject: [PATCH v2 01/16] mmc: meson-gx: fix mux mask definition
-In-Reply-To: <20170821160301.21899-1-jbrunet@baylibre.com>
-References: <20170821160301.21899-1-jbrunet@baylibre.com>
-Message-ID: <20170821160301.21899-2-jbrunet@baylibre.com>
+Date: Mon, 21 Aug 2017 18:02:45 +0200
+Subject: [PATCH v2 00/16] mmc: meson-gx: driver fixups and upgrades
+Message-ID: <20170821160301.21899-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CCF generic mux will shift the mask using the value defined in shift
-Define the mask accordingly
+The patchset features several bugfixes, rework and upgrade for the
+meson-gx MMC driver.
 
-Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- drivers/mmc/host/meson-gx-mmc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The main goal is to improve readability and enable new high speed
+modes, such as eMMC DDR52 and sdcard UHS modes up to SDR50 (100Mhz)
 
-diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index de962c2d5e00..4217287923d4 100644
---- a/drivers/mmc/host/meson-gx-mmc.c
-+++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -366,7 +366,7 @@ static int meson_mmc_clk_init(struct meson_host *host)
- 	init.num_parents = MUX_CLK_NUM_PARENTS;
- 	host->mux.reg = host->regs + SD_EMMC_CLOCK;
- 	host->mux.shift = __bf_shf(CLK_SRC_MASK);
--	host->mux.mask = CLK_SRC_MASK;
-+	host->mux.mask = CLK_SRC_MASK >> host->mux.shift;
- 	host->mux.flags = 0;
- 	host->mux.table = NULL;
- 	host->mux.hw.init = &init;
+SDR104 is not working with a few cards on the p200 and the
+libretech-cc. I suspect that 200Mhz might be a bit too fast for the PCB
+of these boards, adding noise to the signal and eventually breaking
+the communication with some cards. The same cards are working well on a
+laptop or the nanopi-k2 at 200Mhz.
+
+This series has been tested on gxbb-p200, gxbb-nanopi-k2 and
+gxl-s905x-libretech-cc
+
+Changes since v1 [0]:
+* Reorder patches to have fixes first, then rework and finally
+  enhancements.
+* Use CCF to manage clock phases
+
+[0]: https://lkml.kernel.org/r/20170804174353.16486-1-jbrunet at baylibre.com
+
+Jerome Brunet (16):
+  mmc: meson-gx: fix mux mask definition
+  mmc: meson-gx: remove CLK_DIVIDER_ALLOW_ZERO clock flag
+  mmc: meson-gx: clean up some constants
+  mmc: meson-gx: use _irqsave variant of spinlock
+  mmc: meson-gx: cfg init overwrite values
+  mmc: meson-gx: rework set_ios function
+  mmc: meson-gx: rework clk_set function
+  mmc: meson-gx: rework clock init function
+  mmc: meson-gx: fix dual data rate mode frequencies
+  mmc: meson-gx: work around clk-stop issue
+  mmc: meson-gx: simplify interrupt handler
+  mmc: meson-gx: implement card_busy callback
+  mmc: meson-gx: use CCF to handle the clock phases
+  mmc: meson-gx: implement voltage switch callback
+  mmc: meson-gx: change default tx phase
+  mmc: meson-gx: rework tuning function
+
+ drivers/mmc/host/meson-gx-mmc.c | 718 +++++++++++++++++++++++++++-------------
+ 1 file changed, 497 insertions(+), 221 deletions(-)
+
 -- 
 2.9.5
