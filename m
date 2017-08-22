@@ -1,98 +1,136 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 22 Aug 2017 16:01:56 +0100
-Subject: [PATCH v7 5/9] arm64: hugetlb: Handle swap entries in
- huge_pte_offset() for contiguous hugepages
-In-Reply-To: <87wp5vmzpn.fsf@e105922-lin.cambridge.arm.com>
-References: <20170822104249.2189-1-punit.agrawal@arm.com>
- <20170822104249.2189-6-punit.agrawal@arm.com>
- <a54aff75-f79b-b40d-c66f-6730aaccbd39@arm.com>
- <87wp5vmzpn.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <b6a305a2-6653-b20c-66ae-bac7d0b70242@arm.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Tue, 22 Aug 2017 16:03:20 +0100
+Subject: [PATCH 09/27] arm64/sve: Signal frame and context structure
+ definition
+In-Reply-To: <20170822142135.GU6321@e103592.cambridge.arm.com>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-10-git-send-email-Dave.Martin@arm.com>
+ <87y3qb52ez.fsf@linaro.org> <20170822111705.GT6321@e103592.cambridge.arm.com>
+ <87tw0z4sk2.fsf@linaro.org> <20170822142135.GU6321@e103592.cambridge.arm.com>
+Message-ID: <87shgj4pc7.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Dave Martin <Dave.Martin@arm.com> writes:
 
-On 22/08/17 15:41, Punit Agrawal wrote:
-> Julien Thierry <julien.thierry@arm.com> writes:
-> 
->> Hi Punit,
+> On Tue, Aug 22, 2017 at 02:53:49PM +0100, Alex Benn?e wrote:
 >>
->> On 22/08/17 11:42, Punit Agrawal wrote:
->>> huge_pte_offset() was updated to correctly handle swap entries for
->>> hugepages. With the addition of the size parameter, it is now possible
->>> to disambiguate whether the request is for a regular hugepage or a
->>> contiguous hugepage.
->>>
->>> Fix huge_pte_offset() for contiguous hugepages by using the size to find
->>> the correct page table entry.
->>>
->>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
->>> Cc: David Woods <dwoods@mellanox.com>
->>> ---
->>>    arch/arm64/mm/hugetlbpage.c | 21 ++++++++++++++++-----
->>>    1 file changed, 16 insertions(+), 5 deletions(-)
->>>
->>> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
->>> index 594232598cac..b95e24dc3477 100644
->>> --- a/arch/arm64/mm/hugetlbpage.c
->>> +++ b/arch/arm64/mm/hugetlbpage.c
->>> @@ -214,6 +214,7 @@ pte_t *huge_pte_offset(struct mm_struct *mm,
->>>    	pgd_t *pgd;
->>>    	pud_t *pud;
->>>    	pmd_t *pmd;
->>> +	pte_t *pte;
->>>      	pgd = pgd_offset(mm, addr);
->>>    	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
->>> @@ -221,19 +222,29 @@ pte_t *huge_pte_offset(struct mm_struct *mm,
->>>    		return NULL;
->>>      	pud = pud_offset(pgd, addr);
->>> -	if (pud_none(*pud))
->>> +	if (sz != PUD_SIZE && pud_none(*pud))
->>>    		return NULL;
->>> -	/* swap or huge page */
->>> -	if (!pud_present(*pud) || pud_huge(*pud))
->>> +	/* hugepage or swap? */
->>> +	if (pud_huge(*pud) || !pud_present(*pud))
->>>    		return (pte_t *)pud;
->>>    	/* table; check the next level */
->>>    +	if (sz == CONT_PMD_SIZE)
->>> +		addr &= CONT_PMD_MASK;
->>> +
->>>    	pmd = pmd_offset(pud, addr);
->>> -	if (pmd_none(*pmd))
->>> +	if (!(sz == PMD_SIZE || sz == CONT_PMD_SIZE) &&
->>> +	    pmd_none(*pmd))
->>>    		return NULL;
->>> -	if (!pmd_present(*pmd) || pmd_huge(*pmd))
->>> +	if (pmd_huge(*pmd) || !pmd_present(*pmd))
->>>    		return (pte_t *)pmd;
->>>    +	if (sz == CONT_PTE_SIZE) {
->>> +		pte = pte_offset_kernel(
->>> +			pmd, (addr & CONT_PTE_MASK));
->>> +		return pte;
+>> Dave Martin <Dave.Martin@arm.com> writes:
 >>
->> Nit: Looks like this is the only place the new variable pte is
->> used. Since we don't need to test its value, why not just write:
->> 	return pte_offset_kernel(pmd, (addr & CONT_PTE_MASK));
+>> > On Tue, Aug 22, 2017 at 11:22:44AM +0100, Alex Benn?e wrote:
+>> >>
+>> >> Dave Martin <Dave.Martin@arm.com> writes:
+>
+> [...]
+>
+>> >> > +/*
+>> >> > + * The SVE architecture leaves space for future expansion of the
+>> >> > + * vector length beyond its initial architectural limit of 2048 bits
+>> >> > + * (16 quadwords).
+>> >> > + */
+>> >> > +#define SVE_VQ_MIN		1
+>> >> > +#define SVE_VQ_MAX		0x200
+>> >> > +
+>> >> > +#define SVE_VL_MIN		(SVE_VQ_MIN * 0x10)
+>> >> > +#define SVE_VL_MAX		(SVE_VQ_MAX * 0x10)
+>> >> > +
+>> >> > +#define SVE_NUM_ZREGS		32
+>> >> > +#define SVE_NUM_PREGS		16
+>> >> > +
+>> >> > +#define sve_vl_valid(vl) \
+>> >> > +	((vl) % 0x10 == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
+>> >> > +#define sve_vq_from_vl(vl)	((vl) / 0x10)
+>> >> > +#define sve_vl_from_vq(vq)	((vq) * 0x10)
+>> >>
+>> >> I got a little confused first time through over what VQ and VL where.
+>> >> Maybe it would make sense to expand a little more from first principles?
+>> >>
+>> >>   /*
+>> >>    * The SVE architecture defines vector registers as a multiple of 128
+>> >>    * bit quadwords. The current architectural limit is 2048 bits (16
+>> >>    * quadwords) but there is room for future expansion beyond that.
+>> >>     */
+>> >
+>> > This comes up in several places and so I didn't want to comment it
+>> > repeatedly everywhere.
+>> >
+>> > Instead, I wrote up something in section 2 (Vector length terminology)
+>> > of Documentation/arm64/sve.txt -- see patch 25.  Can you take a look and
+>> > see whether that's adequate?
 >>
->> and get rid of the pte variable?
-> 
-> There is no benefit to getting rid of "pte" other than conciseness of
-> the patch. Having an explicit identifier helps highlight the level of
-> the page tables we are accessing.
-> 
-> And we always want to prioritise readability vs conciseness of the
-> patch, no?
-> 
+>> Ahh, I hadn't got to that yet. I'm unsure to the order the kernel likes
+>> to put things but I like to put design documents at the front of the
+>
+> I don't have a strong opinion on that -- I had preferred not to add a
+> document describing stuff that doesn't exist at the time of commit.
+> I could commit a stub document at the start of the series, and then
+> commit the real document later.
+>
+> Either way, it seemed overkill.
+>
+> Perhaps I should have drawn more attention to the documentation in the
+> cover letter, and encouraged reviewers to look at it first.  My
+> experience is that people don't often read cover letters...
+>
+> Now the series is posted, I'm minded to keep the order as-is, unless you
+> think it's a big issue.
+>
+> Adding a reference to the document seems a reasonable thing to do,
+> so I could add that.
+>
+>> patch queue as they are useful primers and saves you having to patch a:
+>>
+>> modified   arch/arm64/include/uapi/asm/sigcontext.h
+>> @@ -132,19 +132,24 @@ struct sve_context {
+>>  /*
+>>   * The SVE architecture leaves space for future expansion of the
+>>   * vector length beyond its initial architectural limit of 2048 bits
+>> - * (16 quadwords).
+>> + * (16 quadwords). See Documentation/arm64/sve.txt for a summary of
+>> + * the terminology of Vector Quads (VQ) and Vector Lengths (VL).
+>>   */
+>> +
+>> +#define SVE_VQ_BITS             128      /* 128 bits in one quadword */
+>> +#define SVE_VQ_BYTES            (SVE_VQ_BITS / 8)
+>> +
+>
+> I was trying to keep extraneous #defines to a minimum, since this is a
+> uapi header, and people may depend on anything defined here.
+>
+> I think SVE_VQ_BYTES is reasonable to have, and this allows us to
+> rewrite a few hard-coded 0x10s and 16s symbolically which is probably a
+> good idea -- I'll add this.
+>
+> SVE_VQ_BITS looks redundant to me though.  It wouldn't be used for any
+> purpose other than defining SVE_VQ_BYTES.
 
-I agree, but I feel here it is more redundancy than increase of 
-readability, because we know pte_offset_kernel returns the address of a 
-pte, no? (otherwise I feel a comment would fit better than a variable).
+Yeah I was more concerned with getting rid of the magic 0x10's than
+showing exactly how many bits something is.
 
-Also, we end up with a variable declared in one scope where it is not 
-used, and it is referenced in a single inner scope, which seems a bit 
-odd to me. Might make the reader pointlessly wonder where else it is used.
+>
+>>  #define SVE_VQ_MIN		1
+>>  #define SVE_VQ_MAX		0x200
+>>
+>> -#define SVE_VL_MIN		(SVE_VQ_MIN * 0x10)
+>> -#define SVE_VL_MAX		(SVE_VQ_MAX * 0x10)
+>> +#define SVE_VL_MIN		(SVE_VQ_MIN * SVE_VQ_BYTES)
+>> +#define SVE_VL_MAX		(SVE_VQ_MAX * SVE_VQ_BYTES)
+>>
+>>  #define SVE_NUM_ZREGS		32
+>>  #define SVE_NUM_PREGS		16
+>>
+>>  #define sve_vl_valid(vl) \
+>> -	((vl) % 0x10 == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
+>> +	((vl) % SVE_VQ_BYTES == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
+>>  #define sve_vq_from_vl(vl)	((vl) / 0x10)
+>>  #define sve_vl_from_vq(vq)	((vq) * 0x10)
+>
+> [...]
+>
+> Cheers
+> ---Dave
 
--- 
-Julien Thierry
+
+--
+Alex Benn?e
