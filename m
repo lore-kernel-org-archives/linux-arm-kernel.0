@@ -1,32 +1,67 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 22 Aug 2017 13:23:20 +0800
-Subject: [PATCH v2 1/3] dt-bindings: add compatible string for Allwinner V3s
- SoC
-Message-ID: <20170822052322.15338-1-icenowy@aosc.io>
+Date: Tue, 22 Aug 2017 13:23:22 +0800
+Subject: [PATCH v2 3/3] ARM: sunxi: add support for R40 SoC
+In-Reply-To: <20170822052322.15338-1-icenowy@aosc.io>
+References: <20170822052322.15338-1-icenowy@aosc.io>
+Message-ID: <20170822052322.15338-3-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The compatible string for Allwinner V3s SoC used to be missing.
+Allwinner R40 is a new SoC, with Quad Core Cortex-A7 and peripherals
+like A20.
 
-Add it to the binding document.
+Add support for it.
 
-Fixes: b074fede01c0 ("arm: sunxi: add support for V3s SoC")
 Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 ---
- Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
- 1 file changed, 1 insertion(+)
+Changes in v2:
+- Fix alphabetical orders.
 
+ Documentation/arm/sunxi/README                  | 6 ++++++
+ Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+ arch/arm/mach-sunxi/sunxi.c                     | 1 +
+ 3 files changed, 8 insertions(+)
+
+diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+index de791e18ccef..f8efc21998bf 100644
+--- a/Documentation/arm/sunxi/README
++++ b/Documentation/arm/sunxi/README
+@@ -76,6 +76,12 @@ SunXi family
+         + Datasheet
+           http://dl.linux-sunxi.org/H3/Allwinner_H3_Datasheet_V1.0.pdf
+ 
++      - Allwinner R40 (sun8i)
++        + Datasheet
++          https://github.com/tinalinux/docs/raw/r40-v1.y/R40_Datasheet_V1.0.pdf
++        + User Manual
++          https://github.com/tinalinux/docs/raw/r40-v1.y/Allwinner_R40_User_Manual_V1.0.pdf
++
+     * Quad ARM Cortex-A15, Quad ARM Cortex-A7 based SoCs
+       - Allwinner A80
+         + Datasheet
 diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-index d2c46449b4eb..f35c6ada5a65 100644
+index f35c6ada5a65..e4beec3d9ad3 100644
 --- a/Documentation/devicetree/bindings/arm/sunxi.txt
 +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
 @@ -14,6 +14,7 @@ using one of the following compatible strings:
    allwinner,sun8i-a83t
    allwinner,sun8i-h2-plus
    allwinner,sun8i-h3
-+  allwinner,sun8i-v3s
++  allwinner-sun8i-r40
+   allwinner,sun8i-v3s
    allwinner,sun9i-a80
    allwinner,sun50i-a64
-   nextthing,gr8
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 7ab353fb25f2..5e9602ce1573 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -65,6 +65,7 @@ static const char * const sun8i_board_dt_compat[] = {
+ 	"allwinner,sun8i-a83t",
+ 	"allwinner,sun8i-h2-plus",
+ 	"allwinner,sun8i-h3",
++	"allwinner,sun8i-r40",
+ 	"allwinner,sun8i-v3s",
+ 	NULL,
+ };
 -- 
 2.13.5
