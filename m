@@ -1,95 +1,101 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 22 Aug 2017 17:21:01 +0100
-Subject: Applied "ASoC: rockchip: Correct 'dmic-delay' property name" to the
- asoc tree
-In-Reply-To: <20170822151009.19014-2-jeffy.chen@rock-chips.com>
-Message-ID: <E1dkBvJ-0004PE-KG@debutante>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Tue, 22 Aug 2017 17:22:11 +0100
+Subject: [PATCH 12/27] arm64/sve: Support vector length resetting for new
+ processes
+In-Reply-To: <1502280338-23002-13-git-send-email-Dave.Martin@arm.com>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-13-git-send-email-Dave.Martin@arm.com>
+Message-ID: <871so3bmj0.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
 
-   ASoC: rockchip: Correct 'dmic-delay' property name
+Dave Martin <Dave.Martin@arm.com> writes:
 
-has been applied to the asoc tree at
+> It's desirable to be able to reset the vector length to some sane
+> default for new processes, since the new binary and its libraries
+> processes may or may not be SVE-aware.
+>
+> This patch tracks the desired post-exec vector length (if any) in a
+> new thread member sve_vl_onexec, and adds a new thread flag
+> TIF_SVE_VL_INHERIT to control whether to inherit or reset the
+> vector length.  Currently these are inactive.  Subsequent patches
+> will provide the capability to configure them.
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> ---
+>  arch/arm64/include/asm/processor.h   |  1 +
+>  arch/arm64/include/asm/thread_info.h |  1 +
+>  arch/arm64/kernel/fpsimd.c           | 13 +++++++++++++
+>  3 files changed, 15 insertions(+)
+>
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 969feed..da8802a 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -87,6 +87,7 @@ struct thread_struct {
+>  	struct fpsimd_state	fpsimd_state;
+>  	void			*sve_state;	/* SVE registers, if any */
+>  	u16			sve_vl;		/* SVE vector length */
+> +	u16			sve_vl_onexec;	/* SVE vl after next
+> exec */
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+Inconsistent size usage here as well...
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+>  	unsigned long		fault_address;	/* fault info */
+>  	unsigned long		fault_code;	/* ESR_EL1 value */
+>  	struct debug_info	debug;		/* debugging */
+> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+> index 1a4b30b..bf9c552 100644
+> --- a/arch/arm64/include/asm/thread_info.h
+> +++ b/arch/arm64/include/asm/thread_info.h
+> @@ -97,6 +97,7 @@ struct thread_info {
+>  #define TIF_SINGLESTEP		21
+>  #define TIF_32BIT		22	/* 32bit process */
+>  #define TIF_SVE			23	/* Scalable Vector Extension in use */
+> +#define TIF_SVE_VL_INHERIT	24	/* Inherit sve_vl_onexec across exec */
+>
+>  #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
+>  #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 37dd1b2..80ecb2d 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -108,6 +108,9 @@ static void task_fpsimd_save(void);
+>   */
+>  static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_last_state);
+>
+> +/* Default VL for tasks that don't set it explicitly: */
+> +static int sve_default_vl = -1;
+> +
+>  static void sve_free(struct task_struct *task)
+>  {
+>  	kfree(task->thread.sve_state);
+> @@ -392,6 +395,9 @@ void fpsimd_flush_thread(void)
+>  		clear_thread_flag(TIF_SVE);
+>  		sve_free(current);
+>
+> +		current->thread.sve_vl = current->thread.sve_vl_onexec ?
+> +			current->thread.sve_vl_onexec : sve_default_vl;
+> +
+>  		/*
+>  		 * User tasks must have a valid vector length set, but tasks
+>  		 * forked early (e.g., init) may not initially have one.
+> @@ -401,6 +407,13 @@ void fpsimd_flush_thread(void)
+>  		 * If not, something went badly wrong.
+>  		 */
+>  		BUG_ON(!sve_vl_valid(current->thread.sve_vl));
+> +
+> +		/*
+> +		 * If the task is not set to inherit, ensure that the vector
+> +		 * length will be reset by a subsequent exec:
+> +		 */
+> +		if (!test_thread_flag(TIF_SVE_VL_INHERIT))
+> +			current->thread.sve_vl_onexec = 0;
+>  	}
+>
+>  	set_thread_flag(TIF_FOREIGN_FPSTATE);
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From f628c4ed3de499f027d3ae70cbb46c6dfadfc098 Mon Sep 17 00:00:00 2001
-From: Jeffy Chen <jeffy.chen@rock-chips.com>
-Date: Tue, 22 Aug 2017 23:35:48 +0800
-Subject: [PATCH] ASoC: rockchip: Correct 'dmic-delay' property name
-
-The 'dmic-delay' property name is different with the dt-binding.
-
-So correct it with 'dmic-wakeup-delay-ms'.
-
-Fixes: 3a6f9dce6116 (ASoC: rk3399_gru_sound: fix recording pop at first attempt)
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/rockchip/rk3399_gru_sound.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-index 70c0908fb9b4..566ccb39fb31 100644
---- a/sound/soc/rockchip/rk3399_gru_sound.c
-+++ b/sound/soc/rockchip/rk3399_gru_sound.c
-@@ -38,7 +38,7 @@
- 
- #define SOUND_FS	256
- 
--static unsigned int rt5514_dmic_delay;
-+static unsigned int dmic_wakeup_delay;
- 
- static struct snd_soc_jack rockchip_sound_jack;
- 
-@@ -126,7 +126,7 @@ static int rockchip_sound_rt5514_hw_params(struct snd_pcm_substream *substream,
- 	}
- 
- 	/* Wait for DMIC stable */
--	msleep(rt5514_dmic_delay);
-+	msleep(dmic_wakeup_delay);
- 
- 	return 0;
- }
-@@ -348,13 +348,13 @@ static int rockchip_sound_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
--	/* Set DMIC delay */
--	ret = device_property_read_u32(&pdev->dev, "dmic-delay",
--					&rt5514_dmic_delay);
-+	/* Set DMIC wakeup delay */
-+	ret = device_property_read_u32(&pdev->dev, "dmic-wakeup-delay-ms",
-+					&dmic_wakeup_delay);
- 	if (ret) {
--		rt5514_dmic_delay = 0;
-+		dmic_wakeup_delay = 0;
- 		dev_dbg(&pdev->dev,
--			"no optional property 'dmic-delay' found, default: no delay\n");
-+			"no optional property 'dmic-wakeup-delay-ms' found, default: no delay\n");
- 	}
- 
- 	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
--- 
-2.13.3
+--
+Alex Benn?e
