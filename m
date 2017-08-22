@@ -1,34 +1,42 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 22 Aug 2017 12:03:56 +0800
-Subject: [PATCH v2 0/4] Workaround broken RTL8211E on some Pine64+ boards
-Message-ID: <20170822040400.12166-1-icenowy@aosc.io>
+Date: Tue, 22 Aug 2017 12:04:00 +0800
+Subject: [PATCH v2 4/4] arm64: allwinner: a64: disable the RTL8211E internal
+ RX delay on Pine64+
+In-Reply-To: <20170822040400.12166-1-icenowy@aosc.io>
+References: <20170822040400.12166-1-icenowy@aosc.io>
+Message-ID: <20170822040400.12166-5-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Pine64+ boards come with bad RTL8211E PHYs, which cannot work reliably
-unless do some hack. According to Pine64 people, Realtek describes the hack
-as totally disabling RX delay, and it's not documented at all.
+Some Pine64+ boards have a broken RTL8211E PHY, which cannot work
+reliably in 1000Base-T mode with default configuration.
 
-This patchset introduces the workaround on Pine64+.
+A solution is passed to Pine64, which is said to be disabling the
+internal RX delay of the PHY.
 
-The first patch adds RGMII variants' support to the dwmac-sun8i driver.
+Enable the hack by set the PHY mode to RGMII-TXID.
 
-The second patch renames some macros in RTL PHY driver, and the third
-patch introduces the hack as the "RGMII-TXID" mode of the PHY.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+Changes in v2:
+- It can be merged now as dwmac-sun8i entered mainline.
+- Use phy-mode rgmii-txid instead of custom property.
 
-The fourth patch enables the hack in the device tree.
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Icenowy Zheng (4):
-  net: stmmac: dwmac-sun8i: support RGMII modes with PHY internal delay
-  net: phy: realtek: change macro name for page select register
-  net: phy: realtek: add disable RX internal delay mode
-  arm64: allwinner: a64: disable the RTL8211E internal RX delay on
-    Pine64+
-
- .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts  |  2 +-
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c  |  3 ++
- drivers/net/phy/realtek.c                          | 43 +++++++++++++++++++---
- 3 files changed, 42 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
+index 24f1aac366d6..ed715426fffc 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64-plus.dts
+@@ -52,7 +52,7 @@
+ &emac {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&rgmii_pins>;
+-	phy-mode = "rgmii";
++	phy-mode = "rgmii-txid";
+ 	phy-handle = <&ext_rgmii_phy>;
+ 	status = "okay";
+ };
 -- 
 2.13.5
