@@ -1,30 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Aug 2017 17:48:48 +0200
-Subject: [GIT PULL 2/2] DaVinci defconfig updates for v4.14
-In-Reply-To: <20170822142739.13411-2-nsekhar@ti.com>
-References: <20170822142739.13411-1-nsekhar@ti.com>
- <20170822142739.13411-2-nsekhar@ti.com>
-Message-ID: <CAK8P3a1FLR8TufV_oK99fQYP0Awz5cvd0p_t_+N8s5_nJo2Zxg@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 22 Aug 2017 16:41:11 +0100
+Subject: [PATCH 09/27] arm64/sve: Signal frame and context structure
+ definition
+In-Reply-To: <87shgj4pc7.fsf@linaro.org>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-10-git-send-email-Dave.Martin@arm.com>
+ <87y3qb52ez.fsf@linaro.org>
+ <20170822111705.GT6321@e103592.cambridge.arm.com>
+ <87tw0z4sk2.fsf@linaro.org>
+ <20170822142135.GU6321@e103592.cambridge.arm.com>
+ <87shgj4pc7.fsf@linaro.org>
+Message-ID: <20170822154111.GW6321@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 22, 2017 at 4:27 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
->
->   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.14/defconfig
->
-> for you to fetch changes up to 8c0b16fb33b2dd3f8cbb0694bef296181fe39949:
->
->   ARM: davinci_all_defconfig: enable tinydrm and ST7586 (2017-08-21 16:28:24 +0530)
->
-> ----------------------------------------------------------------
-> Enable driver for display used on Lego Mindstorms
-> EV3.
+On Tue, Aug 22, 2017 at 04:03:20PM +0100, Alex Benn?e wrote:
+> 
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > On Tue, Aug 22, 2017 at 02:53:49PM +0100, Alex Benn?e wrote:
 
-Pulled into next/defconfig, thanks!
+[...]
 
-      Arnd
+> >> +
+> >> +#define SVE_VQ_BITS             128      /* 128 bits in one quadword */
+> >> +#define SVE_VQ_BYTES            (SVE_VQ_BITS / 8)
+> >> +
+> >
+> > I was trying to keep extraneous #defines to a minimum, since this is a
+> > uapi header, and people may depend on anything defined here.
+> >
+> > I think SVE_VQ_BYTES is reasonable to have, and this allows us to
+> > rewrite a few hard-coded 0x10s and 16s symbolically which is probably a
+> > good idea -- I'll add this.
+> >
+> > SVE_VQ_BITS looks redundant to me though.  It wouldn't be used for any
+> > purpose other than defining SVE_VQ_BYTES.
+> 
+> Yeah I was more concerned with getting rid of the magic 0x10's than
+> showing exactly how many bits something is.
+
+OK, I'll take SVE_VQ_BYTES and use it in the appropriate places.
+There are a few 0x10s/16s in the series that can use this instead
+of being open-coded.
+
+Cheers
+---Dave
