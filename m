@@ -1,46 +1,94 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 22 Aug 2017 11:40:52 +0200
-Subject: [PATCH 0/5] mmc: sdhci-msm: Corrections to implementation of
- power irq
-In-Reply-To: <1503033582-48703-1-git-send-email-vviswana@codeaurora.org>
-References: <1503033582-48703-1-git-send-email-vviswana@codeaurora.org>
-Message-ID: <CAPDyKFqFAbkwXyvfHOTRoe6J8EHirJFUYwR6TGq9BBRDq2Xfpg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Aug 2017 10:45:24 +0100
+Subject: [PATCH 1/2] arm64: mm: abort uaccess retries upon fatal signal
+In-Reply-To: <20170821134202.GA5418@leverpostej>
+References: <1499782763-31418-1-git-send-email-mark.rutland@arm.com>
+ <1499782763-31418-2-git-send-email-mark.rutland@arm.com>
+ <20170711145849.GE13977@arm.com>
+ <20170821134202.GA5418@leverpostej>
+Message-ID: <20170822094523.GA5439@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 August 2017 at 07:19, Vijay Viswanath <vviswana@codeaurora.org> wrote:
-> Register writes which change voltage of IO lines or turn the IO bus on/off
-> require sdhc controller to be ready before progressing further. Once a
-> register write which affects IO lines is done, the driver should wait for
-> power irq from controller. Once the irq comes, the driver should acknowledge
-> the irq by writing to power control register. If the acknowledgement is not
-> given to controller, the controller may not complete the corresponding
-> register write action and this can mess up the controller if drivers proceeds
-> without power irq completing.
->
-> Sahitya Tummala (2):
->   mmc: sdhci-msm: Fix HW issue with power IRQ handling during reset
->   mmc: sdhci-msm: Add support to wait for power irq
->
-> Subhash Jadavani (1):
->   mmc: sdhci-msm: fix issue with power irq
->
-> Vijay Viswanath (2):
->   mmc: sdhci-msm: Add ops to do sdhc register write
->   defconfig: msm: Enable CONFIG_MMC_SDHCI_IO_ACCESSORS
->
->  arch/arm64/configs/defconfig |   1 +
->  drivers/mmc/host/sdhci-msm.c | 233 ++++++++++++++++++++++++++++++++++++++++++-
->  2 files changed, 229 insertions(+), 5 deletions(-)
->
-> --
->  Qualcomm India Private Limited, on behalf of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project.
->
+On Mon, Aug 21, 2017 at 02:42:03PM +0100, Mark Rutland wrote:
+> On Tue, Jul 11, 2017 at 03:58:49PM +0100, Will Deacon wrote:
+> > On Tue, Jul 11, 2017 at 03:19:22PM +0100, Mark Rutland wrote:
+> > > When there's a fatal signal pending, arm64's do_page_fault()
+> > > implementation returns 0. The intent is that we'll return to the
+> > > faulting userspace instruction, delivering the signal on the way.
+> > > 
+> > > However, if we take a fatal signal during fixing up a uaccess, this
+> > > results in a return to the faulting kernel instruction, which will be
+> > > instantly retried, resulting in the same fault being taken forever. As
+> > > the task never reaches userspace, the signal is not delivered, and the
+> > > task is left unkillable. While the task is stuck in this state, it can
+> > > inhibit the forward progress of the system.
+> > > 
+> > > To avoid this, we must ensure that when a fatal signal is pending, we
+> > > apply any necessary fixup for a faulting kernel instruction. Thus we
+> > > will return to an error path, and it is up to that code to make forward
+> > > progress towards delivering the fatal signal.
+> > > 
+> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > > Reviewed-by: Steve Capper <steve.capper@arm.com>
+> > > Tested-by: Steve Capper <steve.capper@arm.com>
+> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > > Cc: James Morse <james.morse@arm.com>
+> > > Cc: Laura Abbott <labbott@redhat.com>
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > Cc: stable at vger.kernel.org
+> > > ---
+> > >  arch/arm64/mm/fault.c | 5 ++++-
+> > >  1 file changed, 4 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> > > index 37b95df..3952d5e 100644
+> > > --- a/arch/arm64/mm/fault.c
+> > > +++ b/arch/arm64/mm/fault.c
+> > > @@ -397,8 +397,11 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+> > >  	 * signal first. We do not need to release the mmap_sem because it
+> > >  	 * would already be released in __lock_page_or_retry in mm/filemap.c.
+> > >  	 */
+> > > -	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current))
+> > > +	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current)) {
+> > > +		if (!user_mode(regs))
+> > > +			goto no_context;
+> > >  		return 0;
+> > > +	}
+> > 
+> > This will need rebasing at -rc1 (take a look at current HEAD).
+> > 
+> > Also, I think it introduces a weird corner case where we take a page fault
+> > when writing the signal frame to the user stack to deliver a SIGSEGV. If
+> > we end up with VM_FAULT_RETRY and somebody has sent a SIGKILL to the task,
+> > then we'll fail setup_sigframe and force an un-handleable SIGSEGV instead
+> > of SIGKILL.
+> > 
+> > The end result (task is killed) is the same, but the fatal signal is wrong.
+> 
+> That doesn't seem to be the case, testing on v4.13-rc5.
+> 
+> I used sigaltstack() to use the userfaultfd region as signal stack,
+> registerd a SIGSEGV handler, and dereferenced NULL. The task locks up,
+> but when killed with a SIGINT or SIGKILL, the exit status reflects that
+> signal, rather than the SIGSEGV.
+> 
+> If I move the SIGINT handler onto the userfaultfd-monitored stack, then
+> delivering SIGINT hangs, but can be killed with SIGKILL, and the exit
+> status reflects that SIGKILL.
+> 
+> As you say, it does look like we'd try to set up a deferred SIGSEGV for
+> the failed signal delivery.
+> 
+> I haven't yet figured out exactly how that works; I'll keep digging.
 
-Looks good to me, besides patch 5 which I provided comments for.
+The SEGV makes it all the way into do_group_exit, but then signal_group_exit
+is set and the exit_code is overridden with SIGKILL at the last minute (see
+complete_signal).
 
-Unless Adrian objects, I intend to queue this within the next couple of days.
+So I'm happy that your patch is doing the right thing -- could you send a
+rebased version please?
 
-Kind regards
-Uffe
+Thanks,
+
+Will
