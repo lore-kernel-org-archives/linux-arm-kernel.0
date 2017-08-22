@@ -1,149 +1,78 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Aug 2017 10:26:54 -0700
-Subject: [RFC PATCH v2 1/3] PCI: rockchip: Add support for pcie wake irq
-In-Reply-To: <5997486D.4040803@rock-chips.com>
-References: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
- <20170817120431.12398-2-jeffy.chen@rock-chips.com>
- <20170818170107.GA119461@google.com>
- <20170818181416.GF6008@atomide.com>
- <5997486D.4040803@rock-chips.com>
-Message-ID: <20170822172653.GJ6008@atomide.com>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 22 Aug 2017 19:34:11 +0200
+Subject: Possible regression between 4.9 and 4.13
+Message-ID: <4dee5523-2d76-e731-6e81-f3027e88827f@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* jeffy <jeffy.chen@rock-chips.com> [170818 13:05]:
-> Hi guys,
-> 
-> On 08/19/2017 02:14 AM, Tony Lindgren wrote:
-> > > static irqreturn_t handle_threaded_wake_irq(int irq, void *_wirq)
-> > > >{
-> > > >         struct wake_irq *wirq = _wirq;
-> > > >         int res;
-> > > >
-> > > >         /* Maybe abort suspend? */
-> > > >         if (irqd_is_wakeup_set(irq_get_irq_data(irq))) {
-> > > >                 pm_wakeup_event(wirq->dev, 0);
-> > > >
-> > > >                 return IRQ_HANDLED; <--- We can return here, with the trigger still asserted
-> > > >         }
-> > > >...
-> > > >
-> > > >This could cause some kind of an IRQ storm, including a lockup or
-> > > >significant slowdown, I think.
-> > Hmm yeah that should be checked. The test cases I have are all
-> > edge interrupts where there is no status whatsoever after the
-> > wake-up event except which irq fired.
-> > 
-> > To me it seems that the wakeirq consumer driver should be able
-> > to clear the level wakeirq in it's runtime_resume, or even better,
-> > maybe all it takes is just let the consumer driver's irq handler
-> > clear the level wakeirq when it runs after runtime_resume.
-> > 
-> 
-> i did some tests about it:
-> [   70.335883] device_wakeup_arm_wake_irqs <-- enable wake irq
-> [   70.335932] handle_threaded_wake_irq
-> ...<--- a lot of wake irq handler log
-> [   70.335965] suspend_device_irq
-> [   70.335987] irq_pm_check_wakeup <--- wake and disable wake irq
-> ...<--- no wake irq handler log
-> [   70.336173] resume_irqs <-- enable wake irq
-> [   70.336480] handle_threaded_wake_irq
-> ...<--- a lot of wake irq handler log
-> [   70.336600] device_wakeup_disarm_wake_irqs < disable wake irq
-> ...<--- no wake irq handler log
-> 
-> 
-> so it would indeed possible to get irq storm in device_wakeup_arm_wake_irqs
-> to suspend_device_irq
-> and resume_irqs to device_wakeup_disarm_wake_irqs.
-> 
-> 
-> a simple workaround would be:
-> enable_irq_wake
-> suspend_device_irq
-> enable_irq
-> ...irq fired, irq_pm_check_wakeup disabled irq
-> disable_irq
-> resume_irqs
-> disable_irq_wake
-> 
-> 
-> 
-> 
-> and i have a hacky patch for that, which works well:
-> 
-> +++ b/drivers/pci/host/pcie-rockchip.c
-> @@ -1308,6 +1308,8 @@ static int __maybe_unused
-> rockchip_pcie_suspend_noirq(struct
-> device *dev)
->         if (!IS_ERR(rockchip->vpcie0v9))
->                 regulator_disable(rockchip->vpcie0v9);
-> 
-> +       dev_pm_enable_wake_irq(dev);
-> +
->         return ret;
->  }
-> 
-> @@ -1316,6 +1318,8 @@ static int __maybe_unused
-> rockchip_pcie_resume_noirq(struct d
-> evice *dev)
->         struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
->         int err;
-> 
-> +       dev_pm_disable_wake_irq(dev);
-> +
-> 
-> 
-> @ -323,7 +324,7 @@ void dev_pm_arm_wake_irq(struct wake_irq *wirq)
->                 return;
-> 
->         if (device_may_wakeup(wirq->dev)) {
-> -               if (wirq->status & WAKE_IRQ_DEDICATED_ALLOCATED)
-> +               if (0 && wirq->status & WAKE_IRQ_DEDICATED_ALLOCATED)
->                         enable_irq(wirq->irq);
-> 
->                 enable_irq_wake(wirq->irq);
-> @@ -345,7 +346,7 @@ void dev_pm_disarm_wake_irq(struct wake_irq *wirq)
->         if (device_may_wakeup(wirq->dev)) {
->                 disable_irq_wake(wirq->irq);
-> 
-> -               if (wirq->status & WAKE_IRQ_DEDICATED_ALLOCATED)
-> +               if (0 && wirq->status & WAKE_IRQ_DEDICATED_ALLOCATED)
->                         disable_irq_nosync(wirq->irq);
->         }
-> 
-> 
-> 
-> which is basically move enable_irq and disable_irq to driver noirq stages,
-> to avoid:
-> 1/ not disabled by irq_pm_check_wakeup when it first fired
-> 2/ re-enabled by resume_irq when it disabled by irq_pm_check_wakeup
-> 
-> 
-> with that hack, i no longer saw the irq storm, and the irq handler would
-> never be called:
-> 
-> [    9.693385] device_wakeup_arm_wake_irqs
-> [    9.697130] suspend_device_irq
-> <--- suspend noirq, enable wake irq
-> [    9.716569] irq_pm_check_wakeup disable the wake irq
-> <--- resume noirq, disable wake irq
-> [    9.968115] resume_irqs <-- enable wake irq(not actually enable, since
-> disabled twice)
-> [   10.193072] device_wakeup_disarm_wake_irqs
+Hello,
 
-OK, let's fix any wakeriq ordering issues to make it more
-usable. Sounds like in your case the wakeirq needs to be enabled
-late and disabled early, while in my test cases I can keep it
-enabled basically any time.
+The driver for my system's PCIe host bridge landed recently
+(in 4.13) but it was developed on 4.9
 
-If this is for suspend/resume, You could just register the
-wakeirq on suspend and then remove it on resume. We do have at
-least network drivers doing device_init_wakeup(dev, true) and
-device_init_wakeup(dev, false) as needed for WOL, see for example
-bfin_mac_ethtool_setwol().
+I tested the PCIe host bridge by plugging a 4-port USB3 adapter
+into the PCIe slot (system at rest) and plugging an USB3 Flash
+drive into the USB3 adapter (at run-time).
 
-Regards,
+On 4.9, the setup works (almost perfectly, see below).
+On 4.13, once I unplug the Flash drive, the controller port
+remains unresponsive.
 
-Tony
+
+On 4.9, I said *almost* perfectly, because the pcieport driver
+does report a few non-fatal errors when I unplug:
+
+[  193.838504] usb 2-2: new SuperSpeed USB device number 2 using xhci_hcd
+[  193.878081] usb-storage 2-2:1.0: USB Mass Storage device detected
+[  193.884547] scsi host0: usb-storage 2-2:1.0
+[  194.907936] scsi 0:0:0:0: Direct-Access     Kingston DataTraveler 3.0      PQ: 0 ANSI: 6
+[  194.920296] sd 0:0:0:0: [sda] 15109516 512-byte logical blocks: (7.74 GB/7.20 GiB)
+[  194.928666] sd 0:0:0:0: [sda] Write Protect is off
+[  194.933755] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
+[  194.946074]  sda: sda1
+[  194.953608] sd 0:0:0:0: [sda] Attached SCSI removable disk
+
+[  208.930260] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+[  208.938342] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+[  208.950163] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+[  208.958577] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+[  208.965432] pcieport 0000:00:00.0: AER: Device recovery failed
+[  209.663733] xhci_hcd 0000:01:00.0: Cannot set link state.
+[  209.669194] usb usb2-port2: cannot disable (err = -32)
+[  209.674376] usb 2-2: USB disconnect, device number 2
+[  209.680481] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+[  209.688689] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+[  209.700555] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+[  209.708978] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+[  209.715845] pcieport 0000:00:00.0: AER: Device recovery failed
+[  209.721722] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+[  209.729785] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+[  209.741602] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+[  209.750027] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+[  209.756866] pcieport 0000:00:00.0: AER: Device recovery failed
+
+After that, I can still plug the drive into the same port.
+
+But on 4.13, I get
+
+[   27.330378] usb 2-2: new SuperSpeed USB device number 2 using xhci_hcd
+[   27.369383] usb-storage 2-2:1.0: USB Mass Storage device detected
+[   27.375840] scsi host0: usb-storage 2-2:1.0
+[   28.403035] scsi 0:0:0:0: Direct-Access     Kingston DataTraveler 3.0      PQ: 0 ANSI: 6
+[   28.413326] sd 0:0:0:0: [sda] 15109516 512-byte logical blocks: (7.74 GB/7.20 GiB)
+[   28.423653] sd 0:0:0:0: [sda] Write Protect is off
+[   28.429139] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
+[   28.441529]  sda: sda1
+[   28.449431] sd 0:0:0:0: [sda] Attached SCSI removable disk
+
+[   90.592134] xhci_hcd 0000:01:00.0: xHCI host controller not responding, assume dead
+[   90.599857] xhci_hcd 0000:01:00.0: HC died; cleaning up
+[   90.605336] usb 2-2: USB disconnect, device number 2
+[   90.630414] udevd[955]: inotify_add_watch(6, /dev/sda, 10) failed: No such file or directory
+
+Trying to replug into the same port = nothing happens
+(Linux did say "assume dead")
+
+Any idea what could have changed between 4.9 and 4.13 ?
+
+Regards.
