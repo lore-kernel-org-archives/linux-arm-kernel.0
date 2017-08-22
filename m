@@ -1,79 +1,47 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 22 Aug 2017 19:39:48 +0100
-Subject: [PATCH 11/27] arm64/sve: Core task context handling
-In-Reply-To: <20170822171959.GX6321@e103592.cambridge.arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-12-git-send-email-Dave.Martin@arm.com>
- <87378jbmkg.fsf@linaro.org> <20170822171959.GX6321@e103592.cambridge.arm.com>
-Message-ID: <87ziara1l7.fsf@linaro.org>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 22 Aug 2017 13:44:53 -0500
+Subject: [PATCH 5/8] ARM: OMAP4: hwmod_data: Remove modulemode from
+ IPU/DSP hwmods
+In-Reply-To: <20170822173749.GK6008@atomide.com>
+References: <20170821234818.4755-1-s-anna@ti.com>
+ <20170821234818.4755-6-s-anna@ti.com> <20170822173749.GK6008@atomide.com>
+Message-ID: <a7ed87b7-bfe3-0b0c-08b4-4c44570364f2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tony,
 
-Dave Martin <Dave.Martin@arm.com> writes:
-
-> On Tue, Aug 22, 2017 at 05:21:19PM +0100, Alex Benn?e wrote:
+On 08/22/2017 12:37 PM, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [170821 16:48]:
 >>
->> Dave Martin <Dave.Martin@arm.com> writes:
->
-> [...]
->
->> > --- a/arch/arm64/include/asm/processor.h
->> > +++ b/arch/arm64/include/asm/processor.h
->> > @@ -85,6 +85,8 @@ struct thread_struct {
->> >  	unsigned long		tp2_value;
->> >  #endif
->> >  	struct fpsimd_state	fpsimd_state;
->> > +	void			*sve_state;	/* SVE registers, if any */
->> > +	u16			sve_vl;		/* SVE vector length */
->>
->> sve_vl is implicitly cast to unsigned int bellow - it should be
->> consistent.
->
-> Agreed -- I think this can just be unsigned int here, which is the type
-> I use everywhere except when encoding the vector length in the signal
-> frame and ptrace data.
->
-> During development, there was an additional flags field here (now
-> merged into the thread_info flags).  u16 was big enough for the largest
-> architectural vector length, so it seemed "tidy" to make both u16s.
-> Elsewhere, this created a risk of overflow if you try to compute say
-> the size of the whole register file from a u16, so I generally used
-> unsigned int for local variables in functions that handle the vl.
->
->> Given the allocation functions rely on sve_vl being valid it might be
->> worth noting where this is set/live from?
->
-> Agreed, I need to look more closely at exactly how to justify the
-> soundness of this in order to thin out BUG_ONs.
->
-> If you need any pointers, please ping me.  In the meantime, I would
-> rather not colour your judgement by infecting you with my assumptions ;)
->
->> >  	unsigned long		fault_address;	/* fault info */
->> >  	unsigned long		fault_code;	/* ESR_EL1 value */
->> >  	struct debug_info	debug;		/* debugging */
->> > diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
->> > index 46c3b93..1a4b30b 100644
->> > --- a/arch/arm64/include/asm/thread_info.h
->> > +++ b/arch/arm64/include/asm/thread_info.h
->> <snip>
->>
->> And I see there are other comments from Ard.
->
-> Yup, I've already picked those up.
->
-> I'll be posting a v2 with feedback applied once I've reviewed the
-> existing BUG_ON()s -- should happen sometime this week.
+>> A shutdown sequence follows a reverse pattern
+>> with the processors put into reset first followed by the unmapping and
+>> disabling of the MMUs. Both the processors and the MMUs are present
+>> within a single clock domain and requires the domain be clocked and
+>> enabled until the last entity. The kernel crash can happen during the
+>> unmapping phase of the MMUs, as the hwmod layer disables the module
+>> during the omap_device_idle processing of the processor hwmod. This
+>> issue is fixed by not defining a modulemode for the IPU/DSP processors,
+>> which results in keeping the module in an activated state. The module
+>> is disabled properly during the omap_device_idle processing of the MMU
+>> hwmod while disabling the MMU.
+> 
+> I think a better way to fix this would be to make sure the module
+> is enabled during the unmapping phase of the MMUs. If there is no
+> driver left at that point to call pm_runtime_get() on the module,
+> do it via pdata-quirks.c using struct iommu_platform_data?
 
-We shall see how far I get tomorrow - you won't get any more from me
-after that until I get back from holiday so don't delay v2 on my account
-;-)
+The problem is because there is no reference counting on modulemode
+programming unlike clocks or omap_device pm_domain callbacks. The IOMMU
+driver already has an active pm_runtime_get() invoked earlier and
+invoking another wouldn't result in any change.
 
->
-> Cheers
-> ---Dave
+> If you can't add the enable/disable around existing assert_reset/
+> deassert_reset, you can add a new one.
 
+The remoteproc driver is only dealing with its resets and hwmod while
+the IOMMU driver is dealing with its dedicated reset. The PRCM registers
+though are a single set between the two.
 
---
-Alex Benn?e
+regards
+Suman
