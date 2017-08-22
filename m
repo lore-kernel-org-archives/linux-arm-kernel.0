@@ -1,29 +1,112 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 22 Aug 2017 09:40:32 -0700
-Subject: [PATCH v3 2/4] net: stmmac: dwmac-sun8i: choose internal PHY via
- phy-is-integrated
-In-Reply-To: <20170818122118.4925-3-clabbe.montjoie@gmail.com>
-References: <20170818122118.4925-1-clabbe.montjoie@gmail.com>
- <20170818122118.4925-3-clabbe.montjoie@gmail.com>
-Message-ID: <2e7f8dec-2d7f-6e1a-a462-226dcd023724@gmail.com>
+From: thgarnie@google.com (Thomas Garnier)
+Date: Tue, 22 Aug 2017 09:42:25 -0700
+Subject: [PATCH v3 3/4] arm/syscalls: Optimize address limit check
+In-Reply-To: <20170814213732.104301-3-thgarnie@google.com>
+References: <20170814213732.104301-1-thgarnie@google.com>
+ <20170814213732.104301-3-thgarnie@google.com>
+Message-ID: <CAJcbSZG1b7ObJAv6Kmp-fR3vZRg7AdbcgqDceGB95r-72Yv0yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/18/2017 05:21 AM, Corentin Labbe wrote:
-> The current way to find if the phy is internal is to compare DT phy-mode
-> and emac_variant/internal_phy.
-> But it will negate a possible future SoC where an external PHY use the
-> same phy mode than the internal one.
-> 
-> This patch adds a new way to find if the PHY is internal, via
-> the phy-is-integrated property.
-> 
-> Since the internal_phy variable does not need anymore to contain the xMII mode
-> used by the internal PHY, it is still used for knowing the presence of an
-> internal PHY, so it is modified to a boolean soc_has_internal_phy.
-> 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+On Mon, Aug 14, 2017 at 2:37 PM, Thomas Garnier <thgarnie@google.com> wrote:
+> Disable the generic address limit check in favor of an architecture
+> specific optimized implementation. The generic implementation using
+> pending work flags did not work well with ARM and alignment faults.
+>
+> The address limit is checked on each syscall return path to user-mode
+> path as well as the irq user-mode return function. If the address limit
+> was changed, a function is called to report data corruption (stopping
+> the kernel or process based on configuration).
+>
+> The address limit check has to be done before any pending work because
+> they can reset the address limit and the process is killed using a
+> SIGKILL signal. For example the lkdtm address limit check does not work
+> because the signal to kill the process will reset the user-mode address
+> limit.
+>
+> Signed-off-by: Thomas Garnier <thgarnie@google.com>
 
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+Any feedback?
+
+> ---
+>  arch/arm/kernel/entry-common.S | 11 +++++++++++
+>  arch/arm/kernel/signal.c       |  7 +++++++
+>  2 files changed, 18 insertions(+)
+>
+> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> index 0b60adf4a5d9..99c908226065 100644
+> --- a/arch/arm/kernel/entry-common.S
+> +++ b/arch/arm/kernel/entry-common.S
+> @@ -12,6 +12,7 @@
+>  #include <asm/unistd.h>
+>  #include <asm/ftrace.h>
+>  #include <asm/unwind.h>
+> +#include <asm/memory.h>
+>  #ifdef CONFIG_AEABI
+>  #include <asm/unistd-oabi.h>
+>  #endif
+> @@ -48,10 +49,14 @@ ret_fast_syscall:
+>   UNWIND(.fnstart       )
+>   UNWIND(.cantunwind    )
+>         disable_irq_notrace                     @ disable interrupts
+> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
+> +       cmp     r2, #TASK_SIZE
+> +       blne    addr_limit_check_failed
+>         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
+>         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+>         bne     fast_work_pending
+>
+> +
+>         /* perform architecture specific actions before user return */
+>         arch_ret_to_user r1, lr
+>
+> @@ -74,6 +79,9 @@ ret_fast_syscall:
+>   UNWIND(.cantunwind    )
+>         str     r0, [sp, #S_R0 + S_OFF]!        @ save returned r0
+>         disable_irq_notrace                     @ disable interrupts
+> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
+> +       cmp     r2, #TASK_SIZE
+> +       blne    addr_limit_check_failed
+>         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
+>         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+>         beq     no_work_pending
+> @@ -106,6 +114,9 @@ ENTRY(ret_to_user)
+>  ret_slow_syscall:
+>         disable_irq_notrace                     @ disable interrupts
+>  ENTRY(ret_to_user_from_irq)
+> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
+> +       cmp     r2, #TASK_SIZE
+> +       blne    addr_limit_check_failed
+>         ldr     r1, [tsk, #TI_FLAGS]
+>         tst     r1, #_TIF_WORK_MASK
+>         bne     slow_work_pending
+> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
+> index 5814298ef0b7..b67ae12503f3 100644
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/uaccess.h>
+>  #include <linux/tracehook.h>
+>  #include <linux/uprobes.h>
+> +#include <linux/syscalls.h>
+>
+>  #include <asm/elf.h>
+>  #include <asm/cacheflush.h>
+> @@ -673,3 +674,9 @@ struct page *get_signal_page(void)
+>
+>         return page;
+>  }
+> +
+> +/* Defer to generic check */
+> +asmlinkage void addr_limit_check_failed(void)
+> +{
+> +       addr_limit_user_check();
+> +}
+> --
+> 2.14.1.480.gb18f417b89-goog
+>
+
+
+
 -- 
-Florian
+Thomas
