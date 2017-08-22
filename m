@@ -1,18 +1,16 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 22 Aug 2017 13:13:28 +0200
-Subject: [PATCH v3] mmc: renesas_sdhi: Add r8a7743/5 support
-In-Reply-To: <1503318311-48664-1-git-send-email-biju.das@bp.renesas.com>
-References: <CAMuHMdWUxxp75u1VSLY3WnObmhSMDvP3skr9Uf3rV4Bf-ixy_w@mail.gmail.com>
- <1503318311-48664-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <CAPDyKFpWDP-XqRahy2YHgZZ+c_q4wP3jAboJrJAdWtt=Gukj5A@mail.gmail.com>
+Date: Tue, 22 Aug 2017 13:14:55 +0200
+Subject: [PATCH] dt-bindings: mmc: sh_mmcif: Document r8a7745 DT bindings
+In-Reply-To: <1502816007-30186-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1502816007-30186-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <CAPDyKFoPm8H8r1tnG0+HtGe_L2afMZw6_-eFOC_H4u8eO7Qbbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 August 2017 at 14:25, Biju Das <biju.das@bp.renesas.com> wrote:
-> Add support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5) SDHI
-> is identical to the R-Car Gen2 family.
->
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+On 15 August 2017 at 18:53, Fabrizio Castro
+<fabrizio.castro@bp.renesas.com> wrote:
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
 
 Thanks, applied for next!
 
@@ -20,45 +18,30 @@ Kind regards
 Uffe
 
 > ---
-> v1->v2
->     - Modified the listing SoC's description related to SoC
->       with 1 Clock and 2 Clocks
-> v2->v3
->     - Fixed the trailing double quote.
->     - Updated listing SoC's description.
+>  Documentation/devicetree/bindings/mmc/renesas,mmcif.txt | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 >
-> This patch is compiled and tested against linux next tag
-> next-20170817.
+> diff --git a/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt b/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt
+> index 703e18c..5ff1e12 100644
+> --- a/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt
+> +++ b/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt
+> @@ -12,6 +12,7 @@ Required properties:
+>         - "renesas,mmcif-r8a73a4" for the MMCIF found in r8a73a4 SoCs
+>         - "renesas,mmcif-r8a7740" for the MMCIF found in r8a7740 SoCs
+>         - "renesas,mmcif-r8a7743" for the MMCIF found in r8a7743 SoCs
+> +       - "renesas,mmcif-r8a7745" for the MMCIF found in r8a7745 SoCs
+>         - "renesas,mmcif-r8a7778" for the MMCIF found in r8a7778 SoCs
+>         - "renesas,mmcif-r8a7790" for the MMCIF found in r8a7790 SoCs
+>         - "renesas,mmcif-r8a7791" for the MMCIF found in r8a7791 SoCs
+> @@ -22,7 +23,7 @@ Required properties:
+>  - interrupts: Some SoCs have only 1 shared interrupt, while others have either
+>    2 or 3 individual interrupts (error, int, card detect). Below is the number
+>    of interrupts for each SoC:
+> -    1: r8a73a4, r8a7743, r8a7778, r8a7790, r8a7791, r8a7793, r8a7794
+> +    1: r8a73a4, r8a7743, r8a7745, r8a7778, r8a7790, r8a7791, r8a7793, r8a7794
+>      2: r8a7740, sh73a0
+>      3: r7s72100
 >
->  Documentation/devicetree/bindings/mmc/tmio_mmc.txt | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-> index 4fd8b7a..54ef642 100644
-> --- a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
-> @@ -15,6 +15,8 @@ Required properties:
->                 "renesas,sdhi-r7s72100" - SDHI IP on R7S72100 SoC
->                 "renesas,sdhi-r8a73a4" - SDHI IP on R8A73A4 SoC
->                 "renesas,sdhi-r8a7740" - SDHI IP on R8A7740 SoC
-> +               "renesas,sdhi-r8a7743" - SDHI IP on R8A7743 SoC
-> +               "renesas,sdhi-r8a7745" - SDHI IP on R8A7745 SoC
->                 "renesas,sdhi-r8a7778" - SDHI IP on R8A7778 SoC
->                 "renesas,sdhi-r8a7779" - SDHI IP on R8A7779 SoC
->                 "renesas,sdhi-r8a7790" - SDHI IP on R8A7790 SoC
-> @@ -33,10 +35,8 @@ Required properties:
->           If 2 clocks are specified by the hardware, you must name them as
->           "core" and "cd". If the controller only has 1 clock, naming is not
->           required.
-> -         Below is the number clocks for each supported SoC:
-> -          1: SH73A0, R8A73A4, R8A7740, R8A7778, R8A7779, R8A7790
-> -             R8A7791, R8A7792, R8A7793, R8A7794, R8A7795, R8A7796
-> -          2: R7S72100
-> +         Devices which have more than 1 clock are listed below:
-> +         2: R7S72100
->
->  Optional properties:
->  - toshiba,mmc-wrprotect-disable: write-protect detection is unavailable
 > --
-> 1.9.1
+> 2.7.4
 >
