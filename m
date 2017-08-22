@@ -1,56 +1,127 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 22 Aug 2017 08:26:37 -0700
-Subject: RCU lockup issues when CONFIG_SOFTLOCKUP_DETECTOR=n - any one
- else seeing this?
-In-Reply-To: <1503391892.3629.28.camel@abdul.in.ibm.com>
-References: <20170821160605.5b1cc019@roar.ozlabs.ibm.com>
- <20170821111833.00006753@huawei.com>
- <20170822001928.74f01322@roar.ozlabs.ibm.com>
- <20170821.135504.1392954698746959868.davem@davemloft.net>
- <20170822084911.00000c23@huawei.com>
- <1503391892.3629.28.camel@abdul.in.ibm.com>
-Message-ID: <20170822152637.GA11320@linux.vnet.ibm.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Tue, 22 Aug 2017 16:27:02 +0100
+Subject: [PATCH] ARM: dtsi: r8a7745: Add I2C DT support
+Message-ID: <1503415622-13450-1-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 22, 2017 at 02:21:32PM +0530, Abdul Haleem wrote:
-> On Tue, 2017-08-22 at 08:49 +0100, Jonathan Cameron wrote:
-> > On Mon, 21 Aug 2017 13:55:04 -0700
-> > David Miller <davem@davemloft.net> wrote:
-> > 
-> > > From: Nicholas Piggin <npiggin@gmail.com>
-> > > Date: Tue, 22 Aug 2017 00:19:28 +1000
-> > > 
-> > > > Thanks here's an updated version with a couple more bugs fixed. If
-> > > > you could try testing, that would be much appreciated.  
-> > > 
-> > > I'm not getting RCU stalls on sparc64 any longer with this patch.
-> > > 
-> > > I'm really happy you guys were able to figure out what was going
-> > > wrong. :-)
-> > > 
-> > > Feel free to add my Tested-by:
-> > > 
-> > 
-> > Like wise - 16 hours of clean run with the latest
-> > 
-> > Tested-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
-> > 
-> > Thanks for all the hard work everyone put into this one, great to
-> > cross it off the list!
-> > 
-> > Jonathan
-> > 
-> 
-> No more RCU stalls on PowerPC, system is clean when idle or with some
-> test runs.
-> 
-> Thank you all for your time and efforts in fixing this.
-> 
-> Reported-and-Tested-by: Abdul Haleem <abdhalee@linux.vnet.ibm.com>
+Add I2C[0-5] devices to the r8a7745 device tree.
 
-I am still seeing failures, but then again I am running rcutorture with
-lots of CPU hotplug activity.  So I am probably seeing some other bug,
-though it still looks a lot like a lost timer.
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+---
+ arch/arm/boot/dts/r8a7745.dtsi | 93 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 93 insertions(+)
 
-							Thanx, Paul
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index 18ca7ae..2fa989f 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -18,6 +18,15 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
+ 
++	aliases {
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
++		i2c2 = &i2c2;
++		i2c3 = &i2c3;
++		i2c4 = &i2c4;
++		i2c5 = &i2c5;
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -613,6 +622,90 @@
+ 			#size-cells = <0>;
+ 			status = "disabled";
+ 		};
++
++		i2c0: i2c at e6508000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7745",
++				     "renesas,rcar-gen2-i2c";
++			reg = <0 0xe6508000 0 0x40>;
++			interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 931>;
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 931>;
++			i2c-scl-internal-delay-ns = <6>;
++			status = "disabled";
++		};
++
++		i2c1: i2c at e6518000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7745",
++				     "renesas,rcar-gen2-i2c";
++			reg = <0 0xe6518000 0 0x40>;
++			interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 930>;
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 930>;
++			i2c-scl-internal-delay-ns = <6>;
++			status = "disabled";
++		};
++
++		i2c2: i2c at e6530000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7745",
++				     "renesas,rcar-gen2-i2c";
++			reg = <0 0xe6530000 0 0x40>;
++			interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 929>;
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 929>;
++			i2c-scl-internal-delay-ns = <6>;
++			status = "disabled";
++		};
++
++		i2c3: i2c at e6540000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7745",
++				     "renesas,rcar-gen2-i2c";
++			reg = <0 0xe6540000 0 0x40>;
++			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 928>;
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 928>;
++			i2c-scl-internal-delay-ns = <6>;
++			status = "disabled";
++		};
++
++		i2c4: i2c at e6520000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7745",
++				     "renesas,rcar-gen2-i2c";
++			reg = <0 0xe6520000 0 0x40>;
++			interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 927>;
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 927>;
++			i2c-scl-internal-delay-ns = <6>;
++			status = "disabled";
++		};
++
++		i2c5: i2c at e6528000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,i2c-r8a7745",
++				     "renesas,rcar-gen2-i2c";
++			reg = <0 0xe6528000 0 0x40>;
++			interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 925>;
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 925>;
++			i2c-scl-internal-delay-ns = <6>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	/* External root clock */
+-- 
+2.7.4
