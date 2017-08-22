@@ -1,23 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Aug 2017 15:31:10 +0200
-Subject: [PATCH] ARM: dts: augment Ux500 to use DT cpufreq
-In-Reply-To: <20170822072820.15801-1-linus.walleij@linaro.org>
-References: <20170822072820.15801-1-linus.walleij@linaro.org>
-Message-ID: <CAK8P3a1Km8Kmzodg6F8UjfO+oDxua8UVgWjUQ4cjZ8hh4t3dCg@mail.gmail.com>
+Date: Tue, 22 Aug 2017 15:33:14 +0200
+Subject: [GIT PULL] ARM: Xilinx Zynq DT fixes for v4.14
+In-Reply-To: <d3b9ce62-6899-8629-d267-2f08d435281d@monstr.eu>
+References: <d3b9ce62-6899-8629-d267-2f08d435281d@monstr.eu>
+Message-ID: <CAK8P3a0p8sR1=f=dS+AFvtfnce5p_HDv-mXwT8-MBjF3B2uQsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 22, 2017 at 9:28 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> This adds the operating points to the Ux500 device tree and
-> deletes the old special-purpose cpufreq node, as we can now
-> use the generic DT cpufreq driver.
+On Mon, Aug 21, 2017 at 2:01 PM, Michal Simek <monstr@monstr.eu> wrote:
 >
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks: please apply this directly for v4.14, I have
-> no other ux500 DTS patches coming this merge window as far
-> as I know. It is just using standard bindings.
+>  ----------------------------------------------------------------
+>  arm: Xilinx Zynq DT fixes for v4.14
+>
+>  - Remove earlycon
+>  - Use C pre-processor
+>  - Add fpga full region
+>  - Add ethernet-phy as device-type
+>  - Add adv7511 nodes to zc70x
+>
 
-applied to next/dt, thanks!
+Pulled into next/dt, thanks!
 
-    Arnd
+       Arnd
