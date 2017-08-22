@@ -1,125 +1,61 @@
 From: stefan@olimex.com (Stefan Mavrodiev)
-Date: Tue, 22 Aug 2017 14:43:12 +0300
-Subject: [PATCH 2/3] ARM: dts: sun7i: Add dts file for A20-OLinuXino-MICRO-exGB
+Date: Tue, 22 Aug 2017 14:43:13 +0300
+Subject: [PATCH 3/3] ARM: dts: sun7i: Rename sun7i-a20-olinuxino-lime2-emmc
 In-Reply-To: <20170822114313.9038-1-stefan@olimex.com>
 References: <20170822114313.9038-1-stefan@olimex.com>
-Message-ID: <20170822114313.9038-3-stefan@olimex.com>
+Message-ID: <20170822114313.9038-4-stefan@olimex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A20-OLinuXino-MICRO has option with onboard eMMC chip. For
-now it's only shipped with 4BG chip, but in the future this
-may change.
+Rename dts file for A20-OLinuXino-LIME2-eMMC to match Olimex Ltd.
+naming convention.
 
-Currently the board is called "A20-OLinuXino-MICRO-e4GB".
-The dts is named "-exGB" to represent all eMMC configurations -
-e4GB, e8GB, etc.
+<board-name>-exGB - option with <x>GB eMMC chip
+<board-name>-nxGB - option with <x>GB NAND chip
+<board-name>-sxMB - option with <x>MB SPI FLASH chip
+
+For example:
+	A20-OLinuXino-LIME2-e4GB - 4GB eMMC
+	A20-OLinuXIno-LIME2-n4GB - 4GB NAND
+	A20-OLinuXIno-LIME2-n8GB - 8GB NAND
 
 Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
 ---
- arch/arm/boot/dts/Makefile                         |  1 +
- .../boot/dts/sun7i-a20-olinuxino-micro-exgb.dts    | 81 ++++++++++++++++++++++
- 2 files changed, 82 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-micro-exgb.dts
+ arch/arm/boot/dts/Makefile                                            | 2 +-
+ ...20-olinuxino-lime2-emmc.dts => sun7i-a20-olinuxino-lime2-exgb.dts} | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+ rename arch/arm/boot/dts/{sun7i-a20-olinuxino-lime2-emmc.dts => sun7i-a20-olinuxino-lime2-exgb.dts} (96%)
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 4b17f35dc9a7..90cbfc57948e 100644
+index 90cbfc57948e..d37e93175fbf 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -880,6 +880,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+@@ -878,7 +878,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ 	sun7i-a20-olimex-som-evb.dtb \
+ 	sun7i-a20-olinuxino-lime.dtb \
  	sun7i-a20-olinuxino-lime2.dtb \
- 	sun7i-a20-olinuxino-lime2-emmc.dtb \
+-	sun7i-a20-olinuxino-lime2-emmc.dtb \
++	sun7i-a20-olinuxino-lime2-exgb.dtb \
  	sun7i-a20-olinuxino-micro.dtb \
-+	sun7i-a20-olinuxino-micro-exgb.dtb \
+ 	sun7i-a20-olinuxino-micro-exgb.dtb \
  	sun7i-a20-orangepi.dtb \
- 	sun7i-a20-orangepi-mini.dtb \
- 	sun7i-a20-pcduino3.dtb \
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro-exgb.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro-exgb.dts
-new file mode 100644
-index 000000000000..2c592748e474
---- /dev/null
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro-exgb.dts
-@@ -0,0 +1,81 @@
-+/*
-+ * Copyright 2017 Olimex Ltd.
-+ *
-+ * Stefan Mavrodiev <stefan@olimex.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "sun7i-a20-olinuxino-micro.dts"
-+
-+/ {
-+	model = "Olimex A20-OLinuXino-MICRO-exGB";
-+	compatible = "olimex,a20-olinuxino-micro-exgb", "allwinner,sun7i-a20";
-+
-+	mmc2_pwrseq: pwrseq {
-+		pinctrl-0 = <&mmc2_pins_nrst>;
-+		pinctrl-names = "default";
-+		compatible = "mmc-pwrseq-emmc";
-+		reset-gpios = <&pio 2 16 GPIO_ACTIVE_LOW>;
-+	};
-+};
-+
-+&pio {
-+	mmc2_pins_nrst: mmc2-rst-pin {
-+		pins = "PC16";
-+		function = "gpio_out";
-+	};
-+};
-+
-+&mmc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc2_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	vqmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	non-removable;
-+	mmc-pwrseq = <&mmc2_pwrseq>;
-+	status = "okay";
-+
-+	emmc: emmc at 0 {
-+		reg = <0>;
-+		compatible = "mmc-card";
-+		broken-hpi;
-+	};
-+};
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-exgb.dts
+similarity index 96%
+rename from arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
+rename to arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-exgb.dts
+index 81f376f2a44d..38d95eaaa224 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-emmc.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2-exgb.dts
+@@ -44,8 +44,8 @@
+ #include "sun7i-a20-olinuxino-lime2.dts"
+ 
+ / {
+-	model = "Olimex A20-OLinuXino-LIME2-eMMC";
+-	compatible = "olimex,a20-olinuxino-lime2-emmc", "allwinner,sun7i-a20";
++	model = "Olimex A20-OLinuXino-LIME2-exGB";
++	compatible = "olimex,a20-olinuxino-lime2-exgb", "allwinner,sun7i-a20";
+ 
+ 	mmc2_pwrseq: pwrseq {
+ 		pinctrl-0 = <&mmc2_pins_nrst>;
 -- 
 2.11.0
