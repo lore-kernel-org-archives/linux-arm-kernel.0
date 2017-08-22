@@ -1,47 +1,61 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 22 Aug 2017 13:14:55 +0200
-Subject: [PATCH] dt-bindings: mmc: sh_mmcif: Document r8a7745 DT bindings
-In-Reply-To: <1502816007-30186-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1502816007-30186-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <CAPDyKFoPm8H8r1tnG0+HtGe_L2afMZw6_-eFOC_H4u8eO7Qbbg@mail.gmail.com>
+Date: Tue, 22 Aug 2017 13:15:08 +0200
+Subject: [PATCH v2 00/16] mmc: meson-gx: driver fixups and upgrades
+In-Reply-To: <20170821160301.21899-1-jbrunet@baylibre.com>
+References: <20170821160301.21899-1-jbrunet@baylibre.com>
+Message-ID: <CAPDyKFoBebVf0wqJ+z5UHC+aMju2Qy0ONc1OVYrwzZKk+XgGTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 August 2017 at 18:53, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Reviewed-by: Chris Paterson <chris.paterson2@renesas.com>
+On 21 August 2017 at 18:02, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> The patchset features several bugfixes, rework and upgrade for the
+> meson-gx MMC driver.
+>
+> The main goal is to improve readability and enable new high speed
+> modes, such as eMMC DDR52 and sdcard UHS modes up to SDR50 (100Mhz)
+>
+> SDR104 is not working with a few cards on the p200 and the
+> libretech-cc. I suspect that 200Mhz might be a bit too fast for the PCB
+> of these boards, adding noise to the signal and eventually breaking
+> the communication with some cards. The same cards are working well on a
+> laptop or the nanopi-k2 at 200Mhz.
+>
+> This series has been tested on gxbb-p200, gxbb-nanopi-k2 and
+> gxl-s905x-libretech-cc
+>
+> Changes since v1 [0]:
+> * Reorder patches to have fixes first, then rework and finally
+>   enhancements.
+> * Use CCF to manage clock phases
+>
+> [0]: https://lkml.kernel.org/r/20170804174353.16486-1-jbrunet at baylibre.com
+>
+> Jerome Brunet (16):
+>   mmc: meson-gx: fix mux mask definition
+>   mmc: meson-gx: remove CLK_DIVIDER_ALLOW_ZERO clock flag
+>   mmc: meson-gx: clean up some constants
+>   mmc: meson-gx: use _irqsave variant of spinlock
+>   mmc: meson-gx: cfg init overwrite values
+>   mmc: meson-gx: rework set_ios function
+>   mmc: meson-gx: rework clk_set function
+>   mmc: meson-gx: rework clock init function
+>   mmc: meson-gx: fix dual data rate mode frequencies
+>   mmc: meson-gx: work around clk-stop issue
+>   mmc: meson-gx: simplify interrupt handler
+>   mmc: meson-gx: implement card_busy callback
+>   mmc: meson-gx: use CCF to handle the clock phases
+>   mmc: meson-gx: implement voltage switch callback
+>   mmc: meson-gx: change default tx phase
+>   mmc: meson-gx: rework tuning function
+>
+>  drivers/mmc/host/meson-gx-mmc.c | 718 +++++++++++++++++++++++++++-------------
+>  1 file changed, 497 insertions(+), 221 deletions(-)
+>
+> --
+> 2.9.5
+>
 
-Thanks, applied for next!
+So far, I decided to pick patch 1 -> 3.
 
 Kind regards
 Uffe
-
-> ---
->  Documentation/devicetree/bindings/mmc/renesas,mmcif.txt | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt b/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt
-> index 703e18c..5ff1e12 100644
-> --- a/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt
-> +++ b/Documentation/devicetree/bindings/mmc/renesas,mmcif.txt
-> @@ -12,6 +12,7 @@ Required properties:
->         - "renesas,mmcif-r8a73a4" for the MMCIF found in r8a73a4 SoCs
->         - "renesas,mmcif-r8a7740" for the MMCIF found in r8a7740 SoCs
->         - "renesas,mmcif-r8a7743" for the MMCIF found in r8a7743 SoCs
-> +       - "renesas,mmcif-r8a7745" for the MMCIF found in r8a7745 SoCs
->         - "renesas,mmcif-r8a7778" for the MMCIF found in r8a7778 SoCs
->         - "renesas,mmcif-r8a7790" for the MMCIF found in r8a7790 SoCs
->         - "renesas,mmcif-r8a7791" for the MMCIF found in r8a7791 SoCs
-> @@ -22,7 +23,7 @@ Required properties:
->  - interrupts: Some SoCs have only 1 shared interrupt, while others have either
->    2 or 3 individual interrupts (error, int, card detect). Below is the number
->    of interrupts for each SoC:
-> -    1: r8a73a4, r8a7743, r8a7778, r8a7790, r8a7791, r8a7793, r8a7794
-> +    1: r8a73a4, r8a7743, r8a7745, r8a7778, r8a7790, r8a7791, r8a7793, r8a7794
->      2: r8a7740, sh73a0
->      3: r7s72100
->
-> --
-> 2.7.4
->
