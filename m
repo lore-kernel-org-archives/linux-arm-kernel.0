@@ -1,20 +1,65 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Aug 2017 15:39:57 +0200
-Subject: [PATCH ] gpio: rcar: Add r8a7745 (RZ/G1E) support
-In-Reply-To: <1502881936-39357-1-git-send-email-biju.das@bp.renesas.com>
-References: <1502881936-39357-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <CACRpkdZzQfe-Mdv0hnf_rTHh0KwX9QrKOUUd0tam_DndkCTy5A@mail.gmail.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Tue, 22 Aug 2017 15:41:47 +0200
+Subject: [PATCH v3 0/5] Add support for the STM32F7 I2C
+In-Reply-To: <d749429a-3cdc-ea9b-84ef-afa9fdf55f29@st.com>
+References: <1499356386-28779-1-git-send-email-pierre-yves.mordret@st.com>
+ <d749429a-3cdc-ea9b-84ef-afa9fdf55f29@st.com>
+Message-ID: <0e2ae765-1608-f25b-663f-948f8c3f1cf2@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 16, 2017 at 1:12 PM, Biju Das <biju.das@bp.renesas.com> wrote:
+Hello all,
 
-> Renesas RZ/G1E (R8A7745) SoC GPIO blocks are identical to the R-Car Gen2
-> family. Add support for its GPIO controllers.
->
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Another gentle ping for driver review since DT Bindings has been acked by Rob
+Herring.
 
-Patch applied with the ACKs
+Many thanks in advance
+Regards
 
-Yours,
-Linus Walleij
+On 07/20/2017 10:34 AM, Pierre Yves MORDRET wrote:
+> 
+> 
+> On 07/06/2017 05:53 PM, Pierre-Yves MORDRET wrote:
+>> This patchset adds support for the I2C controller embedded in STM32F7xx SoC.
+>> It enables I2C transfer in interrupt mode with Standard-mode, Fast-mode and
+>> Fast-mode+ bus speed.
+> 
+> Gentle ping for driver review since DT Bindings has been acked by Rob 
+> Herring.
+> 
+> Thanks
+> Py
+> 
+>> ---
+>>   Version history:
+>>      v3:
+>>          * Move stm32f7_i2c_match above stm32f7_i2c_driver
+>>          * of_device_get_match_data instead of of_match_device
+>>          * Improve I2C Speed DT gathering
+>>          * dev_err into dev_dbg for Arbitration loss
+>>          * Remove useless space aligned
+>>
+>>      v2:
+>>          * Implement an I2C timings computation algorithm instead of static
+>>            values(bindings). Algorithm uses generic I2C SCL Falling/Rising
+>>            bindings and System clock to compute its timings.
+>>          * I2C Device Tree Update
+>> ---
+>> Pierre-Yves MORDRET (5):
+>>    dt-bindings: i2c-stm32: Document the STM32F7 I2C bindings
+>>    i2c: i2c-stm32f4: use generic definition of speed enum
+>>    i2c: i2c-stm32f7: add driver
+>>    ARM: dts: stm32: Add I2C1 support for STM32F746 SoC
+>>    ARM: dts: stm32: Add I2C1 support for STM32F746 eval board
+>>
+>>   .../devicetree/bindings/i2c/i2c-stm32.txt          |  29 +-
+>>   arch/arm/boot/dts/stm32746g-eval.dts               |   8 +
+>>   arch/arm/boot/dts/stm32f746.dtsi                   |  22 +
+>>   drivers/i2c/busses/Kconfig                         |  10 +
+>>   drivers/i2c/busses/Makefile                        |   1 +
+>>   drivers/i2c/busses/i2c-stm32.h                     |  20 +
+>>   drivers/i2c/busses/i2c-stm32f4.c                   |  18 +-
+>>   drivers/i2c/busses/i2c-stm32f7.c                   | 974 +++++++++++++++++++++
+>>   8 files changed, 1068 insertions(+), 14 deletions(-)
+>>   create mode 100644 drivers/i2c/busses/i2c-stm32.h
+>>   create mode 100644 drivers/i2c/busses/i2c-stm32f7.c
