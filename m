@@ -1,43 +1,47 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 22 Aug 2017 10:07:35 +0200
-Subject: [PATCH ] ARM: dts: iwg20d-q7: Add chosen node
-In-Reply-To: <1503075488-44304-1-git-send-email-biju.das@bp.renesas.com>
-References: <1503075488-44304-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <20170822080735.GH30838@verge.net.au>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Tue, 22 Aug 2017 08:53:25 +0100
+Subject: [PATCH ] ARM: dts: r8a7745: Add Ethernet AVB support
+Message-ID: <1503388405-48325-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 05:58:08PM +0100, Biju Das wrote:
-> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> ---
-> This patch tested against renesas-dev tag renesas-devel-20170815-v4.13-rc5
+Add Ethernet AVB support for r8a7745 SoC.
 
-Thanks, I have applied this for v4.15.
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+---
+This patch is depend upon the below patch
+[1/2] ARM: dts: r8a7745: Add MMC interface support
+https://patchwork.kernel.org/patch/9906803/
 
-There was some fuzz when applying this patch.
-Please check that it is correct when I have pushed today's devel tag to
-the renesas tree.
+It is tested against renesas-devel branch tag
+renesas-devel-20170821-v4.13-rc5
 
-> 
->  arch/arm/boot/dts/r8a7743-iwg20d-q7.dts | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-> index 081af01..305a6a1 100644
-> --- a/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-> +++ b/arch/arm/boot/dts/r8a7743-iwg20d-q7.dts
-> @@ -19,6 +19,11 @@
->  		serial0 = &scif0;
->  		ethernet0 = &avb;
->  	};
-> +
-> +	chosen {
-> +		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
-> +		stdout-path = "serial0:115200n8";
-> +	};
->  };
->  
->  &pfc {
-> -- 
-> 1.9.1
-> 
+ arch/arm/boot/dts/r8a7745.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index a55d98f..2816a0b 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -614,6 +614,19 @@
+ 			status = "disabled";
+ 		};
+ 
++		avb: ethernet at e6800000 {
++			compatible = "renesas,etheravb-r8a7745",
++				     "renesas,etheravb-rcar-gen2";
++			reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
++			interrupts = <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 812>;
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 812>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		mmcif0: mmc at ee200000 {
+ 			compatible = "renesas,mmcif-r8a7745",
+ 				     "renesas,sh-mmcif";
+-- 
+1.9.1
