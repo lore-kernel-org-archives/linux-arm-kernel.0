@@ -1,13 +1,10 @@
 From: npiggin@gmail.com (Nicholas Piggin)
-Date: Tue, 22 Aug 2017 11:38:51 +1000
-Subject: No subject
-Message-ID: <20170822013851.32583-1-npiggin@gmail.com>
+Date: Tue, 22 Aug 2017 11:54:39 +1000
+Subject: [PATCH resend] timers: Fix excessive granularity of new timers after
+ a nohz idle
+Message-ID: <20170822015439.11263-1-npiggin@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Date: Sun, 20 Aug 2017 13:16:16 +1000
-Subject: [PATCH] timers: Fix excessive granularity of new timers after a nohz
- idle
 
 When a timer base is idle, it is forwarded when a new timer is added
 to ensure that granularity does not become excessive. When not idle,
