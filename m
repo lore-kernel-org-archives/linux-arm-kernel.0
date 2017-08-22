@@ -1,49 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Aug 2017 12:24:27 -0700
-Subject: [PATCH 5/8] ARM: OMAP4: hwmod_data: Remove modulemode from
- IPU/DSP hwmods
-In-Reply-To: <a7ed87b7-bfe3-0b0c-08b4-4c44570364f2@ti.com>
-References: <20170821234818.4755-1-s-anna@ti.com>
- <20170821234818.4755-6-s-anna@ti.com>
- <20170822173749.GK6008@atomide.com>
- <a7ed87b7-bfe3-0b0c-08b4-4c44570364f2@ti.com>
-Message-ID: <20170822192425.GM6008@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Aug 2017 21:32:53 +0200
+Subject: [GIT PULL 1/6] Broadcom soc changes for 4.14
+In-Reply-To: <843914385.20451.1503420633158@email.1und1.de>
+References: <20170817183748.1450-1-f.fainelli@gmail.com>
+ <20170817183748.1450-2-f.fainelli@gmail.com>
+ <cc4d171e-47cf-3045-738c-929807454297@gmail.com>
+ <843914385.20451.1503420633158@email.1und1.de>
+Message-ID: <CAK8P3a18JqcBBJ36a6w9hHwZtMtoWYHy2E1iVdJGk6WBtn+gPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [170822 11:45]:
-> On 08/22/2017 12:37 PM, Tony Lindgren wrote:
-> > I think a better way to fix this would be to make sure the module
-> > is enabled during the unmapping phase of the MMUs. If there is no
-> > driver left at that point to call pm_runtime_get() on the module,
-> > do it via pdata-quirks.c using struct iommu_platform_data?
-> 
-> The problem is because there is no reference counting on modulemode
-> programming unlike clocks or omap_device pm_domain callbacks. The IOMMU
-> driver already has an active pm_runtime_get() invoked earlier and
-> invoking another wouldn't result in any change.
+On Tue, Aug 22, 2017 at 6:50 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>> Florian Fainelli <f.fainelli@gmail.com> hat am 22. August 2017 um 00:16 geschrieben:
+>> On 08/17/2017 11:37 AM, Florian Fainelli wrote:
+>>
+>> 10:12 < arnd> that would also get rid of the branch dependency as an
+>> added bonus, but avoiding the boot breakage is more important of course
+>
+> i already had a discussion with Eric about the case the dts changes are missing and i wasn't able see a boot breakage ("only" a SMP breakage which is still a regression).
 
-Hmm iommu driver has pm_runtime_get() on which modules? Can you
-please point me to that code too so I can follow..
+Yes, that's what I meant.
 
-Or is there maybe a single module shared across multiple devices?
+>> 10:13 < arnd> Stefan Wahren did the patch, but he's either not on this
+>> channel, or I don't know his nick
+>>
+>> 10:30 < arnd> on a related note, I see that the match table for the
+>> machine descriptor doesn't list bcm2837, and the bcm2837.dtsi file
+>> doesn't list itself as compatible with bcm2836, so that would have to be
+>>    added too to make it actually work
+>>
+>
+> sorry i don't have much time today and i'm not sure how to implement the smp_init.
+>
+> Here is my draft (untested) which has a linker error (arch/arm/mach-bcm/board_bcm2835.o:(.arch.info.init+0x34): Undefined reference on `bcm2836_smp_ops). Does it goes in the right direction?
 
-If so, we need a minimal module wrapper driver. You can do what we
-already do for musb on am335x in drivers/usb/musb/musb_am335x.c.
-A single module has two musb instances and a shared cppi41 dma
-instance. See also it's related entries in am33xx.dtsi.
+Looks good to me.
 
-Note that the clkctrl clocks are available now as clocks, so they
-could be directly enabled for testing. See omap4_tesla_clkctrl_regs
-and omap4_ducati_clkctrl_regs if that helps.
+>  DT_MACHINE_START(BCM2835, "BCM2835")
+> -       .dt_compat = bcm2835_compat
+> +       .dt_compat = bcm2835_compat,
+> +       .smp = smp_ops(bcm2836_smp_ops),
+> +       .smp_init = smp_init_ops(bcm2836_smp_init_ops),
 
-> The remoteproc driver is only dealing with its resets and hwmod while
-> the IOMMU driver is dealing with its dedicated reset. The PRCM registers
-> though are a single set between the two.
+One of the two should actually be sufficient here. Setting the .smp pointer
+is shorter so if that works, we can leave out the init function completely.
 
-Sorry but I'm having hard time following which driver claims
-which modules :)
-
-Regards,
-
-Tony
+       Arnd
