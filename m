@@ -1,41 +1,29 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 22 Aug 2017 15:43:11 +0200
-Subject: [PATCH 2/3 v3] mfd: db8500-prcmu: Get rid of cpufreq dependency
-In-Reply-To: <CACRpkdZ91zUPE8Oyf+ZALekCUbAakM=PX6DiYTO-VZewGGNFmg@mail.gmail.com>
-References: <20170822131741.23473-1-linus.walleij@linaro.org>
- <7661350.vR4F4a82RE@aspire.rjw.lan>
- <CACRpkdZ91zUPE8Oyf+ZALekCUbAakM=PX6DiYTO-VZewGGNFmg@mail.gmail.com>
-Message-ID: <22468782.O1RHkarIGQ@aspire.rjw.lan>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Tue, 22 Aug 2017 14:52:19 +0100
+Subject: [PATCH] dt-bindings: apmu: Document r8a7745 support
+Message-ID: <1503409939-9355-1-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 22, 2017 3:44:18 PM CEST Linus Walleij wrote:
-> On Tue, Aug 22, 2017 at 3:25 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > On Tuesday, August 22, 2017 3:17:40 PM CEST Linus Walleij wrote:
-> >> The ARMSS clock, also known as the operating point of the
-> >> CPU, should not cross-depend on cpufreq like this. Move
-> >> the code to use just frequencies and remove the false
-> >> frequency (1GHz) and put in the actual frequency provided
-> >> by the ARMSS clock (998400000 Hz) as part of the process.
-> >>
-> >> After this and the related cpufreq patch, the DB8500 will
-> >> simply use the standard DT cpufreq driver to change the
-> >> operating points through the common clock framework using
-> >> the ARMSS clock.
-> >>
-> >> Acked-by: Lee Jones <lee.jones@linaro.org>
-> >> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> >
-> > Well, I've already applied the v2, so do you want me to replace the
-> > commit with this patch?
-> 
-> If you can, else tell me and I can send a fixup patch.
+Document APMU and SMP enable method for RZ/G1E (also known as
+r8a7745) SoC.
 
-I can. :-)
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+---
+ Documentation/devicetree/bindings/power/renesas,apmu.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Done already, but the replacement will show up in linux-next when I re-merge
-the branches, which may be in a few days.
-
-> I want to keep Lee happy!
-
-Fair enough.
+diff --git a/Documentation/devicetree/bindings/power/renesas,apmu.txt b/Documentation/devicetree/bindings/power/renesas,apmu.txt
+index af21502..f747f95 100644
+--- a/Documentation/devicetree/bindings/power/renesas,apmu.txt
++++ b/Documentation/devicetree/bindings/power/renesas,apmu.txt
+@@ -8,6 +8,7 @@ Required properties:
+ - compatible: Should be "renesas,<soctype>-apmu", "renesas,apmu" as fallback.
+ 	      Examples with soctypes are:
+ 		- "renesas,r8a7743-apmu" (RZ/G1M)
++		- "renesas,r8a7745-apmu" (RZ/G1E)
+ 		- "renesas,r8a7790-apmu" (R-Car H2)
+ 		- "renesas,r8a7791-apmu" (R-Car M2-W)
+ 		- "renesas,r8a7792-apmu" (R-Car V2H)
+-- 
+2.7.4
