@@ -1,113 +1,233 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue, 22 Aug 2017 15:26:57 +0530
-Subject: [PATCH v3 08/17] dmaengine: bcm-sba-raid: Increase number of free
- sba_request
-In-Reply-To: <1503395827-19428-1-git-send-email-anup.patel@broadcom.com>
-References: <1503395827-19428-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1503395827-19428-9-git-send-email-anup.patel@broadcom.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 22 Aug 2017 11:42:44 +0100
+Subject: [PATCH v7 4/9] arm64: hugetlb: Add break-before-make logic for
+ contiguous entries
+In-Reply-To: <20170822104249.2189-1-punit.agrawal@arm.com>
+References: <20170822104249.2189-1-punit.agrawal@arm.com>
+Message-ID: <20170822104249.2189-5-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we have only 1024 free sba_request created
-by sba_prealloc_channel_resources(). This is too low
-and the prep_xxx() callbacks start failing more often
-at time of RAID array setup over NVMe disks.
+From: Steve Capper <steve.capper@arm.com>
 
-This patch sets number of free sba_request created by
-sba_prealloc_channel_resources() to be:
-<number_of_mailbox_channels> x 8192
+It has become apparent that one has to take special care when modifying
+attributes of memory mappings that employ the contiguous bit.
 
-Due to above, we will have sufficient number of free
-sba_request and prep_xxx() callbacks failing is very
-unlikely.
+Both the requirement and the architecturally correct "Break-Before-Make"
+technique of updating contiguous entries can be found described in:
+ARM DDI 0487A.k_iss10775, "Misprogramming of the Contiguous bit",
+page D4-1762.
 
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+The huge pte accessors currently replace the attributes of contiguous
+pte entries in place thus can, on certain platforms, lead to TLB
+conflict aborts or even erroneous results returned from TLB lookups.
+
+This patch adds two helper functions -
+
+* get_clear_flush(.) - clears a contiguous entry and returns the head
+  pte (whilst taking care to retain dirty bit information that could
+  have been modified by DBM).
+
+* clear_flush(.) that clears a contiguous entry
+
+A tlb invalidate is performed to then ensure that there is no
+possibility of multiple tlb entries being present for the same region.
+
+Cc: David Woods <dwoods@mellanox.com>
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+(Added helper clear_flush(), updated commit log, and some cleanup)
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 ---
- drivers/dma/bcm-sba-raid.c | 25 +++++++++++++------------
- 1 file changed, 13 insertions(+), 12 deletions(-)
+ arch/arm64/mm/hugetlbpage.c | 112 +++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 91 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
-index cd6e3cd..af6cc8e 100644
---- a/drivers/dma/bcm-sba-raid.c
-+++ b/drivers/dma/bcm-sba-raid.c
-@@ -83,6 +83,8 @@
- #define SBA_CMD_WRITE_BUFFER				0xc
- #define SBA_CMD_GALOIS					0xe
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index 08deed7c71f0..594232598cac 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -68,6 +68,66 @@ static int find_num_contig(struct mm_struct *mm, unsigned long addr,
+ 	return CONT_PTES;
+ }
  
-+#define SBA_MAX_REQ_PER_MBOX_CHANNEL			8192
++/*
++ * Changing some bits of contiguous entries requires us to follow a
++ * Break-Before-Make approach, breaking the whole contiguous set
++ * before we can change any entries. See ARM DDI 0487A.k_iss10775,
++ * "Misprogramming of the Contiguous bit", page D4-1762.
++ *
++ * This helper performs the break step.
++ */
++static pte_t get_clear_flush(struct mm_struct *mm,
++			     unsigned long addr,
++			     pte_t *ptep,
++			     unsigned long pgsize,
++			     unsigned long ncontig)
++{
++	struct vm_area_struct vma = { .vm_mm = mm };
++	pte_t orig_pte = huge_ptep_get(ptep);
++	bool valid = pte_valid(orig_pte);
++	unsigned long i, saddr = addr;
 +
- /* Driver helper macros */
- #define to_sba_request(tx)		\
- 	container_of(tx, struct sba_request, tx)
-@@ -1622,6 +1624,13 @@ static int sba_probe(struct platform_device *pdev)
- 	sba->dev = &pdev->dev;
- 	platform_set_drvdata(pdev, sba);
- 
-+	/* Number of channels equals number of mailbox channels */
-+	ret = of_count_phandle_with_args(pdev->dev.of_node,
-+					 "mboxes", "#mbox-cells");
-+	if (ret <= 0)
-+		return -ENODEV;
-+	mchans_count = ret;
++	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++) {
++		pte_t pte = ptep_get_and_clear(mm, addr, ptep);
 +
- 	/* Determine SBA version from DT compatible string */
- 	if (of_device_is_compatible(sba->dev->of_node, "brcm,iproc-sba"))
- 		sba->ver = SBA_VER_1;
-@@ -1634,14 +1643,12 @@ static int sba_probe(struct platform_device *pdev)
- 	/* Derived Configuration parameters */
- 	switch (sba->ver) {
- 	case SBA_VER_1:
--		sba->max_req = 1024;
- 		sba->hw_buf_size = 4096;
- 		sba->hw_resp_size = 8;
- 		sba->max_pq_coefs = 6;
- 		sba->max_pq_srcs = 6;
- 		break;
- 	case SBA_VER_2:
--		sba->max_req = 1024;
- 		sba->hw_buf_size = 4096;
- 		sba->hw_resp_size = 8;
- 		sba->max_pq_coefs = 30;
-@@ -1655,6 +1662,7 @@ static int sba_probe(struct platform_device *pdev)
- 	default:
- 		return -EINVAL;
++		/*
++		 * If HW_AFDBM is enabled, then the HW could turn on
++		 * the dirty bit for any page in the set, so check
++		 * them all.  All hugetlb entries are already young.
++		 */
++		if (IS_ENABLED(CONFIG_ARM64_HW_AFDBM) && pte_dirty(pte))
++			orig_pte = pte_mkdirty(orig_pte);
++	}
++
++	if (valid)
++		flush_tlb_range(&vma, saddr, addr);
++	return orig_pte;
++}
++
++/*
++ * Changing some bits of contiguous entries requires us to follow a
++ * Break-Before-Make approach, breaking the whole contiguous set
++ * before we can change any entries. See ARM DDI 0487A.k_iss10775,
++ * "Misprogramming of the Contiguous bit", page D4-1762.
++ *
++ * This helper performs the break step for use cases where the
++ * original pte is not needed.
++ */
++static void clear_flush(struct mm_struct *mm,
++			     unsigned long addr,
++			     pte_t *ptep,
++			     unsigned long pgsize,
++			     unsigned long ncontig)
++{
++	struct vm_area_struct vma = { .vm_mm = mm };
++	unsigned long i, saddr = addr;
++
++	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++)
++		pte_clear(mm, addr, ptep);
++
++	flush_tlb_range(&vma, saddr, addr);
++}
++
+ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+ 			    pte_t *ptep, pte_t pte)
+ {
+@@ -93,6 +153,8 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+ 	dpfn = pgsize >> PAGE_SHIFT;
+ 	hugeprot = pte_pgprot(pte);
+ 
++	clear_flush(mm, addr, ptep, pgsize, ncontig);
++
+ 	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
+ 		pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
+ 			 pte_val(pfn_pte(pfn, hugeprot)));
+@@ -194,7 +256,7 @@ pte_t arch_make_huge_pte(pte_t entry, struct vm_area_struct *vma,
+ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+ 			      unsigned long addr, pte_t *ptep)
+ {
+-	int ncontig, i;
++	int ncontig;
+ 	size_t pgsize;
+ 	pte_t orig_pte = huge_ptep_get(ptep);
+ 
+@@ -202,17 +264,8 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+ 		return ptep_get_and_clear(mm, addr, ptep);
+ 
+ 	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
+-	for (i = 0; i < ncontig; i++, addr += pgsize, ptep++) {
+-		/*
+-		 * If HW_AFDBM is enabled, then the HW could
+-		 * turn on the dirty bit for any of the page
+-		 * in the set, so check them all.
+-		 */
+-		if (pte_dirty(ptep_get_and_clear(mm, addr, ptep)))
+-			orig_pte = pte_mkdirty(orig_pte);
+-	}
+ 
+-	return orig_pte;
++	return get_clear_flush(mm, addr, ptep, pgsize, ncontig);
+ }
+ 
+ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+@@ -223,18 +276,25 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+ 	size_t pgsize = 0;
+ 	unsigned long pfn = pte_pfn(pte), dpfn;
+ 	pgprot_t hugeprot;
++	pte_t orig_pte;
+ 
+ 	if (!pte_cont(pte))
+ 		return ptep_set_access_flags(vma, addr, ptep, pte, dirty);
+ 
+ 	ncontig = find_num_contig(vma->vm_mm, addr, ptep, &pgsize);
+ 	dpfn = pgsize >> PAGE_SHIFT;
+-	hugeprot = pte_pgprot(pte);
+ 
+-	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn) {
+-		changed |= ptep_set_access_flags(vma, addr, ptep,
+-				pfn_pte(pfn, hugeprot), dirty);
+-	}
++	orig_pte = get_clear_flush(vma->vm_mm, addr, ptep, pgsize, ncontig);
++	if (!pte_same(orig_pte, pte))
++		changed = 1;
++
++	/* Make sure we don't lose the dirty state */
++	if (pte_dirty(orig_pte))
++		pte = pte_mkdirty(pte);
++
++	hugeprot = pte_pgprot(pte);
++	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
++		set_pte_at(vma->vm_mm, addr, ptep, pfn_pte(pfn, hugeprot));
+ 
+ 	return changed;
+ }
+@@ -242,8 +302,11 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+ void huge_ptep_set_wrprotect(struct mm_struct *mm,
+ 			     unsigned long addr, pte_t *ptep)
+ {
++	unsigned long pfn, dpfn;
++	pgprot_t hugeprot;
+ 	int ncontig, i;
+ 	size_t pgsize;
++	pte_t pte;
+ 
+ 	if (!pte_cont(*ptep)) {
+ 		ptep_set_wrprotect(mm, addr, ptep);
+@@ -251,15 +314,23 @@ void huge_ptep_set_wrprotect(struct mm_struct *mm,
  	}
-+	sba->max_req = SBA_MAX_REQ_PER_MBOX_CHANNEL * mchans_count;
- 	sba->max_cmd_per_req = sba->max_pq_srcs + 3;
- 	sba->max_xor_srcs = sba->max_cmd_per_req - 1;
- 	sba->max_resp_pool_size = sba->max_req * sba->hw_resp_size;
-@@ -1668,22 +1676,14 @@ static int sba_probe(struct platform_device *pdev)
- 	sba->client.knows_txdone	= false;
- 	sba->client.tx_tout		= 0;
  
--	/* Number of channels equals number of mailbox channels */
--	ret = of_count_phandle_with_args(pdev->dev.of_node,
--					 "mboxes", "#mbox-cells");
--	if (ret <= 0)
--		return -ENODEV;
--	mchans_count = ret;
--	sba->mchans_count = 0;
--	atomic_set(&sba->mchans_current, 0);
--
- 	/* Allocate mailbox channel array */
--	sba->mchans = devm_kcalloc(&pdev->dev, sba->mchans_count,
-+	sba->mchans = devm_kcalloc(&pdev->dev, mchans_count,
- 				   sizeof(*sba->mchans), GFP_KERNEL);
- 	if (!sba->mchans)
- 		return -ENOMEM;
+ 	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
+-	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize)
+-		ptep_set_wrprotect(mm, addr, ptep);
++	dpfn = pgsize >> PAGE_SHIFT;
++
++	pte = get_clear_flush(mm, addr, ptep, pgsize, ncontig);
++	pte = pte_wrprotect(pte);
++
++	hugeprot = pte_pgprot(pte);
++	pfn = pte_pfn(pte);
++
++	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize, pfn += dpfn)
++		set_pte_at(mm, addr, ptep, pfn_pte(pfn, hugeprot));
+ }
  
- 	/* Request mailbox channels */
-+	sba->mchans_count = 0;
- 	for (i = 0; i < mchans_count; i++) {
- 		sba->mchans[i] = mbox_request_channel(&sba->client, i);
- 		if (IS_ERR(sba->mchans[i])) {
-@@ -1692,6 +1692,7 @@ static int sba_probe(struct platform_device *pdev)
- 		}
- 		sba->mchans_count++;
+ void huge_ptep_clear_flush(struct vm_area_struct *vma,
+ 			   unsigned long addr, pte_t *ptep)
+ {
+-	int ncontig, i;
+ 	size_t pgsize;
++	int ncontig;
+ 
+ 	if (!pte_cont(*ptep)) {
+ 		ptep_clear_flush(vma, addr, ptep);
+@@ -267,8 +338,7 @@ void huge_ptep_clear_flush(struct vm_area_struct *vma,
  	}
-+	atomic_set(&sba->mchans_current, 0);
  
- 	/* Find-out underlying mailbox device */
- 	ret = of_parse_phandle_with_args(pdev->dev.of_node,
+ 	ncontig = find_num_contig(vma->vm_mm, addr, ptep, &pgsize);
+-	for (i = 0; i < ncontig; i++, ptep++, addr += pgsize)
+-		ptep_clear_flush(vma, addr, ptep);
++	clear_flush(vma->vm_mm, addr, ptep, pgsize, ncontig);
+ }
+ 
+ static __init int setup_hugepagesz(char *opt)
 -- 
-2.7.4
+2.13.2
