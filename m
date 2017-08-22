@@ -1,131 +1,81 @@
-From: david@redhat.com (David Hildenbrand)
-Date: Tue, 22 Aug 2017 16:06:57 +0200
-Subject: [PATCH RFC v3 6/9] KVM: rework kvm_vcpu_on_spin loop
-In-Reply-To: <20170821203530.9266-7-rkrcmar@redhat.com>
-References: <20170821203530.9266-1-rkrcmar@redhat.com>
- <20170821203530.9266-7-rkrcmar@redhat.com>
-Message-ID: <debc181e-6517-a8da-7a19-909fda5e4505@redhat.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Tue, 22 Aug 2017 15:14:59 +0100
+Subject: [PATCH v7 5/9] arm64: hugetlb: Handle swap entries in
+ huge_pte_offset() for contiguous hugepages
+In-Reply-To: <20170822104249.2189-6-punit.agrawal@arm.com>
+References: <20170822104249.2189-1-punit.agrawal@arm.com>
+ <20170822104249.2189-6-punit.agrawal@arm.com>
+Message-ID: <a54aff75-f79b-b40d-c66f-6730aaccbd39@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.08.2017 22:35, Radim Kr?m?? wrote:
-> The original code managed to obfuscate a straightforward idea:
-> start iterating from the selected index and reset the index to 0 when
-> reaching the end of online vcpus, then iterate until reaching the index
-> that we started at.
+Hi Punit,
+
+On 22/08/17 11:42, Punit Agrawal wrote:
+> huge_pte_offset() was updated to correctly handle swap entries for
+> hugepages. With the addition of the size parameter, it is now possible
+> to disambiguate whether the request is for a regular hugepage or a
+> contiguous hugepage.
 > 
-> The resulting code is a bit better, IMO.  (Still horrible, though.)
-
-I think I prefer dropping this patch and maybe _after_ we have the list
-implementation in place, simply start walking the list from
-last_boosted_vcpu? (store a pointer instead of an index then, of course)
-
-If I understand correctly, this would then be simply, one walk from
-last_boosted_vcpu until we hit last_boosted_vcpu again.
-
-
+> Fix huge_pte_offset() for contiguous hugepages by using the size to find
+> the correct page table entry.
 > 
-> Signed-off-by: Radim Kr?m?? <rkrcmar@redhat.com>
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: David Woods <dwoods@mellanox.com>
 > ---
->  include/linux/kvm_host.h | 13 +++++++++++++
->  virt/kvm/kvm_main.c      | 47 ++++++++++++++++++-----------------------------
->  2 files changed, 31 insertions(+), 29 deletions(-)
+>   arch/arm64/mm/hugetlbpage.c | 21 ++++++++++++++++-----
+>   1 file changed, 16 insertions(+), 5 deletions(-)
 > 
-> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-> index abd5cb1feb9e..cfb3c0efdd51 100644
-> --- a/include/linux/kvm_host.h
-> +++ b/include/linux/kvm_host.h
-> @@ -498,6 +498,19 @@ static inline struct kvm_vcpu *kvm_get_vcpu(struct kvm *kvm, int i)
->  	     (vcpup = kvm_get_vcpu(kvm, idx)) != NULL; \
->  	     idx++)
->  
-> +#define kvm_for_each_vcpu_from(idx, vcpup, from, kvm) \
-> +	for (idx = from, vcpup = kvm_get_vcpu(kvm, idx); \
-> +	     vcpup; \
-> +	     ({ \
-> +		idx++; \
-> +		if (idx >= atomic_read(&kvm->online_vcpus)) \
-> +			idx = 0; \
-> +		if (idx == from) \
-> +			vcpup = NULL; \
-> +		else \
-> +			vcpup = kvm_get_vcpu(kvm, idx); \
-> +	      }))
+> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> index 594232598cac..b95e24dc3477 100644
+> --- a/arch/arm64/mm/hugetlbpage.c
+> +++ b/arch/arm64/mm/hugetlbpage.c
+> @@ -214,6 +214,7 @@ pte_t *huge_pte_offset(struct mm_struct *mm,
+>   	pgd_t *pgd;
+>   	pud_t *pud;
+>   	pmd_t *pmd;
+> +	pte_t *pte;
+>   
+>   	pgd = pgd_offset(mm, addr);
+>   	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
+> @@ -221,19 +222,29 @@ pte_t *huge_pte_offset(struct mm_struct *mm,
+>   		return NULL;
+>   
+>   	pud = pud_offset(pgd, addr);
+> -	if (pud_none(*pud))
+> +	if (sz != PUD_SIZE && pud_none(*pud))
+>   		return NULL;
+> -	/* swap or huge page */
+> -	if (!pud_present(*pud) || pud_huge(*pud))
+> +	/* hugepage or swap? */
+> +	if (pud_huge(*pud) || !pud_present(*pud))
+>   		return (pte_t *)pud;
+>   	/* table; check the next level */
+>   
+> +	if (sz == CONT_PMD_SIZE)
+> +		addr &= CONT_PMD_MASK;
 > +
->  static inline struct kvm_vcpu *kvm_get_vcpu_by_id(struct kvm *kvm, int id)
->  {
->  	struct kvm_vcpu *vcpu = NULL;
-> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> index d89261d0d8c6..33a15e176927 100644
-> --- a/virt/kvm/kvm_main.c
-> +++ b/virt/kvm/kvm_main.c
-> @@ -2333,8 +2333,7 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me, bool yield_to_kernel_mode)
->  	struct kvm_vcpu *vcpu;
->  	int last_boosted_vcpu = me->kvm->last_boosted_vcpu;
->  	int yielded = 0;
-> -	int try = 3;
-> -	int pass;
-> +	int try = 2;
->  	int i;
->  
->  	kvm_vcpu_set_in_spin_loop(me, true);
-> @@ -2345,34 +2344,24 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me, bool yield_to_kernel_mode)
->  	 * VCPU is holding the lock that we need and will release it.
->  	 * We approximate round-robin by starting at the last boosted VCPU.
->  	 */
-> -	for (pass = 0; pass < 2 && !yielded && try; pass++) {
-> -		kvm_for_each_vcpu(i, vcpu, kvm) {
-> -			if (!pass && i <= last_boosted_vcpu) {
-> -				i = last_boosted_vcpu;
-> -				continue;
-> -			} else if (pass && i > last_boosted_vcpu)
-> -				break;
-> -			if (!ACCESS_ONCE(vcpu->preempted))
-> -				continue;
-> -			if (vcpu == me)
-> -				continue;
-> -			if (swait_active(&vcpu->wq) && !kvm_arch_vcpu_runnable(vcpu))
-> -				continue;
-> -			if (yield_to_kernel_mode && !kvm_arch_vcpu_in_kernel(vcpu))
-> -				continue;
-> -			if (!kvm_vcpu_eligible_for_directed_yield(vcpu))
-> -				continue;
-> +	kvm_for_each_vcpu_from(i, vcpu, last_boosted_vcpu, kvm) {
-> +		if (!ACCESS_ONCE(vcpu->preempted))
-> +			continue;
-> +		if (vcpu == me)
-> +			continue;
-> +		if (swait_active(&vcpu->wq) && !kvm_arch_vcpu_runnable(vcpu))
-> +			continue;
-> +		if (yield_to_kernel_mode && !kvm_arch_vcpu_in_kernel(vcpu))
-> +			continue;
-> +		if (!kvm_vcpu_eligible_for_directed_yield(vcpu))
-> +			continue;
->  
-> -			yielded = kvm_vcpu_yield_to(vcpu);
-> -			if (yielded > 0) {
-> -				kvm->last_boosted_vcpu = i;
-> -				break;
-> -			} else if (yielded < 0) {
-> -				try--;
-> -				if (!try)
-> -					break;
-> -			}
-> -		}
-> +		yielded = kvm_vcpu_yield_to(vcpu);
-> +		if (yielded > 0) {
-> +			kvm->last_boosted_vcpu = i;
-> +			break;
-> +		} else if (yielded < 0 && !try--)
-> +			break;
->  	}
->  	kvm_vcpu_set_in_spin_loop(me, false);
->  
-> 
+>   	pmd = pmd_offset(pud, addr);
+> -	if (pmd_none(*pmd))
+> +	if (!(sz == PMD_SIZE || sz == CONT_PMD_SIZE) &&
+> +	    pmd_none(*pmd))
+>   		return NULL;
+> -	if (!pmd_present(*pmd) || pmd_huge(*pmd))
+> +	if (pmd_huge(*pmd) || !pmd_present(*pmd))
+>   		return (pte_t *)pmd;
+>   
+> +	if (sz == CONT_PTE_SIZE) {
+> +		pte = pte_offset_kernel(
+> +			pmd, (addr & CONT_PTE_MASK));
+> +		return pte;
 
+Nit: Looks like this is the only place the new variable pte is used. 
+Since we don't need to test its value, why not just write:
+	return pte_offset_kernel(pmd, (addr & CONT_PTE_MASK));
+
+and get rid of the pte variable?
+
+Cheers,
 
 -- 
-
-Thanks,
-
-David
+Julien Thierry
