@@ -1,9 +1,9 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 22 Aug 2017 10:08:18 +0200
-Subject: [PATCH 11/11] crypto: aesni - Use GCM IV size constant
+Date: Tue, 22 Aug 2017 10:08:16 +0200
+Subject: [PATCH 09/11] crypto: omap - Use GCM IV size constant
 In-Reply-To: <20170822080818.12486-1-clabbe.montjoie@gmail.com>
 References: <20170822080818.12486-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170822080818.12486-12-clabbe.montjoie@gmail.com>
+Message-ID: <20170822080818.12486-10-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,47 +11,78 @@ This patch replace GCM IV size value by their constant name.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/x86/crypto/aesni-intel_glue.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/crypto/omap-aes-gcm.c | 7 ++++---
+ drivers/crypto/omap-aes.c     | 5 +++--
+ 2 files changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/arch/x86/crypto/aesni-intel_glue.c b/arch/x86/crypto/aesni-intel_glue.c
-index 5c15d6b57329..80664368bf14 100644
---- a/arch/x86/crypto/aesni-intel_glue.c
-+++ b/arch/x86/crypto/aesni-intel_glue.c
-@@ -28,6 +28,7 @@
- #include <crypto/cryptd.h>
- #include <crypto/ctr.h>
- #include <crypto/b128ops.h>
+diff --git a/drivers/crypto/omap-aes-gcm.c b/drivers/crypto/omap-aes-gcm.c
+index 7d4f8a4be6d8..9b8f1c752168 100644
+--- a/drivers/crypto/omap-aes-gcm.c
++++ b/drivers/crypto/omap-aes-gcm.c
+@@ -18,6 +18,7 @@
+ #include <linux/omap-dma.h>
+ #include <linux/interrupt.h>
+ #include <crypto/aes.h>
 +#include <crypto/gcm.h>
- #include <crypto/xts.h>
- #include <asm/cpu_device_id.h>
- #include <asm/fpu/api.h>
-@@ -1131,7 +1132,7 @@ static struct aead_alg aesni_aead_algs[] = { {
- 	.setauthsize		= common_rfc4106_set_authsize,
- 	.encrypt		= helper_rfc4106_encrypt,
- 	.decrypt		= helper_rfc4106_decrypt,
--	.ivsize			= 8,
-+	.ivsize			= GCM_RFC4106_IV_SIZE,
- 	.maxauthsize		= 16,
- 	.base = {
- 		.cra_name		= "__gcm-aes-aesni",
-@@ -1149,7 +1150,7 @@ static struct aead_alg aesni_aead_algs[] = { {
- 	.setauthsize		= rfc4106_set_authsize,
- 	.encrypt		= rfc4106_encrypt,
- 	.decrypt		= rfc4106_decrypt,
--	.ivsize			= 8,
-+	.ivsize			= GCM_RFC4106_IV_SIZE,
- 	.maxauthsize		= 16,
- 	.base = {
- 		.cra_name		= "rfc4106(gcm(aes))",
-@@ -1165,7 +1166,7 @@ static struct aead_alg aesni_aead_algs[] = { {
- 	.setauthsize		= generic_gcmaes_set_authsize,
- 	.encrypt		= generic_gcmaes_encrypt,
- 	.decrypt		= generic_gcmaes_decrypt,
--	.ivsize			= 12,
-+	.ivsize			= GCM_AES_IV_SIZE,
- 	.maxauthsize		= 16,
- 	.base = {
- 		.cra_name		= "gcm(aes)",
+ #include <crypto/scatterwalk.h>
+ #include <crypto/skcipher.h>
+ #include <crypto/internal/aead.h>
+@@ -311,7 +312,7 @@ static int omap_aes_gcm_crypt(struct aead_request *req, unsigned long mode)
+ 	int err, assoclen;
+ 
+ 	memset(rctx->auth_tag, 0, sizeof(rctx->auth_tag));
+-	memcpy(rctx->iv + 12, &counter, 4);
++	memcpy(rctx->iv + GCM_AES_IV_SIZE, &counter, 4);
+ 
+ 	err = do_encrypt_iv(req, (u32 *)rctx->auth_tag, (u32 *)rctx->iv);
+ 	if (err)
+@@ -339,7 +340,7 @@ int omap_aes_gcm_encrypt(struct aead_request *req)
+ {
+ 	struct omap_aes_reqctx *rctx = aead_request_ctx(req);
+ 
+-	memcpy(rctx->iv, req->iv, 12);
++	memcpy(rctx->iv, req->iv, GCM_AES_IV_SIZE);
+ 	return omap_aes_gcm_crypt(req, FLAGS_ENCRYPT | FLAGS_GCM);
+ }
+ 
+@@ -347,7 +348,7 @@ int omap_aes_gcm_decrypt(struct aead_request *req)
+ {
+ 	struct omap_aes_reqctx *rctx = aead_request_ctx(req);
+ 
+-	memcpy(rctx->iv, req->iv, 12);
++	memcpy(rctx->iv, req->iv, GCM_AES_IV_SIZE);
+ 	return omap_aes_gcm_crypt(req, FLAGS_GCM);
+ }
+ 
+diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
+index c376a3ee7c2c..1f3686a1ebfa 100644
+--- a/drivers/crypto/omap-aes.c
++++ b/drivers/crypto/omap-aes.c
+@@ -35,6 +35,7 @@
+ #include <linux/interrupt.h>
+ #include <crypto/scatterwalk.h>
+ #include <crypto/aes.h>
++#include <crypto/gcm.h>
+ #include <crypto/engine.h>
+ #include <crypto/internal/skcipher.h>
+ #include <crypto/internal/aead.h>
+@@ -767,7 +768,7 @@ static struct aead_alg algs_aead_gcm[] = {
+ 	},
+ 	.init		= omap_aes_gcm_cra_init,
+ 	.exit		= omap_aes_gcm_cra_exit,
+-	.ivsize		= 12,
++	.ivsize		= GCM_AES_IV_SIZE,
+ 	.maxauthsize	= AES_BLOCK_SIZE,
+ 	.setkey		= omap_aes_gcm_setkey,
+ 	.encrypt	= omap_aes_gcm_encrypt,
+@@ -788,7 +789,7 @@ static struct aead_alg algs_aead_gcm[] = {
+ 	.init		= omap_aes_gcm_cra_init,
+ 	.exit		= omap_aes_gcm_cra_exit,
+ 	.maxauthsize	= AES_BLOCK_SIZE,
+-	.ivsize		= 8,
++	.ivsize		= GCM_RFC4106_IV_SIZE,
+ 	.setkey		= omap_aes_4106gcm_setkey,
+ 	.encrypt	= omap_aes_4106gcm_encrypt,
+ 	.decrypt	= omap_aes_4106gcm_decrypt,
 -- 
 2.13.0
