@@ -1,89 +1,77 @@
-From: icenowy@aosc.io (icenowy at aosc.io)
-Date: Tue, 22 Aug 2017 13:14:09 +0800
-Subject: [PATCH 2/2] ARM: sunxi: add support for R40 SoC
-In-Reply-To: <20170821093405.n4bum7j6nswnv6wr@flea.lan>
-References: <20170820052957.34597-1-icenowy@aosc.io>
- <20170820052957.34597-2-icenowy@aosc.io>
- <20170821093405.n4bum7j6nswnv6wr@flea.lan>
-Message-ID: <0809ae2d75f210b9bfee49b383f226b2@aosc.io>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 22 Aug 2017 10:52:39 +0530
+Subject: [PATCH v2 2/3] i2c: davinci: Add PM Runtime Support
+In-Reply-To: <d06ef5c6-6501-eca6-2fa2-976d085091b2@ti.com>
+References: <20170816221715.15027-1-fcooper@ti.com>
+ <20170816221715.15027-3-fcooper@ti.com>
+ <8207a684-f010-ca82-baae-db06665f098e@ti.com>
+ <d06ef5c6-6501-eca6-2fa2-976d085091b2@ti.com>
+Message-ID: <bd204f3b-8bfd-9015-18cc-dd915c88b812@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-08-21 17:34?Maxime Ripard ???
-> Hi,
+On Tuesday 22 August 2017 06:47 AM, Franklin S Cooper Jr wrote:
 > 
-> On Sun, Aug 20, 2017 at 01:29:57PM +0800, Icenowy Zheng wrote:
->> Allwinner R40 is a new SoC, with Quad Core Cortex-A7 and peripherals
->> like A20.
->> 
->> Add support for it.
->> 
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> ---
->>  Documentation/arm/sunxi/README                  | 6 ++++++
->>  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
->>  arch/arm/mach-sunxi/sunxi.c                     | 1 +
->>  3 files changed, 8 insertions(+)
->> 
->> diff --git a/Documentation/arm/sunxi/README 
->> b/Documentation/arm/sunxi/README
->> index d7b1f016bd62..4fa836782e46 100644
->> --- a/Documentation/arm/sunxi/README
->> +++ b/Documentation/arm/sunxi/README
->> @@ -75,6 +75,12 @@ SunXi family
->>          + Datasheet
->>            
->> http://linux-sunxi.org/File:Allwinner_V3s_Datasheet_V1.0.pdf
->> 
->> +      - Allwinner R40 (sun8i)
->> +        + Datasheet
->> +          
->> https://github.com/tinalinux/docs/raw/r40-v1.y/R40_Datasheet_V1.0.pdf
->> +        + User Manual
->> +          
->> https://github.com/tinalinux/docs/raw/r40-v1.y/Allwinner_R40_User_Manual_V1.0.pdf
->> +
 > 
-> Please sort it by alphabetical order.
+> On 08/21/2017 04:05 AM, Sekhar Nori wrote:
+>> On Thursday 17 August 2017 03:47 AM, Franklin S Cooper Jr wrote:
+>>
+>>> @@ -802,7 +821,6 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>>>  	dev->clk = devm_clk_get(&pdev->dev, NULL);
+>>>  	if (IS_ERR(dev->clk))
+>>>  		return PTR_ERR(dev->clk);
+>>> -	clk_prepare_enable(dev->clk);
+>>>  
+>>>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>>  	dev->base = devm_ioremap_resource(&pdev->dev, mem);
+>>> @@ -811,6 +829,18 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>>>  		goto err_unuse_clocks;
+>>
+>> This goto is wrong now. There is no need to unwind the pm_runtime setup
+>> on a devm_ioremap_resource() failure. You can just return error here.
+> 
+> Ok
+>>
+>>>  	}
+>>>  
+>>> +	pm_runtime_set_autosuspend_delay(dev->dev,
+>>> +					 DAVINCI_I2C_PM_TIMEOUT);
+>>> +	pm_runtime_use_autosuspend(dev->dev);
+>>> +
+>>> +	pm_runtime_enable(dev->dev);
+>>> +
+>>> +	r = pm_runtime_get_sync(dev->dev);
+>>> +	if (r < 0) {
+>>> +		dev_err(dev->dev, "failed to runtime_get device: %d\n", r);
+>>> +		goto err_unuse_clocks;
+>>> +	}
+>>> +
+>>>  	i2c_davinci_init(dev);
+>>>  
+>>>  	r = devm_request_irq(&pdev->dev, dev->irq, i2c_davinci_isr, 0,
+>>> @@ -849,10 +879,16 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>>>  	if (r)
+>>>  		goto err_unuse_clocks;
+>>>  
+>>> +	pm_runtime_mark_last_busy(dev->dev);
+>>> +	pm_runtime_put_autosuspend(dev->dev);
+>>> +
+>>>  	return 0;
+>>>  
+>>>  err_unuse_clocks:
+>>> -	clk_disable_unprepare(dev->clk);
+>>> +	pm_runtime_dont_use_autosuspend(dev->dev);
+>>> +	pm_runtime_put_sync(dev->dev);
+>>> +	pm_runtime_disable(dev->dev);
+>>> +
+>>>  	dev->clk = NULL;
+>>
+>> This null setting of clk seems quite bogus and can be cleaned-up.
+> 
+> Do you mean that I should just remove this line?
 
-I prefer to sort it by the wafer ID (the number after w in the official 
-ID).
+Yes, and I noticed a similar line in at least one more place that can be
+removed as well.
 
-The current document can be explained to follow the alphabetical order
-or the wafer ID.
-
-P.S. there's some error in the V3s datasheet position, and if it's fixed
-we can still continue to make the two kinds of order both meaningful ;-)
-
-> 
->>      * Quad ARM Cortex-A15, Quad ARM Cortex-A7 based SoCs
->>        - Allwinner A80
->>          + Datasheet
->> diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt 
->> b/Documentation/devicetree/bindings/arm/sunxi.txt
->> index f35c6ada5a65..e4beec3d9ad3 100644
->> --- a/Documentation/devicetree/bindings/arm/sunxi.txt
->> +++ b/Documentation/devicetree/bindings/arm/sunxi.txt
->> @@ -14,6 +14,7 @@ using one of the following compatible strings:
->>    allwinner,sun8i-a83t
->>    allwinner,sun8i-h2-plus
->>    allwinner,sun8i-h3
->> +  allwinner-sun8i-r40
->>    allwinner,sun8i-v3s
->>    allwinner,sun9i-a80
->>    allwinner,sun50i-a64
->> diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
->> index 7ab353fb25f2..311e6c4fc4f4 100644
->> --- a/arch/arm/mach-sunxi/sunxi.c
->> +++ b/arch/arm/mach-sunxi/sunxi.c
->> @@ -66,6 +66,7 @@ static const char * const sun8i_board_dt_compat[] = 
->> {
->>  	"allwinner,sun8i-h2-plus",
->>  	"allwinner,sun8i-h3",
->>  	"allwinner,sun8i-v3s",
->> +	"allwinner,sun8i-r40",
-> 
-> And same thing here.
-> 
-> Thanks!
-> Maxime
+Thanks,
+Sekhar
