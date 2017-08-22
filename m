@@ -1,141 +1,41 @@
-From: zhi.mao@mediatek.com (Zhi Mao)
-Date: Tue, 22 Aug 2017 10:09:15 +0800
-Subject: [PATCH v4 1/1] pwm: mediatek: add MT2712/MT7622 support
-In-Reply-To: <1503367755-6519-1-git-send-email-zhi.mao@mediatek.com>
-References: <1503367755-6519-1-git-send-email-zhi.mao@mediatek.com>
-Message-ID: <1503367755-6519-2-git-send-email-zhi.mao@mediatek.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 21 Aug 2017 21:10:59 -0500
+Subject: [PATCH 1/7] dt-bindings: usb: Document the STM32F7xx DWC2 USB
+ OTG HS core binding
+In-Reply-To: <1502962386-6683-2-git-send-email-amelie.delaunay@st.com>
+References: <1502962386-6683-1-git-send-email-amelie.delaunay@st.com>
+ <1502962386-6683-2-git-send-email-amelie.delaunay@st.com>
+Message-ID: <20170822021059.suqqn7332sjbvfj3@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to MT2712 and MT7622.
-Due to register offset address of pwm7 for MT2712 is not fixed 0x40,
-add mtk_pwm_reg_offset array for pwm register offset.
+On Thu, Aug 17, 2017 at 11:33:00AM +0200, Amelie Delaunay wrote:
+> This patch adds binding documentation for DWC2 controller in HS mode found
+> on STMicroelectronics STM32F7xx SoC.
+> 
+> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+> ---
+>  Documentation/devicetree/bindings/usb/dwc2.txt | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
+> index fcf199b..e64d903 100644
+> --- a/Documentation/devicetree/bindings/usb/dwc2.txt
+> +++ b/Documentation/devicetree/bindings/usb/dwc2.txt
+> @@ -19,6 +19,8 @@ Required properties:
+>    configured in FS mode;
+>    - "st,stm32f4x9-hsotg": The DWC2 USB HS controller instance in STM32F4x9 SoCs
+>    configured in HS mode;
+> +  - "st,stm32f7xx-hsotg": The DWC2 USB HS controller instance in STM32F7xx SoCs
+> +    configured in HS mode;
 
-Signed-off-by: Zhi Mao <zhi.mao@mediatek.com>
----
- drivers/pwm/pwm-mediatek.c |   51 ++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 42 insertions(+), 9 deletions(-)
+Don't use wildcards in compatible strings (not sure how the previous one 
+snuck in). Just "stm32f7" (i.e. just drop the xx) is probably specific 
+enough though.
 
-diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-index 1d78ab1..ccd86e7 100644
---- a/drivers/pwm/pwm-mediatek.c
-+++ b/drivers/pwm/pwm-mediatek.c
-@@ -16,6 +16,7 @@
- #include <linux/module.h>
- #include <linux/clk.h>
- #include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/pwm.h>
- #include <linux/slab.h>
-@@ -40,11 +41,19 @@ enum {
- 	MTK_CLK_PWM3,
- 	MTK_CLK_PWM4,
- 	MTK_CLK_PWM5,
-+	MTK_CLK_PWM6,
-+	MTK_CLK_PWM7,
-+	MTK_CLK_PWM8,
- 	MTK_CLK_MAX,
- };
- 
--static const char * const mtk_pwm_clk_name[] = {
--	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5"
-+static const char * const mtk_pwm_clk_name[MTK_CLK_MAX] = {
-+	"main", "top", "pwm1", "pwm2", "pwm3", "pwm4", "pwm5", "pwm6", "pwm7",
-+	"pwm8"
-+};
-+
-+struct mtk_pwm_platform_data {
-+	unsigned int num_pwms;
- };
- 
- /**
-@@ -57,6 +66,11 @@ struct mtk_pwm_chip {
- 	struct pwm_chip chip;
- 	void __iomem *regs;
- 	struct clk *clks[MTK_CLK_MAX];
-+	const struct mtk_pwm_platform_data *data;
-+};
-+
-+static const unsigned int mtk_pwm_reg_offset[] = {
-+	0x0010, 0x0050, 0x0090, 0x00d0, 0x0110, 0x0150, 0x0190, 0x0220
- };
- 
- static inline struct mtk_pwm_chip *to_mtk_pwm_chip(struct pwm_chip *chip)
-@@ -103,14 +117,14 @@ static void mtk_pwm_clk_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- static inline u32 mtk_pwm_readl(struct mtk_pwm_chip *chip, unsigned int num,
- 				unsigned int offset)
- {
--	return readl(chip->regs + 0x10 + (num * 0x40) + offset);
-+	return readl(chip->regs + mtk_pwm_reg_offset[num] + offset);
- }
- 
- static inline void mtk_pwm_writel(struct mtk_pwm_chip *chip,
- 				  unsigned int num, unsigned int offset,
- 				  u32 value)
- {
--	writel(value, chip->regs + 0x10 + (num * 0x40) + offset);
-+	writel(value, chip->regs + mtk_pwm_reg_offset[num] + offset);
- }
- 
- static int mtk_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-@@ -194,15 +208,20 @@ static int mtk_pwm_probe(struct platform_device *pdev)
- 	if (!pc)
- 		return -ENOMEM;
- 
-+	pc->data = of_device_get_match_data(&pdev->dev);
-+
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	pc->regs = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(pc->regs))
- 		return PTR_ERR(pc->regs);
- 
--	for (i = 0; i < MTK_CLK_MAX; i++) {
-+	for (i = 0; i < pc->data->num_pwms + 2; i++) {
- 		pc->clks[i] = devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
--		if (IS_ERR(pc->clks[i]))
-+		if (IS_ERR(pc->clks[i])) {
-+			dev_err(&pdev->dev, "clock: %s fail: %ld\n",
-+				mtk_pwm_clk_name[i], PTR_ERR(pc->clks[i]));
- 			return PTR_ERR(pc->clks[i]);
-+		}
- 	}
- 
- 	platform_set_drvdata(pdev, pc);
-@@ -210,7 +229,7 @@ static int mtk_pwm_probe(struct platform_device *pdev)
- 	pc->chip.dev = &pdev->dev;
- 	pc->chip.ops = &mtk_pwm_ops;
- 	pc->chip.base = -1;
--	pc->chip.npwm = 5;
-+	pc->chip.npwm = pc->data->num_pwms;
- 
- 	ret = pwmchip_add(&pc->chip);
- 	if (ret < 0) {
-@@ -228,9 +247,23 @@ static int mtk_pwm_remove(struct platform_device *pdev)
- 	return pwmchip_remove(&pc->chip);
- }
- 
-+static const struct mtk_pwm_platform_data mt2712_pwm_data = {
-+	.num_pwms = 8,
-+};
-+
-+static const struct mtk_pwm_platform_data mt7622_pwm_data = {
-+	.num_pwms = 6,
-+};
-+
-+static const struct mtk_pwm_platform_data mt7623_pwm_data = {
-+	.num_pwms = 5,
-+};
-+
- static const struct of_device_id mtk_pwm_of_match[] = {
--	{ .compatible = "mediatek,mt7623-pwm" },
--	{ }
-+	{ .compatible = "mediatek,mt2712-pwm", .data = &mt2712_pwm_data },
-+	{ .compatible = "mediatek,mt7622-pwm", .data = &mt7622_pwm_data },
-+	{ .compatible = "mediatek,mt7623-pwm", .data = &mt7623_pwm_data },
-+	{ },
- };
- MODULE_DEVICE_TABLE(of, mtk_pwm_of_match);
- 
--- 
-1.7.9.5
+>  - reg : Should contain 1 register range (address and length)
+>  - interrupts : Should contain 1 interrupt
+>  - clocks: clock provider specifier
+> -- 
+> 2.7.4
+> 
