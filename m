@@ -1,22 +1,20 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 21 Aug 2017 21:21:03 -0500
-Subject: [RFC 1/4] dt-bindings: clock: Add Realtek RTD1295
-In-Reply-To: <20170817112026.24062-2-afaerber@suse.de>
-References: <20170817112026.24062-1-afaerber@suse.de>
- <20170817112026.24062-2-afaerber@suse.de>
-Message-ID: <20170822022103.3ud4mzjtozhd5ics@rob-hp-laptop>
+Date: Mon, 21 Aug 2017 21:39:23 -0500
+Subject: [PATCH 4/6] dt-bindings: host1x: Fix and add Tegra186 information
+In-Reply-To: <20170817185413.6324-5-mperttunen@nvidia.com>
+References: <20170817185413.6324-1-mperttunen@nvidia.com>
+ <20170817185413.6324-5-mperttunen@nvidia.com>
+Message-ID: <20170822023923.nr22ujsuiousvt2y@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 01:20:22PM +0200, Andreas F?rber wrote:
-> Naming inspired from Zidoo X9S Device Tree and clk_summary.
-> 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  .../devicetree/bindings/clock/realtek,rtd129x.txt  | 20 +++++
->  include/dt-bindings/clock/realtek,rtd1295.h        | 99 ++++++++++++++++++++++
->  2 files changed, 119 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/realtek,rtd129x.txt
->  create mode 100644 include/dt-bindings/clock/realtek,rtd1295.h
+On Thu, Aug 17, 2017 at 09:54:11PM +0300, Mikko Perttunen wrote:
+> Add note that address/size-cells should be 2 on 64-bit systems,
+> and add Tegra186-specific register range properties.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Generally the cell sizes have nothing to do with the addressing size of 
+the cpu. They should be as small as what fits for the given sub-tree. If 
+all the register space fits into 4GB, then there's no reason for the 
+#size-cells to be 2. The same is true if the sub-tree has a parent bus.
+
+Rob
