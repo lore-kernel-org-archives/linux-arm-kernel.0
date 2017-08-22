@@ -1,213 +1,159 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Tue, 22 Aug 2017 15:57:25 +0800
-Subject: [PATCH v5 6/9] ASoC: rockchip: Parse dai links from dts
-In-Reply-To: <20170822075729.8438-1-jeffy.chen@rock-chips.com>
-References: <20170822075729.8438-1-jeffy.chen@rock-chips.com>
-Message-ID: <20170822075729.8438-7-jeffy.chen@rock-chips.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Tue, 22 Aug 2017 08:54:35 +0100
+Subject: [PATCH v5 1/7] arm64: cpufeature: Detect CPU RAS Extentions
+In-Reply-To: <1503065517-7920-2-git-send-email-gengdongjiu@huawei.com>
+References: <1503065517-7920-1-git-send-email-gengdongjiu@huawei.com>
+ <1503065517-7920-2-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <20170822085435.00005ca0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Refactor rockchip_sound_probe, parse dai links from dts instead of
-hard coding them.
+On Fri, 18 Aug 2017 22:11:51 +0800
+Dongjiu Geng <gengdongjiu@huawei.com> wrote:
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
-Tested-by: Matthias Kaehlcke <mka@chromium.org>
----
+> From: Xie XiuQi <xiexiuqi@huawei.com>
+> 
+> ARM's v8.2 Extentions add support for Reliability, Availability and
+> Serviceability (RAS). On CPUs with these extensions system software
 
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-Use compatible to match audio codecs
-        -- Suggested-by Matthias Kaehlcke <mka@chromium.org>
+extensions, system software
 
-Changes in v2:
-Let rockchip,codec-names be a required property, because we plan to
-add more supported codecs to the fixed dai link list in the driver.
-
- sound/soc/rockchip/rk3399_gru_sound.c | 139 ++++++++++++++++++++++------------
- 1 file changed, 91 insertions(+), 48 deletions(-)
-
-diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-index 9b7e28703bfb..d532336871d7 100644
---- a/sound/soc/rockchip/rk3399_gru_sound.c
-+++ b/sound/soc/rockchip/rk3399_gru_sound.c
-@@ -235,14 +235,42 @@ static const struct snd_soc_ops rockchip_sound_da7219_ops = {
- 	.hw_params = rockchip_sound_da7219_hw_params,
- };
- 
-+static struct snd_soc_card rockchip_sound_card = {
-+	.name = "rk3399-gru-sound",
-+	.owner = THIS_MODULE,
-+	.dapm_widgets = rockchip_dapm_widgets,
-+	.num_dapm_widgets = ARRAY_SIZE(rockchip_dapm_widgets),
-+	.dapm_routes = rockchip_dapm_routes,
-+	.num_dapm_routes = ARRAY_SIZE(rockchip_dapm_routes),
-+	.controls = rockchip_controls,
-+	.num_controls = ARRAY_SIZE(rockchip_controls),
-+};
-+
- enum {
-+	DAILINK_DA7219,
- 	DAILINK_MAX98357A,
- 	DAILINK_RT5514,
--	DAILINK_DA7219,
- 	DAILINK_RT5514_DSP,
- };
- 
--static struct snd_soc_dai_link rockchip_dailinks[] = {
-+static const char * const dailink_compat[] = {
-+	[DAILINK_DA7219] = "dlg,da7219",
-+	[DAILINK_MAX98357A] = "maxim,max98357a",
-+	[DAILINK_RT5514] = "realtek,rt5514-i2c",
-+	[DAILINK_RT5514_DSP] = "realtek,rt5514-spi",
-+};
-+
-+static const struct snd_soc_dai_link rockchip_dais[] = {
-+	[DAILINK_DA7219] = {
-+		.name = "DA7219",
-+		.stream_name = "DA7219 PCM",
-+		.codec_dai_name = "da7219-hifi",
-+		.init = rockchip_sound_da7219_init,
-+		.ops = &rockchip_sound_da7219_ops,
-+		/* set da7219 as slave */
-+		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
-+			SND_SOC_DAIFMT_CBS_CFS,
-+	},
- 	[DAILINK_MAX98357A] = {
- 		.name = "MAX98357A",
- 		.stream_name = "MAX98357A PCM",
-@@ -261,16 +289,6 @@ static struct snd_soc_dai_link rockchip_dailinks[] = {
- 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
- 			SND_SOC_DAIFMT_CBS_CFS,
- 	},
--	[DAILINK_DA7219] = {
--		.name = "DA7219",
--		.stream_name = "DA7219 PCM",
--		.codec_dai_name = "da7219-hifi",
--		.init = rockchip_sound_da7219_init,
--		.ops = &rockchip_sound_da7219_ops,
--		/* set da7219 as slave */
--		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
--			SND_SOC_DAIFMT_CBS_CFS,
--	},
- 	/* RT5514 DSP for voice wakeup via spi bus */
- 	[DAILINK_RT5514_DSP] = {
- 		.name = "RT5514 DSP",
-@@ -279,53 +297,78 @@ static struct snd_soc_dai_link rockchip_dailinks[] = {
- 	},
- };
- 
--static struct snd_soc_card rockchip_sound_card = {
--	.name = "rk3399-gru-sound",
--	.owner = THIS_MODULE,
--	.dai_link = rockchip_dailinks,
--	.num_links =  ARRAY_SIZE(rockchip_dailinks),
--	.dapm_widgets = rockchip_dapm_widgets,
--	.num_dapm_widgets = ARRAY_SIZE(rockchip_dapm_widgets),
--	.dapm_routes = rockchip_dapm_routes,
--	.num_dapm_routes = ARRAY_SIZE(rockchip_dapm_routes),
--	.controls = rockchip_controls,
--	.num_controls = ARRAY_SIZE(rockchip_controls),
--};
--
--static int rockchip_sound_probe(struct platform_device *pdev)
-+static int rockchip_sound_codec_node_match(struct device_node *np_codec)
- {
--	struct snd_soc_card *card = &rockchip_sound_card;
--	struct device_node *cpu_node;
--	int i, ret;
-+	int i;
- 
--	cpu_node = of_parse_phandle(pdev->dev.of_node, "rockchip,cpu", 0);
--	if (!cpu_node) {
--		dev_err(&pdev->dev, "Property 'rockchip,cpu' missing or invalid\n");
--		return -EINVAL;
-+	for (i = 0; i < ARRAY_SIZE(dailink_compat); i++) {
-+		if (of_device_is_compatible(np_codec, dailink_compat[i]))
-+			return i;
- 	}
-+	return -1;
-+}
- 
--	for (i = 0; i < ARRAY_SIZE(rockchip_dailinks); i++) {
--		rockchip_dailinks[i].platform_of_node = cpu_node;
--		rockchip_dailinks[i].cpu_of_node = cpu_node;
--
--		rockchip_dailinks[i].codec_of_node =
--			of_parse_phandle(pdev->dev.of_node, "rockchip,codec", i);
--		if (!rockchip_dailinks[i].codec_of_node) {
--			dev_err(&pdev->dev,
--				"Property[%d] 'rockchip,codec' missing or invalid\n", i);
-+static int rockchip_sound_of_parse_dais(struct device *dev,
-+					struct snd_soc_card *card)
-+{
-+	struct device_node *np_cpu;
-+	struct device_node *np_codec;
-+	struct snd_soc_dai_link *dai;
-+	int i, index;
-+
-+	card->dai_link = devm_kzalloc(dev, sizeof(rockchip_dais),
-+				      GFP_KERNEL);
-+	if (!card->dai_link)
-+		return -ENOMEM;
-+
-+	np_cpu = of_parse_phandle(dev->of_node, "rockchip,cpu", 0);
-+
-+	card->num_links = 0;
-+	for (i = 0; i < ARRAY_SIZE(rockchip_dais); i++) {
-+		np_codec = of_parse_phandle(dev->of_node,
-+					    "rockchip,codec", i);
-+		if (!np_codec)
-+			break;
-+
-+		if (!of_device_is_available(np_codec))
-+			continue;
-+
-+		index = rockchip_sound_codec_node_match(np_codec);
-+		if (index < 0)
-+			continue;
-+
-+		if (!np_cpu) {
-+			dev_err(dev, "Missing 'rockchip,cpu' for %s\n",
-+				rockchip_dais[index].name);
- 			return -EINVAL;
- 		}
-+
-+		dai = &card->dai_link[card->num_links++];
-+		*dai = rockchip_dais[index];
-+
-+		dai->codec_of_node = np_codec;
-+		dai->platform_of_node = np_cpu;
-+		dai->cpu_of_node = np_cpu;
-+	}
-+
-+	return 0;
-+}
-+
-+static int rockchip_sound_probe(struct platform_device *pdev)
-+{
-+	struct snd_soc_card *card = &rockchip_sound_card;
-+	int ret;
-+
-+	ret = rockchip_sound_of_parse_dais(&pdev->dev, card);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "Failed to parse dais: %d\n", ret);
-+		return ret;
- 	}
- 
- 	card->dev = &pdev->dev;
- 	platform_set_drvdata(pdev, card);
- 
--	ret = devm_snd_soc_register_card(&pdev->dev, card);
--	if (ret)
--		dev_err(&pdev->dev, "%s snd_soc_register_card fail %d\n",
--			__func__, ret);
--
--	return ret;
-+	return devm_snd_soc_register_card(&pdev->dev, card);
- }
- 
- static const struct of_device_id rockchip_sound_of_match[] = {
--- 
-2.11.0
+> can use additional barriers to isolate errors and determine if faults
+> are pending.
+> 
+> Add cpufeature detection and a barrier in the context-switch code.
+> There is no need to use alternatives for this as CPUs that don't
+> support this feature will treat the instruction as a nop.
+> 
+> Platform level RAS support may require additional firmware support.
+> 
+> Signed-off-by: Xie XiuQi <xiexiuqi@huawei.com>
+> [Rebased, added esb and config option, reworded commit message]
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  arch/arm64/Kconfig               | 16 ++++++++++++++++
+>  arch/arm64/include/asm/barrier.h |  1 +
+>  arch/arm64/include/asm/cpucaps.h |  3 ++-
+>  arch/arm64/include/asm/sysreg.h  |  2 ++
+>  arch/arm64/kernel/cpufeature.c   | 13 +++++++++++++
+>  arch/arm64/kernel/process.c      |  3 +++
+>  6 files changed, 37 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index dfd908630631..4d87aa963d83 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -960,6 +960,22 @@ config ARM64_UAO
+>  	  regular load/store instructions if the cpu does not implement the
+>  	  feature.
+>  
+> +config ARM64_RAS_EXTN
+> +	bool "Enable support for RAS CPU Extensions"
+> +	default y
+> +	help
+> +	  CPUs that support the Reliability, Availability and Serviceability
+> +	  (RAS) Extensions, part of ARMv8.2 are able to track faults and
+> +	  errors, classify them and report them to software.
+> +
+> +	  On CPUs with these extensions system software can use additional
+> +	  barriers to determine if faults are pending and read the
+> +	  classification from a new set of registers.
+> +
+> +	  Selecting this feature will allow the kernel to use these barriers
+> +	  and access the new registers if the system supports the extension.
+> +	  Platform RAS features may additionally depend on firmware support.
+> +
+>  endmenu
+>  
+>  config ARM64_MODULE_CMODEL_LARGE
+> diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
+> index 0fe7e43b7fbc..8b0a0eb67625 100644
+> --- a/arch/arm64/include/asm/barrier.h
+> +++ b/arch/arm64/include/asm/barrier.h
+> @@ -30,6 +30,7 @@
+>  #define isb()		asm volatile("isb" : : : "memory")
+>  #define dmb(opt)	asm volatile("dmb " #opt : : : "memory")
+>  #define dsb(opt)	asm volatile("dsb " #opt : : : "memory")
+> +#define esb()		asm volatile("hint #16"  : : : "memory")
+>  
+>  #define mb()		dsb(sy)
+>  #define rmb()		dsb(ld)
+> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+> index 8d2272c6822c..f93bf77f1f74 100644
+> --- a/arch/arm64/include/asm/cpucaps.h
+> +++ b/arch/arm64/include/asm/cpucaps.h
+> @@ -39,7 +39,8 @@
+>  #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	18
+>  #define ARM64_WORKAROUND_858921			19
+>  #define ARM64_WORKAROUND_CAVIUM_30115		20
+> +#define ARM64_HAS_RAS_EXTN			21
+>  
+> -#define ARM64_NCAPS				21
+> +#define ARM64_NCAPS				22
+>  
+>  #endif /* __ASM_CPUCAPS_H */
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 248339e4aaf5..35b786b43ee4 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -331,6 +331,7 @@
+>  #define ID_AA64ISAR1_JSCVT_SHIFT	12
+>  
+>  /* id_aa64pfr0 */
+> +#define ID_AA64PFR0_RAS_SHIFT		28
+>  #define ID_AA64PFR0_GIC_SHIFT		24
+>  #define ID_AA64PFR0_ASIMD_SHIFT		20
+>  #define ID_AA64PFR0_FP_SHIFT		16
+> @@ -339,6 +340,7 @@
+>  #define ID_AA64PFR0_EL1_SHIFT		4
+>  #define ID_AA64PFR0_EL0_SHIFT		0
+>  
+> +#define ID_AA64PFR0_RAS_V1		0x1
+>  #define ID_AA64PFR0_FP_NI		0xf
+>  #define ID_AA64PFR0_FP_SUPPORTED	0x0
+>  #define ID_AA64PFR0_ASIMD_NI		0xf
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index 9f9e0064c8c1..a807ab55ee10 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -124,6 +124,7 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
+>  };
+>  
+>  static const struct arm64_ftr_bits ftr_id_aa64pfr0[] = {
+> +	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_RAS_SHIFT, 4, 0),
+>  	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_EXACT, ID_AA64PFR0_GIC_SHIFT, 4, 0),
+>  	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_ASIMD_SHIFT, 4, ID_AA64PFR0_ASIMD_NI),
+>  	S_ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64PFR0_FP_SHIFT, 4, ID_AA64PFR0_FP_NI),
+> @@ -888,6 +889,18 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+>  		.min_field_value = 0,
+>  		.matches = has_no_fpsimd,
+>  	},
+> +#ifdef CONFIG_ARM64_RAS_EXTN
+> +	{
+> +		.desc = "RAS Extension Support",
+> +		.capability = ARM64_HAS_RAS_EXTN,
+> +		.def_scope = SCOPE_SYSTEM,
+> +		.matches = has_cpuid_feature,
+> +		.sys_reg = SYS_ID_AA64PFR0_EL1,
+> +		.sign = FTR_UNSIGNED,
+> +		.field_pos = ID_AA64PFR0_RAS_SHIFT,
+> +		.min_field_value = ID_AA64PFR0_RAS_V1,
+> +	},
+> +#endif /* CONFIG_ARM64_RAS_EXTN */
+>  	{},
+>  };
+>  
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index 659ae8094ed5..2def5ce75867 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -363,6 +363,9 @@ __notrace_funcgraph struct task_struct *__switch_to(struct task_struct *prev,
+>  	 */
+>  	dsb(ish);
+>  
+> +	/* Deliver any pending SError from prev */
+> +	esb();
+> +
+>  	/* the actual thread switch */
+>  	last = cpu_switch_to(prev, next);
+>  
