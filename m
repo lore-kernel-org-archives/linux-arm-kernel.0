@@ -1,49 +1,71 @@
-From: stefan@olimex.com (Stefan Mavrodiev)
-Date: Tue, 22 Aug 2017 14:43:11 +0300
-Subject: [PATCH 1/3] ARM: dts: sun7i: Fix A20-OLinuXino-MICRO dts for use with
- LAN8710
-In-Reply-To: <20170822114313.9038-1-stefan@olimex.com>
-References: <20170822114313.9038-1-stefan@olimex.com>
-Message-ID: <20170822114313.9038-2-stefan@olimex.com>
+From: david@redhat.com (David Hildenbrand)
+Date: Tue, 22 Aug 2017 13:44:13 +0200
+Subject: [PATCH RFC v3 3/9] KVM: remember position in kvm->vcpus array
+In-Reply-To: <20170821203530.9266-4-rkrcmar@redhat.com>
+References: <20170821203530.9266-1-rkrcmar@redhat.com>
+ <20170821203530.9266-4-rkrcmar@redhat.com>
+Message-ID: <29ad4696-f106-031e-c9b9-b10b4f4c8107@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From revision J the board uses new phy chip LAN8710. Compared
-with RTL8201, RA17 pin is TXERR. It has pullup which causes phy
-not to work. To fix this, PA17 must be configured output-low.
+On 21.08.2017 22:35, Radim Kr?m?? wrote:
+> Signed-off-by: Radim Kr?m?? <rkrcmar@redhat.com>
+> ---
+>  include/linux/kvm_host.h | 11 +++--------
+>  virt/kvm/kvm_main.c      |  5 ++++-
+>  2 files changed, 7 insertions(+), 9 deletions(-)
+> 
+> diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+> index 6882538eda32..a8ff956616d2 100644
+> --- a/include/linux/kvm_host.h
+> +++ b/include/linux/kvm_host.h
+> @@ -220,7 +220,8 @@ struct kvm_vcpu {
+>  	struct preempt_notifier preempt_notifier;
+>  #endif
+>  	int cpu;
+> -	int vcpu_id;
+> +	int vcpu_id; /* id given by userspace at creation */
+> +	int vcpus_idx; /* index in kvm->vcpus array */
+>  	int srcu_idx;
+>  	int mode;
+>  	unsigned long requests;
+> @@ -516,13 +517,7 @@ static inline struct kvm_vcpu *kvm_get_vcpu_by_id(struct kvm *kvm, int id)
+>  
+>  static inline int kvm_vcpu_get_idx(struct kvm_vcpu *vcpu)
+>  {
+> -	struct kvm_vcpu *tmp;
+> -	int idx;
+> -
+> -	kvm_for_each_vcpu(idx, tmp, vcpu->kvm)
+> -		if (tmp == vcpu)
+> -			return idx;
+> -	BUG();
+> +	return vcpu->vcpus_idx;
+>  }
+>  
+>  #define kvm_for_each_memslot(memslot, slots)	\
+> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> index e17c40d986f3..caf8323f7df7 100644
+> --- a/virt/kvm/kvm_main.c
+> +++ b/virt/kvm/kvm_main.c
+> @@ -2498,7 +2498,10 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
+>  		goto unlock_vcpu_destroy;
+>  	}
+>  
+> -	BUG_ON(kvm->vcpus[atomic_read(&kvm->online_vcpus)]);
+> +	vcpu->vcpus_idx = atomic_read(&kvm->online_vcpus);
+> +
+> +	BUG_ON(kvm->vcpus[vcpu->vcpus_idx]);
+> +
+>  
+>  	/* Now it's all set up, let userspace reach it */
+>  	kvm_get_kvm(kvm);
+> 
 
-This patch is compatible with earlier board revisions, since this
-pin wasn't connected to phy.
+Reviewed-by: David Hildenbrand <david@redhat.com>
 
-Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
----
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index 0b7403e4d687..578c761b551a 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -102,7 +102,7 @@
- 
- &gmac {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&gmac_pins_mii_a>;
-+	pinctrl-0 = <&gmac_pins_mii_a>,<&gmac_txerr_pin>;
- 	phy = <&phy1>;
- 	phy-mode = "mii";
- 	status = "okay";
-@@ -229,6 +229,11 @@
- };
- 
- &pio {
-+	gmac_txerr_pin: gmac_txerr_pin at 0 {
-+		pins = "PA17";
-+		function = "gpio_out"
-+	};
-+
- 	mmc3_cd_pin_olinuxinom: mmc3_cd_pin at 0 {
- 		pins = "PH11";
- 		function = "gpio_in";
 -- 
-2.11.0
+
+Thanks,
+
+David
