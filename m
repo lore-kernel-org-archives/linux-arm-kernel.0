@@ -1,38 +1,64 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 22 Aug 2017 12:03:57 +0800
-Subject: [PATCH v2 1/4] net: stmmac: dwmac-sun8i: support RGMII modes with PHY
- internal delay
-In-Reply-To: <20170822040400.12166-1-icenowy@aosc.io>
-References: <20170822040400.12166-1-icenowy@aosc.io>
-Message-ID: <20170822040400.12166-2-icenowy@aosc.io>
+From: gklkml16@gmail.com (Ganapatrao Kulkarni)
+Date: Tue, 22 Aug 2017 09:51:38 +0530
+Subject: [PATCH v5 0/4] Add support for ThunderX2 pmu events using json
+ files
+In-Reply-To: <20170816071048.26087-1-ganapatrao.kulkarni@cavium.com>
+References: <20170816071048.26087-1-ganapatrao.kulkarni@cavium.com>
+Message-ID: <CAKTKpr79hBBGfkVnKS+XsSOAwR9G1=F04OH0UBE3J8EX_w3L5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some boards uses a PHY with internal delay with an Allwinner SoC.
+Hi Arnaldo, Will,
 
-Support these PHY modes in the driver.
+are there any comments on this series?
 
-As the driver has no configuration registers for these modes, just treat
-them as ordinary RGMII.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
----
- drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 3 +++
- 1 file changed, 3 insertions(+)
+On Wed, Aug 16, 2017 at 12:40 PM, Ganapatrao Kulkarni
+<ganapatrao.kulkarni@cavium.com> wrote:
+> Extending json/jevent framework for parsing arm64 event files.
+> Adding jevents for ThunderX2 implementation defined PMU events.
+>
+> v5:
+>    - Addressed comments from Arnaldo.
+>    - Rebased to 4.13-rc5
+>
+> v4:
+>    - Rebased to 4.13-rc1
+>
+> v3:
+>    - Addressed comments from Will Deacon and Jayachandran C.
+>    - Rebased to 4.12-rc1
+>
+> v2:
+>    - Updated as per Mark Rutland's suggestions.
+>    - Added provision for get_cpuid_str to get cpu id string
+>      from associated cpus of pmu core device.
+>
+> v1: Initial patchset.
+>
+> Ganapatrao Kulkarni (4):
+>   perf utils: passing pmu as a parameter to function get_cpuid_str
+>   perf tools arm64: Add support for get_cpuid_str function.
+>   perf utils: Add helper function is_pmu_core to detect PMU CORE devices
+>   perf vendor events arm64: Add ThunderX2 implementation defined pmu
+>     core events
+>
+>  tools/perf/arch/arm64/util/Build                   |  1 +
+>  tools/perf/arch/arm64/util/header.c                | 61 +++++++++++++++++++++
+>  tools/perf/arch/powerpc/util/header.c              |  2 +-
+>  tools/perf/arch/x86/util/header.c                  |  2 +-
+>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
+>  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
+>  tools/perf/util/header.h                           |  3 +-
+>  tools/perf/util/pmu.c                              | 53 +++++++++++++++---
+>  8 files changed, 188 insertions(+), 11 deletions(-)
+>  create mode 100644 tools/perf/arch/arm64/util/header.c
+>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+>  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+>
+> --
+> 2.9.4
+>
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-index fffd6d5fc907..2af680cac497 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
-@@ -723,6 +723,9 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
- 		/* default */
- 		break;
- 	case PHY_INTERFACE_MODE_RGMII:
-+	case PHY_INTERFACE_MODE_RGMII_ID:
-+	case PHY_INTERFACE_MODE_RGMII_RXID:
-+	case PHY_INTERFACE_MODE_RGMII_TXID:
- 		reg |= SYSCON_EPIT | SYSCON_ETCS_INT_GMII;
- 		break;
- 	case PHY_INTERFACE_MODE_RMII:
--- 
-2.13.5
+thanks
+Ganapat
