@@ -1,47 +1,43 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Tue, 22 Aug 2017 08:53:25 +0100
-Subject: [PATCH ] ARM: dts: r8a7745: Add Ethernet AVB support
-Message-ID: <1503388405-48325-1-git-send-email-biju.das@bp.renesas.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Tue, 22 Aug 2017 10:08:07 +0200
+Subject: [PATCH 00/11] crypto: gcm - add GCM IV size constant
+Message-ID: <20170822080818.12486-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Ethernet AVB support for r8a7745 SoC.
+Many GCM users use directly GCM IV size instead of using some constant.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
----
-This patch is depend upon the below patch
-[1/2] ARM: dts: r8a7745: Add MMC interface support
-https://patchwork.kernel.org/patch/9906803/
+This patch add all IV size constant used by GCM and convert drivers for using them..
 
-It is tested against renesas-devel branch tag
-renesas-devel-20170821-v4.13-rc5
+Corentin Labbe (11):
+  crypto: gcm - add GCM iv size constant
+  crypto: caam - Use GCM IV size constant
+  crypto: ccp - Use GCM IV size constant
+  crypto: nx - Use GCM IV size constant
+  crypto: atmel - Use GCM IV size constant
+  crypto: bcm - Use GCM IV size constant
+  crypto: mediatek - Use GCM IV size constant
+  crypto: chelsio - Use GCM IV size constant
+  crypto: omap - Use GCM IV size constant
+  crypto: gcm - Use GCM IV size constant
+  crypto: aesni - Use GCM IV size constant
 
- arch/arm/boot/dts/r8a7745.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/x86/crypto/aesni-intel_glue.c         |  7 ++++---
+ crypto/gcm.c                               | 23 ++++++++++++-----------
+ drivers/crypto/atmel-aes.c                 |  5 +++--
+ drivers/crypto/bcm/cipher.c                |  8 ++++----
+ drivers/crypto/bcm/cipher.h                |  3 +--
+ drivers/crypto/caam/caamalg.c              | 10 +++++-----
+ drivers/crypto/caam/compat.h               |  1 +
+ drivers/crypto/ccp/ccp-crypto-aes-galois.c |  9 ++++-----
+ drivers/crypto/chelsio/chcr_algo.c         |  9 +++++----
+ drivers/crypto/mediatek/mtk-aes.c          |  3 ++-
+ drivers/crypto/nx/nx-aes-gcm.c             |  9 +++++----
+ drivers/crypto/omap-aes-gcm.c              |  7 ++++---
+ drivers/crypto/omap-aes.c                  |  5 +++--
+ include/crypto/gcm.h                       |  8 ++++++++
+ 14 files changed, 61 insertions(+), 46 deletions(-)
+ create mode 100644 include/crypto/gcm.h
 
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index a55d98f..2816a0b 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -614,6 +614,19 @@
- 			status = "disabled";
- 		};
- 
-+		avb: ethernet at e6800000 {
-+			compatible = "renesas,etheravb-r8a7745",
-+				     "renesas,etheravb-rcar-gen2";
-+			reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
-+			interrupts = <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 812>;
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 812>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		mmcif0: mmc at ee200000 {
- 			compatible = "renesas,mmcif-r8a7745",
- 				     "renesas,sh-mmcif";
 -- 
-1.9.1
+2.13.0
