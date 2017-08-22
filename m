@@ -1,64 +1,48 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 22 Aug 2017 11:42:42 +0100
-Subject: [PATCH v7 2/9] arm64: hugetlb: Introduce pte_pgprot helper
-In-Reply-To: <20170822104249.2189-1-punit.agrawal@arm.com>
-References: <20170822104249.2189-1-punit.agrawal@arm.com>
-Message-ID: <20170822104249.2189-3-punit.agrawal@arm.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Tue, 22 Aug 2017 15:30:40 +0530
+Subject: [PATCH v5] FlexRM support in VFIO platform
+Message-ID: <1503396041-19485-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Capper <steve.capper@arm.com>
+This patchset primarily adds Broadcom FlexRM reset module for
+VFIO platform driver.
 
-Rather than xor pte bits in various places, use this helper function.
+The patches are based on Linux-4.13-rc3 and can also be
+found at flexrm-vfio-v5 branch of
+https://github.com/Broadcom/arm64-linux.git
 
-Cc: David Woods <dwoods@mellanox.com>
-Signed-off-by: Steve Capper <steve.capper@arm.com>
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm64/mm/hugetlbpage.c | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+Changes since v4:
+ - Use "--timeout" instead of "timeout--" in
+   vfio_platform_bcmflexrm_shutdown()
 
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 7b61e4833432..cb84ca33bc6b 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -41,6 +41,16 @@ int pud_huge(pud_t pud)
- #endif
- }
- 
-+/*
-+ * Select all bits except the pfn
-+ */
-+static inline pgprot_t pte_pgprot(pte_t pte)
-+{
-+	unsigned long pfn = pte_pfn(pte);
-+
-+	return __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
-+}
-+
- static int find_num_contig(struct mm_struct *mm, unsigned long addr,
- 			   pte_t *ptep, size_t *pgsize)
- {
-@@ -80,7 +90,7 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
- 
- 	ncontig = find_num_contig(mm, addr, ptep, &pgsize);
- 	pfn = pte_pfn(pte);
--	hugeprot = __pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^ pte_val(pte));
-+	hugeprot = pte_pgprot(pte);
- 	for (i = 0; i < ncontig; i++) {
- 		pr_debug("%s: set pte %p to 0x%llx\n", __func__, ptep,
- 			 pte_val(pfn_pte(pfn, hugeprot)));
-@@ -223,9 +233,7 @@ int huge_ptep_set_access_flags(struct vm_area_struct *vma,
- 		size_t pgsize = 0;
- 		unsigned long pfn = pte_pfn(pte);
- 		/* Select all bits except the pfn */
--		pgprot_t hugeprot =
--			__pgprot(pte_val(pfn_pte(pfn, __pgprot(0))) ^
--				 pte_val(pte));
-+		pgprot_t hugeprot = pte_pgprot(pte);
- 
- 		pfn = pte_pfn(pte);
- 		ncontig = find_num_contig(vma->vm_mm, addr, ptep,
+Changes since v3:
+ - Improve "depends on" for Kconfig option
+   VFIO_PLATFORM_BCMFLEXRM_RESET
+ - Fix typo in pr_warn() called by
+   vfio_platform_bcmflexrm_shutdown()
+ - Return error from vfio_platform_bcmflexrm_shutdown()
+   when FlexRM ring flush timeout happens
+
+Changes since v2:
+ - Remove PATCH1 because fixing VFIO no-IOMMU mode is
+   a separate topic
+
+Changes since v1:
+ - Remove iommu_present() check in vfio_iommu_group_get()
+ - Drop PATCH1-to-PATCH3 because IOMMU_CAP_BYPASS is not
+   required
+ - Move additional comments out of license header in
+   vfio_platform_bcmflexrm.c
+
+Anup Patel (1):
+  vfio: platform: reset: Add Broadcom FlexRM reset module
+
+ drivers/vfio/platform/reset/Kconfig                |   8 ++
+ drivers/vfio/platform/reset/Makefile               |   1 +
+ .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 100 +++++++++++++++++++++
+ 3 files changed, 109 insertions(+)
+ create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
+
 -- 
-2.13.2
+2.7.4
