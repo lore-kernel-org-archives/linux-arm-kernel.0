@@ -1,50 +1,74 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Tue, 22 Aug 2017 23:35:47 +0800
-Subject: [RESENT PATCH v6 0/8] ASoC: rockchip: Parse dai links from dts
-Message-ID: <20170822153555.20735-1-jeffy.chen@rock-chips.com>
+Date: Tue, 22 Aug 2017 23:35:48 +0800
+Subject: [RESENT PATCH v6 1/8] ASoC: rockchip: Correct 'dmic-delay' property
+ name
+In-Reply-To: <20170822153555.20735-1-jeffy.chen@rock-chips.com>
+References: <20170822153555.20735-1-jeffy.chen@rock-chips.com>
+Message-ID: <20170822153555.20735-2-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The 'dmic-delay' property name is different with the dt-binding.
 
-Currently we are using a fixed list of dai links in the driver.
-This serial of patches would let the driver parse dai links from
-dts, so that we can make some of them optional for future boards.
+So correct it with 'dmic-wakeup-delay-ms'.
 
-Tested on my chromebook bob(with cros 4.4 kernel), it still works
-after disabled rt5514 codecs in the dts.
+Fixes: 3a6f9dce6116 (ASoC: rk3399_gru_sound: fix recording pop at first attempt)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 
+---
 
-Changes in v6:
-Add dmic wakeup delay(not used for now).
-
+Changes in v6: None
 Changes in v5:
 Keep the dmic-delay property, but correct it with the name in
 dt-binding.
         -- Suggested-by Mark Brown <broonie@kernel.org>
 
-Changes in v3:
-Use compatible to match audio codecs
-        -- Suggested-by Matthias Kaehlcke <mka@chromium.org>
+Changes in v3: None
+Changes in v2: None
 
-Changes in v2:
-Let rockchip,codec-names be a required property, because we plan to
-add more supported codecs to the fixed dai link list in the driver.
+ sound/soc/rockchip/rk3399_gru_sound.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-Jeffy Chen (8):
-  ASoC: rockchip: Correct 'dmic-delay' property name
-  ASoC: rockchip: Use codec of_node and dai_name for rt5514 dsp
-  arm64: dts: rockchip: Add rt5514 dsp for Gru
-  arm64: dts: rockchip: Update rt5514 devices' compatible for Gru
-  ASoC: rockchip: Parse dai links from dts
-  ASoC: rockchip: Add support for DP codec
-  ASoC: rockchip: Add support for DMIC codec
-  dt-bindings: ASoC: rockchip: Update description of rockchip,codec
-
- .../bindings/sound/rockchip,rk3399-gru-sound.txt   |   2 +-
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       |   7 +-
- sound/soc/rockchip/Kconfig                         |   2 +
- sound/soc/rockchip/rk3399_gru_sound.c              | 270 ++++++++++++++-------
- 4 files changed, 193 insertions(+), 88 deletions(-)
-
+diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
+index 3475c61a5fa0..70b5821afb17 100644
+--- a/sound/soc/rockchip/rk3399_gru_sound.c
++++ b/sound/soc/rockchip/rk3399_gru_sound.c
+@@ -38,7 +38,7 @@
+ 
+ #define SOUND_FS	256
+ 
+-static unsigned int rt5514_dmic_delay;
++static unsigned int dmic_wakeup_delay;
+ 
+ static struct snd_soc_jack rockchip_sound_jack;
+ 
+@@ -126,7 +126,7 @@ static int rockchip_sound_rt5514_hw_params(struct snd_pcm_substream *substream,
+ 	}
+ 
+ 	/* Wait for DMIC stable */
+-	msleep(rt5514_dmic_delay);
++	msleep(dmic_wakeup_delay);
+ 
+ 	return 0;
+ }
+@@ -348,13 +348,13 @@ static int rockchip_sound_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
+-	/* Set DMIC delay */
+-	ret = device_property_read_u32(&pdev->dev, "dmic-delay",
+-					&rt5514_dmic_delay);
++	/* Set DMIC wakeup delay */
++	ret = device_property_read_u32(&pdev->dev, "dmic-wakeup-delay-ms",
++					&dmic_wakeup_delay);
+ 	if (ret) {
+-		rt5514_dmic_delay = 0;
++		dmic_wakeup_delay = 0;
+ 		dev_dbg(&pdev->dev,
+-			"no optional property 'dmic-delay' found, default: no delay\n");
++			"no optional property 'dmic-wakeup-delay-ms' found, default: no delay\n");
+ 	}
+ 
+ 	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
 -- 
 2.11.0
