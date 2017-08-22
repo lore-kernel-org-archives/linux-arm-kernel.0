@@ -1,94 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 22 Aug 2017 10:45:24 +0100
-Subject: [PATCH 1/2] arm64: mm: abort uaccess retries upon fatal signal
-In-Reply-To: <20170821134202.GA5418@leverpostej>
-References: <1499782763-31418-1-git-send-email-mark.rutland@arm.com>
- <1499782763-31418-2-git-send-email-mark.rutland@arm.com>
- <20170711145849.GE13977@arm.com>
- <20170821134202.GA5418@leverpostej>
-Message-ID: <20170822094523.GA5439@arm.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Tue, 22 Aug 2017 15:26:49 +0530
+Subject: [PATCH v3 00/17] Broadcom SBA-RAID driver improvements
+Message-ID: <1503395827-19428-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 21, 2017 at 02:42:03PM +0100, Mark Rutland wrote:
-> On Tue, Jul 11, 2017 at 03:58:49PM +0100, Will Deacon wrote:
-> > On Tue, Jul 11, 2017 at 03:19:22PM +0100, Mark Rutland wrote:
-> > > When there's a fatal signal pending, arm64's do_page_fault()
-> > > implementation returns 0. The intent is that we'll return to the
-> > > faulting userspace instruction, delivering the signal on the way.
-> > > 
-> > > However, if we take a fatal signal during fixing up a uaccess, this
-> > > results in a return to the faulting kernel instruction, which will be
-> > > instantly retried, resulting in the same fault being taken forever. As
-> > > the task never reaches userspace, the signal is not delivered, and the
-> > > task is left unkillable. While the task is stuck in this state, it can
-> > > inhibit the forward progress of the system.
-> > > 
-> > > To avoid this, we must ensure that when a fatal signal is pending, we
-> > > apply any necessary fixup for a faulting kernel instruction. Thus we
-> > > will return to an error path, and it is up to that code to make forward
-> > > progress towards delivering the fatal signal.
-> > > 
-> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > Reviewed-by: Steve Capper <steve.capper@arm.com>
-> > > Tested-by: Steve Capper <steve.capper@arm.com>
-> > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > Cc: James Morse <james.morse@arm.com>
-> > > Cc: Laura Abbott <labbott@redhat.com>
-> > > Cc: Will Deacon <will.deacon@arm.com>
-> > > Cc: stable at vger.kernel.org
-> > > ---
-> > >  arch/arm64/mm/fault.c | 5 ++++-
-> > >  1 file changed, 4 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> > > index 37b95df..3952d5e 100644
-> > > --- a/arch/arm64/mm/fault.c
-> > > +++ b/arch/arm64/mm/fault.c
-> > > @@ -397,8 +397,11 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
-> > >  	 * signal first. We do not need to release the mmap_sem because it
-> > >  	 * would already be released in __lock_page_or_retry in mm/filemap.c.
-> > >  	 */
-> > > -	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current))
-> > > +	if ((fault & VM_FAULT_RETRY) && fatal_signal_pending(current)) {
-> > > +		if (!user_mode(regs))
-> > > +			goto no_context;
-> > >  		return 0;
-> > > +	}
-> > 
-> > This will need rebasing at -rc1 (take a look at current HEAD).
-> > 
-> > Also, I think it introduces a weird corner case where we take a page fault
-> > when writing the signal frame to the user stack to deliver a SIGSEGV. If
-> > we end up with VM_FAULT_RETRY and somebody has sent a SIGKILL to the task,
-> > then we'll fail setup_sigframe and force an un-handleable SIGSEGV instead
-> > of SIGKILL.
-> > 
-> > The end result (task is killed) is the same, but the fatal signal is wrong.
-> 
-> That doesn't seem to be the case, testing on v4.13-rc5.
-> 
-> I used sigaltstack() to use the userfaultfd region as signal stack,
-> registerd a SIGSEGV handler, and dereferenced NULL. The task locks up,
-> but when killed with a SIGINT or SIGKILL, the exit status reflects that
-> signal, rather than the SIGSEGV.
-> 
-> If I move the SIGINT handler onto the userfaultfd-monitored stack, then
-> delivering SIGINT hangs, but can be killed with SIGKILL, and the exit
-> status reflects that SIGKILL.
-> 
-> As you say, it does look like we'd try to set up a deferred SIGSEGV for
-> the failed signal delivery.
-> 
-> I haven't yet figured out exactly how that works; I'll keep digging.
+This patchset does various improvments to Broadcom SBA-RAID
+driver.
 
-The SEGV makes it all the way into do_group_exit, but then signal_group_exit
-is set and the exit_code is overridden with SIGKILL at the last minute (see
-complete_signal).
+The patches are based on Linux-4.13-rc3 and can also be found
+at sba-raid-imp-v3 branch of
+https://github.com/Broadcom/arm64-linux.git
 
-So I'm happy that your patch is doing the right thing -- could you send a
-rebased version please?
+Changes since v2:
+ - Update patch description for PATCH1 and PATCH3
+ - Add dev_err() for debugfs API failures instead of bailing out
+ - Add PATCH17 to remove redundant SBA_REQUEST_STATE_COMPLETED
 
-Thanks,
+Changes since v1:
+ - Split PATCH1 into 10 smaller patches for easier review
+ - Added more info to commit description of PATCH2
+ - Split PATCH4 into 2 patches for easier review
+ - Dropped PATCH6 because it is now part of
+http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1456425.html
 
-Will
+Anup Patel (17):
+  dmaengine: bcm-sba-raid: Minor improvments in comments
+  dmaengine: bcm-sba-raid: Reduce locking context in sba_alloc_request()
+  dmaengine: bcm-sba-raid: Common flags for sba_request state and fence
+  dmaengine: bcm-sba-raid: Remove redundant next_count from sba_request
+  dmaengine: bcm-sba-raid: Remove redundant resp_dma from sba_request
+  dmaengine: bcm-sba-raid: Remove reqs_free_count from sba_device
+  dmaengine: bcm-sba-raid: Allow arbitrary number free sba_request
+  dmaengine: bcm-sba-raid: Increase number of free sba_request
+  dmaengine: bcm-sba-raid: Improve sba_issue_pending() run duration
+  dmaengine: bcm-sba-raid: Alloc resources before registering DMA device
+  dmaengine: bcm-sba-raid: Peek mbox when we have no free requests
+  dmaengine: bcm-sba-raid: Pre-ack async tx descriptor
+  dmaengine: bcm-sba-raid: Re-factor sba_process_deferred_requests()
+  dmaengine: bcm-sba-raid: Remove redundant SBA_REQUEST_STATE_RECEIVED
+  dmaengine: bcm-sba-raid: Add debugfs support
+  dmaengine: bcm-sba-raid: Explicitly ACK mailbox message after sending
+  dmaengine: bcm-sba-raid: Remove redundant SBA_REQUEST_STATE_COMPLETED
+
+ drivers/dma/bcm-sba-raid.c | 538 ++++++++++++++++++++++++---------------------
+ 1 file changed, 292 insertions(+), 246 deletions(-)
+
+-- 
+2.7.4
