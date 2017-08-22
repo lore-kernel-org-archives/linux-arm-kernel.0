@@ -1,65 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Aug 2017 15:02:29 +0200
-Subject: [PATCH 3/8] gpio: zynq: Shift zynq_gpio_init() to subsys_initcall
- level
-In-Reply-To: <68cd52a7-ce87-a507-f02d-ccb99634b465@xilinx.com>
-References: <cover.1502103715.git.michal.simek@xilinx.com>
- <a05cc4f104097bef71ed381229aa8c746717ebce.1502103715.git.michal.simek@xilinx.com>
- <CACRpkdbUBe6z2C9U9THaaLq0JLuu=EsGAVQfaSY55tMUotKvvg@mail.gmail.com>
- <68cd52a7-ce87-a507-f02d-ccb99634b465@xilinx.com>
-Message-ID: <CACRpkdbgPYrSo3KcHuf6sCWT-s2R7UVMRhFagLT2-vB8S_MF0Q@mail.gmail.com>
+Date: Tue, 22 Aug 2017 15:04:31 +0200
+Subject: [PATCH 2/3] arm64: dts: mt2712: add pintcrl device node.
+In-Reply-To: <2f883a8a-5402-5625-bada-bcfed53c098e@gmail.com>
+References: <1501489333-23145-1-git-send-email-zhiyong.tao@mediatek.com>
+ <1501489333-23145-3-git-send-email-zhiyong.tao@mediatek.com>
+ <2f883a8a-5402-5625-bada-bcfed53c098e@gmail.com>
+Message-ID: <CACRpkdZHyXec+L8ueRHOs=9TLT1Arqe3KeQpRZ6D0K1Ag1c+Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 4:15 PM, Michal Simek <michal.simek@xilinx.com> wrote:
-
->> Can't you just move it all the way to device_initcall and
->> simply use the standard module init macros?
->> builtin_platform_driver(), module_platform_driver()?
->
-> When I grep the kernel I see this
->
-> [linux](master)$ git grep "^core_initcall" drivers/gpio/ | wc -l
-> 1
-> [linux](master)$ git grep "^postcore_initcall" drivers/gpio/ | wc -l
-> 12
-> [linux](master)$ git grep "^arch_initcall" drivers/gpio/ | wc -l
-> 2
-> [linux](master)$ git grep "^subsys_initcall" drivers/gpio/ | wc -l
-> 33
-> [linux](master)$ git grep "^device_initcall" drivers/gpio/ | wc -l
-> 4
+On Mon, Aug 14, 2017 at 5:23 PM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+> On 07/31/2017 10:22 AM, Zhiyong Tao wrote:
+>>
+>> The commit includes two change:
+>> 1)add pintcrl device node for mt2712.
+>> 2)add pinfunc file for mt2712.
+>>
+>> Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+>> ---
+>>   arch/arm64/boot/dts/mediatek/mt2712-pinfunc.h | 1014
+>> +++++++++++++++++++++++++
 >
 >
-> [linux](master)$ git grep "^core_initcall" drivers/pinctrl/ | wc -l
-> 6
-> [linux](master)$ git grep "^postcore_initcall" drivers/pinctrl/ | wc -l
-> 7
-> [linux](master)$ git grep "^arch_initcall" drivers/pinctrl/ | wc -l
-> 62
-> [linux](master)$ git grep "^subsys_initcall" drivers/pinctrl/ | wc -l
-> 12
-> [linux](master)$ git grep "^device_initcall" drivers/pinctrl/ | wc -l
-> 0
->
-> Majority of gpio drivers are in subsys_initcall and pinctrl in
-> arch_initcall.
+> Shouldn't this file be in include/dt-bindings/pinctrl?
 
-The majority is likely wrong, we don't vote about what is the
-best code quality luckily :D
-
-You do not see a lot of device_initicall because in the majority
-of cases these come implicitly from module_platform_driver(),
-builtin_platform_driver_probe() or builtin_platform_driver()
-see include/linux/platform_device.h
-
-> It doesn't mean that I have strong opinion about doing
-> this change. I have also read internal tracking system and it is not
-> fully clear if this is fixing any issue rather than removing on
-> deferring probe message.
-
-I think you can make it into module_platform_driver() please
-try that approach.
+Only if it is also #included in the driver.
 
 Yours,
 Linus Walleij
