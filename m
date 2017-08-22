@@ -1,65 +1,36 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Tue, 22 Aug 2017 15:41:47 +0200
-Subject: [PATCH v3 0/5] Add support for the STM32F7 I2C
-In-Reply-To: <d749429a-3cdc-ea9b-84ef-afa9fdf55f29@st.com>
-References: <1499356386-28779-1-git-send-email-pierre-yves.mordret@st.com>
- <d749429a-3cdc-ea9b-84ef-afa9fdf55f29@st.com>
-Message-ID: <0e2ae765-1608-f25b-663f-948f8c3f1cf2@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Aug 2017 15:44:18 +0200
+Subject: [PATCH 2/3 v3] mfd: db8500-prcmu: Get rid of cpufreq dependency
+In-Reply-To: <7661350.vR4F4a82RE@aspire.rjw.lan>
+References: <20170822131741.23473-1-linus.walleij@linaro.org>
+ <20170822131741.23473-2-linus.walleij@linaro.org>
+ <7661350.vR4F4a82RE@aspire.rjw.lan>
+Message-ID: <CACRpkdZ91zUPE8Oyf+ZALekCUbAakM=PX6DiYTO-VZewGGNFmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
-
-Another gentle ping for driver review since DT Bindings has been acked by Rob
-Herring.
-
-Many thanks in advance
-Regards
-
-On 07/20/2017 10:34 AM, Pierre Yves MORDRET wrote:
-> 
-> 
-> On 07/06/2017 05:53 PM, Pierre-Yves MORDRET wrote:
->> This patchset adds support for the I2C controller embedded in STM32F7xx SoC.
->> It enables I2C transfer in interrupt mode with Standard-mode, Fast-mode and
->> Fast-mode+ bus speed.
-> 
-> Gentle ping for driver review since DT Bindings has been acked by Rob 
-> Herring.
-> 
-> Thanks
-> Py
-> 
->> ---
->>   Version history:
->>      v3:
->>          * Move stm32f7_i2c_match above stm32f7_i2c_driver
->>          * of_device_get_match_data instead of of_match_device
->>          * Improve I2C Speed DT gathering
->>          * dev_err into dev_dbg for Arbitration loss
->>          * Remove useless space aligned
+On Tue, Aug 22, 2017 at 3:25 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Tuesday, August 22, 2017 3:17:40 PM CEST Linus Walleij wrote:
+>> The ARMSS clock, also known as the operating point of the
+>> CPU, should not cross-depend on cpufreq like this. Move
+>> the code to use just frequencies and remove the false
+>> frequency (1GHz) and put in the actual frequency provided
+>> by the ARMSS clock (998400000 Hz) as part of the process.
 >>
->>      v2:
->>          * Implement an I2C timings computation algorithm instead of static
->>            values(bindings). Algorithm uses generic I2C SCL Falling/Rising
->>            bindings and System clock to compute its timings.
->>          * I2C Device Tree Update
->> ---
->> Pierre-Yves MORDRET (5):
->>    dt-bindings: i2c-stm32: Document the STM32F7 I2C bindings
->>    i2c: i2c-stm32f4: use generic definition of speed enum
->>    i2c: i2c-stm32f7: add driver
->>    ARM: dts: stm32: Add I2C1 support for STM32F746 SoC
->>    ARM: dts: stm32: Add I2C1 support for STM32F746 eval board
+>> After this and the related cpufreq patch, the DB8500 will
+>> simply use the standard DT cpufreq driver to change the
+>> operating points through the common clock framework using
+>> the ARMSS clock.
 >>
->>   .../devicetree/bindings/i2c/i2c-stm32.txt          |  29 +-
->>   arch/arm/boot/dts/stm32746g-eval.dts               |   8 +
->>   arch/arm/boot/dts/stm32f746.dtsi                   |  22 +
->>   drivers/i2c/busses/Kconfig                         |  10 +
->>   drivers/i2c/busses/Makefile                        |   1 +
->>   drivers/i2c/busses/i2c-stm32.h                     |  20 +
->>   drivers/i2c/busses/i2c-stm32f4.c                   |  18 +-
->>   drivers/i2c/busses/i2c-stm32f7.c                   | 974 +++++++++++++++++++++
->>   8 files changed, 1068 insertions(+), 14 deletions(-)
->>   create mode 100644 drivers/i2c/busses/i2c-stm32.h
->>   create mode 100644 drivers/i2c/busses/i2c-stm32f7.c
+>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> Well, I've already applied the v2, so do you want me to replace the
+> commit with this patch?
+
+If you can, else tell me and I can send a fixup patch.
+
+I want to keep Lee happy!
+
+Yours,
+Linus Walleij
