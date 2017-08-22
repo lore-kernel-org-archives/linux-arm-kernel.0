@@ -1,91 +1,103 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Tue, 22 Aug 2017 15:57:20 +0800
-Subject: [PATCH v5 1/9] ASoC: rockchip: Remove obsolete dmic-delay
+Date: Tue, 22 Aug 2017 15:57:22 +0800
+Subject: [PATCH v5 3/9] ASoC: rockchip: Use codec of_node and dai_name for
+ rt5514 dsp
 In-Reply-To: <20170822075729.8438-1-jeffy.chen@rock-chips.com>
 References: <20170822075729.8438-1-jeffy.chen@rock-chips.com>
-Message-ID: <20170822075729.8438-2-jeffy.chen@rock-chips.com>
+Message-ID: <20170822075729.8438-4-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This property is no longer used.
+Currently we are using codec name for rt5514 dsp dai link, use codec
+of_node instead.
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
-
 ---
 
 Changes in v5: None
-Changes in v4:
-Use non-zero drv id to avoid legacy dai naming instead of switching to
-snd_soc_register_codec.
-
+Changes in v4: None
 Changes in v3: None
 Changes in v2: None
 
- .../bindings/sound/rockchip,rk3399-gru-sound.txt           |  7 -------
- sound/soc/rockchip/rk3399_gru_sound.c                      | 14 --------------
- 2 files changed, 21 deletions(-)
+ sound/soc/rockchip/rk3399_gru_sound.c | 34 ++--------------------------------
+ 1 file changed, 2 insertions(+), 32 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-index eac91db07178..f19b6c830a34 100644
---- a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-+++ b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-@@ -6,17 +6,10 @@ Required properties:
-   connected to the codecs
- - rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
- 
--Optional properties:
--- dmic-wakeup-delay-ms : specify delay time (ms) for DMIC ready.
--  If this option is specified, which means it's required dmic need
--  delay for DMIC to ready so that rt5514 can avoid recording before
--  DMIC send valid data
--
- Example:
- 
- sound {
- 	compatible = "rockchip,rk3399-gru-sound";
- 	rockchip,cpu = <&i2s0>;
- 	rockchip,codec = <&max98357a &rt5514 &da7219>;
--	dmic-wakeup-delay-ms = <20>;
- };
 diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-index 3475c61a5fa0..70876d3c34e6 100644
+index 70876d3c34e6..9b7e28703bfb 100644
 --- a/sound/soc/rockchip/rk3399_gru_sound.c
 +++ b/sound/soc/rockchip/rk3399_gru_sound.c
-@@ -38,8 +38,6 @@
+@@ -242,8 +242,6 @@ enum {
+ 	DAILINK_RT5514_DSP,
+ };
  
- #define SOUND_FS	256
- 
--static unsigned int rt5514_dmic_delay;
+-#define DAILINK_ENTITIES	(DAILINK_DA7219 + 1)
 -
- static struct snd_soc_jack rockchip_sound_jack;
+ static struct snd_soc_dai_link rockchip_dailinks[] = {
+ 	[DAILINK_MAX98357A] = {
+ 		.name = "MAX98357A",
+@@ -277,8 +275,7 @@ static struct snd_soc_dai_link rockchip_dailinks[] = {
+ 	[DAILINK_RT5514_DSP] = {
+ 		.name = "RT5514 DSP",
+ 		.stream_name = "Wake on Voice",
+-		.codec_name = "snd-soc-dummy",
+-		.codec_dai_name = "snd-soc-dummy-dai",
++		.codec_dai_name = "rt5514-dsp-cpu-dai",
+ 	},
+ };
  
- static const struct snd_soc_dapm_widget rockchip_dapm_widgets[] = {
-@@ -125,9 +123,6 @@ static int rockchip_sound_rt5514_hw_params(struct snd_pcm_substream *substream,
- 		return ret;
+@@ -295,17 +292,10 @@ static struct snd_soc_card rockchip_sound_card = {
+ 	.num_controls = ARRAY_SIZE(rockchip_controls),
+ };
+ 
+-static int rockchip_sound_match_stub(struct device *dev, void *data)
+-{
+-	return 1;
+-}
+-
+ static int rockchip_sound_probe(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card = &rockchip_sound_card;
+ 	struct device_node *cpu_node;
+-	struct device *dev;
+-	struct device_driver *drv;
+ 	int i, ret;
+ 
+ 	cpu_node = of_parse_phandle(pdev->dev.of_node, "rockchip,cpu", 0);
+@@ -314,7 +304,7 @@ static int rockchip_sound_probe(struct platform_device *pdev)
+ 		return -EINVAL;
  	}
  
--	/* Wait for DMIC stable */
--	msleep(rt5514_dmic_delay);
--
- 	return 0;
- }
+-	for (i = 0; i < DAILINK_ENTITIES; i++) {
++	for (i = 0; i < ARRAY_SIZE(rockchip_dailinks); i++) {
+ 		rockchip_dailinks[i].platform_of_node = cpu_node;
+ 		rockchip_dailinks[i].cpu_of_node = cpu_node;
  
-@@ -348,15 +343,6 @@ static int rockchip_sound_probe(struct platform_device *pdev)
- 		return -ENODEV;
+@@ -327,26 +317,6 @@ static int rockchip_sound_probe(struct platform_device *pdev)
+ 		}
  	}
  
--	/* Set DMIC delay */
--	ret = device_property_read_u32(&pdev->dev, "dmic-delay",
--					&rt5514_dmic_delay);
--	if (ret) {
--		rt5514_dmic_delay = 0;
--		dev_dbg(&pdev->dev,
--			"no optional property 'dmic-delay' found, default: no delay\n");
+-	/**
+-	 * To acquire the spi driver of the rt5514 and set the dai-links names
+-	 * for soc_bind_dai_link
+-	 */
+-	drv = driver_find("rt5514", &spi_bus_type);
+-	if (!drv) {
+-		dev_err(&pdev->dev, "Can not find the rt5514 driver at the spi bus\n");
+-		return -EINVAL;
 -	}
 -
- 	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
- 	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_dai_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
- 	rockchip_dailinks[DAILINK_RT5514_DSP].platform_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
+-	dev = driver_find_device(drv, NULL, NULL, rockchip_sound_match_stub);
+-	if (!dev) {
+-		dev_err(&pdev->dev, "Can not find the rt5514 device\n");
+-		return -ENODEV;
+-	}
+-
+-	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
+-	rockchip_dailinks[DAILINK_RT5514_DSP].cpu_dai_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
+-	rockchip_dailinks[DAILINK_RT5514_DSP].platform_name = kstrdup_const(dev_name(dev), GFP_KERNEL);
+-
+ 	card->dev = &pdev->dev;
+ 	platform_set_drvdata(pdev, card);
+ 
 -- 
 2.11.0
