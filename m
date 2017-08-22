@@ -1,72 +1,86 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 22 Aug 2017 16:41:01 +0200
-Subject: [PATCH net-next 03/18] net: mvpp2: set the SMI PHY address when
- connecting to the PHY
-In-Reply-To: <20170728042153.GH18666@lunn.ch>
-References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
- <20170724134848.19330-4-antoine.tenart@free-electrons.com>
- <20170726160806.GF12049@lunn.ch> <20170728014905.GC24728@kwain>
- <20170728042153.GH18666@lunn.ch>
-Message-ID: <20170822144101.GC14942@kwain>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 22 Aug 2017 15:41:56 +0100
+Subject: [PATCH v7 5/9] arm64: hugetlb: Handle swap entries in
+ huge_pte_offset() for contiguous hugepages
+In-Reply-To: <a54aff75-f79b-b40d-c66f-6730aaccbd39@arm.com> (Julien Thierry's
+ message of "Tue, 22 Aug 2017 15:14:59 +0100")
+References: <20170822104249.2189-1-punit.agrawal@arm.com>
+ <20170822104249.2189-6-punit.agrawal@arm.com>
+ <a54aff75-f79b-b40d-c66f-6730aaccbd39@arm.com>
+Message-ID: <87wp5vmzpn.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Julien Thierry <julien.thierry@arm.com> writes:
 
-On Fri, Jul 28, 2017 at 06:21:53AM +0200, Andrew Lunn wrote:
-> On Thu, Jul 27, 2017 at 06:49:05PM -0700, Antoine Tenart wrote:
-> > On Wed, Jul 26, 2017 at 06:08:06PM +0200, Andrew Lunn wrote:
-> > > On Mon, Jul 24, 2017 at 03:48:33PM +0200, Antoine Tenart wrote:
-> > > >  
-> > > > +	if (priv->hw_version != MVPP22)
-> > > > +		return 0;
-> > > > +
-> > > > +	/* Set the SMI PHY address */
-> > > > +	if (of_property_read_u32(port->phy_node, "reg", &phy_addr)) {
-> > > > +		netdev_err(port->dev, "cannot find the PHY address\n");
-> > > > +		return -EINVAL;
-> > > > +	}
-> > > > +
-> > > > +	writel(phy_addr, priv->iface_base + MVPP22_SMI_PHY_ADDR(port->gop_id));
-> > > >  	return 0;
-> > > >  }
-> > > 
-> > > Why does the MAC need to know this address? The phylib and PHY driver
-> > > should be the only thing accessing the PHY, otherwise you are asking
-> > > for trouble.
-> > 
-> > This is part of the SMI/xSMI interface. I added into the mvpp2 driver
-> > and not in the mvmdio one because the GoP port number must be known to
-> > set this register (so that would be even less clean to do it).
-> 
-> It is still not clear to my why you need to program the address into
-> the hardware. Is the hardware talking to the PHY?
+> Hi Punit,
+>
+> On 22/08/17 11:42, Punit Agrawal wrote:
+>> huge_pte_offset() was updated to correctly handle swap entries for
+>> hugepages. With the addition of the size parameter, it is now possible
+>> to disambiguate whether the request is for a regular hugepage or a
+>> contiguous hugepage.
+>>
+>> Fix huge_pte_offset() for contiguous hugepages by using the size to find
+>> the correct page table entry.
+>>
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Cc: David Woods <dwoods@mellanox.com>
+>> ---
+>>   arch/arm64/mm/hugetlbpage.c | 21 ++++++++++++++++-----
+>>   1 file changed, 16 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+>> index 594232598cac..b95e24dc3477 100644
+>> --- a/arch/arm64/mm/hugetlbpage.c
+>> +++ b/arch/arm64/mm/hugetlbpage.c
+>> @@ -214,6 +214,7 @@ pte_t *huge_pte_offset(struct mm_struct *mm,
+>>   	pgd_t *pgd;
+>>   	pud_t *pud;
+>>   	pmd_t *pmd;
+>> +	pte_t *pte;
+>>     	pgd = pgd_offset(mm, addr);
+>>   	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
+>> @@ -221,19 +222,29 @@ pte_t *huge_pte_offset(struct mm_struct *mm,
+>>   		return NULL;
+>>     	pud = pud_offset(pgd, addr);
+>> -	if (pud_none(*pud))
+>> +	if (sz != PUD_SIZE && pud_none(*pud))
+>>   		return NULL;
+>> -	/* swap or huge page */
+>> -	if (!pud_present(*pud) || pud_huge(*pud))
+>> +	/* hugepage or swap? */
+>> +	if (pud_huge(*pud) || !pud_present(*pud))
+>>   		return (pte_t *)pud;
+>>   	/* table; check the next level */
+>>   +	if (sz == CONT_PMD_SIZE)
+>> +		addr &= CONT_PMD_MASK;
+>> +
+>>   	pmd = pmd_offset(pud, addr);
+>> -	if (pmd_none(*pmd))
+>> +	if (!(sz == PMD_SIZE || sz == CONT_PMD_SIZE) &&
+>> +	    pmd_none(*pmd))
+>>   		return NULL;
+>> -	if (!pmd_present(*pmd) || pmd_huge(*pmd))
+>> +	if (pmd_huge(*pmd) || !pmd_present(*pmd))
+>>   		return (pte_t *)pmd;
+>>   +	if (sz == CONT_PTE_SIZE) {
+>> +		pte = pte_offset_kernel(
+>> +			pmd, (addr & CONT_PTE_MASK));
+>> +		return pte;
+>
+> Nit: Looks like this is the only place the new variable pte is
+> used. Since we don't need to test its value, why not just write:
+> 	return pte_offset_kernel(pmd, (addr & CONT_PTE_MASK));
+>
+> and get rid of the pte variable?
 
-Sorry for the answer delay, I was out of the office...
+There is no benefit to getting rid of "pte" other than conciseness of
+the patch. Having an explicit identifier helps highlight the level of
+the page tables we are accessing.
 
-This PHY address configuration should be done in the mvmdio driver as
-this is not directly related to the PPv2 (well, the mvmdio driver is
-only an abstraction to reuse the mdio code, using registers exposed by
-PPv2 in this case anyway). But two values must be known in order to do
-this: the PHY address and the GoP port number. Getting the last one from
-the mvmdio driver would be really ugly as we would need to read the PPv2
-dt node. This is why this patch adds it in the PPv2 driver, but I know
-it's not perfect.
+And we always want to prioritise readability vs conciseness of the
+patch, no?
 
-I'll resend a series very soon, with this patch still included. We can
-continue the discussion there I guess, if needed.
-
-Thanks!
-Antoine
-
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170822/62297792/attachment.sig>
+>
+> Cheers,
