@@ -1,122 +1,201 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Tue, 22 Aug 2017 12:22:14 +0200
-Subject: device tree bindings for lp5523 leds on N950?
-In-Reply-To: <20170815131518.jt4xff6qv4whebul@earth>
-References: <20170814133816.GA24493@amd>
- <20170815131518.jt4xff6qv4whebul@earth>
-Message-ID: <20170822102214.pmag4k2dxz4fdvq5@earth>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Tue, 22 Aug 2017 11:22:44 +0100
+Subject: [PATCH 09/27] arm64/sve: Signal frame and context structure
+ definition
+In-Reply-To: <1502280338-23002-10-git-send-email-Dave.Martin@arm.com>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-10-git-send-email-Dave.Martin@arm.com>
+Message-ID: <87y3qb52ez.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tue, Aug 15, 2017 at 09:15:28AM -0400, Sebastian Reichel wrote:
-> Hi Pavel,
-> 
-> On Mon, Aug 14, 2017 at 03:38:16PM +0200, Pavel Machek wrote:
-> > I'm (still) trying to debug "N950 not booting" situation. I'm stuck
-> > with black screen, so I thought it would be cool to use RGB led for
-> > debugging...
-> > 
-> > Unfortunately, I don't see required dts bindings in the mainline.
-> > 
-> > Does anyone have that working?
-> 
-> I have some N950 DTS patches lying around, I think RGB led was one
-> of them. I'm currently in Canda for a company event without my N950,
-> but I should be able to send something tested before the weekend.
+Dave Martin <Dave.Martin@arm.com> writes:
 
-Below is a DTS snippet for N950, that has been tested by me
-on top of 4.13-rc6. The left and right keyboard LEDs are
-also debug LEDs for cpu idle modes, so they will be lit
-without being enabled in lp5523. The status LED of N950 is
-not RGB, but just white. Also you need this to get the driver
-loading. Otherwise detection after reset fails even after
-quite increases waiting times. Looks like the lp5523 reset
-(which is not properly Ack'd by the device) breaks the omap-i2c
-state horribly.
+> This patch defines the representation that will be used for the SVE
+> register state in the signal frame, and implements support for
+> saving and restoring the SVE registers around signals.
+>
+> The same layout will also be used for the in-kernel task state.
+>
+> Due to the variability of the SVE vector length, it is not possible
+> to define a fixed C struct to describe all the registers.  Instead,
+> Macros are defined in sigcontext.h to facilitate access to the
+> parts of the structure.
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> ---
+>  arch/arm64/include/uapi/asm/sigcontext.h | 113 ++++++++++++++++++++++++++++++-
+>  1 file changed, 112 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/include/uapi/asm/sigcontext.h b/arch/arm64/include/uapi/asm/sigcontext.h
+> index f0a76b9..0533bdf 100644
+> --- a/arch/arm64/include/uapi/asm/sigcontext.h
+> +++ b/arch/arm64/include/uapi/asm/sigcontext.h
+> @@ -16,6 +16,8 @@
+>  #ifndef _UAPI__ASM_SIGCONTEXT_H
+>  #define _UAPI__ASM_SIGCONTEXT_H
+>
+> +#ifndef __ASSEMBLY__
+> +
+>  #include <linux/types.h>
+>
+>  /*
+> @@ -41,10 +43,11 @@ struct sigcontext {
+>   *
+>   *	0x210		fpsimd_context
+>   *	 0x10		esr_context
+> + *	0x8a0		sve_context (vl <= 64) (optional)
+>   *	 0x20		extra_context (optional)
+>   *	 0x10		terminator (null _aarch64_ctx)
+>   *
+> - *	0xdb0		(reserved for future allocation)
+> + *	0x510		(reserved for future allocation)
+>   *
+>   * New records that can exceed this space need to be opt-in for userspace, so
+>   * that an expanded signal frame is not generated unexpectedly.  The mechanism
+> @@ -116,4 +119,112 @@ struct extra_context {
+>  	__u32 __reserved[3];
+>  };
+>
+> +#define SVE_MAGIC	0x53564501
+> +
+> +struct sve_context {
+> +	struct _aarch64_ctx head;
+> +	__u16 vl;
+> +	__u16 __reserved[3];
+> +};
+> +
+> +#endif /* !__ASSEMBLY__ */
+> +
+> +/*
+> + * The SVE architecture leaves space for future expansion of the
+> + * vector length beyond its initial architectural limit of 2048 bits
+> + * (16 quadwords).
+> + */
+> +#define SVE_VQ_MIN		1
+> +#define SVE_VQ_MAX		0x200
+> +
+> +#define SVE_VL_MIN		(SVE_VQ_MIN * 0x10)
+> +#define SVE_VL_MAX		(SVE_VQ_MAX * 0x10)
+> +
+> +#define SVE_NUM_ZREGS		32
+> +#define SVE_NUM_PREGS		16
+> +
+> +#define sve_vl_valid(vl) \
+> +	((vl) % 0x10 == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
+> +#define sve_vq_from_vl(vl)	((vl) / 0x10)
+> +#define sve_vl_from_vq(vq)	((vq) * 0x10)
 
--- Sebastian
+I got a little confused first time through over what VQ and VL where.
+Maybe it would make sense to expand a little more from first principles?
 
---- a/drivers/leds/leds-lp55xx-common.c
-+++ b/drivers/leds/leds-lp55xx-common.c
-@@ -413,7 +413,7 @@ int lp55xx_init_device(struct lp55xx_chip *chip)
-                usleep_range(1000, 2000); /* 500us abs min. */
-        }
- 
--       lp55xx_reset_device(chip);
-+       //lp55xx_reset_device(chip); // FIXME: breaks omap-i2c
- 
-        /*
-         * Exact value is not available. 10 - 20ms
+  /*
+   * The SVE architecture defines vector registers as a multiple of 128
+   * bit quadwords. The current architectural limit is 2048 bits (16
+   * quadwords) but there is room for future expansion beyond that.
+    */
 
-----------
+  #define SVE_VQ_BITS             128      /* 128 bits in one quadword */
+  #define SVE_VQ_BYTES            (SVE_VQ_BITS / 8)
 
-&i2c2 {
-       rgb-led at 32 {
-               compatible = "national,lp5523";
-               reg = <0x32>;
+  #define SVE_VQ_MIN		1
+  #define SVE_VQ_MAX		0x200    /* see ZCR_ELx[8:0] */
 
-               enable-gpio = <&gpio2 9 GPIO_ACTIVE_HIGH>; /* 41 */
-               clock-mode = /bits/ 8 <2>; /* external */
+  #define SVE_VL_MIN_BYTES	(SVE_VQ_MIN * SVE_VQ_BYTES)
+  #define SVE_VL_MAX_BYTES	(SVE_VQ_MAX * SVE_VQ_BYTES)
 
-               chan0 {
-                       chan-name = "lp5523:kb5"; /* Keyboard ooooox */
-                       led-cur = /bits/ 8 <50>;
-                       max-cur = /bits/ 8 <130>;
-               };
+  #define SVE_NUM_ZREGS		32
+  #define SVE_NUM_PREGS		16
 
-               chan1 {
-                       chan-name = "lp5523:kb4"; /* Keyboard ooooxo */
-                       led-cur = /bits/ 8 <50>;
-                       max-cur = /bits/ 8 <130>;
-               };
+  #define sve_vl_valid(vl)						\
+          ((vl) % SVE_VQ_BYTES == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
+  #define sve_vq_from_vl(vl)	((vl) / SVE_VQ_BYTES)
+  #define sve_vl_from_vq(vq)	((vq) * SVE_VQ_BYTES)
 
-               chan2 {
-                       chan-name = "lp5523:kb3"; /* Keyboard oooxoo */
-                       led-cur = /bits/ 8 <50>;
-                       max-cur = /bits/ 8 <130>;
-               };
 
-               chan3 {
-                       chan-name = "lp5523:kb2"; /* Keyboard ooxooo */
-                       led-cur = /bits/ 8 <50>;
-                       max-cur = /bits/ 8 <130>;
-               };
+> +
+> +/*
+> + * If the SVE registers are currently live for the thread at signal delivery,
+> + * sve_context.head.size >=
+> + *	SVE_SIG_CONTEXT_SIZE(sve_vq_from_vl(sve_context.vl))
+> + * and the register data may be accessed using the SVE_SIG_*() macros.
+> + *
+> + * If sve_context.head.size <
+> + *	SVE_SIG_CONTEXT_SIZE(sve_vq_from_vl(sve_context.vl)),
+> + * the SVE registers were not live for the thread and no register data
+> + * is included: in this case, the SVE_SIG_*() macros should not be
+> + * used except for this check.
+> + *
+> + * The same convention applies when returning from a signal: a caller
+> + * will need to remove or resize the sve_context block if it wants to
+> + * make the SVE registers live when they were previously non-live or
+> + * vice-versa.  This may require the the caller to allocate fresh
+> + * memory and/or move other context blocks in the signal frame.
+> + *
+> + * Changing the vector length during signal return is not permitted:
+> + * sve_context.vl must equal the thread's current vector length when
+> + * doing a sigreturn.
+> + *
+> + *
+> + * Note: for all these macros, the "vq" argument denotes the SVE
+> + * vector length in quadwords (i.e., units of 128 bits).
+> + *
+> + * The correct way to obtain vq is to use sve_vq_from_vl(vl).  The
+> + * result is valid if and only if sve_vl_valid(vl) is true.  This is
+> + * guaranteed for a struct sve_context written by the kernel.
+> + *
+> + *
+> + * Additional macros describe the contents and layout of the payload.
+> + * For each, SVE_SIG_x_OFFSET(args) is the start offset relative to
+> + * the start of struct sve_context, and SVE_SIG_x_SIZE(args) is the
+> + * size in bytes:
+> + *
+> + *	x	type				description
+> + *	-	----				-----------
+> + *	REGS					the entire SVE context
+> + *
+> + *	ZREGS	__uint128_t[SVE_NUM_ZREGS][vq]	all Z-registers
+> + *	ZREG	__uint128_t[vq]			individual Z-register Zn
+> + *
+> + *	PREGS	uint16_t[SVE_NUM_PREGS][vq]	all P-registers
+> + *	PREG	uint16_t[vq]			individual P-register Pn
+> + *
+> + *	FFR	uint16_t[vq]			first-fault status register
+> + *
+> + * Additional data might be appended in the future.
+> + */
+> +
+> +#define SVE_SIG_ZREG_SIZE(vq)	((__u32)(vq) * 16)
+> +#define SVE_SIG_PREG_SIZE(vq)	((__u32)(vq) * 2)
+> +#define SVE_SIG_FFR_SIZE(vq)	SVE_SIG_PREG_SIZE(vq)
+> +
+> +#define SVE_SIG_REGS_OFFSET	((sizeof(struct sve_context) + 15) / 16 * 16)
+> +
+> +#define SVE_SIG_ZREGS_OFFSET	SVE_SIG_REGS_OFFSET
+> +#define SVE_SIG_ZREG_OFFSET(vq, n) \
+> +	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREG_SIZE(vq) * (n))
+> +#define SVE_SIG_ZREGS_SIZE(vq) \
+> +	(SVE_SIG_ZREG_OFFSET(vq, SVE_NUM_ZREGS) - SVE_SIG_ZREGS_OFFSET)
+> +
+> +#define SVE_SIG_PREGS_OFFSET(vq) \
+> +	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREGS_SIZE(vq))
+> +#define SVE_SIG_PREG_OFFSET(vq, n) \
+> +	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREG_SIZE(vq) * (n))
+> +#define SVE_SIG_PREGS_SIZE(vq) \
+> +	(SVE_SIG_PREG_OFFSET(vq, SVE_NUM_PREGS) - SVE_SIG_PREGS_OFFSET(vq))
+> +
+> +#define SVE_SIG_FFR_OFFSET(vq) \
+> +	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREGS_SIZE(vq))
+> +
+> +#define SVE_SIG_REGS_SIZE(vq) \
+> +	(SVE_SIG_FFR_OFFSET(vq) + SVE_SIG_FFR_SIZE(vq) - SVE_SIG_REGS_OFFSET)
+> +
+> +#define SVE_SIG_CONTEXT_SIZE(vq) (SVE_SIG_REGS_OFFSET + SVE_SIG_REGS_SIZE(vq))
+> +
+> +
+>  #endif /* _UAPI__ASM_SIGCONTEXT_H */
 
-               chan4 {
-                       chan-name = "lp5523:kb1"; /* Keyboard oxoooo */
-                       led-cur = /bits/ 8 <50>;
-                       max-cur = /bits/ 8 <130>;
-               };
 
-               chan5 {
-                       chan-name = "lp5523:kb0"; /* Keyboard xooooo */
-                       led-cur = /bits/ 8 <50>;
-                       max-cur = /bits/ 8 <130>;
-               };
-
-               chan6 {
-                       led-cur = /bits/ 8 <0>;
-                       max-cur = /bits/ 8 <0>;
-               };
-
-               chan7 {
-                       led-cur = /bits/ 8 <0>;
-                       max-cur = /bits/ 8 <0>;
-               };
-
-               chan8 {
-                       chan-name = "lp5523:status-led";
-                       led-cur = /bits/ 8 <50>;
-                       max-cur = /bits/ 8 <130>;
-               };
-       };
-};
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170822/85d089d8/attachment.sig>
+--
+Alex Benn?e
