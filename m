@@ -1,24 +1,37 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 23 Aug 2017 00:56:16 +0200
-Subject: [PATCH v2 2/2] ASoC: rockchip: separate pinctrl pins from each
- other
-In-Reply-To: <1503303907-57630-3-git-send-email-sugar.zhang@rock-chips.com>
-References: <1503303907-57630-1-git-send-email-sugar.zhang@rock-chips.com>
- <1503303907-57630-3-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <6836405.GGQC6Msd0B@phil>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 23 Aug 2017 07:14:33 +0800
+Subject: [PATCH v2 2/4] usb: xhci-mtk: add generic compatible string
+In-Reply-To: <33fa448238c0d95f0cfd6c2be3bd5c4e657a0cd4.1502854628.git.chunfeng.yun@mediatek.com>
+References: <670f9ce1ecaec5859006b6f02b45cfc72c3cca2c.1502854628.git.chunfeng.yun@mediatek.com>
+ <33fa448238c0d95f0cfd6c2be3bd5c4e657a0cd4.1502854628.git.chunfeng.yun@mediatek.com>
+Message-ID: <1503443673.17567.8.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 21. August 2017, 16:25:07 CEST schrieb Sugar Zhang:
-> pdm sdi0~3 pins are optional, for example, if 4ch required,
-> only sdi0~1 need to be enabled.
+Hi, Mathias
+
+On Wed, 2017-08-16 at 14:08 +0800, Chunfeng Yun wrote:
+> The xhci-mtk driver is a generic driver for MediaTek xHCI IP, add
+> a generic compatible to avoid confusion when support new SoCs but
+> use a compatible with specific SoC's name "mt8173".
 > 
-> Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  drivers/usb/host/xhci-mtk.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+> index 67d5dc7..8fb6065 100644
+> --- a/drivers/usb/host/xhci-mtk.c
+> +++ b/drivers/usb/host/xhci-mtk.c
+> @@ -795,6 +795,7 @@ static int __maybe_unused xhci_mtk_resume(struct device *dev)
+>  #ifdef CONFIG_OF
+>  static const struct of_device_id mtk_xhci_of_match[] = {
+>  	{ .compatible = "mediatek,mt8173-xhci"},
+> +	{ .compatible = "mediatek,mtk-xhci"},
+>  	{ },
+>  };
+>  MODULE_DEVICE_TABLE(of, mtk_xhci_of_match);
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-
-But you might want to adapt the subject a bit and include that
-you're actually only change the example in the devicetree binding.
-
-
-Heiko
+Do you have any comment about this patch?
+Thanks.
