@@ -1,112 +1,39 @@
-From: thgarnie@google.com (Thomas Garnier)
-Date: Tue, 22 Aug 2017 09:42:25 -0700
-Subject: [PATCH v3 3/4] arm/syscalls: Optimize address limit check
-In-Reply-To: <20170814213732.104301-3-thgarnie@google.com>
-References: <20170814213732.104301-1-thgarnie@google.com>
- <20170814213732.104301-3-thgarnie@google.com>
-Message-ID: <CAJcbSZG1b7ObJAv6Kmp-fR3vZRg7AdbcgqDceGB95r-72Yv0yg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 22 Aug 2017 18:50:38 +0200
+Subject: [PATCH v3 3/4] net: stmmac: register parent MDIO node for
+ sun8i-h3-emac
+In-Reply-To: <CAGb2v64E4T=1ff3POGuXZA=MvjGAnKQ6OF6A3sT_cU-=jh6zNw@mail.gmail.com>
+References: <CAGb2v66KcZkiDDHryMmVzm4WroXePPy3V44SLpVdoO3ZEjgC=g@mail.gmail.com>
+ <20170819185025.GB13266@Red> <20170819203836.GA21567@lunn.ch>
+ <20170820065757.GA6081@Red> <20170820142545.GB24150@lunn.ch>
+ <CAGb2v67hQXSoCKP7qW+KRUYX+0djQ1Z23cQ67Lyg6G7ozGyfGQ@mail.gmail.com>
+ <20170821132015.GB1703@lunn.ch>
+ <20170821133104.qvrhvwin2rdg4aqo@flea.lan>
+ <20170821142321.GE1703@lunn.ch>
+ <CAGb2v64E4T=1ff3POGuXZA=MvjGAnKQ6OF6A3sT_cU-=jh6zNw@mail.gmail.com>
+Message-ID: <20170822165038.afmpeztr2yzffhbq@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 2:37 PM, Thomas Garnier <thgarnie@google.com> wrote:
-> Disable the generic address limit check in favor of an architecture
-> specific optimized implementation. The generic implementation using
-> pending work flags did not work well with ARM and alignment faults.
->
-> The address limit is checked on each syscall return path to user-mode
-> path as well as the irq user-mode return function. If the address limit
-> was changed, a function is called to report data corruption (stopping
-> the kernel or process based on configuration).
->
-> The address limit check has to be done before any pending work because
-> they can reset the address limit and the process is killed using a
-> SIGKILL signal. For example the lkdtm address limit check does not work
-> because the signal to kill the process will reset the user-mode address
-> limit.
->
-> Signed-off-by: Thomas Garnier <thgarnie@google.com>
+On Tue, Aug 22, 2017 at 11:39:22PM +0800, Chen-Yu Tsai wrote:
+> Now can we please decide on something? We're a week and a half from
+> the 4.13 release. If mdio-mux is wrong, then we could have two mdio
+> nodes (internal-mdio & external-mdio).
 
-Any feedback?
+I can only emphasize this. I'm afraid that if we don't have an
+agreement and a patch implementing it with the proper acks by the end
+of the week, we'll have to revert all the DT bits and the bindings.
 
-> ---
->  arch/arm/kernel/entry-common.S | 11 +++++++++++
->  arch/arm/kernel/signal.c       |  7 +++++++
->  2 files changed, 18 insertions(+)
->
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index 0b60adf4a5d9..99c908226065 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -12,6 +12,7 @@
->  #include <asm/unistd.h>
->  #include <asm/ftrace.h>
->  #include <asm/unwind.h>
-> +#include <asm/memory.h>
->  #ifdef CONFIG_AEABI
->  #include <asm/unistd-oabi.h>
->  #endif
-> @@ -48,10 +49,14 @@ ret_fast_syscall:
->   UNWIND(.fnstart       )
->   UNWIND(.cantunwind    )
->         disable_irq_notrace                     @ disable interrupts
-> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
-> +       cmp     r2, #TASK_SIZE
-> +       blne    addr_limit_check_failed
->         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
->         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
->         bne     fast_work_pending
->
-> +
->         /* perform architecture specific actions before user return */
->         arch_ret_to_user r1, lr
->
-> @@ -74,6 +79,9 @@ ret_fast_syscall:
->   UNWIND(.cantunwind    )
->         str     r0, [sp, #S_R0 + S_OFF]!        @ save returned r0
->         disable_irq_notrace                     @ disable interrupts
-> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
-> +       cmp     r2, #TASK_SIZE
-> +       blne    addr_limit_check_failed
->         ldr     r1, [tsk, #TI_FLAGS]            @ re-check for syscall tracing
->         tst     r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
->         beq     no_work_pending
-> @@ -106,6 +114,9 @@ ENTRY(ret_to_user)
->  ret_slow_syscall:
->         disable_irq_notrace                     @ disable interrupts
->  ENTRY(ret_to_user_from_irq)
-> +       ldr     r2, [tsk, #TI_ADDR_LIMIT]
-> +       cmp     r2, #TASK_SIZE
-> +       blne    addr_limit_check_failed
->         ldr     r1, [tsk, #TI_FLAGS]
->         tst     r1, #_TIF_WORK_MASK
->         bne     slow_work_pending
-> diff --git a/arch/arm/kernel/signal.c b/arch/arm/kernel/signal.c
-> index 5814298ef0b7..b67ae12503f3 100644
-> --- a/arch/arm/kernel/signal.c
-> +++ b/arch/arm/kernel/signal.c
-> @@ -14,6 +14,7 @@
->  #include <linux/uaccess.h>
->  #include <linux/tracehook.h>
->  #include <linux/uprobes.h>
-> +#include <linux/syscalls.h>
->
->  #include <asm/elf.h>
->  #include <asm/cacheflush.h>
-> @@ -673,3 +674,9 @@ struct page *get_signal_page(void)
->
->         return page;
->  }
-> +
-> +/* Defer to generic check */
-> +asmlinkage void addr_limit_check_failed(void)
-> +{
-> +       addr_limit_user_check();
-> +}
-> --
-> 2.14.1.480.gb18f417b89-goog
->
-
-
+Maxime
 
 -- 
-Thomas
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170822/2f634a89/attachment.sig>
