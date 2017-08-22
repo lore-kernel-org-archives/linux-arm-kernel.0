@@ -1,7 +1,9 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 22 Aug 2017 19:57:38 +0530
-Subject: [GIT PULL 1/2] DaVinci device-tree updates for v4.14
-Message-ID: <20170822142739.13411-1-nsekhar@ti.com>
+Date: Tue, 22 Aug 2017 19:57:39 +0530
+Subject: [GIT PULL 2/2] DaVinci defconfig updates for v4.14
+In-Reply-To: <20170822142739.13411-1-nsekhar@ti.com>
+References: <20170822142739.13411-1-nsekhar@ti.com>
+Message-ID: <20170822142739.13411-2-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,18 +13,19 @@ The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.14/dt
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.14/defconfig
 
-for you to fetch changes up to 2798c4b75a14a4f29a56d6f31dae267b8e22ea9f:
+for you to fetch changes up to 8c0b16fb33b2dd3f8cbb0694bef296181fe39949:
 
-  ARM: dts: da850-lego-ev3: Add node for LCD display (2017-08-21 16:45:11 +0530)
+  ARM: davinci_all_defconfig: enable tinydrm and ST7586 (2017-08-21 16:28:24 +0530)
 
 ----------------------------------------------------------------
-Add device-tree node for display on Lego Mindstorms EV3
+Enable driver for display used on Lego Mindstorms
+EV3.
 
 ----------------------------------------------------------------
 David Lechner (1):
-      ARM: dts: da850-lego-ev3: Add node for LCD display
+      ARM: davinci_all_defconfig: enable tinydrm and ST7586
 
- arch/arm/boot/dts/da850-lego-ev3.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm/configs/davinci_all_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
