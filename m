@@ -1,30 +1,41 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 22 Aug 2017 15:25:06 +0200
-Subject: [PATCH 2/3 v3] mfd: db8500-prcmu: Get rid of cpufreq dependency
-In-Reply-To: <20170822131741.23473-2-linus.walleij@linaro.org>
-References: <20170822131741.23473-1-linus.walleij@linaro.org>
- <20170822131741.23473-2-linus.walleij@linaro.org>
-Message-ID: <7661350.vR4F4a82RE@aspire.rjw.lan>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Aug 2017 15:35:50 +0200
+Subject: [PATCH] serio: PS2 gpio bit banging driver for the serio bus
+In-Reply-To: <20170817090908.GP20805@n2100.armlinux.org.uk>
+References: <20170731222452.22887-1-danilokrummrich@dk-develop.de>
+ <CACRpkdYz_+soss4Rb9zMiP4eZZtXqjW_Xy7hH=wm1x2m_R9R3A@mail.gmail.com>
+ <20170807182207.348762301bf3d7f8509b1bf7@dk-develop.de>
+ <8e5e73575b3a70e0e60931698687471d@dk-develop.de>
+ <CACRpkda=bYacXmv8SoQu3wPoZW9v+j8myZnme=QpofD=Y-gYTg@mail.gmail.com>
+ <20170817090908.GP20805@n2100.armlinux.org.uk>
+Message-ID: <CACRpkdZ39AOYdN_KNLJXTkimW1WaHpYvrw89J_kJo_FJThWwuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, August 22, 2017 3:17:40 PM CEST Linus Walleij wrote:
-> The ARMSS clock, also known as the operating point of the
-> CPU, should not cross-depend on cpufreq like this. Move
-> the code to use just frequencies and remove the false
-> frequency (1GHz) and put in the actual frequency provided
-> by the ARMSS clock (998400000 Hz) as part of the process.
-> 
-> After this and the related cpufreq patch, the DB8500 will
-> simply use the standard DT cpufreq driver to change the
-> operating points through the common clock framework using
-> the ARMSS clock.
-> 
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Aug 17, 2017 at 11:09 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Fri, Aug 11, 2017 at 11:16:20AM +0200, Linus Walleij wrote:
+>> writel() should be guaranteeing that the values hit the hardware, wmb() is
+>> spelled out "write memory barrier" I don't see what you're after here.
+>
+> Incorrect.  writel() has a barrier which ensures that data written to
+> memory (eg, dma coherent memory) is visible to the hardware prior to
+> the write hitting the hardware.
+>
+> There is no barrier to ensure that the write hits the hardware in a
+> timely manner - the write can be buffered by the buses, which will
+> delay it before it hits its destination.
+>
+> PCI particularly buffers MMIO writes, and the requirement there has
+> always been that if you need the write to hit the hardware in a timely
+> fashion, you must perform a read-back to force the bus to deliver the
+> write (since a read is not allowed to overlap a write.)
+>
+> The solution is never to use barrier() - barrier() is a _compiler_
+> barrier and does nothing for posted writes on hardware buses.
 
-Well, I've already applied the v2, so do you want me to replace the
-commit with this patch?
+Thanks Russell. I tend to forget things over time even though I have
+some memory of this being spelled out to me in the past :(
 
-Thanks,
-Rafael
+Yours,
+Linus Walleij
