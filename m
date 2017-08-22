@@ -1,73 +1,113 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 22 Aug 2017 14:57:44 +0200
-Subject: [PATCH 2/8] gpio: zynq: Wakeup gpio controller when it is used as
- IRQ controller
-In-Reply-To: <6da5fd79-fbc8-b613-954f-dcbe2ef8d6c5@xilinx.com>
-References: <cover.1502103715.git.michal.simek@xilinx.com>
- <72d3cd83bed792a23ab60cf9b6d51b618f5aa084.1502103715.git.michal.simek@xilinx.com>
- <CACRpkdZE-Edr7fWZY5VQM1_65iw7MYGP-iDa2ExZsPxpM0rurQ@mail.gmail.com>
- <6da5fd79-fbc8-b613-954f-dcbe2ef8d6c5@xilinx.com>
-Message-ID: <CACRpkdY1rw92wLA+g4f=LqRr-pRsm0yRW972S6STq3kn7axgWw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 22 Aug 2017 13:57:47 +0100
+Subject: Page fault while link_path_walk for path_len > 4060 bytes
+In-Reply-To: <953068e79da559bfd4f13e46e31c5a4e@codeaurora.org>
+References: <08e7e3332dc86c535dd2961ac1cde0b5@codeaurora.org>
+ <54083a824d6705a93d972ca5ef3a7b35@codeaurora.org>
+ <3958983ccec4aca494bf72c397f34bfa@codeaurora.org>
+ <953068e79da559bfd4f13e46e31c5a4e@codeaurora.org>
+Message-ID: <20170822125747.GB28024@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 4:33 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+Ankit,
 
-> I have checked 4.13-rc1 and none is doing anything with clock in these
-> irq routines.
-> It means it is a question if they have the same issue when device is
-> sleeping or we do something wrong.
+On Tue, Aug 22, 2017 at 11:19:43AM +0530, ankijain at codeaurora.org wrote:
+> Could you please look into this issue?
+> Can we use srcu_read_lock/srcu_read_unlock instead of
+> rcu_read_lock/rcu_read_unlock in path_init() ,terminate_Walk() and
+> complete_walk() ?
+> if we go for srcu_read_lock, then how can we maintain the idx for
+> srcu_read_unlock in unlazy_walk().
+> 
+> Requesting you please comment on this issue.
 
-No but they may get in the future and new drivers may have
-the issue.
+It would help if you could:
 
-> It is not a problem to move these calls to core (patch is quite simple)
-> but validate that if this is correct on others SoC.
-> Do you know if we can validate this on different SoC?
+  1. Provide the kernel panic log
+  2. Describe the machine on which you're running
+  3. Run the repro code on a mainline kernel
 
-pm_runtime_get() etc are only utilized if the driver
-explicitly enable runtime PM, and if they do, they should
-have their semantics right for this or their code would be
-broken severely.
+Assuming this is an arm64 machine, I'm intrigued as to what is generating
+the fault. v4.4 doesn't support DEBUG_PAGEALLOC, so it must be something
+else. Do you know what the ESR value is when you take the fault?
+
+Does the diff below help?
+
+Will
+
+--->8
+
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 2509e4fe6992..aa6c4a9e1113 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -611,7 +611,7 @@ static const struct fault_info fault_info[] = {
+ 	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 0 translation fault"	},
+ 	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 1 translation fault"	},
+ 	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 2 translation fault"	},
+-	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"level 3 translation fault"	},
++	{ do_translation_fault,	SIGSEGV, SEGV_MAPERR,	"level 3 translation fault"	},
+ 	{ do_bad,		SIGBUS,  0,		"unknown 8"			},
+ 	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 1 access flag fault"	},
+ 	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 access flag fault"	},
 
 
-> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-> index 9568708a550b..a08a044fa4aa 100644
-> --- a/drivers/gpio/gpiolib.c
-> +++ b/drivers/gpio/gpiolib.c
-> @@ -1647,14 +1647,22 @@ static void gpiochip_irq_unmap(struct irq_domain
-> *d, unsigned int irq)
->  static int gpiochip_irq_reqres(struct irq_data *d)
->  {
->         struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
-> +       int ret;
->
->         if (!try_module_get(chip->gpiodev->owner))
->                 return -ENODEV;
->
-> +       ret = pm_runtime_get_sync(chip->parent);
-> +       if (ret < 0) {
-> +               module_put(chip->gpiodev->owner);
-> +               return ret;
-> +       }
-> +
->         if (gpiochip_lock_as_irq(chip, d->hwirq)) {
->                 chip_err(chip,
->                         "unable to lock HW IRQ %lu for IRQ\n",
->                         d->hwirq);
-> +               pm_runtime_put(chip->parent);
->                 module_put(chip->gpiodev->owner);
->                 return -EINVAL;
->         }
-> @@ -1666,6 +1674,7 @@ static void gpiochip_irq_relres(struct irq_data *d)
->         struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
->
->         gpiochip_unlock_as_irq(chip, d->hwirq);
-> +       pm_runtime_put(chip->parent);
->         module_put(chip->gpiodev->owner);
-
-This looks fine, I'm happy to apply that early for v4.15 after the merge
-window (now it is a bit late for radical changes).
-
-Yours,
-Linus Walleij
+> On 2017-08-14 16:44, ankijain at codeaurora.org wrote:
+> >Hi linux-fsdevel
+> >
+> >could you please look at this issue or suggest how we can proceed further.
+> >
+> >Thanks,
+> >
+> >On 2017-08-07 17:48, ankijain at codeaurora.org wrote:
+> >>On 2017-08-07 11:52, ankijain at codeaurora.org wrote:
+> >>>Hi
+> >>>
+> >>>We are facing a issue while creating the directories up-to maximum
+> >>>depth.
+> >>>While doing this, page fault occurs some times if PATH_LEN is near to
+> >>>page boundary.
+> >>>During hash_name() calculation inside link_path_walk(),
+> >>>load_unaligned_zeropad() is causing page fault as it tries to access
+> >>>next page data(which is not mapped).
+> >>>We have already taken a lock(rcu_read_lock) in path_init() and as a
+> >>>part of page fault it checks if process can sleep (might_sleep), which
+> >>>results in panic as rcu_read_lock is already taken in path_init().
+> >>>
+> >>>One observation : Panic happens only when page(which contain the
+> >>>path_name and length > 4060) is the last page of the slab memory.
+> >>>
+> >>>Test Case detail:
+> >>>Kernel version : 4.4
+> >>>We are following stress-ng test.
+> >>>https://github.com/ColinIanKing/stress-ng
+> >>>
+> >>>1. dirdeep for creating directory upto maximum depth.
+> >>>2. vm for memory allocation in backgroud.
+> >>>
+> >>>Above 2 test cases are running simultaneously and it takes ~3-4 hours
+> >>>to reproduce this issue.
+> >>>
+> >>>Pasting comment section for load_unaligned_zeropad():
+> >>>/*
+> >>>  * Load an unaligned word from kernel space.
+> >>>  *
+> >>>  * In the (very unlikely) case of the word being a page-crosser
+> >>>  * and the next page not being mapped, take the exception and
+> >>>  * return zeroes in the non-existing part.
+> >>>  */
+> >>>
+> >>>Wanted to confirm if this "very unlikely case" mentioned above is
+> >>>pointing to the same issue ?
+> >>>Also let us know if this is a known issue and if some fix is already
+> >>>available. If not, please suggest how we can proceed further.
+> >>>
+> >>>Appreciate your help. Thanks in advance!!
+> >>>
+> >>>Regards,
+> >>>Ankit Jain
+> >>>Qualcomm India Private Limited, on behalf of Qualcomm Innovation
+> >>>Center, Inc.
+> >>>Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
+> >>>Linux Foundation Collaborative Project
