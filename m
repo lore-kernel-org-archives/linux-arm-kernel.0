@@ -1,33 +1,59 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Tue, 22 Aug 2017 19:01:52 +0800
-Subject: [PATCH v5 1/9] ASoC: rockchip: Remove obsolete dmic-delay
-In-Reply-To: <20170822103241.wjiycavsro7abknj@sirena.org.uk>
-References: <20170822075729.8438-1-jeffy.chen@rock-chips.com>
- <20170822075729.8438-2-jeffy.chen@rock-chips.com>
- <20170822103241.wjiycavsro7abknj@sirena.org.uk>
-Message-ID: <599C0F20.7080807@rock-chips.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 22 Aug 2017 13:08:46 +0200
+Subject: [PATCH v2 04/16] mmc: meson-gx: use _irqsave variant of spinlock
+In-Reply-To: <20170821160301.21899-5-jbrunet@baylibre.com>
+References: <20170821160301.21899-1-jbrunet@baylibre.com>
+ <20170821160301.21899-5-jbrunet@baylibre.com>
+Message-ID: <CAPDyKFpoOc+1WMqLMOwhGkifP-Zp3GS7wTSkHmBUk4Pf0Dh+DQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 21 August 2017 at 18:02, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> spinlock used in interrupt handler should use the _irqsave variant
 
-On 08/22/2017 06:32 PM, Mark Brown wrote:
-> On Tue, Aug 22, 2017 at 03:57:20PM +0800, Jeffy Chen wrote:
->> This property is no longer used.
+Exactly why is that needed?
+
 >
-> I would still rather keep the existing property documented (the binding
-> does need to be fixed) than remove it.  It's better practice and it's
-> not costing a huge amount.
+> Fixes: 51c5d8447bd7 ("MMC: meson: initial support for GX platforms")
+> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>  drivers/mmc/host/meson-gx-mmc.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
+> index 8a74a048db88..a399fbd415f4 100644
+> --- a/drivers/mmc/host/meson-gx-mmc.c
+> +++ b/drivers/mmc/host/meson-gx-mmc.c
+> @@ -727,6 +727,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
+>         struct mmc_command *cmd;
+>         struct mmc_data *data;
+>         u32 irq_en, status, raw_status;
+> +       unsigned long flag;
+>         irqreturn_t ret = IRQ_HANDLED;
+>
+>         if (WARN_ON(!host))
+> @@ -739,7 +740,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
+>
+>         data = cmd->data;
+>
+> -       spin_lock(&host->lock);
+> +       spin_lock_irqsave(&host->lock, flag);
+>         irq_en = readl(host->regs + SD_EMMC_IRQ_EN);
+>         raw_status = readl(host->regs + SD_EMMC_STATUS);
+>         status = raw_status & irq_en;
+> @@ -806,7 +807,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
+>         if (ret == IRQ_HANDLED)
+>                 meson_mmc_request_done(host->mmc, cmd->mrq);
+>
+> -       spin_unlock(&host->lock);
+> +       spin_unlock_irqrestore(&host->lock, flag);
+>         return ret;
+>  }
+>
+> --
+> 2.9.5
 >
 
-sorry, i should explain more in the commit msg...
-
-just to clarify, this property is replaced by 
-"realtek,dmic-init-delay-ms" in rt5514 driver:
-
-a5461fd6c8f7 ASoC: rt5514: Add the DMIC initial delay to wait it ready.
-
-which does exactly the same thing as the old one: perform a delay after 
-set clk...
-
-i can do that if you still insist to keep it, since it's harmless :)
+Kind regards
+Uffe
