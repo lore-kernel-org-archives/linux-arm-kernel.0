@@ -1,50 +1,53 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 22 Aug 2017 15:39:06 +0200
-Subject: [PATCH v2 3/4] net: phy: realtek: add disable RX internal delay
- mode
-In-Reply-To: <20170822040400.12166-4-icenowy@aosc.io>
-References: <20170822040400.12166-1-icenowy@aosc.io>
- <20170822040400.12166-4-icenowy@aosc.io>
-Message-ID: <20170822133906.GG24555@lunn.ch>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 22 Aug 2017 19:09:07 +0530
+Subject: [PATCH v2 3/5] dt-bindings: sdhci-omap: Add bindings for the
+ sdhci-omap controller
+In-Reply-To: <20170821142132.GH6008@atomide.com>
+References: <20170821142132.GH6008@atomide.com>
+Message-ID: <20170822133907.21549-1-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 22, 2017 at 12:03:59PM +0800, Icenowy Zheng wrote:
-> From: Icenowy Zheng <icenowy@aosc.xyz>
-> 
-> Some RTL8211E chips have broken GbE function, which needs a hack to
-> fix. It's said that this fix will affect the performance on not-buggy
-> PHYs, so it should only be enabled on boards with the broken PHY.
+Add binding for the TI's sdhci-omap controller. This now includes only
+a subset of properties documented in ti-omap-hsmmc.txt but will eventually
+include all the properties.
 
-I would not call this a broken PHY. It is a question of board
-design. If you have shorter tracks, you need a delay. If you have long
-tracks, you don't. Hence the four RGMII modes, so you can select if
-the delay is needed or not, depending on your board design.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+Changes from v1:
+*) Create a new sdhci-omap.txt document for TI's sdhci-omap controller instead
+   of using the ti-omap-hsmmc.txt as suggested by Tony
+ .../devicetree/bindings/mmc/sdhci-omap.txt         | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-omap.txt
 
-> Currently only some Pine64+ boards are known to have this issue.
-
-Design feature.
-
-Please remove all reference to bug.
- 
-> This hack is said to disable RX relay for RTL8211E according to Realtek.
-> So implement it as RGMII-TXID mode.
-
-Do we know that the TX lines do have a delay after making this change?
-We need to be careful here. We will get into a mess if this is
-actually RGMII not RGMII_TXID, and somebody designs a board which
-needs RGMII-TXID.
-
-> +#include <linux/of.h>
->  #include <linux/phy.h>
->  #include <linux/module.h>
-
-> +static int rtl8211e_config_init(struct phy_device *phydev)
-> +{
-> +	struct device *dev = &phydev->mdio.dev;
-> +	struct device_node *of_node = dev->of_node;
-
-You don't appear to use of_node, nor dev. Please remove, along with
-the header file.
-
-    Andrew
+diff --git a/Documentation/devicetree/bindings/mmc/sdhci-omap.txt b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+new file mode 100644
+index 000000000000..139695ad2d58
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+@@ -0,0 +1,22 @@
++* TI OMAP SDHCI Controller
++
++Refer to mmc.txt for standard MMC bindings.
++
++Required properties:
++- compatible: Should be "ti,dra7-sdhci" for DRA7 and DRA72 controllers
++- ti,hwmods: Must be "mmc<n>", <n> is controller instance starting 1
++
++Optional properties:
++- ti,dual-volt: boolean, supports dual voltage cards
++- ti,non-removable: non-removable slot (like eMMC)
++
++Example:
++	mmc1: mmc at 0x4809c000 {
++		compatible = "ti,omap4-hsmmc";
++		reg = <0x4809c000 0x400>;
++		ti,hwmods = "mmc1";
++		ti,dual-volt;
++		bus-width = <4>;
++		vmmc-supply = <&vmmc>; /* phandle to regulator node */
++		ti,non-removable;
++	};
+-- 
+2.11.0
