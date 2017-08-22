@@ -1,68 +1,85 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 22 Aug 2017 23:52:12 +0300
-Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20170822201731.hyjqrbkhggaoomfl@flea.home>
-References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
- <8dd8c350-cd45-5cd9-65cc-67102944811f@xs4all.nl>
- <20170822201731.hyjqrbkhggaoomfl@flea.home>
-Message-ID: <4387854.RiNf2zWZcD@avalon>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 22 Aug 2017 15:54:04 -0500
+Subject: [PATCH 5/8] ARM: OMAP4: hwmod_data: Remove modulemode from
+ IPU/DSP hwmods
+In-Reply-To: <20170822192425.GM6008@atomide.com>
+References: <20170821234818.4755-1-s-anna@ti.com>
+ <20170821234818.4755-6-s-anna@ti.com> <20170822173749.GK6008@atomide.com>
+ <a7ed87b7-bfe3-0b0c-08b4-4c44570364f2@ti.com>
+ <20170822192425.GM6008@atomide.com>
+Message-ID: <76d185df-3daf-cc9e-aabd-5fea26f1f028@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Tony,
 
-On Tuesday, 22 August 2017 23:17:31 EEST Maxime Ripard wrote:
-> On Tue, Aug 22, 2017 at 08:43:35AM +0200, Hans Verkuil wrote:
-> >>>> +static int sun6i_video_link_setup(struct media_entity *entity,
-> >>>> +				  const struct media_pad *local,
-> >>>> +				  const struct media_pad *remote, u32 flags)
-> >>>> +{
-> >>>> +	struct video_device *vdev = media_entity_to_video_device(entity);
-> >>>> +	struct sun6i_video *video = video_get_drvdata(vdev);
-> >>>> +
-> >>>> +	if (WARN_ON(video == NULL))
-> >>>> +		return 0;
-> >>>> +
-> >>>> +	return sun6i_video_formats_init(video);
-> >>> 
-> >>> Why is this called here? Why not in video_init()?
-> >> 
-> >> sun6i_video_init is in the driver probe context.
-> >> sun6i_video_formats_init use media_entity_remote_pad and
-> >> media_entity_to_v4l2_subdev to find the subdevs.
-> >> The media_entity_remote_pad can't work before all the media pad linked.
-> > 
-> > A video_init is typically called from the notify_complete callback.
-> > Actually, that's where the video_register_device should be created as
-> > well. When you create it in probe() there is possibly no sensor yet, so it
-> > would be a dead video node (or worse, crash when used).
-> > 
-> > There are still a lot of platform drivers that create the video node in
-> > the probe, but it's not the right place if you rely on the async loading
-> > of subdevs.
+On 08/22/2017 02:24 PM, Tony Lindgren wrote:
+> * Suman Anna <s-anna@ti.com> [170822 11:45]:
+>> On 08/22/2017 12:37 PM, Tony Lindgren wrote:
+>>> I think a better way to fix this would be to make sure the module
+>>> is enabled during the unmapping phase of the MMUs. If there is no
+>>> driver left at that point to call pm_runtime_get() on the module,
+>>> do it via pdata-quirks.c using struct iommu_platform_data?
+>>
+>> The problem is because there is no reference counting on modulemode
+>> programming unlike clocks or omap_device pm_domain callbacks. The IOMMU
+>> driver already has an active pm_runtime_get() invoked earlier and
+>> invoking another wouldn't result in any change.
 > 
-> That's not really related, but I'm not really sure it's a good way to
-> operate. This essentially means that you might wait forever for a
-> component in your pipeline to be probed, without any chance of it
-> happening (not compiled, compiled as a module and not loaded, hardware
-> defect preventing the driver from probing properly, etc), even though
-> that component might not be essential.
+> Hmm iommu driver has pm_runtime_get() on which modules? Can you
+> please point me to that code too so I can follow..
 
-I agree with Maxime here, we should build the media device incrementally, and 
-offer userspace access early on without waiting for all pieces to be 
-available. If properly implemented (there should definitely be so crash) I 
-don't see any drawback to that approach.
+The OMAP IOMMU driver deals with the MMU device only and uses both the
+omap_device_{assert/deassert}_hardreset and omap_device_{enable/idle} on
+the omap_device associated with the MMU device. The MMU register space
+has a SYSCONFIG register (also has softreset that only resets the MMU
+block) so we do have a hwmod associated with it to deal with its
+setting. Today, the reset API is invoked through pdata-quirks and the
+omap_device_{enable/idle} API through the pm_runtime in the IOMMU
+driver. Lookup iommu_enable() and iommu_disable() in
+drivers/iommu/omap-iommu.c
 
-> This is how DRM operates, and you sometimes end up in some very dumb
-> situations where you wait for say, the DSI controller to probe, while
-> you only care about HDMI in your system.
+> Or is there maybe a single module shared across multiple devices?
+
+Yeah kinda. The PRCM registers are just one set, with different bits in
+RSTCTRL and RSTST registers dealing with different reset lines. The API
+to deal with resets is still using the omap_device API and they are
+invoked using pdata-quirks. For OMAP remoteproc driver, we only have one
+pdata quirks defined, but the function we plug in invokes both the reset
+as well as the omap_device_enable/idle functions (not in mainline yet).
+See [1] for reference.
+
+So, we have a unique hwmod/omap_device associated with each of the
+individual devices (IOMMU and the processor are represented as a device
+each).
+
+> If so, we need a minimal module wrapper driver. You can do what we
+> already do for musb on am335x in drivers/usb/musb/musb_am335x.c.
+> A single module has two musb instances and a shared cppi41 dma
+> instance. See also it's related entries in am33xx.dtsi.
 > 
-> But this seems to be on of the hot topic these days, so we might
-> discuss it further in some other thread :)
+> Note that the clkctrl clocks are available now as clocks, so they
+> could be directly enabled for testing. See omap4_tesla_clkctrl_regs
+> and omap4_ducati_clkctrl_regs if that helps.
 
-Or here :-)
+OK, looks like these are recent additions by Tero. It will still be a
+shared set between the MMU and remoteproc drivers, but let me look into
+how these get integrated. At this point, I don't want to be dealing with
+separate clk API in my driver.
 
--- 
-Regards,
+>> The remoteproc driver is only dealing with its resets and hwmod while
+>> the IOMMU driver is dealing with its dedicated reset. The PRCM registers
+>> though are a single set between the two.
+> 
+> Sorry but I'm having hard time following which driver claims
+> which modules :)
 
-Laurent Pinchart
+OMAP IOMMU driver claims and deals with the MMU device in each of the
+DSP and IPU subsystems. The OMAP remoteproc driver deals with the DSP or
+the Cortex-M3/M4 cores.
+
+regards
+Suman
+
+[1]
+http://git.ti.com/gitweb/?p=rpmsg/remoteproc.git;a=blob;f=arch/arm/mach-omap2/remoteproc.c;h=78a4c4746bb568420b251bc42db02849ef439e27;hb=6f7d874549ce847eeb0308704b6a477c308f59e5
