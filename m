@@ -1,187 +1,53 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Tue, 22 Aug 2017 17:59:26 +0200
-Subject: [PATCH v3 2/4] dmaengine: Add STM32 MDMA driver
-In-Reply-To: <20170816164709.GR3053@localhost>
-References: <1501062502-18778-1-git-send-email-pierre-yves.mordret@st.com>
- <1501062502-18778-3-git-send-email-pierre-yves.mordret@st.com>
- <20170816164709.GR3053@localhost>
-Message-ID: <40c24f87-6ea2-4c3a-1e86-9d30d30481c2@st.com>
+From: Chris.Paterson2@renesas.com (Chris Paterson)
+Date: Tue, 22 Aug 2017 16:03:23 +0000
+Subject: [PATCH  0/2] ARM: dts: Add iWave RZ/G1E board support
+In-Reply-To: <1502794460-30213-1-git-send-email-biju.das@bp.renesas.com>
+References: <1502794460-30213-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <TY1PR06MB070230193DD40E5D09D0A9AFB7840@TY1PR06MB0702.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Simon,
+
+> From: Biju Das [mailto:biju.das at bp.renesas.com]
+> Sent: 15 August 2017 11:54
+> 
+> Hello,
+> 
+> This series aims to add iWave RZ/G1E (R8A7745) based RainboW-G22M-SM
+> SODIMM SoM and RainboW-G22D board support.
+> 
+> This series has been tested against linux-next tag next-20170815 as well as
+> renesas-dev tag 20170814-v4.13-rc5
+> 
+> This patch has documentation dependency on below patches
+
+The below patches are now in your v4.14 branch. Does this mean that this DT series can now be accepted?
+
+Thanks, Chris
 
 
-On 08/16/2017 06:47 PM, Vinod Koul wrote:
-> On Wed, Jul 26, 2017 at 11:48:20AM +0200, Pierre-Yves MORDRET wrote:
 > 
->> +/* MDMA Channel x transfer configuration register */
->> +#define STM32_MDMA_CTCR(x)		(0x50 + 0x40 * (x))
->> +#define STM32_MDMA_CTCR_BWM		BIT(31)
->> +#define STM32_MDMA_CTCR_SWRM		BIT(30)
->> +#define STM32_MDMA_CTCR_TRGM_MSK	GENMASK(29, 28)
->> +#define STM32_MDMA_CTCR_TRGM(n)		(((n) & 0x3) << 28)
->> +#define STM32_MDMA_CTCR_TRGM_GET(n)	(((n) & STM32_MDMA_CTCR_TRGM_MSK) >> 28)
-> 
-> OK this seems oft repeated here.
-> 
-> So you are trying to extract the bit values and set the bit value, so why
-> not this do generically...
-> 
-> #define STM32_MDMA_SHIFT(n)		(ffs(n) - 1))
-> #define STM32_MDMA_SET(n, mask)		((n) << STM32_MDMA_SHIFT(mask))
-> #define STM32_MDMA_GET(n, mask)		(((n) && mask) >> STM32_MDMA_SHIFT(mask))
-> 
-> Basically, u extract the shift using the mask value and ffs helping out, so
-> no need to define these and reduce chances of coding errors...
-> 
-
-OK.
-but I would prefer if you don't mind
-#define STM32_MDMA_SET(n, mask)		(((n) << STM32_MDMA_SHIFT(mask)) & mask)
-
->> +static int stm32_mdma_get_width(struct stm32_mdma_chan *chan,
->> +				enum dma_slave_buswidth width)
->> +{
->> +	switch (width) {
->> +	case DMA_SLAVE_BUSWIDTH_1_BYTE:
->> +	case DMA_SLAVE_BUSWIDTH_2_BYTES:
->> +	case DMA_SLAVE_BUSWIDTH_4_BYTES:
->> +	case DMA_SLAVE_BUSWIDTH_8_BYTES:
->> +		return ffs(width) - 1;
->> +	default:
->> +		dev_err(chan2dev(chan), "Dma bus width not supported\n");
-> 
-> please log the width here, helps in debug...
-> 
-
-Hum.. just a dev_dbg to log the actual width or within the dev_err ?
-
->> +static u32 stm32_mdma_get_best_burst(u32 buf_len, u32 tlen, u32 max_burst,
->> +				     enum dma_slave_buswidth width)
->> +{
->> +	u32 best_burst = max_burst;
->> +	u32 burst_len = best_burst * width;
->> +
->> +	while ((burst_len > 0) && (tlen % burst_len)) {
->> +		best_burst = best_burst >> 1;
->> +		burst_len = best_burst * width;
->> +	}
->> +
->> +	return (best_burst > 0) ? best_burst : 1;
-> 
-> when would best_burst <= 0? DO we really need this check
+> [repost,1/2] ARM: shmobile: document iW-RainboW-G22M-SM SODIMM
+> System on Module https://patchwork.kernel.org/patch/9890389/
+> [repost, 2/2] ARM: shmobile: document iW-RainboW-G22D SODIMM SOM
+> Development Platform https://patchwork.kernel.org/patch/9890391/
 > 
 > 
-
-best_burst < 0 is obviously unlikely but =0 is likely whether no best burst
-found. Se we do need this check.
-
->> +static struct dma_async_tx_descriptor *
->> +stm32_mdma_prep_dma_cyclic(struct dma_chan *c, dma_addr_t buf_addr,
->> +			   size_t buf_len, size_t period_len,
->> +			   enum dma_transfer_direction direction,
->> +			   unsigned long flags)
->> +{
->> +	struct stm32_mdma_chan *chan = to_stm32_mdma_chan(c);
->> +	struct stm32_mdma_device *dmadev = stm32_mdma_get_dev(chan);
->> +	struct dma_slave_config *dma_config = &chan->dma_config;
->> +	struct stm32_mdma_desc *desc;
->> +	dma_addr_t src_addr, dst_addr;
->> +	u32 ccr, ctcr, ctbr, count;
->> +	int i, ret;
->> +
->> +	if (!buf_len || !period_len || period_len > STM32_MDMA_MAX_BLOCK_LEN) {
->> +		dev_err(chan2dev(chan), "Invalid buffer/period len\n");
->> +		return NULL;
->> +	}
->> +
->> +	if (buf_len % period_len) {
->> +		dev_err(chan2dev(chan), "buf_len not multiple of period_len\n");
->> +		return NULL;
->> +	}
->> +
->> +	/*
->> +	 * We allow to take more number of requests till DMA is
->> +	 * not started. The driver will loop over all requests.
->> +	 * Once DMA is started then new requests can be queued only after
->> +	 * terminating the DMA.
->> +	 */
->> +	if (chan->busy) {
->> +		dev_err(chan2dev(chan), "Request not allowed when dma busy\n");
->> +		return NULL;
->> +	}
+> Regards,
 > 
-> is that a HW restriction? Once a txn is completed can't we submit
-> subsequent txn..? Can you explain this part please.
+> Biju Das (2):
+>   ARM: dts: iwg22m: Add iWave RZG1E SODIMM SOM
+>   ARM: dts: iwg22d-sodimm: Add support for iWave G22D-SODIMM board
 > 
-
-Driver can prepare any request Slave SG, Memcpy or Cyclic. But if the channel is
-busy to complete a DMA transfer, the request will be put in pending list. This
-is only when the DMA transfer is going to be completed the next descriptor is
-going to be processed and started.
-However for cyclic this is different since when cyclic is ignited the channel
-will be busy until its termination. This is why we forbid any DMA preparation
-for this channel.
-Nonetheless I believe we have a flaw here since we have to forbid
-Slave/Memcpy/Cyclic whether a cyclic request is on-going.
-
-
->> +	if (len <= STM32_MDMA_MAX_BLOCK_LEN) {
->> +		cbndtr |= STM32_MDMA_CBNDTR_BNDT(len);
->> +		if (len <= STM32_MDMA_MAX_BUF_LEN) {
->> +			/* Setup a buffer transfer */
->> +			tlen = len;
->> +			ccr |= STM32_MDMA_CCR_TCIE | STM32_MDMA_CCR_CTCIE;
->> +			ctcr |= STM32_MDMA_CTCR_TRGM(STM32_MDMA_BUFFER);
->> +			ctcr |= STM32_MDMA_CTCR_TLEN((tlen - 1));
->> +		} else {
->> +			/* Setup a block transfer */
->> +			tlen = STM32_MDMA_MAX_BUF_LEN;
->> +			ccr |= STM32_MDMA_CCR_BTIE | STM32_MDMA_CCR_CTCIE;
->> +			ctcr |= STM32_MDMA_CTCR_TRGM(STM32_MDMA_BLOCK);
->> +			ctcr |= STM32_MDMA_CTCR_TLEN(tlen - 1);
->> +		}
->> +
->> +		/* Set best burst size */
->> +		max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+>  arch/arm/boot/dts/Makefile                  |  1 +
+>  arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 29
+> +++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/r8a7745-iwg22m.dtsi       | 24
+> ++++++++++++++++++++++++
+>  3 files changed, 54 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+>  create mode 100644 arch/arm/boot/dts/r8a7745-iwg22m.dtsi
 > 
-> that maynot be best.. we should have wider and longer burst for best
-> throughput..
-> 
-
-Will look at that.
-
->> +	ret = device_property_read_u32(&pdev->dev, "dma-requests",
->> +				       &nr_requests);
->> +	if (ret) {
->> +		nr_requests = STM32_MDMA_MAX_REQUESTS;
->> +		dev_warn(&pdev->dev, "MDMA defaulting on %i request lines\n",
->> +			 nr_requests);
->> +	}
->> +
->> +	count = of_property_count_u32_elems(of_node, "st,ahb-addr-masks");
-> 
-> We dont have device_property_xxx for this?
-
-Sorry no. Well didn't figure out one though.
-
-> 
->> +	if (count < 0)
->> +		count = 0;
->> +
->> +	dmadev = devm_kzalloc(&pdev->dev, sizeof(*dmadev) + sizeof(u32) * count,
->> +			      GFP_KERNEL);
->> +	if (!dmadev)
->> +		return -ENOMEM;
->> +
->> +	dmadev->nr_channels = nr_channels;
->> +	dmadev->nr_requests = nr_requests;
->> +	of_property_read_u32_array(of_node, "st,ahb-addr-masks",
->> +				   dmadev->ahb_addr_masks,
->> +				   count);
-> 
-> i know we have an device api for array reads :)
-> and I think that helps in former case..
-> 
-
-Correct :) device_property_read_u32_array
+> --
+> 1.9.1
