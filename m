@@ -1,20 +1,27 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 21 Aug 2017 21:39:23 -0500
-Subject: [PATCH 4/6] dt-bindings: host1x: Fix and add Tegra186 information
-In-Reply-To: <20170817185413.6324-5-mperttunen@nvidia.com>
-References: <20170817185413.6324-1-mperttunen@nvidia.com>
- <20170817185413.6324-5-mperttunen@nvidia.com>
-Message-ID: <20170822023923.nr22ujsuiousvt2y@rob-hp-laptop>
+Date: Mon, 21 Aug 2017 21:42:09 -0500
+Subject: [PATCH v4 2/9] ASoC: rockchip: Remove obsolete dmic-delay
+In-Reply-To: <20170818031147.16810-3-jeffy.chen@rock-chips.com>
+References: <20170818031147.16810-1-jeffy.chen@rock-chips.com>
+ <20170818031147.16810-3-jeffy.chen@rock-chips.com>
+Message-ID: <20170822024209.ej6y7pv77ztupvrq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 17, 2017 at 09:54:11PM +0300, Mikko Perttunen wrote:
-> Add note that address/size-cells should be 2 on 64-bit systems,
-> and add Tegra186-specific register range properties.
+On Fri, Aug 18, 2017 at 11:11:40AM +0800, Jeffy Chen wrote:
+> This property is no longer used.
+> 
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> ---
+> 
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+> 
+>  .../bindings/sound/rockchip,rk3399-gru-sound.txt           |  7 -------
+>  sound/soc/rockchip/rk3399_gru_sound.c                      | 14 --------------
+>  2 files changed, 21 deletions(-)
 
-Generally the cell sizes have nothing to do with the addressing size of 
-the cpu. They should be as small as what fits for the given sub-tree. If 
-all the register space fits into 4GB, then there's no reason for the 
-#size-cells to be 2. The same is true if the sub-tree has a parent bus.
+Well, obviously not used since they don't even match.
 
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
