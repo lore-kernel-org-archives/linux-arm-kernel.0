@@ -1,50 +1,63 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue, 22 Aug 2017 15:26:49 +0530
-Subject: [PATCH v3 00/17] Broadcom SBA-RAID driver improvements
-Message-ID: <1503395827-19428-1-git-send-email-anup.patel@broadcom.com>
+Date: Tue, 22 Aug 2017 15:26:50 +0530
+Subject: [PATCH v3 01/17] dmaengine: bcm-sba-raid: Minor improvments in
+ comments
+In-Reply-To: <1503395827-19428-1-git-send-email-anup.patel@broadcom.com>
+References: <1503395827-19428-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1503395827-19428-2-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset does various improvments to Broadcom SBA-RAID
-driver.
+This patch does following improvments to comments:
+1. Make section comments consistent across the driver by
+avoiding " SBA " in some of the comments
+2. Add/update few more section comments
 
-The patches are based on Linux-4.13-rc3 and can also be found
-at sba-raid-imp-v3 branch of
-https://github.com/Broadcom/arm64-linux.git
+Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+---
+ drivers/dma/bcm-sba-raid.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-Changes since v2:
- - Update patch description for PATCH1 and PATCH3
- - Add dev_err() for debugfs API failures instead of bailing out
- - Add PATCH17 to remove redundant SBA_REQUEST_STATE_COMPLETED
-
-Changes since v1:
- - Split PATCH1 into 10 smaller patches for easier review
- - Added more info to commit description of PATCH2
- - Split PATCH4 into 2 patches for easier review
- - Dropped PATCH6 because it is now part of
-http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1456425.html
-
-Anup Patel (17):
-  dmaengine: bcm-sba-raid: Minor improvments in comments
-  dmaengine: bcm-sba-raid: Reduce locking context in sba_alloc_request()
-  dmaengine: bcm-sba-raid: Common flags for sba_request state and fence
-  dmaengine: bcm-sba-raid: Remove redundant next_count from sba_request
-  dmaengine: bcm-sba-raid: Remove redundant resp_dma from sba_request
-  dmaengine: bcm-sba-raid: Remove reqs_free_count from sba_device
-  dmaengine: bcm-sba-raid: Allow arbitrary number free sba_request
-  dmaengine: bcm-sba-raid: Increase number of free sba_request
-  dmaengine: bcm-sba-raid: Improve sba_issue_pending() run duration
-  dmaengine: bcm-sba-raid: Alloc resources before registering DMA device
-  dmaengine: bcm-sba-raid: Peek mbox when we have no free requests
-  dmaengine: bcm-sba-raid: Pre-ack async tx descriptor
-  dmaengine: bcm-sba-raid: Re-factor sba_process_deferred_requests()
-  dmaengine: bcm-sba-raid: Remove redundant SBA_REQUEST_STATE_RECEIVED
-  dmaengine: bcm-sba-raid: Add debugfs support
-  dmaengine: bcm-sba-raid: Explicitly ACK mailbox message after sending
-  dmaengine: bcm-sba-raid: Remove redundant SBA_REQUEST_STATE_COMPLETED
-
- drivers/dma/bcm-sba-raid.c | 538 ++++++++++++++++++++++++---------------------
- 1 file changed, 292 insertions(+), 246 deletions(-)
-
+diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
+index e41bbc7..76999b7 100644
+--- a/drivers/dma/bcm-sba-raid.c
++++ b/drivers/dma/bcm-sba-raid.c
+@@ -48,7 +48,8 @@
+ 
+ #include "dmaengine.h"
+ 
+-/* SBA command related defines */
++/* ====== Driver macros and defines ===== */
++
+ #define SBA_TYPE_SHIFT					48
+ #define SBA_TYPE_MASK					GENMASK(1, 0)
+ #define SBA_TYPE_A					0x0
+@@ -88,6 +89,8 @@
+ #define to_sba_device(dchan)		\
+ 	container_of(dchan, struct sba_device, dma_chan)
+ 
++/* ===== Driver data structures ===== */
++
+ enum sba_request_state {
+ 	SBA_REQUEST_STATE_FREE = 1,
+ 	SBA_REQUEST_STATE_ALLOCED = 2,
+@@ -164,7 +167,7 @@ struct sba_device {
+ 	int reqs_free_count;
+ };
+ 
+-/* ====== SBA command helper routines ===== */
++/* ====== Command helper routines ===== */
+ 
+ static inline u64 __pure sba_cmd_enc(u64 cmd, u32 val, u32 shift, u32 mask)
+ {
+@@ -196,7 +199,7 @@ static inline u32 __pure sba_cmd_pq_c_mdata(u32 d, u32 b1, u32 b0)
+ 	       ((d & SBA_C_MDATA_DNUM_MASK) << SBA_C_MDATA_DNUM_SHIFT);
+ }
+ 
+-/* ====== Channel resource management routines ===== */
++/* ====== General helper routines ===== */
+ 
+ static struct sba_request *sba_alloc_request(struct sba_device *sba)
+ {
 -- 
 2.7.4
