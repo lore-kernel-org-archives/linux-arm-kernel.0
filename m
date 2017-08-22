@@ -1,76 +1,69 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Mon, 21 Aug 2017 20:17:30 -0500
-Subject: [PATCH v2 2/3] i2c: davinci: Add PM Runtime Support
-In-Reply-To: <8207a684-f010-ca82-baae-db06665f098e@ti.com>
-References: <20170816221715.15027-1-fcooper@ti.com>
- <20170816221715.15027-3-fcooper@ti.com>
- <8207a684-f010-ca82-baae-db06665f098e@ti.com>
-Message-ID: <d06ef5c6-6501-eca6-2fa2-976d085091b2@ti.com>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Tue, 22 Aug 2017 09:20:20 +0800
+Subject: [PATCH v5 4/7] support user space to query RAS extension feature
+In-Reply-To: <20170821210824.GC20436@cbox>
+References: <1503065517-7920-1-git-send-email-gengdongjiu@huawei.com>
+ <1503065517-7920-5-git-send-email-gengdongjiu@huawei.com>
+ <20170821210824.GC20436@cbox>
+Message-ID: <1d75940a-dd1f-6349-a65a-adbbd221f41f@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Christoffer,
+   Thanks for the review.
+
+On 2017/8/22 5:08, Christoffer Dall wrote:
+> On Fri, Aug 18, 2017 at 10:11:54PM +0800, Dongjiu Geng wrote:
+> 
+> You should put KVM and arm64 in the subject here.
+I will update it in the next version.
 
 
-On 08/21/2017 04:05 AM, Sekhar Nori wrote:
-> On Thursday 17 August 2017 03:47 AM, Franklin S Cooper Jr wrote:
 > 
->> @@ -802,7 +821,6 @@ static int davinci_i2c_probe(struct platform_device *pdev)
->>  	dev->clk = devm_clk_get(&pdev->dev, NULL);
->>  	if (IS_ERR(dev->clk))
->>  		return PTR_ERR(dev->clk);
->> -	clk_prepare_enable(dev->clk);
+>> In armv8.2 RAS extension, it adds virtual SError exception
+>> syndrome registeri(VSESR_EL2), user space will specify that
+>> value. so user space will check whether CPU feature has RAS
+>> extension. if has, it will specify the virtual SError syndrome
+>> value. Otherwise, it will not set. This patch adds this support
+>>
+>> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+>> ---
+>>  arch/arm64/kvm/reset.c   | 3 +++
+>>  include/uapi/linux/kvm.h | 1 +
+>>  2 files changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+>> index 3256b9228e75..b7313ee028e9 100644
+>> --- a/arch/arm64/kvm/reset.c
+>> +++ b/arch/arm64/kvm/reset.c
+>> @@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+>>  	case KVM_CAP_ARM_PMU_V3:
+>>  		r = kvm_arm_support_pmu_v3();
+>>  		break;
+>> +	case KVM_CAP_ARM_RAS_EXTENSION:
+>> +		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
+>> +		break;
+>>  	case KVM_CAP_SET_GUEST_DEBUG:
+>>  	case KVM_CAP_VCPU_ATTRIBUTES:
+>>  		r = 1;
+>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+>> index 6cd63c18708a..5a2a338cae57 100644
+>> --- a/include/uapi/linux/kvm.h
+>> +++ b/include/uapi/linux/kvm.h
+>> @@ -929,6 +929,7 @@ struct kvm_ppc_resize_hpt {
+>>  #define KVM_CAP_PPC_SMT_POSSIBLE 147
+>>  #define KVM_CAP_HYPERV_SYNIC2 148
+>>  #define KVM_CAP_HYPERV_VP_INDEX 149
+>> +#define KVM_CAP_ARM_RAS_EXTENSION 150
 >>  
->>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->>  	dev->base = devm_ioremap_resource(&pdev->dev, mem);
->> @@ -811,6 +829,18 @@ static int davinci_i2c_probe(struct platform_device *pdev)
->>  		goto err_unuse_clocks;
-> 
-> This goto is wrong now. There is no need to unwind the pm_runtime setup
-> on a devm_ioremap_resource() failure. You can just return error here.
-
-Ok
-> 
->>  	}
+>>  #ifdef KVM_CAP_IRQ_ROUTING
 >>  
->> +	pm_runtime_set_autosuspend_delay(dev->dev,
->> +					 DAVINCI_I2C_PM_TIMEOUT);
->> +	pm_runtime_use_autosuspend(dev->dev);
->> +
->> +	pm_runtime_enable(dev->dev);
->> +
->> +	r = pm_runtime_get_sync(dev->dev);
->> +	if (r < 0) {
->> +		dev_err(dev->dev, "failed to runtime_get device: %d\n", r);
->> +		goto err_unuse_clocks;
->> +	}
->> +
->>  	i2c_davinci_init(dev);
->>  
->>  	r = devm_request_irq(&pdev->dev, dev->irq, i2c_davinci_isr, 0,
->> @@ -849,10 +879,16 @@ static int davinci_i2c_probe(struct platform_device *pdev)
->>  	if (r)
->>  		goto err_unuse_clocks;
->>  
->> +	pm_runtime_mark_last_busy(dev->dev);
->> +	pm_runtime_put_autosuspend(dev->dev);
->> +
->>  	return 0;
->>  
->>  err_unuse_clocks:
->> -	clk_disable_unprepare(dev->clk);
->> +	pm_runtime_dont_use_autosuspend(dev->dev);
->> +	pm_runtime_put_sync(dev->dev);
->> +	pm_runtime_disable(dev->dev);
->> +
->>  	dev->clk = NULL;
-> 
-> This null setting of clk seems quite bogus and can be cleaned-up.
-
-Do you mean that I should just remove this line?
-> 
->>  	return r;
->>  }
+>> -- 
+>> 2.14.0
+>>
 > 
 > Thanks,
-> Sekhar
+> -Christoffer
+> 
+> .
 > 
