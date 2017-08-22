@@ -1,154 +1,78 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 22 Aug 2017 14:53:49 +0100
-Subject: [PATCH 09/27] arm64/sve: Signal frame and context structure
- definition
-In-Reply-To: <20170822111705.GT6321@e103592.cambridge.arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-10-git-send-email-Dave.Martin@arm.com>
- <87y3qb52ez.fsf@linaro.org> <20170822111705.GT6321@e103592.cambridge.arm.com>
-Message-ID: <87tw0z4sk2.fsf@linaro.org>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Tue, 22 Aug 2017 19:32:21 +0530
+Subject: [PATCH] clk: sirf: make clk_ops const
+Message-ID: <1503410541-25461-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Make these const as they are only stored in the const field of a
+clk_init_data structure.
 
-Dave Martin <Dave.Martin@arm.com> writes:
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
+To compile-test clk-common.c, I compiled clk-atlas6.c and clk-prima2.c
+as it gets included in these two files.
 
-> On Tue, Aug 22, 2017 at 11:22:44AM +0100, Alex Benn?e wrote:
->>
->> Dave Martin <Dave.Martin@arm.com> writes:
->>
->> > This patch defines the representation that will be used for the SVE
->> > register state in the signal frame, and implements support for
->> > saving and restoring the SVE registers around signals.
->> >
->> > The same layout will also be used for the in-kernel task state.
->> >
->> > Due to the variability of the SVE vector length, it is not possible
->> > to define a fixed C struct to describe all the registers.  Instead,
->> > Macros are defined in sigcontext.h to facilitate access to the
->> > parts of the structure.
->> >
->> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
->> > ---
->> >  arch/arm64/include/uapi/asm/sigcontext.h | 113 ++++++++++++++++++++++++++++++-
->> >  1 file changed, 112 insertions(+), 1 deletion(-)
->> >
->> > diff --git a/arch/arm64/include/uapi/asm/sigcontext.h b/arch/arm64/include/uapi/asm/sigcontext.h
->> > index f0a76b9..0533bdf 100644
->> > --- a/arch/arm64/include/uapi/asm/sigcontext.h
->> > +++ b/arch/arm64/include/uapi/asm/sigcontext.h
->> > @@ -16,6 +16,8 @@
->> >  #ifndef _UAPI__ASM_SIGCONTEXT_H
->> >  #define _UAPI__ASM_SIGCONTEXT_H
->> >
->> > +#ifndef __ASSEMBLY__
->> > +
->> >  #include <linux/types.h>
->> >
->> >  /*
->> > @@ -41,10 +43,11 @@ struct sigcontext {
->> >   *
->> >   *	0x210		fpsimd_context
->> >   *	 0x10		esr_context
->> > + *	0x8a0		sve_context (vl <= 64) (optional)
->> >   *	 0x20		extra_context (optional)
->> >   *	 0x10		terminator (null _aarch64_ctx)
->> >   *
->> > - *	0xdb0		(reserved for future allocation)
->> > + *	0x510		(reserved for future allocation)
->> >   *
->> >   * New records that can exceed this space need to be opt-in for userspace, so
->> >   * that an expanded signal frame is not generated unexpectedly.  The mechanism
->> > @@ -116,4 +119,112 @@ struct extra_context {
->> >  	__u32 __reserved[3];
->> >  };
->> >
->> > +#define SVE_MAGIC	0x53564501
->> > +
->> > +struct sve_context {
->> > +	struct _aarch64_ctx head;
->> > +	__u16 vl;
->> > +	__u16 __reserved[3];
->> > +};
->> > +
->> > +#endif /* !__ASSEMBLY__ */
->> > +
->> > +/*
->> > + * The SVE architecture leaves space for future expansion of the
->> > + * vector length beyond its initial architectural limit of 2048 bits
->> > + * (16 quadwords).
->> > + */
->> > +#define SVE_VQ_MIN		1
->> > +#define SVE_VQ_MAX		0x200
->> > +
->> > +#define SVE_VL_MIN		(SVE_VQ_MIN * 0x10)
->> > +#define SVE_VL_MAX		(SVE_VQ_MAX * 0x10)
->> > +
->> > +#define SVE_NUM_ZREGS		32
->> > +#define SVE_NUM_PREGS		16
->> > +
->> > +#define sve_vl_valid(vl) \
->> > +	((vl) % 0x10 == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
->> > +#define sve_vq_from_vl(vl)	((vl) / 0x10)
->> > +#define sve_vl_from_vq(vq)	((vq) * 0x10)
->>
->> I got a little confused first time through over what VQ and VL where.
->> Maybe it would make sense to expand a little more from first principles?
->>
->>   /*
->>    * The SVE architecture defines vector registers as a multiple of 128
->>    * bit quadwords. The current architectural limit is 2048 bits (16
->>    * quadwords) but there is room for future expansion beyond that.
->>     */
->
-> This comes up in several places and so I didn't want to comment it
-> repeatedly everywhere.
->
-> Instead, I wrote up something in section 2 (Vector length terminology)
-> of Documentation/arm64/sve.txt -- see patch 25.  Can you take a look and
-> see whether that's adequate?
+ drivers/clk/sirf/clk-common.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-Ahh, I hadn't got to that yet. I'm unsure to the order the kernel likes
-to put things but I like to put design documents at the front of the
-patch queue as they are useful primers and saves you having to patch a:
-
-modified   arch/arm64/include/uapi/asm/sigcontext.h
-@@ -132,19 +132,24 @@ struct sve_context {
- /*
-  * The SVE architecture leaves space for future expansion of the
-  * vector length beyond its initial architectural limit of 2048 bits
-- * (16 quadwords).
-+ * (16 quadwords). See Documentation/arm64/sve.txt for a summary of
-+ * the terminology of Vector Quads (VQ) and Vector Lengths (VL).
-  */
-+
-+#define SVE_VQ_BITS             128      /* 128 bits in one quadword */
-+#define SVE_VQ_BYTES            (SVE_VQ_BITS / 8)
-+
- #define SVE_VQ_MIN		1
- #define SVE_VQ_MAX		0x200
-
--#define SVE_VL_MIN		(SVE_VQ_MIN * 0x10)
--#define SVE_VL_MAX		(SVE_VQ_MAX * 0x10)
-+#define SVE_VL_MIN		(SVE_VQ_MIN * SVE_VQ_BYTES)
-+#define SVE_VL_MAX		(SVE_VQ_MAX * SVE_VQ_BYTES)
-
- #define SVE_NUM_ZREGS		32
- #define SVE_NUM_PREGS		16
-
- #define sve_vl_valid(vl) \
--	((vl) % 0x10 == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
-+	((vl) % SVE_VQ_BYTES == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
- #define sve_vq_from_vl(vl)	((vl) / 0x10)
- #define sve_vl_from_vq(vq)	((vq) * 0x10)
-
-
->
-> [...]
->
-> Cheers
-> ---Dave
-
-
---
-Alex Benn?e
+diff --git a/drivers/clk/sirf/clk-common.c b/drivers/clk/sirf/clk-common.c
+index 77e1e24..f9ef6fa 100644
+--- a/drivers/clk/sirf/clk-common.c
++++ b/drivers/clk/sirf/clk-common.c
+@@ -184,7 +184,7 @@ static unsigned long cpu_clk_recalc_rate(struct clk_hw *hw,
+ 	return clk_hw_get_rate(parent_clk);
+ }
+ 
+-static struct clk_ops std_pll_ops = {
++static const struct clk_ops std_pll_ops = {
+ 	.recalc_rate = pll_clk_recalc_rate,
+ 	.round_rate = pll_clk_round_rate,
+ 	.set_rate = pll_clk_set_rate,
+@@ -265,7 +265,7 @@ static unsigned long usb_pll_clk_recalc_rate(struct clk_hw *hw, unsigned long pa
+ 	return (reg & SIRFSOC_USBPHY_PLL_BYPASS) ? parent_rate : 48*MHZ;
+ }
+ 
+-static struct clk_ops usb_pll_ops = {
++static const struct clk_ops usb_pll_ops = {
+ 	.enable = usb_pll_clk_enable,
+ 	.disable = usb_pll_clk_disable,
+ 	.recalc_rate = usb_pll_clk_recalc_rate,
+@@ -437,7 +437,7 @@ static int cpu_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	return ret2 ? ret2 : ret1;
+ }
+ 
+-static struct clk_ops msi_ops = {
++static const struct clk_ops msi_ops = {
+ 	.set_rate = dmn_clk_set_rate,
+ 	.round_rate = dmn_clk_round_rate,
+ 	.recalc_rate = dmn_clk_recalc_rate,
+@@ -488,7 +488,7 @@ static int cpu_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	},
+ };
+ 
+-static struct clk_ops cpu_ops = {
++static const struct clk_ops cpu_ops = {
+ 	.set_parent = dmn_clk_set_parent,
+ 	.get_parent = dmn_clk_get_parent,
+ 	.set_rate = cpu_clk_set_rate,
+@@ -511,7 +511,7 @@ static int cpu_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	},
+ };
+ 
+-static struct clk_ops dmn_ops = {
++static const struct clk_ops dmn_ops = {
+ 	.is_enabled = std_clk_is_enabled,
+ 	.enable = std_clk_enable,
+ 	.disable = std_clk_disable,
+@@ -679,7 +679,7 @@ static void std_clk_disable(struct clk_hw *hw)
+ 	"io",
+ };
+ 
+-static struct clk_ops ios_ops = {
++static const struct clk_ops ios_ops = {
+ 	.is_enabled = std_clk_is_enabled,
+ 	.enable = std_clk_enable,
+ 	.disable = std_clk_disable,
+-- 
+1.9.1
