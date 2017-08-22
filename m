@@ -1,43 +1,65 @@
-From: oza.oza@broadcom.com (Oza Pawandeep)
-Date: Tue, 22 Aug 2017 13:40:55 +0530
-Subject: [PATCH v3 2/3] dt-bindings: PCI: Add PCIe hotplug property
-In-Reply-To: <1503389456-27373-1-git-send-email-oza.oza@broadcom.com>
-References: <1503389456-27373-1-git-send-email-oza.oza@broadcom.com>
-Message-ID: <1503389456-27373-3-git-send-email-oza.oza@broadcom.com>
+From: zhangshaokun@hisilicon.com (Shaokun Zhang)
+Date: Tue, 22 Aug 2017 16:07:51 +0800
+Subject: [PATCH v5 0/6] Add HiSilicon SoC uncore Performance Monitoring Unit
+ driver
+Message-ID: <1503389277-134131-1-git-send-email-zhangshaokun@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Host drivers have the requirement of implementing PCI hotplug
-based on the how their SOC supports PCI hotplug.
+This patchset adds support for HiSilicon SoC uncore PMUs driver. It
+includes L3C, Hydra Home Agent (HHA) and DDRC.
 
-Couple of properties have been added. the one to enable
-the hotplug feature itself, and the other caters to
-the PCI hotplug implementation with the use of gpios.
+Changes in v5:
+* remove unnecessary name/num_events member in hisi_pmu
+* refactor hisi_pmu_hwevents structure
+* remove hisi_pmu_alloc function
+* revise cpuhotplug for L3C PMUs
+* add cpuhotplug for HHA/DDRC PMUs
+* fix the name format of uncore PMUs
+* remove unnecessary variants
 
-Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+Changes in v4:
+* remove redundant code and comments
+* reverse the functions order in exit function
+* remove some GPL information
+* revise including header file
+* fix Jonathan's other comments
 
-diff --git a/Documentation/devicetree/bindings/pci/pci.txt b/Documentation/devicetree/bindings/pci/pci.txt
-index 50f9e2c..0bf25a1 100644
---- a/Documentation/devicetree/bindings/pci/pci.txt
-+++ b/Documentation/devicetree/bindings/pci/pci.txt
-@@ -24,3 +24,18 @@ driver implementation may support the following properties:
-    unsupported link speed, for instance, trying to do training for
-    unsupported link speed, etc.  Must be '4' for gen4, '3' for gen3, '2'
-    for gen2, and '1' for gen1. Any other values are invalid.
-+
-+- slot-pluggable:
-+   PCI hotplug feature is supported.
-+   PCI hotplug implementation is SOC/Board specific, and also it depends on
-+   how add-in card is designed (e.g. how many present pins are implemented).
-+   If the slot-pluggable property is present, the following propertey could
-+   become effective.
-+   - prsnt-gpios:
-+      Array of gpios, could be present if hotplug is supported.
-+      This property defines gpio based hotplug implementation.
-+      Example:
-+      If x8 card is connected, then it might be possible that all the
-+      3 present pins could go low, or at least one pin goes low.
-+      If x4 card is connected, then it might be possible that 2 present
-+      pins go low, or at least one pin goes low.
+Changes in v3:
+* rebase to 4.13-rc1
+* add dev_err if ioremap fails for PMUs
+ 
+Changes in v2:
+* fix kbuild test robot error
+* make hisi_uncore_ops static
+
+Shaokun Zhang (6):
+  Documentation: perf: hisi: Documentation for HiSilicon SoC PMU driver
+  perf: hisi: Add support for HiSilicon SoC uncore PMU driver
+  perf: hisi: Add support for HiSilicon SoC L3C PMU driver
+  perf: hisi: Add support for HiSilicon SoC HHA PMU driver
+  perf: hisi: Add support for HiSilicon SoC DDRC PMU driver
+  arm64: MAINTAINERS: hisi: Add HiSilicon SoC PMU support
+
+ Documentation/perf/hisi-pmu.txt               |  53 +++
+ MAINTAINERS                                   |   7 +
+ drivers/perf/Kconfig                          |   7 +
+ drivers/perf/Makefile                         |   1 +
+ drivers/perf/hisilicon/Makefile               |   1 +
+ drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c | 467 +++++++++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_hha_pmu.c  | 477 +++++++++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c  | 482 ++++++++++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.c      | 440 +++++++++++++++++++++++
+ drivers/perf/hisilicon/hisi_uncore_pmu.h      | 107 ++++++
+ include/linux/cpuhotplug.h                    |   3 +
+ 11 files changed, 2045 insertions(+)
+ create mode 100644 Documentation/perf/hisi-pmu.txt
+ create mode 100644 drivers/perf/hisilicon/Makefile
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_ddrc_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_hha_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_l3c_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.c
+ create mode 100644 drivers/perf/hisilicon/hisi_uncore_pmu.h
+
 -- 
 1.9.1
