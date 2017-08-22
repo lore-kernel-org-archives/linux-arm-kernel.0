@@ -1,78 +1,36 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 22 Aug 2017 19:34:11 +0200
-Subject: Possible regression between 4.9 and 4.13
-Message-ID: <4dee5523-2d76-e731-6e81-f3027e88827f@free.fr>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 22 Aug 2017 10:37:49 -0700
+Subject: [PATCH 5/8] ARM: OMAP4: hwmod_data: Remove modulemode from
+ IPU/DSP hwmods
+In-Reply-To: <20170821234818.4755-6-s-anna@ti.com>
+References: <20170821234818.4755-1-s-anna@ti.com>
+ <20170821234818.4755-6-s-anna@ti.com>
+Message-ID: <20170822173749.GK6008@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+* Suman Anna <s-anna@ti.com> [170821 16:48]:
+>
+> A shutdown sequence follows a reverse pattern
+> with the processors put into reset first followed by the unmapping and
+> disabling of the MMUs. Both the processors and the MMUs are present
+> within a single clock domain and requires the domain be clocked and
+> enabled until the last entity. The kernel crash can happen during the
+> unmapping phase of the MMUs, as the hwmod layer disables the module
+> during the omap_device_idle processing of the processor hwmod. This
+> issue is fixed by not defining a modulemode for the IPU/DSP processors,
+> which results in keeping the module in an activated state. The module
+> is disabled properly during the omap_device_idle processing of the MMU
+> hwmod while disabling the MMU.
 
-The driver for my system's PCIe host bridge landed recently
-(in 4.13) but it was developed on 4.9
+I think a better way to fix this would be to make sure the module
+is enabled during the unmapping phase of the MMUs. If there is no
+driver left at that point to call pm_runtime_get() on the module,
+do it via pdata-quirks.c using struct iommu_platform_data?
 
-I tested the PCIe host bridge by plugging a 4-port USB3 adapter
-into the PCIe slot (system at rest) and plugging an USB3 Flash
-drive into the USB3 adapter (at run-time).
+If you can't add the enable/disable around existing assert_reset/
+deassert_reset, you can add a new one.
 
-On 4.9, the setup works (almost perfectly, see below).
-On 4.13, once I unplug the Flash drive, the controller port
-remains unresponsive.
+Regards,
 
-
-On 4.9, I said *almost* perfectly, because the pcieport driver
-does report a few non-fatal errors when I unplug:
-
-[  193.838504] usb 2-2: new SuperSpeed USB device number 2 using xhci_hcd
-[  193.878081] usb-storage 2-2:1.0: USB Mass Storage device detected
-[  193.884547] scsi host0: usb-storage 2-2:1.0
-[  194.907936] scsi 0:0:0:0: Direct-Access     Kingston DataTraveler 3.0      PQ: 0 ANSI: 6
-[  194.920296] sd 0:0:0:0: [sda] 15109516 512-byte logical blocks: (7.74 GB/7.20 GiB)
-[  194.928666] sd 0:0:0:0: [sda] Write Protect is off
-[  194.933755] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
-[  194.946074]  sda: sda1
-[  194.953608] sd 0:0:0:0: [sda] Attached SCSI removable disk
-
-[  208.930260] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
-[  208.938342] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
-[  208.950163] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
-[  208.958577] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
-[  208.965432] pcieport 0000:00:00.0: AER: Device recovery failed
-[  209.663733] xhci_hcd 0000:01:00.0: Cannot set link state.
-[  209.669194] usb usb2-port2: cannot disable (err = -32)
-[  209.674376] usb 2-2: USB disconnect, device number 2
-[  209.680481] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
-[  209.688689] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
-[  209.700555] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
-[  209.708978] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
-[  209.715845] pcieport 0000:00:00.0: AER: Device recovery failed
-[  209.721722] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
-[  209.729785] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
-[  209.741602] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
-[  209.750027] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
-[  209.756866] pcieport 0000:00:00.0: AER: Device recovery failed
-
-After that, I can still plug the drive into the same port.
-
-But on 4.13, I get
-
-[   27.330378] usb 2-2: new SuperSpeed USB device number 2 using xhci_hcd
-[   27.369383] usb-storage 2-2:1.0: USB Mass Storage device detected
-[   27.375840] scsi host0: usb-storage 2-2:1.0
-[   28.403035] scsi 0:0:0:0: Direct-Access     Kingston DataTraveler 3.0      PQ: 0 ANSI: 6
-[   28.413326] sd 0:0:0:0: [sda] 15109516 512-byte logical blocks: (7.74 GB/7.20 GiB)
-[   28.423653] sd 0:0:0:0: [sda] Write Protect is off
-[   28.429139] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
-[   28.441529]  sda: sda1
-[   28.449431] sd 0:0:0:0: [sda] Attached SCSI removable disk
-
-[   90.592134] xhci_hcd 0000:01:00.0: xHCI host controller not responding, assume dead
-[   90.599857] xhci_hcd 0000:01:00.0: HC died; cleaning up
-[   90.605336] usb 2-2: USB disconnect, device number 2
-[   90.630414] udevd[955]: inotify_add_watch(6, /dev/sda, 10) failed: No such file or directory
-
-Trying to replug into the same port = nothing happens
-(Linux did say "assume dead")
-
-Any idea what could have changed between 4.9 and 4.13 ?
-
-Regards.
+Tony
