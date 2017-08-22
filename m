@@ -1,50 +1,50 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 22 Aug 2017 16:35:34 +0100
-Subject: [PATCH v6 6/6] perf: ARM DynamIQ Shared Unit PMU support
-In-Reply-To: <20170822121722.0000712c@huawei.com>
-References: <1503338109-32540-1-git-send-email-suzuki.poulose@arm.com>
- <1503338109-32540-7-git-send-email-suzuki.poulose@arm.com>
- <20170822121722.0000712c@huawei.com>
-Message-ID: <f59706eb-8702-7557-10a7-27535aa5f91c@arm.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Tue, 22 Aug 2017 23:35:47 +0800
+Subject: [RESENT PATCH v6 0/8] ASoC: rockchip: Parse dai links from dts
+Message-ID: <20170822153555.20735-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/08/17 12:17, Jonathan Cameron wrote:
-> On Mon, 21 Aug 2017 18:55:09 +0100
-> Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->
->> Add support for the Cluster PMU part of the ARM DynamIQ Shared Unit (DSU).
->> The DSU integrates one or more cores with an L3 memory system, control
->> logic, and external interfaces to form a multicore cluster. The PMU
->> allows counting the various events related to L3, SCU etc, along with
->> providing a cycle counter.
->>
->> The PMU can be accessed via system registers, which are common
->> to the cores in the same cluster. The PMU registers follow the
->> semantics of the ARMv8 PMU, mostly, with the exception that
->> the counters record the cluster wide events.
->>
->> This driver is mostly based on the ARMv8 and CCI PMU drivers.
->> The driver only supports ARM64 at the moment. It can be extended
->> to support ARM32 by providing register accessors like we do in
->> arch/arm64/include/arm_dsu_pmu.h.
->>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->
-> Hi Suzuki,
->
-> Was just reading this again out of curiosity and picked up on a couple of
-> really trivial things.  Nothing that should slow down a merge, but if you happen
-> to be doing a v6...
->
-> Driver looks good to me.
->
-> Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 
-Jonathan,
+Currently we are using a fixed list of dai links in the driver.
+This serial of patches would let the driver parse dai links from
+dts, so that we can make some of them optional for future boards.
 
-Thanks for taking a look. I will fix those issues.
+Tested on my chromebook bob(with cros 4.4 kernel), it still works
+after disabled rt5514 codecs in the dts.
 
-Suzuki
+
+Changes in v6:
+Add dmic wakeup delay(not used for now).
+
+Changes in v5:
+Keep the dmic-delay property, but correct it with the name in
+dt-binding.
+        -- Suggested-by Mark Brown <broonie@kernel.org>
+
+Changes in v3:
+Use compatible to match audio codecs
+        -- Suggested-by Matthias Kaehlcke <mka@chromium.org>
+
+Changes in v2:
+Let rockchip,codec-names be a required property, because we plan to
+add more supported codecs to the fixed dai link list in the driver.
+
+Jeffy Chen (8):
+  ASoC: rockchip: Correct 'dmic-delay' property name
+  ASoC: rockchip: Use codec of_node and dai_name for rt5514 dsp
+  arm64: dts: rockchip: Add rt5514 dsp for Gru
+  arm64: dts: rockchip: Update rt5514 devices' compatible for Gru
+  ASoC: rockchip: Parse dai links from dts
+  ASoC: rockchip: Add support for DP codec
+  ASoC: rockchip: Add support for DMIC codec
+  dt-bindings: ASoC: rockchip: Update description of rockchip,codec
+
+ .../bindings/sound/rockchip,rk3399-gru-sound.txt   |   2 +-
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       |   7 +-
+ sound/soc/rockchip/Kconfig                         |   2 +
+ sound/soc/rockchip/rk3399_gru_sound.c              | 270 ++++++++++++++-------
+ 4 files changed, 193 insertions(+), 88 deletions(-)
+
+-- 
+2.11.0
