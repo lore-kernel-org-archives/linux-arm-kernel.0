@@ -1,63 +1,61 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue, 22 Aug 2017 15:26:50 +0530
-Subject: [PATCH v3 01/17] dmaengine: bcm-sba-raid: Minor improvments in
- comments
+Date: Tue, 22 Aug 2017 15:26:51 +0530
+Subject: [PATCH v3 02/17] dmaengine: bcm-sba-raid: Reduce locking context in
+ sba_alloc_request()
 In-Reply-To: <1503395827-19428-1-git-send-email-anup.patel@broadcom.com>
 References: <1503395827-19428-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1503395827-19428-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1503395827-19428-3-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch does following improvments to comments:
-1. Make section comments consistent across the driver by
-avoiding " SBA " in some of the comments
-2. Add/update few more section comments
+We don't require to hold "sba->reqs_lock" for long-time
+in sba_alloc_request() because lock protection is not
+required when initializing members of "struct sba_request".
 
 Signed-off-by: Anup Patel <anup.patel@broadcom.com>
 ---
- drivers/dma/bcm-sba-raid.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ drivers/dma/bcm-sba-raid.c | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
-index e41bbc7..76999b7 100644
+index 76999b7..f81d5ac 100644
 --- a/drivers/dma/bcm-sba-raid.c
 +++ b/drivers/dma/bcm-sba-raid.c
-@@ -48,7 +48,8 @@
+@@ -207,24 +207,24 @@ static struct sba_request *sba_alloc_request(struct sba_device *sba)
+ 	struct sba_request *req = NULL;
  
- #include "dmaengine.h"
- 
--/* SBA command related defines */
-+/* ====== Driver macros and defines ===== */
+ 	spin_lock_irqsave(&sba->reqs_lock, flags);
+-
+ 	req = list_first_entry_or_null(&sba->reqs_free_list,
+ 				       struct sba_request, node);
+ 	if (req) {
+ 		list_move_tail(&req->node, &sba->reqs_alloc_list);
+-		req->state = SBA_REQUEST_STATE_ALLOCED;
+-		req->fence = false;
+-		req->first = req;
+-		INIT_LIST_HEAD(&req->next);
+-		req->next_count = 1;
+-		atomic_set(&req->next_pending_count, 1);
+-
+ 		sba->reqs_free_count--;
+-
+-		dma_async_tx_descriptor_init(&req->tx, &sba->dma_chan);
+ 	}
+-
+ 	spin_unlock_irqrestore(&sba->reqs_lock, flags);
++	if (!req)
++		return NULL;
 +
- #define SBA_TYPE_SHIFT					48
- #define SBA_TYPE_MASK					GENMASK(1, 0)
- #define SBA_TYPE_A					0x0
-@@ -88,6 +89,8 @@
- #define to_sba_device(dchan)		\
- 	container_of(dchan, struct sba_device, dma_chan)
- 
-+/* ===== Driver data structures ===== */
++	req->state = SBA_REQUEST_STATE_ALLOCED;
++	req->fence = false;
++	req->first = req;
++	INIT_LIST_HEAD(&req->next);
++	req->next_count = 1;
++	atomic_set(&req->next_pending_count, 1);
 +
- enum sba_request_state {
- 	SBA_REQUEST_STATE_FREE = 1,
- 	SBA_REQUEST_STATE_ALLOCED = 2,
-@@ -164,7 +167,7 @@ struct sba_device {
- 	int reqs_free_count;
- };
++	dma_async_tx_descriptor_init(&req->tx, &sba->dma_chan);
  
--/* ====== SBA command helper routines ===== */
-+/* ====== Command helper routines ===== */
- 
- static inline u64 __pure sba_cmd_enc(u64 cmd, u32 val, u32 shift, u32 mask)
- {
-@@ -196,7 +199,7 @@ static inline u32 __pure sba_cmd_pq_c_mdata(u32 d, u32 b1, u32 b0)
- 	       ((d & SBA_C_MDATA_DNUM_MASK) << SBA_C_MDATA_DNUM_SHIFT);
+ 	return req;
  }
- 
--/* ====== Channel resource management routines ===== */
-+/* ====== General helper routines ===== */
- 
- static struct sba_request *sba_alloc_request(struct sba_device *sba)
- {
 -- 
 2.7.4
