@@ -1,36 +1,53 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 22 Aug 2017 10:37:49 -0700
-Subject: [PATCH 5/8] ARM: OMAP4: hwmod_data: Remove modulemode from
- IPU/DSP hwmods
-In-Reply-To: <20170821234818.4755-6-s-anna@ti.com>
-References: <20170821234818.4755-1-s-anna@ti.com>
- <20170821234818.4755-6-s-anna@ti.com>
-Message-ID: <20170822173749.GK6008@atomide.com>
+Date: Tue, 22 Aug 2017 10:39:30 -0700
+Subject: [PATCH v2 3/5] dt-bindings: sdhci-omap: Add bindings for the
+ sdhci-omap controller
+In-Reply-To: <20170822133907.21549-1-kishon@ti.com>
+References: <20170821142132.GH6008@atomide.com>
+ <20170822133907.21549-1-kishon@ti.com>
+Message-ID: <20170822173929.GL6008@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [170821 16:48]:
+* Kishon Vijay Abraham I <kishon@ti.com> [170822 06:39]:
+> Add binding for the TI's sdhci-omap controller. This now includes only
+> a subset of properties documented in ti-omap-hsmmc.txt but will eventually
+> include all the properties.
 >
-> A shutdown sequence follows a reverse pattern
-> with the processors put into reset first followed by the unmapping and
-> disabling of the MMUs. Both the processors and the MMUs are present
-> within a single clock domain and requires the domain be clocked and
-> enabled until the last entity. The kernel crash can happen during the
-> unmapping phase of the MMUs, as the hwmod layer disables the module
-> during the omap_device_idle processing of the processor hwmod. This
-> issue is fixed by not defining a modulemode for the IPU/DSP processors,
-> which results in keeping the module in an activated state. The module
-> is disabled properly during the omap_device_idle processing of the MMU
-> hwmod while disabling the MMU.
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+> Changes from v1:
+> *) Create a new sdhci-omap.txt document for TI's sdhci-omap controller instead
+>    of using the ti-omap-hsmmc.txt as suggested by Tony
 
-I think a better way to fix this would be to make sure the module
-is enabled during the unmapping phase of the MMUs. If there is no
-driver left at that point to call pm_runtime_get() on the module,
-do it via pdata-quirks.c using struct iommu_platform_data?
+Works for me thanks, just one typo below..
 
-If you can't add the enable/disable around existing assert_reset/
-deassert_reset, you can add a new one.
+>  .../devicetree/bindings/mmc/sdhci-omap.txt         | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-omap.txt b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+> new file mode 100644
+> index 000000000000..139695ad2d58
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+> @@ -0,0 +1,22 @@
+> +* TI OMAP SDHCI Controller
+> +
+> +Refer to mmc.txt for standard MMC bindings.
+> +
+> +Required properties:
+> +- compatible: Should be "ti,dra7-sdhci" for DRA7 and DRA72 controllers
+> +- ti,hwmods: Must be "mmc<n>", <n> is controller instance starting 1
+> +
+> +Optional properties:
+> +- ti,dual-volt: boolean, supports dual voltage cards
+> +- ti,non-removable: non-removable slot (like eMMC)
+> +
+> +Example:
+> +	mmc1: mmc at 0x4809c000 {
+> +		compatible = "ti,omap4-hsmmc";
 
-Regards,
+The compatible in the example here is still using hsmmc :)
 
 Tony
