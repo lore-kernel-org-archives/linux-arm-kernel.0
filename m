@@ -1,43 +1,21 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Tue, 22 Aug 2017 18:09:01 +0530
-Subject: [PATCH 11/18] rpmsg: glink: Use the local intents when receiving
- data
-In-Reply-To: <1dc63580-4a6c-750a-7cb6-00906a4ea4c0@codeaurora.org>
-References: <1502903951-5403-1-git-send-email-sricharan@codeaurora.org>
- <1502903951-5403-12-git-send-email-sricharan@codeaurora.org>
- <1dc63580-4a6c-750a-7cb6-00906a4ea4c0@codeaurora.org>
-Message-ID: <65d6412f-ee00-09b1-59ee-7ff20d65827b@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 22 Aug 2017 14:43:49 +0200
+Subject: [PATCH 00/17] constify pinconf_ops, pinctrl_ops,
+ and pinmux_ops structures
+In-Reply-To: <1502359589-15970-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1502359589-15970-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <CACRpkdZA_Nff+5Gk9wexoroX2=-tMzNJFVQbWmV8nhWooEwWbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Aug 10, 2017 at 12:06 PM, Julia Lawall <Julia.Lawall@lip6.fr> wrote:
 
-<snip..>
+> These structures are only stored in fields of a pinctrl_desc
+> structure that are const. Make the structures const as well.
+>
+> Done with the help of Coccinelle.
 
->> ? -??? /* Might have an ongoing, fragmented, message to append */
->> -??? if (!channel->buf) {
->> -??????? channel->buf = kmalloc(chunk_size + left_size, GFP_ATOMIC);
->> -??????? if (!channel->buf)
->> -??????????? return -ENOMEM;
->> +??? if (glink->intentless) {
->> +??????? /* Might have an ongoing, fragmented, message to append */
->> +??????? if (!channel->buf) {
->> +??????????? intent = kzalloc(sizeof(*intent), GFP_ATOMIC);
->> +??????????? if (!intent)
->> +??????????????? return -ENOMEM;
->> +
->> +??????????? intent->data = kmalloc(chunk_size + left_size,
->> +?????????????????????????? GFP_ATOMIC);
-> 
-> Who is supposed to free the intent and intent->data memory ?
- Well, that's done as a part of the rx_done_work.
+Thanks Julia, all patches applied with relevant ACKs collected.
 
-Regards,
- Sricharan
- 
--- 
-"QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
-
----
-This email has been checked for viruses by Avast antivirus software.
-https://www.avast.com/antivirus
+Yours,
+Linus Walleij
