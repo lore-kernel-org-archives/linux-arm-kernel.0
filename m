@@ -1,39 +1,79 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 22 Aug 2017 20:38:05 +0200
-Subject: [PATCH net-next v2 00/10] net: mvpp2: MAC/GoP configuration
-In-Reply-To: <20170822180757.GD18076@lunn.ch>
-References: <20170822170830.32413-1-antoine.tenart@free-electrons.com>
- <20170822180757.GD18076@lunn.ch>
-Message-ID: <20170822183805.GD14942@kwain>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Tue, 22 Aug 2017 19:39:48 +0100
+Subject: [PATCH 11/27] arm64/sve: Core task context handling
+In-Reply-To: <20170822171959.GX6321@e103592.cambridge.arm.com>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-12-git-send-email-Dave.Martin@arm.com>
+ <87378jbmkg.fsf@linaro.org> <20170822171959.GX6321@e103592.cambridge.arm.com>
+Message-ID: <87ziara1l7.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
 
-On Tue, Aug 22, 2017 at 08:07:57PM +0200, Andrew Lunn wrote:
-> On Tue, Aug 22, 2017 at 07:08:20PM +0200, Antoine Tenart wrote:
-> > 
-> > This is based on net-next (e2a7c34fb285).
-> > 
-> > I removed the GoP interrupt and PHY optional parts in this v2 to ease
-> > the review process as the MAC/GoP initialization seemed to start less
-> > discussions :)
-> 
-> By that, do you mean setting the SMI PHY address?
+Dave Martin <Dave.Martin@arm.com> writes:
 
-Yes, the one set in the GoP. You asked more precisions but I need get
-more info to answer, so I removed it in the meantime.
+> On Tue, Aug 22, 2017 at 05:21:19PM +0100, Alex Benn?e wrote:
+>>
+>> Dave Martin <Dave.Martin@arm.com> writes:
+>
+> [...]
+>
+>> > --- a/arch/arm64/include/asm/processor.h
+>> > +++ b/arch/arm64/include/asm/processor.h
+>> > @@ -85,6 +85,8 @@ struct thread_struct {
+>> >  	unsigned long		tp2_value;
+>> >  #endif
+>> >  	struct fpsimd_state	fpsimd_state;
+>> > +	void			*sve_state;	/* SVE registers, if any */
+>> > +	u16			sve_vl;		/* SVE vector length */
+>>
+>> sve_vl is implicitly cast to unsigned int bellow - it should be
+>> consistent.
+>
+> Agreed -- I think this can just be unsigned int here, which is the type
+> I use everywhere except when encoding the vector length in the signal
+> frame and ptrace data.
+>
+> During development, there was an additional flags field here (now
+> merged into the thread_info flags).  u16 was big enough for the largest
+> architectural vector length, so it seemed "tidy" to make both u16s.
+> Elsewhere, this created a risk of overflow if you try to compute say
+> the size of the whole register file from a u16, so I generally used
+> unsigned int for local variables in functions that handle the vl.
+>
+>> Given the allocation functions rely on sve_vl being valid it might be
+>> worth noting where this is set/live from?
+>
+> Agreed, I need to look more closely at exactly how to justify the
+> soundness of this in order to thin out BUG_ONs.
+>
+> If you need any pointers, please ping me.  In the meantime, I would
+> rather not colour your judgement by infecting you with my assumptions ;)
+>
+>> >  	unsigned long		fault_address;	/* fault info */
+>> >  	unsigned long		fault_code;	/* ESR_EL1 value */
+>> >  	struct debug_info	debug;		/* debugging */
+>> > diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+>> > index 46c3b93..1a4b30b 100644
+>> > --- a/arch/arm64/include/asm/thread_info.h
+>> > +++ b/arch/arm64/include/asm/thread_info.h
+>> <snip>
+>>
+>> And I see there are other comments from Ard.
+>
+> Yup, I've already picked those up.
+>
+> I'll be posting a v2 with feedback applied once I've reviewed the
+> existing BUG_ON()s -- should happen sometime this week.
 
-Antoine
+We shall see how far I get tomorrow - you won't get any more from me
+after that until I get back from holiday so don't delay v2 on my account
+;-)
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170822/8cf7ddf6/attachment.sig>
+>
+> Cheers
+> ---Dave
+
+
+--
+Alex Benn?e
