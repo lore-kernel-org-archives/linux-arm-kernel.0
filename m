@@ -1,380 +1,96 @@
-From: brendanhiggins@google.com (Brendan Higgins)
-Date: Mon, 21 Aug 2017 20:35:01 -0700
-Subject: [PATCH v1 2/3] arm: dts: add Nuvoton NPCM750 device tree
-In-Reply-To: <20170822033502.4100-1-brendanhiggins@google.com>
-References: <20170822033502.4100-1-brendanhiggins@google.com>
-Message-ID: <20170822033502.4100-3-brendanhiggins@google.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue, 22 Aug 2017 12:03:59 +0800
+Subject: [PATCH v2 3/4] net: phy: realtek: add disable RX internal delay mode
+In-Reply-To: <20170822040400.12166-1-icenowy@aosc.io>
+References: <20170822040400.12166-1-icenowy@aosc.io>
+Message-ID: <20170822040400.12166-4-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a common device tree for all Nuvoton NPCM750 BMCs and a board
-specific device tree for the NPCM750 (Poleg) evaluation board.
+From: Icenowy Zheng <icenowy@aosc.xyz>
 
-Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
+Some RTL8211E chips have broken GbE function, which needs a hack to
+fix. It's said that this fix will affect the performance on not-buggy
+PHYs, so it should only be enabled on boards with the broken PHY.
+Currently only some Pine64+ boards are known to have this issue.
+
+This hack is said to disable RX relay for RTL8211E according to Realtek.
+So implement it as RGMII-TXID mode.
+
+As this hack is not documented on the datasheet at all, it contains
+magic numbers, and could not be revealed. These magic numbers are
+received from Realtek via Pine64.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
- .../devicetree/bindings/arm/npcm/npcm.txt          |   6 +
- arch/arm/boot/dts/nuvoton-npcm750-evb.dts          |  63 ++++++
- arch/arm/boot/dts/nuvoton-npcm750.dtsi             | 222 +++++++++++++++++++++
- include/dt-bindings/clock/nuvoton,npcm7xx-clks.h   |  39 ++++
- 4 files changed, 330 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/npcm/npcm.txt
- create mode 100644 arch/arm/boot/dts/nuvoton-npcm750-evb.dts
- create mode 100644 arch/arm/boot/dts/nuvoton-npcm750.dtsi
- create mode 100644 include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
+Changes in v2:
+- Used RGMII_TXID phy mode.
 
-diff --git a/Documentation/devicetree/bindings/arm/npcm/npcm.txt b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
-new file mode 100644
-index 000000000000..19aabe9a7414
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/npcm/npcm.txt
-@@ -0,0 +1,6 @@
-+NPCM Platforms Device Tree Bindings
-+-----------------------------------
-+NPCM750 SoC
-+Required root node properties:
-+	- compatible = "nuvoton,npcm750";
-+	- enable-method = "nuvoton,npcm7xx-smp"; required for dual core variant.
-diff --git a/arch/arm/boot/dts/nuvoton-npcm750-evb.dts b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-new file mode 100644
-index 000000000000..10f523388dc1
---- /dev/null
-+++ b/arch/arm/boot/dts/nuvoton-npcm750-evb.dts
-@@ -0,0 +1,63 @@
-+/*
-+ * DTS file for all NPCM750 SoCs
-+ *
-+ * Copyright 2012 Tomer Maimon <tomer.maimon@nuvoton.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
+ drivers/net/phy/realtek.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+
+diff --git a/drivers/net/phy/realtek.c b/drivers/net/phy/realtek.c
+index d820d00addf6..8306b6abaaa8 100644
+--- a/drivers/net/phy/realtek.c
++++ b/drivers/net/phy/realtek.c
+@@ -13,6 +13,7 @@
+  * option) any later version.
+  *
+  */
++#include <linux/of.h>
+ #include <linux/phy.h>
+ #include <linux/module.h>
+ 
+@@ -26,6 +27,8 @@
+ #define RTL8211_PAGE_SELECT	0x1f
+ 
+ #define RTL8211E_INER_LINK_STATUS 0x400
++#define RTL8211E_EXT_PAGE_SELECT 0x1e
++#define RTL8211E_EXT_PAGE	0x7
+ 
+ #define RTL8211F_INER_LINK_STATUS 0x0010
+ #define RTL8211F_INSR		0x1d
+@@ -121,6 +124,33 @@ static int rtl8211f_config_init(struct phy_device *phydev)
+ 	return 0;
+ }
+ 
++static int rtl8211e_config_init(struct phy_device *phydev)
++{
++	struct device *dev = &phydev->mdio.dev;
++	struct device_node *of_node = dev->of_node;
++	int ret;
 +
-+/dts-v1/;
-+#include "nuvoton-npcm750.dtsi"
++	ret = genphy_config_init(phydev);
++	if (ret < 0)
++		return ret;
 +
-+/ {
-+	model = "Nuvoton npcm750 Development Board (Device Tree)";
-+	compatible = "nuvoton,npcm750";
-+	enable-method = "nuvoton,npcm7xx-smp";
++	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID) {
++		/* Disable the RX internal delay here.
++		 *
++		 * All the magic numbers are not documented on RTL8211E
++		 * datasheet. They're said to be from Realtek by Pine64.
++		 */
++		phy_write(phydev, RTL8211_PAGE_SELECT, RTL8211E_EXT_PAGE);
++		phy_write(phydev, RTL8211E_EXT_PAGE_SELECT, 0xa4);
++		phy_write(phydev, 0x1c, 0xb591);
 +
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+		serial3 = &uart3;
-+	};
++		/* Restore to default page 0 */
++		phy_write(phydev, RTL8211_PAGE_SELECT, 0);
++	}
 +
-+	memory {
-+		reg = <0 0x40000000>;
-+	};
++	return 0;
++}
 +
-+	clocks {
-+		clk: clock-controller at f0801000 {
-+			status = "okay";
-+		};
-+	};
-+
-+	ahb {
-+	};
-+
-+	apb {
-+		watchdog1: watchdog at f0009000 {
-+			status = "okay";
-+		};
-+
-+		uart0: uart0 at f0001000 {
-+			status = "okay";
-+		};
-+
-+		uart1: uart1 at f0002000 {
-+			status = "okay";
-+		};
-+
-+		uart2: uart2 at f0003000 {
-+			status = "okay";
-+		};
-+
-+		uart3: uart3 at f0004000 {
-+			status = "okay";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/nuvoton-npcm750.dtsi b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
-new file mode 100644
-index 000000000000..fc64550c49a6
---- /dev/null
-+++ b/arch/arm/boot/dts/nuvoton-npcm750.dtsi
-@@ -0,0 +1,222 @@
-+/*
-+ * DTSi file for the NPCM750 SoC
-+ *
-+ * Copyright 2012 Tomer Maimon <tomer.maimon@nuvoton.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include "skeleton.dtsi"
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/nuvoton,npcm7xx-clks.h>
-+
-+/ {
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <0>;
-+			next-level-cache = <&L2>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			clocks = <&clk NPCM7XX_CLK_CPU>;
-+			clock-names = "clk_cpu";
-+			reg = <1>;
-+			next-level-cache = <&L2>;
-+		};
-+
-+	};
-+
-+	L2: l2-cache {
-+		compatible = "arm,pl310-cache";
-+		reg = <0xf03fc000 0x80000>;
-+		interrupts = <0 21 4>;
-+		cache-unified;
-+		cache-level = <2>;
-+		clocks = <&clk NPCM7XX_CLK_AXI>;
-+		clock-names = "clk_axi";
-+	    };
-+
-+	    clocks {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		clk: clock-controller at f0801000 {
-+			compatible = "nuvoton,npcm750-clk";
-+			#clock-cells = <1>;
-+		};
-+
-+		/* external clock signal rg1refck, supplied by the phy */
-+		clk_rg1refck: clk_rg1refck {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <125000000>;
-+			clock-output-names = "clk_rg1refck";
-+		};
-+
-+		/* external clock signal rg2refck, supplied by the phy */
-+		clk_rg2refck: clk_rg2refck {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <125000000>;
-+			clock-output-names = "clk_rg2refck";
-+		};
-+
-+		clk_xin: clk_xin {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <50000000>;
-+			clock-output-names = "clk_xin";
-+		};
-+	};
-+
-+	ahb {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges = <0x80000000 0x80000000 0x20000000 /* AHB18 */
-+			0xa0000000 0xa0000000 0x28000000 /* AHB3  */
-+			0xe0000000 0xe0000000 0x10000000 /* AHB14 */
-+			0xf0000000 0xf0000000 0x00800000 /* AHB1  */
-+			0xf0800000 0xf0800000 0x00800000 /* AHB8  */
-+			0xf8000000 0xf8000000 0x04000000  /* AHB18 - cont */
-+			0xfffd0000 0xfffd0000 0x00040000>;   /* RAM2 */
-+
-+		gic: interrupt-controller at f03ff000 {
-+			compatible = "arm,cortex-a9-gic";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = <0xf03ff000 0x1000>,
-+			    <0xf03fe100 0x100>;
-+		};
-+
-+		gcr: gcr at f0800000 {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "nuvoton,npcm750-gcr", "syscon",
-+				"simple-mfd";
-+			reg = <0xf0800000 0x1000>;
-+		};
-+
-+		scu: scu at f03fe000 {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "arm,cortex-a9-scu";
-+			reg = <0xf03fe000 0x1000>;
-+		};
-+
-+		clk_rst: clk_rst at f0801000 {
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			compatible = "nuvoton,npcm750-clk_rst", "syscon",
-+				"simple-mfd";
-+			reg = <0xF0801000 0x1000>;
-+		};
-+
-+		twd: timer at f03fe600 {
-+			compatible = "arm,cortex-a9-twd-timer";
-+			reg = <0xf03fe600 0x20>;
-+			interrupts = <1 13 0x304>;
-+		};
-+	};
-+
-+	apb {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges = <0xf0000000 0xf0000000 0x00080000
-+			0xf0080000 0xf0080000 0x00080000
-+			0xf0100000 0xf0100000 0x00080000
-+			0xf0180000 0xf0180000 0x00080000
-+			0xf0200000 0xf0200000 0x00600000>;
-+
-+		timer0: timer at f0000000 {
-+			compatible = "nuvoton,npcm750-timer";
-+			interrupts = <0 32 4>;
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+			clock-names = "clk_timer";
-+		};
-+
-+		watchdog0: watchdog at f0008000 {
-+			compatible = "nuvoton,npcm750-wdt";
-+			interrupts = <0 47 4>;
-+			reg = <0xf0008000 0x1000>;
-+			status = "disabled";
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+			clock-names = "clk_timer";
-+		};
-+
-+		watchdog1: watchdog at f0009000 {
-+			compatible = "nuvoton,npcm750-wdt";
-+			interrupts = <0 48 4>;
-+			reg = <0xf0009000 0x1000>;
-+			status = "disabled";
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+			clock-names = "clk_timer";
-+		};
-+
-+		watchdog2: watchdog at f000a000 {
-+			compatible = "nuvoton,npcm750-wdt";
-+			interrupts = <0 49 4>;
-+			reg = <0xf000a000 0x1000>;
-+			status = "disabled";
-+			clocks = <&clk NPCM7XX_CLK_TIMER>;
-+			clock-names = "clk_timer";
-+		};
-+
-+		uart0: uart0 at f0001000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0001000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			clock-names = "clk_uart";
-+			interrupts = <0 2 4>;
-+			status = "disabled";
-+		};
-+
-+		uart1: uart1 at f0002000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0002000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			clock-names = "clk_uart";
-+			interrupts = <0 3 4>;
-+			status = "disabled";
-+		};
-+
-+		uart2: uart2 at f0003000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0003000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			clock-names = "clk_uart";
-+			interrupts = <0 4 4>;
-+			status = "disabled";
-+		};
-+
-+		uart3: uart3 at f0004000 {
-+			compatible = "nuvoton,npcm750-uart";
-+			reg = <0xf0004000 0x1000>;
-+			clocks = <&clk NPCM7XX_CLK_UART_CORE>;
-+			clock-names = "clk_uart";
-+			interrupts = <0 5 4>;
-+			status = "disabled";
-+		};
-+	};
-+};
-diff --git a/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h b/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
-new file mode 100644
-index 000000000000..c69d3bbf7e42
---- /dev/null
-+++ b/include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
-@@ -0,0 +1,39 @@
-+/*
-+ * Copyright (C) 2016 Nuvoton Technologies,  tali.perry at nuvoton.com
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ */
-+
-+#ifndef _DT_BINDINGS_CLK_NPCM7XX_H
-+#define _DT_BINDINGS_CLK_NPCM7XX_H
-+
-+#define NPCM7XX_CLK_PLL0	0
-+#define NPCM7XX_CLK_PLL1	1
-+#define NPCM7XX_CLK_PLL2	2
-+#define NPCM7XX_CLK_GFX		3
-+#define NPCM7XX_CLK_APB1	4
-+#define NPCM7XX_CLK_APB2	5
-+#define NPCM7XX_CLK_APB3	6
-+#define NPCM7XX_CLK_APB4	7
-+#define NPCM7XX_CLK_APB5	8
-+#define NPCM7XX_CLK_MC		9
-+#define NPCM7XX_CLK_CPU		10
-+#define NPCM7XX_CLK_SPI0	11
-+#define NPCM7XX_CLK_SPI3	12
-+#define NPCM7XX_CLK_SPIX	13
-+#define NPCM7XX_CLK_UART_CORE	14
-+#define NPCM7XX_CLK_TIMER	15
-+#define NPCM7XX_CLK_HOST_UART	16
-+#define NPCM7XX_CLK_MMC		17
-+#define NPCM7XX_CLK_SDHC	18
-+#define NPCM7XX_CLK_ADC		19
-+#define NPCM7XX_CLK_GFX_MEM	20
-+#define NPCM7XX_CLK_USB_BRIDGE	21
-+#define NPCM7XX_CLK_AXI		22
-+#define NPCM7XX_CLK_AHB		23
-+#define NPCM7XX_CLK_EMC		24
-+#define NPCM7XX_CLK_GMAC	25
-+
-+#endif
+ static struct phy_driver realtek_drvs[] = {
+ 	{
+ 		.phy_id         = 0x00008201,
+@@ -159,6 +189,7 @@ static struct phy_driver realtek_drvs[] = {
+ 		.features	= PHY_GBIT_FEATURES,
+ 		.flags		= PHY_HAS_INTERRUPT,
+ 		.config_aneg	= &genphy_config_aneg,
++		.config_init	= rtl8211e_config_init,
+ 		.read_status	= &genphy_read_status,
+ 		.ack_interrupt	= &rtl821x_ack_interrupt,
+ 		.config_intr	= &rtl8211e_config_intr,
 -- 
-2.14.1.480.gb18f417b89-goog
+2.13.5
