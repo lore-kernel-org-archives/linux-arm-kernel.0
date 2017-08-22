@@ -1,201 +1,187 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 22 Aug 2017 11:22:44 +0100
-Subject: [PATCH 09/27] arm64/sve: Signal frame and context structure
- definition
-In-Reply-To: <1502280338-23002-10-git-send-email-Dave.Martin@arm.com>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-10-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87y3qb52ez.fsf@linaro.org>
+From: aneela@codeaurora.org (Arun Kumar Neelakantam)
+Date: Tue, 22 Aug 2017 15:55:23 +0530
+Subject: [PATCH 13/18] rpmsg: glink: Add rx done command
+In-Reply-To: <1502903951-5403-14-git-send-email-sricharan@codeaurora.org>
+References: <1502903951-5403-1-git-send-email-sricharan@codeaurora.org>
+ <1502903951-5403-14-git-send-email-sricharan@codeaurora.org>
+Message-ID: <a5f890fe-7405-ff03-9a43-0e4d62683cb6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Dave Martin <Dave.Martin@arm.com> writes:
 
-> This patch defines the representation that will be used for the SVE
-> register state in the signal frame, and implements support for
-> saving and restoring the SVE registers around signals.
+On 8/16/2017 10:49 PM, Sricharan R wrote:
+> Send RX data receive ack to remote and also inform
+> that local intent buffer is used and freed. This
+> informs the remote to request for next set of
+> intent buffers before doing a send operation.
 >
-> The same layout will also be used for the in-kernel task state.
->
-> Due to the variability of the SVE vector length, it is not possible
-> to define a fixed C struct to describe all the registers.  Instead,
-> Macros are defined in sigcontext.h to facilitate access to the
-> parts of the structure.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 > ---
->  arch/arm64/include/uapi/asm/sigcontext.h | 113 ++++++++++++++++++++++++++++++-
->  1 file changed, 112 insertions(+), 1 deletion(-)
+>   drivers/rpmsg/qcom_glink_native.c | 83 +++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 83 insertions(+)
 >
-> diff --git a/arch/arm64/include/uapi/asm/sigcontext.h b/arch/arm64/include/uapi/asm/sigcontext.h
-> index f0a76b9..0533bdf 100644
-> --- a/arch/arm64/include/uapi/asm/sigcontext.h
-> +++ b/arch/arm64/include/uapi/asm/sigcontext.h
-> @@ -16,6 +16,8 @@
->  #ifndef _UAPI__ASM_SIGCONTEXT_H
->  #define _UAPI__ASM_SIGCONTEXT_H
->
-> +#ifndef __ASSEMBLY__
+> diff --git a/drivers/rpmsg/qcom_glink_native.c b/drivers/rpmsg/qcom_glink_native.c
+> index b2a583a..b8db74a 100644
+> --- a/drivers/rpmsg/qcom_glink_native.c
+> +++ b/drivers/rpmsg/qcom_glink_native.c
+> @@ -76,6 +76,8 @@ struct glink_core_rx_intent {
+>   	bool reuse;
+>   	bool in_use;
+>   	u32 offset;
 > +
->  #include <linux/types.h>
->
->  /*
-> @@ -41,10 +43,11 @@ struct sigcontext {
->   *
->   *	0x210		fpsimd_context
->   *	 0x10		esr_context
-> + *	0x8a0		sve_context (vl <= 64) (optional)
->   *	 0x20		extra_context (optional)
->   *	 0x10		terminator (null _aarch64_ctx)
->   *
-> - *	0xdb0		(reserved for future allocation)
-> + *	0x510		(reserved for future allocation)
->   *
->   * New records that can exceed this space need to be opt-in for userspace, so
->   * that an expanded signal frame is not generated unexpectedly.  The mechanism
-> @@ -116,4 +119,112 @@ struct extra_context {
->  	__u32 __reserved[3];
->  };
->
-> +#define SVE_MAGIC	0x53564501
+> +	struct list_head node;
+>   };
+>   
+>   /**
+> @@ -137,6 +139,8 @@ enum {
+>    * @rcid:	channel id, in remote space
+>    * @intent_lock: lock for protection of @liids
+>    * @liids:	idr of all local intents
+> + * @intent_work: worker responsible for transmitting rx_done packets
+> + * @done_intents: list of intents that needs to be announced rx_done
+>    * @buf:	receive buffer, for gathering fragments
+>    * @buf_offset:	write offset in @buf
+>    * @buf_size:	size of current @buf
+> @@ -159,6 +163,8 @@ struct glink_channel {
+>   
+>   	spinlock_t intent_lock;
+>   	struct idr liids;
+> +	struct work_struct intent_work;
+> +	struct list_head done_intents;
+>   
+>   	struct glink_core_rx_intent *buf;
+>   	int buf_offset;
+> @@ -178,15 +184,19 @@ struct glink_channel {
+>   #define RPM_CMD_CLOSE			3
+>   #define RPM_CMD_OPEN_ACK		4
+>   #define RPM_CMD_INTENT			5
+> +#define RPM_CMD_RX_DONE			6
+>   #define RPM_CMD_RX_INTENT_REQ		7
+>   #define RPM_CMD_RX_INTENT_REQ_ACK	8
+>   #define RPM_CMD_TX_DATA			9
+>   #define RPM_CMD_CLOSE_ACK		11
+>   #define RPM_CMD_TX_DATA_CONT		12
+>   #define RPM_CMD_READ_NOTIF		13
+> +#define RPM_CMD_RX_DONE_W_REUSE		14
+>   
+>   #define GLINK_FEATURE_INTENTLESS	BIT(1)
+>   
+> +static void qcom_glink_rx_done_work(struct work_struct *work);
 > +
-> +struct sve_context {
-> +	struct _aarch64_ctx head;
-> +	__u16 vl;
-> +	__u16 __reserved[3];
-> +};
+>   static struct glink_channel *qcom_glink_alloc_channel(struct qcom_glink *glink,
+>   						      const char *name)
+>   {
+> @@ -198,12 +208,16 @@ static struct glink_channel *qcom_glink_alloc_channel(struct qcom_glink *glink,
+>   
+>   	/* Setup glink internal glink_channel data */
+>   	spin_lock_init(&channel->recv_lock);
 > +
-> +#endif /* !__ASSEMBLY__ */
+>   	channel->glink = glink;
+>   	channel->name = kstrdup(name, GFP_KERNEL);
+>   
+>   	init_completion(&channel->open_req);
+>   	init_completion(&channel->open_ack);
+>   
+> +	INIT_LIST_HEAD(&channel->done_intents);
+> +	INIT_WORK(&channel->intent_work, qcom_glink_rx_done_work);
 > +
-> +/*
-> + * The SVE architecture leaves space for future expansion of the
-> + * vector length beyond its initial architectural limit of 2048 bits
-> + * (16 quadwords).
-> + */
-> +#define SVE_VQ_MIN		1
-> +#define SVE_VQ_MAX		0x200
+>   	idr_init(&channel->liids);
+>   	kref_init(&channel->refcount);
+>   
+> @@ -395,6 +409,70 @@ static void qcom_glink_send_close_ack(struct qcom_glink *glink,
+>   	qcom_glink_tx(glink, &req, sizeof(req), NULL, 0, true);
+>   }
+>   
+> +static void qcom_glink_rx_done_work(struct work_struct *work)
+> +{
+> +	struct glink_channel *channel = container_of(work, struct glink_channel,
+> +						     intent_work);
+> +	struct qcom_glink *glink = channel->glink;
+> +	struct glink_core_rx_intent *intent, *tmp;
+> +	struct {
+> +		u16 id;
+> +		u16 lcid;
+> +		u32 liid;
+> +	} __packed cmd;
 > +
-> +#define SVE_VL_MIN		(SVE_VQ_MIN * 0x10)
-> +#define SVE_VL_MAX		(SVE_VQ_MAX * 0x10)
+> +	unsigned int cid = channel->lcid;
+> +	unsigned int iid;
+> +	bool reuse;
+> +	unsigned long flags;
 > +
-> +#define SVE_NUM_ZREGS		32
-> +#define SVE_NUM_PREGS		16
+> +	spin_lock_irqsave(&channel->intent_lock, flags);
+> +	list_for_each_entry_safe(intent, tmp, &channel->done_intents, node) {
+> +		list_del(&intent->node);
+> +		spin_unlock_irqrestore(&channel->intent_lock, flags);
+> +		iid = intent->id;
+> +		reuse = intent->reuse;
 > +
-> +#define sve_vl_valid(vl) \
-> +	((vl) % 0x10 == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
-> +#define sve_vq_from_vl(vl)	((vl) / 0x10)
-> +#define sve_vl_from_vq(vq)	((vq) * 0x10)
+> +		cmd.id = reuse ? RPM_CMD_RX_DONE_W_REUSE : RPM_CMD_RX_DONE;
+> +		cmd.lcid = cid;
+> +		cmd.liid = iid;
+> +
+> +		qcom_glink_tx(glink, &cmd, sizeof(cmd), NULL, 0, true);
+> +		if (!reuse) {
+> +			kfree(intent->data);
+> +			kfree(intent);
+> +		}
+> +		spin_lock_irqsave(&channel->intent_lock, flags);
+> +	}
+> +	spin_unlock_irqrestore(&channel->intent_lock, flags);
+> +}
+> +
+> +static void qcom_glink_rx_done(struct qcom_glink *glink,
+> +			       struct glink_channel *channel,
+> +			       struct glink_core_rx_intent *intent)
+> +{
+> +	/* We don't send RX_DONE to intentless systems */
+> +	if (glink->intentless) {
+> +		kfree(intent->data);
+> +		kfree(intent);
+> +		return;
+> +	}
+> +
+> +	/* Take it off the tree of receive intents */
+> +	if (!intent->reuse) {
+> +		spin_lock(&channel->intent_lock);
+> +		idr_remove(&channel->liids, intent->id);
+> +		spin_unlock(&channel->intent_lock);
+> +	}
+> +
+> +	/* Schedule the sending of a rx_done indication */
+> +	spin_lock(&channel->intent_lock);
+> +	list_add_tail(&intent->node, &channel->done_intents);
+> +	spin_unlock(&channel->intent_lock);
+> +
+> +	schedule_work(&channel->intent_work);
 
-I got a little confused first time through over what VQ and VL where.
-Maybe it would make sense to expand a little more from first principles?
+Adding one more parallel path will hit performance, if this worker could 
+not get CPU cycles
+or blocked by other RT or HIGH_PRIO worker on global worker pool.
 
-  /*
-   * The SVE architecture defines vector registers as a multiple of 128
-   * bit quadwords. The current architectural limit is 2048 bits (16
-   * quadwords) but there is room for future expansion beyond that.
-    */
-
-  #define SVE_VQ_BITS             128      /* 128 bits in one quadword */
-  #define SVE_VQ_BYTES            (SVE_VQ_BITS / 8)
-
-  #define SVE_VQ_MIN		1
-  #define SVE_VQ_MAX		0x200    /* see ZCR_ELx[8:0] */
-
-  #define SVE_VL_MIN_BYTES	(SVE_VQ_MIN * SVE_VQ_BYTES)
-  #define SVE_VL_MAX_BYTES	(SVE_VQ_MAX * SVE_VQ_BYTES)
-
-  #define SVE_NUM_ZREGS		32
-  #define SVE_NUM_PREGS		16
-
-  #define sve_vl_valid(vl)						\
-          ((vl) % SVE_VQ_BYTES == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
-  #define sve_vq_from_vl(vl)	((vl) / SVE_VQ_BYTES)
-  #define sve_vl_from_vq(vq)	((vq) * SVE_VQ_BYTES)
-
-
+> +}
 > +
-> +/*
-> + * If the SVE registers are currently live for the thread at signal delivery,
-> + * sve_context.head.size >=
-> + *	SVE_SIG_CONTEXT_SIZE(sve_vq_from_vl(sve_context.vl))
-> + * and the register data may be accessed using the SVE_SIG_*() macros.
-> + *
-> + * If sve_context.head.size <
-> + *	SVE_SIG_CONTEXT_SIZE(sve_vq_from_vl(sve_context.vl)),
-> + * the SVE registers were not live for the thread and no register data
-> + * is included: in this case, the SVE_SIG_*() macros should not be
-> + * used except for this check.
-> + *
-> + * The same convention applies when returning from a signal: a caller
-> + * will need to remove or resize the sve_context block if it wants to
-> + * make the SVE registers live when they were previously non-live or
-> + * vice-versa.  This may require the the caller to allocate fresh
-> + * memory and/or move other context blocks in the signal frame.
-> + *
-> + * Changing the vector length during signal return is not permitted:
-> + * sve_context.vl must equal the thread's current vector length when
-> + * doing a sigreturn.
-> + *
-> + *
-> + * Note: for all these macros, the "vq" argument denotes the SVE
-> + * vector length in quadwords (i.e., units of 128 bits).
-> + *
-> + * The correct way to obtain vq is to use sve_vq_from_vl(vl).  The
-> + * result is valid if and only if sve_vl_valid(vl) is true.  This is
-> + * guaranteed for a struct sve_context written by the kernel.
-> + *
-> + *
-> + * Additional macros describe the contents and layout of the payload.
-> + * For each, SVE_SIG_x_OFFSET(args) is the start offset relative to
-> + * the start of struct sve_context, and SVE_SIG_x_SIZE(args) is the
-> + * size in bytes:
-> + *
-> + *	x	type				description
-> + *	-	----				-----------
-> + *	REGS					the entire SVE context
-> + *
-> + *	ZREGS	__uint128_t[SVE_NUM_ZREGS][vq]	all Z-registers
-> + *	ZREG	__uint128_t[vq]			individual Z-register Zn
-> + *
-> + *	PREGS	uint16_t[SVE_NUM_PREGS][vq]	all P-registers
-> + *	PREG	uint16_t[vq]			individual P-register Pn
-> + *
-> + *	FFR	uint16_t[vq]			first-fault status register
-> + *
-> + * Additional data might be appended in the future.
-> + */
+>   /**
+>    * qcom_glink_receive_version() - receive version/features from remote system
+>    *
+> @@ -711,6 +789,8 @@ static int qcom_glink_rx_data(struct qcom_glink *glink, size_t avail)
+>   
+>   		intent->offset = 0;
+>   		channel->buf = NULL;
 > +
-> +#define SVE_SIG_ZREG_SIZE(vq)	((__u32)(vq) * 16)
-> +#define SVE_SIG_PREG_SIZE(vq)	((__u32)(vq) * 2)
-> +#define SVE_SIG_FFR_SIZE(vq)	SVE_SIG_PREG_SIZE(vq)
+> +		qcom_glink_rx_done(glink, channel, intent);
+>   	}
+>   
+>   advance_rx:
+> @@ -1100,6 +1180,9 @@ static void qcom_glink_rx_close(struct qcom_glink *glink, unsigned int rcid)
+>   	if (WARN(!channel, "close request on unknown channel\n"))
+>   		return;
+>   
+> +	/* cancel pending rx_done work */
+> +	cancel_work_sync(&channel->intent_work);
 > +
-> +#define SVE_SIG_REGS_OFFSET	((sizeof(struct sve_context) + 15) / 16 * 16)
-> +
-> +#define SVE_SIG_ZREGS_OFFSET	SVE_SIG_REGS_OFFSET
-> +#define SVE_SIG_ZREG_OFFSET(vq, n) \
-> +	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREG_SIZE(vq) * (n))
-> +#define SVE_SIG_ZREGS_SIZE(vq) \
-> +	(SVE_SIG_ZREG_OFFSET(vq, SVE_NUM_ZREGS) - SVE_SIG_ZREGS_OFFSET)
-> +
-> +#define SVE_SIG_PREGS_OFFSET(vq) \
-> +	(SVE_SIG_ZREGS_OFFSET + SVE_SIG_ZREGS_SIZE(vq))
-> +#define SVE_SIG_PREG_OFFSET(vq, n) \
-> +	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREG_SIZE(vq) * (n))
-> +#define SVE_SIG_PREGS_SIZE(vq) \
-> +	(SVE_SIG_PREG_OFFSET(vq, SVE_NUM_PREGS) - SVE_SIG_PREGS_OFFSET(vq))
-> +
-> +#define SVE_SIG_FFR_OFFSET(vq) \
-> +	(SVE_SIG_PREGS_OFFSET(vq) + SVE_SIG_PREGS_SIZE(vq))
-> +
-> +#define SVE_SIG_REGS_SIZE(vq) \
-> +	(SVE_SIG_FFR_OFFSET(vq) + SVE_SIG_FFR_SIZE(vq) - SVE_SIG_REGS_OFFSET)
-> +
-> +#define SVE_SIG_CONTEXT_SIZE(vq) (SVE_SIG_REGS_OFFSET + SVE_SIG_REGS_SIZE(vq))
-> +
-> +
->  #endif /* _UAPI__ASM_SIGCONTEXT_H */
-
-
---
-Alex Benn?e
+>   	if (channel->rpdev) {
+>   		strncpy(chinfo.name, channel->name, sizeof(chinfo.name));
+>   		chinfo.src = RPMSG_ADDR_ANY;
