@@ -1,66 +1,140 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 22 Aug 2017 13:41:31 +0200
-Subject: [PATCH v2 04/16] mmc: meson-gx: use _irqsave variant of spinlock
-In-Reply-To: <CAPDyKFpoOc+1WMqLMOwhGkifP-Zp3GS7wTSkHmBUk4Pf0Dh+DQ@mail.gmail.com>
-References: <20170821160301.21899-1-jbrunet@baylibre.com>
- <20170821160301.21899-5-jbrunet@baylibre.com>
- <CAPDyKFpoOc+1WMqLMOwhGkifP-Zp3GS7wTSkHmBUk4Pf0Dh+DQ@mail.gmail.com>
-Message-ID: <1503402091.7032.9.camel@baylibre.com>
+From: david@redhat.com (David Hildenbrand)
+Date: Tue, 22 Aug 2017 13:31:27 +0200
+Subject: [PATCH RFC v3 1/9] KVM: s390: optimize detection of started vcpus
+In-Reply-To: <20170821203530.9266-2-rkrcmar@redhat.com>
+References: <20170821203530.9266-1-rkrcmar@redhat.com>
+ <20170821203530.9266-2-rkrcmar@redhat.com>
+Message-ID: <67a8b09c-3e7a-943d-8684-f9ad6e70514b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-08-22 at 13:08 +0200, Ulf Hansson wrote:
-> On 21 August 2017 at 18:02, Jerome Brunet <jbrunet@baylibre.com> wrote:
-> > spinlock used in interrupt handler should use the _irqsave variant
-> 
-> Exactly why is that needed?
+On 21.08.2017 22:35, Radim Kr?m?? wrote:
+> We can add a variable instead of scanning all online VCPUs to know how
+> many are started.  We can't trivially tell which VCPU is the last one,
+> though.
 
-That's a mistake left over from a debugging session. Thx for pointing it out.
-I'll respin w/o it 
+You could keep the started vcpus in a list. Then you might drop unsigned
+started_vcpus;
+
+No started vcpus: Start pointer NULL
+Single started vcpu: Only one element in the list (easy to check)
+> 1 started vcpus: More than one element int he list (easy to check)
+
 
 > 
-> > 
-> > Fixes: 51c5d8447bd7 ("MMC: meson: initial support for GX platforms")
-> > Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> > ---
-> > ?drivers/mmc/host/meson-gx-mmc.c | 5 +++--
-> > ?1 file changed, 3 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-
-> > mmc.c
-> > index 8a74a048db88..a399fbd415f4 100644
-> > --- a/drivers/mmc/host/meson-gx-mmc.c
-> > +++ b/drivers/mmc/host/meson-gx-mmc.c
-> > @@ -727,6 +727,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
-> > ????????struct mmc_command *cmd;
-> > ????????struct mmc_data *data;
-> > ????????u32 irq_en, status, raw_status;
-> > +???????unsigned long flag;
-> > ????????irqreturn_t ret = IRQ_HANDLED;
-> > 
-> > ????????if (WARN_ON(!host))
-> > @@ -739,7 +740,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
-> > 
-> > ????????data = cmd->data;
-> > 
-> > -???????spin_lock(&host->lock);
-> > +???????spin_lock_irqsave(&host->lock, flag);
-> > ????????irq_en = readl(host->regs + SD_EMMC_IRQ_EN);
-> > ????????raw_status = readl(host->regs + SD_EMMC_STATUS);
-> > ????????status = raw_status & irq_en;
-> > @@ -806,7 +807,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
-> > ????????if (ret == IRQ_HANDLED)
-> > ????????????????meson_mmc_request_done(host->mmc, cmd->mrq);
-> > 
-> > -???????spin_unlock(&host->lock);
-> > +???????spin_unlock_irqrestore(&host->lock, flag);
-> > ????????return ret;
-> > ?}
-> > 
-> > --
-> > 2.9.5
-> > 
+> Suggested-by: Cornelia Huck <cohuck@redhat.com>
+> Signed-off-by: Radim Kr?m?? <rkrcmar@redhat.com>
+> ---
+>  arch/s390/include/asm/kvm_host.h |  1 +
+>  arch/s390/kvm/kvm-s390.c         | 39 +++++++++++++++------------------------
+>  2 files changed, 16 insertions(+), 24 deletions(-)
 > 
-> Kind regards
-> Uffe
+> diff --git a/arch/s390/include/asm/kvm_host.h b/arch/s390/include/asm/kvm_host.h
+> index a409d5991934..be0d0bdf585b 100644
+> --- a/arch/s390/include/asm/kvm_host.h
+> +++ b/arch/s390/include/asm/kvm_host.h
+> @@ -735,6 +735,7 @@ struct kvm_arch{
+>  	struct mutex ipte_mutex;
+>  	struct ratelimit_state sthyi_limit;
+>  	spinlock_t start_stop_lock;
+> +	unsigned started_vcpus;
+>  	struct sie_page2 *sie_page2;
+>  	struct kvm_s390_cpu_model model;
+>  	struct kvm_s390_crypto crypto;
+> diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
+> index 9f23a9e81a91..1534778a3c66 100644
+> --- a/arch/s390/kvm/kvm-s390.c
+> +++ b/arch/s390/kvm/kvm-s390.c
+> @@ -3414,25 +3414,17 @@ static void __enable_ibs_on_vcpu(struct kvm_vcpu *vcpu)
+>  
+>  void kvm_s390_vcpu_start(struct kvm_vcpu *vcpu)
+>  {
+> -	int i, online_vcpus, started_vcpus = 0;
+> -
+>  	if (!is_vcpu_stopped(vcpu))
+>  		return;
+>  
+>  	trace_kvm_s390_vcpu_start_stop(vcpu->vcpu_id, 1);
+>  	/* Only one cpu at a time may enter/leave the STOPPED state. */
+>  	spin_lock(&vcpu->kvm->arch.start_stop_lock);
+> -	online_vcpus = atomic_read(&vcpu->kvm->online_vcpus);
+>  
+> -	for (i = 0; i < online_vcpus; i++) {
+> -		if (!is_vcpu_stopped(vcpu->kvm->vcpus[i]))
+> -			started_vcpus++;
+> -	}
+> -
+> -	if (started_vcpus == 0) {
+> +	if (vcpu->kvm->arch.started_vcpus == 0) {
+>  		/* we're the only active VCPU -> speed it up */
+>  		__enable_ibs_on_vcpu(vcpu);
+> -	} else if (started_vcpus == 1) {
+> +	} else if (vcpu->kvm->arch.started_vcpus == 1) {
+>  		/*
+>  		 * As we are starting a second VCPU, we have to disable
+>  		 * the IBS facility on all VCPUs to remove potentially
+> @@ -3441,6 +3433,8 @@ void kvm_s390_vcpu_start(struct kvm_vcpu *vcpu)
+>  		__disable_ibs_on_all_vcpus(vcpu->kvm);
+>  	}
+>  
+> +	vcpu->kvm->arch.started_vcpus++;
+> +
+>  	atomic_andnot(CPUSTAT_STOPPED, &vcpu->arch.sie_block->cpuflags);
+>  	/*
+>  	 * Another VCPU might have used IBS while we were offline.
+> @@ -3453,16 +3447,12 @@ void kvm_s390_vcpu_start(struct kvm_vcpu *vcpu)
+>  
+>  void kvm_s390_vcpu_stop(struct kvm_vcpu *vcpu)
+>  {
+> -	int i, online_vcpus, started_vcpus = 0;
+> -	struct kvm_vcpu *started_vcpu = NULL;
+> -
+>  	if (is_vcpu_stopped(vcpu))
+>  		return;
+>  
+>  	trace_kvm_s390_vcpu_start_stop(vcpu->vcpu_id, 0);
+>  	/* Only one cpu at a time may enter/leave the STOPPED state. */
+>  	spin_lock(&vcpu->kvm->arch.start_stop_lock);
+> -	online_vcpus = atomic_read(&vcpu->kvm->online_vcpus);
+>  
+>  	/* SIGP STOP and SIGP STOP AND STORE STATUS has been fully processed */
+>  	kvm_s390_clear_stop_irq(vcpu);
+> @@ -3470,19 +3460,20 @@ void kvm_s390_vcpu_stop(struct kvm_vcpu *vcpu)
+>  	atomic_or(CPUSTAT_STOPPED, &vcpu->arch.sie_block->cpuflags);
+>  	__disable_ibs_on_vcpu(vcpu);
+>  
+> -	for (i = 0; i < online_vcpus; i++) {
+> -		if (!is_vcpu_stopped(vcpu->kvm->vcpus[i])) {
+> -			started_vcpus++;
+> -			started_vcpu = vcpu->kvm->vcpus[i];
+> -		}
+> -	}
+> +	vcpu->kvm->arch.started_vcpus--;
+> +
+> +	if (vcpu->kvm->arch.started_vcpus == 1) {
+> +		struct kvm_vcpu *started_vcpu;
+>  
+> -	if (started_vcpus == 1) {
+>  		/*
+> -		 * As we only have one VCPU left, we want to enable the
+> -		 * IBS facility for that VCPU to speed it up.
+> +		 * As we only have one VCPU left, we want to enable the IBS
+> +		 * facility for that VCPU to speed it up.
+>  		 */
+> -		__enable_ibs_on_vcpu(started_vcpu);
+> +		kvm_for_each_vcpu(i, started_vcpu, vcpu->kvm)
+> +			if (!is_vcpu_stopped(started_vcpu)) {
+> +				__enable_ibs_on_vcpu(started_vcpu);
+> +				break;
+> +			}
+>  	}
+>  
+>  	spin_unlock(&vcpu->kvm->arch.start_stop_lock);
+> 
+
+
+-- 
+
+Thanks,
+
+David
