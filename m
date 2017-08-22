@@ -1,60 +1,39 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Tue, 22 Aug 2017 08:56:44 +0100
-Subject: [PATCH v5 4/7] support user space to query RAS extension feature
-In-Reply-To: <1503065517-7920-5-git-send-email-gengdongjiu@huawei.com>
-References: <1503065517-7920-1-git-send-email-gengdongjiu@huawei.com>
- <1503065517-7920-5-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <20170822085644.00004844@huawei.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Tue, 22 Aug 2017 15:57:28 +0800
+Subject: [PATCH v5 9/9] dt-bindings: ASoC: rockchip: Update description of
+ rockchip, codec
+In-Reply-To: <20170822075729.8438-1-jeffy.chen@rock-chips.com>
+References: <20170822075729.8438-1-jeffy.chen@rock-chips.com>
+Message-ID: <20170822075729.8438-10-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 18 Aug 2017 22:11:54 +0800
-Dongjiu Geng <gengdongjiu@huawei.com> wrote:
+Update description for newly added optional audio codecs.
 
-> In armv8.2 RAS extension, it adds virtual SError exception
-> syndrome registeri(VSESR_EL2), user space will specify that
-> value. so user space will check whether CPU feature has RAS
-> extension. if has, it will specify the virtual SError syndrome
-> value. Otherwise, it will not set. This patch adds this support
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
 
-In the armv8.2 RAS extension, a virtual SError exception syndrome
-registeri(VSESR_EL) is added.  This value may be specified from userspace.
-Userspace will want to check if the CPU has the RAS extension.
-If it has, it wil specify the virtual SError syndrome value, otherwise
-it will not be set.  This patch adds support for querying the availability
-of this extension.
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
-Code is fine.
-> 
-> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-> ---
->  arch/arm64/kvm/reset.c   | 3 +++
->  include/uapi/linux/kvm.h | 1 +
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> index 3256b9228e75..b7313ee028e9 100644
-> --- a/arch/arm64/kvm/reset.c
-> +++ b/arch/arm64/kvm/reset.c
-> @@ -77,6 +77,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
->  	case KVM_CAP_ARM_PMU_V3:
->  		r = kvm_arm_support_pmu_v3();
->  		break;
-> +	case KVM_CAP_ARM_RAS_EXTENSION:
-> +		r = cpus_have_const_cap(ARM64_HAS_RAS_EXTN);
-> +		break;
->  	case KVM_CAP_SET_GUEST_DEBUG:
->  	case KVM_CAP_VCPU_ATTRIBUTES:
->  		r = 1;
-> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> index 6cd63c18708a..5a2a338cae57 100644
-> --- a/include/uapi/linux/kvm.h
-> +++ b/include/uapi/linux/kvm.h
-> @@ -929,6 +929,7 @@ struct kvm_ppc_resize_hpt {
->  #define KVM_CAP_PPC_SMT_POSSIBLE 147
->  #define KVM_CAP_HYPERV_SYNIC2 148
->  #define KVM_CAP_HYPERV_VP_INDEX 149
-> +#define KVM_CAP_ARM_RAS_EXTENSION 150
->  
->  #ifdef KVM_CAP_IRQ_ROUTING
->  
+ Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+index f19b6c830a34..f54b4e91e97c 100644
+--- a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
++++ b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+@@ -4,7 +4,7 @@ Required properties:
+ - compatible: "rockchip,rk3399-gru-sound"
+ - rockchip,cpu: The phandle of the Rockchip I2S controller that's
+   connected to the codecs
+-- rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
++- rockchip,codec: The phandle of the audio codecs
+ 
+ Example:
+ 
+-- 
+2.11.0
