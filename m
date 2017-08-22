@@ -1,207 +1,152 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue, 22 Aug 2017 15:27:02 +0530
-Subject: [PATCH v3 13/17] dmaengine: bcm-sba-raid: Re-factor
- sba_process_deferred_requests()
+Date: Tue, 22 Aug 2017 15:27:04 +0530
+Subject: [PATCH v3 15/17] dmaengine: bcm-sba-raid: Add debugfs support
 In-Reply-To: <1503395827-19428-1-git-send-email-anup.patel@broadcom.com>
 References: <1503395827-19428-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1503395827-19428-14-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1503395827-19428-16-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, sba_process_deferred_requests() handles both pending
-and completed sba_request which is unnecessary overhead for
-sba_issue_pending() because completed sba_request handling is
-not required in sba_issue_pending().
-
-This patch breaks sba_process_deferred_requests() into two parts
-sba_process_received_request() and _sba_process_pending_requests().
-
-The sba_issue_pending() will only process pending sba_request
-by calling _sba_process_pending_requests(). This will improve
-sba_issue_pending().
-
-The sba_receive_message() will only process received sba_request
-by calling sba_process_received_request() for each received
-sba_request. The sba_process_received_request() will also call
-_sba_process_pending_requests() after handling received sba_request
-because we might have pending sba_request not submitted by previous
-call to sba_issue_pending().
+This patch adds debugfs support to report stats via debugfs
+which in-turn will help debug hang or error situations.
 
 Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
 Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 ---
- drivers/dma/bcm-sba-raid.c | 109 +++++++++++++++++++--------------------------
- 1 file changed, 47 insertions(+), 62 deletions(-)
+ drivers/dma/bcm-sba-raid.c | 78 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
 
 diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
-index 2f444cc..cb6b2e2 100644
+index f0a0e80..12310aa 100644
 --- a/drivers/dma/bcm-sba-raid.c
 +++ b/drivers/dma/bcm-sba-raid.c
-@@ -419,22 +419,20 @@ static int sba_send_mbox_request(struct sba_device *sba,
- 	return 0;
+@@ -36,6 +36,7 @@
+  */
+ 
+ #include <linux/bitops.h>
++#include <linux/debugfs.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/dmaengine.h>
+ #include <linux/list.h>
+@@ -162,6 +163,9 @@ struct sba_device {
+ 	struct list_head reqs_completed_list;
+ 	struct list_head reqs_aborted_list;
+ 	struct list_head reqs_free_list;
++	/* DebugFS directory entries */
++	struct dentry *root;
++	struct dentry *stats;
+ };
+ 
+ /* ====== Command helper routines ===== */
+@@ -486,6 +490,45 @@ static void sba_process_received_request(struct sba_device *sba,
+ 	}
  }
  
--static void sba_process_deferred_requests(struct sba_device *sba)
-+/* Note: Must be called with sba->reqs_lock held */
-+static void _sba_process_pending_requests(struct sba_device *sba)
- {
- 	int ret;
- 	u32 count;
--	unsigned long flags;
- 	struct sba_request *req;
--	struct dma_async_tx_descriptor *tx;
--
--	spin_lock_irqsave(&sba->reqs_lock, flags);
--
--	/* Count pending requests */
--	count = 0;
--	list_for_each_entry(req, &sba->reqs_pending_list, node)
--		count++;
- 
--	/* Process pending requests */
-+	/*
-+	 * Process few pending requests
-+	 *
-+	 * For now, we process (<number_of_mailbox_channels> * 8)
-+	 * number of requests at a time.
-+	 */
-+	count = sba->mchans_count * 8;
- 	while (!list_empty(&sba->reqs_pending_list) && count) {
- 		/* Get the first pending request */
- 		req = list_first_entry(&sba->reqs_pending_list,
-@@ -445,11 +443,7 @@ static void sba_process_deferred_requests(struct sba_device *sba)
- 			break;
- 
- 		/* Send request to mailbox channel */
--		spin_unlock_irqrestore(&sba->reqs_lock, flags);
- 		ret = sba_send_mbox_request(sba, req);
--		spin_lock_irqsave(&sba->reqs_lock, flags);
--
--		/* If something went wrong then keep request pending */
- 		if (ret < 0) {
- 			_sba_pending_request(sba, req);
- 			break;
-@@ -457,20 +451,18 @@ static void sba_process_deferred_requests(struct sba_device *sba)
- 
- 		count--;
- 	}
-+}
- 
--	/* Count completed requests */
--	count = 0;
--	list_for_each_entry(req, &sba->reqs_completed_list, node)
--		count++;
--
--	/* Process completed requests */
--	while (!list_empty(&sba->reqs_completed_list) && count) {
--		req = list_first_entry(&sba->reqs_completed_list,
--					struct sba_request, node);
--		list_del_init(&req->node);
--		tx = &req->tx;
-+static void sba_process_received_request(struct sba_device *sba,
-+					 struct sba_request *req)
++static void sba_write_stats_in_seqfile(struct sba_device *sba,
++				       struct seq_file *file)
 +{
 +	unsigned long flags;
-+	struct dma_async_tx_descriptor *tx;
-+	struct sba_request *nreq, *first = req->first;
- 
--		spin_unlock_irqrestore(&sba->reqs_lock, flags);
-+	/* Process only after all chained requests are received */
-+	if (!atomic_dec_return(&first->next_pending_count)) {
-+		tx = &first->tx;
- 
- 		WARN_ON(tx->cookie < 0);
- 		if (tx->cookie > 0) {
-@@ -485,41 +477,34 @@ static void sba_process_deferred_requests(struct sba_device *sba)
- 
- 		spin_lock_irqsave(&sba->reqs_lock, flags);
- 
--		/* If waiting for 'ack' then move to completed list */
--		if (!async_tx_test_ack(&req->tx))
--			_sba_complete_request(sba, req);
--		else
--			_sba_free_request(sba, req);
-+		/* Free all requests chained to first request */
-+		list_for_each_entry(nreq, &first->next, next)
-+			_sba_free_request(sba, nreq);
-+		INIT_LIST_HEAD(&first->next);
- 
--		count--;
--	}
-+		/* Mark request as received */
-+		_sba_received_request(sba, first);
- 
--	/* Re-check pending and completed work */
--	count = 0;
--	if (!list_empty(&sba->reqs_pending_list) ||
--	    !list_empty(&sba->reqs_completed_list))
--		count = 1;
--
--	spin_unlock_irqrestore(&sba->reqs_lock, flags);
--}
--
--static void sba_process_received_request(struct sba_device *sba,
--					 struct sba_request *req)
--{
--	unsigned long flags;
--
--	spin_lock_irqsave(&sba->reqs_lock, flags);
-+		/* The client is allowed to attach dependent operations
-+		 * until 'ack' is set
-+		 */
-+		if (!async_tx_test_ack(tx))
-+			_sba_complete_request(sba, first);
-+		else
-+			_sba_free_request(sba, first);
- 
--	/* Mark request as received */
--	_sba_received_request(sba, req);
-+		/* Cleanup completed requests */
-+		list_for_each_entry_safe(req, nreq,
-+					 &sba->reqs_completed_list, node) {
-+			if (async_tx_test_ack(&req->tx))
-+				_sba_free_request(sba, req);
-+		}
- 
--	/* Update request */
--	if (!atomic_dec_return(&req->first->next_pending_count))
--		_sba_complete_request(sba, req->first);
--	if (req->first != req)
--		_sba_free_request(sba, req);
-+		/* Process pending requests */
-+		_sba_process_pending_requests(sba);
- 
--	spin_unlock_irqrestore(&sba->reqs_lock, flags);
-+		spin_unlock_irqrestore(&sba->reqs_lock, flags);
-+	}
- }
- 
- /* ====== DMAENGINE callbacks ===== */
-@@ -544,10 +529,13 @@ static int sba_device_terminate_all(struct dma_chan *dchan)
- 
- static void sba_issue_pending(struct dma_chan *dchan)
- {
-+	unsigned long flags;
- 	struct sba_device *sba = to_sba_device(dchan);
- 
--	/* Process deferred requests */
--	sba_process_deferred_requests(sba);
-+	/* Process pending requests */
++	struct sba_request *req;
++	u32 free_count = 0, alloced_count = 0, pending_count = 0;
++	u32 active_count = 0, aborted_count = 0, completed_count = 0;
++
 +	spin_lock_irqsave(&sba->reqs_lock, flags);
-+	_sba_process_pending_requests(sba);
++
++	list_for_each_entry(req, &sba->reqs_free_list, node)
++		free_count++;
++
++	list_for_each_entry(req, &sba->reqs_alloc_list, node)
++		alloced_count++;
++
++	list_for_each_entry(req, &sba->reqs_pending_list, node)
++		pending_count++;
++
++	list_for_each_entry(req, &sba->reqs_active_list, node)
++		active_count++;
++
++	list_for_each_entry(req, &sba->reqs_aborted_list, node)
++		aborted_count++;
++
++	list_for_each_entry(req, &sba->reqs_completed_list, node)
++		completed_count++;
++
 +	spin_unlock_irqrestore(&sba->reqs_lock, flags);
- }
++
++	seq_printf(file, "maximum requests   = %d\n", sba->max_req);
++	seq_printf(file, "free requests      = %d\n", free_count);
++	seq_printf(file, "alloced requests   = %d\n", alloced_count);
++	seq_printf(file, "pending requests   = %d\n", pending_count);
++	seq_printf(file, "active requests    = %d\n", active_count);
++	seq_printf(file, "aborted requests   = %d\n", aborted_count);
++	seq_printf(file, "completed requests = %d\n", completed_count);
++}
++
+ /* ====== DMAENGINE callbacks ===== */
  
- static dma_cookie_t sba_tx_submit(struct dma_async_tx_descriptor *tx)
-@@ -1482,9 +1470,6 @@ static void sba_receive_message(struct mbox_client *cl, void *msg)
- 
- 	/* Process received request */
+ static void sba_free_chan_resources(struct dma_chan *dchan)
+@@ -1451,6 +1494,19 @@ static void sba_receive_message(struct mbox_client *cl, void *msg)
  	sba_process_received_request(sba, req);
--
--	/* Process deferred requests */
--	sba_process_deferred_requests(sba);
  }
  
++/* ====== Debugfs callbacks ====== */
++
++static int sba_debugfs_stats_show(struct seq_file *file, void *offset)
++{
++	struct platform_device *pdev = to_platform_device(file->private);
++	struct sba_device *sba = platform_get_drvdata(pdev);
++
++	/* Write stats in file */
++	sba_write_stats_in_seqfile(sba, file);
++
++	return 0;
++}
++
  /* ====== Platform driver routines ===== */
+ 
+ static int sba_prealloc_channel_resources(struct sba_device *sba)
+@@ -1721,6 +1777,25 @@ static int sba_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto fail_free_mchans;
+ 
++	/* Check availability of debugfs */
++	if (!debugfs_initialized())
++		goto skip_debugfs;
++
++	/* Create debugfs root entry */
++	sba->root = debugfs_create_dir(dev_name(sba->dev), NULL);
++	if (IS_ERR_OR_NULL(sba->root)) {
++		dev_err(sba->dev, "failed to create debugfs root entry\n");
++		sba->root = NULL;
++		goto skip_debugfs;
++	}
++
++	/* Create debugfs stats entry */
++	sba->stats = debugfs_create_devm_seqfile(sba->dev, "stats", sba->root,
++						 sba_debugfs_stats_show);
++	if (IS_ERR_OR_NULL(sba->stats))
++		dev_err(sba->dev, "failed to create debugfs stats file\n");
++skip_debugfs:
++
+ 	/* Register DMA device with Linux async framework */
+ 	ret = sba_async_register(sba);
+ 	if (ret)
+@@ -1734,6 +1809,7 @@ static int sba_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ fail_free_resources:
++	debugfs_remove_recursive(sba->root);
+ 	sba_freeup_channel_resources(sba);
+ fail_free_mchans:
+ 	for (i = 0; i < sba->mchans_count; i++)
+@@ -1748,6 +1824,8 @@ static int sba_remove(struct platform_device *pdev)
+ 
+ 	dma_async_device_unregister(&sba->dma_dev);
+ 
++	debugfs_remove_recursive(sba->root);
++
+ 	sba_freeup_channel_resources(sba);
+ 
+ 	for (i = 0; i < sba->mchans_count; i++)
 -- 
 2.7.4
