@@ -1,87 +1,61 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue, 22 Aug 2017 15:26:56 +0530
-Subject: [PATCH v3 07/17] dmaengine: bcm-sba-raid: Allow arbitrary number free
- sba_request
+Date: Tue, 22 Aug 2017 15:26:55 +0530
+Subject: [PATCH v3 06/17] dmaengine: bcm-sba-raid: Remove reqs_free_count from
+ sba_device
 In-Reply-To: <1503395827-19428-1-git-send-email-anup.patel@broadcom.com>
 References: <1503395827-19428-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1503395827-19428-8-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1503395827-19428-7-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we cannot have any arbitrary number of free sba_request
-because sba_prealloc_channel_resources() allocates an array of
-sba_request using devm_kcalloc() and kcalloc() cannot provide
-memory beyond certain size.
-
-This patch removes "reqs" (sba_request array) from sba_device
-and makes "cmds" as variable array (instead of pointer) in
-sba_request. This helps sba_prealloc_channel_resources() to
-allocate sba_request and associated SBA command in one allocation
-which in-turn allows arbitrary number of free sba_request.
+The reqs_free_count member of sba_device is not used anywhere
+hence no point in tracking number of free sba_request.
 
 Signed-off-by: Anup Patel <anup.patel@broadcom.com>
 ---
- drivers/dma/bcm-sba-raid.c | 26 ++++++++++----------------
- 1 file changed, 10 insertions(+), 16 deletions(-)
+ drivers/dma/bcm-sba-raid.c | 8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
 
 diff --git a/drivers/dma/bcm-sba-raid.c b/drivers/dma/bcm-sba-raid.c
-index 59ef443..cd6e3cd 100644
+index 7d08d4e..59ef443 100644
 --- a/drivers/dma/bcm-sba-raid.c
 +++ b/drivers/dma/bcm-sba-raid.c
-@@ -113,9 +113,10 @@ struct sba_request {
- 	struct list_head next;
- 	atomic_t next_pending_count;
- 	/* BRCM message data */
--	struct brcm_sba_command *cmds;
- 	struct brcm_message msg;
- 	struct dma_async_tx_descriptor tx;
-+	/* SBA commands */
-+	struct brcm_sba_command cmds[0];
+@@ -162,7 +162,6 @@ struct sba_device {
+ 	struct list_head reqs_completed_list;
+ 	struct list_head reqs_aborted_list;
+ 	struct list_head reqs_free_list;
+-	int reqs_free_count;
  };
  
- enum sba_version {
-@@ -153,7 +154,6 @@ struct sba_device {
- 	void *cmds_base;
- 	dma_addr_t cmds_dma_base;
- 	spinlock_t reqs_lock;
--	struct sba_request *reqs;
- 	bool reqs_fence;
- 	struct list_head reqs_alloc_list;
- 	struct list_head reqs_pending_list;
-@@ -1484,26 +1484,20 @@ static int sba_prealloc_channel_resources(struct sba_device *sba)
- 	INIT_LIST_HEAD(&sba->reqs_aborted_list);
- 	INIT_LIST_HEAD(&sba->reqs_free_list);
- 
--	sba->reqs = devm_kcalloc(sba->dev, sba->max_req,
--				 sizeof(*req), GFP_KERNEL);
--	if (!sba->reqs) {
--		ret = -ENOMEM;
--		goto fail_free_cmds_pool;
+ /* ====== Command helper routines ===== */
+@@ -207,10 +206,8 @@ static struct sba_request *sba_alloc_request(struct sba_device *sba)
+ 	spin_lock_irqsave(&sba->reqs_lock, flags);
+ 	req = list_first_entry_or_null(&sba->reqs_free_list,
+ 				       struct sba_request, node);
+-	if (req) {
++	if (req)
+ 		list_move_tail(&req->node, &sba->reqs_alloc_list);
+-		sba->reqs_free_count--;
 -	}
+ 	spin_unlock_irqrestore(&sba->reqs_lock, flags);
+ 	if (!req)
+ 		return NULL;
+@@ -276,7 +273,6 @@ static void _sba_free_request(struct sba_device *sba,
+ 	list_move_tail(&req->node, &sba->reqs_free_list);
+ 	if (list_empty(&sba->reqs_active_list))
+ 		sba->reqs_fence = false;
+-	sba->reqs_free_count++;
+ }
+ 
+ static void sba_received_request(struct sba_request *req)
+@@ -1523,8 +1519,6 @@ static int sba_prealloc_channel_resources(struct sba_device *sba)
+ 		list_add_tail(&req->node, &sba->reqs_free_list);
+ 	}
+ 
+-	sba->reqs_free_count = sba->max_req;
 -
- 	for (i = 0; i < sba->max_req; i++) {
--		req = &sba->reqs[i];
-+		req = devm_kzalloc(sba->dev,
-+				sizeof(*req) +
-+				sba->max_cmd_per_req * sizeof(req->cmds[0]),
-+				GFP_KERNEL);
-+		if (!req) {
-+			ret = -ENOMEM;
-+			goto fail_free_cmds_pool;
-+		}
- 		INIT_LIST_HEAD(&req->node);
- 		req->sba = sba;
- 		req->flags = SBA_REQUEST_STATE_FREE;
- 		INIT_LIST_HEAD(&req->next);
- 		atomic_set(&req->next_pending_count, 0);
--		req->cmds = devm_kcalloc(sba->dev, sba->max_cmd_per_req,
--					 sizeof(*req->cmds), GFP_KERNEL);
--		if (!req->cmds) {
--			ret = -ENOMEM;
--			goto fail_free_cmds_pool;
--		}
- 		for (j = 0; j < sba->max_cmd_per_req; j++) {
- 			req->cmds[j].cmd = 0;
- 			req->cmds[j].cmd_dma = sba->cmds_base +
+ 	return 0;
+ 
+ fail_free_cmds_pool:
 -- 
 2.7.4
