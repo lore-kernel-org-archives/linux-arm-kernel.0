@@ -1,55 +1,76 @@
-From: Wenyou.Yang@Microchip.com (Yang, Wenyou)
-Date: Tue, 22 Aug 2017 09:18:17 +0800
-Subject: [PATCH 1/3] media: atmel-isc: Not support RBG format from sensor.
-In-Reply-To: <61cb51fa-8d05-6707-00cc-429c761fa6f5@xs4all.nl>
-References: <20170817071614.12767-1-wenyou.yang@microchip.com>
- <20170817071614.12767-2-wenyou.yang@microchip.com>
- <61cb51fa-8d05-6707-00cc-429c761fa6f5@xs4all.nl>
-Message-ID: <14941b74-8931-4d00-0664-0735fad9b5d1@Microchip.com>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Mon, 21 Aug 2017 20:17:30 -0500
+Subject: [PATCH v2 2/3] i2c: davinci: Add PM Runtime Support
+In-Reply-To: <8207a684-f010-ca82-baae-db06665f098e@ti.com>
+References: <20170816221715.15027-1-fcooper@ti.com>
+ <20170816221715.15027-3-fcooper@ti.com>
+ <8207a684-f010-ca82-baae-db06665f098e@ti.com>
+Message-ID: <d06ef5c6-6501-eca6-2fa2-976d085091b2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
 
-On 2017/8/21 22:07, Hans Verkuil wrote:
-> On 08/17/2017 09:16 AM, Wenyou Yang wrote:
->> The 12-bit parallel interface supports the Raw Bayer, YCbCr,
->> Monochrome and JPEG Compressed pixel formats from the external
->> sensor, not support RBG pixel format.
->>
->> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
->> ---
->>
->>   drivers/media/platform/atmel/atmel-isc.c | 5 +++++
->>   1 file changed, 5 insertions(+)
->>
->> diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
->> index d4df3d4ccd85..535bb03783fe 100644
->> --- a/drivers/media/platform/atmel/atmel-isc.c
->> +++ b/drivers/media/platform/atmel/atmel-isc.c
->> @@ -1478,6 +1478,11 @@ static int isc_formats_init(struct isc_device *isc)
->>   	while (!v4l2_subdev_call(subdev, pad, enum_mbus_code,
->>   	       NULL, &mbus_code)) {
->>   		mbus_code.index++;
+
+On 08/21/2017 04:05 AM, Sekhar Nori wrote:
+> On Thursday 17 August 2017 03:47 AM, Franklin S Cooper Jr wrote:
+> 
+>> @@ -802,7 +821,6 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>>  	dev->clk = devm_clk_get(&pdev->dev, NULL);
+>>  	if (IS_ERR(dev->clk))
+>>  		return PTR_ERR(dev->clk);
+>> -	clk_prepare_enable(dev->clk);
+>>  
+>>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>>  	dev->base = devm_ioremap_resource(&pdev->dev, mem);
+>> @@ -811,6 +829,18 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>>  		goto err_unuse_clocks;
+> 
+> This goto is wrong now. There is no need to unwind the pm_runtime setup
+> on a devm_ioremap_resource() failure. You can just return error here.
+
+Ok
+> 
+>>  	}
+>>  
+>> +	pm_runtime_set_autosuspend_delay(dev->dev,
+>> +					 DAVINCI_I2C_PM_TIMEOUT);
+>> +	pm_runtime_use_autosuspend(dev->dev);
 >> +
->> +		/* Not support the RGB pixel formats from sensor */
->> +		if ((mbus_code.code & 0xf000) == 0x1000)
->> +			continue;
-> Am I missing something? Here you skip any RGB mediabus formats, but in patch 3/3
-> you add RGB mediabus formats. But this patch prevents those new formats from being
-> selected, right?
-This patch prevents getting the RGB format from the sensor directly.
-The RGB format can be produced by ISC controller by itself.
-
-> Regards,
->
-> 	Hans
->
+>> +	pm_runtime_enable(dev->dev);
 >> +
->>   		fmt = find_format_by_code(mbus_code.code, &i);
->>   		if (!fmt)
->>   			continue;
->>
+>> +	r = pm_runtime_get_sync(dev->dev);
+>> +	if (r < 0) {
+>> +		dev_err(dev->dev, "failed to runtime_get device: %d\n", r);
+>> +		goto err_unuse_clocks;
+>> +	}
+>> +
+>>  	i2c_davinci_init(dev);
+>>  
+>>  	r = devm_request_irq(&pdev->dev, dev->irq, i2c_davinci_isr, 0,
+>> @@ -849,10 +879,16 @@ static int davinci_i2c_probe(struct platform_device *pdev)
+>>  	if (r)
+>>  		goto err_unuse_clocks;
+>>  
+>> +	pm_runtime_mark_last_busy(dev->dev);
+>> +	pm_runtime_put_autosuspend(dev->dev);
+>> +
+>>  	return 0;
+>>  
+>>  err_unuse_clocks:
+>> -	clk_disable_unprepare(dev->clk);
+>> +	pm_runtime_dont_use_autosuspend(dev->dev);
+>> +	pm_runtime_put_sync(dev->dev);
+>> +	pm_runtime_disable(dev->dev);
+>> +
+>>  	dev->clk = NULL;
+> 
+> This null setting of clk seems quite bogus and can be cleaned-up.
 
-Best Regards,
-Wenyou Yang
+Do you mean that I should just remove this line?
+> 
+>>  	return r;
+>>  }
+> 
+> Thanks,
+> Sekhar
+> 
