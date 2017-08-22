@@ -1,55 +1,49 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Tue, 22 Aug 2017 11:47:52 -0700
-Subject: [PATCH v5] vfio: platform: reset: Add Broadcom FlexRM reset module
-In-Reply-To: <1503396041-19485-2-git-send-email-anup.patel@broadcom.com>
-References: <1503396041-19485-1-git-send-email-anup.patel@broadcom.com>
- <1503396041-19485-2-git-send-email-anup.patel@broadcom.com>
-Message-ID: <ffcc2283-506f-6849-16e7-b0f0e618cd84@broadcom.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 22 Aug 2017 12:24:27 -0700
+Subject: [PATCH 5/8] ARM: OMAP4: hwmod_data: Remove modulemode from
+ IPU/DSP hwmods
+In-Reply-To: <a7ed87b7-bfe3-0b0c-08b4-4c44570364f2@ti.com>
+References: <20170821234818.4755-1-s-anna@ti.com>
+ <20170821234818.4755-6-s-anna@ti.com>
+ <20170822173749.GK6008@atomide.com>
+ <a7ed87b7-bfe3-0b0c-08b4-4c44570364f2@ti.com>
+Message-ID: <20170822192425.GM6008@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anup,
+* Suman Anna <s-anna@ti.com> [170822 11:45]:
+> On 08/22/2017 12:37 PM, Tony Lindgren wrote:
+> > I think a better way to fix this would be to make sure the module
+> > is enabled during the unmapping phase of the MMUs. If there is no
+> > driver left at that point to call pm_runtime_get() on the module,
+> > do it via pdata-quirks.c using struct iommu_platform_data?
+> 
+> The problem is because there is no reference counting on modulemode
+> programming unlike clocks or omap_device pm_domain callbacks. The IOMMU
+> driver already has an active pm_runtime_get() invoked earlier and
+> invoking another wouldn't result in any change.
 
-We should add default (as below).
+Hmm iommu driver has pm_runtime_get() on which modules? Can you
+please point me to that code too so I can follow..
 
+Or is there maybe a single module shared across multiple devices?
 
-On 17-08-22 03:00 AM, Anup Patel wrote:
-> This patch adds Broadcom FlexRM low-level reset for
-> VFIO platform.
->
-> It will do the following:
-> 1. Disable/Deactivate each FlexRM ring
-> 2. Flush each FlexRM ring
->
-> The cleanup sequence for FlexRM rings is adapted from
-> Broadcom FlexRM mailbox driver.
->
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> Reviewed-by: Oza Oza <oza.oza@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> Reviewed-by: Eric Auger <eric.auger@redhat.com>
-> ---
->   drivers/vfio/platform/reset/Kconfig                |   8 ++
->   drivers/vfio/platform/reset/Makefile               |   1 +
->   .../vfio/platform/reset/vfio_platform_bcmflexrm.c  | 100 +++++++++++++++++++++
->   3 files changed, 109 insertions(+)
->   create mode 100644 drivers/vfio/platform/reset/vfio_platform_bcmflexrm.c
->
-> diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
-> index 70cccc5..8833805 100644
-> --- a/drivers/vfio/platform/reset/Kconfig
-> +++ b/drivers/vfio/platform/reset/Kconfig
-> @@ -13,3 +13,11 @@ config VFIO_PLATFORM_AMDXGBE_RESET
->   	  Enables the VFIO platform driver to handle reset for AMD XGBE
->   
->   	  If you don't know what to do here, say N.
-> +
-> +config VFIO_PLATFORM_BCMFLEXRM_RESET
-> +	tristate "VFIO support for Broadcom FlexRM reset"
-> +	depends on VFIO_PLATFORM && (ARCH_BCM_IPROC || COMPILE_TEST)
-default ARCH_BCM_IPROC
-> +	help
-> +	  Enables the VFIO platform driver to handle reset for Broadcom FlexRM
-> +
-> +	  If you don't know what to do here, say N.
->
+If so, we need a minimal module wrapper driver. You can do what we
+already do for musb on am335x in drivers/usb/musb/musb_am335x.c.
+A single module has two musb instances and a shared cppi41 dma
+instance. See also it's related entries in am33xx.dtsi.
+
+Note that the clkctrl clocks are available now as clocks, so they
+could be directly enabled for testing. See omap4_tesla_clkctrl_regs
+and omap4_ducati_clkctrl_regs if that helps.
+
+> The remoteproc driver is only dealing with its resets and hwmod while
+> the IOMMU driver is dealing with its dedicated reset. The PRCM registers
+> though are a single set between the two.
+
+Sorry but I'm having hard time following which driver claims
+which modules :)
+
+Regards,
+
+Tony
