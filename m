@@ -1,22 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 22 Aug 2017 15:28:51 +0200
-Subject: [GIT PULL] ARM: at91: drivers fixes for 4.13
-In-Reply-To: <20170821131558.56i2o4o677y6kjzu@piout.net>
-References: <20170821131558.56i2o4o677y6kjzu@piout.net>
-Message-ID: <CAK8P3a0Z=hss9Cm5QWRBAxBdGgwq_vZPYo4sKwsHK4KBbSMnBA@mail.gmail.com>
+Date: Tue, 22 Aug 2017 15:31:10 +0200
+Subject: [PATCH] ARM: dts: augment Ux500 to use DT cpufreq
+In-Reply-To: <20170822072820.15801-1-linus.walleij@linaro.org>
+References: <20170822072820.15801-1-linus.walleij@linaro.org>
+Message-ID: <CAK8P3a1Km8Kmzodg6F8UjfO+oDxua8UVgWjUQ4cjZ8hh4t3dCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 21, 2017 at 3:15 PM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> Arnd, Olof,
+On Tue, Aug 22, 2017 at 9:28 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> This adds the operating points to the Ux500 device tree and
+> deletes the old special-purpose cpufreq node, as we can now
+> use the generic DT cpufreq driver.
 >
-> A very late pull request for a few fixes I'm carrying in my tree for a
-> while.
-> It would be great if you could send that to Linus for 4.13.
->
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: please apply this directly for v4.14, I have
+> no other ux500 DTS patches coming this merge window as far
+> as I know. It is just using standard bindings.
 
-Pulled into fixes. I'm fairly sure we will send at least one more pull
-request for 4.13 fixes, so this should be fine.
+applied to next/dt, thanks!
 
-      Arnd
+    Arnd
