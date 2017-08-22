@@ -1,72 +1,80 @@
 From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Tue, 22 Aug 2017 08:54:26 +0200
-Subject: [PATCH 3/3] media: atmel-isc: Add more format configurations
-In-Reply-To: <20170817071614.12767-4-wenyou.yang@microchip.com>
+Date: Tue, 22 Aug 2017 09:00:23 +0200
+Subject: [PATCH 1/3] media: atmel-isc: Not support RBG format from sensor.
+In-Reply-To: <14941b74-8931-4d00-0664-0735fad9b5d1@Microchip.com>
 References: <20170817071614.12767-1-wenyou.yang@microchip.com>
- <20170817071614.12767-4-wenyou.yang@microchip.com>
-Message-ID: <3b7a0d2a-f8e7-93d1-6cfc-78bfe5e4dbba@xs4all.nl>
+ <20170817071614.12767-2-wenyou.yang@microchip.com>
+ <61cb51fa-8d05-6707-00cc-429c761fa6f5@xs4all.nl>
+ <14941b74-8931-4d00-0664-0735fad9b5d1@Microchip.com>
+Message-ID: <ce6d074b-1c13-d3ea-5dfa-89cca2f26feb@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/17/2017 09:16 AM, Wenyou Yang wrote:
-> Add the configuration of formats: GREY, ARGB444, ARGB555 and ARGB32.
+On 08/22/2017 03:18 AM, Yang, Wenyou wrote:
+> Hi Hans,
 > 
-> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
-> ---
-> 
->  drivers/media/platform/atmel/atmel-isc.c | 22 ++++++++++++++++++++--
->  1 file changed, 20 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
-> index d91f4e5f8a8d..4e18fe1104c8 100644
-> --- a/drivers/media/platform/atmel/atmel-isc.c
-> +++ b/drivers/media/platform/atmel/atmel-isc.c
-> @@ -184,7 +184,7 @@ struct isc_device {
->  #define RAW_FMT_IND_START    0
->  #define RAW_FMT_IND_END      11
->  #define ISC_FMT_IND_START    12
-> -#define ISC_FMT_IND_END      14
-> +#define ISC_FMT_IND_END      18
+> On 2017/8/21 22:07, Hans Verkuil wrote:
+>> On 08/17/2017 09:16 AM, Wenyou Yang wrote:
+>>> The 12-bit parallel interface supports the Raw Bayer, YCbCr,
+>>> Monochrome and JPEG Compressed pixel formats from the external
+>>> sensor, not support RBG pixel format.
+>>>
+>>> Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
+>>> ---
+>>>
+>>>   drivers/media/platform/atmel/atmel-isc.c | 5 +++++
+>>>   1 file changed, 5 insertions(+)
+>>>
+>>> diff --git a/drivers/media/platform/atmel/atmel-isc.c b/drivers/media/platform/atmel/atmel-isc.c
+>>> index d4df3d4ccd85..535bb03783fe 100644
+>>> --- a/drivers/media/platform/atmel/atmel-isc.c
+>>> +++ b/drivers/media/platform/atmel/atmel-isc.c
+>>> @@ -1478,6 +1478,11 @@ static int isc_formats_init(struct isc_device *isc)
+>>>   	while (!v4l2_subdev_call(subdev, pad, enum_mbus_code,
+>>>   	       NULL, &mbus_code)) {
+>>>   		mbus_code.index++;
+>>> +
+>>> +		/* Not support the RGB pixel formats from sensor */
+>>> +		if ((mbus_code.code & 0xf000) == 0x1000)
+>>> +			continue;
+>> Am I missing something? Here you skip any RGB mediabus formats, but in patch 3/3
+>> you add RGB mediabus formats. But this patch prevents those new formats from being
+>> selected, right?
+> This patch prevents getting the RGB format from the sensor directly.
+> The RGB format can be produced by ISC controller by itself.
 
-Shouldn't this be 19?
+OK, I think I see what is going on here. The isc_formats array really is two
+arrays in one: up to RAW_FMT_IND_END it describes what it can receive from
+the source, and after that it describes what it can convert it to.
+
+But if you can't handle RGB formats from the sensor, then why not make
+sure none of the mbus codes in isc_formats uses RGB? That makes much
+more sense.
+
+E.g.:
+
+        { V4L2_PIX_FMT_RGB565, MEDIA_BUS_FMT_RGB565_2X8_LE, 16,
+          ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_RGB565,
+          ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x7b,
+          false, false },
+
+Why use MEDIA_BUS_FMT_RGB565_2X8_LE if this apparently is not supported?
 
 Regards,
 
 	Hans
 
->  
->  static struct isc_format isc_formats[] = {
->  	/* 0 */
-> @@ -246,12 +246,30 @@ static struct isc_format isc_formats[] = {
->  	{ V4L2_PIX_FMT_YUV422P, 0x0, 16,
->  	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_YYCC,
->  	  ISC_DCFG_IMODE_YC422P, ISC_DCTRL_DVIEW_PLANAR, 0x3fb },
-> +
->  	/* 14 */
-> +	{ V4L2_PIX_FMT_GREY, MEDIA_BUS_FMT_Y8_1X8, 8,
-> +	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_DATY8,
-> +	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, 0x1fb },
-> +
-> +	/* 15 */
-> +	{ V4L2_PIX_FMT_ARGB444, MEDIA_BUS_FMT_RGB444_2X8_PADHI_LE, 16,
-> +	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_ARGB444,
-> +	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x7b },
-> +	/* 16 */
-> +	{ V4L2_PIX_FMT_ARGB555, MEDIA_BUS_FMT_RGB555_2X8_PADHI_LE, 16,
-> +	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_ARGB555,
-> +	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x7b },
-> +	/* 17 */
->  	{ V4L2_PIX_FMT_RGB565, MEDIA_BUS_FMT_RGB565_2X8_LE, 16,
->  	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_RGB565,
->  	  ISC_DCFG_IMODE_PACKED16, ISC_DCTRL_DVIEW_PACKED, 0x7b },
-> +	/* 18 */
-> +	{ V4L2_PIX_FMT_ARGB32, MEDIA_BUS_FMT_ARGB8888_1X32, 32,
-> +	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_ARGB32,
-> +	  ISC_DCFG_IMODE_PACKED32, ISC_DCTRL_DVIEW_PACKED, 0x7b },
->  
-> -	/* 15 */
-> +	/* 19 */
->  	{ V4L2_PIX_FMT_YUYV, MEDIA_BUS_FMT_YUYV8_2X8, 16,
->  	  ISC_PFE_CFG0_BPS_EIGHT, ISC_BAY_CFG_BGBG, ISC_RLP_CFG_MODE_DAT8,
->  	  ISC_DCFG_IMODE_PACKED8, ISC_DCTRL_DVIEW_PACKED, 0x0 },
+> 
+>> Regards,
+>>
+>> 	Hans
+>>
+>>> +
+>>>   		fmt = find_format_by_code(mbus_code.code, &i);
+>>>   		if (!fmt)
+>>>   			continue;
+>>>
+> 
+> Best Regards,
+> Wenyou Yang
 > 
