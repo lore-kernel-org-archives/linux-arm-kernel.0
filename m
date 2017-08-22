@@ -1,35 +1,56 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 22 Aug 2017 16:36:03 -0500
-Subject: [PATCH v2 0/3] PCI: mediatek: Add MSI support for MT2712 and
- MT7622
-In-Reply-To: <1502715868-17651-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1502715868-17651-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <20170822213602.GK6948@bhelgaas-glaptop.roam.corp.google.com>
+Date: Tue, 22 Aug 2017 17:19:28 -0500
+Subject: [PATCH v2 1/1] Split VGA default device handler out of VGA arbiter
+In-Reply-To: <20170821105300.GB23287@e107981-lin.cambridge.arm.com>
+References: <20170817113028.16853-1-dja@axtens.net>
+ <20170817113028.16853-2-dja@axtens.net>
+ <20170821105300.GB23287@e107981-lin.cambridge.arm.com>
+Message-ID: <20170822221928.GL6948@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 09:04:25PM +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
+On Mon, Aug 21, 2017 at 11:53:01AM +0100, Lorenzo Pieralisi wrote:
+> On Thu, Aug 17, 2017 at 09:30:28PM +1000, Daniel Axtens wrote:
+> > A system without PCI legacy resources (e.g. ARM64) may find that no
+> > default/boot VGA device has been marked, because the VGA arbiter
+> > checks for legacy resource decoding before marking a card as default.
 > 
-> MT2712 and MT7622's PCIe host controller support MSI, but only 32bit MSI
-> address are supportted. It connect to GIC with the same IRQ number of INTx
-> IRQ, so it shares the same IRQ with INTx IRQ.
+> I do not understand this paragraph, in particular:
 > 
-> This patchset add MSI support for MT2712 and MT7622.
-> Also do some code fixup and cleanups.
-> 
-> Change Since V1:
->  - Add the first two patches into this patchset.
->  - Using -ENODEV instead of PTR_ERR if msi_domain == NULL
->  - Change the error logs with consistency of lower-case
->  - Using has_msi instead of support_msi to make the parameter name a bit shorter
-> 
-> Honghui Zhang (3):
->   PCI: mediatek: Fix return value in case of error
->   PCI: mediatek: take use of bus->sysdata to get host private data
->   PCI: mediatek: add msi support for MT2712 and MT7622
-> 
->  drivers/pci/host/pcie-mediatek.c | 157 +++++++++++++++++++++++++++++++++++++--
->  1 file changed, 151 insertions(+), 6 deletions(-)
+> - "A system without PCI legacy resources (e.g. ARM64)". What does this
+>   mean ? I take this as "ARM64 does not support IO space"; if a PCI host
+>   bridge supports IO space, there is nothing from an architectural
+>   point of view that prevents an MMIO based IO space implementation to
+>   work on ARM64. It is PCI bridge specific, not arch specific.
 
-Just waiting for an ack from Ryder...
+This reference to ARM64 is the same thing I stumbled over.  Maybe it
+could be written along the lines of:
+
+  The VGA arbiter selects a default VGA device that is enabled and
+  reachable via the legacy VGA resources (mem 0xa0000-0xbffff, io
+  0x3b0-0x3bb, io 0x3c0-0x3df, etc).
+
+  If there is no such device, e.g., because there's no enabled VGA
+  device, the host bridge doesn't support access to those legacy
+  resources, or a PCI-PCI bridge doesn't have VGA Enable set, a
+  platform may select an arbitrary device by calling
+  vga_set_default_device().
+
+Then I think this patch changes the previous behavior by allowing the
+arbiter to select a device that is enabled and has a driver but may
+not be reachable via the legacy VGA resources.
+
+I don't know what all the consequences of that would be, but it does
+muddy the VGA arbiter waters a bit.  AIUI, the main reason for the
+arbiter is to allow multiple legacy VGA devices by manipulating bridge
+VGA Enable bits so only one receives the legacy resources at a time.
+
+These devices that do not need the legacy resources don't need that
+special treatment because they don't care about the bridge VGA Enable
+bits and several can coexist in the system with no need for VGA
+arbitration.
+
+I guess the powerpc fixup_vga() already selects a device that doesn't
+need the VGA resources, so we already have that situation.
+
+Bjorn
