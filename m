@@ -1,42 +1,68 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue, 22 Aug 2017 19:08:23 +0200
-Subject: [PATCH net-next v2 03/10] net: mvpp2: move the mii configuration in
- the ndo_open path
-In-Reply-To: <20170822170830.32413-1-antoine.tenart@free-electrons.com>
-References: <20170822170830.32413-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170822170830.32413-4-antoine.tenart@free-electrons.com>
+Date: Tue, 22 Aug 2017 19:08:20 +0200
+Subject: [PATCH net-next v2 00/10] net: mvpp2: MAC/GoP configuration
+Message-ID: <20170822170830.32413-1-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the mii configuration in the ndo_open path, to allow handling
-different mii configurations later and to switch between these
-configurations at runtime.
+Hi all,
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Tested-by: Marcin Wojtas <mw@semihalf.com>
----
- drivers/net/ethernet/marvell/mvpp2.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This is based on net-next (e2a7c34fb285).
 
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 03b7ced1082f..087eb793ab4d 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -5987,6 +5987,7 @@ static void mvpp2_start_dev(struct mvpp2_port *port)
- 	/* Enable interrupts on all CPUs */
- 	mvpp2_interrupts_enable(port);
- 
-+	mvpp2_port_mii_set(port);
- 	mvpp2_port_enable(port);
- 	phy_start(ndev->phydev);
- 	netif_tx_start_all_queues(port->dev);
-@@ -6949,7 +6950,6 @@ static int mvpp2_port_probe(struct platform_device *pdev,
- 		goto err_free_stats;
- 	}
- 
--	mvpp2_port_mii_set(port);
- 	mvpp2_port_periodic_xon_disable(port);
- 
- 	if (priv->hw_version == MVPP21)
+I removed the GoP interrupt and PHY optional parts in this v2 to ease
+the review process as the MAC/GoP initialization seemed to start less
+discussions :)
+
+This series now only aims at making the PPv2 driver less depending on
+the firmware/bootloader initialization. Some patches cleanup some parts
+as well, and add new interface descriptions in the dt.
+
+The current implementation of the PPv2 driver relies on the
+firmware/bootloader initialization to configure some parts, as the Group
+of Ports (GoP) and the MACs (GMAC and/or XLG MAC --for 10G--).  The
+drawback is the kernel must be configured to match exactly what the
+bootloader configures which is not convenient and is an issue when using
+boards having an Ethernet port and an SFP port wired to the same GoP
+port, as no dynamic configuration can be done.
+
+This series adds the GoP and GMAC/XLG MAC initializations so that the
+PPV2 does not have to rely on a previous initialization. One part is
+still missing from this series, and that would be the 'comphy' which
+provides shared serdes PHYs and which must be configured as well for a
+full kernel initialization to work. This comphy support will be part of
+a following up series. (This series was also tested with this 'comphy'
+support, as it's nearly ready).
+
+@Dave: patches 9 and 10 should go through the mvebu tree. Thanks!
+
+Since v1:
+  - Split the previous series.
+  - Rebased on net-next and reworked the series accordingly.
+  - Added support for all RGMII variants.
+  - Added a patch from Stefan Chulski improving / fixing 10G support.
+  - Various small fixes.
+
+Antoine Tenart (9):
+  net: mvpp2: unify register definitions coding style
+  net: mvpp2: fix the synchronization module bypass macro name
+  net: mvpp2: move the mii configuration in the ndo_open path
+  net: mvpp2: initialize the GMAC when using a port
+  net: mvpp2: initialize the XLG MAC when using a port
+  net: mvpp2: initialize the GoP
+  Documentation/bindings: net: marvell-pp2: add the system controller
+  arm64: dts: marvell: add a reference to the sysctrl syscon in the ppv2
+    node
+  arm64: dts: marvell: mcbin: enable more networking ports
+
+Stefan Chulski (1):
+  net: mvpp2: set maximum packet size for 10G ports
+
+ .../devicetree/bindings/net/marvell-pp2.txt        |   1 +
+ arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts  |  30 ++
+ .../boot/dts/marvell/armada-cp110-master.dtsi      |   1 +
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |   1 +
+ drivers/net/ethernet/marvell/mvpp2.c               | 432 +++++++++++++++++----
+ 5 files changed, 393 insertions(+), 72 deletions(-)
+
 -- 
 2.13.5
