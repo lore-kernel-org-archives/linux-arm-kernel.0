@@ -1,52 +1,98 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 22 Aug 2017 16:00:58 +0100
-Subject: [PATCH] soc/tegra: Register SoC device
-In-Reply-To: <20170822111922.GA15965@ulmo>
-References: <20170817144217.31346-1-thierry.reding@gmail.com>
- <61dde661-313f-0b51-233b-ce957c514a55@arm.com> <20170822111922.GA15965@ulmo>
-Message-ID: <cdca760a-0292-c70c-c4cf-99983ee37e6e@arm.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Tue, 22 Aug 2017 16:01:56 +0100
+Subject: [PATCH v7 5/9] arm64: hugetlb: Handle swap entries in
+ huge_pte_offset() for contiguous hugepages
+In-Reply-To: <87wp5vmzpn.fsf@e105922-lin.cambridge.arm.com>
+References: <20170822104249.2189-1-punit.agrawal@arm.com>
+ <20170822104249.2189-6-punit.agrawal@arm.com>
+ <a54aff75-f79b-b40d-c66f-6730aaccbd39@arm.com>
+ <87wp5vmzpn.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <b6a305a2-6653-b20c-66ae-bac7d0b70242@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 22/08/17 12:19, Thierry Reding wrote:
-> On Tue, Aug 22, 2017 at 11:15:21AM +0100, Sudeep Holla wrote:
->>
->>
->> On 17/08/17 15:42, Thierry Reding wrote:
->>> From: Thierry Reding <treding@nvidia.com>
->>>
->>> Move this code from arch/arm/mach-tegra and make it common among 32-bit
->>> and 64-bit Tegra SoCs. This is slightly complicated by the fact that on
->>> 32-bit Tegra, the SoC device is used as the parent for all devices that
->>> are instantiated from device tree.
->>>
->>
->> This seem to be in linux-next and causing the below splat on my platform
->> which is not Tegra :)
->>
->> WARNING: .... at drivers/soc/tegra/fuse/tegra-apbmisc.c:48
->> tegra_get_chip_id+0x30/0x40
->> Modules linked in:
->> CPU: 2 PID: 1 Comm: swapper/0 Not tainted
->> 4.13.0-rc6-next-20170822-00008-g52a8e57512ae #13
->> task: ffff8009768a0000 task.stack: ffff000008038000
->> PC is at tegra_get_chip_id+0x30/0x40
->> LR is at tegra_get_chip_id+0x30/0x40
->>  tegra_get_chip_id+0x30/0x40
->>  tegra_soc_device_register+0x68/0xd0
->>  tegra_init_soc+0x10/0x44
->>  do_one_initcall+0x38/0x120
->>  kernel_init_freeable+0x184/0x224
->>  kernel_init+0x10/0x100
->>  ret_from_fork+0x10/0x18
+On 22/08/17 15:41, Punit Agrawal wrote:
+> Julien Thierry <julien.thierry@arm.com> writes:
 > 
-> Indeed. Does the below patch fix this?
+>> Hi Punit,
+>>
+>> On 22/08/17 11:42, Punit Agrawal wrote:
+>>> huge_pte_offset() was updated to correctly handle swap entries for
+>>> hugepages. With the addition of the size parameter, it is now possible
+>>> to disambiguate whether the request is for a regular hugepage or a
+>>> contiguous hugepage.
+>>>
+>>> Fix huge_pte_offset() for contiguous hugepages by using the size to find
+>>> the correct page table entry.
+>>>
+>>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>>> Cc: David Woods <dwoods@mellanox.com>
+>>> ---
+>>>    arch/arm64/mm/hugetlbpage.c | 21 ++++++++++++++++-----
+>>>    1 file changed, 16 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+>>> index 594232598cac..b95e24dc3477 100644
+>>> --- a/arch/arm64/mm/hugetlbpage.c
+>>> +++ b/arch/arm64/mm/hugetlbpage.c
+>>> @@ -214,6 +214,7 @@ pte_t *huge_pte_offset(struct mm_struct *mm,
+>>>    	pgd_t *pgd;
+>>>    	pud_t *pud;
+>>>    	pmd_t *pmd;
+>>> +	pte_t *pte;
+>>>      	pgd = pgd_offset(mm, addr);
+>>>    	pr_debug("%s: addr:0x%lx pgd:%p\n", __func__, addr, pgd);
+>>> @@ -221,19 +222,29 @@ pte_t *huge_pte_offset(struct mm_struct *mm,
+>>>    		return NULL;
+>>>      	pud = pud_offset(pgd, addr);
+>>> -	if (pud_none(*pud))
+>>> +	if (sz != PUD_SIZE && pud_none(*pud))
+>>>    		return NULL;
+>>> -	/* swap or huge page */
+>>> -	if (!pud_present(*pud) || pud_huge(*pud))
+>>> +	/* hugepage or swap? */
+>>> +	if (pud_huge(*pud) || !pud_present(*pud))
+>>>    		return (pte_t *)pud;
+>>>    	/* table; check the next level */
+>>>    +	if (sz == CONT_PMD_SIZE)
+>>> +		addr &= CONT_PMD_MASK;
+>>> +
+>>>    	pmd = pmd_offset(pud, addr);
+>>> -	if (pmd_none(*pmd))
+>>> +	if (!(sz == PMD_SIZE || sz == CONT_PMD_SIZE) &&
+>>> +	    pmd_none(*pmd))
+>>>    		return NULL;
+>>> -	if (!pmd_present(*pmd) || pmd_huge(*pmd))
+>>> +	if (pmd_huge(*pmd) || !pmd_present(*pmd))
+>>>    		return (pte_t *)pmd;
+>>>    +	if (sz == CONT_PTE_SIZE) {
+>>> +		pte = pte_offset_kernel(
+>>> +			pmd, (addr & CONT_PTE_MASK));
+>>> +		return pte;
+>>
+>> Nit: Looks like this is the only place the new variable pte is
+>> used. Since we don't need to test its value, why not just write:
+>> 	return pte_offset_kernel(pmd, (addr & CONT_PTE_MASK));
+>>
+>> and get rid of the pte variable?
+> 
+> There is no benefit to getting rid of "pte" other than conciseness of
+> the patch. Having an explicit identifier helps highlight the level of
+> the page tables we are accessing.
+> 
+> And we always want to prioritise readability vs conciseness of the
+> patch, no?
 > 
 
-Yes, it does.
+I agree, but I feel here it is more redundancy than increase of 
+readability, because we know pte_offset_kernel returns the address of a 
+pte, no? (otherwise I feel a comment would fit better than a variable).
+
+Also, we end up with a variable declared in one scope where it is not 
+used, and it is referenced in a single inner scope, which seems a bit 
+odd to me. Might make the reader pointlessly wonder where else it is used.
 
 -- 
-Regards,
-Sudeep
+Julien Thierry
