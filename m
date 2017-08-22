@@ -1,74 +1,34 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 22 Aug 2017 12:03:58 +0800
-Subject: [PATCH v2 2/4] net: phy: realtek: change macro name for page select
- register
-In-Reply-To: <20170822040400.12166-1-icenowy@aosc.io>
-References: <20170822040400.12166-1-icenowy@aosc.io>
-Message-ID: <20170822040400.12166-3-icenowy@aosc.io>
+Date: Tue, 22 Aug 2017 12:03:56 +0800
+Subject: [PATCH v2 0/4] Workaround broken RTL8211E on some Pine64+ boards
+Message-ID: <20170822040400.12166-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.xyz>
+Some Pine64+ boards come with bad RTL8211E PHYs, which cannot work reliably
+unless do some hack. According to Pine64 people, Realtek describes the hack
+as totally disabling RX delay, and it's not documented at all.
 
-The page select register also exists on RTL8211E PHY (although it
-behaves slightly differently).
+This patchset introduces the workaround on Pine64+.
 
-Change the register macro name to remove the F.
+The first patch adds RGMII variants' support to the dwmac-sun8i driver.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- drivers/net/phy/realtek.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+The second patch renames some macros in RTL PHY driver, and the third
+patch introduces the hack as the "RGMII-TXID" mode of the PHY.
 
-diff --git a/drivers/net/phy/realtek.c b/drivers/net/phy/realtek.c
-index 9cbe645e3d89..d820d00addf6 100644
---- a/drivers/net/phy/realtek.c
-+++ b/drivers/net/phy/realtek.c
-@@ -22,11 +22,13 @@
- #define RTL821x_INER		0x12
- #define RTL821x_INER_INIT	0x6400
- #define RTL821x_INSR		0x13
-+
-+#define RTL8211_PAGE_SELECT	0x1f
-+
- #define RTL8211E_INER_LINK_STATUS 0x400
- 
- #define RTL8211F_INER_LINK_STATUS 0x0010
- #define RTL8211F_INSR		0x1d
--#define RTL8211F_PAGE_SELECT	0x1f
- #define RTL8211F_TX_DELAY	0x100
- 
- MODULE_DESCRIPTION("Realtek PHY driver");
-@@ -46,10 +48,10 @@ static int rtl8211f_ack_interrupt(struct phy_device *phydev)
- {
- 	int err;
- 
--	phy_write(phydev, RTL8211F_PAGE_SELECT, 0xa43);
-+	phy_write(phydev, RTL8211_PAGE_SELECT, 0xa43);
- 	err = phy_read(phydev, RTL8211F_INSR);
- 	/* restore to default page 0 */
--	phy_write(phydev, RTL8211F_PAGE_SELECT, 0x0);
-+	phy_write(phydev, RTL8211_PAGE_SELECT, 0x0);
- 
- 	return (err < 0) ? err : 0;
- }
-@@ -102,7 +104,7 @@ static int rtl8211f_config_init(struct phy_device *phydev)
- 	if (ret < 0)
- 		return ret;
- 
--	phy_write(phydev, RTL8211F_PAGE_SELECT, 0xd08);
-+	phy_write(phydev, RTL8211_PAGE_SELECT, 0xd08);
- 	reg = phy_read(phydev, 0x11);
- 
- 	/* enable TX-delay for rgmii-id and rgmii-txid, otherwise disable it */
-@@ -114,7 +116,7 @@ static int rtl8211f_config_init(struct phy_device *phydev)
- 
- 	phy_write(phydev, 0x11, reg);
- 	/* restore to default page 0 */
--	phy_write(phydev, RTL8211F_PAGE_SELECT, 0x0);
-+	phy_write(phydev, RTL8211_PAGE_SELECT, 0x0);
- 
- 	return 0;
- }
+The fourth patch enables the hack in the device tree.
+
+Icenowy Zheng (4):
+  net: stmmac: dwmac-sun8i: support RGMII modes with PHY internal delay
+  net: phy: realtek: change macro name for page select register
+  net: phy: realtek: add disable RX internal delay mode
+  arm64: allwinner: a64: disable the RTL8211E internal RX delay on
+    Pine64+
+
+ .../boot/dts/allwinner/sun50i-a64-pine64-plus.dts  |  2 +-
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c  |  3 ++
+ drivers/net/phy/realtek.c                          | 43 +++++++++++++++++++---
+ 3 files changed, 42 insertions(+), 6 deletions(-)
+
 -- 
 2.13.5
