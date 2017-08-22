@@ -1,80 +1,35 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 22 Aug 2017 10:08:09 +0200
-Subject: [PATCH 02/11] crypto: caam - Use GCM IV size constant
+Date: Tue, 22 Aug 2017 10:08:08 +0200
+Subject: [PATCH 01/11] crypto: gcm - add GCM IV size constant
 In-Reply-To: <20170822080818.12486-1-clabbe.montjoie@gmail.com>
 References: <20170822080818.12486-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170822080818.12486-3-clabbe.montjoie@gmail.com>
+Message-ID: <20170822080818.12486-2-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch replace GCM IV size value by their constant name.
+Many GCM users use directly GCM IV size instead of using some constant.
+
+This patch add all IV size constant used by GCM.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/crypto/caam/caamalg.c | 10 +++++-----
- drivers/crypto/caam/compat.h  |  1 +
- 2 files changed, 6 insertions(+), 5 deletions(-)
+ include/crypto/gcm.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+ create mode 100644 include/crypto/gcm.h
 
-diff --git a/drivers/crypto/caam/caamalg.c b/drivers/crypto/caam/caamalg.c
-index 54f3b375a453..baa8dd52472d 100644
---- a/drivers/crypto/caam/caamalg.c
-+++ b/drivers/crypto/caam/caamalg.c
-@@ -992,7 +992,7 @@ static void init_gcm_job(struct aead_request *req,
- 	struct caam_ctx *ctx = crypto_aead_ctx(aead);
- 	unsigned int ivsize = crypto_aead_ivsize(aead);
- 	u32 *desc = edesc->hw_desc;
--	bool generic_gcm = (ivsize == 12);
-+	bool generic_gcm = (ivsize == GCM_AES_IV_SIZE);
- 	unsigned int last;
- 
- 	init_aead_job(req, edesc, all_contig, encrypt);
-@@ -1004,7 +1004,7 @@ static void init_gcm_job(struct aead_request *req,
- 
- 	/* Read GCM IV */
- 	append_cmd(desc, CMD_FIFO_LOAD | FIFOLD_CLASS_CLASS1 | IMMEDIATE |
--			 FIFOLD_TYPE_IV | FIFOLD_TYPE_FLUSH1 | 12 | last);
-+			 FIFOLD_TYPE_IV | FIFOLD_TYPE_FLUSH1 | GCM_AES_IV_SIZE | last);
- 	/* Append Salt */
- 	if (!generic_gcm)
- 		append_data(desc, ctx->key + ctx->cdata.keylen, 4);
-@@ -1953,7 +1953,7 @@ static struct caam_aead_alg driver_aeads[] = {
- 			.setauthsize = rfc4106_setauthsize,
- 			.encrypt = ipsec_gcm_encrypt,
- 			.decrypt = ipsec_gcm_decrypt,
--			.ivsize = 8,
-+			.ivsize = GCM_RFC4106_IV_SIZE,
- 			.maxauthsize = AES_BLOCK_SIZE,
- 		},
- 		.caam = {
-@@ -1971,7 +1971,7 @@ static struct caam_aead_alg driver_aeads[] = {
- 			.setauthsize = rfc4543_setauthsize,
- 			.encrypt = ipsec_gcm_encrypt,
- 			.decrypt = ipsec_gcm_decrypt,
--			.ivsize = 8,
-+			.ivsize = GCM_RFC4543_IV_SIZE,
- 			.maxauthsize = AES_BLOCK_SIZE,
- 		},
- 		.caam = {
-@@ -1990,7 +1990,7 @@ static struct caam_aead_alg driver_aeads[] = {
- 			.setauthsize = gcm_setauthsize,
- 			.encrypt = gcm_encrypt,
- 			.decrypt = gcm_decrypt,
--			.ivsize = 12,
-+			.ivsize = GCM_AES_IV_SIZE,
- 			.maxauthsize = AES_BLOCK_SIZE,
- 		},
- 		.caam = {
-diff --git a/drivers/crypto/caam/compat.h b/drivers/crypto/caam/compat.h
-index 7149cd2492e0..5b8d930f3dd8 100644
---- a/drivers/crypto/caam/compat.h
-+++ b/drivers/crypto/caam/compat.h
-@@ -31,6 +31,7 @@
- #include <crypto/aes.h>
- #include <crypto/ctr.h>
- #include <crypto/des.h>
-+#include <crypto/gcm.h>
- #include <crypto/sha.h>
- #include <crypto/md5.h>
- #include <crypto/internal/aead.h>
+diff --git a/include/crypto/gcm.h b/include/crypto/gcm.h
+new file mode 100644
+index 000000000000..c50e057ea17e
+--- /dev/null
++++ b/include/crypto/gcm.h
+@@ -0,0 +1,8 @@
++#ifndef _CRYPTO_GCM_H
++#define _CRYPTO_GCM_H
++
++#define GCM_AES_IV_SIZE 12
++#define GCM_RFC4106_IV_SIZE 8
++#define GCM_RFC4543_IV_SIZE 8
++
++#endif
 -- 
 2.13.0
