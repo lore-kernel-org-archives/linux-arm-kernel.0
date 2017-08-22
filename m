@@ -1,187 +1,110 @@
-From: aneela@codeaurora.org (Arun Kumar Neelakantam)
-Date: Tue, 22 Aug 2017 15:55:23 +0530
-Subject: [PATCH 13/18] rpmsg: glink: Add rx done command
-In-Reply-To: <1502903951-5403-14-git-send-email-sricharan@codeaurora.org>
-References: <1502903951-5403-1-git-send-email-sricharan@codeaurora.org>
- <1502903951-5403-14-git-send-email-sricharan@codeaurora.org>
-Message-ID: <a5f890fe-7405-ff03-9a43-0e4d62683cb6@codeaurora.org>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Tue, 22 Aug 2017 11:27:31 +0100
+Subject: [PATCH v4 3/4] perf utils: Add helper function is_pmu_core to
+ detect PMU CORE devices
+In-Reply-To: <20170720055608.5333-4-ganapatrao.kulkarni@cavium.com>
+References: <20170720055608.5333-1-ganapatrao.kulkarni@cavium.com>
+ <20170720055608.5333-4-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20170822112731.000015e2@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 20 Jul 2017 11:26:07 +0530
+Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com> wrote:
 
+> On some platforms, PMU core devices sysfs name is not cpu.
+> Adding function is_pmu_core to detect as core device using
+> core device specific hints in sysfs.
+> 
+> For arm64 platforms, all core devices have file "cpus" in sysfs.
+> 
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 
-On 8/16/2017 10:49 PM, Sricharan R wrote:
-> Send RX data receive ack to remote and also inform
-> that local intent buffer is used and freed. This
-> informs the remote to request for next set of
-> intent buffers before doing a send operation.
->
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+One really trivial point inline.  Otherwise looks good to me.
+
+Jonathan
+
 > ---
->   drivers/rpmsg/qcom_glink_native.c | 83 +++++++++++++++++++++++++++++++++++++++
->   1 file changed, 83 insertions(+)
->
-> diff --git a/drivers/rpmsg/qcom_glink_native.c b/drivers/rpmsg/qcom_glink_native.c
-> index b2a583a..b8db74a 100644
-> --- a/drivers/rpmsg/qcom_glink_native.c
-> +++ b/drivers/rpmsg/qcom_glink_native.c
-> @@ -76,6 +76,8 @@ struct glink_core_rx_intent {
->   	bool reuse;
->   	bool in_use;
->   	u32 offset;
-> +
-> +	struct list_head node;
->   };
->   
->   /**
-> @@ -137,6 +139,8 @@ enum {
->    * @rcid:	channel id, in remote space
->    * @intent_lock: lock for protection of @liids
->    * @liids:	idr of all local intents
-> + * @intent_work: worker responsible for transmitting rx_done packets
-> + * @done_intents: list of intents that needs to be announced rx_done
->    * @buf:	receive buffer, for gathering fragments
->    * @buf_offset:	write offset in @buf
->    * @buf_size:	size of current @buf
-> @@ -159,6 +163,8 @@ struct glink_channel {
->   
->   	spinlock_t intent_lock;
->   	struct idr liids;
-> +	struct work_struct intent_work;
-> +	struct list_head done_intents;
->   
->   	struct glink_core_rx_intent *buf;
->   	int buf_offset;
-> @@ -178,15 +184,19 @@ struct glink_channel {
->   #define RPM_CMD_CLOSE			3
->   #define RPM_CMD_OPEN_ACK		4
->   #define RPM_CMD_INTENT			5
-> +#define RPM_CMD_RX_DONE			6
->   #define RPM_CMD_RX_INTENT_REQ		7
->   #define RPM_CMD_RX_INTENT_REQ_ACK	8
->   #define RPM_CMD_TX_DATA			9
->   #define RPM_CMD_CLOSE_ACK		11
->   #define RPM_CMD_TX_DATA_CONT		12
->   #define RPM_CMD_READ_NOTIF		13
-> +#define RPM_CMD_RX_DONE_W_REUSE		14
->   
->   #define GLINK_FEATURE_INTENTLESS	BIT(1)
->   
-> +static void qcom_glink_rx_done_work(struct work_struct *work);
-> +
->   static struct glink_channel *qcom_glink_alloc_channel(struct qcom_glink *glink,
->   						      const char *name)
->   {
-> @@ -198,12 +208,16 @@ static struct glink_channel *qcom_glink_alloc_channel(struct qcom_glink *glink,
->   
->   	/* Setup glink internal glink_channel data */
->   	spin_lock_init(&channel->recv_lock);
-> +
->   	channel->glink = glink;
->   	channel->name = kstrdup(name, GFP_KERNEL);
->   
->   	init_completion(&channel->open_req);
->   	init_completion(&channel->open_ack);
->   
-> +	INIT_LIST_HEAD(&channel->done_intents);
-> +	INIT_WORK(&channel->intent_work, qcom_glink_rx_done_work);
-> +
->   	idr_init(&channel->liids);
->   	kref_init(&channel->refcount);
->   
-> @@ -395,6 +409,70 @@ static void qcom_glink_send_close_ack(struct qcom_glink *glink,
->   	qcom_glink_tx(glink, &req, sizeof(req), NULL, 0, true);
->   }
->   
-> +static void qcom_glink_rx_done_work(struct work_struct *work)
+>  tools/perf/util/pmu.c | 44 ++++++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 40 insertions(+), 4 deletions(-)
+> 
+> diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
+> index aefdbd1..0057d1c 100644
+> --- a/tools/perf/util/pmu.c
+> +++ b/tools/perf/util/pmu.c
+> @@ -506,6 +506,39 @@ static struct cpu_map *pmu_cpumask(const char *name)
+>  }
+>  
+>  /*
+> + *  PMU CORE devices have different name other than cpu in sysfs on some
+> + *  platforms. looking for possible sysfs files to identify as core device.
+> + */
+> +static int is_pmu_core(const char *name)
 > +{
-> +	struct glink_channel *channel = container_of(work, struct glink_channel,
-> +						     intent_work);
-> +	struct qcom_glink *glink = channel->glink;
-> +	struct glink_core_rx_intent *intent, *tmp;
-> +	struct {
-> +		u16 id;
-> +		u16 lcid;
-> +		u32 liid;
-> +	} __packed cmd;
+> +	struct stat st;
+> +	char path[PATH_MAX];
+> +	const char *sysfs = sysfs__mountpoint();
+> +	const char **template;
+> +	const char *templates[] = {
+> +		 "%s/bus/event_source/devices/%s/cpus",
+> +		 NULL
+> +	};
 > +
-> +	unsigned int cid = channel->lcid;
-> +	unsigned int iid;
-> +	bool reuse;
-> +	unsigned long flags;
+> +	if (!sysfs)
+> +		return 0;
 > +
-> +	spin_lock_irqsave(&channel->intent_lock, flags);
-> +	list_for_each_entry_safe(intent, tmp, &channel->done_intents, node) {
-> +		list_del(&intent->node);
-> +		spin_unlock_irqrestore(&channel->intent_lock, flags);
-> +		iid = intent->id;
-> +		reuse = intent->reuse;
+> +	/* Look for cpu sysfs */
+> +	snprintf(path, PATH_MAX, "%s/bus/event_source/devices/cpu", sysfs);
+> +	if ((stat(path, &st) == 0) &&
+> +			(strncmp(name, "cpu", strlen("cpu")) == 0))
+> +		return 1;
 > +
-> +		cmd.id = reuse ? RPM_CMD_RX_DONE_W_REUSE : RPM_CMD_RX_DONE;
-> +		cmd.lcid = cid;
-> +		cmd.liid = iid;
+> +	for (template = templates; *template; template++) {
+> +		snprintf(path, PATH_MAX, *template, sysfs, name);
+> +		if (stat(path, &st) == 0)
+> +			return 1;
+> +	}
+
+Adding generic infrastructure for one entry where we already know the other
+case doesn't fit the pattern, seems a little premature.
+
+If we can't make these two fit it seems like we should just hard code
+the second case as well for now.
+
+Refactoring to this may be make sense once we have a few different cases
+that do share a common form (of including the name)
+
+You could actually put both options in templates and rely on the fact that
+snprintf will ignore excess parameters, but that feels fragile.
+
 > +
-> +		qcom_glink_tx(glink, &cmd, sizeof(cmd), NULL, 0, true);
-> +		if (!reuse) {
-> +			kfree(intent->data);
-> +			kfree(intent);
+> +	return 0;
+> +}
+> +
+> +/*
+>   * Return the CPU id as a raw string.
+>   *
+>   * Each architecture should provide a more precise id string that
+> @@ -558,15 +591,18 @@ static void pmu_add_cpu_aliases(struct list_head *head, const char *name,
+>  	 */
+>  	i = 0;
+>  	while (1) {
+> -		const char *pname;
+>  
+>  		pe = &map->table[i++];
+>  		if (!pe->name)
+>  			break;
+>  
+> -		pname = pe->pmu ? pe->pmu : "cpu";
+> -		if (strncmp(pname, name, strlen(pname)))
+> -			continue;
+> +		if (!is_pmu_core(name)) {
+> +			/* check for uncore devices */
+> +			if (pe->pmu == NULL)
+> +				continue;
+> +			if (strncmp(pe->pmu, name, strlen(pe->pmu)))
+> +				continue;
 > +		}
-> +		spin_lock_irqsave(&channel->intent_lock, flags);
-> +	}
-> +	spin_unlock_irqrestore(&channel->intent_lock, flags);
-> +}
-> +
-> +static void qcom_glink_rx_done(struct qcom_glink *glink,
-> +			       struct glink_channel *channel,
-> +			       struct glink_core_rx_intent *intent)
-> +{
-> +	/* We don't send RX_DONE to intentless systems */
-> +	if (glink->intentless) {
-> +		kfree(intent->data);
-> +		kfree(intent);
-> +		return;
-> +	}
-> +
-> +	/* Take it off the tree of receive intents */
-> +	if (!intent->reuse) {
-> +		spin_lock(&channel->intent_lock);
-> +		idr_remove(&channel->liids, intent->id);
-> +		spin_unlock(&channel->intent_lock);
-> +	}
-> +
-> +	/* Schedule the sending of a rx_done indication */
-> +	spin_lock(&channel->intent_lock);
-> +	list_add_tail(&intent->node, &channel->done_intents);
-> +	spin_unlock(&channel->intent_lock);
-> +
-> +	schedule_work(&channel->intent_work);
-
-Adding one more parallel path will hit performance, if this worker could 
-not get CPU cycles
-or blocked by other RT or HIGH_PRIO worker on global worker pool.
-
-> +}
-> +
->   /**
->    * qcom_glink_receive_version() - receive version/features from remote system
->    *
-> @@ -711,6 +789,8 @@ static int qcom_glink_rx_data(struct qcom_glink *glink, size_t avail)
->   
->   		intent->offset = 0;
->   		channel->buf = NULL;
-> +
-> +		qcom_glink_rx_done(glink, channel, intent);
->   	}
->   
->   advance_rx:
-> @@ -1100,6 +1180,9 @@ static void qcom_glink_rx_close(struct qcom_glink *glink, unsigned int rcid)
->   	if (WARN(!channel, "close request on unknown channel\n"))
->   		return;
->   
-> +	/* cancel pending rx_done work */
-> +	cancel_work_sync(&channel->intent_work);
-> +
->   	if (channel->rpdev) {
->   		strncpy(chinfo.name, channel->name, sizeof(chinfo.name));
->   		chinfo.src = RPMSG_ADDR_ANY;
+>  
+>  		/* need type casts to override 'const' */
+>  		__perf_pmu__new_alias(head, NULL, (char *)pe->name,
