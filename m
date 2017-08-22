@@ -1,70 +1,40 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Tue, 22 Aug 2017 17:41:42 +0200
-Subject: [PATCH 1/5] iommu/arm-smmu-v3: put off the execution of TLBI* to
- reduce lock confliction
-In-Reply-To: <1498484330-10840-2-git-send-email-thunder.leizhen@huawei.com>
-References: <1498484330-10840-1-git-send-email-thunder.leizhen@huawei.com>
- <1498484330-10840-2-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <20170822154142.GA19533@8bytes.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 22 Aug 2017 17:43:03 +0200
+Subject: [GIT PULL] ARM64: Xilinx ZynqMP DT fixes for v4.14
+In-Reply-To: <36ea049b-a57f-78e5-440f-ab6cdf1df1f7@monstr.eu>
+References: <36ea049b-a57f-78e5-440f-ab6cdf1df1f7@monstr.eu>
+Message-ID: <CAK8P3a3nuxdtrcWFa28U8nF4k00v0VXWvDZr9hBzAioxsKV73Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 26, 2017 at 09:38:46PM +0800, Zhen Lei wrote:
-> -static int queue_insert_raw(struct arm_smmu_queue *q, u64 *ent)
-> +static int queue_insert_raw(struct arm_smmu_queue *q, u64 *ent, int optimize)
->  {
->  	if (queue_full(q))
->  		return -ENOSPC;
->  
->  	queue_write(Q_ENT(q, q->prod), ent, q->ent_dwords);
-> -	queue_inc_prod(q);
-> +
-> +	/*
-> +	 * We don't want too many commands to be delayed, this may lead the
-> +	 * followed sync command to wait for a long time.
-> +	 */
-> +	if (optimize && (++q->nr_delay < CMDQ_MAX_DELAYED)) {
-> +		queue_inc_swprod(q);
-> +	} else {
-> +		queue_inc_prod(q);
-> +		q->nr_delay = 0;
-> +	}
-> +
->  	return 0;
->  }
->  
-> @@ -909,6 +928,7 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
->  static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
->  				    struct arm_smmu_cmdq_ent *ent)
->  {
-> +	int optimize = 0;
->  	u64 cmd[CMDQ_ENT_DWORDS];
->  	unsigned long flags;
->  	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
-> @@ -920,8 +940,17 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
->  		return;
->  	}
->  
-> +	/*
-> +	 * All TLBI commands should be followed by a sync command later.
-> +	 * The CFGI commands is the same, but they are rarely executed.
-> +	 * So just optimize TLBI commands now, to reduce the "if" judgement.
-> +	 */
-> +	if ((ent->opcode >= CMDQ_OP_TLBI_NH_ALL) &&
-> +	    (ent->opcode <= CMDQ_OP_TLBI_NSNH_ALL))
-> +		optimize = 1;
-> +
->  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
-> -	while (queue_insert_raw(q, cmd) == -ENOSPC) {
-> +	while (queue_insert_raw(q, cmd, optimize) == -ENOSPC) {
->  		if (queue_poll_cons(q, false, wfe))
->  			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
->  	}
+On Mon, Aug 21, 2017 at 2:14 PM, Michal Simek <monstr@monstr.eu> wrote:
+>
+>> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+>>
+>>   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   https://github.com/Xilinx/linux-xlnx.git tags/zynqmp-dt-for-4.14
+>>
+>> for you to fetch changes up to 0bb6f25a6ee5ff0826d2e620cbb78b1579c3d2ee:
+>>
+>>   arm64: zynqmp: Add generic compatible string for I2C EEPROM (2017-08-21 14:07:37 +0200)
+>>
+>> ----------------------------------------------------------------
+>> arm: Xilinx ZynqMP DT fixes for v4.14
+>>
+>> - Fix DTC warnings
+>> - Add idle states, OP, cci-400, RTC, pcie prefetchable memory
+>>   fpd/lpd dmas, clocks for ep108
+>> - Enable can1
+>> - Fix smmu IRQ, aliases, uart compatible string
+>> - Use generic compatible string for i2c eeprom
 
-This doesn't look correct. How do you make sure that a given IOVA range
-is flushed before the addresses are reused?
+Pulled into next/dt64, thanks!
 
+Some of these look like they might be needed on older kernels as well,
+but you only asked for these to be in 4.14, not 4.13 or older. Can you
+double-check if we should have some of them backported?
 
-Regards,
-
-	Joerg
+     Arnd
