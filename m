@@ -1,52 +1,29 @@
-From: david@redhat.com (David Hildenbrand)
-Date: Tue, 22 Aug 2017 13:43:02 +0200
-Subject: [PATCH RFC v3 2/9] KVM: arm/arm64: fix vcpu self-detection in
- vgic_v3_dispatch_sgi()
-In-Reply-To: <20170821203530.9266-3-rkrcmar@redhat.com>
-References: <20170821203530.9266-1-rkrcmar@redhat.com>
- <20170821203530.9266-3-rkrcmar@redhat.com>
-Message-ID: <a6c6b3e0-ded0-f81b-7b14-c85a12e513b5@redhat.com>
+From: stefan@olimex.com (Stefan Mavrodiev)
+Date: Tue, 22 Aug 2017 14:43:10 +0300
+Subject: [PATCH 0/3] Update board support for OLinuXino boards
+Message-ID: <20170822114313.9038-1-stefan@olimex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.08.2017 22:35, Radim Kr?m?? wrote:
-> The index in kvm->vcpus array and vcpu->vcpu_id are very different
-> things.  Comparing struct kvm_vcpu pointers is a sure way to know.
-> 
-> Signed-off-by: Radim Kr?m?? <rkrcmar@redhat.com>
-> ---
->  virt/kvm/arm/vgic/vgic-mmio-v3.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index 408ef06638fc..9d4b69b766ec 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -797,7 +797,6 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
->  	u16 target_cpus;
->  	u64 mpidr;
->  	int sgi, c;
-> -	int vcpu_id = vcpu->vcpu_id;
->  	bool broadcast;
->  
->  	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
-> @@ -821,7 +820,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
->  			break;
->  
->  		/* Don't signal the calling VCPU */
-> -		if (broadcast && c == vcpu_id)
-> +		if (broadcast && c_vcpu == vcpu)
->  			continue;
->  
->  		if (!broadcast) {
-> 
+Based of increased number of boards with their shipping options,
+there is new board naming convention.
 
-Yes, this looks correct to me.
+Along with that, A20-OLinuXino-MICRO has new revision(rev.J),
+which introduce new PHY chip (LAN8710) and eMMC option. The new
+dts file is based on the already existing one for lime2-emmc.
 
-Reviewed-by: David Hildenbrand <david@redhat.com>
+Stefan Mavrodiev (3):
+  ARM: dts: sun7i: Fix A20-OLinuXino-MICRO dts for use with LAN8710
+  ARM: dts: sun7i: Add dts file for A20-OLinuXino-MICRO-exGB
+  ARM: dts: sun7i: Rename sun7i-a20-olinuxino-lime2-emmc
+
+ arch/arm/boot/dts/Makefile                         |  3 +-
+ ...emmc.dts => sun7i-a20-olinuxino-lime2-exgb.dts} |  4 +-
+ .../boot/dts/sun7i-a20-olinuxino-micro-exgb.dts    | 81 ++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts    |  7 +-
+ 4 files changed, 91 insertions(+), 4 deletions(-)
+ rename arch/arm/boot/dts/{sun7i-a20-olinuxino-lime2-emmc.dts => sun7i-a20-olinuxino-lime2-exgb.dts} (96%)
+ create mode 100644 arch/arm/boot/dts/sun7i-a20-olinuxino-micro-exgb.dts
 
 -- 
-
-Thanks,
-
-David
+2.11.0
