@@ -1,64 +1,126 @@
-From: david@redhat.com (David Hildenbrand)
-Date: Tue, 22 Aug 2017 16:18:59 +0200
-Subject: [PATCH RFC v3 7/9] KVM: add kvm_free_vcpus and kvm_arch_free_vcpus
-In-Reply-To: <20170821203530.9266-8-rkrcmar@redhat.com>
-References: <20170821203530.9266-1-rkrcmar@redhat.com>
- <20170821203530.9266-8-rkrcmar@redhat.com>
-Message-ID: <45e07499-e60c-5289-f439-9c51f59866ec@redhat.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 22 Aug 2017 15:21:36 +0100
+Subject: [PATCH 09/27] arm64/sve: Signal frame and context structure
+ definition
+In-Reply-To: <87tw0z4sk2.fsf@linaro.org>
+References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
+ <1502280338-23002-10-git-send-email-Dave.Martin@arm.com>
+ <87y3qb52ez.fsf@linaro.org>
+ <20170822111705.GT6321@e103592.cambridge.arm.com>
+ <87tw0z4sk2.fsf@linaro.org>
+Message-ID: <20170822142135.GU6321@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> index 33a15e176927..0d2d8b0c785c 100644
-> --- a/virt/kvm/kvm_main.c
-> +++ b/virt/kvm/kvm_main.c
-> @@ -750,6 +750,23 @@ static void kvm_destroy_devices(struct kvm *kvm)
->  	}
->  }
->  
-> +void kvm_free_vcpus(struct kvm *kvm)
-> +{
-> +	int i;
-> +
-> +	kvm_arch_free_vcpus(kvm);
-
-I wonder if it would be possible to get rid of kvm_arch_free_vcpus(kvm)
-completely and simply call
-
-kvm_for_each_vcpu(i, vcpu, kvm)
-	kvm_arch_vcpu_free(vcpu);
-
-at that point.
-
-Would certainly require some refactoring, and I am not sure if we could
-modify the special mmu handling for x86 ("Unpin any mmu pages first.").
-But if in doubt, that part could be moved to kvm_arch_destroy_vm(), just
-before calling kvm_free_vcpus().
-
-> +
-> +	mutex_lock(&kvm->lock);
-> +
-> +	i = atomic_read(&kvm->online_vcpus);
-> +	atomic_set(&kvm->online_vcpus, 0);
-
-i = atomic_xchg(&kvm->online_vcpus, 0);
-
-> +
-> +	while (i--)
-> +		kvm->vcpus[i] = NULL;
-> +
-> +	mutex_unlock(&kvm->lock);
-> +}
-> +
->  static void kvm_destroy_vm(struct kvm *kvm)
->  {
->  	int i;
+On Tue, Aug 22, 2017 at 02:53:49PM +0100, Alex Benn?e wrote:
 > 
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > On Tue, Aug 22, 2017 at 11:22:44AM +0100, Alex Benn?e wrote:
+> >>
+> >> Dave Martin <Dave.Martin@arm.com> writes:
 
+[...]
 
--- 
+> >> > +/*
+> >> > + * The SVE architecture leaves space for future expansion of the
+> >> > + * vector length beyond its initial architectural limit of 2048 bits
+> >> > + * (16 quadwords).
+> >> > + */
+> >> > +#define SVE_VQ_MIN		1
+> >> > +#define SVE_VQ_MAX		0x200
+> >> > +
+> >> > +#define SVE_VL_MIN		(SVE_VQ_MIN * 0x10)
+> >> > +#define SVE_VL_MAX		(SVE_VQ_MAX * 0x10)
+> >> > +
+> >> > +#define SVE_NUM_ZREGS		32
+> >> > +#define SVE_NUM_PREGS		16
+> >> > +
+> >> > +#define sve_vl_valid(vl) \
+> >> > +	((vl) % 0x10 == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
+> >> > +#define sve_vq_from_vl(vl)	((vl) / 0x10)
+> >> > +#define sve_vl_from_vq(vq)	((vq) * 0x10)
+> >>
+> >> I got a little confused first time through over what VQ and VL where.
+> >> Maybe it would make sense to expand a little more from first principles?
+> >>
+> >>   /*
+> >>    * The SVE architecture defines vector registers as a multiple of 128
+> >>    * bit quadwords. The current architectural limit is 2048 bits (16
+> >>    * quadwords) but there is room for future expansion beyond that.
+> >>     */
+> >
+> > This comes up in several places and so I didn't want to comment it
+> > repeatedly everywhere.
+> >
+> > Instead, I wrote up something in section 2 (Vector length terminology)
+> > of Documentation/arm64/sve.txt -- see patch 25.  Can you take a look and
+> > see whether that's adequate?
+> 
+> Ahh, I hadn't got to that yet. I'm unsure to the order the kernel likes
+> to put things but I like to put design documents at the front of the
 
-Thanks,
+I don't have a strong opinion on that -- I had preferred not to add a
+document describing stuff that doesn't exist at the time of commit.
+I could commit a stub document at the start of the series, and then
+commit the real document later.
 
-David
+Either way, it seemed overkill.
+
+Perhaps I should have drawn more attention to the documentation in the
+cover letter, and encouraged reviewers to look at it first.  My
+experience is that people don't often read cover letters...
+
+Now the series is posted, I'm minded to keep the order as-is, unless you
+think it's a big issue.
+
+Adding a reference to the document seems a reasonable thing to do,
+so I could add that.
+
+> patch queue as they are useful primers and saves you having to patch a:
+> 
+> modified   arch/arm64/include/uapi/asm/sigcontext.h
+> @@ -132,19 +132,24 @@ struct sve_context {
+>  /*
+>   * The SVE architecture leaves space for future expansion of the
+>   * vector length beyond its initial architectural limit of 2048 bits
+> - * (16 quadwords).
+> + * (16 quadwords). See Documentation/arm64/sve.txt for a summary of
+> + * the terminology of Vector Quads (VQ) and Vector Lengths (VL).
+>   */
+> +
+> +#define SVE_VQ_BITS             128      /* 128 bits in one quadword */
+> +#define SVE_VQ_BYTES            (SVE_VQ_BITS / 8)
+> +
+
+I was trying to keep extraneous #defines to a minimum, since this is a
+uapi header, and people may depend on anything defined here.
+
+I think SVE_VQ_BYTES is reasonable to have, and this allows us to
+rewrite a few hard-coded 0x10s and 16s symbolically which is probably a
+good idea -- I'll add this.
+
+SVE_VQ_BITS looks redundant to me though.  It wouldn't be used for any
+purpose other than defining SVE_VQ_BYTES.
+
+>  #define SVE_VQ_MIN		1
+>  #define SVE_VQ_MAX		0x200
+> 
+> -#define SVE_VL_MIN		(SVE_VQ_MIN * 0x10)
+> -#define SVE_VL_MAX		(SVE_VQ_MAX * 0x10)
+> +#define SVE_VL_MIN		(SVE_VQ_MIN * SVE_VQ_BYTES)
+> +#define SVE_VL_MAX		(SVE_VQ_MAX * SVE_VQ_BYTES)
+> 
+>  #define SVE_NUM_ZREGS		32
+>  #define SVE_NUM_PREGS		16
+> 
+>  #define sve_vl_valid(vl) \
+> -	((vl) % 0x10 == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
+> +	((vl) % SVE_VQ_BYTES == 0 && (vl) >= SVE_VL_MIN && (vl) <= SVE_VL_MAX)
+>  #define sve_vq_from_vl(vl)	((vl) / 0x10)
+>  #define sve_vl_from_vq(vq)	((vq) * 0x10)
+
+[...]
+
+Cheers
+---Dave
