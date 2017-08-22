@@ -1,9 +1,9 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue, 22 Aug 2017 10:08:12 +0200
-Subject: [PATCH 05/11] crypto: atmel - Use GCM IV size constant
+Date: Tue, 22 Aug 2017 10:08:13 +0200
+Subject: [PATCH 06/11] crypto: bcm - Use GCM IV size constant
 In-Reply-To: <20170822080818.12486-1-clabbe.montjoie@gmail.com>
 References: <20170822080818.12486-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170822080818.12486-6-clabbe.montjoie@gmail.com>
+Message-ID: <20170822080818.12486-7-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,38 +11,66 @@ This patch replace GCM IV size value by their constant name.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- drivers/crypto/atmel-aes.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/crypto/bcm/cipher.c | 8 ++++----
+ drivers/crypto/bcm/cipher.h | 3 +--
+ 2 files changed, 5 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-index 29e20c37f3a6..903fd43f23a5 100644
---- a/drivers/crypto/atmel-aes.c
-+++ b/drivers/crypto/atmel-aes.c
-@@ -36,6 +36,7 @@
- #include <crypto/scatterwalk.h>
- #include <crypto/algapi.h>
+diff --git a/drivers/crypto/bcm/cipher.c b/drivers/crypto/bcm/cipher.c
+index 8685c7e4debd..537a67483aa3 100644
+--- a/drivers/crypto/bcm/cipher.c
++++ b/drivers/crypto/bcm/cipher.c
+@@ -1367,11 +1367,11 @@ static int handle_aead_req(struct iproc_reqctx_s *rctx)
+ 		 * expects AAD to include just SPI and seqno. So
+ 		 * subtract off the IV len.
+ 		 */
+-		aead_parms.assoc_size -= GCM_ESP_IV_SIZE;
++		aead_parms.assoc_size -= GCM_RFC4106_IV_SIZE;
+ 
+ 		if (rctx->is_encrypt) {
+ 			aead_parms.return_iv = true;
+-			aead_parms.ret_iv_len = GCM_ESP_IV_SIZE;
++			aead_parms.ret_iv_len = GCM_RFC4106_IV_SIZE;
+ 			aead_parms.ret_iv_off = GCM_ESP_SALT_SIZE;
+ 		}
+ 	} else {
+@@ -3255,7 +3255,7 @@ static struct iproc_alg_s driver_algs[] = {
+ 			.cra_flags = CRYPTO_ALG_NEED_FALLBACK
+ 		 },
+ 		 .setkey = aead_gcm_esp_setkey,
+-		 .ivsize = GCM_ESP_IV_SIZE,
++		 .ivsize = GCM_RFC4106_IV_SIZE,
+ 		 .maxauthsize = AES_BLOCK_SIZE,
+ 	 },
+ 	 .cipher_info = {
+@@ -3301,7 +3301,7 @@ static struct iproc_alg_s driver_algs[] = {
+ 			.cra_flags = CRYPTO_ALG_NEED_FALLBACK
+ 		 },
+ 		 .setkey = rfc4543_gcm_esp_setkey,
+-		 .ivsize = GCM_ESP_IV_SIZE,
++		 .ivsize = GCM_RFC4106_IV_SIZE,
+ 		 .maxauthsize = AES_BLOCK_SIZE,
+ 	 },
+ 	 .cipher_info = {
+diff --git a/drivers/crypto/bcm/cipher.h b/drivers/crypto/bcm/cipher.h
+index 57a55eb2a255..763c425c41ca 100644
+--- a/drivers/crypto/bcm/cipher.h
++++ b/drivers/crypto/bcm/cipher.h
+@@ -23,6 +23,7 @@
  #include <crypto/aes.h>
+ #include <crypto/internal/hash.h>
+ #include <crypto/aead.h>
 +#include <crypto/gcm.h>
- #include <crypto/xts.h>
- #include <crypto/internal/aead.h>
- #include <linux/platform_data/crypto-atmel.h>
-@@ -1532,7 +1533,7 @@ static int atmel_aes_gcm_start(struct atmel_aes_dev *dd)
- 	if (err)
- 		return atmel_aes_complete(dd, err);
+ #include <crypto/sha.h>
+ #include <crypto/sha3.h>
  
--	if (likely(ivsize == 12)) {
-+	if (likely(ivsize == GCM_AES_IV_SIZE)) {
- 		memcpy(ctx->j0, iv, ivsize);
- 		ctx->j0[3] = cpu_to_be32(1);
- 		return atmel_aes_gcm_process(dd);
-@@ -1820,7 +1821,7 @@ static struct aead_alg aes_gcm_alg = {
- 	.decrypt	= atmel_aes_gcm_decrypt,
- 	.init		= atmel_aes_gcm_init,
- 	.exit		= atmel_aes_gcm_exit,
--	.ivsize		= 12,
-+	.ivsize		= GCM_AES_IV_SIZE,
- 	.maxauthsize	= AES_BLOCK_SIZE,
+@@ -39,8 +40,6 @@
+ #define ARC4_STATE_SIZE     4
  
- 	.base = {
+ #define CCM_AES_IV_SIZE    16
+-#define GCM_AES_IV_SIZE    12
+-#define GCM_ESP_IV_SIZE     8
+ #define CCM_ESP_IV_SIZE     8
+ #define RFC4543_ICV_SIZE   16
+ 
 -- 
 2.13.0
