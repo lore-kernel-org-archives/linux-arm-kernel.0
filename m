@@ -1,59 +1,64 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 22 Aug 2017 13:08:46 +0200
-Subject: [PATCH v2 04/16] mmc: meson-gx: use _irqsave variant of spinlock
-In-Reply-To: <20170821160301.21899-5-jbrunet@baylibre.com>
-References: <20170821160301.21899-1-jbrunet@baylibre.com>
- <20170821160301.21899-5-jbrunet@baylibre.com>
-Message-ID: <CAPDyKFpoOc+1WMqLMOwhGkifP-Zp3GS7wTSkHmBUk4Pf0Dh+DQ@mail.gmail.com>
+Date: Tue, 22 Aug 2017 13:13:28 +0200
+Subject: [PATCH v3] mmc: renesas_sdhi: Add r8a7743/5 support
+In-Reply-To: <1503318311-48664-1-git-send-email-biju.das@bp.renesas.com>
+References: <CAMuHMdWUxxp75u1VSLY3WnObmhSMDvP3skr9Uf3rV4Bf-ixy_w@mail.gmail.com>
+ <1503318311-48664-1-git-send-email-biju.das@bp.renesas.com>
+Message-ID: <CAPDyKFpWDP-XqRahy2YHgZZ+c_q4wP3jAboJrJAdWtt=Gukj5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 August 2017 at 18:02, Jerome Brunet <jbrunet@baylibre.com> wrote:
-> spinlock used in interrupt handler should use the _irqsave variant
+On 21 August 2017 at 14:25, Biju Das <biju.das@bp.renesas.com> wrote:
+> Add support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5) SDHI
+> is identical to the R-Car Gen2 family.
+>
+> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
 
-Exactly why is that needed?
-
->
-> Fixes: 51c5d8447bd7 ("MMC: meson: initial support for GX platforms")
-> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> ---
->  drivers/mmc/host/meson-gx-mmc.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-> index 8a74a048db88..a399fbd415f4 100644
-> --- a/drivers/mmc/host/meson-gx-mmc.c
-> +++ b/drivers/mmc/host/meson-gx-mmc.c
-> @@ -727,6 +727,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
->         struct mmc_command *cmd;
->         struct mmc_data *data;
->         u32 irq_en, status, raw_status;
-> +       unsigned long flag;
->         irqreturn_t ret = IRQ_HANDLED;
->
->         if (WARN_ON(!host))
-> @@ -739,7 +740,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
->
->         data = cmd->data;
->
-> -       spin_lock(&host->lock);
-> +       spin_lock_irqsave(&host->lock, flag);
->         irq_en = readl(host->regs + SD_EMMC_IRQ_EN);
->         raw_status = readl(host->regs + SD_EMMC_STATUS);
->         status = raw_status & irq_en;
-> @@ -806,7 +807,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
->         if (ret == IRQ_HANDLED)
->                 meson_mmc_request_done(host->mmc, cmd->mrq);
->
-> -       spin_unlock(&host->lock);
-> +       spin_unlock_irqrestore(&host->lock, flag);
->         return ret;
->  }
->
-> --
-> 2.9.5
->
+Thanks, applied for next!
 
 Kind regards
 Uffe
+
+> ---
+> v1->v2
+>     - Modified the listing SoC's description related to SoC
+>       with 1 Clock and 2 Clocks
+> v2->v3
+>     - Fixed the trailing double quote.
+>     - Updated listing SoC's description.
+>
+> This patch is compiled and tested against linux next tag
+> next-20170817.
+>
+>  Documentation/devicetree/bindings/mmc/tmio_mmc.txt | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+> index 4fd8b7a..54ef642 100644
+> --- a/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/tmio_mmc.txt
+> @@ -15,6 +15,8 @@ Required properties:
+>                 "renesas,sdhi-r7s72100" - SDHI IP on R7S72100 SoC
+>                 "renesas,sdhi-r8a73a4" - SDHI IP on R8A73A4 SoC
+>                 "renesas,sdhi-r8a7740" - SDHI IP on R8A7740 SoC
+> +               "renesas,sdhi-r8a7743" - SDHI IP on R8A7743 SoC
+> +               "renesas,sdhi-r8a7745" - SDHI IP on R8A7745 SoC
+>                 "renesas,sdhi-r8a7778" - SDHI IP on R8A7778 SoC
+>                 "renesas,sdhi-r8a7779" - SDHI IP on R8A7779 SoC
+>                 "renesas,sdhi-r8a7790" - SDHI IP on R8A7790 SoC
+> @@ -33,10 +35,8 @@ Required properties:
+>           If 2 clocks are specified by the hardware, you must name them as
+>           "core" and "cd". If the controller only has 1 clock, naming is not
+>           required.
+> -         Below is the number clocks for each supported SoC:
+> -          1: SH73A0, R8A73A4, R8A7740, R8A7778, R8A7779, R8A7790
+> -             R8A7791, R8A7792, R8A7793, R8A7794, R8A7795, R8A7796
+> -          2: R7S72100
+> +         Devices which have more than 1 clock are listed below:
+> +         2: R7S72100
+>
+>  Optional properties:
+>  - toshiba,mmc-wrprotect-disable: write-protect detection is unavailable
+> --
+> 1.9.1
+>
