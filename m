@@ -1,95 +1,66 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 22 Aug 2017 13:19:22 +0200
-Subject: [PATCH] soc/tegra: Register SoC device
-In-Reply-To: <61dde661-313f-0b51-233b-ce957c514a55@arm.com>
-References: <20170817144217.31346-1-thierry.reding@gmail.com>
- <61dde661-313f-0b51-233b-ce957c514a55@arm.com>
-Message-ID: <20170822111922.GA15965@ulmo>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue, 22 Aug 2017 13:41:31 +0200
+Subject: [PATCH v2 04/16] mmc: meson-gx: use _irqsave variant of spinlock
+In-Reply-To: <CAPDyKFpoOc+1WMqLMOwhGkifP-Zp3GS7wTSkHmBUk4Pf0Dh+DQ@mail.gmail.com>
+References: <20170821160301.21899-1-jbrunet@baylibre.com>
+ <20170821160301.21899-5-jbrunet@baylibre.com>
+ <CAPDyKFpoOc+1WMqLMOwhGkifP-Zp3GS7wTSkHmBUk4Pf0Dh+DQ@mail.gmail.com>
+Message-ID: <1503402091.7032.9.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 22, 2017 at 11:15:21AM +0100, Sudeep Holla wrote:
+On Tue, 2017-08-22 at 13:08 +0200, Ulf Hansson wrote:
+> On 21 August 2017 at 18:02, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> > spinlock used in interrupt handler should use the _irqsave variant
 > 
+> Exactly why is that needed?
+
+That's a mistake left over from a debugging session. Thx for pointing it out.
+I'll respin w/o it 
+
 > 
-> On 17/08/17 15:42, Thierry Reding wrote:
-> > From: Thierry Reding <treding@nvidia.com>
 > > 
-> > Move this code from arch/arm/mach-tegra and make it common among 32-bit
-> > and 64-bit Tegra SoCs. This is slightly complicated by the fact that on
-> > 32-bit Tegra, the SoC device is used as the parent for all devices that
-> > are instantiated from device tree.
+> > Fixes: 51c5d8447bd7 ("MMC: meson: initial support for GX platforms")
+> > Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> > ---
+> > ?drivers/mmc/host/meson-gx-mmc.c | 5 +++--
+> > ?1 file changed, 3 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-
+> > mmc.c
+> > index 8a74a048db88..a399fbd415f4 100644
+> > --- a/drivers/mmc/host/meson-gx-mmc.c
+> > +++ b/drivers/mmc/host/meson-gx-mmc.c
+> > @@ -727,6 +727,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
+> > ????????struct mmc_command *cmd;
+> > ????????struct mmc_data *data;
+> > ????????u32 irq_en, status, raw_status;
+> > +???????unsigned long flag;
+> > ????????irqreturn_t ret = IRQ_HANDLED;
+> > 
+> > ????????if (WARN_ON(!host))
+> > @@ -739,7 +740,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
+> > 
+> > ????????data = cmd->data;
+> > 
+> > -???????spin_lock(&host->lock);
+> > +???????spin_lock_irqsave(&host->lock, flag);
+> > ????????irq_en = readl(host->regs + SD_EMMC_IRQ_EN);
+> > ????????raw_status = readl(host->regs + SD_EMMC_STATUS);
+> > ????????status = raw_status & irq_en;
+> > @@ -806,7 +807,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
+> > ????????if (ret == IRQ_HANDLED)
+> > ????????????????meson_mmc_request_done(host->mmc, cmd->mrq);
+> > 
+> > -???????spin_unlock(&host->lock);
+> > +???????spin_unlock_irqrestore(&host->lock, flag);
+> > ????????return ret;
+> > ?}
+> > 
+> > --
+> > 2.9.5
 > > 
 > 
-> This seem to be in linux-next and causing the below splat on my platform
-> which is not Tegra :)
-> 
-> WARNING: .... at drivers/soc/tegra/fuse/tegra-apbmisc.c:48
-> tegra_get_chip_id+0x30/0x40
-> Modules linked in:
-> CPU: 2 PID: 1 Comm: swapper/0 Not tainted
-> 4.13.0-rc6-next-20170822-00008-g52a8e57512ae #13
-> task: ffff8009768a0000 task.stack: ffff000008038000
-> PC is at tegra_get_chip_id+0x30/0x40
-> LR is at tegra_get_chip_id+0x30/0x40
->  tegra_get_chip_id+0x30/0x40
->  tegra_soc_device_register+0x68/0xd0
->  tegra_init_soc+0x10/0x44
->  do_one_initcall+0x38/0x120
->  kernel_init_freeable+0x184/0x224
->  kernel_init+0x10/0x100
->  ret_from_fork+0x10/0x18
-
-Indeed. Does the below patch fix this?
-
-Thierry
-
---- >8 ---
->From 5706cacc2af5e4ef138d1cd9e1269ca4947a447f Mon Sep 17 00:00:00 2001
-From: Thierry Reding <treding@nvidia.com>
-Date: Tue, 22 Aug 2017 13:15:18 +0200
-Subject: [PATCH] soc/tegra: Restrict SoC device registration to Tegra
-
-Commit 8a46828e623c ("soc/tegra: Register SoC device") added an initcall
-to register the SoC device on Tegra. However, that code is unrestricted
-and will run on all platforms, causing unwanted warnings.
-
-Fix this by first checking that we're running on hardware that supports
-the fuses block that we use to provide SoC information.
-
-Fixes: 8a46828e623c ("soc/tegra: Register SoC device")
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- drivers/soc/tegra/fuse/fuse-tegra.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/drivers/soc/tegra/fuse/fuse-tegra.c b/drivers/soc/tegra/fuse/fuse-tegra.c
-index 02686378dfc1..161522bd98ac 100644
---- a/drivers/soc/tegra/fuse/fuse-tegra.c
-+++ b/drivers/soc/tegra/fuse/fuse-tegra.c
-@@ -349,8 +349,16 @@ early_initcall(tegra_init_fuse);
- #ifdef CONFIG_ARM64
- static int __init tegra_init_soc(void)
- {
-+	struct device_node *np;
- 	struct device *soc;
- 
-+	/* make sure we're running on Tegra */
-+	np = of_find_matching_node(NULL, tegra_fuse_match);
-+	if (!np)
-+		return 0;
-+
-+	of_node_put(np);
-+
- 	soc = tegra_soc_device_register();
- 	if (IS_ERR(soc)) {
- 		pr_err("failed to register SoC device: %ld\n", PTR_ERR(soc));
--- 
-2.13.3
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170822/b05aad13/attachment.sig>
+> Kind regards
+> Uffe
