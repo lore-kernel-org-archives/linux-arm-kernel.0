@@ -1,39 +1,119 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Tue, 22 Aug 2017 15:57:28 +0800
-Subject: [PATCH v5 9/9] dt-bindings: ASoC: rockchip: Update description of
- rockchip, codec
-In-Reply-To: <20170822075729.8438-1-jeffy.chen@rock-chips.com>
-References: <20170822075729.8438-1-jeffy.chen@rock-chips.com>
-Message-ID: <20170822075729.8438-10-jeffy.chen@rock-chips.com>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Tue, 22 Aug 2017 08:57:23 +0100
+Subject: [PATCH v5 6/7] KVM: arm64: Allow get exception information from
+ userspace
+In-Reply-To: <1503065517-7920-7-git-send-email-gengdongjiu@huawei.com>
+References: <1503065517-7920-1-git-send-email-gengdongjiu@huawei.com>
+ <1503065517-7920-7-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <20170822085723.0000670e@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update description for newly added optional audio codecs.
+On Fri, 18 Aug 2017 22:11:56 +0800
+Dongjiu Geng <gengdongjiu@huawei.com> wrote:
 
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
+> when userspace gets SIGBUS signal, it does not know whether
+> this is a synchronous external abort or SError, so needs
+> to get the exception syndrome. so this patch allows userspace
+> can get this values. For syndrome, only give userspace
+> syndrome EC and ISS.
+> 
+> Now we move the synchronous external abort injection logic to
+> userspace, when userspace injects the SEA exception to guest
+> OS, it needs to specify the far_el1 value, so this patch give
+> the exception virtual address to user space.
+> 
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+> Signed-off-by: Quanming Wu <wuquanming@huawei.com>
 
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+A couple of really trivial formatting points inline.
 
- Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> ---
+>  arch/arm64/include/uapi/asm/kvm.h |  5 +++++
+>  arch/arm64/kvm/guest.c            | 35 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 40 insertions(+)
+> 
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 9f3ca24bbcc6..514261f682b8 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -181,6 +181,11 @@ struct kvm_arch_memory_slot {
+>  #define KVM_REG_ARM64_SYSREG_OP2_MASK	0x0000000000000007
+>  #define KVM_REG_ARM64_SYSREG_OP2_SHIFT	0
+>  
+> +/* AArch64 fault registers */
+> +#define KVM_REG_ARM64_FAULT		(0x0014 << KVM_REG_ARM_COPROC_SHIFT)
+> +#define KVM_REG_ARM64_FAULT_ESR_EC_ISS	(0)
+> +#define KVM_REG_ARM64_FAULT_FAR		(1)
+> +
+>  #define ARM64_SYS_REG_SHIFT_MASK(x,n) \
+>  	(((x) << KVM_REG_ARM64_SYSREG_ ## n ## _SHIFT) & \
+>  	KVM_REG_ARM64_SYSREG_ ## n ## _MASK)
+> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> index 5c7f657dd207..cb383c310f18 100644
+> --- a/arch/arm64/kvm/guest.c
+> +++ b/arch/arm64/kvm/guest.c
+> @@ -128,6 +128,38 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  out:
+>  	return err;
+>  }
+> +static int get_fault_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> +{
+> +	void __user *uaddr = (void __user *)(unsigned long)reg->addr;
+> +	u32 ec, value;
+> +	u32 id = reg->id & ~(KVM_REG_ARCH_MASK |
+> +			KVM_REG_SIZE_MASK | KVM_REG_ARM64_FAULT);
+> +
+> +	switch (id) {
+> +	case KVM_REG_ARM64_FAULT_ESR_EC_ISS:
+> +		/* The user space needs to know the fault exception
+> +		 * class field
+> +		 */
 
-diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-index f19b6c830a34..f54b4e91e97c 100644
---- a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-+++ b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
-@@ -4,7 +4,7 @@ Required properties:
- - compatible: "rockchip,rk3399-gru-sound"
- - rockchip,cpu: The phandle of the Rockchip I2S controller that's
-   connected to the codecs
--- rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
-+- rockchip,codec: The phandle of the audio codecs
- 
- Example:
- 
--- 
-2.11.0
+The rest of this file uses the multiline comment syntax
+/*
+ * The user...
+ */
+
+> +		ec = kvm_vcpu_get_hsr(vcpu) & ESR_ELx_EC_MASK;
+> +		value = ec | (kvm_vcpu_get_hsr(vcpu) & ESR_ELx_ISS_MASK);
+Same as
+
+value = kvm_vpcu_get_hsr(vcpu) & (ESR_ELx_EC_MASK | ESR_ELx_ISS_MASK);
+
+?
+
+> +
+> +		if (copy_to_user(uaddr, &value, KVM_REG_SIZE(reg->id)) != 0)
+> +			return -EFAULT;
+> +		break;
+> +	case KVM_REG_ARM64_FAULT_FAR:
+> +		/* when user space injects synchronized abort, it needs
+> +		 * to inject the fault address.
+> +		 */
+
+Again, multiline comment syntax.
+
+> +		if (copy_to_user(uaddr, &(vcpu->arch.fault.far_el2),
+> +				KVM_REG_SIZE(reg->id)) != 0)
+> +			return -EFAULT;
+> +		break;
+> +	default:
+> +		return -ENOENT;
+> +	}
+> +	return 0;
+> +}
+> +
+>  
+>  int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+>  {
+> @@ -243,6 +275,9 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
+>  		return get_core_reg(vcpu, reg);
+>  
+> +	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM64_FAULT)
+> +		return get_fault_reg(vcpu, reg);
+> +
+>  	if (is_timer_reg(reg->id))
+>  		return get_timer_reg(vcpu, reg);
+>  
