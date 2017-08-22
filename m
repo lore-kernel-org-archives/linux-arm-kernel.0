@@ -1,71 +1,46 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 22 Aug 2017 11:42:40 +0100
-Subject: [PATCH v7 0/9] arm64: Enable contiguous pte hugepage support
-Message-ID: <20170822104249.2189-1-punit.agrawal@arm.com>
+Date: Tue, 22 Aug 2017 11:42:41 +0100
+Subject: [PATCH v7 1/9] arm64: hugetlb: set_huge_pte_at Add WARN_ON on
+ !pte_present
+In-Reply-To: <20170822104249.2189-1-punit.agrawal@arm.com>
+References: <20170822104249.2189-1-punit.agrawal@arm.com>
+Message-ID: <20170822104249.2189-2-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Steve Capper <steve.capper@arm.com>
 
-This series re-enables contiguous hugepage support for arm64.
+This patch adds a WARN_ON to set_huge_pte_at as the accessor assumes
+that entries to be written down are all present. (There are separate
+accessors to clear huge ptes).
 
-Changes in v7 -
+We will need to handle the !pte_present case where memory offlining
+is used on hugetlb pages. swap and migration entries will be supplied
+to set_huge_pte_at in this case.
 
-* Patch 4 - "Add break-before-make logic for contiguous entries"
-  - get_clear_flush() - unconditionally clear the ptes (even if they
-    are not present). This is to bring huge_ptep_get_and_clear()
-    in line with generic implementation.
-  - get_clear_flush() - Only flush the TLBs if the cleared entry was
-    valid.
-  - huge_ptep_set_wrprotect() - simplified based on Catalin's
-    feedback.
+Cc: David Woods <dwoods@mellanox.com>
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+---
+ arch/arm64/mm/hugetlbpage.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-* Patch 6 - "Override huge_pte_clear() to support"
-  - Address compile warnings due to non-existence of certain levels of
-    the page table when using 16 and 64k pages.
-
-All the dependent series ([2], [3]) for enabling contiguous hugepage
-support have been merged in the previous cycle. Additionally, a patch
-to clarify the semantics of huge_pte_offset() in generic code[6] is
-currently in the -mm tree.
-
-Previous postings can be found at [0], [1], [4], [5], [7].
-
-The patches are based on v4.13-rc6. If there are no further comments
-please consider merging for the next release cycle.
-
-Thanks,
-Punit
-
-[0] https://www.spinics.net/lists/arm-kernel/msg570422.html
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/497027.html
-[2] https://www.spinics.net/lists/arm-kernel/msg581657.html
-[3] https://www.spinics.net/lists/arm-kernel/msg583342.html
-[4] https://www.spinics.net/lists/arm-kernel/msg583367.html
-[5] https://www.spinics.net/lists/arm-kernel/msg582758.html
-[6] https://lkml.org/lkml/2017/8/18/678
-[7] https://www.spinics.net/lists/arm-kernel/msg597777.html
-[8] http://www.spinics.net/lists/linux-mm/msg133176.html
-
-Punit Agrawal (4):
-  arm64: hugetlb: Handle swap entries in huge_pte_offset() for
-    contiguous hugepages
-  arm64: hugetlb: Override huge_pte_clear() to support contiguous
-    hugepages
-  arm64: hugetlb: Override set_huge_swap_pte_at() to support contiguous
-    hugepages
-  arm64: Re-enable support for contiguous hugepages
-
-Steve Capper (5):
-  arm64: hugetlb: set_huge_pte_at Add WARN_ON on !pte_present
-  arm64: hugetlb: Introduce pte_pgprot helper
-  arm64: hugetlb: Spring clean huge pte accessors
-  arm64: hugetlb: Add break-before-make logic for contiguous entries
-  arm64: hugetlb: Cleanup setup_hugepagesz
-
- arch/arm64/include/asm/hugetlb.h |   9 +-
- arch/arm64/mm/hugetlbpage.c      | 316 ++++++++++++++++++++++++++++-----------
- 2 files changed, 240 insertions(+), 85 deletions(-)
-
+diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+index 656e0ece2289..7b61e4833432 100644
+--- a/arch/arm64/mm/hugetlbpage.c
++++ b/arch/arm64/mm/hugetlbpage.c
+@@ -67,6 +67,12 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+ 	unsigned long pfn;
+ 	pgprot_t hugeprot;
+ 
++	/*
++	 * Code needs to be expanded to handle huge swap and migration
++	 * entries. Needed for HUGETLB and MEMORY_FAILURE.
++	 */
++	WARN_ON(!pte_present(pte));
++
+ 	if (!pte_cont(pte)) {
+ 		set_pte_at(mm, addr, ptep, pte);
+ 		return;
 -- 
 2.13.2
