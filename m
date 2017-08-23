@@ -1,61 +1,23 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 23 Aug 2017 21:24:13 +0200
-Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20170823104118.b4524830e4bb767d7714772c@magewell.com>
-References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
- <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
- <20170728160233.xooevio4hoqkgfaq@flea.lan>
- <20170730060801.bkc2kvm72ktixy74@tarshish>
- <20170821202145.kmxancepyq55v3o2@flea.lan>
- <20170823104118.b4524830e4bb767d7714772c@magewell.com>
-Message-ID: <20170823192413.y5psmcgd3ghvpkbz@flea.home>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 23 Aug 2017 21:33:01 +0200
+Subject: [PATCH] rtc: sa1100: fix unbalanced
+ clk_prepare_enable/clk_disable_unprepare
+References: <20170821160038.22650-1-alexandre.belloni@free-electrons.com>
+Message-ID: <87bmn6qdua.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 10:41:18AM +0800, Yong wrote:
-> > > > > +static irqreturn_t sun6i_csi_isr(int irq, void *dev_id)
-> > > > > +{
-> > > > > +	struct sun6i_csi_dev *sdev = (struct sun6i_csi_dev *)dev_id;
-> > > > > +	struct regmap *regmap = sdev->regmap;
-> > > > > +	u32 status;
-> > > > > +
-> > > > > +	regmap_read(regmap, CSI_CH_INT_STA_REG, &status);
-> > > > > +
-> > > > > +	if ((status & CSI_CH_INT_STA_FIFO0_OF_PD) ||
-> > > > > +	    (status & CSI_CH_INT_STA_FIFO1_OF_PD) ||
-> > > > > +	    (status & CSI_CH_INT_STA_FIFO2_OF_PD) ||
-> > > > > +	    (status & CSI_CH_INT_STA_HB_OF_PD)) {
-> > > > > +		regmap_write(regmap, CSI_CH_INT_STA_REG, status);
-> > > > > +		regmap_update_bits(regmap, CSI_EN_REG, CSI_EN_CSI_EN, 0);
-> > > > > +		regmap_update_bits(regmap, CSI_EN_REG, CSI_EN_CSI_EN,
-> > > > > +				   CSI_EN_CSI_EN);
-> > > > 
-> > > > You need to enable / disable it at every frame? How do you deal with
-> > > > double buffering? (or did you choose to ignore it for now?)
-> > > 
-> > > These *_OF_PD status bits indicate an overflow error condition.
-> > 
-> > Shouldn't we return an error code then? The names of these flags could
-> > be better too.
-> 
-> Then, where and how to deal with the error coce.
+Alexandre Belloni <alexandre.belloni@free-electrons.com> writes:
 
-If you want to deal with FIFO overflow, I'm not sure you have anything
-to do. It means, you've been to slow to queue buffers, so I guess
-stopping the pipeline until more buffers are queued would make
-sense. And we should probably increase the sequence number while doing
-so to notify the userspace that some frames were lost.
+> In the error path of sa1100_rtc_open(), info->clk is disabled which will
+> happen again in sa1100_rtc_remove() when the module is removed whereas it
+> is only enabled once in sa1100_rtc_init().
+>
+> Fixes: 0cc0c38e9139 ("drivers/rtc/rtc-sa1100.c: move clock enable/disable to probe/remove")
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-Maxime
+Cheers.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170823/354fbae2/attachment.sig>
+--
+Robert
