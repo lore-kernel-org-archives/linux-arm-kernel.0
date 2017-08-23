@@ -1,103 +1,73 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 23 Aug 2017 11:48:13 -0700
-Subject: [PATCH] Arm: mm: ftrace: Only set text back to ro after kernel
- has been marked ro
-In-Reply-To: <20170823135836.52fb44fc@gandalf.local.home>
-References: <20170823135836.52fb44fc@gandalf.local.home>
-Message-ID: <CAGXu5jLaQozk-TuZd8o=CK2kBcj3EFqD+VQtGX-DehU=c_TAkg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 23 Aug 2017 13:48:47 -0500
+Subject: [PATCH] binder: let ANDROID_BINDER_IPC_32BIT be selectable on
+ 32bit ARM
+In-Reply-To: <CALAqxLXSqUZCvzrqfUbozdZrwwP_0xWAU7sx69UYv81rBhovMg@mail.gmail.com>
+References: <20170808110305.2748-1-jszhang@marvell.com>
+ <20170823015108.GA18228@kroah.com>
+ <20170823103420.6ffb5ce7@xhacker>
+ <CALAqxLU_ACM-91Sp+BPqsAhqdhqf7V6-m111j7F=xZ+K4Aji1Q@mail.gmail.com>
+ <CALAqxLXSqUZCvzrqfUbozdZrwwP_0xWAU7sx69UYv81rBhovMg@mail.gmail.com>
+Message-ID: <CABGGisx73j7SHkA71sBQdHP0UnVc=EALo9b1AmrA6Af7WB=94Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 10:58 AM, Steven Rostedt <rostedt@goodmis.org> wrote:
+On Tue, Aug 22, 2017 at 9:57 PM, John Stultz <john.stultz@linaro.org> wrote:
+> On Tue, Aug 22, 2017 at 7:56 PM, John Stultz <john.stultz@linaro.org> wrote:
+>> On Tue, Aug 22, 2017 at 7:34 PM, Jisheng Zhang <jszhang@marvell.com> wrote:
+>>> On Tue, 22 Aug 2017 18:51:08 -0700 Greg KH wrote:
+>>>
+>>>> On Tue, Aug 08, 2017 at 07:03:05PM +0800, Jisheng Zhang wrote:
+>>>> > As noted in commit d0bdff0db809 ("staging: Fix build issues with new
+>>>> > binder API"), we can add back the choice for 32bit ARM "once a 64bit
+>>>> > __get_user_asm_* implementation is merged." Commit e38361d032f1 ("ARM:
+>>>> > 8091/2: add get_user() support for 8 byte types") has added the
+>>>> > support, so it's time to let ANDROID_BINDER_IPC_32BIT be selectable on
+>>>> > 32bit ARM
+>>>>
+>>>> Ok, but:
+>>>>
+>>>> >
+>>>> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+>>>> > ---
+>>>> >  drivers/android/Kconfig | 2 +-
+>>>> >  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>> >
+>>>> > diff --git a/drivers/android/Kconfig b/drivers/android/Kconfig
+>>>> > index 832e885349b1..aca5dc30b97b 100644
+>>>> > --- a/drivers/android/Kconfig
+>>>> > +++ b/drivers/android/Kconfig
+>>>> > @@ -32,7 +32,7 @@ config ANDROID_BINDER_DEVICES
+>>>> >       therefore logically separated from the other devices.
+>>>> >
+>>>> >  config ANDROID_BINDER_IPC_32BIT
+>>>> > -   bool
+>>>> > +   bool "Use old (Android 4.4 and earlier) 32-bit binder API"
+>>>> >     depends on !64BIT && ANDROID_BINDER_IPC
+>>>>
+>>>> You don't actually change the depends line :(
+>>>>
+>>>> Please fix up, and test it, and then resend.
+>>>
+>>> IHOM, the dependency is correct: 64bit platforms don't support
+>>> ANDROID_BINDER_IPC_32BIT. What do you think?
+>>
+>> I think this indicates the commit message is unclear.
+>>
+>> Part of it is that the config is inverted from the description. The
+>> patch doesn't enable the 32bit legacy binder ABI on 32bit systems, it
+>> just allows the option to be unselected, so that the 64bit ABI will be
+>> used on 32bit systems.
+>>
+>> Conceptually I don't have an objection to the change (though maybe try
+>> to rework the commit message), but I don't have anything to actually
+>> test it on right now, so I'm hesitant to ack it.
 >
-> ftrace needs to modify the kernel text in order to enable function tracing.
-> For security reasons, the kernel text is marked to read-only (ro) at the end
-> of system bootup. When enabling function tracing after that, ftrace calls
-> arch specific code that needs to enable the modification of kernel text
-> while ftrace does the update, and reset it back again when finished.
->
-> The issue arises when function tracing is enabled during system bootup. The
-> text hasn't been marked as read-only yet, but the same code to modify the
-> kernel is executed, and when it is finished, it will cause the kernel to
-> become read-only. This causes issues for other init code that requires
-> modification of kernel text during system bootup. This appears to cause
-> issue with Raspberry Pi 2.
->
-> By implementing the feature that is used in x86 to deal with this issue, it
-> fixes the problem. The solution is simple. Have a variable
-> (kernel_set_to_readonly) get set when the system finished boot and marks the
-> kernel to readonly. If that variable is not set, both
-> kernel_set_to_readonly() and kernel_set_to_rw() return without doing any
-> modifications. Those functions are used by ftrace to change the permissions
-> of the kernel text. By not doing anything, ftrace will not mess with the
-> permissions when it is enabled at system bootup.
->
-> Link: http://lkml.kernel.org/r/20170821153402.7so2u364htvt6tnf at camel2.lan
-> Link: https://github.com/raspberrypi/linux/issues/2166#issuecomment-323355145
-> Reported-by: Matthias Reichl <hias@horus.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Eric Anholt <eric@anholt.net>
-> Cc: Stefan Wahren <stefan.wahren@i2se.com>
-> Cc: Phil Elwell <phil@raspberrypi.org>
-> Cc: linux-rpi-kernel at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: stable at vger.kernel.org
-> Fixes: 80d6b0c2ee ("ARM: mm: allow text and rodata sections to be read-only")
-> Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-> ---
->  arch/arm/mm/init.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
->
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index ad80548..fd75f38 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -745,19 +745,29 @@ static int __mark_rodata_ro(void *unused)
->         return 0;
->  }
->
-> +static int kernel_set_to_readonly;
+> It might also be good to add some detail as to the motivation for this
+> change? What benefit does it bring to 32bit platforms to use the newer
+> 64bit ABI?
 
-Adding a comment here might be a good idea, something like:
+It allows running the same 32-bit userspace build whether the kernel
+is 64-bit or 32-bit.
 
-/* Has system boot-up reached mark_rodata_ro() yet? */
-
-Otherwise:
-
-Acked-by: Kees Cook <keescook@chromium.org>
-
-> +
->  void mark_rodata_ro(void)
->  {
-> +       kernel_set_to_readonly = 1;
-> +
->         stop_machine(__mark_rodata_ro, NULL, NULL);
->  }
->
->  void set_kernel_text_rw(void)
->  {
-> +       if (!kernel_set_to_readonly)
-> +               return;
-> +
->         set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), false,
->                                 current->active_mm);
->  }
->
->  void set_kernel_text_ro(void)
->  {
-> +       if (!kernel_set_to_readonly)
-> +               return;
-> +
->         set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), true,
->                                 current->active_mm);
->  }
-
-Does arm64 suffer from a similar condition? (It looks like no, as text
-patching is done with a fixmap poke.)
-
--Kees
-
--- 
-Kees Cook
-Pixel Security
+Rob
