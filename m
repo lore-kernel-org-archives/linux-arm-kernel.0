@@ -1,199 +1,53 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 23 Aug 2017 13:15:02 +0900
-Subject: [PATCH v4 3/4] mmc: sdhci: enable/disable the clock in
- sdhci_pltfm_suspend/resume
-In-Reply-To: <1503461703-16225-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1503461703-16225-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1503461703-16225-4-git-send-email-yamada.masahiro@socionext.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 23 Aug 2017 00:40:45 -0400
+Subject: [PATCH v11 2/4] PCI: Factor out pci_bus_wait_crs()
+In-Reply-To: <eca38319-9e78-1a9c-b275-43944fd0a63d@codeaurora.org>
+References: <20170818212310.15145.21732.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20170818213210.15145.15340.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <9cb3006d-31d0-e57a-fd3e-c32914e8ba42@codeaurora.org>
+ <20170821191806.GC28977@bhelgaas-glaptop.roam.corp.google.com>
+ <eca38319-9e78-1a9c-b275-43944fd0a63d@codeaurora.org>
+Message-ID: <b9cbd3d8-dec5-65db-efec-b84f1e96985d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit provides similar cleanups as commit 83eacdfa2529 ("mmc:
-sdhci: disable the clock in sdhci_pltfm_unregister()") did for
-unregister hooks.
+On 8/21/2017 3:37 PM, Sinan Kaya wrote:
+> bool pci_bus_crs_pending(struct pci_dev *dev, u32 l)
+> {
+> 	if !pci_bus_crs_vis_supported(dev->parent)
+> 		return false;
 
-sdhci-brcmstb.c and sdhci-sirf.c implement their own suspend/resume
-hooks to handle pltfm_host->clk.  Move clock handling to sdhci_pltfm.c
-so that the drivers can reuse sdhci_pltfm_pmops.
+Apparently, I can't do this. By the time, we come to here from vendor id read
+function, the topology has not been set up yet. 
 
-The following drivers did not previously touch pltfm_host->clk during
-suspend/resume, but now do:
-  - sdhci-bcm-kona.c
-  - sdhci-dove.c
-  - sdhci-iproc.c
-  - sdhci-pxav2.c
-  - sdhci-tegra.c
-  - sdhci-xenon.c
+I'm getting an exception:
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+[    6.067392] [<ffff00000846c878>] pci_bus_crs_visibility_pending+0x4/0x7c
+[    6.074085] [<ffff00000846cccc>] pci_scan_single_device+0x40/0xb4
+[    6.080170] [<ffff00000846cd90>] pci_scan_slot+0x50/0xe8
+[    6.085474] [<ffff00000846dc14>] pci_scan_child_bus+0x30/0x108
+[    6.091300] [<ffff0000084bab94>] acpi_pci_root_create+0x184/0x1f0
+[    6.097388] [<ffff000008091dc8>] pci_acpi_scan_root+0x188/0x1d4
+[    6.103298] [<ffff0000084ba7a8>] acpi_pci_root_add+0x38c/0x44c
+[    6.109125] [<ffff0000084b4d94>] acpi_bus_attach+0xe0/0x1ac
+[    6.114689] [<ffff0000084b4e08>] acpi_bus_attach+0x154/0x1ac
+[    6.120340] [<ffff0000084b4e08>] acpi_bus_attach+0x154/0x1ac
+[    6.125991] [<ffff0000084b6608>] acpi_bus_scan+0x60/0x70
+[    6.131297] [<ffff0000091c87f8>] acpi_scan_init+0xd8/0x228
+[    6.136774] [<ffff0000091c84e0>] acpi_init+0x2d4/0x328
+[    6.141905] [<ffff0000091a0c88>] do_one_initcall+0x80/0x108
+[    6.147469] [<ffff0000091a0e98>] kernel_init_freeable+0x188/0x228
+[    6.153556] [<ffff000008c9bcbc>] kernel_init+0x10/0xfc
+[    6.158687] [<ffff000008082ec0>] ret_from_fork+0x10/0x50
 
-Changes in v4:
-  - Disable clk when resume fails
 
-Changes in v3: None
-Changes in v2:
-  - Fix build error reported by kbuild test robot
 
- drivers/mmc/host/sdhci-brcmstb.c | 37 +------------------------------------
- drivers/mmc/host/sdhci-pltfm.c   | 22 ++++++++++++++++++++--
- drivers/mmc/host/sdhci-sirf.c    | 39 +--------------------------------------
- 3 files changed, 22 insertions(+), 76 deletions(-)
+> 
+> 	return (l & 0xFFFF) == 0x0001;
+> }
 
-diff --git a/drivers/mmc/host/sdhci-brcmstb.c b/drivers/mmc/host/sdhci-brcmstb.c
-index e2f638338e8f..6d461fcdd663 100644
---- a/drivers/mmc/host/sdhci-brcmstb.c
-+++ b/drivers/mmc/host/sdhci-brcmstb.c
-@@ -21,41 +21,6 @@
- 
- #include "sdhci-pltfm.h"
- 
--#ifdef CONFIG_PM_SLEEP
--
--static int sdhci_brcmstb_suspend(struct device *dev)
--{
--	struct sdhci_host *host = dev_get_drvdata(dev);
--	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	int res;
--
--	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
--		mmc_retune_needed(host->mmc);
--
--	res = sdhci_suspend_host(host);
--	if (res)
--		return res;
--	clk_disable_unprepare(pltfm_host->clk);
--	return res;
--}
--
--static int sdhci_brcmstb_resume(struct device *dev)
--{
--	struct sdhci_host *host = dev_get_drvdata(dev);
--	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	int err;
--
--	err = clk_prepare_enable(pltfm_host->clk);
--	if (err)
--		return err;
--	return sdhci_resume_host(host);
--}
--
--#endif /* CONFIG_PM_SLEEP */
--
--static SIMPLE_DEV_PM_OPS(sdhci_brcmstb_pmops, sdhci_brcmstb_suspend,
--			sdhci_brcmstb_resume);
--
- static const struct sdhci_ops sdhci_brcmstb_ops = {
- 	.set_clock = sdhci_set_clock,
- 	.set_bus_width = sdhci_set_bus_width,
-@@ -131,7 +96,7 @@ MODULE_DEVICE_TABLE(of, sdhci_brcm_of_match);
- static struct platform_driver sdhci_brcmstb_driver = {
- 	.driver		= {
- 		.name	= "sdhci-brcmstb",
--		.pm	= &sdhci_brcmstb_pmops,
-+		.pm	= &sdhci_pltfm_pmops,
- 		.of_match_table = of_match_ptr(sdhci_brcm_of_match),
- 	},
- 	.probe		= sdhci_brcmstb_probe,
-diff --git a/drivers/mmc/host/sdhci-pltfm.c b/drivers/mmc/host/sdhci-pltfm.c
-index e090d8c42ddb..4c0135e184e9 100644
---- a/drivers/mmc/host/sdhci-pltfm.c
-+++ b/drivers/mmc/host/sdhci-pltfm.c
-@@ -212,18 +212,36 @@ EXPORT_SYMBOL_GPL(sdhci_pltfm_unregister);
- static int sdhci_pltfm_suspend(struct device *dev)
- {
- 	struct sdhci_host *host = dev_get_drvdata(dev);
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	int ret;
- 
- 	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
- 		mmc_retune_needed(host->mmc);
- 
--	return sdhci_suspend_host(host);
-+	ret = sdhci_suspend_host(host);
-+	if (ret)
-+		return ret;
-+
-+	clk_disable_unprepare(pltfm_host->clk);
-+
-+	return 0;
- }
- 
- static int sdhci_pltfm_resume(struct device *dev)
- {
- 	struct sdhci_host *host = dev_get_drvdata(dev);
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	int ret;
-+
-+	ret = clk_prepare_enable(pltfm_host->clk);
-+	if (ret)
-+		return ret;
- 
--	return sdhci_resume_host(host);
-+	ret = sdhci_resume_host(host);
-+	if (ret)
-+		clk_disable_unprepare(pltfm_host->clk);
-+
-+	return ret;
- }
- #endif
- 
-diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
-index c251c6c0a112..0c7aa89df4e2 100644
---- a/drivers/mmc/host/sdhci-sirf.c
-+++ b/drivers/mmc/host/sdhci-sirf.c
-@@ -230,43 +230,6 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
- 	return ret;
- }
- 
--#ifdef CONFIG_PM_SLEEP
--static int sdhci_sirf_suspend(struct device *dev)
--{
--	struct sdhci_host *host = dev_get_drvdata(dev);
--	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	int ret;
--
--	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
--		mmc_retune_needed(host->mmc);
--
--	ret = sdhci_suspend_host(host);
--	if (ret)
--		return ret;
--
--	clk_disable(pltfm_host->clk);
--
--	return 0;
--}
--
--static int sdhci_sirf_resume(struct device *dev)
--{
--	struct sdhci_host *host = dev_get_drvdata(dev);
--	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	int ret;
--
--	ret = clk_enable(pltfm_host->clk);
--	if (ret) {
--		dev_dbg(dev, "Resume: Error enabling clock\n");
--		return ret;
--	}
--
--	return sdhci_resume_host(host);
--}
--#endif
--
--static SIMPLE_DEV_PM_OPS(sdhci_sirf_pm_ops, sdhci_sirf_suspend, sdhci_sirf_resume);
--
- static const struct of_device_id sdhci_sirf_of_match[] = {
- 	{ .compatible = "sirf,prima2-sdhc" },
- 	{ }
-@@ -277,7 +240,7 @@ static struct platform_driver sdhci_sirf_driver = {
- 	.driver		= {
- 		.name	= "sdhci-sirf",
- 		.of_match_table = sdhci_sirf_of_match,
--		.pm	= &sdhci_sirf_pm_ops,
-+		.pm	= &sdhci_pltfm_pmops,
- 	},
- 	.probe		= sdhci_sirf_probe,
- 	.remove		= sdhci_pltfm_unregister,
+
 -- 
-2.7.4
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
