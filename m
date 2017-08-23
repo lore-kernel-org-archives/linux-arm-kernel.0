@@ -1,38 +1,97 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 23 Aug 2017 18:02:31 +0800
-Subject: [patch v5 1/3] drivers: jtag: Add JTAG core driver
-In-Reply-To: <1503315069-29465-2-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <201708231747.SIlkHSak%fengguang.wu@intel.com>
+From: hias@horus.com (Matthias Reichl)
+Date: Wed, 23 Aug 2017 20:20:21 +0200
+Subject: [PATCH] Arm: mm: ftrace: Only set text back to ro after kernel
+ has been marked ro
+In-Reply-To: <20170823135836.52fb44fc@gandalf.local.home>
+References: <20170823135836.52fb44fc@gandalf.local.home>
+Message-ID: <20170823182021.4yv5cfcdqmzkddyc@camel2.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oleksandr,
+On Wed, Aug 23, 2017 at 01:58:36PM -0400, Steven Rostedt wrote:
+> 
+> ftrace needs to modify the kernel text in order to enable function tracing.
+> For security reasons, the kernel text is marked to read-only (ro) at the end
+> of system bootup. When enabling function tracing after that, ftrace calls
+> arch specific code that needs to enable the modification of kernel text
+> while ftrace does the update, and reset it back again when finished.
+> 
+> The issue arises when function tracing is enabled during system bootup. The
+> text hasn't been marked as read-only yet, but the same code to modify the
+> kernel is executed, and when it is finished, it will cause the kernel to
+> become read-only. This causes issues for other init code that requires
+> modification of kernel text during system bootup. This appears to cause
+> issue with Raspberry Pi 2.
+> 
+> By implementing the feature that is used in x86 to deal with this issue, it
+> fixes the problem. The solution is simple. Have a variable
+> (kernel_set_to_readonly) get set when the system finished boot and marks the
+> kernel to readonly. If that variable is not set, both
+> kernel_set_to_readonly() and kernel_set_to_rw() return without doing any
+> modifications. Those functions are used by ftrace to change the permissions
+> of the kernel text. By not doing anything, ftrace will not mess with the
+> permissions when it is enabled at system bootup.
+> 
+> Link: http://lkml.kernel.org/r/20170821153402.7so2u364htvt6tnf at camel2.lan
+> Link: https://github.com/raspberrypi/linux/issues/2166#issuecomment-323355145
+> Reported-by: Matthias Reichl <hias@horus.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Kees Cook <keescook@chromium.org>
+> Cc: Eric Anholt <eric@anholt.net>
+> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+> Cc: Phil Elwell <phil@raspberrypi.org>
+> Cc: linux-rpi-kernel at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: stable at vger.kernel.org
+> Fixes: 80d6b0c2ee ("ARM: mm: allow text and rodata sections to be read-only")
+> Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
 
-[auto build test WARNING on linus/master]
-[also build test WARNING on v4.13-rc6 next-20170823]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Tested-by: Matthias Reichl <hias@horus.com>
 
-url:    https://github.com/0day-ci/linux/commits/Oleksandr-Shamray/JTAG-driver-introduction/20170824-004528
-config: ia64-allnoconfig (attached as .config)
-compiler: ia64-linux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=ia64 
+Thanks, again, for resolving the issue so quickly!
 
-All warnings (new ones prefixed by >>):
+so long,
 
->> ./usr/include/linux/jtag.h:14: include of <linux/types.h> is preferred over <asm/types.h>
-   ./usr/include/linux/jtag.h:76: found __[us]{8,16,32,64} type without #include <linux/types.h>
+Hias
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 6016 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170823/d1fb014b/attachment.gz>
+> ---
+>  arch/arm/mm/init.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index ad80548..fd75f38 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -745,19 +745,29 @@ static int __mark_rodata_ro(void *unused)
+>  	return 0;
+>  }
+>  
+> +static int kernel_set_to_readonly;
+> +
+>  void mark_rodata_ro(void)
+>  {
+> +	kernel_set_to_readonly = 1;
+> +
+>  	stop_machine(__mark_rodata_ro, NULL, NULL);
+>  }
+>  
+>  void set_kernel_text_rw(void)
+>  {
+> +	if (!kernel_set_to_readonly)
+> +		return;
+> +
+>  	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), false,
+>  				current->active_mm);
+>  }
+>  
+>  void set_kernel_text_ro(void)
+>  {
+> +	if (!kernel_set_to_readonly)
+> +		return;
+> +
+>  	set_section_perms(ro_perms, ARRAY_SIZE(ro_perms), true,
+>  				current->active_mm);
+>  }
+> -- 
+> 2.9.5
+> 
