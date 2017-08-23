@@ -1,270 +1,136 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 23 Aug 2017 16:42:06 +0200
-Subject: [PATCH v2 6/9] PM / ACPI: Enable the runtime PM centric approach for
- system sleep
+Date: Wed, 23 Aug 2017 16:42:05 +0200
+Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable direct_complete
+ for ACPI devices
 In-Reply-To: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
 References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1503499329-28834-7-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1503499329-28834-6-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change extends the interpretation of the ACPI's no_direct_complete
-flag to be used to enable the so called runtime PM centric approach, for
-devices being attached to the ACPI PM domain.
+In some cases a driver for an ACPI device needs to be able to prevent the
+ACPI PM domain from using the direct_complete path during system sleep.
 
-The principle behind the runtime PM centric approach is to re-use the
-runtime PM callbacks to implement system sleep for drivers/subsystems.
-Moreover, using the runtime PM centric approach gives an optimized
-behaviour around avoiding to wake up a device from its low power state
-during system sleep, unless really needed.
+One typical case is when the driver for the device needs its device to stay
+runtime enabled, during the __device_suspend phase. This isn't the case
+when the direct_complete path is being executed by the PM core, as it then
+disables runtime PM for the device in __device_suspend(). Any following
+attempts to runtime resume the device after that point, just fails.
 
-To deploy the runtime PM centric approach for a subsystem/driver, the
-following adaptations needs to be made.
+A workaround to this problem is to let the driver runtime resume its device
+from its ->prepare() callback, as that would prevent the direct_complete
+path from being executed. However, that may often be a waste, especially if
+it turned out that no one really needed the device.
 
-First, the runtime PM callbacks may be called when runtime PM has been
-disabled for the device. This serves as an indication for the callbacks to
-understand they are running in the system sleep sequence, instead of in the
-regular runtime PM path. In some cases, a callback needs to take different
-actions depending in what path it is being executed in, as is the case for
-the ACPI PM domain.
+For this reason, invent acpi_dev_disable|enable_direct_complete(), to allow
+drivers to inform the ACPI PM domain to change its default behaviour during
+system sleep, and thus control whether it may use the direct_complete path
+or not.
 
-In particular for the ACPI PM domain's ->runtime_suspend|resume()
-callbacks, when those finds runtime PM being disabled for the device, it
-instead executes the same operations as normally being run when
-->suspend_late() and ->resume_early() callbacks are invoked during system
-sleep.
-
-Second, at the PM domain level, it is expected that the driver for the
-device makes use of pm_runtime_force_suspend|resume(), to re-use the
-runtime PM callbacks to put the device into low power state and to wake it
-up when needed during system sleep.
-
-For the ACPI PM domain's ->suspend_late() and ->resume_early() callbacks,
-it means bypassing the operations putting the device into low power state
-and the operations that wakes it up. Instead it shall invoke only the lower
-level ->suspend_late() and ->resume_early() callbacks for the driver, if
-present.
+Typically a driver should call acpi_dev_disable_direct_comlete() during
+->probe() and acpi_dev_enable_direct_complete() in ->remove().
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
 
 Changes in v2:
-	- Rebased.
-	- Updated header for acpi_enable|disable_no_direct_complete().
+	- Moved the no_direct_complete flag to the struct acpi_device_power.
 
 ---
- drivers/acpi/acpi_lpss.c | 58 +++++++++++++++++++++++++++++++---------------
- drivers/acpi/device_pm.c | 60 ++++++++++++++++++++++++++++++++++++++++++------
- 2 files changed, 93 insertions(+), 25 deletions(-)
+ drivers/acpi/device_pm.c | 38 +++++++++++++++++++++++++++++++++++++-
+ include/acpi/acpi_bus.h  |  1 +
+ include/linux/acpi.h     |  4 ++++
+ 3 files changed, 42 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/acpi/acpi_lpss.c b/drivers/acpi/acpi_lpss.c
-index e726173..f0d1141 100644
---- a/drivers/acpi/acpi_lpss.c
-+++ b/drivers/acpi/acpi_lpss.c
-@@ -729,10 +729,11 @@ static int lpss_suspend_late(struct device *dev)
- 
- static int acpi_lpss_suspend_late(struct device *dev)
- {
-+	struct acpi_device *adev = ACPI_COMPANION(dev);
- 	int ret;
- 
- 	ret = pm_generic_suspend_late(dev);
--	if (ret)
-+	if (ret || adev->power.no_direct_complete)
- 		return ret;
- 
- 	return lpss_suspend_late(dev);
-@@ -757,13 +758,23 @@ static int lpss_resume_early(struct device *dev)
- 
- static int acpi_lpss_resume_early(struct device *dev)
- {
--	int ret;
-+	struct acpi_device *adev = ACPI_COMPANION(dev);
-+	int ret = 0;
- 
--	ret = lpss_resume_early(dev);
--	if (ret)
--		return ret;
-+	if (!adev->power.no_direct_complete)
-+		ret = lpss_resume_early(dev);
- 
--	return pm_generic_resume_early(dev);
-+	return ret ? ret : pm_generic_resume_early(dev);
-+}
-+#else
-+static inline int lpss_suspend_late(struct device *dev)
-+{
-+	return 0;
-+}
-+
-+static inline int lpss_resume_early(struct device *dev)
-+{
-+	return 0;
- }
- #endif /* CONFIG_PM_SLEEP */
- 
-@@ -861,6 +872,9 @@ static int acpi_lpss_runtime_suspend(struct device *dev)
- 	if (ret)
- 		return ret;
- 
-+	if (!pm_runtime_enabled(dev))
-+		return lpss_suspend_late(dev);
-+
- 	if (pdata->dev_desc->flags & LPSS_SAVE_CTX)
- 		acpi_lpss_save_ctx(dev, pdata);
- 
-@@ -882,21 +896,29 @@ static int acpi_lpss_runtime_resume(struct device *dev)
- 	struct lpss_private_data *pdata = acpi_driver_data(ACPI_COMPANION(dev));
- 	int ret;
- 
--	/*
--	 * This call is kept first to be in symmetry with
--	 * acpi_lpss_runtime_suspend() one.
--	 */
--	if (lpss_quirks & LPSS_QUIRK_ALWAYS_POWER_ON && iosf_mbi_available())
--		lpss_iosf_exit_d3_state();
-+	if (pm_runtime_enabled(dev)) {
-+		/*
-+		 * This call is kept first to be in symmetry with
-+		 * acpi_lpss_runtime_suspend() one.
-+		 */
-+		if (lpss_quirks & LPSS_QUIRK_ALWAYS_POWER_ON &&
-+		    iosf_mbi_available())
-+			lpss_iosf_exit_d3_state();
- 
--	ret = acpi_dev_runtime_resume(dev);
--	if (ret)
--		return ret;
-+		ret = acpi_dev_runtime_resume(dev);
-+		if (ret)
-+			return ret;
- 
--	acpi_lpss_d3_to_d0_delay(pdata);
-+		acpi_lpss_d3_to_d0_delay(pdata);
- 
--	if (pdata->dev_desc->flags & LPSS_SAVE_CTX)
--		acpi_lpss_restore_ctx(dev, pdata);
-+		if (pdata->dev_desc->flags & LPSS_SAVE_CTX)
-+			acpi_lpss_restore_ctx(dev, pdata);
-+
-+	} else {
-+		ret = lpss_resume_early(dev);
-+		if (ret)
-+			return ret;
-+	}
- 
- 	return pm_generic_runtime_resume(dev);
- }
 diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
-index f7bf596..b595968 100644
+index 5181057..f7bf596 100644
 --- a/drivers/acpi/device_pm.c
 +++ b/drivers/acpi/device_pm.c
-@@ -913,7 +913,14 @@ EXPORT_SYMBOL_GPL(acpi_dev_runtime_resume);
- int acpi_subsys_runtime_suspend(struct device *dev)
- {
- 	int ret = pm_generic_runtime_suspend(dev);
--	return ret ? ret : acpi_dev_runtime_suspend(dev);
-+
-+	if (ret)
-+		return ret;
-+
-+	if (!pm_runtime_enabled(dev))
-+		return acpi_dev_suspend_late(dev);
-+
-+	return acpi_dev_runtime_suspend(dev);
- }
- EXPORT_SYMBOL_GPL(acpi_subsys_runtime_suspend);
+@@ -933,6 +933,41 @@ EXPORT_SYMBOL_GPL(acpi_subsys_runtime_resume);
  
-@@ -926,7 +933,17 @@ EXPORT_SYMBOL_GPL(acpi_subsys_runtime_suspend);
-  */
- int acpi_subsys_runtime_resume(struct device *dev)
- {
--	int ret = acpi_dev_runtime_resume(dev);
-+	struct acpi_device *adev = ACPI_COMPANION(dev);
-+	int ret = 0;
-+
-+	if (!adev)
-+		return 0;
-+
-+	if (!pm_runtime_enabled(dev))
-+		ret = acpi_dev_resume_early(dev);
-+	else
-+		ret = acpi_dev_runtime_resume(dev);
-+
- 	return ret ? ret : pm_generic_runtime_resume(dev);
- }
- EXPORT_SYMBOL_GPL(acpi_subsys_runtime_resume);
-@@ -939,6 +956,10 @@ EXPORT_SYMBOL_GPL(acpi_subsys_runtime_resume);
-  * Per default the ACPI PM domain tries to use the direct_complete path for its
-  * devices during system sleep. This function allows a user, typically a driver
-  * during probe, to disable the direct_complete path from being used by ACPI.
-+ * Moreover, the ACPI PM domain expects and depends on that such driver deploys
-+ * the runtime PM centric path for system sleep. In other words, the driver must
-+ * make use of the pm_runtime_force_suspend|resume() helpers when implementing
-+ * system sleep.
-  */
- void acpi_dev_disable_direct_complete(struct device *dev)
- {
-@@ -1072,13 +1093,21 @@ EXPORT_SYMBOL_GPL(acpi_subsys_prepare);
-  */
- void acpi_subsys_complete(struct device *dev)
- {
+ #ifdef CONFIG_PM_SLEEP
+ /**
++ * acpi_dev_disable_direct_complete - Disable the direct_complete path for ACPI.
++ * @dev: Device to disable the path for.
++ *
++ * Per default the ACPI PM domain tries to use the direct_complete path for its
++ * devices during system sleep. This function allows a user, typically a driver
++ * during probe, to disable the direct_complete path from being used by ACPI.
++ */
++void acpi_dev_disable_direct_complete(struct device *dev)
++{
 +	struct acpi_device *adev = ACPI_COMPANION(dev);
 +
-+	if (!adev)
-+		return;
++	if (adev)
++		adev->power.no_direct_complete = true;
++}
++EXPORT_SYMBOL_GPL(acpi_dev_disable_direct_complete);
 +
- 	pm_generic_complete(dev);
- 	/*
- 	 * If the device had been runtime-suspended before the system went into
- 	 * the sleep state it is going out of and it has never been resumed till
--	 * now, resume it in case the firmware powered it up.
-+	 * now, resume it in case the firmware powered it up. Also resume it in
-+	 * case no_direct_complete is set for the device, to be sure the device
-+	 * are managed correctly when firmware has powered it up.
- 	 */
--	if (dev->power.direct_complete && pm_resume_via_firmware())
-+	if ((dev->power.direct_complete || adev->power.no_direct_complete) &&
-+	    pm_resume_via_firmware())
- 		pm_request_resume(dev);
- }
- EXPORT_SYMBOL_GPL(acpi_subsys_complete);
-@@ -1106,8 +1135,17 @@ EXPORT_SYMBOL_GPL(acpi_subsys_suspend);
-  */
- int acpi_subsys_suspend_late(struct device *dev)
- {
--	int ret = pm_generic_suspend_late(dev);
--	return ret ? ret : acpi_dev_suspend_late(dev);
++/**
++ * acpi_dev_enable_direct_complete - Enable the direct_complete path for ACPI.
++ * @dev: Device to enable the path for.
++ *
++ * Enable the direct_complete path to be used during system suspend for the ACPI
++ * PM domain, which is the default option. Typically a driver that disabled the
++ * path during ->probe(), must call this function during ->remove() to re-enable
++ * the direct_complete path to be used by ACPI.
++ */
++void acpi_dev_enable_direct_complete(struct device *dev)
++{
 +	struct acpi_device *adev = ACPI_COMPANION(dev);
-+	int ret;
 +
-+	if (!adev)
-+		return 0;
++	if (adev)
++		adev->power.no_direct_complete = false;
++}
++EXPORT_SYMBOL_GPL(acpi_dev_enable_direct_complete);
 +
-+	ret = pm_generic_suspend_late(dev);
-+	if (ret || adev->power.no_direct_complete)
-+		return ret;
-+
-+	return acpi_dev_suspend_late(dev);
- }
- EXPORT_SYMBOL_GPL(acpi_subsys_suspend_late);
++/**
+  * acpi_dev_suspend_late - Put device into a low-power state using ACPI.
+  * @dev: Device to put into a low-power state.
+  *
+@@ -1023,7 +1058,8 @@ int acpi_subsys_prepare(struct device *dev)
+ 	if (ret < 0)
+ 		return ret;
  
-@@ -1121,7 +1159,15 @@ EXPORT_SYMBOL_GPL(acpi_subsys_suspend_late);
-  */
- int acpi_subsys_resume_early(struct device *dev)
- {
--	int ret = acpi_dev_resume_early(dev);
-+	struct acpi_device *adev = ACPI_COMPANION(dev);
-+	int ret = 0;
-+
-+	if (!adev)
-+		return 0;
-+
-+	if (!adev->power.no_direct_complete)
-+		ret = acpi_dev_resume_early(dev);
-+
- 	return ret ? ret : pm_generic_resume_early(dev);
- }
- EXPORT_SYMBOL_GPL(acpi_subsys_resume_early);
+-	if (!adev || !pm_runtime_suspended(dev))
++	if (!adev || adev->power.no_direct_complete ||
++	    !pm_runtime_suspended(dev))
+ 		return 0;
+ 
+ 	return !acpi_dev_needs_resume(dev, adev);
+diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+index dedf9d7..bdec5f2 100644
+--- a/include/acpi/acpi_bus.h
++++ b/include/acpi/acpi_bus.h
+@@ -285,6 +285,7 @@ struct acpi_device_power_state {
+ 
+ struct acpi_device_power {
+ 	int state;		/* Current state */
++	bool no_direct_complete;
+ 	struct acpi_device_power_flags flags;
+ 	struct acpi_device_power_state states[ACPI_D_STATE_COUNT];	/* Power states (D0-D3Cold) */
+ };
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index c1a5213..ec33c41 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -867,6 +867,8 @@ static inline int acpi_dev_pm_attach(struct device *dev, bool power_on)
+ #endif
+ 
+ #if defined(CONFIG_ACPI) && defined(CONFIG_PM_SLEEP)
++void acpi_dev_disable_direct_complete(struct device *dev);
++void acpi_dev_enable_direct_complete(struct device *dev);
+ int acpi_dev_suspend_late(struct device *dev);
+ int acpi_dev_resume_early(struct device *dev);
+ int acpi_subsys_prepare(struct device *dev);
+@@ -876,6 +878,8 @@ int acpi_subsys_resume_early(struct device *dev);
+ int acpi_subsys_suspend(struct device *dev);
+ int acpi_subsys_freeze(struct device *dev);
+ #else
++static inline void acpi_dev_disable_direct_complete(struct device *dev) {}
++static inline void acpi_dev_enable_direct_complete(struct device *dev) {}
+ static inline int acpi_dev_suspend_late(struct device *dev) { return 0; }
+ static inline int acpi_dev_resume_early(struct device *dev) { return 0; }
+ static inline int acpi_subsys_prepare(struct device *dev) { return 0; }
 -- 
 2.7.4
