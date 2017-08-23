@@ -1,39 +1,66 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 23 Aug 2017 10:17:06 +0100
-Subject: [PATCH] doc: coresight: correct usage for '/dev/cpu_dma_latency'
-In-Reply-To: <1503472998-9009-1-git-send-email-leo.yan@linaro.org>
-References: <1503472998-9009-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <c6d08eff-d92e-9cd2-5c33-1bf67711471c@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 23 Aug 2017 10:17:53 +0100
+Subject: [PATCH] irqchip: Convert to using %pOF instead of full_name
+In-Reply-To: <20170718214339.7774-30-robh@kernel.org>
+References: <20170718214339.7774-30-robh@kernel.org>
+Message-ID: <dfc0a724-ea9d-ffad-fd69-ef3f65fe4328@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 23/08/17 08:23, Leo Yan wrote:
-> In the coresight CPU debug document it suggests to use 'echo' command
-> to set latency request to /dev/cpu_dma_latency so can disable all CPU
-> idle states, but in fact this doesn't work.
+On 18/07/17 22:43, Rob Herring wrote:
+> Now that we have a custom printf format specifier, convert users of
+> full_name to use %pOF instead. This is preparation to remove storing
+> of the full path string for each node.
 > 
-> This is because when the command 'echo' exits, it releases the device
-> node's file descriptor and the kernel release function removes the QoS
-> constraint; finally when the command 'echo' finished there have no
-> constraint imposed on cpu_dma_latency.
-> 
-> This patch changes to use 'exec' to access '/dev/cpu_dma_latency', the
-> command 'exec' can avoid the file descriptor to be closed so we can
-> keep the constraint on cpu_dma_latency.
-> 
-> This patch also corrects the description when set latency = 0uS, in
-> this case the idle state0 still can be selected by CPUIdle governor so
-> this means on ARM platform the 'WFI' state is still enabled, but all
-> other deeper states have been disabled so CPUs will not be powered off.
-> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Lee Jones <lee@kernel.org>
+> Cc: Eric Anholt <eric@anholt.net>
+> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Ray Jui <rjui@broadcom.com>
+> Cc: Scott Branden <sbranden@broadcom.com>
+> Cc: bcm-kernel-feedback-list at broadcom.com
+> Cc: Baruch Siach <baruch@tkos.co.il>
+> Cc: Vladimir Zapolskiy <vz@mleia.com>
+> Cc: Sylvain Lemieux <slemieux.tyco@gmail.com>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> Cc: Alexandre Torgue <alexandre.torgue@st.com>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Jonathan Hunter <jonathanh@nvidia.com>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
+> Cc: linux-rpi-kernel at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-mediatek at lists.infradead.org
+> Cc: linux-tegra at vger.kernel.org
+> ---
+>  drivers/irqchip/irq-bcm2835.c            |  9 ++++-----
+>  drivers/irqchip/irq-bcm2836.c            |  5 ++---
+>  drivers/irqchip/irq-crossbar.c           |  6 +++---
+>  drivers/irqchip/irq-digicolor.c          |  8 ++++----
+>  drivers/irqchip/irq-dw-apb-ictl.c        | 12 ++++++------
+>  drivers/irqchip/irq-gic-v3-its-pci-msi.c |  2 +-
+>  drivers/irqchip/irq-gic-v3-its.c         |  6 +++---
+>  drivers/irqchip/irq-gic-v3.c             | 11 ++++-------
+>  drivers/irqchip/irq-imx-gpcv2.c          |  4 ++--
+>  drivers/irqchip/irq-lpc32xx.c            |  2 +-
+>  drivers/irqchip/irq-mtk-sysirq.c         |  3 +--
+>  drivers/irqchip/irq-mxs.c                |  4 ++--
+>  drivers/irqchip/irq-stm32-exti.c         |  8 ++++----
+>  drivers/irqchip/irq-sun4i.c              |  6 +++---
+>  drivers/irqchip/irq-tegra.c              | 16 ++++++++--------
+>  drivers/irqchip/irq-xilinx-intc.c        |  4 ++--
+>  16 files changed, 50 insertions(+), 56 deletions(-)
+Queued for 4.14.
 
+Thanks,
 
-IMO, we should just refer to cpuidle and PM QoS documents from here so
-that any updates or changes in those documents are observed. Having a
-copy of the text may result in it getting obsolete.
-
+	M.
 -- 
-Regards,
-Sudeep
+Jazz is not dead. It just smells funny...
