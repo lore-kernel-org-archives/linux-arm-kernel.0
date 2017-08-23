@@ -1,61 +1,115 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 24 Aug 2017 00:00:24 +0200
-Subject: [PATCH] rtc: mxc: avoid disabling interrupts on device close
-Message-ID: <20170823220024.22861-1-alexandre.belloni@free-electrons.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 23 Aug 2017 17:24:36 -0500
+Subject: [PATCH V12 4/5] PCI: Handle CRS ("device not ready") returned by
+ device after FLR
+In-Reply-To: <0ef4c01d-75bc-17dc-8926-2f9647cfeec8@codeaurora.org>
+References: <1503464171-6471-1-git-send-email-okaya@codeaurora.org>
+ <1503464171-6471-4-git-send-email-okaya@codeaurora.org>
+ <20170823213838.GG8498@bhelgaas-glaptop.roam.corp.google.com>
+ <0ef4c01d-75bc-17dc-8926-2f9647cfeec8@codeaurora.org>
+Message-ID: <20170823222436.GH8498@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the IRQs are disabled when the rtc character device is closed.
-This means that the device needs to stay open to get alarms while the usual
-use case will open the device, set the alarm and close the device as is
-done in rtcwake.
+On Wed, Aug 23, 2017 at 05:51:19PM -0400, Sinan Kaya wrote:
+> On 8/23/2017 5:38 PM, Bjorn Helgaas wrote:
+> > If we increase the timeout, is there still value in adding the
+> > pci_bus_wait_crs() stuff?  I'm not sure there is.
+> 
+> I agree increasing the timeout is more than enough for FLR case. 
 
-Keep the alarm functional on character device release so the platform can
-actually wakeup
+If that's the case, I think there's no value in adding additional
+complexity to the path.  If we increase the timeout, we might pretty
+it up a little along the lines of the patch below.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/rtc/rtc-mxc.c | 21 ---------------------
- 1 file changed, 21 deletions(-)
+> However, I was considering the wait and pending functions as a utility
+> that I can reuse towards fixing CRS in other conditions like secondary
+> bus reset and potentially PM.
+> 
+> I'm planning to have a CRS session in the Linux Plumbers Conference 
+> to talk about CRS use cases. 
 
-diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
-index 401f46d8f21b..bce427d202ee 100644
---- a/drivers/rtc/rtc-mxc.c
-+++ b/drivers/rtc/rtc-mxc.c
-@@ -238,26 +238,6 @@ static irqreturn_t mxc_rtc_interrupt(int irq, void *dev_id)
- 	return IRQ_HANDLED;
+Great idea.  I'm kind of confused on its value in general myself.  And
+there's now a new mechanism (Function Readiness Status) that I don't
+think we have any support for at all.
+
+> I was going to follow up this series with secondary bus reset next once
+> this goes in. 
+
+I think I'm OK with everything except the pci_flr_wait() change.  The
+rest of it makes sense (although I don't think there are any users
+outside probe.c, so maybe should be static for now).
+
+> I'm unable to test PM. I can't promise how I fix/test it.
+
+
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index af0cc3456dc1..b04c99e60b77 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -3811,27 +3811,50 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
  }
+ EXPORT_SYMBOL(pci_wait_for_pending_transaction);
  
 -/*
-- * Clear all interrupts and release the IRQ
+- * We should only need to wait 100ms after FLR, but some devices take longer.
+- * Wait for up to 1000ms for config space to return something other than -1.
+- * Intel IGD requires this when an LCD panel is attached.  We read the 2nd
+- * dword because VFs don't implement the 1st dword.
 - */
--static void mxc_rtc_release(struct device *dev)
--{
--	struct platform_device *pdev = to_platform_device(dev);
--	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
--	void __iomem *ioaddr = pdata->ioaddr;
--
--	spin_lock_irq(&pdata->rtc->irq_lock);
--
--	/* Disable all rtc interrupts */
--	writew(0, ioaddr + RTC_RTCIENR);
--
--	/* Clear all interrupt status */
--	writew(0xffffffff, ioaddr + RTC_RTCISR);
--
--	spin_unlock_irq(&pdata->rtc->irq_lock);
--}
--
- static int mxc_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
+ static void pci_flr_wait(struct pci_dev *dev)
  {
- 	mxc_rtc_irq_enable(dev, RTC_ALM_BIT, enabled);
-@@ -343,7 +323,6 @@ static int mxc_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
+-	int i = 0;
++	int delay = 1, timeout = 60000;
+ 	u32 id;
  
- /* RTC layer */
- static const struct rtc_class_ops mxc_rtc_ops = {
--	.release		= mxc_rtc_release,
- 	.read_time		= mxc_rtc_read_time,
- 	.set_mmss64		= mxc_rtc_set_mmss,
- 	.read_alarm		= mxc_rtc_read_alarm,
--- 
-2.14.1
+-	do {
+-		msleep(100);
++	/*
++	 * Per PCIe r3.1, sec 6.6.2, a device must complete an FLR within
++	 * 100ms, but may silently discard requests while the FLR is in
++	 * progress.  Wait 100ms before trying to access the device.
++	 */
++	msleep(100);
++
++	/*
++	 * After 100ms, the device should not silently discard config
++	 * requests, but it may still indicate that it needs more time by
++	 * responding to them with CRS completions.  The Root Port will
++	 * generally synthesize ~0 data to complete the read (except when
++	 * CRS SV is enabled and the read was for the Vendor ID; in that
++	 * case it synthesizes 0x0001 data).
++	 *
++	 * Wait for the device to return a non-CRS completion.  Read the
++	 * Command register instead of Vendor ID so we don't have to
++	 * contend with the CRS SV value.
++	 */
++	pci_read_config_dword(dev, PCI_COMMAND, &id);
++	while (id == ~0) {
++		if (delay > timeout) {
++			dev_warn(&dev->dev, "not ready %dms after FLR; giving up\n",
++				 delay - 1);
++			return;
++		}
++
++		if (delay > 1000)
++			dev_info(&dev->dev, "not ready %dms after FLR; waiting\n",
++				 delay - 1);
++
++		msleep(delay);
++		delay *= 2;
++
+ 		pci_read_config_dword(dev, PCI_COMMAND, &id);
+-	} while (i++ < 10 && id == ~0);
++	}
+ 
+-	if (id == ~0)
+-		dev_warn(&dev->dev, "Failed to return from FLR\n");
+-	else if (i > 1)
+-		dev_info(&dev->dev, "Required additional %dms to return from FLR\n",
+-			 (i - 1) * 100);
++	if (delay > 1000)
++		dev_info(&dev->dev, "ready %dms after FLR\n", delay - 1);
+ }
+ 
+ /**
