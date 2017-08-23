@@ -1,394 +1,103 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Aug 2017 15:58:12 +0100
-Subject: [PATCH v4] arm64: kernel: implement fast refcount checking
-In-Reply-To: <20170731192251.12491-1-ard.biesheuvel@linaro.org>
-References: <20170731192251.12491-1-ard.biesheuvel@linaro.org>
-Message-ID: <20170823145811.GA30753@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 23 Aug 2017 17:19:51 +0200
+Subject: [PATCH] ARM: at91: don't select CONFIG_ARM_CPU_SUSPEND for old
+ platforms
+In-Reply-To: <20170823144636.2333097-1-arnd@arndb.de>
+References: <20170823144636.2333097-1-arnd@arndb.de>
+Message-ID: <20170823151951.bfkxypspcrdnc7v4@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On 23/08/2017 at 16:46:15 +0200, Arnd Bergmann wrote:
+> My previous patch fixed a link error for all at91 platforms when
+> CONFIG_ARM_CPU_SUSPEND was not set, however this caused another
+> problem on a configuration that enabled CONFIG_ARCH_AT91 but none
+> of the individual SoCs, and that also enabled CPU_ARM720 as
+> the only CPU:
+> 
+> warning: (ARCH_AT91 && SOC_IMX23 && SOC_IMX28 && ARCH_PXA && MACH_MVEBU_V7 && SOC_IMX6 && ARCH_OMAP3 && ARCH_OMAP4 && SOC_OMAP5 && SOC_AM33XX && SOC_DRA7XX && ARCH_EXYNOS3 && ARCH_EXYNOS4 && EXYNOS5420_MCPM && EXYNOS_CPU_SUSPEND && ARCH_VEXPRESS_TC2_PM && ARM_BIG_LITTLE_CPUIDLE && ARM_HIGHBANK_CPUIDLE && QCOM_PM) selects ARM_CPU_SUSPEND which has unmet direct dependencies (ARCH_SUSPEND_POSSIBLE)
+> arch/arm/kernel/sleep.o: In function `cpu_resume':
+> (.text+0xf0): undefined reference to `cpu_arm720_suspend_size'
+> arch/arm/kernel/suspend.o: In function `__cpu_suspend_save':
+> suspend.c:(.text+0x134): undefined reference to `cpu_arm720_do_suspend'
+> 
+> This improves the hack some more by only selecting ARM_CPU_SUSPEND
+> for the part that requires it, and changing pm.c to drop the
+> contents of unused init functions so we no longer refer to
+> cpu_resume on at91 platforms that don't need it.
+> 
+> Fixes: cc7a938f5f30 ("ARM: at91: select CONFIG_ARM_CPU_SUSPEND")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Comments of varying quality inline...
+I think you can take it directly through arm-soc, I probably won't send
+more for 4.13.
 
-On Mon, Jul 31, 2017 at 08:22:51PM +0100, Ard Biesheuvel wrote:
-> This adds support to arm64 for fast refcount checking, as proposed by
-> Kees for x86 based on the implementation by grsecurity/PaX.
-> 
-> The general approach is identical: the existing atomic_t helpers are
-> cloned for refcount_t, with the arithmetic instruction modified to set
-> the PSTATE flags, and one or two branch instructions added that jump to
-> an out of line handler if overflow, decrement to zero or increment from
-> zero are detected.
-> 
-> One complication that we have to deal with on arm64 is the fact that
-> it has two atomics implementations: the original LL/SC implementation
-> using load/store exclusive loops, and the newer LSE one that does mostly
-> the same in a single instruction. So we need to clone some parts of
-> both for the refcount handlers, but we also need to deal with the way
-> LSE builds fall back to LL/SC at runtime if the hardware does not
-> support it. (The only exception is refcount_add_not_zero(), which
-> updates the refcount conditionally, so it is only implemented using
-> a load/store exclusive loop)
-> 
-> As is the case with the x86 version, the performance delta is in the
-> noise (Cortex-A57 @ 2 GHz, using LL/SC not LSE), even though the arm64
-> implementation incorporates an add-from-zero check as well:
-
-How does this compare to versions built using cmpxchg?
-
-> 
-> perf stat -B -- cat <(echo ATOMIC_TIMING) >/sys/kernel/debug/provoke-crash/DIRECT
-> 
->  Performance counter stats for 'cat /dev/fd/63':
-> 
->       65758.632112      task-clock (msec)         #    1.000 CPUs utilized
->                  2      context-switches          #    0.000 K/sec
->                  0      cpu-migrations            #    0.000 K/sec
->                 47      page-faults               #    0.001 K/sec
->       131421735632      cycles                    #    1.999 GHz
->        36752227542      instructions              #    0.28  insn per cycle
->    <not supported>      branches
->             961008      branch-misses
-> 
->       65.785264736 seconds time elapsed
-> 
-> perf stat -B -- cat <(echo REFCOUNT_TIMING) >/sys/kernel/debug/provoke-crash/DIRECT
-> 
->  Performance counter stats for 'cat /dev/fd/63':
-> 
->       65734.255992      task-clock (msec)         #    1.000 CPUs utilized
->                  2      context-switches          #    0.000 K/sec
->                  0      cpu-migrations            #    0.000 K/sec
->                 46      page-faults               #    0.001 K/sec
->       131376830467      cycles                    #    1.999 GHz
->        43183673156      instructions              #    0.33  insn per cycle
->    <not supported>      branches
->             879345      branch-misses
-> 
->       65.735309648 seconds time elapsed
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
-> v4: Implement add-from-zero checking using a conditional compare rather than
->     a conditional branch, which I omitted from v3 due to the 10% performance
->     hit: this will result in the new refcount to be written back to memory
->     before invoking the handler, which is more in line with the other checks,
->     and is apparently much easier on the branch predictor, given that there
->     is no performance hit whatsoever.
+>  arch/arm/mach-at91/Kconfig |  2 +-
+>  arch/arm/mach-at91/pm.c    | 12 ++++++++++++
+>  2 files changed, 13 insertions(+), 1 deletion(-)
 > 
->  arch/arm64/Kconfig                    |  1 +
->  arch/arm64/include/asm/atomic.h       | 25 +++++++
->  arch/arm64/include/asm/atomic_ll_sc.h | 29 ++++++++
->  arch/arm64/include/asm/atomic_lse.h   | 56 +++++++++++++++
->  arch/arm64/include/asm/brk-imm.h      |  1 +
->  arch/arm64/include/asm/refcount.h     | 71 ++++++++++++++++++++
->  arch/arm64/kernel/traps.c             | 29 ++++++++
->  arch/arm64/lib/atomic_ll_sc.c         | 16 +++++
->  8 files changed, 228 insertions(+)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index dfd908630631..53b9a8f5277b 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -16,6 +16,7 @@ config ARM64
->  	select ARCH_HAS_GCOV_PROFILE_ALL
->  	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
->  	select ARCH_HAS_KCOV
-> +	select ARCH_HAS_REFCOUNT
->  	select ARCH_HAS_SET_MEMORY
->  	select ARCH_HAS_SG_CHAIN
->  	select ARCH_HAS_STRICT_KERNEL_RWX
-> diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
-> index c0235e0ff849..ded9bde5f08f 100644
-> --- a/arch/arm64/include/asm/atomic.h
-> +++ b/arch/arm64/include/asm/atomic.h
-> @@ -24,10 +24,35 @@
->  #include <linux/types.h>
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index d735e5fc4772..195da38cb9a2 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -1,7 +1,7 @@
+>  menuconfig ARCH_AT91
+>  	bool "Atmel SoCs"
+>  	depends on ARCH_MULTI_V4T || ARCH_MULTI_V5 || ARCH_MULTI_V7 || ARM_SINGLE_ARMV7M
+> -	select ARM_CPU_SUSPEND if PM
+> +	select ARM_CPU_SUSPEND if PM && ARCH_MULTI_V7
+>  	select COMMON_CLK_AT91
+>  	select GPIOLIB
+>  	select PINCTRL
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 667fddac3856..5036f996e694 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -608,6 +608,9 @@ static void __init at91_pm_init(void (*pm_idle)(void))
 >  
->  #include <asm/barrier.h>
-> +#include <asm/brk-imm.h>
->  #include <asm/lse.h>
+>  void __init at91rm9200_pm_init(void)
+>  {
+> +	if (!IS_ENABLED(CONFIG_SOC_AT91RM9200))
+> +		return;
+> +
+>  	at91_dt_ramc();
 >  
->  #ifdef __KERNEL__
+>  	/*
+> @@ -620,18 +623,27 @@ void __init at91rm9200_pm_init(void)
 >  
-> +#define REFCOUNT_CHECK_TAIL						\
-> +"	.subsection	1\n"						\
-> +"33:	mov		x16, %[counter]\n"				\
-> +"	adr		x17, 44f\n"					\
-> +"	brk		%[brk_imm]\n"					\
-> +"44:	.long		22b - .\n"					\
-> +"	.previous\n"
+>  void __init at91sam9_pm_init(void)
+>  {
+> +	if (!IS_ENABLED(CONFIG_SOC_AT91SAM9))
+> +		return;
 > +
-> +#define REFCOUNT_POST_CHECK_NEG						\
-> +"22:	b.mi		33f\n"						\
-> +	REFCOUNT_CHECK_TAIL
-> +
-> +#define REFCOUNT_POST_CHECK_NEG_OR_ZERO					\
-> +"	b.eq		33f\n"						\
-> +	REFCOUNT_POST_CHECK_NEG
-> +
-> +#define REFCOUNT_PRE_CHECK_ZERO(reg)	"ccmp " #reg ", wzr, #8, pl\n"
-
-How does this work for the add_lt case if we compute negative counter
-value? afaict, we'll set the flags to #8 (HI), which won't get picked up
-by the NEG_OR_ZERO post check.
-
-> +#define REFCOUNT_PRE_CHECK_NONE(reg)
-> +
-> +#define REFCOUNT_INPUTS(r)						\
-> +	[counter] "r" (&(r)->counter), [brk_imm] "i" (REFCOUNT_BRK_IMM),
-> +
-> +#define REFCOUNT_CLOBBERS	"cc", "x16", "x17"
-
-It would be better to just have "cc" here, and then let the compiler
-allocate the registers for the normal cases. That would allow us to use
-__LL_SC_CLOBBERS for the LSE versions.
-
-> +
->  #define __ARM64_IN_ATOMIC_IMPL
->  
->  #if defined(CONFIG_ARM64_LSE_ATOMICS) && defined(CONFIG_AS_LSE)
-> diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-> index f5a2d09afb38..7037428b7efb 100644
-> --- a/arch/arm64/include/asm/atomic_ll_sc.h
-> +++ b/arch/arm64/include/asm/atomic_ll_sc.h
-> @@ -327,4 +327,33 @@ __CMPXCHG_DBL(_mb, dmb ish, l, "memory")
->  
->  #undef __CMPXCHG_DBL
->  
-> +#define REFCOUNT_OP(op, asm_op, pre, post, l)				\
-> +__LL_SC_INLINE int							\
-> +__LL_SC_PREFIX(__refcount_##op(int i, atomic_t *r))			\
-> +{									\
-> +	unsigned long tmp;						\
-
-This can be unsigned int.
-
-> +	int result;							\
-> +									\
-> +	asm volatile("// refcount_" #op "\n"				\
-> +"	prfm		pstl1strm, %2\n"				\
-> +"1:	ldxr		%w1, %2\n"					\
-> +"	" #asm_op "	%w[val], %w1, %w[i]\n"				\
-> +	REFCOUNT_PRE_CHECK_ ## pre (%w1)				\
-> +"	st" #l "xr	%w1, %w[val], %2\n"				\
-
-Given that you don't avoid the store here, how do you ensure that the
-counter saturates?
-
-> +"	cbnz		%w1, 1b\n"					\
-> +	REFCOUNT_POST_CHECK_ ## post					\
-> +	: [val] "=&r" (result), "=&r" (tmp), "+Q" (r->counter)		\
-> +	: REFCOUNT_INPUTS(r) [i] "Ir" (i)				\
-> +	: REFCOUNT_CLOBBERS);						\
-> +									\
-> +	return result;							\
-
-We're back in C here, so I don't think we can safely assume that the
-compiler won't nobble the condition flags as part of the return. If it
-does that, then the post-check in the caller for the case that the LL/SC
-atomics are out-of-line won't necessary work correctly.
-
-> +}									\
-> +__LL_SC_EXPORT(__refcount_##op);
-> +
-> +REFCOUNT_OP(add_lt,     adds, ZERO, NEG_OR_ZERO,  );
-> +REFCOUNT_OP(sub_lt_neg, adds, NONE, NEG,         l);
-> +REFCOUNT_OP(sub_le_neg, adds, NONE, NEG_OR_ZERO, l);
-
-Where are sub_{lt,le}_neg used?  (gah, I just spotted this!).
-
-> +REFCOUNT_OP(sub_lt,     subs, NONE, NEG,         l);
-> +REFCOUNT_OP(sub_le,     subs, NONE, NEG_OR_ZERO, l);
-> +
->  #endif	/* __ASM_ATOMIC_LL_SC_H */
-> diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
-> index 99fa69c9c3cf..c00e02edc589 100644
-> --- a/arch/arm64/include/asm/atomic_lse.h
-> +++ b/arch/arm64/include/asm/atomic_lse.h
-> @@ -531,4 +531,60 @@ __CMPXCHG_DBL(_mb, al, "memory")
->  #undef __LL_SC_CMPXCHG_DBL
->  #undef __CMPXCHG_DBL
->  
-> +#define REFCOUNT_ADD_OP(op, rel, pre, nops, post)			\
-> +static inline int __refcount_##op(int i, atomic_t *r)			\
-> +{									\
-> +	register int w0 asm ("w0") = i;					\
-> +	register atomic_t *x1 asm ("x1") = r;				\
-> +	register int w30 asm ("w30");					\
-> +									\
-> +	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
-> +	/* LL/SC */							\
-> +	__LL_SC_CALL(__refcount_##op)					\
-> +	__nops(nops),							\
-> +	/* LSE atomics */						\
-> +	"	ldadd" #rel "	%w[i], %w[val], %[v]\n"			\
-> +	"	adds		%w[i], %w[i], %w[val]\n"		\
-> +	REFCOUNT_PRE_CHECK_ ## pre (%w[val]))				\
-> +	REFCOUNT_POST_CHECK_ ## post					\
-> +	: [i] "+r" (w0), [v] "+Q" (r->counter), [val] "=&r" (w30)	\
-> +	: REFCOUNT_INPUTS(r) "r" (x1)					\
-> +	: REFCOUNT_CLOBBERS);						\
-> +									\
-> +	return w0;							\
-> +}
-> +
-> +REFCOUNT_ADD_OP(add_lt,      , ZERO, 2, NEG_OR_ZERO);
-> +REFCOUNT_ADD_OP(sub_lt_neg, l, NONE, 1, NEG        );
-> +REFCOUNT_ADD_OP(sub_le_neg, l, NONE, 1, NEG_OR_ZERO);
-
-Hmm, this is really horrible to read. If we can get rid of the _neg variants
-it would be nice, because the interaction between the choice of PRE handler
-and the number of nops is subtle.
-
-> +
-> +#define REFCOUNT_SUB_OP(op, post, fbop)					\
-> +static inline int __refcount_##op(int i, atomic_t *r)			\
-> +{									\
-> +	register int w0 asm ("w0") = i;					\
-> +	register atomic_t *x1 asm ("x1") = r;				\
-> +	register int w30 asm ("w30");					\
-> +									\
-> +	if (__builtin_constant_p(i))					\
-> +		return __refcount_##fbop(-i, r);			\
-
-Why is this worthwhile?
-
-> +									\
-> +	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
-> +	/* LL/SC */							\
-> +	__LL_SC_CALL(__refcount_##op)					\
-> +	__nops(2),							\
-> +	/* LSE atomics */						\
-> +	"	neg	%w[i], %w[i]\n"					\
-> +	"	ldaddl	%w[i], %w[val], %[v]\n"				\
-> +	"	adds	%w[i], %w[i], %w[val]")				\
-> +	REFCOUNT_POST_CHECK_ ## post					\
-> +	: [i] "+r" (w0), [v] "+Q" (r->counter), [val] "=&r" (w30)	\
-> +	: REFCOUNT_INPUTS(r) "r" (x1)					\
-> +	: REFCOUNT_CLOBBERS);						\
-> +									\
-> +	return w0;							\
-> +}
-> +
-> +REFCOUNT_SUB_OP(sub_lt, NEG,         sub_lt_neg);
-> +REFCOUNT_SUB_OP(sub_le, NEG_OR_ZERO, sub_le_neg);
-> +
->  #endif	/* __ASM_ATOMIC_LSE_H */
-> diff --git a/arch/arm64/include/asm/brk-imm.h b/arch/arm64/include/asm/brk-imm.h
-> index ed693c5bcec0..0bce57737ff1 100644
-> --- a/arch/arm64/include/asm/brk-imm.h
-> +++ b/arch/arm64/include/asm/brk-imm.h
-> @@ -18,6 +18,7 @@
->   * 0x800: kernel-mode BUG() and WARN() traps
->   */
->  #define FAULT_BRK_IMM			0x100
-> +#define REFCOUNT_BRK_IMM		0x101
->  #define KGDB_DYN_DBG_BRK_IMM		0x400
->  #define KGDB_COMPILED_DBG_BRK_IMM	0x401
->  #define BUG_BRK_IMM			0x800
-> diff --git a/arch/arm64/include/asm/refcount.h b/arch/arm64/include/asm/refcount.h
-> new file mode 100644
-> index 000000000000..ceb2fe713b80
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/refcount.h
-> @@ -0,0 +1,71 @@
-> +/*
-> + * arm64-specific implementation of refcount_t. Based on x86 version and
-> + * PAX_REFCOUNT from PaX/grsecurity.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __ASM_REFCOUNT_H
-> +#define __ASM_REFCOUNT_H
-> +
-> +#include <linux/refcount.h>
-> +
-> +#include <asm/atomic.h>
-> +#include <asm/uaccess.h>
-> +
-> +static __always_inline void refcount_add(int i, refcount_t *r)
-> +{
-> +	__refcount_add_lt(i, &r->refs);
-> +}
-> +
-> +static __always_inline void refcount_inc(refcount_t *r)
-> +{
-> +	__refcount_add_lt(1, &r->refs);
-> +}
-> +
-> +static __always_inline void refcount_dec(refcount_t *r)
-> +{
-> +	__refcount_sub_le(1, &r->refs);
-> +}
-> +
-> +static __always_inline __must_check bool refcount_sub_and_test(unsigned int i,
-> +							       refcount_t *r)
-> +{
-> +	return __refcount_sub_lt(i, &r->refs) == 0;
-> +}
-> +
-> +static __always_inline __must_check bool refcount_dec_and_test(refcount_t *r)
-> +{
-> +	return __refcount_sub_lt(1, &r->refs) == 0;
-> +}
-
-Nit, but we can just follow the lib/refcount.c implementation here.
-
-> +
-> +static __always_inline __must_check bool refcount_add_not_zero(unsigned int i,
-> +							       refcount_t *r)
-> +{
-> +	unsigned long tmp;
-> +	int result;
-> +
-> +	asm volatile("// refcount_add_not_zero \n"
-> +"	prfm		pstl1strm, %2\n"
-> +"1:	ldxr		%w[val], %2\n"
-> +"	cbz		%w[val], 2f\n"
-> +"	adds		%w[val], %w[val], %w[i]\n"
-> +"	stxr		%w1, %w[val], %2\n"
-> +"	cbnz		%w1, 1b\n"
-> +	REFCOUNT_POST_CHECK_NEG
-> +"2:"
-> +	: [val] "=&r" (result), "=&r" (tmp), "+Q" (r->refs.counter)
-> +	: REFCOUNT_INPUTS(&r->refs) [i] "Ir" (i)
-> +	: REFCOUNT_CLOBBERS);
-> +
-> +	return result != 0;
-> +}
-
-We could implement this using CAS for LSE (like we do for things like
-deC_if_positive). Alternatively, define a shared version using cmpxchg.
-
-> +
-> +static __always_inline __must_check bool refcount_inc_not_zero(refcount_t *r)
-> +{
-> +	return refcount_add_not_zero(1, r);
-> +}
-> +
-> +#endif
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index c7c7088097be..07bd026ec71d 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -758,8 +758,37 @@ int __init early_brk64(unsigned long addr, unsigned int esr,
->  	return bug_handler(regs, esr) != DBG_HOOK_HANDLED;
+>  	at91_dt_ramc();
+>  	at91_pm_init(at91sam9_idle);
 >  }
 >  
-> +static int refcount_overflow_handler(struct pt_regs *regs, unsigned int esr)
-> +{
-> +	bool zero = regs->pstate & PSR_Z_BIT;
+>  void __init sama5_pm_init(void)
+>  {
+> +	if (!IS_ENABLED(CONFIG_SOC_SAMA5))
+> +		return;
 > +
-> +	/* First unconditionally saturate the refcount. */
-> +	*(int *)regs->regs[16] = INT_MIN / 2;
+>  	at91_dt_ramc();
+>  	at91_pm_init(NULL);
+>  }
+>  
+>  void __init sama5d2_pm_init(void)
+>  {
+> +	if (!IS_ENABLED(CONFIG_SOC_SAMA5D2))
+> +		return;
+> +
+>  	at91_pm_backup_init();
+>  	sama5_pm_init();
+>  }
+> -- 
+> 2.9.0
+> 
 
-Does this work even when racing against a concurrent refcount operation 
-that doesn't have a pre-check? I can't figure out how something like a
-sub_lt operation on a saturated counter couldn't reset the value to zero.
-
-Will
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
