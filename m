@@ -1,109 +1,112 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Wed, 23 Aug 2017 09:21:33 +0800
-Subject: [PATCH 1/5] iommu/arm-smmu-v3: put off the execution of TLBI* to
- reduce lock confliction
-In-Reply-To: <20170822154142.GA19533@8bytes.org>
-References: <1498484330-10840-1-git-send-email-thunder.leizhen@huawei.com>
- <1498484330-10840-2-git-send-email-thunder.leizhen@huawei.com>
- <20170822154142.GA19533@8bytes.org>
-Message-ID: <599CD89D.7080600@huawei.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 23 Aug 2017 10:30:07 +0900
+Subject: [PATCH v2] irqchip: uniphier-aidet: add UniPhier AIDET irqchip
+ driver
+In-Reply-To: <046d0078-bb9d-f043-b5b4-481c695e2bea@arm.com>
+References: <1503309663-2742-1-git-send-email-yamada.masahiro@socionext.com>
+ <e3b865f5-a779-f176-67ef-9ffac25019d4@arm.com>
+ <CAK7LNASUzuKpQyZt6ks44EoQOhvqgUU8rUfJyNknGNVAgWYAKg@mail.gmail.com>
+ <046d0078-bb9d-f043-b5b4-481c695e2bea@arm.com>
+Message-ID: <CAK7LNATfeDk0rFjspEM08Y4R_3TKffE2dcBNCLnNn+t1G5YXew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
+
+2017-08-22 17:20 GMT+09:00 Marc Zyngier <marc.zyngier@arm.com>:
+> On 22/08/17 03:03, Masahiro Yamada wrote:
+>> Hi Mark,
+>>
+>>
+>> 2017-08-21 19:25 GMT+09:00 Marc Zyngier <marc.zyngier@arm.com>:
+>>
+>>>> +static struct irq_chip uniphier_aidet_irq_chip = {
+>>>> +     .name = "AIDET",
+>>>> +     .irq_mask = irq_chip_mask_parent,
+>>>> +     .irq_unmask = irq_chip_unmask_parent,
+>>>> +     .irq_eoi = irq_chip_eoi_parent,
+>>>> +     .irq_set_type = uniphier_aidet_irq_set_type,
+>>>
+>>> Is this irqchip only used in a uniprocessor system? If not, how is the
+>>> interrupt affinity managed without a irq_set_affinity callback?
+>>>
+>>
+>>
+>> After consideration, some questions popped up.
+>>
+>>
+>>
+>> We can set other hooks, for example, .irq_{enable,disable} if we like.
+>>
+>>          .irq_enable = irq_chip_enable_parent,
+>>          .irq_disable = irq_chip_disable_parent,
+>>
+>>
+>> I know the parent (GIC) implements unmask/mask instead of enable/disable,
+>> but this is also out of the scope of this driver.
+>>
+>> I am not familiar with the difference between unmask/mask and enable/disable.
+>> IIUC, the difference is that
+>> if enable/disable hooks are missing, IRQs are masked lazily.
+>
+> That's a rather good thing. Disabling interrupts lazily is a net
+> performance gain when you you have to repeatedly mask/unmask interrupts.
+>
+>> If a child irqchip implemented enable/disable,
+>> IRQs would be masked immediately.  So, in irq-domain hierarchy,
+>> a child irqchip need to have a good insight about its parent
+>> which is be better, unmask/mask or enable/disable.
+>
+> Not necessarily. irq_chip_enable_parent will call unmask if enable is
+> not implemented in the parent. But you'll loose the benefit of lazy
+> masking of interrupts routed through this controller.
+
+Right.
+I will not add .irq_{enable/disable} to keep the benefit of lazy masking.
 
 
-On 2017/8/22 23:41, Joerg Roedel wrote:
-> On Mon, Jun 26, 2017 at 09:38:46PM +0800, Zhen Lei wrote:
->> -static int queue_insert_raw(struct arm_smmu_queue *q, u64 *ent)
->> +static int queue_insert_raw(struct arm_smmu_queue *q, u64 *ent, int optimize)
->>  {
->>  	if (queue_full(q))
->>  		return -ENOSPC;
->>  
->>  	queue_write(Q_ENT(q, q->prod), ent, q->ent_dwords);
->> -	queue_inc_prod(q);
->> +
->> +	/*
->> +	 * We don't want too many commands to be delayed, this may lead the
->> +	 * followed sync command to wait for a long time.
->> +	 */
->> +	if (optimize && (++q->nr_delay < CMDQ_MAX_DELAYED)) {
->> +		queue_inc_swprod(q);
->> +	} else {
->> +		queue_inc_prod(q);
->> +		q->nr_delay = 0;
->> +	}
->> +
->>  	return 0;
->>  }
->>  
->> @@ -909,6 +928,7 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
->>  static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
->>  				    struct arm_smmu_cmdq_ent *ent)
->>  {
->> +	int optimize = 0;
->>  	u64 cmd[CMDQ_ENT_DWORDS];
->>  	unsigned long flags;
->>  	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
->> @@ -920,8 +940,17 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
->>  		return;
->>  	}
->>  
->> +	/*
->> +	 * All TLBI commands should be followed by a sync command later.
->> +	 * The CFGI commands is the same, but they are rarely executed.
->> +	 * So just optimize TLBI commands now, to reduce the "if" judgement.
->> +	 */
->> +	if ((ent->opcode >= CMDQ_OP_TLBI_NH_ALL) &&
->> +	    (ent->opcode <= CMDQ_OP_TLBI_NSNH_ALL))
->> +		optimize = 1;
->> +
->>  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
->> -	while (queue_insert_raw(q, cmd) == -ENOSPC) {
->> +	while (queue_insert_raw(q, cmd, optimize) == -ENOSPC) {
->>  		if (queue_poll_cons(q, false, wfe))
->>  			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
->>  	}
-> 
-> This doesn't look correct. How do you make sure that a given IOVA range
-> is flushed before the addresses are reused?
-Hi, Joerg:
-	It's actullay guaranteed by the upper layer functions, for example:
-	static int arm_lpae_unmap(
-        ...
-    	unmapped = __arm_lpae_unmap(data, iova, size, lvl, ptep);	//__arm_lpae_unmap will indirectly call arm_smmu_cmdq_issue_cmd to invalidate tlbs
-	if (unmapped)
-		io_pgtable_tlb_sync(&data->iop);			//a tlb_sync wait all tlbi operations finished
 
-	
-	I also described it in the next patch(2/5). Showed below:
 
-Some people might ask: Is it safe to do so? The answer is yes. The standard
-processing flow is:
-	alloc iova
-	map
-	process data
-	unmap
-	tlb invalidation and sync
-	free iova
+> There are many other things that are *much* worse, like the need to
+> implement a irq_eoi callback even if the irqchip has no such concept.
 
-What should be guaranteed is: "free iova" action is behind "unmap" and "tlbi
-operation" action, that is what we are doing right now. This ensures that:
-all TLBs of an iova-range have been invalidated before the iova reallocated.
+Right. I noticed irq_eoi is mandatory when I tested my driver.
 
-Best regards,
-	LeiZhen
+I notice handle_percpu_irq() and handle_percpu_devid_irq()
+check the NULL pointer dereference like
 
-> 
-> 
-> Regards,
-> 
-> 	Joerg
-> 
-> 
-> .
-> 
+        if (chip->irq_eoi)
+                chip->irq_eoi(&desc->irq_data);
+
+But, other flow handlers do not this.
+
+
+
+
+>>> Nit: please use irq_domain_create_hierarchy.
+>>
+>> I'd like to know your intention about your commit
+>> 2a5e9a072da6469a37d1f0b1577416f51223c280
+>>
+>> Is that mean, irq_domain_add_hierarchy will be deprecated
+>> some time in the future?
+>
+> That's the intent, as we're moving towards a firmware-agnostic
+> irq_domain layer. Think of it as a deprecated interface.
+>
+>> If I grep under drivers/irqchip/,
+>> most drivers are currently using irq_domain_add_hierarchy(),
+>> and this provides a shorter form for DT-based drivers.
+> Yes, we have a lot of legacy, and I don't always catch new additions.
+
+I see.
+
+I hope all drivers will be converted and irq_domain_add_hierarchy() will be
+deleted.
+
+Having many variants with slight difference is confusing to driver developers.
+
 
 -- 
-Thanks!
-BestRegards
+Best Regards
+Masahiro Yamada
