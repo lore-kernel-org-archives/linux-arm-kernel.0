@@ -1,41 +1,81 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Wed, 23 Aug 2017 09:04:26 +0800
-Subject: [PATCH v2 0/3] PCI: mediatek: Add MSI support for MT2712 and
- MT7622
-In-Reply-To: <20170822213602.GK6948@bhelgaas-glaptop.roam.corp.google.com>
-References: <1502715868-17651-1-git-send-email-honghui.zhang@mediatek.com>
- <20170822213602.GK6948@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <1503450266.11985.3.camel@mtkswgap22>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 23 Aug 2017 03:18:22 +0200
+Subject: [RFC 2/3] rtc: Add Realtek RTD1295
+In-Reply-To: <3307d3ed-c8e0-a7b5-f0ee-d401f4b12a90@suse.de>
+References: <20170820013632.18375-1-afaerber@suse.de>
+ <20170820013632.18375-3-afaerber@suse.de>
+ <20170820083219.siez3rl2hbjgjgk5@piout.net>
+ <3307d3ed-c8e0-a7b5-f0ee-d401f4b12a90@suse.de>
+Message-ID: <20170823011822.adda7emuz3eig3yt@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-08-22 at 16:36 -0500, Bjorn Helgaas wrote:
-> On Mon, Aug 14, 2017 at 09:04:25PM +0800, honghui.zhang at mediatek.com wrote:
-> > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> > 
-> > MT2712 and MT7622's PCIe host controller support MSI, but only 32bit MSI
-> > address are supportted. It connect to GIC with the same IRQ number of INTx
-> > IRQ, so it shares the same IRQ with INTx IRQ.
-> > 
-> > This patchset add MSI support for MT2712 and MT7622.
-> > Also do some code fixup and cleanups.
-> > 
-> > Change Since V1:
-> >  - Add the first two patches into this patchset.
-> >  - Using -ENODEV instead of PTR_ERR if msi_domain == NULL
-> >  - Change the error logs with consistency of lower-case
-> >  - Using has_msi instead of support_msi to make the parameter name a bit shorter
-> > 
-> > Honghui Zhang (3):
-> >   PCI: mediatek: Fix return value in case of error
-> >   PCI: mediatek: take use of bus->sysdata to get host private data
-> >   PCI: mediatek: add msi support for MT2712 and MT7622
-> > 
-> >  drivers/pci/host/pcie-mediatek.c | 157 +++++++++++++++++++++++++++++++++++++--
-> >  1 file changed, 151 insertions(+), 6 deletions(-)
+On 20/08/2017 at 23:10:16 +0200, Andreas F?rber wrote:
+> > Is RTD_RTCDATE_HIGH latched when RTD_RTCDATE_LOW is read?
 > 
-> Just waiting for an ack from Ryder...
+> I do not have an answer to that.
+> 
+> > If this is not
+> > the case, you probably want to handle a possible update between both
+> > readl_relaxed.
+> 
+> Are you proposing to disable the RTC while reading the registers, or
+> something related to my choice of _relaxed? (it follows an explanation
+> by Marc Zyngier on the irq mux series) Inconsistencies might not be
+> limited to the date.
+> 
 
-For whole series:
+A simple way to be sure would be to read RTD_RTCSEC first, then the
+other registers and check RTD_RTCSEC didn't change. This will ensure the
+other registers have not be updated in the meantime (unless it takes
+one minute but I doubt this is the case). if RTD_RTCSEC changed, then
+you can start over.
 
-Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+> >> +	t = mktime64(data->base_year, 1, 1, 0, 0, 0);
+> >> +	t += day * 24 * 60 * 60;
+> >> +	rtc_time64_to_tm(t, tm);
+> 
+> BTW is there any more efficient way to get from year+days to
+> day/month/year without going via seconds?
+> 
+
+Completely untested:
+
+for (y = data->base_year; (day - (365 + is_leap_year(y))) > 0; y++)
+	day -= (365 + is_leap_year(y));
+
+for (m = 0; (day - rtc_month_days(m, y)) > 0; m++)
+	day -= rtc_month_days(m, y);
+
+
+> >> +
+> >> +	rtd119x_rtc_set_enabled(dev, true);
+> >> +
+> > 
+> > This is certainly not what you want. The RTC device is usually not
+> > opened so enabling the RTC when open and disabling it when closed will
+> > not work on most systems. This is probably true for the clock too. i.e
+> > what you do here should be done in probe.
+> 
+> I did test the probe path to work, but I can change it again. The
+> downstream code had it in probe, but looking at rtc_class_ops I saw
+> those hooks and thought they'd serve a purpose - what are they for then?
+> (Any chance you can improve the documentation comments to avoid such
+> misunderstandings? :))
+> 
+
+They are (were) used only when the rtc character device (/dev/rtcx) is
+opened/released but the cdev interface is one of many interfaces to the
+RTC sod it doesn't make sense to do something only in that case
+(especially requesting IRQs).
+
+To solve your concern, this is what I'm going to apply after fixing the
+two remaining uses of .release:
+
+http://patchwork.ozlabs.org/patch/804707/
+
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
