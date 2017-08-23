@@ -1,43 +1,53 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Wed, 23 Aug 2017 11:05:28 -0500
-Subject: [PATCH] doc: coresight: correct usage for '/dev/cpu_dma_latency'
-In-Reply-To: <1503472998-9009-1-git-send-email-leo.yan@linaro.org>
-References: <1503472998-9009-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170823110528.ba272128cde46f40c71241cc@arm.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Thu, 24 Aug 2017 00:10:03 +0800
+Subject: [PATCH 0/7] PM / OPP: per OPP node clock support and imx7ulp cpufreq
+ driver
+Message-ID: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Aug 2017 15:23:18 +0800
-Leo Yan <leo.yan@linaro.org> wrote:
+This patch series does three things:
+1) Add platform specific set_clk function
+2) Add per OPP node clock support
+3) Add imx7ulp cpufreq driver support
 
-> Cc: Kim Phillips <kim.phillips@arm.com>
-> Reported-by: Kim Phillips <kim.phillips@arm.com>
+3 is depends on 1 & 2.
 
-Thanks; typically only the latter is needed.
+MX7ULP supports HSRUN mode (528 Mhz), RUN mode (413 Mhz) and VLPR mode
+(restricted to FIRC clock, usually 48 Mhz). This patch adds the cpufreq
+driver support for HSRUN and RUN mode.
+When in different modes, the A7 core is using different clocks:
+RUN:	clk run_divcore
+HSRUN:	clk hsrun_divcore
 
->  Set latency request to /dev/cpu_dma_latency to disable all CPUs specific idle
-> -states (if latency = 0uS then disable all idle states):
-> -# echo "what_ever_latency_you_need_in_uS" > /dev/cpu_dma_latency
-> +states (if latency = 0uS then CPU Idle governor selects idle state0, so this
-> +means 'WFI' is still enabled but other deeper states have be disabled, this
-> +can avoid power off CPUs):
-> +# exec 3<> /dev/cpu_dma_latency; echo "what_ever_latency_you_need_in_uS" >&3
+Thus, this driver replies on the newly added features in OPP core framework
+patch 1~6: e.g.
+"PM / OPP: use OPP node clock to set CPU frequency"
 
-not a fan of the "what_ever_latency_you_need_in_uS" (including and
-especially the quotes which can create ambiguity in the user's mind):
-just put a cut-n-pasteable example, clarifying the typically-default
-value you chose, and its unit, in the text.
+And since IMX7ULP CPU clock setting is different from the generic
+set OPP clock, we also implemented a private set_clk function.
 
-More to the point, how did you test this?  Are you sure that that the
-value being echoed isn't being interpreted as a binary number?
+Dong Aisheng (7):
+  PM / OPP: Add platform specific set_clk function
+  dt-bindings: PM / OPP: add clocks per OPP node support
+  PM / OPP: rename opp_table->clk to opp_table->cur_clk
+  PM / OPP: use OPP node clock to set CPU frequency
+  PM / OPP: Add dev_pm_opp_get_cur_clk()
+  cpufreq: make cpufreq_generic_init transition_latency default to
+    CPUFREQ_ETERNAL
+  cpufreq: add imx7ulp cpufreq driver
 
-kernel/power/qos.c:pm_qos_power_read() looks to be looking for a 32-bit
-binary integer, but I'm not sure if that's where it gets read.
+ Documentation/devicetree/bindings/opp/opp.txt |  52 ++++++
+ drivers/base/power/opp/core.c                 | 155 ++++++++++++++---
+ drivers/base/power/opp/of.c                   |   8 +
+ drivers/base/power/opp/opp.h                  |  11 +-
+ drivers/cpufreq/Kconfig.arm                   |   8 +
+ drivers/cpufreq/Makefile                      |   1 +
+ drivers/cpufreq/cpufreq.c                     |   2 +
+ drivers/cpufreq/imx7ulp-cpufreq.c             | 234 ++++++++++++++++++++++++++
+ include/linux/pm_opp.h                        |  16 ++
+ 9 files changed, 466 insertions(+), 21 deletions(-)
+ create mode 100644 drivers/cpufreq/imx7ulp-cpufreq.c
 
-Certainly, this 2013 article uses a C example to write a binary integer:
-
-https://access.redhat.com/articles/65410
-
-Please double-check, thanks,
-
-Kim
+-- 
+2.7.4
