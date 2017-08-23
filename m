@@ -1,14 +1,14 @@
 From: plaes@plaes.org (Priit Laes)
-Date: Wed, 23 Aug 2017 20:23:30 +0300
-Subject: [PATCH v7 2/5] dt-bindings: List devicetree binding for the CCU of
- Allwinner A20
+Date: Wed, 23 Aug 2017 20:23:31 +0300
+Subject: [PATCH v7 3/5] dt-bindings: List devicetree binding for the CCU of
+ Allwinner A10
 In-Reply-To: <cover.2a284ee63f45063ec7c0720b1098860e0b516c6d.1503507503.git-series.plaes@plaes.org>
 References: <cover.2a284ee63f45063ec7c0720b1098860e0b516c6d.1503507503.git-series.plaes@plaes.org>
-Message-ID: <9723e9c9341f5d7d23a01a3d6d37b7acdb8aa3cf.1503507503.git-series.plaes@plaes.org>
+Message-ID: <8164ec90ec4949801522a1b6b3fe57efe9feb60e.1503507503.git-series.plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A20 is now driven by sunxi-ng CCU driver.
+Allwinner A10 is now driven by sunxi-ng CCU driver.
 
 Add devicetree binding for it.
 
@@ -20,16 +20,16 @@ Signed-off-by: Priit Laes <plaes@plaes.org>
  1 file changed, 1 insertion(+)
 
 diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-index a082260..2712891 100644
+index 2712891..7eda08e 100644
 --- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
 +++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-@@ -6,6 +6,7 @@ Required properties :
+@@ -3,6 +3,7 @@ Allwinner Clock Control Unit Binding
+ 
+ Required properties :
+ - compatible: must contain one of the following compatibles:
++		- "allwinner,sun4i-a10-ccu"
  		- "allwinner,sun5i-a10s-ccu"
  		- "allwinner,sun5i-a13-ccu"
  		- "allwinner,sun6i-a31-ccu"
-+		- "allwinner,sun7i-a20-ccu"
- 		- "allwinner,sun8i-a23-ccu"
- 		- "allwinner,sun8i-a33-ccu"
- 		- "allwinner,sun8i-a83t-ccu"
 -- 
 git-series 0.9.1
