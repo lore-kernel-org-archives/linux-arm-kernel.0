@@ -1,58 +1,35 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 22 Aug 2017 23:21:24 -0400
-Subject: [PATCH V10 2/3] PCI: handle CRS returned by device after FLR
-In-Reply-To: <20170821180030.GB28977@bhelgaas-glaptop.roam.corp.google.com>
-References: <1502470596-4112-1-git-send-email-okaya@codeaurora.org>
- <1502470596-4112-2-git-send-email-okaya@codeaurora.org>
- <20170818210134.GO28977@bhelgaas-glaptop.roam.corp.google.com>
- <4da26c10-3426-e752-4a59-25bb59cde8cd@codeaurora.org>
- <20170821180030.GB28977@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <48497e49-21c2-9289-f546-2b0ef938beb0@codeaurora.org>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 23 Aug 2017 13:14:59 +0900
+Subject: [PATCH v4 0/4] mmc: sdhci: refactor PM in sdhci-pltfm add support PM
+ for cadence port
+Message-ID: <1503461703-16225-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/21/2017 2:00 PM, Bjorn Helgaas wrote:
-> On Mon, Aug 21, 2017 at 09:44:09AM -0400, Sinan Kaya wrote:
->> Hi Bjorn,
->>
->> On 8/18/2017 5:01 PM, Bjorn Helgaas wrote:
 
-> 
-> It would still be interesting to see the lspci output.  Likely <MAbort
-> in the upstream bridge will be set even before the FLR because of
-> aborts during enumeration.  The PCI core should probably clear that
-> after enumeration.  I expect that if you manually clear it with
-> setpci, do the lspci, do the FLR, do another lspci, you will probably
-> see <MAbort being set by this pci_flr_wait() loop.  We might want to
-> consider clearing it here as well.
+[1] implements suspend / resume for sdhci-cadence.c
+
+[2] refactor sdhci-pxav2
+
+[3] add clk handling for suspend/resume hooks of sdhci-pltfm.
+    This also cleans up sdhci-brcmstb.c and sdhci-sirf.c
+
+[4] export sdhci_pltfm_suspend/resume to reduce code duplication
 
 
-     Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
-        Latency: 0
-        Interrupt: pin A routed to IRQ 345
-        Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
-        I/O behind bridge: 00002000-00002fff
-        Memory behind bridge: 00100000-002fffff
-        Prefetchable memory behind bridge: 0000090400000000-00000904001fffff
-        Secondary status: 66MHz- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- <SERR- <PERR-
+Masahiro Yamada (4):
+  mmc: sdhci-cadence: add suspend / resume support
+  mmc: sdhci-pxav2: switch to managed clk and sdhci_pltfm_unregister()
+  mmc: sdhci: enable/disable the clock in sdhci_pltfm_suspend/resume
+  mmc: sdhci-pltfm: export sdhci_pltfm_suspend/resume
 
-FLR reset here with CRS to the NVMe drive.
-	
-     Status: Cap+ 66MHz- UDF- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- >SERR- <PERR- INTx-
-        Latency: 0
-        Interrupt: pin A routed to IRQ 345
-        Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
-        I/O behind bridge: 00002000-00002fff
-        Memory behind bridge: 00100000-002fffff
-        Prefetchable memory behind bridge: 0000090400000000-00000904001fffff
-        Secondary status: 66MHz- FastB2B- ParErr- DEVSEL=fast >TAbort- <TAbort- <MAbort- <SERR- <PERR-
-	
-I don't see <MAbort getting set. 
-
-
-
+ drivers/mmc/host/sdhci-brcmstb.c | 37 +----------------
+ drivers/mmc/host/sdhci-cadence.c | 88 ++++++++++++++++++++++++++++++++++++----
+ drivers/mmc/host/sdhci-pltfm.c   | 28 +++++++++++--
+ drivers/mmc/host/sdhci-pltfm.h   |  2 +
+ drivers/mmc/host/sdhci-pxav2.c   | 30 ++++----------
+ drivers/mmc/host/sdhci-sirf.c    | 39 +-----------------
+ 6 files changed, 114 insertions(+), 110 deletions(-)
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.7.4
