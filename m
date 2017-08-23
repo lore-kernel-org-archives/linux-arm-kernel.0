@@ -1,17 +1,17 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 23 Aug 2017 15:38:31 -0700
-Subject: [GIT PULL] Amlogic clock driver updates for 4.14
-In-Reply-To: <894174b4-63d5-1e7d-c518-5bba150178ab@baylibre.com>
-References: <894174b4-63d5-1e7d-c518-5bba150178ab@baylibre.com>
-Message-ID: <20170823223831.GD21656@codeaurora.org>
+Date: Wed, 23 Aug 2017 15:38:55 -0700
+Subject: [GIT PULL] Allwinner clock changes for 4.14 round 2
+In-Reply-To: <20170821024531.7ghc3n5r57qrrou4@wens.csie.org>
+References: <20170821024531.7ghc3n5r57qrrou4@wens.csie.org>
+Message-ID: <20170823223855.GF21656@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/04, Neil Armstrong wrote:
+On 08/21, Chen-Yu Tsai wrote:
 > Hi Mike, Stephen,
 > 
-> Below is a request to pull the Amlogic clock driver updates for 4.14.
-> 
+> Here is the second round of Allwinner clock changes for 4.14.
+> It includes and supercedes the first pull request I sent two weeks ago.
 > 
 
 Thanks. Pulled into clk-next.
