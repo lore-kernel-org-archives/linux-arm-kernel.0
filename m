@@ -1,81 +1,109 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 23 Aug 2017 03:18:22 +0200
-Subject: [RFC 2/3] rtc: Add Realtek RTD1295
-In-Reply-To: <3307d3ed-c8e0-a7b5-f0ee-d401f4b12a90@suse.de>
-References: <20170820013632.18375-1-afaerber@suse.de>
- <20170820013632.18375-3-afaerber@suse.de>
- <20170820083219.siez3rl2hbjgjgk5@piout.net>
- <3307d3ed-c8e0-a7b5-f0ee-d401f4b12a90@suse.de>
-Message-ID: <20170823011822.adda7emuz3eig3yt@piout.net>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Wed, 23 Aug 2017 09:21:33 +0800
+Subject: [PATCH 1/5] iommu/arm-smmu-v3: put off the execution of TLBI* to
+ reduce lock confliction
+In-Reply-To: <20170822154142.GA19533@8bytes.org>
+References: <1498484330-10840-1-git-send-email-thunder.leizhen@huawei.com>
+ <1498484330-10840-2-git-send-email-thunder.leizhen@huawei.com>
+ <20170822154142.GA19533@8bytes.org>
+Message-ID: <599CD89D.7080600@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/08/2017 at 23:10:16 +0200, Andreas F?rber wrote:
-> > Is RTD_RTCDATE_HIGH latched when RTD_RTCDATE_LOW is read?
+
+
+On 2017/8/22 23:41, Joerg Roedel wrote:
+> On Mon, Jun 26, 2017 at 09:38:46PM +0800, Zhen Lei wrote:
+>> -static int queue_insert_raw(struct arm_smmu_queue *q, u64 *ent)
+>> +static int queue_insert_raw(struct arm_smmu_queue *q, u64 *ent, int optimize)
+>>  {
+>>  	if (queue_full(q))
+>>  		return -ENOSPC;
+>>  
+>>  	queue_write(Q_ENT(q, q->prod), ent, q->ent_dwords);
+>> -	queue_inc_prod(q);
+>> +
+>> +	/*
+>> +	 * We don't want too many commands to be delayed, this may lead the
+>> +	 * followed sync command to wait for a long time.
+>> +	 */
+>> +	if (optimize && (++q->nr_delay < CMDQ_MAX_DELAYED)) {
+>> +		queue_inc_swprod(q);
+>> +	} else {
+>> +		queue_inc_prod(q);
+>> +		q->nr_delay = 0;
+>> +	}
+>> +
+>>  	return 0;
+>>  }
+>>  
+>> @@ -909,6 +928,7 @@ static void arm_smmu_cmdq_skip_err(struct arm_smmu_device *smmu)
+>>  static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+>>  				    struct arm_smmu_cmdq_ent *ent)
+>>  {
+>> +	int optimize = 0;
+>>  	u64 cmd[CMDQ_ENT_DWORDS];
+>>  	unsigned long flags;
+>>  	bool wfe = !!(smmu->features & ARM_SMMU_FEAT_SEV);
+>> @@ -920,8 +940,17 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
+>>  		return;
+>>  	}
+>>  
+>> +	/*
+>> +	 * All TLBI commands should be followed by a sync command later.
+>> +	 * The CFGI commands is the same, but they are rarely executed.
+>> +	 * So just optimize TLBI commands now, to reduce the "if" judgement.
+>> +	 */
+>> +	if ((ent->opcode >= CMDQ_OP_TLBI_NH_ALL) &&
+>> +	    (ent->opcode <= CMDQ_OP_TLBI_NSNH_ALL))
+>> +		optimize = 1;
+>> +
+>>  	spin_lock_irqsave(&smmu->cmdq.lock, flags);
+>> -	while (queue_insert_raw(q, cmd) == -ENOSPC) {
+>> +	while (queue_insert_raw(q, cmd, optimize) == -ENOSPC) {
+>>  		if (queue_poll_cons(q, false, wfe))
+>>  			dev_err_ratelimited(smmu->dev, "CMDQ timeout\n");
+>>  	}
 > 
-> I do not have an answer to that.
+> This doesn't look correct. How do you make sure that a given IOVA range
+> is flushed before the addresses are reused?
+Hi, Joerg:
+	It's actullay guaranteed by the upper layer functions, for example:
+	static int arm_lpae_unmap(
+        ...
+    	unmapped = __arm_lpae_unmap(data, iova, size, lvl, ptep);	//__arm_lpae_unmap will indirectly call arm_smmu_cmdq_issue_cmd to invalidate tlbs
+	if (unmapped)
+		io_pgtable_tlb_sync(&data->iop);			//a tlb_sync wait all tlbi operations finished
+
+	
+	I also described it in the next patch(2/5). Showed below:
+
+Some people might ask: Is it safe to do so? The answer is yes. The standard
+processing flow is:
+	alloc iova
+	map
+	process data
+	unmap
+	tlb invalidation and sync
+	free iova
+
+What should be guaranteed is: "free iova" action is behind "unmap" and "tlbi
+operation" action, that is what we are doing right now. This ensures that:
+all TLBs of an iova-range have been invalidated before the iova reallocated.
+
+Best regards,
+	LeiZhen
+
 > 
-> > If this is not
-> > the case, you probably want to handle a possible update between both
-> > readl_relaxed.
 > 
-> Are you proposing to disable the RTC while reading the registers, or
-> something related to my choice of _relaxed? (it follows an explanation
-> by Marc Zyngier on the irq mux series) Inconsistencies might not be
-> limited to the date.
+> Regards,
 > 
-
-A simple way to be sure would be to read RTD_RTCSEC first, then the
-other registers and check RTD_RTCSEC didn't change. This will ensure the
-other registers have not be updated in the meantime (unless it takes
-one minute but I doubt this is the case). if RTD_RTCSEC changed, then
-you can start over.
-
-> >> +	t = mktime64(data->base_year, 1, 1, 0, 0, 0);
-> >> +	t += day * 24 * 60 * 60;
-> >> +	rtc_time64_to_tm(t, tm);
+> 	Joerg
 > 
-> BTW is there any more efficient way to get from year+days to
-> day/month/year without going via seconds?
 > 
-
-Completely untested:
-
-for (y = data->base_year; (day - (365 + is_leap_year(y))) > 0; y++)
-	day -= (365 + is_leap_year(y));
-
-for (m = 0; (day - rtc_month_days(m, y)) > 0; m++)
-	day -= rtc_month_days(m, y);
-
-
-> >> +
-> >> +	rtd119x_rtc_set_enabled(dev, true);
-> >> +
-> > 
-> > This is certainly not what you want. The RTC device is usually not
-> > opened so enabling the RTC when open and disabling it when closed will
-> > not work on most systems. This is probably true for the clock too. i.e
-> > what you do here should be done in probe.
+> .
 > 
-> I did test the probe path to work, but I can change it again. The
-> downstream code had it in probe, but looking at rtc_class_ops I saw
-> those hooks and thought they'd serve a purpose - what are they for then?
-> (Any chance you can improve the documentation comments to avoid such
-> misunderstandings? :))
-> 
-
-They are (were) used only when the rtc character device (/dev/rtcx) is
-opened/released but the cdev interface is one of many interfaces to the
-RTC sod it doesn't make sense to do something only in that case
-(especially requesting IRQs).
-
-To solve your concern, this is what I'm going to apply after fixing the
-two remaining uses of .release:
-
-http://patchwork.ozlabs.org/patch/804707/
-
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks!
+BestRegards
