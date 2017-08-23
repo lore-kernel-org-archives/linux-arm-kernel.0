@@ -1,36 +1,58 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 23 Aug 2017 00:56:08 -0400
-Subject: [PATCH V12 2/5] PCI: add pci_bus_crs_visibility_pending() function to
- detect CRS response
-In-Reply-To: <1503464171-6471-1-git-send-email-okaya@codeaurora.org>
-References: <1503464171-6471-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1503464171-6471-2-git-send-email-okaya@codeaurora.org>
+Date: Wed, 23 Aug 2017 00:56:07 -0400
+Subject: [PATCH V12 1/5] PCI: Don't ignore valid response before CRS timeout
+Message-ID: <1503464171-6471-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need a wrapper function to determine when a particular device is
-returning Configuration Request Retry Status (CRS) response. This will only
-happen if the root port supports CRS visibility.
+From: Bjorn Helgaas <bhelgaas@google.com>
 
+While waiting for a device to become ready (i.e., to return a non-CRS
+completion to a read of its Vendor ID), if we got a valid response to the
+very last read before timing out, we printed a warning and gave up on the
+device even though it was actually ready.
+
+For a typical 60s timeout, we wait about 65s (it's not exact because of the
+exponential backoff), but we treated devices that became ready between 33s
+and 65s as though they failed.
+
+Move the Device ID read later so we check whether the device is ready
+immediately, before checking for a timeout.
+
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+[okaya: reorder reads so that we check device presence after sleep]
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/pci.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/pci/probe.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
-index 22e0617..7fa583a 100644
---- a/drivers/pci/pci.h
-+++ b/drivers/pci/pci.h
-@@ -235,6 +235,10 @@ enum pci_bar_type {
- 	pci_bar_mem64,		/* A 64-bit memory BAR */
- };
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index c31310d..2849e0e 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1847,17 +1847,18 @@ bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
+ 		if (!crs_timeout)
+ 			return false;
  
-+static inline bool pci_bus_crs_visibility_pending(u32 l)
-+{
-+	return (l & 0xffff) == 0x0001;
-+}
- bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *pl,
- 				int crs_timeout);
- int pci_setup_device(struct pci_dev *dev);
+-		msleep(delay);
+-		delay *= 2;
+-		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
+-			return false;
+-		/* Card hasn't responded in 60 seconds?  Must be stuck. */
+ 		if (delay > crs_timeout) {
+ 			printk(KERN_WARNING "pci %04x:%02x:%02x.%d: not responding\n",
+ 			       pci_domain_nr(bus), bus->number, PCI_SLOT(devfn),
+ 			       PCI_FUNC(devfn));
+ 			return false;
+ 		}
++
++		msleep(delay);
++		delay *= 2;
++
++		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
++			return false;
+ 	}
+ 
+ 	return true;
 -- 
 1.9.1
