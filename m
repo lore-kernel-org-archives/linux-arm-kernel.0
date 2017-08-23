@@ -1,63 +1,76 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 23 Aug 2017 16:42:08 +0200
-Subject: [PATCH v2 8/9] i2c: designware: Don't resume device in the
- ->complete() callback
+Date: Wed, 23 Aug 2017 16:42:02 +0200
+Subject: [PATCH v2 2/9] PM / Sleep: Remove pm_complete_with_resume_check()
 In-Reply-To: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
 References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1503499329-28834-9-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1503499329-28834-3-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case the PM core is able to use the direct_complete path during system
-sleep for the i2c device, the device is runtime resumed in the ->complete()
-callback. For ACPI platforms this is needed to synchronize the power state
-of the device, while for non-ACPI platforms this is a waste.
-
-To better deal with this, let's drop the ->complete() callback from the
-i2c-dw-plat driver altogether, thus avoiding the runtime resume of the
-device.
-
-This change still plays well for the ACPI case, because the ACPI PM
-domain's ->complete() callback, assigned to acpi_subsys_complete(), already
-deals with runtime resuming the device in case it's needed.
+According to recent changes for ACPI, the are longer any users of
+pm_complete_with_resume_check(), thus let's drop it.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
 
 Changes in v2:
-	- New patch.
+	- None.
 
 ---
- drivers/i2c/busses/i2c-designware-platdrv.c | 8 --------
- 1 file changed, 8 deletions(-)
+ drivers/base/power/generic_ops.c | 23 -----------------------
+ include/linux/pm.h               |  1 -
+ 2 files changed, 24 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index 441afc7..fc6b99f 100644
---- a/drivers/i2c/busses/i2c-designware-platdrv.c
-+++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -418,15 +418,8 @@ static int dw_i2c_plat_prepare(struct device *dev)
- {
- 	return pm_runtime_suspended(dev);
- }
--
--static void dw_i2c_plat_complete(struct device *dev)
--{
--	if (dev->power.direct_complete)
--		pm_request_resume(dev);
--}
- #else
- #define dw_i2c_plat_prepare	NULL
--#define dw_i2c_plat_complete	NULL
- #endif
+diff --git a/drivers/base/power/generic_ops.c b/drivers/base/power/generic_ops.c
+index 07c3c4a..b2ed606 100644
+--- a/drivers/base/power/generic_ops.c
++++ b/drivers/base/power/generic_ops.c
+@@ -9,7 +9,6 @@
+ #include <linux/pm.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/export.h>
+-#include <linux/suspend.h>
  
  #ifdef CONFIG_PM
-@@ -462,7 +455,6 @@ static int dw_i2c_plat_suspend(struct device *dev)
+ /**
+@@ -298,26 +297,4 @@ void pm_generic_complete(struct device *dev)
+ 	if (drv && drv->pm && drv->pm->complete)
+ 		drv->pm->complete(dev);
+ }
+-
+-/**
+- * pm_complete_with_resume_check - Complete a device power transition.
+- * @dev: Device to handle.
+- *
+- * Complete a device power transition during a system-wide power transition and
+- * optionally schedule a runtime resume of the device if the system resume in
+- * progress has been initated by the platform firmware and the device had its
+- * power.direct_complete flag set.
+- */
+-void pm_complete_with_resume_check(struct device *dev)
+-{
+-	pm_generic_complete(dev);
+-	/*
+-	 * If the device had been runtime-suspended before the system went into
+-	 * the sleep state it is going out of and it has never been resumed till
+-	 * now, resume it in case the firmware powered it up.
+-	 */
+-	if (dev->power.direct_complete && pm_resume_via_firmware())
+-		pm_request_resume(dev);
+-}
+-EXPORT_SYMBOL_GPL(pm_complete_with_resume_check);
+ #endif /* CONFIG_PM_SLEEP */
+diff --git a/include/linux/pm.h b/include/linux/pm.h
+index 47ded8a..a0ceecc 100644
+--- a/include/linux/pm.h
++++ b/include/linux/pm.h
+@@ -736,7 +736,6 @@ extern int pm_generic_poweroff_noirq(struct device *dev);
+ extern int pm_generic_poweroff_late(struct device *dev);
+ extern int pm_generic_poweroff(struct device *dev);
+ extern void pm_generic_complete(struct device *dev);
+-extern void pm_complete_with_resume_check(struct device *dev);
  
- static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
- 	.prepare = dw_i2c_plat_prepare,
--	.complete = dw_i2c_plat_complete,
- 	SET_SYSTEM_SLEEP_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume)
- 	SET_RUNTIME_PM_OPS(dw_i2c_plat_runtime_suspend,
- 			   dw_i2c_plat_resume,
+ #else /* !CONFIG_PM_SLEEP */
+ 
 -- 
 2.7.4
