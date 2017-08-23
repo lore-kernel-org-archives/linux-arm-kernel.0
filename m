@@ -1,31 +1,46 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 23 Aug 2017 18:28:29 -0500
-Subject: [PATCH 1/3] gliolib: request the gpio before querying its
- direction
-In-Reply-To: <CACRpkdZv0NjXfwm_-TSoY=QFeP64V-ZoKvmLXk3qkV49fq1UtQ@mail.gmail.com>
-References: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
- <1501179565-26466-2-git-send-email-timur@codeaurora.org>
- <CACRpkdYPBd4ZvuXo__LRQezTQD3u=3r2WO+2dTzBanLL1zX72w@mail.gmail.com>
- <103341c8-6cc5-3d3f-eef7-28b9f31cdc71@codeaurora.org>
- <CACRpkdZv0NjXfwm_-TSoY=QFeP64V-ZoKvmLXk3qkV49fq1UtQ@mail.gmail.com>
-Message-ID: <e1eae89c-f007-2e0b-cbb8-1aba71dae0e1@codeaurora.org>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 24 Aug 2017 01:39:44 +0200
+Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable
+ direct_complete for ACPI devices
+In-Reply-To: <1503499329-28834-6-git-send-email-ulf.hansson@linaro.org>
+References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
+ <1503499329-28834-6-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <CAJZ5v0gJn=SzNFGUT7Zb+CfhQBZ7KNDK2GTSSXGexD8GObjGOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/23/2017 03:32 AM, Linus Walleij wrote:
-> It's right there on the "devel" branch from the GPIO git tree.
-> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git/log/?h=devel
+On Wed, Aug 23, 2017 at 4:42 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> In some cases a driver for an ACPI device needs to be able to prevent the
+> ACPI PM domain from using the direct_complete path during system sleep.
+>
+> One typical case is when the driver for the device needs its device to stay
+> runtime enabled, during the __device_suspend phase. This isn't the case
+> when the direct_complete path is being executed by the PM core, as it then
+> disables runtime PM for the device in __device_suspend(). Any following
+> attempts to runtime resume the device after that point, just fails.
 
-The devel branch is missing this commit:
+OK, that is a problem.
 
-https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git/commit/?id=83cf5faeba37fede8a6274d07f646d1cd1b25d35
+> A workaround to this problem is to let the driver runtime resume its device
+> from its ->prepare() callback, as that would prevent the direct_complete
+> path from being executed. However, that may often be a waste, especially if
+> it turned out that no one really needed the device.
+>
+> For this reason, invent acpi_dev_disable|enable_direct_complete(), to allow
+> drivers to inform the ACPI PM domain to change its default behaviour during
+> system sleep, and thus control whether it may use the direct_complete path
+> or not.
 
-which I need to avoid a merge conflict.  I'm going to submit a new 
-version of my patches, but they won't apply on top of 'devel' unless you 
-pull in that commit from linux-pinctrl.  Or you could copy that my 
-gpiolib commit to linux-pinctrl.
+But I'm not sure this is the right place to address it as it very well
+may affect a PCI device too.
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Also, this is about the device and not about its ACPI companion
+object, so putting the flag in there is somewhat unclean, so to speak.
+
+It looks like we need a flag in dev_pm_info saying something along the
+lines of "my system suspend callback can deal with runtime PM" that
+will cause the direct_complete update to occur in
+__device_suspend_late() instead of __device_suspend().
+
+Thanks,
+Rafael
