@@ -1,15 +1,15 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 24 Aug 2017 00:10:08 +0800
-Subject: [PATCH 5/7] PM / OPP: Add dev_pm_opp_get_cur_clk()
+Date: Thu, 24 Aug 2017 00:10:07 +0800
+Subject: [PATCH 4/7] PM / OPP: use OPP node clock to set CPU frequency
 In-Reply-To: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
 References: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1503504610-12880-6-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1503504610-12880-5-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-User may need to know the current OPP clock for updating policy clk
-accordingly. e.g. cpufreq policy clock.
-This function does the work.
+If OPP node has a valid clock, we use this corresponding OPP clock to
+set the device clock frequency instead of the default opp_table->clk which
+is shared by all OPPs.
 
 Cc: Viresh Kumar <vireshk@kernel.org>
 Cc: Nishanth Menon <nm@ti.com>
@@ -17,70 +17,92 @@ Cc: Stephen Boyd <sboyd@codeaurora.org>
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- drivers/base/power/opp/core.c | 29 +++++++++++++++++++++++++++++
- include/linux/pm_opp.h        |  3 +++
- 2 files changed, 32 insertions(+)
+ drivers/base/power/opp/core.c | 10 +++++++++-
+ drivers/base/power/opp/of.c   |  8 ++++++++
+ drivers/base/power/opp/opp.h  |  3 +++
+ 3 files changed, 20 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/base/power/opp/core.c b/drivers/base/power/opp/core.c
-index d4656cc..a425f98 100644
+index 2579401..d4656cc 100644
 --- a/drivers/base/power/opp/core.c
 +++ b/drivers/base/power/opp/core.c
-@@ -1441,6 +1441,35 @@ void dev_pm_opp_put_clkname(struct opp_table *opp_table)
- EXPORT_SYMBOL_GPL(dev_pm_opp_put_clkname);
+@@ -600,7 +600,7 @@ int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq)
+ 	struct opp_table *opp_table;
+ 	unsigned long freq, old_freq;
+ 	struct dev_pm_opp *old_opp, *opp;
+-	struct clk *clk;
++	struct clk *clk, *old_clk = NULL;
+ 	int ret, size;
  
- /**
-+ * dev_pm_opp_get_cur_clk() - Get the current OPP clock the device is running
-+ * @dev: device for which we do this operation
-+ *
-+ * This must be called before any OPPs are initialized for the device.
-+ */
-+struct clk *dev_pm_opp_get_cur_clk(struct device *dev)
-+{
-+	struct opp_table *opp_table;
-+	int ret;
-+
-+	opp_table = dev_pm_opp_get_opp_table(dev);
-+	if (!opp_table)
-+		return ERR_PTR(-ENOMEM);
-+
-+	if (IS_ERR(opp_table->cur_clk)) {
-+		ret = -ENODEV;
-+		goto err;
+ 	if (unlikely(!target_freq)) {
+@@ -651,6 +651,11 @@ int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq)
+ 		goto put_old_opp;
+ 	}
+ 
++	if (!IS_ERR_OR_NULL(opp->clk)) {
++		old_clk = opp_table->cur_clk;
++		opp_table->cur_clk = opp->clk;
 +	}
 +
-+	return opp_table->cur_clk;
-+
-+err:
-+	dev_pm_opp_put_opp_table(opp_table);
-+
-+	return ERR_PTR(ret);
-+}
-+EXPORT_SYMBOL_GPL(dev_pm_opp_get_cur_clk);
-+
-+/**
-  * dev_pm_opp_register_set_opp_helper() - Register custom set OPP helper
-  * @dev: Device for which the helper is getting registered.
-  * @set_opp: Custom set OPP helper.
-diff --git a/include/linux/pm_opp.h b/include/linux/pm_opp.h
-index a8b1e4d..e20d090 100644
---- a/include/linux/pm_opp.h
-+++ b/include/linux/pm_opp.h
-@@ -123,6 +123,7 @@ struct opp_table *dev_pm_opp_set_regulators(struct device *dev, const char * con
- void dev_pm_opp_put_regulators(struct opp_table *opp_table);
- struct opp_table *dev_pm_opp_set_clkname(struct device *dev, const char * name);
- void dev_pm_opp_put_clkname(struct opp_table *opp_table);
-+struct clk *dev_pm_opp_get_cur_clk(struct device *dev);
- struct opp_table *dev_pm_opp_register_set_opp_helper(struct device *dev, int (*set_opp)(struct dev_pm_set_opp_data *data));
- void dev_pm_opp_register_put_opp_helper(struct opp_table *opp_table);
- struct opp_table *dev_pm_opp_register_set_clk_helper(struct device *dev, int (*set_clk)(struct device *dev, struct clk *clk,
-@@ -279,6 +280,8 @@ static inline struct opp_table *dev_pm_opp_set_clkname(struct device *dev, const
+ 	dev_dbg(dev, "%s: switching OPP: %lu Hz --> %lu Hz\n", __func__,
+ 		old_freq, freq);
  
- static inline void dev_pm_opp_put_clkname(struct opp_table *opp_table) {}
+@@ -683,6 +688,9 @@ int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq)
+ 		ret = opp_table->set_opp(data);
+ 	}
  
-+static inline struct clk *dev_pm_opp_get_cur_clk(struct device *dev) {}
++	if (ret && !IS_ERR_OR_NULL(opp->clk))
++		opp_table->cur_clk = old_clk;
 +
- static inline int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq)
- {
- 	return -ENOTSUPP;
+ 	dev_pm_opp_put(opp);
+ put_old_opp:
+ 	if (!IS_ERR(old_opp))
+diff --git a/drivers/base/power/opp/of.c b/drivers/base/power/opp/of.c
+index 57eec1c..64909e7 100644
+--- a/drivers/base/power/opp/of.c
++++ b/drivers/base/power/opp/of.c
+@@ -13,6 +13,7 @@
+ 
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
++#include <linux/clk.h>
+ #include <linux/cpu.h>
+ #include <linux/errno.h>
+ #include <linux/device.h>
+@@ -314,6 +315,13 @@ static int _opp_add_static_v2(struct opp_table *opp_table, struct device *dev,
+ 	new_opp->dynamic = false;
+ 	new_opp->available = true;
+ 
++	new_opp->clk = of_clk_get(np, 0);
++	if (IS_ERR(new_opp->clk)) {
++		ret = PTR_ERR(new_opp->clk);
++		if (ret == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++	}
++
+ 	if (!of_property_read_u32(np, "clock-latency-ns", &val))
+ 		new_opp->clock_latency_ns = val;
+ 
+diff --git a/drivers/base/power/opp/opp.h b/drivers/base/power/opp/opp.h
+index 30a637c..dbe8ec6 100644
+--- a/drivers/base/power/opp/opp.h
++++ b/drivers/base/power/opp/opp.h
+@@ -60,6 +60,7 @@ extern struct list_head opp_tables;
+  * @suspend:	true if suspend OPP
+  * @rate:	Frequency in hertz
+  * @supplies:	Power supplies voltage/current values
++ * @clk:	Clock used for this OPP
+  * @clock_latency_ns: Latency (in nanoseconds) of switching to this OPP's
+  *		frequency from any other OPP's frequency.
+  * @opp_table:	points back to the opp_table struct this opp belongs to
+@@ -80,6 +81,8 @@ struct dev_pm_opp {
+ 
+ 	struct dev_pm_opp_supply *supplies;
+ 
++	struct clk *clk;
++
+ 	unsigned long clock_latency_ns;
+ 
+ 	struct opp_table *opp_table;
 -- 
 2.7.4
