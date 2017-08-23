@@ -1,9 +1,9 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 23 Aug 2017 18:36:34 +0200
-Subject: [GIT PULL 2/3] ARM: exynos: Changes for v4.14
+Date: Wed, 23 Aug 2017 18:36:35 +0200
+Subject: [GIT PULL 3/3] ARM: dts: exynos: Changes for v4.14
 In-Reply-To: <20170823163635.6064-1-krzk@kernel.org>
 References: <20170823163635.6064-1-krzk@kernel.org>
-Message-ID: <20170823163635.6064-2-krzk@kernel.org>
+Message-ID: <20170823163635.6064-3-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,26 +16,26 @@ Best regards,
 Krzysztof
 
 
-The following changes since commit f991ce429a420dbb42b3e4b5a47490c84390d7e1:
+The following changes since commit 9d2770b8e49a1726310e706ae23b52c83b33a986:
 
-  ARM: s3c24xx: make H1940BT depend on RFKILL (2017-07-20 20:26:24 +0200)
+  ARM: dts: exynos: Remove num-slots from exynos platforms (2017-07-18 07:14:22 +0200)
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.14-2
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.14-2
 
-for you to fetch changes up to 225bd1de16fb2e330be5bad261d427d00293c55e:
+for you to fetch changes up to 5911fc65f6da56ba55ccab34832e040522e9a3b5:
 
-  ARM: s3c24xx: Fix NAND ECC mode for mini2440 board (2017-08-21 19:50:51 +0200)
-
-----------------------------------------------------------------
-Samsung mach/soc changes for v4.14, part 2
-
-Fix NAND ECC mode for mini2440 board.
+  ARM: dts: exynos: fix PCI bus dtc warnings (2017-07-28 07:49:14 +0200)
 
 ----------------------------------------------------------------
-Sylwester Nawrocki (1):
-      ARM: s3c24xx: Fix NAND ECC mode for mini2440 board
+Samsung DTS ARM changes for v4.14, part 2
 
- arch/arm/mach-s3c24xx/mach-mini2440.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Fix PCI bus dtc warnings.
+
+----------------------------------------------------------------
+Rob Herring (1):
+      ARM: dts: exynos: fix PCI bus dtc warnings
+
+ arch/arm/boot/dts/exynos5440.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
