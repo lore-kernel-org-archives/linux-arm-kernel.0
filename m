@@ -1,46 +1,29 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 24 Aug 2017 01:39:44 +0200
-Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable
- direct_complete for ACPI devices
-In-Reply-To: <1503499329-28834-6-git-send-email-ulf.hansson@linaro.org>
-References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
- <1503499329-28834-6-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAJZ5v0gJn=SzNFGUT7Zb+CfhQBZ7KNDK2GTSSXGexD8GObjGOw@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 23 Aug 2017 18:47:09 -0500
+Subject: [PATCH 0/2][v4] pinctrl: qcom: add support for sparse GPIOs
+Message-ID: <1503532031-6428-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 4:42 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> In some cases a driver for an ACPI device needs to be able to prevent the
-> ACPI PM domain from using the direct_complete path during system sleep.
->
-> One typical case is when the driver for the device needs its device to stay
-> runtime enabled, during the __device_suspend phase. This isn't the case
-> when the direct_complete path is being executed by the PM core, as it then
-> disables runtime PM for the device in __device_suspend(). Any following
-> attempts to runtime resume the device after that point, just fails.
+First patch allows for for pinctrl-msm to understand GPIO groups with
+no pins.  Such pins are "hidden" and can't be exported or accessed.
 
-OK, that is a problem.
+Second patch updates the QDF2xxx driver to take advantage of all that.
 
-> A workaround to this problem is to let the driver runtime resume its device
-> from its ->prepare() callback, as that would prevent the direct_complete
-> path from being executed. However, that may often be a waste, especially if
-> it turned out that no one really needed the device.
->
-> For this reason, invent acpi_dev_disable|enable_direct_complete(), to allow
-> drivers to inform the ACPI PM domain to change its default behaviour during
-> system sleep, and thus control whether it may use the direct_complete path
-> or not.
+v4:
+  Introduce 'sparse' variable
+  Update irq_valid_mask instead of conditionals in every IRQ function
 
-But I'm not sure this is the right place to address it as it very well
-may affect a PCI device too.
+Timur Tabi (2):
+  [v4] pinctrl: qcom: disable GPIO groups with no pins
+  [v3] pinctrl: qcom: qdf2xxx: add support for new ACPI HID QCOM8002
 
-Also, this is about the device and not about its ACPI companion
-object, so putting the flag in there is somewhat unclean, so to speak.
+ drivers/pinctrl/qcom/pinctrl-msm.c     |  36 ++++++--
+ drivers/pinctrl/qcom/pinctrl-msm.h     |   2 +
+ drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 145 +++++++++++++++++++++++++--------
+ 3 files changed, 142 insertions(+), 41 deletions(-)
 
-It looks like we need a flag in dev_pm_info saying something along the
-lines of "my system suspend callback can deal with runtime PM" that
-will cause the direct_complete update to occur in
-__device_suspend_late() instead of __device_suspend().
-
-Thanks,
-Rafael
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
