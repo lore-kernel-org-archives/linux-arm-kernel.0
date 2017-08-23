@@ -1,79 +1,40 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 23 Aug 2017 15:29:46 +0100
-Subject: [PATCH v6 3/3] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <20170823132430.GB634@arm.com>
-References: <20170809100715.870516-1-shameerali.kolothum.thodi@huawei.com>
- <20170809100715.870516-4-shameerali.kolothum.thodi@huawei.com>
- <20170810172723.GD9980@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA8383CC287@FRAEML521-MBX.china.huawei.com>
- <c6b7c641-b839-1388-7982-366e796e6ba9@huawei.com>
- <20170823132430.GB634@arm.com>
-Message-ID: <77b6c97f-f2d2-fd14-e83e-345addc5ea71@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Aug 2017 16:39:27 +0200
+Subject: [PATCH] clk: sunxi: fix uninitialized access
+Message-ID: <20170823143937.2176025-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/08/2017 14:24, Will Deacon wrote:
-> On Wed, Aug 23, 2017 at 02:17:24PM +0100, John Garry wrote:
->>>>> Signed-off-by: Shameer Kolothum
->>>> <shameerali.kolothum.thodi@huawei.com>
->>>>> ---
->>>>> drivers/iommu/arm-smmu-v3.c | 27 ++++++++++++++++++++++-----
->>>>> 1 file changed, 22 insertions(+), 5 deletions(-)
->>>>
->>>> Please can you also add a devicetree binding with corresponding
->>>> documentation to enable this workaround on non-ACPI based systems too?
->>>> It should be straightforward if you update the arm_smmu_options table.
->>>
->>> As I mentioned before, devicetree was a lower priority and we would definitely
->>> submit patch to support that. Even if we update the arm_smmu_options table
->>> with DT binding, the generic function to retrieve the MSI address regions only
->>> works on ACPI/IORT case now.
->>>
->>
->> Hi Will,
->>
->> Can you confirm your stance on supporting this workaround for DT as well as
->> ACPI?
->>
->> For us, we now only "officially" support ACPI FW, and DT support at this
->> point is patchy/limited. To me, adding DT support is just more errata
->> workaround code to maintain with little useful gain.
->
-> I basically don't like the idea of a driver that only works for one of
-> ACPI or DT yet claims to support both. I'm less fussed about functionality
-> differences (feature X is only available with firmware Y), but not working
-> around a hardware erratum that we know about is just lazy.
->
-> So I'd prefer that we handle this in both cases, or blacklist affected
-> devices when booting with DT. Continuing as though there isn't an erratum
-> is the worst thing we can do.
+gcc-8 reports an uninitialized variable access in a code path
+that we would see with incorrect DTB input:
 
-OK, seems reasonable.
+drivers/clk/sunxi/clk-sun8i-bus-gates.c: In function 'sun8i_h3_bus_gates_init':
+drivers/clk/sunxi/clk-sun8i-bus-gates.c:85:27: error: 'clk_parent' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-We would consider blacklisting the device, where/how to do is the question.
+This works around by skipping invalid input and printing a warning
+instead if it ever happens. The problem was apparently part of the
+initiali driver submission, but older compilers don't notice it.
 
-So the errata is in the GICv3 ITS/PCI host controller, and we just use 
-the in-between SMMU (driver) to provide the workaround. So my initial 
-impression is that the PCI host controller would have to be blacklisted 
-IFF behind an IOMMU for DT firmware in pcie-hisi.c or pci quirks 
-framework. How does it sound?
+Fixes: ab6e23a4e388 ("clk: sunxi: Add H3 clocks support")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/clk/sunxi/clk-sun8i-bus-gates.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Please also note that in our SoC we have other devices behind the same 
-SMMU, like storage controller, which are not affected or related to the 
-Errata.
-
-BTW, ignoring DT support, are you happy with this patchset?
-
-Regards,
-John
-
->
-> Will
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-> .
->
+diff --git a/drivers/clk/sunxi/clk-sun8i-bus-gates.c b/drivers/clk/sunxi/clk-sun8i-bus-gates.c
+index 63fdb790df29..bee305bdddbe 100644
+--- a/drivers/clk/sunxi/clk-sun8i-bus-gates.c
++++ b/drivers/clk/sunxi/clk-sun8i-bus-gates.c
+@@ -78,6 +78,10 @@ static void __init sun8i_h3_bus_gates_init(struct device_node *node)
+ 			clk_parent = APB1;
+ 		else if (index >= 96 && index <= 127)
+ 			clk_parent = APB2;
++		else {
++			WARN_ON(true);
++			continue;
++		}
+ 
+ 		clk_reg = reg + 4 * (index / 32);
+ 		clk_bit = index % 32;
+-- 
+2.9.0
