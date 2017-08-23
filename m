@@ -1,39 +1,41 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 22 Aug 2017 19:40:12 -0500
-Subject: [PATCH v2] irqchip: uniphier-aidet: add UniPhier AIDET irqchip
- driver
-In-Reply-To: <1503309663-2742-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1503309663-2742-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20170823004012.nxpslh37we7btqkg@rob-hp-laptop>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Wed, 23 Aug 2017 09:04:26 +0800
+Subject: [PATCH v2 0/3] PCI: mediatek: Add MSI support for MT2712 and
+ MT7622
+In-Reply-To: <20170822213602.GK6948@bhelgaas-glaptop.roam.corp.google.com>
+References: <1502715868-17651-1-git-send-email-honghui.zhang@mediatek.com>
+ <20170822213602.GK6948@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <1503450266.11985.3.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 21, 2017 at 07:01:03PM +0900, Masahiro Yamada wrote:
-> UniPhier SoCs contain AIDET (ARM Interrupt Detector).  This is intended
-> to provide additional features that are not covered by GIC.  The main
-> purpose is to provide logic inverter to support low level and falling
-> edge trigger type for interrupt lines from on-board devices.
+On Tue, 2017-08-22 at 16:36 -0500, Bjorn Helgaas wrote:
+> On Mon, Aug 14, 2017 at 09:04:25PM +0800, honghui.zhang at mediatek.com wrote:
+> > From: Honghui Zhang <honghui.zhang@mediatek.com>
+> > 
+> > MT2712 and MT7622's PCIe host controller support MSI, but only 32bit MSI
+> > address are supportted. It connect to GIC with the same IRQ number of INTx
+> > IRQ, so it shares the same IRQ with INTx IRQ.
+> > 
+> > This patchset add MSI support for MT2712 and MT7622.
+> > Also do some code fixup and cleanups.
+> > 
+> > Change Since V1:
+> >  - Add the first two patches into this patchset.
+> >  - Using -ENODEV instead of PTR_ERR if msi_domain == NULL
+> >  - Change the error logs with consistency of lower-case
+> >  - Using has_msi instead of support_msi to make the parameter name a bit shorter
+> > 
+> > Honghui Zhang (3):
+> >   PCI: mediatek: Fix return value in case of error
+> >   PCI: mediatek: take use of bus->sysdata to get host private data
+> >   PCI: mediatek: add msi support for MT2712 and MT7622
+> > 
+> >  drivers/pci/host/pcie-mediatek.c | 157 +++++++++++++++++++++++++++++++++++++--
+> >  1 file changed, 151 insertions(+), 6 deletions(-)
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
-> Changes in v2:
->   - Use readl/write_relaxed instead of readl/writel
->   - Move val = 0 for code symmetry
->   - .alloc() hook only supports nr_irqs==1 case
->   - Move struct irq_chip to static data because this driver expects
->     only one device instance in the system
->   - Match the interrupt number to SPI of GIC to make DT binding clearer
->     (register offset starts from 0x4)
-> 
->  .../socionext,uniphier-aidet.txt                   |  32 +++
+> Just waiting for an ack from Ryder...
 
-Acked-by: Rob Herring <robh@kernel.org>
+For whole series:
 
->  MAINTAINERS                                        |   1 +
->  drivers/irqchip/Kconfig                            |   8 +
->  drivers/irqchip/Makefile                           |   1 +
->  drivers/irqchip/irq-uniphier-aidet.c               | 246 +++++++++++++++++++++
->  5 files changed, 288 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/socionext,uniphier-aidet.txt
->  create mode 100644 drivers/irqchip/irq-uniphier-aidet.c
+Acked-by: Ryder Lee <ryder.lee@mediatek.com>
