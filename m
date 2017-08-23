@@ -1,78 +1,61 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 23 Aug 2017 21:08:34 +0200
-Subject: [PATCH] ARM: bcm283x: Fix SMP for old dtb files
-Message-ID: <1503515314-16576-1-git-send-email-stefan.wahren@i2se.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 23 Aug 2017 21:24:13 +0200
+Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20170823104118.b4524830e4bb767d7714772c@magewell.com>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+ <20170728160233.xooevio4hoqkgfaq@flea.lan>
+ <20170730060801.bkc2kvm72ktixy74@tarshish>
+ <20170821202145.kmxancepyq55v3o2@flea.lan>
+ <20170823104118.b4524830e4bb767d7714772c@magewell.com>
+Message-ID: <20170823192413.y5psmcgd3ghvpkbz@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since "irqchip: bcm2836: Move SMP startup code to arch/arm" the SMP
-for BCM2836 and BCM2837 (32 bit) depends on commit "ARM: dts: bcm283x:
-Add 32-bit enable method for SMP". This patch fixes SMP for older
-dtb files.
+On Wed, Aug 23, 2017 at 10:41:18AM +0800, Yong wrote:
+> > > > > +static irqreturn_t sun6i_csi_isr(int irq, void *dev_id)
+> > > > > +{
+> > > > > +	struct sun6i_csi_dev *sdev = (struct sun6i_csi_dev *)dev_id;
+> > > > > +	struct regmap *regmap = sdev->regmap;
+> > > > > +	u32 status;
+> > > > > +
+> > > > > +	regmap_read(regmap, CSI_CH_INT_STA_REG, &status);
+> > > > > +
+> > > > > +	if ((status & CSI_CH_INT_STA_FIFO0_OF_PD) ||
+> > > > > +	    (status & CSI_CH_INT_STA_FIFO1_OF_PD) ||
+> > > > > +	    (status & CSI_CH_INT_STA_FIFO2_OF_PD) ||
+> > > > > +	    (status & CSI_CH_INT_STA_HB_OF_PD)) {
+> > > > > +		regmap_write(regmap, CSI_CH_INT_STA_REG, status);
+> > > > > +		regmap_update_bits(regmap, CSI_EN_REG, CSI_EN_CSI_EN, 0);
+> > > > > +		regmap_update_bits(regmap, CSI_EN_REG, CSI_EN_CSI_EN,
+> > > > > +				   CSI_EN_CSI_EN);
+> > > > 
+> > > > You need to enable / disable it at every frame? How do you deal with
+> > > > double buffering? (or did you choose to ignore it for now?)
+> > > 
+> > > These *_OF_PD status bits indicate an overflow error condition.
+> > 
+> > Shouldn't we return an error code then? The names of these flags could
+> > be better too.
+> 
+> Then, where and how to deal with the error coce.
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/mach-bcm/board_bcm2835.c |  6 +++++-
- arch/arm/mach-bcm/platsmp.c       |  2 +-
- arch/arm/mach-bcm/platsmp.h       | 10 ++++++++++
- 3 files changed, 16 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/mach-bcm/platsmp.h
+If you want to deal with FIFO overflow, I'm not sure you have anything
+to do. It means, you've been to slow to queue buffers, so I guess
+stopping the pipeline until more buffers are queued would make
+sense. And we should probably increase the sequence number while doing
+so to notify the userspace that some frames were lost.
 
-diff --git a/arch/arm/mach-bcm/board_bcm2835.c b/arch/arm/mach-bcm/board_bcm2835.c
-index 24af33f..8cff865 100644
---- a/arch/arm/mach-bcm/board_bcm2835.c
-+++ b/arch/arm/mach-bcm/board_bcm2835.c
-@@ -19,16 +19,20 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
-+#include "platsmp.h"
-+
- static const char * const bcm2835_compat[] = {
- #ifdef CONFIG_ARCH_MULTI_V6
- 	"brcm,bcm2835",
- #endif
- #ifdef CONFIG_ARCH_MULTI_V7
- 	"brcm,bcm2836",
-+	"brcm,bcm2837",
- #endif
- 	NULL
- };
- 
- DT_MACHINE_START(BCM2835, "BCM2835")
--	.dt_compat = bcm2835_compat
-+	.dt_compat = bcm2835_compat,
-+	.smp = smp_ops(bcm2836_smp_ops),
- MACHINE_END
-diff --git a/arch/arm/mach-bcm/platsmp.c b/arch/arm/mach-bcm/platsmp.c
-index 7811160..7d95483 100644
---- a/arch/arm/mach-bcm/platsmp.c
-+++ b/arch/arm/mach-bcm/platsmp.c
-@@ -339,7 +339,7 @@ static const struct smp_operations nsp_smp_ops __initconst = {
- };
- CPU_METHOD_OF_DECLARE(bcm_smp_nsp, "brcm,bcm-nsp-smp", &nsp_smp_ops);
- 
--static const struct smp_operations bcm2836_smp_ops __initconst = {
-+const struct smp_operations bcm2836_smp_ops __initconst = {
- 	.smp_boot_secondary	= bcm2836_boot_secondary,
- };
- CPU_METHOD_OF_DECLARE(bcm_smp_bcm2836, "brcm,bcm2836-smp", &bcm2836_smp_ops);
-diff --git a/arch/arm/mach-bcm/platsmp.h b/arch/arm/mach-bcm/platsmp.h
-new file mode 100644
-index 0000000..b8b8b3f
---- /dev/null
-+++ b/arch/arm/mach-bcm/platsmp.h
-@@ -0,0 +1,10 @@
-+/*
-+ * Copyright (C) 2017 Stefan Wahren <stefan.wahren@i2se.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ */
-+
-+extern const struct smp_operations bcm2836_smp_ops;
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170823/354fbae2/attachment.sig>
