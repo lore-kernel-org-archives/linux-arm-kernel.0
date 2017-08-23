@@ -1,26 +1,64 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 23 Aug 2017 15:34:35 +0200
-Subject: [EXT] Re: [PATCH net-next 03/18] net: mvpp2: set the SMI PHY
- address when connecting to the PHY
-In-Reply-To: <7dc117f56c284081b791bceb588a8aa1@IL-EXCH01.marvell.com>
-References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
- <20170724134848.19330-4-antoine.tenart@free-electrons.com>
- <20170726160806.GF12049@lunn.ch> <20170728014905.GC24728@kwain>
- <20170728042153.GH18666@lunn.ch>
- <f6d8907b057241c7a72da0a0255cfd23@IL-EXCH01.marvell.com>
- <20170823123424.GA28612@lunn.ch>
- <7dc117f56c284081b791bceb588a8aa1@IL-EXCH01.marvell.com>
-Message-ID: <20170823133435.GF28612@lunn.ch>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 23 Aug 2017 14:48:42 +0100
+Subject: [PATCH v2 1/1] Split VGA default device handler out of VGA arbiter
+In-Reply-To: <20170822221928.GL6948@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170817113028.16853-1-dja@axtens.net>
+ <20170817113028.16853-2-dja@axtens.net>
+ <20170821105300.GB23287@e107981-lin.cambridge.arm.com>
+ <20170822221928.GL6948@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CAKv+Gu-FCkV9Dv=yn_CNC9orj8Roiabb75jX34w3mMziWVZaeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This feature work only for Out-of-Band Auto-Negotiation in SGMII Mode.
-> Current GoP(MAC) code configure SGMII In-band Auto-Negotiation performed by the PCS layer
-> without PHY polling.
+On 22 August 2017 at 23:19, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> On Mon, Aug 21, 2017 at 11:53:01AM +0100, Lorenzo Pieralisi wrote:
+>> On Thu, Aug 17, 2017 at 09:30:28PM +1000, Daniel Axtens wrote:
+>> > A system without PCI legacy resources (e.g. ARM64) may find that no
+>> > default/boot VGA device has been marked, because the VGA arbiter
+>> > checks for legacy resource decoding before marking a card as default.
+>>
+>> I do not understand this paragraph, in particular:
+>>
+>> - "A system without PCI legacy resources (e.g. ARM64)". What does this
+>>   mean ? I take this as "ARM64 does not support IO space"; if a PCI host
+>>   bridge supports IO space, there is nothing from an architectural
+>>   point of view that prevents an MMIO based IO space implementation to
+>>   work on ARM64. It is PCI bridge specific, not arch specific.
+>
+> This reference to ARM64 is the same thing I stumbled over.  Maybe it
+> could be written along the lines of:
+>
+>   The VGA arbiter selects a default VGA device that is enabled and
+>   reachable via the legacy VGA resources (mem 0xa0000-0xbffff, io
+>   0x3b0-0x3bb, io 0x3c0-0x3df, etc).
+>
+>   If there is no such device, e.g., because there's no enabled VGA
+>   device, the host bridge doesn't support access to those legacy
+>   resources, or a PCI-PCI bridge doesn't have VGA Enable set, a
+>   platform may select an arbitrary device by calling
+>   vga_set_default_device().
+>
+> Then I think this patch changes the previous behavior by allowing the
+> arbiter to select a device that is enabled and has a driver but may
+> not be reachable via the legacy VGA resources.
+>
+> I don't know what all the consequences of that would be, but it does
+> muddy the VGA arbiter waters a bit.  AIUI, the main reason for the
+> arbiter is to allow multiple legacy VGA devices by manipulating bridge
+> VGA Enable bits so only one receives the legacy resources at a time.
+>
+> These devices that do not need the legacy resources don't need that
+> special treatment because they don't care about the bridge VGA Enable
+> bits and several can coexist in the system with no need for VGA
+> arbitration.
+>
+> I guess the powerpc fixup_vga() already selects a device that doesn't
+> need the VGA resources, so we already have that situation.
+>
 
-Hi Stefan
-
-So there is no need to configure the address then, leave PHY polling
-turned off and we avoid all the issues.
-
-       Andrew
+Perhaps it is unclear that the whole point of tinkering with the VGA
+arbiter is that X may refuse to use a GFX card if it is not tagged as
+the default VGA device by the arbiter. I have suggested before that
+fixing X may be more appropriate in this case, given that ownership of
+the legacy VGA resources may not correlate at all with being the
+primary display device on non-x86 architectures.
