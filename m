@@ -1,48 +1,92 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 23 Aug 2017 19:08:10 +0800
-Subject: [PATCH] doc: coresight: correct usage for '/dev/cpu_dma_latency'
-In-Reply-To: <c6d08eff-d92e-9cd2-5c33-1bf67711471c@arm.com>
-References: <1503472998-9009-1-git-send-email-leo.yan@linaro.org>
- <c6d08eff-d92e-9cd2-5c33-1bf67711471c@arm.com>
-Message-ID: <20170823110810.GA28579@leoy-linaro>
+From: icenowy@aosc.io (icenowy at aosc.io)
+Date: Wed, 23 Aug 2017 19:13:31 +0800
+Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <3036789.1NOcar0Ykn@avalon>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <20170822201731.hyjqrbkhggaoomfl@flea.home>
+ <3392c717-10ea-4d6e-4c25-9be0bbec004e@xs4all.nl> <3036789.1NOcar0Ykn@avalon>
+Message-ID: <8f6b9ca17a987a5aec0bdd47870688ab@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
-
-On Wed, Aug 23, 2017 at 10:17:06AM +0100, Sudeep Holla wrote:
+? 2017-08-23 15:43?Laurent Pinchart ???
+> Hi Hans,
 > 
-> On 23/08/17 08:23, Leo Yan wrote:
-> > In the coresight CPU debug document it suggests to use 'echo' command
-> > to set latency request to /dev/cpu_dma_latency so can disable all CPU
-> > idle states, but in fact this doesn't work.
-> > 
-> > This is because when the command 'echo' exits, it releases the device
-> > node's file descriptor and the kernel release function removes the QoS
-> > constraint; finally when the command 'echo' finished there have no
-> > constraint imposed on cpu_dma_latency.
-> > 
-> > This patch changes to use 'exec' to access '/dev/cpu_dma_latency', the
-> > command 'exec' can avoid the file descriptor to be closed so we can
-> > keep the constraint on cpu_dma_latency.
-> > 
-> > This patch also corrects the description when set latency = 0uS, in
-> > this case the idle state0 still can be selected by CPUIdle governor so
-> > this means on ARM platform the 'WFI' state is still enabled, but all
-> > other deeper states have been disabled so CPUs will not be powered off.
-> > 
+> On Wednesday, 23 August 2017 09:52:00 EEST Hans Verkuil wrote:
+>> On 08/22/2017 10:17 PM, Maxime Ripard wrote:
+>> > On Tue, Aug 22, 2017 at 08:43:35AM +0200, Hans Verkuil wrote:
+>> >>>>> +static int sun6i_video_link_setup(struct media_entity *entity,
+>> >>>>> +				  const struct media_pad *local,
+>> >>>>> +				  const struct media_pad *remote, u32 flags)
+>> >>>>> +{
+>> >>>>> +	struct video_device *vdev = media_entity_to_video_device(entity);
+>> >>>>> +	struct sun6i_video *video = video_get_drvdata(vdev);
+>> >>>>> +
+>> >>>>> +	if (WARN_ON(video == NULL))
+>> >>>>> +		return 0;
+>> >>>>> +
+>> >>>>> +	return sun6i_video_formats_init(video);
+>> >>>>
+>> >>>> Why is this called here? Why not in video_init()?
+>> >>>
+>> >>> sun6i_video_init is in the driver probe context.
+>> >>> sun6i_video_formats_init use media_entity_remote_pad and
+>> >>> media_entity_to_v4l2_subdev to find the subdevs.
+>> >>> The media_entity_remote_pad can't work before all the media pad linked.
+>> >>
+>> >> A video_init is typically called from the notify_complete callback.
+>> >> Actually, that's where the video_register_device should be created as
+>> >> well. When you create it in probe() there is possibly no sensor yet, so
+>> >> it would be a dead video node (or worse, crash when used).
+>> >>
+>> >> There are still a lot of platform drivers that create the video node in
+>> >> the probe, but it's not the right place if you rely on the async loading
+>> >> of subdevs.
+>> >
+>> > That's not really related, but I'm not really sure it's a good way to
+>> > operate. This essentially means that you might wait forever for a
+>> > component in your pipeline to be probed, without any chance of it
+>> > happening (not compiled, compiled as a module and not loaded, hardware
+>> > defect preventing the driver from probing properly, etc), even though
+>> > that component might not be essential.
+>> 
+>> We're talking straightforward video pipelines here. I.e. a source, 
+>> some
+>> processing units and a DMA engine at the end.
 > 
+> As a first step possibly, but many SoCs have ISPs that are not 
+> supported by
+> the initial camera driver version.
+
+I think here it's also the situation.
+
+Allwinner SoCs beyond sun6i (which is this driver targeting at) has an 
+ISP
+internally called "HawkView ISP", and there's no document of it (even 
+the
+source code is only released in recent several months).
+
 > 
-> IMO, we should just refer to cpuidle and PM QoS documents from here so
-> that any updates or changes in those documents are observed. Having a
-> copy of the text may result in it getting obsolete.
-
-Agree, we should point to below docs:
-Documentation/power/pm_qos_interface.txt, section 'From user mode';
-Documentation/cpuidle/sysfs.txt;
-
-Thanks for good suggestion.
-
-> -- 
-> Regards,
-> Sudeep
+>> There is no point in creating a video node if the pipeline is not 
+>> complete
+>> since you need the full pipeline.
+>> 
+>> I've had bad experiences in the past where video nodes were created 
+>> too
+>> soon and part of the internal state was still incomplete, causing at 
+>> best
+>> weird behavior and at worst crashes.
+> 
+> Drivers obviously need to be fixed if they are buggy in that regard. 
+> Such race
+> conditions are definitely something I keep an eye on when reviewing 
+> code.
+> 
+>> More complex devices are a whole different ballgame.
+>> 
+>> > This is how DRM operates, and you sometimes end up in some very dumb
+>> > situations where you wait for say, the DSI controller to probe, while
+>> > you only care about HDMI in your system.
+>> >
+>> > But this seems to be on of the hot topic these days, so we might
+>> > discuss it further in some other thread :)
