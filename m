@@ -1,71 +1,82 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 23 Aug 2017 08:57:34 -0500
-Subject: [PATCH v2 1/1] Split VGA default device handler out of VGA arbiter
-In-Reply-To: <CAKv+Gu-FCkV9Dv=yn_CNC9orj8Roiabb75jX34w3mMziWVZaeA@mail.gmail.com>
-References: <20170817113028.16853-1-dja@axtens.net>
- <20170817113028.16853-2-dja@axtens.net>
- <20170821105300.GB23287@e107981-lin.cambridge.arm.com>
- <20170822221928.GL6948@bhelgaas-glaptop.roam.corp.google.com>
- <CAKv+Gu-FCkV9Dv=yn_CNC9orj8Roiabb75jX34w3mMziWVZaeA@mail.gmail.com>
-Message-ID: <20170823135734.GB8498@bhelgaas-glaptop.roam.corp.google.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 23 Aug 2017 19:26:35 +0530
+Subject: [PATCH v3 3/5] dt-bindings: sdhci-omap: Add bindings for the
+ sdhci-omap controller
+In-Reply-To: <CAPDyKFp7gchVQ+JPNqv4LktvHRm2Lzx6KakOw85zEZxDEX0OhA@mail.gmail.com>
+References: <20170821142132.GH6008@atomide.com>
+ <20170823054246.23927-1-kishon@ti.com>
+ <CAPDyKFp7gchVQ+JPNqv4LktvHRm2Lzx6KakOw85zEZxDEX0OhA@mail.gmail.com>
+Message-ID: <c9342689-f09e-44af-0975-d43ef122a477@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 02:48:42PM +0100, Ard Biesheuvel wrote:
-> On 22 August 2017 at 23:19, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> > On Mon, Aug 21, 2017 at 11:53:01AM +0100, Lorenzo Pieralisi wrote:
-> >> On Thu, Aug 17, 2017 at 09:30:28PM +1000, Daniel Axtens wrote:
-> >> > A system without PCI legacy resources (e.g. ARM64) may find that no
-> >> > default/boot VGA device has been marked, because the VGA arbiter
-> >> > checks for legacy resource decoding before marking a card as default.
-> >>
-> >> I do not understand this paragraph, in particular:
-> >>
-> >> - "A system without PCI legacy resources (e.g. ARM64)". What does this
-> >>   mean ? I take this as "ARM64 does not support IO space"; if a PCI host
-> >>   bridge supports IO space, there is nothing from an architectural
-> >>   point of view that prevents an MMIO based IO space implementation to
-> >>   work on ARM64. It is PCI bridge specific, not arch specific.
-> >
-> > This reference to ARM64 is the same thing I stumbled over.  Maybe it
-> > could be written along the lines of:
-> >
-> >   The VGA arbiter selects a default VGA device that is enabled and
-> >   reachable via the legacy VGA resources (mem 0xa0000-0xbffff, io
-> >   0x3b0-0x3bb, io 0x3c0-0x3df, etc).
-> >
-> >   If there is no such device, e.g., because there's no enabled VGA
-> >   device, the host bridge doesn't support access to those legacy
-> >   resources, or a PCI-PCI bridge doesn't have VGA Enable set, a
-> >   platform may select an arbitrary device by calling
-> >   vga_set_default_device().
-> >
-> > Then I think this patch changes the previous behavior by allowing the
-> > arbiter to select a device that is enabled and has a driver but may
-> > not be reachable via the legacy VGA resources.
-> >
-> > I don't know what all the consequences of that would be, but it does
-> > muddy the VGA arbiter waters a bit.  AIUI, the main reason for the
-> > arbiter is to allow multiple legacy VGA devices by manipulating bridge
-> > VGA Enable bits so only one receives the legacy resources at a time.
-> >
-> > These devices that do not need the legacy resources don't need that
-> > special treatment because they don't care about the bridge VGA Enable
-> > bits and several can coexist in the system with no need for VGA
-> > arbitration.
-> >
-> > I guess the powerpc fixup_vga() already selects a device that doesn't
-> > need the VGA resources, so we already have that situation.
-> >
-> 
-> Perhaps it is unclear that the whole point of tinkering with the VGA
-> arbiter is that X may refuse to use a GFX card if it is not tagged as
-> the default VGA device by the arbiter. I have suggested before that
-> fixing X may be more appropriate in this case, given that ownership of
-> the legacy VGA resources may not correlate at all with being the
-> primary display device on non-x86 architectures.
+Hi Uffe,
 
-Yeah, maybe it's time to disconnect the "default display device" idea
-from the VGA arbiter.  I have no idea what (if any) dependencies X has
-on the legacy VGA resources.  I assume X works fine on power, where it
-sounds like those resources are rarely or never available.
+On Wednesday 23 August 2017 06:37 PM, Ulf Hansson wrote:
+> On 23 August 2017 at 07:42, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> Add binding for the TI's sdhci-omap controller. This now includes only
+>> a subset of properties documented in ti-omap-hsmmc.txt but will eventually
+>> include all the properties.
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>> Changes from v2:
+>> *) Fixed example to use the updated compatible
+>>
+>> Changes from v1:
+>> *) Create a new sdhci-omap.txt document for TI's sdhci-omap controller instead
+>>    of using the ti-omap-hsmmc.txt as suggested by Tony
+>>  .../devicetree/bindings/mmc/sdhci-omap.txt         | 22 ++++++++++++++++++++++
+>>  1 file changed, 22 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-omap.txt b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+>> new file mode 100644
+>> index 000000000000..139695ad2d58
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+>> @@ -0,0 +1,22 @@
+>> +* TI OMAP SDHCI Controller
+>> +
+>> +Refer to mmc.txt for standard MMC bindings.
+>> +
+>> +Required properties:
+>> +- compatible: Should be "ti,dra7-sdhci" for DRA7 and DRA72 controllers
+>> +- ti,hwmods: Must be "mmc<n>", <n> is controller instance starting 1
+>> +
+>> +Optional properties:
+>> +- ti,dual-volt: boolean, supports dual voltage cards
+>> +- ti,non-removable: non-removable slot (like eMMC)
+>> +
+>> +Example:
+>> +       mmc1: mmc at 0x4809c000 {
+>> +               compatible = "ti,dra7-sdhci";
+>> +               reg = <0x4809c000 0x400>;
+>> +               ti,hwmods = "mmc1";
+>> +               ti,dual-volt;
+>> +               bus-width = <4>;
+>> +               vmmc-supply = <&vmmc>; /* phandle to regulator node */
+>> +               ti,non-removable;
+>> +       };
+>> --
+>> 2.11.0
+>>
+> 
+> I am wondering a bit on the long term plan here.
+> 
+> Ideally at some point in future, we would like to remove the old
+> omap_hsmmc driver, but from compatible string point of view, that
+> means we first needs to deprecate the old ones for a while. Right?
+
+right but sdhci-omap is still lacking features that was present in omap_hsmmc
+like context save/restore, SDIO support etc. I think we should deprecate
+omap_hsmmc compatible once we add all the features in sdhci-omap?
+> 
+> That said, what is then the reason to why we should bring over the
+> existing omap_hsmmc bindings to the sdhci-omap bindings?
+
+This is mainly for old dt compatibility. Even after removing the omap_hsmmc
+driver, users should still be able to use newer kernel with their existing dtbs.
+
+Thanks
+Kishon
