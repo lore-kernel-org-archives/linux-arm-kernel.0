@@ -1,38 +1,34 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 23 Aug 2017 21:59:08 +0800
-Subject: [PATCH v1 1/3] arm: npcm: add basic support for Nuvoton BMCs
-In-Reply-To: <20170822033502.4100-2-brendanhiggins@google.com>
-Message-ID: <201708232122.mBCbVCE7%fengguang.wu@intel.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 23 Aug 2017 17:51:19 -0400
+Subject: [PATCH V12 4/5] PCI: Handle CRS ("device not ready") returned by
+ device after FLR
+In-Reply-To: <20170823213838.GG8498@bhelgaas-glaptop.roam.corp.google.com>
+References: <1503464171-6471-1-git-send-email-okaya@codeaurora.org>
+ <1503464171-6471-4-git-send-email-okaya@codeaurora.org>
+ <20170823213838.GG8498@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <0ef4c01d-75bc-17dc-8926-2f9647cfeec8@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brendan,
+On 8/23/2017 5:38 PM, Bjorn Helgaas wrote:
+> If we increase the timeout, is there still value in adding the
+> pci_bus_wait_crs() stuff?  I'm not sure there is.
 
-[auto build test WARNING on linus/master]
-[also build test WARNING on v4.13-rc6 next-20170823]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+I agree increasing the timeout is more than enough for FLR case. 
 
-url:    https://github.com/0day-ci/linux/commits/Brendan-Higgins/arm-npcm-add-basic-support-for-Nuvoton-BMCs/20170824-031106
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+However, I was considering the wait and pending functions as a utility
+that I can reuse towards fixing CRS in other conditions like secondary
+bus reset and potentially PM.
 
-All warnings (new ones prefixed by >>):
+I'm planning to have a CRS session in the Linux Plumbers Conference 
+to talk about CRS use cases. 
 
-warning: (CPU_NPCM750_SMP) selects ARM_ERRATA_458693 which has unmet direct dependencies (CPU_V7 && !ARCH_MULTIPLATFORM)
-warning: (CPU_NPCM750_SMP) selects ARM_ERRATA_742231 which has unmet direct dependencies (CPU_V7 && SMP && !ARCH_MULTIPLATFORM)
+I was going to follow up this series with secondary bus reset next once
+this goes in. 
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 62836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170823/8118174d/attachment-0001.gz>
+I'm unable to test PM. I can't promise how I fix/test it.
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
