@@ -1,78 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 23 Aug 2017 08:57:11 +0100
-Subject: [PATCH 1/1] Revert "mfd: da9061: Fix to remove BBAT_CONT
- register from chip model"
-In-Reply-To: <6ED8E3B22081A4459DAC7699F3695FB7019411968F@SW-EX-MBX02.diasemi.com>
-References: <20170815083804.26073-1-lee.jones@linaro.org>
- <20170821074936.ae2sw2ncvoaxsq3w@dell>
- <6ED8E3B22081A4459DAC7699F3695FB7019411968F@SW-EX-MBX02.diasemi.com>
-Message-ID: <20170823075711.lprkw3gg23j4wyav@dell>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 23 Aug 2017 09:01:10 +0100
+Subject: [PATCH v3] irqchip: uniphier-aidet: add UniPhier AIDET irqchip
+ driver
+In-Reply-To: <1503451907-21535-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1503451907-21535-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <5dfc1478-c558-eb6d-6a82-a9ca23851bcd@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 21 Aug 2017, Steve Twiss wrote:
+On 23/08/17 02:31, Masahiro Yamada wrote:
+> UniPhier SoCs contain AIDET (ARM Interrupt Detector).  This is intended
+> to provide additional features that are not covered by GIC.  The main
+> purpose is to provide logic inverter to support low level and falling
+> edge trigger types for interrupt lines from on-board devices.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+> 
+> Changes in v3:
+>   - Use irq_domain_create_hierarchy() instead of legacy
+>     irq_domain_add_hierarchy()
+>   - Add .irq_set_affinity hook
+>   - Pass proper trigger type to parent
+> 
+> Changes in v2:
+>   - Use readl/write_relaxed instead of readl/writel
+>   - Move val = 0 for code symmetry
+>   - .alloc() hook only supports nr_irqs==1 case
+>   - Move struct irq_chip to static data because this driver expects
+>     only one device instance in the system
+>   - Match the interrupt number to SPI of GIC to make DT binding clearer
+>     (register offset starts from 0x4)
+> 
+>  .../socionext,uniphier-aidet.txt                   |  32 +++
+>  MAINTAINERS                                        |   1 +
+>  drivers/irqchip/Kconfig                            |   8 +
+>  drivers/irqchip/Makefile                           |   1 +
+>  drivers/irqchip/irq-uniphier-aidet.c               | 261 +++++++++++++++++++++
+>  5 files changed, 303 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/socionext,uniphier-aidet.txt
+>  create mode 100644 drivers/irqchip/irq-uniphier-aidet.c
+Queued for 4.14.
 
-> On 21 August 2017 08:50, Lee Jones wrote:
-> 
-> Hi Lee,
-> 
-> > To: Steve Twiss
-> > Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> > Subject: Re: [PATCH 1/1] Revert "mfd: da9061: Fix to remove BBAT_CONT register from chip model"
-> > 
-> > On Tue, 15 Aug 2017, Lee Jones wrote:
-> > 
-> > > This patch was applied to the MFD twice, causing unwanted behavour.
-> > >
-> > > This reverts commit b77eb79acca3203883e8d8dbc7f2b842def1bff8.
-> > >
-> > > Fixes: b77eb79acca3 ("mfd: da9061: Fix to remove BBAT_CONT register from chip model")
-> > > Reported-by: Steve Twiss <stwiss.opensource@diasemi.com>
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  drivers/mfd/da9062-core.c | 6 ++++++
-> > >  1 file changed, 6 insertions(+)
-> > 
-> > Steve, It would be good to obtain a {Reviewed|Acked}-by from you
-> > before applying.
-> >
-> 
-> Sure.
-> 
-> > > diff --git a/drivers/mfd/da9062-core.c b/drivers/mfd/da9062-core.c
-> > > index fbe0f245ce8e..fe1811523e4a 100644
-> > > --- a/drivers/mfd/da9062-core.c
-> > > +++ b/drivers/mfd/da9062-core.c
-> > > @@ -645,6 +645,9 @@ static const struct regmap_range da9062_aa_readable_ranges[] = {
-> > >  		.range_min = DA9062AA_VLDO1_B,
-> > >  		.range_max = DA9062AA_VLDO4_B,
-> > >  	}, {
-> > > +		.range_min = DA9062AA_BBAT_CONT,
-> > > +		.range_max = DA9062AA_BBAT_CONT,
-> > > +	}, {
-> > >  		.range_min = DA9062AA_INTERFACE,
-> > >  		.range_max = DA9062AA_CONFIG_E,
-> > >  	}, {
-> > > @@ -721,6 +724,9 @@ static const struct regmap_range da9062_aa_writeable_ranges[] = {
-> > >  		.range_min = DA9062AA_VLDO1_B,
-> > >  		.range_max = DA9062AA_VLDO4_B,
-> > >  	}, {
-> > > +		.range_min = DA9062AA_BBAT_CONT,
-> > > +		.range_max = DA9062AA_BBAT_CONT,
-> > > +	}, {
-> > >  		.range_min = DA9062AA_GP_ID_0,
-> > >  		.range_max = DA9062AA_GP_ID_19,
-> > >  	},
-> 
-> This looks good. Thanks for the changes.
-> 
-> Reviewed-by: Steve Twiss <stwiss.opensource@diasemi.com>
-> Acked-by: Steve Twiss <stwiss.opensource@diasemi.com>
+Thanks,
 
-Patch now send to Mainline for v4.13 fixes.
-
+	M.
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jazz is not dead. It just smells funny...
