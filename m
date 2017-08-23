@@ -1,66 +1,53 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Aug 2017 17:24:54 +0100
-Subject: [GIT PULL] arm64: Late fixes for 4.13
-Message-ID: <20170823162453.GC32528@arm.com>
+Date: Wed, 23 Aug 2017 17:27:32 +0100
+Subject: [RFC/PATCH v2] arm64: define MODULES_VADDR by module_alloc_base
+In-Reply-To: <1502788166-25730-1-git-send-email-miles.chen@mediatek.com>
+References: <1502788166-25730-1-git-send-email-miles.chen@mediatek.com>
+Message-ID: <20170823162732.GD32528@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, Aug 15, 2017 at 05:09:26PM +0800, Miles Chen wrote:
+> After the kernel ASLR, the module virtual address is moved to
+> [module_alloc_base, module_alloc_base + MODULES_VSIZE).
+> However, the MODULES_VADDR is still defined as a constant and functions
+> like is_vmalloc_or_module_addr() and dump function will not able to
+> use correct module range information.
+> 
+> Use module_alloc_base to define MODULES_VADDR. I tested the patch under
+> three different conditions:
+> 1.CONFIG_RANDOMIZE_BASE=y, seed=0, CONFIG_KASAN=n
+> 2.CONFIG_RANDOMIZE_BASE=y, seed=0x2304909023333333, CONFIG_KASAN=n
+> 3.CONFIG_RANDOMIZE_BASE=y, seed=0x2304909023333333, CONFIG_KASAN=y
+> 
+> test log:
+> 
+> 1.CONFIG_RANDOMIZE_BASE=y, seed=0, CONFIG_KASAN=n
+> 
+> [    0.000000] Virtual kernel memory layout:
+> [    0.000000]     modules : 0xffffff8000550000 - 0xffffff8008550000   (   128 MB)
 
-Please pull these late arm64 fixes for 4.13. They fix very early boot
-failures with KASLR where the early mapping of the kernel is incorrect,
-so the failure mode looks like a hang with no output. There's also a
-signal-handling fix when a uaccess routine faults with a fatal signal
-pending, which could be used to create unkillable user tasks using
-userfaultfd and finally a state leak fix for the floating pointer registers
-across a call to exec().
+Minor nit: but it might be worth putting this after the vmalloc line in
+the case where they overlap.
 
-We're still seeing some random issues crop up (inode memory corruption
-and spinlock recursion) but we've not managed to reproduce things reliably
-enough to debug or bisect them yet.
+> [    0.000000]     vmalloc : 0xffffff8008000000 - 0xffffffbebfff0000   (   250 GB)
+> [    0.000000]       .text : 0xffffff8008080000 - 0xffffff8008550000   (  4928 KB)
+> [    0.000000]     .rodata : 0xffffff8008550000 - 0xffffff80086a0000   (  1344 KB)
+> [    0.000000]       .init : 0xffffff80086a0000 - 0xffffff8008a30000   (  3648 KB)
+> [    0.000000]       .data : 0xffffff8008a30000 - 0xffffff8008ab9200   (   549 KB)
+> [    0.000000]        .bss : 0xffffff8008ab9200 - 0xffffff8008b0b238   (   329 KB)
+> [    0.000000]     fixed   : 0xffffffbefe7fd000 - 0xffffffbefec00000   (  4108 KB)
+> [    0.000000]     PCI I/O : 0xffffffbefee00000 - 0xffffffbeffe00000   (    16 MB)
+> [    0.000000]     vmemmap : 0xffffffbf00000000 - 0xffffffc000000000   (     4 GB maximum)
+> [    0.000000]               0xffffffbf00000000 - 0xffffffbf02000000   (    32 MB actual)
+> [    0.000000]     memory  : 0xffffffc000000000 - 0xffffffc080000000   (  2048 MB)
+> 
+> \# cat kernel_page_tables
+> ---[ Modules start ]---
+> ---[ Modules end ]---
 
-Please pull,
+
+I still reckon we should just omit talking about the modules area at all
+for the cases where they're mapped entirely within vmalloc here.
 
 Will
-
---->8
-
-The following changes since commit 14ccee78fc82f5512908f4424f541549a5705b89:
-
-  Linux 4.13-rc6 (2017-08-20 14:13:52 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to a067d94d37ed590fd17684d18c3edf52110d305a:
-
-  arm64: kaslr: Adjust the offset to avoid Image across alignment boundary (2017-08-22 18:15:42 +0100)
-
-----------------------------------------------------------------
-Late arm64 fixes:
-
-- Fix very early boot failures with KASLR enabled
-
-- Fix fatal signal handling on userspace access from kernel
-
-- Fix leakage of floating point register state across exec()
-
-----------------------------------------------------------------
-Ard Biesheuvel (1):
-      arm64: kaslr: ignore modulo offset when validating virtual displacement
-
-Catalin Marinas (1):
-      arm64: kaslr: Adjust the offset to avoid Image across alignment boundary
-
-Dave Martin (1):
-      arm64: fpsimd: Prevent registers leaking across exec
-
-Mark Rutland (1):
-      arm64: mm: abort uaccess retries upon fatal signal
-
- arch/arm64/kernel/fpsimd.c |  2 ++
- arch/arm64/kernel/head.S   |  1 -
- arch/arm64/kernel/kaslr.c  | 20 +++++++++++---------
- arch/arm64/mm/fault.c      |  5 ++++-
- 4 files changed, 17 insertions(+), 11 deletions(-)
