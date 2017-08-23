@@ -1,84 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Aug 2017 16:23:51 +0200
-Subject: [PATCH v2] ARM: vdso: Define vdso_{start,end} as array
-Message-ID: <20170823142419.1811665-1-arnd@arndb.de>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 23 Aug 2017 16:28:20 +0200
+Subject: [RESEND PATCH v5 10/16] ARM: dts: zynq: Add generic compatible
+ string for I2C EEPROM
+In-Reply-To: <b22a7db6-7daf-b5c1-3978-cdc699723e30@xilinx.com>
+References: <20170615185418.13980-1-javier@dowhile0.org>
+ <20170615185418.13980-11-javier@dowhile0.org>
+ <b22a7db6-7daf-b5c1-3978-cdc699723e30@xilinx.com>
+Message-ID: <CABxcv=n4pCJLPb_C6eYVJ3CLBVH7T0amiJj7mYbshpv4u8xkXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc-8 correctly points out that reading four bytes from a pointer to a
-'char' variable is wrong
+Hello Michal,
 
-arch/arm/kernel/vdso.c: In function 'vdso_init':
-arch/arm/kernel/vdso.c:200:6: error: '__builtin_memcmp_eq' reading 4 bytes from a region of size 1 [-Werror=stringop-overflow=]
+On Wed, Jun 21, 2017 at 1:43 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+> On 15.6.2017 20:54, Javier Martinez Canillas wrote:
+>> The at24 driver allows to register I2C EEPROM chips using different vendor
+>> and devices, but the I2C subsystem does not take the vendor into account
+>> when matching using the I2C table since it only has device entries.
+>>
+>> But when matching using an OF table, both the vendor and device has to be
+>> taken into account so the driver defines only a set of compatible strings
+>> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+>>
+>> So add this generic fallback to the device node compatible string to make
+>> the device to match the driver using the OF device ID table.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+>>
 
-However, in this case the variable just stands for the beginning of the
-vdso and is not actually a 'char', so the code is doing what it is meant
-to do.
+[snip]
 
-This uses the same approach as arm64 and x86, declaring the addresses
-as char arrays.
+>> --- a/arch/arm/boot/dts/zynq-zc706.dts
+>> +++ b/arch/arm/boot/dts/zynq-zc706.dts
+>> @@ -92,7 +92,7 @@
+>>                       #size-cells = <0>;
+>>                       reg = <2>;
+>>                       eeprom at 54 {
+>> -                             compatible = "at,24c08";
+>> +                             compatible = "atmel,24c08";
+>>                               reg = <0x54>;
+>>                       };
+>>               };
+>>
+>
+> Acked-by: Michal Simek <michal.simek@xilinx.com>
+>
 
-See also: dbbb08f500d6 ("arm64, vdso: Define vdso_{start,end} as array")
+Same question than for the other patch, could you please also apply this?
 
-Suggested-by: Mark Rutland <mark.rutland@arm.com>
-Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/include/asm/vdso.h |  2 +-
- arch/arm/kernel/vdso.c      | 10 +++++-----
- 2 files changed, 6 insertions(+), 6 deletions(-)
+Sorry for not being clear in the cover letter that the patches could
+be applied independently.
 
-diff --git a/arch/arm/include/asm/vdso.h b/arch/arm/include/asm/vdso.h
-index d0295f1dd1a3..95b7a4dcd6d2 100644
---- a/arch/arm/include/asm/vdso.h
-+++ b/arch/arm/include/asm/vdso.h
-@@ -11,7 +11,7 @@ struct mm_struct;
- 
- void arm_install_vdso(struct mm_struct *mm, unsigned long addr);
- 
--extern char vdso_start, vdso_end;
-+extern char vdso_start[], vdso_end[];
- 
- extern unsigned int vdso_total_pages;
- 
-diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-index a4d6dc0f2427..f401b51d06ea 100644
---- a/arch/arm/kernel/vdso.c
-+++ b/arch/arm/kernel/vdso.c
-@@ -197,13 +197,13 @@ static int __init vdso_init(void)
- 	unsigned int text_pages;
- 	int i;
- 
--	if (memcmp(&vdso_start, "\177ELF", 4)) {
-+	if (memcmp(vdso_start, "\177ELF", 4)) {
- 		pr_err("VDSO is not a valid ELF object!\n");
- 		return -ENOEXEC;
- 	}
- 
--	text_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
--	pr_debug("vdso: %i text pages at base %p\n", text_pages, &vdso_start);
-+	text_pages = (vdso_end - vdso_start) >> PAGE_SHIFT;
-+	pr_debug("vdso: %i text pages at base %p\n", text_pages, vdso_start);
- 
- 	/* Allocate the VDSO text pagelist */
- 	vdso_text_pagelist = kcalloc(text_pages, sizeof(struct page *),
-@@ -218,7 +218,7 @@ static int __init vdso_init(void)
- 	for (i = 0; i < text_pages; i++) {
- 		struct page *page;
- 
--		page = virt_to_page(&vdso_start + i * PAGE_SIZE);
-+		page = virt_to_page(vdso_start + i * PAGE_SIZE);
- 		vdso_text_pagelist[i] = page;
- 	}
- 
-@@ -229,7 +229,7 @@ static int __init vdso_init(void)
- 
- 	cntvct_ok = cntvct_functional();
- 
--	patch_vdso(&vdso_start);
-+	patch_vdso(vdso_start);
- 
- 	return 0;
- }
--- 
-2.9.0
+Best regards,
+Javier
