@@ -1,85 +1,145 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 23 Aug 2017 16:42:07 +0200
-Subject: [PATCH v2 7/9] PM / ACPI: Avoid runtime resuming device in
- acpi_subsys_suspend|freeze()
+Date: Wed, 23 Aug 2017 16:42:09 +0200
+Subject: [PATCH v2 9/9] i2c: designware: Deploy the runtime PM centric
+ approach for system sleep
 In-Reply-To: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
 References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1503499329-28834-8-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1503499329-28834-10-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the case when the no_direct_complete flag is set for the ACPI device, we
-can under some conditions during system sleep, avoid runtime resuming the
-device in acpi_subsys_suspend|freeze(). This means we can decrease the time
-needed for the device to enter its system sleep state, but also that we can
-avoid to waste power.
+Currently the device is runtime resumed in the i2c-dw-plat driver's
+->suspend() callback, which is needed to manage system sleep properly.
 
-More precisely, calling acpi_dev_needs_resume() from the
-acpi_subsys_suspend|freeze() in cases when the no_direct_complete flag has
-been set for the device, tells us if a runtime resume of the device is
-needed. Thus it may allow us to avoid it.
+The particular reason for the runtime resume is because the PM core may
+unset the direct_complete flag for a parent device, in case its child
+device are being system suspended before. This leads to that the
+i2c-dw-plat driver's ->suspend() callback can be invoked when the device is
+runtime suspended.
+
+Runtime resuming the device in this scenario may be unnecessary, in case
+when the device is already in its proper lower power state for system
+sleep. This behaviour increases the time it takes to put the device into
+low power state, but means also a waste of power.
+
+Let's fix the behaviour by deploying the runtime PM centric path for system
+sleep, via assigning the pm_runtime_force_suspend|resume() helpers as the
+system sleep callbacks for the i2c-dw-plat driver.
+
+To deploy this, we must also make sure that the direct_complete path isn't
+used for the device. Therefore we drop the ->prepare() callback from the
+i2c-dw-plat driver and we inform the ACPI PM domain to not try out the
+direct_complete path for the device, as that is the default behaviour for
+the ACPI PM domain.
+
+Along with the runtime PM centric path, we also get some additional
+improvements of the behaviour during system sleep. More precisely:
+
+*)
+In case the device is/gets runtime resumed before the device_suspend()
+phase is entered, the PM core doesn't run the direct_complete path for the
+device during system sleep. During system resume, this lead to that the
+device will always be brought back to full power when the i2c-dw-plat
+driver's ->resume() callback is invoked. This may not be necessary, thus
+increasing the resume time for the device and wasting power.
+
+In the runtime PM centric path, the pm_runtime_force_resume() helper takes
+better care, as it resumes the device only in case it's really needed.
+Normally this means it can be postponed to be dealt with via regular calls
+to runtime PM (pm_runtime_get*()) instead. In other words, the device
+remains in its low power state until someone request a new i2c transfer,
+whenever that may be.
+
+**)
+In case the device is runtime suspended when the ->prepare() callback is
+invoked, the direct_complete path is tried by the PM core. If it succeeds,
+this leads to disabling runtime PM for the device in the device_suspend()
+phase. That is a problem in cases when others may need the device to be
+operational, as to be able send i2c transfers during the entire
+device_suspend() phase.
+
+By using the runtime PM centric path, we postpones runtime PM to be
+disabled for the device by the PM core to the regular device_suspend_late()
+phase.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
 
 Changes in v2:
-	- Clarified changelog.
-	- Improved comments is code.
 	- Rebased.
-	- Improved change to avoid open-coding.
+	- Clarify changelog.
 
 ---
- drivers/acpi/device_pm.c | 23 +++++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
+ drivers/i2c/busses/i2c-designware-platdrv.c | 27 ++++++---------------------
+ 1 file changed, 6 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
-index b595968..5dd23de 100644
---- a/drivers/acpi/device_pm.c
-+++ b/drivers/acpi/device_pm.c
-@@ -1117,11 +1117,19 @@ EXPORT_SYMBOL_GPL(acpi_subsys_complete);
-  * @dev: Device to handle.
-  *
-  * Follow PCI and resume devices suspended at run time before running their
-- * system suspend callbacks.
-+ * system suspend callbacks. However, try to avoid it when no_direct_complete
-+ * is set.
-  */
- int acpi_subsys_suspend(struct device *dev)
+diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+index fc6b99f..e0cbf5e 100644
+--- a/drivers/i2c/busses/i2c-designware-platdrv.c
++++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+@@ -372,6 +372,7 @@ static int dw_i2c_plat_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto exit_probe;
+ 
++	acpi_dev_disable_direct_complete(&pdev->dev);
+ 	return ret;
+ 
+ exit_probe:
+@@ -387,6 +388,7 @@ static int dw_i2c_plat_remove(struct platform_device *pdev)
  {
--	pm_runtime_resume(dev);
-+	struct acpi_device *adev = ACPI_COMPANION(dev);
-+
-+	if (!adev)
-+		return 0;
-+
-+	if (!adev->power.no_direct_complete || acpi_dev_needs_resume(dev, adev))
-+		pm_runtime_resume(dev);
-+
- 	return pm_generic_suspend(dev);
- }
- EXPORT_SYMBOL_GPL(acpi_subsys_suspend);
-@@ -1178,13 +1186,20 @@ EXPORT_SYMBOL_GPL(acpi_subsys_resume_early);
-  */
- int acpi_subsys_freeze(struct device *dev)
+ 	struct dw_i2c_dev *dev = platform_get_drvdata(pdev);
+ 
++	acpi_dev_enable_direct_complete(&pdev->dev);
+ 	pm_runtime_get_sync(&pdev->dev);
+ 
+ 	i2c_del_adapter(&dev->adapter);
+@@ -413,15 +415,6 @@ static const struct of_device_id dw_i2c_of_match[] = {
+ MODULE_DEVICE_TABLE(of, dw_i2c_of_match);
+ #endif
+ 
+-#ifdef CONFIG_PM_SLEEP
+-static int dw_i2c_plat_prepare(struct device *dev)
+-{
+-	return pm_runtime_suspended(dev);
+-}
+-#else
+-#define dw_i2c_plat_prepare	NULL
+-#endif
+-
+ #ifdef CONFIG_PM
+ static int dw_i2c_plat_runtime_suspend(struct device *dev)
  {
-+	struct acpi_device *adev = ACPI_COMPANION(dev);
-+
-+	if (!adev)
-+		return 0;
-+
- 	/*
- 	 * This used to be done in acpi_subsys_prepare() for all devices and
- 	 * some drivers may depend on it, so do it here.  Ideally, however,
- 	 * runtime-suspended devices should not be touched during freeze/thaw
--	 * transitions.
-+	 * transitions. In case the no_direct_complete is set, try to avoid it.
- 	 */
--	pm_runtime_resume(dev);
-+	if (!adev->power.no_direct_complete || acpi_dev_needs_resume(dev, adev))
-+		pm_runtime_resume(dev);
-+
- 	return pm_generic_freeze(dev);
+@@ -434,7 +427,7 @@ static int dw_i2c_plat_runtime_suspend(struct device *dev)
+ 	return 0;
  }
- EXPORT_SYMBOL_GPL(acpi_subsys_freeze);
+ 
+-static int dw_i2c_plat_resume(struct device *dev)
++static int dw_i2c_plat_runtime_resume(struct device *dev)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	struct dw_i2c_dev *i_dev = platform_get_drvdata(pdev);
+@@ -445,19 +438,11 @@ static int dw_i2c_plat_resume(struct device *dev)
+ 	return 0;
+ }
+ 
+-#ifdef CONFIG_PM_SLEEP
+-static int dw_i2c_plat_suspend(struct device *dev)
+-{
+-	pm_runtime_resume(dev);
+-	return dw_i2c_plat_runtime_suspend(dev);
+-}
+-#endif
+-
+ static const struct dev_pm_ops dw_i2c_dev_pm_ops = {
+-	.prepare = dw_i2c_plat_prepare,
+-	SET_SYSTEM_SLEEP_PM_OPS(dw_i2c_plat_suspend, dw_i2c_plat_resume)
++	SET_LATE_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
++				     pm_runtime_force_resume)
+ 	SET_RUNTIME_PM_OPS(dw_i2c_plat_runtime_suspend,
+-			   dw_i2c_plat_resume,
++			   dw_i2c_plat_runtime_resume,
+ 			   NULL)
+ };
+ 
 -- 
 2.7.4
