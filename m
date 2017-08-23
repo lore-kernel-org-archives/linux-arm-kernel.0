@@ -1,68 +1,35 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 23 Aug 2017 18:29:52 +0100
-Subject: [PATCH 14/27] arm64/sve: Backend logic for setting the vector
- length
-In-Reply-To: <87shgi9u4h.fsf@linaro.org>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-15-git-send-email-Dave.Martin@arm.com>
- <87shgi9u4h.fsf@linaro.org>
-Message-ID: <20170823172952.GB6321@e103592.cambridge.arm.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Wed, 23 Aug 2017 20:23:30 +0300
+Subject: [PATCH v7 2/5] dt-bindings: List devicetree binding for the CCU of
+ Allwinner A20
+In-Reply-To: <cover.2a284ee63f45063ec7c0720b1098860e0b516c6d.1503507503.git-series.plaes@plaes.org>
+References: <cover.2a284ee63f45063ec7c0720b1098860e0b516c6d.1503507503.git-series.plaes@plaes.org>
+Message-ID: <9723e9c9341f5d7d23a01a3d6d37b7acdb8aa3cf.1503507503.git-series.plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 04:33:18PM +0100, Alex Benn?e wrote:
-> 
-> Dave Martin <Dave.Martin@arm.com> writes:
-> 
-> > This patch implements the core logic for changing a task's vector
-> > length on request from userspace.  This will be used by the ptrace
-> > and prctl frontends that are implemented in later patches.
-> >
-> > The SVE architecture permits, but does not require, implementations
-> > to support vector lengths that are not a power of two.  To handle
-> > this, logic is added to check a requested vector length against a
-> > possibly sparse bitmap of available vector lengths at runtime, so
-> > that the best supported value can be chosen.
-> >
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > ---
-> >  arch/arm64/include/asm/fpsimd.h |   6 +++
-> >  arch/arm64/kernel/fpsimd.c      | 116 ++++++++++++++++++++++++++++++++++++++++
-> >  include/uapi/linux/prctl.h      |   5 ++
-> >  3 files changed, 127 insertions(+)
-> >
-> > diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-> > index 7efd04e..39b26d2 100644
-> > --- a/arch/arm64/include/asm/fpsimd.h
-> > +++ b/arch/arm64/include/asm/fpsimd.h
-> > @@ -70,11 +70,15 @@ extern void fpsimd_update_current_state(struct fpsimd_state *state);
-> >
-> >  extern void fpsimd_flush_task_state(struct task_struct *target);
-> >
-> > +#define SVE_VL_ARCH_MAX 0x100
-> > +
-> 
-> Hmm this isn't the same as SVE_VL_MAX. Why aren't we using that?
+Allwinner A20 is now driven by sunxi-ng CCU driver.
 
-There should probably be a comment on this.
+Add devicetree binding for it.
 
-SVE vector-length agnostic software needs to be able to assume that
-VL <= 256 (the SVE maximum), because some instructions won't work as
-expected if this is not the case, particularly TBL, where in a larger
-vector there's no guarantee that a vector index (which might be as small
-as a byte) can index a vector element (of which there could be >256).
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Priit Laes <plaes@plaes.org>
+---
+ Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-I really don't want to expose SVE_VL_ARCH_MAX to userspace, so that
-people are not tempted to design data structures and protocols that
-can't handle up to SVE_VL_MAX.  Exposing both together seemed to carry
-a high risk of confusion and misuse.
-
-Instead, I silently clamp to an SVE-compatible length (i.e.,
-SVE_VL_ARCH_MAX) in sve_set_vector_length().  If future architecture
-revisions support larger vectors later on, my plan is to require an
-extra "force flag" to be passed to override the clamp.
-
-[...]
-
-Cheers
----Dave
+diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+index a082260..2712891 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+@@ -6,6 +6,7 @@ Required properties :
+ 		- "allwinner,sun5i-a10s-ccu"
+ 		- "allwinner,sun5i-a13-ccu"
+ 		- "allwinner,sun6i-a31-ccu"
++		- "allwinner,sun7i-a20-ccu"
+ 		- "allwinner,sun8i-a23-ccu"
+ 		- "allwinner,sun8i-a33-ccu"
+ 		- "allwinner,sun8i-a83t-ccu"
+-- 
+git-series 0.9.1
