@@ -1,56 +1,59 @@
-From: wulf@rock-chips.com (wlf)
-Date: Wed, 23 Aug 2017 20:22:42 +0800
-Subject: [PATCH v3 1/3] dt-bindings: usb: add DT binding for RK3328 dwc3
- controller
-In-Reply-To: <1503322566-31489-2-git-send-email-william.wu@rock-chips.com>
-References: <1503322566-31489-1-git-send-email-william.wu@rock-chips.com>
- <1503322566-31489-2-git-send-email-william.wu@rock-chips.com>
-Message-ID: <4406bd06-8b2b-9e30-f0b4-b41596622782@rock-chips.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 23 Aug 2017 14:34:24 +0200
+Subject: [EXT] Re: [PATCH net-next 03/18] net: mvpp2: set the SMI PHY
+ address when connecting to the PHY
+In-Reply-To: <f6d8907b057241c7a72da0a0255cfd23@IL-EXCH01.marvell.com>
+References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
+ <20170724134848.19330-4-antoine.tenart@free-electrons.com>
+ <20170726160806.GF12049@lunn.ch> <20170728014905.GC24728@kwain>
+ <20170728042153.GH18666@lunn.ch>
+ <f6d8907b057241c7a72da0a0255cfd23@IL-EXCH01.marvell.com>
+Message-ID: <20170823123424.GA28612@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Balbi & Gregkh,
+> 2. Auto-Negotiation with PHY devices connected to the GMAC ports.
+> The device uses a standard master Serial Management Interface for reading from/writing to the PHY
+> registers. In addition, the PHY polling unit performs Auto-Negotiation status update with PHY devices attached
+> to the Network ports via the Master SMI Interface.
+> The device polls the Status register of each PHY in a round-robin manner.
+> If the device detects a change in the link from down to up on 1 of the ports, it performs a series of
+> register reads from the PHY and updates the Auto-Negotiation results in the device's registers. The
+> Port MAC Status register is updated with these results only if Auto-Negotiation is enabled.
 
-? 2017?08?21? 21:36, William Wu ??:
-> Adds the device tree bindings description for RK3328 and
-> compatible USB DWC3 controller.
->
-> Signed-off-by: William Wu <william.wu@rock-chips.com>
-> ---
-> Changes in v3:
-> - Add this for separate usb dt-bindings patch.
->
-> Changes in v2:
-> - None
->
->   Documentation/devicetree/bindings/usb/rockchip,dwc3.txt | 4 +++-
->   1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
-> index 0536a93..d6b2e47 100644
-> --- a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
-> +++ b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
-> @@ -1,7 +1,9 @@
->   Rockchip SuperSpeed DWC3 USB SoC controller
->   
->   Required properties:
-> -- compatible:	should contain "rockchip,rk3399-dwc3" for rk3399 SoC
-> +- compatible:	should be one of the following:
-> +  - "rockchip,rk3399-dwc3": for rk3399 SoC
-> +  - "rockchip,rk3328-dwc3", "rockchip,rk3399-dwc3": for rk3328 SoC
->   - clocks:	A list of phandle + clock-specifier pairs for the
->   		clocks listed in clock-names
->   - clock-names:	Should contain the following:
-         Could you help to reviewed this patch? According to Heiko's 
-suggestion, this patch
-         need to be submitted to usb tree or at least get an Ack from you.
+Hi Stefan
 
-         Thank you!
+That is what i was afraid off.
 
--- 
-??? William.Wu
-?????????????89????A?21??
-No.21 Building, A District, No.89,software Boulevard Fuzhou,Fujian, PRC
-??: 13685012275
-??: 0591-83991906-8520
-??:wulf at rock-chips.com
+How clever is this phy polling hardware? e.g. Say somebody reads the
+PHY temperature sensor:
+
+commit 0b04680fdae464ee51409b8cb36005f6ef8bd689
+Author: Andrew Lunn <andrew@lunn.ch>
+Date:   Fri Jan 20 01:37:49 2017 +0100
+
+    phy: marvell: Add support for temperature sensor
+    
+    Some Marvell PHYs have an inbuilt temperature sensor. Add hwmon
+    support for this sensor.
+    
+    There are two different variants. The simpler, older chips have a 5
+    degree accuracy. The newer devices have 1 degree accuracy.
+    
+    Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+
+This requires changing the PHY page to 0x1a. Any reads the polling
+unit does at that time are going to get registers from page 0x1a, not
+0x0.
+
+And there are other examples where the page may change,
+e.g. configuring WOL, LEDs. Cable test is not yet supported, but it is
+on my todo list.
+
+In order to safely read/write the PHY, you need to hold the PHY mutex.
+Unless the hardware is very smart, please don't enable this. Let the
+phylib and the appropriate PHY driver do the work.
+
+       Andrew
