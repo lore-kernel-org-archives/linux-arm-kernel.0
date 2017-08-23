@@ -1,34 +1,31 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 24 Aug 2017 00:41:08 +0200
-Subject: [PATCH v2 1/9] PM / ACPI: Restore acpi_subsys_complete()
-In-Reply-To: <1503499329-28834-2-git-send-email-ulf.hansson@linaro.org>
-References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
- <1503499329-28834-2-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CAJZ5v0iAanGEvRF=J-wL9jKoBpZoGGc7+BXokt4PLWKxi85ctA@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 23 Aug 2017 18:28:29 -0500
+Subject: [PATCH 1/3] gliolib: request the gpio before querying its
+ direction
+In-Reply-To: <CACRpkdZv0NjXfwm_-TSoY=QFeP64V-ZoKvmLXk3qkV49fq1UtQ@mail.gmail.com>
+References: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
+ <1501179565-26466-2-git-send-email-timur@codeaurora.org>
+ <CACRpkdYPBd4ZvuXo__LRQezTQD3u=3r2WO+2dTzBanLL1zX72w@mail.gmail.com>
+ <103341c8-6cc5-3d3f-eef7-28b9f31cdc71@codeaurora.org>
+ <CACRpkdZv0NjXfwm_-TSoY=QFeP64V-ZoKvmLXk3qkV49fq1UtQ@mail.gmail.com>
+Message-ID: <e1eae89c-f007-2e0b-cbb8-1aba71dae0e1@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 4:42 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> The commit 58a1fbbb2ee8 ("PM / PCI / ACPI: Kick devices that might have
-> been reset by firmware"), made PCI's and ACPI's ->complete() callbacks to
-> be assigned to a new API called pm_complete_with_resume_check(), which was
-> introduced in the same change.
->
-> Later it turned out that using pm_complete_with_resume_check() isn't good
-> enough for PCI, as it needs additional PCI specific checks, before deciding
-> whether runtime resuming the device is needed when running the ->complete()
-> callback.
->
-> This leaves ACPI being the only user of pm_complete_with_resume_check().
+On 08/23/2017 03:32 AM, Linus Walleij wrote:
+> It's right there on the "devel" branch from the GPIO git tree.
+> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git/log/?h=devel
 
-I would say "the ACPI PM domain" instead of just "ACPI" here, because
-in fact this is only about the ACPI PM domain.
+The devel branch is missing this commit:
 
-This more-or-less applies to all of the changelogs in this series and
-to some comments added by it too: please be specific that it is *only*
-about the ACPI PM domain.
+https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git/commit/?id=83cf5faeba37fede8a6274d07f646d1cd1b25d35
 
-The patch itself is fine.
+which I need to avoid a merge conflict.  I'm going to submit a new 
+version of my patches, but they won't apply on top of 'devel' unless you 
+pull in that commit from linux-pinctrl.  Or you could copy that my 
+gpiolib commit to linux-pinctrl.
 
-Thanks,
-Rafael
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
