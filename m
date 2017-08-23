@@ -1,53 +1,47 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 23 Aug 2017 00:40:45 -0400
-Subject: [PATCH v11 2/4] PCI: Factor out pci_bus_wait_crs()
-In-Reply-To: <eca38319-9e78-1a9c-b275-43944fd0a63d@codeaurora.org>
-References: <20170818212310.15145.21732.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20170818213210.15145.15340.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <9cb3006d-31d0-e57a-fd3e-c32914e8ba42@codeaurora.org>
- <20170821191806.GC28977@bhelgaas-glaptop.roam.corp.google.com>
- <eca38319-9e78-1a9c-b275-43944fd0a63d@codeaurora.org>
-Message-ID: <b9cbd3d8-dec5-65db-efec-b84f1e96985d@codeaurora.org>
+From: aneela@codeaurora.org (Arun Kumar Neelakantam)
+Date: Wed, 23 Aug 2017 10:14:44 +0530
+Subject: [PATCH 13/18] rpmsg: glink: Add rx done command
+In-Reply-To: <67a2b4db-fabb-9787-6813-7bd001814bfc@codeaurora.org>
+References: <1502903951-5403-1-git-send-email-sricharan@codeaurora.org>
+ <1502903951-5403-14-git-send-email-sricharan@codeaurora.org>
+ <a5f890fe-7405-ff03-9a43-0e4d62683cb6@codeaurora.org>
+ <67a2b4db-fabb-9787-6813-7bd001814bfc@codeaurora.org>
+Message-ID: <6b36382b-8889-0a10-d276-fe6d5bd1874e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/21/2017 3:37 PM, Sinan Kaya wrote:
-> bool pci_bus_crs_pending(struct pci_dev *dev, u32 l)
-> {
-> 	if !pci_bus_crs_vis_supported(dev->parent)
-> 		return false;
-
-Apparently, I can't do this. By the time, we come to here from vendor id read
-function, the topology has not been set up yet. 
-
-I'm getting an exception:
-
-[    6.067392] [<ffff00000846c878>] pci_bus_crs_visibility_pending+0x4/0x7c
-[    6.074085] [<ffff00000846cccc>] pci_scan_single_device+0x40/0xb4
-[    6.080170] [<ffff00000846cd90>] pci_scan_slot+0x50/0xe8
-[    6.085474] [<ffff00000846dc14>] pci_scan_child_bus+0x30/0x108
-[    6.091300] [<ffff0000084bab94>] acpi_pci_root_create+0x184/0x1f0
-[    6.097388] [<ffff000008091dc8>] pci_acpi_scan_root+0x188/0x1d4
-[    6.103298] [<ffff0000084ba7a8>] acpi_pci_root_add+0x38c/0x44c
-[    6.109125] [<ffff0000084b4d94>] acpi_bus_attach+0xe0/0x1ac
-[    6.114689] [<ffff0000084b4e08>] acpi_bus_attach+0x154/0x1ac
-[    6.120340] [<ffff0000084b4e08>] acpi_bus_attach+0x154/0x1ac
-[    6.125991] [<ffff0000084b6608>] acpi_bus_scan+0x60/0x70
-[    6.131297] [<ffff0000091c87f8>] acpi_scan_init+0xd8/0x228
-[    6.136774] [<ffff0000091c84e0>] acpi_init+0x2d4/0x328
-[    6.141905] [<ffff0000091a0c88>] do_one_initcall+0x80/0x108
-[    6.147469] [<ffff0000091a0e98>] kernel_init_freeable+0x188/0x228
-[    6.153556] [<ffff000008c9bcbc>] kernel_init+0x10/0xfc
-[    6.158687] [<ffff000008082ec0>] ret_from_fork+0x10/0x50
 
 
+On 8/22/2017 7:46 PM, Sricharan R wrote:
+> Hi,
+>>> +??? /* Take it off the tree of receive intents */
+>>> +??? if (!intent->reuse) {
+>>> +??????? spin_lock(&channel->intent_lock);
+>>> +??????? idr_remove(&channel->liids, intent->id);
+>>> +??????? spin_unlock(&channel->intent_lock);
+>>> +??? }
+>>> +
+>>> +??? /* Schedule the sending of a rx_done indication */
+>>> +??? spin_lock(&channel->intent_lock);
+>>> +??? list_add_tail(&intent->node, &channel->done_intents);
+>>> +??? spin_unlock(&channel->intent_lock);
+>>> +
+>>> +??? schedule_work(&channel->intent_work);
+>> Adding one more parallel path will hit performance, if this worker could not get CPU cycles
+>> or blocked by other RT or HIGH_PRIO worker on global worker pool.
+>   The idea is, by design to have parallel non-blocking paths for rx and tx (that is done as a
+>   part of rx by sending the rx_done command), otherwise trying to send the rx_done
+>   command in the rx isr context is a problem since the tx can wait for the FIFO space and
+>   in worst case, can even lead to a potential deadlock if both the local and remote try
+>   the same. Having said that, instead of queuing this work in to the global queue, this
+>   can be put in to a local glink edge owned queue (or) a threaded isr ?, downstream does the
+>   rx_done in a client specific worker.
 
-> 
-> 	return (l & 0xFFFF) == 0x0001;
-> }
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Yes, mixing RX and TX path will cause dead lock. I am okay to use 
+specific queue with HIGH_PRIO or a threaded isr.
+down stream uses both client specific worker and client RX cb [this mix 
+the TX and RX path] which want to avoid.
+>
+> Regards,
+>   Sricharan
+>
