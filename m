@@ -1,149 +1,114 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Wed, 23 Aug 2017 17:58:10 +0800
-Subject: [PATCH v1 1/3] arm64: dts: rockchip: add mmc nodes for rk3328
- evaluation board
-In-Reply-To: <1503477632-9661-2-git-send-email-cl@rock-chips.com>
-References: <1503477632-9661-1-git-send-email-cl@rock-chips.com>
- <1503477632-9661-2-git-send-email-cl@rock-chips.com>
-Message-ID: <70373b2e-2b2f-215e-04e3-1559a00950f0@rock-chips.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Aug 2017 11:17:24 +0100
+Subject: [PATCH v5 2/4] perf tools arm64: Add support for get_cpuid_str
+ function.
+In-Reply-To: <20170816071048.26087-3-ganapatrao.kulkarni@cavium.com>
+References: <20170816071048.26087-1-ganapatrao.kulkarni@cavium.com>
+ <20170816071048.26087-3-ganapatrao.kulkarni@cavium.com>
+Message-ID: <20170823101723.GD27301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 2017/8/23 16:40, cl at rock-chips.com wrote:
-> From: Liang Chen <cl@rock-chips.com>
+On Wed, Aug 16, 2017 at 12:40:46PM +0530, Ganapatrao Kulkarni wrote:
+> function get_cpuid_str returns MIDR string of the first online
+> cpu from the range of cpus associated with the pmu core device.
 > 
-> Rockchip's rk3328 evaluation board has 3 mmc controllers for
-> sdio/sdmmc/emmc, let's enable them.
-> 
-> Signed-off-by: Liang Chen <cl@rock-chips.com>
+> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 > ---
->   arch/arm64/boot/dts/rockchip/rk3328-evb.dts | 74 +++++++++++++++++++++++++++++
->   1 file changed, 74 insertions(+)
+>  tools/perf/arch/arm64/util/Build    |  1 +
+>  tools/perf/arch/arm64/util/header.c | 61 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 62 insertions(+)
+>  create mode 100644 tools/perf/arch/arm64/util/header.c
 > 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-> index 86605ae..479f9d9 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-> +++ b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-> @@ -60,6 +60,20 @@
->   		regulator-max-microvolt = <12000000>;
->   	};
->   
-> +	sdio_pwrseq: sdio-pwrseq {
-> +		compatible = "mmc-pwrseq-simple";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&wifi_enable_h>;
+> diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
+> index cef6fb3..b1ab72d 100644
+> --- a/tools/perf/arch/arm64/util/Build
+> +++ b/tools/perf/arch/arm64/util/Build
+> @@ -1,3 +1,4 @@
+> +libperf-y += header.o
+>  libperf-$(CONFIG_DWARF)     += dwarf-regs.o
+>  libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
+>  
+> diff --git a/tools/perf/arch/arm64/util/header.c b/tools/perf/arch/arm64/util/header.c
+> new file mode 100644
+> index 0000000..713ef17
+> --- /dev/null
+> +++ b/tools/perf/arch/arm64/util/header.c
+> @@ -0,0 +1,61 @@
+> +#include <stdio.h>
+> +#include <stdlib.h>
+> +#include <api/fs/fs.h>
+> +#include "header.h"
 > +
-> +		/*
-> +		 * On the module itself this is one of these (depending
-> +		 * on the actual card populated):
-> +		 * - SDIO_RESET_L_WL_REG_ON
-> +		 * - PDN (power down when low)
+> +#define MIDR "/regs/identification/midr_el1"
+> +#define MIDR_SIZE 128
+
+Why is this so big?
+
+> +char *get_cpuid_str(struct perf_pmu *pmu)
+> +{
+> +	char *buf = NULL;
+> +	char *temp = NULL;
+> +	char path[PATH_MAX];
+> +	const char *sysfs = sysfs__mountpoint();
+> +	int cpu;
+> +	unsigned long long midr = 0;
+> +	struct cpu_map *cpus;
+> +	FILE *file;
+> +
+> +	if (!sysfs || !pmu->cpus)
+> +		return NULL;
+> +
+> +	buf = malloc(MIDR_SIZE);
+> +	if (!buf)
+> +		return NULL;
+> +
+> +	/* read midr from list of cpus mapped to this pmu */
+> +	cpus = cpu_map__get(pmu->cpus);
+> +	for (cpu = 0; cpu < cpus->nr; cpu++) {
+> +		scnprintf(path, PATH_MAX, "%s/devices/system/cpu/cpu%d"MIDR,
+> +				sysfs, cpus->map[cpu]);
+> +
+> +		file = fopen(path, "r");
+> +		if (!file) {
+> +			pr_err("fopen failed for file %s\n", path);
+
+pr_debug instead? It's not fatal if a CPU is hotplugged off and you can't
+read its midr.
+
+> +			continue;
+> +		}
+> +
+> +		temp = fgets(buf, MIDR_SIZE, file);
+> +		if (!temp)
+> +			continue;
+
+Do you actually need a temporary variable for this?
+
+> +		fclose(file);
+> +
+> +		/* Ignore/clear Variant[23:20] and
+> +		 * Revision[3:0] of MIDR
 > +		 */
-> +		reset-gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
-> +	};
+> +		midr = strtoll(buf, NULL, 16);
+> +		midr &= (~(0xf << 20 | 0xf));
+
+If midr really needs to be unsigned long long (u64 might be better), then
+you need to fix these immediates to have a ULL suffix.
+
+Can you use the GENMASK_ULL macro to generate the MIDR mask, or is that
+not available here?
+
+> +		scnprintf(buf, MIDR_SIZE, "0x%016llx", midr);
+> +		/* got midr break loop */
+> +		break;
+> +	}
 > +
->   	vcc_sys: vcc-sys {
->   		compatible = "regulator-fixed";
->   		regulator-name = "vcc_sys";
-> @@ -69,6 +83,29 @@
->   		regulator-max-microvolt = <5000000>;
->   		vin-supply = <&dc_12v>;
->   	};
-> +
-> +	vcc_sd: sdmmc-regulator {
-> +		compatible = "regulator-fixed";
-> +		gpio = <&gpio0 30 GPIO_ACTIVE_LOW>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&sdmmc0m1_gpio>;
-> +		regulator-name = "vcc_sd";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		vin-supply = <&vcc_io>;
-> +	};
-> +};
-> +
-> +&emmc {
-> +	bus-width = <8>;
-> +	cap-mmc-highspeed;
-> +	supports-emmc;
-> +	disable-wp;
+> +	if (!midr) {
+> +		free(buf);
+> +		buf = NULL;
 
-Please remove supports-{emmc,sd, sdio} for all mmc node.
+If you want the pr_err, here would seem more appropriate because at this
+point we've actually failed.
 
-And disable-wp is for SD *only*.
-
-> +	non-removable;
-> +	num-slots = <1>;
-
-num-slots is deprecated.
-
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_bus8>;
-> +	status = "okay";
->   };
->   
->   &i2c1 {
-> @@ -186,6 +223,43 @@
->   			rockchip,pins = <2 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>;
->   		};
->   	};
-> +
-> +	sdio-pwrseq {
-> +		wifi_enable_h: wifi-enable-h {
-> +		rockchip,pins =
-> +			<1 18 RK_FUNC_GPIO &pcfg_pull_none>;
-> +		};
-> +	};
-> +};
-> +
-> +&sdio {
-> +	bus-width = <4>;
-> +	cap-sd-highspeed;
-> +	cap-sdio-irq;
-> +	disable-wp;
-
-Ditto
-
-> +	keep-power-in-suspend;
-> +	max-frequency = <150000000>;
-> +	mmc-pwrseq = <&sdio_pwrseq>;
-> +	non-removable;
-> +	num-slots = <1>;
-
-Ditto
-
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&sdmmc1_bus4 &sdmmc1_cmd &sdmmc1_clk>;
-> +	supports-sdio;
-
-Ditto
-
-> +	status = "okay";
-> +};
-> +
-> +&sdmmc {
-> +	bus-width = <4>;
-> +	cap-mmc-highspeed;
-> +	cap-sd-highspeed;
-
-Ditto
-
-> +	disable-wp;
-> +	max-frequency = <150000000>;
-> +	num-slots = <1>;
-
-Ditto
-
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&sdmmc0_clk &sdmmc0_cmd &sdmmc0_dectn &sdmmc0_bus4>;
-> +	supports-sd;
-
-Ditto
-
-> +	vmmc-supply = <&vcc_sd>;
-> +	status = "okay";
->   };
->   
->   &tsadc {
-> 
+Will
