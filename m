@@ -1,113 +1,56 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 23 Aug 2017 00:56:09 -0400
-Subject: [PATCH V12 3/5] PCI: Factor out pci_bus_wait_crs()
-In-Reply-To: <1503464171-6471-1-git-send-email-okaya@codeaurora.org>
-References: <1503464171-6471-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1503464171-6471-3-git-send-email-okaya@codeaurora.org>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 22 Aug 2017 22:35:36 -0700
+Subject: [PATCH] binder: let ANDROID_BINDER_IPC_32BIT be selectable on
+ 32bit ARM
+In-Reply-To: <20170823103420.6ffb5ce7@xhacker>
+References: <20170808110305.2748-1-jszhang@marvell.com>
+ <20170823015108.GA18228@kroah.com>
+ <20170823103420.6ffb5ce7@xhacker>
+Message-ID: <20170823053536.GB23426@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configuration Request Retry Status (CRS) was previously hidden inside
-pci_bus_read_dev_vendor_id().  We want to add support for CRS in other
-situations, such as waiting for a device to become ready after a Function
-Level Reset.
+On Wed, Aug 23, 2017 at 10:34:20AM +0800, Jisheng Zhang wrote:
+> On Tue, 22 Aug 2017 18:51:08 -0700 Greg KH wrote:
+> 
+> > On Tue, Aug 08, 2017 at 07:03:05PM +0800, Jisheng Zhang wrote:
+> > > As noted in commit d0bdff0db809 ("staging: Fix build issues with new
+> > > binder API"), we can add back the choice for 32bit ARM "once a 64bit
+> > > __get_user_asm_* implementation is merged." Commit e38361d032f1 ("ARM:
+> > > 8091/2: add get_user() support for 8 byte types") has added the
+> > > support, so it's time to let ANDROID_BINDER_IPC_32BIT be selectable on
+> > > 32bit ARM  
+> > 
+> > Ok, but:
+> > 
+> > > 
+> > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > > ---
+> > >  drivers/android/Kconfig | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/android/Kconfig b/drivers/android/Kconfig
+> > > index 832e885349b1..aca5dc30b97b 100644
+> > > --- a/drivers/android/Kconfig
+> > > +++ b/drivers/android/Kconfig
+> > > @@ -32,7 +32,7 @@ config ANDROID_BINDER_DEVICES
+> > >  	  therefore logically separated from the other devices.
+> > >  
+> > >  config ANDROID_BINDER_IPC_32BIT
+> > > -	bool
+> > > +	bool "Use old (Android 4.4 and earlier) 32-bit binder API"
+> > >  	depends on !64BIT && ANDROID_BINDER_IPC  
+> > 
+> > You don't actually change the depends line :(
+> > 
+> > Please fix up, and test it, and then resend.
+> 
+> IHOM, the dependency is correct: 64bit platforms don't support
+> ANDROID_BINDER_IPC_32BIT. What do you think?
 
-Move CRS handling into pci_bus_wait_crs() so it can be called from other
-places.
+I think your changelog text is totally wrong, please fix this up
+properly and resend it if you think it is needed.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/pci.h   |  1 +
- drivers/pci/probe.c | 46 ++++++++++++++++++++++++++++------------------
- 2 files changed, 29 insertions(+), 18 deletions(-)
+thanks,
 
-diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
-index 7fa583a..56d2515 100644
---- a/drivers/pci/pci.h
-+++ b/drivers/pci/pci.h
-@@ -239,6 +239,7 @@ static inline bool pci_bus_crs_visibility_pending(u32 l)
- {
- 	return (l & 0xffff) == 0x0001;
- }
-+bool pci_bus_wait_crs(struct pci_bus *bus, int devfn, u32 l, int timeout);
- bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *pl,
- 				int crs_timeout);
- int pci_setup_device(struct pci_dev *dev);
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 2849e0e..93b89dd 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1824,30 +1824,23 @@ struct pci_dev *pci_alloc_dev(struct pci_bus *bus)
- }
- EXPORT_SYMBOL(pci_alloc_dev);
- 
--bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
--				int crs_timeout)
-+bool pci_bus_wait_crs(struct pci_bus *bus, int devfn, u32 l, int timeout)
- {
- 	int delay = 1;
- 
--	if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
--		return false;
-+	if ((l & 0xffff) != 0x0001)
-+		return true;	/* not a CRS completion */
- 
--	/* some broken boards return 0 or ~0 if a slot is empty: */
--	if (*l == 0xffffffff || *l == 0x00000000 ||
--	    *l == 0x0000ffff || *l == 0xffff0000)
--		return false;
-+	if (!timeout)
-+		return false;	/* CRS, but caller doesn't want to wait */
- 
- 	/*
--	 * Configuration Request Retry Status.  Some root ports return the
--	 * actual device ID instead of the synthetic ID (0xFFFF) required
--	 * by the PCIe spec.  Ignore the device ID and only check for
--	 * (vendor id == 1).
-+	 * We got the reserved Vendor ID that indicates a completion with
-+	 * Configuration Request Retry Status (CRS).  Retry until we get a
-+	 * valid Vendor ID or we time out.
- 	 */
--	while ((*l & 0xffff) == 0x0001) {
--		if (!crs_timeout)
--			return false;
--
--		if (delay > crs_timeout) {
-+	while ((l & 0xffff) == 0x0001) {
-+		if (delay > timeout) {
- 			printk(KERN_WARNING "pci %04x:%02x:%02x.%d: not responding\n",
- 			       pci_domain_nr(bus), bus->number, PCI_SLOT(devfn),
- 			       PCI_FUNC(devfn));
-@@ -1857,12 +1850,29 @@ bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
- 		msleep(delay);
- 		delay *= 2;
- 
--		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
-+		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, &l))
- 			return false;
- 	}
- 
- 	return true;
- }
-+
-+bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
-+				int timeout)
-+{
-+	if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
-+		return false;
-+
-+	/* some broken boards return 0 or ~0 if a slot is empty: */
-+	if (*l == 0xffffffff || *l == 0x00000000 ||
-+	    *l == 0x0000ffff || *l == 0xffff0000)
-+		return false;
-+
-+	if (pci_bus_crs_visibility_pending(*l))
-+		return pci_bus_wait_crs(bus, devfn, *l, timeout);
-+
-+	return true;
-+}
- EXPORT_SYMBOL(pci_bus_read_dev_vendor_id);
- 
- /*
--- 
-1.9.1
+greg k-h
