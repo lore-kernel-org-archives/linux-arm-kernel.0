@@ -1,297 +1,73 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 23 Aug 2017 11:58:50 +0100
-Subject: [PATCH v6] irqchip: Add support for tango interrupt router
-In-Reply-To: <21670cea-beaf-8a41-84fb-f3c892527b0e@free.fr>
-References: <657580dd-0cfe-e377-e425-0deabf6d20c3@free.fr>
- <20170606175219.34ef62b9@free-electrons.com>
- <d8a4d8ad-a9f3-07eb-9e2a-a4bbec01961e@free.fr>
- <dfb86360-2247-65bb-602b-5c21029709fd@free.fr>
- <c0bd235a-9035-2002-31eb-e68710b076fd@free.fr>
- <24f34220-a017-f4e0-b72e-d1fdb014c0e1@free.fr>
- <9f384711-eef0-5117-b89c-9d2dc16e5ae5@free.fr>
- <afcc2b79-61ff-b54d-eac1-ea7f3ee6b6b2@free.fr>
- <e4a201b1-64e7-32a1-9cad-e632eeb156f6@free.fr>
- <473118cd-20dc-3534-d0d8-88799e3d2c3b@free.fr>
- <eea0ba7d-15d2-fb20-7c23-b2d3c4a7cfa7@free.fr>
- <ee9e4a52-9b21-d57f-1ae8-c7297d4386a6@arm.com>
- <21670cea-beaf-8a41-84fb-f3c892527b0e@free.fr>
-Message-ID: <29109a5f-3c0d-374a-97d5-f98b365d0e0e@arm.com>
+From: mathias.nyman@linux.intel.com (Mathias Nyman)
+Date: Wed, 23 Aug 2017 14:11:38 +0300
+Subject: Possible regression between 4.9 and 4.13
+In-Reply-To: <251c41c0-a4fd-8aae-88e0-5d5928ce45cf@free.fr>
+References: <4dee5523-2d76-e731-6e81-f3027e88827f@free.fr>
+ <87a82qbyv5.fsf@linux.intel.com> <599D3410.9050504@intel.com>
+ <251c41c0-a4fd-8aae-88e0-5d5928ce45cf@free.fr>
+Message-ID: <599D62EA.7050100@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/08/17 18:22, Mason wrote:
-> On 07/08/2017 14:47, Marc Zyngier wrote:
-> 
->> On 01/08/17 17:56, Mason wrote:
+On 23.08.2017 12:31, Mason wrote:
+> On 23/08/2017 09:51, Mathias Nyman wrote:
+>
+>> very likely cause is the more aggressive detection of pci removed xhci hosts
 >>
->>> +/*
->>> + * This controller maps IRQ_MAX input lines to SPI_MAX output lines.
->>> + * The output lines are routed to GIC SPI 0 to 23.
->>> + * This driver muxes LEVEL_HIGH IRQs onto output line 0,
->>> + * and gives every EDGE_RISING IRQ a dedicated output line.
->>> + */
->>> +#define IRQ_MAX		128
->>> +#define SPI_MAX		24
->>> +#define LEVEL_SPI	0
->>> +#define IRQ_ENABLE	BIT(31)
->>> +#define STATUS		0x420
->>> +
->>> +struct tango_intc {
->>> +	void __iomem *base;
->>> +	struct irq_domain *dom;
->>> +	u8 spi_to_tango_irq[SPI_MAX];
->>> +	u8 tango_irq_to_spi[IRQ_MAX];
->>> +	DECLARE_BITMAP(enabled_level, IRQ_MAX);
->>> +	DECLARE_BITMAP(enabled_edge, IRQ_MAX);
->>> +	spinlock_t lock;
->>> +};
->>> +
->>> +static struct tango_intc *tango_intc;
->>> +
->>> +static void tango_level_isr(struct irq_desc *desc)
->>> +{
->>> +	uint pos, virq;
->>> +	struct irq_chip *chip = irq_desc_get_chip(desc);
->>> +	struct tango_intc *intc = irq_desc_get_handler_data(desc);
->>> +	DECLARE_BITMAP(status, IRQ_MAX);
->>> +
->>> +	chained_irq_enter(chip, desc);
->>> +
->>> +	spin_lock(&intc->lock);
->>> +	memcpy_fromio(status, intc->base + STATUS, IRQ_MAX / BITS_PER_BYTE);
+>> See commit d9f11ba9f107aa335091ab8d7ba5eea714e46e8b
+>>       xhci: Rework how we handle unresponsive or hoptlug removed hosts
 >>
->> No. Please don't. Nothing guarantees that your bus can deal with those.
->> We have readl_relaxed, which is what should be used.
-> 
-> Is that because readl_relaxed() handles endianness, while
-> memcpy_fromio() does not?
-
-That's because memcpy_fromio is just that. A memcpy. No guarantees about
-the size of the access, no indianness, no barriers.
-
-> How do I fill a DECLARE_BITMAP using readl_relaxed() ?
-
-You don't.
-
->> Also, you do know which inputs are level, right? So why do you need to
->> read the whole register array all the time?
-> 
-> AFAIR, interrupts are scattered all over the map, so there's
-> at least one interrupt per word. I'll double-check.
-
-And even if that's the case. You just read each word that contains a
-level interrupt, deal with that one, and move on to the next.
-
-> 
-> 
->>> +	bitmap_and(status, status, intc->enabled_level, IRQ_MAX);
->>> +	spin_unlock(&intc->lock);
->>> +
->>> +	for_each_set_bit(pos, status, IRQ_MAX) {
->>> +		virq = irq_find_mapping(intc->dom, pos);
->>> +		generic_handle_irq(virq);
+>> It checks if a xhci register reads returns 0xffffffff and assumes xhci
+>> died in that case.
 >>
->> Please check for virq==0, just in case you get a spurious interrupt.
-> 
-> AFAICT, generic_handle_irq() would handle virq==0
-> gracefully(?)
+>> Could you add something like the below to check which what is killing the host?
+>> Or a BUG()/WARN() in xhci_hc_died() to get a backtrace of who called it.
+>
+> [   46.525247] usb 2-2: new SuperSpeed USB device number 2 using xhci_hcd
+> [   46.565496] usb-storage 2-2:1.0: USB Mass Storage device detected
+> [   46.571934] scsi host0: usb-storage 2-2:1.0
+> [   47.601227] scsi 0:0:0:0: Direct-Access     Kingston DataTraveler 3.0      PQ: 0 ANSI: 6
+> [   47.611340] sd 0:0:0:0: [sda] 15109516 512-byte logical blocks: (7.74 GB/7.20 GiB)
+> [   47.621624] sd 0:0:0:0: [sda] Write Protect is off
+> [   47.627131] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
+> [   47.639637]  sda: sda1
+> [   47.648091] sd 0:0:0:0: [sda] Attached SCSI removable disk
+> [   58.100306] xhci_hcd 0000:01:00.0: xHCI host controller not responding, assume dead
+> [   58.108021] CPU: 0 PID: 939 Comm: kworker/0:2 Tainted: G         C      4.13.0-rc6 #11
+> [   58.115976] Hardware name: Sigma Tango DT
+> [   58.120016] Workqueue: usb_hub_wq hub_event
+> [   58.124241] [<c010f288>] (unwind_backtrace) from [<c010af58>] (show_stack+0x10/0x14)
+> [   58.132033] [<c010af58>] (show_stack) from [<c049d714>] (dump_stack+0x84/0x98)
+> [   58.139302] [<c049d714>] (dump_stack) from [<c03b090c>] (xhci_hc_died.part.9+0x50/0x23c)
+> [   58.147438] [<c03b090c>] (xhci_hc_died.part.9) from [<c03b5d80>] (xhci_hub_control+0xf3c/0x175c)
+> [   58.156273] [<c03b5d80>] (xhci_hub_control) from [<c03934a4>] (usb_hcd_submit_urb+0x264/0x814)
+> [   58.164932] [<c03934a4>] (usb_hcd_submit_urb) from [<c0394fa4>] (usb_start_wait_urb+0x4c/0xbc)
+> [   58.173591] [<c0394fa4>] (usb_start_wait_urb) from [<c03950b4>] (usb_control_msg+0xa0/0xcc)
+> [   58.181985] [<c03950b4>] (usb_control_msg) from [<c038bf54>] (usb_clear_port_feature+0x44/0x4c)
+> [   58.190730] [<c038bf54>] (usb_clear_port_feature) from [<c038c320>] (hub_port_reset+0x228/0x51c)
+> [   58.199561] [<c038c320>] (hub_port_reset) from [<c038fd68>] (hub_event+0x87c/0x108c)
+> [   58.207349] [<c038fd68>] (hub_event) from [<c012ecc4>] (process_one_work+0x1d8/0x3f0)
+> [   58.215220] [<c012ecc4>] (process_one_work) from [<c012f8d8>] (worker_thread+0x38/0x554)
+> [   58.223354] [<c012f8d8>] (worker_thread) from [<c01347d0>] (kthread+0x108/0x138)
+> [   58.230789] [<c01347d0>] (kthread) from [<c01076d8>] (ret_from_fork+0x14/0x3c)
+> [   58.238056] xhci_hcd 0000:01:00.0: HC died; cleaning up
+> [   58.243391] usb 2-2: USB disconnect, device number 2
+> --
 
-Yes, by calling irq_to_desc, which results in a radix_tree_lookup. Just
-check for zero here, there is no reason to propagate the crap if we can
-avoid it. You can even take that opportunity to dump a splat, because it
-means that something is pretty fishy if you're getting spurious interrupts.
+xhci driver reads 0xffffffff from a mmio mapped xhci portsc register and bails out in:
+xhci-hub.c:
+         temp = readl(port_array[wIndex]);
+                 if (temp == ~(u32)0) {
+                         xhci_hc_died(xhci);
+			retval = -ENODEV;
+	                break;
+		}
 
->>> +static void tango_edge_isr(struct irq_desc *desc)
->>> +{
->>> +	uint virq;
->>> +	struct irq_data *data = irq_desc_get_irq_data(desc);
->>> +	struct irq_chip *chip = irq_desc_get_chip(desc);
->>> +	struct tango_intc *intc = irq_desc_get_handler_data(desc);
->>> +	int tango_irq = intc->spi_to_tango_irq[data->hwirq - 32];
->>> +
->>> +	chained_irq_enter(chip, desc);
->>> +	virq = irq_find_mapping(intc->dom, tango_irq);
->>> +	generic_handle_irq(virq);
->>> +	chained_irq_exit(chip, desc);
->>
->> If you have a 1:1 mapping between an edge input and its output, why do
->> you with a chained interrupt handler? This should be a hierarchical
->> setup for these 23 interrupts.
-> 
-> I don't understand what you are suggesting.
-> 
-> I should not call chained_irq_enter/chained_irq_exit
-> in tango_edge_isr()?
+In this case we read the register when hub thread asks to clear port feature.
 
-I'm suggesting a hierarchical mapping, and not a multiplexer. I'm sorry,
-there is no other words to explain this.
+why portsc returns 0xffffffff is a nother quiestion, could the hub thread be running while xhci controller is (in D3)?
+Was xhci runtime suspended?
+There were some pcieport errors in another log you showed, maybe PCI devices are not properly recovered
+and the registers return 0xffffffff?
 
-> 
->>> +static int tango_set_type(struct irq_data *data, uint flow_type)
->>> +{
->>> +	return 0;
->>
->> What does this mean? Either you can do a set-type (and you do it), or
->> you cannot, and you fail. At least you check that what you're asked to
->> do matches the configuration.
-> 
-> IIRC, __irq_set_trigger() barfed when I did it differently.
-> 
-> (FWIW, this HW block only routes interrupt signals, it doesn't
-> latch anything.)
-
-And? You obviously have different ways of dealing with edge and level
-interrupts. Also, the parent irqchip deals with probably has its own
-views about interrupt triggering.
-
-> 
-> 
->>> +static int tango_alloc(struct irq_domain *dom, uint virq, uint n, void *arg)
->>> +{
->>> +	int spi;
->>> +	struct irq_fwspec *fwspec = arg;
->>> +	struct tango_intc *intc = dom->host_data;
->>> +	u32 hwirq = fwspec->param[0], trigger = fwspec->param[1];
->>> +
->>> +	if (trigger & IRQ_TYPE_EDGE_FALLING || trigger & IRQ_TYPE_LEVEL_LOW)
->>> +		return -EINVAL;
->>> +
->>> +	if (trigger & IRQ_TYPE_LEVEL_HIGH)
->>> +		intc->tango_irq_to_spi[hwirq] = LEVEL_SPI;
->>> +
->>> +	if (trigger & IRQ_TYPE_EDGE_RISING) {
->>> +		for (spi = 1; spi < SPI_MAX; ++spi) {
->>> +			if (intc->spi_to_tango_irq[spi] == 0) {
->>> +				intc->tango_irq_to_spi[hwirq] = spi;
->>> +				intc->spi_to_tango_irq[spi] = hwirq;
->>> +				break;
->>> +			}
->>> +		}
->>> +		if (spi == SPI_MAX)
->>> +			return -ENOSPC;
->>> +	}
->>
->> What's wrong with having a bitmap allocation, just like on other drivers?
-> 
-> I don't understand what you are suggesting.
-> 
-> The mapping is set up at run-time, I need to record it
-> somewhere.
-
-Again. All the other drivers in the tree are using a bitmap to deal with
-their slot allocation. Why do you have to use a different data structure?
-
-> 
-> 
->>> +static int __init tango_irq_init(struct device_node *node, struct device_node *parent)
->>> +{
->>> +	int spi, virq;
->>> +	struct tango_intc *intc;
->>> +
->>> +	intc = kzalloc(sizeof(*intc), GFP_KERNEL);
->>> +	if (!intc)
->>> +		panic("%s: Failed to kalloc\n", node->name);
->>> +
->>> +	virq = map_irq(parent, LEVEL_SPI, IRQ_TYPE_LEVEL_HIGH);
->>> +	if (!virq)
->>> +		panic("%s: Failed to map IRQ %d\n", node->name, LEVEL_SPI);
->>> +
->>> +	irq_set_chained_handler_and_data(virq, tango_level_isr, intc);
->>> +
->>> +	for (spi = 1; spi < SPI_MAX; ++spi) {
->>> +		virq = map_irq(parent, spi, IRQ_TYPE_EDGE_RISING);
->>> +		if (!virq)
->>> +			panic("%s: Failed to map IRQ %d\n", node->name, spi);
->>> +
->>> +		irq_set_chained_handler_and_data(virq, tango_edge_isr, intc);
->>> +	}
->>
->> Calling panic? For a secondary interrupt controller? Don't. We call
->> panic when we know for sure that the system is in such a state that
->> we're better off killing it altogether than keeping it running (to avoid
->> corruption, for example). panic is not a substitute for proper error
->> handling.
-> 
-> I handled the setup like irq-tango.c did.
-
-Doesn't make it less crap.
-
-> What is the point in bringing up a system where
-> interrupts do not work? Nothing will work.
-
-This is a secondary interrupt controller. For things that are secondary.
-You already have a primary interrupt controller which can be used to
-find out about what is going on and diagnostic the platform.
-
-And if the platform is really toasted, then there is no need for calling
-panic, the box won't go anywhere.
-
-> 
-> 
->>> +	tango_intc = intc;
->>> +	register_syscore_ops(&tango_syscore_ops);
->>> +
->>> +	spin_lock_init(&intc->lock);
->>> +	intc->base = of_iomap(node, 0);
->>> +	intc->dom = irq_domain_add_linear(node, IRQ_MAX, &dom_ops, intc);
->>> +	if (!intc->base || !intc->dom)
->>> +		panic("%s: Failed to setup IRQ controller\n", node->name);
->>> +
->>> +	return 0;
->>> +}
->>> +IRQCHIP_DECLARE(tango_intc, "sigma,smp8759-intc", tango_irq_init);
->>
->> Overall, this edge business feels wrong. If you want to mux a single
->> output for all level interrupts, fine by me. But edge interrupts that
->> have a 1:1 mapping with the underlying SPI must be represented as a
->> hierarchy.
-> 
-> I don't understand what you mean by "feels wrong".
-> 
-> There are 128 inputs, and only 24 outputs.
-> Therefore, I must map some inputs to the same output.
-> Thomas explained that edge interrupts *cannot* be shared.
-> So edge interrupts must receive a dedicated output line.
-> Did I write anything wrong so far?
-
-Let me repeat what Thomas already said:
-
-- you dedicate one line to level interrupts using a multiplexer (chained
-interrupts).
-
-- you use the remaining 23 inputs in a hierarchical model, each input
-being mapped to one output, no chained handler.
-
-That's what I want to see.
-
-	M.
-
-> 
-> Therefore, I figured that I must
-> A) map every edge interrupt to a different output
-> B) map at least some level interrupts to the same output
-> 
-> Are you saying that I could do things differently?
-> 
-> Do you mean I should have defined two separate domains,
-> one for level interrupts, one for edge interrupts?
-> 
-> For level interrupts:
-> irq_domain_add_linear(node, IRQ_MAX, &dom_ops, intc);
-> 
-> For edge interrupts:
-> irq_domain_add_hierarchy(...)
-> 
-> Eventually, irq_domain_create_hierarchy() calls
-> irq_domain_create_linear() anyway.
-> 
-> So maybe you are suggesting a single hierarchical
-> domain. I will test tomorrow. What differences will
-> it make? Better performance?
-> 
-> Regards.
-> 
-
-
--- 
-Jazz is not dead. It just smells funny...
+-Mathias
