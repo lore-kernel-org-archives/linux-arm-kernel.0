@@ -1,42 +1,80 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 23 Aug 2017 09:38:06 +0200
-Subject: [PATCH v2 4/5] arm64: dts: add RK3399-Q7 (Puma) SoM
-In-Reply-To: <20170818193445.47542-5-klaus.goger@theobroma-systems.com>
-References: <20170818193445.47542-1-klaus.goger@theobroma-systems.com>
- <20170818193445.47542-5-klaus.goger@theobroma-systems.com>
-Message-ID: <1970473.BhgrPuBMdS@phil>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 23 Aug 2017 10:43:12 +0300
+Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <3392c717-10ea-4d6e-4c25-9be0bbec004e@xs4all.nl>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <20170822201731.hyjqrbkhggaoomfl@flea.home>
+ <3392c717-10ea-4d6e-4c25-9be0bbec004e@xs4all.nl>
+Message-ID: <3036789.1NOcar0Ykn@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 18. August 2017, 21:34:44 CEST schrieb Klaus Goger:
-> The RK3399-Q7 SoM is a Qseven-compatible (70mm x 70mm, MXM-230
-> connector) system-on-module from Theobroma Systems, featuring the
-> Rockchip RK3399.
+Hi Hans,
+
+On Wednesday, 23 August 2017 09:52:00 EEST Hans Verkuil wrote:
+> On 08/22/2017 10:17 PM, Maxime Ripard wrote:
+> > On Tue, Aug 22, 2017 at 08:43:35AM +0200, Hans Verkuil wrote:
+> >>>>> +static int sun6i_video_link_setup(struct media_entity *entity,
+> >>>>> +				  const struct media_pad *local,
+> >>>>> +				  const struct media_pad *remote, u32 flags)
+> >>>>> +{
+> >>>>> +	struct video_device *vdev = media_entity_to_video_device(entity);
+> >>>>> +	struct sun6i_video *video = video_get_drvdata(vdev);
+> >>>>> +
+> >>>>> +	if (WARN_ON(video == NULL))
+> >>>>> +		return 0;
+> >>>>> +
+> >>>>> +	return sun6i_video_formats_init(video);
+> >>>> 
+> >>>> Why is this called here? Why not in video_init()?
+> >>> 
+> >>> sun6i_video_init is in the driver probe context. 
+> >>> sun6i_video_formats_init use media_entity_remote_pad and
+> >>> media_entity_to_v4l2_subdev to find the subdevs.
+> >>> The media_entity_remote_pad can't work before all the media pad linked.
+> >> 
+> >> A video_init is typically called from the notify_complete callback.
+> >> Actually, that's where the video_register_device should be created as
+> >> well. When you create it in probe() there is possibly no sensor yet, so
+> >> it would be a dead video node (or worse, crash when used).
+> >> 
+> >> There are still a lot of platform drivers that create the video node in
+> >> the probe, but it's not the right place if you rely on the async loading
+> >> of subdevs.
+> > 
+> > That's not really related, but I'm not really sure it's a good way to
+> > operate. This essentially means that you might wait forever for a
+> > component in your pipeline to be probed, without any chance of it
+> > happening (not compiled, compiled as a module and not loaded, hardware
+> > defect preventing the driver from probing properly, etc), even though
+> > that component might not be essential.
 > 
-> It provides the following feature set:
->  * up to 4GB DDR3
->  * on-module SPI-NOR flash
->  * on-module eMMC (with 8-bit 1.8V interface)
->  * SD card (on a baseboad) via edge connector
->  * Gigabit Ethernet with on-module Micrel KSZ9031 GbE PHY
->  * HDMI/eDP/2x MIPI-DSI
->  * 2x MIPI-CSI
->  * USB
->    - 1x USB 3.0 dual-role (direct connection)
->    - 2x USB 3.0 host + 1x USB 2.0 (on-module USB 3.0 hub)
->  * on-module STM32 Cortex-M0 companion controller, implementing:
->    - low-power RTC functionality (ISL1208 emulation)
->    - fan controller (AMC6821 emulation)
->    - USB<->CAN bridge controller
+> We're talking straightforward video pipelines here. I.e. a source, some
+> processing units and a DMA engine at the end.
+
+As a first step possibly, but many SoCs have ISPs that are not supported by 
+the initial camera driver version.
+
+> There is no point in creating a video node if the pipeline is not complete
+> since you need the full pipeline.
 > 
-> Signed-off-by: Klaus Goger <klaus.goger@theobroma-systems.com>
+> I've had bad experiences in the past where video nodes were created too
+> soon and part of the internal state was still incomplete, causing at best
+> weird behavior and at worst crashes.
 
-applied for 4.14 with:
-- a comment style fix
-- added "rockchip:" to patch subject 
-- 2 minor indentation fixes
-- property and node reorderings
+Drivers obviously need to be fixed if they are buggy in that regard. Such race 
+conditions are definitely something I keep an eye on when reviewing code.
 
+> More complex devices are a whole different ballgame.
+> 
+> > This is how DRM operates, and you sometimes end up in some very dumb
+> > situations where you wait for say, the DSI controller to probe, while
+> > you only care about HDMI in your system.
+> > 
+> > But this seems to be on of the hot topic these days, so we might
+> > discuss it further in some other thread :)
 
-Thanks
-Heiko
+-- 
+Regards,
+
+Laurent Pinchart
