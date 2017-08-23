@@ -1,24 +1,20 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 22 Aug 2017 19:23:43 -0500
-Subject: [PATCH v2 3/5] dt-bindings: add rk3399-q7 SoM
-In-Reply-To: <20170818193445.47542-4-klaus.goger@theobroma-systems.com>
-References: <20170818193445.47542-1-klaus.goger@theobroma-systems.com>
- <20170818193445.47542-4-klaus.goger@theobroma-systems.com>
-Message-ID: <20170823002343.3yuagvfe4vqmxnh7@rob-hp-laptop>
+Date: Tue, 22 Aug 2017 19:29:11 -0500
+Subject: [RFC 1/3] dt-bindings: rtc: Add Realtek RTD1295
+In-Reply-To: <20170820013632.18375-2-afaerber@suse.de>
+References: <20170820013632.18375-1-afaerber@suse.de>
+ <20170820013632.18375-2-afaerber@suse.de>
+Message-ID: <20170823002911.y35nn7jkt34dvjbc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 09:34:43PM +0200, Klaus Goger wrote:
-> RK3399-Q7 is a Qseven compatible system-on-module by Theobroma Systems.
+On Sun, Aug 20, 2017 at 03:36:29AM +0200, Andreas F?rber wrote:
+> Add a binding for the RTC on the Realtek RTD119x/RTD129x SoC families.
 > 
-> This adds the module and the EVK baseboard "Haikou"
-> 
-> Signed-off-by: Klaus Goger <klaus.goger@theobroma-systems.com>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
-> 
-> Changes in v2: None
-> 
->  Documentation/devicetree/bindings/arm/rockchip.txt | 4 ++++
->  1 file changed, 4 insertions(+)
+>  .../devicetree/bindings/rtc/realtek,rtd119x.txt          | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/realtek,rtd119x.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
