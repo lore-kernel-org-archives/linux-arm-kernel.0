@@ -1,45 +1,35 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 22 Aug 2017 18:51:08 -0700
-Subject: [PATCH] binder: let ANDROID_BINDER_IPC_32BIT be selectable on
- 32bit ARM
-In-Reply-To: <20170808110305.2748-1-jszhang@marvell.com>
-References: <20170808110305.2748-1-jszhang@marvell.com>
-Message-ID: <20170823015108.GA18228@kroah.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Tue, 22 Aug 2017 18:57:15 -0700
+Subject: [RFC PATCH v2 1/3] PCI: rockchip: Add support for pcie wake irq
+In-Reply-To: <599CDB37.3070307@rock-chips.com>
+References: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
+ <20170817120431.12398-2-jeffy.chen@rock-chips.com>
+ <20170818170107.GA119461@google.com>
+ <20170818181416.GF6008@atomide.com>
+ <5997486D.4040803@rock-chips.com>
+ <20170822172653.GJ6008@atomide.com>
+ <599CDB37.3070307@rock-chips.com>
+Message-ID: <20170823015714.GA129497@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 08, 2017 at 07:03:05PM +0800, Jisheng Zhang wrote:
-> As noted in commit d0bdff0db809 ("staging: Fix build issues with new
-> binder API"), we can add back the choice for 32bit ARM "once a 64bit
-> __get_user_asm_* implementation is merged." Commit e38361d032f1 ("ARM:
-> 8091/2: add get_user() support for 8 byte types") has added the
-> support, so it's time to let ANDROID_BINDER_IPC_32BIT be selectable on
-> 32bit ARM
+Hi Jeffy,
 
-Ok, but:
+On Wed, Aug 23, 2017 at 09:32:39AM +0800, Jeffy Chen wrote:
+> and for eage irq, maybe we should enable it right after(or before)
+> the driver activate wake function(for example activate WOWLAN or
+> WOLAN), otherwise would it be possible to miss some irqs(triggered
+> before we actually enable the wake irq)?
 
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  drivers/android/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/android/Kconfig b/drivers/android/Kconfig
-> index 832e885349b1..aca5dc30b97b 100644
-> --- a/drivers/android/Kconfig
-> +++ b/drivers/android/Kconfig
-> @@ -32,7 +32,7 @@ config ANDROID_BINDER_DEVICES
->  	  therefore logically separated from the other devices.
->  
->  config ANDROID_BINDER_IPC_32BIT
-> -	bool
-> +	bool "Use old (Android 4.4 and earlier) 32-bit binder API"
->  	depends on !64BIT && ANDROID_BINDER_IPC
+I already mentioned this: for the PCI case, the specification explicitly
+says that the WAKE# pin must remain asserted until the system wakes and
+resets the link. So we don't have this problem.
 
-You don't actually change the depends line :(
+But it is probably still useful to make sure there's a well-defined
+point at which these interrupts are armed, so that if a device driver
+does care, it can account for that. Just before suspend_noirq (as it is
+today) is probably fine, so if there's some device-level handling that
+needs to happen before we get to suspend (but after the wakeirq is
+armed), it can go in the device or bus {suspend,resume}_noirq callbacks.
 
-Please fix up, and test it, and then resend.
-
-thanks,
-
-greg k-h
+Brian
