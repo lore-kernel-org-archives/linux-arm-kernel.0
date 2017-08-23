@@ -1,74 +1,90 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Aug 2017 17:43:01 +0100
-Subject: [PATCH v6 3/3] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <77b6c97f-f2d2-fd14-e83e-345addc5ea71@huawei.com>
-References: <20170809100715.870516-1-shameerali.kolothum.thodi@huawei.com>
- <20170809100715.870516-4-shameerali.kolothum.thodi@huawei.com>
- <20170810172723.GD9980@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA8383CC287@FRAEML521-MBX.china.huawei.com>
- <c6b7c641-b839-1388-7982-366e796e6ba9@huawei.com>
- <20170823132430.GB634@arm.com>
- <77b6c97f-f2d2-fd14-e83e-345addc5ea71@huawei.com>
-Message-ID: <20170823164301.GC590@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 23 Aug 2017 09:48:03 -0700
+Subject: [PATCH v4] arm64: kernel: implement fast refcount checking
+In-Reply-To: <CAKv+Gu89_deP8L=hy==6uv-szdGSBO7v9t+vKHT8rKUjARdc-w@mail.gmail.com>
+References: <20170731192251.12491-1-ard.biesheuvel@linaro.org>
+ <20170823145811.GA30753@arm.com>
+ <CAKv+Gu89_deP8L=hy==6uv-szdGSBO7v9t+vKHT8rKUjARdc-w@mail.gmail.com>
+Message-ID: <CAGXu5jLXFA4=X5mC9ph9dZ0ZJaVkGXd2p1Vh8jH_EE15kVL6Hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 03:29:46PM +0100, John Garry wrote:
-> On 23/08/2017 14:24, Will Deacon wrote:
-> >On Wed, Aug 23, 2017 at 02:17:24PM +0100, John Garry wrote:
-> >>>>>Signed-off-by: Shameer Kolothum
-> >>>><shameerali.kolothum.thodi@huawei.com>
-> >>>>>---
-> >>>>>drivers/iommu/arm-smmu-v3.c | 27 ++++++++++++++++++++++-----
-> >>>>>1 file changed, 22 insertions(+), 5 deletions(-)
-> >>>>
-> >>>>Please can you also add a devicetree binding with corresponding
-> >>>>documentation to enable this workaround on non-ACPI based systems too?
-> >>>>It should be straightforward if you update the arm_smmu_options table.
-> >>>
-> >>>As I mentioned before, devicetree was a lower priority and we would definitely
-> >>>submit patch to support that. Even if we update the arm_smmu_options table
-> >>>with DT binding, the generic function to retrieve the MSI address regions only
-> >>>works on ACPI/IORT case now.
-> >>>
-> >>
-> >>Hi Will,
-> >>
-> >>Can you confirm your stance on supporting this workaround for DT as well as
-> >>ACPI?
-> >>
-> >>For us, we now only "officially" support ACPI FW, and DT support at this
-> >>point is patchy/limited. To me, adding DT support is just more errata
-> >>workaround code to maintain with little useful gain.
-> >
-> >I basically don't like the idea of a driver that only works for one of
-> >ACPI or DT yet claims to support both. I'm less fussed about functionality
-> >differences (feature X is only available with firmware Y), but not working
-> >around a hardware erratum that we know about is just lazy.
-> >
-> >So I'd prefer that we handle this in both cases, or blacklist affected
-> >devices when booting with DT. Continuing as though there isn't an erratum
-> >is the worst thing we can do.
-> 
-> OK, seems reasonable.
-> 
-> We would consider blacklisting the device, where/how to do is the question.
-> 
-> So the errata is in the GICv3 ITS/PCI host controller, and we just use the
-> in-between SMMU (driver) to provide the workaround. So my initial impression
-> is that the PCI host controller would have to be blacklisted IFF behind an
-> IOMMU for DT firmware in pcie-hisi.c or pci quirks framework. How does it
-> sound?
+On Wed, Aug 23, 2017 at 8:51 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 23 August 2017 at 15:58, Will Deacon <will.deacon@arm.com> wrote:
+>> On Mon, Jul 31, 2017 at 08:22:51PM +0100, Ard Biesheuvel wrote:
+>>> +static __always_inline void refcount_add(int i, refcount_t *r)
+>>> +{
+>>> +     __refcount_add_lt(i, &r->refs);
+>>> +}
+>>> +
+>>> +static __always_inline void refcount_inc(refcount_t *r)
+>>> +{
+>>> +     __refcount_add_lt(1, &r->refs);
+>>> +}
+>>> +
+>>> +static __always_inline void refcount_dec(refcount_t *r)
+>>> +{
+>>> +     __refcount_sub_le(1, &r->refs);
+>>> +}
+>>> +
+>>> +static __always_inline __must_check bool refcount_sub_and_test(unsigned int i,
+>>> +                                                            refcount_t *r)
+>>> +{
+>>> +     return __refcount_sub_lt(i, &r->refs) == 0;
+>>> +}
+>>> +
+>>> +static __always_inline __must_check bool refcount_dec_and_test(refcount_t *r)
+>>> +{
+>>> +     return __refcount_sub_lt(1, &r->refs) == 0;
+>>> +}
+>>
+>> Nit, but we can just follow the lib/refcount.c implementation here.
+>
+> Yes, and the same applies to Kees's version for x86, I suppose. We can
+> do that as a separate fix.
 
-If that avoids us running into the erratum, then fine by me. I'd obviously
-prefer we work-around it since we know how to, but that's up to you.
+Sorry, I didn't follow context here. What are these comments referring
+to? The dec_and_test implementation?
 
-> Please also note that in our SoC we have other devices behind the same SMMU,
-> like storage controller, which are not affected or related to the Errata.
-> 
-> BTW, ignoring DT support, are you happy with this patchset?
+>>> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+>>> index c7c7088097be..07bd026ec71d 100644
+>>> --- a/arch/arm64/kernel/traps.c
+>>> +++ b/arch/arm64/kernel/traps.c
+>>> @@ -758,8 +758,37 @@ int __init early_brk64(unsigned long addr, unsigned int esr,
+>>>       return bug_handler(regs, esr) != DBG_HOOK_HANDLED;
+>>>  }
+>>>
+>>> +static int refcount_overflow_handler(struct pt_regs *regs, unsigned int esr)
+>>> +{
+>>> +     bool zero = regs->pstate & PSR_Z_BIT;
+>>> +
+>>> +     /* First unconditionally saturate the refcount. */
+>>> +     *(int *)regs->regs[16] = INT_MIN / 2;
+>>
+>> Does this work even when racing against a concurrent refcount operation
+>> that doesn't have a pre-check? I can't figure out how something like a
+>> sub_lt operation on a saturated counter couldn't reset the value to zero.
+>
+> I hope Kees can clarify this, but as I understand it, this value was
+> chosen right in the middle of the negative space so it would take many
+> operations to get it to a sane value again, reducing the likelihood
+> that a situation is created that may be exploited.
 
-Yes, but I won't ack it without the above taken care of.
+We can't protect against over-subtraction, since a legitimate
+dec-to-zero can't be distinguished from an early dec-to-zero (the
+resource will always get freed and potentially abused via
+use-after-free). If you mean the case of racing many increments, it
+would require INT_MIN / 2 threads perfectly performing an increment
+simultaneously with another thread performing a dec_and_test(), which
+is unrealistic in the face of saturation happening within a couple
+instructions on all of those INT_MIN / 2 threads. So, while
+theoretically possible, it is not a real-world condition. As I see it,
+this is the trade off of these implementations vs REFCOUNT_FULL, which
+has perfect saturation but high performance cost.
 
-Will
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
