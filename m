@@ -1,34 +1,40 @@
-From: bst@pengutronix.de (Bastian Stender)
-Date: Wed, 23 Aug 2017 15:54:12 +0200
-Subject: [PATCH v13 3/6] fpga manager: Add altera-ps-spi driver for Altera
- FPGAs
-In-Reply-To: <aadca281de183aa8b0471dc3e6c850012c775a9c.1497047816.git.stillcompiling@gmail.com>
-References: <03e591707dc72f4c2b5e63a1272060956294ea51.1497047816.git.stillcompiling@gmail.com>
- <aadca281de183aa8b0471dc3e6c850012c775a9c.1497047816.git.stillcompiling@gmail.com>
-Message-ID: <e63152d3-ef91-55d2-4af3-d6e27dab7168@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Aug 2017 16:05:26 +0200
+Subject: [PATCH] [RFC] ARM: vdso: work around gcc-8 warning
+Message-ID: <20170823140538.1590432-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2017 12:39 AM, Joshua Clayton wrote:
-> altera-ps-spi loads FPGA firmware over SPI, using the "passive serial"
-> interface on Altera Arria 10, Cyclone V or Stratix V FPGAs.
-> 
-> This is one of the simpler ways to set up an FPGA at runtime.
-> The signal interface is close to unidirectional SPI with lsb first.
-> 
-> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-> Signed-off-by: Anatolij Gustschin <agust@denx.de>
+gcc-8 correctly points out that reading four bytes from a pointer to a
+'char' variable is wrong
 
-Tested-by: Bastian Stender <bst@pengutronix.de>
+arch/arm/kernel/vdso.c: In function 'vdso_init':
+arch/arm/kernel/vdso.c:200:6: error: '__builtin_memcmp_eq' reading 4 bytes from a region of size 1 [-Werror=stringop-overflow=]
 
-I tested the whole series with an Altera Arria 10 and it's working as 
-expected. Thanks again!
+However, in this case the variable just stands for the beginning of the
+vdso and is not actually a 'char', so the code is doing what it is meant
+to do.
 
-Bastian
+Not sure what the best solution for this is, changing the hack to
+declare the variable as 'int' instead makes the warning go away.
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/include/asm/vdso.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/asm/vdso.h b/arch/arm/include/asm/vdso.h
+index d0295f1dd1a3..eff7d3a1d1ce 100644
+--- a/arch/arm/include/asm/vdso.h
++++ b/arch/arm/include/asm/vdso.h
+@@ -11,7 +11,7 @@ struct mm_struct;
+ 
+ void arm_install_vdso(struct mm_struct *mm, unsigned long addr);
+ 
+-extern char vdso_start, vdso_end;
++extern int vdso_start, vdso_end;
+ 
+ extern unsigned int vdso_total_pages;
+ 
 -- 
-Pengutronix e.K.
-Industrial Linux Solutions
-http://www.pengutronix.de/
-Peiner Str. 6-8, 31137 Hildesheim, Germany
-Amtsgericht Hildesheim, HRA 2686
+2.9.0
