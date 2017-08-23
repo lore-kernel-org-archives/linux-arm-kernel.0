@@ -1,73 +1,51 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 23 Aug 2017 15:10:25 +0200
-Subject: [PATCH v2 00/16] mmc: meson-gx: driver fixups and upgrades
-In-Reply-To: <1503402390.7032.11.camel@baylibre.com>
-References: <20170821160301.21899-1-jbrunet@baylibre.com>
- <CAPDyKFoBebVf0wqJ+z5UHC+aMju2Qy0ONc1OVYrwzZKk+XgGTg@mail.gmail.com>
- <1503402390.7032.11.camel@baylibre.com>
-Message-ID: <CAPDyKFpxSNrP12JUp-JviV32182-EN1BG+Q_X0opNLt-dkGSMw@mail.gmail.com>
+From: john.garry@huawei.com (John Garry)
+Date: Wed, 23 Aug 2017 14:17:24 +0100
+Subject: [PATCH v6 3/3] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+ erratum 161010801
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA8383CC287@FRAEML521-MBX.china.huawei.com>
+References: <20170809100715.870516-1-shameerali.kolothum.thodi@huawei.com>
+ <20170809100715.870516-4-shameerali.kolothum.thodi@huawei.com>
+ <20170810172723.GD9980@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA8383CC287@FRAEML521-MBX.china.huawei.com>
+Message-ID: <c6b7c641-b839-1388-7982-366e796e6ba9@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 August 2017 at 13:46, Jerome Brunet <jbrunet@baylibre.com> wrote:
-> On Tue, 2017-08-22 at 13:15 +0200, Ulf Hansson wrote:
->> On 21 August 2017 at 18:02, Jerome Brunet <jbrunet@baylibre.com> wrote:
->> > The patchset features several bugfixes, rework and upgrade for the
->> > meson-gx MMC driver.
->> >
->> > The main goal is to improve readability and enable new high speed
->> > modes, such as eMMC DDR52 and sdcard UHS modes up to SDR50 (100Mhz)
->> >
->> > SDR104 is not working with a few cards on the p200 and the
->> > libretech-cc. I suspect that 200Mhz might be a bit too fast for the PCB
->> > of these boards, adding noise to the signal and eventually breaking
->> > the communication with some cards. The same cards are working well on a
->> > laptop or the nanopi-k2 at 200Mhz.
->> >
->> > This series has been tested on gxbb-p200, gxbb-nanopi-k2 and
->> > gxl-s905x-libretech-cc
->> >
->> > Changes since v1 [0]:
->> > * Reorder patches to have fixes first, then rework and finally
->> >   enhancements.
->> > * Use CCF to manage clock phases
->> >
->> > [0]: https://lkml.kernel.org/r/20170804174353.16486-1-jbrunet at baylibre.com
->> >
->> > Jerome Brunet (16):
->> >   mmc: meson-gx: fix mux mask definition
->> >   mmc: meson-gx: remove CLK_DIVIDER_ALLOW_ZERO clock flag
->> >   mmc: meson-gx: clean up some constants
->> >   mmc: meson-gx: use _irqsave variant of spinlock
->> >   mmc: meson-gx: cfg init overwrite values
->> >   mmc: meson-gx: rework set_ios function
->> >   mmc: meson-gx: rework clk_set function
->> >   mmc: meson-gx: rework clock init function
->> >   mmc: meson-gx: fix dual data rate mode frequencies
->> >   mmc: meson-gx: work around clk-stop issue
->> >   mmc: meson-gx: simplify interrupt handler
->> >   mmc: meson-gx: implement card_busy callback
->> >   mmc: meson-gx: use CCF to handle the clock phases
->> >   mmc: meson-gx: implement voltage switch callback
->> >   mmc: meson-gx: change default tx phase
->> >   mmc: meson-gx: rework tuning function
->> >
->> >  drivers/mmc/host/meson-gx-mmc.c | 718 +++++++++++++++++++++++++++--------
->> > -----
->> >  1 file changed, 497 insertions(+), 221 deletions(-)
->> >
->> > --
->> > 2.9.5
->> >
+>>> Signed-off-by: Shameer Kolothum
+>> <shameerali.kolothum.thodi@huawei.com>
+>>> ---
+>>>  drivers/iommu/arm-smmu-v3.c | 27 ++++++++++++++++++++++-----
+>>>  1 file changed, 22 insertions(+), 5 deletions(-)
 >>
->> So far, I decided to pick patch 1 -> 3.
+>> Please can you also add a devicetree binding with corresponding
+>> documentation to enable this workaround on non-ACPI based systems too?
+>> It should be straightforward if you update the arm_smmu_options table.
 >
-> Thx Ulf.
-> Do you want me to respin w/o patch 1 -> 4 or shall I wait for further review on
-> the other changes ?
+> As I mentioned before, devicetree was a lower priority and we would definitely
+> submit patch to support that. Even if we update the arm_smmu_options table
+> with DT binding, the generic function to retrieve the MSI address regions only
+> works on ACPI/IORT case now.
+>
 
-I think you can wait a bit, hopefully some of the earlier authors and
-Kevin can give some input as well.
+Hi Will,
 
-Kind regards
-Uffe
+Can you confirm your stance on supporting this workaround for DT as well 
+as ACPI?
+
+For us, we now only "officially" support ACPI FW, and DT support at this 
+point is patchy/limited. To me, adding DT support is just more errata 
+workaround code to maintain with little useful gain.
+
+Thanks very much,
+John
+
+> Moreover I am on holidays starting tomorrow, and really appreciate if this series
+> can go through now.
+>
+> Please let me know.
+>
+> Thanks,
+> Shameer
+>
+> .
+>
