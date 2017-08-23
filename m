@@ -1,73 +1,48 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Wed, 23 Aug 2017 14:11:38 +0300
-Subject: Possible regression between 4.9 and 4.13
-In-Reply-To: <251c41c0-a4fd-8aae-88e0-5d5928ce45cf@free.fr>
-References: <4dee5523-2d76-e731-6e81-f3027e88827f@free.fr>
- <87a82qbyv5.fsf@linux.intel.com> <599D3410.9050504@intel.com>
- <251c41c0-a4fd-8aae-88e0-5d5928ce45cf@free.fr>
-Message-ID: <599D62EA.7050100@linux.intel.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Wed, 23 Aug 2017 19:08:10 +0800
+Subject: [PATCH] doc: coresight: correct usage for '/dev/cpu_dma_latency'
+In-Reply-To: <c6d08eff-d92e-9cd2-5c33-1bf67711471c@arm.com>
+References: <1503472998-9009-1-git-send-email-leo.yan@linaro.org>
+ <c6d08eff-d92e-9cd2-5c33-1bf67711471c@arm.com>
+Message-ID: <20170823110810.GA28579@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.08.2017 12:31, Mason wrote:
-> On 23/08/2017 09:51, Mathias Nyman wrote:
->
->> very likely cause is the more aggressive detection of pci removed xhci hosts
->>
->> See commit d9f11ba9f107aa335091ab8d7ba5eea714e46e8b
->>       xhci: Rework how we handle unresponsive or hoptlug removed hosts
->>
->> It checks if a xhci register reads returns 0xffffffff and assumes xhci
->> died in that case.
->>
->> Could you add something like the below to check which what is killing the host?
->> Or a BUG()/WARN() in xhci_hc_died() to get a backtrace of who called it.
->
-> [   46.525247] usb 2-2: new SuperSpeed USB device number 2 using xhci_hcd
-> [   46.565496] usb-storage 2-2:1.0: USB Mass Storage device detected
-> [   46.571934] scsi host0: usb-storage 2-2:1.0
-> [   47.601227] scsi 0:0:0:0: Direct-Access     Kingston DataTraveler 3.0      PQ: 0 ANSI: 6
-> [   47.611340] sd 0:0:0:0: [sda] 15109516 512-byte logical blocks: (7.74 GB/7.20 GiB)
-> [   47.621624] sd 0:0:0:0: [sda] Write Protect is off
-> [   47.627131] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
-> [   47.639637]  sda: sda1
-> [   47.648091] sd 0:0:0:0: [sda] Attached SCSI removable disk
-> [   58.100306] xhci_hcd 0000:01:00.0: xHCI host controller not responding, assume dead
-> [   58.108021] CPU: 0 PID: 939 Comm: kworker/0:2 Tainted: G         C      4.13.0-rc6 #11
-> [   58.115976] Hardware name: Sigma Tango DT
-> [   58.120016] Workqueue: usb_hub_wq hub_event
-> [   58.124241] [<c010f288>] (unwind_backtrace) from [<c010af58>] (show_stack+0x10/0x14)
-> [   58.132033] [<c010af58>] (show_stack) from [<c049d714>] (dump_stack+0x84/0x98)
-> [   58.139302] [<c049d714>] (dump_stack) from [<c03b090c>] (xhci_hc_died.part.9+0x50/0x23c)
-> [   58.147438] [<c03b090c>] (xhci_hc_died.part.9) from [<c03b5d80>] (xhci_hub_control+0xf3c/0x175c)
-> [   58.156273] [<c03b5d80>] (xhci_hub_control) from [<c03934a4>] (usb_hcd_submit_urb+0x264/0x814)
-> [   58.164932] [<c03934a4>] (usb_hcd_submit_urb) from [<c0394fa4>] (usb_start_wait_urb+0x4c/0xbc)
-> [   58.173591] [<c0394fa4>] (usb_start_wait_urb) from [<c03950b4>] (usb_control_msg+0xa0/0xcc)
-> [   58.181985] [<c03950b4>] (usb_control_msg) from [<c038bf54>] (usb_clear_port_feature+0x44/0x4c)
-> [   58.190730] [<c038bf54>] (usb_clear_port_feature) from [<c038c320>] (hub_port_reset+0x228/0x51c)
-> [   58.199561] [<c038c320>] (hub_port_reset) from [<c038fd68>] (hub_event+0x87c/0x108c)
-> [   58.207349] [<c038fd68>] (hub_event) from [<c012ecc4>] (process_one_work+0x1d8/0x3f0)
-> [   58.215220] [<c012ecc4>] (process_one_work) from [<c012f8d8>] (worker_thread+0x38/0x554)
-> [   58.223354] [<c012f8d8>] (worker_thread) from [<c01347d0>] (kthread+0x108/0x138)
-> [   58.230789] [<c01347d0>] (kthread) from [<c01076d8>] (ret_from_fork+0x14/0x3c)
-> [   58.238056] xhci_hcd 0000:01:00.0: HC died; cleaning up
-> [   58.243391] usb 2-2: USB disconnect, device number 2
-> --
+Hi Sudeep,
 
-xhci driver reads 0xffffffff from a mmio mapped xhci portsc register and bails out in:
-xhci-hub.c:
-         temp = readl(port_array[wIndex]);
-                 if (temp == ~(u32)0) {
-                         xhci_hc_died(xhci);
-			retval = -ENODEV;
-	                break;
-		}
+On Wed, Aug 23, 2017 at 10:17:06AM +0100, Sudeep Holla wrote:
+> 
+> On 23/08/17 08:23, Leo Yan wrote:
+> > In the coresight CPU debug document it suggests to use 'echo' command
+> > to set latency request to /dev/cpu_dma_latency so can disable all CPU
+> > idle states, but in fact this doesn't work.
+> > 
+> > This is because when the command 'echo' exits, it releases the device
+> > node's file descriptor and the kernel release function removes the QoS
+> > constraint; finally when the command 'echo' finished there have no
+> > constraint imposed on cpu_dma_latency.
+> > 
+> > This patch changes to use 'exec' to access '/dev/cpu_dma_latency', the
+> > command 'exec' can avoid the file descriptor to be closed so we can
+> > keep the constraint on cpu_dma_latency.
+> > 
+> > This patch also corrects the description when set latency = 0uS, in
+> > this case the idle state0 still can be selected by CPUIdle governor so
+> > this means on ARM platform the 'WFI' state is still enabled, but all
+> > other deeper states have been disabled so CPUs will not be powered off.
+> > 
+> 
+> 
+> IMO, we should just refer to cpuidle and PM QoS documents from here so
+> that any updates or changes in those documents are observed. Having a
+> copy of the text may result in it getting obsolete.
 
-In this case we read the register when hub thread asks to clear port feature.
+Agree, we should point to below docs:
+Documentation/power/pm_qos_interface.txt, section 'From user mode';
+Documentation/cpuidle/sysfs.txt;
 
-why portsc returns 0xffffffff is a nother quiestion, could the hub thread be running while xhci controller is (in D3)?
-Was xhci runtime suspended?
-There were some pcieport errors in another log you showed, maybe PCI devices are not properly recovered
-and the registers return 0xffffffff?
+Thanks for good suggestion.
 
--Mathias
+> -- 
+> Regards,
+> Sudeep
