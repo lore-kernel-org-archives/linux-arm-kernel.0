@@ -1,121 +1,68 @@
-From: mathias.nyman@intel.com (Mathias Nyman)
-Date: Wed, 23 Aug 2017 10:51:44 +0300
-Subject: Possible regression between 4.9 and 4.13
-In-Reply-To: <87a82qbyv5.fsf@linux.intel.com>
-References: <4dee5523-2d76-e731-6e81-f3027e88827f@free.fr>
- <87a82qbyv5.fsf@linux.intel.com>
-Message-ID: <599D3410.9050504@intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 23 Aug 2017 09:49:42 +0200
+Subject: [PATCH v3 3/4] net: stmmac: register parent MDIO node for
+ sun8i-h3-emac
+In-Reply-To: <352ae66b-78a4-e88b-4544-a8edd9390b0c@gmail.com>
+References: <20170820065757.GA6081@Red> <20170820142545.GB24150@lunn.ch>
+ <CAGb2v67hQXSoCKP7qW+KRUYX+0djQ1Z23cQ67Lyg6G7ozGyfGQ@mail.gmail.com>
+ <20170821132015.GB1703@lunn.ch>
+ <20170821133104.qvrhvwin2rdg4aqo@flea.lan>
+ <20170821142321.GE1703@lunn.ch>
+ <CAGb2v64E4T=1ff3POGuXZA=MvjGAnKQ6OF6A3sT_cU-=jh6zNw@mail.gmail.com>
+ <bfe784b6-5137-8fcd-dbd0-ad96974f4060@gmail.com>
+ <20170822181140.GA11596@Red>
+ <352ae66b-78a4-e88b-4544-a8edd9390b0c@gmail.com>
+Message-ID: <20170823074942.yt3c5gvnmdw5pqge@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.08.2017 09:07, Felipe Balbi wrote:
->
-> Hi,
->
-> Mason <slash.tmp@free.fr> writes:
->> Hello,
->>
->> The driver for my system's PCIe host bridge landed recently
->> (in 4.13) but it was developed on 4.9
->>
->> I tested the PCIe host bridge by plugging a 4-port USB3 adapter
->> into the PCIe slot (system at rest) and plugging an USB3 Flash
->> drive into the USB3 adapter (at run-time).
->>
->> On 4.9, the setup works (almost perfectly, see below).
->> On 4.13, once I unplug the Flash drive, the controller port
->> remains unresponsive.
->>
->>
->> On 4.9, I said *almost* perfectly, because the pcieport driver
->> does report a few non-fatal errors when I unplug:
->>
->> [  193.838504] usb 2-2: new SuperSpeed USB device number 2 using xhci_hcd
->> [  193.878081] usb-storage 2-2:1.0: USB Mass Storage device detected
->> [  193.884547] scsi host0: usb-storage 2-2:1.0
->> [  194.907936] scsi 0:0:0:0: Direct-Access     Kingston DataTraveler 3.0      PQ: 0 ANSI: 6
->> [  194.920296] sd 0:0:0:0: [sda] 15109516 512-byte logical blocks: (7.74 GB/7.20 GiB)
->> [  194.928666] sd 0:0:0:0: [sda] Write Protect is off
->> [  194.933755] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
->> [  194.946074]  sda: sda1
->> [  194.953608] sd 0:0:0:0: [sda] Attached SCSI removable disk
->>
->> [  208.930260] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
->> [  208.938342] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
->> [  208.950163] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
->> [  208.958577] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
->> [  208.965432] pcieport 0000:00:00.0: AER: Device recovery failed
->> [  209.663733] xhci_hcd 0000:01:00.0: Cannot set link state.
->> [  209.669194] usb usb2-port2: cannot disable (err = -32)
->> [  209.674376] usb 2-2: USB disconnect, device number 2
->> [  209.680481] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
->> [  209.688689] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
->> [  209.700555] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
->> [  209.708978] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
->> [  209.715845] pcieport 0000:00:00.0: AER: Device recovery failed
->> [  209.721722] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
->> [  209.729785] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
->> [  209.741602] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
->> [  209.750027] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
->> [  209.756866] pcieport 0000:00:00.0: AER: Device recovery failed
->>
->> After that, I can still plug the drive into the same port.
->>
->> But on 4.13, I get
->>
->> [   27.330378] usb 2-2: new SuperSpeed USB device number 2 using xhci_hcd
->> [   27.369383] usb-storage 2-2:1.0: USB Mass Storage device detected
->> [   27.375840] scsi host0: usb-storage 2-2:1.0
->> [   28.403035] scsi 0:0:0:0: Direct-Access     Kingston DataTraveler 3.0      PQ: 0 ANSI: 6
->> [   28.413326] sd 0:0:0:0: [sda] 15109516 512-byte logical blocks: (7.74 GB/7.20 GiB)
->> [   28.423653] sd 0:0:0:0: [sda] Write Protect is off
->> [   28.429139] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
->> [   28.441529]  sda: sda1
->> [   28.449431] sd 0:0:0:0: [sda] Attached SCSI removable disk
->>
->> [   90.592134] xhci_hcd 0000:01:00.0: xHCI host controller not responding, assume dead
->> [   90.599857] xhci_hcd 0000:01:00.0: HC died; cleaning up
->> [   90.605336] usb 2-2: USB disconnect, device number 2
->> [   90.630414] udevd[955]: inotify_add_watch(6, /dev/sda, 10) failed: No such file or directory
->>
->> Trying to replug into the same port = nothing happens
->> (Linux did say "assume dead")
->>
->> Any idea what could have changed between 4.9 and 4.13 ?
->>
->
-> Quite a bit:
->
-> $ git rev-list --no-merges  --count v4.13-rc6 ^v4.9 -- drivers/usb/host/xhci drivers/usb/core/
-> 58
->
+Hi Florian,
 
-very likely cause is the more aggressive detection of pci removed xhci hosts
+On Tue, Aug 22, 2017 at 11:35:01AM -0700, Florian Fainelli wrote:
+> >>> So I think what you are saying is either impossible or engineering-wise
+> >>> a very stupid design, like using an external MAC with a discrete PHY
+> >>> connected to the internal MAC's MDIO bus, while using the internal MAC
+> >>> with the internal PHY.
+> >>>
+> >>> Now can we please decide on something? We're a week and a half from
+> >>> the 4.13 release. If mdio-mux is wrong, then we could have two mdio
+> >>> nodes (internal-mdio & external-mdio).
+> >>
+> >> I really don't see a need for a mdio-mux in the first place, just have
+> >> one MDIO controller (current state) sub-node which describes the
+> >> built-in STMMAC MDIO controller and declare the internal PHY as a child
+> >> node (along with 'phy-is-integrated'). If a different configuration is
+> >> used, then just put the external PHY as a child node there.
+> >>
+> >> If fixed-link is required, the mdio node becomes unused anyway.
+> >>
+> >> Works for everyone?
+> > 
+> > If we put an external PHY with reg=1 as a child of internal MDIO,
+> > il will be merged with internal PHY node and get
+> > phy-is-integrated.
+> 
+> Then have the .dtsi file contain just the mdio node, but no internal or
+> external PHY and push all the internal and external PHY node definition
+> (in its entirety) to the per-board DTS file, does not that work?
 
-See commit d9f11ba9f107aa335091ab8d7ba5eea714e46e8b
-     xhci: Rework how we handle unresponsive or hoptlug removed hosts
+If possible, I'd really like to have the internal PHY in the
+DTSI. It's always there in hardware anyway, and duplicating the PHY,
+with its clock, reset line, and whatever info we might need in the
+future in each and every board DTS that uses it will be very error
+prone and we will have the usual bunch of issues that come up with
+duplication.
 
-It checks if a xhci register reads returns 0xffffffff and assumes xhci
-died in that case.
+Maxime
 
-Could you add something like the below to check which what is killing the host?
-Or a BUG()/WARN() in xhci_hc_died() to get a backtrace of who called it.
-
-diff --git a/drivers/usb/host/xhci-ring.c b/drivers/usb/host/xhci-ring.c
-index 51cd4b8..ade2ad6 100644
---- a/drivers/usb/host/xhci-ring.c
-+++ b/drivers/usb/host/xhci-ring.c
-@@ -922,7 +922,8 @@ void xhci_hc_died(struct xhci_hcd *xhci)
-         if (xhci->xhc_state & XHCI_STATE_DYING)
-                 return;
-  
--       xhci_err(xhci, "xHCI host controller not responding, assume dead\n");
-+       xhci_err(xhci, "xHC not responding in %pf, assume controller is dead\n",
-+                __builtin_return_address(0));
-         xhci->xhc_state |= XHCI_STATE_DYING;
-  
-         xhci_cleanup_command_queue(xhci);
-
-
-Thanks
-Mathias
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170823/1748b0b4/attachment.sig>
