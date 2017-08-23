@@ -1,75 +1,40 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 23 Aug 2017 08:52:00 +0200
-Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20170822201731.hyjqrbkhggaoomfl@flea.home>
-References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
- <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
- <5082b6d6-29a7-f101-8cba-13fce8983c89@xs4all.nl>
- <20170822110148.734c01b69dacc57fa08965d1@magewell.com>
- <8dd8c350-cd45-5cd9-65cc-67102944811f@xs4all.nl>
- <20170822201731.hyjqrbkhggaoomfl@flea.home>
-Message-ID: <3392c717-10ea-4d6e-4c25-9be0bbec004e@xs4all.nl>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Wed, 23 Aug 2017 12:25:36 +0530
+Subject: [PATCH] KVM: arm/arm64: vgic: constify seq_operations and
+ file_operations
+Message-ID: <de67d01fab53d5b7874cda1ac2c269887c673450.1503471217.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/22/2017 10:17 PM, Maxime Ripard wrote:
-> On Tue, Aug 22, 2017 at 08:43:35AM +0200, Hans Verkuil wrote:
->>>>> +static int sun6i_video_link_setup(struct media_entity *entity,
->>>>> +				  const struct media_pad *local,
->>>>> +				  const struct media_pad *remote, u32 flags)
->>>>> +{
->>>>> +	struct video_device *vdev = media_entity_to_video_device(entity);
->>>>> +	struct sun6i_video *video = video_get_drvdata(vdev);
->>>>> +
->>>>> +	if (WARN_ON(video == NULL))
->>>>> +		return 0;
->>>>> +
->>>>> +	return sun6i_video_formats_init(video);
->>>>
->>>> Why is this called here? Why not in video_init()?
->>>
->>> sun6i_video_init is in the driver probe context. sun6i_video_formats_init
->>> use media_entity_remote_pad and media_entity_to_v4l2_subdev to find the
->>> subdevs.
->>> The media_entity_remote_pad can't work before all the media pad linked.
->>
->> A video_init is typically called from the notify_complete callback.
->> Actually, that's where the video_register_device should be created as well.
->> When you create it in probe() there is possibly no sensor yet, so it would
->> be a dead video node (or worse, crash when used).
->>
->> There are still a lot of platform drivers that create the video node in the
->> probe, but it's not the right place if you rely on the async loading of
->> subdevs.
-> 
-> That's not really related, but I'm not really sure it's a good way to
-> operate. This essentially means that you might wait forever for a
-> component in your pipeline to be probed, without any chance of it
-> happening (not compiled, compiled as a module and not loaded, hardware
-> defect preventing the driver from probing properly, etc), even though
-> that component might not be essential.
+vgic_debug_seq_ops and file_operations are not supposed to change
+at runtime and none of the structures is modified.
 
-We're talking straightforward video pipelines here. I.e. a source, some
-processing units and a DMA engine at the end. There is no point in
-creating a video node if the pipeline is not complete since you need
-the full pipeline.
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+ virt/kvm/arm/vgic/vgic-debug.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-I've had bad experiences in the past where video nodes were created too
-soon and part of the internal state was still incomplete, causing at best
-weird behavior and at worst crashes.
-
-More complex devices are a whole different ballgame.
-
-Regards,
-
-	Hans
-
-> This is how DRM operates, and you sometimes end up in some very dumb
-> situations where you wait for say, the DSI controller to probe, while
-> you only care about HDMI in your system.
-> 
-> But this seems to be on of the hot topic these days, so we might
-> discuss it further in some other thread :)
-> 
-> Maxime
-> 
+diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
+index 7072ab7..10b3817 100644
+--- a/virt/kvm/arm/vgic/vgic-debug.c
++++ b/virt/kvm/arm/vgic/vgic-debug.c
+@@ -234,7 +234,7 @@ static int vgic_debug_show(struct seq_file *s, void *v)
+ 	return 0;
+ }
+ 
+-static struct seq_operations vgic_debug_seq_ops = {
++static const struct seq_operations vgic_debug_seq_ops = {
+ 	.start = vgic_debug_start,
+ 	.next  = vgic_debug_next,
+ 	.stop  = vgic_debug_stop,
+@@ -255,7 +255,7 @@ static int debug_open(struct inode *inode, struct file *file)
+ 	return ret;
+ };
+ 
+-static struct file_operations vgic_debug_fops = {
++static const struct file_operations vgic_debug_fops = {
+ 	.owner   = THIS_MODULE,
+ 	.open    = debug_open,
+ 	.read    = seq_read,
+-- 
+1.9.1
