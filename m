@@ -1,281 +1,191 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 23 Aug 2017 12:30:26 +0100
-Subject: [PATCH 13/27] arm64/sve: Signal handling support
-In-Reply-To: <87y3qaaaj8.fsf@linaro.org>
-References: <1502280338-23002-1-git-send-email-Dave.Martin@arm.com>
- <1502280338-23002-14-git-send-email-Dave.Martin@arm.com>
- <87y3qaaaj8.fsf@linaro.org>
-Message-ID: <20170823113025.GA6321@e103592.cambridge.arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 23 Aug 2017 13:54:40 +0200
+Subject: Possible regression between 4.9 and 4.13
+In-Reply-To: <599D62EA.7050100@linux.intel.com>
+References: <4dee5523-2d76-e731-6e81-f3027e88827f@free.fr>
+ <87a82qbyv5.fsf@linux.intel.com> <599D3410.9050504@intel.com>
+ <251c41c0-a4fd-8aae-88e0-5d5928ce45cf@free.fr>
+ <599D62EA.7050100@linux.intel.com>
+Message-ID: <c31b86b7-2974-858c-baa9-2c2e65688606@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 10:38:51AM +0100, Alex Benn?e wrote:
+On 23/08/2017 13:11, Mathias Nyman wrote:
+
+> On 23.08.2017 12:31, Mason wrote:
 > 
-> Dave Martin <Dave.Martin@arm.com> writes:
+>> [   46.525247] usb 2-2: new SuperSpeed USB device number 2 using xhci_hcd
+>> [   46.565496] usb-storage 2-2:1.0: USB Mass Storage device detected
+>> [   46.571934] scsi host0: usb-storage 2-2:1.0
+>> [   47.601227] scsi 0:0:0:0: Direct-Access     Kingston DataTraveler 3.0      PQ: 0 ANSI: 6
+>> [   47.611340] sd 0:0:0:0: [sda] 15109516 512-byte logical blocks: (7.74 GB/7.20 GiB)
+>> [   47.621624] sd 0:0:0:0: [sda] Write Protect is off
+>> [   47.627131] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
+>> [   47.639637]  sda: sda1
+>> [   47.648091] sd 0:0:0:0: [sda] Attached SCSI removable disk
+>> [   58.100306] xhci_hcd 0000:01:00.0: xHCI host controller not responding, assume dead
+>> [   58.108021] CPU: 0 PID: 939 Comm: kworker/0:2 Tainted: G         C      4.13.0-rc6 #11
+>> [   58.115976] Hardware name: Sigma Tango DT
+>> [   58.120016] Workqueue: usb_hub_wq hub_event
+>> [   58.124241] [<c010f288>] (unwind_backtrace) from [<c010af58>] (show_stack+0x10/0x14)
+>> [   58.132033] [<c010af58>] (show_stack) from [<c049d714>] (dump_stack+0x84/0x98)
+>> [   58.139302] [<c049d714>] (dump_stack) from [<c03b090c>] (xhci_hc_died.part.9+0x50/0x23c)
+>> [   58.147438] [<c03b090c>] (xhci_hc_died.part.9) from [<c03b5d80>] (xhci_hub_control+0xf3c/0x175c)
+>> [   58.156273] [<c03b5d80>] (xhci_hub_control) from [<c03934a4>] (usb_hcd_submit_urb+0x264/0x814)
+>> [   58.164932] [<c03934a4>] (usb_hcd_submit_urb) from [<c0394fa4>] (usb_start_wait_urb+0x4c/0xbc)
+>> [   58.173591] [<c0394fa4>] (usb_start_wait_urb) from [<c03950b4>] (usb_control_msg+0xa0/0xcc)
+>> [   58.181985] [<c03950b4>] (usb_control_msg) from [<c038bf54>] (usb_clear_port_feature+0x44/0x4c)
+>> [   58.190730] [<c038bf54>] (usb_clear_port_feature) from [<c038c320>] (hub_port_reset+0x228/0x51c)
+>> [   58.199561] [<c038c320>] (hub_port_reset) from [<c038fd68>] (hub_event+0x87c/0x108c)
+>> [   58.207349] [<c038fd68>] (hub_event) from [<c012ecc4>] (process_one_work+0x1d8/0x3f0)
+>> [   58.215220] [<c012ecc4>] (process_one_work) from [<c012f8d8>] (worker_thread+0x38/0x554)
+>> [   58.223354] [<c012f8d8>] (worker_thread) from [<c01347d0>] (kthread+0x108/0x138)
+>> [   58.230789] [<c01347d0>] (kthread) from [<c01076d8>] (ret_from_fork+0x14/0x3c)
+>> [   58.238056] xhci_hcd 0000:01:00.0: HC died; cleaning up
+>> [   58.243391] usb 2-2: USB disconnect, device number 2
 > 
-> > This patch implements support for saving and restoring the SVE
-> > registers around signals.
-> >
-> > A fixed-size header struct sve_context is always included in the
-> > signal frame encoding the thread's vector length at the time of
-> > signal delivery, optionally followed by a variable-layout structure
-> > encoding the SVE registers.
-> >
-> > Because of the need to preserve backwards compatibility, the FPSIMD
-> > view of the SVE registers is always dumped as a struct
-> > fpsimd_context in the usual way, in addition to any sve_context.
-> >
-> > The SVE vector registers are dumped in full, including bits 127:0
-> > of each register which alias the corresponding FPSIMD vector
-> > registers in the hardware.  To avoid any ambiguity about which
-> > alias to restore during sigreturn, the kernel always restores bits
-> > 127:0 of each SVE vector register from the fpsimd_context in the
-> > signal frame (which must be present): userspace needs to take this
-> > into account if it wants to modify the SVE vector register contents
-> > on return from a signal.
-> >
-> > FPSR and FPCR, which are used by both FPSIMD and SVE, are not
-> > included in sve_context because they are always present in
-> > fpsimd_context anyway.
-> >
-> > For signal delivery, a new helper
-> > fpsimd_signal_preserve_current_state() is added to update _both_
-> > the FPSIMD and SVE views in the task struct, to make it easier to
-> > populate this information into the signal frame.  Because of the
-> > redundancy between the two views of the state, only one is updated
-> > otherwise.  In order to avoid racing with a pending discard of the
-> > SVE state, this flush is hoisted before the sigframe layout phase,
-> > so that the layout and population phases see a consistent view of
-> > the thread.
-> >
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > ---
-
-[...]
-
-> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> > index 80ecb2d..e8674f6 100644
-> > --- a/arch/arm64/kernel/fpsimd.c
-> > +++ b/arch/arm64/kernel/fpsimd.c
-> > @@ -148,8 +148,6 @@ static void change_cpacr(u64 old, u64 new)
-> >  		write_sysreg(new, CPACR_EL1);
-> >  }
-> >
-> > -#ifdef CONFIG_ARM64_SVE
-> > -
-> >  #define ZREG(sve_state, vq, n) ((char *)(sve_state) +		\
-> >  	(SVE_SIG_ZREG_OFFSET(vq, n) - SVE_SIG_REGS_OFFSET))
-> >
-> > @@ -191,6 +189,8 @@ static void fpsimd_to_sve(struct task_struct *task)
-> >  		       sizeof(fst->vregs[i]));
-> >  }
-> >
-> > +#ifdef CONFIG_ARM64_SVE
-> > +
+> xhci driver reads 0xffffffff from a mmio mapped xhci portsc register and bails out in:
+> xhci-hub.c:
+>          temp = readl(port_array[wIndex]);
+>                  if (temp == ~(u32)0) {
+>                          xhci_hc_died(xhci);
+> 			retval = -ENODEV;
+> 	                break;
+> 		}
 > 
-> Hmm have sve_to_fpsimd and fpsimd_to_sve only just started being used by
-> the generic code here?
-
-Yes, the signal code now makes use of these via
-fpsimd_signal_preserve_current_state() and
-fpsimd_update_current_state(), with this patch.
-
-[...]
-
-> > diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> > index 4991e87..2694143 100644
-> > --- a/arch/arm64/kernel/signal.c
-> > +++ b/arch/arm64/kernel/signal.c
-
-[...]
-
-> > +#ifdef CONFIG_ARM64_SVE
-> > +
-> > +static int preserve_sve_context(struct sve_context __user *ctx)
-> > +{
-> > +	int err = 0;
-> > +	u16 reserved[ARRAY_SIZE(ctx->__reserved)];
-> > +	unsigned int vl = current->thread.sve_vl;
-> > +	unsigned int vq = 0;
-> > +
-> > +	BUG_ON(!sve_vl_valid(vl));
-> > +	if (test_thread_flag(TIF_SVE))
-> > +		vq = sve_vq_from_vl(vl);
-> > +
-> > +	memset(reserved, 0, sizeof(reserved));
-> > +
-> > +	__put_user_error(SVE_MAGIC, &ctx->head.magic, err);
-> > +	__put_user_error(round_up(SVE_SIG_CONTEXT_SIZE(vq), 16),
-> > +			 &ctx->head.size, err);
-> > +	__put_user_error(vl, &ctx->vl, err);
-> > +	BUILD_BUG_ON(sizeof(ctx->__reserved) != sizeof(reserved));
-> > +	err |= copy_to_user(&ctx->__reserved, reserved, sizeof(reserved));
-> > +
-> > +	if (vq) {
-> > +		/*
-> > +		 * This assumes that the SVE state has already been saved to
-> > +		 * the task struct by calling preserve_fpsimd_context().
-> > +		 */
-> > +		BUG_ON(SVE_SIG_REGS_SIZE(vq) !=
-> > sve_state_size(current));
+> In this case we read the register when hub thread asks to clear port feature.
 > 
-> I think others have mentioned the excessive BUG_ON()s here but I think
-> you are planning on cleaning some up on the next version. Assuming
-> sve_vq_from_vl() can't give you an invalid answer from a
-> sve_vl_valid(vl) then I wouldn't expect this test to add much.
+> why portsc returns 0xffffffff is a another question, could the hub thread be running while xhci controller is (in D3)?
+> Was xhci runtime suspended?
 
-Agreed.  Some BUG_ON()s test for things that are now obviously true
-by construction, which was not initially the case during development.
-This one can go away.
+How do I tell?
+Should I disable SUSPEND support and all kinds of power management?
 
-I'm very interested in any BUG_ON() that you think can actually fire.
-There _shouldn't_ be any of those, but the reasons are non-trivial in
-some cases.
+> There were some pcieport errors in another log you showed, maybe PCI devices are not properly recovered
+> and the registers return 0xffffffff?
 
-> > +		err |= copy_to_user((char __user *)ctx + SVE_SIG_REGS_OFFSET,
-> > +				    current->thread.sve_state,
-> > +				    SVE_SIG_REGS_SIZE(vq));
-> > +	}
-> > +
-> > +	return err ? -EFAULT : 0;
-> > +}
-> > +
-> > +static int restore_sve_fpsimd_context(struct user_ctxs *user)
-> > +{
-> > +	int err;
-> > +	unsigned int vq;
-> > +	struct fpsimd_state fpsimd;
-> > +	struct sve_context sve;
-> > +
-> > +	if (__copy_from_user(&sve, user->sve, sizeof(sve)))
-> > +		return -EFAULT;
-> > +
-> > +	if (sve.vl != current->thread.sve_vl)
-> > +		return -EINVAL;
-> > +
-> > +	if (sve.head.size <= sizeof(*user->sve)) {
-> > +		clear_thread_flag(TIF_SVE);
-> > +		goto fpsimd_only;
-> > +	}
-> > +
-> > +	BUG_ON(!sve_vl_valid(sve.vl));
-> > +	vq = sve_vq_from_vl(sve.vl);
-> > +
-> > +	if (sve.head.size < SVE_SIG_CONTEXT_SIZE(vq))
-> > +		return -EINVAL;
-> > +
-> > +	fpsimd_flush_task_state(current);
-> > +	barrier();
-> > +	set_thread_flag(TIF_FOREIGN_FPSTATE);
-> > +	barrier();
-> 
-> What are you trying to achieve with barriers here? Is there a potential
-> interaction between flushing the state and setting the flag that the
-> compiler can't see? A comment should be added at least.
+FWIW, I just compiled v4.12-rc1 and I do get the broken behavior.
 
-This is a tricky one -- I suppose I should definitely add comments,
-since it took me 2-3 weeks to debug this and get it right the first time
-around...
+v4.11.12 = OK
+v4.12-rc1 = KO
 
-I'm trying to protect against a context switch during the copy_from_user
-rewriting stale register data over the data we're copying from the user
-signal frame.
+PLUG
+[   17.226953] usb 2-2: new SuperSpeed USB device number 2 using xhci_hcd
+[   17.267195] usb-storage 2-2:1.0: USB Mass Storage device detected
+[   17.273612] scsi host0: usb-storage 2-2:1.0
+[   18.296369] scsi 0:0:0:0: Direct-Access     Kingston DataTraveler 3.0      PQ: 0 ANSI: 6
+[   18.307772] sd 0:0:0:0: [sda] 15109516 512-byte logical blocks: (7.74 GB/7.20 GiB)
+[   18.316991] sd 0:0:0:0: [sda] Write Protect is off
+[   18.322588] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
+[   18.334828]  sda: sda1
+[   18.339507] sd 0:0:0:0: [sda] Attached SCSI removable disk
+[   18.366202] random: fast init done
 
-In most places, I now disable preemption when writing into thread_struct,
-to keep this can of worms firmly closed.
-
-Here though, the code writes directly into thread_struct with
-preemption enabled: in this one case the copy is a copy_from_user(),
-and we can't disable preemption for that.  Other than this, the reasons
-for this code being the way it is derive from Ard's deferred fpsimd
-reload machinery (the TIF_FOREIGN_FPSTATE stuff), which is described in
-more detail in fpsimd.c.
+UNPLUG
+[   21.314111] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+[   21.322219] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+[   21.334039] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+[   21.342453] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+[   21.349306] pcieport 0000:00:00.0: AER: Device recovery failed
+[   22.055471] xhci_hcd 0000:01:00.0: xHCI host controller not responding, assume dead
+[   22.063187] xhci_hcd 0000:01:00.0: HC died; cleaning up
+[   22.068523] usb 2-2: USB disconnect, device number 2
+[   22.073774] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+[   22.085369] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+[   22.098823] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+[   22.107245] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+[   22.114130] pcieport 0000:00:00.0: AER: Device recovery failed
+[   22.120026] pcieport 0000:00:00.0: AER: Uncorrected (Non-Fatal) error received: id=0000
+[   22.128096] pcieport 0000:00:00.0: PCIe Bus Error: severity=Uncorrected (Non-Fatal), type=Transaction Layer, id=0000(Requester ID)
+[   22.139916] pcieport 0000:00:00.0:   device [1105:0024] error status/mask=00004000/00000000
+[   22.148320] pcieport 0000:00:00.0:    [14] Completion Timeout     (First)
+[   22.155162] pcieport 0000:00:00.0: AER: Device recovery failed
 
 
-The reason for the difference from the old fpsimd code here is that the
-SVE state may be unreasonably large to bounce via a buffer on the stack,
-and the copy-in occurs while the thread is running.  In the ptrace case
-(later on) the thread is guaranteed stopped, whereas for fpsimd the
-state is small enough that we _can_ bounce it via the stack.
+The defconfig I used for testing:
 
-TIF_FOREIGN_FPSTATE may be cleared by the context switch code, but only
-if fpsimd_flush_task_state() wasn't called since the last kernel entry
-for current.  (See fpsimd_thread_switch().)
-
-The context switch code may write the CPU registers over thread_struct,
-but only if TIF_FOREIGN_FPSTATE is not set at sched-out time.
-(fpsimd_thread_switch() again).
-
-These dependencies are strictly intra-thread, since context-switch is
-part of the same thread, so
-
-	fpsimd_flush_task_state();
-	barrier();
-	set_thread_flag(TIF_FOREIGN_FPSTATE);
-	barrier();
-	copy_from_user(current->thread.sve_state, ...);
-
-should be sufficient.
-
-I prefer to avoid spuriously saving the SVE regs into thread_struct
-when they may not already be live, so I don't set TIF_SVE until after
-TIF_FOREIGN_FPSTATE is set.  (This is a cost saving rather than a
-security issue -- only current's state can be in the registers, but the
-extra SVE bits are definitely not worth saving.  In any case, it only
-makes a difference to context switches in this narrow window.)
-
-> > +
-> > +	sve_alloc(current);
-> > +	BUG_ON(SVE_SIG_REGS_SIZE(vq) != sve_state_size(current));
-> > +	err = __copy_from_user(current->thread.sve_state,
-> > +			       (char __user const *)user->sve +
-> > +					SVE_SIG_REGS_OFFSET,
-> > +			       SVE_SIG_REGS_SIZE(vq));
-> > +	if (err)
-> > +		return err;
-> > +
-> > +	barrier();
-> > +	set_thread_flag(TIF_SVE);
-> 
-> Hmm and again. If this is about visibility of context when the thread
-> flag is read by other CPUs a barrier() on it's own is not enough as it
-> only stop local code re-organisation - do you actually mean smp_mb()?
-> 
-> Either way you need to document the potential race in a comment so the
-> reason can be understood.
-
-The final barrier() isn't really needed, and the ordering of TIF_SVE
-with the copy_from_user is unimportant unless I've missed something ...
-so I may get rid of that.  TIF_SVE would affect context switch, but
-only if TIF_FOREIGN_FPSTATE is clear or a ret_to_user occurs, neither
-of which is possible after the second barrier().
-
-
-Re smp_mb(), the only cross-thread ordering guarantees needed are for
-ptrace (later in the series), since that runs in some thread operating
-on a stopped thread that may have last run on some other CPU.  But this
-is a general ptrace issue, not specifically related to SVE.  IIRC some
-interaction between the ptrace core code and the scheduler's
-manipulation of the task state and runqueue locks ensures safety in
-that case without need for extra smp_mb() all over the place.
-
-> > +
-> > +fpsimd_only:
-> > +	/* copy the FP and status/control registers */
-> > +	/* restore_sigframe() already checked that user->fpsimd != NULL. */
-> > +	err = __copy_from_user(fpsimd.vregs, user->fpsimd->vregs,
-> > +			       sizeof(fpsimd.vregs));
-> > +	__get_user_error(fpsimd.fpsr, &user->fpsimd->fpsr, err);
-> > +	__get_user_error(fpsimd.fpcr, &user->fpsimd->fpcr, err);
-> > +
-> > +	/* load the hardware registers from the fpsimd_state structure */
-> > +	if (!err)
-> > +		fpsimd_update_current_state(&fpsimd);
-> > +
-> > +	return err;
-> > +}
-
-[...]
-
-Cheers
----Dave
+# CONFIG_SWAP is not set
+CONFIG_SYSVIPC=y
+CONFIG_NO_HZ_IDLE=y
+CONFIG_HIGH_RES_TIMERS=y
+# CONFIG_COMPAT_BRK is not set
+CONFIG_SLAB=y
+CONFIG_MODULES=y
+CONFIG_MODULE_UNLOAD=y
+CONFIG_MODVERSIONS=y
+CONFIG_ARCH_TANGO=y
+# CONFIG_ARM_ERRATA_643719 is not set
+CONFIG_PCI=y
+CONFIG_PCIEPORTBUS=y
+CONFIG_PCI_MSI=y
+CONFIG_PCIE_TANGO_SMP8759=y
+CONFIG_SMP=y
+CONFIG_PREEMPT=y
+CONFIG_HZ_300=y
+CONFIG_AEABI=y
+CONFIG_HIGHMEM=y
+# CONFIG_ATAGS is not set
+CONFIG_ARM_APPENDED_DTB=y
+CONFIG_ARM_ATAG_DTB_COMPAT=y
+CONFIG_CPU_FREQ=y
+CONFIG_CPU_FREQ_GOV_ONDEMAND=y
+CONFIG_CPUFREQ_DT=y
+CONFIG_VFP=y
+CONFIG_NEON=y
+CONFIG_NET=y
+CONFIG_PACKET=y
+CONFIG_UNIX=y
+CONFIG_INET=y
+CONFIG_IP_MULTICAST=y
+CONFIG_IP_PNP=y
+CONFIG_IP_PNP_DHCP=y
+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
+# CONFIG_INET_XFRM_MODE_BEET is not set
+# CONFIG_IPV6 is not set
+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_BLK_DEV_LOOP=y
+CONFIG_SCSI=y
+CONFIG_BLK_DEV_SD=y
+CONFIG_NETDEVICES=y
+CONFIG_NET_VENDOR_AURORA=y
+CONFIG_AURORA_NB8800=y
+CONFIG_AT803X_PHY=y
+# CONFIG_WLAN is not set
+# CONFIG_INPUT_KEYBOARD is not set
+# CONFIG_INPUT_MOUSE is not set
+# CONFIG_SERIO is not set
+CONFIG_SERIAL_8250=y
+# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
+CONFIG_SERIAL_8250_CONSOLE=y
+CONFIG_SERIAL_8250_RT288X=y
+CONFIG_SERIAL_OF_PLATFORM=y
+# CONFIG_HW_RANDOM is not set
+CONFIG_I2C=y
+CONFIG_I2C_XLR=y
+CONFIG_GPIOLIB=y
+CONFIG_THERMAL=y
+CONFIG_CPU_THERMAL=y
+CONFIG_TANGO_THERMAL=y
+CONFIG_WATCHDOG=y
+CONFIG_TANGOX_WATCHDOG=y
+CONFIG_FB=y
+# CONFIG_HID is not set
+# CONFIG_USB_HID is not set
+CONFIG_USB=y
+CONFIG_USB_XHCI_HCD=y
+CONFIG_USB_STORAGE=y
+CONFIG_EXT4_FS=y
+CONFIG_FUSE_FS=m
+CONFIG_VFAT_FS=m
+CONFIG_TMPFS=y
+CONFIG_NFS_FS=y
+# CONFIG_NFS_V2 is not set
+CONFIG_ROOT_NFS=y
+CONFIG_NLS_CODEPAGE_437=m
+CONFIG_NLS_ISO8859_1=m
+CONFIG_NLS_UTF8=m
+CONFIG_PRINTK_TIME=y
+# CONFIG_CRYPTO_ECHAINIV is not set
