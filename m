@@ -1,74 +1,74 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 23 Aug 2017 12:41:20 -0400 (EDT)
-Subject: [PATCH v2 0/8] ELF-FDPIC support for ARM
-In-Reply-To: <20170817083716.GN20805@n2100.armlinux.org.uk>
-References: <20170817072347.19990-1-nicolas.pitre@linaro.org>
- <20170817083716.GN20805@n2100.armlinux.org.uk>
-Message-ID: <alpine.LFD.2.20.1708231158090.14288@knanqh.ubzr>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 23 Aug 2017 17:43:01 +0100
+Subject: [PATCH v6 3/3] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
+ erratum 161010801
+In-Reply-To: <77b6c97f-f2d2-fd14-e83e-345addc5ea71@huawei.com>
+References: <20170809100715.870516-1-shameerali.kolothum.thodi@huawei.com>
+ <20170809100715.870516-4-shameerali.kolothum.thodi@huawei.com>
+ <20170810172723.GD9980@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA8383CC287@FRAEML521-MBX.china.huawei.com>
+ <c6b7c641-b839-1388-7982-366e796e6ba9@huawei.com>
+ <20170823132430.GB634@arm.com>
+ <77b6c97f-f2d2-fd14-e83e-345addc5ea71@huawei.com>
+Message-ID: <20170823164301.GC590@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 17 Aug 2017, Russell King - ARM Linux wrote:
-
-> On Thu, Aug 17, 2017 at 03:23:39AM -0400, Nicolas Pitre wrote:
-> > This series provides the needed changes to suport the ELF_FDPIC binary
-> > format on ARM. Both MMU and non-MMU systems are supported. This format
-> > has many advantages over the BFLT format used on MMU-less systems, such
-> > as being real ELF that can be parsed by standard tools, can support
-> > shared dynamic libs, etc.
+On Wed, Aug 23, 2017 at 03:29:46PM +0100, John Garry wrote:
+> On 23/08/2017 14:24, Will Deacon wrote:
+> >On Wed, Aug 23, 2017 at 02:17:24PM +0100, John Garry wrote:
+> >>>>>Signed-off-by: Shameer Kolothum
+> >>>><shameerali.kolothum.thodi@huawei.com>
+> >>>>>---
+> >>>>>drivers/iommu/arm-smmu-v3.c | 27 ++++++++++++++++++++++-----
+> >>>>>1 file changed, 22 insertions(+), 5 deletions(-)
+> >>>>
+> >>>>Please can you also add a devicetree binding with corresponding
+> >>>>documentation to enable this workaround on non-ACPI based systems too?
+> >>>>It should be straightforward if you update the arm_smmu_options table.
+> >>>
+> >>>As I mentioned before, devicetree was a lower priority and we would definitely
+> >>>submit patch to support that. Even if we update the arm_smmu_options table
+> >>>with DT binding, the generic function to retrieve the MSI address regions only
+> >>>works on ACPI/IORT case now.
+> >>>
+> >>
+> >>Hi Will,
+> >>
+> >>Can you confirm your stance on supporting this workaround for DT as well as
+> >>ACPI?
+> >>
+> >>For us, we now only "officially" support ACPI FW, and DT support at this
+> >>point is patchy/limited. To me, adding DT support is just more errata
+> >>workaround code to maintain with little useful gain.
+> >
+> >I basically don't like the idea of a driver that only works for one of
+> >ACPI or DT yet claims to support both. I'm less fussed about functionality
+> >differences (feature X is only available with firmware Y), but not working
+> >around a hardware erratum that we know about is just lazy.
+> >
+> >So I'd prefer that we handle this in both cases, or blacklist affected
+> >devices when booting with DT. Continuing as though there isn't an erratum
+> >is the worst thing we can do.
 > 
-> I don't see anything issues from the core arch point of view with this,
-> most of it looks straight forward, and the impact on existing users
-> should be low.  However, it would be nice to get some acks (if possible)
-> for the non-arch stuff and some tested-by's on this.
+> OK, seems reasonable.
+> 
+> We would consider blacklisting the device, where/how to do is the question.
+> 
+> So the errata is in the GICv3 ITS/PCI host controller, and we just use the
+> in-between SMMU (driver) to provide the workaround. So my initial impression
+> is that the PCI host controller would have to be blacklisted IFF behind an
+> IOMMU for DT firmware in pcie-hisi.c or pci quirks framework. How does it
+> sound?
 
-Well...
+If that avoids us running into the erratum, then fine by me. I'd obviously
+prefer we work-around it since we know how to, but that's up to you.
 
-I did prod a few people for testing. Either they're on vacation, or not 
-interested, but I've received no tested-by's nor ACK's what so ever at 
-this point. I did test it myself of course, on both MMU and non-MMU 
-targets, and with static and dynamic binaries.
+> Please also note that in our SoC we have other devices behind the same SMMU,
+> like storage controller, which are not affected or related to the Errata.
+> 
+> BTW, ignoring DT support, are you happy with this patchset?
 
-For the non-arch stuff I did post the relevant patches separately to 
-viro and cc to lkml a while ago. So far I've been greated with silence 
-there as well. Here's what those changes are:
+Yes, but I won't ack it without the above taken care of.
 
-1) binfmt_elf: don't attempt to load FDPIC binaries
-
-This adds a default definition for elf_check_fdpic returning false. 
-Therefore on architectures with no ELF-FDPIC support this is a no-op. 
-Among those architectures actually defining elf_check_fdpic, only ARM 
-(with this series applied) does support standard ELF as well. The FRV 
-architecture could possibly do both but it is currently marked BROKEN. 
-Maybe this patch could potentially "fix" FRV too? So in practice the 
-only place where this has an effect right now is on ARM.
-
-2) binfmt_elf_fdpic: fix crash on MMU system with dynamic binaries
-
-This one should be obvious enough to people actually _using_ it. 
-Apparently there aren't that many or this would have been fixed long 
-ago. This is turning a direct user space access into one with a proper 
-accessor. On no-MMU targets those accessors are transparent so this 
-won't change anything to the compiled code.
-
-3) ARM: enable elf_fdpic on systems with an MMU
-
-This adds a block surrounded by #ifdef ARCH_HAS_SETUP_ADDITIONAL_PAGES 
-in fs/binfmt_elf_fdpic.c inside a block already surrounded by #ifdef 
-CONFIG_MMU. As indicated in #2, the MMU version of fs/binfmt_elf_fdpic.c 
-was already non-functional so this is unlikely to affect anyone. 
-Furthermore, none of the architectures that may enable this code (MMU or 
-not) have ARCH_HAS_SETUP_ADDITIONAL_PAGES defined, except for ARM.
-
-So I think that the non-arch changes is demonstrably not going to affect 
-any existing users.
-
-Therefore at this point I'd suggest you pull the branch so it gets some 
-exposure in linux-next to see if this clashes with other people's work 
-somehow (I doubt it will). If ever ACKs come by I'll add them and ask 
-you to repull before the merge window.
-
-http://git.linaro.org/people/nicolas.pitre/linux fdpic
-
-
-Nicolas
+Will
