@@ -1,22 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 22 Aug 2017 19:18:33 -0500
-Subject: [PATCH v6 1/2] dt-bindings: misc: achc: Add device tree binding
- for GE ACHC
-In-Reply-To: <1503071628-11899-2-git-send-email-martyn.welch@collabora.co.uk>
-References: <1503071628-11899-1-git-send-email-martyn.welch@collabora.co.uk>
- <1503071628-11899-2-git-send-email-martyn.welch@collabora.co.uk>
-Message-ID: <20170823001833.jiqt2ojfgd7kgz3r@rob-hp-laptop>
+Date: Tue, 22 Aug 2017 19:23:43 -0500
+Subject: [PATCH v2 3/5] dt-bindings: add rk3399-q7 SoM
+In-Reply-To: <20170818193445.47542-4-klaus.goger@theobroma-systems.com>
+References: <20170818193445.47542-1-klaus.goger@theobroma-systems.com>
+ <20170818193445.47542-4-klaus.goger@theobroma-systems.com>
+Message-ID: <20170823002343.3yuagvfe4vqmxnh7@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Aug 18, 2017 at 04:53:47PM +0100, Martyn Welch wrote:
-> Add Device Tree binding document for GE Healthcare USB Management
-> Controller (ACHC).
+On Fri, Aug 18, 2017 at 09:34:43PM +0200, Klaus Goger wrote:
+> RK3399-Q7 is a Qseven compatible system-on-module by Theobroma Systems.
 > 
-> Signed-off-by: Martyn Welch <martyn.welch@collabora.co.uk>
+> This adds the module and the EVK baseboard "Haikou"
+> 
+> Signed-off-by: Klaus Goger <klaus.goger@theobroma-systems.com>
 > ---
->  Documentation/devicetree/bindings/misc/ge-achc.txt | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/misc/ge-achc.txt
+> 
+> Changes in v2: None
+> 
+>  Documentation/devicetree/bindings/arm/rockchip.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
