@@ -1,64 +1,53 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 23 Aug 2017 14:48:42 +0100
-Subject: [PATCH v2 1/1] Split VGA default device handler out of VGA arbiter
-In-Reply-To: <20170822221928.GL6948@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170817113028.16853-1-dja@axtens.net>
- <20170817113028.16853-2-dja@axtens.net>
- <20170821105300.GB23287@e107981-lin.cambridge.arm.com>
- <20170822221928.GL6948@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAKv+Gu-FCkV9Dv=yn_CNC9orj8Roiabb75jX34w3mMziWVZaeA@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 23 Aug 2017 16:53:50 +0300
+Subject: [PATCH] ARM: OMAP2+: fix missing variable declaration
+In-Reply-To: <20170823132841.642239-1-arnd@arndb.de>
+References: <20170823132841.642239-1-arnd@arndb.de>
+Message-ID: <12875092.dy1RW0XmqV@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 August 2017 at 23:19, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Mon, Aug 21, 2017 at 11:53:01AM +0100, Lorenzo Pieralisi wrote:
->> On Thu, Aug 17, 2017 at 09:30:28PM +1000, Daniel Axtens wrote:
->> > A system without PCI legacy resources (e.g. ARM64) may find that no
->> > default/boot VGA device has been marked, because the VGA arbiter
->> > checks for legacy resource decoding before marking a card as default.
->>
->> I do not understand this paragraph, in particular:
->>
->> - "A system without PCI legacy resources (e.g. ARM64)". What does this
->>   mean ? I take this as "ARM64 does not support IO space"; if a PCI host
->>   bridge supports IO space, there is nothing from an architectural
->>   point of view that prevents an MMIO based IO space implementation to
->>   work on ARM64. It is PCI bridge specific, not arch specific.
->
-> This reference to ARM64 is the same thing I stumbled over.  Maybe it
-> could be written along the lines of:
->
->   The VGA arbiter selects a default VGA device that is enabled and
->   reachable via the legacy VGA resources (mem 0xa0000-0xbffff, io
->   0x3b0-0x3bb, io 0x3c0-0x3df, etc).
->
->   If there is no such device, e.g., because there's no enabled VGA
->   device, the host bridge doesn't support access to those legacy
->   resources, or a PCI-PCI bridge doesn't have VGA Enable set, a
->   platform may select an arbitrary device by calling
->   vga_set_default_device().
->
-> Then I think this patch changes the previous behavior by allowing the
-> arbiter to select a device that is enabled and has a driver but may
-> not be reachable via the legacy VGA resources.
->
-> I don't know what all the consequences of that would be, but it does
-> muddy the VGA arbiter waters a bit.  AIUI, the main reason for the
-> arbiter is to allow multiple legacy VGA devices by manipulating bridge
-> VGA Enable bits so only one receives the legacy resources at a time.
->
-> These devices that do not need the legacy resources don't need that
-> special treatment because they don't care about the bridge VGA Enable
-> bits and several can coexist in the system with no need for VGA
-> arbitration.
->
-> I guess the powerpc fixup_vga() already selects a device that doesn't
-> need the VGA resources, so we already have that situation.
->
+Hi Arnd,
 
-Perhaps it is unclear that the whole point of tinkering with the VGA
-arbiter is that X may refuse to use a GFX card if it is not tagged as
-the default VGA device by the arbiter. I have suggested before that
-fixing X may be more appropriate in this case, given that ownership of
-the legacy VGA resources may not correlate at all with being the
-primary display device on non-x86 architectures.
+On Wednesday, 23 August 2017 16:28:19 EEST Arnd Bergmann wrote:
+> The function that was added doesn't actually build:
+> 
+> arch/arm/mach-omap2/display.c: In function 'omapdss_init_fbdev':
+> arch/arm/mach-omap2/display.c:184:2: error: 'r' undeclared (first use in
+> this function)
+> 
+> This adds a declaration for 'r' to fix it.
+> 
+> Fixes: 5ce783025c82 ("ARM: OMAP2+: Don't register omapdss device for
+> omapdrm")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+Looks like I haven't tested the patch with CONFIG_FB_OMAP2 enabled after the 
+last rebase. I'm very sorry about that :-(
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+Tomi, I assume you will pick this up and sent it to Dave for v4.14-rc1.
+
+> ---
+>  arch/arm/mach-omap2/display.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+> index 798fc718fffe..b3f6eb5d04a2 100644
+> --- a/arch/arm/mach-omap2/display.c
+> +++ b/arch/arm/mach-omap2/display.c
+> @@ -172,6 +172,7 @@ static int __init omapdss_init_fbdev(void)
+>  		.set_min_bus_tput = omap_dss_set_min_bus_tput,
+>  	};
+>  	struct device_node *node;
+> +	int r;
+> 
+>  	board_data.version = omap_display_get_version();
+>  	if (board_data.version == OMAPDSS_VER_UNKNOWN) {
+
+
+-- 
+Regards,
+
+Laurent Pinchart
