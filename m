@@ -1,73 +1,191 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 23 Aug 2017 13:48:47 -0500
-Subject: [PATCH] binder: let ANDROID_BINDER_IPC_32BIT be selectable on
- 32bit ARM
-In-Reply-To: <CALAqxLXSqUZCvzrqfUbozdZrwwP_0xWAU7sx69UYv81rBhovMg@mail.gmail.com>
-References: <20170808110305.2748-1-jszhang@marvell.com>
- <20170823015108.GA18228@kroah.com>
- <20170823103420.6ffb5ce7@xhacker>
- <CALAqxLU_ACM-91Sp+BPqsAhqdhqf7V6-m111j7F=xZ+K4Aji1Q@mail.gmail.com>
- <CALAqxLXSqUZCvzrqfUbozdZrwwP_0xWAU7sx69UYv81rBhovMg@mail.gmail.com>
-Message-ID: <CABGGisx73j7SHkA71sBQdHP0UnVc=EALo9b1AmrA6Af7WB=94Q@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 23 Aug 2017 13:58:30 -0500
+Subject: [PATCH v2 0/3] PCI: mediatek: Add MSI support for MT2712 and
+ MT7622
+In-Reply-To: <1502715868-17651-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1502715868-17651-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <20170823185830.GE8498@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 22, 2017 at 9:57 PM, John Stultz <john.stultz@linaro.org> wrote:
-> On Tue, Aug 22, 2017 at 7:56 PM, John Stultz <john.stultz@linaro.org> wrote:
->> On Tue, Aug 22, 2017 at 7:34 PM, Jisheng Zhang <jszhang@marvell.com> wrote:
->>> On Tue, 22 Aug 2017 18:51:08 -0700 Greg KH wrote:
->>>
->>>> On Tue, Aug 08, 2017 at 07:03:05PM +0800, Jisheng Zhang wrote:
->>>> > As noted in commit d0bdff0db809 ("staging: Fix build issues with new
->>>> > binder API"), we can add back the choice for 32bit ARM "once a 64bit
->>>> > __get_user_asm_* implementation is merged." Commit e38361d032f1 ("ARM:
->>>> > 8091/2: add get_user() support for 8 byte types") has added the
->>>> > support, so it's time to let ANDROID_BINDER_IPC_32BIT be selectable on
->>>> > 32bit ARM
->>>>
->>>> Ok, but:
->>>>
->>>> >
->>>> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
->>>> > ---
->>>> >  drivers/android/Kconfig | 2 +-
->>>> >  1 file changed, 1 insertion(+), 1 deletion(-)
->>>> >
->>>> > diff --git a/drivers/android/Kconfig b/drivers/android/Kconfig
->>>> > index 832e885349b1..aca5dc30b97b 100644
->>>> > --- a/drivers/android/Kconfig
->>>> > +++ b/drivers/android/Kconfig
->>>> > @@ -32,7 +32,7 @@ config ANDROID_BINDER_DEVICES
->>>> >       therefore logically separated from the other devices.
->>>> >
->>>> >  config ANDROID_BINDER_IPC_32BIT
->>>> > -   bool
->>>> > +   bool "Use old (Android 4.4 and earlier) 32-bit binder API"
->>>> >     depends on !64BIT && ANDROID_BINDER_IPC
->>>>
->>>> You don't actually change the depends line :(
->>>>
->>>> Please fix up, and test it, and then resend.
->>>
->>> IHOM, the dependency is correct: 64bit platforms don't support
->>> ANDROID_BINDER_IPC_32BIT. What do you think?
->>
->> I think this indicates the commit message is unclear.
->>
->> Part of it is that the config is inverted from the description. The
->> patch doesn't enable the 32bit legacy binder ABI on 32bit systems, it
->> just allows the option to be unselected, so that the 64bit ABI will be
->> used on 32bit systems.
->>
->> Conceptually I don't have an objection to the change (though maybe try
->> to rework the commit message), but I don't have anything to actually
->> test it on right now, so I'm hesitant to ack it.
->
-> It might also be good to add some detail as to the motivation for this
-> change? What benefit does it bring to 32bit platforms to use the newer
-> 64bit ABI?
+On Mon, Aug 14, 2017 at 09:04:25PM +0800, honghui.zhang at mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
+> 
+> MT2712 and MT7622's PCIe host controller support MSI, but only 32bit MSI
+> address are supportted. It connect to GIC with the same IRQ number of INTx
+> IRQ, so it shares the same IRQ with INTx IRQ.
+> 
+> This patchset add MSI support for MT2712 and MT7622.
+> Also do some code fixup and cleanups.
+> 
+> Change Since V1:
+>  - Add the first two patches into this patchset.
+>  - Using -ENODEV instead of PTR_ERR if msi_domain == NULL
+>  - Change the error logs with consistency of lower-case
+>  - Using has_msi instead of support_msi to make the parameter name a bit shorter
+> 
+> Honghui Zhang (3):
+>   PCI: mediatek: Fix return value in case of error
+>   PCI: mediatek: take use of bus->sysdata to get host private data
+>   PCI: mediatek: add msi support for MT2712 and MT7622
+> 
+>  drivers/pci/host/pcie-mediatek.c | 157 +++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 151 insertions(+), 6 deletions(-)
 
-It allows running the same 32-bit userspace build whether the kernel
-is 64-bit or 32-bit.
+Since "PCI: mediatek: Add controller support for MT2712 and MT7622" patch
+hasn't appeared upstream yet, I folded the return value fix directly into
+it.
 
-Rob
+I applied the others to pci/host-mediatek.  I modified the third one to
+remove what seemed to be needless differences from the rcar and tegra
+drivers.  The incremental diff is attached.  Please check to make sure I
+didn't break anything.
+
+
+diff --git a/drivers/pci/host/pcie-mediatek.c b/drivers/pci/host/pcie-mediatek.c
+index 35ab2321ed16..8891c00bf13c 100644
+--- a/drivers/pci/host/pcie-mediatek.c
++++ b/drivers/pci/host/pcie-mediatek.c
+@@ -134,7 +134,7 @@ struct mtk_pcie_port;
+ 
+ /**
+  * struct mtk_pcie_soc - differentiate between host generations
+- * @has_msi: whether this host support MSI interrupt or not
++ * @has_msi: whether this host supports MSI interrupts or not
+  * @ops: pointer to configuration access functions
+  * @startup: pointer to controller setting functions
+  * @setup_irq: pointer to initialize IRQ functions
+@@ -439,44 +439,51 @@ static int mtk_pcie_startup_port_v2(struct mtk_pcie_port *port)
+ 	return 0;
+ }
+ 
+-static int mtk_pcie_assign_msi(struct mtk_pcie_port *port)
++static int mtk_pcie_msi_alloc(struct mtk_pcie_port *port)
+ {
+-	int pos;
++	int msi;
+ 
+-	pos = find_first_zero_bit(port->msi_irq_in_use, MTK_MSI_IRQS_NUM);
+-	if (pos < MTK_MSI_IRQS_NUM)
+-		set_bit(pos, port->msi_irq_in_use);
++	msi = find_first_zero_bit(port->msi_irq_in_use, MTK_MSI_IRQS_NUM);
++	if (msi < MTK_MSI_IRQS_NUM)
++		set_bit(msi, port->msi_irq_in_use);
+ 	else
+ 		return -ENOSPC;
+ 
+-	return pos;
++	return msi;
++}
++
++static void mtk_pcie_msi_free(struct mtk_pcie_port *port, unsigned long hwirq)
++{
++	clear_bit(hwirq, port->msi_irq_in_use);
+ }
+ 
+ static int mtk_pcie_msi_setup_irq(struct msi_controller *chip,
+-				  struct pci_dev *pdev,
+-				  struct msi_desc *desc)
++				  struct pci_dev *pdev, struct msi_desc *desc)
+ {
+ 	struct mtk_pcie_port *port;
+ 	struct msi_msg msg;
++	unsigned int irq;
+ 	int hwirq;
+-	u32 irq;
+ 
+ 	port = mtk_pcie_find_port(pdev->bus, pdev->devfn);
+ 	if (!port)
+ 		return -EINVAL;
+ 
+-	chip->dev = &pdev->dev;
+-	hwirq = mtk_pcie_assign_msi(port);
++	hwirq = mtk_pcie_msi_alloc(port);
+ 	if (hwirq < 0)
+ 		return hwirq;
+ 
+ 	irq = irq_create_mapping(port->msi_domain, hwirq);
+-	if (!irq)
++	if (!irq) {
++		mtk_pcie_msi_free(port, hwirq);
+ 		return -EINVAL;
++	}
++
++	chip->dev = &pdev->dev;
+ 
+ 	irq_set_msi_desc(irq, desc);
+ 
+-	/* MT2712/MT7622 only support 32 bit MSI address */
++	/* MT2712/MT7622 only support 32-bit MSI addresses */
+ 	msg.address_hi = 0;
+ 	msg.address_lo = lower_32_bits((u64)(port->base + PCIE_MSI_VECTOR));
+ 	msg.data = hwirq;
+@@ -497,10 +504,8 @@ static void mtk_msi_teardown_irq(struct msi_controller *chip, unsigned int irq)
+ 	if (!port)
+ 		return;
+ 
+-	if (!test_bit(hwirq, port->msi_irq_in_use))
+-		dev_err(&pdev->dev, "trying to free unused MSI#%d\n", irq);
+-	else
+-		clear_bit(hwirq, port->msi_irq_in_use);
++	irq_dispose_mapping(irq);
++	mtk_pcie_msi_free(port, hwirq);
+ }
+ 
+ static struct msi_controller mtk_pcie_msi_chip = {
+@@ -529,16 +534,26 @@ static const struct irq_domain_ops msi_domain_ops = {
+ 	.map = mtk_pcie_msi_map,
+ };
+ 
+-static void mtk_pcie_enable_msi(struct mtk_pcie_port *port)
++static int mtk_pcie_enable_msi(struct mtk_pcie_port *port)
+ {
+ 	u32 val;
+ 
++	port->msi_domain = irq_domain_add_linear(node, MTK_MSI_IRQS_NUM,
++						 &msi_domain_ops,
++						 &mtk_pcie_msi_chip);
++	if (!port->msi_domain) {
++		dev_err(dev, "failed to create MSI IRQ domain\n");
++		return -ENOMEM;
++	}
++
+ 	val = lower_32_bits((u64)(port->base + PCIE_MSI_VECTOR));
+ 	writel(val, port->base + PCIE_IMSI_ADDR);
+ 
+ 	val = readl(port->base + PCIE_INT_MASK);
+ 	val &= ~MSI_MASK;
+ 	writel(val, port->base + PCIE_INT_MASK);
++
++	return 0;
+ }
+ 
+ static int mtk_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+@@ -559,6 +574,7 @@ static int mtk_pcie_init_irq_domain(struct mtk_pcie_port *port,
+ {
+ 	struct device *dev = port->pcie->dev;
+ 	struct device_node *pcie_intc_node;
++	int err;
+ 
+ 	/* Setup INTx */
+ 	pcie_intc_node = of_get_next_child(node, NULL);
+@@ -574,16 +590,10 @@ static int mtk_pcie_init_irq_domain(struct mtk_pcie_port *port,
+ 		return -ENODEV;
+ 	}
+ 
+-	/* Setup MSI */
+ 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+-		port->msi_domain = irq_domain_add_linear(node, MTK_MSI_IRQS_NUM,
+-							 &msi_domain_ops,
+-							 &mtk_pcie_msi_chip);
+-		if (!port->msi_domain) {
+-			dev_err(dev, "failed to get MSI IRQ domain\n");
+-			return -ENODEV;
+-		}
+-		mtk_pcie_enable_msi(port);
++		err = mtk_pcie_enable_msi(port);
++		if (err < 0)
++			return err;
+ 	}
+ 
+ 	return 0;
