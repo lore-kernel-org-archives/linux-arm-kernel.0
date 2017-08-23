@@ -1,49 +1,43 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 23 Aug 2017 18:04:44 +0200
-Subject: [EXT] Re: [PATCH net-next 10/18] net: mvpp2: use the GoP
- interrupt for link status changes
-In-Reply-To: <5ebd192c54984b25adda0a294035b1b9@IL-EXCH01.marvell.com>
-References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
- <20170724134848.19330-11-antoine.tenart@free-electrons.com>
- <20170726162648.GK12049@lunn.ch> <20170823082510.GD5202@kwain>
- <5ebd192c54984b25adda0a294035b1b9@IL-EXCH01.marvell.com>
-Message-ID: <20170823160444.GC23960@kwain>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Wed, 23 Aug 2017 11:05:28 -0500
+Subject: [PATCH] doc: coresight: correct usage for '/dev/cpu_dma_latency'
+In-Reply-To: <1503472998-9009-1-git-send-email-leo.yan@linaro.org>
+References: <1503472998-9009-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <20170823110528.ba272128cde46f40c71241cc@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 03:24:55PM +0000, Stefan Chulski wrote:
-> > When the cable is connected (there is signal) and the serdes is in sync and AN
-> > succeeded.
-> > 
-> > > With SFF/SFP ports, you generally need a gpio line the fibre module
-> > > can use to indicate if it has link. Fixed-phy has such support, and
-> > > your link_change function will get called when the link changes.
-> > 
-> > So that would work when using SFP modules but I wonder if the GoP irq isn't
-> > needed when using passive cable, in which case this patch would still be needed
-> > (and of course we should support the new Russell phylib capabilities).
-> 
-> Even if new phylib driver supports passive direct cables connection, 
-> GoP IRQ required for SOHO/Peridot external switch support.
-> SOHO/Peridot external switch could be connected directly to Serdes line.
+On Wed, 23 Aug 2017 15:23:18 +0800
+Leo Yan <leo.yan@linaro.org> wrote:
 
-So I guess the GoP link irq patches are needed. Should I resend them
-then?
+> Cc: Kim Phillips <kim.phillips@arm.com>
+> Reported-by: Kim Phillips <kim.phillips@arm.com>
 
-We'll have to discuss how to handle fixed-phy vs GoP IRQ, but I guess we
-can do this when adding the fixed-phy support later.
+Thanks; typically only the latter is needed.
 
-Thanks,
-Antoine
+>  Set latency request to /dev/cpu_dma_latency to disable all CPUs specific idle
+> -states (if latency = 0uS then disable all idle states):
+> -# echo "what_ever_latency_you_need_in_uS" > /dev/cpu_dma_latency
+> +states (if latency = 0uS then CPU Idle governor selects idle state0, so this
+> +means 'WFI' is still enabled but other deeper states have be disabled, this
+> +can avoid power off CPUs):
+> +# exec 3<> /dev/cpu_dma_latency; echo "what_ever_latency_you_need_in_uS" >&3
 
--- 
-Antoine T?nart, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170823/f8f2ffb0/attachment.sig>
+not a fan of the "what_ever_latency_you_need_in_uS" (including and
+especially the quotes which can create ambiguity in the user's mind):
+just put a cut-n-pasteable example, clarifying the typically-default
+value you chose, and its unit, in the text.
+
+More to the point, how did you test this?  Are you sure that that the
+value being echoed isn't being interpreted as a binary number?
+
+kernel/power/qos.c:pm_qos_power_read() looks to be looking for a 32-bit
+binary integer, but I'm not sure if that's where it gets read.
+
+Certainly, this 2013 article uses a C example to write a binary integer:
+
+https://access.redhat.com/articles/65410
+
+Please double-check, thanks,
+
+Kim
