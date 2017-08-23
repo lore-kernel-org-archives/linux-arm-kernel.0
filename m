@@ -1,121 +1,33 @@
 From: cl@rock-chips.com (cl at rock-chips.com)
-Date: Wed, 23 Aug 2017 16:40:30 +0800
-Subject: [PATCH v1 1/3] arm64: dts: rockchip: add mmc nodes for rk3328
- evaluation board
+Date: Wed, 23 Aug 2017 16:40:31 +0800
+Subject: [PATCH v1 2/3] cpufreq: rockchip: add support for rk3328 soc
 In-Reply-To: <1503477632-9661-1-git-send-email-cl@rock-chips.com>
 References: <1503477632-9661-1-git-send-email-cl@rock-chips.com>
-Message-ID: <1503477632-9661-2-git-send-email-cl@rock-chips.com>
+Message-ID: <1503477632-9661-3-git-send-email-cl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Liang Chen <cl@rock-chips.com>
 
-Rockchip's rk3328 evaluation board has 3 mmc controllers for
-sdio/sdmmc/emmc, let's enable them.
+Add compatible rockchip,rk3328 to the machines table to
+launch cpufreq-dt driver for rk3328 soc.
 
 Signed-off-by: Liang Chen <cl@rock-chips.com>
 ---
- arch/arm64/boot/dts/rockchip/rk3328-evb.dts | 74 +++++++++++++++++++++++++++++
- 1 file changed, 74 insertions(+)
+ drivers/cpufreq/cpufreq-dt-platdev.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-index 86605ae..479f9d9 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-@@ -60,6 +60,20 @@
- 		regulator-max-microvolt = <12000000>;
- 	};
- 
-+	sdio_pwrseq: sdio-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wifi_enable_h>;
-+
-+		/*
-+		 * On the module itself this is one of these (depending
-+		 * on the actual card populated):
-+		 * - SDIO_RESET_L_WL_REG_ON
-+		 * - PDN (power down when low)
-+		 */
-+		reset-gpios = <&gpio1 18 GPIO_ACTIVE_LOW>;
-+	};
-+
- 	vcc_sys: vcc-sys {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vcc_sys";
-@@ -69,6 +83,29 @@
- 		regulator-max-microvolt = <5000000>;
- 		vin-supply = <&dc_12v>;
- 	};
-+
-+	vcc_sd: sdmmc-regulator {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio0 30 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sdmmc0m1_gpio>;
-+		regulator-name = "vcc_sd";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		vin-supply = <&vcc_io>;
-+	};
-+};
-+
-+&emmc {
-+	bus-width = <8>;
-+	cap-mmc-highspeed;
-+	supports-emmc;
-+	disable-wp;
-+	non-removable;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_bus8>;
-+	status = "okay";
- };
- 
- &i2c1 {
-@@ -186,6 +223,43 @@
- 			rockchip,pins = <2 RK_PA6 RK_FUNC_GPIO &pcfg_pull_up>;
- 		};
- 	};
-+
-+	sdio-pwrseq {
-+		wifi_enable_h: wifi-enable-h {
-+		rockchip,pins =
-+			<1 18 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+};
-+
-+&sdio {
-+	bus-width = <4>;
-+	cap-sd-highspeed;
-+	cap-sdio-irq;
-+	disable-wp;
-+	keep-power-in-suspend;
-+	max-frequency = <150000000>;
-+	mmc-pwrseq = <&sdio_pwrseq>;
-+	non-removable;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdmmc1_bus4 &sdmmc1_cmd &sdmmc1_clk>;
-+	supports-sdio;
-+	status = "okay";
-+};
-+
-+&sdmmc {
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	disable-wp;
-+	max-frequency = <150000000>;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdmmc0_clk &sdmmc0_cmd &sdmmc0_dectn &sdmmc0_bus4>;
-+	supports-sd;
-+	vmmc-supply = <&vcc_sd>;
-+	status = "okay";
- };
- 
- &tsadc {
+diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
+index 1c26292..f16c3ba 100644
+--- a/drivers/cpufreq/cpufreq-dt-platdev.c
++++ b/drivers/cpufreq/cpufreq-dt-platdev.c
+@@ -76,6 +76,7 @@
+ 	{ .compatible = "rockchip,rk3188", },
+ 	{ .compatible = "rockchip,rk3228", },
+ 	{ .compatible = "rockchip,rk3288", },
++	{ .compatible = "rockchip,rk3328", },
+ 	{ .compatible = "rockchip,rk3366", },
+ 	{ .compatible = "rockchip,rk3368", },
+ 	{ .compatible = "rockchip,rk3399", },
 -- 
 1.9.1
