@@ -1,44 +1,35 @@
-From: jeffy.chen@rock-chips.com (jeffy)
-Date: Wed, 23 Aug 2017 09:32:39 +0800
-Subject: [RFC PATCH v2 1/3] PCI: rockchip: Add support for pcie wake irq
-In-Reply-To: <20170822172653.GJ6008@atomide.com>
-References: <20170817120431.12398-1-jeffy.chen@rock-chips.com>
- <20170817120431.12398-2-jeffy.chen@rock-chips.com>
- <20170818170107.GA119461@google.com> <20170818181416.GF6008@atomide.com>
- <5997486D.4040803@rock-chips.com> <20170822172653.GJ6008@atomide.com>
-Message-ID: <599CDB37.3070307@rock-chips.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 22 Aug 2017 18:39:47 -0700
+Subject: [PATCH] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <20170819171812.21902-1-laurentiu.tudor@nxp.com>
+References: <20170819171812.21902-1-laurentiu.tudor@nxp.com>
+Message-ID: <20170823013947.GB10615@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Sat, Aug 19, 2017 at 08:18:12PM +0300, laurentiu.tudor at nxp.com wrote:
+> From: Stuart Yoder <stuart.yoder@nxp.com>
+> 
+> Move the source files out of staging into their final locations:
+>   -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
+>   -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
+>   -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
+>   -README.txt, providing and overview of DPAA goes to
+>    Documentation/dpaa2/overview.txt
+> 
+> Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
+> Update dpaa2_eth and dpio staging drivers.
+> 
+> Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
+> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+> [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 
-On 08/23/2017 01:26 AM, Tony Lindgren wrote:
-> OK, let's fix any wakeriq ordering issues to make it more
-> usable. Sounds like in your case the wakeirq needs to be enabled
-> late and disabled early, while in my test cases I can keep it
-> enabled basically any time.
+Really?  You all have fixed all of the previous issues found?  Is it
+time for another real review?  If so, please ask for it.
 
-yes, in my case it's a level triggered irq, which needs to be disabled 
-when receive it(by irq_pm_check_wakeup(my hack) or inside of the custom 
-irq handler)
+thanks,
 
-
-and for eage irq, maybe we should enable it right after(or before) the 
-driver activate wake function(for example activate WOWLAN or WOLAN), 
-otherwise would it be possible to miss some irqs(triggered before we 
-actually enable the wake irq)?
-
->
-> If this is for suspend/resume, You could just register the
-> wakeirq on suspend and then remove it on resume. We do have at
-> least network drivers doing device_init_wakeup(dev, true) and
-> device_init_wakeup(dev, false) as needed for WOL, see for example
-> bfin_mac_ethtool_setwol().
->
-> Regards,
->
-> Tony
->
->
->
->
+greg k-h
