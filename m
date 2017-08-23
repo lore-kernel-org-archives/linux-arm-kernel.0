@@ -1,35 +1,56 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 22 Aug 2017 22:38:47 -0700
-Subject: [PATCH] staging: fsl-mc: be consistent when checking strcmp()
- returns
-In-Reply-To: <1503455625.6933.12.camel@perches.com>
-References: <20170817115504.4308-1-laurentiu.tudor@nxp.com>
- <20170823014031.GA14400@kroah.com>
- <1503455625.6933.12.camel@perches.com>
-Message-ID: <20170823053847.GF23426@kroah.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 23 Aug 2017 11:12:46 +0530
+Subject: [PATCH v3 3/5] dt-bindings: sdhci-omap: Add bindings for the
+ sdhci-omap controller
+In-Reply-To: <20170821142132.GH6008@atomide.com>
+References: <20170821142132.GH6008@atomide.com>
+Message-ID: <20170823054246.23927-1-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 22, 2017 at 07:33:45PM -0700, Joe Perches wrote:
-> On Tue, 2017-08-22 at 18:40 -0700, Greg KH wrote:
-> > On Thu, Aug 17, 2017 at 02:55:04PM +0300, laurentiu.tudor at nxp.com wrote:
-> > > From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> > > 
-> > > Throughout the driver we use == 0 / != 0 to check strcmp() returns except
-> > > this place, so fix it.
-> > 
-> > You will just get someone else fixing it as it is not what checkpatch
-> > recommends, so just leave it as-is please.
-> 
-> No.  That's not correct.
-> 
-> checkpatch does not make a recommendation about
-> style use with the strcmp family of functions.
+Add binding for the TI's sdhci-omap controller. This now includes only
+a subset of properties documented in ti-omap-hsmmc.txt but will eventually
+include all the properties.
 
-Ah, ok, nevermind then...
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+Changes from v2:
+*) Fixed example to use the updated compatible
 
-Laurentiu, can you resend this?
+Changes from v1:
+*) Create a new sdhci-omap.txt document for TI's sdhci-omap controller instead
+   of using the ti-omap-hsmmc.txt as suggested by Tony
+ .../devicetree/bindings/mmc/sdhci-omap.txt         | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-omap.txt
 
-thanks,
-
-greg k-h
+diff --git a/Documentation/devicetree/bindings/mmc/sdhci-omap.txt b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+new file mode 100644
+index 000000000000..139695ad2d58
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
+@@ -0,0 +1,22 @@
++* TI OMAP SDHCI Controller
++
++Refer to mmc.txt for standard MMC bindings.
++
++Required properties:
++- compatible: Should be "ti,dra7-sdhci" for DRA7 and DRA72 controllers
++- ti,hwmods: Must be "mmc<n>", <n> is controller instance starting 1
++
++Optional properties:
++- ti,dual-volt: boolean, supports dual voltage cards
++- ti,non-removable: non-removable slot (like eMMC)
++
++Example:
++	mmc1: mmc at 0x4809c000 {
++		compatible = "ti,dra7-sdhci";
++		reg = <0x4809c000 0x400>;
++		ti,hwmods = "mmc1";
++		ti,dual-volt;
++		bus-width = <4>;
++		vmmc-supply = <&vmmc>; /* phandle to regulator node */
++		ti,non-removable;
++	};
+-- 
+2.11.0
