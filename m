@@ -1,108 +1,38 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 23 Aug 2017 16:38:38 -0500
-Subject: [PATCH V12 4/5] PCI: Handle CRS ("device not ready") returned by
- device after FLR
-In-Reply-To: <1503464171-6471-4-git-send-email-okaya@codeaurora.org>
-References: <1503464171-6471-1-git-send-email-okaya@codeaurora.org>
- <1503464171-6471-4-git-send-email-okaya@codeaurora.org>
-Message-ID: <20170823213838.GG8498@bhelgaas-glaptop.roam.corp.google.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 23 Aug 2017 21:59:08 +0800
+Subject: [PATCH v1 1/3] arm: npcm: add basic support for Nuvoton BMCs
+In-Reply-To: <20170822033502.4100-2-brendanhiggins@google.com>
+Message-ID: <201708232122.mBCbVCE7%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 12:56:10AM -0400, Sinan Kaya wrote:
-> Sporadic reset issues have been observed with Intel 750 NVMe drive while
-> assigning the physical function to the guest machine.  The sequence of
-> events observed is as follows:
-> 
->   - perform a Function Level Reset (FLR)
->   - sleep up to 1000ms total
->   - read ~0 from PCI_COMMAND
->   - warn that the device didn't return from FLR
->   - touch the device before it's ready
->   - device drops config writes when we restore register settings
->   - incomplete register restore leaves device in inconsistent state
->   - device probe fails because device is in inconsistent state
-> 
-> After reset, an endpoint may respond to config requests with Configuration
-> Request Retry Status (CRS) to indicate that it is not ready to accept new
-> requests.  See PCIe r3.1, sec 2.3.1 and 6.6.2.
-> 
-> After an FLR, read the Vendor ID and use pci_bus_wait_crs() to wait for a
-> value that indicates the device is ready only if CRS visibility is
-> supported and device is responding with 0x0001.
-> 
-> If pci_bus_wait_crs() fails, i.e., the device has responded with CRS status
-> for at least the timeout interval, fall back to the old behavior of reading
-> the Command register until it is not ~0.
-> 
-> Also increase the timeout value from 1 second to 60 seconds to have
-> consistent behavior for root ports that do and do not support CRS
-> visibility.
+Hi Brendan,
 
-So, after all this work, I bet you a nickel that merely increasing the
-timeout from 1 sec to 60 sec (while keeping just the original PCI_COMMAND
-loop) would be sufficient to fix this problem.
+[auto build test WARNING on linus/master]
+[also build test WARNING on v4.13-rc6 next-20170823]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Reading PCI_COMMAND will cause CRS completions just like reading
-PCI_VENDOR_ID will.  The only difference is that there's no CRS SV
-handling, and the Root Port will synthesize ~0 data when it stops retrying
-the read.
+url:    https://github.com/0day-ci/linux/commits/Brendan-Higgins/arm-npcm-add-basic-support-for-Nuvoton-BMCs/20170824-031106
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-If we increase the timeout, is there still value in adding the
-pci_bus_wait_crs() stuff?  I'm not sure there is.
+All warnings (new ones prefixed by >>):
 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/pci/pci.c | 20 ++++++++++++++++++--
->  1 file changed, 18 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index af0cc34..5980ab3 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -3819,19 +3819,35 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
->   */
->  static void pci_flr_wait(struct pci_dev *dev)
->  {
-> +	int timeout_ms = 60000;
->  	int i = 0;
->  	u32 id;
->  
-> +	/*
-> +	 * Per PCIe r3.1, sec 6.6.2, the device should finish FLR within
-> +	 * 100ms, but even after that, it may respond to config requests
-> +	 * with CRS status if it requires more time.
-> +	 */
-> +	msleep(100);
-> +
-> +	if (pci_bus_read_config_dword(dev->bus, dev->devfn, PCI_VENDOR_ID, &id))
-> +		return;
-> +
-> +	if (pci_bus_crs_visibility_pending(id) &&
-> +		pci_bus_wait_crs(dev->bus, dev->devfn, id, timeout_ms))
-> +		return;
-> +
-> +	timeout_ms -= 100;
->  	do {
->  		msleep(100);
->  		pci_read_config_dword(dev, PCI_COMMAND, &id);
-> -	} while (i++ < 10 && id == ~0);
-> +	} while (i++ < (timeout_ms / 100) && id == ~0);
->  
->  	if (id == ~0)
->  		dev_warn(&dev->dev, "Failed to return from FLR\n");
->  	else if (i > 1)
->  		dev_info(&dev->dev, "Required additional %dms to return from FLR\n",
-> -			 (i - 1) * 100);
-> +			 i * 100);
->  }
->  
->  /**
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+warning: (CPU_NPCM750_SMP) selects ARM_ERRATA_458693 which has unmet direct dependencies (CPU_V7 && !ARCH_MULTIPLATFORM)
+warning: (CPU_NPCM750_SMP) selects ARM_ERRATA_742231 which has unmet direct dependencies (CPU_V7 && SMP && !ARCH_MULTIPLATFORM)
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 62836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170823/8118174d/attachment-0001.gz>
