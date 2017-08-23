@@ -1,59 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Aug 2017 11:50:16 +0200
-Subject: [GIT PULL] arm: mediatek: dts32 updates for v4.14
-In-Reply-To: <1503455717.16782.7.camel@mtksdaap41>
-References: <9434dcb8-d38d-ff3a-a6ce-2b27d3a74cef@gmail.com>
- <CAK8P3a0HnyJq4LUQyv8zn5vKcybyY3avam8s=6UFcMSeqXVQbg@mail.gmail.com>
- <1503454566.15454.0.camel@mtksdaap41> <1503455717.16782.7.camel@mtksdaap41>
-Message-ID: <CAK8P3a1qP-usWg9=30Oh7t51LEj+LeUXnOCF2Xc9j9Rq6kZnBg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 23 Aug 2017 10:52:23 +0100
+Subject: [PATCH v2] arm64: dts: marvell: add Device Tree files for
+ Armada-8KP
+In-Reply-To: <1502364534-20732-1-git-send-email-hannah@marvell.com>
+References: <1502364534-20732-1-git-send-email-hannah@marvell.com>
+Message-ID: <deba07ea-3033-e224-e98a-62072687e673@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 4:35 AM, YT Shen <yt.shen@mediatek.com> wrote:
->> On Sat, 2017-08-19 at 04:41 +0800, Arnd Bergmann wrote:
->> > On Thu, Aug 17, 2017 at 3:37 PM, Matthias Brugger
->> > <matthias.bgg@gmail.com> wrote:
->> > >
->> > > The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
->> > >
->> > >   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
->> > >
->> > > are available in the git repository at:
->> > >
->> > >   https://github.com/mbgg/linux-mediatek.git tags/v4.13-next-dts64
->> > >
->> > > for you to fetch changes up to bdf2cbb2b3160122f7ff16445fdb73267fffd583:
->> > >
->> > >   arm64: dts: Add Mediatek SoC MT2712 and evaluation board dts and Makefile
->> > > (2017-08-17 15:33:45 +0200)
->> > >
->> > > ----------------------------------------------------------------
->> > > - add SoC mt7622 and its reference board
->> > > - cleanup of dts bindings
->> > > - mt6797: add watchdog and delete unused clock
->> > > - add support for SoC mt2701 and it's eval board
->> >
->> > Nice to see mt7622 support already getting merged, at least it seems this
->> > is getting there before the chip ends up in consumer devices, normally
->> > it's the other way round ;-)
->> >
->> > Could you let me know what mt2712 is? I can't find anything about this
->> > chip, not even which business unit made it, and I'd like to have a brief
->> > description for most newly added hardware in my own pull requests.
->> >
->> >         Arnd
->> >
-> Hi,
->
-> MT2712 is a family of automotive processors designed for infotainment
-> applications.
->
-> Is that sufficient?  Thanks.
-> yt.shen
+Thanks Thomas for pointing me to this patch.
 
-Thanks, that just what I was missing. It would be good to add something
-like that, plus any pointers to public websites (when they exist) when merging
-support for a new chip, in the commit log and/or the Kconfig entry when we
-have one (the latter usually only for arm32 but not arm64).
+Hannah: in the future, please include  whoever commented on your patch
+when you respin it.
 
-      Arnd
+On 10/08/17 12:28, hannah at marvell.com wrote:
+> From: Hanna Hawa <hannah@marvell.com>
+> 
+> This commit adds the base Device Tree files for the Armada 8KPlus.
+> The Armada 8KP SoCs include several hardware blocks, and this
+> commit only adds support for the AP810 block, that contains the CPU
+> core and basic peripherals.
+> 
+> AP810 is a high-performance die, includes octal core application
+> processor based ARMv8-A architecture, two standard high speed DDR4
+> interface, and GIC-600 interrupt controller.
+> AP810 Built as part of Marvell?s MoChi AP family products.
+> 
+> Armada-8080 (8KPlus family), include an AP810 block that contains
+> the CPU core and basic peripherals.
+> 
+> This commit creates the following hierarchy:
+>  * armada-ap810-ap0.dtsi - definitions common to AP810
+>  	* armada-ap810-ap0-octa-core.dtsi - description of the octa cores
+> 		* armada-8080.dtsi - description of the 8080 SoC
+> 			* armada-8080-db.dts - description of the 8080 board
+> 
+> Change-Id: I34ff3dc5d686b048477d953278622d74eaef843d
+
+Please drop this Change-Id from mainline submissions, as we don't carry
+such tags.
+
+> Signed-off-by: Hanna Hawa <hannah@marvell.com>
+> ---
+> 
+> Notes:
+> 	Changes in v2:
+> 	- remove affininty mask for PPI
+> 	- add missing regions in GIC address space (GICC, GICH, and GICV)
+> 
+>  .../devicetree/bindings/arm/marvell/armada-8kp.txt |  15 ++
+>  arch/arm64/boot/dts/marvell/Makefile               |   1 +
+>  arch/arm64/boot/dts/marvell/armada-8080-db.dts     |  67 +++++++++
+>  arch/arm64/boot/dts/marvell/armada-8080.dtsi       |  53 +++++++
+>  .../dts/marvell/armada-ap810-ap0-octa-core.dtsi    | 104 +++++++++++++
+>  arch/arm64/boot/dts/marvell/armada-ap810-ap0.dtsi  | 163 +++++++++++++++++++++
+>  6 files changed, 403 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/marvell/armada-8kp.txt
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-8080-db.dts
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-8080.dtsi
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-ap810-ap0-octa-core.dtsi
+>  create mode 100644 arch/arm64/boot/dts/marvell/armada-ap810-ap0.dtsi
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
