@@ -1,35 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 23 Aug 2017 15:27:23 +0200
-Subject: [PATCH] ARM: ux500: don't select CPUFREQ_DT
-Message-ID: <20170823132733.619811-1-arnd@arndb.de>
+Date: Wed, 23 Aug 2017 15:28:19 +0200
+Subject: [PATCH] ARM: OMAP2+: fix missing variable declaration
+Message-ID: <20170823132841.642239-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new 'select CPUFREQ_DT' statement causes a warning in some
-configurations:
+The function that was added doesn't actually build:
 
-warning: (ARCH_U8500) selects CPUFREQ_DT which has unmet direct dependencies (CPU_FREQ && HAVE_CLK && OF && (!CPU_THERMAL || THERMAL))
+arch/arm/mach-omap2/display.c: In function 'omapdss_init_fbdev':
+arch/arm/mach-omap2/display.c:184:2: error: 'r' undeclared (first use in this function)
 
-No other platform does this, so I think for consistency it's
-best if we remove it again from ux500 and instead add the driver
-to the defconfig.
+This adds a declaration for 'r' to fix it.
 
+Fixes: 5ce783025c82 ("ARM: OMAP2+: Don't register omapdss device for omapdrm")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-ux500/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/mach-omap2/display.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index 2b56e4af5a27..4740ac393297 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -9,7 +9,6 @@ menuconfig ARCH_U8500
- 	select ARM_GIC
- 	select CACHE_L2X0
- 	select CLKSRC_NOMADIK_MTU
--	select CPUFREQ_DT
- 	select GPIOLIB
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
+diff --git a/arch/arm/mach-omap2/display.c b/arch/arm/mach-omap2/display.c
+index 798fc718fffe..b3f6eb5d04a2 100644
+--- a/arch/arm/mach-omap2/display.c
++++ b/arch/arm/mach-omap2/display.c
+@@ -172,6 +172,7 @@ static int __init omapdss_init_fbdev(void)
+ 		.set_min_bus_tput = omap_dss_set_min_bus_tput,
+ 	};
+ 	struct device_node *node;
++	int r;
+ 
+ 	board_data.version = omap_display_get_version();
+ 	if (board_data.version == OMAPDSS_VER_UNKNOWN) {
 -- 
 2.9.0
