@@ -1,51 +1,50 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Wed, 23 Aug 2017 10:35:17 +0800
-Subject: [GIT PULL] arm: mediatek: dts32 updates for v4.14
-In-Reply-To: <1503454566.15454.0.camel@mtksdaap41>
-References: <9434dcb8-d38d-ff3a-a6ce-2b27d3a74cef@gmail.com>
- <CAK8P3a0HnyJq4LUQyv8zn5vKcybyY3avam8s=6UFcMSeqXVQbg@mail.gmail.com>
- <1503454566.15454.0.camel@mtksdaap41>
-Message-ID: <1503455717.16782.7.camel@mtksdaap41>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 23 Aug 2017 10:34:20 +0800
+Subject: [PATCH] binder: let ANDROID_BINDER_IPC_32BIT be selectable on
+ 32bit ARM
+In-Reply-To: <20170823015108.GA18228@kroah.com>
+References: <20170808110305.2748-1-jszhang@marvell.com>
+ <20170823015108.GA18228@kroah.com>
+Message-ID: <20170823103420.6ffb5ce7@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Sat, 2017-08-19 at 04:41 +0800, Arnd Bergmann wrote:
-> > On Thu, Aug 17, 2017 at 3:37 PM, Matthias Brugger
-> > <matthias.bgg@gmail.com> wrote:
-> > >
-> > > The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
-> > >
-> > >   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-> > >
-> > > are available in the git repository at:
-> > >
-> > >   https://github.com/mbgg/linux-mediatek.git tags/v4.13-next-dts64
-> > >
-> > > for you to fetch changes up to bdf2cbb2b3160122f7ff16445fdb73267fffd583:
-> > >
-> > >   arm64: dts: Add Mediatek SoC MT2712 and evaluation board dts and Makefile
-> > > (2017-08-17 15:33:45 +0200)
-> > >
-> > > ----------------------------------------------------------------
-> > > - add SoC mt7622 and its reference board
-> > > - cleanup of dts bindings
-> > > - mt6797: add watchdog and delete unused clock
-> > > - add support for SoC mt2701 and it's eval board
-> > 
-> > Nice to see mt7622 support already getting merged, at least it seems this
-> > is getting there before the chip ends up in consumer devices, normally
-> > it's the other way round ;-)
-> > 
-> > Could you let me know what mt2712 is? I can't find anything about this
-> > chip, not even which business unit made it, and I'd like to have a brief
-> > description for most newly added hardware in my own pull requests.
-> > 
-> >         Arnd
-> > 
-Hi,
+On Tue, 22 Aug 2017 18:51:08 -0700 Greg KH wrote:
 
-MT2712 is a family of automotive processors designed for infotainment
-applications.
+> On Tue, Aug 08, 2017 at 07:03:05PM +0800, Jisheng Zhang wrote:
+> > As noted in commit d0bdff0db809 ("staging: Fix build issues with new
+> > binder API"), we can add back the choice for 32bit ARM "once a 64bit
+> > __get_user_asm_* implementation is merged." Commit e38361d032f1 ("ARM:
+> > 8091/2: add get_user() support for 8 byte types") has added the
+> > support, so it's time to let ANDROID_BINDER_IPC_32BIT be selectable on
+> > 32bit ARM  
+> 
+> Ok, but:
+> 
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  drivers/android/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/android/Kconfig b/drivers/android/Kconfig
+> > index 832e885349b1..aca5dc30b97b 100644
+> > --- a/drivers/android/Kconfig
+> > +++ b/drivers/android/Kconfig
+> > @@ -32,7 +32,7 @@ config ANDROID_BINDER_DEVICES
+> >  	  therefore logically separated from the other devices.
+> >  
+> >  config ANDROID_BINDER_IPC_32BIT
+> > -	bool
+> > +	bool "Use old (Android 4.4 and earlier) 32-bit binder API"
+> >  	depends on !64BIT && ANDROID_BINDER_IPC  
+> 
+> You don't actually change the depends line :(
+> 
+> Please fix up, and test it, and then resend.
 
-Is that sufficient?  Thanks.
-yt.shen
+IHOM, the dependency is correct: 64bit platforms don't support
+ANDROID_BINDER_IPC_32BIT. What do you think?
+
+Thanks,
+Jisheng
