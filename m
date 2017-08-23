@@ -1,50 +1,146 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 23 Aug 2017 10:34:20 +0800
-Subject: [PATCH] binder: let ANDROID_BINDER_IPC_32BIT be selectable on
- 32bit ARM
-In-Reply-To: <20170823015108.GA18228@kroah.com>
-References: <20170808110305.2748-1-jszhang@marvell.com>
- <20170823015108.GA18228@kroah.com>
-Message-ID: <20170823103420.6ffb5ce7@xhacker>
+From: yong.deng@magewell.com (Yong)
+Date: Wed, 23 Aug 2017 10:41:18 +0800
+Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20170821202145.kmxancepyq55v3o2@flea.lan>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+ <20170728160233.xooevio4hoqkgfaq@flea.lan>
+ <20170730060801.bkc2kvm72ktixy74@tarshish>
+ <20170821202145.kmxancepyq55v3o2@flea.lan>
+Message-ID: <20170823104118.b4524830e4bb767d7714772c@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 22 Aug 2017 18:51:08 -0700 Greg KH wrote:
+On Mon, 21 Aug 2017 22:21:45 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-> On Tue, Aug 08, 2017 at 07:03:05PM +0800, Jisheng Zhang wrote:
-> > As noted in commit d0bdff0db809 ("staging: Fix build issues with new
-> > binder API"), we can add back the choice for 32bit ARM "once a 64bit
-> > __get_user_asm_* implementation is merged." Commit e38361d032f1 ("ARM:
-> > 8091/2: add get_user() support for 8 byte types") has added the
-> > support, so it's time to let ANDROID_BINDER_IPC_32BIT be selectable on
-> > 32bit ARM  
+> Hi Baruch,
 > 
-> Ok, but:
-> 
+> On Sun, Jul 30, 2017 at 09:08:01AM +0300, Baruch Siach wrote:
+> > On Fri, Jul 28, 2017 at 06:02:33PM +0200, Maxime Ripard wrote:
+> > > Hi, 
+> > > 
+> > > Thanks for the second iteration!
+> > > 
+> > > On Thu, Jul 27, 2017 at 01:01:35PM +0800, Yong Deng wrote:
+> > > > Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
+> > > > and CSI1 is used for parallel interface. This is not documented in
+> > > > datasheet but by testing and guess.
+> > > > 
+> > > > This patch implement a v4l2 framework driver for it.
+> > > > 
+> > > > Currently, the driver only support the parallel interface. MIPI-CSI2,
+> > > > ISP's support are not included in this patch.
+> > > > 
+> > > > Signed-off-by: Yong Deng <yong.deng@magewell.com>
 > > 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >  drivers/android/Kconfig | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > [...]
 > > 
-> > diff --git a/drivers/android/Kconfig b/drivers/android/Kconfig
-> > index 832e885349b1..aca5dc30b97b 100644
-> > --- a/drivers/android/Kconfig
-> > +++ b/drivers/android/Kconfig
-> > @@ -32,7 +32,7 @@ config ANDROID_BINDER_DEVICES
-> >  	  therefore logically separated from the other devices.
-> >  
-> >  config ANDROID_BINDER_IPC_32BIT
-> > -	bool
-> > +	bool "Use old (Android 4.4 and earlier) 32-bit binder API"
-> >  	depends on !64BIT && ANDROID_BINDER_IPC  
+> > > > +#ifdef DEBUG
+> > > > +static void sun6i_csi_dump_regs(struct sun6i_csi_dev *sdev)
+> > > > +{
+> > > > +	struct regmap *regmap = sdev->regmap;
+> > > > +	u32 val;
+> > > > +
+> > > > +	regmap_read(regmap, CSI_EN_REG, &val);
+> > > > +	printk("CSI_EN_REG=0x%x\n",		val);
+> > > > +	regmap_read(regmap, CSI_IF_CFG_REG, &val);
+> > > > +	printk("CSI_IF_CFG_REG=0x%x\n",		val);
+> > > > +	regmap_read(regmap, CSI_CAP_REG, &val);
+> > > > +	printk("CSI_CAP_REG=0x%x\n",		val);
+> > > > +	regmap_read(regmap, CSI_SYNC_CNT_REG, &val);
+> > > > +	printk("CSI_SYNC_CNT_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_FIFO_THRS_REG, &val);
+> > > > +	printk("CSI_FIFO_THRS_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_PTN_LEN_REG, &val);
+> > > > +	printk("CSI_PTN_LEN_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_PTN_ADDR_REG, &val);
+> > > > +	printk("CSI_PTN_ADDR_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_VER_REG, &val);
+> > > > +	printk("CSI_VER_REG=0x%x\n",		val);
+> > > > +	regmap_read(regmap, CSI_CH_CFG_REG, &val);
+> > > > +	printk("CSI_CH_CFG_REG=0x%x\n",		val);
+> > > > +	regmap_read(regmap, CSI_CH_SCALE_REG, &val);
+> > > > +	printk("CSI_CH_SCALE_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_CH_F0_BUFA_REG, &val);
+> > > > +	printk("CSI_CH_F0_BUFA_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_CH_F1_BUFA_REG, &val);
+> > > > +	printk("CSI_CH_F1_BUFA_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_CH_F2_BUFA_REG, &val);
+> > > > +	printk("CSI_CH_F2_BUFA_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_CH_STA_REG, &val);
+> > > > +	printk("CSI_CH_STA_REG=0x%x\n",		val);
+> > > > +	regmap_read(regmap, CSI_CH_INT_EN_REG, &val);
+> > > > +	printk("CSI_CH_INT_EN_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_CH_INT_STA_REG, &val);
+> > > > +	printk("CSI_CH_INT_STA_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_CH_FLD1_VSIZE_REG, &val);
+> > > > +	printk("CSI_CH_FLD1_VSIZE_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_CH_HSIZE_REG, &val);
+> > > > +	printk("CSI_CH_HSIZE_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_CH_VSIZE_REG, &val);
+> > > > +	printk("CSI_CH_VSIZE_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_CH_BUF_LEN_REG, &val);
+> > > > +	printk("CSI_CH_BUF_LEN_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_CH_FLIP_SIZE_REG, &val);
+> > > > +	printk("CSI_CH_FLIP_SIZE_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_CH_FRM_CLK_CNT_REG, &val);
+> > > > +	printk("CSI_CH_FRM_CLK_CNT_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_CH_ACC_ITNL_CLK_CNT_REG, &val);
+> > > > +	printk("CSI_CH_ACC_ITNL_CLK_CNT_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_CH_FIFO_STAT_REG, &val);
+> > > > +	printk("CSI_CH_FIFO_STAT_REG=0x%x\n",	val);
+> > > > +	regmap_read(regmap, CSI_CH_PCLK_STAT_REG, &val);
+> > > > +	printk("CSI_CH_PCLK_STAT_REG=0x%x\n",	val);
+> > > > +}
+> > > > +#endif
+> > > 
+> > > You can already dump a regmap through debugfs, that's redundant.
+> > 
+> > The advantage of in-code registers dump routine is the ability to
+> > synchronize the snapshot with the driver code execution. This is
+> > particularly important for the capture statistics registers. I have
+> > found it useful here.
 > 
-> You don't actually change the depends line :(
+> You also have the option to use the traces to do that, but if that's
+> useful, this should be added to regmap itself. It can benefit others
+> too.
 > 
-> Please fix up, and test it, and then resend.
+> > > > +static irqreturn_t sun6i_csi_isr(int irq, void *dev_id)
+> > > > +{
+> > > > +	struct sun6i_csi_dev *sdev = (struct sun6i_csi_dev *)dev_id;
+> > > > +	struct regmap *regmap = sdev->regmap;
+> > > > +	u32 status;
+> > > > +
+> > > > +	regmap_read(regmap, CSI_CH_INT_STA_REG, &status);
+> > > > +
+> > > > +	if ((status & CSI_CH_INT_STA_FIFO0_OF_PD) ||
+> > > > +	    (status & CSI_CH_INT_STA_FIFO1_OF_PD) ||
+> > > > +	    (status & CSI_CH_INT_STA_FIFO2_OF_PD) ||
+> > > > +	    (status & CSI_CH_INT_STA_HB_OF_PD)) {
+> > > > +		regmap_write(regmap, CSI_CH_INT_STA_REG, status);
+> > > > +		regmap_update_bits(regmap, CSI_EN_REG, CSI_EN_CSI_EN, 0);
+> > > > +		regmap_update_bits(regmap, CSI_EN_REG, CSI_EN_CSI_EN,
+> > > > +				   CSI_EN_CSI_EN);
+> > > 
+> > > You need to enable / disable it at every frame? How do you deal with
+> > > double buffering? (or did you choose to ignore it for now?)
+> > 
+> > These *_OF_PD status bits indicate an overflow error condition.
+> 
+> Shouldn't we return an error code then? The names of these flags could
+> be better too.
 
-IHOM, the dependency is correct: 64bit platforms don't support
-ANDROID_BINDER_IPC_32BIT. What do you think?
+Then, where and how to deal with the error coce.
+
+> 
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+
 
 Thanks,
-Jisheng
+Yong
