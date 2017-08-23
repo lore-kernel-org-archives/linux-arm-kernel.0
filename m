@@ -1,40 +1,130 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Wed, 23 Aug 2017 12:25:36 +0530
-Subject: [PATCH] KVM: arm/arm64: vgic: constify seq_operations and
- file_operations
-Message-ID: <de67d01fab53d5b7874cda1ac2c269887c673450.1503471217.git.arvind.yadav.cs@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 23 Aug 2017 08:06:16 +0100
+Subject: [PATCH v2] irqchip: uniphier-aidet: add UniPhier AIDET irqchip
+ driver
+In-Reply-To: <CAK7LNATfeDk0rFjspEM08Y4R_3TKffE2dcBNCLnNn+t1G5YXew@mail.gmail.com>
+References: <1503309663-2742-1-git-send-email-yamada.masahiro@socionext.com>
+ <e3b865f5-a779-f176-67ef-9ffac25019d4@arm.com>
+ <CAK7LNASUzuKpQyZt6ks44EoQOhvqgUU8rUfJyNknGNVAgWYAKg@mail.gmail.com>
+ <046d0078-bb9d-f043-b5b4-481c695e2bea@arm.com>
+ <CAK7LNATfeDk0rFjspEM08Y4R_3TKffE2dcBNCLnNn+t1G5YXew@mail.gmail.com>
+Message-ID: <797ca4dae038c0cc5a7215a427c9d18f@www.loen.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vgic_debug_seq_ops and file_operations are not supposed to change
-at runtime and none of the structures is modified.
+On 2017-08-23 02:30, Masahiro Yamada wrote:
+> Hi Marc,
+>
+> 2017-08-22 17:20 GMT+09:00 Marc Zyngier <marc.zyngier@arm.com>:
+>> On 22/08/17 03:03, Masahiro Yamada wrote:
+>>> Hi Mark,
+>>>
+>>>
+>>> 2017-08-21 19:25 GMT+09:00 Marc Zyngier <marc.zyngier@arm.com>:
+>>>
+>>>>> +static struct irq_chip uniphier_aidet_irq_chip = {
+>>>>> +     .name = "AIDET",
+>>>>> +     .irq_mask = irq_chip_mask_parent,
+>>>>> +     .irq_unmask = irq_chip_unmask_parent,
+>>>>> +     .irq_eoi = irq_chip_eoi_parent,
+>>>>> +     .irq_set_type = uniphier_aidet_irq_set_type,
+>>>>
+>>>> Is this irqchip only used in a uniprocessor system? If not, how is 
+>>>> the
+>>>> interrupt affinity managed without a irq_set_affinity callback?
+>>>>
+>>>
+>>>
+>>> After consideration, some questions popped up.
+>>>
+>>>
+>>>
+>>> We can set other hooks, for example, .irq_{enable,disable} if we 
+>>> like.
+>>>
+>>>          .irq_enable = irq_chip_enable_parent,
+>>>          .irq_disable = irq_chip_disable_parent,
+>>>
+>>>
+>>> I know the parent (GIC) implements unmask/mask instead of 
+>>> enable/disable,
+>>> but this is also out of the scope of this driver.
+>>>
+>>> I am not familiar with the difference between unmask/mask and 
+>>> enable/disable.
+>>> IIUC, the difference is that
+>>> if enable/disable hooks are missing, IRQs are masked lazily.
+>>
+>> That's a rather good thing. Disabling interrupts lazily is a net
+>> performance gain when you you have to repeatedly mask/unmask 
+>> interrupts.
+>>
+>>> If a child irqchip implemented enable/disable,
+>>> IRQs would be masked immediately.  So, in irq-domain hierarchy,
+>>> a child irqchip need to have a good insight about its parent
+>>> which is be better, unmask/mask or enable/disable.
+>>
+>> Not necessarily. irq_chip_enable_parent will call unmask if enable 
+>> is
+>> not implemented in the parent. But you'll loose the benefit of lazy
+>> masking of interrupts routed through this controller.
+>
+> Right.
+> I will not add .irq_{enable/disable} to keep the benefit of lazy 
+> masking.
+>
+>
+>
+>
+>> There are many other things that are *much* worse, like the need to
+>> implement a irq_eoi callback even if the irqchip has no such 
+>> concept.
+>
+> Right. I noticed irq_eoi is mandatory when I tested my driver.
+>
+> I notice handle_percpu_irq() and handle_percpu_devid_irq()
+> check the NULL pointer dereference like
+>
+>         if (chip->irq_eoi)
+>                 chip->irq_eoi(&desc->irq_data);
+>
+> But, other flow handlers do not this.
+>
+>
+>
+>
+>>>> Nit: please use irq_domain_create_hierarchy.
+>>>
+>>> I'd like to know your intention about your commit
+>>> 2a5e9a072da6469a37d1f0b1577416f51223c280
+>>>
+>>> Is that mean, irq_domain_add_hierarchy will be deprecated
+>>> some time in the future?
+>>
+>> That's the intent, as we're moving towards a firmware-agnostic
+>> irq_domain layer. Think of it as a deprecated interface.
+>>
+>>> If I grep under drivers/irqchip/,
+>>> most drivers are currently using irq_domain_add_hierarchy(),
+>>> and this provides a shorter form for DT-based drivers.
+>> Yes, we have a lot of legacy, and I don't always catch new 
+>> additions.
+>
+> I see.
+>
+> I hope all drivers will be converted and irq_domain_add_hierarchy() 
+> will be
+> deleted.
+>
+> Having many variants with slight difference is confusing to driver
+> developers.
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- virt/kvm/arm/vgic/vgic-debug.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Feel free to submit patches removing all of the irq_domain_add_*(). 
+With about 300 uses covering most non-x86 architectures, that will be 
+interesting to watch.  I seriously doubt there is any value in that much 
+churn, and simply documenting the fact that this is irq_domain_add* is 
+not the preferred API would be just as efficient.
 
-diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
-index 7072ab7..10b3817 100644
---- a/virt/kvm/arm/vgic/vgic-debug.c
-+++ b/virt/kvm/arm/vgic/vgic-debug.c
-@@ -234,7 +234,7 @@ static int vgic_debug_show(struct seq_file *s, void *v)
- 	return 0;
- }
- 
--static struct seq_operations vgic_debug_seq_ops = {
-+static const struct seq_operations vgic_debug_seq_ops = {
- 	.start = vgic_debug_start,
- 	.next  = vgic_debug_next,
- 	.stop  = vgic_debug_stop,
-@@ -255,7 +255,7 @@ static int debug_open(struct inode *inode, struct file *file)
- 	return ret;
- };
- 
--static struct file_operations vgic_debug_fops = {
-+static const struct file_operations vgic_debug_fops = {
- 	.owner   = THIS_MODULE,
- 	.open    = debug_open,
- 	.read    = seq_read,
+         M.
 -- 
-1.9.1
+Fast, cheap, reliable. Pick two.
