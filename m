@@ -1,92 +1,35 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 23 Aug 2017 10:22:31 +0100
-Subject: [PATCH v5 0/4] Add support for ThunderX2 pmu events using json
- files
-In-Reply-To: <CAKTKpr79hBBGfkVnKS+XsSOAwR9G1=F04OH0UBE3J8EX_w3L5A@mail.gmail.com>
-References: <20170816071048.26087-1-ganapatrao.kulkarni@cavium.com>
- <CAKTKpr79hBBGfkVnKS+XsSOAwR9G1=F04OH0UBE3J8EX_w3L5A@mail.gmail.com>
-Message-ID: <4900f29c-aea5-9792-ee4b-adbf942eb361@huawei.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 23 Aug 2017 11:25:09 +0200
+Subject: [PATCH 2/2] soc/tegra: fuse: Add missing semi-colon
+In-Reply-To: <20170823092509.5243-1-thierry.reding@gmail.com>
+References: <20170823092509.5243-1-thierry.reding@gmail.com>
+Message-ID: <20170823092509.5243-2-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/08/2017 05:21, Ganapatrao Kulkarni wrote:
-> Hi Arnaldo, Will,
->
-> are there any comments on this series?
->
+From: Thierry Reding <treding@nvidia.com>
 
-Hi Ganapatrao,
+Commit 8a46828e623c ("soc/tegra: Register SoC device") added a new
+initcall, but forgot to terminate the line with a semi-colon. Some
+recent versions of GCC seem to report this as an error.
 
-Is it possible to have vendor sub-folder in 
-tools/perf/pmu-events/arch/arm64 folder (like arm64 device tree files)? 
-We (HiSilicon) want to add support for our hip08 SoC, and I don't think 
-"hip08" or "<internal code name for core>" are good arch sub-folder names.
+Fixes: 8a46828e623c ("soc/tegra: Register SoC device")
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ drivers/soc/tegra/fuse/fuse-tegra.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I am not sure if this way discussed before, but the changelog does not 
-mention it. And I think that we had the same location for thunderx2 in 
-v1 series.
-
-We should also consider that in theory the events could change per SoC 
-using the same custom ARMv8 custom implementation.
-
-Thanks,
-John
-
->
-> On Wed, Aug 16, 2017 at 12:40 PM, Ganapatrao Kulkarni
-> <ganapatrao.kulkarni@cavium.com> wrote:
->> Extending json/jevent framework for parsing arm64 event files.
->> Adding jevents for ThunderX2 implementation defined PMU events.
->>
->> v5:
->>    - Addressed comments from Arnaldo.
->>    - Rebased to 4.13-rc5
->>
->> v4:
->>    - Rebased to 4.13-rc1
->>
->> v3:
->>    - Addressed comments from Will Deacon and Jayachandran C.
->>    - Rebased to 4.12-rc1
->>
->> v2:
->>    - Updated as per Mark Rutland's suggestions.
->>    - Added provision for get_cpuid_str to get cpu id string
->>      from associated cpus of pmu core device.
->>
->> v1: Initial patchset.
->>
->> Ganapatrao Kulkarni (4):
->>   perf utils: passing pmu as a parameter to function get_cpuid_str
->>   perf tools arm64: Add support for get_cpuid_str function.
->>   perf utils: Add helper function is_pmu_core to detect PMU CORE devices
->>   perf vendor events arm64: Add ThunderX2 implementation defined pmu
->>     core events
->>
->>  tools/perf/arch/arm64/util/Build                   |  1 +
->>  tools/perf/arch/arm64/util/header.c                | 61 +++++++++++++++++++++
->>  tools/perf/arch/powerpc/util/header.c              |  2 +-
->>  tools/perf/arch/x86/util/header.c                  |  2 +-
->>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
->>  .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
->>  tools/perf/util/header.h                           |  3 +-
->>  tools/perf/util/pmu.c                              | 53 +++++++++++++++---
->>  8 files changed, 188 insertions(+), 11 deletions(-)
->>  create mode 100644 tools/perf/arch/arm64/util/header.c
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
->>
->> --
->> 2.9.4
->>
->
-> thanks
-> Ganapat
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> .
->
+diff --git a/drivers/soc/tegra/fuse/fuse-tegra.c b/drivers/soc/tegra/fuse/fuse-tegra.c
+index be003d04383f..b7c552e3133c 100644
+--- a/drivers/soc/tegra/fuse/fuse-tegra.c
++++ b/drivers/soc/tegra/fuse/fuse-tegra.c
+@@ -364,5 +364,5 @@ static int __init tegra_init_soc(void)
+ 
+ 	return 0;
+ }
+-device_initcall(tegra_init_soc)
++device_initcall(tegra_init_soc);
+ #endif
+-- 
+2.13.3
