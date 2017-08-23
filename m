@@ -1,94 +1,127 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Thu, 24 Aug 2017 00:10:05 +0800
-Subject: [PATCH 2/7] dt-bindings: PM / OPP: add clocks per OPP node support
+Date: Thu, 24 Aug 2017 00:10:06 +0800
+Subject: [PATCH 3/7] PM / OPP: rename opp_table->clk to opp_table->cur_clk
 In-Reply-To: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
 References: <1503504610-12880-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1503504610-12880-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1503504610-12880-4-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's used for platforms where different OPPs may use different clocks.
-With this extended binding, user could specify the correct clock for each
-OPP node.
+Since we now support per OPP clocks, we rename opp_table->clk to
+opp_table->cur_clk to make it less confusing as the opp_table->clk
+will become only represent the current clock of the current OPP
+on which the device is running.
 
 Cc: Viresh Kumar <vireshk@kernel.org>
 Cc: Nishanth Menon <nm@ti.com>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Frank Rowand <frowand.list@gmail.com>
-Cc: devicetree at vger.kernel.org
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- Documentation/devicetree/bindings/opp/opp.txt | 52 +++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+ drivers/base/power/opp/core.c | 30 +++++++++++++++---------------
+ drivers/base/power/opp/opp.h  |  4 ++--
+ 2 files changed, 17 insertions(+), 17 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/opp/opp.txt b/Documentation/devicetree/bindings/opp/opp.txt
-index e36d261..40a4340 100644
---- a/Documentation/devicetree/bindings/opp/opp.txt
-+++ b/Documentation/devicetree/bindings/opp/opp.txt
-@@ -152,6 +152,11 @@ Optional properties:
-   hierarchy can be contained in multiple 32 bit values. i.e. <X Y Z1 Z2> in the
-   above example, Z1 & Z2 refer to the version hierarchy Z.
+diff --git a/drivers/base/power/opp/core.c b/drivers/base/power/opp/core.c
+index 37cf970..2579401 100644
+--- a/drivers/base/power/opp/core.c
++++ b/drivers/base/power/opp/core.c
+@@ -527,9 +527,9 @@ _generic_set_opp_clk_only(const struct opp_table *opp_table, struct device *dev,
+ 	int ret;
  
-+- clocks: Clock phandle and specifier used for this opp.
-+
-+- clock-names: clock names for this opp. The valid clock names are platform
-+	       specific.
-+
- - status: Marks the node enabled/disabled.
+ 	if (opp_table->set_clk)
+-		return opp_table->set_clk(dev, opp_table->clk, old_freq, freq);
++		return opp_table->set_clk(dev, opp_table->cur_clk, old_freq, freq);
  
- Example 1: Single cluster Dual-core ARM cortex A9, switch DVFS states together.
-@@ -528,3 +533,50 @@ Example 6: opp-microvolt-<name>, opp-microamp-<name>:
- 		};
- 	};
- };
-+
-+Example 7: Single core ARM cortex A7, switch separate clocks for each OPP:
-+
-+/ {
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a7";
-+			reg = <0>;
-+			next-level-cache = <&L2>;
-+			clocks = <&clk_controller 0>;
-+			clock-names = "cpu";
-+			cpu-supply = <&cpu_supply0>;
-+			operating-points-v2 = <&cpu0_opp_table>;
-+		};
-+	};
-+
-+	cpu0_opp_table: opp_table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp-1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			opp-microvolt = <975000 970000 985000>;
-+			opp-microamp = <70000>;
-+			clock-latency-ns = <300000>;
-+			clocks = <&clk_controller 0>;
-+			opp-suspend;
-+		};
-+		opp-1100000000 {
-+			opp-hz = /bits/ 64 <1100000000>;
-+			opp-microvolt = <1000000 980000 1010000>;
-+			opp-microamp = <80000>;
-+			clocks = <&clk_controller 1>;
-+			clock-latency-ns = <310000>;
-+		};
-+		opp-1200000000 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <1025000>;
-+			clocks = <&clk_controller 2>;
-+			clock-latency-ns = <290000>;
-+			turbo-mode;
-+		};
-+	};
-+};
+-	ret = clk_set_rate(opp_table->clk, freq);
++	ret = clk_set_rate(opp_table->cur_clk, freq);
+ 	if (ret) {
+ 		dev_err(dev, "%s: failed to set clock rate: %d\n", __func__,
+ 			ret);
+@@ -615,7 +615,7 @@ int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq)
+ 		return PTR_ERR(opp_table);
+ 	}
+ 
+-	clk = opp_table->clk;
++	clk = opp_table->cur_clk;
+ 	if (IS_ERR(clk)) {
+ 		dev_err(dev, "%s: No clock available for the device\n",
+ 			__func__);
+@@ -750,9 +750,9 @@ static struct opp_table *_allocate_opp_table(struct device *dev)
+ 	_of_init_opp_table(opp_table, dev);
+ 
+ 	/* Find clk for the device */
+-	opp_table->clk = clk_get(dev, NULL);
+-	if (IS_ERR(opp_table->clk)) {
+-		ret = PTR_ERR(opp_table->clk);
++	opp_table->cur_clk = clk_get(dev, NULL);
++	if (IS_ERR(opp_table->cur_clk)) {
++		ret = PTR_ERR(opp_table->cur_clk);
+ 		if (ret != -EPROBE_DEFER)
+ 			dev_dbg(dev, "%s: Couldn't find clock: %d\n", __func__,
+ 				ret);
+@@ -799,8 +799,8 @@ static void _opp_table_kref_release(struct kref *kref)
+ 	struct opp_device *opp_dev;
+ 
+ 	/* Release clk */
+-	if (!IS_ERR(opp_table->clk))
+-		clk_put(opp_table->clk);
++	if (!IS_ERR(opp_table->cur_clk))
++		clk_put(opp_table->cur_clk);
+ 
+ 	opp_dev = list_first_entry(&opp_table->dev_list, struct opp_device,
+ 				   node);
+@@ -1393,13 +1393,13 @@ struct opp_table *dev_pm_opp_set_clkname(struct device *dev, const char *name)
+ 	}
+ 
+ 	/* Already have default clk set, free it */
+-	if (!IS_ERR(opp_table->clk))
+-		clk_put(opp_table->clk);
++	if (!IS_ERR(opp_table->cur_clk))
++		clk_put(opp_table->cur_clk);
+ 
+ 	/* Find clk for the device */
+-	opp_table->clk = clk_get(dev, name);
+-	if (IS_ERR(opp_table->clk)) {
+-		ret = PTR_ERR(opp_table->clk);
++	opp_table->cur_clk = clk_get(dev, name);
++	if (IS_ERR(opp_table->cur_clk)) {
++		ret = PTR_ERR(opp_table->cur_clk);
+ 		if (ret != -EPROBE_DEFER) {
+ 			dev_err(dev, "%s: Couldn't find clock: %d\n", __func__,
+ 				ret);
+@@ -1425,8 +1425,8 @@ void dev_pm_opp_put_clkname(struct opp_table *opp_table)
+ 	/* Make sure there are no concurrent readers while updating opp_table */
+ 	WARN_ON(!list_empty(&opp_table->opp_list));
+ 
+-	clk_put(opp_table->clk);
+-	opp_table->clk = ERR_PTR(-EINVAL);
++	clk_put(opp_table->cur_clk);
++	opp_table->cur_clk = ERR_PTR(-EINVAL);
+ 
+ 	dev_pm_opp_put_opp_table(opp_table);
+ }
+diff --git a/drivers/base/power/opp/opp.h b/drivers/base/power/opp/opp.h
+index c85405e..30a637c 100644
+--- a/drivers/base/power/opp/opp.h
++++ b/drivers/base/power/opp/opp.h
+@@ -132,7 +132,7 @@ enum opp_table_access {
+  * @supported_hw: Array of version number to support.
+  * @supported_hw_count: Number of elements in supported_hw array.
+  * @prop_name: A name to postfix to many DT properties, while parsing them.
+- * @clk: Device's clock handle
++ * @cur_clk: Current device's clock handle
+  * @regulators: Supply regulators
+  * @regulator_count: Number of power supply regulators
+  * @set_opp: Platform specific set_opp callback
+@@ -169,7 +169,7 @@ struct opp_table {
+ 	unsigned int *supported_hw;
+ 	unsigned int supported_hw_count;
+ 	const char *prop_name;
+-	struct clk *clk;
++	struct clk *cur_clk;
+ 	struct regulator **regulators;
+ 	unsigned int regulator_count;
+ 
 -- 
 2.7.4
