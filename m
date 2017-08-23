@@ -1,50 +1,41 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Wed, 23 Aug 2017 10:11:12 +0200
-Subject: [PATCH net-next v2 10/10] arm64: dts: marvell: mcbin: enable
- more networking ports
-In-Reply-To: <20170823072842.ibk6gqtswhamvppy@sapphire.tkos.co.il>
-References: <20170822170830.32413-1-antoine.tenart@free-electrons.com>
- <20170822170830.32413-11-antoine.tenart@free-electrons.com>
- <20170823072842.ibk6gqtswhamvppy@sapphire.tkos.co.il>
-Message-ID: <20170823081112.GC5202@kwain>
+Date: Wed, 23 Aug 2017 10:25:10 +0200
+Subject: [PATCH net-next 10/18] net: mvpp2: use the GoP interrupt for
+ link status changes
+In-Reply-To: <20170726162648.GK12049@lunn.ch>
+References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
+ <20170724134848.19330-11-antoine.tenart@free-electrons.com>
+ <20170726162648.GK12049@lunn.ch>
+Message-ID: <20170823082510.GD5202@kwain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+Hi Andrew, Russell,
 
-On Wed, Aug 23, 2017 at 10:28:42AM +0300, Baruch Siach wrote:
-> On Tue, Aug 22, 2017 at 07:08:30PM +0200, Antoine Tenart wrote:
-> > This patch enables the two GE/SFP ports. They are configured in 10GKR
-> > mode by default. To do this the cpm_xdmio is enabled as well, and two
-> > phy descriptions are added.
-> > 
-> > Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> > Tested-by: Marcin Wojtas <mw@semihalf.com>
-> > ---
-> >  arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 30 +++++++++++++++++++++++
-> >  1 file changed, 30 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> > index abd39d1c1739..6cb4b000e1ac 100644
-> > --- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> > +++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-> > @@ -127,6 +127,30 @@
-> >  	};
-> >  };
-> >  
-> > +&cpm_xmdio {
-> > +	status = "okay";
-> > +
-> > +	phy0: ethernet-phy at 0 {
-> > +		compatible = "ethernet-phy-ieee802.3-c45";
-> > +		reg = <0>;
-> > +	};
-> > +
-> > +	phy1: ethernet-phy at 1 {
+On Wed, Jul 26, 2017 at 06:26:48PM +0200, Andrew Lunn wrote:
+> On Mon, Jul 24, 2017 at 03:48:40PM +0200, Antoine Tenart wrote:
+> > This patch adds the GoP link interrupt support for when a port isn't
+> > connected to a PHY. Because of this the phylib callback is never called
+> > and the link status management isn't done. This patch use the GoP link
+> > interrupt in such cases to still have a minimal link management. Without
+> > this patch ports not connected to a PHY cannot work.
 > 
-> Should be named 'ethernet-phy at 8' to match the 'reg' property.
+> When is a GoP link interrupt signalled? When is a port without a PHY
+> actually up/down?
 
-That's right.
+When the cable is connected (there is signal) and the serdes is in sync
+and AN succeeded.
+
+> With SFF/SFP ports, you generally need a gpio line the fibre module
+> can use to indicate if it has link. Fixed-phy has such support, and
+> your link_change function will get called when the link changes.
+
+So that would work when using SFP modules but I wonder if the GoP irq
+isn't needed when using passive cable, in which case this patch would
+still be needed (and of course we should support the new Russell phylib
+capabilities).
+
+What's your thoughts on this?
 
 Thanks!
 Antoine
@@ -59,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170823/a5c64539/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170823/dd2feb68/attachment.sig>
