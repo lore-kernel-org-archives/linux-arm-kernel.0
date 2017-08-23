@@ -1,34 +1,61 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 23 Aug 2017 17:51:19 -0400
-Subject: [PATCH V12 4/5] PCI: Handle CRS ("device not ready") returned by
- device after FLR
-In-Reply-To: <20170823213838.GG8498@bhelgaas-glaptop.roam.corp.google.com>
-References: <1503464171-6471-1-git-send-email-okaya@codeaurora.org>
- <1503464171-6471-4-git-send-email-okaya@codeaurora.org>
- <20170823213838.GG8498@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <0ef4c01d-75bc-17dc-8926-2f9647cfeec8@codeaurora.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 24 Aug 2017 00:00:24 +0200
+Subject: [PATCH] rtc: mxc: avoid disabling interrupts on device close
+Message-ID: <20170823220024.22861-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/23/2017 5:38 PM, Bjorn Helgaas wrote:
-> If we increase the timeout, is there still value in adding the
-> pci_bus_wait_crs() stuff?  I'm not sure there is.
+Currently, the IRQs are disabled when the rtc character device is closed.
+This means that the device needs to stay open to get alarms while the usual
+use case will open the device, set the alarm and close the device as is
+done in rtcwake.
 
-I agree increasing the timeout is more than enough for FLR case. 
+Keep the alarm functional on character device release so the platform can
+actually wakeup
 
-However, I was considering the wait and pending functions as a utility
-that I can reuse towards fixing CRS in other conditions like secondary
-bus reset and potentially PM.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ drivers/rtc/rtc-mxc.c | 21 ---------------------
+ 1 file changed, 21 deletions(-)
 
-I'm planning to have a CRS session in the Linux Plumbers Conference 
-to talk about CRS use cases. 
-
-I was going to follow up this series with secondary bus reset next once
-this goes in. 
-
-I'm unable to test PM. I can't promise how I fix/test it.
-
+diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
+index 401f46d8f21b..bce427d202ee 100644
+--- a/drivers/rtc/rtc-mxc.c
++++ b/drivers/rtc/rtc-mxc.c
+@@ -238,26 +238,6 @@ static irqreturn_t mxc_rtc_interrupt(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-/*
+- * Clear all interrupts and release the IRQ
+- */
+-static void mxc_rtc_release(struct device *dev)
+-{
+-	struct platform_device *pdev = to_platform_device(dev);
+-	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
+-	void __iomem *ioaddr = pdata->ioaddr;
+-
+-	spin_lock_irq(&pdata->rtc->irq_lock);
+-
+-	/* Disable all rtc interrupts */
+-	writew(0, ioaddr + RTC_RTCIENR);
+-
+-	/* Clear all interrupt status */
+-	writew(0xffffffff, ioaddr + RTC_RTCISR);
+-
+-	spin_unlock_irq(&pdata->rtc->irq_lock);
+-}
+-
+ static int mxc_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
+ {
+ 	mxc_rtc_irq_enable(dev, RTC_ALM_BIT, enabled);
+@@ -343,7 +323,6 @@ static int mxc_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
+ 
+ /* RTC layer */
+ static const struct rtc_class_ops mxc_rtc_ops = {
+-	.release		= mxc_rtc_release,
+ 	.read_time		= mxc_rtc_read_time,
+ 	.set_mmss64		= mxc_rtc_set_mmss,
+ 	.read_alarm		= mxc_rtc_read_alarm,
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.14.1
