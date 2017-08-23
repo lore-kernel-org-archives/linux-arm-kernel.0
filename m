@@ -1,164 +1,75 @@
-From: hjc@rock-chips.com (Sandy Huang)
-Date: Wed, 23 Aug 2017 14:30:13 +0800
-Subject: [PATCH v6 1/3] dt-bindings: display: Add Document for Rockchip
- Soc LVDS
-In-Reply-To: <20170822024819.cmhmumpps6xgming@rob-hp-laptop>
-References: <1503043780-22605-1-git-send-email-hjc@rock-chips.com>
- <1503043792-22746-1-git-send-email-hjc@rock-chips.com>
- <20170822024819.cmhmumpps6xgming@rob-hp-laptop>
-Message-ID: <26b54c1d-8529-eb27-bc76-1ca6f7a62871@rock-chips.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Wed, 23 Aug 2017 08:52:00 +0200
+Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20170822201731.hyjqrbkhggaoomfl@flea.home>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+ <5082b6d6-29a7-f101-8cba-13fce8983c89@xs4all.nl>
+ <20170822110148.734c01b69dacc57fa08965d1@magewell.com>
+ <8dd8c350-cd45-5cd9-65cc-67102944811f@xs4all.nl>
+ <20170822201731.hyjqrbkhggaoomfl@flea.home>
+Message-ID: <3392c717-10ea-4d6e-4c25-9be0bbec004e@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08/22/2017 10:17 PM, Maxime Ripard wrote:
+> On Tue, Aug 22, 2017 at 08:43:35AM +0200, Hans Verkuil wrote:
+>>>>> +static int sun6i_video_link_setup(struct media_entity *entity,
+>>>>> +				  const struct media_pad *local,
+>>>>> +				  const struct media_pad *remote, u32 flags)
+>>>>> +{
+>>>>> +	struct video_device *vdev = media_entity_to_video_device(entity);
+>>>>> +	struct sun6i_video *video = video_get_drvdata(vdev);
+>>>>> +
+>>>>> +	if (WARN_ON(video == NULL))
+>>>>> +		return 0;
+>>>>> +
+>>>>> +	return sun6i_video_formats_init(video);
+>>>>
+>>>> Why is this called here? Why not in video_init()?
+>>>
+>>> sun6i_video_init is in the driver probe context. sun6i_video_formats_init
+>>> use media_entity_remote_pad and media_entity_to_v4l2_subdev to find the
+>>> subdevs.
+>>> The media_entity_remote_pad can't work before all the media pad linked.
+>>
+>> A video_init is typically called from the notify_complete callback.
+>> Actually, that's where the video_register_device should be created as well.
+>> When you create it in probe() there is possibly no sensor yet, so it would
+>> be a dead video node (or worse, crash when used).
+>>
+>> There are still a lot of platform drivers that create the video node in the
+>> probe, but it's not the right place if you rely on the async loading of
+>> subdevs.
+> 
+> That's not really related, but I'm not really sure it's a good way to
+> operate. This essentially means that you might wait forever for a
+> component in your pipeline to be probed, without any chance of it
+> happening (not compiled, compiled as a module and not loaded, hardware
+> defect preventing the driver from probing properly, etc), even though
+> that component might not be essential.
 
+We're talking straightforward video pipelines here. I.e. a source, some
+processing units and a DMA engine at the end. There is no point in
+creating a video node if the pipeline is not complete since you need
+the full pipeline.
 
-? 2017/8/22 10:48, Rob Herring ??:
-> On Fri, Aug 18, 2017 at 04:09:49PM +0800, Sandy Huang wrote:
->> This patch add Document for Rockchip Soc RK3288 LVDS,
->> This based on the patches from Mark yao and Heiko Stuebner.
->>
->> Signed-off-by: Sandy Huang <hjc@rock-chips.com>
->> Signed-off-by: Mark yao <mark.yao@rock-chips.com>
->> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->> ---
->> Changes:
->>      - use data-mapping instead of rockchip,data-mapping and rockchip,data-width
->>      - move rockchip,output to lvds node
->>
->>   .../bindings/display/rockchip/rockchip-lvds.txt    | 100 +++++++++++++++++++++
->>   1 file changed, 100 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
->>
->> diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
->> new file mode 100644
->> index 0000000..a33821b
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-lvds.txt
->> @@ -0,0 +1,100 @@
->> +Rockchip RK3288 LVDS interface
->> +================================
->> +
->> +Required properties:
->> +- compatible: matching the soc type, one of
->> +	- "rockchip,rk3288-lvds";
->> +
->> +- reg: physical base address of the controller and length
->> +	of memory mapped region.
->> +- clocks: must include clock specifiers corresponding to entries in the
->> +	clock-names property.
->> +- clock-names: must contain "pclk_lvds"
->> +
->> +- avdd1v0-supply: regulator phandle for 1.0V analog power
->> +- avdd1v8-supply: regulator phandle for 1.8V analog power
->> +- avdd3v3-supply: regulator phandle for 3.3V analog power
->> +
->> +- rockchip,grf: phandle to the general register files syscon
->> +- rockchip,output: "rgb", "lvds" or "duallvds", This describes the output face.
-> 
-> s/face/interface/
->
-thanks, this will be fix at next version;
+I've had bad experiences in the past where video nodes were created too
+soon and part of the internal state was still incomplete, causing at best
+weird behavior and at worst crashes.
 
->> +
->> +Optional properties:
->> +- pinctrl-names: must contain a "lcdc" entry.
->> +- pinctrl-0: pin control group to be used for this controller.
->> +
->> +Required nodes:
->> +
->> +The lvds has two video ports as described by
->> +	Documentation/devicetree/bindings/media/video-interfaces.txt.
->> +Their connections are modeled using the OF graph bindings specified in
->> +	Documentation/devicetree/bindings/graph.txt.
->> +
->> +- video port 0 for the VOP inputs
-> 
-> with 2 endpoints...
-> 
-yes, lvds port0 remote endpoint maybe vopb or vopl, i will add this 
-describe at next version.
+More complex devices are a whole different ballgame.
 
->> +- video port 1 for either a panel or subsequent encoder
->> +
->> +the lvds panel described by
->> +	Documentation/devicetree/bindings/display/panel/simple-panel.txt
->> +
->> +Panel required properties:
->> +- ports for remote LVDS output
->> +
->> +Panel optional properties:
->> +- data-mapping: should be "vesa-24","jeida-24" or "jeida-18".
->> +This describes decribed by:
->> +	Documentation/devicetree/bindings/display/panel/panel-lvds.txt
->> +
->> +Example:
->> +
->> +lvds_panel: lvds-panel {
->> +	status = "okay";
+Regards,
+
+	Hans
+
+> This is how DRM operates, and you sometimes end up in some very dumb
+> situations where you wait for say, the DSI controller to probe, while
+> you only care about HDMI in your system.
 > 
-> Don't show status in examples.
+> But this seems to be on of the hot topic these days, so we might
+> discuss it further in some other thread :)
 > 
-thanks, this will be fix at next version;
->> +	compatible = "auo,b101ean01";
->> +	enable-gpios = <&gpio7 21 GPIO_ACTIVE_HIGH>;
->> +	data-mapping = "jeida-24";
->> +
->> +	ports {
->> +		panel_in_lvds: endpoint {
->> +			remote-endpoint = <&lvds_out_panel>;
->> +		};
->> +	};
->> +};
->> +
->> +For Rockchip RK3288:
->> +
->> +	lvds: lvds at ff96c000 {
->> +		compatible = "rockchip,rk3288-lvds";
->> +		rockchip,grf = <&grf>;
->> +		reg = <0xff96c000 0x4000>;
->> +		clocks = <&cru PCLK_LVDS_PHY>;
->> +		clock-names = "pclk_lvds";
->> +		pinctrl-names = "lcdc";
->> +		pinctrl-0 = <&lcdc_ctl>;
->> +		avdd1v0-supply = <&vdd10_lcd>;
->> +		avdd1v8-supply = <&vcc18_lcd>;
->> +		avdd3v3-supply = <&vcca_33>;
->> +		rockchip,output = "rgb";
->> +		ports {
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +
->> +			lvds_in: port at 0 {
->> +				reg = <0>;
->> +
->> +				lvds_in_vopb: endpoint at 0 {
->> +					reg = <0>;
->> +					remote-endpoint = <&vopb_out_lvds>;
->> +				};
->> +				lvds_in_vopl: endpoint at 1 {
->> +					reg = <1>;
->> +					remote-endpoint = <&vopl_out_lvds>;
->> +				};
->> +			};
->> +
->> +			lvds_out: port at 1 {
->> +				reg = <1>;
->> +
->> +				lvds_out_panel: endpoint {
->> +					remote-endpoint = <&panel_in_lvds>;
->> +				};
->> +			};
->> +		};
->> +	};
->> -- 
->> 2.7.4
->>
->>
-> 
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
-> 
-> 
+> Maxime
 > 
