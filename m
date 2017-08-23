@@ -1,46 +1,108 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Wed, 23 Aug 2017 23:05:33 +0200
-Subject: [EXT] Re: [PATCH net-next 10/18] net: mvpp2: use the GoP
- interrupt for link status changes
-In-Reply-To: <20170823160444.GC23960@kwain>
-References: <20170724134848.19330-1-antoine.tenart@free-electrons.com>
- <20170724134848.19330-11-antoine.tenart@free-electrons.com>
- <20170726162648.GK12049@lunn.ch> <20170823082510.GD5202@kwain>
- <5ebd192c54984b25adda0a294035b1b9@IL-EXCH01.marvell.com>
- <20170823160444.GC23960@kwain>
-Message-ID: <CAPv3WKcSFcd4kBS_vpTsbf789xsLatuT2TBfZZbiu16sRauk7A@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 23 Aug 2017 16:38:38 -0500
+Subject: [PATCH V12 4/5] PCI: Handle CRS ("device not ready") returned by
+ device after FLR
+In-Reply-To: <1503464171-6471-4-git-send-email-okaya@codeaurora.org>
+References: <1503464171-6471-1-git-send-email-okaya@codeaurora.org>
+ <1503464171-6471-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <20170823213838.GG8498@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antoine,
+On Wed, Aug 23, 2017 at 12:56:10AM -0400, Sinan Kaya wrote:
+> Sporadic reset issues have been observed with Intel 750 NVMe drive while
+> assigning the physical function to the guest machine.  The sequence of
+> events observed is as follows:
+> 
+>   - perform a Function Level Reset (FLR)
+>   - sleep up to 1000ms total
+>   - read ~0 from PCI_COMMAND
+>   - warn that the device didn't return from FLR
+>   - touch the device before it's ready
+>   - device drops config writes when we restore register settings
+>   - incomplete register restore leaves device in inconsistent state
+>   - device probe fails because device is in inconsistent state
+> 
+> After reset, an endpoint may respond to config requests with Configuration
+> Request Retry Status (CRS) to indicate that it is not ready to accept new
+> requests.  See PCIe r3.1, sec 2.3.1 and 6.6.2.
+> 
+> After an FLR, read the Vendor ID and use pci_bus_wait_crs() to wait for a
+> value that indicates the device is ready only if CRS visibility is
+> supported and device is responding with 0x0001.
+> 
+> If pci_bus_wait_crs() fails, i.e., the device has responded with CRS status
+> for at least the timeout interval, fall back to the old behavior of reading
+> the Command register until it is not ~0.
+> 
+> Also increase the timeout value from 1 second to 60 seconds to have
+> consistent behavior for root ports that do and do not support CRS
+> visibility.
 
-2017-08-23 18:04 GMT+02:00 Antoine Tenart <antoine.tenart@free-electrons.com>:
-> On Wed, Aug 23, 2017 at 03:24:55PM +0000, Stefan Chulski wrote:
->> > When the cable is connected (there is signal) and the serdes is in sync and AN
->> > succeeded.
->> >
->> > > With SFF/SFP ports, you generally need a gpio line the fibre module
->> > > can use to indicate if it has link. Fixed-phy has such support, and
->> > > your link_change function will get called when the link changes.
->> >
->> > So that would work when using SFP modules but I wonder if the GoP irq isn't
->> > needed when using passive cable, in which case this patch would still be needed
->> > (and of course we should support the new Russell phylib capabilities).
->>
->> Even if new phylib driver supports passive direct cables connection,
->> GoP IRQ required for SOHO/Peridot external switch support.
->> SOHO/Peridot external switch could be connected directly to Serdes line.
->
-> So I guess the GoP link irq patches are needed. Should I resend them
-> then?
->
-> We'll have to discuss how to handle fixed-phy vs GoP IRQ, but I guess we
-> can do this when adding the fixed-phy support later.
->
+So, after all this work, I bet you a nickel that merely increasing the
+timeout from 1 sec to 60 sec (while keeping just the original PCI_COMMAND
+loop) would be sufficient to fix this problem.
 
-Please check mvneta.c - you can find there coexistence of normal
-libphy support, fixed phy and link irq for the inband management mode.
-IMO it's exactly, what you need here.
+Reading PCI_COMMAND will cause CRS completions just like reading
+PCI_VENDOR_ID will.  The only difference is that there's no CRS SV
+handling, and the Root Port will synthesize ~0 data when it stops retrying
+the read.
 
-Best regards,
-Marcin
+If we increase the timeout, is there still value in adding the
+pci_bus_wait_crs() stuff?  I'm not sure there is.
+
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/pci/pci.c | 20 ++++++++++++++++++--
+>  1 file changed, 18 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index af0cc34..5980ab3 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -3819,19 +3819,35 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
+>   */
+>  static void pci_flr_wait(struct pci_dev *dev)
+>  {
+> +	int timeout_ms = 60000;
+>  	int i = 0;
+>  	u32 id;
+>  
+> +	/*
+> +	 * Per PCIe r3.1, sec 6.6.2, the device should finish FLR within
+> +	 * 100ms, but even after that, it may respond to config requests
+> +	 * with CRS status if it requires more time.
+> +	 */
+> +	msleep(100);
+> +
+> +	if (pci_bus_read_config_dword(dev->bus, dev->devfn, PCI_VENDOR_ID, &id))
+> +		return;
+> +
+> +	if (pci_bus_crs_visibility_pending(id) &&
+> +		pci_bus_wait_crs(dev->bus, dev->devfn, id, timeout_ms))
+> +		return;
+> +
+> +	timeout_ms -= 100;
+>  	do {
+>  		msleep(100);
+>  		pci_read_config_dword(dev, PCI_COMMAND, &id);
+> -	} while (i++ < 10 && id == ~0);
+> +	} while (i++ < (timeout_ms / 100) && id == ~0);
+>  
+>  	if (id == ~0)
+>  		dev_warn(&dev->dev, "Failed to return from FLR\n");
+>  	else if (i > 1)
+>  		dev_info(&dev->dev, "Required additional %dms to return from FLR\n",
+> -			 (i - 1) * 100);
+> +			 i * 100);
+>  }
+>  
+>  /**
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
