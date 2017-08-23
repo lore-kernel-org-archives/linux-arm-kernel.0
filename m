@@ -1,40 +1,21 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 23 Aug 2017 21:33:44 +0200
-Subject: [PATCH v5 0/9] mtd: sharpslpart partition parser
-References: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
- <20170821221339.70cfcfb7@bbrezillon>
-Message-ID: <87pobmoz8n.fsf@belgarion.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Aug 2017 21:44:39 +0200
+Subject: [PATCH] ARM: bcm283x: Fix SMP for old dtb files
+In-Reply-To: <1503515314-16576-1-git-send-email-stefan.wahren@i2se.com>
+References: <1503515314-16576-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <CAK8P3a303oEejUZQ3bXVdTLwsWCC2BiLqzigCYbw6T0tAF=Y+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boris Brezillon <boris.brezillon@free-electrons.com> writes:
-
-> Le Mon, 14 Aug 2017 22:48:31 +0200,
->> Andrea Adami (9):
->>   mtd: sharpslpart: Add sharpslpart partition parser
->>   mtd: nand: sharpsl: Add partition parsers platform data
->>   mfd: tmio: Add partition parsers platform data
->>   mtd: nand: sharpsl: Register partitions using the parsers
->>   mtd: nand: tmio: Register partitions using the parsers
+On Wed, Aug 23, 2017 at 9:08 PM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> Since "irqchip: bcm2836: Move SMP startup code to arch/arm" the SMP
+> for BCM2836 and BCM2837 (32 bit) depends on commit "ARM: dts: bcm283x:
+> Add 32-bit enable method for SMP". This patch fixes SMP for older
+> dtb files.
 >
-> Applied patches 2, to 5 to nand/next.
->>   ARM: pxa/corgi: Remove hardcoded partitioning, use sharpslpart parser
->>   ARM: pxa/tosa: Remove hardcoded partitioning, use sharpslpart parser
->>   ARM: pxa/spitz: Remove hardcoded partitioning, use sharpslpart parser
->>   ARM: pxa/poodle: Remove hardcoded partitioning, use sharpslpart parser
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-I'm quite happy with patches 6 to 9 except for the subject title length.
+Looks good to me, thanks for the update.
 
-Andrea, if you give me an idea of change, I'll modify the titles myself before
-applying, no need to resend a serie.
-
-For example, you could propose :
-ARM: pxa: corgi: use sharpslpart parser instead of hardcoded one
-
-
-Then I'll take them into pxa/for-next if there are no objections.
-
-Cheers.
-
--- 
-Robert
+Acked-by: Arnd Bergmann <arnd@arndb.de>
