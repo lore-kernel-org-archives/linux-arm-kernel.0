@@ -1,58 +1,88 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 23 Aug 2017 00:56:07 -0400
-Subject: [PATCH V12 1/5] PCI: Don't ignore valid response before CRS timeout
-Message-ID: <1503464171-6471-1-git-send-email-okaya@codeaurora.org>
+Date: Wed, 23 Aug 2017 00:56:10 -0400
+Subject: [PATCH V12 4/5] PCI: Handle CRS ("device not ready") returned by
+ device after FLR
+In-Reply-To: <1503464171-6471-1-git-send-email-okaya@codeaurora.org>
+References: <1503464171-6471-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1503464171-6471-4-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bjorn Helgaas <bhelgaas@google.com>
+Sporadic reset issues have been observed with Intel 750 NVMe drive while
+assigning the physical function to the guest machine.  The sequence of
+events observed is as follows:
 
-While waiting for a device to become ready (i.e., to return a non-CRS
-completion to a read of its Vendor ID), if we got a valid response to the
-very last read before timing out, we printed a warning and gave up on the
-device even though it was actually ready.
+  - perform a Function Level Reset (FLR)
+  - sleep up to 1000ms total
+  - read ~0 from PCI_COMMAND
+  - warn that the device didn't return from FLR
+  - touch the device before it's ready
+  - device drops config writes when we restore register settings
+  - incomplete register restore leaves device in inconsistent state
+  - device probe fails because device is in inconsistent state
 
-For a typical 60s timeout, we wait about 65s (it's not exact because of the
-exponential backoff), but we treated devices that became ready between 33s
-and 65s as though they failed.
+After reset, an endpoint may respond to config requests with Configuration
+Request Retry Status (CRS) to indicate that it is not ready to accept new
+requests.  See PCIe r3.1, sec 2.3.1 and 6.6.2.
 
-Move the Device ID read later so we check whether the device is ready
-immediately, before checking for a timeout.
+After an FLR, read the Vendor ID and use pci_bus_wait_crs() to wait for a
+value that indicates the device is ready only if CRS visibility is
+supported and device is responding with 0x0001.
 
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-[okaya: reorder reads so that we check device presence after sleep]
+If pci_bus_wait_crs() fails, i.e., the device has responded with CRS status
+for at least the timeout interval, fall back to the old behavior of reading
+the Command register until it is not ~0.
+
+Also increase the timeout value from 1 second to 60 seconds to have
+consistent behavior for root ports that do and do not support CRS
+visibility.
+
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/probe.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/pci/pci.c | 20 ++++++++++++++++++--
+ 1 file changed, 18 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index c31310d..2849e0e 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1847,17 +1847,18 @@ bool pci_bus_read_dev_vendor_id(struct pci_bus *bus, int devfn, u32 *l,
- 		if (!crs_timeout)
- 			return false;
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index af0cc34..5980ab3 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -3819,19 +3819,35 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
+  */
+ static void pci_flr_wait(struct pci_dev *dev)
+ {
++	int timeout_ms = 60000;
+ 	int i = 0;
+ 	u32 id;
  
--		msleep(delay);
--		delay *= 2;
--		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
--			return false;
--		/* Card hasn't responded in 60 seconds?  Must be stuck. */
- 		if (delay > crs_timeout) {
- 			printk(KERN_WARNING "pci %04x:%02x:%02x.%d: not responding\n",
- 			       pci_domain_nr(bus), bus->number, PCI_SLOT(devfn),
- 			       PCI_FUNC(devfn));
- 			return false;
- 		}
++	/*
++	 * Per PCIe r3.1, sec 6.6.2, the device should finish FLR within
++	 * 100ms, but even after that, it may respond to config requests
++	 * with CRS status if it requires more time.
++	 */
++	msleep(100);
 +
-+		msleep(delay);
-+		delay *= 2;
++	if (pci_bus_read_config_dword(dev->bus, dev->devfn, PCI_VENDOR_ID, &id))
++		return;
 +
-+		if (pci_bus_read_config_dword(bus, devfn, PCI_VENDOR_ID, l))
-+			return false;
- 	}
++	if (pci_bus_crs_visibility_pending(id) &&
++		pci_bus_wait_crs(dev->bus, dev->devfn, id, timeout_ms))
++		return;
++
++	timeout_ms -= 100;
+ 	do {
+ 		msleep(100);
+ 		pci_read_config_dword(dev, PCI_COMMAND, &id);
+-	} while (i++ < 10 && id == ~0);
++	} while (i++ < (timeout_ms / 100) && id == ~0);
  
- 	return true;
+ 	if (id == ~0)
+ 		dev_warn(&dev->dev, "Failed to return from FLR\n");
+ 	else if (i > 1)
+ 		dev_info(&dev->dev, "Required additional %dms to return from FLR\n",
+-			 (i - 1) * 100);
++			 i * 100);
+ }
+ 
+ /**
 -- 
 1.9.1
