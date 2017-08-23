@@ -1,50 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 23 Aug 2017 14:24:30 +0100
-Subject: [PATCH v6 3/3] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <c6b7c641-b839-1388-7982-366e796e6ba9@huawei.com>
-References: <20170809100715.870516-1-shameerali.kolothum.thodi@huawei.com>
- <20170809100715.870516-4-shameerali.kolothum.thodi@huawei.com>
- <20170810172723.GD9980@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA8383CC287@FRAEML521-MBX.china.huawei.com>
- <c6b7c641-b839-1388-7982-366e796e6ba9@huawei.com>
-Message-ID: <20170823132430.GB634@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 23 Aug 2017 15:27:23 +0200
+Subject: [PATCH] ARM: ux500: don't select CPUFREQ_DT
+Message-ID: <20170823132733.619811-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 02:17:24PM +0100, John Garry wrote:
-> >>>Signed-off-by: Shameer Kolothum
-> >><shameerali.kolothum.thodi@huawei.com>
-> >>>---
-> >>> drivers/iommu/arm-smmu-v3.c | 27 ++++++++++++++++++++++-----
-> >>> 1 file changed, 22 insertions(+), 5 deletions(-)
-> >>
-> >>Please can you also add a devicetree binding with corresponding
-> >>documentation to enable this workaround on non-ACPI based systems too?
-> >>It should be straightforward if you update the arm_smmu_options table.
-> >
-> >As I mentioned before, devicetree was a lower priority and we would definitely
-> >submit patch to support that. Even if we update the arm_smmu_options table
-> >with DT binding, the generic function to retrieve the MSI address regions only
-> >works on ACPI/IORT case now.
-> >
-> 
-> Hi Will,
-> 
-> Can you confirm your stance on supporting this workaround for DT as well as
-> ACPI?
-> 
-> For us, we now only "officially" support ACPI FW, and DT support at this
-> point is patchy/limited. To me, adding DT support is just more errata
-> workaround code to maintain with little useful gain.
+The new 'select CPUFREQ_DT' statement causes a warning in some
+configurations:
 
-I basically don't like the idea of a driver that only works for one of
-ACPI or DT yet claims to support both. I'm less fussed about functionality
-differences (feature X is only available with firmware Y), but not working
-around a hardware erratum that we know about is just lazy.
+warning: (ARCH_U8500) selects CPUFREQ_DT which has unmet direct dependencies (CPU_FREQ && HAVE_CLK && OF && (!CPU_THERMAL || THERMAL))
 
-So I'd prefer that we handle this in both cases, or blacklist affected
-devices when booting with DT. Continuing as though there isn't an erratum
-is the worst thing we can do.
+No other platform does this, so I think for consistency it's
+best if we remove it again from ux500 and instead add the driver
+to the defconfig.
 
-Will
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-ux500/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index 2b56e4af5a27..4740ac393297 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -9,7 +9,6 @@ menuconfig ARCH_U8500
+ 	select ARM_GIC
+ 	select CACHE_L2X0
+ 	select CLKSRC_NOMADIK_MTU
+-	select CPUFREQ_DT
+ 	select GPIOLIB
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+-- 
+2.9.0
