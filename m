@@ -1,82 +1,49 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 23 Aug 2017 19:26:35 +0530
-Subject: [PATCH v3 3/5] dt-bindings: sdhci-omap: Add bindings for the
- sdhci-omap controller
-In-Reply-To: <CAPDyKFp7gchVQ+JPNqv4LktvHRm2Lzx6KakOw85zEZxDEX0OhA@mail.gmail.com>
-References: <20170821142132.GH6008@atomide.com>
- <20170823054246.23927-1-kishon@ti.com>
- <CAPDyKFp7gchVQ+JPNqv4LktvHRm2Lzx6KakOw85zEZxDEX0OhA@mail.gmail.com>
-Message-ID: <c9342689-f09e-44af-0975-d43ef122a477@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 23 Aug 2017 16:02:57 +0200
+Subject: [[PATCH]] Revert "leds: handle suspend/resume in heartbeat
+ trigger"
+In-Reply-To: <1497321560-46817-1-git-send-email-bo.zhang@nxp.com>
+References: <1497321560-46817-1-git-send-email-bo.zhang@nxp.com>
+Message-ID: <CAMuHMdUjZHpEQKmhCGnqtZjw_PK5PeQe2kEH6TTKfS8Ne2+drQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uffe,
+Hi Zhang,
 
-On Wednesday 23 August 2017 06:37 PM, Ulf Hansson wrote:
-> On 23 August 2017 at 07:42, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->> Add binding for the TI's sdhci-omap controller. This now includes only
->> a subset of properties documented in ti-omap-hsmmc.txt but will eventually
->> include all the properties.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->> Changes from v2:
->> *) Fixed example to use the updated compatible
->>
->> Changes from v1:
->> *) Create a new sdhci-omap.txt document for TI's sdhci-omap controller instead
->>    of using the ti-omap-hsmmc.txt as suggested by Tony
->>  .../devicetree/bindings/mmc/sdhci-omap.txt         | 22 ++++++++++++++++++++++
->>  1 file changed, 22 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-omap.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-omap.txt b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
->> new file mode 100644
->> index 000000000000..139695ad2d58
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
->> @@ -0,0 +1,22 @@
->> +* TI OMAP SDHCI Controller
->> +
->> +Refer to mmc.txt for standard MMC bindings.
->> +
->> +Required properties:
->> +- compatible: Should be "ti,dra7-sdhci" for DRA7 and DRA72 controllers
->> +- ti,hwmods: Must be "mmc<n>", <n> is controller instance starting 1
->> +
->> +Optional properties:
->> +- ti,dual-volt: boolean, supports dual voltage cards
->> +- ti,non-removable: non-removable slot (like eMMC)
->> +
->> +Example:
->> +       mmc1: mmc at 0x4809c000 {
->> +               compatible = "ti,dra7-sdhci";
->> +               reg = <0x4809c000 0x400>;
->> +               ti,hwmods = "mmc1";
->> +               ti,dual-volt;
->> +               bus-width = <4>;
->> +               vmmc-supply = <&vmmc>; /* phandle to regulator node */
->> +               ti,non-removable;
->> +       };
->> --
->> 2.11.0
->>
-> 
-> I am wondering a bit on the long term plan here.
-> 
-> Ideally at some point in future, we would like to remove the old
-> omap_hsmmc driver, but from compatible string point of view, that
-> means we first needs to deprecate the old ones for a while. Right?
+On Tue, Jun 13, 2017 at 4:39 AM, Zhang Bo <bo.zhang@nxp.com> wrote:
+> This reverts commit 5ab92a7cb82c66bf30685583a38a18538e3807db.
+>
+> System cannot enter suspend mode because of heartbeat led trigger.
+> In autosleep_wq, try_to_suspend function will try to enter suspend
+> mode in specific period. it will get wakeup_count then call pm_notifier
+> chain callback function and freeze processes.
+> Heartbeat_pm_notifier is called and it call led_trigger_unregister to
+> change the trigger of led device to none. It will send uevent message
+> and the wakeup source count changed. As wakeup_count changed, suspend
+> will abort.
+>
+> Signed-off-by: Zhang Bo <bo.zhang@nxp.com>
 
-right but sdhci-omap is still lacking features that was present in omap_hsmmc
-like context save/restore, SDIO support etc. I think we should deprecate
-omap_hsmmc compatible once we add all the features in sdhci-omap?
-> 
-> That said, what is then the reason to why we should bring over the
-> existing omap_hsmmc bindings to the sdhci-omap bindings?
+While investigating an heartbeat LED issue in v4.9.40-ltsi, I stumpled on this
+revert (commit 436c4c45b5b9562b ("Revert "leds: handle suspend/resume in
+heartbeat trigger"") in v4.12-rc6), which was not backported to v4.9 (yet).
 
-This is mainly for old dt compatibility. Even after removing the omap_hsmmc
-driver, users should still be able to use newer kernel with their existing dtbs.
+Interestingly, while running v4.9.x on r8a7791/koelsch with an LED configured
+for heartbeat, I can actually suspend the system using s2ram.
+However, after system resume the heartbeat LED no longer flashes.
+/sys/class/leds/LED6/trigger shows the trigger is still "none", and thus
+wasn't restored to "heartbeat" by the notifier.
+There's no "could not re-register heartbeat trigger" message printed.
 
-Thanks
-Kishon
+Backporting the revert fixes this.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
