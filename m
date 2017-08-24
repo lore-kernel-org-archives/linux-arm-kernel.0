@@ -1,49 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 24 Aug 2017 17:56:17 +0100
-Subject: [PATCH 08/14] arm64: kexec_file: create purgatory
-In-Reply-To: <20170824081811.19299-9-takahiro.akashi@linaro.org>
-References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
- <20170824081811.19299-9-takahiro.akashi@linaro.org>
-Message-ID: <20170824165617.GC29665@leverpostej>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 24 Aug 2017 12:01:47 -0500
+Subject: [PATCH v10] PCI: tango: Add MSI controller support
+In-Reply-To: <e32f8446-bd0b-0bc8-55b4-8dbebaeba101@sigmadesigns.com>
+References: <7b7278f4-7639-62b3-8a35-e6f7f9afa998@sigmadesigns.com>
+ <e32f8446-bd0b-0bc8-55b4-8dbebaeba101@sigmadesigns.com>
+Message-ID: <20170824170147.GN31858@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 24, 2017 at 05:18:05PM +0900, AKASHI Takahiro wrote:
-> This is a basic purgtory, or a kind of glue code between the two kernel,
-> for arm64. We will later add a feature of verifying a digest check against
-> loaded memory segments.
+On Wed, Aug 23, 2017 at 02:59:42PM +0200, Marc Gonzalez wrote:
+> On 22/08/2017 16:56, Marc Gonzalez wrote:
 > 
-> arch_kexec_apply_relocations_add() is responsible for re-linking any
-> relative symbols in purgatory. Please note that the purgatory is not
-> an executable, but a non-linked archive of binaries so relative symbols
-> contained here must be resolved at kexec load time.
-> Despite that arm64_kernel_start and arm64_dtb_addr are only such global
-> variables now, arch_kexec_apply_relocations_add() can manage more various
-> types of relocations.
+> > @@ -76,7 +234,9 @@ static int tango_pcie_probe(struct platform_device *pdev)
+> >  	struct device *dev = &pdev->dev;
+> >  	struct tango_pcie *pcie;
+> >  	struct resource *res;
+> > -	int ret;
+> > +	struct irq_domain *msi_dom, *irq_dom;
+> > +	struct fwnode_handle *fwnode = of_node_to_fwnode(dev->of_node);
+> > +	int ret, reg, virq;
+> >  
+> >  	dev_warn(dev, "simultaneous PCI config and MMIO accesses may cause data corruption\n");
+> >  	add_taint(TAINT_CRAP, LOCKDEP_STILL_OK);
+> 
+>   CC      drivers/pci/host/pcie-tango.o
+> drivers/pci/host/pcie-tango.c: In function 'tango_pcie_probe':
+> drivers/pci/host/pcie-tango.c:257:6: warning: unused variable 'ret' [-Wunused-variable]
+>   int ret, reg, virq;
+>       ^~~
+> 
+> Hmmm, dunno how I managed to miss that...
+> Is the kbuild test robot enjoying a well-deserved vacation?
+> 
+> Bjorn, if/when you take the patch, can you first apply this fixup:
 
-Why does the purgatory code need to be so complex?
+Sure, no problem.
 
-Why is it not possible to write this as position-independent asm?
-
-> +/*
-> + * Apply purgatory relocations.
-> + *
-> + * ehdr: Pointer to elf headers
-> + * sechdrs: Pointer to section headers.
-> + * relsec: section index of SHT_RELA section.
-> + *
-> + * Note:
-> + * Currently R_AARCH64_ABS64, R_AARCH64_LD_PREL_LO19 and R_AARCH64_CALL26
-> + * are the only types to be generated from purgatory code.
-
-Is this all that has been observed, or is this ensured somehow?
-
-The arch_kexec_apply_relocations_add() function below duplicates a lot
-of logic that already exists in the arm64 module loader's
-apply_relocate_add() function.
-
-Please reuse that code. Having a duplicate or alternative implementation
-is just asking for subtle bugs.
-
-Thanks,
-Mark.
+> @@ -254,7 +254,7 @@ static int tango_pcie_probe(struct platform_device *pdev)
+>         struct resource *res;
+>         struct irq_domain *msi_dom, *irq_dom;
+>         struct fwnode_handle *fwnode = of_node_to_fwnode(dev->of_node);
+> -       int ret, reg, virq;
+> +       int reg, virq;
+>  
+>         dev_warn(dev, "simultaneous PCI config and MMIO accesses may cause data corruption\n");
+>         add_taint(TAINT_CRAP, LOCKDEP_STILL_OK);
+> 
+> 
+> Regards.
+> 
