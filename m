@@ -1,17 +1,19 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 24 Aug 2017 11:27:25 +0200
-Subject: [PATCH 2/4] arm: dts: gr-peach: Add SCIF2 pin group
-In-Reply-To: <1503564523-31899-3-git-send-email-jacopo+renesas@jmondi.org>
+Date: Thu, 24 Aug 2017 11:31:15 +0200
+Subject: [PATCH 4/4] arm: dts: gr-peach: Add user led device nodes
+In-Reply-To: <1503564523-31899-5-git-send-email-jacopo+renesas@jmondi.org>
 References: <1503564523-31899-1-git-send-email-jacopo+renesas@jmondi.org>
- <1503564523-31899-3-git-send-email-jacopo+renesas@jmondi.org>
-Message-ID: <CAMuHMdVfKmgFcU9o9u9U8x_XsHbUACUiTKcJuvYozn2i1XK6JA@mail.gmail.com>
+ <1503564523-31899-5-git-send-email-jacopo+renesas@jmondi.org>
+Message-ID: <CAMuHMdWtkf7tc_QNZdrJzGXE2pu1tdjYmNS+kqSu_2u=79oAxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Aug 24, 2017 at 10:48 AM, Jacopo Mondi
 <jacopo+renesas@jmondi.org> wrote:
-> Add pin configuration subnode for SCIF2 serial debug interface.
->
+> Add device nodes for user leds on gr-peach board.
+
+Singular? (also in the one-line summary)
+
 > Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
 
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
