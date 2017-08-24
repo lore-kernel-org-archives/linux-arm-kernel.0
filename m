@@ -1,37 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 24 Aug 2017 23:24:28 +0200
-Subject: [GIT PULL] ARM: dts: aspeed: Changes for 4.14
-In-Reply-To: <076266b4-175e-492f-0edf-543217efbce2@kaod.org>
-References: <CACPK8XerZV+3RbxofpghWioYC68kK531aQQ_Jc8ZYLrjjCUqjQ@mail.gmail.com>
- <CAK8P3a1i0qJ+3Ty+QejDW5Pbyx24D9JjxrZuvhx8-1Hj2G1h1g@mail.gmail.com>
- <076266b4-175e-492f-0edf-543217efbce2@kaod.org>
-Message-ID: <CAK8P3a1eQq+fkAT7jkpzHk0arCtVENJzGxk3s7aRLzU5v86xzA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 24 Aug 2017 23:28:25 +0200
+Subject: [PATCH 1/3] gliolib: request the gpio before querying its
+ direction
+In-Reply-To: <e1eae89c-f007-2e0b-cbb8-1aba71dae0e1@codeaurora.org>
+References: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
+ <1501179565-26466-2-git-send-email-timur@codeaurora.org>
+ <CACRpkdYPBd4ZvuXo__LRQezTQD3u=3r2WO+2dTzBanLL1zX72w@mail.gmail.com>
+ <103341c8-6cc5-3d3f-eef7-28b9f31cdc71@codeaurora.org>
+ <CACRpkdZv0NjXfwm_-TSoY=QFeP64V-ZoKvmLXk3qkV49fq1UtQ@mail.gmail.com>
+ <e1eae89c-f007-2e0b-cbb8-1aba71dae0e1@codeaurora.org>
+Message-ID: <CACRpkdZ-=uyFntmwL3Z8dg32ovRwRuz0XRXr833TEjokvg+5=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 24, 2017 at 5:06 PM, C?dric Le Goater <clg@kaod.org> wrote:
-> On 08/24/2017 01:13 PM, Arnd Bergmann wrote:
->> On Thu, Aug 24, 2017 at 6:14 AM, Joel Stanley <joel@jms.id.au> wrote:
->>> Hi Arnd and Olof,
->>> Aspeed devicetree updates for 4.14
->>>
->>>  - fix to expose the full flash windows on ast2400.
->>>
+On Thu, Aug 24, 2017 at 1:28 AM, Timur Tabi <timur@codeaurora.org> wrote:
+> On 08/23/2017 03:32 AM, Linus Walleij wrote:
 >>
->> Pulled into next/dt, thanks! Can you explain the CONFIG_VMSPLIT_2G
->> requirement mentioned in the changelog here? Will it stop working with
->> a normal multiplatform configuration that uses VMSPLIT_3G, or just
->> have no effect?
+>> It's right there on the "devel" branch from the GPIO git tree.
+>>
+>> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git/log/?h=devel
 >
-> The kernel will still boot but, without VMSPLIT_2G, the SPI flash
-> controller driver will fail to map the memory windows of the flash
-> devices. And the system will surely lack a root filesystem.
+>
+> The devel branch is missing this commit:
+>
+> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git/commit/?id=83cf5faeba37fede8a6274d07f646d1cd1b25d35
 
-Hmm, why does the flash controller even map the entire area?
+Yes I have separate git trees for GPIO and pin control even.
 
-IIRC, NOR flash controllers normally have a 'ranges' property that
-gets set up to list the available memory ranges, and the chips
-attached to them have the 'reg' property that matches the actual
-size.
+> which I need to avoid a merge conflict.  I'm going to submit a new version
+> of my patches, but they won't apply on top of 'devel' unless you pull in
+> that commit from linux-pinctrl.  Or you could copy that my gpiolib commit to
+> linux-pinctrl.
 
-     Arnd
+I don't see how you can have a merge conflict between this
+patch that only affects gpiolib.c and something in the pin
+control tree?
+
+The merge window is imminent, so if it is not extremely urgent
+I would opt to wait until after.
+
+Yours,
+Linus Walleij
