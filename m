@@ -1,70 +1,24 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 24 Aug 2017 10:46:39 +0200
-Subject: [PATCH v3 2/2] arm64: dts: marvell: mcbin: enable more networking
- ports
-In-Reply-To: <20170824084639.19282-1-antoine.tenart@free-electrons.com>
-References: <20170824084639.19282-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170824084639.19282-2-antoine.tenart@free-electrons.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 24 Aug 2017 10:49:06 +0200
+Subject: [RFC 3/3] sched: depend on 64BIT_ATOMIC_ACCESS to determine if
+ to use min_vruntime_copy
+In-Reply-To: <1503553377-3646-4-git-send-email-hoeun.ryu@gmail.com>
+References: <1503553377-3646-1-git-send-email-hoeun.ryu@gmail.com>
+ <1503553377-3646-4-git-send-email-hoeun.ryu@gmail.com>
+Message-ID: <20170824084906.mtmj6rz4igo63dl5@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the two GE/SFP ports. They are configured in 10GKR
-mode by default. To do this the cpm_xdmio is enabled as well, and two
-phy descriptions are added.
+On Thu, Aug 24, 2017 at 02:42:57PM +0900, Hoeun Ryu wrote:
+> +#ifndef CONFIG_64BIT_ATOMIC_ALIGNED_ACCESS
+>  	u64 min_vruntime;
+> -#ifndef CONFIG_64BIT
+> +#else
+> +	u64 min_vruntime __attribute__((aligned(sizeof(u64))));
+> +#endif
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Tested-by: Marcin Wojtas <mw@semihalf.com>
----
- arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts | 30 +++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+That's stupid, just make sure your platform defines u64 as naturally
+aligned when you have this 64BIT_ATOMIC foo.
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-index abd39d1c1739..9f0a00802452 100644
---- a/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-8040-mcbin.dts
-@@ -127,6 +127,30 @@
- 	};
- };
- 
-+&cpm_xmdio {
-+	status = "okay";
-+
-+	phy0: ethernet-phy at 0 {
-+		compatible = "ethernet-phy-ieee802.3-c45";
-+		reg = <0>;
-+	};
-+
-+	phy8: ethernet-phy at 8 {
-+		compatible = "ethernet-phy-ieee802.3-c45";
-+		reg = <8>;
-+	};
-+};
-+
-+&cpm_ethernet {
-+	status = "okay";
-+};
-+
-+&cpm_eth0 {
-+	status = "okay";
-+	phy = <&phy0>;
-+	phy-mode = "10gbase-kr";
-+};
-+
- &cpm_sata0 {
- 	/* CPM Lane 0 - U29 */
- 	status = "okay";
-@@ -154,6 +178,12 @@
- 	status = "okay";
- };
- 
-+&cps_eth0 {
-+	status = "okay";
-+	phy = <&phy8>;
-+	phy-mode = "10gbase-kr";
-+};
-+
- &cps_eth1 {
- 	/* CPS Lane 0 - J5 (Gigabit RJ45) */
- 	status = "okay";
--- 
-2.13.5
+Also, please try and dig out more 32bit archs that can use this and make
+sure to include performance numbers to justify this extra cruft.
