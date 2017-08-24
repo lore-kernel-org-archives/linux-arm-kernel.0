@@ -1,47 +1,58 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 24 Aug 2017 11:48:52 -0400 (EDT)
-Subject: [PATCH v2 0/8] ELF-FDPIC support for ARM
-In-Reply-To: <770523b1-49f6-2033-ff68-027dae1d53fc@st.com>
-References: <20170817072347.19990-1-nicolas.pitre@linaro.org>
- <20170817083716.GN20805@n2100.armlinux.org.uk>
- <alpine.LFD.2.20.1708231158090.14288@knanqh.ubzr>
- <38b1d822-345d-0b79-6d44-b78649e46efb@arm.com>
- <alpine.LFD.2.20.1708240834210.14288@knanqh.ubzr>
- <770523b1-49f6-2033-ff68-027dae1d53fc@st.com>
-Message-ID: <alpine.LFD.2.20.1708241114090.14288@knanqh.ubzr>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 24 Aug 2017 17:49:19 +0200
+Subject: [PATCH] arm64: dts: rockchip: enable display subsystem on
+ rk3399-firefly
+Message-ID: <20170824154919.12324-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Aug 2017, Mickael GUENE wrote:
+Enable the graphics-related nodes on the rk3399-firefly which makes
+it possible to see output on the on-board hdmi output.
 
-> Hi Nicolas,
-> 
-> > The first one is.
->   It also seems to me that 'Add tls support for cortex-m cpu family'
-> patch is missing. There is the one that add the get_tls syscall but
-> not this one which enable usage for cortex-m family.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm64/boot/dts/rockchip/rk3399-firefly.dts | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-The patch titled "Add tls support for cortex-m cpu family" in your 
-repository does 3 things:
-
-- It defines switch_tls to switch_tls_none. Without the patch the 
-  default is switch_tls_software. But this has no purpose as on Cortex-M
-  targets there is simply no switch_tls usage at all. The switch_tls 
-  macro is invoked in entry-armv.S within __switch_to whereas Cortex-M
-  uses a different implementation of __switch_to in entry-v7m.S.
-
-- The patch also defines has_tls_reg to 0. That's the same as de default 
-  without the patch.
-
-- It also defines tls_emu to 1. That makes no sense as this is for ARMv6 
-  that lack the dedicated CP15 register and is completely wrong for 
-  Cortex-M. I suspect the actual reason for defining this to 1 was a 
-  dubious workaround to prevent set_tls() from storing the TLS value at 
-  the absolute address 0xffff0ff0. In recent kernels that particular 
-  code is properly conditioned on CONFIG_KUSER_HELPERS instead.
-
-So in the current mainline kernel this patch is useless. This is why I 
-didn't consider it.
-
-
-Nicolas
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
+index 7fd4bfcaa38e..05fb773f975b 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-firefly.dts
+@@ -255,6 +255,11 @@
+ 	status = "okay";
+ };
+ 
++&hdmi {
++	ddc-i2c-bus = <&i2c3>;
++	status = "okay";
++};
++
+ &i2c0 {
+ 	clock-frequency = <400000>;
+ 	i2c-scl-rising-time-ns = <168>;
+@@ -728,3 +733,23 @@
+ 	status = "okay";
+ 	dr_mode = "host";
+ };
++
++&vopb {
++	assigned-clocks = <&cru ACLK_VOP0>, <&cru HCLK_VOP0>, <&cru DCLK_VOP0>;
++	assigned-clock-rates = <400000000>, <200000000>, <100000000>;
++	status = "okay";
++};
++
++&vopb_mmu {
++	status = "okay";
++};
++
++&vopl {
++	assigned-clocks = <&cru ACLK_VOP1>, <&cru HCLK_VOP1>, <&cru DCLK_VOP1>;
++	assigned-clock-rates = <400000000>, <200000000>, <100000000>;
++	status = "okay";
++};
++
++&vopl_mmu {
++	status = "okay";
++};
+-- 
+2.14.1
