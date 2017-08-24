@@ -1,55 +1,37 @@
-From: code@mmayer.net (Markus Mayer)
-Date: Thu, 24 Aug 2017 16:36:25 -0700
-Subject: [PATCH v3 1/2] dt/bindings: Add bindings for Broadcom STB DRAM Sensors
-In-Reply-To: <20170824233626.1343-1-code@mmayer.net>
-References: <20170824233626.1343-1-code@mmayer.net>
-Message-ID: <20170824233626.1343-2-code@mmayer.net>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 25 Aug 2017 01:28:13 +0200
+Subject: [PATCH] ARM: ux500: don't select CPUFREQ_DT
+In-Reply-To: <CACRpkdb9bOuVaLUA4XVd89a58Y6UWnifQXurOHVWYfOBDHQ02Q@mail.gmail.com>
+References: <20170823132733.619811-1-arnd@arndb.de>
+ <CACRpkdb9bOuVaLUA4XVd89a58Y6UWnifQXurOHVWYfOBDHQ02Q@mail.gmail.com>
+Message-ID: <3890976.3OiFpNYlek@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Mayer <mmayer@broadcom.com>
+On Thursday, August 24, 2017 9:47:52 PM CEST Linus Walleij wrote:
+> On Wed, Aug 23, 2017 at 3:27 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> > The new 'select CPUFREQ_DT' statement causes a warning in some
+> > configurations:
+> >
+> > warning: (ARCH_U8500) selects CPUFREQ_DT which has unmet direct dependencies (CPU_FREQ && HAVE_CLK && OF && (!CPU_THERMAL || THERMAL))
+> >
+> > No other platform does this, so I think for consistency it's
+> > best if we remove it again from ux500 and instead add the driver
+> > to the defconfig.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> OK then. I should update the defconfig anyway.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Rafael, can you stick this on top of the other patches on
+> your cpufreq branch?
 
-Provide bindings for the Broadcom STB DDR PHY Front End (DPFE).
+Done locally, but will show up in linux-next next week.
 
-Signed-off-by: Markus Mayer <mmayer@broadcom.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../bindings/memory-controllers/brcm,dpfe-cpu.txt  | 27 ++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/brcm,dpfe-cpu.txt
+Though honestly, that not being in linux-pm Patchwork doesn't make things
+particularly easy for me ...
 
-diff --git a/Documentation/devicetree/bindings/memory-controllers/brcm,dpfe-cpu.txt b/Documentation/devicetree/bindings/memory-controllers/brcm,dpfe-cpu.txt
-new file mode 100644
-index 0000000..82d923e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/memory-controllers/brcm,dpfe-cpu.txt
-@@ -0,0 +1,27 @@
-+DDR PHY Front End (DPFE) for Broadcom STB
-+=========================================
-+
-+DPFE and the DPFE firmware provide an interface for the host CPU to
-+communicate with the DCPU, which resides inside the DDR PHY.
-+
-+There are three memory regions for interacting with the DCPU. These are
-+specified in a single reg property.
-+
-+Required properties:
-+  - compatible: must be "brcm,bcm7271-dpfe-cpu", "brcm,bcm7268-dpfe-cpu"
-+    or "brcm,dpfe-cpu"
-+  - reg: must reference three register ranges
-+      - start address and length of the DCPU register space
-+      - start address and length of the DCPU data memory space
-+      - start address and length of the DCPU instruction memory space
-+  - reg-names: must contain "dpfe-cpu", "dpfe-dmem", and "dpfe-imem";
-+        they must be in the same order as the register declarations
-+
-+Example:
-+	dpfe_cpu0: dpfe-cpu at f1132000 {
-+		compatible = "brcm,bcm7271-dpfe-cpu", "brcm,dpfe-cpu";
-+		reg =  <0xf1132000 0x180
-+			0xf1134000 0x1000
-+			0xf1138000 0x4000>;
-+		reg-names = "dpfe-cpu", "dpfe-dmem", "dpfe-imem";
-+	};
--- 
-2.7.4
+Thanks,
+Rafael
