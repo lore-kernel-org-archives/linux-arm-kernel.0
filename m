@@ -1,185 +1,90 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Thu, 24 Aug 2017 10:36:27 +0200
-Subject: [PATCH v3 2/4] dmaengine: Add STM32 MDMA driver
-In-Reply-To: <20170823160044.GE3053@localhost>
-References: <1501062502-18778-1-git-send-email-pierre-yves.mordret@st.com>
- <1501062502-18778-3-git-send-email-pierre-yves.mordret@st.com>
- <20170816164709.GR3053@localhost>
- <40c24f87-6ea2-4c3a-1e86-9d30d30481c2@st.com>
- <20170823160044.GE3053@localhost>
-Message-ID: <14b7ce2f-4828-2138-3547-209eb519c482@st.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Thu, 24 Aug 2017 10:21:24 +0200
+Subject: [PATCH v3 3/4] net: stmmac: register parent MDIO node for
+ sun8i-h3-emac
+In-Reply-To: <f14fe754-6339-32a0-3439-2daff6dd1d7e@gmail.com>
+References: <CAGb2v67hQXSoCKP7qW+KRUYX+0djQ1Z23cQ67Lyg6G7ozGyfGQ@mail.gmail.com>
+ <20170821132015.GB1703@lunn.ch>
+ <20170821133104.qvrhvwin2rdg4aqo@flea.lan>
+ <20170821142321.GE1703@lunn.ch>
+ <CAGb2v64E4T=1ff3POGuXZA=MvjGAnKQ6OF6A3sT_cU-=jh6zNw@mail.gmail.com>
+ <bfe784b6-5137-8fcd-dbd0-ad96974f4060@gmail.com>
+ <20170822181140.GA11596@Red>
+ <352ae66b-78a4-e88b-4544-a8edd9390b0c@gmail.com>
+ <20170823074942.yt3c5gvnmdw5pqge@flea.home>
+ <f14fe754-6339-32a0-3439-2daff6dd1d7e@gmail.com>
+Message-ID: <20170824082124.GA14302@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Aug 23, 2017 at 09:31:53AM -0700, Florian Fainelli wrote:
+> On 08/23/2017 12:49 AM, Maxime Ripard wrote:
+> > Hi Florian,
+> > 
+> > On Tue, Aug 22, 2017 at 11:35:01AM -0700, Florian Fainelli wrote:
+> >>>>> So I think what you are saying is either impossible or engineering-wise
+> >>>>> a very stupid design, like using an external MAC with a discrete PHY
+> >>>>> connected to the internal MAC's MDIO bus, while using the internal MAC
+> >>>>> with the internal PHY.
+> >>>>>
+> >>>>> Now can we please decide on something? We're a week and a half from
+> >>>>> the 4.13 release. If mdio-mux is wrong, then we could have two mdio
+> >>>>> nodes (internal-mdio & external-mdio).
+> >>>>
+> >>>> I really don't see a need for a mdio-mux in the first place, just have
+> >>>> one MDIO controller (current state) sub-node which describes the
+> >>>> built-in STMMAC MDIO controller and declare the internal PHY as a child
+> >>>> node (along with 'phy-is-integrated'). If a different configuration is
+> >>>> used, then just put the external PHY as a child node there.
+> >>>>
+> >>>> If fixed-link is required, the mdio node becomes unused anyway.
+> >>>>
+> >>>> Works for everyone?
+> >>>
+> >>> If we put an external PHY with reg=1 as a child of internal MDIO,
+> >>> il will be merged with internal PHY node and get
+> >>> phy-is-integrated.
+> >>
+> >> Then have the .dtsi file contain just the mdio node, but no internal or
+> >> external PHY and push all the internal and external PHY node definition
+> >> (in its entirety) to the per-board DTS file, does not that work?
+> > 
+> > If possible, I'd really like to have the internal PHY in the
+> > DTSI. It's always there in hardware anyway, and duplicating the PHY,
+> > with its clock, reset line, and whatever info we might need in the
+> > future in each and every board DTS that uses it will be very error
+> > prone and we will have the usual bunch of issues that come up with
+> > duplication.
+> 
+> OK, then what if you put the internal PHY in the DTSI, mark it with a
+> status = "disabled" property, and have the per-board DTS put a status =
+> "okay" property along with a "phy-is-integrated" boolean property? Would
+> that work?
+
+No, I tested and for example with sun8i-h3-orangepi-plus.dts, the external PHY (ethernet-phy at 1) is still merged.
+So that adding a 'status = "disabled"' does not bring anything.
+
+> 
+> What I really don't think is necessary is:
+> 
+> - duplicating the "mdio" controller node for external vs. internal PHY,
+> because this is not accurate, there is just one MDIO controller, but
+> there may be different kinds of MDIO/PHY devices attached
+
+For me, if we want to represent the reality, we need two MDIO:
+- since two PHY at the same address could co-exists
+- since they are isolated so not on the same MDIO bus
+
+> - having the STMMAC driver MDIO probing code having to deal with a
+> "mdio" sub-node or an "internal-mdio" sub-node because this is confusing
+> and requiring more driver-level changes that are error prone
+
+My patch for stmmac is really small, only the name of my variable ("need_mdio_mux_ids")
+have to be changed to something like "register_parent_mdio"
 
 
-On 08/23/2017 06:00 PM, Vinod Koul wrote:
-> On Tue, Aug 22, 2017 at 05:59:26PM +0200, Pierre Yves MORDRET wrote:
->>
->>
->>>
->>> #define STM32_MDMA_SHIFT(n)		(ffs(n) - 1))
->>> #define STM32_MDMA_SET(n, mask)		((n) << STM32_MDMA_SHIFT(mask))
->>> #define STM32_MDMA_GET(n, mask)		(((n) && mask) >> STM32_MDMA_SHIFT(mask))
->>>
->>> Basically, u extract the shift using the mask value and ffs helping out, so
->>> no need to define these and reduce chances of coding errors...
->>>
->>
->> OK.
->> but I would prefer if you don't mind
-> 
-> hmmm, I don't have a very strong opinion, so okay. But from programming PoV
-> it reduces human errors..
-> 
->> #define STM32_MDMA_SET(n, mask)		(((n) << STM32_MDMA_SHIFT(mask)) & mask)
->>
+So I agree with Maxime, we need to avoid merging PHY nodes, and we can avoid it only by having two separate MDIO nodes.
+Furthermore, with only one MDIO, we will face with lots of small patch for adding phy-is-integrated, with two we do not need to change any board DT, all is simply clean.
+Really having two MDIO seems cleaner.
 
-I agree with your proposal :) I just said I prefer for the setter
-#define STM32_MDMA_SET(n, mask)		(((n) << STM32_MDMA_SHIFT(mask)) & mask)
-instead of
-#define STM32_MDMA_SET(n, mask)		((n) << STM32_MDMA_SHIFT(mask))
-
->>>> +static int stm32_mdma_get_width(struct stm32_mdma_chan *chan,
->>>> +				enum dma_slave_buswidth width)
->>>> +{
->>>> +	switch (width) {
->>>> +	case DMA_SLAVE_BUSWIDTH_1_BYTE:
->>>> +	case DMA_SLAVE_BUSWIDTH_2_BYTES:
->>>> +	case DMA_SLAVE_BUSWIDTH_4_BYTES:
->>>> +	case DMA_SLAVE_BUSWIDTH_8_BYTES:
->>>> +		return ffs(width) - 1;
->>>> +	default:
->>>> +		dev_err(chan2dev(chan), "Dma bus width not supported\n");
->>>
->>> please log the width here, helps in debug...
->>>
->>
->> Hum.. just a dev_dbg to log the actual width or within the dev_err ?
-> 
-> latter pls
-> 
-
-OK
-
->>>> +static struct dma_async_tx_descriptor *
->>>> +stm32_mdma_prep_dma_cyclic(struct dma_chan *c, dma_addr_t buf_addr,
->>>> +			   size_t buf_len, size_t period_len,
->>>> +			   enum dma_transfer_direction direction,
->>>> +			   unsigned long flags)
->>>> +{
->>>> +	struct stm32_mdma_chan *chan = to_stm32_mdma_chan(c);
->>>> +	struct stm32_mdma_device *dmadev = stm32_mdma_get_dev(chan);
->>>> +	struct dma_slave_config *dma_config = &chan->dma_config;
->>>> +	struct stm32_mdma_desc *desc;
->>>> +	dma_addr_t src_addr, dst_addr;
->>>> +	u32 ccr, ctcr, ctbr, count;
->>>> +	int i, ret;
->>>> +
->>>> +	if (!buf_len || !period_len || period_len > STM32_MDMA_MAX_BLOCK_LEN) {
->>>> +		dev_err(chan2dev(chan), "Invalid buffer/period len\n");
->>>> +		return NULL;
->>>> +	}
->>>> +
->>>> +	if (buf_len % period_len) {
->>>> +		dev_err(chan2dev(chan), "buf_len not multiple of period_len\n");
->>>> +		return NULL;
->>>> +	}
->>>> +
->>>> +	/*
->>>> +	 * We allow to take more number of requests till DMA is
->>>> +	 * not started. The driver will loop over all requests.
->>>> +	 * Once DMA is started then new requests can be queued only after
->>>> +	 * terminating the DMA.
->>>> +	 */
->>>> +	if (chan->busy) {
->>>> +		dev_err(chan2dev(chan), "Request not allowed when dma busy\n");
->>>> +		return NULL;
->>>> +	}
->>>
->>> is that a HW restriction? Once a txn is completed can't we submit
->>> subsequent txn..? Can you explain this part please.
->>>
->>
->> Driver can prepare any request Slave SG, Memcpy or Cyclic. But if the channel is
->> busy to complete a DMA transfer, the request will be put in pending list. This
->> is only when the DMA transfer is going to be completed the next descriptor is
->> going to be processed and started.
->> However for cyclic this is different since when cyclic is ignited the channel
->> will be busy until its termination. This is why we forbid any DMA preparation
->> for this channel.
->> Nonetheless I believe we have a flaw here since we have to forbid
->> Slave/Memcpy/Cyclic whether a cyclic request is on-going.
-> 
-> But you are not submitting a txn to HW. The prepare_xxx operation prepares a
-> descriptor which is pushed to pending queue on submit and further pushed to
-> hw on queue move or issue_pending()
-> 
-> So here we should ideally accept the request.
-> 
-> After you finish memcpy you can submit a memcpy right...?
-> 
-
-Correct TXn is not submitted to HW only descriptors are prepared. They are going
-to be pushed to HW on issue_pending if not channel not running. Otherwise the
-next pending request is pushed to HW on DMA completion.
-So yes I can queue a memcpy can be submitted during a memcpy (or Slave SG). The
-mempy will be pushed to HW after the completion of the preceding.
-
-The only drawback is cyclic. If a cyclic DMA operation is running, no other
-requests (cyclic or SG or memcpy) can be granted or queued.
-
->>
->>
->>>> +	ret = device_property_read_u32(&pdev->dev, "dma-requests",
->>>> +				       &nr_requests);
->>>> +	if (ret) {
->>>> +		nr_requests = STM32_MDMA_MAX_REQUESTS;
->>>> +		dev_warn(&pdev->dev, "MDMA defaulting on %i request lines\n",
->>>> +			 nr_requests);
->>>> +	}
->>>> +
->>>> +	count = of_property_count_u32_elems(of_node, "st,ahb-addr-masks");
->>>
->>> We dont have device_property_xxx for this?
->>
->> Sorry no. Well didn't figure out one though.
-> 
-> we do :) the array property with NULL argument returns the size of array..
-> 
-> int device_property_read_u32_array(struct device *dev, const char *propname,
-> 				   u32 *val, size_t nval)
-> 
-> Documentation says:
->  Return: number of values if @val was %NULL,
-> 
-
-Dho. ok :)
-
->>
->>>
->>>> +	if (count < 0)
->>>> +		count = 0;
->>>> +
->>>> +	dmadev = devm_kzalloc(&pdev->dev, sizeof(*dmadev) + sizeof(u32) * count,
->>>> +			      GFP_KERNEL);
->>>> +	if (!dmadev)
->>>> +		return -ENOMEM;
->>>> +
->>>> +	dmadev->nr_channels = nr_channels;
->>>> +	dmadev->nr_requests = nr_requests;
->>>> +	of_property_read_u32_array(of_node, "st,ahb-addr-masks",
->>>> +				   dmadev->ahb_addr_masks,
->>>> +				   count);
->>>
->>> i know we have an device api for array reads :)
->>> and I think that helps in former case..
->>>
->>
->> Correct :) device_property_read_u32_array
-> 
-> yes..
-> 
-
-Thanks
-Py
+Regards
