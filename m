@@ -1,16 +1,16 @@
 From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 24 Aug 2017 13:44:39 +0930
-Subject: [GIT PULL] ARM: dts: aspeed: Changes for 4.14
-Message-ID: <CACPK8XerZV+3RbxofpghWioYC68kK531aQQ_Jc8ZYLrjjCUqjQ@mail.gmail.com>
+Date: Thu, 24 Aug 2017 13:44:38 +0930
+Subject: [GIT PULL] ARM: config: aspeed: Changes for 4.14
+Message-ID: <CACPK8XehxPjTuAq70ofmom9_DJ7LBR2C0ehO+2jGJUANTXod+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd and Olof,
 
-Here's an Aspeed devicetree change for 4.14.
+Here's two Aspeed defconifg changes for 4.14.
 
-As with the defconfig pull, this change has been kicking around for a while
-now so it is well tested.
+This is a bit later than I planned, sorry about that. These changes
+have been kicking around for a while now so they areb well tested.
 
 The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 
@@ -19,21 +19,25 @@ The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
-tags/aspeed-4.14-devicetree
+tags/aspeed-4.14-defconfig
 
-for you to fetch changes up to bcbd328d3fe765f333642b7cfe384d59dffc2db2:
+for you to fetch changes up to 652213cd1081017e2139d57b6c7871670e41bf0b:
 
-  ARM: dts: aspeed-g4: fix AHB window size of the SMC controllers
-(2017-08-23 16:06:02 +0930)
+  ARM: config: aspeed: Add I2C, VUART, LPC Snoop (2017-08-23 16:04:42 +0930)
 
 ----------------------------------------------------------------
-Aspeed devicetree updates for 4.14
+Aspeed defconfig updates for 4.14
 
- - fix to expose the full flash windows on ast2400.
+ - Enable new Aspeed drivers for i2c, lpc snoop and vuart
+ - Set VMSPLIT_2G for ast2400 platforms, required for mtd driver
 
 ----------------------------------------------------------------
 C?dric Le Goater (1):
-      ARM: dts: aspeed-g4: fix AHB window size of the SMC controllers
+      ARM: configs: aspeed: Update Aspeed G4 with VMSPLIT_2G
 
- arch/arm/boot/dts/aspeed-g4.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Joel Stanley (1):
+      ARM: config: aspeed: Add I2C, VUART, LPC Snoop
+
+ arch/arm/configs/aspeed_g4_defconfig | 5 ++++-
+ arch/arm/configs/aspeed_g5_defconfig | 4 +++-
+ 2 files changed, 7 insertions(+), 2 deletions(-)
