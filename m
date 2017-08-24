@@ -1,41 +1,54 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Thu, 24 Aug 2017 10:35:44 +0100
-Subject: [PATCH ] PCI: rcar: Add r8a7743/5 support
-Message-ID: <1503567344-5610-1-git-send-email-biju.das@bp.renesas.com>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Thu, 24 Aug 2017 10:54:42 +0100
+Subject: [PATCH] clk: versatile: make clk_ops const
+In-Reply-To: <1503410786-25519-1-git-send-email-bhumirks@gmail.com>
+References: <1503410786-25519-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <20170824095442.GC11316@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add internal PCI bridge support for r8a7743/5 SoC. Renesas RZ/G1[ME]
-(R8A7743/5) internal PCI bridge is identical to the R-Car Gen2 family.
+On Tue, Aug 22, 2017 at 07:36:26PM +0530, Bhumika Goyal wrote:
+> Make this const as it is only stored in the const field of a
+> clk_init_data structure.
+> 
+> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
----
-This patch is tested against Linux next tag next-20170824 and
-renesas-dev branch renesas-devel-20170822-v4.13-rc6. 
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
- Documentation/devicetree/bindings/pci/pci-rcar-gen2.txt | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+Thanks for the patch!
 
-diff --git a/Documentation/devicetree/bindings/pci/pci-rcar-gen2.txt b/Documentation/devicetree/bindings/pci/pci-rcar-gen2.txt
-index 07a7509..3d03863 100644
---- a/Documentation/devicetree/bindings/pci/pci-rcar-gen2.txt
-+++ b/Documentation/devicetree/bindings/pci/pci-rcar-gen2.txt
-@@ -6,11 +6,14 @@ AHB. There is one bridge instance per USB port connected to the internal
- OHCI and EHCI controllers.
- 
- Required properties:
--- compatible: "renesas,pci-r8a7790" for the R8A7790 SoC;
-+- compatible: "renesas,pci-r8a7743" for the R8A7743 SoC;
-+	      "renesas,pci-r8a7745" for the R8A7745 SoC;
-+	      "renesas,pci-r8a7790" for the R8A7790 SoC;
- 	      "renesas,pci-r8a7791" for the R8A7791 SoC;
- 	      "renesas,pci-r8a7793" for the R8A7793 SoC;
- 	      "renesas,pci-r8a7794" for the R8A7794 SoC;
--	      "renesas,pci-rcar-gen2" for a generic R-Car Gen2 compatible device
-+	      "renesas,pci-rcar-gen2" for a generic R-Car Gen2 or
-+				      RZ/G1 compatible device.
- 
- 
- 	      When compatible with the generic version, nodes must list the
+Sudeep, can you going to pick this up for 4.14?
+
+Best regards,
+Liviu
+
+> ---
+>  drivers/clk/versatile/clk-vexpress-osc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
+> index 7e5add7..e7a868b 100644
+> --- a/drivers/clk/versatile/clk-vexpress-osc.c
+> +++ b/drivers/clk/versatile/clk-vexpress-osc.c
+> @@ -61,7 +61,7 @@ static int vexpress_osc_set_rate(struct clk_hw *hw, unsigned long rate,
+>  	return regmap_write(osc->reg, 0, rate);
+>  }
+>  
+> -static struct clk_ops vexpress_osc_ops = {
+> +static const struct clk_ops vexpress_osc_ops = {
+>  	.recalc_rate = vexpress_osc_recalc_rate,
+>  	.round_rate = vexpress_osc_round_rate,
+>  	.set_rate = vexpress_osc_set_rate,
+> -- 
+> 1.9.1
+> 
+
 -- 
-1.9.1
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
