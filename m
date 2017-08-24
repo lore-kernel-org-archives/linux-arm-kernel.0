@@ -1,1124 +1,752 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 24 Aug 2017 17:18:01 +0900
-Subject: [PATCH 04/14] kexec_file: factor out vmlinux (elf) parser from powerpc
+Date: Thu, 24 Aug 2017 17:18:02 +0900
+Subject: [PATCH 05/14] kexec_file: factor out crashdump elf header function
+ from x86
 In-Reply-To: <20170824081811.19299-1-takahiro.akashi@linaro.org>
 References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
-Message-ID: <20170824081811.19299-5-takahiro.akashi@linaro.org>
+Message-ID: <20170824081811.19299-6-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-build_elf_exec_info() can also be useful for other architectures,
+prepare_elf_headers() can also be useful for other architectures,
 including arm64. So let it factored out.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Michael Ellerman <mpe@ellerman.id.au>
-Cc: Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>
 Cc: Dave Young <dyoung@redhat.com>
 Cc: Vivek Goyal <vgoyal@redhat.com>
 Cc: Baoquan He <bhe@redhat.com>
 ---
- arch/Kconfig                       |   3 +
- arch/powerpc/Kconfig               |   1 +
- arch/powerpc/kernel/kexec_elf_64.c | 464 -------------------------------------
- include/linux/elf.h                |  62 +++++
- include/linux/kexec.h              |  19 ++
- kernel/Makefile                    |   1 +
- kernel/kexec_file_elf.c            | 454 ++++++++++++++++++++++++++++++++++++
- 7 files changed, 540 insertions(+), 464 deletions(-)
- create mode 100644 kernel/kexec_file_elf.c
+ arch/x86/kernel/crash.c | 324 ----------------------------------------------
+ include/linux/kexec.h   |  19 +++
+ kernel/crash_core.c     | 333 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 352 insertions(+), 324 deletions(-)
 
-diff --git a/arch/Kconfig b/arch/Kconfig
-index 21d0089117fe..e940d16412f4 100644
---- a/arch/Kconfig
-+++ b/arch/Kconfig
-@@ -9,6 +9,9 @@ config KEXEC_CORE
- 	select CRASH_CORE
- 	bool
- 
-+config KEXEC_FILE_ELF
-+	bool
-+
- config HAVE_IMA_KEXEC
- 	bool
- 
-diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-index 36f858c37ca7..f73921bbe29a 100644
---- a/arch/powerpc/Kconfig
-+++ b/arch/powerpc/Kconfig
-@@ -529,6 +529,7 @@ config KEXEC
- config KEXEC_FILE
- 	bool "kexec file based system call"
- 	select KEXEC_CORE
-+	select KEXEC_FILE_ELF
- 	select HAVE_IMA_KEXEC
- 	select BUILD_BIN2C
- 	depends on PPC64
-diff --git a/arch/powerpc/kernel/kexec_elf_64.c b/arch/powerpc/kernel/kexec_elf_64.c
-index 9a42309b091a..a0c92bd14259 100644
---- a/arch/powerpc/kernel/kexec_elf_64.c
-+++ b/arch/powerpc/kernel/kexec_elf_64.c
-@@ -26,475 +26,11 @@
+diff --git a/arch/x86/kernel/crash.c b/arch/x86/kernel/crash.c
+index 44404e2307bb..3c6b880f6dbf 100644
+--- a/arch/x86/kernel/crash.c
++++ b/arch/x86/kernel/crash.c
+@@ -21,7 +21,6 @@
  #include <linux/elf.h>
- #include <linux/kexec.h>
- #include <linux/libfdt.h>
--#include <linux/module.h>
- #include <linux/of_fdt.h>
- #include <linux/slab.h>
--#include <linux/types.h>
+ #include <linux/elfcore.h>
+ #include <linux/export.h>
+-#include <linux/slab.h>
+ #include <linux/vmalloc.h>
  
- #define PURGATORY_STACK_SIZE	(16 * 1024)
+ #include <asm/processor.h>
+@@ -41,34 +40,6 @@
+ /* Alignment required for elf header segment */
+ #define ELF_CORE_HEADER_ALIGN   4096
  
--#define elf_addr_to_cpu	elf64_to_cpu
+-/* This primarily represents number of split ranges due to exclusion */
+-#define CRASH_MAX_RANGES	16
 -
--#ifndef Elf_Rel
--#define Elf_Rel		Elf64_Rel
--#endif /* Elf_Rel */
--
--struct elf_info {
--	/*
--	 * Where the ELF binary contents are kept.
--	 * Memory managed by the user of the struct.
--	 */
--	const char *buffer;
--
--	const struct elfhdr *ehdr;
--	const struct elf_phdr *proghdrs;
--	struct elf_shdr *sechdrs;
+-struct crash_mem_range {
+-	u64 start, end;
 -};
 -
--static inline bool elf_is_elf_file(const struct elfhdr *ehdr)
--{
--       return memcmp(ehdr->e_ident, ELFMAG, SELFMAG) == 0;
--}
+-struct crash_mem {
+-	unsigned int nr_ranges;
+-	struct crash_mem_range ranges[CRASH_MAX_RANGES];
+-};
 -
--static uint64_t elf64_to_cpu(const struct elfhdr *ehdr, uint64_t value)
--{
--	if (ehdr->e_ident[EI_DATA] == ELFDATA2LSB)
--		value = le64_to_cpu(value);
--	else if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB)
--		value = be64_to_cpu(value);
--
--	return value;
--}
--
--static uint16_t elf16_to_cpu(const struct elfhdr *ehdr, uint16_t value)
--{
--	if (ehdr->e_ident[EI_DATA] == ELFDATA2LSB)
--		value = le16_to_cpu(value);
--	else if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB)
--		value = be16_to_cpu(value);
--
--	return value;
--}
--
--static uint32_t elf32_to_cpu(const struct elfhdr *ehdr, uint32_t value)
--{
--	if (ehdr->e_ident[EI_DATA] == ELFDATA2LSB)
--		value = le32_to_cpu(value);
--	else if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB)
--		value = be32_to_cpu(value);
--
--	return value;
--}
--
--/**
-- * elf_is_ehdr_sane - check that it is safe to use the ELF header
-- * @buf_len:	size of the buffer in which the ELF file is loaded.
-- */
--static bool elf_is_ehdr_sane(const struct elfhdr *ehdr, size_t buf_len)
--{
--	if (ehdr->e_phnum > 0 && ehdr->e_phentsize != sizeof(struct elf_phdr)) {
--		pr_debug("Bad program header size.\n");
--		return false;
--	} else if (ehdr->e_shnum > 0 &&
--		   ehdr->e_shentsize != sizeof(struct elf_shdr)) {
--		pr_debug("Bad section header size.\n");
--		return false;
--	} else if (ehdr->e_ident[EI_VERSION] != EV_CURRENT ||
--		   ehdr->e_version != EV_CURRENT) {
--		pr_debug("Unknown ELF version.\n");
--		return false;
--	}
--
--	if (ehdr->e_phoff > 0 && ehdr->e_phnum > 0) {
--		size_t phdr_size;
--
--		/*
--		 * e_phnum is at most 65535 so calculating the size of the
--		 * program header cannot overflow.
--		 */
--		phdr_size = sizeof(struct elf_phdr) * ehdr->e_phnum;
--
--		/* Sanity check the program header table location. */
--		if (ehdr->e_phoff + phdr_size < ehdr->e_phoff) {
--			pr_debug("Program headers at invalid location.\n");
--			return false;
--		} else if (ehdr->e_phoff + phdr_size > buf_len) {
--			pr_debug("Program headers truncated.\n");
--			return false;
--		}
--	}
--
--	if (ehdr->e_shoff > 0 && ehdr->e_shnum > 0) {
--		size_t shdr_size;
--
--		/*
--		 * e_shnum is at most 65536 so calculating
--		 * the size of the section header cannot overflow.
--		 */
--		shdr_size = sizeof(struct elf_shdr) * ehdr->e_shnum;
--
--		/* Sanity check the section header table location. */
--		if (ehdr->e_shoff + shdr_size < ehdr->e_shoff) {
--			pr_debug("Section headers at invalid location.\n");
--			return false;
--		} else if (ehdr->e_shoff + shdr_size > buf_len) {
--			pr_debug("Section headers truncated.\n");
--			return false;
--		}
--	}
--
--	return true;
--}
--
--static int elf_read_ehdr(const char *buf, size_t len, struct elfhdr *ehdr)
--{
--	struct elfhdr *buf_ehdr;
--
--	if (len < sizeof(*buf_ehdr)) {
--		pr_debug("Buffer is too small to hold ELF header.\n");
--		return -ENOEXEC;
--	}
--
--	memset(ehdr, 0, sizeof(*ehdr));
--	memcpy(ehdr->e_ident, buf, sizeof(ehdr->e_ident));
--	if (!elf_is_elf_file(ehdr)) {
--		pr_debug("No ELF header magic.\n");
--		return -ENOEXEC;
--	}
--
--	if (ehdr->e_ident[EI_CLASS] != ELF_CLASS) {
--		pr_debug("Not a supported ELF class.\n");
--		return -ENOEXEC;
--	} else  if (ehdr->e_ident[EI_DATA] != ELFDATA2LSB &&
--		ehdr->e_ident[EI_DATA] != ELFDATA2MSB) {
--		pr_debug("Not a supported ELF data format.\n");
--		return -ENOEXEC;
--	}
--
--	buf_ehdr = (struct elfhdr *) buf;
--	if (elf16_to_cpu(ehdr, buf_ehdr->e_ehsize) != sizeof(*buf_ehdr)) {
--		pr_debug("Bad ELF header size.\n");
--		return -ENOEXEC;
--	}
--
--	ehdr->e_type      = elf16_to_cpu(ehdr, buf_ehdr->e_type);
--	ehdr->e_machine   = elf16_to_cpu(ehdr, buf_ehdr->e_machine);
--	ehdr->e_version   = elf32_to_cpu(ehdr, buf_ehdr->e_version);
--	ehdr->e_entry     = elf_addr_to_cpu(ehdr, buf_ehdr->e_entry);
--	ehdr->e_phoff     = elf_addr_to_cpu(ehdr, buf_ehdr->e_phoff);
--	ehdr->e_shoff     = elf_addr_to_cpu(ehdr, buf_ehdr->e_shoff);
--	ehdr->e_flags     = elf32_to_cpu(ehdr, buf_ehdr->e_flags);
--	ehdr->e_phentsize = elf16_to_cpu(ehdr, buf_ehdr->e_phentsize);
--	ehdr->e_phnum     = elf16_to_cpu(ehdr, buf_ehdr->e_phnum);
--	ehdr->e_shentsize = elf16_to_cpu(ehdr, buf_ehdr->e_shentsize);
--	ehdr->e_shnum     = elf16_to_cpu(ehdr, buf_ehdr->e_shnum);
--	ehdr->e_shstrndx  = elf16_to_cpu(ehdr, buf_ehdr->e_shstrndx);
--
--	return elf_is_ehdr_sane(ehdr, len) ? 0 : -ENOEXEC;
--}
--
--/**
-- * elf_is_phdr_sane - check that it is safe to use the program header
-- * @buf_len:	size of the buffer in which the ELF file is loaded.
-- */
--static bool elf_is_phdr_sane(const struct elf_phdr *phdr, size_t buf_len)
--{
--
--	if (phdr->p_offset + phdr->p_filesz < phdr->p_offset) {
--		pr_debug("ELF segment location wraps around.\n");
--		return false;
--	} else if (phdr->p_offset + phdr->p_filesz > buf_len) {
--		pr_debug("ELF segment not in file.\n");
--		return false;
--	} else if (phdr->p_paddr + phdr->p_memsz < phdr->p_paddr) {
--		pr_debug("ELF segment address wraps around.\n");
--		return false;
--	}
--
--	return true;
--}
--
--static int elf_read_phdr(const char *buf, size_t len, struct elf_info *elf_info,
--			 int idx)
--{
--	/* Override the const in proghdrs, we are the ones doing the loading. */
--	struct elf_phdr *phdr = (struct elf_phdr *) &elf_info->proghdrs[idx];
--	const char *pbuf;
--	struct elf_phdr *buf_phdr;
--
--	pbuf = buf + elf_info->ehdr->e_phoff + (idx * sizeof(*buf_phdr));
--	buf_phdr = (struct elf_phdr *) pbuf;
--
--	phdr->p_type   = elf32_to_cpu(elf_info->ehdr, buf_phdr->p_type);
--	phdr->p_offset = elf_addr_to_cpu(elf_info->ehdr, buf_phdr->p_offset);
--	phdr->p_paddr  = elf_addr_to_cpu(elf_info->ehdr, buf_phdr->p_paddr);
--	phdr->p_vaddr  = elf_addr_to_cpu(elf_info->ehdr, buf_phdr->p_vaddr);
--	phdr->p_flags  = elf32_to_cpu(elf_info->ehdr, buf_phdr->p_flags);
--
+-/* Misc data about ram ranges needed to prepare elf headers */
+-struct crash_elf_data {
+-	struct kimage *image;
 -	/*
--	 * The following fields have a type equivalent to Elf_Addr
--	 * both in 32 bit and 64 bit ELF.
+-	 * Total number of ram ranges we have after various adjustments for
+-	 * crash reserved region, etc.
 -	 */
--	phdr->p_filesz = elf_addr_to_cpu(elf_info->ehdr, buf_phdr->p_filesz);
--	phdr->p_memsz  = elf_addr_to_cpu(elf_info->ehdr, buf_phdr->p_memsz);
--	phdr->p_align  = elf_addr_to_cpu(elf_info->ehdr, buf_phdr->p_align);
+-	unsigned int max_nr_ranges;
 -
--	return elf_is_phdr_sane(phdr, len) ? 0 : -ENOEXEC;
--}
+-	/* Pointer to elf header */
+-	void *ehdr;
+-	/* Pointer to next phdr */
+-	void *bufp;
+-	struct crash_mem mem;
+-};
 -
--/**
-- * elf_read_phdrs - read the program headers from the buffer
-- *
-- * This function assumes that the program header table was checked for sanity.
-- * Use elf_is_ehdr_sane() if it wasn't.
-- */
--static int elf_read_phdrs(const char *buf, size_t len,
--			  struct elf_info *elf_info)
+ /* Used while preparing memory map entries for second kernel */
+ struct crash_memmap_data {
+ 	struct boot_params *params;
+@@ -209,301 +180,6 @@ void native_machine_crash_shutdown(struct pt_regs *regs)
+ }
+ 
+ #ifdef CONFIG_KEXEC_FILE
+-static int get_nr_ram_ranges_callback(u64 start, u64 end, void *arg)
 -{
--	size_t phdr_size, i;
--	const struct elfhdr *ehdr = elf_info->ehdr;
+-	unsigned int *nr_ranges = arg;
 -
--	/*
--	 * e_phnum is at most 65535 so calculating the size of the
--	 * program header cannot overflow.
--	 */
--	phdr_size = sizeof(struct elf_phdr) * ehdr->e_phnum;
--
--	elf_info->proghdrs = kzalloc(phdr_size, GFP_KERNEL);
--	if (!elf_info->proghdrs)
--		return -ENOMEM;
--
--	for (i = 0; i < ehdr->e_phnum; i++) {
--		int ret;
--
--		ret = elf_read_phdr(buf, len, elf_info, i);
--		if (ret) {
--			kfree(elf_info->proghdrs);
--			elf_info->proghdrs = NULL;
--			return ret;
--		}
--	}
--
+-	(*nr_ranges)++;
 -	return 0;
 -}
 -
--/**
-- * elf_is_shdr_sane - check that it is safe to use the section header
-- * @buf_len:	size of the buffer in which the ELF file is loaded.
-- */
--static bool elf_is_shdr_sane(const struct elf_shdr *shdr, size_t buf_len)
+-
+-/* Gather all the required information to prepare elf headers for ram regions */
+-static void fill_up_crash_elf_data(struct crash_elf_data *ced,
+-				   struct kimage *image)
 -{
--	bool size_ok;
+-	unsigned int nr_ranges = 0;
 -
--	/* SHT_NULL headers have undefined values, so we can't check them. */
--	if (shdr->sh_type == SHT_NULL)
--		return true;
+-	ced->image = image;
 -
--	/* Now verify sh_entsize */
--	switch (shdr->sh_type) {
--	case SHT_SYMTAB:
--		size_ok = shdr->sh_entsize == sizeof(Elf_Sym);
--		break;
--	case SHT_RELA:
--		size_ok = shdr->sh_entsize == sizeof(Elf_Rela);
--		break;
--	case SHT_DYNAMIC:
--		size_ok = shdr->sh_entsize == sizeof(Elf_Dyn);
--		break;
--	case SHT_REL:
--		size_ok = shdr->sh_entsize == sizeof(Elf_Rel);
--		break;
--	case SHT_NOTE:
--	case SHT_PROGBITS:
--	case SHT_HASH:
--	case SHT_NOBITS:
--	default:
--		/*
--		 * This is a section whose entsize requirements
--		 * I don't care about.  If I don't know about
--		 * the section I can't care about it's entsize
--		 * requirements.
--		 */
--		size_ok = true;
--		break;
--	}
+-	walk_system_ram_res(0, -1, &nr_ranges,
+-				get_nr_ram_ranges_callback);
 -
--	if (!size_ok) {
--		pr_debug("ELF section with wrong entry size.\n");
--		return false;
--	} else if (shdr->sh_addr + shdr->sh_size < shdr->sh_addr) {
--		pr_debug("ELF section address wraps around.\n");
--		return false;
--	}
+-	ced->max_nr_ranges = nr_ranges;
 -
--	if (shdr->sh_type != SHT_NOBITS) {
--		if (shdr->sh_offset + shdr->sh_size < shdr->sh_offset) {
--			pr_debug("ELF section location wraps around.\n");
--			return false;
--		} else if (shdr->sh_offset + shdr->sh_size > buf_len) {
--			pr_debug("ELF section not in file.\n");
--			return false;
+-	/* Exclusion of crash region could split memory ranges */
+-	ced->max_nr_ranges++;
+-
+-	/* If crashk_low_res is not 0, another range split possible */
+-	if (crashk_low_res.end)
+-		ced->max_nr_ranges++;
+-}
+-
+-static int exclude_mem_range(struct crash_mem *mem,
+-		unsigned long long mstart, unsigned long long mend)
+-{
+-	int i, j;
+-	unsigned long long start, end;
+-	struct crash_mem_range temp_range = {0, 0};
+-
+-	for (i = 0; i < mem->nr_ranges; i++) {
+-		start = mem->ranges[i].start;
+-		end = mem->ranges[i].end;
+-
+-		if (mstart > end || mend < start)
+-			continue;
+-
+-		/* Truncate any area outside of range */
+-		if (mstart < start)
+-			mstart = start;
+-		if (mend > end)
+-			mend = end;
+-
+-		/* Found completely overlapping range */
+-		if (mstart == start && mend == end) {
+-			mem->ranges[i].start = 0;
+-			mem->ranges[i].end = 0;
+-			if (i < mem->nr_ranges - 1) {
+-				/* Shift rest of the ranges to left */
+-				for (j = i; j < mem->nr_ranges - 1; j++) {
+-					mem->ranges[j].start =
+-						mem->ranges[j+1].start;
+-					mem->ranges[j].end =
+-							mem->ranges[j+1].end;
+-				}
+-			}
+-			mem->nr_ranges--;
+-			return 0;
 -		}
+-
+-		if (mstart > start && mend < end) {
+-			/* Split original range */
+-			mem->ranges[i].end = mstart - 1;
+-			temp_range.start = mend + 1;
+-			temp_range.end = end;
+-		} else if (mstart != start)
+-			mem->ranges[i].end = mstart - 1;
+-		else
+-			mem->ranges[i].start = mend + 1;
+-		break;
 -	}
 -
--	return true;
--}
+-	/* If a split happend, add the split to array */
+-	if (!temp_range.end)
+-		return 0;
 -
--static int elf_read_shdr(const char *buf, size_t len, struct elf_info *elf_info,
--			 int idx)
--{
--	struct elf_shdr *shdr = &elf_info->sechdrs[idx];
--	const struct elfhdr *ehdr = elf_info->ehdr;
--	const char *sbuf;
--	struct elf_shdr *buf_shdr;
--
--	sbuf = buf + ehdr->e_shoff + idx * sizeof(*buf_shdr);
--	buf_shdr = (struct elf_shdr *) sbuf;
--
--	shdr->sh_name      = elf32_to_cpu(ehdr, buf_shdr->sh_name);
--	shdr->sh_type      = elf32_to_cpu(ehdr, buf_shdr->sh_type);
--	shdr->sh_addr      = elf_addr_to_cpu(ehdr, buf_shdr->sh_addr);
--	shdr->sh_offset    = elf_addr_to_cpu(ehdr, buf_shdr->sh_offset);
--	shdr->sh_link      = elf32_to_cpu(ehdr, buf_shdr->sh_link);
--	shdr->sh_info      = elf32_to_cpu(ehdr, buf_shdr->sh_info);
--
--	/*
--	 * The following fields have a type equivalent to Elf_Addr
--	 * both in 32 bit and 64 bit ELF.
--	 */
--	shdr->sh_flags     = elf_addr_to_cpu(ehdr, buf_shdr->sh_flags);
--	shdr->sh_size      = elf_addr_to_cpu(ehdr, buf_shdr->sh_size);
--	shdr->sh_addralign = elf_addr_to_cpu(ehdr, buf_shdr->sh_addralign);
--	shdr->sh_entsize   = elf_addr_to_cpu(ehdr, buf_shdr->sh_entsize);
--
--	return elf_is_shdr_sane(shdr, len) ? 0 : -ENOEXEC;
--}
--
--/**
-- * elf_read_shdrs - read the section headers from the buffer
-- *
-- * This function assumes that the section header table was checked for sanity.
-- * Use elf_is_ehdr_sane() if it wasn't.
-- */
--static int elf_read_shdrs(const char *buf, size_t len,
--			  struct elf_info *elf_info)
--{
--	size_t shdr_size, i;
--
--	/*
--	 * e_shnum is at most 65536 so calculating
--	 * the size of the section header cannot overflow.
--	 */
--	shdr_size = sizeof(struct elf_shdr) * elf_info->ehdr->e_shnum;
--
--	elf_info->sechdrs = kzalloc(shdr_size, GFP_KERNEL);
--	if (!elf_info->sechdrs)
+-	/* Split happened */
+-	if (i == CRASH_MAX_RANGES - 1) {
+-		pr_err("Too many crash ranges after split\n");
 -		return -ENOMEM;
--
--	for (i = 0; i < elf_info->ehdr->e_shnum; i++) {
--		int ret;
--
--		ret = elf_read_shdr(buf, len, elf_info, i);
--		if (ret) {
--			kfree(elf_info->sechdrs);
--			elf_info->sechdrs = NULL;
--			return ret;
--		}
 -	}
 -
+-	/* Location where new range should go */
+-	j = i + 1;
+-	if (j < mem->nr_ranges) {
+-		/* Move over all ranges one slot towards the end */
+-		for (i = mem->nr_ranges - 1; i >= j; i--)
+-			mem->ranges[i + 1] = mem->ranges[i];
+-	}
+-
+-	mem->ranges[j].start = temp_range.start;
+-	mem->ranges[j].end = temp_range.end;
+-	mem->nr_ranges++;
 -	return 0;
 -}
 -
--/**
-- * elf_read_from_buffer - read ELF file and sets up ELF header and ELF info
-- * @buf:	Buffer to read ELF file from.
-- * @len:	Size of @buf.
-- * @ehdr:	Pointer to existing struct which will be populated.
-- * @elf_info:	Pointer to existing struct which will be populated.
-- *
-- * This function allows reading ELF files with different byte order than
-- * the kernel, byte-swapping the fields as needed.
-- *
-- * Return:
-- * On success returns 0, and the caller should call elf_free_info(elf_info) to
-- * free the memory allocated for the section and program headers.
+-/*
+- * Look for any unwanted ranges between mstart, mend and remove them. This
+- * might lead to split and split ranges are put in ced->mem.ranges[] array
 - */
--int elf_read_from_buffer(const char *buf, size_t len, struct elfhdr *ehdr,
--			 struct elf_info *elf_info)
+-static int elf_header_exclude_ranges(struct crash_elf_data *ced,
+-		unsigned long long mstart, unsigned long long mend)
 -{
--	int ret;
+-	struct crash_mem *cmem = &ced->mem;
+-	int ret = 0;
 -
--	ret = elf_read_ehdr(buf, len, ehdr);
+-	memset(cmem->ranges, 0, sizeof(cmem->ranges));
+-
+-	cmem->ranges[0].start = mstart;
+-	cmem->ranges[0].end = mend;
+-	cmem->nr_ranges = 1;
+-
+-	/* Exclude crashkernel region */
+-	ret = exclude_mem_range(cmem, crashk_res.start, crashk_res.end);
 -	if (ret)
 -		return ret;
 -
--	elf_info->buffer = buf;
--	elf_info->ehdr = ehdr;
--	if (ehdr->e_phoff > 0 && ehdr->e_phnum > 0) {
--		ret = elf_read_phdrs(buf, len, elf_info);
+-	if (crashk_low_res.end) {
+-		ret = exclude_mem_range(cmem, crashk_low_res.start, crashk_low_res.end);
 -		if (ret)
 -			return ret;
 -	}
--	if (ehdr->e_shoff > 0 && ehdr->e_shnum > 0) {
--		ret = elf_read_shdrs(buf, len, elf_info);
--		if (ret) {
--			kfree(elf_info->proghdrs);
--			return ret;
--		}
--	}
 -
--	return 0;
+-	return ret;
 -}
 -
--/**
-- * elf_free_info - free memory allocated by elf_read_from_buffer
-- */
--void elf_free_info(struct elf_info *elf_info)
+-static int prepare_elf64_ram_headers_callback(u64 start, u64 end, void *arg)
 -{
--	kfree(elf_info->proghdrs);
--	kfree(elf_info->sechdrs);
--	memset(elf_info, 0, sizeof(*elf_info));
--}
--/**
-- * build_elf_exec_info - read ELF executable and check that we can use it
-- */
--static int build_elf_exec_info(const char *buf, size_t len, struct elfhdr *ehdr,
--			       struct elf_info *elf_info)
--{
--	int i;
--	int ret;
+-	struct crash_elf_data *ced = arg;
+-	Elf64_Ehdr *ehdr;
+-	Elf64_Phdr *phdr;
+-	unsigned long mstart, mend;
+-	struct kimage *image = ced->image;
+-	struct crash_mem *cmem;
+-	int ret, i;
 -
--	ret = elf_read_from_buffer(buf, len, ehdr, elf_info);
+-	ehdr = ced->ehdr;
+-
+-	/* Exclude unwanted mem ranges */
+-	ret = elf_header_exclude_ranges(ced, start, end);
 -	if (ret)
 -		return ret;
 -
--	/* Big endian vmlinux has type ET_DYN. */
--	if (ehdr->e_type != ET_EXEC && ehdr->e_type != ET_DYN) {
--		pr_err("Not an ELF executable.\n");
--		goto error;
--	} else if (!elf_info->proghdrs) {
--		pr_err("No ELF program header.\n");
--		goto error;
--	}
+-	/* Go through all the ranges in ced->mem.ranges[] and prepare phdr */
+-	cmem = &ced->mem;
 -
--	for (i = 0; i < ehdr->e_phnum; i++) {
+-	for (i = 0; i < cmem->nr_ranges; i++) {
+-		mstart = cmem->ranges[i].start;
+-		mend = cmem->ranges[i].end;
+-
+-		phdr = ced->bufp;
+-		ced->bufp += sizeof(Elf64_Phdr);
+-
+-		phdr->p_type = PT_LOAD;
+-		phdr->p_flags = PF_R|PF_W|PF_X;
+-		phdr->p_offset  = mstart;
+-
 -		/*
--		 * Kexec does not support loading interpreters.
--		 * In addition this check keeps us from attempting
--		 * to kexec ordinay executables.
+-		 * If a range matches backup region, adjust offset to backup
+-		 * segment.
 -		 */
--		if (elf_info->proghdrs[i].p_type == PT_INTERP) {
--			pr_err("Requires an ELF interpreter.\n");
--			goto error;
--		}
+-		if (mstart == image->arch.backup_src_start &&
+-		    (mend - mstart + 1) == image->arch.backup_src_sz)
+-			phdr->p_offset = image->arch.backup_load_addr;
+-
+-		phdr->p_paddr = mstart;
+-		phdr->p_vaddr = (unsigned long long) __va(mstart);
+-		phdr->p_filesz = phdr->p_memsz = mend - mstart + 1;
+-		phdr->p_align = 0;
+-		ehdr->e_phnum++;
+-		pr_debug("Crash PT_LOAD elf header. phdr=%p vaddr=0x%llx, paddr=0x%llx, sz=0x%llx e_phnum=%d p_offset=0x%llx\n",
+-			phdr, phdr->p_vaddr, phdr->p_paddr, phdr->p_filesz,
+-			ehdr->e_phnum, phdr->p_offset);
 -	}
 -
--	return 0;
--error:
--	elf_free_info(elf_info);
--	return -ENOEXEC;
+-	return ret;
 -}
 -
- static int elf64_probe(const char *buf, unsigned long len)
+-static int prepare_elf64_headers(struct crash_elf_data *ced,
+-		void **addr, unsigned long *sz)
+-{
+-	Elf64_Ehdr *ehdr;
+-	Elf64_Phdr *phdr;
+-	unsigned long nr_cpus = num_possible_cpus(), nr_phdr, elf_sz;
+-	unsigned char *buf, *bufp;
+-	unsigned int cpu;
+-	unsigned long long notes_addr;
+-	int ret;
+-
+-	/* extra phdr for vmcoreinfo elf note */
+-	nr_phdr = nr_cpus + 1;
+-	nr_phdr += ced->max_nr_ranges;
+-
+-	/*
+-	 * kexec-tools creates an extra PT_LOAD phdr for kernel text mapping
+-	 * area on x86_64 (ffffffff80000000 - ffffffffa0000000).
+-	 * I think this is required by tools like gdb. So same physical
+-	 * memory will be mapped in two elf headers. One will contain kernel
+-	 * text virtual addresses and other will have __va(physical) addresses.
+-	 */
+-
+-	nr_phdr++;
+-	elf_sz = sizeof(Elf64_Ehdr) + nr_phdr * sizeof(Elf64_Phdr);
+-	elf_sz = ALIGN(elf_sz, ELF_CORE_HEADER_ALIGN);
+-
+-	buf = vzalloc(elf_sz);
+-	if (!buf)
+-		return -ENOMEM;
+-
+-	bufp = buf;
+-	ehdr = (Elf64_Ehdr *)bufp;
+-	bufp += sizeof(Elf64_Ehdr);
+-	memcpy(ehdr->e_ident, ELFMAG, SELFMAG);
+-	ehdr->e_ident[EI_CLASS] = ELFCLASS64;
+-	ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
+-	ehdr->e_ident[EI_VERSION] = EV_CURRENT;
+-	ehdr->e_ident[EI_OSABI] = ELF_OSABI;
+-	memset(ehdr->e_ident + EI_PAD, 0, EI_NIDENT - EI_PAD);
+-	ehdr->e_type = ET_CORE;
+-	ehdr->e_machine = ELF_ARCH;
+-	ehdr->e_version = EV_CURRENT;
+-	ehdr->e_phoff = sizeof(Elf64_Ehdr);
+-	ehdr->e_ehsize = sizeof(Elf64_Ehdr);
+-	ehdr->e_phentsize = sizeof(Elf64_Phdr);
+-
+-	/* Prepare one phdr of type PT_NOTE for each present cpu */
+-	for_each_present_cpu(cpu) {
+-		phdr = (Elf64_Phdr *)bufp;
+-		bufp += sizeof(Elf64_Phdr);
+-		phdr->p_type = PT_NOTE;
+-		notes_addr = per_cpu_ptr_to_phys(per_cpu_ptr(crash_notes, cpu));
+-		phdr->p_offset = phdr->p_paddr = notes_addr;
+-		phdr->p_filesz = phdr->p_memsz = sizeof(note_buf_t);
+-		(ehdr->e_phnum)++;
+-	}
+-
+-	/* Prepare one PT_NOTE header for vmcoreinfo */
+-	phdr = (Elf64_Phdr *)bufp;
+-	bufp += sizeof(Elf64_Phdr);
+-	phdr->p_type = PT_NOTE;
+-	phdr->p_offset = phdr->p_paddr = paddr_vmcoreinfo_note();
+-	phdr->p_filesz = phdr->p_memsz = VMCOREINFO_NOTE_SIZE;
+-	(ehdr->e_phnum)++;
+-
+-#ifdef CONFIG_X86_64
+-	/* Prepare PT_LOAD type program header for kernel text region */
+-	phdr = (Elf64_Phdr *)bufp;
+-	bufp += sizeof(Elf64_Phdr);
+-	phdr->p_type = PT_LOAD;
+-	phdr->p_flags = PF_R|PF_W|PF_X;
+-	phdr->p_vaddr = (Elf64_Addr)_text;
+-	phdr->p_filesz = phdr->p_memsz = _end - _text;
+-	phdr->p_offset = phdr->p_paddr = __pa_symbol(_text);
+-	(ehdr->e_phnum)++;
+-#endif
+-
+-	/* Prepare PT_LOAD headers for system ram chunks. */
+-	ced->ehdr = ehdr;
+-	ced->bufp = bufp;
+-	ret = walk_system_ram_res(0, -1, ced,
+-			prepare_elf64_ram_headers_callback);
+-	if (ret < 0)
+-		return ret;
+-
+-	*addr = buf;
+-	*sz = elf_sz;
+-	return 0;
+-}
+-
+-/* Prepare elf headers. Return addr and size */
+-static int prepare_elf_headers(struct kimage *image, void **addr,
+-					unsigned long *sz)
+-{
+-	struct crash_elf_data *ced;
+-	int ret;
+-
+-	ced = kzalloc(sizeof(*ced), GFP_KERNEL);
+-	if (!ced)
+-		return -ENOMEM;
+-
+-	fill_up_crash_elf_data(ced, image);
+-
+-	/* By default prepare 64bit headers */
+-	ret =  prepare_elf64_headers(ced, addr, sz);
+-	kfree(ced);
+-	return ret;
+-}
+-
+ static int add_e820_entry(struct boot_params *params, struct e820_entry *entry)
  {
- 	struct elfhdr ehdr;
-diff --git a/include/linux/elf.h b/include/linux/elf.h
-index ba069e8f4f78..e758bb4365c1 100644
---- a/include/linux/elf.h
-+++ b/include/linux/elf.h
-@@ -1,6 +1,8 @@
- #ifndef _LINUX_ELF_H
- #define _LINUX_ELF_H
- 
-+#include <linux/types.h>
-+#include <asm/byteorder.h>
- #include <asm/elf.h>
- #include <uapi/linux/elf.h>
- 
-@@ -55,4 +57,64 @@ static inline int elf_coredump_extra_notes_write(struct coredump_params *cprm) {
- extern int elf_coredump_extra_notes_size(void);
- extern int elf_coredump_extra_notes_write(struct coredump_params *cprm);
- #endif
-+
-+static inline u16 elf16_to_cpu(const struct elfhdr *ehdr, u16 value)
-+{
-+	if (ehdr->e_ident[EI_DATA] == ELFDATA2LSB)
-+		value = le16_to_cpu(value);
-+	else if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB)
-+		value = be16_to_cpu(value);
-+
-+	return value;
-+}
-+
-+static inline u16 cpu_to_elf16(const struct elfhdr *ehdr, u16 value)
-+{
-+	if (ehdr->e_ident[EI_DATA] == ELFDATA2LSB)
-+		value = cpu_to_le16(value);
-+	else if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB)
-+		value = cpu_to_be16(value);
-+
-+	return value;
-+}
-+
-+static inline u32 elf32_to_cpu(const struct elfhdr *ehdr, u32 value)
-+{
-+	if (ehdr->e_ident[EI_DATA] == ELFDATA2LSB)
-+		value = le32_to_cpu(value);
-+	else if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB)
-+		value = be32_to_cpu(value);
-+
-+	return value;
-+}
-+
-+static inline u32 cpu_to_elf32(const struct elfhdr *ehdr, u32 value)
-+{
-+	if (ehdr->e_ident[EI_DATA] == ELFDATA2LSB)
-+		value = cpu_to_le32(value);
-+	else if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB)
-+		value = cpu_to_be32(value);
-+
-+	return value;
-+}
-+
-+static inline u64 elf64_to_cpu(const struct elfhdr *ehdr, u64 value)
-+{
-+	if (ehdr->e_ident[EI_DATA] == ELFDATA2LSB)
-+		value = le64_to_cpu(value);
-+	else if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB)
-+		value = be64_to_cpu(value);
-+
-+	return value;
-+}
-+
-+static inline u64 cpu_to_elf64(const struct elfhdr *ehdr, u64 value)
-+{
-+	if (ehdr->e_ident[EI_DATA] == ELFDATA2LSB)
-+		value = cpu_to_le64(value);
-+	else if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB)
-+		value = cpu_to_be64(value);
-+
-+	return value;
-+}
- #endif /* _LINUX_ELF_H */
+ 	unsigned int nr_e820_entries;
 diff --git a/include/linux/kexec.h b/include/linux/kexec.h
-index dd056fab9e35..db98e3459e90 100644
+index db98e3459e90..acaecd72b134 100644
 --- a/include/linux/kexec.h
 +++ b/include/linux/kexec.h
-@@ -22,6 +22,7 @@
- #ifdef CONFIG_KEXEC_CORE
- #include <linux/list.h>
- #include <linux/compat.h>
-+#include <linux/elf.h>
- #include <linux/ioport.h>
- #include <linux/module.h>
- #include <asm/kexec.h>
-@@ -162,6 +163,24 @@ int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
+@@ -163,6 +163,25 @@ int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
  			       int (*func)(u64, u64, void *));
  extern int kexec_add_buffer(struct kexec_buf *kbuf);
  int kexec_locate_mem_hole(struct kexec_buf *kbuf);
++#ifdef CONFIG_CRASH_CORE
++extern int prepare_elf_headers(struct kimage *image, void **addr,
++				unsigned long *sz);
 +
-+#ifdef CONFIG_KEXEC_FILE_ELF
-+struct elf_info {
-+	/*
-+	 * Where the ELF binary contents are kept.
-+	 * Memory managed by the user of the struct.
-+	 */
-+	const char *buffer;
++/* This primarily represents number of split ranges due to exclusion */
++#define CRASH_MAX_RANGES        16
 +
-+	const struct elfhdr *ehdr;
-+	const struct elf_phdr *proghdrs;
-+	struct elf_shdr *sechdrs;
++struct crash_mem_range {
++	u64 start, end;
 +};
 +
-+extern void elf_free_info(struct elf_info *elf_info);
-+extern int build_elf_exec_info(const char *buf, size_t len, struct elfhdr *ehdr,
-+				struct elf_info *elf_info);
-+#endif /* CONFIG_KEXEC_FILE_ELF */
- #endif /* CONFIG_KEXEC_FILE */
++struct crash_mem {
++	unsigned int nr_ranges;
++	struct crash_mem_range ranges[CRASH_MAX_RANGES];
++};
++
++extern int exclude_mem_range(struct crash_mem *mem,
++		unsigned long long mstart, unsigned long long mend);
++#endif
  
- struct kimage {
-diff --git a/kernel/Makefile b/kernel/Makefile
-index d5f9748ab19f..d07492eb3804 100644
---- a/kernel/Makefile
-+++ b/kernel/Makefile
-@@ -63,6 +63,7 @@ obj-$(CONFIG_CRASH_CORE) += crash_core.o
- obj-$(CONFIG_KEXEC_CORE) += kexec_core.o
- obj-$(CONFIG_KEXEC) += kexec.o
- obj-$(CONFIG_KEXEC_FILE) += kexec_file.o
-+obj-$(CONFIG_KEXEC_FILE_ELF) += kexec_file_elf.o
- obj-$(CONFIG_BACKTRACE_SELF_TEST) += backtracetest.o
- obj-$(CONFIG_COMPAT) += compat.o
- obj-$(CONFIG_CGROUPS) += cgroup/
-diff --git a/kernel/kexec_file_elf.c b/kernel/kexec_file_elf.c
-new file mode 100644
-index 000000000000..4fc049e9731b
---- /dev/null
-+++ b/kernel/kexec_file_elf.c
-@@ -0,0 +1,454 @@
-+/*
-+ * Load ELF vmlinux file for the kexec_file_load syscall.
-+ *
-+ * Copyright (C) 2004  Adam Litke (agl at us.ibm.com)
-+ * Copyright (C) 2004  IBM Corp.
-+ * Copyright (C) 2005  R Sharada (sharada at in.ibm.com)
-+ * Copyright (C) 2006  Mohan Kumar M (mohan at in.ibm.com)
-+ * Copyright (C) 2016  IBM Corporation
-+ *
-+ * Based on kexec-tools' kexec-elf-exec.c and kexec-elf-ppc64.c.
-+ * Heavily modified for the kernel by
-+ * Thiago Jung Bauermann <bauerman@linux.vnet.ibm.com>.
-+ * Factored out for general use by
-+ * AKASHI Takahiro <takahiro.akashi@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation (version 2 of the License).
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#define pr_fmt(fmt)	"kexec_elf_elf: " fmt
-+
+ #ifdef CONFIG_KEXEC_FILE_ELF
+ struct elf_info {
+diff --git a/kernel/crash_core.c b/kernel/crash_core.c
+index 6db80fc0810b..f2385590e94b 100644
+--- a/kernel/crash_core.c
++++ b/kernel/crash_core.c
+@@ -7,6 +7,11 @@
+  */
+ 
+ #include <linux/crash_core.h>
 +#include <linux/elf.h>
-+#include <linux/errno.h>
++#include <linux/elfcore.h>
++#include <linux/kernel.h>
 +#include <linux/kexec.h>
-+#include <linux/module.h>
 +#include <linux/slab.h>
-+#include <linux/types.h>
-+#include <asm/byteorder.h>
+ #include <linux/utsname.h>
+ #include <linux/vmalloc.h>
+ 
+@@ -469,3 +474,331 @@ static int __init crash_save_vmcoreinfo_init(void)
+ }
+ 
+ subsys_initcall(crash_save_vmcoreinfo_init);
 +
-+#if ELF_CLASS == ELFCLASS32
-+#define elf_addr_to_cpu elf32_to_cpu
-+#else
-+#define elf_addr_to_cpu elf64_to_cpu
-+#endif
-+
-+/**
-+ * elf_is_ehdr_sane - check that it is safe to use the ELF header
-+ * @buf_len:	size of the buffer in which the ELF file is loaded.
++#ifdef CONFIG_KEXEC_FILE
++/*
++ * The following definitions are for local use only.
 + */
-+static bool elf_is_ehdr_sane(const struct elfhdr *ehdr, size_t buf_len)
-+{
-+	if (ehdr->e_phnum > 0 && ehdr->e_phentsize != sizeof(struct elf_phdr)) {
-+		pr_debug("Bad program header size.\n");
-+		return false;
-+	} else if (ehdr->e_shnum > 0 &&
-+		   ehdr->e_shentsize != sizeof(struct elf_shdr)) {
-+		pr_debug("Bad section header size.\n");
-+		return false;
-+	} else if (ehdr->e_ident[EI_VERSION] != EV_CURRENT ||
-+		   ehdr->e_version != EV_CURRENT) {
-+		pr_debug("Unknown ELF version.\n");
-+		return false;
-+	}
 +
-+	if (ehdr->e_phoff > 0 && ehdr->e_phnum > 0) {
-+		size_t phdr_size;
++/* Alignment required for elf header segment */
++#define ELF_CORE_HEADER_ALIGN   4096
 +
-+		/*
-+		 * e_phnum is at most 65535 so calculating the size of the
-+		 * program header cannot overflow.
-+		 */
-+		phdr_size = sizeof(struct elf_phdr) * ehdr->e_phnum;
-+
-+		/* Sanity check the program header table location. */
-+		if (ehdr->e_phoff + phdr_size < ehdr->e_phoff) {
-+			pr_debug("Program headers at invalid location.\n");
-+			return false;
-+		} else if (ehdr->e_phoff + phdr_size > buf_len) {
-+			pr_debug("Program headers truncated.\n");
-+			return false;
-+		}
-+	}
-+
-+	if (ehdr->e_shoff > 0 && ehdr->e_shnum > 0) {
-+		size_t shdr_size;
-+
-+		/*
-+		 * e_shnum is at most 65536 so calculating
-+		 * the size of the section header cannot overflow.
-+		 */
-+		shdr_size = sizeof(struct elf_shdr) * ehdr->e_shnum;
-+
-+		/* Sanity check the section header table location. */
-+		if (ehdr->e_shoff + shdr_size < ehdr->e_shoff) {
-+			pr_debug("Section headers at invalid location.\n");
-+			return false;
-+		} else if (ehdr->e_shoff + shdr_size > buf_len) {
-+			pr_debug("Section headers truncated.\n");
-+			return false;
-+		}
-+	}
-+
-+	return true;
-+}
-+
-+static int elf_read_ehdr(const char *buf, size_t len, struct elfhdr *ehdr)
-+{
-+	struct elfhdr *buf_ehdr;
-+
-+	if (len < sizeof(*buf_ehdr)) {
-+		pr_debug("Buffer is too small to hold ELF header.\n");
-+		return -ENOEXEC;
-+	}
-+
-+	memset(ehdr, 0, sizeof(*ehdr));
-+	memcpy(ehdr->e_ident, buf, sizeof(ehdr->e_ident));
-+	if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG)) {
-+		pr_debug("No ELF header magic.\n");
-+		return -ENOEXEC;
-+	}
-+
-+	if (ehdr->e_ident[EI_CLASS] != ELF_CLASS) {
-+		pr_debug("Not a supported ELF class.\n");
-+		return -ENOEXEC;
-+	} else  if (ehdr->e_ident[EI_DATA] != ELFDATA2LSB &&
-+		ehdr->e_ident[EI_DATA] != ELFDATA2MSB) {
-+		pr_debug("Not a supported ELF data format.\n");
-+		return -ENOEXEC;
-+	}
-+
-+	buf_ehdr = (struct elfhdr *) buf;
-+	if (elf16_to_cpu(ehdr, buf_ehdr->e_ehsize) != sizeof(*buf_ehdr)) {
-+		pr_debug("Bad ELF header size.\n");
-+		return -ENOEXEC;
-+	}
-+
-+	ehdr->e_type      = elf16_to_cpu(ehdr, buf_ehdr->e_type);
-+	ehdr->e_machine   = elf16_to_cpu(ehdr, buf_ehdr->e_machine);
-+	ehdr->e_version   = elf32_to_cpu(ehdr, buf_ehdr->e_version);
-+	ehdr->e_entry     = elf_addr_to_cpu(ehdr, buf_ehdr->e_entry);
-+	ehdr->e_phoff     = elf_addr_to_cpu(ehdr, buf_ehdr->e_phoff);
-+	ehdr->e_shoff     = elf_addr_to_cpu(ehdr, buf_ehdr->e_shoff);
-+	ehdr->e_flags     = elf32_to_cpu(ehdr, buf_ehdr->e_flags);
-+	ehdr->e_phentsize = elf16_to_cpu(ehdr, buf_ehdr->e_phentsize);
-+	ehdr->e_phnum     = elf16_to_cpu(ehdr, buf_ehdr->e_phnum);
-+	ehdr->e_shentsize = elf16_to_cpu(ehdr, buf_ehdr->e_shentsize);
-+	ehdr->e_shnum     = elf16_to_cpu(ehdr, buf_ehdr->e_shnum);
-+	ehdr->e_shstrndx  = elf16_to_cpu(ehdr, buf_ehdr->e_shstrndx);
-+
-+	return elf_is_ehdr_sane(ehdr, len) ? 0 : -ENOEXEC;
-+}
-+
-+/**
-+ * elf_is_phdr_sane - check that it is safe to use the program header
-+ * @buf_len:	size of the buffer in which the ELF file is loaded.
-+ */
-+static bool elf_is_phdr_sane(const struct elf_phdr *phdr, size_t buf_len)
-+{
-+
-+	if (phdr->p_offset + phdr->p_filesz < phdr->p_offset) {
-+		pr_debug("ELF segment location wraps around.\n");
-+		return false;
-+	} else if (phdr->p_offset + phdr->p_filesz > buf_len) {
-+		pr_debug("ELF segment not in file.\n");
-+		return false;
-+	} else if (phdr->p_paddr + phdr->p_memsz < phdr->p_paddr) {
-+		pr_debug("ELF segment address wraps around.\n");
-+		return false;
-+	}
-+
-+	return true;
-+}
-+
-+static int elf_read_phdr(const char *buf, size_t len, struct elf_info *elf_info,
-+			 int idx)
-+{
-+	/* Override the const in proghdrs, we are the ones doing the loading. */
-+	struct elf_phdr *phdr = (struct elf_phdr *) &elf_info->proghdrs[idx];
-+	const char *pbuf;
-+	struct elf_phdr *buf_phdr;
-+
-+	pbuf = buf + elf_info->ehdr->e_phoff + (idx * sizeof(*buf_phdr));
-+	buf_phdr = (struct elf_phdr *) pbuf;
-+
-+	phdr->p_type   = elf32_to_cpu(elf_info->ehdr, buf_phdr->p_type);
-+	phdr->p_offset = elf_addr_to_cpu(elf_info->ehdr, buf_phdr->p_offset);
-+	phdr->p_paddr  = elf_addr_to_cpu(elf_info->ehdr, buf_phdr->p_paddr);
-+	phdr->p_vaddr  = elf_addr_to_cpu(elf_info->ehdr, buf_phdr->p_vaddr);
-+	phdr->p_flags  = elf32_to_cpu(elf_info->ehdr, buf_phdr->p_flags);
-+
++/* Misc data about ram ranges needed to prepare elf headers */
++struct crash_elf_data {
++	struct kimage *image;
 +	/*
-+	 * The following fields have a type equivalent to Elf_Addr
-+	 * both in 32 bit and 64 bit ELF.
++	 * Total number of ram ranges we have after various adjustments for
++	 * crash reserved region, etc.
 +	 */
-+	phdr->p_filesz = elf_addr_to_cpu(elf_info->ehdr, buf_phdr->p_filesz);
-+	phdr->p_memsz  = elf_addr_to_cpu(elf_info->ehdr, buf_phdr->p_memsz);
-+	phdr->p_align  = elf_addr_to_cpu(elf_info->ehdr, buf_phdr->p_align);
++	unsigned int max_nr_ranges;
 +
-+	return elf_is_phdr_sane(phdr, len) ? 0 : -ENOEXEC;
-+}
++	/* Pointer to elf header */
++	void *ehdr;
++	/* Pointer to next phdr */
++	void *bufp;
++	struct crash_mem mem;
++};
 +
-+/**
-+ * elf_read_phdrs - read the program headers from the buffer
-+ *
-+ * This function assumes that the program header table was checked for sanity.
-+ * Use elf_is_ehdr_sane() if it wasn't.
-+ */
-+static int elf_read_phdrs(const char *buf, size_t len,
-+			  struct elf_info *elf_info)
++static int get_nr_ram_ranges_callback(u64 start, u64 end, void *arg)
 +{
-+	size_t phdr_size, i;
-+	const struct elfhdr *ehdr = elf_info->ehdr;
++	unsigned int *nr_ranges = arg;
 +
-+	/*
-+	 * e_phnum is at most 65535 so calculating the size of the
-+	 * program header cannot overflow.
-+	 */
-+	phdr_size = sizeof(struct elf_phdr) * ehdr->e_phnum;
-+
-+	elf_info->proghdrs = kzalloc(phdr_size, GFP_KERNEL);
-+	if (!elf_info->proghdrs)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < ehdr->e_phnum; i++) {
-+		int ret;
-+
-+		ret = elf_read_phdr(buf, len, elf_info, i);
-+		if (ret) {
-+			kfree(elf_info->proghdrs);
-+			elf_info->proghdrs = NULL;
-+			return ret;
-+		}
-+	}
-+
++	(*nr_ranges)++;
 +	return 0;
 +}
 +
-+/**
-+ * elf_is_shdr_sane - check that it is safe to use the section header
-+ * @buf_len:	size of the buffer in which the ELF file is loaded.
-+ */
-+static bool elf_is_shdr_sane(const struct elf_shdr *shdr, size_t buf_len)
++
++/* Gather all the required information to prepare elf headers for ram regions */
++static void fill_up_crash_elf_data(struct crash_elf_data *ced,
++				   struct kimage *image)
 +{
-+	bool size_ok;
++	unsigned int nr_ranges = 0;
 +
-+	/* SHT_NULL headers have undefined values, so we can't check them. */
-+	if (shdr->sh_type == SHT_NULL)
-+		return true;
++	ced->image = image;
 +
-+	/* Now verify sh_entsize */
-+	switch (shdr->sh_type) {
-+	case SHT_SYMTAB:
-+		size_ok = shdr->sh_entsize == sizeof(Elf_Sym);
-+		break;
-+#ifdef Elf_Rela
-+	case SHT_RELA:
-+		size_ok = shdr->sh_entsize == sizeof(Elf_Rela);
-+		break;
++	walk_system_ram_res(0, -1, &nr_ranges,
++				get_nr_ram_ranges_callback);
++
++	ced->max_nr_ranges = nr_ranges;
++
++	/* Exclusion of crash region could split memory ranges */
++	ced->max_nr_ranges++;
++
++#ifdef CONFIG_X86_64
++	/* If crashk_low_res is not 0, another range split possible */
++	if (crashk_low_res.end)
++		ced->max_nr_ranges++;
 +#endif
-+	case SHT_DYNAMIC:
-+		size_ok = shdr->sh_entsize == sizeof(Elf_Dyn);
-+		break;
-+#ifdef Elf_Rel
-+	case SHT_REL:
-+		size_ok = shdr->sh_entsize == sizeof(Elf_Rel);
-+		break;
-+#endif
-+	case SHT_NOTE:
-+	case SHT_PROGBITS:
-+	case SHT_HASH:
-+	case SHT_NOBITS:
-+	default:
-+		/*
-+		 * This is a section whose entsize requirements
-+		 * I don't care about.  If I don't know about
-+		 * the section I can't care about it's entsize
-+		 * requirements.
-+		 */
-+		size_ok = true;
-+		break;
-+	}
++}
 +
-+	if (!size_ok) {
-+		pr_debug("ELF section with wrong entry size.\n");
-+		return false;
-+	} else if (shdr->sh_addr + shdr->sh_size < shdr->sh_addr) {
-+		pr_debug("ELF section address wraps around.\n");
-+		return false;
-+	}
++int exclude_mem_range(struct crash_mem *mem,
++		unsigned long long mstart, unsigned long long mend)
++{
++	int i, j;
++	unsigned long long start, end;
++	struct crash_mem_range temp_range = {0, 0};
 +
-+	if (shdr->sh_type != SHT_NOBITS) {
-+		if (shdr->sh_offset + shdr->sh_size < shdr->sh_offset) {
-+			pr_debug("ELF section location wraps around.\n");
-+			return false;
-+		} else if (shdr->sh_offset + shdr->sh_size > buf_len) {
-+			pr_debug("ELF section not in file.\n");
-+			return false;
++	for (i = 0; i < mem->nr_ranges; i++) {
++		start = mem->ranges[i].start;
++		end = mem->ranges[i].end;
++
++		if (mstart > end || mend < start)
++			continue;
++
++		/* Truncate any area outside of range */
++		if (mstart < start)
++			mstart = start;
++		if (mend > end)
++			mend = end;
++
++		/* Found completely overlapping range */
++		if (mstart == start && mend == end) {
++			mem->ranges[i].start = 0;
++			mem->ranges[i].end = 0;
++			if (i < mem->nr_ranges - 1) {
++				/* Shift rest of the ranges to left */
++				for (j = i; j < mem->nr_ranges - 1; j++) {
++					mem->ranges[j].start =
++						mem->ranges[j+1].start;
++					mem->ranges[j].end =
++							mem->ranges[j+1].end;
++				}
++			}
++			mem->nr_ranges--;
++			return 0;
 +		}
++
++		if (mstart > start && mend < end) {
++			/* Split original range */
++			mem->ranges[i].end = mstart - 1;
++			temp_range.start = mend + 1;
++			temp_range.end = end;
++		} else if (mstart != start)
++			mem->ranges[i].end = mstart - 1;
++		else
++			mem->ranges[i].start = mend + 1;
++		break;
 +	}
 +
-+	return true;
-+}
++	/* If a split happened, add the split to array */
++	if (!temp_range.end)
++		return 0;
 +
-+static int elf_read_shdr(const char *buf, size_t len, struct elf_info *elf_info,
-+			 int idx)
-+{
-+	struct elf_shdr *shdr = &elf_info->sechdrs[idx];
-+	const struct elfhdr *ehdr = elf_info->ehdr;
-+	const char *sbuf;
-+	struct elf_shdr *buf_shdr;
-+
-+	sbuf = buf + ehdr->e_shoff + idx * sizeof(*buf_shdr);
-+	buf_shdr = (struct elf_shdr *) sbuf;
-+
-+	shdr->sh_name      = elf32_to_cpu(ehdr, buf_shdr->sh_name);
-+	shdr->sh_type      = elf32_to_cpu(ehdr, buf_shdr->sh_type);
-+	shdr->sh_addr      = elf_addr_to_cpu(ehdr, buf_shdr->sh_addr);
-+	shdr->sh_offset    = elf_addr_to_cpu(ehdr, buf_shdr->sh_offset);
-+	shdr->sh_link      = elf32_to_cpu(ehdr, buf_shdr->sh_link);
-+	shdr->sh_info      = elf32_to_cpu(ehdr, buf_shdr->sh_info);
-+
-+	/*
-+	 * The following fields have a type equivalent to Elf_Addr
-+	 * both in 32 bit and 64 bit ELF.
-+	 */
-+	shdr->sh_flags     = elf_addr_to_cpu(ehdr, buf_shdr->sh_flags);
-+	shdr->sh_size      = elf_addr_to_cpu(ehdr, buf_shdr->sh_size);
-+	shdr->sh_addralign = elf_addr_to_cpu(ehdr, buf_shdr->sh_addralign);
-+	shdr->sh_entsize   = elf_addr_to_cpu(ehdr, buf_shdr->sh_entsize);
-+
-+	return elf_is_shdr_sane(shdr, len) ? 0 : -ENOEXEC;
-+}
-+
-+/**
-+ * elf_read_shdrs - read the section headers from the buffer
-+ *
-+ * This function assumes that the section header table was checked for sanity.
-+ * Use elf_is_ehdr_sane() if it wasn't.
-+ */
-+static int elf_read_shdrs(const char *buf, size_t len,
-+			  struct elf_info *elf_info)
-+{
-+	size_t shdr_size, i;
-+
-+	/*
-+	 * e_shnum is at most 65536 so calculating
-+	 * the size of the section header cannot overflow.
-+	 */
-+	shdr_size = sizeof(struct elf_shdr) * elf_info->ehdr->e_shnum;
-+
-+	elf_info->sechdrs = kzalloc(shdr_size, GFP_KERNEL);
-+	if (!elf_info->sechdrs)
++	/* Split happened */
++	if (i == CRASH_MAX_RANGES - 1) {
++		pr_err("Too many crash ranges after split\n");
 +		return -ENOMEM;
-+
-+	for (i = 0; i < elf_info->ehdr->e_shnum; i++) {
-+		int ret;
-+
-+		ret = elf_read_shdr(buf, len, elf_info, i);
-+		if (ret) {
-+			kfree(elf_info->sechdrs);
-+			elf_info->sechdrs = NULL;
-+			return ret;
-+		}
 +	}
 +
++	/* Location where new range should go */
++	j = i + 1;
++	if (j < mem->nr_ranges) {
++		/* Move over all ranges one slot towards the end */
++		for (i = mem->nr_ranges - 1; i >= j; i--)
++			mem->ranges[i + 1] = mem->ranges[i];
++	}
++
++	mem->ranges[j].start = temp_range.start;
++	mem->ranges[j].end = temp_range.end;
++	mem->nr_ranges++;
 +	return 0;
 +}
 +
-+/**
-+ * elf_read_from_buffer - read ELF file and sets up ELF header and ELF info
-+ * @buf:	Buffer to read ELF file from.
-+ * @len:	Size of @buf.
-+ * @ehdr:	Pointer to existing struct which will be populated.
-+ * @elf_info:	Pointer to existing struct which will be populated.
-+ *
-+ * This function allows reading ELF files with different byte order than
-+ * the kernel, byte-swapping the fields as needed.
-+ *
-+ * Return:
-+ * On success returns 0, and the caller should call elf_free_info(elf_info) to
-+ * free the memory allocated for the section and program headers.
++/*
++ * Look for any unwanted ranges between mstart, mend and remove them. This
++ * might lead to split and split ranges are put in ced->mem.ranges[] array
 + */
-+static int elf_read_from_buffer(const char *buf, size_t len,
-+				struct elfhdr *ehdr, struct elf_info *elf_info)
++static int elf_header_exclude_ranges(struct crash_elf_data *ced,
++		unsigned long long mstart, unsigned long long mend)
 +{
-+	int ret;
++	struct crash_mem *cmem = &ced->mem;
++	int ret = 0;
 +
-+	ret = elf_read_ehdr(buf, len, ehdr);
++	memset(cmem->ranges, 0, sizeof(cmem->ranges));
++
++	cmem->ranges[0].start = mstart;
++	cmem->ranges[0].end = mend;
++	cmem->nr_ranges = 1;
++
++	/* Exclude crashkernel region */
++	ret = exclude_mem_range(cmem, crashk_res.start, crashk_res.end);
 +	if (ret)
 +		return ret;
 +
-+	elf_info->buffer = buf;
-+	elf_info->ehdr = ehdr;
-+	if (ehdr->e_phoff > 0 && ehdr->e_phnum > 0) {
-+		ret = elf_read_phdrs(buf, len, elf_info);
++#ifdef CONFIG_X86_64
++	if (crashk_low_res.end) {
++		ret = exclude_mem_range(cmem, crashk_low_res.start,
++							crashk_low_res.end);
 +		if (ret)
 +			return ret;
 +	}
-+	if (ehdr->e_shoff > 0 && ehdr->e_shnum > 0) {
-+		ret = elf_read_shdrs(buf, len, elf_info);
-+		if (ret) {
-+			kfree(elf_info->proghdrs);
-+			return ret;
-+		}
-+	}
++#endif
 +
-+	return 0;
++	return ret;
 +}
 +
-+/**
-+ * elf_free_info - free memory allocated by elf_read_from_buffer
-+ */
-+void elf_free_info(struct elf_info *elf_info)
++static int prepare_elf64_ram_headers_callback(u64 start, u64 end, void *arg)
 +{
-+	kfree(elf_info->proghdrs);
-+	kfree(elf_info->sechdrs);
-+	memset(elf_info, 0, sizeof(*elf_info));
-+}
++	struct crash_elf_data *ced = arg;
++	Elf64_Ehdr *ehdr;
++	Elf64_Phdr *phdr;
++	unsigned long mstart, mend;
++#ifdef CONFIG_X86_64
++	struct kimage *image = ced->image;
++#endif
++	struct crash_mem *cmem;
++	int ret, i;
 +
-+/**
-+ * build_elf_exec_info - read ELF executable and check that we can use it
-+ */
-+int build_elf_exec_info(const char *buf, size_t len, struct elfhdr *ehdr,
-+			struct elf_info *elf_info)
-+{
-+	int i;
-+	int ret;
++	ehdr = ced->ehdr;
 +
-+	ret = elf_read_from_buffer(buf, len, ehdr, elf_info);
++	/* Exclude unwanted mem ranges */
++	ret = elf_header_exclude_ranges(ced, start, end);
 +	if (ret)
 +		return ret;
 +
-+	/* Big endian vmlinux has type ET_DYN. */
-+	if (ehdr->e_type != ET_EXEC && ehdr->e_type != ET_DYN) {
-+		pr_err("Not an ELF executable.\n");
-+		goto error;
-+	} else if (!elf_info->proghdrs) {
-+		pr_err("No ELF program header.\n");
-+		goto error;
-+	}
++	/* Go through all the ranges in ced->mem.ranges[] and prepare phdr */
++	cmem = &ced->mem;
 +
-+	for (i = 0; i < ehdr->e_phnum; i++) {
++	for (i = 0; i < cmem->nr_ranges; i++) {
++		mstart = cmem->ranges[i].start;
++		mend = cmem->ranges[i].end;
++
++		phdr = ced->bufp;
++		ced->bufp += sizeof(Elf64_Phdr);
++
++		phdr->p_type = PT_LOAD;
++		phdr->p_flags = PF_R|PF_W|PF_X;
++		phdr->p_offset  = mstart;
++
++#ifdef CONFIG_X86_64
 +		/*
-+		 * Kexec does not support loading interpreters.
-+		 * In addition this check keeps us from attempting
-+		 * to kexec ordinary executables.
++		 * If a range matches backup region, adjust offset to backup
++		 * segment.
 +		 */
-+		if (elf_info->proghdrs[i].p_type == PT_INTERP) {
-+			pr_err("Requires an ELF interpreter.\n");
-+			goto error;
-+		}
++		if (mstart == image->arch.backup_src_start &&
++		    (mend - mstart + 1) == image->arch.backup_src_sz)
++			phdr->p_offset = image->arch.backup_load_addr;
++#endif
++
++		phdr->p_paddr = mstart;
++		phdr->p_vaddr = (unsigned long long) __va(mstart);
++		phdr->p_filesz = phdr->p_memsz = mend - mstart + 1;
++		phdr->p_align = 0;
++		ehdr->e_phnum++;
++		pr_debug("Crash PT_LOAD elf header. phdr=%p vaddr=0x%llx, paddr=0x%llx, sz=0x%llx e_phnum=%d p_offset=0x%llx\n",
++			phdr, phdr->p_vaddr, phdr->p_paddr, phdr->p_filesz,
++			ehdr->e_phnum, phdr->p_offset);
 +	}
 +
-+	return 0;
-+error:
-+	elf_free_info(elf_info);
-+	return -ENOEXEC;
++	return ret;
 +}
++
++static int prepare_elf64_headers(struct crash_elf_data *ced,
++		void **addr, unsigned long *sz)
++{
++	Elf64_Ehdr *ehdr;
++	Elf64_Phdr *phdr;
++	unsigned long nr_cpus = num_possible_cpus(), nr_phdr, elf_sz;
++	unsigned char *buf, *bufp;
++	unsigned int cpu;
++	unsigned long long notes_addr;
++	int ret;
++
++	/* extra phdr for vmcoreinfo elf note */
++	nr_phdr = nr_cpus + 1;
++	nr_phdr += ced->max_nr_ranges;
++
++	/*
++	 * kexec-tools creates an extra PT_LOAD phdr for kernel text mapping
++	 * area on x86_64 (ffffffff80000000 - ffffffffa0000000).
++	 * I think this is required by tools like gdb. So same physical
++	 * memory will be mapped in two elf headers. One will contain kernel
++	 * text virtual addresses and other will have __va(physical) addresses.
++	 */
++
++	nr_phdr++;
++	elf_sz = sizeof(Elf64_Ehdr) + nr_phdr * sizeof(Elf64_Phdr);
++	elf_sz = ALIGN(elf_sz, ELF_CORE_HEADER_ALIGN);
++
++	buf = vzalloc(elf_sz);
++	if (!buf)
++		return -ENOMEM;
++
++	bufp = buf;
++	ehdr = (Elf64_Ehdr *)bufp;
++	bufp += sizeof(Elf64_Ehdr);
++	memcpy(ehdr->e_ident, ELFMAG, SELFMAG);
++	ehdr->e_ident[EI_CLASS] = ELFCLASS64;
++	ehdr->e_ident[EI_DATA] = ELFDATA2LSB;
++	ehdr->e_ident[EI_VERSION] = EV_CURRENT;
++	ehdr->e_ident[EI_OSABI] = ELF_OSABI;
++	memset(ehdr->e_ident + EI_PAD, 0, EI_NIDENT - EI_PAD);
++	ehdr->e_type = ET_CORE;
++	ehdr->e_machine = ELF_ARCH;
++	ehdr->e_version = EV_CURRENT;
++	ehdr->e_phoff = sizeof(Elf64_Ehdr);
++	ehdr->e_ehsize = sizeof(Elf64_Ehdr);
++	ehdr->e_phentsize = sizeof(Elf64_Phdr);
++
++	/* Prepare one phdr of type PT_NOTE for each present cpu */
++	for_each_present_cpu(cpu) {
++		phdr = (Elf64_Phdr *)bufp;
++		bufp += sizeof(Elf64_Phdr);
++		phdr->p_type = PT_NOTE;
++		notes_addr = per_cpu_ptr_to_phys(per_cpu_ptr(crash_notes, cpu));
++		phdr->p_offset = phdr->p_paddr = notes_addr;
++		phdr->p_filesz = phdr->p_memsz = sizeof(note_buf_t);
++		(ehdr->e_phnum)++;
++	}
++
++	/* Prepare one PT_NOTE header for vmcoreinfo */
++	phdr = (Elf64_Phdr *)bufp;
++	bufp += sizeof(Elf64_Phdr);
++	phdr->p_type = PT_NOTE;
++	phdr->p_offset = phdr->p_paddr = paddr_vmcoreinfo_note();
++	phdr->p_filesz = phdr->p_memsz = VMCOREINFO_NOTE_SIZE;
++	(ehdr->e_phnum)++;
++
++#ifdef CONFIG_X86_64
++	/* Prepare PT_LOAD type program header for kernel text region */
++	phdr = (Elf64_Phdr *)bufp;
++	bufp += sizeof(Elf64_Phdr);
++	phdr->p_type = PT_LOAD;
++	phdr->p_flags = PF_R|PF_W|PF_X;
++	phdr->p_vaddr = (Elf64_Addr)_text;
++	phdr->p_filesz = phdr->p_memsz = _end - _text;
++	phdr->p_offset = phdr->p_paddr = __pa_symbol(_text);
++	(ehdr->e_phnum)++;
++#endif
++
++	/* Prepare PT_LOAD headers for system ram chunks. */
++	ced->ehdr = ehdr;
++	ced->bufp = bufp;
++	ret = walk_system_ram_res(0, -1, ced,
++			prepare_elf64_ram_headers_callback);
++	if (ret < 0)
++		return ret;
++
++	*addr = buf;
++	*sz = elf_sz;
++	return 0;
++}
++
++/* Prepare elf headers. Return addr and size */
++int prepare_elf_headers(struct kimage *image, void **addr, unsigned long *sz)
++{
++	struct crash_elf_data *ced;
++	int ret;
++
++	ced = kzalloc(sizeof(*ced), GFP_KERNEL);
++	if (!ced)
++		return -ENOMEM;
++
++	fill_up_crash_elf_data(ced, image);
++
++	/* By default prepare 64bit headers */
++	ret =  prepare_elf64_headers(ced, addr, sz);
++	kfree(ced);
++	return ret;
++}
++#endif /* CONFIG_KEXEC_FILE */
 -- 
 2.14.1
