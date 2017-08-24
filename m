@@ -1,96 +1,36 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 24 Aug 2017 17:18:03 +0900
-Subject: [PATCH 06/14] kexec_file: add kexec_add_segment()
+Date: Thu, 24 Aug 2017 17:18:04 +0900
+Subject: [PATCH 07/14] asm-generic: add kexec_file_load system call to unistd.h
 In-Reply-To: <20170824081811.19299-1-takahiro.akashi@linaro.org>
 References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
-Message-ID: <20170824081811.19299-7-takahiro.akashi@linaro.org>
+Message-ID: <20170824081811.19299-8-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In contrast to kexec_add_buffer(), this function assumes that kbuf->mem
-is already assigned by caller. This type of allocation is commonly used
-in kexec-tools.
-
-This function will be used on arm64 in loading vmlinux(elf) binary.
+The initial user of this system call number is arm64.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Dave Young <dyoung@redhat.com>
-Cc: Vivek Goyal <vgoyal@redhat.com>
-Cc: Baoquan He <bhe@redhat.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
 ---
- include/linux/kexec.h |  1 +
- kernel/kexec_file.c   | 47 +++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 48 insertions(+)
+ include/uapi/asm-generic/unistd.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/kexec.h b/include/linux/kexec.h
-index acaecd72b134..be5e99afaf77 100644
---- a/include/linux/kexec.h
-+++ b/include/linux/kexec.h
-@@ -162,6 +162,7 @@ struct kexec_buf {
- int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
- 			       int (*func)(u64, u64, void *));
- extern int kexec_add_buffer(struct kexec_buf *kbuf);
-+extern int kexec_add_segment(struct kexec_buf *kbuf);
- int kexec_locate_mem_hole(struct kexec_buf *kbuf);
- #ifdef CONFIG_CRASH_CORE
- extern int prepare_elf_headers(struct kimage *image, void **addr,
-diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-index 9f48f4412297..d898dec37816 100644
---- a/kernel/kexec_file.c
-+++ b/kernel/kexec_file.c
-@@ -519,6 +519,53 @@ int kexec_add_buffer(struct kexec_buf *kbuf)
- 	return 0;
- }
+diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+index 061185a5eb51..086697fe3917 100644
+--- a/include/uapi/asm-generic/unistd.h
++++ b/include/uapi/asm-generic/unistd.h
+@@ -731,9 +731,11 @@ __SYSCALL(__NR_pkey_alloc,    sys_pkey_alloc)
+ __SYSCALL(__NR_pkey_free,     sys_pkey_free)
+ #define __NR_statx 291
+ __SYSCALL(__NR_statx,     sys_statx)
++#define __NR_kexec_file_load 292
++__SYSCALL(__NR_kexec_file_load,     sys_kexec_file_load)
  
-+/**
-+ * kexec_add_segment - place a buffer in a kexec segment
-+ * @kbuf:	Buffer contents and memory parameters.
-+ *
-+ * In contrast to kexec_add_buffer(), this function assumes
-+ * that kbuf->mem is already assigned by caller.
-+ *
-+ * Return: 0 on success, negative errno on error.
-+ */
-+int kexec_add_segment(struct kexec_buf *kbuf)
-+{
-+
-+	struct kexec_segment *ksegment;
-+
-+	/* Currently adding segment this way is allowed only in file mode */
-+	if (!kbuf->image->file_mode)
-+		return -EINVAL;
-+
-+	if (kbuf->image->nr_segments >= KEXEC_SEGMENT_MAX)
-+		return -EINVAL;
-+
-+	/*
-+	 * Make sure we are not trying to add buffer after allocating
-+	 * control pages. All segments need to be placed first before
-+	 * any control pages are allocated. As control page allocation
-+	 * logic goes through list of segments to make sure there are
-+	 * no destination overlaps.
-+	 */
-+	if (!list_empty(&kbuf->image->control_pages)) {
-+		WARN_ON(1);
-+		return -EINVAL;
-+	}
-+
-+	/* Ensure minimum alignment needed for segments. */
-+	kbuf->memsz = ALIGN(kbuf->memsz, PAGE_SIZE);
-+
-+	/* Found a suitable memory range */
-+	ksegment = &kbuf->image->segment[kbuf->image->nr_segments];
-+	ksegment->kbuf = kbuf->buffer;
-+	ksegment->bufsz = kbuf->bufsz;
-+	ksegment->mem = kbuf->mem;
-+	ksegment->memsz = kbuf->memsz;
-+	kbuf->image->nr_segments++;
-+
-+	return 0;
-+}
-+
- /* Calculate and store the digest of segments */
- static int kexec_calculate_store_digests(struct kimage *image)
- {
+ #undef __NR_syscalls
+-#define __NR_syscalls 292
++#define __NR_syscalls 293
+ 
+ /*
+  * All syscalls below here should go away really,
 -- 
 2.14.1
