@@ -1,136 +1,72 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 24 Aug 2017 03:03:57 +0200
-Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable
- direct_complete for ACPI devices
-In-Reply-To: <9174364.s7oU13Tavs@aspire.rjw.lan>
-References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
- <3774251.HUIR40xRhc@aspire.rjw.lan> <9174364.s7oU13Tavs@aspire.rjw.lan>
-Message-ID: <1726767.L8TO24juDO@aspire.rjw.lan>
+From: yong.deng@magewell.com (Yong)
+Date: Thu, 24 Aug 2017 09:43:08 +0800
+Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20170823192413.y5psmcgd3ghvpkbz@flea.home>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+ <20170728160233.xooevio4hoqkgfaq@flea.lan>
+ <20170730060801.bkc2kvm72ktixy74@tarshish>
+ <20170821202145.kmxancepyq55v3o2@flea.lan>
+ <20170823104118.b4524830e4bb767d7714772c@magewell.com>
+ <20170823192413.y5psmcgd3ghvpkbz@flea.home>
+Message-ID: <20170824094308.c78aab49c64f4755a7706453@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 24, 2017 2:20:00 AM CEST Rafael J. Wysocki wrote:
-> On Thursday, August 24, 2017 2:13:55 AM CEST Rafael J. Wysocki wrote:
-> > On Thursday, August 24, 2017 1:39:44 AM CEST Rafael J. Wysocki wrote:
-> > > On Wed, Aug 23, 2017 at 4:42 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> > > > In some cases a driver for an ACPI device needs to be able to prevent the
-> > > > ACPI PM domain from using the direct_complete path during system sleep.
-> > > >
-> > > > One typical case is when the driver for the device needs its device to stay
-> > > > runtime enabled, during the __device_suspend phase. This isn't the case
-> > > > when the direct_complete path is being executed by the PM core, as it then
-> > > > disables runtime PM for the device in __device_suspend(). Any following
-> > > > attempts to runtime resume the device after that point, just fails.
+On Wed, 23 Aug 2017 21:24:13 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+
+> On Wed, Aug 23, 2017 at 10:41:18AM +0800, Yong wrote:
+> > > > > > +static irqreturn_t sun6i_csi_isr(int irq, void *dev_id)
+> > > > > > +{
+> > > > > > +	struct sun6i_csi_dev *sdev = (struct sun6i_csi_dev *)dev_id;
+> > > > > > +	struct regmap *regmap = sdev->regmap;
+> > > > > > +	u32 status;
+> > > > > > +
+> > > > > > +	regmap_read(regmap, CSI_CH_INT_STA_REG, &status);
+> > > > > > +
+> > > > > > +	if ((status & CSI_CH_INT_STA_FIFO0_OF_PD) ||
+> > > > > > +	    (status & CSI_CH_INT_STA_FIFO1_OF_PD) ||
+> > > > > > +	    (status & CSI_CH_INT_STA_FIFO2_OF_PD) ||
+> > > > > > +	    (status & CSI_CH_INT_STA_HB_OF_PD)) {
+> > > > > > +		regmap_write(regmap, CSI_CH_INT_STA_REG, status);
+> > > > > > +		regmap_update_bits(regmap, CSI_EN_REG, CSI_EN_CSI_EN, 0);
+> > > > > > +		regmap_update_bits(regmap, CSI_EN_REG, CSI_EN_CSI_EN,
+> > > > > > +				   CSI_EN_CSI_EN);
+> > > > > 
+> > > > > You need to enable / disable it at every frame? How do you deal with
+> > > > > double buffering? (or did you choose to ignore it for now?)
+> > > > 
+> > > > These *_OF_PD status bits indicate an overflow error condition.
 > > > 
-> > > OK, that is a problem.
-> > > 
-> > > > A workaround to this problem is to let the driver runtime resume its device
-> > > > from its ->prepare() callback, as that would prevent the direct_complete
-> > > > path from being executed. However, that may often be a waste, especially if
-> > > > it turned out that no one really needed the device.
-> > > >
-> > > > For this reason, invent acpi_dev_disable|enable_direct_complete(), to allow
-> > > > drivers to inform the ACPI PM domain to change its default behaviour during
-> > > > system sleep, and thus control whether it may use the direct_complete path
-> > > > or not.
-> > > 
-> > > But I'm not sure this is the right place to address it as it very well
-> > > may affect a PCI device too.
-> > > 
-> > > Also, this is about the device and not about its ACPI companion
-> > > object, so putting the flag in there is somewhat unclean, so to speak.
-> > > 
-> > > It looks like we need a flag in dev_pm_info saying something along the
-> > > lines of "my system suspend callback can deal with runtime PM" that
-> > > will cause the direct_complete update to occur in
-> > > __device_suspend_late() instead of __device_suspend().
+> > > Shouldn't we return an error code then? The names of these flags could
+> > > be better too.
 > > 
-> > IOW, something like the patch below.
-> > 
-> > It actually should work with the ACPI PM domain code as is except that it
-> > will cause the device to be runtime resumed every time during suspend.
-> > 
-> > But acpi_subsys_suspend() can be changed to avoid resuming the device if
-> > power.force_suspend is set.
+> > Then, where and how to deal with the error coce.
 > 
-> Or better yet, if power.direct_complete is not set, because that means the
-> device needs to be resumed anyway.
+> If you want to deal with FIFO overflow, I'm not sure you have anything
+> to do. It means, you've been to slow to queue buffers, so I guess
+> stopping the pipeline until more buffers are queued would make
+> sense. And we should probably increase the sequence number while doing
+> so to notify the userspace that some frames were lost.
+
+If there is no queued buffers, the CSI must has been already stoped by
+sun6i_video_frame_done. So, the FIFO overflow may only occur on some 
+unpredictable conditions or something I don't know.
+
+For sequence number, I can't actually get the number of the lost frames.
+
+Maybe I misunderstood you. Did you mean use IRQ_RETVAL(error) instead
+of IRQ_HANDLED?
+
 > 
-> And if power.direct_complete is set at that point, power.force_suspend has to
-> be set too.
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
-Overall, like below, and of course drivers that ser power.force_suspend need to
-be able to deal with devices that have been runtime resumed during
-__device_suspend().
 
----
- drivers/acpi/device_pm.c  |    8 ++++++++
- drivers/base/power/main.c |   11 +++++++++--
- include/linux/pm.h        |    1 +
- 3 files changed, 18 insertions(+), 2 deletions(-)
-
-Index: linux-pm/drivers/base/power/main.c
-===================================================================
---- linux-pm.orig/drivers/base/power/main.c
-+++ linux-pm/drivers/base/power/main.c
-@@ -1271,9 +1271,16 @@ static int __device_suspend_late(struct
- 		goto Complete;
- 	}
- 
--	if (dev->power.syscore || dev->power.direct_complete)
-+	if (dev->power.syscore)
- 		goto Complete;
- 
-+	if (dev->power.direct_complete) {
-+		if (pm_runtime_status_suspended(dev))
-+			goto Complete;
-+
-+		dev->power.direct_complete = false;
-+	}
-+
- 	if (dev->pm_domain) {
- 		info = "late power domain ";
- 		callback = pm_late_early_op(&dev->pm_domain->ops, state);
-@@ -1482,7 +1489,7 @@ static int __device_suspend(struct devic
- 	if (dev->power.syscore)
- 		goto Complete;
- 
--	if (dev->power.direct_complete) {
-+	if (dev->power.direct_complete && !dev->power.force_suspend) {
- 		if (pm_runtime_status_suspended(dev)) {
- 			pm_runtime_disable(dev);
- 			if (pm_runtime_status_suspended(dev))
-Index: linux-pm/include/linux/pm.h
-===================================================================
---- linux-pm.orig/include/linux/pm.h
-+++ linux-pm/include/linux/pm.h
-@@ -554,6 +554,7 @@ struct dev_pm_info {
- 	pm_message_t		power_state;
- 	unsigned int		can_wakeup:1;
- 	unsigned int		async_suspend:1;
-+	unsigned int		force_suspend:1;
- 	bool			in_dpm_list:1;	/* Owned by the PM core */
- 	bool			is_prepared:1;	/* Owned by the PM core */
- 	bool			is_suspended:1;	/* Ditto */
-Index: linux-pm/drivers/acpi/device_pm.c
-===================================================================
---- linux-pm.orig/drivers/acpi/device_pm.c
-+++ linux-pm/drivers/acpi/device_pm.c
-@@ -1025,9 +1025,17 @@ EXPORT_SYMBOL_GPL(acpi_subsys_prepare);
-  *
-  * Follow PCI and resume devices suspended at run time before running their
-  * system suspend callbacks.
-+ *
-+ * If the power.direct_complete flag is set for the device, though, skip all
-+ * that, because the device doesn't need to be resumed then and if it is
-+ * resumed via runtime PM, the core will notice that and will carry out the
-+ * late suspend for it.
-  */
- int acpi_subsys_suspend(struct device *dev)
- {
-+	if (dev->power.direct_complete)
-+		return 0;
-+
- 	pm_runtime_resume(dev);
- 	return pm_generic_suspend(dev);
- }
+Thanks,
+Yong
