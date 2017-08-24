@@ -1,111 +1,42 @@
-From: ganapatrao.kulkarni@cavium.com (Ganapatrao Kulkarni)
-Date: Thu, 24 Aug 2017 17:33:49 +0530
-Subject: [PATCH v6 4/4] perf vendor events arm64: Add ThunderX2 implementation
- defined pmu core events
-In-Reply-To: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
-References: <20170824120349.2323-1-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20170824120349.2323-5-ganapatrao.kulkarni@cavium.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Thu, 24 Aug 2017 14:09:08 +0200
+Subject: [PATCH] ARM: at91: Replace uses of virt_to_phys with __pa_symbol
+In-Reply-To: <20170824114454.22812-1-alexandre.belloni@free-electrons.com>
+References: <20170824114454.22812-1-alexandre.belloni@free-electrons.com>
+Message-ID: <062c5218-3370-905a-d113-4d9526d13cd1@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is not a full event list, but a short list of useful events.
+On 24/08/2017 at 13:44, Alexandre Belloni wrote:
+> The PM code wrongly uses virt_to_phys() instead of __pa_symbol() and was
+> not updated by commit 64fc2a947a98 ("ARM: 8641/1: treewide: Replace uses of
+> virt_to_phys with __pa_symbol") because it was not yet in tree.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
----
- tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
- .../arm64/thunderx2/implementation-defined.json    | 62 ++++++++++++++++++++++
- 2 files changed, 77 insertions(+)
- create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
- create mode 100644 tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-new file mode 100644
-index 0000000..7167086
---- /dev/null
-+++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-@@ -0,0 +1,15 @@
-+# Format:
-+#	MIDR,Version,JSON/file/pathname,Type
-+#
-+# where
-+#	MIDR	Processor version
-+#		Variant[23:20] and Revision [3:0] should be zero.
-+#	Version could be used to track version of of JSON file
-+#		but currently unused.
-+#	JSON/file/pathname is the path to JSON file, relative
-+#		to tools/perf/pmu-events/arch/arm64/.
-+#	Type is core, uncore etc
-+#
-+#
-+#Family-model,Version,Filename,EventType
-+0x00000000420f5160,v1,thunderx2,core
-diff --git a/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
-new file mode 100644
-index 0000000..2db45c4
---- /dev/null
-+++ b/tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
-@@ -0,0 +1,62 @@
-+[
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache access, read",
-+        "EventCode": "0x40",
-+        "EventName": "l1d_cache_rd",
-+        "BriefDescription": "L1D cache read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache access, write ",
-+        "EventCode": "0x41",
-+        "EventName": "l1d_cache_wr",
-+        "BriefDescription": "L1D cache write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache refill, read",
-+        "EventCode": "0x42",
-+        "EventName": "l1d_cache_refill_rd",
-+        "BriefDescription": "L1D cache refill read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache refill, write",
-+        "EventCode": "0x43",
-+        "EventName": "l1d_cache_refill_wr",
-+        "BriefDescription": "L1D refill write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data TLB refill, read",
-+        "EventCode": "0x4C",
-+        "EventName": "l1d_tlb_refill_rd",
-+        "BriefDescription": "L1D tlb refill read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data TLB refill, write",
-+        "EventCode": "0x4D",
-+        "EventName": "l1d_tlb_refill_wr",
-+        "BriefDescription": "L1D tlb refill write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
-+        "EventCode": "0x4E",
-+        "EventName": "l1d_tlb_rd",
-+        "BriefDescription": "L1D tlb read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
-+        "EventCode": "0x4F",
-+        "EventName": "l1d_tlb_wr",
-+        "BriefDescription": "L1D tlb write",
-+    },
-+    {
-+        "PublicDescription": "Bus access read",
-+        "EventCode": "0x60",
-+        "EventName": "bus_access_rd",
-+        "BriefDescription": "Bus access read",
-+   },
-+   {
-+        "PublicDescription": "Bus access write",
-+        "EventCode": "0x61",
-+        "EventName": "bus_access_wr",
-+        "BriefDescription": "Bus access write",
-+   }
-+]
+> ---
+>  arch/arm/mach-at91/pm.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index b1a59d638321..ccaaaa138d13 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -535,8 +535,8 @@ static void __init at91_pm_backup_init(void)
+>  	}
+>  
+>  	pm_bu->suspended = 0;
+> -	pm_bu->canary = virt_to_phys(&canary);
+> -	pm_bu->resume = virt_to_phys(cpu_resume);
+> +	pm_bu->canary = __pa_symbol(&canary);
+> +	pm_bu->resume = __pa_symbol(cpu_resume);
+>  
+>  	return;
+>  
+> 
+
+
 -- 
-2.9.4
+Nicolas Ferre
