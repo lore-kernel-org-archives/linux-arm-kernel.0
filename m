@@ -1,82 +1,180 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 24 Aug 2017 10:40:28 +0300
-Subject: [PATCH 1/5] mmc: sdhci-msm: fix issue with power irq
-In-Reply-To: <1503033582-48703-2-git-send-email-vviswana@codeaurora.org>
-References: <1503033582-48703-1-git-send-email-vviswana@codeaurora.org>
- <1503033582-48703-2-git-send-email-vviswana@codeaurora.org>
-Message-ID: <7b85cd75-4f39-df08-eaa1-cd7f9499c29b@intel.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Thu, 24 Aug 2017 12:51:37 +0530
+Subject: [PATCH v2 15/20] rpmsg: glink: Add rx done command
+In-Reply-To: <1503559302-3744-1-git-send-email-sricharan@codeaurora.org>
+References: <1503559302-3744-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1503559302-3744-16-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/08/17 08:19, Vijay Viswanath wrote:
-> From: Subhash Jadavani <subhashj@codeaurora.org>
-> 
-> SDCC controller reset (SW_RST) during probe may trigger power irq if
-> previous status of PWRCTL was either BUS_ON or IO_HIGH_V. So before we
-> enable the power irq interrupt in GIC (by registering the interrupt
-> handler), we need to ensure that any pending power irq interrupt status
-> is acknowledged otherwise power irq interrupt handler would be fired
-> prematurely.
-> 
-> Signed-off-by: Subhash Jadavani <subhashj@codeaurora.org>
-> Signed-off-by: Vijay Viswanath <vviswana@codeaurora.org>
-> ---
->  drivers/mmc/host/sdhci-msm.c | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
-> index 9d601dc..0957199 100644
-> --- a/drivers/mmc/host/sdhci-msm.c
-> +++ b/drivers/mmc/host/sdhci-msm.c
-> @@ -1128,6 +1128,7 @@ static int sdhci_msm_probe(struct platform_device *pdev)
->  	u16 host_version, core_minor;
->  	u32 core_version, config;
->  	u8 core_major;
-> +	u32 irq_status, irq_ctl;
->  
->  	host = sdhci_pltfm_init(pdev, &sdhci_msm_pdata, sizeof(*msm_host));
->  	if (IS_ERR(host))
-> @@ -1250,6 +1251,28 @@ static int sdhci_msm_probe(struct platform_device *pdev)
->  			       CORE_VENDOR_SPEC_CAPABILITIES0);
->  	}
->  
-> +	/*
-> +	 * Power on reset state may trigger power irq if previous status of
-> +	 * PWRCTL was either BUS_ON or IO_HIGH_V. So before enabling pwr irq
-> +	 * interrupt in GIC, any pending power irq interrupt should be
-> +	 * acknowledged. Otherwise power irq interrupt handler would be
-> +	 * fired prematurely.
-> +	 */
-> +
-> +	irq_status = readl_relaxed(msm_host->core_mem + CORE_PWRCTL_STATUS);
-> +	writel_relaxed(irq_status, msm_host->core_mem + CORE_PWRCTL_CLEAR);
-> +	irq_ctl = readl_relaxed(msm_host->core_mem + CORE_PWRCTL_CTL);
-> +	if (irq_status & (CORE_PWRCTL_BUS_ON | CORE_PWRCTL_BUS_OFF))
-> +		irq_ctl |= CORE_PWRCTL_BUS_SUCCESS;
-> +	if (irq_status & (CORE_PWRCTL_IO_HIGH | CORE_PWRCTL_IO_LOW))
-> +		irq_ctl |= CORE_PWRCTL_IO_SUCCESS;
-> +	writel_relaxed(irq_ctl,	msm_host->core_mem + CORE_PWRCTL_CTL);
+Send RX data receive ack to remote and also inform
+that local intent buffer is used and freed. This
+informs the remote to request for next set of
+intent buffers before doing a send operation.
 
-This looks a lot like sdhci_msm_voltage_switch().  Can clearing the
-interrupt be a common function?
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ drivers/rpmsg/qcom_glink_native.c | 83 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 83 insertions(+)
 
-> +	/*
-> +	 * Ensure that above writes are propogated before interrupt enablement
-> +	 * in GIC.
-> +	 */
-> +	mb();
-> +
->  	/* Setup IRQ for handling power/voltage tasks with PMIC */
->  	msm_host->pwr_irq = platform_get_irq_byname(pdev, "pwr_irq");
->  	if (msm_host->pwr_irq < 0) {
-> @@ -1259,6 +1282,9 @@ static int sdhci_msm_probe(struct platform_device *pdev)
->  		goto clk_disable;
->  	}
->  
-> +	/* Enable pwr irq interrupts */
-> +	writel_relaxed(INT_MASK, msm_host->core_mem + CORE_PWRCTL_MASK);
-> +
->  	ret = devm_request_threaded_irq(&pdev->dev, msm_host->pwr_irq, NULL,
->  					sdhci_msm_pwr_irq, IRQF_ONESHOT,
->  					dev_name(&pdev->dev), host);
-> 
+diff --git a/drivers/rpmsg/qcom_glink_native.c b/drivers/rpmsg/qcom_glink_native.c
+index ff83cbb..1458bdb 100644
+--- a/drivers/rpmsg/qcom_glink_native.c
++++ b/drivers/rpmsg/qcom_glink_native.c
+@@ -77,6 +77,8 @@ struct glink_core_rx_intent {
+ 	bool reuse;
+ 	bool in_use;
+ 	u32 offset;
++
++	struct list_head node;
+ };
+ 
+ /**
+@@ -139,6 +141,8 @@ enum {
+  * @rcid:	channel id, in remote space
+  * @intent_lock: lock for protection of @liids
+  * @liids:	idr of all local intents
++ * @intent_work: worker responsible for transmitting rx_done packets
++ * @done_intents: list of intents that needs to be announced rx_done
+  * @buf:	receive buffer, for gathering fragments
+  * @buf_offset:	write offset in @buf
+  * @buf_size:	size of current @buf
+@@ -161,6 +165,8 @@ struct glink_channel {
+ 
+ 	spinlock_t intent_lock;
+ 	struct idr liids;
++	struct work_struct intent_work;
++	struct list_head done_intents;
+ 
+ 	struct glink_core_rx_intent *buf;
+ 	int buf_offset;
+@@ -180,15 +186,19 @@ struct glink_channel {
+ #define RPM_CMD_CLOSE			3
+ #define RPM_CMD_OPEN_ACK		4
+ #define RPM_CMD_INTENT			5
++#define RPM_CMD_RX_DONE			6
+ #define RPM_CMD_RX_INTENT_REQ		7
+ #define RPM_CMD_RX_INTENT_REQ_ACK	8
+ #define RPM_CMD_TX_DATA			9
+ #define RPM_CMD_CLOSE_ACK		11
+ #define RPM_CMD_TX_DATA_CONT		12
+ #define RPM_CMD_READ_NOTIF		13
++#define RPM_CMD_RX_DONE_W_REUSE		14
+ 
+ #define GLINK_FEATURE_INTENTLESS	BIT(1)
+ 
++static void qcom_glink_rx_done_work(struct work_struct *work);
++
+ static struct glink_channel *qcom_glink_alloc_channel(struct qcom_glink *glink,
+ 						      const char *name)
+ {
+@@ -201,12 +211,16 @@ static struct glink_channel *qcom_glink_alloc_channel(struct qcom_glink *glink,
+ 	/* Setup glink internal glink_channel data */
+ 	spin_lock_init(&channel->recv_lock);
+ 	spin_lock_init(&channel->intent_lock);
++
+ 	channel->glink = glink;
+ 	channel->name = kstrdup(name, GFP_KERNEL);
+ 
+ 	init_completion(&channel->open_req);
+ 	init_completion(&channel->open_ack);
+ 
++	INIT_LIST_HEAD(&channel->done_intents);
++	INIT_WORK(&channel->intent_work, qcom_glink_rx_done_work);
++
+ 	idr_init(&channel->liids);
+ 	kref_init(&channel->refcount);
+ 
+@@ -402,6 +416,70 @@ static void qcom_glink_send_close_ack(struct qcom_glink *glink,
+ 	qcom_glink_tx(glink, &req, sizeof(req), NULL, 0, true);
+ }
+ 
++static void qcom_glink_rx_done_work(struct work_struct *work)
++{
++	struct glink_channel *channel = container_of(work, struct glink_channel,
++						     intent_work);
++	struct qcom_glink *glink = channel->glink;
++	struct glink_core_rx_intent *intent, *tmp;
++	struct {
++		u16 id;
++		u16 lcid;
++		u32 liid;
++	} __packed cmd;
++
++	unsigned int cid = channel->lcid;
++	unsigned int iid;
++	bool reuse;
++	unsigned long flags;
++
++	spin_lock_irqsave(&channel->intent_lock, flags);
++	list_for_each_entry_safe(intent, tmp, &channel->done_intents, node) {
++		list_del(&intent->node);
++		spin_unlock_irqrestore(&channel->intent_lock, flags);
++		iid = intent->id;
++		reuse = intent->reuse;
++
++		cmd.id = reuse ? RPM_CMD_RX_DONE_W_REUSE : RPM_CMD_RX_DONE;
++		cmd.lcid = cid;
++		cmd.liid = iid;
++
++		qcom_glink_tx(glink, &cmd, sizeof(cmd), NULL, 0, true);
++		if (!reuse) {
++			kfree(intent->data);
++			kfree(intent);
++		}
++		spin_lock_irqsave(&channel->intent_lock, flags);
++	}
++	spin_unlock_irqrestore(&channel->intent_lock, flags);
++}
++
++static void qcom_glink_rx_done(struct qcom_glink *glink,
++			       struct glink_channel *channel,
++			       struct glink_core_rx_intent *intent)
++{
++	/* We don't send RX_DONE to intentless systems */
++	if (glink->intentless) {
++		kfree(intent->data);
++		kfree(intent);
++		return;
++	}
++
++	/* Take it off the tree of receive intents */
++	if (!intent->reuse) {
++		spin_lock(&channel->intent_lock);
++		idr_remove(&channel->liids, intent->id);
++		spin_unlock(&channel->intent_lock);
++	}
++
++	/* Schedule the sending of a rx_done indication */
++	spin_lock(&channel->intent_lock);
++	list_add_tail(&intent->node, &channel->done_intents);
++	spin_unlock(&channel->intent_lock);
++
++	schedule_work(&channel->intent_work);
++}
++
+ /**
+  * qcom_glink_receive_version() - receive version/features from remote system
+  *
+@@ -718,6 +796,8 @@ static int qcom_glink_rx_data(struct qcom_glink *glink, size_t avail)
+ 
+ 		intent->offset = 0;
+ 		channel->buf = NULL;
++
++		qcom_glink_rx_done(glink, channel, intent);
+ 	}
+ 
+ advance_rx:
+@@ -1107,6 +1187,9 @@ static void qcom_glink_rx_close(struct qcom_glink *glink, unsigned int rcid)
+ 	if (WARN(!channel, "close request on unknown channel\n"))
+ 		return;
+ 
++	/* cancel pending rx_done work */
++	cancel_work_sync(&channel->intent_work);
++
+ 	if (channel->rpdev) {
+ 		strncpy(chinfo.name, channel->name, sizeof(chinfo.name));
+ 		chinfo.src = RPMSG_ADDR_ANY;
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
