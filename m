@@ -1,139 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 24 Aug 2017 18:30:50 +0100
-Subject: [PATCH 14/14] arm64: kexec_file: add vmlinux format support
-In-Reply-To: <20170824081811.19299-15-takahiro.akashi@linaro.org>
-References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
- <20170824081811.19299-15-takahiro.akashi@linaro.org>
-Message-ID: <20170824173049.GG29665@leverpostej>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Thu, 24 Aug 2017 19:51:16 +0200
+Subject: [PATCH v10] PCI: tango: Add MSI controller support
+In-Reply-To: <20170824170445.GO31858@bhelgaas-glaptop.roam.corp.google.com>
+References: <7b7278f4-7639-62b3-8a35-e6f7f9afa998@sigmadesigns.com>
+ <8452c9ca-7131-cf43-d35c-afc4252844f0@arm.com>
+ <4b93964c-49eb-efbf-f6b2-956c67694182@sigmadesigns.com>
+ <86efs3wesi.fsf@arm.com>
+ <20170824170445.GO31858@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <e2d48341-3ab1-f80a-b044-ff7dcc059ed4@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 24, 2017 at 05:18:11PM +0900, AKASHI Takahiro wrote:
-> The first PT_LOAD segment, which is assumed to be "text" code, in vmlinux
-> will be loaded at the offset of TEXT_OFFSET from the begining of system
-> memory. The other PT_LOAD segments are placed relative to the first one.
+On 24/08/2017 19:04, Bjorn Helgaas wrote:
+> On Tue, Aug 22, 2017 at 09:03:41PM +0100, Marc Zyngier wrote:
+>> Marc Gonzalez wrote:
+>>> On 22/08/2017 18:29, Marc Zyngier wrote:
+>>>> On 22/08/17 15:56, Marc Gonzalez wrote:
+>>>>
+>>>>>  #define SMP8759_MUX		0x48
+>>>>>  #define SMP8759_TEST_OUT	0x74
+>>>>> +#define SMP8759_STATUS		0x80
+>>>>> +#define SMP8759_ENABLE		0xa0
+>>>>> +#define SMP8759_DOORBELL	0xa002e07c
+>>>>
+>>>> Why is this hardcoded and not coming from the device-tree, just like any
+>>>> other address property?
+>>>
+>>> Since this bus address is software-configurable, I didn't think
+>>> it belonged in the DT. Also, I didn't see anything similar in
+>>> other binding docs, especially
+>>>
+>>> Documentation/devicetree/bindings/interrupt-controller/msi.txt
+>>
+>> If that's software configurable, how on Earth did you pick the address?
+>> How do you ensure that it doesn't conflict with DMA? How is it
+>> configured into the RC?
+> 
+> But we *do* need to resolve this.  This does seem like an address that
+> shouldn't be hard-coded into the driver.  Since this driver is
+> programming the address into an MSI message, but not into the receiver
+> of that message, there's a coordination issue between this driver and
+> whatever other software does that receiver configuration.
 
-I really don't like assuming things about the vmlinux ELF file.
+OK. I'll move the doorbell address to the DT for v11.
 
-> Regarding kernel verification, since there is no standard way to contain
-> a signature within elf binary, we follow PowerPC's (not yet upstreamed)
-> approach, that is, appending a signature right after the kernel binary
-> itself like module signing.
+What property should be used for this address?
 
-I also *really* don't like this. It's a bizarre in-band mechanism,
-without explcit information. It's not a nice ABI.
+sigma,doorbell ?
 
-If we can load an Image, why do we need to be able to load a vmlinux?
+Or maybe I can put it in reg, since I have a 1:1 mapping
+between bus and cpu addresses?
 
-[...]
+git grep -i doorbell arch/arm/boot/dts/ arch/arm64/boot/dts/
+returns nothing.
 
-> diff --git a/arch/arm64/kernel/kexec_elf.c b/arch/arm64/kernel/kexec_elf.c
-> new file mode 100644
-> index 000000000000..7bd3c1e1f65a
-> --- /dev/null
-> +++ b/arch/arm64/kernel/kexec_elf.c
-> @@ -0,0 +1,216 @@
-> +/*
-> + * Kexec vmlinux loader
-> +
-> + * Copyright (C) 2017 Linaro Limited
-> + * Authors: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#define pr_fmt(fmt)	"kexec_file(elf): " fmt
-> +
-> +#include <linux/elf.h>
-> +#include <linux/err.h>
-> +#include <linux/errno.h>
-> +#include <linux/kernel.h>
-> +#include <linux/kexec.h>
-> +#include <linux/module_signature.h>
-> +#include <linux/types.h>
-> +#include <linux/verification.h>
-> +#include <asm/byteorder.h>
-> +#include <asm/kexec_file.h>
-> +#include <asm/memory.h>
-> +
-> +static int elf64_probe(const char *buf, unsigned long len)
-> +{
-> +	struct elfhdr ehdr;
-> +
-> +	/* Check for magic and architecture */
-> +	memcpy(&ehdr, buf, sizeof(ehdr));
-> +	if (memcmp(ehdr.e_ident, ELFMAG, SELFMAG) ||
-> +		(elf16_to_cpu(&ehdr, ehdr.e_machine) != EM_AARCH64))
-> +		return -ENOEXEC;
-> +
-> +	return 0;
-> +}
-> +
-> +static int elf_exec_load(struct kimage *image, struct elfhdr *ehdr,
-> +			 struct elf_info *elf_info,
-> +			 unsigned long *kernel_load_addr)
-> +{
-> +	struct kexec_buf kbuf;
-> +	const struct elf_phdr *phdr;
-> +	const struct arm64_image_header *h;
-> +	unsigned long text_offset, rand_offset;
-> +	unsigned long page_offset, phys_offset;
-> +	int first_segment, i, ret = -ENOEXEC;
-> +
-> +	kbuf.image = image;
-> +	if (image->type == KEXEC_TYPE_CRASH) {
-> +		kbuf.buf_min = crashk_res.start;
-> +		kbuf.buf_max = crashk_res.end + 1;
-> +	} else {
-> +		kbuf.buf_min = 0;
-> +		kbuf.buf_max = ULONG_MAX;
-> +	}
-> +	kbuf.top_down = 0;
-> +
-> +	/* Load PT_LOAD segments. */
-> +	for (i = 0, first_segment = 1; i < ehdr->e_phnum; i++) {
-> +		phdr = &elf_info->proghdrs[i];
-> +		if (phdr->p_type != PT_LOAD)
-> +			continue;
-> +
-> +		kbuf.buffer = (void *) elf_info->buffer + phdr->p_offset;
-> +		kbuf.bufsz = min(phdr->p_filesz, phdr->p_memsz);
-> +		kbuf.memsz = phdr->p_memsz;
-> +		kbuf.buf_align = phdr->p_align;
-> +
-> +		if (first_segment) {
-> +			/*
-> +			 * Identify TEXT_OFFSET:
-> +			 * When CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET=y the image
-> +			 * header could be offset in the elf segment. The linker
-> +			 * script sets ehdr->e_entry to the start of text.
-
-Please, let's not have to go delving into the vmlinux, knowing intimate
-details about how it's put together.
-
-> +			 *
-> +			 * NOTE: In v3.16 or older, h->text_offset is 0,
-> +			 * so use the default, 0x80000
-> +			 */
-> +			rand_offset = ehdr->e_entry - phdr->p_vaddr;
-> +			h = (struct arm64_image_header *)
-> +					(elf_info->buffer + phdr->p_offset +
-> +					rand_offset);
-> +
-> +			if (!arm64_header_check_magic(h))
-> +				goto out;
-> +
-> +			if (h->image_size)
-> +				text_offset = le64_to_cpu(h->text_offset);
-> +			else
-> +				text_offset = 0x80000;
-
-Surely we can share the Image header parsing with the Image parser?
-
-The Image code had practically the exact same logic operating on the
-header struct.
-
-Thanks,
-Mark.
+Regards.
