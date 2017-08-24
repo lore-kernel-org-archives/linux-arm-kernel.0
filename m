@@ -1,51 +1,216 @@
 From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Thu, 24 Aug 2017 12:52:23 +0800
-Subject: [RESENT PATCH v7 3/7] arm64: dts: rockchip: Update rt5514 devices'
- compatible for Gru
+Date: Thu, 24 Aug 2017 12:52:24 +0800
+Subject: [RESENT PATCH v7 4/7] ASoC: rockchip: Parse dai links from dts
 In-Reply-To: <20170824045227.15504-1-jeffy.chen@rock-chips.com>
 References: <20170824045227.15504-1-jeffy.chen@rock-chips.com>
-Message-ID: <20170824045227.15504-4-jeffy.chen@rock-chips.com>
+Message-ID: <20170824045227.15504-5-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the rt5514 i2c driver and rt5514 spi driver are using the same
-compatible string.
-
-Add additional unused compatible strings to identify them for Gru
-boards.
+Refactor rockchip_sound_probe, parse dai links from dts instead of
+hard coding them.
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+Tested-by: Matthias Kaehlcke <mka@chromium.org>
 ---
 
 Changes in v7: None
 Changes in v6: None
-Changes in v3: None
-Changes in v2: None
+Changes in v3:
+Use compatible to match audio codecs
+        -- Suggested-by Matthias Kaehlcke <mka@chromium.org>
 
- arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Changes in v2:
+Let rockchip,codec-names be a required property, because we plan to
+add more supported codecs to the fixed dai link list in the driver.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-index 5772c52fbfd3..50fb11ad9f17 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-@@ -611,7 +611,7 @@ ap_i2c_mic: &i2c1 {
- 	i2c-scl-rising-time-ns = <300>;
+ sound/soc/rockchip/rk3399_gru_sound.c | 140 ++++++++++++++++++++++------------
+ 1 file changed, 91 insertions(+), 49 deletions(-)
+
+diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
+index cd2fdba922f1..347c34d0db4c 100644
+--- a/sound/soc/rockchip/rk3399_gru_sound.c
++++ b/sound/soc/rockchip/rk3399_gru_sound.c
+@@ -240,14 +240,42 @@ static const struct snd_soc_ops rockchip_sound_da7219_ops = {
+ 	.hw_params = rockchip_sound_da7219_hw_params,
+ };
  
- 	headsetcodec: rt5514 at 57 {
--		compatible = "realtek,rt5514";
-+		compatible = "realtek,rt5514", "realtek,rt5514-i2c";
- 		reg = <0x57>;
- 		realtek,dmic-init-delay-ms = <20>;
- 	};
-@@ -820,7 +820,7 @@ ap_i2c_audio: &i2c8 {
- 	status = "okay";
++static struct snd_soc_card rockchip_sound_card = {
++	.name = "rk3399-gru-sound",
++	.owner = THIS_MODULE,
++	.dapm_widgets = rockchip_dapm_widgets,
++	.num_dapm_widgets = ARRAY_SIZE(rockchip_dapm_widgets),
++	.dapm_routes = rockchip_dapm_routes,
++	.num_dapm_routes = ARRAY_SIZE(rockchip_dapm_routes),
++	.controls = rockchip_controls,
++	.num_controls = ARRAY_SIZE(rockchip_controls),
++};
++
+ enum {
++	DAILINK_DA7219,
+ 	DAILINK_MAX98357A,
+ 	DAILINK_RT5514,
+-	DAILINK_DA7219,
+ 	DAILINK_RT5514_DSP,
+ };
  
- 	wacky_spi_audio: spi2 at 0 {
--		compatible = "realtek,rt5514";
-+		compatible = "realtek,rt5514", "realtek,rt5514-spi";
- 		reg = <0>;
- 		interrupt-parent = <&gpio1>;
- 		interrupts = <13 IRQ_TYPE_LEVEL_HIGH>;
+-static struct snd_soc_dai_link rockchip_dailinks[] = {
++static const char * const dailink_compat[] = {
++	[DAILINK_DA7219] = "dlg,da7219",
++	[DAILINK_MAX98357A] = "maxim,max98357a",
++	[DAILINK_RT5514] = "realtek,rt5514-i2c",
++	[DAILINK_RT5514_DSP] = "realtek,rt5514-spi",
++};
++
++static const struct snd_soc_dai_link rockchip_dais[] = {
++	[DAILINK_DA7219] = {
++		.name = "DA7219",
++		.stream_name = "DA7219 PCM",
++		.codec_dai_name = "da7219-hifi",
++		.init = rockchip_sound_da7219_init,
++		.ops = &rockchip_sound_da7219_ops,
++		/* set da7219 as slave */
++		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
++			SND_SOC_DAIFMT_CBS_CFS,
++	},
+ 	[DAILINK_MAX98357A] = {
+ 		.name = "MAX98357A",
+ 		.stream_name = "MAX98357A PCM",
+@@ -266,16 +294,6 @@ static struct snd_soc_dai_link rockchip_dailinks[] = {
+ 		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+ 			SND_SOC_DAIFMT_CBS_CFS,
+ 	},
+-	[DAILINK_DA7219] = {
+-		.name = "DA7219",
+-		.stream_name = "DA7219 PCM",
+-		.codec_dai_name = "da7219-hifi",
+-		.init = rockchip_sound_da7219_init,
+-		.ops = &rockchip_sound_da7219_ops,
+-		/* set da7219 as slave */
+-		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+-			SND_SOC_DAIFMT_CBS_CFS,
+-	},
+ 	/* RT5514 DSP for voice wakeup via spi bus */
+ 	[DAILINK_RT5514_DSP] = {
+ 		.name = "RT5514 DSP",
+@@ -284,42 +302,72 @@ static struct snd_soc_dai_link rockchip_dailinks[] = {
+ 	},
+ };
+ 
+-static struct snd_soc_card rockchip_sound_card = {
+-	.name = "rk3399-gru-sound",
+-	.owner = THIS_MODULE,
+-	.dai_link = rockchip_dailinks,
+-	.num_links =  ARRAY_SIZE(rockchip_dailinks),
+-	.dapm_widgets = rockchip_dapm_widgets,
+-	.num_dapm_widgets = ARRAY_SIZE(rockchip_dapm_widgets),
+-	.dapm_routes = rockchip_dapm_routes,
+-	.num_dapm_routes = ARRAY_SIZE(rockchip_dapm_routes),
+-	.controls = rockchip_controls,
+-	.num_controls = ARRAY_SIZE(rockchip_controls),
+-};
+-
+-static int rockchip_sound_probe(struct platform_device *pdev)
++static int rockchip_sound_codec_node_match(struct device_node *np_codec)
+ {
+-	struct snd_soc_card *card = &rockchip_sound_card;
+-	struct device_node *cpu_node;
+-	int i, ret;
++	int i;
+ 
+-	cpu_node = of_parse_phandle(pdev->dev.of_node, "rockchip,cpu", 0);
+-	if (!cpu_node) {
+-		dev_err(&pdev->dev, "Property 'rockchip,cpu' missing or invalid\n");
+-		return -EINVAL;
++	for (i = 0; i < ARRAY_SIZE(dailink_compat); i++) {
++		if (of_device_is_compatible(np_codec, dailink_compat[i]))
++			return i;
+ 	}
++	return -1;
++}
+ 
+-	for (i = 0; i < ARRAY_SIZE(rockchip_dailinks); i++) {
+-		rockchip_dailinks[i].platform_of_node = cpu_node;
+-		rockchip_dailinks[i].cpu_of_node = cpu_node;
+-
+-		rockchip_dailinks[i].codec_of_node =
+-			of_parse_phandle(pdev->dev.of_node, "rockchip,codec", i);
+-		if (!rockchip_dailinks[i].codec_of_node) {
+-			dev_err(&pdev->dev,
+-				"Property[%d] 'rockchip,codec' missing or invalid\n", i);
++static int rockchip_sound_of_parse_dais(struct device *dev,
++					struct snd_soc_card *card)
++{
++	struct device_node *np_cpu;
++	struct device_node *np_codec;
++	struct snd_soc_dai_link *dai;
++	int i, index;
++
++	card->dai_link = devm_kzalloc(dev, sizeof(rockchip_dais),
++				      GFP_KERNEL);
++	if (!card->dai_link)
++		return -ENOMEM;
++
++	np_cpu = of_parse_phandle(dev->of_node, "rockchip,cpu", 0);
++
++	card->num_links = 0;
++	for (i = 0; i < ARRAY_SIZE(rockchip_dais); i++) {
++		np_codec = of_parse_phandle(dev->of_node,
++					    "rockchip,codec", i);
++		if (!np_codec)
++			break;
++
++		if (!of_device_is_available(np_codec))
++			continue;
++
++		index = rockchip_sound_codec_node_match(np_codec);
++		if (index < 0)
++			continue;
++
++		if (!np_cpu) {
++			dev_err(dev, "Missing 'rockchip,cpu' for %s\n",
++				rockchip_dais[index].name);
+ 			return -EINVAL;
+ 		}
++
++		dai = &card->dai_link[card->num_links++];
++		*dai = rockchip_dais[index];
++
++		dai->codec_of_node = np_codec;
++		dai->platform_of_node = np_cpu;
++		dai->cpu_of_node = np_cpu;
++	}
++
++	return 0;
++}
++
++static int rockchip_sound_probe(struct platform_device *pdev)
++{
++	struct snd_soc_card *card = &rockchip_sound_card;
++	int ret;
++
++	ret = rockchip_sound_of_parse_dais(&pdev->dev, card);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Failed to parse dais: %d\n", ret);
++		return ret;
+ 	}
+ 
+ 	/* Set DMIC wakeup delay */
+@@ -332,13 +380,7 @@ static int rockchip_sound_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	card->dev = &pdev->dev;
+-
+-	ret = devm_snd_soc_register_card(&pdev->dev, card);
+-	if (ret)
+-		dev_err(&pdev->dev, "%s snd_soc_register_card fail %d\n",
+-			__func__, ret);
+-
+-	return ret;
++	return devm_snd_soc_register_card(&pdev->dev, card);
+ }
+ 
+ static const struct of_device_id rockchip_sound_of_match[] = {
 -- 
 2.11.0
