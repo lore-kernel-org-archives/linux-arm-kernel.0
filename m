@@ -1,272 +1,64 @@
 From: roy.pledge@nxp.com (Roy Pledge)
-Date: Thu, 24 Aug 2017 16:37:51 -0400
-Subject: [v4 07/11] soc/fsl/qbman: Rework portal mapping calls for ARM/PPC
-In-Reply-To: <1503607075-28970-1-git-send-email-roy.pledge@nxp.com>
-References: <1503607075-28970-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1503607075-28970-8-git-send-email-roy.pledge@nxp.com>
+Date: Thu, 24 Aug 2017 16:37:44 -0400
+Subject: [v4 00/11] soc/fsl/qbman: Enable QBMan on ARM Platforms
+Message-ID: <1503607075-28970-1-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rework portal mapping for PPC and ARM. The PPC devices require a
-cacheable coherent mapping while ARM will work with a non-cachable/write
-combine mapping. This also eliminates the need for manual cache
-flushes on ARM
+This patch series enables DPAA1 QBMan devices for ARM and
+ARM64 architectures. This allows the LS1043A and LS1046A to use
+QBMan functionality which allows access to ethernet and cyptographic
+devices for example.
 
-Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
----
- drivers/soc/fsl/qbman/bman.c        |  6 +++---
- drivers/soc/fsl/qbman/bman_portal.c | 36 +++++++++++++++++++++++-------------
- drivers/soc/fsl/qbman/bman_priv.h   |  8 +++-----
- drivers/soc/fsl/qbman/dpaa_sys.h    |  8 ++++----
- drivers/soc/fsl/qbman/qman.c        |  6 +++---
- drivers/soc/fsl/qbman/qman_portal.c | 36 +++++++++++++++++++++++-------------
- drivers/soc/fsl/qbman/qman_priv.h   |  8 +++-----
- 7 files changed, 62 insertions(+), 46 deletions(-)
+Changes since v3:
+- Use memremap() instead of ioremap() for non iomem QBMan portal regions
+- Ensured the __iomem attribute is respected when accessing iomem mapped regions
+- Removed calls to flush/invalidate/prefetch for ARM/ARM64 since mapping is done as write combine
 
-diff --git a/drivers/soc/fsl/qbman/bman.c b/drivers/soc/fsl/qbman/bman.c
-index ff8998f..e31c843 100644
---- a/drivers/soc/fsl/qbman/bman.c
-+++ b/drivers/soc/fsl/qbman/bman.c
-@@ -154,7 +154,7 @@ struct bm_mc {
- };
- 
- struct bm_addr {
--	void __iomem *ce;	/* cache-enabled */
-+	void *ce;		/* cache-enabled */
- 	void __iomem *ci;	/* cache-inhibited */
- };
- 
-@@ -512,8 +512,8 @@ static int bman_create_portal(struct bman_portal *portal,
- 	 * config, everything that follows depends on it and "config" is more
- 	 * for (de)reference...
- 	 */
--	p->addr.ce = c->addr_virt[DPAA_PORTAL_CE];
--	p->addr.ci = c->addr_virt[DPAA_PORTAL_CI];
-+	p->addr.ce = c->addr_virt_ce;
-+	p->addr.ci = c->addr_virt_ci;
- 	if (bm_rcr_init(p, bm_rcr_pvb, bm_rcr_cce)) {
- 		dev_err(c->dev, "RCR initialisation failed\n");
- 		goto fail_rcr;
-diff --git a/drivers/soc/fsl/qbman/bman_portal.c b/drivers/soc/fsl/qbman/bman_portal.c
-index 39b39c8..bb03503 100644
---- a/drivers/soc/fsl/qbman/bman_portal.c
-+++ b/drivers/soc/fsl/qbman/bman_portal.c
-@@ -91,7 +91,6 @@ static int bman_portal_probe(struct platform_device *pdev)
- 	struct device_node *node = dev->of_node;
- 	struct bm_portal_config *pcfg;
- 	struct resource *addr_phys[2];
--	void __iomem *va;
- 	int irq, cpu;
- 
- 	pcfg = devm_kmalloc(dev, sizeof(*pcfg), GFP_KERNEL);
-@@ -123,23 +122,34 @@ static int bman_portal_probe(struct platform_device *pdev)
- 	}
- 	pcfg->irq = irq;
- 
--	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]), 0);
--	if (!va) {
--		dev_err(dev, "ioremap::CE failed\n");
-+	/*
-+	 * TODO: Ultimately we would like to use a cacheable/non-shareable
-+	 * (coherent) mapping for the portal on both architectures but that
-+	 * isn't currently available in the kernel.  Because of HW differences
-+	 * PPC needs to be mapped cacheable while ARM SoCs will work with non
-+	 * cacheable mappings
-+	 */
-+#ifdef CONFIG_PPC
-+	/* PPC requires a cacheable/non-coherent mapping of the portal */
-+	pcfg->addr_virt_ce = memremap(addr_phys[0]->start,
-+				resource_size(addr_phys[0]), MEMREMAP_WB);
-+#else
-+	/* ARM can use a write combine mapping. */
-+	pcfg->addr_virt_ce = memremap(addr_phys[0]->start,
-+				resource_size(addr_phys[0]), MEMREMAP_WC);
-+#endif
-+	if (!pcfg->addr_virt_ce) {
-+		dev_err(dev, "memremap::CE failed\n");
- 		goto err_ioremap1;
- 	}
- 
--	pcfg->addr_virt[DPAA_PORTAL_CE] = va;
--
--	va = ioremap_prot(addr_phys[1]->start, resource_size(addr_phys[1]),
--			  _PAGE_GUARDED | _PAGE_NO_CACHE);
--	if (!va) {
-+	pcfg->addr_virt_ci = ioremap(addr_phys[1]->start,
-+					resource_size(addr_phys[1]));
-+	if (!pcfg->addr_virt_ci) {
- 		dev_err(dev, "ioremap::CI failed\n");
- 		goto err_ioremap2;
- 	}
- 
--	pcfg->addr_virt[DPAA_PORTAL_CI] = va;
--
- 	spin_lock(&bman_lock);
- 	cpu = cpumask_next_zero(-1, &portal_cpus);
- 	if (cpu >= nr_cpu_ids) {
-@@ -164,9 +174,9 @@ static int bman_portal_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_portal_init:
--	iounmap(pcfg->addr_virt[DPAA_PORTAL_CI]);
-+	iounmap(pcfg->addr_virt_ci);
- err_ioremap2:
--	iounmap(pcfg->addr_virt[DPAA_PORTAL_CE]);
-+	memunmap(pcfg->addr_virt_ce);
- err_ioremap1:
- 	return -ENXIO;
- }
-diff --git a/drivers/soc/fsl/qbman/bman_priv.h b/drivers/soc/fsl/qbman/bman_priv.h
-index 765a4bf..c48e6eb 100644
---- a/drivers/soc/fsl/qbman/bman_priv.h
-+++ b/drivers/soc/fsl/qbman/bman_priv.h
-@@ -49,11 +49,9 @@ extern u16 bman_ip_rev;	/* 0 if uninitialised, otherwise BMAN_REVx */
- extern struct gen_pool *bm_bpalloc;
- 
- struct bm_portal_config {
--	/*
--	 * Corenet portal addresses;
--	 * [0]==cache-enabled, [1]==cache-inhibited.
--	 */
--	void __iomem *addr_virt[2];
-+	/* Portal addresses */
-+	void  *addr_virt_ce;
-+	void __iomem *addr_virt_ci;
- 	/* Allow these to be joined in lists */
- 	struct list_head list;
- 	struct device *dev;
-diff --git a/drivers/soc/fsl/qbman/dpaa_sys.h b/drivers/soc/fsl/qbman/dpaa_sys.h
-index 81a9a5e..0a1d573 100644
---- a/drivers/soc/fsl/qbman/dpaa_sys.h
-+++ b/drivers/soc/fsl/qbman/dpaa_sys.h
-@@ -51,12 +51,12 @@
- 
- static inline void dpaa_flush(void *p)
- {
-+	/*
-+	 * Only PPC needs to flush the cache currently - on ARM the mapping
-+	 * is non cacheable
-+	 */
- #ifdef CONFIG_PPC
- 	flush_dcache_range((unsigned long)p, (unsigned long)p+64);
--#elif defined(CONFIG_ARM)
--	__cpuc_flush_dcache_area(p, 64);
--#elif defined(CONFIG_ARM64)
--	__flush_dcache_area(p, 64);
- #endif
- }
- 
-diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
-index 25419e1..668fab1 100644
---- a/drivers/soc/fsl/qbman/qman.c
-+++ b/drivers/soc/fsl/qbman/qman.c
-@@ -300,7 +300,7 @@ struct qm_mc {
- };
- 
- struct qm_addr {
--	void __iomem *ce;	/* cache-enabled */
-+	void *ce;		/* cache-enabled */
- 	void __iomem *ci;	/* cache-inhibited */
- };
- 
-@@ -1123,8 +1123,8 @@ static int qman_create_portal(struct qman_portal *portal,
- 	 * config, everything that follows depends on it and "config" is more
- 	 * for (de)reference
- 	 */
--	p->addr.ce = c->addr_virt[DPAA_PORTAL_CE];
--	p->addr.ci = c->addr_virt[DPAA_PORTAL_CI];
-+	p->addr.ce = c->addr_virt_ce;
-+	p->addr.ci = c->addr_virt_ci;
- 	/*
- 	 * If CI-stashing is used, the current defaults use a threshold of 3,
- 	 * and stash with high-than-DQRR priority.
-diff --git a/drivers/soc/fsl/qbman/qman_portal.c b/drivers/soc/fsl/qbman/qman_portal.c
-index cbacdf4..41fe33a 100644
---- a/drivers/soc/fsl/qbman/qman_portal.c
-+++ b/drivers/soc/fsl/qbman/qman_portal.c
-@@ -224,7 +224,6 @@ static int qman_portal_probe(struct platform_device *pdev)
- 	struct device_node *node = dev->of_node;
- 	struct qm_portal_config *pcfg;
- 	struct resource *addr_phys[2];
--	void __iomem *va;
- 	int irq, cpu, err;
- 	u32 val;
- 
-@@ -262,23 +261,34 @@ static int qman_portal_probe(struct platform_device *pdev)
- 	}
- 	pcfg->irq = irq;
- 
--	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]), 0);
--	if (!va) {
--		dev_err(dev, "ioremap::CE failed\n");
-+	/*
-+	 * TODO: Ultimately we would like to use a cacheable/non-shareable
-+	 * (coherent) mapping for the portal on both architectures but that
-+	 * isn't currently available in the kernel.  Because of HW differences
-+	 * PPC needs to be mapped cacheable while ARM SoCs will work with non
-+	 * cacheable mappings
-+	 */
-+#ifdef CONFIG_PPC
-+	/* PPC requires a cacheable mapping of the portal */
-+	pcfg->addr_virt_ce = memremap(addr_phys[0]->start,
-+				resource_size(addr_phys[0]), MEMREMAP_WB);
-+#else
-+	/* ARM can use write combine mapping for the cacheable area */
-+	pcfg->addr_virt_ce = memremap(addr_phys[0]->start,
-+				resource_size(addr_phys[0]), MEMREMAP_WT);
-+#endif
-+	if (!pcfg->addr_virt_ce) {
-+		dev_err(dev, "memremap::CE failed\n");
- 		goto err_ioremap1;
- 	}
- 
--	pcfg->addr_virt[DPAA_PORTAL_CE] = va;
--
--	va = ioremap_prot(addr_phys[1]->start, resource_size(addr_phys[1]),
--			  _PAGE_GUARDED | _PAGE_NO_CACHE);
--	if (!va) {
-+	pcfg->addr_virt_ci = ioremap(addr_phys[1]->start,
-+				resource_size(addr_phys[1]));
-+	if (!pcfg->addr_virt_ci) {
- 		dev_err(dev, "ioremap::CI failed\n");
- 		goto err_ioremap2;
- 	}
- 
--	pcfg->addr_virt[DPAA_PORTAL_CI] = va;
--
- 	pcfg->pools = qm_get_pools_sdqcr();
- 
- 	spin_lock(&qman_lock);
-@@ -310,9 +320,9 @@ static int qman_portal_probe(struct platform_device *pdev)
- 	return 0;
- 
- err_portal_init:
--	iounmap(pcfg->addr_virt[DPAA_PORTAL_CI]);
-+	iounmap(pcfg->addr_virt_ci);
- err_ioremap2:
--	iounmap(pcfg->addr_virt[DPAA_PORTAL_CE]);
-+	memunmap(pcfg->addr_virt_ce);
- err_ioremap1:
- 	return -ENXIO;
- }
-diff --git a/drivers/soc/fsl/qbman/qman_priv.h b/drivers/soc/fsl/qbman/qman_priv.h
-index 957ef54..bab7f15 100644
---- a/drivers/soc/fsl/qbman/qman_priv.h
-+++ b/drivers/soc/fsl/qbman/qman_priv.h
-@@ -155,11 +155,9 @@ static inline void qman_cgrs_xor(struct qman_cgrs *dest,
- void qman_init_cgr_all(void);
- 
- struct qm_portal_config {
--	/*
--	 * Corenet portal addresses;
--	 * [0]==cache-enabled, [1]==cache-inhibited.
--	 */
--	void __iomem *addr_virt[2];
-+	/* Portal addresses */
-+	void *addr_virt_ce;
-+	void __iomem *addr_virt_ci;
- 	struct device *dev;
- 	struct iommu_domain *iommu_domain;
- 	/* Allow these to be joined in lists */
--- 
+Changes since v2:
+- Fixed some misspellings
+- Added 'no-map' constraint to device tree bindings
+- Described ordering contraint on regions in the device tree
+- Removed confusing comment regarding non-shareable mappings
+- Added warning if old reserved-memory technique is used on ARM
+
+Changes since v1:
+- Reworked private memory allocations to use shared-dma-pool on ARM platforms
+
+
+Claudiu Manoil (2):
+  soc/fsl/qbman: Drop L1_CACHE_BYTES compile time check
+  soc/fsl/qbman: Add missing headers on ARM
+
+Madalin Bucur (4):
+  soc/fsl/qbman: Drop set/clear_bits usage
+  soc/fsl/qbman: add QMAN_REV32
+  soc/fsl/qbman: different register offsets on ARM
+  fsl/soc/qbman: Enable FSL_LAYERSCAPE config on ARM
+
+Roy Pledge (4):
+  soc/fsl/qbman: Use shared-dma-pool for BMan private memory allocations
+  soc/fsl/qbman: Use shared-dma-pool for QMan private memory allocations
+  dt-bindings: soc/fsl: Update reserved memory binding for QBMan
+  soc/fsl/qbman: Rework portal mapping calls for ARM/PPC
+
+Valentin Rothberg (1):
+  soc/fsl/qbman: Fix ARM32 typo
+
+ Documentation/devicetree/bindings/soc/fsl/bman.txt |  12 +-
+ Documentation/devicetree/bindings/soc/fsl/qman.txt |  26 ++--
+ drivers/soc/fsl/qbman/Kconfig                      |   2 +-
+ drivers/soc/fsl/qbman/bman.c                       |  30 ++++-
+ drivers/soc/fsl/qbman/bman_ccsr.c                  |  35 +++++-
+ drivers/soc/fsl/qbman/bman_portal.c                |  36 ++++--
+ drivers/soc/fsl/qbman/bman_priv.h                  |  11 +-
+ drivers/soc/fsl/qbman/dpaa_sys.h                   |  14 +--
+ drivers/soc/fsl/qbman/qman.c                       |  52 ++++++--
+ drivers/soc/fsl/qbman/qman_ccsr.c                  | 140 ++++++++++++++++-----
+ drivers/soc/fsl/qbman/qman_portal.c                |  36 ++++--
+ drivers/soc/fsl/qbman/qman_priv.h                  |  13 +-
+ drivers/soc/fsl/qbman/qman_test.h                  |   2 -
+ 13 files changed, 305 insertions(+), 104 deletions(-)
+
+--
 2.7.4
