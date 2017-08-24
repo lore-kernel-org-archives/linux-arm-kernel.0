@@ -1,49 +1,80 @@
 From: oza.oza@broadcom.com (Oza Pawandeep)
-Date: Thu, 24 Aug 2017 10:34:23 +0530
-Subject: [PATCH v8 0/3] PCI: iproc: SOC specific fixes
-Message-ID: <1503551066-23212-1-git-send-email-oza.oza@broadcom.com>
+Date: Thu, 24 Aug 2017 10:34:24 +0530
+Subject: [PATCH v8 1/3] PCI: iproc: factor out ep configuration access
+In-Reply-To: <1503551066-23212-1-git-send-email-oza.oza@broadcom.com>
+References: <1503551066-23212-1-git-send-email-oza.oza@broadcom.com>
+Message-ID: <1503551066-23212-2-git-send-email-oza.oza@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCI: iproc: Retry request when CRS returned from EP Above patch adds
-support for CRS in PCI RC driver, otherwise if not handled at lower
-level, the user space PMD (poll mode drivers) can timeout.
+This patch factors out ep configuration access
+as a separate function.
 
-PCI: iproc: add device shutdown for PCI RC This fixes the issue where
-certian PCI endpoints are not getting detected on Stingray SOC after
-reboot.
+Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
 
-Changes Since v7:
-Factor out the ep config access code.
-
-Changes Since v6:
-Rebased patches on top of Lorenzo's patches.
-Bjorn's comments addressed.
-now the confg retry returns 0xffffffff as data.
-Added reference to PCIe spec and iproc Controller spec in Changelog.
-
-Changes Since v5:
-Ray's comments addressed.
-
-Changes Since v4:
-Bjorn's comments addressed.
-
-Changes Since v3:
-[re-send]
-
-Changes Since v2:
-Fix compilation errors for pcie-iproc-platform.ko which was caught
-by kbuild.
-
-Oza Pawandeep (3):
-  PCI: iproc: factor-out ep configuration access
-  PCI: iproc: Retry request when CRS returned from EP
-  PCI: iproc: add device shutdown for PCI RC
-
- drivers/pci/host/pcie-iproc-platform.c |   8 ++
- drivers/pci/host/pcie-iproc.c          | 143 ++++++++++++++++++++++++++-------
- drivers/pci/host/pcie-iproc.h          |   1 +
- 3 files changed, 124 insertions(+), 28 deletions(-)
-
+diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+index c574863..61d9be6 100644
+--- a/drivers/pci/host/pcie-iproc.c
++++ b/drivers/pci/host/pcie-iproc.c
+@@ -448,6 +448,31 @@ static inline void iproc_pcie_apb_err_disable(struct pci_bus *bus,
+ 	}
+ }
+ 
++static void __iomem *iproc_pcie_map_ep_cfg_reg(struct iproc_pcie *pcie,
++					       unsigned int busno,
++					       unsigned int slot,
++					       unsigned int fn,
++					       int where)
++{
++	u16 offset;
++	u32 val;
++
++	/* EP device access */
++	val = (busno << CFG_ADDR_BUS_NUM_SHIFT) |
++		(slot << CFG_ADDR_DEV_NUM_SHIFT) |
++		(fn << CFG_ADDR_FUNC_NUM_SHIFT) |
++		(where & CFG_ADDR_REG_NUM_MASK) |
++		(1 & CFG_ADDR_CFG_TYPE_MASK);
++
++	iproc_pcie_write_reg(pcie, IPROC_PCIE_CFG_ADDR, val);
++	offset = iproc_pcie_reg_offset(pcie, IPROC_PCIE_CFG_DATA);
++
++	if (iproc_pcie_reg_is_invalid(offset))
++		return NULL;
++
++	return (pcie->base + offset);
++}
++
+ /**
+  * Note access to the configuration registers are protected at the higher layer
+  * by 'pci_lock' in drivers/pci/access.c
+@@ -459,7 +484,6 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct iproc_pcie *pcie,
+ {
+ 	unsigned slot = PCI_SLOT(devfn);
+ 	unsigned fn = PCI_FUNC(devfn);
+-	u32 val;
+ 	u16 offset;
+ 
+ 	/* root complex access */
+@@ -484,18 +508,7 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct iproc_pcie *pcie,
+ 		if (slot > 0)
+ 			return NULL;
+ 
+-	/* EP device access */
+-	val = (busno << CFG_ADDR_BUS_NUM_SHIFT) |
+-		(slot << CFG_ADDR_DEV_NUM_SHIFT) |
+-		(fn << CFG_ADDR_FUNC_NUM_SHIFT) |
+-		(where & CFG_ADDR_REG_NUM_MASK) |
+-		(1 & CFG_ADDR_CFG_TYPE_MASK);
+-	iproc_pcie_write_reg(pcie, IPROC_PCIE_CFG_ADDR, val);
+-	offset = iproc_pcie_reg_offset(pcie, IPROC_PCIE_CFG_DATA);
+-	if (iproc_pcie_reg_is_invalid(offset))
+-		return NULL;
+-	else
+-		return (pcie->base + offset);
++	return iproc_pcie_map_ep_cfg_reg(pcie, busno, slot, fn, where);
+ }
+ 
+ static void __iomem *iproc_pcie_bus_map_cfg_bus(struct pci_bus *bus,
 -- 
 1.9.1
