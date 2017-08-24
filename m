@@ -1,43 +1,44 @@
-From: oza.oza@broadcom.com (Oza Pawandeep)
-Date: Thu, 24 Aug 2017 14:19:08 +0530
-Subject: [PATCH v4 3/3] dt-bindings: PCI iproc: add optional property
- prsnt-gpios
-In-Reply-To: <1503564548-1834-1-git-send-email-oza.oza@broadcom.com>
-References: <1503564548-1834-1-git-send-email-oza.oza@broadcom.com>
-Message-ID: <1503564548-1834-4-git-send-email-oza.oza@broadcom.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 24 Aug 2017 10:50:35 +0200
+Subject: [PATCH] clk: sunxi: fix uninitialized access
+In-Reply-To: <20170823143937.2176025-1-arnd@arndb.de>
+References: <20170823143937.2176025-1-arnd@arndb.de>
+Message-ID: <20170824085035.uznlemp5dzpts5ms@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add description for optional device tree property
-'prsnt-gpios' for PCI hotplug feature.
+On Wed, Aug 23, 2017 at 04:39:27PM +0200, Arnd Bergmann wrote:
+> gcc-8 reports an uninitialized variable access in a code path
+> that we would see with incorrect DTB input:
+> 
+> drivers/clk/sunxi/clk-sun8i-bus-gates.c: In function 'sun8i_h3_bus_gates_init':
+> drivers/clk/sunxi/clk-sun8i-bus-gates.c:85:27: error: 'clk_parent' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> 
+> This works around by skipping invalid input and printing a warning
+> instead if it ever happens. The problem was apparently part of the
+> initiali driver submission, but older compilers don't notice it.
+> 
+> Fixes: ab6e23a4e388 ("clk: sunxi: Add H3 clocks support")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+That's weird it stayed for that long without any compiler noticing.
 
-diff --git a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
-index b8e48b4..0c5f631 100644
---- a/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/brcm,iproc-pcie.txt
-@@ -72,6 +72,20 @@ Optional properties:
- - brcm,pcie-msi-inten: Needs to be present for some older iProc platforms that
- require the interrupt enable registers to be set explicitly to enable MSI
- 
-+Optional properties:
-+- slot-pluggable: PCI hotplug feature is supported.
-+- prsnt-gpios: Array of gpios, needs to be present if Hotplug is supported.
-+
-+Refer to the following binding documents for more detailed description on
-+the use of 'slot-pluggable' and 'prsnt-gpios'.
-+  Documentation/devicetree/bindings/pci/pci.txt
-+
-+Example:
-+prsnt-gpios: <&pca9505 32 1>, <&pca9505 33 1>;
-+This is x4 connector: monitoring max 2 present lines.
-+prsnt-gpios: <&pca9505 32 1>, <&pca9505 33 1>, <&pca9505 34 1>;
-+This is x8 connector: monitoring max 3 present lines.
-+
- Example:
- 	pcie0: pcie at 18012000 {
- 		compatible = "brcm,iproc-pcie";
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Mike, Stephen, can you pick it up as a fix? We don't have anything
+else coming your way.
+
+Thanks!
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170824/ab1db200/attachment.sig>
