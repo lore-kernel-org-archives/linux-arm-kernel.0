@@ -1,330 +1,329 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 24 Aug 2017 17:18:05 +0900
-Subject: [PATCH 08/14] arm64: kexec_file: create purgatory
+Date: Thu, 24 Aug 2017 17:18:07 +0900
+Subject: [PATCH 10/14] arm64: kexec_file: load initrd,
+ device-tree and purgatory segments
 In-Reply-To: <20170824081811.19299-1-takahiro.akashi@linaro.org>
 References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
-Message-ID: <20170824081811.19299-9-takahiro.akashi@linaro.org>
+Message-ID: <20170824081811.19299-11-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a basic purgtory, or a kind of glue code between the two kernel,
-for arm64. We will later add a feature of verifying a digest check against
-loaded memory segments.
+load_other_segments() sets up and adds all the memory segments necessary
+other than kernel, including initrd, device-tree blob and purgatory.
+Most of the code was borrowed from kexec-tools' counterpart.
 
-arch_kexec_apply_relocations_add() is responsible for re-linking any
-relative symbols in purgatory. Please note that the purgatory is not
-an executable, but a non-linked archive of binaries so relative symbols
-contained here must be resolved at kexec load time.
-Despite that arm64_kernel_start and arm64_dtb_addr are only such global
-variables now, arch_kexec_apply_relocations_add() can manage more various
-types of relocations.
+In addition, arch_kexec_image_probe(), arch_kexec_image_load() and
+arch_kexec_kernel_verify_sig() are stubs for supporting multiple types
+of kernel image formats.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/Makefile                    |   1 +
- arch/arm64/kernel/Makefile             |   1 +
- arch/arm64/kernel/machine_kexec_file.c | 199 +++++++++++++++++++++++++++++++++
- arch/arm64/purgatory/Makefile          |  24 ++++
- arch/arm64/purgatory/entry.S           |  28 +++++
- 5 files changed, 253 insertions(+)
- create mode 100644 arch/arm64/kernel/machine_kexec_file.c
- create mode 100644 arch/arm64/purgatory/Makefile
- create mode 100644 arch/arm64/purgatory/entry.S
+ arch/arm64/include/asm/kexec.h         |  18 +++
+ arch/arm64/kernel/machine_kexec_file.c | 255 +++++++++++++++++++++++++++++++++
+ 2 files changed, 273 insertions(+)
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 9b41f1e3b1a0..429f60728c0a 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -105,6 +105,7 @@ core-$(CONFIG_XEN) += arch/arm64/xen/
- core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
- libs-y		:= arch/arm64/lib/ $(libs-y)
- core-$(CONFIG_EFI_STUB) += $(objtree)/drivers/firmware/efi/libstub/lib.a
-+core-$(CONFIG_KEXEC_FILE) += arch/arm64/purgatory/
+diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+index e17f0529a882..ebc4aaa707ae 100644
+--- a/arch/arm64/include/asm/kexec.h
++++ b/arch/arm64/include/asm/kexec.h
+@@ -93,6 +93,24 @@ static inline void crash_prepare_suspend(void) {}
+ static inline void crash_post_resume(void) {}
+ #endif
  
- # Default target when executing plain make
- boot		:= arch/arm64/boot
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index f2b4e816b6de..16e9f56b536a 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -50,6 +50,7 @@ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
- arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
- arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
- 					   cpu-reset.o
-+arm64-obj-$(CONFIG_KEXEC_FILE)		+= machine_kexec_file.o
- arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
- arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
- arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
++#ifdef CONFIG_KEXEC_FILE
++#define ARCH_HAS_KIMAGE_ARCH
++
++struct kimage_arch {
++	void *dtb_buf;
++};
++
++struct kimage;
++extern int setup_dtb(struct kimage *image,
++		unsigned long initrd_load_addr, unsigned long initrd_len,
++		char *cmdline, unsigned long cmdline_len,
++		char **dtb_buf, size_t *dtb_buf_len);
++extern int load_other_segments(struct kimage *image,
++		unsigned long kernel_load_addr,
++		char *initrd, unsigned long initrd_len,
++		char *cmdline, unsigned long cmdline_len);
++#endif
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
 diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
-new file mode 100644
-index 000000000000..183f7776d6dd
---- /dev/null
+index 183f7776d6dd..cd12e451e474 100644
+--- a/arch/arm64/kernel/machine_kexec_file.c
 +++ b/arch/arm64/kernel/machine_kexec_file.c
-@@ -0,0 +1,199 @@
-+/*
-+ * kexec_file for arm64
-+ *
-+ * Copyright (C) 2017 Linaro Limited
-+ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-+ *
-+ * Most code is derived from arm64 port of kexec-tools
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+@@ -16,8 +16,78 @@
+ #include <linux/elf.h>
+ #include <linux/errno.h>
+ #include <linux/kernel.h>
++#include <linux/kexec.h>
++#include <linux/libfdt.h>
++#include <linux/memblock.h>
++#include <linux/of_fdt.h>
+ #include <linux/types.h>
+ #include <asm/byteorder.h>
++#include <asm/kexec_file.h>
 +
-+#define pr_fmt(fmt) "kexec_file: " fmt
++static int __dt_root_addr_cells;
++static int __dt_root_size_cells;
 +
-+#include <linux/elf.h>
-+#include <linux/errno.h>
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <asm/byteorder.h>
++static struct kexec_file_ops *kexec_file_loaders[0];
 +
-+/*
-+ * Apply purgatory relocations.
-+ *
-+ * ehdr: Pointer to elf headers
-+ * sechdrs: Pointer to section headers.
-+ * relsec: section index of SHT_RELA section.
-+ *
-+ * Note:
-+ * Currently R_AARCH64_ABS64, R_AARCH64_LD_PREL_LO19 and R_AARCH64_CALL26
-+ * are the only types to be generated from purgatory code.
-+ * If we add more functionalities, other types may also be used.
-+ */
-+int arch_kexec_apply_relocations_add(const Elf64_Ehdr *ehdr,
-+				     Elf64_Shdr *sechdrs, unsigned int relsec)
++int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
++				  unsigned long buf_len)
 +{
-+	Elf64_Rela *rel;
-+	Elf64_Shdr *section, *symtabsec;
-+	Elf64_Sym *sym;
-+	const char *strtab, *name, *shstrtab;
-+	unsigned long address, sec_base, value;
-+	void *location;
-+	u64 *loc64;
-+	u32 *loc32, imm;
-+	unsigned int i;
++	struct kexec_file_ops *fops;
++	int i, ret;
 +
-+	/*
-+	 * ->sh_offset has been modified to keep the pointer to section
-+	 * contents in memory
-+	 */
-+	rel = (void *)sechdrs[relsec].sh_offset;
++	for (i = 0; i < ARRAY_SIZE(kexec_file_loaders); i++) {
++		fops = kexec_file_loaders[i];
++		if (!fops || !fops->probe)
++			continue;
 +
-+	/* Section to which relocations apply */
-+	section = &sechdrs[sechdrs[relsec].sh_info];
-+
-+	pr_debug("reloc: Applying relocate section %u to %u\n", relsec,
-+		 sechdrs[relsec].sh_info);
-+
-+	/* Associated symbol table */
-+	symtabsec = &sechdrs[sechdrs[relsec].sh_link];
-+
-+	/* String table */
-+	if (symtabsec->sh_link >= ehdr->e_shnum) {
-+		/* Invalid strtab section number */
-+		pr_err("reloc: Invalid string table section index %d\n",
-+		       symtabsec->sh_link);
-+		return -ENOEXEC;
-+	}
-+
-+	strtab = (char *)sechdrs[symtabsec->sh_link].sh_offset;
-+
-+	/* section header string table */
-+	shstrtab = (char *)sechdrs[ehdr->e_shstrndx].sh_offset;
-+
-+	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rel); i++) {
-+
-+		/*
-+		 * rel[i].r_offset contains byte offset from beginning
-+		 * of section to the storage unit affected.
-+		 *
-+		 * This is location to update (->sh_offset). This is temporary
-+		 * buffer where section is currently loaded. This will finally
-+		 * be loaded to a different address later, pointed to by
-+		 * ->sh_addr. kexec takes care of moving it
-+		 *  (kexec_load_segment()).
-+		 */
-+		location = (void *)(section->sh_offset + rel[i].r_offset);
-+
-+		/* Final address of the location */
-+		address = section->sh_addr + rel[i].r_offset;
-+
-+		/*
-+		 * rel[i].r_info contains information about symbol table index
-+		 * w.r.t which relocation must be made and type of relocation
-+		 * to apply. ELF64_R_SYM() and ELF64_R_TYPE() macros get
-+		 * these respectively.
-+		 */
-+		sym = (Elf64_Sym *)symtabsec->sh_offset +
-+				ELF64_R_SYM(rel[i].r_info);
-+
-+		if (sym->st_name)
-+			name = strtab + sym->st_name;
-+		else
-+			name = shstrtab + sechdrs[sym->st_shndx].sh_name;
-+
-+		pr_debug("Symbol: %-16s info: %02x shndx: %02x value=%llx size: %llx reloc type:%d\n",
-+			 name, sym->st_info, sym->st_shndx, sym->st_value,
-+			 sym->st_size, (int)ELF64_R_TYPE(rel[i].r_info));
-+
-+		if (sym->st_shndx == SHN_UNDEF) {
-+			pr_err("reloc: Undefined symbol: %s\n", name);
-+			return -ENOEXEC;
-+		}
-+
-+		if (sym->st_shndx == SHN_COMMON) {
-+			pr_err("reloc: symbol '%s' in common section\n", name);
-+			return -ENOEXEC;
-+		}
-+
-+		if (sym->st_shndx == SHN_ABS) {
-+			sec_base = 0;
-+		} else if (sym->st_shndx < ehdr->e_shnum) {
-+			sec_base = sechdrs[sym->st_shndx].sh_addr;
-+		} else {
-+			pr_err("reloc: Invalid section %d for symbol %s\n",
-+			       sym->st_shndx, name);
-+			return -ENOEXEC;
-+		}
-+
-+		value = sym->st_value;
-+		value += sec_base;
-+		value += rel[i].r_addend;
-+
-+		switch (ELF64_R_TYPE(rel[i].r_info)) {
-+		case R_AARCH64_ABS64:
-+			loc64 = location;
-+			*loc64 = cpu_to_elf64(ehdr,
-+					elf64_to_cpu(ehdr, *loc64) + value);
-+			break;
-+		case R_AARCH64_PREL32:
-+			loc32 = location;
-+			*loc32 = cpu_to_elf32(ehdr,
-+					elf32_to_cpu(ehdr, *loc32) + value
-+								- address);
-+			break;
-+		case R_AARCH64_LD_PREL_LO19:
-+			loc32 = location;
-+			*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
-+				+ (((value - address) << 3) & 0xffffe0));
-+			break;
-+		case R_AARCH64_ADR_PREL_LO21:
-+			if (value & 3) {
-+				pr_err("reloc: Unaligned value: %lx\n", value);
-+				return -ENOEXEC;
-+			}
-+			loc32 = location;
-+			*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
-+				+ (((value - address) << 3) & 0xffffe0));
-+			break;
-+		case R_AARCH64_ADR_PREL_PG_HI21:
-+			imm = ((value & ~0xfff) - (address & ~0xfff)) >> 12;
-+			loc32 = location;
-+			*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
-+				+ ((imm & 3) << 29)
-+				+ ((imm & 0x1ffffc) << (5 - 2)));
-+			break;
-+		case R_AARCH64_ADD_ABS_LO12_NC:
-+			loc32 = location;
-+			*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
-+				+ ((value & 0xfff) << 10));
-+			break;
-+		case R_AARCH64_JUMP26:
-+			loc32 = location;
-+			*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
-+				+ (((value - address) >> 2) & 0x3ffffff));
-+			break;
-+		case R_AARCH64_CALL26:
-+			loc32 = location;
-+			*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
-+				+ (((value - address) >> 2) & 0x3ffffff));
-+			break;
-+		case R_AARCH64_LDST64_ABS_LO12_NC:
-+			if (value & 7) {
-+				pr_err("reloc: Unaligned value: %lx\n", value);
-+				return -ENOEXEC;
-+			}
-+			loc32 = location;
-+			*loc32 = cpu_to_le32(le32_to_cpu(*loc32)
-+				+ ((value & 0xff8) << (10 - 3)));
-+			break;
-+		default:
-+			pr_err("reloc: Unknown relocation type: %llu\n",
-+			       ELF64_R_TYPE(rel[i].r_info));
-+			return -ENOEXEC;
++		ret = fops->probe(buf, buf_len);
++		if (!ret) {
++			image->fops = fops;
++			return 0;
 +		}
 +	}
++
++	return -ENOEXEC;
++}
++
++void *arch_kexec_kernel_image_load(struct kimage *image)
++{
++	if (!image->fops || !image->fops->load)
++		return ERR_PTR(-ENOEXEC);
++
++	return image->fops->load(image, image->kernel_buf,
++				 image->kernel_buf_len, image->initrd_buf,
++				 image->initrd_buf_len, image->cmdline_buf,
++				 image->cmdline_buf_len);
++}
++
++int arch_kimage_file_post_load_cleanup(struct kimage *image)
++{
++	vfree(image->arch.dtb_buf);
++	image->arch.dtb_buf = NULL;
++
++	vfree(image->arch.elf_headers);
++	image->arch.elf_headers = NULL;
++	image->arch.elf_headers_sz = 0;
++
++	if (!image->fops || !image->fops->cleanup)
++		return 0;
++
++	return image->fops->cleanup(image->image_loader_data);
++}
++
++#ifdef CONFIG_KEXEC_VERIFY_SIG
++int arch_kexec_kernel_verify_sig(struct kimage *image, void *kernel,
++				 unsigned long kernel_len)
++{
++	if (!image->fops || !image->fops->verify_sig) {
++		pr_debug("kernel loader does not support signature verification.\n");
++		return -EKEYREJECTED;
++	}
++
++	return image->fops->verify_sig(kernel, kernel_len);
++}
++#endif
+ 
+ /*
+  * Apply purgatory relocations.
+@@ -197,3 +267,188 @@ int arch_kexec_apply_relocations_add(const Elf64_Ehdr *ehdr,
+ 
+ 	return 0;
+ }
++
++int arch_kexec_walk_mem(struct kexec_buf *kbuf, int (*func)(u64, u64, void *))
++{
++	if (kbuf->image->type == KEXEC_TYPE_CRASH)
++		return walk_iomem_res_desc(crashk_res.desc,
++					IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY,
++					crashk_res.start, crashk_res.end,
++					kbuf, func);
++	else if (kbuf->top_down)
++		return walk_system_ram_res_rev(0, ULONG_MAX, kbuf, func);
++	else
++		return walk_system_ram_res(0, ULONG_MAX, kbuf, func);
++}
++
++int setup_dtb(struct kimage *image,
++		unsigned long initrd_load_addr, unsigned long initrd_len,
++		char *cmdline, unsigned long cmdline_len,
++		char **dtb_buf, size_t *dtb_buf_len)
++{
++	char *buf = NULL;
++	size_t buf_size;
++	int nodeoffset;
++	u64 value;
++	int range_len;
++	int ret;
++
++	/* duplicate dt blob */
++	buf_size = fdt_totalsize(initial_boot_params);
++	range_len = (__dt_root_addr_cells + __dt_root_size_cells) * sizeof(u32);
++
++	if (initrd_load_addr)
++		buf_size += fdt_prop_len("initrd-start", sizeof(u64))
++				+ fdt_prop_len("initrd-end", sizeof(u64));
++
++	if (cmdline)
++		buf_size += fdt_prop_len("bootargs", cmdline_len + 1);
++
++	buf = vmalloc(buf_size);
++	if (!buf) {
++		ret = -ENOMEM;
++		goto out_err;
++	}
++
++	ret = fdt_open_into(initial_boot_params, buf, buf_size);
++	if (ret)
++		goto out_err;
++
++	nodeoffset = fdt_path_offset(buf, "/chosen");
++	if (nodeoffset < 0)
++		goto out_err;
++
++	/* add bootargs */
++	if (cmdline) {
++		ret = fdt_setprop(buf, nodeoffset, "bootargs",
++						cmdline, cmdline_len + 1);
++		if (ret)
++			goto out_err;
++	}
++
++	/* add initrd-* */
++	if (initrd_load_addr) {
++		value = cpu_to_fdt64(initrd_load_addr);
++		ret = fdt_setprop(buf, nodeoffset, "initrd-start",
++				&value, sizeof(value));
++		if (ret)
++			goto out_err;
++
++		value = cpu_to_fdt64(initrd_load_addr + initrd_len);
++		ret = fdt_setprop(buf, nodeoffset, "initrd-end",
++				&value, sizeof(value));
++		if (ret)
++			goto out_err;
++	}
++
++	/* trim a buffer */
++	fdt_pack(buf);
++	*dtb_buf = buf;
++	*dtb_buf_len = fdt_totalsize(buf);
 +
 +	return 0;
++
++out_err:
++	vfree(buf);
++	return ret;
 +}
-diff --git a/arch/arm64/purgatory/Makefile b/arch/arm64/purgatory/Makefile
-new file mode 100644
-index 000000000000..c2127a2cbd51
---- /dev/null
-+++ b/arch/arm64/purgatory/Makefile
-@@ -0,0 +1,24 @@
-+OBJECT_FILES_NON_STANDARD := y
 +
-+purgatory-y := entry.o
++int load_other_segments(struct kimage *image, unsigned long kernel_load_addr,
++			char *initrd, unsigned long initrd_len,
++			char *cmdline, unsigned long cmdline_len)
++{
++	struct kexec_buf kbuf;
++	unsigned long initrd_load_addr = 0;
++	unsigned long purgatory_load_addr, dtb_load_addr;
++	char *dtb = NULL;
++	unsigned long dtb_len;
++	int ret = 0;
 +
-+targets += $(purgatory-y)
-+PURGATORY_OBJS = $(addprefix $(obj)/,$(purgatory-y))
++	kbuf.image = image;
 +
-+LDFLAGS_purgatory.ro := -e purgatory_start -r --no-undefined \
-+					-nostdlib -z nodefaultlib
-+targets += purgatory.ro
++	/* Load initrd */
++	if (initrd) {
++		kbuf.buffer = initrd;
++		kbuf.bufsz = initrd_len;
++		kbuf.memsz = initrd_len;
++		kbuf.buf_align = PAGE_SIZE;
++		/* within 1GB-aligned window of up to 32GB in size */
++		kbuf.buf_min = kernel_load_addr;
++		kbuf.buf_max = round_down(kernel_load_addr, SZ_1G)
++						+ (unsigned long)SZ_1G * 31;
++		kbuf.top_down = 0;
 +
-+$(obj)/purgatory.ro: $(PURGATORY_OBJS) FORCE
-+		$(call if_changed,ld)
++		ret = kexec_add_buffer(&kbuf);
++		if (ret)
++			goto out_err;
++		initrd_load_addr = kbuf.mem;
 +
-+targets += kexec_purgatory.c
++		pr_debug("Loaded initrd@0x%lx bufsz=0x%lx memsz=0x%lx\n",
++				initrd_load_addr, initrd_len, initrd_len);
++	}
 +
-+CMD_BIN2C = $(objtree)/scripts/basic/bin2c
-+quiet_cmd_bin2c = BIN2C $@
-+	cmd_bin2c = $(CMD_BIN2C) kexec_purgatory < $< > $@
++	/* Load dtb blob */
++	ret = setup_dtb(image, initrd_load_addr, initrd_len,
++				cmdline, cmdline_len, &dtb, &dtb_len);
++	if (ret) {
++		pr_err("Preparing for new dtb failed\n");
++		goto out_err;
++	}
 +
-+$(obj)/kexec_purgatory.c: $(obj)/purgatory.ro FORCE
-+	$(call if_changed,bin2c)
++	kbuf.buffer = dtb;
++	kbuf.bufsz = dtb_len;
++	kbuf.memsz = dtb_len;
++	/* not across 2MB boundary */
++	kbuf.buf_align = SZ_2M;
++	/*
++	 * Note for backporting:
++	 * On kernel prior to v4.2, fdt must reside within 512MB block
++	 * where the kernel also resides. So
++	 *   kbuf.buf_min = round_down(kernel_load_addr, SZ_512M);
++	 *   kbuf.buf_max = round_up(kernel_load_addr, SZ_512M);
++	 * would be required.
++	 */
++	kbuf.buf_min = kernel_load_addr;
++	kbuf.buf_max = ULONG_MAX;
++	kbuf.top_down = 1;
 +
-+obj-${CONFIG_KEXEC_FILE}	+= kexec_purgatory.o
-diff --git a/arch/arm64/purgatory/entry.S b/arch/arm64/purgatory/entry.S
-new file mode 100644
-index 000000000000..bc4e6b3bf8a1
---- /dev/null
-+++ b/arch/arm64/purgatory/entry.S
-@@ -0,0 +1,28 @@
-+/*
-+ * kexec core purgatory
-+ */
-+#include <linux/linkage.h>
++	ret = kexec_add_buffer(&kbuf);
++	if (ret)
++		goto out_err;
++	dtb_load_addr = kbuf.mem;
++	image->arch.dtb_buf = dtb;
 +
-+.text
++	pr_debug("Loaded dtb at 0x%lx bufsz=0x%lx memsz=0x%lx\n",
++			dtb_load_addr, dtb_len, dtb_len);
 +
-+ENTRY(purgatory_start)
-+	/* Start new image. */
-+	ldr	x17, arm64_kernel_entry
-+	ldr	x0, arm64_dtb_addr
-+	mov	x1, xzr
-+	mov	x2, xzr
-+	mov	x3, xzr
-+	br	x17
-+END(purgatory_start)
++	/* Load purgatory  */
++	ret = kexec_load_purgatory(image, kernel_load_addr, ULONG_MAX, 1,
++				   &purgatory_load_addr);
++	if (ret) {
++		pr_err("Loading purgatory failed\n");
++		goto out_err;
++	}
 +
-+.data
++	ret = kexec_purgatory_get_set_symbol(image, "arm64_kernel_entry",
++				&kernel_load_addr, sizeof(kernel_load_addr), 0);
++	if (ret) {
++		pr_err("Relocating symbol (arm64_kernel_entry) failed.\n");
++		goto out_err;
++	}
 +
-+.align 3
++	ret = kexec_purgatory_get_set_symbol(image, "arm64_dtb_addr",
++				&dtb_load_addr, sizeof(dtb_load_addr), 0);
++	if (ret) {
++		pr_err("Relocating symbol (arm64_dtb_addr) failed.\n");
++		goto out_err;
++	}
 +
-+ENTRY(arm64_kernel_entry)
-+	.quad	0
-+END(arm64_kernel_entry)
++	pr_debug("Loaded purgatory at 0x%lx\n", purgatory_load_addr);
 +
-+ENTRY(arm64_dtb_addr)
-+	.quad	0
-+END(arm64_dtb_addr)
++	return 0;
++
++out_err:
++	vfree(dtb);
++	image->arch.dtb_buf = NULL;
++	return ret;
++}
 -- 
 2.14.1
