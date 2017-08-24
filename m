@@ -1,39 +1,34 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 25 Aug 2017 00:25:00 +0800
-Subject: [PATCH 1/3] pci: designware: add driver for DWC controller in
- ECAM shift mode
-In-Reply-To: <20170821192907.8695-2-ard.biesheuvel@linaro.org>
-Message-ID: <201708250048.Dd1IM480%fengguang.wu@intel.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Thu, 24 Aug 2017 22:05:56 +0530
+Subject: [PATCH 0/9] constify amba_id
+Message-ID: <1503592565-21601-1-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+amba_id are not supposed to change at runtime. All functions
+working with const amba_id. So mark the non-const structs as const.
 
-[auto build test WARNING on pci/next]
-[also build test WARNING on v4.13-rc6 next-20170824]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Arvind Yadav (9):
+  [PATCH 1/9] coresight: constify amba_id
+  [PATCH 2/9] coresight: etb10: constify amba_id
+  [PATCH 3/9] coresight: etm3x: constify amba_id
+  [PATCH 4/9] coresight: etm4x: constify amba_id
+  [PATCH 5/9] coresight: funnel: constify amba_id
+  [PATCH 6/9] coresight: replicator: constify amba_id
+  [PATCH 7/9] coresight: stm: constify amba_id
+  [PATCH 8/9] coresight: tmc: constify amba_id
+  [PATCH 9/9] coresight: tpiu: constify amba_id
 
-url:    https://github.com/0day-ci/linux/commits/Ard-Biesheuvel/pci-add-support-for-firmware-initialized-designware-RCs/20170824-232638
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
-config: mips-allmodconfig (attached as .config)
-compiler: mips-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=mips 
+ drivers/hwtracing/coresight/coresight-cpu-debug.c       | 2 +-
+ drivers/hwtracing/coresight/coresight-etb10.c           | 2 +-
+ drivers/hwtracing/coresight/coresight-etm3x.c           | 2 +-
+ drivers/hwtracing/coresight/coresight-etm4x.c           | 2 +-
+ drivers/hwtracing/coresight/coresight-funnel.c          | 2 +-
+ drivers/hwtracing/coresight/coresight-replicator-qcom.c | 2 +-
+ drivers/hwtracing/coresight/coresight-stm.c             | 2 +-
+ drivers/hwtracing/coresight/coresight-tmc.c             | 2 +-
+ drivers/hwtracing/coresight/coresight-tpiu.c            | 2 +-
+ 9 files changed, 9 insertions(+), 9 deletions(-)
 
-All warnings (new ones prefixed by >>):
-
-warning: (PCIE_DW_HOST_ECAM) selects PCI_HOST_COMMON which has unmet direct dependencies (PCI)
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 47113 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170825/d2fac168/attachment-0001.gz>
+-- 
+2.7.4
