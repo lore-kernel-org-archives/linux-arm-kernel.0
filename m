@@ -1,112 +1,141 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Thu, 24 Aug 2017 12:53:06 +0530
-Subject: [PATCH v5 0/4] Add support for ThunderX2 pmu events using json
- files
-In-Reply-To: <4900f29c-aea5-9792-ee4b-adbf942eb361@huawei.com>
-References: <20170816071048.26087-1-ganapatrao.kulkarni@cavium.com>
- <CAKTKpr79hBBGfkVnKS+XsSOAwR9G1=F04OH0UBE3J8EX_w3L5A@mail.gmail.com>
- <4900f29c-aea5-9792-ee4b-adbf942eb361@huawei.com>
-Message-ID: <CAKTKpr6KB3VQ0bg-nA02T2-o9D1WbqS9UAinCN7YYwVd=MhyWg@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Thu, 24 Aug 2017 12:51:39 +0530
+Subject: [PATCH v2 17/20] rpmsg: glink: Receive and store the remote intent
+ buffers
+In-Reply-To: <1503559302-3744-1-git-send-email-sricharan@codeaurora.org>
+References: <1503559302-3744-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1503559302-3744-18-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
+Just like we allocating and sending intent ids to remote,
+remote side allocates and sends us the intents as well.
+So save the intent ids and use it later while sending
+data targeting the appropriate intents based on the size.
 
-On Wed, Aug 23, 2017 at 2:52 PM, John Garry <john.garry@huawei.com> wrote:
-> On 22/08/2017 05:21, Ganapatrao Kulkarni wrote:
->>
->> Hi Arnaldo, Will,
->>
->> are there any comments on this series?
->>
->
-> Hi Ganapatrao,
->
-> Is it possible to have vendor sub-folder in tools/perf/pmu-events/arch/arm64
-> folder (like arm64 device tree files)? We (HiSilicon) want to add support
-> for our hip08 SoC, and I don't think "hip08" or "<internal code name for
-> core>" are good arch sub-folder names.
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ drivers/rpmsg/qcom_glink_native.c | 71 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 70 insertions(+), 1 deletion(-)
 
-at present the directory structure is in-line with as done for x86 and powerpc.
-there can be separate patchset to have directory hierarchy as
-suggested by you, if every one agrees on it!
-
->
-> I am not sure if this way discussed before, but the changelog does not
-> mention it. And I think that we had the same location for thunderx2 in v1
-> series.
->
-> We should also consider that in theory the events could change per SoC using
-> the same custom ARMv8 custom implementation.
->
-> Thanks,
-> John
->
->>
->> On Wed, Aug 16, 2017 at 12:40 PM, Ganapatrao Kulkarni
->> <ganapatrao.kulkarni@cavium.com> wrote:
->>>
->>> Extending json/jevent framework for parsing arm64 event files.
->>> Adding jevents for ThunderX2 implementation defined PMU events.
->>>
->>> v5:
->>>    - Addressed comments from Arnaldo.
->>>    - Rebased to 4.13-rc5
->>>
->>> v4:
->>>    - Rebased to 4.13-rc1
->>>
->>> v3:
->>>    - Addressed comments from Will Deacon and Jayachandran C.
->>>    - Rebased to 4.12-rc1
->>>
->>> v2:
->>>    - Updated as per Mark Rutland's suggestions.
->>>    - Added provision for get_cpuid_str to get cpu id string
->>>      from associated cpus of pmu core device.
->>>
->>> v1: Initial patchset.
->>>
->>> Ganapatrao Kulkarni (4):
->>>   perf utils: passing pmu as a parameter to function get_cpuid_str
->>>   perf tools arm64: Add support for get_cpuid_str function.
->>>   perf utils: Add helper function is_pmu_core to detect PMU CORE devices
->>>   perf vendor events arm64: Add ThunderX2 implementation defined pmu
->>>     core events
->>>
->>>  tools/perf/arch/arm64/util/Build                   |  1 +
->>>  tools/perf/arch/arm64/util/header.c                | 61
->>> +++++++++++++++++++++
->>>  tools/perf/arch/powerpc/util/header.c              |  2 +-
->>>  tools/perf/arch/x86/util/header.c                  |  2 +-
->>>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
->>>  .../arm64/thunderx2/implementation-defined.json    | 62
->>> ++++++++++++++++++++++
->>>  tools/perf/util/header.h                           |  3 +-
->>>  tools/perf/util/pmu.c                              | 53
->>> +++++++++++++++---
->>>  8 files changed, 188 insertions(+), 11 deletions(-)
->>>  create mode 100644 tools/perf/arch/arm64/util/header.c
->>>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
->>>  create mode 100644
->>> tools/perf/pmu-events/arch/arm64/thunderx2/implementation-defined.json
->>>
->>> --
->>> 2.9.4
->>>
->>
->> thanks
->> Ganapat
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->> .
->>
->
->
-
-thanks
-Ganapat
+diff --git a/drivers/rpmsg/qcom_glink_native.c b/drivers/rpmsg/qcom_glink_native.c
+index 76ee86e..d93d651 100644
+--- a/drivers/rpmsg/qcom_glink_native.c
++++ b/drivers/rpmsg/qcom_glink_native.c
+@@ -139,8 +139,9 @@ enum {
+  * @name:	unique channel name/identifier
+  * @lcid:	channel id, in local space
+  * @rcid:	channel id, in remote space
+- * @intent_lock: lock for protection of @liids
++ * @intent_lock: lock for protection of @liids, @riids
+  * @liids:	idr of all local intents
++ * @riids:	idr of all remote intents
+  * @intent_work: worker responsible for transmitting rx_done packets
+  * @done_intents: list of intents that needs to be announced rx_done
+  * @buf:	receive buffer, for gathering fragments
+@@ -165,6 +166,7 @@ struct glink_channel {
+ 
+ 	spinlock_t intent_lock;
+ 	struct idr liids;
++	struct idr riids;
+ 	struct work_struct intent_work;
+ 	struct list_head done_intents;
+ 
+@@ -222,6 +224,7 @@ static struct glink_channel *qcom_glink_alloc_channel(struct qcom_glink *glink,
+ 	INIT_WORK(&channel->intent_work, qcom_glink_rx_done_work);
+ 
+ 	idr_init(&channel->liids);
++	idr_init(&channel->riids);
+ 	kref_init(&channel->refcount);
+ 
+ 	return channel;
+@@ -235,6 +238,7 @@ static void qcom_glink_channel_release(struct kref *ref)
+ 
+ 	spin_lock_irqsave(&channel->intent_lock, flags);
+ 	idr_destroy(&channel->liids);
++	idr_destroy(&channel->riids);
+ 	spin_unlock_irqrestore(&channel->intent_lock, flags);
+ 
+ 	kfree(channel->name);
+@@ -806,6 +810,68 @@ static int qcom_glink_rx_data(struct qcom_glink *glink, size_t avail)
+ 	return ret;
+ }
+ 
++static void qcom_glink_handle_intent(struct qcom_glink *glink,
++				     unsigned int cid,
++				     unsigned int count,
++				     size_t avail)
++{
++	struct glink_core_rx_intent *intent;
++	struct glink_channel *channel;
++	struct intent_pair {
++		__le32 size;
++		__le32 iid;
++	};
++
++	struct {
++		struct glink_msg msg;
++		struct intent_pair intents[];
++	} __packed * msg;
++
++	const size_t msglen = sizeof(*msg) + sizeof(struct intent_pair) * count;
++	int ret;
++	int i;
++	unsigned long flags;
++
++	if (avail < msglen) {
++		dev_dbg(glink->dev, "Not enough data in fifo\n");
++		return;
++	}
++
++	spin_lock_irqsave(&glink->idr_lock, flags);
++	channel = idr_find(&glink->rcids, cid);
++	spin_unlock_irqrestore(&glink->idr_lock, flags);
++	if (!channel) {
++		dev_err(glink->dev, "intents for non-existing channel\n");
++		return;
++	}
++
++	msg = kmalloc(msglen, GFP_ATOMIC);
++	if (!msg)
++		return;
++
++	qcom_glink_rx_peak(glink, msg, 0, msglen);
++
++	for (i = 0; i < count; ++i) {
++		intent = kzalloc(sizeof(*intent), GFP_ATOMIC);
++		if (!intent)
++			break;
++
++		intent->id = le32_to_cpu(msg->intents[i].iid);
++		intent->size = le32_to_cpu(msg->intents[i].size);
++
++		spin_lock_irqsave(&channel->intent_lock, flags);
++		ret = idr_alloc(&channel->riids, intent,
++				intent->id, intent->id + 1, GFP_ATOMIC);
++		spin_unlock_irqrestore(&channel->intent_lock, flags);
++
++		if (ret < 0)
++			dev_err(glink->dev, "failed to store remote intent\n");
++	}
++
++	kfree(msg);
++	qcom_glink_rx_advance(glink, ALIGN(msglen, 8));
++}
++
+ static int qcom_glink_rx_open_ack(struct qcom_glink *glink, unsigned int lcid)
+ {
+ 	struct glink_channel *channel;
+@@ -871,6 +937,9 @@ static irqreturn_t qcom_glink_native_intr(int irq, void *data)
+ 
+ 			ret = 0;
+ 			break;
++		case RPM_CMD_INTENT:
++			qcom_glink_handle_intent(glink, param1, param2, avail);
++			break;
+ 		default:
+ 			qcom_glink_rx_advance(glink, ALIGN(sizeof(msg), 8));
+ 			dev_err(glink->dev, "unhandled rx cmd: %d\n", cmd);
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
