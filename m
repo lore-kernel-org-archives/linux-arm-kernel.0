@@ -1,32 +1,16 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 24 Aug 2017 11:20:19 +0100
-Subject: [PATCH] clk: versatile: make clk_ops const
-In-Reply-To: <20170824095442.GC11316@e110455-lin.cambridge.arm.com>
-References: <1503410786-25519-1-git-send-email-bhumirks@gmail.com>
- <20170824095442.GC11316@e110455-lin.cambridge.arm.com>
-Message-ID: <de0c14c4-cdd4-8e6f-6f47-d318f775938d@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 24 Aug 2017 06:20:21 -0400
+Subject: [PATCH] dt-bindings: apmu: Document r8a7745 support
+In-Reply-To: <1503409939-9355-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1503409939-9355-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20170824102021.GG17607@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 24/08/17 10:54, Liviu Dudau wrote:
-> On Tue, Aug 22, 2017 at 07:36:26PM +0530, Bhumika Goyal wrote:
->> Make this const as it is only stored in the const field of a
->> clk_init_data structure.
->>
->> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+On Tue, Aug 22, 2017 at 02:52:19PM +0100, Fabrizio Castro wrote:
+> Document APMU and SMP enable method for RZ/G1E (also known as
+> r8a7745) SoC.
 > 
-> Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> 
-> Thanks for the patch!
-> 
-> Sudeep, can you going to pick this up for 4.14?
-> 
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-IIUC anything under drivers/clk is routed via clk tree.
-I assume Mike/Stephen will pick this up.
-
--- 
-Regards,
-Sudeep
+Thanks, applied for v4.15.
