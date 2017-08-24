@@ -1,157 +1,48 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Thu, 24 Aug 2017 12:51:35 +0530
-Subject: [PATCH v2 13/20] rpmsg: glink: Use the local intents when receiving
- data
-In-Reply-To: <1503559302-3744-1-git-send-email-sricharan@codeaurora.org>
-References: <1503559302-3744-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1503559302-3744-14-git-send-email-sricharan@codeaurora.org>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Thu, 24 Aug 2017 15:42:11 +0800
+Subject: [PATCH v2 1/2] iommu/mediatek: Fix a build fail of m4u_type
+Message-ID: <1503560532-24416-1-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So previously on request from remote side, we allocated local
-intent buffers and passed the ids to the remote. Now when
-we receive data buffers from remote directed to that intent
-id, copy the data to the corresponding preallocated intent
-buffer.
+The commit ("iommu/mediatek: Enlarge the validate PA range
+for 4GB mode") introduce the following build error:
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+   drivers/iommu/mtk_iommu.c: In function 'mtk_iommu_hw_init':
+>> drivers/iommu/mtk_iommu.c:536:30: error: 'const struct mtk_iommu_data'
+ has no member named 'm4u_type'; did you mean 'm4u_dom'?
+     if (data->enable_4GB && data->m4u_type != M4U_MT8173) {
+
+This patch fix it, use "m4u_plat" instead of "m4u_type".
+
+Reported-by: kernel test robot <lkp@intel.com>
+Signed-off-by: Yong Wu <yong.wu@mediatek.com>
 ---
- drivers/rpmsg/qcom_glink_native.c | 75 ++++++++++++++++++++++++++-------------
- 1 file changed, 50 insertions(+), 25 deletions(-)
+1) In the v2 of mt2712 iommu support patch-set, We changed a variant
+name from "m4u_type" to "m4u_plat", But I'm sorry that I forgot to
+change it in the later patch.
+2) This patch is based on [1].
+[1]:https://lists.linuxfoundation.org/pipermail/iommu/2017-August/023847.html
+3) I cann't find the commit id of the patch ("iommu/mediatek: Enlarge
+the validate PA range for 4GB mode") in the [2].
+So I don't write the commit id for that patch in the commit message.
+[2]https://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git next
+---
+ drivers/iommu/mtk_iommu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/rpmsg/qcom_glink_native.c b/drivers/rpmsg/qcom_glink_native.c
-index 7778e57..67eeb86 100644
---- a/drivers/rpmsg/qcom_glink_native.c
-+++ b/drivers/rpmsg/qcom_glink_native.c
-@@ -162,7 +162,7 @@ struct glink_channel {
- 	spinlock_t intent_lock;
- 	struct idr liids;
+diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+index 4f233e1..bc00e40 100644
+--- a/drivers/iommu/mtk_iommu.c
++++ b/drivers/iommu/mtk_iommu.c
+@@ -533,7 +533,7 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
  
--	void *buf;
-+	struct glink_core_rx_intent *buf;
- 	int buf_offset;
- 	int buf_size;
- 
-@@ -614,6 +614,7 @@ static int qcom_glink_rx_defer(struct qcom_glink *glink, size_t extra)
- 
- static int qcom_glink_rx_data(struct qcom_glink *glink, size_t avail)
- {
-+	struct glink_core_rx_intent *intent;
- 	struct glink_channel *channel;
- 	struct {
- 		struct glink_msg msg;
-@@ -623,6 +624,8 @@ static int qcom_glink_rx_data(struct qcom_glink *glink, size_t avail)
- 	unsigned int chunk_size;
- 	unsigned int left_size;
- 	unsigned int rcid;
-+	unsigned int liid;
-+	int ret = 0;
- 	unsigned long flags;
- 
- 	if (avail < sizeof(hdr)) {
-@@ -650,56 +653,78 @@ static int qcom_glink_rx_data(struct qcom_glink *glink, size_t avail)
- 		dev_dbg(glink->dev, "Data on non-existing channel\n");
- 
- 		/* Drop the message */
--		qcom_glink_rx_advance(glink,
--				      ALIGN(sizeof(hdr) + chunk_size, 8));
--		return 0;
-+		goto advance_rx;
- 	}
- 
--	/* Might have an ongoing, fragmented, message to append */
--	if (!channel->buf) {
--		channel->buf = kmalloc(chunk_size + left_size, GFP_ATOMIC);
--		if (!channel->buf)
--			return -ENOMEM;
-+	if (glink->intentless) {
-+		/* Might have an ongoing, fragmented, message to append */
-+		if (!channel->buf) {
-+			intent = kzalloc(sizeof(*intent), GFP_ATOMIC);
-+			if (!intent)
-+				return -ENOMEM;
-+
-+			intent->data = kmalloc(chunk_size + left_size,
-+					       GFP_ATOMIC);
-+			if (!intent->data) {
-+				kfree(intent);
-+				return -ENOMEM;
-+			}
-+
-+			intent->id = 0xbabababa;
-+			intent->size = chunk_size + left_size;
-+			intent->offset = 0;
-+
-+			channel->buf = intent;
-+		} else {
-+			intent = channel->buf;
-+		}
-+	} else {
-+		liid = le32_to_cpu(hdr.msg.param2);
- 
--		channel->buf_size = chunk_size + left_size;
--		channel->buf_offset = 0;
--	}
-+		spin_lock_irqsave(&channel->intent_lock, flags);
-+		intent = idr_find(&channel->liids, liid);
-+		spin_unlock_irqrestore(&channel->intent_lock, flags);
- 
--	qcom_glink_rx_advance(glink, sizeof(hdr));
-+		if (!intent) {
-+			dev_err(glink->dev,
-+				"no intent found for channel %s intent %d",
-+				channel->name, liid);
-+			goto advance_rx;
-+		}
-+	}
- 
--	if (channel->buf_size - channel->buf_offset < chunk_size) {
--		dev_err(glink->dev, "Insufficient space in input buffer\n");
-+	if (intent->size - intent->offset < chunk_size) {
-+		dev_err(glink->dev, "Insufficient space in intent\n");
- 
- 		/* The packet header lied, drop payload */
--		qcom_glink_rx_advance(glink, chunk_size);
--		return -ENOMEM;
-+		goto advance_rx;
- 	}
- 
--	qcom_glink_rx_peak(glink, channel->buf + channel->buf_offset,
-+	qcom_glink_rx_advance(glink, ALIGN(sizeof(hdr), 8));
-+	qcom_glink_rx_peak(glink, intent->data + intent->offset,
- 			   chunk_size);
--	channel->buf_offset += chunk_size;
-+	intent->offset += chunk_size;
- 
- 	/* Handle message when no fragments remain to be received */
- 	if (!left_size) {
- 		spin_lock(&channel->recv_lock);
- 		if (channel->ept.cb) {
- 			channel->ept.cb(channel->ept.rpdev,
--					channel->buf,
--					channel->buf_offset,
-+					intent->data,
-+					intent->offset,
- 					channel->ept.priv,
- 					RPMSG_ADDR_ANY);
- 		}
- 		spin_unlock(&channel->recv_lock);
- 
--		kfree(channel->buf);
-+		intent->offset = 0;
- 		channel->buf = NULL;
--		channel->buf_size = 0;
- 	}
- 
--	/* Each message starts at 8 byte aligned address */
-+advance_rx:
- 	qcom_glink_rx_advance(glink, ALIGN(chunk_size, 8));
- 
--	return 0;
-+	return ret;
- }
- 
- static int qcom_glink_rx_open_ack(struct qcom_glink *glink, unsigned int lcid)
+ 	writel_relaxed(F_MMU_IVRP_PA_SET(data->protect_base, data->enable_4GB),
+ 		       data->base + REG_MMU_IVRP_PADDR);
+-	if (data->enable_4GB && data->m4u_type != M4U_MT8173) {
++	if (data->enable_4GB && data->m4u_plat != M4U_MT8173) {
+ 		/*
+ 		 * If 4GB mode is enabled, the validate PA range is from
+ 		 * 0x1_0000_0000 to 0x1_ffff_ffff. here record bit[32:30].
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+1.9.1
