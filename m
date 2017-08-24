@@ -1,105 +1,122 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 24 Aug 2017 13:29:39 +0200
-Subject: [PATCH v3 3/5] dt-bindings: sdhci-omap: Add bindings for the
- sdhci-omap controller
-In-Reply-To: <c9342689-f09e-44af-0975-d43ef122a477@ti.com>
-References: <20170821142132.GH6008@atomide.com>
- <20170823054246.23927-1-kishon@ti.com>
- <CAPDyKFp7gchVQ+JPNqv4LktvHRm2Lzx6KakOw85zEZxDEX0OhA@mail.gmail.com>
- <c9342689-f09e-44af-0975-d43ef122a477@ti.com>
-Message-ID: <CAPDyKFqCZFM7UmHyQCm=DwwZXJvzUde3pW0HqARKrsgfgxSuaw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 24 Aug 2017 12:37:43 +0100
+Subject: Intermittent memory corruption with v4.13-rc6+ and earlier
+Message-ID: <20170824113743.GA14737@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 August 2017 at 15:56, Kishon Vijay Abraham I <kishon@ti.com> wrote:
-> Hi Uffe,
->
-> On Wednesday 23 August 2017 06:37 PM, Ulf Hansson wrote:
->> On 23 August 2017 at 07:42, Kishon Vijay Abraham I <kishon@ti.com> wrote:
->>> Add binding for the TI's sdhci-omap controller. This now includes only
->>> a subset of properties documented in ti-omap-hsmmc.txt but will eventually
->>> include all the properties.
->>>
->>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>> ---
->>> Changes from v2:
->>> *) Fixed example to use the updated compatible
->>>
->>> Changes from v1:
->>> *) Create a new sdhci-omap.txt document for TI's sdhci-omap controller instead
->>>    of using the ti-omap-hsmmc.txt as suggested by Tony
->>>  .../devicetree/bindings/mmc/sdhci-omap.txt         | 22 ++++++++++++++++++++++
->>>  1 file changed, 22 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-omap.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-omap.txt b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
->>> new file mode 100644
->>> index 000000000000..139695ad2d58
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/mmc/sdhci-omap.txt
->>> @@ -0,0 +1,22 @@
->>> +* TI OMAP SDHCI Controller
->>> +
->>> +Refer to mmc.txt for standard MMC bindings.
->>> +
->>> +Required properties:
->>> +- compatible: Should be "ti,dra7-sdhci" for DRA7 and DRA72 controllers
->>> +- ti,hwmods: Must be "mmc<n>", <n> is controller instance starting 1
->>> +
->>> +Optional properties:
->>> +- ti,dual-volt: boolean, supports dual voltage cards
->>> +- ti,non-removable: non-removable slot (like eMMC)
->>> +
->>> +Example:
->>> +       mmc1: mmc at 0x4809c000 {
->>> +               compatible = "ti,dra7-sdhci";
->>> +               reg = <0x4809c000 0x400>;
->>> +               ti,hwmods = "mmc1";
->>> +               ti,dual-volt;
->>> +               bus-width = <4>;
->>> +               vmmc-supply = <&vmmc>; /* phandle to regulator node */
->>> +               ti,non-removable;
->>> +       };
->>> --
->>> 2.11.0
->>>
->>
->> I am wondering a bit on the long term plan here.
->>
->> Ideally at some point in future, we would like to remove the old
->> omap_hsmmc driver, but from compatible string point of view, that
->> means we first needs to deprecate the old ones for a while. Right?
->
-> right but sdhci-omap is still lacking features that was present in omap_hsmmc
-> like context save/restore, SDIO support etc. I think we should deprecate
-> omap_hsmmc compatible once we add all the features in sdhci-omap?
->>
->> That said, what is then the reason to why we should bring over the
->> existing omap_hsmmc bindings to the sdhci-omap bindings?
->
-> This is mainly for old dt compatibility. Even after removing the omap_hsmmc
-> driver, users should still be able to use newer kernel with their existing dtbs.
+Hi,
 
-I guess we have two options.
+I'm chasing intermittent memory corruption bugs seen at least on rc5,
+rc6, and yesterday's HEAD (98b9f8a4549909c6), on arm64. 
 
-1) Allow us to invent and use new bindings - and a new compatible.
-When everything is implemented in sdhci-omap, we can deprecate the old
-omap_hsmmc driver and its corresponding compatible/bindings. At some
-point later we can remove the legacy driver/bindings altogether - of
-course that might take a while. This option allows us to re-think some
-of the old bindings and really clean up some if its related code. For
-example, I think "ti,dual-volt" is a bad binding. Instead it would be
-better to use the existing mmc bindings about which speed mode the
-controller/board supports (as the voltage level comes with it).
+It looks like we make use of dangling references to a freed struct file,
+which is caught by KASAN. Without KASAN, I see a number of other
+intermittent issues that I suspect are the result of this memory
+corruption. I've included an example splat below, complete with KASAN's
+alloc/free traces at the end of this mail.
 
-2) Invent only a new compatible, but stick to use the old omap hsmmc
-bindings and thus also deploy the similar code dealing with them. When
-everything is implemented move the old omap_hsmmc compatibles into the
-new sdhci-omap driver and them remove the old omap_hsmmc driver. At
-that point we could also deprecate the old omap hsmmc compatibles, but
-to me that is rather pointless.
+I've dumped more info in the bugs/20170824-file-uaf directory in my
+kernel.org web space [1], including a number of logs, my kernel config,
+and Syzkaller reproducers (original and partially minimized). The bug
+can be triggered with either, but the original is much faster (minutes
+vs hours on average).
 
-The two options has different advantages, feel free to pick any of them!
+I haven't yet tried to bisect this, but I intend to shortly. In prior
+testing. I hadn't seen these issues with v4.12, but I've upgraded
+Syzkaller in the mean time, and it's possible its now triggering paths
+which it didn't in the past.
 
-Kind regards
-Uffe
+I'll attack v4.12 with the reproducer to make sure, and attempt a bisect
+from there. Any suggestions welcome.
+
+Thanks,
+Mark.
+
+[1] https://www.kernel.org/pub/linux/kernel/people/mark/bugs/20170824-file-uaf/
+
+----->8----
+[17631.541544] ==================================================================
+[17631.542778] BUG: KASAN: use-after-free in get_mm_exe_file+0x244/0x250
+[17631.543614] Read of size 8 at addr ffff80000b456ab0 by task syz-executor0/1399
+[17631.544543]
+[17631.544792] CPU: 3 PID: 1399 Comm: syz-executor0 Not tainted 4.13.0-rc6-00050-g98b9f8a #1
+[17631.546081] Hardware name: linux,dummy-virt (DT)
+[17631.546826] Call trace:
+[17631.547229] [<ffff200008090b08>] dump_backtrace+0x0/0x490
+[17631.548046] [<ffff2000080912c0>] show_stack+0x20/0x30
+[17631.548779] [<ffff200009a9feb0>] dump_stack+0xd0/0x120
+[17631.549525] [<ffff200008432df0>] print_address_description+0x60/0x250
+[17631.550452] [<ffff2000084332d8>] kasan_report+0x238/0x2f8
+[17631.551289] [<ffff200008433410>] __asan_report_load8_noabort+0x18/0x20
+[17631.552302] [<ffff200008117f84>] get_mm_exe_file+0x244/0x250
+[17631.553121] [<ffff20000811cfa4>] copy_process.isra.5.part.6+0x3584/0x4b88
+[17631.554085] [<ffff20000811e8cc>] _do_fork+0x15c/0x938
+[17631.554797] [<ffff20000811f208>] SyS_clone+0x48/0x60
+[17631.555507] [<ffff200008083f70>] el0_svc_naked+0x24/0x28
+[17631.556292]
+[17631.556534] Allocated by task 1398:
+[17631.557106]  save_stack_trace_tsk+0x0/0x378
+[17631.558024]  save_stack_trace+0x20/0x30
+[17631.558630]  kasan_kmalloc+0xd8/0x188
+[17631.559143]  kasan_slab_alloc+0x14/0x20
+[17631.559715]  kmem_cache_alloc+0x124/0x208
+[17631.560407]  get_empty_filp+0x8c/0x328
+[17631.560994]  path_openat+0xb8/0x1c20
+[17631.561540]  do_filp_open+0x138/0x1f0
+[17631.562096]  do_open_execat+0xcc/0x3e8
+[17631.562666]  do_execveat_common.isra.15+0x5c0/0x1490
+[17631.563700]  SyS_execve+0x48/0x60
+[17631.564314]  el0_svc_naked+0x24/0x28
+[17631.565058]
+[17631.565345] Freed by task 0:
+[17631.565970]  save_stack_trace_tsk+0x0/0x378
+[17631.566710]  save_stack_trace+0x20/0x30
+[17631.567308]  kasan_slab_free+0x88/0x188
+[17631.568052]  kmem_cache_free+0x88/0x230
+[17631.568647]  file_free_rcu+0x6c/0x80
+[17631.569399]  rcu_process_callbacks+0x3e4/0x958
+[17631.570323]  __do_softirq+0x304/0x6c4
+[17631.571079]
+[17631.571337] The buggy address belongs to the object at ffff80000b456a40
+[17631.571337]  which belongs to the cache filp of size 456
+[17631.573323] The buggy address is located 112 bytes inside of
+[17631.573323]  456-byte region [ffff80000b456a40, ffff80000b456c08)
+[17631.575775] The buggy address belongs to the page:
+[17631.576599] page:ffff7e00002d1500 count:1 mapcount:0 mapping:          (null) index:0xffff80000b457140 compound_mapcount: 0
+[17631.578386] flags: 0xfffc00000008100(slab|head)
+[17631.579126] raw: 0fffc00000008100 0000000000000000 ffff80000b457140 000000010012000c
+[17631.580320] raw: ffff7e0000307620 ffff80000c04eb40 ffff80000c053880 0000000000000000
+[17631.581619] page dumped because: kasan: bad access detected
+[17631.582498]
+[17631.582754] Memory state around the buggy address:
+[17631.583746]  ffff80000b456980: fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc fc
+[17631.584853]  ffff80000b456a00: fc fc fc fc fc fc fc fc fb fb fb fb fb fb fb fb
+[17631.586351] >ffff80000b456a80: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
+[17631.587869]                                      ^
+[17631.588887]  ffff80000b456b00: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
+[17631.590130]  ffff80000b456b80: fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb fb
+[17631.591327] ==================================================================
+[17631.592494] Disabling lock debugging due to kernel taint
+[17631.594702] Kernel panic - not syncing: panic_on_warn set ...
+[17631.594702]
+[17631.595635] CPU: 3 PID: 1399 Comm: syz-executor0 Tainted: G    B           4.13.0-rc6-00050-g98b9f8a #1
+[17631.597704] Hardware name: linux,dummy-virt (DT)
+[17631.598457] Call trace:
+[17631.598957] [<ffff200008090b08>] dump_backtrace+0x0/0x490
+[17631.600128] [<ffff2000080912c0>] show_stack+0x20/0x30
+[17631.601225] [<ffff200009a9feb0>] dump_stack+0xd0/0x120
+[17631.602324] [<ffff2000081209ec>] panic+0x208/0x3e4
+[17631.603190] [<ffff200008432d68>] kasan_save_enable_multi_shot+0x0/0x28
+[17631.604581] [<ffff200008433198>] kasan_report+0xf8/0x2f8
+[17631.605501] [<ffff200008433410>] __asan_report_load8_noabort+0x18/0x20
+[17631.606891] [<ffff200008117f84>] get_mm_exe_file+0x244/0x250
+[17631.608114] [<ffff20000811cfa4>] copy_process.isra.5.part.6+0x3584/0x4b88
+[17631.609525] [<ffff20000811e8cc>] _do_fork+0x15c/0x938
+[17631.610577] [<ffff20000811f208>] SyS_clone+0x48/0x60
+[17631.611623] [<ffff200008083f70>] el0_svc_naked+0x24/0x28
+[17631.612447] SMP: stopping secondary CPUs
+[17631.631714] Kernel Offset: disabled
+[17631.632477] CPU features: 0x002082
+[17631.633117] Memory Limit: none
+[17631.633795] Rebooting in 86400 seconds..
