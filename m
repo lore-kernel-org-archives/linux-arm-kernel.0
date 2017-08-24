@@ -1,63 +1,46 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 24 Aug 2017 10:19:43 +0200
-Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable
- direct_complete for ACPI devices
-In-Reply-To: <CAJZ5v0gJn=SzNFGUT7Zb+CfhQBZ7KNDK2GTSSXGexD8GObjGOw@mail.gmail.com>
-References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
- <1503499329-28834-6-git-send-email-ulf.hansson@linaro.org>
- <CAJZ5v0gJn=SzNFGUT7Zb+CfhQBZ7KNDK2GTSSXGexD8GObjGOw@mail.gmail.com>
-Message-ID: <CAPDyKFrGvqhBdenSyQ8Qr76DbfEvc74_dKZAjraA5qL63Mm2rg@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 24 Aug 2017 09:22:33 +0100
+Subject: [PATCH v2 0/8] ELF-FDPIC support for ARM
+In-Reply-To: <alpine.LFD.2.20.1708231158090.14288@knanqh.ubzr>
+References: <20170817072347.19990-1-nicolas.pitre@linaro.org>
+ <20170817083716.GN20805@n2100.armlinux.org.uk>
+ <alpine.LFD.2.20.1708231158090.14288@knanqh.ubzr>
+Message-ID: <38b1d822-345d-0b79-6d44-b78649e46efb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 August 2017 at 01:39, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> On Wed, Aug 23, 2017 at 4:42 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> In some cases a driver for an ACPI device needs to be able to prevent the
->> ACPI PM domain from using the direct_complete path during system sleep.
+On 23/08/17 17:41, Nicolas Pitre wrote:
+> On Thu, 17 Aug 2017, Russell King - ARM Linux wrote:
+> 
+>> On Thu, Aug 17, 2017 at 03:23:39AM -0400, Nicolas Pitre wrote:
+>>> This series provides the needed changes to suport the ELF_FDPIC binary
+>>> format on ARM. Both MMU and non-MMU systems are supported. This format
+>>> has many advantages over the BFLT format used on MMU-less systems, such
+>>> as being real ELF that can be parsed by standard tools, can support
+>>> shared dynamic libs, etc.
 >>
->> One typical case is when the driver for the device needs its device to stay
->> runtime enabled, during the __device_suspend phase. This isn't the case
->> when the direct_complete path is being executed by the PM core, as it then
->> disables runtime PM for the device in __device_suspend(). Any following
->> attempts to runtime resume the device after that point, just fails.
->
-> OK, that is a problem.
->
->> A workaround to this problem is to let the driver runtime resume its device
->> from its ->prepare() callback, as that would prevent the direct_complete
->> path from being executed. However, that may often be a waste, especially if
->> it turned out that no one really needed the device.
->>
->> For this reason, invent acpi_dev_disable|enable_direct_complete(), to allow
->> drivers to inform the ACPI PM domain to change its default behaviour during
->> system sleep, and thus control whether it may use the direct_complete path
->> or not.
->
-> But I'm not sure this is the right place to address it as it very well
-> may affect a PCI device too.
->
-> Also, this is about the device and not about its ACPI companion
-> object, so putting the flag in there is somewhat unclean, so to speak.
->
-> It looks like we need a flag in dev_pm_info saying something along the
-> lines of "my system suspend callback can deal with runtime PM" that
-> will cause the direct_complete update to occur in
-> __device_suspend_late() instead of __device_suspend().
+>> I don't see anything issues from the core arch point of view with this,
+>> most of it looks straight forward, and the impact on existing users
+>> should be low.  However, it would be nice to get some acks (if possible)
+>> for the non-arch stuff and some tested-by's on this.
+> 
+> Well...
+> 
+> I did prod a few people for testing. Either they're on vacation, or not 
+> interested, but I've received no tested-by's nor ACK's what so ever at 
+> this point. I did test it myself of course, on both MMU and non-MMU 
+> targets, and with static and dynamic binaries.
 
-I realize that in the end this turns out to be a comparison between
-the runtime PM centric path and the direct_complete path while
-implementing system sleep. In patch 9, there is some more explanation
-around this, however if you like I can elaborate even more about
-this!?
+IIRC, Andras (CCed) has been running FDPIC for a while. Also, I can try to
+give it a go on M/R class systems around next week.
 
-Regarding making changes to the PM core and adding more flags to the
-dev_pm_info etc, I am not sure we really want that. Isn't it already
-complex enough?
+I've noticed under Mickael's repo extra patches:
 
-My point is, that I am trying to improve the behavior of the ACPI PM
-domain by enabling the runtime PM centric path for it, and even if
-there is something similar that could be done for PCI, I don't think
-we should need involvement by the PM core.
+- Add tls support for cortex-m cpu family
+- Workaround to fix futex bug on mmu less
 
-Kind regards
-Uffe
+It'd be nice if you shed some light on why they are not present in your
+series.
+
+Thanks
+Vladimir
