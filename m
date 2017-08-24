@@ -1,58 +1,222 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 24 Aug 2017 17:43:08 +0100
-Subject: [PATCH 2/3] pci: designware: add separate driver for the MSI part
- of the RC
-In-Reply-To: <20170824164211.GH31858@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170821192907.8695-1-ard.biesheuvel@linaro.org>
- <20170821192907.8695-3-ard.biesheuvel@linaro.org>
- <20170824164211.GH31858@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAKv+Gu-K7wqROca9wOPGppEJyrsWCZFzJisqKwObZtFSGkC6vQ@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 24 Aug 2017 18:35:49 +0200
+Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable
+ direct_complete for ACPI devices
+In-Reply-To: <CAPDyKFrj6RdsG4Qf847OvLQMgqHeyh1=YyeKZMeaGgQ2du3cNA@mail.gmail.com>
+References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
+ <1726767.L8TO24juDO@aspire.rjw.lan>
+ <CAPDyKFrj6RdsG4Qf847OvLQMgqHeyh1=YyeKZMeaGgQ2du3cNA@mail.gmail.com>
+Message-ID: <12333551.k204JYSgao@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 August 2017 at 17:42, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Mon, Aug 21, 2017 at 08:29:06PM +0100, Ard Biesheuvel wrote:
->> Most drivers that currently exist for the Synopsys Designware PCIe
->> controller in RC mode hardcode the relation with the embedded MSI
->> controller. This makes it more difficult than necessary to use a
->> generic driver to drive the RC, which is especially unfortunate
->> in cases where the firmware already configures the RC to the extent
->> that it can be driven by the generic ECAM driver. It also makes it
->> impossible to use an existing driver but use another IP block for
->> MSI support, i.e., a GICv2m or GICv3-ITS.
->>
->> So add a separate driver for the MSI part, which can be referenced
->> from the DT node describing the RC via its msi-parent property.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
->> +static int dw_pcie_msi_probe(struct platform_device *pdev)
->> +{
->> +     struct fwnode_handle *fwnode = of_node_to_fwnode(pdev->dev.of_node);
->> +     struct device *dev = &pdev->dev;
->> +     struct dw_pcie_msi *dw_msi;
->> +     struct resource *res;
->> +
->> +     dw_msi = devm_kzalloc(dev, sizeof(*dw_msi), GFP_KERNEL);
->> +     if (!dw_msi)
->> +             return -ENOMEM;
->> +
->> +     /* get the control register and map it */
->> +     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +     dw_msi->regbase = devm_ioremap_resource(dev, res);
->> +     if (IS_ERR(dw_msi->regbase))
->> +             return PTR_ERR(dw_msi->regbase);
->> +
->> +     /* get the wired interrupt that gets raised when we receive an MSI */
->> +     dw_msi->irq = platform_get_irq(pdev, 0);
->> +     if (dw_msi->irq <= 0) {
->> +             pr_err("Failed to map IRQ\n");
->
-> dev_err()
->
-> I'm not sure "failed to *map* IRQ" is the most informative text.
-> Other callers often use some variant of "failed to get IRQ" or "no IRQ
-> resource found".
->
+On Thursday, August 24, 2017 11:15:26 AM CEST Ulf Hansson wrote:
+> [...]
+> 
+> >> >
+> >> > It actually should work with the ACPI PM domain code as is except that it
+> >> > will cause the device to be runtime resumed every time during suspend.
+> >> >
+> >> > But acpi_subsys_suspend() can be changed to avoid resuming the device if
+> >> > power.force_suspend is set.
+> >>
+> >> Or better yet, if power.direct_complete is not set, because that means the
+> >> device needs to be resumed anyway.
+> >>
+> >> And if power.direct_complete is set at that point, power.force_suspend has to
+> >> be set too.
+> 
+> I believe I understand your goal here. You want to consider if it is
+> possible to extend the behavior of the direct_complete path, instead
+> of enabling the runtime PM centric path for the ACPI PM domain, to
+> accomplish the same optimizations.
 
-Good point. I will fix that.
+This isn't really "instead of", but rather "in addition to".
+
+> I think the answer to that, is that it simply can't. See more
+> information about why further down below.
+> 
+> >
+> > Overall, like below, and of course drivers that ser power.force_suspend need to
+> > be able to deal with devices that have been runtime resumed during
+> > __device_suspend().
+> 
+> The a concern I see with this approach, is that is going to be too
+> complex to understand.
+
+That is a valid concern, but then your approach with using an extra flag
+just for the ACPI PM domain isn't particularly straightforward either IMO.
+
+> We have already seen how the i2c-designware-driver was screwed up when
+> it was trying to take advantage of the optimizations provided by the
+> current direct_complete path. I think we should be careful when
+> considering making it even more complex.
+
+OK, but this applies to your series as well, as it is adding a new flag too,
+just not in the core. :-)
+
+> In the runtime PM centric path, driver authors can easily deploy
+> system sleep support. In some cases it may even consists of only two
+> lines of code. As can be shown in patch9 for the i2c driver.
+
+That still requires the new flag to be set if the ACPI PM is in use AFAICS,
+which then will prevent the entire hierarchy above the device from having
+direct_complete set.
+
+> Just to be clear, that doesn't mean that I think the direct_complete
+> path isn't useful. Especially it is a good match for the ACPI PM
+> domain, as it can easily affect all its devices, without having to
+> care much about the behavior of the drivers.
+
+OK
+
+[cut]
+
+> 
+> The above change would offer an improvement, however there are more
+> benefits from the runtime PM centric path that it doesn't cover.
+
+The idea, though, is not to make it instead of, but in addition to the
+runtime PM centric path.
+
+So a driver using the runtime PM centric (or rather runtime PM aware)
+callbacks can set power.force_suspend and benefit from having direct_complete
+set conditional on whether or not the device is runtime resumed before the
+late suspend.
+
+If device_complete remains set in __device_suspend_late(), no system
+suspend/resume callbacks will be invoked from that point on.  If it isn't
+set, pm_runtime_force_suspend() should work just fine and then
+pm_runtime_force_resume() should do the right thing on the way back.
+
+All boils down to (a) setting a flag and (b) using the right callbacks
+for system suspend which is the case with your patches either.
+
+> The below is pasted from the changelog for patch9 (I will make sure to
+> fold in this in the changelog for $subject patch next version).
+> 
+> In case the device is/gets runtime resumed before the device_suspend()
+> phase is entered, the PM core doesn't run the direct_complete path for
+> the device during system sleep. During system resume, this lead to
+> that the device will always be brought back to full power when the
+> i2c-dw-plat driver's ->resume() callback is invoked. This may not be
+> necessary, thus increasing the resume time for the device and wasting
+> power.
+
+Well, I guess that depends on what is there in its resume callbacks.
+
+> In the runtime PM centric path, the pm_runtime_force_resume() helper
+> takes better care, as it resumes the device only in case it's really
+> needed. Normally this means it can be postponed to be dealt with via
+> regular calls to runtime PM (pm_runtime_get*()) instead. In other
+> words, the device remains in its low power state until someone request
+> a new i2c transfer, whenever that may be.
+> 
+> As far as I can think of, the direct_complete path can't be adjusted
+> to support this. Or can it?
+
+It surely can, it's just software. :-)  The question is how complicated that
+is going to be in the end, however.
+
+So the patch I sent didn't address the dependency issue, but it allows the
+core to deal with the issue which is a core issue, not an ACPI PM domain
+issue, because the core disables runtime PM for devices with direct_complete
+set, not the ACPI PM domain or PCI etc.
+
+[BTW, it is not entirely clear to me why it ever is necessary to runtime resume
+a device with direct_complete set after __device_suspend(), because it can only
+have direct_complete set at that point if all of the hierarchy below it has
+this flag set too and so runtime PM has to be disabled for all of those
+devices as well.]
+
+It can be made slightly better by adding a piece to avoid clearing the
+parent's direct_complete if it had the new flag set, so below is a new
+version (with the new flag renamed to safe_suspend which seemed better to
+me).
+
+Of course, having safe_suspend set will still cause the parent's
+direct_complete to be cleared unless the parent has safe_suspend set too,
+but that's better than not allowing the parent to use direct_complete at all.
+
+---
+ drivers/acpi/device_pm.c  |    8 ++++++++
+ drivers/base/power/main.c |   15 ++++++++++++---
+ include/linux/pm.h        |    1 +
+ 3 files changed, 21 insertions(+), 3 deletions(-)
+
+Index: linux-pm/drivers/base/power/main.c
+===================================================================
+--- linux-pm.orig/drivers/base/power/main.c
++++ linux-pm/drivers/base/power/main.c
+@@ -1271,9 +1271,16 @@ static int __device_suspend_late(struct
+ 		goto Complete;
+ 	}
+ 
+-	if (dev->power.syscore || dev->power.direct_complete)
++	if (dev->power.syscore)
+ 		goto Complete;
+ 
++	if (dev->power.direct_complete) {
++		if (pm_runtime_status_suspended(dev))
++			goto Complete;
++
++		dev->power.direct_complete = false;
++	}
++
+ 	if (dev->pm_domain) {
+ 		info = "late power domain ";
+ 		callback = pm_late_early_op(&dev->pm_domain->ops, state);
+@@ -1482,7 +1489,7 @@ static int __device_suspend(struct devic
+ 	if (dev->power.syscore)
+ 		goto Complete;
+ 
+-	if (dev->power.direct_complete) {
++	if (dev->power.direct_complete && !dev->power.safe_suspend) {
+ 		if (pm_runtime_status_suspended(dev)) {
+ 			pm_runtime_disable(dev);
+ 			if (pm_runtime_status_suspended(dev))
+@@ -1549,7 +1556,9 @@ static int __device_suspend(struct devic
+ 		if (parent) {
+ 			spin_lock_irq(&parent->power.lock);
+ 
+-			dev->parent->power.direct_complete = false;
++			if (!dev->parent->power.safe_suspend)
++				dev->parent->power.direct_complete = false;
++
+ 			if (dev->power.wakeup_path
+ 			    && !dev->parent->power.ignore_children)
+ 				dev->parent->power.wakeup_path = true;
+Index: linux-pm/include/linux/pm.h
+===================================================================
+--- linux-pm.orig/include/linux/pm.h
++++ linux-pm/include/linux/pm.h
+@@ -554,6 +554,7 @@ struct dev_pm_info {
+ 	pm_message_t		power_state;
+ 	unsigned int		can_wakeup:1;
+ 	unsigned int		async_suspend:1;
++	unsigned int		safe_suspend:1;
+ 	bool			in_dpm_list:1;	/* Owned by the PM core */
+ 	bool			is_prepared:1;	/* Owned by the PM core */
+ 	bool			is_suspended:1;	/* Ditto */
+Index: linux-pm/drivers/acpi/device_pm.c
+===================================================================
+--- linux-pm.orig/drivers/acpi/device_pm.c
++++ linux-pm/drivers/acpi/device_pm.c
+@@ -1025,9 +1025,17 @@ EXPORT_SYMBOL_GPL(acpi_subsys_prepare);
+  *
+  * Follow PCI and resume devices suspended at run time before running their
+  * system suspend callbacks.
++ *
++ * If the power.direct_complete flag is set for the device, though, skip all
++ * that, because the device doesn't need to be resumed then and if it is
++ * resumed via runtime PM, the core will notice that and will carry out the
++ * late suspend for it.
+  */
+ int acpi_subsys_suspend(struct device *dev)
+ {
++	if (dev->power.direct_complete)
++		return 0;
++
+ 	pm_runtime_resume(dev);
+ 	return pm_generic_suspend(dev);
+ }
