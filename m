@@ -1,136 +1,40 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Thu, 24 Aug 2017 15:26:40 +0530
-Subject: [PATCH v5 2/4] perf tools arm64: Add support for get_cpuid_str
- function.
-In-Reply-To: <20170823101723.GD27301@arm.com>
-References: <20170816071048.26087-1-ganapatrao.kulkarni@cavium.com>
- <20170816071048.26087-3-ganapatrao.kulkarni@cavium.com>
- <20170823101723.GD27301@arm.com>
-Message-ID: <CAKTKpr76-mfXqPPHkKEa58eHNU6cKibivLgb3fpx2ND=LX87Sg@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 24 Aug 2017 12:04:47 +0200
+Subject: [GIT PULL] second round of Rockchip soc32 changes for 4.14
+Message-ID: <1512183.GTgy5kOUk8@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 3:47 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Aug 16, 2017 at 12:40:46PM +0530, Ganapatrao Kulkarni wrote:
->> function get_cpuid_str returns MIDR string of the first online
->> cpu from the range of cpus associated with the pmu core device.
->>
->> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
->> ---
->>  tools/perf/arch/arm64/util/Build    |  1 +
->>  tools/perf/arch/arm64/util/header.c | 61 +++++++++++++++++++++++++++++++++++++
->>  2 files changed, 62 insertions(+)
->>  create mode 100644 tools/perf/arch/arm64/util/header.c
->>
->> diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
->> index cef6fb3..b1ab72d 100644
->> --- a/tools/perf/arch/arm64/util/Build
->> +++ b/tools/perf/arch/arm64/util/Build
->> @@ -1,3 +1,4 @@
->> +libperf-y += header.o
->>  libperf-$(CONFIG_DWARF)     += dwarf-regs.o
->>  libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
->>
->> diff --git a/tools/perf/arch/arm64/util/header.c b/tools/perf/arch/arm64/util/header.c
->> new file mode 100644
->> index 0000000..713ef17
->> --- /dev/null
->> +++ b/tools/perf/arch/arm64/util/header.c
->> @@ -0,0 +1,61 @@
->> +#include <stdio.h>
->> +#include <stdlib.h>
->> +#include <api/fs/fs.h>
->> +#include "header.h"
->> +
->> +#define MIDR "/regs/identification/midr_el1"
->> +#define MIDR_SIZE 128
->
-> Why is this so big?
+Hi Arnd, Kevin, Olof,
 
-ok, i will reduce it to exact size(19)
->
->> +char *get_cpuid_str(struct perf_pmu *pmu)
->> +{
->> +     char *buf = NULL;
->> +     char *temp = NULL;
->> +     char path[PATH_MAX];
->> +     const char *sysfs = sysfs__mountpoint();
->> +     int cpu;
->> +     unsigned long long midr = 0;
->> +     struct cpu_map *cpus;
->> +     FILE *file;
->> +
->> +     if (!sysfs || !pmu->cpus)
->> +             return NULL;
->> +
->> +     buf = malloc(MIDR_SIZE);
->> +     if (!buf)
->> +             return NULL;
->> +
->> +     /* read midr from list of cpus mapped to this pmu */
->> +     cpus = cpu_map__get(pmu->cpus);
->> +     for (cpu = 0; cpu < cpus->nr; cpu++) {
->> +             scnprintf(path, PATH_MAX, "%s/devices/system/cpu/cpu%d"MIDR,
->> +                             sysfs, cpus->map[cpu]);
->> +
->> +             file = fopen(path, "r");
->> +             if (!file) {
->> +                     pr_err("fopen failed for file %s\n", path);
->
-> pr_debug instead? It's not fatal if a CPU is hotplugged off and you can't
-> read its midr.
+forgot that I had another kconfig option for LPAE support sitting
+in my tree when sending the devicetree pulls. So please find below
+enablement of ARCH_DMA_ADDR_T_64BIT for LPAE builds.
 
-ok
->
->> +                     continue;
->> +             }
->> +
->> +             temp = fgets(buf, MIDR_SIZE, file);
->> +             if (!temp)
->> +                     continue;
->
-> Do you actually need a temporary variable for this?
 
-ok
->
->> +             fclose(file);
->> +
->> +             /* Ignore/clear Variant[23:20] and
->> +              * Revision[3:0] of MIDR
->> +              */
->> +             midr = strtoll(buf, NULL, 16);
->> +             midr &= (~(0xf << 20 | 0xf));
->
-> If midr really needs to be unsigned long long (u64 might be better), then
-> you need to fix these immediates to have a ULL suffix.
+Thanks
+Heiko
 
-yes, will use u64
->
-> Can you use the GENMASK_ULL macro to generate the MIDR mask, or is that
-> not available here?
 
-it is not defined in tools/include/linux/bitops.h
->
->> +             scnprintf(buf, MIDR_SIZE, "0x%016llx", midr);
->> +             /* got midr break loop */
->> +             break;
->> +     }
->> +
->> +     if (!midr) {
->> +             free(buf);
->> +             buf = NULL;
->
-> If you want the pr_err, here would seem more appropriate because at this
-> point we've actually failed.
+The following changes since commit bf3c4b517c2e2217e6cd53bc7a44e321bb799d75:
 
-thanks, makes sense.
->
-> Will
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+  ARM: rockchip: enable ZONE_DMA for non 64-bit capable peripherals (2017-08-01 00:57:59 +0200)
 
-thanks
-Ganapat
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.14-rockchip-soc32-2
+
+for you to fetch changes up to 58ed5e5733b293f03a302612d395ac747021b946:
+
+  ARM: rockchip: select ARCH_DMA_ADDR_T_64BIT for LPAE (2017-08-06 13:06:05 +0200)
+
+----------------------------------------------------------------
+Enable the ARCH_DMA_ADDR_T_64BIT kconfig option for LPAE builds,
+as some peripherals like the Mali gpu do support 64bit dma addresses.
+
+----------------------------------------------------------------
+Tao Huang (1):
+      ARM: rockchip: select ARCH_DMA_ADDR_T_64BIT for LPAE
+
+ arch/arm/mach-rockchip/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
