@@ -1,48 +1,54 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Thu, 24 Aug 2017 13:24:09 +0800
-Subject: [PATCH] iommu/mediatek: Fix a build fail of m4u_type
-Message-ID: <1503552249-22060-1-git-send-email-yong.wu@mediatek.com>
+From: hoeun.ryu@gmail.com (Hoeun Ryu)
+Date: Thu, 24 Aug 2017 14:42:54 +0900
+Subject: [RFC 0/3] add 64BIT_ATOMIC_ACCESS and 64BIT_ATOMIC_ALIGNED_ACCESS
+Message-ID: <1503553377-3646-1-git-send-email-hoeun.ryu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit ("iommu/mediatek: Enlarge the validate PA range
-for 4GB mode") introduce the following build error:
+ On some 32-bit architectures, 64bit accesses are atomic when certain
+conditions are satisfied.
 
-   drivers/iommu/mtk_iommu.c: In function 'mtk_iommu_hw_init':
->> drivers/iommu/mtk_iommu.c:536:30: error: 'const struct mtk_iommu_data'
- has no member named 'm4u_type'; did you mean 'm4u_dom'?
-     if (data->enable_4GB && data->m4u_type != M4U_MT8173) {
+ For example, on LPAE (Large Physical Address Extension) enabled ARM
+architecture, 'ldrd/strd' (load/store doublewords) instructions are 64bit
+atomic as long as the address is 64-bit aligned. This feature is to
+guarantee atomic accesses on newly introduced 64bit wide descriptors in
+the translation tables, and 's/u64' variables can be accessed atomically
+when they are aligned(8) on LPAE enabled ARM architecture machines.
 
-This patch fix it, use "m4u_plat" instead of "m4u_type".
+ Introducing 64BIT_ATOMIC_ACCESS and 64BIT_ATOMIC_ALIGNED_ACCESS, which
+can be true for the 32bit architectures as well as 64bit architectures.
 
-Reported-by: kernel test robot <lkp@intel.com>
-Signed-off-by: Yong Wu <yong.wu@mediatek.com>
----
-1) In the v2 of mt2712 iommu support patch-set, We changed a variant
-name from "m4u_type" to "m4u_plat", But I'm sorry that I forgot to
-change it in the later patch.
-2) This patch is based on [1].
-[1]:https://lists.linuxfoundation.org/pipermail/iommu/2017-August/023847.html
-3) I cann't find the commit id of the patch ("iommu/mediatek: Enlarge
-the validate PA range for 4GB mode") in the [2].
-So I don't write the commit id for that patch in the commit message.
-[2]https://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git next
----
- drivers/iommu/mtk_iommu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ we can optimize some kernel codes using seqlock (timekeeping) or mimics
+of it (like in sched/cfq) simply to read or write 64bit variables.
+ The existing codes depend on CONFIG_64BIT to determine whether the 64bit
+variables can be directly accessed or need additional synchronization
+primitives like seqlock. CONFIG_64BIT_ATOMIC_ACCESS can be used instead of
+CONFIG_64BIT in the cases.
 
-diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-index 4f233e1..bc00e40 100644
---- a/drivers/iommu/mtk_iommu.c
-+++ b/drivers/iommu/mtk_iommu.c
-@@ -533,7 +533,7 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
- 
- 	writel_relaxed(F_MMU_IVRP_PA_SET(data->protect_base, data->enable_4GB),
- 		       data->base + REG_MMU_IVRP_PADDR);
--	if (data->enable_4GB && data->m4u_type != M4U_MT8173) {
-+	if (data->enable_4GB && data->m4u_plat != M4U_MT8173) {
- 		/*
- 		 * If 4GB mode is enabled, the validate PA range is from
- 		 * 0x1_0000_0000 to 0x1_ffff_ffff. here record bit[32:30].
+ 64BIT_ATOMIC_ALIGNED_ACCESS can be used in the variable declaration to
+indicate the alignment requirement to the compiler
+(__attribute__((aligned(8)))) in the way of #ifdef.
+
+ The last patch "sched: depend on 64BIT_ATOMIC_ACCESS to determine if to
+use min_vruntime_copy" is an example of this approach.
+
+ I'd like to know what the architecture maintainers and kernel maintainers
+think about it. I think I can make more examples (mostly removing seqlock
+to access the 64bit variables on the machines) if this approach is
+accepted.
+
+Hoeun Ryu (3):
+  arch: add 64BIT_ATOMIC_ACCESS to support 64bit atomic access on 32bit
+    machines
+  arm: enable 64BIT_ATOMIC(_ALIGNED)_ACCESS on LPAE enabled machines
+  sched: depend on 64BIT_ATOMIC_ACCESS to determine if to use
+    min_vruntime_copy
+
+ arch/Kconfig         | 20 ++++++++++++++++++++
+ arch/arm/mm/Kconfig  |  2 ++
+ kernel/sched/fair.c  |  6 +++---
+ kernel/sched/sched.h |  6 +++++-
+ 4 files changed, 30 insertions(+), 4 deletions(-)
+
 -- 
-1.9.1
+2.7.4
