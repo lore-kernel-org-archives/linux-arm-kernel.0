@@ -1,82 +1,59 @@
-From: hoeun.ryu@gmail.com (Hoeun Ryu)
-Date: Thu, 24 Aug 2017 14:42:57 +0900
-Subject: [RFC 3/3] sched: depend on 64BIT_ATOMIC_ACCESS to determine if to use
- min_vruntime_copy
-In-Reply-To: <1503553377-3646-1-git-send-email-hoeun.ryu@gmail.com>
-References: <1503553377-3646-1-git-send-email-hoeun.ryu@gmail.com>
-Message-ID: <1503553377-3646-4-git-send-email-hoeun.ryu@gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 24 Aug 2017 08:47:56 +0300
+Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
+In-Reply-To: <f7ddd927-5db3-e1b1-b7f1-94050b508298@st.com>
+References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
+ <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
+ <20170722065133.GT3053@localhost>
+ <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
+ <20170726052930.GF3053@localhost>
+ <f2908e38-dc4d-3886-4058-52a7ad845415@st.com>
+ <20170731123157.GJ3053@localhost>
+ <e3a76a50-4160-d111-cce9-132b46b66c33@st.com>
+ <20170802045522.GU3053@localhost>
+ <7d2091fe-a2e5-78bb-b63d-9cb66bdb7e84@ti.com>
+ <7bcad698-fa1a-3dc2-e918-4400639ca6d7@st.com>
+ <47ceba83-1097-072e-bed6-d1964bce7a25@ti.com>
+ <0e16a519-3d60-f683-5517-12a520e0e521@st.com>
+ <f0db566e-5613-8914-e070-915c8c4d9b9f@ti.com>
+ <71b7ef2a-d745-d16b-4538-567c856cce9a@st.com>
+ <401305f0-15d8-1996-60d6-69c13cbacc06@ti.com>
+ <58bf2f7c-faf1-d1e9-3c87-d7964d1ba3d4@st.com>
+ <6e8e19f1-8d0f-183b-e02f-1ec8c4dd57b3@ti.com>
+ <f7ddd927-5db3-e1b1-b7f1-94050b508298@st.com>
+Message-ID: <d1cc3cbb-c4aa-2acc-91ff-1d6713cb8867@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 'min_vruntime_copy' is copied when 'min_vruntime' is updated for cfq_rq
-and used to check if updating 'min_vruntime' is completed on reader side.
- Because 'min_vruntime' variable is 64bit, we need a mimic of seqlock to
-check if the variable is not being updated on 32bit machines.
 
- On 64BIT_ATOMIC_ACCESS enabled machines, 64bit accesses are atomic even
-though the machines are 32bit, so we can directly access 'min_vruntime'
-on the architectures.
 
- Depend on CONFIG_64BIT_ATOMIC_ACCESS instead of CONFIG_64BIT to determine
-whether 'min_vruntime_copy' variable is used for synchronization or not.
-And align 'min_vruntime' by 8 if 64BIT_ATOMIC_ALIGNED_ACCESS is true
-because 64BIT_ATOMIC_ALIGNED_ACCESS enabled system can access the variable
-atomically only when it' aligned.
+On 2017-08-21 12:34, Pierre Yves MORDRET wrote:
+> OK. I will redesign my driver to take into account this idea.
+> 
+> I believe I should get rid of my custom API in DMA for channelID as well. Please
+> confirm. Not very clear for me whether I can keep it or not.
 
-Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
----
- kernel/sched/fair.c  | 6 +++---
- kernel/sched/sched.h | 6 +++++-
- 2 files changed, 8 insertions(+), 4 deletions(-)
+Yes, you should be able to get rid of any custom API.
+The DMA event router should be 'invisible' to both the DMA driver itself
+and for the DMA users as well. If you end up still needing custom API
+(which I doubt) then it is better to extend the core support to cover
+that in a generic way since it is likely that other might have similar
+needs.
 
-diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index c95880e..840658f 100644
---- a/kernel/sched/fair.c
-+++ b/kernel/sched/fair.c
-@@ -536,7 +536,7 @@ static void update_min_vruntime(struct cfs_rq *cfs_rq)
- 
- 	/* ensure we never gain time by being placed backwards. */
- 	cfs_rq->min_vruntime = max_vruntime(cfs_rq->min_vruntime, vruntime);
--#ifndef CONFIG_64BIT
-+#ifndef CONFIG_64BIT_ATOMIC_ACCESS
- 	smp_wmb();
- 	cfs_rq->min_vruntime_copy = cfs_rq->min_vruntime;
- #endif
-@@ -5975,7 +5975,7 @@ static void migrate_task_rq_fair(struct task_struct *p)
- 		struct cfs_rq *cfs_rq = cfs_rq_of(se);
- 		u64 min_vruntime;
- 
--#ifndef CONFIG_64BIT
-+#ifndef CONFIG_64BIT_ATOMIC_ACCESS
- 		u64 min_vruntime_copy;
- 
- 		do {
-@@ -9173,7 +9173,7 @@ void init_cfs_rq(struct cfs_rq *cfs_rq)
- {
- 	cfs_rq->tasks_timeline = RB_ROOT;
- 	cfs_rq->min_vruntime = (u64)(-(1LL << 20));
--#ifndef CONFIG_64BIT
-+#ifndef CONFIG_64BIT_ATOMIC_ACCESS
- 	cfs_rq->min_vruntime_copy = cfs_rq->min_vruntime;
- #endif
- #ifdef CONFIG_SMP
-diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
-index eeef1a3..870010b 100644
---- a/kernel/sched/sched.h
-+++ b/kernel/sched/sched.h
-@@ -421,8 +421,12 @@ struct cfs_rq {
- 	unsigned int nr_running, h_nr_running;
- 
- 	u64 exec_clock;
-+#ifndef CONFIG_64BIT_ATOMIC_ALIGNED_ACCESS
- 	u64 min_vruntime;
--#ifndef CONFIG_64BIT
-+#else
-+	u64 min_vruntime __attribute__((aligned(sizeof(u64))));
-+#endif
-+#ifndef CONFIG_64BIT_ATOMIC_ACCESS
- 	u64 min_vruntime_copy;
- #endif
- 
--- 
-2.7.4
+You need to identify what you need to manage with the DMA router, again
+in my cases:
+am335x/am437x: The DMA channel is fixed, but the DMA event to be handled
+by the channel (DMA event muxer) is selected by the router.
+dra7x: The DMA event is the fixed part and I needed to translate that to
+local eDMA/sDMA events and in eDMA I needed to pick a channel based on
+the translated event.
+
+The same router code works for eDMA and sDMA in dra7, while the two DMA
+engines are different in their internal works.
+
+At the end of the day I only needed to plug the DMA event routers and
+there is no change in the DMA drivers at all.
+
+I'm happy to answer any questions you might have, if I can.
+
+- P?ter
