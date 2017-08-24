@@ -1,48 +1,84 @@
-From: biju.das@bp.renesas.com (Biju Das)
-Date: Thu, 24 Aug 2017 14:45:59 +0100
-Subject: [PATCH resend] ARM: dts: r8a7745: Add Ethernet AVB support
-In-Reply-To: <1503388405-48325-1-git-send-email-biju.das@bp.renesas.com>
-References: <1503388405-48325-1-git-send-email-biju.das@bp.renesas.com>
-Message-ID: <1503582359-43820-1-git-send-email-biju.das@bp.renesas.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 24 Aug 2017 16:14:23 +0200
+Subject: [GIT PULL 2/2] second round of Rockchip dts32 changes for 4.14
+In-Reply-To: <CAK8P3a3SKUoNPzCQMgnV=g+f3twBM_9Gn-=k0znx4cMRkeb9cQ@mail.gmail.com>
+References: <4088347.CX4PhsiguF@phil> <2301603.fd1AhSc3fO@phil>
+ <CAK8P3a3SKUoNPzCQMgnV=g+f3twBM_9Gn-=k0znx4cMRkeb9cQ@mail.gmail.com>
+Message-ID: <2188017.aNViITp28l@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Ethernet AVB support for r8a7745 SoC.
+Am Donnerstag, 24. August 2017, 15:50:51 CEST schrieb Arnd Bergmann:
+> On Thu, Aug 24, 2017 at 10:42 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> > The following changes since commit 0f4dc7e154d054303c4dd6b5c3e3207f9a7f8714:
+> >
+> >   ARM: dts: rockchip: fix property-ordering in rv1108 mmc nodes (2017-07-22 22:41:35 +0200)
+> >
+> > are available in the git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.14-rockchip-dts32-2
+> >
+> > for you to fetch changes up to 274ff50d3ad951bca0adbfb9ffd628d35ba6db6f:
+> >
+> >   ARM: dts: rockchip: enable usb for rv1108-evb (2017-08-23 09:24:51 +0200)
+> >
+> > ----------------------------------------------------------------
+> > A lot of attention for the rv1108 soc targetted at media-processing
+> > (usb, operating points, spi, pwm, adc, watchdog, i2c and devices for
+> > its evb).
+> >
+> > RK3228/3229 gets iommu and spi nodes. Similar to the rk3288 which
+> > also gets some more iommu nodes as well as getting converted to 64
+> > bit addresses due to wanting to address more than 4GB of memory
+> > via LPAE.
+> 
+> Pulled into next/dt with a small fixup, see below. Please check.
+> 
+> Thanks!
+> 
+>       Arnd
+> 
+> 
+> diff --cc arch/arm/boot/dts/rk3288.dtsi
+> index 858e1fed762a,c0c04e99e159..356ed1e62452
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@@ -1126,9 -1145,27 +1145,27 @@@
+>                 };
+>         };
+> 
+> +       vpu_mmu: iommu at ff9a0800 {
+> +               compatible = "rockchip,iommu";
+> +               reg = <0x0 0xff9a0800 0x0 0x100>;
+> +               interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+> +               interrupt-names = "vpu_mmu";
+> +               #iommu-cells = <0>;
+> +               status = "disabled";
+> +       };
+> +
+> +       hevc_mmu: iommu at ff9c0440 {
+> +               compatible = "rockchip,iommu";
+> +               reg = <0x0 0xff9c0440 0x0 0x40>, <0x0 0xff9c0480 0x0 0x40>;
+> +               interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+> +               interrupt-names = "hevc_mmu";
+> +               #iommu-cells = <0>;
+> +               status = "disabled";
+> +       };
+> +
+>  -      gpu: mali at ffa30000 {
+>  -              compatible = "rockchip,rk3288-mali", "arm,mali-t760",
+> "arm,mali-midgard";
+>  +      gpu: gpu at ffa30000 {
+>  +              compatible = "rockchip,rk3288-mali", "arm,mali-t760";
+> -               reg = <0xffa30000 0x10000>;
+> +               reg = <0x0 0xffa30000 0x0 0x10000>;
+>                 interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
+>                              <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
+>                              <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
----
-It is applying cleanly on renesas-devel branch tag
-renesas-devel-20170824-v4.13-rc6.
+yep looks good. Seems like the mali compatible-fix that was going into
+an 4.13-rc interfered here.
 
-It is tested against renesas-devel branch tag
-renesas-devel-20170824-v4.13-rc6.
 
- arch/arm/boot/dts/r8a7745.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index 7fd2967..c34f88e 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -707,6 +707,19 @@
- 			status = "disabled";
- 		};
- 
-+		avb: ethernet at e6800000 {
-+			compatible = "renesas,etheravb-r8a7745",
-+				     "renesas,etheravb-rcar-gen2";
-+			reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
-+			interrupts = <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 812>;
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 812>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		mmcif0: mmc at ee200000 {
- 			compatible = "renesas,mmcif-r8a7745",
- 				     "renesas,sh-mmcif";
--- 
-1.9.1
+Thanks
+Heiko
