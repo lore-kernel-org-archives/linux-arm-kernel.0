@@ -1,40 +1,40 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 24 Aug 2017 11:16:16 +0100
-Subject: [GIT PULL] firmware: arm_scpi: fix for v4.14
-Message-ID: <0a748aa5-ff12-58ce-928d-940825da6d84@arm.com>
+From: biju.das@bp.renesas.com (Biju Das)
+Date: Thu, 24 Aug 2017 10:59:33 +0100
+Subject: [PATCH ] phy: rcar-gen2: Add r8a7743/5 support
+Message-ID: <1503568773-41410-1-git-send-email-biju.das@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC Team,
+Add USB PHY support for r8a7743/5 SoC. Renesas RZ/G1[ME] (R8A7743/5)
+USB PHY is identical to the R-Car Gen2 family.
 
-Please pull!
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+---
+This patch is tested against Linux next tag next-20170824 and 
+renesas-dev branch renesas-devel-20170822-v4.13-rc6. 
 
-Regards,
-Sudeep
+ Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-
-The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
-
-  Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
-tags/scpi-fixes-4.14
-
-for you to fetch changes up to 0d30176819c8738b012ec623c7b3db19df818e70:
-
-  firmware: arm_scpi: fix endianness of dev_id in struct dev_pstate_set
-(2017-08-23 16:36:51 +0100)
-
-----------------------------------------------------------------
-ARM SCPI fixes for v4.14
-
-Simple endianness fix for dev_id in dev_pstate_set structure
-
-----------------------------------------------------------------
-Sudeep Holla (1):
-      firmware: arm_scpi: fix endianness of dev_id in struct dev_pstate_set
-
- drivers/firmware/arm_scpi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+diff --git a/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt b/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
+index 91da947..eeb9e18 100644
+--- a/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
++++ b/Documentation/devicetree/bindings/phy/rcar-gen2-phy.txt
+@@ -4,10 +4,13 @@ This file provides information on what the device node for the R-Car generation
+ 2 USB PHY contains.
+ 
+ Required properties:
+-- compatible: "renesas,usb-phy-r8a7790" if the device is a part of R8A7790 SoC.
++- compatible: "renesas,usb-phy-r8a7743" if the device is a part of R8A7743 SoC.
++	      "renesas,usb-phy-r8a7745" if the device is a part of R8A7745 SoC.
++	      "renesas,usb-phy-r8a7790" if the device is a part of R8A7790 SoC.
+ 	      "renesas,usb-phy-r8a7791" if the device is a part of R8A7791 SoC.
+ 	      "renesas,usb-phy-r8a7794" if the device is a part of R8A7794 SoC.
+-	      "renesas,rcar-gen2-usb-phy" for a generic R-Car Gen2 compatible device.
++	      "renesas,rcar-gen2-usb-phy" for a generic R-Car Gen2 or
++					  RZ/G1 compatible device.
+ 
+ 	      When compatible with the generic version, nodes must list the
+ 	      SoC-specific version corresponding to the platform first
+-- 
+1.9.1
