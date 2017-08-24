@@ -1,39 +1,107 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 Aug 2017 22:45:27 +0200
-Subject: [PATCH 02/11] watchdog: gemini/ftwdt010: rename driver and symbols
-In-Reply-To: <20170814150105.GG14491@roeck-us.net>
-References: <20170812184318.10144-1-linus.walleij@linaro.org>
- <20170812184318.10144-3-linus.walleij@linaro.org>
- <20170814150105.GG14491@roeck-us.net>
-Message-ID: <CACRpkdb_UkQdg0H-WA+9tbW5_9UX2-3Ezoyww=HXuUGi=8aH8A@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 24 Aug 2017 22:53:16 +0200
+Subject: [PATCH v10] PCI: tango: Add MSI controller support
+In-Reply-To: <CAKv+Gu8ksqfBgXUTitDOB8O6Ke5Swkp2Agdt=3F0KJ130uUkBw@mail.gmail.com>
+References: <7b7278f4-7639-62b3-8a35-e6f7f9afa998@sigmadesigns.com>
+ <8452c9ca-7131-cf43-d35c-afc4252844f0@arm.com>
+ <4b93964c-49eb-efbf-f6b2-956c67694182@sigmadesigns.com>
+ <86efs3wesi.fsf@arm.com>
+ <20170824170445.GO31858@bhelgaas-glaptop.roam.corp.google.com>
+ <e2d48341-3ab1-f80a-b044-ff7dcc059ed4@sigmadesigns.com>
+ <CAKv+Gu8ksqfBgXUTitDOB8O6Ke5Swkp2Agdt=3F0KJ130uUkBw@mail.gmail.com>
+Message-ID: <e381170c-e462-01cd-12db-30773005602b@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Aug 14, 2017 at 5:01 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On Sat, Aug 12, 2017 at 08:43:09PM +0200, Linus Walleij wrote:
+On 24/08/2017 20:35, Ard Biesheuvel wrote:
+> On 24 August 2017 at 18:51, Marc Gonzalez wrote:
+>> On 24/08/2017 19:04, Bjorn Helgaas wrote:
+>>> On Tue, Aug 22, 2017 Marc Zyngier wrote:
+>>>> Marc Gonzalez wrote:
+>>>>> On 22/08/2017 18:29, Marc Zyngier wrote:
+>>>>>> On 22/08/17 15:56, Marc Gonzalez wrote:
+>>>>>>
+>>>>>>>  #define SMP8759_MUX              0x48
+>>>>>>>  #define SMP8759_TEST_OUT 0x74
+>>>>>>> +#define SMP8759_STATUS           0x80
+>>>>>>> +#define SMP8759_ENABLE           0xa0
+>>>>>>> +#define SMP8759_DOORBELL 0xa002e07c
+>>>>>>
+>>>>>> Why is this hardcoded and not coming from the device-tree, just like any
+>>>>>> other address property?
+>>>>>
+>>>>> Since this bus address is software-configurable, I didn't think
+>>>>> it belonged in the DT. Also, I didn't see anything similar in
+>>>>> other binding docs, especially
+>>>>>
+>>>>> Documentation/devicetree/bindings/interrupt-controller/msi.txt
+>>>>
+>>>> If that's software configurable, how on Earth did you pick the address?
+>>>> How do you ensure that it doesn't conflict with DMA? How is it
+>>>> configured into the RC?
+>>>
+>>> But we *do* need to resolve this.  This does seem like an address that
+>>> shouldn't be hard-coded into the driver.  Since this driver is
+>>> programming the address into an MSI message, but not into the receiver
+>>> of that message, there's a coordination issue between this driver and
+>>> whatever other software does that receiver configuration.
+>>
+>> OK. I'll move the doorbell address to the DT for v11.
+>>
+>> What property should be used for this address?
+>>
+>> sigma,doorbell ?
+>>
+>> Or maybe I can put it in reg, since I have a 1:1 mapping
+>> between bus and cpu addresses?
+>>
+>> git grep -i doorbell arch/arm/boot/dts/ arch/arm64/boot/dts/
+>> returns nothing.
+> 
+> You haven't answered the question yet: you stated that the doorbell
+> address is software configurable, yet your code does not seem to
+> configure it. It only returns the doorbell address so that it gets
+> communicated to the downstream devices.
+> 
+> So how does the RC know which address is special, so it can trigger on
+> inbound writes hitting that address and assert the SPI ?
 
->> -config GEMINI_WATCHDOG
->> -     tristate "Gemini watchdog"
->> -     depends on ARCH_GEMINI
->> +config FTWDT010_WATCHDOG
->> +     tristate "Faraday Technology FTWDT010 watchdog"
->> +     depends on ARM || COMPILE_TEST
->
-> Did you test this ? I am kind of wary about COMPILE_TEST in watchdog drivers.
-> I tried to enable that a while ago, and we had to spend a couple of releases
-> fixing the fallout (even though I had tried to make sure that everything
-> builds).
+The CPU address of the MSI doorbell address is 0x2e07c
+i.e. within the reg space of the PCIe controller block.
 
-Incidentally, yes!
+As I discussed back in March, the RC implements an odd
+bus-to-system mapping.
 
-I push my tree to kernelorg where the zeroday autobuilders pick it up
-and compile all kind of archs.
+RC BAR0 defines a window in PCI address space (max 1GB).
+Accesses outside this window are silently ignored.
+The window is divided into 8 "regions" and there are 8
+registers defining the offset into CPU space.
 
-I'm pushing the updated patches too.
+In pseudo code, assuming pci_address is within the
+window defined by BAR0:
 
-The big culprit used to be um linux, since it doesn't do MMIO.
-But I think that has been solved recently because I don't see
-complaints about it anymore.
+cpu_address map_bus_to_system(pci_address)
+{
+    temp = pci_address - BAR0.base
+    region = temp / region_size
+    offset = temp % region_size
+    cpu_address = region_reg[region] + offset
+    return cpu_address
+}
 
-Yours,
-Linus Walleij
+The current setup is:
+
+DRAM at 0x80000000-0xa0000000
+BAR0.base = 0x80000000
+REGION[0] = 0x80000000
+REGION[1] = 0x88000000
+REGION[2] = 0x90000000
+REGION[3] = 0x98000000
+REGION[4] = 0x0
+
+(This map means 1:1 identity for DRAM addresses.)
+
+Thus when a device writes to 0xa002e07c (region 4)
+the write is forwarded to 0x2e07c.
+
+Regards.
