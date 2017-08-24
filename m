@@ -1,82 +1,129 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 24 Aug 2017 15:35:37 +0100
-Subject: [PATCH v6 3/3] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <53b9795c-6222-9cf0-50dc-9dafbfb67a2c@huawei.com>
-References: <20170809100715.870516-1-shameerali.kolothum.thodi@huawei.com>
- <20170809100715.870516-4-shameerali.kolothum.thodi@huawei.com>
- <20170810172723.GD9980@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA8383CC287@FRAEML521-MBX.china.huawei.com>
- <c6b7c641-b839-1388-7982-366e796e6ba9@huawei.com>
- <20170823132430.GB634@arm.com>
- <77b6c97f-f2d2-fd14-e83e-345addc5ea71@huawei.com>
- <20170823164301.GC590@arm.com>
- <53b9795c-6222-9cf0-50dc-9dafbfb67a2c@huawei.com>
-Message-ID: <20170824143536.GA8904@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 24 Aug 2017 16:36:45 +0200
+Subject: [PATCH] rtc: sun6i: Add support for the external oscillator gate
+In-Reply-To: <20170824121854.23995-1-maxime.ripard@free-electrons.com>
+References: <20170824121854.23995-1-maxime.ripard@free-electrons.com>
+Message-ID: <20170824143645.3pwfgnvhhqh3m2d6@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 05:55:52PM +0100, John Garry wrote:
-> On 23/08/2017 17:43, Will Deacon wrote:
-> >On Wed, Aug 23, 2017 at 03:29:46PM +0100, John Garry wrote:
-> >>On 23/08/2017 14:24, Will Deacon wrote:
-> >>>On Wed, Aug 23, 2017 at 02:17:24PM +0100, John Garry wrote:
-> >>>>>>>Signed-off-by: Shameer Kolothum
-> >>>>>><shameerali.kolothum.thodi@huawei.com>
-> >>>>>>>---
-> >>>>>>>drivers/iommu/arm-smmu-v3.c | 27 ++++++++++++++++++++++-----
-> >>>>>>>1 file changed, 22 insertions(+), 5 deletions(-)
-> >>>>>>
-> >>>>>>Please can you also add a devicetree binding with corresponding
-> >>>>>>documentation to enable this workaround on non-ACPI based systems too?
-> >>>>>>It should be straightforward if you update the arm_smmu_options table.
-> >>>>>
-> >>>>>As I mentioned before, devicetree was a lower priority and we would definitely
-> >>>>>submit patch to support that. Even if we update the arm_smmu_options table
-> >>>>>with DT binding, the generic function to retrieve the MSI address regions only
-> >>>>>works on ACPI/IORT case now.
-> >>>>>
-> >>>>
-> >>>>Hi Will,
-> >>>>
-> >>>>Can you confirm your stance on supporting this workaround for DT as well as
-> >>>>ACPI?
-> >>>>
-> >>>>For us, we now only "officially" support ACPI FW, and DT support at this
-> >>>>point is patchy/limited. To me, adding DT support is just more errata
-> >>>>workaround code to maintain with little useful gain.
-> >>>
-> >>>I basically don't like the idea of a driver that only works for one of
-> >>>ACPI or DT yet claims to support both. I'm less fussed about functionality
-> >>>differences (feature X is only available with firmware Y), but not working
-> >>>around a hardware erratum that we know about is just lazy.
-> >>>
-> >>>So I'd prefer that we handle this in both cases, or blacklist affected
-> >>>devices when booting with DT. Continuing as though there isn't an erratum
-> >>>is the worst thing we can do.
-> >>
-> >>OK, seems reasonable.
-> >>
-> >>We would consider blacklisting the device, where/how to do is the question.
-> >>
-> >>So the errata is in the GICv3 ITS/PCI host controller, and we just use the
-> >>in-between SMMU (driver) to provide the workaround. So my initial impression
-> >>is that the PCI host controller would have to be blacklisted IFF behind an
-> >>IOMMU for DT firmware in pcie-hisi.c or pci quirks framework. How does it
-> >>sound?
-> >
-> >If that avoids us running into the erratum, then fine by me. I'd obviously
-> >prefer we work-around it since we know how to, but that's up to you.
+Hi,
+
+On 24/08/2017 at 14:18:54 +0200, Maxime Ripard wrote:
+> The RTC can output its 32kHz clock outside of the SoC, for example to clock
+> a WiFi chip.
 > 
-> I'm surpsised that you may want more errata workaround code to maintain.
+> Create a new clock that other devices will be able to retrieve, while
+> maintaining the DT stability by providing a default name for that clock if
+> clock-output-names doesn't list one.
 > 
-> Anyway we'll check both approaches and show you how they look and go from
-> there.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  .../devicetree/bindings/rtc/sun6i-rtc.txt          |  4 ++--
+>  drivers/rtc/rtc-sun6i.c                            | 24 +++++++++++++++++++---
+>  2 files changed, 23 insertions(+), 5 deletions(-)
+> 
 
-Don't get me wrong, I don't dream about adding errata workarounds to the
-code, but our job as an operating system is to abstract the hardware from
-the user, which means dealing with its quirks whether we like it or not.
+It doesn't apply cleanly, can you rebase on top of -next?
 
-Thanks,
+> diff --git a/Documentation/devicetree/bindings/rtc/sun6i-rtc.txt b/Documentation/devicetree/bindings/rtc/sun6i-rtc.txt
+> index 945934918b71..d5e26d313f62 100644
+> --- a/Documentation/devicetree/bindings/rtc/sun6i-rtc.txt
+> +++ b/Documentation/devicetree/bindings/rtc/sun6i-rtc.txt
+> @@ -10,7 +10,7 @@ Required properties:
+>  
+>  Required properties for new device trees
+>  - clocks	: phandle to the 32kHz external oscillator
+> -- clock-output-names : name of the LOSC clock created
+> +- clock-output-names : names of the LOSC and its external output clocks created
+>  - #clock-cells  : must be equals to 1. The RTC provides two clocks: the
+>  		  LOSC and its external output, with index 0 and 1
+>  		  respectively.
+> @@ -21,7 +21,7 @@ rtc: rtc at 01f00000 {
+>  	compatible = "allwinner,sun6i-a31-rtc";
+>  	reg = <0x01f00000 0x54>;
+>  	interrupts = <0 40 4>, <0 41 4>;
+> -	clock-output-names = "osc32k";
+> +	clock-output-names = "osc32k", "osc32k-out";
+>  	clocks = <&ext_osc32k>;
+>  	#clock-cells = <1>;
+>  };
+> diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+> index 39cbc1238b92..d4a6ddbfd872 100644
+> --- a/drivers/rtc/rtc-sun6i.c
+> +++ b/drivers/rtc/rtc-sun6i.c
+> @@ -73,6 +73,9 @@
+>  #define SUN6I_ALARM_CONFIG			0x0050
+>  #define SUN6I_ALARM_CONFIG_WAKEUP		BIT(0)
+>  
+> +#define SUN6I_LOSC_OUT_GATING			0x0060
+> +#define SUN6I_LOSC_OUT_GATING_EN		BIT(0)
+> +
+>  /*
+>   * Get date values
+>   */
+> @@ -125,6 +128,7 @@ struct sun6i_rtc_dev {
+>  	struct clk_hw hw;
+>  	struct clk_hw *int_osc;
+>  	struct clk *losc;
+> +	struct clk *ext_losc;
+>  
+>  	spinlock_t lock;
+>  };
+> @@ -188,6 +192,7 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
+>  	struct clk_init_data init = {
+>  		.ops		= &sun6i_rtc_osc_ops,
+>  	};
+> +	const char *clkout_name = "osc32k-out";
+>  	const char *parents[2];
+>  
+>  	rtc = kzalloc(sizeof(*rtc), GFP_KERNEL);
+> @@ -195,7 +200,7 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
+>  		return;
+>  	spin_lock_init(&rtc->lock);
+>  
+> -	clk_data = kzalloc(sizeof(*clk_data) + sizeof(*clk_data->hws),
+> +	clk_data = kzalloc(sizeof(*clk_data) + (sizeof(*clk_data->hws) * 2),
+>  			   GFP_KERNEL);
+>  	if (!clk_data)
+>  		return;
+> @@ -235,7 +240,8 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
+>  
+>  	init.parent_names = parents;
+>  	init.num_parents = of_clk_get_parent_count(node) + 1;
+> -	of_property_read_string(node, "clock-output-names", &init.name);
+> +	of_property_read_string_index(node, "clock-output-names", 0,
+> +				      &init.name);
+>  
+>  	rtc->losc = clk_register(NULL, &rtc->hw);
+>  	if (IS_ERR(rtc->losc)) {
+> @@ -243,8 +249,20 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
+>  		return;
+>  	}
+>  
+> -	clk_data->num = 1;
+> +	of_property_read_string_index(node, "clock-output-names", 1,
+> +				      &clkout_name);
+> +	rtc->ext_losc = clk_register_gate(NULL, clkout_name, rtc->hw.init->name,
+> +					  0, rtc->base + SUN6I_LOSC_OUT_GATING,
+> +					  SUN6I_LOSC_OUT_GATING_EN, 0,
+> +					  &rtc->lock);
+> +	if (IS_ERR(rtc->ext_losc)) {
+> +		pr_crit("Couldn't register the LOSC external gate\n");
+> +		return;
+> +	}
+> +
+> +	clk_data->num = 2;
+>  	clk_data->hws[0] = &rtc->hw;
+> +	clk_data->hws[1] = __clk_get_hw(rtc->ext_losc);
+>  	of_clk_add_hw_provider(node, of_clk_hw_onecell_get, clk_data);
+>  }
+>  CLK_OF_DECLARE_DRIVER(sun6i_rtc_clk, "allwinner,sun6i-a31-rtc",
+> -- 
+> 2.13.5
+> 
 
-Will
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
