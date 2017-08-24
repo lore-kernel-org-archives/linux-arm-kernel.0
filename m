@@ -1,50 +1,27 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 24 Aug 2017 21:04:51 +0800
-Subject: [PATCH v11 3/6] ACPI: build and enable APEI GHES in the Makefile
- and configuration
-In-Reply-To: <1503066227-18251-4-git-send-email-gengdongjiu@huawei.com>
-References: <1503066227-18251-1-git-send-email-gengdongjiu@huawei.com>
- <1503066227-18251-4-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <599ECEF3.80001@huawei.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 24 Aug 2017 15:12:21 +0200
+Subject: [PATCH v2 3/4] net: phy: realtek: add disable RX internal delay
+ mode
+In-Reply-To: <7c43220aef447e5cf21e48a9eca18535@aosc.io>
+References: <20170822040400.12166-1-icenowy@aosc.io>
+ <20170822040400.12166-4-icenowy@aosc.io>
+ <20170822133906.GG24555@lunn.ch>
+ <7c43220aef447e5cf21e48a9eca18535@aosc.io>
+Message-ID: <20170824131221.GA8022@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2017/8/18 22:23, Dongjiu Geng wrote:
-> Add CONFIG_ACPI_APEI configuration in the Makefile and
-> enable it in the arm-softmmu.mak
+> >Do we know that the TX lines do have a delay after making this change?
+> >We need to be careful here. We will get into a mess if this is
+> >actually RGMII not RGMII_TXID, and somebody designs a board which
+> >needs RGMII-TXID.
 > 
-> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-> ---
->  default-configs/arm-softmmu.mak | 1 +
->  hw/acpi/Makefile.objs           | 1 +
->  2 files changed, 2 insertions(+)
-> 
-> diff --git a/default-configs/arm-softmmu.mak b/default-configs/arm-softmmu.mak
-> index bbdd3c1..c362113 100644
-> --- a/default-configs/arm-softmmu.mak
-> +++ b/default-configs/arm-softmmu.mak
-> @@ -129,3 +129,4 @@ CONFIG_ACPI=y
->  CONFIG_SMBIOS=y
->  CONFIG_ASPEED_SOC=y
->  CONFIG_GPIO_KEY=y
-> +CONFIG_ACPI_APEI=y
-> diff --git a/hw/acpi/Makefile.objs b/hw/acpi/Makefile.objs
-> index 11c35bc..bafb148 100644
-> --- a/hw/acpi/Makefile.objs
-> +++ b/hw/acpi/Makefile.objs
-> @@ -6,6 +6,7 @@ common-obj-$(CONFIG_ACPI_MEMORY_HOTPLUG) += memory_hotplug.o
->  common-obj-$(CONFIG_ACPI_CPU_HOTPLUG) += cpu.o
->  common-obj-$(CONFIG_ACPI_NVDIMM) += nvdimm.o
->  common-obj-$(CONFIG_ACPI_VMGENID) += vmgenid.o
-> +common-obj-$(CONFIG_ACPI_APEI) += hest_ghes.o
->  common-obj-$(call lnot,$(CONFIG_ACPI_X86)) += acpi-stub.o
->  
->  common-obj-y += acpi_interface.o
-> 
-Fold this patch into previous one.
+> In fact I'm not sure -- I'm even not sure that after making this change
+> there's no TX delay. The change is totally not documented, so I choose
+> to use a custom property in v1.
 
-Thanks,
--- 
-Shannon
+Can you get in touch with Realtek and ask? Or can you get a hardware
+guy to do some measurements?
+
+Thanks
+    Andrew
