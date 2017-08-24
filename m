@@ -1,44 +1,49 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 24 Aug 2017 11:55:05 -0500
-Subject: [PATCH v4 0/4] PCI: rockchip: Move PCIE_WAKE handling into
- rockchip pcie driver
-In-Reply-To: <20170822031934.8675-1-jeffy.chen@rock-chips.com>
-References: <20170822031934.8675-1-jeffy.chen@rock-chips.com>
-Message-ID: <20170824165505.GM31858@bhelgaas-glaptop.roam.corp.google.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 24 Aug 2017 17:56:17 +0100
+Subject: [PATCH 08/14] arm64: kexec_file: create purgatory
+In-Reply-To: <20170824081811.19299-9-takahiro.akashi@linaro.org>
+References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
+ <20170824081811.19299-9-takahiro.akashi@linaro.org>
+Message-ID: <20170824165617.GC29665@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 22, 2017 at 11:19:30AM +0800, Jeffy Chen wrote:
+On Thu, Aug 24, 2017 at 05:18:05PM +0900, AKASHI Takahiro wrote:
+> This is a basic purgtory, or a kind of glue code between the two kernel,
+> for arm64. We will later add a feature of verifying a digest check against
+> loaded memory segments.
 > 
-> Currently we are handling pcie wake in mrvl wifi driver. But Brian
-> suggests to move it into rockchip pcie driver.
-> 
-> Tested on my chromebook bob(with cros 4.4 kernel and mrvl wifi).
-> 
-> 
-> Changes in v4:
-> Rebase on newest for-next branch, also fix error handling by:
-> 1e7f570a1b86 PCI: rockchip: Idle inactive PHY(s)
-> 
-> Changes in v3:
-> Fix error handling
-> 
-> Changes in v2:
-> Use dev_pm_set_dedicated_wake_irq
->         -- Suggested by Brian Norris <briannorris@chromium.com>
-> 
-> Jeffy Chen (4):
->   PCI: rockchip: Fix error handlings
->   PCI: rockchip: Add support for pcie wake irq
->   dt-bindings: PCI: rockchip: Add support for pcie wake irq
->   arm64: dts: rockchip: Handle pcie wake in pcie driver for Gru
-> 
->  .../devicetree/bindings/pci/rockchip-pcie.txt      |  20 ++-
->  arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       |  15 +-
->  drivers/pci/host/pcie-rockchip.c                   | 179 ++++++++++++---------
->  3 files changed, 126 insertions(+), 88 deletions(-)
+> arch_kexec_apply_relocations_add() is responsible for re-linking any
+> relative symbols in purgatory. Please note that the purgatory is not
+> an executable, but a non-linked archive of binaries so relative symbols
+> contained here must be resolved at kexec load time.
+> Despite that arm64_kernel_start and arm64_dtb_addr are only such global
+> variables now, arch_kexec_apply_relocations_add() can manage more various
+> types of relocations.
 
-Looking for acks from Shawn and Rob...
+Why does the purgatory code need to be so complex?
 
-And I'm not sure about the DT wake IRQ description.  That seems like it
-could potentially be generic than this Rockchip-specific proposal.
+Why is it not possible to write this as position-independent asm?
+
+> +/*
+> + * Apply purgatory relocations.
+> + *
+> + * ehdr: Pointer to elf headers
+> + * sechdrs: Pointer to section headers.
+> + * relsec: section index of SHT_RELA section.
+> + *
+> + * Note:
+> + * Currently R_AARCH64_ABS64, R_AARCH64_LD_PREL_LO19 and R_AARCH64_CALL26
+> + * are the only types to be generated from purgatory code.
+
+Is this all that has been observed, or is this ensured somehow?
+
+The arch_kexec_apply_relocations_add() function below duplicates a lot
+of logic that already exists in the arm64 module loader's
+apply_relocate_add() function.
+
+Please reuse that code. Having a duplicate or alternative implementation
+is just asking for subtle bugs.
+
+Thanks,
+Mark.
