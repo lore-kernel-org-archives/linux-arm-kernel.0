@@ -1,55 +1,36 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Thu, 24 Aug 2017 12:51:41 +0530
-Subject: [PATCH v2 19/20] rpmsg: glink: Request for intents when unavailable
+Date: Thu, 24 Aug 2017 12:51:42 +0530
+Subject: [PATCH v2 20/20] rpmsg: glink: Handle remote rx done command
 In-Reply-To: <1503559302-3744-1-git-send-email-sricharan@codeaurora.org>
 References: <1503559302-3744-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1503559302-3744-20-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1503559302-3744-21-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While sending data, we search for suitable sized
-intent to map and simply fail if a intent is not
-found. Instead request for a intent of required
-size and wait till one is alloted.
+Once the remote side sends a rx done ack, check
+for the intent reuse information from it and
+suitably discard or reuse the remote passed
+intent buffers.
 
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
- drivers/rpmsg/qcom_glink_native.c | 76 +++++++++++++++++++++++++++++++++++++--
- 1 file changed, 74 insertions(+), 2 deletions(-)
+ drivers/rpmsg/qcom_glink_native.c | 42 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
 diff --git a/drivers/rpmsg/qcom_glink_native.c b/drivers/rpmsg/qcom_glink_native.c
-index 163c082..54ddb66 100644
+index 54ddb66..08953ca 100644
 --- a/drivers/rpmsg/qcom_glink_native.c
 +++ b/drivers/rpmsg/qcom_glink_native.c
-@@ -149,6 +149,9 @@ enum {
-  * @buf_size:	size of current @buf
-  * @open_ack:	completed once remote has acked the open-request
-  * @open_req:	completed once open-request has been received
-+ * @intent_req_lock: Synchronises multiple intent requests
-+ * @intent_req_result: Result of intent request
-+ * @intent_req_comp: Completion for intent_req signalling
-  */
- struct glink_channel {
- 	struct rpmsg_endpoint ept;
-@@ -176,6 +179,10 @@ struct glink_channel {
- 
- 	struct completion open_ack;
- 	struct completion open_req;
-+
-+	struct mutex intent_req_lock;
-+	bool intent_req_result;
-+	struct completion intent_req_comp;
- };
- 
- #define to_glink_channel(_ept) container_of(_ept, struct glink_channel, ept)
-@@ -342,6 +349,24 @@ static void qcom_glink_send_open_ack(struct qcom_glink *glink,
- 	qcom_glink_tx(glink, &msg, sizeof(msg), NULL, 0, true);
+@@ -657,6 +657,40 @@ static int qcom_glink_advertise_intent(struct qcom_glink *glink,
+ 	return intent;
  }
  
-+static void qcom_glink_handle_intent_req_ack(struct qcom_glink *glink,
-+					     unsigned int cid, bool granted)
++static void qcom_glink_handle_rx_done(struct qcom_glink *glink,
++				      u32 cid, uint32_t iid,
++				      bool reuse)
 +{
++	struct glink_core_rx_intent *intent;
 +	struct glink_channel *channel;
 +	unsigned long flags;
 +
@@ -57,96 +38,45 @@ index 163c082..54ddb66 100644
 +	channel = idr_find(&glink->rcids, cid);
 +	spin_unlock_irqrestore(&glink->idr_lock, flags);
 +	if (!channel) {
-+		dev_err(glink->dev, "unable to find channel\n");
++		dev_err(glink->dev, "invalid channel id received\n");
 +		return;
 +	}
 +
-+	channel->intent_req_result = granted;
-+	complete(&channel->intent_req_comp);
++	spin_lock_irqsave(&channel->intent_lock, flags);
++	intent = idr_find(&channel->riids, iid);
++
++	if (!intent) {
++		spin_unlock_irqrestore(&channel->intent_lock, flags);
++		dev_err(glink->dev, "invalid intent id received\n");
++		return;
++	}
++
++	intent->in_use = false;
++
++	if (!reuse) {
++		idr_remove(&channel->riids, intent->id);
++		kfree(intent);
++	}
++	spin_unlock_irqrestore(&channel->intent_lock, flags);
 +}
 +
  /**
-  * qcom_glink_send_open_req() - send a RPM_CMD_OPEN request to the remote
-  * @glink: Ptr to the glink edge
-@@ -940,6 +965,10 @@ static irqreturn_t qcom_glink_native_intr(int irq, void *data)
+  * qcom_glink_handle_intent_req() - Receive a request for rx_intent
+  *					    from remote side
+@@ -965,6 +999,14 @@ static irqreturn_t qcom_glink_native_intr(int irq, void *data)
  		case RPM_CMD_INTENT:
  			qcom_glink_handle_intent(glink, param1, param2, avail);
  			break;
-+		case RPM_CMD_RX_INTENT_REQ_ACK:
-+			qcom_glink_handle_intent_req_ack(glink, param1, param2);
++		case RPM_CMD_RX_DONE:
++			qcom_glink_handle_rx_done(glink, param1, param2, false);
 +			qcom_glink_rx_advance(glink, ALIGN(sizeof(msg), 8));
 +			break;
- 		default:
++		case RPM_CMD_RX_DONE_W_REUSE:
++			qcom_glink_handle_rx_done(glink, param1, param2, true);
++			qcom_glink_rx_advance(glink, ALIGN(sizeof(msg), 8));
++			break;
+ 		case RPM_CMD_RX_INTENT_REQ_ACK:
+ 			qcom_glink_handle_intent_req_ack(glink, param1, param2);
  			qcom_glink_rx_advance(glink, ALIGN(sizeof(msg), 8));
- 			dev_err(glink->dev, "unhandled rx cmd: %d\n", cmd);
-@@ -1106,6 +1135,42 @@ static void qcom_glink_destroy_ept(struct rpmsg_endpoint *ept)
- 	qcom_glink_send_close_req(glink, channel);
- }
- 
-+static int qcom_glink_request_intent(struct qcom_glink *glink,
-+				     struct glink_channel *channel,
-+				     size_t size)
-+{
-+	struct {
-+		u16 id;
-+		u16 cid;
-+		u32 size;
-+	} __packed cmd;
-+
-+	int ret;
-+
-+	mutex_lock(&channel->intent_req_lock);
-+
-+	reinit_completion(&channel->intent_req_comp);
-+
-+	cmd.id = RPM_CMD_RX_INTENT_REQ;
-+	cmd.cid = channel->lcid;
-+	cmd.size = size;
-+
-+	ret = qcom_glink_tx(glink, &cmd, sizeof(cmd), NULL, 0, true);
-+	if (ret)
-+		return ret;
-+
-+	ret = wait_for_completion_timeout(&channel->intent_req_comp, 10 * HZ);
-+	if (!ret) {
-+		dev_err(glink->dev, "intent request timed out\n");
-+		ret = -ETIMEDOUT;
-+	} else {
-+		ret = channel->intent_req_result ? 0 : -ECANCELED;
-+	}
-+
-+	mutex_unlock(&channel->intent_req_lock);
-+	return ret;
-+}
-+
- static int __qcom_glink_send(struct glink_channel *channel,
- 			     void *data, int len, bool wait)
- {
-@@ -1122,7 +1187,7 @@ static int __qcom_glink_send(struct glink_channel *channel,
- 	unsigned long flags;
- 
- 	if (!glink->intentless) {
--		if (!intent) {
-+		while (!intent) {
- 			spin_lock_irqsave(&channel->intent_lock, flags);
- 			idr_for_each_entry(&channel->riids, tmp, iid) {
- 				if (tmp->size >= len && !tmp->in_use) {
-@@ -1134,8 +1199,15 @@ static int __qcom_glink_send(struct glink_channel *channel,
- 			spin_unlock_irqrestore(&channel->intent_lock, flags);
- 
- 			/* We found an available intent */
--			if (!intent)
-+			if (intent)
-+				break;
-+
-+			if (!wait)
- 				return -EBUSY;
-+
-+			ret = qcom_glink_request_intent(glink, channel, len);
-+			if (ret < 0)
-+				return ret;
- 		}
- 
- 		iid = intent->id;
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
