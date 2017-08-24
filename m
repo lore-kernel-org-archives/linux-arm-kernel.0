@@ -1,56 +1,33 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 24 Aug 2017 08:37:29 -0400 (EDT)
-Subject: [PATCH v2 0/8] ELF-FDPIC support for ARM
-In-Reply-To: <38b1d822-345d-0b79-6d44-b78649e46efb@arm.com>
-References: <20170817072347.19990-1-nicolas.pitre@linaro.org>
- <20170817083716.GN20805@n2100.armlinux.org.uk>
- <alpine.LFD.2.20.1708231158090.14288@knanqh.ubzr>
- <38b1d822-345d-0b79-6d44-b78649e46efb@arm.com>
-Message-ID: <alpine.LFD.2.20.1708240834210.14288@knanqh.ubzr>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 24 Aug 2017 13:36:48 +0100
+Subject: Intermittent memory corruption with v4.13-rc6+ and earlier
+In-Reply-To: <20170824114833.GH5943@dhcp22.suse.cz>
+References: <20170824113743.GA14737@leverpostej>
+ <20170824114833.GH5943@dhcp22.suse.cz>
+Message-ID: <20170824123647.GA19698@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 24 Aug 2017, Vladimir Murzin wrote:
-
-> On 23/08/17 17:41, Nicolas Pitre wrote:
-> > On Thu, 17 Aug 2017, Russell King - ARM Linux wrote:
+On Thu, Aug 24, 2017 at 01:48:34PM +0200, Michal Hocko wrote:
+> On Thu 24-08-17 12:37:43, Mark Rutland wrote:
+> > Hi,
 > > 
-> >> On Thu, Aug 17, 2017 at 03:23:39AM -0400, Nicolas Pitre wrote:
-> >>> This series provides the needed changes to suport the ELF_FDPIC binary
-> >>> format on ARM. Both MMU and non-MMU systems are supported. This format
-> >>> has many advantages over the BFLT format used on MMU-less systems, such
-> >>> as being real ELF that can be parsed by standard tools, can support
-> >>> shared dynamic libs, etc.
-> >>
-> >> I don't see anything issues from the core arch point of view with this,
-> >> most of it looks straight forward, and the impact on existing users
-> >> should be low.  However, it would be nice to get some acks (if possible)
-> >> for the non-arch stuff and some tested-by's on this.
+> > I'm chasing intermittent memory corruption bugs seen at least on rc5,
+> > rc6, and yesterday's HEAD (98b9f8a4549909c6), on arm64. 
 > > 
-> > Well...
-> > 
-> > I did prod a few people for testing. Either they're on vacation, or not 
-> > interested, but I've received no tested-by's nor ACK's what so ever at 
-> > this point. I did test it myself of course, on both MMU and non-MMU 
-> > targets, and with static and dynamic binaries.
+> > It looks like we make use of dangling references to a freed struct file,
+> > which is caught by KASAN. Without KASAN, I see a number of other
+> > intermittent issues that I suspect are the result of this memory
+> > corruption. I've included an example splat below, complete with KASAN's
+> > alloc/free traces at the end of this mail.
 > 
-> IIRC, Andras (CCed) has been running FDPIC for a while. Also, I can try to
-> give it a go on M/R class systems around next week.
+> Is it possible this is the same issue as the one fixed by
+> http://lkml.kernel.org/r/20170823211408.31198-1-ebiggers3 at gmail.com?
 
-Thanks.
+That sounds plausible, and so far the fix seems to help. Thanks for the
+pointer!
 
-> I've noticed under Mickael's repo extra patches:
-> 
-> - Add tls support for cortex-m cpu family
-> - Workaround to fix futex bug on mmu less
-> 
-> It'd be nice if you shed some light on why they are not present in your
-> series.
+I'll leave that running for a while, just in case.
 
-The first one is.
-
-The second one concerns a different maintainer entirely and is 
-orthogonal to FDPIC support so I didn't include it here.
-
-
-Nicolas
+Thanks,
+Mark.
