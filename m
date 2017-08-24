@@ -1,79 +1,101 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 24 Aug 2017 21:01:50 +0800
-Subject: [PATCH v6 04/19] crypto: marvell/cesa: remove redundant backlog
- checks on EBUSY
-In-Reply-To: <1503324309-13673-5-git-send-email-gilad@benyossef.com>
-Message-ID: <201708242036.ODpqdw7q%fengguang.wu@intel.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Thu, 24 Aug 2017 15:03:30 +0200
+Subject: [PATCH v3 2/5] dmaengine: Add STM32 DMAMUX driver
+In-Reply-To: <d1cc3cbb-c4aa-2acc-91ff-1d6713cb8867@ti.com>
+References: <1499343623-5964-1-git-send-email-pierre-yves.mordret@st.com>
+ <1499343623-5964-3-git-send-email-pierre-yves.mordret@st.com>
+ <20170722065133.GT3053@localhost>
+ <2b916330-9b65-f4d5-817f-79b66cc236b3@st.com>
+ <20170726052930.GF3053@localhost>
+ <f2908e38-dc4d-3886-4058-52a7ad845415@st.com>
+ <20170731123157.GJ3053@localhost>
+ <e3a76a50-4160-d111-cce9-132b46b66c33@st.com>
+ <20170802045522.GU3053@localhost>
+ <7d2091fe-a2e5-78bb-b63d-9cb66bdb7e84@ti.com>
+ <7bcad698-fa1a-3dc2-e918-4400639ca6d7@st.com>
+ <47ceba83-1097-072e-bed6-d1964bce7a25@ti.com>
+ <0e16a519-3d60-f683-5517-12a520e0e521@st.com>
+ <f0db566e-5613-8914-e070-915c8c4d9b9f@ti.com>
+ <71b7ef2a-d745-d16b-4538-567c856cce9a@st.com>
+ <401305f0-15d8-1996-60d6-69c13cbacc06@ti.com>
+ <58bf2f7c-faf1-d1e9-3c87-d7964d1ba3d4@st.com>
+ <6e8e19f1-8d0f-183b-e02f-1ec8c4dd57b3@ti.com>
+ <f7ddd927-5db3-e1b1-b7f1-94050b508298@st.com>
+ <d1cc3cbb-c4aa-2acc-91ff-1d6713cb8867@ti.com>
+Message-ID: <ea66ba14-fe18-cb83-5989-8ae7b3ab50c6@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gilad,
 
-[auto build test ERROR on cryptodev/master]
-[also build test ERROR on v4.13-rc6 next-20170823]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/Gilad-Ben-Yossef/crypto-change-transient-busy-return-code-to-EAGAIN/20170824-180606
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/herbert/cryptodev-2.6.git master
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On 08/24/2017 07:47 AM, Peter Ujfalusi wrote:
+> 
+> 
+> On 2017-08-21 12:34, Pierre Yves MORDRET wrote:
+>> OK. I will redesign my driver to take into account this idea.
+>>
+>> I believe I should get rid of my custom API in DMA for channelID as well. Please
+>> confirm. Not very clear for me whether I can keep it or not.
+> 
+> Yes, you should be able to get rid of any custom API.
+> The DMA event router should be 'invisible' to both the DMA driver itself
+> and for the DMA users as well. If you end up still needing custom API
+> (which I doubt) then it is better to extend the core support to cover
+> that in a generic way since it is likely that other might have similar
+> needs.
+> 
 
-All error/warnings (new ones prefixed by >>):
+Will see that later on :)
 
-   drivers/crypto/marvell/cesa.c: In function 'mv_cesa_queue_req':
->> drivers/crypto/marvell/cesa.c:187:3: error: expected ')' before 'mv_cesa_tdma_chain'
-      mv_cesa_tdma_chain(engine, creq);
-      ^~~~~~~~~~~~~~~~~~
->> drivers/crypto/marvell/cesa.c:196:1: error: expected expression before '}' token
-    }
-    ^
->> drivers/crypto/marvell/cesa.c:196:1: warning: control reaches end of non-void function [-Wreturn-type]
-    }
-    ^
+> You need to identify what you need to manage with the DMA router, again
+> in my cases:
+> am335x/am437x: The DMA channel is fixed, but the DMA event to be handled
+> by the channel (DMA event muxer) is selected by the router.
+> dra7x: The DMA event is the fixed part and I needed to translate that to
+> local eDMA/sDMA events and in eDMA I needed to pick a channel based on
+> the translated event.
+> 
+> The same router code works for eDMA and sDMA in dra7, while the two DMA
+> engines are different in their internal works.
+> 
+> At the end of the day I only needed to plug the DMA event routers and
+> there is no change in the DMA drivers at all.
+> 
 
-vim +187 drivers/crypto/marvell/cesa.c
+Please tell me whether I'm wrong but for am335x/am437x both DMA Channels and
+events are given by DT. I believe IP Spec provides the mapping for the channel
+(this is what you call fixed channel) and DMA router event is selected randomly
+within the DT.
+As for dra7 events comes from DT but channel is selected though out local
+algorithm. IP Spec defines DMA event muxer mapping.
 
-f63601fd6 Boris Brezillon  2015-06-18  176  
-53da740fe Romain Perier    2016-06-21  177  int mv_cesa_queue_req(struct crypto_async_request *req,
-53da740fe Romain Perier    2016-06-21  178  		      struct mv_cesa_req *creq)
-f63601fd6 Boris Brezillon  2015-06-18  179  {
-f63601fd6 Boris Brezillon  2015-06-18  180  	int ret;
-bf8f91e71 Romain Perier    2016-06-21  181  	struct mv_cesa_engine *engine = creq->engine;
-f63601fd6 Boris Brezillon  2015-06-18  182  
-bf8f91e71 Romain Perier    2016-06-21  183  	spin_lock_bh(&engine->lock);
-bf8f91e71 Romain Perier    2016-06-21  184  	ret = crypto_enqueue_request(&engine->queue, req);
-603e989eb Romain Perier    2016-07-22  185  	if ((mv_cesa_req_get_type(creq) == CESA_DMA_REQ) &&
-3a1c7473a Gilad Ben-Yossef 2017-08-21  186  	    (ret == -EINPROGRESS || ret == -EBUSY)
-603e989eb Romain Perier    2016-07-22 @187  		mv_cesa_tdma_chain(engine, creq);
-bf8f91e71 Romain Perier    2016-06-21  188  	spin_unlock_bh(&engine->lock);
-f63601fd6 Boris Brezillon  2015-06-18  189  
-f63601fd6 Boris Brezillon  2015-06-18  190  	if (ret != -EINPROGRESS)
-f63601fd6 Boris Brezillon  2015-06-18  191  		return ret;
-f63601fd6 Boris Brezillon  2015-06-18  192  
-85030c516 Romain Perier    2016-06-21  193  	mv_cesa_rearm_engine(engine);
-f63601fd6 Boris Brezillon  2015-06-18  194  
-f63601fd6 Boris Brezillon  2015-06-18  195  	return -EINPROGRESS;
-f63601fd6 Boris Brezillon  2015-06-18 @196  }
-f63601fd6 Boris Brezillon  2015-06-18  197  
+At my opinion my router is more closed to dra7. IP Spec defines event mapping.
+Nonetheless the DMA has a fixed allocated mapping. Using DMA alone DT has to
+provide channel number. In router mode this number doesn't matter since router
+makes the routing from fixed event to channel. However router needs to know
+which channel will be assign to event: any random channel is allowed.
 
-:::::: The code at line 187 was first introduced by commit
-:::::: 603e989ebee21bfa9cddf8390d0515a07324edc8 crypto: marvell - Don't chain at DMA level when backlog is disabled
+I'm pretty sure I can mimic what has been for DRA7 related to DMA Channel
+allocation however it seems to be this is aside DMA engine. This kind of
+implementation forbid the use of DMA and DMA router at the same time : I
+remember you already raise the point. If a DMA channel is requested DMA router
+is not aware of this allocation. This is the idea of my custom API which relies
+on get_any_slave_channel().
+Using DT to assign channel seems not a good idea either as I lost router's benefice.
 
-:::::: TO: Romain Perier <romain.perier@free-electrons.com>
-:::::: CC: Herbert Xu <herbert@gondor.apana.org.au>
+BTW I need the channel ID within router.
+Looking at core or of_dma_router_xlate() I don't really know how to do it a
+generic manner.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 63446 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170824/da621504/attachment-0001.gz>
+Ideas are welcomed
+
+> I'm happy to answer any questions you might have, if I can.
+> 
+
+You will be happy then.
+
+> - P?ter
+> 
+
+Thanks
+Py
