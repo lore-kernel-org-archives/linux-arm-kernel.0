@@ -1,55 +1,51 @@
-From: john.garry@huawei.com (John Garry)
-Date: Thu, 24 Aug 2017 16:01:08 +0100
-Subject: [PATCH v6 3/3] iommu/arm-smmu-v3:Enable ACPI based HiSilicon
- erratum 161010801
-In-Reply-To: <20170824143536.GA8904@arm.com>
-References: <20170809100715.870516-1-shameerali.kolothum.thodi@huawei.com>
- <20170809100715.870516-4-shameerali.kolothum.thodi@huawei.com>
- <20170810172723.GD9980@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA8383CC287@FRAEML521-MBX.china.huawei.com>
- <c6b7c641-b839-1388-7982-366e796e6ba9@huawei.com>
- <20170823132430.GB634@arm.com>
- <77b6c97f-f2d2-fd14-e83e-345addc5ea71@huawei.com>
- <20170823164301.GC590@arm.com>
- <53b9795c-6222-9cf0-50dc-9dafbfb67a2c@huawei.com>
- <20170824143536.GA8904@arm.com>
-Message-ID: <9a40f823-4323-21fd-343c-83c412a23bf1@huawei.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 24 Aug 2017 17:02:10 +0200
+Subject: [PATCH] arm64: defconfig: enable rockchip graphics
+Message-ID: <20170824150210.10949-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/08/2017 15:35, Will Deacon wrote:
->>>> > >>OK, seems reasonable.
->>>> > >>
->>>> > >>We would consider blacklisting the device, where/how to do is the question.
->>>> > >>
->>>> > >>So the errata is in the GICv3 ITS/PCI host controller, and we just use the
->>>> > >>in-between SMMU (driver) to provide the workaround. So my initial impression
->>>> > >>is that the PCI host controller would have to be blacklisted IFF behind an
->>>> > >>IOMMU for DT firmware in pcie-hisi.c or pci quirks framework. How does it
->>>> > >>sound?
->>> > >
->>> > >If that avoids us running into the erratum, then fine by me. I'd obviously
->>> > >prefer we work-around it since we know how to, but that's up to you.
->> >
->> > I'm surpsised that you may want more errata workaround code to maintain.
->> >
->> > Anyway we'll check both approaches and show you how they look and go from
->> > there.
-> Don't get me wrong, I don't dream about adding errata workarounds to the
-> code, but our job as an operating system is to abstract the hardware from
-> the user, which means dealing with its quirks whether we like it or not.
->
+Enable the graphics-related options needed by Rockchip boards.
+This includes the pwm-backlight which will be needed by the internal
+displays used on Gru Chrome-devices.
 
-Fine, it's ok.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm64/configs/defconfig | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-For our next platform, hip08, we will provide no DT FW support, so this 
-whole DT grey area should not be an issue.
-
-And hopefully no errata also.
-
-Much appreciated,
-John
-
-> Thanks,
->
-> Will
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index b4ca115b3be1..0789c7a66969 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -358,6 +358,12 @@ CONFIG_DRM_EXYNOS_DSI=y
+ # CONFIG_DRM_EXYNOS_DP is not set
+ CONFIG_DRM_EXYNOS_HDMI=y
+ CONFIG_DRM_EXYNOS_MIC=y
++CONFIG_DRM_ROCKCHIP=m
++CONFIG_ROCKCHIP_ANALOGIX_DP=y
++CONFIG_ROCKCHIP_CDN_DP=y
++CONFIG_ROCKCHIP_DW_HDMI=y
++CONFIG_ROCKCHIP_DW_MIPI_DSI=y
++CONFIG_ROCKCHIP_INNO_HDMI=y
+ CONFIG_DRM_RCAR_DU=m
+ CONFIG_DRM_RCAR_LVDS=y
+ CONFIG_DRM_RCAR_VSP=y
+@@ -370,6 +376,7 @@ CONFIG_DRM_MESON=m
+ CONFIG_FB=y
+ CONFIG_FB_ARMCLCD=y
+ CONFIG_BACKLIGHT_GENERIC=m
++CONFIG_BACKLIGHT_PWM=m
+ CONFIG_BACKLIGHT_LP855X=m
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_LOGO=y
+@@ -482,6 +489,7 @@ CONFIG_ARM_MHU=y
+ CONFIG_PLATFORM_MHU=y
+ CONFIG_BCM2835_MBOX=y
+ CONFIG_HI6220_MBOX=y
++CONFIG_ROCKCHIP_IOMMU=y
+ CONFIG_ARM_SMMU=y
+ CONFIG_ARM_SMMU_V3=y
+ CONFIG_RPMSG_QCOM_SMD=y
+-- 
+2.14.1
