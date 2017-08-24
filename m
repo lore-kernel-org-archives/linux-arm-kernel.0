@@ -1,110 +1,79 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 24 Aug 2017 07:05:12 +0000
-Subject: [PATCH V2 00/10] clk: add imx7ulp clk support
-References: <1499946435-7177-1-git-send-email-aisheng.dong@nxp.com> 
-Message-ID: <AM3PR04MB3063B98A5B78C3F9791A553809A0@AM3PR04MB306.eurprd04.prod.outlook.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Thu, 24 Aug 2017 12:51:22 +0530
+Subject: [PATCH v2 00/20] rpmsg: glink: Add glink smem based transport
+Message-ID: <1503559302-3744-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: A.s. Dong
-> Sent: Wednesday, July 26, 2017 10:57 AM
-> To: A.s. Dong; linux-clk at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> sboyd at codeaurora.org; mturquette at baylibre.com; dongas86 at gmail.com;
-> shawnguo at kernel.org; Anson Huang; Jacky Bai
-> Subject: RE: [PATCH V2 00/10] clk: add imx7ulp clk support
-> 
-> Ping...
-> 
+The glink protocol works with a shared-memory(transport) for
+communication between the local and remote processors. The
+existing glink-rpm driver implements the basic features
+of the protocol and uses msgram as the transport.
 
-Gently ping again...
+The same is extended to support smem based transport as well.
+The first few patches consolidates the code, so that the
+core protocol code is made common for both the types of
+transport.
 
-Hi Stephen,
+The next set of patches adds the additional features of the
+protocol required by clients using smem based transport,
+particularly support for intents.
 
-This has been more there without comments for more than one month.
+ * What is intents ?
+	Intents are nothing but pre-allocated buffers that
+	both the local and the remote clients allocate and
+	share the details (about the buffer size and an id)
+	before intending to receive data. The transmitter then
+	searches for an suitable 'intent-id' based on size from
+	the list that it was notified previously and sends the data
+	targeting that intent buffer, which is then copied by the
+	receiver in to the same intent-buffer. So this avoids memory
+	allocation stalls on copy based transports.
 
-Would you help review when you're available later?
+[V2]
+        Fixed review comments and a race condition when the remote
+        device goes down. Added 2 small patches for fixing the same.
+        Previous version is here [1]
 
-Regards
-Dong Aisheng
- 
-> > -----Original Message-----
-> > From: Dong Aisheng [mailto:aisheng.dong at nxp.com]
-> > Sent: Thursday, July 13, 2017 7:47 PM
-> > To: linux-clk at vger.kernel.org
-> > Cc: linux-kernel at vger.kernel.org;
-> > linux-arm-kernel at lists.infradead.org;
-> > sboyd at codeaurora.org; mturquette at baylibre.com; A.s. Dong;
-> > dongas86 at gmail.com; shawnguo at kernel.org; Anson Huang; Jacky Bai
-> > Subject: [PATCH V2 00/10] clk: add imx7ulp clk support
-> >
-> > This patch series intends to add imx7ulp clk support.
-> >
-> > i.MX7ULP Clock functions are under joint control of the System Clock
-> > Generation (SCG) modules, Peripheral Clock Control (PCC) modules, and
-> > Core Mode Controller (CMC)1 blocks
-> >
-> > The clocking scheme provides clear separation between M4 domain and A7
-> > domain. Except for a few clock sources shared between two domains,
-> > such as the System Oscillator clock, the Slow IRC (SIRC), and and the
-> > Fast IRC clock (FIRCLK), clock sources and clock management are
-> > separated and contained within each domain.
-> >
-> > M4 clock management consists of SCG0, PCC0, PCC1, and CMC0 modules.
-> > A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
-> >
-> > Note: this series only adds A7 clock domain support as M4 clock domain
-> > will be handled by M4 seperately.
-> >
-> > Change Log:
-> > v1->v2:
-> >  * add enable/disable for the type of CLK_DIVIDER_ZERO_GATE dividers
-> >  * use clk_hw apis to register clocks
-> >  * use of_clk_add_hw_provider
-> >  * split the clocks register process into two parts: early part for
-> > possible
-> >    timers clocks registered by CLK_OF_DECLARE_DRIVER and the later
-> > part for
-> >    the left normal peripheral clocks registered by a platform driver.
-> >
-> > Dong Aisheng (10):
-> >   clk: clk-divider: add CLK_DIVIDER_ZERO_GATE clk support
-> >   clk: reparent orphans after critical clocks enabled
-> >   clk: fractional-divider: add CLK_FRAC_DIVIDER_ZERO_BASED flag support
-> >   clk: imx: add pllv4 support
-> >   clk: imx: add pfdv2 support
-> >   clk: imx: add composite clk support
-> >   dt-bindings: clock: add imx7ulp clock binding doc
-> >   clk: imx: make mux parent strings const
-> >   clk: imx: implement new clk_hw based APIs
-> >   clk: imx: add imx7ulp clk driver
-> >
-> >  .../devicetree/bindings/clock/imx7ulp-clock.txt    |  62 ++++++
-> >  drivers/clk/clk-divider.c                          | 100 ++++++++-
-> >  drivers/clk/clk-fractional-divider.c               |  10 +
-> >  drivers/clk/clk.c                                  |  39 ++--
-> >  drivers/clk/imx/Makefile                           |   6 +-
-> >  drivers/clk/imx/clk-busy.c                         |   2 +-
-> >  drivers/clk/imx/clk-composite.c                    |  90 ++++++++
-> >  drivers/clk/imx/clk-fixup-mux.c                    |   2 +-
-> >  drivers/clk/imx/clk-imx7ulp.c                      | 245
-> > +++++++++++++++++++++
-> >  drivers/clk/imx/clk-pfdv2.c                        | 207
-> > +++++++++++++++++
-> >  drivers/clk/imx/clk-pllv4.c                        | 188
-> ++++++++++++++++
-> >  drivers/clk/imx/clk.c                              |  22 ++
-> >  drivers/clk/imx/clk.h                              |  92 +++++++-
-> >  include/dt-bindings/clock/imx7ulp-clock.h          | 108 +++++++++
-> >  include/linux/clk-provider.h                       |  17 ++
-> >  15 files changed, 1159 insertions(+), 31 deletions(-)  create mode
-> > 100644 Documentation/devicetree/bindings/clock/imx7ulp-clock.txt
-> >  create mode 100644 drivers/clk/imx/clk-composite.c  create mode
-> > 100644 drivers/clk/imx/clk-imx7ulp.c  create mode 100644
-> > drivers/clk/imx/clk- pfdv2.c  create mode 100644
-> > drivers/clk/imx/clk-pllv4.c  create mode
-> > 100644 include/dt-bindings/clock/imx7ulp-clock.h
-> >
-> > --
-> > 2.7.4
+[1] https://www.spinics.net/lists/arm-kernel/msg601119.html
+
+Bjorn Andersson (7):
+  rpmsg: glink: Rename glink_rpm_xx functions to qcom_glink_xx
+  rpmsg: glink: Associate indirections for pipe fifo accessor's
+  rpmsg: glink: Split rpm_probe to reuse the common code
+  rpmsg: glink: Move the common glink protocol implementation to
+    glink_native.c
+  rpmsg: glink: Allow unaligned data access
+  rpmsg: glink: Introduce glink smem based transport
+  rpmsg: glink: Make RX FIFO peak accessor to take an offset
+
+Sricharan R (13):
+  rpmsg: glink: Return -EAGAIN when there is no FIFO space
+  rpmsg: glink: Do a mbox_free_channel in remove
+  rpmsg: glink: Fix default case while handling received commands
+  rpmsg: glink: Add support for transport version negotiation
+  rpmsg: glink: Fix idr_lock from mutex to spinlock
+  rpmsg: glink: Add support for TX intents
+  rpmsg: glink: Use the local intents when receiving data
+  rpmsg: glink: Add rx done command
+  rpmsg: glink: Add announce_create ops and preallocate intents
+  rpmsg: glink: Receive and store the remote intent buffers
+  rpmsg: glink: Use the intents passed by remote
+  rpmsg: glink: Request for intents when unavailable
+  rpmsg: glink: Handle remote rx done command
+
+ drivers/rpmsg/Kconfig             |   16 +-
+ drivers/rpmsg/Makefile            |    2 +
+ drivers/rpmsg/qcom_glink_native.c | 1611 +++++++++++++++++++++++++++++++++++++
+ drivers/rpmsg/qcom_glink_native.h |   45 ++
+ drivers/rpmsg/qcom_glink_rpm.c    | 1026 ++---------------------
+ drivers/rpmsg/qcom_glink_smem.c   |  316 ++++++++
+ include/linux/rpmsg/qcom_glink.h  |   27 +
+ 7 files changed, 2092 insertions(+), 951 deletions(-)
+ create mode 100644 drivers/rpmsg/qcom_glink_native.c
+ create mode 100644 drivers/rpmsg/qcom_glink_native.h
+ create mode 100644 drivers/rpmsg/qcom_glink_smem.c
+ create mode 100644 include/linux/rpmsg/qcom_glink.h
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
