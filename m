@@ -1,59 +1,71 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 24 Aug 2017 11:46:31 +0200
-Subject: [PATCH v5 0/9] mtd: sharpslpart partition parser
-In-Reply-To: <CAAQYJAv8bNrxJ_ESgC0fOAdry7i5mstzgQ3P74q1D=C-xsJprg@mail.gmail.com>
-References: <1502743720-28672-1-git-send-email-andrea.adami@gmail.com>
- <20170821221339.70cfcfb7@bbrezillon>
- <87pobmoz8n.fsf@belgarion.home>
- <CAAQYJAv8bNrxJ_ESgC0fOAdry7i5mstzgQ3P74q1D=C-xsJprg@mail.gmail.com>
-Message-ID: <20170824114631.089d2628@bbrezillon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 24 Aug 2017 10:47:56 +0100
+Subject: [PATCH v2 1/1] futex: remove duplicated code and fix UB
+In-Reply-To: <20170824073105.3901-1-jslaby@suse.cz>
+References: <20170824073105.3901-1-jslaby@suse.cz>
+Message-ID: <20170824094756.GA6346@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+Hi Jiri,
 
-On Thu, 24 Aug 2017 11:33:02 +0200
-Andrea Adami <andrea.adami@gmail.com> wrote:
-
-> On Wed, Aug 23, 2017 at 9:33 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> > Boris Brezillon <boris.brezillon@free-electrons.com> writes:
-> >  
-> >> Le Mon, 14 Aug 2017 22:48:31 +0200,  
-> >>> Andrea Adami (9):
-> >>>   mtd: sharpslpart: Add sharpslpart partition parser
-> >>>   mtd: nand: sharpsl: Add partition parsers platform data
-> >>>   mfd: tmio: Add partition parsers platform data
-> >>>   mtd: nand: sharpsl: Register partitions using the parsers
-> >>>   mtd: nand: tmio: Register partitions using the parsers  
-> >>
-> >> Applied patches 2, to 5 to nand/next.  
-> >>>   ARM: pxa/corgi: Remove hardcoded partitioning, use sharpslpart parser
-> >>>   ARM: pxa/tosa: Remove hardcoded partitioning, use sharpslpart parser
-> >>>   ARM: pxa/spitz: Remove hardcoded partitioning, use sharpslpart parser
-> >>>   ARM: pxa/poodle: Remove hardcoded partitioning, use sharpslpart parser  
-> >
-> > I'm quite happy with patches 6 to 9 except for the subject title length.
-> >  
+On Thu, Aug 24, 2017 at 09:31:05AM +0200, Jiri Slaby wrote:
+> There is code duplicated over all architecture's headers for
+> futex_atomic_op_inuser. Namely op decoding, access_ok check for uaddr,
+> and comparison of the result.
 > 
-> Argh, this time I got it totally wrong with the titles of the patches!
-> Sorry for the eye-sore.
+> Remove this duplication and leave up to the arches only the needed
+> assembly which is now in arch_futex_atomic_op_inuser.
 > 
-> > Andrea, if you give me an idea of change, I'll modify the titles myself before
-> > applying, no need to resend a serie.
-> >
-> > For example, you could propose :
-> > ARM: pxa: corgi: use sharpslpart parser instead of hardcoded one
-> >
-> >
-> > Then I'll take them into pxa/for-next if there are no objections.
+> This effectively distributes the Will Deacon's arm64 fix for undefined
+> behaviour reported by UBSAN to all architectures. The fix was done in
+> commit 5f16a046f8e1 (arm64: futex: Fix undefined behaviour with
+> FUTEX_OP_OPARG_SHIFT usage). Look there for an example dump.
+> 
+> And as suggested by Thomas, check for negative oparg too, because it was
+> also reported to cause undefined behaviour report.
+> 
+> Note that s390 removed access_ok check in d12a29703 ("s390/uaccess:
+> remove pointless access_ok() checks") as access_ok there returns true.
+> We introduce it back to the helper for the sake of simplicity (it gets
+> optimized away anyway).
 
-Wait a bit before applying. I think patches 6 to 9 have a dependency on
-patch 1 (it's not a build dependency, but NAND partitioning might be
-wrong if you apply them), so we need to sync. What release is
-pxa/for-next targeting? If it's 4.15 I can apply patch 1 just after
-4.14-rc1 is out and provide an immutable branch for you to pull in
-pxa/for-next.
+For arm64 and the core code:
 
-Regards,
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-Boris
+Although one minor thing on the core part:
+
+> diff --git a/kernel/futex.c b/kernel/futex.c
+> index 0939255fc750..3d38eaf05492 100644
+> --- a/kernel/futex.c
+> +++ b/kernel/futex.c
+> @@ -1551,6 +1551,45 @@ futex_wake(u32 __user *uaddr, unsigned int flags, int nr_wake, u32 bitset)
+>  	return ret;
+>  }
+>  
+> +static int futex_atomic_op_inuser(unsigned int encoded_op, u32 __user *uaddr)
+> +{
+> +	unsigned int op =	  (encoded_op & 0x70000000) >> 28;
+> +	unsigned int cmp =	  (encoded_op & 0x0f000000) >> 24;
+> +	int oparg = sign_extend32((encoded_op & 0x00fff000) >> 12, 12);
+> +	int cmparg = sign_extend32(encoded_op & 0x00000fff, 12);
+> +	int oldval, ret;
+> +
+> +	if (encoded_op & (FUTEX_OP_OPARG_SHIFT << 28)) {
+> +		if (oparg < 0 || oparg > 31)
+> +			return -EINVAL;
+> +		oparg = 1 << oparg;
+> +	}
+> +
+> +	if (!access_ok(VERIFY_WRITE, uaddr, sizeof(u32)))
+> +		return -EFAULT;
+> +
+> +	ret = arch_futex_atomic_op_inuser(op, oparg, &oldval, uaddr);
+> +	if (ret)
+> +		return ret;
+
+We could move the pagefault_{disable,enable} calls here, and then remove
+them from the futex_atomic_op_inuser callsites elsewhere in futex.c
+
+Will
