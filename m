@@ -1,9 +1,9 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Thu, 24 Aug 2017 22:06:02 +0530
-Subject: [PATCH 6/9] coresight: replicator: constify amba_id
+Date: Thu, 24 Aug 2017 22:06:03 +0530
+Subject: [PATCH 7/9] coresight: stm: constify amba_id
 In-Reply-To: <1503592565-21601-1-git-send-email-arvind.yadav.cs@gmail.com>
 References: <1503592565-21601-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1503592565-21601-7-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <1503592565-21601-8-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,21 +12,21 @@ working with const amba_id. So mark the non-const structs as const.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- drivers/hwtracing/coresight/coresight-replicator-qcom.c | 2 +-
+ drivers/hwtracing/coresight/coresight-stm.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-replicator-qcom.c b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-index 0a3d15f..e1ab121 100644
---- a/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-+++ b/drivers/hwtracing/coresight/coresight-replicator-qcom.c
-@@ -175,7 +175,7 @@ static const struct dev_pm_ops replicator_dev_pm_ops = {
- 			   NULL)
+diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
+index 93fc26f..903fe2a 100644
+--- a/drivers/hwtracing/coresight/coresight-stm.c
++++ b/drivers/hwtracing/coresight/coresight-stm.c
+@@ -914,7 +914,7 @@ static const struct dev_pm_ops stm_dev_pm_ops = {
+ 	SET_RUNTIME_PM_OPS(stm_runtime_suspend, stm_runtime_resume, NULL)
  };
  
--static struct amba_id replicator_ids[] = {
-+static const struct amba_id replicator_ids[] = {
+-static struct amba_id stm_ids[] = {
++static const struct amba_id stm_ids[] = {
  	{
- 		.id     = 0x0003b909,
+ 		.id     = 0x0003b962,
  		.mask   = 0x0003ffff,
 -- 
 2.7.4
