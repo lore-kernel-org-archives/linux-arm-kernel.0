@@ -1,44 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 24 Aug 2017 10:50:35 +0200
-Subject: [PATCH] clk: sunxi: fix uninitialized access
-In-Reply-To: <20170823143937.2176025-1-arnd@arndb.de>
-References: <20170823143937.2176025-1-arnd@arndb.de>
-Message-ID: <20170824085035.uznlemp5dzpts5ms@flea.lan>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 24 Aug 2017 10:04:20 +0100
+Subject: [PATCH 02/14] include: pe.h: remove message[] from mz header
+ definition
+In-Reply-To: <20170824081811.19299-3-takahiro.akashi@linaro.org>
+References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
+ <20170824081811.19299-3-takahiro.akashi@linaro.org>
+Message-ID: <CAKv+Gu-o=3jgw9eMuS2crK6ftQ2iBiyA3iuy6dmLgg9BUPeLQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 04:39:27PM +0200, Arnd Bergmann wrote:
-> gcc-8 reports an uninitialized variable access in a code path
-> that we would see with incorrect DTB input:
-> 
-> drivers/clk/sunxi/clk-sun8i-bus-gates.c: In function 'sun8i_h3_bus_gates_init':
-> drivers/clk/sunxi/clk-sun8i-bus-gates.c:85:27: error: 'clk_parent' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> 
-> This works around by skipping invalid input and printing a warning
-> instead if it ever happens. The problem was apparently part of the
-> initiali driver submission, but older compilers don't notice it.
-> 
-> Fixes: ab6e23a4e388 ("clk: sunxi: Add H3 clocks support")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On 24 August 2017 at 09:17, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> message[] field won't be part of the definition of mz header.
+>
+> This change is crucial for enabling kexec_file_load on arm64 because
+> arm64's "Image" binary, as in PE format, doesn't have any data for it and
+> accordingly the following check in pefile_parse_binary() will fail:
+>
+>         chkaddr(cursor, mz->peaddr, sizeof(*pe));
+>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: David Howells <dhowells@redhat.com>
+> Cc: Vivek Goyal <vgoyal@redhat.com>
+> Cc: Herbert Xu <herbert@gondor.apana.org.au>
+> Cc: David S. Miller <davem@davemloft.net>
+> ---
+>  include/linux/pe.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/include/linux/pe.h b/include/linux/pe.h
+> index 143ce75be5f0..3482b18a48b5 100644
+> --- a/include/linux/pe.h
+> +++ b/include/linux/pe.h
+> @@ -166,7 +166,7 @@ struct mz_hdr {
+>         uint16_t oem_info;      /* oem specific */
+>         uint16_t reserved1[10]; /* reserved */
+>         uint32_t peaddr;        /* address of pe header */
+> -       char     message[64];   /* message to print */
+> +       char     message[];     /* message to print */
+>  };
+>
+>  struct mz_reloc {
 
-That's weird it stayed for that long without any compiler noticing.
-
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Mike, Stephen, can you pick it up as a fix? We don't have anything
-else coming your way.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170824/ab1db200/attachment.sig>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
