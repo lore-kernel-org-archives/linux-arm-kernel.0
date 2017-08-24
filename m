@@ -1,141 +1,63 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Thu, 24 Aug 2017 12:51:39 +0530
-Subject: [PATCH v2 17/20] rpmsg: glink: Receive and store the remote intent
- buffers
+Date: Thu, 24 Aug 2017 12:51:38 +0530
+Subject: [PATCH v2 16/20] rpmsg: glink: Add announce_create ops and
+ preallocate intents
 In-Reply-To: <1503559302-3744-1-git-send-email-sricharan@codeaurora.org>
 References: <1503559302-3744-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1503559302-3744-18-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1503559302-3744-17-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just like we allocating and sending intent ids to remote,
-remote side allocates and sends us the intents as well.
-So save the intent ids and use it later while sending
-data targeting the appropriate intents based on the size.
+Preallocate local intent buffers and pass the intent ids
+to the remote. This way there are some default intents
+available  for the remote to start sending data without
+having to wait by sending intent requests. Do this by
+adding the rpmsg announce_create ops, which gets called
+right after the rpmsg device gets probed.
 
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
- drivers/rpmsg/qcom_glink_native.c | 71 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 70 insertions(+), 1 deletion(-)
+ drivers/rpmsg/qcom_glink_native.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
 diff --git a/drivers/rpmsg/qcom_glink_native.c b/drivers/rpmsg/qcom_glink_native.c
-index 76ee86e..d93d651 100644
+index 1458bdb..76ee86e 100644
 --- a/drivers/rpmsg/qcom_glink_native.c
 +++ b/drivers/rpmsg/qcom_glink_native.c
-@@ -139,8 +139,9 @@ enum {
-  * @name:	unique channel name/identifier
-  * @lcid:	channel id, in local space
-  * @rcid:	channel id, in remote space
-- * @intent_lock: lock for protection of @liids
-+ * @intent_lock: lock for protection of @liids, @riids
-  * @liids:	idr of all local intents
-+ * @riids:	idr of all remote intents
-  * @intent_work: worker responsible for transmitting rx_done packets
-  * @done_intents: list of intents that needs to be announced rx_done
-  * @buf:	receive buffer, for gathering fragments
-@@ -165,6 +166,7 @@ struct glink_channel {
- 
- 	spinlock_t intent_lock;
- 	struct idr liids;
-+	struct idr riids;
- 	struct work_struct intent_work;
- 	struct list_head done_intents;
- 
-@@ -222,6 +224,7 @@ static struct glink_channel *qcom_glink_alloc_channel(struct qcom_glink *glink,
- 	INIT_WORK(&channel->intent_work, qcom_glink_rx_done_work);
- 
- 	idr_init(&channel->liids);
-+	idr_init(&channel->riids);
- 	kref_init(&channel->refcount);
- 
- 	return channel;
-@@ -235,6 +238,7 @@ static void qcom_glink_channel_release(struct kref *ref)
- 
- 	spin_lock_irqsave(&channel->intent_lock, flags);
- 	idr_destroy(&channel->liids);
-+	idr_destroy(&channel->riids);
- 	spin_unlock_irqrestore(&channel->intent_lock, flags);
- 
- 	kfree(channel->name);
-@@ -806,6 +810,68 @@ static int qcom_glink_rx_data(struct qcom_glink *glink, size_t avail)
- 	return ret;
+@@ -1002,6 +1002,25 @@ static struct rpmsg_endpoint *qcom_glink_create_ept(struct rpmsg_device *rpdev,
+ 	return ept;
  }
  
-+static void qcom_glink_handle_intent(struct qcom_glink *glink,
-+				     unsigned int cid,
-+				     unsigned int count,
-+				     size_t avail)
++static int qcom_glink_announce_create(struct rpmsg_device *rpdev)
 +{
++	struct glink_channel *channel = to_glink_channel(rpdev->ept);
 +	struct glink_core_rx_intent *intent;
-+	struct glink_channel *channel;
-+	struct intent_pair {
-+		__le32 size;
-+		__le32 iid;
-+	};
++	struct qcom_glink *glink = channel->glink;
++	int num_intents = glink->intentless ? 0 : 5;
 +
-+	struct {
-+		struct glink_msg msg;
-+		struct intent_pair intents[];
-+	} __packed * msg;
-+
-+	const size_t msglen = sizeof(*msg) + sizeof(struct intent_pair) * count;
-+	int ret;
-+	int i;
-+	unsigned long flags;
-+
-+	if (avail < msglen) {
-+		dev_dbg(glink->dev, "Not enough data in fifo\n");
-+		return;
-+	}
-+
-+	spin_lock_irqsave(&glink->idr_lock, flags);
-+	channel = idr_find(&glink->rcids, cid);
-+	spin_unlock_irqrestore(&glink->idr_lock, flags);
-+	if (!channel) {
-+		dev_err(glink->dev, "intents for non-existing channel\n");
-+		return;
-+	}
-+
-+	msg = kmalloc(msglen, GFP_ATOMIC);
-+	if (!msg)
-+		return;
-+
-+	qcom_glink_rx_peak(glink, msg, 0, msglen);
-+
-+	for (i = 0; i < count; ++i) {
-+		intent = kzalloc(sizeof(*intent), GFP_ATOMIC);
++	/* Channel is now open, advertise base set of intents */
++	while (num_intents--) {
++		intent = qcom_glink_alloc_intent(glink, channel, SZ_1K, true);
 +		if (!intent)
 +			break;
 +
-+		intent->id = le32_to_cpu(msg->intents[i].iid);
-+		intent->size = le32_to_cpu(msg->intents[i].size);
-+
-+		spin_lock_irqsave(&channel->intent_lock, flags);
-+		ret = idr_alloc(&channel->riids, intent,
-+				intent->id, intent->id + 1, GFP_ATOMIC);
-+		spin_unlock_irqrestore(&channel->intent_lock, flags);
-+
-+		if (ret < 0)
-+			dev_err(glink->dev, "failed to store remote intent\n");
++		qcom_glink_advertise_intent(glink, channel, intent);
 +	}
 +
-+	kfree(msg);
-+	qcom_glink_rx_advance(glink, ALIGN(msglen, 8));
++	return 0;
 +}
 +
- static int qcom_glink_rx_open_ack(struct qcom_glink *glink, unsigned int lcid)
+ static void qcom_glink_destroy_ept(struct rpmsg_endpoint *ept)
  {
- 	struct glink_channel *channel;
-@@ -871,6 +937,9 @@ static irqreturn_t qcom_glink_native_intr(int irq, void *data)
+ 	struct glink_channel *channel = to_glink_channel(ept);
+@@ -1077,6 +1096,7 @@ static struct device_node *qcom_glink_match_channel(struct device_node *node,
  
- 			ret = 0;
- 			break;
-+		case RPM_CMD_INTENT:
-+			qcom_glink_handle_intent(glink, param1, param2, avail);
-+			break;
- 		default:
- 			qcom_glink_rx_advance(glink, ALIGN(sizeof(msg), 8));
- 			dev_err(glink->dev, "unhandled rx cmd: %d\n", cmd);
+ static const struct rpmsg_device_ops glink_device_ops = {
+ 	.create_ept = qcom_glink_create_ept,
++	.announce_create = qcom_glink_announce_create,
+ };
+ 
+ static const struct rpmsg_endpoint_ops glink_endpoint_ops = {
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
