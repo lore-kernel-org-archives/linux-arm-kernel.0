@@ -1,48 +1,39 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 24 Aug 2017 09:20:34 -0700
-Subject: [PATCH] KVM: arm/arm64: vgic: constify seq_operations and
- file_operations
-In-Reply-To: <de67d01fab53d5b7874cda1ac2c269887c673450.1503471217.git.arvind.yadav.cs@gmail.com>
-References: <de67d01fab53d5b7874cda1ac2c269887c673450.1503471217.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20170824162034.GC2150@lvm>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 25 Aug 2017 00:24:00 +0800
+Subject: [PATCH 1/3] pci: designware: add driver for DWC controller in
+ ECAM shift mode
+In-Reply-To: <20170821192907.8695-2-ard.biesheuvel@linaro.org>
+Message-ID: <201708250050.JQLhJI9c%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Aug 23, 2017 at 12:25:36PM +0530, Arvind Yadav wrote:
-> vgic_debug_seq_ops and file_operations are not supposed to change
-> at runtime and none of the structures is modified.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Hi Ard,
 
-Applied, thanks.
--Christoffer
+[auto build test WARNING on pci/next]
+[also build test WARNING on v4.13-rc6 next-20170824]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> ---
->  virt/kvm/arm/vgic/vgic-debug.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
-> index 7072ab7..10b3817 100644
-> --- a/virt/kvm/arm/vgic/vgic-debug.c
-> +++ b/virt/kvm/arm/vgic/vgic-debug.c
-> @@ -234,7 +234,7 @@ static int vgic_debug_show(struct seq_file *s, void *v)
->  	return 0;
->  }
->  
-> -static struct seq_operations vgic_debug_seq_ops = {
-> +static const struct seq_operations vgic_debug_seq_ops = {
->  	.start = vgic_debug_start,
->  	.next  = vgic_debug_next,
->  	.stop  = vgic_debug_stop,
-> @@ -255,7 +255,7 @@ static int debug_open(struct inode *inode, struct file *file)
->  	return ret;
->  };
->  
-> -static struct file_operations vgic_debug_fops = {
-> +static const struct file_operations vgic_debug_fops = {
->  	.owner   = THIS_MODULE,
->  	.open    = debug_open,
->  	.read    = seq_read,
-> -- 
-> 1.9.1
-> 
+url:    https://github.com/0day-ci/linux/commits/Ard-Biesheuvel/pci-add-support-for-firmware-initialized-designware-RCs/20170824-232638
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
+config: m68k-allmodconfig (attached as .config)
+compiler: m68k-linux-gcc (GCC) 4.9.0
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=m68k 
+
+All warnings (new ones prefixed by >>):
+
+warning: (PCIE_DW_HOST_ECAM) selects PCI_HOST_COMMON which has unmet direct dependencies (MMU && PCI)
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 43721 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170825/22c0e570/attachment-0001.gz>
