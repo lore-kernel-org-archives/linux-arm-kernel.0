@@ -1,24 +1,39 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 24 Aug 2017 10:49:06 +0200
-Subject: [RFC 3/3] sched: depend on 64BIT_ATOMIC_ACCESS to determine if
- to use min_vruntime_copy
-In-Reply-To: <1503553377-3646-4-git-send-email-hoeun.ryu@gmail.com>
-References: <1503553377-3646-1-git-send-email-hoeun.ryu@gmail.com>
- <1503553377-3646-4-git-send-email-hoeun.ryu@gmail.com>
-Message-ID: <20170824084906.mtmj6rz4igo63dl5@hirez.programming.kicks-ass.net>
+From: oza.oza@broadcom.com (Oza Pawandeep)
+Date: Thu, 24 Aug 2017 14:19:05 +0530
+Subject: [PATCH v4 0/3] PCI hotplug feature
+Message-ID: <1503564548-1834-1-git-send-email-oza.oza@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 24, 2017 at 02:42:57PM +0900, Hoeun Ryu wrote:
-> +#ifndef CONFIG_64BIT_ATOMIC_ALIGNED_ACCESS
->  	u64 min_vruntime;
-> -#ifndef CONFIG_64BIT
-> +#else
-> +	u64 min_vruntime __attribute__((aligned(sizeof(u64))));
-> +#endif
+These patches bring in PCI hotplug support for iproc family chipsets.
 
-That's stupid, just make sure your platform defines u64 as naturally
-aligned when you have this 64BIT_ATOMIC foo.
+It includes DT binding documentation update and, implementation in
+iproc pcie RC driver.
 
-Also, please try and dig out more 32bit archs that can use this and make
-sure to include performance numbers to justify this extra cruft.
+These patch set is made on top of following patches.
+[PATCH v8 2/2] PCI: iproc: add device shutdown for PCI RC
+[PATCH v8 1/2] PCI: iproc: Retry request when CRS returned from EP
+
+Changes since v3:
+Resend. just to be in sync previous in-flight patches.
+
+Changes since v2:
+Addressed Rob Herring's comments.
+Changed subject to "dt-bindings: PCI:..."
+Made generic PCI hotplug properties 'slot-pluggable' and 'prsnt-gpios'
+Rebased the patches on top of Lorenzo's patches.
+
+Oza Pawandeep (3):
+  PCI: iproc: implement PCI hotplug support
+  dt-bindings: PCI: add PCIe hotplug property
+  dt-bindings: PCI iproc: add optional property prsnt-gpios
+
+ .../devicetree/bindings/pci/brcm,iproc-pcie.txt    |  14 ++
+ Documentation/devicetree/bindings/pci/pci.txt      |  15 ++
+ drivers/pci/host/pcie-iproc-platform.c             |   3 +
+ drivers/pci/host/pcie-iproc.c                      | 166 ++++++++++++++++++---
+ drivers/pci/host/pcie-iproc.h                      |   7 +
+ 5 files changed, 187 insertions(+), 18 deletions(-)
+
+-- 
+1.9.1
