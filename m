@@ -1,84 +1,59 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 24 Aug 2017 16:14:23 +0200
-Subject: [GIT PULL 2/2] second round of Rockchip dts32 changes for 4.14
-In-Reply-To: <CAK8P3a3SKUoNPzCQMgnV=g+f3twBM_9Gn-=k0znx4cMRkeb9cQ@mail.gmail.com>
-References: <4088347.CX4PhsiguF@phil> <2301603.fd1AhSc3fO@phil>
- <CAK8P3a3SKUoNPzCQMgnV=g+f3twBM_9Gn-=k0znx4cMRkeb9cQ@mail.gmail.com>
-Message-ID: <2188017.aNViITp28l@phil>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Aug 2017 16:15:08 +0200
+Subject: [GIT PULL] ARM: SoC fixes for 4.13
+Message-ID: <CAK8P3a0XZOZSgNB6yJX0fXoGMwJaMBS9GP-JYzX+XpkuXbuG7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 24. August 2017, 15:50:51 CEST schrieb Arnd Bergmann:
-> On Thu, Aug 24, 2017 at 10:42 AM, Heiko Stuebner <heiko@sntech.de> wrote:
-> > The following changes since commit 0f4dc7e154d054303c4dd6b5c3e3207f9a7f8714:
-> >
-> >   ARM: dts: rockchip: fix property-ordering in rv1108 mmc nodes (2017-07-22 22:41:35 +0200)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.14-rockchip-dts32-2
-> >
-> > for you to fetch changes up to 274ff50d3ad951bca0adbfb9ffd628d35ba6db6f:
-> >
-> >   ARM: dts: rockchip: enable usb for rv1108-evb (2017-08-23 09:24:51 +0200)
-> >
-> > ----------------------------------------------------------------
-> > A lot of attention for the rv1108 soc targetted at media-processing
-> > (usb, operating points, spi, pwm, adc, watchdog, i2c and devices for
-> > its evb).
-> >
-> > RK3228/3229 gets iommu and spi nodes. Similar to the rk3288 which
-> > also gets some more iommu nodes as well as getting converted to 64
-> > bit addresses due to wanting to address more than 4GB of memory
-> > via LPAE.
-> 
-> Pulled into next/dt with a small fixup, see below. Please check.
-> 
-> Thanks!
-> 
->       Arnd
-> 
-> 
-> diff --cc arch/arm/boot/dts/rk3288.dtsi
-> index 858e1fed762a,c0c04e99e159..356ed1e62452
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@@ -1126,9 -1145,27 +1145,27 @@@
->                 };
->         };
-> 
-> +       vpu_mmu: iommu at ff9a0800 {
-> +               compatible = "rockchip,iommu";
-> +               reg = <0x0 0xff9a0800 0x0 0x100>;
-> +               interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-> +               interrupt-names = "vpu_mmu";
-> +               #iommu-cells = <0>;
-> +               status = "disabled";
-> +       };
-> +
-> +       hevc_mmu: iommu at ff9c0440 {
-> +               compatible = "rockchip,iommu";
-> +               reg = <0x0 0xff9c0440 0x0 0x40>, <0x0 0xff9c0480 0x0 0x40>;
-> +               interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
-> +               interrupt-names = "hevc_mmu";
-> +               #iommu-cells = <0>;
-> +               status = "disabled";
-> +       };
-> +
->  -      gpu: mali at ffa30000 {
->  -              compatible = "rockchip,rk3288-mali", "arm,mali-t760",
-> "arm,mali-midgard";
->  +      gpu: gpu at ffa30000 {
->  +              compatible = "rockchip,rk3288-mali", "arm,mali-t760";
-> -               reg = <0xffa30000 0x10000>;
-> +               reg = <0x0 0xffa30000 0x0 0x10000>;
->                 interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
->                              <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>,
->                              <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
+The following changes since commit 4dd6a9973b8aaffac4bf37c5bb70e8eae5a7afb4:
 
-yep looks good. Seems like the mali compatible-fix that was going into
-an 4.13-rc interfered here.
+  soc: ti: ti_sci_pm_domains: Populate name for genpd (2017-08-18
+11:59:53 +0200)
 
+are available in the git repository at:
 
-Thanks
-Heiko
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+tags/armsoc-fixes
+
+for you to fetch changes up to 93a4c8355e0e448d83f31801b4c72f66e4360975:
+
+  ARM: dts: exynos: add needs-hpd for Odroid-XU3/4 (2017-08-23 21:43:29 +0200)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 4.13
+
+A small number of bugfixes, again nothing serious.
+
+- Alexander Dahl found multiple bugs in the Atmel memory interface driver
+
+- A randconfig build fix for at91 was incomplete, the second
+  attempt fixes the remaining corner case
+
+- One fix for the TI Keystone queue handler
+
+- The Odroid XU4 HDMI port (added in 4.13) needs a small DT fix
+
+----------------------------------------------------------------
+Alexander Dahl (3):
+      memory: atmel-ebi: Fix smc timing return value evaluation
+      memory: atmel-ebi: Allow t_DF timings of zero ns
+      memory: atmel-ebi: Fix smc cycle xlate converter
+
+Arnd Bergmann (2):
+      Merge tag 'at91-ab-4.13-drivers-fixes' of
+git://git.kernel.org/.../abelloni/linux into fixes
+      ARM: at91: don't select CONFIG_ARM_CPU_SUSPEND for old platforms
+
+Hans Verkuil (1):
+      ARM: dts: exynos: add needs-hpd for Odroid-XU3/4
+
+Keerthy (1):
+      soc: ti: knav: Add a NULL pointer check for kdev in knav_pool_create
+
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
+ arch/arm/mach-at91/Kconfig                         |  2 +-
+ arch/arm/mach-at91/pm.c                            | 12 ++++++++++++
+ drivers/memory/atmel-ebi.c                         | 10 ++++++----
+ drivers/mfd/atmel-smc.c                            |  2 +-
+ drivers/soc/ti/knav_qmss_queue.c                   |  3 +++
+ 6 files changed, 24 insertions(+), 6 deletions(-)
