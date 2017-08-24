@@ -1,160 +1,144 @@
 From: oza.oza@broadcom.com (Oza Pawandeep)
-Date: Thu, 24 Aug 2017 10:34:25 +0530
-Subject: [PATCH v8 2/3] PCI: iproc: retry request when CRS returned from EP
+Date: Thu, 24 Aug 2017 10:34:26 +0530
+Subject: [PATCH v8 3/3] PCI: iproc: add device shutdown for PCI RC
 In-Reply-To: <1503551066-23212-1-git-send-email-oza.oza@broadcom.com>
 References: <1503551066-23212-1-git-send-email-oza.oza@broadcom.com>
-Message-ID: <1503551066-23212-3-git-send-email-oza.oza@broadcom.com>
+Message-ID: <1503551066-23212-4-git-send-email-oza.oza@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCIe spec r3.1, sec 2.3.2
-If CRS software visibility is not enabled, the RC must reissue the
-config request as a new request.
+PERST must be asserted around ~500ms before the reboot is applied.
 
-- If CRS software visibility is enabled,
-- for a config read of Vendor ID, the RC must return 0x0001 data
-- for all other config reads/writes, the RC must reissue the
-  request
+During soft reset (e.g., "reboot" from Linux) on some iproc based SOCs
+LCPLL clock and PERST both goes off simultaneously.
+This will cause certain Endpoints Intel NVMe not get detected, upon
+next boot sequence.
 
-iproc PCIe Controller spec:
-4.7.3.3. Retry Status On Configuration Cycle
-Endpoints are allowed to generate retry status on configuration
-cycles. In this case, the RC needs to re-issue the request. The IP
-does not handle this because the number of configuration cycles needed
-will probably be less than the total number of non-posted operations
-needed.
+This is specifically happening with Intel P3700 400GB series.
+Endpoint is expecting the clock for some amount of time after PERST is
+asserted, which is not happening in Stingray (iproc based SOC).
+This causes NVMe to behave in undefined way.
 
-When a retry status is received on the User RX interface for a
-configuration request that was sent on the User TX interface,
-it will be indicated with a completion with the CMPL_STATUS field set
-to 2=CRS, and the user will have to find the address and data values
-and send a new transaction on the User TX interface.
-When the internal configuration space returns a retry status during a
-configuration cycle (user_cscfg = 1) on the Command/Status interface,
-the pcie_cscrs will assert with the pcie_csack signal to indicate the
-CRS status.
-When the CRS Software Visibility Enable register in the Root Control
-register is enabled, the IP will return the data value to 0x0001 for
-the Vendor ID value and 0xffff  (all 1?s) for the rest of the data in
-the request for reads of offset 0 that return with CRS status.  This
-is true for both the User RX Interface and for the Command/Status
-interface.  When CRS Software Visibility is enabled, the CMPL_STATUS
-field of the completion on the User RX Interface will not be 2=CRS and
-the pcie_cscrs signal will not assert on the Command/Status interface.
+On the contrary, Intel x86 boards will have ref clock running, so we
+do not see this behavior there.
 
-Per PCIe r3.1, sec 2.3.2, config requests that receive completions
-with Configuration Request Retry Status (CRS) should be reissued by
-the hardware except reads of the Vendor ID when CRS Software
-Visibility is enabled.
+Besides, PCI spec does not stipulate about such timings.
+In-fact it does not tell us, whether PCIe device should consider
+refclk to be available or not to be.
 
-This hardware never reissues configuration requests when it receives
-CRS completions.
-Note that, neither PCIe host bridge nor PCIe core re-issues the
-request for any configuration offset.
+It is completely up to vendor to design their EP the way they want
+with respect to ref clock availability.
 
-For config reads, this hardware returns CFG_RETRY_STATUS data when
-it receives a CRS completion for a config read, regardless of the
-address of the read or the CRS Software Visibility Enable bit.
-
-This patch implements iproc_pcie_config_read which gets called for
-Stingray, if it receives a CRS completion, it retries reading it again.
-In case of timeout, it returns 0xffffffff.
-For other iproc based SOC, it falls back to PCI generic APIs.
+500ms is just based on the observation and taken as safe margin.
+This patch adds platform shutdown where it should be
+called in device_shutdown while reboot command is issued.
+So in sequence first Endpoint Shutdown (e.g. nvme_shutdown)
+followed by RC shutdown, which issues safe PERST assertion.
 
 Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 
-diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-index 61d9be6..37f4adf 100644
---- a/drivers/pci/host/pcie-iproc.c
-+++ b/drivers/pci/host/pcie-iproc.c
-@@ -68,6 +68,9 @@
- #define APB_ERR_EN_SHIFT             0
- #define APB_ERR_EN                   BIT(APB_ERR_EN_SHIFT)
- 
-+#define CFG_RETRY_STATUS             0xffff0001
-+#define CFG_RETRY_STATUS_TIMEOUT_US  500000 /* 500 milli-seconds. */
-+
- /* derive the enum index of the outbound/inbound mapping registers */
- #define MAP_REG(base_reg, index)      ((base_reg) + (index) * 2)
- 
-@@ -473,6 +476,64 @@ static void __iomem *iproc_pcie_map_ep_cfg_reg(struct iproc_pcie *pcie,
- 	return (pcie->base + offset);
+diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
+index 2253119..a5073a9 100644
+--- a/drivers/pci/host/pcie-iproc-platform.c
++++ b/drivers/pci/host/pcie-iproc-platform.c
+@@ -134,6 +134,13 @@ static int iproc_pcie_pltfm_remove(struct platform_device *pdev)
+ 	return iproc_pcie_remove(pcie);
  }
  
-+static unsigned int iproc_pcie_cfg_retry(void __iomem *cfg_data_p)
++static void iproc_pcie_pltfm_shutdown(struct platform_device *pdev)
 +{
-+	int timeout = CFG_RETRY_STATUS_TIMEOUT_US;
-+	unsigned int data;
++	struct iproc_pcie *pcie = platform_get_drvdata(pdev);
 +
-+	/*
-+	 * As per PCIe spec r3.1, sec 2.3.2, CRS Software
-+	 * Visibility only affects config read of the Vendor ID.
-+	 * For config write or any other config read the Root must
-+	 * automatically re-issue configuration request again as a
-+	 * new request.
-+	 *
-+	 * For config reads, this hardware returns CFG_RETRY_STATUS data when
-+	 * it receives a CRS completion for a config read, regardless of the
-+	 * address of the read or the CRS Software Visibility Enable bit. As a
-+	 * partial workaround for this, we retry in software any read that
-+	 * returns CFG_RETRY_STATUS.
-+	 */
-+	data = readl(cfg_data_p);
-+	while (data == CFG_RETRY_STATUS && timeout--) {
-+		udelay(1);
-+		data = readl(cfg_data_p);
-+	}
-+
-+	if (data == CFG_RETRY_STATUS)
-+		data = 0xffffffff;
-+
-+	return data;
++	iproc_pcie_shutdown(pcie);
 +}
 +
-+static int iproc_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
-+				    int where, int size, u32 *val)
-+{
-+	struct iproc_pcie *pcie = iproc_data(bus);
-+	unsigned int slot = PCI_SLOT(devfn);
-+	unsigned int fn = PCI_FUNC(devfn);
-+	unsigned int busno = bus->number;
-+	void __iomem *cfg_data_p;
-+	unsigned int data;
-+
-+	/* root complex access. */
-+	if (busno == 0)
-+		return pci_generic_config_read32(bus, devfn, where, size, val);
-+
-+	cfg_data_p = iproc_pcie_map_ep_cfg_reg(pcie, busno, slot, fn, where);
-+
-+	if (!cfg_data_p)
-+		return PCIBIOS_DEVICE_NOT_FOUND;
-+
-+	data = iproc_pcie_cfg_retry(cfg_data_p);
-+
-+	*val = data;
-+	if (size <= 2)
-+		*val = (data >> (8 * (where & 3))) & ((1 << (size * 8)) - 1);
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
- /**
-  * Note access to the configuration registers are protected@the higher layer
-  * by 'pci_lock' in drivers/pci/access.c
-@@ -567,8 +628,13 @@ static int iproc_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
- 				    int where, int size, u32 *val)
+ static struct platform_driver iproc_pcie_pltfm_driver = {
+ 	.driver = {
+ 		.name = "iproc-pcie",
+@@ -141,6 +148,7 @@ static int iproc_pcie_pltfm_remove(struct platform_device *pdev)
+ 	},
+ 	.probe = iproc_pcie_pltfm_probe,
+ 	.remove = iproc_pcie_pltfm_remove,
++	.shutdown = iproc_pcie_pltfm_shutdown,
+ };
+ module_platform_driver(iproc_pcie_pltfm_driver);
+ 
+diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+index 37f4adf..cbdabe8 100644
+--- a/drivers/pci/host/pcie-iproc.c
++++ b/drivers/pci/host/pcie-iproc.c
+@@ -659,7 +659,7 @@ static int iproc_pcie_config_write32(struct pci_bus *bus, unsigned int devfn,
+ 	.write = iproc_pcie_config_write32,
+ };
+ 
+-static void iproc_pcie_reset(struct iproc_pcie *pcie)
++static void iproc_pcie_perst_ctrl(struct iproc_pcie *pcie, bool assert)
  {
- 	int ret;
-+	struct iproc_pcie *pcie = iproc_data(bus);
+ 	u32 val;
  
- 	iproc_pcie_apb_err_disable(bus, true);
-+	if (pcie->type == IPROC_PCIE_PAXB_V2)
-+		ret = iproc_pcie_config_read(bus, devfn, where, size, val);
-+	else
-+		ret = pci_generic_config_read32(bus, devfn, where, size, val);
- 	ret = pci_generic_config_read32(bus, devfn, where, size, val);
- 	iproc_pcie_apb_err_disable(bus, false);
+@@ -671,19 +671,26 @@ static void iproc_pcie_reset(struct iproc_pcie *pcie)
+ 	if (pcie->ep_is_internal)
+ 		return;
  
+-	/*
+-	 * Select perst_b signal as reset source. Put the device into reset,
+-	 * and then bring it out of reset
+-	 */
+-	val = iproc_pcie_read_reg(pcie, IPROC_PCIE_CLK_CTRL);
+-	val &= ~EP_PERST_SOURCE_SELECT & ~EP_MODE_SURVIVE_PERST &
+-		~RC_PCIE_RST_OUTPUT;
+-	iproc_pcie_write_reg(pcie, IPROC_PCIE_CLK_CTRL, val);
+-	udelay(250);
+-
+-	val |= RC_PCIE_RST_OUTPUT;
+-	iproc_pcie_write_reg(pcie, IPROC_PCIE_CLK_CTRL, val);
+-	msleep(100);
++	if (assert) {
++		val = iproc_pcie_read_reg(pcie, IPROC_PCIE_CLK_CTRL);
++		val &= ~EP_PERST_SOURCE_SELECT & ~EP_MODE_SURVIVE_PERST &
++			~RC_PCIE_RST_OUTPUT;
++		iproc_pcie_write_reg(pcie, IPROC_PCIE_CLK_CTRL, val);
++		udelay(250);
++	} else {
++		val = iproc_pcie_read_reg(pcie, IPROC_PCIE_CLK_CTRL);
++		val |= RC_PCIE_RST_OUTPUT;
++		iproc_pcie_write_reg(pcie, IPROC_PCIE_CLK_CTRL, val);
++		msleep(100);
++	}
++}
++
++int iproc_pcie_shutdown(struct iproc_pcie *pcie)
++{
++	iproc_pcie_perst_ctrl(pcie, true);
++	msleep(500);
++
++	return 0;
+ }
+ 
+ static int iproc_pcie_check_link(struct iproc_pcie *pcie)
+@@ -1365,7 +1372,8 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+ 		goto err_exit_phy;
+ 	}
+ 
+-	iproc_pcie_reset(pcie);
++	iproc_pcie_perst_ctrl(pcie, true);
++	iproc_pcie_perst_ctrl(pcie, false);
+ 
+ 	if (pcie->need_ob_cfg) {
+ 		ret = iproc_pcie_map_ranges(pcie, res);
+diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
+index 0bbe2ea..a6b55ce 100644
+--- a/drivers/pci/host/pcie-iproc.h
++++ b/drivers/pci/host/pcie-iproc.h
+@@ -110,6 +110,7 @@ struct iproc_pcie {
+ 
+ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res);
+ int iproc_pcie_remove(struct iproc_pcie *pcie);
++int iproc_pcie_shutdown(struct iproc_pcie *pcie);
+ 
+ #ifdef CONFIG_PCIE_IPROC_MSI
+ int iproc_msi_init(struct iproc_pcie *pcie, struct device_node *node);
 -- 
 1.9.1
