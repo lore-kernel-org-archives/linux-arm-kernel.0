@@ -1,54 +1,82 @@
-From: gilad@benyossef.com (Gilad Ben-Yossef)
-Date: Thu, 24 Aug 2017 16:25:14 +0300
-Subject: [PATCH v6 04/19] crypto: marvell/cesa: remove redundant backlog
- checks on EBUSY
-In-Reply-To: <201708242036.ODpqdw7q%fengguang.wu@intel.com>
-References: <1503324309-13673-5-git-send-email-gilad@benyossef.com>
- <201708242036.ODpqdw7q%fengguang.wu@intel.com>
-Message-ID: <CAOtvUMcJXyupc1N+wRRfJNWwS2P9V36J0_eYHLbdDtj4kWaYxw@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Thu, 24 Aug 2017 15:34:17 +0200
+Subject: [GIT PULL] ARM: Xilinx Zynq SoC patches for v4.14
+In-Reply-To: <CAK8P3a0KttjyxbtP=WyrYdRSV49jr_NMBWfhquxThL-x8wdiXQ@mail.gmail.com>
+References: <8d0c07a6-27e9-e14a-560f-3fc89327f8cd@monstr.eu>
+ <CAK8P3a0KttjyxbtP=WyrYdRSV49jr_NMBWfhquxThL-x8wdiXQ@mail.gmail.com>
+Message-ID: <55aac7c8-3a68-082a-6b13-63201670f711@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 24, 2017 at 4:01 PM, kbuild test robot <lkp@intel.com> wrote:
-> Hi Gilad,
->
-> [auto build test ERROR on cryptodev/master]
-> [also build test ERROR on v4.13-rc6 next-20170823]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Gilad-Ben-Yossef/crypto-change-transient-busy-return-code-to-EAGAIN/20170824-180606
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/herbert/cryptodev-2.6.git master
-> config: arm-allmodconfig (attached as .config)
-> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm
->
-> All error/warnings (new ones prefixed by >>):
->
->    drivers/crypto/marvell/cesa.c: In function 'mv_cesa_queue_req':
->>> drivers/crypto/marvell/cesa.c:187:3: error: expected ')' before 'mv_cesa_tdma_chain'
->       mv_cesa_tdma_chain(engine, creq);
->       ^~~~~~~~~~~~~~~~~~
->>> drivers/crypto/marvell/cesa.c:196:1: error: expected expression before '}' token
->     }
->     ^
->>> drivers/crypto/marvell/cesa.c:196:1: warning: control reaches end of non-void function [-Wreturn-type]
->     }
->     ^
+On 22.8.2017 17:45, Arnd Bergmann wrote:
+> On Mon, Aug 21, 2017 at 3:05 PM, Michal Simek <monstr@monstr.eu> wrote:
+>> Hi,
+>>
+>> please apply these two patches to your tree.
+>>
+>> Thanks,
+>> Michal
+>>
+>>
+>>  The following changes since commit
+>> 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+>>
+>>    Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+>>
+>>  are available in the git repository at:
+>>
+>>    https://github.com/Xilinx/linux-xlnx.git tags/zynq-soc-for-4.14
+>>
+>>  for you to fetch changes up to b04d4c876b1b7f25cff35b7c26c5b9f518f612b2:
+>>
+>>    ARM: zynq: Add support for Zynq-7000S devices (2017-08-21 14:22:50 +0200)
+>>
+>>  ----------------------------------------------------------------
+>>  arm: Xilinx Zynq patches for v4.14
+>>
+>>  - Add support for 7000s devices
+>>
+>>  ----------------------------------------------------------------
+>>  Michal Simek (2):
+>>        devicetree: ARM: zynq: Add DT binding for eFuse controller
+>>        ARM: zynq: Add support for Zynq-7000S devices
+>>
+>>   Documentation/devicetree/bindings/nvmem/zynq-efuse.txt | 15
+>> +++++++++++++++
+>>   arch/arm/boot/dts/zynq-7000.dtsi                       |  5 +++++
+>>   arch/arm/mach-zynq/Makefile                            |  2 +-
+>>   arch/arm/mach-zynq/common.c                            |  1 +
+>>   arch/arm/mach-zynq/common.h                            |  3 +++
+>>   arch/arm/mach-zynq/efuse.c                             | 75
+>> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+>>   arch/arm/mach-zynq/platsmp.c                           |  3 +++
+>>   7 files changed, 103 insertions(+), 1 deletion(-)
+> 
+> Not pulled yet, it looked like you add a driver stub for something
+> that belongs into drivers/nvmem/.
+> 
+> Can you consult with Srinivas Kandagatla about what the right
+> approach is for this?
 
-Oy! I thought I've added COMPILE_TEST to my local tree to build it. I didn't.
+Srinivas: Any comment?
+We can move it to nvmem and make regular driver from this.
 
-Fix underway.
+Thanks,
+Michal
 
-Gilad
 
 -- 
-Gilad Ben-Yossef
-Chief Coffee Drinker
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Xilinx Microblaze
+Maintainer of Linux kernel - Xilinx Zynq ARM and ZynqMP ARM64 SoCs
+U-Boot custodian - Xilinx Microblaze/Zynq/ZynqMP SoCs
 
-"If you take a class in large-scale robotics, can you end up in a
-situation where the homework eats your dog?"
- -- Jean-Baptiste Queru
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170824/33a23ccc/attachment-0001.sig>
