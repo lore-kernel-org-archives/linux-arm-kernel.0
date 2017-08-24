@@ -1,253 +1,56 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Thu, 24 Aug 2017 20:33:47 +0800
-Subject: [PATCH v11 1/6] ACPI: add APEI/HEST/CPER structures and macros
-In-Reply-To: <1503066227-18251-2-git-send-email-gengdongjiu@huawei.com>
-References: <1503066227-18251-1-git-send-email-gengdongjiu@huawei.com>
- <1503066227-18251-2-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <599EC7AB.3080604@huawei.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 24 Aug 2017 08:37:29 -0400 (EDT)
+Subject: [PATCH v2 0/8] ELF-FDPIC support for ARM
+In-Reply-To: <38b1d822-345d-0b79-6d44-b78649e46efb@arm.com>
+References: <20170817072347.19990-1-nicolas.pitre@linaro.org>
+ <20170817083716.GN20805@n2100.armlinux.org.uk>
+ <alpine.LFD.2.20.1708231158090.14288@knanqh.ubzr>
+ <38b1d822-345d-0b79-6d44-b78649e46efb@arm.com>
+Message-ID: <alpine.LFD.2.20.1708240834210.14288@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 24 Aug 2017, Vladimir Murzin wrote:
 
-
-On 2017/8/18 22:23, Dongjiu Geng wrote:
-> (1) Add related APEI/HEST table structures and  macros, these
->     definition refer to ACPI 6.1 and UEFI 2.6 spec.
-> (2) Add generic error status block and CPER memory section
->     definition, user space only handle memory section errors.
+> On 23/08/17 17:41, Nicolas Pitre wrote:
+> > On Thu, 17 Aug 2017, Russell King - ARM Linux wrote:
+> > 
+> >> On Thu, Aug 17, 2017 at 03:23:39AM -0400, Nicolas Pitre wrote:
+> >>> This series provides the needed changes to suport the ELF_FDPIC binary
+> >>> format on ARM. Both MMU and non-MMU systems are supported. This format
+> >>> has many advantages over the BFLT format used on MMU-less systems, such
+> >>> as being real ELF that can be parsed by standard tools, can support
+> >>> shared dynamic libs, etc.
+> >>
+> >> I don't see anything issues from the core arch point of view with this,
+> >> most of it looks straight forward, and the impact on existing users
+> >> should be low.  However, it would be nice to get some acks (if possible)
+> >> for the non-arch stuff and some tested-by's on this.
+> > 
+> > Well...
+> > 
+> > I did prod a few people for testing. Either they're on vacation, or not 
+> > interested, but I've received no tested-by's nor ACK's what so ever at 
+> > this point. I did test it myself of course, on both MMU and non-MMU 
+> > targets, and with static and dynamic binaries.
 > 
-> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-> ---
->  include/hw/acpi/acpi-defs.h | 193 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 193 insertions(+)
+> IIRC, Andras (CCed) has been running FDPIC for a while. Also, I can try to
+> give it a go on M/R class systems around next week.
+
+Thanks.
+
+> I've noticed under Mickael's repo extra patches:
 > 
-> diff --git a/include/hw/acpi/acpi-defs.h b/include/hw/acpi/acpi-defs.h
-> index 72be675..3b4bad7 100644
-> --- a/include/hw/acpi/acpi-defs.h
-> +++ b/include/hw/acpi/acpi-defs.h
-> @@ -297,6 +297,44 @@ typedef struct AcpiMultipleApicTable AcpiMultipleApicTable;
->  #define ACPI_APIC_GENERIC_TRANSLATOR    15
->  #define ACPI_APIC_RESERVED              16   /* 16 and greater are reserved */
->  
-> +/* UEFI Spec 2.6, "N.2.5 Memory Error Section */
-missing "
-
-> +#define UEFI_CPER_MEM_VALID_ERROR_STATUS     0x0001
-> +#define UEFI_CPER_MEM_VALID_PA               0x0002
-> +#define UEFI_CPER_MEM_VALID_PA_MASK          0x0004
-> +#define UEFI_CPER_MEM_VALID_NODE             0x0008
-> +#define UEFI_CPER_MEM_VALID_CARD             0x0010
-> +#define UEFI_CPER_MEM_VALID_MODULE           0x0020
-> +#define UEFI_CPER_MEM_VALID_BANK             0x0040
-> +#define UEFI_CPER_MEM_VALID_DEVICE           0x0080
-> +#define UEFI_CPER_MEM_VALID_ROW              0x0100
-> +#define UEFI_CPER_MEM_VALID_COLUMN           0x0200
-> +#define UEFI_CPER_MEM_VALID_BIT_POSITION     0x0400
-> +#define UEFI_CPER_MEM_VALID_REQUESTOR        0x0800
-> +#define UEFI_CPER_MEM_VALID_RESPONDER        0x1000
-> +#define UEFI_CPER_MEM_VALID_TARGET           0x2000
-> +#define UEFI_CPER_MEM_VALID_ERROR_TYPE       0x4000
-> +#define UEFI_CPER_MEM_VALID_RANK_NUMBER      0x8000
-> +#define UEFI_CPER_MEM_VALID_CARD_HANDLE      0x10000
-> +#define UEFI_CPER_MEM_VALID_MODULE_HANDLE    0x20000
-> +#define UEFI_CPER_MEM_ERROR_TYPE_MULTI_ECC   3
-> +
-> +/* From the ACPI 6.1 spec, "18.3.2.9 Hardware Error Notification" */
-> +
-It's better to refer to the first spec version of this structure and
-same with others you define.
-
-> +enum AcpiHestNotifyType {
-> +    ACPI_HEST_NOTIFY_POLLED = 0,
-> +    ACPI_HEST_NOTIFY_EXTERNAL = 1,
-> +    ACPI_HEST_NOTIFY_LOCAL = 2,
-> +    ACPI_HEST_NOTIFY_SCI = 3,
-> +    ACPI_HEST_NOTIFY_NMI = 4,
-> +    ACPI_HEST_NOTIFY_CMCI = 5,  /* ACPI 5.0 */
-> +    ACPI_HEST_NOTIFY_MCE = 6,   /* ACPI 5.0 */
-> +    ACPI_HEST_NOTIFY_GPIO = 7,  /* ACPI 6.0 */
-> +    ACPI_HEST_NOTIFY_SEA = 8,   /* ACPI 6.1 */
-> +    ACPI_HEST_NOTIFY_SEI = 9,   /* ACPI 6.1 */
-> +    ACPI_HEST_NOTIFY_GSIV = 10, /* ACPI 6.1 */
-> +    ACPI_HEST_NOTIFY_RESERVED = 11  /* 11 and greater are reserved */
-In ACPI 6.2, 11 is for Software Delegated Exception, is this useful for
-your patchset?
-
-> +};
-> +
->  /*
->   * MADT sub-structures (Follow MULTIPLE_APIC_DESCRIPTION_TABLE)
->   */
-> @@ -474,6 +512,161 @@ struct AcpiSystemResourceAffinityTable {
->  } QEMU_PACKED;
->  typedef struct AcpiSystemResourceAffinityTable AcpiSystemResourceAffinityTable;
->  
-> +/* Hardware Error Notification, from the ACPI 6.1
-> + * spec, "18.3.2.9 Hardware Error Notification"
-> + */
-Use below style for multiple comment lines
-/*
- * XXX
- */
-
-> +struct AcpiHestNotify {
-> +    uint8_t type;
-> +    uint8_t length;
-> +    uint16_t config_write_enable;
-> +    uint32_t poll_interval;
-> +    uint32_t vector;
-> +    uint32_t polling_threshold_value;
-> +    uint32_t polling_threshold_window;
-> +    uint32_t error_threshold_value;
-> +    uint32_t error_threshold_window;
-> +} QEMU_PACKED;
-> +typedef struct AcpiHestNotify AcpiHestNotify;
-> +
-> +/* From ACPI 6.1, sections "18.3.2.1 IA-32 Architecture Machine
-> + * Check Exception" through "18.3.2.8 Generic Hardware Error Source version 2".
-> + */
-> +enum AcpiHestSourceType {
-> +    ACPI_HEST_SOURCE_IA32_CHECK = 0,
-> +    ACPI_HEST_SOURCE_IA32_CORRECTED_CHECK = 1,
-> +    ACPI_HEST_SOURCE_IA32_NMI = 2,
-What's 3, 4, 5 for?
-
-> +    ACPI_HEST_SOURCE_AER_ROOT_PORT = 6,
-> +    ACPI_HEST_SOURCE_AER_ENDPOINT = 7,
-> +    ACPI_HEST_SOURCE_AER_BRIDGE = 8,
-> +    ACPI_HEST_SOURCE_GENERIC_ERROR = 9,
-> +    ACPI_HEST_SOURCE_GENERIC_ERROR_V2 = 10,
-> +    ACPI_HEST_SOURCE_RESERVED = 11    /* 11 and greater are reserved */
-> +};
-> +
-> +/* Block status bitmasks from ACPI 6.1, "18.3.2.7.1 Generic Error Data" */
-> +#define ACPI_GEBS_UNCORRECTABLE             (1)
-> +#define ACPI_GEBS_CORRECTABLE               (1 << 1)
-> +#define ACPI_GEBS_MULTIPLE_UNCORRECTABLE    (1 << 2)
-> +#define ACPI_GEBS_MULTIPLE_CORRECTABLE      (1 << 3)
-> +/* 10 bits, error data entry count */
-> +#define ACPI_GEBS_ERROR_ENTRY_COUNT         (0x3FF << 4)
-> +
-> +/* Generic Hardware Error Source Structure, refer to ACPI 6.1
-> + * "18.3.2.7 Generic Hardware Error Source". in this struct the
-> + * "type" field has to be ACPI_HEST_SOURCE_GENERIC_ERROR
-> + */
-> +
-> +struct AcpiGenericHardwareErrorSource {
-> +    uint16_t type;
-> +    uint16_t source_id;
-> +    uint16_t related_source_id;
-> +    uint8_t flags;
-> +    uint8_t enabled;
-> +    uint32_t number_of_records;
-> +    uint32_t max_sections_per_record;
-> +    uint32_t max_raw_data_length;
-> +    struct AcpiGenericAddress error_status_address;
-> +    struct AcpiHestNotify notify;
-> +    uint32_t error_status_block_length;
-> +} QEMU_PACKED;
-> +typedef struct AcpiGenericHardwareErrorSource AcpiGenericHardwareErrorSource;
-> +
-> +/* Generic Hardware Error Source, version 2, ACPI 6.1, "18.3.2.8 Generic
-> + * Hardware Error Source version 2", in this struct the "type" field has to
-> + * be ACPI_HEST_SOURCE_GENERIC_ERROR_V2
-> + */
-> +struct AcpiGenericHardwareErrorSourceV2 {
-> +    uint16_t type;
-> +    uint16_t source_id;
-> +    uint16_t related_source_id;
-> +    uint8_t flags;
-> +    uint8_t enabled;
-> +    uint32_t number_of_records;
-> +    uint32_t max_sections_per_record;
-> +    uint32_t max_raw_data_length;
-> +    struct AcpiGenericAddress error_status_address;
-> +    struct AcpiHestNotify notify;
-> +    uint32_t error_status_block_length;
-> +    struct AcpiGenericAddress read_ack_register;
-> +    uint64_t read_ack_preserve;
-> +    uint64_t read_ack_write;
-> +} QEMU_PACKED;
-> +typedef struct AcpiGenericHardwareErrorSourceV2
-> +            AcpiGenericHardwareErrorSourceV2;
-> +
-> +/* Generic Error Status block, from ACPI 6.1,
-> + * "18.3.2.7.1 Generic Error Data"
-> + */
-> +struct AcpiGenericErrorStatus {
-> +    /* It is a bitmask composed of ACPI_GEBS_xxx macros */
-> +    uint32_t block_status;
-> +    uint32_t raw_data_offset;
-> +    uint32_t raw_data_length;
-> +    uint32_t data_length;
-> +    uint32_t error_severity;
-> +} QEMU_PACKED;
-> +typedef struct AcpiGenericErrorStatus AcpiGenericErrorStatus;
-> +
-> +enum AcpiGenericErrorSeverity {
-> +    ACPI_CPER_SEV_RECOVERABLE,
-> +    ACPI_CPER_SEV_FATAL,
-> +    ACPI_CPER_SEV_CORRECTED,
-> +    ACPI_CPER_SEV_NONE,
-> +};
-> +
-> +/* Generic Error Data entry, revision number is 0x0300,
-> + * ACPI 6.1, "18.3.2.7.1 Generic Error Data"
-> + */
-> +struct AcpiGenericErrorData {
-> +    uint8_t section_type_le[16];
-> +    /* The "error_severity" fields that they take their
-> +     * values from AcpiGenericErrorSeverity
-> +     */
-> +    uint32_t error_severity;
-> +    uint16_t revision;
-> +    uint8_t validation_bits;
-> +    uint8_t flags;
-> +    uint32_t error_data_length;
-> +    uint8_t fru_id[16];
-> +    uint8_t fru_text[20];
-> +    uint64_t time_stamp;
-> +} QEMU_PACKED;
-> +typedef struct AcpiGenericErrorData AcpiGenericErrorData;
-> +
-> +/* From UEFI 2.6, "N.2.5 Memory Error Section" */
-> +struct UefiCperSecMemErr {
-> +    uint64_t    validation_bits;
-> +    uint64_t    error_status;
-> +    uint64_t    physical_addr;
-> +    uint64_t    physical_addr_mask;
-> +    uint16_t    node;
-> +    uint16_t    card;
-> +    uint16_t    module;
-> +    uint16_t    bank;
-> +    uint16_t    device;
-> +    uint16_t    row;
-> +    uint16_t    column;
-> +    uint16_t    bit_pos;
-> +    uint64_t    requestor_id;
-> +    uint64_t    responder_id;
-> +    uint64_t    target_id;
-> +    uint8_t     error_type;
-> +    uint8_t     reserved;
-> +    uint16_t    rank;
-> +    uint16_t    mem_array_handle;   /* card handle in UEFI 2.4 */
-> +    uint16_t    mem_dev_handle;     /* module handle in UEFI 2.4 */
-> +} QEMU_PACKED;
-> +typedef struct UefiCperSecMemErr UefiCperSecMemErr;
-> +
-> +/*
-> + * HEST Description Table
-> + */
-> +struct AcpiHardwareErrorSourceTable {
-> +    ACPI_TABLE_HEADER_DEF                    /* ACPI common table header */
-> +    uint32_t           error_source_count;
-> +} QEMU_PACKED;
-> +typedef struct AcpiHardwareErrorSourceTable AcpiHardwareErrorSourceTable;
-> +
->  #define ACPI_SRAT_PROCESSOR_APIC     0
->  #define ACPI_SRAT_MEMORY             1
->  #define ACPI_SRAT_PROCESSOR_x2APIC   2
+> - Add tls support for cortex-m cpu family
+> - Workaround to fix futex bug on mmu less
 > 
+> It'd be nice if you shed some light on why they are not present in your
+> series.
 
--- 
-Shannon
+The first one is.
+
+The second one concerns a different maintainer entirely and is 
+orthogonal to FDPIC support so I didn't include it here.
+
+
+Nicolas
