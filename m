@@ -1,72 +1,78 @@
-From: yong.deng@magewell.com (Yong)
-Date: Thu, 24 Aug 2017 09:43:08 +0800
-Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20170823192413.y5psmcgd3ghvpkbz@flea.home>
-References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
- <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
- <20170728160233.xooevio4hoqkgfaq@flea.lan>
- <20170730060801.bkc2kvm72ktixy74@tarshish>
- <20170821202145.kmxancepyq55v3o2@flea.lan>
- <20170823104118.b4524830e4bb767d7714772c@magewell.com>
- <20170823192413.y5psmcgd3ghvpkbz@flea.home>
-Message-ID: <20170824094308.c78aab49c64f4755a7706453@magewell.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 24 Aug 2017 09:44:12 +0800
+Subject: [PATCH] binder: let ANDROID_BINDER_IPC_32BIT be selectable on
+ 32bit ARM
+In-Reply-To: <CABGGisx73j7SHkA71sBQdHP0UnVc=EALo9b1AmrA6Af7WB=94Q@mail.gmail.com>
+References: <20170808110305.2748-1-jszhang@marvell.com>
+ <20170823015108.GA18228@kroah.com>	<20170823103420.6ffb5ce7@xhacker>
+ <CALAqxLU_ACM-91Sp+BPqsAhqdhqf7V6-m111j7F=xZ+K4Aji1Q@mail.gmail.com>
+ <CALAqxLXSqUZCvzrqfUbozdZrwwP_0xWAU7sx69UYv81rBhovMg@mail.gmail.com>
+ <CABGGisx73j7SHkA71sBQdHP0UnVc=EALo9b1AmrA6Af7WB=94Q@mail.gmail.com>
+Message-ID: <20170824094412.1d73da94@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 23 Aug 2017 21:24:13 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On Wed, 23 Aug 2017 13:48:47 -0500 Rob Herring wrote:
 
-> On Wed, Aug 23, 2017 at 10:41:18AM +0800, Yong wrote:
-> > > > > > +static irqreturn_t sun6i_csi_isr(int irq, void *dev_id)
-> > > > > > +{
-> > > > > > +	struct sun6i_csi_dev *sdev = (struct sun6i_csi_dev *)dev_id;
-> > > > > > +	struct regmap *regmap = sdev->regmap;
-> > > > > > +	u32 status;
-> > > > > > +
-> > > > > > +	regmap_read(regmap, CSI_CH_INT_STA_REG, &status);
-> > > > > > +
-> > > > > > +	if ((status & CSI_CH_INT_STA_FIFO0_OF_PD) ||
-> > > > > > +	    (status & CSI_CH_INT_STA_FIFO1_OF_PD) ||
-> > > > > > +	    (status & CSI_CH_INT_STA_FIFO2_OF_PD) ||
-> > > > > > +	    (status & CSI_CH_INT_STA_HB_OF_PD)) {
-> > > > > > +		regmap_write(regmap, CSI_CH_INT_STA_REG, status);
-> > > > > > +		regmap_update_bits(regmap, CSI_EN_REG, CSI_EN_CSI_EN, 0);
-> > > > > > +		regmap_update_bits(regmap, CSI_EN_REG, CSI_EN_CSI_EN,
-> > > > > > +				   CSI_EN_CSI_EN);
-> > > > > 
-> > > > > You need to enable / disable it at every frame? How do you deal with
-> > > > > double buffering? (or did you choose to ignore it for now?)
-> > > > 
-> > > > These *_OF_PD status bits indicate an overflow error condition.
-> > > 
-> > > Shouldn't we return an error code then? The names of these flags could
-> > > be better too.
-> > 
-> > Then, where and how to deal with the error coce.
+> On Tue, Aug 22, 2017 at 9:57 PM, John Stultz <john.stultz@linaro.org> wrote:
+> > On Tue, Aug 22, 2017 at 7:56 PM, John Stultz <john.stultz@linaro.org> wrote:  
+> >> On Tue, Aug 22, 2017 at 7:34 PM, Jisheng Zhang <jszhang@marvell.com> wrote:  
+> >>> On Tue, 22 Aug 2017 18:51:08 -0700 Greg KH wrote:
+> >>>  
+> >>>> On Tue, Aug 08, 2017 at 07:03:05PM +0800, Jisheng Zhang wrote:  
+> >>>> > As noted in commit d0bdff0db809 ("staging: Fix build issues with new
+> >>>> > binder API"), we can add back the choice for 32bit ARM "once a 64bit
+> >>>> > __get_user_asm_* implementation is merged." Commit e38361d032f1 ("ARM:
+> >>>> > 8091/2: add get_user() support for 8 byte types") has added the
+> >>>> > support, so it's time to let ANDROID_BINDER_IPC_32BIT be selectable on
+> >>>> > 32bit ARM  
+> >>>>
+> >>>> Ok, but:
+> >>>>  
+> >>>> >
+> >>>> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> >>>> > ---
+> >>>> >  drivers/android/Kconfig | 2 +-
+> >>>> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>> >
+> >>>> > diff --git a/drivers/android/Kconfig b/drivers/android/Kconfig
+> >>>> > index 832e885349b1..aca5dc30b97b 100644
+> >>>> > --- a/drivers/android/Kconfig
+> >>>> > +++ b/drivers/android/Kconfig
+> >>>> > @@ -32,7 +32,7 @@ config ANDROID_BINDER_DEVICES
+> >>>> >       therefore logically separated from the other devices.
+> >>>> >
+> >>>> >  config ANDROID_BINDER_IPC_32BIT
+> >>>> > -   bool
+> >>>> > +   bool "Use old (Android 4.4 and earlier) 32-bit binder API"
+> >>>> >     depends on !64BIT && ANDROID_BINDER_IPC  
+> >>>>
+> >>>> You don't actually change the depends line :(
+> >>>>
+> >>>> Please fix up, and test it, and then resend.  
+> >>>
+> >>> IHOM, the dependency is correct: 64bit platforms don't support
+> >>> ANDROID_BINDER_IPC_32BIT. What do you think?  
+> >>
+> >> I think this indicates the commit message is unclear.
+> >>
+> >> Part of it is that the config is inverted from the description. The
+> >> patch doesn't enable the 32bit legacy binder ABI on 32bit systems, it
+> >> just allows the option to be unselected, so that the 64bit ABI will be
+> >> used on 32bit systems.
+> >>
+> >> Conceptually I don't have an objection to the change (though maybe try
+> >> to rework the commit message), but I don't have anything to actually
+> >> test it on right now, so I'm hesitant to ack it.  
+> >
+> > It might also be good to add some detail as to the motivation for this
+> > change? What benefit does it bring to 32bit platforms to use the newer
+> > 64bit ABI?  
 > 
-> If you want to deal with FIFO overflow, I'm not sure you have anything
-> to do. It means, you've been to slow to queue buffers, so I guess
-> stopping the pipeline until more buffers are queued would make
-> sense. And we should probably increase the sequence number while doing
-> so to notify the userspace that some frames were lost.
-
-If there is no queued buffers, the CSI must has been already stoped by
-sun6i_video_frame_done. So, the FIFO overflow may only occur on some 
-unpredictable conditions or something I don't know.
-
-For sequence number, I can't actually get the number of the lost frames.
-
-Maybe I misunderstood you. Did you mean use IRQ_RETVAL(error) instead
-of IRQ_HANDLED?
-
+> It allows running the same 32-bit userspace build whether the kernel
+> is 64-bit or 32-bit.
 > 
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
 
+Oh, yes, this is a good "motivation" which can be added into the commit msg.
 
-Thanks,
-Yong
+thanks for the inspiration.
