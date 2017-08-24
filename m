@@ -1,60 +1,37 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 24 Aug 2017 02:20:00 +0200
-Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable
- direct_complete for ACPI devices
-In-Reply-To: <3774251.HUIR40xRhc@aspire.rjw.lan>
-References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
- <CAJZ5v0gJn=SzNFGUT7Zb+CfhQBZ7KNDK2GTSSXGexD8GObjGOw@mail.gmail.com>
- <3774251.HUIR40xRhc@aspire.rjw.lan>
-Message-ID: <9174364.s7oU13Tavs@aspire.rjw.lan>
+From: airlied@gmail.com (Dave Airlie)
+Date: Thu, 24 Aug 2017 10:57:26 +1000
+Subject: [PATCH v2 1/1] Split VGA default device handler out of VGA arbiter
+In-Reply-To: <20170823135734.GB8498@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170817113028.16853-1-dja@axtens.net>
+ <20170817113028.16853-2-dja@axtens.net>
+ <20170821105300.GB23287@e107981-lin.cambridge.arm.com>
+ <20170822221928.GL6948@bhelgaas-glaptop.roam.corp.google.com>
+ <CAKv+Gu-FCkV9Dv=yn_CNC9orj8Roiabb75jX34w3mMziWVZaeA@mail.gmail.com>
+ <20170823135734.GB8498@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CAPM=9tzhzGEY_-FhGNECQ8QkxPtXxhojwPeVQT43Rcgf6X0Lww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 24, 2017 2:13:55 AM CEST Rafael J. Wysocki wrote:
-> On Thursday, August 24, 2017 1:39:44 AM CEST Rafael J. Wysocki wrote:
-> > On Wed, Aug 23, 2017 at 4:42 PM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> > > In some cases a driver for an ACPI device needs to be able to prevent the
-> > > ACPI PM domain from using the direct_complete path during system sleep.
-> > >
-> > > One typical case is when the driver for the device needs its device to stay
-> > > runtime enabled, during the __device_suspend phase. This isn't the case
-> > > when the direct_complete path is being executed by the PM core, as it then
-> > > disables runtime PM for the device in __device_suspend(). Any following
-> > > attempts to runtime resume the device after that point, just fails.
-> > 
-> > OK, that is a problem.
-> > 
-> > > A workaround to this problem is to let the driver runtime resume its device
-> > > from its ->prepare() callback, as that would prevent the direct_complete
-> > > path from being executed. However, that may often be a waste, especially if
-> > > it turned out that no one really needed the device.
-> > >
-> > > For this reason, invent acpi_dev_disable|enable_direct_complete(), to allow
-> > > drivers to inform the ACPI PM domain to change its default behaviour during
-> > > system sleep, and thus control whether it may use the direct_complete path
-> > > or not.
-> > 
-> > But I'm not sure this is the right place to address it as it very well
-> > may affect a PCI device too.
-> > 
-> > Also, this is about the device and not about its ACPI companion
-> > object, so putting the flag in there is somewhat unclean, so to speak.
-> > 
-> > It looks like we need a flag in dev_pm_info saying something along the
-> > lines of "my system suspend callback can deal with runtime PM" that
-> > will cause the direct_complete update to occur in
-> > __device_suspend_late() instead of __device_suspend().
-> 
-> IOW, something like the patch below.
-> 
-> It actually should work with the ACPI PM domain code as is except that it
-> will cause the device to be runtime resumed every time during suspend.
-> 
-> But acpi_subsys_suspend() can be changed to avoid resuming the device if
-> power.force_suspend is set.
+> Yeah, maybe it's time to disconnect the "default display device" idea
+> from the VGA arbiter.  I have no idea what (if any) dependencies X has
+> on the legacy VGA resources.  I assume X works fine on power, where it
+> sounds like those resources are rarely or never available.
 
-Or better yet, if power.direct_complete is not set, because that means the
-device needs to be resumed anyway.
+The question on non-x86 archs, is what is the correct device to default to.
 
-And if power.direct_complete is set at that point, power.force_suspend has to
-be set too.
+On x86 we use the legacy VGA resources as a pointer, as this is the device
+the BIOS appeared on at boot so hopefully should be one you can see stuff on.
+
+On non-x86 I've no idea how to decide if there are multiple devices, maybe the
+firmware needs to tag something for the kernel if there are. Otherwise
+you'd just
+be picking something in probe order.
+
+I think the idea of these patches is to separate default display
+device from the arbiter.
+
+X uses the arbiter on x86 if required (it's horrible, and it's rare we
+have to nowadays),
+but for finding the default device it justs uses the sysfs boot_vga flag.
+
+Dave.
