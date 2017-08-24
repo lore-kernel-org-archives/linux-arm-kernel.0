@@ -1,236 +1,88 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 24 Aug 2017 13:05:46 +0300
-Subject: [PATCH 3/5] mmc: sdhci-msm: Add support to wait for power irq
-In-Reply-To: <1503033582-48703-4-git-send-email-vviswana@codeaurora.org>
-References: <1503033582-48703-1-git-send-email-vviswana@codeaurora.org>
- <1503033582-48703-4-git-send-email-vviswana@codeaurora.org>
-Message-ID: <50577fff-c7d3-7fa5-875e-d3f97336a97a@intel.com>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Thu, 24 Aug 2017 11:16:15 +0100
+Subject: [PATCH] drm: hdlcd: allow HDLCD to be used without interrupt
+In-Reply-To: <9cdccb9c-83c5-5867-06a5-3b344102d232@arm.com>
+References: <E1daJCF-0003pG-DI@rmk-PC.armlinux.org.uk>
+ <20170726102748.GM31807@n2100.armlinux.org.uk>
+ <e68186a4-2435-a969-7eff-21556d6a6b03@arm.com>
+ <9cdccb9c-83c5-5867-06a5-3b344102d232@arm.com>
+Message-ID: <20170824101615.GE11316@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/08/17 08:19, Vijay Viswanath wrote:
-> From: Sahitya Tummala <stummala@codeaurora.org>
+On Mon, Aug 21, 2017 at 03:45:21PM +0100, Vladimir Murzin wrote:
+> On 10/08/17 13:15, Vladimir Murzin wrote:
+> > On 26/07/17 11:27, Russell King - ARM Linux wrote:
+> >> I suspect the above failure is down to either (a) not having enough
+> >> memory available to allocate a 1920x1080 frame buffer, or (b) not
+> >> (yet) being able to program the hdlcd pixel clock for this platform,
+> >> which is currently hard-coded in DT at 23.75MHz.
+> > 
+> > Given it is NOMMU it is likely (a). Usually, tweaking FORCE_MAX_ZONEORDER
+> > helped me in such cases.
 > 
-> Add support API which will check if power irq is expected to be
-> generated and wait for the power irq to come and complete if the irq is
-> expected.
+> Ok, with CONFIG_FORCE_MAX_ZONEORDER=12 I see
 > 
-> Signed-off-by: Sahitya Tummala <stummala@codeaurora.org>
-> Signed-off-by: Vijay Viswanath <vviswana@codeaurora.org>
-> ---
->  drivers/mmc/host/sdhci-msm.c | 125 ++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 123 insertions(+), 2 deletions(-)
+> [    5.242423] [drm] found ARM HDLCD version r0p0
+> [    5.493835] tda998x 2-0070: found TDA19988
+> [    5.527771] hdlcd 40205000.hdlcd: bound 2-0070 (ops 0x1470f8)
+> [    5.535819] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+> [    5.543478] [drm] No driver support for vblank timestamp query.
+> [    7.443189] hdlcd 40205000.hdlcd: fb0:  frame buffer device
+> [    7.501975] [drm] Initialized hdlcd 1.0.0 20151021 for 40205000.hdlcd on minor 0
 > 
-> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
-> index f3e0489..6d3b1fd 100644
-> --- a/drivers/mmc/host/sdhci-msm.c
-> +++ b/drivers/mmc/host/sdhci-msm.c
-> @@ -123,6 +123,10 @@
->  #define CMUX_SHIFT_PHASE_MASK	(7 << CMUX_SHIFT_PHASE_SHIFT)
->  
->  #define MSM_MMC_AUTOSUSPEND_DELAY_MS	50
-> +
-> +/* Timeout value to avoid infinite waiting for pwr_irq */
-> +#define MSM_PWR_IRQ_TIMEOUT_MS 5000
-> +
->  struct sdhci_msm_host {
->  	struct platform_device *pdev;
->  	void __iomem *core_mem;	/* MSM SDCC mapped address */
-> @@ -138,6 +142,11 @@ struct sdhci_msm_host {
->  	bool calibration_done;
->  	u8 saved_tuning_phase;
->  	bool use_cdclp533;
-> +	u32 curr_pwr_state;
-> +	u32 curr_io_level;
-> +#ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
-> +	struct completion pwr_irq_completion;
-> +#endif
->  };
->  
->  static unsigned int msm_get_clock_rate_for_bus_mode(struct sdhci_host *host,
-> @@ -995,6 +1004,90 @@ static void sdhci_msm_set_uhs_signaling(struct sdhci_host *host,
->  		sdhci_msm_hs400(host, &mmc->ios);
->  }
->  
-> +#ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
-> +static inline void sdhci_msm_init_pwr_irq_completion(
-> +		struct sdhci_msm_host *msm_host)
-> +{
-> +	init_completion(&msm_host->pwr_irq_completion);
-> +}
-> +
-> +static inline void sdhci_msm_complete_pwr_irq_completion(
-> +		struct sdhci_msm_host *msm_host)
-> +{
-> +	complete(&msm_host->pwr_irq_completion);
-> +}
-> +
-> +/*
-> + * sdhci_msm_check_power_status API should be called when registers writes
-> + * which can toggle sdhci IO bus ON/OFF or change IO lines HIGH/LOW happens.
-> + * To what state the register writes will change the IO lines should be passed
-> + * as the argument req_type. This API will check whether the IO line's state
-> + * is already the expected state and will wait for power irq only if
-> + * power irq is expected to be trigerred based on the current IO line state
-> + * and expected IO line state.
-> + */
-> +static void sdhci_msm_check_power_status(struct sdhci_host *host, u32 req_type)
-> +{
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
-> +	unsigned long flags;
-> +	bool done = false;
-> +
-> +	spin_lock_irqsave(&host->lock, flags);
-> +	pr_debug("%s: %s: request %d curr_pwr_state %x curr_io_level %x\n",
-> +			mmc_hostname(host->mmc), __func__, req_type,
-> +			msm_host->curr_pwr_state, msm_host->curr_io_level);
-> +
-> +	/*
-> +	 * The IRQ for request type IO High/LOW will be generated when -
-> +	 * there is a state change in 1.8V enable bit (bit 3) of
-> +	 * SDHCI_HOST_CONTROL2 register. The reset state of that bit is 0
-> +	 * which indicates 3.3V IO voltage. So, when MMC core layer tries
-> +	 * to set it to 3.3V before card detection happens, the
-> +	 * IRQ doesn't get triggered as there is no state change in this bit.
-> +	 * The driver already handles this case by changing the IO voltage
-> +	 * level to high as part of controller power up sequence. Hence, check
-> +	 * for host->pwr to handle a case where IO voltage high request is
-> +	 * issued even before controller power up.
-> +	 */
-> +	if ((req_type & REQ_IO_HIGH) && !host->pwr) {
-> +		pr_debug("%s: do not wait for power IRQ that never comes\n",
-> +				mmc_hostname(host->mmc));
-> +		spin_unlock_irqrestore(&host->lock, flags);
-> +		return;
-> +	}
-> +	if ((req_type & msm_host->curr_pwr_state) ||
-> +			(req_type & msm_host->curr_io_level))
-> +		done = true;
-> +	spin_unlock_irqrestore(&host->lock, flags);
-> +	/*
-> +	 * This is needed here to hanlde a case where IRQ gets
-> +	 * triggered even before this function is called so that
-> +	 * x->done counter of completion gets reset. Otherwise,
-> +	 * next call to wait_for_completion returns immediately
-> +	 * without actually waiting for the IRQ to be handled.
-> +	 */
-> +	if (done)
-> +		init_completion(&msm_host->pwr_irq_completion);
-> +	else if (!wait_for_completion_timeout(&msm_host->pwr_irq_completion,
-> +				msecs_to_jiffies(MSM_PWR_IRQ_TIMEOUT_MS)))
-
-This all looks a bit more complicated and fragile than it needs to be.  You
-are waiting for an event so you really want to be using
-wait_event_timeout().  Reset the event condition before (will need a memory
-barrier) writing the register and then just wait_event_timeout() to wait i.e.
-
-Waiter:
-	clear flag
-	memory barrier
-	write register
-	wait_event_timeout(wq,flag is set,timeout)
-
-Interrupt:
-	set flag
-	wake_up(&wq);
-
-AFAICS you shouldn't need the spin lock at all.
-
-> +		__WARN_printf("%s: request(%d) timed out waiting for pwr_irq\n",
-> +				mmc_hostname(host->mmc), req_type);
-> +	pr_debug("%s: %s: request %d done\n", mmc_hostname(host->mmc),
-> +			__func__, req_type);
-> +}
-> +#else
-> +static inline void sdhci_msm_init_pwr_irq_completion(
-> +		struct sdhci_msm_host *msm_host)
-> +{
-> +}
-> +
-> +static inline void sdhci_msm_complete_pwr_irq_completion(
-> +		struct sdhci_msm_host *msm_host)
-> +{
-> +}
-> +#endif
-> +
->  static void sdhci_msm_dump_pwr_ctrl_regs(struct sdhci_host *host)
->  {
->  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> @@ -1013,6 +1106,9 @@ static void sdhci_msm_handle_pwr_irq(struct sdhci_host *host, int irq)
->  	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
->  	u32 irq_status, irq_ack = 0;
->  	int retry = 10;
-> +	int pwr_state = 0, io_level = 0;
-> +	unsigned long flags;
-> +
->  
->  	irq_status = readl_relaxed(msm_host->core_mem + CORE_PWRCTL_STATUS);
->  	irq_status &= INT_MASK;
-> @@ -1040,10 +1136,26 @@ static void sdhci_msm_handle_pwr_irq(struct sdhci_host *host, int irq)
->  		udelay(10);
->  	}
->  
-> -	if (irq_status & (CORE_PWRCTL_BUS_ON | CORE_PWRCTL_BUS_OFF))
-> +	/* Handle BUS ON/OFF*/
-> +	if (irq_status & CORE_PWRCTL_BUS_ON) {
-> +		pwr_state = REQ_BUS_ON;
-> +		io_level = REQ_IO_HIGH;
-> +		irq_ack |= CORE_PWRCTL_BUS_SUCCESS;
-> +	}
-> +	if (irq_status & CORE_PWRCTL_BUS_OFF) {
-> +		pwr_state = REQ_BUS_OFF;
-> +		io_level = REQ_IO_LOW;
->  		irq_ack |= CORE_PWRCTL_BUS_SUCCESS;
-> -	if (irq_status & (CORE_PWRCTL_IO_LOW | CORE_PWRCTL_IO_HIGH))
-> +	}
-> +	/* Handle IO LOW/HIGH */
-> +	if (irq_status & CORE_PWRCTL_IO_LOW) {
-> +		io_level = REQ_IO_LOW;
->  		irq_ack |= CORE_PWRCTL_IO_SUCCESS;
-> +	}
-> +	if (irq_status & CORE_PWRCTL_IO_HIGH) {
-> +		io_level = REQ_IO_HIGH;
-> +		irq_ack |= CORE_PWRCTL_IO_SUCCESS;
-> +	}
->  
->  	/*
->  	 * The driver has to acknowledge the interrupt, switch voltages and
-> @@ -1052,6 +1164,14 @@ static void sdhci_msm_handle_pwr_irq(struct sdhci_host *host, int irq)
->  	 */
->  	writel_relaxed(irq_ack, msm_host->core_mem + CORE_PWRCTL_CTL);
->  
-> +	spin_lock_irqsave(&host->lock, flags);
-> +	if (pwr_state)
-> +		msm_host->curr_pwr_state = pwr_state;
-> +	if (io_level)
-> +		msm_host->curr_io_level = io_level;
-
-Why separate curr_pwr_state and curr_io_level - the bits are separate
-anyway.  Looks like this could just be:
-
-	if (irq_status & (CORE_PWRCTL_BUS_ON | CORE_PWRCTL_BUS_OFF))
-		irq_ack |= CORE_PWRCTL_BUS_SUCCESS;
-	if (irq_status & (CORE_PWRCTL_IO_LOW | CORE_PWRCTL_IO_HIGH))
-		irq_ack |= CORE_PWRCTL_IO_SUCCESS;
-  	writel_relaxed(irq_ack, msm_host->core_mem + CORE_PWRCTL_CTL);
-
-	msm_host->pwr_irq_status = irq_status;
-
-And as mentioned above, I don't think you need the spin lock.
-
-> +	spin_unlock_irqrestore(&host->lock, flags);
-> +	sdhci_msm_complete_pwr_irq_completion(msm_host);
-> +
->  	pr_debug("%s: %s: Handled IRQ(%d), irq_status=0x%x, ack=0x%x\n",
->  		mmc_hostname(msm_host->mmc), __func__, irq, irq_status,
->  		irq_ack);
-> @@ -1319,6 +1439,7 @@ static int sdhci_msm_probe(struct platform_device *pdev)
->  		goto clk_disable;
->  	}
->  
-> +	sdhci_msm_init_pwr_irq_completion(msm_host);
->  	/* Enable pwr irq interrupts */
->  	writel_relaxed(INT_MASK, msm_host->core_mem + CORE_PWRCTL_MASK);
->  
+> when display is connected.
 > 
+> To make fb-test [1] happy I had to apply following diff:
+> 
+> diff --git a/drivers/gpu/drm/arm/Kconfig b/drivers/gpu/drm/arm/Kconfig
+> index 9a18e1b..d4cb1b1 100644
+> --- a/drivers/gpu/drm/arm/Kconfig
+> +++ b/drivers/gpu/drm/arm/Kconfig
+> @@ -10,6 +10,7 @@ config DRM_HDLCD
+>         select DRM_ARM
+>         select DRM_KMS_HELPER
+>         select DRM_KMS_CMA_HELPER
+> +       select FB_PROVIDE_GET_FB_UNMAPPED_AREA if !MMU
+>         help
+>           Choose this option if you have an ARM High Definition Colour LCD
+>           controller.
+> 
+> (The only user of FB_PROVIDE_GET_FB_UNMAPPED_AREA is NOMMU only drivers/gpu/drm/stm/)
+> 
+> However, I do not see anything on the screen. I'm probably missing something
+> obvious, so if you have an idea, please let me know and I can test the patch.
+
+Do you have fbdev/fbcon enabled? If not, then you need some userspace that
+makes use of the DRM interface. I usually play with the tests from
+libdrm, you can start with modetest.
+
+Best regards,
+Liviu
+
+> 
+> [1] https://github.com/prpplague/fb-test-app.git 
+> 
+> Thanks
+> Vladimir
+> 
+> > 
+> > Cheers
+> > Vladimir
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
