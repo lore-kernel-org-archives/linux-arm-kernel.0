@@ -1,37 +1,79 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Thu, 24 Aug 2017 14:59:34 +0200
-Subject: Intermittent memory corruption with v4.13-rc6+ and earlier
-In-Reply-To: <20170824123647.GA19698@leverpostej>
-References: <20170824113743.GA14737@leverpostej>
- <20170824114833.GH5943@dhcp22.suse.cz>
- <20170824123647.GA19698@leverpostej>
-Message-ID: <20170824125934.GL5943@dhcp22.suse.cz>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 24 Aug 2017 21:01:50 +0800
+Subject: [PATCH v6 04/19] crypto: marvell/cesa: remove redundant backlog
+ checks on EBUSY
+In-Reply-To: <1503324309-13673-5-git-send-email-gilad@benyossef.com>
+Message-ID: <201708242036.ODpqdw7q%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 24-08-17 13:36:48, Mark Rutland wrote:
-> On Thu, Aug 24, 2017 at 01:48:34PM +0200, Michal Hocko wrote:
-> > On Thu 24-08-17 12:37:43, Mark Rutland wrote:
-> > > Hi,
-> > > 
-> > > I'm chasing intermittent memory corruption bugs seen at least on rc5,
-> > > rc6, and yesterday's HEAD (98b9f8a4549909c6), on arm64. 
-> > > 
-> > > It looks like we make use of dangling references to a freed struct file,
-> > > which is caught by KASAN. Without KASAN, I see a number of other
-> > > intermittent issues that I suspect are the result of this memory
-> > > corruption. I've included an example splat below, complete with KASAN's
-> > > alloc/free traces at the end of this mail.
-> > 
-> > Is it possible this is the same issue as the one fixed by
-> > http://lkml.kernel.org/r/20170823211408.31198-1-ebiggers3 at gmail.com?
-> 
-> That sounds plausible, and so far the fix seems to help. Thanks for the
-> pointer!
-> 
-> I'll leave that running for a while, just in case.
+Hi Gilad,
 
-Thanks!
--- 
-Michal Hocko
-SUSE Labs
+[auto build test ERROR on cryptodev/master]
+[also build test ERROR on v4.13-rc6 next-20170823]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Gilad-Ben-Yossef/crypto-change-transient-busy-return-code-to-EAGAIN/20170824-180606
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/herbert/cryptodev-2.6.git master
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/01org/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+All error/warnings (new ones prefixed by >>):
+
+   drivers/crypto/marvell/cesa.c: In function 'mv_cesa_queue_req':
+>> drivers/crypto/marvell/cesa.c:187:3: error: expected ')' before 'mv_cesa_tdma_chain'
+      mv_cesa_tdma_chain(engine, creq);
+      ^~~~~~~~~~~~~~~~~~
+>> drivers/crypto/marvell/cesa.c:196:1: error: expected expression before '}' token
+    }
+    ^
+>> drivers/crypto/marvell/cesa.c:196:1: warning: control reaches end of non-void function [-Wreturn-type]
+    }
+    ^
+
+vim +187 drivers/crypto/marvell/cesa.c
+
+f63601fd6 Boris Brezillon  2015-06-18  176  
+53da740fe Romain Perier    2016-06-21  177  int mv_cesa_queue_req(struct crypto_async_request *req,
+53da740fe Romain Perier    2016-06-21  178  		      struct mv_cesa_req *creq)
+f63601fd6 Boris Brezillon  2015-06-18  179  {
+f63601fd6 Boris Brezillon  2015-06-18  180  	int ret;
+bf8f91e71 Romain Perier    2016-06-21  181  	struct mv_cesa_engine *engine = creq->engine;
+f63601fd6 Boris Brezillon  2015-06-18  182  
+bf8f91e71 Romain Perier    2016-06-21  183  	spin_lock_bh(&engine->lock);
+bf8f91e71 Romain Perier    2016-06-21  184  	ret = crypto_enqueue_request(&engine->queue, req);
+603e989eb Romain Perier    2016-07-22  185  	if ((mv_cesa_req_get_type(creq) == CESA_DMA_REQ) &&
+3a1c7473a Gilad Ben-Yossef 2017-08-21  186  	    (ret == -EINPROGRESS || ret == -EBUSY)
+603e989eb Romain Perier    2016-07-22 @187  		mv_cesa_tdma_chain(engine, creq);
+bf8f91e71 Romain Perier    2016-06-21  188  	spin_unlock_bh(&engine->lock);
+f63601fd6 Boris Brezillon  2015-06-18  189  
+f63601fd6 Boris Brezillon  2015-06-18  190  	if (ret != -EINPROGRESS)
+f63601fd6 Boris Brezillon  2015-06-18  191  		return ret;
+f63601fd6 Boris Brezillon  2015-06-18  192  
+85030c516 Romain Perier    2016-06-21  193  	mv_cesa_rearm_engine(engine);
+f63601fd6 Boris Brezillon  2015-06-18  194  
+f63601fd6 Boris Brezillon  2015-06-18  195  	return -EINPROGRESS;
+f63601fd6 Boris Brezillon  2015-06-18 @196  }
+f63601fd6 Boris Brezillon  2015-06-18  197  
+
+:::::: The code at line 187 was first introduced by commit
+:::::: 603e989ebee21bfa9cddf8390d0515a07324edc8 crypto: marvell - Don't chain at DMA level when backlog is disabled
+
+:::::: TO: Romain Perier <romain.perier@free-electrons.com>
+:::::: CC: Herbert Xu <herbert@gondor.apana.org.au>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 63446 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170824/da621504/attachment-0001.gz>
