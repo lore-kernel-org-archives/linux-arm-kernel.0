@@ -1,144 +1,39 @@
-From: oza.oza@broadcom.com (Oza Pawandeep)
-Date: Thu, 24 Aug 2017 10:34:26 +0530
-Subject: [PATCH v8 3/3] PCI: iproc: add device shutdown for PCI RC
-In-Reply-To: <1503551066-23212-1-git-send-email-oza.oza@broadcom.com>
-References: <1503551066-23212-1-git-send-email-oza.oza@broadcom.com>
-Message-ID: <1503551066-23212-4-git-send-email-oza.oza@broadcom.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Thu, 24 Aug 2017 12:52:27 +0800
+Subject: [RESENT PATCH v7 7/7] dt-bindings: ASoC: rockchip: Update description
+ of rockchip, codec
+In-Reply-To: <20170824045227.15504-1-jeffy.chen@rock-chips.com>
+References: <20170824045227.15504-1-jeffy.chen@rock-chips.com>
+Message-ID: <20170824045227.15504-8-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PERST must be asserted around ~500ms before the reboot is applied.
+Update description for newly added optional audio codecs.
 
-During soft reset (e.g., "reboot" from Linux) on some iproc based SOCs
-LCPLL clock and PERST both goes off simultaneously.
-This will cause certain Endpoints Intel NVMe not get detected, upon
-next boot sequence.
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
 
-This is specifically happening with Intel P3700 400GB series.
-Endpoint is expecting the clock for some amount of time after PERST is
-asserted, which is not happening in Stingray (iproc based SOC).
-This causes NVMe to behave in undefined way.
+Changes in v7: None
+Changes in v6: None
+Changes in v3: None
+Changes in v2: None
 
-On the contrary, Intel x86 boards will have ref clock running, so we
-do not see this behavior there.
+ Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Besides, PCI spec does not stipulate about such timings.
-In-fact it does not tell us, whether PCIe device should consider
-refclk to be available or not to be.
-
-It is completely up to vendor to design their EP the way they want
-with respect to ref clock availability.
-
-500ms is just based on the observation and taken as safe margin.
-This patch adds platform shutdown where it should be
-called in device_shutdown while reboot command is issued.
-So in sequence first Endpoint Shutdown (e.g. nvme_shutdown)
-followed by RC shutdown, which issues safe PERST assertion.
-
-Signed-off-by: Oza Pawandeep <oza.oza@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-
-diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
-index 2253119..a5073a9 100644
---- a/drivers/pci/host/pcie-iproc-platform.c
-+++ b/drivers/pci/host/pcie-iproc-platform.c
-@@ -134,6 +134,13 @@ static int iproc_pcie_pltfm_remove(struct platform_device *pdev)
- 	return iproc_pcie_remove(pcie);
- }
+diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+index eac91db07178..72d3cf4c2606 100644
+--- a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
++++ b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+@@ -4,7 +4,7 @@ Required properties:
+ - compatible: "rockchip,rk3399-gru-sound"
+ - rockchip,cpu: The phandle of the Rockchip I2S controller that's
+   connected to the codecs
+-- rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
++- rockchip,codec: The phandle of the audio codecs
  
-+static void iproc_pcie_pltfm_shutdown(struct platform_device *pdev)
-+{
-+	struct iproc_pcie *pcie = platform_get_drvdata(pdev);
-+
-+	iproc_pcie_shutdown(pcie);
-+}
-+
- static struct platform_driver iproc_pcie_pltfm_driver = {
- 	.driver = {
- 		.name = "iproc-pcie",
-@@ -141,6 +148,7 @@ static int iproc_pcie_pltfm_remove(struct platform_device *pdev)
- 	},
- 	.probe = iproc_pcie_pltfm_probe,
- 	.remove = iproc_pcie_pltfm_remove,
-+	.shutdown = iproc_pcie_pltfm_shutdown,
- };
- module_platform_driver(iproc_pcie_pltfm_driver);
- 
-diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-index 37f4adf..cbdabe8 100644
---- a/drivers/pci/host/pcie-iproc.c
-+++ b/drivers/pci/host/pcie-iproc.c
-@@ -659,7 +659,7 @@ static int iproc_pcie_config_write32(struct pci_bus *bus, unsigned int devfn,
- 	.write = iproc_pcie_config_write32,
- };
- 
--static void iproc_pcie_reset(struct iproc_pcie *pcie)
-+static void iproc_pcie_perst_ctrl(struct iproc_pcie *pcie, bool assert)
- {
- 	u32 val;
- 
-@@ -671,19 +671,26 @@ static void iproc_pcie_reset(struct iproc_pcie *pcie)
- 	if (pcie->ep_is_internal)
- 		return;
- 
--	/*
--	 * Select perst_b signal as reset source. Put the device into reset,
--	 * and then bring it out of reset
--	 */
--	val = iproc_pcie_read_reg(pcie, IPROC_PCIE_CLK_CTRL);
--	val &= ~EP_PERST_SOURCE_SELECT & ~EP_MODE_SURVIVE_PERST &
--		~RC_PCIE_RST_OUTPUT;
--	iproc_pcie_write_reg(pcie, IPROC_PCIE_CLK_CTRL, val);
--	udelay(250);
--
--	val |= RC_PCIE_RST_OUTPUT;
--	iproc_pcie_write_reg(pcie, IPROC_PCIE_CLK_CTRL, val);
--	msleep(100);
-+	if (assert) {
-+		val = iproc_pcie_read_reg(pcie, IPROC_PCIE_CLK_CTRL);
-+		val &= ~EP_PERST_SOURCE_SELECT & ~EP_MODE_SURVIVE_PERST &
-+			~RC_PCIE_RST_OUTPUT;
-+		iproc_pcie_write_reg(pcie, IPROC_PCIE_CLK_CTRL, val);
-+		udelay(250);
-+	} else {
-+		val = iproc_pcie_read_reg(pcie, IPROC_PCIE_CLK_CTRL);
-+		val |= RC_PCIE_RST_OUTPUT;
-+		iproc_pcie_write_reg(pcie, IPROC_PCIE_CLK_CTRL, val);
-+		msleep(100);
-+	}
-+}
-+
-+int iproc_pcie_shutdown(struct iproc_pcie *pcie)
-+{
-+	iproc_pcie_perst_ctrl(pcie, true);
-+	msleep(500);
-+
-+	return 0;
- }
- 
- static int iproc_pcie_check_link(struct iproc_pcie *pcie)
-@@ -1365,7 +1372,8 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
- 		goto err_exit_phy;
- 	}
- 
--	iproc_pcie_reset(pcie);
-+	iproc_pcie_perst_ctrl(pcie, true);
-+	iproc_pcie_perst_ctrl(pcie, false);
- 
- 	if (pcie->need_ob_cfg) {
- 		ret = iproc_pcie_map_ranges(pcie, res);
-diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
-index 0bbe2ea..a6b55ce 100644
---- a/drivers/pci/host/pcie-iproc.h
-+++ b/drivers/pci/host/pcie-iproc.h
-@@ -110,6 +110,7 @@ struct iproc_pcie {
- 
- int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res);
- int iproc_pcie_remove(struct iproc_pcie *pcie);
-+int iproc_pcie_shutdown(struct iproc_pcie *pcie);
- 
- #ifdef CONFIG_PCIE_IPROC_MSI
- int iproc_msi_init(struct iproc_pcie *pcie, struct device_node *node);
+ Optional properties:
+ - dmic-wakeup-delay-ms : specify delay time (ms) for DMIC ready.
 -- 
-1.9.1
+2.11.0
