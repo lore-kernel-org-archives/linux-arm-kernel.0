@@ -1,17 +1,19 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 24 Aug 2017 06:48:16 -0400
-Subject: [PATCH] ARM: dtsi: iwg22m: Add RTC support
-In-Reply-To: <1503426166-26773-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1503426166-26773-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <20170824104816.GB27788@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 24 Aug 2017 12:53:26 +0200
+Subject: [PATCH 07/14] asm-generic: add kexec_file_load system call to
+ unistd.h
+In-Reply-To: <20170824081811.19299-8-takahiro.akashi@linaro.org>
+References: <20170824081811.19299-1-takahiro.akashi@linaro.org>
+ <20170824081811.19299-8-takahiro.akashi@linaro.org>
+Message-ID: <CAK8P3a3gieZhSS5Qz4UeEP2TENV8j0897qYC3Dbn6jR8h7SUNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Aug 22, 2017 at 07:22:46PM +0100, Fabrizio Castro wrote:
-> Add support for the bq32000 RTC to the iwg22m device tree.
-> 
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+On Thu, Aug 24, 2017 at 10:18 AM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> The initial user of this system call number is arm64.
+>
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
 
-The prefix of this patch should be "ARM: dts: iwg22m:"
-
-I have fixed that and applied this patch for v4.15
+Acked-by:Arnd Bergmann <arnd@arndb.de>
