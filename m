@@ -1,43 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 24 Aug 2017 23:28:25 +0200
-Subject: [PATCH 1/3] gliolib: request the gpio before querying its
- direction
-In-Reply-To: <e1eae89c-f007-2e0b-cbb8-1aba71dae0e1@codeaurora.org>
-References: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
- <1501179565-26466-2-git-send-email-timur@codeaurora.org>
- <CACRpkdYPBd4ZvuXo__LRQezTQD3u=3r2WO+2dTzBanLL1zX72w@mail.gmail.com>
- <103341c8-6cc5-3d3f-eef7-28b9f31cdc71@codeaurora.org>
- <CACRpkdZv0NjXfwm_-TSoY=QFeP64V-ZoKvmLXk3qkV49fq1UtQ@mail.gmail.com>
- <e1eae89c-f007-2e0b-cbb8-1aba71dae0e1@codeaurora.org>
-Message-ID: <CACRpkdZ-=uyFntmwL3Z8dg32ovRwRuz0XRXr833TEjokvg+5=A@mail.gmail.com>
+From: raltherr@google.com (Rick Altherr)
+Date: Thu, 24 Aug 2017 14:37:06 -0700
+Subject: [patch v6 0/3] JTAG driver introduction
+In-Reply-To: <CACRpkdZePXyo8Q36mBH7OnJU3E=yWPWSGkGUOH=zJFMjM=Yrhw@mail.gmail.com>
+References: <1503418256-5215-1-git-send-email-oleksandrs@mellanox.com>
+ <CACRpkdZePXyo8Q36mBH7OnJU3E=yWPWSGkGUOH=zJFMjM=Yrhw@mail.gmail.com>
+Message-ID: <CAPLgG==Jj=Ys=SvhOCspSfunbWnuqPySvW9RfuqE8HYnG4C=ZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 24, 2017 at 1:28 AM, Timur Tabi <timur@codeaurora.org> wrote:
-> On 08/23/2017 03:32 AM, Linus Walleij wrote:
->>
->> It's right there on the "devel" branch from the GPIO git tree.
->>
->> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-gpio.git/log/?h=devel
+On Thu, Aug 24, 2017 at 2:07 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Aug 22, 2017 at 6:10 PM, Oleksandr Shamray
+> <oleksandrs@mellanox.com> wrote:
 >
+>> SoC which are not equipped with JTAG master interface, can be built
+>> on top of JTAG core driver infrastructure, by applying bit-banging of
+>> TDI, TDO, TCK and TMS pins within the hardware specific driver.
 >
-> The devel branch is missing this commit:
+> I guess you mean it should then use GPIO lines for bit-banging?
 >
-> https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git/commit/?id=83cf5faeba37fede8a6274d07f646d1cd1b25d35
+> I was wondering about how some JTAG clients like openOCD does
+> this in some cases.
+>
 
-Yes I have separate git trees for GPIO and pin control even.
+Many common uses of OpenOCD leverage USB devices, such as FTDI FT232R,
+that have a command queue for bitbanging operations.  Managing these
+via libusb is ugly but platform-agnostic.
 
-> which I need to avoid a merge conflict.  I'm going to submit a new version
-> of my patches, but they won't apply on top of 'devel' unless you pull in
-> that commit from linux-pinctrl.  Or you could copy that my gpiolib commit to
-> linux-pinctrl.
+> In my worst nightmare they export GPIO lines using
+> the horrid ABI in /sys/gpio/*
+>
 
-I don't see how you can have a merge conflict between this
-patch that only affects gpiolib.c and something in the pin
-control tree?
+https://sourceforge.net/p/openocd/code/ci/v0.10.0/tree/src/jtag/drivers/sysfsgpio.c
 
-The merge window is imminent, so if it is not extremely urgent
-I would opt to wait until after.
+While that is certainly horrible (and slow), mapping in the GPIO
+registers via /dev/mem strikes me as worse:
 
-Yours,
-Linus Walleij
+https://sourceforge.net/p/openocd/code/ci/v0.10.0/tree/src/jtag/drivers/bcm2835gpio.c
+
+> In best case they use the GPIO character device or even
+> libgpiod.
+>
+> But having a JTAG abstraction inside the kernel that can
+> grab a few lines for JTAG defined in a device tree, ACPI DSDT
+> or similar makes sense too, as it abstracts the hardware so the
+> JTAG client can then just open whatever /dev/jtag0 is on the machine
+> and go ahead without having to bother about what GPIO lines
+> are connected exactly where.
+>
+> Yours,
+> Linus Walleij
