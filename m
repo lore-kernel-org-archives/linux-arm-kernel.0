@@ -1,68 +1,35 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 24 Aug 2017 23:50:40 +0200
-Subject: [PATCH v2 5/9] PM / ACPI: Provide option to disable
- direct_complete for ACPI devices
-In-Reply-To: <12333551.k204JYSgao@aspire.rjw.lan>
-References: <1503499329-28834-1-git-send-email-ulf.hansson@linaro.org>
- <CAPDyKFrj6RdsG4Qf847OvLQMgqHeyh1=YyeKZMeaGgQ2du3cNA@mail.gmail.com>
- <12333551.k204JYSgao@aspire.rjw.lan>
-Message-ID: <6003495.864qntojfu@aspire.rjw.lan>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 24 Aug 2017 17:00:37 -0500
+Subject: [PATCH 1/3] gliolib: request the gpio before querying its
+ direction
+In-Reply-To: <CACRpkdZ-=uyFntmwL3Z8dg32ovRwRuz0XRXr833TEjokvg+5=A@mail.gmail.com>
+References: <1501179565-26466-1-git-send-email-timur@codeaurora.org>
+ <1501179565-26466-2-git-send-email-timur@codeaurora.org>
+ <CACRpkdYPBd4ZvuXo__LRQezTQD3u=3r2WO+2dTzBanLL1zX72w@mail.gmail.com>
+ <103341c8-6cc5-3d3f-eef7-28b9f31cdc71@codeaurora.org>
+ <CACRpkdZv0NjXfwm_-TSoY=QFeP64V-ZoKvmLXk3qkV49fq1UtQ@mail.gmail.com>
+ <e1eae89c-f007-2e0b-cbb8-1aba71dae0e1@codeaurora.org>
+ <CACRpkdZ-=uyFntmwL3Z8dg32ovRwRuz0XRXr833TEjokvg+5=A@mail.gmail.com>
+Message-ID: <038c4c8a-ec3f-2c61-420f-2bd5b54b5c3c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, August 24, 2017 6:35:49 PM CEST Rafael J. Wysocki wrote:
-> On Thursday, August 24, 2017 11:15:26 AM CEST Ulf Hansson wrote:
+On 08/24/2017 04:28 PM, Linus Walleij wrote:
+> I don't see how you can have a merge conflict between this
+> patch that only affects gpiolib.c and something in the pin
+> control tree?
 
-[cut]
+Actually, the merge conflict is because this is missing in the gpio tree:
 
-> [BTW, it is not entirely clear to me why it ever is necessary to runtime resume
-> a device with direct_complete set after __device_suspend(), because it can only
-> have direct_complete set at that point if all of the hierarchy below it has
-> this flag set too and so runtime PM has to be disabled for all of those
-> devices as well.]
+pinctrl: msm: add support to configure ipq40xx GPIO_PULL bits
 
-Which makes me realize that we should take a step back and look at what
-problems there are.
+> The merge window is imminent, so if it is not extremely urgent
+> I would opt to wait until after.
 
-First, there are devices (I know about two examples so far and both are PCI)
-that may need to be runtime resumed during system suspend for reasons other
-than the ones checked by the ACPI PM domain (or the PCI bus type).  There needs
-to be a way to indicate that from the driver side.
+As long as it gets into 4.14-final, I don't care which specific RC it 
+appears in.  Thanks.
 
-However, it still may be valuable to check the power-related conditions for
-leaving the device in runtime suspend over system suspend/resume in case
-it actually doesn't need to be runtime resumed during system suspend after
-all.  That's what the majority of my patch was about.
-
-The second problem is that the ACPI PM domain (and the PCI bus type)
-runtime resumes all devices unconditionally in its ->suspend callback,
-even though that may not be necessary for some devices.  Therefore there
-needs to be a way to indicate that too.  That still would be good to
-have *regardless* of the direct_complete mechanism, because the direct_complete
-flag may not be set very often due to dependencies and then the
-resume-during-suspend will take place unnecessarily.
-
-Accordingly, it looks like we need a "no need to resume me" flag in the first
-place.  That would indicate to interested pieces of code that, from the
-driver perspective, the device doesn't need to be runtime resumed before
-invoking its system suspend callbacks.  This should be clear enough to everyone
-IMO.
-
-[Note that if that flag is set for all devices, we may drop it along with
-direct_complete, but before that happens both are needed.]
-
-To address the first issue I would add something like the flag in the patches
-I sent (but without the ACPI PM domain part which should be covered by the
-"no need to resume me" flag above), because that allows the device's ->suspend
-callback to run in principle and the driver may use that callback even to
-runtime resume the device if that's what it wants to do.  So something like
-"run my ->suspend callback even though I might stay in runtime suspend".
-
-I would probably add driver_flags to dev_pm_info for that to set at the probe
-time (and I would make the core clear that on driver removal).
-
-The complexity concern is there, but honestly I don't see a better way at
-this point.
-
-Thanks,
-Rafael
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
